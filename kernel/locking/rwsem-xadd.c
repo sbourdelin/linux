@@ -272,6 +272,18 @@ static inline bool rwsem_try_write_lock(long count, struct rw_semaphore *sem)
 
 #ifdef CONFIG_RWSEM_SPIN_ON_OWNER
 /*
+ * Reader spinning threshold
+ */
+static int __read_mostly rspin_threshold = RWSEM_RSPIN_THRESHOLD;
+
+static int __init set_rspin_threshold(char *str)
+{
+	get_option(&str, &rspin_threshold);
+	return 0;
+}
+early_param("rwsem_rspin_threshold", set_rspin_threshold);
+
+/*
  * Try to acquire write lock before the writer has been put on wait queue.
  */
 static inline bool rwsem_try_write_lock_unqueued(struct rw_semaphore *sem)
@@ -394,7 +406,7 @@ static bool rwsem_optimistic_spin(struct rw_semaphore *sem,
 	if (!osq_lock(&sem->osq))
 		goto done;
 
-	rspin_cnt = sem->rspin_enabled ? RWSEM_RSPIN_THRESHOLD : 0;
+	rspin_cnt = sem->rspin_enabled ? rspin_threshold : 0;
 
 	/*
 	 * Optimistically spin on the owner field and attempt to acquire the

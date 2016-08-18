@@ -3690,6 +3690,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 
 	rw		[KNL] Mount root device read-write on boot
 
+	rwsem_rspin_threshold=
+			[KNL] Set rw semaphore reader spinning threshold
+
 	S		[KNL] Run init in single mode
 
 	s390_iommu=	[HW,S390]
