@@ -108,6 +108,7 @@ void __init_rwsem(struct rw_semaphore *sem, const char *name,
 #ifdef CONFIG_RWSEM_SPIN_ON_OWNER
 	sem->owner = NULL;
 	sem->rspin_enabled = RWSEM_RSPIN_ENABLED_DEFAULT;
+	sem->wspin_cnt = 0;
 	osq_lock_init(&sem->osq);
 #endif
 }
@@ -458,10 +459,32 @@ static bool rwsem_optimistic_spin(struct rw_semaphore *sem,
 		if (taken && (sem->rspin_enabled < RWSEM_RSPIN_ENABLED_MAX)) {
 			sem->rspin_enabled++;
 		} else if (!taken) {
-			if  (sem->rspin_enabled > 2)
+			if  (sem->rspin_enabled > 2) {
 				sem->rspin_enabled -= 2;
-			else
+			} else if (sem->rspin_enabled) {
 				sem->rspin_enabled = 0;
+				/*
+				 * Reset wspin_cnt so that it won't get
+				 * re-enabled too soon.
+				 */
+				if (sem->wspin_cnt > -30)
+					sem->wspin_cnt = -30;
+			}
+		}
+	} else if (type == RWSEM_WAITING_FOR_WRITE) {
+		/*
+		 * Every 10 successful writer-on-writer spins more than failed
+		 * spins will increment rspin_enabled to encourage more
+		 * writer-on-reader spinning attempts.
+		 */
+		if (taken) {
+			if ((++sem->wspin_cnt >= 10) &&
+			    (sem->rspin_enabled < RWSEM_RSPIN_ENABLED_MAX)) {
+				sem->wspin_cnt = 0;
+				sem->rspin_enabled++;
+			}
+		} else if (sem->wspin_cnt > -100) {
+			sem->wspin_cnt--;
 		}
 	}
 	osq_unlock(&sem->osq);

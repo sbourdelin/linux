@@ -32,7 +32,11 @@ struct rw_semaphore {
 	raw_spinlock_t wait_lock;
 #ifdef CONFIG_RWSEM_SPIN_ON_OWNER
 	struct optimistic_spin_queue osq; /* spinner MCS lock */
-	int rspin_enabled;	/* protected by osq lock */
+	/*
+	 * Reader optimistic spinning fields protected by osq lock
+	 */
+	uint16_t rspin_enabled;
+	int16_t  wspin_cnt;
 
 	/*
 	 * Write owner. Used as a speculative check to see
@@ -74,10 +78,10 @@ static inline int rwsem_is_locked(struct rw_semaphore *sem)
 /*
  * Each successful reader spin will increment the rspin_enabled by 1.
  * Each unsuccessful spin, on the other hand, will decrement it by 2.
- * Reader spinning will be permanently disabled when it reaches 0.
+ * Reader spinning will be disabled when it reaches 0.
  */
 #ifndef RWSEM_RSPIN_ENABLED_DEFAULT
-# define RWSEM_RSPIN_ENABLED_DEFAULT	40
+# define RWSEM_RSPIN_ENABLED_DEFAULT	30
 #endif
 #define RWSEM_RSPIN_ENABLED_MAX		1024
 
@@ -87,7 +91,7 @@ static inline int rwsem_is_locked(struct rw_semaphore *sem)
 
 #ifdef CONFIG_RWSEM_SPIN_ON_OWNER
 #define __RWSEM_OPT_INIT(lockname) , .osq = OSQ_LOCK_UNLOCKED, .owner = NULL, \
-		.rspin_enabled = RWSEM_RSPIN_ENABLED_DEFAULT
+		.rspin_enabled = RWSEM_RSPIN_ENABLED_DEFAULT, .wspin_cnt = 0
 #else
 #define __RWSEM_OPT_INIT(lockname)
 #endif
