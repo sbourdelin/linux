@@ -1739,15 +1739,20 @@ void __iomem *pci_ioremap_wc_bar(struct pci_dev *pdev, int bar);
 int pci_iov_virtfn_bus(struct pci_dev *dev, int id);
 int pci_iov_virtfn_devfn(struct pci_dev *dev, int id);
 
+int pci_enable_sriov_with_override(struct pci_dev *dev, int nr_virtfn,
+				   char *driver_override);
 int pci_enable_sriov(struct pci_dev *dev, int nr_virtfn);
 void pci_disable_sriov(struct pci_dev *dev);
-int pci_iov_add_virtfn(struct pci_dev *dev, int id, int reset);
+int pci_iov_add_virtfn(struct pci_dev *dev, int id, int reset,
+		       char *driver_override);
 void pci_iov_remove_virtfn(struct pci_dev *dev, int id, int reset);
 int pci_num_vf(struct pci_dev *dev);
 int pci_vfs_assigned(struct pci_dev *dev);
 int pci_sriov_set_totalvfs(struct pci_dev *dev, u16 numvfs);
 int pci_sriov_get_totalvfs(struct pci_dev *dev);
 resource_size_t pci_iov_resource_size(struct pci_dev *dev, int resno);
+
+void pci_iov_set_numvfs(struct pci_dev *dev, int nr_virtfn);
 #else
 static inline int pci_iov_virtfn_bus(struct pci_dev *dev, int id)
 {
@@ -1757,6 +1762,11 @@ static inline int pci_iov_virtfn_devfn(struct pci_dev *dev, int id)
 {
 	return -ENOSYS;
 }
+
+static inline int pci_enable_sriov_with_override(struct pci_dev *dev,
+						 int nr_virtfn,
+						 char *driver_override)
+{ return -ENODEV; }
 static inline int pci_enable_sriov(struct pci_dev *dev, int nr_virtfn)
 { return -ENODEV; }
 static inline int pci_iov_add_virtfn(struct pci_dev *dev, int id, int reset)
@@ -1775,6 +1785,7 @@ static inline int pci_sriov_get_totalvfs(struct pci_dev *dev)
 { return 0; }
 static inline resource_size_t pci_iov_resource_size(struct pci_dev *dev, int resno)
 { return 0; }
+static inline void pci_iov_set_numvfs(struct pci_dev *dev, int nr_virtfn) { }
 #endif
 
 #if defined(CONFIG_HOTPLUG_PCI) || defined(CONFIG_HOTPLUG_PCI_MODULE)

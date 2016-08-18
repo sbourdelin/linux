@@ -41,7 +41,7 @@ int pci_iov_virtfn_devfn(struct pci_dev *dev, int vf_id)
  *
  * Update iov->offset and iov->stride when NumVFs is written.
  */
-static inline void pci_iov_set_numvfs(struct pci_dev *dev, int nr_virtfn)
+void pci_iov_set_numvfs(struct pci_dev *dev, int nr_virtfn)
 {
 	struct pci_sriov *iov = dev->sriov;
 
@@ -49,6 +49,7 @@ static inline void pci_iov_set_numvfs(struct pci_dev *dev, int nr_virtfn)
 	pci_read_config_word(dev, iov->pos + PCI_SRIOV_VF_OFFSET, &iov->offset);
 	pci_read_config_word(dev, iov->pos + PCI_SRIOV_VF_STRIDE, &iov->stride);
 }
+EXPORT_SYMBOL(pci_iov_set_numvfs);
 
 /*
  * The PF consumes one bus number.  NumVFs, First VF Offset, and VF Stride
@@ -112,8 +113,10 @@ resource_size_t pci_iov_resource_size(struct pci_dev *dev, int resno)
 
 	return dev->sriov->barsz[resno - PCI_IOV_RESOURCES];
 }
+EXPORT_SYMBOL(pci_iov_resource_size);
 
-int pci_iov_add_virtfn(struct pci_dev *dev, int id, int reset)
+int pci_iov_add_virtfn(struct pci_dev *dev, int id, int reset,
+		       char *driver_override)
 {
 	int i;
 	int rc = -ENOMEM;
@@ -154,14 +157,20 @@ int pci_iov_add_virtfn(struct pci_dev *dev, int id, int reset)
 		rc = request_resource(res, &virtfn->resource[i]);
 		BUG_ON(rc);
 	}
-
 	if (reset)
 		__pci_reset_function(virtfn);
 
 	pci_device_add(virtfn, virtfn->bus);
 	mutex_unlock(&iov->dev->sriov->lock);
 
+	if (driver_override) {
+		virtfn->driver_override = kstrdup(driver_override, GFP_KERNEL);
+		if (!virtfn->driver_override)
+			goto failed1;
+	}
+
 	pci_bus_add_device(virtfn);
+
 	sprintf(buf, "virtfn%u", id);
 	rc = sysfs_create_link(&dev->dev.kobj, &virtfn->dev.kobj, buf);
 	if (rc)
@@ -235,7 +244,8 @@ int __weak pcibios_sriov_disable(struct pci_dev *pdev)
 	return 0;
 }
 
-static int sriov_enable(struct pci_dev *dev, int nr_virtfn)
+static int sriov_enable(struct pci_dev *dev, int nr_virtfn,
+			char *driver_override)
 {
 	int rc;
 	int i;
@@ -321,7 +331,7 @@ static int sriov_enable(struct pci_dev *dev, int nr_virtfn)
 	}
 
 	for (i = 0; i < initial; i++) {
-		rc = pci_iov_add_virtfn(dev, i, 0);
+		rc = pci_iov_add_virtfn(dev, i, 0, driver_override);
 		if (rc)
 			goto failed;
 	}
@@ -622,6 +632,26 @@ int pci_iov_bus_range(struct pci_bus *bus)
 }
 
 /**
+ * pci_enable_sriov_with_override - enable the SR-IOV capability
+ * @dev: the PCI device
+ * @nr_virtfn: number of virtual functions to enable
+ * @driver_override: driver override for VFs
+ *
+ * Returns 0 on success, or negative on failure.
+ */
+int pci_enable_sriov_with_override(struct pci_dev *dev, int nr_virtfn,
+				   char *driver_override)
+{
+	might_sleep();
+
+	if (!dev->is_physfn)
+		return -ENOSYS;
+
+	return sriov_enable(dev, nr_virtfn, driver_override);
+}
+EXPORT_SYMBOL_GPL(pci_enable_sriov_with_override);
+
+/**
  * pci_enable_sriov - enable the SR-IOV capability
  * @dev: the PCI device
  * @nr_virtfn: number of virtual functions to enable
@@ -630,12 +660,7 @@ int pci_iov_bus_range(struct pci_bus *bus)
  */
 int pci_enable_sriov(struct pci_dev *dev, int nr_virtfn)
 {
-	might_sleep();
-
-	if (!dev->is_physfn)
-		return -ENOSYS;
-
-	return sriov_enable(dev, nr_virtfn);
+	return pci_enable_sriov_with_override(dev, nr_virtfn, NULL);
 }
 EXPORT_SYMBOL_GPL(pci_enable_sriov);
 
