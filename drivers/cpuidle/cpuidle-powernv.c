@@ -20,7 +20,6 @@
 #include <asm/opal.h>
 #include <asm/runlatch.h>
 
-#define POWERNV_THRESHOLD_LATENCY_NS 200000
 
 struct cpuidle_driver powernv_idle_driver = {
 	.name             = "powernv_idle",
@@ -90,6 +89,30 @@ static int fastsleep_loop(struct cpuidle_device *dev,
 
 	mtspr(SPRN_LPCR, new_lpcr);
 	power7_sleep();
+
+	mtspr(SPRN_LPCR, old_lpcr);
+
+	return index;
+}
+
+static int winkle_loop(struct cpuidle_device *dev,
+				struct cpuidle_driver *drv,
+				int index)
+{
+	unsigned long old_lpcr = mfspr(SPRN_LPCR);
+	unsigned long new_lpcr;
+
+	if (unlikely(system_state < SYSTEM_RUNNING))
+		return index;
+
+	new_lpcr = old_lpcr;
+	/* Do not exit powersave upon decrementer as we've setup the timer
+	 * offload.
+	 */
+	new_lpcr &= ~LPCR_PECE1;
+
+	mtspr(SPRN_LPCR, new_lpcr);
+	power7_winkle();
 
 	mtspr(SPRN_LPCR, old_lpcr);
 
@@ -246,13 +269,6 @@ static int powernv_add_idle_states(void)
 		"ibm,cpu-idle-state-residency-ns", residency_ns, dt_idle_states);
 
 	for (i = 0; i < dt_idle_states; i++) {
-		/*
-		 * If an idle state has exit latency beyond
-		 * POWERNV_THRESHOLD_LATENCY_NS then don't use it
-		 * in cpu-idle.
-		 */
-		if (latency_ns[i] > POWERNV_THRESHOLD_LATENCY_NS)
-			continue;
 
 		/*
 		 * Cpuidle accepts exit_latency and target_residency in us.
@@ -300,6 +316,18 @@ static int powernv_add_idle_states(void)
 			powernv_states[nr_idle_states].flags = CPUIDLE_FLAG_TIMER_STOP;
 			powernv_states[nr_idle_states].enter = stop_loop;
 			stop_psscr_table[nr_idle_states] = psscr_val[i];
+		}
+
+		if (flags[i] & OPAL_PM_WINKLE_ENABLED) {
+			int state_idx = nr_idle_states;
+
+			strcpy(powernv_states[state_idx].name, "Winkle");
+			strcpy(powernv_states[state_idx].desc, "Winkle");
+			powernv_states[state_idx].flags =
+						CPUIDLE_FLAG_TIMER_STOP;
+			powernv_states[state_idx].target_residency = 500000;
+			powernv_states[state_idx].enter = winkle_loop;
+			powernv_states[state_idx].disable_use_at_start = true;
 		}
 #endif
 		powernv_states[nr_idle_states].exit_latency =
