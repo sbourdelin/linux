@@ -528,7 +528,9 @@ enum nft_cmp_ops {
 	NFT_CMP_LTE,
 	NFT_CMP_GT,
 	NFT_CMP_GTE,
+	__NFT_CMP_MAX
 };
+#define NFT_CMP_MAX	(__NFT_CMP_MAX - 1)
 
 /**
  * enum nft_cmp_attributes - nf_tables cmp expression netlink attributes
