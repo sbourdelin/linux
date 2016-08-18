@@ -17,6 +17,7 @@
 #define SPRN_DC_DAT	570	/* Read-only data register */
 
 /* Misc Debug */
+#define SPRN_ICR	148
 #define SPRN_DPDR	630
 #define SPRN_MI_CAM	816
 #define SPRN_MI_RAM0	817

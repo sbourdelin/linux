@@ -400,7 +400,15 @@ static inline int check_io_access(struct pt_regs *regs)
 #define REASON_TRAP		0x20000
 
 #define single_stepping(regs)	((regs)->msr & MSR_SE)
+#ifdef CONFIG_PPC_8xx
+static inline void clear_single_step(struct pt_regs *regs)
+{
+	regs->msr &= ~MSR_SE;
+	mfspr(SPRN_ICR);
+}
+#else
 #define clear_single_step(regs)	((regs)->msr &= ~MSR_SE)
+#endif
 #endif
 
 #if defined(CONFIG_4xx)
