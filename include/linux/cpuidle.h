@@ -44,7 +44,12 @@ struct cpuidle_state {
 	int		power_usage; /* in mW */
 	unsigned int	target_residency; /* in US */
 	bool		disabled; /* disabled on all CPUs */
-
+	/*
+	 * disable_use_at_start: If true, then this idle state will be
+	 * disabled by default. It can be enabled at runtime using the
+	 * per-cpu cpuidle sysfs control file named "disable".
+	 */
+	bool            disable_use_at_start;
 	int (*enter)	(struct cpuidle_device *dev,
 			struct cpuidle_driver *drv,
 			int index);

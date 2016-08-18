@@ -439,7 +439,14 @@ static void __cpuidle_unregister_device(struct cpuidle_device *dev)
 
 static void __cpuidle_device_init(struct cpuidle_device *dev)
 {
+	struct cpuidle_driver *drv = cpuidle_get_cpu_driver(dev);
+	int i;
+
 	memset(dev->states_usage, 0, sizeof(dev->states_usage));
+	for (i = 0; i < drv->state_count; i++) {
+		if (drv->states[i].disable_use_at_start)
+			dev->states_usage[i].disable = 1;
+	}
 	dev->last_residency = 0;
 }
 
