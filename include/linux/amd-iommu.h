@@ -34,6 +34,7 @@ struct amd_ir_data {
 	struct msi_msg msi_entry;
 	void *entry;    /* Pointer to union irte or struct irte_ga */
 	void *ref;      /* Pointer to the actual irte */
+	struct list_head node;	/* Used by SVM for per-vcpu ir_list */
 };
 
 /*
