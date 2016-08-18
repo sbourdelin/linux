@@ -34,6 +34,7 @@ struct sugov_policy {
 	s64 freq_update_delay_ns;
 	unsigned int next_freq;
 
+	struct timer_list idle_timer;
 	/* The next fields are only needed if fast switch cannot be used. */
 	struct irq_work irq_work;
 	struct work_struct work;
@@ -152,6 +153,8 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	struct cpufreq_policy *policy = sg_policy->policy;
 	unsigned int next_f;
 
+	mod_timer(&sg_policy->idle_timer, jiffies + 1);
+
 	if (!sugov_should_update_freq(sg_policy, time))
 		return;
 
@@ -215,6 +218,8 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 
 	raw_spin_lock(&sg_policy->update_lock);
 
+	mod_timer(&sg_policy->idle_timer, jiffies + 1);
+
 	sg_cpu->util = util;
 	sg_cpu->max = max;
 	sg_cpu->last_update = time;
@@ -245,6 +250,18 @@ static void sugov_irq_work(struct irq_work *irq_work)
 
 	sg_policy = container_of(irq_work, struct sugov_policy, irq_work);
 	schedule_work_on(smp_processor_id(), &sg_policy->work);
+}
+
+static void sugov_idle_timer(unsigned long data)
+{
+	struct sugov_policy *sg_policy = (struct sugov_policy *)data;
+	struct cpufreq_policy *policy = sg_policy->policy;
+	struct sugov_cpu *sg_cpu = &per_cpu(sugov_cpu, smp_processor_id());
+
+	/* CPU is in idle state, set to min directly to save power. */
+	if (!sg_policy->work_in_progress && (policy->min != policy->cur))
+		sugov_update_commit(sg_policy, sg_cpu->last_update,
+				policy->min);
 }
 
 /************************** sysfs interface ************************/
@@ -310,6 +327,11 @@ static struct sugov_policy *sugov_policy_alloc(struct cpufreq_policy *policy)
 	init_irq_work(&sg_policy->irq_work, sugov_irq_work);
 	INIT_WORK(&sg_policy->work, sugov_work);
 	mutex_init(&sg_policy->work_lock);
+
+	init_timer_pinned(&sg_policy->idle_timer);
+	sg_policy->idle_timer.function = sugov_idle_timer;
+	sg_policy->idle_timer.data = (unsigned long)sg_policy;
+
 	raw_spin_lock_init(&sg_policy->update_lock);
 	return sg_policy;
 }
@@ -468,6 +490,7 @@ static void sugov_stop(struct cpufreq_policy *policy)
 
 	synchronize_sched();
 
+	del_timer_sync(&sg_policy->idle_timer);
 	irq_work_sync(&sg_policy->irq_work);
 	cancel_work_sync(&sg_policy->work);
 }
