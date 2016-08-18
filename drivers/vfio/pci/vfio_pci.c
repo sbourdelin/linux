@@ -1229,6 +1229,7 @@ static int vfio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	vdev->irq_type = VFIO_PCI_NUM_IRQS;
 	mutex_init(&vdev->igate);
 	spin_lock_init(&vdev->irqlock);
+	mutex_init(&vdev->sriov_mutex);
 
 	ret = vfio_add_group_dev(&pdev->dev, &vfio_pci_ops, vdev);
 	if (ret) {
@@ -1317,14 +1318,32 @@ static const struct pci_error_handlers vfio_err_handlers = {
 
 static int vfio_pci_sriov_configure(struct pci_dev *pdev, int num_vfs)
 {
-	if (!num_vfs) {
-		pci_disable_sriov(pdev);
-		return 0;
+	struct vfio_pci_device *vdev;
+	struct vfio_device *device;
+	int ret = 0;
+
+	device = vfio_device_get_from_dev(&pdev->dev);
+	if (!device)
+		return -EINVAL;
+
+	vdev = vfio_device_data(device);
+	if (!vdev) {
+		vfio_device_put(device);
+		return -EINVAL;
 	}
 
-	return pci_enable_sriov_with_override(pdev,
+	mutex_lock(&vdev->sriov_mutex);
+	if (!num_vfs) {
+		pci_disable_sriov(pdev);
+		goto out;
+	}
+
+	ret =  pci_enable_sriov_with_override(pdev,
 					      num_vfs,
 					     "vfio-pci");
+out:
+	mutex_unlock(&vdev->sriov_mutex);
+	return ret;
 }
 
 static struct pci_driver vfio_pci_driver = {
