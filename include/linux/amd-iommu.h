@@ -29,10 +29,23 @@ struct irq_2_irte {
 };
 
 struct amd_ir_data {
+	u32 cached_ga_tag;
 	struct irq_2_irte irq_2_irte;
 	struct msi_msg msi_entry;
 	void *entry;    /* Pointer to union irte or struct irte_ga */
 	void *ref;      /* Pointer to the actual irte */
+};
+
+/*
+ * This is mainly used to communicate information back-and-forth
+ * between SVM and IOMMU for setting up and tearing down posted
+ * interrupt
+ */
+struct amd_iommu_pi_data {
+	u32 ga_tag;
+	bool is_guest_mode;
+	struct vcpu_data *vcpu_data;
+	struct amd_ir_data *ir_data;
 };
 
 #ifdef CONFIG_AMD_IOMMU
