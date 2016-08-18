@@ -2295,7 +2295,7 @@ pl330_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
 	list_for_each_entry(desc, &pch->work_list, node) {
 		if (desc->status == DONE)
 			transferred = desc->bytes_requested;
-		else if (running && desc == running)
+		else if ((running && desc == running) || (desc->status == BUSY))
 			transferred =
 				pl330_get_current_xferred_count(pch, desc);
 		else
