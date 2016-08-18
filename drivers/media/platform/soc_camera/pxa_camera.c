@@ -636,7 +636,7 @@ static void pxa_camera_wakeup(struct pxa_camera_dev *pcdev,
 	v4l2_get_timestamp(&vb->ts);
 	vb->field_count++;
 	wake_up(&vb->done);
-	dev_dbg(pcdev->soc_host.v4l2_dev.dev, "%s dequeud buffer (vb=0x%p)\n",
+	dev_dbg(pcdev->soc_host.v4l2_dev.dev, "%s dequeued buffer (vb=0x%p)\n",
 		__func__, vb);
 
 	if (list_empty(&pcdev->capture)) {
