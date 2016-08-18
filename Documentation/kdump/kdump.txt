@@ -390,9 +390,11 @@ Notes on loading the dump-capture kernel:
 * Boot parameter "1" boots the dump-capture kernel into single-user
   mode without networking. If you want networking, use "3".
 
-* We generally don' have to bring up a SMP kernel just to capture the
+* We generally don' have to bring up an SMP kernel just to capture the
   dump. Hence generally it is useful either to build a UP dump-capture
   kernel or specify maxcpus=1 option while loading dump-capture kernel.
+  Note, though maxcpus always works, you should replace it by nr_cpus to
+  save memory if supported by the current ARCH, such as x86.
 
 * For s390x there are two kdump modes: If a ELF header is specified with
   the elfcorehdr= kernel parameter, it is used by the kdump kernel as it
