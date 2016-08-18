@@ -651,6 +651,11 @@ static int __init pm_init(void)
 	if (error)
 		return error;
 	pm_print_times_init();
+	/*
+	 * freeze state should be supported even without any suspend_ops,
+	 * calling suspend_set_ops without any ops will setup freeze state
+	 */
+	suspend_set_ops(NULL);
 	return pm_autosleep_init();
 }
 

@@ -138,7 +138,9 @@ void suspend_set_ops(const struct platform_suspend_ops *ops)
 
 	lock_system_sleep();
 
-	suspend_ops = ops;
+	WARN_ONCE(ops && suspend_ops, "overriding suspend_ops");
+	if (ops)
+		suspend_ops = ops;
 	for (i = PM_SUSPEND_MEM; i >= PM_SUSPEND_STANDBY; i--)
 		if (valid_state(i)) {
 			pm_states[i] = pm_labels[j++];
@@ -211,7 +213,7 @@ static int platform_suspend_begin(suspend_state_t state)
 {
 	if (state == PM_SUSPEND_FREEZE && freeze_ops && freeze_ops->begin)
 		return freeze_ops->begin();
-	else if (suspend_ops->begin)
+	else if (suspend_ops && suspend_ops->begin)
 		return suspend_ops->begin(state);
 	else
 		return 0;
@@ -221,7 +223,7 @@ static void platform_resume_end(suspend_state_t state)
 {
 	if (state == PM_SUSPEND_FREEZE && freeze_ops && freeze_ops->end)
 		freeze_ops->end();
-	else if (suspend_ops->end)
+	else if (suspend_ops && suspend_ops->end)
 		suspend_ops->end();
 }
 
