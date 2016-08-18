@@ -245,8 +245,11 @@ static int __acpi_processor_start(struct acpi_device *device)
 		return 0;
 
 	result = acpi_cppc_processor_probe(pr);
-	if (result)
+	if (result) {
+#ifndef CONFIG_ACPI_CPU_FREQ_PSS
 		return -ENODEV;
+#endif
+	}
 
 	if (!cpuidle_get_driver() || cpuidle_get_driver() == &acpi_idle_driver)
 		acpi_processor_power_init(pr);
