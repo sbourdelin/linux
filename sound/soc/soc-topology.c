@@ -1645,6 +1645,9 @@ static int soc_tplg_link_create(struct soc_tplg *tplg,
 	link->dpcm_playback = pcm->playback;
 	link->dpcm_capture = pcm->capture;
 
+	link->trigger[0] = pcm->trigger[0];
+	link->trigger[1] = pcm->trigger[1];
+
 	/* pass control to component driver for optional further init */
 	ret = soc_tplg_dai_link_load(tplg, link);
 	if (ret < 0) {

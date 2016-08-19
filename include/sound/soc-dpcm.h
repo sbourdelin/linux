@@ -52,19 +52,6 @@ enum snd_soc_dpcm_state {
 };
 
 /*
- * Dynamic PCM trigger ordering. Triggering flexibility is required as some
- * DSPs require triggering before/after their CPU platform and DAIs.
- *
- * i.e. some clients may want to manually order this call in their PCM
- * trigger() whilst others will just use the regular core ordering.
- */
-enum snd_soc_dpcm_trigger {
-	SND_SOC_DPCM_TRIGGER_PRE		= 0,
-	SND_SOC_DPCM_TRIGGER_POST,
-	SND_SOC_DPCM_TRIGGER_BESPOKE,
-};
-
-/*
  * Dynamic PCM link
  * This links together a FE and BE DAI at runtime and stores the link
  * state information and the hw_params configuration.
