@@ -461,6 +461,22 @@ gmbus_xfer_index_read(struct drm_i915_private *dev_priv, struct i2c_msg *msgs)
 	return ret;
 }
 
+static bool gpio_is_alive(struct intel_gmbus *bus)
+{
+	bool result = true;
+
+	intel_i2c_quirk_set(bus->dev_priv, true);
+	set_clock(bus, 1);
+
+	if (wait_for_us(get_clock(bus), 10) && wait_for(get_clock(bus), 2))
+		result = false;
+
+	set_clock(bus, 0);
+	intel_i2c_quirk_set(bus->dev_priv, false);
+
+	return result;
+}
+
 static int
 do_gmbus_xfer(struct i2c_adapter *adapter, struct i2c_msg *msgs, int num)
 {
@@ -473,6 +489,13 @@ do_gmbus_xfer(struct i2c_adapter *adapter, struct i2c_msg *msgs, int num)
 					       FW_REG_READ | FW_REG_WRITE);
 	int i = 0, inc, try = 0;
 	int ret = 0;
+
+	/* Some GMBUS devices fail to report NAKs and so we hit the 50ms
+	 * timeout, every time. Try a quick GPIO discovery first by seeing
+	 * if the device responds to setting the clock line high.
+	 */
+	if (!gpio_is_alive(bus))
+		return -ENXIO;
 
 	intel_uncore_forcewake_get(dev_priv, fw);
 retry:
