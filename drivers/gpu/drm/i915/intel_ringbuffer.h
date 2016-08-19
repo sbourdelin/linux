@@ -505,13 +505,20 @@ static inline u32 intel_engine_get_seqno(struct intel_engine_cs *engine)
 int init_workarounds_ring(struct intel_engine_cs *engine);
 
 /*
- * Arbitrary size for largest possible 'add request' sequence. The code paths
- * are complex and variable. Empirical measurement shows that the worst case
- * is BDW at 192 bytes (6 + 6 + 36 dwords), then ILK at 136 bytes. However,
- * we need to allocate double the largest single packet within that emission
- * to account for tail wraparound (so 6 + 6 + 72 dwords for BDW).
+ * Size for the longest possible 'add_request' sequence, for the given request.
+ *
+ * In theory, this could depend on the platform, or the engine, or many other
+ * things; hence the macro takes the request as an argument on which to base
+ * this calculation.  In practive, the code paths are complex and variable,
+ * and it's simpler just to give an upper bound for all possibilities,
+ * ignoring the details of the actual request.
+ *
+ * Empirical measurement shows that the worst case is BDW at 192 bytes
+ * (6 + 6 + 36 dwords), then ILK at 136 bytes. However, we need to allocate
+ * double the largest single packet within that emissionto account for tail
+ * wraparound (so 6 + 6 + 72 dwords for BDW).
  */
-#define MIN_SPACE_FOR_ADD_REQUEST 336
+#define MAX_ADD_REQUEST_DWORDS(request)	(6+6+72)
 
 static inline u32 intel_hws_seqno_address(struct intel_engine_cs *engine)
 {

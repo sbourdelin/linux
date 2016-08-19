@@ -382,7 +382,7 @@ i915_gem_request_alloc(struct intel_engine_cs *engine,
 	 * to be redone if the request is not actually submitted straight
 	 * away, e.g. because a GPU scheduler has deferred it.
 	 */
-	req->reserved_space = MIN_SPACE_FOR_ADD_REQUEST;
+	req->reserved_space = sizeof(u32) * MAX_ADD_REQUEST_DWORDS(req);
 
 	if (i915.enable_execlists)
 		ret = intel_logical_ring_alloc_request_extras(req);
