@@ -333,6 +333,18 @@ int qcom_scm_video_set_state(u32 state, u32 spare)
 }
 EXPORT_SYMBOL(qcom_scm_video_set_state);
 
+int qcom_scm_iommu_secure_ptbl_size(u32 spare, size_t *size)
+{
+	return __qcom_scm_iommu_secure_ptbl_size(__scm->dev, spare, size);
+}
+EXPORT_SYMBOL(qcom_scm_iommu_secure_ptbl_size);
+
+int qcom_scm_iommu_secure_ptbl_init(u64 addr, u32 size, u32 spare)
+{
+	return __qcom_scm_iommu_secure_ptbl_init(__scm->dev, addr, size, spare);
+}
+EXPORT_SYMBOL(qcom_scm_iommu_secure_ptbl_init);
+
 static int qcom_scm_probe(struct platform_device *pdev)
 {
 	struct qcom_scm *scm;

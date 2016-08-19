@@ -48,4 +48,7 @@ extern u32 qcom_scm_get_version(void);
 
 extern int qcom_scm_video_set_state(u32 state, u32 spare);
 
+extern int qcom_scm_iommu_secure_ptbl_size(u32 spare, size_t *size);
+extern int qcom_scm_iommu_secure_ptbl_init(u64 addr, u32 size, u32 spare);
+
 #endif
