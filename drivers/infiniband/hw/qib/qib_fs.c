@@ -338,15 +338,10 @@ static ssize_t flash_write(struct file *file, const char __user *buf,
 		goto bail;
 	}
 
-	tmp = kmalloc(count, GFP_KERNEL);
-	if (!tmp) {
-		ret = -ENOMEM;
+	tmp = memdup_user(buf, count);
+	if (IS_ERR(tmp)) {
+		ret = PTR_ERR(tmp);
 		goto bail;
-	}
-
-	if (copy_from_user(tmp, buf, count)) {
-		ret = -EFAULT;
-		goto bail_tmp;
 	}
 
 	dd = private2dd(file);
