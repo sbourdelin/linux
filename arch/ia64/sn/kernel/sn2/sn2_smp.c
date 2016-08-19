@@ -41,9 +41,6 @@
 #include <asm/sn/rw_mmr.h>
 #include <asm/sn/sn_feature_sets.h>
 
-DEFINE_PER_CPU(struct ptc_stats, ptcstats);
-DECLARE_PER_CPU(struct ptc_stats, ptcstats);
-
 static  __cacheline_aligned DEFINE_SPINLOCK(sn2_global_ptc_lock);
 
 /* 0 = old algorithm (no IPI flushes), 1 = ipi deadlock flush, 2 = ipi instead of SHUB ptc, >2 = always ipi */
@@ -82,6 +79,9 @@ struct ptc_stats {
 	unsigned long shub_ipi_flushes;
 	unsigned long shub_ipi_flushes_itc_clocks;
 };
+
+DEFINE_PER_CPU(struct ptc_stats, ptcstats);
+DECLARE_PER_CPU(struct ptc_stats, ptcstats);
 
 #define sn2_ptctest	0
 
