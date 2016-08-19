@@ -23,6 +23,8 @@
 #ifndef __ASM_ASSEMBLER_H
 #define __ASM_ASSEMBLER_H
 
+#include <asm/alternative.h>
+#include <asm/arch_gicv3.h>
 #include <asm/asm-offsets.h>
 #include <asm/cpufeature.h>
 #include <asm/page.h>
@@ -33,12 +35,30 @@
 /*
  * Enable and disable interrupts.
  */
-	.macro	disable_irq
+	.macro	disable_irq, tmp
+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+	mov	\tmp, #ICC_PMR_EL1_MASKED
+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
 	msr	daifset, #2
+alternative_else
+	msr_s	ICC_PMR_EL1, \tmp
+alternative_endif
+#else
+	msr	daifset, #2
+#endif
 	.endm
 
-	.macro	enable_irq
+	.macro	enable_irq, tmp
+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+	mov     \tmp, #ICC_PMR_EL1_UNMASKED
+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
 	msr	daifclr, #2
+alternative_else
+	msr_s	ICC_PMR_EL1, \tmp
+alternative_endif
+#else
+	msr	daifclr, #2
+#endif
 	.endm
 
 /*
@@ -70,13 +90,19 @@
 9990:
 	.endm
 
+
 /*
  * Enable both debug exceptions and interrupts. This is likely to be
  * faster than two daifclr operations, since writes to this register
  * are self-synchronising.
  */
-	.macro	enable_dbg_and_irq
+	.macro	enable_dbg_and_irq, tmp
+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+	enable_dbg
+	enable_irq \tmp
+#else
 	msr	daifclr, #(8 | 2)
+#endif
 	.endm
 
 /*

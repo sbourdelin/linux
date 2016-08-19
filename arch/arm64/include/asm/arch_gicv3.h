@@ -80,6 +80,9 @@
 #include <linux/stringify.h>
 #include <asm/barrier.h>
 
+/* Our default, arbitrary priority value. Linux only uses one anyway. */
+#define DEFAULT_PMR_VALUE	0xf0
+
 /*
  * Low-level accessors
  *
@@ -102,9 +105,35 @@ static inline void gic_write_dir(u32 irq)
 static inline u64 gic_read_iar_common(void)
 {
 	u64 irqstat;
+	u64 __maybe_unused daif;
+	u64 __maybe_unused pmr;
+	u64 __maybe_unused default_pmr_value = DEFAULT_PMR_VALUE;
 
+#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
 	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
 	dsb(sy);
+#else
+	/*
+	 * The PMR may be configured to mask interrupts when this code is
+	 * called, thus in order to acknowledge interrupts we must set the
+	 * PMR to its default value before reading from the IAR.
+	 *
+	 * To do this without taking an interrupt we also ensure the I bit
+	 * is set whilst we are interfering with the value of the PMR.
+	 */
+	asm volatile(
+		"mrs	%1, daif\n\t"			     /* save I bit  */
+		"msr	daifset, #2\n\t"		     /* set I bit   */
+		"mrs_s  %2, " __stringify(ICC_PMR_EL1) "\n\t"/* save PMR    */
+		"msr_s	" __stringify(ICC_PMR_EL1) ",%3\n\t" /* set PMR     */
+		"mrs_s	%0, " __stringify(ICC_IAR1_EL1) "\n\t" /* ack int   */
+		"msr_s  " __stringify(ICC_PMR_EL1) ",%2\n\t" /* restore PMR */
+		"isb\n\t"
+		"msr	daif, %1"			     /* restore I   */
+		: "=r" (irqstat), "=&r" (daif), "=&r" (pmr)
+		: "r" (default_pmr_value));
+#endif
+
 	return irqstat;
 }
 
@@ -118,7 +147,11 @@ static inline u64 gic_read_iar_common(void)
 static inline u64 gic_read_iar_cavium_thunderx(void)
 {
 	u64 irqstat;
+	u64 __maybe_unused daif;
+	u64 __maybe_unused pmr;
+	u64 __maybe_unused default_pmr_value = DEFAULT_PMR_VALUE;
 
+#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
 	asm volatile(
 		"nop;nop;nop;nop\n\t"
 		"nop;nop;nop;nop\n\t"
@@ -126,6 +159,24 @@ static inline u64 gic_read_iar_cavium_thunderx(void)
 		"nop;nop;nop;nop"
 		: "=r" (irqstat));
 	mb();
+#else
+	/* Refer to comment in gic_read_iar_common() for more details */
+	asm volatile(
+		"mrs	%1, daif\n\t"			     /* save I bit  */
+		"msr	daifset, #2\n\t"		     /* set I bit   */
+		"mrs_s  %2, " __stringify(ICC_PMR_EL1) "\n\t"/* save PMR    */
+		"msr_s	" __stringify(ICC_PMR_EL1) ",%3\n\t" /* set PMR     */
+		"nop;nop;nop;nop\n\t"
+		"nop;nop;nop;nop\n\t"
+		"mrs_s	%0, " __stringify(ICC_IAR1_EL1) "\n\t" /* ack int   */
+		"nop;nop;nop;nop\n\t"
+		"msr_s  " __stringify(ICC_PMR_EL1) ",%2\n\t" /* restore PMR */
+		"isb\n\t"
+		"msr	daif, %1"			     /* restore I   */
+		: "=r" (irqstat), "=&r" (daif), "=&r" (pmr)
+		: "r" (default_pmr_value));
+
+#endif
 
 	return irqstat;
 }

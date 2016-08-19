@@ -448,6 +448,12 @@ void __init smp_prepare_boot_cpu(void)
 	 * and/or scheduling is enabled.
 	 */
 	apply_alternatives_early();
+
+	/*
+	 * Conditionally switch to GIC PMR for interrupt masking (this
+	 * will be a nop if we are using normal interrupt masking)
+	 */
+	maybe_switch_to_sysreg_gic_cpuif();
 }
 
 static u64 __init of_get_cpu_mpidr(struct device_node *dn)

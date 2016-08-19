@@ -492,8 +492,10 @@ static void gic_cpu_sys_reg_init(void)
 	if (!gic_enable_sre())
 		pr_err("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
 
+#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
 	/* Set priority mask register */
 	gic_write_pmr(DEFAULT_PMR_VALUE);
+#endif
 
 	/*
 	 * Some firmwares hand over to the kernel with the BPR changed from

@@ -25,6 +25,24 @@
 #define CurrentEL_EL1		(1 << 2)
 #define CurrentEL_EL2		(2 << 2)
 
+/* PMR values used to mask/unmask interrupts */
+#define ICC_PMR_EL1_G_SHIFT     6
+#define ICC_PMR_EL1_G_BIT       (1 << ICC_PMR_EL1_G_SHIFT)
+#define ICC_PMR_EL1_UNMASKED    0xf0
+#define ICC_PMR_EL1_MASKED      (ICC_PMR_EL1_UNMASKED ^ ICC_PMR_EL1_G_BIT)
+
+/*
+ * This is the GIC interrupt mask bit. It is not actually part of the
+ * PSR and so does not appear in the user API, we are simply using some
+ * reserved bits in the PSR to store some state from the interrupt
+ * controller. The context save/restore functions will extract the
+ * ICC_PMR_EL1_G_BIT and save it as the PSR_G_BIT.
+ */
+#define PSR_G_BIT		0x00400000
+#define PSR_G_SHIFT             22
+#define PSR_G_PMR_G_SHIFT	(PSR_G_SHIFT - ICC_PMR_EL1_G_SHIFT)
+#define PSR_I_PMR_G_SHIFT	(7 - ICC_PMR_EL1_G_SHIFT)
+
 /* AArch32-specific ptrace requests */
 #define COMPAT_PTRACE_GETREGS		12
 #define COMPAT_PTRACE_SETREGS		13
@@ -142,8 +160,13 @@ struct pt_regs {
 #define processor_mode(regs) \
 	((regs)->pstate & PSR_MODE_MASK)
 
+#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
 #define interrupts_enabled(regs) \
 	(!((regs)->pstate & PSR_I_BIT))
+#else
+#define interrupts_enabled(regs) \
+	((!((regs)->pstate & PSR_I_BIT)) && (!((regs)->pstate & PSR_G_BIT)))
+#endif
 
 #define fast_interrupts_enabled(regs) \
 	(!((regs)->pstate & PSR_F_BIT))

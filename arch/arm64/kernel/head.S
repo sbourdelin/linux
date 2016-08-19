@@ -620,6 +620,38 @@ set_cpu_boot_mode_flag:
 	ret
 ENDPROC(set_cpu_boot_mode_flag)
 
+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+/*
+ * void maybe_switch_to_sysreg_gic_cpuif(void)
+ *
+ * Enable interrupt controller system register access if this feature
+ * has been detected by the alternatives system.
+ *
+ * Before we jump into generic code we must enable interrupt controller system
+ * register access because this is required by the irqflags macros.  We must
+ * also mask interrupts at the PMR and unmask them within the PSR. That leaves
+ * us set up and ready for the kernel to make its first call to
+ * arch_local_irq_enable().
+
+ *
+ */
+ENTRY(maybe_switch_to_sysreg_gic_cpuif)
+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
+	b	1f
+alternative_else
+	mrs_s	x0, ICC_SRE_EL1
+alternative_endif
+	orr	x0, x0, #1
+	msr_s	ICC_SRE_EL1, x0			// Set ICC_SRE_EL1.SRE==1
+	isb					// Make sure SRE is now set
+	mov	x0, ICC_PMR_EL1_MASKED
+	msr_s	ICC_PMR_EL1, x0			// Prepare for unmask of I bit
+	msr	daifclr, #2			// Clear the I bit
+1:
+	ret
+ENDPROC(maybe_switch_to_sysreg_gic_cpuif)
+#endif
+
 /*
  * We need to find out the CPU boot mode long after boot, so we need to
  * store it in a writable variable.
@@ -684,6 +716,9 @@ __secondary_switched:
 	mov	sp, x0
 	and	x0, x0, #~(THREAD_SIZE - 1)
 	msr	sp_el0, x0			// save thread_info
+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+	bl	maybe_switch_to_sysreg_gic_cpuif
+#endif
 	mov	x29, #0
 	b	secondary_start_kernel
 ENDPROC(__secondary_switched)

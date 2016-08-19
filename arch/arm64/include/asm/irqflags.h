@@ -18,7 +18,12 @@
 
 #ifdef __KERNEL__
 
+#include <asm/alternative.h>
+#include <asm/arch_gicv3.h>
+#include <asm/cpufeature.h>
 #include <asm/ptrace.h>
+
+#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
 
 /*
  * CPU interrupt mask handling.
@@ -83,6 +88,107 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
 {
 	return flags & PSR_I_BIT;
 }
+
+static inline void maybe_switch_to_sysreg_gic_cpuif(void) {}
+
+#else /* CONFIG_IRQFLAGS_GIC_MASKING */
+
+/*
+ * CPU interrupt mask handling.
+ */
+static inline unsigned long arch_local_irq_save(void)
+{
+	unsigned long flags, masked = ICC_PMR_EL1_MASKED;
+
+	asm volatile(ALTERNATIVE(
+		"mrs	%0, daif		// arch_local_irq_save\n"
+		"msr	daifset, #2",
+		/* --- */
+		"mrs_s  %0, " __stringify(ICC_PMR_EL1) "\n"
+		"msr_s	" __stringify(ICC_PMR_EL1) ",%1",
+		ARM64_HAS_SYSREG_GIC_CPUIF)
+		: "=&r" (flags)
+		: "r" (masked)
+		: "memory");
+
+	return flags;
+}
+
+static inline void arch_local_irq_enable(void)
+{
+	unsigned long unmasked = ICC_PMR_EL1_UNMASKED;
+
+	asm volatile(ALTERNATIVE(
+		"msr	daifclr, #2		// arch_local_irq_enable",
+		"msr_s  " __stringify(ICC_PMR_EL1) ",%0",
+		ARM64_HAS_SYSREG_GIC_CPUIF)
+		:
+		: "r" (unmasked)
+		: "memory");
+}
+
+static inline void arch_local_irq_disable(void)
+{
+	unsigned long masked = ICC_PMR_EL1_MASKED;
+
+	asm volatile(ALTERNATIVE(
+		"msr	daifset, #2		// arch_local_irq_disable",
+		"msr_s  " __stringify(ICC_PMR_EL1) ",%0",
+		ARM64_HAS_SYSREG_GIC_CPUIF)
+		:
+		: "r" (masked)
+		: "memory");
+}
+
+/*
+ * Save the current interrupt enable state.
+ */
+static inline unsigned long arch_local_save_flags(void)
+{
+	unsigned long flags;
+
+	asm volatile(ALTERNATIVE(
+		"mrs	%0, daif		// arch_local_save_flags",
+		"mrs_s  %0, " __stringify(ICC_PMR_EL1),
+		ARM64_HAS_SYSREG_GIC_CPUIF)
+		: "=r" (flags)
+		:
+		: "memory");
+
+	return flags;
+}
+
+/*
+ * restore saved IRQ state
+ */
+static inline void arch_local_irq_restore(unsigned long flags)
+{
+	asm volatile(ALTERNATIVE(
+		"msr	daif, %0		// arch_local_irq_restore",
+		"msr_s  " __stringify(ICC_PMR_EL1) ",%0",
+		ARM64_HAS_SYSREG_GIC_CPUIF)
+	:
+	: "r" (flags)
+	: "memory");
+}
+
+static inline int arch_irqs_disabled_flags(unsigned long flags)
+{
+	asm volatile(ALTERNATIVE(
+		"and	%0, %0, #" __stringify(PSR_I_BIT) "\n"
+		"nop",
+		/* --- */
+		"and	%0, %0, # " __stringify(ICC_PMR_EL1_G_BIT) "\n"
+		"eor	%0, %0, # " __stringify(ICC_PMR_EL1_G_BIT),
+		ARM64_HAS_SYSREG_GIC_CPUIF)
+		: "+r" (flags));
+
+	return flags;
+}
+
+void maybe_switch_to_sysreg_gic_cpuif(void);
+
+#endif /* CONFIG_IRQFLAGS_GIC_MASKING */
 
 #define local_fiq_enable()	asm("msr	daifclr, #1" : : : "memory")
 #define local_fiq_disable()	asm("msr	daifset, #1" : : : "memory")
