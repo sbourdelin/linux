@@ -30,6 +30,7 @@
 #include <asm/smp.h>
 #include <asm/hw_breakpoint.h>
 #include <asm/asm-prototypes.h>
+#include <asm/firmware.h>
 
 #ifdef CONFIG_PPC_BOOK3E
 int default_machine_kexec_prepare(struct kimage *image)
@@ -54,9 +55,6 @@ int default_machine_kexec_prepare(struct kimage *image)
 	struct device_node *node;
 	const unsigned long *basep;
 	const unsigned int *sizep;
-
-	if (!mmu_hash_ops.hpte_clear_all)
-		return -ENOENT;
 
 	/*
 	 * Since we use the kernel fault handlers and paging code to
@@ -379,13 +377,8 @@ void default_machine_kexec(struct kimage *image)
 	 * a toc is easier in C, so pass in what we can.
 	 */
 	kexec_sequence(&kexec_stack, image->start, image,
-			page_address(image->control_code_page),
-#ifdef CONFIG_PPC_STD_MMU
-			mmu_hash_ops.hpte_clear_all
-#else
-			NULL
-#endif
-	);
+		       page_address(image->control_code_page),
+		       mmu_cleanup_all);
 	/* NOTREACHED */
 }
 
