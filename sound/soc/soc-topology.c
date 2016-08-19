@@ -1683,13 +1683,25 @@ static int soc_tplg_link_create(struct soc_tplg *tplg,
 static int soc_tplg_pcm_create(struct soc_tplg *tplg,
 	struct snd_soc_tplg_pcm *pcm)
 {
+	struct snd_soc_dai_link_component dai_component = {0};
+	struct snd_soc_dai *dai;
 	int ret;
 
-	ret = soc_tplg_dai_create(tplg, pcm);
-	if (ret < 0)
-		return ret;
+	if (!strlen(pcm->dai_name)) {
+		dev_err(tplg->dev, "ASoC: Invalid FE DAI name %s\n",
+			pcm->dai_name);
+		return -EINVAL;
+	}
 
-	return  soc_tplg_link_create(tplg, pcm);
+	dai_component.dai_name = pcm->dai_name;
+	dai = snd_soc_find_dai(&dai_component);
+	if (!dai) { /* FE DAI doesn't exist, create it */
+		ret = soc_tplg_dai_create(tplg, pcm);
+		if (ret < 0)
+			return ret;
+	}
+
+	return soc_tplg_link_create(tplg, pcm);
 }
 
 static int soc_tplg_pcm_elems_load(struct soc_tplg *tplg,
