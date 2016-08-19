@@ -27,6 +27,18 @@
 #include <asm/insn.h>
 #include <linux/stop_machine.h>
 
+/*
+ * early-apply features can be detected using only the boot CPU (i.e.
+ * no need to check capability of any secondary CPUs) and, even then,
+ * should only include features where we must patch the kernel very
+ * early in the boot process.
+ *
+ * Note that the cpufeature logic *must* be made aware of early-apply
+ * features to ensure they are reported as enabled without waiting
+ * for other CPUs to boot.
+ */
+#define EARLY_APPLY_FEATURE_MASK BIT(ARM64_HAS_SYSREG_GIC_CPUIF)
+
 #define __ALT_PTR(a,f)		(u32 *)((void *)&(a)->f + (a)->f)
 #define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
 #define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
@@ -85,7 +97,7 @@ static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
 	return insn;
 }
 
-static void __apply_alternatives(void *alt_region)
+static void __apply_alternatives(void *alt_region, unsigned long feature_mask)
 {
 	struct alt_instr *alt;
 	struct alt_region *region = alt_region;
@@ -94,6 +106,9 @@ static void __apply_alternatives(void *alt_region)
 	for (alt = region->begin; alt < region->end; alt++) {
 		u32 insn;
 		int i, nr_inst;
+
+		if ((BIT(alt->cpufeature) & feature_mask) == 0)
+			continue;
 
 		if (!cpus_have_cap(alt->cpufeature))
 			continue;
@@ -117,6 +132,21 @@ static void __apply_alternatives(void *alt_region)
 }
 
 /*
+ * This is called very early in the boot process (directly after we run
+ * a feature detect on the boot CPU). No need to worry about other CPUs
+ * here.
+ */
+void apply_alternatives_early(void)
+{
+	struct alt_region region = {
+		.begin	= __alt_instructions,
+		.end	= __alt_instructions_end,
+	};
+
+	__apply_alternatives(&region, EARLY_APPLY_FEATURE_MASK);
+}
+
+/*
  * We might be patching the stop_machine state machine, so implement a
  * really simple polling protocol here.
  */
@@ -135,7 +165,7 @@ static int __apply_alternatives_multi_stop(void *unused)
 		isb();
 	} else {
 		BUG_ON(patched);
-		__apply_alternatives(&region);
+		__apply_alternatives(&region, ~EARLY_APPLY_FEATURE_MASK);
 		/* Barriers provided by the cache flushing */
 		WRITE_ONCE(patched, 1);
 	}
@@ -156,5 +186,5 @@ void apply_alternatives(void *start, size_t length)
 		.end	= start + length,
 	};
 
-	__apply_alternatives(&region);
+	__apply_alternatives(&region, -1);
 }
