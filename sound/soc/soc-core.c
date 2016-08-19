@@ -2872,7 +2872,8 @@ int snd_soc_register_dai(struct snd_soc_component *component,
 	struct snd_soc_dai *dai;
 	int ret;
 
-	if (dai_drv->dobj.type != SND_SOC_DOBJ_PCM) {
+	if (!(dai_drv->dobj.type == SND_SOC_DOBJ_PCM ||
+	    dai_drv->dobj.type == SND_SOC_DOBJ_BE_DAI)) {
 		dev_err(component->dev, "Invalid dai type %d\n",
 			dai_drv->dobj.type);
 		return -EINVAL;
