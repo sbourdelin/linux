@@ -241,7 +241,7 @@ static void virtscsi_req_done(struct virtqueue *vq)
 	struct virtio_scsi_vq *req_vq = &vscsi->req_vqs[index];
 
 	virtscsi_vq_done(vscsi, req_vq, virtscsi_complete_cmd);
-};
+}
 
 static void virtscsi_poll_requests(struct virtio_scsi *vscsi)
 {
@@ -267,7 +267,7 @@ static void virtscsi_ctrl_done(struct virtqueue *vq)
 	struct virtio_scsi *vscsi = shost_priv(sh);
 
 	virtscsi_vq_done(vscsi, &vscsi->ctrl_vq, virtscsi_complete_free);
-};
+}
 
 static void virtscsi_handle_event(struct work_struct *work);
 
@@ -413,7 +413,7 @@ static void virtscsi_event_done(struct virtqueue *vq)
 	struct virtio_scsi *vscsi = shost_priv(sh);
 
 	virtscsi_vq_done(vscsi, &vscsi->event_vq, virtscsi_complete_event);
-};
+}
 
 /**
  * virtscsi_add_cmd - add a virtio_scsi_cmd to a virtqueue
