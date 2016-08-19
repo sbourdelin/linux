@@ -473,6 +473,7 @@ static inline void dw_mci_prepare_desc64(struct dw_mci *host,
 {
 	unsigned int desc_len;
 	struct idmac_desc_64addr *desc_first, *desc_last, *desc;
+	unsigned long timeout = jiffies + msecs_to_jiffies(100);
 	int i;
 
 	desc_first = desc_last = desc = host->sg_cpu;
@@ -487,6 +488,20 @@ static inline void dw_mci_prepare_desc64(struct dw_mci *host,
 				   length : DW_MCI_DESC_DATA_LENGTH;
 
 			length -= desc_len;
+
+			/*
+			 * Wait for the former clear OWN bit operation
+			 * of IDMAC to make sure that this descriptor
+			 * isn't still owned by IDMAC as IDMAC's write
+			 * ops and CPU's read ops are asynchronous.
+			 */
+			while (readl(&desc->des0) & IDMAC_DES0_OWN) {
+				if (time_after(jiffies, timeout)) {
+					dev_err(host->dev, "DESC is still owned by IDMAC.\n");
+					break;
+				}
+				udelay(10);
+			}
 
 			/*
 			 * Set the OWN bit and disable interrupts
@@ -525,6 +540,7 @@ static inline void dw_mci_prepare_desc32(struct dw_mci *host,
 {
 	unsigned int desc_len;
 	struct idmac_desc *desc_first, *desc_last, *desc;
+	unsigned long timeout = jiffies + msecs_to_jiffies(100);
 	int i;
 
 	desc_first = desc_last = desc = host->sg_cpu;
@@ -539,6 +555,20 @@ static inline void dw_mci_prepare_desc32(struct dw_mci *host,
 				   length : DW_MCI_DESC_DATA_LENGTH;
 
 			length -= desc_len;
+
+			/*
+			 * Wait for the former clear OWN bit operation
+			 * of IDMAC to make sure that this descriptor
+			 * isn't still owned by IDMAC as IDMAC's write
+			 * ops and CPU's read ops are asynchronous.
+			 */
+			while (readl(&desc->des0) & IDMAC_DES0_OWN) {
+				if (time_after(jiffies, timeout)) {
+					dev_err(host->dev, "DESC is still owned by IDMAC.\n");
+					break;
+				}
+				udelay(10);
+			}
 
 			/*
 			 * Set the OWN bit and disable interrupts
