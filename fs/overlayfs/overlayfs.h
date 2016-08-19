@@ -114,13 +114,13 @@ static inline int ovl_do_rename(struct inode *olddir, struct dentry *olddentry,
 {
 	int err;
 
-	pr_debug("rename2(%pd2, %pd2, 0x%x)\n",
+	pr_debug("rename(%pd2, %pd2, 0x%x)\n",
 		 olddentry, newdentry, flags);
 
 	err = vfs_rename(olddir, olddentry, newdir, newdentry, NULL, flags);
 
 	if (err) {
-		pr_debug("...rename2(%pd2, %pd2, ...) = %i\n",
+		pr_debug("...rename(%pd2, %pd2, ...) = %i\n",
 			 olddentry, newdentry, err);
 	}
 	return err;
@@ -193,6 +193,7 @@ int ovl_removexattr(struct dentry *dentry, const char *name);
 struct posix_acl *ovl_get_acl(struct inode *inode, int type);
 int ovl_open_maybe_copy_up(struct dentry *dentry, unsigned int file_flags);
 int ovl_update_time(struct inode *inode, struct timespec *ts, int flags);
+bool ovl_is_private_xattr(const char *name);
 
 struct inode *ovl_new_inode(struct super_block *sb, umode_t mode);
 struct inode *ovl_get_inode(struct super_block *sb, struct inode *realinode);
