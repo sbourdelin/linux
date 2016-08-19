@@ -96,6 +96,7 @@ struct hci_uart {
 #define HCI_UART_PROTO_SET	0
 #define HCI_UART_REGISTERED	1
 #define HCI_UART_PROTO_READY	2
+#define HCI_UART_CLOSING	3
 
 /* TX states  */
 #define HCI_UART_SENDING	1
