@@ -1671,6 +1671,8 @@ static int isp_link_entity(
 	return media_create_pad_link(entity, i, input, pad, flags);
 }
 
+static void isp_release(struct media_device *mdev);
+
 static int isp_register_entities(struct isp_device *isp)
 {
 	int ret;
@@ -1683,6 +1685,7 @@ static int isp_register_entities(struct isp_device *isp)
 		sizeof(isp->media_dev->model));
 	isp->media_dev->hw_revision = isp->revision;
 	isp->media_dev->link_notify = v4l2_pipeline_link_notify;
+	isp->media_dev->release = isp_release;
 
 	isp->v4l2_dev.mdev = isp->media_dev;
 	ret = v4l2_device_register(isp->dev, &isp->v4l2_dev);
@@ -1945,6 +1948,20 @@ static void isp_detach_iommu(struct isp_device *isp)
 	iommu_group_remove_device(isp->dev);
 }
 
+static void isp_release(struct media_device *mdev)
+{
+	struct isp_device *isp = media_device_priv(mdev);
+
+	isp_cleanup_modules(isp);
+	isp_xclk_cleanup(isp);
+
+	__omap3isp_get(isp, false);
+	isp_detach_iommu(isp);
+	__omap3isp_put(isp, false);
+
+	media_entity_enum_cleanup(&isp->crashed);
+}
+
 static int isp_attach_iommu(struct isp_device *isp)
 {
 	struct dma_iommu_mapping *mapping;
@@ -2005,14 +2022,6 @@ static int isp_remove(struct platform_device *pdev)
 
 	v4l2_async_notifier_unregister(&isp->notifier);
 	isp_unregister_entities(isp);
-	isp_cleanup_modules(isp);
-	isp_xclk_cleanup(isp);
-
-	__omap3isp_get(isp, false);
-	isp_detach_iommu(isp);
-	__omap3isp_put(isp, false);
-
-	media_entity_enum_cleanup(&isp->crashed);
 
 	return 0;
 }
