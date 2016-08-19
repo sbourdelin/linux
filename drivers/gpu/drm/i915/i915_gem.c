@@ -2469,11 +2469,6 @@ static void i915_gem_reset_engine_cleanup(struct intel_engine_cs *engine)
 		intel_ring_update_space(ring);
 	}
 
-<<<<<<< HEAD
-	intel_ring_init_seqno(engine, engine->last_submitted_seqno);
-
-=======
->>>>>>> linux-next/akpm-base
 	engine->i915->gt.active_engines &= ~intel_engine_flag(engine);
 }
 

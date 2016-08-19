@@ -420,34 +420,14 @@ void intel_prepare_dp_ddi_buffers(struct intel_encoder *encoder)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	u32 iboost_bit = 0;
-<<<<<<< HEAD
-	int i, n_hdmi_entries, n_dp_entries, n_edp_entries,
-	    size;
-	int hdmi_level;
-	enum port port;
-=======
 	int i, n_dp_entries, n_edp_entries, size;
 	enum port port = intel_ddi_get_encoder_port(encoder);
->>>>>>> linux-next/akpm-base
 	const struct ddi_buf_trans *ddi_translations_fdi;
 	const struct ddi_buf_trans *ddi_translations_dp;
 	const struct ddi_buf_trans *ddi_translations_edp;
 	const struct ddi_buf_trans *ddi_translations;
 
-<<<<<<< HEAD
-	port = intel_ddi_get_encoder_port(encoder);
-	hdmi_level = intel_ddi_hdmi_level(dev_priv, port);
-
-	if (IS_BROXTON(dev_priv)) {
-		if (encoder->type != INTEL_OUTPUT_HDMI)
-			return;
-
-		/* Vswing programming for HDMI */
-		bxt_ddi_vswing_sequence(dev_priv, hdmi_level, port,
-					INTEL_OUTPUT_HDMI);
-=======
 	if (IS_BROXTON(dev_priv))
->>>>>>> linux-next/akpm-base
 		return;
 
 	if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv)) {
@@ -456,12 +436,7 @@ void intel_prepare_dp_ddi_buffers(struct intel_encoder *encoder)
 				skl_get_buf_trans_dp(dev_priv, &n_dp_entries);
 		ddi_translations_edp =
 				skl_get_buf_trans_edp(dev_priv, &n_edp_entries);
-<<<<<<< HEAD
-		ddi_translations_hdmi =
-				skl_get_buf_trans_hdmi(dev_priv, &n_hdmi_entries);
-=======
 
->>>>>>> linux-next/akpm-base
 		/* If we're boosting the current, set bit 31 of trans1 */
 		if (dev_priv->vbt.ddi_port_info[port].dp_boost_level)
 			iboost_bit = DDI_BUF_BALANCE_LEG_ENABLE;
@@ -475,19 +450,11 @@ void intel_prepare_dp_ddi_buffers(struct intel_encoder *encoder)
 		ddi_translations_dp = bdw_ddi_translations_dp;
 		ddi_translations_edp = bdw_get_buf_trans_edp(dev_priv, &n_edp_entries);
 		n_dp_entries = ARRAY_SIZE(bdw_ddi_translations_dp);
-<<<<<<< HEAD
-		n_hdmi_entries = ARRAY_SIZE(bdw_ddi_translations_hdmi);
-=======
->>>>>>> linux-next/akpm-base
 	} else if (IS_HASWELL(dev_priv)) {
 		ddi_translations_fdi = hsw_ddi_translations_fdi;
 		ddi_translations_dp = hsw_ddi_translations_dp;
 		ddi_translations_edp = hsw_ddi_translations_dp;
 		n_dp_entries = n_edp_entries = ARRAY_SIZE(hsw_ddi_translations_dp);
-<<<<<<< HEAD
-		n_hdmi_entries = ARRAY_SIZE(hsw_ddi_translations_hdmi);
-=======
->>>>>>> linux-next/akpm-base
 	} else {
 		WARN(1, "ddi translation table missing\n");
 		ddi_translations_edp = bdw_ddi_translations_dp;
@@ -495,10 +462,6 @@ void intel_prepare_dp_ddi_buffers(struct intel_encoder *encoder)
 		ddi_translations_dp = bdw_ddi_translations_dp;
 		n_edp_entries = ARRAY_SIZE(bdw_ddi_translations_edp);
 		n_dp_entries = ARRAY_SIZE(bdw_ddi_translations_dp);
-<<<<<<< HEAD
-		n_hdmi_entries = ARRAY_SIZE(bdw_ddi_translations_hdmi);
-=======
->>>>>>> linux-next/akpm-base
 	}
 
 	switch (encoder->type) {
@@ -542,8 +505,6 @@ static void intel_prepare_hdmi_ddi_buffers(struct intel_encoder *encoder)
 	if (IS_BROXTON(dev_priv))
 		return;
 
-<<<<<<< HEAD
-=======
 	hdmi_level = intel_ddi_hdmi_level(dev_priv, port);
 
 	if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv)) {
@@ -564,7 +525,6 @@ static void intel_prepare_hdmi_ddi_buffers(struct intel_encoder *encoder)
 		n_hdmi_entries = ARRAY_SIZE(bdw_ddi_translations_hdmi);
 	}
 
->>>>>>> linux-next/akpm-base
 	/* Entry 9 is for HDMI: */
 	I915_WRITE(DDI_BUF_TRANS_LO(port, 9),
 		   ddi_translations_hdmi[hdmi_level].trans1 | iboost_bit);
@@ -1689,10 +1649,6 @@ static void intel_ddi_pre_enable(struct intel_encoder *intel_encoder)
 		struct intel_hdmi *intel_hdmi = enc_to_intel_hdmi(encoder);
 		int level = intel_ddi_hdmi_level(dev_priv, port);
 
-<<<<<<< HEAD
-		if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))
-			skl_ddi_set_iboost(intel_encoder, level);
-=======
 		intel_prepare_hdmi_ddi_buffers(intel_encoder);
 
 		if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))
@@ -1700,7 +1656,6 @@ static void intel_ddi_pre_enable(struct intel_encoder *intel_encoder)
 		else if (IS_BROXTON(dev_priv))
 			bxt_ddi_vswing_sequence(dev_priv, level, port,
 						INTEL_OUTPUT_HDMI);
->>>>>>> linux-next/akpm-base
 
 		intel_hdmi->set_infoframes(encoder,
 					   crtc->config->has_hdmi_sink,
