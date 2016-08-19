@@ -1235,6 +1235,7 @@ static int sd_open(struct block_device *bdev, fmode_t mode)
 		if (scsi_block_when_processing_errors(sdev))
 			scsi_set_medium_removal(sdev, SCSI_REMOVAL_PREVENT);
 	}
+	sdev->usage_count = sdkp->openers.counter;
 
 	return 0;
 
@@ -1267,7 +1268,7 @@ static void sd_release(struct gendisk *disk, fmode_t mode)
 		if (scsi_block_when_processing_errors(sdev))
 			scsi_set_medium_removal(sdev, SCSI_REMOVAL_ALLOW);
 	}
-
+	sdev->usage_count = sdkp->openers.counter;
 	/*
 	 * XXX and what if there are packets in flight and this close()
 	 * XXX is followed by a "rmmod sd_mod"?
@@ -3081,6 +3082,8 @@ static int sd_probe(struct device *dev)
 	sdkp->index = index;
 	atomic_set(&sdkp->openers, 0);
 	atomic_set(&sdkp->device->ioerr_cnt, 0);
+
+	sdp->usage_count = sdkp->openers.counter;
 
 	if (!sdp->request_queue->rq_timeout) {
 		if (sdp->type != TYPE_MOD)

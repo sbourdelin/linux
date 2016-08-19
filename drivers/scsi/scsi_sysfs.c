@@ -12,6 +12,9 @@
 #include <linux/blkdev.h>
 #include <linux/device.h>
 #include <linux/pm_runtime.h>
+#include <linux/time.h>
+#include <linux/timer.h>
+
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
@@ -457,6 +460,9 @@ static void scsi_device_dev_release_usercontext(struct work_struct *work)
 	kfree(sdev->vpd_pg83);
 	kfree(sdev->vpd_pg80);
 	kfree(sdev->inquiry);
+	if (sdev->delete_msg_buf != NULL)
+		kfree(sdev->delete_msg_buf);
+
 	kfree(sdev);
 
 	if (parent)
@@ -709,11 +715,54 @@ static ssize_t
 sdev_store_delete(struct device *dev, struct device_attribute *attr,
 		  const char *buf, size_t count)
 {
+	struct scsi_device *sdev = to_scsi_device(dev);
+	struct timeval tv;
+	struct tm tms;
+
+	if (buf[0] == '?')  {
+		if (sdev->usage_count) {
+			/*
+			 * Buffer to hold I/O statistics on delete attempt.
+			 */
+			if (sdev->delete_msg_buf == NULL) {
+				sdev->delete_msg_buf =
+				kmalloc(128, GFP_KERNEL);
+				memset(sdev->delete_msg_buf, 0, 128);
+			}
+			do_gettimeofday(&tv);
+			time_to_tm(tv.tv_sec, 0, &tms);
+			sprintf(sdev->delete_msg_buf,
+				"Last delete attempt: %d:%d:%d %02d:%02d\n"
+				"Open Count : %d\n"
+				"IO Active Count : %d\n"
+				"IO Done Count : %d\n",
+				tms.tm_mday, tms.tm_mon + 1,
+				tms.tm_year + 1900,
+				tms.tm_hour, tms.tm_min,
+				sdev->usage_count,
+				sdev->iorequest_cnt.counter,
+				sdev->iodone_cnt.counter);
+
+				return count;
+			}
+		}
+
 	if (device_remove_file_self(dev, attr))
 		scsi_remove_device(to_scsi_device(dev));
 	return count;
 };
-static DEVICE_ATTR(delete, S_IWUSR, NULL, sdev_store_delete);
+
+static ssize_t sdev_show_delete(struct device *dev,
+		struct device_attribute *attr, char *buf) {
+
+	struct scsi_device *sdev = to_scsi_device(dev);
+	if (sdev->delete_msg_buf != NULL)
+		return sprintf(buf, "%s", sdev->delete_msg_buf);
+	else
+		return 0;
+}
+static DEVICE_ATTR(delete, S_IRUGO | S_IWUSR, sdev_show_delete,
+			 sdev_store_delete);
 
 static ssize_t
 store_state_field(struct device *dev, struct device_attribute *attr,

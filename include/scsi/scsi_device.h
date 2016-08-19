@@ -208,6 +208,8 @@ struct scsi_device {
 
 	unsigned char		access_state;
 	enum scsi_device_state sdev_state;
+	char                    *delete_msg_buf;
+	int                     usage_count;
 	unsigned long		sdev_data[0];
 } __attribute__((aligned(sizeof(unsigned long))));
 
