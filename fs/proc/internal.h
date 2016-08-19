@@ -314,3 +314,10 @@ extern void show_val_kb(struct seq_file *m, unsigned long num);
  	seq_write(seq, name, sizeof(name));	\
  	show_val_kb(seq, (pages) << (PAGE_SHIFT - 10));\
  })
+
+#define show_name_bytes_kb(seq, name, val)	\
+({						\
+ 	BUILD_BUG_ON(!__builtin_constant_p(name));\
+ 	seq_write(seq, name, sizeof(name));	\
+ 	show_val_kb(seq, (val) >> 10);		\
+})
