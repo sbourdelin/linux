@@ -52,6 +52,7 @@ struct media_entity_notify {
  * struct media_device - Media device
  * @dev:	Parent device
  * @devnode:	Media device node
+ * @priv:	A pointer to driver private data
  * @driver_name: Optional device driver name. If not set, calls to
  *		%MEDIA_IOC_DEVICE_INFO will return dev->driver->name.
  *		This is needed for USB drivers for example, as otherwise
@@ -117,6 +118,7 @@ struct media_device {
 	/* dev->driver_data points to this struct. */
 	struct device *dev;
 	struct media_devnode devnode;
+	void *priv;
 
 	char model[32];
 	char driver_name[32];
@@ -200,6 +202,7 @@ void media_device_init(struct media_device *mdev);
  * media_device_alloc() - Allocate and initialise a media device
  *
  * @dev:	The associated struct device pointer
+ * @priv:	pointer to a driver private data structure
  *
  * Allocate and initialise a media device. Returns a media device.
  * The media device is refcounted, and this function returns a media
@@ -208,7 +211,7 @@ void media_device_init(struct media_device *mdev);
  * References are taken and given using media_device_get() and
  * media_device_put().
  */
-struct media_device *media_device_alloc(struct device *dev);
+struct media_device *media_device_alloc(struct device *dev, void *priv);
 
 /**
  * media_device_get() - Get a reference to a media device
@@ -233,6 +236,16 @@ struct media_device *media_device_alloc(struct device *dev);
 			__func__, (mdev)->bus_info);			\
 		put_device(&(mdev)->devnode.dev);			\
 	} while (0)
+
+/**
+ * media_device_priv() - Obtain the driver private pointer
+ *
+ * Returns a pointer passed to the media_device_alloc() function.
+ */
+static inline void *media_device_priv(struct media_device *mdev)
+{
+	return mdev->priv;
+}
 
 /**
  * media_device_cleanup() - Cleanups a media device element

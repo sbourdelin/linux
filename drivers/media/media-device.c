@@ -699,7 +699,7 @@ void media_device_init(struct media_device *mdev)
 }
 EXPORT_SYMBOL_GPL(media_device_init);
 
-struct media_device *media_device_alloc(struct device *dev)
+struct media_device *media_device_alloc(struct device *dev, void *priv)
 {
 	struct media_device *mdev;
 
@@ -716,6 +716,7 @@ struct media_device *media_device_alloc(struct device *dev)
 	media_devnode_init(&mdev->devnode);
 	mdev->dev = dev;
 	media_device_init(mdev);
+	mdev->priv = priv;
 
 	return mdev;
 }
