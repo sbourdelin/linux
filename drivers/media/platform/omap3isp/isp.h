@@ -176,7 +176,7 @@ struct isp_xclk {
 struct isp_device {
 	struct v4l2_device v4l2_dev;
 	struct v4l2_async_notifier notifier;
-	struct media_device media_dev;
+	struct media_device *media_dev;
 	struct device *dev;
 	u32 revision;
 

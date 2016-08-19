@@ -1077,7 +1077,7 @@ isp_video_streamon(struct file *file, void *fh, enum v4l2_buf_type type)
 	pipe = video->video.entity.pipe
 	     ? to_isp_pipeline(&video->video.entity) : &video->pipe;
 
-	ret = media_entity_enum_init(&pipe->ent_enum, &video->isp->media_dev);
+	ret = media_entity_enum_init(&pipe->ent_enum, video->isp->media_dev);
 	if (ret)
 		goto err_enum_init;
 
