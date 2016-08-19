@@ -102,6 +102,17 @@ struct media_devnode {
 #define to_media_devnode(cd) container_of(cd, struct media_devnode, dev)
 
 /**
+ * media_devnode_init - initialise a media devnode
+ *
+ * @devnode: struct media_devnode we want to initialise
+ *
+ * Initialise a media devnode. Note that after initialising the media
+ * devnode is refcounted. Releaseing references to it may be done
+ * using put_device.
+ */
+void media_devnode_init(struct media_devnode *devnode);
+
+/**
  * media_devnode_register - register a media device node
  *
  * @devnode: struct media_devnode we want to register a device node
@@ -112,10 +123,6 @@ struct media_devnode {
  * or if the registration of the device node fails.
  *
  * Zero is returned on success.
- *
- * Note that if the media_devnode_register call fails, the release() callback of
- * the media_devnode structure is *not* called, so the caller is responsible for
- * freeing any data.
  */
 int __must_check media_devnode_register(struct media_devnode *devnode,
 					struct module *owner);

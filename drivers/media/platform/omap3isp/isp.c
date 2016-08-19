@@ -1726,8 +1726,10 @@ static int isp_register_entities(struct isp_device *isp)
 		goto done;
 
 done:
-	if (ret < 0)
+	if (ret < 0) {
 		isp_unregister_entities(isp);
+		media_device_put(&isp->media_dev);
+	}
 
 	return ret;
 }

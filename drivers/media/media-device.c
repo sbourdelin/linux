@@ -707,6 +707,7 @@ struct media_device *media_device_alloc(void)
 	if (!mdev)
 		return NULL;
 
+	media_devnode_init(&mdev->devnode);
 	media_device_init(mdev);
 
 	return mdev;
