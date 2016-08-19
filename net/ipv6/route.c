@@ -2769,6 +2769,16 @@ static int rtm_to_fib6_config(struct sk_buff *skb, struct nlmsghdr *nlh,
 	cfg->fc_protocol = rtm->rtm_protocol;
 	cfg->fc_type = rtm->rtm_type;
 
+	if (rtm->rtm_protocol == RTPROT_RA) {
+		/* RA-derived route: set flags accordingly. */
+		cfg->fc_flags |= RTF_ADDRCONF;
+		if (rtm->rtm_dst_len == 0) {
+			cfg->fc_flags |= RTF_DEFAULT;
+		} else {
+			cfg->fc_flags |= RTF_ROUTEINFO;
+		}
+	}
+
 	if (rtm->rtm_type == RTN_UNREACHABLE ||
 	    rtm->rtm_type == RTN_BLACKHOLE ||
 	    rtm->rtm_type == RTN_PROHIBIT ||
