@@ -944,18 +944,18 @@ static long vop_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 		/* Ensure desc has not changed between the two reads */
 		if (memcmp(&dd, dd_config, sizeof(dd))) {
 			ret = -EINVAL;
-			goto free_ret;
+			goto free_config;
 		}
 		mutex_lock(&vdev->vdev_mutex);
 		mutex_lock(&vi->vop_mutex);
 		ret = vop_virtio_add_device(vdev, dd_config);
 		if (ret)
-			goto unlock_ret;
+			goto unlock_device_addition;
 		list_add_tail(&vdev->list, &vi->vdev_list);
-unlock_ret:
+unlock_device_addition:
 		mutex_unlock(&vi->vop_mutex);
 		mutex_unlock(&vdev->vdev_mutex);
-free_ret:
+free_config:
 		kfree(dd_config);
 		return ret;
 	}
@@ -966,21 +966,21 @@ free_ret:
 		mutex_lock(&vdev->vdev_mutex);
 		ret = vop_vdev_inited(vdev);
 		if (ret)
-			goto _unlock_ret;
+			goto unlock_desc_copy;
 
 		if (copy_from_user(&copy, argp, sizeof(copy))) {
 			ret = -EFAULT;
-			goto _unlock_ret;
+			goto unlock_desc_copy;
 		}
 
 		ret = vop_virtio_copy_desc(vdev, &copy);
 		if (ret < 0)
-			goto _unlock_ret;
+			goto unlock_desc_copy;
 		if (copy_to_user(
 			&((struct mic_copy_desc __user *)argp)->out_len,
 			&copy.out_len, sizeof(copy.out_len)))
 			ret = -EFAULT;
-_unlock_ret:
+unlock_desc_copy:
 		mutex_unlock(&vdev->vdev_mutex);
 		return ret;
 	}
@@ -991,15 +991,15 @@ _unlock_ret:
 		mutex_lock(&vdev->vdev_mutex);
 		ret = vop_vdev_inited(vdev);
 		if (ret)
-			goto __unlock_ret;
+			goto unlock_config_change;
 		buf = memdup_user(argp, vdev->dd->config_len);
 		if (IS_ERR(buf)) {
 			ret = PTR_ERR(buf);
-			goto __unlock_ret;
+			goto unlock_config_change;
 		}
 		ret = vop_virtio_config_change(vdev, buf);
 		kfree(buf);
-__unlock_ret:
+unlock_config_change:
 		mutex_unlock(&vdev->vdev_mutex);
 		return ret;
 	}
