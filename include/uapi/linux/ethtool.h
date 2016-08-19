@@ -708,7 +708,7 @@ enum ethtool_flags {
  * @pdst: Destination port
  * @tos: Type-of-service
  *
- * This can be used to specify a TCP/IPv4, UDP/IPv4 or SCTP/IPv4 flow.
+ * This can be used to specify a TCP/IPv4 or UDP/IPv4 flow.
  */
 struct ethtool_tcpip4_spec {
 	__be32	ip4src;
@@ -716,6 +716,27 @@ struct ethtool_tcpip4_spec {
 	__be16	psrc;
 	__be16	pdst;
 	__u8    tos;
+};
+
+/**
+ * struct ethtool_sctpip4_spec - flow specification for SCTP/IPv4
+ * @ip4src: Source host
+ * @ip4dst: Destination host
+ * @psrc: Source port
+ * @pdst: Destination port
+ * @tos: Type-of-service
+ * @vtag: Verification tag
+ *
+ * This can be used to specify a SCTP/IPv4 flow.
+ */
+struct ethtool_sctpip4_spec {
+	__be32	ip4src;
+	__be32	ip4dst;
+	__be16	psrc;
+	__be16	pdst;
+	__u8    tos;
+	/* 3 byte hole */
+	__be32	vtag;
 };
 
 /**
@@ -762,7 +783,7 @@ struct ethtool_usrip4_spec {
  * @pdst: Destination port
  * @tclass: Traffic Class
  *
- * This can be used to specify a TCP/IPv6, UDP/IPv6 or SCTP/IPv6 flow.
+ * This can be used to specify a TCP/IPv6 or UDP/IPv6 flow.
  */
 struct ethtool_tcpip6_spec {
 	__be32	ip6src[4];
@@ -770,6 +791,27 @@ struct ethtool_tcpip6_spec {
 	__be16	psrc;
 	__be16	pdst;
 	__u8    tclass;
+};
+
+/**
+ * struct ethtool_sctpip6_spec - flow specification for SCTP/IPv6
+ * @ip6src: Source host
+ * @ip6dst: Destination host
+ * @psrc: Source port
+ * @pdst: Destination port
+ * @tclass: Traffic Class
+ * @vtag: Verification tag
+ *
+ * This can be used to specify a SCTP/IPv6 flow.
+ */
+struct ethtool_sctpip6_spec {
+	__be32	ip6src[4];
+	__be32	ip6dst[4];
+	__be16	psrc;
+	__be16	pdst;
+	__u8    tclass;
+	/* 3 byte hole */
+	__be32	vtag;
 };
 
 /**
@@ -807,13 +849,13 @@ struct ethtool_usrip6_spec {
 union ethtool_flow_union {
 	struct ethtool_tcpip4_spec		tcp_ip4_spec;
 	struct ethtool_tcpip4_spec		udp_ip4_spec;
-	struct ethtool_tcpip4_spec		sctp_ip4_spec;
+	struct ethtool_sctpip4_spec		sctp_ip4_spec;
 	struct ethtool_ah_espip4_spec		ah_ip4_spec;
 	struct ethtool_ah_espip4_spec		esp_ip4_spec;
 	struct ethtool_usrip4_spec		usr_ip4_spec;
 	struct ethtool_tcpip6_spec		tcp_ip6_spec;
 	struct ethtool_tcpip6_spec		udp_ip6_spec;
-	struct ethtool_tcpip6_spec		sctp_ip6_spec;
+	struct ethtool_sctpip6_spec		sctp_ip6_spec;
 	struct ethtool_ah_espip6_spec		ah_ip6_spec;
 	struct ethtool_ah_espip6_spec		esp_ip6_spec;
 	struct ethtool_usrip6_spec		usr_ip6_spec;
