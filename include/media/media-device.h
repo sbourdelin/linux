@@ -199,6 +199,8 @@ void media_device_init(struct media_device *mdev);
 /**
  * media_device_alloc() - Allocate and initialise a media device
  *
+ * @dev:	The associated struct device pointer
+ *
  * Allocate and initialise a media device. Returns a media device.
  * The media device is refcounted, and this function returns a media
  * device the refcount of which is one (1).
@@ -206,7 +208,7 @@ void media_device_init(struct media_device *mdev);
  * References are taken and given using media_device_get() and
  * media_device_put().
  */
-struct media_device *media_device_alloc(void);
+struct media_device *media_device_alloc(struct device *dev);
 
 /**
  * media_device_get() - Get a reference to a media device

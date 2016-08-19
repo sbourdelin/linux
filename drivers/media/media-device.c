@@ -699,15 +699,22 @@ void media_device_init(struct media_device *mdev)
 }
 EXPORT_SYMBOL_GPL(media_device_init);
 
-struct media_device *media_device_alloc(void)
+struct media_device *media_device_alloc(struct device *dev)
 {
 	struct media_device *mdev;
 
-	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
-	if (!mdev)
+	dev = get_device(dev);
+	if (!dev)
 		return NULL;
 
+	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
+	if (!mdev) {
+		put_device(dev);
+		return NULL;
+	}
+
 	media_devnode_init(&mdev->devnode);
+	mdev->dev = dev;
 	media_device_init(mdev);
 
 	return mdev;
@@ -720,6 +727,7 @@ void media_device_cleanup(struct media_device *mdev)
 	mdev->entity_internal_idx_max = 0;
 	media_entity_graph_walk_cleanup(&mdev->pm_count_walk);
 	mutex_destroy(&mdev->graph_mutex);
+	put_device(mdev->dev);
 }
 EXPORT_SYMBOL_GPL(media_device_cleanup);
 
