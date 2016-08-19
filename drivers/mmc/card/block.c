@@ -336,22 +336,21 @@ static struct mmc_blk_ioc_data *mmc_blk_ioctl_copy_from_user(
 	struct mmc_ioc_cmd __user *user)
 {
 	struct mmc_blk_ioc_data *idata;
-	int err;
 
 	idata = kmalloc(sizeof(*idata), GFP_KERNEL);
 	if (!idata) {
-		err = -ENOMEM;
+		idata = ERR_PTR(-ENOMEM);
 		goto out;
 	}
 
 	if (copy_from_user(&idata->ic, user, sizeof(idata->ic))) {
-		err = -EFAULT;
+		idata = ERR_PTR(-EFAULT);
 		goto idata_err;
 	}
 
 	idata->buf_bytes = (u64) idata->ic.blksz * idata->ic.blocks;
 	if (idata->buf_bytes > MMC_IOC_MAX_BYTES) {
-		err = -EOVERFLOW;
+		idata = ERR_PTR(-EOVERFLOW);
 		goto idata_err;
 	}
 
@@ -360,26 +359,19 @@ static struct mmc_blk_ioc_data *mmc_blk_ioctl_copy_from_user(
 		return idata;
 	}
 
-	idata->buf = kmalloc(idata->buf_bytes, GFP_KERNEL);
-	if (!idata->buf) {
-		err = -ENOMEM;
+	idata->buf = memdup_user((void __user *)(unsigned long)
+				 idata->ic.data_ptr,
+				 idata->buf_bytes);
+	if (IS_ERR(idata->buf)) {
+		idata = (void *) idata->buf;
 		goto idata_err;
 	}
-
-	if (copy_from_user(idata->buf, (void __user *)(unsigned long)
-					idata->ic.data_ptr, idata->buf_bytes)) {
-		err = -EFAULT;
-		goto copy_err;
-	}
-
 	return idata;
 
-copy_err:
-	kfree(idata->buf);
 idata_err:
 	kfree(idata);
 out:
-	return ERR_PTR(err);
+	return idata;
 }
 
 static int mmc_blk_ioctl_copy_to_user(struct mmc_ioc_cmd __user *ic_ptr,
