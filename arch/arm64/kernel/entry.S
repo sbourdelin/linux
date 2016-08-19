@@ -268,6 +268,40 @@ alternative_endif
 	mov	sp, x19
 	.endm
 
+	.macro	trace_hardirqs_off, pstate
+#ifdef CONFIG_TRACE_IRQFLAGS
+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
+	bl	trace_hardirqs_off
+	nop
+alternative_else
+	tbnz	\pstate, #PSR_G_SHIFT, 1f		// PSR_G_BIT
+	bl	trace_hardirqs_off
+1:
+alternative_endif
+#else
+	bl	trace_hardirqs_off
+#endif
+#endif
+	.endm
+
+	.macro	trace_hardirqs_on, pstate
+#ifdef CONFIG_TRACE_IRQFLAGS
+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
+	bl	trace_hardirqs_on
+	nop
+alternative_else
+	tbnz	\pstate, #PSR_G_SHIFT, 1f		// PSR_G_BIT
+	bl	trace_hardirqs_on
+1:
+alternative_endif
+#else
+	bl	trace_hardirqs_on
+#endif
+#endif
+	.endm
+
 /*
  * These are the registers used in the syscall handler, and allow us to
  * have in theory up to 7 arguments to a function - x0 to x6.
@@ -413,12 +447,12 @@ el1_da:
 	 * Data abort handling
 	 */
 	mrs	x0, far_el1
+	enable_nmi
 	enable_dbg
 	// re-enable interrupts if they were enabled in the aborted context
 #ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
 alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
 	tbnz	x23, #7, 1f			// PSR_I_BIT
-	nop
 	nop
 	msr     daifclr, #2
 1:
@@ -426,7 +460,6 @@ alternative_else
 	tbnz	x23, #PSR_G_SHIFT, 1f		// PSR_G_BIT
 	mov     x2, #ICC_PMR_EL1_UNMASKED
 	msr_s   ICC_PMR_EL1, x2
-	msr     daifclr, #2
 1:
 alternative_endif
 #else
@@ -439,6 +472,7 @@ alternative_endif
 
 	// disable interrupts before pulling preserved data off the stack
 	disable_irq x21
+	disable_nmi
 	kernel_exit 1
 el1_sp_pc:
 	/*
@@ -479,10 +513,14 @@ ENDPROC(el1_sync)
 el1_irq:
 	kernel_entry 1
 	enable_dbg
-#ifdef CONFIG_TRACE_IRQFLAGS
-	bl	trace_hardirqs_off
-#endif
+	trace_hardirqs_off x23
 
+	/*
+	 * On systems with CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS then
+	 * we do not yet know if this IRQ is a pseudo-NMI or a normal
+	 * interrupt. For that reason we must rely on the irq_handler to
+	 * enable the NMI once the interrupt type is determined.
+	 */
 	irq_handler
 
 #ifdef CONFIG_PREEMPT
@@ -493,9 +531,9 @@ el1_irq:
 	bl	el1_preempt
 1:
 #endif
-#ifdef CONFIG_TRACE_IRQFLAGS
-	bl	trace_hardirqs_on
-#endif
+
+	disable_nmi
+	trace_hardirqs_on x23
 	kernel_exit 1
 ENDPROC(el1_irq)
 
@@ -592,6 +630,7 @@ el0_da:
 	 */
 	mrs	x26, far_el1
 	// enable interrupts before calling the main handler
+	enable_nmi
 	enable_dbg_and_irq x0
 	ct_user_exit
 	bic	x0, x26, #(0xff << 56)
@@ -605,6 +644,7 @@ el0_ia:
 	 */
 	mrs	x26, far_el1
 	// enable interrupts before calling the main handler
+	enable_nmi
 	enable_dbg_and_irq x0
 	ct_user_exit
 	mov	x0, x26
@@ -638,6 +678,7 @@ el0_sp_pc:
 	 */
 	mrs	x26, far_el1
 	// enable interrupts before calling the main handler
+	enable_nmi
 	enable_dbg_and_irq x0
 	ct_user_exit
 	mov	x0, x26
@@ -650,6 +691,7 @@ el0_undef:
 	 * Undefined instruction
 	 */
 	// enable interrupts before calling the main handler
+	enable_nmi
 	enable_dbg_and_irq x0
 	ct_user_exit
 	mov	x0, sp
@@ -692,16 +734,18 @@ el0_irq:
 	kernel_entry 0
 el0_irq_naked:
 	enable_dbg
-#ifdef CONFIG_TRACE_IRQFLAGS
-	bl	trace_hardirqs_off
-#endif
-
+	trace_hardirqs_off x23
 	ct_user_exit
+
+	/*
+	 * On systems with CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS then
+	 * we do not yet know if this IRQ is a pseudo-NMI or a normal
+	 * interrupt. For that reason we must rely on the irq_handler to
+	 * enable the NMI once the interrupt type is determined.
+	 */
 	irq_handler
 
-#ifdef CONFIG_TRACE_IRQFLAGS
-	bl	trace_hardirqs_on
-#endif
+	trace_hardirqs_on x23
 	b	ret_to_user
 ENDPROC(el0_irq)
 
@@ -751,6 +795,7 @@ ret_fast_syscall:
 	and	x2, x1, #_TIF_WORK_MASK
 	cbnz	x2, work_pending
 	enable_step_tsk x1, x2
+	disable_nmi
 	kernel_exit 0
 ret_fast_syscall_trace:
 	enable_irq x0				// enable interrupts
@@ -763,6 +808,7 @@ work_pending:
 	tbnz	x1, #TIF_NEED_RESCHED, work_resched
 	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
 	mov	x0, sp				// 'regs'
+	enable_nmi
 	enable_irq x21				// enable interrupts for do_notify_resume()
 	bl	do_notify_resume
 	b	ret_to_user
@@ -781,6 +827,7 @@ ret_to_user:
 	and	x2, x1, #_TIF_WORK_MASK
 	cbnz	x2, work_pending
 	enable_step_tsk x1, x2
+	disable_nmi
 	kernel_exit 0
 ENDPROC(ret_to_user)
 
@@ -806,6 +853,7 @@ el0_svc:
 	mov	sc_nr, #__NR_syscalls
 el0_svc_naked:					// compat entry point
 	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
+	enable_nmi
 	enable_dbg_and_irq x16
 	ct_user_exit 1
 

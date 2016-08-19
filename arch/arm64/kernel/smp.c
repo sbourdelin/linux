@@ -879,6 +879,13 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 #endif
 
 	case IPI_CPU_BACKTRACE:
+		BUILD_BUG_ON(SMP_IPI_NMI_MASK != BIT(IPI_CPU_BACKTRACE));
+
+		if (in_nmi()) {
+			nmi_cpu_backtrace(regs);
+			break;
+		}
+
 		printk_nmi_enter();
 		irq_enter();
 		nmi_cpu_backtrace(regs);
@@ -960,13 +967,31 @@ bool cpus_are_stuck_in_kernel(void)
 	return !!cpus_stuck_in_kernel || smp_spin_tables;
 }
 
+/*
+ * IPI_CPU_BACKTRACE is either implemented either as a normal IRQ  or,
+ * if the hardware can supports it, using a pseudo-NMI.
+ *
+ * The mechanism used to implement pseudo-NMI means that in both cases
+ * testing if the backtrace IPI is disabled requires us to check the
+ * PSR I bit. However in the later case we cannot use irqs_disabled()
+ * to check the I bit because, when the pseudo-NMI is active that
+ * function examines the GIC PMR instead.
+ */
+static unsigned long nmi_disabled(void)
+{
+	unsigned long flags;
+
+	asm volatile("mrs %0, daif" : "=r"(flags) :: "memory");
+	return flags & PSR_I_BIT;
+}
+
 static void raise_nmi(cpumask_t *mask)
 {
 	/*
 	 * Generate the backtrace directly if we are running in a
 	 * calling context that is not preemptible by the backtrace IPI.
 	 */
-	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
+	if (cpumask_test_cpu(smp_processor_id(), mask) && nmi_disabled())
 		nmi_cpu_backtrace(NULL);
 
 	smp_cross_call(mask, IPI_CPU_BACKTRACE);

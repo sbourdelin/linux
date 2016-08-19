@@ -33,6 +33,29 @@
 #include <asm/thread_info.h>
 
 /*
+ * Enable and disable pseudo NMI.
+ */
+	.macro disable_nmi
+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
+	nop
+alternative_else
+	msr	daifset, #2
+alternative_endif
+#endif
+	.endm
+
+	.macro enable_nmi
+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
+	nop
+alternative_else
+	msr	daifclr, #2
+alternative_endif
+#endif
+	.endm
+
+/*
  * Enable and disable interrupts.
  */
 	.macro	disable_irq, tmp

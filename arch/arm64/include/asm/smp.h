@@ -33,6 +33,8 @@
 #include <linux/cpumask.h>
 #include <linux/thread_info.h>
 
+#define SMP_IPI_NMI_MASK (1 << 6)
+
 #define raw_smp_processor_id() (current_thread_info()->cpu)
 
 struct seq_file;

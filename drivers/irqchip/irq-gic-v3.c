@@ -23,6 +23,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/irqdomain.h>
+#include <linux/nmi.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
@@ -342,9 +343,59 @@ static u64 gic_mpidr_to_affinity(unsigned long mpidr)
 	return aff;
 }
 
+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+static bool gic_handle_nmi(struct pt_regs *regs)
+{
+	u64 irqnr;
+	struct pt_regs *old_regs;
+
+	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r"(irqnr));
+
+	/*
+	 * If no IRQ is acknowledged at this point then we have entered the
+	 * handler due to an normal interrupt (rather than a pseudo-NMI).
+	 * If so then unmask the I-bit and return to normal handling.
+	 */
+	if (irqnr == ICC_IAR1_EL1_SPURIOUS) {
+		asm volatile("msr daifclr, #2" : : : "memory");
+		return false;
+	}
+
+	old_regs = set_irq_regs(regs);
+	nmi_enter();
+
+	do {
+		if (SMP_IPI_NMI_MASK & (1 << irqnr)) {
+			gic_write_eoir(irqnr);
+			if (static_key_true(&supports_deactivate))
+				gic_write_dir(irqnr);
+			nmi_cpu_backtrace(regs);
+		} else if (unlikely(irqnr != ICC_IAR1_EL1_SPURIOUS)) {
+			gic_write_eoir(irqnr);
+			if (static_key_true(&supports_deactivate))
+				gic_write_dir(irqnr);
+			WARN_ONCE(true, "Unexpected NMI received!\n");
+		}
+
+		asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1)
+			     : "=r"(irqnr));
+	} while (irqnr != ICC_IAR1_EL1_SPURIOUS);
+
+	nmi_exit();
+	set_irq_regs(old_regs);
+
+	return true;
+}
+#else
+static bool gic_handle_nmi(struct pt_regs *regs) { return false; }
+#endif
+
 static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
 {
 	u32 irqnr;
+
+	if (gic_handle_nmi(regs))
+		return;
 
 	do {
 		irqnr = gic_read_iar();
@@ -525,6 +576,7 @@ static int gic_dist_supports_lpis(void)
 static void gic_cpu_init(void)
 {
 	void __iomem *rbase;
+	unsigned long __maybe_unused nmimask, hwirq;
 
 	/* Register ourselves with the rest of the world */
 	if (gic_populate_rdist())
@@ -545,6 +597,16 @@ static void gic_cpu_init(void)
 
 	/* initialise system registers */
 	gic_cpu_sys_reg_init();
+
+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+	/* Boost the priority of any IPI in the mask */
+	nmimask = SMP_IPI_NMI_MASK;
+	for_each_set_bit(hwirq, &nmimask, 16)
+		writeb_relaxed(GICD_INT_DEF_PRI ^ BIT(7),
+			       rbase + GIC_DIST_PRI + hwirq);
+	gic_dist_wait_for_rwp();
+	gic_redist_wait_for_rwp();
+#endif
 }
 
 #ifdef CONFIG_SMP
