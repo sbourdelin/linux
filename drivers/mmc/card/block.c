@@ -345,13 +345,13 @@ static struct mmc_blk_ioc_data *mmc_blk_ioctl_copy_from_user(
 
 	if (copy_from_user(&idata->ic, user, sizeof(idata->ic))) {
 		idata = ERR_PTR(-EFAULT);
-		goto idata_err;
+		goto free_idata;
 	}
 
 	idata->buf_bytes = (u64) idata->ic.blksz * idata->ic.blocks;
 	if (idata->buf_bytes > MMC_IOC_MAX_BYTES) {
 		idata = ERR_PTR(-EOVERFLOW);
-		goto idata_err;
+		goto free_idata;
 	}
 
 	if (!idata->buf_bytes) {
@@ -364,11 +364,11 @@ static struct mmc_blk_ioc_data *mmc_blk_ioctl_copy_from_user(
 				 idata->buf_bytes);
 	if (IS_ERR(idata->buf)) {
 		idata = (void *) idata->buf;
-		goto idata_err;
+		goto free_idata;
 	}
 	return idata;
 
-idata_err:
+free_idata:
 	kfree(idata);
 out:
 	return idata;
