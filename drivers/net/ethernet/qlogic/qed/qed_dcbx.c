@@ -115,7 +115,6 @@ static bool qed_dcbx_fcoe_tlv(u32 app_info_bitmap, u16 proto_id, bool ieee)
 		ethtype = qed_dcbx_app_ethtype(app_info_bitmap);
 
 	return !!(ethtype && (proto_id == QED_ETH_TYPE_FCOE));
-<<<<<<< HEAD
 }
 
 static bool qed_dcbx_roce_tlv(u32 app_info_bitmap, u16 proto_id, bool ieee)
@@ -132,24 +131,6 @@ static bool qed_dcbx_roce_tlv(u32 app_info_bitmap, u16 proto_id, bool ieee)
 
 static bool qed_dcbx_roce_v2_tlv(u32 app_info_bitmap, u16 proto_id, bool ieee)
 {
-=======
-}
-
-static bool qed_dcbx_roce_tlv(u32 app_info_bitmap, u16 proto_id, bool ieee)
-{
-	bool ethtype;
-
-	if (ieee)
-		ethtype = qed_dcbx_ieee_app_ethtype(app_info_bitmap);
-	else
-		ethtype = qed_dcbx_app_ethtype(app_info_bitmap);
-
-	return !!(ethtype && (proto_id == QED_ETH_TYPE_ROCE));
-}
-
-static bool qed_dcbx_roce_v2_tlv(u32 app_info_bitmap, u16 proto_id, bool ieee)
-{
->>>>>>> linux-next/akpm-base
 	bool port;
 
 	if (ieee)

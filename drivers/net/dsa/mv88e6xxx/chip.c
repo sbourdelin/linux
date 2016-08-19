@@ -3250,37 +3250,6 @@ static int mv88e6xxx_set_addr(struct dsa_switch *ds, u8 *addr)
 	return err;
 }
 
-<<<<<<< HEAD
-#ifdef CONFIG_NET_DSA_HWMON
-static int mv88e6xxx_mdio_page_read(struct dsa_switch *ds, int port, int page,
-				    int reg)
-{
-	struct mv88e6xxx_chip *chip = ds_to_priv(ds);
-	int ret;
-
-	mutex_lock(&chip->reg_lock);
-	ret = _mv88e6xxx_mdio_page_read(chip, port, page, reg);
-	mutex_unlock(&chip->reg_lock);
-
-	return ret;
-}
-
-static int mv88e6xxx_mdio_page_write(struct dsa_switch *ds, int port, int page,
-				     int reg, int val)
-{
-	struct mv88e6xxx_chip *chip = ds_to_priv(ds);
-	int ret;
-
-	mutex_lock(&chip->reg_lock);
-	ret = _mv88e6xxx_mdio_page_write(chip, port, page, reg, val);
-	mutex_unlock(&chip->reg_lock);
-
-	return ret;
-}
-#endif
-
-=======
->>>>>>> linux-next/akpm-base
 static int mv88e6xxx_port_to_mdio_addr(struct mv88e6xxx_chip *chip, int port)
 {
 	if (port >= 0 && port < chip->info->num_ports)

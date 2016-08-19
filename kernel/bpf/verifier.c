@@ -1078,12 +1078,8 @@ static int check_map_func_compatibility(struct bpf_map *map, int func_id)
 			goto error;
 		break;
 	case BPF_MAP_TYPE_CGROUP_ARRAY:
-<<<<<<< HEAD
-		if (func_id != BPF_FUNC_skb_under_cgroup)
-=======
 		if (func_id != BPF_FUNC_skb_under_cgroup &&
 		    func_id != BPF_FUNC_current_task_under_cgroup)
->>>>>>> linux-next/akpm-base
 			goto error;
 		break;
 	default:
@@ -1105,10 +1101,7 @@ static int check_map_func_compatibility(struct bpf_map *map, int func_id)
 		if (map->map_type != BPF_MAP_TYPE_STACK_TRACE)
 			goto error;
 		break;
-<<<<<<< HEAD
-=======
 	case BPF_FUNC_current_task_under_cgroup:
->>>>>>> linux-next/akpm-base
 	case BPF_FUNC_skb_under_cgroup:
 		if (map->map_type != BPF_MAP_TYPE_CGROUP_ARRAY)
 			goto error;

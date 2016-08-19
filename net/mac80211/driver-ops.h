@@ -1092,15 +1092,9 @@ static inline u32 drv_get_expected_throughput(struct ieee80211_local *local,
 {
 	u32 ret = 0;
 
-<<<<<<< HEAD
-	trace_drv_get_expected_throughput(sta);
-	if (local->ops->get_expected_throughput)
-		ret = local->ops->get_expected_throughput(&local->hw, sta);
-=======
 	trace_drv_get_expected_throughput(&sta->sta);
 	if (local->ops->get_expected_throughput && sta->uploaded)
 		ret = local->ops->get_expected_throughput(&local->hw, &sta->sta);
->>>>>>> linux-next/akpm-base
 	trace_drv_return_u32(local, ret);
 
 	return ret;
