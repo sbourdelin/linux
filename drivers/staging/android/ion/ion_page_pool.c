@@ -31,7 +31,7 @@ static void *ion_page_pool_alloc_pages(struct ion_page_pool *pool)
 	if (!page)
 		return NULL;
 	ion_pages_sync_for_device(NULL, page, PAGE_SIZE << pool->order,
-						DMA_BIDIRECTIONAL);
+				  DMA_BIDIRECTIONAL);
 	return page;
 }
 
@@ -114,7 +114,7 @@ static int ion_page_pool_total(struct ion_page_pool *pool, bool high)
 }
 
 int ion_page_pool_shrink(struct ion_page_pool *pool, gfp_t gfp_mask,
-				int nr_to_scan)
+			 int nr_to_scan)
 {
 	int freed = 0;
 	bool high;

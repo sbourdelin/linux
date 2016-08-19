@@ -71,7 +71,7 @@ static struct page *alloc_buffer_page(struct ion_system_heap *heap,
 		if (!page)
 			return NULL;
 		ion_pages_sync_for_device(NULL, page, PAGE_SIZE << order,
-						DMA_BIDIRECTIONAL);
+					  DMA_BIDIRECTIONAL);
 	}
 
 	return page;
@@ -118,9 +118,9 @@ static struct page *alloc_largest_available(struct ion_system_heap *heap,
 }
 
 static int ion_system_heap_allocate(struct ion_heap *heap,
-				     struct ion_buffer *buffer,
-				     unsigned long size, unsigned long align,
-				     unsigned long flags)
+				    struct ion_buffer *buffer,
+				    unsigned long size, unsigned long align,
+				    unsigned long flags)
 {
 	struct ion_system_heap *sys_heap = container_of(heap,
 							struct ion_system_heap,
@@ -142,7 +142,7 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 	INIT_LIST_HEAD(&pages);
 	while (size_remaining > 0) {
 		page = alloc_largest_available(sys_heap, buffer, size_remaining,
-						max_order);
+					       max_order);
 		if (!page)
 			goto free_pages;
 		list_add_tail(&page->lru, &pages);
@@ -200,7 +200,7 @@ static void ion_system_heap_free(struct ion_buffer *buffer)
 }
 
 static int ion_system_heap_shrink(struct ion_heap *heap, gfp_t gfp_mask,
-					int nr_to_scan)
+				  int nr_to_scan)
 {
 	struct ion_system_heap *sys_heap;
 	int nr_total = 0;
