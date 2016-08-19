@@ -1117,6 +1117,7 @@ static void ci_controller_suspend(struct ci_hdrc *ci)
 		usleep_range(ci->platdata->phy_clkgate_delay_us,
 			     ci->platdata->phy_clkgate_delay_us + 50);
 	usb_phy_set_suspend(ci->usb_phy, 1);
+	phy_power_off(ci->phy);
 	ci->in_lpm = true;
 	enable_irq(ci->irq);
 }
@@ -1133,9 +1134,10 @@ static int ci_controller_resume(struct device *dev)
 	}
 
 	ci_hdrc_enter_lpm(ci, false);
-	if (ci->usb_phy) {
+	if (ci->usb_phy || ci->phy) {
 		usb_phy_set_suspend(ci->usb_phy, 0);
 		usb_phy_set_wakeup(ci->usb_phy, false);
+		phy_power_on(ci->phy);
 		hw_wait_phy_stable();
 	}
 
