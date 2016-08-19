@@ -1059,4 +1059,6 @@ void omap3isp_stat_cleanup(struct ispstat *stat)
 	mutex_destroy(&stat->ioctl_lock);
 	isp_stat_bufs_free(stat);
 	kfree(stat->buf);
+	kfree(stat->priv);
+	kfree(stat->recover_priv);
 }

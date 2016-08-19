@@ -1370,7 +1370,7 @@ static int isp_get_clocks(struct isp_device *isp)
 	unsigned int i;
 
 	for (i = 0; i < ARRAY_SIZE(isp_clocks); ++i) {
-		clk = devm_clk_get(isp->dev, isp_clocks[i]);
+		clk = clk_get(isp->dev, isp_clocks[i]);
 		if (IS_ERR(clk)) {
 			dev_err(isp->dev, "clk_get %s failed\n", isp_clocks[i]);
 			return PTR_ERR(clk);
@@ -1380,6 +1380,14 @@ static int isp_get_clocks(struct isp_device *isp)
 	}
 
 	return 0;
+}
+
+static void isp_put_clocks(struct isp_device *isp)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(isp_clocks); ++i)
+		clk_put(isp->clock[i]);
 }
 
 /*
@@ -1596,7 +1604,6 @@ static void isp_unregister_entities(struct isp_device *isp)
 	omap3isp_stat_unregister_entities(&isp->isp_af);
 	omap3isp_stat_unregister_entities(&isp->isp_hist);
 
-	v4l2_device_unregister(&isp->v4l2_dev);
 	media_device_unregister(isp->media_dev);
 }
 
@@ -1952,6 +1959,8 @@ static void isp_release(struct media_device *mdev)
 {
 	struct isp_device *isp = media_device_priv(mdev);
 
+	v4l2_device_unregister(&isp->v4l2_dev);
+
 	isp_cleanup_modules(isp);
 	isp_xclk_cleanup(isp);
 
@@ -1960,6 +1969,10 @@ static void isp_release(struct media_device *mdev)
 	__omap3isp_put(isp, false);
 
 	media_entity_enum_cleanup(&isp->crashed);
+
+	isp_put_clocks(isp);
+
+	kfree(isp);
 }
 
 static int isp_attach_iommu(struct isp_device *isp)
@@ -2212,7 +2225,7 @@ static int isp_probe(struct platform_device *pdev)
 	int ret;
 	int i, m;
 
-	isp = devm_kzalloc(&pdev->dev, sizeof(*isp), GFP_KERNEL);
+	isp = kzalloc(sizeof(*isp), GFP_KERNEL);
 	if (!isp) {
 		dev_err(&pdev->dev, "could not allocate memory\n");
 		return -ENOMEM;
@@ -2221,21 +2234,23 @@ static int isp_probe(struct platform_device *pdev)
 	ret = of_property_read_u32(pdev->dev.of_node, "ti,phy-type",
 				   &isp->phy_type);
 	if (ret)
-		return ret;
+		goto error_release_isp;
 
 	isp->syscon = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
 						      "syscon");
-	if (IS_ERR(isp->syscon))
-		return PTR_ERR(isp->syscon);
+	if (IS_ERR(isp->syscon)) {
+		ret = PTR_ERR(isp->syscon);
+		goto error_release_isp;
+	}
 
 	ret = of_property_read_u32_index(pdev->dev.of_node, "syscon", 1,
 					 &isp->syscon_offset);
 	if (ret)
-		return ret;
+		goto error_release_isp;
 
 	ret = isp_of_parse_nodes(&pdev->dev, &isp->notifier);
 	if (ret < 0)
-		return ret;
+		goto error_release_isp;
 
 	isp->autoidle = autoidle;
 
@@ -2252,8 +2267,8 @@ static int isp_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, isp);
 
 	/* Regulators */
-	isp->isp_csiphy1.vdd = devm_regulator_get(&pdev->dev, "vdd-csiphy1");
-	isp->isp_csiphy2.vdd = devm_regulator_get(&pdev->dev, "vdd-csiphy2");
+	isp->isp_csiphy1.vdd = regulator_get(&pdev->dev, "vdd-csiphy1");
+	isp->isp_csiphy2.vdd = regulator_get(&pdev->dev, "vdd-csiphy2");
 
 	/* Clocks
 	 *
@@ -2385,6 +2400,9 @@ error_isp:
 	__omap3isp_put(isp, false);
 error:
 	mutex_destroy(&isp->isp_mutex);
+	isp_put_clocks(isp);
+error_release_isp:
+	kfree(isp);
 
 	return ret;
 }

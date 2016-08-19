@@ -477,9 +477,9 @@ int omap3isp_hist_init(struct isp_device *isp)
 {
 	struct ispstat *hist = &isp->isp_hist;
 	struct omap3isp_hist_config *hist_cfg;
-	int ret = -1;
+	int ret;
 
-	hist_cfg = devm_kzalloc(isp->dev, sizeof(*hist_cfg), GFP_KERNEL);
+	hist_cfg = kzalloc(sizeof(*hist_cfg), GFP_KERNEL);
 	if (hist_cfg == NULL)
 		return -ENOMEM;
 
@@ -517,6 +517,7 @@ int omap3isp_hist_init(struct isp_device *isp)
 	if (ret) {
 		if (hist->dma_ch)
 			dma_release_channel(hist->dma_ch);
+		kfree(hist_cfg);
 	}
 
 	return ret;
