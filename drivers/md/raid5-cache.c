@@ -40,6 +40,16 @@
  */
 #define R5L_POOL_SIZE	4
 
+enum r5c_cache_mode {
+	R5C_MODE_NO_CACHE = 0,
+	R5C_MODE_WRITE_THROUGH = 1,
+	R5C_MODE_WRITE_BACK = 2,
+	R5C_MODE_BROKEN_CACHE = 3,
+};
+
+static char *r5c_cache_mode_str[] = {"no-cache", "write-through",
+				     "write-back", "broken-cache"};
+
 struct r5l_log {
 	struct md_rdev *rdev;
 
@@ -97,6 +107,8 @@ struct r5l_log {
 
 	bool need_cache_flush;
 	bool in_teardown;
+
+	enum r5c_cache_mode cache_mode;
 };
 
 /*
@@ -1193,6 +1205,56 @@ ioerr:
 	return ret;
 }
 
+ssize_t r5c_show_cache_mode(struct mddev *mddev, char *page)
+{
+	struct r5conf *conf = mddev->private;
+	int val = 0;
+	int ret = 0;
+
+	if (conf->log)
+		val = conf->log->cache_mode;
+	else if (test_bit(MD_HAS_JOURNAL, &mddev->flags))
+		val = R5C_MODE_BROKEN_CACHE;
+	ret += snprintf(page, PAGE_SIZE - ret, "%d: %s\n",
+			val, r5c_cache_mode_str[val]);
+	return ret;
+}
+
+ssize_t r5c_store_cache_mode(struct mddev *mddev, const char *page, size_t len)
+{
+	struct r5conf *conf = mddev->private;
+	struct r5l_log *log = conf->log;
+	int val;
+
+	if (kstrtoint(page, 10, &val))
+		return -EINVAL;
+	if (!log && val != R5C_MODE_NO_CACHE)
+		return -EINVAL;
+	/* currently only support write through (write journal) */
+	if (val < R5C_MODE_NO_CACHE || val > R5C_MODE_WRITE_THROUGH)
+		return -EINVAL;
+	if (val == R5C_MODE_NO_CACHE) {
+		if (conf->log &&
+		    !test_bit(Faulty, &log->rdev->flags)) {
+			pr_err("md/raid:%s: journal device is in use, cannot remove it\n",
+			       mdname(mddev));
+			return -EINVAL;
+		}
+	}
+
+	spin_lock_irq(&conf->device_lock);
+	if (log)
+		conf->log->cache_mode = val;
+	if (val == R5C_MODE_NO_CACHE) {
+		clear_bit(MD_HAS_JOURNAL, &mddev->flags);
+		set_bit(MD_UPDATE_SB_FLAGS, &mddev->flags);
+	}
+	spin_unlock_irq(&conf->device_lock);
+	pr_info("%s: setting r5c cache mode to %d: %s\n",
+		       mdname(mddev), val, r5c_cache_mode_str[val]);
+	return len;
+}
+
 int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev)
 {
 	struct request_queue *q = bdev_get_queue(rdev->bdev);
@@ -1245,6 +1307,8 @@ int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev)
 
 	INIT_LIST_HEAD(&log->no_space_stripes);
 	spin_lock_init(&log->no_space_stripes_lock);
+
+	log->cache_mode = R5C_MODE_WRITE_THROUGH;
 
 	if (r5l_load_log(log))
 		goto error;

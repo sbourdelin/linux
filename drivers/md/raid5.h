@@ -635,4 +635,10 @@ extern void r5l_stripe_write_finished(struct stripe_head *sh);
 extern int r5l_handle_flush_request(struct r5l_log *log, struct bio *bio);
 extern void r5l_quiesce(struct r5l_log *log, int state);
 extern bool r5l_log_disk_error(struct r5conf *conf);
+
+
+extern ssize_t r5c_show_cache_mode(struct mddev *mddev, char *page);
+extern ssize_t
+r5c_store_cache_mode(struct mddev *mddev, const char *page, size_t len);
+
 #endif

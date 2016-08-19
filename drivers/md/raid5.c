@@ -6216,6 +6216,10 @@ raid5_group_thread_cnt = __ATTR(group_thread_cnt, S_IRUGO | S_IWUSR,
 				raid5_show_group_thread_cnt,
 				raid5_store_group_thread_cnt);
 
+static struct md_sysfs_entry
+r5c_cache_mode = __ATTR(r5c_cache_mode, S_IRUGO | S_IWUSR,
+			r5c_show_cache_mode, r5c_store_cache_mode);
+
 static struct attribute *raid5_attrs[] =  {
 	&raid5_stripecache_size.attr,
 	&raid5_stripecache_active.attr,
@@ -6223,6 +6227,7 @@ static struct attribute *raid5_attrs[] =  {
 	&raid5_group_thread_cnt.attr,
 	&raid5_skip_copy.attr,
 	&raid5_rmw_level.attr,
+	&r5c_cache_mode.attr,
 	NULL,
 };
 static struct attribute_group raid5_attrs_group = {
