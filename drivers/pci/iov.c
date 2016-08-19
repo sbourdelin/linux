@@ -640,6 +640,20 @@ int pci_enable_sriov(struct pci_dev *dev, int nr_virtfn)
 EXPORT_SYMBOL_GPL(pci_enable_sriov);
 
 /**
+ * pci_sriov_fdl_override - fix incorrect Function Dependency Link
+ * @dev: the PCI device
+ * @fdl: the corrected Function Dependency Link value
+ *
+ * For hardware presenting an incorrect Function Dependency Link in
+ * the SR-IOV Extended Capability, allow a driver to override it.
+ */
+void pci_sriov_fdl_override(struct pci_dev *dev, u8 fdl)
+{
+	dev->sriov->link = fdl;
+}
+EXPORT_SYMBOL_GPL(pci_sriov_fdl_override);
+
+/**
  * pci_disable_sriov - disable the SR-IOV capability
  * @dev: the PCI device
  */
