@@ -304,3 +304,13 @@ extern unsigned long task_statm(struct mm_struct *,
 				unsigned long *, unsigned long *,
 				unsigned long *, unsigned long *);
 extern void task_mem(struct seq_file *, struct mm_struct *);
+
+/* prints given value (in kB) padded properly to 8 spaces */
+extern void show_val_kb(struct seq_file *m, unsigned long num);
+
+#define show_name_pages_kb(seq, name, pages)	\
+({						\
+ 	BUILD_BUG_ON(!__builtin_constant_p(name));\
+ 	seq_write(seq, name, sizeof(name));	\
+ 	show_val_kb(seq, (pages) << (PAGE_SHIFT - 10));\
+ })
