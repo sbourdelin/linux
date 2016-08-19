@@ -1113,6 +1113,8 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 			if (++migratetype == MIGRATE_PCPTYPES)
 				migratetype = 0;
 			list = &pcp->lists[migratetype];
+
+			WARN_ON(batch_free > MIGRATE_PCPTYPES);
 		} while (list_empty(list));
 
 		/* This is the only non-empty list. Free them all. */
