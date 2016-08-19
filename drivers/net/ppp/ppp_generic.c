@@ -162,6 +162,46 @@ struct ppp {
 			 |SC_MULTILINK|SC_MP_SHORTSEQ|SC_MP_XSHORTSEQ \
 			 |SC_COMP_TCP|SC_REJ_COMP_TCP|SC_MUST_COMP)
 
+struct channel_lock {
+	spinlock_t lock;
+	int owner;
+};
+
+static inline void ppp_channel_lock_init(struct channel_lock *cl)
+{
+	cl->owner = -1;
+	spin_lock_init(&cl->lock);
+}
+
+static inline bool ppp_channel_lock_bh(struct channel_lock *cl)
+{
+	int cpu;
+
+	local_bh_disable();
+	cpu = smp_processor_id();
+	if (cpu == cl->owner) {
+		/* The CPU already holds this channel lock and sends. But the
+		 * channel is selected after inappropriate route. It causes
+		 * reenter the channel again. It is forbidden by PPP module.
+		 */
+		if (net_ratelimit())
+			pr_err("PPP detects one recursive channel send\n");
+		local_bh_enable();
+		return false;
+	}
+	spin_lock(&cl->lock);
+	cl->owner = cpu;
+
+	return true;
+}
+
+static inline void ppp_channel_unlock_bh(struct channel_lock *cl)
+{
+	cl->owner = -1;
+	spin_unlock(&cl->lock);
+	local_bh_enable();
+}
+
 /*
  * Private data structure for each channel.
  * This includes the data structure used for multilink.
@@ -171,7 +211,7 @@ struct channel {
 	struct list_head list;		/* link in all/new_channels list */
 	struct ppp_channel *chan;	/* public channel data structure */
 	struct rw_semaphore chan_sem;	/* protects `chan' during chan ioctl */
-	spinlock_t	downl;		/* protects `chan', file.xq dequeue */
+	struct channel_lock downl;	/* protects `chan', file.xq dequeue */
 	struct ppp	*ppp;		/* ppp unit we're connected to */
 	struct net	*chan_net;	/* the net channel belongs to */
 	struct list_head clist;		/* link in list of channels per unit */
@@ -1587,9 +1627,7 @@ ppp_push(struct ppp *ppp)
 	list = &ppp->channels;
 	if (list_empty(list)) {
 		/* nowhere to send the packet, just drop it */
-		ppp->xmit_pending = NULL;
-		kfree_skb(skb);
-		return;
+		goto drop;
 	}
 
 	if ((ppp->flags & SC_MULTILINK) == 0) {
@@ -1597,16 +1635,19 @@ ppp_push(struct ppp *ppp)
 		list = list->next;
 		pch = list_entry(list, struct channel, clist);
 
-		spin_lock_bh(&pch->downl);
+		if (unlikely(!ppp_channel_lock_bh(&pch->downl))) {
+			/* Fail to hold channel lock */
+			goto drop;
+		}
 		if (pch->chan) {
 			if (pch->chan->ops->start_xmit(pch->chan, skb))
 				ppp->xmit_pending = NULL;
 		} else {
 			/* channel got unregistered */
-			kfree_skb(skb);
-			ppp->xmit_pending = NULL;
+			ppp_channel_unlock_bh(&pch->downl);
+			goto drop;
 		}
-		spin_unlock_bh(&pch->downl);
+		ppp_channel_unlock_bh(&pch->downl);
 		return;
 	}
 
@@ -1617,6 +1658,7 @@ ppp_push(struct ppp *ppp)
 		return;
 #endif /* CONFIG_PPP_MULTILINK */
 
+drop:
 	ppp->xmit_pending = NULL;
 	kfree_skb(skb);
 }
@@ -1645,6 +1687,7 @@ static int ppp_mp_explode(struct ppp *ppp, struct sk_buff *skb)
 	struct channel *pch;
 	struct sk_buff *frag;
 	struct ppp_channel *chan;
+	bool locked;
 
 	totspeed = 0; /*total bitrate of the bundle*/
 	nfree = 0; /* # channels which have no packet already queued */
@@ -1735,17 +1778,21 @@ static int ppp_mp_explode(struct ppp *ppp, struct sk_buff *skb)
 			pch->avail = 1;
 		}
 
-		/* check the channel's mtu and whether it is still attached. */
-		spin_lock_bh(&pch->downl);
-		if (pch->chan == NULL) {
-			/* can't use this channel, it's being deregistered */
+		locked = ppp_channel_lock_bh(&pch->downl);
+		if (!locked || !pch->chan) {
+			/* can't use this channel, it's being deregistered
+			 * or fail to lock the channel
+			 */
 			if (pch->speed == 0)
 				nzero--;
 			else
 				totspeed -= pch->speed;
 
-			spin_unlock_bh(&pch->downl);
-			pch->avail = 0;
+			if (locked) {
+				/* channel is deregistered */
+				ppp_channel_unlock_bh(&pch->downl);
+				pch->avail = 0;
+			}
 			totlen = len;
 			totfree--;
 			nfree--;
@@ -1795,7 +1842,7 @@ static int ppp_mp_explode(struct ppp *ppp, struct sk_buff *skb)
 		 */
 		if (flen <= 0) {
 			pch->avail = 2;
-			spin_unlock_bh(&pch->downl);
+			ppp_channel_unlock_bh(&pch->downl);
 			continue;
 		}
 
@@ -1840,14 +1887,14 @@ static int ppp_mp_explode(struct ppp *ppp, struct sk_buff *skb)
 		len -= flen;
 		++ppp->nxseq;
 		bits = 0;
-		spin_unlock_bh(&pch->downl);
+		ppp_channel_unlock_bh(&pch->downl);
 	}
 	ppp->nxchan = i;
 
 	return 1;
 
  noskb:
-	spin_unlock_bh(&pch->downl);
+	ppp_channel_unlock_bh(&pch->downl);
 	if (ppp->debug & 1)
 		netdev_err(ppp->dev, "PPP: no memory (fragment)\n");
 	++ppp->dev->stats.tx_errors;
@@ -1865,7 +1912,8 @@ ppp_channel_push(struct channel *pch)
 	struct sk_buff *skb;
 	struct ppp *ppp;
 
-	spin_lock_bh(&pch->downl);
+	if (unlikely(!ppp_channel_lock_bh(&pch->downl)))
+		return;
 	if (pch->chan) {
 		while (!skb_queue_empty(&pch->file.xq)) {
 			skb = skb_dequeue(&pch->file.xq);
@@ -1879,7 +1927,7 @@ ppp_channel_push(struct channel *pch)
 		/* channel got deregistered */
 		skb_queue_purge(&pch->file.xq);
 	}
-	spin_unlock_bh(&pch->downl);
+	ppp_channel_unlock_bh(&pch->downl);
 	/* see if there is anything from the attached unit to be sent */
 	if (skb_queue_empty(&pch->file.xq)) {
 		read_lock_bh(&pch->upl);
@@ -2520,7 +2568,7 @@ int ppp_register_net_channel(struct net *net, struct ppp_channel *chan)
 	pch->lastseq = -1;
 #endif /* CONFIG_PPP_MULTILINK */
 	init_rwsem(&pch->chan_sem);
-	spin_lock_init(&pch->downl);
+	ppp_channel_lock_init(&pch->downl);
 	rwlock_init(&pch->upl);
 
 	spin_lock_bh(&pn->all_channels_lock);
@@ -2599,9 +2647,12 @@ ppp_unregister_channel(struct ppp_channel *chan)
 	 * the channel's start_xmit or ioctl routine before we proceed.
 	 */
 	down_write(&pch->chan_sem);
-	spin_lock_bh(&pch->downl);
+	if (unlikely(!ppp_channel_lock_bh(&pch->downl))) {
+		up_write(&pch->chan_sem);
+		return;
+	}
 	pch->chan = NULL;
-	spin_unlock_bh(&pch->downl);
+	ppp_channel_unlock_bh(&pch->downl);
 	up_write(&pch->chan_sem);
 	ppp_disconnect_channel(pch);
 
