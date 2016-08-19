@@ -1862,6 +1862,7 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 	struct snd_soc_pcm_runtime *rtd;
 	struct snd_soc_dai_link *dai_link;
 	int ret, i, order;
+	bool find_new_link; /* topolgy may create new links */
 
 	mutex_lock(&client_mutex);
 	mutex_lock_nested(&card->mutex, SND_SOC_CARD_CLASS_INIT);
@@ -1934,7 +1935,13 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 			goto card_probe_error;
 	}
 
+	/* probe auxiliary components */
+	ret = soc_probe_aux_devices(card);
+	if (ret < 0)
+		goto probe_dai_err;
+
 	/* probe all components used by DAI links on this card */
+probe_link_cmpnt:
 	for (order = SND_SOC_COMP_ORDER_FIRST; order <= SND_SOC_COMP_ORDER_LAST;
 			order++) {
 		list_for_each_entry(rtd, &card->rtd_list, list) {
@@ -1948,18 +1955,15 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 		}
 	}
 
-	/* probe auxiliary components */
-	ret = soc_probe_aux_devices(card);
-	if (ret < 0)
-		goto probe_dai_err;
-
 	/* Find new DAI links added during probing components and bind them.
 	 * Components with topology may bring new DAIs and DAI links.
 	 */
+	find_new_link = false;
 	list_for_each_entry(dai_link, &card->dai_link_list, list) {
 		if (soc_is_dai_link_bound(card, dai_link))
 			continue;
 
+		find_new_link = true;
 		ret = soc_init_dai_link(card, dai_link);
 		if (ret)
 			goto probe_dai_err;
@@ -1967,6 +1971,9 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 		if (ret)
 			goto probe_dai_err;
 	}
+
+	if (find_new_link) /* new link may have unprobed components */
+		goto probe_link_cmpnt;
 
 	/* probe all DAI links on this card */
 	for (order = SND_SOC_COMP_ORDER_FIRST; order <= SND_SOC_COMP_ORDER_LAST;
