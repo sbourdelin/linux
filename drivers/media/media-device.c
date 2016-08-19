@@ -552,6 +552,9 @@ static void media_device_release(struct media_devnode *devnode)
 	mutex_destroy(&mdev->graph_mutex);
 	dev_dbg(devnode->parent, "Media device released\n");
 
+	if (mdev->release)
+		mdev->release(mdev);
+
 	kfree(mdev);
 }
 
@@ -699,9 +702,15 @@ void media_device_init(struct media_device *mdev)
 }
 EXPORT_SYMBOL_GPL(media_device_init);
 
-struct media_device *media_device_alloc(struct device *dev, void *priv)
+struct media_device *media_device_alloc(struct device *dev, void *priv,
+					size_t size)
 {
 	struct media_device *mdev;
+
+	if (!size)
+		size = sizeof(*mdev);
+	else if (WARN_ON(size < sizeof(*mdev)))
+		return NULL;
 
 	dev = get_device(dev);
 	if (!dev)

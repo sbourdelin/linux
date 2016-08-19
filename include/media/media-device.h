@@ -152,6 +152,7 @@ struct media_device {
 
 	int (*link_notify)(struct media_link *link, u32 flags,
 			   unsigned int notification);
+	void (*release)(struct media_device *mdev);
 };
 
 /* We don't need to include pci.h or usb.h here */
@@ -203,15 +204,20 @@ void media_device_init(struct media_device *mdev);
  *
  * @dev:	The associated struct device pointer
  * @priv:	pointer to a driver private data structure
+ * @size:	size of a driver structure containing the media device
  *
  * Allocate and initialise a media device. Returns a media device.
  * The media device is refcounted, and this function returns a media
  * device the refcount of which is one (1).
  *
+ * The size parameter can be zero if the media_device is not embedded
+ * in another struct.
+ *
  * References are taken and given using media_device_get() and
  * media_device_put().
  */
-struct media_device *media_device_alloc(struct device *dev, void *priv);
+struct media_device *media_device_alloc(struct device *dev, void *priv,
+					size_t size);
 
 /**
  * media_device_get() - Get a reference to a media device
