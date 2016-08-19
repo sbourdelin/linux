@@ -171,6 +171,9 @@ static void v4l2_device_release(struct device *cd)
 {
 	struct video_device *vdev = to_video_device(cd);
 	struct v4l2_device *v4l2_dev = vdev->v4l2_dev;
+#ifdef CONFIG_MEDIA_CONTROLLER
+	struct media_device *mdev = v4l2_dev->mdev;
+#endif
 
 	mutex_lock(&videodev_lock);
 	if (WARN_ON(video_device[vdev->minor] != vdev)) {
@@ -193,8 +196,8 @@ static void v4l2_device_release(struct device *cd)
 
 	mutex_unlock(&videodev_lock);
 
-#if defined(CONFIG_MEDIA_CONTROLLER)
-	if (v4l2_dev->mdev) {
+#ifdef CONFIG_MEDIA_CONTROLLER
+	if (mdev) {
 		/* Remove interfaces and interface links */
 		media_devnode_remove(vdev->intf_devnode);
 		if (vdev->entity.function != MEDIA_ENT_F_UNKNOWN)
@@ -220,6 +223,11 @@ static void v4l2_device_release(struct device *cd)
 	/* Decrease v4l2_device refcount */
 	if (v4l2_dev)
 		v4l2_device_put(v4l2_dev);
+
+#ifdef CONFIG_MEDIA_CONTROLLER
+	if (mdev)
+		media_device_put(mdev);
+#endif
 }
 
 static struct class video_class = {
@@ -808,6 +816,7 @@ static int video_register_media_controller(struct video_device *vdev, int type)
 
 	/* FIXME: how to create the other interface links? */
 
+	media_device_get(vdev->v4l2_dev->mdev);
 #endif
 	return 0;
 }
