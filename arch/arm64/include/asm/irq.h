@@ -56,5 +56,8 @@ static inline bool on_irq_stack(unsigned long sp, int cpu)
 	return (low <= sp && sp <= high);
 }
 
+extern void arch_trigger_all_cpu_backtrace(bool);
+#define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
+
 #endif /* !__ASSEMBLER__ */
 #endif
