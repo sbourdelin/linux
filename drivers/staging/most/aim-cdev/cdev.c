@@ -505,7 +505,6 @@ static int __init mod_init(void)
 
 	INIT_LIST_HEAD(&channel_list);
 	spin_lock_init(&ch_list_lock);
-	ida_init(&minor_id);
 
 	err = alloc_chrdev_region(&aim_devno, 0, 50, "cdev");
 	if (err < 0)
@@ -521,6 +520,7 @@ static int __init mod_init(void)
 	err = most_register_aim(&cdev_aim);
 	if (err)
 		goto dest_class;
+	ida_init(&minor_id);
 	return 0;
 
 dest_class:
