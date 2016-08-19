@@ -631,6 +631,9 @@ struct pipe_inode_info *alloc_pipe_info(void)
 	if (pipe == NULL)
 		goto out_free_uid;
 
+	if (!capable(CAP_SYS_RESOURCE) && pipe_bufs * PAGE_SIZE > pipe_max_size)
+		pipe_bufs = pipe_max_size >> PAGE_SHIFT;
+
 	if (too_many_pipe_buffers_soft(atomic_long_read(&user->pipe_bufs)))
 		pipe_bufs = 1;
 
