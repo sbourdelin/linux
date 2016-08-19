@@ -317,6 +317,50 @@ struct sock *udp6_lib_lookup(struct net *net, const struct in6_addr *saddr, __be
 EXPORT_SYMBOL_GPL(udp6_lib_lookup);
 #endif
 
+/* caller should hold rcu lock */
+struct sock *udp6_lib_lookup_full(struct net *net,
+				  const struct in6_addr *saddr, __be16 sport,
+				  const struct in6_addr *daddr, __be16 dport,
+				  int dif, struct udp_table *table)
+{
+	struct sock *sk;
+	int i;
+
+	for (i = 0; i <= table->mask; i++) {
+		struct udp_hslot *hslot = &table->hash[i];
+
+		sk_for_each_rcu(sk, &hslot->head) {
+			struct inet_sock *inet;
+
+			if (!net_eq(sock_net(sk), net) ||
+			    ipv6_only_sock(sk))
+				continue;
+
+			if (dif && sk->sk_bound_dev_if != dif)
+				continue;
+
+			if (sk->sk_family != PF_INET6)
+				continue;
+
+			if (udp_sk(sk)->udp_port_hash != ntohs(sport))
+				continue;
+
+			if (!ipv6_addr_equal(&sk->sk_v6_rcv_saddr, saddr) ||
+			    !ipv6_addr_equal(&sk->sk_v6_daddr, daddr))
+				continue;
+
+			inet = inet_sk(sk);
+			if (inet->inet_dport != dport)
+				continue;
+
+			return sk;
+		}
+	}
+
+	return NULL;
+}
+EXPORT_SYMBOL(udp6_lib_lookup_full);
+
 /*
  *	This should be easy, if there is something there we
  *	return it, otherwise we block.
@@ -1467,6 +1511,7 @@ struct proto udpv6_prot = {
 	.compat_getsockopt = compat_udpv6_getsockopt,
 #endif
 	.clear_sk	   = udp_v6_clear_sk,
+	.diag_destroy      = udp_abort,
 };
 
 static struct inet_protosw udpv6_protosw = {

@@ -594,6 +594,47 @@ struct sock *udp4_lib_lookup(struct net *net, __be32 saddr, __be16 sport,
 EXPORT_SYMBOL_GPL(udp4_lib_lookup);
 #endif
 
+/* caller should hold rcu lock */
+struct sock *udp4_lib_lookup_full(struct net *net, __be32 saddr,
+				  __be16 sport, __be32 daddr, __be16 dport,
+				  int dif, struct udp_table *table)
+{
+	struct sock *sk;
+	int i;
+
+	for (i = 0; i <= table->mask; i++) {
+		struct udp_hslot *hslot = &table->hash[i];
+
+		sk_for_each_rcu(sk, &hslot->head) {
+			struct inet_sock *inet;
+
+			if (!net_eq(sock_net(sk), net) ||
+			    ipv6_only_sock(sk))
+				continue;
+
+			if (dif && sk->sk_bound_dev_if != dif)
+				continue;
+
+			if (sk->sk_family != PF_INET)
+				continue;
+
+			if (udp_sk(sk)->udp_port_hash != ntohs(sport))
+				continue;
+
+			inet = inet_sk(sk);
+			if (inet->inet_rcv_saddr != saddr  ||
+			    inet->inet_daddr     != daddr  ||
+			    inet->inet_dport     != dport)
+				continue;
+
+			return sk;
+		}
+	}
+
+	return NULL;
+}
+EXPORT_SYMBOL(udp4_lib_lookup_full);
+
 static inline bool __udp_is_mcast_sock(struct net *net, struct sock *sk,
 				       __be16 loc_port, __be32 loc_addr,
 				       __be16 rmt_port, __be32 rmt_addr,
@@ -2192,6 +2233,22 @@ unsigned int udp_poll(struct file *file, struct socket *sock, poll_table *wait)
 }
 EXPORT_SYMBOL(udp_poll);
 
+int udp_abort(struct sock *sk, int err)
+{
+	lock_sock(sk);
+
+	sk->sk_err = err;
+	sk->sk_error_report(sk);
+	udp_disconnect(sk, 0);
+
+	release_sock(sk);
+
+	sock_put(sk);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(udp_abort);
+
 struct proto udp_prot = {
 	.name		   = "UDP",
 	.owner		   = THIS_MODULE,
@@ -2223,6 +2280,7 @@ struct proto udp_prot = {
 	.compat_getsockopt = compat_udp_getsockopt,
 #endif
 	.clear_sk	   = sk_prot_clear_portaddr_nulls,
+	.diag_destroy	   = udp_abort,
 };
 EXPORT_SYMBOL(udp_prot);
 

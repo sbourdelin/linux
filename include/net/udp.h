@@ -251,6 +251,7 @@ int udp_get_port(struct sock *sk, unsigned short snum,
 		 int (*saddr_cmp)(const struct sock *,
 				  const struct sock *));
 void udp_err(struct sk_buff *, u32);
+int udp_abort(struct sock *sk, int err);
 int udp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len);
 int udp_push_pending_frames(struct sock *sk);
 void udp_flush_pending_frames(struct sock *sk);
@@ -274,6 +275,9 @@ struct sock *__udp4_lib_lookup(struct net *net, __be32 saddr, __be16 sport,
 			       struct udp_table *tbl, struct sk_buff *skb);
 struct sock *udp4_lib_lookup_skb(struct sk_buff *skb,
 				 __be16 sport, __be16 dport);
+struct sock *udp4_lib_lookup_full(struct net *net, __be32 saddr,
+				  __be16 sport, __be32 daddr, __be16 dport,
+				  int dif, struct udp_table *table);
 struct sock *udp6_lib_lookup(struct net *net,
 			     const struct in6_addr *saddr, __be16 sport,
 			     const struct in6_addr *daddr, __be16 dport,
@@ -286,6 +290,10 @@ struct sock *__udp6_lib_lookup(struct net *net,
 struct sock *udp6_lib_lookup_skb(struct sk_buff *skb,
 				 __be16 sport, __be16 dport);
 
+struct sock *udp6_lib_lookup_full(struct net *net,
+				  const struct in6_addr *saddr, __be16 sport,
+				  const struct in6_addr *daddr, __be16 dport,
+				  int dif, struct udp_table *table);
 /*
  * 	SNMP statistics for UDP and UDP-Lite
  */
