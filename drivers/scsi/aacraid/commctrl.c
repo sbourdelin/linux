@@ -476,20 +476,20 @@ static int aac_send_raw_srb(struct aac_dev* dev, void __user * arg)
 {
 	struct fib* srbfib;
 	int status;
-	struct aac_srb *srbcmd = NULL;
-	struct user_aac_srb *user_srbcmd = NULL;
+	struct aac_srb *srbcmd;
+	struct user_aac_srb *user_srbcmd;
 	struct user_aac_srb __user *user_srb = arg;
 	struct aac_srb_reply __user *user_reply;
 	struct aac_srb_reply* reply;
-	u32 fibsize = 0;
-	u32 flags = 0;
+	u32 fibsize;
+	u32 flags;
 	s32 rcode = 0;
 	u32 data_dir;
 	void __user *sg_user[32];
 	void *sg_list[32];
 	u32 sg_indx = 0;
-	u32 byte_count = 0;
-	u32 actual_fibsize64, actual_fibsize = 0;
+	u32 byte_count;
+	u32 actual_fibsize64, actual_fibsize;
 	int i;
 
 
