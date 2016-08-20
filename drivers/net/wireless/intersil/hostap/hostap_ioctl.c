@@ -2895,7 +2895,7 @@ static int prism2_ioctl_priv_monitor(struct net_device *dev, int *i)
 {
 	struct hostap_interface *iface;
 	local_info_t *local;
-	int ret = 0;
+	int ret;
 	u32 mode;
 
 	iface = netdev_priv(dev);
@@ -3035,7 +3035,7 @@ static int ap_mac_cmd_ioctl(local_info_t *local, int *cmd)
 static int prism2_ioctl_priv_download(local_info_t *local, struct iw_point *p)
 {
 	struct prism2_download_param *param;
-	int ret = 0;
+	int ret;
 
 	if (p->length < sizeof(struct prism2_download_param) ||
 	    p->length > 1024 || !p->pointer)
@@ -3791,7 +3791,7 @@ static int prism2_ioctl_scan_req(local_info_t *local,
 static int prism2_ioctl_priv_hostapd(local_info_t *local, struct iw_point *p)
 {
 	struct prism2_hostapd_param *param;
-	int ret = 0;
+	int ret;
 	int ap_ioctl = 0;
 
 	if (p->length < sizeof(struct prism2_hostapd_param) ||
@@ -3954,7 +3954,7 @@ int hostap_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	struct iwreq *wrq = (struct iwreq *) ifr;
 	struct hostap_interface *iface;
 	local_info_t *local;
-	int ret = 0;
+	int ret;
 
 	iface = netdev_priv(dev);
 	local = iface->local;
