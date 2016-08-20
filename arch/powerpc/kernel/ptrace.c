@@ -2046,21 +2046,23 @@ static const struct user_regset_view user_ppc_native_view = {
 static int gpr32_get_common(struct task_struct *target,
 		     const struct user_regset *regset,
 		     unsigned int pos, unsigned int count,
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 			    void *kbuf, void __user *ubuf, bool tm_active)
+#else
+			    void *kbuf, void __user *ubuf)
+#endif
 {
 	const unsigned long *regs = &target->thread.regs->gpr[0];
-	const unsigned long *ckpt_regs;
 	compat_ulong_t *k = kbuf;
 	compat_ulong_t __user *u = ubuf;
 	compat_ulong_t reg;
 	int i;
 
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
-	ckpt_regs = &target->thread.ckpt_regs.gpr[0];
-#endif
 	if (tm_active) {
-		regs = ckpt_regs;
+		regs = &target->thread.ckpt_regs.gpr[0];
 	} else {
+#endif
 		if (target->thread.regs == NULL)
 			return -EIO;
 
@@ -2072,7 +2074,9 @@ static int gpr32_get_common(struct task_struct *target,
 			for (i = 14; i < 32; i++)
 				target->thread.regs->gpr[i] = NV_REG_POISON;
 		}
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	}
+#endif
 
 	pos /= sizeof(reg);
 	count /= sizeof(reg);
@@ -2114,28 +2118,31 @@ static int gpr32_get_common(struct task_struct *target,
 static int gpr32_set_common(struct task_struct *target,
 		     const struct user_regset *regset,
 		     unsigned int pos, unsigned int count,
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 		     const void *kbuf, const void __user *ubuf, bool tm_active)
+#else
+		     const void *kbuf, const void __user *ubuf)
+#endif
 {
 	unsigned long *regs = &target->thread.regs->gpr[0];
-	unsigned long *ckpt_regs;
 	const compat_ulong_t *k = kbuf;
 	const compat_ulong_t __user *u = ubuf;
 	compat_ulong_t reg;
 
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
-	ckpt_regs = &target->thread.ckpt_regs.gpr[0];
-#endif
-
 	if (tm_active) {
-		regs = ckpt_regs;
+		regs = &target->thread.ckpt_regs.gpr[0];
 	} else {
+#endif
 		regs = &target->thread.regs->gpr[0];
 
 		if (target->thread.regs == NULL)
 			return -EIO;
 
 		CHECK_FULL_REGS(target->thread.regs);
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	}
+#endif
 
 	pos /= sizeof(reg);
 	count /= sizeof(reg);
@@ -2218,7 +2225,11 @@ static int gpr32_get(struct task_struct *target,
 		     unsigned int pos, unsigned int count,
 		     void *kbuf, void __user *ubuf)
 {
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	return gpr32_get_common(target, regset, pos, count, kbuf, ubuf, 0);
+#else
+	return gpr32_get_common(target, regset, pos, count, kbuf, ubuf);
+#endif
 }
 
 static int gpr32_set(struct task_struct *target,
@@ -2226,7 +2237,11 @@ static int gpr32_set(struct task_struct *target,
 		     unsigned int pos, unsigned int count,
 		     const void *kbuf, const void __user *ubuf)
 {
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	return gpr32_set_common(target, regset, pos, count, kbuf, ubuf, 0);
+#else
+	return gpr32_set_common(target, regset, pos, count, kbuf, ubuf);
+#endif
 }
 
 /*
