@@ -652,6 +652,37 @@ int seq_open_private(struct file *filp, const struct seq_operations *ops,
 }
 EXPORT_SYMBOL(seq_open_private);
 
+void *__seq_open_private_bufsize(struct file *f,
+				 const struct seq_operations *ops,
+				 int psize, size_t bufsize)
+{
+	int rc;
+	void *private;
+	struct seq_file *seq;
+
+	private = kzalloc(psize, GFP_KERNEL);
+	if (private == NULL)
+		goto out;
+
+	rc = seq_open(f, ops);
+	if (rc < 0)
+		goto out_free;
+
+	seq = f->private_data;
+	seq->private = private;
+
+	kfree(seq->buf);
+	seq->buf = seq_buf_alloc(seq->size = round_up(bufsize, PAGE_SIZE));
+
+	return private;
+
+out_free:
+	kfree(private);
+out:
+	return NULL;
+}
+EXPORT_SYMBOL(__seq_open_private_bufsize);
+
 void seq_putc(struct seq_file *m, char c)
 {
 	if (m->count >= m->size)
