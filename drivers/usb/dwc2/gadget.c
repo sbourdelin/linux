@@ -3868,8 +3868,8 @@ int dwc2_gadget_init(struct dwc2_hsotg *hsotg, int irq)
 	u32 p_tx_fifo[] = DWC2_G_P_LEGACY_TX_FIFO_SIZE;
 
 	/* Initialize to legacy fifo configuration values */
-	hsotg->g_rx_fifo_sz = 2048;
-	hsotg->g_np_g_tx_fifo_sz = 1024;
+	hsotg->g_rx_fifo_sz = 256;
+	hsotg->g_np_g_tx_fifo_sz = 128;
 	memcpy(&hsotg->g_tx_fifo_sz[1], p_tx_fifo, sizeof(p_tx_fifo));
 	/* Device tree specific probe */
 	dwc2_hsotg_of_probe(hsotg);
