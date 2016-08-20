@@ -307,7 +307,8 @@ static struct page *ll_dir_page_locate(struct inode *dir, __u64 *hash,
 				 * the page we want.
 				 */
 				ll_release_page(page,
-				    le32_to_cpu(dp->ldp_flags) & LDF_COLLIDE);
+						le32_to_cpu(dp->ldp_flags) &
+						LDF_COLLIDE);
 				page = NULL;
 			}
 		} else {

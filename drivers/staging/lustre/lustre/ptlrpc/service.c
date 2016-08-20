@@ -1982,11 +1982,12 @@ ptlrpc_wait_event(struct ptlrpc_service_part *svcpt,
 	cond_resched();
 
 	l_wait_event_exclusive_head(svcpt->scp_waitq,
-				ptlrpc_thread_stopping(thread) ||
-				ptlrpc_server_request_incoming(svcpt) ||
-				ptlrpc_server_request_pending(svcpt, false) ||
-				ptlrpc_rqbd_pending(svcpt) ||
-				ptlrpc_at_check(svcpt), &lwi);
+				    ptlrpc_thread_stopping(thread) ||
+				    ptlrpc_server_request_incoming(svcpt) ||
+				    ptlrpc_server_request_pending(svcpt,
+								  false) ||
+				    ptlrpc_rqbd_pending(svcpt) ||
+				    ptlrpc_at_check(svcpt), &lwi);
 
 	if (ptlrpc_thread_stopping(thread))
 		return -EINTR;
@@ -2349,7 +2350,7 @@ static void ptlrpc_svcpt_stop_threads(struct ptlrpc_service_part *svcpt)
 
 	while (!list_empty(&zombie)) {
 		thread = list_entry(zombie.next,
-					struct ptlrpc_thread, t_link);
+				    struct ptlrpc_thread, t_link);
 		list_del(&thread->t_link);
 		kfree(thread);
 	}
@@ -2539,8 +2540,8 @@ int ptlrpc_hr_init(void)
 		LASSERT(hrp->hrp_nthrs > 0);
 		hrp->hrp_thrs =
 			kzalloc_node(hrp->hrp_nthrs * sizeof(*hrt), GFP_NOFS,
-				cfs_cpt_spread_node(ptlrpc_hr.hr_cpt_table,
-						    i));
+				     cfs_cpt_spread_node(ptlrpc_hr.hr_cpt_table,
+							 i));
 		if (!hrp->hrp_thrs) {
 			rc = -ENOMEM;
 			goto out;
@@ -2593,7 +2594,8 @@ static void ptlrpc_wait_replies(struct ptlrpc_service_part *svcpt)
 						     NULL, NULL);
 
 		rc = l_wait_event(svcpt->scp_waitq,
-		     atomic_read(&svcpt->scp_nreps_difficult) == 0, &lwi);
+				  atomic_read(&svcpt->scp_nreps_difficult) == 0,
+				  &lwi);
 		if (rc == 0)
 			break;
 		CWARN("Unexpectedly long timeout %s %p\n",
@@ -2639,7 +2641,7 @@ ptlrpc_service_unlink_rqbd(struct ptlrpc_service *svc)
 		 * event with its 'unlink' flag set for each posted rqbd
 		 */
 		list_for_each_entry(rqbd, &svcpt->scp_rqbd_posted,
-					rqbd_list) {
+				    rqbd_list) {
 			rc = LNetMDUnlink(rqbd->rqbd_md_h);
 			LASSERT(rc == 0 || rc == -ENOENT);
 		}
