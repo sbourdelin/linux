@@ -463,8 +463,8 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
 	 * holding the lock even if app still believes it has it, since
 	 * server already dropped it anyway. Only for granted locks too.
 	 */
-	if ((lock->l_flags & (LDLM_FL_FAILED|LDLM_FL_LOCAL_ONLY)) ==
-	    (LDLM_FL_FAILED|LDLM_FL_LOCAL_ONLY)) {
+	if ((lock->l_flags & (LDLM_FL_FAILED | LDLM_FL_LOCAL_ONLY)) ==
+	    (LDLM_FL_FAILED | LDLM_FL_LOCAL_ONLY)) {
 		if (lock->l_req_mode == lock->l_granted_mode &&
 		    lock->l_granted_mode != LCK_NL && !data)
 			ldlm_lock_decref_internal(lock, lock->l_req_mode);
