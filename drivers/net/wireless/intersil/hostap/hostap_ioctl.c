@@ -3835,14 +3835,12 @@ static int prism2_ioctl_priv_hostapd(local_info_t *local, struct iw_point *p)
 	}
 
 	if (ret == 1 || !ap_ioctl) {
-		if (copy_to_user(p->pointer, param, p->length)) {
+		if (copy_to_user(p->pointer, param, p->length))
 			ret = -EFAULT;
-			goto out;
-		} else if (ap_ioctl)
+		else if (ap_ioctl)
 			ret = 0;
 	}
 
- out:
 	kfree(param);
 	return ret;
 }
