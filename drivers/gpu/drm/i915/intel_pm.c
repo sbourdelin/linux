@@ -4966,6 +4966,7 @@ static void gen9_disable_rc6(struct drm_i915_private *dev_priv)
 static void gen9_disable_rps(struct drm_i915_private *dev_priv)
 {
 	I915_WRITE(GEN6_RP_CONTROL, 0);
+	dev_priv->rps.enabled = false;
 }
 
 static void gen6_disable_rps(struct drm_i915_private *dev_priv)
@@ -4973,11 +4974,16 @@ static void gen6_disable_rps(struct drm_i915_private *dev_priv)
 	I915_WRITE(GEN6_RC_CONTROL, 0);
 	I915_WRITE(GEN6_RPNSWREQ, 1 << 31);
 	I915_WRITE(GEN6_RP_CONTROL, 0);
+
+	dev_priv->rps.enabled = false;
+
 }
 
 static void cherryview_disable_rps(struct drm_i915_private *dev_priv)
 {
 	I915_WRITE(GEN6_RC_CONTROL, 0);
+
+	dev_priv->rps.enabled = false;
 }
 
 static void valleyview_disable_rps(struct drm_i915_private *dev_priv)
@@ -4989,6 +4995,8 @@ static void valleyview_disable_rps(struct drm_i915_private *dev_priv)
 	I915_WRITE(GEN6_RC_CONTROL, 0);
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	dev_priv->rps.enabled = false;
 }
 
 static void intel_print_rc6_info(struct drm_i915_private *dev_priv, u32 mode)
@@ -5206,6 +5214,8 @@ static void gen9_enable_rps(struct drm_i915_private *dev_priv)
 	reset_rps(dev_priv, gen6_set_rps);
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	dev_priv->rps.enabled = true;
 }
 
 static void gen9_enable_rc6(struct drm_i915_private *dev_priv)
@@ -5349,6 +5359,8 @@ static void gen8_enable_rps(struct drm_i915_private *dev_priv)
 	reset_rps(dev_priv, gen6_set_rps);
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	dev_priv->rps.enabled = true;
 }
 
 static void gen6_enable_rps(struct drm_i915_private *dev_priv)
@@ -5445,6 +5457,8 @@ static void gen6_enable_rps(struct drm_i915_private *dev_priv)
 	}
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	dev_priv->rps.enabled = true;
 }
 
 static void gen6_update_ring_freq(struct drm_i915_private *dev_priv)
@@ -5922,6 +5936,8 @@ static void cherryview_enable_rps(struct drm_i915_private *dev_priv)
 	reset_rps(dev_priv, valleyview_set_rps);
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	dev_priv->rps.enabled = true;
 }
 
 static void valleyview_enable_rps(struct drm_i915_private *dev_priv)
@@ -6002,6 +6018,8 @@ static void valleyview_enable_rps(struct drm_i915_private *dev_priv)
 	reset_rps(dev_priv, valleyview_set_rps);
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	dev_priv->rps.enabled = true;
 }
 
 static unsigned long intel_pxfreq(u32 vidfreq)
@@ -6589,7 +6607,6 @@ void intel_disable_gt_powersave(struct drm_i915_private *dev_priv)
 		ironlake_disable_drps(dev_priv);
 	}
 
-	dev_priv->rps.enabled = false;
 	mutex_unlock(&dev_priv->rps.hw_lock);
 }
 
@@ -6633,7 +6650,6 @@ void intel_enable_gt_powersave(struct drm_i915_private *dev_priv)
 	WARN_ON(dev_priv->rps.efficient_freq < dev_priv->rps.min_freq);
 	WARN_ON(dev_priv->rps.efficient_freq > dev_priv->rps.max_freq);
 
-	dev_priv->rps.enabled = true;
 	mutex_unlock(&dev_priv->rps.hw_lock);
 }
 
