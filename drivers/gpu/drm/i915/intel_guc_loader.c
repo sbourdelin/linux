@@ -132,6 +132,25 @@ static void direct_interrupts_to_guc(struct drm_i915_private *dev_priv)
 	}
 }
 
+static void sanitize_slpc_option(struct drm_device *dev)
+{
+	/* Handle default case */
+	if (i915.enable_slpc < 0)
+		i915.enable_slpc = HAS_SLPC(dev);
+
+	/* slpc requires hardware support and compatible firmware */
+	if (!HAS_SLPC(dev))
+		i915.enable_slpc = 0;
+
+	/* slpc requires guc loaded */
+	if (!i915.enable_guc_loading)
+		i915.enable_slpc = 0;
+
+	/* slpc requires guc submission */
+	if (!i915.enable_guc_submission)
+		i915.enable_slpc = 0;
+}
+
 static u32 get_gttype(struct drm_i915_private *dev_priv)
 {
 	/* XXX: GT type based on PCI device ID? field seems unused by fw */
@@ -714,18 +733,21 @@ void intel_guc_init(struct drm_device *dev)
 	guc_fw->guc_fw_fetch_status = GUC_FIRMWARE_NONE;
 	guc_fw->guc_fw_load_status = GUC_FIRMWARE_NONE;
 
-	/* Early (and silent) return if GuC loading is disabled */
+	/* Return if GuC loading is disabled sanitizing SLPC option */
 	if (!i915.enable_guc_loading)
-		return;
+		goto out;
 	if (fw_path == NULL)
-		return;
+		goto out;
 	if (*fw_path == '\0')
-		return;
+		goto out;
 
 	guc_fw->guc_fw_fetch_status = GUC_FIRMWARE_PENDING;
 	DRM_DEBUG_DRIVER("GuC firmware pending, path %s\n", fw_path);
 	guc_fw_fetch(dev, guc_fw);
 	/* status must now be FAIL or SUCCESS */
+
+out:
+	sanitize_slpc_option(dev);
 }
 
 /**
