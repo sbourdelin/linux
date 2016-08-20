@@ -1026,7 +1026,7 @@ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
 
 					oldfs = get_fs();
 					set_fs(KERNEL_DS);
-					rc = (var->fops->write)(&fakefile, sval,
+					rc = var->fops->write(&fakefile, sval,
 								vallen, NULL);
 					set_fs(oldfs);
 				}
