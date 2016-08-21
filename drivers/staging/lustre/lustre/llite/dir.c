@@ -1676,14 +1676,9 @@ out_poll:
 	case LL_IOC_QUOTACTL: {
 		struct if_quotactl *qctl;
 
-		qctl = kzalloc(sizeof(*qctl), GFP_NOFS);
-		if (!qctl)
-			return -ENOMEM;
-
-		if (copy_from_user(qctl, (void __user *)arg, sizeof(*qctl))) {
-			rc = -EFAULT;
-			goto out_quotactl;
-		}
+		qctl = memdup_user((void __user *)arg, sizeof(*qctl));
+		if (IS_ERR(qctl))
+			return PTR_ERR(qctl);
 
 		rc = quotactl_ioctl(sbi, qctl);
 
@@ -1691,7 +1686,6 @@ out_poll:
 					    sizeof(*qctl)))
 			rc = -EFAULT;
 
-out_quotactl:
 		kfree(qctl);
 		return rc;
 	}
