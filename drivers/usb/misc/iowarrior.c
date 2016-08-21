@@ -292,7 +292,8 @@ static ssize_t iowarrior_read(struct file *file, char __user *buffer,
 	/* repeat until no buffer overrun in callback handler occur */
 	do {
 		atomic_set(&dev->overflow_flag, 0);
-		if ((read_idx = read_index(dev)) == -1) {
+		read_idx = read_index(dev);
+		if (read_idx == -1) {
 			/* queue empty */
 			if (file->f_flags & O_NONBLOCK)
 				return -EAGAIN;
@@ -616,7 +617,8 @@ static int iowarrior_open(struct inode *inode, struct file *file)
 	}
 
 	/* setup interrupt handler for receiving values */
-	if ((retval = usb_submit_urb(dev->int_in_urb, GFP_KERNEL)) < 0) {
+	retval = usb_submit_urb(dev->int_in_urb, GFP_KERNEL);
+	if (retval < 0) {
 		dev_err(&interface->dev, "Error %d while submitting URB\n", retval);
 		retval = -EFAULT;
 		goto out;
