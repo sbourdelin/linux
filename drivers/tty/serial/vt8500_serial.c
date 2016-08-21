@@ -664,7 +664,7 @@ static int vt8500_serial_probe(struct platform_device *pdev)
 	if (port < 0) {
 		/* calculate the port id */
 		port = find_first_zero_bit(&vt8500_ports_in_use,
-					sizeof(vt8500_ports_in_use));
+					   BITS_PER_LONG);
 	}
 
 	if (port >= VT8500_MAX_PORTS)
