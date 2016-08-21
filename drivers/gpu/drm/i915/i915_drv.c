@@ -1662,6 +1662,7 @@ static int i915_drm_resume(struct drm_device *dev)
 static int i915_drm_resume_early(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
 	int ret;
 
 	/*
@@ -1717,6 +1718,12 @@ static int i915_drm_resume_early(struct drm_device *dev)
 	if (ret)
 		DRM_ERROR("Resume prepare failed: %d, continuing anyway\n",
 			  ret);
+
+	/*
+	 * Mark GuC FW load status as PENDING to avoid any Host to GuC actions
+	 * invoked till GuC gets loaded in i915_drm_resume.
+	*/
+	guc_fw->guc_fw_load_status = GUC_FIRMWARE_PENDING;
 
 	intel_uncore_early_sanitize(dev_priv, true);
 
