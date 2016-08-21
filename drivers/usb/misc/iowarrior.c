@@ -587,10 +587,10 @@ error_out:
  */
 static int iowarrior_open(struct inode *inode, struct file *file)
 {
-	struct iowarrior *dev = NULL;
+	struct iowarrior *dev;
 	struct usb_interface *interface;
 	int subminor;
-	int retval = 0;
+	int retval;
 
 	mutex_lock(&iowarrior_mutex);
 	subminor = iminor(inode);
