@@ -194,6 +194,7 @@ static bool mrst_lvds_find_best_pll(const struct gma_limit_t *limit,
 	struct gma_clock_t clock;
 	int err = target;
 
+	memset(clock, 0, sizeof(struct gma_clock_t));
 	memset(best_clock, 0, sizeof(*best_clock));
 
 	for (clock.m = limit->m.min; clock.m <= limit->m.max; clock.m++) {
