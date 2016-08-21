@@ -297,13 +297,15 @@ void __ieee80211_start_rx_ba_session(struct sta_info *sta,
 	if (buf_size == 0)
 		buf_size = IEEE80211_MAX_AMPDU_BUF;
 
-	/* make sure the size doesn't exceed the maximum supported by the hw */
-	if (buf_size > local->hw.max_rx_aggregation_subframes)
-		buf_size = local->hw.max_rx_aggregation_subframes;
-	params.buf_size = buf_size;
-
 	/* examine state machine */
 	mutex_lock(&sta->ampdu_mlme.mtx);
+
+	/* make sure the size doesn't exceed the maximum supported by the hw */
+	if (buf_size > sta->sta.max_rx_aggregation_subframes)
+		buf_size = sta->sta.max_rx_aggregation_subframes;
+	params.buf_size = buf_size;
+
+	ht_dbg(sta->sdata, "AddBA Req buf_size=%d\n", buf_size);
 
 	if (test_bit(tid, sta->ampdu_mlme.agg_session_valid)) {
 		tid_agg_rx = rcu_dereference_protected(
