@@ -644,7 +644,7 @@ out:
 static int iowarrior_release(struct inode *inode, struct file *file)
 {
 	struct iowarrior *dev;
-	int retval = 0;
+	int retval;
 
 	dev = file->private_data;
 	if (dev == NULL) {
