@@ -127,7 +127,7 @@ int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
 	struct scatterlist sg, *sg_ptr;
 	struct sg_table sgtable;
 	unsigned int nents, left_size, i;
-	unsigned int seg_size = card->host->max_seg_size;
+	unsigned int seg_size;
 
 	BUG_ON(!card);
 	BUG_ON(fn > 7);
@@ -136,6 +136,8 @@ int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
 	/* sanity check */
 	if (addr & ~0x1FFFF)
 		return -EINVAL;
+
+	seg_size = card->host->max_seg_size;
 
 	mrq.cmd = &cmd;
 	mrq.data = &data;
