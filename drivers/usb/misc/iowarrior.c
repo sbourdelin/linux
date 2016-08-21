@@ -338,8 +338,8 @@ static ssize_t iowarrior_write(struct file *file,
 			       size_t count, loff_t *ppos)
 {
 	struct iowarrior *dev;
-	int retval = 0;
-	char *buf = NULL;	/* for IOW24 and IOW56 we need a buffer */
+	int retval;
+	char *buf;	/* for IOW24 and IOW56 we need a buffer */
 	struct urb *int_out_urb = NULL;
 
 	dev = file->private_data;
