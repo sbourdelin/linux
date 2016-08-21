@@ -138,6 +138,7 @@ static bool mrst_sdvo_find_best_pll(const struct gma_limit_t *limit,
 	u32 target_vco, actual_freq;
 	s32 freq_error, min_error = 100000;
 
+	memset(clock, 0, sizeof(struct gma_clock_t));
 	memset(best_clock, 0, sizeof(*best_clock));
 
 	for (clock.m = limit->m.min; clock.m <= limit->m.max; clock.m++) {
