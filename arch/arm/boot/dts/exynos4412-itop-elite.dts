@@ -1,0 +1,148 @@
+/*
+ * TOPEET's Exynos4412 based itop board device tree source
+ *
+ * Copyright (c) 2016 SUMOMO Computer Association
+ *			https://www.sumomo.mobi
+ *			Randy Li <ayaka@soulik.info>
+ *			
+ * Device tree source file for TOPEET iTop Exynos 4412 core board 
+ * which is based on Samsung's Exynos4412 SoC.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+*/
+
+/dts-v1/;
+#include "exynos4412-itop-scp-core.dtsi"
+
+/ {
+	model = "TOPEET iTop 4412 Elite board based on Exynos4412";
+	compatible = "topeet,itop4412-elite", "samsung,exynos4412", "samsung,exynos4";
+
+	chosen {
+		bootargs ="console=ttySAC2,115200";
+		stdout-path = &serial_2;
+	};
+	
+	leds {
+		compatible = "gpio-leds";
+		
+		led2 {
+			label = "red:system";
+			gpios = <&gpx1 0 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+			linux,default-trigger = "heartbeat";
+		};
+
+		led3 {
+			label = "red:user";
+			gpios = <&gpk1 1 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		
+		home {
+			lable = "GPIO Key Home";
+			linux,code = <KEY_HOME>;
+			gpios = <&gpx1 1 GPIO_ACTIVE_LOW>;
+		};
+
+		back {
+			lable = "GPIO Key Back";
+			linux,code = <KEY_BACK>;
+			gpios = <&gpx1 2 GPIO_ACTIVE_LOW>;
+		};
+
+		sleep {
+			lable = "GPIO Key Sleep";
+			linux,code = <KEY_POWER>;
+			gpios = <&gpx3 3 GPIO_ACTIVE_LOW>;
+		};
+
+		vol_up {
+			lable = "GPIO Key Vol+";
+			linux,code = <KEY_UP>;
+			gpios = <&gpx2 1 GPIO_ACTIVE_LOW>;
+		};
+
+		vol_down {
+			lable = "GPIO Key Vol-";
+			linux,code = <KEY_DOWN>;
+			gpios = <&gpx2 0 GPIO_ACTIVE_LOW>;
+		};
+	};
+	
+	beep {
+		compatible = "pwm-beeper";
+		pwms = <&pwm>;
+		pinctrl-0 = <&pwm0_out>;
+		pinctrl-names = "default";
+	};
+
+};
+
+&pinctrl_1 {
+	ether-reset {
+		samsung,pins = "gpc0-1";
+		samsung,pin-function = <1>;
+		samsung,pin-pud = <0>;
+		samsung,pin-drv = <0>;
+	};
+};
+
+&sdhci_2 {
+	bus-width = <4>;
+	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4>;
+	pinctrl-names = "default";
+	broken-cd;
+	cap-sd-highspeed;
+	vmmc-supply = <&ldo23_reg>;
+	vqmmc-supply = <&ldo17_reg>;
+	status = "okay";
+};
+
+&ehci {
+	status = "okay";
+	/* In order to reset USB ethernet */
+	samsung,vbus-gpio = <&gpc0 1 GPIO_ACTIVE_HIGH>;
+
+	port@0 {
+		status = "okay";
+	};
+
+	port@2 {
+		status = "okay";
+	};
+};
+
+&exynos_usbphy {
+	status = "okay";
+};
+
+&hsotg {
+	dr_mode = "peripheral";
+	status = "okay";
+};
+
+&serial_1 {
+	status = "okay";
+};
+
+&serial_2 {
+	status = "okay";
+};
+
+&pwm {
+	pinctrl-0 = <&pwm1_out>;
+	pinctrl-names = "default";
+	samsung,pwm-outputs = <1>;
+	status = "okay";
+};
+
+&adc {
+	status = "okay";
+};
