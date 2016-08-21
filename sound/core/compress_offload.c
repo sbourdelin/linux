@@ -545,14 +545,14 @@ static int snd_compress_check_input(struct snd_compr_params *params)
 static int
 snd_compr_set_params(struct snd_compr_stream *stream, unsigned long arg)
 {
-	struct snd_compr_params *params;
-	int retval;
-
 	if (stream->runtime->state == SNDRV_PCM_STATE_OPEN) {
 		/*
 		 * we should allow parameter change only when stream has been
 		 * opened not in other cases
 		 */
+		int retval;
+		struct snd_compr_params *params;
+
 		params = memdup_user((void __user *)arg, sizeof(*params));
 		if (IS_ERR(params))
 			return PTR_ERR(params);
@@ -578,12 +578,12 @@ snd_compr_set_params(struct snd_compr_stream *stream, unsigned long arg)
 			stream->runtime->state = SNDRV_PCM_STATE_SETUP;
 		else
 			stream->runtime->state = SNDRV_PCM_STATE_PREPARED;
+out:
+		kfree(params);
+		return retval;
 	} else {
 		return -EPERM;
 	}
-out:
-	kfree(params);
-	return retval;
 }
 
 static int
