@@ -2962,7 +2962,7 @@ static int si_get_vce_clock_voltage(struct radeon_device *rdev,
 		&rdev->pm.dpm.dyn_state.vce_clock_voltage_dependency_table;
 
 	if (((evclk == 0) && (ecclk == 0)) ||
-	    (table && (table->count == 0))) {
+	    table == NULL || table->count == 0) {
 		*voltage = 0;
 		return 0;
 	}
