@@ -287,11 +287,6 @@ static int gmc_v8_0_mc_load_microcode(struct amdgpu_device *adev)
 	running = REG_GET_FIELD(RREG32(mmMC_SEQ_SUP_CNTL), MC_SEQ_SUP_CNTL, RUN);
 
 	if (running == 0) {
-		if (running) {
-			blackout = RREG32(mmMC_SHARED_BLACKOUT_CNTL);
-			WREG32(mmMC_SHARED_BLACKOUT_CNTL, blackout | 1);
-		}
-
 		/* reset the engine and set to writable */
 		WREG32(mmMC_SEQ_SUP_CNTL, 0x00000008);
 		WREG32(mmMC_SEQ_SUP_CNTL, 0x00000010);
@@ -323,9 +318,6 @@ static int gmc_v8_0_mc_load_microcode(struct amdgpu_device *adev)
 				break;
 			udelay(1);
 		}
-
-		if (running)
-			WREG32(mmMC_SHARED_BLACKOUT_CNTL, blackout);
 	}
 
 	return 0;
