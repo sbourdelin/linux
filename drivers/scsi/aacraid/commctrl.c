@@ -66,13 +66,11 @@ static int ioctl_send_fib(struct aac_dev * dev, void __user *arg)
 	unsigned int size, osize;
 	int retval;
 
-	if (dev->in_reset) {
+	if (dev->in_reset)
 		return -EBUSY;
-	}
 	fibptr = aac_fib_alloc(dev);
-	if(fibptr == NULL) {
+	if (!fibptr)
 		return -ENOMEM;
-	}
 
 	kfib = fibptr->hw_fib_va;
 	/*
@@ -138,9 +136,8 @@ static int ioctl_send_fib(struct aac_dev * dev, void __user *arg)
 		retval = aac_fib_send(le16_to_cpu(kfib->header.Command), fibptr,
 				le16_to_cpu(kfib->header.Size) , FsaNormal,
 				1, 1, NULL, NULL);
-		if (retval) {
+		if (retval)
 			goto cleanup;
-		}
 		if (aac_fib_complete(fibptr) != 0) {
 			retval = -EINVAL;
 			goto cleanup;
@@ -228,12 +225,10 @@ static int open_getadapter_fib(struct aac_dev * dev, void __user *arg)
 		}
 		list_add_tail(&fibctx->next, &dev->fib_list);
 		spin_unlock_irqrestore(&dev->fib_lock, flags);
-		if (copy_to_user(arg, &fibctx->unique,
-						sizeof(fibctx->unique))) {
+		if (copy_to_user(arg, &fibctx->unique, sizeof(fibctx->unique)))
 			status = -EFAULT;
-		} else {
+		else
 			status = 0;
-		}
 	}
 	return status;
 }
@@ -820,9 +815,8 @@ static int aac_send_raw_srb(struct aac_dev* dev, void __user * arg)
 free_user_srbcmd:
 	kfree(user_srbcmd);
 free_sg_list:
-	for(i=0; i <= sg_indx; i++){
+	for (i = 0; i <= sg_indx; i++)
 		kfree(sg_list[i]);
-	}
 	if (rcode != -ERESTARTSYS) {
 		aac_fib_complete(srbfib);
 		aac_fib_free(srbfib);
