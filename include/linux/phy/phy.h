@@ -36,6 +36,7 @@ enum phy_mode {
  * @power_on: powering on the phy
  * @power_off: powering off the phy
  * @set_mode: set the mode of the phy
+ * @reset: reseting the phy
  * @owner: the module owner containing the ops
  */
 struct phy_ops {
@@ -44,6 +45,7 @@ struct phy_ops {
 	int	(*power_on)(struct phy *phy);
 	int	(*power_off)(struct phy *phy);
 	int	(*set_mode)(struct phy *phy, enum phy_mode mode);
+	int	(*reset)(struct phy *phy);
 	struct module *owner;
 };
 
