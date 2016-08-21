@@ -3251,7 +3251,6 @@ void *ll_iocontrol_register(llioc_callback_t cb, int count, unsigned int *cmd)
 	if (!in_data)
 		return NULL;
 
-	memset(in_data, 0, sizeof(*in_data));
 	in_data->iocd_size = size;
 	in_data->iocd_cb = cb;
 	in_data->iocd_count = count;
