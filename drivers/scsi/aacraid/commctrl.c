@@ -499,9 +499,9 @@ static int aac_send_raw_srb(struct aac_dev* dev, void __user * arg)
 	/*
 	 *	Allocate and initialize a Fib then setup a SRB command
 	 */
-	if (!(srbfib = aac_fib_alloc(dev))) {
+	srbfib = aac_fib_alloc(dev);
+	if (!srbfib)
 		return -ENOMEM;
-	}
 	aac_fib_init(srbfib);
 	/* raw_srb FIB is not FastResponseCapable */
 	srbfib->hw_fib_va->header.XferState &= ~cpu_to_le32(FastResponseCapable);
