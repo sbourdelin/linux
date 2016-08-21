@@ -484,7 +484,7 @@ static int goldfish_mmc_probe(struct platform_device *pdev)
 	host->virt_base = dma_alloc_coherent(&pdev->dev, BUFFER_SIZE,
 					     &buf_addr, GFP_KERNEL);
 
-	if (host->virt_base == 0) {
+	if (!host->virt_base) {
 		ret = -ENOMEM;
 		goto dma_alloc_failed;
 	}
