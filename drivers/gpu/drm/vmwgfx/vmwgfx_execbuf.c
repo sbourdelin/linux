@@ -652,7 +652,11 @@ static int vmw_cmd_res_reloc_add(struct vmw_private *dev_priv,
 	int ret;
 	struct vmw_resource_val_node *node;
 
+	if (!p_val)
+		return;
+
 	*p_val = NULL;
+
 	ret = vmw_resource_relocation_add(&sw_context->res_relocations,
 					  res,
 					  id_loc - sw_context->buf_start);
@@ -663,8 +667,7 @@ static int vmw_cmd_res_reloc_add(struct vmw_private *dev_priv,
 	if (unlikely(ret != 0))
 		return ret;
 
-	if (p_val)
-		*p_val = node;
+	*p_val = node;
 
 	return 0;
 }
