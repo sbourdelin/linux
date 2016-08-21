@@ -212,6 +212,10 @@ int __hci_req_sync(struct hci_dev *hdev, int (*func)(struct hci_request *req,
 	set_current_state(TASK_INTERRUPTIBLE);
 
 	err = hci_req_run_skb(&req, hci_req_sync_complete);
+
+	kfree_skb(hdev->req_skb);
+	hdev->req_skb = NULL;
+
 	if (err < 0) {
 		hdev->req_status = 0;
 
