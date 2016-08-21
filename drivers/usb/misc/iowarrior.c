@@ -468,7 +468,7 @@ exit:
 static long iowarrior_ioctl(struct file *file, unsigned int cmd,
 							unsigned long arg)
 {
-	struct iowarrior *dev = NULL;
+	struct iowarrior *dev;
 	__u8 *buffer;
 	__u8 __user *user_buffer;
 	int retval;
@@ -751,7 +751,7 @@ static int iowarrior_probe(struct usb_interface *interface,
 			   const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(interface);
-	struct iowarrior *dev = NULL;
+	struct iowarrior *dev;
 	struct usb_host_interface *iface_desc;
 	struct usb_endpoint_descriptor *endpoint;
 	int i;
