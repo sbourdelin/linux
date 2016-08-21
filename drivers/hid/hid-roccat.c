@@ -43,7 +43,6 @@ struct roccat_device {
 	unsigned int minor;
 	int report_size;
 	int open;
-	int exist;
 	wait_queue_head_t wait;
 	struct device *dev;
 	struct hid_device *hid;
@@ -99,7 +98,7 @@ static ssize_t roccat_read(struct file *file, char __user *buffer,
 				retval = -ERESTARTSYS;
 				break;
 			}
-			if (!device->exist) {
+			if (device->open == 0) {
 				retval = -EIO;
 				break;
 			}
@@ -143,7 +142,7 @@ static unsigned int roccat_poll(struct file *file, poll_table *wait)
 	poll_wait(file, &reader->device->wait, wait);
 	if (reader->cbuf_start != reader->device->cbuf_end)
 		return POLLIN | POLLRDNORM;
-	if (!reader->device->exist)
+	if (reader->device->open == 0)
 		return POLLERR | POLLHUP;
 	return 0;
 }
@@ -224,13 +223,11 @@ static int roccat_release(struct inode *inode, struct file *file)
 	kfree(reader);
 
 	if (!--device->open) {
-		/* removing last reader */
-		if (device->exist) {
-			hid_hw_power(device->hid, PM_HINT_NORMAL);
-			hid_hw_close(device->hid);
-		} else {
-			kfree(device);
-		}
+		/* we have removed the last reader */
+		kfree(device);
+	} else {
+		hid_hw_power(device->hid, PM_HINT_NORMAL);
+		hid_hw_close(device->hid);
 	}
 
 	mutex_unlock(&devices_lock);
@@ -340,7 +337,6 @@ int roccat_connect(struct class *klass, struct hid_device *hid, int report_size)
 	mutex_init(&device->cbuf_lock);
 	device->minor = minor;
 	device->hid = hid;
-	device->exist = 1;
 	device->cbuf_end = 0;
 	device->report_size = report_size;
 
@@ -358,8 +354,6 @@ void roccat_disconnect(int minor)
 	mutex_lock(&devices_lock);
 	device = devices[minor];
 	mutex_unlock(&devices_lock);
-
-	device->exist = 0; /* TODO exist maybe not needed */
 
 	device_destroy(device->dev->class, MKDEV(roccat_major, minor));
 
