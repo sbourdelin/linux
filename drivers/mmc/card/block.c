@@ -1882,10 +1882,12 @@ static int mmc_blk_end_packed_req(struct mmc_queue_req *mq_rq)
 {
 	struct request *prq;
 	struct mmc_packed *packed = mq_rq->packed;
-	int idx = packed->idx_failure, i = 0;
+	int idx, i = 0;
 	int ret = 0;
 
 	BUG_ON(!packed);
+
+	idx = packed->idx_failure;
 
 	while (!list_empty(&packed->list)) {
 		prq = list_entry_rq(packed->list.next);
