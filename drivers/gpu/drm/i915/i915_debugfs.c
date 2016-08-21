@@ -1199,6 +1199,9 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 
 	intel_runtime_pm_get(dev_priv);
 
+	if (intel_slpc_active(dev_priv))
+		seq_puts(m, "SLPC Active\n");
+
 	if (IS_GEN5(dev)) {
 		u16 rgvswctl = I915_READ16(MEMSWCTL);
 		u16 rgvstat = I915_READ16(MEMSTAT_ILK);
@@ -2450,6 +2453,9 @@ static int i915_rps_boost_info(struct seq_file *m, void *data)
 	struct drm_device *dev = node->minor->dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_file *file;
+
+	if (intel_slpc_active(dev_priv))
+		return -ENODEV;
 
 	seq_printf(m, "RPS enabled? %d\n", dev_priv->rps.enabled);
 	seq_printf(m, "GPU busy? %s [%x]\n",
