@@ -4024,8 +4024,8 @@ static void __btrfs_btree_balance_dirty(struct btrfs_root *root,
 	ret = percpu_counter_compare(&root->fs_info->dirty_metadata_bytes,
 				     BTRFS_DIRTY_METADATA_THRESH);
 	if (ret > 0) {
-		balance_dirty_pages_ratelimited(
-				   root->fs_info->btree_inode->i_mapping);
+		balance_dirty_pages_ratelimited(&root->fs_info->bdi,
+						root->fs_info->sb);
 	}
 }
 

@@ -226,7 +226,8 @@ again:
 		written += copied;
 		length -= copied;
 
-		balance_dirty_pages_ratelimited(inode->i_mapping);
+		balance_dirty_pages_ratelimited(inode_to_bdi(inode),
+						inode->i_sb);
 	} while (iov_iter_count(i) && length);
 
 	return written ? written : status;
