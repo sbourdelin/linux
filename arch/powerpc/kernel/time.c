@@ -970,11 +970,7 @@ static void __init init_decrementer_clockevent(void)
 
 	clockevents_calc_mult_shift(&decrementer_clockevent, ppc_tb_freq, 4);
 
-	decrementer_clockevent.max_delta_ns =
-		clockevent_delta2ns(decrementer_max, &decrementer_clockevent);
 	decrementer_clockevent.max_delta_ticks = decrementer_max;
-	decrementer_clockevent.min_delta_ns =
-		clockevent_delta2ns(2, &decrementer_clockevent);
 	decrementer_clockevent.min_delta_ticks = 2;
 
 	register_decrementer_clockevent(cpu);

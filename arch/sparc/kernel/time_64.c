@@ -794,11 +794,7 @@ void __init time_init(void)
 	sparc64_clockevent.name = tick_ops->name;
 	clockevents_calc_mult_shift(&sparc64_clockevent, freq, 4);
 
-	sparc64_clockevent.max_delta_ns =
-		clockevent_delta2ns(0x7fffffffffffffffUL, &sparc64_clockevent);
 	sparc64_clockevent.max_delta_ticks = 0x7fffffffffffffffUL;
-	sparc64_clockevent.min_delta_ns =
-		clockevent_delta2ns(0xF, &sparc64_clockevent);
 	sparc64_clockevent.min_delta_ticks = 0xF;
 
 	printk("clockevent: mult[%x] shift[%d]\n",

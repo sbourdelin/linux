@@ -50,9 +50,7 @@ static struct clock_event_device numachip2_clockevent = {
 	.features        = CLOCK_EVT_FEAT_ONESHOT,
 	.mult            = 1,
 	.shift           = 0,
-	.min_delta_ns    = 1250,
 	.min_delta_ticks = 1250,
-	.max_delta_ns    = LONG_MAX,
 	.max_delta_ticks = LONG_MAX,
 };
 
