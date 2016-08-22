@@ -3,6 +3,7 @@
 #ifndef _UAPI_SCC_H
 #define _UAPI_SCC_H
 
+#include <linux/sockios.h>
 
 /* selection of hardware types */
 
