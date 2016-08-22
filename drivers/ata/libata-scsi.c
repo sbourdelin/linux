@@ -3322,7 +3322,7 @@ static unsigned int ata_scsi_write_same_xlat(struct ata_queued_cmd *qc)
 	buf = page_address(sg_page(scsi_sglist(scmd)));
 
 	if (n_block <= 65535 * ATA_MAX_TRIM_RNUM) {
-		size = ata_set_lba_range_entries(buf, ATA_MAX_TRIM_RNUM, block, n_block);
+		size = ata_set_lba_range_entries(buf, block, n_block);
 	} else {
 		fp = 2;
 		goto invalid_fld;

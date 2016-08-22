@@ -1077,19 +1077,19 @@ static inline void ata_id_to_hd_driveid(u16 *id)
  * TO NV CACHE PINNED SET.
  */
 static inline unsigned ata_set_lba_range_entries(void *_buffer,
-		unsigned num, u64 sector, unsigned long count)
+		u64 sector, unsigned long count)
 {
 	__le64 *buffer = _buffer;
 	unsigned i = 0, used_bytes;
 
-	while (i < num) {
-		u64 entry = sector |
-			((u64)(count > 0xffff ? 0xffff : count) << 48);
+	while (count > 0) {
+		u64 range, entry;
+
+		range = count > 0xffff ? 0xffff : count;
+	        entry = sector | (range << 48);
 		buffer[i++] = __cpu_to_le64(entry);
-		if (count <= 0xffff)
-			break;
-		count -= 0xffff;
-		sector += 0xffff;
+		count -= range;
+		sector += range;
 	}
 
 	used_bytes = ALIGN(i * 8, 512);
