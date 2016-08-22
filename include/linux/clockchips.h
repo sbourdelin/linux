@@ -75,7 +75,7 @@ enum clock_event_state {
  * @next_event:		local storage for the next event in oneshot mode
  * @max_delta_ticks:	maximum delta value in ticks
  * @min_delta_ticks_adjusted:	minimum delta value, increased as needed
- * @mult:		nanosecond to cycles multiplier
+ * @mult_adjusted:	adjusted multiplier compensating for NTP adjustments
  * @shift:		nanoseconds to cycles divisor (power of two)
  * @state_use_accessors:current state of the device, assigned by the core code
  * @features:		features
@@ -87,6 +87,7 @@ enum clock_event_state {
  * @tick_resume:	resume clkevt device
  * @broadcast:		function to broadcast events
  * @min_delta_ticks:	minimum delta value in ticks stored for reconfiguration
+ * @mult:		ns to cycles multiplier stored for reconfiguration
  * @name:		ptr to clock event name
  * @rating:		variable to rate clock event devices
  * @irq:		IRQ number (only for non CPU local devices)
@@ -102,7 +103,7 @@ struct clock_event_device {
 	ktime_t			next_event;
 	unsigned long		max_delta_ticks;
 	unsigned long		min_delta_ticks_adjusted;
-	u32			mult;
+	u32			mult_adjusted;
 	u32			shift;
 	enum clock_event_state	state_use_accessors;
 	unsigned int		features;
@@ -118,6 +119,7 @@ struct clock_event_device {
 	void			(*suspend)(struct clock_event_device *);
 	void			(*resume)(struct clock_event_device *);
 	unsigned long		min_delta_ticks;
+	u32			mult;
 
 	const char		*name;
 	int			rating;
