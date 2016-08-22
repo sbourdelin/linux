@@ -6,6 +6,7 @@
 #ifndef	AX25_KERNEL_H
 #define	AX25_KERNEL_H
 
+#include <linux/libc-compat.h>
 #include <linux/socket.h>
 
 #define AX25_MTU	256
@@ -25,6 +26,7 @@
 
 #define AX25_KILL	99
 
+#if __UAPI_DEF_SIOCAX25GETUID_TO_SIOCAX25DELFWD
 #define SIOCAX25GETUID		(SIOCPROTOPRIVATE+0)
 #define SIOCAX25ADDUID		(SIOCPROTOPRIVATE+1)
 #define SIOCAX25DELUID		(SIOCPROTOPRIVATE+2)
@@ -34,46 +36,61 @@
 #define SIOCAX25GETINFOOLD	(SIOCPROTOPRIVATE+9)
 #define SIOCAX25ADDFWD		(SIOCPROTOPRIVATE+10)
 #define SIOCAX25DELFWD		(SIOCPROTOPRIVATE+11)
+#endif /* __UAPI_DEF_SIOCAX25GETUID_TO_SIOCAX25DELFWD */
 #define SIOCAX25DEVCTL          (SIOCPROTOPRIVATE+12)
+/* glibc uses SIOCPROTOPRIVATE+9 for SIOCAX25GETINFO */
+#if __UAPI_DEF_SIOCAX25GETINFO
 #define SIOCAX25GETINFO         (SIOCPROTOPRIVATE+13)
+#endif /* __UAPI_DEF_SIOCAX25GETINFO */
 
 #define AX25_SET_RT_IPMODE	2
 
 #define AX25_NOUID_DEFAULT	0
 #define AX25_NOUID_BLOCK	1
 
+#if __UAPI_DEF_AX25_ADDRESS
 typedef struct {
 	char		ax25_call[7];	/* 6 call + SSID (shifted ascii!) */
 } ax25_address;
+#endif /* __UAPI_DEF_AX25_ADDRESS */
 
+#if __UAPI_DEF_SOCKADDR_AX25
 struct sockaddr_ax25 {
 	__kernel_sa_family_t sax25_family;
 	ax25_address	sax25_call;
 	int		sax25_ndigis;
 	/* Digipeater ax25_address sets follow */
 };
+#endif /* __UAPI_DEF_SOCKADDR_AX25 */
 
 #define sax25_uid	sax25_ndigis
 
+#if __UAPI_DEF_FULL_SOCKADDR_AX25
 struct full_sockaddr_ax25 {
 	struct sockaddr_ax25 fsa_ax25;
 	ax25_address	fsa_digipeater[AX25_MAX_DIGIS];
 };
+#endif /* __UAPI_DEF_FULL_SOCKADDR_AX25 */
 
+#if __UAPI_DEF_AX25_ROUTES_STRUCT
 struct ax25_routes_struct {
 	ax25_address	port_addr;
 	ax25_address	dest_addr;
 	unsigned char	digi_count;
 	ax25_address	digi_addr[AX25_MAX_DIGIS];
 };
+#endif /* __UAPI_DEF_AX25_ROUTES_STRUCT */
 
+#if __UAPI_DEF_AX25_ROUTES_OPT_STRUCT
 struct ax25_route_opt_struct {
 	ax25_address	port_addr;
 	ax25_address	dest_addr;
 	int		cmd;
 	int		arg;
 };
+#endif /* __UAPI_DEF_AX25_ROUTES_OPT_STRUCT */
 
+#if __UAPI_DEF_AX25_CTL_STRUCT
 struct ax25_ctl_struct {
         ax25_address            port_addr;
         ax25_address            source_addr;
@@ -83,6 +100,7 @@ struct ax25_ctl_struct {
         unsigned char           digi_count;
         ax25_address            digi_addr[AX25_MAX_DIGIS];
 };
+#endif /* __UAPI_DEF_AX25_CTL_STRUCT */
 
 /* this will go away. Please do not export to user land */
 struct ax25_info_struct_deprecated {
@@ -95,6 +113,7 @@ struct ax25_info_struct_deprecated {
 	unsigned int	rcv_q, snd_q;
 };
 
+#if __UAPI_DEF_AX25_INFO_STRUCT
 struct ax25_info_struct {
 	unsigned int	n2, n2count;
 	unsigned int	t1, t1timer;
@@ -107,10 +126,13 @@ struct ax25_info_struct {
 	unsigned int	paclen;
 	unsigned int	window;
 };
+#endif /* __UAPI_DEF_AX25_INFO_STRUCT */
 
+#if __UAPI_DEF_AX25_FWD_STRUCT
 struct ax25_fwd_struct {
 	ax25_address	port_from;
 	ax25_address	port_to;
 };
+#endif /* __UAPI_DEF_AX25_FWD_STRUCT */
 
 #endif

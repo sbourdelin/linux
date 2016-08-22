@@ -100,6 +100,35 @@
 
 #endif /* _NET_IF_H */
 
+/* Coordinate with glibc netax25/ax25.h header. */
+#if defined(_NETAX25_AX25_H)
+
+#define __UAPI_DEF_SIOCAX25GETUID_TO_SIOCAX25DELFWD	0
+#define __UAPI_DEF_SIOCAX25GETINFO			0
+#define __UAPI_DEF_AX25_ADDRESS				0
+#define __UAPI_DEF_SOCKADDR_AX25			0
+#define __UAPI_DEF_FULL_SOCKADDR_AX25			0
+#define __UAPI_DEF_AX25_ROUTES_STRUCT			0
+#define __UAPI_DEF_AX25_ROUTES_OPT_STRUCT		0
+#define __UAPI_DEF_AX25_CTL_STRUCT			0
+#define __UAPI_DEF_AX25_INFO_STRUCT			0
+#define __UAPI_DEF_AX25_FWD_STRUCT			0
+
+#else /* defined(_NETAX25_AX25_H) */
+
+#define __UAPI_DEF_SIOCAX25GETUID_TO_SIOCAX25DELFWD	1
+#define __UAPI_DEF_SIOCAX25GETINFO			1
+#define __UAPI_DEF_AX25_ADDRESS				1
+#define __UAPI_DEF_SOCKADDR_AX25			1
+#define __UAPI_DEF_FULL_SOCKADDR_AX25			1
+#define __UAPI_DEF_AX25_ROUTES_STRUCT			1
+#define __UAPI_DEF_AX25_ROUTES_OPT_STRUCT		1
+#define __UAPI_DEF_AX25_CTL_STRUCT			1
+#define __UAPI_DEF_AX25_INFO_STRUCT			1
+#define __UAPI_DEF_AX25_FWD_STRUCT			1
+
+#endif /* defined(_NETAX25_AX25_H) */
+
 /* Coordinate with glibc netinet/in.h header. */
 #if defined(_NETINET_IN_H)
 
@@ -203,6 +232,18 @@
 #define __UAPI_DEF_FLOCK			1
 #define __UAPI_DEF_F_DUPFD_CLOEXEC		1
 #define __UAPI_DEF_O_ACCMODE_RDONLY_WRONLY_RDWR	1
+
+/* Definitions for ax25.h */
+#define __UAPI_DEF_SIOCAX25GETUID_TO_SIOCAX25DELFWD	1
+#define __UAPI_DEF_SIOCAX25GETINFO			1
+#define __UAPI_DEF_AX25_ADDRESS				1
+#define __UAPI_DEF_SOCKADDR_AX25			1
+#define __UAPI_DEF_FULL_SOCKADDR_AX25			1
+#define __UAPI_DEF_AX25_ROUTES_STRUCT			1
+#define __UAPI_DEF_AX25_ROUTES_OPT_STRUCT		1
+#define __UAPI_DEF_AX25_CTL_STRUCT			1
+#define __UAPI_DEF_AX25_INFO_STRUCT			1
+#define __UAPI_DEF_AX25_FWD_STRUCT			1
 
 /* Definitions for if.h */
 #define __UAPI_DEF_IF_IFCONF 1
