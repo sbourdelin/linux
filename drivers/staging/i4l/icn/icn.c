@@ -1022,7 +1022,8 @@ icn_readstatus(u_char __user *buf, int len, icn_card *card)
 
 /* Put command-strings into the command-queue of the Interface */
 static int
-icn_writecmd(const u_char *buf, int len, int user, icn_card *card)
+icn_writecmd(const u_char __user *ubuf, const u_char *kbuf, int len,
+	     int user, icn_card *card)
 {
 	int mch = card->secondhalf ? 2 : 0;
 	int pp;
@@ -1045,10 +1046,10 @@ icn_writecmd(const u_char *buf, int len, int user, icn_card *card)
 		if (count > len)
 			count = len;
 		if (user) {
-			if (copy_from_user(msg, buf, count))
+			if (copy_from_user(msg, ubuf, count))
 				return -EFAULT;
 		} else
-			memcpy(msg, buf, count);
+			memcpy(msg, kbuf, count);
 
 		spin_lock_irqsave(&dev.devlock, flags);
 		lastmap_card = dev.mcard;
@@ -1274,7 +1275,9 @@ icn_command(isdn_ctrl *c, icn_card *card)
 					msleep_interruptible(ICN_BOOT_TIMEOUT1);
 					sprintf(cbuf, "00;FV2ON\n01;EAZ%c\n02;EAZ%c\n",
 						(a & 1) ? '1' : 'C', (a & 2) ? '2' : 'C');
-					i = icn_writecmd(cbuf, strlen(cbuf), 0, card);
+					i = icn_writecmd(NULL, cbuf,
+							 strlen(cbuf),
+							 0, card);
 					printk(KERN_INFO
 					       "icn: (%s) Leased-line mode enabled\n",
 					       CID);
@@ -1287,7 +1290,9 @@ icn_command(isdn_ctrl *c, icn_card *card)
 				if (card->leased) {
 					card->leased = 0;
 					sprintf(cbuf, "00;FV2OFF\n");
-					i = icn_writecmd(cbuf, strlen(cbuf), 0, card);
+					i = icn_writecmd(NULL, cbuf,
+							 strlen(cbuf),
+							 0, card);
 					printk(KERN_INFO
 					       "icn: (%s) Leased-line mode disabled\n",
 					       CID);
@@ -1324,7 +1329,7 @@ icn_command(isdn_ctrl *c, icn_card *card)
 				 "%02d;D%s_R%s,%02d,%02d,%s\n", (int)(a + 1),
 				 dcode, p, c->parm.setup.si1,
 				 c->parm.setup.si2, c->parm.setup.eazmsn);
-			i = icn_writecmd(cbuf, strlen(cbuf), 0, card);
+			i = icn_writecmd(NULL, cbuf, strlen(cbuf), 0, card);
 		}
 		break;
 	case ISDN_CMD_ACCEPTD:
@@ -1341,10 +1346,12 @@ icn_command(isdn_ctrl *c, icn_card *card)
 					sprintf(cbuf, "%02d;BTRA\n", (int)a);
 					break;
 				}
-				i = icn_writecmd(cbuf, strlen(cbuf), 0, card);
+				i = icn_writecmd(NULL, cbuf,
+						 strlen(cbuf), 0,
+						 card);
 			}
 			sprintf(cbuf, "%02d;DCON_R\n", (int)a);
-			i = icn_writecmd(cbuf, strlen(cbuf), 0, card);
+			i = icn_writecmd(NULL, cbuf, strlen(cbuf), 0, card);
 		}
 		break;
 	case ISDN_CMD_ACCEPTB:
@@ -1362,7 +1369,7 @@ icn_command(isdn_ctrl *c, icn_card *card)
 					break;
 				} else
 				sprintf(cbuf, "%02d;BCON_R\n", (int)a);
-			i = icn_writecmd(cbuf, strlen(cbuf), 0, card);
+			i = icn_writecmd(NULL, cbuf, strlen(cbuf), 0, card);
 		}
 		break;
 	case ISDN_CMD_HANGUP:
@@ -1371,7 +1378,7 @@ icn_command(isdn_ctrl *c, icn_card *card)
 		if (c->arg < ICN_BCH) {
 			a = c->arg + 1;
 			sprintf(cbuf, "%02d;BDIS_R\n%02d;DDIS_R\n", (int)a, (int)a);
-			i = icn_writecmd(cbuf, strlen(cbuf), 0, card);
+			i = icn_writecmd(NULL, cbuf, strlen(cbuf), 0, card);
 		}
 		break;
 	case ISDN_CMD_SETEAZ:
@@ -1387,7 +1394,7 @@ icn_command(isdn_ctrl *c, icn_card *card)
 			} else
 				sprintf(cbuf, "%02d;EAZ%s\n", (int)a,
 					c->parm.num[0] ? (char *)(c->parm.num) : "0123456789");
-			i = icn_writecmd(cbuf, strlen(cbuf), 0, card);
+			i = icn_writecmd(NULL, cbuf, strlen(cbuf), 0, card);
 		}
 		break;
 	case ISDN_CMD_CLREAZ:
@@ -1401,7 +1408,7 @@ icn_command(isdn_ctrl *c, icn_card *card)
 				sprintf(cbuf, "%02d;MSNC\n", (int)a);
 			else
 				sprintf(cbuf, "%02d;EAZC\n", (int)a);
-			i = icn_writecmd(cbuf, strlen(cbuf), 0, card);
+			i = icn_writecmd(NULL, cbuf, strlen(cbuf), 0, card);
 		}
 		break;
 	case ISDN_CMD_SETL2:
@@ -1419,7 +1426,7 @@ icn_command(isdn_ctrl *c, icn_card *card)
 			default:
 				return -EINVAL;
 			}
-			i = icn_writecmd(cbuf, strlen(cbuf), 0, card);
+			i = icn_writecmd(NULL, cbuf, strlen(cbuf), 0, card);
 			card->l2_proto[a & 255] = (a >> 8);
 		}
 		break;
@@ -1473,7 +1480,7 @@ if_writecmd(const u_char __user *buf, int len, int id, int channel)
 	if (card) {
 		if (!(card->flags & ICN_FLAGS_RUNNING))
 			return -ENODEV;
-		return icn_writecmd(buf, len, 1, card);
+		return icn_writecmd(buf, NULL, len, 1, card);
 	}
 	printk(KERN_ERR
 	       "icn: if_writecmd called with invalid driverId!\n");
