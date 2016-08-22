@@ -854,6 +854,9 @@ static int ir_parse_one_ioapic_scope(struct acpi_dmar_device_scope *scope,
 	count = (scope->length - sizeof(struct acpi_dmar_device_scope))
 		/ sizeof(struct acpi_dmar_pci_path);
 
+	if (skip_ioapic_setup)
+		return -ENODEV;
+
 	while (--count > 0) {
 		/*
 		 * Access PCI directly due to the PCI
