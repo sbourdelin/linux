@@ -11,12 +11,11 @@
 #ifndef XZ_H
 #define XZ_H
 
+#	include <linux/types.h>
 #ifdef __KERNEL__
 #	include <linux/stddef.h>
-#	include <linux/types.h>
 #else
 #	include <stddef.h>
-#	include <stdint.h>
 #endif
 
 /* In Linux, this is used to make extern functions static when needed. */
@@ -134,11 +133,11 @@ enum xz_ret {
  * the variables in_pos and out_pos are modified by the XZ code.
  */
 struct xz_buf {
-	const uint8_t *in;
+	const __u8 *in;
 	size_t in_pos;
 	size_t in_size;
 
-	uint8_t *out;
+	__u8 *out;
 	size_t out_pos;
 	size_t out_size;
 };
@@ -191,7 +190,7 @@ struct xz_dec;
  * ready to be used with xz_dec_run(). If memory allocation fails,
  * xz_dec_init() returns NULL.
  */
-XZ_EXTERN struct xz_dec *xz_dec_init(enum xz_mode mode, uint32_t dict_max);
+XZ_EXTERN struct xz_dec *xz_dec_init(enum xz_mode mode, __u32 dict_max);
 
 /**
  * xz_dec_run() - Run the XZ decoder
@@ -259,6 +258,6 @@ XZ_EXTERN void xz_crc32_init(void);
  * calculation, the third argument must be zero. To continue the calculation,
  * the previously returned value is passed as the third argument.
  */
-XZ_EXTERN uint32_t xz_crc32(const uint8_t *buf, size_t size, uint32_t crc);
+XZ_EXTERN __u32 xz_crc32(const __u8 *buf, size_t size, __u32 crc);
 #endif
 #endif
