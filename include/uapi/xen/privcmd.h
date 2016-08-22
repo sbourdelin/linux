@@ -35,7 +35,17 @@
 
 #include <linux/types.h>
 #include <linux/compiler.h>
-#include <xen/interface/xen.h>
+
+/* Defined by include/xen/interface/xen.h, but it is not part of Linux uapi */
+#ifndef __XEN_PUBLIC_XEN_H__
+typedef __u16 domid_t;
+
+#if (defined __ARMEL__ || defined __ARMEB__)
+typedef __u64 xen_pfn_t;
+#else
+typedef unsigned long xen_pfn_t;
+#endif /* (defined __ARMEL__ || defined __ARMEB__) */
+#endif /* __XEN_PUBLIC_XEN_H__ */
 
 struct privcmd_hypercall {
 	__u64 op;
