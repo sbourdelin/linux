@@ -23,12 +23,9 @@
 #include <linux/types.h>		/* for "__kernel_caddr_t" et al	*/
 #include <linux/socket.h>		/* for "struct sockaddr" et al	*/
 #include <linux/compiler.h>		/* for "__user" et al           */
+#include <linux/hdlc/ioctl.h>		/* for IFNAMSIZ                 */
 
-#if __UAPI_DEF_IF_IFNAMSIZ
-#define	IFNAMSIZ	16
-#endif /* __UAPI_DEF_IF_IFNAMSIZ */
 #define	IFALIASZ	256
-#include <linux/hdlc/ioctl.h>
 
 /* For glibc compatibility. An empty enum does not compile. */
 #if __UAPI_DEF_IF_NET_DEVICE_FLAGS_LOWER_UP_DORMANT_ECHO != 0 && \

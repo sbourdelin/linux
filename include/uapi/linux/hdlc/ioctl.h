@@ -1,6 +1,11 @@
 #ifndef __HDLC_IOCTL_H__
 #define __HDLC_IOCTL_H__
 
+#include <linux/libc-compat.h>	/* for compatibility with glibc */
+
+#if __UAPI_DEF_IF_IFNAMSIZ
+#define	IFNAMSIZ	16
+#endif /* __UAPI_DEF_IF_IFNAMSIZ */
 
 #define GENERIC_HDLC_VERSION 4	/* For synchronization with sethdlc utility */
 
