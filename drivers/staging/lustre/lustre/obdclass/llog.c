@@ -248,8 +248,6 @@ repeat:
 		CDEBUG(D_OTHER, "index: %d last_index %d\n",
 		       index, last_index);
 
-		/* get the buf with our target record; avoid old garbage */
-		memset(buf, 0, LLOG_CHUNK_SIZE);
 		last_offset = cur_offset;
 		rc = llog_next_block(lpi->lpi_env, loghandle, &saved_index,
 				     index, &cur_offset, buf, LLOG_CHUNK_SIZE);
@@ -275,8 +273,11 @@ repeat:
 			if (rec->lrh_index == 0) {
 				/* probably another rec just got added? */
 				rc = 0;
-				if (index <= loghandle->lgh_last_idx)
+				if (index <= loghandle->lgh_last_idx) {
+					/* avoid old garbage */
+					memset(buf, 0, LLOG_CHUNK_SIZE);
 					goto repeat;
+				}
 				goto out; /* no more records */
 			}
 			if (rec->lrh_len == 0 ||
