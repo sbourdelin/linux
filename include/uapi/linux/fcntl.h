@@ -1,6 +1,7 @@
 #ifndef _UAPI_LINUX_FCNTL_H
 #define _UAPI_LINUX_FCNTL_H
 
+#include <linux/libc-compat.h>
 #include <asm/fcntl.h>
 
 #define F_SETLEASE	(F_LINUX_SPECIFIC_BASE + 0)
@@ -13,7 +14,9 @@
 #define F_CANCELLK	(F_LINUX_SPECIFIC_BASE + 5)
 
 /* Create a file descriptor with FD_CLOEXEC set. */
+#if __UAPI_DEF_F_DUPFD_CLOEXEC
 #define F_DUPFD_CLOEXEC	(F_LINUX_SPECIFIC_BASE + 6)
+#endif /* __UAPI_DEF_F_DUPFD_CLOEXEC */
 
 /*
  * Request nofications on a directory.

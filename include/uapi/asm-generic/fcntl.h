@@ -1,6 +1,7 @@
 #ifndef _ASM_GENERIC_FCNTL_H
 #define _ASM_GENERIC_FCNTL_H
 
+#include <linux/libc-compat.h>
 #include <linux/types.h>
 
 /*
@@ -15,10 +16,13 @@
  * When introducing new O_* bits, please check its uniqueness in fcntl_init().
  */
 
+#if __UAPI_DEF_O_ACCMODE_RDONLY_WRONLY_RDWR
 #define O_ACCMODE	00000003
 #define O_RDONLY	00000000
 #define O_WRONLY	00000001
 #define O_RDWR		00000002
+#endif /* __UAPI_DEF_O_ACCMODE_RDONLY_WRONLY_RDWR */
+
 #ifndef O_CREAT
 #define O_CREAT		00000100	/* not fcntl */
 #endif
@@ -192,6 +196,7 @@ struct f_owner_ex {
 #define __ARCH_FLOCK_PAD
 #endif
 
+#if __UAPI_DEF_FLOCK
 struct flock {
 	short	l_type;
 	short	l_whence;
@@ -200,6 +205,7 @@ struct flock {
 	__kernel_pid_t	l_pid;
 	__ARCH_FLOCK_PAD
 };
+#endif /* __UAPI_DEF_FLOCK */
 #endif
 
 #ifndef HAVE_ARCH_STRUCT_FLOCK64

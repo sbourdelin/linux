@@ -51,6 +51,21 @@
 /* We have included glibc headers... */
 #if defined(__GLIBC__)
 
+/* Coordinate with glibc fcntl.h header. */
+#if defined(_FCNTL_H)
+
+#define __UAPI_DEF_FLOCK			0
+#define __UAPI_DEF_F_DUPFD_CLOEXEC		0
+#define __UAPI_DEF_O_ACCMODE_RDONLY_WRONLY_RDWR	0
+
+#else /* defined(_FCNTL_H) */
+
+#define __UAPI_DEF_FLOCK			1
+#define __UAPI_DEF_F_DUPFD_CLOEXEC		1
+#define __UAPI_DEF_O_ACCMODE_RDONLY_WRONLY_RDWR	1
+
+#endif /* defined(_FCNTL_H) */
+
 /* Coordinate with glibc net/if.h header. */
 #if defined(_NET_IF_H) && defined(__USE_MISC)
 
@@ -169,6 +184,11 @@
  * or we are being included in the kernel, then define everything
  * that we need. */
 #else /* !defined(__GLIBC__) */
+
+/* Definitions for asm-generic/fcntl.h */
+#define __UAPI_DEF_FLOCK			1
+#define __UAPI_DEF_F_DUPFD_CLOEXEC		1
+#define __UAPI_DEF_O_ACCMODE_RDONLY_WRONLY_RDWR	1
 
 /* Definitions for if.h */
 #define __UAPI_DEF_IF_IFCONF 1
