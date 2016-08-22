@@ -88,6 +88,11 @@ enum ttu_flags {
 	TTU_LZFREE = 8,			/* lazy free mode */
 	TTU_SPLIT_HUGE_PMD = 16,	/* split huge PMD if any */
 
+#ifdef CONFIG_LATE_UNMAP
+	TTU_CHECK_DIRTY = (1 << 5),	/* Check dirty mode */
+	TTU_READONLY = (1 << 6),	/* Change readonly mode */
+#endif
+
 	TTU_IGNORE_MLOCK = (1 << 8),	/* ignore mlock */
 	TTU_IGNORE_ACCESS = (1 << 9),	/* don't age */
 	TTU_IGNORE_HWPOISON = (1 << 10),/* corrupted page is recoverable */

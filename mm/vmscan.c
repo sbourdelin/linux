@@ -494,12 +494,19 @@ void drop_slab(void)
 
 static inline int is_page_cache_freeable(struct page *page)
 {
+	int count = page_count(page) - page_has_private(page);
+
+#ifdef CONFIG_LATE_UNMAP
+	if (PageAnon(page))
+		count -= page_mapcount(page);
+#endif
+
 	/*
 	 * A freeable page cache page is referenced only by the caller
 	 * that isolated the page, the page cache radix tree and
 	 * optional buffer heads at page->private.
 	 */
-	return page_count(page) - page_has_private(page) == 2;
+	return count == 2;
 }
 
 static int may_write_to_inode(struct inode *inode, struct scan_control *sc)
@@ -894,6 +901,22 @@ static void page_check_dirty_writeback(struct page *page,
 		mapping->a_ops->is_dirty_writeback(page, dirty, writeback);
 }
 
+#define TRY_TO_UNMAP(_page, _ttu_flags)				\
+	do {							\
+		switch (try_to_unmap(_page, _ttu_flags)) {	\
+		case SWAP_FAIL:					\
+			goto activate_locked;			\
+		case SWAP_AGAIN:				\
+			goto keep_locked;			\
+		case SWAP_MLOCK:				\
+			goto cull_mlocked;			\
+		case SWAP_LZFREE:				\
+			goto lazyfree;				\
+		case SWAP_SUCCESS:				\
+			; /* try to free the page below */	\
+		}						\
+	} while (0)
+
 /*
  * shrink_page_list() returns the number of reclaimed pages
  */
@@ -925,7 +948,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		struct page *page;
 		int may_enter_fs;
 		enum page_references references = PAGEREF_RECLAIM_CLEAN;
-		bool dirty, writeback;
+		bool dirty, writeback, anon;
 		bool lazyfree = false;
 		int ret = SWAP_SUCCESS;
 
@@ -1061,11 +1084,13 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			; /* try to reclaim the page below */
 		}
 
+		anon = PageAnon(page);
+
 		/*
 		 * Anonymous process memory has backing store?
 		 * Try to allocate it some swap space here.
 		 */
-		if (PageAnon(page) && !PageSwapCache(page)) {
+		if (anon && !PageSwapCache(page)) {
 			if (!(sc->gfp_mask & __GFP_IO))
 				goto keep_locked;
 			if (!add_to_swap(page, page_list))
@@ -1083,25 +1108,28 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 
 		VM_BUG_ON_PAGE(PageTransHuge(page), page);
 
+		ttu_flags = lazyfree ?
+				(ttu_flags | TTU_BATCH_FLUSH | TTU_LZFREE) :
+				(ttu_flags | TTU_BATCH_FLUSH);
+
 		/*
 		 * The page is mapped into the page tables of one or more
 		 * processes. Try to unmap it here.
 		 */
 		if (page_mapped(page) && mapping) {
-			switch (ret = try_to_unmap(page, lazyfree ?
-				(ttu_flags | TTU_BATCH_FLUSH | TTU_LZFREE) :
-				(ttu_flags | TTU_BATCH_FLUSH))) {
-			case SWAP_FAIL:
-				goto activate_locked;
-			case SWAP_AGAIN:
-				goto keep_locked;
-			case SWAP_MLOCK:
-				goto cull_mlocked;
-			case SWAP_LZFREE:
-				goto lazyfree;
-			case SWAP_SUCCESS:
-				; /* try to free the page below */
-			}
+			enum ttu_flags l_ttu_flags = ttu_flags;
+
+#ifdef CONFIG_LATE_UNMAP
+			/* Hanle the pte_dirty
+			   and change pte to readonly.
+			   Write behavior before unmap will make
+			   pte dirty again.  Then we can check
+			   pte_dirty before unmap to make sure
+			   the page was written or not.  */
+			if (anon)
+				l_ttu_flags |= TTU_CHECK_DIRTY | TTU_READONLY;
+#endif
+			TRY_TO_UNMAP(page, l_ttu_flags);
 		}
 
 		if (PageDirty(page)) {
@@ -1157,6 +1185,25 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 					goto keep;
 				if (PageDirty(page) || PageWriteback(page))
 					goto keep_locked;
+
+#ifdef CONFIG_LATE_UNMAP
+				if (anon) {
+					if (!PageSwapCache(page))
+						goto keep_locked;
+
+					/* Check if pte dirty by do_swap_page
+					   or do_wp_page.  */
+					TRY_TO_UNMAP(page,
+						     ttu_flags |
+						     TTU_CHECK_DIRTY);
+					if (PageDirty(page))
+						goto keep_locked;
+
+					if (page_mapped(page) && mapping)
+						TRY_TO_UNMAP(page, ttu_flags);
+				}
+#endif
+
 				mapping = page_mapping(page);
 			case PAGE_CLEAN:
 				; /* try to free the page below */
