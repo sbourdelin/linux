@@ -230,6 +230,13 @@
 
 #endif /* defined(_NETROSE_ROSE_H) */
 
+/* Coordinate with glibc net/route.h */
+#if defined(_NET_ROUTE_H)
+#define __UAPI_DEF_RTENTRY		0
+#else /* defined(_NET_ROUTE_H) */
+#define __UAPI_DEF_RTENTRY		1
+#endif /* defined(_NET_ROUTE_H) */
+
 /* Coordinate with glibc pty.h */
 #if defined(_PTY_H)
 #define __UAPI_DEF_TERMIOS	0
@@ -368,6 +375,9 @@
 #define __UAPI_DEF_ROSE_ROUTE_STRUCT			1
 #define __UAPI_DEF_ROSE_CAUSE_STRUCT			1
 #define __UAPI_DEF_ROSE_FACILITIES_STRUCT		1
+
+/* Definitions for route.h */
+#define __UAPI_DEF_RTENTRY		1
 
 /* Definitions for time.h */
 #define __UAPI_DEF_TIMESPEC			1

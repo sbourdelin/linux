@@ -23,10 +23,12 @@
 #ifndef _LINUX_ROUTE_H
 #define _LINUX_ROUTE_H
 
+#include <linux/libc-compat.h>
 #include <linux/if.h>
 #include <linux/compiler.h>
 
 /* This structure gets passed by the SIOCADDRT and SIOCDELRT calls. */
+#if __UAPI_DEF_RTENTRY
 struct rtentry {
 	unsigned long	rt_pad1;
 	struct sockaddr	rt_dst;		/* target address		*/
@@ -45,7 +47,7 @@ struct rtentry {
 	unsigned long	rt_window;	/* Window clamping 		*/
 	unsigned short	rt_irtt;	/* Initial RTT			*/
 };
-
+#endif /* __UAPI_DEF_RTENTRY */
 
 #define	RTF_UP		0x0001		/* route usable		  	*/
 #define	RTF_GATEWAY	0x0002		/* destination is a gateway	*/
