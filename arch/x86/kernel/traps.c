@@ -693,12 +693,10 @@ dotraplinkage void do_debug(struct pt_regs *regs, long error_code)
 		goto exit;
 	}
 
-	if (WARN_ON_ONCE((dr6 & DR_STEP) && !user_mode(regs))) {
+	if ((dr6 & DR_STEP) && !user_mode(regs)) {
 		/*
 		 * Historical junk that used to handle SYSENTER single-stepping.
-		 * This should be unreachable now.  If we survive for a while
-		 * without anyone hitting this warning, we'll turn this into
-		 * an oops.
+		 * Still needed on qemu TCG.
 		 */
 		tsk->thread.debugreg6 &= ~DR_STEP;
 		set_tsk_thread_flag(tsk, TIF_SINGLESTEP);
