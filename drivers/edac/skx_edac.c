@@ -762,23 +762,23 @@ rir_found:
 	return true;
 }
 
-static u8 skx_close_row[] = {
+static const u8 skx_close_row[] = {
 	15, 16, 17, 18, 20, 21, 22, 28, 10, 11, 12, 13, 29, 30, 31, 32, 33
 };
-static u8 skx_close_column[] = {
+static const u8 skx_close_column[] = {
 	3, 4, 5, 14, 19, 23, 24, 25, 26, 27
 };
-static u8 skx_open_row[] = {
+static const u8 skx_open_row[] = {
 	14, 15, 16, 20, 28, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 32, 33
 };
-static u8 skx_open_column[] = {
+static const u8 skx_open_column[] = {
 	3, 4, 5, 6, 7, 8, 9, 10, 11, 12
 };
-static u8 skx_open_fine_column[] = {
+static const u8 skx_open_fine_column[] = {
 	3, 4, 5, 7, 8, 9, 10, 11, 12, 13
 };
 
-static int skx_bits(u64 addr, int nbits, u8 *bits)
+static int skx_bits(u64 addr, int nbits, const u8 *bits)
 {
 	int i, res = 0;
 
@@ -884,7 +884,8 @@ static void skx_mce_output_error(struct mem_ctl_info *mci,
 				 struct decoded_addr *res)
 {
 	enum hw_event_mc_err_type tp_event;
-	char *type, *optype, msg[256];
+	const char *type, *optype;
+	char msg[256];
 	bool ripv = GET_BITFIELD(m->mcgstatus, 0, 0);
 	bool overflow = GET_BITFIELD(m->status, 62, 62);
 	bool uncorrected_error = GET_BITFIELD(m->status, 61, 61);
