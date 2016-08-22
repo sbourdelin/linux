@@ -35,9 +35,9 @@ struct __sysctl_args {
 	int __user *name;
 	int nlen;
 	void __user *oldval;
-	size_t __user *oldlenp;
+	__kernel_size_t __user *oldlenp;
 	void __user *newval;
-	size_t newlen;
+	__kernel_size_t newlen;
 	unsigned long __unused[4];
 };
 
