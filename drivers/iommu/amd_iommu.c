@@ -166,6 +166,15 @@ struct dma_ops_domain {
 static struct iova_domain reserved_iova_ranges;
 static struct lock_class_key reserved_rbtree_key;
 
+/*
+ * Support for memory encryption. If memory encryption is supported, then an
+ * override to this function will be provided.
+ */
+unsigned long __weak amd_iommu_get_me_mask(void)
+{
+	return 0;
+}
+
 /****************************************************************************
  *
  * Helper functions
@@ -2302,6 +2311,7 @@ static dma_addr_t __map_single(struct device *dev,
 
 	prot = dir2prot(direction);
 
+	paddr |= amd_iommu_get_me_mask();
 	start = address;
 	for (i = 0; i < pages; ++i) {
 		ret = iommu_map_page(&dma_dom->domain, start, paddr,
