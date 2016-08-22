@@ -404,7 +404,8 @@ rcu_perf_writer(void *arg)
 				 perf_type, PERF_FLAG, me, MIN_MEAS);
 			if (atomic_inc_return(&n_rcu_perf_writer_finished) >=
 			    nrealwriters) {
-				schedule_timeout_interruptible(10);
+				schedule_timeout_interruptible(
+							msecs_to_jiffies(10));
 				rcu_ftrace_dump(DUMP_ALL);
 				PERFOUT_STRING("Test complete");
 				t_rcu_perf_writer_finished = t;
