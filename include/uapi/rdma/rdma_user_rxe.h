@@ -34,6 +34,8 @@
 #define RDMA_USER_RXE_H
 
 #include <linux/types.h>
+#include <linux/in.h>
+#include <linux/in6.h>
 
 union rxe_gid {
 	__u8	raw[16];
