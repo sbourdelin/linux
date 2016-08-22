@@ -667,6 +667,18 @@ int sys_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	unsigned long msr;
 #endif
 
+	/*
+	 * We always send the user to their signal handler non
+	 * transactionally. If there is a transactional/suspended state
+	 * then throw it away. The purpose of a sigreturn is to destroy
+	 * all traces of the signal frame, this includes any transactional
+	 * state created within in.
+	 * The cause is not important as there will never be a
+	 * recheckpoint so it's not user visible.
+	 */
+	if (MSR_TM_ACTIVE(mfmsr()))
+		tm_reclaim_current(0);
+
 	/* Always make any pending restarted system calls return -EINTR */
 	current->restart_block.fn = do_no_restart_syscall;
 
