@@ -294,6 +294,27 @@ found:
 	return;
 }
 
+/*
+ * For radix page tables we setup, the IAMR values as follows
+ * IMAR = 0100...00 (key 0 is set to 1)
+ * AMOR = 1100....00 (Mask for key 0 is 11)
+ * AMR, UAMR, UAMOR are not affected
+ */
+static void __init radix_init_iamr(void)
+{
+	unsigned long iamr_mask = 0x4000000000000000;
+	unsigned long iamr = mfspr(SPRN_IAMR);
+
+	unsigned long amor_mask = 0xc000000000000000;
+	unsigned long amor = mfspr(SPRN_AMOR);
+
+	iamr |= iamr_mask;
+	amor |= amor_mask;
+
+	mtspr(SPRN_AMOR, amor);
+	mtspr(SPRN_IAMR, iamr);
+}
+
 void __init radix__early_init_mmu(void)
 {
 	unsigned long lpcr;
@@ -350,6 +371,7 @@ void __init radix__early_init_mmu(void)
 		radix_init_partition_table();
 	}
 
+	radix_init_iamr();
 	radix_init_pgtable();
 }
 
