@@ -14,11 +14,54 @@
 #include <linux/mm.h>
 
 #include <asm/mem_encrypt.h>
+#include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 #include <asm/fixmap.h>
 
 /* Buffer used for early in-place encryption by BSP, no locking needed */
 static char me_early_buffer[PAGE_SIZE] __aligned(PAGE_SIZE);
+
+int sme_set_mem_enc(void *vaddr, unsigned long size)
+{
+	unsigned long addr, numpages;
+
+	if (!sme_me_mask)
+		return 0;
+
+	addr = (unsigned long)vaddr & PAGE_MASK;
+	numpages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+
+	/*
+	 * The set_memory_xxx functions take an integer for numpages, make
+	 * sure it doesn't exceed that.
+	 */
+	if (numpages > INT_MAX)
+		return -EINVAL;
+
+	return set_memory_enc(addr, numpages);
+}
+EXPORT_SYMBOL_GPL(sme_set_mem_enc);
+
+int sme_set_mem_dec(void *vaddr, unsigned long size)
+{
+	unsigned long addr, numpages;
+
+	if (!sme_me_mask)
+		return 0;
+
+	addr = (unsigned long)vaddr & PAGE_MASK;
+	numpages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+
+	/*
+	 * The set_memory_xxx functions take an integer for numpages, make
+	 * sure it doesn't exceed that.
+	 */
+	if (numpages > INT_MAX)
+		return -EINVAL;
+
+	return set_memory_dec(addr, numpages);
+}
+EXPORT_SYMBOL_GPL(sme_set_mem_dec);
 
 /*
  * This routine does not change the underlying encryption setting of the
