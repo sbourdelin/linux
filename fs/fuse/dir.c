@@ -13,6 +13,7 @@
 #include <linux/sched.h>
 #include <linux/namei.h>
 #include <linux/slab.h>
+#include <linux/xattr.h>
 
 static bool fuse_use_readdirplus(struct inode *dir, struct dir_context *ctx)
 {
@@ -1724,9 +1725,8 @@ static int fuse_getattr(struct vfsmount *mnt, struct dentry *entry,
 	return fuse_update_attributes(inode, stat, NULL, NULL);
 }
 
-static int fuse_setxattr(struct dentry *unused, struct inode *inode,
-			 const char *name, const void *value,
-			 size_t size, int flags)
+static int fuse_setxattr(struct inode *inode, const char *name,
+			 const void *value, size_t size, int flags)
 {
 	struct fuse_conn *fc = get_fuse_conn(inode);
 	FUSE_ARGS(args);
@@ -1843,9 +1843,8 @@ static ssize_t fuse_listxattr(struct dentry *entry, char *list, size_t size)
 	return ret;
 }
 
-static int fuse_removexattr(struct dentry *entry, const char *name)
+static int fuse_removexattr(struct inode *inode, const char *name)
 {
-	struct inode *inode = d_inode(entry);
 	struct fuse_conn *fc = get_fuse_conn(inode);
 	FUSE_ARGS(args);
 	int err;
@@ -1884,10 +1883,10 @@ static const struct inode_operations fuse_dir_inode_operations = {
 	.mknod		= fuse_mknod,
 	.permission	= fuse_permission,
 	.getattr	= fuse_getattr,
-	.setxattr	= fuse_setxattr,
-	.getxattr	= fuse_getxattr,
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
 	.listxattr	= fuse_listxattr,
-	.removexattr	= fuse_removexattr,
+	.removexattr	= generic_removexattr,
 };
 
 static const struct file_operations fuse_dir_operations = {
@@ -1905,10 +1904,10 @@ static const struct inode_operations fuse_common_inode_operations = {
 	.setattr	= fuse_setattr,
 	.permission	= fuse_permission,
 	.getattr	= fuse_getattr,
-	.setxattr	= fuse_setxattr,
-	.getxattr	= fuse_getxattr,
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
 	.listxattr	= fuse_listxattr,
-	.removexattr	= fuse_removexattr,
+	.removexattr	= generic_removexattr,
 };
 
 static const struct inode_operations fuse_symlink_inode_operations = {
@@ -1916,10 +1915,10 @@ static const struct inode_operations fuse_symlink_inode_operations = {
 	.get_link	= fuse_get_link,
 	.readlink	= generic_readlink,
 	.getattr	= fuse_getattr,
-	.setxattr	= fuse_setxattr,
-	.getxattr	= fuse_getxattr,
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
 	.listxattr	= fuse_listxattr,
-	.removexattr	= fuse_removexattr,
+	.removexattr	= generic_removexattr,
 };
 
 void fuse_init_common(struct inode *inode)
@@ -1937,3 +1936,34 @@ void fuse_init_symlink(struct inode *inode)
 {
 	inode->i_op = &fuse_symlink_inode_operations;
 }
+
+static int fuse_xattr_get(const struct xattr_handler *handler,
+		          struct dentry *dentry, struct inode *inode,
+		          const char *name, void *buffer, size_t size)
+{
+       return fuse_getxattr(dentry, inode, name, buffer, size);
+}
+
+static int fuse_xattr_set(const struct xattr_handler *handler,
+		          struct dentry *dentry, struct inode *inode,
+			  const char *name, const void *value, size_t size,
+			  int flags)
+{
+       if (value)
+		return fuse_setxattr(inode, name, value, size, flags);
+       else {
+		BUG_ON(flags != XATTR_REPLACE);
+		return fuse_removexattr(inode, name);
+       }
+}
+
+const struct xattr_handler fuse_xattr_handler = {
+       .prefix = "",  /* match anything */
+       .get = fuse_xattr_get,
+       .set = fuse_xattr_set,
+};
+
+const struct xattr_handler *fuse_xattr_handlers[] = {
+       &fuse_xattr_handler,
+       NULL
+};
