@@ -1324,7 +1324,7 @@ static void assert_sprites_disabled(struct drm_i915_private *dev_priv,
 
 	if (INTEL_INFO(dev)->gen >= 9) {
 		for_each_sprite(dev_priv, pipe, sprite) {
-			u32 val = I915_READ(PLANE_CTL(pipe, sprite));
+			u32 val = I915_READ(PLANE_CTL(pipe, sprite + 1));
 			I915_STATE_WARN(val & PLANE_CTL_ENABLE,
 			     "plane %d assertion failure, should be off on pipe %c but is still active\n",
 			     sprite, pipe_name(pipe));
