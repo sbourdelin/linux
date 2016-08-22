@@ -77,7 +77,7 @@ config BATTERY_88PM860X
 
 config BATTERY_ACT8945A
 	tristate "Active-semi ACT8945A charger driver"
-	depends on MFD_ACT8945A || COMPILE_TEST
+	depends on MFD_ACT8945A || GPIOLIB || COMPILE_TEST
 	help
 	  Say Y here to enable support for power supply provided by
 	  Active-semi ActivePath ACT8945A charger.
