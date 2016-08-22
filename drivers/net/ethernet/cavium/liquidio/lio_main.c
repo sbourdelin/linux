@@ -3190,7 +3190,7 @@ static int liquidio_vlan_rx_kill_vid(struct net_device *netdev,
  *                              OCTNET_CMD_RXCSUM_DISABLE
  * @returns                     SUCCESS or FAILURE
  */
-int liquidio_set_rxcsum_command(struct net_device *netdev, int command,
+static int liquidio_set_rxcsum_command(struct net_device *netdev, int command,
 				u8 rx_cmd)
 {
 	struct lio *lio = GET_LIO(netdev);
