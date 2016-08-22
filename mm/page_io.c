@@ -238,7 +238,7 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 	int ret = 0;
 
 #ifdef CONFIG_LATE_UNMAP
-	if (!(PageAnon(page) && page_mapped(page)))
+	if (!page_mapped(page))
 #endif
 		if (try_to_free_swap(page)) {
 			unlock_page(page);

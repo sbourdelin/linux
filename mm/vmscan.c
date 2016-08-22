@@ -54,6 +54,8 @@
 #include <linux/swapops.h>
 #include <linux/balloon_compaction.h>
 
+#include <linux/shmem_fs.h>
+
 #include "internal.h"
 
 #define CREATE_TRACE_POINTS
@@ -492,12 +494,13 @@ void drop_slab(void)
 		drop_slab_node(nid);
 }
 
-static inline int is_page_cache_freeable(struct page *page)
+static inline int is_page_cache_freeable(struct page *page,
+					 struct address_space *mapping)
 {
 	int count = page_count(page) - page_has_private(page);
 
 #ifdef CONFIG_LATE_UNMAP
-	if (PageAnon(page))
+	if (PageAnon(page) || (mapping && mapping->a_ops == &shmem_aops))
 		count -= page_mapcount(page);
 #endif
 
@@ -576,7 +579,7 @@ static pageout_t pageout(struct page *page, struct address_space *mapping,
 	 * swap_backing_dev_info is bust: it doesn't reflect the
 	 * congestion state of the swapdevs.  Easy to fix, if needed.
 	 */
-	if (!is_page_cache_freeable(page))
+	if (!is_page_cache_freeable(page, mapping))
 		return PAGE_KEEP;
 	if (!mapping) {
 		/*
@@ -972,7 +975,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		struct page *page;
 		int may_enter_fs;
 		enum page_references references = PAGEREF_RECLAIM_CLEAN;
-		bool dirty, writeback, anon;
+		bool dirty, writeback, anon, late_unmap;
 		bool lazyfree = false;
 		int ret = SWAP_SUCCESS;
 
@@ -1109,6 +1112,10 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		}
 
 		anon = PageAnon(page);
+		if (anon)
+			late_unmap = true;
+		else
+			late_unmap = false;
 
 		/*
 		 * Anonymous process memory has backing store?
@@ -1144,13 +1151,16 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			enum ttu_flags l_ttu_flags = ttu_flags;
 
 #ifdef CONFIG_LATE_UNMAP
+			if (mapping->a_ops == &shmem_aops)
+				late_unmap = true;
+
 			/* Hanle the pte_dirty
 			   and change pte to readonly.
 			   Write behavior before unmap will make
 			   pte dirty again.  Then we can check
 			   pte_dirty before unmap to make sure
 			   the page was written or not.  */
-			if (anon)
+			if (late_unmap)
 				l_ttu_flags |= TTU_CHECK_DIRTY | TTU_READONLY;
 #endif
 			TRY_TO_UNMAP(page, l_ttu_flags);
@@ -1211,7 +1221,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 					goto keep_locked;
 
 #ifdef CONFIG_LATE_UNMAP
-				if (anon) {
+				if (late_unmap) {
 					if (!PageSwapCache(page))
 						goto keep_locked;
 
@@ -1231,8 +1241,11 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 					}
 #endif
 
-					if (page_mapped(page) && mapping)
+					if (page_mapped(page) && mapping) {
 						TRY_TO_UNMAP(page, ttu_flags);
+						if (!anon)
+							shmem_page_unmap(page);
+					}
 				}
 #endif
 

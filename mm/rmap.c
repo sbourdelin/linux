@@ -1490,12 +1490,7 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 
 #ifdef CONFIG_LATE_UNMAP
 	if ((flags & TTU_CHECK_DIRTY) || (flags & TTU_READONLY)) {
-		BUG_ON(!PageAnon(page));
-
 		pteval = *pte;
-
-		BUG_ON(pte_write(pteval) &&
-		       page_mapcount(page) + page_swapcount(page) > 1);
 
 		if ((flags & TTU_CHECK_DIRTY) && pte_dirty(pteval)) {
 			set_page_dirty(page);

@@ -715,8 +715,7 @@ compress_again:
 	}
 
 #ifdef CONFIG_ZRAM_NON_SWAP
-	if (!is_partial_io(bvec) && PageAnon(page) &&
-	    zram->non_swap && clen > zram->non_swap) {
+	if (!is_partial_io(bvec) && zram->non_swap && clen > zram->non_swap) {
 		ret = 0;
 		SetPageNonSwap(page);
 		goto out;
