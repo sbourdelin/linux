@@ -1058,6 +1058,10 @@ init_conntrack(struct net *net, struct nf_conn *tmpl,
 				if (help)
 					rcu_assign_pointer(help->helper, exp->helper);
 			}
+#ifdef ATL_CHANGE
+			if (exp->logfn)
+				exp->logfn(tuple);
+#endif
 
 #ifdef CONFIG_NF_CONNTRACK_MARK
 			ct->mark = exp->master->mark;

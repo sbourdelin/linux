@@ -27,6 +27,11 @@ struct nf_conntrack_expect {
 	void (*expectfn)(struct nf_conn *new,
 			 struct nf_conntrack_expect *this);
 
+#ifdef ATL_CHANGE
+	/* Logging function to call when seeing an expected connection */
+	void (*logfn)(const struct nf_conntrack_tuple *tuple);
+#endif
+
 	/* Helper to assign to new connection */
 	struct nf_conntrack_helper *helper;
 

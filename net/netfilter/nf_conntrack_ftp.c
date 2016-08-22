@@ -384,6 +384,23 @@ static void update_nl_seq(struct nf_conn *ct, u32 nl_seq,
 	}
 }
 
+#ifdef ATL_CHANGE
+void log_ftp_data_connection(const struct nf_conntrack_tuple *tuple)
+{
+	if (tuple) {
+		if (tuple->src.l3num == PF_INET) {
+			pr_info("FTP data connection initiated by %pI4:%d to %pI4:%d\n",
+				&tuple->src.u3.ip, tuple->src.u.tcp.port,
+				&tuple->dst.u3.ip, tuple->dst.u.tcp.port);
+		} else {
+			pr_info("FTP data connection initiated by %pI6:%d to %pI6:%d\n",
+				&tuple->src.u3.ip, tuple->src.u.tcp.port,
+				&tuple->dst.u3.ip, tuple->dst.u.tcp.port);
+		}
+	}
+}
+#endif
+
 static int help(struct sk_buff *skb,
 		unsigned int protoff,
 		struct nf_conn *ct,
@@ -530,6 +547,10 @@ skip_nl_seq:
 	nf_ct_expect_init(exp, NF_CT_EXPECT_CLASS_DEFAULT, cmd.l3num,
 			  &ct->tuplehash[!dir].tuple.src.u3, daddr,
 			  IPPROTO_TCP, NULL, &cmd.u.tcp.port);
+
+#ifdef ATL_CHANGE
+	exp->logfn = log_ftp_data_connection;
+#endif
 
 	/* Now, NAT might want to mangle the packet, and register the
 	 * (possibly changed) expectation itself. */
