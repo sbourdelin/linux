@@ -23,6 +23,11 @@ extern unsigned long sme_me_mask;
 
 u8 sme_get_me_loss(void);
 
+void __init sme_early_mem_enc(resource_size_t paddr,
+			      unsigned long size);
+void __init sme_early_mem_dec(resource_size_t paddr,
+			      unsigned long size);
+
 void __init sme_early_init(void);
 
 #define __sme_pa(x)		(__pa((x)) | sme_me_mask)
@@ -37,6 +42,16 @@ void __init sme_early_init(void);
 static inline u8 sme_get_me_loss(void)
 {
 	return 0;
+}
+
+static inline void __init sme_early_mem_enc(resource_size_t paddr,
+					    unsigned long size)
+{
+}
+
+static inline void __init sme_early_mem_dec(resource_size_t paddr,
+					    unsigned long size)
+{
 }
 
 static inline void __init sme_early_init(void)
