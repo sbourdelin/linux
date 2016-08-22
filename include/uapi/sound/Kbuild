@@ -1,6 +1,5 @@
 # UAPI Header export list
 header-y += asequencer.h
-header-y += asoc.h
 header-y += asound.h
 header-y += asound_fm.h
 header-y += compress_offload.h
