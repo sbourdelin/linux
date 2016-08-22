@@ -236,7 +236,9 @@ LIBTRACEEVENT = $(TE_PATH)libtraceevent.a
 export LIBTRACEEVENT
 
 LIBTRACEEVENT_DYNAMIC_LIST = $(TE_PATH)libtraceevent-dynamic-list
+ifeq ($(filter -static,$(LDFLAGS)),)
 LIBTRACEEVENT_DYNAMIC_LIST_LDFLAGS = -Xlinker --dynamic-list=$(LIBTRACEEVENT_DYNAMIC_LIST)
+endif
 
 LIBAPI = $(API_PATH)libapi.a
 export LIBAPI
