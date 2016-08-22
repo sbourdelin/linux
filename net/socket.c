@@ -332,6 +332,14 @@ static int sockfs_xattr_get(const struct xattr_handler *handler,
 	return dentry->d_name.len + 1;
 }
 
+static int sockfs_xattr_set(const struct xattr_handler *handler,
+			    struct dentry *dentry, struct inode *inode,
+			    const char *suffix, const void *value, size_t size,
+			    int flags)
+{
+	return -EOPNOTSUPP;
+}
+
 #define XATTR_SOCKPROTONAME_SUFFIX "sockprotoname"
 #define XATTR_NAME_SOCKPROTONAME (XATTR_SYSTEM_PREFIX XATTR_SOCKPROTONAME_SUFFIX)
 #define XATTR_NAME_SOCKPROTONAME_LEN (sizeof(XATTR_NAME_SOCKPROTONAME)-1)
@@ -339,6 +347,7 @@ static int sockfs_xattr_get(const struct xattr_handler *handler,
 static const struct xattr_handler sockfs_xattr_handler = {
 	.name = XATTR_NAME_SOCKPROTONAME,
 	.get = sockfs_xattr_get,
+	.set = sockfs_xattr_set,
 };
 
 static const struct xattr_handler *sockfs_xattr_handlers[] = {
