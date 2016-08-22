@@ -2530,8 +2530,8 @@ static long calc_cfs_shares(struct cfs_rq *cfs_rq, struct task_group *tg)
 	if (tg_weight)
 		shares /= tg_weight;
 
-	if (shares < MIN_SHARES)
-		shares = MIN_SHARES;
+	if (shares < scale_load(MIN_SHARES))
+		shares = scale_load(MIN_SHARES);
 	if (shares > tg->shares)
 		shares = tg->shares;
 
@@ -5023,9 +5023,9 @@ static long effective_load(struct task_group *tg, int cpu, long wl, long wg)
 		 * wl = S * s'_i; see (2)
 		 */
 		if (W > 0 && w < W)
-			wl = (w * (long)tg->shares) / W;
+			wl = (w * (long)scale_load_down(tg->shares)) / W;
 		else
-			wl = tg->shares;
+			wl = scale_load_down(tg->shares);
 
 		/*
 		 * Per the above, wl is the new se->load.weight value; since
