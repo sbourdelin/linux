@@ -33,6 +33,8 @@
 #ifndef __LINUX_PUBLIC_EVTCHN_H__
 #define __LINUX_PUBLIC_EVTCHN_H__
 
+#include <xen/privcmd.h>
+
 /*
  * Bind a fresh port to VIRQ @virq.
  * Return allocated port.
