@@ -1,4 +1,6 @@
 #!/bin/sh
+set -e
+set -u
 
 if [ $# -lt 2 ]
 then
@@ -26,7 +28,6 @@ shift
 # Iterate through files listed on command line
 
 FILE=
-trap 'rm -f "$OUTDIR/$FILE" "$OUTDIR/$FILE.sed"' EXIT
 for i in "$@"
 do
 	FILE="$(basename "$i")"
@@ -37,10 +38,13 @@ do
 		-e 's/(^|[^a-zA-Z0-9])__packed([^a-zA-Z0-9_]|$)/\1__attribute__((packed))\2/g' \
 		-e 's/(^|[ \t(])(inline|asm|volatile)([ \t(]|$)/\1__\2__\3/g' \
 		-e 's@#(ifndef|define|endif[ \t]*/[*])[ \t]*_UAPI@#\1 @' \
-		"$SRCDIR/$i" > "$OUTDIR/$FILE.sed" || exit 1
+		"$SRCDIR/$i" > "$OUTDIR/$FILE.sed" || \
+		( rm -f "$OUTDIR/$FILE.sed" ; exit 1 )
 	scripts/unifdef -U__KERNEL__ -D__EXPORTED_HEADERS__ "$OUTDIR/$FILE.sed" \
-		> "$OUTDIR/$FILE"
-	[ $? -gt 1 ] && exit 1
+		> "$OUTDIR/$FILE" || \
+		( if [ $? -gt 1 ]; then \
+				rm -f "$OUTDIR/$FILE" "$OUTDIR/$FILE.sed" ; \
+				exit 1 ; \
+		  fi )
 	rm -f "$OUTDIR/$FILE.sed"
 done
-trap - EXIT
