@@ -35,6 +35,7 @@
 #define _LINUX_RDS_H
 
 #include <linux/types.h>
+#include <linux/socket.h>
 
 #define RDS_IB_ABI_VERSION		0x301
 
