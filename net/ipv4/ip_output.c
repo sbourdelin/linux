@@ -216,6 +216,40 @@ static int ip_finish_output2(struct net *net, struct sock *sk, struct sk_buff *s
 	return -EINVAL;
 }
 
+static inline int skb_gso_clamp(struct sk_buff *skb, unsigned int network_len)
+{
+	struct skb_shared_info *shinfo = skb_shinfo(skb);
+	unsigned short gso_size;
+	unsigned int seglen;
+
+	if (shinfo->gso_size == GSO_BY_FRAGS)
+		return -EINVAL;
+
+	seglen = skb_gso_network_seglen(skb);
+
+	/* Decrease gso_size to fit specified network length */
+	gso_size = shinfo->gso_size - (seglen - network_len);
+	if (shinfo->gso_type & SKB_GSO_UDP)
+		gso_size &= ~7;
+
+	if (!(shinfo->gso_type & SKB_GSO_DODGY)) {
+		/* Recalculate gso_segs for skbs of trusted sources.
+		 * Untrusted skbs will have their gso_segs calculated by
+		 * skb_gso_segment.
+		 */
+		unsigned int hdr_len, payload_len;
+
+		hdr_len = seglen - shinfo->gso_size;
+		payload_len = skb->len - hdr_len;
+		shinfo->gso_segs = DIV_ROUND_UP(payload_len, gso_size);
+
+		// Q: need to verify gso_segs <= dev->gso_max_segs?
+		//    seems to be protected by netif_skb_features
+	}
+	shinfo->gso_size = gso_size;
+	return 0;
+}
+
 static int ip_finish_output_gso(struct net *net, struct sock *sk,
 				struct sk_buff *skb, unsigned int mtu)
 {
@@ -237,6 +271,16 @@ static int ip_finish_output_gso(struct net *net, struct sock *sk,
 	 * 2) skb arrived via virtio-net, we thus get TSO/GSO skbs directly
 	 * from host network stack.
 	 */
+
+	/* Attempt to clamp gso_size to avoid segmenting and fragmenting.
+	 *
+	 * Q: policy needed? per device?
+	 */
+	if (sysctl_ip_output_gso_clamp) {
+		if (!skb_gso_clamp(skb, mtu))
+			return ip_finish_output2(net, sk, skb);
+	}
+
 	features = netif_skb_features(skb);
 	BUILD_BUG_ON(sizeof(*IPCB(skb)) > SKB_SGO_CB_OFFSET);
 	segs = skb_gso_segment(skb, features & ~NETIF_F_GSO_MASK);
