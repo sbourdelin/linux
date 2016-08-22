@@ -397,8 +397,7 @@ cleanup needed then just return directly.
 
 Choose label names which say what the goto does or why the goto exists.  An
 example of a good name could be "out_buffer:" if the goto frees "buffer".  Avoid
-using GW-BASIC names like "err1:" and "err2:".  Also don't name them after the
-goto location like "err_kmalloc_failed:"
+using GW-BASIC names like "err1:" and "err2:".
 
 The rationale for using gotos is:
 
@@ -440,6 +439,47 @@ A common type of bug to be aware of is "one err bugs" which look like this:
 The bug in this code is that on some exit paths "foo" is NULL.  Normally the
 fix for this is to split it up into two error labels "err_bar:" and "err_foo:".
 
+Note that labels normally come before the appropriate cleanups:
+
+		foo = kmalloc(SIZE, GFP_KERNEL); 
+		if (!foo)
+			goto out;
+
+		foo->bar = kmalloc(SIZE, GFP_KERNEL); 
+		if (!foo->bar)
+			goto out_foo;
+		...
+		if (err)
+			goto out_bar;
+
+	out_bar:
+		kfree(foo->bar);
+
+	out_foo:
+		kfree(foo);
+
+	out:
+		return ret;
+
+If labels are named after the goto location (or error that was detected), they
+come after the matching cleanup code:
+
+		foo = kmalloc(SIZE, GFP_KERNEL); 
+		if (!foo)
+			goto err_foo;
+
+		foo->bar = kmalloc(SIZE, GFP_KERNEL); 
+		if (!foo->bar)
+			goto err_bar;
+		...
+
+		kfree(foo->bar);
+	err_bar:
+
+		kfree(foo);
+	err_foo:
+
+		return ret;
 
 		Chapter 8: Commenting
 

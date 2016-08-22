@@ -80,7 +80,9 @@ extern unsigned ring_size;
 
 /* Is there a portable way to do this? */
 #if defined(__x86_64__) || defined(__i386__)
-#define cpu_relax() asm ("rep; nop" ::: "memory")
+#define cpu_relax() do { \
+	asm ("rep; nop" ::: "memory"); \
+} while (0)
 #else
 #define cpu_relax() assert(0)
 #endif
