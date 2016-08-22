@@ -1,5 +1,5 @@
 TEST_PROGS := tm-resched-dscr tm-syscall tm-signal-msr-resv tm-signal-stack \
-	tm-vmxcopy tm-fork tm-tar tm-tmspr tm-exec tm-execed
+	tm-vmxcopy tm-fork tm-tar tm-tmspr tm-exec tm-execed tm-sigreturn
 
 all: $(TEST_PROGS)
 
