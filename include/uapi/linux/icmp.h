@@ -17,6 +17,7 @@
 #ifndef _UAPI_LINUX_ICMP_H
 #define _UAPI_LINUX_ICMP_H
 
+#include <linux/libc-compat.h>
 #include <linux/types.h>
 
 #define ICMP_ECHOREPLY		0	/* Echo Reply			*/
@@ -64,7 +65,7 @@
 #define ICMP_EXC_TTL		0	/* TTL count exceeded		*/
 #define ICMP_EXC_FRAGTIME	1	/* Fragment Reass time exceeded	*/
 
-
+#if __UAPI_DEF_ICMPHDR
 struct icmphdr {
   __u8		type;
   __u8		code;
@@ -82,6 +83,7 @@ struct icmphdr {
 	__u8	reserved[4];
   } un;
 };
+#endif /* __UAPI_DEF_ICMPHDR */
 
 
 /*

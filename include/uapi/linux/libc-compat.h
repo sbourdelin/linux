@@ -154,6 +154,13 @@
 
 #endif /* _NETINET_IN_H */
 
+/* Coordinate with glibc netinet/ip_icmp.h header. */
+#if defined(__NETINET_IP_ICMP_H)
+#define __UAPI_DEF_ICMPHDR		0
+#else /* defined(__NETINET_IP_ICMP_H) */
+#define __UAPI_DEF_ICMPHDR		1
+#endif /* defined(__NETINET_IP_ICMP_H) */
+
 /* Coordinate with glibc netipx/ipx.h header. */
 #if defined(__NETIPX_IPX_H)
 
@@ -217,6 +224,9 @@
 #define __UAPI_DEF_IPV6_OPTIONS		1
 #define __UAPI_DEF_IN6_PKTINFO		1
 #define __UAPI_DEF_IP6_MTUINFO		1
+
+/* Definitions for icmp.h */
+#define __UAPI_DEF_ICMPHDR		1
 
 /* Definitions for ipx.h */
 #define __UAPI_DEF_SOCKADDR_IPX			1
