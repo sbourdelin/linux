@@ -24,6 +24,7 @@
 #include <linux/mount.h>
 #include <linux/syscalls.h>
 #include <linux/fs.h>
+#include <linux/xattr.h>
 #include <linux/uaccess.h>
 
 #include "internal.h"
@@ -41,11 +42,16 @@ enum {
 static LIST_HEAD(entries);
 static int enabled = 1;
 
-enum {Enabled, Magic};
+enum {Enabled, Magic, Keyword};
 #define MISC_FMT_PRESERVE_ARGV0 (1 << 31)
 #define MISC_FMT_OPEN_BINARY (1 << 30)
 #define MISC_FMT_CREDENTIALS (1 << 29)
 #define MISC_FMT_OPEN_FILE (1 << 28)
+
+#define XATTR_BINFMT_PREFIX XATTR_USER_PREFIX "binfmt."
+#define XATTR_BINFMT_INTERPRETER_SUFFIX "interp"
+#define XATTR_NAME_BINFMT (XATTR_BINFMT_PREFIX XATTR_BINFMT_INTERPRETER_SUFFIX)
+#define XATTR_VALUE_MAX_LENGTH 128
 
 typedef struct {
 	struct list_head list;
@@ -61,6 +67,7 @@ typedef struct {
 } Node;
 
 static DEFINE_RWLOCK(entries_lock);
+static int get_xattr_interp_keyword(struct file *file, char *buf, size_t count);
 static struct file_system_type bm_fs_type;
 static struct vfsmount *bm_mnt;
 static int entry_count;
@@ -87,6 +94,8 @@ static int entry_count;
  */
 static Node *check_file(struct linux_binprm *bprm)
 {
+	char k[XATTR_VALUE_MAX_LENGTH];
+	int k_len = get_xattr_interp_keyword(bprm->file, k, sizeof(k)-1);
 	char *p = strrchr(bprm->interp, '.');
 	struct list_head *l;
 
@@ -99,6 +108,16 @@ static Node *check_file(struct linux_binprm *bprm)
 		/* Make sure this one is currently enabled. */
 		if (!test_bit(Enabled, &e->flags))
 			continue;
+
+		/* Do matching based on xattrs keyword */
+		if (test_bit(Keyword, &e->flags)) {
+			if (k_len <= 0)
+				continue;
+			k[k_len] = 0;
+			if (!strcmp(e->magic, k))
+				return e;
+			continue;
+		}
 
 		/* Do matching based on extension if applicable. */
 		if (!test_bit(Magic, &e->flags)) {
@@ -309,6 +328,20 @@ static char *check_special_flags(char *sfs, Node *e)
 }
 
 /*
+ * Check to see if the filesystem supports xattrs
+ * and grab the value so it can be checked against
+ * the list of keywords in binfmt_misc for a match
+ */
+static int get_xattr_interp_keyword(struct file *file, char *buf, size_t count)
+{
+
+	if (unlikely(!file->f_inode->i_op->getxattr))
+		return -ENOENT;
+	return file->f_inode->i_op->getxattr(file->f_path.dentry, file->f_inode,
+		XATTR_NAME_BINFMT, buf, count);
+}
+
+/*
  * This registers a new binary format, it recognises the syntax
  * ':name:type:offset:magic:mask:interpreter:flags'
  * where the ':' is the IFS, that can be chosen with the first char
@@ -365,6 +398,10 @@ static Node *create_entry(const char __user *buffer, size_t count)
 	case 'E':
 		pr_debug("register: type: E (extension)\n");
 		e->flags = 1 << Enabled;
+		break;
+	case 'K':
+		pr_debug("register: type: K (xattrs keyword)\n");
+		e->flags = (1 << Enabled) | (1 << Keyword);
 		break;
 	case 'M':
 		pr_debug("register: type: M (magic)\n");
@@ -453,7 +490,7 @@ static Node *create_entry(const char __user *buffer, size_t count)
 			}
 		}
 	} else {
-		/* Handle the 'E' (extension) format. */
+		/* Handle the 'E' (extension) and 'K' (keyword) format. */
 
 		/* Skip the 'offset' field. */
 		p = strchr(p, del);
@@ -469,7 +506,10 @@ static Node *create_entry(const char __user *buffer, size_t count)
 		*p++ = '\0';
 		if (!e->magic[0] || strchr(e->magic, '/'))
 			goto einval;
-		pr_debug("register: extension: {%s}\n", e->magic);
+		if (test_bit(Keyword, &e->flags))
+			pr_debug("register: keyword: {%s}\n", e->magic);
+		else
+			pr_debug("register: extension: {%s}\n", e->magic);
 
 		/* Skip the 'mask' field. */
 		p = strchr(p, del);
@@ -563,7 +603,10 @@ static void entry_status(Node *e, char *page)
 	*dp++ = '\n';
 
 	if (!test_bit(Magic, &e->flags)) {
-		sprintf(dp, "extension .%s\n", e->magic);
+		if (test_bit(Keyword, &e->flags))
+			sprintf(dp, "keyword %s\n", e->magic);
+		else
+			sprintf(dp, "extension .%s\n", e->magic);
 	} else {
 		dp += sprintf(dp, "offset %i\nmagic ", e->offset);
 		dp = bin2hex(dp, e->magic, e->size);
