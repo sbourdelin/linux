@@ -80,6 +80,7 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 		"SwapTotal:      %8lu kB\n"
 		"SwapFree:       %8lu kB\n"
 		"Dirty:          %8lu kB\n"
+		"MetadataDirty:  %8lu kB\n"
 		"Writeback:      %8lu kB\n"
 		"AnonPages:      %8lu kB\n"
 		"Mapped:         %8lu kB\n"
@@ -139,6 +140,7 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 		K(i.totalswap),
 		K(i.freeswap),
 		K(global_node_page_state(NR_FILE_DIRTY)),
+		K(global_node_page_state(NR_METADATA_DIRTY)),
 		K(global_node_page_state(NR_WRITEBACK)),
 		K(global_node_page_state(NR_ANON_MAPPED)),
 		K(global_node_page_state(NR_FILE_MAPPED)),

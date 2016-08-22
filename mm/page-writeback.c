@@ -506,6 +506,7 @@ bool node_dirty_ok(struct pglist_data *pgdat)
 	nr_pages += node_page_state(pgdat, NR_FILE_DIRTY);
 	nr_pages += node_page_state(pgdat, NR_UNSTABLE_NFS);
 	nr_pages += node_page_state(pgdat, NR_WRITEBACK);
+	nr_pages += node_page_state(pgdat, NR_METADATA_DIRTY);
 
 	return nr_pages <= limit;
 }
@@ -1595,7 +1596,8 @@ static void balance_dirty_pages(struct bdi_writeback *wb,
 		 * been flushed to permanent storage.
 		 */
 		nr_reclaimable = global_node_page_state(NR_FILE_DIRTY) +
-					global_node_page_state(NR_UNSTABLE_NFS);
+				global_node_page_state(NR_UNSTABLE_NFS) +
+				global_node_page_state(NR_METADATA_DIRTY);
 		gdtc->avail = global_dirtyable_memory();
 		gdtc->dirty = nr_reclaimable + global_node_page_state(NR_WRITEBACK);
 
@@ -1935,7 +1937,8 @@ bool wb_over_bg_thresh(struct bdi_writeback *wb)
 	 */
 	gdtc->avail = global_dirtyable_memory();
 	gdtc->dirty = global_node_page_state(NR_FILE_DIRTY) +
-		      global_node_page_state(NR_UNSTABLE_NFS);
+		      global_node_page_state(NR_UNSTABLE_NFS) +
+		      global_node_page_state(NR_METADATA_DIRTY);
 	domain_dirty_limits(gdtc);
 
 	if (gdtc->dirty > gdtc->bg_thresh)
@@ -2009,7 +2012,8 @@ void laptop_mode_timer_fn(unsigned long data)
 {
 	struct request_queue *q = (struct request_queue *)data;
 	int nr_pages = global_node_page_state(NR_FILE_DIRTY) +
-		global_node_page_state(NR_UNSTABLE_NFS);
+		global_node_page_state(NR_UNSTABLE_NFS) +
+		global_node_page_state(NR_METADATA_DIRTY);
 	struct bdi_writeback *wb;
 
 	/*
@@ -2471,6 +2475,96 @@ void account_page_dirtied(struct page *page, struct address_space *mapping)
 	}
 }
 EXPORT_SYMBOL(account_page_dirtied);
+
+/*
+ * account_metadata_dirtied
+ * @page - the page being dirited
+ * @bdi - the bdi that owns this page
+ *
+ * Do the dirty page accounting for metadata pages that aren't backed by an
+ * address_space.
+ */
+void account_metadata_dirtied(struct page *page, struct backing_dev_info *bdi)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	__inc_node_page_state(page, NR_METADATA_DIRTY);
+	__inc_zone_page_state(page, NR_ZONE_WRITE_PENDING);
+	__inc_node_page_state(page, NR_DIRTIED);
+	__inc_wb_stat(&bdi->wb, WB_RECLAIMABLE);
+	__inc_wb_stat(&bdi->wb, WB_DIRTIED);
+	__inc_wb_stat(&bdi->wb, WB_METADATA_DIRTY);
+	current->nr_dirtied++;
+	task_io_account_write(PAGE_SIZE);
+	this_cpu_inc(bdp_ratelimits);
+	local_irq_restore(flags);
+}
+EXPORT_SYMBOL(account_metadata_dirtied);
+
+/*
+ * account_metadata_cleaned
+ * @page - the page being cleaned
+ * @bdi - the bdi that owns this page
+ *
+ * Called on a no longer dirty metadata page.
+ */
+void account_metadata_cleaned(struct page *page, struct backing_dev_info *bdi)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	__dec_node_page_state(page, NR_METADATA_DIRTY);
+	__dec_zone_page_state(page, NR_ZONE_WRITE_PENDING);
+	__dec_wb_stat(&bdi->wb, WB_RECLAIMABLE);
+	__dec_wb_stat(&bdi->wb, WB_METADATA_DIRTY);
+	task_io_account_cancelled_write(PAGE_SIZE);
+	local_irq_restore(flags);
+}
+EXPORT_SYMBOL(account_metadata_cleaned);
+
+/*
+ * account_metadata_writeback
+ * @page - the page being marked as writeback
+ * @bdi - the bdi that owns this page
+ *
+ * Called on a metadata page that has been marked writeback.
+ */
+void account_metadata_writeback(struct page *page,
+				struct backing_dev_info *bdi)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	__inc_wb_stat(&bdi->wb, WB_WRITEBACK);
+	__inc_node_page_state(page, NR_WRITEBACK);
+	__dec_node_page_state(page, NR_METADATA_DIRTY);
+	__dec_wb_stat(&bdi->wb, WB_METADATA_DIRTY);
+	__dec_wb_stat(&bdi->wb, WB_RECLAIMABLE);
+	local_irq_restore(flags);
+}
+EXPORT_SYMBOL(account_metadata_writeback);
+
+/*
+ * account_metadata_end_writeback
+ * @page - the page we are ending writeback on
+ * @bdi - the bdi that owns this page
+ *
+ * Called on a metadata page that has completed writeback.
+ */
+void account_metadata_end_writeback(struct page *page,
+				    struct backing_dev_info *bdi)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	__dec_wb_stat(&bdi->wb, WB_WRITEBACK);
+	__dec_node_page_state(page, NR_WRITEBACK);
+	__dec_zone_page_state(page, NR_ZONE_WRITE_PENDING);
+	__inc_node_page_state(page, NR_WRITTEN);
+	local_irq_restore(flags);
+}
+EXPORT_SYMBOL(account_metadata_end_writeback);
 
 /*
  * Helper function for deaccounting dirty page without writeback.

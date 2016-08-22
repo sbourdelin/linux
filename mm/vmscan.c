@@ -3714,7 +3714,8 @@ static unsigned long node_pagecache_reclaimable(struct pglist_data *pgdat)
 
 	/* If we can't clean pages, remove dirty pages from consideration */
 	if (!(node_reclaim_mode & RECLAIM_WRITE))
-		delta += node_page_state(pgdat, NR_FILE_DIRTY);
+		delta += node_page_state(pgdat, NR_FILE_DIRTY) +
+			node_page_state(pgdat, NR_METADATA_DIRTY);
 
 	/* Watch for any possible underflows due to delta */
 	if (unlikely(delta > nr_pagecache_reclaimable))

@@ -1810,6 +1810,7 @@ static unsigned long get_nr_dirty_pages(void)
 {
 	return global_node_page_state(NR_FILE_DIRTY) +
 		global_node_page_state(NR_UNSTABLE_NFS) +
+		global_node_page_state(NR_METADATA_DIRTY) +
 		get_nr_dirty_inodes();
 }
 

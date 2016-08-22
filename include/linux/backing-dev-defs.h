@@ -34,6 +34,7 @@ typedef int (congested_fn)(void *, int);
 enum wb_stat_item {
 	WB_RECLAIMABLE,
 	WB_WRITEBACK,
+	WB_METADATA_DIRTY,
 	WB_DIRTIED,
 	WB_WRITTEN,
 	NR_WB_STAT_ITEMS
