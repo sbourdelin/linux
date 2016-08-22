@@ -103,7 +103,7 @@ static int init_pgtable(struct kimage *image, unsigned long start_pgtable)
 	struct x86_mapping_info info = {
 		.alloc_pgt_page	= alloc_pgt_page,
 		.context	= image,
-		.pmd_flag	= __PAGE_KERNEL_LARGE_EXEC,
+		.pmd_flag	= __PAGE_KERNEL_LARGE_EXEC | _PAGE_ENC,
 	};
 	unsigned long mstart, mend;
 	pgd_t *level4p;
