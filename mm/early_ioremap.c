@@ -34,6 +34,14 @@ void __init __weak early_ioremap_shutdown(void)
 {
 }
 
+pgprot_t __init __weak early_memremap_pgprot_adjust(resource_size_t phys_addr,
+						    unsigned long size,
+						    enum memremap_owner owner,
+						    pgprot_t prot)
+{
+	return prot;
+}
+
 void __init early_ioremap_reset(void)
 {
 	early_ioremap_shutdown();
@@ -213,16 +221,23 @@ early_ioremap(resource_size_t phys_addr, unsigned long size)
 
 /* Remap memory */
 void __init *
-early_memremap(resource_size_t phys_addr, unsigned long size)
+early_memremap(resource_size_t phys_addr, unsigned long size,
+	       enum memremap_owner owner)
 {
-	return (__force void *)__early_ioremap(phys_addr, size,
-					       FIXMAP_PAGE_NORMAL);
+	pgprot_t prot = early_memremap_pgprot_adjust(phys_addr, size, owner,
+						     FIXMAP_PAGE_NORMAL);
+
+	return (__force void *)__early_ioremap(phys_addr, size, prot);
 }
 #ifdef FIXMAP_PAGE_RO
 void __init *
-early_memremap_ro(resource_size_t phys_addr, unsigned long size)
+early_memremap_ro(resource_size_t phys_addr, unsigned long size,
+		  enum memremap_owner owner)
 {
-	return (__force void *)__early_ioremap(phys_addr, size, FIXMAP_PAGE_RO);
+	pgprot_t prot = early_memremap_pgprot_adjust(phys_addr, size, owner,
+						     FIXMAP_PAGE_RO);
+
+	return (__force void *)__early_ioremap(phys_addr, size, prot);
 }
 #endif
 
@@ -236,7 +251,8 @@ early_memremap_prot(resource_size_t phys_addr, unsigned long size,
 
 #define MAX_MAP_CHUNK	(NR_FIX_BTMAPS << PAGE_SHIFT)
 
-void __init copy_from_early_mem(void *dest, phys_addr_t src, unsigned long size)
+void __init copy_from_early_mem(void *dest, phys_addr_t src, unsigned long size,
+				enum memremap_owner owner)
 {
 	unsigned long slop, clen;
 	char *p;
@@ -246,7 +262,7 @@ void __init copy_from_early_mem(void *dest, phys_addr_t src, unsigned long size)
 		clen = size;
 		if (clen > MAX_MAP_CHUNK - slop)
 			clen = MAX_MAP_CHUNK - slop;
-		p = early_memremap(src & PAGE_MASK, clen + slop);
+		p = early_memremap(src & PAGE_MASK, clen + slop, owner);
 		memcpy(dest, p + slop, clen);
 		early_memunmap(p, clen + slop);
 		dest += clen;
@@ -265,12 +281,14 @@ early_ioremap(resource_size_t phys_addr, unsigned long size)
 
 /* Remap memory */
 void __init *
-early_memremap(resource_size_t phys_addr, unsigned long size)
+early_memremap(resource_size_t phys_addr, unsigned long size,
+	       enum memremap_owner owner)
 {
 	return (void *)phys_addr;
 }
 void __init *
-early_memremap_ro(resource_size_t phys_addr, unsigned long size)
+early_memremap_ro(resource_size_t phys_addr, unsigned long size,
+		  enum memremap_owner owner)
 {
 	return (void *)phys_addr;
 }

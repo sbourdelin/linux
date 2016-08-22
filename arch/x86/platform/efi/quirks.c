@@ -311,7 +311,7 @@ int __init efi_reuse_config(u64 tables, int nr_tables)
 	if (!efi_enabled(EFI_64BIT))
 		return 0;
 
-	data = early_memremap(efi_setup, sizeof(*data));
+	data = early_memremap(efi_setup, sizeof(*data), BOOT_DATA);
 	if (!data) {
 		ret = -ENOMEM;
 		goto out;
@@ -322,7 +322,7 @@ int __init efi_reuse_config(u64 tables, int nr_tables)
 
 	sz = sizeof(efi_config_table_64_t);
 
-	p = tablep = early_memremap(tables, nr_tables * sz);
+	p = tablep = early_memremap(tables, nr_tables * sz, BOOT_DATA);
 	if (!p) {
 		pr_err("Could not map Configuration table!\n");
 		ret = -ENOMEM;

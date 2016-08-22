@@ -273,7 +273,7 @@ void __init efi_esrt_init(void)
 		return;
 	}
 
-	va = early_memremap(efi.esrt, size);
+	va = early_memremap(efi.esrt, size, BOOT_DATA);
 	if (!va) {
 		pr_err("early_memremap(%p, %zu) failed.\n", (void *)efi.esrt,
 		       size);
@@ -323,7 +323,7 @@ void __init efi_esrt_init(void)
 	/* remap it with our (plausible) new pages */
 	early_memunmap(va, size);
 	size += entries_size;
-	va = early_memremap(efi.esrt, size);
+	va = early_memremap(efi.esrt, size, BOOT_DATA);
 	if (!va) {
 		pr_err("early_memremap(%p, %zu) failed.\n", (void *)efi.esrt,
 		       size);

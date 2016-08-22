@@ -3,6 +3,11 @@
 
 #include <linux/types.h>
 
+enum memremap_owner {
+	KERNEL_DATA = 0,
+	BOOT_DATA,
+};
+
 /*
  * early_ioremap() and early_iounmap() are for temporary early boot-time
  * mappings, before the real ioremap() is functional.
@@ -10,9 +15,13 @@
 extern void __iomem *early_ioremap(resource_size_t phys_addr,
 				   unsigned long size);
 extern void *early_memremap(resource_size_t phys_addr,
-			    unsigned long size);
+			    unsigned long size, enum memremap_owner);
 extern void *early_memremap_ro(resource_size_t phys_addr,
-			       unsigned long size);
+			       unsigned long size, enum memremap_owner);
+/*
+ * When supplying the protection value assume the caller knows the
+ * situation, so the memremap_owner data is not required.
+ */
 extern void *early_memremap_prot(resource_size_t phys_addr,
 				 unsigned long size, unsigned long prot_val);
 extern void early_iounmap(void __iomem *addr, unsigned long size);
@@ -41,7 +50,7 @@ extern void early_ioremap_reset(void);
  * Early copy from unmapped memory to kernel mapped memory.
  */
 extern void copy_from_early_mem(void *dest, phys_addr_t src,
-				unsigned long size);
+				unsigned long size, enum memremap_owner owner);
 
 #else
 static inline void early_ioremap_init(void) { }

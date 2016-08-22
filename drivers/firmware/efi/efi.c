@@ -386,7 +386,7 @@ int __init efi_mem_desc_lookup(u64 phys_addr, efi_memory_desc_t *out_md)
 		 * So just always get our own virtual map on the CPU.
 		 *
 		 */
-		md = early_memremap(p, sizeof (*md));
+		md = early_memremap(p, sizeof (*md), BOOT_DATA);
 		if (!md) {
 			pr_err_once("early_memremap(%pa, %zu) failed.\n",
 				    &p, sizeof (*md));
@@ -501,7 +501,8 @@ int __init efi_config_parse_tables(void *config_tables, int count, int sz,
 	if (efi.properties_table != EFI_INVALID_TABLE_ADDR) {
 		efi_properties_table_t *tbl;
 
-		tbl = early_memremap(efi.properties_table, sizeof(*tbl));
+		tbl = early_memremap(efi.properties_table, sizeof(*tbl),
+				     BOOT_DATA);
 		if (tbl == NULL) {
 			pr_err("Could not map Properties table!\n");
 			return -ENOMEM;
@@ -531,7 +532,7 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
 	 * Let's see what config tables the firmware passed to us.
 	 */
 	config_tables = early_memremap(efi.systab->tables,
-				       efi.systab->nr_tables * sz);
+				       efi.systab->nr_tables * sz, BOOT_DATA);
 	if (config_tables == NULL) {
 		pr_err("Could not map Configuration table!\n");
 		return -ENOMEM;

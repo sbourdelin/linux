@@ -344,7 +344,8 @@ static void __init relocate_initrd(void)
 	printk(KERN_INFO "Allocated new RAMDISK: [mem %#010llx-%#010llx]\n",
 	       relocated_ramdisk, relocated_ramdisk + ramdisk_size - 1);
 
-	copy_from_early_mem((void *)initrd_start, ramdisk_image, ramdisk_size);
+	copy_from_early_mem((void *)initrd_start, ramdisk_image, ramdisk_size,
+			    BOOT_DATA);
 
 	printk(KERN_INFO "Move RAMDISK from [mem %#010llx-%#010llx] to"
 		" [mem %#010llx-%#010llx]\n",
@@ -426,7 +427,7 @@ static void __init parse_setup_data(void)
 	while (pa_data) {
 		u32 data_len, data_type;
 
-		data = early_memremap(pa_data, sizeof(*data));
+		data = early_memremap(pa_data, sizeof(*data), BOOT_DATA);
 		data_len = data->len + sizeof(struct setup_data);
 		data_type = data->type;
 		pa_next = data->next;
@@ -459,7 +460,7 @@ static void __init e820_reserve_setup_data(void)
 		return;
 
 	while (pa_data) {
-		data = early_memremap(pa_data, sizeof(*data));
+		data = early_memremap(pa_data, sizeof(*data), BOOT_DATA);
 		e820_update_range(pa_data, sizeof(*data)+data->len,
 			 E820_RAM, E820_RESERVED_KERN);
 		pa_data = data->next;
@@ -479,7 +480,7 @@ static void __init memblock_x86_reserve_range_setup_data(void)
 
 	pa_data = boot_params.hdr.setup_data;
 	while (pa_data) {
-		data = early_memremap(pa_data, sizeof(*data));
+		data = early_memremap(pa_data, sizeof(*data), BOOT_DATA);
 		memblock_reserve(pa_data, sizeof(*data) + data->len);
 		pa_data = data->next;
 		early_memunmap(data, sizeof(*data));

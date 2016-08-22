@@ -67,7 +67,8 @@ static void __init init_screen_info(void)
 	struct screen_info *si;
 
 	if (screen_info_table != EFI_INVALID_TABLE_ADDR) {
-		si = early_memremap_ro(screen_info_table, sizeof(*si));
+		si = early_memremap_ro(screen_info_table, sizeof(*si),
+				       BOOT_DATA);
 		if (!si) {
 			pr_err("Could not map screen_info config table\n");
 			return;
@@ -94,7 +95,7 @@ static int __init uefi_init(void)
 	int i, retval;
 
 	efi.systab = early_memremap_ro(efi_system_table,
-				       sizeof(efi_system_table_t));
+				       sizeof(efi_system_table_t), BOOT_DATA);
 	if (efi.systab == NULL) {
 		pr_warn("Unable to map EFI system table.\n");
 		return -ENOMEM;
@@ -121,7 +122,8 @@ static int __init uefi_init(void)
 
 	/* Show what we know for posterity */
 	c16 = early_memremap_ro(efi_to_phys(efi.systab->fw_vendor),
-				sizeof(vendor) * sizeof(efi_char16_t));
+				sizeof(vendor) * sizeof(efi_char16_t),
+				BOOT_DATA);
 	if (c16) {
 		for (i = 0; i < (int) sizeof(vendor) - 1 && *c16; ++i)
 			vendor[i] = c16[i];
@@ -135,7 +137,7 @@ static int __init uefi_init(void)
 
 	table_size = sizeof(efi_config_table_64_t) * efi.systab->nr_tables;
 	config_tables = early_memremap_ro(efi_to_phys(efi.systab->tables),
-					  table_size);
+					  table_size, BOOT_DATA);
 	if (config_tables == NULL) {
 		pr_warn("Unable to map EFI config table array.\n");
 		retval = -ENOMEM;
@@ -226,7 +228,8 @@ void __init efi_init(void)
 	efi_system_table = params.system_table;
 
 	efi.memmap.phys_map = params.mmap;
-	efi.memmap.map = early_memremap_ro(params.mmap, params.mmap_size);
+	efi.memmap.map = early_memremap_ro(params.mmap, params.mmap_size,
+					   BOOT_DATA);
 	if (efi.memmap.map == NULL) {
 		/*
 		* If we are booting via UEFI, the UEFI memory map is the only

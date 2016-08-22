@@ -276,11 +276,13 @@ static void __init x86_flattree_get_config(void)
 
 	map_len = max(PAGE_SIZE - (initial_dtb & ~PAGE_MASK), (u64)128);
 
-	initial_boot_params = dt = early_memremap(initial_dtb, map_len);
+	initial_boot_params = dt = early_memremap(initial_dtb, map_len,
+						  BOOT_DATA);
 	size = of_get_flat_dt_size();
 	if (map_len < size) {
 		early_memunmap(dt, map_len);
-		initial_boot_params = dt = early_memremap(initial_dtb, size);
+		initial_boot_params = dt = early_memremap(initial_dtb, size,
+							  BOOT_DATA);
 		map_len = size;
 	}
 

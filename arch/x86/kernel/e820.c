@@ -661,7 +661,7 @@ void __init parse_e820_ext(u64 phys_addr, u32 data_len)
 	struct e820entry *extmap;
 	struct setup_data *sdata;
 
-	sdata = early_memremap(phys_addr, data_len);
+	sdata = early_memremap(phys_addr, data_len, BOOT_DATA);
 	entries = sdata->len / sizeof(struct e820entry);
 	extmap = (struct e820entry *)(sdata->data);
 	__append_e820_map(extmap, entries);

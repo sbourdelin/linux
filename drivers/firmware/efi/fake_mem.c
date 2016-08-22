@@ -101,7 +101,8 @@ void __init efi_fake_memmap(void)
 
 	/* create new EFI memmap */
 	new_memmap = early_memremap(new_memmap_phy,
-				    efi.memmap.desc_size * new_nr_map);
+				    efi.memmap.desc_size * new_nr_map,
+				    BOOT_DATA);
 	if (!new_memmap) {
 		memblock_free(new_memmap_phy, efi.memmap.desc_size * new_nr_map);
 		return;

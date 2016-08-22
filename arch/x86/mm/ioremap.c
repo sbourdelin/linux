@@ -419,6 +419,25 @@ void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr)
 	iounmap((void __iomem *)((unsigned long)addr & PAGE_MASK));
 }
 
+/*
+ * Architecure override of __weak function to adjust the protection attributes
+ * used when remapping memory.
+ */
+pgprot_t __init early_memremap_pgprot_adjust(resource_size_t phys_addr,
+					     unsigned long size,
+					     enum memremap_owner owner,
+					     pgprot_t prot)
+{
+	/*
+	 * If memory encryption is enabled and BOOT_DATA is being mapped
+	 * then remove the encryption bit.
+	 */
+	if (_PAGE_ENC && (owner == BOOT_DATA))
+		prot = __pgprot(pgprot_val(prot) & ~_PAGE_ENC);
+
+	return prot;
+}
+
 /* Remap memory with encryption */
 void __init *early_memremap_enc(resource_size_t phys_addr,
 				unsigned long size)

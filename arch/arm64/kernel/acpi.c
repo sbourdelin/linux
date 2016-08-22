@@ -98,7 +98,7 @@ char *__init __acpi_map_table(unsigned long phys, unsigned long size)
 	if (!size)
 		return NULL;
 
-	return early_memremap(phys, size);
+	return early_memremap(phys, size, BOOT_DATA);
 }
 
 void __init __acpi_unmap_table(char *map, unsigned long size)

@@ -28,7 +28,7 @@ int __init efi_memattr_init(void)
 	if (efi.mem_attr_table == EFI_INVALID_TABLE_ADDR)
 		return 0;
 
-	tbl = early_memremap(efi.mem_attr_table, sizeof(*tbl));
+	tbl = early_memremap(efi.mem_attr_table, sizeof(*tbl), BOOT_DATA);
 	if (!tbl) {
 		pr_err("Failed to map EFI Memory Attributes table @ 0x%lx\n",
 		       efi.mem_attr_table);

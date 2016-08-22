@@ -2020,7 +2020,7 @@ static unsigned long __init xen_read_phys_ulong(phys_addr_t addr)
 	unsigned long *vaddr;
 	unsigned long val;
 
-	vaddr = early_memremap_ro(addr, sizeof(val));
+	vaddr = early_memremap_ro(addr, sizeof(val), KERNEL_DATA);
 	val = *vaddr;
 	early_memunmap(vaddr, sizeof(val));
 	return val;
@@ -2114,15 +2114,16 @@ void __init xen_relocate_p2m(void)
 	pgd = __va(read_cr3());
 	new_p2m = (unsigned long *)(2 * PGDIR_SIZE);
 	for (idx_pud = 0; idx_pud < n_pud; idx_pud++) {
-		pud = early_memremap(pud_phys, PAGE_SIZE);
+		pud = early_memremap(pud_phys, PAGE_SIZE, KERNEL_DATA);
 		clear_page(pud);
 		for (idx_pmd = 0; idx_pmd < min(n_pmd, PTRS_PER_PUD);
 		     idx_pmd++) {
-			pmd = early_memremap(pmd_phys, PAGE_SIZE);
+			pmd = early_memremap(pmd_phys, PAGE_SIZE, KERNEL_DATA);
 			clear_page(pmd);
 			for (idx_pt = 0; idx_pt < min(n_pt, PTRS_PER_PMD);
 			     idx_pt++) {
-				pt = early_memremap(pt_phys, PAGE_SIZE);
+				pt = early_memremap(pt_phys, PAGE_SIZE,
+						    KERNEL_DATA);
 				clear_page(pt);
 				for (idx_pte = 0;
 				     idx_pte < min(n_pte, PTRS_PER_PTE);

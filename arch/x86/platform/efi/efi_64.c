@@ -222,7 +222,12 @@ int __init efi_setup_page_tables(unsigned long pa_memmap, unsigned num_pages)
 	if (efi_enabled(EFI_OLD_MEMMAP))
 		return 0;
 
-	efi_scratch.efi_pgt = (pgd_t *)__pa(efi_pgd);
+	/*
+	 * Since the PGD is encrypted, set the encryption mask so that when
+	 * this value is loaded into cr3 the PGD will be decrypted during
+	 * the pagetable walk.
+	 */
+	efi_scratch.efi_pgt = (pgd_t *)__sme_pa(efi_pgd);
 	pgd = efi_pgd;
 
 	/*
@@ -261,7 +266,8 @@ int __init efi_setup_page_tables(unsigned long pa_memmap, unsigned num_pages)
 		pfn = md->phys_addr >> PAGE_SHIFT;
 		npages = md->num_pages;
 
-		if (kernel_map_pages_in_pgd(pgd, pfn, md->phys_addr, npages, _PAGE_RW)) {
+		if (kernel_map_pages_in_pgd(pgd, pfn, md->phys_addr, npages,
+					    _PAGE_RW | _PAGE_ENC)) {
 			pr_err("Failed to map 1:1 memory\n");
 			return 1;
 		}
@@ -278,7 +284,8 @@ int __init efi_setup_page_tables(unsigned long pa_memmap, unsigned num_pages)
 	text = __pa(_text);
 	pfn = text >> PAGE_SHIFT;
 
-	if (kernel_map_pages_in_pgd(pgd, pfn, text, npages, _PAGE_RW)) {
+	if (kernel_map_pages_in_pgd(pgd, pfn, text, npages,
+				    _PAGE_RW | _PAGE_ENC)) {
 		pr_err("Failed to map kernel text 1:1\n");
 		return 1;
 	}

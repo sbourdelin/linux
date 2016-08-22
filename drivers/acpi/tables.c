@@ -583,7 +583,7 @@ void __init acpi_table_upgrade(void)
 			if (clen > MAP_CHUNK_SIZE - slop)
 				clen = MAP_CHUNK_SIZE - slop;
 			dest_p = early_memremap(dest_addr & PAGE_MASK,
-						clen + slop);
+						clen + slop, BOOT_DATA);
 			memcpy(dest_p + slop, src_p, clen);
 			early_memunmap(dest_p, clen + slop);
 			src_p += clen;

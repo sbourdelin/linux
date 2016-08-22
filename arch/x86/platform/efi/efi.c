@@ -239,12 +239,13 @@ static int __init efi_systab_init(void *phys)
 		u64 tmp = 0;
 
 		if (efi_setup) {
-			data = early_memremap(efi_setup, sizeof(*data));
+			data = early_memremap(efi_setup, sizeof(*data),
+					      BOOT_DATA);
 			if (!data)
 				return -ENOMEM;
 		}
 		systab64 = early_memremap((unsigned long)phys,
-					 sizeof(*systab64));
+					  sizeof(*systab64), BOOT_DATA);
 		if (systab64 == NULL) {
 			pr_err("Couldn't map the system table!\n");
 			if (data)
@@ -293,7 +294,7 @@ static int __init efi_systab_init(void *phys)
 		efi_system_table_32_t *systab32;
 
 		systab32 = early_memremap((unsigned long)phys,
-					 sizeof(*systab32));
+					  sizeof(*systab32), BOOT_DATA);
 		if (systab32 == NULL) {
 			pr_err("Couldn't map the system table!\n");
 			return -ENOMEM;
@@ -338,7 +339,7 @@ static int __init efi_runtime_init32(void)
 	efi_runtime_services_32_t *runtime;
 
 	runtime = early_memremap((unsigned long)efi.systab->runtime,
-			sizeof(efi_runtime_services_32_t));
+				 sizeof(efi_runtime_services_32_t), BOOT_DATA);
 	if (!runtime) {
 		pr_err("Could not map the runtime service table!\n");
 		return -ENOMEM;
@@ -362,7 +363,7 @@ static int __init efi_runtime_init64(void)
 	efi_runtime_services_64_t *runtime;
 
 	runtime = early_memremap((unsigned long)efi.systab->runtime,
-			sizeof(efi_runtime_services_64_t));
+				 sizeof(efi_runtime_services_64_t), BOOT_DATA);
 	if (!runtime) {
 		pr_err("Could not map the runtime service table!\n");
 		return -ENOMEM;
@@ -425,7 +426,7 @@ static int __init efi_memmap_init(void)
 	size = efi.memmap.nr_map * efi.memmap.desc_size;
 	addr = (unsigned long)efi.memmap.phys_map;
 
-	efi.memmap.map = early_memremap(addr, size);
+	efi.memmap.map = early_memremap(addr, size, BOOT_DATA);
 	if (efi.memmap.map == NULL) {
 		pr_err("Could not map the memory map!\n");
 		return -ENOMEM;
@@ -471,7 +472,7 @@ void __init efi_init(void)
 	/*
 	 * Show what we know for posterity
 	 */
-	c16 = tmp = early_memremap(efi.systab->fw_vendor, 2);
+	c16 = tmp = early_memremap(efi.systab->fw_vendor, 2, BOOT_DATA);
 	if (c16) {
 		for (i = 0; i < sizeof(vendor) - 1 && *c16; ++i)
 			vendor[i] = *c16++;
