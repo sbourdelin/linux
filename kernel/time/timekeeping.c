@@ -1845,6 +1845,9 @@ static __always_inline void timekeeping_apply_adjustment(struct timekeeper *tk,
 	tk->xtime_interval += interval;
 	tk->tkr_mono.xtime_nsec -= offset;
 	tk->ntp_error -= (interval - offset) << tk->ntp_error_shift;
+
+	clockevents_adjust_all_freqs(tk->tkr_mono.mult,
+				tk->tkr_mono.clock->mult);
 }
 
 /*
