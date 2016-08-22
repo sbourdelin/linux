@@ -26,6 +26,7 @@
 
 #include <linux/types.h>
 #include <linux/ioctl.h>
+#include <linux/time.h>
 
 /* chardev parameters */
 #define CS_DEV_FILE_NAME		"/dev/cmt_speech"
