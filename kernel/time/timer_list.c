@@ -206,6 +206,10 @@ static void
 print_tickdevice(struct seq_file *m, struct tick_device *td, int cpu)
 {
 	struct clock_event_device *dev = td->evtdev;
+	unsigned long long min_delta_ns =
+		clockevent_delta2ns(dev->min_delta_ticks_adjusted, dev);
+	unsigned long long max_delta_ns =
+		clockevent_delta2ns(dev->max_delta_ticks, dev);
 
 	SEQ_printf(m, "Tick Device: mode:     %d\n", td->mode);
 	if (cpu < 0)
@@ -219,10 +223,8 @@ print_tickdevice(struct seq_file *m, struct tick_device *td, int cpu)
 		return;
 	}
 	SEQ_printf(m, "%s\n", dev->name);
-	SEQ_printf(m, " max_delta_ns:   %llu\n",
-		   (unsigned long long) dev->max_delta_ns);
-	SEQ_printf(m, " min_delta_ns:   %llu\n",
-		   (unsigned long long) dev->min_delta_ns);
+	SEQ_printf(m, " max_delta_ns:   %llu\n", max_delta_ns);
+	SEQ_printf(m, " min_delta_ns:   %llu\n", min_delta_ns);
 	SEQ_printf(m, " mult:           %u\n", dev->mult);
 	SEQ_printf(m, " shift:          %u\n", dev->shift);
 	SEQ_printf(m, " mode:           %d\n", clockevent_get_state(dev));
