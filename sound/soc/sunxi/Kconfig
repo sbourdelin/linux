@@ -2,6 +2,7 @@ menu "Allwinner SoC Audio support"
 
 config SND_SUN4I_CODEC
 	tristate "Allwinner A10 Codec Support"
+	depends on ARCH_SUNXI || COMPILE_TEST
 	select SND_SOC_GENERIC_DMAENGINE_PCM
 	select REGMAP_MMIO
 	help
@@ -10,6 +11,7 @@ config SND_SUN4I_CODEC
 
 config SND_SUN4I_I2S
 	tristate "Allwinner A10 I2S Support"
+	depends on ARCH_SUNXI || COMPILE_TEST
 	select SND_SOC_GENERIC_DMAENGINE_PCM
 	select REGMAP_MMIO
 	help
@@ -19,7 +21,7 @@ config SND_SUN4I_I2S
 
 config SND_SUN4I_SPDIF
 	tristate "Allwinner A10 SPDIF Support"
-	depends on OF
+	depends on OF && (ARCH_SUNXI || COMPILE_TEST)
 	select SND_SOC_GENERIC_DMAENGINE_PCM
 	select REGMAP_MMIO
 	help
