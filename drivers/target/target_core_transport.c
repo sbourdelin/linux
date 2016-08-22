@@ -2495,7 +2495,7 @@ int transport_generic_free_cmd(struct se_cmd *cmd, int wait_for_tasks)
 	 * the remaining calls to target_put_sess_cmd(), and not the
 	 * callers of this function.
 	 */
-	if (aborted) {
+	if (aborted && !cmd->cmd_wait_set) {
 		pr_debug("Detected CMD_T_ABORTED for ITT: %llu\n", cmd->tag);
 		wait_for_completion(&cmd->cmd_wait_comp);
 		cmd->se_tfo->release_cmd(cmd);
@@ -2620,9 +2620,11 @@ void target_sess_cmd_list_set_waiting(struct se_session *se_sess)
 	list_for_each_entry(se_cmd, &se_sess->sess_wait_list, se_cmd_list) {
 		rc = kref_get_unless_zero(&se_cmd->cmd_kref);
 		if (rc) {
-			se_cmd->cmd_wait_set = 1;
 			spin_lock(&se_cmd->t_state_lock);
-			se_cmd->transport_state |= CMD_T_FABRIC_STOP;
+			if (!(se_cmd->transport_state & CMD_T_FABRIC_STOP)) {
+				se_cmd->cmd_wait_set = 1;
+				se_cmd->transport_state |= CMD_T_FABRIC_STOP;
+			}
 			spin_unlock(&se_cmd->t_state_lock);
 		}
 	}
@@ -2642,24 +2644,26 @@ void target_wait_for_sess_cmds(struct se_session *se_sess)
 
 	list_for_each_entry_safe(se_cmd, tmp_cmd,
 				&se_sess->sess_wait_list, se_cmd_list) {
+		int cmd_wait;
 		pr_debug("Waiting for se_cmd: %p t_state: %d, fabric state:"
 			" %d\n", se_cmd, se_cmd->t_state,
 			se_cmd->se_tfo->get_cmd_state(se_cmd));
 
 		spin_lock_irqsave(&se_cmd->t_state_lock, flags);
 		tas = (se_cmd->transport_state & CMD_T_TAS);
+		cmd_wait = se_cmd->cmd_wait_set;
 		spin_unlock_irqrestore(&se_cmd->t_state_lock, flags);
-
 		if (!target_put_sess_cmd(se_cmd)) {
 			if (tas)
 				target_put_sess_cmd(se_cmd);
 		}
-
+		if (!cmd_wait)
+			continue;
 		wait_for_completion(&se_cmd->cmd_wait_comp);
 		pr_debug("After cmd_wait_comp: se_cmd: %p t_state: %d"
 			" fabric state: %d\n", se_cmd, se_cmd->t_state,
 			se_cmd->se_tfo->get_cmd_state(se_cmd));
-
+		se_cmd->cmd_wait_set = 0;
 		se_cmd->se_tfo->release_cmd(se_cmd);
 	}
 
