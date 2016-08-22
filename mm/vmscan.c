@@ -758,14 +758,38 @@ redo:
 	ClearPageUnevictable(page);
 
 	if (page_evictable(page)) {
+#ifdef CONFIG_NON_SWAP
+		bool added = false;
+
+		if (unlikely(PageNonSwap(page))) {
+			struct zone *zone = page_zone(page);
+
+			BUG_ON(irqs_disabled());
+
+			spin_lock_irq(zone_lru_lock(zone));
+			if (likely(PageNonSwap(page))) {
+				struct lruvec *lruvec;
+
+				lruvec = mem_cgroup_page_lruvec(page,
+							zone->zone_pgdat);
+				SetPageLRU(page);
+				add_page_to_lru_list(page, lruvec,
+						     LRU_UNEVICTABLE);
+				added = true;
+			}
+			spin_unlock_irq(zone_lru_lock(zone));
+		}
+
 		/*
 		 * For evictable pages, we can use the cache.
 		 * In event of a race, worst case is we end up with an
 		 * unevictable page on [in]active list.
 		 * We know how to handle that.
 		 */
+		if (!added)
+#endif
+			lru_cache_add(page);
 		is_unevictable = false;
-		lru_cache_add(page);
 	} else {
 		/*
 		 * Put unevictable pages directly on zone's unevictable
@@ -1199,6 +1223,14 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 					if (PageDirty(page))
 						goto keep_locked;
 
+#ifdef CONFIG_NON_SWAP
+					if (PageNonSwap(page)) {
+						try_to_free_swap(page);
+						unlock_page(page);
+						goto non_swap_keep;
+					}
+#endif
+
 					if (page_mapped(page) && mapping)
 						TRY_TO_UNMAP(page, ttu_flags);
 				}
@@ -1281,6 +1313,9 @@ cull_mlocked:
 		if (PageSwapCache(page))
 			try_to_free_swap(page);
 		unlock_page(page);
+#ifdef CONFIG_NON_SWAP
+		ClearPageNonSwap(page);
+#endif
 		list_add(&page->lru, &ret_pages);
 		continue;
 
@@ -1294,6 +1329,10 @@ activate_locked:
 keep_locked:
 		unlock_page(page);
 keep:
+#ifdef CONFIG_NON_SWAP
+		ClearPageNonSwap(page);
+non_swap_keep:
+#endif
 		list_add(&page->lru, &ret_pages);
 		VM_BUG_ON_PAGE(PageLRU(page) || PageUnevictable(page), page);
 	}

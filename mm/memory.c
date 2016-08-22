@@ -64,6 +64,7 @@
 #include <linux/debugfs.h>
 #include <linux/userfaultfd_k.h>
 #include <linux/dax.h>
+#include <linux/mm_inline.h>
 
 #include <asm/io.h>
 #include <asm/mmu_context.h>
@@ -2338,6 +2339,26 @@ static int wp_page_shared(struct fault_env *fe, pte_t orig_pte,
 	return wp_page_reuse(fe, orig_pte, old_page, page_mkwrite, 1);
 }
 
+#ifdef CONFIG_NON_SWAP
+static void
+clear_page_non_swap(struct page *page)
+{
+	struct zone *zone;
+	struct lruvec *lruvec;
+
+	if (!PageLRU(page) || !page_evictable(page))
+		return;
+
+	zone = page_zone(page);
+	spin_lock_irq(zone_lru_lock(zone));
+	__dec_zone_page_state(page, NR_NON_SWAP);
+	lruvec = mem_cgroup_page_lruvec(page, zone->zone_pgdat);
+	del_page_from_lru_list(page, lruvec, LRU_UNEVICTABLE);
+	add_page_to_lru_list(page, lruvec, page_lru(page));
+	spin_unlock_irq(zone_lru_lock(zone));
+}
+#endif
+
 /*
  * This routine handles present pages, when users try to write
  * to a shared page. It is done by copying the page to a new address
@@ -2400,6 +2421,10 @@ static int do_wp_page(struct fault_env *fe, pte_t orig_pte)
 			put_page(old_page);
 		}
 		if (reuse_swap_page(old_page, &total_mapcount)) {
+#ifdef CONFIG_NON_SWAP
+			if (unlikely(TestClearPageNonSwap(old_page)))
+				clear_page_non_swap(old_page);
+#endif
 			if (total_mapcount == 1) {
 				/*
 				 * The page is all ours. Move it to
@@ -2581,6 +2606,11 @@ int do_swap_page(struct fault_env *fe, pte_t orig_pte)
 		goto out_release;
 	}
 
+#ifdef CONFIG_NON_SWAP
+	if ((fe->flags & FAULT_FLAG_WRITE) && unlikely(TestClearPageNonSwap(page)))
+		clear_page_non_swap(page);
+#endif
+
 	/*
 	 * Make sure try_to_free_swap or reuse_swap_page or swapoff did not
 	 * release the swapcache from under us.  The page pin, and pte_same
@@ -2638,6 +2668,10 @@ int do_swap_page(struct fault_env *fe, pte_t orig_pte)
 	flush_icache_page(vma, page);
 	if (pte_swp_soft_dirty(orig_pte))
 		pte = pte_mksoft_dirty(pte);
+#ifdef CONFIG_NON_SWAP
+	if (!(fe->flags & FAULT_FLAG_WRITE) && PageNonSwap(page))
+		pte = pte_wrprotect(pte);
+#endif
 	set_pte_at(vma->vm_mm, fe->address, fe->pte, pte);
 	if (page == swapcache) {
 		do_page_add_anon_rmap(page, vma, fe->address, exclusive);

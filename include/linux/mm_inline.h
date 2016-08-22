@@ -46,15 +46,31 @@ static __always_inline void update_lru_size(struct lruvec *lruvec,
 static __always_inline void add_page_to_lru_list(struct page *page,
 				struct lruvec *lruvec, enum lru_list lru)
 {
-	update_lru_size(lruvec, lru, page_zonenum(page), hpage_nr_pages(page));
+	int nr_pages = hpage_nr_pages(page);
+	enum zone_type zid = page_zonenum(page);
+#ifdef CONFIG_NON_SWAP
+	if (PageNonSwap(page)) {
+		lru = LRU_UNEVICTABLE;
+		update_lru_size(lruvec, NR_NON_SWAP, zid, nr_pages);
+	}
+#endif
+	update_lru_size(lruvec, lru, zid, nr_pages);
 	list_add(&page->lru, &lruvec->lists[lru]);
 }
 
 static __always_inline void del_page_from_lru_list(struct page *page,
 				struct lruvec *lruvec, enum lru_list lru)
 {
+	int nr_pages = hpage_nr_pages(page);
+	enum zone_type zid = page_zonenum(page);
+#ifdef CONFIG_NON_SWAP
+	if (PageNonSwap(page)) {
+		lru = LRU_UNEVICTABLE;
+		update_lru_size(lruvec, NR_NON_SWAP, zid, -nr_pages);
+	}
+#endif
 	list_del(&page->lru);
-	update_lru_size(lruvec, lru, page_zonenum(page), -hpage_nr_pages(page));
+	update_lru_size(lruvec, lru, zid, -nr_pages);
 }
 
 /**

@@ -708,3 +708,8 @@ config ARCH_HAS_PKEYS
 config LATE_UNMAP
 	bool
 	depends on SWAP
+
+config NON_SWAP
+	bool
+	depends on SWAP
+	select LATE_UNMAP

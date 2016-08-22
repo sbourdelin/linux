@@ -105,6 +105,9 @@ enum pageflags {
 	PG_young,
 	PG_idle,
 #endif
+#ifdef CONFIG_NON_SWAP
+	PG_non_swap,
+#endif
 	__NR_PAGEFLAGS,
 
 	/* Filesystems */
@@ -302,6 +305,11 @@ PAGEFLAG(Reclaim, reclaim, PF_NO_TAIL)
 	TESTCLEARFLAG(Reclaim, reclaim, PF_NO_TAIL)
 PAGEFLAG(Readahead, reclaim, PF_NO_COMPOUND)
 	TESTCLEARFLAG(Readahead, reclaim, PF_NO_COMPOUND)
+
+#ifdef CONFIG_NON_SWAP
+PAGEFLAG(NonSwap, non_swap, PF_NO_TAIL)
+	TESTSCFLAG(NonSwap, non_swap, PF_NO_TAIL)
+#endif
 
 #ifdef CONFIG_HIGHMEM
 /*
