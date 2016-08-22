@@ -34,6 +34,12 @@
 #define __LINUX_PUBLIC_GNTDEV_H__
 
 #include <linux/types.h>
+#include <xen/privcmd.h>
+
+/*
+ * Reference to a grant entry in a specified domain's grant table.
+ */
+typedef __u32 grant_ref_t;
 
 struct ioctl_gntdev_grant_ref {
 	/* The domain ID of the grant to be mapped. */
