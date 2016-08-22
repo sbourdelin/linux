@@ -7,6 +7,7 @@
 #ifndef	ROSE_KERNEL_H
 #define	ROSE_KERNEL_H
 
+#include <linux/libc-compat.h>
 #include <linux/socket.h>
 #include <linux/ax25.h>
 
@@ -22,6 +23,7 @@
 #define	ROSE_QBITINCL	6
 #define	ROSE_HOLDBACK	7
 
+#if __UAPI_DEF_SIOCRSGCAUSE_TO_SIOCRSGFACILITIES
 #define	SIOCRSGCAUSE		(SIOCPROTOPRIVATE+0)
 #define	SIOCRSSCAUSE		(SIOCPROTOPRIVATE+1)
 #define	SIOCRSL2CALL		(SIOCPROTOPRIVATE+2)
@@ -30,6 +32,7 @@
 #define	SIOCRSCLRRT		(SIOCPROTOPRIVATE+4)
 #define	SIOCRSGL2CALL		(SIOCPROTOPRIVATE+5)
 #define	SIOCRSGFACILITIES	(SIOCPROTOPRIVATE+6)
+#endif /* __UAPI_DEF_SIOCRSGCAUSE_TO_SIOCRSGFACILITIES */
 
 #define	ROSE_DTE_ORIGINATED	0x00
 #define	ROSE_NUMBER_BUSY	0x01
@@ -42,10 +45,13 @@
 #define	ROSE_LOCAL_PROCEDURE	0x13
 #define	ROSE_SHIP_ABSENT	0x39
 
+#if __UAPI_DEF_ROSE_ADDRESS
 typedef struct {
 	char		rose_addr[5];
 } rose_address;
+#endif /* __UAPI_DEF_ROSE_ADDRESS */
 
+#if __UAPI_DEF_SOCKADDR_ROSE
 struct sockaddr_rose {
 	__kernel_sa_family_t srose_family;
 	rose_address	srose_addr;
@@ -53,7 +59,9 @@ struct sockaddr_rose {
 	int		srose_ndigis;
 	ax25_address	srose_digi;
 };
+#endif /* __UAPI_DEF_SOCKADDR_ROSE */
 
+#if __UAPI_DEF_FULL_SOCKADDR_ROSE
 struct full_sockaddr_rose {
 	__kernel_sa_family_t srose_family;
 	rose_address	srose_addr;
@@ -61,7 +69,9 @@ struct full_sockaddr_rose {
 	unsigned int	srose_ndigis;
 	ax25_address	srose_digis[ROSE_MAX_DIGIS];
 };
+#endif /* __UAPI_DEF_FULL_SOCKADDR_ROSE */
 
+#if __UAPI_DEF_ROSE_ROUTE_STRUCT
 struct rose_route_struct {
 	rose_address	address;
 	unsigned short	mask;
@@ -70,12 +80,16 @@ struct rose_route_struct {
 	unsigned char	ndigis;
 	ax25_address	digipeaters[AX25_MAX_DIGIS];
 };
+#endif /* __UAPI_DEF_ROSE_ROUTE_STRUCT */
 
+#if __UAPI_DEF_ROSE_CAUSE_STRUCT
 struct rose_cause_struct {
 	unsigned char	cause;
 	unsigned char	diagnostic;
 };
+#endif /* __UAPI_DEF_ROSE_CAUSE_STRUCT */
 
+#if __UAPI_DEF_ROSE_FACILITIES_STRUCT
 struct rose_facilities_struct {
 	rose_address	source_addr,   dest_addr;
 	ax25_address	source_call,   dest_call;
@@ -86,5 +100,6 @@ struct rose_facilities_struct {
 	rose_address	fail_addr;
 	ax25_address	fail_call;
 };
+#endif /* __UAPI_DEF_ROSE_FACILITIES_STRUCT */
 
 #endif

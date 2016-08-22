@@ -209,6 +209,27 @@
 
 #endif /* defined(__NETIPX_IPX_H) */
 
+/* Coordinate with glibc netrose/rose.h */
+#if defined(_NETROSE_ROSE_H)
+#define __UAPI_DEF_SIOCRSGCAUSE_TO_SIOCRSGFACILITIES	0
+#define __UAPI_DEF_ROSE_ADDRESS				0
+#define __UAPI_DEF_SOCKADDR_ROSE			0
+#define __UAPI_DEF_FULL_SOCKADDR_ROSE			0
+#define __UAPI_DEF_ROSE_ROUTE_STRUCT			0
+#define __UAPI_DEF_ROSE_CAUSE_STRUCT			0
+#define __UAPI_DEF_ROSE_FACILITIES_STRUCT		0
+
+#else /* defined(_NETROSE_ROSE_H) */
+#define __UAPI_DEF_SIOCRSGCAUSE_TO_SIOCRSGFACILITIES	1
+#define __UAPI_DEF_ROSE_ADDRESS				1
+#define __UAPI_DEF_SOCKADDR_ROSE			1
+#define __UAPI_DEF_FULL_SOCKADDR_ROSE			1
+#define __UAPI_DEF_ROSE_ROUTE_STRUCT			1
+#define __UAPI_DEF_ROSE_CAUSE_STRUCT			1
+#define __UAPI_DEF_ROSE_FACILITIES_STRUCT		1
+
+#endif /* defined(_NETROSE_ROSE_H) */
+
 /* Definitions for sys/uio.h */
 #if defined(_SYS_UIO_H)
 #define __UAPI_DEF_IOVEC		0
@@ -282,6 +303,15 @@
 #define __UAPI_DEF_IPX_INTERFACE_DEFINITION	1
 #define __UAPI_DEF_IPX_CONFIG_DATA		1
 #define __UAPI_DEF_IPX_ROUTE_DEF		1
+
+/* Definitions for rose.h */
+#define __UAPI_DEF_SIOCRSGCAUSE_TO_SIOCRSGFACILITIES	1
+#define __UAPI_DEF_ROSE_ADDRESS				1
+#define __UAPI_DEF_SOCKADDR_ROSE			1
+#define __UAPI_DEF_FULL_SOCKADDR_ROSE			1
+#define __UAPI_DEF_ROSE_ROUTE_STRUCT			1
+#define __UAPI_DEF_ROSE_CAUSE_STRUCT			1
+#define __UAPI_DEF_ROSE_FACILITIES_STRUCT		1
 
 /* Definitions for uio.h */
 #define __UAPI_DEF_IOVEC		1
