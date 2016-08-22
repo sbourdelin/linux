@@ -674,7 +674,6 @@ enum i40iw_status_code i40iw_free_virt_mem(struct i40iw_hw *hw,
 	if (!mem)
 		return I40IW_ERR_PARAM;
 	kfree(mem->va);
-	mem->va = NULL;
 	return 0;
 }
 
