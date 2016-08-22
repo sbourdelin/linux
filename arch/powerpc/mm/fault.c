@@ -404,6 +404,10 @@ good_area:
 		    (cpu_has_feature(CPU_FTR_NOEXECUTE) ||
 		     !(vma->vm_flags & (VM_READ | VM_WRITE))))
 			goto bad_area;
+#ifdef CONFIG_PPC_RADIX_MMU
+		if (radix_enabled() && regs->msr & PPC_BIT(35))
+			goto bad_area;
+#endif
 #ifdef CONFIG_PPC_STD_MMU
 		/*
 		 * protfault should only happen due to us
