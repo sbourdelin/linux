@@ -180,6 +180,13 @@
 
 #endif /* defined(__NETIPX_IPX_H) */
 
+/* Definitions for sys/uio.h */
+#if defined(_SYS_UIO_H)
+#define __UAPI_DEF_IOVEC		0
+#else /* defined(_SYS_UIO_H) */
+#define __UAPI_DEF_IOVEC		1
+#endif /* defined(_SYS_UIO_H) */
+
 /* Definitions for xattr.h */
 #if defined(_SYS_XATTR_H)
 #define __UAPI_DEF_XATTR		0
@@ -234,6 +241,9 @@
 #define __UAPI_DEF_IPX_INTERFACE_DEFINITION	1
 #define __UAPI_DEF_IPX_CONFIG_DATA		1
 #define __UAPI_DEF_IPX_ROUTE_DEF		1
+
+/* Definitions for uio.h */
+#define __UAPI_DEF_IOVEC		1
 
 /* Definitions for xattr.h */
 #define __UAPI_DEF_XATTR		1
