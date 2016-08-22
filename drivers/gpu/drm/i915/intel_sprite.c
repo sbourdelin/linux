@@ -82,10 +82,9 @@ int intel_usecs_to_scanlines(const struct drm_display_mode *adjusted_mode,
 void intel_pipe_update_start(struct intel_crtc *crtc)
 {
 	const struct drm_display_mode *adjusted_mode = &crtc->config->base.adjusted_mode;
-	long timeout = msecs_to_jiffies_timeout(1);
 	int scanline, min, max, vblank_start;
-	wait_queue_head_t *wq = drm_crtc_vblank_waitqueue(&crtc->base);
-	DEFINE_WAIT(wait);
+
+	preempt_disable();
 
 	vblank_start = adjusted_mode->crtc_vblank_start;
 	if (adjusted_mode->flags & DRM_MODE_FLAG_INTERLACE)
@@ -95,19 +94,21 @@ void intel_pipe_update_start(struct intel_crtc *crtc)
 	min = vblank_start - intel_usecs_to_scanlines(adjusted_mode, 100);
 	max = vblank_start - 1;
 
-	local_irq_disable();
-
-	if (min <= 0 || max <= 0)
-		return;
-
-	if (WARN_ON(drm_crtc_vblank_get(&crtc->base)))
-		return;
-
 	crtc->debug.min_vbl = min;
 	crtc->debug.max_vbl = max;
+
 	trace_i915_pipe_update_start(crtc);
 
-	for (;;) {
+	if (min <= 0 || max <= 0)
+		goto out;
+
+	if (WARN_ON(drm_crtc_vblank_get(&crtc->base)))
+		goto out;
+
+	do {
+		wait_queue_head_t *wq = drm_crtc_vblank_waitqueue(&crtc->base);
+		DEFINE_WAIT(wait);
+
 		/*
 		 * prepare_to_wait() has a memory barrier, which guarantees
 		 * other CPUs can see the task state update by the time we
@@ -116,29 +117,24 @@ void intel_pipe_update_start(struct intel_crtc *crtc)
 		prepare_to_wait(wq, &wait, TASK_UNINTERRUPTIBLE);
 
 		scanline = intel_get_crtc_scanline(crtc);
-		if (scanline < min || scanline > max)
-			break;
-
-		if (timeout <= 0) {
-			DRM_ERROR("Potential atomic update failure on pipe %c\n",
-				  pipe_name(crtc->pipe));
-			break;
+		if (scanline >= min && scanline <= max) {
+			preempt_enable();
+			if (!schedule_timeout(2))
+				DRM_ERROR("vblank wait timed out\n");
+			preempt_disable();
 		}
 
-		local_irq_enable();
-
-		timeout = schedule_timeout(timeout);
-
-		local_irq_disable();
-	}
-
-	finish_wait(wq, &wait);
+		finish_wait(wq, &wait);
+	} while (0);
 
 	drm_crtc_vblank_put(&crtc->base);
 
-	crtc->debug.scanline_start = scanline;
+out:
+	local_irq_disable();
+
 	crtc->debug.start_vbl_time = ktime_get();
 	crtc->debug.start_vbl_count = intel_crtc_get_vblank_counter(crtc);
+	crtc->debug.scanline_start = intel_get_crtc_scanline(crtc);
 
 	trace_i915_pipe_update_vblank_evaded(crtc);
 }
@@ -192,6 +188,8 @@ void intel_pipe_update_end(struct intel_crtc *crtc, struct intel_flip_work *work
 			  crtc->debug.min_vbl, crtc->debug.max_vbl,
 			  crtc->debug.scanline_start, scanline_end);
 	}
+
+	preempt_enable();
 }
 
 static void
