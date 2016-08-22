@@ -84,6 +84,7 @@ enum bxtwc_irqs_level2 {
 	BXTWC_THRM2_IRQ,
 	BXTWC_BCU_IRQ,
 	BXTWC_ADC_IRQ,
+	BXTWC_USBC_IRQ,
 	BXTWC_CHGR0_IRQ,
 	BXTWC_CHGR1_IRQ,
 	BXTWC_GPIO0_IRQ,
@@ -109,6 +110,7 @@ static const struct regmap_irq bxtwc_regmap_irqs_level2[] = {
 	REGMAP_IRQ_REG(BXTWC_THRM2_IRQ, 2, 0xff),
 	REGMAP_IRQ_REG(BXTWC_BCU_IRQ, 3, 0x1f),
 	REGMAP_IRQ_REG(BXTWC_ADC_IRQ, 4, 0xff),
+	REGMAP_IRQ_REG(BXTWC_USBC_IRQ, 5, BIT(5)),
 	REGMAP_IRQ_REG(BXTWC_CHGR0_IRQ, 5, 0x1f),
 	REGMAP_IRQ_REG(BXTWC_CHGR1_IRQ, 6, 0x1f),
 	REGMAP_IRQ_REG(BXTWC_GPIO0_IRQ, 7, 0xff),
@@ -143,6 +145,10 @@ static struct resource adc_resources[] = {
 	DEFINE_RES_IRQ_NAMED(BXTWC_ADC_IRQ, "ADC"),
 };
 
+static struct resource usbc_resources[] = {
+	DEFINE_RES_IRQ(BXTWC_USBC_IRQ),
+};
+
 static struct resource charger_resources[] = {
 	DEFINE_RES_IRQ_NAMED(BXTWC_CHGR0_IRQ, "CHARGER"),
 	DEFINE_RES_IRQ_NAMED(BXTWC_CHGR1_IRQ, "CHARGER1"),
@@ -168,6 +174,11 @@ static struct mfd_cell bxt_wc_dev[] = {
 		.name = "bxt_wcove_thermal",
 		.num_resources = ARRAY_SIZE(thermal_resources),
 		.resources = thermal_resources,
+	},
+	{
+		.name = "bxt_wcove_usbc",
+		.num_resources = ARRAY_SIZE(usbc_resources),
+		.resources = usbc_resources,
 	},
 	{
 		.name = "bxt_wcove_ext_charger",
