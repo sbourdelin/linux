@@ -311,7 +311,7 @@ static int clockevents_program_min_delta(struct clock_event_device *dev)
 int clockevents_program_event(struct clock_event_device *dev, ktime_t expires,
 			      bool force)
 {
-	unsigned long long clc;
+	unsigned long clc;
 	int64_t delta;
 	int rc;
 
@@ -337,11 +337,12 @@ int clockevents_program_event(struct clock_event_device *dev, ktime_t expires,
 	if (delta <= 0)
 		return force ? clockevents_program_min_delta(dev) : -ETIME;
 
-	clc = ((unsigned long long) delta * dev->mult) >> dev->shift;
-	clc = min_t(unsigned long, clc, dev->max_delta_ticks);
-	clc = max_t(unsigned long, clc, dev->min_delta_ticks_adjusted);
+	clc = (unsigned long)(((unsigned long long)delta *
+					dev->mult) >> dev->shift);
+	clc = min(clc, dev->max_delta_ticks);
+	clc = max(clc, dev->min_delta_ticks_adjusted);
 
-	rc = dev->set_next_event((unsigned long) clc, dev);
+	rc = dev->set_next_event(clc, dev);
 
 	return (rc && force) ? clockevents_program_min_delta(dev) : rc;
 }
