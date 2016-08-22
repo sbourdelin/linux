@@ -183,6 +183,8 @@ void __init mem_encrypt_init(void)
 
 	/* Make SWIOTLB use an unencrypted DMA area */
 	swiotlb_clear_encryption();
+
+	pr_info("memory encryption active\n");
 }
 
 unsigned long amd_iommu_get_me_mask(void)
