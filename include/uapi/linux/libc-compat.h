@@ -230,6 +230,13 @@
 
 #endif /* defined(_NETROSE_ROSE_H) */
 
+/* Coordinate with glibc pty.h */
+#if defined(_PTY_H)
+#define __UAPI_DEF_TERMIOS	0
+#else /* defined(_PTY_H) */
+#define __UAPI_DEF_TERMIOS	1
+#endif /* defined(_PTY_H) */
+
 /* Coordinate with glibc time.h */
 #if defined(_TIME_H)
 #define __UAPI_DEF_TIMESPEC		0
@@ -244,6 +251,15 @@
 #define __UAPI_DEF_TIMER_ABSTIME	1
 
 #endif /* defined(_TIME_H) */
+
+/* Definitions for sys/ioctl.h */
+#if defined(_SYS_IOCTL_H)
+#define __UAPI_DEF_TERMIO		0
+#define __UAPI_DEF_WINSIZE		0
+#else /* defined(_SYS_IOCTL_H) */
+#define __UAPI_DEF_TERMIO		1
+#define __UAPI_DEF_WINSIZE		1
+#endif /* defined(_SYS_IOCTL_H) */
 
 /* Definitions for sys/uio.h */
 #if defined(_SYS_UIO_H)
@@ -265,6 +281,13 @@
 
 #endif /* defined(_SYS_TIME_H) */
 
+/* Coordinate with glibc termios.h */
+#if defined(_TERMIOS_H)
+#define __UAPI_DEF_TERMIOS	0
+#else /* defined(_TERMIOS_H) */
+#define __UAPI_DEF_TERMIOS	1
+#endif /* defined(_TERMIOS_H) */
+
 /* Definitions for xattr.h */
 #if defined(_SYS_XATTR_H)
 #define __UAPI_DEF_XATTR		0
@@ -281,6 +304,11 @@
 #define __UAPI_DEF_FLOCK			1
 #define __UAPI_DEF_F_DUPFD_CLOEXEC		1
 #define __UAPI_DEF_O_ACCMODE_RDONLY_WRONLY_RDWR	1
+
+/* Definitions for asm-generic/termbits.h and asm-generic/termios.h */
+#define __UAPI_DEF_TERMIO		1
+#define __UAPI_DEF_TERMIOS		1
+#define __UAPI_DEF_WINSIZE		1
 
 /* Definitions for ax25.h */
 #define __UAPI_DEF_SIOCAX25GETUID_TO_SIOCAX25DELFWD	1

@@ -8,17 +8,21 @@
  * New architectures should not provide their own version.
  */
 
+#include <linux/libc-compat.h>
 #include <asm/termbits.h>
 #include <asm/ioctls.h>
 
+#if __UAPI_DEF_WINSIZE
 struct winsize {
 	unsigned short ws_row;
 	unsigned short ws_col;
 	unsigned short ws_xpixel;
 	unsigned short ws_ypixel;
 };
+#endif /* __UAPI_DEF_WINSIZE */
 
 #define NCC 8
+#if __UAPI_DEF_TERMIO
 struct termio {
 	unsigned short c_iflag;		/* input mode flags */
 	unsigned short c_oflag;		/* output mode flags */
@@ -27,6 +31,7 @@ struct termio {
 	unsigned char c_line;		/* line discipline */
 	unsigned char c_cc[NCC];	/* control characters */
 };
+#endif /* __UAPI_DEF_TERMIO */
 
 /* modem lines */
 #define TIOCM_LE	0x001
