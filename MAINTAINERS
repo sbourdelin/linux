@@ -11005,6 +11005,8 @@ S:	Supported
 F:	Documentation/devicetree/bindings/sound/
 F:	Documentation/sound/alsa/soc/
 F:	sound/soc/
+F:	include/sound/simple_card.h
+F:	include/sound/simple_card_utils.h
 F:	include/sound/soc*
 
 SOUND - DMAENGINE HELPERS
