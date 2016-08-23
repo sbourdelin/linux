@@ -145,6 +145,8 @@ struct intel_guc {
 
 	uint64_t submissions[I915_NUM_ENGINES];
 	uint32_t last_seqno[I915_NUM_ENGINES];
+
+	struct intel_slpc slpc;
 };
 
 static inline int intel_slpc_enabled(void)
