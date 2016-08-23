@@ -122,3 +122,8 @@ static __init int of_pci_phb_init(void)
 device_initcall(of_pci_phb_init);
 
 #endif /* CONFIG_PPC_OF_PLATFORM_PCI */
+
+bool __init arch_want_default_of_probe(void)
+{
+	return false;
+}

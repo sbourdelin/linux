@@ -76,6 +76,7 @@ extern int of_platform_default_populate(struct device_node *root,
 					const struct of_dev_auxdata *lookup,
 					struct device *parent);
 extern void of_platform_depopulate(struct device *parent);
+extern bool arch_want_default_of_probe(void);
 #else
 static inline int of_platform_populate(struct device_node *root,
 					const struct of_device_id *matches,
