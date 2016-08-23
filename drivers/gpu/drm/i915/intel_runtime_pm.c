@@ -2770,7 +2770,7 @@ void intel_runtime_pm_enable(struct drm_i915_private *dev_priv)
 	 * so the driver's own RPM reference tracking asserts also work on
 	 * platforms without RPM support.
 	 */
-	if (!HAS_RUNTIME_PM(dev)) {
+	if (!HAS_RUNTIME_PM(dev_priv)) {
 		pm_runtime_dont_use_autosuspend(kdev);
 		pm_runtime_get_sync(kdev);
 	} else {
