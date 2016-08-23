@@ -17,6 +17,10 @@
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 
+#define BUS_OF_DECLARE_COMPAT(name, compat) OF_DECLARE_COMPAT(bus, name, compat)
+#define BUS_OF_DECLARE_TYPE(name, type) OF_DECLARE_TYPE(bus, name, type)
+#define BUS_OF_DECLARE_NAME(name, node_name) OF_DECLARE_NAME(bus, name, node_name)
+
 /**
  * struct of_dev_auxdata - lookup table entry for device names & platform_data
  * @compatible: compatible value of node to match against node
@@ -52,6 +56,7 @@ struct of_dev_auxdata {
 	  .platform_data = _pdata }
 
 extern const struct of_device_id of_default_bus_match_table[];
+extern const struct of_device_id __bus_of_table[];
 
 /* Platform drivers register/unregister */
 extern struct platform_device *of_device_alloc(struct device_node *np,

@@ -1002,12 +1002,28 @@ static inline int of_get_available_child_count(const struct device_node *np)
 		__used __section(__##table##_of_table)			\
 		 = { .compatible = compat,				\
 		     .data = (fn == (fn_type)NULL) ? fn : fn  }
+
+#define __OF_DECLARE_ALL(table, entry, _name, _type, _compat, _data)	\
+	static const struct of_device_id __of_table_##entry		\
+		__used __section(__##table##_of_table)			\
+		= { .name = _name,					\
+		    .type = _type,					\
+		    .compatible = _compat,				\
+		    .data = _data }
 #else
 #define _OF_DECLARE(table, name, compat, fn, fn_type)			\
 	static const struct of_device_id __of_table_##name		\
 		__attribute__((unused))					\
 		 = { .compatible = compat,				\
 		     .data = (fn == (fn_type)NULL) ? fn : fn }
+
+#define __OF_DECLARE_ALL(table, entry, _name, _type, _compat, _data)	\
+	static const struct of_device_id __of_table_##_name		\
+		__attribute__((unused))					\
+		= { .name = _name,					\
+		    .type = _type,					\
+		    .compatible = _compat,				\
+		    .data = _data }
 #endif
 
 typedef int (*of_init_fn_2)(struct device_node *, struct device_node *);
@@ -1020,6 +1036,12 @@ typedef void (*of_init_fn_1)(struct device_node *);
 		_OF_DECLARE(table, name, compat, fn, of_init_fn_1_ret)
 #define OF_DECLARE_2(table, name, compat, fn) \
 		_OF_DECLARE(table, name, compat, fn, of_init_fn_2)
+#define OF_DECLARE_COMPAT(table, name, compat) \
+		__OF_DECLARE_ALL(table, name, "", "", compat, NULL)
+#define OF_DECLARE_TYPE(table, name, type) \
+		__OF_DECLARE_ALL(table, name, "", type, "", NULL)
+#define OF_DECLARE_NAME(table, name, node_name) \
+		__OF_DECLARE_ALL(table, name, node_name, "", "", NULL)
 
 /**
  * struct of_changeset_entry	- Holds a changeset entry
