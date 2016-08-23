@@ -61,11 +61,10 @@ struct bio {
 	struct io_context	*bi_ioc;
 	struct cgroup_subsys_state *bi_css;
 #endif
-	union {
+
 #if defined(CONFIG_BLK_DEV_INTEGRITY)
-		struct bio_integrity_payload *bi_integrity; /* data integrity */
+	struct bio_integrity_payload *bi_integrity; /* data integrity */
 #endif
-	};
 
 	unsigned short		bi_vcnt;	/* how many bio_vec's */
 
