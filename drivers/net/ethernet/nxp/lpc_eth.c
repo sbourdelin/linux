@@ -475,12 +475,19 @@ static void __lpc_get_mac(struct netdata_local *pldat, u8 *mac)
 	mac[5] = tmp >> 8;
 }
 
-static void __lpc_eth_clock_enable(struct netdata_local *pldat, bool enable)
+static int __lpc_eth_clock_enable(struct netdata_local *pldat, bool enable)
 {
-	if (enable)
-		clk_prepare_enable(pldat->clk);
-	else
+	int ret;
+
+	if (enable) {
+		ret = clk_prepare_enable(pldat->clk);
+		if (ret)
+			return ret;
+	} else {
 		clk_disable_unprepare(pldat->clk);
+	}
+
+	return 0;
 }
 
 static void __lpc_params_setup(struct netdata_local *pldat)
@@ -1039,6 +1046,7 @@ static int lpc_eth_close(struct net_device *ndev)
 {
 	unsigned long flags;
 	struct netdata_local *pldat = netdev_priv(ndev);
+	int ret;
 
 	if (netif_msg_ifdown(pldat))
 		dev_dbg(&pldat->pdev->dev, "shutting down %s\n", ndev->name);
@@ -1056,7 +1064,9 @@ static int lpc_eth_close(struct net_device *ndev)
 	writel(0, LPC_ENET_MAC2(pldat->net_base));
 	spin_unlock_irqrestore(&pldat->lock, flags);
 
-	__lpc_eth_clock_enable(pldat, false);
+	ret = __lpc_eth_clock_enable(pldat, false);
+	if (ret)
+		return ret;
 
 	return 0;
 }
@@ -1197,11 +1207,14 @@ static int lpc_eth_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
 static int lpc_eth_open(struct net_device *ndev)
 {
 	struct netdata_local *pldat = netdev_priv(ndev);
+	int ret;
 
 	if (netif_msg_ifup(pldat))
 		dev_dbg(&pldat->pdev->dev, "enabling %s\n", ndev->name);
 
-	__lpc_eth_clock_enable(pldat, true);
+	ret = __lpc_eth_clock_enable(pldat, true);
+	if (ret)
+		return ret;
 
 	/* Suspended PHY makes LPC ethernet core block, so resume now */
 	phy_resume(ndev->phydev);
@@ -1320,7 +1333,9 @@ static int lpc_eth_drv_probe(struct platform_device *pdev)
 	}
 
 	/* Enable network clock */
-	__lpc_eth_clock_enable(pldat, true);
+	ret = __lpc_eth_clock_enable(pldat, true);
+	if (ret)
+		goto err_out_free_dev;
 
 	/* Map IO space */
 	pldat->net_base = ioremap(res->start, resource_size(res));
