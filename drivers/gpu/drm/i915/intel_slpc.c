@@ -229,14 +229,12 @@ static void slpc_shared_data_init(struct drm_i915_private *dev_priv)
 		data = kmap_atomic(page);
 		memset(data, 0, sizeof(struct slpc_shared_data));
 
-		data->slpc_version = SLPC_VERSION;
 		data->shared_data_size = sizeof(struct slpc_shared_data);
 		data->global_state = (u32)SLPC_GLOBAL_STATE_NOT_RUNNING;
 		data->platform_info.platform_sku =
 					(u8)slpc_get_platform_sku(dev_priv);
 		data->platform_info.slice_count =
 					(u8)slpc_get_slice_count(dev_priv);
-		data->platform_info.host_os = (u8)SLPC_HOST_OS_WINDOWS_8;
 		data->platform_info.power_plan_source =
 			(u8)SLPC_POWER_PLAN_SOURCE(SLPC_POWER_PLAN_BALANCED,
 						    SLPC_POWER_SOURCE_AC);
@@ -246,10 +244,6 @@ static void slpc_shared_data_init(struct drm_i915_private *dev_priv)
 		data->platform_info.P1_freq = (u8)(msr_value >> 8);
 		data->platform_info.Pe_freq = (u8)(msr_value >> 40);
 		data->platform_info.Pn_freq = (u8)(msr_value >> 48);
-		rdmsrl(MSR_PKG_POWER_LIMIT, msr_value);
-		data->platform_info.package_rapl_limit_high =
-							(u32)(msr_value >> 32);
-		data->platform_info.package_rapl_limit_low = (u32)msr_value;
 
 		kunmap_atomic(data);
 	}
@@ -322,17 +316,28 @@ void intel_slpc_enable(struct drm_i915_private *dev_priv)
 				SLPC_PARAM_TASK_DISABLE_DCC);
 
 	intel_slpc_set_param(dev_priv,
-			     SLPC_PARAM_GLOBAL_DISABLE_IA_GT_BALANCING,
-			     1);
-
-	intel_slpc_set_param(dev_priv,
-			     SLPC_PARAM_DFPS_THRESHOLD_MAX_FPS,
+			     SLPC_PARAM_GLOBAL_ENABLE_IA_GT_BALANCING,
 			     0);
 
 	intel_slpc_set_param(dev_priv,
-			     SLPC_PARAM_DFPS_DISABLE_FRAMERATE_STALLING,
-			     1);
+			     SLPC_PARAM_GTPERF_THRESHOLD_MAX_FPS,
+			     0);
 
+	intel_slpc_set_param(dev_priv,
+			     SLPC_PARAM_GTPERF_ENABLE_FRAMERATE_STALLING,
+			     0);
+
+	intel_slpc_set_param(dev_priv,
+			     SLPC_PARAM_GLOBAL_ENABLE_ADAPTIVE_BURST_TURBO,
+			     0);
+
+	intel_slpc_set_param(dev_priv,
+			     SLPC_PARAM_GLOBAL_ENABLE_EVAL_MODE,
+			     0);
+
+	intel_slpc_set_param(dev_priv,
+			     SLPC_PARAM_GLOBAL_ENABLE_BALANCER_IN_NON_GAMING_MODE,
+			     0);
 }
 
 void intel_slpc_reset(struct drm_i915_private *dev_priv)

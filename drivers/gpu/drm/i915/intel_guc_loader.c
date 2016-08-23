@@ -59,11 +59,11 @@
  *
  */
 
-#define SKL_FW_MAJOR 6
-#define SKL_FW_MINOR 1
+#define SKL_FW_MAJOR 9
+#define SKL_FW_MINOR 18
 
-#define BXT_FW_MAJOR 8
-#define BXT_FW_MINOR 7
+#define BXT_FW_MAJOR 9
+#define BXT_FW_MINOR 18
 
 #define KBL_FW_MAJOR 9
 #define KBL_FW_MINOR 14
@@ -164,8 +164,8 @@ static void sanitize_slpc_option(struct drm_i915_private *dev_priv)
 	if (!i915.enable_guc_submission)
 		i915.enable_slpc = 0;
 
-	if ((IS_SKYLAKE(dev_priv) && (guc_fw->guc_fw_major_found != 6))
-	     || (IS_BROXTON(dev_priv) && (guc_fw->guc_fw_major_found != 8))) {
+	if ((IS_SKYLAKE(dev_priv) && (guc_fw->guc_fw_major_found != 9))
+	     || (IS_BROXTON(dev_priv) && (guc_fw->guc_fw_major_found != 9))) {
 		DRM_INFO("SLPC not supported with current GuC firmware\n");
 		i915.enable_slpc = 0;
 	}

@@ -24,10 +24,6 @@
 #ifndef _INTEL_SLPC_H_
 #define _INTEL_SLPC_H_
 
-#define SLPC_MAJOR_VER 2
-#define SLPC_MINOR_VER 4
-#define SLPC_VERSION ((2015 << 16) | (SLPC_MAJOR_VER << 8) | (SLPC_MINOR_VER))
-
 enum slpc_status {
 	SLPC_STATUS_OK = 0,
 	SLPC_STATUS_ERROR = 1,
@@ -45,14 +41,13 @@ enum slpc_status {
 	SLPC_STATUS_VALUE_ALREADY_SET = 13,
 	SLPC_STATUS_VALUE_ALREADY_UNSET = 14,
 	SLPC_STATUS_VALUE_NOT_CHANGED = 15,
-	SLPC_STATUS_MISMATCHING_VERSION = 16,
-	SLPC_STATUS_MEMIO_ERROR = 17,
-	SLPC_STATUS_EVENT_QUEUED_REQ_DPC = 18,
-	SLPC_STATUS_EVENT_QUEUED_NOREQ_DPC = 19,
-	SLPC_STATUS_NO_EVENT_QUEUED = 20,
-	SLPC_STATUS_OUT_OF_SPACE = 21,
-	SLPC_STATUS_TIMEOUT = 22,
-	SLPC_STATUS_NO_LOCK = 23,
+	SLPC_STATUS_MEMIO_ERROR = 16,
+	SLPC_STATUS_EVENT_QUEUED_REQ_DPC = 17,
+	SLPC_STATUS_EVENT_QUEUED_NOREQ_DPC = 18,
+	SLPC_STATUS_NO_EVENT_QUEUED = 19,
+	SLPC_STATUS_OUT_OF_SPACE = 20,
+	SLPC_STATUS_TIMEOUT = 21,
+	SLPC_STATUS_NO_LOCK = 22,
 };
 
 enum slpc_event_id {
@@ -80,13 +75,16 @@ enum slpc_param_id {
 	SLPC_PARAM_GLOBAL_MAX_GT_UNSLICE_FREQ_MHZ = 7,
 	SLPC_PARAM_GLOBAL_MIN_GT_SLICE_FREQ_MHZ = 8,
 	SLPC_PARAM_GLOBAL_MAX_GT_SLICE_FREQ_MHZ = 9,
-	SLPC_PARAM_DFPS_THRESHOLD_MAX_FPS = 10,
+	SLPC_PARAM_GTPERF_THRESHOLD_MAX_FPS = 10,
 	SLPC_PARAM_GLOBAL_DISABLE_GT_FREQ_MANAGEMENT = 11,
-	SLPC_PARAM_DFPS_DISABLE_FRAMERATE_STALLING = 12,
+	SLPC_PARAM_GTPERF_ENABLE_FRAMERATE_STALLING = 12,
 	SLPC_PARAM_GLOBAL_DISABLE_RC6_MODE_CHANGE = 13,
 	SLPC_PARAM_GLOBAL_OC_UNSLICE_FREQ_MHZ = 14,
 	SLPC_PARAM_GLOBAL_OC_SLICE_FREQ_MHZ = 15,
-	SLPC_PARAM_GLOBAL_DISABLE_IA_GT_BALANCING = 16,
+	SLPC_PARAM_GLOBAL_ENABLE_IA_GT_BALANCING = 16,
+	SLPC_PARAM_GLOBAL_ENABLE_ADAPTIVE_BURST_TURBO = 17,
+	SLPC_PARAM_GLOBAL_ENABLE_EVAL_MODE = 18,
+	SLPC_PARAM_GLOBAL_ENABLE_BALANCER_IN_NON_GAMING_MODE = 19,
 };
 
 #define SLPC_PARAM_TASK_DEFAULT 0
@@ -101,11 +99,6 @@ enum slpc_global_state {
 	SLPC_GLOBAL_STATE_RUNNING = 3,
 	SLPC_GLOBAL_STATE_SHUTTING_DOWN = 4,
 	SLPC_GLOBAL_STATE_ERROR = 5
-};
-
-enum slpc_host_os {
-	SLPC_HOST_OS_UNDEFINED = 0,
-	SLPC_HOST_OS_WINDOWS_8 = 1,
 };
 
 enum slpc_platform_sku {
@@ -140,25 +133,55 @@ enum slpc_power_source {
 struct slpc_platform_info {
 	u8 platform_sku;
 	u8 slice_count;
-	u8 host_os;
+	u8 reserved;
 	u8 power_plan_source;
 	u8 P0_freq;
 	u8 P1_freq;
 	u8 Pe_freq;
 	u8 Pn_freq;
-	u32 package_rapl_limit_high;
-	u32 package_rapl_limit_low;
+	u32 reserved1;
+	u32 reserved2;
 } __packed;
+
+struct slpc_task_state_data {
+	union {
+		u32 bitfield1;
+		struct {
+			u32 gtperf_task_active:1;
+			u32 gtperf_stall_possible:1;
+			u32 gtperf_gaming_mode:1;
+			u32 gtperf_target_fps:8;
+			u32 dcc_task_active:1;
+			u32 in_dcc:1;
+			u32 in_dct:1;
+			u32 freq_switch_active:1;
+			u32 ibc_enabled:1;
+			u32 ibc_active:1;
+			u32 pg1_enabled:1;
+			u32 pg1_active:1;
+			u32 reserved:13;
+		};
+	};
+	union {
+		u32 bitfield2;
+		struct {
+			u32 freq_unslice_max:8;
+			u32 freq_unslice_min:8;
+			u32 freq_slice_max:8;
+			u32 freq_slice_min:8;
+		};
+	};
+};
 
 #define SLPC_MAX_OVERRIDE_PARAMETERS 192
 #define SLPC_OVERRIDE_BITFIELD_SIZE ((SLPC_MAX_OVERRIDE_PARAMETERS + 31) / 32)
 
 struct slpc_shared_data {
-	u32 slpc_version;
+	u32 reserved;
 	u32 shared_data_size;
 	u32 global_state;
 	struct slpc_platform_info platform_info;
-	u32 task_state_data;
+	struct slpc_task_state_data task_state_data;
 	u32 override_parameters_set_bits[SLPC_OVERRIDE_BITFIELD_SIZE];
 	u32 override_parameters_values[SLPC_MAX_OVERRIDE_PARAMETERS];
 } __packed;

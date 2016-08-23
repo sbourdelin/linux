@@ -1356,10 +1356,10 @@ static int i915_slpc_info(struct seq_file *m, void *unused)
 	struct page *page;
 	void *pv = NULL;
 	struct slpc_shared_data data;
+	struct slpc_task_state_data *task_data;
 	int i, value;
 	enum slpc_global_state global_state;
 	enum slpc_platform_sku platform_sku;
-	enum slpc_host_os host_os;
 	enum slpc_power_plan power_plan;
 	enum slpc_power_source power_source;
 
@@ -1376,11 +1376,6 @@ static int i915_slpc_info(struct seq_file *m, void *unused)
 		data = *(struct slpc_shared_data *) pv;
 		kunmap_atomic(pv);
 
-		seq_printf(m, "SLPC Version: %d.%d.%d (0x%8x)\n",
-			   data.slpc_version >> 16,
-			   (data.slpc_version >> 8) & 0xFF,
-			   data.slpc_version & 0xFF,
-			   data.slpc_version);
 		seq_printf(m, "shared data size: %d\n", data.shared_data_size);
 
 		global_state = (enum slpc_global_state) data.global_state;
@@ -1439,20 +1434,6 @@ static int i915_slpc_info(struct seq_file *m, void *unused)
 		seq_printf(m, "slice count: %d\n",
 			   data.platform_info.slice_count);
 
-		host_os = (enum slpc_host_os) data.platform_info.host_os;
-		seq_printf(m, "host OS: %d (", host_os);
-		switch (host_os) {
-		case SLPC_HOST_OS_UNDEFINED:
-			seq_puts(m, "undefined)\n");
-			break;
-		case SLPC_HOST_OS_WINDOWS_8:
-			seq_puts(m, "Windows 8)\n");
-			break;
-		default:
-			seq_puts(m, "unknown)\n");
-			break;
-		}
-
 		seq_printf(m, "power plan/source: 0x%x\n\tplan:\t",
 			   data.platform_info.power_plan_source);
 		power_plan = (enum slpc_power_plan) SLPC_POWER_PLAN(
@@ -1499,17 +1480,45 @@ static int i915_slpc_info(struct seq_file *m, void *unused)
 			   data.platform_info.P1_freq * 50,
 			   data.platform_info.Pe_freq * 50,
 			   data.platform_info.Pn_freq * 50);
-		seq_printf(m, "RAPL package power limits:\n\t0x%08x\n\t0x%08x\n",
-			   data.platform_info.package_rapl_limit_high,
-			   data.platform_info.package_rapl_limit_low);
-		seq_printf(m, "task state data: 0x%08x\n",
-			   data.task_state_data);
-		seq_printf(m, "\tturbo active: %d\n",
-			   (data.task_state_data & 1));
-		seq_printf(m, "\tdfps stall possible: %d\n\tgame mode: %d\n\tdfps target fps: %d\n",
-			   (data.task_state_data & 2),
-			   (data.task_state_data & 4),
-			   (data.task_state_data >> 3) & 0xFF);
+		task_data = &data.task_state_data;
+		seq_printf(m, "task state data: 0x%08x 0x%08x\n",
+			   task_data->bitfield1, task_data->bitfield2);
+
+		seq_printf(m, "\tgtperf task active: %s\n",
+			   yesno(task_data->gtperf_task_active));
+		seq_printf(m, "\tgtperf stall possible: %s\n",
+			   yesno(task_data->gtperf_stall_possible));
+		seq_printf(m, "\tgtperf gaming mode: %s\n",
+			   yesno(task_data->gtperf_gaming_mode));
+		seq_printf(m, "\tgtperf target fps: %d\n",
+			   task_data->gtperf_target_fps);
+
+		seq_printf(m, "\tdcc task active: %s\n",
+			   yesno(task_data->dcc_task_active));
+		seq_printf(m, "\tin dcc: %s\n",
+			   yesno(task_data->in_dcc));
+		seq_printf(m, "\tin dct: %s\n",
+			   yesno(task_data->in_dct));
+		seq_printf(m, "\tfreq switch active: %d\n",
+			   task_data->freq_switch_active);
+
+		seq_printf(m, "\tibc enabled: %s\n",
+			   yesno(task_data->ibc_enabled));
+		seq_printf(m, "\tibc active: %s\n",
+			   yesno(task_data->ibc_active));
+		seq_printf(m, "\tpg1 enabled: %s\n",
+			   yesno(task_data->pg1_enabled));
+		seq_printf(m, "\tpg1 active: %s\n",
+			   yesno(task_data->pg1_active));
+
+		seq_printf(m, "\tunslice max freq: %d\n",
+			   task_data->freq_unslice_max);
+		seq_printf(m, "\tunslice min freq: %d\n",
+			   task_data->freq_unslice_min);
+		seq_printf(m, "\tslice max freq: %d\n",
+			   task_data->freq_slice_max);
+		seq_printf(m, "\tslice min freq: %d\n",
+			   task_data->freq_slice_min);
 
 		seq_puts(m, "override parameter bitfield\n");
 		for (i = 0; i < SLPC_OVERRIDE_BITFIELD_SIZE; i++)
