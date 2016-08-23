@@ -664,6 +664,19 @@ int machine_check_e200(struct pt_regs *regs)
 
 	return 0;
 }
+#elif defined(CONFIG_PPC_8xx)
+int machine_check_8xx(struct pt_regs *regs)
+{
+	unsigned long reason = get_mc_reason(regs);
+
+	printk("Machine check in kernel mode.\n");
+	printk("Caused by (from SRR1=%lx): ", reason);
+	if (reason & 0x40000000)
+		printk("Fetch error at address %lx\n", regs->nip);
+	else
+		printk("Data access error at address %lx\n", regs->dar);
+	return 0;
+}
 #else
 int machine_check_generic(struct pt_regs *regs)
 {
