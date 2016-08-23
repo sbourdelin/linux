@@ -1761,6 +1761,8 @@ int i915_reset(struct drm_i915_private *dev_priv)
 	unsigned reset_counter;
 	int ret;
 
+	intel_sanitize_gt_powersave(dev_priv);
+
 	mutex_lock(&dev->struct_mutex);
 
 	/* Clear any previous failed attempts at recovery. Time to try again. */
