@@ -2835,6 +2835,27 @@ int snd_soc_dapm_add_routes(struct snd_soc_dapm_context *dapm,
 EXPORT_SYMBOL_GPL(snd_soc_dapm_add_routes);
 
 /**
+ * snd_soc_dapm_add_route_single - Add a single route
+ * @dapm: DAPM context
+ * @route: audio route element
+ *
+ * Connects 2 dapm widgets together via a named audio path.
+ * xxx_add_route is already managed through dapm lock.
+ */
+int snd_soc_dapm_add_route_single(struct snd_soc_dapm_context *dapm,
+			    const struct snd_soc_dapm_route *route)
+{
+	int ret;
+
+	mutex_lock_nested(&dapm->card->dapm_mutex, SND_SOC_DAPM_CLASS_INIT);
+	ret = snd_soc_dapm_add_route(dapm, route);
+	mutex_unlock(&dapm->card->dapm_mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_soc_dapm_add_route_single);
+
+/**
  * snd_soc_dapm_del_routes - Remove routes between DAPM widgets
  * @dapm: DAPM context
  * @route: audio routes
