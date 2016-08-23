@@ -301,8 +301,38 @@ void intel_slpc_disable(struct drm_i915_private *dev_priv)
 
 void intel_slpc_enable(struct drm_i915_private *dev_priv)
 {
+	u64 val;
+
 	host2guc_slpc_reset(dev_priv);
 	dev_priv->guc.slpc.enabled = true;
+
+	/* Enable only GTPERF task, Disable others */
+	val = SLPC_PARAM_TASK_ENABLED;
+	slpc_enable_disable_set(&dev_priv->drm, val,
+				SLPC_PARAM_TASK_ENABLE_GTPERF,
+				SLPC_PARAM_TASK_DISABLE_GTPERF);
+
+	val = SLPC_PARAM_TASK_DISABLED;
+	slpc_enable_disable_set(&dev_priv->drm, val,
+				SLPC_PARAM_TASK_ENABLE_BALANCER,
+				SLPC_PARAM_TASK_DISABLE_BALANCER);
+
+	slpc_enable_disable_set(&dev_priv->drm, val,
+				SLPC_PARAM_TASK_ENABLE_DCC,
+				SLPC_PARAM_TASK_DISABLE_DCC);
+
+	intel_slpc_set_param(dev_priv,
+			     SLPC_PARAM_GLOBAL_DISABLE_IA_GT_BALANCING,
+			     1);
+
+	intel_slpc_set_param(dev_priv,
+			     SLPC_PARAM_DFPS_THRESHOLD_MAX_FPS,
+			     0);
+
+	intel_slpc_set_param(dev_priv,
+			     SLPC_PARAM_DFPS_DISABLE_FRAMERATE_STALLING,
+			     1);
+
 }
 
 void intel_slpc_reset(struct drm_i915_private *dev_priv)
