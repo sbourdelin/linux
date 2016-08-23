@@ -1818,7 +1818,7 @@ static void *gfs2_glock_seq_start(struct seq_file *seq, loff_t *pos)
 		n = (*pos - gi->last_pos);
 
 	ret = rhashtable_walk_start(&gi->hti);
-	if (ret)
+	if (ret && ret != -EAGAIN)
 		return NULL;
 
 	do {
