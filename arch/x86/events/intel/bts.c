@@ -204,6 +204,16 @@ static void bts_update(struct bts_ctx *bts)
 static int
 bts_buffer_reset(struct bts_buffer *buf, struct perf_output_handle *handle);
 
+/*
+ * Ordering PMU callbacks wrt themselves and the PMI is done by means
+ * of bts::started, which:
+ *  - is set when bts::handle::event is valid, that is, between
+ *    perf_aux_output_begin() and perf_aux_output_end();
+ *  - is zero otherwise;
+ *  - is ordered against bts::handle::event with a local barrier to
+ *    enforce CPU ordering.
+ */
+
 static void __bts_event_start(struct perf_event *event)
 {
 	struct bts_ctx *bts = this_cpu_ptr(&bts_ctx);
@@ -221,9 +231,12 @@ static void __bts_event_start(struct perf_event *event)
 
 	/*
 	 * local barrier to make sure that ds configuration made it
-	 * before we enable BTS
+	 * before we enable BTS and bts::started is set
 	 */
 	wmb();
+
+	/* PMI handler: this counter is running and likely generating PMIs */
+	WRITE_ONCE(bts->started, 1);
 
 	intel_pmu_enable_bts(config);
 
@@ -251,9 +264,6 @@ static void bts_event_start(struct perf_event *event, int flags)
 
 	__bts_event_start(event);
 
-	/* PMI handler: this counter is running and likely generating PMIs */
-	ACCESS_ONCE(bts->started) = 1;
-
 	return;
 
 fail_end_stop:
@@ -265,28 +275,34 @@ fail_stop:
 
 static void __bts_event_stop(struct perf_event *event)
 {
+	struct bts_ctx *bts = this_cpu_ptr(&bts_ctx);
+
+	/* PMI handler: don't restart this counter */
+	WRITE_ONCE(bts->started, 0);
+
 	/*
 	 * No extra synchronization is mandated by the documentation to have
 	 * BTS data stores globally visible.
 	 */
 	intel_pmu_disable_bts();
-
-	if (event->hw.state & PERF_HES_STOPPED)
-		return;
-
-	ACCESS_ONCE(event->hw.state) |= PERF_HES_STOPPED;
 }
 
 static void bts_event_stop(struct perf_event *event, int flags)
 {
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
 	struct bts_ctx *bts = this_cpu_ptr(&bts_ctx);
-	struct bts_buffer *buf = perf_get_aux(&bts->handle);
+	struct bts_buffer *buf;
 
-	/* PMI handler: don't restart this counter */
-	ACCESS_ONCE(bts->started) = 0;
+	if (READ_ONCE(bts->started)) {
+		__bts_event_stop(event);
 
-	__bts_event_stop(event);
+		/* order buf (handle::event load) against bts::started store */
+		mb();
+	}
+
+	buf = perf_get_aux(&bts->handle);
+
+	event->hw.state |= PERF_HES_STOPPED;
 
 	if (flags & PERF_EF_UPDATE) {
 		bts_update(bts);
@@ -311,13 +327,25 @@ void intel_bts_enable_local(void)
 {
 	struct bts_ctx *bts = this_cpu_ptr(&bts_ctx);
 
-	if (bts->handle.event && bts->started)
+	if (!READ_ONCE(bts->started))
+		return;
+
+	/* matches wmb() ordering bts::started store against handle::event */
+	rmb();
+
+	if (bts->handle.event)
 		__bts_event_start(bts->handle.event);
 }
 
 void intel_bts_disable_local(void)
 {
 	struct bts_ctx *bts = this_cpu_ptr(&bts_ctx);
+
+	if (!READ_ONCE(bts->started))
+		return;
+
+	/* matches wmb() ordering bts::started store against handle::event */
+	rmb();
 
 	if (bts->handle.event)
 		__bts_event_stop(bts->handle.event);
@@ -407,9 +435,15 @@ int intel_bts_interrupt(void)
 	struct perf_event *event = bts->handle.event;
 	struct bts_buffer *buf;
 	s64 old_head;
-	int err;
+	int err = -ENOSPC;
 
-	if (!event || !bts->started)
+	if (!READ_ONCE(bts->started))
+		return 0;
+
+	/* matches wmb() ordering bts::started store against handle::event */
+	rmb();
+
+	if (!event)
 		return 0;
 
 	buf = perf_get_aux(&bts->handle);
@@ -432,12 +466,21 @@ int intel_bts_interrupt(void)
 			    !!local_xchg(&buf->lost, 0));
 
 	buf = perf_aux_output_begin(&bts->handle, event);
-	if (!buf)
-		return 1;
+	if (buf)
+		err = bts_buffer_reset(buf, &bts->handle);
 
-	err = bts_buffer_reset(buf, &bts->handle);
-	if (err)
-		perf_aux_output_end(&bts->handle, 0, false);
+	if (err) {
+		WRITE_ONCE(bts->started, 0);
+
+		if (buf) {
+			/*
+			 * cleared bts::started should be visible before
+			 * cleared handle::event
+			 */
+			wmb();
+			perf_aux_output_end(&bts->handle, 0, false);
+		}
+	}
 
 	return 1;
 }
