@@ -54,7 +54,6 @@ struct i915_params {
 	unsigned int inject_load_failure;
 	/* leave bools at the end to not create holes */
 	bool enable_hangcheck;
-	bool fastboot;
 	bool prefault_disable;
 	bool load_detect_test;
 	bool force_reset_modeset_test;
