@@ -8763,9 +8763,9 @@ i9xx_get_initial_plane_config(struct intel_crtc *crtc,
 
 	plane_config->size = fb->pitches[0] * aligned_height;
 
-	DRM_DEBUG_KMS("pipe/plane %c/%d with fb: size=%dx%d@%d, offset=%x, pitch %d, size 0x%x\n",
+	DRM_DEBUG_KMS("pipe/plane %c/%d with fb: size=%dx%d@%d, base=%x, offset=%x, pitch=%d, size=0x%x\n",
 		      pipe_name(pipe), plane, fb->width, fb->height,
-		      fb->bits_per_pixel, base, fb->pitches[0],
+		      fb->bits_per_pixel, base, offset, fb->pitches[0],
 		      plane_config->size);
 
 	plane_config->fb = intel_fb;
@@ -9787,9 +9787,9 @@ skylake_get_initial_plane_config(struct intel_crtc *crtc,
 
 	plane_config->size = fb->pitches[0] * aligned_height;
 
-	DRM_DEBUG_KMS("pipe %c with fb: size=%dx%d@%d, offset=%x, pitch %d, size 0x%x\n",
+	DRM_DEBUG_KMS("pipe %c with fb: size=%dx%d@%d, base=%x, offset=%x, pitch=%d, size=0x%x\n",
 		      pipe_name(pipe), fb->width, fb->height,
-		      fb->bits_per_pixel, base, fb->pitches[0],
+		      fb->bits_per_pixel, base, offset, fb->pitches[0],
 		      plane_config->size);
 
 	plane_config->fb = intel_fb;
@@ -9884,9 +9884,9 @@ ironlake_get_initial_plane_config(struct intel_crtc *crtc,
 
 	plane_config->size = fb->pitches[0] * aligned_height;
 
-	DRM_DEBUG_KMS("pipe %c with fb: size=%dx%d@%d, offset=%x, pitch %d, size 0x%x\n",
+	DRM_DEBUG_KMS("pipe %c with fb: size=%dx%d@%d, base=%x, offset=%x, pitch=%d, size=0x%x\n",
 		      pipe_name(pipe), fb->width, fb->height,
-		      fb->bits_per_pixel, base, fb->pitches[0],
+		      fb->bits_per_pixel, base, offset, fb->pitches[0],
 		      plane_config->size);
 
 	plane_config->fb = intel_fb;
