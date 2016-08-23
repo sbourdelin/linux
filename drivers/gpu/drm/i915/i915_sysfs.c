@@ -299,6 +299,9 @@ static ssize_t gt_cur_freq_mhz_show(struct device *kdev,
 {
 	struct drm_i915_private *dev_priv = kdev_minor_to_i915(kdev);
 
+	if (intel_slpc_active(dev_priv))
+		return -ENODEV;
+
 	return snprintf(buf, PAGE_SIZE, "%d\n",
 			intel_gpu_freq(dev_priv,
 				       dev_priv->rps.cur_freq));
