@@ -1437,6 +1437,13 @@ static struct clk_core *clk_propagate_rate_change(struct clk_core *core,
 	if (core->rate == core->new_rate)
 		return NULL;
 
+	if ((event == PRE_RATE_CHANGE) &&
+	    (core->flags & CLK_SET_RATE_GATE) && core->prepare_count) {
+		pr_err("%s: %s not gated but wants to change rate\n",
+			__func__, core->name);
+		fail_clk = core;
+	}
+
 	if (core->notifier_count) {
 		ret = __clk_notify(core, event, core->rate, core->new_rate);
 		if (ret & NOTIFY_STOP_MASK)
@@ -1570,9 +1577,6 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	/* bail early if nothing to do */
 	if (rate == clk_core_get_rate_nolock(core))
 		return 0;
-
-	if ((core->flags & CLK_SET_RATE_GATE) && core->prepare_count)
-		return -EBUSY;
 
 	/* calculate new rates and get the topmost changed clock */
 	top = clk_calc_new_rates(core, rate);
