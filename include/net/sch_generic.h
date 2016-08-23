@@ -40,6 +40,10 @@ struct gso_cell {
 	struct sk_buff *skb;
 };
 
+struct bad_txq_cell {
+	struct sk_buff *skb;
+};
+
 struct Qdisc {
 	int 			(*enqueue)(struct sk_buff *skb,
 					   struct Qdisc *sch,
@@ -77,7 +81,8 @@ struct Qdisc {
 	struct gnet_stats_basic_cpu __percpu *cpu_bstats;
 	struct gnet_stats_queue	__percpu *cpu_qstats;
 
-	struct gso_cell __percpu *gso_cpu_skb;
+	struct gso_cell     __percpu *gso_cpu_skb;
+	struct bad_txq_cell __percpu *skb_bad_txq_cpu;
 
 	/*
 	 * For performance sake on SMP, we put highly modified fields at the end
