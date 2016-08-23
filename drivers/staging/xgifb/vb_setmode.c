@@ -727,7 +727,6 @@ static void XGI_SetCRT1DE(unsigned short ModeIdIndex,
 		tempax |= 0x40;
 
 	xgifb_reg_and_or(pVBInfo->P3d4, 0x07, ~0x42, tempax);
-	data = xgifb_reg_get(pVBInfo->P3d4, 0x07);
 	tempax = 0;
 
 	if (tempbx & 0x04)
