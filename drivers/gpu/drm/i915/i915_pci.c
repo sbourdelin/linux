@@ -322,12 +322,14 @@ static const struct intel_device_info intel_skylake_info = {
 	BDW_FEATURES,
 	.is_skylake = 1,
 	.gen = 9,
+	.has_slpc = 1,
 };
 
 static const struct intel_device_info intel_skylake_gt3_info = {
 	BDW_FEATURES,
 	.is_skylake = 1,
 	.gen = 9,
+	.has_slpc = 1,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING,
 };
 
