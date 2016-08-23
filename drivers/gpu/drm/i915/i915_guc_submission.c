@@ -78,12 +78,16 @@ static inline bool host2guc_action_response(struct drm_i915_private *dev_priv,
 int i915_guc_action(struct intel_guc *guc, u32 *data, u32 len)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
+	struct intel_guc_fw *guc_fw = &guc->guc_fw;
 	u32 status;
 	int i;
 	int ret;
 
 	if (WARN_ON(len < 1 || len > 15))
 		return -EINVAL;
+
+	if (WARN_ON(guc_fw->guc_fw_load_status != GUC_FIRMWARE_SUCCESS))
+		return -ENODEV;
 
 	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
 
