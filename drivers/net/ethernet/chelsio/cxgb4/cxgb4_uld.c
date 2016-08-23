@@ -121,20 +121,14 @@ static int alloc_uld_rxqs(struct adapter *adap,
 			  struct sge_uld_rxq_info *rxq_info,
 			  unsigned int nq, unsigned int offset, bool lro)
 {
-	struct sge *s = &adap->sge;
 	struct sge_ofld_rxq *q = rxq_info->uldrxq + offset;
 	unsigned short *ids = rxq_info->rspq_id + offset;
 	unsigned int per_chan = nq / adap->params.nports;
-	unsigned int msi_idx, bmap_idx;
+	unsigned int bmap_idx;
 	int i, err;
 
-	if (adap->flags & USING_MSIX)
-		msi_idx = 1;
-	else
-		msi_idx = -((int)s->intrq.abs_id + 1);
-
 	for (i = 0; i < nq; i++, q++) {
-		if (msi_idx >= 0) {
+		if (adap->flags & USING_MSIX) {
 			bmap_idx = get_msix_idx_from_bmap(adap);
 			adap->msi_idx++;
 		}
@@ -147,7 +141,7 @@ static int alloc_uld_rxqs(struct adapter *adap,
 				       0);
 		if (err)
 			goto freeout;
-		if (msi_idx >= 0)
+		if (adap->flags & USING_MSIX)
 			rxq_info->msix_tbl[i + offset] = bmap_idx;
 		memset(&q->stats, 0, sizeof(q->stats));
 		if (ids)
