@@ -89,6 +89,7 @@ struct hidma_chan {
 	bool				allocated;
 	char				dbg_name[16];
 	u32				dma_sig;
+	dma_cookie_t			last_success;
 
 	/*
 	 * active descriptor on this channel
