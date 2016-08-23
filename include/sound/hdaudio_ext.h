@@ -205,6 +205,7 @@ struct hdac_ext_device {
 	struct snd_card *card;
 	void *scodec;
 	void *private_data;
+	const struct hda_device_id *id_entry;
 };
 
 struct hdac_ext_dma_params {
