@@ -62,10 +62,17 @@ static int __init init_dax_wait_table(void)
 }
 fs_initcall(init_dax_wait_table);
 
-static wait_queue_head_t *dax_entry_waitqueue(struct address_space *mapping,
-					      pgoff_t index)
+static pgoff_t dax_entry_start(pgoff_t index, void *entry)
 {
-	unsigned long hash = hash_long((unsigned long)mapping ^ index,
+	if (RADIX_DAX_TYPE(entry) == RADIX_DAX_PMD)
+		index &= (PMD_MASK >> PAGE_SHIFT);
+	return index;
+}
+
+static wait_queue_head_t *dax_entry_waitqueue(struct address_space *mapping,
+					      pgoff_t entry_start)
+{
+	unsigned long hash = hash_long((unsigned long)mapping ^ entry_start,
 				       DAX_WAIT_TABLE_BITS);
 	return wait_table + hash;
 }
@@ -283,7 +290,7 @@ EXPORT_SYMBOL_GPL(dax_do_io);
  */
 struct exceptional_entry_key {
 	struct address_space *mapping;
-	unsigned long index;
+	pgoff_t entry_start;
 };
 
 struct wait_exceptional_entry_queue {
@@ -299,7 +306,7 @@ static int wake_exceptional_entry_func(wait_queue_t *wait, unsigned int mode,
 		container_of(wait, struct wait_exceptional_entry_queue, wait);
 
 	if (key->mapping != ewait->key.mapping ||
-	    key->index != ewait->key.index)
+	    key->entry_start != ewait->key.entry_start)
 		return 0;
 	return autoremove_wake_function(wait, mode, sync, NULL);
 }
@@ -357,12 +364,10 @@ static void *get_unlocked_mapping_entry(struct address_space *mapping,
 {
 	void *entry, **slot;
 	struct wait_exceptional_entry_queue ewait;
-	wait_queue_head_t *wq = dax_entry_waitqueue(mapping, index);
+	wait_queue_head_t *wq;
 
 	init_wait(&ewait.wait);
 	ewait.wait.func = wake_exceptional_entry_func;
-	ewait.key.mapping = mapping;
-	ewait.key.index = index;
 
 	for (;;) {
 		entry = __radix_tree_lookup(&mapping->page_tree, index, NULL,
@@ -373,6 +378,11 @@ static void *get_unlocked_mapping_entry(struct address_space *mapping,
 				*slotp = slot;
 			return entry;
 		}
+
+		wq = dax_entry_waitqueue(mapping,
+				dax_entry_start(index, entry));
+		ewait.key.mapping = mapping;
+		ewait.key.entry_start = dax_entry_start(index, entry);
 		prepare_to_wait_exclusive(wq, &ewait.wait,
 					  TASK_UNINTERRUPTIBLE);
 		spin_unlock_irq(&mapping->tree_lock);
@@ -445,10 +455,11 @@ restart:
 	return entry;
 }
 
-void dax_wake_mapping_entry_waiter(struct address_space *mapping,
+void dax_wake_mapping_entry_waiter(void *entry, struct address_space *mapping,
 				   pgoff_t index, bool wake_all)
 {
-	wait_queue_head_t *wq = dax_entry_waitqueue(mapping, index);
+	wait_queue_head_t *wq = dax_entry_waitqueue(mapping,
+						dax_entry_start(index, entry));
 
 	/*
 	 * Checking for locked entry and prepare_to_wait_exclusive() happens
@@ -460,7 +471,7 @@ void dax_wake_mapping_entry_waiter(struct address_space *mapping,
 		struct exceptional_entry_key key;
 
 		key.mapping = mapping;
-		key.index = index;
+		key.entry_start = dax_entry_start(index, entry);
 		__wake_up(wq, TASK_NORMAL, wake_all ? 0 : 1, &key);
 	}
 }
@@ -478,7 +489,7 @@ void dax_unlock_mapping_entry(struct address_space *mapping, pgoff_t index)
 	}
 	unlock_slot(mapping, slot);
 	spin_unlock_irq(&mapping->tree_lock);
-	dax_wake_mapping_entry_waiter(mapping, index, false);
+	dax_wake_mapping_entry_waiter(entry, mapping, index, false);
 }
 
 static void put_locked_mapping_entry(struct address_space *mapping,
@@ -503,7 +514,7 @@ static void put_unlocked_mapping_entry(struct address_space *mapping,
 		return;
 
 	/* We have to wake up next waiter for the radix tree entry lock */
-	dax_wake_mapping_entry_waiter(mapping, index, false);
+	dax_wake_mapping_entry_waiter(entry, mapping, index, false);
 }
 
 /*
@@ -530,7 +541,7 @@ int dax_delete_mapping_entry(struct address_space *mapping, pgoff_t index)
 	radix_tree_delete(&mapping->page_tree, index);
 	mapping->nrexceptional--;
 	spin_unlock_irq(&mapping->tree_lock);
-	dax_wake_mapping_entry_waiter(mapping, index, true);
+	dax_wake_mapping_entry_waiter(entry, mapping, index, true);
 
 	return 1;
 }
