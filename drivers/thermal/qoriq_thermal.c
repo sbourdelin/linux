@@ -217,15 +217,13 @@ static int qoriq_tmu_probe(struct platform_device *pdev)
 	data->sensor_id = qoriq_tmu_get_sensor_id();
 	if (data->sensor_id < 0) {
 		dev_err(&pdev->dev, "Failed to get sensor id\n");
-		ret = -ENODEV;
-		goto err_iomap;
+		return -ENODEV;
 	}
 
 	data->regs = of_iomap(np, 0);
 	if (!data->regs) {
 		dev_err(&pdev->dev, "Failed to get memory region\n");
-		ret = -ENODEV;
-		goto err_iomap;
+		return -ENODEV;
 	}
 
 	qoriq_tmu_init_device(data);	/* TMU initialization */
@@ -254,9 +252,6 @@ static int qoriq_tmu_probe(struct platform_device *pdev)
 err_tmu:
 	iounmap(data->regs);
 
-err_iomap:
-	platform_set_drvdata(pdev, NULL);
-
 	return ret;
 }
 
@@ -270,7 +265,6 @@ static int qoriq_tmu_remove(struct platform_device *pdev)
 	tmu_write(data, TMR_DISABLE, &data->regs->tmr);
 
 	iounmap(data->regs);
-	platform_set_drvdata(pdev, NULL);
 
 	return 0;
 }
