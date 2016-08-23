@@ -30,6 +30,7 @@
 #include <linux/syscore_ops.h>
 #include <linux/reboot.h>
 #include <linux/security.h>
+#include <linux/swait.h>
 
 #include <generated/utsrelease.h>
 
@@ -109,13 +110,13 @@ enum {
 
 struct fw_status {
 	unsigned long status;
-	struct completion completion;
+	struct swait_queue_head wq;
 };
 
 static void fw_status_init(struct fw_status *fw_st)
 {
 	fw_st->status = FW_STATUS_UNKNOWN;
-	init_completion(&fw_st->completion);
+	init_swait_queue_head(&fw_st->wq);
 }
 
 static unsigned long __fw_status_get(struct fw_status *fw_st)
@@ -123,15 +124,19 @@ static unsigned long __fw_status_get(struct fw_status *fw_st)
 	return READ_ONCE(fw_st->status);
 }
 
+static inline bool is_fw_status_done(unsigned long status)
+{
+	return status == FW_STATUS_DONE ||
+	       status == FW_STATUS_ABORTED;
+}
+
 static int fw_status_wait_timeout(struct fw_status *fw_st, long timeout)
 {
-	unsigned long status;
 	int err;
-
-	err = wait_for_completion_interruptible_timeout(&fw_st->completion,
-							timeout);
-	status = READ_ONCE(fw_st->status);
-	if (err == 0 && status == FW_STATUS_ABORTED)
+	err = swait_event_interruptible_timeout(fw_st->wq,
+				is_fw_status_done(READ_ONCE(fw_st->status)),
+				timeout);
+	if (err == 0 && fw_st->status == FW_STATUS_ABORTED)
 		return -ENOENT;
 
 	return err;
@@ -144,7 +149,7 @@ static void __fw_status_set(struct fw_status *fw_st,
 
 	if (status == FW_STATUS_DONE ||
 			status == FW_STATUS_ABORTED)
-		complete_all(&fw_st->completion);
+		swake_up(&fw_st->wq);
 }
 
 #define fw_status_start(fw_st)					\
