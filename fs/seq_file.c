@@ -242,7 +242,8 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 			m->count = 0;
 		if (unlikely(!m->count)) {
 			p = m->op->next(m, p, &pos);
-			m->index = pos;
+			if (p && !IS_ERR(p))
+				m->index = pos;
 			continue;
 		}
 		if (m->count < m->size)
