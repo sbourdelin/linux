@@ -295,6 +295,10 @@ void intel_slpc_disable(struct drm_i915_private *dev_priv)
 
 void intel_slpc_enable(struct drm_i915_private *dev_priv)
 {
+	struct drm_i915_gem_object *obj;
+	struct page *page;
+	void *pv = NULL;
+	struct slpc_shared_data data;
 	u64 val;
 
 	host2guc_slpc_reset(dev_priv);
@@ -338,6 +342,25 @@ void intel_slpc_enable(struct drm_i915_private *dev_priv)
 	intel_slpc_set_param(dev_priv,
 			     SLPC_PARAM_GLOBAL_ENABLE_BALANCER_IN_NON_GAMING_MODE,
 			     0);
+
+	obj = dev_priv->guc.slpc.vma->obj;
+	intel_slpc_query_task_state(dev_priv);
+
+	pv = kmap_atomic(i915_gem_object_get_page(obj, 0));
+	data = *(struct slpc_shared_data *) pv;
+	kunmap_atomic(pv);
+
+	/*
+	 * TODO: Define separate variables for slice and unslice
+	 *	 frequencies for driver state variable.
+	 */
+	dev_priv->rps.max_freq_softlimit =
+			data.task_state_data.freq_unslice_max;
+	dev_priv->rps.min_freq_softlimit =
+			data.task_state_data.freq_unslice_min;
+
+	dev_priv->rps.max_freq_softlimit *= GEN9_FREQ_SCALER;
+	dev_priv->rps.min_freq_softlimit *= GEN9_FREQ_SCALER;
 }
 
 void intel_slpc_reset(struct drm_i915_private *dev_priv)
