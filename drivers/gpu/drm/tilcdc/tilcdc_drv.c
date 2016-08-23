@@ -129,7 +129,7 @@ static int tilcdc_commit(struct drm_device *dev,
 
 	drm_atomic_helper_cleanup_planes(dev, state);
 
-	drm_atomic_state_free(state);
+	drm_atomic_state_put(state);
 
 	return 0;
 }

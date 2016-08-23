@@ -39,7 +39,17 @@ static inline void drm_crtc_commit_get(struct drm_crtc_commit *commit)
 struct drm_atomic_state * __must_check
 drm_atomic_state_alloc(struct drm_device *dev);
 void drm_atomic_state_clear(struct drm_atomic_state *state);
-void drm_atomic_state_free(struct drm_atomic_state *state);
+static inline struct drm_atomic_state *
+drm_atomic_state_get(struct drm_atomic_state *state)
+{
+	kref_get(&state->ref);
+	return state;
+}
+void __drm_atomic_state_free(struct kref *ref);
+static inline void drm_atomic_state_put(struct drm_atomic_state *state)
+{
+	kref_put(&state->ref, __drm_atomic_state_free);
+}
 
 int  __must_check
 drm_atomic_state_init(struct drm_device *dev, struct drm_atomic_state *state);

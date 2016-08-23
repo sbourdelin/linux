@@ -141,7 +141,7 @@ static void complete_commit(struct msm_commit *c, bool async)
 
 	kms->funcs->complete_commit(kms, state);
 
-	drm_atomic_state_free(state);
+	drm_atomic_state_put(state);
 
 	commit_destroy(c);
 }
