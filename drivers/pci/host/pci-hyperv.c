@@ -456,6 +456,9 @@ hv_pci_generic_compl(void *context, struct pci_response *resp,
 
 	if (resp_packet_size >= offsetofend(struct pci_response, status))
 		comp_pkt->completion_status = resp->status;
+	else
+		comp_pkt->completion_status = -1;
+
 	complete(&comp_pkt->host_event);
 }
 
