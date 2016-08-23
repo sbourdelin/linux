@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 
+#include "cros_ec_debugfs.h"
 #include "cros_ec_dev.h"
 
 /* Device variables */
@@ -276,6 +277,9 @@ static int ec_device_probe(struct platform_device *pdev)
 		goto dev_reg_failed;
 	}
 
+	if (cros_ec_debugfs_init(ec))
+		dev_warn(dev, "failed to create debugfs directory\n");
+
 	return 0;
 
 dev_reg_failed:
@@ -290,6 +294,9 @@ cdev_add_failed:
 static int ec_device_remove(struct platform_device *pdev)
 {
 	struct cros_ec_dev *ec = dev_get_drvdata(&pdev->dev);
+
+	cros_ec_debugfs_remove(ec);
+
 	cdev_del(&ec->cdev);
 	device_unregister(&ec->class_dev);
 	return 0;
