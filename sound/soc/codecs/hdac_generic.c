@@ -41,6 +41,7 @@ struct hdac_generic_priv {
 	unsigned int num_adcs;
 	unsigned int num_dacs;
 	unsigned int num_dapm_widgets;
+	struct hdac_generic_vendor_ops *vendor_ops;
 };
 
 static char *wid_names[] = {
@@ -1625,6 +1626,7 @@ static int hdac_generic_dev_probe(struct hdac_ext_device *edev)
 	struct hdac_device *codec = &edev->hdac;
 	struct hdac_generic_priv *hdac_priv;
 	struct snd_soc_dai_driver *codec_dais = NULL;
+	struct hdac_generic_vendor_ops *ops;
 	int num_dais = 0;
 	int ret = 0;
 
@@ -1664,6 +1666,16 @@ static int hdac_generic_dev_probe(struct hdac_ext_device *edev)
 		return ret;
 	}
 
+	/* codec specific init if any */
+	ops = (struct hdac_generic_vendor_ops *)edev->id_entry->driver_data;
+	if (ops && ops->init) {
+		ret = ops->init(edev);
+		if (ret < 0)
+			return ret;
+	}
+
+	hdac_priv->vendor_ops = ops;
+
 	/* ASoC specific initialization */
 	return snd_soc_register_codec(&codec->dev, &hdac_generic_codec,
 			codec_dais, num_dais);
@@ -1675,6 +1687,23 @@ static int hdac_generic_dev_remove(struct hdac_ext_device *edev)
 	return 0;
 }
 
+static void write_def_coeffs(struct hdac_ext_device *edev)
+{
+	snd_hdac_codec_write(&edev->hdac, 0x20, 0, AC_VERB_SET_COEF_INDEX, 0x4f);
+	snd_hdac_codec_write(&edev->hdac, 0x20, 0, AC_VERB_SET_PROC_COEF, 0x5000);
+}
+
+int hdac_realtek_init(struct hdac_ext_device *edev)
+{
+	write_def_coeffs(edev);
+
+	return 0;
+}
+
+struct hdac_generic_vendor_ops realtek_ops = {
+	.init = hdac_realtek_init,
+};
+
 /*
  * TODO:
  * Driver_data will be used to perform any vendor specific init, register
@@ -1682,7 +1711,7 @@ static int hdac_generic_dev_remove(struct hdac_ext_device *edev)
  * Driver will implement it's own match function to retrieve driver data.
  */
 static const struct hda_device_id codec_list[] = {
-	HDA_CODEC_EXT_ENTRY(0x10ec0286, 0x100002, "ALC286", 0),
+	HDA_CODEC_EXT_ENTRY(0x10ec0286, 0x100002, "ALC286", &realtek_ops),
 	{}
 };
 
