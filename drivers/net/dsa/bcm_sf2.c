@@ -1643,10 +1643,8 @@ static int bcm_sf2_sw_probe(struct platform_device *pdev)
 	for (i = 0; i < BCM_SF2_REGS_NUM; i++) {
 		r = platform_get_resource(pdev, IORESOURCE_MEM, i);
 		*base = devm_ioremap_resource(&pdev->dev, r);
-		if (IS_ERR(*base)) {
-			pr_err("unable to find register: %s\n", reg_names[i]);
+		if (IS_ERR(*base))
 			return PTR_ERR(*base);
-		}
 		base++;
 	}
 
