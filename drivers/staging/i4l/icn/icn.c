@@ -804,21 +804,16 @@ static int
 icn_loadboot(u_char __user *buffer, icn_card *card)
 {
 	int ret;
-	u_char *codebuf;
+	void *codebuf;
 	unsigned long flags;
 
 #ifdef BOOT_DEBUG
 	printk(KERN_DEBUG "icn_loadboot called, buffaddr=%08lx\n", (ulong) buffer);
 #endif
-	codebuf = kmalloc(ICN_CODE_STAGE1, GFP_KERNEL);
-	if (!codebuf) {
-		printk(KERN_WARNING "icn: Could not allocate code buffer\n");
-		ret = -ENOMEM;
-		goto out;
-	}
-	if (copy_from_user(codebuf, buffer, ICN_CODE_STAGE1)) {
-		ret = -EFAULT;
-		goto out_kfree;
+	codebuf = memdup_user(buffer, ICN_CODE_STAGE1);
+	if (IS_ERR(codebuf)) {
+		pr_warn("icn: Could not allocate code buffer\n");
+		return PTR_ERR(codebuf);
 	}
 	if (!card->rvalid) {
 		if (!request_region(card->port, ICN_PORTLEN, card->regname)) {
@@ -902,7 +897,6 @@ icn_loadboot(u_char __user *buffer, icn_card *card)
 
 out_kfree:
 	kfree(codebuf);
-out:
 	return ret;
 }
 
