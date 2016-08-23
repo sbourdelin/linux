@@ -773,6 +773,9 @@ int ext2_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_
 	if (ret > 0) {
 		bh_result->b_size = (ret << inode->i_blkbits);
 		ret = 0;
+	} else if (ret == 0) {
+		/* hole case, need to fill in bh_result->b_size */
+		bh_result->b_size = 1 << inode->i_blkbits;
 	}
 	return ret;
 
