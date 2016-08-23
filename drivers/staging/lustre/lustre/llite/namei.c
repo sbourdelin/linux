@@ -1101,10 +1101,7 @@ const struct inode_operations ll_dir_inode_operations = {
 	.setattr	    = ll_setattr,
 	.getattr	    = ll_getattr,
 	.permission	 = ll_inode_permission,
-	.setxattr	   = ll_setxattr,
-	.getxattr	   = ll_getxattr,
 	.listxattr	  = ll_listxattr,
-	.removexattr	= ll_removexattr,
 	.get_acl	    = ll_get_acl,
 };
 
@@ -1112,9 +1109,6 @@ const struct inode_operations ll_special_inode_operations = {
 	.setattr	= ll_setattr,
 	.getattr	= ll_getattr,
 	.permission     = ll_inode_permission,
-	.setxattr       = ll_setxattr,
-	.getxattr       = ll_getxattr,
 	.listxattr      = ll_listxattr,
-	.removexattr    = ll_removexattr,
 	.get_acl	    = ll_get_acl,
 };
