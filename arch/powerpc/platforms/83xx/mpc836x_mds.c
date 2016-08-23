@@ -135,8 +135,6 @@ static void __init mpc836x_mds_setup_arch(void)
 #endif				/* CONFIG_QUICC_ENGINE */
 }
 
-machine_device_initcall(mpc836x_mds, mpc83xx_declare_of_platform_devices);
-
 #ifdef CONFIG_QE_USB
 static int __init mpc836x_usb_cfg(void)
 {

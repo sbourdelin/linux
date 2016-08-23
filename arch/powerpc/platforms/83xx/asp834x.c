@@ -34,8 +34,6 @@ static void __init asp834x_setup_arch(void)
 	mpc834x_usb_cfg();
 }
 
-machine_device_initcall(asp834x, mpc83xx_declare_of_platform_devices);
-
 /*
  * Called very early, MMU is off, device-tree isn't unflattened
  */

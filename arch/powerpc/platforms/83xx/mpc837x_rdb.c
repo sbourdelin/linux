@@ -55,8 +55,6 @@ static void __init mpc837x_rdb_setup_arch(void)
 	mpc837x_rdb_sd_cfg();
 }
 
-machine_device_initcall(mpc837x_rdb, mpc83xx_declare_of_platform_devices);
-
 static const char * const board[] __initconst = {
 	"fsl,mpc8377rdb",
 	"fsl,mpc8378rdb",

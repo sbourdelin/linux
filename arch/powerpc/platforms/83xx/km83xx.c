@@ -154,8 +154,6 @@ static void __init mpc83xx_km_setup_arch(void)
 #endif	/* CONFIG_QUICC_ENGINE */
 }
 
-machine_device_initcall(mpc83xx_km, mpc83xx_declare_of_platform_devices);
-
 /* list of the supported boards */
 static char *board[] __initdata = {
 	"Keymile,KMETER1",

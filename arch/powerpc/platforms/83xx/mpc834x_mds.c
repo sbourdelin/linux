@@ -81,8 +81,6 @@ static void __init mpc834x_mds_setup_arch(void)
 	mpc834xemds_usb_cfg();
 }
 
-machine_device_initcall(mpc834x_mds, mpc83xx_declare_of_platform_devices);
-
 /*
  * Called very early, MMU is off, device-tree isn't unflattened
  */

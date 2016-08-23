@@ -114,23 +114,6 @@ void __init mpc83xx_ipic_and_qe_init_IRQ(void)
 }
 #endif /* CONFIG_QUICC_ENGINE */
 
-static const struct of_device_id of_bus_ids[] __initconst = {
-	{ .type = "soc", },
-	{ .compatible = "soc", },
-	{ .compatible = "simple-bus" },
-	{ .compatible = "gianfar" },
-	{ .compatible = "gpio-leds", },
-	{ .type = "qe", },
-	{ .compatible = "fsl,qe", },
-	{},
-};
-
-int __init mpc83xx_declare_of_platform_devices(void)
-{
-	of_platform_bus_probe(NULL, of_bus_ids, NULL);
-	return 0;
-}
-
 #ifdef CONFIG_PCI
 void __init mpc83xx_setup_pci(void)
 {
@@ -149,4 +132,12 @@ void __init mpc83xx_setup_arch(void)
 		ppc_md.progress("mpc83xx_setup_arch()", 0);
 
 	mpc83xx_setup_pci();
+	arch_enable_default_of_probe();
 }
+
+BUS_OF_DECLARE_TYPE(type_soc, "soc");
+BUS_OF_DECLARE_TYPE(type_qe, "qe");
+BUS_OF_DECLARE_COMPAT(simple_bus, "simple-bus");
+BUS_OF_DECLARE_COMPAT(gianfar, "gianfar");
+BUS_OF_DECLARE_COMPAT(gpio_leds, "gpio-leds");
+BUS_OF_DECLARE_COMPAT(qe, "fsl,qe");

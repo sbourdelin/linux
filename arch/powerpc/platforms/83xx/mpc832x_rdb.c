@@ -210,8 +210,6 @@ static void __init mpc832x_rdb_setup_arch(void)
 #endif				/* CONFIG_QUICC_ENGINE */
 }
 
-machine_device_initcall(mpc832x_rdb, mpc83xx_declare_of_platform_devices);
-
 /*
  * Called very early, MMU is off, device-tree isn't unflattened
  */

@@ -50,8 +50,6 @@ static void __init sbc834x_setup_arch(void)
 	mpc83xx_setup_arch();
 }
 
-machine_device_initcall(sbc834x, mpc83xx_declare_of_platform_devices);
-
 /*
  * Called very early, MMU is off, device-tree isn't unflattened
  */

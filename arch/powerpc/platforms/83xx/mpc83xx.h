@@ -85,7 +85,6 @@ extern void mpc83xx_setup_pci(void);
 #define mpc83xx_setup_pci()	do {} while (0)
 #endif
 
-extern int mpc83xx_declare_of_platform_devices(void);
 extern void mpc83xx_setup_arch(void);
 
 #endif				/* __MPC83XX_H__ */

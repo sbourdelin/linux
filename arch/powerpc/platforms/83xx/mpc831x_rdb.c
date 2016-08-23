@@ -46,8 +46,6 @@ static int __init mpc831x_rdb_probe(void)
 	return of_device_compatible_match(of_root, board);
 }
 
-machine_device_initcall(mpc831x_rdb, mpc83xx_declare_of_platform_devices);
-
 define_machine(mpc831x_rdb) {
 	.name			= "MPC831x RDB",
 	.probe			= mpc831x_rdb_probe,

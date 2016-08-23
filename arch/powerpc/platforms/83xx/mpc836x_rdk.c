@@ -27,8 +27,6 @@
 
 #include "mpc83xx.h"
 
-machine_device_initcall(mpc836x_rdk, mpc83xx_declare_of_platform_devices);
-
 static void __init mpc836x_rdk_setup_arch(void)
 {
 	mpc83xx_setup_arch();
