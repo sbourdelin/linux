@@ -76,6 +76,8 @@ extern int pm_qos_sysfs_add_flags(struct device *dev);
 extern void pm_qos_sysfs_remove_flags(struct device *dev);
 extern int pm_qos_sysfs_add_latency_tolerance(struct device *dev);
 extern void pm_qos_sysfs_remove_latency_tolerance(struct device *dev);
+extern int pm_qos_sysfs_add_bandwidth(struct device *dev);
+extern void pm_qos_sysfs_remove_bandwidth(struct device *dev);
 
 #else /* CONFIG_PM */
 

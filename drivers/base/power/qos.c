@@ -163,6 +163,14 @@ static int apply_constraint(struct dev_pm_qos_request *req,
 			req->dev->power.set_latency_tolerance(req->dev, value);
 		}
 		break;
+	case DEV_PM_QOS_BANDWIDTH:
+		ret = pm_qos_update_target(&qos->bandwidth,
+					   &req->data.pnode, action, value);
+		if (ret) {
+			value = pm_qos_read_value(&qos->bandwidth);
+			req->dev->power.set_bandwidth(req->dev, value);
+		}
+		break;
 	case DEV_PM_QOS_FLAGS:
 		ret = pm_qos_update_flags(&qos->flags, &req->data.flr,
 					  action, value);
@@ -212,6 +220,13 @@ static int dev_pm_qos_constraints_allocate(struct device *dev)
 	c->default_value = PM_QOS_LATENCY_TOLERANCE_DEFAULT_VALUE;
 	c->no_constraint_value = PM_QOS_LATENCY_TOLERANCE_NO_CONSTRAINT;
 	c->type = PM_QOS_MIN;
+
+	c = &qos->bandwidth;
+	plist_head_init(&c->list);
+	c->target_value = PM_QOS_BANDWIDTH_DEFAULT_VALUE;
+	c->default_value = PM_QOS_BANDWIDTH_DEFAULT_VALUE;
+	c->no_constraint_value = PM_QOS_BANDWIDTH_NO_CONSTRAINT;
+	c->type = PM_QOS_SUM;
 
 	INIT_LIST_HEAD(&qos->flags.list);
 
@@ -271,6 +286,11 @@ void dev_pm_qos_constraints_destroy(struct device *dev)
 		apply_constraint(req, PM_QOS_REMOVE_REQ, PM_QOS_DEFAULT_VALUE);
 		memset(req, 0, sizeof(*req));
 	}
+	c = &qos->bandwidth;
+	plist_for_each_entry_safe(req, tmp, &c->list, data.pnode) {
+		apply_constraint(req, PM_QOS_REMOVE_REQ, PM_QOS_DEFAULT_VALUE);
+		memset(req, 0, sizeof(*req));
+	}
 	f = &qos->flags;
 	list_for_each_entry_safe(req, tmp, &f->list, data.flr.node) {
 		apply_constraint(req, PM_QOS_REMOVE_REQ, PM_QOS_DEFAULT_VALUE);
@@ -293,8 +313,15 @@ void dev_pm_qos_constraints_destroy(struct device *dev)
 static bool dev_pm_qos_invalid_request(struct device *dev,
 				       enum dev_pm_qos_req_type type)
 {
-	return (type == DEV_PM_QOS_LATENCY_TOLERANCE
-			&& !dev->power.set_latency_tolerance);
+	if (type == DEV_PM_QOS_LATENCY_TOLERANCE
+		&& !dev->power.set_latency_tolerance)
+		return true;
+
+	if (type == DEV_PM_QOS_BANDWIDTH
+		&& !dev->power.set_bandwidth)
+		return true;
+
+	return false;
 }
 
 static int __dev_pm_qos_add_request(struct device *dev,
@@ -382,6 +409,7 @@ static int __dev_pm_qos_update_request(struct dev_pm_qos_request *req,
 	switch(req->type) {
 	case DEV_PM_QOS_RESUME_LATENCY:
 	case DEV_PM_QOS_LATENCY_TOLERANCE:
+	case DEV_PM_QOS_BANDWIDTH:
 		curr_value = req->data.pnode.prio;
 		break;
 	case DEV_PM_QOS_FLAGS:
@@ -590,6 +618,11 @@ int dev_pm_qos_add_ancestor_request(struct device *dev,
 			ancestor = ancestor->parent;
 
 		break;
+	case DEV_PM_QOS_BANDWIDTH:
+		while (ancestor && !ancestor->power.set_bandwidth)
+			ancestor = ancestor->parent;
+
+		break;
 	default:
 		ancestor = NULL;
 	}
@@ -616,6 +649,10 @@ static void __dev_pm_qos_drop_user_request(struct device *dev,
 	case DEV_PM_QOS_LATENCY_TOLERANCE:
 		req = dev->power.qos->latency_tolerance_req;
 		dev->power.qos->latency_tolerance_req = NULL;
+		break;
+	case DEV_PM_QOS_BANDWIDTH:
+		req = dev->power.qos->bandwidth_req;
+		dev->power.qos->bandwidth_req = NULL;
 		break;
 	case DEV_PM_QOS_FLAGS:
 		req = dev->power.qos->flags_req;
@@ -920,3 +957,101 @@ void dev_pm_qos_hide_latency_tolerance(struct device *dev)
 	pm_runtime_put(dev);
 }
 EXPORT_SYMBOL_GPL(dev_pm_qos_hide_latency_tolerance);
+
+/**
+ * dev_pm_qos_get_user_bandwidth - Get user space bandwidth request.
+ * @dev: Device to obtain the user space bandwidth request for.
+ */
+s32 dev_pm_qos_get_user_bandwidth(struct device *dev)
+{
+	s32 ret;
+
+	mutex_lock(&dev_pm_qos_mtx);
+	ret = IS_ERR_OR_NULL(dev->power.qos)
+		|| !dev->power.qos->bandwidth_req ?
+			PM_QOS_BANDWIDTH_NO_CONSTRAINT :
+			dev->power.qos->bandwidth_req->data.pnode.prio;
+	mutex_unlock(&dev_pm_qos_mtx);
+	return ret;
+}
+
+/**
+ * dev_pm_qos_update_user_bandwidth - Update user space bandwidth request.
+ * @dev: Device to obtain the user space bandwidth request for.
+ * @val: New user space bandwidth request for @dev (negative values disable).
+ */
+int dev_pm_qos_update_user_bandwidth(struct device *dev, s32 val)
+{
+	int ret;
+
+	mutex_lock(&dev_pm_qos_mtx);
+
+	if (IS_ERR_OR_NULL(dev->power.qos)
+	    || !dev->power.qos->bandwidth_req) {
+		struct dev_pm_qos_request *req;
+
+		if (val < 0) {
+			ret = -EINVAL;
+			goto out;
+		}
+		req = kzalloc(sizeof(*req), GFP_KERNEL);
+		if (!req) {
+			ret = -ENOMEM;
+			goto out;
+		}
+		ret = __dev_pm_qos_add_request(dev, req, DEV_PM_QOS_BANDWIDTH, val);
+		if (ret < 0) {
+			kfree(req);
+			goto out;
+		}
+		dev->power.qos->bandwidth_req = req;
+	} else {
+		if (val < 0) {
+			__dev_pm_qos_drop_user_request(dev, DEV_PM_QOS_BANDWIDTH);
+			ret = 0;
+		} else {
+			ret = __dev_pm_qos_update_request(dev->power.qos->bandwidth_req, val);
+		}
+	}
+
+ out:
+	mutex_unlock(&dev_pm_qos_mtx);
+	return ret;
+}
+
+/**
+ * dev_pm_qos_expose_bandwidth - Expose bandwidth to userspace
+ * @dev: Device whose bandwidth to expose
+ */
+int dev_pm_qos_expose_bandwidth(struct device *dev)
+{
+	int ret;
+
+	if (!dev->power.set_bandwidth)
+		return -EINVAL;
+
+	mutex_lock(&dev_pm_qos_sysfs_mtx);
+	ret = pm_qos_sysfs_add_bandwidth(dev);
+	mutex_unlock(&dev_pm_qos_sysfs_mtx);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(dev_pm_qos_expose_bandwidth);
+
+/**
+ * dev_pm_qos_hide_bandwidth - Hide bandwidth from userspace
+ * @dev: Device whose bandwidth to hide
+ */
+void dev_pm_qos_hide_bandwidth(struct device *dev)
+{
+	mutex_lock(&dev_pm_qos_sysfs_mtx);
+	pm_qos_sysfs_remove_bandwidth(dev);
+	mutex_unlock(&dev_pm_qos_sysfs_mtx);
+
+	/* Remove the request from user space now */
+	pm_runtime_get_sync(dev);
+	dev_pm_qos_update_user_bandwidth(dev,
+		PM_QOS_BANDWIDTH_NO_CONSTRAINT);
+	pm_runtime_put(dev);
+}
+EXPORT_SYMBOL_GPL(dev_pm_qos_hide_bandwidth);

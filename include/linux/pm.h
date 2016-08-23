@@ -607,6 +607,7 @@ struct dev_pm_info {
 #endif
 	struct pm_subsys_data	*subsys_data;  /* Owned by the subsystem. */
 	void (*set_latency_tolerance)(struct device *, s32);
+	void (*set_bandwidth)(struct device *, s32);
 	struct dev_pm_qos	*qos;
 };
 

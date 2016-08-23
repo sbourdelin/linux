@@ -276,6 +276,40 @@ static ssize_t pm_qos_latency_tolerance_store(struct device *dev,
 static DEVICE_ATTR(pm_qos_latency_tolerance_us, 0644,
 		   pm_qos_latency_tolerance_show, pm_qos_latency_tolerance_store);
 
+static ssize_t pm_qos_bandwidth_show(struct device *dev,
+					     struct device_attribute *attr,
+					     char *buf)
+{
+	s32 value = dev_pm_qos_get_user_bandwidth(dev);
+
+	if (value < 0)
+		return sprintf(buf, "auto\n");
+	else if (value == PM_QOS_BANDWIDTH_ANY)
+		return sprintf(buf, "any\n");
+
+	return sprintf(buf, "%d\n", value);
+}
+
+static ssize_t pm_qos_bandwidth_store(struct device *dev,
+					      struct device_attribute *attr,
+					      const char *buf, size_t n)
+{
+	s32 value;
+	int ret;
+
+	if (kstrtos32(buf, 0, &value)) {
+		if (!strcmp(buf, "auto") || !strcmp(buf, "auto\n"))
+			value = PM_QOS_BANDWIDTH_NO_CONSTRAINT;
+		else if (!strcmp(buf, "any") || !strcmp(buf, "any\n"))
+			value = PM_QOS_BANDWIDTH_ANY;
+	}
+	ret = dev_pm_qos_update_user_bandwidth(dev, value);
+	return ret < 0 ? ret : n;
+}
+
+static DEVICE_ATTR(pm_qos_bandwidth_kbps, 0644,
+		   pm_qos_bandwidth_show, pm_qos_bandwidth_store);
+
 static ssize_t pm_qos_no_power_off_show(struct device *dev,
 					struct device_attribute *attr,
 					char *buf)
@@ -663,6 +697,15 @@ static struct attribute_group pm_qos_latency_tolerance_attr_group = {
 	.attrs	= pm_qos_latency_tolerance_attrs,
 };
 
+static struct attribute *pm_qos_bandwidth_attrs[] = {
+	&dev_attr_pm_qos_bandwidth_kbps.attr,
+	NULL,
+};
+static struct attribute_group pm_qos_bandwidth_attr_group = {
+	.name	= power_group_name,
+	.attrs	= pm_qos_bandwidth_attrs,
+};
+
 static struct attribute *pm_qos_flags_attrs[] = {
 	&dev_attr_pm_qos_no_power_off.attr,
 	&dev_attr_pm_qos_remote_wakeup.attr,
@@ -697,8 +740,16 @@ int dpm_sysfs_add(struct device *dev)
 		if (rc)
 			goto err_wakeup;
 	}
+	if (dev->power.set_bandwidth) {
+		rc = sysfs_merge_group(&dev->kobj,
+				       &pm_qos_bandwidth_attr_group);
+		if (rc)
+			goto err_latency_tolerance;
+	}
 	return 0;
 
+ err_latency_tolerance:
+	sysfs_unmerge_group(&dev->kobj, &pm_qos_latency_tolerance_attr_group);
  err_wakeup:
 	sysfs_unmerge_group(&dev->kobj, &pm_wakeup_attr_group);
  err_runtime:
@@ -749,6 +800,17 @@ void pm_qos_sysfs_remove_latency_tolerance(struct device *dev)
 	sysfs_unmerge_group(&dev->kobj, &pm_qos_latency_tolerance_attr_group);
 }
 
+int pm_qos_sysfs_add_bandwidth(struct device *dev)
+{
+	return sysfs_merge_group(&dev->kobj,
+				 &pm_qos_bandwidth_attr_group);
+}
+
+void pm_qos_sysfs_remove_bandwidth(struct device *dev)
+{
+	sysfs_unmerge_group(&dev->kobj, &pm_qos_bandwidth_attr_group);
+}
+
 void rpm_sysfs_remove(struct device *dev)
 {
 	sysfs_unmerge_group(&dev->kobj, &pm_runtime_attr_group);
@@ -756,6 +818,7 @@ void rpm_sysfs_remove(struct device *dev)
 
 void dpm_sysfs_remove(struct device *dev)
 {
+	sysfs_unmerge_group(&dev->kobj, &pm_qos_bandwidth_attr_group);
 	sysfs_unmerge_group(&dev->kobj, &pm_qos_latency_tolerance_attr_group);
 	dev_pm_qos_constraints_destroy(dev);
 	rpm_sysfs_remove(dev);

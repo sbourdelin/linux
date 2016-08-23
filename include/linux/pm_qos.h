@@ -38,6 +38,9 @@ enum pm_qos_flags_status {
 #define PM_QOS_LATENCY_TOLERANCE_DEFAULT_VALUE	0
 #define PM_QOS_LATENCY_TOLERANCE_NO_CONSTRAINT	(-1)
 #define PM_QOS_LATENCY_ANY			((s32)(~(__u32)0 >> 1))
+#define PM_QOS_BANDWIDTH_DEFAULT_VALUE 0
+#define PM_QOS_BANDWIDTH_NO_CONSTRAINT (-1)
+#define PM_QOS_BANDWIDTH_ANY			((s32)(~(__u32)0 >> 1))
 
 #define PM_QOS_FLAG_NO_POWER_OFF	(1 << 0)
 #define PM_QOS_FLAG_REMOTE_WAKEUP	(1 << 1)
@@ -56,6 +59,7 @@ struct pm_qos_flags_request {
 enum dev_pm_qos_req_type {
 	DEV_PM_QOS_RESUME_LATENCY = 1,
 	DEV_PM_QOS_LATENCY_TOLERANCE,
+	DEV_PM_QOS_BANDWIDTH,
 	DEV_PM_QOS_FLAGS,
 };
 
@@ -97,9 +101,11 @@ struct pm_qos_flags {
 struct dev_pm_qos {
 	struct pm_qos_constraints resume_latency;
 	struct pm_qos_constraints latency_tolerance;
+	struct pm_qos_constraints bandwidth;
 	struct pm_qos_flags flags;
 	struct dev_pm_qos_request *resume_latency_req;
 	struct dev_pm_qos_request *latency_tolerance_req;
+	struct dev_pm_qos_request *bandwidth_req;
 	struct dev_pm_qos_request *flags_req;
 };
 
@@ -163,6 +169,10 @@ s32 dev_pm_qos_get_user_latency_tolerance(struct device *dev);
 int dev_pm_qos_update_user_latency_tolerance(struct device *dev, s32 val);
 int dev_pm_qos_expose_latency_tolerance(struct device *dev);
 void dev_pm_qos_hide_latency_tolerance(struct device *dev);
+s32 dev_pm_qos_get_user_bandwidth(struct device *dev);
+int dev_pm_qos_update_user_bandwidth(struct device *dev, s32 val);
+int dev_pm_qos_expose_bandwidth(struct device *dev);
+void dev_pm_qos_hide_bandwidth(struct device *dev);
 
 static inline s32 dev_pm_qos_requested_resume_latency(struct device *dev)
 {
@@ -235,6 +245,13 @@ static inline int dev_pm_qos_expose_latency_tolerance(struct device *dev)
 			{ return 0; }
 static inline void dev_pm_qos_hide_latency_tolerance(struct device *dev) {}
 
+static inline s32 dev_pm_qos_get_user_bandwidth(struct device *dev)
+			{ return PM_QOS_BANDWIDTH_NO_CONSTRAINT; }
+static inline int dev_pm_qos_update_user_bandwidth(struct device *dev, s32 val)
+			{ return 0; }
+static inline int dev_pm_qos_expose_bandwidth(struct device *dev)
+			{ return 0; }
+static inline void dev_pm_qos_hide_bandwidth(struct device *dev) {}
 static inline s32 dev_pm_qos_requested_resume_latency(struct device *dev) { return 0; }
 static inline s32 dev_pm_qos_requested_flags(struct device *dev) { return 0; }
 #endif
