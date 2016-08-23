@@ -1018,6 +1018,7 @@ static int mmc_switch_status(struct mmc_card *card)
  */
 static int mmc_select_hs(struct mmc_card *card)
 {
+	struct mmc_host *host = card->host;
 	int err;
 
 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
@@ -1027,6 +1028,9 @@ static int mmc_select_hs(struct mmc_card *card)
 	if (!err) {
 		mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
 		err = mmc_switch_status(card);
+	} else {
+		pr_err("%s: switch to high-speed failed, err:%d\n",
+			mmc_hostname(host), err);
 	}
 
 	return err;
@@ -1265,11 +1269,8 @@ static int mmc_select_hs400es(struct mmc_card *card)
 
 	/* Switch card to HS mode */
 	err = mmc_select_hs(card);
-	if (err) {
-		pr_err("%s: switch to high-speed failed, err:%d\n",
-			mmc_hostname(host), err);
+	if (err)
 		goto out_err;
-	}
 
 	err = mmc_switch_status(card);
 	if (err)
