@@ -208,6 +208,8 @@ static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
 	return read_cpuid(CPUID_MPIDR);
 }
 
+#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->cpuid
+
 /*
  * Intel's XScale3 core supports some v6 features (supersections, L2)
  * but advertises itself as v5 as it does not support the v6 ISA.  For
