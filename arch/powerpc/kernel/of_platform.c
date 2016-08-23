@@ -123,7 +123,14 @@ device_initcall(of_pci_phb_init);
 
 #endif /* CONFIG_PPC_OF_PLATFORM_PCI */
 
+static bool default_of_probe_enabled;
+
 bool __init arch_want_default_of_probe(void)
 {
-	return false;
+	return default_of_probe_enabled;
+}
+
+void __init arch_enable_default_of_probe(void)
+{
+	default_of_probe_enabled = true;
 }

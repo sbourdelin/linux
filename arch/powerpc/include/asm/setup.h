@@ -24,6 +24,7 @@ extern void reloc_got2(unsigned long);
 void check_for_initrd(void);
 void initmem_init(void);
 void setup_panic(void);
+extern void arch_enable_default_of_probe(void);
 #define ARCH_PANIC_TIMEOUT 180
 
 #ifdef CONFIG_PPC_PSERIES
