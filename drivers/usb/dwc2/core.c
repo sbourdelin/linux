@@ -377,14 +377,14 @@ int dwc2_core_reset(struct dwc2_hsotg *hsotg)
 	return 0;
 }
 
-/*
- * Force the mode of the controller.
+/**
+ * dwc2_force_mode() - Force the mode of the controller.
  *
  * Forcing the mode is needed for two cases:
  *
  * 1) If the dr_mode is set to either HOST or PERIPHERAL we force the
  * controller to stay in a particular mode regardless of ID pin
- * changes. We do this usually after a core reset.
+ * changes. We do this once during probe.
  *
  * 2) During probe we want to read reset values of the hw
  * configuration registers that are only available in either host or
@@ -401,7 +401,7 @@ int dwc2_core_reset(struct dwc2_hsotg *hsotg)
  * the filter is configured and enabled. We poll the current mode of
  * the controller to account for this delay.
  */
-static bool dwc2_force_mode(struct dwc2_hsotg *hsotg, bool host)
+static void dwc2_force_mode(struct dwc2_hsotg *hsotg, bool host)
 {
 	u32 gusbcfg;
 	u32 set;
@@ -413,17 +413,17 @@ static bool dwc2_force_mode(struct dwc2_hsotg *hsotg, bool host)
 	 * Force mode has no effect if the hardware is not OTG.
 	 */
 	if (!dwc2_hw_is_otg(hsotg))
-		return false;
+		return;
 
 	/*
 	 * If dr_mode is either peripheral or host only, there is no
 	 * need to ever force the mode to the opposite mode.
 	 */
 	if (WARN_ON(host && hsotg->dr_mode == USB_DR_MODE_PERIPHERAL))
-		return false;
+		return;
 
 	if (WARN_ON(!host && hsotg->dr_mode == USB_DR_MODE_HOST))
-		return false;
+		return;
 
 	gusbcfg = dwc2_readl(hsotg->regs + GUSBCFG);
 
@@ -449,6 +449,11 @@ static bool dwc2_force_mode(struct dwc2_hsotg *hsotg, bool host)
 static void dwc2_clear_force_mode(struct dwc2_hsotg *hsotg)
 {
 	u32 gusbcfg;
+
+	if (!dwc2_hw_is_otg(hsotg))
+		return;
+
+	dev_dbg(hsotg->dev, "Clearing force mode bits\n");
 
 	gusbcfg = dwc2_readl(hsotg->regs + GUSBCFG);
 	gusbcfg &= ~GUSBCFG_FORCEHOSTMODE;
@@ -479,25 +484,6 @@ void dwc2_force_dr_mode(struct dwc2_hsotg *hsotg)
 			 __func__, hsotg->dr_mode);
 		break;
 	}
-}
-
-/*
- * Do core a soft reset of the core.  Be careful with this because it
- * resets all the internal state machines of the core.
- *
- * Additionally this will apply force mode as per the hsotg->dr_mode
- * parameter.
- */
-int dwc2_core_reset_and_force_dr_mode(struct dwc2_hsotg *hsotg)
-{
-	int retval;
-
-	retval = dwc2_core_reset(hsotg);
-	if (retval)
-		return retval;
-
-	dwc2_force_dr_mode(hsotg);
-	return 0;
 }
 
 /**
@@ -1419,22 +1405,6 @@ void dwc2_set_parameters(struct dwc2_hsotg *hsotg,
 }
 
 /*
- * Forces either host or device mode if the controller is not
- * currently in that mode.
- *
- * Returns true if the mode was forced.
- */
-static bool dwc2_force_mode_if_needed(struct dwc2_hsotg *hsotg, bool host)
-{
-	if (host && dwc2_is_host_mode(hsotg))
-		return false;
-	else if (!host && dwc2_is_device_mode(hsotg))
-		return false;
-
-	return dwc2_force_mode(hsotg, host);
-}
-
-/*
  * Gets host hardware parameters. Forces host mode if not currently in
  * host mode. Should be called immediately after a core soft reset in
  * order to get the reset values.
@@ -1444,20 +1414,16 @@ static void dwc2_get_host_hwparams(struct dwc2_hsotg *hsotg)
 	struct dwc2_hw_params *hw = &hsotg->hw_params;
 	u32 gnptxfsiz;
 	u32 hptxfsiz;
-	bool forced;
 
 	if (hsotg->dr_mode == USB_DR_MODE_PERIPHERAL)
 		return;
 
-	forced = dwc2_force_mode_if_needed(hsotg, true);
+	dwc2_force_mode(hsotg, true);
 
 	gnptxfsiz = dwc2_readl(hsotg->regs + GNPTXFSIZ);
 	hptxfsiz = dwc2_readl(hsotg->regs + HPTXFSIZ);
 	dev_dbg(hsotg->dev, "gnptxfsiz=%08x\n", gnptxfsiz);
 	dev_dbg(hsotg->dev, "hptxfsiz=%08x\n", hptxfsiz);
-
-	if (forced)
-		dwc2_clear_force_mode(hsotg);
 
 	hw->host_nperio_tx_fifo_size = (gnptxfsiz & FIFOSIZE_DEPTH_MASK) >>
 				       FIFOSIZE_DEPTH_SHIFT;
@@ -1473,19 +1439,15 @@ static void dwc2_get_host_hwparams(struct dwc2_hsotg *hsotg)
 static void dwc2_get_dev_hwparams(struct dwc2_hsotg *hsotg)
 {
 	struct dwc2_hw_params *hw = &hsotg->hw_params;
-	bool forced;
 	u32 gnptxfsiz;
 
 	if (hsotg->dr_mode == USB_DR_MODE_HOST)
 		return;
 
-	forced = dwc2_force_mode_if_needed(hsotg, false);
+	dwc2_force_mode(hsotg, false);
 
 	gnptxfsiz = dwc2_readl(hsotg->regs + GNPTXFSIZ);
 	dev_dbg(hsotg->dev, "gnptxfsiz=%08x\n", gnptxfsiz);
-
-	if (forced)
-		dwc2_clear_force_mode(hsotg);
 
 	hw->dev_nperio_tx_fifo_size = (gnptxfsiz & FIFOSIZE_DEPTH_MASK) >>
 				       FIFOSIZE_DEPTH_SHIFT;

@@ -568,7 +568,9 @@ static int dwc2_driver_probe(struct platform_device *dev)
 	 * Reset before dwc2_get_hwparams() then it could get power-on real
 	 * reset value form registers.
 	 */
-	dwc2_core_reset_and_force_dr_mode(hsotg);
+	retval = dwc2_core_reset(hsotg);
+	if (retval)
+		goto error;
 
 	/* Detect config values from hardware */
 	retval = dwc2_get_hwparams(hsotg);
@@ -578,6 +580,11 @@ static int dwc2_driver_probe(struct platform_device *dev)
 	/* Validate parameter values */
 	dwc2_set_parameters(hsotg, params);
 
+	/*
+	 * For OTG cores, set the force mode bits to reflect the value
+	 * of dr_mode. Force mode bits should not be touched at any
+	 * other time after this.
+	 */
 	dwc2_force_dr_mode(hsotg);
 
 	if (hsotg->dr_mode != USB_DR_MODE_HOST) {
