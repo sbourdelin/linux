@@ -90,6 +90,7 @@ static const struct xhci_plat_priv xhci_plat_marvell_armada = {
 
 XHCI_PLAT_RENESAS_RCAR_PRIV(gen2, XHCI_RCAR_FIRMWARE_NAME_V1);
 XHCI_PLAT_RENESAS_RCAR_PRIV(gen3, XHCI_RCAR_FIRMWARE_NAME_V2);
+XHCI_PLAT_RENESAS_RCAR_PRIV(r8a7796, XHCI_RCAR_FIRMWARE_NAME_V3);
 
 static const struct of_device_id usb_xhci_of_match[] = {
 	{
@@ -114,6 +115,9 @@ static const struct of_device_id usb_xhci_of_match[] = {
 	}, {
 		.compatible = "renesas,xhci-r8a7795",
 		.data = &xhci_plat_renesas_rcar_gen3,
+	}, {
+		.compatible = "renesas,xhci-r8a7796",
+		.data = &xhci_plat_renesas_rcar_r8a7796,
 	}, {
 		.compatible = "renesas,rcar-gen2-xhci",
 		.data = &xhci_plat_renesas_rcar_gen2,
