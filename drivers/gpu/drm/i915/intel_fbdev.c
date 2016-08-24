@@ -138,13 +138,16 @@ static int intelfb_alloc(struct drm_fb_helper *helper,
 
 	mode_cmd.pitches[0] = ALIGN(mode_cmd.width *
 				    DIV_ROUND_UP(sizes->surface_bpp, 8), 64);
+	if (i915.enable_fbc)
+		mode_cmd.pitches[0] = ALIGN(mode_cmd.pitches[0], 512);
+
 	mode_cmd.pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
 							  sizes->surface_depth);
 
-	mutex_lock(&dev->struct_mutex);
-
 	size = mode_cmd.pitches[0] * mode_cmd.height;
 	size = PAGE_ALIGN(size);
+
+	mutex_lock(&dev->struct_mutex);
 
 	/* If the FB is too big, just don't use it since fbdev is not very
 	 * important and we should probably use that space with FBC or other
@@ -157,6 +160,12 @@ static int intelfb_alloc(struct drm_fb_helper *helper,
 		DRM_ERROR("failed to allocate framebuffer\n");
 		ret = PTR_ERR(obj);
 		goto out;
+	}
+
+	if (i915.enable_fbc) {
+		obj->tiling_and_stride = mode_cmd.pitches[0] | I915_TILING_X;
+		mode_cmd.modifier[0] = I915_FORMAT_MOD_X_TILED;
+		mode_cmd.flags |= DRM_MODE_FB_MODIFIERS;
 	}
 
 	fb = __intel_framebuffer_create(dev, &mode_cmd, obj);
