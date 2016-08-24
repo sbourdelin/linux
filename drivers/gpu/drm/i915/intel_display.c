@@ -2700,7 +2700,7 @@ intel_alloc_initial_plane_obj(struct intel_crtc *crtc,
 		return false;
 	}
 
-	if (plane_config->tiling == I915_TILING_X)
+	if (fb->modifier[0] == I915_FORMAT_MOD_X_TILED)
 		obj->tiling_and_stride = fb->pitches[0] | I915_TILING_X;
 
 	mode_cmd.pixel_format = fb->pixel_format;
@@ -8727,12 +8727,8 @@ i9xx_get_initial_plane_config(struct intel_crtc *crtc,
 
 	fb = &intel_fb->base;
 
-	if (INTEL_INFO(dev)->gen >= 4) {
-		if (val & DISPPLANE_TILED) {
-			plane_config->tiling = I915_TILING_X;
-			fb->modifier[0] = I915_FORMAT_MOD_X_TILED;
-		}
-	}
+	if (INTEL_GEN(dev) >= 4 && val & DISPPLANE_TILED)
+		fb->modifier[0] = I915_FORMAT_MOD_X_TILED;
 
 	pixel_format = val & DISPPLANE_PIXFORMAT_MASK;
 	fourcc = i9xx_format_to_fourcc(pixel_format);
@@ -8740,7 +8736,7 @@ i9xx_get_initial_plane_config(struct intel_crtc *crtc,
 	fb->bits_per_pixel = drm_format_plane_cpp(fourcc, 0) * 8;
 
 	if (INTEL_INFO(dev)->gen >= 4) {
-		if (plane_config->tiling)
+		if (fb->modifier[0] == I915_FORMAT_MOD_X_TILED)
 			offset = I915_READ(DSPTILEOFF(plane));
 		else
 			offset = I915_READ(DSPLINOFF(plane));
@@ -9753,7 +9749,6 @@ skylake_get_initial_plane_config(struct intel_crtc *crtc,
 		fb->modifier[0] = DRM_FORMAT_MOD_NONE;
 		break;
 	case PLANE_CTL_TILED_X:
-		plane_config->tiling = I915_TILING_X;
 		fb->modifier[0] = I915_FORMAT_MOD_X_TILED;
 		break;
 	case PLANE_CTL_TILED_Y:
@@ -9848,12 +9843,8 @@ ironlake_get_initial_plane_config(struct intel_crtc *crtc,
 
 	fb = &intel_fb->base;
 
-	if (INTEL_INFO(dev)->gen >= 4) {
-		if (val & DISPPLANE_TILED) {
-			plane_config->tiling = I915_TILING_X;
-			fb->modifier[0] = I915_FORMAT_MOD_X_TILED;
-		}
-	}
+	if (INTEL_GEN(dev) >= 4 && val & DISPPLANE_TILED)
+		fb->modifier[0] = I915_FORMAT_MOD_X_TILED;
 
 	pixel_format = val & DISPPLANE_PIXFORMAT_MASK;
 	fourcc = i9xx_format_to_fourcc(pixel_format);
@@ -9864,7 +9855,7 @@ ironlake_get_initial_plane_config(struct intel_crtc *crtc,
 	if (IS_HASWELL(dev) || IS_BROADWELL(dev)) {
 		offset = I915_READ(DSPOFFSET(pipe));
 	} else {
-		if (plane_config->tiling)
+		if (fb->modifier[0] == I915_FORMAT_MOD_X_TILED)
 			offset = I915_READ(DSPTILEOFF(pipe));
 		else
 			offset = I915_READ(DSPLINOFF(pipe));
