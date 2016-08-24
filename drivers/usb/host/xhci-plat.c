@@ -88,17 +88,8 @@ static const struct xhci_plat_priv xhci_plat_marvell_armada = {
 	.init_quirk = xhci_mvebu_mbus_init_quirk,
 };
 
-static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen2 = {
-	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V1,
-	.init_quirk = xhci_rcar_init_quirk,
-	.plat_start = xhci_rcar_start,
-};
-
-static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen3 = {
-	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V2,
-	.init_quirk = xhci_rcar_init_quirk,
-	.plat_start = xhci_rcar_start,
-};
+XHCI_PLAT_RENESAS_RCAR_PRIV(gen2, XHCI_RCAR_FIRMWARE_NAME_V1);
+XHCI_PLAT_RENESAS_RCAR_PRIV(gen3, XHCI_RCAR_FIRMWARE_NAME_V2);
 
 static const struct of_device_id usb_xhci_of_match[] = {
 	{
