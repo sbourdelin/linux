@@ -349,17 +349,13 @@ static void setup_pci_atmu(struct pci_controller *hose)
 	}
 
 	sz = min(mem, paddr_lo);
-	mem_log = ilog2(sz);
+	mem_log = order_base_2(sz);
 
 	/* PCIe can overmap inbound & outbound since RX & TX are separated */
 	if (early_find_capability(hose, 0, 0, PCI_CAP_ID_EXP)) {
-		/* Size window to exact size if power-of-two or one size up */
-		if ((1ull << mem_log) != mem) {
-			mem_log++;
-			if ((1ull << mem_log) > mem)
-				pr_info("%s: Setting PCI inbound window "
-					"greater than memory size\n", name);
-		}
+		if ((1ull << mem_log) > mem)
+			pr_info("%s: Setting PCI inbound window greater than memory size\n",
+				name);
 
 		piwar |= ((mem_log - 1) & PIWAR_SZ_MASK);
 
@@ -379,23 +375,27 @@ static void setup_pci_atmu(struct pci_controller *hose)
 		 * let devices that are 64-bit address capable to work w/o
 		 * SWIOTLB and access the full range of memory
 		 */
-		if (sz != mem) {
-			mem_log = ilog2(mem);
-
-			/* Size window up if we dont fit in exact power-of-2 */
-			if ((1ull << mem_log) != mem)
-				mem_log++;
-
+		if (mem > 0x100000000ULL) {
+			/* ok we mapped 4G in WIN1, now lets see how much memory
+			 * is left un-mapped and calculate the log, also
+			 * make sure we dont have a window lager then 64G
+			 */
+			mem_log = order_base_2(min(mem - sz, 1ULL << 36));
 			piwar = (piwar & ~PIWAR_SZ_MASK) | (mem_log - 1);
 
 			if (setup_inbound) {
-				/* Setup inbound memory window */
-				out_be32(&pci->piw[win_idx].pitar,  0x00000000);
+				/* Setup inbound memory window
+				 * The windows starts at 4G and spans all the
+				 * remaining memory aka (mem - 4G)
+				 */
+				out_be32(&pci->piw[win_idx].pitar,
+					 0x00000000);
 				out_be32(&pci->piw[win_idx].piwbear,
-						pci64_dma_offset >> 44);
+					 0x00000000);
 				out_be32(&pci->piw[win_idx].piwbar,
-						pci64_dma_offset >> 12);
-				out_be32(&pci->piw[win_idx].piwar,  piwar);
+					 0x100000000ULL >> 12);
+				out_be32(&pci->piw[win_idx].piwar,
+					 piwar);
 			}
 
 			/*
