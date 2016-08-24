@@ -2700,8 +2700,15 @@ intel_alloc_initial_plane_obj(struct intel_crtc *crtc,
 		return false;
 	}
 
-	if (fb->modifier[0] == I915_FORMAT_MOD_X_TILED)
-		obj->tiling_and_stride = fb->pitches[0] | I915_TILING_X;
+	if (fb->modifier[0]) {
+		obj->tiling_and_stride = fb->pitches[0];
+		if (fb->modifier[0] == I915_FORMAT_MOD_X_TILED)
+			obj->tiling_and_stride |= I915_TILING_X;
+		else if (fb->modifier[0] == I915_FORMAT_MOD_Y_TILED)
+			obj->tiling_and_stride |= I915_TILING_Y;
+		else
+			obj->tiling_and_stride = 0; /* unfenced tiling mode */
+	}
 
 	mode_cmd.pixel_format = fb->pixel_format;
 	mode_cmd.width = fb->width;
