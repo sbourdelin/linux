@@ -67,6 +67,12 @@ config RESET_SUNXI
 	help
 	  This enables the reset driver for Allwinner SoCs.
 
+config RESET_ZYNQ
+	bool "ZYNQ Reset Driver" if COMPILE_TEST
+	default ARCH_ZYNQ
+	help
+	  This enables the reset driver for Xilinx Zynq FPGAs.
+
 config TI_SYSCON_RESET
 	tristate "TI SYSCON Reset Driver"
 	depends on HAS_IOMEM
