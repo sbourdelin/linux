@@ -8,6 +8,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/dax.h>
 #include <linux/gfp.h>
 #include <linux/export.h>
 #include <linux/blkdev.h>
@@ -543,6 +544,9 @@ do_readahead(struct address_space *mapping, struct file *filp,
 {
 	if (!mapping || !mapping->a_ops)
 		return -EINVAL;
+
+	if (dax_mapping(mapping))
+		return 0;
 
 	return force_page_cache_readahead(mapping, filp, index, nr);
 }
