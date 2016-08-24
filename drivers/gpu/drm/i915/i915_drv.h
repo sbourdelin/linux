@@ -3792,8 +3792,8 @@ __raw_write(64, q)
  * critical sections inside IRQ handlers where forcewake is explicitly
  * controlled.
  * Think twice, and think again, before using these.
- * Note: Should only be used between intel_uncore_forcewake_irqlock() and
- * intel_uncore_forcewake_irqunlock().
+ * Note: Should only be used between intel_uncore_forcewake_get and
+ * intel_uncore_forcewake_put.
  */
 #define I915_READ_FW(reg__) __raw_i915_read32(dev_priv, (reg__))
 #define I915_WRITE_FW(reg__, val__) __raw_i915_write32(dev_priv, (reg__), (val__))
