@@ -21,6 +21,10 @@ Required Properties:
   - interrupts: Interrupt specifier
   - interrupt-parent: Phandle for the interrupt controller that services
 		      interrupts for this device.
+Optional Properties:
+- fake-cd: On Zynq Devices the SDHCI Controller will not work without the cd
+  bit. When this option is set the driver will put the controller in test mode
+  and fake the cd bit so it will function.
 
 Required Properties for "arasan,sdhci-5.1":
   - phys: From PHY bindings: Phandle for the Generic PHY for arasan.
