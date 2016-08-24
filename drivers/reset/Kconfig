@@ -34,6 +34,12 @@ config RESET_LPC18XX
 	  This enables the LPC18xx/43 reset driver that supports the reset
 	  controllers on AR71xx SoCs.
 
+config RESET_MESON
+	bool "Meson Reset Driver" if COMPILE_TEST
+	default ARCH_MESON
+	help
+	  This enables the reset driver for Amlogic Meson SoCs.
+
 config RESET_OXNAS
 	bool
 
