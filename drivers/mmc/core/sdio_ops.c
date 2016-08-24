@@ -129,8 +129,6 @@ int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
 	unsigned int nents, left_size, i;
 	unsigned int seg_size = card->host->max_seg_size;
 
-	BUG_ON(!card);
-	BUG_ON(fn > 7);
 	WARN_ON(blksz == 0);
 
 	/* sanity check */
