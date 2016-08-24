@@ -132,6 +132,8 @@ struct samsung_pin_bank_data {
 	u32		eint_mask;
 	u32		eint_offset;
 	const char	*name;
+	unsigned int	pctl_res_idx;
+	unsigned int	eint_res_idx;
 };
 
 /**
@@ -164,6 +166,8 @@ struct samsung_pin_bank {
 	u32		eint_mask;
 	u32		eint_offset;
 	const char	*name;
+	unsigned int	pctl_res_idx;
+	unsigned int	eint_res_idx;
 
 	u32		pin_base;
 	void		*soc_priv;
@@ -190,6 +194,7 @@ struct samsung_pin_bank {
 struct samsung_pin_ctrl {
 	const struct samsung_pin_bank_data *pin_banks;
 	u32		nr_banks;
+	u32		nr_ext_resources;
 
 	int		(*eint_gpio_init)(struct samsung_pinctrl_drv_data *);
 	int		(*eint_wkup_init)(struct samsung_pinctrl_drv_data *);
@@ -215,7 +220,7 @@ struct samsung_pin_ctrl {
  */
 struct samsung_pinctrl_drv_data {
 	struct list_head		node;
-	void __iomem			*virt_base;
+	void __iomem			**virt_base;
 	struct device			*dev;
 	int				irq;
 

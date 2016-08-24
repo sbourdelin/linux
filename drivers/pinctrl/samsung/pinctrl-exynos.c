@@ -65,12 +65,13 @@ static void exynos_irq_mask(struct irq_data *irqd)
 	unsigned long reg_mask = our_chip->eint_mask + bank->eint_offset;
 	unsigned long mask;
 	unsigned long flags;
+	unsigned int eint_res_idx = bank->eint_res_idx;
 
 	spin_lock_irqsave(&bank->slock, flags);
 
-	mask = readl(d->virt_base + reg_mask);
+	mask = readl(d->virt_base[eint_res_idx] + reg_mask);
 	mask |= 1 << irqd->hwirq;
-	writel(mask, d->virt_base + reg_mask);
+	writel(mask, d->virt_base[eint_res_idx] + reg_mask);
 
 	spin_unlock_irqrestore(&bank->slock, flags);
 }
@@ -82,8 +83,9 @@ static void exynos_irq_ack(struct irq_data *irqd)
 	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
 	struct samsung_pinctrl_drv_data *d = bank->drvdata;
 	unsigned long reg_pend = our_chip->eint_pend + bank->eint_offset;
+	unsigned int eint_res_idx = bank->eint_res_idx;
 
-	writel(1 << irqd->hwirq, d->virt_base + reg_pend);
+	writel(1 << irqd->hwirq, d->virt_base[eint_res_idx] + reg_pend);
 }
 
 static void exynos_irq_unmask(struct irq_data *irqd)
@@ -95,6 +97,7 @@ static void exynos_irq_unmask(struct irq_data *irqd)
 	unsigned long reg_mask = our_chip->eint_mask + bank->eint_offset;
 	unsigned long mask;
 	unsigned long flags;
+	unsigned int eint_res_idx = bank->eint_res_idx;
 
 	/*
 	 * Ack level interrupts right before unmask
@@ -109,9 +112,9 @@ static void exynos_irq_unmask(struct irq_data *irqd)
 
 	spin_lock_irqsave(&bank->slock, flags);
 
-	mask = readl(d->virt_base + reg_mask);
+	mask = readl(d->virt_base[eint_res_idx] + reg_mask);
 	mask &= ~(1 << irqd->hwirq);
-	writel(mask, d->virt_base + reg_mask);
+	writel(mask, d->virt_base[eint_res_idx] + reg_mask);
 
 	spin_unlock_irqrestore(&bank->slock, flags);
 }
@@ -125,6 +128,7 @@ static int exynos_irq_set_type(struct irq_data *irqd, unsigned int type)
 	unsigned int shift = EXYNOS_EINT_CON_LEN * irqd->hwirq;
 	unsigned int con, trig_type;
 	unsigned long reg_con = our_chip->eint_con + bank->eint_offset;
+	unsigned int eint_res_idx = bank->eint_res_idx;
 
 	switch (type) {
 	case IRQ_TYPE_EDGE_RISING:
@@ -152,10 +156,10 @@ static int exynos_irq_set_type(struct irq_data *irqd, unsigned int type)
 	else
 		irq_set_handler_locked(irqd, handle_level_irq);
 
-	con = readl(d->virt_base + reg_con);
+	con = readl(d->virt_base[eint_res_idx] + reg_con);
 	con &= ~(EXYNOS_EINT_CON_MASK << shift);
 	con |= trig_type << shift;
-	writel(con, d->virt_base + reg_con);
+	writel(con, d->virt_base[eint_res_idx] + reg_con);
 
 	return 0;
 }
@@ -169,6 +173,7 @@ static int exynos_irq_request_resources(struct irq_data *irqd)
 	struct samsung_pinctrl_drv_data *d = bank->drvdata;
 	unsigned int shift = EXYNOS_EINT_CON_LEN * irqd->hwirq;
 	unsigned long reg_con = our_chip->eint_con + bank->eint_offset;
+	unsigned int eint_res_idx = bank->eint_res_idx;
 	unsigned long flags;
 	unsigned int mask;
 	unsigned int con;
@@ -188,10 +193,10 @@ static int exynos_irq_request_resources(struct irq_data *irqd)
 
 	spin_lock_irqsave(&bank->slock, flags);
 
-	con = readl(d->virt_base + reg_con);
+	con = readl(d->virt_base[eint_res_idx] + reg_con);
 	con &= ~(mask << shift);
 	con |= EXYNOS_EINT_FUNC << shift;
-	writel(con, d->virt_base + reg_con);
+	writel(con, d->virt_base[eint_res_idx] + reg_con);
 
 	spin_unlock_irqrestore(&bank->slock, flags);
 
@@ -209,6 +214,7 @@ static void exynos_irq_release_resources(struct irq_data *irqd)
 	struct samsung_pinctrl_drv_data *d = bank->drvdata;
 	unsigned int shift = EXYNOS_EINT_CON_LEN * irqd->hwirq;
 	unsigned long reg_con = our_chip->eint_con + bank->eint_offset;
+	unsigned int eint_res_idx = bank->eint_res_idx;
 	unsigned long flags;
 	unsigned int mask;
 	unsigned int con;
@@ -221,10 +227,10 @@ static void exynos_irq_release_resources(struct irq_data *irqd)
 
 	spin_lock_irqsave(&bank->slock, flags);
 
-	con = readl(d->virt_base + reg_con);
+	con = readl(d->virt_base[eint_res_idx] + reg_con);
 	con &= ~(mask << shift);
 	con |= FUNC_INPUT << shift;
-	writel(con, d->virt_base + reg_con);
+	writel(con, d->virt_base[eint_res_idx] + reg_con);
 
 	spin_unlock_irqrestore(&bank->slock, flags);
 
@@ -272,9 +278,10 @@ static irqreturn_t exynos_eint_gpio_irq(int irq, void *data)
 {
 	struct samsung_pinctrl_drv_data *d = data;
 	struct samsung_pin_bank *bank = d->pin_banks;
+	unsigned int eint_res_idx = bank->eint_res_idx;
 	unsigned int svc, group, pin, virq;
 
-	svc = readl(d->virt_base + EXYNOS_SVC_OFFSET);
+	svc = readl(d->virt_base[eint_res_idx] + EXYNOS_SVC_OFFSET);
 	group = EXYNOS_SVC_GROUP(svc);
 	pin = svc & EXYNOS_SVC_NUM_MASK;
 
@@ -465,10 +472,11 @@ static void exynos_irq_demux_eint16_31(struct irq_desc *desc)
 
 	for (i = 0; i < eintd->nr_banks; ++i) {
 		struct samsung_pin_bank *b = eintd->banks[i];
-		pend = readl(d->virt_base + b->irq_chip->eint_pend
-				+ b->eint_offset);
-		mask = readl(d->virt_base + b->irq_chip->eint_mask
-				+ b->eint_offset);
+		unsigned int eint_res_idx = b->eint_res_idx;
+		pend = readl(d->virt_base[eint_res_idx]
+				+ b->irq_chip->eint_pend + b->eint_offset);
+		mask = readl(d->virt_base[eint_res_idx]
+				+ b->irq_chip->eint_mask + b->eint_offset);
 		exynos_irq_demux_eint(pend & ~mask, b->irq_domain);
 	}
 
@@ -585,7 +593,8 @@ static void exynos_pinctrl_suspend_bank(
 				struct samsung_pin_bank *bank)
 {
 	struct exynos_eint_gpio_save *save = bank->soc_priv;
-	void __iomem *regs = drvdata->virt_base;
+	unsigned int eint_res_idx = bank->eint_res_idx;
+	void __iomem *regs = drvdata->virt_base[eint_res_idx];
 
 	save->eint_con = readl(regs + EXYNOS_GPIO_ECON_OFFSET
 						+ bank->eint_offset);
@@ -614,7 +623,8 @@ static void exynos_pinctrl_resume_bank(
 				struct samsung_pin_bank *bank)
 {
 	struct exynos_eint_gpio_save *save = bank->soc_priv;
-	void __iomem *regs = drvdata->virt_base;
+	unsigned int eint_res_idx = bank->eint_res_idx;
+	void __iomem *regs = drvdata->virt_base[eint_res_idx];
 
 	pr_debug("%s:     con %#010x => %#010x\n", bank->name,
 			readl(regs + EXYNOS_GPIO_ECON_OFFSET

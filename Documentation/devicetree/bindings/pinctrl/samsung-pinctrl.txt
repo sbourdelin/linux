@@ -94,6 +94,11 @@ Required Properties:
   pin configuration should use the bindings listed in the "pinctrl-bindings.txt"
   file.
 
+Optional Properties:
+- reg: Second base address of the pin controller hardware module and length of
+  the address space it occupies if the specific register of the pin controller
+  are located in the different base address.
+
 External GPIO and Wakeup Interrupts:
 
 The controller supports two types of external interrupts over gpio. The first
@@ -302,6 +307,18 @@ Example 2: A pin-controller node with external wakeup interrupt controller node.
 			compatible = "samsung,exynos4210-wakeup-eint";
 			interrupt-parent = <&gic>;
 			interrupts = <0 32 0>;
+		};
+	};
+
+	- A pin-controller node with multiple base address.
+
+	pinctrl_0: pinctrl@10580000 {
+		compatible = "samsung,exynos5433-pinctrl";
+		reg = <0x10580000 0x1a20>, <0x11090000 0x100>;
+
+		wakeup-interrupt-controller {
+			compatible = "samsung,exynos7-wakeup-eint";
+			interrupts = <0 16 0>;
 		};
 	};
 
