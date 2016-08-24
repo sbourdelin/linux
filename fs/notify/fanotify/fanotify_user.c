@@ -193,6 +193,10 @@ static int process_access_response(struct fsnotify_group *group,
 	if (!event)
 		return -ENOENT;
 
+	/*
+	 * Make sure the dequeue is preceived before the store of "response"
+	 */
+	smp_wmb();
 	event->response = response;
 	wake_up(&group->fanotify_data.access_waitq);
 
@@ -305,6 +309,11 @@ static ssize_t fanotify_read(struct file *file, char __user *buf,
 		} else {
 #ifdef CONFIG_FANOTIFY_ACCESS_PERMISSIONS
 			if (ret < 0) {
+				/*
+				 * Make sure the dequeue is preceived before
+				 * the store of "response"
+				 */
+				smp_wmb();
 				FANOTIFY_PE(kevent)->response = FAN_DENY;
 				wake_up(&group->fanotify_data.access_waitq);
 				break;
@@ -365,26 +374,34 @@ static int fanotify_release(struct inode *ignored, struct file *file)
 	 * enter or leave access_list by now.
 	 */
 	spin_lock(&group->fanotify_data.access_lock);
-
-	atomic_inc(&group->fanotify_data.bypass_perm);
-
 	list_for_each_entry_safe(event, next, &group->fanotify_data.access_list,
 				 fae.fse.list) {
 		pr_debug("%s: found group=%p event=%p\n", __func__, group,
 			 event);
 
 		list_del_init(&event->fae.fse.list);
+		/*
+		 * Make sure the dequeue is preceived before the store of
+		 * "response"
+		 */
+		smp_wmb();
 		event->response = FAN_ALLOW;
 	}
 	spin_unlock(&group->fanotify_data.access_lock);
 
 	/*
-	 * Since bypass_perm is set, newly queued events will not wait for
+	 * After bypass_perm is set, newly queued events will not wait for
 	 * access response. Wake up the already sleeping ones now.
+	 *
+	 * Make sure we do this only *after* all events were taken off
+	 * group->fanotify_data.access_list, otherwise the entry might be
+	 * deleted concurrently by two entities, resulting in list corruption.
+	 *
 	 * synchronize_srcu() in fsnotify_destroy_group() will wait for all
 	 * processes sleeping in fanotify_handle_event() waiting for access
 	 * response and thus also for all permission events to be freed.
 	 */
+	atomic_inc(&group->fanotify_data.bypass_perm);
 	wake_up(&group->fanotify_data.access_waitq);
 #endif
 

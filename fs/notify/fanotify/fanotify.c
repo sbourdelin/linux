@@ -70,6 +70,11 @@ static int fanotify_get_response(struct fsnotify_group *group,
 	wait_event(group->fanotify_data.access_waitq, event->response ||
 				atomic_read(&group->fanotify_data.bypass_perm));
 
+	/*
+	 * Pairs with smp_wmb() before storing event->response.  This makes sure
+	 * that the list_del_init() done on the event is preceived after this.
+	 */
+	smp_rmb();
 	if (!event->response) {	/* bypass_perm set */
 		/*
 		 * Event was canceled because group is being destroyed. Remove
