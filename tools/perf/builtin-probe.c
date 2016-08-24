@@ -602,6 +602,12 @@ __cmd_probe(int argc, const char **argv, const char *prefix __maybe_unused)
 	 */
 	symbol_conf.try_vmlinux_path = (symbol_conf.vmlinux_name == NULL);
 
+	/* If user gives output directory and offline vmlinux, ignore buildid */
+	if (probe_conf.output_dir && symbol_conf.vmlinux_name &&
+	    strcmp(probe_conf.output_dir, tracing_path) != 0) {
+		symbol_conf.ignore_vmlinux_buildid = true;
+	}
+
 	switch (params.command) {
 	case 'l':
 		if (params.uprobes) {
