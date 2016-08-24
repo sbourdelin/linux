@@ -60,6 +60,10 @@ module_param(fs_enet_debug, int, 0);
 MODULE_PARM_DESC(fs_enet_debug,
 		 "Freescale bitmapped debugging message enable value");
 
+static int rx_copybreak = 240;
+module_param(rx_copybreak, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(rx_copybreak, "Receive copy threshold");
+
 #ifdef CONFIG_NET_POLL_CONTROLLER
 static void fs_enet_netpoll(struct net_device *dev);
 #endif
@@ -84,7 +88,6 @@ static int fs_enet_napi(struct napi_struct *napi, int budget)
 {
 	struct fs_enet_private *fep = container_of(napi, struct fs_enet_private, napi);
 	struct net_device *dev = fep->ndev;
-	const struct fs_platform_info *fpi = fep->fpi;
 	cbd_t __iomem *bdp;
 	struct sk_buff *skb, *skbn;
 	int received = 0;
@@ -232,7 +235,7 @@ static int fs_enet_napi(struct napi_struct *napi, int budget)
 			pkt_len = CBDR_DATLEN(bdp) - 4;	/* remove CRC */
 			fep->stats.rx_bytes += pkt_len + 4;
 
-			if (pkt_len <= fpi->rx_copybreak) {
+			if (pkt_len <= rx_copybreak) {
 				/* +2 to make IP header L1 cache aligned */
 				skbn = netdev_alloc_skb(dev, pkt_len + 2);
 				if (skbn != NULL) {
@@ -905,7 +908,6 @@ static int fs_enet_probe(struct platform_device *ofdev)
 
 	fpi->rx_ring = 32;
 	fpi->tx_ring = 64;
-	fpi->rx_copybreak = 240;
 	fpi->napi_weight = 17;
 	fpi->phy_node = of_parse_phandle(ofdev->dev.of_node, "phy-handle", 0);
 	if (!fpi->phy_node && of_phy_is_fixed_link(ofdev->dev.of_node)) {
