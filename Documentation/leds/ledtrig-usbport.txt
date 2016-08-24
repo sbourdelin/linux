@@ -1,0 +1,49 @@
+USB port LED trigger
+====================
+
+This LED trigger can be used for signalling to the user a presence of USB device
+in a given port. It simply turns on LED when device appears and turns it off
+when it disappears.
+
+It requires specifying a list of USB ports that should be observed. Used format
+matches Linux kernel format and consists of a root hub number and a hub port
+separated by a dash (e.g. 3-1).
+
+It is also possible to handle devices with internal hubs (that are always
+connected to the root hub). User can simply specify internal hub ports then
+(e.g. 1-1.1, 1-1.2, etc.).
+
+Please note that this trigger allows assigning multiple USB ports to a single
+LED. This can be useful in two cases:
+
+1) Device with single USB LED and few physical ports
+
+In such a case LED will be turned on as long as there is at least one connected
+USB device.
+
+2) Device with a physical port handled by few controllers
+
+Some devices have e.g. one controller per PHY standard. E.g. USB 3.0 physical
+port may be handled by ohci-platform, ehci-platform and xhci-hcd. If there is
+only one LED user will most likely want to assign ports from all 3 hubs.
+
+
+This trigger can be activated from user space on led class devices as shown
+below:
+
+  echo usbport > trigger
+
+This adds the following sysfs attributes to the LED:
+
+  ports - Reading it lists all USB ports assigned to the trigger. Writing USB
+	  port number to it will make this driver start observing it. It's also
+	  possible to remove USB port from observable list by writing it with a
+	  "-" prefix.
+
+Example use-case:
+
+  echo usbport > trigger
+  echo 4-1 > ports
+  echo 2-1 > ports
+  echo -4-1 > ports
+  cat ports
