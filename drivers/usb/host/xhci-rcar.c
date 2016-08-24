@@ -19,13 +19,20 @@
 #include "xhci-rcar.h"
 
 /*
-* - The V2 firmware is possible to use on R-Car Gen2. However, the V2 causes
-*   performance degradation. So, this driver continues to use the V1 if R-Car
-*   Gen2.
-* - The V1 firmware is impossible to use on R-Car Gen3.
-*/
+ *	   |	Gen2	r8a7795	r8a7796
+ *	---+----------------------------
+ *	V3 |	note1	NG	OK
+ *	V2 |	note1	OK	note1
+ *	V1 |	OK	NG	NG
+ *
+ * Gen2: r8a7790, r8a7791 and r8a7793
+ * OK: This firmware version works correctly on such SoC(s)
+ * NG: This firmware version is impossible to use on such SoC(s)
+ * note1: This firmware version causes performance degradation.
+ */
 MODULE_FIRMWARE(XHCI_RCAR_FIRMWARE_NAME_V1);
 MODULE_FIRMWARE(XHCI_RCAR_FIRMWARE_NAME_V2);
+MODULE_FIRMWARE(XHCI_RCAR_FIRMWARE_NAME_V3);
 
 /*** Register Offset ***/
 #define RCAR_USB3_INT_ENA	0x224	/* Interrupt Enable */
