@@ -385,7 +385,7 @@ static const struct of_device_id uniphier_reset_match[] = {
 };
 MODULE_DEVICE_TABLE(of, uniphier_reset_match);
 
-int uniphier_reset_probe(struct platform_device *pdev)
+static int uniphier_reset_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	const struct of_device_id *match;
