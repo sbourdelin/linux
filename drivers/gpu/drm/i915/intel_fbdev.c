@@ -45,6 +45,19 @@
 #include <drm/i915_drm.h>
 #include "i915_drv.h"
 
+static void intel_fbdev_invalidate(struct intel_fbdev *ifbdev)
+{
+	struct drm_device *dev = ifbdev->helper.dev;
+	struct drm_i915_gem_object *obj = ifbdev->fb->obj;
+	unsigned int origin;
+
+	origin = i915_gem_object_is_tiled(obj) ? ORIGIN_GTT : ORIGIN_CPU;
+
+	mutex_lock(&dev->struct_mutex);
+	intel_fb_obj_invalidate(obj, origin);
+	mutex_unlock(&dev->struct_mutex);
+}
+
 static int intel_fbdev_set_par(struct fb_info *info)
 {
 	struct drm_fb_helper *fb_helper = info->par;
@@ -53,12 +66,8 @@ static int intel_fbdev_set_par(struct fb_info *info)
 	int ret;
 
 	ret = drm_fb_helper_set_par(info);
-
-	if (ret == 0) {
-		mutex_lock(&fb_helper->dev->struct_mutex);
-		intel_fb_obj_invalidate(ifbdev->fb->obj, ORIGIN_GTT);
-		mutex_unlock(&fb_helper->dev->struct_mutex);
-	}
+	if (ret == 0)
+		intel_fbdev_invalidate(ifbdev);
 
 	return ret;
 }
@@ -71,12 +80,8 @@ static int intel_fbdev_blank(int blank, struct fb_info *info)
 	int ret;
 
 	ret = drm_fb_helper_blank(blank, info);
-
-	if (ret == 0) {
-		mutex_lock(&fb_helper->dev->struct_mutex);
-		intel_fb_obj_invalidate(ifbdev->fb->obj, ORIGIN_GTT);
-		mutex_unlock(&fb_helper->dev->struct_mutex);
-	}
+	if (ret == 0)
+		intel_fbdev_invalidate(ifbdev);
 
 	return ret;
 }
@@ -89,13 +94,10 @@ static int intel_fbdev_pan_display(struct fb_var_screeninfo *var,
 		container_of(fb_helper, struct intel_fbdev, helper);
 
 	int ret;
-	ret = drm_fb_helper_pan_display(var, info);
 
-	if (ret == 0) {
-		mutex_lock(&fb_helper->dev->struct_mutex);
-		intel_fb_obj_invalidate(ifbdev->fb->obj, ORIGIN_GTT);
-		mutex_unlock(&fb_helper->dev->struct_mutex);
-	}
+	ret = drm_fb_helper_pan_display(var, info);
+	if (ret == 0)
+		intel_fbdev_invalidate(ifbdev);
 
 	return ret;
 }
@@ -842,11 +844,8 @@ void intel_fbdev_restore_mode(struct drm_device *dev)
 	if (!ifbdev->fb)
 		return;
 
-	if (drm_fb_helper_restore_fbdev_mode_unlocked(&ifbdev->helper)) {
+	if (drm_fb_helper_restore_fbdev_mode_unlocked(&ifbdev->helper))
 		DRM_DEBUG("failed to restore crtc mode\n");
-	} else {
-		mutex_lock(&dev->struct_mutex);
-		intel_fb_obj_invalidate(ifbdev->fb->obj, ORIGIN_GTT);
-		mutex_unlock(&dev->struct_mutex);
-	}
+	else
+		intel_fbdev_invalidate(ifbdev);
 }
