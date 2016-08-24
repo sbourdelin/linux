@@ -3111,6 +3111,26 @@ static int cxgb_set_vf_mac(struct net_device *dev, int vf, u8 *mac)
 		 "Setting MAC %pM on VF %d\n", mac, vf);
 	return t4_set_vf_mac_acl(adap, vf + 1, 1, mac);
 }
+
+static int cxgb_set_vf_vlan(struct net_device *dev, int vf, u16 vlan, u8 qos)
+{
+	struct port_info *pi = netdev_priv(dev);
+	struct adapter *adap = pi->adapter;
+
+	if (vlan > 4095 || qos > 7) {
+		dev_err(pi->adapter->pdev_dev,
+			"Illegal vlan value %u qos %u\n", vlan, qos);
+		return -EINVAL;
+	}
+
+	dev_info(pi->adapter->pdev_dev,
+		 "Setting Vlan %u to VF [%d]\n", vlan, vf);
+	dev_info(pi->adapter->pdev_dev,
+		 "The VF [%d] interface needs to brought down and up, "
+		 "if VF is already up and running, for VST to work\n", vf);
+	vlan |= qos << VLAN_PRIO_SHIFT;
+	return t4_set_vf_vlan_acl(adap, vf + 1, vlan);
+}
 #endif
 
 static int cxgb_set_mac_addr(struct net_device *dev, void *p)
@@ -3259,6 +3279,7 @@ static const struct net_device_ops cxgb4_netdev_ops = {
 static const struct net_device_ops cxgb4_mgmt_netdev_ops = {
 	.ndo_open             = dummy_open,
 	.ndo_set_vf_mac       = cxgb_set_vf_mac,
+	.ndo_set_vf_vlan      = cxgb_set_vf_vlan,
 };
 #endif
 

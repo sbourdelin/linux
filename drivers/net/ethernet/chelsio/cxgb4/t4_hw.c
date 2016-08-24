@@ -8334,3 +8334,28 @@ int t4_sched_params(struct adapter *adapter, int type, int level, int mode,
 	return t4_wr_mbox_meat(adapter, adapter->mbox, &cmd, sizeof(cmd),
 			       NULL, 1);
 }
+
+/**
+ *	t4_set_vf_vlan_acl - Set MAC address for the specified VF
+ *	@adapter: The adapter
+ *	@vf: one of the VFs instantiated by the specified PF
+ *	@vlan: the vlan id
+ *	@qos: QOS
+ */
+int t4_set_vf_vlan_acl(struct adapter *adapter, unsigned int vf, u16 vlan)
+{
+	struct fw_acl_vlan_cmd cmd;
+
+	memset(&cmd, 0, sizeof(cmd));
+
+	cmd.op_to_vfn = htonl(FW_CMD_OP_V(FW_ACL_VLAN_CMD) |
+			      FW_CMD_REQUEST_F |
+			      FW_CMD_WRITE_F |
+			      FW_ACL_MAC_CMD_PFN_V(adapter->pf) |
+			      FW_ACL_MAC_CMD_VFN_V(vf));
+	cmd.en_to_len16 = htonl((unsigned int)FW_LEN16(cmd));
+	cmd.nvlan = 1;
+	cmd.vlanid[0] = vlan;
+
+	return t4_wr_mbox(adapter, adapter->mbox, &cmd, sizeof(cmd), &cmd);
+}

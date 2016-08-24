@@ -1627,6 +1627,7 @@ void t4_idma_monitor(struct adapter *adapter,
 		     int hz, int ticks);
 int t4_set_vf_mac_acl(struct adapter *adapter, unsigned int vf,
 		      unsigned int naddr, u8 *addr);
+int t4_set_vf_vlan_acl(struct adapter *adapter, unsigned int vf, u16 vlan);
 void uld_mem_free(struct adapter *adap);
 int uld_mem_alloc(struct adapter *adap);
 void free_rspq_fl(struct adapter *adap, struct sge_rspq *rq, struct sge_fl *fl);
