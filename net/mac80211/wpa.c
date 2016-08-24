@@ -28,13 +28,13 @@
 #include "wpa.h"
 
 ieee80211_tx_result
-ieee80211_tx_h_michael_mic_add(struct ieee80211_tx_data *tx)
+ieee80211_tx_h_michael_mic_add_skb(struct ieee80211_tx_data *tx,
+				   struct sk_buff *skb)
 {
 	u8 *data, *key, *mic;
 	size_t data_len;
 	unsigned int hdrlen;
 	struct ieee80211_hdr *hdr;
-	struct sk_buff *skb = tx->skb;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	int tail;
 
@@ -80,6 +80,20 @@ ieee80211_tx_h_michael_mic_add(struct ieee80211_tx_data *tx)
 	if (unlikely(info->flags & IEEE80211_TX_INTFL_TKIP_MIC_FAILURE))
 		mic[0]++;
 
+	return TX_CONTINUE;
+}
+
+ieee80211_tx_result
+ieee80211_tx_h_michael_mic_add(struct ieee80211_tx_data *tx)
+{
+	struct sk_buff *skb;
+	ieee80211_tx_result r;
+
+	skb_queue_walk(&tx->skbs, skb) {
+		r = ieee80211_tx_h_michael_mic_add_skb(tx, skb);
+		if (r != TX_CONTINUE)
+			return r;
+	}
 	return TX_CONTINUE;
 }
 
