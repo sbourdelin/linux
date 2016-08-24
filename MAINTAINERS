@@ -6599,6 +6599,7 @@ F:	include/linux/kasan*.h
 F:	lib/test_kasan.c
 F:	mm/kasan/
 F:	scripts/Makefile.kasan
+F:	scripts/ksymbolize.py
 
 KCONFIG
 M:	"Yann E. MORIN" <yann.morin.1998@free.fr>
