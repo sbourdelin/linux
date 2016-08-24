@@ -28,4 +28,12 @@ static inline int xhci_rcar_init_quirk(struct usb_hcd *hcd)
 	return 0;
 }
 #endif
+
+#define XHCI_PLAT_RENESAS_RCAR_PRIV(soc, firmware)	\
+static const struct xhci_plat_priv xhci_plat_renesas_rcar_##soc = {	\
+	.firmware_name = firmware,			\
+	.init_quirk = xhci_rcar_init_quirk,		\
+	.plat_start = xhci_rcar_start,			\
+}
+
 #endif /* _XHCI_RCAR_H */
