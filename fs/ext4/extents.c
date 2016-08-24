@@ -5506,12 +5506,6 @@ int ext4_collapse_range(struct inode *inode, loff_t offset, loff_t len)
 		goto out_mutex;
 	}
 
-	/* Currently just for extent based files */
-	if (!ext4_test_inode_flag(inode, EXT4_INODE_EXTENTS)) {
-		ret = -EOPNOTSUPP;
-		goto out_mutex;
-	}
-
 	/* Wait for existing dio to complete */
 	ext4_inode_block_unlocked_dio(inode);
 	inode_dio_wait(inode);
@@ -5643,11 +5637,6 @@ int ext4_insert_range(struct inode *inode, loff_t offset, loff_t len)
 	}
 
 	inode_lock(inode);
-	/* Currently just for extent based files */
-	if (!ext4_test_inode_flag(inode, EXT4_INODE_EXTENTS)) {
-		ret = -EOPNOTSUPP;
-		goto out_mutex;
-	}
 
 	/* Check for wrap through zero */
 	if (inode->i_size + len > inode->i_sb->s_maxbytes) {
