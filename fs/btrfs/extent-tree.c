@@ -9905,6 +9905,7 @@ static int find_first_block_group(struct btrfs_root *root,
 				ret = -ENOENT;
 			} else {
 				ret = 0;
+				free_extent_map(em);
 			}
 			goto out;
 		}
