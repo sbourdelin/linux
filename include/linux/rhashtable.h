@@ -566,7 +566,7 @@ restart:
 /* Internal function, please use rhashtable_insert_fast() instead */
 static inline int __rhashtable_insert_fast(
 	struct rhashtable *ht, const void *key, struct rhash_head *obj,
-	const struct rhashtable_params params)
+	const struct rhashtable_params params, void **data)
 {
 	struct rhashtable_compare_arg arg = {
 		.ht = ht,
@@ -630,8 +630,11 @@ slow_path:
 		if (key &&
 		    unlikely(!(params.obj_cmpfn ?
 			       params.obj_cmpfn(&arg, rht_obj(ht, head)) :
-			       rhashtable_compare(&arg, rht_obj(ht, head)))))
+			       rhashtable_compare(&arg, rht_obj(ht, head))))) {
+			if (data)
+				*data = rht_obj(ht, head);
 			goto out;
+		}
 		if (!--elasticity)
 			goto slow_path;
 	}
@@ -675,7 +678,7 @@ static inline int rhashtable_insert_fast(
 	struct rhashtable *ht, struct rhash_head *obj,
 	const struct rhashtable_params params)
 {
-	return __rhashtable_insert_fast(ht, NULL, obj, params);
+	return __rhashtable_insert_fast(ht, NULL, obj, params, NULL);
 }
 
 /**
@@ -708,7 +711,7 @@ static inline int rhashtable_lookup_insert_fast(
 	BUG_ON(ht->p.obj_hashfn);
 
 	return __rhashtable_insert_fast(ht, key + ht->p.key_offset, obj,
-					params);
+					params, NULL);
 }
 
 /**
@@ -739,7 +742,26 @@ static inline int rhashtable_lookup_insert_key(
 {
 	BUG_ON(!ht->p.obj_hashfn || !key);
 
-	return __rhashtable_insert_fast(ht, key, obj, params);
+	return __rhashtable_insert_fast(ht, key, obj, params, NULL);
+}
+
+/**
+ * rhashtable_lookup_get_insert_key - lookup and insert object into hash table
+ * @ht:		hash table
+ * @obj:	pointer to hash head inside object
+ * @params:	hash table parameters
+ * @data:	pointer to element data already in hashes
+ *
+ * Just like rhashtable_lookup_insert_key(), but it returns the matching
+ * element in case that it already exists in the hashes.
+ */
+static inline int rhashtable_lookup_get_insert_key(
+	struct rhashtable *ht, const void *key, struct rhash_head *obj,
+	const struct rhashtable_params params, void **data)
+{
+	BUG_ON(!ht->p.obj_hashfn || !key);
+
+	return __rhashtable_insert_fast(ht, key, obj, params, data);
 }
 
 /* Internal function, please use rhashtable_remove_fast() instead */
