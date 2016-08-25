@@ -278,10 +278,10 @@ static const struct ni_board_struct *ni_atmio_probe(struct comedi_device *dev)
 	}
 	if (device_id == 255)
 		dev_err(dev->class_dev, "can't find board\n");
-	 else if (device_id == 0)
+	else if (device_id == 0)
 		dev_err(dev->class_dev,
 			"EEPROM read error (?) or device not found\n");
-	 else
+	else
 		dev_err(dev->class_dev,
 			"unknown device ID %d -- contact author\n", device_id);
 
