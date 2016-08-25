@@ -387,6 +387,7 @@ typedef struct drm_i915_irq_wait {
 #define I915_PARAM_HAS_EXEC_SOFTPIN	 37
 #define I915_PARAM_HAS_POOLED_EU	 38
 #define I915_PARAM_MIN_EU_IN_POOL	 39
+#define I915_PARAM_HAS_EXEC_ASYNC	 40
 
 typedef struct drm_i915_getparam {
 	__s32 param;
@@ -728,8 +729,9 @@ struct drm_i915_gem_exec_object2 {
 #define EXEC_OBJECT_SUPPORTS_48B_ADDRESS (1<<3)
 #define EXEC_OBJECT_PINNED		 (1<<4)
 #define EXEC_OBJECT_PAD_TO_SIZE		 (1<<5)
+#define EXEC_OBJECT_ASYNC		 (1<<6)
 /* All remaining bits are MBZ and RESERVED FOR FUTURE USE */
-#define __EXEC_OBJECT_UNKNOWN_FLAGS -(EXEC_OBJECT_PAD_TO_SIZE<<1)
+#define __EXEC_OBJECT_UNKNOWN_FLAGS -(EXEC_OBJECT_ASYNC<<1)
 	__u64 flags;
 
 	union {
