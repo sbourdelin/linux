@@ -323,7 +323,7 @@ static struct cryptocop_dma_desc *alloc_cdesc(int alloc_flag)
 		spin_unlock_irqrestore(&descr_pool_lock, flags);
 		cdesc->from_pool = 1;
 	} else {
-		cdesc = kmalloc(sizeof(struct cryptocop_dma_desc), alloc_flag);
+		cdesc = kmalloc(sizeof(*cdesc), alloc_flag);
 		if (!cdesc) {
 			DEBUG_API(printk("alloc_cdesc: kmalloc\n"));
 			return NULL;
@@ -1526,7 +1526,7 @@ int cryptocop_new_session(cryptocop_session_id *sid, struct cryptocop_transform_
 		return -EINVAL;
 	}
 
-	sess = kmalloc(sizeof(struct cryptocop_session), alloc_flag);
+	sess = kmalloc(sizeof(*sess), alloc_flag);
 	if (!sess){
 		DEBUG_API(printk("cryptocop_new_session, kmalloc cryptocop_session\n"));
 		return -ENOMEM;
@@ -2247,7 +2247,7 @@ static int cryptocop_job_setup(struct cryptocop_prio_job **pj, struct cryptocop_
 	int  alloc_flag = operation->in_interrupt ? GFP_ATOMIC : GFP_KERNEL;
 	void *iop_alloc_ptr = NULL;
 
-	*pj = kmalloc(sizeof (struct cryptocop_prio_job), alloc_flag);
+	*pj = kmalloc(sizeof(**pj), alloc_flag);
 	if (!*pj) return -ENOMEM;
 
 	DEBUG(printk("cryptocop_job_setup: operation=0x%p\n", operation));
@@ -2552,12 +2552,12 @@ static int cryptocop_ioctl_process(struct inode *inode, struct file *filp, unsig
 		return -EFAULT;
 	}
 
-	cop = kmalloc(sizeof(struct cryptocop_operation), GFP_KERNEL);
+	cop = kmalloc(sizeof(*cop), GFP_KERNEL);
 	if (!cop) {
 		DEBUG_API(printk("cryptocop_ioctl_process: kmalloc\n"));
 		return -ENOMEM;
 	}
-	jc = kmalloc(sizeof(struct ioctl_job_cb_ctx), GFP_KERNEL);
+	jc = kmalloc(sizeof(*jc), GFP_KERNEL);
 	if (!jc) {
 		DEBUG_API(printk("cryptocop_ioctl_process: kmalloc\n"));
 		err = -ENOMEM;
@@ -3082,7 +3082,7 @@ static int cryptocop_ioctl_create_session(struct inode *inode, struct file *filp
 		ti_csum.next = tis;
 		tis = &ti_csum;
 	} /* (sop.csum != cryptocop_csum_none) */
-	dev = kmalloc(sizeof(struct cryptocop_private), GFP_KERNEL);
+	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev){
 		DEBUG_API(printk("create session, alloc dev\n"));
 		return -ENOMEM;
