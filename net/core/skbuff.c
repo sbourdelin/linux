@@ -3060,6 +3060,7 @@ struct sk_buff *skb_segment(struct sk_buff *head_skb,
 	unsigned int offset = doffset;
 	unsigned int tnl_hlen = skb_tnl_header_len(head_skb);
 	unsigned int partial_segs = 0;
+	unsigned int fraglist_segs = 0;
 	unsigned int headroom;
 	unsigned int len = head_skb->len;
 	__be16 proto;
@@ -3078,16 +3079,27 @@ struct sk_buff *skb_segment(struct sk_buff *head_skb,
 	sg = !!(features & NETIF_F_SG);
 	csum = !!can_checksum_protocol(features, proto);
 
-	/* GSO partial only requires that we trim off any excess that
-	 * doesn't fit into an MSS sized block, so take care of that
-	 * now.
-	 */
-	if (sg && csum && (features & NETIF_F_GSO_PARTIAL)) {
-		partial_segs = len / mss;
-		if (partial_segs > 1)
-			mss *= partial_segs;
-		else
-			partial_segs = 0;
+	if (sg && csum) {
+		/* GSO partial only requires that we trim off any excess that
+		 * doesn't fit into an MSS sized block, so take care of that
+		 * now.
+		 */
+		if ((features & NETIF_F_GSO_PARTIAL)) {
+			partial_segs = len / mss;
+			if (partial_segs > 1)
+				mss *= partial_segs;
+			else
+				partial_segs = 0;
+		} else if (list_skb && (mss != GSO_BY_FRAGS) &&
+			   net_gso_ok(features, skb_shinfo(head_skb)->gso_type)) {
+
+			skb_walk_frags(head_skb, segs) {
+				len -= segs->len;
+			}
+			fraglist_segs = len / mss;
+			mss = len;
+			segs = NULL;
+		}
 	}
 
 	headroom = skb_headroom(head_skb);
@@ -3296,6 +3308,20 @@ perform_csum_check:
 		skb_shinfo(segs)->gso_segs = partial_segs;
 		skb_shinfo(segs)->gso_type = type;
 		SKB_GSO_CB(segs)->data_offset = skb_headroom(segs) + doffset;
+	}
+
+	if (fraglist_segs) {
+		struct sk_buff *iter;
+
+		for (iter = segs; iter; iter = iter->next) {
+			if (iter->next) {
+				skb_shinfo(iter)->gso_size = skb_shinfo(head_skb)->gso_size;
+				skb_shinfo(iter)->gso_segs = fraglist_segs;
+			} else {
+				skb_shinfo(iter)->gso_size = skb_shinfo(head_skb)->gso_size;
+				skb_shinfo(iter)->gso_segs = iter->len / skb_shinfo(head_skb)->gso_size;
+			}
+		}
 	}
 
 	/* Following permits correct backpressure, for protocols
