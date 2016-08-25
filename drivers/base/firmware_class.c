@@ -91,10 +91,13 @@ static inline bool fw_is_builtin_firmware(const struct firmware *fw)
 }
 #endif
 
+#ifdef CONFIG_FW_LOADER_USER_HELPER
+
 enum {
+	FW_STATUS_UNKNOWN,
 	FW_STATUS_LOADING,
 	FW_STATUS_DONE,
-	FW_STATUS_ABORT,
+	FW_STATUS_ABORTED,
 };
 
 static int loading_timeout = 60;	/* In seconds */
@@ -103,6 +106,72 @@ static inline long firmware_loading_timeout(void)
 {
 	return loading_timeout > 0 ? loading_timeout * HZ : MAX_JIFFY_OFFSET;
 }
+
+struct fw_status {
+	unsigned long status;
+	struct completion completion;
+};
+
+static void fw_status_init(struct fw_status *fw_st)
+{
+	fw_st->status = FW_STATUS_UNKNOWN;
+	init_completion(&fw_st->completion);
+}
+
+static int __fw_status_check(struct fw_status *fw_st, unsigned long status)
+{
+	return test_bit(status, &fw_st->status);
+}
+
+static int fw_status_wait_timeout(struct fw_status *fw_st, long timeout)
+{
+	int ret;
+
+	ret = wait_for_completion_interruptible_timeout(&fw_st->completion,
+							timeout);
+	if (ret == 0 && test_bit(FW_STATUS_ABORTED, &fw_st->status))
+		return -ENOENT;
+
+	return ret;
+}
+
+static void __fw_status_set(struct fw_status *fw_st,
+			  unsigned long status)
+{
+	set_bit(status, &fw_st->status);
+
+	if (status == FW_STATUS_DONE ||
+			status == FW_STATUS_ABORTED) {
+		clear_bit(FW_STATUS_LOADING, &fw_st->status);
+		complete_all(&fw_st->completion);
+	}
+}
+
+#define fw_status_start(fw_st)					\
+	__fw_status_set(fw_st, FW_STATUS_LOADING)
+#define fw_status_done(fw_st)					\
+	__fw_status_set(fw_st, FW_STATUS_DONE)
+#define fw_status_aborted(fw_st)				\
+	__fw_status_set(fw_st, FW_STATUS_ABORTED)
+#define fw_status_is_loading(fw_st)				\
+	__fw_status_check(fw_st, FW_STATUS_LOADING)
+#define fw_status_is_done(fw_st)				\
+	__fw_status_check(fw_st, FW_STATUS_DONE)
+#define fw_status_is_aborted(fw_st)				\
+	__fw_status_check(fw_st, FW_STATUS_ABORTED)
+
+#else /* CONFIG_FW_LOADER_USER_HELPER */
+
+static int loading_timeout = 60;
+#define firmware_loading_timeout()		(loading_timeout * HZ)
+
+#define fw_status_wait_timeout(fw_st, long)	0
+
+#define fw_status_done(fw_st)
+#define fw_status_is_done(fw_st)		true
+#define fw_status_is_aborted(fw_st)		false
+
+#endif /* !CONFIG_FW_LOADER_USER_HELPER */
 
 /* firmware behavior options */
 #define FW_OPT_UEVENT	(1U << 0)
@@ -145,13 +214,12 @@ struct firmware_cache {
 struct firmware_buf {
 	struct kref ref;
 	struct list_head list;
-	struct completion completion;
 	struct firmware_cache *fwc;
-	unsigned long status;
 	void *data;
 	size_t size;
 	size_t allocated_size;
 #ifdef CONFIG_FW_LOADER_USER_HELPER
+	struct fw_status fw_st;
 	bool is_paged_buf;
 	bool need_uevent;
 	struct page **pages;
@@ -205,8 +273,8 @@ static struct firmware_buf *__allocate_fw_buf(const char *fw_name,
 	buf->fwc = fwc;
 	buf->data = dbuf;
 	buf->allocated_size = size;
-	init_completion(&buf->completion);
 #ifdef CONFIG_FW_LOADER_USER_HELPER
+	fw_status_init(&buf->fw_st);
 	INIT_LIST_HEAD(&buf->pending_list);
 #endif
 
@@ -309,8 +377,7 @@ static void fw_finish_direct_load(struct device *device,
 				  struct firmware_buf *buf)
 {
 	mutex_lock(&fw_lock);
-	set_bit(FW_STATUS_DONE, &buf->status);
-	complete_all(&buf->completion);
+	fw_status_done(&buf->fw_st);
 	mutex_unlock(&fw_lock);
 }
 
@@ -478,12 +545,11 @@ static void __fw_load_abort(struct firmware_buf *buf)
 	 * There is a small window in which user can write to 'loading'
 	 * between loading done and disappearance of 'loading'
 	 */
-	if (test_bit(FW_STATUS_DONE, &buf->status))
+	if (fw_status_is_done(&buf->fw_st))
 		return;
 
 	list_del_init(&buf->pending_list);
-	set_bit(FW_STATUS_ABORT, &buf->status);
-	complete_all(&buf->completion);
+	fw_status_aborted(&buf->fw_st);
 }
 
 static void fw_load_abort(struct firmware_priv *fw_priv)
@@ -495,9 +561,6 @@ static void fw_load_abort(struct firmware_priv *fw_priv)
 	/* avoid user action after loading abort */
 	fw_priv->buf = NULL;
 }
-
-#define is_fw_load_aborted(buf)	\
-	test_bit(FW_STATUS_ABORT, &(buf)->status)
 
 static LIST_HEAD(pending_fw_head);
 
@@ -598,7 +661,7 @@ static ssize_t firmware_loading_show(struct device *dev,
 
 	mutex_lock(&fw_lock);
 	if (fw_priv->buf)
-		loading = test_bit(FW_STATUS_LOADING, &fw_priv->buf->status);
+		loading = fw_status_is_loading(&fw_priv->buf->fw_st);
 	mutex_unlock(&fw_lock);
 
 	return sprintf(buf, "%d\n", loading);
@@ -653,22 +716,19 @@ static ssize_t firmware_loading_store(struct device *dev,
 	switch (loading) {
 	case 1:
 		/* discarding any previous partial load */
-		if (!test_bit(FW_STATUS_DONE, &fw_buf->status)) {
+		if (!fw_status_is_done(&fw_buf->fw_st)) {
 			for (i = 0; i < fw_buf->nr_pages; i++)
 				__free_page(fw_buf->pages[i]);
 			vfree(fw_buf->pages);
 			fw_buf->pages = NULL;
 			fw_buf->page_array_size = 0;
 			fw_buf->nr_pages = 0;
-			set_bit(FW_STATUS_LOADING, &fw_buf->status);
+			fw_status_start(&fw_buf->fw_st);
 		}
 		break;
 	case 0:
-		if (test_bit(FW_STATUS_LOADING, &fw_buf->status)) {
+		if (fw_status_is_loading(&fw_buf->fw_st)) {
 			int rc;
-
-			set_bit(FW_STATUS_DONE, &fw_buf->status);
-			clear_bit(FW_STATUS_LOADING, &fw_buf->status);
 
 			/*
 			 * Several loading requests may be pending on
@@ -691,10 +751,11 @@ static ssize_t firmware_loading_store(struct device *dev,
 			 */
 			list_del_init(&fw_buf->pending_list);
 			if (rc) {
-				set_bit(FW_STATUS_ABORT, &fw_buf->status);
+				fw_status_aborted(&fw_buf->fw_st);
 				written = rc;
+			} else {
+				fw_status_done(&fw_buf->fw_st);
 			}
-			complete_all(&fw_buf->completion);
 			break;
 		}
 		/* fallthrough */
@@ -702,7 +763,7 @@ static ssize_t firmware_loading_store(struct device *dev,
 		dev_err(dev, "%s: unexpected value (%d)\n", __func__, loading);
 		/* fallthrough */
 	case -1:
-		fw_load_abort(fw_priv);
+		fw_status_aborted(&fw_buf->fw_st);
 		break;
 	}
 out:
@@ -755,7 +816,7 @@ static ssize_t firmware_data_read(struct file *filp, struct kobject *kobj,
 
 	mutex_lock(&fw_lock);
 	buf = fw_priv->buf;
-	if (!buf || test_bit(FW_STATUS_DONE, &buf->status)) {
+	if (!buf || fw_status_is_done(&buf->fw_st)) {
 		ret_count = -ENODEV;
 		goto out;
 	}
@@ -842,7 +903,7 @@ static ssize_t firmware_data_write(struct file *filp, struct kobject *kobj,
 
 	mutex_lock(&fw_lock);
 	buf = fw_priv->buf;
-	if (!buf || test_bit(FW_STATUS_DONE, &buf->status)) {
+	if (!buf || fw_status_is_done(&buf->fw_st)) {
 		retval = -ENODEV;
 		goto out;
 	}
@@ -955,8 +1016,7 @@ static int _request_firmware_load(struct firmware_priv *fw_priv,
 		timeout = MAX_JIFFY_OFFSET;
 	}
 
-	retval = wait_for_completion_interruptible_timeout(&buf->completion,
-			timeout);
+	retval = fw_status_wait_timeout(&buf->fw_st, timeout);
 	if (retval == -ERESTARTSYS || !retval) {
 		mutex_lock(&fw_lock);
 		fw_load_abort(fw_priv);
@@ -965,7 +1025,7 @@ static int _request_firmware_load(struct firmware_priv *fw_priv,
 		retval = 0;
 	}
 
-	if (is_fw_load_aborted(buf))
+	if (fw_status_is_aborted(&buf->fw_st))
 		retval = -EAGAIN;
 	else if (buf->is_paged_buf && !buf->data)
 		retval = -ENOMEM;
@@ -1015,15 +1075,11 @@ fw_load_from_user_helper(struct firmware *firmware, const char *name,
 	return -ENOENT;
 }
 
-/* No abort during direct loading */
-#define is_fw_load_aborted(buf) false
-
 #ifdef CONFIG_PM_SLEEP
 static inline void kill_requests_without_uevent(void) { }
 #endif
 
 #endif /* CONFIG_FW_LOADER_USER_HELPER */
-
 
 /* wait until the shared firmware_buf becomes ready (or error) */
 static int sync_cached_firmware_buf(struct firmware_buf *buf)
@@ -1031,13 +1087,13 @@ static int sync_cached_firmware_buf(struct firmware_buf *buf)
 	int ret = 0;
 
 	mutex_lock(&fw_lock);
-	while (!test_bit(FW_STATUS_DONE, &buf->status)) {
-		if (is_fw_load_aborted(buf)) {
+	while (!fw_status_is_done(&buf->fw_st)) {
+		if (fw_status_is_aborted(&buf->fw_st)) {
 			ret = -ENOENT;
 			break;
 		}
 		mutex_unlock(&fw_lock);
-		ret = wait_for_completion_interruptible(&buf->completion);
+		ret = fw_status_wait_timeout(&buf->fw_st, 0);
 		mutex_lock(&fw_lock);
 	}
 	mutex_unlock(&fw_lock);
@@ -1095,7 +1151,7 @@ static int assign_firmware_buf(struct firmware *fw, struct device *device,
 	struct firmware_buf *buf = fw->priv;
 
 	mutex_lock(&fw_lock);
-	if (!buf->size || is_fw_load_aborted(buf)) {
+	if (!buf->size || fw_status_is_aborted(&buf->fw_st)) {
 		mutex_unlock(&fw_lock);
 		return -ENOENT;
 	}
