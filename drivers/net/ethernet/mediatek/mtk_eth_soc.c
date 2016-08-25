@@ -304,7 +304,7 @@ static int mtk_mdio_init(struct mtk_eth *eth)
 		goto err_put_node;
 	}
 
-	eth->mii_bus = mdiobus_alloc();
+	eth->mii_bus = devm_mdiobus_alloc(eth->dev);
 	if (!eth->mii_bus) {
 		err = -ENOMEM;
 		goto err_put_node;
@@ -318,18 +318,9 @@ static int mtk_mdio_init(struct mtk_eth *eth)
 
 	snprintf(eth->mii_bus->id, MII_BUS_ID_SIZE, "%s", mii_np->name);
 	err = of_mdiobus_register(eth->mii_bus, mii_np);
-	if (err)
-		goto err_free_bus;
-	of_node_put(mii_np);
-
-	return 0;
-
-err_free_bus:
-	mdiobus_free(eth->mii_bus);
 
 err_put_node:
 	of_node_put(mii_np);
-	eth->mii_bus = NULL;
 	return err;
 }
 
@@ -339,8 +330,6 @@ static void mtk_mdio_cleanup(struct mtk_eth *eth)
 		return;
 
 	mdiobus_unregister(eth->mii_bus);
-	of_node_put(eth->mii_bus->dev.of_node);
-	mdiobus_free(eth->mii_bus);
 }
 
 static inline void mtk_irq_disable(struct mtk_eth *eth, u32 mask)
