@@ -300,7 +300,7 @@ static int mtk_mdio_init(struct mtk_eth *eth)
 	}
 
 	if (!of_device_is_available(mii_np)) {
-		err = 0;
+		err = -ENODEV;
 		goto err_put_node;
 	}
 
