@@ -2534,6 +2534,7 @@ static int nl80211_dump_interface(struct sk_buff *skb, struct netlink_callback *
 		struct nl80211_dump_wiphy_state state = {};
 		int ret;
 
+		state.filter_wiphy = -1;
 		ret = nl80211_dump_wiphy_parse(skb, cb, &state);
 		if (ret)
 			return ret;
