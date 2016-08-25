@@ -182,7 +182,7 @@ am79c961_ramtest(struct net_device *dev, unsigned int val)
 	am_readbuffer(dev, 0, buffer, 65536);
 	for (i = 0; i < 65536; i++) {
 		if (buffer[i] != val && !error) {
-			printk ("%s: buffer error (%02X %02X) %05X - ", dev->name, val, buffer[i], i);
+			printk (KERN_ERR "%s: buffer error (%02X %02X) %05X - ", dev->name, val, buffer[i], i);
 			error = 1;
 			errorcount ++;
 		} else if (error && buffer[i] == val) {
