@@ -448,7 +448,8 @@ static int jr3_download_firmware(struct comedi_device *dev,
 	return 0;
 }
 
-static struct jr3_pci_poll_delay jr3_pci_poll_subdevice(struct comedi_subdevice *s)
+static struct jr3_pci_poll_delay
+jr3_pci_poll_subdevice(struct comedi_subdevice *s)
 {
 	struct jr3_pci_subdev_private *spriv = s->private;
 	struct jr3_pci_poll_delay result = poll_delay_min_max(1000, 2000);
