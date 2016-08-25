@@ -689,7 +689,7 @@ int setup_purgatory(struct kimage *image, const void *slave_code,
  * @initrd_load_addr:	Address where the next initrd will be loaded.
  * @initrd_len:		Size of the next initrd, or 0 if there will be none.
  * @cmdline:		Command line for the next kernel, or NULL if there will
- * 			be none.
+ *			be none.
  *
  * Return: 0 on success, or negative errno on error.
  */
