@@ -404,6 +404,9 @@ struct mtk_eth {
 	struct clk			*clk_esw;
 	struct clk			*clk_gp1;
 	struct clk			*clk_gp2;
+	struct pinctrl			*pins;
+	struct pinctrl_state		*ephy_default;
+
 	struct mii_bus			*mii_bus;
 	struct work_struct		pending_work;
 };
