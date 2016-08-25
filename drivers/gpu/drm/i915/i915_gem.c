@@ -1694,6 +1694,9 @@ static unsigned int tile_row_pages(struct drm_i915_gem_object *obj)
  * from the GTT and/or fence registers to make room.  So performance may
  * suffer if the GTT working set is large or there are few fence registers
  * left.
+ *
+ * The current feature set supported by i915_gem_fault() and thus GTT mmaps
+ * is exposed via I915_PARAM_MMAP_GTT_VERSION.
  */
 int i915_gem_fault(struct vm_area_struct *area, struct vm_fault *vmf)
 {
