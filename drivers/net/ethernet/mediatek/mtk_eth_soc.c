@@ -1851,8 +1851,15 @@ static int mtk_probe(struct platform_device *pdev)
 	eth->clk_gp1 = devm_clk_get(&pdev->dev, "gp1");
 	eth->clk_gp2 = devm_clk_get(&pdev->dev, "gp2");
 	if (IS_ERR(eth->clk_esw) || IS_ERR(eth->clk_gp1) ||
-	    IS_ERR(eth->clk_gp2) || IS_ERR(eth->clk_ethif))
-		return -ENODEV;
+	    IS_ERR(eth->clk_gp2) || IS_ERR(eth->clk_ethif)) {
+		if (PTR_ERR(eth->clk_esw) == -EPROBE_DEFER ||
+		    PTR_ERR(eth->clk_gp1) == -EPROBE_DEFER ||
+		    PTR_ERR(eth->clk_gp1) == -EPROBE_DEFER ||
+		    PTR_ERR(eth->clk_gp2) == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
+		else
+			return -ENODEV;
+	}
 
 	clk_prepare_enable(eth->clk_ethif);
 	clk_prepare_enable(eth->clk_esw);
