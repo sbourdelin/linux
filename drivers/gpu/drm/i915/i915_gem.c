@@ -2501,27 +2501,12 @@ i915_gem_find_active_request(struct intel_engine_cs *engine)
 	return NULL;
 }
 
-static void i915_gem_reset_engine_status(struct intel_engine_cs *engine)
+static void i915_gem_reset_engine(struct intel_engine_cs *engine)
 {
 	struct drm_i915_gem_request *request;
-	bool ring_hung;
-
-	request = i915_gem_find_active_request(engine);
-	if (request == NULL)
-		return;
-
-	ring_hung = engine->hangcheck.score >= HANGCHECK_SCORE_RING_HUNG;
-
-	i915_set_reset_status(request->ctx, ring_hung);
-	list_for_each_entry_continue(request, &engine->request_list, link)
-		i915_set_reset_status(request->ctx, false);
-}
-
-static void i915_gem_reset_engine_cleanup(struct intel_engine_cs *engine)
-{
-	struct drm_i915_gem_request *request;
+	struct i915_gem_context *incomplete_ctx;
 	unsigned long flags;
-	struct intel_ring *ring;
+	bool ring_hung;
 
 	/* Ensure irq handler finishes or is cancelled, and not run again. */
 	local_irq_save(flags);
@@ -2529,6 +2514,55 @@ static void i915_gem_reset_engine_cleanup(struct intel_engine_cs *engine)
 	tasklet_disable(&engine->irq_tasklet);
 	local_irq_restore(flags);
 
+	request = i915_gem_find_active_request(engine);
+	if (!request)
+		goto out;
+
+	ring_hung = engine->hangcheck.score >= HANGCHECK_SCORE_RING_HUNG;
+
+	i915_set_reset_status(request->ctx, ring_hung);
+
+	engine->reset_hw(engine, request);
+
+	incomplete_ctx = request->ctx;
+	if (i915_gem_context_is_default(incomplete_ctx))
+		incomplete_ctx = NULL;
+
+	list_for_each_entry_continue(request, &engine->request_list, link) {
+		void *vaddr = request->ring->vaddr;
+		u32 head;
+
+		if (request->ctx != incomplete_ctx)
+			continue;
+
+		head = request->head;
+		if (request->postfix < head) {
+			memset(vaddr + head, 0, request->ring->size - head);
+			head = 0;
+		}
+		memset(vaddr + head, 0, request->postfix - head);
+
+		i915_set_reset_status(request->ctx, false);
+	}
+
+out:
+	tasklet_enable(&engine->irq_tasklet);
+}
+
+void i915_gem_reset(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct intel_engine_cs *engine;
+
+	for_each_engine(engine, dev_priv)
+		i915_gem_reset_engine(engine);
+
+	i915_gem_context_lost(dev_priv);
+	i915_gem_restore_fences(dev);
+}
+
+static void i915_gem_cleanup_engine(struct intel_engine_cs *engine)
+{
 	/* Mark all pending requests as complete so that any concurrent
 	 * (lockless) lookup doesn't try and wait upon the request as we
 	 * reset it.
@@ -2550,56 +2584,18 @@ static void i915_gem_reset_engine_cleanup(struct intel_engine_cs *engine)
 		spin_unlock(&engine->execlist_lock);
 	}
 
-	/*
-	 * We must free the requests after all the corresponding objects have
-	 * been moved off active lists. Which is the same order as the normal
-	 * retire_requests function does. This is important if object hold
-	 * implicit references on things like e.g. ppgtt address spaces through
-	 * the request.
-	 */
-	request = i915_gem_active_raw(&engine->last_request,
-				      &engine->i915->drm.struct_mutex);
-	if (request)
-		i915_gem_request_retire_upto(request);
-	GEM_BUG_ON(intel_engine_is_active(engine));
-
-	/* Having flushed all requests from all queues, we know that all
-	 * ringbuffers must now be empty. However, since we do not reclaim
-	 * all space when retiring the request (to prevent HEADs colliding
-	 * with rapid ringbuffer wraparound) the amount of available space
-	 * upon reset is less than when we start. Do one more pass over
-	 * all the ringbuffers to reset last_retired_head.
-	 */
-	list_for_each_entry(ring, &engine->buffers, link) {
-		ring->last_retired_head = ring->tail;
-		intel_ring_update_space(ring);
-	}
-
 	engine->i915->gt.active_engines &= ~intel_engine_flag(engine);
-
-	tasklet_enable(&engine->irq_tasklet);
 }
 
-void i915_gem_reset(struct drm_device *dev)
+void i915_gem_set_wedged(struct drm_i915_private *dev_priv)
 {
-	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_engine_cs *engine;
 
-	/*
-	 * Before we free the objects from the requests, we need to inspect
-	 * them for finding the guilty party. As the requests only borrow
-	 * their reference to the objects, the inspection must be done first.
-	 */
-	for_each_engine(engine, dev_priv)
-		i915_gem_reset_engine_status(engine);
+	atomic_or(I915_WEDGED, &dev_priv->gpu_error.reset_counter);
 
 	for_each_engine(engine, dev_priv)
-		i915_gem_reset_engine_cleanup(engine);
+		i915_gem_cleanup_engine(engine);
 	mod_delayed_work(dev_priv->wq, &dev_priv->gt.idle_work, 0);
-
-	i915_gem_context_reset(dev);
-
-	i915_gem_restore_fences(dev);
 }
 
 static void
@@ -4478,7 +4474,7 @@ int i915_gem_init(struct drm_device *dev)
 		 * for all other failure, such as an allocation failure, bail.
 		 */
 		DRM_ERROR("Failed to initialize GPU, declaring it wedged\n");
-		atomic_or(I915_WEDGED, &dev_priv->gpu_error.reset_counter);
+		i915_gem_set_wedged(dev_priv);
 		ret = 0;
 	}
 

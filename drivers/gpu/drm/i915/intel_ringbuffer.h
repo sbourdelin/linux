@@ -211,6 +211,8 @@ struct intel_engine_cs {
 	void		(*irq_disable)(struct intel_engine_cs *engine);
 
 	int		(*init_hw)(struct intel_engine_cs *engine);
+	void		(*reset_hw)(struct intel_engine_cs *engine,
+				    struct drm_i915_gem_request *req);
 
 	int		(*init_context)(struct drm_i915_gem_request *req);
 
