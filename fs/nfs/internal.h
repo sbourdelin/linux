@@ -58,6 +58,9 @@ struct nfs_clone_mount {
  */
 #define NFS_UNSPEC_PORT		(-1)
 
+#define NFS_UNSPEC_RETRANS	(UINT_MAX)
+#define NFS_UNSPEC_TIMEO	(UINT_MAX)
+
 /*
  * Maximum number of pages that readdir can use for creating
  * a vmapped array of pages.
@@ -156,7 +159,7 @@ struct nfs_client *nfs_get_client(const struct nfs_client_initdata *,
 int nfs_probe_fsinfo(struct nfs_server *server, struct nfs_fh *, struct nfs_fattr *);
 void nfs_server_insert_lists(struct nfs_server *);
 void nfs_server_remove_lists(struct nfs_server *);
-void nfs_init_timeout_values(struct rpc_timeout *, int, unsigned int, unsigned int);
+void nfs_init_timeout_values(struct rpc_timeout *to, int proto, int timeo, int retrans);
 int nfs_init_server_rpcclient(struct nfs_server *, const struct rpc_timeout *t,
 		rpc_authflavor_t);
 struct nfs_server *nfs_alloc_server(void);
@@ -356,7 +359,8 @@ int nfs_unlink(struct inode *, struct dentry *);
 int nfs_symlink(struct inode *, struct dentry *, const char *);
 int nfs_link(struct dentry *, struct inode *, struct dentry *);
 int nfs_mknod(struct inode *, struct dentry *, umode_t, dev_t);
-int nfs_rename(struct inode *, struct dentry *, struct inode *, struct dentry *);
+int nfs_rename(struct inode *, struct dentry *,
+	       struct inode *, struct dentry *, unsigned int);
 
 /* file.c */
 int nfs_file_fsync(struct file *file, loff_t start, loff_t end, int datasync);

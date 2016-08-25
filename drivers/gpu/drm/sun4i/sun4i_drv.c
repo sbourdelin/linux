@@ -17,6 +17,7 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_fb_cma_helper.h>
 #include <drm/drm_gem_cma_helper.h>
+#include <drm/drm_fb_helper.h>
 
 #include "sun4i_crtc.h"
 #include "sun4i_drv.h"
@@ -109,7 +110,7 @@ static void sun4i_remove_framebuffers(void)
 	ap->ranges[0].base = 0;
 	ap->ranges[0].size = ~0;
 
-	remove_conflicting_framebuffers(ap, "sun4i-drm-fb", false);
+	drm_fb_helper_remove_conflicting_framebuffers(ap, "sun4i-drm-fb", false);
 	kfree(ap);
 }
 
@@ -257,8 +258,8 @@ static int sun4i_drv_add_endpoints(struct device *dev,
 		}
 
 		/*
-		 * If the node is our TCON, the first port is used for our
-		 * panel, and will not be part of the
+		 * If the node is our TCON, the first port is used for
+		 * panel or bridges, and will not be part of the
 		 * component framework.
 		 */
 		if (sun4i_drv_node_is_tcon(node)) {
