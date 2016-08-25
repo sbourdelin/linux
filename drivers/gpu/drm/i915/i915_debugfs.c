@@ -1969,13 +1969,20 @@ static int i915_context_status(struct seq_file *m, void *unused)
 	return 0;
 }
 
+enum {
+	LRC_CONTEXT_DUMP,  /* First PAGE size bytes of register state ctx */
+	FULL_CONTEXT_DUMP, /* Full context */
+};
+
 static void i915_dump_lrc_obj(struct seq_file *m,
 			      struct i915_gem_context *ctx,
-			      struct intel_engine_cs *engine)
+			      struct intel_engine_cs *engine,
+			      unsigned int flags)
 {
 	struct i915_vma *vma = ctx->engine[engine->id].state;
 	struct page *page;
-	int j;
+	struct sg_page_iter sg_iter;
+	int i;
 
 	seq_printf(m, "CONTEXT: %s %u\n", engine->name, ctx->hw_id);
 
@@ -1993,18 +2000,53 @@ static void i915_dump_lrc_obj(struct seq_file *m,
 		return;
 	}
 
+	i = 0;
 	page = i915_gem_object_get_page(vma->obj, LRC_STATE_PN);
-	if (page) {
-		u32 *reg_state = kmap_atomic(page);
+	for_each_sg_page(vma->pages->sgl, &sg_iter, vma->pages->nents, 0) {
+		int j;
+		u32 *reg_state;
+		int run_length = 0;
+		u32 data_size = (flags == LRC_CONTEXT_DUMP) ? 0x600 : PAGE_SIZE;
+		unsigned long ggtt_offset = i915_ggtt_offset(vma);
+		unsigned long page_offset = ggtt_offset + i*PAGE_SIZE;
 
-		for (j = 0; j < 0x600 / sizeof(u32) / 4; j += 4) {
-			seq_printf(m,
-				   "\t[0x%04x] 0x%08x 0x%08x 0x%08x 0x%08x\n",
-				   j * 4,
-				   reg_state[j], reg_state[j + 1],
+		if (flags == LRC_CONTEXT_DUMP && i > LRC_STATE_PN)
+			break;
+
+		page = sg_page_iter_page(&sg_iter);
+		if (WARN_ON(page == NULL))
+			break;
+
+		reg_state = kmap_atomic(page);
+
+		seq_printf(m, "Context object page: %d\n", i);
+		for (j = 0; j < data_size / sizeof(u32); j += 4) {
+			if (reg_state[j + 0] == 0 && reg_state[j + 1] == 0 &&
+			    reg_state[j + 2] == 0 && reg_state[j + 3] == 0) {
+				run_length += 4;
+				continue;
+			}
+
+			if (run_length) {
+				seq_printf(m, "\t[0x%08lx - 0x%08lx]: 0x00000000\n",
+					   page_offset + (j * 4) - (run_length * 4),
+					   page_offset + (j * 4) - 1);
+				run_length = 0;
+			}
+
+			seq_printf(m, "\t[0x%08lx] 0x%08x 0x%08x 0x%08x 0x%08x\n",
+				   page_offset + (j * 4),
+				   reg_state[j + 0], reg_state[j + 1],
 				   reg_state[j + 2], reg_state[j + 3]);
 		}
+		/* zeros in the whole page */
+		if (run_length) {
+			seq_printf(m, "\t[0x%08lx - 0x%08lx]: 0x00000000\n",
+				   page_offset, page_offset + data_size - 1);
+			run_length = 0;
+		}
 		kunmap_atomic(reg_state);
+		++i;
 	}
 
 	seq_putc(m, '\n');
@@ -2012,10 +2054,12 @@ static void i915_dump_lrc_obj(struct seq_file *m,
 
 static int i915_dump_lrc(struct seq_file *m, void *unused)
 {
+	struct drm_info_node *node = (struct drm_info_node *) m->private;
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
 	struct drm_device *dev = &dev_priv->drm;
 	struct intel_engine_cs *engine;
 	struct i915_gem_context *ctx;
+	uintptr_t flags = (uintptr_t) node->info_ent->data;
 	int ret;
 
 	if (!i915.enable_execlists) {
@@ -2027,9 +2071,10 @@ static int i915_dump_lrc(struct seq_file *m, void *unused)
 	if (ret)
 		return ret;
 
-	list_for_each_entry(ctx, &dev_priv->context_list, link)
+	list_for_each_entry(ctx, &dev_priv->context_list, link) {
 		for_each_engine(engine, dev_priv)
-			i915_dump_lrc_obj(m, ctx, engine);
+			i915_dump_lrc_obj(m, ctx, engine, flags);
+	}
 
 	mutex_unlock(&dev->struct_mutex);
 
@@ -5277,7 +5322,8 @@ static const struct drm_info_list i915_debugfs_list[] = {
 	{"i915_vbt", i915_vbt, 0},
 	{"i915_gem_framebuffer", i915_gem_framebuffer_info, 0},
 	{"i915_context_status", i915_context_status, 0},
-	{"i915_dump_lrc", i915_dump_lrc, 0},
+	{"i915_dump_lrc", i915_dump_lrc, 0, (void *)LRC_CONTEXT_DUMP},
+	{"i915_dump_lrc_complete", i915_dump_lrc, 0, (void *)FULL_CONTEXT_DUMP},
 	{"i915_execlists", i915_execlists, 0},
 	{"i915_forcewake_domains", i915_forcewake_domains, 0},
 	{"i915_swizzle_info", i915_swizzle_info, 0},
