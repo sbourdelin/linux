@@ -904,6 +904,10 @@ struct perf_sample_data {
 
 	struct perf_regs		regs_intr;
 	u64				stack_user_size;
+	struct {
+		u32	cid;
+		u32	reserved;
+	}				cid_entry;
 } ____cacheline_aligned;
 
 /* default value for data source */

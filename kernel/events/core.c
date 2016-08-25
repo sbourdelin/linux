@@ -5716,6 +5716,9 @@ void perf_output_sample(struct perf_output_handle *handle,
 		}
 	}
 
+	if (sample_type & PERF_SAMPLE_CID)
+		perf_output_put(handle, data->cid_entry);
+
 	if (!event->attr.watermark) {
 		int wakeup_events = event->attr.wakeup_events;
 
@@ -5847,6 +5850,18 @@ void perf_prepare_sample(struct perf_event_header *header,
 			size += hweight64(mask) * sizeof(u64);
 		}
 
+		header->size += size;
+	}
+
+	if (sample_type & PERF_SAMPLE_CID) {
+		int size = sizeof(u64);
+
+		/*
+		 * Container identifier for a given task.
+		 * Using cgroup namespace inode number for this.
+		 */
+		data->cid_entry.cid = current->nsproxy->cgroup_ns->ns.inum;
+		data->cid_entry.reserved = 0;
 		header->size += size;
 	}
 }
