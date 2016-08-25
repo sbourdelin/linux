@@ -377,6 +377,12 @@ void cpuinfo_store_cpu(void)
 void __init cpuinfo_store_boot_cpu(void)
 {
 	struct cpuinfo_arm64 *info = &per_cpu(cpu_data, 0);
+
+	/*
+	 * Initialise the static keys early as they may be enabled by
+	 * check_local_cpu_errata() -> update_cpu_capabilities().
+	 */
+	jump_label_init();
 	__cpuinfo_store_cpu(info);
 
 	boot_cpu_data = *info;
