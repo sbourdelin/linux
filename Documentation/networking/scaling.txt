@@ -400,14 +400,30 @@ transport layer is responsible for setting ooo_okay appropriately. TCP,
 for instance, sets the flag when all data for a connection has been
 acknowledged.
 
+When the traffic source is a VM running on the host, there is no
+socket structure known to the host.  In this case, unless the VM is
+itself CPU-pinned, the traffic being sent from it can end-up queued to
+multiple transmit queues and end-up being transmitted out of order.
+
+In some cases this can result in a considerable loss of performance.
+
+In such situations, XPS should not be enabled at runtime, or
+explicitly disabled if the NIC driver(s) in question enable it on
+their own.  Othersise, if possible, the VMs should be CPU pinned.
+
 ==== XPS Configuration
 
-XPS is only available if the kconfig symbol CONFIG_XPS is enabled (on by
-default for SMP). The functionality remains disabled until explicitly
-configured. To enable XPS, the bitmap of CPUs that may use a transmit
-queue is configured using the sysfs file entry:
+XPS is available only if the kconfig symbol CONFIG_XPS is enabled
+prior to building the kernel.  It is enabled by default for SMP kernel
+configurations.  In many cases the functionality remains disabled at
+runtime until explicitly configured by the system administrator. To
+enable XPS, the bitmap of CPUs that may use a transmit queue is
+configured using the sysfs file entry:
 
 /sys/class/net/<dev>/queues/tx-<n>/xps_cpus
+
+However, some NIC drivers will configure XPS at runtime for the
+interfaces they drive, via a call to netif_set_xps_queue.
 
 == Suggested Configuration
 
