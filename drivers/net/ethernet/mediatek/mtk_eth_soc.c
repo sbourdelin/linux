@@ -1415,6 +1415,7 @@ static int __init mtk_hw_init(struct mtk_eth *eth)
 	usleep_range(10, 20);
 	reset_control_deassert(eth->rstc);
 	usleep_range(10, 20);
+	pinctrl_select_state(eth->pins, eth->ephy_default);
 
 	/* Set GE2 driving and slew rate */
 	regmap_write(eth->pctl, GPIO_DRV_SEL10, 0xa00);
@@ -1856,6 +1857,19 @@ static int mtk_probe(struct platform_device *pdev)
 			return -EPROBE_DEFER;
 		else
 			return -ENODEV;
+	}
+
+	eth->pins = devm_pinctrl_get(&pdev->dev);
+	if (IS_ERR(eth->pins)) {
+		dev_err(&pdev->dev, "cannot get pinctrl\n");
+		return PTR_ERR(eth->pins);
+	}
+
+	eth->ephy_default =
+		pinctrl_lookup_state(eth->pins, "default");
+	if (IS_ERR(eth->ephy_default)) {
+		dev_err(&pdev->dev, "cannot get pinctrl state\n");
+		return PTR_ERR(eth->ephy_default);
 	}
 
 	clk_prepare_enable(eth->clk_ethif);
