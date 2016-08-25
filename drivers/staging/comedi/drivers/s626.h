@@ -329,7 +329,7 @@
 						 * WS1-WS4 = CS* outputs.
 						 */
 
-#if S626_PLATFORM == S626_INTEL		/*
+#if (S626_PLATFORM == S626_INTEL)	/*
 					 * Base ACON1 config: always run
 					 * A1 based on TSL1.
 					 */
