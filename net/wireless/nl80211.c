@@ -2525,7 +2525,7 @@ static int nl80211_dump_interface(struct sk_buff *skb, struct netlink_callback *
 	int if_idx = 0;
 	int wp_start = cb->args[0];
 	int if_start = cb->args[1];
-	int filter_wiphy = -1;
+	int filter_wiphy;
 	struct cfg80211_registered_device *rdev;
 	struct wireless_dev *wdev;
 
@@ -2534,6 +2534,7 @@ static int nl80211_dump_interface(struct sk_buff *skb, struct netlink_callback *
 		struct nl80211_dump_wiphy_state state = {};
 		int ret;
 
+		state.filter_wiphy = -1;
 		ret = nl80211_dump_wiphy_parse(skb, cb, &state);
 		if (ret)
 			return ret;
