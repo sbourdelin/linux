@@ -342,6 +342,7 @@ int iwch_alloc_pbl(struct iwch_mr *mhp, int npages);
 void iwch_free_pbl(struct iwch_mr *mhp);
 int iwch_write_pbl(struct iwch_mr *mhp, __be64 *pages, int npages, int offset);
 
+/* node_desc cannot exceed IB_DEVICE_NODE_DESC_MAX */
 #define IWCH_NODE_DESC "cxgb3 Chelsio Communications"
 
 #endif

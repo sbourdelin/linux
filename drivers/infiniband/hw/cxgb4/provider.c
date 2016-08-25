@@ -563,7 +563,7 @@ int c4iw_register_device(struct c4iw_dev *dev)
 	    (1ull << IB_USER_VERBS_CMD_POST_SEND) |
 	    (1ull << IB_USER_VERBS_CMD_POST_RECV);
 	dev->ibdev.node_type = RDMA_NODE_RNIC;
-	memcpy(dev->ibdev.node_desc, C4IW_NODE_DESC, sizeof(C4IW_NODE_DESC));
+	memcpy(dev->ibdev.node_desc, C4IW_NODE_DESC, IB_DEVICE_NODE_DESC_MAX);
 	dev->ibdev.phys_port_cnt = dev->rdev.lldi.nports;
 	dev->ibdev.num_comp_vectors =  dev->rdev.lldi.nciq;
 	dev->ibdev.dma_device = &(dev->rdev.lldi.pdev->dev);

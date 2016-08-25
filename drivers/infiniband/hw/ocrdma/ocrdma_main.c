@@ -120,7 +120,7 @@ static int ocrdma_register_device(struct ocrdma_dev *dev)
 	strlcpy(dev->ibdev.name, "ocrdma%d", IB_DEVICE_NAME_MAX);
 	ocrdma_get_guid(dev, (u8 *)&dev->ibdev.node_guid);
 	memcpy(dev->ibdev.node_desc, OCRDMA_NODE_DESC,
-	       sizeof(OCRDMA_NODE_DESC));
+	       IB_DEVICE_NODE_DESC_MAX);
 	dev->ibdev.owner = THIS_MODULE;
 	dev->ibdev.uverbs_abi_ver = OCRDMA_ABI_VERSION;
 	dev->ibdev.uverbs_cmd_mask =

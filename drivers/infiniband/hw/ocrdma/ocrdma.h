@@ -58,6 +58,7 @@
 #define OCRDMA_ROCE_DRV_VERSION "11.0.0.0"
 
 #define OCRDMA_ROCE_DRV_DESC "Emulex OneConnect RoCE Driver"
+/* node_desc cannot excced IB_DEVICE_NODE_DESC_MAX */
 #define OCRDMA_NODE_DESC "Emulex OneConnect RoCE HCA"
 
 #define OC_NAME_SH	OCRDMA_NODE_DESC "(Skyhawk)"

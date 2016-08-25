@@ -633,6 +633,7 @@ enum c4iw_mmid_state {
 	C4IW_STAG_STATE_INVALID
 };
 
+/* node_desc cannot excced IB_DEVICE_NODE_DESC_MAX */
 #define C4IW_NODE_DESC "cxgb4 Chelsio Communications"
 
 #define MPA_KEY_REQ "MPA ID Req Frame"
