@@ -185,11 +185,11 @@ static int template_desc_init_fields(const char *template_fmt,
 }
 
 #ifdef CONFIG_KEXEC_FILE
-void *kexec_buffer = NULL;
-size_t kexec_buffer_size = 0;
+void *kexec_buffer;
+size_t kexec_buffer_size;
 
 /* Physical address of the measurement buffer in the next kernel. */
-unsigned long kexec_buffer_load_addr = 0;
+unsigned long kexec_buffer_load_addr;
 
 /*
  * Called during reboot. IMA can add here new events that were generated after
