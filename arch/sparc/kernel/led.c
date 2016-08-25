@@ -69,7 +69,7 @@ static ssize_t led_proc_write(struct file *file, const char __user *buffer,
 	if (count > LED_MAX_LENGTH)
 		count = LED_MAX_LENGTH;
 
-	buf = kmalloc(sizeof(char) * (count + 1), GFP_KERNEL);
+	buf = kmalloc_array(count + 1, sizeof(*buf), GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
