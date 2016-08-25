@@ -370,17 +370,19 @@ static int ovl_create_over_whiteout(struct dentry *dentry, struct inode *inode,
 		goto out_dput2;
 
 	/*
-	 * mode could have been mutilated due to umask (e.g. sgid directory)
+	 * mode could lose sgid bit if upperdir has it set, because workdir has
+	 * no sgid. Reset mode against upperdir.
 	 */
-	if (!hardlink &&
-	    !S_ISLNK(stat->mode) && newdentry->d_inode->i_mode != stat->mode) {
+	if (!hardlink && !S_ISLNK(stat->mode)) {
+		struct inode *newinode = newdentry->d_inode;
 		struct iattr attr = {
 			.ia_valid = ATTR_MODE,
-			.ia_mode = stat->mode,
 		};
-		inode_lock(newdentry->d_inode);
+		inode_init_owner(newinode, udir, newinode->i_mode);
+		attr.ia_mode = newinode->i_mode;
+		inode_lock(newinode);
 		err = notify_change(newdentry, &attr, NULL);
-		inode_unlock(newdentry->d_inode);
+		inode_unlock(newinode);
 		if (err)
 			goto out_cleanup;
 	}
