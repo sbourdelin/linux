@@ -58,25 +58,13 @@
 #define SMC_inw(a, r)		readw((a) + (r))
 #define SMC_inl(a, r)		readl((a) + (r))
 #define SMC_outb(v, a, r)	writeb(v, (a) + (r))
+#define SMC_outw(v, a, r)	writew(v, (a) + (r))
 #define SMC_outl(v, a, r)	writel(v, (a) + (r))
 #define SMC_insw(a, r, p, l)	readsw((a) + (r), p, l)
 #define SMC_outsw(a, r, p, l)	writesw((a) + (r), p, l)
 #define SMC_insl(a, r, p, l)	readsl((a) + (r), p, l)
 #define SMC_outsl(a, r, p, l)	writesl((a) + (r), p, l)
 #define SMC_IRQ_FLAGS		(-1)	/* from resource */
-
-/* We actually can't write halfwords properly if not word aligned */
-static inline void SMC_outw(u16 val, void __iomem *ioaddr, int reg)
-{
-	if ((machine_is_mainstone() || machine_is_stargate2() ||
-	     machine_is_pxa_idp()) && reg & 2) {
-		unsigned int v = val << 16;
-		v |= readl(ioaddr + (reg & ~2)) & 0xffff;
-		writel(v, ioaddr + (reg & ~2));
-	} else {
-		writew(val, ioaddr + reg);
-	}
-}
 
 #elif	defined(CONFIG_SH_SH4202_MICRODEV)
 
@@ -1029,18 +1017,40 @@ static const char * chip_ids[ 16 ] =  {
 
 #define SMC_SET_MAC_ADDR(lp, addr)					\
 	do {								\
-		SMC_out16(addr[0]|(addr[1] << 8), ioaddr, ADDR0_REG(lp)); \
-		SMC_out16(addr[2]|(addr[3] << 8), ioaddr, ADDR1_REG(lp)); \
-		SMC_out16(addr[4]|(addr[5] << 8), ioaddr, ADDR2_REG(lp)); \
+		if (SMC_32BIT(lp)) {					\
+			SMC_outl((addr[0]      )|(addr[1] <<  8) |	\
+				 (addr[2] << 16)|(addr[3] << 24),	\
+				 ioaddr, ADDR0_REG(lp));		\
+		} else {						\
+			SMC_out16(addr[0]|(addr[1] << 8), ioaddr,	\
+				  ADDR0_REG(lp));			\
+			SMC_out16(addr[2]|(addr[3] << 8), ioaddr,	\
+				  ADDR1_REG(lp));			\
+		}							\
+		SMC_out16(addr[4]|(addr[5] << 8), ioaddr,		\
+			  ADDR2_REG(lp)); \
 	} while (0)
 
 #define SMC_SET_MCAST(lp, x)						\
 	do {								\
 		const unsigned char *mt = (x);				\
-		SMC_out16(mt[0] | (mt[1] << 8), ioaddr, MCAST_REG1(lp)); \
-		SMC_out16(mt[2] | (mt[3] << 8), ioaddr, MCAST_REG2(lp)); \
-		SMC_out16(mt[4] | (mt[5] << 8), ioaddr, MCAST_REG3(lp)); \
-		SMC_out16(mt[6] | (mt[7] << 8), ioaddr, MCAST_REG4(lp)); \
+		if (SMC_32BIT(lp)) {					\
+			SMC_outl((mt[0]      ) | (mt[1] <<  8) |	\
+				 (mt[2] << 16) | (mt[3] << 24),		\
+				 ioaddr, MCAST_REG1(lp));		\
+			SMC_outl((mt[4]      ) | (mt[5] <<  8) |	\
+				 (mt[6] << 16) | (mt[7] << 24),		\
+				 ioaddr, MCAST_REG3(lp));		\
+		} else {						\
+			SMC_out16(mt[0] | (mt[1] << 8),			\
+				  ioaddr, MCAST_REG1(lp));		\
+			SMC_out16(mt[2] | (mt[3] << 8),			\
+				  ioaddr, MCAST_REG2(lp));		\
+			SMC_out16(mt[4] | (mt[5] << 8),			\
+				  ioaddr, MCAST_REG3(lp));		\
+			SMC_out16(mt[6] | (mt[7] << 8),			\
+				  ioaddr, MCAST_REG4(lp));		\
+		}							\
 	} while (0)
 
 #define SMC_PUT_PKT_HDR(lp, status, length)				\
