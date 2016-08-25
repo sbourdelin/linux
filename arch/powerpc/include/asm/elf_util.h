@@ -39,11 +39,12 @@ typedef unsigned long func_desc_t;
 typedef struct ppc64_opd_entry func_desc_t;
 #endif /* PPC64_ELF_ABI_v2 */
 
-/* Like PPC32, we need little trampolines to do > 24-bit jumps (into
-   the kernel itself).  But on PPC64, these need to be used for every
-   jump, actually, to reset r2 (TOC+0x8000). */
-struct ppc64_stub_entry
-{
+/*
+ * Like PPC32, we need little trampolines to do > 24-bit jumps (into
+ * the kernel itself).  But on PPC64, these need to be used for every
+ * jump, actually, to reset r2 (TOC+0x8000).
+ */
+struct ppc64_stub_entry {
 	/* 28 byte jump instruction sequence (7 instructions). We only
 	 * need 6 instructions on ABIv2 but we always allocate 7 so
 	 * so we don't have to modify the trampoline load instruction. */

@@ -14,12 +14,14 @@
 #include <asm-generic/module.h>
 #include <asm/elf_util.h>
 
-/* Both low and high 16 bits are added as SIGNED additions, so if low
-   16 bits has high bit set, high 16 bits must be adjusted.  These
-   macros do that (stolen from binutils). */
+/*
+ * Both low and high 16 bits are added as SIGNED additions, so if low 16 bits
+ * has high bit set, high 16 bits must be adjusted.  These macros do that
+ * (stolen from binutils).
+ */
 #define PPC_LO(v) ((v) & 0xffff)
 #define PPC_HI(v) (((v) >> 16) & 0xffff)
-#define PPC_HA(v) PPC_HI ((v) + 0x8000)
+#define PPC_HA(v) PPC_HI((v) + 0x8000)
 
 #ifndef __powerpc64__
 /*

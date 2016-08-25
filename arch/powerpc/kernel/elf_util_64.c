@@ -33,9 +33,11 @@ struct module;
 
 static unsigned int local_entry_offset(const Elf64_Sym *sym)
 {
-	/* sym->st_other indicates offset to local entry point
+	/*
+	 * sym->st_other indicates offset to local entry point
 	 * (otherwise it will assume r12 is the address of the start
-	 * of function and try to derive r2 from it). */
+	 * of function and try to derive r2 from it).
+	 */
 	return PPC64_LOCAL_ENTRY_OFFSET(sym->st_other);
 }
 #else
@@ -176,19 +178,21 @@ int elf64_apply_relocate_add(const struct elf_info *elf_info,
 			/* FIXME: Handle weak symbols here --RR */
 			if (sym->st_shndx == SHN_UNDEF) {
 				/* External: go via stub */
-				value = stub_for_addr(elf_info, value, obj_name);
+				value = stub_for_addr(elf_info, value,
+						      obj_name);
 				if (!value)
 					return -ENOENT;
 				if (!restore_r2((u32 *)location + 1, obj_name))
 					return -ENOEXEC;
 
-				squash_toc_save_inst(strtab + sym->st_name, value);
+				squash_toc_save_inst(strtab + sym->st_name,
+						     value);
 			} else
 				value += local_entry_offset(sym);
 
 			/* Convert value to relative */
 			value -= (unsigned long)location;
-			if (value + 0x2000000 > 0x3ffffff || (value & 3) != 0){
+			if (value + 0x2000000 > 0x3ffffff || (value & 3) != 0) {
 				pr_err("%s: REL24 %li out of range!\n",
 				       obj_name, (long int)value);
 				return -ENOEXEC;

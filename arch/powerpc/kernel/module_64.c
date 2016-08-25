@@ -377,10 +377,11 @@ static inline int create_stub(const struct elf_info *elf_info,
 unsigned long stub_for_addr(const struct elf_info *elf_info, unsigned long addr,
 			    const char *obj_name)
 {
-	struct elf_shdr *stubs_sec = &elf_info->sechdrs[elf_info->stubs_section];
+	struct elf_shdr *stubs_sec;
 	struct ppc64_stub_entry *stubs;
 	unsigned int i, num_stubs;
 
+	stubs_sec = &elf_info->sechdrs[elf_info->stubs_section];
 	num_stubs = stubs_sec->sh_size / sizeof(*stubs);
 
 	/* Find this stub, or if that fails, the next avail. entry */
