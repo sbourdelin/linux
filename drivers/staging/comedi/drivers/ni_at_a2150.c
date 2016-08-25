@@ -58,41 +58,49 @@
 
 /* Registers and bits */
 #define CONFIG_REG		0x0
-#define   CHANNEL_BITS(x)		((x) & 0x7)
-#define   CHANNEL_MASK		0x7
-#define   CLOCK_SELECT_BITS(x)		(((x) & 0x3) << 3)
-#define   CLOCK_DIVISOR_BITS(x)		(((x) & 0x3) << 5)
-#define   CLOCK_MASK		(0xf << 3)
-#define   ENABLE0_BIT		0x80	/*  enable (don't internally ground) channels 0 and 1 */
-#define   ENABLE1_BIT		0x100	/*  enable (don't internally ground) channels 2 and 3 */
-#define   AC0_BIT		0x200	/*  ac couple channels 0,1 */
-#define   AC1_BIT		0x400	/*  ac couple channels 2,3 */
-#define   APD_BIT		0x800	/*  analog power down */
-#define   DPD_BIT		0x1000	/*  digital power down */
-#define TRIGGER_REG		0x2	/*  trigger config register */
-#define   POST_TRIGGER_BITS		0x2
-#define   DELAY_TRIGGER_BITS		0x3
-#define   HW_TRIG_EN		0x10	/*  enable hardware trigger */
-#define FIFO_START_REG		0x6	/*  software start aquistion trigger */
-#define FIFO_RESET_REG		0x8	/*  clears fifo + fifo flags */
-#define FIFO_DATA_REG		0xa	/*  read data */
-#define DMA_TC_CLEAR_REG		0xe	/*  clear dma terminal count interrupt */
-#define STATUS_REG		0x12	/*  read only */
-#define   FNE_BIT		0x1	/*  fifo not empty */
-#define   OVFL_BIT		0x8	/*  fifo overflow */
-#define   EDAQ_BIT		0x10	/*  end of acquisition interrupt */
-#define   DCAL_BIT		0x20	/*  offset calibration in progress */
-#define   INTR_BIT		0x40	/*  interrupt has occurred */
-#define   DMA_TC_BIT		0x80	/*  dma terminal count interrupt has occurred */
-#define   ID_BITS(x)	(((x) >> 8) & 0x3)
-#define IRQ_DMA_CNTRL_REG		0x12	/*  write only */
-#define   DMA_CHAN_BITS(x)		((x) & 0x7)	/*  sets dma channel */
-#define   DMA_EN_BIT		0x8	/*  enables dma */
-#define   IRQ_LVL_BITS(x)		(((x) & 0xf) << 4)	/*  sets irq level */
-#define   FIFO_INTR_EN_BIT		0x100	/*  enable fifo interrupts */
-#define   FIFO_INTR_FHF_BIT		0x200	/*  interrupt fifo half full */
-#define   DMA_INTR_EN_BIT		0x800	/*  enable interrupt on dma terminal count */
-#define   DMA_DEM_EN_BIT	0x1000	/*  enables demand mode dma */
+#define CHANNEL_BITS(x)		((x) & 0x7)
+#define CHANNEL_MASK		0x7
+#define CLOCK_SELECT_BITS(x)	(((x) & 0x3) << 3)
+#define CLOCK_DIVISOR_BITS(x)	(((x) & 0x3) << 5)
+#define CLOCK_MASK		(0xf << 3)
+#define ENABLE0_BIT		0x80	/* enable (don't internally ground)
+					 * channels 0 and 1
+					 */
+#define ENABLE1_BIT		0x100	/* enable (don't internally ground)
+					 * channels 2 and 3
+					 */
+#define AC0_BIT			0x200	/* ac couple channels 0,1 */
+#define AC1_BIT			0x400	/* ac couple channels 2,3 */
+#define APD_BIT			0x800	/* analog power down */
+#define DPD_BIT			0x1000	/* digital power down */
+#define TRIGGER_REG		0x2	/* trigger config register */
+#define POST_TRIGGER_BITS	0x2
+#define DELAY_TRIGGER_BITS	0x3
+#define HW_TRIG_EN		0x10	/* enable hardware trigger */
+#define FIFO_START_REG		0x6	/* software start aquistion trigger */
+#define FIFO_RESET_REG		0x8	/* clears fifo + fifo flags */
+#define FIFO_DATA_REG		0xa	/* read data */
+#define DMA_TC_CLEAR_REG	0xe	/* clear dma terminal count interrupt */
+#define STATUS_REG		0x12	/* read only */
+#define FNE_BIT			0x1	/* fifo not empty */
+#define OVFL_BIT		0x8	/* fifo overflow */
+#define EDAQ_BIT		0x10	/* end of acquisition interrupt */
+#define DCAL_BIT		0x20	/* offset calibration in progress */
+#define INTR_BIT		0x40	/* interrupt has occurred */
+#define DMA_TC_BIT		0x80	/* dma terminal count interrupt has
+					 * occurred
+					 */
+#define ID_BITS(x)		(((x) >> 8) & 0x3)
+#define IRQ_DMA_CNTRL_REG	0x12			/* write only */
+#define DMA_CHAN_BITS(x)	((x) & 0x7)		/* sets dma channel */
+#define DMA_EN_BIT		0x8			/* enables dma */
+#define IRQ_LVL_BITS(x)		(((x) & 0xf) << 4)	/* sets irq level */
+#define FIFO_INTR_EN_BIT	0x100	/* enable fifo interrupts */
+#define FIFO_INTR_FHF_BIT	0x200	/* interrupt fifo half full */
+#define DMA_INTR_EN_BIT		0x800	/* enable interrupt on dma terminal
+					 * count
+					 */
+#define DMA_DEM_EN_BIT		0x1000	/* enables demand mode dma */
 #define I8253_BASE_REG		0x14
 
 struct a2150_board {
@@ -550,7 +558,9 @@ static int a2150_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	if (cmd->start_src == TRIG_EXT) {
 		trigger_bits |= HW_TRIG_EN;
 	} else if (cmd->start_src == TRIG_OTHER) {
-		/*  XXX add support for level/slope start trigger using TRIG_OTHER */
+		/* XXX add support for level/slope start trigger
+		 * using TRIG_OTHER
+		 */
 		dev_err(dev->class_dev, "you shouldn't see this?\n");
 	}
 	/*  send trigger config bits */
