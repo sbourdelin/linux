@@ -871,6 +871,37 @@ static int arizona_of_get_core_pdata(struct arizona *arizona)
 		count++;
 	}
 
+	count = 0;
+	of_property_for_each_u32(arizona->dev->of_node,
+				 "wlf,max-channels-clocked",
+				 prop, cur, val) {
+		if (count == ARRAY_SIZE(pdata->max_channels_clocked))
+			break;
+
+		pdata->max_channels_clocked[count] = val;
+		count++;
+	}
+
+	count = 0;
+	of_property_for_each_u32(arizona->dev->of_node, "wlf,spk-fmt", prop,
+				 cur, val) {
+		if (count == ARRAY_SIZE(pdata->spk_fmt))
+			break;
+
+		pdata->spk_fmt[count] = val;
+		count++;
+	}
+
+	count = 0;
+	of_property_for_each_u32(arizona->dev->of_node, "wlf,spk-mute", prop,
+				 cur, val) {
+		if (count == ARRAY_SIZE(pdata->spk_mute))
+			break;
+
+		pdata->spk_mute[count] = val;
+		count++;
+	}
+
 	return 0;
 }
 
