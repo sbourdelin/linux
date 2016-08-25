@@ -100,37 +100,18 @@ static int rng_probe(struct platform_device *ofdev)
 	void __iomem *rng_regs;
 	struct device_node *rng_np = ofdev->dev.of_node;
 	struct resource res;
-	int err = 0;
 
-	err = of_address_to_resource(rng_np, 0, &res);
-	if (err)
+	if (of_address_to_resource(rng_np, 0, &res))
 		return -ENODEV;
 
-	rng_regs = ioremap(res.start, 0x100);
-
+	rng_regs = devm_ioremap(&ofdev->dev, res.start, 0x100);
 	if (!rng_regs)
 		return -ENOMEM;
 
 	pasemi_rng.priv = (unsigned long)rng_regs;
 
 	pr_info("Registering PA Semi RNG\n");
-
-	err = hwrng_register(&pasemi_rng);
-
-	if (err)
-		iounmap(rng_regs);
-
-	return err;
-}
-
-static int rng_remove(struct platform_device *dev)
-{
-	void __iomem *rng_regs = (void __iomem *)pasemi_rng.priv;
-
-	hwrng_unregister(&pasemi_rng);
-	iounmap(rng_regs);
-
-	return 0;
+	return devm_hwrng_register(&ofdev->dev, &pasemi_rng);
 }
 
 static const struct of_device_id rng_match[] = {
@@ -146,7 +127,6 @@ static struct platform_driver rng_driver = {
 		.of_match_table = rng_match,
 	},
 	.probe		= rng_probe,
-	.remove		= rng_remove,
 };
 
 module_platform_driver(rng_driver);
