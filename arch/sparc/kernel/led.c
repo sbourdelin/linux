@@ -64,7 +64,7 @@ static int led_proc_open(struct inode *inode, struct file *file)
 static ssize_t led_proc_write(struct file *file, const char __user *buffer,
 			      size_t count, loff_t *ppos)
 {
-	char *buf = NULL;
+	char *buf;
 
 	if (count > LED_MAX_LENGTH)
 		count = LED_MAX_LENGTH;
