@@ -421,12 +421,13 @@ struct jr3_channel {
 	 */
 
 	struct force_array filter[7];	/* offset 0x0090,
-					   offset 0x0098,
-					   offset 0x00a0,
-					   offset 0x00a8,
-					   offset 0x00b0,
-					   offset 0x00b8 ,
-					   offset 0x00c0 */
+					 * offset 0x0098,
+					 * offset 0x00a0,
+					 * offset 0x00a8,
+					 * offset 0x00b0,
+					 * offset 0x00b8,
+					 * offset 0x00c0
+					 */
 
 	/* Rate_data is the calculated rate data. It is a first derivative
 	 * calculation. It is calculated at a frequency specified by the
