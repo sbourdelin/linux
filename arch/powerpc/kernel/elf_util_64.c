@@ -140,7 +140,8 @@ int elf64_apply_relocate_add(const struct elf_info *elf_info,
 				pr_err("Undefined symbol: %s\n", name);
 				return -ENOEXEC;
 			} else if (sym->st_shndx == SHN_COMMON) {
-				pr_err("Symbol '%s' in common section.\n", name);
+				pr_err("Symbol '%s' in common section.\n",
+				       name);
 				return -ENOEXEC;
 			}
 		}
@@ -173,7 +174,8 @@ int elf64_apply_relocate_add(const struct elf_info *elf_info,
 			break;
 
 		case R_PPC64_REL32:
-			*(uint32_t *)location = value - (uint32_t)(uint64_t)location;
+			*(uint32_t *)location =
+				value - (uint32_t)(uint64_t)location;
 			break;
 
 		case R_PPC64_TOC:
@@ -248,8 +250,8 @@ int elf64_apply_relocate_add(const struct elf_info *elf_info,
 			/* Convert value to relative */
 			value -= address;
 			if (value + 0x8000 > 0xffff || (value & 3) != 0) {
-				pr_err("%s: REL14 %li out of range!\n", obj_name,
-				       (long int)value);
+				pr_err("%s: REL14 %li out of range!\n",
+				       obj_name, (long int)value);
 				return -ENOEXEC;
 			}
 
