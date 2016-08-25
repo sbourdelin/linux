@@ -1,0 +1,25 @@
+What:		/sys/class/leds/<led>/new_port
+Date:		August 2016
+KernelVersion:	4.9
+Contact:	linux-leds@vger.kernel.org
+Description:
+		Adds USB port (specified by a name using Linux format, e.g. 1-1)
+		to the list of observable ones. This will have immediate effect
+		if there is device already connected. This will also make
+		trigger checking for a match on every USB (dis)connection event.
+
+What:		/sys/class/leds/<led>/remove_port
+Date:		August 2016
+KernelVersion:	4.9
+Contact:	linux-leds@vger.kernel.org
+Description:
+		This allows removing USB port from the list of observable ones.
+
+What:		/sys/class/leds/<led>/ports/<port>
+Date:		August 2016
+KernelVersion:	4.9
+Contact:	linux-leds@vger.kernel.org
+Description:
+		Every port entry is a name (in Linux format) of USB port that is
+		being observed by the usbport trigger. It's useful for checking
+		the current state of trigger setup.
