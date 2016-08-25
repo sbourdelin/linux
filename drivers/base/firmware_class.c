@@ -30,6 +30,7 @@
 #include <linux/syscore_ops.h>
 #include <linux/reboot.h>
 #include <linux/security.h>
+#include <linux/swait.h>
 
 #include <generated/utsrelease.h>
 
@@ -109,13 +110,13 @@ static inline long firmware_loading_timeout(void)
 
 struct fw_status {
 	unsigned long status;
-	struct completion completion;
+	struct swait_queue_head wq;
 };
 
 static void fw_status_init(struct fw_status *fw_st)
 {
 	fw_st->status = FW_STATUS_UNKNOWN;
-	init_completion(&fw_st->completion);
+	init_swait_queue_head(&fw_st->wq);
 }
 
 static int __fw_status_check(struct fw_status *fw_st, unsigned long status)
@@ -123,15 +124,19 @@ static int __fw_status_check(struct fw_status *fw_st, unsigned long status)
 	return fw_st->status == status;
 }
 
+static inline bool __fw_status_is_done(unsigned long status)
+{
+	return status == FW_STATUS_DONE ||
+	       status == FW_STATUS_ABORTED;
+}
+
 static int fw_status_wait_timeout(struct fw_status *fw_st, long timeout)
 {
-	unsigned long status;
 	int ret;
-
-	ret = wait_for_completion_interruptible_timeout(&fw_st->completion,
-							timeout);
-	status = READ_ONCE(fw_st->status);
-	if (ret == 0 && status == FW_STATUS_ABORTED)
+	ret = swait_event_interruptible_timeout(fw_st->wq,
+				__fw_status_is_done(READ_ONCE(fw_st->status)),
+				timeout);
+	if (ret == 0 && fw_st->status == FW_STATUS_ABORTED)
 		return -ENOENT;
 
 	return ret;
@@ -144,7 +149,7 @@ static void __fw_status_set(struct fw_status *fw_st,
 
 	if (status == FW_STATUS_DONE ||
 			status == FW_STATUS_ABORTED)
-		complete_all(&fw_st->completion);
+		swake_up(&fw_st->wq);
 }
 
 #define fw_status_start(fw_st)					\
@@ -373,14 +378,6 @@ static const char * const fw_path[] = {
 module_param_string(path, fw_path_para, sizeof(fw_path_para), 0644);
 MODULE_PARM_DESC(path, "customized firmware image search path with a higher priority than default path");
 
-static void fw_finish_direct_load(struct device *device,
-				  struct firmware_buf *buf)
-{
-	mutex_lock(&fw_lock);
-	fw_status_done(&buf->fw_st);
-	mutex_unlock(&fw_lock);
-}
-
 static int
 fw_get_filesystem_firmware(struct device *device, struct firmware_buf *buf)
 {
@@ -427,7 +424,7 @@ fw_get_filesystem_firmware(struct device *device, struct firmware_buf *buf)
 		}
 		dev_dbg(device, "direct-loading %s\n", buf->fw_id);
 		buf->size = size;
-		fw_finish_direct_load(device, buf);
+		fw_status_done(&buf->fw_st);
 		break;
 	}
 	__putname(path);
@@ -1081,24 +1078,6 @@ static inline void kill_requests_without_uevent(void) { }
 
 #endif /* CONFIG_FW_LOADER_USER_HELPER */
 
-/* wait until the shared firmware_buf becomes ready (or error) */
-static int sync_cached_firmware_buf(struct firmware_buf *buf)
-{
-	int ret = 0;
-
-	mutex_lock(&fw_lock);
-	while (!fw_status_is_done(&buf->fw_st)) {
-		if (fw_status_is_aborted(&buf->fw_st)) {
-			ret = -ENOENT;
-			break;
-		}
-		mutex_unlock(&fw_lock);
-		ret = fw_status_wait_timeout(&buf->fw_st, 0);
-		mutex_lock(&fw_lock);
-	}
-	mutex_unlock(&fw_lock);
-	return ret;
-}
 
 /* prepare firmware and firmware_buf structs;
  * return 0 if a firmware is already assigned, 1 if need to load one,
@@ -1133,7 +1112,7 @@ _request_firmware_prepare(struct firmware **firmware_p, const char *name,
 	firmware->priv = buf;
 
 	if (ret > 0) {
-		ret = sync_cached_firmware_buf(buf);
+		ret = fw_status_wait_timeout(&buf->fw_st, 0);
 		if (!ret) {
 			fw_set_page_data(buf, firmware);
 			return 0; /* assigned */
