@@ -1415,6 +1415,24 @@ int perf_evlist__apply_filters(struct perf_evlist *evlist, struct perf_evsel **e
 	return err;
 }
 
+int perf_evlist__apply_drv_configs(struct perf_evlist *evlist,
+				   struct perf_evsel **err_evsel,
+				   struct perf_evsel_config_term **err_term)
+{
+	struct perf_evsel *evsel;
+	int err = 0;
+
+	evlist__for_each_entry(evlist, evsel) {
+		err = perf_evsel__apply_drv_configs(evsel, err_term);
+		if (err) {
+			*err_evsel = evsel;
+			break;
+		}
+	}
+
+	return err;
+}
+
 int perf_evlist__set_filter(struct perf_evlist *evlist, const char *filter)
 {
 	struct perf_evsel *evsel;
