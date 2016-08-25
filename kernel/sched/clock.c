@@ -147,7 +147,7 @@ static inline struct sched_clock_data *cpu_sdc(int cpu)
 	return &per_cpu(sched_clock_data, cpu);
 }
 
-void sched_clock_init(void)
+void __init sched_clock_init(void)
 {
 	u64 ktime_now = ktime_to_ns(ktime_get());
 	int cpu;
@@ -366,7 +366,7 @@ EXPORT_SYMBOL_GPL(sched_clock_idle_wakeup_event);
 
 #else /* CONFIG_HAVE_UNSTABLE_SCHED_CLOCK */
 
-void sched_clock_init(void)
+void __init sched_clock_init(void)
 {
 	sched_clock_running = 1;
 }
