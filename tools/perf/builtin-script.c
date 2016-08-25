@@ -65,6 +65,7 @@ enum perf_output_field {
 	PERF_OUTPUT_WEIGHT	    = 1U << 18,
 	PERF_OUTPUT_BPF_OUTPUT	    = 1U << 19,
 	PERF_OUTPUT_CALLINDENT	    = 1U << 20,
+	PERF_OUTPUT_CID             = 1U << 21,
 };
 
 struct output_option {
@@ -92,6 +93,7 @@ struct output_option {
 	{.str = "weight",   .field = PERF_OUTPUT_WEIGHT},
 	{.str = "bpf-output",   .field = PERF_OUTPUT_BPF_OUTPUT},
 	{.str = "callindent", .field = PERF_OUTPUT_CALLINDENT},
+	{.str = "cid",   .field = PERF_OUTPUT_CID},
 };
 
 /* default set to maintain compatibility with current format */
@@ -310,6 +312,11 @@ static int perf_evsel__check_attr(struct perf_evsel *evsel,
 	if (PRINT_FIELD(IREGS) &&
 		perf_evsel__check_stype(evsel, PERF_SAMPLE_REGS_INTR, "IREGS",
 					PERF_OUTPUT_IREGS))
+		return -EINVAL;
+
+	if (PRINT_FIELD(CID) &&
+		perf_evsel__check_stype(evsel, PERF_SAMPLE_CID, "CID",
+					PERF_OUTPUT_CID))
 		return -EINVAL;
 
 	return 0;
@@ -908,6 +915,9 @@ static void process_event(struct perf_script *script,
 
 	if (perf_evsel__is_bpf_output(evsel) && PRINT_FIELD(BPF_OUTPUT))
 		print_sample_bpf_output(sample);
+
+	if (PRINT_FIELD(CID))
+		printf("%10u ", sample->cid);
 
 	printf("\n");
 }
@@ -2114,8 +2124,8 @@ int cmd_script(int argc, const char **argv, const char *prefix __maybe_unused)
 	OPT_CALLBACK('F', "fields", NULL, "str",
 		     "comma separated output fields prepend with 'type:'. "
 		     "Valid types: hw,sw,trace,raw. "
-		     "Fields: comm,tid,pid,time,cpu,event,trace,ip,sym,dso,"
-		     "addr,symoff,period,iregs,brstack,brstacksym,flags,"
+		     "Fields: comm,tid,pid,cid,time,cpu,event,trace,ip,sym,"
+		     "dso,addr,symoff,period,iregs,brstack,brstacksym,flags,"
 		     "callindent", parse_output_fields),
 	OPT_BOOLEAN('a', "all-cpus", &system_wide,
 		    "system-wide collection from all CPUs"),

@@ -1108,6 +1108,9 @@ static void dump_sample(struct perf_evsel *evsel, union perf_event *event,
 
 	if (sample_type & PERF_SAMPLE_READ)
 		sample_read__printf(sample, evsel->attr.read_format);
+
+	if (sample_type & PERF_SAMPLE_CID)
+		printf("... cid: %u\n", sample->cid);
 }
 
 static struct machine *machines__find_for_cpumode(struct machines *machines,

@@ -929,6 +929,8 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts,
 	if (opts->sample_transaction)
 		perf_evsel__set_sample_bit(evsel, TRANSACTION);
 
+	perf_evsel__set_sample_bit(evsel, CID);
+
 	if (opts->running_time) {
 		evsel->attr.read_format |=
 			PERF_FORMAT_TOTAL_TIME_ENABLED |
@@ -1973,6 +1975,20 @@ int perf_evsel__parse_sample(struct perf_evsel *evsel, union perf_event *event,
 		}
 	}
 
+	data->cid = 0;
+	if (type & PERF_SAMPLE_CID) {
+		u.val64 = *array;
+
+		if (swapped) {
+			/* undo swap of u64, then swap on individual u32s */
+			u.val64 = bswap_64(u.val64);
+			u.val32[0] = bswap_32(u.val32[0]);
+		}
+
+		data->cid = u.val32[0];
+		array++;
+	}
+
 	return 0;
 }
 
@@ -2077,6 +2093,9 @@ size_t perf_event__sample_event_size(const struct perf_sample *sample, u64 type,
 			result += sizeof(u64);
 		}
 	}
+
+	if (type & PERF_SAMPLE_CID)
+		result += sizeof(u64);
 
 	return result;
 }
@@ -2265,6 +2284,21 @@ int perf_event__synthesize_sample(union perf_event *event, u64 type,
 		} else {
 			*array++ = 0;
 		}
+	}
+
+	if (type & PERF_SAMPLE_CID) {
+		u.val32[0] = sample->cid;
+
+		if (swapped) {
+			/*
+			 * Inverse of what is done in perf_evsel__parse_sample
+			 */
+			u.val32[0] = bswap_32(u.val32[0]);
+			u.val64 = bswap_64(u.val64);
+		}
+
+		*array = u.val64;
+		array++;
 	}
 
 	return 0;

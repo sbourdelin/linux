@@ -1392,6 +1392,27 @@ struct sort_entry sort_transaction = {
 	.se_width_idx	= HISTC_TRANSACTION,
 };
 
+/* --sort cid */
+
+static int64_t
+sort__cid_cmp(struct hist_entry *left, struct hist_entry *right)
+{
+	return (int64_t)right->cid - (int64_t)left->cid;
+}
+
+static int hist_entry__cid_snprintf(struct hist_entry *he, char *bf,
+				       size_t size, unsigned int width)
+{
+	return repsep_snprintf(bf, size, "%-*u", width, he->cid);
+}
+
+struct sort_entry sort_cid = {
+	.se_header	= "Container ID ",
+	.se_cmp		= sort__cid_cmp,
+	.se_snprintf	= hist_entry__cid_snprintf,
+	.se_width_idx	= HISTC_CID,
+};
+
 struct sort_dimension {
 	const char		*name;
 	struct sort_entry	*entry;
@@ -1414,6 +1435,7 @@ static struct sort_dimension common_sort_dimensions[] = {
 	DIM(SORT_GLOBAL_WEIGHT, "weight", sort_global_weight),
 	DIM(SORT_TRANSACTION, "transaction", sort_transaction),
 	DIM(SORT_TRACE, "trace", sort_trace),
+	DIM(SORT_CID, "cid", sort_cid),
 };
 
 #undef DIM
