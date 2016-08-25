@@ -317,6 +317,7 @@ void native_flush_tlb_others(const struct cpumask *cpumask,
 
 #define TLBSTATE_OK	1
 #define TLBSTATE_LAZY	2
+#define TLBSTATE_FLUSH	3
 
 static inline void reset_lazy_tlbstate(void)
 {
