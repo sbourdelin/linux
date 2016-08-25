@@ -1478,6 +1478,16 @@ static int __init mtk_hw_init(struct mtk_eth *eth)
 	return 0;
 }
 
+static int mtk_hw_deinit(struct mtk_eth *eth)
+{
+	clk_disable_unprepare(eth->clk_esw);
+	clk_disable_unprepare(eth->clk_gp1);
+	clk_disable_unprepare(eth->clk_gp2);
+	clk_disable_unprepare(eth->clk_ethif);
+
+	return 0;
+}
+
 static int __init mtk_init(struct net_device *dev)
 {
 	struct mtk_mac *mac = netdev_priv(dev);
@@ -1919,11 +1929,15 @@ err_free_dev:
 static int mtk_remove(struct platform_device *pdev)
 {
 	struct mtk_eth *eth = platform_get_drvdata(pdev);
+	int i;
 
-	clk_disable_unprepare(eth->clk_ethif);
-	clk_disable_unprepare(eth->clk_esw);
-	clk_disable_unprepare(eth->clk_gp1);
-	clk_disable_unprepare(eth->clk_gp2);
+	/* stop all devices to make sure that dma is properly shut down */
+	for (i = 0; i < MTK_MAC_COUNT; i++) {
+		if (!eth->netdev[i])
+			continue;
+		mtk_stop(eth->netdev[i]);
+	}
+	mtk_hw_deinit(eth);
 
 	netif_napi_del(&eth->tx_napi);
 	netif_napi_del(&eth->rx_napi);
