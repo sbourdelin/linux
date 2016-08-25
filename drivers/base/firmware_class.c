@@ -120,16 +120,18 @@ static void fw_status_init(struct fw_status *fw_st)
 
 static int __fw_status_check(struct fw_status *fw_st, unsigned long status)
 {
-	return test_bit(status, &fw_st->status);
+	return fw_st->status == status;
 }
 
 static int fw_status_wait_timeout(struct fw_status *fw_st, long timeout)
 {
+	unsigned long status;
 	int ret;
 
 	ret = wait_for_completion_interruptible_timeout(&fw_st->completion,
 							timeout);
-	if (ret == 0 && test_bit(FW_STATUS_ABORTED, &fw_st->status))
+	status = READ_ONCE(fw_st->status);
+	if (ret == 0 && status == FW_STATUS_ABORTED)
 		return -ENOENT;
 
 	return ret;
@@ -138,13 +140,11 @@ static int fw_status_wait_timeout(struct fw_status *fw_st, long timeout)
 static void __fw_status_set(struct fw_status *fw_st,
 			  unsigned long status)
 {
-	set_bit(status, &fw_st->status);
+	WRITE_ONCE(fw_st->status, status);
 
 	if (status == FW_STATUS_DONE ||
-			status == FW_STATUS_ABORTED) {
-		clear_bit(FW_STATUS_LOADING, &fw_st->status);
+			status == FW_STATUS_ABORTED)
 		complete_all(&fw_st->completion);
-	}
 }
 
 #define fw_status_start(fw_st)					\
