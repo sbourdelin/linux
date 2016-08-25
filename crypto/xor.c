@@ -113,13 +113,14 @@ calibrate_xor_blocks(void)
 
 #ifdef XOR_SELECT_TEMPLATE
 	fastest = XOR_SELECT_TEMPLATE(fastest);
+#endif
+
 	if (fastest) {
 		printk(KERN_INFO "xor: automatically using best "
 				 "checksumming function   %-10s\n",
 		       fastest->name);
 		goto out;
 	}
-#endif
 
 	/*
 	 * Note: Since the memory is not actually used for _anything_ but to
