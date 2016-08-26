@@ -60,8 +60,17 @@ static int imx_boot_secondary(unsigned int cpu, struct task_struct *idle)
 static void __init imx_smp_init_cpus(void)
 {
 	int i, ncores;
+	unsigned long val, arch_type;
 
-	ncores = scu_get_core_count(scu_base);
+	asm volatile("mrc p15, 0, %0, c0, c0, 0" : "=r" (arch_type));
+
+	if (((arch_type >> 4) & 0xfff) == 0xc07) {
+		/* cortex-a7 core number is in bit[25:24] of CP15 L2CTLR */
+		asm volatile("mrc p15, 1, %0, c9, c0, 2" : "=r" (val));
+		ncores = ((val >> 24) & 0x3) + 1;
+	} else {
+		ncores = scu_get_core_count(scu_base);
+	}
 
 	for (i = ncores; i < NR_CPUS; i++)
 		set_cpu_possible(i, false);
@@ -74,6 +83,14 @@ void imx_smp_prepare(void)
 
 static void __init imx_smp_prepare_cpus(unsigned int max_cpus)
 {
+	unsigned long arch_type;
+
+	asm volatile("mrc p15, 0, %0, c0, c0, 0" : "=r" (arch_type));
+
+	/* no need for cortex-a7 */
+	if (((arch_type >> 4) & 0xfff) == 0xc07)
+		return;
+
 	imx_smp_prepare();
 
 	/*

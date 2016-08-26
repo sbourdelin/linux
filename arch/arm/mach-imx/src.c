@@ -18,6 +18,7 @@
 #include <linux/smp.h>
 #include <asm/smp_plat.h>
 #include "common.h"
+#include "hardware.h"
 
 #define SRC_SCR				0x000
 #define SRC_GPR1			0x020
@@ -29,6 +30,15 @@
 #define BP_SRC_SCR_SW_IPU2_RST		12
 #define BP_SRC_SCR_CORE1_RST		14
 #define BP_SRC_SCR_CORE1_ENABLE		22
+
+/* below are for i.MX7D */
+#define SRC_GPR1_V2                     0x074
+#define SRC_A7RCR0                      0x004
+#define SRC_A7RCR1                      0x008
+#define SRC_M4RCR                       0x00C
+
+#define BP_SRC_A7RCR0_A7_CORE_RESET0   0
+#define BP_SRC_A7RCR1_A7_CORE1_ENABLE  1
 
 static void __iomem *src_base;
 static DEFINE_SPINLOCK(scr_lock);
@@ -87,12 +97,21 @@ void imx_enable_cpu(int cpu, bool enable)
 	u32 mask, val;
 
 	cpu = cpu_logical_map(cpu);
-	mask = 1 << (BP_SRC_SCR_CORE1_ENABLE + cpu - 1);
 	spin_lock(&scr_lock);
-	val = readl_relaxed(src_base + SRC_SCR);
-	val = enable ? val | mask : val & ~mask;
-	val |= 1 << (BP_SRC_SCR_CORE1_RST + cpu - 1);
-	writel_relaxed(val, src_base + SRC_SCR);
+	if (cpu_is_imx7d()) {
+		if (enable)
+			imx_gpcv2_set_core1_pdn_pup_by_software(false);
+		mask = 1 << (BP_SRC_A7RCR1_A7_CORE1_ENABLE + cpu - 1);
+		val = readl_relaxed(src_base + SRC_A7RCR1);
+		val = enable ? val | mask : val & ~mask;
+		writel_relaxed(val, src_base + SRC_A7RCR1);
+	} else {
+		mask = 1 << (BP_SRC_SCR_CORE1_ENABLE + cpu - 1);
+		val = readl_relaxed(src_base + SRC_SCR);
+		val = enable ? val | mask : val & ~mask;
+		val |= 1 << (BP_SRC_SCR_CORE1_RST + cpu - 1);
+		writel_relaxed(val, src_base + SRC_SCR);
+	}
 	spin_unlock(&scr_lock);
 }
 
@@ -100,19 +119,22 @@ void imx_set_cpu_jump(int cpu, void *jump_addr)
 {
 	cpu = cpu_logical_map(cpu);
 	writel_relaxed(virt_to_phys(jump_addr),
-		       src_base + SRC_GPR1 + cpu * 8);
+		       src_base + (cpu_is_imx7d() ?
+		       SRC_GPR1_V2 : SRC_GPR1) + cpu * 8);
 }
 
 u32 imx_get_cpu_arg(int cpu)
 {
 	cpu = cpu_logical_map(cpu);
-	return readl_relaxed(src_base + SRC_GPR1 + cpu * 8 + 4);
+	return readl_relaxed(src_base + (cpu_is_imx7d() ?
+		SRC_GPR1_V2 : SRC_GPR1) + cpu * 8 + 4);
 }
 
 void imx_set_cpu_arg(int cpu, u32 arg)
 {
 	cpu = cpu_logical_map(cpu);
-	writel_relaxed(arg, src_base + SRC_GPR1 + cpu * 8 + 4);
+	writel_relaxed(arg, src_base + (cpu_is_imx7d() ?
+		SRC_GPR1_V2 : SRC_GPR1) + cpu * 8 + 4);
 }
 
 void __init imx_src_init(void)

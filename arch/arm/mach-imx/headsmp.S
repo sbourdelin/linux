@@ -26,7 +26,18 @@ diag_reg_offset:
 	.endm
 
 ENTRY(v7_secondary_startup)
+	.word	0xc070			@ 0xc07 is cortex-a7 id
+	.word	0xfff0			@ mask for core type
+
 ARM_BE8(setend be)			@ go BE8 if entered LE
+	mrc     p15, 0, r0, c0, c0, 0
+	adr	r1, v7_secondary_startup
+	ldr	r2, [r1]
+	ldr	r3, [r1, #0x4]
+	and     r0, r0, r3
+	cmp     r0, r2
+	beq     secondary_startup
+
 	set_diag_reg
 	b	secondary_startup
 ENDPROC(v7_secondary_startup)
