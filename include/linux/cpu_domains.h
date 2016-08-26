@@ -14,8 +14,10 @@
 #include <linux/types.h>
 
 struct cpumask;
+struct device_node;
 
 struct cpu_pd_ops {
+	int (*populate_state_data)(struct device_node *n, u32 *param);
 	int (*power_off)(u32 state_idx, u32 param, const struct cpumask *mask);
 	int (*power_on)(void);
 };
@@ -45,5 +47,21 @@ static inline int cpu_pd_attach_cpu(struct generic_pm_domain *genpd, int cpu)
 { return -ENODEV; }
 
 #endif /* CONFIG_PM_GENERIC_DOMAINS */
+
+#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
+
+int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops);
+
+int of_setup_cpu_pd(const struct cpu_pd_ops *ops);
+
+#else
+
+static inline int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops)
+{ return -ENODEV; }
+
+static inline int of_setup_cpu_pd(const struct cpu_pd_ops *ops)
+{ return -ENODEV; }
+
+#endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
 
 #endif /* __CPU_DOMAINS_H__ */

@@ -15,6 +15,7 @@
 #include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
+#include <linux/of.h>
 #include <linux/pm_domain.h>
 #include <linux/rculist.h>
 #include <linux/rcupdate.h>
@@ -189,3 +190,192 @@ fail:
 	return ERR_PTR(ret);
 }
 EXPORT_SYMBOL(cpu_pd_init);
+
+static struct generic_pm_domain *alloc_genpd(const char *name)
+{
+	struct generic_pm_domain *genpd;
+
+	genpd = kzalloc(sizeof(*genpd), GFP_KERNEL);
+	if (!genpd)
+		return ERR_PTR(-ENOMEM);
+
+	genpd->name = kstrndup(name, CPU_PD_NAME_MAX, GFP_KERNEL);
+	if (!genpd->name) {
+		kfree(genpd);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	return genpd;
+}
+
+/**
+ * of_init_cpu_pm_domain() - Initialize a CPU PM domain from a device node
+ *
+ * @dn: The domain provider's device node
+ * @ops: The power_on/_off callbacks for the domain
+ *
+ * Returns the generic_pm_domain (genpd) pointer to the domain on success
+ */
+static struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
+				const struct cpu_pd_ops *ops)
+{
+	struct cpu_pm_domain *pd = NULL;
+	struct generic_pm_domain *genpd = NULL;
+	int ret = -ENOMEM;
+
+	if (!of_device_is_available(dn))
+		return ERR_PTR(-ENODEV);
+
+	genpd = alloc_genpd(dn->full_name);
+	if (IS_ERR(genpd))
+		return genpd;
+
+	genpd->of_node = dn;
+
+	/* Populate platform specific states from DT */
+	if (ops->populate_state_data) {
+		struct device_node *np;
+		int i;
+
+		/* Initialize the arm,idle-state properties */
+		ret = pm_genpd_of_parse_power_states(genpd);
+		if (ret) {
+			pr_warn("%s domain states not initialized (%d)\n",
+					dn->full_name, ret);
+			goto fail;
+		}
+		for (i = 0; i < genpd->state_count; i++) {
+			ret = ops->populate_state_data(genpd->states[i].of_node,
+						&genpd->states[i].param);
+			of_node_put(np);
+			if (ret)
+				goto fail;
+		}
+	}
+
+	genpd = cpu_pd_init(genpd, ops);
+	if (IS_ERR(genpd))
+		goto fail;
+
+	ret = of_genpd_add_provider_simple(dn, genpd);
+	if (ret)
+		pr_warn("Unable to add genpd %s as provider\n",
+				pd->genpd->name);
+
+	return genpd;
+fail:
+	kfree(genpd->name);
+	kfree(genpd);
+	if (pd)
+		kfree(pd->cpus);
+	kfree(pd);
+	return ERR_PTR(ret);
+}
+
+static struct generic_pm_domain *of_get_cpu_domain(struct device_node *dn,
+		const struct cpu_pd_ops *ops, int cpu)
+{
+	struct of_phandle_args args;
+	struct generic_pm_domain *genpd, *parent;
+	int ret;
+
+	/* Do we have this domain? If not, create the domain */
+	args.np = dn;
+	args.args_count = 0;
+
+	genpd = of_genpd_get_from_provider(&args);
+	if (!IS_ERR(genpd))
+		return genpd;
+
+	genpd = of_init_cpu_pm_domain(dn, ops);
+	if (IS_ERR(genpd))
+		return genpd;
+
+	/* Is there a domain provider for this domain? */
+	ret = of_parse_phandle_with_args(dn, "power-domains",
+			"#power-domain-cells", 0, &args);
+	if (ret < 0)
+		goto skip_parent;
+
+	/* Find its parent and attach this domain to it, recursively */
+	parent = of_get_cpu_domain(args.np, ops, cpu);
+	if (IS_ERR(parent))
+		goto skip_parent;
+
+	ret = cpu_pd_attach_domain(parent, genpd);
+	if (ret)
+		pr_err("Unable to attach domain %s to parent %s\n",
+				genpd->name, parent->name);
+
+skip_parent:
+	of_node_put(dn);
+	return genpd;
+}
+
+/**
+ * of_setup_cpu_pd_single() - Setup the PM domains for a CPU
+ *
+ * @cpu: The CPU for which the PM domain is to be set up.
+ * @ops: The PM domain suspend/resume ops for the CPU's domain
+ *
+ * If the CPU PM domain exists already, then the CPU is attached to
+ * that CPU PD. If it doesn't, the domain is created, the @ops are
+ * set for power_on/power_off callbacks and then the CPU is attached
+ * to that domain. If the domain was created outside this framework,
+ * then we do not attach the CPU to the domain.
+ */
+int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops)
+{
+
+	struct device_node *dn, *np;
+	struct generic_pm_domain *genpd;
+	struct cpu_pm_domain *cpu_pd;
+
+	np = of_get_cpu_node(cpu, NULL);
+	if (!np)
+		return -ENODEV;
+
+	dn = of_parse_phandle(np, "power-domains", 0);
+	of_node_put(np);
+	if (!dn)
+		return -ENODEV;
+
+	/* Find the genpd for this CPU, create if not found */
+	genpd = of_get_cpu_domain(dn, ops, cpu);
+	of_node_put(dn);
+	if (IS_ERR(genpd))
+		return PTR_ERR(genpd);
+
+	cpu_pd = to_cpu_pd(genpd);
+	if (!cpu_pd) {
+		pr_err("%s: Genpd was created outside CPU PM domains\n",
+				__func__);
+		return -ENOENT;
+	}
+
+	return cpu_pd_attach_cpu(genpd, cpu);
+}
+EXPORT_SYMBOL(of_setup_cpu_pd_single);
+
+/**
+ * of_setup_cpu_pd() - Setup the PM domains for all CPUs
+ *
+ * @ops: The PM domain suspend/resume ops for all the domains
+ *
+ * Setup the CPU PM domain and attach all possible CPUs to their respective
+ * domains. The domains are created if not already and then attached.
+ */
+int of_setup_cpu_pd(const struct cpu_pd_ops *ops)
+{
+	int cpu;
+	int ret;
+
+	for_each_possible_cpu(cpu) {
+		ret = of_setup_cpu_pd_single(cpu, ops);
+		if (ret)
+			break;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(of_setup_cpu_pd);
