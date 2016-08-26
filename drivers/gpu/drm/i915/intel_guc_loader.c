@@ -533,9 +533,9 @@ fail:
 	 * nonfatal error (i.e. it doesn't prevent driver load, but
 	 * marks the GPU as wedged until reset).
 	 */
-	if (i915.enable_guc_loading >= FIRMWARE_LOAD_MANDATORY) {
+	if (i915.enable_guc_loading == FIRMWARE_LOAD_MANDATORY) {
 		ret = -EIO;
-	} else if (i915.enable_guc_submission >= GUC_SUBMISSION_MANDATORY) {
+	} else if (i915.enable_guc_submission == GUC_SUBMISSION_MANDATORY) {
 		ret = -EIO;
 	} else {
 		ret = 0;
@@ -700,13 +700,37 @@ void intel_guc_init(struct drm_device *dev)
 	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
 	const char *fw_path;
 
-	/* Any negative value means "use platform default" */
-	if (i915.enable_guc_loading <= FIRMWARE_LOAD_DEFAULT)
+	/* Sanitise user-specified options */
+	switch (i915.enable_guc_loading) {
+	case FIRMWARE_LOAD_DISABLED:
+	case FIRMWARE_LOAD_PREFERRED:
+	case FIRMWARE_LOAD_MANDATORY:
+		break;
+
+	default:
+		DRM_INFO("ignoring unknown value %d for 'enable_guc_loading'\n",
+			 i915.enable_guc_loading);
+		/*FALLTHRU*/
+	case FIRMWARE_LOAD_DEFAULT:
 		i915.enable_guc_loading = HAS_GUC_UCODE(dev) ?
 			FIRMWARE_LOAD_PREFERRED : FIRMWARE_LOAD_DISABLED;
-	if (i915.enable_guc_submission <= GUC_SUBMISSION_DEFAULT)
+		break;
+	}
+
+	switch (i915.enable_guc_submission) {
+	case GUC_SUBMISSION_DISABLED:
+	case GUC_SUBMISSION_PREFERRED:
+	case GUC_SUBMISSION_MANDATORY:
+		break;
+
+	default:
+		DRM_INFO("ignoring unknown value %d for 'enable_guc_submission'\n",
+			 i915.enable_guc_submission);
+		/*FALLTHRU*/
+	case GUC_SUBMISSION_DEFAULT:
 		i915.enable_guc_submission = HAS_GUC_SCHED(dev) ?
 			GUC_SUBMISSION_PREFERRED : GUC_SUBMISSION_DISABLED;
+	}
 
 	if (!HAS_GUC_UCODE(dev)) {
 		fw_path = NULL;
