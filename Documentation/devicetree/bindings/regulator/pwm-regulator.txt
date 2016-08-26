@@ -29,6 +29,16 @@ Required properties:
 
 - pwms:			PWM specification (See: ../pwm/pwm.txt)
 
+Optional properties:
+--------------------
+- settle-time-up-us:	Time to settle down after a voltage increase
+			(unit: us). For regulators with a ramp delay
+			the two values are added.
+
+- settle-time-down-us:	Time to settle down after a voltage decrease
+			(unit: us). For regulators with a ramp delay
+			the two values are added.
+
 Only required for Voltage Table Mode:
 - voltage-table: 	Voltage and Duty-Cycle table consisting of 2 cells
 			    First cell is voltage in microvolts (uV)
