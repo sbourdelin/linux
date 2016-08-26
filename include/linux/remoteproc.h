@@ -312,6 +312,7 @@ struct fw_rsc_vdev {
  * @len: length, in bytes
  * @da: device address
  * @priv: associated data
+ * @memmap: true if memory is memremapped
  * @node: list node
  */
 struct rproc_mem_entry {
@@ -320,6 +321,7 @@ struct rproc_mem_entry {
 	int len;
 	u32 da;
 	void *priv;
+	bool memmap;
 	struct list_head node;
 };
 
@@ -458,6 +460,7 @@ struct rproc {
  * @notifyid: rproc-specific unique vring index
  * @rvdev: remote vdev
  * @vq: the virtqueue of this vring
+ * @memmap: true if memory is memremapped
  */
 struct rproc_vring {
 	void *va;
@@ -468,6 +471,7 @@ struct rproc_vring {
 	int notifyid;
 	struct rproc_vdev *rvdev;
 	struct virtqueue *vq;
+	bool memmap;
 };
 
 /**

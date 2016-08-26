@@ -213,13 +213,25 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 	/* actual size of vring (in bytes) */
 	size = PAGE_ALIGN(vring_size(rvring->len, rvring->align));
 
-	/*
-	 * Allocate non-cacheable memory for the vring. In the future
-	 * this call will also configure the IOMMU for us
-	 */
-	va = dma_alloc_coherent(dev->parent, size, &dma, GFP_KERNEL);
+	rsc = (void *)rproc->table_ptr + rvdev->rsc_offset;
+
+	/* check if specific memory region requested by firmware */
+	if (rsc->vring[i].da != 0 && rsc->vring[i].da != FW_RSC_ADDR_ANY) {
+		va = memremap(rsc->vring[i].da, size, MEMREMAP_WC);
+		rvring->dma = rsc->vring[i].da;
+		rvring->memmap = true;
+	} else {
+		/*
+		 * Allocate non-cacheable memory for the vring. In the future
+		 * this call will also configure the IOMMU for us
+		 */
+		va = dma_alloc_coherent(dev->parent, size, &dma, GFP_KERNEL);
+		rvring->dma = dma;
+		rsc->vring[i].da = dma;
+	}
+
 	if (!va) {
-		dev_err(dev->parent, "dma_alloc_coherent failed\n");
+		dev_err(dev->parent, "Failed to get valid ving[%d] va\n", i);
 		return -EINVAL;
 	}
 
@@ -231,7 +243,10 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 	ret = idr_alloc(&rproc->notifyids, rvring, 0, 0, GFP_KERNEL);
 	if (ret < 0) {
 		dev_err(dev, "idr_alloc failed: %d\n", ret);
-		dma_free_coherent(dev->parent, size, va, dma);
+		if (rvring->memmap)
+			memunmap(rvring->va);
+		else
+			dma_free_coherent(dev->parent, size, va, dma);
 		return ret;
 	}
 	notifyid = ret;
@@ -240,7 +255,6 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 		i, va, &dma, size, notifyid);
 
 	rvring->va = va;
-	rvring->dma = dma;
 	rvring->notifyid = notifyid;
 
 	/*
@@ -249,8 +263,6 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 	 * set up the iommu. In this case the device address (da) will
 	 * hold the physical address and not the device address.
 	 */
-	rsc = (void *)rproc->table_ptr + rvdev->rsc_offset;
-	rsc->vring[i].da = dma;
 	rsc->vring[i].notifyid = notifyid;
 	return 0;
 }
@@ -293,7 +305,11 @@ void rproc_free_vring(struct rproc_vring *rvring)
 	int idx = rvring->rvdev->vring - rvring;
 	struct fw_rsc_vdev *rsc;
 
-	dma_free_coherent(rproc->dev.parent, size, rvring->va, rvring->dma);
+	if (rvring->memmap)
+		memunmap(rvring->va);
+	else
+		dma_free_coherent(rproc->dev.parent, size, rvring->va,
+				  rvring->dma);
 	idr_remove(&rproc->notifyids, rvring->notifyid);
 
 	/* reset resource entry info */
@@ -585,7 +601,15 @@ static int rproc_handle_carveout(struct rproc *rproc,
 	if (!carveout)
 		return -ENOMEM;
 
-	va = dma_alloc_coherent(dev->parent, rsc->len, &dma, GFP_KERNEL);
+	/* check if specific memory region requested by firmware */
+	if (rsc->pa != 0 && rsc->pa != FW_RSC_ADDR_ANY) {
+		va = memremap(rsc->pa, rsc->len, MEMREMAP_WC);
+		carveout->memmap = true;
+		dma = rsc->pa;
+	} else {
+		va = dma_alloc_coherent(dev->parent, rsc->len, &dma, GFP_KERNEL);
+		rsc->pa = dma;
+	}
 	if (!va) {
 		dev_err(dev->parent,
 			"failed to allocate dma memory: len 0x%x\n", rsc->len);
@@ -659,7 +683,6 @@ static int rproc_handle_carveout(struct rproc *rproc,
 	 * In this case, the device address and the physical address
 	 * are the same.
 	 */
-	rsc->pa = dma;
 
 	carveout->va = va;
 	carveout->len = rsc->len;
@@ -673,7 +696,10 @@ static int rproc_handle_carveout(struct rproc *rproc,
 free_mapping:
 	kfree(mapping);
 dma_free:
-	dma_free_coherent(dev->parent, rsc->len, va, dma);
+	if (carveout->memmap)
+		memunmap(va);
+	else
+		dma_free_coherent(dev->parent, rsc->len, va, dma);
 free_carv:
 	kfree(carveout);
 	return ret;
@@ -780,8 +806,11 @@ static void rproc_resource_cleanup(struct rproc *rproc)
 
 	/* clean up carveout allocations */
 	list_for_each_entry_safe(entry, tmp, &rproc->carveouts, node) {
-		dma_free_coherent(dev->parent, entry->len, entry->va,
-				  entry->dma);
+		if (entry->memmap)
+			memunmap(entry->va);
+		else
+			dma_free_coherent(dev->parent, entry->len, entry->va,
+					  entry->dma);
 		list_del(&entry->node);
 		kfree(entry);
 	}
