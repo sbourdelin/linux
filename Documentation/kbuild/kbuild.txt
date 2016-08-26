@@ -238,3 +238,10 @@ KBUILD_VMLINUX_MAIN
 All object files for the main part of vmlinux.
 KBUILD_VMLINUX_INIT and KBUILD_VMLINUX_MAIN together specify
 all the object files used to link vmlinux.
+
+KDEB_NO_HEADERS, KDEB_NO_LIBC_HEADERS, KDEB_NO_FIRMWARE
+-------------------------------------------------------
+If these variables are set, the deb-pkg and bindeb-pkg targets won't create
+linux-headers, linux-libc-dev and linux-firmware packages respectively. This
+may be useful for developers who use the deb-pkg targets in their workflow
+but don't need the full set of packages.
