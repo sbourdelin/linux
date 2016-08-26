@@ -800,6 +800,7 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
 	if (budget <= 0)
 		return polled;
 
+	rcu_read_lock();
 	xdp_prog = READ_ONCE(ring->xdp_prog);
 	doorbell_pending = 0;
 	tx_index = (priv->tx_ring_num - priv->xdp_ring_num) + cq->ring;
@@ -1077,6 +1078,7 @@ consumed:
 	}
 
 out:
+	rcu_read_unlock();
 	if (doorbell_pending)
 		mlx4_en_xmit_doorbell(priv->tx_ring[tx_index]);
 
