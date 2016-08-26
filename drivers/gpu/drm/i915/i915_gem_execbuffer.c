@@ -1432,6 +1432,25 @@ out:
 	return vma;
 }
 
+static inline int
+emit_instpm(struct drm_i915_gem_request *request, u32 mask, int mode)
+{
+	struct intel_ring *ring = request->ring;
+	int ret;
+
+	ret = intel_ring_begin(request, 4);
+	if (ret)
+		return ret;
+
+	intel_ring_emit(ring, MI_NOOP);
+	intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(1));
+	intel_ring_emit_reg(ring, INSTPM);
+	intel_ring_emit(ring, mask << 16 | mode);
+	intel_ring_advance(ring);
+
+	return 0;
+}
+
 static int
 execbuf_submit(struct i915_execbuffer_params *params,
 	       struct drm_i915_gem_execbuffer2 *args,
@@ -1462,43 +1481,32 @@ execbuf_submit(struct i915_execbuffer_params *params,
 			return -EINVAL;
 		}
 
-		if (instp_mode != dev_priv->relative_constants_mode) {
-			if (INTEL_INFO(dev_priv)->gen < 4) {
-				DRM_DEBUG("no rel constants on pre-gen4\n");
-				return -EINVAL;
-			}
-
-			if (INTEL_INFO(dev_priv)->gen > 5 &&
-			    instp_mode == I915_EXEC_CONSTANTS_REL_SURFACE) {
-				DRM_DEBUG("rel surface constants mode invalid on gen5+\n");
-				return -EINVAL;
-			}
-
-			/* The HW changed the meaning on this bit on gen6 */
-			if (INTEL_INFO(dev_priv)->gen >= 6)
-				instp_mask &= ~I915_EXEC_CONSTANTS_REL_SURFACE;
+		if (INTEL_INFO(dev_priv)->gen < 4) {
+			DRM_DEBUG("no rel constants on pre-gen4\n");
+			return -EINVAL;
 		}
+
+		if (INTEL_INFO(dev_priv)->gen > 5 &&
+		    instp_mode == I915_EXEC_CONSTANTS_REL_SURFACE) {
+			DRM_DEBUG("rel surface constants mode invalid on gen5+\n");
+			return -EINVAL;
+		}
+
+		/* The HW changed the meaning on this bit on gen6 */
+		if (INTEL_INFO(dev_priv)->gen >= 6)
+			instp_mask &= ~I915_EXEC_CONSTANTS_REL_SURFACE;
+
 		break;
 	default:
 		DRM_DEBUG("execbuf with unknown constants: %d\n", instp_mode);
 		return -EINVAL;
 	}
 
-	if (params->engine->id == RCS &&
-	    instp_mode != dev_priv->relative_constants_mode) {
-		struct intel_ring *ring = params->request->ring;
-
-		ret = intel_ring_begin(params->request, 4);
+	if (instp_mode != I915_EXEC_CONSTANTS_REL_GENERAL) {
+		/* Set non-default value of INSTPM */
+		ret = emit_instpm(params->request, instp_mask, instp_mode);
 		if (ret)
 			return ret;
-
-		intel_ring_emit(ring, MI_NOOP);
-		intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(1));
-		intel_ring_emit_reg(ring, INSTPM);
-		intel_ring_emit(ring, instp_mask << 16 | instp_mode);
-		intel_ring_advance(ring);
-
-		dev_priv->relative_constants_mode = instp_mode;
 	}
 
 	if (args->flags & I915_EXEC_GEN7_SOL_RESET) {
@@ -1519,6 +1527,14 @@ execbuf_submit(struct i915_execbuffer_params *params,
 					    params->dispatch_flags);
 	if (ret)
 		return ret;
+
+	if (instp_mode != I915_EXEC_CONSTANTS_REL_GENERAL) {
+		/* Restore default value of INSTPM */
+		ret = emit_instpm(params->request, instp_mask,
+				  I915_EXEC_CONSTANTS_REL_GENERAL);
+		if (ret)
+			return ret;
+	}
 
 	trace_i915_gem_ring_dispatch(params->request, params->dispatch_flags);
 
