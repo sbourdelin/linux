@@ -2461,14 +2461,12 @@ static int cryptocop_ioctl_process(struct inode *inode, struct file *filp, unsig
 	struct cryptocop_private        *dev = filp->private_data;
 	struct strcop_crypto_op         *crp_oper = (struct strcop_crypto_op *)arg;
 	struct strcop_crypto_op         oper = {0};
-	int                             err = 0;
-	struct cryptocop_operation      *cop = NULL;
-
-	struct ioctl_job_cb_ctx         *jc = NULL;
-
-	struct page                     **inpages = NULL;
+	int                             err;
+	struct cryptocop_operation      *cop;
+	struct ioctl_job_cb_ctx         *jc;
+	struct page                     **inpages;
 	struct page                     **outpages = NULL;
-	int                             noinpages = 0;
+	int                             noinpages;
 	int                             nooutpages;
 
 	struct cryptocop_desc           descs[5]; /* Max 5 descriptors are needed, there are three transforms that
@@ -2482,16 +2480,14 @@ static int cryptocop_ioctl_process(struct inode *inode, struct file *filp, unsig
 
 	unsigned char                   *digest_result = NULL;
 	int                             digest_length = 0;
-	int                             cblocklen = 0;
+	int                             cblocklen;
 	unsigned char                   csum_result[CSUM_BLOCK_LENGTH];
 	struct cryptocop_session        *sess;
-
-	int    iovlen = 0;
+	int    iovlen;
 	int    iovix = 0;
 	int    pageix = 0;
-	int    pageoffset = 0;
-
-	size_t prev_ix = 0;
+	int    pageoffset;
+	size_t prev_ix;
 	size_t next_ix;
 
 	int    cipher_active, digest_active, csum_active;
