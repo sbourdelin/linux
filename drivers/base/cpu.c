@@ -17,6 +17,7 @@
 #include <linux/of.h>
 #include <linux/cpufeature.h>
 #include <linux/tick.h>
+#include <linux/pm_runtime.h>
 
 #include "base.h"
 
@@ -344,6 +345,21 @@ static int cpu_uevent(struct device *dev, struct kobj_uevent_env *env)
 }
 #endif
 
+#ifdef CONFIG_PM
+static void cpu_runtime_pm_init(struct device *dev)
+{
+	pm_runtime_irq_safe(dev);
+	pm_runtime_enable(dev);
+	if (cpu_online(dev->id)) {
+		pm_runtime_get_noresume(dev);
+		pm_runtime_set_active(dev);
+	}
+}
+#else
+static void cpu_runtime_pm_init(struct device *dev)
+{ }
+#endif
+
 /*
  * register_cpu - Setup a sysfs device for a CPU.
  * @cpu - cpu->hotpluggable field set to 1 will generate a control file in
@@ -375,6 +391,8 @@ int register_cpu(struct cpu *cpu, int num)
 		per_cpu(cpu_sys_devices, num) = &cpu->dev;
 	if (!error)
 		register_cpu_under_node(num, cpu_to_node(num));
+
+	cpu_runtime_pm_init(&cpu->dev);
 
 	return error;
 }
