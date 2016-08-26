@@ -1219,6 +1219,7 @@ static int gen8_init_common_ring(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
 
+	intel_mocs_init_engine(engine);
 	lrc_init_hws(engine);
 
 	I915_WRITE_IMR(engine,
@@ -1238,7 +1239,10 @@ static int gen8_init_common_ring(struct intel_engine_cs *engine)
 
 	intel_engine_init_hangcheck(engine);
 
-	return intel_mocs_init_engine(engine);
+	if (!execlists_elsp_idle(engine))
+		execlists_submit_ports(engine);
+
+	return 0;
 }
 
 static int gen8_init_render_ring(struct intel_engine_cs *engine)
@@ -1272,6 +1276,33 @@ static int gen9_init_render_ring(struct intel_engine_cs *engine)
 		return ret;
 
 	return init_workarounds_ring(engine);
+}
+
+static void reset_common_ring(struct intel_engine_cs *engine,
+			      struct drm_i915_gem_request *request)
+{
+	struct drm_i915_private *dev_priv = engine->i915;
+	struct execlist_port *port = engine->execlist_port;
+	struct intel_context *ce = &request->ctx->engine[engine->id];
+
+	/* Move the RING_HEAD onto the breadcrumb, past the hanging batch */
+	ce->lrc_reg_state[CTX_RING_HEAD+1] = request->postfix;
+	request->ring->head = request->postfix;
+	request->ring->last_retired_head = -1;
+	intel_ring_update_space(request->ring);
+
+	/* Catch up with any missed context-switch interrupts */
+	I915_WRITE(RING_CONTEXT_STATUS_PTR(engine), _MASKED_FIELD(0xffff, 0));
+	if (request->ctx != port[0].request->ctx) {
+		i915_gem_request_put(port[0].request);
+		port[0] = port[1];
+		memset(&port[1], 0, sizeof(port[1]));
+	}
+
+	/* CS is stopped, and we will resubmit both ports on resume */
+	GEM_BUG_ON(request->ctx != port[0].request->ctx);
+	port[0].count = 0;
+	port[1].count = 0;
 }
 
 static int intel_logical_ring_emit_pdps(struct drm_i915_gem_request *req)
@@ -1636,6 +1667,7 @@ logical_ring_default_vfuncs(struct intel_engine_cs *engine)
 {
 	/* Default vfuncs which can be overriden by each engine. */
 	engine->init_hw = gen8_init_common_ring;
+	engine->reset_hw = reset_common_ring;
 	engine->emit_flush = gen8_emit_flush;
 	engine->emit_request = gen8_emit_request;
 	engine->submit_request = execlists_submit_request;

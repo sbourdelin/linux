@@ -1595,7 +1595,7 @@ static int i915_drm_resume(struct drm_device *dev)
 	mutex_lock(&dev->struct_mutex);
 	if (i915_gem_init_hw(dev)) {
 		DRM_ERROR("failed to re-initialize GPU, declaring wedged!\n");
-		atomic_or(I915_WEDGED, &dev_priv->gpu_error.reset_counter);
+		i915_gem_set_wedged(dev_priv);
 	}
 	mutex_unlock(&dev->struct_mutex);
 
@@ -1821,7 +1821,7 @@ int i915_reset(struct drm_i915_private *dev_priv)
 	return 0;
 
 error:
-	atomic_or(I915_WEDGED, &error->reset_counter);
+	i915_gem_set_wedged(dev_priv);
 	mutex_unlock(&dev->struct_mutex);
 	return ret;
 }
