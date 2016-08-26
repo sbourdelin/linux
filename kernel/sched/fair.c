@@ -4255,8 +4255,15 @@ static void do_sched_cfs_slack_timer(struct cfs_bandwidth *cfs_b)
  */
 static void check_enqueue_throttle(struct cfs_rq *cfs_rq)
 {
+	struct cfs_bandwidth *cfs_b = &cfs_rq->tg->cfs_bandwidth;
+
 	if (!cfs_bandwidth_used())
 		return;
+
+	/* register cfs_b->quota */
+	raw_spin_lock(&cfs_b->lock);
+	cfs_rq->runtime_enabled = cfs_b->quota != RUNTIME_INF;
+	raw_spin_unlock(&cfs_b->lock);
 
 	/* an active group must be handled by the update_curr()->put() path */
 	if (!cfs_rq->runtime_enabled || cfs_rq->curr)
