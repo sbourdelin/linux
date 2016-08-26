@@ -2520,7 +2520,14 @@ static void i915_gem_reset_engine_status(struct intel_engine_cs *engine)
 static void i915_gem_reset_engine_cleanup(struct intel_engine_cs *engine)
 {
 	struct drm_i915_gem_request *request;
+	unsigned long flags;
 	struct intel_ring *ring;
+
+	/* Ensure irq handler finishes or is cancelled, and not run again. */
+	local_irq_save(flags);
+	tasklet_kill(&engine->irq_tasklet);
+	tasklet_disable(&engine->irq_tasklet);
+	local_irq_restore(flags);
 
 	/* Mark all pending requests as complete so that any concurrent
 	 * (lockless) lookup doesn't try and wait upon the request as we
@@ -2535,10 +2542,12 @@ static void i915_gem_reset_engine_cleanup(struct intel_engine_cs *engine)
 	 */
 
 	if (i915.enable_execlists) {
-		/* Ensure irq handler finishes or is cancelled. */
-		tasklet_kill(&engine->irq_tasklet);
-
-		intel_execlists_cancel_requests(engine);
+		spin_lock(&engine->execlist_lock);
+		INIT_LIST_HEAD(&engine->execlist_queue);
+		i915_gem_request_put(engine->execlist_port[0].request);
+		i915_gem_request_put(engine->execlist_port[1].request);
+		memset(engine->execlist_port, 0, sizeof(engine->execlist_port));
+		spin_unlock(&engine->execlist_lock);
 	}
 
 	/*
@@ -2567,6 +2576,8 @@ static void i915_gem_reset_engine_cleanup(struct intel_engine_cs *engine)
 	}
 
 	engine->i915->gt.active_engines &= ~intel_engine_flag(engine);
+
+	tasklet_enable(&engine->irq_tasklet);
 }
 
 void i915_gem_reset(struct drm_device *dev)
