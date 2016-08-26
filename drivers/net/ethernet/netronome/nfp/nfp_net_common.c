@@ -1298,23 +1298,20 @@ static void nfp_net_rx_csum(struct nfp_net *nn, struct nfp_net_r_vector *r_vec,
  * nfp_net_set_hash() - Set SKB hash data
  * @netdev: adapter's net_device structure
  * @skb:   SKB to set the hash data on
- * @rxd:   RX descriptor
  *
  * The RSS hash and hash-type are pre-pended to the packet data.
  * Extract and decode it and set the skb fields.
  */
-static void nfp_net_set_hash(struct net_device *netdev, struct sk_buff *skb,
-			     struct nfp_net_rx_desc *rxd)
+static void nfp_net_set_hash(struct net_device *netdev, struct sk_buff *skb)
 {
 	struct nfp_net_rx_hash *rx_hash;
 
-	if (!(rxd->rxd.flags & PCIE_DESC_RX_RSS) ||
-	    !(netdev->features & NETIF_F_RXHASH))
+	if (!(netdev->features & NETIF_F_RXHASH))
 		return;
 
 	rx_hash = (struct nfp_net_rx_hash *)(skb->data - sizeof(*rx_hash));
 
-	switch (be32_to_cpu(rx_hash->hash_type)) {
+	switch (be32_to_cpu(rx_hash->hash_type) & NPF_NET_META_FIELD_HASH) {
 	case NFP_NET_RSS_IPV4:
 	case NFP_NET_RSS_IPV6:
 	case NFP_NET_RSS_IPV6_EX:
@@ -1323,6 +1320,33 @@ static void nfp_net_set_hash(struct net_device *netdev, struct sk_buff *skb,
 	default:
 		skb_set_hash(skb, be32_to_cpu(rx_hash->hash), PKT_HASH_TYPE_L4);
 		break;
+	}
+}
+
+static void
+nfp_net_parse_meta(struct net_device *netdev, struct sk_buff *skb,
+		   struct nfp_net_rx_desc *rxd, int meta_len)
+{
+	u32 meta_info;
+	u8 *data = skb->data - 4;
+
+	if (rxd->rxd.flags & PCIE_DESC_RX_RSS) {
+		data -= 4;
+		nfp_net_set_hash(netdev, skb);
+	}
+
+	meta_info = get_unaligned_be32(data) >> 8;
+	data -= 4;
+
+	while (meta_info) {
+		switch (meta_info & GENMASK(NFP_NET_META_FIELD_SIZE, 0)) {
+		case NFP_NET_META_MARK:
+			skb->mark = get_unaligned_be32(data);
+			data -= 4;
+			break;
+		}
+
+		meta_info >>= NFP_NET_META_FIELD_SIZE;
 	}
 }
 
@@ -1440,7 +1464,7 @@ static int nfp_net_rx(struct nfp_net_rx_ring *rx_ring, int budget)
 			skb_reserve(skb, nn->rx_offset);
 		skb_put(skb, data_len - meta_len);
 
-		nfp_net_set_hash(nn->netdev, skb, rxd);
+		nfp_net_parse_meta(nn->netdev, skb, rxd, meta_len);
 
 		/* Pad small frames to minimum */
 		if (skb_put_padto(skb, 60))

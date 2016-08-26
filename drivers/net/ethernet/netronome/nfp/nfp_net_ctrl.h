@@ -80,6 +80,14 @@
 #define NFP_NET_RSS_IPV6_EX_UDP         9
 
 /**
+ * Prepend field types
+ */
+#define NPF_NET_META_FIELD_HASH		0xff
+
+#define NFP_NET_META_FIELD_SIZE		4
+#define NFP_NET_META_MARK		1
+
+/**
  * @NFP_NET_TXR_MAX:         Maximum number of TX rings
  * @NFP_NET_RXR_MAX:         Maximum number of RX rings
  */
