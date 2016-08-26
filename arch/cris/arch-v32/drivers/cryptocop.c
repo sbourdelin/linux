@@ -2497,8 +2497,6 @@ static int cryptocop_ioctl_process(struct inode *inode, struct file *filp, unsig
 	int    cipher_active, digest_active, csum_active;
 	int    end_digest, end_csum;
 	int    digest_done = 0;
-	int    cipher_done = 0;
-	int    csum_done = 0;
 
 	DEBUG(printk("cryptocop_ioctl_process\n"));
 
@@ -2794,12 +2792,10 @@ static int cryptocop_ioctl_process(struct inode *inode, struct file *filp, unsig
 			dcfgs[dcfg_ix].src = cryptocop_source_dma;
 			cipher_active = 1;
 
-			if (next_ix == (oper.cipher_start + oper.cipher_len)){
-				cipher_done = 1;
+			if (next_ix == (oper.cipher_start + oper.cipher_len))
 				dcfgs[dcfg_ix].last = 1;
-			} else {
+			else
 				dcfgs[dcfg_ix].last = 0;
-			}
 			dcfgs[dcfg_ix].next = descs[desc_ix].cfg;
 			descs[desc_ix].cfg = &dcfgs[dcfg_ix];
 			++dcfg_ix;
@@ -2823,12 +2819,10 @@ static int cryptocop_ioctl_process(struct inode *inode, struct file *filp, unsig
 			csum_active = 1;
 			dcfgs[dcfg_ix].tid = CRYPTOCOP_IOCTL_CSUM_TID;
 			dcfgs[dcfg_ix].src = cryptocop_source_dma;
-			if (next_ix == (oper.csum_start + oper.csum_len)){
-				csum_done = 1;
+			if (next_ix == (oper.csum_start + oper.csum_len))
 				dcfgs[dcfg_ix].last = 1;
-			} else {
+			else
 				dcfgs[dcfg_ix].last = 0;
-			}
 			dcfgs[dcfg_ix].next = descs[desc_ix].cfg;
 			descs[desc_ix].cfg = &dcfgs[dcfg_ix];
 			++dcfg_ix;
