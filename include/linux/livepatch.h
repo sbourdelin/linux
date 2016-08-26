@@ -65,18 +65,32 @@ struct klp_func {
 };
 
 /**
+ * struct klp_hook - hook structure for live patching
+ * @hook:	function to be executed on hook
+ *
+ */
+struct klp_hook {
+	int (*hook)(void);
+};
+
+/**
  * struct klp_object - kernel object structure for live patching
- * @name:	module name (or NULL for vmlinux)
- * @funcs:	function entries for functions to be patched in the object
- * @kobj:	kobject for sysfs resources
- * @mod:	kernel module associated with the patched object
- * 		(NULL for vmlinux)
- * @state:	tracks object-level patch application state
+ * @name:		module name (or NULL for vmlinux)
+ * @funcs:		function entries for functions to be patched in the
+ *                      object
+ * @load_hooks:		functions to be executed before load time (optional)
+ * @unload_hooks:	functions to be executed before load time (optional)
+ * @kobj:		kobject for sysfs resources
+ * @mod:		kernel module associated with the patched object
+ *                      (NULL for vmlinux)
+ * @state:		tracks object-level patch application state
  */
 struct klp_object {
 	/* external */
 	const char *name;
 	struct klp_func *funcs;
+	struct klp_hook *load_hooks;
+	struct klp_hook *unload_hooks;
 
 	/* internal */
 	struct kobject kobj;
@@ -110,6 +124,13 @@ struct klp_patch {
 	for (func = obj->funcs; \
 	     func->old_name || func->new_func || func->old_sympos; \
 	     func++)
+
+#define klp_for_each_load_hook(obj, hook) \
+	for (hook = obj->load_hooks; hook && hook->hook; hook++)
+
+#define klp_for_each_unload_hook(obj, hook) \
+	for (hook = obj->unload_hooks; hook && hook->hook; hook++)
+
 
 int klp_register_patch(struct klp_patch *);
 int klp_unregister_patch(struct klp_patch *);

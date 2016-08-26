@@ -378,6 +378,14 @@ static void klp_disable_func(struct klp_func *func)
 	func->state = KLP_DISABLED;
 }
 
+static int klp_run_hook(struct klp_hook *hook)
+{
+	if (hook && hook->hook)
+		return (*hook->hook)();
+
+	return 0;
+}
+
 static int klp_enable_func(struct klp_func *func)
 {
 	struct klp_ops *ops;
@@ -448,10 +456,20 @@ err:
 static void klp_disable_object(struct klp_object *obj)
 {
 	struct klp_func *func;
+	struct klp_hook *hook;
+	int ret;
 
 	klp_for_each_func(obj, func)
 		if (func->state == KLP_ENABLED)
 			klp_disable_func(func);
+
+	klp_for_each_unload_hook(obj, hook) {
+		ret = klp_run_hook(hook);
+		if (ret) {
+			pr_warn("unload hook '%p' failed for object '%s'\n",
+				hook, klp_is_module(obj) ? obj->name : "vmlinux");
+		}
+	}
 
 	obj->state = KLP_DISABLED;
 }
@@ -459,6 +477,7 @@ static void klp_disable_object(struct klp_object *obj)
 static int klp_enable_object(struct klp_object *obj)
 {
 	struct klp_func *func;
+	struct klp_hook *hook;
 	int ret;
 
 	if (WARN_ON(obj->state != KLP_DISABLED))
@@ -466,6 +485,16 @@ static int klp_enable_object(struct klp_object *obj)
 
 	if (WARN_ON(!klp_is_object_loaded(obj)))
 		return -EINVAL;
+
+	klp_for_each_load_hook(obj, hook) {
+		ret = klp_run_hook(hook);
+		if (ret) {
+			pr_warn("load hook '%p' failed for object '%s'\n",
+				hook, klp_is_module(obj) ? obj->name : "vmlinux");
+			klp_disable_object(obj);
+			return ret;
+		}
+	}
 
 	klp_for_each_func(obj, func) {
 		ret = klp_enable_func(func);
