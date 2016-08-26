@@ -16,9 +16,11 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/cpu.h>
 #include <linux/cpu_pm.h>
 #include <linux/module.h>
 #include <linux/notifier.h>
+#include <linux/pm_runtime.h>
 #include <linux/spinlock.h>
 #include <linux/syscore_ops.h>
 
@@ -99,6 +101,7 @@ int cpu_pm_enter(void)
 {
 	int nr_calls;
 	int ret = 0;
+	struct device *dev = get_cpu_device(smp_processor_id());
 
 	read_lock(&cpu_pm_notifier_lock);
 	ret = cpu_pm_notify(CPU_PM_ENTER, -1, &nr_calls);
@@ -109,6 +112,10 @@ int cpu_pm_enter(void)
 		 */
 		cpu_pm_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
 	read_unlock(&cpu_pm_notifier_lock);
+
+	/* Notify Runtime PM that we are suspending the CPU */
+	if (!ret && dev)
+		RCU_NONIDLE(pm_runtime_put_sync_suspend(dev));
 
 	return ret;
 }
@@ -129,6 +136,11 @@ EXPORT_SYMBOL_GPL(cpu_pm_enter);
 int cpu_pm_exit(void)
 {
 	int ret;
+	struct device *dev = get_cpu_device(smp_processor_id());
+
+	/* Notify Runtime PM that we are resuming the CPU */
+	if (dev)
+		RCU_NONIDLE(pm_runtime_get_sync(dev));
 
 	read_lock(&cpu_pm_notifier_lock);
 	ret = cpu_pm_notify(CPU_PM_EXIT, -1, NULL);
@@ -199,6 +211,39 @@ int cpu_cluster_pm_exit(void)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(cpu_cluster_pm_exit);
+
+#ifdef CONFIG_HOTPLUG_CPU
+static int cpu_pm_cpu_hotplug(struct notifier_block *nb,
+			unsigned long action, void *data)
+{
+	struct device *dev = get_cpu_device(smp_processor_id());
+
+	if (!dev)
+		return NOTIFY_OK;
+
+	/* Execute CPU runtime PM on that CPU */
+	switch (action & ~CPU_TASKS_FROZEN) {
+	case CPU_DYING:
+		pm_runtime_put_sync_suspend(dev);
+		break;
+	case CPU_STARTING:
+		pm_runtime_get_sync(dev);
+		break;
+	default:
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static int __init cpu_pm_hotplug_init(void)
+{
+	/* Register for hotplug notifications for runtime PM */
+	hotcpu_notifier(cpu_pm_cpu_hotplug, 0);
+	return 0;
+}
+device_initcall(cpu_pm_hotplug_init);
+#endif
 
 #ifdef CONFIG_PM
 static int cpu_pm_suspend(void)
