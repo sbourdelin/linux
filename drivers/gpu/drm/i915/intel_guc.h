@@ -89,12 +89,26 @@ struct i915_guc_client {
 	uint64_t submissions[I915_NUM_ENGINES];
 };
 
+/*
+ * These signed ranges represent user-requested preferences.
+ * Out-of-range values from the user will be clipped towards
+ * zero: any negative value is treated as -1, anything over 2
+ * is just 2. ANY user-supplied value also taints the kernel.
+ */
 enum {
 	GUC_SUBMISSION_DEFAULT = -1,
 	GUC_SUBMISSION_DISABLED = 0,
 	GUC_SUBMISSION_PREFERRED,
 	GUC_SUBMISSION_MANDATORY
 };
+enum {
+	FIRMWARE_LOAD_DEFAULT = -1,
+	FIRMWARE_LOAD_DISABLED = 0,
+	FIRMWARE_LOAD_PREFERRED,
+	FIRMWARE_LOAD_MANDATORY
+};
+
+/* These represent the actual firmware status  */
 enum intel_guc_fw_status {
 	GUC_FIRMWARE_FAIL = -1,
 	GUC_FIRMWARE_NONE = 0,
