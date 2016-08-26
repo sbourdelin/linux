@@ -367,7 +367,7 @@ static int devfreq_cooling_state2power(struct thermal_cooling_device *cdev,
 	u32 static_power;
 	unsigned long dyn_power;
 
-	if (state < 0 || state >= dfc->freq_table_size)
+	if (state >= dfc->freq_table_size)
 		return -EINVAL;
 
 	freq = dfc->freq_table[state];
