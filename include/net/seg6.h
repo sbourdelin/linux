@@ -19,6 +19,9 @@
 #if IS_ENABLED(CONFIG_IPV6_SEG6_IPTUNNEL)
 #include <net/lwtunnel.h>
 #endif
+#ifdef CONFIG_IPV6_SEG6_HMAC
+#include <net/seg6_hmac.h>
+#endif
 
 #define SEG6_VERSION_MAJOR	0
 #define SEG6_VERSION_MINOR	30
@@ -26,6 +29,9 @@
 struct seg6_pernet_data {
 	spinlock_t lock;
 	struct in6_addr __rcu *tun_src;
+#ifdef CONFIG_IPV6_SEG6_HMAC
+	struct list_head hmac_infos;
+#endif
 };
 
 static inline struct seg6_pernet_data *seg6_pernet(struct net *net)
@@ -49,6 +55,10 @@ seg6_lwtunnel_encap(struct lwtunnel_state *lwtstate)
 {
 	return (struct seg6_iptunnel_encap *)lwtstate->data;
 }
+#endif
+
+#ifdef CONFIG_IPV6_SEG6_HMAC
+extern struct sr6_tlv_hmac *seg6_get_tlv_hmac(struct ipv6_sr_hdr *srh);
 #endif
 
 #endif
