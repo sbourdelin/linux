@@ -1,0 +1,49 @@
+/*
+ * include/linux/cpu_domains.h
+ *
+ * Copyright (C) 2016 Linaro Ltd.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+#ifndef __CPU_DOMAINS_H__
+#define __CPU_DOMAINS_H__
+
+#include <linux/types.h>
+
+struct cpumask;
+
+struct cpu_pd_ops {
+	int (*power_off)(u32 state_idx, u32 param, const struct cpumask *mask);
+	int (*power_on)(void);
+};
+
+#ifdef CONFIG_PM_GENERIC_DOMAINS
+
+struct generic_pm_domain *cpu_pd_init(struct generic_pm_domain *genpd,
+				const struct cpu_pd_ops *ops);
+
+int cpu_pd_attach_domain(struct generic_pm_domain *parent,
+				struct generic_pm_domain *child);
+
+int cpu_pd_attach_cpu(struct generic_pm_domain *genpd, int cpu);
+
+#else
+
+static inline
+struct generic_pm_domain *cpu_pd_init(struct generic_pm_domain *genpd,
+				const struct cpu_pd_ops *ops)
+{ return ERR_PTR(-ENODEV); }
+
+static inline int cpu_pd_attach_domain(struct generic_pm_domain *parent,
+				struct generic_pm_domain *child)
+{ return -ENODEV; }
+
+static inline int cpu_pd_attach_cpu(struct generic_pm_domain *genpd, int cpu)
+{ return -ENODEV; }
+
+#endif /* CONFIG_PM_GENERIC_DOMAINS */
+
+#endif /* __CPU_DOMAINS_H__ */
