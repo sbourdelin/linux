@@ -1460,6 +1460,23 @@ out_exit:
 	local_irq_restore(flags);
 }
 
+/*
+ * Transactions are not aborted by tlbiel, only tlbie.
+ * Without, syncing a page back to a block device w/ PIO could pick up
+ * transactional data (bad!) so we force an abort here.  Before the
+ * sync the page will be made read-only, which will flush_hash_page.
+ * BIG ISSUE here: if the kernel uses a page from userspace without
+ * unmapping it first, it may see the speculated version.
+ */
+void local_tm_abort(int local)
+{
+	if (local && cpu_has_feature(CPU_FTR_TM) && current->thread.regs &&
+		MSR_TM_ACTIVE(current->thread.regs->msr)) {
+		tm_enable();
+		tm_abort(TM_CAUSE_TLBI);
+	}
+}
+
 /* WARNING: This is called from hash_low_64.S, if you change this prototype,
  *          do not forget to update the assembly call site !
  */
@@ -1487,19 +1504,7 @@ void flush_hash_page(unsigned long vpn, real_pte_t pte, int psize, int ssize,
 	} pte_iterate_hashed_end();
 
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
-	/* Transactions are not aborted by tlbiel, only tlbie.
-	 * Without, syncing a page back to a block device w/ PIO could pick up
-	 * transactional data (bad!) so we force an abort here.  Before the
-	 * sync the page will be made read-only, which will flush_hash_page.
-	 * BIG ISSUE here: if the kernel uses a page from userspace without
-	 * unmapping it first, it may see the speculated version.
-	 */
-	if (local && cpu_has_feature(CPU_FTR_TM) &&
-	    current->thread.regs &&
-	    MSR_TM_ACTIVE(current->thread.regs->msr)) {
-		tm_enable();
-		tm_abort(TM_CAUSE_TLBI);
-	}
+	local_tm_abort(local);
 #endif
 }
 
@@ -1558,19 +1563,7 @@ void flush_hash_hugepage(unsigned long vsid, unsigned long addr,
 	}
 tm_abort:
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
-	/* Transactions are not aborted by tlbiel, only tlbie.
-	 * Without, syncing a page back to a block device w/ PIO could pick up
-	 * transactional data (bad!) so we force an abort here.  Before the
-	 * sync the page will be made read-only, which will flush_hash_page.
-	 * BIG ISSUE here: if the kernel uses a page from userspace without
-	 * unmapping it first, it may see the speculated version.
-	 */
-	if (local && cpu_has_feature(CPU_FTR_TM) &&
-	    current->thread.regs &&
-	    MSR_TM_ACTIVE(current->thread.regs->msr)) {
-		tm_enable();
-		tm_abort(TM_CAUSE_TLBI);
-	}
+	local_tm_abort(local);
 #endif
 	return;
 }
