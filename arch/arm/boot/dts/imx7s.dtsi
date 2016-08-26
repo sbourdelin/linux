@@ -299,10 +299,13 @@
 
 		timer {
 			compatible = "arm,armv7-timer";
+			arm,cpu-registers-not-fw-configured;
 			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
 				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
 				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
 				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+			interrupt-parent = <&intc>;
+			clock-frequency = <8000000>;
 		};
 
 		aips1: aips-bus@30000000 {
@@ -311,6 +314,11 @@
 			#size-cells = <1>;
 			reg = <0x30000000 0x400000>;
 			ranges;
+
+			gpc: gpc@303a0000 {
+				compatible = "fsl,imx7d-gpc";
+				reg = <0x303a0000 0x10000>;
+			};
 
 			gpio1: gpio@30200000 {
 				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
