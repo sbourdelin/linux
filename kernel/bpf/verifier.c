@@ -1523,6 +1523,12 @@ static int check_alu_op(struct verifier_env *env, struct bpf_insn *insn)
 		verbose("invalid BPF_ALU opcode %x\n", opcode);
 		return -EINVAL;
 
+	} else if (opcode == BPF_XOR && BPF_SRC(insn->code) == BPF_X &&
+		   insn->src_reg == insn->dst_reg) {
+
+		regs[insn->dst_reg].type = CONST_IMM;
+		regs[insn->dst_reg].imm = 0;
+
 	} else {	/* all other ALU ops: and, sub, xor, add, ... */
 
 		if (BPF_SRC(insn->code) == BPF_X) {
