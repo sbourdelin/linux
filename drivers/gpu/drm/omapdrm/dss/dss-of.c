@@ -132,7 +132,6 @@ static struct device_node *omapdss_of_get_remote_port(const struct device_node *
 		return NULL;
 
 	np_parent = of_get_next_parent(np);
-	of_node_put(np);
 
 	return np_parent;
 }
