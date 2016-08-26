@@ -728,6 +728,10 @@ void rxrpc_data_ready(struct sock *sk)
 		if (sp->hdr.callNumber < chan->last_call)
 			goto discard_unlock;
 
+		call = rcu_dereference(chan->call);
+		if (!call || atomic_read(&call->usage) == 0)
+			goto cant_route_call;
+
 		if (sp->hdr.callNumber == chan->last_call) {
 			/* For the previous service call, if completed
 			 * successfully, we discard all further packets.
@@ -743,10 +747,6 @@ void rxrpc_data_ready(struct sock *sk)
 			rxrpc_post_packet_to_conn(conn, skb);
 			goto out_unlock;
 		}
-
-		call = rcu_dereference(chan->call);
-		if (!call || atomic_read(&call->usage) == 0)
-			goto cant_route_call;
 
 		rxrpc_post_packet_to_call(call, skb);
 		goto out_unlock;
