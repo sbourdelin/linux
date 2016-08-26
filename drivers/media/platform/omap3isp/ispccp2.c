@@ -1135,7 +1135,7 @@ int omap3isp_ccp2_init(struct isp_device *isp)
 	 * TODO: Don't hardcode the usage of PHY1 (shared with CSI2c).
 	 */
 	if (isp->revision == ISP_REVISION_2_0) {
-		ccp2->vdds_csib = devm_regulator_get(isp->dev, "vdds_csib");
+		ccp2->vdds_csib = regulator_get(isp->dev, "vdds_csib");
 		if (IS_ERR(ccp2->vdds_csib)) {
 			dev_dbg(isp->dev,
 				"Could not get regulator vdds_csib\n");
@@ -1163,4 +1163,5 @@ void omap3isp_ccp2_cleanup(struct isp_device *isp)
 
 	omap3isp_video_cleanup(&ccp2->video_in);
 	media_entity_cleanup(&ccp2->subdev.entity);
+	regulator_put(ccp2->vdds_csib);
 }
