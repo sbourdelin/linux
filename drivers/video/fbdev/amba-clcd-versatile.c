@@ -567,5 +567,5 @@ int versatile_clcd_init_panel(struct clcd_fb *fb,
 
 	return 0;
 }
-
+EXPORT_SYMBOL_GPL(versatile_clcd_init_panel);
 #endif
