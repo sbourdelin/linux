@@ -2469,7 +2469,7 @@ static int cryptocop_ioctl_process(struct inode *inode, struct file *filp, unsig
 	struct page                     **inpages = NULL;
 	struct page                     **outpages = NULL;
 	int                             noinpages = 0;
-	int                             nooutpages = 0;
+	int                             nooutpages;
 
 	struct cryptocop_desc           descs[5]; /* Max 5 descriptors are needed, there are three transforms that
 						   * can get connected/disconnected on different places in the indata. */
@@ -2695,6 +2695,8 @@ static int cryptocop_ioctl_process(struct inode *inode, struct file *filp, unsig
 			err = -ENOMEM;
 			goto free_inpages;
 		}
+	} else {
+		nooutpages = 0;
 	}
 
 	/* Acquire the mm page semaphore. */
