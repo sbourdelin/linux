@@ -89,6 +89,12 @@ struct i915_guc_client {
 	uint64_t submissions[I915_NUM_ENGINES];
 };
 
+enum {
+	GUC_SUBMISSION_DEFAULT = -1,
+	GUC_SUBMISSION_DISABLED = 0,
+	GUC_SUBMISSION_PREFERRED,
+	GUC_SUBMISSION_MANDATORY
+};
 enum intel_guc_fw_status {
 	GUC_FIRMWARE_FAIL = -1,
 	GUC_FIRMWARE_NONE = 0,
