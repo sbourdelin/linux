@@ -300,4 +300,14 @@ config IPV6_SEG6
 
 	  If unsure, say N.
 
+config IPV6_SEG6_CORE
+	tristate "IPv6: Segment Routing core control plane support"
+	depends on IPV6_SEG6
+	---help---
+	  Enable the core functionalities required for a control plane support
+	  of SR-IPv6. This option is not useful by itself, it rather provides
+	  the code base for a control plane support.
+
+	  If unsure, say N.
+
 endif # IPV6
