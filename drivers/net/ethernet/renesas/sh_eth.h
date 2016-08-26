@@ -484,6 +484,7 @@ struct sh_eth_cpu_data {
 	unsigned tpauser:1;	/* EtherC have TPAUSER */
 	unsigned bculr:1;	/* EtherC have BCULR */
 	unsigned tsu:1;		/* EtherC have TSU */
+	unsigned tsu_no_post:1;	/* EtherC have TSU, but no POST */
 	unsigned hw_swap:1;	/* E-DMAC have DE bit in EDMR */
 	unsigned rpadir:1;	/* E-DMAC have RPADIR */
 	unsigned no_trimd:1;	/* E-DMAC DO NOT have TRIMD */

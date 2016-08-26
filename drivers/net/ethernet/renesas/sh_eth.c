@@ -532,6 +532,7 @@ static struct sh_eth_cpu_data r7s72100_data = {
 	.no_ade		= 1,
 	.hw_crc		= 1,
 	.tsu		= 1,
+	.tsu_no_post	= 1,
 	.shift_rd0	= 1,
 };
 
@@ -2460,6 +2461,9 @@ static void sh_eth_tsu_enable_cam_entry_post(struct net_device *ndev,
 	u32 tmp;
 	void *reg_offset;
 
+	if (mdp->cd->tsu_no_post)
+		return;
+
 	reg_offset = sh_eth_tsu_get_post_reg_offset(mdp, entry);
 	tmp = ioread32(reg_offset);
 	iowrite32(tmp | sh_eth_tsu_get_post_bit(mdp, entry), reg_offset);
@@ -2471,6 +2475,9 @@ static bool sh_eth_tsu_disable_cam_entry_post(struct net_device *ndev,
 	struct sh_eth_private *mdp = netdev_priv(ndev);
 	u32 post_mask, ref_mask, tmp;
 	void *reg_offset;
+
+	if (mdp->cd->tsu_no_post)
+		return false;
 
 	reg_offset = sh_eth_tsu_get_post_reg_offset(mdp, entry);
 	post_mask = sh_eth_tsu_get_post_mask(entry);
