@@ -351,8 +351,8 @@ out:
 	return to - to_buff;
 }
 
-static struct bpf_prog *bpf_prog_clone_create(struct bpf_prog *fp_other,
-					      gfp_t gfp_extra_flags)
+struct bpf_prog *bpf_prog_clone_create(struct bpf_prog *fp_other,
+				       gfp_t gfp_extra_flags)
 {
 	gfp_t gfp_flags = GFP_KERNEL | __GFP_HIGHMEM | __GFP_ZERO |
 			  gfp_extra_flags;
@@ -371,8 +371,9 @@ static struct bpf_prog *bpf_prog_clone_create(struct bpf_prog *fp_other,
 
 	return fp;
 }
+EXPORT_SYMBOL_GPL(bpf_prog_clone_create);
 
-static void bpf_prog_clone_free(struct bpf_prog *fp)
+void bpf_prog_clone_free(struct bpf_prog *fp)
 {
 	/* aux was stolen by the other clone, so we cannot free
 	 * it from this path! It will be freed eventually by the
@@ -384,6 +385,7 @@ static void bpf_prog_clone_free(struct bpf_prog *fp)
 	fp->aux = NULL;
 	__bpf_prog_free(fp);
 }
+EXPORT_SYMBOL_GPL(bpf_prog_clone_free);
 
 void bpf_jit_prog_release_other(struct bpf_prog *fp, struct bpf_prog *fp_other)
 {
