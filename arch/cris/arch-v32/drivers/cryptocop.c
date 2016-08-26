@@ -1510,7 +1510,8 @@ int cryptocop_new_session(cryptocop_session_id *sid, struct cryptocop_transform_
 	while (tfrm_in){
 		int err;
 		++no_tfrms;
-		if ((err = transform_ok(tfrm_in))) {
+		err = transform_ok(tfrm_in);
+		if (err) {
 			DEBUG_API(printk("cryptocop_new_session, bad transform\n"));
 			return err;
 		}
@@ -2276,7 +2277,10 @@ static int cryptocop_job_setup(struct cryptocop_prio_job **pj, struct cryptocop_
 		(*pj)->iop->ctx_in.saved_data = operation->list_op.inlist;
 		(*pj)->iop->ctx_in.saved_data_buf = operation->list_op.in_data_buf;
 	} else {
-		if ((err = cryptocop_setup_dma_list(operation, &(*pj)->iop, alloc_flag))) {
+		err = cryptocop_setup_dma_list(operation,
+					       &(*pj)->iop,
+					       alloc_flag);
+		if (err) {
 			DEBUG_API(printk("cryptocop_job_setup: cryptocop_setup_dma_list failed %d\n", err));
 			kfree(*pj);
 			return err;
@@ -2867,7 +2871,8 @@ static int cryptocop_ioctl_process(struct inode *inode, struct file *filp, unsig
 
 	DEBUG(printk("cryptocop_ioctl_process: inserting job, cb_data=0x%p\n", cop->cb_data));
 
-	if ((err = cryptocop_job_queue_insert_user_job(cop)) != 0) {
+	err = cryptocop_job_queue_insert_user_job(cop);
+	if (err) {
 		DEBUG_API(printk("cryptocop_ioctl_process: insert job %d\n", err));
 		err = -EINVAL;
 		goto mark_outpages_dirty;
