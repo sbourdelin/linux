@@ -1153,6 +1153,10 @@ static int do_checkpoint(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 	clear_prefree_segments(sbi, cpc);
 	clear_sbi_flag(sbi, SBI_IS_DIRTY);
 
+	/* redirty superblock if node page is updated by ->write_inode */
+	if (get_pages(sbi, F2FS_DIRTY_NODES))
+		set_sbi_flag(sbi, SBI_IS_DIRTY);
+
 	return 0;
 }
 

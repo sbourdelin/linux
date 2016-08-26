@@ -1599,6 +1599,7 @@ static int f2fs_write_node_page(struct page *page,
 	fio.old_blkaddr = ni.blk_addr;
 	write_node_page(nid, &fio);
 	set_node_addr(sbi, &ni, fio.new_blkaddr, is_fsync_dnode(page));
+	set_sbi_flag(sbi, SBI_IS_DIRTY);
 	dec_page_count(sbi, F2FS_DIRTY_NODES);
 	up_read(&sbi->node_write);
 
