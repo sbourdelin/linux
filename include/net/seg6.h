@@ -16,6 +16,9 @@
 
 #include <linux/net.h>
 #include <linux/ipv6.h>
+#if IS_ENABLED(CONFIG_IPV6_SEG6_IPTUNNEL)
+#include <net/lwtunnel.h>
+#endif
 
 #define SEG6_VERSION_MAJOR	0
 #define SEG6_VERSION_MINOR	30
@@ -39,5 +42,13 @@ static inline void seg6_pernet_unlock(struct net *net)
 {
 	spin_unlock(&seg6_pernet(net)->lock);
 }
+
+#if IS_ENABLED(CONFIG_IPV6_SEG6_IPTUNNEL)
+static inline struct seg6_iptunnel_encap *
+seg6_lwtunnel_encap(struct lwtunnel_state *lwtstate)
+{
+	return (struct seg6_iptunnel_encap *)lwtstate->data;
+}
+#endif
 
 #endif

@@ -310,4 +310,13 @@ config IPV6_SEG6_CORE
 
 	  If unsure, say N.
 
+config IPV6_SEG6_IPTUNNEL
+	tristate "IPv6: Segment Routing IP Tunnels encapsulation support"
+	depends on IPV6_SEG6_CORE
+	---help---
+	  Support encapsulation and injection of SRH in locally emitted and
+	  forwarded packets.
+
+	  If unsure, say N.
+
 endif # IPV6
