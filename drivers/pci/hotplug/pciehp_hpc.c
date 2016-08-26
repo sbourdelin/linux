@@ -228,7 +228,7 @@ static void pcie_write_cmd(struct controller *ctrl, u16 cmd, u16 mask)
 }
 
 /* Same as above without waiting for the hardware to latch */
-static void pcie_write_cmd_nowait(struct controller *ctrl, u16 cmd, u16 mask)
+void pcie_write_cmd_nowait(struct controller *ctrl, u16 cmd, u16 mask)
 {
 	pcie_do_write_cmd(ctrl, cmd, mask, false);
 }
@@ -804,6 +804,10 @@ struct controller *pcie_init(struct pcie_device *dev)
 	}
 	ctrl->pcie = dev;
 	pcie_capability_read_dword(pdev, PCI_EXP_SLTCAP, &slot_cap);
+
+	if (pdev->user_leds)
+		slot_cap &= ~(PCI_EXP_SLTCAP_AIP | PCI_EXP_SLTCAP_PIP);
+
 	ctrl->slot_cap = slot_cap;
 	mutex_init(&ctrl->ctrl_lock);
 	init_waitqueue_head(&ctrl->queue);

@@ -70,6 +70,8 @@ static int get_attention_status(struct hotplug_slot *slot, u8 *value);
 static int get_latch_status(struct hotplug_slot *slot, u8 *value);
 static int get_adapter_status(struct hotplug_slot *slot, u8 *value);
 static int reset_slot(struct hotplug_slot *slot, int probe);
+static int set_user_led_status(struct hotplug_slot *slot, u8 value);
+static int get_user_led_status(struct hotplug_slot *slot, u8 *value);
 
 /**
  * release_slot - free up the memory used by a slot
@@ -114,6 +116,9 @@ static int init_slot(struct controller *ctrl)
 	if (ATTN_LED(ctrl)) {
 		ops->get_attention_status = get_attention_status;
 		ops->set_attention_status = set_attention_status;
+	} else if (ctrl->pcie->port->user_leds) {
+		ops->get_attention_status = get_user_led_status;
+		ops->set_attention_status = set_user_led_status;
 	}
 
 	/* register this slot with the hotplug pci core */
@@ -140,6 +145,27 @@ out:
 static void cleanup_slot(struct controller *ctrl)
 {
 	pci_hp_deregister(ctrl->slot->hotplug_slot);
+}
+
+static int get_user_led_status(struct hotplug_slot *hotplug_slot, u8 *value)
+{
+	u16 slot_ctrl;
+	struct slot *slot = hotplug_slot->private;
+	struct pci_dev *pdev = slot->ctrl->pcie->port;
+
+	pcie_capability_read_word(pdev, PCI_EXP_SLTCTL, &slot_ctrl);
+	*value = (slot_ctrl & (PCI_EXP_SLTCTL_AIC | PCI_EXP_SLTCTL_PIC)) >> 6;
+
+	return 0;
+}
+
+static int set_user_led_status(struct hotplug_slot *hotplug_slot, u8 status)
+{
+	struct slot *slot = hotplug_slot->private;
+
+	pcie_write_cmd_nowait(slot->ctrl, status << 6,
+			      PCI_EXP_SLTCTL_AIC | PCI_EXP_SLTCTL_PIC);
+	return 0;
 }
 
 /*

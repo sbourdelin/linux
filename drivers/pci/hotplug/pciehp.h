@@ -151,6 +151,7 @@ int pciehp_check_link_status(struct controller *ctrl);
 bool pciehp_check_link_active(struct controller *ctrl);
 void pciehp_release_ctrl(struct controller *ctrl);
 int pciehp_reset_slot(struct slot *slot, int probe);
+void pcie_write_cmd_nowait(struct controller *ctrl, u16 cmd, u16 mask);
 
 static inline const char *slot_name(struct slot *slot)
 {
