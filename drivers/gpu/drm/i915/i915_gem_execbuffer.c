@@ -1199,20 +1199,22 @@ i915_gem_execbuffer_move_to_gpu(struct drm_i915_gem_request *req,
 		struct drm_i915_gem_object *obj = vma->obj;
 		struct reservation_object *resv;
 
-		if (obj->flags & other_rings) {
-			ret = eb_sync(obj, req, obj->base.pending_write_domain);
-			if (ret)
-				return ret;
-		}
+		if ((vma->exec_entry->flags & EXEC_OBJECT_ASYNC) == 0) {
+			if (obj->flags & other_rings) {
+				ret = eb_sync(obj, req, obj->base.pending_write_domain);
+				if (ret)
+					return ret;
+			}
 
-		resv = i915_gem_object_get_dmabuf_resv(obj);
-		if (resv) {
-			ret = i915_sw_fence_await_reservation
-				(&req->submit, resv, &i915_fence_ops,
-				 obj->base.pending_write_domain,
-				 GFP_KERNEL | __GFP_NOWARN);
-			if (ret < 0)
-				return ret;
+			resv = i915_gem_object_get_dmabuf_resv(obj);
+			if (resv) {
+				ret = i915_sw_fence_await_reservation
+					(&req->submit, resv, &i915_fence_ops,
+					 obj->base.pending_write_domain,
+					 GFP_KERNEL | __GFP_NOWARN);
+				if (ret < 0)
+					return ret;
+			}
 		}
 
 		if (obj->base.write_domain & I915_GEM_DOMAIN_CPU)
