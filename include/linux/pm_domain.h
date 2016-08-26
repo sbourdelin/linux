@@ -40,6 +40,9 @@ struct gpd_dev_ops {
 struct genpd_power_state {
 	s64 power_off_latency_ns;
 	s64 power_on_latency_ns;
+	s64 residency_ns;
+	u32 param;
+	struct device_node *of_node;
 };
 
 struct generic_pm_domain {
@@ -51,6 +54,7 @@ struct generic_pm_domain {
 	struct mutex lock;
 	struct dev_power_governor *gov;
 	struct work_struct power_off_work;
+	struct device_node *of_node;	/* Device node of the PM domain */
 	const char *name;
 	atomic_t sd_count;	/* Number of subdomains with power "on" */
 	enum gpd_status status;	/* Current state of the domain */
@@ -129,7 +133,7 @@ extern int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
 				     struct generic_pm_domain *target);
 extern int pm_genpd_init(struct generic_pm_domain *genpd,
 			 struct dev_power_governor *gov, bool is_off);
-
+extern int pm_genpd_of_parse_power_states(struct generic_pm_domain *genpd);
 extern struct dev_power_governor simple_qos_governor;
 extern struct dev_power_governor pm_domain_always_on_gov;
 #else
@@ -167,6 +171,11 @@ static inline int pm_genpd_init(struct generic_pm_domain *genpd,
 				struct dev_power_governor *gov, bool is_off)
 {
 	return -ENOSYS;
+}
+static inline int pm_genpd_of_parse_power_states(
+				struct generic_pm_domain *genpd)
+{
+	return -ENODEV;
 }
 #endif
 

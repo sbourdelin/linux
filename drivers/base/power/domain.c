@@ -1253,6 +1253,90 @@ out:
 }
 EXPORT_SYMBOL_GPL(pm_genpd_remove_subdomain);
 
+static const struct of_device_id arm_idle_state_match[] = {
+	{ .compatible = "arm,idle-state", },
+	{ }
+};
+
+static int genpd_of_get_power_state(struct genpd_power_state *genpd_state,
+				    struct device_node *state_node)
+{
+	int err = 0;
+	u32 latency;
+	u32 residency;
+	u32 entry_latency, exit_latency;
+	const struct of_device_id *match_id;
+
+	match_id = of_match_node(arm_idle_state_match, state_node);
+	if (!match_id)
+		return -EINVAL;
+
+	err = of_property_read_u32(state_node, "entry-latency-us",
+				   &entry_latency);
+	if (err) {
+		pr_debug(" * %s missing entry-latency-us property\n",
+			 state_node->full_name);
+		return -EINVAL;
+	}
+
+	err = of_property_read_u32(state_node, "exit-latency-us",
+				   &exit_latency);
+	if (err) {
+		pr_debug(" * %s missing exit-latency-us property\n",
+			 state_node->full_name);
+		return -EINVAL;
+	}
+
+	err = of_property_read_u32(state_node, "min-residency-us", &residency);
+	if (!err)
+		genpd_state->residency_ns = 1000 * residency;
+
+	latency = entry_latency + exit_latency;
+	genpd_state->power_on_latency_ns = 1000 * latency;
+	genpd_state->power_off_latency_ns = 1000 * entry_latency;
+	genpd_state->of_node = state_node;
+
+	return 0;
+}
+
+int pm_genpd_of_parse_power_states(struct generic_pm_domain *genpd)
+{
+	struct device_node *np;
+	int i, err = 0;
+
+	for (i = 0; i < GENPD_MAX_NUM_STATES; i++) {
+		np = of_parse_phandle(genpd->of_node, "domain-idle-states", i);
+		if (!np)
+			break;
+
+		err = genpd_of_get_power_state(&genpd->states[i], np);
+		if (err) {
+			pr_err
+			    ("Parsing idle state node %s failed with err %d\n",
+			     np->full_name, err);
+			err = -EINVAL;
+			of_node_put(np);
+			break;
+		}
+		of_node_put(np);
+	}
+
+	if (err)
+		return err;
+
+	genpd->state_count = i;
+	return 0;
+}
+EXPORT_SYMBOL(pm_genpd_of_parse_power_states);
+
+static int genpd_of_parse(struct generic_pm_domain *genpd)
+{
+	if (!genpd->of_node || (genpd->state_count > 0))
+		return 0;
+
+	return pm_genpd_of_parse_power_states(genpd);
+}
+
 /**
  * pm_genpd_init - Initialize a generic I/O PM domain object.
  * @genpd: PM domain object to initialize.
@@ -1262,8 +1346,10 @@ EXPORT_SYMBOL_GPL(pm_genpd_remove_subdomain);
  * Returns 0 on successful initialization, else a negative error code.
  */
 int pm_genpd_init(struct generic_pm_domain *genpd,
-		  struct dev_power_governor *gov, bool is_off)
+		   struct dev_power_governor *gov, bool is_off)
 {
+	int ret;
+
 	if (IS_ERR_OR_NULL(genpd))
 		return -EINVAL;
 
@@ -1305,6 +1391,10 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
 		genpd->dev_ops.stop = pm_clk_suspend;
 		genpd->dev_ops.start = pm_clk_resume;
 	}
+
+	ret = genpd_of_parse(genpd);
+	if (ret)
+		return ret;
 
 	if (genpd->state_idx >= GENPD_MAX_NUM_STATES) {
 		pr_warn("Initial state index out of bounds.\n");
