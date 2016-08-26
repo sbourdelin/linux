@@ -9,12 +9,12 @@
 #include "hardware.h"
 #include "common.h"
 
-unsigned int __mxc_cpu_type;
+unsigned int __mxc_soc_type;
 static unsigned int imx_soc_revision;
 
-void mxc_set_cpu_type(unsigned int type)
+void mxc_set_soc_type(unsigned int type)
 {
-	__mxc_cpu_type = type;
+	__mxc_soc_type = type;
 }
 
 void imx_set_soc_revision(unsigned int rev)
@@ -91,47 +91,47 @@ struct device * __init imx_soc_device_init(void)
 	if (ret)
 		goto free_soc;
 
-	switch (__mxc_cpu_type) {
-	case MXC_CPU_MX1:
+	switch (__mxc_soc_type) {
+	case MXC_SOC_MX1:
 		soc_id = "i.MX1";
 		break;
-	case MXC_CPU_MX21:
+	case MXC_SOC_MX21:
 		soc_id = "i.MX21";
 		break;
-	case MXC_CPU_MX25:
+	case MXC_SOC_MX25:
 		soc_id = "i.MX25";
 		break;
-	case MXC_CPU_MX27:
+	case MXC_SOC_MX27:
 		soc_id = "i.MX27";
 		break;
-	case MXC_CPU_MX31:
+	case MXC_SOC_MX31:
 		soc_id = "i.MX31";
 		break;
-	case MXC_CPU_MX35:
+	case MXC_SOC_MX35:
 		soc_id = "i.MX35";
 		break;
-	case MXC_CPU_MX51:
+	case MXC_SOC_MX51:
 		soc_id = "i.MX51";
 		break;
-	case MXC_CPU_MX53:
+	case MXC_SOC_MX53:
 		soc_id = "i.MX53";
 		break;
-	case MXC_CPU_IMX6SL:
+	case MXC_SOC_IMX6SL:
 		soc_id = "i.MX6SL";
 		break;
-	case MXC_CPU_IMX6DL:
+	case MXC_SOC_IMX6DL:
 		soc_id = "i.MX6DL";
 		break;
-	case MXC_CPU_IMX6SX:
+	case MXC_SOC_IMX6SX:
 		soc_id = "i.MX6SX";
 		break;
-	case MXC_CPU_IMX6Q:
+	case MXC_SOC_IMX6Q:
 		soc_id = "i.MX6Q";
 		break;
-	case MXC_CPU_IMX6UL:
+	case MXC_SOC_IMX6UL:
 		soc_id = "i.MX6UL";
 		break;
-	case MXC_CPU_IMX7D:
+	case MXC_SOC_IMX7D:
 		soc_id = "i.MX7D";
 		break;
 	default:

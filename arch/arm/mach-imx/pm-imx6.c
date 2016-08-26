@@ -293,9 +293,9 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
 		val |= 0x2 << BP_CLPCR_LPM;
 		val &= ~BM_CLPCR_VSTBY;
 		val &= ~BM_CLPCR_SBYOS;
-		if (cpu_is_imx6sl())
+		if (soc_is_imx6sl())
 			val |= BM_CLPCR_BYPASS_PMIC_READY;
-		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
+		if (soc_is_imx6sl() || soc_is_imx6sx() || soc_is_imx6ul())
 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
 		else
 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
@@ -310,9 +310,9 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
 		val |= 0x3 << BP_CLPCR_STBY_COUNT;
 		val |= BM_CLPCR_VSTBY;
 		val |= BM_CLPCR_SBYOS;
-		if (cpu_is_imx6sl())
+		if (soc_is_imx6sl())
 			val |= BM_CLPCR_BYPASS_PMIC_READY;
-		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
+		if (soc_is_imx6sl() || soc_is_imx6sx() || soc_is_imx6ul())
 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
 		else
 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
@@ -369,11 +369,11 @@ static int imx6q_pm_enter(suspend_state_t state)
 		imx6_set_lpm(STOP_POWER_ON);
 		imx6q_set_int_mem_clk_lpm(true);
 		imx_gpc_pre_suspend(false);
-		if (cpu_is_imx6sl())
+		if (soc_is_imx6sl())
 			imx6sl_set_wait_clk(true);
 		/* Zzz ... */
 		cpu_do_idle();
-		if (cpu_is_imx6sl())
+		if (soc_is_imx6sl())
 			imx6sl_set_wait_clk(false);
 		imx_gpc_post_resume();
 		imx6_set_lpm(WAIT_CLOCKED);
@@ -392,7 +392,7 @@ static int imx6q_pm_enter(suspend_state_t state)
 		imx_anatop_pre_suspend();
 		/* Zzz ... */
 		cpu_suspend(0, imx6q_suspend_finish);
-		if (cpu_is_imx6q() || cpu_is_imx6dl())
+		if (soc_is_imx6q() || soc_is_imx6dl())
 			imx_smp_prepare();
 		imx_anatop_post_resume();
 		imx_gpc_post_resume();

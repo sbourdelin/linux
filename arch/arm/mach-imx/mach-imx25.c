@@ -20,7 +20,7 @@
 
 static void __init imx25_init_early(void)
 {
-	mxc_set_cpu_type(MXC_CPU_MX25);
+	mxc_set_soc_type(MXC_SOC_MX25);
 }
 
 static void __init mx25_init_irq(void)

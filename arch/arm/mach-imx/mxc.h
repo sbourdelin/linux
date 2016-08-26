@@ -26,61 +26,61 @@
 #error "Do not include directly."
 #endif
 
-#define MXC_CPU_MX1		1
-#define MXC_CPU_MX21		21
-#define MXC_CPU_MX25		25
-#define MXC_CPU_MX27		27
-#define MXC_CPU_MX31		31
-#define MXC_CPU_MX35		35
-#define MXC_CPU_MX51		51
-#define MXC_CPU_MX53		53
-#define MXC_CPU_IMX6SL		0x60
-#define MXC_CPU_IMX6DL		0x61
-#define MXC_CPU_IMX6SX		0x62
-#define MXC_CPU_IMX6Q		0x63
-#define MXC_CPU_IMX6UL		0x64
-#define MXC_CPU_IMX7D		0x72
+#define MXC_SOC_MX1		1
+#define MXC_SOC_MX21		21
+#define MXC_SOC_MX25		25
+#define MXC_SOC_MX27		27
+#define MXC_SOC_MX31		31
+#define MXC_SOC_MX35		35
+#define MXC_SOC_MX51		51
+#define MXC_SOC_MX53		53
+#define MXC_SOC_IMX6SL		0x60
+#define MXC_SOC_IMX6DL		0x61
+#define MXC_SOC_IMX6SX		0x62
+#define MXC_SOC_IMX6Q		0x63
+#define MXC_SOC_IMX6UL		0x64
+#define MXC_SOC_IMX7D		0x72
 
 #define IMX_DDR_TYPE_LPDDR2		1
 
 #ifndef __ASSEMBLY__
-extern unsigned int __mxc_cpu_type;
+extern unsigned int __mxc_soc_type;
 
 #ifdef CONFIG_SOC_IMX6SL
-static inline bool cpu_is_imx6sl(void)
+static inline bool soc_is_imx6sl(void)
 {
-	return __mxc_cpu_type == MXC_CPU_IMX6SL;
+	return __mxc_soc_type == MXC_SOC_IMX6SL;
 }
 #else
-static inline bool cpu_is_imx6sl(void)
+static inline bool soc_is_imx6sl(void)
 {
 	return false;
 }
 #endif
 
-static inline bool cpu_is_imx6dl(void)
+static inline bool soc_is_imx6dl(void)
 {
-	return __mxc_cpu_type == MXC_CPU_IMX6DL;
+	return __mxc_soc_type == MXC_SOC_IMX6DL;
 }
 
-static inline bool cpu_is_imx6sx(void)
+static inline bool soc_is_imx6sx(void)
 {
-	return __mxc_cpu_type == MXC_CPU_IMX6SX;
+	return __mxc_soc_type == MXC_SOC_IMX6SX;
 }
 
-static inline bool cpu_is_imx6ul(void)
+static inline bool soc_is_imx6ul(void)
 {
-	return __mxc_cpu_type == MXC_CPU_IMX6UL;
+	return __mxc_soc_type == MXC_SOC_IMX6UL;
 }
 
-static inline bool cpu_is_imx6q(void)
+static inline bool soc_is_imx6q(void)
 {
-	return __mxc_cpu_type == MXC_CPU_IMX6Q;
+	return __mxc_soc_type == MXC_SOC_IMX6Q;
 }
 
-static inline bool cpu_is_imx7d(void)
+static inline bool soc_is_imx7d(void)
 {
-	return __mxc_cpu_type == MXC_CPU_IMX7D;
+	return __mxc_soc_type == MXC_SOC_IMX7D;
 }
 
 struct cpu_op {

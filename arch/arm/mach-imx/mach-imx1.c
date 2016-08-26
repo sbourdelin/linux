@@ -18,7 +18,7 @@
 
 static void __init imx1_init_early(void)
 {
-	mxc_set_cpu_type(MXC_CPU_MX1);
+	mxc_set_soc_type(MXC_SOC_MX1);
 }
 
 static void __init imx1_init_irq(void)

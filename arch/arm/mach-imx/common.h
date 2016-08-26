@@ -46,7 +46,7 @@ int mx35_clocks_init(void);
 int mx31_clocks_init_dt(void);
 struct platform_device *mxc_register_gpio(char *name, int id,
 	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
-void mxc_set_cpu_type(unsigned int type);
+void mxc_set_soc_type(unsigned int type);
 void mxc_restart(enum reboot_mode, const char *);
 void mxc_arch_reset_init(void __iomem *);
 void imx1_reset_init(void __iomem *);

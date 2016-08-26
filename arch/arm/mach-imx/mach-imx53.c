@@ -25,7 +25,7 @@
 
 static void __init imx53_init_early(void)
 {
-	mxc_set_cpu_type(MXC_CPU_MX53);
+	mxc_set_soc_type(MXC_SOC_MX53);
 }
 
 static void __init imx53_dt_init(void)

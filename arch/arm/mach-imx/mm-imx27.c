@@ -65,7 +65,7 @@ void __init mx27_map_io(void)
 
 void __init imx27_init_early(void)
 {
-	mxc_set_cpu_type(MXC_CPU_MX27);
+	mxc_set_soc_type(MXC_SOC_MX27);
 	imx_iomuxv1_init(MX27_IO_ADDRESS(MX27_GPIO_BASE_ADDR),
 			MX27_NUM_GPIO_PORT);
 }

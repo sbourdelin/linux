@@ -81,7 +81,7 @@ void imx_anatop_pre_suspend(void)
 
 	imx_anatop_enable_fet_odrive(true);
 
-	if (cpu_is_imx6sl())
+	if (soc_is_imx6sl())
 		imx_anatop_disconnect_high_snvs(true);
 }
 
@@ -94,7 +94,7 @@ void imx_anatop_post_resume(void)
 
 	imx_anatop_enable_fet_odrive(false);
 
-	if (cpu_is_imx6sl())
+	if (soc_is_imx6sl())
 		imx_anatop_disconnect_high_snvs(false);
 
 }
@@ -168,7 +168,7 @@ void __init imx_init_revision_from_anatop(void)
 		revision = digprog & 0xff;
 	}
 
-	mxc_set_cpu_type(digprog >> 16 & 0xff);
+	mxc_set_soc_type(digprog >> 16 & 0xff);
 	imx_set_soc_revision(revision);
 }
 

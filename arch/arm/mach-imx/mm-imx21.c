@@ -65,7 +65,7 @@ void __init mx21_map_io(void)
 
 void __init imx21_init_early(void)
 {
-	mxc_set_cpu_type(MXC_CPU_MX21);
+	mxc_set_soc_type(MXC_SOC_MX21);
 	imx_iomuxv1_init(MX21_IO_ADDRESS(MX21_GPIO_BASE_ADDR),
 			MX21_NUM_GPIO_PORT);
 }

@@ -266,10 +266,10 @@ static void __init imx6q_init_machine(void)
 {
 	struct device *parent;
 
-	if (cpu_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_2_0)
+	if (soc_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_2_0)
 		imx_print_silicon_rev("i.MX6QP", IMX_CHIP_REVISION_1_0);
 	else
-		imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
+		imx_print_silicon_rev(soc_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
 				imx_get_soc_revision());
 
 	parent = imx_soc_device_init();
@@ -281,7 +281,7 @@ static void __init imx6q_init_machine(void)
 	of_platform_default_populate(NULL, NULL, parent);
 
 	imx_anatop_init();
-	cpu_is_imx6q() ?  imx6q_pm_init() : imx6dl_pm_init();
+	soc_is_imx6q() ?  imx6q_pm_init() : imx6dl_pm_init();
 	imx6q_1588_init();
 	imx6q_axi_init();
 }
@@ -322,13 +322,13 @@ static void __init imx6q_opp_check_speed_grading(struct device *cpu_dev)
 	val >>= OCOTP_CFG3_SPEED_SHIFT;
 	val &= 0x3;
 
-	if ((val != OCOTP_CFG3_SPEED_1P2GHZ) && cpu_is_imx6q())
+	if ((val != OCOTP_CFG3_SPEED_1P2GHZ) && soc_is_imx6q())
 		if (dev_pm_opp_disable(cpu_dev, 1200000000))
 			pr_warn("failed to disable 1.2 GHz OPP\n");
 	if (val < OCOTP_CFG3_SPEED_996MHZ)
 		if (dev_pm_opp_disable(cpu_dev, 996000000))
 			pr_warn("failed to disable 996 MHz OPP\n");
-	if (cpu_is_imx6q()) {
+	if (soc_is_imx6q()) {
 		if (val != OCOTP_CFG3_SPEED_852MHZ)
 			if (dev_pm_opp_disable(cpu_dev, 852000000))
 				pr_warn("failed to disable 852 MHz OPP\n");
