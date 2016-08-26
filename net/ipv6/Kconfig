@@ -305,8 +305,9 @@ config IPV6_SEG6_CORE
 	depends on IPV6_SEG6
 	---help---
 	  Enable the core functionalities required for a control plane support
-	  of SR-IPv6. This option is not useful by itself, it rather provides
-	  the code base for a control plane support.
+	  of SR-IPv6. It also enables the support for per-socket SRH injection
+	  through the setsockopt() system call with the IPPROTO_IPV6,IPV6_RTHDR
+	  options.
 
 	  If unsure, say N.
 
