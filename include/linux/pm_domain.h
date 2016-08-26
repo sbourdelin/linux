@@ -45,13 +45,14 @@ struct genpd_power_state {
 	struct device_node *of_node;
 };
 
+struct genpd_lock_fns;
+
 struct generic_pm_domain {
 	struct dev_pm_domain domain;	/* PM domain operations */
 	struct list_head gpd_list_node;	/* Node in the global PM domains list */
 	struct list_head master_links;	/* Links with PM domain as a master */
 	struct list_head slave_links;	/* Links with PM domain as a slave */
 	struct list_head dev_list;	/* List of devices */
-	struct mutex lock;
 	struct dev_power_governor *gov;
 	struct work_struct power_off_work;
 	struct device_node *of_node;	/* Device node of the PM domain */
@@ -75,6 +76,8 @@ struct generic_pm_domain {
 	struct genpd_power_state states[GENPD_MAX_NUM_STATES];
 	unsigned int state_count; /* number of states */
 	unsigned int state_idx; /* state that genpd will go to when off */
+	const struct genpd_lock_fns *lock_fns;
+	struct mutex mlock;
 
 };
 
