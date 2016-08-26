@@ -1462,30 +1462,28 @@ execbuf_submit(struct i915_execbuffer_params *params,
 			return -EINVAL;
 		}
 
-		if (instp_mode != dev_priv->relative_constants_mode) {
-			if (INTEL_INFO(dev_priv)->gen < 4) {
-				DRM_DEBUG("no rel constants on pre-gen4\n");
-				return -EINVAL;
-			}
-
-			if (INTEL_INFO(dev_priv)->gen > 5 &&
-			    instp_mode == I915_EXEC_CONSTANTS_REL_SURFACE) {
-				DRM_DEBUG("rel surface constants mode invalid on gen5+\n");
-				return -EINVAL;
-			}
-
-			/* The HW changed the meaning on this bit on gen6 */
-			if (INTEL_INFO(dev_priv)->gen >= 6)
-				instp_mask &= ~I915_EXEC_CONSTANTS_REL_SURFACE;
+		if (INTEL_INFO(dev_priv)->gen < 4) {
+			DRM_DEBUG("no rel constants on pre-gen4\n");
+			return -EINVAL;
 		}
+
+		if (INTEL_INFO(dev_priv)->gen > 5 &&
+		    instp_mode == I915_EXEC_CONSTANTS_REL_SURFACE) {
+			DRM_DEBUG("rel surface constants mode invalid on gen5+\n");
+			return -EINVAL;
+		}
+
+		/* The HW changed the meaning on this bit on gen6 */
+		if (INTEL_INFO(dev_priv)->gen >= 6)
+			instp_mask &= ~I915_EXEC_CONSTANTS_REL_SURFACE;
+
 		break;
 	default:
 		DRM_DEBUG("execbuf with unknown constants: %d\n", instp_mode);
 		return -EINVAL;
 	}
 
-	if (params->engine->id == RCS &&
-	    instp_mode != dev_priv->relative_constants_mode) {
+	if (params->engine->id == RCS) {
 		struct intel_ring *ring = params->request->ring;
 
 		ret = intel_ring_begin(params->request, 4);
@@ -1497,8 +1495,6 @@ execbuf_submit(struct i915_execbuffer_params *params,
 		intel_ring_emit_reg(ring, INSTPM);
 		intel_ring_emit(ring, instp_mask << 16 | instp_mode);
 		intel_ring_advance(ring);
-
-		dev_priv->relative_constants_mode = instp_mode;
 	}
 
 	if (args->flags & I915_EXEC_GEN7_SOL_RESET) {
