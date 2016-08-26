@@ -377,8 +377,11 @@ retry:
 		goto retry;
 	}
 
-	if (err)
+	if (err) {
+		f2fs_lock_op(sbi);
 		update_inode_page(inode);
+		f2fs_unlock_op(sbi);
+	}
 	sb_end_intwrite(inode->i_sb);
 no_delete:
 	stat_dec_inline_xattr(inode);
