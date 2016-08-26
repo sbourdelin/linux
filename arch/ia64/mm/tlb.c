@@ -244,7 +244,7 @@ ia64_global_tlb_purge (struct mm_struct *mm, unsigned long start,
 
 	toolatetochangeptcgsem = 1;
 
-	if (mm != active_mm) {
+	if (mm != active_mm)
 		/* Restore region IDs for mm */
 		if (mm && active_mm) {
 			activate_context(mm);
@@ -252,7 +252,6 @@ ia64_global_tlb_purge (struct mm_struct *mm, unsigned long start,
 			flush_tlb_all();
 			return;
 		}
-	}
 
 	if (need_ptcg_sem)
 		down_spin(&ptcg_sem);
@@ -440,14 +439,13 @@ int ia64_itr_entry(u64 target_mask, u64 va, u64 pte, u64 log_size)
 	if (target_mask & 0x1) {
 		p = ia64_idtrs[cpu];
 		for (i = IA64_TR_ALLOC_BASE; i <= per_cpu(ia64_tr_used, cpu);
-								i++, p++) {
+								i++, p++)
 			if (p->pte & 0x1)
 				if (is_tr_overlap(p, va, log_size)) {
 					printk(KERN_DEBUG "Overlapped Entry"
 						"Inserted for TR Register!!\n");
 					goto out;
 			}
-		}
 	}
 	if (target_mask & 0x2) {
 		p = ia64_idtrs[cpu] + IA64_TR_ALLOC_MAX;
@@ -551,11 +549,10 @@ void ia64_ptr_entry(u64 target_mask, int slot)
 		}
 	}
 
-	for (i = per_cpu(ia64_tr_used, cpu); i >= IA64_TR_ALLOC_BASE; i--) {
+	for (i = per_cpu(ia64_tr_used, cpu); i >= IA64_TR_ALLOC_BASE; i--)
 		if (((ia64_idtrs[cpu] + i)->pte & 0x1) ||
 		    ((ia64_idtrs[cpu] + IA64_TR_ALLOC_MAX + i)->pte & 0x1))
 			break;
-	}
 	per_cpu(ia64_tr_used, cpu) = i;
 }
 EXPORT_SYMBOL_GPL(ia64_ptr_entry);
