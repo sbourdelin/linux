@@ -1,0 +1,102 @@
+Device idle states
+========================
+
+A device are often capable of entering a low power state(s) when it becomes
+idle, hence the terminology of device idle states. Entering an idle state for a
+device helps it to avoid wasting power and reduces the leakage of current.
+
+However, entering an idle state for a device may unfortunate often also come
+with a cost, as it could introduce a wakeup latency when a new request needs to
+be served using the device.
+
+Devices may support more than one idle state, where each state could have its
+own specific characteristic on how it impacts power saving, wakeup latency etc.
+
+These DT bindings can be used to describe these device idle states, but also to
+assign the supported idle states to devices.
+
+
+== Device idle states container node ==
+
+The device idle states are defined within a device-idle-states node, which
+provides a container where the device idle states must be listed as device tree
+nodes.
+
+
+== Device idle states nodes ==
+
+To be able to distinguish between different types of device idle states, a
+compatible string is assigned to each type. Currently one type is described,
+but this can be extended to more types if needed.
+
+Each device idle state node represents a device idle state description and must
+be defined as a child of the device idle states container node.
+
+
+== The simple device idle state type ==
+
+For most of the simple devices this type of device idle state, is sufficient to
+be able to describe the device's idle states. The supported properties can be
+extended if needed, although a more complex idle state is probably better
+described by using another type/compatible.
+
+Required properties:
+- compatible:		Must contain "simple-dev, idle-state".
+- entry-latency-ns:	An u32 value in nano-seconds representing the worst case
+			latency required for the device to enter the idle state.
+- exit-latency-ns:	An u32 value in nano-seconds representing the worst case
+			wakeup latency of the device, after entry-latency-ns has
+			passed.
+
+Optional properties:
+- idle-state-name: A string used as a descriptive name for the idle state.
+
+
+== Assigning idle states to devices ==
+
+Required properties:
+ - dev-idle-states:	A list of phandles pointing to the supported
+			device idle states nodes. The list must be ordered as
+			the shallower state - the earlier in the list.
+
+
+== Examples ==
+
+	device-idle-states {
+		RETENTION_0: dev-retention-0 {
+			compatible = "simple-dev,idle-state";
+			entry-latency-ns = <300>;
+			exit-latency-ns = <1000>;
+		};
+
+		SLEEP_0: dev-sleep-0 {
+			compatible = "simple-dev,idle-state";
+			entry-latency-us = <3000>;
+			exit-latency-us = <10000>;
+		};
+
+		SLEEP_1: dev-sleep-1 {
+			compatible = "simple-dev,idle-state";
+			entry-latency-us = <50000>;
+			exit-latency-us = <100000>;
+		};
+	};
+
+	leaky-device@12340000 {
+		compatible = "foo,i-leak-current";
+		reg = <0x12340000 0x1000>;
+		dev-idle-states = <&SLEEP_0>;
+	};
+
+	leaky-device@23450000 {
+		compatible = "foo,i-leak-current";
+		reg = <0x23450000 0x1000>;
+		dev-idle-states = <&RETENTION_0>, <&SLEEP_0>;
+	};
+
+	leaky-device@34560000 {
+		compatible = "foo,i-leak-current";
+		reg = <0x34560000 0x1000>;
+		dev-idle-states = <&SLEEP_1>;
+	};
+
