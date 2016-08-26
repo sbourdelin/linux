@@ -2632,8 +2632,7 @@ static int pma_get_opa_datacounters(struct opa_pma_mad *pmp,
 	 * port the request came in on.
 	 */
 	port_mask = be64_to_cpu(req->port_select_mask[3]);
-	port_num = find_first_bit((unsigned long *)&port_mask,
-				  sizeof(port_mask));
+	port_num = find_first_bit((unsigned long *)&port_mask, 64);
 
 	if ((u8)port_num != port) {
 		pmp->mad_hdr.status |= IB_SMP_INVALID_FIELD;
@@ -2836,8 +2835,7 @@ static int pma_get_opa_porterrors(struct opa_pma_mad *pmp,
 	 * port the request came in on.
 	 */
 	port_mask = be64_to_cpu(req->port_select_mask[3]);
-	port_num = find_first_bit((unsigned long *)&port_mask,
-				  sizeof(port_mask));
+	port_num = find_first_bit((unsigned long *)&port_mask, 64);
 
 	if (port_num != port) {
 		pmp->mad_hdr.status |= IB_SMP_INVALID_FIELD;
@@ -3009,8 +3007,7 @@ static int pma_get_opa_errorinfo(struct opa_pma_mad *pmp,
 	 * the request came in on.
 	 */
 	port_mask = be64_to_cpu(req->port_select_mask[3]);
-	port_num = find_first_bit((unsigned long *)&port_mask,
-				  sizeof(port_mask));
+	port_num = find_first_bit((unsigned long *)&port_mask, 64);
 
 	if (port_num != port) {
 		pmp->mad_hdr.status |= IB_SMP_INVALID_FIELD;
@@ -3246,8 +3243,7 @@ static int pma_set_opa_errorinfo(struct opa_pma_mad *pmp,
 	 * the request came in on.
 	 */
 	port_mask = be64_to_cpu(req->port_select_mask[3]);
-	port_num = find_first_bit((unsigned long *)&port_mask,
-				  sizeof(port_mask));
+	port_num = find_first_bit((unsigned long *)&port_mask, 64);
 
 	if (port_num != port) {
 		pmp->mad_hdr.status |= IB_SMP_INVALID_FIELD;
