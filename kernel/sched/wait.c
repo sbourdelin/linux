@@ -423,20 +423,28 @@ int __sched
 __wait_on_bit_lock(wait_queue_head_t *wq, struct wait_bit_queue *q,
 			wait_bit_action_f *action, unsigned mode)
 {
-	do {
-		int ret;
+	int ret = 0;
 
+	for (;;) {
 		prepare_to_wait_exclusive(wq, &q->wait, mode);
-		if (!test_bit(q->key.bit_nr, q->key.flags))
-			continue;
-		ret = action(&q->key, mode);
-		if (!ret)
-			continue;
-		abort_exclusive_wait(wq, &q->wait, &q->key);
-		return ret;
-	} while (test_and_set_bit(q->key.bit_nr, q->key.flags));
-	finish_wait(wq, &q->wait);
-	return 0;
+		if (test_bit(q->key.bit_nr, q->key.flags)) {
+			ret = action(&q->key, mode);
+			/*
+			 * Ensure that clear_bit() + wake_up() right after
+			 * test_and_set_bit() below can't see us; it should
+			 * wake up another exclusive waiter if we fail.
+			 */
+			if (ret)
+				finish_wait(wq, &q->wait);
+		}
+		if (!test_and_set_bit(q->key.bit_nr, q->key.flags)) {
+			if (!ret)
+				finish_wait(wq, &q->wait);
+			return 0;
+		} else if (ret) {
+			return ret;
+		}
+	}
 }
 EXPORT_SYMBOL(__wait_on_bit_lock);
 
