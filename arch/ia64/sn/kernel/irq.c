@@ -474,12 +474,12 @@ void __init sn_irq_lh_init(void)
 {
 	int i;
 
-	sn_irq_lh = kmalloc(sizeof(struct list_head *) * NR_IRQS, GFP_KERNEL);
+	sn_irq_lh = kmalloc_array(NR_IRQS, sizeof(*sn_irq_lh), GFP_KERNEL);
 	if (!sn_irq_lh)
 		panic("SN PCI INIT: Failed to allocate memory for PCI init\n");
 
 	for (i = 0; i < NR_IRQS; i++) {
-		sn_irq_lh[i] = kmalloc(sizeof(struct list_head), GFP_KERNEL);
+		sn_irq_lh[i] = kmalloc(*sn_irq_lh[i], GFP_KERNEL);
 		if (!sn_irq_lh[i])
 			panic("SN PCI INIT: Failed IRQ memory allocation\n");
 
