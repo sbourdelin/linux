@@ -81,7 +81,10 @@ static void sync_fs_one_sb(struct super_block *sb, void *arg)
 
 static void fdatawrite_one_bdev(struct block_device *bdev, void *arg)
 {
-	filemap_fdatawrite(bdev->bd_inode->i_mapping);
+	mutex_lock(&bdev->bd_mutex);
+	if (bdev->bd_disk)
+		filemap_fdatawrite(bdev->bd_inode->i_mapping);
+	mutex_unlock(&bdev->bd_mutex);
 }
 
 static void fdatawait_one_bdev(struct block_device *bdev, void *arg)
