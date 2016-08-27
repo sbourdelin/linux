@@ -230,7 +230,7 @@ void br_stp_rcv(const struct stp_proto *proto, struct sk_buff *skb,
 			if (net_ratelimit())
 				br_notice(p->br,
 					  "port %u config from %pM"
-					  " (message_age %ul > max_age %ul)\n",
+					  " (message_age %u > max_age %u)\n",
 					  p->port_no,
 					  eth_hdr(skb)->h_source,
 					  bpdu.message_age, bpdu.max_age);
