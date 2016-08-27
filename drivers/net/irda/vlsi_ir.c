@@ -279,7 +279,7 @@ static void vlsi_proc_ndev(struct seq_file *seq, struct net_device *ndev)
 		(idev->mode==IFF_SIR)?"SIR":((idev->mode==IFF_MIR)?"MIR":"FIR"));
 	sec = div_s64_rem(ktime_us_delta(ktime_get(), idev->last_rx),
 			  USEC_PER_SEC, &usec);
-	seq_printf(seq, "last rx: %ul.%06u sec\n", sec, usec);
+	seq_printf(seq, "last rx: %u.%06u sec\n", sec, usec);
 
 	seq_printf(seq, "RX: packets=%lu / bytes=%lu / errors=%lu / dropped=%lu",
 		ndev->stats.rx_packets, ndev->stats.rx_bytes, ndev->stats.rx_errors,
