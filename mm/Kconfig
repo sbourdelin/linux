@@ -144,14 +144,16 @@ config ARCH_DISCARD_MEMBLOCK
 	bool
 
 config NO_BOOTMEM
-	bool
+	bool "No legacy boot memory"
+	depends on HAVE_MEMBLOCK
+	help
+	 NO_BOOTMEM is implemented by memblock
 
 config MEMORY_ISOLATION
 	bool
 
 config MOVABLE_NODE
 	bool "Enable to assign a node which has only movable memory"
-	depends on HAVE_MEMBLOCK
 	depends on NO_BOOTMEM
 	depends on X86_64
 	depends on NUMA
