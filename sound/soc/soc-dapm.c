@@ -984,6 +984,14 @@ static int dapm_new_pga(struct snd_soc_dapm_widget *w)
 	int i, ret;
 
 	for (i = 0; i < w->num_kcontrols; i++) {
+		const struct soc_mixer_control *mc =
+			(struct soc_mixer_control *)w->kcontrol_news[i].private_value;
+
+		if (mc->reg != SND_SOC_NOPM)
+			dev_err(w->dapm->dev,
+				"ASoC: hardware backed PGA controls not supported: '%s'\n",
+				w->name);
+
 		ret = dapm_create_or_share_kcontrol(w, i);
 		if (ret < 0)
 			return ret;
