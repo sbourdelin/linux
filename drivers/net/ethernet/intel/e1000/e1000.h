@@ -279,6 +279,7 @@ struct e1000_adapter {
 			     struct e1000_rx_ring *rx_ring,
 			     int cleaned_count);
 	struct e1000_rx_ring *rx_ring;      /* One per active queue */
+	struct bpf_prog *prog;
 	struct napi_struct napi;
 
 	int num_tx_queues;
