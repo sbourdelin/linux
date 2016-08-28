@@ -12,6 +12,7 @@
 #include <linux/types.h>
 #include <asm/hw_irq.h>
 #include <linux/device.h>
+#include <uapi/asm/perf_regs.h>
 #include <uapi/asm/perf_event.h>
 
 /* Update perf_event_print_debug() if this changes */
@@ -20,6 +21,12 @@
 #define MAX_LIMITED_HWCOUNTERS	2
 
 struct perf_event;
+
+struct perf_arch_regs {
+	unsigned long regs[PERF_ARCH_REG_POWERPC_MAX];
+};
+
+#define perf_arch_regs perf_arch_regs
 
 /*
  * This struct provides the constants and functions needed to
@@ -52,6 +59,10 @@ struct power_pmu {
 
 	/* BHRB entries in the PMU */
 	int		bhrb_nr;
+
+	/* perf_arch_regs bits */
+	u64		ar_mask;
+	void		(*get_arch_regs)(struct perf_arch_regs *regs);
 };
 
 /*

@@ -57,6 +57,9 @@ struct cpu_hw_events {
 	void				*bhrb_context;
 	struct	perf_branch_stack	bhrb_stack;
 	struct	perf_branch_entry	bhrb_entries[BHRB_MAX_ENTRIES];
+
+	/* perf_arch_regs bits */
+	struct perf_arch_regs		ar_regs;
 };
 
 static DEFINE_PER_CPU(struct cpu_hw_events, cpu_hw_events);
@@ -1928,6 +1931,33 @@ ssize_t power_events_sysfs_show(struct device *dev,
 	return sprintf(page, "event=0x%02llx\n", pmu_attr->id);
 }
 
+u64 perf_get_arch_regs_mask(void)
+{
+	return ppmu->ar_mask;
+}
+
+struct perf_arch_regs *perf_get_arch_reg()
+{
+	struct cpu_hw_events *cpuhw;
+
+	cpuhw = this_cpu_ptr(&cpu_hw_events);
+	if (!ppmu->ar_mask)
+		return NULL;
+
+	return &cpuhw->ar_regs;
+}
+
+u64 perf_arch_reg_value(struct perf_arch_regs *regs, int idx)
+{
+	struct cpu_hw_events *cpuhw;
+
+	cpuhw = this_cpu_ptr(&cpu_hw_events);
+	if (WARN_ON_ONCE(idx >= PERF_ARCH_REG_POWERPC_MAX))
+		return 0;
+
+	return cpuhw->ar_regs.regs[idx];
+}
+
 static struct pmu power_pmu = {
 	.pmu_enable	= power_pmu_enable,
 	.pmu_disable	= power_pmu_disable,
@@ -2007,6 +2037,14 @@ static void record_and_restart(struct perf_event *event, unsigned long val,
 			cpuhw = this_cpu_ptr(&cpu_hw_events);
 			power_pmu_bhrb_read(cpuhw);
 			data.br_stack = &cpuhw->bhrb_stack;
+		}
+
+		if (event->attr.sample_type & PERF_SAMPLE_REGS_INTR) {
+			struct cpu_hw_events *cpuhw;
+			cpuhw = this_cpu_ptr(&cpu_hw_events);
+
+			if (ppmu->get_arch_regs)
+				ppmu->get_arch_regs(&cpuhw->ar_regs);
 		}
 
 		if (perf_event_overflow(event, &data, regs))
