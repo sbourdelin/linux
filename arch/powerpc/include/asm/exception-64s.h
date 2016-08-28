@@ -450,7 +450,7 @@ label##_hv:								\
 #define MASKABLE_EXCEPTION_HV_OOL(vec, label)				\
 	.globl label##_hv;						\
 label##_hv:								\
-	EXCEPTION_PROLOG_1(PACA_EXGEN, SOFTEN_TEST_HV, vec);		\
+	__EXCEPTION_PROLOG_1(PACA_EXGEN, SOFTEN_TEST_HV, vec);		\
 	EXCEPTION_PROLOG_PSERIES_1(label##_common, EXC_HV);
 
 #define __MASKABLE_RELON_EXCEPTION_PSERIES(vec, label, h, extra)	\
@@ -478,7 +478,7 @@ label##_relon_hv:							\
 #define MASKABLE_RELON_EXCEPTION_HV_OOL(vec, label)			\
 	.globl label##_relon_hv;					\
 label##_relon_hv:							\
-	EXCEPTION_PROLOG_1(PACA_EXGEN, SOFTEN_NOTEST_HV, vec);		\
+	__EXCEPTION_PROLOG_1(PACA_EXGEN, SOFTEN_NOTEST_HV, vec);		\
 	EXCEPTION_PROLOG_PSERIES_1(label##_common, EXC_HV);
 
 /*
