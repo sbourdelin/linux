@@ -5780,12 +5780,14 @@ void perf_output_sample(struct perf_output_handle *handle,
 
 	if (sample_type & PERF_SAMPLE_REGS_USER) {
 		u64 abi = data->regs_user.abi;
+		u64 arch_regs_mask = data->regs_user.arch_regs_mask;
 
 		/*
 		 * If there are no regs to dump, notice it through
 		 * first u64 being zero (PERF_SAMPLE_REGS_ABI_NONE).
 		 */
 		perf_output_put(handle, abi);
+		perf_output_put(handle, arch_regs_mask);
 
 		if (abi) {
 			u64 mask = event->attr.sample_regs_user;
@@ -5812,11 +5814,14 @@ void perf_output_sample(struct perf_output_handle *handle,
 
 	if (sample_type & PERF_SAMPLE_REGS_INTR) {
 		u64 abi = data->regs_intr.abi;
+		u64 arch_regs_mask = data->regs_intr.arch_regs_mask;
+
 		/*
 		 * If there are no regs to dump, notice it through
 		 * first u64 being zero (PERF_SAMPLE_REGS_ABI_NONE).
 		 */
 		perf_output_put(handle, abi);
+		perf_output_put(handle, arch_regs_mask);
 
 		if (abi) {
 			u64 mask = event->attr.sample_regs_intr;
@@ -5910,8 +5915,8 @@ void perf_prepare_sample(struct perf_event_header *header,
 				      &data->regs_user_copy);
 
 	if (sample_type & PERF_SAMPLE_REGS_USER) {
-		/* regs dump ABI info */
-		int size = sizeof(u64);
+		/* regs dump ABI info and arch_regs_mask */
+		int size = sizeof(u64) * 2;
 
 		if (data->regs_user.regs) {
 			u64 mask = event->attr.sample_regs_user;
@@ -5947,14 +5952,17 @@ void perf_prepare_sample(struct perf_event_header *header,
 	}
 
 	if (sample_type & PERF_SAMPLE_REGS_INTR) {
-		/* regs dump ABI info */
-		int size = sizeof(u64);
+		/* regs dump ABI info and arch_regs_mask */
+		int size = sizeof(u64) * 2;
 
 		perf_sample_regs_intr(&data->regs_intr, regs);
 
 		if (data->regs_intr.regs) {
 			u64 mask = event->attr.sample_regs_intr;
 
+			size += hweight64(mask) * sizeof(u64);
+
+			mask = data->regs_intr.arch_regs_mask;
 			size += hweight64(mask) * sizeof(u64);
 		}
 
