@@ -1602,15 +1602,25 @@ static int snd_timer_user_tselect(struct file *file,
 	kfree(tu->tqueue);
 	tu->tqueue = NULL;
 	if (tu->tread) {
-		tu->tqueue = kmalloc(tu->queue_size * sizeof(struct snd_timer_tread),
+		struct snd_timer_tread *ttr;
+		ttr = kmalloc(tu->queue_size * sizeof(struct snd_timer_tread),
 				     GFP_KERNEL);
-		if (tu->tqueue == NULL)
+		if (ttr) {
+			kfree(tu->tqueue);
+			tu->tqueue = ttr;
+		} else {
 			err = -ENOMEM;
+		}
 	} else {
-		tu->queue = kmalloc(tu->queue_size * sizeof(struct snd_timer_read),
+		struct snd_timer_read *tr;
+		tr = kmalloc(tu->queue_size * sizeof(struct snd_timer_read),
 				    GFP_KERNEL);
-		if (tu->queue == NULL)
+		if (tr) {
+			kfree(tu->queue);
+			tu->queue = tr;
+		} else {
 			err = -ENOMEM;
+		}
 	}
 
       	if (err < 0) {
@@ -1958,6 +1968,7 @@ static ssize_t snd_timer_user_read(struct file *file, char __user *buffer,
 		tu->qused--;
 		spin_unlock_irq(&tu->qlock);
 
+		mutex_lock(&tu->ioctl_lock);
 		if (tu->tread) {
 			if (copy_to_user(buffer, &tu->tqueue[qhead],
 					 sizeof(struct snd_timer_tread)))
@@ -1967,6 +1978,7 @@ static ssize_t snd_timer_user_read(struct file *file, char __user *buffer,
 					 sizeof(struct snd_timer_read)))
 				err = -EFAULT;
 		}
+		mutex_unlock(&tu->ioctl_lock);
 
 		spin_lock_irq(&tu->qlock);
 		if (err < 0)
