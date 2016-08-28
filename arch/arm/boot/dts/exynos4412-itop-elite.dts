@@ -82,6 +82,14 @@
 		pinctrl-0 = <&pwm0_out>;
 		pinctrl-names = "default";
 	};
+
+	camera: camera {
+		pinctrl-0 = <&cam_port_a_clk_active>;
+		pinctrl-names = "default";
+		status = "okay";
+		assigned-clocks = <&clock CLK_MOUT_CAM0>;
+		assigned-clock-parents = <&clock CLK_XUSBXTI>;
+	};
 };
 
 &pinctrl_1 {
@@ -145,4 +153,12 @@
 &adc {
 	vdd-supply = <&ldo3_reg>;
 	status = "okay";
+};
+
+&fimc_0 {
+	status = "okay";
+	assigned-clocks = <&clock CLK_MOUT_FIMC0>,
+			<&clock CLK_SCLK_FIMC0>;
+	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
+	assigned-clock-rates = <0>, <176000000>;
 };
