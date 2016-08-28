@@ -12,6 +12,7 @@
 #include <linux/perf_event.h>
 #include <asm/reg.h>
 #include <asm/cputable.h>
+#include <uapi/asm/perf_regs.h>
 
 /*
  * Bits in event code for PPC970
@@ -474,6 +475,26 @@ static int ppc970_cache_events[C(MAX)][C(OP_MAX)][C(RESULT_MAX)] = {
 	},
 };
 
+#define PPC970_ARCH_REGS_MASK	(PERF_ARCH_REG_PVR |\
+		PERF_ARCH_REG_PMC1 | PERF_ARCH_REG_PMC2 |\
+		PERF_ARCH_REG_PMC3 | PERF_ARCH_REG_PMC4 |\
+		PERF_ARCH_REG_PMC5 | PERF_ARCH_REG_PMC6 |\
+		PERF_ARCH_REG_MMCR0 | PERF_ARCH_REG_MMCR1 | PERF_ARCH_REG_MMCRA)
+
+static void ppc970_get_arch_regs(struct perf_arch_regs *regs)
+{
+	regs->regs[PERF_ARCH_REG_POWERPC_PVR] = mfspr(SPRN_PVR);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC1] = mfspr(SPRN_PMC1);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC2] = mfspr(SPRN_PMC2);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC3] = mfspr(SPRN_PMC3);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC4] = mfspr(SPRN_PMC4);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC5] = mfspr(SPRN_PMC5);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC6] = mfspr(SPRN_PMC6);
+	regs->regs[PERF_ARCH_REG_POWERPC_MMCR0] = mfspr(SPRN_MMCR0);
+	regs->regs[PERF_ARCH_REG_POWERPC_MMCR1] = mfspr(SPRN_MMCR1);
+	regs->regs[PERF_ARCH_REG_POWERPC_MMCRA] = mfspr(SPRN_MMCRA);
+}
+
 static struct power_pmu ppc970_pmu = {
 	.name			= "PPC970/FX/MP",
 	.n_counter		= 8,
@@ -488,6 +509,8 @@ static struct power_pmu ppc970_pmu = {
 	.generic_events		= ppc970_generic_events,
 	.cache_events		= &ppc970_cache_events,
 	.flags			= PPMU_NO_SIPR | PPMU_NO_CONT_SAMPLING,
+	.ar_mask		= PPC970_ARCH_REGS_MASK,
+	.get_arch_regs		= ppc970_get_arch_regs,
 };
 
 static int __init init_ppc970_pmu(void)
