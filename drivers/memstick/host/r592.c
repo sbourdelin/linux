@@ -49,6 +49,9 @@ static const char *tpc_names[] = {
  */
 const char *memstick_debug_get_tpc_name(int tpc)
 {
+	if (tpc < 1 || tpc > ARRAY_SIZE(tpc_names))
+		return "";
+
 	return tpc_names[tpc-1];
 }
 EXPORT_SYMBOL(memstick_debug_get_tpc_name);
