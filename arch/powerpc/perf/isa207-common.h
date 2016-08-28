@@ -16,6 +16,7 @@
 #include <linux/perf_event.h>
 #include <asm/firmware.h>
 #include <asm/cputable.h>
+#include <uapi/asm/perf_regs.h>
 
 /*
  * Raw event encoding for PowerISA v2.07:
@@ -227,10 +228,19 @@
 #define MAX_ALT				2
 #define MAX_PMU_COUNTERS		6
 
+#define	ISA207_ARCH_REGS_MASK  (PERF_ARCH_REG_PVR |\
+		PERF_ARCH_REG_PMC1 | PERF_ARCH_REG_PMC2 |\
+		PERF_ARCH_REG_PMC3 | PERF_ARCH_REG_PMC4 |\
+		PERF_ARCH_REG_PMC5 | PERF_ARCH_REG_PMC6 |\
+		PERF_ARCH_REG_MMCR0 | PERF_ARCH_REG_MMCR1 |\
+		PERF_ARCH_REG_SIER | PERF_ARCH_REG_SIAR |\
+		PERF_ARCH_REG_SDAR | PERF_ARCH_REG_MMCRA | PERF_ARCH_REG_MMCR2)
+
 int isa207_get_constraint(u64 event, unsigned long *maskp, unsigned long *valp);
 int isa207_compute_mmcr(u64 event[], int n_ev,
 				unsigned int hwc[], unsigned long mmcr[],
 				struct perf_event *pevents[]);
 void isa207_disable_pmc(unsigned int pmc, unsigned long mmcr[]);
+void isa207_get_arch_regs(struct perf_arch_regs *regs);
 
 #endif

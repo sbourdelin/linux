@@ -261,3 +261,21 @@ void isa207_disable_pmc(unsigned int pmc, unsigned long mmcr[])
 	if (pmc <= 3)
 		mmcr[1] &= ~(0xffUL << MMCR1_PMCSEL_SHIFT(pmc + 1));
 }
+
+void isa207_get_arch_regs(struct perf_arch_regs *regs)
+{
+	regs->regs[PERF_ARCH_REG_POWERPC_PVR] = mfspr(SPRN_PVR);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC1] = mfspr(SPRN_PMC1);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC2] = mfspr(SPRN_PMC2);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC3] = mfspr(SPRN_PMC3);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC4] = mfspr(SPRN_PMC4);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC5] = mfspr(SPRN_PMC5);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC6] = mfspr(SPRN_PMC6);
+	regs->regs[PERF_ARCH_REG_POWERPC_MMCR0] = mfspr(SPRN_MMCR0);
+	regs->regs[PERF_ARCH_REG_POWERPC_MMCR1] = mfspr(SPRN_MMCR1);
+	regs->regs[PERF_ARCH_REG_POWERPC_SIER] = mfspr(SPRN_SIER);
+	regs->regs[PERF_ARCH_REG_POWERPC_SIAR] = mfspr(SPRN_SIAR);
+	regs->regs[PERF_ARCH_REG_POWERPC_SDAR] = mfspr(SPRN_SDAR);
+	regs->regs[PERF_ARCH_REG_POWERPC_MMCRA] = mfspr(SPRN_MMCRA);
+	regs->regs[PERF_ARCH_REG_POWERPC_MMCR2] = mfspr(SPRN_MMCR2);
+}

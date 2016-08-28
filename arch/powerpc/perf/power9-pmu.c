@@ -307,6 +307,8 @@ static struct power_pmu power9_pmu = {
 	.cache_events		= &power9_cache_events,
 	.attr_groups		= power9_pmu_attr_groups,
 	.bhrb_nr		= 32,
+	.ar_mask                = ISA207_ARCH_REGS_MASK,
+	.get_arch_regs          = isa207_get_arch_regs,
 };
 
 static int __init init_power9_pmu(void)
