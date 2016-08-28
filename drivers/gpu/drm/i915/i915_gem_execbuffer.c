@@ -28,6 +28,7 @@
 
 #include <linux/dma_remapping.h>
 #include <linux/reservation.h>
+#include <linux/sync_file.h>
 #include <linux/uaccess.h>
 
 #include <drm/drmP.h>
@@ -1153,6 +1154,35 @@ eb_await_request(struct drm_i915_gem_request *to,
 	return 0;
 }
 
+static int eb_await_fence(struct drm_i915_gem_request *req, struct fence *fence)
+{
+	struct fence_array *array;
+	int i;
+
+	if (fence_is_i915(fence))
+		return eb_await_request(req, to_request(fence));
+
+	if (!fence_is_array(fence))
+		return i915_sw_fence_await_dma_fence(&req->submit,
+						     fence, GFP_KERNEL);
+
+	array = to_fence_array(fence);
+	for (i = 0; i < array->num_fences; i++) {
+		struct fence *child = array->fences[i];
+		int ret;
+
+		if (fence_is_i915(child))
+			ret = eb_await_request(req, to_request(child));
+		else
+			ret = i915_sw_fence_await_dma_fence(&req->submit,
+							    child, GFP_KERNEL);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
+
 static int
 eb_await_bo(struct drm_i915_gem_request *to,
 	     struct drm_i915_gem_object *obj,
@@ -1701,6 +1731,9 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	struct i915_execbuffer_params *params = &params_master;
 	const u32 ctx_id = i915_execbuffer2_get_context_id(*args);
 	u32 dispatch_flags;
+	struct fence *in_fence = NULL;
+	struct sync_file *out_fence = NULL;
+	int out_fence_fd = -1;
 	int ret;
 	bool need_relocs;
 
@@ -1742,6 +1775,23 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 		}
 
 		dispatch_flags |= I915_DISPATCH_RS;
+	}
+
+	if (args->flags & I915_EXEC_FENCE_IN) {
+		in_fence = sync_file_get_fence(lower_32_bits(args->rsvd2));
+		if (!in_fence) {
+			ret = -EINVAL;
+			goto pre_mutex_err;
+		}
+	}
+
+	if (args->flags & I915_EXEC_FENCE_OUT) {
+		out_fence_fd = get_unused_fd_flags(O_CLOEXEC);
+		if (out_fence_fd < 0) {
+			ret = out_fence_fd;
+			out_fence_fd = -1;
+			goto pre_mutex_err;
+		}
 	}
 
 	/* Take a local wakeref for preparing to dispatch the execbuf as
@@ -1888,6 +1938,20 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 		goto err_batch_unpin;
 	}
 
+	if (in_fence) {
+		ret = eb_await_fence(params->request, in_fence);
+		if (ret < 0)
+			goto err_request;
+	}
+
+	if (out_fence_fd != -1) {
+		out_fence = sync_file_create(fence_get(&params->request->fence));
+		if (!out_fence) {
+			ret = -ENOMEM;
+			goto err_request;
+		}
+	}
+
 	/* Whilst this request exists, batch_obj will be on the
 	 * active_list, and so will hold the active reference. Only when this
 	 * request is retired will the the batch_obj be moved onto the
@@ -1915,6 +1979,16 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	ret = execbuf_submit(params, args, &eb->vmas);
 err_request:
 	__i915_add_request(params->request, ret == 0);
+	if (out_fence) {
+		if (ret == 0) {
+			fd_install(out_fence_fd, out_fence->file);
+			args->rsvd2 &= ~((u64)0xffffffff << 32);
+			args->rsvd2 |= (u64)out_fence_fd << 32;
+			out_fence_fd = -1;
+		} else {
+			fput(out_fence->file);
+		}
+	}
 
 err_batch_unpin:
 	/*
@@ -1936,6 +2010,9 @@ pre_mutex_err:
 	/* intel_gpu_busy should also get a ref, so it will free when the device
 	 * is really idle. */
 	intel_runtime_pm_put(dev_priv);
+	if (out_fence_fd != -1)
+		put_unused_fd(out_fence_fd);
+	fence_put(in_fence);
 	return ret;
 }
 
@@ -2040,11 +2117,6 @@ i915_gem_execbuffer2(struct drm_device *dev, void *data,
 	if (args->buffer_count < 1 ||
 	    args->buffer_count > UINT_MAX / sizeof(*exec2_list)) {
 		DRM_DEBUG("execbuf2 with %d buffers\n", args->buffer_count);
-		return -EINVAL;
-	}
-
-	if (args->rsvd2 != 0) {
-		DRM_DEBUG("dirty rvsd2 field\n");
 		return -EINVAL;
 	}
 
