@@ -420,6 +420,7 @@ static void print_sample_iregs(struct perf_sample *sample,
 {
 	struct regs_dump *regs = &sample->intr_regs;
 	uint64_t mask = attr->sample_regs_intr;
+	uint64_t arch_regs_mask = regs->arch_regs_mask;
 	unsigned i = 0, r;
 	DECLARE_BITMAP(_mask, 64);
 
@@ -430,6 +431,12 @@ static void print_sample_iregs(struct perf_sample *sample,
 	for_each_set_bit(r, _mask, sizeof(mask) * 8) {
 		u64 val = regs->regs[i++];
 		printf("%5s:0x%"PRIx64" ", perf_reg_name(r), val);
+	}
+
+	bitmap_from_u64(_mask, arch_regs_mask);
+	for_each_set_bit(r, _mask, sizeof(mask) * 8) {
+		u64 val = regs->regs[i++];
+		printf("%5s:0x%"PRIx64" ", perf_arch_reg_name(r), val);
 	}
 }
 

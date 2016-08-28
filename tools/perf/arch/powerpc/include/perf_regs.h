@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <linux/types.h>
 #include <asm/perf_regs.h>
+#include <uapi/asm/perf_regs.h>
 
 #define PERF_REGS_MASK  ((1ULL << PERF_REG_POWERPC_MAX) - 1)
 #define PERF_REGS_MAX   PERF_REG_POWERPC_MAX
@@ -65,5 +66,29 @@ static const char *reg_names[] = {
 static inline const char *perf_reg_name(int id)
 {
 	return reg_names[id];
+}
+
+static const char *arch_reg_names[] = {
+	[PERF_ARCH_REG_POWERPC_PVR] = "pvr",
+	[PERF_ARCH_REG_POWERPC_PMC1] = "pmc1",
+	[PERF_ARCH_REG_POWERPC_PMC2] = "pmc2",
+	[PERF_ARCH_REG_POWERPC_PMC3] = "pmc3",
+	[PERF_ARCH_REG_POWERPC_PMC4] = "pmc4",
+	[PERF_ARCH_REG_POWERPC_PMC5] = "pmc5",
+	[PERF_ARCH_REG_POWERPC_PMC6] = "pmc6",
+	[PERF_ARCH_REG_POWERPC_PMC7] = "pmc7",
+	[PERF_ARCH_REG_POWERPC_PMC8] = "pmc8",
+	[PERF_ARCH_REG_POWERPC_MMCR0] = "mmcr0",
+	[PERF_ARCH_REG_POWERPC_MMCR1] = "mmcr1",
+	[PERF_ARCH_REG_POWERPC_SIER] = "sier",
+	[PERF_ARCH_REG_POWERPC_SIAR] = "siar",
+	[PERF_ARCH_REG_POWERPC_SDAR] = "sdar",
+	[PERF_ARCH_REG_POWERPC_MMCRA] = "mmcra",
+	[PERF_ARCH_REG_POWERPC_MMCR2] = "mmcr2"
+};
+
+static inline const char *perf_arch_reg_name(int id)
+{
+	return arch_reg_names[id];
 }
 #endif /* ARCH_PERF_REGS_H */

@@ -83,4 +83,9 @@ static inline const char *perf_reg_name(int id)
 	return NULL;
 }
 
+static inline const char *perf_arch_reg_name(int id __maybe_unused)
+{
+	return NULL;
+}
+
 #endif /* ARCH_PERF_REGS_H */

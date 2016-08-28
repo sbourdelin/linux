@@ -29,6 +29,11 @@ static inline const char *perf_reg_name(int id __maybe_unused)
 	return NULL;
 }
 
+static inline const char *perf_arch_reg_name(int id __maybe_unused)
+{
+	return NULL;
+}
+
 static inline int perf_reg_value(u64 *valp __maybe_unused,
 				 struct regs_dump *regs __maybe_unused,
 				 int id __maybe_unused)
