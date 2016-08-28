@@ -94,6 +94,7 @@ struct sample_event {
 struct regs_dump {
 	u64 abi;
 	u64 mask;
+	u64 arch_regs_mask;
 	u64 *regs;
 
 	/* Cached values/mask filled by first register access. */

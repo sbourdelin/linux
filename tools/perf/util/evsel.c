@@ -1902,6 +1902,8 @@ int perf_evsel__parse_sample(struct perf_evsel *evsel, union perf_event *event,
 		OVERFLOW_CHECK_u64(array);
 		data->user_regs.abi = *array;
 		array++;
+		data->user_regs.arch_regs_mask = *array;
+		array++;
 
 		if (data->user_regs.abi) {
 			u64 mask = evsel->attr.sample_regs_user;
@@ -1961,11 +1963,14 @@ int perf_evsel__parse_sample(struct perf_evsel *evsel, union perf_event *event,
 		OVERFLOW_CHECK_u64(array);
 		data->intr_regs.abi = *array;
 		array++;
+		data->intr_regs.arch_regs_mask = *array;
+		array++;
 
 		if (data->intr_regs.abi != PERF_SAMPLE_REGS_ABI_NONE) {
 			u64 mask = evsel->attr.sample_regs_intr;
 
 			sz = hweight_long(mask) * sizeof(u64);
+			sz += hweight_long(data->intr_regs.arch_regs_mask) * sizeof(u64);
 			OVERFLOW_CHECK(array, sz, max_size);
 			data->intr_regs.mask = mask;
 			data->intr_regs.regs = (u64 *)array;
@@ -2044,6 +2049,7 @@ size_t perf_event__sample_event_size(const struct perf_sample *sample, u64 type,
 		if (sample->user_regs.abi) {
 			result += sizeof(u64);
 			sz = hweight_long(sample->user_regs.mask) * sizeof(u64);
+			sz += hweight_long(sample->user_regs.arch_regs_mask) * sizeof(u64);
 			result += sz;
 		} else {
 			result += sizeof(u64);
@@ -2072,6 +2078,7 @@ size_t perf_event__sample_event_size(const struct perf_sample *sample, u64 type,
 		if (sample->intr_regs.abi) {
 			result += sizeof(u64);
 			sz = hweight_long(sample->intr_regs.mask) * sizeof(u64);
+			sz += hweight_long(sample->intr_regs.arch_regs_mask) * sizeof(u64);
 			result += sz;
 		} else {
 			result += sizeof(u64);
@@ -2223,7 +2230,9 @@ int perf_event__synthesize_sample(union perf_event *event, u64 type,
 	if (type & PERF_SAMPLE_REGS_USER) {
 		if (sample->user_regs.abi) {
 			*array++ = sample->user_regs.abi;
+			*array++ = sample->user_regs.arch_regs_mask;
 			sz = hweight_long(sample->user_regs.mask) * sizeof(u64);
+			sz += hweight_long(sample->user_regs.arch_regs_mask) * sizeof(u64);
 			memcpy(array, sample->user_regs.regs, sz);
 			array = (void *)array + sz;
 		} else {
@@ -2259,7 +2268,9 @@ int perf_event__synthesize_sample(union perf_event *event, u64 type,
 	if (type & PERF_SAMPLE_REGS_INTR) {
 		if (sample->intr_regs.abi) {
 			*array++ = sample->intr_regs.abi;
+			*array++ = sample->intr_regs.arch_regs_mask;
 			sz = hweight_long(sample->intr_regs.mask) * sizeof(u64);
+			sz += hweight_long(sample->intr_regs.arch_regs_mask) * sizeof(u64);
 			memcpy(array, sample->intr_regs.regs, sz);
 			array = (void *)array + sz;
 		} else {
