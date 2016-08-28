@@ -5371,16 +5371,24 @@ u64 __attribute__((weak)) perf_arch_reg_value(struct perf_arch_regs *regs,
 
 static void
 perf_output_sample_regs(struct perf_output_handle *handle,
-			struct pt_regs *regs, u64 mask)
+				struct perf_regs *regs, u64 mask)
 {
 	int bit;
 	DECLARE_BITMAP(_mask, 64);
+	u64 arch_regs_mask = regs->arch_regs_mask;
 
 	bitmap_from_u64(_mask, mask);
 	for_each_set_bit(bit, _mask, sizeof(mask) * BITS_PER_BYTE) {
 		u64 val;
 
-		val = perf_reg_value(regs, bit);
+		val = perf_reg_value(regs->regs, bit);
+		perf_output_put(handle, val);
+	}
+
+	bitmap_from_u64(_mask, arch_regs_mask);
+	for_each_set_bit(bit, _mask, sizeof(mask) * BITS_PER_BYTE) {
+		u64 val;
+		val = perf_arch_reg_value(regs->arch_regs, bit);
 		perf_output_put(handle, val);
 	}
 }
@@ -5792,7 +5800,7 @@ void perf_output_sample(struct perf_output_handle *handle,
 		if (abi) {
 			u64 mask = event->attr.sample_regs_user;
 			perf_output_sample_regs(handle,
-						data->regs_user.regs,
+						&data->regs_user,
 						mask);
 		}
 	}
@@ -5827,7 +5835,7 @@ void perf_output_sample(struct perf_output_handle *handle,
 			u64 mask = event->attr.sample_regs_intr;
 
 			perf_output_sample_regs(handle,
-						data->regs_intr.regs,
+						&data->regs_intr,
 						mask);
 		}
 	}
