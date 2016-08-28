@@ -5353,6 +5353,22 @@ int perf_unregister_guest_info_callbacks(struct perf_guest_info_callbacks *cbs)
 }
 EXPORT_SYMBOL_GPL(perf_unregister_guest_info_callbacks);
 
+u64 __attribute__((weak)) perf_get_arch_regs_mask()
+{
+	return 0;
+}
+
+struct perf_arch_regs *__attribute__((weak)) perf_get_arch_reg()
+{
+	return 0;
+}
+
+u64 __attribute__((weak)) perf_arch_reg_value(struct perf_arch_regs *regs,
+								int idx)
+{
+	return 0;
+}
+
 static void
 perf_output_sample_regs(struct perf_output_handle *handle,
 			struct pt_regs *regs, u64 mask)
