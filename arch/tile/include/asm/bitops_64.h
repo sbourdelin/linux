@@ -52,9 +52,9 @@ static inline void change_bit(unsigned nr, volatile unsigned long *addr)
  * barrier(), to block until the atomic op is complete.
  */
 
-static inline int test_and_set_bit(unsigned nr, volatile unsigned long *addr)
+static inline bool test_and_set_bit(unsigned nr, volatile unsigned long *addr)
 {
-	int val;
+	bool val;
 	unsigned long mask = (1UL << (nr % BITS_PER_LONG));
 	smp_mb();  /* barrier for proper semantics */
 	val = (__insn_fetchor((void *)(addr + nr / BITS_PER_LONG), mask)
@@ -64,9 +64,9 @@ static inline int test_and_set_bit(unsigned nr, volatile unsigned long *addr)
 }
 
 
-static inline int test_and_clear_bit(unsigned nr, volatile unsigned long *addr)
+static inline bool test_and_clear_bit(unsigned nr, volatile unsigned long *addr)
 {
-	int val;
+	bool val;
 	unsigned long mask = (1UL << (nr % BITS_PER_LONG));
 	smp_mb();  /* barrier for proper semantics */
 	val = (__insn_fetchand((void *)(addr + nr / BITS_PER_LONG), ~mask)
@@ -76,7 +76,7 @@ static inline int test_and_clear_bit(unsigned nr, volatile unsigned long *addr)
 }
 
 
-static inline int test_and_change_bit(unsigned nr,
+static inline bool test_and_change_bit(unsigned nr,
 				      volatile unsigned long *addr)
 {
 	unsigned long mask = (1UL << (nr % BITS_PER_LONG));

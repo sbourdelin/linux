@@ -68,7 +68,7 @@ static inline void __clear_bit(unsigned long nr, volatile void *addr)
 /*
  * test bit
  */
-static inline int test_bit(unsigned long nr, const volatile void *addr)
+static inline bool test_bit(unsigned long nr, const volatile void *addr)
 {
 	return 1UL & (((const volatile unsigned int *) addr)[nr >> 5] >> (nr & 31));
 }
@@ -133,9 +133,10 @@ extern void change_bit(unsigned long nr, volatile void *addr);
 /*
  * test and change bit
  */
-static inline int __test_and_change_bit(unsigned long nr, volatile void *addr)
+static inline bool __test_and_change_bit(unsigned long nr, volatile void *addr)
 {
-	int	mask, retval;
+	int mask;
+	bool retval;
 	unsigned int *a = (unsigned int *)addr;
 
 	a += nr >> 5;

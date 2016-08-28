@@ -154,7 +154,7 @@ static inline void change_bit(unsigned int bit, volatile unsigned long *p)
 			: "memory");
 }
 
-static inline int
+static inline bool
 test_and_set_bit(unsigned int bit, volatile unsigned long *p)
 {
 	unsigned long tmp, value;
@@ -175,7 +175,7 @@ test_and_set_bit(unsigned int bit, volatile unsigned long *p)
 	return tmp & mask;
 }
 
-static inline int
+static inline bool
 test_and_clear_bit(unsigned int bit, volatile unsigned long *p)
 {
 	unsigned long tmp, value;
@@ -196,7 +196,7 @@ test_and_clear_bit(unsigned int bit, volatile unsigned long *p)
 	return tmp & mask;
 }
 
-static inline int
+static inline bool
 test_and_change_bit(unsigned int bit, volatile unsigned long *p)
 {
 	unsigned long tmp, value;

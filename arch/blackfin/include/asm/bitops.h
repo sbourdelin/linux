@@ -47,13 +47,13 @@ asmlinkage int __raw_bit_clear_asm(volatile unsigned long *addr, int nr);
 
 asmlinkage int __raw_bit_toggle_asm(volatile unsigned long *addr, int nr);
 
-asmlinkage int __raw_bit_test_set_asm(volatile unsigned long *addr, int nr);
+asmlinkage bool __raw_bit_test_set_asm(volatile unsigned long *addr, int nr);
 
-asmlinkage int __raw_bit_test_clear_asm(volatile unsigned long *addr, int nr);
+asmlinkage bool __raw_bit_test_clear_asm(volatile unsigned long *addr, int nr);
 
-asmlinkage int __raw_bit_test_toggle_asm(volatile unsigned long *addr, int nr);
+asmlinkage bool __raw_bit_test_toggle_asm(volatile unsigned long *addr, int nr);
 
-asmlinkage int __raw_bit_test_asm(const volatile unsigned long *addr, int nr);
+asmlinkage bool __raw_bit_test_asm(const volatile unsigned long *addr, int nr);
 
 static inline void set_bit(int nr, volatile unsigned long *addr)
 {
@@ -73,25 +73,25 @@ static inline void change_bit(int nr, volatile unsigned long *addr)
 	__raw_bit_toggle_asm(a, nr & 0x1f);
 }
 
-static inline int test_bit(int nr, const volatile unsigned long *addr)
+static inline bool test_bit(int nr, const volatile unsigned long *addr)
 {
 	volatile const unsigned long *a = addr + (nr >> 5);
 	return __raw_bit_test_asm(a, nr & 0x1f) != 0;
 }
 
-static inline int test_and_set_bit(int nr, volatile unsigned long *addr)
+static inline bool test_and_set_bit(int nr, volatile unsigned long *addr)
 {
 	volatile unsigned long *a = addr + (nr >> 5);
 	return __raw_bit_test_set_asm(a, nr & 0x1f);
 }
 
-static inline int test_and_clear_bit(int nr, volatile unsigned long *addr)
+static inline bool test_and_clear_bit(int nr, volatile unsigned long *addr)
 {
 	volatile unsigned long *a = addr + (nr >> 5);
 	return __raw_bit_test_clear_asm(a, nr & 0x1f);
 }
 
-static inline int test_and_change_bit(int nr, volatile unsigned long *addr)
+static inline bool test_and_change_bit(int nr, volatile unsigned long *addr)
 {
 	volatile unsigned long *a = addr + (nr >> 5);
 	return __raw_bit_test_toggle_asm(a, nr & 0x1f);

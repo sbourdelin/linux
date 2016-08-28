@@ -196,7 +196,7 @@ __change_bit (int nr, volatile void *addr)
  * This operation is atomic and cannot be reordered.  
  * It also implies the acquisition side of the memory barrier.
  */
-static __inline__ int
+static __inline__ bool
 test_and_set_bit (int nr, volatile void *addr)
 {
 	__u32 bit, old, new;
@@ -231,7 +231,7 @@ test_and_set_bit (int nr, volatile void *addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int
+static __inline__ bool
 __test_and_set_bit (int nr, volatile void *addr)
 {
 	__u32 *p = (__u32 *) addr + (nr >> 5);
@@ -250,7 +250,7 @@ __test_and_set_bit (int nr, volatile void *addr)
  * This operation is atomic and cannot be reordered.  
  * It also implies the acquisition side of the memory barrier.
  */
-static __inline__ int
+static __inline__ bool
 test_and_clear_bit (int nr, volatile void *addr)
 {
 	__u32 mask, old, new;
@@ -276,7 +276,7 @@ test_and_clear_bit (int nr, volatile void *addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int
+static __inline__ bool
 __test_and_clear_bit(int nr, volatile void * addr)
 {
 	__u32 *p = (__u32 *) addr + (nr >> 5);
@@ -295,7 +295,7 @@ __test_and_clear_bit(int nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.  
  * It also implies the acquisition side of the memory barrier.
  */
-static __inline__ int
+static __inline__ bool
 test_and_change_bit (int nr, volatile void *addr)
 {
 	__u32 bit, old, new;
@@ -319,7 +319,7 @@ test_and_change_bit (int nr, volatile void *addr)
  *
  * This operation is non-atomic and can be reordered.
  */
-static __inline__ int
+static __inline__ bool
 __test_and_change_bit (int nr, void *addr)
 {
 	__u32 old, bit = (1 << (nr & 31));
@@ -330,7 +330,7 @@ __test_and_change_bit (int nr, void *addr)
 	return (old & bit) != 0;
 }
 
-static __inline__ int
+static __inline__ bool
 test_bit (int nr, const volatile void *addr)
 {
 	return 1 & (((const volatile __u32 *) addr)[nr >> 5] >> (nr & 31));

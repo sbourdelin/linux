@@ -80,7 +80,7 @@ static inline void change_bit(unsigned nr, volatile unsigned long *addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static inline int test_and_set_bit(unsigned nr, volatile unsigned long *addr)
+static inline bool test_and_set_bit(unsigned nr, volatile unsigned long *addr)
 {
 	unsigned long mask = BIT_MASK(nr);
 	addr += BIT_WORD(nr);
@@ -96,7 +96,7 @@ static inline int test_and_set_bit(unsigned nr, volatile unsigned long *addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static inline int test_and_clear_bit(unsigned nr, volatile unsigned long *addr)
+static inline bool test_and_clear_bit(unsigned nr, volatile unsigned long *addr)
 {
 	unsigned long mask = BIT_MASK(nr);
 	addr += BIT_WORD(nr);
@@ -112,7 +112,7 @@ static inline int test_and_clear_bit(unsigned nr, volatile unsigned long *addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static inline int test_and_change_bit(unsigned nr,
+static inline bool test_and_change_bit(unsigned nr,
 				      volatile unsigned long *addr)
 {
 	unsigned long mask = BIT_MASK(nr);

@@ -28,7 +28,7 @@ unsigned long ___change_bit(unsigned long *addr, unsigned long mask);
  * within the first byte. Sparc is BIG-Endian. Unless noted otherwise
  * all bit-ops return 0 if bit was previously clear and != 0 otherwise.
  */
-static inline int test_and_set_bit(unsigned long nr, volatile unsigned long *addr)
+static inline bool test_and_set_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	unsigned long *ADDR, mask;
 
@@ -48,7 +48,7 @@ static inline void set_bit(unsigned long nr, volatile unsigned long *addr)
 	(void) ___set_bit(ADDR, mask);
 }
 
-static inline int test_and_clear_bit(unsigned long nr, volatile unsigned long *addr)
+static inline bool test_and_clear_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	unsigned long *ADDR, mask;
 
@@ -68,7 +68,7 @@ static inline void clear_bit(unsigned long nr, volatile unsigned long *addr)
 	(void) ___clear_bit(ADDR, mask);
 }
 
-static inline int test_and_change_bit(unsigned long nr, volatile unsigned long *addr)
+static inline bool test_and_change_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	unsigned long *ADDR, mask;
 

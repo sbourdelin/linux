@@ -48,7 +48,7 @@ static inline void change_bit(unsigned int bit, volatile unsigned long *p)
 	__global_unlock1(flags);
 }
 
-static inline int test_and_set_bit(unsigned int bit, volatile unsigned long *p)
+static inline bool test_and_set_bit(unsigned int bit, volatile unsigned long *p)
 {
 	unsigned long flags;
 	unsigned long old;
@@ -67,7 +67,7 @@ static inline int test_and_set_bit(unsigned int bit, volatile unsigned long *p)
 	return (old & mask) != 0;
 }
 
-static inline int test_and_clear_bit(unsigned int bit,
+static inline bool test_and_clear_bit(unsigned int bit,
 				     volatile unsigned long *p)
 {
 	unsigned long flags;
@@ -87,7 +87,7 @@ static inline int test_and_clear_bit(unsigned int bit,
 	return (old & mask) != 0;
 }
 
-static inline int test_and_change_bit(unsigned int bit,
+static inline bool test_and_change_bit(unsigned int bit,
 				      volatile unsigned long *p)
 {
 	unsigned long flags;

@@ -68,7 +68,7 @@ static inline void ____atomic_change_bit(unsigned int bit, volatile unsigned lon
 	raw_local_irq_restore(flags);
 }
 
-static inline int
+static inline bool
 ____atomic_test_and_set_bit(unsigned int bit, volatile unsigned long *p)
 {
 	unsigned long flags;
@@ -85,7 +85,7 @@ ____atomic_test_and_set_bit(unsigned int bit, volatile unsigned long *p)
 	return (res & mask) != 0;
 }
 
-static inline int
+static inline bool
 ____atomic_test_and_clear_bit(unsigned int bit, volatile unsigned long *p)
 {
 	unsigned long flags;
@@ -102,7 +102,7 @@ ____atomic_test_and_clear_bit(unsigned int bit, volatile unsigned long *p)
 	return (res & mask) != 0;
 }
 
-static inline int
+static inline bool
 ____atomic_test_and_change_bit(unsigned int bit, volatile unsigned long *p)
 {
 	unsigned long flags;
@@ -152,9 +152,9 @@ ____atomic_test_and_change_bit(unsigned int bit, volatile unsigned long *p)
 extern void _set_bit(int nr, volatile unsigned long * p);
 extern void _clear_bit(int nr, volatile unsigned long * p);
 extern void _change_bit(int nr, volatile unsigned long * p);
-extern int _test_and_set_bit(int nr, volatile unsigned long * p);
-extern int _test_and_clear_bit(int nr, volatile unsigned long * p);
-extern int _test_and_change_bit(int nr, volatile unsigned long * p);
+extern bool _test_and_set_bit(int nr, volatile unsigned long *p);
+extern bool _test_and_clear_bit(int nr, volatile unsigned long *p);
+extern bool _test_and_change_bit(int nr, volatile unsigned long *p);
 
 /*
  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
