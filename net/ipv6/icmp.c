@@ -397,6 +397,7 @@ static void icmp6_send(struct sk_buff *skb, u8 type, u8 code, __u32 info,
 	struct sock *sk;
 	struct ipv6_pinfo *np;
 	const struct in6_addr *saddr = NULL;
+	struct in6_addr tmp_saddr;
 	struct dst_entry *dst;
 	struct icmp6hdr tmp_hdr;
 	struct flowi6 fl6;
@@ -420,6 +421,17 @@ static void icmp6_send(struct sk_buff *skb, u8 type, u8 code, __u32 info,
 	 *	in any code that processes icmp errors.
 	 */
 	addr_type = ipv6_addr_type(&hdr->daddr);
+
+	switch (type) {
+	case ICMPV6_DEST_UNREACH:
+	case ICMPV6_PKT_TOOBIG:
+	case ICMPV6_TIME_EXCEED:
+	case ICMPV6_PARAMPROB:
+		if (!ipv6_dev_get_saddr(net, skb->dev, &hdr->saddr, 0,
+					&tmp_saddr))
+			saddr = &tmp_saddr;
+		break;
+	}
 
 	if (ipv6_chk_addr(net, &hdr->daddr, skb->dev, 0) ||
 	    ipv6_chk_acast_addr_src(net, skb->dev, &hdr->daddr))
