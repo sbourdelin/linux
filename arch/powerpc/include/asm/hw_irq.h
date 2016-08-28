@@ -81,6 +81,23 @@ static inline unsigned long arch_local_irq_disable(void)
 	return flags;
 }
 
+static inline unsigned long soft_irq_set_mask(int value)
+{
+	unsigned long flags, zero;
+
+#ifdef CONFIG_IRQ_DEBUG_SUPPORT
+	WARN_ON(value <= IRQ_DISABLE_MASK_LINUX);
+#endif
+	asm volatile(
+		"li %1,%3; lbz %0,%2(13); stb %1,%2(13)"
+		: "=r" (flags), "=&r" (zero)
+		: "i" (offsetof(struct paca_struct, soft_enabled)),\
+		 "i" (value)
+		: "memory");
+
+	return flags;
+}
+
 extern void arch_local_irq_restore(unsigned long);
 
 static inline void arch_local_irq_enable(void)
