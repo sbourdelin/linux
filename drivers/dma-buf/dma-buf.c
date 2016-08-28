@@ -156,6 +156,18 @@ static unsigned int dma_buf_poll(struct file *file, poll_table *poll)
 	if (!events)
 		return 0;
 
+	if (poll_does_not_wait(poll)) {
+		if (events & POLLOUT &&
+		    !reservation_object_test_signaled_rcu(resv, true))
+			events &= ~(POLLOUT | POLLIN);
+
+		if (events & POLLIN &&
+		    !reservation_object_test_signaled_rcu(resv, false))
+			events &= ~POLLIN;
+
+		return events;
+	}
+
 retry:
 	seq = read_seqcount_begin(&resv->seq);
 	rcu_read_lock();
