@@ -147,7 +147,7 @@ static __inline__ void change_bit(int nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_set_bit(int nr, volatile void * addr)
+static __inline__ bool test_and_set_bit(int nr, volatile void * addr)
 {
 	__u32 mask, oldbit;
 	volatile __u32 *a = addr;
@@ -182,7 +182,7 @@ static __inline__ int test_and_set_bit(int nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_clear_bit(int nr, volatile void * addr)
+static __inline__ bool test_and_clear_bit(int nr, volatile void * addr)
 {
 	__u32 mask, oldbit;
 	volatile __u32 *a = addr;
@@ -219,7 +219,7 @@ static __inline__ int test_and_clear_bit(int nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_change_bit(int nr, volatile void * addr)
+static __inline__ bool test_and_change_bit(int nr, volatile void * addr)
 {
 	__u32 mask, oldbit;
 	volatile __u32 *a = addr;

@@ -30,13 +30,13 @@
 void __mips_set_bit(unsigned long nr, volatile unsigned long *addr);
 void __mips_clear_bit(unsigned long nr, volatile unsigned long *addr);
 void __mips_change_bit(unsigned long nr, volatile unsigned long *addr);
-int __mips_test_and_set_bit(unsigned long nr,
+bool __mips_test_and_set_bit(unsigned long nr,
 			    volatile unsigned long *addr);
-int __mips_test_and_set_bit_lock(unsigned long nr,
+bool __mips_test_and_set_bit_lock(unsigned long nr,
 				 volatile unsigned long *addr);
-int __mips_test_and_clear_bit(unsigned long nr,
+bool __mips_test_and_clear_bit(unsigned long nr,
 			      volatile unsigned long *addr);
-int __mips_test_and_change_bit(unsigned long nr,
+bool __mips_test_and_change_bit(unsigned long nr,
 			       volatile unsigned long *addr);
 
 
@@ -210,7 +210,7 @@ static inline void change_bit(unsigned long nr, volatile unsigned long *addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static inline int test_and_set_bit(unsigned long nr,
+static inline bool test_and_set_bit(unsigned long nr,
 	volatile unsigned long *addr)
 {
 	int bit = nr & SZLONG_MASK;
@@ -266,7 +266,7 @@ static inline int test_and_set_bit(unsigned long nr,
  * This operation is atomic and implies acquire ordering semantics
  * after the memory operation.
  */
-static inline int test_and_set_bit_lock(unsigned long nr,
+static inline bool test_and_set_bit_lock(unsigned long nr,
 	volatile unsigned long *addr)
 {
 	int bit = nr & SZLONG_MASK;
@@ -319,7 +319,7 @@ static inline int test_and_set_bit_lock(unsigned long nr,
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static inline int test_and_clear_bit(unsigned long nr,
+static inline bool test_and_clear_bit(unsigned long nr,
 	volatile unsigned long *addr)
 {
 	int bit = nr & SZLONG_MASK;
@@ -393,7 +393,7 @@ static inline int test_and_clear_bit(unsigned long nr,
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static inline int test_and_change_bit(unsigned long nr,
+static inline bool test_and_change_bit(unsigned long nr,
 	volatile unsigned long *addr)
 {
 	int bit = nr & SZLONG_MASK;

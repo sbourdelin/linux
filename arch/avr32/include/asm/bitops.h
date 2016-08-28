@@ -128,7 +128,7 @@ static inline void change_bit(int nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static inline int test_and_set_bit(int nr, volatile void * addr)
+static inline bool test_and_set_bit(int nr, volatile void * addr)
 {
 	unsigned long *p = ((unsigned long *)addr) + nr / BITS_PER_LONG;
 	unsigned long mask = 1UL << (nr % BITS_PER_LONG);
@@ -168,7 +168,7 @@ static inline int test_and_set_bit(int nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static inline int test_and_clear_bit(int nr, volatile void * addr)
+static inline bool test_and_clear_bit(int nr, volatile void * addr)
 {
 	unsigned long *p = ((unsigned long *)addr) + nr / BITS_PER_LONG;
 	unsigned long mask = 1UL << (nr % BITS_PER_LONG);
@@ -209,7 +209,7 @@ static inline int test_and_clear_bit(int nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static inline int test_and_change_bit(int nr, volatile void * addr)
+static inline bool test_and_change_bit(int nr, volatile void * addr)
 {
 	unsigned long *p = ((unsigned long *)addr) + nr / BITS_PER_LONG;
 	unsigned long mask = 1UL << (nr % BITS_PER_LONG);

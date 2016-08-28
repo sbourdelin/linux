@@ -6,6 +6,7 @@
 #endif
 
 #include <asm/compiler.h>
+#include <linux/types.h>
 #include <asm/barrier.h>
 
 /*
@@ -125,7 +126,7 @@ __change_bit(unsigned long nr, volatile void * addr)
 	*m ^= 1 << (nr & 31);
 }
 
-static inline int
+static inline bool
 test_and_set_bit(unsigned long nr, volatile void *addr)
 {
 	unsigned long oldbit;
@@ -155,7 +156,7 @@ test_and_set_bit(unsigned long nr, volatile void *addr)
 	return oldbit != 0;
 }
 
-static inline int
+static inline bool
 test_and_set_bit_lock(unsigned long nr, volatile void *addr)
 {
 	unsigned long oldbit;
@@ -185,7 +186,7 @@ test_and_set_bit_lock(unsigned long nr, volatile void *addr)
 /*
  * WARNING: non atomic version.
  */
-static inline int
+static inline bool
 __test_and_set_bit(unsigned long nr, volatile void * addr)
 {
 	unsigned long mask = 1 << (nr & 0x1f);
@@ -196,7 +197,7 @@ __test_and_set_bit(unsigned long nr, volatile void * addr)
 	return (old & mask) != 0;
 }
 
-static inline int
+static inline bool
 test_and_clear_bit(unsigned long nr, volatile void * addr)
 {
 	unsigned long oldbit;
@@ -229,7 +230,7 @@ test_and_clear_bit(unsigned long nr, volatile void * addr)
 /*
  * WARNING: non atomic version.
  */
-static inline int
+static inline bool
 __test_and_clear_bit(unsigned long nr, volatile void * addr)
 {
 	unsigned long mask = 1 << (nr & 0x1f);
@@ -240,7 +241,7 @@ __test_and_clear_bit(unsigned long nr, volatile void * addr)
 	return (old & mask) != 0;
 }
 
-static inline int
+static inline bool
 test_and_change_bit(unsigned long nr, volatile void * addr)
 {
 	unsigned long oldbit;
@@ -271,7 +272,7 @@ test_and_change_bit(unsigned long nr, volatile void * addr)
 /*
  * WARNING: non atomic version.
  */
-static __inline__ int
+static __inline__ bool
 __test_and_change_bit(unsigned long nr, volatile void * addr)
 {
 	unsigned long mask = 1 << (nr & 0x1f);
@@ -282,7 +283,7 @@ __test_and_change_bit(unsigned long nr, volatile void * addr)
 	return (old & mask) != 0;
 }
 
-static inline int
+static inline bool
 test_bit(int nr, const volatile void * addr)
 {
 	return (1UL & (((const int *) addr)[nr >> 5] >> (nr & 31))) != 0UL;

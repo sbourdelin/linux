@@ -42,7 +42,7 @@
  * @nr:  bit number to clear
  * @addr:  pointer to memory
  */
-static inline int test_and_clear_bit(int nr, volatile void *addr)
+static inline bool test_and_clear_bit(int nr, volatile void *addr)
 {
 	int oldval;
 
@@ -66,7 +66,7 @@ static inline int test_and_clear_bit(int nr, volatile void *addr)
  * @nr:  bit number to set
  * @addr:  pointer to memory
  */
-static inline int test_and_set_bit(int nr, volatile void *addr)
+static inline bool test_and_set_bit(int nr, volatile void *addr)
 {
 	int oldval;
 
@@ -92,7 +92,7 @@ static inline int test_and_set_bit(int nr, volatile void *addr)
  * @nr:  bit number to set
  * @addr:  pointer to memory
  */
-static inline int test_and_change_bit(int nr, volatile void *addr)
+static inline bool test_and_change_bit(int nr, volatile void *addr)
 {
 	int oldval;
 
@@ -157,22 +157,22 @@ static inline void __change_bit(int nr, volatile unsigned long *addr)
 }
 
 /*  Apparently, at least some of these are allowed to be non-atomic  */
-static inline int __test_and_clear_bit(int nr, volatile unsigned long *addr)
+static inline bool __test_and_clear_bit(int nr, volatile unsigned long *addr)
 {
 	return test_and_clear_bit(nr, addr);
 }
 
-static inline int __test_and_set_bit(int nr, volatile unsigned long *addr)
+static inline bool __test_and_set_bit(int nr, volatile unsigned long *addr)
 {
 	return test_and_set_bit(nr, addr);
 }
 
-static inline int __test_and_change_bit(int nr, volatile unsigned long *addr)
+static inline bool __test_and_change_bit(int nr, volatile unsigned long *addr)
 {
 	return test_and_change_bit(nr, addr);
 }
 
-static inline int __test_bit(int nr, const volatile unsigned long *addr)
+static inline bool __test_bit(int nr, const volatile unsigned long *addr)
 {
 	int retval;
 

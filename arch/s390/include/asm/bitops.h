@@ -173,7 +173,7 @@ static inline void change_bit(unsigned long nr, volatile unsigned long *ptr)
 	__BITOPS_LOOP(addr, mask, __BITOPS_XOR, __BITOPS_NO_BARRIER);
 }
 
-static inline int
+static inline bool
 test_and_set_bit(unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned long *addr = __bitops_word(nr, ptr);
@@ -184,7 +184,7 @@ test_and_set_bit(unsigned long nr, volatile unsigned long *ptr)
 	return (old & mask) != 0;
 }
 
-static inline int
+static inline bool
 test_and_clear_bit(unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned long *addr = __bitops_word(nr, ptr);
@@ -195,7 +195,7 @@ test_and_clear_bit(unsigned long nr, volatile unsigned long *ptr)
 	return (old & ~mask) != 0;
 }
 
-static inline int
+static inline bool
 test_and_change_bit(unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned long *addr = __bitops_word(nr, ptr);
@@ -228,7 +228,7 @@ static inline void __change_bit(unsigned long nr, volatile unsigned long *ptr)
 	*addr ^= 1 << (nr & 7);
 }
 
-static inline int
+static inline bool
 __test_and_set_bit(unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned char *addr = __bitops_byte(nr, ptr);
@@ -239,7 +239,7 @@ __test_and_set_bit(unsigned long nr, volatile unsigned long *ptr)
 	return (ch >> (nr & 7)) & 1;
 }
 
-static inline int
+static inline bool
 __test_and_clear_bit(unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned char *addr = __bitops_byte(nr, ptr);
@@ -250,7 +250,7 @@ __test_and_clear_bit(unsigned long nr, volatile unsigned long *ptr)
 	return (ch >> (nr & 7)) & 1;
 }
 
-static inline int
+static inline bool
 __test_and_change_bit(unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned char *addr = __bitops_byte(nr, ptr);
@@ -261,7 +261,7 @@ __test_and_change_bit(unsigned long nr, volatile unsigned long *ptr)
 	return (ch >> (nr & 7)) & 1;
 }
 
-static inline int test_bit(unsigned long nr, const volatile unsigned long *ptr)
+static inline bool test_bit(unsigned long nr, const volatile unsigned long *ptr)
 {
 	const volatile unsigned char *addr;
 
@@ -270,7 +270,7 @@ static inline int test_bit(unsigned long nr, const volatile unsigned long *ptr)
 	return (*addr >> (nr & 7)) & 1;
 }
 
-static inline int test_and_set_bit_lock(unsigned long nr,
+static inline bool test_and_set_bit_lock(unsigned long nr,
 					volatile unsigned long *ptr)
 {
 	if (test_bit(nr, ptr))
@@ -321,7 +321,7 @@ static inline void __clear_bit_inv(unsigned long nr, volatile unsigned long *ptr
 	return __clear_bit(nr ^ (BITS_PER_LONG - 1), ptr);
 }
 
-static inline int test_bit_inv(unsigned long nr,
+static inline bool test_bit_inv(unsigned long nr,
 			       const volatile unsigned long *ptr)
 {
 	return test_bit(nr ^ (BITS_PER_LONG - 1), ptr);

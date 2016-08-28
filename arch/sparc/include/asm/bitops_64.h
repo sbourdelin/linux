@@ -15,9 +15,9 @@
 #include <asm/byteorder.h>
 #include <asm/barrier.h>
 
-int test_and_set_bit(unsigned long nr, volatile unsigned long *addr);
-int test_and_clear_bit(unsigned long nr, volatile unsigned long *addr);
-int test_and_change_bit(unsigned long nr, volatile unsigned long *addr);
+bool test_and_set_bit(unsigned long nr, volatile unsigned long *addr);
+bool test_and_clear_bit(unsigned long nr, volatile unsigned long *addr);
+bool test_and_change_bit(unsigned long nr, volatile unsigned long *addr);
 void set_bit(unsigned long nr, volatile unsigned long *addr);
 void clear_bit(unsigned long nr, volatile unsigned long *addr);
 void change_bit(unsigned long nr, volatile unsigned long *addr);

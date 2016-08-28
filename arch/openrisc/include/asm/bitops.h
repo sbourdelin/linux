@@ -27,6 +27,7 @@
 
 #include <linux/irqflags.h>
 #include <linux/compiler.h>
+#include <linux/types.h>
 #include <asm/barrier.h>
 
 #include <asm/bitops/__ffs.h>

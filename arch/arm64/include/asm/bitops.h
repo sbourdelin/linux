@@ -17,6 +17,7 @@
 #define __ASM_BITOPS_H
 
 #include <linux/compiler.h>
+#include <linux/types.h>
 #include <asm/barrier.h>
 
 #ifndef _LINUX_BITOPS_H
@@ -29,9 +30,9 @@
 extern void set_bit(int nr, volatile unsigned long *p);
 extern void clear_bit(int nr, volatile unsigned long *p);
 extern void change_bit(int nr, volatile unsigned long *p);
-extern int test_and_set_bit(int nr, volatile unsigned long *p);
-extern int test_and_clear_bit(int nr, volatile unsigned long *p);
-extern int test_and_change_bit(int nr, volatile unsigned long *p);
+extern bool test_and_set_bit(int nr, volatile unsigned long *p);
+extern bool test_and_clear_bit(int nr, volatile unsigned long *p);
+extern bool test_and_change_bit(int nr, volatile unsigned long *p);
 
 #include <asm-generic/bitops/builtin-__ffs.h>
 #include <asm-generic/bitops/builtin-ffs.h>

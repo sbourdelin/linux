@@ -13,6 +13,7 @@
 #endif
 
 #include <linux/compiler.h>
+#include <linux/types.h>
 #include <asm/barrier.h>
 
 /*
@@ -148,13 +149,13 @@ static inline void bfchg_mem_change_bit(int nr, volatile unsigned long *vaddr)
 #define __change_bit(nr, vaddr)	change_bit(nr, vaddr)
 
 
-static inline int test_bit(int nr, const unsigned long *vaddr)
+static inline bool test_bit(int nr, const unsigned long *vaddr)
 {
 	return (vaddr[nr >> 5] & (1UL << (nr & 31))) != 0;
 }
 
 
-static inline int bset_reg_test_and_set_bit(int nr,
+static inline bool bset_reg_test_and_set_bit(int nr,
 					    volatile unsigned long *vaddr)
 {
 	char *p = (char *)vaddr + (nr ^ 31) / 8;
@@ -167,7 +168,7 @@ static inline int bset_reg_test_and_set_bit(int nr,
 	return retval;
 }
 
-static inline int bset_mem_test_and_set_bit(int nr,
+static inline bool bset_mem_test_and_set_bit(int nr,
 					    volatile unsigned long *vaddr)
 {
 	char *p = (char *)vaddr + (nr ^ 31) / 8;
@@ -179,7 +180,7 @@ static inline int bset_mem_test_and_set_bit(int nr,
 	return retval;
 }
 
-static inline int bfset_mem_test_and_set_bit(int nr,
+static inline bool bfset_mem_test_and_set_bit(int nr,
 					     volatile unsigned long *vaddr)
 {
 	char retval;
@@ -204,7 +205,7 @@ static inline int bfset_mem_test_and_set_bit(int nr,
 #define __test_and_set_bit(nr, vaddr)	test_and_set_bit(nr, vaddr)
 
 
-static inline int bclr_reg_test_and_clear_bit(int nr,
+static inline bool bclr_reg_test_and_clear_bit(int nr,
 					      volatile unsigned long *vaddr)
 {
 	char *p = (char *)vaddr + (nr ^ 31) / 8;
@@ -217,7 +218,7 @@ static inline int bclr_reg_test_and_clear_bit(int nr,
 	return retval;
 }
 
-static inline int bclr_mem_test_and_clear_bit(int nr,
+static inline bool bclr_mem_test_and_clear_bit(int nr,
 					      volatile unsigned long *vaddr)
 {
 	char *p = (char *)vaddr + (nr ^ 31) / 8;
@@ -229,7 +230,7 @@ static inline int bclr_mem_test_and_clear_bit(int nr,
 	return retval;
 }
 
-static inline int bfclr_mem_test_and_clear_bit(int nr,
+static inline bool bfclr_mem_test_and_clear_bit(int nr,
 					       volatile unsigned long *vaddr)
 {
 	char retval;
@@ -254,7 +255,7 @@ static inline int bfclr_mem_test_and_clear_bit(int nr,
 #define __test_and_clear_bit(nr, vaddr)	test_and_clear_bit(nr, vaddr)
 
 
-static inline int bchg_reg_test_and_change_bit(int nr,
+static inline bool bchg_reg_test_and_change_bit(int nr,
 					       volatile unsigned long *vaddr)
 {
 	char *p = (char *)vaddr + (nr ^ 31) / 8;
@@ -267,7 +268,7 @@ static inline int bchg_reg_test_and_change_bit(int nr,
 	return retval;
 }
 
-static inline int bchg_mem_test_and_change_bit(int nr,
+static inline bool bchg_mem_test_and_change_bit(int nr,
 					       volatile unsigned long *vaddr)
 {
 	char *p = (char *)vaddr + (nr ^ 31) / 8;
@@ -279,7 +280,7 @@ static inline int bchg_mem_test_and_change_bit(int nr,
 	return retval;
 }
 
-static inline int bfchg_mem_test_and_change_bit(int nr,
+static inline bool bfchg_mem_test_and_change_bit(int nr,
 						volatile unsigned long *vaddr)
 {
 	char retval;

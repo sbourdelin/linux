@@ -83,14 +83,14 @@ EXPORT_SYMBOL(__mips_change_bit);
  * @nr: Bit to set
  * @addr: Address to count from
  */
-int __mips_test_and_set_bit(unsigned long nr,
+bool __mips_test_and_set_bit(unsigned long nr,
 			    volatile unsigned long *addr)
 {
 	unsigned long *a = (unsigned long *)addr;
 	unsigned bit = nr & SZLONG_MASK;
 	unsigned long mask;
 	unsigned long flags;
-	int res;
+	bool res;
 
 	a += nr >> SZLONG_LOG;
 	mask = 1UL << bit;
@@ -109,14 +109,14 @@ EXPORT_SYMBOL(__mips_test_and_set_bit);
  * @nr: Bit to set
  * @addr: Address to count from
  */
-int __mips_test_and_set_bit_lock(unsigned long nr,
+bool __mips_test_and_set_bit_lock(unsigned long nr,
 				 volatile unsigned long *addr)
 {
 	unsigned long *a = (unsigned long *)addr;
 	unsigned bit = nr & SZLONG_MASK;
 	unsigned long mask;
 	unsigned long flags;
-	int res;
+	bool res;
 
 	a += nr >> SZLONG_LOG;
 	mask = 1UL << bit;
@@ -135,13 +135,13 @@ EXPORT_SYMBOL(__mips_test_and_set_bit_lock);
  * @nr: Bit to clear
  * @addr: Address to count from
  */
-int __mips_test_and_clear_bit(unsigned long nr, volatile unsigned long *addr)
+bool __mips_test_and_clear_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	unsigned long *a = (unsigned long *)addr;
 	unsigned bit = nr & SZLONG_MASK;
 	unsigned long mask;
 	unsigned long flags;
-	int res;
+	bool res;
 
 	a += nr >> SZLONG_LOG;
 	mask = 1UL << bit;
@@ -160,13 +160,13 @@ EXPORT_SYMBOL(__mips_test_and_clear_bit);
  * @nr: Bit to change
  * @addr: Address to count from
  */
-int __mips_test_and_change_bit(unsigned long nr, volatile unsigned long *addr)
+bool __mips_test_and_change_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	unsigned long *a = (unsigned long *)addr;
 	unsigned bit = nr & SZLONG_MASK;
 	unsigned long mask;
 	unsigned long flags;
-	int res;
+	bool res;
 
 	a += nr >> SZLONG_LOG;
 	mask = 1UL << bit;

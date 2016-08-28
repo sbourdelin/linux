@@ -64,7 +64,7 @@ static inline void change_bit(int nr, volatile void *addr)
 	);
 }
 
-static inline int test_and_set_bit(int nr, volatile void *addr)
+static inline bool test_and_set_bit(int nr, volatile void *addr)
 {
 	int	mask, retval;
 	volatile unsigned int *a = addr;
@@ -89,7 +89,7 @@ static inline int test_and_set_bit(int nr, volatile void *addr)
 	return retval != 0;
 }
 
-static inline int test_and_clear_bit(int nr, volatile void *addr)
+static inline bool test_and_clear_bit(int nr, volatile void *addr)
 {
 	int	mask, retval;
 	volatile unsigned int *a = addr;
@@ -115,7 +115,7 @@ static inline int test_and_clear_bit(int nr, volatile void *addr)
 	return retval != 0;
 }
 
-static inline int test_and_change_bit(int nr, volatile void *addr)
+static inline bool test_and_change_bit(int nr, volatile void *addr)
 {
 	int	mask, retval;
 	volatile unsigned int *a = addr;

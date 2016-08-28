@@ -46,7 +46,7 @@ static inline void change_bit(int nr, volatile void *addr)
 	while (__bo_cas(a, old, old^mask) != old);
 }
 
-static inline int test_and_set_bit(int nr, volatile void *addr)
+static inline bool test_and_set_bit(int nr, volatile void *addr)
 {
 	unsigned mask, old;
 	volatile unsigned *a = addr;
@@ -60,7 +60,7 @@ static inline int test_and_set_bit(int nr, volatile void *addr)
 	return !!(old & mask);
 }
 
-static inline int test_and_clear_bit(int nr, volatile void *addr)
+static inline bool test_and_clear_bit(int nr, volatile void *addr)
 {
 	unsigned mask, old;
 	volatile unsigned *a = addr;
@@ -74,7 +74,7 @@ static inline int test_and_clear_bit(int nr, volatile void *addr)
 	return !!(old & mask);
 }
 
-static inline int test_and_change_bit(int nr, volatile void *addr)
+static inline bool test_and_change_bit(int nr, volatile void *addr)
 {
 	unsigned mask, old;
 	volatile unsigned *a = addr;

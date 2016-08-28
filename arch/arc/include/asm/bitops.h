@@ -60,7 +60,7 @@ static inline void op##_bit(unsigned long nr, volatile unsigned long *m)\
  * and the old value of bit is returned
  */
 #define TEST_N_BIT_OP(op, c_op, asm_op)					\
-static inline int test_and_##op##_bit(unsigned long nr, volatile unsigned long *m)\
+static inline bool test_and_##op##_bit(unsigned long nr, volatile unsigned long *m)\
 {									\
 	unsigned long old, temp;					\
 									\
@@ -124,7 +124,7 @@ static inline void op##_bit(unsigned long nr, volatile unsigned long *m)\
 }
 
 #define TEST_N_BIT_OP(op, c_op, asm_op)					\
-static inline int test_and_##op##_bit(unsigned long nr, volatile unsigned long *m)\
+static inline bool test_and_##op##_bit(unsigned long nr, volatile unsigned long *m)\
 {									\
 	unsigned long old, flags;					\
 	m += nr >> 5;							\
@@ -160,7 +160,7 @@ static inline void op##_bit(unsigned long nr, volatile unsigned long *m)\
 }
 
 #define TEST_N_BIT_OP(op, c_op, asm_op)					\
-static inline int test_and_##op##_bit(unsigned long nr, volatile unsigned long *m)\
+static inline bool test_and_##op##_bit(unsigned long nr, volatile unsigned long *m)\
 {									\
 	unsigned long old;						\
 									\
@@ -204,7 +204,7 @@ static inline void __##op##_bit(unsigned long nr, volatile unsigned long *m)	\
 }
 
 #define __TEST_N_BIT_OP(op, c_op, asm_op)				\
-static inline int __test_and_##op##_bit(unsigned long nr, volatile unsigned long *m)\
+static inline bool __test_and_##op##_bit(unsigned long nr, volatile unsigned long *m)\
 {									\
 	unsigned long old;						\
 	m += nr >> 5;							\
@@ -242,7 +242,7 @@ BIT_OPS(change, ^, CTOP_INST_AXOR_DI_R2_R2_R3)
 /*
  * This routine doesn't need to be atomic.
  */
-static inline int
+static inline bool
 test_bit(unsigned int nr, const volatile unsigned long *addr)
 {
 	unsigned long mask;
