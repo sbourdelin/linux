@@ -110,6 +110,7 @@ static int fname_encrypt(struct inode *inode,
 				"%s: Error (error code %d)\n", __func__, res);
 
 	oname->len = ciphertext_len;
+	oname->name[oname->len] = 0;
 	return res;
 }
 
