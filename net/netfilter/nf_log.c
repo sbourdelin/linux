@@ -43,8 +43,10 @@ void nf_log_set(struct net *net, u_int8_t pf, const struct nf_logger *logger)
 {
 	const struct nf_logger *log;
 
-	if (pf == NFPROTO_UNSPEC)
+	if (pf == NFPROTO_UNSPEC || pf >= NFPROTO_NUMPROTO) {
+		pr_err("Wrong pf(%d) for nf log", pf);
 		return;
+	}
 
 	mutex_lock(&nf_log_mutex);
 	log = nft_log_dereference(net->nf.nf_loggers[pf]);
