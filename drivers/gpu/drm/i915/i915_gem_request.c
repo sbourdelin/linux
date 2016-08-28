@@ -346,7 +346,7 @@ i915_gem_request_alloc(struct intel_engine_cs *engine,
 		       struct i915_gem_context *ctx)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
-	struct drm_i915_gem_request *req;
+	struct drm_i915_gem_request *req, *prev;
 	u32 seqno;
 	int ret;
 
@@ -441,6 +441,18 @@ i915_gem_request_alloc(struct intel_engine_cs *engine,
 	 * position of the head.
 	 */
 	req->head = req->ring->tail;
+
+	prev = i915_gem_active_peek(&engine->last_request,
+				    &req->i915->drm.struct_mutex);
+	if (prev) {
+		ret = i915_sw_fence_await_sw_fence(&req->submit,
+						   &prev->submit,
+						   GFP_KERNEL);
+		if (ret < 0) {
+			i915_add_request(req);
+			return ERR_PTR(ret);
+		}
+	}
 
 	return req;
 
