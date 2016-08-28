@@ -13,6 +13,7 @@
 #include <linux/string.h>
 #include <asm/reg.h>
 #include <asm/cputable.h>
+#include <uapi/asm/perf_regs.h>
 
 /*
  * Bits in event code for POWER7
@@ -427,6 +428,31 @@ static const struct attribute_group *power7_pmu_attr_groups[] = {
 	NULL,
 };
 
+#define POWER7_ARCH_REGS_MASK  (PERF_ARCH_REG_PVR |\
+		PERF_ARCH_REG_PMC1 | PERF_ARCH_REG_PMC2 |\
+		PERF_ARCH_REG_PMC3 | PERF_ARCH_REG_PMC4 |\
+		PERF_ARCH_REG_PMC5 | PERF_ARCH_REG_PMC6 |\
+		PERF_ARCH_REG_MMCR0 | PERF_ARCH_REG_MMCR1 |\
+		PERF_ARCH_REG_SIER | PERF_ARCH_REG_SIAR |\
+		PERF_ARCH_REG_SDAR | PERF_ARCH_REG_MMCRA)
+
+static void power7_get_arch_regs(struct perf_arch_regs *regs)
+{
+	regs->regs[PERF_ARCH_REG_POWERPC_PVR] = mfspr(SPRN_PVR);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC1] = mfspr(SPRN_PMC1);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC2] = mfspr(SPRN_PMC2);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC3] = mfspr(SPRN_PMC3);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC4] = mfspr(SPRN_PMC4);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC5] = mfspr(SPRN_PMC5);
+	regs->regs[PERF_ARCH_REG_POWERPC_PMC6] = mfspr(SPRN_PMC6);
+	regs->regs[PERF_ARCH_REG_POWERPC_MMCR0] = mfspr(SPRN_MMCR0);
+	regs->regs[PERF_ARCH_REG_POWERPC_MMCR1] = mfspr(SPRN_MMCR1);
+	regs->regs[PERF_ARCH_REG_POWERPC_SIER] = mfspr(SPRN_SIER);
+	regs->regs[PERF_ARCH_REG_POWERPC_SIAR] = mfspr(SPRN_SIAR);
+	regs->regs[PERF_ARCH_REG_POWERPC_SDAR] = mfspr(SPRN_SDAR);
+	regs->regs[PERF_ARCH_REG_POWERPC_MMCRA] = mfspr(SPRN_MMCRA);
+}
+
 static struct power_pmu power7_pmu = {
 	.name			= "POWER7",
 	.n_counter		= 6,
@@ -442,6 +468,8 @@ static struct power_pmu power7_pmu = {
 	.n_generic		= ARRAY_SIZE(power7_generic_events),
 	.generic_events		= power7_generic_events,
 	.cache_events		= &power7_cache_events,
+	.ar_mask		= POWER7_ARCH_REGS_MASK,
+	.get_arch_regs		= power7_get_arch_regs,
 };
 
 static int __init init_power7_pmu(void)
