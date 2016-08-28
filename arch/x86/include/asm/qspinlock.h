@@ -61,6 +61,17 @@ static inline bool virt_spin_lock(struct qspinlock *lock)
 }
 #endif /* CONFIG_PARAVIRT */
 
+#ifndef smp_mb__after_spin_lock
+/**
+ * smp_mb__after_spin_lock() - Provide smp_mb() after spin_lock
+ *
+ * queued_spin_lock() provides full memory barriers semantics,
+ * thus no further memory barrier is required. See
+ * queued_spin_unlock_wait() for further details.
+ */
+#define smp_mb__after_spin_lock()	barrier()
+#endif
+
 #include <asm-generic/qspinlock.h>
 
 #endif /* _ASM_X86_QSPINLOCK_H */
