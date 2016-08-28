@@ -5398,6 +5398,9 @@ static void perf_sample_regs_user(struct perf_regs *regs_user,
 		regs_user->abi = PERF_SAMPLE_REGS_ABI_NONE;
 		regs_user->regs = NULL;
 	}
+
+	/* Init arch_regs_mask to zero */
+	regs_user->arch_regs_mask = 0;
 }
 
 static void perf_sample_regs_intr(struct perf_regs *regs_intr,
@@ -5405,6 +5408,8 @@ static void perf_sample_regs_intr(struct perf_regs *regs_intr,
 {
 	regs_intr->regs = regs;
 	regs_intr->abi  = perf_reg_abi(current);
+	regs_intr->arch_regs_mask = perf_get_arch_regs_mask();
+	regs_intr->arch_regs = perf_get_arch_reg();
 }
 
 
