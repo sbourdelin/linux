@@ -393,9 +393,9 @@ static int bq24735_charger_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, charger);
 
 	if (gpio_is_valid(charger->pdata->status_gpio)) {
-		ret = devm_gpio_request(&client->dev,
-					charger->pdata->status_gpio,
-					name);
+		ret = devm_gpio_request_one(&client->dev,
+						charger->pdata->status_gpio,
+						GPIOF_IN, name);
 		if (ret) {
 			dev_err(&client->dev,
 				"Failed GPIO request for GPIO %d: %d\n",
