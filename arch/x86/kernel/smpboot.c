@@ -366,7 +366,17 @@ static struct sched_domain_topology_level numa_inside_package_topology[] = {
  */
 static void primarily_use_numa_for_topology(void)
 {
-	set_sched_topology(numa_inside_package_topology);
+	static bool once;
+
+	/*
+	 * We need to run it only during boot, once we are
+	 * here due to getting cpu online again we have already
+	 * NUMA topology setup done.
+	 */
+	if (!once) {
+		set_sched_topology(numa_inside_package_topology);
+		once = true;
+	}
 }
 
 void set_cpu_sibling_map(int cpu)
