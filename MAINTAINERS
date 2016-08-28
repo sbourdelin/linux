@@ -7674,6 +7674,14 @@ W:	http://www.mellanox.com
 F:	drivers/i2c/busses/i2c-mlxcpld.c
 F:	Documentation/i2c/busses/i2c-mlxcpld
 
+MELLANOX MLXCPLD I2C MUX DRIVER
+M:	Vadim Pasternak <vadimp@mellanox.com>
+M:	Michael Shych <michaelsh@mellanox.com>
+L:	linux-kernel@vger.kernel.org
+S:	Supported
+W:	http://www.mellanox.com
+F:	drivers/i2c/muxes/i2c-mux-mlxcpld.c
+
 SOFT-ROCE DRIVER (rxe)
 M:	Moni Shoua <monis@mellanox.com>
 L:	linux-rdma@vger.kernel.org
