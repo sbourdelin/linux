@@ -289,7 +289,7 @@ int sst_prepare_and_post_msg(struct intel_sst_drv *sst,
 				ret = -ENOMEM;
 				goto out;
 			} else
-				memcpy(data, (void *) block->data, block->size);
+				memcpy(*data, (void *) block->data, block->size);
 		}
 	}
 out:
