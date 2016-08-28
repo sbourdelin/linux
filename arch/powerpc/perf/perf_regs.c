@@ -75,6 +75,9 @@ u64 perf_reg_value(struct pt_regs *regs, int idx)
 	if (WARN_ON_ONCE(idx >= PERF_REG_POWERPC_MAX))
 		return 0;
 
+	if (idx == PERF_REG_POWERPC_ARCH_REGS)
+		return perf_get_arch_regs_mask();
+
 	return regs_get_register(regs, pt_regs_offset[idx]);
 }
 
