@@ -22,6 +22,10 @@
 #define NR_syscalls  (__NR_O32_Linux + __NR_O32_Linux_syscalls)
 #endif
 
+#define NR_syscall_tables (1 + \
+	IS_ENABLED(CONFIG_MIPS32_O32) + \
+	IS_ENABLED(CONFIG_MIPS32_N32))
+
 #ifndef __ASSEMBLY__
 
 #define __ARCH_WANT_OLD_READDIR
