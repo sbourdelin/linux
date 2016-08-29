@@ -30,9 +30,27 @@ struct snd_kcontrol;
 typedef int (snd_kcontrol_info_t) (struct snd_kcontrol * kcontrol, struct snd_ctl_elem_info * uinfo);
 typedef int (snd_kcontrol_get_t) (struct snd_kcontrol * kcontrol, struct snd_ctl_elem_value * ucontrol);
 typedef int (snd_kcontrol_put_t) (struct snd_kcontrol * kcontrol, struct snd_ctl_elem_value * ucontrol);
+
+/**
+ * snd_kcontrol_tlv_rw_t - a type of callback function to operate information
+ *			   for threshold level or arbitrary I/O, via TLV
+ *			   feature of ALSA control interface.
+ * @kcontrol: A pointer to an instance for control element set.
+ * @op_flag: One of SNDRV_CTL_TLV_OP_READ/WRITE/CMD.
+ * @size: The size of buffer in user space in byte unit. After operated, the
+ *	  size should be changed to size of actually operated data in byte unit,
+ * @tlv: A pointer to the buffer in user space.
+ *
+ * Originally, this function is designed to allow each driver to generate and
+ * transfer data about threshold level. Later, this function is used to operate
+ * arbitrary I/O depending on each driver.
+ *
+ * Return: Zero if successful. Negative value in error. Positive value generates
+ *	   an event with SNDRV_CTL_EVENT_MASK_TLV. This return value is received
+ *	   by applications as a result of ioctl(2).
+ */
 typedef int (snd_kcontrol_tlv_rw_t)(struct snd_kcontrol *kcontrol,
-				    int op_flag, /* SNDRV_CTL_TLV_OP_XXX */
-				    unsigned int *size,
+				    int op_flag, unsigned int *size,
 				    unsigned int __user *tlv);
 
 enum {
