@@ -5531,6 +5531,9 @@ void btrfs_free_block_rsv(struct btrfs_root *root,
 	if (!rsv)
 		return;
 	btrfs_block_rsv_release(root, rsv, (u64)-1);
+
+	WARN_ON(rsv->size > 0);
+	WARN_ON(rsv->reserved > 0);
 	kfree(rsv);
 }
 
