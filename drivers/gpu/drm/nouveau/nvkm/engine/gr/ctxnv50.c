@@ -109,6 +109,8 @@
 
 #include <subdev/fb.h>
 
+#include "nv50.h"
+
 #define IS_NVA3F(x) (((x) > 0xa0 && (x) < 0xaa) || (x) == 0xaf)
 #define IS_NVAAF(x) ((x) >= 0xaa && (x) <= 0xac)
 
