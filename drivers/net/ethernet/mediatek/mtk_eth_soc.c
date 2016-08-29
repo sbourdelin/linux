@@ -1903,6 +1903,14 @@ err_free_dev:
 static int mtk_remove(struct platform_device *pdev)
 {
 	struct mtk_eth *eth = platform_get_drvdata(pdev);
+	int i;
+
+	/* stop all devices to make sure that dma is properly shut down */
+	for (i = 0; i < MTK_MAC_COUNT; i++) {
+		if (!eth->netdev[i])
+			continue;
+		mtk_stop(eth->netdev[i]);
+	}
 
 	clk_disable_unprepare(eth->clks[MTK_CLK_GP1]);
 	clk_disable_unprepare(eth->clks[MTK_CLK_GP2]);
