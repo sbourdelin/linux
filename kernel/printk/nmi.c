@@ -103,20 +103,29 @@ again:
  * printk one line from the temporary buffer from @start index until
  * and including the @end index.
  */
-static void print_nmi_seq_line(struct nmi_seq_buf *s, int start, int end)
+static void __print_nmi_seq_line(const char *text, int len)
 {
-	const char *buf = s->buffer + start;
-
 	/*
 	 * The buffers are flushed in NMI only on panic.  The messages must
 	 * go only into the ring buffer at this stage.  Consoles will get
 	 * explicitly called later when a crashdump is not generated.
 	 */
 	if (in_nmi())
-		printk_deferred("%.*s", (end - start) + 1, buf);
+		printk_deferred("%.*s", len, text);
 	else
-		printk("%.*s", (end - start) + 1, buf);
+		printk("%.*s", len, text);
 
+}
+
+/*
+ * printk one line from the temporary buffer from @start index until
+ * and including the @end index.
+ */
+static void print_nmi_seq_line(struct nmi_seq_buf *s, int start, int end)
+{
+	const char *buf = s->buffer + start;
+
+	__print_nmi_seq_line(buf, (end - start) + 1);
 }
 
 /*
@@ -150,9 +159,11 @@ more:
 	 * the buffer an unexpected way. If we printed something then
 	 * @len must only increase.
 	 */
-	if (i && i >= len)
-		pr_err("printk_nmi_flush: internal error: i=%d >= len=%zu\n",
-		       i, len);
+	if (i && i >= len) {
+		const char *msg = "printk_nmi_flush: internal error\n";
+
+		__print_nmi_seq_line(msg, strlen(msg));
+	}
 
 	if (!len)
 		goto out; /* Someone else has already flushed the buffer. */
@@ -173,7 +184,7 @@ more:
 	/* Check if there was a partial line. */
 	if (last_i < size) {
 		print_nmi_seq_line(s, last_i, size - 1);
-		pr_cont("\n");
+		__print_nmi_seq_line("\n", strlen("\n"));
 	}
 
 	/*
