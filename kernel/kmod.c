@@ -91,7 +91,7 @@ static int call_modprobe(char *module_name, int wait)
 	argv[4] = NULL;
 
 	info = call_usermodehelper_setup(modprobe_path, argv, envp, GFP_KERNEL,
-					 NULL, free_modprobe_argv, NULL);
+					 NULL, NULL, free_modprobe_argv, NULL);
 	if (!info)
 		goto free_module_name;
 
@@ -209,14 +209,11 @@ static void umh_complete(struct subprocess_info *sub_info)
 		call_usermodehelper_freeinfo(sub_info);
 }
 
-/*
- * This is the task which runs the usermode application
- */
-static int call_usermodehelper_exec_async(void *data)
+static int __call_usermodehelper_exec_doexec(void *data)
 {
 	struct subprocess_info *sub_info = data;
 	struct cred *new;
-	int retval;
+	int retval = 0;
 
 	spin_lock_irq(&current->sighand->siglock);
 	flush_signal_handlers(current, 1);
@@ -228,10 +225,11 @@ static int call_usermodehelper_exec_async(void *data)
 	 */
 	set_user_nice(current, 0);
 
-	retval = -ENOMEM;
 	new = prepare_kernel_cred(current);
-	if (!new)
+	if (!new) {
+		retval = -ENOMEM;
 		goto out;
+	}
 
 	spin_lock(&umh_sysctl_lock);
 	new->cap_bset = cap_intersect(usermodehelper_bset, new->cap_bset);
@@ -248,20 +246,121 @@ static int call_usermodehelper_exec_async(void *data)
 	}
 
 	commit_creds(new);
-
 	retval = do_execve(getname_kernel(sub_info->path),
-			   (const char __user *const __user *)sub_info->argv,
-			   (const char __user *const __user *)sub_info->envp);
+		   (const char __user *const __user *)sub_info->argv,
+		   (const char __user *const __user *)sub_info->envp);
+
 out:
-	sub_info->retval = retval;
+	return retval;
+}
+
+static int call_usermodehelper_exec_doexec(void *data)
+{
+	struct subprocess_info *sub_info = data;
+	int ret = __call_usermodehelper_exec_doexec(data);
+
 	/*
-	 * call_usermodehelper_exec_sync() will call umh_complete
-	 * if UHM_WAIT_PROC.
+	 * If it is called in non-sync mode:
+	 * On fail:
+	 *   should set sub_info->retval, call umh_complete and exit process.
+	 * On success:
+	 *   should set sub_info->retval, call umh_complete and return to
+	 *   user-mode program.
+	 * It it is called in sync mode:
+	 * On fail:
+	 *   should set sub_info->retval and exit process, the parent process
+	 *   will wait and call umh_complete()
+	 * On success:
+	 *   should return to user-mode program, the parent process will wait
+	 *   and get program's ret from wait(), and call umh_complete().
 	 */
+	sub_info->retval = ret;
+
 	if (!(sub_info->wait & UMH_WAIT_PROC))
 		umh_complete(sub_info);
-	if (!retval)
+
+	if (!ret)
 		return 0;
+
+	/*
+	 * see comment in call_usermodehelper_exec_sync() before change
+	 * it to do_exit(ret).
+	 */
+	do_exit(0);
+}
+
+/*
+ * This is the task which runs the usermode application
+ */
+static int call_usermodehelper_exec_async(void *data)
+{
+	struct subprocess_info *sub_info = data;
+	int ret = 0;
+	int refork = 0;
+
+	if (sub_info->init_intermediate) {
+		ret = sub_info->init_intermediate(sub_info);
+		switch (ret) {
+		case 0:
+			break;
+		case -EAGAIN:
+			/*
+			 * if pid namespace is changed,
+			 * we need refork to make it active.
+			 */
+			ret = 0;
+			refork = 1;
+			break;
+		default:
+			goto out;
+		}
+	}
+
+	if (refork) {
+		/*
+		 * Code copyed from call_usermodehelper_exec_work() and
+		 * call_usermodehelper_exec_sync(), see comments in these
+		 * functions for detail.
+		 */
+		pid_t pid;
+
+		if (sub_info->wait & UMH_WAIT_PROC) {
+			kernel_sigaction(SIGCHLD, SIG_DFL);
+			pid = kernel_thread(call_usermodehelper_exec_doexec,
+					    sub_info, SIGCHLD);
+			if (pid < 0) {
+				ret = pid;
+			} else {
+				ret = -ECHILD;
+				sys_wait4(pid, (int __user *)&ret, 0, NULL);
+			}
+			kernel_sigaction(SIGCHLD, SIG_IGN);
+
+			sub_info->retval = ret;
+		} else {
+			pid = kernel_thread(call_usermodehelper_exec_doexec,
+					    sub_info, SIGCHLD);
+			if (pid < 0) {
+				sub_info->retval = pid;
+				umh_complete(sub_info);
+			}
+		}
+	} else {
+		ret = __call_usermodehelper_exec_doexec(data);
+
+out:
+		/*
+		 * see comment in call_usermodehelper_exec_doexec() for detail
+		 */
+		sub_info->retval = ret;
+
+		if (!(sub_info->wait & UMH_WAIT_PROC))
+			umh_complete(sub_info);
+
+		if (!ret)
+			return 0;
+	}
+
 	do_exit(0);
 }
 
@@ -518,6 +617,7 @@ static void helper_unlock(void)
  */
 struct subprocess_info *call_usermodehelper_setup(char *path, char **argv,
 		char **envp, gfp_t gfp_mask,
+		int (*init_intermediate)(struct subprocess_info *info),
 		int (*init)(struct subprocess_info *info, struct cred *new),
 		void (*cleanup)(struct subprocess_info *info),
 		void *data)
@@ -533,6 +633,7 @@ struct subprocess_info *call_usermodehelper_setup(char *path, char **argv,
 	sub_info->envp = envp;
 
 	sub_info->cleanup = cleanup;
+	sub_info->init_intermediate = init_intermediate;
 	sub_info->init = init;
 	sub_info->data = data;
   out:
@@ -619,7 +720,7 @@ int call_usermodehelper(char *path, char **argv, char **envp, int wait)
 	gfp_t gfp_mask = (wait == UMH_NO_WAIT) ? GFP_ATOMIC : GFP_KERNEL;
 
 	info = call_usermodehelper_setup(path, argv, envp, gfp_mask,
-					 NULL, NULL, NULL);
+					 NULL, NULL, NULL, NULL);
 	if (info == NULL)
 		return -ENOMEM;
 
