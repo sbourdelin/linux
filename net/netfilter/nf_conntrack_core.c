@@ -79,20 +79,29 @@ static __read_mostly bool nf_conntrack_locks_all;
 
 void nf_conntrack_lock(spinlock_t *lock) __acquires(lock)
 {
+	/* 1) Acquire the lock */
 	spin_lock(lock);
-	while (unlikely(nf_conntrack_locks_all)) {
-		spin_unlock(lock);
 
-		/*
-		 * Order the 'nf_conntrack_locks_all' load vs. the
-		 * spin_unlock_wait() loads below, to ensure
-		 * that 'nf_conntrack_locks_all_lock' is indeed held:
-		 */
-		smp_rmb(); /* spin_lock(&nf_conntrack_locks_all_lock) */
-		spin_unlock_wait(&nf_conntrack_locks_all_lock);
-		spin_lock(lock);
-	}
+	/* 2) Order writing the lock and reading nf_conntrack_locks_all */
+	smp_mb__after_spin_lock();
+
+	/* 3) read nf_conntrack_locks_all, with ACQUIRE semantics */
+	if (likely(smp_load_acquire(&nf_conntrack_locks_all) == false))
+		return;
+
+	/* fast path failed, unlock */
+	spin_unlock(lock);
+
+	/* Slow path 1) get global lock */
+	spin_lock(&nf_conntrack_locks_all_lock);
+
+	/* Slow path 2) get the lock we want */
+	spin_lock(lock);
+
+	/* Slow path 3) release the global lock */
+	spin_unlock(&nf_conntrack_locks_all_lock);
 }
+
 EXPORT_SYMBOL_GPL(nf_conntrack_lock);
 
 static void nf_conntrack_double_unlock(unsigned int h1, unsigned int h2)
@@ -132,15 +141,14 @@ static void nf_conntrack_all_lock(void)
 	int i;
 
 	spin_lock(&nf_conntrack_locks_all_lock);
-	nf_conntrack_locks_all = true;
 
 	/*
-	 * Order the above store of 'nf_conntrack_locks_all' against
+	 * Order the store of 'nf_conntrack_locks_all' against
 	 * the spin_unlock_wait() loads below, such that if
 	 * nf_conntrack_lock() observes 'nf_conntrack_locks_all'
 	 * we must observe nf_conntrack_locks[] held:
 	 */
-	smp_mb(); /* spin_lock(&nf_conntrack_locks_all_lock) */
+	smp_store_mb(nf_conntrack_locks_all, true);
 
 	for (i = 0; i < CONNTRACK_LOCKS; i++) {
 		spin_unlock_wait(&nf_conntrack_locks[i]);
