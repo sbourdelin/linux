@@ -331,7 +331,15 @@ static void pca953x_gpio_set_value(struct gpio_chip *gc, unsigned off, int val)
 	u8 reg_val;
 	int ret, offset = 0;
 
-	mutex_lock(&chip->i2c_lock);
+	/*
+	 * We're using mutex_lock_nested() here to avoid a lockdep warning
+	 * when there are two pca953x expanders, of which one is used to
+	 * control an i2c gpio mux.
+	 *
+	 * We're using the GPIO base number to distinguish the lock
+	 * subclasses.
+	 */
+	mutex_lock_nested(&chip->i2c_lock, chip->gpio_start);
 	if (val)
 		reg_val = chip->reg_output[off / BANK_SZ]
 			| (1u << (off % BANK_SZ));
