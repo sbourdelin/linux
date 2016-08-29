@@ -130,6 +130,18 @@ do {								\
 #define smp_mb__before_spinlock()	smp_wmb()
 #endif
 
+#ifndef smp_mb__after_spin_lock
+/**
+ * smp_mb__after_spin_lock() - Provide smp_mb() after spin_lock
+ *
+ * spin_lock() provides ACQUIRE semantics regarding reading the lock.
+ * There are no guarantees that the lock write is visible before any read
+ * or write operation within the protected area is performed.
+ * If the lock write must happen first, this function is required.
+ */
+#define smp_mb__after_spin_lock()	smp_mb()
+#endif
+
 /**
  * raw_spin_unlock_wait - wait until the spinlock gets unlocked
  * @lock: the spinlock in question.

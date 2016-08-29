@@ -40,6 +40,11 @@ example, internal driver data structures that nobody else ever touches).
    touches a shared variable has to agree about the spinlock they want
    to use.
 
+   NOTE! Code that needs stricter memory barriers than ACQUIRE during
+   LOCK and RELEASE during UNLOCK must use appropriate memory barriers
+   such as smp_mb__after_spin_lock().
+   spin_unlock_wait() has ACQUIRE semantics.
+
 ----
 
 Lesson 2: reader-writer spinlocks.
