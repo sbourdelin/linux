@@ -154,14 +154,14 @@ static int hsta_msi_probe(struct platform_device *pdev)
 
 	ret = msi_bitmap_alloc(&ppc4xx_hsta_msi.bmp, irq_count, dev->of_node);
 	if (ret)
-		goto out;
+		goto unmap_io;
 
 	ppc4xx_hsta_msi.irq_map = kmalloc_array(irq_count,
 						sizeof(*ppc4xx_hsta_msi.irq_map),
 						GFP_KERNEL);
 	if (!ppc4xx_hsta_msi.irq_map) {
 		ret = -ENOMEM;
-		goto out1;
+		goto free_bitmap;
 	}
 
 	/* Setup a mapping from irq offsets to hardware irq numbers */
@@ -171,7 +171,7 @@ static int hsta_msi_probe(struct platform_device *pdev)
 		if (ppc4xx_hsta_msi.irq_map[irq] == NO_IRQ) {
 			dev_err(dev, "Unable to map IRQ\n");
 			ret = -EINVAL;
-			goto out2;
+			goto free_irq_map;
 		}
 	}
 
@@ -180,14 +180,11 @@ static int hsta_msi_probe(struct platform_device *pdev)
 		phb->controller_ops.teardown_msi_irqs = hsta_teardown_msi_irqs;
 	}
 	return 0;
-
-out2:
+ free_irq_map:
 	kfree(ppc4xx_hsta_msi.irq_map);
-
-out1:
+ free_bitmap:
 	msi_bitmap_free(&ppc4xx_hsta_msi.bmp);
-
-out:
+ unmap_io:
 	iounmap(ppc4xx_hsta_msi.data);
 	return ret;
 }
