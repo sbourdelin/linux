@@ -260,6 +260,7 @@ struct trace_array {
 	/* function tracing enabled */
 	int			function_enabled;
 #endif
+	struct trace_export	*export;
 };
 
 enum {
