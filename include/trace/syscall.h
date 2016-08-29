@@ -8,6 +8,9 @@
 
 #include <asm/ptrace.h>
 
+#ifndef NR_syscall_tables
+#define NR_syscall_tables 1
+#endif
 
 /*
  * A syscall entry in the ftrace syscalls array.
@@ -23,7 +26,7 @@
  */
 struct syscall_metadata {
 	const char	*name;
-	int		syscall_nr;
+	int		syscall_nr[NR_syscall_tables];
 	int		nb_args;
 	const char	**types;
 	const char	**args;
