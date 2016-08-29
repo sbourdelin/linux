@@ -122,7 +122,7 @@
 		model = "On-board Codec";
 		mux-ext-port = <3>;
 		mux-int-port = <1>;
-		ssi-controller = <&ssi1>;
+		cpu-dai = <&ssi1>;
 	};
 
 	sound-spdif {

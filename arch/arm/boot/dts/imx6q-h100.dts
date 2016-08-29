@@ -155,7 +155,7 @@
 			"Headphone Jack", "HP_OUT";
 		mux-ext-port = <5>;
 		mux-int-port = <1>;
-		ssi-controller = <&ssi1>;
+		cpu-dai = <&ssi1>;
 	};
 };
 

@@ -17,7 +17,7 @@
 		compatible = "fsl,imx53-voipac-sgtl5000",
 			     "fsl,imx-audio-sgtl5000";
 		model = "imx53-voipac-sgtl5000";
-		ssi-controller = <&ssi2>;
+		cpu-dai = <&ssi2>;
 		audio-codec = <&sgtl5000>;
 		audio-routing =
 			"Headphone Jack", "HP_OUT";

@@ -71,7 +71,7 @@
 		compatible = "tq,imx53-mba53-sgtl5000",
 			     "fsl,imx-audio-sgtl5000";
 		model = "imx53-mba53-sgtl5000";
-		ssi-controller = <&ssi2>;
+		cpu-dai = <&ssi2>;
 		audio-codec = <&codec>;
 		audio-routing =
 			"MIC_IN", "Mic Jack",

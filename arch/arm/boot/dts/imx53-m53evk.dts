@@ -99,7 +99,7 @@
 		compatible = "fsl,imx53-m53evk-sgtl5000",
 			     "fsl,imx-audio-sgtl5000";
 		model = "imx53-m53evk-sgtl5000";
-		ssi-controller = <&ssi2>;
+		cpu-dai = <&ssi2>;
 		audio-codec = <&sgtl5000>;
 		audio-routing =
 			"MIC_IN", "Mic Jack",
