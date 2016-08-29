@@ -4978,10 +4978,12 @@ static inline void __snmp6_fill_stats64(u64 *stats, void __percpu *mib,
 	memset(buff, 0, sizeof(buff));
 	buff[0] = IPSTATS_MIB_MAX;
 
-	for_each_possible_cpu(c) {
+	preempt_disable();
+	for_each_present_cpu(c) {
 		for (i = 1; i < IPSTATS_MIB_MAX; i++)
 			buff[i] += snmp_get_cpu_field64(mib, c, i, syncpoff);
 	}
+	preempt_enable();
 
 	memcpy(stats, buff, IPSTATS_MIB_MAX * sizeof(u64));
 	memset(&stats[IPSTATS_MIB_MAX], 0, pad);
