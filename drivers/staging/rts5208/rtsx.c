@@ -88,7 +88,8 @@ static int slave_configure(struct scsi_device *sdev)
 	 * of 512, we'll use that as the scsi device queue's DMA alignment
 	 * mask.  Guaranteeing proper alignment of the first buffer will
 	 * have the desired effect because, except at the beginning and
-	 * the end, scatter-gather buffers follow page boundaries. */
+	 * the end, scatter-gather buffers follow page boundaries.
+	 */
 	blk_queue_dma_alignment(sdev->request_queue, (512 - 1));
 
 	/* Set the SCSI level to at least 2.  We'll leave it at 3 if that's
@@ -186,7 +187,8 @@ static int command_abort(struct scsi_cmnd *srb)
 }
 
 /* This invokes the transport reset mechanism to reset the state of the
- * device */
+ * device
+ */
 static int device_reset(struct scsi_cmnd *srb)
 {
 	int result = 0;
@@ -655,14 +657,16 @@ static void rtsx_release_resources(struct rtsx_dev *dev)
 }
 
 /* First stage of disconnect processing: stop all commands and remove
- * the host */
+ * the host
+ */
 static void quiesce_and_remove_host(struct rtsx_dev *dev)
 {
 	struct Scsi_Host *host = rtsx_to_host(dev);
 	struct rtsx_chip *chip = dev->chip;
 
 	/* Prevent new transfers, stop the current command, and
-	 * interrupt a SCSI-scan or device-reset delay */
+	 * interrupt a SCSI-scan or device-reset delay
+	 */
 	mutex_lock(&dev->dev_mutex);
 	scsi_lock(host);
 	rtsx_set_stat(chip, RTSX_STAT_DISCONNECT);
@@ -676,7 +680,8 @@ static void quiesce_and_remove_host(struct rtsx_dev *dev)
 
 	/* queuecommand won't accept any new commands and the control
 	 * thread won't execute a previously-queued command.  If there
-	 * is such a command pending, complete it with an error. */
+	 * is such a command pending, complete it with an error.
+	 */
 	mutex_lock(&dev->dev_mutex);
 	if (chip->srb) {
 		chip->srb->result = DID_NO_CONNECT << 16;
@@ -697,7 +702,8 @@ static void release_everything(struct rtsx_dev *dev)
 	rtsx_release_resources(dev);
 
 	/* Drop our reference to the host; the SCSI core will free it
-	 * when the refcount becomes 0. */
+	 * when the refcount becomes 0.
+	 */
 	scsi_host_put(rtsx_to_host(dev));
 }
 
@@ -937,7 +943,8 @@ static int rtsx_probe(struct pci_dev *pci,
 	rtsx_init_chip(dev->chip);
 
 	/* set the supported max_lun and max_id for the scsi host
-	 * NOTE: the minimal value of max_id is 1 */
+	 * NOTE: the minimal value of max_id is 1
+	 */
 	host->max_id = 1;
 	host->max_lun = dev->chip->max_lun;
 
