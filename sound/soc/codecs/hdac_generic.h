@@ -21,5 +21,8 @@
 #define __HDAC_GENERIC_H__
 
 #define HDAC_GENERIC_NAME_SIZE	32
+#define AMP_OUT_MUTE		0xb080
+#define AMP_OUT_UNMUTE		0xb000
+#define PIN_OUT			(AC_PINCTL_OUT_EN)
 
 #endif /* __HDAC_GENERIC_H__ */
