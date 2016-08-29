@@ -46,6 +46,13 @@ struct hdac_codec_widget {
 	void *params;	/* Widget specific parameters */
 };
 
+static inline struct hdac_ext_device *to_hda_ext_device(struct device *dev)
+{
+	struct hdac_device *hdac = dev_to_hdac_dev(dev);
+
+	return to_ehdac_device(hdac);
+}
+
 int snd_hdac_parse_widgets(struct hdac_device *hdac);
 int snd_hdac_codec_init(struct hdac_device *hdac);
 void snd_hdac_codec_cleanup(struct hdac_device *hdac);
