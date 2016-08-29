@@ -57,11 +57,11 @@ static int xfrm_statistics_seq_show(struct seq_file *seq, void *v)
 	memset(buff, 0, sizeof(unsigned long) * LINUX_MIB_XFRMMAX);
 
 	for_each_possible_cpu(c)
-		for (i = 0; xfrm_mib_list[i].name != NULL; i++)
+		for (i = 0; xfrm_mib_list[i].name; i++)
 			buff[i] += snmp_get_cpu_field(
 						net->mib.xfrm_statistics,
 						c, xfrm_mib_list[i].entry);
-	for (i = 0; xfrm_mib_list[i].name != NULL; i++)
+	for (i = 0; xfrm_mib_list[i].name; i++)
 		seq_printf(seq, "%-24s\t%lu\n", xfrm_mib_list[i].name,
 						buff[i]);
 

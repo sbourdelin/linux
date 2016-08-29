@@ -355,22 +355,22 @@ static void icmp_put(struct seq_file *seq)
 	atomic_long_t *ptr = net->mib.icmpmsg_statistics->mibs;
 
 	seq_puts(seq, "\nIcmp: InMsgs InErrors InCsumErrors");
-	for (i = 0; icmpmibmap[i].name != NULL; i++)
+	for (i = 0; icmpmibmap[i].name; i++)
 		seq_printf(seq, " In%s", icmpmibmap[i].name);
 	seq_puts(seq, " OutMsgs OutErrors");
-	for (i = 0; icmpmibmap[i].name != NULL; i++)
+	for (i = 0; icmpmibmap[i].name; i++)
 		seq_printf(seq, " Out%s", icmpmibmap[i].name);
 	seq_printf(seq, "\nIcmp: %lu %lu %lu",
 		snmp_fold_field(net->mib.icmp_statistics, ICMP_MIB_INMSGS),
 		snmp_fold_field(net->mib.icmp_statistics, ICMP_MIB_INERRORS),
 		snmp_fold_field(net->mib.icmp_statistics, ICMP_MIB_CSUMERRORS));
-	for (i = 0; icmpmibmap[i].name != NULL; i++)
+	for (i = 0; icmpmibmap[i].name; i++)
 		seq_printf(seq, " %lu",
 			   atomic_long_read(ptr + icmpmibmap[i].index));
 	seq_printf(seq, " %lu %lu",
 		snmp_fold_field(net->mib.icmp_statistics, ICMP_MIB_OUTMSGS),
 		snmp_fold_field(net->mib.icmp_statistics, ICMP_MIB_OUTERRORS));
-	for (i = 0; icmpmibmap[i].name != NULL; i++)
+	for (i = 0; icmpmibmap[i].name; i++)
 		seq_printf(seq, " %lu",
 			   atomic_long_read(ptr + (icmpmibmap[i].index | 0x100)));
 }
@@ -389,7 +389,7 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 	memset(buff64, 0, IPSTATS_MIB_MAX * sizeof(u64));
 
 	seq_puts(seq, "Ip: Forwarding DefaultTTL");
-	for (i = 0; snmp4_ipstats_list[i].name != NULL; i++)
+	for (i = 0; snmp4_ipstats_list[i].name; i++)
 		seq_printf(seq, " %s", snmp4_ipstats_list[i].name);
 
 	seq_printf(seq, "\nIp: %d %d",
@@ -399,30 +399,30 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 	BUILD_BUG_ON(offsetof(struct ipstats_mib, mibs) != 0);
 
 	for_each_possible_cpu(c) {
-		for (i = 0; snmp4_ipstats_list[i].name != NULL; i++)
+		for (i = 0; snmp4_ipstats_list[i].name; i++)
 			buff64[i] += snmp_get_cpu_field64(
 					net->mib.ip_statistics,
 					c, snmp4_ipstats_list[i].entry,
 					offsetof(struct ipstats_mib, syncp));
 	}
-	for (i = 0; snmp4_ipstats_list[i].name != NULL; i++)
+	for (i = 0; snmp4_ipstats_list[i].name; i++)
 		seq_printf(seq, " %llu", buff64[i]);
 
 	icmp_put(seq);	/* RFC 2011 compatibility */
 	icmpmsg_put(seq);
 
 	seq_puts(seq, "\nTcp:");
-	for (i = 0; snmp4_tcp_list[i].name != NULL; i++)
+	for (i = 0; snmp4_tcp_list[i].name; i++)
 		seq_printf(seq, " %s", snmp4_tcp_list[i].name);
 
 	seq_puts(seq, "\nTcp:");
 	for_each_possible_cpu(c) {
-		for (i = 0; snmp4_tcp_list[i].name != NULL; i++)
+		for (i = 0; snmp4_tcp_list[i].name; i++)
 			buff[i] += snmp_get_cpu_field(net->mib.tcp_statistics,
 						c, snmp4_tcp_list[i].entry);
 	}
 
-	for (i = 0; snmp4_tcp_list[i].name != NULL; i++) {
+	for (i = 0; snmp4_tcp_list[i].name; i++) {
 		/* MaxConn field is signed, RFC 2012 */
 		if (snmp4_tcp_list[i].entry == TCP_MIB_MAXCONN)
 			seq_printf(seq, " %ld", buff[i]);
@@ -433,23 +433,23 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 	memset(buff, 0, TCP_MIB_MAX * sizeof(unsigned long));
 
 	for_each_possible_cpu(c) {
-		for (i = 0; snmp4_udp_list[i].name != NULL; i++)
+		for (i = 0; snmp4_udp_list[i].name; i++)
 			buff[i] += snmp_get_cpu_field(net->mib.udp_statistics,
 						c, snmp4_udp_list[i].entry);
 	}
 	seq_puts(seq, "\nUdp:");
-	for (i = 0; snmp4_udp_list[i].name != NULL; i++)
+	for (i = 0; snmp4_udp_list[i].name; i++)
 		seq_printf(seq, " %s", snmp4_udp_list[i].name);
 	seq_puts(seq, "\nUdp:");
-	for (i = 0; snmp4_udp_list[i].name != NULL; i++)
+	for (i = 0; snmp4_udp_list[i].name; i++)
 		seq_printf(seq, " %lu", buff[i]);
 
 	/* the UDP and UDP-Lite MIBs are the same */
 	seq_puts(seq, "\nUdpLite:");
-	for (i = 0; snmp4_udp_list[i].name != NULL; i++)
+	for (i = 0; snmp4_udp_list[i].name; i++)
 		seq_printf(seq, " %s", snmp4_udp_list[i].name);
 	seq_puts(seq, "\nUdpLite:");
-	for (i = 0; snmp4_udp_list[i].name != NULL; i++)
+	for (i = 0; snmp4_udp_list[i].name; i++)
 		seq_printf(seq, " %lu", buff[i]);
 
 	seq_putc(seq, '\n');
@@ -485,29 +485,29 @@ static int netstat_seq_show(struct seq_file *seq, void *v)
 	memset(buff64, 0, sizeof(u64) * IPSTATS_MIB_MAX);
 
 	seq_puts(seq, "TcpExt:");
-	for (i = 0; snmp4_net_list[i].name != NULL; i++)
+	for (i = 0; snmp4_net_list[i].name; i++)
 		seq_printf(seq, " %s", snmp4_net_list[i].name);
 
 	seq_puts(seq, "\nTcpExt:");
 	for_each_possible_cpu(c)
-		for (i = 0; snmp4_net_list[i].name != NULL; i++)
+		for (i = 0; snmp4_net_list[i].name; i++)
 			buff[i] += snmp_get_cpu_field(net->mib.net_statistics,
 						c, snmp4_net_list[i].entry);
-	for (i = 0; snmp4_net_list[i].name != NULL; i++)
+	for (i = 0; snmp4_net_list[i].name; i++)
 		seq_printf(seq, " %lu", buff[i]);
 
 	seq_puts(seq, "\nIpExt:");
-	for (i = 0; snmp4_ipextstats_list[i].name != NULL; i++)
+	for (i = 0; snmp4_ipextstats_list[i].name; i++)
 		seq_printf(seq, " %s", snmp4_ipextstats_list[i].name);
 
 	seq_puts(seq, "\nIpExt:");
 	for_each_possible_cpu(c)
-		for (i = 0; snmp4_ipextstats_list[i].name != NULL; i++)
+		for (i = 0; snmp4_ipextstats_list[i].name; i++)
 			buff64[i] += snmp_get_cpu_field64(
 					net->mib.ip_statistics,
 					c, snmp4_ipextstats_list[i].entry,
 					offsetof(struct ipstats_mib, syncp));
-	for (i = 0; snmp4_ipextstats_list[i].name != NULL; i++)
+	for (i = 0; snmp4_ipextstats_list[i].name; i++)
 		seq_printf(seq, " %llu", buff64[i]);
 
 	seq_putc(seq, '\n');
