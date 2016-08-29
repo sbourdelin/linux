@@ -550,8 +550,8 @@ EXPORT_SYMBOL(of_machine_is_compatible);
  *
  *  @device: Node to check for availability, with locks already held
  *
- *  Returns true if the status property is absent or set to "okay" or "ok",
- *  false otherwise
+ *  Returns true if the status property is absent or set to "okay", "ok",
+ *  or starting with "fail-", false otherwise
  */
 static bool __of_device_is_available(const struct device_node *device)
 {
@@ -566,7 +566,8 @@ static bool __of_device_is_available(const struct device_node *device)
 		return true;
 
 	if (statlen > 0) {
-		if (!strcmp(status, "okay") || !strcmp(status, "ok"))
+		if (!strcmp(status, "okay") || !strcmp(status, "ok") ||
+		    !strncmp(status, "fail-", 5))
 			return true;
 	}
 
@@ -593,6 +594,63 @@ bool of_device_is_available(const struct device_node *device)
 
 }
 EXPORT_SYMBOL(of_device_is_available);
+
+/**
+ *  __of_device_is_incomplete - check if a device is incomplete
+ *
+ *  @device: Node to check for partial failure with locks already held
+ *  @status: Status string for optional handling of the fail-sss state
+ */
+static bool __of_device_is_incomplete(const struct device_node *device,
+				      const char **status)
+{
+	const char *s, *m = "fail-";
+	int slen, mlen;
+
+	if (!device)
+		return false;
+
+	s = __of_get_property(device, "status", &slen);
+	if (!s)
+		return false;
+
+	mlen = strlen(m);
+	if (slen <= mlen)
+		return false;
+
+	if (strncmp("fail-", s, mlen))
+		return false;
+
+	*status = s + mlen;
+
+	return true;
+}
+
+/**
+ *  of_device_is_incomplete - check if a device is incomplete
+ *
+ *  @device: Node to check for partial failure
+ *  @status: Status string for optional handling of the fail-sss state
+ *
+ *  Returns true if the status property is set to "fail-sss",
+ *  false otherwise. Fore more information, see fail-sss in ePAPR 1.1
+ *  "Table 2-4 Values for status property".
+ *
+ *  The caller can optionally try to handle the error based on the
+ *  status string.
+ */
+bool of_device_is_incomplete(const struct device_node *device,
+			     const char **status)
+{
+	unsigned long flags;
+	bool res;
+
+	raw_spin_lock_irqsave(&devtree_lock, flags);
+	res = __of_device_is_incomplete(device, status);
+	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+	return res;
+}
+EXPORT_SYMBOL(of_device_is_incomplete);
 
 /**
  *  of_device_is_big_endian - check if a device has BE registers

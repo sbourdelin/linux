@@ -320,6 +320,8 @@ extern int of_device_is_compatible(const struct device_node *device,
 extern int of_device_compatible_match(struct device_node *device,
 				      const char *const *compat);
 extern bool of_device_is_available(const struct device_node *device);
+extern bool of_device_is_incomplete(const struct device_node *device,
+				    const char **status);
 extern bool of_device_is_big_endian(const struct device_node *device);
 extern const void *of_get_property(const struct device_node *node,
 				const char *name,
@@ -500,6 +502,12 @@ static inline int of_device_is_compatible(const struct device_node *device,
 }
 
 static inline bool of_device_is_available(const struct device_node *device)
+{
+	return false;
+}
+
+static inline bool of_device_is_incomplete(const struct device_node *device,
+					   const char **status)
 {
 	return false;
 }
