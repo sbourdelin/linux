@@ -38,6 +38,7 @@ hwdep_read_resp_buf(struct snd_efw *efw, char __user *buf, long remained,
 	buf += sizeof(type);
 
 	/* write into buffer as many responses as possible */
+	spin_lock_irq(&efw->lock);
 	while (efw->resp_queues > 0) {
 		t = (struct snd_efw_transaction *)(efw->pull_ptr);
 		length = be32_to_cpu(t->length) * sizeof(__be32);
@@ -52,8 +53,12 @@ hwdep_read_resp_buf(struct snd_efw *efw, char __user *buf, long remained,
 				(unsigned int)(efw->pull_ptr - efw->resp_buf);
 			till_end = min_t(unsigned int, length, till_end);
 
+			spin_unlock_irq(&efw->lock);
+
 			if (copy_to_user(buf, efw->pull_ptr, till_end))
 				return -EFAULT;
+
+			spin_lock_irq(&efw->lock);
 
 			efw->pull_ptr += till_end;
 			if (efw->pull_ptr >= efw->resp_buf +
@@ -69,6 +74,8 @@ hwdep_read_resp_buf(struct snd_efw *efw, char __user *buf, long remained,
 		efw->resp_queues--;
 	}
 
+	spin_unlock_irq(&efw->lock);
+
 	return count;
 }
 
@@ -76,13 +83,16 @@ static long
 hwdep_read_locked(struct snd_efw *efw, char __user *buf, long count,
 		  loff_t *offset)
 {
-	union snd_firewire_event event;
+	union snd_firewire_event event = {
+		.lock_status.type = SNDRV_FIREWIRE_EVENT_LOCK_STATUS,
+	};
 
-	memset(&event, 0, sizeof(event));
+	spin_lock_irq(&efw->lock);
 
-	event.lock_status.type = SNDRV_FIREWIRE_EVENT_LOCK_STATUS;
 	event.lock_status.status = (efw->dev_lock_count > 0);
 	efw->dev_lock_changed = false;
+
+	spin_unlock_irq(&efw->lock);
 
 	count = min_t(long, count, sizeof(event.lock_status));
 
@@ -111,12 +121,13 @@ hwdep_read(struct snd_hwdep *hwdep, char __user *buf, long count,
 		spin_lock_irq(&efw->lock);
 	}
 
+	/* Loosely release the lock here, but still safe. */
+	spin_unlock_irq(&efw->lock);
+
 	if (efw->dev_lock_changed)
 		count = hwdep_read_locked(efw, buf, count, offset);
 	else if (efw->resp_queues > 0)
 		count = hwdep_read_resp_buf(efw, buf, count, offset);
-
-	spin_unlock_irq(&efw->lock);
 
 	return count;
 }
