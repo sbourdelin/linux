@@ -143,10 +143,7 @@ static int hsta_msi_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	ppc4xx_hsta_msi.dev = dev;
-	ppc4xx_hsta_msi.address = mem->start;
 	ppc4xx_hsta_msi.data = ioremap(mem->start, resource_size(mem));
-	ppc4xx_hsta_msi.irq_count = irq_count;
 	if (!ppc4xx_hsta_msi.data) {
 		dev_err(dev, "Unable to map memory\n");
 		return -ENOMEM;
@@ -179,6 +176,10 @@ static int hsta_msi_probe(struct platform_device *pdev)
 		phb->controller_ops.setup_msi_irqs = hsta_setup_msi_irqs;
 		phb->controller_ops.teardown_msi_irqs = hsta_teardown_msi_irqs;
 	}
+
+	ppc4xx_hsta_msi.dev = dev;
+	ppc4xx_hsta_msi.address = mem->start;
+	ppc4xx_hsta_msi.irq_count = irq_count;
 	return 0;
  free_irq_map:
 	kfree(ppc4xx_hsta_msi.irq_map);
