@@ -113,7 +113,7 @@ int snd_hda_mixer_amp_volume_get(struct snd_kcontrol *kcontrol,
 int snd_hda_mixer_amp_volume_put(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol);
 int snd_hda_mixer_amp_tlv(struct snd_kcontrol *kcontrol, int op_flag,
-			  unsigned int size, unsigned int __user *tlv);
+			  unsigned int *size, unsigned int __user *tlv);
 int snd_hda_mixer_amp_switch_info(struct snd_kcontrol *kcontrol,
 				  struct snd_ctl_elem_info *uinfo);
 int snd_hda_mixer_amp_switch_get(struct snd_kcontrol *kcontrol,
@@ -218,7 +218,7 @@ int snd_hda_mixer_bind_ctls_get(struct snd_kcontrol *kcontrol,
 int snd_hda_mixer_bind_ctls_put(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol);
 int snd_hda_mixer_bind_tlv(struct snd_kcontrol *kcontrol, int op_flag,
-			   unsigned int size, unsigned int __user *tlv);
+			   unsigned int *size, unsigned int __user *tlv);
 
 #define HDA_BIND_VOL(xname, bindrec) \
 	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, \

@@ -84,7 +84,7 @@ void snd_usb_mixer_elem_init_std(struct usb_mixer_elem_list *list,
 				 int unitid);
 
 int snd_usb_mixer_vol_tlv(struct snd_kcontrol *kcontrol, int op_flag,
-			  unsigned int size, unsigned int __user *_tlv);
+			  unsigned int *size, unsigned int __user *_tlv);
 
 #ifdef CONFIG_PM
 int snd_usb_mixer_suspend(struct usb_mixer_interface *mixer);

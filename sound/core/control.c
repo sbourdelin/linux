@@ -1139,7 +1139,7 @@ static int snd_ctl_elem_user_put(struct snd_kcontrol *kcontrol,
 
 static int snd_ctl_elem_user_tlv(struct snd_kcontrol *kcontrol,
 				 int op_flag,
-				 unsigned int size,
+				 unsigned int *size,
 				 unsigned int __user *tlv)
 {
 	struct user_element *ue = kcontrol->private_data;
@@ -1147,19 +1147,19 @@ static int snd_ctl_elem_user_tlv(struct snd_kcontrol *kcontrol,
 	void *new_data;
 
 	if (op_flag == SNDRV_CTL_TLV_OP_WRITE) {
-		if (size > 1024 * 128)	/* sane value */
+		if (*size > 1024 * 128)	/* sane value */
 			return -EINVAL;
 
-		new_data = memdup_user(tlv, size);
+		new_data = memdup_user(tlv, *size);
 		if (IS_ERR(new_data))
 			return PTR_ERR(new_data);
 		mutex_lock(&ue->card->user_ctl_lock);
-		change = ue->tlv_data_size != size;
+		change = ue->tlv_data_size != *size;
 		if (!change)
-			change = memcmp(ue->tlv_data, new_data, size);
+			change = memcmp(ue->tlv_data, new_data, *size);
 		kfree(ue->tlv_data);
 		ue->tlv_data = new_data;
-		ue->tlv_data_size = size;
+		ue->tlv_data_size = *size;
 		mutex_unlock(&ue->card->user_ctl_lock);
 	} else {
 		int ret = 0;
@@ -1169,12 +1169,13 @@ static int snd_ctl_elem_user_tlv(struct snd_kcontrol *kcontrol,
 			ret = -ENXIO;
 			goto err_unlock;
 		}
-		if (size < ue->tlv_data_size) {
+		if (*size < ue->tlv_data_size) {
 			ret = -ENOSPC;
 			goto err_unlock;
 		}
 		if (copy_to_user(tlv, ue->tlv_data, ue->tlv_data_size))
 			ret = -EFAULT;
+		*size = ue->tlv_data_size;
 err_unlock:
 		mutex_unlock(&ue->card->user_ctl_lock);
 		if (ret)
@@ -1466,7 +1467,15 @@ static int snd_ctl_tlv_ioctl(struct snd_ctl_file *file,
 			err = -EPERM;
 			goto __kctl_end;
 		}
-		err = kctl->tlv.c(kctl, op_flag, tlv.length, _tlv->tlv);
+		len = tlv.length;
+		err = kctl->tlv.c(kctl, op_flag, &len, _tlv->tlv);
+		if (err < 0)
+			goto __kctl_end;
+		/* Return operated bytes. */
+		if (put_user(len, &_tlv->length)) {
+			err = -EFAULT;
+			goto __kctl_end;
+		}
 		if (err > 0) {
 			struct snd_ctl_elem_id id = kctl->id;
 			up_read(&card->controls_rwsem);
@@ -1483,7 +1492,8 @@ static int snd_ctl_tlv_ioctl(struct snd_ctl_file *file,
 			err = -ENOMEM;
 			goto __kctl_end;
 		}
-		if (copy_to_user(_tlv->tlv, kctl->tlv.p, len))
+		if (copy_to_user(_tlv->tlv, kctl->tlv.p, len) ||
+		    put_user(len, &_tlv->length))
 			err = -EFAULT;
 	}
       __kctl_end:

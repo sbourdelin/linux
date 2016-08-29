@@ -32,7 +32,7 @@ typedef int (snd_kcontrol_get_t) (struct snd_kcontrol * kcontrol, struct snd_ctl
 typedef int (snd_kcontrol_put_t) (struct snd_kcontrol * kcontrol, struct snd_ctl_elem_value * ucontrol);
 typedef int (snd_kcontrol_tlv_rw_t)(struct snd_kcontrol *kcontrol,
 				    int op_flag, /* SNDRV_CTL_TLV_OP_XXX */
-				    unsigned int size,
+				    unsigned int *size,
 				    unsigned int __user *tlv);
 
 enum {

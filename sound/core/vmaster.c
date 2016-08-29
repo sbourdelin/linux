@@ -220,7 +220,7 @@ static int slave_put(struct snd_kcontrol *kcontrol,
 }
 
 static int slave_tlv_cmd(struct snd_kcontrol *kcontrol,
-			 int op_flag, unsigned int size,
+			 int op_flag, unsigned int *size,
 			 unsigned int __user *tlv)
 {
 	struct link_slave *slave = snd_kcontrol_chip(kcontrol);

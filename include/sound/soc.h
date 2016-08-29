@@ -647,7 +647,7 @@ int snd_soc_bytes_put(struct snd_kcontrol *kcontrol,
 int snd_soc_bytes_info_ext(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_info *ucontrol);
 int snd_soc_bytes_tlv_callback(struct snd_kcontrol *kcontrol, int op_flag,
-	unsigned int size, unsigned int __user *tlv);
+	unsigned int *size, unsigned int __user *tlv);
 int snd_soc_info_xr_sx(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_info *uinfo);
 int snd_soc_get_xr_sx(struct snd_kcontrol *kcontrol,

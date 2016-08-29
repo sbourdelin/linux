@@ -1420,7 +1420,7 @@ EXPORT_SYMBOL_GPL(snd_hda_mixer_amp_volume_put);
  * set up via HDA_COMPOSE_AMP_VAL*() or related macros.
  */
 int snd_hda_mixer_amp_tlv(struct snd_kcontrol *kcontrol, int op_flag,
-			  unsigned int size, unsigned int __user *_tlv)
+			  unsigned int *size, unsigned int __user *_tlv)
 {
 	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
 	hda_nid_t nid = get_amp_nid(kcontrol);
@@ -1429,7 +1429,7 @@ int snd_hda_mixer_amp_tlv(struct snd_kcontrol *kcontrol, int op_flag,
 	bool min_mute = get_amp_min_mute(kcontrol);
 	u32 caps, val1, val2;
 
-	if (size < 4 * sizeof(unsigned int))
+	if (*size < 4 * sizeof(unsigned int))
 		return -ENOMEM;
 	caps = query_amp_caps(codec, nid, dir);
 	val2 = (caps & AC_AMPCAP_STEP_SIZE) >> AC_AMPCAP_STEP_SIZE_SHIFT;
@@ -1447,6 +1447,9 @@ int snd_hda_mixer_amp_tlv(struct snd_kcontrol *kcontrol, int op_flag,
 		return -EFAULT;
 	if (put_user(val2, _tlv + 3))
 		return -EFAULT;
+
+	*size = sizeof(unsigned int) * 4;
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_hda_mixer_amp_tlv);
@@ -1737,13 +1740,14 @@ static int get_kctl_0dB_offset(struct hda_codec *codec,
 {
 	int _tlv[4];
 	const int *tlv = NULL;
+	unsigned int size = sizeof(_tlv);
 	int val = -1;
 
 	if (kctl->vd[0].access & SNDRV_CTL_ELEM_ACCESS_TLV_CALLBACK) {
 		/* FIXME: set_fs() hack for obtaining user-space TLV data */
 		mm_segment_t fs = get_fs();
 		set_fs(get_ds());
-		if (!kctl->tlv.c(kctl, 0, sizeof(_tlv), _tlv))
+		if (!kctl->tlv.c(kctl, 0, &size, _tlv))
 			tlv = _tlv;
 		set_fs(fs);
 	} else if (kctl->vd[0].access & SNDRV_CTL_ELEM_ACCESS_TLV_READ)
@@ -2207,7 +2211,7 @@ EXPORT_SYMBOL_GPL(snd_hda_mixer_bind_ctls_put);
  * set up via HDA_BIND_VOL() macro.
  */
 int snd_hda_mixer_bind_tlv(struct snd_kcontrol *kcontrol, int op_flag,
-			   unsigned int size, unsigned int __user *tlv)
+			   unsigned int *size, unsigned int __user *tlv)
 {
 	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
 	struct hda_bind_ctls *c;

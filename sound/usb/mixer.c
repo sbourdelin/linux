@@ -535,17 +535,20 @@ int snd_usb_set_cur_mix_value(struct usb_mixer_elem_info *cval, int channel,
  * TLV callback for mixer volume controls
  */
 int snd_usb_mixer_vol_tlv(struct snd_kcontrol *kcontrol, int op_flag,
-			 unsigned int size, unsigned int __user *_tlv)
+			 unsigned int *size, unsigned int __user *_tlv)
 {
 	struct usb_mixer_elem_info *cval = kcontrol->private_data;
 	DECLARE_TLV_DB_MINMAX(scale, 0, 0);
 
-	if (size < sizeof(scale))
+	if (*size < sizeof(scale))
 		return -ENOMEM;
 	scale[2] = cval->dBmin;
 	scale[3] = cval->dBmax;
 	if (copy_to_user(_tlv, scale, sizeof(scale)))
 		return -EFAULT;
+
+	*size = sizeof(scale);
+
 	return 0;
 }
 

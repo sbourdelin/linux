@@ -3868,7 +3868,7 @@ static int ca0132_volume_put(struct snd_kcontrol *kcontrol,
 }
 
 static int ca0132_volume_tlv(struct snd_kcontrol *kcontrol, int op_flag,
-			     unsigned int size, unsigned int __user *tlv)
+			     unsigned int *size, unsigned int __user *tlv)
 {
 	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
 	struct ca0132_spec *spec = codec->spec;

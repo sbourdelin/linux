@@ -553,14 +553,14 @@ static int lola_analog_vol_put(struct snd_kcontrol *kcontrol,
 }
 
 static int lola_analog_vol_tlv(struct snd_kcontrol *kcontrol, int op_flag,
-			       unsigned int size, unsigned int __user *tlv)
+			       unsigned int *size, unsigned int __user *tlv)
 {
 	struct lola *chip = snd_kcontrol_chip(kcontrol);
 	int dir = kcontrol->private_value;
 	unsigned int val1, val2;
 	struct lola_pin *pin;
 
-	if (size < 4 * sizeof(unsigned int))
+	if (*size < 4 * sizeof(unsigned int))
 		return -ENOMEM;
 	pin = &chip->pin[dir].pins[0];
 
@@ -577,6 +577,9 @@ static int lola_analog_vol_tlv(struct snd_kcontrol *kcontrol, int op_flag,
 		return -EFAULT;
 	if (put_user(val2, tlv + 3))
 		return -EFAULT;
+
+	*size = 4 * sizeof(unsigned int);
+
 	return 0;
 }
 

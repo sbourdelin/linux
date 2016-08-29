@@ -661,7 +661,7 @@ static int spk_mask_from_spk_alloc(int spk_alloc)
 }
 
 static int hdmi_chmap_ctl_tlv(struct snd_kcontrol *kcontrol, int op_flag,
-			      unsigned int size, unsigned int __user *tlv)
+			      unsigned int *size, unsigned int __user *tlv)
 {
 	struct snd_pcm_chmap *info = snd_kcontrol_chip(kcontrol);
 	struct hdac_chmap *chmap = info->private_data;
@@ -672,11 +672,11 @@ static int hdmi_chmap_ctl_tlv(struct snd_kcontrol *kcontrol, int op_flag,
 	int type;
 	int spk_alloc, spk_mask;
 
-	if (size < 8)
+	if (*size < 8)
 		return -ENOMEM;
 	if (put_user(SNDRV_CTL_TLVT_CONTAINER, tlv))
 		return -EFAULT;
-	size -= 8;
+	*size -= 8;
 	dst = tlv + 2;
 
 	spk_alloc = chmap->ops.get_spk_alloc(chmap->hdac, pcm_idx);
@@ -703,7 +703,7 @@ static int hdmi_chmap_ctl_tlv(struct snd_kcontrol *kcontrol, int op_flag,
 							chmap, cap, chs);
 			if (type < 0)
 				return -ENODEV;
-			if (size < 8)
+			if (*size < 8)
 				return -ENOMEM;
 
 			if (put_user(type, dst) ||
@@ -711,13 +711,13 @@ static int hdmi_chmap_ctl_tlv(struct snd_kcontrol *kcontrol, int op_flag,
 				return -EFAULT;
 
 			dst += 2;
-			size -= 8;
+			*size -= 8;
 			count += 8;
 
-			if (size < chs_bytes)
+			if (*size < chs_bytes)
 				return -ENOMEM;
 
-			size -= chs_bytes;
+			*size -= chs_bytes;
 			count += chs_bytes;
 			chmap->ops.cea_alloc_to_tlv_chmap(chmap, cap,
 						tlv_chmap, chs);
@@ -730,6 +730,8 @@ static int hdmi_chmap_ctl_tlv(struct snd_kcontrol *kcontrol, int op_flag,
 
 	if (put_user(count, tlv + 1))
 		return -EFAULT;
+
+	*size = count + sizeof(unsigned int) * 2;
 
 	return 0;
 }
