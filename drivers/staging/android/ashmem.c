@@ -595,6 +595,7 @@ static int ashmem_pin(struct ashmem_area *asma, size_t pgstart, size_t pgend)
 {
 	struct ashmem_range *range, *next;
 	int ret = ASHMEM_NOT_PURGED;
+	int err;
 
 	list_for_each_entry_safe(range, next, &asma->unpinned_list, unpinned) {
 		/* moved past last applicable page; we can short circuit */
@@ -643,8 +644,11 @@ static int ashmem_pin(struct ashmem_area *asma, size_t pgstart, size_t pgend)
 			 * more complicated, we allocate a new range for the
 			 * second half and adjust the first chunk's endpoint.
 			 */
-			range_alloc(asma, range, range->purged,
-				    pgend + 1, range->pgend);
+			err = range_alloc(asma, range, range->purged,
+					  pgend + 1, range->pgend);
+			if (err)
+				return err;
+
 			range_shrink(range, range->pgstart, pgstart - 1);
 			break;
 		}
@@ -800,7 +804,9 @@ static long ashmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				.nr_to_scan = LONG_MAX,
 			};
 			ret = ashmem_shrink_count(&ashmem_shrinker, &sc);
-			ashmem_shrink_scan(&ashmem_shrinker, &sc);
+			if (ret)
+				return ret;
+			ret = ashmem_shrink_scan(&ashmem_shrinker, &sc);
 		}
 		break;
 	}
@@ -870,12 +876,18 @@ static int __init ashmem_init(void)
 		goto out_free2;
 	}
 
-	register_shrinker(&ashmem_shrinker);
+	ret = register_shrinker(&ashmem_shrinker);
+	if (unlikely(ret)) {
+		pr_err("failed to register shrinker!\n");
+		goto out_free3;
+	}
 
 	pr_info("initialized\n");
 
 	return 0;
 
+out_free3:
+	misc_deregister(&ashmem_misc);
 out_free2:
 	kmem_cache_destroy(ashmem_range_cachep);
 out_free1:
