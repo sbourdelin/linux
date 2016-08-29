@@ -31,6 +31,7 @@
 #include <sound/pcm_drm_eld.h>
 #include <sound/hda_chmap.h>
 #include "../../hda/local.h"
+#include "../../hda/ext/hdac_codec.h"
 #include "hdac_hdmi.h"
 
 #define NAME_SIZE	32
@@ -125,13 +126,6 @@ static struct hdac_hdmi_pcm *get_hdmi_pcm_from_id(struct hdac_hdmi_priv *hdmi,
 	}
 
 	return NULL;
-}
-
-static inline struct hdac_ext_device *to_hda_ext_device(struct device *dev)
-{
-	struct hdac_device *hdac = dev_to_hdac_dev(dev);
-
-	return to_ehdac_device(hdac);
 }
 
 static unsigned int sad_format(const u8 *sad)
