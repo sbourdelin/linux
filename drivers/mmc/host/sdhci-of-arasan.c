@@ -78,6 +78,7 @@ struct sdhci_arasan_soc_ctl_map {
  * struct sdhci_arasan_data
  * @host:		Pointer to the main SDHCI host structure.
  * @clk_ahb:		Pointer to the AHB clock
+ * @clk_syscon:		Pointer to the optional clock for accessing syscon
  * @phy:		Pointer to the generic phy
  * @is_phy_on:		True if the PHY is on; false if not.
  * @sdcardclk_hw:	Struct for the clock we might provide to a PHY.
@@ -88,6 +89,7 @@ struct sdhci_arasan_soc_ctl_map {
 struct sdhci_arasan_data {
 	struct sdhci_host *host;
 	struct clk	*clk_ahb;
+	struct clk	*clk_syscon;
 	struct phy	*phy;
 	bool		is_phy_on;
 
@@ -290,6 +292,7 @@ static int sdhci_arasan_suspend(struct device *dev)
 
 	clk_disable(pltfm_host->clk);
 	clk_disable(sdhci_arasan->clk_ahb);
+	clk_disable(sdhci_arasan->clk_syscon);
 
 	return 0;
 }
@@ -308,6 +311,12 @@ static int sdhci_arasan_resume(struct device *dev)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
 	int ret;
+
+	ret = clk_enable(sdhci_arasan->clk_syscon);
+	if (ret) {
+		dev_err(dev, "Cannot enable syscon clock.\n");
+		return ret;
+	}
 
 	ret = clk_enable(sdhci_arasan->clk_ahb);
 	if (ret) {
@@ -528,26 +537,33 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
 					ret);
 			goto err_pltfm_free;
 		}
+
+		sdhci_arasan->clk_syscon = devm_clk_get(&pdev->dev,
+							"clk_syscon");
+		if (clk_prepare_enable(sdhci_arasan->clk_syscon)) {
+			dev_err(&pdev->dev, "Unable to enable syscon clock.\n");
+			goto err_pltfm_free;
+		}
 	}
 
 	sdhci_arasan->clk_ahb = devm_clk_get(&pdev->dev, "clk_ahb");
 	if (IS_ERR(sdhci_arasan->clk_ahb)) {
 		dev_err(&pdev->dev, "clk_ahb clock not found.\n");
 		ret = PTR_ERR(sdhci_arasan->clk_ahb);
-		goto err_pltfm_free;
+		goto clk_dis_syscon;
 	}
 
 	clk_xin = devm_clk_get(&pdev->dev, "clk_xin");
 	if (IS_ERR(clk_xin)) {
 		dev_err(&pdev->dev, "clk_xin clock not found.\n");
 		ret = PTR_ERR(clk_xin);
-		goto err_pltfm_free;
+		goto clk_dis_syscon;
 	}
 
 	ret = clk_prepare_enable(sdhci_arasan->clk_ahb);
 	if (ret) {
 		dev_err(&pdev->dev, "Unable to enable AHB clock.\n");
-		goto err_pltfm_free;
+		goto clk_dis_syscon;
 	}
 
 	ret = clk_prepare_enable(clk_xin);
@@ -607,6 +623,8 @@ clk_disable_all:
 	clk_disable_unprepare(clk_xin);
 clk_dis_ahb:
 	clk_disable_unprepare(sdhci_arasan->clk_ahb);
+clk_dis_syscon:
+	clk_disable_unprepare(sdhci_arasan->clk_syscon);
 err_pltfm_free:
 	sdhci_pltfm_free(pdev);
 	return ret;
@@ -631,6 +649,7 @@ static int sdhci_arasan_remove(struct platform_device *pdev)
 	ret = sdhci_pltfm_unregister(pdev);
 
 	clk_disable_unprepare(clk_ahb);
+	clk_disable_unprepare(sdhci_arasan->clk_syscon);
 
 	return ret;
 }
