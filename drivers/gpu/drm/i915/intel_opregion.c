@@ -1059,6 +1059,7 @@ intel_opregion_get_panel_type(struct drm_i915_private *dev_priv)
 			      ret);
 		return ret;
 	}
+	DRM_DEBUG_KMS("SEAN: panel_details: 0x%08x\n", panel_details);
 
 	ret = (panel_details >> 8) & 0xff;
 	if (ret > 0x10) {
@@ -1069,6 +1070,14 @@ intel_opregion_get_panel_type(struct drm_i915_private *dev_priv)
 	/* fall back to VBT panel type? */
 	if (ret == 0x0) {
 		DRM_DEBUG_KMS("No panel type in OpRegion\n");
+		return -ENODEV;
+	}
+
+	/* Bit 17 is reserved and should be zero. Observed it set to one on
+	 * a Panasonic CF-30, where it also returns the incorrect panel type.
+	 */
+	if (panel_details & (1<<17)) {
+		DRM_DEBUG_KMS("Invalid panel details, ignoring OpRegion panel type (%d)\n", ret - 1);
 		return -ENODEV;
 	}
 
