@@ -25,4 +25,7 @@
 #define AMP_OUT_UNMUTE		0xb000
 #define PIN_OUT			(AC_PINCTL_OUT_EN)
 
+int hdac_generic_machine_control_init(struct snd_soc_dapm_context *dapm,
+					struct snd_soc_codec *codec);
+
 #endif /* __HDAC_GENERIC_H__ */
