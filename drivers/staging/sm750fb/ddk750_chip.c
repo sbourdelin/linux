@@ -332,7 +332,9 @@ unsigned int calcPllValue(unsigned int request_orig, pll_value_t *pll)
 	request = request_orig / 1000;
 	input = pll->inputFreq / 1000;
 
-	/* for MXCLK register , no POD provided, so need be treated differently	*/
+	/* for MXCLK register,
+	 * no POD provided, so need be treated differently.
+	 */
 	if (pll->clockType == MXCLK_PLL)
 		max_d = 3;
 
