@@ -72,7 +72,7 @@ int afs_open_socket(void)
 
 	skb_queue_head_init(&afs_incoming_calls);
 
-	afs_async_calls = create_singlethread_workqueue("kafsd");
+	afs_async_calls = alloc_workqueue("kafsd", WQ_MEM_RECLAIM, 0);
 	if (!afs_async_calls) {
 		_leave(" = -ENOMEM [wq]");
 		return -ENOMEM;
