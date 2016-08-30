@@ -282,8 +282,6 @@ static int qce_ahash_update(struct ahash_request *req)
 	sg = sg_last = req->src;
 
 	while (len < nbytes && sg) {
-		if (len + sg_dma_len(sg) > nbytes)
-			break;
 		len += sg_dma_len(sg);
 		sg_last = sg;
 		sg = sg_next(sg);
