@@ -139,4 +139,5 @@ static inline int vfio_pci_igd_init(struct vfio_pci_device *vdev)
 	return -ENODEV;
 }
 #endif
+extern int vfio_pci_virtio_quirk(struct vfio_pci_device *vdev, bool noiommu);
 #endif /* VFIO_PCI_PRIVATE_H */
