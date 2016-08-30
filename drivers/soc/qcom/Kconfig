@@ -10,6 +10,12 @@ config QCOM_GSBI
           functions for connecting the underlying serial UART, SPI, and I2C
           devices to the output pins.
 
+config QCOM_L2_ACCESSORS
+	bool
+	help
+	  Provides support for accessing registers in the L2 cache
+	  for Qualcomm Technologies ARM64 chips.
+
 config QCOM_PM
 	bool "Qualcomm Power Management"
 	depends on ARCH_QCOM && !ARM64
