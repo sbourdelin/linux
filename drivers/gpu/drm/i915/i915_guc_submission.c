@@ -434,20 +434,23 @@ int i915_guc_wq_check_space(struct drm_i915_gem_request *request)
 {
 	const size_t wqi_size = sizeof(struct guc_wq_item);
 	struct i915_guc_client *gc = request->i915->guc.execbuf_client;
-	struct guc_process_desc *desc;
+	struct guc_process_desc *desc = gc->client_base + gc->proc_desc_offset;
 	u32 freespace;
+	int ret;
 
-	GEM_BUG_ON(gc == NULL);
-
-	desc = gc->client_base + gc->proc_desc_offset;
-
+	spin_lock(&gc->lock);
 	freespace = CIRC_SPACE(gc->wq_tail, desc->head, gc->wq_size);
-	if (likely(freespace >= wqi_size))
-		return 0;
+	freespace -= gc->wq_rsvd;
+	if (likely(freespace >= wqi_size)) {
+		gc->wq_rsvd += wqi_size;
+		ret = 0;
+	} else {
+		gc->no_wq_space++;
+		ret = -EAGAIN;
+	}
+	spin_unlock(&gc->lock);
 
-	gc->no_wq_space += 1;
-
-	return -EAGAIN;
+	return ret;
 }
 
 static void guc_add_workqueue_item(struct i915_guc_client *gc,
@@ -457,22 +460,9 @@ static void guc_add_workqueue_item(struct i915_guc_client *gc,
 	const size_t wqi_size = sizeof(struct guc_wq_item);
 	const u32 wqi_len = wqi_size/sizeof(u32) - 1;
 	struct intel_engine_cs *engine = rq->engine;
-	struct guc_process_desc *desc;
 	struct guc_wq_item *wqi;
 	void *base;
-	u32 freespace, tail, wq_off, wq_page;
-
-	desc = gc->client_base + gc->proc_desc_offset;
-
-	/* Free space is guaranteed, see i915_guc_wq_check_space() above */
-	freespace = CIRC_SPACE(gc->wq_tail, desc->head, gc->wq_size);
-	GEM_BUG_ON(freespace < wqi_size);
-
-	/* The GuC firmware wants the tail index in QWords, not bytes */
-	tail = rq->tail;
-	GEM_BUG_ON(tail & 7);
-	tail >>= 3;
-	GEM_BUG_ON(tail > WQ_RING_TAIL_MAX);
+	u32 wq_off, wq_page;
 
 	/* For now workqueue item is 4 DWs; workqueue buffer is 2 pages. So we
 	 * should not have the case where structure wqi is across page, neither
@@ -482,18 +472,19 @@ static void guc_add_workqueue_item(struct i915_guc_client *gc,
 	 * workqueue buffer dw by dw.
 	 */
 	BUILD_BUG_ON(wqi_size != 16);
+	GEM_BUG_ON(gc->wq_rsvd < wqi_size);
 
 	/* postincrement WQ tail for next time */
 	wq_off = gc->wq_tail;
+	GEM_BUG_ON(wq_off & (wqi_size - 1));
 	gc->wq_tail += wqi_size;
 	gc->wq_tail &= gc->wq_size - 1;
-	GEM_BUG_ON(wq_off & (wqi_size - 1));
+	gc->wq_rsvd -= wqi_size;
 
 	/* WQ starts from the page after doorbell / process_desc */
 	wq_page = (wq_off + GUC_DB_SIZE) >> PAGE_SHIFT;
-	wq_off &= PAGE_SIZE - 1;
 	base = kmap_atomic(i915_gem_object_get_page(gc->vma->obj, wq_page));
-	wqi = (struct guc_wq_item *)((char *)base + wq_off);
+	wqi = (struct guc_wq_item *)((char *)base + offset_in_page(wq_off));
 
 	/* Now fill in the 4-word work queue item */
 	wqi->header = WQ_TYPE_INORDER |
@@ -504,7 +495,7 @@ static void guc_add_workqueue_item(struct i915_guc_client *gc,
 	/* The GuC wants only the low-order word of the context descriptor */
 	wqi->context_desc = (u32)intel_lr_context_descriptor(rq->ctx, engine);
 
-	wqi->ring_tail = tail << WQ_RING_TAIL_SHIFT;
+	wqi->ring_tail = rq->tail >> 3 << WQ_RING_TAIL_SHIFT;
 	wqi->fence_id = rq->fence.seqno;
 
 	kunmap_atomic(base);
@@ -591,8 +582,10 @@ static void i915_guc_submit(struct drm_i915_gem_request *rq)
 	struct i915_guc_client *client = guc->execbuf_client;
 	int b_ret;
 
+	spin_lock(&client->lock);
 	guc_add_workqueue_item(client, rq);
 	b_ret = guc_ring_doorbell(client);
+	spin_unlock(&client->lock);
 
 	client->submissions[engine_id] += 1;
 	client->retcode = b_ret;
@@ -769,6 +762,8 @@ guc_client_alloc(struct drm_i915_private *dev_priv,
 	client = kzalloc(sizeof(*client), GFP_KERNEL);
 	if (!client)
 		return NULL;
+
+	spin_lock_init(&client->lock);
 
 	client->owner = ctx;
 	client->guc = guc;
@@ -1019,9 +1014,11 @@ int i915_guc_submission_enable(struct drm_i915_private *dev_priv)
 		engine->submit_request = i915_guc_submit;
 
 		/* Replay the current set of previously submitted requests */
-		list_for_each_entry(request, &engine->request_list, link)
+		list_for_each_entry(request, &engine->request_list, link) {
+			client->wq_rsvd += sizeof(struct guc_wq_item);
 			if (i915_sw_fence_done(&request->submit))
 				i915_guc_submit(request);
+		}
 	}
 
 	return 0;
