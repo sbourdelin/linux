@@ -736,8 +736,8 @@ int rsxx_creg_setup(struct rsxx_cardinfo *card)
 {
 	card->creg_ctrl.active_cmd = NULL;
 
-	card->creg_ctrl.creg_wq =
-			create_singlethread_workqueue(DRIVER_NAME"_creg");
+	card->creg_ctrl.creg_wq = alloc_workqueue(DRIVER_NAME "_creg",
+						  WQ_MEM_RECLAIM, 0);
 	if (!card->creg_ctrl.creg_wq)
 		return -ENOMEM;
 

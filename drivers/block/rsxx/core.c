@@ -887,7 +887,8 @@ static int rsxx_pci_probe(struct pci_dev *dev,
 	}
 
 	/************* Setup Card Event Handler *************/
-	card->event_wq = create_singlethread_workqueue(DRIVER_NAME"_event");
+	card->event_wq = alloc_workqueue(DRIVER_NAME "_event", WQ_MEM_RECLAIM,
+					 0);
 	if (!card->event_wq) {
 		dev_err(CARD_TO_DEV(card), "Failed card event setup.\n");
 		goto failed_event_handler;
