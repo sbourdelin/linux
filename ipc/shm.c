@@ -415,7 +415,7 @@ static int shm_mmap(struct file *file, struct vm_area_struct *vma)
 
 	/*
 	 * In case of remap_file_pages() emulation, the file can represent
-	 * removed IPC ID: propogate shm_lock() error to caller.
+	 * removed IPC ID: propagate shm_lock() error to caller.
 	 */
 	ret =__shm_open(vma);
 	if (ret)

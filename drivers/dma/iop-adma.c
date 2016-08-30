@@ -1315,7 +1315,7 @@ static int iop_adma_probe(struct platform_device *pdev)
 
 	adev->id = plat_data->hw_id;
 
-	/* discover transaction capabilites from the platform data */
+	/* discover transaction capabilities from the platform data */
 	dma_dev->cap_mask = plat_data->cap_mask;
 
 	adev->pdev = pdev;

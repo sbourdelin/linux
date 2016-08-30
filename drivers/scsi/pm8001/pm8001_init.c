@@ -973,7 +973,7 @@ intx:
  * @ent: pci device id
  *
  * This function is the main initialization function, when register a new
- * pci driver it is invoked, all struct an hardware initilization should be done
+ * pci driver it is invoked, all struct an hardware initialization should be done
  * here, also, register interrupt
  */
 static int pm8001_pci_probe(struct pci_dev *pdev,

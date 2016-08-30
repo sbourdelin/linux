@@ -147,7 +147,7 @@ int polaris10_copy_bytes_to_smc(struct pp_smumgr *smumgr, uint32_t smc_start_add
 	addr = smc_start_address;
 
 	while (byte_count >= 4) {
-	/* Bytes are written into the SMC addres space with the MSB first. */
+	/* Bytes are written into the SMC address space with the MSB first. */
 		data = src[0] * 0x1000000 + src[1] * 0x10000 + src[2] * 0x100 + src[3];
 
 		result = polaris10_set_smc_sram_address(smumgr, addr, limit);
@@ -177,7 +177,7 @@ int polaris10_copy_bytes_to_smc(struct pp_smumgr *smumgr, uint32_t smc_start_add
 		extra_shift = 8 * (4 - byte_count);
 
 		while (byte_count > 0) {
-			/* Bytes are written into the SMC addres space with the MSB first. */
+			/* Bytes are written into the SMC address space with the MSB first. */
 			data = (0x100 * data) + *src++;
 			byte_count--;
 		}
@@ -728,7 +728,7 @@ int polaris10_setup_graphics_level_structure(struct pp_smumgr *smumgr)
 				"[AVFS][Polaris10_SetupGfxLvlStruct] Copying of MCLK DPM table failed!",
 			return -1);
 
-	/* MVDD Boot value - neccessary for getting rid of the hang that occurs during Mclk DPM enablement */
+	/* MVDD Boot value - necessary for getting rid of the hang that occurs during Mclk DPM enablement */
 
 	graphics_level_address = dpm_table_start + offsetof(SMU74_Discrete_DpmTable, BootMVdd);
 

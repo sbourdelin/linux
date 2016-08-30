@@ -33,7 +33,7 @@
  *  -Changes related to MMU v2 (Rel 4.8)
  *
  * Vineetg: Aug 29th 2008
- *  -In TLB Flush operations (Metal Fix MMU) there is a explict command to
+ *  -In TLB Flush operations (Metal Fix MMU) there is an explicit command to
  *    flush Micro-TLBS. If TLB Index Reg is invalid prior to TLBIVUTLB cmd,
  *    it fails. Thus need to load it with ANY valid value before invoking
  *    TLBIVUTLB cmd
@@ -151,7 +151,7 @@ static void tlb_entry_erase(unsigned int vaddr_n_asid)
 /****************************************************************************
  * ARC700 MMU caches recently used J-TLB entries (RAM) as uTLBs (FLOPs)
  *
- * New IVUTLB cmd in MMU v2 explictly invalidates the uTLB
+ * New IVUTLB cmd in MMU v2 explicitly invalidates the uTLB
  *
  * utlb_invalidate ( )
  *  -For v2 MMU calls Flush uTLB Cmd
@@ -318,7 +318,7 @@ noinline void local_flush_tlb_mm(struct mm_struct *mm)
  * Difference between this and Kernel Range Flush is
  *  -Here the fastest way (if range is too large) is to move to next ASID
  *      without doing any explicit Shootdown
- *  -In case of kernel Flush, entry has to be shot down explictly
+ *  -In case of kernel Flush, entry has to be shot down explicitly
  */
 void local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 			   unsigned long end)

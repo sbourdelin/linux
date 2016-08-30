@@ -728,7 +728,7 @@ static int check_input_term(struct mixer_build *state, int id,
 					return err;
 
 				/* save input term properties after recursion,
-				 * to ensure they are not overriden by the
+				 * to ensure they are not overridden by the
 				 * recursion calls */
 				term->id = id;
 				term->type = le16_to_cpu(d->wTerminalType);

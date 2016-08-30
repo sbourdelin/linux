@@ -653,7 +653,8 @@ static int cdc_ncm_setup(struct usbnet *dev)
 	struct cdc_ncm_ctx *ctx = (struct cdc_ncm_ctx *)dev->data[0];
 	u32 def_rx, def_tx;
 
-	/* be conservative when selecting intial buffer size to
+	/*
+	 * be conservative when selecting initial buffer size to
 	 * increase the number of hosts this will work for
 	 */
 	def_rx = min_t(u32, CDC_NCM_NTB_DEF_SIZE_RX,

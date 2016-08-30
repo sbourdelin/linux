@@ -141,7 +141,7 @@ int fiji_copy_bytes_to_smc(struct pp_smumgr *smumgr,
 	addr = smcStartAddress;
 
 	while (byteCount >= 4) {
-		/* Bytes are written into the SMC addres space with the MSB first. */
+		/* Bytes are written into the SMC address space with the MSB first. */
 		data = src[0] * 0x1000000 + src[1] * 0x10000 + src[2] * 0x100 + src[3];
 
 		result = fiji_set_smc_sram_address(smumgr, addr, limit);

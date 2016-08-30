@@ -1045,7 +1045,7 @@ static int ppc4xx_edac_mc_init(struct mem_ctl_info *mci,
 	mci->scrub_mode		= SCRUB_NONE;
 
 	/*
-	 * Update the actual capabilites based on the MCOPT1[MCHK]
+	 * Update the actual capabilities based on the MCOPT1[MCHK]
 	 * settings. Scrubbing is only useful if reporting is enabled.
 	 */
 

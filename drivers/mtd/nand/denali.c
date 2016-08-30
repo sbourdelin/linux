@@ -1487,7 +1487,7 @@ int denali_init(struct denali_nand_info *denali)
 
 	/*
 	 * denali_isr register is done after all the hardware
-	 * initilization is finished
+	 * initialization is finished
 	 */
 	if (request_irq(denali->irq, denali_isr, IRQF_SHARED,
 			DENALI_NAND_NAME, denali)) {

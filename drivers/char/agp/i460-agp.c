@@ -495,7 +495,7 @@ static int i460_remove_memory_large_io_page (struct agp_memory *mem,
 	return 0;
 }
 
-/* Wrapper routines to call the approriate {small_io_page,large_io_page} function */
+/* Wrapper routines to call the appropriate {small_io_page,large_io_page} function */
 
 static int i460_insert_memory (struct agp_memory *mem,
 				off_t pg_start, int type)

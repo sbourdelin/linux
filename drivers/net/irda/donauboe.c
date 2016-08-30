@@ -1281,7 +1281,7 @@ dumpbufs(self->rx_bufs[self->rxs],len,'<');
             /* TODO: =========================================== */
             /*  if OBOE_CTL_RX_LENGTH, our buffers are too small */
             /* (MIR or FIR) data is lost. */
-            /* (SIR) data is splitted in several slots. */
+            /* (SIR) data is split in several slots. */
             /* we have to join all the received buffers received */
             /*in a large buffer before checking CRC. */
 		    pr_debug("%s.err:%x(%x)\n", __func__

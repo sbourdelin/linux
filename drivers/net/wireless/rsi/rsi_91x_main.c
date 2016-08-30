@@ -234,7 +234,7 @@ err:
 EXPORT_SYMBOL_GPL(rsi_91x_init);
 
 /**
- * rsi_91x_deinit() - This function de-intializes os intf operations.
+ * rsi_91x_deinit() - This function de-initializes os intf operations.
  * @adapter: Pointer to the adapter structure.
  *
  * Return: None.

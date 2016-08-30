@@ -5,7 +5,7 @@ audio data transfer between devices in the system.
 
 Required properties:
 
-- compatible: should be one of the followings
+- compatible: should be one of the following:
    - "allwinner,sun4i-a10-i2s"
 - reg: physical base address of the controller and length of memory mapped
   region.

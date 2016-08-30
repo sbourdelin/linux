@@ -591,7 +591,7 @@ void tracefs_remove_recursive(struct dentry *dentry)
 			simple_release_fs(&tracefs_mount, &tracefs_mount_count);
 
 		/*
-		 * The parent->d_lock protects agaist child from unlinking
+		 * The parent->d_lock protects against child from unlinking
 		 * from d_subdirs. When releasing the parent->d_lock we can
 		 * no longer trust that the next pointer is valid.
 		 * Restart the loop. We'll skip this one with the

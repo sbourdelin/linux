@@ -123,7 +123,7 @@ struct mvebu_mbus_soc_data {
 };
 
 /*
- * Used to store the state of one MBus window accross suspend/resume.
+ * Used to store the state of one MBus window across suspend/resume.
  */
 struct mvebu_mbus_win_data {
 	u32 ctrl;

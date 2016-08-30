@@ -641,7 +641,7 @@ static int orangefs_fsync(struct file *file,
 /*
  * Change the file pointer position for an instance of an open file.
  *
- * \note If .llseek is overriden, we must acquire lock as described in
+ * \note If .llseek is overridden, we must acquire lock as described in
  *       Documentation/filesystems/Locking.
  *
  * Future upgrade could support SEEK_DATA and SEEK_HOLE but would

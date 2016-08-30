@@ -423,7 +423,7 @@ _scsih_get_sas_address(struct MPT3SAS_ADAPTER *ioc, u16 handle,
 		return 0;
 	}
 
-	/* we hit this becuase the given parent handle doesn't exist */
+	/* we hit this because the given parent handle doesn't exist */
 	if (ioc_status == MPI2_IOCSTATUS_CONFIG_INVALID_PAGE)
 		return -ENXIO;
 
@@ -2951,7 +2951,7 @@ _scsih_ublock_io_device(struct MPT3SAS_ADAPTER *ioc, u64 sas_address)
  * @ioc: per adapter object
  * @handle: device handle
  *
- * During device pull we need to appropiately set the sdev state.
+ * During device pull we need to appropriately set the sdev state.
  */
 static void
 _scsih_block_io_all_device(struct MPT3SAS_ADAPTER *ioc)
@@ -2980,7 +2980,7 @@ _scsih_block_io_all_device(struct MPT3SAS_ADAPTER *ioc)
  * @ioc: per adapter object
  * @handle: device handle
  *
- * During device pull we need to appropiately set the sdev state.
+ * During device pull we need to appropriately set the sdev state.
  */
 static void
 _scsih_block_io_device(struct MPT3SAS_ADAPTER *ioc, u16 handle)
@@ -4080,7 +4080,7 @@ scsih_qcmd(struct Scsi_Host *shost, struct scsi_cmnd *scmd)
 		scmd->result = DID_NO_CONNECT << 16;
 		scmd->scsi_done(scmd);
 		return 0;
-	/* device busy with task managment */
+	/* device busy with task management */
 	} else if (sas_target_priv_data->tm_busy ||
 	    sas_device_priv_data->block)
 		return SCSI_MLQUEUE_DEVICE_BUSY;
@@ -8448,7 +8448,7 @@ _scsih_probe_devices(struct MPT3SAS_ADAPTER *ioc)
  * @shost: SCSI host pointer
  *
  * The shost has the ability to discover targets on its own instead
- * of scanning the entire bus.  In our implemention, we will kick off
+ * of scanning the entire bus.  In our implementation, we will kick off
  * firmware discovery.
  */
 void
@@ -8474,8 +8474,8 @@ scsih_scan_start(struct Scsi_Host *shost)
  * @shost: SCSI host pointer
  * @time: elapsed time of the scan in jiffies
  *
- * This function will be called periodicallyn until it returns 1 with the
- * scsi_host and the elapsed time of the scan in jiffies. In our implemention,
+ * This function will be called periodically until it returns 1 with the
+ * scsi_host and the elapsed time of the scan in jiffies. In our implementation,
  * we wait for firmware discovery to complete, then return 1.
  */
 int
@@ -9160,10 +9160,10 @@ scsih_init(void)
 
 	mpt3sas_base_initialize_callback_handler();
 
-	 /* queuecommand callback hander */
+	 /* queuecommand callback handler */
 	scsi_io_cb_idx = mpt3sas_base_register_callback_handler(_scsih_io_done);
 
-	/* task managment callback handler */
+	/* task management callback handler */
 	tm_cb_idx = mpt3sas_base_register_callback_handler(_scsih_tm_done);
 
 	/* base internal commands callback handler */

@@ -68,7 +68,7 @@ static int try_one_irq(struct irq_desc *desc, bool force)
 	raw_spin_lock(&desc->lock);
 
 	/*
-	 * PER_CPU, nested thread interrupts and interrupts explicitely
+	 * PER_CPU, nested thread interrupts and interrupts explicitly
 	 * marked polled are excluded from polling.
 	 */
 	if (irq_settings_is_per_cpu(desc) ||
@@ -78,7 +78,7 @@ static int try_one_irq(struct irq_desc *desc, bool force)
 
 	/*
 	 * Do not poll disabled interrupts unless the spurious
-	 * disabled poller asks explicitely.
+	 * disabled poller asks explicitly.
 	 */
 	if (irqd_irq_disabled(&desc->irq_data) && !force)
 		goto out;

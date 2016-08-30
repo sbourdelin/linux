@@ -220,7 +220,7 @@ config DM_MQ_DEFAULT
 	  This option enables the blk-mq based I/O path for request-based
 	  DM devices by default.  With the option the dm_mod.use_blk_mq
 	  module/boot option defaults to Y, without it to N, but it can
-	  still be overriden either way.
+	  still be overridden either way.
 
 	  If unsure say N.
 

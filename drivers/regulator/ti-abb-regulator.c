@@ -42,7 +42,7 @@
 /**
  * struct ti_abb_info - ABB information per voltage setting
  * @opp_sel:	one of TI_ABB macro
- * @vset:	(optional) vset value that LDOVBB needs to be overriden with.
+ * @vset:	(optional) vset value that LDOVBB needs to be overridden with.
  *
  * Array of per voltage entries organized in the same order as regulator_desc's
  * volt_table list. (selector is used to index from this array)
@@ -688,7 +688,7 @@ MODULE_DEVICE_TABLE(of, ti_abb_of_match);
  * @pdev: ABB platform device
  *
  * Initializes an individual ABB LDO for required Body-Bias. ABB is used to
- * addional bias supply to SoC modules for power savings or mandatory stability
+ * additional bias supply to SoC modules for power savings or mandatory stability
  * configuration at certain Operating Performance Points(OPPs).
  *
  * Return: 0 on success or appropriate error value when fails

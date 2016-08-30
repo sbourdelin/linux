@@ -98,7 +98,7 @@ struct knfsd_fh {
 #define	fh_fileid_type		fh_base.fh_new.fb_fileid_type
 #define	fh_fsid			fh_base.fh_new.fb_auth
 
-/* Do not use, provided for userspace compatiblity. */
+/* Do not use, provided for userspace compatibility. */
 #define	fh_auth			fh_base.fh_new.fb_auth
 
 #endif /* _UAPI_LINUX_NFSD_FH_H */

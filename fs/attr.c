@@ -33,7 +33,7 @@ int inode_change_ok(const struct inode *inode, struct iattr *attr)
 	unsigned int ia_valid = attr->ia_valid;
 
 	/*
-	 * First check size constraints.  These can't be overriden using
+	 * First check size constraints.  These can't be overridden using
 	 * ATTR_FORCE.
 	 */
 	if (ia_valid & ATTR_SIZE) {

@@ -1470,7 +1470,7 @@ static struct sparc32_cachetlb_ops viking_ops = {
  * flush resulting in corruption.
  *
  * Our workaround is to take a global spinlock around the TLB flushes,
- * which guarentees we won't ever have too many pending.  It's a big
+ * which guarantees we won't ever have too many pending.  It's a big
  * hammer, but a semaphore like system to make sure we only have N TLB
  * flushes going at once will require SMP locking anyways so there's
  * no real value in trying any harder than this.

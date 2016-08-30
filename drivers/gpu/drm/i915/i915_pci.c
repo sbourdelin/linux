@@ -465,8 +465,8 @@ static int __init i915_init(void)
 	bool use_kms = true;
 
 	/*
-	 * Enable KMS by default, unless explicitly overriden by
-	 * either the i915.modeset prarameter or by the
+	 * Enable KMS by default, unless explicitly overridden by
+	 * either the i915.modeset parameter or by the
 	 * vga_text_mode_force boot option.
 	 */
 

@@ -572,7 +572,7 @@ static int pti_char_open(struct inode *inode, struct file *filp)
  * pti_char_release()-  Close a char channel to the PTI device. Part
  * of the misc device implementation.
  *
- * @inode: Not used in this implementaiton.
+ * @inode: Not used in this implementation.
  * @filp:  Contains private_data that contains the master, channel
  *         ID to be released by the PTI device.
  *
@@ -671,7 +671,7 @@ static struct miscdevice pti_char_driver = {
 /**
  * pti_console_write()-  Write to the console that has been acquired.
  *
- * @c:   Not used in this implementaiton.
+ * @c:   Not used in this implementation.
  * @buf: Data to be written.
  * @len: Length of buf.
  */

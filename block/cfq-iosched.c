@@ -419,7 +419,7 @@ enum cfqq_state_flags {
 	CFQ_CFQQ_FLAG_slice_new,	/* no requests dispatched in slice */
 	CFQ_CFQQ_FLAG_sync,		/* synchronous queue */
 	CFQ_CFQQ_FLAG_coop,		/* cfqq is shared */
-	CFQ_CFQQ_FLAG_split_coop,	/* shared cfqq will be splitted */
+	CFQ_CFQQ_FLAG_split_coop,	/* shared cfqq will be split */
 	CFQ_CFQQ_FLAG_deep,		/* sync cfqq experienced large depth */
 	CFQ_CFQQ_FLAG_wait_busy,	/* Waiting for next request */
 };
@@ -1459,7 +1459,7 @@ static inline u64 cfq_cfqq_slice_usage(struct cfq_queue *cfqq,
 	if (!cfqq->slice_start || cfqq->slice_start == now) {
 		/*
 		 * Also charge the seek time incurred to the group, otherwise
-		 * if there are mutiple queues in the group, each can dispatch
+		 * if there are multiple queues in the group, each can dispatch
 		 * a single request on seeky media and cause lots of seek time
 		 * and group will never know it.
 		 */

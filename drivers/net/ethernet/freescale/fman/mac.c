@@ -933,7 +933,7 @@ static int mac_probe(struct platform_device *_of_dev)
 	/* pause frame autonegotiation enabled */
 	mac_dev->autoneg_pause = true;
 
-	/* By intializing the values to false, force FMD to enable PAUSE frames
+	/* By initializing the values to false, force FMD to enable PAUSE frames
 	 * on RX and TX
 	 */
 	mac_dev->rx_pause_req = true;

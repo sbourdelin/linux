@@ -395,10 +395,10 @@ static void iscsi_iser_cleanup_task(struct iscsi_task *task)
  * @task:     iscsi task
  * @sector:   error sector if exsists (output)
  *
- * Return: zero if no data-integrity errors have occured
- *         0x1: data-integrity error occured in the guard-block
- *         0x2: data-integrity error occured in the reference tag
- *         0x3: data-integrity error occured in the application tag
+ * Return: zero if no data-integrity errors have occurred
+ *         0x1: data-integrity error occurred in the guard-block
+ *         0x2: data-integrity error occurred in the reference tag
+ *         0x3: data-integrity error occurred in the application tag
  *
  *         In addition the error sector is marked.
  */
@@ -509,7 +509,7 @@ out:
  * iscsi_iser_conn_start() - start iscsi-iser connection
  * @cls_conn: iscsi class connection
  *
- * Notes: Here iser intialize (or re-initialize) stop_completion as
+ * Notes: Here iser initialize (or re-initialize) stop_completion as
  *        from this point iscsi must call conn_stop in session/connection
  *        teardown so iser transport must wait for it.
  */

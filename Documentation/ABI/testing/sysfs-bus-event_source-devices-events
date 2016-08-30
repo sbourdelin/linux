@@ -47,7 +47,7 @@ Description:	Per-pmu performance monitoring events specific to the running syste
 		If a <term> is specified alone (without an assigned value), it
 		is implied that 0x1 is assigned to that <term>.
 
-		Examples (each of these lines would be in a seperate file):
+		Examples (each of these lines would be in a separate file):
 
 			event=0x2abc
 			event=0x423,inv,cmask=0x3

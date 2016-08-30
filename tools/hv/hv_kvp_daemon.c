@@ -1098,7 +1098,7 @@ static int parse_ip_val_buffer(char *in_buf, int *offset,
 	char *start;
 
 	/*
-	 * in_buf has sequence of characters that are seperated by
+	 * in_buf has sequence of characters that are separated by
 	 * the character ';'. The last sequence does not have the
 	 * terminating ";" character.
 	 */

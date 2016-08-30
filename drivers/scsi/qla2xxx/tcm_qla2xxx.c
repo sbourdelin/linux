@@ -1459,13 +1459,13 @@ static int tcm_qla2xxx_check_initiator_node_acl(
 		return -EINVAL;
 	}
 	/*
-	 * Format the FCP Initiator port_name into colon seperated values to
-	 * match the format by tcm_qla2xxx explict ConfigFS NodeACLs.
+	 * Format the FCP Initiator port_name into colon separated values to
+	 * match the format by tcm_qla2xxx explicit ConfigFS NodeACLs.
 	 */
 	memset(&port_name, 0, 36);
 	snprintf(port_name, sizeof(port_name), "%8phC", fc_wwpn);
 	/*
-	 * Locate our struct se_node_acl either from an explict NodeACL created
+	 * Locate our struct se_node_acl either from an explicit NodeACL created
 	 * via ConfigFS, or via running in TPG demo mode.
 	 */
 	se_sess = target_alloc_session(&tpg->se_tpg, num_tags,
@@ -1738,7 +1738,7 @@ static struct se_wwn *tcm_qla2xxx_npiv_make_lport(
 
 	p = strchr(tmp, '@');
 	if (!p) {
-		pr_err("Unable to locate NPIV '@' seperator\n");
+		pr_err("Unable to locate NPIV '@' separator\n");
 		return ERR_PTR(-EINVAL);
 	}
 	*p++ = '\0';

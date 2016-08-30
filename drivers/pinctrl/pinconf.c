@@ -272,7 +272,7 @@ void pinconf_show_setting(struct seq_file *s,
 	}
 
 	/*
-	 * FIXME: We should really get the pin controler to dump the config
+	 * FIXME: We should really get the pin controller to dump the config
 	 * values, so they can be decoded to something meaningful.
 	 */
 	pinconf_show_config(s, pctldev, setting->data.configs.configs,

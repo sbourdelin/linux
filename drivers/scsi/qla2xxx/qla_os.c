@@ -6014,7 +6014,7 @@ qla2x00_module_init(void)
 		return ret;
 	} else if (ret > 0) {
 		/*
-		 * If initiator mode is explictly disabled by qlt_init(),
+		 * If initiator mode is explicitly disabled by qlt_init(),
 		 * prevent scsi_transport_fc.c:fc_scsi_scan_rport() from
 		 * performing scsi_scan_target() during LOOP UP event.
 		 */

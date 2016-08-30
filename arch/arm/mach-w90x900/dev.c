@@ -514,7 +514,7 @@ struct platform_device nuc900_device_ac97 = {
 	}
 };
 
-/*Here should be your evb resourse,such as LCD*/
+/* Here should be your evb resource, such as LCD */
 
 static struct platform_device *nuc900_public_dev[] __initdata = {
 	&nuc900_serial_device,

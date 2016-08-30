@@ -667,8 +667,9 @@ void mwifiex_update_ralist_tx_pause(struct mwifiex_private *priv, u8 *mac,
 	spin_unlock_irqrestore(&priv->wmm.ra_list_spinlock, flags);
 }
 
-/* This function update non-tdls peer ralist tx_pause while
- * tdls channel swithing
+/*
+ * This function updates non-tdls peer ralist tx_pause while
+ * tdls channel switching
  */
 void mwifiex_update_ralist_tx_pause_in_tdls_cs(struct mwifiex_private *priv,
 					       u8 *mac, u8 tx_pause)
@@ -1152,7 +1153,8 @@ found:
 	return ptr;
 }
 
-/* This functions rotates ra and bss lists so packets are picked round robin.
+/*
+ * This function rotates ra and bss lists so packets are picked round robin.
  *
  * After a packet is successfully transmitted, rotate the ra list, so the ra
  * next to the one transmitted, will come first in the list. This way we pick

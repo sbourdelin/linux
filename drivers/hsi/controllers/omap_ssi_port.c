@@ -1028,7 +1028,7 @@ static irqreturn_t ssi_wake_thread(int irq __maybe_unused, void *ssi_port)
 		 * In such a case if we have long interrupt latencies,
 		 * we can miss the low event or get twice a high event.
 		 * This workaround will avoid breaking the clock reference
-		 * count when such a situation ocurrs.
+		 * count when such a situation occurs.
 		 */
 		if (!test_and_set_bit(SSI_WAKE_EN, &omap_port->flags))
 			pm_runtime_get_sync(omap_port->pdev);

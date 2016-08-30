@@ -1146,7 +1146,7 @@ int tonga_construct_voltage_tables(struct pp_hwmgr *hwmgr)
 		result = tonga_get_svi2_vdd_ci_voltage_table(hwmgr,
 					pptable_info->vdd_dep_on_mclk);
 		PP_ASSERT_WITH_CODE((0 == result),
-			"Failed to retrieve SVI2 VDDCI table from dependancy table.", return result;);
+			"Failed to retrieve SVI2 VDDCI table from dependency table.", return result;);
 	}
 
 	if (TONGA_VOLTAGE_CONTROL_BY_SVID2 == data->vdd_gfx_control) {
@@ -1442,7 +1442,7 @@ static int tonga_populate_vr_config(struct pp_hwmgr *hwmgr,
 			config = VR_SVI2_PLANE_2;
 			table->VRConfig |= config;
 		} else {
-			printk(KERN_ERR "[ powerplay ] VDDC and VDDGFX should be both on SVI2 control in splitted mode! \n");
+			printk(KERN_ERR "[ powerplay ] VDDC and VDDGFX should be both on SVI2 control in split mode! \n");
 		}
 	} else {
 		/* Merged mode  */
@@ -2786,7 +2786,7 @@ static int tonga_setup_default_pcie_tables(struct pp_hwmgr *hwmgr)
 }
 
 /*
- * This function is to initalize all DPM state tables for SMU7 based on the dependency table.
+ * This function is to initialize all DPM state tables for SMU7 based on the dependency table.
  * Dynamic state patching function will then trim these state tables to the allowed range based
  * on the power policy or external client requests, such as UVD request, etc.
  */

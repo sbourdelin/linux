@@ -1277,7 +1277,7 @@ static void dwc2_set_param_hibernation(struct dwc2_hsotg *hsotg,
 }
 
 /*
- * This function is called during module intialization to pass module parameters
+ * This function is called during module initialization to pass module parameters
  * for the DWC_otg core.
  */
 void dwc2_set_parameters(struct dwc2_hsotg *hsotg,

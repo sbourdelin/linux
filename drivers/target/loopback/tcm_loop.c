@@ -553,7 +553,7 @@ static int tcm_loop_check_demo_mode_cache(struct se_portal_group *se_tpg)
 }
 
 /*
- * Allow I_T Nexus full READ-WRITE access without explict Initiator Node ACLs for
+ * Allow I_T Nexus full READ-WRITE access without explicit Initiator Node ACLs for
  * local virtual Linux/SCSI LLD passthrough into VM hypervisor guest
  */
 static int tcm_loop_check_demo_mode_write_protect(struct se_portal_group *se_tpg)
@@ -562,7 +562,7 @@ static int tcm_loop_check_demo_mode_write_protect(struct se_portal_group *se_tpg
 }
 
 /*
- * Because TCM_Loop does not use explict ACLs and MappedLUNs, this will
+ * Because TCM_Loop does not use explicit ACLs and MappedLUNs, this will
  * never be called for TCM_Loop by target_core_fabric_configfs.c code.
  * It has been added here as a nop for target_fabric_tf_ops_check()
  */

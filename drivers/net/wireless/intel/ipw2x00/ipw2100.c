@@ -1238,7 +1238,7 @@ static int ipw2100_get_hw_features(struct ipw2100_priv *priv)
 }
 
 /*
- * Start firmware execution after power on and intialization
+ * Start firmware execution after power on and initialization
  * The sequence is:
  *  1. Release ARC
  *  2. Wait for f/w initialization completes;
@@ -1277,7 +1277,7 @@ static int ipw2100_start_adapter(struct ipw2100_priv *priv)
 	/* Release ARC - clear reset bit */
 	write_register(priv->net_dev, IPW_REG_RESET_REG, 0);
 
-	/* wait for f/w intialization complete */
+	/* wait for f/w initialization complete */
 	IPW_DEBUG_FW("Waiting for f/w initialization to complete...\n");
 	i = 5000;
 	do {
@@ -5652,7 +5652,7 @@ static void shim__set_security(struct net_device *dev,
 
 /* As a temporary work around to enable WPA until we figure out why
  * wpa_supplicant toggles the security capability of the driver, which
- * forces a disassocation with force_update...
+ * forces a disassociation with force_update...
  *
  *	if (force_update || !(priv->status & STATUS_ASSOCIATED))*/
 	if (!(priv->status & (STATUS_ASSOCIATED | STATUS_ASSOCIATING)))
@@ -8164,7 +8164,7 @@ static struct iw_statistics *ipw2100_wx_wireless_stats(struct net_device *dev)
 	/* if hw is disabled, then ipw2100_get_ordinal() can't be called.
 	 * ipw2100_wx_wireless_stats seems to be called before fw is
 	 * initialized.  STATUS_ASSOCIATED will only be set if the hw is up
-	 * and associated; if not associcated, the values are all meaningless
+	 * and associated; if not associated, the values are all meaningless
 	 * anyway, so set them all to NULL and INVALID */
 	if (!(priv->status & STATUS_ASSOCIATED)) {
 		wstats->miss.beacon = 0;

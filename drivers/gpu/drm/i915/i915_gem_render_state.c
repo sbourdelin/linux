@@ -80,7 +80,7 @@ free_gem:
  * this is sufficient as the null state generator makes the final batch
  * with two passes to build command and state separately. At this point
  * the size of both are known and it compacts them by relocating the state
- * right after the commands taking care of aligment so we should sufficient
+ * right after the commands taking care of alignment so we should sufficient
  * space below them for adding new commands.
  */
 #define OUT_BATCH(batch, i, val)				\

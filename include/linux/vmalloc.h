@@ -23,7 +23,7 @@ struct notifier_block;		/* in notifier.h */
 
 /*
  * Maximum alignment for ioremap() regions.
- * Can be overriden by arch-specific value.
+ * Can be overridden by arch-specific value.
  */
 #ifndef IOREMAP_MAX_ORDER
 #define IOREMAP_MAX_ORDER	(7 + PAGE_SHIFT)	/* 128 pages */

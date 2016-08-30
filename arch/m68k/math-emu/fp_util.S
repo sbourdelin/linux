@@ -351,7 +351,7 @@ fp_e2e_small2:
 	bfins	%d0,(%a0){%d1,#8}
 #endif
 	jra	fp_e2e_checkround
-1:	neg.w	%d1			| lower lword is splitted between
+1:	neg.w	%d1			| lower lword is split between
 	bfins	%d0,(%a0){%d1,#32}	| higher and lower lword
 #ifndef CONFIG_M68KFPU_EMU_EXTRAPREC
 	jra	fp_e2e_checkround
@@ -390,7 +390,7 @@ fp_e2e_small3:
 	move.b	%d0,(7,%a0)
 	jra	fp_e2e_checkround
 #endif
-1:	move.l	%d0,%d1			| lower lword is splitted between
+1:	move.l	%d0,%d1			| lower lword is split between
 	lsl.l	%d2,%d0			| higher and lower lword
 	move.l	%d0,(%a0)
 	move.l	%d1,%d0
@@ -577,7 +577,7 @@ fp_ne_small2:
 	bfins	%d0,(%a0){%d1,#8}
 #endif
 	jra	fp_ne_checkround
-1:	neg.w	%d1			| lower lword is splitted between
+1:	neg.w	%d1			| lower lword is split between
 	bfins	%d0,(%a0){%d1,#32}	| higher and lower lword
 #ifndef CONFIG_M68KFPU_EMU_EXTRAPREC
 	jra	fp_ne_checkround
@@ -1012,7 +1012,7 @@ fp_ns_huge:
 	| fp_normalize_single_fast:
 	| normalize an extended with single (23-bit) precision
 	| this is only used by fsgldiv/fsgdlmul, where the
-	| operand is not completly normalized.
+	| operand is not completely normalized.
 	| args:	 %a0 (struct fp_ext *)
 
 fp_normalize_single_fast:

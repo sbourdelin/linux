@@ -3104,7 +3104,7 @@ static void gsmtty_set_termios(struct tty_struct *tty, struct ktermios *old)
 	if (dlci->state == DLCI_CLOSED)
 		return;
 	/* For the moment its fixed. In actual fact the speed information
-	   for the virtual channel can be propogated in both directions by
+	   for the virtual channel can be propagated in both directions by
 	   the RPN control message. This however rapidly gets nasty as we
 	   then have to remap modem signals each way according to whether
 	   our virtual cable is null modem etc .. */

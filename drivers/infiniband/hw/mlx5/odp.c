@@ -711,7 +711,7 @@ void mlx5_ib_qp_disable_pagefaults(struct mlx5_ib_qp *qp)
 	spin_unlock_irqrestore(&qp->disable_page_faults_lock, flags);
 
 	/*
-	 * Note that at this point, we are guarenteed that no more
+	 * Note that at this point, we are guaranteed that no more
 	 * work queue elements will be posted to the work queue with
 	 * the QP we are closing.
 	 */

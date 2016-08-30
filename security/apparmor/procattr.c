@@ -49,7 +49,7 @@ int aa_getprocattr(struct aa_profile *profile, char **string)
 	ns_name = aa_ns_name(current_ns, ns);
 	ns_len = strlen(ns_name);
 
-	/* if the visible ns_name is > 0 increase size for : :// seperator */
+	/* if the visible ns_name is > 0 increase size for : :// separator */
 	if (ns_len)
 		ns_len += 4;
 
@@ -150,7 +150,7 @@ int aa_setprocattr_changehat(char *args, size_t size, int test)
 
 /**
  * aa_setprocattr_changeprofile - handle procattr interface to changeprofile
- * @fqname: args received from writting to /proc/<pid>/attr/current (NOT NULL)
+ * @fqname: args received from writing to /proc/<pid>/attr/current (NOT NULL)
  * @onexec: true if change_profile should be delayed until exec
  * @test: true if this is a test of change_profile permissions
  *

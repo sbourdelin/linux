@@ -268,7 +268,8 @@ int qed_vf_hw_prepare(struct qed_hwfn *p_hwfn)
 	struct qed_vf_iov *p_iov;
 	u32 reg;
 
-	/* Set number of hwfns - might be overriden once leading hwfn learns
+	/*
+	 * Set number of hwfns - might be overridden once leading hwfn learns
 	 * actual configuration from PF.
 	 */
 	if (IS_LEAD_HWFN(p_hwfn))

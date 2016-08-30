@@ -15,7 +15,7 @@ config UBSAN_SANITIZE_ALL
 	depends on ARCH_HAS_UBSAN_SANITIZE_ALL
 
 	# We build with -Wno-maybe-uninitilzed, but we still want to
-	# use -Wmaybe-uninitilized in allmodconfig builds.
+	# use -Wmaybe-uninitialized in allmodconfig builds.
 	# So dependsy bellow used to disable this option in allmodconfig
 	depends on !COMPILE_TEST
 	default y

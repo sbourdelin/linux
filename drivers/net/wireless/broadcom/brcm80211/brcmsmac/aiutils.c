@@ -453,7 +453,7 @@ ai_buscore_setup(struct si_info *sii, struct bcma_device *cc)
 	/* get chipcommon chipstatus */
 	sii->chipst = bcma_read32(cc, CHIPCREGOFFS(chipstatus));
 
-	/* get chipcommon capabilites */
+	/* get chipcommon capabilities */
 	sii->pub.cccaps = bcma_read32(cc, CHIPCREGOFFS(capabilities));
 
 	/* get pmu rev and caps */

@@ -980,7 +980,7 @@ static int ks7010_sdio_probe(struct sdio_func *func,
 	priv = NULL;
 	netdev = NULL;
 
-	/* initilize ks_sdio_card */
+	/* initialize ks_sdio_card */
 	card = kzalloc(sizeof(struct ks_sdio_card), GFP_KERNEL);
 	if (!card)
 		return -ENOMEM;

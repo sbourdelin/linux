@@ -43,7 +43,7 @@
  * Chunks can be determined from the address using the index field
  * in the page struct. The index field contains a pointer to the chunk.
  *
- * To use this allocator, arch code should do the followings.
+ * To use this allocator, arch code should do the following:
  *
  * - define __addr_to_pcpu_ptr() and __pcpu_ptr_to_addr() to translate
  *   regular address to percpu pointer and back if they need to be
@@ -385,7 +385,7 @@ static void pcpu_chunk_relocate(struct pcpu_chunk *chunk, int oslot)
  * considered; however, async extension is scheduled if the left amount is
  * low.  If !@is_atomic, it aims for more empty space.  Combined, this
  * ensures that the map is likely to have enough available space to
- * accomodate atomic allocations which can't extend maps directly.
+ * accommodate atomic allocations which can't extend maps directly.
  *
  * CONTEXT:
  * pcpu_lock.

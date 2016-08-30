@@ -593,7 +593,7 @@ static uint8_t fsl_ifc_read_byte(struct mtd_info *mtd)
 
 /*
  * Read two bytes from the IFC hardware buffer
- * read function for 16-bit buswith
+ * read function for 16-bit buswidth
  */
 static uint8_t fsl_ifc_read_byte16(struct mtd_info *mtd)
 {

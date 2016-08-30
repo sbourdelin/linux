@@ -610,8 +610,8 @@ static int get_num_ver(int mode, struct tree_balance *tb, int h,
  *	h	current level of the node;
  *	lnum	number of items from S[h] that must be shifted to L[h];
  *	rnum	number of items from S[h] that must be shifted to R[h];
- *	blk_num	number of blocks that S[h] will be splitted into;
- *	s012	number of items that fall into splitted nodes.
+ *	blk_num	number of blocks that S[h] will be split into;
+ *	s012	number of items that fall into split nodes.
  *	lbytes	number of bytes which flow to the left neighbor from the
  *              item that is not not shifted entirely
  *	rbytes	number of bytes which flow to the right neighbor from the
@@ -1545,7 +1545,7 @@ static int ip_check_balance(struct tree_balance *tb, int h)
 		 * l_shift_num first items and l_shift_bytes of the right
 		 * most liquid item to be shifted are shifted to the left
 		 * neighbor, as well as number of items in each part of the
-		 * splitted node (s012 numbers), and number of bytes
+		 * split node (s012 numbers), and number of bytes
 		 * (s1bytes) of the shared drop which flow to S1 if any
 		 */
 		lset = LEFT_SHIFT_NO_FLOW;
@@ -1569,7 +1569,7 @@ static int ip_check_balance(struct tree_balance *tb, int h)
 		 * calculate number of blocks S[h] must be split into when
 		 * r_shift_num first items and r_shift_bytes of the left most
 		 * liquid item to be shifted are shifted to the right neighbor,
-		 * as well as number of items in each part of the splitted
+		 * as well as number of items in each part of the split
 		 * node (s012 numbers), and number of bytes (s1bytes) of the
 		 * shared drop which flow to S1 if any
 		 */
@@ -1599,7 +1599,7 @@ static int ip_check_balance(struct tree_balance *tb, int h)
 		/*
 		 * calculate number of blocks S[h] must be split into when
 		 * items are shifted in both directions, as well as number
-		 * of items in each part of the splitted node (s012 numbers),
+		 * of items in each part of the split node (s012 numbers),
 		 * and number of bytes (s1bytes) of the shared drop which
 		 * flow to S1 if any
 		 */

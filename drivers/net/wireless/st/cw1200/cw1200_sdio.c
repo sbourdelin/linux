@@ -63,7 +63,7 @@ static const struct sdio_device_id cw1200_sdio_ids[] = {
 	{ /* end: all zeroes */			},
 };
 
-/* hwbus_ops implemetation */
+/* hwbus_ops implementation */
 
 static int cw1200_sdio_memcpy_fromio(struct hwbus_priv *self,
 				     unsigned int addr,

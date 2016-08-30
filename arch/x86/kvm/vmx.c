@@ -256,7 +256,7 @@ struct __packed vmcs12 {
 	/*
 	 * To allow migration of L1 (complete with its L2 guests) between
 	 * machines of different natural widths (32 or 64 bit), we cannot have
-	 * unsigned long fields with no explict size. We use u64 (aliased
+	 * unsigned long fields with no explicit size. We use u64 (aliased
 	 * natural_width) instead. Luckily, x86 is little-endian.
 	 */
 	natural_width cr0_guest_host_mask;

@@ -10,7 +10,7 @@
 #include "sysfs.h"
 
 /*
- * We keep absolute totals of various statistics, and addionally a set of three
+ * We keep absolute totals of various statistics, and additionally a set of three
  * rolling averages.
  *
  * Every so often, a timer goes off and rescales the rolling averages.

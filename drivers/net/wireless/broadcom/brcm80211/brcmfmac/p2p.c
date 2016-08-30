@@ -660,7 +660,7 @@ static s32 brcmf_p2p_escan(struct brcmf_p2p_info *p2p, u32 num_chans,
 	switch (search_state) {
 	case WL_P2P_DISC_ST_SEARCH:
 		/*
-		 * If we in SEARCH STATE, we don't need to set SSID explictly
+		 * If we in SEARCH STATE, we don't need to set SSID explicitly
 		 * because dongle use P2P WILDCARD internally by default, use
 		 * null ssid, which it is already due to kzalloc.
 		 */
