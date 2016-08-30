@@ -666,8 +666,8 @@ int i915_wait_request(struct drm_i915_gem_request *req,
 	if (i915_spin_request(req, state, 5))
 		goto complete;
 
-	set_current_state(state);
-	add_wait_queue(&req->i915->gpu_error.wait_queue, &reset);
+	if (flags & I915_WAIT_LOCKED)
+		add_wait_queue(&req->i915->gpu_error.wait_queue, &reset);
 
 	intel_wait_init(&wait, req->fence.seqno);
 	if (intel_engine_add_wait(req->engine, &wait))
@@ -692,9 +692,9 @@ int i915_wait_request(struct drm_i915_gem_request *req,
 		if (intel_wait_complete(&wait))
 			break;
 
+wakeup:
 		set_current_state(state);
 
-wakeup:
 		/* Carefully check if the request is complete, giving time
 		 * for the seqno to be visible following the interrupt.
 		 * We also have to check in case we are kicked by the GPU
@@ -703,11 +703,32 @@ wakeup:
 		if (__i915_request_irq_complete(req))
 			break;
 
+		/* If the GPU is hung, and we hold the lock, reset the GPU
+		 * and then check for completion. On a full reset, the engine's
+		 * HW seqno will be advanced passed us and we are complete.
+		 * If we do a partial reset, we have to wait for the GPU to
+		 * resume and update the breadcrumb.
+		 *
+		 * If we don't hold the mutex, we can just wait for the worker
+		 * to come along and update the breadcrumb (either directly
+		 * itself, or indirectly by recovering the GPU).
+		 */
+		if (flags & I915_WAIT_LOCKED &&
+		    i915_reset_in_progress(&req->i915->gpu_error)) {
+			__set_current_state(TASK_RUNNING);
+			if (!i915_reset(req->i915))
+				goto wakeup;
+
+			break;
+		}
+
 		/* Only spin if we know the GPU is processing this request */
 		if (i915_spin_request(req, state, 2))
 			break;
 	}
-	remove_wait_queue(&req->i915->gpu_error.wait_queue, &reset);
+
+	if (flags & I915_WAIT_LOCKED)
+		remove_wait_queue(&req->i915->gpu_error.wait_queue, &reset);
 
 	intel_engine_remove_wait(req->engine, &wait);
 	__set_current_state(TASK_RUNNING);
