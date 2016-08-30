@@ -71,7 +71,7 @@ static void setChipClock(unsigned int frequency)
 		pll.clockType = MXCLK_PLL;
 
 		/*
-		* Call calcPllValue() to fill up the other fields for PLL structure.
+		* Call calcPllValue() to fill the other fields of PLL structure.
 		* Sometime, the chip cannot set up the exact clock required by User.
 		* Return value from calcPllValue() gives the actual possible clock.
 		*/
