@@ -48,7 +48,6 @@ static bool add_fib_rules = true;
 
 struct net_vrf {
 	struct rtable __rcu	*rth_local;
-	struct rt6_info	__rcu	*rt6;
 	struct rt6_info	__rcu	*rt6_local;
 	u32                     tb_id;
 };
@@ -289,25 +288,11 @@ static struct sk_buff *vrf_ip6_out(struct net_device *vrf_dev,
 /* holding rtnl */
 static void vrf_rt6_release(struct net_device *dev, struct net_vrf *vrf)
 {
-	struct rt6_info *rt6 = rtnl_dereference(vrf->rt6);
 	struct rt6_info *rt6_local = rtnl_dereference(vrf->rt6_local);
 	struct net *net = dev_net(dev);
 	struct dst_entry *dst;
 
-	RCU_INIT_POINTER(vrf->rt6, NULL);
-	RCU_INIT_POINTER(vrf->rt6_local, NULL);
-	synchronize_rcu();
-
-	/* move dev in dst's to loopback so this VRF device can be deleted
-	 * - based on dst_ifdown
-	 */
-	if (rt6) {
-		dst = &rt6->dst;
-		dev_put(dst->dev);
-		dst->dev = net->loopback_dev;
-		dev_hold(dst->dev);
-		dst_release(dst);
-	}
+	rcu_assign_pointer(vrf->rt6_local, NULL);
 
 	if (rt6_local) {
 		if (rt6_local->rt6i_idev)
@@ -327,7 +312,7 @@ static int vrf_rt6_create(struct net_device *dev)
 	struct net_vrf *vrf = netdev_priv(dev);
 	struct net *net = dev_net(dev);
 	struct fib6_table *rt6i_table;
-	struct rt6_info *rt6, *rt6_local;
+	struct rt6_info *rt6_local;
 	int rc = -ENOMEM;
 
 	/* IPv6 can be CONFIG enabled and then disabled runtime */
@@ -338,24 +323,12 @@ static int vrf_rt6_create(struct net_device *dev)
 	if (!rt6i_table)
 		goto out;
 
-	/* create a dst for routing packets out a VRF device */
-	rt6 = ip6_dst_alloc(net, dev, flags);
-	if (!rt6)
-		goto out;
-
-	dst_hold(&rt6->dst);
-
-	rt6->rt6i_table = rt6i_table;
-	rt6->dst.output	= vrf_output6;
-
 	/* create a dst for local routing - packets sent locally
 	 * to local address via the VRF device as a loopback
 	 */
 	rt6_local = ip6_dst_alloc(net, dev, flags);
-	if (!rt6_local) {
-		dst_release(&rt6->dst);
+	if (!rt6_local)
 		goto out;
-	}
 
 	dst_hold(&rt6_local->dst);
 
@@ -364,7 +337,6 @@ static int vrf_rt6_create(struct net_device *dev)
 	rt6_local->rt6i_table = rt6i_table;
 	rt6_local->dst.input  = ip6_input;
 
-	rcu_assign_pointer(vrf->rt6, rt6);
 	rcu_assign_pointer(vrf->rt6_local, rt6_local);
 
 	rc = 0;
@@ -693,7 +665,7 @@ static struct rt6_info *vrf_ip6_route_lookup(struct net *net,
 	rcu_read_lock();
 
 	/* fib6_table does not have a refcnt and can not be freed */
-	rt6 = rcu_dereference(vrf->rt6);
+	rt6 = rcu_dereference(vrf->rt6_local);
 	if (likely(rt6))
 		table = rt6->rt6i_table;
 
@@ -816,66 +788,10 @@ static struct sk_buff *vrf_l3_rcv(struct net_device *vrf_dev,
 	return skb;
 }
 
-#if IS_ENABLED(CONFIG_IPV6)
-static struct dst_entry *vrf_get_rt6_dst(const struct net_device *dev,
-					 struct flowi6 *fl6)
-{
-	bool need_strict = rt6_need_strict(&fl6->daddr);
-	struct net_vrf *vrf = netdev_priv(dev);
-	struct net *net = dev_net(dev);
-	struct dst_entry *dst = NULL;
-	struct rt6_info *rt;
-
-	/* send to link-local or multicast address */
-	if (need_strict) {
-		int flags = RT6_LOOKUP_F_IFACE;
-
-		/* VRF device does not have a link-local address and
-		 * sending packets to link-local or mcast addresses over
-		 * a VRF device does not make sense
-		 */
-		if (fl6->flowi6_oif == dev->ifindex) {
-			struct dst_entry *dst = &net->ipv6.ip6_null_entry->dst;
-
-			dst_hold(dst);
-			return dst;
-		}
-
-		if (!ipv6_addr_any(&fl6->saddr))
-			flags |= RT6_LOOKUP_F_HAS_SADDR;
-
-		rt = vrf_ip6_route_lookup(net, dev, fl6, fl6->flowi6_oif, flags);
-		if (rt)
-			dst = &rt->dst;
-
-	} else if (!(fl6->flowi6_flags & FLOWI_FLAG_L3MDEV_SRC)) {
-
-		rcu_read_lock();
-
-		rt = rcu_dereference(vrf->rt6);
-		if (likely(rt)) {
-			dst = &rt->dst;
-			dst_hold(dst);
-		}
-
-		rcu_read_unlock();
-	}
-
-	/* make sure oif is set to VRF device for lookup */
-	if (!need_strict)
-		fl6->flowi6_oif = dev->ifindex;
-
-	return dst;
-}
-#endif
-
 static const struct l3mdev_ops vrf_l3mdev_ops = {
 	.l3mdev_fib_table	= vrf_fib_table,
 	.l3mdev_l3_rcv		= vrf_l3_rcv,
 	.l3mdev_l3_out		= vrf_l3_out,
-#if IS_ENABLED(CONFIG_IPV6)
-	.l3mdev_get_rt6_dst	= vrf_get_rt6_dst,
-#endif
 };
 
 static void vrf_get_drvinfo(struct net_device *dev,

@@ -22,8 +22,6 @@
  * @l3mdev_l3_rcv:    Hook in L3 receive path
  *
  * @l3mdev_l3_out:    Hook in L3 output path
- *
- * @l3mdev_get_rt6_dst: Get cached IPv6 rt6_info (dst_entry) for device
  */
 
 struct l3mdev_ops {
@@ -33,10 +31,6 @@ struct l3mdev_ops {
 	struct sk_buff * (*l3mdev_l3_out)(struct net_device *dev,
 					  struct sock *sk, struct sk_buff *skb,
 					  u16 proto);
-
-	/* IPv6 ops */
-	struct dst_entry * (*l3mdev_get_rt6_dst)(const struct net_device *dev,
-						 struct flowi6 *fl6);
 };
 
 #ifdef CONFIG_NET_L3_MASTER_DEV
@@ -153,8 +147,6 @@ static inline bool netif_index_is_l3_master(struct net *net, int ifindex)
 	return rc;
 }
 
-struct dst_entry *l3mdev_get_rt6_dst(struct net *net, struct flowi6 *fl6);
-
 static inline
 struct sk_buff *l3mdev_l3_rcv(struct sk_buff *skb, u16 proto)
 {
@@ -257,12 +249,6 @@ static inline u32 l3mdev_fib_table_by_index(struct net *net, int ifindex)
 static inline bool netif_index_is_l3_master(struct net *net, int ifindex)
 {
 	return false;
-}
-
-static inline
-struct dst_entry *l3mdev_get_rt6_dst(struct net *net, struct flowi6 *fl6)
-{
-	return NULL;
 }
 
 static inline
