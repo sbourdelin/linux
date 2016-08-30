@@ -144,8 +144,9 @@ static void setMasterClock(unsigned int frequency)
 		return;
 
 	if (frequency) {
-		/* Set the frequency to the maximum frequency that the SM750 engine can
-		run, which is about 190 MHz. */
+		/* Set the frequency to the maximum frequency
+		 * that the SM750 engine can run, which is about 190 MHz.
+		*/
 		if (frequency > MHz(190))
 			frequency = MHz(190);
 
