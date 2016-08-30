@@ -230,7 +230,6 @@ static void intel_engine_init_requests(struct intel_engine_cs *engine)
  */
 void intel_engine_setup_common(struct intel_engine_cs *engine)
 {
-	INIT_LIST_HEAD(&engine->buffers);
 	INIT_LIST_HEAD(&engine->execlist_queue);
 	spin_lock_init(&engine->execlist_lock);
 

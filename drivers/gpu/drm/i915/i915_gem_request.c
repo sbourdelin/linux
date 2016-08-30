@@ -716,7 +716,7 @@ wakeup:
 		if (flags & I915_WAIT_LOCKED &&
 		    i915_reset_in_progress(&req->i915->gpu_error)) {
 			__set_current_state(TASK_RUNNING);
-			if (!i915_reset(req->i915))
+			if (i915_reset(req->i915))
 				goto wakeup;
 
 			break;
