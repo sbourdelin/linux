@@ -316,6 +316,25 @@ static int i915_gem_get_seqno(struct drm_i915_private *dev_priv, u32 *seqno)
 	return 0;
 }
 
+static int __i915_sw_fence_call
+submit_notify(struct i915_sw_fence *fence, enum i915_sw_fence_notify state)
+{
+	struct drm_i915_gem_request *request =
+		container_of(fence, typeof(*request), submit);
+
+	switch (state) {
+	case FENCE_COMPLETE:
+		request->engine->submit_request(request);
+		break;
+
+	case FENCE_FREE:
+		i915_gem_request_put(request);
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
 /**
  * i915_gem_request_alloc - allocate a request structure
  *
@@ -412,6 +431,8 @@ i915_gem_request_alloc(struct intel_engine_cs *engine,
 	 * away, e.g. because a GPU scheduler has deferred it.
 	 */
 	req->reserved_space = MIN_SPACE_FOR_ADD_REQUEST;
+
+	i915_sw_fence_init(&i915_gem_request_get(req)->submit, submit_notify);
 
 	if (i915.enable_execlists)
 		ret = intel_logical_ring_alloc_request_extras(req);
@@ -528,7 +549,10 @@ void __i915_add_request(struct drm_i915_gem_request *request, bool flush_caches)
 		  reserved_tail, ret);
 
 	i915_gem_mark_busy(engine);
-	engine->submit_request(request);
+
+	local_bh_disable();
+	i915_sw_fence_commit(&request->submit);
+	local_bh_enable(); /* Kick the execlists tasklet if just scheduled */
 }
 
 static unsigned long local_clock_us(unsigned int *cpu)
