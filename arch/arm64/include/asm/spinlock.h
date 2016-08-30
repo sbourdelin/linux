@@ -113,7 +113,7 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
 	 */
 "	sevl\n"
 "2:	wfe\n"
-"	ldaxrh	%w2, %4\n"
+"	ldrh	%w2, %4\n"
 "	eor	%w1, %w2, %w0, lsr #16\n"
 "	cbnz	%w1, 2b\n"
 	/* We got the lock. Critical section starts here. */
