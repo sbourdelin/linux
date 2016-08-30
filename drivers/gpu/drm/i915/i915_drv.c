@@ -362,6 +362,9 @@ static int i915_getparam(struct drm_device *dev, void *data,
 		 */
 		value = i915_gem_mmap_gtt_version();
 		break;
+	case I915_PARAM_HAS_EXEC_ASYNC:
+		value = 1;
+		break;
 	default:
 		DRM_DEBUG("Unknown parameter %d\n", param->param);
 		return -EINVAL;
