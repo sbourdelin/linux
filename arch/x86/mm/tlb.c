@@ -140,10 +140,24 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 	}
 #ifdef CONFIG_SMP
 	  else {
+		int *tlbstate = this_cpu_ptr(&cpu_tlbstate.state);
+		int oldstate = *tlbstate;
+
+		if (unlikely(oldstate == TLBSTATE_LAZY)) {
+			/*
+			 * The TLB flush code (lazy_tlb_can_skip_flush) can
+			 * move the TLB state to TLBSTATE_FLUSH concurrently
+			 * with a context switch. Using cmpxchg here will catch
+			 * that transition, causing a TLB flush below.
+			 */
+			oldstate = cmpxchg(tlbstate, oldstate, TLBSTATE_OK);
+		}
 		this_cpu_write(cpu_tlbstate.state, TLBSTATE_OK);
+
 		BUG_ON(this_cpu_read(cpu_tlbstate.active_mm) != next);
 
-		if (!cpumask_test_cpu(cpu, mm_cpumask(next))) {
+		if (oldstate == TLBSTATE_FLUSH ||
+				!cpumask_test_cpu(cpu, mm_cpumask(next))) {
 			/*
 			 * On established mms, the mm_cpumask is only changed
 			 * from irq context, from ptep_clear_flush() while in
@@ -242,11 +256,44 @@ static void flush_tlb_func(void *info)
 
 }
 
-void native_flush_tlb_others(const struct cpumask *cpumask,
+/*
+ * Determine whether a CPU's TLB needs to be flushed now, or whether the
+ * flush can be delayed until the next context switch, by changing the
+ * tlbstate from TLBSTATE_LAZY to TLBSTATE_FLUSH.
+ */
+static bool lazy_tlb_can_skip_flush(int cpu)
+{
+	int *tlbstate = &per_cpu(cpu_tlbstate.state, cpu);
+	int old;
+
+	switch (*tlbstate) {
+	case TLBSTATE_FLUSH:
+		/* The TLB will be flushed on the next context switch. */
+		return true;
+	case TLBSTATE_LAZY:
+		/*
+		 * The CPU is in TLBSTATE_LAZY, which could context switch back
+		 * to TLBSTATE_OK, re-using the old TLB state without a flush.
+		 * If that happened, send a TLB flush IPI.
+		 *
+		 * Otherwise, the state is now TLBSTATE_FLUSH, and TLB will
+		 * be flushed at the next context switch. Skip the IPI.
+		 */
+		old = cmpxchg(tlbstate, TLBSTATE_LAZY, TLBSTATE_FLUSH);
+		return old != TLBSTATE_OK;
+	case TLBSTATE_OK:
+	default:
+		/* A task on the CPU is actively using the mm. Flush the TLB. */
+		return false;
+	}
+}
+
+void native_flush_tlb_others(struct cpumask *cpumask,
 				 struct mm_struct *mm, unsigned long start,
 				 unsigned long end)
 {
 	struct flush_tlb_info info;
+	unsigned int cpu;
 
 	if (end == 0)
 		end = start + PAGE_SIZE;
@@ -262,8 +309,6 @@ void native_flush_tlb_others(const struct cpumask *cpumask,
 				(end - start) >> PAGE_SHIFT);
 
 	if (is_uv_system()) {
-		unsigned int cpu;
-
 		cpu = smp_processor_id();
 		cpumask = uv_flush_tlb_others(cpumask, mm, start, end, cpu);
 		if (cpumask)
@@ -271,6 +316,17 @@ void native_flush_tlb_others(const struct cpumask *cpumask,
 								&info, 1);
 		return;
 	}
+
+	/*
+	 * Instead of sending IPIs to CPUs in lazy TLB mode, move that
+	 * CPU's TLB state to TLBSTATE_FLUSH, causing the TLB to be flushed
+	 * at the next context switch.
+	 */
+	for_each_cpu(cpu, cpumask) {
+		if (lazy_tlb_can_skip_flush(cpu))
+			cpumask_clear_cpu(cpu, cpumask);
+	}
+
 	smp_call_function_many(cpumask, flush_tlb_func, &info, 1);
 }
 

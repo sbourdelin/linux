@@ -311,12 +311,13 @@ extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
 
 #define flush_tlb()	flush_tlb_current_task()
 
-void native_flush_tlb_others(const struct cpumask *cpumask,
+void native_flush_tlb_others(struct cpumask *cpumask,
 				struct mm_struct *mm,
 				unsigned long start, unsigned long end);
 
 #define TLBSTATE_OK	1
 #define TLBSTATE_LAZY	2
+#define TLBSTATE_FLUSH	3
 
 static inline void reset_lazy_tlbstate(void)
 {
