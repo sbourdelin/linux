@@ -65,11 +65,12 @@ $(obj)/virtex405-head.o: BOOTAFLAGS += -mcpu=405
 
 # the kernel's version of zlib pulls in a lot of other kernel headers
 # which we don't provide inside the wrapper.
+zlib-decomp-$(CONFIG_KERNEL_GZIP) := decompress_inflate.c
 zlib-$(CONFIG_KERNEL_GZIP) := inffast.c inflate.c inftrees.c
 zlibheaders-$(CONFIG_KERNEL_GZIP) := inffast.h inffixed.h inflate.h inftrees.h infutil.h
 zliblinuxheader-$(CONFIG_KERNEL_GZIP) := zlib.h zconf.h zutil.h
 
-$(addprefix $(obj)/,$(zlib-y) cuboot-c2k.o gunzip_util.o main.o): \
+$(addprefix $(obj)/,$(zlib-y) cuboot-c2k.o decompress.o main.o): \
 	$(addprefix $(obj)/,$(zliblinuxheader-y)) \
 	$(addprefix $(obj)/,$(zlibheaders-y)) \
 	$(addprefix $(obj)/,$(zlib-decomp-y))
@@ -80,10 +81,10 @@ libfdtheader := fdt.h libfdt.h libfdt_internal.h
 $(addprefix $(obj)/,$(libfdt) libfdt-wrapper.o simpleboot.o epapr.o opal.o): \
 	$(addprefix $(obj)/,$(libfdtheader))
 
-src-wlib-y := string.S crt0.S crtsavres.S stdio.c main.c \
+src-wlib-y := string.S crt0.S crtsavres.S stdio.c decompress.c main.c \
 		$(libfdt) libfdt-wrapper.c \
 		ns16550.c serial.c simple_alloc.c div64.S util.S \
-		gunzip_util.c elf_util.c $(zlib-y) devtree.c stdlib.c \
+		decompress.o elf_util.c $(zlib-y) devtree.c stdlib.c \
 		oflib.c ofconsole.c cuboot.c mpsc.c cpm-serial.c \
 		uartlite.c mpc52xx-psc.c opal.c opal-calls.S
 src-wlib-$(CONFIG_40x) += 4xx.c planetcore.c
@@ -142,6 +143,9 @@ $(addprefix $(obj)/,$(zlibheaders-y)): $(obj)/%: $(srctree)/lib/zlib_inflate/%
 	$(call cmd,copy_kern_src)
 
 $(addprefix $(obj)/,$(zliblinuxheader-y)): $(obj)/%: $(srctree)/include/linux/%
+	$(call cmd,copy_kern_src)
+
+$(addprefix $(obj)/,$(zlib-decomp-y)): $(obj)/%: $(srctree)/lib/%
 	$(call cmd,copy_kern_src)
 
 quiet_cmd_copy_libfdt = COPY    $@
