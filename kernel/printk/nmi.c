@@ -39,6 +39,7 @@
  * were handled or when IRQs are blocked.
  */
 DEFINE_PER_CPU(printk_func_t, printk_func) = vprintk_default;
+DEFINE_PER_CPU(printk_func_t, printk_func_saved);
 static int printk_nmi_irq_ready;
 atomic_t nmi_message_lost;
 
@@ -251,10 +252,16 @@ void __init printk_nmi_init(void)
 
 void printk_nmi_enter(void)
 {
+	printk_func_t func = this_cpu_read(printk_func);
+
+	if (func != vprintk_nmi)
+		this_cpu_write(printk_func_saved, func);
 	this_cpu_write(printk_func, vprintk_nmi);
 }
 
 void printk_nmi_exit(void)
 {
-	this_cpu_write(printk_func, vprintk_default);
+	printk_func_t func = this_cpu_read(printk_func_saved);
+
+	this_cpu_write(printk_func, func);
 }
