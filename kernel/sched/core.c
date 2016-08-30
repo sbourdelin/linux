@@ -2016,6 +2016,17 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	success = 1; /* we're going to change ->state */
 	cpu = task_cpu(p);
 
+	/*
+	 * Ensure we see on_rq and p_state consistently
+	 *
+	 * For example in __rwsem_down_write_failed(), we have
+	 *    [S] ->on_rq = 1				[L] ->state
+	 *    MB					 RMB
+	 *    [S] ->state = TASK_UNINTERRUPTIBLE	[L] ->on_rq
+	 * In the absence of the RMB p->on_rq can be observed to be 0
+	 * and we end up spinning indefinitely in while (p->on_cpu)
+	 */
+	smp_rmb();
 	if (p->on_rq && ttwu_remote(p, wake_flags))
 		goto stat;
 
