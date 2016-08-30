@@ -59,6 +59,7 @@ struct qce_sha_reqctx {
 	u64 count;
 	bool first_blk;
 	bool last_blk;
+	bool finalized;
 	struct scatterlist sg[2];
 	u8 *authkey;
 	unsigned int authklen;

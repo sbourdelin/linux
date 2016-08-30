@@ -139,6 +139,7 @@ static int qce_ahash_init(struct ahash_request *req)
 	rctx->first_blk = true;
 	rctx->last_blk = false;
 	rctx->flags = tmpl->alg_flags;
+	rctx->finalized = false;
 	memcpy(rctx->digest, std_iv, sizeof(rctx->digest));
 
 	return 0;
@@ -314,7 +315,12 @@ static int qce_ahash_final(struct ahash_request *req)
 	if (!rctx->buflen)
 		return 0;
 
+	/* If hash is already been finalized, don't do anything */
+	if (rctx->finalized)
+		return 0;
+
 	rctx->last_blk = true;
+	rctx->finalized = true;
 
 	rctx->src_orig = req->src;
 	rctx->nbytes_orig = req->nbytes;
