@@ -731,9 +731,6 @@ struct vmbus_channel {
 
 	struct vmbus_close_msg close_msg;
 
-	/* Channel callback are invoked in this workqueue context */
-	/* HANDLE dataWorkQueue; */
-
 	void (*onchannel_callback)(void *context);
 	void *channel_callback_context;
 
