@@ -47,7 +47,6 @@
 static bool add_fib_rules = true;
 
 struct net_vrf {
-	struct rtable __rcu	*rth;
 	struct rtable __rcu	*rth_local;
 	struct rt6_info	__rcu	*rt6;
 	struct rt6_info	__rcu	*rt6_local;
@@ -460,26 +459,16 @@ static struct sk_buff *vrf_l3_out(struct net_device *vrf_dev,
 /* holding rtnl */
 static void vrf_rtable_release(struct net_device *dev, struct net_vrf *vrf)
 {
-	struct rtable *rth = rtnl_dereference(vrf->rth);
 	struct rtable *rth_local = rtnl_dereference(vrf->rth_local);
 	struct net *net = dev_net(dev);
 	struct dst_entry *dst;
 
-	RCU_INIT_POINTER(vrf->rth, NULL);
 	RCU_INIT_POINTER(vrf->rth_local, NULL);
 	synchronize_rcu();
 
 	/* move dev in dst's to loopback so this VRF device can be deleted
 	 * - based on dst_ifdown
 	 */
-	if (rth) {
-		dst = &rth->dst;
-		dev_put(dst->dev);
-		dst->dev = net->loopback_dev;
-		dev_hold(dst->dev);
-		dst_release(dst);
-	}
-
 	if (rth_local) {
 		dst = &rth_local->dst;
 		dev_put(dst->dev);
@@ -492,31 +481,20 @@ static void vrf_rtable_release(struct net_device *dev, struct net_vrf *vrf)
 static int vrf_rtable_create(struct net_device *dev)
 {
 	struct net_vrf *vrf = netdev_priv(dev);
-	struct rtable *rth, *rth_local;
+	struct rtable *rth_local;
 
 	if (!fib_new_table(dev_net(dev), vrf->tb_id))
-		return -ENOMEM;
-
-	/* create a dst for routing packets out through a VRF device */
-	rth = rt_dst_alloc(dev, 0, RTN_UNICAST, 1, 1, 0);
-	if (!rth)
 		return -ENOMEM;
 
 	/* create a dst for local ingress routing - packets sent locally
 	 * to local address via the VRF device as a loopback
 	 */
 	rth_local = rt_dst_alloc(dev, RTCF_LOCAL, RTN_LOCAL, 1, 1, 0);
-	if (!rth_local) {
-		dst_release(&rth->dst);
+	if (!rth_local)
 		return -ENOMEM;
-	}
-
-	rth->dst.output	= vrf_output;
-	rth->rt_table_id = vrf->tb_id;
 
 	rth_local->rt_table_id = vrf->tb_id;
 
-	rcu_assign_pointer(vrf->rth, rth);
 	rcu_assign_pointer(vrf->rth_local, rth_local);
 
 	return 0;
@@ -646,26 +624,6 @@ static u32 vrf_fib_table(const struct net_device *dev)
 	struct net_vrf *vrf = netdev_priv(dev);
 
 	return vrf->tb_id;
-}
-
-static struct rtable *vrf_get_rtable(const struct net_device *dev,
-				     const struct flowi4 *fl4)
-{
-	struct rtable *rth = NULL;
-
-	if (!(fl4->flowi4_flags & FLOWI_FLAG_L3MDEV_SRC)) {
-		struct net_vrf *vrf = netdev_priv(dev);
-
-		rcu_read_lock();
-
-		rth = rcu_dereference(vrf->rth);
-		if (likely(rth))
-			dst_hold(&rth->dst);
-
-		rcu_read_unlock();
-	}
-
-	return rth;
 }
 
 static int vrf_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
@@ -913,7 +871,6 @@ static struct dst_entry *vrf_get_rt6_dst(const struct net_device *dev,
 
 static const struct l3mdev_ops vrf_l3mdev_ops = {
 	.l3mdev_fib_table	= vrf_fib_table,
-	.l3mdev_get_rtable	= vrf_get_rtable,
 	.l3mdev_l3_rcv		= vrf_l3_rcv,
 	.l3mdev_l3_out		= vrf_l3_out,
 #if IS_ENABLED(CONFIG_IPV6)
