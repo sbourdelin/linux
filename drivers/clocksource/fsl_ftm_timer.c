@@ -335,36 +335,40 @@ static int __init ftm_timer_init(struct device_node *np)
 	priv->clksrc_base = of_iomap(np, 1);
 	if (!priv->clksrc_base) {
 		pr_err("ftm: unable to map source timer registers\n");
-		goto err;
+		goto err1;
 	}
 
 	ret = -EINVAL;
 	irq = irq_of_parse_and_map(np, 0);
 	if (irq <= 0) {
 		pr_err("ftm: unable to get IRQ from DT, %d\n", irq);
-		goto err;
+		goto err2;
 	}
 
 	priv->big_endian = of_property_read_bool(np, "big-endian");
 
 	freq = ftm_clk_init(np);
 	if (!freq)
-		goto err;
+		goto err2;
 
 	ret = ftm_calc_closest_round_cyc(freq);
 	if (ret)
-		goto err;
+		goto err2;
 
 	ret = ftm_clocksource_init(freq);
 	if (ret)
-		goto err;
+		goto err2;
 
 	ret = ftm_clockevent_init(freq, irq);
 	if (ret)
-		goto err;
+		goto err2;
 
 	return 0;
 
+err2:
+	iounmap(priv->clksrc_base);
+err1:
+	iounmap(priv->clkevt_base);
 err:
 	kfree(priv);
 	return ret;
