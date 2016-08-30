@@ -872,6 +872,18 @@ static bool vfio_dev_present(struct vfio_group *group, struct device *dev)
 }
 
 /*
+ * Is device part of a noiommu group?
+ * Note: must call vfio_add_group_dev first.
+ */
+bool vfio_is_noiommu_group_dev(struct device *dev)
+{
+	struct vfio_device *device = dev_get_drvdata(dev);
+	struct vfio_group *group = device->group;
+
+	return group->noiommu;
+}
+
+/*
  * Decrement the device reference count and wait for the device to be
  * removed.  Open file descriptors for the device... */
 void *vfio_del_group_dev(struct device *dev)
