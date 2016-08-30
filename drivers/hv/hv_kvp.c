@@ -379,7 +379,7 @@ kvp_send_key(struct work_struct *dummy)
 	 * the max lengths specified. We will however, reserve room
 	 * for the string terminating character - in the utf16s_utf8s()
 	 * function we limit the size of the buffer where the converted
-	 * string is placed to HV_KVP_EXCHANGE_MAX_*_SIZE -1 to gaurantee
+	 * string is placed to HV_KVP_EXCHANGE_MAX_*_SIZE -1 to guarantee
 	 * that the strings can be properly terminated!
 	 */
 
@@ -589,8 +589,8 @@ response_done:
  * This callback is invoked when we get a KVP message from the host.
  * The host ensures that only one KVP transaction can be active at a time.
  * KVP implementation in Linux needs to forward the key to a user-mde
- * component to retrive the corresponding value. Consequently, we cannot
- * respond to the host in the conext of this callback. Since the host
+ * component to retrieve the corresponding value. Consequently, we cannot
+ * respond to the host in the context of this callback. Since the host
  * guarantees that at most only one transaction can be active at a time,
  * we stash away the transaction state in a set of global variables.
  */

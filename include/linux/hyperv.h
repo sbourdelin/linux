@@ -239,7 +239,7 @@ struct vmbus_channel_offer {
 
 		/*
 		 * Pipes:
-		 * The following sructure is an integrated pipe protocol, which
+		 * The following structure is an integrated pipe protocol, which
 		 * is implemented on top of standard user-defined data. Pipe
 		 * clients have MAX_PIPE_USER_DEFINED_BYTES left for their own
 		 * use.
@@ -773,13 +773,13 @@ struct vmbus_channel {
 	 * Support for sub-channels. For high performance devices,
 	 * it will be useful to have multiple sub-channels to support
 	 * a scalable communication infrastructure with the host.
-	 * The support for sub-channels is implemented as an extention
+	 * The support for sub-channels is implemented as an extension
 	 * to the current infrastructure.
 	 * The initial offer is considered the primary channel and this
 	 * offer message will indicate if the host supports sub-channels.
-	 * The guest is free to ask for sub-channels to be offerred and can
+	 * The guest is free to ask for sub-channels to be offered and can
 	 * open these sub-channels as a normal "primary" channel. However,
-	 * all sub-channels will have the same type and instance guids as the
+	 * all sub-channels will have the same type and instance GUID's as the
 	 * primary channel. Requests sent on a given channel will result in a
 	 * response on the same channel.
 	 */
@@ -839,11 +839,11 @@ struct vmbus_channel {
 	enum hv_signal_policy  signal_policy;
 	/*
 	 * On the channel send side, many of the VMBUS
-	 * device drivers explicity serialize access to the
+	 * device drivers explicitly serialize access to the
 	 * outgoing ring buffer. Give more control to the
 	 * VMBUS device drivers in terms how to serialize
-	 * accesss to the outgoing ring buffer.
-	 * The default behavior will be to aquire the
+	 * access to the outgoing ring buffer.
+	 * The default behavior will be to acquire the
 	 * ring lock to preserve the current behavior.
 	 */
 	bool acquire_ring_lock;
@@ -911,7 +911,7 @@ void vmbus_set_chn_rescind_callback(struct vmbus_channel *channel,
 struct vmbus_channel *vmbus_get_outgoing_channel(struct vmbus_channel *primary);
 
 /*
- * Check if sub-channels have already been offerred. This API will be useful
+ * Check if sub-channels have already been offered. This API will be useful
  * when the driver is unloaded after establishing sub-channels. In this case,
  * when the driver is re-loaded, the driver would have to check if the
  * subchannels have already been established before attempting to request
