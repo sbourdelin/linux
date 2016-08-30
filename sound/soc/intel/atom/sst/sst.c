@@ -76,7 +76,7 @@ static irqreturn_t intel_sst_interrupt_mrfld(int irq, void *context)
 		spin_unlock(&drv->ipc_spin_lock);
 
 		/* we can send more messages to DSP so trigger work */
-		queue_work(drv->post_msg_wq, &drv->ipc_post_msg_wq);
+		schedule_work(&drv->ipc_post_msg_wq);
 		retval = IRQ_HANDLED;
 	}
 
@@ -213,10 +213,6 @@ static int sst_workqueue_init(struct intel_sst_drv *ctx)
 	INIT_WORK(&ctx->ipc_post_msg_wq, sst_process_pending_msg);
 	init_waitqueue_head(&ctx->wait_queue);
 
-	ctx->post_msg_wq =
-		create_singlethread_workqueue("sst_post_msg_wq");
-	if (!ctx->post_msg_wq)
-		return -EBUSY;
 	return 0;
 }
 
@@ -319,7 +315,6 @@ int sst_context_init(struct intel_sst_drv *ctx)
 	return 0;
 
 do_free_mem:
-	destroy_workqueue(ctx->post_msg_wq);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(sst_context_init);
@@ -331,7 +326,7 @@ void sst_context_cleanup(struct intel_sst_drv *ctx)
 	sst_unregister(ctx->dev);
 	sst_set_fw_state_locked(ctx, SST_SHUTDOWN);
 	flush_scheduled_work();
-	destroy_workqueue(ctx->post_msg_wq);
+	flush_work(&ctx->ipc_post_msg_wq);
 	pm_qos_remove_request(ctx->qos);
 	kfree(ctx->fw_sg_list.src);
 	kfree(ctx->fw_sg_list.dst);
@@ -415,7 +410,7 @@ static int intel_sst_runtime_suspend(struct device *dev)
 	sst_set_fw_state_locked(ctx, SST_RESET);
 
 	synchronize_irq(ctx->irq_num);
-	flush_workqueue(ctx->post_msg_wq);
+	flush_work(&ctx->ipc_post_msg_wq);
 
 	ctx->ops->reset(ctx);
 	/* save the shim registers because PMC doesn't save state */
@@ -446,8 +441,9 @@ static int intel_sst_suspend(struct device *dev)
 			return -EBUSY;
 		}
 	}
+
 	synchronize_irq(ctx->irq_num);
-	flush_workqueue(ctx->post_msg_wq);
+	flush_work(ctx->ipc_post_msg_wq);
 
 	/* Move the SST state to Reset */
 	sst_set_fw_state_locked(ctx, SST_RESET);
