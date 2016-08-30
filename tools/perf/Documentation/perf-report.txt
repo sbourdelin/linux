@@ -68,12 +68,13 @@ OPTIONS
 --sort=::
 	Sort histogram entries by given key(s) - multiple keys can be specified
 	in CSV format.  Following sort keys are available:
-	pid, comm, dso, symbol, parent, cpu, socket, srcline, weight, local_weight.
+	pid, comm, cid, dso, symbol, parent, cpu, socket, srcline, weight, local_weight.
 
 	Each key has following meaning:
 
 	- comm: command (name) of the task which can be read via /proc/<pid>/comm
 	- pid: command and tid of the task
+	- cid: ccontainer id of the task
 	- dso: name of library or module executed at the time of sample
 	- symbol: name of function executed at the time of sample
 	- parent: name of function matched to the parent regex filter. Unmatched
