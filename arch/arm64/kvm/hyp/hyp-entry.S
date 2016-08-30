@@ -121,14 +121,15 @@ el1_trap:
 	cmp	x2, #ESR_ELx_EC_FP_ASIMD
 	b.eq	__fpsimd_guest_restore
 
-	mrs	x0, tpidr_el2
-	mov	x1, #ARM_EXCEPTION_TRAP
+	ldp     x2, x3, [sp], #16
+	mrs	x1, tpidr_el2
+	mov	x0, #ARM_EXCEPTION_TRAP
 	b	__guest_exit
 
 el1_irq:
-	save_x0_to_x3
-	mrs	x0, tpidr_el2
-	mov	x1, #ARM_EXCEPTION_IRQ
+	stp     x0, x1, [sp, #-16]!
+	mrs	x1, tpidr_el2
+	mov	x0, #ARM_EXCEPTION_IRQ
 	b	__guest_exit
 
 ENTRY(__hyp_do_panic)
