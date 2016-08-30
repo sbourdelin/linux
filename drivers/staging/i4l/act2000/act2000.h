@@ -198,5 +198,5 @@ static inline void act2000_schedule_poll(act2000_card *card)
 
 extern char *act2000_find_eaz(act2000_card *, char);
 
-#endif                          /* defined(__KERNEL__) || defined(__DEBUGVAR__) */
-#endif                          /* act2000_h */
+#endif                       /* defined(__KERNEL__) || defined(__DEBUGVAR__) */
+#endif                       /* act2000_h */
