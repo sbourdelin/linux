@@ -437,6 +437,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
 	int i, ret;
 	LIST_HEAD(res);
 	struct resource_entry *win;
+	struct msi_controller *msi = NULL;
 
 	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
 	if (cfg_res) {
@@ -525,10 +526,21 @@ int dw_pcie_host_init(struct pcie_port *pp)
 		pp->lanes = 0;
 
 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-		if (!pp->ops->msi_host_init) {
+		if (of_find_property(pp->dev->of_node, "msi-parent", NULL)) {
+			struct device_node *msi_node;
+
+			msi_node = of_parse_phandle(pp->dev->of_node,
+						    "msi-parent", 0);
+			if (!msi_node)
+				return -ENODEV;
+
+			msi = of_pci_find_msi_chip_by_node(msi_node);
+		} else if (!pp->ops->msi_host_init) {
+			msi = &dw_pcie_msi_chip;
+			msi->dev = pp->dev;
 			pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
 						MAX_MSI_IRQS, &msi_domain_ops,
-						&dw_pcie_msi_chip);
+						msi);
 			if (!pp->irq_domain) {
 				dev_err(pp->dev, "irq domain init failed\n");
 				ret = -ENXIO;
@@ -538,7 +550,9 @@ int dw_pcie_host_init(struct pcie_port *pp)
 			for (i = 0; i < MAX_MSI_IRQS; i++)
 				irq_create_mapping(pp->irq_domain, i);
 		} else {
-			ret = pp->ops->msi_host_init(pp, &dw_pcie_msi_chip);
+			msi = &dw_pcie_msi_chip;
+			msi->dev = pp->dev;
+			ret = pp->ops->msi_host_init(pp, msi);
 			if (ret < 0)
 				goto error;
 		}
@@ -550,9 +564,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
 	pp->root_bus_nr = pp->busn->start;
 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
 		bus = pci_scan_root_bus_msi(pp->dev, pp->root_bus_nr,
-					    &dw_pcie_ops, pp, &res,
-					    &dw_pcie_msi_chip);
-		dw_pcie_msi_chip.dev = pp->dev;
+					    &dw_pcie_ops, pp, &res, msi);
 	} else
 		bus = pci_scan_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops,
 					pp, &res);
