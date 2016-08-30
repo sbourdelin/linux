@@ -240,9 +240,11 @@ static int qce_ahash_update(struct ahash_request *req)
 	struct qce_device *qce = tmpl->qce;
 	struct scatterlist *sg_last, *sg;
 	unsigned int total, len;
+	unsigned int tmpbuflen = 0;
 	unsigned int hash_later;
 	unsigned int nbytes;
 	unsigned int blocksize;
+	unsigned int src_offset;
 
 	blocksize = crypto_tfm_alg_blocksize(crypto_ahash_tfm(tfm));
 	rctx->count += req->nbytes;
@@ -265,21 +267,30 @@ static int qce_ahash_update(struct ahash_request *req)
 	 * if we have data from previous update copy them on buffer. The old
 	 * data will be combined with current request bytes.
 	 */
-	if (rctx->buflen)
+	if (rctx->buflen) {
 		memcpy(rctx->tmpbuf, rctx->buf, rctx->buflen);
+		tmpbuflen = rctx->buflen;
+	}
 
 	/* calculate how many bytes will be hashed later */
 	hash_later = total % blocksize;
-	if (hash_later) {
-		unsigned int src_offset = req->nbytes - hash_later;
-		scatterwalk_map_and_copy(rctx->buf, req->src, src_offset,
-					 hash_later, 0);
-	}
+	/* ensure we always have something on buffer */
+	if (hash_later == 0)
+		hash_later = blocksize;
+	src_offset = req->nbytes - hash_later;
+	scatterwalk_map_and_copy(rctx->buf, req->src, src_offset,
+				 hash_later, 0);
+	rctx->buflen = hash_later;
 
 	/* here nbytes is multiple of blocksize */
 	nbytes = total - hash_later;
 
-	len = rctx->buflen;
+	len = tmpbuflen;
+
+	/* Zero-length update is a no-op */
+	if (nbytes == 0)
+		return 0;
+
 	sg = sg_last = req->src;
 
 	while (len < nbytes && sg) {
@@ -293,15 +304,14 @@ static int qce_ahash_update(struct ahash_request *req)
 
 	sg_mark_end(sg_last);
 
-	if (rctx->buflen) {
+	if (tmpbuflen) {
 		sg_init_table(rctx->sg, 2);
-		sg_set_buf(rctx->sg, rctx->tmpbuf, rctx->buflen);
+		sg_set_buf(rctx->sg, rctx->tmpbuf, tmpbuflen);
 		sg_chain(rctx->sg, 2, req->src);
 		req->src = rctx->sg;
 	}
 
 	req->nbytes = nbytes;
-	rctx->buflen = hash_later;
 
 	return qce->async_req_enqueue(tmpl->qce, &req->base);
 }
