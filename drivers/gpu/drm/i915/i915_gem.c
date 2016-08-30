@@ -3746,7 +3746,7 @@ i915_gem_ring_throttle(struct drm_device *dev, struct drm_file *file)
 	if (target == NULL)
 		return 0;
 
-	ret = i915_wait_request(target, true, NULL, NULL);
+	ret = i915_wait_request(target, I915_WAIT_INTERRUPTIBLE, NULL, NULL);
 	i915_gem_request_put(target);
 
 	return ret;
