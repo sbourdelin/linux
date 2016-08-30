@@ -290,21 +290,22 @@ int ddk750_initHw(initchip_param_t *pInitParam)
 }
 
 /*
-	monk liu @ 4/6/2011:
-		   re-write the calculatePLL function of ddk750.
-		   the original version function does not use some mathematics tricks and shortcut
-		   when it doing the calculation of the best N,M,D combination
-		   I think this version gives a little upgrade in speed
-
-	750 pll clock formular:
-	Request Clock = (Input Clock * M )/(N * X)
-
-	Input Clock = 14318181 hz
-	X = 2 power D
-	D ={0,1,2,3,4,5,6}
-	M = {1,...,255}
-	N = {2,...,15}
-*/
+ * monk liu @ 4/6/2011:
+ *	re-write the calculatePLL function of ddk750.
+ *	the original version function does not use
+ *	some mathematics tricks and shortcut when it doing
+ *	the calculation of the best N,M,D combination
+ *	I think this version gives a little upgrade in speed
+ *
+ *  750 pll clock formular:
+ *  Request Clock = (Input Clock * M )/(N * X)
+ *
+ * Input Clock = 14318181 hz
+ * X = 2 power D
+ * D ={0,1,2,3,4,5,6}
+ * M = {1,...,255}
+ * N = {2,...,15}
+ */
 unsigned int calcPllValue(unsigned int request_orig, pll_value_t *pll)
 {
 	/* as sm750 register definition, N located in 2,15 and M located in 1,255	*/
