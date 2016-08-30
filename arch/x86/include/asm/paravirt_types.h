@@ -225,7 +225,7 @@ struct pv_mmu_ops {
 	void (*flush_tlb_user)(void);
 	void (*flush_tlb_kernel)(void);
 	void (*flush_tlb_single)(unsigned long addr);
-	void (*flush_tlb_others)(const struct cpumask *cpus,
+	void (*flush_tlb_others)(struct cpumask *cpus,
 				 struct mm_struct *mm,
 				 unsigned long start,
 				 unsigned long end);
