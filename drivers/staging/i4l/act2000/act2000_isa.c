@@ -134,9 +134,9 @@ act2000_isa_config_irq(act2000_card *card, short irq)
 {
 	int old_irq;
 
-	if (card->flags & ACT2000_FLAGS_IVALID) {
+	if (card->flags & ACT2000_FLAGS_IVALID)
 		free_irq(card->irq, card);
-	}
+
 	card->flags &= ~ACT2000_FLAGS_IVALID;
 	outb(ISA_COR_IRQOFF, ISA_PORT_COR);
 	if (!irq)
@@ -259,6 +259,7 @@ act2000_isa_receive(act2000_card *card)
 					       "act2000_isa_receive: Invalid CAPI msg\n");
 					{
 						int i; __u8 *p; __u8 *t; __u8 tmp[30];
+
 						for (i = 0, p = (__u8 *)&card->idat.isa.rcvhdr, t = tmp; i < 8; i++)
 							t += sprintf(t, "%02x ", *(p++));
 						printk(KERN_WARNING "act2000_isa_receive: %s\n", tmp);
