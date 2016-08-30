@@ -1136,12 +1136,13 @@ eb_await_request(struct drm_i915_gem_request *to,
 
 	trace_i915_gem_ring_sync_to(to, from);
 	if (!i915.semaphores) {
-		ret = i915_wait_request(from,
-					I915_WAIT_INTERRUPTIBLE |
-					I915_WAIT_LOCKED,
-					NULL, NO_WAITBOOST);
-		if (ret)
-			return ret;
+		if (!i915_spin_request(from, TASK_INTERRUPTIBLE, 2)) {
+			ret = i915_sw_fence_await_dma_fence(&to->submit,
+							    &from->fence,
+							    GFP_KERNEL);
+			if (ret < 0)
+				return ret;
+		}
 	} else {
 		ret = to->engine->semaphore.sync_to(to, from);
 		if (ret)
