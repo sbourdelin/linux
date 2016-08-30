@@ -561,7 +561,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
 	}
 
 	pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node,
-							INTX_NUM,
+							INTX_NUM + 1,
 							&legacy_domain_ops,
 							pcie);
 
