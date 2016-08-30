@@ -395,6 +395,8 @@ struct bam_device {
 	const struct reg_offset_data *layout;
 
 	struct clk *bamclk;
+	struct clk *axi_clk;
+	struct clk *core_clk;
 	int irq;
 
 	/* dma start transaction tasklet */
@@ -1189,6 +1191,25 @@ static int bam_dma_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	bdev->axi_clk = devm_clk_get(bdev->dev, "axi_clk");
+	if (IS_ERR(bdev->axi_clk))
+		bdev->axi_clk = NULL;
+
+	ret = clk_prepare_enable(bdev->axi_clk);
+	if (ret) {
+		dev_err(bdev->dev, "failed to prepare/enable axi clock\n");
+		return ret;
+	}
+
+	bdev->core_clk = devm_clk_get(bdev->dev, "core_clk");
+	if (IS_ERR(bdev->core_clk))
+		bdev->core_clk = NULL;
+
+	ret = clk_prepare_enable(bdev->core_clk);
+	if (ret) {
+		dev_err(bdev->dev, "failed to prepare/enable core clock\n");
+		return ret;
+	}
 	ret = bam_init(bdev);
 	if (ret)
 		goto err_disable_clk;
