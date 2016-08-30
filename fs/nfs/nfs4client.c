@@ -817,6 +817,12 @@ static int nfs4_set_client(struct nfs_server *server,
 		goto error;
 	}
 
+	/* This client is already set, is there a migration loop? */
+	if (server->nfs_client == clp) {
+		error = -EEXIST;
+		goto error;
+	}
+
 	/*
 	 * Query for the lease time on clientid setup or renewal
 	 *
