@@ -28,6 +28,8 @@ Optional properties:
 - clock-names: Must include the following entries:
 	- "pcie"
 	- "pcie_bus"
+- msi-parent: Pointer to an external MSI controller. If not provided,
+  the built-in MSI controller is used.
 
 Example configuration:
 
