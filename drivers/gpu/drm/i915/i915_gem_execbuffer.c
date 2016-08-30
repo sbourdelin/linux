@@ -1122,6 +1122,71 @@ static unsigned int eb_other_engines(struct drm_i915_gem_request *req)
 }
 
 static int
+eb_await_request(struct drm_i915_gem_request *to,
+		 struct drm_i915_gem_request *from)
+{
+	int idx, ret;
+
+	if (to->engine == from->engine)
+		return 0;
+
+	idx = intel_engine_sync_index(from->engine, to->engine);
+	if (from->fence.seqno <= from->engine->semaphore.sync_seqno[idx])
+		return 0;
+
+	trace_i915_gem_ring_sync_to(to, from);
+	if (!i915.semaphores) {
+		ret = i915_wait_request(from,
+					I915_WAIT_INTERRUPTIBLE |
+					I915_WAIT_LOCKED,
+					NULL, NO_WAITBOOST);
+		if (ret)
+			return ret;
+	} else {
+		ret = to->engine->semaphore.sync_to(to, from);
+		if (ret)
+			return ret;
+	}
+
+	from->engine->semaphore.sync_seqno[idx] = from->fence.seqno;
+	return 0;
+}
+
+static int
+eb_await_bo(struct drm_i915_gem_request *to,
+	     struct drm_i915_gem_object *obj,
+	     bool write)
+{
+	struct i915_gem_active *active;
+	unsigned long active_mask;
+	int idx;
+
+	if (write) {
+		active_mask = i915_gem_object_get_active(obj);
+		active = obj->last_read;
+	} else {
+		active_mask = 1;
+		active = &obj->last_write;
+	}
+
+	for_each_active(active_mask, idx) {
+		struct drm_i915_gem_request *request;
+		int ret;
+
+		request = i915_gem_active_peek(&active[idx],
+					       &obj->base.dev->struct_mutex);
+		if (!request)
+			continue;
+
+		ret = eb_await_request(to, request);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int
 i915_gem_execbuffer_move_to_gpu(struct drm_i915_gem_request *req,
 				struct list_head *vmas)
 {
@@ -1133,7 +1198,8 @@ i915_gem_execbuffer_move_to_gpu(struct drm_i915_gem_request *req,
 		struct drm_i915_gem_object *obj = vma->obj;
 
 		if (obj->flags & other_rings) {
-			ret = i915_gem_object_sync(obj, req);
+			ret = eb_await_bo(req, obj,
+					  obj->base.pending_write_domain);
 			if (ret)
 				return ret;
 		}
