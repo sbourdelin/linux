@@ -592,6 +592,8 @@ struct netdev_queue {
 
 #ifdef CONFIG_BQL
 	struct dql		dql;
+	unsigned int		head_cnt;
+	unsigned int		tail_cnt;
 #endif
 } ____cacheline_aligned_in_smp;
 
@@ -2958,6 +2960,7 @@ static inline void netdev_tx_sent_queue(struct netdev_queue *dev_queue,
 					unsigned int bytes)
 {
 #ifdef CONFIG_BQL
+	dev_queue->head_cnt++;
 	dql_queued(&dev_queue->dql, bytes);
 
 	if (likely(dql_avail(&dev_queue->dql) >= 0))
@@ -2999,6 +3002,7 @@ static inline void netdev_tx_completed_queue(struct netdev_queue *dev_queue,
 	if (unlikely(!bytes))
 		return;
 
+	dev_queue->tail_cnt += pkts;
 	dql_completed(&dev_queue->dql, bytes);
 
 	/*
