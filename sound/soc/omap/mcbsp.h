@@ -325,6 +325,9 @@ struct omap_mcbsp {
 	unsigned int in_freq;
 	int clk_div;
 	int wlen;
+
+	s32 latency;
+	struct pm_qos_request pm_qos_req;
 };
 
 void omap_mcbsp_config(struct omap_mcbsp *mcbsp,

@@ -25,6 +25,7 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
+#include <linux/pm_qos.h>
 
 #include <linux/platform_data/asoc-ti-mcbsp.h>
 
@@ -643,6 +644,11 @@ void omap_mcbsp_start(struct omap_mcbsp *mcbsp, int tx, int rx)
 	int enable_srg = 0;
 	u16 w;
 
+	/* Prevent omap hardware from hitting off between fifo fills */
+	if (mcbsp->latency)
+		pm_qos_add_request(&mcbsp->pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
+				   mcbsp->latency);
+
 	if (mcbsp->st_data)
 		omap_st_start(mcbsp);
 
@@ -731,6 +737,8 @@ void omap_mcbsp_stop(struct omap_mcbsp *mcbsp, int tx, int rx)
 
 	if (mcbsp->st_data)
 		omap_st_stop(mcbsp);
+
+	pm_qos_remove_request(&mcbsp->pm_qos_req);
 }
 
 int omap2_mcbsp_set_clks_src(struct omap_mcbsp *mcbsp, u8 fck_src_id)
@@ -1064,6 +1072,16 @@ int omap_mcbsp_init(struct platform_device *pdev)
 		mcbsp->max_tx_thres = max_thres(mcbsp) - 0x10;
 		mcbsp->max_rx_thres = max_thres(mcbsp) - 0x10;
 
+		/*
+		 * Prevent device from hitting deeper idle states between
+		 * DMA fifo loads. On omap3 mcbsp2 we have a larger FIFO of
+		 * 1280 bytes instead of the usual 128 bytes, and the measured
+		 * max latency we can tolerate is somewhere below 40 ms. To be
+		 * safe, use a fixed value of 30 ms to block off idle on omap3
+		 * while still allowing retention idle.
+		 */
+		mcbsp->latency = 30 * 1000;
+
 		ret = sysfs_create_group(&mcbsp->dev->kobj,
 					 &additional_attr_group);
 		if (ret) {
@@ -1098,6 +1116,9 @@ err_thres:
 
 void omap_mcbsp_cleanup(struct omap_mcbsp *mcbsp)
 {
+	if (pm_qos_request_active(&mcbsp->pm_qos_req))
+		pm_qos_remove_request(&mcbsp->pm_qos_req);
+
 	if (mcbsp->pdata->buffer_size)
 		sysfs_remove_group(&mcbsp->dev->kobj, &additional_attr_group);
 
