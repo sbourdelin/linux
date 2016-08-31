@@ -3210,6 +3210,7 @@ sch_handle_egress(struct sk_buff *skb, int *ret, struct net_device *dev)
 }
 #endif /* CONFIG_NET_EGRESS */
 
+/* Must be called with RCU read_lock */
 static inline int get_xps_queue(struct net_device *dev, struct sk_buff *skb)
 {
 #ifdef CONFIG_XPS
@@ -3217,7 +3218,6 @@ static inline int get_xps_queue(struct net_device *dev, struct sk_buff *skb)
 	struct xps_map *map;
 	int queue_index = -1;
 
-	rcu_read_lock();
 	dev_maps = rcu_dereference(dev->xps_maps);
 	if (dev_maps) {
 		map = rcu_dereference(
@@ -3232,7 +3232,6 @@ static inline int get_xps_queue(struct net_device *dev, struct sk_buff *skb)
 				queue_index = -1;
 		}
 	}
-	rcu_read_unlock();
 
 	return queue_index;
 #else
@@ -3240,26 +3239,90 @@ static inline int get_xps_queue(struct net_device *dev, struct sk_buff *skb)
 #endif
 }
 
+/* Must be called with RCU read_lock */
+static int get_xfs_index(struct net_device *dev, struct sk_buff *skb)
+{
+#ifdef CONFIG_XFS
+	struct xps_dev_flow_table *flow_table;
+	struct xps_dev_flow ent;
+	int queue_index;
+	struct netdev_queue *txq;
+	u32 hash;
+
+	flow_table = rcu_dereference(dev->xps_flow_table);
+	if (!flow_table)
+		return -1;
+
+	queue_index = get_xps_queue(dev, skb);
+	if (queue_index < 0)
+		return -1;
+
+	hash = skb_get_hash(skb);
+	if (!hash)
+		return -1;
+
+	ent.v64 = flow_table->flows[hash & flow_table->mask].v64;
+	if (ent.queue_index >= 0 &&
+	    ent.queue_index < dev->real_num_tx_queues) {
+		txq = netdev_get_tx_queue(dev, ent.queue_index);
+		if (queue_index != ent.queue_index) {
+			if ((int)(txq->tail_cnt - ent.queue_ptr) >= 0)  {
+				/* The current queue's tail has advanced
+				 * beyone the last packet that was
+				 * enqueued using the table entry. All
+				 * previous packets sent for this flow
+				 * should have been completed so the
+				 * queue for the flow cna be changed.
+				 */
+				ent.queue_index = queue_index;
+				txq = netdev_get_tx_queue(dev, queue_index);
+			} else {
+				queue_index = ent.queue_index;
+			}
+		}
+	} else {
+		/* Queue from the table was bad, use the new one. */
+		ent.queue_index = queue_index;
+		txq = netdev_get_tx_queue(dev, queue_index);
+	}
+
+	/* Save the updated entry */
+	ent.queue_ptr = txq->head_cnt;
+	flow_table->flows[hash & flow_table->mask].v64 = ent.v64;
+
+	return queue_index;
+#else
+	return = get_xps_queue(dev, skb);
+#endif
+}
+
 static u16 __netdev_pick_tx(struct net_device *dev, struct sk_buff *skb)
 {
 	struct sock *sk = skb->sk;
 	int queue_index = sk_tx_queue_get(sk);
+	int new_index;
 
-	if (queue_index < 0 || skb->ooo_okay ||
-	    queue_index >= dev->real_num_tx_queues) {
-		int new_index = get_xps_queue(dev, skb);
-		if (new_index < 0)
-			new_index = skb_tx_hash(dev, skb);
-
-		if (queue_index != new_index && sk &&
-		    sk_fullsock(sk) &&
-		    rcu_access_pointer(sk->sk_dst_cache))
-			sk_tx_queue_set(sk, new_index);
-
-		queue_index = new_index;
+	if (queue_index < 0) {
+		/* Socket did not provide a queue index, try XFS */
+		new_index = get_xfs_index(dev, skb);
+	} else if (skb->ooo_okay || queue_index >= dev->real_num_tx_queues) {
+		/* Queue index in socket, see if we can find a better one */
+		new_index = get_xps_queue(dev, skb);
+	} else {
+		/* Valid queue in socket and can't send OOO. Just return it */
+		return queue_index;
 	}
 
-	return queue_index;
+	if (new_index < 0) {
+		/* No queue index from flow steering, fallback to hash */
+		new_index = skb_tx_hash(dev, skb);
+	}
+
+	if (queue_index != new_index && sk && sk_fullsock(sk) &&
+	    rcu_access_pointer(sk->sk_dst_cache))
+		sk_tx_queue_set(sk, new_index);
+
+	return new_index;
 }
 
 struct netdev_queue *netdev_pick_tx(struct net_device *dev,
