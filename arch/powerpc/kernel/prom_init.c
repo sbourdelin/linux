@@ -2639,6 +2639,69 @@ static void __init fixup_device_tree_efika(void)
 #else
 #define fixup_device_tree_efika()
 #endif
+#ifdef CONFIG_PPC_PASEMI
+static void __init fixup_device_tree_pasemi(void)
+{
+#ifdef CONFIG_PPC_PASEMI_NEMO
+/*
+ * CFE supplied on Nemo is broken in several ways, biggest
+ * problem is that it reassigns ISA interrupts to unused mpic ints.
+ * Add an interrupt-controller property for the io-bridge to use
+ * and correct the ints so we can attach them to an irq_domain
+ */
+ 	phandle iob, node;
+	u32 interrupts[2];
+	u32 parent;
+	u32 val = 0, rval;
+	char * name, * pci_name;
+
+	/* Find the root pci node */
+	name = "/pxp@0,e0000000";
+	iob = call_prom("finddevice", 1, 1, ADDR(name));
+	if (!PHANDLE_VALID(iob))
+		return;
+
+	/* check if interrupt-controller node set yet */
+	if (prom_getproplen(iob, "interrupt-controller") !=PROM_ERROR)
+		return;
+
+	prom_printf("adding interrupt-controller property for SB600...\n");
+
+	prom_setprop(iob, name, "interrupt-controller", &val, 0);
+
+	pci_name = "/pxp@0,e0000000/pci@11";
+	node = call_prom("finddevice", 1, 1, ADDR(pci_name));
+	parent = ADDR(iob);
+	for( ; prom_next_node(&node); ) {
+		/* scan each node for one with an interrupt */
+		if (PHANDLE_VALID(node)) {
+			rval = prom_getproplen(node, "interrupts");
+			if (rval != 0 && rval != PROM_ERROR) {
+				prom_getprop(node, "interrupts", &interrupts, sizeof(interrupts));
+				if ((interrupts[0] > 211) && (interrupts[0] < 223)) {
+					/* found a node, update both interrupts and interrupt-parent */
+					if ((interrupts[0] > 211) && (interrupts[0] < 216))
+						interrupts[0] -= 203;
+					if ((interrupts[0] > 215) && (interrupts[0] < 221))
+						interrupts[0] -= 213;
+					if (interrupts[0] == 221)
+						interrupts[0] = 14;
+					if (interrupts[0] == 222)
+						interrupts[0] = 8;
+
+					prom_setprop(node, pci_name, "interrupts", interrupts,
+								sizeof(interrupts));
+					prom_setprop(node, pci_name, "interrupt-parent", &parent,
+								sizeof(parent));
+				}
+			}
+		}
+	}
+#endif //CONFIG_PPC_PASEMI_NEMO
+}
+#else
+#define fixup_device_tree_pasemi()
+#endif
 
 static void __init fixup_device_tree(void)
 {
@@ -2647,6 +2710,7 @@ static void __init fixup_device_tree(void)
 	fixup_device_tree_chrp();
 	fixup_device_tree_pmac();
 	fixup_device_tree_efika();
+	fixup_device_tree_pasemi();
 }
 
 static void __init prom_find_boot_cpu(void)
