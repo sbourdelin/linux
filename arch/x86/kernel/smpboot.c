@@ -108,7 +108,6 @@ EXPORT_SYMBOL(__max_logical_packages);
 /* Maximum number of SMT threads on any online core */
 int __max_smt_threads __read_mostly;
 
-unsigned int __read_mostly sysctl_sched_itmt_enabled;
 /* Flag to indicate if a complete sched domain rebuild is required */
 bool x86_topology_update;
 
