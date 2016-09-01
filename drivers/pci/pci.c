@@ -3829,6 +3829,44 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
 	return 0;
 }
 
+/*
+ * Mostly copy paste from pci_walk_bus with the exceptions of hard coded
+ * work and removed locks.
+ */
+static void pci_bus_probe_crs(struct pci_bus *top)
+{
+	struct pci_dev *dev;
+	struct pci_bus *bus;
+	struct list_head *next;
+	int retval;
+	u32 l;
+
+	bus = top;
+	next = top->devices.next;
+	for (;;) {
+		if (next == &bus->devices) {
+			/* end of this bus, go up or finish */
+			if (bus == top)
+				break;
+			next = bus->self->bus_list.next;
+			bus = bus->self->bus;
+			continue;
+		}
+		dev = list_entry(next, struct pci_dev, bus_list);
+		if (dev->subordinate) {
+			/* this is a pci-pci bridge, do its devices next */
+			next = dev->subordinate->devices.next;
+			bus = dev->subordinate;
+		} else
+			next = dev->bus_list.next;
+
+		retval = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &l,
+						    60 * 1000);
+		if (retval)
+			break;
+	}
+}
+
 void pci_reset_secondary_bus(struct pci_dev *dev)
 {
 	u16 ctrl;
@@ -4361,6 +4399,7 @@ void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
 	pci_bus_save_and_disable(dev->bus);
 	pcibios_reset_secondary_bus(dev);
 	pci_bus_restore(dev->bus);
+	pci_bus_probe_crs(dev->subordinate);
 }
 EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
 
