@@ -614,15 +614,13 @@ debug_open(struct inode *inode, struct file *file)
 			continue;
 		else if (debug_info->debugfs_entries[i] ==
 			 file->f_path.dentry) {
-			goto found;	/* found view ! */
+			goto copy_info;
 		}
 	}
 	/* no entry found */
 	rc = -EINVAL;
-	goto out;
-
-found:
-
+	goto unlock;
+ copy_info:
 	/* Make snapshot of current debug areas to get it consistent.     */
 	/* To copy all the areas is only needed, if we have a view which  */
 	/* formats the debug areas. */
@@ -636,14 +634,14 @@ found:
 
 	if (!debug_info_snapshot) {
 		rc = -ENOMEM;
-		goto out;
+		goto unlock;
 	}
 	p_info = kmalloc(sizeof(file_private_info_t),
 						GFP_KERNEL);
 	if (!p_info) {
 		debug_info_free(debug_info_snapshot);
 		rc = -ENOMEM;
-		goto out;
+		goto unlock;
 	}
 	p_info->offset = 0;
 	p_info->debug_info_snap = debug_info_snapshot;
@@ -656,7 +654,7 @@ found:
 	file->private_data = p_info;
 	debug_info_get(debug_info);
 	nonseekable_open(inode, file);
-out:
+ unlock:
 	mutex_unlock(&debug_mutex);
 	return rc;
 }
