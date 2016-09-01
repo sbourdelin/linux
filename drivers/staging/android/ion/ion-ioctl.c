@@ -28,6 +28,7 @@ union ion_ioctl_arg {
 	struct ion_handle_data handle;
 	struct ion_custom_data custom;
 	struct ion_abi_version abi_version;
+	struct ion_heap_query query;
 };
 
 static int validate_ioctl_arg(unsigned int cmd, union ion_ioctl_arg *arg)
@@ -37,6 +38,11 @@ static int validate_ioctl_arg(unsigned int cmd, union ion_ioctl_arg *arg)
 	switch (cmd) {
 	case ION_IOC_ABI_VERSION:
 		ret = arg->abi_version.reserved != 0;
+		break;
+	case ION_IOC_HEAP_QUERY:
+		ret = arg->query.reserved0 != 0;
+		ret |= arg->query.reserved1 != 0;
+		ret |= arg->query.reserved2 != 0;
 		break;
 	default:
 		break;
@@ -160,6 +166,11 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case ION_IOC_ABI_VERSION:
 	{
 		data.abi_version.abi_version = ION_ABI_VERSION;
+		break;
+	}
+	case ION_IOC_HEAP_QUERY:
+	{
+		ret = ion_query_heaps(client, &data.query);
 		break;
 	}
 	default:
