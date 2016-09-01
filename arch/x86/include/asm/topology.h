@@ -146,4 +146,8 @@ struct pci_bus;
 int x86_pci_root_bus_node(int bus);
 void x86_pci_root_bus_resources(int bus, struct list_head *resources);
 
+#ifdef CONFIG_SCHED_ITMT
+extern unsigned int __read_mostly sysctl_sched_itmt_enabled;
+#endif /* CONFIG_SCHED_ITMT */
+
 #endif /* _ASM_X86_TOPOLOGY_H */
