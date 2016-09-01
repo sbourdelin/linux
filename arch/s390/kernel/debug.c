@@ -1254,7 +1254,7 @@ out:
 static int
 debug_prolog_level_fn(debug_info_t * id, struct debug_view *view, char *out_buf)
 {
-	int rc = 0;
+	int rc;
 
 	if (id->level == DEBUG_OFF_LEVEL)
 		rc = sprintf(out_buf,"-\n");
