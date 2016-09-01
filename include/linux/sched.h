@@ -1332,9 +1332,10 @@ struct sched_entity {
 	u64			vruntime;
 	u64			prev_sum_exec_runtime;
 
+#ifdef CONFIG_64BIT
 	u64			nr_migrations;
-
-#ifndef CONFIG_64BIT
+#else
+	u32			nr_migrations;
 	seqcount_t		sum_exec_runtime_seqcount;
 #endif
 
