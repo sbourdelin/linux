@@ -218,8 +218,10 @@ static int tegra_adma_init(struct tegra_adma *tdma)
 	ret = readx_poll_timeout(readl,
 				 tdma->base_addr + ADMA_GLOBAL_SOFT_RESET,
 				 status, status == 0, 20, 10000);
-	if (ret)
+	if (ret) {
+		dev_err(tdma->dev, "Timeout waiting for soft reset\n");
 		return ret;
+	}
 
 	/* Enable global ADMA registers */
 	tdma_write(tdma, ADMA_GLOBAL_CMD, 1);
@@ -581,6 +583,7 @@ static int tegra_adma_alloc_chan_resources(struct dma_chan *dc)
 
 	ret = pm_runtime_get_sync(tdc2dev(tdc));
 	if (ret < 0) {
+		dev_err(tdc2dev(tdc), "failed to get pm runtime: %d\n", ret);
 		free_irq(tdc->irq, tdc);
 		return ret;
 	}
@@ -647,8 +650,10 @@ static int tegra_adma_runtime_resume(struct device *dev)
 	int ret;
 
 	ret = pm_clk_resume(dev);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed to resume pm clock: %d\n", ret);
 		return ret;
+	}
 
 	tdma_write(tdma, ADMA_GLOBAL_CMD, tdma->global_cmd);
 
@@ -728,6 +733,9 @@ static int tegra_adma_probe(struct platform_device *pdev)
 
 		tdc->irq = of_irq_get(pdev->dev.of_node, i);
 		if (tdc->irq < 0) {
+			dev_err(&pdev->dev,
+				"failed to get irq for channel %d: %d\n",
+				i + 1, tdc->irq);
 			ret = tdc->irq;
 			goto irq_dispose;
 		}
