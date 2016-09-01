@@ -198,33 +198,32 @@ debug_areas_alloc(int pages_per_area, int nr_areas)
 
 	areas = kmalloc_array(nr_areas, sizeof(*areas), GFP_KERNEL);
 	if (!areas)
-		goto fail_malloc_areas;
+		goto exit;
 	for (i = 0; i < nr_areas; i++) {
 		areas[i] = kmalloc_array(pages_per_area,
 					 sizeof(*areas[i]),
 					 GFP_KERNEL);
 		if (!areas[i])
-			goto fail_malloc_areas2;
+			goto free_areas;
 		for (j = 0; j < pages_per_area; j++) {
 			areas[i][j] = kzalloc(PAGE_SIZE, GFP_KERNEL);
 			if (!areas[i][j]) {
 				for (j--; j >= 0; j--)
 					kfree(areas[i][j]);
 				kfree(areas[i]);
-				goto fail_malloc_areas2;
+				goto free_areas;
 			}
 		}
 	}
 	return areas;
-
-fail_malloc_areas2:
+ free_areas:
 	for (i--; i >= 0; i--) {
 		for (j = 0; j < pages_per_area; j++)
 			kfree(areas[i][j]);
 		kfree(areas[i]);
 	}
 	kfree(areas);
-fail_malloc_areas:
+ exit:
 	return NULL;
 
 }
