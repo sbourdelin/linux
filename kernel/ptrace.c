@@ -85,6 +85,7 @@ void __ptrace_unlink(struct task_struct *child)
 	task_clear_jobctl_pending(child, JOBCTL_TRAP_MASK);
 	task_clear_jobctl_trapping(child);
 
+	clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 	/*
 	 * Reinstate JOBCTL_STOP_PENDING if group stop is in effect and
 	 * @child isn't dead.
