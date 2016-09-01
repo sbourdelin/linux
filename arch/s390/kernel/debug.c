@@ -736,13 +736,10 @@ void
 debug_unregister(debug_info_t * id)
 {
 	if (!id)
-		goto out;
+		return;
 	mutex_lock(&debug_mutex);
 	debug_info_put(id);
 	mutex_unlock(&debug_mutex);
-
-out:
-	return;
 }
 EXPORT_SYMBOL(debug_unregister);
 
