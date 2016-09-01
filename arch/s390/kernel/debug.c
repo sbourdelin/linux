@@ -244,17 +244,17 @@ debug_info_alloc(const char *name, int pages_per_area, int nr_areas,
 
 	rc = kmalloc(sizeof(debug_info_t), GFP_KERNEL);
 	if(!rc)
-		goto fail_malloc_rc;
+		goto exit;
 	rc->active_entries = kcalloc(nr_areas, sizeof(int), GFP_KERNEL);
 	if(!rc->active_entries)
-		goto fail_malloc_active_entries;
+		goto free_rc;
 	rc->active_pages = kcalloc(nr_areas, sizeof(int), GFP_KERNEL);
 	if(!rc->active_pages)
-		goto fail_malloc_active_pages;
+		goto free_entries;
 	if((mode == ALL_AREAS) && (pages_per_area != 0)){
 		rc->areas = debug_areas_alloc(pages_per_area, nr_areas);
 		if(!rc->areas)
-			goto fail_malloc_areas;
+			goto free_pages;
 	} else {
 		rc->areas = NULL;
 	}
@@ -275,14 +275,13 @@ debug_info_alloc(const char *name, int pages_per_area, int nr_areas,
 	atomic_set(&(rc->ref_count), 0);
 
 	return rc;
-
-fail_malloc_areas:
+ free_pages:
 	kfree(rc->active_pages);
-fail_malloc_active_pages:
+ free_entries:
 	kfree(rc->active_entries);
-fail_malloc_active_entries:
+ free_rc:
 	kfree(rc);
-fail_malloc_rc:
+ exit:
 	return NULL;
 }
 
