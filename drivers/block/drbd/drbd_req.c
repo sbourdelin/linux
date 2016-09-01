@@ -1447,7 +1447,8 @@ static bool prepare_al_transaction_nonblock(struct drbd_device *device,
 	return !list_empty(pending);
 }
 
-void send_and_submit_pending(struct drbd_device *device, struct list_head *pending)
+static void
+send_and_submit_pending(struct drbd_device *device, struct list_head *pending)
 {
 	struct drbd_request *req, *tmp;
 
