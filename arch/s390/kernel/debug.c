@@ -700,14 +700,14 @@ debug_info_t *debug_register_mode(const char *name, int pages_per_area,
         /* create new debug_info */
 
 	rc = debug_info_create(name, pages_per_area, nr_areas, buf_size, mode);
-	if (!rc)
-		goto out;
+	if (!rc) {
+		pr_err("Registering debug feature %s failed\n", name);
+		goto unlock;
+	}
 	debug_register_view(rc, &debug_level_view);
         debug_register_view(rc, &debug_flush_view);
 	debug_register_view(rc, &debug_pages_view);
-out:
-	if (!rc)
-		pr_err("Registering debug feature %s failed\n", name);
+ unlock:
 	mutex_unlock(&debug_mutex);
 	return rc;
 }
