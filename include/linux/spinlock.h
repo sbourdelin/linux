@@ -130,6 +130,22 @@ do {								\
 #define smp_mb__before_spinlock()	smp_wmb()
 #endif
 
+#ifndef smp_mb__after_unlock_lock
+/**
+ * smp_mb__after_unlock_lock() - Provide smp_mb() after unlock+lock
+ *
+ * Place this after a lock-acquisition primitive to guarantee that
+ * an UNLOCK+LOCK pair act as a full barrier.  This guarantee applies
+ * if the UNLOCK and LOCK are executed by the same CPU or if the
+ * UNLOCK and LOCK operate on the same lock variable.
+ */
+#ifdef CONFIG_PPC
+#define smp_mb__after_unlock_lock()	smp_mb()  /* Full ordering for lock. */
+#else /* #ifdef CONFIG_PPC */
+#define smp_mb__after_unlock_lock()	do { } while (0)
+#endif /* #else #ifdef CONFIG_PPC */
+#endif
+
 /**
  * raw_spin_unlock_wait - wait until the spinlock gets unlocked
  * @lock: the spinlock in question.
