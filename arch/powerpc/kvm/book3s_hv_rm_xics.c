@@ -19,6 +19,7 @@
 #include <asm/synch.h>
 #include <asm/cputhreads.h>
 #include <asm/ppc-opcode.h>
+#include <asm/asm-prototypes.h>
 
 #include "book3s_xics.h"
 

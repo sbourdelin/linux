@@ -25,6 +25,7 @@
 #include <asm/xics.h>
 #include <asm/dbell.h>
 #include <asm/cputhreads.h>
+#include <asm/asm-prototypes.h>
 
 #define KVM_CMA_CHUNK_ORDER	18
 
