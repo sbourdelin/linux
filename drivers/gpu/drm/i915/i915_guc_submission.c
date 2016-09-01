@@ -330,7 +330,6 @@ static void guc_init_ctx_desc(struct intel_guc *guc,
 	struct i915_gem_context *ctx = client->owner;
 	struct guc_context_desc desc;
 	struct sg_table *sg;
-	unsigned int tmp;
 	u32 gfx_addr;
 
 	memset(&desc, 0, sizeof(desc));
@@ -340,7 +339,7 @@ static void guc_init_ctx_desc(struct intel_guc *guc,
 	desc.priority = client->priority;
 	desc.db_id = client->doorbell_id;
 
-	for_each_engine_masked(engine, dev_priv, client->engines, tmp) {
+	for_each_engine_masked(engine, dev_priv, client->engines) {
 		struct intel_context *ce = &ctx->engine[engine->id];
 		uint32_t guc_engine_id = engine->guc_id;
 		struct guc_execlist_context *lrc = &desc.lrc[guc_engine_id];

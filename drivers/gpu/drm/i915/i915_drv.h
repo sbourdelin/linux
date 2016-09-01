@@ -2093,16 +2093,17 @@ static inline struct drm_i915_private *guc_to_i915(struct intel_guc *guc)
 		for_each_if (((id__) = (engine__)->id, \
 			      intel_engine_initialized(engine__)))
 
-#define __mask_next_bit(mask) ({					\
-	int __idx = ffs(mask) - 1;					\
-	mask &= ~BIT(__idx);						\
-	__idx;								\
-})
-
 /* Iterator over subset of engines selected by mask */
-#define for_each_engine_masked(engine__, dev_priv__, mask__, tmp__) \
-	for (tmp__ = mask__ & INTEL_INFO(dev_priv__)->ring_mask;	\
-	     tmp__ ? (engine__ = &(dev_priv__)->engine[__mask_next_bit(tmp__)]), 1 : 0; )
+#define for_each_engine_masked(engine__, dev_priv__, mask__)		\
+	for ((engine__) = NULL;						\
+	     ({								\
+		u32 next__ = INTEL_INFO(dev_priv__)->ring_mask;		\
+		if (likely(engine__))					\
+			next__ &= ~1u << (engine__)->id;		\
+		next__ = ffs(mask__ & next__);				\
+		(engine__) = (dev_priv__)->engine + next__ - 1;		\
+		next__;							\
+	     }); )
 
 enum hdmi_force_audio {
 	HDMI_AUDIO_OFF_DVI = -2,	/* no aux data for HDMI-DVI converter */
