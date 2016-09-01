@@ -1013,11 +1013,25 @@ complete_reset:
 
 static int i40e_vf_netdev_open(struct net_device *dev)
 {
+	struct i40e_vf_netdev_priv *priv = netdev_priv(dev);
+	struct i40e_vf *vf = priv->vf;
+
+	vf->link_forced = true;
+	vf->link_up = true;
+	i40e_vc_notify_vf_link_state(vf);
+
 	return 0;
 }
 
 static int i40e_vf_netdev_stop(struct net_device *dev)
 {
+	struct i40e_vf_netdev_priv *priv = netdev_priv(dev);
+	struct i40e_vf *vf = priv->vf;
+
+	vf->link_forced = true;
+	vf->link_up = false;
+	i40e_vc_notify_vf_link_state(vf);
+
 	return 0;
 }
 
@@ -1907,6 +1921,10 @@ static int i40e_vc_enable_queues_msg(struct i40e_vf *vf, u8 *msg, u16 msglen)
 
 	if (i40e_vsi_control_rings(pf->vsi[vf->lan_vsi_idx], true))
 		aq_ret = I40E_ERR_TIMEOUT;
+
+	if ((0 == aq_ret) && vf->ctrl_netdev)
+		netif_carrier_on(vf->ctrl_netdev);
+
 error_param:
 	/* send the response to the VF */
 	return i40e_vc_send_resp_to_vf(vf, I40E_VIRTCHNL_OP_ENABLE_QUEUES,
@@ -1946,6 +1964,9 @@ static int i40e_vc_disable_queues_msg(struct i40e_vf *vf, u8 *msg, u16 msglen)
 
 	if (i40e_vsi_control_rings(pf->vsi[vf->lan_vsi_idx], false))
 		aq_ret = I40E_ERR_TIMEOUT;
+
+	if ((0 == aq_ret) && vf->ctrl_netdev)
+		netif_carrier_off(vf->ctrl_netdev);
 
 error_param:
 	/* send the response to the VF */
@@ -3179,6 +3200,7 @@ int i40e_ndo_set_vf_link_state(struct net_device *netdev, int vf_id, int link)
 	struct i40e_virtchnl_pf_event pfe;
 	struct i40e_hw *hw = &pf->hw;
 	struct i40e_vf *vf;
+	struct net_device *vf_netdev;
 	int abs_vf_id;
 	int ret = 0;
 
@@ -3219,6 +3241,17 @@ int i40e_ndo_set_vf_link_state(struct net_device *netdev, int vf_id, int link)
 		ret = -EINVAL;
 		goto error_out;
 	}
+
+	vf_netdev = vf->ctrl_netdev;
+	if (vf_netdev) {
+		unsigned int flags = vf_netdev->flags;
+
+		if (vf->link_up)
+			dev_change_flags(vf_netdev, flags | IFF_UP);
+		else
+			dev_change_flags(vf_netdev, flags & ~IFF_UP);
+	}
+
 	/* Notify the VF of its new link state */
 	i40e_aq_send_msg_to_vf(hw, abs_vf_id, I40E_VIRTCHNL_OP_EVENT,
 			       0, (u8 *)&pfe, sizeof(pfe), NULL);
