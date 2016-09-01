@@ -42,26 +42,26 @@ static bool reset = true;
 
 static struct usb_driver btusb_driver;
 
-#define BTUSB_IGNORE		0x01
-#define BTUSB_DIGIANSWER	0x02
-#define BTUSB_CSR		0x04
-#define BTUSB_SNIFFER		0x08
-#define BTUSB_BCM92035		0x10
-#define BTUSB_BROKEN_ISOC	0x20
-#define BTUSB_WRONG_SCO_MTU	0x40
-#define BTUSB_ATH3012		0x80
-#define BTUSB_INTEL		0x100
-#define BTUSB_INTEL_BOOT	0x200
-#define BTUSB_BCM_PATCHRAM	0x400
-#define BTUSB_MARVELL		0x800
-#define BTUSB_SWAVE		0x1000
-#define BTUSB_INTEL_NEW		0x2000
-#define BTUSB_AMP		0x4000
-#define BTUSB_QCA_ROME		0x8000
-#define BTUSB_BCM_APPLE		0x10000
-#define BTUSB_REALTEK		0x20000
-#define BTUSB_BCM2045		0x40000
-#define BTUSB_IFNUM_2		0x80000
+#define BTUSB_IGNORE			0x01
+#define BTUSB_DIGIANSWER		0x02
+#define BTUSB_CSR			0x04
+#define BTUSB_SNIFFER			0x08
+#define BTUSB_BCM92035			0x10
+#define BTUSB_BROKEN_ISOC		0x20
+#define BTUSB_WRONG_SCO_MTU		0x40
+#define BTUSB_ATH3012			0x80
+#define BTUSB_INTEL			0x100
+#define BTUSB_INTEL_BOOT		0x200
+#define BTUSB_BCM_PATCHRAM		0x400
+#define BTUSB_MARVELL			0x800
+#define BTUSB_SWAVE			0x1000
+#define BTUSB_INTEL_NEW			0x2000
+#define BTUSB_AMP			0x4000
+#define BTUSB_QCA_ROME			0x8000
+#define BTUSB_BCM_APPLE			0x10000
+#define BTUSB_REALTEK			0x20000
+#define BTUSB_BROKEN_STORED_LINK_KEY	0x40000
+#define BTUSB_IFNUM_2			0x80000
 
 static const struct usb_device_id btusb_table[] = {
 	/* Generic Bluetooth USB device */
@@ -173,8 +173,9 @@ static const struct usb_device_id blacklist_table[] = {
 	/* Broadcom BCM2033 without firmware */
 	{ USB_DEVICE(0x0a5c, 0x2033), .driver_info = BTUSB_IGNORE },
 
-	/* Broadcom BCM2045 devices */
-	{ USB_DEVICE(0x0a5c, 0x2045), .driver_info = BTUSB_BCM2045 },
+	/* Broadcom BCM2045 devices, broken Read Stored Link Key command */
+	{ USB_DEVICE(0x0a5c, 0x2045),
+	  .driver_info = BTUSB_BROKEN_STORED_LINK_KEY },
 
 	/* Atheros 3011 with sflash firmware */
 	{ USB_DEVICE(0x0489, 0xe027), .driver_info = BTUSB_IGNORE },
@@ -290,8 +291,11 @@ static const struct usb_device_id blacklist_table[] = {
 	{ USB_DEVICE(0x0400, 0x0807), .driver_info = BTUSB_BROKEN_ISOC },
 	{ USB_DEVICE(0x0400, 0x080a), .driver_info = BTUSB_BROKEN_ISOC },
 
-	/* CONWISE Technology based adapters with buggy SCO support */
-	{ USB_DEVICE(0x0e5e, 0x6622), .driver_info = BTUSB_BROKEN_ISOC },
+	/* CONWISE Technology based adapters with buggy SCO support and broken
+	 * Read Stored Link Key command
+	 */
+	{ USB_DEVICE(0x0e5e, 0x6622),
+	  .driver_info = BTUSB_BROKEN_ISOC | BTUSB_BROKEN_STORED_LINK_KEY},
 
 	/* Roper Class 1 Bluetooth Dongle (Silicon Wave based) */
 	{ USB_DEVICE(0x1310, 0x0001), .driver_info = BTUSB_SWAVE },
@@ -2845,7 +2849,7 @@ static int btusb_probe(struct usb_interface *intf,
 	hdev->send   = btusb_send_frame;
 	hdev->notify = btusb_notify;
 
-	if (id->driver_info & BTUSB_BCM2045)
+	if (id->driver_info & BTUSB_BROKEN_STORED_LINK_KEY)
 		set_bit(HCI_QUIRK_BROKEN_STORED_LINK_KEY, &hdev->quirks);
 
 	if (id->driver_info & BTUSB_BCM92035)
