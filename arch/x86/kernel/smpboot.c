@@ -109,6 +109,17 @@ EXPORT_SYMBOL(__max_logical_packages);
 int __max_smt_threads __read_mostly;
 
 unsigned int __read_mostly sysctl_sched_itmt_enabled;
+/* Flag to indicate if a complete sched domain rebuild is required */
+bool x86_topology_update;
+
+int arch_update_cpu_topology(void)
+{
+	if (x86_topology_update) {
+		x86_topology_update = false;
+		return 1;
+	} else
+		return 0;
+}
 
 static inline void smpboot_setup_warm_reset_vector(unsigned long start_eip)
 {
