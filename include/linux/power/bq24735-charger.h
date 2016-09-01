@@ -28,9 +28,7 @@ struct bq24735_platform {
 
 	const char *name;
 
-	int status_gpio;
-	int status_gpio_active_low;
-	bool status_gpio_valid;
+	struct gpio_desc *status_gpio;
 
 	bool ext_control;
 
