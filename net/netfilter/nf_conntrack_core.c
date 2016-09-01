@@ -82,10 +82,7 @@ void nf_conntrack_lock(spinlock_t *lock) __acquires(lock)
 	/* 1) Acquire the lock */
 	spin_lock(lock);
 
-	/* 2) Order storing the lock and reading nf_conntrack_locks_all */
-	smp_mb();
-
-	/* 3) read nf_conntrack_locks_all, with ACQUIRE semantics */
+	/* 2) read nf_conntrack_locks_all, with ACQUIRE semantics */
 	if (likely(smp_load_acquire(&nf_conntrack_locks_all) == false))
 		return;
 
