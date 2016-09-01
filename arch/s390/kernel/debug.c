@@ -377,7 +377,7 @@ debug_info_copy(debug_info_t* in, int mode)
 			in->nr_areas, in->buf_size, in->level, mode);
 		spin_lock_irqsave(&in->lock, flags);
 		if (!rc)
-			goto out;
+			goto unlock;
 		/* has something changed in the meantime ? */
 		if ((rc->pages_per_area == in->pages_per_area) &&
 		   (rc->nr_areas == in->nr_areas)) {
@@ -388,12 +388,12 @@ debug_info_copy(debug_info_t* in, int mode)
 	} while (1);
 
 	if (mode == NO_AREAS)
-                goto out;
+		goto unlock;
 
 	for (i = 0; i < in->nr_areas; i++)
 		for (j = 0; j < in->pages_per_area; j++)
 			memcpy(rc->areas[i][j], in->areas[i][j], PAGE_SIZE);
-out:
+ unlock:
         spin_unlock_irqrestore(&in->lock, flags);
         return rc;
 }
