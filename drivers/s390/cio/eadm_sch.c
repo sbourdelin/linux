@@ -251,7 +251,7 @@ static int eadm_subchannel_probe(struct subchannel *sch)
 	spin_unlock_irq(&list_lock);
 
 	if (dev_get_uevent_suppress(&sch->dev)) {
-		dev_set_uevent_suppress(&sch->dev, 0);
+		dev_set_uevent_suppress(&sch->dev, false);
 		kobject_uevent(&sch->dev.kobj, KOBJ_ADD);
 	}
 out:

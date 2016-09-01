@@ -623,7 +623,7 @@ void acpi_dock_add(struct acpi_device *adev)
 	INIT_LIST_HEAD(&dock_station->dependent_devices);
 
 	/* we want the dock device to send uevents */
-	dev_set_uevent_suppress(&dd->dev, 0);
+	dev_set_uevent_suppress(&dd->dev, false);
 
 	if (acpi_dock_match(handle))
 		dock_station->flags |= DOCK_IS_DOCK;

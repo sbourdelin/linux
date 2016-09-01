@@ -310,7 +310,7 @@ int css_register_subchannel(struct subchannel *sch)
 	 * the subchannel driver can decide itself when it wants to inform
 	 * userspace of its existence.
 	 */
-	dev_set_uevent_suppress(&sch->dev, 1);
+	dev_set_uevent_suppress(&sch->dev, true);
 	css_update_ssd_info(sch);
 	/* make it known to the system */
 	ret = css_sch_device_register(sch);
@@ -325,7 +325,7 @@ int css_register_subchannel(struct subchannel *sch)
 		 * a fitting driver module may be loaded based on the
 		 * modalias.
 		 */
-		dev_set_uevent_suppress(&sch->dev, 0);
+		dev_set_uevent_suppress(&sch->dev, false);
 		kobject_uevent(&sch->dev.kobj, KOBJ_ADD);
 	}
 	return ret;

@@ -344,7 +344,7 @@ struct hd_struct *add_partition(struct gendisk *disk, int partno,
 	pdev->devt = devt;
 
 	/* delay uevent until 'holders' subdir is created */
-	dev_set_uevent_suppress(pdev, 1);
+	dev_set_uevent_suppress(pdev, true);
 	err = device_add(pdev);
 	if (err)
 		goto out_put;
@@ -354,7 +354,7 @@ struct hd_struct *add_partition(struct gendisk *disk, int partno,
 	if (!p->holder_dir)
 		goto out_del;
 
-	dev_set_uevent_suppress(pdev, 0);
+	dev_set_uevent_suppress(pdev, false);
 	if (flags & ADDPART_FLAG_WHOLEDISK) {
 		err = device_create_file(pdev, &dev_attr_whole_disk);
 		if (err)

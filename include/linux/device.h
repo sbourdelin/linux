@@ -929,7 +929,7 @@ static inline unsigned int dev_get_uevent_suppress(const struct device *dev)
 	return dev->kobj.uevent_suppress;
 }
 
-static inline void dev_set_uevent_suppress(struct device *dev, int val)
+static inline void dev_set_uevent_suppress(struct device *dev, bool val)
 {
 	dev->kobj.uevent_suppress = val;
 }

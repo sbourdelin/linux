@@ -519,7 +519,7 @@ static void register_disk(struct device *parent, struct gendisk *disk)
 	dev_set_name(ddev, "%s", disk->disk_name);
 
 	/* delay uevents, until we scanned partition table */
-	dev_set_uevent_suppress(ddev, 1);
+	dev_set_uevent_suppress(ddev, true);
 
 	if (device_add(ddev))
 		return;
@@ -562,7 +562,7 @@ static void register_disk(struct device *parent, struct gendisk *disk)
 
 exit:
 	/* announce disk after possible partitions are created */
-	dev_set_uevent_suppress(ddev, 0);
+	dev_set_uevent_suppress(ddev, false);
 	kobject_uevent(&ddev->kobj, KOBJ_ADD);
 
 	/* announce possible partitions */

@@ -97,7 +97,7 @@ static int chsc_subchannel_probe(struct subchannel *sch)
 		kfree(private);
 	} else {
 		if (dev_get_uevent_suppress(&sch->dev)) {
-			dev_set_uevent_suppress(&sch->dev, 0);
+			dev_set_uevent_suppress(&sch->dev, false);
 			kobject_uevent(&sch->dev.kobj, KOBJ_ADD);
 		}
 	}

@@ -350,7 +350,7 @@ static void cuse_process_init_reply(struct fuse_conn *fc, struct fuse_req *req)
 		goto err_region;
 
 	device_initialize(dev);
-	dev_set_uevent_suppress(dev, 1);
+	dev_set_uevent_suppress(dev, true);
 	dev->class = cuse_class;
 	dev->devt = devt;
 	dev->release = cuse_gendev_release;
@@ -391,7 +391,7 @@ static void cuse_process_init_reply(struct fuse_conn *fc, struct fuse_req *req)
 	mutex_unlock(&cuse_lock);
 
 	/* announce device availability */
-	dev_set_uevent_suppress(dev, 0);
+	dev_set_uevent_suppress(dev, false);
 	kobject_uevent(&dev->kobj, KOBJ_ADD);
 out:
 	kfree(arg);
