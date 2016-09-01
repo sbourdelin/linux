@@ -435,6 +435,15 @@ static int ovl_create_or_link(struct dentry *dentry, struct inode *inode,
 	if (override_cred) {
 		override_cred->fsuid = inode->i_uid;
 		override_cred->fsgid = inode->i_gid;
+		if (!hardlink) {
+			err = security_dentry_create_files_as(dentry,
+					stat->mode, &dentry->d_name, old_cred,
+					override_cred);
+			if (err) {
+				put_cred(override_cred);
+				goto out_revert_creds;
+			}
+		}
 		put_cred(override_creds(override_cred));
 		put_cred(override_cred);
 
@@ -445,6 +454,7 @@ static int ovl_create_or_link(struct dentry *dentry, struct inode *inode,
 			err = ovl_create_over_whiteout(dentry, inode, stat,
 							link, hardlink);
 	}
+out_revert_creds:
 	revert_creds(old_cred);
 	if (!err) {
 		struct inode *realinode = d_inode(ovl_dentry_upper(dentry));
@@ -942,7 +952,7 @@ const struct inode_operations ovl_dir_inode_operations = {
 	.symlink	= ovl_symlink,
 	.unlink		= ovl_unlink,
 	.rmdir		= ovl_rmdir,
-	.rename2	= ovl_rename2,
+	.rename		= ovl_rename2,
 	.link		= ovl_link,
 	.setattr	= ovl_setattr,
 	.create		= ovl_create,

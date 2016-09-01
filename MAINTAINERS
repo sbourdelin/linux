@@ -636,6 +636,15 @@ F:	drivers/tty/serial/altera_jtaguart.c
 F:	include/linux/altera_uart.h
 F:	include/linux/altera_jtaguart.h
 
+AMAZON ETHERNET DRIVERS
+M:	Netanel Belgazal <netanel@annapurnalabs.com>
+R:	Saeed Bishara <saeed@annapurnalabs.com>
+R:	Zorik Machulsky <zorik@annapurnalabs.com>
+L:	netdev@vger.kernel.org
+S:	Supported
+F:	Documentation/networking/ena.txt
+F:	drivers/net/ethernet/amazon/
+
 AMD CRYPTOGRAPHIC COPROCESSOR (CCP) DRIVER
 M:	Tom Lendacky <thomas.lendacky@amd.com>
 M:	Gary Hook <gary.hook@amd.com>
@@ -798,6 +807,7 @@ M:	Laura Abbott <labbott@redhat.com>
 M:	Sumit Semwal <sumit.semwal@linaro.org>
 L:	devel@driverdev.osuosl.org
 S:	Supported
+F:	Documentation/devicetree/bindings/staging/ion/
 F:	drivers/staging/android/ion
 F:	drivers/staging/android/uapi/ion.h
 F:	drivers/staging/android/uapi/ion_test.h
@@ -1008,6 +1018,7 @@ F:	arch/arm/mach-meson/
 F:	arch/arm/boot/dts/meson*
 F:	arch/arm64/boot/dts/amlogic/
 F: 	drivers/pinctrl/meson/
+F:      drivers/mmc/host/meson*
 N:	meson
 
 ARM/Annapurna Labs ALPINE ARCHITECTURE
@@ -1623,7 +1634,7 @@ N:	rockchip
 
 ARM/SAMSUNG EXYNOS ARM ARCHITECTURES
 M:	Kukjin Kim <kgene@kernel.org>
-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
+M:	Krzysztof Kozlowski <krzk@kernel.org>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 L:	linux-samsung-soc@vger.kernel.org (moderated for non-subscribers)
 S:	Maintained
@@ -1643,7 +1654,6 @@ F:	drivers/*/*s3c64xx*
 F:	drivers/*/*s5pv210*
 F:	drivers/memory/samsung/*
 F:	drivers/soc/samsung/*
-F:	drivers/spi/spi-s3c*
 F:	Documentation/arm/Samsung/
 F:	Documentation/devicetree/bindings/arm/samsung/
 F:	Documentation/devicetree/bindings/sram/samsung-sram.txt
@@ -1973,6 +1983,13 @@ T:	git git://linuxtv.org/media_tree.git
 S:	Maintained
 F:	drivers/media/i2c/as3645a.c
 F:	include/media/i2c/as3645a.h
+
+ASAHI KASEI AK8974 DRIVER
+M:	Linus Walleij <linus.walleij@linaro.org>
+L:	linux-iio@vger.kernel.org
+W:	http://www.akm.com/
+S:	Supported
+F:	drivers/iio/magnetometer/ak8974.c
 
 ASC7621 HARDWARE MONITOR DRIVER
 M:	George Joseph <george.joseph@fairview5.com>
@@ -3134,7 +3151,7 @@ L:	cocci@systeme.lip6.fr (moderated for non-subscribers)
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mmarek/kbuild.git misc
 W:	http://coccinelle.lip6.fr/
 S:	Supported
-F:	Documentation/coccinelle.txt
+F:	Documentation/dev-tools/coccinelle.rst
 F:	scripts/coccinelle/
 F:	scripts/coccicheck
 
@@ -3160,6 +3177,7 @@ COMMON CLK FRAMEWORK
 M:	Michael Turquette <mturquette@baylibre.com>
 M:	Stephen Boyd <sboyd@codeaurora.org>
 L:	linux-clk@vger.kernel.org
+Q:	http://patchwork.kernel.org/project/linux-clk/list/
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
 S:	Maintained
 F:	Documentation/devicetree/bindings/clock/
@@ -3761,8 +3779,8 @@ F:	drivers/leds/leds-da90??.c
 F:	drivers/mfd/da903x.c
 F:	drivers/mfd/da90??-*.c
 F:	drivers/mfd/da91??-*.c
-F:	drivers/power/da9052-battery.c
-F:	drivers/power/da91??-*.c
+F:	drivers/power/supply/da9052-battery.c
+F:	drivers/power/supply/da91??-*.c
 F:	drivers/regulator/da903x.c
 F:	drivers/regulator/da9???-regulator.[ch]
 F:	drivers/rtc/rtc-da90??.c
@@ -3777,6 +3795,12 @@ F:	include/linux/mfd/da9150/
 F:	include/linux/regulator/da9211.h
 F:	include/sound/da[79]*.h
 F:	sound/soc/codecs/da[79]*.[ch]
+
+DIAMOND SYSTEMS GPIO-MM GPIO DRIVER
+M:	William Breathitt Gray <vilhelm.gray@gmail.com>
+L:	linux-gpio@vger.kernel.org
+S:	Maintained
+F:	drivers/gpio/gpio-gpio-mm.c
 
 DIGI NEO AND CLASSIC PCI PRODUCTS
 M:	Lidza Louina <lidza.louina@gmail.com>
@@ -4072,6 +4096,14 @@ DRM DRIVER FOR INTEL I810 VIDEO CARDS
 S:	Orphan / Obsolete
 F:	drivers/gpu/drm/i810/
 F:	include/uapi/drm/i810_drm.h
+
+DRM DRIVERS FOR MEDIATEK
+M:	CK Hu <ck.hu@mediatek.com>
+M:	Philipp Zabel <p.zabel@pengutronix.de>
+L:	dri-devel@lists.freedesktop.org
+S:	Supported
+F:	drivers/gpu/drm/mediatek/
+F:	Documentation/devicetree/bindings/display/mediatek/
 
 DRM DRIVER FOR MSM ADRENO GPU
 M:	Rob Clark <robdclark@gmail.com>
@@ -5134,7 +5166,7 @@ GCOV BASED KERNEL PROFILING
 M:	Peter Oberparleiter <oberpar@linux.vnet.ibm.com>
 S:	Maintained
 F:	kernel/gcov/
-F:	Documentation/gcov.txt
+F:	Documentation/dev-tools/gcov.rst
 
 GDT SCSI DISK ARRAY CONTROLLER DRIVER
 M:	Achim Leubner <achim_leubner@adaptec.com>
@@ -5572,6 +5604,14 @@ W:	http://www.hisilicon.com
 S:	Maintained
 F:	drivers/net/ethernet/hisilicon/
 F:	Documentation/devicetree/bindings/net/hisilicon*.txt
+
+HISILICON ROCE DRIVER
+M:	Lijun Ou <oulijun@huawei.com>
+M:	Wei Hu(Xavier) <xavier.huwei@huawei.com>
+L:	linux-rdma@vger.kernel.org
+S:	Maintained
+F:	drivers/infiniband/hw/hns/
+F:	Documentation/devicetree/bindings/infiniband/hisilicon-hns-roce.txt
 
 HISILICON SAS Controller
 M:	John Garry <john.garry@huawei.com>
@@ -6093,6 +6133,13 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/lenb/linux.git
 S:	Supported
 F:	drivers/idle/intel_idle.c
 
+INTEL INTEGRATED SENSOR HUB DRIVER
+M:	Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+M:	Jiri Kosina <jikos@kernel.org>
+L:	linux-input@vger.kernel.org
+S:	Maintained
+F:	drivers/hid/intel-ish-hid/
+
 INTEL PSTATE DRIVER
 M:	Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
 M:	Len Brown <lenb@kernel.org>
@@ -6603,7 +6650,7 @@ L:	kasan-dev@googlegroups.com
 S:	Maintained
 F:	arch/*/include/asm/kasan.h
 F:	arch/*/mm/kasan_init*
-F:	Documentation/kasan.txt
+F:	Documentation/dev-tools/kasan.rst
 F:	include/linux/kasan*.h
 F:	lib/test_kasan.c
 F:	mm/kasan/
@@ -6819,7 +6866,7 @@ KMEMCHECK
 M:	Vegard Nossum <vegardno@ifi.uio.no>
 M:	Pekka Enberg <penberg@kernel.org>
 S:	Maintained
-F:	Documentation/kmemcheck.txt
+F:	Documentation/dev-tools/kmemcheck.rst
 F:	arch/x86/include/asm/kmemcheck.h
 F:	arch/x86/mm/kmemcheck/
 F:	include/linux/kmemcheck.h
@@ -6828,7 +6875,7 @@ F:	mm/kmemcheck.c
 KMEMLEAK
 M:	Catalin Marinas <catalin.marinas@arm.com>
 S:	Maintained
-F:	Documentation/kmemleak.txt
+F:	Documentation/dev-tools/kmemleak.rst
 F:	include/linux/kmemleak.h
 F:	mm/kmemleak.c
 F:	mm/kmemleak-test.c
@@ -7464,11 +7511,12 @@ F:	Documentation/devicetree/bindings/sound/max9860.txt
 F:	sound/soc/codecs/max9860.*
 
 MAXIM MUIC CHARGER DRIVERS FOR EXYNOS BASED BOARDS
-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
+M:	Krzysztof Kozlowski <krzk@kernel.org>
+M:	Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 L:	linux-pm@vger.kernel.org
 S:	Supported
-F:	drivers/power/max14577_charger.c
-F:	drivers/power/max77693_charger.c
+F:	drivers/power/supply/max14577_charger.c
+F:	drivers/power/supply/max77693_charger.c
 
 MAXIM MAX77802 MULTIFUNCTION PMIC DEVICE DRIVERS
 M:	Javier Martinez Canillas <javier@osg.samsung.com>
@@ -7480,7 +7528,8 @@ F:	include/dt-bindings/*/*max77802.h
 
 MAXIM PMIC AND MUIC DRIVERS FOR EXYNOS BASED BOARDS
 M:	Chanwoo Choi <cw00.choi@samsung.com>
-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
+M:	Krzysztof Kozlowski <krzk@kernel.org>
+M:	Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 L:	linux-kernel@vger.kernel.org
 S:	Supported
 F:	drivers/*/max14577*.c
@@ -7511,6 +7560,12 @@ M:	Peter Rosin <peda@axentia.se>
 L:	linux-iio@vger.kernel.org
 S:	Maintained
 F:	drivers/iio/potentiometer/mcp4531.c
+
+MEASUREMENT COMPUTING CIO-DAC IIO DRIVER
+M:	William Breathitt Gray <vilhelm.gray@gmail.com>
+L:	linux-iio@vger.kernel.org
+S:	Maintained
+F:	drivers/iio/dac/cio-dac.c
 
 MEDIA DRIVERS FOR RENESAS - FCP
 M:	Laurent Pinchart <laurent.pinchart@ideasonboard.com>
@@ -7834,6 +7889,17 @@ L:	linux-iio@vger.kernel.org
 W:	http://www.melexis.com
 S:	Supported
 F:	drivers/iio/temperature/mlx90614.c
+
+MICROSEMI SMART ARRAY SMARTPQI DRIVER (smartpqi)
+M:	Don Brace <don.brace@microsemi.com>
+L:	esc.storagedev@microsemi.com
+L:	linux-scsi@vger.kernel.org
+S:	Supported
+F:	drivers/scsi/smartpqi/smartpqi*.[ch]
+F:	drivers/scsi/smartpqi/Kconfig
+F:	drivers/scsi/smartpqi/Makefile
+F:	include/linux/cciss*.h
+F:	include/uapi/linux/cciss*.h
 
 MN88472 MEDIA DRIVER
 M:	Antti Palosaari <crope@iki.fi>
@@ -8339,11 +8405,11 @@ R:	Pali Rohár <pali.rohar@gmail.com>
 F:	include/linux/power/bq2415x_charger.h
 F:	include/linux/power/bq27xxx_battery.h
 F:	include/linux/power/isp1704_charger.h
-F:	drivers/power/bq2415x_charger.c
-F:	drivers/power/bq27xxx_battery.c
-F:	drivers/power/bq27xxx_battery_i2c.c
-F:	drivers/power/isp1704_charger.c
-F:	drivers/power/rx51_battery.c
+F:	drivers/power/supply/bq2415x_charger.c
+F:	drivers/power/supply/bq27xxx_battery.c
+F:	drivers/power/supply/bq27xxx_battery_i2c.c
+F:	drivers/power/supply/isp1704_charger.c
+F:	drivers/power/supply/rx51_battery.c
 
 NTB DRIVER CORE
 M:	Jon Mason <jdmason@kudzu.us>
@@ -9246,7 +9312,7 @@ F:	drivers/pinctrl/sh-pfc/
 
 PIN CONTROLLER - SAMSUNG
 M:	Tomasz Figa <tomasz.figa@gmail.com>
-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
+M:	Krzysztof Kozlowski <krzk@kernel.org>
 M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 L:	linux-samsung-soc@vger.kernel.org (moderated for non-subscribers)
@@ -9347,11 +9413,9 @@ M:	David Woodhouse <dwmw2@infradead.org>
 L:	linux-pm@vger.kernel.org
 T:	git git://git.infradead.org/battery-2.6.git
 S:	Maintained
-F:	Documentation/devicetree/bindings/power/
-F:	Documentation/devicetree/bindings/power_supply/
+F:	Documentation/devicetree/bindings/power/supply/
 F:	include/linux/power_supply.h
-F:	drivers/power/
-X:	drivers/power/avs/
+F:	drivers/power/supply/
 
 POWER STATE COORDINATION INTERFACE (PSCI)
 M:	Mark Rutland <mark.rutland@arm.com>
@@ -9942,6 +10006,7 @@ F:	net/rfkill/
 
 RHASHTABLE
 M:	Thomas Graf <tgraf@suug.ch>
+M:	Herbert Xu <herbert@gondor.apana.org.au>
 L:	netdev@vger.kernel.org
 S:	Maintained
 F:	lib/rhashtable.c
@@ -10179,7 +10244,7 @@ S:	Maintained
 F:	drivers/platform/x86/samsung-laptop.c
 
 SAMSUNG AUDIO (ASoC) DRIVERS
-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
+M:	Krzysztof Kozlowski <krzk@kernel.org>
 M:	Sangbeom Kim <sbkim73@samsung.com>
 M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
 L:	alsa-devel@alsa-project.org (moderated for non-subscribers)
@@ -10194,7 +10259,8 @@ F:	drivers/video/fbdev/s3c-fb.c
 
 SAMSUNG MULTIFUNCTION PMIC DEVICE DRIVERS
 M:	Sangbeom Kim <sbkim73@samsung.com>
-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
+M:	Krzysztof Kozlowski <krzk@kernel.org>
+M:	Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 L:	linux-kernel@vger.kernel.org
 L:	linux-samsung-soc@vger.kernel.org
 S:	Supported
@@ -10252,6 +10318,17 @@ M:	Tomasz Figa <tomasz.figa@gmail.com>
 S:	Supported
 L:	linux-samsung-soc@vger.kernel.org (moderated for non-subscribers)
 F:	drivers/clk/samsung/
+
+SAMSUNG SPI DRIVERS
+M:	Kukjin Kim <kgene@kernel.org>
+M:	Krzysztof Kozlowski <krzk@kernel.org>
+M:	Andi Shyti <andi.shyti@samsung.com>
+L:	linux-spi@vger.kernel.org
+L:	linux-samsung-soc@vger.kernel.org (moderated for non-subscribers)
+S:	Maintained
+F:	Documentation/devicetree/bindings/spi/spi-samsung.txt
+F:	drivers/spi/spi-s3c*
+F:	include/linux/platform_data/spi-s3c64xx.h
 
 SAMSUNG SXGBE DRIVERS
 M:	Byungho An <bh74.an@samsung.com>
@@ -10338,8 +10415,8 @@ F:	drivers/thunderbolt/
 TI BQ27XXX POWER SUPPLY DRIVER
 R:	Andrew F. Davis <afd@ti.com>
 F:	include/linux/power/bq27xxx_battery.h
-F:	drivers/power/bq27xxx_battery.c
-F:	drivers/power/bq27xxx_battery_i2c.c
+F:	drivers/power/supply/bq27xxx_battery.c
+F:	drivers/power/supply/bq27xxx_battery_i2c.c
 
 TIMEKEEPING, CLOCKSOURCE CORE, NTP, ALARMTIMER
 M:	John Stultz <john.stultz@linaro.org>
@@ -11099,6 +11176,7 @@ F:	Documentation/spi/
 F:	drivers/spi/
 F:	include/linux/spi/
 F:	include/uapi/linux/spi/
+F:	tools/spi/
 
 SPIDERNET NETWORK DRIVER for CELL
 M:	Ishizaki Kou <kou.ishizaki@toshiba.co.jp>
@@ -11169,6 +11247,7 @@ F:	drivers/staging/media/lirc/
 STAGING - LUSTRE PARALLEL FILESYSTEM
 M:	Oleg Drokin <oleg.drokin@intel.com>
 M:	Andreas Dilger <andreas.dilger@intel.com>
+M:	James Simmons <jsimmons@infradead.org>
 L:	lustre-devel@lists.lustre.org (moderated for non-subscribers)
 W:	http://wiki.lustre.org/
 S:	Maintained
@@ -11232,12 +11311,8 @@ S:	Odd Fixes
 F:	drivers/staging/vt665?/
 
 STAGING - WILC1000 WIFI DRIVER
-M:	Johnny Kim <johnny.kim@atmel.com>
-M:	Austin Shin <austin.shin@atmel.com>
-M:	Chris Park <chris.park@atmel.com>
-M:	Tony Cho <tony.cho@atmel.com>
-M:	Glen Lee <glen.lee@atmel.com>
-M:	Leo Kim <leo.kim@atmel.com>
+M:	Aditya Shankar <aditya.shankar@microchip.com>
+M:	Ganesh Krishna <ganesh.krishna@microchip.com>
 L:	linux-wireless@vger.kernel.org
 S:	Supported
 F:	drivers/staging/wilc1000/
@@ -11344,6 +11419,16 @@ M:	Arnd Bergmann <arnd@arndb.de>
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git
 S:	Supported
 F:	drivers/mfd/syscon.c
+
+SYSTEM RESET/SHUTDOWN DRIVERS
+M:	Sebastian Reichel <sre@kernel.org>
+M:	Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+M:	David Woodhouse <dwmw2@infradead.org>
+L:	linux-pm@vger.kernel.org
+T:	git git://git.infradead.org/battery-2.6.git
+S:	Maintained
+F:	Documentation/devicetree/bindings/power/reset/
+F:	drivers/power/reset/
 
 SYSV FILESYSTEM
 M:	Christoph Hellwig <hch@infradead.org>
@@ -11693,7 +11778,7 @@ F:	include/linux/platform_data/lp855x.h
 TI LP8727 CHARGER DRIVER
 M:	Milo Kim <milo.kim@ti.com>
 S:	Maintained
-F:	drivers/power/lp8727_charger.c
+F:	drivers/power/supply/lp8727_charger.c
 F:	include/linux/platform_data/lp8727.h
 
 TI LP8788 MFD DRIVER
@@ -11702,7 +11787,7 @@ S:	Maintained
 F:	drivers/iio/adc/lp8788_adc.c
 F:	drivers/leds/leds-lp8788.c
 F:	drivers/mfd/lp8788*.c
-F:	drivers/power/lp8788-charger.c
+F:	drivers/power/supply/lp8788-charger.c
 F:	drivers/regulator/lp8788-*.c
 F:	include/linux/mfd/lp8788*.h
 
@@ -12778,7 +12863,7 @@ F:	drivers/input/touchscreen/wm97*.c
 F:	drivers/mfd/arizona*
 F:	drivers/mfd/wm*.c
 F:	drivers/mfd/cs47l24*
-F:	drivers/power/wm83*.c
+F:	drivers/power/supply/wm83*.c
 F:	drivers/rtc/rtc-wm83*.c
 F:	drivers/regulator/wm8*.c
 F:	drivers/video/backlight/wm83*_bl.c

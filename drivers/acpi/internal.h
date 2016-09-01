@@ -40,10 +40,8 @@ int acpi_sysfs_init(void);
 void acpi_container_init(void);
 void acpi_memory_hotplug_init(void);
 #ifdef	CONFIG_ACPI_HOTPLUG_IOAPIC
-int acpi_ioapic_add(struct acpi_pci_root *root);
 int acpi_ioapic_remove(struct acpi_pci_root *root);
 #else
-static inline int acpi_ioapic_add(struct acpi_pci_root *root) { return 0; }
 static inline int acpi_ioapic_remove(struct acpi_pci_root *root) { return 0; }
 #endif
 #ifdef CONFIG_ACPI_DOCK
@@ -174,6 +172,8 @@ struct acpi_ec {
 	struct work_struct work;
 	unsigned long timestamp;
 	unsigned long nr_pending_queries;
+	bool saved_busy_polling;
+	unsigned int saved_polling_guard;
 };
 
 extern struct acpi_ec *first_ec;
