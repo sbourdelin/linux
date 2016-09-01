@@ -48,15 +48,19 @@ distance (memory latency) between all numa nodes.
 
   Note:
 	1. Each entry represents distance from first node to second node.
-	The distances are equal in either direction.
 	2. The distance from a node to self (local distance) is represented
 	with value 10 and all internode distance should be represented with
 	a value greater than 10.
-	3. distance-matrix should have entries in lexicographical ascending
+	3. For non-local node pairs:
+	  1) If both direction specified, keep no change.
+	  2) If only one direction specified, assign it to the other direction.
+	  3) If none of the two direction specified, both are assigned to
+	     REMOTE_DISTANCE.
+	4. distance-matrix should have entries in lexicographical ascending
 	order of nodes.
-	4. There must be only one device node distance-map which must
+	5. There must be only one device node distance-map which must
 	reside in the root node.
-	5. If the distance-map node is not present, a default
+	6. If the distance-map node is not present, a default
 	distance-matrix is used.
 
 Example:
