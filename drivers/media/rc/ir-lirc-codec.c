@@ -153,7 +153,7 @@ static ssize_t ir_lirc_transmit_ir(struct file *file, const char __user *buf,
 	}
 
 	ret = dev->tx_ir(dev, txbuf, count);
-	if (ret < 0)
+	if (ret < 0 || dev->driver_type == RC_DRIVER_IR_RAW_TX)
 		goto out;
 
 	for (duration = i = 0; i < ret; i++)
