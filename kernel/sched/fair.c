@@ -802,7 +802,7 @@ static void update_curr(struct cfs_rq *cfs_rq)
 	schedstat_set(curr->statistics.exec_max,
 		      max(delta_exec, curr->statistics.exec_max));
 
-	curr->sum_exec_runtime += delta_exec;
+	update_sum_exec_runtime(curr, delta_exec);
 	schedstat_add(cfs_rq, exec_clock, delta_exec);
 
 	curr->vruntime += calc_delta_fair(delta_exec, curr);

@@ -190,7 +190,8 @@ static int cpu_clock_sample(const clockid_t which_clock, struct task_struct *p,
 		*sample = virt_ticks(p);
 		break;
 	case CPUCLOCK_SCHED:
-		*sample = task_sched_runtime(p);
+		update_sched_runtime(p);
+		*sample = read_sum_exec_runtime(p);
 		break;
 	}
 	return 0;

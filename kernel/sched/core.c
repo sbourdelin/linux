@@ -2991,20 +2991,17 @@ static inline void prefetch_curr_exec_start(struct task_struct *p)
 }
 
 /*
- * Return accounted runtime for the task.
- * In case the task is currently running, return the runtime plus current's
+ * In case the task is currently running, update scheduler stats to include
  * pending runtime that have not been accounted yet.
  */
-unsigned long long task_sched_runtime(struct task_struct *p)
+void update_sched_runtime(struct task_struct *p)
 {
 	struct rq_flags rf;
 	struct rq *rq;
-	u64 ns;
 
-#if defined(CONFIG_64BIT) && defined(CONFIG_SMP)
 	/*
-	 * 64-bit doesn't need locks to atomically read a 64bit value.
-	 * So we have a optimization chance when the task's delta_exec is 0.
+	 * Optimization to to avoid taking task lock.
+	 *
 	 * Reading ->on_cpu is racy, but this is ok.
 	 *
 	 * If we race with it leaving cpu, we'll take a lock. So we're correct.
@@ -3014,8 +3011,7 @@ unsigned long long task_sched_runtime(struct task_struct *p)
 	 * been accounted, so we're correct here as well.
 	 */
 	if (!p->on_cpu || !task_on_rq_queued(p))
-		return p->se.sum_exec_runtime;
-#endif
+		return;
 
 	rq = task_rq_lock(p, &rf);
 	/*
@@ -3028,10 +3024,7 @@ unsigned long long task_sched_runtime(struct task_struct *p)
 		update_rq_clock(rq);
 		p->sched_class->update_curr(rq);
 	}
-	ns = p->se.sum_exec_runtime;
 	task_rq_unlock(rq, p, &rf);
-
-	return ns;
 }
 
 /*

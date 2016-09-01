@@ -306,26 +306,6 @@ static inline cputime_t account_other_time(cputime_t max)
 	return accounted;
 }
 
-#ifdef CONFIG_64BIT
-static inline u64 read_sum_exec_runtime(struct task_struct *t)
-{
-	return t->se.sum_exec_runtime;
-}
-#else
-static u64 read_sum_exec_runtime(struct task_struct *t)
-{
-	u64 ns;
-	struct rq_flags rf;
-	struct rq *rq;
-
-	rq = task_rq_lock(t, &rf);
-	ns = t->se.sum_exec_runtime;
-	task_rq_unlock(rq, t, &rf);
-
-	return ns;
-}
-#endif
-
 /*
  * Accumulate raw cputime values of dead tasks (sig->[us]time) and live
  * tasks (sum on group iteration) belonging to @tsk's group.
@@ -347,7 +327,7 @@ void thread_group_cputime(struct task_struct *tsk, struct task_cputime *times)
 	 * other scheduler action.
 	 */
 	if (same_thread_group(current, tsk))
-		(void) task_sched_runtime(current);
+		update_sched_runtime(current);
 
 	rcu_read_lock();
 	/* Attempt a lockless read on the first round. */

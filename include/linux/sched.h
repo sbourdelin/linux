@@ -1334,6 +1334,10 @@ struct sched_entity {
 
 	u64			nr_migrations;
 
+#ifndef CONFIG_64BIT
+	seqcount_t		sum_exec_runtime_seqcount;
+#endif
+
 #ifdef CONFIG_SCHEDSTATS
 	struct sched_statistics statistics;
 #endif
@@ -2490,8 +2494,39 @@ static inline void enable_sched_clock_irqtime(void) {}
 static inline void disable_sched_clock_irqtime(void) {}
 #endif
 
-extern unsigned long long
-task_sched_runtime(struct task_struct *task);
+extern void update_sched_runtime(struct task_struct *task);
+
+#ifdef CONFIG_64BIT
+static inline void update_sum_exec_runtime(struct sched_entity *se, u64 delta)
+{
+	se->sum_exec_runtime += delta;
+}
+
+static inline u64 read_sum_exec_runtime(struct task_struct *t)
+{
+	return  t->se.sum_exec_runtime;
+}
+#else
+static inline void update_sum_exec_runtime(struct sched_entity *se, u64 delta)
+{
+	write_seqcount_begin(&se->sum_exec_runtime_seqcount);
+	se->sum_exec_runtime += delta;
+	write_seqcount_end(&se->sum_exec_runtime_seqcount);
+}
+
+static inline u64 read_sum_exec_runtime(struct task_struct *t)
+{
+	u64 ns;
+	int seq;
+
+	do {
+		seq = read_seqcount_begin(&t->se.sum_exec_runtime_seqcount);
+		ns = t->se.sum_exec_runtime;
+	} while (read_seqcount_retry(&t->se.sum_exec_runtime_seqcount, seq));
+
+	return ns;
+}
+#endif
 
 /* sched_exec is called by processes performing an exec */
 #ifdef CONFIG_SMP
