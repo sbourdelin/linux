@@ -305,32 +305,14 @@ static int omap_abe_probe(struct platform_device *pdev)
 
 	snd_soc_card_set_drvdata(card, priv);
 
-<<<<<<< HEAD
-	ret = snd_soc_register_card(card);
-	if (ret)
-		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
-=======
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret)
 		dev_err(&pdev->dev, "devm_snd_soc_register_card() failed: %d\n",
->>>>>>> linux-next/akpm-base
 			ret);
 
 	return ret;
 }
 
-<<<<<<< HEAD
-static int omap_abe_remove(struct platform_device *pdev)
-{
-	struct snd_soc_card *card = platform_get_drvdata(pdev);
-
-	snd_soc_unregister_card(card);
-
-	return 0;
-}
-
-=======
->>>>>>> linux-next/akpm-base
 static const struct of_device_id omap_abe_of_match[] = {
 	{.compatible = "ti,abe-twl6040", },
 	{ },

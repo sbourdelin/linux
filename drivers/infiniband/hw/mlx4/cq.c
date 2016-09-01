@@ -576,14 +576,9 @@ static int mlx4_ib_ipoib_csum_ok(__be16 status, __be16 checksum)
 		checksum == cpu_to_be16(0xffff);
 }
 
-<<<<<<< HEAD
-static void use_tunnel_data(struct mlx4_ib_qp *qp, struct mlx4_ib_cq *cq, struct ib_wc *wc,
-			    unsigned tail, struct mlx4_cqe *cqe, int is_eth)
-=======
 static void use_tunnel_data(struct mlx4_ib_qp *qp, struct mlx4_ib_cq *cq,
 			    struct ib_wc *wc, unsigned tail,
 			    struct mlx4_cqe *cqe, int is_eth)
->>>>>>> linux-next/akpm-base
 {
 	struct mlx4_ib_proxy_sqp_hdr *hdr;
 
@@ -696,11 +691,7 @@ repoll:
 	if (unlikely((cqe->owner_sr_opcode & MLX4_CQE_OPCODE_MASK) == MLX4_OPCODE_NOP &&
 		     is_send)) {
 		pr_warn("Completion for NOP opcode detected!\n");
-<<<<<<< HEAD
-		return -EAGAIN;
-=======
 		goto out;
->>>>>>> linux-next/akpm-base
 	}
 
 	/* Resize CQ in progress */
@@ -731,11 +722,7 @@ repoll:
 		if (unlikely(!mqp)) {
 			pr_warn("CQ %06x with entry for unknown QPN %06x\n",
 			       cq->mcq.cqn, be32_to_cpu(cqe->vlan_my_qpn) & MLX4_CQE_QPN_MASK);
-<<<<<<< HEAD
-			return -EAGAIN;
-=======
 			goto out;
->>>>>>> linux-next/akpm-base
 		}
 
 		*cur_qp = to_mibqp(mqp);
@@ -753,11 +740,7 @@ repoll:
 		if (unlikely(!msrq)) {
 			pr_warn("CQ %06x with entry for unknown SRQN %06x\n",
 				cq->mcq.cqn, srq_num);
-<<<<<<< HEAD
-			return -EAGAIN;
-=======
 			goto out;
->>>>>>> linux-next/akpm-base
 		}
 	}
 

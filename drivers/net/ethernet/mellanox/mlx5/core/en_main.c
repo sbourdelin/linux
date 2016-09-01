@@ -3209,19 +3209,13 @@ static void mlx5e_destroy_q_counter(struct mlx5e_priv *priv)
 
 static int mlx5e_create_umr_mkey(struct mlx5e_priv *priv)
 {
+#if 0
 	struct mlx5_core_dev *mdev = priv->mdev;
-<<<<<<< HEAD
 	struct mlx5_create_mkey_mbox_in *in;
 	struct mlx5_mkey_seg *mkc;
 	int inlen = sizeof(*in);
 	u64 npages = MLX5E_REQUIRED_MTTS(priv->profile->max_nch(mdev),
 					 BIT(MLX5E_PARAMS_MAXIMUM_LOG_RQ_SIZE_MPW));
-=======
-	u64 npages = priv->profile->max_nch(mdev) * MLX5_CHANNEL_MAX_NUM_MTTS;
-	int inlen = MLX5_ST_SZ_BYTES(create_mkey_in);
-	void *mkc;
-	u32 *in;
->>>>>>> linux-next/akpm-base
 	int err;
 
 	in = mlx5_vzalloc(inlen);
@@ -3230,21 +3224,11 @@ static int mlx5e_create_umr_mkey(struct mlx5e_priv *priv)
 
 	mkc = MLX5_ADDR_OF(create_mkey_in, in, memory_key_mkey_entry);
 
-<<<<<<< HEAD
-	npages = min_t(u32, ALIGN(U16_MAX, 4) * 2, npages);
-
-	mkc->qpn_mkey7_0 = cpu_to_be32(0xffffff << 8);
-	mkc->flags_pd = cpu_to_be32(mdev->mlx5e_res.pdn);
-	mkc->len = cpu_to_be64(npages << PAGE_SHIFT);
-	mkc->xlt_oct_size = cpu_to_be32(MLX5_MTT_OCTW(npages));
-	mkc->log2_page_size = PAGE_SHIFT;
-=======
 	MLX5_SET(mkc, mkc, free, 1);
 	MLX5_SET(mkc, mkc, umr_en, 1);
 	MLX5_SET(mkc, mkc, lw, 1);
 	MLX5_SET(mkc, mkc, lr, 1);
 	MLX5_SET(mkc, mkc, access_mode, MLX5_MKC_ACCESS_MODE_MTT);
->>>>>>> linux-next/akpm-base
 
 	MLX5_SET(mkc, mkc, qpn, 0xffffff);
 	MLX5_SET(mkc, mkc, pd, mdev->mlx5e_res.pdn);
@@ -3257,6 +3241,7 @@ static int mlx5e_create_umr_mkey(struct mlx5e_priv *priv)
 
 	kvfree(in);
 	return err;
+#endif
 }
 
 static void mlx5e_nic_init(struct mlx5_core_dev *mdev,

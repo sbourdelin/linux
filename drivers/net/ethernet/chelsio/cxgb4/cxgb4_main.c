@@ -4476,17 +4476,12 @@ static void cfg_queues(struct adapter *adap)
 
 	/* Reduce memory usage in kdump environment, disable all offload.
 	 */
-<<<<<<< HEAD
-	if (is_kdump_kernel())
-		adap->params.offload = 0;
-=======
 	if (is_kdump_kernel()) {
 		adap->params.offload = 0;
 		adap->params.crypto = 0;
 	} else if (adap->num_uld && uld_mem_alloc(adap)) {
 		adap->params.crypto = 0;
 	}
->>>>>>> linux-next/akpm-base
 
 	for_each_port(adap, i)
 		n10g += is_x_10g_port(&adap2pinfo(adap, i)->link_cfg);

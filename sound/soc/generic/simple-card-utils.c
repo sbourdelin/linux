@@ -7,10 +7,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-<<<<<<< HEAD
-=======
 #include <linux/clk.h>
->>>>>>> linux-next/akpm-base
 #include <linux/module.h>
 #include <linux/of.h>
 #include <sound/simple_card_utils.h>
@@ -101,8 +98,6 @@ int asoc_simple_card_parse_card_name(struct snd_soc_card *card,
 }
 EXPORT_SYMBOL_GPL(asoc_simple_card_parse_card_name);
 
-<<<<<<< HEAD
-=======
 int asoc_simple_card_parse_clk(struct device_node *node,
 			       struct device_node *dai_of_node,
 			       struct asoc_simple_dai *simple_dai)
@@ -243,7 +238,6 @@ int asoc_simple_card_clean_reference(struct snd_soc_card *card)
 }
 EXPORT_SYMBOL_GPL(asoc_simple_card_clean_reference);
 
->>>>>>> linux-next/akpm-base
 /* Module information */
 MODULE_AUTHOR("Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>");
 MODULE_DESCRIPTION("ALSA SoC Simple Card Utils");
