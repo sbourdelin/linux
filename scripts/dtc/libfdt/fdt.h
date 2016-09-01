@@ -92,7 +92,8 @@ struct fdt_property {
 
 #endif /* !__ASSEMBLY */
 
-#define FDT_MAGIC	0xd00dfeed	/* 4: version, 4: total size */
+/* 4: version, 4: total size */
+#define FDT_MAGIC	((fdt32_t)0xd00dfeed)
 #define FDT_TAGSIZE	sizeof(fdt32_t)
 
 #define FDT_BEGIN_NODE	0x1		/* Start node: full name */

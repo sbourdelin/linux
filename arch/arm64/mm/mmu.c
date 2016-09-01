@@ -717,7 +717,8 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
 	create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
 			dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
 
-	if (fdt_magic(dt_virt) != FDT_MAGIC)
+	if (fdt_magic(dt_virt) != FDT_MAGIC &&
+			fdt_magic(dt_virt) != FDT_SW_MAGIC)
 		return NULL;
 
 	*size = fdt_totalsize(dt_virt);

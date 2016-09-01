@@ -54,6 +54,8 @@
 #include "libfdt_env.h"
 #include "fdt.h"
 
+#define FDT_SW_MAGIC           (~FDT_MAGIC)
+
 #define FDT_FIRST_SUPPORTED_VERSION	0x10
 #define FDT_LAST_SUPPORTED_VERSION	0x11
 
