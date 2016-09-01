@@ -153,11 +153,6 @@ static void nf_conntrack_all_lock(void)
 	for (i = 0; i < CONNTRACK_LOCKS; i++) {
 		spin_unlock_wait(&nf_conntrack_locks[i]);
 	}
-	/* spin_unlock_wait() is at least a control barrier.
-	 * Add smp_rmb() to upgrade it to an ACQUIRE, it must
-	 * pair with the spin_unlock(&nf_conntrack_locks[])
-	 */
-	smp_rmb();
 }
 
 static void nf_conntrack_all_unlock(void)
