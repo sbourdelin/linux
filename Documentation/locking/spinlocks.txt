@@ -40,6 +40,15 @@ example, internal driver data structures that nobody else ever touches).
    touches a shared variable has to agree about the spinlock they want
    to use.
 
+   NOTE! Code that needs stricter memory barriers than ACQUIRE during
+   LOCK and RELEASE during UNLOCK must use appropriate memory barriers
+   such as smp_mb__before_spinlock(). Especially, the ACQUIRE during
+   LOCK applies to reading the lock state. Operations within the
+   guarded area can happen before the lock store.
+   spin_unlock_wait() behaves like spin_lock();spin_unlock().
+   spin_is_locked() should not be used to build synchronization
+   primitives, no memory ordering is guaranteed.
+
 ----
 
 Lesson 2: reader-writer spinlocks.
