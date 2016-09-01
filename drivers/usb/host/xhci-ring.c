@@ -605,7 +605,8 @@ static void xhci_giveback_urb_in_irq(struct xhci_hcd *xhci,
 	}
 }
 
-void xhci_unmap_td_bounce_buffer(struct xhci_hcd *xhci, struct xhci_ring *ring,
+static void
+xhci_unmap_td_bounce_buffer(struct xhci_hcd *xhci, struct xhci_ring *ring,
 				 struct xhci_td *td)
 {
 	struct device *dev = xhci_to_hcd(xhci)->self.controller;
