@@ -53,29 +53,29 @@ static int rps_sock_flow_sysctl(struct ctl_table *table, int write,
 	ret = proc_dointvec(&tmp, write, buffer, lenp, ppos);
 
 	if (write) {
-		if (size) {
-			if (size > 1<<29) {
-				/* Enforce limit to prevent overflow */
-				mutex_unlock(&sock_flow_mutex);
-				return -EINVAL;
-			}
-			size = roundup_pow_of_two(size);
-			if (size != orig_size) {
-				sock_table =
-				    vmalloc(RPS_SOCK_FLOW_TABLE_SIZE(size));
-				if (!sock_table) {
-					mutex_unlock(&sock_flow_mutex);
-					return -ENOMEM;
-				}
-				rps_cpu_mask = roundup_pow_of_two(nr_cpu_ids) - 1;
-				sock_table->mask = size - 1;
-			} else
-				sock_table = orig_sock_table;
+		if (!size)
+			goto exit_unlock;
+		if (size > 1 << 29) {
+			/* Enforce limit to prevent overflow */
+			ret = -EINVAL;
+			goto exit_unlock;
+		}
 
-			for (i = 0; i < size; i++)
-				sock_table->ents[i] = RPS_NO_CPU;
-		} else
-			sock_table = NULL;
+		size = roundup_pow_of_two(size);
+		if (size != orig_size) {
+			sock_table = vmalloc(RPS_SOCK_FLOW_TABLE_SIZE(size));
+			if (!sock_table) {
+				ret = -ENOMEM;
+				goto exit_unlock;
+			}
+			rps_cpu_mask = roundup_pow_of_two(nr_cpu_ids) - 1;
+			sock_table->mask = size - 1;
+		} else {
+			sock_table = orig_sock_table;
+		}
+
+		for (i = 0; i < size; i++)
+			sock_table->ents[i] = RPS_NO_CPU;
 
 		if (sock_table != orig_sock_table) {
 			rcu_assign_pointer(rps_sock_flow_table, sock_table);
@@ -89,8 +89,8 @@ static int rps_sock_flow_sysctl(struct ctl_table *table, int write,
 		}
 	}
 
+exit_unlock:
 	mutex_unlock(&sock_flow_mutex);
-
 	return ret;
 }
 #endif /* CONFIG_RPS */
