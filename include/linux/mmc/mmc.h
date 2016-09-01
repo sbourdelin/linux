@@ -430,6 +430,7 @@ struct _mmc_csd {
 /*
  * BKOPS status level
  */
+#define EXT_CSD_BKOPS_LEVEL_1		0x1
 #define EXT_CSD_BKOPS_LEVEL_2		0x2
 
 /*
