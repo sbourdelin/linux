@@ -21,6 +21,7 @@
 #include <linux/of.h>
 #include <linux/device.h>
 #include <linux/init.h>
+#include <linux/pm_runtime.h>
 #include <linux/sched.h>
 #include <linux/clkdev.h>
 
@@ -46,6 +47,7 @@ struct clk_core {
 	const struct clk_ops	*ops;
 	struct clk_hw		*hw;
 	struct module		*owner;
+	struct device		*dev;
 	struct clk_core		*parent;
 	const char		**parent_names;
 	struct clk_core		**parents;
@@ -86,6 +88,42 @@ struct clk {
 	unsigned long max_rate;
 	struct hlist_node clks_node;
 };
+
+/***           runtime pm          ***/
+static int clk_pm_runtime_get(struct clk_core *core)
+{
+	int ret = 0;
+
+	if (!core->dev)
+		return 0;
+
+	if (pm_runtime_enabled(core->dev)) {
+		ret = pm_runtime_get_sync(core->dev);
+	} else {
+		if (!pm_runtime_status_suspended(core->dev))
+			pm_runtime_get_noresume(core->dev);
+	}
+	return ret < 0 ? ret : 0;
+}
+
+static void clk_pm_runtime_put(struct clk_core *core)
+{
+	if (!core->dev)
+		return;
+
+	if (pm_runtime_enabled(core->dev))
+		pm_runtime_put(core->dev);
+	else
+		pm_runtime_put_noidle(core->dev);
+}
+
+static bool clk_pm_runtime_suspended(struct clk_core *core)
+{
+	if (!core->dev)
+		return 0;
+
+	return pm_runtime_suspended(core->dev);
+}
 
 /***           locking             ***/
 static void clk_prepare_lock(void)
@@ -150,6 +188,9 @@ static void clk_enable_unlock(unsigned long flags)
 
 static bool clk_core_is_prepared(struct clk_core *core)
 {
+	if (clk_pm_runtime_suspended(core))
+		return false;
+
 	/*
 	 * .is_prepared is optional for clocks that can prepare
 	 * fall back to software usage counter if it is missing
@@ -162,6 +203,9 @@ static bool clk_core_is_prepared(struct clk_core *core)
 
 static bool clk_core_is_enabled(struct clk_core *core)
 {
+	if (clk_pm_runtime_suspended(core))
+		return false;
+
 	/*
 	 * .is_enabled is only mandatory for clocks that gate
 	 * fall back to software usage counter if .is_enabled is missing
@@ -489,6 +533,8 @@ static void clk_core_unprepare(struct clk_core *core)
 	if (core->ops->unprepare)
 		core->ops->unprepare(core->hw);
 
+	clk_pm_runtime_put(core);
+
 	trace_clk_unprepare_complete(core);
 	clk_core_unprepare(core->parent);
 }
@@ -530,9 +576,13 @@ static int clk_core_prepare(struct clk_core *core)
 		return 0;
 
 	if (core->prepare_count == 0) {
-		ret = clk_core_prepare(core->parent);
+		ret = clk_pm_runtime_get(core);
 		if (ret)
 			return ret;
+
+		ret = clk_core_prepare(core->parent);
+		if (ret)
+			goto runtime_put;
 
 		trace_clk_prepare(core);
 
@@ -541,15 +591,18 @@ static int clk_core_prepare(struct clk_core *core)
 
 		trace_clk_prepare_complete(core);
 
-		if (ret) {
-			clk_core_unprepare(core->parent);
-			return ret;
-		}
+		if (ret)
+			goto unprepare;
 	}
 
 	core->prepare_count++;
 
 	return 0;
+unprepare:
+	clk_core_unprepare(core->parent);
+runtime_put:
+	clk_pm_runtime_put(core);
+	return ret;
 }
 
 static int clk_core_prepare_lock(struct clk_core *core)
@@ -1563,6 +1616,7 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 {
 	struct clk_core *top, *fail_clk;
 	unsigned long rate = req_rate;
+	int ret = 0;
 
 	if (!core)
 		return 0;
@@ -1579,21 +1633,28 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	if (!top)
 		return -EINVAL;
 
+	ret = clk_pm_runtime_get(core);
+	if (ret)
+		return ret;
+
 	/* notify that we are about to change rates */
 	fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
 	if (fail_clk) {
 		pr_debug("%s: failed to set %s rate\n", __func__,
 				fail_clk->name);
 		clk_propagate_rate_change(top, ABORT_RATE_CHANGE);
-		return -EBUSY;
+		ret = -EBUSY;
+		goto err;
 	}
 
 	/* change the rates */
 	clk_change_rate(top);
 
 	core->req_rate = req_rate;
+err:
+	clk_pm_runtime_put(core);
 
-	return 0;
+	return ret;
 }
 
 /**
@@ -1824,12 +1885,16 @@ static int clk_core_set_parent(struct clk_core *core, struct clk_core *parent)
 		p_rate = parent->rate;
 	}
 
+	ret = clk_pm_runtime_get(core);
+	if (ret)
+		goto out;
+
 	/* propagate PRE_RATE_CHANGE notifications */
 	ret = __clk_speculate_rates(core, p_rate);
 
 	/* abort if a driver objects */
 	if (ret & NOTIFY_STOP_MASK)
-		goto out;
+		goto runtime_put;
 
 	/* do the re-parent */
 	ret = __clk_set_parent(core, parent, p_index);
@@ -1842,6 +1907,8 @@ static int clk_core_set_parent(struct clk_core *core, struct clk_core *parent)
 		__clk_recalc_accuracies(core);
 	}
 
+runtime_put:
+	clk_pm_runtime_put(core);
 out:
 	clk_prepare_unlock();
 
@@ -2549,6 +2616,7 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
 		goto fail_name;
 	}
 	core->ops = hw->init->ops;
+	core->dev = dev;
 	if (dev && dev->driver)
 		core->owner = dev->driver->owner;
 	core->hw = hw;
