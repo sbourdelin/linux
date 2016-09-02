@@ -181,6 +181,35 @@ struct hda_dai_map {
 };
 
 #define HDA_MAX_NIDS 16
+#define HDA_MAX_CONNECTIONS 32
+/* amp values */
+#define AMP_IN_MUTE(idx)	(0x7080 | ((idx)<<8))
+#define AMP_IN_UNMUTE(idx)	(0x7000 | ((idx)<<8))
+#define AMP_OUT_MUTE		0xb080
+#define AMP_OUT_UNMUTE		0xb000
+
+
+struct hdac_ext_codec_widget;
+
+struct hdac_ext_codec_connection_list {
+	hda_nid_t nid;
+	unsigned int type;
+	struct hdac_ext_codec_widget *input_w;
+};
+
+/**
+ * struct hdac_ext_device - HDAC Ext device
+ */
+struct hdac_ext_codec_widget {
+	struct list_head head;
+	hda_nid_t nid;
+	unsigned int caps;
+	unsigned int type;
+	int num_inputs;
+	struct hdac_ext_codec_connection_list conn_list[HDA_MAX_CONNECTIONS];
+	void *priv;	/* Codec specific widget data */
+	void *params;	/* Widget specific parameters */
+};
 
 /**
  * struct hdac_ext_device - HDAC Ext device
@@ -205,6 +234,8 @@ struct hdac_ext_device {
 	struct snd_card *card;
 	void *scodec;
 	void *private_data;
+
+	struct list_head widget_list;
 };
 
 struct hdac_ext_dma_params {

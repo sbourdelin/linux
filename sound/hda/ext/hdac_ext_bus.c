@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/io.h>
 #include <sound/hdaudio_ext.h>
+#include "hdac_ext_codec.h"
 
 MODULE_DESCRIPTION("HDA extended core");
 MODULE_LICENSE("GPL v2");
@@ -128,6 +129,7 @@ static void default_release(struct device *dev)
 	snd_hdac_ext_bus_device_exit(container_of(dev, struct hdac_device, dev));
 }
 
+
 /**
  * snd_hdac_ext_bus_device_init - initialize the HDA extended codec base device
  * @ebus: hdac extended bus to attach to
@@ -159,6 +161,9 @@ int snd_hdac_ext_bus_device_init(struct hdac_ext_bus *ebus, int addr)
 	hdev->type = HDA_DEV_ASOC;
 	hdev->dev.release = default_release;
 
+	INIT_LIST_HEAD(&edev->widget_list);
+	snd_hdac_ext_parse_widgets(edev);
+
 	ret = snd_hdac_device_register(hdev);
 	if (ret) {
 		dev_err(bus->dev, "failed to register hdac device\n");
@@ -178,6 +183,7 @@ void snd_hdac_ext_bus_device_exit(struct hdac_device *hdev)
 {
 	struct hdac_ext_device *edev = to_ehdac_device(hdev);
 
+	snd_hdac_ext_codec_cleanup(edev);
 	snd_hdac_device_exit(hdev);
 	kfree(edev);
 }
