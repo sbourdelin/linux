@@ -241,8 +241,7 @@ debug_info_alloc(const char *name, int pages_per_area, int nr_areas,
 	debug_info_t* rc;
 
 	/* alloc everything */
-
-	rc = kmalloc(sizeof(debug_info_t), GFP_KERNEL);
+	rc = kmalloc(sizeof(*rc), GFP_KERNEL);
 	if(!rc)
 		goto exit;
 	rc->active_entries = kcalloc(nr_areas, sizeof(int), GFP_KERNEL);
