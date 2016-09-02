@@ -244,6 +244,14 @@ struct hdac_ext_dma_params {
 };
 #define to_ehdac_device(dev) (container_of((dev), \
 				 struct hdac_ext_device, hdac))
+
+static inline struct hdac_ext_device *to_hda_ext_device(struct device *dev)
+{
+	struct hdac_device *hdac = dev_to_hdac_dev(dev);
+
+	return to_ehdac_device(hdac);
+}
+
 /*
  * HD-audio codec base driver
  */

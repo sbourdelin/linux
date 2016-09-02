@@ -30,6 +30,7 @@
 #include <sound/hda_i915.h>
 #include <sound/pcm_drm_eld.h>
 #include <sound/hda_chmap.h>
+#include <sound/hdaudio_ext.h>
 #include "../../hda/local.h"
 #include "hdac_hdmi.h"
 
@@ -125,13 +126,6 @@ static struct hdac_hdmi_pcm *get_hdmi_pcm_from_id(struct hdac_hdmi_priv *hdmi,
 	}
 
 	return NULL;
-}
-
-static inline struct hdac_ext_device *to_hda_ext_device(struct device *dev)
-{
-	struct hdac_device *hdac = dev_to_hdac_dev(dev);
-
-	return to_ehdac_device(hdac);
 }
 
 static unsigned int sad_format(const u8 *sad)
