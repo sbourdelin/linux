@@ -1486,7 +1486,7 @@ debug_sprintf_format_fn(debug_info_t * id, struct debug_view *view,
 	/* number of arguments used for sprintf (without the format string) */
 	num_used_args   = min(DEBUG_SPRINTF_MAX_ARGS, (num_longs - 1));
 
-	memset(index, 0, DEBUG_SPRINTF_MAX_ARGS * sizeof(int));
+	memset(index, 0, sizeof(index));
 
 	for (i = 0; i < num_used_args; i++)
 		index[i] = i;
