@@ -60,6 +60,7 @@ static int tcf_mirred_init(struct net *net, struct nlattr *nla,
 {
 	struct tc_action_net *tn = net_generic(net, mirred_net_id);
 	struct nlattr *tb[TCA_MIRRED_MAX + 1];
+	struct tc_action *n;
 	struct tc_mirred *parm;
 	struct tcf_mirred *m;
 	struct net_device *dev;
@@ -108,44 +109,40 @@ static int tcf_mirred_init(struct net *net, struct nlattr *nla,
 			ok_push = 1;
 			break;
 		}
-	} else {
-		dev = NULL;
+	} else if (!exists) {
+		return -EINVAL;
 	}
 
-	if (!exists) {
-		if (dev == NULL)
-			return -EINVAL;
-		ret = tcf_hash_create(tn, parm->index, est, a,
-				      &act_mirred_ops, bind, true);
-		if (ret)
-			return ret;
-		ret = ACT_P_CREATED;
-	} else {
+	if (exists && !ovr) {
 		tcf_hash_release(*a, bind);
-		if (!ovr)
-			return -EEXIST;
+		return -EEXIST;
 	}
-	m = to_mirred(*a);
+
+	ret = tcf_hash_create(tn, parm->index, est, &n,
+			      &act_mirred_ops, bind, true);
+	if (ret) {
+		tcf_hash_release(*a, bind);
+		return ret;
+	}
+
+	tcf_hash_copy(n, *a);
+	m = to_mirred(n);
 
 	ASSERT_RTNL();
 	m->tcf_action = parm->action;
 	m->tcfm_eaction = parm->eaction;
 	if (dev != NULL) {
 		m->tcfm_ifindex = parm->ifindex;
-		if (ret != ACT_P_CREATED)
-			dev_put(rcu_dereference_protected(m->tcfm_dev, 1));
 		dev_hold(dev);
 		rcu_assign_pointer(m->tcfm_dev, dev);
 		m->tcfm_ok_push = ok_push;
 	}
 
-	if (ret == ACT_P_CREATED) {
-		spin_lock_bh(&mirred_list_lock);
-		list_add(&m->tcfm_list, &mirred_list);
-		spin_unlock_bh(&mirred_list_lock);
-		tcf_hash_insert(tn, *a);
-	}
+	spin_lock_bh(&mirred_list_lock);
+	list_add(&m->tcfm_list, &mirred_list);
+	spin_unlock_bh(&mirred_list_lock);
 
+	tcf_hash_replace(tn, a, n, bind);
 	return ret;
 }
 
