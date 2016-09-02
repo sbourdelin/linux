@@ -60,6 +60,7 @@
 #include <linux/spi/spi.h>
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
+#include <linux/of_device.h>
 
 #include <linux/platform_data/max3421-hcd.h>
 
@@ -157,6 +158,7 @@ struct max3421_hcd {
 	u8 mode;
 	u8 iopins[2];
 	unsigned long todo;
+	struct max3421_hcd_platform_data *pdata;
 #ifdef DEBUG
 	unsigned long err_stat[16];
 #endif
@@ -1684,21 +1686,18 @@ max3421_gpout_set_value(struct usb_hcd *hcd, u8 pin_number, u8 value)
 		max3421_hcd->iopins[idx] &= ~mask;
 	set_bit(IOPIN_UPDATE, &max3421_hcd->todo);
 	wake_up_process(max3421_hcd->spi_thread);
+
 }
 
 static int
 max3421_hub_control(struct usb_hcd *hcd, u16 type_req, u16 value, u16 index,
 		    char *buf, u16 length)
 {
-	struct spi_device *spi = to_spi_device(hcd->self.controller);
 	struct max3421_hcd *max3421_hcd = hcd_to_max3421(hcd);
-	struct max3421_hcd_platform_data *pdata;
 	unsigned long flags;
 	int retval = 0;
 
 	spin_lock_irqsave(&max3421_hcd->lock, flags);
-
-	pdata = spi->dev.platform_data;
 
 	switch (type_req) {
 	case ClearHubFeature:
@@ -1709,8 +1708,8 @@ max3421_hub_control(struct usb_hcd *hcd, u16 type_req, u16 value, u16 index,
 			break;
 		case USB_PORT_FEAT_POWER:
 			dev_dbg(hcd->self.controller, "power-off\n");
-			max3421_gpout_set_value(hcd, pdata->vbus_gpout,
-						!pdata->vbus_active_level);
+			max3421_gpout_set_value(hcd, max3421_hcd->pdata->vbus_gpout,
+				!max3421_hcd->pdata->vbus_active_level);
 			/* FALLS THROUGH */
 		default:
 			max3421_hcd->port_status &= ~(1 << value);
@@ -1759,8 +1758,9 @@ max3421_hub_control(struct usb_hcd *hcd, u16 type_req, u16 value, u16 index,
 		case USB_PORT_FEAT_POWER:
 			dev_dbg(hcd->self.controller, "power-on\n");
 			max3421_hcd->port_status |= USB_PORT_STAT_POWER;
-			max3421_gpout_set_value(hcd, pdata->vbus_gpout,
-						pdata->vbus_active_level);
+			max3421_gpout_set_value(hcd, max3421_hcd->pdata->vbus_gpout,
+						max3421_hcd->pdata->vbus_active_level);
+
 			break;
 		case USB_PORT_FEAT_RESET:
 			max3421_reset_port(hcd);
@@ -1831,6 +1831,23 @@ static struct hc_driver max3421_hcd_desc = {
 	.bus_resume =		max3421_bus_resume,
 };
 
+#ifdef CONFIG_OF
+int max3421_init_dt(struct spi_device *spi, struct max3421_hcd *max3421_hcd)
+{
+	struct device_node *np = spi->dev.of_node;
+	u32 val;
+
+	if (!of_property_read_u32(np, "vbus-gpout", &val))
+		max3421_hcd->pdata->vbus_gpout = (u8) val;
+
+	if (!of_property_read_u32(np, "vbus-active-level", &val))
+		max3421_hcd->pdata->vbus_active_level = (u8) val;
+
+
+	return 0;
+}
+#endif
+
 static int
 max3421_probe(struct spi_device *spi)
 {
@@ -1866,6 +1883,17 @@ max3421_probe(struct spi_device *spi)
 		goto error;
 	}
 
+#ifdef CONFIG_OF
+	max3421_hcd->pdata = kmalloc(sizeof(*max3421_hcd->pdata), GFP_KERNEL);
+	if (!max3421_hcd->pdata) {
+		dev_err(&spi->dev, "failed to kmalloc pdata buffer\n");
+		goto error;
+	}
+	max3421_init_dt(spi, max3421_hcd);
+#else
+	max3421_hcd->pdata = spi->dev.platform_data;
+#endif
+
 	max3421_hcd->spi_thread = kthread_run(max3421_spi_thread, hcd,
 					      "max3421_spi_thread");
 	if (max3421_hcd->spi_thread == ERR_PTR(-ENOMEM)) {
@@ -1892,6 +1920,7 @@ error:
 	if (hcd) {
 		kfree(max3421_hcd->tx);
 		kfree(max3421_hcd->rx);
+		kfree(max3421_hcd->pdata);
 		if (max3421_hcd->spi_thread)
 			kthread_stop(max3421_hcd->spi_thread);
 		usb_put_hcd(hcd);
