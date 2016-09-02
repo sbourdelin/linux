@@ -138,6 +138,19 @@ enum tpm2_startup_types {
 
 #define TPM_PPI_VERSION_LEN		3
 
+struct tpm_class_ops {
+	unsigned int flags;
+	const u8 req_complete_mask;
+	const u8 req_complete_val;
+	bool (*req_canceled)(struct tpm_chip *chip, u8 status);
+	int (*recv) (struct tpm_chip *chip, u8 *buf, size_t len);
+	int (*send) (struct tpm_chip *chip, u8 *buf, size_t len);
+	void (*cancel) (struct tpm_chip *chip);
+	u8 (*status) (struct tpm_chip *chip);
+	bool (*update_timeouts)(struct tpm_chip *chip,
+				unsigned long *timeout_cap);
+};
+
 enum tpm_chip_flags {
 	TPM_CHIP_FLAG_REGISTERED	= BIT(0),
 	TPM_CHIP_FLAG_TPM2		= BIT(1),
