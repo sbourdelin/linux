@@ -422,7 +422,8 @@ static int wpa_set_encryption(struct net_device *dev, struct ieee_param *param,
 			    (u8)_FAIL)
 				ret = -EOPNOTSUPP;
 		} else {
-			/* don't update "psecuritypriv->PrivacyAlgrthm" and
+			/*
+			 * don't update "psecuritypriv->PrivacyAlgrthm" and
 			 * "psecuritypriv->PrivacyKeyIndex=keyid", but can
 			 * r8712_set_key to fw/cam
 			 */
@@ -664,7 +665,7 @@ static int r8711_wx_set_freq(struct net_device *dev,
 	struct iw_freq *fwrq = &wrqu->freq;
 	int rc = 0;
 
-/* If setting by frequency, convert to a channel */
+	/* If setting by frequency, convert to a channel */
 	if ((fwrq->e == 1) &&
 	  (fwrq->m >= (int) 2.412e8) &&
 	  (fwrq->m <= (int) 2.487e8)) {
@@ -827,7 +828,8 @@ static int r871x_wx_set_pmkid(struct net_device *dev,
 		for (j = 0; j < NUM_PMKID_CACHE; j++) {
 			if (!memcmp(psecuritypriv->PMKIDList[j].Bssid,
 			    strIssueBssid, ETH_ALEN)) {
-				/* BSSID is matched, the same AP => Remove
+				/*
+				 *BSSID is matched, the same AP => Remove
 				 * this PMKID information and reset it.
 				 */
 				eth_zero_addr(psecuritypriv->PMKIDList[j].Bssid);
@@ -870,11 +872,13 @@ static int r8711_wx_get_range(struct net_device *dev,
 
 	wrqu->data.length = sizeof(*range);
 	memset(range, 0, sizeof(*range));
-	/* Let's try to keep this struct in the same order as in
+	/*
+	 * Let's try to keep this struct in the same order as in
 	 * linux/include/wireless.h
 	 */
 
-	/* TODO: See what values we can set, and remove the ones we can't
+	/*
+	 * TODO: See what values we can set, and remove the ones we can't
 	 * set, or fill them with some default data.
 	 */
 	/* ~5 Mb/s real (802.11b) */
@@ -1714,7 +1718,8 @@ static int r871x_wx_set_auth(struct net_device *dev,
 		}
 		break;
 	case IW_AUTH_DROP_UNENCRYPTED:
-		/* HACK:
+		/*
+		 * HACK:
 		 *
 		 * wpa_supplicant calls set_wpa_enabled when the driver
 		 * is loaded and unloaded, regardless of if WPA is being
@@ -1727,12 +1732,13 @@ static int r871x_wx_set_auth(struct net_device *dev,
 		 */
 		if (padapter->securitypriv.ndisencryptstatus ==
 		    Ndis802_11Encryption1Enabled) {
-				/* it means init value, or using wep,
-				 * ndisencryptstatus =
-				 *	Ndis802_11Encryption1Enabled,
-				 * then it needn't reset it;
-				 */
-				break;
+			/*
+			 * it means init value, or using wep,
+			 * ndisencryptstatus =
+			 *	Ndis802_11Encryption1Enabled,
+			 * then it needn't reset it;
+			 */
+			break;
 		}
 
 		if (paramval) {
@@ -1976,9 +1982,9 @@ static int r871x_get_ap_info(struct net_device *dev,
 	if (pdata->length >= 32) {
 		if (copy_from_user(data, pdata->pointer, 32))
 			return -EINVAL;
-                data[32] = 0;
+		data[32] = 0;
 	} else {
-		 return -EINVAL;
+		return -EINVAL;
 	}
 	spin_lock_irqsave(&(pmlmepriv->scanned_queue.lock), irqL);
 	phead = &queue->queue;
@@ -2107,7 +2113,8 @@ static int wpa_set_param(struct net_device *dev, u8 name, u32 value)
 	case IEEE_PARAM_TKIP_COUNTERMEASURES:
 		break;
 	case IEEE_PARAM_DROP_UNENCRYPTED:
-		/* HACK:
+		/*
+		 * HACK:
 		 *
 		 * wpa_supplicant calls set_wpa_enabled when the driver
 		 * is loaded and unloaded, regardless of if WPA is being
