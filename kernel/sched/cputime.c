@@ -78,30 +78,26 @@ EXPORT_SYMBOL_GPL(irqtime_account_irq);
 static cputime_t irqtime_account_hi_update(cputime_t maxtime)
 {
 	u64 *cpustat = kcpustat_this_cpu->cpustat;
-	unsigned long flags;
 	cputime_t irq_cputime;
 
-	local_irq_save(flags);
 	irq_cputime = nsecs_to_cputime64(__this_cpu_read(cpu_hardirq_time)) -
 		      cpustat[CPUTIME_IRQ];
 	irq_cputime = min(irq_cputime, maxtime);
 	cpustat[CPUTIME_IRQ] += irq_cputime;
-	local_irq_restore(flags);
+
 	return irq_cputime;
 }
 
 static cputime_t irqtime_account_si_update(cputime_t maxtime)
 {
 	u64 *cpustat = kcpustat_this_cpu->cpustat;
-	unsigned long flags;
 	cputime_t softirq_cputime;
 
-	local_irq_save(flags);
 	softirq_cputime = nsecs_to_cputime64(__this_cpu_read(cpu_softirq_time)) -
 			  cpustat[CPUTIME_SOFTIRQ];
 	softirq_cputime = min(softirq_cputime, maxtime);
 	cpustat[CPUTIME_SOFTIRQ] += softirq_cputime;
-	local_irq_restore(flags);
+
 	return softirq_cputime;
 }
 
