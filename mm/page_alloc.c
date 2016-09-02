@@ -2421,7 +2421,13 @@ void free_hot_cold_page(struct page *page, bool cold)
 	}
 
 	pcp = &this_cpu_ptr(zone->pageset)->pcp;
-	if (!cold)
+	/*
+	 * XPFO: Allocating a page to userspace that was previously allocated
+	 * to the kernel requires an expensive TLB shootdown. To minimize this,
+	 * we only put non-kernel pages into the hot cache to favor their
+	 * allocation.
+	 */
+	if (!cold && !xpfo_page_is_kernel(page))
 		list_add(&page->lru, &pcp->lists[migratetype]);
 	else
 		list_add_tail(&page->lru, &pcp->lists[migratetype]);
