@@ -162,7 +162,12 @@ int snd_hdac_ext_bus_device_init(struct hdac_ext_bus *ebus, int addr)
 	hdev->dev.release = default_release;
 
 	INIT_LIST_HEAD(&edev->widget_list);
-	snd_hdac_ext_parse_widgets(edev);
+	ret = snd_hdac_ext_parse_widgets(edev);
+	if (ret < 0) {
+		dev_err(bus->dev, "Failed to parse widgets with err: %d\n",
+							ret);
+		return ret;
+	}
 
 	ret = snd_hdac_device_register(hdev);
 	if (ret) {
