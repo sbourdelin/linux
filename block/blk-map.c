@@ -52,7 +52,7 @@ static int __blk_rq_map_user_iov(struct request *rq,
 	struct bio *bio, *orig_bio;
 	int ret;
 
-	if (copy)
+	if (copy || IS_ENABLED(CONFIG_XPFO))
 		bio = bio_copy_user_iov(q, map_data, iter, gfp_mask);
 	else
 		bio = bio_map_user_iov(q, iter, gfp_mask);
