@@ -25,6 +25,7 @@
 #define VMX_H
 
 
+#include <linux/bitops.h>
 #include <linux/types.h>
 #include <uapi/asm/vmx.h>
 
@@ -109,6 +110,26 @@
 #define VMX_MISC_PREEMPTION_TIMER_RATE_MASK	0x0000001f
 #define VMX_MISC_SAVE_EFER_LMA			0x00000020
 #define VMX_MISC_ACTIVITY_HLT			0x00000040
+
+static inline int vmx_misc_preemption_timer_rate(u64 vmx_misc)
+{
+	return vmx_misc & VMX_MISC_PREEMPTION_TIMER_RATE_MASK;
+}
+
+static inline int vmx_misc_cr3_count(u64 vmx_misc)
+{
+	return (vmx_misc & GENMASK_ULL(24, 16)) >> 16;
+}
+
+static inline int vmx_misc_max_msr(u64 vmx_misc)
+{
+	return (vmx_misc & GENMASK_ULL(27, 25)) >> 25;
+}
+
+static inline int vmx_misc_mseg_revid(u64 vmx_misc)
+{
+	return (vmx_misc & GENMASK_ULL(63, 32)) >> 32;
+}
 
 /* VMCS Encodings */
 enum vmcs_field {
