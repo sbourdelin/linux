@@ -27,7 +27,13 @@ static inline struct nf_conn_seqadj *nfct_seqadj(const struct nf_conn *ct)
 
 static inline struct nf_conn_seqadj *nfct_seqadj_ext_add(struct nf_conn *ct)
 {
-	return nf_ct_ext_add(ct, NF_CT_EXT_SEQADJ, GFP_ATOMIC);
+	struct nf_conn_seqadj *seqadj = nf_ct_ext_add(ct, NF_CT_EXT_SEQADJ,
+						      GFP_ATOMIC);
+
+	if (!seqadj)
+		pr_warn("failed to add seqadj extension area");
+
+	return seqadj;
 }
 
 int nf_ct_seqadj_init(struct nf_conn *ct, enum ip_conntrack_info ctinfo,
