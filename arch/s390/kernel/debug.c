@@ -269,9 +269,8 @@ debug_info_alloc(const char *name, int pages_per_area, int nr_areas,
 	rc->buf_size       = buf_size;
 	rc->entry_size     = sizeof(debug_entry_t) + buf_size;
 	strlcpy(rc->name, name, sizeof(rc->name));
-	memset(rc->views, 0, DEBUG_MAX_VIEWS * sizeof(struct debug_view *));
-	memset(rc->debugfs_entries, 0, DEBUG_MAX_VIEWS *
-		sizeof(struct dentry*));
+	memset(rc->views, 0, sizeof(rc->views));
+	memset(rc->debugfs_entries, 0, sizeof(rc->debugfs_entries));
 	atomic_set(&(rc->ref_count), 0);
 
 	return rc;
