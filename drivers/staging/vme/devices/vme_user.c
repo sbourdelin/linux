@@ -45,7 +45,7 @@
 static const char driver_name[] = "vme_user";
 
 static int bus[VME_USER_BUS_MAX];
-static unsigned int bus_num;
+static int bus_num = -1;
 
 /* Currently Documentation/devices.txt defines the following for VME:
  *
@@ -735,12 +735,6 @@ static int __init vme_user_init(void)
 
 	pr_info("VME User Space Access Driver\n");
 
-	if (bus_num == 0) {
-		pr_err("No cards, skipping registration\n");
-		retval = -ENODEV;
-		goto err_nocard;
-	}
-
 	/* Let's start by supporting one bus, we can support more than one
 	 * in future revisions if that ever becomes necessary.
 	 */
@@ -763,7 +757,6 @@ static int __init vme_user_init(void)
 	return retval;
 
 err_reg:
-err_nocard:
 	return retval;
 }
 
