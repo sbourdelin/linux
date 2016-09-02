@@ -299,7 +299,7 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 	struct vme_irq_id irq_req;
 	unsigned long copied;
 	unsigned int minor = MINOR(inode->i_rdev);
-	int retval;
+	int retval = -EINVAL;
 	dma_addr_t pci_addr;
 	void __user *argp = (void __user *)arg;
 
@@ -314,9 +314,10 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 				return -EFAULT;
 			}
 
-			return vme_irq_generate(vme_user_bridge,
+			retval = vme_irq_generate(vme_user_bridge,
 						  irq_req.level,
 						  irq_req.statid);
+			break;
 		}
 		break;
 	case MASTER_MINOR:
@@ -337,13 +338,11 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 					      sizeof(master));
 			if (copied) {
 				pr_warn("Partial copy to userspace\n");
-				return -EFAULT;
+				retval = -EFAULT;
 			}
 
-			return retval;
-
+			break;
 		case VME_SET_MASTER:
-
 			if (image[minor].mmap_count != 0) {
 				pr_warn("Can't adjust mapped window\n");
 				return -EPERM;
@@ -358,7 +357,7 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 			/* XXX	We do not want to push aspace, cycle and width
 			 *	to userspace as they are
 			 */
-			return vme_master_set(image[minor].resource,
+			retval = vme_master_set(image[minor].resource,
 				master.enable, master.vme_addr, master.size,
 				master.aspace, master.cycle, master.dwidth);
 
@@ -382,11 +381,10 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 					      sizeof(slave));
 			if (copied) {
 				pr_warn("Partial copy to userspace\n");
-				return -EFAULT;
+				retval = -EFAULT;
 			}
 
-			return retval;
-
+			break;
 		case VME_SET_SLAVE:
 
 			copied = copy_from_user(&slave, argp, sizeof(slave));
@@ -398,7 +396,7 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 			/* XXX	We do not want to push aspace, cycle and width
 			 *	to userspace as they are
 			 */
-			return vme_slave_set(image[minor].resource,
+			retval = vme_slave_set(image[minor].resource,
 				slave.enable, slave.vme_addr, slave.size,
 				image[minor].pci_buf, slave.aspace,
 				slave.cycle);
@@ -408,7 +406,7 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
-	return -EINVAL;
+	return retval;
 }
 
 static long
