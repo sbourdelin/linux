@@ -1162,13 +1162,9 @@ debug_get_user_string(const char __user *user_buf, size_t user_len)
 {
 	char* buffer;
 
-	buffer = kmalloc(user_len + 1, GFP_KERNEL);
-	if (!buffer)
-		return ERR_PTR(-ENOMEM);
-	if (copy_from_user(buffer, user_buf, user_len) != 0) {
-		kfree(buffer);
-		return ERR_PTR(-EFAULT);
-	}
+	buffer = memdup_user(user_buf, user_len + 1);
+	if (IS_ERR(buffer))
+		return PTR_ERR(buffer);
 	/* got the string, now strip linefeed. */
 	if (buffer[user_len - 1] == '\n')
 		buffer[user_len - 1] = 0;
