@@ -1782,6 +1782,88 @@ void vfio_info_cap_shift(struct vfio_info_cap *caps, size_t offset)
 }
 EXPORT_SYMBOL_GPL(vfio_info_cap_shift);
 
+/*
+ * Pin a set of guest PFNs and return their associated host PFNs for mediated
+ * domain only.
+ * @user_pfn [in]: array of user/guest PFNs
+ * @npage [in]: count of array elements
+ * @prot [in] : protection flags
+ * @phys_pfn[out] : array of host PFNs
+ */
+long vfio_pin_pages(struct mdev_device *mdev, unsigned long *user_pfn,
+		    long npage, int prot, unsigned long *phys_pfn)
+{
+	struct vfio_device *device;
+	struct vfio_container *container;
+	struct vfio_iommu_driver *driver;
+	ssize_t ret = -EINVAL;
+
+	if (!mdev || !user_pfn || !phys_pfn)
+		return -EINVAL;
+
+	device = dev_get_drvdata(&mdev->dev);
+
+	if (!device || !device->group)
+		return -EINVAL;
+
+	container = device->group->container;
+
+	if (!container)
+		return -EINVAL;
+
+	down_read(&container->group_lock);
+
+	driver = container->iommu_driver;
+	if (likely(driver && driver->ops->pin_pages))
+		ret = driver->ops->pin_pages(container->iommu_data, user_pfn,
+					     npage, prot, phys_pfn);
+
+	up_read(&container->group_lock);
+
+	return ret;
+
+}
+EXPORT_SYMBOL(vfio_pin_pages);
+
+/*
+ * Unpin set of host PFNs for mediated domain only.
+ * @pfn [in] : array of host PFNs to be unpinned.
+ * @npage [in] :count of elements in array, that is number of pages.
+ */
+long vfio_unpin_pages(struct mdev_device *mdev, unsigned long *pfn, long npage)
+{
+	struct vfio_device *device;
+	struct vfio_container *container;
+	struct vfio_iommu_driver *driver;
+	ssize_t ret = -EINVAL;
+
+	if (!mdev || !pfn)
+		return -EINVAL;
+
+	device = dev_get_drvdata(&mdev->dev);
+
+	if (!device || !device->group)
+		return -EINVAL;
+
+	container = device->group->container;
+
+	if (!container)
+		return -EINVAL;
+
+	down_read(&container->group_lock);
+
+	driver = container->iommu_driver;
+	if (likely(driver && driver->ops->unpin_pages))
+		ret = driver->ops->unpin_pages(container->iommu_data, pfn,
+					       npage);
+
+	up_read(&container->group_lock);
+
+	return ret;
+
+}
+EXPORT_SYMBOL(vfio_unpin_pages);
+
 /**
  * Module/class support
  */
