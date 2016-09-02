@@ -166,6 +166,7 @@ void tcf_hash_cleanup(struct tc_action *a, struct nlattr *est);
 void tcf_hash_insert(struct tc_action_net *tn, struct tc_action *a);
 void tcf_hash_replace(struct tc_action_net *tn, struct tc_action **old,
 		      struct tc_action *new, int bind);
+bool tcf_hash_copy(struct tc_action *dst, const struct tc_action *src);
 
 int __tcf_hash_release(struct tc_action *a, bool bind, bool strict);
 

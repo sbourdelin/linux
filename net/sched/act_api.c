@@ -296,6 +296,24 @@ err2:
 }
 EXPORT_SYMBOL(tcf_hash_create);
 
+bool tcf_hash_copy(struct tc_action *dst, const struct tc_action *src)
+{
+	if (src) {
+		memcpy(dst, src, sizeof(*src));
+		spin_lock_init(&dst->tcfa_lock);
+		INIT_HLIST_NODE(&dst->tcfa_head);
+		INIT_LIST_HEAD(&dst->list);
+
+		/* tcf_hash_check() is called before this */
+		dst->tcfa_refcnt = src->tcfa_refcnt - 1;
+		if (src->tcfa_bindcnt)
+			dst->tcfa_bindcnt = src->tcfa_bindcnt - 1;
+		return true;
+	}
+	return false;
+}
+EXPORT_SYMBOL(tcf_hash_copy);
+
 void tcf_hash_insert(struct tc_action_net *tn, struct tc_action *a)
 {
 	struct tcf_hashinfo *hinfo = tn->hinfo;
