@@ -1380,11 +1380,8 @@ static int
 debug_raw_header_fn(debug_info_t * id, struct debug_view *view,
 			int area, debug_entry_t * entry, char *out_buf)
 {
-	int rc;
-
-	rc = sizeof(debug_entry_t);
-	memcpy(out_buf, entry, sizeof(debug_entry_t));
-	return rc;
+	memcpy(out_buf, entry, sizeof(*entry));
+	return sizeof(*entry);
 }
 
 /*
