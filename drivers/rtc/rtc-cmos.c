@@ -323,13 +323,117 @@ static void cmos_irq_disable(struct cmos_rtc *cmos, unsigned char mask)
 	cmos_checkintr(cmos, rtc_control);
 }
 
+static int cmos_validate_alarm(struct device *dev, struct rtc_wkalrm *t)
+{
+	struct cmos_rtc *cmos = dev_get_drvdata(dev);
+	struct rtc_time now;
+
+	cmos_read_time(dev, &now);
+
+	if (!cmos->day_alrm) {
+		time64_t t_max_date;
+		time64_t t_alrm;
+
+		t_alrm = rtc_tm_to_time64(&t->time);
+		t_max_date = rtc_tm_to_time64(&now);
+		/*
+		 * Subtract 1 second to ensure that the alarm time is
+		 * different from the current time.
+		 */
+		t_max_date += 24 * 60 * 60 - 1;
+		if (t_alrm > t_max_date) {
+			dev_err(dev,
+				"Alarms can be up to one day in the future\n");
+			return -EINVAL;
+		}
+	} else if (!cmos->mon_alrm) {
+		struct rtc_time max_date = now;
+		time64_t t_max_date;
+		time64_t t_alrm;
+		int max_mday;
+		bool is_max_mday = false;
+
+		/*
+		 * If the next month has more days than the current month
+		 * and we are at the max mday of this month, we can program
+		 * the alarm to go off the max mday of the next month without
+		 * it going off sooner than expected.
+		 */
+		max_mday = rtc_month_days(now.tm_mon, now.tm_year);
+		if (now.tm_mday == max_mday)
+			is_max_mday = true;
+
+		if (max_date.tm_mon == 11) {
+			max_date.tm_mon = 0;
+			max_date.tm_year += 1;
+		} else {
+			max_date.tm_mon += 1;
+		}
+		max_mday = rtc_month_days(max_date.tm_mon, max_date.tm_year);
+		if (max_date.tm_mday > max_mday || is_max_mday)
+			max_date.tm_mday = max_mday;
+
+		max_date.tm_hour = 23;
+		max_date.tm_min = 59;
+		max_date.tm_sec = 59;
+
+		t_max_date = rtc_tm_to_time64(&max_date);
+		t_alrm = rtc_tm_to_time64(&t->time);
+		if (t_alrm > t_max_date) {
+			dev_err(dev,
+				"Alarms can be up to one month in the future\n");
+			return -EINVAL;
+		}
+	} else {
+		struct rtc_time max_date = now;
+		time64_t t_max_date;
+		time64_t t_alrm;
+		int max_mday;
+		bool allow_leap_day = false;
+
+		/*
+		 * If it's the 28th of February and the next year is a leap
+		 * year, allow to set alarms for the 29th of February.
+		 */
+		if (now.tm_mon == 1) {
+			max_mday = rtc_month_days(now.tm_mon, now.tm_year);
+			if (now.tm_mday == max_mday)
+				allow_leap_day = true;
+		}
+
+		max_date.tm_year += 1;
+		max_mday = rtc_month_days(max_date.tm_mon, max_date.tm_year);
+		if (max_date.tm_mday > max_mday || allow_leap_day)
+			max_date.tm_mday = max_mday;
+
+		max_date.tm_hour = 23;
+		max_date.tm_min = 59;
+		max_date.tm_sec = 59;
+
+		t_max_date = rtc_tm_to_time64(&max_date);
+		t_alrm = rtc_tm_to_time64(&t->time);
+		if (t_alrm > t_max_date) {
+			dev_err(dev,
+				"Alarms can be up to one year in the future\n");
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
 static int cmos_set_alarm(struct device *dev, struct rtc_wkalrm *t)
 {
 	struct cmos_rtc	*cmos = dev_get_drvdata(dev);
 	unsigned char mon, mday, hrs, min, sec, rtc_control;
+	int ret;
 
 	if (!is_valid_irq(cmos->irq))
 		return -EIO;
+
+	ret = cmos_validate_alarm(dev, t);
+	if (ret < 0)
+		return ret;
 
 	mon = t->time.tm_mon + 1;
 	mday = t->time.tm_mday;
