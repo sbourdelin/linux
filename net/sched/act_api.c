@@ -39,7 +39,7 @@ static void free_tcf(struct rcu_head *head)
 static void tcf_hash_destroy(struct tcf_hashinfo *hinfo, struct tc_action *p)
 {
 	spin_lock_bh(&hinfo->lock);
-	hlist_del(&p->tcfa_head);
+	hlist_del_rcu(&p->tcfa_head);
 	spin_unlock_bh(&hinfo->lock);
 	gen_kill_estimator(&p->tcfa_bstats,
 			   &p->tcfa_rate_est);
@@ -79,9 +79,9 @@ static int tcf_dump_walker(struct tcf_hashinfo *hinfo, struct sk_buff *skb,
 	int err = 0, index = -1, i = 0, s_i = 0, n_i = 0;
 	struct nlattr *nest;
 
-	spin_lock_bh(&hinfo->lock);
-
 	s_i = cb->args[0];
+
+	rcu_read_lock_bh();
 
 	for (i = 0; i < (hinfo->hmask + 1); i++) {
 		struct hlist_head *head;
@@ -110,7 +110,7 @@ static int tcf_dump_walker(struct tcf_hashinfo *hinfo, struct sk_buff *skb,
 		}
 	}
 done:
-	spin_unlock_bh(&hinfo->lock);
+	rcu_read_unlock_bh();
 	if (n_i)
 		cb->args[0] += n_i;
 	return n_i;
@@ -179,12 +179,12 @@ static struct tc_action *tcf_hash_lookup(u32 index, struct tcf_hashinfo *hinfo)
 	struct tc_action *p = NULL;
 	struct hlist_head *head;
 
-	spin_lock_bh(&hinfo->lock);
+	rcu_read_lock_bh();
 	head = &hinfo->htab[tcf_hash(index, hinfo->hmask)];
 	hlist_for_each_entry_rcu(p, head, tcfa_head)
 		if (p->tcfa_index == index)
 			break;
-	spin_unlock_bh(&hinfo->lock);
+	rcu_read_unlock_bh();
 
 	return p;
 }
@@ -301,7 +301,7 @@ void tcf_hash_insert(struct tc_action_net *tn, struct tc_action *a)
 	unsigned int h = tcf_hash(a->tcfa_index, hinfo->hmask);
 
 	spin_lock_bh(&hinfo->lock);
-	hlist_add_head(&a->tcfa_head, &hinfo->htab[h]);
+	hlist_add_head_rcu(&a->tcfa_head, &hinfo->htab[h]);
 	spin_unlock_bh(&hinfo->lock);
 }
 EXPORT_SYMBOL(tcf_hash_insert);
