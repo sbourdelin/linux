@@ -470,10 +470,14 @@ int tcf_action_exec(struct sk_buff *skb, struct tc_action **actions,
 		goto exec_done;
 	}
 	for (i = 0; i < nr_actions; i++) {
-		const struct tc_action *a = actions[i];
+		const struct tc_action *a;
 
+		rcu_read_lock();
+		a = rcu_dereference(actions[i]);
 repeat:
 		ret = a->ops->act(skb, a, res);
+		rcu_read_unlock();
+
 		if (ret == TC_ACT_REPEAT)
 			goto repeat;	/* we need a ttl - JHS */
 		if (ret != TC_ACT_PIPE)
