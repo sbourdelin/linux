@@ -302,6 +302,7 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 	int retval = -EINVAL;
 	dma_addr_t pci_addr;
 	void __user *argp = (void __user *)arg;
+	struct image_desc *img = &image[minor];
 
 	switch (type[minor]) {
 	case CONTROL_MINOR:
@@ -328,7 +329,7 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 			/* XXX	We do not want to push aspace, cycle and width
 			 *	to userspace as they are
 			 */
-			retval = vme_master_get(image[minor].resource,
+			retval = vme_master_get(img->resource,
 						&master.enable,
 						&master.vme_addr,
 						&master.size, &master.aspace,
@@ -343,7 +344,7 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 
 			break;
 		case VME_SET_MASTER:
-			if (image[minor].mmap_count != 0) {
+			if (img->mmap_count != 0) {
 				pr_warn("Can't adjust mapped window\n");
 				return -EPERM;
 			}
@@ -357,7 +358,7 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 			/* XXX	We do not want to push aspace, cycle and width
 			 *	to userspace as they are
 			 */
-			retval = vme_master_set(image[minor].resource,
+			retval = vme_master_set(img->resource,
 				master.enable, master.vme_addr, master.size,
 				master.aspace, master.cycle, master.dwidth);
 
@@ -372,7 +373,7 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 			/* XXX	We do not want to push aspace, cycle and width
 			 *	to userspace as they are
 			 */
-			retval = vme_slave_get(image[minor].resource,
+			retval = vme_slave_get(img->resource,
 					       &slave.enable, &slave.vme_addr,
 					       &slave.size, &pci_addr,
 					       &slave.aspace, &slave.cycle);
@@ -396,9 +397,9 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 			/* XXX	We do not want to push aspace, cycle and width
 			 *	to userspace as they are
 			 */
-			retval = vme_slave_set(image[minor].resource,
+			retval = vme_slave_set(img->resource,
 				slave.enable, slave.vme_addr, slave.size,
-				image[minor].pci_buf, slave.aspace,
+				img->pci_buf, slave.aspace,
 				slave.cycle);
 
 			break;
