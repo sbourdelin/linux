@@ -152,5 +152,8 @@ int ib_nl_handle_set_timeout(struct sk_buff *skb,
 			     struct netlink_callback *cb);
 int ib_nl_handle_ip_res_resp(struct sk_buff *skb,
 			     struct netlink_callback *cb);
+struct ib_qp *ib_create_qp_ex(struct ib_pd *pd,
+			struct ib_qp_init_attr *qp_init_attr,
+			struct ib_udata *udata);
 
 #endif /* _CORE_PRIV_H */
