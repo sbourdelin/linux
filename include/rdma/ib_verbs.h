@@ -1276,6 +1276,18 @@ static inline struct ib_sig_handover_wr *sig_handover_wr(struct ib_send_wr *wr)
 	return container_of(wr, struct ib_sig_handover_wr, wr);
 }
 
+struct ib_xrc_wr {
+	u32 			remote_srqn;
+	u32			reserved1;
+	u64			reserved2;
+	struct ib_send_wr	wr;
+};
+
+static inline struct ib_xrc_wr *xrc_wr(struct ib_send_wr *wr)
+{
+	return container_of(wr, struct ib_xrc_wr, wr);
+}
+
 struct ib_recv_wr {
 	struct ib_recv_wr      *next;
 	union {
