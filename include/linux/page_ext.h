@@ -27,6 +27,8 @@ enum page_ext_flags {
 	PAGE_EXT_DEBUG_POISON,		/* Page is poisoned */
 	PAGE_EXT_DEBUG_GUARD,
 	PAGE_EXT_OWNER,
+	PAGE_EXT_XPFO_KERNEL,		/* Page is a kernel page */
+	PAGE_EXT_XPFO_UNMAPPED,		/* Page is unmapped */
 #if defined(CONFIG_IDLE_PAGE_TRACKING) && !defined(CONFIG_64BIT)
 	PAGE_EXT_YOUNG,
 	PAGE_EXT_IDLE,
@@ -47,6 +49,11 @@ struct page_ext {
 	gfp_t gfp_mask;
 	int last_migrate_reason;
 	depot_stack_handle_t handle;
+#endif
+#ifdef CONFIG_XPFO
+	int inited;		/* Map counter and lock initialized */
+	atomic_t mapcount;	/* Counter for balancing map/unmap requests */
+	spinlock_t maplock;	/* Lock to serialize map/unmap requests */
 #endif
 };
 
