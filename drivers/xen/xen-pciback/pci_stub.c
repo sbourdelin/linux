@@ -25,6 +25,8 @@
 #include "conf_space.h"
 #include "conf_space_quirks.h"
 
+#define PCISTUB_DRIVER_NAME "pciback"
+
 static char *pci_devs_to_hide;
 wait_queue_head_t xen_pcibk_aer_wait_queue;
 /*Add sem for sync AER handling and xen_pcibk remove/reconfigue ops,
@@ -529,16 +531,18 @@ static int pcistub_probe(struct pci_dev *dev, const struct pci_device_id *id)
 				"don't have a normal (0) or bridge (1) "
 				"header type!\n");
 			err = -ENODEV;
-			goto out;
 		}
 
-		dev_info(&dev->dev, "seizing device\n");
-		err = pcistub_seize(dev);
-	} else
+	} else if (!dev->driver_override ||
+		   strcmp(dev->driver_override, PCISTUB_DRIVER_NAME))
 		/* Didn't find the device */
 		err = -ENODEV;
 
-out:
+	if (!err) {
+		dev_info(&dev->dev, "seizing device\n");
+		err = pcistub_seize(dev);
+	}
+
 	return err;
 }
 
@@ -945,7 +949,7 @@ static const struct pci_error_handlers xen_pcibk_error_handler = {
 static struct pci_driver xen_pcibk_pci_driver = {
 	/* The name should be xen_pciback, but until the tools are updated
 	 * we will keep it as pciback. */
-	.name = "pciback",
+	.name = PCISTUB_DRIVER_NAME,
 	.id_table = pcistub_ids,
 	.probe = pcistub_probe,
 	.remove = pcistub_remove,
