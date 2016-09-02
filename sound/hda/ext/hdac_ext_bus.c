@@ -246,6 +246,18 @@ static void hdac_ext_drv_shutdown(struct device *dev)
 	return (get_edrv(dev))->shutdown(get_edev(dev));
 }
 
+static int hdac_ext_drv_match(struct hdac_device *dev, struct hdac_driver *drv)
+{
+	struct hdac_ext_device *edev = get_edev(&dev->dev);
+	const struct hda_device_id *id_entry = hdac_get_device_id(dev, drv);
+
+	if (id_entry) {
+		edev->id_entry = id_entry;
+		return 1;
+	} else
+		return 0;
+}
+
 /**
  * snd_hda_ext_driver_register - register a driver for ext hda devices
  *
@@ -255,6 +267,7 @@ int snd_hda_ext_driver_register(struct hdac_ext_driver *drv)
 {
 	drv->hdac.type = HDA_DEV_ASOC;
 	drv->hdac.driver.bus = &snd_hda_bus_type;
+	drv->hdac.match = hdac_ext_drv_match;
 	/* we use default match */
 
 	if (drv->probe)

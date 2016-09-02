@@ -236,6 +236,7 @@ struct hdac_ext_device {
 	void *private_data;
 
 	struct list_head widget_list;
+	const struct hda_device_id *id_entry;
 };
 
 struct hdac_ext_dma_params {
