@@ -306,6 +306,26 @@ void tcf_hash_insert(struct tc_action_net *tn, struct tc_action *a)
 }
 EXPORT_SYMBOL(tcf_hash_insert);
 
+void tcf_hash_replace(struct tc_action_net *tn, struct tc_action **old,
+		      struct tc_action *new, int bind)
+{
+	struct tcf_hashinfo *hinfo = tn->hinfo;
+	unsigned int h = tcf_hash(new->tcfa_index, hinfo->hmask);
+
+	spin_lock_bh(&hinfo->lock);
+	if (*old)
+		hlist_replace_rcu(&(*old)->tcfa_head, &new->tcfa_head);
+	else
+		hlist_add_head_rcu(&new->tcfa_head, &hinfo->htab[h]);
+	spin_unlock_bh(&hinfo->lock);
+
+	if (*old)
+		tcf_hash_release(*old, bind);
+
+	rcu_assign_pointer(*old, new);
+}
+EXPORT_SYMBOL(tcf_hash_replace);
+
 void tcf_hashinfo_destroy(const struct tc_action_ops *ops,
 			  struct tcf_hashinfo *hinfo)
 {
