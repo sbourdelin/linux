@@ -8,3 +8,11 @@ config MDEV
 	See Documentation/vfio-mediated-device.txt for more details.
 
         If you don't know what do here, say N.
+
+config VFIO_MDEV
+    tristate "VFIO Bus driver for Mediated devices"
+    depends on VFIO && MDEV
+    default n
+    help
+        VFIO Bus driver for mediated devices.
+
