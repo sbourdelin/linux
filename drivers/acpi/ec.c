@@ -1438,13 +1438,17 @@ static int acpi_ec_add(struct acpi_device *device)
 		return -ENOMEM;
 	if (ec_parse_device(device->handle, 0, ec, NULL) !=
 		AE_CTRL_TERMINATE) {
-			acpi_ec_free(ec);
-			return -EINVAL;
+			ret = -EINVAL;
+			goto error;
 	}
 
 	/* Find and register all query methods */
 	acpi_walk_namespace(ACPI_TYPE_METHOD, ec->handle, 1,
 			    acpi_ec_register_query_methods, NULL, ec, NULL);
+
+	ret = acpi_config_boot_ec(ec, false);
+	if (ret)
+		goto error;
 
 	device->driver_data = ec;
 
@@ -1452,8 +1456,7 @@ static int acpi_ec_add(struct acpi_device *device)
 	WARN(!ret, "Could not request EC data io port 0x%lx", ec->data_addr);
 	ret = !!request_region(ec->command_addr, 1, "EC cmd");
 	WARN(!ret, "Could not request EC cmd io port 0x%lx", ec->command_addr);
-
-	ret = acpi_config_boot_ec(ec, false);
+	ret = 0;
 
 	/* Reprobe devices depending on the EC */
 	acpi_walk_dep_device_list(ec->handle);
@@ -1464,6 +1467,9 @@ static int acpi_ec_add(struct acpi_device *device)
 	/* Clear stale _Q events if hardware might require that */
 	if (EC_FLAGS_CLEAR_ON_RESUME)
 		acpi_ec_clear(ec);
+error:
+	if (ret)
+		acpi_ec_free(ec);
 	return ret;
 }
 
