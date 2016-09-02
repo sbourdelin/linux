@@ -629,8 +629,12 @@ static int __init proc_kcore_init(void)
 		pr_err("couldn't create /proc/kcore\n");
 		return 0; /* Always returns 0. */
 	}
+
+#ifndef CONFIG_HARDENED_USERCOPY
 	/* Store text area if it's special */
 	proc_kcore_text_init();
+#endif
+
 	/* Store vmalloc area */
 	kclist_add(&kcore_vmalloc, (void *)VMALLOC_START,
 		VMALLOC_END - VMALLOC_START, KCORE_VMALLOC);
