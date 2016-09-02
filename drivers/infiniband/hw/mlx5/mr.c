@@ -817,7 +817,7 @@ static struct ib_umem *mr_umem_get(struct ib_pd *pd, u64 start, u64 length,
 {
 	struct mlx5_ib_dev *dev = to_mdev(pd->device);
 	struct ib_umem *umem = ib_umem_get(pd->uobject->context, start, length,
-					   access_flags, 0);
+					   access_flags);
 	if (IS_ERR(umem)) {
 		mlx5_ib_err(dev, "umem get failed (%ld)\n", PTR_ERR(umem));
 		return (void *)umem;
