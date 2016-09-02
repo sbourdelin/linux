@@ -52,7 +52,7 @@ static void __ib_umem_release(struct ib_device *dev, struct ib_umem *umem, int d
 	if (umem->nmap > 0)
 		ib_dma_unmap_sg(dev, umem->sg_head.sgl,
 				umem->nmap,
-				DMA_BIDIRECTIONAL);
+				umem->dir);
 
 	for_each_sg(umem->sg_head.sgl, sg, umem->npages, i) {
 
@@ -82,6 +82,17 @@ static void __ib_umem_release(struct ib_device *dev, struct ib_umem *umem, int d
 struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
 			    size_t size, int access, int dmasync)
 {
+	unsigned long dma_attrs = 0;
+	if (dmasync)
+		dma_attrs |= DMA_ATTR_WRITE_BARRIER;
+	return ib_umem_get_attrs(context, addr, size, access, DMA_BIDIRECTIONAL, dma_attrs);
+}
+EXPORT_SYMBOL(ib_umem_get);
+
+struct ib_umem *ib_umem_get_attrs(struct ib_ucontext *context, unsigned long addr,
+				  size_t size, int access, enum dma_data_direction dir,
+				  unsigned long dma_attrs)
+{
 	struct ib_umem *umem;
 	struct page **page_list;
 	struct vm_area_struct **vma_list;
@@ -91,16 +102,11 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
 	unsigned long npages;
 	int ret;
 	int i;
-	unsigned long dma_attrs = 0;
 	struct scatterlist *sg, *sg_list_start;
 	int need_release = 0;
 
-	if (dmasync)
-		dma_attrs |= DMA_ATTR_WRITE_BARRIER;
-
 	if (!size)
 		return ERR_PTR(-EINVAL);
-
 	/*
 	 * If the combination of the addr and size requested for this memory
 	 * region causes an integer overflow, return error.
@@ -121,6 +127,7 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
 	umem->address   = addr;
 	umem->page_size = PAGE_SIZE;
 	umem->pid       = get_task_pid(current, PIDTYPE_PID);
+	umem->dir	= dir;
 	/*
 	 * We ask for writable memory if any of the following
 	 * access flags are set.  "Local write" and "remote write"
@@ -213,7 +220,7 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
 	umem->nmap = ib_dma_map_sg_attrs(context->device,
 				  umem->sg_head.sgl,
 				  umem->npages,
-				  DMA_BIDIRECTIONAL,
+				  dir,
 				  dma_attrs);
 
 	if (umem->nmap <= 0) {
@@ -239,7 +246,7 @@ out:
 
 	return ret < 0 ? ERR_PTR(ret) : umem;
 }
-EXPORT_SYMBOL(ib_umem_get);
+EXPORT_SYMBOL(ib_umem_get_attrs);
 
 static void ib_umem_account(struct work_struct *work)
 {
