@@ -137,16 +137,16 @@
 		and	t0,t1			# isolate allowed ones
 
 		beqz	t0,spurious
-
 #ifdef CONFIG_32BIT
 		 and	t2,t0
 		bnez	t2,fpu			# handle FPU immediately
 #endif
+		 nop
 
 		/*
 		 * Find irq with highest priority
 		 */
-		 PTR_LA	t1,cpu_mask_nr_tbl
+		PTR_LA	t1,cpu_mask_nr_tbl
 1:		lw	t2,(t1)
 		nop
 		and	t2,t0
@@ -191,11 +191,12 @@
 1:		and	t0,t1			# mask out allowed ones
 
 		beqz	t0,spurious
+		 nop
 
 		/*
 		 * Find irq with highest priority
 		 */
-		 PTR_LA	t1,asic_mask_nr_tbl
+		PTR_LA	t1,asic_mask_nr_tbl
 2:		lw	t2,(t1)
 		nop
 		and	t2,t0
