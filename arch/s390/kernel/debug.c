@@ -636,8 +636,7 @@ debug_open(struct inode *inode, struct file *file)
 		rc = -ENOMEM;
 		goto unlock;
 	}
-	p_info = kmalloc(sizeof(file_private_info_t),
-						GFP_KERNEL);
+	p_info = kmalloc(sizeof(*p_info), GFP_KERNEL);
 	if (!p_info) {
 		debug_info_free(debug_info_snapshot);
 		rc = -ENOMEM;
