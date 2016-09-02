@@ -189,6 +189,11 @@ struct tegra_dc_window {
 	struct tegra_bo_tiling tiling;
 	u32 format;
 	u32 swap;
+	u32 blend_nokey;
+	u32 blend_1win;
+	u32 blend_2win_x;
+	u32 blend_2win_y;
+	u32 blend_3win_xy;
 };
 
 /* from dc.c */
@@ -200,6 +205,15 @@ int tegra_dc_state_setup_clock(struct tegra_dc *dc,
 			       struct drm_crtc_state *crtc_state,
 			       struct clk *clk, unsigned long pclk,
 			       unsigned int div);
+void tegra_dc_set_color_key(struct drm_crtc_state *crtc_state,
+			    int key_id, u32 upper, u32 lower);
+void tegra20_dc_plane_set_blending(struct drm_plane_state *plane_state,
+				   unsigned int blend_config,
+				   unsigned int blend_control,
+				   unsigned int blend_weight0,
+				   unsigned int blend_weight1,
+				   bool use_color_key0,
+				   bool use_color_key1);
 
 struct tegra_output {
 	struct device_node *of_node;

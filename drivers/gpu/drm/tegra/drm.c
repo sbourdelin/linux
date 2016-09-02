@@ -13,6 +13,8 @@
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 
+#include <soc/tegra/fuse.h>
+
 #include "drm.h"
 #include "gem.h"
 
@@ -771,6 +773,161 @@ static int tegra_gem_get_flags(struct drm_device *drm, void *data,
 
 	return 0;
 }
+
+static int tegra_set_color_key(struct drm_device *drm, void *data,
+			       struct drm_file *file)
+{
+	struct drm_tegra_set_color_key *args = data;
+	struct drm_modeset_acquire_ctx ctx;
+	struct drm_atomic_state *state;
+	struct drm_crtc_state *crtc_state;
+	struct drm_crtc *crtc;
+	bool crtc_mask_invalid = true;
+	int ret;
+
+	if (args->key_id > 1)
+		return -EINVAL;
+
+	drm_for_each_crtc(crtc, drm) {
+		if (!(args->crtc_mask & drm_crtc_mask(crtc)))
+			continue;
+
+		crtc_mask_invalid = false;
+
+		drm_modeset_acquire_init(&ctx, 0);
+
+		state = drm_atomic_state_alloc(drm);
+		if (!state) {
+			ret = -ENOMEM;
+			goto unlock;
+		}
+
+		state->acquire_ctx = &ctx;
+retry:
+		crtc_state = drm_atomic_get_crtc_state(state, crtc);
+		if (IS_ERR(crtc_state)) {
+			ret = PTR_ERR(crtc_state);
+			goto unlock;
+		}
+
+		tegra_dc_set_color_key(crtc_state, args->key_id,
+				       args->upper, args->lower);
+
+		ret = drm_atomic_commit(state);
+		if (ret == -EDEADLK)
+			goto backoff;
+		if (ret)
+			drm_atomic_state_free(state);
+unlock:
+		drm_modeset_drop_locks(&ctx);
+		drm_modeset_acquire_fini(&ctx);
+
+		if (ret)
+			return ret;
+
+		continue;
+backoff:
+		drm_atomic_state_clear(state);
+		drm_modeset_backoff(&ctx);
+
+		goto retry;
+	}
+
+	if (crtc_mask_invalid)
+		return -ENOENT;
+
+	return 0;
+}
+
+static int tegra20_plane_set_blending(struct drm_device *drm, void *data,
+				      struct drm_file *file)
+{
+	struct drm_tegra20_plane_set_blending *args = data;
+	struct drm_modeset_acquire_ctx ctx;
+	struct drm_plane *plane;
+	struct drm_plane_state *plane_state;
+	struct drm_atomic_state *state;
+	u8 chip = tegra_get_chip_id();
+	int ret;
+
+	switch (chip) {
+	case TEGRA20:
+	case TEGRA30:
+		break;
+	default:
+		return -ENOTTY;
+	}
+
+	plane = drm_plane_find(drm, args->plane_id);
+	if (!plane)
+		return -ENOENT;
+
+	switch (args->blend_config) {
+	case DRM_TEGRA_PLANE_BLEND_CONFIG_NOKEY:
+	case DRM_TEGRA_PLANE_BLEND_CONFIG_1WIN:
+	case DRM_TEGRA_PLANE_BLEND_CONFIG_2WIN_X:
+	case DRM_TEGRA_PLANE_BLEND_CONFIG_2WIN_Y:
+	case DRM_TEGRA_PLANE_BLEND_CONFIG_3WIN_XY:
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	switch (args->blend_control) {
+	case DRM_TEGRA_PLANE_BLEND_CONTROL_FIX_WEIGHT:
+	case DRM_TEGRA_PLANE_BLEND_CONTROL_ALPHA_WEIGHT:
+	case DRM_TEGRA_PLANE_BLEND_CONTROL_DEPENDENT_WEIGHT:
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (args->blend_weight0 > 0xff)
+		return -EINVAL;
+
+	if (args->blend_weight1 > 0xff)
+		return -EINVAL;
+
+	drm_modeset_acquire_init(&ctx, 0);
+
+	state = drm_atomic_state_alloc(drm);
+	if (!state) {
+		ret = -ENOMEM;
+		goto unlock;
+	}
+
+	state->acquire_ctx = &ctx;
+retry:
+	plane_state = drm_atomic_get_plane_state(state, plane);
+	if (IS_ERR(plane_state)) {
+		ret = PTR_ERR(plane_state);
+		goto unlock;
+	}
+
+	tegra20_dc_plane_set_blending(plane_state,
+				      args->blend_config,
+				      args->blend_control,
+				      args->blend_weight0,
+				      args->blend_weight1,
+				      args->use_color_key0,
+				      args->use_color_key1);
+
+	ret = drm_atomic_commit(state);
+	if (ret == -EDEADLK)
+		goto backoff;
+	if (ret)
+		drm_atomic_state_free(state);
+unlock:
+	drm_modeset_drop_locks(&ctx);
+	drm_modeset_acquire_fini(&ctx);
+
+	return ret;
+backoff:
+	drm_atomic_state_clear(state);
+	drm_modeset_backoff(&ctx);
+
+	goto retry;
+}
 #endif
 
 static const struct drm_ioctl_desc tegra_drm_ioctls[] = {
@@ -789,6 +946,8 @@ static const struct drm_ioctl_desc tegra_drm_ioctls[] = {
 	DRM_IOCTL_DEF_DRV(TEGRA_GEM_GET_TILING, tegra_gem_get_tiling, 0),
 	DRM_IOCTL_DEF_DRV(TEGRA_GEM_SET_FLAGS, tegra_gem_set_flags, 0),
 	DRM_IOCTL_DEF_DRV(TEGRA_GEM_GET_FLAGS, tegra_gem_get_flags, 0),
+	DRM_IOCTL_DEF_DRV(TEGRA_SET_COLOR_KEY, tegra_set_color_key, 0),
+	DRM_IOCTL_DEF_DRV(TEGRA20_PLANE_SET_BLENDING, tegra20_plane_set_blending, 0),
 #endif
 };
 

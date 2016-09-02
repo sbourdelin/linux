@@ -42,6 +42,11 @@ static inline struct tegra_plane *to_tegra_plane(struct drm_plane *plane)
 	return container_of(plane, struct tegra_plane, base);
 }
 
+struct tegra_dc_color_key {
+	u32 upper;
+	u32 lower;
+};
+
 struct tegra_dc_state {
 	struct drm_crtc_state base;
 
@@ -50,6 +55,9 @@ struct tegra_dc_state {
 	unsigned int div;
 
 	u32 planes;
+
+	struct tegra_dc_color_key color_key0;
+	struct tegra_dc_color_key color_key1;
 };
 
 static inline struct tegra_dc_state *to_dc_state(struct drm_crtc_state *state)
@@ -66,6 +74,11 @@ struct tegra_plane_state {
 	struct tegra_bo_tiling tiling;
 	u32 format;
 	u32 swap;
+	u32 blend_nokey;
+	u32 blend_1win;
+	u32 blend_2win_x;
+	u32 blend_2win_y;
+	u32 blend_3win_xy;
 };
 
 static inline struct tegra_plane_state *
@@ -75,6 +88,66 @@ to_tegra_plane_state(struct drm_plane_state *state)
 		return container_of(state, struct tegra_plane_state, base);
 
 	return NULL;
+}
+
+void tegra_dc_set_color_key(struct drm_crtc_state *crtc_state,
+			    int key_id, u32 upper, u32 lower)
+{
+	struct tegra_dc_state *state = to_dc_state(crtc_state);
+	struct tegra_dc_color_key *color_key;
+
+	if (key_id == 0)
+		color_key = &state->color_key0;
+	else
+		color_key = &state->color_key1;
+
+	color_key->lower = lower;
+	color_key->upper = upper;
+}
+
+void tegra20_dc_plane_set_blending(struct drm_plane_state *plane_state,
+				   unsigned int blend_config,
+				   unsigned int blend_control,
+				   unsigned int blend_weight0,
+				   unsigned int blend_weight1,
+				   bool use_color_key0,
+				   bool use_color_key1)
+{
+	struct tegra_plane_state *state = to_tegra_plane_state(plane_state);
+	u32 value;
+
+	if (blend_config == DRM_TEGRA_PLANE_BLEND_CONFIG_NOKEY) {
+		value = DC_WIN_BLEND_CONTROL_NOKEY(blend_control);
+	} else {
+		value = DC_WIN_BLEND_CONTROL(blend_control);
+
+		if (use_color_key0)
+			value |= DC_WIN_BLEND_CKEY0;
+
+		if (use_color_key1)
+			value |= DC_WIN_BLEND_CKEY1;
+	}
+
+	value |= DC_WIN_BLEND_WEIGHT0(blend_weight0);
+	value |= DC_WIN_BLEND_WEIGHT1(blend_weight1);
+
+	switch (blend_config) {
+	case DRM_TEGRA_PLANE_BLEND_CONFIG_NOKEY:
+		state->blend_nokey = value;
+		break;
+	case DRM_TEGRA_PLANE_BLEND_CONFIG_1WIN:
+		state->blend_1win = value;
+		break;
+	case DRM_TEGRA_PLANE_BLEND_CONFIG_2WIN_X:
+		state->blend_2win_x = value;
+		break;
+	case DRM_TEGRA_PLANE_BLEND_CONFIG_2WIN_Y:
+		state->blend_2win_y = value;
+		break;
+	case DRM_TEGRA_PLANE_BLEND_CONFIG_3WIN_XY:
+		state->blend_3win_xy = value;
+		break;
+	}
 }
 
 static void tegra_dc_stats_reset(struct tegra_dc_stats *stats)
@@ -381,32 +454,11 @@ static void tegra_dc_setup_window(struct tegra_dc *dc, unsigned int index,
 
 	tegra_dc_writel(dc, value, DC_WIN_WIN_OPTIONS);
 
-	/*
-	 * Disable blending and assume Window A is the bottom-most window,
-	 * Window C is the top-most window and Window B is in the middle.
-	 */
-	tegra_dc_writel(dc, 0xffff00, DC_WIN_BLEND_NOKEY);
-	tegra_dc_writel(dc, 0xffff00, DC_WIN_BLEND_1WIN);
-
-	switch (index) {
-	case 0:
-		tegra_dc_writel(dc, 0x000000, DC_WIN_BLEND_2WIN_X);
-		tegra_dc_writel(dc, 0x000000, DC_WIN_BLEND_2WIN_Y);
-		tegra_dc_writel(dc, 0x000000, DC_WIN_BLEND_3WIN_XY);
-		break;
-
-	case 1:
-		tegra_dc_writel(dc, 0xffff00, DC_WIN_BLEND_2WIN_X);
-		tegra_dc_writel(dc, 0x000000, DC_WIN_BLEND_2WIN_Y);
-		tegra_dc_writel(dc, 0x000000, DC_WIN_BLEND_3WIN_XY);
-		break;
-
-	case 2:
-		tegra_dc_writel(dc, 0xffff00, DC_WIN_BLEND_2WIN_X);
-		tegra_dc_writel(dc, 0xffff00, DC_WIN_BLEND_2WIN_Y);
-		tegra_dc_writel(dc, 0xffff00, DC_WIN_BLEND_3WIN_XY);
-		break;
-	}
+	tegra_dc_writel(dc, window->blend_nokey,   DC_WIN_BLEND_NOKEY);
+	tegra_dc_writel(dc, window->blend_1win,    DC_WIN_BLEND_1WIN);
+	tegra_dc_writel(dc, window->blend_2win_x,  DC_WIN_BLEND_2WIN_X);
+	tegra_dc_writel(dc, window->blend_2win_y,  DC_WIN_BLEND_2WIN_Y);
+	tegra_dc_writel(dc, window->blend_3win_xy, DC_WIN_BLEND_3WIN_XY);
 
 	spin_unlock_irqrestore(&dc->lock, flags);
 }
@@ -444,6 +496,34 @@ static void tegra_plane_reset(struct drm_plane *plane)
 	if (state) {
 		plane->state = &state->base;
 		plane->state->plane = plane;
+
+		/*
+		 * By default, disable blending and assume Window A is the
+		 * bottom-most window, Window C is the top-most window and
+		 * Window B is in the middle.
+		 */
+		state->blend_nokey = 0xffff00;
+		state->blend_1win  = 0xffff00;
+
+		switch (plane->index) {
+		case 0:
+			state->blend_2win_x  = 0x000000;
+			state->blend_2win_y  = 0x000000;
+			state->blend_3win_xy = 0x000000;
+			break;
+
+		case 1:
+			state->blend_2win_x  = 0xffff00;
+			state->blend_2win_y  = 0x000000;
+			state->blend_3win_xy = 0x000000;
+			break;
+
+		case 2:
+			state->blend_2win_x  = 0xffff00;
+			state->blend_2win_y  = 0xffff00;
+			state->blend_3win_xy = 0xffff00;
+			break;
+		}
 	}
 }
 
@@ -460,6 +540,11 @@ static struct drm_plane_state *tegra_plane_atomic_duplicate_state(struct drm_pla
 	copy->tiling = state->tiling;
 	copy->format = state->format;
 	copy->swap = state->swap;
+	copy->blend_nokey = state->blend_nokey;
+	copy->blend_1win = state->blend_1win;
+	copy->blend_2win_x = state->blend_2win_x;
+	copy->blend_2win_y = state->blend_2win_y;
+	copy->blend_3win_xy = state->blend_3win_xy;
 
 	return &copy->base;
 }
@@ -586,6 +671,11 @@ static void tegra_plane_atomic_update(struct drm_plane *plane,
 	window.tiling = state->tiling;
 	window.format = state->format;
 	window.swap = state->swap;
+	window.blend_nokey = state->blend_nokey;
+	window.blend_1win = state->blend_1win;
+	window.blend_2win_x = state->blend_2win_x;
+	window.blend_2win_y = state->blend_2win_y;
+	window.blend_3win_xy = state->blend_3win_xy;
 
 	for (i = 0; i < drm_format_num_planes(fb->pixel_format); i++) {
 		struct tegra_bo *bo = tegra_fb_get_plane(fb, i);
@@ -1028,6 +1118,8 @@ tegra_crtc_atomic_duplicate_state(struct drm_crtc *crtc)
 	copy->pclk = state->pclk;
 	copy->div = state->div;
 	copy->planes = state->planes;
+	copy->color_key0 = state->color_key0;
+	copy->color_key1 = state->color_key1;
 
 	return &copy->base;
 }
@@ -1326,6 +1418,12 @@ static void tegra_crtc_atomic_flush(struct drm_crtc *crtc,
 
 	tegra_dc_writel(dc, state->planes << 8, DC_CMD_STATE_CONTROL);
 	tegra_dc_writel(dc, state->planes, DC_CMD_STATE_CONTROL);
+
+	tegra_dc_writel(dc, state->color_key0.lower, DC_DISP_COLOR_KEY0_LOWER);
+	tegra_dc_writel(dc, state->color_key0.upper, DC_DISP_COLOR_KEY0_UPPER);
+	tegra_dc_writel(dc, state->color_key1.lower, DC_DISP_COLOR_KEY1_LOWER);
+	tegra_dc_writel(dc, state->color_key1.upper, DC_DISP_COLOR_KEY1_UPPER);
+	tegra_dc_commit(dc);
 }
 
 static const struct drm_crtc_helper_funcs tegra_crtc_helper_funcs = {

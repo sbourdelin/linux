@@ -172,6 +172,36 @@ struct drm_tegra_gem_get_flags {
 	__u32 flags;
 };
 
+struct drm_tegra_set_color_key {
+	/* input */
+	__u32 crtc_mask;	/* Display controllers to use that key */
+	__u32 key_id;		/* Specify what color key to set, 0 or 1 */
+	__u32 upper;		/* Color key itself in ARGB_8888 format */
+	__u32 lower;		/* in range lower..upper */
+};
+
+#define DRM_TEGRA_PLANE_BLEND_CONFIG_NOKEY	0
+#define DRM_TEGRA_PLANE_BLEND_CONFIG_1WIN	1
+#define DRM_TEGRA_PLANE_BLEND_CONFIG_2WIN_X	2
+#define DRM_TEGRA_PLANE_BLEND_CONFIG_2WIN_Y	3
+#define DRM_TEGRA_PLANE_BLEND_CONFIG_3WIN_XY	4
+
+#define DRM_TEGRA_PLANE_BLEND_CONTROL_FIX_WEIGHT	0
+#define DRM_TEGRA_PLANE_BLEND_CONTROL_ALPHA_WEIGHT	1
+#define DRM_TEGRA_PLANE_BLEND_CONTROL_DEPENDENT_WEIGHT	2
+
+struct drm_tegra20_plane_set_blending {
+	/* input */
+	__u32 plane_id;
+	__u32 blend_config;	/* Specify blending configuration to set */
+	__u32 blend_control;
+	__u32 blend_weight0;
+	__u32 blend_weight1;
+	__u32 use_color_key0;	/* Ignored by the NOKEY blending config */
+	__u32 use_color_key1;	/* Ignored by the NOKEY blending config */
+	__u32 pad;
+};
+
 #define DRM_TEGRA_GEM_CREATE		0x00
 #define DRM_TEGRA_GEM_MMAP		0x01
 #define DRM_TEGRA_SYNCPT_READ		0x02
@@ -186,6 +216,8 @@ struct drm_tegra_gem_get_flags {
 #define DRM_TEGRA_GEM_GET_TILING	0x0b
 #define DRM_TEGRA_GEM_SET_FLAGS		0x0c
 #define DRM_TEGRA_GEM_GET_FLAGS		0x0d
+#define DRM_TEGRA_SET_COLOR_KEY		0x0e
+#define DRM_TEGRA20_PLANE_SET_BLENDING	0x0f
 
 #define DRM_IOCTL_TEGRA_GEM_CREATE DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GEM_CREATE, struct drm_tegra_gem_create)
 #define DRM_IOCTL_TEGRA_GEM_MMAP DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GEM_MMAP, struct drm_tegra_gem_mmap)
@@ -201,6 +233,8 @@ struct drm_tegra_gem_get_flags {
 #define DRM_IOCTL_TEGRA_GEM_GET_TILING DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GEM_GET_TILING, struct drm_tegra_gem_get_tiling)
 #define DRM_IOCTL_TEGRA_GEM_SET_FLAGS DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GEM_SET_FLAGS, struct drm_tegra_gem_set_flags)
 #define DRM_IOCTL_TEGRA_GEM_GET_FLAGS DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GEM_GET_FLAGS, struct drm_tegra_gem_get_flags)
+#define DRM_IOCTL_TEGRA_SET_COLOR_KEY DRM_IOW(DRM_COMMAND_BASE + DRM_TEGRA_SET_COLOR_KEY, struct drm_tegra_set_color_key)
+#define DRM_IOCTL_TEGRA20_PLANE_SET_BLENDING DRM_IOW(DRM_COMMAND_BASE + DRM_TEGRA20_PLANE_SET_BLENDING, struct drm_tegra20_plane_set_blending)
 
 #if defined(__cplusplus)
 }
