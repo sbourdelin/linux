@@ -230,6 +230,7 @@ bool tcf_hash_check(struct tc_action_net *tn, u32 index, struct tc_action **a,
 		*a = p;
 		return true;
 	}
+	*a = NULL;
 	return false;
 }
 EXPORT_SYMBOL(tcf_hash_check);
