@@ -120,6 +120,19 @@ struct vme_user_vma_priv {
 	atomic_t refcnt;
 };
 
+static void slave_buffer_free(struct image_desc *img)
+{
+	if (!img->kern_buf)
+		return;
+
+	vme_free_consistent(img->resource, img->size_buf, img->kern_buf,
+			    img->pci_buf);
+
+	img->kern_buf = NULL;
+	img->pci_buf = 0;
+	img->size_buf = 0;
+}
+
 static ssize_t resource_to_user(int minor, char __user *buf, size_t count,
 				loff_t *ppos)
 {
@@ -394,6 +407,22 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 				return -EFAULT;
 			}
 
+			if (img->kern_buf && (img->size_buf != slave.size))
+				slave_buffer_free(img);
+
+			if (!img->kern_buf) {
+				img->kern_buf = vme_alloc_consistent(
+						img->resource, slave.size,
+						&pci_addr);
+				if (!img->kern_buf) {
+					dev_warn(img->device,
+						 "Unable to allocate memory for buffer\n");
+					return -ENOMEM;
+				}
+				img->pci_buf = pci_addr;
+				img->size_buf = slave.size;
+			}
+
 			/* XXX	We do not want to push aspace, cycle and width
 			 *	to userspace as they are
 			 */
@@ -401,6 +430,9 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 				slave.enable, slave.vme_addr, slave.size,
 				img->pci_buf, slave.aspace,
 				slave.cycle);
+
+			if (retval)
+				slave_buffer_free(img);
 
 			break;
 		}
@@ -578,17 +610,6 @@ static int vme_user_probe(struct vme_dev *vdev)
 			err = -ENOMEM;
 			goto err_slave;
 		}
-		image[i].size_buf = PCI_BUF_SIZE;
-		image[i].kern_buf = vme_alloc_consistent(image[i].resource,
-			image[i].size_buf, &image[i].pci_buf);
-		if (!image[i].kern_buf) {
-			dev_warn(&vdev->dev,
-				 "Unable to allocate memory for buffer\n");
-			image[i].pci_buf = 0;
-			vme_slave_free(image[i].resource);
-			err = -ENOMEM;
-			goto err_slave;
-		}
 	}
 
 	/*
@@ -676,8 +697,6 @@ err_master:
 err_slave:
 	while (i > SLAVE_MINOR) {
 		i--;
-		vme_free_consistent(image[i].resource, image[i].size_buf,
-				    image[i].kern_buf, image[i].pci_buf);
 		vme_slave_free(image[i].resource);
 	}
 err_class:
@@ -707,8 +726,7 @@ static int vme_user_remove(struct vme_dev *dev)
 
 	for (i = SLAVE_MINOR; i < (SLAVE_MAX + 1); i++) {
 		vme_slave_set(image[i].resource, 0, 0, 0, 0, VME_A32, 0);
-		vme_free_consistent(image[i].resource, image[i].size_buf,
-				    image[i].kern_buf, image[i].pci_buf);
+		slave_buffer_free(&image[i]);
 		vme_slave_free(image[i].resource);
 	}
 
