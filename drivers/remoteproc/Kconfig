@@ -100,4 +100,15 @@ config ST_REMOTEPROC
 	  processor framework.
 	  This can be either built-in or a loadable module.
 
+config MIPS_REMOTEPROC
+	tristate "MIPS remoteproc support"
+	depends on MIPS_CPS && HAS_DMA
+	select CMA
+	select REMOTEPROC
+	select MIPS_STEAL
+	help
+	  Say y here to support using offline cores/VPEs as remote processors
+	  via the remote processor framework.
+	  If unsure say N.
+
 endmenu
