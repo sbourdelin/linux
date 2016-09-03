@@ -25,6 +25,54 @@ config UEVENT_HELPER_PATH
 	  via /proc/sys/kernel/hotplug or via /sys/kernel/uevent_helper
 	  later at runtime.
 
+config CRITICAL_MOUNTS_WAIT
+	bool "Enable waiting for critical-filesystems-ready notification"
+	default n
+	help
+	  Kernel subsystems and device drivers often need to read files
+	  from the filesystem, however in doing this races are possible at
+	  bootup -- the subsystem requesting the file might look for it in /
+	  early in boot, but if we haven't yet mounted the real root
+	  filesystem we'll just tell the subsystem the file is not present and
+	  it will fail. Furthermore what path to the filesystem is used varies
+	  depending on the subsystem. To help the kernel we provide the option
+	  to let the kernel wait for all critical filesystems to mounted and
+	  ready before letting the kernel start trying to read files from the
+	  systems' filesystem. Since pivot_root() can be used and therefore a
+	  system might be configured to change its / filesystem at bootup as
+	  many times as it wishes, only userspace can realy know exactly when
+	  all critical filesystems are ready. Enabling this lets userspace
+	  communicate to the kernel when all critical filesystems are ready.
+
+	  What are the critical filesystems are obviously system specific, but
+	  examples of some are:
+
+	    o /lib/firmware/
+	    o /etc/XXX/
+
+	  If you enable this you must have a userspace init script or tool
+	  which will vet to ensure all critical filesystems are ready, once
+	  they are all ready it will inform the kenrel by setting the file
+	  /sys/kernel/critical_mounts_ready to 1.
+
+	  The kernel will wait by default 10 seconds for the event, if the
+	  the timeout is reached, it will proceed to just try to enable
+	  reading of the files from the kernel but warn.
+
+	  If not sure say "no" for now. You need proper userpace implementation
+	  for this.
+
+config CRITICAL_MOUNTS_WAIT_TIMEOUT
+	int "Timeout for critical-fs-reayd notification in miliseconds"
+	depends on CRITICAL_MOUNTS_WAIT
+	default 10000
+	help
+	  Defines the timeout for the kernel to wait for critical filesystems
+	  to be loaded. This if system specific as only the system will know
+	  exaclty when how long this typically takes. By default this is
+	  10 seconds. You can override at boot time by using the kernel
+	  parameter critical_mounts_timeout_ms.
+
 config DEVTMPFS
 	bool "Maintain a devtmpfs filesystem to mount at /dev"
 	help

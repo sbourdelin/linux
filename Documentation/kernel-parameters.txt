@@ -849,6 +849,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			It will be ignored when crashkernel=X,high is not used
 			or memory reserved is below 4G.
 
+	critical_mounts_timeout_ms=T	[KNL] timeout in ms
+			Format: <integer>
+			Use this to override the kernel's default timeout for
+			waiting for critical system mount points to become
+			available.
+
 	cryptomgr.notests
                         [KNL] Disable crypto self-tests
 

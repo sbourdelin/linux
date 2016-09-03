@@ -21,6 +21,7 @@
 #include <linux/compiler.h>
 
 #include <linux/rcupdate.h>	/* rcu_expedited and rcu_normal */
+#include <linux/swait.h>
 
 #define KERNEL_ATTR_RO(_name) \
 static struct kobj_attribute _name##_attr = __ATTR_RO(_name)
@@ -180,6 +181,78 @@ static ssize_t rcu_normal_store(struct kobject *kobj,
 KERNEL_ATTR_RW(rcu_normal);
 #endif /* #ifndef CONFIG_TINY_RCU */
 
+#ifdef CONFIG_CRITICAL_MOUNTS_WAIT
+static int are_critical_mounts_ready;
+
+static DECLARE_SWAIT_QUEUE_HEAD(critical_wq);
+static int critical_mounts_timeout_ms = CONFIG_CRITICAL_MOUNTS_WAIT_TIMEOUT;
+
+core_param(critical_mounts_timeout_ms, critical_mounts_timeout_ms, int, 0644);
+
+static bool critical_mounts_ready(void)
+{
+	return !!are_critical_mounts_ready;
+}
+
+
+static void __wait_for_critical_mounts(void)
+{
+	int ret;
+	struct swait_queue_head *wq = &critical_wq;
+
+	pr_debug("Waiting for critical filesystems...\n");
+	ret = swait_event_interruptible_timeout(*wq, critical_mounts_ready(),
+						msecs_to_jiffies(critical_mounts_timeout_ms));
+	if (ret > 0)
+		return;
+
+	WARN_ON(ret < 0);
+}
+static ssize_t critical_mounts_ready_show(struct kobject *kobj,
+					  struct kobj_attribute *attr,
+					  char *buf)
+{
+	return sprintf(buf, "%d\n", critical_mounts_ready());
+}
+static ssize_t critical_mounts_ready_store(struct kobject *kobj,
+					   struct kobj_attribute *attr,
+					   const char *buf, size_t count)
+{
+	if (kstrtoint(buf, 0, &are_critical_mounts_ready))
+		return -EINVAL;
+
+	return count;
+}
+KERNEL_ATTR_RW(critical_mounts_ready);
+
+static ssize_t critical_mounts_timeout_ms_show(struct kobject *kobj,
+					       struct kobj_attribute *attr,
+					       char *buf)
+{
+	return sprintf(buf, "%d\n", critical_mounts_timeout_ms);
+}
+KERNEL_ATTR_RO(critical_mounts_timeout_ms);
+
+void wait_for_critical_mounts(enum kernel_read_file_id id)
+{
+	switch (id) {
+	case READING_FIRMWARE:
+	case READING_FIRMWARE_PREALLOC_BUFFER:
+	case READING_POLICY:
+		if (!critical_mounts_ready()) {
+			pr_info("Waiting for critical filesystems...\n");
+			__wait_for_critical_mounts();
+		}
+		else
+			pr_info("All critical filesystems are ready!\n");
+		break;
+	default:
+		break;
+	}
+}
+EXPORT_SYMBOL_GPL(wait_for_critical_mounts);
+#endif /* CONFIG_CRITICAL_MOUNTS_WAIT */
+
 /*
  * Make /sys/kernel/notes give the raw contents of our kernel .notes section.
  */
@@ -224,6 +297,10 @@ static struct attribute * kernel_attrs[] = {
 #ifndef CONFIG_TINY_RCU
 	&rcu_expedited_attr.attr,
 	&rcu_normal_attr.attr,
+#endif
+#ifdef CONFIG_CRITICAL_MOUNTS_WAIT
+	&critical_mounts_ready_attr.attr,
+	&critical_mounts_timeout_ms_attr.attr,
 #endif
 	NULL
 };

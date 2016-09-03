@@ -57,6 +57,7 @@
 #include <linux/oom.h>
 #include <linux/compat.h>
 #include <linux/vmalloc.h>
+#include <linux/swait.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -948,6 +949,8 @@ int kernel_read_file_from_path(char *path, void **buf, loff_t *size,
 {
 	struct file *file;
 	int ret;
+
+	wait_for_critical_mounts(id);
 
 	if (!path || !*path)
 		return -EINVAL;

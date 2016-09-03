@@ -3192,4 +3192,12 @@ static inline bool dir_relax_shared(struct inode *inode)
 extern bool path_noexec(const struct path *path);
 extern void inode_nohighmem(struct inode *inode);
 
+#ifdef CONFIG_CRITICAL_MOUNTS_WAIT
+void wait_for_critical_mounts(enum kernel_read_file_id id);
+#else
+static inline void wait_for_critical_mounts(enum kernel_read_file_id id)
+{
+}
+#endif /* CONFIG_CRITICAL_MOUNTS_WAIT */
+
 #endif /* _LINUX_FS_H */
