@@ -111,6 +111,7 @@ struct tegra_adma_desc {
 	size_t				buf_len;
 	size_t				period_len;
 	size_t				num_periods;
+	bool				cyclic;
 };
 
 /*
@@ -406,7 +407,8 @@ static irqreturn_t tegra_adma_isr(int irq, void *dev_id)
 		return IRQ_NONE;
 	}
 
-	vchan_cyclic_callback(&tdc->desc->vd);
+	if (tdc->desc->cyclic)
+		vchan_cyclic_callback(&tdc->desc->vd);
 
 	spin_unlock_irqrestore(&tdc->vc.lock, flags);
 
@@ -555,6 +557,7 @@ static struct dma_async_tx_descriptor *tegra_adma_prep_dma_cyclic(
 	if (!desc)
 		return NULL;
 
+	desc->cyclic = true;
 	desc->buf_len = buf_len;
 	desc->period_len = period_len;
 	desc->num_periods = buf_len / period_len;
