@@ -115,7 +115,7 @@ static inline bool vxlan_addr_multicast(const union vxlan_addr *ipa)
 		return IN_MULTICAST(ntohl(ipa->sin.sin_addr.s_addr));
 }
 
-static int vxlan_nla_get_addr(union vxlan_addr *ip, struct nlattr *nla)
+static int vxlan_nla_get_addr(union vxlan_addr *ip, const struct nlattr *nla)
 {
 	if (nla_len(nla) >= sizeof(struct in6_addr)) {
 		ip->sin6.sin6_addr = nla_get_in6_addr(nla);
@@ -157,7 +157,7 @@ static inline bool vxlan_addr_multicast(const union vxlan_addr *ipa)
 	return IN_MULTICAST(ntohl(ipa->sin.sin_addr.s_addr));
 }
 
-static int vxlan_nla_get_addr(union vxlan_addr *ip, struct nlattr *nla)
+static int vxlan_nla_get_addr(union vxlan_addr *ip, const struct nlattr *nla)
 {
 	if (nla_len(nla) >= sizeof(struct in6_addr)) {
 		return -EAFNOSUPPORT;
