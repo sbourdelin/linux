@@ -102,7 +102,7 @@ static int scode_set;
 static int
 dcss_set_subcodes(void)
 {
-	char *name = kmalloc(8 * sizeof(char), GFP_KERNEL | GFP_DMA);
+	char *name = kmalloc_array(8, sizeof(*name), GFP_KERNEL | GFP_DMA);
 	unsigned long rx, ry;
 	int rc;
 
