@@ -365,13 +365,14 @@ void bpf_jit_compile(struct bpf_prog *fp)
 	unsigned int cleanup_addr, proglen, oldproglen;
 	u32 temp[8], *prog, *func, seen, pass;
 	const struct sock_filter *filter;
-	int i, flen = fp->len, pc_ret0;
+	int i, flen, pc_ret0;
 	unsigned int *addrs;
 	void *image;
 
 	if (!bpf_jit_enable)
 		return;
 
+	flen = fp->len;
 	addrs = kmalloc_array(flen, sizeof(*addrs), GFP_KERNEL);
 	if (addrs == NULL)
 		return;
