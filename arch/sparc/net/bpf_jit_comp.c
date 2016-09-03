@@ -761,7 +761,7 @@ cond_branch:			f_offset = addrs[i + filter[i].jf];
 
 			default:
 				/* hmm, too complex filter, give up with jit compiler */
-				goto out;
+				goto free_addresses;
 			}
 			ilen = (void *) prog - (void *) temp;
 			if (image) {
@@ -793,7 +793,7 @@ cond_branch:			f_offset = addrs[i + filter[i].jf];
 		if (proglen == oldproglen) {
 			image = module_alloc(proglen);
 			if (!image)
-				goto out;
+				goto free_addresses;
 		}
 		oldproglen = proglen;
 	}
@@ -806,7 +806,7 @@ cond_branch:			f_offset = addrs[i + filter[i].jf];
 		fp->bpf_func = (void *)image;
 		fp->jited = 1;
 	}
-out:
+ free_addresses:
 	kfree(addrs);
 	return;
 }
