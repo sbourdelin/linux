@@ -193,6 +193,10 @@ static int qce_crypto_probe(struct platform_device *pdev)
 	if (ret < 0)
 		return ret;
 
+	qce->core_src = devm_clk_get(qce->dev, "core_src");
+	if (IS_ERR(qce->core_src))
+		return PTR_ERR(qce->core_src);
+
 	qce->core = devm_clk_get(qce->dev, "core");
 	if (IS_ERR(qce->core))
 		return PTR_ERR(qce->core);
@@ -205,9 +209,19 @@ static int qce_crypto_probe(struct platform_device *pdev)
 	if (IS_ERR(qce->bus))
 		return PTR_ERR(qce->bus);
 
-	ret = clk_prepare_enable(qce->core);
+	ret = clk_prepare_enable(qce->core_src);
 	if (ret)
 		return ret;
+
+	ret = clk_set_rate(qce->core_src, 100000000);
+	if (ret) {
+		dev_warn(qce->dev, "Unable to set QCE core src clk @100Mhz, performance might be degraded\n");
+		goto err_clks_core_src;
+	}
+
+	ret = clk_prepare_enable(qce->core);
+	if (ret)
+		goto err_clks_core_src;
 
 	ret = clk_prepare_enable(qce->iface);
 	if (ret)
@@ -247,6 +261,8 @@ err_clks_iface:
 	clk_disable_unprepare(qce->iface);
 err_clks_core:
 	clk_disable_unprepare(qce->core);
+err_clks_core_src:
+	clk_disable_unprepare(qce->core_src);
 	return ret;
 }
 

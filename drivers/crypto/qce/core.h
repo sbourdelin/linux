@@ -42,7 +42,7 @@ struct qce_device {
 	int result;
 	void __iomem *base;
 	struct device *dev;
-	struct clk *core, *iface, *bus;
+	struct clk *core, *iface, *bus, *core_src;
 	struct qce_dma_data dma;
 	int burst_size;
 	unsigned int pipe_pair_id;
