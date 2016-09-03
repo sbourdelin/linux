@@ -97,8 +97,8 @@ static int do_make_slave(struct mount *mnt)
 		list_for_each_entry(slave_mnt, &mnt->mnt_slave_list, mnt_slave)
 			slave_mnt->mnt_master = master;
 		list_move(&mnt->mnt_slave, &master->mnt_slave_list);
-		list_splice(&mnt->mnt_slave_list, master->mnt_slave_list.prev);
-		INIT_LIST_HEAD(&mnt->mnt_slave_list);
+		list_splice_init(&mnt->mnt_slave_list,
+				 master->mnt_slave_list.prev);
 	} else {
 		struct list_head *p = &mnt->mnt_slave_list;
 		while (!list_empty(p)) {
