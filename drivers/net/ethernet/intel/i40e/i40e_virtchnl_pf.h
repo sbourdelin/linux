@@ -156,4 +156,6 @@ void i40e_vc_notify_reset(struct i40e_pf *pf);
 int i40e_alloc_vf_netdev(struct i40e_vf *vf, u16 vf_num);
 void i40e_free_vf_netdev(struct i40e_vf *vf);
 
+int __i40e_sw_attr_get(struct i40e_pf *pf, struct switchdev_attr *attr);
+
 #endif /* _I40E_VIRTCHNL_PF_H_ */
