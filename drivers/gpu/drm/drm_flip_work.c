@@ -101,8 +101,7 @@ void drm_flip_work_commit(struct drm_flip_work *work,
 	unsigned long flags;
 
 	spin_lock_irqsave(&work->lock, flags);
-	list_splice_tail(&work->queued, &work->commited);
-	INIT_LIST_HEAD(&work->queued);
+	list_splice_tail_init(&work->queued, &work->commited);
 	spin_unlock_irqrestore(&work->lock, flags);
 	queue_work(wq, &work->worker);
 }
@@ -119,8 +118,7 @@ static void flip_worker(struct work_struct *w)
 
 		INIT_LIST_HEAD(&tasks);
 		spin_lock_irqsave(&work->lock, flags);
-		list_splice_tail(&work->commited, &tasks);
-		INIT_LIST_HEAD(&work->commited);
+		list_splice_tail_init(&work->commited, &tasks);
 		spin_unlock_irqrestore(&work->lock, flags);
 
 		if (list_empty(&tasks))
