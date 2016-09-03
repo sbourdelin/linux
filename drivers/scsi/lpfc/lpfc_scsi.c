@@ -978,9 +978,8 @@ lpfc_get_scsi_buf_s3(struct lpfc_hba *phba, struct lpfc_nodelist *ndlp)
 			 list);
 	if (!lpfc_cmd) {
 		spin_lock(&phba->scsi_buf_list_put_lock);
-		list_splice(&phba->lpfc_scsi_buf_list_put,
-			    &phba->lpfc_scsi_buf_list_get);
-		INIT_LIST_HEAD(&phba->lpfc_scsi_buf_list_put);
+		list_splice_init(&phba->lpfc_scsi_buf_list_put,
+				 &phba->lpfc_scsi_buf_list_get);
 		list_remove_head(scsi_buf_list_get, lpfc_cmd,
 				 struct lpfc_scsi_buf, list);
 		spin_unlock(&phba->scsi_buf_list_put_lock);
@@ -1018,9 +1017,8 @@ lpfc_get_scsi_buf_s4(struct lpfc_hba *phba, struct lpfc_nodelist *ndlp)
 	}
 	if (!found) {
 		spin_lock(&phba->scsi_buf_list_put_lock);
-		list_splice(&phba->lpfc_scsi_buf_list_put,
-			    &phba->lpfc_scsi_buf_list_get);
-		INIT_LIST_HEAD(&phba->lpfc_scsi_buf_list_put);
+		list_splice_init(&phba->lpfc_scsi_buf_list_put,
+				 &phba->lpfc_scsi_buf_list_get);
 		spin_unlock(&phba->scsi_buf_list_put_lock);
 		list_for_each_entry_safe(lpfc_cmd, lpfc_cmd_next,
 					 &phba->lpfc_scsi_buf_list_get, list) {
