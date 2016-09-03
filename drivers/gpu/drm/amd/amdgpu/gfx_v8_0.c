@@ -3927,7 +3927,7 @@ static void gfx_v8_0_init_pg(struct amdgpu_device *adev)
 	}
 }
 
-void gfx_v8_0_rlc_stop(struct amdgpu_device *adev)
+static void gfx_v8_0_rlc_stop(struct amdgpu_device *adev)
 {
 	u32 tmp = RREG32(mmRLC_CNTL);
 

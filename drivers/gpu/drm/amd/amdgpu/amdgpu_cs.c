@@ -287,7 +287,7 @@ static u64 amdgpu_cs_get_threshold_for_moves(struct amdgpu_device *adev)
 	return max(bytes_moved_threshold, 1024*1024ull);
 }
 
-int amdgpu_cs_list_validate(struct amdgpu_cs_parser *p,
+static int amdgpu_cs_list_validate(struct amdgpu_cs_parser *p,
 			    struct list_head *validated)
 {
 	struct amdgpu_bo_list_entry *lobj;
