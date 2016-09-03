@@ -297,6 +297,7 @@ static int write_to_device(struct ks_wlan_private *priv, unsigned char *buffer,
 	int rc, retval;
 	unsigned char rw_data;
 	struct hostif_hdr *hdr;
+
 	hdr = (struct hostif_hdr *)buffer;
 	rc = 0;
 
@@ -363,6 +364,7 @@ int ks_wlan_hw_tx(struct ks_wlan_private *priv, void *p, unsigned long size,
 {
 	int result = 0;
 	struct hostif_hdr *hdr;
+
 	hdr = (struct hostif_hdr *)p;
 
 	if (hdr->event < HIF_DATA_REQ || HIF_REQ_MAX < hdr->event) {
@@ -695,6 +697,7 @@ static int ks7010_sdio_update_index(struct ks_wlan_private *priv, u32 index)
 	int rc = 0;
 	int retval;
 	unsigned char *data_buf;
+
 	data_buf = NULL;
 
 	data_buf = kmalloc(sizeof(u32), GFP_KERNEL);
@@ -727,6 +730,7 @@ static int ks7010_sdio_data_compare(struct ks_wlan_private *priv, u32 address,
 	int rc = 0;
 	int retval;
 	unsigned char *read_buf;
+
 	read_buf = NULL;
 	read_buf = kmalloc(ROM_BUFF_SIZE, GFP_KERNEL);
 	if (!read_buf) {
@@ -1121,6 +1125,7 @@ static void ks7010_sdio_remove(struct sdio_func *func)
 	struct ks_sdio_card *card;
 	struct ks_wlan_private *priv;
 	struct net_device *netdev;
+
 	DPRINTK(1, "ks7010_sdio_remove()\n");
 
 	card = sdio_get_drvdata(func);
@@ -1145,6 +1150,7 @@ static void ks7010_sdio_remove(struct sdio_func *func)
 		/* send stop request to MAC */
 		{
 			struct hostif_stop_request_t *pp;
+
 			pp = (struct hostif_stop_request_t *)
 			    kzalloc(hif_align_size(sizeof(*pp)), GFP_KERNEL);
 			if (pp == NULL) {
