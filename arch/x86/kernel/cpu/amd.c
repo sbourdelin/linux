@@ -368,7 +368,7 @@ static void amd_detect_cmp(struct cpuinfo_x86 *c)
 	 if (c->x86 != 0x17 || !cpuid_edx(0x80000006))
 		return;
 
-	socket_id	= (c->apicid >> bits) - 1;
+	socket_id	= c->apicid >> bits;
 	core_complex_id	= (c->apicid & ((1 << bits) - 1)) >> 3;
 
 	per_cpu(cpu_llc_id, cpu) = (socket_id << 3) | core_complex_id;
