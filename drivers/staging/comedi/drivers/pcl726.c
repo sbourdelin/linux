@@ -96,7 +96,7 @@ static const struct comedi_lrange *const rangelist_728[] = {
 	&range_bipolar5,
 	&range_bipolar10,
 	&range_4_20mA,
-	&range_0_20mA
+	&range_0_20ma
 };
 
 struct pcl726_board {
