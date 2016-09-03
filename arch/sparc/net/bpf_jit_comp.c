@@ -362,10 +362,10 @@ do {	*prog++ = BR_OPC | WDISP22(OFF);		\
 
 void bpf_jit_compile(struct bpf_prog *fp)
 {
-	unsigned int cleanup_addr, proglen, oldproglen = 0;
-	u32 temp[8], *prog, *func, seen = 0, pass;
-	const struct sock_filter *filter = fp->insns;
-	int i, flen = fp->len, pc_ret0 = -1;
+	unsigned int cleanup_addr, proglen, oldproglen;
+	u32 temp[8], *prog, *func, seen, pass;
+	const struct sock_filter *filter;
+	int i, flen = fp->len, pc_ret0;
 	unsigned int *addrs;
 	void *image;
 
@@ -385,6 +385,10 @@ void bpf_jit_compile(struct bpf_prog *fp)
 	}
 	cleanup_addr = proglen; /* epilogue address */
 	image = NULL;
+	filter = fp->insns;
+	oldproglen = 0;
+	pc_ret0 = -1;
+	seen = 0;
 	for (pass = 0; pass < 10; pass++) {
 		u8 seen_or_pass0 = (pass == 0) ? (SEEN_XREG | SEEN_DATAREF | SEEN_MEM) : seen;
 
