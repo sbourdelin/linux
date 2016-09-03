@@ -167,8 +167,7 @@ void rds_loop_exit(void)
 
 	/* avoid calling conn_destroy with irqs off */
 	spin_lock_irq(&loop_conns_lock);
-	list_splice(&loop_conns, &tmp_list);
-	INIT_LIST_HEAD(&loop_conns);
+	list_splice_init(&loop_conns, &tmp_list);
 	spin_unlock_irq(&loop_conns_lock);
 
 	list_for_each_entry_safe(lc, _lc, &tmp_list, loop_node) {
