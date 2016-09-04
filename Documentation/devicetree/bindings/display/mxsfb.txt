@@ -7,6 +7,9 @@ Required properties:
 - interrupts: Should contain lcdif interrupts
 - display : phandle to display node (see below for details)
 
+Optional properties:
+- lcd-supply: Regulator for LCD supply voltage.
+
 * display node
 
 Required properties:

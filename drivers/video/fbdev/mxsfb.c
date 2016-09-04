@@ -920,7 +920,7 @@ static int mxsfb_probe(struct platform_device *pdev)
 	if (IS_ERR(host->clk_disp_axi))
 		host->clk_disp_axi = NULL;
 
-	host->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
+	host->reg_lcd = devm_regulator_get_optional(&pdev->dev, "lcd");
 	if (IS_ERR(host->reg_lcd))
 		host->reg_lcd = NULL;
 
