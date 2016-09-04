@@ -442,6 +442,19 @@ int clockevents_unbind_device(struct clock_event_device *ced, int cpu)
 }
 EXPORT_SYMBOL_GPL(clockevents_unbind_device);
 
+static void __clockevents_update_bounds(struct clock_event_device *dev)
+{
+	if (!(dev->features & CLOCK_EVT_FEAT_ONESHOT))
+		return;
+
+	/*
+	 * cev_delta2ns() never returns values less than 1us and thus,
+	 * we'll never program any ced with anything less.
+	 */
+	dev->min_delta_ns = cev_delta2ns(dev->min_delta_ticks, dev, false);
+	dev->max_delta_ns = cev_delta2ns(dev->max_delta_ticks, dev, true);
+}
+
 /**
  * clockevents_register_device - register a clock event device
  * @dev:	device to register
@@ -457,6 +470,8 @@ void clockevents_register_device(struct clock_event_device *dev)
 		WARN_ON(num_possible_cpus() > 1);
 		dev->cpumask = cpumask_of(smp_processor_id());
 	}
+
+	__clockevents_update_bounds(dev);
 
 	raw_spin_lock_irqsave(&clockevents_lock, flags);
 
@@ -488,8 +503,6 @@ static void clockevents_config(struct clock_event_device *dev, u32 freq)
 		sec = 600;
 
 	clockevents_calc_mult_shift(dev, freq, sec);
-	dev->min_delta_ns = cev_delta2ns(dev->min_delta_ticks, dev, false);
-	dev->max_delta_ns = cev_delta2ns(dev->max_delta_ticks, dev, true);
 }
 
 /**
@@ -515,6 +528,7 @@ EXPORT_SYMBOL_GPL(clockevents_config_and_register);
 int __clockevents_update_freq(struct clock_event_device *dev, u32 freq)
 {
 	clockevents_config(dev, freq);
+	__clockevents_update_bounds(dev);
 
 	if (clockevent_state_oneshot(dev))
 		return clockevents_program_event(dev, dev->next_event, false);
