@@ -492,14 +492,12 @@ static void __clockevents_update_bounds(struct clock_event_device *dev)
 	}
 
 	/*
-	 * cev_delta2ns() never returns values less than 1us and thus,
-	 * we'll never program any ced with anything less.
+	 * Enforce ->min_delta_ticks_adjusted to correspond to a value
+	 * >= 1us.
 	 */
-	dev->min_delta_ns = cev_delta2ns(dev->min_delta_ticks, dev, false);
-	dev->min_delta_ticks_adjusted = (unsigned long)((dev->min_delta_ns *
-						dev->mult) >> dev->shift);
-	dev->min_delta_ticks_adjusted = max(dev->min_delta_ticks_adjusted,
-						dev->min_delta_ticks);
+	dev->min_delta_ticks_adjusted =
+		max(dev->min_delta_ticks,
+			(unsigned long)((1000ULL * dev->mult) >> dev->shift));
 }
 
 /**
