@@ -1637,7 +1637,7 @@ static const struct x86_cpu_id intel_mbm_total_match[] = {
 
 static int intel_mbm_init(void)
 {
-	int ret = 0, maxid = cqm_max_rmid + 1;
+	int const maxid = cqm_max_rmid + 1;
 
 	mbm_socket_max = topology_max_packages();
 	mbm_local = kmalloc_array(maxid * mbm_socket_max,
@@ -1649,25 +1649,20 @@ static int intel_mbm_init(void)
 	mbm_total = kmalloc_array(maxid * mbm_socket_max,
 				  sizeof(*mbm_total),
 				  GFP_KERNEL);
-	if (!mbm_total) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	if (!mbm_total)
+		goto free_mbm;
 
 	mbm_timers = kmalloc_array(mbm_socket_max,
 				   sizeof(*mbm_timers),
 				   GFP_KERNEL);
-	if (!mbm_timers) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	if (!mbm_timers)
+		goto free_mbm;
+
 	mbm_hrtimer_init();
-
-out:
-	if (ret)
-		mbm_cleanup();
-
-	return ret;
+	return 0;
+ free_mbm:
+	mbm_cleanup();
+	return -ENOMEM;
 }
 
 static int __init intel_cqm_init(void)
