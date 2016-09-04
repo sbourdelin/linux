@@ -582,7 +582,7 @@ int comedi_check_chanlist(struct comedi_subdevice *s,
 
 #define RANGE(a, b)		{(a) * 1e6, (b) * 1e6, 0}
 #define RANGE_ext(a, b)		{(a) * 1e6, (b) * 1e6, RF_EXTERNAL}
-#define RANGE_mA(a, b)		{(a) * 1e6, (b) * 1e6, UNIT_mA}
+#define RANGE_MA(a, b)		{(a) * 1e6, (b) * 1e6, UNIT_MA}
 #define RANGE_unitless(a, b)	{(a) * 1e6, (b) * 1e6, 0}
 #define BIP_RANGE(a)		{-(a) * 1e6, (a) * 1e6, 0}
 #define UNI_RANGE(a)		{0, (a) * 1e6, 0}
@@ -593,9 +593,9 @@ extern const struct comedi_lrange range_bipolar2_5;
 extern const struct comedi_lrange range_unipolar10;
 extern const struct comedi_lrange range_unipolar5;
 extern const struct comedi_lrange range_unipolar2_5;
-extern const struct comedi_lrange range_0_20mA;
-extern const struct comedi_lrange range_4_20mA;
-extern const struct comedi_lrange range_0_32mA;
+extern const struct comedi_lrange range_0_20ma;
+extern const struct comedi_lrange range_4_20ma;
+extern const struct comedi_lrange range_0_32ma;
 extern const struct comedi_lrange range_unknown;
 
 #define range_digital		range_unipolar5
