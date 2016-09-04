@@ -296,7 +296,7 @@ int cmd_freq_set(int argc, char **argv)
 			struct cpufreq_affected_cpus *cpus;
 
 			if (!bitmask_isbitset(cpus_chosen, cpu) ||
-			    cpupower_is_cpu_online(cpu))
+			    cpupower_is_cpu_online(cpu) != 1)
 				continue;
 
 			cpus = cpufreq_get_related_cpus(cpu);
@@ -315,8 +315,7 @@ int cmd_freq_set(int argc, char **argv)
 	for (cpu = bitmask_first(cpus_chosen);
 	     cpu <= bitmask_last(cpus_chosen); cpu++) {
 
-		if (!bitmask_isbitset(cpus_chosen, cpu) ||
-		    cpupower_is_cpu_online(cpu))
+		if (!bitmask_isbitset(cpus_chosen, cpu))
 			continue;
 
 		if (cpupower_is_cpu_online(cpu) != 1)
