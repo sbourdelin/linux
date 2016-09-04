@@ -1651,8 +1651,9 @@ static int intel_mbm_init(void)
 		goto out;
 	}
 
-	array_size = sizeof(struct hrtimer) * mbm_socket_max;
-	mbm_timers = kmalloc(array_size, GFP_KERNEL);
+	mbm_timers = kmalloc_array(mbm_socket_max,
+				   sizeof(*mbm_timers),
+				   GFP_KERNEL);
 	if (!mbm_timers) {
 		ret = -ENOMEM;
 		goto out;
