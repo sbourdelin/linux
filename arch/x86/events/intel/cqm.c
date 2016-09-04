@@ -1637,15 +1637,18 @@ static const struct x86_cpu_id intel_mbm_total_match[] = {
 
 static int intel_mbm_init(void)
 {
-	int ret = 0, array_size, maxid = cqm_max_rmid + 1;
+	int ret = 0, maxid = cqm_max_rmid + 1;
 
 	mbm_socket_max = topology_max_packages();
-	array_size = sizeof(struct sample) * maxid * mbm_socket_max;
-	mbm_local = kmalloc(array_size, GFP_KERNEL);
+	mbm_local = kmalloc_array(maxid * mbm_socket_max,
+				  sizeof(*mbm_local),
+				  GFP_KERNEL);
 	if (!mbm_local)
 		return -ENOMEM;
 
-	mbm_total = kmalloc(array_size, GFP_KERNEL);
+	mbm_total = kmalloc_array(maxid * mbm_socket_max,
+				  sizeof(*mbm_total),
+				  GFP_KERNEL);
 	if (!mbm_total) {
 		ret = -ENOMEM;
 		goto out;
