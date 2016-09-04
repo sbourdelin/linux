@@ -1701,7 +1701,7 @@ static int __init intel_cqm_init(void)
 		if (c->x86_cache_occ_scale != cqm_l3_scale) {
 			pr_err("Multiple LLC scale values, disabling\n");
 			ret = -EINVAL;
-			goto out;
+			goto put_cpus;
 		}
 	}
 
@@ -1719,19 +1719,19 @@ static int __init intel_cqm_init(void)
 	str = kstrdup(scale, GFP_KERNEL);
 	if (!str) {
 		ret = -ENOMEM;
-		goto out;
+		goto put_cpus;
 	}
 
 	event_attr_intel_cqm_llc_scale.event_str = str;
 
 	ret = intel_cqm_setup_rmid_cache();
 	if (ret)
-		goto out;
+		goto put_cpus;
 
 	if (mbm_enabled)
 		ret = intel_mbm_init();
 	if (ret && !cqm_enabled)
-		goto out;
+		goto put_cpus;
 
 	if (cqm_enabled && mbm_enabled)
 		intel_cqm_events_group.attrs = intel_cmt_mbm_events_attr;
@@ -1743,7 +1743,7 @@ static int __init intel_cqm_init(void)
 	ret = perf_pmu_register(&intel_cqm_pmu, "intel_cqm", -1);
 	if (ret) {
 		pr_err("Intel CQM perf registration failed: %d\n", ret);
-		goto out;
+		goto put_cpus;
 	}
 
 	if (cqm_enabled)
@@ -1760,8 +1760,7 @@ static int __init intel_cqm_init(void)
 			  intel_cqm_cpu_starting, NULL);
 	cpuhp_setup_state(CPUHP_AP_PERF_X86_CQM_ONLINE, "AP_PERF_X86_CQM_ONLINE",
 			  NULL, intel_cqm_cpu_exit);
-
-out:
+ put_cpus:
 	put_online_cpus();
 
 	if (ret) {
