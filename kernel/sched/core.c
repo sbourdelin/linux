@@ -2957,7 +2957,7 @@ void sched_exec(void)
 		struct migration_arg arg = { p, dest_cpu };
 
 		raw_spin_unlock_irqrestore(&p->pi_lock, flags);
-		stop_one_cpu(task_cpu(p), migration_cpu_stop, &arg);
+		stop_one_cpu_sync(task_cpu(p), migration_cpu_stop, &arg);
 		return;
 	}
 unlock:

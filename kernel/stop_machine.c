@@ -130,6 +130,27 @@ int stop_one_cpu(unsigned int cpu, cpu_stop_fn_t fn, void *arg)
 	return done.ret;
 }
 
+/**
+ * the caller keeps task_on_rq_queued, so it's more suitable for
+ * sched_exec on the case when needs migration
+ */
+void stop_one_cpu_sync(unsigned int cpu, cpu_stop_fn_t fn, void *arg)
+{
+	struct cpu_stop_work work = { .fn = fn, .arg = arg, .done = NULL };
+
+	if (!cpu_stop_queue_work(cpu, &work))
+		return;
+
+#if defined(CONFIG_PREEMPT_NONE) || defined(CONFIG_PREEMPT_VOLUNTARY)
+	/*
+	 * CONFIG_PREEMPT doesn't need call schedule here, because
+	 * preempt_enable already does the similar thing when call
+	 * cpu_stop_queue_work
+	 */
+	schedule();
+#endif
+}
+
 /* This controls the threads on each CPU. */
 enum multi_stop_state {
 	/* Dummy starting state for thread. */
