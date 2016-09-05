@@ -167,15 +167,15 @@ static int __init hest_parse_ghes(struct acpi_hest_header *hest_hdr, void *data)
 
 	rc = platform_device_add_data(ghes_dev, &hest_hdr, sizeof(void *));
 	if (rc)
-		goto err;
+		goto put_device;
 
 	rc = platform_device_add(ghes_dev);
 	if (rc)
-		goto err;
+		goto put_device;
 	ghes_arr->ghes_devs[ghes_arr->count++] = ghes_dev;
 
 	return 0;
-err:
+ put_device:
 	platform_device_put(ghes_dev);
 	return rc;
 }
