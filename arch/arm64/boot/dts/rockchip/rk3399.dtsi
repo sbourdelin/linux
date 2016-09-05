@@ -166,6 +166,16 @@
 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW 0>;
 	};
 
+	pmu_a53 {
+		compatible = "arm,cortex-a53-pmu";
+		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW &part0>;
+	};
+
+	pmu_a72 {
+		compatible = "arm,cortex-a72-pmu";
+		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW &part1>;
+	};
+
 	xin24m: xin24m {
 		compatible = "fixed-clock";
 		clock-frequency = <24000000>;
@@ -352,6 +362,16 @@
 		resets = <&cru SRST_P_SARADC>;
 		reset-names = "saradc-apb";
 		status = "disabled";
+	};
+
+	ppi-partitions {
+		part0: interrupt-partition-0 {
+			affinity = <&cpu_l0 &cpu_l1 &cpu_l2 &cpu_l3>;
+		};
+
+		part1: interrupt-partition-1 {
+			affinity = <&cpu_b0 &cpu_b1>;
+		};
 	};
 
 	i2c1: i2c@ff110000 {
