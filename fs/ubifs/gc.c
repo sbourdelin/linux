@@ -297,10 +297,8 @@ static int sort_nodes(struct ubifs_info *c, struct ubifs_scan_leb *sleb,
 	err = dbg_check_data_nodes_order(c, &sleb->nodes);
 	if (err)
 		return err;
-	err = dbg_check_nondata_nodes_order(c, nondata);
-	if (err)
-		return err;
-	return 0;
+
+	return dbg_check_nondata_nodes_order(c, nondata);
 }
 
 /**

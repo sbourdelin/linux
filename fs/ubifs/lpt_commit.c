@@ -313,10 +313,7 @@ static int layout_cnodes(struct ubifs_info *c)
 	alen = ALIGN(offs, c->min_io_size);
 	upd_ltab(c, lnum, c->leb_size - alen, alen - offs);
 	dbg_chk_lpt_sz(c, 4, alen - offs);
-	err = dbg_chk_lpt_sz(c, 3, alen);
-	if (err)
-		return err;
-	return 0;
+	return dbg_chk_lpt_sz(c, 3, alen);
 
 no_space:
 	ubifs_err(c, "LPT out of space at LEB %d:%d needing %d, done_ltab %d, done_lsave %d",
