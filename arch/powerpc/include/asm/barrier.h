@@ -74,7 +74,7 @@ do {									\
 	___p1;								\
 })
 
-#define smp_mb__before_spinlock()   smp_mb()
+#define smp_mb__after_spinlock()   smp_mb()
 
 #include <asm-generic/barrier.h>
 

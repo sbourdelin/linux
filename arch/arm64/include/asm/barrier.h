@@ -104,6 +104,8 @@ do {									\
 	VAL;								\
 })
 
+#define smp_mb__after_spinlock()	smp_mb()
+
 #include <asm-generic/barrier.h>
 
 #endif	/* __ASSEMBLY__ */
