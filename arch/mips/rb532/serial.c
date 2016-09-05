@@ -36,6 +36,8 @@
 
 extern unsigned int idt_cpu_freq;
 
+#ifdef CONFIG_SERIAL_8250
+
 static struct uart_port rb532_uart = {
 	.flags = UPF_BOOT_AUTOCONF,
 	.line = 0,
@@ -52,3 +54,6 @@ int __init setup_serial_port(void)
 	return early_serial_setup(&rb532_uart);
 }
 arch_initcall(setup_serial_port);
+
+#endif /* CONFIG_SERIAL_8250 */
+
