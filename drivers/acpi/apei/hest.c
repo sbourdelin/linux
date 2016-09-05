@@ -185,13 +185,13 @@ static int __init hest_ghes_dev_register(unsigned int ghes_count)
 	int rc, i;
 	struct ghes_arr ghes_arr;
 
-	ghes_arr.count = 0;
 	ghes_arr.ghes_devs = kmalloc_array(ghes_count,
 					   sizeof(*ghes_arr.ghes_devs),
 					   GFP_KERNEL);
 	if (!ghes_arr.ghes_devs)
 		return -ENOMEM;
 
+	ghes_arr.count = 0;
 	rc = apei_hest_parse(hest_parse_ghes, &ghes_arr);
 	if (rc)
 		goto err;
