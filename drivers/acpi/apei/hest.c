@@ -194,14 +194,14 @@ static int __init hest_ghes_dev_register(unsigned int ghes_count)
 	ghes_arr.count = 0;
 	rc = apei_hest_parse(hest_parse_ghes, &ghes_arr);
 	if (rc)
-		goto err;
-out:
+		goto unregister;
+ free_array:
 	kfree(ghes_arr.ghes_devs);
 	return rc;
-err:
+ unregister:
 	for (i = 0; i < ghes_arr.count; i++)
 		platform_device_unregister(ghes_arr.ghes_devs[i]);
-	goto out;
+	goto free_array;
 }
 
 static int __init setup_hest_disable(char *str)
