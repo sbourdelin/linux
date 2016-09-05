@@ -226,12 +226,12 @@ void __init acpi_hest_init(void)
 	status = acpi_get_table(ACPI_SIG_HEST, 0,
 				(struct acpi_table_header **)&hest_tab);
 	if (status == AE_NOT_FOUND)
-		goto err;
+		goto disable_hest;
 	else if (ACPI_FAILURE(status)) {
 		const char *msg = acpi_format_exception(status);
 		pr_err(HEST_PFX "Failed to get table, %s\n", msg);
 		rc = -EINVAL;
-		goto err;
+		goto disable_hest;
 	}
 
 	if (!acpi_disable_cmcff)
@@ -240,14 +240,14 @@ void __init acpi_hest_init(void)
 	if (!ghes_disable) {
 		rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
 		if (rc)
-			goto err;
+			goto disable_hest;
 		rc = hest_ghes_dev_register(ghes_count);
 		if (rc)
-			goto err;
+			goto disable_hest;
 	}
 
 	pr_info(HEST_PFX "Table parsing has been initialized.\n");
 	return;
-err:
+ disable_hest:
 	hest_disable = 1;
 }
