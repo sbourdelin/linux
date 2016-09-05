@@ -100,4 +100,8 @@ config ST_REMOTEPROC
 	  processor framework.
 	  This can be either built-in or a loadable module.
 
+config ST_SLIM_REMOTEPROC
+	tristate
+	select REMOTEPROC
+
 endmenu
