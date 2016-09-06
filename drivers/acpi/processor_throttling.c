@@ -526,7 +526,7 @@ static int acpi_processor_get_throttling_states(struct acpi_processor *pr)
 	if (!tss || (tss->type != ACPI_TYPE_PACKAGE)) {
 		printk(KERN_ERR PREFIX "Invalid _TSS data\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found %d throttling states\n",
@@ -539,7 +539,7 @@ static int acpi_processor_get_throttling_states(struct acpi_processor *pr)
 						  GFP_KERNEL);
 	if (!pr->throttling.states_tss) {
 		result = -ENOMEM;
-		goto end;
+		goto free_buffer;
 	}
 
 	for (i = 0; i < pr->throttling.state_count; i++) {
@@ -559,7 +559,7 @@ static int acpi_processor_get_throttling_states(struct acpi_processor *pr)
 			ACPI_EXCEPTION((AE_INFO, status, "Invalid _TSS data"));
 			result = -EFAULT;
 			kfree(pr->throttling.states_tss);
-			goto end;
+			goto free_buffer;
 		}
 
 		if (!tx->freqpercentage) {
@@ -567,11 +567,10 @@ static int acpi_processor_get_throttling_states(struct acpi_processor *pr)
 			       "Invalid _TSS data: freq is zero\n");
 			result = -EFAULT;
 			kfree(pr->throttling.states_tss);
-			goto end;
+			goto free_buffer;
 		}
 	}
-
-      end:
+ free_buffer:
 	kfree(buffer.pointer);
 
 	return result;
