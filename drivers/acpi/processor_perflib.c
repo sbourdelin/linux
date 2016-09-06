@@ -240,7 +240,7 @@ static int acpi_processor_get_performance_control(struct acpi_processor *pr)
 	    || (pct->package.count != 2)) {
 		printk(KERN_ERR PREFIX "Invalid _PCT data\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	/*
@@ -254,7 +254,7 @@ static int acpi_processor_get_performance_control(struct acpi_processor *pr)
 	    || (obj.buffer.pointer == NULL)) {
 		printk(KERN_ERR PREFIX "Invalid _PCT data (control_register)\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 	memcpy(&pr->performance->control_register, obj.buffer.pointer,
 	       sizeof(struct acpi_pct_register));
@@ -270,13 +270,12 @@ static int acpi_processor_get_performance_control(struct acpi_processor *pr)
 	    || (obj.buffer.pointer == NULL)) {
 		printk(KERN_ERR PREFIX "Invalid _PCT data (status_register)\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	memcpy(&pr->performance->status_register, obj.buffer.pointer,
 	       sizeof(struct acpi_pct_register));
-
-      end:
+ free_buffer:
 	kfree(buffer.pointer);
 
 	return result;
