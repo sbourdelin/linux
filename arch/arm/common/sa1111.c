@@ -751,11 +751,9 @@ static int __sa1111_probe(struct device *me, struct resource *mem, int irq)
 	 * The interrupt controller must be initialised before any
 	 * other device to ensure that the interrupts are available.
 	 */
-	if (sachip->irq != NO_IRQ) {
-		ret = sa1111_setup_irq(sachip, pd->irq_base);
-		if (ret)
-			goto err_unmap;
-	}
+	ret = sa1111_setup_irq(sachip, pd->irq_base);
+	if (ret)
+		goto err_unmap;
 
 #ifdef CONFIG_ARCH_SA1100
 	{
@@ -834,12 +832,10 @@ static void __sa1111_remove(struct sa1111 *sachip)
 	clk_disable(sachip->clk);
 	clk_unprepare(sachip->clk);
 
-	if (sachip->irq != NO_IRQ) {
-		irq_set_chained_handler_and_data(sachip->irq, NULL, NULL);
-		irq_free_descs(sachip->irq_base, SA1111_IRQ_NR);
+	irq_set_chained_handler_and_data(sachip->irq, NULL, NULL);
+	irq_free_descs(sachip->irq_base, SA1111_IRQ_NR);
 
-		release_mem_region(sachip->phys + SA1111_INTC, 512);
-	}
+	release_mem_region(sachip->phys + SA1111_INTC, 512);
 
 	iounmap(sachip->base);
 	clk_put(sachip->clk);
