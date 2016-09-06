@@ -339,7 +339,7 @@ static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 	if (!pss || (pss->type != ACPI_TYPE_PACKAGE)) {
 		printk(KERN_ERR PREFIX "Invalid _PSS data\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found %d performance states\n",
@@ -351,7 +351,7 @@ static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 						GFP_KERNEL);
 	if (!pr->performance->states) {
 		result = -ENOMEM;
-		goto end;
+		goto free_buffer;
 	}
 
 	for (i = 0; i < pr->performance->state_count; i++) {
@@ -369,7 +369,7 @@ static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 			ACPI_EXCEPTION((AE_INFO, status, "Invalid _PSS data"));
 			result = -EFAULT;
 			kfree(pr->performance->states);
-			goto end;
+			goto free_buffer;
 		}
 
 		amd_fixup_frequency(px, i);
@@ -417,8 +417,7 @@ static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 
 	if (last_invalid > 0)
 		pr->performance->state_count = last_invalid;
-
-      end:
+ free_buffer:
 	kfree(buffer.pointer);
 
 	return result;
