@@ -234,8 +234,7 @@ static const struct pci_device_id dwc3_pci_id_table[] = {
 };
 MODULE_DEVICE_TABLE(pci, dwc3_pci_id_table);
 
-#ifdef CONFIG_PM
-static int dwc3_pci_runtime_suspend(struct device *dev)
+static int __maybe_unused dwc3_pci_runtime_suspend(struct device *dev)
 {
 	if (device_run_wake(dev))
 		return 0;
@@ -243,14 +242,14 @@ static int dwc3_pci_runtime_suspend(struct device *dev)
 	return -EBUSY;
 }
 
-static int dwc3_pci_runtime_resume(struct device *dev)
+static int __maybe_unused dwc3_pci_runtime_resume(struct device *dev)
 {
 	struct platform_device *dwc3 = dev_get_drvdata(dev);
 
 	return pm_runtime_get(&dwc3->dev);
 }
 
-static int dwc3_pci_pm_dummy(struct device *dev)
+static int __maybe_unused dwc3_pci_pm_dummy(struct device *dev)
 {
 	/*
 	 * There's nothing to do here. No, seriously. Everything is either taken
@@ -262,7 +261,6 @@ static int dwc3_pci_pm_dummy(struct device *dev)
 	 */
 	return 0;
 }
-#endif /* CONFIG_PM */
 
 static struct dev_pm_ops dwc3_pci_dev_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(dwc3_pci_pm_dummy, dwc3_pci_pm_dummy)
