@@ -1036,7 +1036,11 @@ init_conntrack(struct net *net, struct nf_conn *tmpl,
 		return (struct nf_conntrack_tuple_hash *)ct;
 
 	if (tmpl && nfct_synproxy(tmpl)) {
-		nfct_seqadj_ext_add(ct);
+		if (!nfct_seqadj_ext_add(ct)) {
+			nf_conntrack_free(ct);
+			pr_debug("Can't add seqadj extension\n");
+			return NULL;
+		}
 		nfct_synproxy_ext_add(ct);
 	}
 
