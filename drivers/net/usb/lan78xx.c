@@ -1457,27 +1457,27 @@ static void lan78xx_set_mdix_status(struct net_device *net, __u8 mdix_ctrl)
 		phy_write(phydev, LAN88XX_EXT_PAGE_ACCESS,
 			  LAN88XX_EXT_PAGE_SPACE_1);
 		buf = phy_read(phydev, LAN88XX_EXT_MODE_CTRL);
-		buf &= ~LAN88XX_EXT_MODE_CTRL_MDIX_MASK_;
+		buf &= ~LAN88XX_EXT_MODE_CTRL_MDIX_MASK;
 		phy_write(phydev, LAN88XX_EXT_MODE_CTRL,
-			  buf | LAN88XX_EXT_MODE_CTRL_MDI_);
+			  buf | LAN88XX_EXT_MODE_CTRL_MDI);
 		phy_write(phydev, LAN88XX_EXT_PAGE_ACCESS,
 			  LAN88XX_EXT_PAGE_SPACE_0);
 	} else if (mdix_ctrl == ETH_TP_MDI_X) {
 		phy_write(phydev, LAN88XX_EXT_PAGE_ACCESS,
 			  LAN88XX_EXT_PAGE_SPACE_1);
 		buf = phy_read(phydev, LAN88XX_EXT_MODE_CTRL);
-		buf &= ~LAN88XX_EXT_MODE_CTRL_MDIX_MASK_;
+		buf &= ~LAN88XX_EXT_MODE_CTRL_MDIX_MASK;
 		phy_write(phydev, LAN88XX_EXT_MODE_CTRL,
-			  buf | LAN88XX_EXT_MODE_CTRL_MDI_X_);
+			  buf | LAN88XX_EXT_MODE_CTRL_MDI_X);
 		phy_write(phydev, LAN88XX_EXT_PAGE_ACCESS,
 			  LAN88XX_EXT_PAGE_SPACE_0);
 	} else if (mdix_ctrl == ETH_TP_MDI_AUTO) {
 		phy_write(phydev, LAN88XX_EXT_PAGE_ACCESS,
 			  LAN88XX_EXT_PAGE_SPACE_1);
 		buf = phy_read(phydev, LAN88XX_EXT_MODE_CTRL);
-		buf &= ~LAN88XX_EXT_MODE_CTRL_MDIX_MASK_;
+		buf &= ~LAN88XX_EXT_MODE_CTRL_MDIX_MASK;
 		phy_write(phydev, LAN88XX_EXT_MODE_CTRL,
-			  buf | LAN88XX_EXT_MODE_CTRL_AUTO_MDIX_);
+			  buf | LAN88XX_EXT_MODE_CTRL_AUTO_MDIX);
 		phy_write(phydev, LAN88XX_EXT_PAGE_ACCESS,
 			  LAN88XX_EXT_PAGE_SPACE_0);
 	}
@@ -1499,14 +1499,14 @@ static int lan78xx_get_settings(struct net_device *net, struct ethtool_cmd *cmd)
 
 	buf = lan78xx_get_mdix_status(net);
 
-	buf &= LAN88XX_EXT_MODE_CTRL_MDIX_MASK_;
-	if (buf == LAN88XX_EXT_MODE_CTRL_AUTO_MDIX_) {
+	buf &= LAN88XX_EXT_MODE_CTRL_MDIX_MASK;
+	if (buf == LAN88XX_EXT_MODE_CTRL_AUTO_MDIX) {
 		cmd->eth_tp_mdix = ETH_TP_MDI_AUTO;
 		cmd->eth_tp_mdix_ctrl = ETH_TP_MDI_AUTO;
-	} else if (buf == LAN88XX_EXT_MODE_CTRL_MDI_) {
+	} else if (buf == LAN88XX_EXT_MODE_CTRL_MDI) {
 		cmd->eth_tp_mdix = ETH_TP_MDI;
 		cmd->eth_tp_mdix_ctrl = ETH_TP_MDI;
-	} else if (buf == LAN88XX_EXT_MODE_CTRL_MDI_X_) {
+	} else if (buf == LAN88XX_EXT_MODE_CTRL_MDI_X) {
 		cmd->eth_tp_mdix = ETH_TP_MDI_X;
 		cmd->eth_tp_mdix_ctrl = ETH_TP_MDI_X;
 	}
@@ -1815,7 +1815,7 @@ static void lan78xx_link_status_change(struct net_device *net)
 	if (!phydev->autoneg && (phydev->speed == 100)) {
 		/* disable phy interrupt */
 		temp = phy_read(phydev, LAN88XX_INT_MASK);
-		temp &= ~LAN88XX_INT_MASK_MDINTPIN_EN_;
+		temp &= ~LAN88XX_INT_MASK_MDINTPIN_EN;
 		ret = phy_write(phydev, LAN88XX_INT_MASK, temp);
 
 		temp = phy_read(phydev, MII_BMCR);
@@ -1829,7 +1829,7 @@ static void lan78xx_link_status_change(struct net_device *net)
 
 		/* enable phy interrupt back */
 		temp = phy_read(phydev, LAN88XX_INT_MASK);
-		temp |= LAN88XX_INT_MASK_MDINTPIN_EN_;
+		temp |= LAN88XX_INT_MASK_MDINTPIN_EN;
 		ret = phy_write(phydev, LAN88XX_INT_MASK, temp);
 	}
 }
@@ -1851,8 +1851,8 @@ static int lan78xx_phy_init(struct lan78xx_net *dev)
 	 */
 	ret = phy_read(phydev, LAN88XX_INT_STS);
 	ret = phy_write(phydev, LAN88XX_INT_MASK,
-			LAN88XX_INT_MASK_MDINTPIN_EN_ |
-			LAN88XX_INT_MASK_LINK_CHANGE_);
+			LAN88XX_INT_MASK_MDINTPIN_EN |
+			LAN88XX_INT_MASK_LINK_CHANGE);
 
 	phydev->irq = PHY_IGNORE_INTERRUPT;
 

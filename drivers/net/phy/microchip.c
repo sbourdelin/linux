@@ -39,8 +39,8 @@ static int lan88xx_phy_config_intr(struct phy_device *phydev)
 		rc = phy_write(phydev, LAN88XX_INT_MASK, 0x7FFF);
 		rc = phy_read(phydev, LAN88XX_INT_STS);
 		rc = phy_write(phydev, LAN88XX_INT_MASK,
-			       LAN88XX_INT_MASK_MDINTPIN_EN_ |
-			       LAN88XX_INT_MASK_LINK_CHANGE_);
+			       LAN88XX_INT_MASK_MDINTPIN_EN |
+			       LAN88XX_INT_MASK_LINK_CHANGE);
 	} else {
 		rc = phy_write(phydev, LAN88XX_INT_MASK, 0);
 	}
