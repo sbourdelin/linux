@@ -223,9 +223,9 @@ void acpi_processor_ppc_exit(void)
 static int acpi_processor_get_performance_control(struct acpi_processor *pr)
 {
 	int result = 0;
-	acpi_status status = 0;
+	acpi_status status;
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-	union acpi_object *pct = NULL;
+	union acpi_object *pct;
 	union acpi_object obj = { 0 };
 
 
