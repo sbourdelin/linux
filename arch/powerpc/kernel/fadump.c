@@ -778,7 +778,11 @@ static int fadump_init_elfcore_header(char *bufp)
 	elf->e_entry = 0;
 	elf->e_phoff = sizeof(struct elfhdr);
 	elf->e_shoff = 0;
-	elf->e_flags = ELF_CORE_EFLAGS;
+#ifdef __LITTLE_ENDIAN__
+	elf->e_flags = 2;
+#else
+	elf->e_flags = 0;
+#endif
 	elf->e_ehsize = sizeof(struct elfhdr);
 	elf->e_phentsize = sizeof(struct elf_phdr);
 	elf->e_phnum = 0;
