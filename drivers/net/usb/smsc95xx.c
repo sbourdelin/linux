@@ -178,7 +178,7 @@ static int __must_check __smsc95xx_phy_wait_not_busy(struct usbnet *dev,
 			return ret;
 		}
 
-		if (!(val & MII_BUSY_))
+		if (!(val & MII_BUSY))
 			return 0;
 	} while (!time_after(jiffies, start_time + HZ));
 
@@ -204,7 +204,7 @@ static int __smsc95xx_mdio_read(struct net_device *netdev, int phy_id, int idx,
 	/* set the address, index & direction (read from PHY) */
 	phy_id &= dev->mii.phy_id_mask;
 	idx &= dev->mii.reg_num_mask;
-	addr = (phy_id << 11) | (idx << 6) | MII_READ_ | MII_BUSY_;
+	addr = (phy_id << 11) | (idx << 6) | MII_READ | MII_BUSY;
 	ret = __smsc95xx_write_reg(dev, MII_ADDR, addr, in_pm);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Error writing MII_ADDR\n");
@@ -256,7 +256,7 @@ static void __smsc95xx_mdio_write(struct net_device *netdev, int phy_id,
 	/* set the address, index & direction (write to PHY) */
 	phy_id &= dev->mii.phy_id_mask;
 	idx &= dev->mii.reg_num_mask;
-	addr = (phy_id << 11) | (idx << 6) | MII_WRITE_ | MII_BUSY_;
+	addr = (phy_id << 11) | (idx << 6) | MII_WRITE | MII_BUSY;
 	ret = __smsc95xx_write_reg(dev, MII_ADDR, addr, in_pm);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Error writing MII_ADDR\n");
@@ -309,12 +309,12 @@ static int __must_check smsc95xx_wait_eeprom(struct usbnet *dev)
 			return ret;
 		}
 
-		if (!(val & E2P_CMD_BUSY_) || (val & E2P_CMD_TIMEOUT_))
+		if (!(val & E2P_CMD_BUSY) || (val & E2P_CMD_TIMEOUT))
 			break;
 		udelay(40);
 	} while (!time_after(jiffies, start_time + HZ));
 
-	if (val & (E2P_CMD_TIMEOUT_ | E2P_CMD_BUSY_)) {
+	if (val & (E2P_CMD_TIMEOUT | E2P_CMD_BUSY)) {
 		netdev_warn(dev->net, "EEPROM read operation timeout\n");
 		return -EIO;
 	}
@@ -335,7 +335,7 @@ static int __must_check smsc95xx_eeprom_confirm_not_busy(struct usbnet *dev)
 			return ret;
 		}
 
-		if (!(val & E2P_CMD_BUSY_))
+		if (!(val & E2P_CMD_BUSY))
 			return 0;
 
 		udelay(40);
@@ -359,7 +359,7 @@ static int smsc95xx_read_eeprom(struct usbnet *dev, u32 offset, u32 length,
 		return ret;
 
 	for (i = 0; i < length; i++) {
-		val = E2P_CMD_BUSY_ | E2P_CMD_READ_ | (offset & E2P_CMD_ADDR_);
+		val = E2P_CMD_BUSY | E2P_CMD_READ | (offset & E2P_CMD_ADDR);
 		ret = smsc95xx_write_reg(dev, E2P_CMD, val);
 		if (ret < 0) {
 			netdev_warn(dev->net, "Error writing E2P_CMD\n");
@@ -397,7 +397,7 @@ static int smsc95xx_write_eeprom(struct usbnet *dev, u32 offset, u32 length,
 		return ret;
 
 	/* Issue write/erase enable command */
-	val = E2P_CMD_BUSY_ | E2P_CMD_EWEN_;
+	val = E2P_CMD_BUSY | E2P_CMD_EWEN;
 	ret = smsc95xx_write_reg(dev, E2P_CMD, val);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Error writing E2P_DATA\n");
@@ -419,7 +419,7 @@ static int smsc95xx_write_eeprom(struct usbnet *dev, u32 offset, u32 length,
 		}
 
 		/* Send "write" command */
-		val = E2P_CMD_BUSY_ | E2P_CMD_WRITE_ | (offset & E2P_CMD_ADDR_);
+		val = E2P_CMD_BUSY | E2P_CMD_WRITE | (offset & E2P_CMD_ADDR);
 		ret = smsc95xx_write_reg(dev, E2P_CMD, val);
 		if (ret < 0) {
 			netdev_warn(dev->net, "Error writing E2P_CMD\n");
@@ -478,17 +478,17 @@ static void smsc95xx_set_multicast(struct net_device *netdev)
 
 	if (dev->net->flags & IFF_PROMISC) {
 		netif_dbg(dev, drv, dev->net, "promiscuous mode enabled\n");
-		pdata->mac_cr |= MAC_CR_PRMS_;
-		pdata->mac_cr &= ~(MAC_CR_MCPAS_ | MAC_CR_HPFILT_);
+		pdata->mac_cr |= MAC_CR_PRMS;
+		pdata->mac_cr &= ~(MAC_CR_MCPAS | MAC_CR_HPFILT);
 	} else if (dev->net->flags & IFF_ALLMULTI) {
 		netif_dbg(dev, drv, dev->net, "receive all multicast enabled\n");
-		pdata->mac_cr |= MAC_CR_MCPAS_;
-		pdata->mac_cr &= ~(MAC_CR_PRMS_ | MAC_CR_HPFILT_);
+		pdata->mac_cr |= MAC_CR_MCPAS;
+		pdata->mac_cr &= ~(MAC_CR_PRMS | MAC_CR_HPFILT);
 	} else if (!netdev_mc_empty(dev->net)) {
 		struct netdev_hw_addr *ha;
 
-		pdata->mac_cr |= MAC_CR_HPFILT_;
-		pdata->mac_cr &= ~(MAC_CR_PRMS_ | MAC_CR_MCPAS_);
+		pdata->mac_cr |= MAC_CR_HPFILT;
+		pdata->mac_cr &= ~(MAC_CR_PRMS | MAC_CR_MCPAS);
 
 		netdev_for_each_mc_addr(ha, netdev) {
 			u32 bitnum = smsc95xx_hash(ha->addr);
@@ -504,7 +504,7 @@ static void smsc95xx_set_multicast(struct net_device *netdev)
 	} else {
 		netif_dbg(dev, drv, dev->net, "receive own packets only\n");
 		pdata->mac_cr &=
-			~(MAC_CR_PRMS_ | MAC_CR_MCPAS_ | MAC_CR_HPFILT_);
+			~(MAC_CR_PRMS | MAC_CR_MCPAS | MAC_CR_HPFILT);
 	}
 
 	spin_unlock_irqrestore(&pdata->mac_cr_lock, flags);
@@ -575,7 +575,7 @@ static int smsc95xx_link_reset(struct usbnet *dev)
 	if (ret < 0)
 		return ret;
 
-	ret = smsc95xx_write_reg(dev, INT_STS, INT_STS_CLEAR_ALL_);
+	ret = smsc95xx_write_reg(dev, INT_STS, INT_STS_CLEAR_ALL);
 	if (ret < 0)
 		return ret;
 
@@ -590,11 +590,11 @@ static int smsc95xx_link_reset(struct usbnet *dev)
 
 	spin_lock_irqsave(&pdata->mac_cr_lock, flags);
 	if (ecmd.duplex != DUPLEX_FULL) {
-		pdata->mac_cr &= ~MAC_CR_FDPX_;
-		pdata->mac_cr |= MAC_CR_RCVOWN_;
+		pdata->mac_cr &= ~MAC_CR_FDPX;
+		pdata->mac_cr |= MAC_CR_RCVOWN;
 	} else {
-		pdata->mac_cr &= ~MAC_CR_RCVOWN_;
-		pdata->mac_cr |= MAC_CR_FDPX_;
+		pdata->mac_cr &= ~MAC_CR_RCVOWN;
+		pdata->mac_cr |= MAC_CR_FDPX;
 	}
 	spin_unlock_irqrestore(&pdata->mac_cr_lock, flags);
 
@@ -624,7 +624,7 @@ static void smsc95xx_status(struct usbnet *dev, struct urb *urb)
 
 	netif_dbg(dev, link, dev->net, "intdata: 0x%08X\n", intdata);
 
-	if (intdata & INT_ENP_PHY_INT_)
+	if (intdata & INT_ENP_PHY_INT)
 		usbnet_defer_kevent(dev, EVENT_LINK_RESET);
 	else
 		netdev_warn(dev->net, "unexpected interrupt, intdata=0x%08X\n",
@@ -682,14 +682,14 @@ static int smsc95xx_set_features(struct net_device *netdev,
 		return ret;
 
 	if (features & NETIF_F_HW_CSUM)
-		read_buf |= Tx_COE_EN_;
+		read_buf |= TX_COE_EN;
 	else
-		read_buf &= ~Tx_COE_EN_;
+		read_buf &= ~TX_COE_EN;
 
 	if (features & NETIF_F_RXCSUM)
-		read_buf |= Rx_COE_EN_;
+		read_buf |= RX_COE_EN;
 	else
-		read_buf &= ~Rx_COE_EN_;
+		read_buf &= ~RX_COE_EN;
 
 	ret = smsc95xx_write_reg(dev, COE_CR, read_buf);
 	if (ret < 0)
@@ -791,14 +791,14 @@ static int get_mdix_status(struct net_device *net)
 	int buf;
 
 	buf = smsc95xx_mdio_read(dev->net, dev->mii.phy_id, SPECIAL_CTRL_STS);
-	if (buf & SPECIAL_CTRL_STS_OVRRD_AMDIX_) {
-		if (buf & SPECIAL_CTRL_STS_AMDIX_ENABLE_)
+	if (buf & SPECIAL_CTRL_STS_OVRRD_AMDIX) {
+		if (buf & SPECIAL_CTRL_STS_AMDIX_ENABLE)
 			return ETH_TP_MDI_AUTO;
-		else if (buf & SPECIAL_CTRL_STS_AMDIX_STATE_)
+		else if (buf & SPECIAL_CTRL_STS_AMDIX_STATE)
 			return ETH_TP_MDI_X;
 	} else {
 		buf = smsc95xx_read_reg(dev, STRAP_STATUS, &val);
-		if (val & STRAP_STATUS_AMDIX_EN_)
+		if (val & STRAP_STATUS_AMDIX_EN)
 			return ETH_TP_MDI_AUTO;
 	}
 
@@ -811,14 +811,14 @@ static void set_mdix_status(struct net_device *net, __u8 mdix_ctrl)
 	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
 	int buf;
 
-	if ((pdata->chip_id == ID_REV_CHIP_ID_9500A_) ||
-	    (pdata->chip_id == ID_REV_CHIP_ID_9530_) ||
-	    (pdata->chip_id == ID_REV_CHIP_ID_89530_) ||
-	    (pdata->chip_id == ID_REV_CHIP_ID_9730_)) {
+	if ((pdata->chip_id == ID_REV_CHIP_ID_9500A) ||
+	    (pdata->chip_id == ID_REV_CHIP_ID_9530) ||
+	    (pdata->chip_id == ID_REV_CHIP_ID_89530) ||
+	    (pdata->chip_id == ID_REV_CHIP_ID_9730)) {
 		/* Extend Manual AutoMDIX timer for 9500A/9500Ai */
 		buf = smsc95xx_mdio_read(dev->net, dev->mii.phy_id,
 					 PHY_EDPD_CONFIG);
-		buf |= PHY_EDPD_CONFIG_EXT_CROSSOVER_;
+		buf |= PHY_EDPD_CONFIG_EXT_CROSSOVER;
 		smsc95xx_mdio_write(dev->net, dev->mii.phy_id,
 				    PHY_EDPD_CONFIG, buf);
 	}
@@ -826,27 +826,27 @@ static void set_mdix_status(struct net_device *net, __u8 mdix_ctrl)
 	if (mdix_ctrl == ETH_TP_MDI) {
 		buf = smsc95xx_mdio_read(dev->net, dev->mii.phy_id,
 					 SPECIAL_CTRL_STS);
-		buf |= SPECIAL_CTRL_STS_OVRRD_AMDIX_;
-		buf &= ~(SPECIAL_CTRL_STS_AMDIX_ENABLE_ |
-			 SPECIAL_CTRL_STS_AMDIX_STATE_);
+		buf |= SPECIAL_CTRL_STS_OVRRD_AMDIX;
+		buf &= ~(SPECIAL_CTRL_STS_AMDIX_ENABLE |
+			 SPECIAL_CTRL_STS_AMDIX_STATE);
 		smsc95xx_mdio_write(dev->net, dev->mii.phy_id,
 				    SPECIAL_CTRL_STS, buf);
 	} else if (mdix_ctrl == ETH_TP_MDI_X) {
 		buf = smsc95xx_mdio_read(dev->net, dev->mii.phy_id,
 					 SPECIAL_CTRL_STS);
-		buf |= SPECIAL_CTRL_STS_OVRRD_AMDIX_;
-		buf &= ~(SPECIAL_CTRL_STS_AMDIX_ENABLE_ |
-			 SPECIAL_CTRL_STS_AMDIX_STATE_);
-		buf |= SPECIAL_CTRL_STS_AMDIX_STATE_;
+		buf |= SPECIAL_CTRL_STS_OVRRD_AMDIX;
+		buf &= ~(SPECIAL_CTRL_STS_AMDIX_ENABLE |
+			 SPECIAL_CTRL_STS_AMDIX_STATE);
+		buf |= SPECIAL_CTRL_STS_AMDIX_STATE;
 		smsc95xx_mdio_write(dev->net, dev->mii.phy_id,
 				    SPECIAL_CTRL_STS, buf);
 	} else if (mdix_ctrl == ETH_TP_MDI_AUTO) {
 		buf = smsc95xx_mdio_read(dev->net, dev->mii.phy_id,
 					 SPECIAL_CTRL_STS);
-		buf &= ~SPECIAL_CTRL_STS_OVRRD_AMDIX_;
-		buf &= ~(SPECIAL_CTRL_STS_AMDIX_ENABLE_ |
-			 SPECIAL_CTRL_STS_AMDIX_STATE_);
-		buf |= SPECIAL_CTRL_STS_AMDIX_ENABLE_;
+		buf &= ~SPECIAL_CTRL_STS_OVRRD_AMDIX;
+		buf &= ~(SPECIAL_CTRL_STS_AMDIX_ENABLE |
+			 SPECIAL_CTRL_STS_AMDIX_STATE);
+		buf |= SPECIAL_CTRL_STS_AMDIX_ENABLE;
 		smsc95xx_mdio_write(dev->net, dev->mii.phy_id,
 				    SPECIAL_CTRL_STS, buf);
 	}
@@ -959,7 +959,7 @@ static int smsc95xx_start_tx_path(struct usbnet *dev)
 
 	/* Enable Tx at MAC */
 	spin_lock_irqsave(&pdata->mac_cr_lock, flags);
-	pdata->mac_cr |= MAC_CR_TXEN_;
+	pdata->mac_cr |= MAC_CR_TXEN;
 	spin_unlock_irqrestore(&pdata->mac_cr_lock, flags);
 
 	ret = smsc95xx_write_reg(dev, MAC_CR, pdata->mac_cr);
@@ -967,7 +967,7 @@ static int smsc95xx_start_tx_path(struct usbnet *dev)
 		return ret;
 
 	/* Enable Tx at SCSRs */
-	return smsc95xx_write_reg(dev, TX_CFG, TX_CFG_ON_);
+	return smsc95xx_write_reg(dev, TX_CFG, TX_CFG_ON);
 }
 
 /* Starts the Receive path */
@@ -977,7 +977,7 @@ static int smsc95xx_start_rx_path(struct usbnet *dev, int in_pm)
 	unsigned long flags;
 
 	spin_lock_irqsave(&pdata->mac_cr_lock, flags);
-	pdata->mac_cr |= MAC_CR_RXEN_;
+	pdata->mac_cr |= MAC_CR_RXEN;
 	spin_unlock_irqrestore(&pdata->mac_cr_lock, flags);
 
 	return __smsc95xx_write_reg(dev, MAC_CR, pdata->mac_cr, in_pm);
@@ -1021,7 +1021,7 @@ static int smsc95xx_phy_initialize(struct usbnet *dev)
 	}
 
 	smsc95xx_mdio_write(dev->net, dev->mii.phy_id, PHY_INT_MASK,
-		PHY_INT_MASK_DEFAULT_);
+		PHY_INT_MASK_DEFAULT);
 	mii_nway_restart(&dev->mii);
 
 	netif_dbg(dev, ifup, dev->net, "phy initialised successfully\n");
@@ -1036,7 +1036,7 @@ static int smsc95xx_reset(struct usbnet *dev)
 
 	netif_dbg(dev, ifup, dev->net, "entering smsc95xx_reset\n");
 
-	ret = smsc95xx_write_reg(dev, HW_CFG, HW_CFG_LRST_);
+	ret = smsc95xx_write_reg(dev, HW_CFG, HW_CFG_LRST);
 	if (ret < 0)
 		return ret;
 
@@ -1047,14 +1047,14 @@ static int smsc95xx_reset(struct usbnet *dev)
 		if (ret < 0)
 			return ret;
 		timeout++;
-	} while ((read_buf & HW_CFG_LRST_) && (timeout < 100));
+	} while ((read_buf & HW_CFG_LRST) && (timeout < 100));
 
 	if (timeout >= 100) {
 		netdev_warn(dev->net, "timeout waiting for completion of Lite Reset\n");
 		return ret;
 	}
 
-	ret = smsc95xx_write_reg(dev, PM_CTRL, PM_CTL_PHY_RST_);
+	ret = smsc95xx_write_reg(dev, PM_CTRL, PM_CTL_PHY_RST);
 	if (ret < 0)
 		return ret;
 
@@ -1065,7 +1065,7 @@ static int smsc95xx_reset(struct usbnet *dev)
 		if (ret < 0)
 			return ret;
 		timeout++;
-	} while ((read_buf & PM_CTL_PHY_RST_) && (timeout < 100));
+	} while ((read_buf & PM_CTL_PHY_RST) && (timeout < 100));
 
 	if (timeout >= 100) {
 		netdev_warn(dev->net, "timeout waiting for PHY Reset\n");
@@ -1086,7 +1086,7 @@ static int smsc95xx_reset(struct usbnet *dev)
 	netif_dbg(dev, ifup, dev->net, "Read Value from HW_CFG : 0x%08x\n",
 		  read_buf);
 
-	read_buf |= HW_CFG_BIR_;
+	read_buf |= HW_CFG_BIR;
 
 	ret = smsc95xx_write_reg(dev, HW_CFG, read_buf);
 	if (ret < 0)
@@ -1097,7 +1097,7 @@ static int smsc95xx_reset(struct usbnet *dev)
 		return ret;
 
 	netif_dbg(dev, ifup, dev->net,
-		  "Read Value from HW_CFG after writing HW_CFG_BIR_: 0x%08x\n",
+		  "Read Value from HW_CFG after writing HW_CFG_BIR: 0x%08x\n",
 		  read_buf);
 
 	if (!turbo_mode) {
@@ -1146,9 +1146,9 @@ static int smsc95xx_reset(struct usbnet *dev)
 		  read_buf);
 
 	if (turbo_mode)
-		read_buf |= (HW_CFG_MEF_ | HW_CFG_BCE_);
+		read_buf |= (HW_CFG_MEF | HW_CFG_BCE);
 
-	read_buf &= ~HW_CFG_RXDOFF_;
+	read_buf &= ~HW_CFG_RXDOFF;
 
 	/* set Rx data offset=2, Make IP header aligns on word boundary. */
 	read_buf |= NET_IP_ALIGN << 9;
@@ -1164,7 +1164,7 @@ static int smsc95xx_reset(struct usbnet *dev)
 	netif_dbg(dev, ifup, dev->net,
 		  "Read Value from HW_CFG after writing: 0x%08x\n", read_buf);
 
-	ret = smsc95xx_write_reg(dev, INT_STS, INT_STS_CLEAR_ALL_);
+	ret = smsc95xx_write_reg(dev, INT_STS, INT_STS_CLEAR_ALL);
 	if (ret < 0)
 		return ret;
 
@@ -1220,7 +1220,7 @@ static int smsc95xx_reset(struct usbnet *dev)
 		return ret;
 
 	/* enable PHY interrupts */
-	read_buf |= INT_EP_CTL_PHY_INT_;
+	read_buf |= INT_EP_CTL_PHY_INT;
 
 	ret = smsc95xx_write_reg(dev, INT_EP_CTL, read_buf);
 	if (ret < 0)
@@ -1298,12 +1298,12 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	pdata->chip_id = val;
 	pdata->mdix_ctrl = get_mdix_status(dev->net);
 
-	if ((val == ID_REV_CHIP_ID_9500A_) || (val == ID_REV_CHIP_ID_9530_) ||
-	    (val == ID_REV_CHIP_ID_89530_) || (val == ID_REV_CHIP_ID_9730_))
+	if ((val == ID_REV_CHIP_ID_9500A) || (val == ID_REV_CHIP_ID_9530) ||
+	    (val == ID_REV_CHIP_ID_89530) || (val == ID_REV_CHIP_ID_9730))
 		pdata->features = (FEATURE_8_WAKEUP_FILTERS |
 			FEATURE_PHY_NLP_CROSSOVER |
 			FEATURE_REMOTE_WAKEUP);
-	else if (val == ID_REV_CHIP_ID_9512_)
+	else if (val == ID_REV_CHIP_ID_9512)
 		pdata->features = FEATURE_8_WAKEUP_FILTERS;
 
 	dev->net->netdev_ops = &smsc95xx_netdev_ops;
@@ -1389,7 +1389,7 @@ static int smsc95xx_enter_suspend0(struct usbnet *dev)
 	if (ret < 0)
 		return ret;
 
-	val &= (~(PM_CTL_SUS_MODE_ | PM_CTL_WUPS_ | PM_CTL_PHY_RST_));
+	val &= (~(PM_CTL_SUS_MODE | PM_CTL_WUPS | PM_CTL_PHY_RST));
 	val |= PM_CTL_SUS_MODE_0;
 
 	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
@@ -1397,12 +1397,12 @@ static int smsc95xx_enter_suspend0(struct usbnet *dev)
 		return ret;
 
 	/* clear wol status */
-	val &= ~PM_CTL_WUPS_;
-	val |= PM_CTL_WUPS_WOL_;
+	val &= ~PM_CTL_WUPS;
+	val |= PM_CTL_WUPS_WOL;
 
 	/* enable energy detection */
 	if (pdata->wolopts & WAKE_PHY)
-		val |= PM_CTL_WUPS_ED_;
+		val |= PM_CTL_WUPS_ED;
 
 	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
 	if (ret < 0)
@@ -1437,7 +1437,7 @@ static int smsc95xx_enter_suspend1(struct usbnet *dev)
 	if (ret < 0)
 		return ret;
 
-	ret |= MODE_CTRL_STS_EDPWRDOWN_;
+	ret |= MODE_CTRL_STS_EDPWRDOWN;
 
 	smsc95xx_mdio_write_nopm(dev->net, mii->phy_id, PHY_MODE_CTRL_STS, ret);
 
@@ -1446,7 +1446,7 @@ static int smsc95xx_enter_suspend1(struct usbnet *dev)
 	if (ret < 0)
 		return ret;
 
-	val &= ~(PM_CTL_SUS_MODE_ | PM_CTL_WUPS_ | PM_CTL_PHY_RST_);
+	val &= ~(PM_CTL_SUS_MODE | PM_CTL_WUPS | PM_CTL_PHY_RST);
 	val |= PM_CTL_SUS_MODE_1;
 
 	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
@@ -1454,8 +1454,8 @@ static int smsc95xx_enter_suspend1(struct usbnet *dev)
 		return ret;
 
 	/* clear wol status, enable energy detection */
-	val &= ~PM_CTL_WUPS_;
-	val |= (PM_CTL_WUPS_ED_ | PM_CTL_ED_EN_);
+	val &= ~PM_CTL_WUPS;
+	val |= (PM_CTL_WUPS_ED | PM_CTL_ED_EN);
 
 	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
 	if (ret < 0)
@@ -1476,7 +1476,7 @@ static int smsc95xx_enter_suspend2(struct usbnet *dev)
 	if (ret < 0)
 		return ret;
 
-	val &= ~(PM_CTL_SUS_MODE_ | PM_CTL_WUPS_ | PM_CTL_PHY_RST_);
+	val &= ~(PM_CTL_SUS_MODE | PM_CTL_WUPS | PM_CTL_PHY_RST);
 	val |= PM_CTL_SUS_MODE_2;
 
 	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
@@ -1507,7 +1507,7 @@ static int smsc95xx_enter_suspend3(struct usbnet *dev)
 	if (ret < 0)
 		return ret;
 
-	val &= ~(PM_CTL_SUS_MODE_ | PM_CTL_WUPS_ | PM_CTL_PHY_RST_);
+	val &= ~(PM_CTL_SUS_MODE | PM_CTL_WUPS | PM_CTL_PHY_RST);
 	val |= PM_CTL_SUS_MODE_3 | PM_CTL_RES_CLR_WKP_STS;
 
 	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
@@ -1515,8 +1515,8 @@ static int smsc95xx_enter_suspend3(struct usbnet *dev)
 		return ret;
 
 	/* clear wol status */
-	val &= ~PM_CTL_WUPS_;
-	val |= PM_CTL_WUPS_WOL_;
+	val &= ~PM_CTL_WUPS;
+	val |= PM_CTL_WUPS_WOL;
 
 	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
 	if (ret < 0)
@@ -1552,7 +1552,7 @@ static int smsc95xx_autosuspend(struct usbnet *dev, u32 link_up)
 
 		/* enable PHY wakeup events for if cable is attached */
 		ret = smsc95xx_enable_phy_wakeup_interrupts(dev,
-			PHY_INT_MASK_ANEG_COMP_);
+			PHY_INT_MASK_ANEG_COMP);
 		if (ret < 0) {
 			netdev_warn(dev->net, "error enabling PHY wakeup ints\n");
 			return ret;
@@ -1564,7 +1564,7 @@ static int smsc95xx_autosuspend(struct usbnet *dev, u32 link_up)
 
 	/* enable PHY wakeup events so we remote wakeup if cable is pulled */
 	ret = smsc95xx_enable_phy_wakeup_interrupts(dev,
-		PHY_INT_MASK_LINK_DOWN_);
+		PHY_INT_MASK_LINK_DOWN);
 	if (ret < 0) {
 		netdev_warn(dev->net, "error enabling PHY wakeup ints\n");
 		return ret;
@@ -1614,7 +1614,7 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 		if (ret < 0)
 			goto done;
 
-		val &= ~(WUCSR_MPEN_ | WUCSR_WAKE_EN_);
+		val &= ~(WUCSR_MPEN | WUCSR_WAKE_EN);
 
 		ret = smsc95xx_write_reg_nopm(dev, WUCSR, val);
 		if (ret < 0)
@@ -1624,7 +1624,7 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 		if (ret < 0)
 			goto done;
 
-		val &= ~(PM_CTL_ED_EN_ | PM_CTL_WOL_EN_);
+		val &= ~(PM_CTL_ED_EN | PM_CTL_WOL_EN);
 
 		ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
 		if (ret < 0)
@@ -1636,7 +1636,7 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 
 	if (pdata->wolopts & WAKE_PHY) {
 		ret = smsc95xx_enable_phy_wakeup_interrupts(dev,
-			(PHY_INT_MASK_ANEG_COMP_ | PHY_INT_MASK_LINK_DOWN_));
+			(PHY_INT_MASK_ANEG_COMP | PHY_INT_MASK_LINK_DOWN));
 		if (ret < 0) {
 			netdev_warn(dev->net, "error enabling PHY wakeup ints\n");
 			goto done;
@@ -1755,7 +1755,7 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 		if (ret < 0)
 			goto done;
 
-		val |= WUCSR_WUFR_;
+		val |= WUCSR_WUFR;
 
 		ret = smsc95xx_write_reg_nopm(dev, WUCSR, val);
 		if (ret < 0)
@@ -1768,7 +1768,7 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 		if (ret < 0)
 			goto done;
 
-		val |= WUCSR_MPR_;
+		val |= WUCSR_MPR;
 
 		ret = smsc95xx_write_reg_nopm(dev, WUCSR, val);
 		if (ret < 0)
@@ -1782,18 +1782,18 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 
 	if (pdata->wolopts & (WAKE_BCAST | WAKE_MCAST | WAKE_ARP | WAKE_UCAST)) {
 		netdev_info(dev->net, "enabling pattern match wakeup\n");
-		val |= WUCSR_WAKE_EN_;
+		val |= WUCSR_WAKE_EN;
 	} else {
 		netdev_info(dev->net, "disabling pattern match wakeup\n");
-		val &= ~WUCSR_WAKE_EN_;
+		val &= ~WUCSR_WAKE_EN;
 	}
 
 	if (pdata->wolopts & WAKE_MAGIC) {
 		netdev_info(dev->net, "enabling magic packet wakeup\n");
-		val |= WUCSR_MPEN_;
+		val |= WUCSR_MPEN;
 	} else {
 		netdev_info(dev->net, "disabling magic packet wakeup\n");
-		val &= ~WUCSR_MPEN_;
+		val &= ~WUCSR_MPEN;
 	}
 
 	ret = smsc95xx_write_reg_nopm(dev, WUCSR, val);
@@ -1805,11 +1805,11 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 	if (ret < 0)
 		goto done;
 
-	val |= PM_CTL_WOL_EN_;
+	val |= PM_CTL_WOL_EN;
 
 	/* phy energy detect wakeup source */
 	if (pdata->wolopts & WAKE_PHY)
-		val |= PM_CTL_ED_EN_;
+		val |= PM_CTL_ED_EN;
 
 	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
 	if (ret < 0)
@@ -1856,7 +1856,7 @@ static int smsc95xx_resume(struct usb_interface *intf)
 		if (ret < 0)
 			return ret;
 
-		val &= ~(WUCSR_WAKE_EN_ | WUCSR_MPEN_);
+		val &= ~(WUCSR_WAKE_EN | WUCSR_MPEN);
 
 		ret = smsc95xx_write_reg_nopm(dev, WUCSR, val);
 		if (ret < 0)
@@ -1867,8 +1867,8 @@ static int smsc95xx_resume(struct usb_interface *intf)
 		if (ret < 0)
 			return ret;
 
-		val &= ~PM_CTL_WOL_EN_;
-		val |= PM_CTL_WUPS_;
+		val &= ~PM_CTL_WOL_EN;
+		val |= PM_CTL_WUPS;
 
 		ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
 		if (ret < 0)
@@ -1919,23 +1919,23 @@ static int smsc95xx_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 		packet = skb->data;
 
 		/* get the packet length */
-		size = (u16)((header & RX_STS_FL_) >> 16);
+		size = (u16)((header & RX_STS_FL) >> 16);
 		align_count = (4 - ((size + NET_IP_ALIGN) % 4)) % 4;
 
-		if (unlikely(header & RX_STS_ES_)) {
+		if (unlikely(header & RX_STS_ES)) {
 			netif_dbg(dev, rx_err, dev->net,
 				  "Error header=0x%08x\n", header);
 			dev->net->stats.rx_errors++;
 			dev->net->stats.rx_dropped++;
 
-			if (header & RX_STS_CRC_) {
+			if (header & RX_STS_CRC) {
 				dev->net->stats.rx_crc_errors++;
 			} else {
-				if (header & (RX_STS_TL_ | RX_STS_RF_))
+				if (header & (RX_STS_TL | RX_STS_RF))
 					dev->net->stats.rx_frame_errors++;
 
-				if ((header & RX_STS_LE_) &&
-					(!(header & RX_STS_FT_)))
+				if ((header & RX_STS_LE) &&
+					(!(header & RX_STS_FT)))
 					dev->net->stats.rx_length_errors++;
 			}
 		} else {
@@ -2037,8 +2037,8 @@ static struct sk_buff *smsc95xx_tx_fixup(struct usbnet *dev,
 	memcpy(skb->data, &tx_cmd_b, 4);
 
 	skb_push(skb, 4);
-	tx_cmd_a = (u32)(skb->len - 8) | TX_CMD_A_FIRST_SEG_ |
-		TX_CMD_A_LAST_SEG_;
+	tx_cmd_a = (u32)(skb->len - 8) | TX_CMD_A_FIRST_SEG |
+		TX_CMD_A_LAST_SEG;
 	cpu_to_le32s(&tx_cmd_a);
 	memcpy(skb->data, &tx_cmd_a, 4);
 
