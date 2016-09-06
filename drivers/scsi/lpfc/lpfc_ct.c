@@ -188,12 +188,8 @@ lpfc_ct_unsol_event(struct lpfc_hba *phba, struct lpfc_sli_ring *pring,
 int
 lpfc_ct_handle_unsol_abort(struct lpfc_hba *phba, struct hbq_dmabuf *dmabuf)
 {
-	int handled;
-
 	/* CT upper level goes through BSG */
-	handled = lpfc_bsg_ct_unsol_abort(phba, dmabuf);
-
-	return handled;
+	return lpfc_bsg_ct_unsol_abort(phba, dmabuf);
 }
 
 static void

@@ -1242,11 +1242,7 @@ static long
 mraid_mm_compat_ioctl(struct file *filep, unsigned int cmd,
 		      unsigned long arg)
 {
-	int err;
-
-	err = mraid_mm_ioctl(filep, cmd, arg);
-
-	return err;
+	return mraid_mm_ioctl(filep, cmd, arg);
 }
 #endif
 

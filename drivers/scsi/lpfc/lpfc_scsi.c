@@ -2857,10 +2857,7 @@ lpfc_bg_crc(uint8_t *data, int count)
 static uint16_t
 lpfc_bg_csum(uint8_t *data, int count)
 {
-	uint16_t ret;
-
-	ret = ip_compute_csum(data, count);
-	return ret;
+	return ip_compute_csum(data, count);
 }
 
 /*

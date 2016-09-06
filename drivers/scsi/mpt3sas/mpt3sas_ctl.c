@@ -2355,15 +2355,13 @@ out_unlock_pciaccess:
 long
 _ctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	long ret;
-
-	/* pass MPI25_VERSION | MPI26_VERSION value,
+	/*
+	 * pass MPI25_VERSION | MPI26_VERSION value,
 	 * to indicate that this ioctl cmd
 	 * came from mpt3ctl ioctl device.
 	 */
-	ret = _ctl_ioctl_main(file, cmd, (void __user *)arg, 0,
-		MPI25_VERSION | MPI26_VERSION);
-	return ret;
+	return _ctl_ioctl_main(file, cmd, (void __user *)arg, 0,
+			       MPI25_VERSION | MPI26_VERSION);
 }
 
 /**
@@ -2375,13 +2373,11 @@ _ctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 long
 _ctl_mpt2_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	long ret;
-
-	/* pass MPI2_VERSION value, to indicate that this ioctl cmd
+	/*
+	 * pass MPI2_VERSION value, to indicate that this ioctl cmd
 	 * came from mpt2ctl ioctl device.
 	 */
-	ret = _ctl_ioctl_main(file, cmd, (void __user *)arg, 0, MPI2_VERSION);
-	return ret;
+	return _ctl_ioctl_main(file, cmd, (void __user *)arg, 0, MPI2_VERSION);
 }
 #ifdef CONFIG_COMPAT
 /**
@@ -2395,11 +2391,8 @@ _ctl_mpt2_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 long
 _ctl_ioctl_compat(struct file *file, unsigned cmd, unsigned long arg)
 {
-	long ret;
-
-	ret = _ctl_ioctl_main(file, cmd, (void __user *)arg, 1,
-		MPI25_VERSION | MPI26_VERSION);
-	return ret;
+	return _ctl_ioctl_main(file, cmd, (void __user *)arg, 1,
+			       MPI25_VERSION | MPI26_VERSION);
 }
 
 /**
@@ -2413,10 +2406,7 @@ _ctl_ioctl_compat(struct file *file, unsigned cmd, unsigned long arg)
 long
 _ctl_mpt2_ioctl_compat(struct file *file, unsigned cmd, unsigned long arg)
 {
-	long ret;
-
-	ret = _ctl_ioctl_main(file, cmd, (void __user *)arg, 1, MPI2_VERSION);
-	return ret;
+	return _ctl_ioctl_main(file, cmd, (void __user *)arg, 1, MPI2_VERSION);
 }
 #endif
 

@@ -396,11 +396,8 @@ EXPORT_SYMBOL(osd_dev_fini);
 
 static struct osd_request *_osd_request_alloc(gfp_t gfp)
 {
-	struct osd_request *or;
-
 	/* TODO: Use mempool with one saved request */
-	or = kzalloc(sizeof(*or), gfp);
-	return or;
+	return kzalloc(sizeof(struct osd_request), gfp);
 }
 
 static void _osd_request_free(struct osd_request *or)

@@ -2625,12 +2625,8 @@ lpfc_oas_lun_state_change(struct lpfc_hba *phba, uint8_t vpt_wwpn[],
 			  uint8_t tgt_wwpn[], uint64_t lun,
 			  uint32_t oas_state, uint8_t pri)
 {
-
-	int rc;
-
-	rc = lpfc_oas_lun_state_set(phba, vpt_wwpn, tgt_wwpn, lun,
-				    oas_state, pri);
-	return rc;
+	return lpfc_oas_lun_state_set(phba, vpt_wwpn, tgt_wwpn, lun,
+				      oas_state, pri);
 }
 
 /**

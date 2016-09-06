@@ -624,10 +624,7 @@ __lpfc_clear_active_sglq(struct lpfc_hba *phba, uint16_t xritag)
 struct lpfc_sglq *
 __lpfc_get_active_sglq(struct lpfc_hba *phba, uint16_t xritag)
 {
-	struct lpfc_sglq *sglq;
-
-	sglq =  phba->sli4_hba.lpfc_sglq_active_list[xritag];
-	return sglq;
+	return phba->sli4_hba.lpfc_sglq_active_list[xritag];
 }
 
 /**

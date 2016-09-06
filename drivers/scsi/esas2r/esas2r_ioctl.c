@@ -373,18 +373,14 @@ static bool csmi_ioctl_tunnel(struct esas2r_adapter *a,
 
 static bool check_lun(struct scsi_lun lun)
 {
-	bool result;
-
-	result = ((lun.scsi_lun[7] == 0) &&
-		  (lun.scsi_lun[6] == 0) &&
-		  (lun.scsi_lun[5] == 0) &&
-		  (lun.scsi_lun[4] == 0) &&
-		  (lun.scsi_lun[3] == 0) &&
-		  (lun.scsi_lun[2] == 0) &&
-/* Byte 1 is intentionally skipped */
-		  (lun.scsi_lun[0] == 0));
-
-	return result;
+	return (lun.scsi_lun[7] == 0) &&
+	       (lun.scsi_lun[6] == 0) &&
+	       (lun.scsi_lun[5] == 0) &&
+	       (lun.scsi_lun[4] == 0) &&
+	       (lun.scsi_lun[3] == 0) &&
+	       (lun.scsi_lun[2] == 0) &&
+		/* Byte 1 is intentionally skipped */
+	       (lun.scsi_lun[0] == 0);
 }
 
 static int csmi_ioctl_callback(struct esas2r_adapter *a,

@@ -1129,13 +1129,9 @@ static long sg_compat_ioctl(struct file *filp, unsigned int cmd_in, unsigned lon
 		return -ENXIO;
 
 	sdev = sdp->device;
-	if (sdev->host->hostt->compat_ioctl) { 
-		int ret;
-
-		ret = sdev->host->hostt->compat_ioctl(sdev, cmd_in, (void __user *)arg);
-
-		return ret;
-	}
+	if (sdev->host->hostt->compat_ioctl)
+		return sdev->host->hostt->compat_ioctl(sdev, cmd_in,
+						       (void __user *)arg);
 	
 	return -ENOIOCTLCMD;
 }
