@@ -210,7 +210,7 @@ static void __init wrt350n_v2_init(void)
 	 */
 	orion5x_ehci0_init();
 	orion5x_eth_init(&wrt350n_v2_eth_data);
-	orion5x_eth_switch_init(&wrt350n_v2_switch_plat_data, NO_IRQ);
+	orion5x_eth_switch_init(&wrt350n_v2_switch_plat_data, 0);
 	orion5x_uart0_init();
 
 	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,

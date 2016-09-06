@@ -489,11 +489,10 @@ void __init orion_ge00_switch_init(struct dsa_platform_data *d, int irq)
 {
 	int i;
 
-	if (irq != NO_IRQ) {
-		orion_switch_resources[0].start = irq;
-		orion_switch_resources[0].end = irq;
+	orion_switch_resources[0].start = irq;
+	orion_switch_resources[0].end = irq;
+	if (irq)
 		orion_switch_device.num_resources = 1;
-	}
 
 	d->netdev = &orion_ge00.dev;
 	for (i = 0; i < d->nr_chips; i++)
