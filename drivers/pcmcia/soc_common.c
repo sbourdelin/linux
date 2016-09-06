@@ -691,7 +691,7 @@ void soc_pcmcia_init_one(struct soc_pcmcia_socket *skt,
 	skt->ops = ops;
 	skt->socket.owner = ops->owner;
 	skt->socket.dev.parent = dev;
-	skt->socket.pci_irq = NO_IRQ;
+	skt->socket.pci_irq = 0;
 
 	for (i = 0; i < ARRAY_SIZE(skt->stat); i++)
 		skt->stat[i].gpio = -EINVAL;
