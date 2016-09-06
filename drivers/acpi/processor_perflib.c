@@ -621,12 +621,12 @@ int acpi_processor_preregister_performance(
 
 		if (pr->performance) {
 			retval = -EBUSY;
-			goto err_out;
+			goto unlock;
 		}
 
 		if (!performance || !per_cpu_ptr(performance, i)) {
 			retval = -EINVAL;
-			goto err_out;
+			goto unlock;
 		}
 	}
 
@@ -644,7 +644,7 @@ int acpi_processor_preregister_performance(
 		}
 	}
 	if (retval)
-		goto err_ret;
+		goto clear_cpu;
 
 	/*
 	 * Now that we have _PSD data from all CPUs, lets setup P-state 
@@ -689,12 +689,12 @@ int acpi_processor_preregister_performance(
 
 			if (match_pdomain->num_processors != count_target) {
 				retval = -EINVAL;
-				goto err_ret;
+				goto clear_cpu;
 			}
 
 			if (pdomain->coord_type != match_pdomain->coord_type) {
 				retval = -EINVAL;
-				goto err_ret;
+				goto clear_cpu;
 			}
 
 			cpumask_set_cpu(j, covered_cpus);
@@ -719,8 +719,7 @@ int acpi_processor_preregister_performance(
 				     pr->performance->shared_cpu_map);
 		}
 	}
-
-err_ret:
+ clear_cpu:
 	for_each_possible_cpu(i) {
 		pr = per_cpu(processors, i);
 		if (!pr || !pr->performance)
@@ -734,8 +733,7 @@ err_ret:
 		}
 		pr->performance = NULL; /* Will be set for real in register */
 	}
-
-err_out:
+ unlock:
 	mutex_unlock(&performance_mutex);
 	free_cpumask_var(covered_cpus);
 	return retval;
