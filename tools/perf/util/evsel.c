@@ -25,6 +25,7 @@
 #include "thread_map.h"
 #include "target.h"
 #include "perf_regs.h"
+#include "pmu.h"
 #include "debug.h"
 #include "trace-event.h"
 #include "stat.h"
@@ -1060,6 +1061,45 @@ int perf_evsel__append_filter(struct perf_evsel *evsel,
 	}
 
 	return -1;
+}
+
+int perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
+				  struct perf_evsel_config_term **err_term)
+{
+	bool found = false;
+	int err = 0;
+	struct perf_evsel_config_term *term;
+	struct perf_pmu *pmu = NULL;
+
+	while ((pmu = perf_pmu__scan(pmu)) != NULL)
+		if (pmu->type == evsel->attr.type) {
+			found = true;
+			break;
+		}
+
+	list_for_each_entry(term, &evsel->config_terms, list) {
+		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
+			continue;
+
+		/*
+		 * We have a configuration term, report an error if we
+		 * can't find the PMU or if the PMU driver doesn't support
+		 * cmd line driver configuration.
+		 */
+		if (!found || !pmu->set_drv_config) {
+			err = -EINVAL;
+			*err_term = term;
+			break;
+		}
+
+		err = pmu->set_drv_config(term);
+		if (err) {
+			*err_term = term;
+			break;
+		}
+	}
+
+	return err;
 }
 
 int perf_evsel__enable(struct perf_evsel *evsel)
