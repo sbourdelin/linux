@@ -127,6 +127,7 @@ stop:
 		goto done;
 
 	rhashtable_walk_exit(hti);
+	kfree(hti);
 	cb->args[2] = 0;
 	num++;
 
