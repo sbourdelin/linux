@@ -46,6 +46,7 @@ static void interrupt_event_handler(struct work_struct *work)
 	list_for_each_entry_safe_reverse(dev, temp, &parent->devices,
 					 bus_list) {
 		pci_dev_get(dev);
+		dev->is_removed = 1;
 		pci_stop_and_remove_bus_device(dev);
 		pci_dev_put(dev);
 	}
