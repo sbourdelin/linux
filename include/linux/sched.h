@@ -2493,6 +2493,15 @@ static inline void disable_sched_clock_irqtime(void) {}
 extern unsigned long long
 task_sched_runtime(struct task_struct *task);
 
+#ifdef CONFIG_64BIT
+static inline u64 read_sum_exec_runtime(struct task_struct *t)
+{
+	return t->se.sum_exec_runtime;
+}
+#else
+extern u64 read_sum_exec_runtime(struct task_struct *t);
+#endif
+
 /* sched_exec is called by processes performing an exec */
 #ifdef CONFIG_SMP
 extern void sched_exec(void);

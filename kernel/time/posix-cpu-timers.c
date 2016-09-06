@@ -848,7 +848,7 @@ static void check_thread_timers(struct task_struct *tsk,
 	tsk_expires->virt_exp = expires_to_cputime(expires);
 
 	tsk_expires->sched_exp = check_timers_list(++timers, firing,
-						   tsk->se.sum_exec_runtime);
+						   read_sum_exec_runtime(tsk));
 
 	/*
 	 * Check for the special case thread timers.
@@ -1115,7 +1115,7 @@ static inline int fastpath_timer_check(struct task_struct *tsk)
 		struct task_cputime task_sample;
 
 		task_cputime(tsk, &task_sample.utime, &task_sample.stime);
-		task_sample.sum_exec_runtime = tsk->se.sum_exec_runtime;
+		task_sample.sum_exec_runtime = read_sum_exec_runtime(tsk);
 		if (task_cputime_expired(&task_sample, &tsk->cputime_expires))
 			return 1;
 	}
