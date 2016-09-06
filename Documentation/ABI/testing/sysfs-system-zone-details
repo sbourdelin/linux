@@ -1,0 +1,9 @@
+What:		/sys/devices/system/memory/system_zone_details
+Date:		Sep 2016
+KernelVersion:	4.8
+Contact:	khandual@linux.vnet.ibm.com
+Description:
+		This read only file dumps the zonelist and it's constituent
+		zones information for both ZONELIST_FALLBACK and ZONELIST_
+		NOFALLBACK zonelists for each online node of the system at
+		any given point of time.
