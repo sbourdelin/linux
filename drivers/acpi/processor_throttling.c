@@ -582,11 +582,11 @@ static int acpi_processor_get_throttling_states(struct acpi_processor *pr)
 static int acpi_processor_get_tsd(struct acpi_processor *pr)
 {
 	int result = 0;
-	acpi_status status = AE_OK;
+	acpi_status status;
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
 	struct acpi_buffer format = { sizeof("NNNNN"), "NNNNN" };
 	struct acpi_buffer state = { 0, NULL };
-	union acpi_object *tsd = NULL;
+	union acpi_object *tsd;
 	struct acpi_tsd_package *pdomain;
 	struct acpi_processor_throttling *pthrottling;
 
