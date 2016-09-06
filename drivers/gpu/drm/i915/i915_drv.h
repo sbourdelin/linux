@@ -558,6 +558,16 @@ enum forcewake_domains {
 #define FW_REG_READ  (1)
 #define FW_REG_WRITE (2)
 
+enum power_domains {
+	GEN9_DECOUPLED_PD_BLITTER = 0,
+	GEN9_DECOUPLED_PD_RENDER,
+	GEN9_DECOUPLED_PD_MEDIA,
+	GEN9_DECOUPLED_PD_ALL
+};
+
+#define GEN9_DECOUPLED_OP_WRITE 0
+#define GEN9_DECOUPLED_OP_READ 1
+
 enum forcewake_domains
 intel_uncore_forcewake_for_reg(struct drm_i915_private *dev_priv,
 			       i915_reg_t reg, unsigned int op);
@@ -2850,6 +2860,7 @@ struct drm_i915_cmd_table {
 #define GT_FREQUENCY_MULTIPLIER 50
 #define GEN9_FREQ_SCALER 3
 
+#define HAS_DECOUPLED_MMIO(dev_priv) (IS_BROXTON(dev_priv) && IS_BXT_REVID(dev_priv, BXT_REVID_C0, REVID_FOREVER))
 #include "i915_trace.h"
 
 static inline bool intel_scanout_needs_vtd_wa(struct drm_i915_private *dev_priv)
