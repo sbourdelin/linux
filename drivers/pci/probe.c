@@ -1666,6 +1666,8 @@ static void pci_init_capabilities(struct pci_dev *dev)
 	/* Enable ACS P2P upstream forwarding */
 	pci_enable_acs(dev);
 
+	/* Advanced Error Reporting */
+	dev->aer_cap = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_ERR);
 	pci_cleanup_aer_error_status_regs(dev);
 
 	/* Precision Time Measurement */
