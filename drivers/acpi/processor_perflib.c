@@ -595,7 +595,7 @@ int acpi_processor_preregister_performance(
 		struct acpi_processor_performance __percpu *performance)
 {
 	int count_target;
-	int retval = 0;
+	int retval;
 	unsigned int i, j;
 	cpumask_var_t covered_cpus;
 	struct acpi_processor *pr;
@@ -719,6 +719,8 @@ int acpi_processor_preregister_performance(
 				     pr->performance->shared_cpu_map);
 		}
 	}
+
+	retval = 0;
  clear_cpu:
 	for_each_possible_cpu(i) {
 		pr = per_cpu(processors, i);
