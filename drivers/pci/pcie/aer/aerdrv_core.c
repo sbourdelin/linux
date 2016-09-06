@@ -715,14 +715,23 @@ static inline void aer_process_err_devices(struct pcie_device *p_device,
 static void aer_isr_one_error(struct pcie_device *p_device,
 		struct aer_err_source *e_src)
 {
-	struct aer_err_info *e_info;
+	struct aer_rpc *rpc = get_service_data(p_device);
+	struct aer_err_info *e_info = rpc->e_info;
 
-	/* struct aer_err_info might be big, so we allocate it with slab */
-	e_info = kmalloc(sizeof(struct aer_err_info), GFP_KERNEL);
+	/*
+	 * struct aer_err_info might be big, so we allocate it with slab.
+	 * It's not unreasonable to assume a faulting device might emit
+	 * another error, so try to only malloc once and keep the
+	 * reference through the root port's life.
+	 */
 	if (!e_info) {
-		dev_printk(KERN_DEBUG, &p_device->port->dev,
-			"Can't allocate mem when processing AER errors\n");
-		return;
+		e_info = kmalloc(sizeof(struct aer_err_info), GFP_KERNEL);
+		if (!e_info) {
+			dev_printk(KERN_DEBUG, &p_device->port->dev,
+				"Can't allocate mem when processing AER errors\n");
+			return;
+		}
+		rpc->e_info = e_info;
 	}
 
 	/*
@@ -762,8 +771,6 @@ static void aer_isr_one_error(struct pcie_device *p_device,
 		if (find_source_device(p_device->port, e_info))
 			aer_process_err_devices(p_device, e_info);
 	}
-
-	kfree(e_info);
 }
 
 /**
