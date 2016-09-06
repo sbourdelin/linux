@@ -90,18 +90,17 @@ static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 
 	pr = per_cpu(processors, policy->cpu);
 	if (!pr || !pr->performance)
-		goto out;
+		goto unlock;
 
 	ppc = (unsigned int)pr->performance_platform_limit;
 
 	if (ppc >= pr->performance->state_count)
-		goto out;
+		goto unlock;
 
 	cpufreq_verify_within_limits(policy, 0,
 				     pr->performance->states[ppc].
 				     core_frequency * 1000);
-
-      out:
+ unlock:
 	mutex_unlock(&performance_mutex);
 
 	return 0;
