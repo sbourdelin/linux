@@ -196,22 +196,26 @@ static void p80211req_mibset_mibget(wlandevice_t *wlandev,
 				   int isget)
 {
 	p80211itemd_t *mibitem = (p80211itemd_t *) mib_msg->mibattribute.data;
-	p80211pstrd_t *pstr = (p80211pstrd_t *) mibitem->data;
-	u8 *key = mibitem->data + sizeof(p80211pstrd_t);
+	p80211pstrd_t *pstr;
+	u8 *key;
+	u32 *data;
 
 	switch (mibitem->did) {
 	case DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey0:
 	case DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey1:
 	case DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey2:
 	case DIDmib_dot11smt_dot11WEPDefaultKeysTable_dot11WEPDefaultKey3:
-		if (!isget)
+		if (!isget) {
+			pstr = (struct p80211pstrd *)mibitem->data;
+			key = mibitem->data + sizeof(struct p80211pstrd);
 			wep_change_key(wlandev,
 				       P80211DID_ITEM(mibitem->did) - 1,
 				       key, pstr->len);
+		}
 		break;
 
-	case DIDmib_dot11smt_dot11PrivacyTable_dot11WEPDefaultKeyID:{
-		u32 *data = (u32 *) mibitem->data;
+	case DIDmib_dot11smt_dot11PrivacyTable_dot11WEPDefaultKeyID:
+		data = (u32 *)mibitem->data;
 
 		if (isget) {
 			*data = wlandev->hostwep & HOSTWEP_DEFAULTKEY_MASK;
@@ -219,21 +223,20 @@ static void p80211req_mibset_mibget(wlandevice_t *wlandev,
 			wlandev->hostwep &= ~(HOSTWEP_DEFAULTKEY_MASK);
 			wlandev->hostwep |= (*data & HOSTWEP_DEFAULTKEY_MASK);
 		}
-	break;
-	}
-	case DIDmib_dot11smt_dot11PrivacyTable_dot11PrivacyInvoked:{
-		u32 *data = (u32 *) mibitem->data;
+		break;
+
+	case DIDmib_dot11smt_dot11PrivacyTable_dot11PrivacyInvoked:
+		data = (u32 *)mibitem->data;
 
 		p80211req_handle_action(wlandev, data, isget,
 					HOSTWEP_PRIVACYINVOKED);
-	break;
-	}
-	case DIDmib_dot11smt_dot11PrivacyTable_dot11ExcludeUnencrypted:{
-		u32 *data = (u32 *) mibitem->data;
+		break;
+
+	case DIDmib_dot11smt_dot11PrivacyTable_dot11ExcludeUnencrypted:
+		data = (u32 *)mibitem->data;
 
 		p80211req_handle_action(wlandev, data, isget,
 					HOSTWEP_EXCLUDEUNENCRYPTED);
-	break;
-	}
+		break;
 	}
 }
