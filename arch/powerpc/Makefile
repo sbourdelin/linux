@@ -332,6 +332,11 @@ corenet64_smp_defconfig:
 	$(call merge_into_defconfig,corenet_basic_defconfig,\
 		85xx-64bit 85xx-smp altivec 85xx-hw fsl-emb-nonhw)
 
+PHONY += cyrus_defconfig
+cyrus_defconfig:
+	$(call merge_into_defconfig,cyrus_basic_defconfig,\
+		85xx-64bit 85xx-smp altivec 85xx-hw fsl-emb-nonhw)
+
 PHONY += mpc86xx_defconfig
 mpc86xx_defconfig:
 	$(call merge_into_defconfig,mpc86xx_basic_defconfig,\
