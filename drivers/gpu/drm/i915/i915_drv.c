@@ -1325,13 +1325,7 @@ void i915_driver_unload(struct drm_device *dev)
 
 static int i915_driver_open(struct drm_device *dev, struct drm_file *file)
 {
-	int ret;
-
-	ret = i915_gem_open(dev, file);
-	if (ret)
-		return ret;
-
-	return 0;
+	return i915_gem_open(dev, file);
 }
 
 /**

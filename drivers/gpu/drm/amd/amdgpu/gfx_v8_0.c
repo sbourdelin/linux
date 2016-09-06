@@ -5854,11 +5854,7 @@ static int gfx_v8_0_set_clockgating_state(void *handle,
 
 static u32 gfx_v8_0_ring_get_rptr_gfx(struct amdgpu_ring *ring)
 {
-	u32 rptr;
-
-	rptr = ring->adev->wb.wb[ring->rptr_offs];
-
-	return rptr;
+	return ring->adev->wb.wb[ring->rptr_offs];
 }
 
 static u32 gfx_v8_0_ring_get_wptr_gfx(struct amdgpu_ring *ring)
