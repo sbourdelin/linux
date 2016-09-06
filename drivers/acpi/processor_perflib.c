@@ -556,7 +556,7 @@ static int acpi_processor_get_psd(struct acpi_processor	*pr)
 
 	pdomain = &(pr->performance->domain_info);
 
-	state.length = sizeof(struct acpi_psd_package);
+	state.length = sizeof(*pdomain);
 	state.pointer = pdomain;
 
 	status = acpi_extract_package(&(psd->package.elements[0]),
