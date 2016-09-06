@@ -462,21 +462,20 @@ static inline int entity_before(struct sched_entity *a,
 
 static void update_min_vruntime(struct cfs_rq *cfs_rq)
 {
-	u64 vruntime = cfs_rq->min_vruntime;
+	u64 vruntime = U64_MAX;
 
-	if (cfs_rq->rb_leftmost) {
-		struct sched_entity *se = rb_entry(cfs_rq->rb_leftmost,
-						   struct sched_entity,
-						   run_node);
-
-		vruntime = se->vruntime;
-	}
+	if (cfs_rq->rb_leftmost)
+		vruntime = rb_entry(cfs_rq->rb_leftmost,
+				    struct sched_entity,
+				    run_node)->vruntime;
 
 	if (cfs_rq->curr)
 		vruntime = min_vruntime(vruntime, cfs_rq->curr->vruntime);
 
 	/* ensure we never gain time by being placed backwards. */
-	cfs_rq->min_vruntime = max_vruntime(cfs_rq->min_vruntime, vruntime);
+	if (vruntime != U64_MAX)
+		cfs_rq->min_vruntime = max_vruntime(cfs_rq->min_vruntime, vruntime);
+
 #ifndef CONFIG_64BIT
 	smp_wmb();
 	cfs_rq->min_vruntime_copy = cfs_rq->min_vruntime;
