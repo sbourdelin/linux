@@ -358,7 +358,7 @@ static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 
 		struct acpi_processor_px *px = &(pr->performance->states[i]);
 
-		state.length = sizeof(struct acpi_processor_px);
+		state.length = sizeof(*px);
 		state.pointer = px;
 
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Extracting state %d\n", i));
@@ -400,7 +400,8 @@ static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 				 * Copy this valid entry over last_invalid entry
 				 */
 				memcpy(&(pr->performance->states[last_invalid]),
-				       px, sizeof(struct acpi_processor_px));
+				       px,
+				       sizeof(*px));
 				++last_invalid;
 			}
 		}
