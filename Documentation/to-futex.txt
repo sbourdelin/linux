@@ -1,0 +1,124 @@
+Started by: Waiman Long <waiman.long@hpe.com>
+
+Throughput-Optimized Futexes
+----------------------------
+
+There are two main problems for a wait-wake futex (FUTEX_WAIT and
+FUTEX_WAKE) when used for creating user-space locking primitives:
+
+ 1) With a wait-wake futex, tasks waiting for a lock are put to sleep
+    in the futex queue to be woken up by the lock owner when it is done
+    with the lock. Waking up a sleeping task, however, introduces some
+    additional latency which can be large especially if the critical
+    section protected by the lock is relatively short. This may cause
+    a performance bottleneck on large systems with many CPUs running
+    applications that need a lot of inter-thread synchronization.
+
+ 2) The performance of the wait-wake futex is currently
+    spinlock-constrained.  When many threads are contending for a
+    futex in a large system with many CPUs, it is not unusual to have
+    spinlock contention accounting for more than 90% of the total
+    CPU cycles consumed at various points in time.
+
+Throughput-optimized futex is a solution to both the wakeup latency
+and spinlock contention problems by encouraging lock stealing and
+optimistically spinning on a locked futex when the lock owner is
+running within the kernel until the lock is free. This is the same
+optimistic spinning mechanism used by the kernel mutex and rw semaphore
+implementations to improve performance. Optimistic spinning was done
+without taking any lock.
+
+The downside of this improved throughput is the increased variance
+of the actual response times of the locking operations. Some locking
+operations will be very fast, while others may be considerably slower.
+The average response time should be better than the wait-wake futexes.
+
+Implementation
+--------------
+
+Like the PI and robust futexes, a lock acquirer has to atomically
+put its thread ID (TID) into the lower 30 bits of the 32-bit futex
+which should has an original value of 0. If it succeeds, it will be
+the owner of the futex. Otherwise, it has to call into the kernel
+using the new FUTEX_LOCK_TO futex(2) syscall.
+
+  futex(uaddr, FUTEX_LOCK_TO, 0, timeout, NULL, 0);
+
+Only the optional timeout parameter is being used by the new futex
+call.
+
+A kernel mutex is used for serialization.  The top lock waiter that is
+the owner of the serialization mutex will try to steal the lock when
+it is available and delay setting the FUTEX_WAITERS bit to encourage
+more lock stealing in the userspace. When it has waited long enough
+or is going to sleep, it then set the FUTEX_WAITERS bit to make sure
+that it is going to get the lock next and is woken up when the lock
+owner releases the lock.
+
+When it is time to unlock, the lock owner has to atomically change the
+futex value from its TID to 0. If that fails, it can optionally clear
+the TID portion of the futex value to encourage faster lock transfer.
+It also has to issue a FUTEX_UNLOCK_TO futex system call to wake up
+the top waiter, if it has slept.
+
+  futex(uaddr, FUTEX_UNLOCK_TO, 0, NULL, NULL, 0);
+
+A return value of 1 from the FUTEX_UNLOCK_TO futex(2) syscall
+indicates a task has been woken up. The syscall returns 0 if no
+sleeping task is woken.
+
+The error number returned by a FUTEX_UNLOCK_TO call on an empty futex
+can be used to decide if the TO futex functionality is implemented in
+the kernel. If it is present, no error will be returned.  Otherwise it
+will be ENOSYS.
+
+TO futexes require the kernel to have support for the cmpxchg
+functionality. For architectures that don't support cmpxchg, TO
+futexes will not be supported as well.
+
+The TO futexes are orthogonal to the robust futexes and can be combined
+without problem.
+
+Usage Scenario
+--------------
+
+A TO futex can be used as an exclusive lock to guard a critical
+section which are unlikely to go to sleep. The waiters in a TO futex,
+however, will fall back to sleep in a wait queue if the lock owner
+isn't running. Therefore, it can also be used when the critical
+section is long and prone to sleeping. However, it may not have the
+performance benefit when compared with a wait-wake futex in this case.
+
+Sample Code
+-----------
+
+The following are sample code to implement a simple lock and unlock
+function.
+
+__thread int tid;	/* Thread ID */
+
+void mutex_lock(int *faddr)
+{
+	if (cmpxchg(faddr, 0, tid) == 0)
+		return;
+	for (;;)
+		if (futex(faddr, FUTEX_LOCK_TO, ...) == 0)
+			break;
+}
+
+void mutex_unlock(int *faddr)
+{
+	int old, fval;
+
+	if ((fval = cmpxchg(faddr, tid, 0)) == tid)
+		return;
+	/* Clear only the TID portion of the futex */
+	for (;;) {
+		old  = fval;
+		fval = cmpxchg(faddr, old, old & ~FUTEX_TID_MASK);
+		if (fval == old)
+			break;
+	}
+	if (fval & FUTEX_WAITERS)
+		futex(faddr, FUTEX_UNLOCK_TO, ...);
+}
