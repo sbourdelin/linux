@@ -616,7 +616,7 @@ static int acpi_processor_get_tsd(struct acpi_processor *pr)
 
 	pdomain = &(pr->throttling.domain_info);
 
-	state.length = sizeof(struct acpi_tsd_package);
+	state.length = sizeof(*pdomain);
 	state.pointer = pdomain;
 
 	status = acpi_extract_package(&(tsd->package.elements[0]),
