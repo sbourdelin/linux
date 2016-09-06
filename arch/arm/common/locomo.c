@@ -253,8 +253,7 @@ locomo_init_one_child(struct locomo *lchip, struct locomo_dev_info *info)
 		dev->mapbase = 0;
 	dev->length = info->length;
 
-	dev->irq[0] = (lchip->irq_base == NO_IRQ) ?
-			NO_IRQ : lchip->irq_base + info->irq[0];
+	dev->irq[0] = lchip->irq_base + info->irq[0];
 
 	ret = device_register(&dev->dev);
 	if (ret) {
@@ -376,6 +375,9 @@ __locomo_probe(struct device *me, struct resource *mem, int irq)
 	unsigned long r;
 	int i, ret = -ENODEV;
 
+	if (!pdata || !pdata->irq_base)
+		return ret;
+
 	lchip = kzalloc(sizeof(struct locomo), GFP_KERNEL);
 	if (!lchip)
 		return -ENOMEM;
@@ -387,7 +389,7 @@ __locomo_probe(struct device *me, struct resource *mem, int irq)
 
 	lchip->phys = mem->start;
 	lchip->irq = irq;
-	lchip->irq_base = (pdata) ? pdata->irq_base : NO_IRQ;
+	lchip->irq_base = pdata->irq_base;
 
 	/*
 	 * Map the whole region.  This also maps the
@@ -454,8 +456,7 @@ __locomo_probe(struct device *me, struct resource *mem, int irq)
 	 * The interrupt controller must be initialised before any
 	 * other device to ensure that the interrupts are available.
 	 */
-	if (lchip->irq != NO_IRQ && lchip->irq_base != NO_IRQ)
-		locomo_setup_irq(lchip);
+	locomo_setup_irq(lchip);
 
 	for (i = 0; i < ARRAY_SIZE(locomo_devices); i++)
 		locomo_init_one_child(lchip, &locomo_devices[i]);
@@ -476,9 +477,7 @@ static void __locomo_remove(struct locomo *lchip)
 {
 	device_for_each_child(lchip->dev, NULL, locomo_remove_child);
 
-	if (lchip->irq != NO_IRQ) {
-		irq_set_chained_handler_and_data(lchip->irq, NULL, NULL);
-	}
+	irq_set_chained_handler_and_data(lchip->irq, NULL, NULL);
 
 	iounmap(lchip->base);
 	kfree(lchip);
