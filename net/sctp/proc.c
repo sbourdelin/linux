@@ -74,12 +74,19 @@ static const struct snmp_mib sctp_snmp_list[] = {
 static int sctp_snmp_seq_show(struct seq_file *seq, void *v)
 {
 	struct net *net = seq->private;
-	int i;
+	int i, c;
+	unsigned long buff[SCTP_MIB_MAX];
 
+	memset(buff, 0, sizeof(unsigned long) * SCTP_MIB_MAX);
+
+	for_each_possible_cpu(c)
+		for (i = 0; sctp_snmp_list[i].name != NULL; i++)
+			buff[i] += snmp_get_cpu_field(
+						net->sctp.sctp_statistics,
+						c, sctp_snmp_list[i].entry);
 	for (i = 0; sctp_snmp_list[i].name != NULL; i++)
 		seq_printf(seq, "%-32s\t%ld\n", sctp_snmp_list[i].name,
-			   snmp_fold_field(net->sctp.sctp_statistics,
-				      sctp_snmp_list[i].entry));
+						buff[i]);
 
 	return 0;
 }
