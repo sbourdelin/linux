@@ -1279,9 +1279,8 @@ static void fill_shadow_tree(struct inode *inode, struct page *page,
 	struct shadow_tree *tree = &super->s_shadow_tree;
 
 	if (PagePrivate(page)) {
-		if (block->alias_map)
-			super->s_no_object_aliases -= bitmap_weight(
-					block->alias_map, LOGFS_BLOCK_FACTOR);
+		super->s_no_object_aliases -= bitmap_weight(
+			block->alias_map, LOGFS_BLOCK_FACTOR);
 		logfs_handle_transaction(inode, block->ta);
 		block->ops->free_block(inode->i_sb, block);
 	}
