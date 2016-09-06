@@ -545,13 +545,13 @@ static int acpi_processor_get_psd(struct acpi_processor	*pr)
 	if (!psd || (psd->type != ACPI_TYPE_PACKAGE)) {
 		printk(KERN_ERR PREFIX "Invalid _PSD data\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	if (psd->package.count != 1) {
 		printk(KERN_ERR PREFIX "Invalid _PSD data\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	pdomain = &(pr->performance->domain_info);
@@ -564,19 +564,19 @@ static int acpi_processor_get_psd(struct acpi_processor	*pr)
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PREFIX "Invalid _PSD data\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	if (pdomain->num_entries != ACPI_PSD_REV0_ENTRIES) {
 		printk(KERN_ERR PREFIX "Unknown _PSD:num_entries\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	if (pdomain->revision != ACPI_PSD_REV0_REVISION) {
 		printk(KERN_ERR PREFIX "Unknown _PSD:revision\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	if (pdomain->coord_type != DOMAIN_COORD_TYPE_SW_ALL &&
@@ -584,9 +584,8 @@ static int acpi_processor_get_psd(struct acpi_processor	*pr)
 	    pdomain->coord_type != DOMAIN_COORD_TYPE_HW_ALL) {
 		printk(KERN_ERR PREFIX "Invalid _PSD:coord_type\n");
 		result = -EFAULT;
-		goto end;
 	}
-end:
+ free_buffer:
 	kfree(buffer.pointer);
 	return result;
 }
