@@ -932,28 +932,46 @@ struct pci_ops *pci_bus_set_ops(struct pci_bus *bus, struct pci_ops *ops);
 
 static inline int pci_read_config_byte(const struct pci_dev *dev, int where, u8 *val)
 {
+	if (unlikely(dev->is_removed)) {
+		*val = ~0;
+		return -ENODEV;
+	}
 	return pci_bus_read_config_byte(dev->bus, dev->devfn, where, val);
 }
 static inline int pci_read_config_word(const struct pci_dev *dev, int where, u16 *val)
 {
+	if (unlikely(dev->is_removed)) {
+		*val = ~0;
+		return -ENODEV;
+	}
 	return pci_bus_read_config_word(dev->bus, dev->devfn, where, val);
 }
 static inline int pci_read_config_dword(const struct pci_dev *dev, int where,
 					u32 *val)
 {
+	if (unlikely(dev->is_removed)) {
+		*val = ~0;
+		return -ENODEV;
+	}
 	return pci_bus_read_config_dword(dev->bus, dev->devfn, where, val);
 }
 static inline int pci_write_config_byte(const struct pci_dev *dev, int where, u8 val)
 {
+	if (unlikely(dev->is_removed))
+		return -ENODEV;
 	return pci_bus_write_config_byte(dev->bus, dev->devfn, where, val);
 }
 static inline int pci_write_config_word(const struct pci_dev *dev, int where, u16 val)
 {
+	if (unlikely(dev->is_removed))
+		return -ENODEV;
 	return pci_bus_write_config_word(dev->bus, dev->devfn, where, val);
 }
 static inline int pci_write_config_dword(const struct pci_dev *dev, int where,
 					 u32 val)
 {
+	if (unlikely(dev->is_removed))
+		return -ENODEV;
 	return pci_bus_write_config_dword(dev->bus, dev->devfn, where, val);
 }
 
