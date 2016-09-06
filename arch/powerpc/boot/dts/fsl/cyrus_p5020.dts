@@ -150,6 +150,17 @@
 				  0 0x00010000>;
 		};
 	};
+
+        gpio-poweroff {
+                compatible = "gpio-poweroff";
+                gpios = <&gpio0 3 1>;
+        };
+
+        gpio-restart {
+                compatible = "gpio-restart";
+                gpios = <&gpio0 2 1>;
+        };
+
 };
 
 /include/ "p5020si-post.dtsi"
