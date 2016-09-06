@@ -341,6 +341,7 @@ enum zone_type {
 
 };
 
+extern char * const zone_names[];
 #ifndef __GENERATING_BOUNDS_H
 
 struct zone {
