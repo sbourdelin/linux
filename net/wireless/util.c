@@ -1157,7 +1157,9 @@ static u32 cfg80211_calculate_bitrate_vht(struct rate_info *rate)
 		   58500000,
 		   65000000,
 		   78000000,
-		   0,
+		   /* some drivers report MCS 9 for 20MHz anyway. Clip to MCS 8
+		    * bitrate as it's closer than 0 */
+		   78000000,
 		},
 		{  13500000,
 		   27000000,
