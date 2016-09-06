@@ -97,11 +97,9 @@ static int acpi_processor_update_tsd_coord(void)
 		 */
 		if (!pthrottling->tsd_valid_flag) {
 			retval = -EINVAL;
-			break;
+			goto free_cpumask;
 		}
 	}
-	if (retval)
-		goto err_ret;
 
 	for_each_possible_cpu(i) {
 		pr = per_cpu(processors, i);
@@ -147,12 +145,12 @@ static int acpi_processor_update_tsd_coord(void)
 			 */
 			if (match_pdomain->num_processors != count_target) {
 				retval = -EINVAL;
-				goto err_ret;
+				goto free_cpumask;
 			}
 
 			if (pdomain->coord_type != match_pdomain->coord_type) {
 				retval = -EINVAL;
-				goto err_ret;
+				goto free_cpumask;
 			}
 
 			cpumask_set_cpu(j, covered_cpus);
@@ -180,8 +178,7 @@ static int acpi_processor_update_tsd_coord(void)
 				     pthrottling->shared_cpu_map);
 		}
 	}
-
-err_ret:
+ free_cpumask:
 	free_cpumask_var(covered_cpus);
 
 	for_each_possible_cpu(i) {
