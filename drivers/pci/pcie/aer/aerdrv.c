@@ -282,6 +282,7 @@ static void aer_remove(struct pcie_device *dev)
 
 		flush_work(&rpc->dpc_handler);
 		aer_disable_rootport(rpc);
+		kfree(rpc->e_info);
 		kfree(rpc);
 		set_service_data(dev, NULL);
 	}
