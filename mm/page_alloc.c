@@ -3455,6 +3455,7 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	enum compact_result compact_result;
 	int compaction_retries = 0;
 	int no_progress_loops = 0;
+	int oom_failed = 0;
 
 	/*
 	 * In the slowpath, we sanity check order to avoid ever trying to
@@ -3643,8 +3644,13 @@ retry:
 	page = __alloc_pages_may_oom(gfp_mask, order, ac, &did_some_progress);
 	if (page)
 		goto got_pg;
+	else
+		oom_failed++;
 
-	/* Retry as long as the OOM killer is making progress */
+	/* more than limited times will drop out */
+	if (oom_failed > MAX_RECLAIM_RETRIES)
+		goto nopage;
+
 	if (did_some_progress) {
 		no_progress_loops = 0;
 		goto retry;
