@@ -1184,7 +1184,7 @@ int acpi_processor_set_throttling(struct acpi_processor *pr,
 
 int acpi_processor_get_throttling_info(struct acpi_processor *pr)
 {
-	int result = 0;
+	int result;
 	struct acpi_processor_throttling *pthrottling;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO,
@@ -1249,7 +1249,7 @@ int acpi_processor_get_throttling_info(struct acpi_processor *pr)
 
 	result = acpi_processor_get_throttling(pr);
 	if (result)
-		goto end;
+		goto disable_throttling;
 
 	if (pr->throttling.state) {
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
@@ -1257,13 +1257,11 @@ int acpi_processor_get_throttling_info(struct acpi_processor *pr)
 				  pr->throttling.state));
 		result = acpi_processor_set_throttling(pr, 0, false);
 		if (result)
-			goto end;
+			goto disable_throttling;
 	}
-
-      end:
-	if (result)
-		pr->flags.throttling = 0;
-
+	return 0;
+ disable_throttling:
+	pr->flags.throttling = 0;
 	return result;
 }
 
