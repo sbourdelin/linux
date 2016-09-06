@@ -4970,9 +4970,18 @@ F:	drivers/net/ethernet/freescale/fec_ptp.c
 F:	drivers/net/ethernet/freescale/fec.h
 F:	Documentation/devicetree/bindings/net/fsl-fec.txt
 
-FREESCALE QUICC ENGINE LIBRARY
+FREESCALE SOC DRIVERS
+M:	Scott Wood <oss@buserror.net>
 L:	linuxppc-dev@lists.ozlabs.org
-S:	Orphan
+L:	linux-arm-kernel@lists.infradead.org
+S:	Maintained
+F:	drivers/soc/fsl/
+F:	include/linux/fsl/
+
+FREESCALE QUICC ENGINE LIBRARY
+M:	Qiang Zhao <qiang.zhao@nxp.com>
+L:	linuxppc-dev@lists.ozlabs.org
+S:	Maintained
 F:	drivers/soc/fsl/qe/
 F:	include/soc/fsl/*qe*.h
 F:	include/soc/fsl/*ucc*.h
