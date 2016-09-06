@@ -379,23 +379,19 @@ void acpi_processor_reevaluate_tstate(struct acpi_processor *pr,
 {
 	int result = 0;
 
-	if (action == CPU_DEAD) {
+	if (action == CPU_DEAD)
 		/* When one CPU is offline, the T-state throttling
 		 * will be invalidated.
 		 */
-		pr->flags.throttling = 0;
-		return;
-	}
+		goto disable_throttling;
 	/* the following is to recheck whether the T-state is valid for
 	 * the online CPU
 	 */
-	if (!pr->throttling.state_count) {
+	if (!pr->throttling.state_count)
 		/* If the number of T-state is invalid, it is
 		 * invalidated.
 		 */
-		pr->flags.throttling = 0;
-		return;
-	}
+		goto disable_throttling;
 	pr->flags.throttling = 1;
 
 	/* Disable throttling (if enabled).  We'll let subsequent
@@ -405,17 +401,16 @@ void acpi_processor_reevaluate_tstate(struct acpi_processor *pr,
 
 	result = acpi_processor_get_throttling(pr);
 	if (result)
-		goto end;
+		goto disable_throttling;
 
 	if (pr->throttling.state) {
 		result = acpi_processor_set_throttling(pr, 0, false);
 		if (result)
-			goto end;
+			goto disable_throttling;
 	}
-
-end:
-	if (result)
-		pr->flags.throttling = 0;
+	return;
+ disable_throttling:
+	pr->flags.throttling = 0;
 }
 /*
  * _PTC - Processor Throttling Control (and status) register location
