@@ -423,9 +423,9 @@ end:
 static int acpi_processor_get_throttling_control(struct acpi_processor *pr)
 {
 	int result = 0;
-	acpi_status status = 0;
+	acpi_status status;
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-	union acpi_object *ptc = NULL;
+	union acpi_object *ptc;
 	union acpi_object obj = { 0 };
 	struct acpi_processor_throttling *throttling;
 
