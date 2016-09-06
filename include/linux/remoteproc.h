@@ -331,12 +331,16 @@ struct rproc;
  * @stop:	power off the device
  * @kick:	kick a virtqueue (virtqueue id given as a parameter)
  * @da_to_va:	optional platform hook to perform address translations
+ * @alloc:	alloc requested memory chunck
+ * @free:	release specified memory chunck
  */
 struct rproc_ops {
 	int (*start)(struct rproc *rproc);
 	int (*stop)(struct rproc *rproc);
 	void (*kick)(struct rproc *rproc, int vqid);
 	void * (*da_to_va)(struct rproc *rproc, u64 da, int len);
+	void * (*alloc)(struct rproc *rproc, int size, dma_addr_t *dma_handle);
+	int (*free)(struct rproc *rproc, size_t size, void *cpu_addr, dma_addr_t dma_handle);
 };
 
 /**
