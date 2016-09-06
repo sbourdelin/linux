@@ -54,6 +54,7 @@ extern unsigned int apic_verbosity;
 extern int local_apic_timer_c2_ok;
 
 extern int disable_apic;
+extern int disable_apic_timer;
 extern unsigned int lapic_timer_frequency;
 
 #ifdef CONFIG_SMP

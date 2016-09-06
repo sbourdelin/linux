@@ -17,6 +17,7 @@
 */
 
 #include <linux/clocksource.h>
+#include <linux/clockchips.h>
 #include <linux/kvm_para.h>
 #include <asm/pvclock.h>
 #include <asm/msr.h>
@@ -245,6 +246,155 @@ static void kvm_shutdown(void)
 	native_machine_shutdown();
 }
 
+#ifdef CONFIG_X86_LOCAL_APIC
+/*
+ * kvmclock-based clock event implementation, used only together with the
+ * TSC deadline timer.  A subset of the normal LAPIC clockevent, but it
+ * uses kvmclock to convert nanoseconds to TSC.  This is necessary to
+ * handle changes to the TSC frequency, e.g. from live migration.
+ */
+
+static void kvmclock_lapic_timer_setup(unsigned lvtt_value)
+{
+	lvtt_value |= LOCAL_TIMER_VECTOR | APIC_LVT_TIMER_TSCDEADLINE;
+	apic_write(APIC_LVTT, lvtt_value);
+}
+
+static int kvmclock_lapic_timer_set_oneshot(struct clock_event_device *evt)
+{
+	kvmclock_lapic_timer_setup(0);
+	printk_once(KERN_DEBUG "kvmclock: TSC deadline timer enabled\n");
+
+	/*
+	 * See Intel SDM: TSC-Deadline Mode chapter. In xAPIC mode,
+	 * writing to the APIC LVTT and TSC_DEADLINE MSR isn't serialized.
+	 * According to Intel, MFENCE can do the serialization here.
+	 */
+	asm volatile("mfence" : : : "memory");
+	return 0;
+}
+
+static int kvmclock_lapic_timer_stop(struct clock_event_device *evt)
+{
+	kvmclock_lapic_timer_setup(APIC_LVT_MASKED);
+	wrmsrl(MSR_IA32_TSC_DEADLINE, -1);
+	return 0;
+}
+
+/*
+ * We already have the inverse of the (mult,shift) pair, though this means
+ * we need a division.  To avoid it we could compute a multiplicative inverse
+ * every time src->version changes.
+ */
+#define KVMCLOCK_TSC_DEADLINE_MAX_BITS	38
+#define KVMCLOCK_TSC_DEADLINE_MAX	((1ull << KVMCLOCK_TSC_DEADLINE_MAX_BITS) - 1)
+
+static int kvmclock_lapic_next_ktime(ktime_t expires,
+				     struct clock_event_device *evt)
+{
+	u64 ns, tsc;
+	u32 version;
+	int cpu;
+	struct pvclock_vcpu_time_info *src;
+
+	cpu = smp_processor_id();
+	src = &hv_clock[cpu].pvti;
+	ns = ktime_to_ns(expires);
+
+	do {
+		u64 delta_ns;
+		int shift;
+
+		version = pvclock_read_begin(src);
+		if (unlikely(ns < src->system_time)) {
+			tsc = src->tsc_timestamp;
+			virt_rmb();
+			continue;
+		}
+
+		delta_ns = ns - src->system_time;
+
+		/* Cap the wait to avoid overflow.  */
+		if (unlikely(delta_ns > KVMCLOCK_TSC_DEADLINE_MAX))
+			delta_ns = KVMCLOCK_TSC_DEADLINE_MAX;
+
+		/*
+		 * delta_tsc = delta_ns << (32-tsc_shift) / tsc_to_system_mul.
+		 * The shift is split in two steps so that a 38 bits (275 s)
+		 * deadline fits into the 64-bit dividend.
+		 */
+		shift = 32 - src->tsc_shift;
+		
+		/* First shift step... */
+		delta_ns <<= 64 - KVMCLOCK_TSC_DEADLINE_MAX_BITS;
+		shift -= 64 - KVMCLOCK_TSC_DEADLINE_MAX_BITS;
+
+		/* ... division... */
+		tsc = div_u64(delta_ns, src->tsc_to_system_mul);
+
+		/* ... and second shift step for the remaining bits.  */
+		if (shift >= 0)
+			tsc <<= shift;
+		else
+			tsc >>= -shift;
+
+		tsc += src->tsc_timestamp;
+	} while (pvclock_read_retry(src, version));
+
+	wrmsrl(MSR_IA32_TSC_DEADLINE, tsc);
+	return 0;
+}
+
+/*
+ * The local apic timer can be used for any function which is CPU local.
+ */
+static struct clock_event_device kvm_clockevent = {
+	.name			= "lapic",
+	/* Under KVM the LAPIC timer always runs in deep C-states.  */
+	.features		= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_KTIME,
+	.set_state_shutdown	= kvmclock_lapic_timer_stop,
+	.set_state_oneshot	= kvmclock_lapic_timer_set_oneshot,
+	.set_next_ktime		= kvmclock_lapic_next_ktime,
+	.mult			= 1,
+	/* Make LAPIC timer preferrable over percpu HPET */
+	.rating			= 150,
+	.irq			= -1,
+};
+static DEFINE_PER_CPU(struct clock_event_device, kvm_events);
+
+static void kvmclock_local_apic_timer_interrupt(void)
+{
+	int cpu = smp_processor_id();
+	struct clock_event_device *evt = &per_cpu(kvm_events, cpu);
+
+	/*
+	 * Defer to the native clockevent if ours hasn't been setup yet.
+	 */
+	if (!evt->event_handler) {
+		native_local_apic_timer_interrupt();
+		return;
+	}
+
+	inc_irq_stat(apic_timer_irqs);
+	evt->event_handler(evt);
+}
+
+/*
+ * Setup the local APIC timer for this CPU. Copy the initialized values
+ * of the boot CPU and register the clock event in the framework.
+ */
+static void setup_kvmclock_timer(void)
+{
+	struct clock_event_device *evt = this_cpu_ptr(&kvm_events);
+
+	kvmclock_lapic_timer_stop(evt);
+
+	memcpy(evt, &kvm_clockevent, sizeof(*evt));
+	evt->cpumask = cpumask_of(smp_processor_id());
+	clockevents_register_device(evt);
+}
+#endif
+
 void __init kvmclock_init(void)
 {
 	struct pvclock_vcpu_time_info *vcpu_time;
@@ -292,6 +442,12 @@ void __init kvmclock_init(void)
 	x86_platform.get_wallclock = kvm_get_wallclock;
 	x86_platform.set_wallclock = kvm_set_wallclock;
 #ifdef CONFIG_X86_LOCAL_APIC
+	if (boot_cpu_has(X86_FEATURE_TSC_DEADLINE_TIMER) &&
+	    !disable_apic && !disable_apic_timer) {
+		pv_time_ops.local_apic_timer_interrupt = kvmclock_local_apic_timer_interrupt;
+		x86_init.timers.setup_percpu_clockev = setup_kvmclock_timer;
+		x86_cpuinit.setup_percpu_clockev = setup_kvmclock_timer;
+	}
 	x86_cpuinit.early_percpu_clock_init =
 		kvm_setup_secondary_clock;
 #endif
