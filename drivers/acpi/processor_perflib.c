@@ -529,11 +529,11 @@ EXPORT_SYMBOL(acpi_processor_notify_smm);
 static int acpi_processor_get_psd(struct acpi_processor	*pr)
 {
 	int result = 0;
-	acpi_status status = AE_OK;
+	acpi_status status;
 	struct acpi_buffer buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 	struct acpi_buffer format = {sizeof("NNNNN"), "NNNNN"};
 	struct acpi_buffer state = {0, NULL};
-	union acpi_object  *psd = NULL;
+	union acpi_object  *psd;
 	struct acpi_psd_package *pdomain;
 
 	status = acpi_evaluate_object(pr->handle, "_PSD", NULL, &buffer);
