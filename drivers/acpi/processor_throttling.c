@@ -377,7 +377,7 @@ int acpi_processor_tstate_has_changed(struct acpi_processor *pr)
 void acpi_processor_reevaluate_tstate(struct acpi_processor *pr,
 					unsigned long action)
 {
-	int result = 0;
+	int result;
 
 	if (action == CPU_DEAD)
 		/* When one CPU is offline, the T-state throttling
