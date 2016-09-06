@@ -442,7 +442,7 @@ static int acpi_processor_get_throttling_control(struct acpi_processor *pr)
 	    || (ptc->package.count != 2)) {
 		printk(KERN_ERR PREFIX "Invalid _PTC data\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	/*
@@ -457,7 +457,7 @@ static int acpi_processor_get_throttling_control(struct acpi_processor *pr)
 		printk(KERN_ERR PREFIX
 		       "Invalid _PTC data (control_register)\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 	memcpy(&pr->throttling.control_register, obj.buffer.pointer,
 	       sizeof(struct acpi_ptc_register));
@@ -473,7 +473,7 @@ static int acpi_processor_get_throttling_control(struct acpi_processor *pr)
 	    || (obj.buffer.pointer == NULL)) {
 		printk(KERN_ERR PREFIX "Invalid _PTC data (status_register)\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	memcpy(&pr->throttling.status_register, obj.buffer.pointer,
@@ -485,17 +485,15 @@ static int acpi_processor_get_throttling_control(struct acpi_processor *pr)
 		throttling->control_register.bit_offset) > 32) {
 		printk(KERN_ERR PREFIX "Invalid _PTC control register\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	if ((throttling->status_register.bit_width +
 		throttling->status_register.bit_offset) > 32) {
 		printk(KERN_ERR PREFIX "Invalid _PTC status register\n");
 		result = -EFAULT;
-		goto end;
 	}
-
-      end:
+ free_buffer:
 	kfree(buffer.pointer);
 
 	return result;
