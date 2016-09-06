@@ -102,7 +102,12 @@ static ssize_t bonding_store_bonds(struct class *cls,
 	int rv, res = count;
 
 	sscanf(buffer, "%16s", command); /* IFNAMSIZ*/
-	ifname = command + 1;
+
+	if ((command[0] == '?') && (command[1] == '-'))
+		ifname = command + 2;
+	else
+		ifname = command + 1;
+
 	if ((strlen(command) <= 1) ||
 	    !dev_valid_name(ifname))
 		goto err_no_cmd;
@@ -130,6 +135,32 @@ static ssize_t bonding_store_bonds(struct class *cls,
 			res = -ENODEV;
 		}
 		rtnl_unlock();
+	} else if ((command[0] == '?') && (command[1] == '-')) {
+		struct net_device *bond_dev;
+
+		rtnl_lock();
+		bond_dev = bond_get_by_name(bn, ifname);
+
+		if (bond_dev) {
+			struct in_device *in_dev;
+			struct bonding *bond = netdev_priv(bond_dev);
+
+			in_dev = __in_dev_get_rtnl(bond_dev);
+
+			if (((in_dev->ifa_list) != NULL) &&
+			    (bond->slave_cnt > 0)) {
+				pr_err("%s is in use. Unconfigure IP %pI4 before deletion.\n",
+				       ifname, &in_dev->ifa_list->ifa_local);
+				rtnl_unlock();
+				return -EBUSY;
+			}
+			pr_info("%s is being deleted...\n", ifname);
+			unregister_netdevice(bond_dev);
+		} else {
+			pr_err("unable to delete non-existent %s\n", ifname);
+			res = -ENODEV;
+		}
+		rtnl_unlock();
 	} else
 		goto err_no_cmd;
 
@@ -139,7 +170,7 @@ static ssize_t bonding_store_bonds(struct class *cls,
 	return res;
 
 err_no_cmd:
-	pr_err("no command found in bonding_masters - use +ifname or -ifname\n");
+	pr_err("no command found in bonding_masters - use +ifname or -ifname or ?-ifname\n");
 	return -EPERM;
 }
 

@@ -1335,9 +1335,15 @@ static int bond_option_slaves_set(struct bonding *bond,
 	struct net_device *dev;
 	char *ifname;
 	int ret;
+	struct in_device *in_dev;
 
 	sscanf(newval->string, "%16s", command); /* IFNAMSIZ*/
-	ifname = command + 1;
+
+	if ((command[0] == '?') && (command[1] == '-'))
+		ifname = command + 2;
+	else
+		ifname = command + 1;
+
 	if ((strlen(command) <= 1) ||
 	    !dev_valid_name(ifname))
 		goto err_no_cmd;
@@ -1356,6 +1362,20 @@ static int bond_option_slaves_set(struct bonding *bond,
 		ret = bond_enslave(bond->dev, dev);
 		break;
 
+	case '?':
+		if (command[1] == '-') {
+			in_dev = __in_dev_get_rtnl(bond->dev);
+			if ((bond->slave_cnt == 1) &&
+			    ((in_dev->ifa_list) != NULL)) {
+				netdev_info(bond->dev, "attempt to remove last slave %s from bond.\n",
+					    dev->name);
+				ret = -EBUSY;
+				break;
+			}
+		} else {
+			goto err_no_cmd;
+		}
+
 	case '-':
 		netdev_info(bond->dev, "Removing slave %s\n", dev->name);
 		ret = bond_release(bond->dev, dev);
@@ -1369,7 +1389,7 @@ out:
 	return ret;
 
 err_no_cmd:
-	netdev_err(bond->dev, "no command found in slaves file - use +ifname or -ifname\n");
+	netdev_err(bond->dev, "no command found in slaves file - use +ifname or -ifname or ?-ifname\n");
 	ret = -EPERM;
 	goto out;
 }
