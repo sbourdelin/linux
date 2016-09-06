@@ -453,7 +453,7 @@ static int prng_sha512_reseed(void)
 
 static int prng_sha512_generate(u8 *buf, size_t nbytes)
 {
-	int ret;
+	int ret = nbytes;
 
 	/* reseed needed ? */
 	if (prng_data->ppnows.reseed_counter > prng_reseed_limit) {
