@@ -73,7 +73,7 @@ static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 {
 	struct cpufreq_policy *policy = data;
 	struct acpi_processor *pr;
-	unsigned int ppc = 0;
+	unsigned int ppc;
 
 	if (event == CPUFREQ_START && ignore_ppc <= 0) {
 		ignore_ppc = 0;
