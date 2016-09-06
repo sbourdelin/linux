@@ -423,7 +423,7 @@ static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 
 int acpi_processor_get_performance_info(struct acpi_processor *pr)
 {
-	int result = 0;
+	int result;
 
 	if (!pr || !pr->performance || !pr->handle)
 		return -EINVAL;
