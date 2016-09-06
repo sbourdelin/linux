@@ -18,6 +18,7 @@
 #include <linux/stat.h>
 #include <linux/slab.h>
 #include <linux/random.h>
+#include <trace/events/kobject.h>
 
 /**
  * kobject_namespace - return @kobj's namespace tag
@@ -306,6 +307,9 @@ int kobject_set_name(struct kobject *kobj, const char *fmt, ...)
 	retval = kobject_set_name_vargs(kobj, fmt, vargs);
 	va_end(vargs);
 
+	if (!retval)
+		trace_kobject_set_name(kobj);
+
 	return retval;
 }
 EXPORT_SYMBOL(kobject_set_name);
@@ -343,6 +347,7 @@ void kobject_init(struct kobject *kobj, struct kobj_type *ktype)
 
 	kobject_init_internal(kobj);
 	kobj->ktype = ktype;
+	trace_kobject_init(kobj);
 	return;
 
 error:
@@ -411,6 +416,9 @@ int kobject_add(struct kobject *kobj, struct kobject *parent,
 	retval = kobject_add_varg(kobj, parent, fmt, args);
 	va_end(args);
 
+	if (!retval)
+		trace_kobject_add(kobj);
+
 	return retval;
 }
 EXPORT_SYMBOL(kobject_add);
@@ -437,6 +445,9 @@ int kobject_init_and_add(struct kobject *kobj, struct kobj_type *ktype,
 	va_start(args, fmt);
 	retval = kobject_add_varg(kobj, parent, fmt, args);
 	va_end(args);
+
+	if (!retval)
+		trace_kobject_init_and_add(kobj);
 
 	return retval;
 }
@@ -494,10 +505,13 @@ int kobject_rename(struct kobject *kobj, const char *new_name)
 	dup_name = kobj->name;
 	kobj->name = name;
 
+	trace_kobject_rename(kobj, devpath);
+
 	/* This function is mostly/only used for network interface.
 	 * Some hotplug package track interfaces by their name and
 	 * therefore want to know when the name is changed by the user. */
 	kobject_uevent_env(kobj, KOBJ_MOVE, envp);
+
 
 out:
 	kfree_const(dup_name);
@@ -553,6 +567,7 @@ int kobject_move(struct kobject *kobj, struct kobject *new_parent)
 	new_parent = NULL;
 	kobject_put(old_parent);
 	kobject_uevent_env(kobj, KOBJ_MOVE, envp);
+	trace_kobject_move(kobj, old_parent);
 out:
 	kobject_put(new_parent);
 	kobject_put(kobj);
@@ -581,6 +596,7 @@ void kobject_del(struct kobject *kobj)
 	kobj_kset_leave(kobj);
 	kobject_put(kobj->parent);
 	kobj->parent = NULL;
+	trace_kobject_del(kobj);
 }
 EXPORT_SYMBOL(kobject_del);
 
@@ -596,6 +612,7 @@ struct kobject *kobject_get(struct kobject *kobj)
 			       "initialized, yet kobject_get() is being "
 			       "called.\n", kobject_name(kobj), kobj);
 		kref_get(&kobj->kref);
+		trace_kobject_get(kobj);
 	}
 	return kobj;
 }
@@ -619,6 +636,8 @@ static void kobject_cleanup(struct kobject *kobj)
 
 	pr_debug("kobject: '%s' (%p): %s, parent %p\n",
 		 kobject_name(kobj), kobj, __func__, kobj->parent);
+
+	trace_kobject_cleanup(kobj);
 
 	if (t && !t->release)
 		pr_debug("kobject: '%s' (%p): does not have a release() "
@@ -688,6 +707,8 @@ void kobject_put(struct kobject *kobj)
 			WARN(1, KERN_WARNING "kobject: '%s' (%p): is not "
 			       "initialized, yet kobject_put() is being "
 			       "called.\n", kobject_name(kobj), kobj);
+		/* call it now - kobj could get released during kref_put() */
+		trace_kobject_put(kobj);
 		kref_put(&kobj->kref, kobject_release);
 	}
 }
@@ -756,6 +777,7 @@ struct kobject *kobject_create_and_add(const char *name, struct kobject *parent)
 		kobject_put(kobj);
 		kobj = NULL;
 	}
+	trace_kobject_create_and_add(kobj);
 	return kobj;
 }
 EXPORT_SYMBOL_GPL(kobject_create_and_add);
