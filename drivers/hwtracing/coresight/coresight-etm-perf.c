@@ -28,6 +28,7 @@
 #include <linux/workqueue.h>
 
 #include "coresight-priv.h"
+#include "coresight-etm-perf.h"
 
 static struct pmu etm_pmu;
 static bool etm_perf_up;
