@@ -30,6 +30,13 @@
 #include <net/transp_v6.h>
 #include <net/ipv6.h>
 
+#define MAX(a, b) ((u32)(a) >= (u32)(b) ? (a) : (b))
+
+#define MAX4(a, b, c, d) \
+	MAX(MAX(a, b), MAX(c, d))
+#define SNMP_MIB_MAX MAX4(UDP_MIB_MAX, TCP_MIB_MAX, \
+			IPSTATS_MIB_MAX, ICMP_MIB_MAX)
+
 static int sockstat6_seq_show(struct seq_file *seq, void *v)
 {
 	struct net *net = seq->private;
@@ -191,25 +198,43 @@ static void snmp6_seq_show_item(struct seq_file *seq, void __percpu *pcpumib,
 				atomic_long_t *smib,
 				const struct snmp_mib *itemlist)
 {
-	int i;
-	unsigned long val;
+	int i, c;
+	unsigned long buff[SNMP_MIB_MAX];
 
-	for (i = 0; itemlist[i].name; i++) {
-		val = pcpumib ?
-			snmp_fold_field(pcpumib, itemlist[i].entry) :
-			atomic_long_read(smib + itemlist[i].entry);
-		seq_printf(seq, "%-32s\t%lu\n", itemlist[i].name, val);
+	memset(buff, 0, sizeof(unsigned long) * SNMP_MIB_MAX);
+
+	if (pcpumib) {
+		for_each_possible_cpu(c)
+			for (i = 0; itemlist[i].name; i++)
+				buff[i] += snmp_get_cpu_field(pcpumib, c,
+							itemlist[i].entry);
+		for (i = 0; itemlist[i].name; i++)
+			seq_printf(seq, "%-32s\t%lu\n",
+				   itemlist[i].name, buff[i]);
+	} else {
+		for (i = 0; itemlist[i].name; i++)
+			seq_printf(seq, "%-32s\t%lu\n", itemlist[i].name,
+				   atomic_long_read(smib + itemlist[i].entry));
 	}
 }
 
 static void snmp6_seq_show_item64(struct seq_file *seq, void __percpu *mib,
 				  const struct snmp_mib *itemlist, size_t syncpoff)
 {
-	int i;
+	int i, c;
+	u64 buff[SNMP_MIB_MAX];
 
+	memset(buff, 0, sizeof(unsigned long) * SNMP_MIB_MAX);
+
+	for_each_possible_cpu(c) {
+		for (i = 0; itemlist[i].name; i++) {
+			buff[i] += snmp_get_cpu_field64(mib, c,
+							itemlist[i].entry,
+							syncpoff);
+		}
+	}
 	for (i = 0; itemlist[i].name; i++)
-		seq_printf(seq, "%-32s\t%llu\n", itemlist[i].name,
-			   snmp_fold_field64(mib, itemlist[i].entry, syncpoff));
+		seq_printf(seq, "%-32s\t%llu\n", itemlist[i].name, buff[i]);
 }
 
 static int snmp6_seq_show(struct seq_file *seq, void *v)
