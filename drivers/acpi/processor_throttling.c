@@ -533,9 +533,10 @@ static int acpi_processor_get_throttling_states(struct acpi_processor *pr)
 			  tss->package.count));
 
 	pr->throttling.state_count = tss->package.count;
-	pr->throttling.states_tss =
-	    kmalloc(sizeof(struct acpi_processor_tx_tss) * tss->package.count,
-		    GFP_KERNEL);
+	pr->throttling.states_tss = kmalloc_array(tss->package.count,
+						  sizeof(*pr->
+							 throttling.states_tss),
+						  GFP_KERNEL);
 	if (!pr->throttling.states_tss) {
 		result = -ENOMEM;
 		goto end;
