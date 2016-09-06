@@ -59,6 +59,16 @@ void __init corenet_gen_pic_init(void)
 	}
 }
 
+/* If someone has registered a poweroff callback, invoke it */
+static void __noreturn corenet_generic_halt(void)
+{
+	if (pm_power_off)
+		pm_power_off();
+
+	/* Should not return */
+	for(;;);
+}
+
 /*
  * Setup the architecture
  */
@@ -127,6 +137,12 @@ static const struct of_device_id of_device_ids[] = {
 	{
 		.name		= "handles",
 	},
+	{
+		.name		= "gpio-poweroff",
+	},
+	{
+		.name		= "gpio-restart",
+	},
 	{}
 };
 
@@ -175,6 +191,8 @@ static int __init corenet_generic_probe(void)
 #ifdef CONFIG_SMP
 	extern struct smp_ops_t smp_85xx_ops;
 #endif
+
+	ppc_md.halt = corenet_generic_halt;
 
 	if (of_device_compatible_match(of_root, boards))
 		return 1;
