@@ -605,13 +605,13 @@ static int acpi_processor_get_tsd(struct acpi_processor *pr)
 	if (!tsd || (tsd->type != ACPI_TYPE_PACKAGE)) {
 		printk(KERN_ERR PREFIX "Invalid _TSD data\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	if (tsd->package.count != 1) {
 		printk(KERN_ERR PREFIX "Invalid _TSD data\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	pdomain = &(pr->throttling.domain_info);
@@ -624,19 +624,19 @@ static int acpi_processor_get_tsd(struct acpi_processor *pr)
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PREFIX "Invalid _TSD data\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	if (pdomain->num_entries != ACPI_TSD_REV0_ENTRIES) {
 		printk(KERN_ERR PREFIX "Unknown _TSD:num_entries\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	if (pdomain->revision != ACPI_TSD_REV0_REVISION) {
 		printk(KERN_ERR PREFIX "Unknown _TSD:revision\n");
 		result = -EFAULT;
-		goto end;
+		goto free_buffer;
 	}
 
 	pthrottling = &pr->throttling;
@@ -654,8 +654,7 @@ static int acpi_processor_get_tsd(struct acpi_processor *pr)
 		pthrottling->tsd_valid_flag = 0;
 		pthrottling->shared_type = DOMAIN_COORD_TYPE_SW_ALL;
 	}
-
-      end:
+ free_buffer:
 	kfree(buffer.pointer);
 	return result;
 }
