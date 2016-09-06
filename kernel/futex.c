@@ -191,6 +191,11 @@ int __read_mostly futex_cmpxchg_enabled;
 #define FLAGS_CLOCKRT		0x02
 #define FLAGS_HAS_TIMEOUT	0x04
 
+enum futex_type {
+	TYPE_PI = 0,
+	TYPE_TO,
+};
+
 /*
  * Futex state object:
  *  - Priority Inheritance state
@@ -203,12 +208,27 @@ struct futex_state {
 	struct list_head list;
 
 	/*
-	 * The PI object:
+	 * Linking into the owning hashed bucket (TO futexes only)
 	 */
-	struct rt_mutex pi_mutex;
+	struct list_head hb_list;
 
+	/*
+	 * The PI or mutex object:
+	 */
+	union {
+		struct rt_mutex pi_mutex;
+		struct mutex mutex;
+	};
+
+	/*
+	 * For PI futex, owner is the task that owns the futex.
+	 * For TO futex, owner is the mutex lock holder that is either
+	 * spinning on the futex owner or sleeping.
+	 */
 	struct task_struct *owner;
 	atomic_t refcount;
+
+	enum futex_type type;
 
 	union futex_key key;
 };
@@ -262,6 +282,7 @@ struct futex_hash_bucket {
 	atomic_t waiters;
 	spinlock_t lock;
 	struct plist_head chain;
+	struct list_head fs_list;	/* List of futex state objects */
 } ____cacheline_aligned_in_smp;
 
 /*
@@ -801,6 +822,8 @@ static int refill_futex_state_cache(void)
 		return -ENOMEM;
 
 	INIT_LIST_HEAD(&state->list);
+	INIT_LIST_HEAD(&state->hb_list);
+
 	/* pi_mutex gets initialized later */
 	state->owner = NULL;
 	atomic_set(&state->refcount, 1);
@@ -836,16 +859,21 @@ static void put_futex_state(struct futex_state *state)
 		return;
 
 	/*
-	 * If state->owner is NULL, the owner is most probably dying
-	 * and has cleaned up the futex state already
+	 * If state->owner is NULL and the type is TYPE_PI, the owner
+	 * is most probably dying and has cleaned up the state already
 	 */
-	if (state->owner) {
+	if (state->owner && (state->type == TYPE_PI)) {
 		raw_spin_lock_irq(&state->owner->pi_lock);
 		list_del_init(&state->list);
 		raw_spin_unlock_irq(&state->owner->pi_lock);
 
 		rt_mutex_proxy_unlock(&state->pi_mutex, state->owner);
 	}
+
+	/*
+	 * Dequeue it from the HB futex state list.
+	 */
+	list_del_init(&state->hb_list);
 
 	if (current->pi_state_cache)
 		kfree(state);
@@ -919,13 +947,24 @@ void exit_pi_state_list(struct task_struct *curr)
 			continue;
 		}
 
-		WARN_ON(pi_state->owner != curr);
 		WARN_ON(list_empty(&pi_state->list));
+		if (pi_state->type == TYPE_PI) {
+			WARN_ON(pi_state->owner != curr);
+			pi_state->owner = NULL;
+		}
 		list_del_init(&pi_state->list);
-		pi_state->owner = NULL;
 		raw_spin_unlock_irq(&curr->pi_lock);
 
-		rt_mutex_unlock(&pi_state->pi_mutex);
+		if (pi_state->type == TYPE_PI)
+			rt_mutex_unlock(&pi_state->pi_mutex);
+		else if (pi_state->type == TYPE_TO) {
+			/*
+			 * Need to wakeup the mutex owner.
+			 */
+			WARN_ON(!pi_state->owner);
+			if (pi_state->owner)
+				wake_up_process(pi_state->owner);
+		}
 
 		spin_unlock(&hb->lock);
 
@@ -997,7 +1036,7 @@ static int attach_to_pi_state(u32 uval, struct futex_state *pi_state,
 	/*
 	 * Userspace might have messed up non-PI and PI futexes [3]
 	 */
-	if (unlikely(!pi_state))
+	if (unlikely(!pi_state || (pi_state->type != TYPE_PI)))
 		return -EINVAL;
 
 	WARN_ON(!atomic_read(&pi_state->refcount));
@@ -1115,6 +1154,7 @@ static int attach_to_pi_owner(u32 uval, union futex_key *key,
 
 	/* Store the key for possible exit cleanups: */
 	pi_state->key = *key;
+	pi_state->type = TYPE_PI;
 
 	WARN_ON(!list_empty(&pi_state->list));
 	list_add(&pi_state->list, &p->pi_state_list);
@@ -3075,8 +3115,8 @@ retry:
 			goto retry;
 
 		/*
-		 * Wake robust non-PI futexes here. The wakeup of
-		 * PI futexes happens in exit_pi_state():
+		 * Wake robust non-PI/TO futexes here. The wakeup of
+		 * PI/TO futexes happens in exit_pi_state():
 		 */
 		if (!pi && (uval & FUTEX_WAITERS))
 			futex_wake(uaddr, 1, 1, FUTEX_BITSET_MATCH_ANY);
@@ -3171,6 +3211,460 @@ void exit_robust_list(struct task_struct *curr)
 				   curr, pip);
 }
 
+/*
+ * Throughput-Optimized Futexes
+ * ----------------------------
+ *
+ * Userspace mutual exclusion locks can be implemented either by using the
+ * wait-wake futexes or the PI futexes. The wait-wake futexes have much higher
+ * throughput but can't guarantee minimal latency for high priority processes
+ * like the PI futexes. Even then, the overhead of wait-wake futexes in
+ * userspace locking primitives can easily become a performance bottleneck
+ * on system with a large number of cores.
+ *
+ * The throughput-optimized (TO) futex is a new futex implementation that
+ * provides higher throughput than wait-wake futex via the use of following
+ * two techniques:
+ *  1) Optimistic spinning when futex owner is actively running
+ *  2) Lock stealing
+ *
+ * Optimistic spinning isn't present in other futexes. Lock stealing is
+ * possible in wait-wake futexes, but isn't actively encouraged like the
+ * TO futexes. The downside, however, is in the much higher variance of
+ * the response times. Starvation shouldn't happen, but some tasks may
+ * take much longer times to acquire the futexes than the others.
+ *
+ * The use of TO futexes is very similar to the PI futexes. Locking is done
+ * by atomically transiting the futex from 0 to the task's thread ID.
+ * Unlocking is done by atomically changing the futex from thread ID to 0.
+ * Any failure to do so will require calls to the kernel to do the locking
+ * and unlocking. One difference is that an unlocker can optionally clear
+ * the task ID value from the futex while keeping the FUTEX_WAITERS bit
+ * before calling into the kernel. This will encourage faster lock transfer.
+ *
+ * Like PI futexes, TO futexes are orthogonal to robust futexes. However,
+ * TO futexes have similar dying process handling as the PI futexes. So
+ * userspace management of locks in for exiting lock holders should not be
+ * needed for TO futexes unless to avoid the rare cases of pid wraparound.
+ *
+ * Unlike the other futexes, waiters of the TO futexes will not queue
+ * themselves to the plist of the hash bucket. Instead, they will queue up
+ * in the serialization mutex of the futex state container queued in the
+ * hash bucket.
+ */
+
+/*
+ * Looking up the futex state structure.
+ *
+ * It differs from lookup_pi_state() in that it searches the fs_list in the
+ * hash bucket instead of the waiters in the plist. The hb lock must be held
+ * before calling it. If the create flag is set, a new state structure will be
+ * pushed into the list and returned.
+ */
+static struct futex_state *
+lookup_futex_state(struct futex_hash_bucket *hb, union futex_key *key,
+		   bool create)
+{
+	struct futex_state *state;
+
+	list_for_each_entry(state, &hb->fs_list, hb_list)
+		if (match_futex(key, &state->key)) {
+			atomic_inc(&state->refcount);
+			return state;
+		}
+
+	if (!create)
+		return NULL;
+
+	/*
+	 * Push a new one into the list and return it.
+	 */
+	state = alloc_futex_state();
+	state->type = TYPE_TO;
+	state->key = *key;
+	list_add(&state->hb_list, &hb->fs_list);
+	WARN_ON(atomic_read(&state->refcount) != 1);
+
+	/*
+	 * Initialize the mutex structure.
+	 */
+	mutex_init(&state->mutex);
+	WARN_ON(!list_empty(&state->list));
+	return state;
+}
+
+/*
+ * Try to lock the userspace futex word (0 => vpid).
+ *
+ * Return: 1 if lock acquired or an error happens, 0 if not.
+ *	   The status code will be 0 if no error, or < 0 if an error happens.
+ *	   *puval will contain the latest futex value when trylock fails.
+ *
+ * The waiter flag, if set, will make it ignore the FUTEX_WAITERS bit.
+ * The HB spinlock should NOT be held while calling this function. A
+ * successful lock acquisition will clear the waiter and died bits.
+ */
+static inline int futex_trylock_to(u32 __user *uaddr, u32 vpid, u32 *puval,
+				   const bool waiter, int *status)
+{
+	u32 uval;
+
+	*status = 0;
+
+	if (unlikely(get_user(uval, uaddr)))
+		goto efault;
+
+	*puval = uval;
+
+	if (waiter ? (uval & FUTEX_TID_MASK) : uval)
+		return 0;	/* Trylock fails */
+
+	if (unlikely(futex_atomic_cmpxchg_inatomic(puval, uaddr, uval, vpid)))
+		goto efault;
+
+	return *puval == uval;
+
+efault:
+	*status = -EFAULT;
+	return 1;
+}
+
+/*
+ * Spinning threshold for futex word without setting FUTEX_WAITERS.
+ */
+#define FUTEX_SPIN_THRESHOLD	(1 << 10)
+
+/*
+ * Spin on the futex word while the futex owner is active. Otherwise, set
+ * the FUTEX_WAITERS bit and go to sleep. As we take a reference to the futex
+ * owner's task structure, we don't need to use RCU to ensure that the task
+ * structure is valid. The function will directly grab the lock if the
+ * owner is dying or the pid is invalid. That should take care of the problem
+ * of dead lock owners unless the pid wraps around and the preceived owner is
+ * not the real owner.
+ *
+ * Return: 0 if futex acquired, < 0 if an error happens.
+ */
+static int futex_spin_on_owner(u32 __user *uaddr, u32 vpid,
+			       struct futex_state *state)
+{
+	int ret, loop = FUTEX_SPIN_THRESHOLD;
+	u32 uval, curval;
+	u32 opid = 0;				/* Futex owner task ID */
+	struct task_struct *otask = NULL;	/* Futex owner task struct */
+	bool on_owner_list = false;
+
+	preempt_disable();
+	WRITE_ONCE(state->owner, current);
+	for (;; loop--) {
+		if (futex_trylock_to(uaddr, vpid, &uval, true, &ret))
+			break;
+		WARN_ON_ONCE(!(uval & FUTEX_TID_MASK));
+
+		if ((uval & FUTEX_TID_MASK) != opid) {
+			/*
+			 * Get the new task structure
+			 */
+			if (otask)
+				put_task_struct(otask);
+
+			WARN_ON_ONCE(on_owner_list);
+			opid  = uval & FUTEX_TID_MASK;
+			otask = futex_find_get_task(opid);
+		}
+		if (unlikely(!otask || (otask->flags & PF_EXITING) ||
+			    (uval & FUTEX_OWNER_DIED))) {
+			/*
+			 * PID invalid or exiting/dead task, try to grab
+			 * the lock now.
+			 */
+			ret = futex_atomic_cmpxchg_inatomic(&curval,
+					uaddr, uval, vpid);
+			if (unlikely(ret))
+				goto efault;
+			if (curval != uval)
+				continue;	/* Futex value changed */
+			pr_info("futex_spin_on_owner: pid %d grabs futex from pid %d (%s)!\n",
+				vpid, opid, otask ? "dying" : "invalid");
+			break;
+		}
+		while ((loop <= 0) && !(uval & FUTEX_WAITERS)) {
+			/*
+			 * Need to set the FUTEX_WAITERS bit.
+			 */
+			if (futex_atomic_cmpxchg_inatomic(&curval, uaddr, uval,
+							  uval | FUTEX_WAITERS))
+				goto efault;
+			if (curval == uval) {
+				uval |= FUTEX_WAITERS;
+				break;
+			}
+			uval = curval;
+		}
+		if (!(uval & ~FUTEX_TID_MASK))
+			continue;	/* Do trylock again */
+
+		if (need_resched()) {
+			__set_current_state(TASK_RUNNING);
+			schedule_preempt_disabled();
+			continue;
+		}
+
+		if (signal_pending(current)) {
+			ret = -EINTR;
+			break;
+		}
+
+		/*
+		 * If the owner isn't active, we need to go to sleep after
+		 * making sure that the FUTEX_WAITERS bit is set. We also
+		 * need to put the futex state into the futex owner's
+		 * pi_state_list to prevent deadlock when the owner dies.
+		 */
+		if (!otask->on_cpu) {
+			if (!(uval & FUTEX_WAITERS)) {
+				loop = 0;
+				continue;
+			}
+
+			/*
+			 * As there will be no lock stealing with the
+			 * FUTEX_WAITERS bit set, otask should remain the
+			 * same after that unless the owner die.
+			 */
+			if (!on_owner_list) {
+				raw_spin_lock_irq(&otask->pi_lock);
+				if (unlikely(otask->flags & PF_EXITING)) {
+					/*
+					 * Task is exiting, can directly
+					 * grab the futex instead.
+					 */
+					raw_spin_unlock_irq(&otask->pi_lock);
+					continue;
+				}
+				WARN_ON(!list_empty(&state->list));
+				list_add(&state->list, &otask->pi_state_list);
+				raw_spin_unlock_irq(&otask->pi_lock);
+				on_owner_list = true;
+			}
+
+			/*
+			 * Do a trylock after setting the task state to make
+			 * sure we won't miss a wakeup.
+			 *
+			 * Futex owner		Mutex owner
+			 * -----------		-----------
+			 *  unlock		set state
+			 *  MB			MB
+			 *  read state		trylock
+			 *  wakeup		sleep
+			 */
+			set_current_state(TASK_INTERRUPTIBLE);
+			if (futex_trylock_to(uaddr, vpid, &uval, true, &ret)) {
+				__set_current_state(TASK_RUNNING);
+				break;
+			}
+
+			/*
+			 * Don't sleep if the owner has died.
+			 */
+			if (!(uval & FUTEX_OWNER_DIED))
+				schedule_preempt_disabled();
+			__set_current_state(TASK_RUNNING);
+			continue;
+		}
+
+		cpu_relax();
+	}
+out:
+	preempt_enable();
+	if (on_owner_list && !list_empty(&state->list)) {
+		BUG_ON(!otask);
+		raw_spin_lock_irq(&otask->pi_lock);
+		list_del_init(&state->list);
+		raw_spin_unlock_irq(&otask->pi_lock);
+	}
+	if (otask)
+		put_task_struct(otask);
+	WRITE_ONCE(state->owner, NULL);
+	return ret;
+
+efault:
+	ret = -EFAULT;
+	goto out;
+}
+
+/*
+ * Userspace tried a 0 -> TID atomic transition of the futex value
+ * and failed. The kernel side here does the whole locking operation.
+ * The kernel mutex will be used for serialization. Once becoming the
+ * sole mutex lock owner, it will spin on the futex owner's task structure
+ * to see if it is running. It will also spin on the futex word so as to grab
+ * the lock as soon as it is free.
+ */
+static int futex_lock_to(u32 __user *uaddr, unsigned int flags, ktime_t *time)
+{
+	struct hrtimer_sleeper timeout, *to = NULL;
+	struct futex_hash_bucket *hb;
+	union futex_key key = FUTEX_KEY_INIT;
+	struct futex_state *state;
+	u32 uval, vpid = task_pid_vnr(current);
+	int ret;
+
+	if (futex_trylock_to(uaddr, vpid, &uval, false, &ret))
+		/* Lock acquired or an error happens */
+		return ret;
+
+	/*
+	 * Detect deadlocks.
+	 */
+	if (unlikely(((uval & FUTEX_TID_MASK) == vpid) ||
+			should_fail_futex(true)))
+		return -EDEADLK;
+
+	if (refill_futex_state_cache())
+		return -ENOMEM;
+
+	futex_set_timer(time, &to, &timeout, flags, current->timer_slack_ns);
+
+	ret = get_futex_key(uaddr, flags & FLAGS_SHARED, &key, VERIFY_WRITE);
+	if (unlikely(ret))
+		goto out;
+
+	hb = hash_futex(&key);
+	spin_lock(&hb->lock);
+
+	/*
+	 * Locate the futex state by looking up the futex state list in the
+	 * hash bucket. If it isn't found, create a new one and put it into
+	 * the list.
+	 */
+	state = lookup_futex_state(hb, &key, true);
+
+	/*
+	 * We don't need to hold the HB lock after looking up the futex state
+	 * as we have incremented the reference count.
+	 */
+	spin_unlock(&hb->lock);
+	BUG_ON(!state);
+
+	/*
+	 * Acquiring the serialization mutex.
+	 */
+	if (state->type != TYPE_TO) {
+		ret = -EINVAL;
+	} else {
+		if (to)
+			hrtimer_start_expires(&to->timer, HRTIMER_MODE_ABS);
+		ret = mutex_lock_interruptible(&state->mutex);
+	}
+
+	if (unlikely(ret))
+		/*
+		 * We got a signal or has some other error, need to abort
+		 * the lock operation and return.
+		 */
+		goto out_put_state_key;
+
+	/*
+	 * As the mutex owner, we can now spin on the futex word as well as
+	 * the active-ness of the futex owner.
+	 */
+	ret = futex_spin_on_owner(uaddr, vpid, state);
+
+	mutex_unlock(&state->mutex);
+
+out_put_state_key:
+	spin_lock(&hb->lock);
+	put_futex_state(state);
+	spin_unlock(&hb->lock);
+	put_futex_key(&key);
+
+out:
+	if (to) {
+		hrtimer_cancel(&to->timer);
+		destroy_hrtimer_on_stack(&to->timer);
+	}
+	return ret;
+}
+
+/*
+ * Userspace attempted a TID -> 0 atomic transition, and failed.
+ * This is the in-kernel slowpath: we look up the futex state (if any),
+ * and wakeup the mutex owner.
+ *
+ * Return: 1 if a process was woken up, 0 if not, or < 0 when an error happens.
+ */
+static int futex_unlock_to(u32 __user *uaddr, unsigned int flags)
+{
+	u32 uval, pid, vpid = task_pid_vnr(current);
+	union futex_key key = FUTEX_KEY_INIT;
+	struct futex_hash_bucket *hb;
+	struct futex_state *state;
+	struct task_struct *owner;
+	int ret;
+
+	if (get_user(uval, uaddr))
+		return -EFAULT;
+	/*
+	 * If there is a new lock owner, we can exit now.
+	 * If uval is 0, another task may have acquired and release the
+	 * lock in the mean time, so we should also exit.
+	 */
+	pid = uval & FUTEX_TID_MASK;
+	if ((pid && (pid != vpid)) || !uval)
+		return 0;
+	WARN_ON_ONCE(!(uval & FUTEX_WAITERS));
+
+	/*
+	 * If the TID isn't cleared in the userspace, clear it here to
+	 * encourage faster lock transfer to the mutex owner.
+	 */
+	if (pid == vpid) {
+		futex_atomic_cmpxchg_inatomic(&uval, uaddr, uval,
+					       uval & ~FUTEX_TID_MASK);
+		WARN_ON((uval & FUTEX_TID_MASK) != vpid);
+	}
+	ret = get_futex_key(uaddr, flags & FLAGS_SHARED, &key, VERIFY_WRITE);
+	if (ret)
+		return ret;
+
+	hb = hash_futex(&key);
+	spin_lock(&hb->lock);
+
+	/*
+	 * Check the hash bucket only for matching futex state.
+	 */
+	state = lookup_futex_state(hb, &key, false);
+
+	if (!state)
+		goto out_unlock;
+
+	if (state->type != TYPE_TO) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
+	/*
+	 * We don't need to do the wakeup if the futex isn't equal to
+	 * FUTEX_WAITERS as it implies that someone else has taken over
+	 * the futex.
+	 */
+	if (get_user(uval, uaddr)) {
+		ret = -EFAULT;
+		goto out_unlock;
+	}
+
+	owner = READ_ONCE(state->owner);
+	if ((uval == FUTEX_WAITERS) && owner)
+		ret = wake_up_process(owner);
+
+out_unlock:
+	spin_unlock(&hb->lock);
+	put_futex_key(&key);
+	return ret;
+}
+
 long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 		u32 __user *uaddr2, u32 val2, u32 val3)
 {
@@ -3193,6 +3687,8 @@ long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 	case FUTEX_TRYLOCK_PI:
 	case FUTEX_WAIT_REQUEUE_PI:
 	case FUTEX_CMP_REQUEUE_PI:
+	case FUTEX_LOCK_TO:
+	case FUTEX_UNLOCK_TO:
 		if (!futex_cmpxchg_enabled)
 			return -ENOSYS;
 	}
@@ -3224,6 +3720,10 @@ long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 					     uaddr2);
 	case FUTEX_CMP_REQUEUE_PI:
 		return futex_requeue(uaddr, flags, uaddr2, val, val2, &val3, 1);
+	case FUTEX_LOCK_TO:
+		return futex_lock_to(uaddr, flags, timeout);
+	case FUTEX_UNLOCK_TO:
+		return futex_unlock_to(uaddr, flags);
 	}
 	return -ENOSYS;
 }
@@ -3307,6 +3807,7 @@ static int __init futex_init(void)
 	for (i = 0; i < futex_hashsize; i++) {
 		atomic_set(&futex_queues[i].waiters, 0);
 		plist_head_init(&futex_queues[i].chain);
+		INIT_LIST_HEAD(&futex_queues[i].fs_list);
 		spin_lock_init(&futex_queues[i].lock);
 	}
 
