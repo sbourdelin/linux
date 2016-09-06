@@ -110,6 +110,7 @@ extern void native_apic_wait_icr_idle(void);
 extern u32 native_safe_apic_wait_icr_idle(void);
 extern void native_apic_icr_write(u32 low, u32 id);
 extern u64 native_apic_icr_read(void);
+extern void native_local_apic_timer_interrupt(void);
 
 static inline bool apic_is_x2apic_enabled(void)
 {

@@ -310,6 +310,7 @@ struct pv_init_ops pv_init_ops = {
 struct pv_time_ops pv_time_ops = {
 	.sched_clock = native_sched_clock,
 	.steal_clock = native_steal_clock,
+	.local_apic_timer_interrupt = native_local_apic_timer_interrupt,
 };
 
 __visible struct pv_irq_ops pv_irq_ops = {

@@ -198,6 +198,11 @@ static inline u64 paravirt_steal_clock(int cpu)
 	return PVOP_CALL1(u64, pv_time_ops.steal_clock, cpu);
 }
 
+static inline void local_apic_timer_interrupt(void)
+{
+	PVOP_VCALL0(pv_time_ops.local_apic_timer_interrupt);
+}
+
 static inline unsigned long long paravirt_read_pmc(int counter)
 {
 	return PVOP_CALL1(u64, pv_cpu_ops.read_pmc, counter);

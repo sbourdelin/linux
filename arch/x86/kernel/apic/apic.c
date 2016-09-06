@@ -876,7 +876,7 @@ void setup_secondary_APIC_clock(void)
 /*
  * The guts of the apic timer interrupt
  */
-static void local_apic_timer_interrupt(void)
+void native_local_apic_timer_interrupt(void)
 {
 	int cpu = smp_processor_id();
 	struct clock_event_device *evt = &per_cpu(lapic_events, cpu);
