@@ -320,11 +320,11 @@ static void amd_fixup_frequency(struct acpi_processor_px *px, int i) {};
 static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 {
 	int result = 0;
-	acpi_status status = AE_OK;
+	acpi_status status;
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
 	struct acpi_buffer format = { sizeof("NNNNNN"), "NNNNNN" };
 	struct acpi_buffer state = { 0, NULL };
-	union acpi_object *pss = NULL;
+	union acpi_object *pss;
 	int i;
 	int last_invalid = -1;
 
