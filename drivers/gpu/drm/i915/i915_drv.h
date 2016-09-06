@@ -579,8 +579,6 @@ struct intel_uncore_funcs {
 				uint16_t val, bool trace);
 	void (*mmio_writel)(struct drm_i915_private *dev_priv, i915_reg_t r,
 				uint32_t val, bool trace);
-	void (*mmio_writeq)(struct drm_i915_private *dev_priv, i915_reg_t r,
-				uint64_t val, bool trace);
 };
 
 struct intel_uncore {
@@ -3760,7 +3758,6 @@ int intel_freq_opcode(struct drm_i915_private *dev_priv, int val);
  * act upon the intermediate value, possibly leading to corruption and
  * machine death. You have been warned.
  */
-#define I915_WRITE64(reg, val)	dev_priv->uncore.funcs.mmio_writeq(dev_priv, (reg), (val), true)
 #define I915_READ64(reg)	dev_priv->uncore.funcs.mmio_readq(dev_priv, (reg), true)
 
 #define I915_READ64_2x32(lower_reg, upper_reg) ({			\
