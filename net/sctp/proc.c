@@ -80,11 +80,11 @@ static int sctp_snmp_seq_show(struct seq_file *seq, void *v)
 	memset(buff, 0, sizeof(unsigned long) * SCTP_MIB_MAX);
 
 	for_each_possible_cpu(c)
-		for (i = 0; sctp_snmp_list[i].name != NULL; i++)
+		for (i = 0; sctp_snmp_list[i].name; i++)
 			buff[i] += snmp_get_cpu_field(
 						net->sctp.sctp_statistics,
 						c, sctp_snmp_list[i].entry);
-	for (i = 0; sctp_snmp_list[i].name != NULL; i++)
+	for (i = 0; sctp_snmp_list[i].name; i++)
 		seq_printf(seq, "%-32s\t%ld\n", sctp_snmp_list[i].name,
 						buff[i]);
 
