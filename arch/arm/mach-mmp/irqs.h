@@ -1,10 +1,12 @@
 #ifndef __ASM_MACH_IRQS_H
 #define __ASM_MACH_IRQS_H
 
+#define IRQ_MMP_NONE			(-1)
+
 /*
  * Interrupt numbers for PXA168
  */
-#define IRQ_PXA168_NONE			(-1)
+#define IRQ_PXA168_NONE			IRQ_MMP_NONE
 #define IRQ_PXA168_SSP4			0
 #define IRQ_PXA168_SSP3			1
 #define IRQ_PXA168_SSP2			2
@@ -54,7 +56,7 @@
 /*
  * Interrupt numbers for PXA910
  */
-#define IRQ_PXA910_NONE			(-1)
+#define IRQ_PXA910_NONE			IRQ_MMP_NONE
 #define IRQ_PXA910_AIRQ			0
 #define IRQ_PXA910_SSP3			1
 #define IRQ_PXA910_SSP2			2
@@ -116,7 +118,7 @@
 /*
  * Interrupt numbers for MMP2
  */
-#define IRQ_MMP2_NONE			(-1)
+#define IRQ_MMP2_NONE			IRQ_MMP_NONE
 #define IRQ_MMP2_SSP1			0
 #define IRQ_MMP2_SSP2			1
 #define IRQ_MMP2_SSPA1			2
