@@ -294,7 +294,7 @@ static int acpi_processor_get_platform_limit(struct acpi_processor *pr)
 		return -EINVAL;
 
 	if (ignore_tpc)
-		goto end;
+		goto limit_throttling;
 
 	status = acpi_evaluate_integer(pr->handle, "_TPC", NULL, &tpc);
 	if (ACPI_FAILURE(status)) {
@@ -303,8 +303,7 @@ static int acpi_processor_get_platform_limit(struct acpi_processor *pr)
 		}
 		return -ENODEV;
 	}
-
-end:
+ limit_throttling:
 	pr->throttling_platform_limit = (int)tpc;
 	return 0;
 }
