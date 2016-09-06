@@ -548,7 +548,7 @@ static int acpi_processor_get_throttling_states(struct acpi_processor *pr)
 		    (struct acpi_processor_tx_tss *)&(pr->throttling.
 						      states_tss[i]);
 
-		state.length = sizeof(struct acpi_processor_tx_tss);
+		state.length = sizeof(*tx);
 		state.pointer = tx;
 
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Extracting state %d\n", i));
