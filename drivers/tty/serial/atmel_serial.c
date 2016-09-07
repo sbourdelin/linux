@@ -2130,14 +2130,26 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
 	} else if ((termios->c_cflag & CRTSCTS) &&
 		   !mctrl_gpio_use_rtscts(atmel_port->gpios)) {
 		/*
-		 * RS232 with hardware handshake (RTS/CTS)
-		 * handled by the controller.
+		 * Automatic hardware handshake (RTS/CTS) only work with
+		 * DMA enabled and FIFOs.
+		 * TODO: sam9x5 controllers don't have FIFOs like samad
+		 * controllers, and yet, the datasheet says that the
+		 * ATMEL_US_USMODE_HWHS can be used with (and only with) a DMA
+		 * channel for reception.
 		 */
-		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
-			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
-			termios->c_cflag &= ~CRTSCTS;
+		if (atmel_use_dma_rx(port)) {
+			if (atmel_use_fifo(port)) {
+				mode |= ATMEL_US_USMODE_HWHS;
+			} else {
+				dev_info(port->dev, "not enabling hardware flow control because DMA is used without fifo");
+				termios->c_cflag &= ~CRTSCTS;
+			}
 		} else {
-			mode |= ATMEL_US_USMODE_HWHS;
+			/*
+			 * if DMA is not used, tell the controller that it
+			 * should not handle the RTS pin automatically
+			 */
+			mode |= ATMEL_US_USMODE_NORMAL;
 		}
 	} else {
 		/* RS232 without hadware handshake or controlled by GPIOs */
