@@ -1133,6 +1133,9 @@ i915_gem_execbuffer_move_to_gpu(struct drm_i915_gem_request *req,
 		struct drm_i915_gem_object *obj = vma->obj;
 		struct reservation_object *resv;
 
+		if (vma->exec_entry->flags & EXEC_OBJECT_ASYNC)
+			continue;
+
 		if (obj->flags & other_rings) {
 			ret = i915_gem_request_await_object
 				(req, obj, obj->base.pending_write_domain);
