@@ -440,7 +440,7 @@ int intel_guc_setup(struct drm_device *dev)
 		intel_guc_fw_status_repr(guc_fw->guc_fw_load_status));
 
 	/* Loading forbidden, or no firmware to load? */
-	if (!i915.enable_guc_loading) {
+	if (i915.enable_guc_loading == FIRMWARE_LOAD_DISABLED) {
 		err = 0;
 		goto fail;
 	} else if (fw_path == NULL) {
@@ -533,7 +533,7 @@ fail:
 	 * nonfatal error (i.e. it doesn't prevent driver load, but
 	 * marks the GPU as wedged until reset).
 	 */
-	if (i915.enable_guc_loading > 1) {
+	if (i915.enable_guc_loading >= FIRMWARE_LOAD_MANDATORY) {
 		ret = -EIO;
 	} else if (i915.enable_guc_submission >= GUC_SUBMISSION_MANDATORY) {
 		ret = -EIO;
@@ -700,9 +700,10 @@ void intel_guc_init(struct drm_device *dev)
 	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
 	const char *fw_path;
 
-	/* A negative value means "use platform default" */
-	if (i915.enable_guc_loading < 0)
-		i915.enable_guc_loading = HAS_GUC_UCODE(dev);
+	/* Any negative value means "use platform default" */
+	if (i915.enable_guc_loading <= FIRMWARE_LOAD_DEFAULT)
+		i915.enable_guc_loading = HAS_GUC_UCODE(dev) ?
+			FIRMWARE_LOAD_PREFERRED : FIRMWARE_LOAD_DISABLED;
 	if (i915.enable_guc_submission <= GUC_SUBMISSION_DEFAULT)
 		i915.enable_guc_submission = HAS_GUC_SCHED(dev) ?
 			GUC_SUBMISSION_PREFERRED : GUC_SUBMISSION_DISABLED;
@@ -731,7 +732,7 @@ void intel_guc_init(struct drm_device *dev)
 	guc_fw->guc_fw_load_status = GUC_FIRMWARE_NONE;
 
 	/* Early (and silent) return if GuC loading is disabled */
-	if (!i915.enable_guc_loading)
+	if (i915.enable_guc_loading == FIRMWARE_LOAD_DISABLED)
 		return;
 	if (fw_path == NULL)
 		return;
