@@ -360,7 +360,7 @@
 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 			};
 
-			uart0_pins_a: uart0@0 {
+			uart0_pins: uart0 {
 				allwinner,pins = "PA4", "PA5";
 				allwinner,function = "uart0";
 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
