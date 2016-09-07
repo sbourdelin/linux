@@ -989,6 +989,14 @@ static void i2c_imx_init_recovery_info(struct imx_i2c_struct *i2c_imx,
 {
 	struct i2c_bus_recovery_info *rinfo = &i2c_imx->rinfo;
 
+	/* If pinctrl is not available disable bus recovery */
+	if (IS_ERR(i2c_imx->pinctrl))
+		i2c_imx->pinctrl = NULL;
+	if (!i2c_imx->pinctrl) {
+		dev_info(&pdev->dev, "can't get pinctrl, bus recovery not supported\n");
+		return;
+	}
+
 	i2c_imx->pinctrl_pins_default = pinctrl_lookup_state(i2c_imx->pinctrl,
 			PINCTRL_STATE_DEFAULT);
 	i2c_imx->pinctrl_pins_gpio = pinctrl_lookup_state(i2c_imx->pinctrl,
@@ -1081,8 +1089,19 @@ static int i2c_imx_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	/*
+	 * If pinctrl is available it might be possible to switch the
+	 * SDA and SCL lines to their GPIO functions and do a recovery
+	 * procedure in this mode. If there is anything wrong with
+	 * pinctrl we cannot do this and simply not enable it.
+	 */
 	i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
-	if (IS_ERR(i2c_imx->pinctrl)) {
+	/*
+	 * Bailout on critical errors, continue for other errors.
+	 * Bus recovery will not be enabled if pinctrl is not available.
+	 */
+	if (PTR_ERR(i2c_imx->pinctrl) == -ENOMEM ||
+			PTR_ERR(i2c_imx->pinctrl) == -EPROBE_DEFER) {
 		ret = PTR_ERR(i2c_imx->pinctrl);
 		goto clk_disable;
 	}
@@ -1125,6 +1144,7 @@ static int i2c_imx_probe(struct platform_device *pdev)
 			i2c_imx, IMX_I2C_I2CR);
 	imx_i2c_write_reg(i2c_imx->hwdata->i2sr_clr_opcode, i2c_imx, IMX_I2C_I2SR);
 
+	/* Init bus recovery info if supported */
 	i2c_imx_init_recovery_info(i2c_imx, pdev);
 
 	/* Add I2C adapter */
