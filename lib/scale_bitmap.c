@@ -15,6 +15,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <linux/random.h>
 #include <linux/scale_bitmap.h>
 
 int scale_bitmap_init_node(struct scale_bitmap *bitmap, unsigned int depth,
@@ -210,6 +211,11 @@ int scale_bitmap_queue_init_node(struct scale_bitmap_queue *sbq,
 	if (!sbq->alloc_hint) {
 		scale_bitmap_free(&sbq->map);
 		return -ENOMEM;
+	}
+
+	if (depth && !round_robin) {
+		for_each_possible_cpu(i)
+			*per_cpu_ptr(sbq->alloc_hint, i) = prandom_u32() % depth;
 	}
 
 	sbq->wake_batch = SBQ_WAKE_BATCH;
