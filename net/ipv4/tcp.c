@@ -380,6 +380,7 @@ void tcp_init_sock(struct sock *sk)
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 
+	seqcount_init(&tp->seqcnt);
 	__skb_queue_head_init(&tp->out_of_order_queue);
 	tcp_init_xmit_timers(sk);
 	tcp_prequeue_init(tp);
@@ -2690,7 +2691,7 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	u32 now = tcp_time_stamp;
 	unsigned int start;
 	int notsent_bytes;
-	u64 rate64;
+	u64 rate64, rwnd_limited;
 	u32 rate;
 
 	memset(info, 0, sizeof(*info));
@@ -2777,6 +2778,12 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	info->tcpi_min_rtt = tcp_min_rtt(tp);
 	info->tcpi_data_segs_in = tp->data_segs_in;
 	info->tcpi_data_segs_out = tp->data_segs_out;
+
+	do {
+		start = read_seqcount_begin(&tp->seqcnt);
+		rwnd_limited = tp->rwnd_limited + tcp_rwnd_limited_delta(tp);
+	} while (read_seqcount_retry(&tp->seqcnt, start));
+	put_unaligned(rwnd_limited, &info->tcpi_rwnd_limited);
 }
 EXPORT_SYMBOL_GPL(tcp_get_info);
 

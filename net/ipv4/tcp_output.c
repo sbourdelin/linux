@@ -2020,6 +2020,39 @@ static int tcp_mtu_probe(struct sock *sk)
 	return -1;
 }
 
+u32 tcp_rwnd_limited_delta(const struct tcp_sock *tp)
+{
+	if (tp->rwnd_limited_ts.v64) {
+		struct skb_mstamp now;
+
+		skb_mstamp_get(&now);
+		return skb_mstamp_us_delta(&now, &tp->rwnd_limited_ts);
+	}
+
+	return 0;
+}
+
+static void tcp_start_rwnd_limited(struct tcp_sock *tp)
+{
+	if (!tp->rwnd_limited_ts.v64) {
+		write_seqcount_begin(&tp->seqcnt);
+		skb_mstamp_get(&tp->rwnd_limited_ts);
+		write_seqcount_end(&tp->seqcnt);
+	}
+}
+
+static void tcp_stop_rwnd_limited(struct tcp_sock *tp)
+{
+	if (tp->rwnd_limited_ts.v64) {
+		u32 delta = tcp_rwnd_limited_delta(tp);
+
+		write_seqcount_begin(&tp->seqcnt);
+		tp->rwnd_limited += delta;
+		tp->rwnd_limited_ts.v64 = 0;
+		write_seqcount_end(&tp->seqcnt);
+	}
+}
+
 /* This routine writes packets to the network.  It advances the
  * send_head.  This happens as incoming acks open up the remote
  * window for us.
@@ -2072,6 +2105,7 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 
 		cwnd_quota = tcp_cwnd_test(tp, skb);
 		if (!cwnd_quota) {
+			tcp_stop_rwnd_limited(tp);
 			if (push_one == 2)
 				/* Force out a loss probe pkt. */
 				cwnd_quota = 1;
@@ -2079,8 +2113,11 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 				break;
 		}
 
-		if (unlikely(!tcp_snd_wnd_test(tp, skb, mss_now)))
+		if (unlikely(!tcp_snd_wnd_test(tp, skb, mss_now))) {
+			tcp_start_rwnd_limited(tp);
 			break;
+		}
+		tcp_stop_rwnd_limited(tp);
 
 		if (tso_segs == 1) {
 			if (unlikely(!tcp_nagle_test(tp, skb, mss_now,

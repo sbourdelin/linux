@@ -211,6 +211,7 @@ struct tcp_info {
 	__u32	tcpi_min_rtt;
 	__u32	tcpi_data_segs_in;	/* RFC4898 tcpEStatsDataSegsIn */
 	__u32	tcpi_data_segs_out;	/* RFC4898 tcpEStatsDataSegsOut */
+	__u64	tcpi_rwnd_limited;	/* total time (us) limited by rwnd */
 };
 
 /* for TCP_MD5SIG socket option */

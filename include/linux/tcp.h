@@ -176,6 +176,7 @@ struct tcp_sock {
 				 * were acked.
 				 */
 	struct u64_stats_sync syncp; /* protects 64bit vars (cf tcp_get_info()) */
+	seqcount_t seqcnt;	/* proctects rwnd-limited-related vars, etc. */
 
  	u32	snd_una;	/* First byte we want an ack for	*/
  	u32	snd_sml;	/* Last byte of the most recently transmitted small packet */
@@ -204,6 +205,8 @@ struct tcp_sock {
 
 	u32	window_clamp;	/* Maximal window to advertise		*/
 	u32	rcv_ssthresh;	/* Current window clamp			*/
+	struct skb_mstamp rwnd_limited_ts; /* Last timestamp limited by rwnd */
+	u64	rwnd_limited;	/* Total time (us) limited by rwnd */
 
 	/* Information of the most recently (s)acked skb */
 	struct tcp_rack {
@@ -421,5 +424,7 @@ static inline void tcp_saved_syn_free(struct tcp_sock *tp)
 	kfree(tp->saved_syn);
 	tp->saved_syn = NULL;
 }
+
+u32 tcp_rwnd_limited_delta(const struct tcp_sock *tp);
 
 #endif	/* _LINUX_TCP_H */
