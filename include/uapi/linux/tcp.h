@@ -214,6 +214,13 @@ struct tcp_info {
 	__u64	tcpi_rwnd_limited;	/* total time (us) limited by rwnd */
 };
 
+/* netlink attributes type for SCM_OPT_STATS */
+enum {
+	TCP_NLA_UNSPEC,
+	TCP_NLA_RWND_LIMITED,	/* total time (us) limited by rwnd */
+	TCP_NLA_MIN_RTT,	/* min RTT in us */
+};
+
 /* for TCP_MD5SIG socket option */
 #define TCP_MD5SIG_MAXKEYLEN	80
 

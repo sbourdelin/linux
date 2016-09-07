@@ -2787,6 +2787,29 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 }
 EXPORT_SYMBOL_GPL(tcp_get_info);
 
+void tcp_put_opt_stats(struct sock *sk, struct sk_buff *skb)
+{
+	const struct tcp_sock *tp = tcp_sk(sk);
+	unsigned int start;
+	u64 rwnd_limited;
+
+	do {
+		start = read_seqcount_begin(&tp->seqcnt);
+		rwnd_limited = tp->rwnd_limited + tcp_rwnd_limited_delta(tp);
+	} while (read_seqcount_retry(&tp->seqcnt, start));
+
+	if (nla_put(skb, TCP_NLA_RWND_LIMITED, sizeof(u64), &rwnd_limited))
+		goto nla_put_failure;
+
+	if (nla_put_u32(skb, TCP_NLA_MIN_RTT, tcp_min_rtt(tp)))
+		goto nla_put_failure;
+
+	return;
+
+nla_put_failure:
+	WARN_ONCE(1, "Not enough space for TCP stats\n");
+}
+
 static int do_tcp_getsockopt(struct sock *sk, int level,
 		int optname, char __user *optval, int __user *optlen)
 {

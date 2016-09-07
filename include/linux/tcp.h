@@ -427,4 +427,7 @@ static inline void tcp_saved_syn_free(struct tcp_sock *tp)
 
 u32 tcp_rwnd_limited_delta(const struct tcp_sock *tp);
 
+#define OPT_STATS_DEFAULT_SIZE 256
+void tcp_put_opt_stats(struct sock *sk, struct sk_buff *skb);
+
 #endif	/* _LINUX_TCP_H */

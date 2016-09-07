@@ -3805,7 +3805,7 @@ void __skb_tstamp_tx(struct sk_buff *orig_skb,
 		     struct sock *sk, int tstype)
 {
 	struct sk_buff *skb;
-	bool tsonly;
+	bool tsonly, opt_stats;
 
 	if (!sk)
 		return;
@@ -3814,7 +3814,10 @@ void __skb_tstamp_tx(struct sk_buff *orig_skb,
 	if (!skb_may_tx_timestamp(sk, tsonly))
 		return;
 
-	if (tsonly)
+	opt_stats = sk->sk_tsflags & SOF_TIMESTAMPING_OPT_STATS;
+	if (opt_stats)
+		skb = alloc_skb(OPT_STATS_DEFAULT_SIZE, GFP_ATOMIC);
+	else if (tsonly)
 		skb = alloc_skb(0, GFP_ATOMIC);
 	else
 		skb = skb_clone(orig_skb, GFP_ATOMIC);
@@ -3824,6 +3827,9 @@ void __skb_tstamp_tx(struct sk_buff *orig_skb,
 	if (tsonly) {
 		skb_shinfo(skb)->tx_flags = skb_shinfo(orig_skb)->tx_flags;
 		skb_shinfo(skb)->tskey = skb_shinfo(orig_skb)->tskey;
+
+		if (opt_stats)
+			tcp_put_opt_stats(sk, skb);
 	}
 
 	if (hwtstamps)
