@@ -51,6 +51,8 @@
 
 #define VERSION "2.3"
 
+static DEFINE_MUTEX(ioctl_mutex);
+
 static const struct hci_uart_proto *hup[HCI_UART_MAX_PROTO];
 
 int hci_uart_register_proto(const struct hci_uart_proto *p)
@@ -685,7 +687,7 @@ static int hci_uart_tty_ioctl(struct tty_struct *tty, struct file *file,
 			      unsigned int cmd, unsigned long arg)
 {
 	struct hci_uart *hu = tty->disc_data;
-	int err = 0;
+	int result = 0;
 
 	BT_DBG("");
 
@@ -693,45 +695,52 @@ static int hci_uart_tty_ioctl(struct tty_struct *tty, struct file *file,
 	if (!hu)
 		return -EBADF;
 
+	mutex_lock(&ioctl_mutex);
 	switch (cmd) {
 	case HCIUARTSETPROTO:
 		if (!test_bit(HCI_UART_PROTO_SET, &hu->flags)) {
-			err = hci_uart_set_proto(hu, arg);
-			if (!err)
+			result = hci_uart_set_proto(hu, arg);
+			if (!result)
 				set_bit(HCI_UART_PROTO_SET, &hu->flags);
-			else
-				return err;
 		} else
-			return -EBUSY;
+			result = -EBUSY;
 		break;
 
 	case HCIUARTGETPROTO:
 		if (test_bit(HCI_UART_PROTO_SET, &hu->flags))
-			return hu->proto->id;
-		return -EUNATCH;
+			result = hu->proto->id;
+		else
+			result = -EUNATCH;
+		break;
 
 	case HCIUARTGETDEVICE:
 		if (test_bit(HCI_UART_REGISTERED, &hu->flags))
-			return hu->hdev->id;
-		return -EUNATCH;
+			result = hu->hdev->id;
+		else
+			result = -EUNATCH;
+		break;
 
 	case HCIUARTSETFLAGS:
 		if (test_bit(HCI_UART_PROTO_SET, &hu->flags))
-			return -EBUSY;
-		err = hci_uart_set_flags(hu, arg);
-		if (err)
-			return err;
+			result = -EBUSY;
+		else {
+			result = hci_uart_set_flags(hu, arg);
+			if (result)
+				return result;
+		}
 		break;
 
 	case HCIUARTGETFLAGS:
-		return hu->hdev_flags;
+		result = hu->hdev_flags;
+		break;
 
 	default:
-		err = n_tty_ioctl_helper(tty, file, cmd, arg);
+		result = n_tty_ioctl_helper(tty, file, cmd, arg);
 		break;
 	}
+	mutex_unlock(&ioctl_mutex);
 
-	return err;
+	return result;
 }
 
 /*
