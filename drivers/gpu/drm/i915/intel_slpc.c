@@ -52,6 +52,19 @@ static void host2guc_slpc_reset(struct drm_i915_private *dev_priv)
 	host2guc_slpc(dev_priv, data, 4);
 }
 
+static void host2guc_slpc_shutdown(struct drm_i915_private *dev_priv)
+{
+	u32 data[4];
+	u32 shared_data_gtt_offset = i915_ggtt_offset(dev_priv->guc.slpc.vma);
+
+	data[0] = HOST2GUC_ACTION_SLPC_REQUEST;
+	data[1] = SLPC_EVENT(SLPC_EVENT_SHUTDOWN, 2);
+	data[2] = shared_data_gtt_offset;
+	data[3] = 0;
+
+	host2guc_slpc(dev_priv, data, 4);
+}
+
 static unsigned int slpc_get_platform_sku(struct drm_i915_private *dev_priv)
 {
 	enum slpc_platform_sku platform_sku;
@@ -149,10 +162,14 @@ void intel_slpc_cleanup(struct drm_i915_private *dev_priv)
 
 void intel_slpc_suspend(struct drm_i915_private *dev_priv)
 {
+	host2guc_slpc_shutdown(dev_priv);
+	dev_priv->guc.slpc.enabled = false;
 }
 
 void intel_slpc_disable(struct drm_i915_private *dev_priv)
 {
+	host2guc_slpc_shutdown(dev_priv);
+	dev_priv->guc.slpc.enabled = false;
 }
 
 void intel_slpc_enable(struct drm_i915_private *dev_priv)

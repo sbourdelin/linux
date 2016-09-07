@@ -6691,7 +6691,7 @@ void intel_suspend_gt_powersave(struct drm_i915_private *dev_priv)
 void intel_sanitize_gt_powersave(struct drm_i915_private *dev_priv)
 {
 	if (intel_slpc_enabled()) {
-		/* TODO: Set SLPC enabled forcefully */
+		dev_priv->guc.slpc.enabled = true;
 		intel_disable_gt_powersave(dev_priv);
 	} else {
 		dev_priv->rps.enabled = true; /* force disabling */
@@ -6704,8 +6704,10 @@ void intel_sanitize_gt_powersave(struct drm_i915_private *dev_priv)
 void intel_disable_gt_powersave(struct drm_i915_private *dev_priv)
 {
 	if (intel_slpc_enabled()) {
-		if (!intel_slpc_active(dev_priv))
+		if (!intel_slpc_active(dev_priv)) {
+			dev_priv->guc.slpc.enabled = false;
 			return;
+		}
 	} else if (!READ_ONCE(dev_priv->rps.enabled))
 		return;
 
