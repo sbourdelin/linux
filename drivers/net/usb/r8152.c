@@ -30,7 +30,7 @@
 #include <linux/usb/usbnet.h>
 
 /* Information for net-next */
-#define NETNEXT_VERSION		"08"
+#define NETNEXT_VERSION		"09"
 
 /* Information for net */
 #define NET_VERSION		"5"
@@ -4267,11 +4267,6 @@ static int rtl8152_probe(struct usb_interface *intf,
 	if (version == RTL_VER_UNKNOWN)
 		return -ENODEV;
 
-	if (udev->actconfig->desc.bConfigurationValue != 1) {
-		usb_driver_set_configuration(udev, 1);
-		return -ENODEV;
-	}
-
 	usb_reset_device(udev);
 	netdev = alloc_etherdev(sizeof(struct r8152));
 	if (!netdev) {
@@ -4403,9 +4398,32 @@ static void rtl8152_disconnect(struct usb_interface *intf)
 	}
 }
 
+static bool rtl_change_config(struct usb_interface *intf)
+{
+	struct usb_device *udev = interface_to_usbdev(intf);
+	u8 actconfig = udev->actconfig->desc.bConfigurationValue;
+
+	if (CONFIG_RTL8152_CONFIG_VALUE <= 0 ||
+	    udev->descriptor.bNumConfigurations < CONFIG_RTL8152_CONFIG_VALUE ||
+	    actconfig == CONFIG_RTL8152_CONFIG_VALUE)
+		return false;
+
+	if (CONFIG_RTL8152_CONFIG_VALUE == 1 && !rtl_get_version(intf))
+		return false;
+
+	return true;
+}
+
 static int rtl_usbnet_probe(struct usb_interface *intf,
 			    const struct usb_device_id *id)
 {
+	if (rtl_change_config(intf)) {
+		struct usb_device *udev = interface_to_usbdev(intf);
+
+		usb_driver_set_configuration(udev, CONFIG_RTL8152_CONFIG_VALUE);
+		return -ENODEV;
+	}
+
 	switch (id->bInterfaceClass) {
 	case USB_CLASS_VENDOR_SPEC:
 		return rtl8152_probe(intf, id);

@@ -106,6 +106,19 @@ config USB_RTL8152
 	  To compile this driver as a module, choose M here: the
 	  module will be called r8152.
 
+config RTL8152_CONFIG_VALUE
+	depends on USB_RTL8152
+	int "RTL8152/RTL8153 USB Configuration Value"
+	default 1
+	help
+		This is used to select the USB configuration value of RTL8152/RTL8153.
+		0: support all configuration values. It means the user could
+		   change the configuration value. However, it may have problem
+		   if you change the configuration value frequently. Don't set
+		   this value unless you really know what you want.
+		1: use vendor mode only. (recommended)
+		2: use ECM mode only.
+
 config USB_LAN78XX
 	tristate "Microchip LAN78XX Based USB Ethernet Adapters"
 	select MII
