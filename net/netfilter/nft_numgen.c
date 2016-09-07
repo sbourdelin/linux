@@ -44,6 +44,7 @@ static const struct nla_policy nft_ng_policy[NFTA_NG_MAX + 1] = {
 	[NFTA_NG_DREG]		= { .type = NLA_U32 },
 	[NFTA_NG_MODULUS]	= { .type = NLA_U32 },
 	[NFTA_NG_TYPE]		= { .type = NLA_U32 },
+	[NFTA_NG_SUM]		= { .type = NLA_U32 },
 };
 
 static int nft_ng_inc_init(const struct nft_ctx *ctx,
@@ -51,13 +52,17 @@ static int nft_ng_inc_init(const struct nft_ctx *ctx,
 			   const struct nlattr * const tb[])
 {
 	struct nft_ng_inc *priv = nft_expr_priv(expr);
+	u32 sum = 0;
+
+	if (tb[NFTA_NG_SUM])
+		sum = ntohl(nla_get_be32(tb[NFTA_NG_SUM]));
 
 	priv->modulus = ntohl(nla_get_be32(tb[NFTA_NG_MODULUS]));
-	if (priv->modulus == 0)
+	if (priv->modulus == 0 || sum >= priv->modulus)
 		return -ERANGE;
 
 	priv->dreg = nft_parse_register(tb[NFTA_NG_DREG]);
-	atomic_set(&priv->counter, 0);
+	atomic_set(&priv->counter, sum);
 
 	return nft_validate_register_store(ctx, priv->dreg, NULL,
 					   NFT_DATA_VALUE, sizeof(u32));
