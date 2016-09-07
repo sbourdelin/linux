@@ -21,10 +21,15 @@ static void __init *lis331dl_platform_data(void *info)
 	int intr = get_gpio_by_name("accel_int");
 	int intr2nd = get_gpio_by_name("accel_2");
 
-	if (intr < 0)
-		return NULL;
-	if (intr2nd < 0)
-		return NULL;
+	if (intr < 0) {
+		pr_err("%s: invalid interrupt1 error\n", __func__);
+		return ERR_PTR(intr);
+	}
+
+	if (intr2nd < 0) {
+		pr_err("%s: invalid interrupt2 error\n", __func__);
+		return ERR_PTR(intr2nd);
+	}
 
 	i2c_info->irq = intr + INTEL_MID_IRQ_OFFSET;
 	intr2nd_pdata = intr2nd + INTEL_MID_IRQ_OFFSET;

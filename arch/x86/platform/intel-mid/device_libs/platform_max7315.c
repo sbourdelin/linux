@@ -31,7 +31,7 @@ static void __init *max7315_platform_data(void *info)
 	if (nr == MAX7315_NUM) {
 		pr_err("too many max7315s, we only support %d\n",
 				MAX7315_NUM);
-		return NULL;
+		return ERR_PTR(-ENODEV);
 	}
 	/* we have several max7315 on the board, we only need load several
 	 * instances of the same pca953x driver to cover them
@@ -48,8 +48,11 @@ static void __init *max7315_platform_data(void *info)
 	gpio_base = get_gpio_by_name(base_pin_name);
 	intr = get_gpio_by_name(intr_pin_name);
 
-	if (gpio_base < 0)
-		return NULL;
+	if (gpio_base < 0) {
+		pr_err("%s: invalid gpio base error\n", __func__);
+		return ERR_PTR(gpio_base);
+	}
+
 	max7315->gpio_base = gpio_base;
 	if (intr != -1) {
 		i2c_info->irq = intr + INTEL_MID_IRQ_OFFSET;

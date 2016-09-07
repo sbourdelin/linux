@@ -34,8 +34,11 @@ static void *tca6416_platform_data(void *info)
 	gpio_base = get_gpio_by_name(base_pin_name);
 	intr = get_gpio_by_name(intr_pin_name);
 
-	if (gpio_base < 0)
-		return NULL;
+	if (gpio_base < 0) {
+		pr_err("%s: invalid gpio base error\n", __func__);
+		return ERR_PTR(gpio_base);
+	}
+
 	tca6416.gpio_base = gpio_base;
 	if (intr >= 0) {
 		i2c_info->irq = intr + INTEL_MID_IRQ_OFFSET;
