@@ -196,8 +196,8 @@ unsigned int scale_bitmap_weight(const struct scale_bitmap *bitmap)
 EXPORT_SYMBOL_GPL(scale_bitmap_weight);
 
 int scale_bitmap_queue_init_node(struct scale_bitmap_queue *sbq,
-				 unsigned int depth, int shift, gfp_t flags,
-				 int node)
+				 unsigned int depth, int shift,
+				 bool round_robin, gfp_t flags, int node)
 {
 	int ret;
 	int i;
@@ -229,6 +229,8 @@ int scale_bitmap_queue_init_node(struct scale_bitmap_queue *sbq,
 		init_waitqueue_head(&sbq->ws[i].wait);
 		atomic_set(&sbq->ws[i].wait_cnt, sbq->wake_batch);
 	}
+
+	sbq->round_robin = round_robin;
 	return 0;
 }
 EXPORT_SYMBOL_GPL(scale_bitmap_queue_init_node);
@@ -267,7 +269,7 @@ static struct sbq_wait_state *sbq_wake_ptr(struct scale_bitmap_queue *sbq)
 }
 
 void scale_bitmap_queue_clear(struct scale_bitmap_queue *sbq, unsigned int nr,
-			      bool round_robin, unsigned int cpu)
+			      unsigned int cpu)
 {
 	struct sbq_wait_state *ws;
 	int wait_cnt;
@@ -291,7 +293,7 @@ void scale_bitmap_queue_clear(struct scale_bitmap_queue *sbq, unsigned int nr,
 	}
 
 update_cache:
-	if (likely(!round_robin))
+	if (likely(!sbq->round_robin))
 		*per_cpu_ptr(sbq->alloc_hint, cpu) = nr;
 }
 EXPORT_SYMBOL_GPL(scale_bitmap_queue_clear);

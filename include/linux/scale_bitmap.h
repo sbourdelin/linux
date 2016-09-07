@@ -122,6 +122,11 @@ struct scale_bitmap_queue {
 	 * @ws: Wait queues.
 	 */
 	struct sbq_wait_state *ws;
+
+	/**
+	 * @round_robin: Allocate bits in strict round-robin order.
+	 */
+	bool round_robin;
 };
 
 /**
@@ -270,14 +275,15 @@ unsigned int scale_bitmap_weight(const struct scale_bitmap *bitmap);
  * @sbq: Bitmap queue to initialize.
  * @depth: See scale_bitmap_init_node().
  * @shift: See scale_bitmap_init_node().
+ * @round_robin: See scale_bitmap_get().
  * @flags: Allocation flags.
  * @node: Memory node to allocate on.
  *
  * Return: Zero on success or negative errno on failure.
  */
 int scale_bitmap_queue_init_node(struct scale_bitmap_queue *sbq,
-				 unsigned int depth, int shift, gfp_t flags,
-				 int node);
+				 unsigned int depth, int shift,
+				 bool round_robin, gfp_t flags, int node);
 
 /**
  * scale_bitmap_queue_free() - Free memory used by a &struct scale_bitmap_queue.
@@ -307,34 +313,31 @@ void scale_bitmap_queue_resize(struct scale_bitmap_queue *sbq,
  * __scale_bitmap_queue_get() - Try to allocate a free bit from a &struct
  * scale_bitmap_queue with preemption already disabled.
  * @sbq: Bitmap queue to allocate from.
- * @round_robin: See scale_bitmap_get().
  *
  * Return: Non-negative allocated bit number if successful, -1 otherwise.
  */
-static inline int __scale_bitmap_queue_get(struct scale_bitmap_queue *sbq,
-					   bool round_robin)
+static inline int __scale_bitmap_queue_get(struct scale_bitmap_queue *sbq)
 {
 	return scale_bitmap_get(&sbq->map, this_cpu_ptr(sbq->alloc_hint),
-				round_robin);
+				sbq->round_robin);
 }
 
 /**
  * scale_bitmap_queue_get() - Try to allocate a free bit from a &struct
  * scale_bitmap_queue.
  * @sbq: Bitmap queue to allocate from.
- * @round_robin: See scale_bitmap_get().
  * @cpu: Output parameter; will contain the CPU we ran on (e.g., to be passed to
  *       scale_bitmap_queue_clear()).
  *
  * Return: Non-negative allocated bit number if successful, -1 otherwise.
  */
 static inline int scale_bitmap_queue_get(struct scale_bitmap_queue *sbq,
-					 bool round_robin, unsigned int *cpu)
+					 unsigned int *cpu)
 {
 	int ret;
 
 	*cpu = get_cpu();
-	ret = __scale_bitmap_queue_get(sbq, round_robin);
+	ret = __scale_bitmap_queue_get(sbq);
 	put_cpu();
 	return ret;
 }
@@ -344,11 +347,10 @@ static inline int scale_bitmap_queue_get(struct scale_bitmap_queue *sbq,
  * &struct scale_bitmap_queue.
  * @sbq: Bitmap to free from.
  * @nr: Bit number to free.
- * @round_robin: See scale_bitmap_get().
  * @cpu: CPU the bit was allocated on.
  */
 void scale_bitmap_queue_clear(struct scale_bitmap_queue *sbq, unsigned int nr,
-			      bool round_robin, unsigned int cpu);
+			      unsigned int cpu);
 
 static inline int sbq_index_inc(int index)
 {
