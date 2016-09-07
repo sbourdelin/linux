@@ -9,7 +9,7 @@ obj-y     = fork.o exec_domain.o panic.o \
 	    extable.o params.o \
 	    kthread.o sys_ni.o nsproxy.o \
 	    notifier.o ksysfs.o cred.o reboot.o \
-	    async.o range.o smpboot.o
+	    async.o range.o smpboot.o rlimit.o
 
 obj-$(CONFIG_MULTIUSER) += groups.o
 
@@ -17,6 +17,8 @@ ifdef CONFIG_FUNCTION_TRACER
 # Do not trace internal ftrace files
 CFLAGS_REMOVE_irq_work.o = $(CC_FLAGS_FTRACE)
 endif
+
+CFLAGS_rlimit.o := -I$(src)
 
 # Prevents flicker of uninteresting __do_softirq()/__local_bh_disable_ip()
 # in coverage traces.
