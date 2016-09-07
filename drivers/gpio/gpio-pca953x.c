@@ -129,7 +129,6 @@ struct pca953x_chip {
 	struct i2c_client *client;
 	struct gpio_chip gpio_chip;
 	const char *const *names;
-	int	chip_type;
 	unsigned long driver_data;
 
 	const struct pca953x_offset *offset;
@@ -760,8 +759,6 @@ static int pca953x_probe(struct i2c_client *client,
 		}
 	}
 
-	chip->chip_type = PCA_CHIP_TYPE(chip->driver_data);
-
 	mutex_init(&chip->i2c_lock);
 
 	/* initialize cached registers from their original values.
@@ -774,7 +771,7 @@ static int pca953x_probe(struct i2c_client *client,
 	else if (chip->gpio_chip.ngpio >= 24)
 		chip->write_regs = pca953x_write_regs_24;
 
-	if (chip->chip_type == PCA953X_TYPE)
+	if (PCA_CHIP_TYPE(chip->driver_data) == PCA953X_TYPE)
 		ret = device_pca953x_init(chip, invert);
 	else
 		ret = device_pca957x_init(chip, invert);
