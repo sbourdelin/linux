@@ -202,7 +202,7 @@ static void set_guc_init_params(struct drm_i915_private *dev_priv)
 	}
 
 	/* If GuC submission is enabled, set up additional parameters here */
-	if (i915.enable_guc_submission) {
+	if (i915.enable_guc_submission != GUC_SUBMISSION_DISABLED) {
 		u32 pgs = i915_ggtt_offset(dev_priv->guc.ctx_pool_vma);
 		u32 ctx_in_16 = GUC_MAX_GPU_CONTEXTS / 16;
 
@@ -507,7 +507,7 @@ int intel_guc_setup(struct drm_device *dev)
 		intel_guc_fw_status_repr(guc_fw->guc_fw_fetch_status),
 		intel_guc_fw_status_repr(guc_fw->guc_fw_load_status));
 
-	if (i915.enable_guc_submission) {
+	if (i915.enable_guc_submission != GUC_SUBMISSION_DISABLED) {
 		err = i915_guc_submission_enable(dev_priv);
 		if (err)
 			goto fail;
@@ -535,7 +535,7 @@ fail:
 	 */
 	if (i915.enable_guc_loading > 1) {
 		ret = -EIO;
-	} else if (i915.enable_guc_submission > 1) {
+	} else if (i915.enable_guc_submission >= GUC_SUBMISSION_MANDATORY) {
 		ret = -EIO;
 	} else {
 		ret = 0;
@@ -550,7 +550,7 @@ fail:
 	else
 		DRM_WARN("GuC firmware load failed: %d\n", err);
 
-	if (i915.enable_guc_submission) {
+	if (i915.enable_guc_submission != GUC_SUBMISSION_DISABLED) {
 		if (fw_path == NULL)
 			DRM_INFO("GuC submission without firmware not supported\n");
 		if (ret == 0)
@@ -558,7 +558,7 @@ fail:
 		else
 			DRM_ERROR("GuC init failed: %d\n", ret);
 	}
-	i915.enable_guc_submission = 0;
+	i915.enable_guc_submission = GUC_SUBMISSION_DISABLED;
 
 	return ret;
 }
@@ -703,8 +703,9 @@ void intel_guc_init(struct drm_device *dev)
 	/* A negative value means "use platform default" */
 	if (i915.enable_guc_loading < 0)
 		i915.enable_guc_loading = HAS_GUC_UCODE(dev);
-	if (i915.enable_guc_submission < 0)
-		i915.enable_guc_submission = HAS_GUC_SCHED(dev);
+	if (i915.enable_guc_submission <= GUC_SUBMISSION_DEFAULT)
+		i915.enable_guc_submission = HAS_GUC_SCHED(dev) ?
+			GUC_SUBMISSION_PREFERRED : GUC_SUBMISSION_DISABLED;
 
 	if (!HAS_GUC_UCODE(dev)) {
 		fw_path = NULL;

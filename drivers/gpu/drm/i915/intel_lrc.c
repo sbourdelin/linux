@@ -662,7 +662,7 @@ int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request
 
 	request->ring = ce->ring;
 
-	if (i915.enable_guc_submission) {
+	if (i915.enable_guc_submission != GUC_SUBMISSION_DISABLED) {
 		/*
 		 * Check that the GuC has space for the request before
 		 * going any further, as the i915_add_request() call
@@ -798,7 +798,7 @@ static int intel_lr_context_pin(struct i915_gem_context *ctx,
 	ce->state->obj->dirty = true;
 
 	/* Invalidate GuC TLB. */
-	if (i915.enable_guc_submission) {
+	if (i915.enable_guc_submission != GUC_SUBMISSION_DISABLED) {
 		struct drm_i915_private *dev_priv = ctx->i915;
 		I915_WRITE(GEN8_GTCR, GEN8_GTCR_INVALIDATE);
 	}

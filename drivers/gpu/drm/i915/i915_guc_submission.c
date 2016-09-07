@@ -970,7 +970,7 @@ int i915_guc_submission_init(struct drm_i915_private *dev_priv)
 	bitmap_clear(guc->doorbell_bitmap, 0, GUC_MAX_DOORBELLS);
 	i915_guc_submission_disable(dev_priv);
 
-	if (!i915.enable_guc_submission)
+	if (i915.enable_guc_submission == GUC_SUBMISSION_DISABLED)
 		return 0; /* not enabled  */
 
 	if (guc->ctx_pool_vma)
