@@ -99,6 +99,14 @@ struct scale_bitmap_queue {
 	 */
 	struct scale_bitmap map;
 
+	/*
+	 * @alloc_hint: Cache of last successfully allocated or freed bit.
+	 *
+	 * This is per-cpu, which allows multiple users to stick to different
+	 * cachelines until the map is exhausted.
+	 */
+	unsigned int __percpu *alloc_hint;
+
 	/**
 	 * @wake_batch: Number of bits which must be freed before we wake up any
 	 * waiters.
@@ -279,6 +287,7 @@ int scale_bitmap_queue_init_node(struct scale_bitmap_queue *sbq,
 static inline void scale_bitmap_queue_free(struct scale_bitmap_queue *sbq)
 {
 	kfree(sbq->ws);
+	free_percpu(sbq->alloc_hint);
 	scale_bitmap_free(&sbq->map);
 }
 
@@ -295,12 +304,51 @@ void scale_bitmap_queue_resize(struct scale_bitmap_queue *sbq,
 			       unsigned int depth);
 
 /**
+ * __scale_bitmap_queue_get() - Try to allocate a free bit from a &struct
+ * scale_bitmap_queue with preemption already disabled.
+ * @sbq: Bitmap queue to allocate from.
+ * @round_robin: See scale_bitmap_get().
+ *
+ * Return: Non-negative allocated bit number if successful, -1 otherwise.
+ */
+static inline int __scale_bitmap_queue_get(struct scale_bitmap_queue *sbq,
+					   bool round_robin)
+{
+	return scale_bitmap_get(&sbq->map, this_cpu_ptr(sbq->alloc_hint),
+				round_robin);
+}
+
+/**
+ * scale_bitmap_queue_get() - Try to allocate a free bit from a &struct
+ * scale_bitmap_queue.
+ * @sbq: Bitmap queue to allocate from.
+ * @round_robin: See scale_bitmap_get().
+ * @cpu: Output parameter; will contain the CPU we ran on (e.g., to be passed to
+ *       scale_bitmap_queue_clear()).
+ *
+ * Return: Non-negative allocated bit number if successful, -1 otherwise.
+ */
+static inline int scale_bitmap_queue_get(struct scale_bitmap_queue *sbq,
+					 bool round_robin, unsigned int *cpu)
+{
+	int ret;
+
+	*cpu = get_cpu();
+	ret = __scale_bitmap_queue_get(sbq, round_robin);
+	put_cpu();
+	return ret;
+}
+
+/**
  * scale_bitmap_queue_clear() - Free an allocated bit and wake up waiters on a
  * &struct scale_bitmap_queue.
  * @sbq: Bitmap to free from.
  * @nr: Bit number to free.
+ * @round_robin: See scale_bitmap_get().
+ * @cpu: CPU the bit was allocated on.
  */
-void scale_bitmap_queue_clear(struct scale_bitmap_queue *sbq, unsigned int nr);
+void scale_bitmap_queue_clear(struct scale_bitmap_queue *sbq, unsigned int nr,
+			      bool round_robin, unsigned int cpu);
 
 static inline int sbq_index_inc(int index)
 {

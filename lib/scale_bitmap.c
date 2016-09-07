@@ -206,6 +206,12 @@ int scale_bitmap_queue_init_node(struct scale_bitmap_queue *sbq,
 	if (ret)
 		return ret;
 
+	sbq->alloc_hint = alloc_percpu_gfp(unsigned int, flags);
+	if (!sbq->alloc_hint) {
+		scale_bitmap_free(&sbq->map);
+		return -ENOMEM;
+	}
+
 	sbq->wake_batch = SBQ_WAKE_BATCH;
 	if (sbq->wake_batch > depth / SBQ_WAIT_QUEUES)
 		sbq->wake_batch = max(1U, depth / SBQ_WAIT_QUEUES);
@@ -214,6 +220,7 @@ int scale_bitmap_queue_init_node(struct scale_bitmap_queue *sbq,
 
 	sbq->ws = kzalloc_node(SBQ_WAIT_QUEUES * sizeof(*sbq->ws), flags, node);
 	if (!sbq->ws) {
+		free_percpu(sbq->alloc_hint);
 		scale_bitmap_free(&sbq->map);
 		return -ENOMEM;
 	}
@@ -259,7 +266,8 @@ static struct sbq_wait_state *sbq_wake_ptr(struct scale_bitmap_queue *sbq)
 	return NULL;
 }
 
-void scale_bitmap_queue_clear(struct scale_bitmap_queue *sbq, unsigned int nr)
+void scale_bitmap_queue_clear(struct scale_bitmap_queue *sbq, unsigned int nr,
+			      bool round_robin, unsigned int cpu)
 {
 	struct sbq_wait_state *ws;
 	int wait_cnt;
@@ -271,7 +279,7 @@ void scale_bitmap_queue_clear(struct scale_bitmap_queue *sbq, unsigned int nr)
 
 	ws = sbq_wake_ptr(sbq);
 	if (!ws)
-		return;
+		goto update_cache;
 
 	wait_cnt = atomic_dec_return(&ws->wait_cnt);
 	if (unlikely(wait_cnt < 0))
@@ -281,6 +289,10 @@ void scale_bitmap_queue_clear(struct scale_bitmap_queue *sbq, unsigned int nr)
 		sbq_index_atomic_inc(&sbq->wake_index);
 		wake_up(&ws->wait);
 	}
+
+update_cache:
+	if (likely(!round_robin))
+		*per_cpu_ptr(sbq->alloc_hint, cpu) = nr;
 }
 EXPORT_SYMBOL_GPL(scale_bitmap_queue_clear);
 
