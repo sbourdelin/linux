@@ -26,6 +26,32 @@
 #include "i915_drv.h"
 #include "intel_guc.h"
 
+static void host2guc_slpc(struct drm_i915_private *dev_priv, u32 *data, u32 len)
+{
+	int ret = i915_guc_action(&dev_priv->guc, data, len);
+
+	if (!ret) {
+		ret = I915_READ(SOFT_SCRATCH(1));
+		ret &= SLPC_EVENT_STATUS_MASK;
+	}
+
+	if (ret)
+		DRM_ERROR("event 0x%x status %d\n", (data[1] >> 8), ret);
+}
+
+static void host2guc_slpc_reset(struct drm_i915_private *dev_priv)
+{
+	u32 data[4];
+	u32 shared_data_gtt_offset = i915_ggtt_offset(dev_priv->guc.slpc.vma);
+
+	data[0] = HOST2GUC_ACTION_SLPC_REQUEST;
+	data[1] = SLPC_EVENT(SLPC_EVENT_RESET, 2);
+	data[2] = shared_data_gtt_offset;
+	data[3] = 0;
+
+	host2guc_slpc(dev_priv, data, 4);
+}
+
 static unsigned int slpc_get_platform_sku(struct drm_i915_private *dev_priv)
 {
 	enum slpc_platform_sku platform_sku;
@@ -131,4 +157,7 @@ void intel_slpc_disable(struct drm_i915_private *dev_priv)
 
 void intel_slpc_enable(struct drm_i915_private *dev_priv)
 {
+	host2guc_slpc_reset(dev_priv);
+	DRM_INFO("SLPC Enabled\n");
+	dev_priv->guc.slpc.enabled = true;
 }
