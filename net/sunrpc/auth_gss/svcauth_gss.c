@@ -695,7 +695,8 @@ gss_verify_header(struct svc_rqst *rqstp, struct rsc *rsci,
 	if (!gss_check_seq_num(rsci, gc->gc_seq)) {
 		dprintk("RPC:       svcauth_gss: discarding request with "
 				"old sequence number %d\n", gc->gc_seq);
-		return SVC_DROP;
+		/* Signal to the client that an RPC message was lost */
+		return SVC_CLOSE;
 	}
 	return SVC_OK;
 }
