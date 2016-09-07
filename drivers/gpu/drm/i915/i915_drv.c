@@ -1135,7 +1135,13 @@ static void i915_driver_register(struct drm_i915_private *dev_priv)
 	if (IS_GEN5(dev_priv))
 		intel_gpu_ips_init(dev_priv);
 
-	i915_audio_component_init(dev_priv);
+	if (intel_lpe_audio_detect(dev_priv)) {
+		if (intel_lpe_audio_setup(dev_priv) < 0)
+			DRM_ERROR("failed to setup LPE Audio bridge\n");
+	}
+
+	if (!IS_LPE_AUDIO_ENABLED(dev_priv))
+		i915_audio_component_init(dev_priv);
 
 	/*
 	 * Some ports require correctly set-up hpd registers for detection to
@@ -1153,7 +1159,10 @@ static void i915_driver_register(struct drm_i915_private *dev_priv)
  */
 static void i915_driver_unregister(struct drm_i915_private *dev_priv)
 {
-	i915_audio_component_cleanup(dev_priv);
+	if (IS_LPE_AUDIO_ENABLED(dev_priv))
+		intel_lpe_audio_teardown(dev_priv);
+	else
+		i915_audio_component_cleanup(dev_priv);
 
 	intel_gpu_ips_teardown();
 	acpi_video_unregister();

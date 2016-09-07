@@ -1790,6 +1790,13 @@ static irqreturn_t valleyview_irq_handler(int irq, void *arg)
 		 * signalled in iir */
 		valleyview_pipestat_irq_ack(dev_priv, iir, pipe_stats);
 
+		if (IS_LPE_AUDIO_ENABLED(dev_priv))
+			if (IS_LPE_AUDIO_IRQ_VALID(dev_priv))
+				if (iir & (I915_LPE_PIPE_A_INTERRUPT |
+					I915_LPE_PIPE_B_INTERRUPT |
+					I915_LPE_PIPE_C_INTERRUPT))
+					intel_lpe_audio_irq_handler(dev_priv);
+
 		/*
 		 * VLV_IIR is single buffered, and reflects the level
 		 * from PIPESTAT/PORT_HOTPLUG_STAT, hence clear it last.
@@ -1844,6 +1851,13 @@ static irqreturn_t cherryview_irq_handler(int irq, void *arg)
 
 		ret = IRQ_HANDLED;
 
+		if (IS_LPE_AUDIO_ENABLED(dev_priv))
+			if (IS_LPE_AUDIO_IRQ_VALID(dev_priv))
+				if (iir & (I915_LPE_PIPE_A_INTERRUPT |
+					I915_LPE_PIPE_B_INTERRUPT |
+					I915_LPE_PIPE_C_INTERRUPT))
+					intel_lpe_audio_irq_handler(dev_priv);
+
 		/*
 		 * Theory on interrupt generation, based on empirical evidence:
 		 *
@@ -1869,6 +1883,13 @@ static irqreturn_t cherryview_irq_handler(int irq, void *arg)
 		/* Call regardless, as some status bits might not be
 		 * signalled in iir */
 		valleyview_pipestat_irq_ack(dev_priv, iir, pipe_stats);
+
+		if (IS_LPE_AUDIO_ENABLED(dev_priv))
+			if (IS_LPE_AUDIO_IRQ_VALID(dev_priv))
+				if (iir & (I915_LPE_PIPE_A_INTERRUPT |
+					I915_LPE_PIPE_B_INTERRUPT |
+					I915_LPE_PIPE_C_INTERRUPT))
+					intel_lpe_audio_irq_handler(dev_priv);
 
 		/*
 		 * VLV_IIR is single buffered, and reflects the level
