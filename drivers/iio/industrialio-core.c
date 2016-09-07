@@ -81,6 +81,7 @@ static const char * const iio_chan_type_name_spec[] = {
 	[IIO_PH] = "ph",
 	[IIO_UVINDEX] = "uvindex",
 	[IIO_ELECTRICALCONDUCTIVITY] = "electricalconductivity",
+	[IIO_COUNT] = "count",
 };
 
 static const char * const iio_modifier_names[] = {
@@ -151,6 +152,12 @@ static const char * const iio_chan_info_postfix[] = {
 	[IIO_CHAN_INFO_DEBOUNCE_TIME] = "debounce_time",
 	[IIO_CHAN_INFO_CALIBEMISSIVITY] = "calibemissivity",
 	[IIO_CHAN_INFO_OVERSAMPLING_RATIO] = "oversampling_ratio",
+	[IIO_CHAN_INFO_FLAGS] = "flags",
+	[IIO_CHAN_INFO_DIRECTION] = "direction",
+	[IIO_CHAN_INFO_INDEX] = "index",
+	[IIO_CHAN_INFO_MODE] = "mode",
+	[IIO_CHAN_INFO_PRESET] = "preset",
+	[IIO_CHAN_INFO_PRESET_EN] = "preset_enable",
 };
 
 /**
