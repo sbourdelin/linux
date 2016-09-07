@@ -205,4 +205,5 @@ void intel_slpc_set_param(struct drm_i915_private *dev_priv,
 void intel_slpc_get_param(struct drm_i915_private *dev_priv,
 			  enum slpc_param_id id,
 			  int *overriding, u32 *value);
+void intel_slpc_query_task_state(struct drm_i915_private *dev_priv);
 #endif
