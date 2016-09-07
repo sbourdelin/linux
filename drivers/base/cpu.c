@@ -261,6 +261,7 @@ static struct attribute_group topology_attr_group = {
 	.name = "topology"
 };
 
+#ifndef CONFIG_PERMANENT_CPU_TOPOLOGY
 /* Add/Remove cpu_topology interface for CPU device */
 static int topology_add_dev(unsigned int cpu)
 {
@@ -317,10 +318,14 @@ out:
 }
 
 device_initcall(topology_sysfs_init);
+#endif
 
 static const struct attribute_group *common_cpu_attr_groups[] = {
 #ifdef CONFIG_KEXEC
 	&crash_note_cpu_attr_group,
+#endif
+#ifdef CONFIG_PERMANENT_CPU_TOPOLOGY
+	&topology_attr_group,
 #endif
 	NULL
 };
@@ -328,6 +333,9 @@ static const struct attribute_group *common_cpu_attr_groups[] = {
 static const struct attribute_group *hotplugable_cpu_attr_groups[] = {
 #ifdef CONFIG_KEXEC
 	&crash_note_cpu_attr_group,
+#endif
+#ifdef CONFIG_PERMANENT_CPU_TOPOLOGY
+	&topology_attr_group,
 #endif
 	NULL
 };

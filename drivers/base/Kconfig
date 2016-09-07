@@ -334,4 +334,16 @@ config CMA_ALIGNMENT
 
 endif
 
+config PERMANENT_CPU_TOPOLOGY
+	bool "Permanent CPU Topology"
+	depends on HOTPLUG_CPU
+	def_bool y if X86_64
+	help
+	  This option configures CPU topology to be permanent for the lifetime
+	  of the CPU (until it is physically removed).  Selecting Y here
+	  results in the kernel reporting the physical location for offlined
+	  CPUs.
+
+	  If unsure, leave the default value as is.
+
 endmenu
