@@ -90,10 +90,10 @@ struct i915_guc_client {
 };
 
 /*
- * These signed ranges represent user-requested preferences.
- * Out-of-range values from the user will be clipped towards
- * zero: any negative value is treated as -1, anything over 2
- * is just 2. ANY user-supplied value also taints the kernel.
+ * These values represent user-requested preferences; any other value will be
+ * treated as DEFAULT, so the driver will then choose an appropriate value.
+ *
+ * ANY user-supplied value (even DEFAULT) also taints the kernel.
  */
 enum {
 	GUC_SUBMISSION_DEFAULT = -1,
