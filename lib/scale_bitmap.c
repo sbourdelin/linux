@@ -212,7 +212,7 @@ int scale_bitmap_queue_init_node(struct scale_bitmap_queue *sbq,
 
 	atomic_set(&sbq->wake_index, 0);
 
-	sbq->ws = kzalloc(SBQ_WAIT_QUEUES * sizeof(*sbq->ws), flags);
+	sbq->ws = kzalloc_node(SBQ_WAIT_QUEUES * sizeof(*sbq->ws), flags, node);
 	if (!sbq->ws) {
 		scale_bitmap_free(&sbq->map);
 		return -ENOMEM;
