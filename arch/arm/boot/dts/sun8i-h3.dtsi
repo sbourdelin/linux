@@ -443,6 +443,8 @@
 			resets = <&ccu RST_BUS_UART2>;
 			dmas = <&dma 8>, <&dma 8>;
 			dma-names = "rx", "tx";
+			pinctrl-names = "default";
+			pinctrl-0 = <&uart2_rts_cts_pins>;
 			status = "disabled";
 		};
 
@@ -456,6 +458,8 @@
 			resets = <&ccu RST_BUS_UART3>;
 			dmas = <&dma 9>, <&dma 9>;
 			dma-names = "rx", "tx";
+			pinctrl-names = "default";
+			pinctrl-0 = <&uart3_rts_cts_pins>;
 			status = "disabled";
 		};
 
