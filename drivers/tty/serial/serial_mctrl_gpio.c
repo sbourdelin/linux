@@ -17,6 +17,7 @@
 #include <linux/err.h>
 #include <linux/device.h>
 #include <linux/irq.h>
+#include <linux/err.h>
 #include <linux/gpio/consumer.h>
 #include <linux/termios.h>
 #include <linux/serial_core.h>
@@ -71,6 +72,13 @@ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
 	return gpios->gpio[gidx];
 }
 EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
+
+bool mctrl_gpio_use_rtscts(struct mctrl_gpios *gpios)
+{
+	return !IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(gpios, UART_GPIO_CTS)) &&
+		!IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(gpios, UART_GPIO_RTS));
+}
+EXPORT_SYMBOL_GPL(mctrl_gpio_use_rtscts);
 
 unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
 {
