@@ -1115,6 +1115,8 @@ void gen6_disable_rps_interrupts(struct drm_i915_private *dev_priv);
 u32 gen6_sanitize_rps_pm_mask(struct drm_i915_private *dev_priv, u32 mask);
 void intel_runtime_pm_disable_interrupts(struct drm_i915_private *dev_priv);
 void intel_runtime_pm_enable_interrupts(struct drm_i915_private *dev_priv);
+int i915_enable_hdmi_audio_int(struct drm_i915_private *dev_priv);
+int i915_disable_hdmi_audio_int(struct drm_i915_private *dev_priv);
 static inline bool intel_irqs_enabled(struct drm_i915_private *dev_priv)
 {
 	/*

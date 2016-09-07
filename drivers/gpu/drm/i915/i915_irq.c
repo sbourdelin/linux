@@ -2817,6 +2817,67 @@ static void gen8_disable_vblank(struct drm_device *dev, unsigned int pipe)
 	spin_unlock_irqrestore(&dev_priv->irq_lock, irqflags);
 }
 
+/* Added for HDMI Audio */
+int i915_enable_hdmi_audio_int(struct drm_i915_private *dev_priv)
+{
+	unsigned long irqflags;
+	u32 imr, int_bit;
+	int pipe = -1;
+
+	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
+
+	imr = I915_READ(VLV_IMR);
+
+	if (IS_CHERRYVIEW(&dev_priv->drm)) {
+		pipe = PIPE_C;
+		int_bit = (pipe ? (I915_LPE_PIPE_B_INTERRUPT >>
+					((pipe - 1) * 9)) :
+					I915_LPE_PIPE_A_INTERRUPT);
+		imr &= ~int_bit;
+	} else {
+		/* Audio is on Stream A but uses HDMI PIPE B */
+		pipe = PIPE_B;
+		imr &= ~I915_LPE_PIPE_B_INTERRUPT;
+	}
+
+	I915_WRITE(VLV_IMR, imr);
+	I915_WRITE(VLV_IER, ~imr);
+	POSTING_READ(VLV_IER);
+	spin_unlock_irqrestore(&dev_priv->irq_lock, irqflags);
+
+	return 0;
+}
+
+/* Added for HDMI Audio */
+int i915_disable_hdmi_audio_int(struct drm_i915_private *dev_priv)
+{
+	unsigned long irqflags;
+	u32 imr, int_bit;
+	int pipe = -1;
+
+	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
+	imr = I915_READ(VLV_IMR);
+
+	if (IS_CHERRYVIEW(&dev_priv->drm)) {
+		pipe = PIPE_C;
+		int_bit = (pipe ? (I915_LPE_PIPE_B_INTERRUPT >>
+					((pipe - 1) * 9)) :
+					I915_LPE_PIPE_A_INTERRUPT);
+		imr |= int_bit;
+	} else {
+		pipe = PIPE_B;
+		imr |= I915_LPE_PIPE_B_INTERRUPT;
+	}
+
+	I915_WRITE(VLV_IER, ~imr);
+	I915_WRITE(VLV_IMR, imr);
+	POSTING_READ(VLV_IMR);
+
+	spin_unlock_irqrestore(&dev_priv->irq_lock, irqflags);
+
+	return 0;
+}
+
 static bool
 ipehr_is_semaphore_wait(struct intel_engine_cs *engine, u32 ipehr)
 {
@@ -3298,6 +3359,14 @@ static void vlv_display_irq_postinstall(struct drm_i915_private *dev_priv)
 		enable_mask |= I915_DISPLAY_PIPE_C_EVENT_INTERRUPT;
 
 	WARN_ON(dev_priv->irq_mask != ~0);
+
+	if (IS_LPE_AUDIO_ENABLED(dev_priv)) {
+		u32 val = (I915_LPE_PIPE_A_INTERRUPT |
+			I915_LPE_PIPE_B_INTERRUPT |
+			I915_LPE_PIPE_C_INTERRUPT);
+
+		enable_mask |= val;
+	}
 
 	dev_priv->irq_mask = ~enable_mask;
 
