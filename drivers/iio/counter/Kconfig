@@ -1,0 +1,23 @@
+#
+# Counter devices
+#
+# When adding new entries keep the list in alphabetical order
+
+menu "Counters"
+
+config 104_QUAD_8
+	tristate "ACCES 104-QUAD-8 driver"
+	depends on X86 && ISA_BUS_API
+	help
+	  Say yes here to build support for the ACCES 104-QUAD-8 quadrature
+	  encoder counter/interface device family (104-QUAD-8, 104-QUAD-4).
+
+	  Index interrupts (FLG1) are not supported by this driver. Furthermore,
+	  the index function is disabled; non-synchorous mode is enabled for
+	  non-quadrature and quadrature count modes. Performing a write of 0 to
+	  a counter's flags interface clears the respective clearable flags.
+
+	  The base port addresses for the devices may be configured via the base
+	  array module parameter.
+
+endmenu
