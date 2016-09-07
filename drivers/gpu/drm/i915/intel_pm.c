@@ -6656,7 +6656,8 @@ void intel_init_gt_powersave(struct drm_i915_private *dev_priv)
 
 void intel_cleanup_gt_powersave(struct drm_i915_private *dev_priv)
 {
-	if (intel_slpc_enabled())
+	if (intel_slpc_enabled() &&
+	    dev_priv->guc.slpc.vma)
 		intel_slpc_cleanup(dev_priv);
 	else if (IS_VALLEYVIEW(dev_priv))
 		valleyview_cleanup_gt_powersave(dev_priv);
@@ -6746,7 +6747,8 @@ void intel_enable_gt_powersave(struct drm_i915_private *dev_priv)
 
 	mutex_lock(&dev_priv->rps.hw_lock);
 
-	if (intel_slpc_enabled()) {
+	if (intel_slpc_enabled() &&
+	    dev_priv->guc.slpc.vma) {
 		gen9_enable_rc6(dev_priv);
 		intel_slpc_enable(dev_priv);
 		if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))
