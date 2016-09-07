@@ -224,6 +224,8 @@ config SCHED_TRACER
 config HWLAT_TRACER
 	bool "Tracer to detect hardware latencies (like SMIs)"
 	select GENERIC_TRACER
+	select TRACER_MAX_TRACE
+	select TRACER_SNAPSHOT
 	help
 	 This tracer, when enabled will create one or more kernel threads,
 	 depening on what the cpumask file is set to, which each thread
