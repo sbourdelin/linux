@@ -117,6 +117,17 @@ static int dwc3_pci_quirks(struct pci_dev *pdev, struct platform_device *dwc3)
 				usleep_range(10000, 11000);
 			}
 		}
+
+		if (pdev->device == PCI_DEVICE_ID_INTEL_BSW) {
+			struct property_entry bsw_properties[] = {
+				PROPERTY_ENTRY_BOOL(
+					"snps,avoid_clearpendin_quirk"),
+				{ }
+			};
+
+			return platform_device_add_properties(dwc3,
+							      bsw_properties);
+		}
 	}
 
 	if (pdev->vendor == PCI_VENDOR_ID_SYNOPSYS &&

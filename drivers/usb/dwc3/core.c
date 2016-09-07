@@ -934,6 +934,9 @@ static int dwc3_probe(struct platform_device *pdev)
 	device_property_read_u32(dev, "snps,quirk-frame-length-adjustment",
 				 &dwc->fladj);
 
+	dwc->avoid_clearpendin_quirk = device_property_read_bool(dev,
+				"snps,avoid_clearpendin_quirk");
+
 	dwc->lpm_nyet_threshold = lpm_nyet_threshold;
 	dwc->tx_de_emphasis = tx_de_emphasis;
 
