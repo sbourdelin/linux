@@ -88,6 +88,9 @@
 #define SCLK_PVTM_GPU		124
 #define SCLK_CRYPTO		125
 #define SCLK_MIPIDSI_24M	126
+#define SCLK_I2S_PRE		127
+#define SCLK_I2S_SRC		128
+#define SCLK_I2S_FRAC		129
 
 #define SCLK_MAC		151
 #define SCLK_MACREF_OUT		152
