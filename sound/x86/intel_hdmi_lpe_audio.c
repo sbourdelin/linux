@@ -36,6 +36,7 @@
 #include <sound/initval.h>
 #include <drm/intel_lpe_audio.h>
 #include "intel_hdmi_lpe_audio.h"
+#include "intel_hdmi_audio.h"
 
 /* globals*/
 struct platform_device *gpdev;
@@ -563,6 +564,8 @@ static int hdmi_lpe_audio_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, ctx);
 
+	ret = hdmi_audio_probe((void *)pdev);
+
 	if (pdata->notify_pending) {
 		pr_debug("%s: handle pending notification\n", __func__);
 
@@ -585,6 +588,8 @@ static int hdmi_lpe_audio_remove(struct platform_device *pdev)
 	struct hdmi_lpe_audio_ctx *ctx;
 
 	pr_debug("Enter %s\n", __func__);
+
+	hdmi_audio_remove(pdev);
 
 	/* get context, release resources */
 	ctx = platform_get_drvdata(pdev);
