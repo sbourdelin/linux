@@ -146,6 +146,12 @@ struct intel_guc {
 	uint32_t last_seqno[I915_NUM_ENGINES];
 };
 
+static inline int intel_slpc_enabled(void)
+{
+	WARN_ON(i915.enable_slpc < 0);
+	return i915.enable_slpc;
+}
+
 /* intel_guc_loader.c */
 extern void intel_guc_init(struct drm_device *dev);
 extern int intel_guc_setup(struct drm_device *dev);
@@ -153,6 +159,7 @@ extern void intel_guc_fini(struct drm_device *dev);
 extern const char *intel_guc_fw_status_repr(enum intel_guc_fw_status status);
 extern int intel_guc_suspend(struct drm_device *dev);
 extern int intel_guc_resume(struct drm_device *dev);
+extern void sanitize_slpc_option(struct drm_i915_private *dev_priv);
 
 /* i915_guc_submission.c */
 int i915_guc_action(struct intel_guc *guc, u32 *data, u32 len);

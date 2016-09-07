@@ -144,6 +144,25 @@ static void direct_interrupts_to_guc(struct drm_i915_private *dev_priv)
 	}
 }
 
+void sanitize_slpc_option(struct drm_i915_private *dev_priv)
+{
+	/* Handle default case */
+	if (i915.enable_slpc < 0)
+		i915.enable_slpc = HAS_SLPC(dev_priv);
+
+	/* slpc requires hardware support and compatible firmware */
+	if (!HAS_SLPC(dev_priv))
+		i915.enable_slpc = 0;
+
+	/* slpc requires guc loaded */
+	if (!i915.enable_guc_loading)
+		i915.enable_slpc = 0;
+
+	/* slpc requires guc submission */
+	if (!i915.enable_guc_submission)
+		i915.enable_slpc = 0;
+}
+
 static u32 get_gttype(struct drm_i915_private *dev_priv)
 {
 	/* XXX: GT type based on PCI device ID? field seems unused by fw */
