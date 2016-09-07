@@ -1884,17 +1884,43 @@ static int fdp1_buf_prepare(struct vb2_buffer *vb)
 
 	q_data = get_q_data(ctx, vb->vb2_queue->type);
 
-	/* Default to Progressive if ANY selected */
-	if (vbuf->field == V4L2_FIELD_ANY)
-		vbuf->field = V4L2_FIELD_NONE;
+	if (V4L2_TYPE_IS_OUTPUT(vb->vb2_queue->type)) {
+		bool field_valid = true;
 
-	/* We only support progressive CAPTURE */
-	if (!V4L2_TYPE_IS_OUTPUT(vb->vb2_queue->type) &&
-	     vbuf->field != V4L2_FIELD_NONE) {
-		dprintk(ctx->fdp1, "field isn't supported on capture\n");
+		/* Validate the buffer field. */
+		switch (q_data->format.field) {
+		case V4L2_FIELD_NONE:
+			if (vbuf->field != V4L2_FIELD_NONE)
+				field_valid = false;
+			break;
+
+		case V4L2_FIELD_ALTERNATE:
+			if (vbuf->field != V4L2_FIELD_TOP &&
+			    vbuf->field != V4L2_FIELD_BOTTOM)
+				field_valid = false;
+			break;
+
+		case V4L2_FIELD_INTERLACED:
+		case V4L2_FIELD_SEQ_TB:
+		case V4L2_FIELD_SEQ_BT:
+		case V4L2_FIELD_INTERLACED_TB:
+		case V4L2_FIELD_INTERLACED_BT:
+			if (vbuf->field != q_data->format.field)
+				field_valid = false;
+			break;
+		}
+
+		if (!field_valid) {
+			dprintk(ctx->fdp1,
+				"buffer field %u invalid for format field %u\n",
+				vbuf->field, q_data->format.field);
 			return -EINVAL;
+		}
+	} else {
+		vbuf->field = V4L2_FIELD_NONE;
 	}
 
+	/* Validate the planes sizes. */
 	for (i = 0; i < q_data->format.num_planes; i++) {
 		unsigned long size = q_data->format.plane_fmt[i].sizeimage;
 
