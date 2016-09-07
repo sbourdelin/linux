@@ -132,6 +132,7 @@
 #define   GUC_LOG_VERBOSITY_HIGH	(2 << GUC_LOG_VERBOSITY_SHIFT)
 #define   GUC_LOG_VERBOSITY_ULTRA	(3 << GUC_LOG_VERBOSITY_SHIFT)
 /* Verbosity range-check limits, without the shift */
+#define	  GUC_LOG_VERBOSITY_NONE	(-1)
 #define	  GUC_LOG_VERBOSITY_MIN		0
 #define	  GUC_LOG_VERBOSITY_MAX		3
 #define	  GUC_LOG_VERBOSITY_MASK	0x0000000f

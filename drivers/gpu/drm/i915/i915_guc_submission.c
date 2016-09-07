@@ -849,7 +849,7 @@ static void guc_create_log(struct intel_guc *guc)
 		vma = guc_allocate_vma(guc, size);
 		if (IS_ERR(vma)) {
 			/* logging will be off */
-			i915.guc_log_level = -1;
+			i915.guc_log_level = GUC_LOG_VERBOSITY_NONE;
 			return;
 		}
 

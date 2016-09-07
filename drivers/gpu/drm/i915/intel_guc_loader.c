@@ -189,7 +189,7 @@ static void set_guc_init_params(struct drm_i915_private *dev_priv)
 	params[GUC_CTL_FEATURE] |= GUC_CTL_DISABLE_SCHEDULER |
 			GUC_CTL_VCS2_ENABLED;
 
-	if (i915.guc_log_level >= 0) {
+	if (i915.guc_log_level > GUC_LOG_VERBOSITY_NONE) {
 		params[GUC_CTL_LOG_PARAMS] = guc->log_flags;
 		params[GUC_CTL_DEBUG] =
 			i915.guc_log_level << GUC_LOG_VERBOSITY_SHIFT;
