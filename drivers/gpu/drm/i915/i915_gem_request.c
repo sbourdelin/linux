@@ -23,6 +23,7 @@
  */
 
 #include <linux/prefetch.h>
+#include <linux/fence-array.h>
 
 #include "i915_drv.h"
 
@@ -489,6 +490,41 @@ i915_gem_request_await_request(struct drm_i915_gem_request *to,
 	}
 
 	from->engine->semaphore.sync_seqno[idx] = from->fence.seqno;
+	return 0;
+}
+
+int
+i915_gem_request_await_fence(struct drm_i915_gem_request *req,
+			     struct fence *fence)
+{
+	struct fence_array *array;
+	int i;
+
+	if (test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags))
+		return 0;
+
+	if (fence_is_i915(fence))
+		return i915_gem_request_await_request(req, to_request(fence));
+
+	if (!fence_is_array(fence))
+		return i915_sw_fence_await_dma_fence(&req->submit,
+						     fence, GFP_KERNEL);
+
+	array = to_fence_array(fence);
+	for (i = 0; i < array->num_fences; i++) {
+		struct fence *child = array->fences[i];
+		int ret;
+
+		if (fence_is_i915(child))
+			ret = i915_gem_request_await_request(req,
+							     to_request(child));
+		else
+			ret = i915_sw_fence_await_dma_fence(&req->submit,
+							    child, GFP_KERNEL);
+		if (ret < 0)
+			return ret;
+	}
+
 	return 0;
 }
 
