@@ -263,7 +263,8 @@ struct i2c_mux_core *i2c_mux_alloc(struct i2c_adapter *parent,
 }
 EXPORT_SYMBOL_GPL(i2c_mux_alloc);
 
-int i2c_mux_add_adapter(struct i2c_mux_core *muxc,
+int i2c_mux_add_reparented_adapter(struct module *owner,
+			struct i2c_mux_core *muxc,
 			u32 force_nr, u32 chan_id,
 			unsigned int class)
 {
@@ -305,7 +306,7 @@ int i2c_mux_add_adapter(struct i2c_mux_core *muxc,
 	/* Now fill out new adapter structure */
 	snprintf(priv->adap.name, sizeof(priv->adap.name),
 		 "i2c-%d-mux (chan_id %d)", i2c_adapter_id(parent), chan_id);
-	priv->adap.owner = THIS_MODULE;
+	priv->adap.owner = owner;
 	priv->adap.algo = &priv->algo;
 	priv->adap.algo_data = priv;
 	priv->adap.dev.parent = &parent->dev;
@@ -384,6 +385,15 @@ int i2c_mux_add_adapter(struct i2c_mux_core *muxc,
 
 	muxc->adapter[muxc->num_adapters++] = &priv->adap;
 	return 0;
+}
+EXPORT_SYMBOL_GPL(i2c_mux_add_reparented_adapter);
+
+int i2c_mux_add_adapter(struct i2c_mux_core *muxc,
+			u32 force_nr, u32 chan_id,
+			unsigned int class)
+{
+	return i2c_mux_add_reparented_adapter(THIS_MODULE, muxc, force_nr,
+			chan_id, class);
 }
 EXPORT_SYMBOL_GPL(i2c_mux_add_adapter);
 

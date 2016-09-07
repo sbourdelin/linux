@@ -64,6 +64,21 @@ struct i2c_adapter *i2c_root_adapter(struct device *dev);
  * Called to create an i2c bus on a multiplexed bus segment.
  * The chan_id parameter is passed to the select and deselect
  * callback functions to perform hardware-specific mux control.
+ *
+ * Unlike the simple i2c_add_mux_adapter, this is passed in the caller's
+ * module reference in order to reparent the adapter from the perspective of
+ * the i2c hierarchy. This allows the caller to be reference locked while the
+ * i2c adapter is in use.
+ */
+int i2c_mux_add_reparented_adapter(struct module *owner,
+				   struct i2c_mux_core *muxc,
+				   u32 force_nr, u32 chan_id,
+				   unsigned int class);
+
+/*
+ * Called to create an i2c bus on a multiplexed bus segment.
+ * The chan_id parameter is passed to the select and deselect
+ * callback functions to perform hardware-specific mux control.
  */
 int i2c_mux_add_adapter(struct i2c_mux_core *muxc,
 			u32 force_nr, u32 chan_id,
