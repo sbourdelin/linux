@@ -44,10 +44,12 @@ static long try_increment_locked_vm(long npages)
 	down_write(&current->mm->mmap_sem);
 	locked = current->mm->locked_vm + npages;
 	lock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
-	if (locked > lock_limit && !capable(CAP_IPC_LOCK))
+	if (locked > lock_limit && !capable(CAP_IPC_LOCK)) {
+		rlimit_exceeded(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
 		ret = -ENOMEM;
-	else
+	} else {
 		current->mm->locked_vm += npages;
+	}
 
 	pr_debug("[%d] RLIMIT_MEMLOCK +%ld %ld/%ld%s\n", current->pid,
 			npages << PAGE_SHIFT,

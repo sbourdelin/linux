@@ -303,6 +303,7 @@ static inline int __scif_check_inc_pinned_vm(struct mm_struct *mm,
 		dev_err(scif_info.mdev.this_device,
 			"locked(%lu) > lock_limit(%lu)\n",
 			locked, lock_limit);
+		rlimit_exceeded(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
 		return -ENOMEM;
 	}
 	mm->pinned_vm = locked;

@@ -362,6 +362,7 @@ __sigqueue_alloc(int sig, struct task_struct *t, gfp_t flags, int override_rlimi
 {
 	struct sigqueue *q = NULL;
 	struct user_struct *user;
+	int nsigs;
 
 	/*
 	 * Protect access to @t credentials. This can go away when all
@@ -372,11 +373,11 @@ __sigqueue_alloc(int sig, struct task_struct *t, gfp_t flags, int override_rlimi
 	atomic_inc(&user->sigpending);
 	rcu_read_unlock();
 
-	if (override_rlimit ||
-	    atomic_read(&user->sigpending) <=
-			task_rlimit(t, RLIMIT_SIGPENDING)) {
+	nsigs = atomic_read(&user->sigpending);
+	if (override_rlimit || nsigs <= task_rlimit(t, RLIMIT_SIGPENDING)) {
 		q = kmem_cache_alloc(sigqueue_cachep, flags);
 	} else {
+		rlimit_exceeded_task(RLIMIT_SIGPENDING, nsigs, t);
 		print_dropped_signal(sig);
 	}
 

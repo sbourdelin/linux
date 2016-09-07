@@ -280,6 +280,8 @@ static long vfio_pin_pages(unsigned long vaddr, long npage,
 		put_pfn(*pfn_base, prot);
 		pr_warn("%s: RLIMIT_MEMLOCK (%ld) exceeded\n", __func__,
 			limit << PAGE_SHIFT);
+		rlimit_exceeded(RLIMIT_MEMLOCK,
+				(current->mm->locked_vm + 1) << PAGE_SHIFT);
 		return -ENOMEM;
 	}
 
@@ -308,6 +310,8 @@ static long vfio_pin_pages(unsigned long vaddr, long npage,
 			put_pfn(pfn, prot);
 			pr_warn("%s: RLIMIT_MEMLOCK (%ld) exceeded\n",
 				__func__, limit << PAGE_SHIFT);
+			rlimit_exceeded(RLIMIT_MEMLOCK,
+					(current->mm->locked_vm + i + 1) << PAGE_SHIFT);
 			break;
 		}
 	}

@@ -2002,8 +2002,13 @@ static inline int check_data_rlimit(unsigned long rlim,
 				    unsigned long start_data)
 {
 	if (rlim < RLIM_INFINITY) {
-		if (((new - start) + (end_data - start_data)) > rlim)
+		unsigned long data_size;
+
+		data_size = (new - start) + (end_data - start_data);
+		if (data_size > rlim) {
+			rlimit_exceeded(RLIMIT_DATA, data_size);
 			return -ENOSPC;
+		}
 	}
 
 	return 0;

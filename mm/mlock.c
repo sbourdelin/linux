@@ -28,6 +28,9 @@ bool can_do_mlock(void)
 {
 	if (rlimit(RLIMIT_MEMLOCK) != 0)
 		return true;
+	else
+		rlimit_exceeded(RLIMIT_MEMLOCK, (u64)-1);
+
 	if (capable(CAP_IPC_LOCK))
 		return true;
 	return false;
@@ -643,6 +646,8 @@ static __must_check int do_mlock(unsigned long start, size_t len, vm_flags_t fla
 	/* check against resource limits */
 	if ((locked <= lock_limit) || capable(CAP_IPC_LOCK))
 		error = apply_vma_lock_flags(start, len, flags);
+	else
+		rlimit_exceeded(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
 
 	up_write(&current->mm->mmap_sem);
 	if (error)
@@ -757,6 +762,10 @@ SYSCALL_DEFINE1(mlockall, int, flags)
 	if (!(flags & MCL_CURRENT) || (current->mm->total_vm <= lock_limit) ||
 	    capable(CAP_IPC_LOCK))
 		ret = apply_mlockall_flags(flags);
+	else
+		rlimit_exceeded(RLIMIT_MEMLOCK,
+				current->mm->total_vm << PAGE_SHIFT);
+
 	up_write(&current->mm->mmap_sem);
 	if (!ret && (flags & MCL_CURRENT))
 		mm_populate(0, TASK_SIZE);
@@ -793,8 +802,11 @@ int user_shm_lock(size_t size, struct user_struct *user)
 	lock_limit >>= PAGE_SHIFT;
 	spin_lock(&shmlock_user_lock);
 	if (!allowed &&
-	    locked + user->locked_shm > lock_limit && !capable(CAP_IPC_LOCK))
+	    locked + user->locked_shm > lock_limit && !capable(CAP_IPC_LOCK)) {
+		rlimit_exceeded(RLIMIT_MEMLOCK,
+				(locked + user->locked_shm) << PAGE_SHIFT);
 		goto out;
+	}
 	get_uid(user);
 	user->locked_shm += locked;
 	allowed = 1;

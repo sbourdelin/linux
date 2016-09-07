@@ -512,6 +512,7 @@ static int load_flat_file(struct linux_binprm *bprm,
 	if (rlim >= RLIM_INFINITY)
 		rlim = ~0;
 	if (data_len + bss_len > rlim) {
+		rlimit_exceeded(RLIMIT_DATA, data_len + bss_len);
 		ret = -ENOMEM;
 		goto err;
 	}

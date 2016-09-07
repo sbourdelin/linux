@@ -1139,8 +1139,10 @@ static inline int mlock_future_check(struct mm_struct *mm,
 		locked += mm->locked_vm;
 		lock_limit = rlimit(RLIMIT_MEMLOCK);
 		lock_limit >>= PAGE_SHIFT;
-		if (locked > lock_limit && !capable(CAP_IPC_LOCK))
+		if (locked > lock_limit && !capable(CAP_IPC_LOCK)) {
+			rlimit_exceeded(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
 			return -EAGAIN;
+		}
 	}
 	return 0;
 }
@@ -2012,8 +2014,10 @@ static int acct_stack_growth(struct vm_area_struct *vma, unsigned long size, uns
 	actual_size = size;
 	if (size && (vma->vm_flags & (VM_GROWSUP | VM_GROWSDOWN)))
 		actual_size -= PAGE_SIZE;
-	if (actual_size > READ_ONCE(rlim[RLIMIT_STACK].rlim_cur))
+	if (actual_size > READ_ONCE(rlim[RLIMIT_STACK].rlim_cur)) {
+		rlimit_exceeded(RLIMIT_STACK, actual_size);
 		return -ENOMEM;
+	}
 
 	/* mlock limit tests */
 	if (vma->vm_flags & VM_LOCKED) {
@@ -2022,8 +2026,10 @@ static int acct_stack_growth(struct vm_area_struct *vma, unsigned long size, uns
 		locked = mm->locked_vm + grow;
 		limit = READ_ONCE(rlim[RLIMIT_MEMLOCK].rlim_cur);
 		limit >>= PAGE_SHIFT;
-		if (locked > limit && !capable(CAP_IPC_LOCK))
+		if (locked > limit && !capable(CAP_IPC_LOCK)) {
+			rlimit_exceeded(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
 			return -ENOMEM;
+		}
 	}
 
 	/* Check to ensure the stack will not grow into a hugetlb-only region */
@@ -2925,8 +2931,11 @@ out:
  */
 bool may_expand_vm(struct mm_struct *mm, vm_flags_t flags, unsigned long npages)
 {
-	if (mm->total_vm + npages > rlimit(RLIMIT_AS) >> PAGE_SHIFT)
+	if (mm->total_vm + npages > rlimit(RLIMIT_AS) >> PAGE_SHIFT) {
+		rlimit_exceeded(RLIMIT_AS,
+				(mm->total_vm + npages) << PAGE_SHIFT);
 		return false;
+	}
 
 	if (is_data_mapping(flags) &&
 	    mm->data_vm + npages > rlimit(RLIMIT_DATA) >> PAGE_SHIFT) {
@@ -2935,6 +2944,8 @@ bool may_expand_vm(struct mm_struct *mm, vm_flags_t flags, unsigned long npages)
 		    mm->data_vm + npages <= rlimit_max(RLIMIT_DATA) >> PAGE_SHIFT)
 			return true;
 		if (!ignore_rlimit_data) {
+			rlimit_exceeded(RLIMIT_DATA,
+					(mm->data_vm + npages) << PAGE_SHIFT);
 			pr_warn_once("%s (%d): VmData %lu exceed data ulimit %lu. Update limits or use boot option ignore_rlimit_data.\n",
 				     current->comm, current->pid,
 				     (mm->data_vm + npages) << PAGE_SHIFT,

@@ -230,6 +230,7 @@ static struct page *get_arg_page(struct linux_binprm *bprm, unsigned long pos,
 		 */
 		rlim = current->signal->rlim;
 		if (size > ACCESS_ONCE(rlim[RLIMIT_STACK].rlim_cur) / 4) {
+			/* should it be reported somehow? */
 			put_page(page);
 			return NULL;
 		}
@@ -1650,10 +1651,15 @@ static int do_execveat_common(int fd, struct filename *filename,
 	 * don't check setuid() return code.  Here we additionally recheck
 	 * whether NPROC limit is still exceeded.
 	 */
-	if ((current->flags & PF_NPROC_EXCEEDED) &&
-	    atomic_read(&current_user()->processes) > rlimit(RLIMIT_NPROC)) {
-		retval = -EAGAIN;
-		goto out_ret;
+	if (current->flags & PF_NPROC_EXCEEDED) {
+		int nproc;
+
+		nproc = atomic_read(&current_user()->processes);
+		if (nproc > rlimit(RLIMIT_NPROC)) {
+			rlimit_exceeded(RLIMIT_NPROC, nproc);
+			retval = -EAGAIN;
+			goto out_ret;
+		}
 	}
 
 	/* We're below the limit (still or again), so we don't want to make

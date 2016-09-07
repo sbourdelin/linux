@@ -1034,6 +1034,7 @@ SYSCALL_DEFINE3(shmctl, int, shmid, int, cmd, struct shmid_ds __user *, buf)
 				goto out_unlock0;
 			}
 			if (cmd == SHM_LOCK && !rlimit(RLIMIT_MEMLOCK)) {
+				rlimit_exceeded(RLIMIT_MEMLOCK, (u64)-1);
 				err = -EPERM;
 				goto out_unlock0;
 			}

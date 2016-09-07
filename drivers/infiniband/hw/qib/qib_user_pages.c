@@ -61,6 +61,7 @@ static int __qib_get_user_pages(unsigned long start_page, size_t num_pages,
 	lock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
 
 	if (num_pages > lock_limit && !capable(CAP_IPC_LOCK)) {
+		rlimit_exceeded(RLIMIT_MEMLOCK, num_pages << PAGE_SHIFT);
 		ret = -ENOMEM;
 		goto bail;
 	}

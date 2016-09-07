@@ -860,6 +860,9 @@ static void check_thread_timers(struct task_struct *tsk,
 
 		if (hard != RLIM_INFINITY &&
 		    tsk->rt.timeout > DIV_ROUND_UP(hard, USEC_PER_SEC/HZ)) {
+			rlimit_hard_exceeded_task(RLIMIT_RTTIME,
+						  tsk->rt.timeout,
+						  tsk);
 			/*
 			 * At the hard limit, we just die.
 			 * No need to calculate anything else now.
@@ -875,6 +878,9 @@ static void check_thread_timers(struct task_struct *tsk,
 				soft += USEC_PER_SEC;
 				sig->rlim[RLIMIT_RTTIME].rlim_cur = soft;
 			}
+			rlimit_exceeded_task(RLIMIT_RTTIME,
+					     tsk->rt.timeout,
+					     tsk);
 			printk(KERN_INFO
 				"RT Watchdog Timeout: %s[%d]\n",
 				tsk->comm, task_pid_nr(tsk));
@@ -980,6 +986,7 @@ static void check_process_timers(struct task_struct *tsk,
 			READ_ONCE(sig->rlim[RLIMIT_CPU].rlim_max);
 		cputime_t x;
 		if (psecs >= hard) {
+			rlimit_hard_exceeded(RLIMIT_CPU, psecs);
 			/*
 			 * At the hard limit, we just die.
 			 * No need to calculate anything else now.
@@ -988,6 +995,7 @@ static void check_process_timers(struct task_struct *tsk,
 			return;
 		}
 		if (psecs >= soft) {
+			rlimit_exceeded(RLIMIT_CPU, psecs);
 			/*
 			 * At the soft limit, send a SIGXCPU every second.
 			 */

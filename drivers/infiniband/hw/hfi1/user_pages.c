@@ -95,8 +95,11 @@ bool hfi1_can_pin_pages(struct hfi1_devdata *dd, struct mm_struct *mm,
 	up_read(&mm->mmap_sem);
 
 	/* First, check the absolute limit against all pinned pages. */
-	if (pinned + npages >= ulimit && !can_lock)
+	if (pinned + npages >= ulimit && !can_lock) {
+		/* if it's in pages, should be converted to bytes? */
+		rlimit_exceeded(RLIMIT_MEMLOCK, pinned + npages);
 		return false;
+	}
 
 	return ((nlocked + npages) <= size) || can_lock;
 }

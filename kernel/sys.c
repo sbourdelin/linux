@@ -421,6 +421,7 @@ error:
 static int set_user(struct cred *new)
 {
 	struct user_struct *new_user;
+	int nproc;
 
 	new_user = alloc_uid(new->uid);
 	if (!new_user)
@@ -433,11 +434,13 @@ static int set_user(struct cred *new)
 	 * for programs doing set*uid()+execve() by harmlessly deferring the
 	 * failure to the execve() stage.
 	 */
-	if (atomic_read(&new_user->processes) >= rlimit(RLIMIT_NPROC) &&
-			new_user != INIT_USER)
+	nproc = atomic_read(&new_user->processes);
+	if (nproc >= rlimit(RLIMIT_NPROC) && new_user != INIT_USER) {
+		rlimit_exceeded(RLIMIT_NPROC, nproc);
 		current->flags |= PF_NPROC_EXCEEDED;
-	else
+	} else {
 		current->flags &= ~PF_NPROC_EXCEEDED;
+	}
 
 	free_uid(new->user);
 	new->user = new_user;

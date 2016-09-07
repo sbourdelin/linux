@@ -129,6 +129,7 @@ static int usnic_uiom_get_pages(unsigned long addr, size_t size, int writable,
 	lock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
 
 	if ((locked > lock_limit) && !capable(CAP_IPC_LOCK)) {
+		rlimit_exceeded(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
 		ret = -ENOMEM;
 		goto out;
 	}

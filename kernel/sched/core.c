@@ -3736,9 +3736,13 @@ int can_nice(const struct task_struct *p, const int nice)
 {
 	/* convert nice value [19,-20] to rlimit style value [1,40] */
 	int nice_rlim = nice_to_rlimit(nice);
+	int ret;
 
-	return (nice_rlim <= task_rlimit(p, RLIMIT_NICE) ||
-		capable(CAP_SYS_NICE));
+	ret = (nice_rlim <= task_rlimit(p, RLIMIT_NICE) ||
+	       capable(CAP_SYS_NICE));
+	if (!ret)
+		rlimit_exceeded(RLIMIT_NICE, nice_rlim);
+	return ret;
 }
 
 #ifdef __ARCH_WANT_SYS_NICE
@@ -4070,13 +4074,18 @@ recheck:
 					task_rlimit(p, RLIMIT_RTPRIO);
 
 			/* can't set/change the rt policy */
-			if (policy != p->policy && !rlim_rtprio)
+			if (policy != p->policy && !rlim_rtprio) {
+				rlimit_exceeded(RLIMIT_RTPRIO, (u64)-1);
 				return -EPERM;
+			}
 
 			/* can't increase priority */
 			if (attr->sched_priority > p->rt_priority &&
-			    attr->sched_priority > rlim_rtprio)
+			    attr->sched_priority > rlim_rtprio) {
+				rlimit_exceeded(RLIMIT_RTPRIO,
+						attr->sched_priority);
 				return -EPERM;
+			}
 		}
 
 		 /*

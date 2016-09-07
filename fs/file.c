@@ -554,12 +554,22 @@ out:
 
 static int alloc_fd(unsigned start, unsigned flags)
 {
-	return __alloc_fd(current->files, start, rlimit(RLIMIT_NOFILE), flags);
+	int ret;
+
+	ret = __alloc_fd(current->files, start, rlimit(RLIMIT_NOFILE), flags);
+	if (ret == -EMFILE)
+		rlimit_exceeded(RLIMIT_NOFILE, (u64)-1);
+	return ret;
 }
 
 int get_unused_fd_flags(unsigned flags)
 {
-	return __alloc_fd(current->files, 0, rlimit(RLIMIT_NOFILE), flags);
+	int ret;
+
+	ret = __alloc_fd(current->files, 0, rlimit(RLIMIT_NOFILE), flags);
+	if (ret == -EMFILE)
+		rlimit_exceeded(RLIMIT_NOFILE, (u64)-1);
+	return ret;
 }
 EXPORT_SYMBOL(get_unused_fd_flags);
 
@@ -872,8 +882,10 @@ int replace_fd(unsigned fd, struct file *file, unsigned flags)
 	if (!file)
 		return __close_fd(files, fd);
 
-	if (fd >= rlimit(RLIMIT_NOFILE))
+	if (fd >= rlimit(RLIMIT_NOFILE)) {
+		rlimit_exceeded(RLIMIT_NOFILE, fd);
 		return -EBADF;
+	}
 
 	spin_lock(&files->file_lock);
 	err = expand_files(files, fd);
@@ -898,8 +910,10 @@ SYSCALL_DEFINE3(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
 	if (unlikely(oldfd == newfd))
 		return -EINVAL;
 
-	if (newfd >= rlimit(RLIMIT_NOFILE))
+	if (newfd >= rlimit(RLIMIT_NOFILE)) {
+		rlimit_exceeded(RLIMIT_NOFILE, newfd);
 		return -EBADF;
+	}
 
 	spin_lock(&files->file_lock);
 	err = expand_files(files, newfd);
@@ -953,8 +967,10 @@ SYSCALL_DEFINE1(dup, unsigned int, fildes)
 int f_dupfd(unsigned int from, struct file *file, unsigned flags)
 {
 	int err;
-	if (from >= rlimit(RLIMIT_NOFILE))
+	if (from >= rlimit(RLIMIT_NOFILE)) {
+		rlimit_exceeded(RLIMIT_NOFILE, from);
 		return -EINVAL;
+	}
 	err = alloc_fd(from, flags);
 	if (err >= 0) {
 		get_file(file);

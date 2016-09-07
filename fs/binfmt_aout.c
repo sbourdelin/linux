@@ -228,8 +228,10 @@ static int load_aout_binary(struct linux_binprm * bprm)
 	rlim = rlimit(RLIMIT_DATA);
 	if (rlim >= RLIM_INFINITY)
 		rlim = ~0;
-	if (ex.a_data + ex.a_bss > rlim)
+	if (ex.a_data + ex.a_bss > rlim) {
+		rlimit_exceeded(RLIMIT_DATA, data_len + bss_len);
 		return -ENOMEM;
+	}
 
 	/* Flush all traces of the currently running executable */
 	retval = flush_old_exec(bprm);

@@ -56,8 +56,11 @@ int bpf_map_precharge_memlock(u32 pages)
 	memlock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
 	cur = atomic_long_read(&user->locked_vm);
 	free_uid(user);
-	if (cur + pages > memlock_limit)
+	if (cur + pages > memlock_limit) {
+		rlimit_exceeded(RLIMIT_MEMLOCK,
+				(cur + pages) << PAGE_SHIFT);
 		return -EPERM;
+	}
 	return 0;
 }
 
@@ -65,14 +68,17 @@ static int bpf_map_charge_memlock(struct bpf_map *map)
 {
 	struct user_struct *user = get_current_user();
 	unsigned long memlock_limit;
+	int npages;
 
 	memlock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
 
 	atomic_long_add(map->pages, &user->locked_vm);
 
-	if (atomic_long_read(&user->locked_vm) > memlock_limit) {
+	npages = atomic_long_read(&user->locked_vm);
+	if (npages > memlock_limit) {
 		atomic_long_sub(map->pages, &user->locked_vm);
 		free_uid(user);
+		rlimit_exceeded(RLIMIT_MEMLOCK, npages << PAGE_SHIFT);
 		return -EPERM;
 	}
 	map->user = user;
@@ -603,13 +609,16 @@ static int bpf_prog_charge_memlock(struct bpf_prog *prog)
 {
 	struct user_struct *user = get_current_user();
 	unsigned long memlock_limit;
+	int npages;
 
 	memlock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
 
 	atomic_long_add(prog->pages, &user->locked_vm);
-	if (atomic_long_read(&user->locked_vm) > memlock_limit) {
+	npages = atomic_long_read(&user->locked_vm);
+	if (npages > memlock_limit) {
 		atomic_long_sub(prog->pages, &user->locked_vm);
 		free_uid(user);
+		rlimit_exceeded(RLIMIT_MEMLOCK, npages << PAGE_SHIFT);
 		return -EPERM;
 	}
 	prog->aux->user = user;

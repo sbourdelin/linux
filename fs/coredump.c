@@ -784,8 +784,10 @@ int dump_emit(struct coredump_params *cprm, const void *addr, int nr)
 	struct file *file = cprm->file;
 	loff_t pos = file->f_pos;
 	ssize_t n;
-	if (cprm->written + nr > cprm->limit)
+	if (cprm->written + nr > cprm->limit) {
+		rlimit_exceeded(RLIMIT_CORE, cprm->written + nr);
 		return 0;
+	}
 	while (nr) {
 		if (dump_interrupted())
 			return 0;

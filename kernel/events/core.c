@@ -5166,6 +5166,7 @@ accounting:
 
 	if ((locked > lock_limit) && perf_paranoid_tracepoint_raw() &&
 		!capable(CAP_IPC_LOCK)) {
+		rlimit_exceeded(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
 		ret = -EPERM;
 		goto unlock;
 	}

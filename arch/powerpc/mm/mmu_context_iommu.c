@@ -42,10 +42,12 @@ static long mm_iommu_adjust_locked_vm(struct mm_struct *mm,
 	if (incr) {
 		locked = mm->locked_vm + npages;
 		lock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
-		if (locked > lock_limit && !capable(CAP_IPC_LOCK))
+		if (locked > lock_limit && !capable(CAP_IPC_LOCK)) {
+			rlimit_exceeded(RLIMIT_MEMLOCK, locked << PAGE_SHIFT);
 			ret = -ENOMEM;
-		else
+		} else {
 			mm->locked_vm += npages;
+		}
 	} else {
 		if (WARN_ON_ONCE(npages > mm->locked_vm))
 			npages = mm->locked_vm;
