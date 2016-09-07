@@ -334,7 +334,7 @@ const char *print_tainted(void)
 	return buf;
 }
 
-int test_taint(unsigned flag)
+int test_taint(enum taint_flags flag)
 {
 	return test_bit(flag, &tainted_mask);
 }
@@ -353,7 +353,7 @@ unsigned long get_taint(void)
  * If something bad has gone wrong, you'll want @lockdebug_ok = false, but for
  * some notewortht-but-not-corrupting cases, it can be set to true.
  */
-void add_taint(unsigned flag, enum lockdep_ok lockdep_ok)
+void add_taint(enum taint_flags flag, enum lockdep_ok lockdep_ok)
 {
 	if (lockdep_ok == LOCKDEP_NOW_UNRELIABLE && __debug_locks_off())
 		pr_warn("Disabling lock debugging due to kernel taint\n");

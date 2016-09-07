@@ -472,14 +472,10 @@ static inline void set_arch_panic_timeout(int timeout, int arch_default_timeout)
 	if (panic_timeout == arch_default_timeout)
 		panic_timeout = timeout;
 }
-extern const char *print_tainted(void);
 enum lockdep_ok {
 	LOCKDEP_STILL_OK,
 	LOCKDEP_NOW_UNRELIABLE
 };
-extern void add_taint(unsigned flag, enum lockdep_ok);
-extern int test_taint(unsigned flag);
-extern unsigned long get_taint(void);
 extern int root_mountflags;
 
 extern bool early_boot_irqs_disabled;
@@ -493,22 +489,30 @@ extern enum system_states {
 	SYSTEM_RESTART,
 } system_state;
 
-#define TAINT_PROPRIETARY_MODULE	0
-#define TAINT_FORCED_MODULE		1
-#define TAINT_CPU_OUT_OF_SPEC		2
-#define TAINT_FORCED_RMMOD		3
-#define TAINT_MACHINE_CHECK		4
-#define TAINT_BAD_PAGE			5
-#define TAINT_USER			6
-#define TAINT_DIE			7
-#define TAINT_OVERRIDDEN_ACPI_TABLE	8
-#define TAINT_WARN			9
-#define TAINT_CRAP			10
-#define TAINT_FIRMWARE_WORKAROUND	11
-#define TAINT_OOT_MODULE		12
-#define TAINT_UNSIGNED_MODULE		13
-#define TAINT_SOFTLOCKUP		14
-#define TAINT_LIVEPATCH			15
+enum taint_flags {
+	TAINT_PROPRIETARY_MODULE,	/*  0 */
+	TAINT_FORCED_MODULE,		/*  1 */
+	TAINT_CPU_OUT_OF_SPEC,		/*  2 */
+	TAINT_FORCED_RMMOD,		/*  3 */
+	TAINT_MACHINE_CHECK,		/*  4 */
+	TAINT_BAD_PAGE,			/*  5 */
+	TAINT_USER,			/*  6 */
+	TAINT_DIE,			/*  7 */
+	TAINT_OVERRIDDEN_ACPI_TABLE,	/*  8 */
+	TAINT_WARN,			/*  9 */
+	TAINT_CRAP,			/* 10 */
+	TAINT_FIRMWARE_WORKAROUND,	/* 11 */
+	TAINT_OOT_MODULE,		/* 12 */
+	TAINT_UNSIGNED_MODULE,		/* 13 */
+	TAINT_SOFTLOCKUP,		/* 14 */
+	TAINT_LIVEPATCH,		/* 15 */
+	TAINT_FLAGS_COUNT		/* keep last! */
+};
+
+extern const char *print_tainted(void);
+extern void add_taint(enum taint_flags flag, enum lockdep_ok);
+extern int test_taint(enum taint_flags flag);
+extern unsigned long get_taint(void);
 
 extern const char hex_asc[];
 #define hex_asc_lo(x)	hex_asc[((x) & 0x0f)]
