@@ -269,6 +269,7 @@ void intel_slpc_init(struct drm_i915_private *dev_priv)
 	}
 
 	slpc_shared_data_init(dev_priv);
+	dev_priv->guc.slpc.first_enable = false;
 }
 
 void intel_slpc_cleanup(struct drm_i915_private *dev_priv)
@@ -279,6 +280,8 @@ void intel_slpc_cleanup(struct drm_i915_private *dev_priv)
 	mutex_lock(&dev_priv->drm.struct_mutex);
 	i915_vma_unpin_and_release(&guc->slpc.vma);
 	mutex_unlock(&dev_priv->drm.struct_mutex);
+
+	dev_priv->guc.slpc.first_enable = false;
 }
 
 void intel_slpc_suspend(struct drm_i915_private *dev_priv)
@@ -339,4 +342,48 @@ void intel_slpc_enable(struct drm_i915_private *dev_priv)
 	intel_slpc_set_param(dev_priv,
 			     SLPC_PARAM_GLOBAL_ENABLE_BALANCER_IN_NON_GAMING_MODE,
 			     0);
+
+	if (!dev_priv->guc.slpc.first_enable) {
+		struct drm_i915_gem_object *obj;
+		void *pv = NULL;
+		struct slpc_shared_data data;
+
+		obj = dev_priv->guc.slpc.vma->obj;
+		intel_slpc_query_task_state(dev_priv);
+
+		pv = kmap_atomic(i915_gem_object_get_page(obj, 0));
+		data = *(struct slpc_shared_data *) pv;
+		kunmap_atomic(pv);
+
+		/*
+		 * TODO: Define separate variables for slice and unslice
+		 *	 frequencies for driver state variable.
+		 */
+		dev_priv->rps.max_freq_softlimit =
+				data.task_state_data.freq_unslice_max;
+		dev_priv->rps.min_freq_softlimit =
+				data.task_state_data.freq_unslice_min;
+
+		dev_priv->rps.max_freq_softlimit *= GEN9_FREQ_SCALER;
+		dev_priv->rps.min_freq_softlimit *= GEN9_FREQ_SCALER;
+		dev_priv->guc.slpc.first_enable = true;
+	} else {
+		/* Ask SLPC to operate within min/max freq softlimits */
+		intel_slpc_set_param(dev_priv,
+				     SLPC_PARAM_GLOBAL_MAX_GT_UNSLICE_FREQ_MHZ,
+				     (u32) intel_gpu_freq(dev_priv,
+					dev_priv->rps.max_freq_softlimit));
+		intel_slpc_set_param(dev_priv,
+				     SLPC_PARAM_GLOBAL_MAX_GT_SLICE_FREQ_MHZ,
+				     (u32) intel_gpu_freq(dev_priv,
+					dev_priv->rps.max_freq_softlimit));
+		intel_slpc_set_param(dev_priv,
+				     SLPC_PARAM_GLOBAL_MIN_GT_UNSLICE_FREQ_MHZ,
+				     (u32) intel_gpu_freq(dev_priv,
+					dev_priv->rps.min_freq_softlimit));
+		intel_slpc_set_param(dev_priv,
+				     SLPC_PARAM_GLOBAL_MIN_GT_SLICE_FREQ_MHZ,
+				     (u32) intel_gpu_freq(dev_priv,
+					dev_priv->rps.min_freq_softlimit));
+	}
 }
