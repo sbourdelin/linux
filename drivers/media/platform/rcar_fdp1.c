@@ -514,19 +514,6 @@ enum fdp1_deint_mode {
 	 mode == FDP1_PREVFIELD)
 
 /*
- * fdp1_v4l2_buffer: Track v4l2_buffers with a reference count
- *
- * As buffers come in, they may be used for more than one field.
- * It then becomes necessary to track the usage of these buffers,
- * and only release when the last job has completed using this
- * vb buffer.
- */
-struct fdp1_v4l2_buffer {
-	struct vb2_v4l2_buffer	vb;
-	struct list_head	list;
-};
-
-/*
  * FDP1 operates on potentially 3 fields, which are tracked
  * from the VB buffers using this context structure.
  * Will always be a field or a full frame, never two fields.
