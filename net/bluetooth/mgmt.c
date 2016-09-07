@@ -3015,6 +3015,39 @@ static int user_passkey_neg_reply(struct sock *sk, struct hci_dev *hdev,
 				 HCI_OP_USER_PASSKEY_NEG_REPLY, 0);
 }
 
+static void adv_expire(struct hci_dev *hdev, u32 flags)
+{
+	struct adv_info *adv_instance, *n, *next_instance;
+	u8 schedule_instance = 0;
+	struct hci_request req;
+	int err;
+
+	list_for_each_entry_safe(adv_instance, n, &hdev->adv_instances, list) {
+		if (hdev->cur_adv_instance != adv_instance->instance)
+			continue;
+
+		/* stop if current instance doesn't need to be changed */
+		if (!(adv_instance->flags & flags))
+			break;
+
+		cancel_adv_timeout(hdev);
+
+		next_instance = hci_get_next_instance(hdev,
+						      adv_instance->instance);
+		if (next_instance)
+			schedule_instance = next_instance->instance;
+		break;
+	}
+
+	if (!schedule_instance)
+		return;
+
+	hci_req_init(&req, hdev);
+	err = __hci_req_schedule_adv_instance(&req, schedule_instance, true);
+	if (!err)
+		hci_req_run(&req, NULL);
+}
+
 static void set_name_complete(struct hci_dev *hdev, u8 status, u16 opcode)
 {
 	struct mgmt_cp_set_local_name *cp;
@@ -3030,12 +3063,16 @@ static void set_name_complete(struct hci_dev *hdev, u8 status, u16 opcode)
 
 	cp = cmd->param;
 
-	if (status)
+	if (status) {
 		mgmt_cmd_status(cmd->sk, hdev->id, MGMT_OP_SET_LOCAL_NAME,
 			        mgmt_status(status));
-	else
+	} else {
 		mgmt_cmd_complete(cmd->sk, hdev->id, MGMT_OP_SET_LOCAL_NAME, 0,
 				  cp, sizeof(*cp));
+
+		if (hci_dev_test_flag(hdev, HCI_LE_ADV))
+			adv_expire(hdev, MGMT_ADV_FLAG_LOCAL_NAME);
+	}
 
 	mgmt_pending_remove(cmd);
 
@@ -3132,11 +3169,8 @@ static int set_appearance(struct sock *sk, struct hci_dev *hdev, void *data,
 		goto failed;
 	}
 
-	if (hci_dev_test_flag(hdev, HCI_LE_ADV)) {
-		mgmt_cmd_status(sk, hdev->id, MGMT_OP_SET_APPEARANCE,
-				MGMT_STATUS_BUSY);
-		goto failed;
-	}
+	if (hci_dev_test_flag(hdev, HCI_LE_ADV))
+		adv_expire(hdev, MGMT_ADV_FLAG_APPEARANCE);
 
 	hdev->appearance = cp->appearance;
 
