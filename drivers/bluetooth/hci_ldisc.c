@@ -125,15 +125,22 @@ static inline struct sk_buff *hci_uart_dequeue(struct hci_uart *hu)
 
 int hci_uart_tx_wakeup(struct hci_uart *hu)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&hu->schedule_lock, flags);
+	if (test_bit(HCI_UART_UNREGISTERING, &hu->flags))
+		goto no_schedule;
 	if (test_and_set_bit(HCI_UART_SENDING, &hu->tx_state)) {
 		set_bit(HCI_UART_TX_WAKEUP, &hu->tx_state);
-		return 0;
+		goto no_schedule;
 	}
 
 	BT_DBG("");
 
 	schedule_work(&hu->write_work);
 
+no_schedule:
+	spin_unlock_irqrestore(&hu->schedule_lock, flags);
 	return 0;
 }
 
@@ -464,6 +471,8 @@ static int hci_uart_tty_open(struct tty_struct *tty)
 	INIT_WORK(&hu->init_ready, hci_uart_init_work);
 	INIT_WORK(&hu->write_work, hci_uart_write_work);
 
+	spin_lock_init(&hu->schedule_lock);
+
 	/* Flush any pending characters in the driver */
 	tty_driver_flush_buffer(tty);
 
@@ -479,6 +488,7 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 {
 	struct hci_uart *hu = tty->disc_data;
 	struct hci_dev *hdev;
+	unsigned long flags;
 
 	BT_DBG("tty %p", tty);
 
@@ -487,6 +497,10 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 
 	if (!hu)
 		return;
+
+	spin_lock_irqsave(&hu->schedule_lock, flags);
+	set_bit(HCI_UART_UNREGISTERING, &hu->flags);
+	spin_unlock_irqrestore(&hu->schedule_lock, flags);
 
 	hdev = hu->hdev;
 	if (hdev)

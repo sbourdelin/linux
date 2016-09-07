@@ -88,6 +88,8 @@ struct hci_uart {
 	struct sk_buff		*tx_skb;
 	unsigned long		tx_state;
 
+	/* prevent scheduling work during close */
+	spinlock_t		schedule_lock;
 	unsigned int init_speed;
 	unsigned int oper_speed;
 };
@@ -96,6 +98,7 @@ struct hci_uart {
 #define HCI_UART_PROTO_SET	0
 #define HCI_UART_REGISTERED	1
 #define HCI_UART_PROTO_READY	2
+#define HCI_UART_UNREGISTERING	3
 
 /* TX states  */
 #define HCI_UART_SENDING	1
