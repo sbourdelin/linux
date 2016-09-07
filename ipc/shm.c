@@ -467,9 +467,15 @@ static unsigned long shm_get_unmapped_area(struct file *file,
 	unsigned long addr, unsigned long len, unsigned long pgoff,
 	unsigned long flags)
 {
+	unsigned long (*get_area)(struct file *, unsigned long, unsigned long,
+			unsigned long, unsigned long);
 	struct shm_file_data *sfd = shm_file_data(file);
-	return sfd->file->f_op->get_unmapped_area(sfd->file, addr, len,
-						pgoff, flags);
+
+	if (sfd->file->f_op->get_unmapped_area)
+		get_area = sfd->file->f_op->get_unmapped_area;
+	else
+		get_area = current->mm->get_unmapped_area;
+	return get_area(sfd->file, addr, len, pgoff, flags);
 }
 
 static const struct file_operations shm_file_operations = {
