@@ -128,7 +128,6 @@ static int ninja32_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 	rc = dma_set_coherent_mask(&dev->dev, ATA_DMA_MASK);
 	if (rc)
 		return rc;
-	pci_set_master(dev);
 
 	/* Set up the register mappings. We use the I/O mapping as only the
 	   older chips also have MMIO on BAR 1 */
@@ -148,6 +147,7 @@ static int ninja32_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 
 	ninja32_program(base);
 	/* FIXME: Should we disable them at remove ? */
+	pci_set_master(dev);
 	return ata_host_activate(host, dev->irq, ata_bmdma_interrupt,
 				 IRQF_SHARED, &ninja32_sht);
 }
