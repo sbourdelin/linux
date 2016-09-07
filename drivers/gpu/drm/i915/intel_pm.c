@@ -5064,7 +5064,13 @@ static void gen9_disable_rc6(struct drm_i915_private *dev_priv)
 
 static void gen9_disable_rps(struct drm_i915_private *dev_priv)
 {
-	I915_WRITE(GEN6_RP_CONTROL, 0);
+	uint32_t rp_ctl = 0;
+
+	/* RP SW Mode Control will be needed for SLPC, Hence not clearing.*/
+	if (i915.enable_slpc)
+		rp_ctl = I915_READ(GEN6_RP_CONTROL) & GEN6_RP_MEDIA_MODE_MASK;
+
+	I915_WRITE(GEN6_RP_CONTROL, rp_ctl);
 
 	dev_priv->rps.enabled = false;
 }
