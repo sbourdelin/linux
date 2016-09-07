@@ -5887,6 +5887,7 @@ static u32 get_supported_adv_flags(struct hci_dev *hdev)
 	flags |= MGMT_ADV_FLAG_DISCOV;
 	flags |= MGMT_ADV_FLAG_LIMITED_DISCOV;
 	flags |= MGMT_ADV_FLAG_MANAGED_FLAGS;
+	flags |= MGMT_ADV_FLAG_LOCAL_NAME;
 
 	if (hdev->adv_tx_power != HCI_TX_POWER_INVALID)
 		flags |= MGMT_ADV_FLAG_TX_POWER;
