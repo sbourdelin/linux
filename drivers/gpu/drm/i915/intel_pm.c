@@ -2887,7 +2887,7 @@ skl_wm_plane_id(const struct intel_plane *plane)
 static bool
 intel_has_sagv(struct drm_i915_private *dev_priv)
 {
-	return IS_SKYLAKE(dev_priv);
+	return IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv);
 }
 
 /*
