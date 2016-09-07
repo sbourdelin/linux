@@ -172,6 +172,14 @@ static inline const char *check_heap_object(const void *ptr, unsigned long n,
 		return NULL;
 	}
 
+#ifndef CONFIG_HARDENED_USERCOPY_PAGESPAN
+	/*
+	 * The page-spanning checks are hitting false positives, so
+	 * do not check them for now.
+	 */
+	return NULL;
+#endif
+
 	/* Allow kernel data region (if not marked as Reserved). */
 	if (ptr >= (const void *)_sdata && end <= (const void *)_edata)
 		return NULL;
