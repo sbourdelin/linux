@@ -1798,11 +1798,13 @@ int i915_reset(struct drm_i915_private *dev_priv)
 	intel_sanitize_gt_powersave(dev_priv);
 	intel_autoenable_gt_powersave(dev_priv);
 
-	return 0;
+out:
+	wake_up_bit(&error->flags, I915_RESET_IN_PROGRESS);
+	return ret;
 
 error:
 	set_bit(I915_WEDGED, &error->flags);
-	return ret;
+	goto out;
 }
 
 static int i915_pm_suspend(struct device *kdev)
