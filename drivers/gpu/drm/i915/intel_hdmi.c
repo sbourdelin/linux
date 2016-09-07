@@ -36,6 +36,7 @@
 #include <drm/drm_edid.h>
 #include "intel_drv.h"
 #include <drm/i915_drm.h>
+#include <drm/intel_lpe_audio.h>
 #include "i915_drv.h"
 
 static struct drm_device *intel_hdmi_to_dev(struct intel_hdmi *intel_hdmi)
@@ -1513,12 +1514,25 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 	intel_hdmi_unset_edid(connector);
 
 	if (intel_hdmi_set_edid(connector, live_status)) {
-		struct intel_hdmi *intel_hdmi = intel_attached_hdmi(connector);
+		intel_hdmi = intel_attached_hdmi(connector);
 
 		hdmi_to_dig_port(intel_hdmi)->base.type = INTEL_OUTPUT_HDMI;
 		status = connector_status_connected;
-	} else
+		i915_enable_hdmi_audio_int(dev_priv);
+
+		if (IS_LPE_AUDIO_ENABLED(dev_priv))
+			intel_lpe_audio_notify(dev_priv,
+				connector->eld, 0,
+				0, true);
+	} else {
 		status = connector_status_disconnected;
+		i915_disable_hdmi_audio_int(dev_priv);
+
+		if (IS_LPE_AUDIO_ENABLED(dev_priv))
+			intel_lpe_audio_notify(dev_priv,
+				NULL, 0,
+				0, false);
+	}
 
 	intel_display_power_put(dev_priv, POWER_DOMAIN_GMBUS);
 
@@ -1545,12 +1559,15 @@ intel_hdmi_force(struct drm_connector *connector)
 static int intel_hdmi_get_modes(struct drm_connector *connector)
 {
 	struct edid *edid;
+	int ret;
 
 	edid = to_intel_connector(connector)->detect_edid;
 	if (edid == NULL)
 		return 0;
 
-	return intel_connector_update_modes(connector, edid);
+	ret = intel_connector_update_modes(connector, edid);
+
+	return ret;
 }
 
 static bool

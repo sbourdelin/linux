@@ -24,6 +24,7 @@
 #include <linux/kernel.h>
 #include <linux/component.h>
 #include <drm/i915_component.h>
+#include <drm/intel_lpe_audio.h>
 #include "intel_drv.h"
 
 #include <drm/drmP.h>
@@ -524,7 +525,12 @@ void intel_audio_codec_enable(struct intel_encoder *intel_encoder)
 	mutex_unlock(&dev_priv->av_mutex);
 
 	if (acomp && acomp->audio_ops && acomp->audio_ops->pin_eld_notify)
-		acomp->audio_ops->pin_eld_notify(acomp->audio_ops->audio_ptr, (int) port);
+		acomp->audio_ops->pin_eld_notify(
+			acomp->audio_ops->audio_ptr, (int) port);
+
+	if (IS_LPE_AUDIO_ENABLED(dev_priv))
+		intel_lpe_audio_notify(dev_priv, connector->eld, port,
+			crtc->config->port_clock, true);
 }
 
 /**
@@ -553,6 +559,9 @@ void intel_audio_codec_disable(struct intel_encoder *intel_encoder)
 
 	if (acomp && acomp->audio_ops && acomp->audio_ops->pin_eld_notify)
 		acomp->audio_ops->pin_eld_notify(acomp->audio_ops->audio_ptr, (int) port);
+
+	if (IS_LPE_AUDIO_ENABLED(dev_priv))
+		intel_lpe_audio_notify(dev_priv, NULL, port, 0, true);
 }
 
 /**
