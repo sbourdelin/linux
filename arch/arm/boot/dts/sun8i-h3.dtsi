@@ -414,6 +414,8 @@
 			resets = <&ccu RST_BUS_UART1>;
 			dmas = <&dma 7>, <&dma 7>;
 			dma-names = "rx", "tx";
+			pinctrl-names = "default";
+			pinctrl-0 = <&uart1_rts_cts_pins>;
 			status = "disabled";
 		};
 

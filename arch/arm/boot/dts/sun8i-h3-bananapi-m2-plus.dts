@@ -182,8 +182,6 @@
 };
 
 &uart1 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&uart1_rts_cts_pins>;
 	status = "okay";
 };
 
