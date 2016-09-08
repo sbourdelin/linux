@@ -180,7 +180,6 @@ struct fsnotify_group {
 			spinlock_t access_lock;
 			struct list_head access_list;
 			wait_queue_head_t access_waitq;
-			atomic_t bypass_perm;
 #endif /* CONFIG_FANOTIFY_ACCESS_PERMISSIONS */
 			int f_flags;
 			unsigned int max_marks;
