@@ -195,3 +195,13 @@ config HIGH_RES_TIMERS
 
 endmenu
 endif
+
+config POSIX_TIMERS
+	bool "Posix Clocks & timers" if EMBEDDED
+	default y
+	help
+	  This includes native support for POSIX timers into the kernel.
+	  Small embedded systems may have no use for them and therefore they
+	  can be configured out to reduce the size of the kernel image.
+	  If unsure say y.
+
