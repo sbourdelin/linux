@@ -38,6 +38,7 @@
 #define DEBUG_SUBSYSTEM S_LOV
 
 #include "lov_cl_internal.h"
+#include "../llite/vvp_internal.h"
 
 /** \addtogroup lov
  *  @{
