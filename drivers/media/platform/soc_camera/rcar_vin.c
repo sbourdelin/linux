@@ -856,7 +856,7 @@ static void rcar_vin_stop_streaming(struct vb2_queue *vq)
 	spin_unlock_irq(&priv->lock);
 }
 
-static struct vb2_ops rcar_vin_vb2_ops = {
+static const struct vb2_ops rcar_vin_vb2_ops = {
 	.queue_setup	= rcar_vin_videobuf_setup,
 	.buf_queue	= rcar_vin_videobuf_queue,
 	.stop_streaming	= rcar_vin_stop_streaming,
