@@ -126,4 +126,12 @@ config LEDS_TRIGGER_PANIC
 	  a different trigger.
 	  If unsure, say Y.
 
+config LEDS_TRIGGER_USBPORT
+	tristate "USB port LED trigger"
+	depends on LEDS_TRIGGERS && USB
+	help
+	  This allows LEDs to be controlled by USB events. Enabling this option
+	  allows specifying list of USB ports that should turn on LED when some
+	  USB device gets connected.
+
 endif # LEDS_TRIGGERS
