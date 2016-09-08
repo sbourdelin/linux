@@ -109,6 +109,8 @@ static bool logical_packages_frozen __read_mostly;
 /* Maximum number of SMT threads on any online core */
 int __max_smt_threads __read_mostly;
 
+unsigned int __read_mostly sysctl_sched_itmt_enabled;
+
 static inline void smpboot_setup_warm_reset_vector(unsigned long start_eip)
 {
 	unsigned long flags;
@@ -471,31 +473,57 @@ static bool match_die(struct cpuinfo_x86 *c, struct cpuinfo_x86 *o)
 	return false;
 }
 
-static struct sched_domain_topology_level numa_inside_package_topology[] = {
+#ifdef CONFIG_SCHED_ITMT
+static int x86_core_flags(void)
+{
+	int flags = cpu_core_flags();
+
+	if (sysctl_sched_itmt_enabled)
+		flags |= SD_ASYM_PACKING;
+
+	return flags;
+}
+
+static int x86_smt_flags(void)
+{
+	int flags = cpu_smt_flags();
+
+	if (sysctl_sched_itmt_enabled)
+		flags |= SD_ASYM_PACKING;
+
+	return flags;
+}
+#else
+#define x86_core_flags cpu_core_flags
+#define x86_smt_flags cpu_smt_flags
+#endif
+
+static struct sched_domain_topology_level x86_topology[] = {
 #ifdef CONFIG_SCHED_SMT
-	{ cpu_smt_mask, cpu_smt_flags, SD_INIT_NAME(SMT) },
+	{ cpu_smt_mask, x86_smt_flags, SD_INIT_NAME(SMT) },
 #endif
 #ifdef CONFIG_SCHED_MC
-	{ cpu_coregroup_mask, cpu_core_flags, SD_INIT_NAME(MC) },
+	{ cpu_coregroup_mask, x86_core_flags, SD_INIT_NAME(MC) },
+#endif
+	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
+	{ NULL, },
+};
+
+static struct sched_domain_topology_level x86_numa_in_package_topology[] = {
+#ifdef CONFIG_SCHED_SMT
+	{ cpu_smt_mask, x86_smt_flags, SD_INIT_NAME(SMT) },
+#endif
+#ifdef CONFIG_SCHED_MC
+	{ cpu_coregroup_mask, x86_core_flags, SD_INIT_NAME(MC) },
 #endif
 	{ NULL, },
 };
+
 /*
- * set_sched_topology() sets the topology internal to a CPU.  The
- * NUMA topologies are layered on top of it to build the full
- * system topology.
- *
- * If NUMA nodes are observed to occur within a CPU package, this
- * function should be called.  It forces the sched domain code to
- * only use the SMT level for the CPU portion of the topology.
- * This essentially falls back to relying on NUMA information
- * from the SRAT table to describe the entire system topology
- * (except for hyperthreads).
+ * Set if a package/die has multiple NUMA nodes inside.
+ * AMD Magny-Cours and Intel Cluster-on-Die have this.
  */
-static void primarily_use_numa_for_topology(void)
-{
-	set_sched_topology(numa_inside_package_topology);
-}
+static bool x86_has_numa_in_package;
 
 void set_cpu_sibling_map(int cpu)
 {
@@ -558,7 +586,7 @@ void set_cpu_sibling_map(int cpu)
 				c->booted_cores = cpu_data(i).booted_cores;
 		}
 		if (match_die(c, o) && !topology_same_node(c, o))
-			primarily_use_numa_for_topology();
+			x86_has_numa_in_package = true;
 	}
 
 	threads = cpumask_weight(topology_sibling_cpumask(cpu));
@@ -1304,6 +1332,16 @@ void __init native_smp_prepare_cpus(unsigned int max_cpus)
 		zalloc_cpumask_var(&per_cpu(cpu_core_map, i), GFP_KERNEL);
 		zalloc_cpumask_var(&per_cpu(cpu_llc_shared_map, i), GFP_KERNEL);
 	}
+
+	/*
+	 * Set 'default' x86 topology, this matches default_topology() in that
+	 * it has NUMA nodes as a topology level. See also
+	 * native_smp_cpus_done().
+	 *
+	 * Must be done before set_cpus_sibling_map() is ran.
+	 */
+	set_sched_topology(x86_topology);
+
 	set_cpu_sibling_map(0);
 
 	switch (smp_sanity_check(max_cpus)) {
@@ -1369,6 +1407,9 @@ void __init native_smp_prepare_boot_cpu(void)
 void __init native_smp_cpus_done(unsigned int max_cpus)
 {
 	pr_debug("Boot done\n");
+
+	if (x86_has_numa_in_package)
+		set_sched_topology(x86_numa_in_package_topology);
 
 	nmi_selftest();
 	impress_friends();
