@@ -1655,7 +1655,7 @@ hsw_vebox_irq_enable(struct intel_engine_cs *engine)
 	struct drm_i915_private *dev_priv = engine->i915;
 
 	I915_WRITE_IMR(engine, ~engine->irq_enable_mask);
-	gen6_enable_pm_irq(dev_priv, engine->irq_enable_mask);
+	gen6_unmask_pm_irq(dev_priv, engine->irq_enable_mask);
 }
 
 static void
@@ -1664,7 +1664,7 @@ hsw_vebox_irq_disable(struct intel_engine_cs *engine)
 	struct drm_i915_private *dev_priv = engine->i915;
 
 	I915_WRITE_IMR(engine, ~0);
-	gen6_disable_pm_irq(dev_priv, engine->irq_enable_mask);
+	gen6_mask_pm_irq(dev_priv, engine->irq_enable_mask);
 }
 
 static void
