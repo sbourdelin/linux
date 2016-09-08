@@ -38,7 +38,7 @@ static inline int rsi_wait_event(struct rsi_event *event, u32 timeout)
 
 	if (!timeout)
 		status = wait_event_interruptible(event->event_queue,
-				(atomic_read(&event->event_condition) == 0));
+				(!atomic_read(&event->event_condition)));
 	else
 		status = wait_event_interruptible_timeout(event->event_queue,
 				(atomic_read(&event->event_condition) == 0),

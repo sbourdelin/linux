@@ -255,9 +255,9 @@ static int rsi_send_internal_mgmt_frame(struct rsi_common *common,
 {
 	struct skb_info *tx_params;
 
-	if (skb == NULL) {
+	if (!skb) {
 		rsi_dbg(ERR_ZONE, "%s: Unable to allocate skb\n", __func__);
-		return -ENOMEM;
+		return -EINVAL;
 	}
 	tx_params = (struct skb_info *)&IEEE80211_SKB_CB(skb)->driver_data;
 	tx_params->flags |= INTERNAL_MGMT_PKT;
@@ -290,12 +290,8 @@ static int rsi_load_radio_caps(struct rsi_common *common)
 	rsi_dbg(INFO_ZONE, "%s: Sending rate symbol req frame\n", __func__);
 
 	skb = dev_alloc_skb(sizeof(struct rsi_radio_caps));
-
-	if (!skb) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of skb\n",
-			__func__);
+	if (!skb)
 		return -ENOMEM;
-	}
 
 	memset(skb->data, 0, sizeof(struct rsi_radio_caps));
 	radio_caps = (struct rsi_radio_caps *)skb->data;
@@ -375,8 +371,8 @@ static int rsi_load_radio_caps(struct rsi_common *common)
  * rsi_mgmt_pkt_to_core() - This function is the entry point for Mgmt module.
  * @common: Pointer to the driver private structure.
  * @msg: Pointer to received packet.
- * @msg_len: Length of the recieved packet.
- * @type: Type of recieved packet.
+ * @msg_len: Length of the received packet.
+ * @type: Type of received packet.
  *
  * Return: 0 on success, -1 on failure.
  */
@@ -406,11 +402,8 @@ static int rsi_mgmt_pkt_to_core(struct rsi_common *common,
 		}
 
 		skb = dev_alloc_skb(msg_len);
-		if (!skb) {
-			rsi_dbg(ERR_ZONE, "%s: Failed to allocate skb\n",
-				__func__);
+		if (!skb)
 			return -ENOMEM;
-		}
 
 		buffer = skb_put(skb, msg_len);
 
@@ -425,9 +418,8 @@ static int rsi_mgmt_pkt_to_core(struct rsi_common *common,
 		rx_params->rssi = rsi_get_rssi(msg);
 		rx_params->channel = rsi_get_channel(msg);
 		rsi_indicate_pkt_to_os(common, skb);
-	} else {
+	} else
 		rsi_dbg(MGMT_TX_ZONE, "%s: Internal Packet\n", __func__);
-	}
 
 	return 0;
 }
@@ -459,12 +451,8 @@ static int rsi_hal_send_sta_notify_frame(struct rsi_common *common,
 	rsi_dbg(MGMT_TX_ZONE, "%s: Sending sta notify frame\n", __func__);
 
 	skb = dev_alloc_skb(sizeof(struct rsi_peer_notify));
-
-	if (!skb) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of skb\n",
-			__func__);
+	if (!skb)
 		return -ENOMEM;
-	}
 
 	memset(skb->data, 0, sizeof(struct rsi_peer_notify));
 	peer_notify = (struct rsi_peer_notify *)skb->data;
@@ -505,7 +493,7 @@ static int rsi_hal_send_sta_notify_frame(struct rsi_common *common,
 }
 
 /**
- * rsi_send_aggregation_params_frame() - This function sends the ampdu
+ * rsi_send_aggr_params_frame() - This function sends the ampdu
  *					 indication frame to firmware.
  * @common: Pointer to the driver private structure.
  * @tid: traffic identifier.
@@ -515,28 +503,26 @@ static int rsi_hal_send_sta_notify_frame(struct rsi_common *common,
  *
  * Return: 0 on success, corresponding negative error code on failure.
  */
-int rsi_send_aggregation_params_frame(struct rsi_common *common,
-				      u16 tid,
-				      u16 ssn,
-				      u8 buf_size,
-				      u8 event)
+int rsi_send_aggr_params_frame(struct rsi_common *common,
+			       u16 tid,
+			       u16 ssn,
+			       u8 buf_size,
+			       u8 event)
 {
 	struct sk_buff *skb = NULL;
 	struct rsi_mac_frame *mgmt_frame;
 	u8 peer_id = 0;
 
 	skb = dev_alloc_skb(FRAME_DESC_SZ);
-
-	if (!skb) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of skb\n",
-			__func__);
+	if (!skb)
 		return -ENOMEM;
-	}
 
 	memset(skb->data, 0, FRAME_DESC_SZ);
 	mgmt_frame = (struct rsi_mac_frame *)skb->data;
 
-	rsi_dbg(MGMT_TX_ZONE, "%s: Sending AMPDU indication frame\n", __func__);
+	rsi_dbg(MGMT_TX_ZONE,
+		"%s: Sending AMPDU indication frame\n",
+		__func__);
 
 	mgmt_frame->desc_word[0] = cpu_to_le16(RSI_WIFI_MGMT_Q << 12);
 	mgmt_frame->desc_word[1] = cpu_to_le16(AMPDU_IND);
@@ -545,7 +531,9 @@ int rsi_send_aggregation_params_frame(struct rsi_common *common,
 		mgmt_frame->desc_word[4] = cpu_to_le16(ssn);
 		mgmt_frame->desc_word[5] = cpu_to_le16(buf_size);
 		mgmt_frame->desc_word[7] =
-		cpu_to_le16((tid | (START_AMPDU_AGGR << 4) | (peer_id << 8)));
+			cpu_to_le16((tid |
+				    (START_AMPDU_AGGR << 4) |
+				    (peer_id << 8)));
 	} else if (event == STA_RX_ADDBA_DONE) {
 		mgmt_frame->desc_word[4] = cpu_to_le16(ssn);
 		mgmt_frame->desc_word[7] = cpu_to_le16(tid |
@@ -583,11 +571,8 @@ static int rsi_program_bb_rf(struct rsi_common *common)
 	rsi_dbg(MGMT_TX_ZONE, "%s: Sending program BB/RF frame\n", __func__);
 
 	skb = dev_alloc_skb(FRAME_DESC_SZ);
-	if (!skb) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of skb\n",
-			__func__);
+	if (!skb)
 		return -ENOMEM;
-	}
 
 	memset(skb->data, 0, FRAME_DESC_SZ);
 	mgmt_frame = (struct rsi_mac_frame *)skb->data;
@@ -605,6 +590,7 @@ static int rsi_program_bb_rf(struct rsi_common *common)
 	common->bb_rf_prog_count = 1;
 	mgmt_frame->desc_word[7] |= cpu_to_le16(PUT_BBP_RESET |
 				     BBP_REG_WRITE | (RSI_RF_TYPE << 4));
+
 	skb_put(skb, FRAME_DESC_SZ);
 
 	return rsi_send_internal_mgmt_frame(common, skb);
@@ -617,7 +603,8 @@ static int rsi_program_bb_rf(struct rsi_common *common)
  *
  * Return: 0 on success, corresponding negative error code on failure.
  */
-int rsi_set_vap_capabilities(struct rsi_common *common, enum opmode mode)
+int rsi_set_vap_capabilities(struct rsi_common *common,
+			     enum opmode mode)
 {
 	struct sk_buff *skb = NULL;
 	struct rsi_vap_caps *vap_caps;
@@ -626,14 +613,12 @@ int rsi_set_vap_capabilities(struct rsi_common *common, enum opmode mode)
 	struct ieee80211_conf *conf = &hw->conf;
 	u16 vap_id = 0;
 
-	rsi_dbg(MGMT_TX_ZONE, "%s: Sending VAP capabilities frame\n", __func__);
+	rsi_dbg(MGMT_TX_ZONE,
+		"%s: Sending VAP capabilities frame\n", __func__);
 
 	skb = dev_alloc_skb(sizeof(struct rsi_vap_caps));
-	if (!skb) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of skb\n",
-			__func__);
+	if (!skb)
 		return -ENOMEM;
-	}
 
 	memset(skb->data, 0, sizeof(struct rsi_vap_caps));
 	vap_caps = (struct rsi_vap_caps *)skb->data;
@@ -705,11 +690,8 @@ int rsi_hal_load_key(struct rsi_common *common,
 	rsi_dbg(MGMT_TX_ZONE, "%s: Sending load key frame\n", __func__);
 
 	skb = dev_alloc_skb(sizeof(struct rsi_set_key));
-	if (!skb) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of skb\n",
-			__func__);
+	if (!skb)
 		return -ENOMEM;
-	}
 
 	memset(skb->data, 0, sizeof(struct rsi_set_key));
 	set_key = (struct rsi_set_key *)skb->data;
@@ -736,13 +718,10 @@ int rsi_hal_load_key(struct rsi_common *common,
 	set_key->desc_word[4] = cpu_to_le16(key_descriptor);
 
 	if ((cipher == WLAN_CIPHER_SUITE_WEP40) ||
-	    (cipher == WLAN_CIPHER_SUITE_WEP104)) {
-		memcpy(&set_key->key[key_id][1],
-		       data,
-		       key_len * 2);
-	} else {
+	    (cipher == WLAN_CIPHER_SUITE_WEP104))
+		memcpy(&set_key->key[key_id][1], data, key_len * 2);
+	else
 		memcpy(&set_key->key[0][0], data, key_len);
-	}
 
 	memcpy(set_key->tx_mic_key, &data[16], 8);
 	memcpy(set_key->rx_mic_key, &data[24], 8);
@@ -765,11 +744,8 @@ static int rsi_load_bootup_params(struct rsi_common *common)
 
 	rsi_dbg(MGMT_TX_ZONE, "%s: Sending boot params frame\n", __func__);
 	skb = dev_alloc_skb(sizeof(struct rsi_boot_params));
-	if (!skb) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of skb\n",
-			__func__);
+	if (!skb)
 		return -ENOMEM;
-	}
 
 	memset(skb->data, 0, sizeof(struct rsi_boot_params));
 	boot_params = (struct rsi_boot_params *)skb->data;
@@ -780,7 +756,8 @@ static int rsi_load_bootup_params(struct rsi_common *common)
 		memcpy(&boot_params->bootup_params,
 		       &boot_params_40,
 		       sizeof(struct bootup_params));
-		rsi_dbg(MGMT_TX_ZONE, "%s: Packet 40MHZ <=== %d\n", __func__,
+		rsi_dbg(MGMT_TX_ZONE,
+			"%s: Packet 40MHZ <=== %d\n", __func__,
 			UMAC_CLK_40BW);
 		boot_params->desc_word[7] = cpu_to_le16(UMAC_CLK_40BW);
 	} else {
@@ -828,11 +805,8 @@ static int rsi_send_reset_mac(struct rsi_common *common)
 	rsi_dbg(MGMT_TX_ZONE, "%s: Sending reset MAC frame\n", __func__);
 
 	skb = dev_alloc_skb(FRAME_DESC_SZ);
-	if (!skb) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of skb\n",
-			__func__);
+	if (!skb)
 		return -ENOMEM;
-	}
 
 	memset(skb->data, 0, FRAME_DESC_SZ);
 	mgmt_frame = (struct rsi_mac_frame *)skb->data;
@@ -919,11 +893,8 @@ int rsi_set_channel(struct rsi_common *common, u16 channel)
 		"%s: Sending scan req frame\n", __func__);
 
 	skb = dev_alloc_skb(FRAME_DESC_SZ);
-	if (!skb) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of skb\n",
-			__func__);
+	if (!skb)
 		return -ENOMEM;
-	}
 
 	memset(skb->data, 0, FRAME_DESC_SZ);
 	mgmt_frame = (struct rsi_mac_frame *)skb->data;
@@ -980,6 +951,7 @@ static int rsi_compare(const void *a, const void *b)
 static bool rsi_map_rates(u16 rate, int *offset)
 {
 	int kk;
+
 	for (kk = 0; kk < ARRAY_SIZE(rsi_mcsrates); kk++) {
 		if (rate == mcs[kk]) {
 			*offset = kk;
@@ -1013,20 +985,14 @@ static int rsi_send_auto_rate_request(struct rsi_common *common)
 	u8 num_supported_rates = 0;
 	u8 rate_table_offset, rate_offset = 0;
 	u32 rate_bitmap = common->bitrate_mask[band];
-
 	u16 *selected_rates, min_rate;
 
 	skb = dev_alloc_skb(sizeof(struct rsi_auto_rate));
-	if (!skb) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of skb\n",
-			__func__);
+	if (!skb)
 		return -ENOMEM;
-	}
 
 	selected_rates = kzalloc(2 * RSI_TBL_SZ, GFP_KERNEL);
 	if (!selected_rates) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of mem\n",
-			__func__);
 		dev_kfree_skb(skb);
 		return -ENOMEM;
 	}
@@ -1140,14 +1106,17 @@ void rsi_inform_bss_status(struct rsi_common *common,
 			   u16 aid)
 {
 	if (status) {
+		common->hw_data_qs_blocked = true;
 		rsi_hal_send_sta_notify_frame(common,
 					      RSI_IFTYPE_STATION,
 					      STA_CONNECTED,
 					      bssid,
 					      qos_enable,
 					      aid);
-		if (common->min_rate == 0xffff)
+		if (common->min_rate == 0xffff) {
+			rsi_dbg(INFO_ZONE, "Send auto rate request\n");
 			rsi_send_auto_rate_request(common);
+		}
 	} else {
 		rsi_hal_send_sta_notify_frame(common,
 					      RSI_IFTYPE_STATION,
@@ -1170,14 +1139,12 @@ static int rsi_eeprom_read(struct rsi_common *common)
 	struct rsi_mac_frame *mgmt_frame;
 	struct sk_buff *skb;
 
-	rsi_dbg(MGMT_TX_ZONE, "%s: Sending EEPROM read req frame\n", __func__);
+	rsi_dbg(MGMT_TX_ZONE,
+		"%s: Sending EEPROM read req frame\n", __func__);
 
 	skb = dev_alloc_skb(FRAME_DESC_SZ);
-	if (!skb) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of skb\n",
-			__func__);
+	if (!skb)
 		return -ENOMEM;
-	}
 
 	memset(skb->data, 0, FRAME_DESC_SZ);
 	mgmt_frame = (struct rsi_mac_frame *)skb->data;
@@ -1214,11 +1181,8 @@ int rsi_send_block_unblock_frame(struct rsi_common *common, bool block_event)
 	rsi_dbg(MGMT_TX_ZONE, "%s: Sending block/unblock frame\n", __func__);
 
 	skb = dev_alloc_skb(FRAME_DESC_SZ);
-	if (!skb) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of skb\n",
-			__func__);
+	if (!skb)
 		return -ENOMEM;
-	}
 
 	memset(skb->data, 0, FRAME_DESC_SZ);
 	mgmt_frame = (struct rsi_mac_frame *)skb->data;
@@ -1261,9 +1225,8 @@ static int rsi_handle_ta_confirm_type(struct rsi_common *common,
 			if (rsi_eeprom_read(common)) {
 				common->fsm_state = FSM_CARD_NOT_READY;
 				goto out;
-			} else {
+			} else
 				common->fsm_state = FSM_EEPROM_READ_MAC_ADDR;
-			}
 		} else {
 			rsi_dbg(INFO_ZONE,
 				"%s: Received bootup params cfm in %d state\n",
@@ -1273,6 +1236,9 @@ static int rsi_handle_ta_confirm_type(struct rsi_common *common,
 		break;
 
 	case EEPROM_READ_TYPE:
+		rsi_dbg(FSM_ZONE,
+			"%s: EEPROM READ confirm received\n",
+			__func__);
 		if (common->fsm_state == FSM_EEPROM_READ_MAC_ADDR) {
 			if (msg[16] == MAGIC_WORD) {
 				u8 offset = (FRAME_DESC_SZ + WLAN_HOST_MODE_LEN
@@ -1324,7 +1290,8 @@ static int rsi_handle_ta_confirm_type(struct rsi_common *common,
 				goto out;
 			} else {
 				common->fsm_state = FSM_BB_RF_PROG_SENT;
-				rsi_dbg(FSM_ZONE, "%s: Radio cap cfm received\n",
+				rsi_dbg(FSM_ZONE,
+					"%s: Radio cap cfm received\n",
 					__func__);
 			}
 		} else {
@@ -1347,27 +1314,29 @@ static int rsi_handle_ta_confirm_type(struct rsi_common *common,
 			}
 		} else {
 			rsi_dbg(INFO_ZONE,
-				"%s: Received bbb_rf cfm in %d state\n",
+				"%s: Received bb_rf cfm in %d state\n",
 				 __func__, common->fsm_state);
 			return 0;
 		}
 		break;
 
 	default:
-		rsi_dbg(INFO_ZONE, "%s: Invalid TA confirm pkt received\n",
+		rsi_dbg(INFO_ZONE,
+			"%s: Invalid TA confirm pkt received\n",
 			__func__);
 		break;
 	}
 	return 0;
 out:
-	rsi_dbg(ERR_ZONE, "%s: Unable to send pkt/Invalid frame received\n",
+	rsi_dbg(ERR_ZONE,
+		"%s: Unable to send pkt/Invalid frame received\n",
 		__func__);
 	return -EINVAL;
 }
 
 /**
  * rsi_mgmt_pkt_recv() - This function processes the management packets
- *			 recieved from the hardware.
+ *			 received from the hardware.
  * @common: Pointer to the driver private structure.
  * @msg: Pointer to the received packet.
  *
@@ -1376,7 +1345,7 @@ out:
 int rsi_mgmt_pkt_recv(struct rsi_common *common, u8 *msg)
 {
 	s32 msg_len = (le16_to_cpu(*(__le16 *)&msg[0]) & 0x0fff);
-	u16 msg_type = (msg[2]);
+	u16 msg_type = msg[2];
 	int ret;
 
 	rsi_dbg(FSM_ZONE, "%s: Msg Len: %d, Msg Type: %4x\n",
@@ -1404,8 +1373,8 @@ int rsi_mgmt_pkt_recv(struct rsi_common *common, u8 *msg)
 			rsi_dbg(FSM_ZONE, "%s: Probe confirm received\n",
 				__func__);
 		}
-	} else {
+	} else
 		return rsi_mgmt_pkt_to_core(common, msg, msg_len, msg_type);
-	}
+
 	return 0;
 }

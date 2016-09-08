@@ -86,7 +86,7 @@ static struct sk_buff *rsi_prepare_skb(struct rsi_common *common,
 
 	pkt_len -= extended_desc;
 	skb = dev_alloc_skb(pkt_len + FRAME_DESC_SZ);
-	if (skb == NULL)
+	if (!skb)
 		return NULL;
 
 	payload_offset = (extended_desc + FRAME_DESC_SZ);
@@ -111,11 +111,10 @@ static struct sk_buff *rsi_prepare_skb(struct rsi_common *common,
 int rsi_read_pkt(struct rsi_common *common, s32 rcv_pkt_len)
 {
 	u8 *frame_desc = NULL, extended_desc = 0;
-	u32 index, length = 0, queueno = 0;
+	u32 index = 0, length = 0, queueno = 0;
 	u16 actual_length = 0, offset;
 	struct sk_buff *skb = NULL;
 
-	index = 0;
 	do {
 		frame_desc = &common->rx_data_pkt[index];
 		actual_length = *(u16 *)&frame_desc[0];
@@ -131,7 +130,7 @@ int rsi_read_pkt(struct rsi_common *common, s32 rcv_pkt_len)
 					      (frame_desc + offset),
 					      length,
 					      extended_desc);
-			if (skb == NULL)
+			if (!skb)
 				goto fail;
 
 			rsi_indicate_pkt_to_os(common, skb);
@@ -198,15 +197,14 @@ struct rsi_hw *rsi_91x_init(void)
 		return NULL;
 
 	adapter->priv = kzalloc(sizeof(*common), GFP_KERNEL);
-	if (adapter->priv == NULL) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of memory\n",
+	if (!adapter->priv) {
+		rsi_dbg(ERR_ZONE, "%s: Failed in allocation of priv\n",
 			__func__);
 		kfree(adapter);
 		return NULL;
-	} else {
-		common = adapter->priv;
-		common->priv = adapter;
 	}
+	common = adapter->priv;
+	common->priv = adapter;
 
 	for (ii = 0; ii < NUM_SOFT_QUEUES; ii++)
 		skb_queue_head_init(&common->tx_queue[ii]);

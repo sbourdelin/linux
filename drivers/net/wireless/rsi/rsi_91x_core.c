@@ -134,7 +134,7 @@ static u8 rsi_core_determine_hal_queue(struct rsi_common *common)
 	bool recontend_queue = false;
 	u32 q_len = 0;
 	u8 q_num = INVALID_QUEUE;
-	u8 ii = 0;
+	u8 ii;
 
 	if (skb_queue_len(&common->tx_queue[MGMT_SOFT_Q])) {
 		if (!common->mgmt_q_block)
@@ -142,8 +142,10 @@ static u8 rsi_core_determine_hal_queue(struct rsi_common *common)
 		return q_num;
 	}
 
-	if (common->hw_data_qs_blocked)
+	if (common->hw_data_qs_blocked) {
+		rsi_dbg(INFO_ZONE, "%s: data queue blocked\n", __func__);
 		return q_num;
+	}
 
 	if (common->pkt_cnt != 0) {
 		--common->pkt_cnt;
@@ -210,6 +212,7 @@ static void rsi_core_queue_pkt(struct rsi_common *common,
 			       struct sk_buff *skb)
 {
 	u8 q_num = skb->priority;
+
 	if (q_num >= NUM_SOFT_QUEUES) {
 		rsi_dbg(ERR_ZONE, "%s: Invalid Queue Number: q_num = %d\n",
 			__func__, q_num);
@@ -285,7 +288,7 @@ void rsi_core_qos_processor(struct rsi_common *common)
 		}
 
 		skb = rsi_core_dequeue_pkt(common, q_num);
-		if (skb == NULL) {
+		if (!skb) {
 			rsi_dbg(ERR_ZONE, "skb null\n");
 			mutex_unlock(&common->tx_rxlock);
 			break;
@@ -331,14 +334,15 @@ void rsi_core_xmit(struct rsi_common *common, struct sk_buff *skb)
 			__func__);
 		goto xmit_fail;
 	}
-	info = IEEE80211_SKB_CB(skb);
-	tx_params = (struct skb_info *)info->driver_data;
-	tmp_hdr = (struct ieee80211_hdr *)&skb->data[0];
 
 	if (common->fsm_state != FSM_MAC_INIT_DONE) {
 		rsi_dbg(ERR_ZONE, "%s: FSM state not open\n", __func__);
 		goto xmit_fail;
 	}
+
+	info = IEEE80211_SKB_CB(skb);
+	tx_params = (struct skb_info *)info->driver_data;
+	tmp_hdr = (struct ieee80211_hdr *)&skb->data[0];
 
 	if ((ieee80211_is_mgmt(tmp_hdr->frame_control)) ||
 	    (ieee80211_is_ctl(tmp_hdr->frame_control)) ||
@@ -360,7 +364,7 @@ void rsi_core_xmit(struct rsi_common *common, struct sk_buff *skb)
 
 	if ((q_num != MGMT_SOFT_Q) &&
 	    ((skb_queue_len(&common->tx_queue[q_num]) + 1) >=
-	     DATA_QUEUE_WATER_MARK)) {
+		 DATA_QUEUE_WATER_MARK)) {
 		rsi_dbg(ERR_ZONE, "%s: sw queue full\n", __func__);
 		if (!ieee80211_queue_stopped(adapter->hw, WME_AC(q_num)))
 			ieee80211_stop_queue(adapter->hw, WME_AC(q_num));

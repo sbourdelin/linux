@@ -71,31 +71,31 @@
 #define RSI_ENABLE_40MHZ                (0x1 << 3)
 #define ENABLE_SHORTGI_RATE		BIT(9)
 
-#define RX_BA_INDICATION                1
-#define RSI_TBL_SZ                      40
-#define MAX_RETRIES                     8
+#define RX_BA_INDICATION		1
+#define RSI_TBL_SZ			40
+#define MAX_RETRIES			8
 #define RSI_IFTYPE_STATION		 0
 
-#define STD_RATE_MCS7                   0x07
-#define STD_RATE_MCS6                   0x06
-#define STD_RATE_MCS5                   0x05
-#define STD_RATE_MCS4                   0x04
-#define STD_RATE_MCS3                   0x03
-#define STD_RATE_MCS2                   0x02
-#define STD_RATE_MCS1                   0x01
-#define STD_RATE_MCS0                   0x00
-#define STD_RATE_54                     0x6c
-#define STD_RATE_48                     0x60
-#define STD_RATE_36                     0x48
-#define STD_RATE_24                     0x30
-#define STD_RATE_18                     0x24
-#define STD_RATE_12                     0x18
-#define STD_RATE_11                     0x16
-#define STD_RATE_09                     0x12
-#define STD_RATE_06                     0x0C
-#define STD_RATE_5_5                    0x0B
-#define STD_RATE_02                     0x04
-#define STD_RATE_01                     0x02
+#define STD_RATE_MCS7			0x07
+#define STD_RATE_MCS6			0x06
+#define STD_RATE_MCS5			0x05
+#define STD_RATE_MCS4			0x04
+#define STD_RATE_MCS3			0x03
+#define STD_RATE_MCS2			0x02
+#define STD_RATE_MCS1			0x01
+#define STD_RATE_MCS0			0x00
+#define STD_RATE_54			0x6c
+#define STD_RATE_48			0x60
+#define STD_RATE_36			0x48
+#define STD_RATE_24			0x30
+#define STD_RATE_18			0x24
+#define STD_RATE_12			0x18
+#define STD_RATE_11			0x16
+#define STD_RATE_09			0x12
+#define STD_RATE_06			0x0C
+#define STD_RATE_5_5			0x0B
+#define STD_RATE_02			0x04
+#define STD_RATE_01			0x02
 
 #define RSI_RF_TYPE                     1
 #define RSI_RATE_00                     0x00
@@ -173,9 +173,9 @@ enum cmd_frame_type {
 	AUTO_RATE_IND,
 	BOOTUP_PARAMS_REQUEST,
 	VAP_CAPABILITIES,
-	EEPROM_READ_TYPE ,
+	EEPROM_READ_TYPE,
 	EEPROM_WRITE,
-	GPIO_PIN_CONFIG ,
+	GPIO_PIN_CONFIG,
 	SET_RX_FILTER,
 	AMPDU_IND,
 	STATS_REQUEST_FRAME,
@@ -288,8 +288,8 @@ static inline u8 rsi_get_channel(u8 *addr)
 
 int rsi_mgmt_pkt_recv(struct rsi_common *common, u8 *msg);
 int rsi_set_vap_capabilities(struct rsi_common *common, enum opmode mode);
-int rsi_send_aggregation_params_frame(struct rsi_common *common, u16 tid,
-				      u16 ssn, u8 buf_size, u8 event);
+int rsi_send_aggr_params_frame(struct rsi_common *common, u16 tid,
+			       u16 ssn, u8 buf_size, u8 event);
 int rsi_hal_load_key(struct rsi_common *common, u8 *data, u16 key_len,
 		     u8 key_type, u8 key_id, u32 cipher);
 int rsi_set_channel(struct rsi_common *common, u16 chno);

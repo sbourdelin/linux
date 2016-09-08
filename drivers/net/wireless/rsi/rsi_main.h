@@ -21,23 +21,25 @@
 #include <linux/skbuff.h>
 #include <net/mac80211.h>
 
-#define ERR_ZONE                        BIT(0)  /* For Error Msgs             */
-#define INFO_ZONE                       BIT(1)  /* For General Status Msgs    */
-#define INIT_ZONE                       BIT(2)  /* For Driver Init Seq Msgs   */
-#define MGMT_TX_ZONE                    BIT(3)  /* For TX Mgmt Path Msgs      */
-#define MGMT_RX_ZONE                    BIT(4)  /* For RX Mgmt Path Msgs      */
-#define DATA_TX_ZONE                    BIT(5)  /* For TX Data Path Msgs      */
-#define DATA_RX_ZONE                    BIT(6)  /* For RX Data Path Msgs      */
-#define FSM_ZONE                        BIT(7)  /* For State Machine Msgs     */
-#define ISR_ZONE                        BIT(8)  /* For Interrupt Msgs         */
+#define ERR_ZONE                        BIT(0) /* Error Msgs		*/
+#define INFO_ZONE                       BIT(1) /* General Debug Msgs	*/
+#define INIT_ZONE                       BIT(2) /* Driver Init Msgs	*/
+#define MGMT_TX_ZONE                    BIT(3) /* TX Mgmt Path Msgs	*/
+#define MGMT_RX_ZONE                    BIT(4) /* RX Mgmt Path Msgs	*/
+#define DATA_TX_ZONE                    BIT(5) /* TX Data Path Msgs	*/
+#define DATA_RX_ZONE                    BIT(6) /* RX Data Path Msgs	*/
+#define FSM_ZONE                        BIT(7) /* State Machine Msgs	*/
+#define ISR_ZONE                        BIT(8) /* Interrupt Msgs	*/
 
 #define FSM_CARD_NOT_READY              0
-#define FSM_BOOT_PARAMS_SENT            1
-#define FSM_EEPROM_READ_MAC_ADDR        2
-#define FSM_RESET_MAC_SENT              3
-#define FSM_RADIO_CAPS_SENT             4
-#define FSM_BB_RF_PROG_SENT             5
-#define FSM_MAC_INIT_DONE               6
+#define FSM_COMMON_DEV_PARAMS_SENT	1
+#define FSM_BOOT_PARAMS_SENT            2
+#define FSM_EEPROM_READ_MAC_ADDR        3
+#define FSM_EEPROM_READ_RF_TYPE		4
+#define FSM_RESET_MAC_SENT              5
+#define FSM_RADIO_CAPS_SENT             6
+#define FSM_BB_RF_PROG_SENT             7
+#define FSM_MAC_INIT_DONE               8
 
 extern u32 rsi_zone_enabled;
 extern __printf(2, 3) void rsi_dbg(u32 zone, const char *fmt, ...);
@@ -206,12 +208,14 @@ struct rsi_common {
 	bool hw_data_qs_blocked;
 };
 
+#define IEEE80211_NUM_BANDS 2
+
 struct rsi_hw {
 	struct rsi_common *priv;
 	struct ieee80211_hw *hw;
 	struct ieee80211_vif *vifs[RSI_MAX_VIFS];
 	struct ieee80211_tx_queue_params edca_params[NUM_EDCA_QUEUES];
-	struct ieee80211_supported_band sbands[NUM_NL80211_BANDS];
+	struct ieee80211_supported_band sbands[IEEE80211_NUM_BANDS];
 
 	struct device *device;
 	u8 sc_nvifs;

@@ -194,6 +194,7 @@ static void rsi_register_rates_channels(struct rsi_hw *adapter, int band)
 void rsi_mac80211_detach(struct rsi_hw *adapter)
 {
 	struct ieee80211_hw *hw = adapter->hw;
+	int i;
 
 	if (hw) {
 		ieee80211_stop_queues(hw);
@@ -201,7 +202,17 @@ void rsi_mac80211_detach(struct rsi_hw *adapter)
 		ieee80211_free_hw(hw);
 	}
 
+	for (i = 0; i < 2; i++) {
+		struct ieee80211_supported_band *sbands = &adapter->sbands[i];
+
+		if (!sbands->channels)
+			kfree(sbands->channels);
+	}
+
+#ifdef CONFIG_RSI_DEBUGFS
 	rsi_remove_dbgfs(adapter);
+	kfree(adapter->dfsentry);
+#endif
 }
 EXPORT_SYMBOL_GPL(rsi_mac80211_detach);
 
@@ -429,9 +440,11 @@ static int rsi_mac80211_config(struct ieee80211_hw *hw,
 u16 rsi_get_connected_channel(struct rsi_hw *adapter)
 {
 	struct ieee80211_vif *vif = adapter->vifs[0];
+
 	if (vif) {
 		struct ieee80211_bss_conf *bss = &vif->bss_conf;
 		struct ieee80211_channel *channel = bss->chandef.chan;
+
 		return channel->hw_value;
 	}
 
@@ -667,15 +680,14 @@ static int rsi_mac80211_ampdu_action(struct ieee80211_hw *hw,
 				     struct ieee80211_vif *vif,
 				     struct ieee80211_ampdu_params *params)
 {
-	int status = -EOPNOTSUPP;
+	int status = 1;
 	struct rsi_hw *adapter = hw->priv;
 	struct rsi_common *common = adapter->priv;
-	u16 seq_no = 0;
+	u16 seq_no = params->ssn;
 	u8 ii = 0;
 	struct ieee80211_sta *sta = params->sta;
 	enum ieee80211_ampdu_mlme_action action = params->action;
 	u16 tid = params->tid;
-	u16 *ssn = &params->ssn;
 	u8 buf_size = params->buf_size;
 
 	for (ii = 0; ii < RSI_MAX_VIFS; ii++) {
@@ -684,28 +696,30 @@ static int rsi_mac80211_ampdu_action(struct ieee80211_hw *hw,
 	}
 
 	mutex_lock(&common->mutex);
-	rsi_dbg(INFO_ZONE, "%s: AMPDU action %d called\n", __func__, action);
-	if (ssn != NULL)
-		seq_no = *ssn;
 
 	switch (action) {
 	case IEEE80211_AMPDU_RX_START:
-		status = rsi_send_aggregation_params_frame(common,
-							   tid,
-							   seq_no,
-							   buf_size,
-							   STA_RX_ADDBA_DONE);
+		rsi_dbg(INFO_ZONE, "AMPDU action RX_START (%d)\n", action);
+		status = rsi_send_aggr_params_frame(common,
+						    tid,
+						    seq_no,
+						    buf_size,
+						    STA_RX_ADDBA_DONE);
 		break;
 
 	case IEEE80211_AMPDU_RX_STOP:
-		status = rsi_send_aggregation_params_frame(common,
-							   tid,
-							   0,
-							   buf_size,
-							   STA_RX_DELBA);
+		rsi_dbg(INFO_ZONE,
+			"AMPDU action RX_STOP (%d) called\n", action);
+		status = rsi_send_aggr_params_frame(common,
+						    tid,
+						    0,
+						    buf_size,
+						    STA_RX_DELBA);
 		break;
 
 	case IEEE80211_AMPDU_TX_START:
+		rsi_dbg(INFO_ZONE,
+			"AMPDU action TX_START (%d) called\n", action);
 		common->vif_info[ii].seq_start = seq_no;
 		ieee80211_start_tx_ba_cb_irqsafe(vif, sta->addr, tid);
 		status = 0;
@@ -714,22 +728,27 @@ static int rsi_mac80211_ampdu_action(struct ieee80211_hw *hw,
 	case IEEE80211_AMPDU_TX_STOP_CONT:
 	case IEEE80211_AMPDU_TX_STOP_FLUSH:
 	case IEEE80211_AMPDU_TX_STOP_FLUSH_CONT:
-		status = rsi_send_aggregation_params_frame(common,
-							   tid,
-							   seq_no,
-							   buf_size,
-							   STA_TX_DELBA);
+		rsi_dbg(INFO_ZONE,
+			"AMPDU action TX_STOP_CONT / TX_STOP_FLUSH /"
+			" TX_STOP_FLUSH_CONT (%d) called\n", action);
+		status = rsi_send_aggr_params_frame(common,
+						    tid,
+						    seq_no,
+						    buf_size,
+						    STA_TX_DELBA);
 		if (!status)
 			ieee80211_stop_tx_ba_cb_irqsafe(vif, sta->addr, tid);
 		break;
 
 	case IEEE80211_AMPDU_TX_OPERATIONAL:
-		status = rsi_send_aggregation_params_frame(common,
-							   tid,
-							   common->vif_info[ii]
-								.seq_start,
-							   buf_size,
-							   STA_TX_ADDBA_DONE);
+		rsi_dbg(INFO_ZONE,
+			"AMPDU action TX_OPERATIONAL(%d) called\n",
+			action);
+		status = rsi_send_aggr_params_frame(common,
+						tid,
+						common->vif_info[ii].seq_start,
+						buf_size,
+						STA_TX_ADDBA_DONE);
 		break;
 
 	default:
@@ -819,8 +838,6 @@ static void rsi_perform_cqm(struct rsi_common *common,
 	common->cqm_info.last_cqm_event_rssi = rssi;
 	rsi_dbg(INFO_ZONE, "CQM: Notifying event: %d\n", event);
 	ieee80211_cqm_rssi_notify(adapter->vifs[0], event, GFP_KERNEL);
-
-	return;
 }
 
 /**
@@ -875,16 +892,14 @@ static void rsi_fill_rx_status(struct ieee80211_hw *hw,
 	}
 
 	/* CQM only for connected AP beacons, the RSSI is a weighted avg */
-	if (bss->assoc && !(memcmp(bss->bssid, hdr->addr2, ETH_ALEN))) {
+	if (bss->assoc && ether_addr_equal(bss->bssid, hdr->addr2)) {
 		if (ieee80211_is_beacon(hdr->frame_control))
 			rsi_perform_cqm(common, hdr->addr2, rxs->signal);
 	}
-
-	return;
 }
 
 /**
- * rsi_indicate_pkt_to_os() - This function sends recieved packet to mac80211.
+ * rsi_indicate_pkt_to_os() - This function sends received packet to mac80211.
  * @common: Pointer to the driver private structure.
  * @skb: Pointer to the socket buffer structure.
  *

@@ -1,6 +1,8 @@
 /**
  * Copyright (c) 2014 Redpine Signals Inc.
  *
+ * Developers:
+ *		Fariya Fathima	2014 <fariya.f@redpinesignals.com>
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
@@ -128,7 +130,7 @@ static int rsi_issue_sdiocommand(struct sdio_func *func,
 }
 
 /**
- * rsi_handle_interrupt() - This function is called upon the occurence
+ * rsi_handle_interrupt() - This function is called upon the occurrence
  *			    of an interrupt.
  * @function: Pointer to the sdio_func structure.
  *
@@ -183,7 +185,7 @@ static void rsi_reset_card(struct sdio_func *pfunction)
 	host->ios.timing = MMC_TIMING_LEGACY;
 	host->ops->set_ios(host, &host->ios);
 
-	/*
+	/**
 	 * This delay should be sufficient to allow the power supply
 	 * to reach the minimum voltage.
 	 */
@@ -193,7 +195,7 @@ static void rsi_reset_card(struct sdio_func *pfunction)
 	host->ios.power_mode = MMC_POWER_ON;
 	host->ops->set_ios(host, &host->ios);
 
-	/*
+	/**
 	 * This delay must be at least 74 clock sizes, or 1 ms, or the
 	 * time required to reach a stable voltage.
 	 */
@@ -361,6 +363,7 @@ static int rsi_setblocklength(struct rsi_hw *adapter, u32 length)
 	struct rsi_91x_sdiodev *dev =
 		(struct rsi_91x_sdiodev *)adapter->rsi_dev;
 	int status;
+
 	rsi_dbg(INIT_ZONE, "%s: Setting the block length\n", __func__);
 
 	status = sdio_set_block_size(dev->pfunction, length);
@@ -464,6 +467,7 @@ int rsi_sdio_write_register(struct rsi_hw *adapter,
 void rsi_sdio_ack_intr(struct rsi_hw *adapter, u8 int_bit)
 {
 	int status;
+
 	status = rsi_sdio_write_register(adapter,
 					 1,
 					 (SDIO_FUN1_INTR_CLR_REG |
@@ -472,8 +476,6 @@ void rsi_sdio_ack_intr(struct rsi_hw *adapter, u8 int_bit)
 	if (status)
 		rsi_dbg(ERR_ZONE, "%s: unable to send ack\n", __func__);
 }
-
-
 
 /**
  * rsi_sdio_read_register_multiple() - This function read multiple bytes of
@@ -667,7 +669,7 @@ static int rsi_init_sdio_interface(struct rsi_hw *adapter,
 		goto fail;
 	}
 
-	rsi_dbg(INIT_ZONE, "%s: Setup card succesfully\n", __func__);
+	rsi_dbg(INIT_ZONE, "%s: Setup card successfully\n", __func__);
 
 	status = rsi_init_sdio_slave_regs(adapter);
 	if (status) {

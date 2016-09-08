@@ -23,12 +23,10 @@
 #ifndef CONFIG_RSI_DEBUGFS
 static inline int rsi_init_dbgfs(struct rsi_hw *adapter)
 {
-	return 0;
 }
 
 static inline void rsi_remove_dbgfs(struct rsi_hw *adapter)
 {
-	return;
 }
 #else
 struct rsi_dbg_files {
@@ -42,6 +40,7 @@ struct rsi_debugfs {
 	struct rsi_dbg_ops *dfs_get_ops;
 	struct dentry *rsi_files[MAX_DEBUGFS_ENTRIES];
 };
+
 int rsi_init_dbgfs(struct rsi_hw *adapter);
 void rsi_remove_dbgfs(struct rsi_hw *adapter);
 #endif

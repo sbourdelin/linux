@@ -37,17 +37,17 @@ enum sdio_interrupt_type {
 };
 
 /* Buffer status register related info */
-#define PKT_BUFF_SEMI_FULL                      0
-#define PKT_BUFF_FULL                           1
-#define PKT_MGMT_BUFF_FULL                      2
-#define MSDU_PKT_PENDING                        3
+#define PKT_BUFF_SEMI_FULL			0
+#define PKT_BUFF_FULL				1
+#define PKT_MGMT_BUFF_FULL			2
+#define MSDU_PKT_PENDING			3
 /* Interrupt Bit Related Macros */
-#define PKT_BUFF_AVAILABLE                      1
-#define FW_ASSERT_IND                           2
+#define PKT_BUFF_AVAILABLE			1
+#define FW_ASSERT_IND				2
 
-#define RSI_DEVICE_BUFFER_STATUS_REGISTER       0xf3
-#define RSI_FN1_INT_REGISTER                    0xf9
-#define RSI_SD_REQUEST_MASTER                   0x10000
+#define RSI_DEVICE_BUFFER_STATUS_REGISTER	0xf3
+#define RSI_FN1_INT_REGISTER			0xf9
+#define RSI_SD_REQUEST_MASTER			0x10000
 
 /* FOR SD CARD ONLY */
 #define SDIO_RX_NUM_BLOCKS_REG                  0x000F1

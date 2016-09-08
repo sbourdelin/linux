@@ -1,6 +1,9 @@
 /**
  * Copyright (c) 2014 Redpine Signals Inc.
  *
+ * Developers:
+ *	Prameela Rani Garnepudi	2016 <prameela.garnepudi@redpinesignals.com>
+ *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
@@ -43,7 +46,6 @@ static int rsi_usb_card_write(struct rsi_hw *adapter,
 			      len,
 			      &transfer,
 			      HZ * 5);
-
 	if (status < 0) {
 		rsi_dbg(ERR_ZONE,
 			"Card write failed with error code :%10d\n", status);
@@ -275,11 +277,11 @@ static int rsi_rx_urb_submit(struct rsi_hw *adapter)
 
 /**
  * rsi_usb_write_register_multiple() - This function writes multiple bytes of
- *				       information to multiple registers.
- * @adapter: Pointer to the adapter structure.
- * @addr: Address of the register.
- * @data: Pointer to the data that has to be written.
- * @count: Number of multiple bytes to be written on to the registers.
+ *				       information to the given address.
+ * @adapter:	Pointer to the adapter structure.
+ * @addr:	Address of the register.
+ * @data:	Pointer to the data that has to be written.
+ * @count:	Number of multiple bytes to be written on to the registers.
  *
  * Return: status: 0 on success, a negative error code on failure.
  */
@@ -392,11 +394,8 @@ static int rsi_init_usb_interface(struct rsi_hw *adapter,
 	usb_set_intfdata(pfunction, adapter);
 
 	common->rx_data_pkt = kmalloc(2048, GFP_KERNEL);
-	if (!common->rx_data_pkt) {
-		rsi_dbg(ERR_ZONE, "%s: Failed to allocate memory\n",
-			__func__);
+	if (!common->rx_data_pkt)
 		return -ENOMEM;
-	}
 
 	rsi_dev->tx_buffer = kmalloc(2048, GFP_KERNEL);
 	if (!rsi_dev->tx_buffer) {
@@ -568,7 +567,20 @@ static struct usb_driver rsi_driver = {
 #endif
 };
 
-module_usb_driver(rsi_driver);
+static int __init rsi_usb_module_init(void)
+{
+	rsi_dbg(INIT_ZONE,
+		"=====> RSI USB Module Initialize <=====\n");
+	return usb_register(&rsi_driver);
+}
+
+static void __exit rsi_usb_module_exit(void)
+{
+	usb_deregister(&rsi_driver);
+}
+
+module_init(rsi_usb_module_init);
+module_exit(rsi_usb_module_exit);
 
 MODULE_AUTHOR("Redpine Signals Inc");
 MODULE_DESCRIPTION("Common USB layer for RSI drivers");

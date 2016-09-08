@@ -252,11 +252,8 @@ static int rsi_process_pkt(struct rsi_common *common)
 	rcv_pkt_len = (num_blks * 256);
 
 	common->rx_data_pkt = kmalloc(rcv_pkt_len, GFP_KERNEL);
-	if (!common->rx_data_pkt) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in memory allocation\n",
-			__func__);
+	if (!common->rx_data_pkt)
 		return -ENOMEM;
-	}
 
 	status = rsi_sdio_host_intf_read_pkt(adapter,
 					     common->rx_data_pkt,
@@ -426,8 +423,8 @@ void rsi_interrupt_handler(struct rsi_hw *adapter)
 					"%s: ==> FIRMWARE Assert <==\n",
 					__func__);
 				status = rsi_sdio_read_register(common->priv,
-							SDIO_FW_STATUS_REG,
-							&fw_status);
+								SDIO_FW_STATUS_REG,
+								&fw_status);
 				if (status) {
 					rsi_dbg(ERR_ZONE,
 						"%s: Failed to read f/w reg\n",
@@ -435,7 +432,7 @@ void rsi_interrupt_handler(struct rsi_hw *adapter)
 				} else {
 					rsi_dbg(ERR_ZONE,
 						"%s: Firmware Status is 0x%x\n",
-						__func__ , fw_status);
+						__func__, fw_status);
 					rsi_sdio_ack_intr(common->priv,
 							  (1 << FW_ASSERT_IND));
 				}
