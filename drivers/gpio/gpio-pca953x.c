@@ -29,12 +29,12 @@
 
 #define REG_ADDR_AI		0x80
 
-#define PCA957X_IN		0
+#define PCA957X_INPUT		0
 #define PCA957X_INVRT		1
 #define PCA957X_BKEN		2
 #define PCA957X_PUPD		3
-#define PCA957X_CFG		4
-#define PCA957X_OUT		5
+#define PCA957X_DIRECTION	4
+#define PCA957X_OUTPUT		5
 #define PCA957X_MSK		6
 #define PCA957X_INTS		7
 
@@ -107,9 +107,9 @@ static const struct pca953x_reg_config pca953x_regs = {
 };
 
 static const struct pca953x_reg_config pca957x_regs = {
-	.direction = PCA957X_CFG,
-	.output = PCA957X_OUT,
-	.input = PCA957X_IN,
+	.direction = PCA957X_DIRECTION,
+	.output = PCA957X_OUTPUT,
+	.input = PCA957X_INPUT,
 };
 
 struct pca953x_chip {
@@ -699,10 +699,10 @@ static int device_pca957x_init(struct pca953x_chip *chip, u32 invert)
 
 	chip->regs = &pca957x_regs;
 
-	ret = pca953x_read_regs(chip, PCA957X_OUT, chip->reg_output);
+	ret = pca953x_read_regs(chip, PCA957X_OUTPUT, chip->reg_output);
 	if (ret)
 		goto out;
-	ret = pca953x_read_regs(chip, PCA957X_CFG, chip->reg_direction);
+	ret = pca953x_read_regs(chip, PCA957X_DIRECTION, chip->reg_direction);
 	if (ret)
 		goto out;
 
