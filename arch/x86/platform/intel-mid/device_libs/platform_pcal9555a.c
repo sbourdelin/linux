@@ -41,13 +41,16 @@ static void __init *pcal9555a_platform_data(void *info)
 	intr = get_gpio_by_name(intr_pin_name);
 
 	/* Check if the SFI record valid */
-	if (gpio_base == -1)
+	if (gpio_base == -1) {
+		pr_err("%s: Unknown GPIO base number, falling back to dynamic"
+		       "allocation\n", __func__);
 		return NULL;
+	}
 
 	if (nr >= PCAL9555A_NUM) {
 		pr_err("%s: Too many instances, only %d supported\n", __func__,
 		       PCAL9555A_NUM);
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	pcal9555a = &pcal9555a_pdata[nr++];

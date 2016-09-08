@@ -335,9 +335,13 @@ static void __init sfi_handle_ipc_dev(struct sfi_device_table_entry *pentry,
 
 	pr_debug("IPC bus, name = %16.16s, irq = 0x%2x\n",
 		pentry->name, pentry->irq);
+
 	pdata = intel_mid_sfi_get_pdata(dev, pentry);
-	if (IS_ERR(pdata))
+	if (IS_ERR(pdata)) {
+		pr_debug("%s:  Can't get platform data for %s\n", __func__,
+			 pentry->name);
 		return;
+	}
 
 	pdev = platform_device_alloc(pentry->name, 0);
 	if (pdev == NULL) {
@@ -371,8 +375,11 @@ static void __init sfi_handle_spi_dev(struct sfi_device_table_entry *pentry,
 		spi_info.chip_select);
 
 	pdata = intel_mid_sfi_get_pdata(dev, &spi_info);
-	if (IS_ERR(pdata))
+	if (IS_ERR(pdata)) {
+		pr_debug("%s:  Can't get platform data for %s\n", __func__,
+			 pentry->name);
 		return;
+	}
 
 	spi_info.platform_data = pdata;
 	if (dev->delay)
@@ -398,8 +405,11 @@ static void __init sfi_handle_i2c_dev(struct sfi_device_table_entry *pentry,
 		i2c_info.addr);
 	pdata = intel_mid_sfi_get_pdata(dev, &i2c_info);
 	i2c_info.platform_data = pdata;
-	if (IS_ERR(pdata))
+	if (IS_ERR(pdata)) {
+		pr_debug("%s:  Can't get platform data for %s\n", __func__,
+			 pentry->name);
 		return;
+	}
 
 	if (dev->delay)
 		intel_scu_i2c_device_register(pentry->host_num, &i2c_info);
@@ -424,8 +434,11 @@ static void __init sfi_handle_sd_dev(struct sfi_device_table_entry *pentry,
 		 sd_info.max_clk,
 		 sd_info.addr);
 	pdata = intel_mid_sfi_get_pdata(dev, &sd_info);
-	if (IS_ERR(pdata))
+	if (IS_ERR(pdata)) {
+		pr_debug("%s:  Can't get platform data for %s\n", __func__,
+			 pentry->name);
 		return;
+	}
 
 	/* Nothing we can do with this for now */
 	sd_info.platform_data = pdata;
