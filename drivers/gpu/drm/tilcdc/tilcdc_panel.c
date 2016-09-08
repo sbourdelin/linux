@@ -24,6 +24,7 @@
 #include <video/videomode.h>
 
 #include "tilcdc_drv.h"
+#include "tilcdc_panel.h"
 
 struct panel_module {
 	struct tilcdc_module base;

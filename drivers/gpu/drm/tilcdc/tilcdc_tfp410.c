@@ -22,6 +22,7 @@
 #include <linux/pinctrl/consumer.h>
 
 #include "tilcdc_drv.h"
+#include "tilcdc_tfp410.h"
 
 struct tfp410_module {
 	struct tilcdc_module base;
