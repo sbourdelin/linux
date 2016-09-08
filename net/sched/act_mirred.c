@@ -36,15 +36,16 @@ static DEFINE_SPINLOCK(mirred_list_lock);
 static void tcf_mirred_release(struct tc_action *a, int bind)
 {
 	struct tcf_mirred *m = to_mirred(a);
-	struct net_device *dev;
+	struct tcf_mirred_params *params;
 
 	/* We could be called either in a RCU callback or with RTNL lock held. */
 	spin_lock_bh(&mirred_list_lock);
 	list_del(&m->tcfm_list);
-	dev = rcu_dereference_protected(m->tcfm_dev, 1);
-	if (dev)
-		dev_put(dev);
+	params = rcu_dereference_protected(m->params, 1);
+	if (params->dev)
+		dev_put(params->dev);
 	spin_unlock_bh(&mirred_list_lock);
+	kfree_rcu(params, rcu);
 }
 
 static const struct nla_policy mirred_policy[TCA_MIRRED_MAX + 1] = {
@@ -60,6 +61,8 @@ static int tcf_mirred_init(struct net *net, struct nlattr *nla,
 {
 	struct tc_action_net *tn = net_generic(net, mirred_net_id);
 	struct nlattr *tb[TCA_MIRRED_MAX + 1];
+	struct tcf_mirred_params *params_new;
+	struct tcf_mirred_params *params_old;
 	struct tc_mirred *parm;
 	struct tcf_mirred *m;
 	struct net_device *dev;
@@ -124,21 +127,33 @@ static int tcf_mirred_init(struct net *net, struct nlattr *nla,
 		tcf_hash_release(*a, bind);
 		if (!ovr)
 			return -EEXIST;
+		ret = 0;
 	}
 	m = to_mirred(*a);
 
 	ASSERT_RTNL();
-	m->tcf_action = parm->action;
-	m->tcfm_eaction = parm->eaction;
+	params_new = kzalloc(sizeof(*params_new), GFP_KERNEL);
+	if (unlikely(!params_new)) {
+		if (ret == ACT_P_CREATED)
+			tcf_hash_release(*a, bind);
+		return -ENOMEM;
+	}
+	params_old = rtnl_dereference(m->params);
+	params_new->action = m->tcf_action = parm->action;
+	params_new->eaction = m->tcfm_eaction = parm->eaction;
 	if (dev != NULL) {
 		m->tcfm_ifindex = parm->ifindex;
-		if (ret != ACT_P_CREATED)
-			dev_put(rcu_dereference_protected(m->tcfm_dev, 1));
 		dev_hold(dev);
-		rcu_assign_pointer(m->tcfm_dev, dev);
-		m->tcfm_ok_push = ok_push;
+		params_new->dev = dev;
+		params_new->ok_push = ok_push;
 	}
 
+	rcu_assign_pointer(m->params, params_new);
+	if (params_old) {
+		if (params_old->dev)
+			dev_put(params_old->dev);
+		kfree_rcu(params_old, rcu);
+	}
 	if (ret == ACT_P_CREATED) {
 		spin_lock_bh(&mirred_list_lock);
 		list_add(&m->tcfm_list, &mirred_list);
@@ -153,6 +168,7 @@ static int tcf_mirred(struct sk_buff *skb, const struct tc_action *a,
 		      struct tcf_result *res)
 {
 	struct tcf_mirred *m = to_mirred(a);
+	struct tcf_mirred_params *params;
 	struct net_device *dev;
 	struct sk_buff *skb2;
 	int retval, err;
@@ -162,8 +178,9 @@ static int tcf_mirred(struct sk_buff *skb, const struct tc_action *a,
 	bstats_cpu_update(this_cpu_ptr(m->common.cpu_bstats), skb);
 
 	rcu_read_lock();
-	retval = READ_ONCE(m->tcf_action);
-	dev = rcu_dereference(m->tcfm_dev);
+	params = rcu_dereference(m->params);
+	retval = params->action;
+	dev = params->dev;
 	if (unlikely(!dev)) {
 		pr_notice_once("tc mirred: target device is gone\n");
 		goto out;
@@ -181,12 +198,12 @@ static int tcf_mirred(struct sk_buff *skb, const struct tc_action *a,
 		goto out;
 
 	if (!(at & AT_EGRESS)) {
-		if (m->tcfm_ok_push)
+		if (params->ok_push)
 			skb_push_rcsum(skb2, skb->mac_len);
 	}
 
 	/* mirror is always swallowed */
-	if (m->tcfm_eaction != TCA_EGRESS_MIRROR)
+	if (params->eaction != TCA_EGRESS_MIRROR)
 		skb2->tc_verd = SET_TC_FROM(skb2->tc_verd, at);
 
 	skb2->skb_iif = skb->dev->ifindex;
@@ -196,7 +213,7 @@ static int tcf_mirred(struct sk_buff *skb, const struct tc_action *a,
 	if (err) {
 out:
 		qstats_overlimit_inc(this_cpu_ptr(m->common.cpu_qstats));
-		if (m->tcfm_eaction != TCA_EGRESS_MIRROR)
+		if (params->eaction != TCA_EGRESS_MIRROR)
 			retval = TC_ACT_SHOT;
 	}
 	rcu_read_unlock();
@@ -257,12 +274,15 @@ static int mirred_device_event(struct notifier_block *unused,
 	if (event == NETDEV_UNREGISTER) {
 		spin_lock_bh(&mirred_list_lock);
 		list_for_each_entry(m, &mirred_list, tcfm_list) {
-			if (rcu_access_pointer(m->tcfm_dev) == dev) {
+			struct tcf_mirred_params *params;
+
+			params = rtnl_dereference(m->params);
+			if (params->dev == dev) {
 				dev_put(dev);
 				/* Note : no rcu grace period necessary, as
 				 * net_device are already rcu protected.
 				 */
-				RCU_INIT_POINTER(m->tcfm_dev, NULL);
+				params->dev = NULL;
 			}
 		}
 		spin_unlock_bh(&mirred_list_lock);

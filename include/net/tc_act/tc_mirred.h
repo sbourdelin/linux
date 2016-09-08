@@ -4,12 +4,20 @@
 #include <net/act_api.h>
 #include <linux/tc_act/tc_mirred.h>
 
+
+struct tcf_mirred_params {
+	struct net_device	*dev;
+	int			action;
+	int			eaction;
+	int			ok_push;
+	struct rcu_head		rcu;
+};
+
 struct tcf_mirred {
 	struct tc_action	common;
 	int			tcfm_eaction;
 	int			tcfm_ifindex;
-	int			tcfm_ok_push;
-	struct net_device __rcu	*tcfm_dev;
+	struct tcf_mirred_params __rcu *params;
 	struct list_head	tcfm_list;
 };
 #define to_mirred(a) ((struct tcf_mirred *)a)
