@@ -110,6 +110,10 @@ static const char *const rapl_domain_names[NR_RAPL_DOMAINS] __initconst = {
 #define RAPL_IDX_KNL	(1<<RAPL_IDX_PKG_NRG_STAT|\
 			 1<<RAPL_IDX_RAM_NRG_STAT)
 
+/* Baytrail/Braswell clients have PP0, PKG */
+#define RAPL_IDX_BYT	(1<<RAPL_IDX_PP0_NRG_STAT|\
+			 1<<RAPL_IDX_PKG_NRG_STAT)
+
 /*
  * event code: LSB 8 bits, passed in attr->config
  * any other bit is reserved
@@ -136,6 +140,11 @@ static struct perf_pmu_events_attr event_attr_##v = {				\
 	.event_str	= str,							\
 };
 
+enum rapl_quirk {
+	RAPL_HSX_QUIRK = 1,
+	RAPL_BYT_QUIRK,
+};
+
 struct rapl_pmu {
 	raw_spinlock_t		lock;
 	int			n_active;
@@ -158,6 +167,7 @@ static struct rapl_pmus *rapl_pmus;
 static cpumask_t rapl_cpu_mask;
 static unsigned int rapl_cntr_mask;
 static u64 rapl_timer_ms;
+static bool is_baytrail;
 
 static inline struct rapl_pmu *cpu_to_rapl_pmu(unsigned int cpu)
 {
@@ -177,6 +187,16 @@ static inline u64 rapl_scale(u64 v, int cfg)
 		pr_warn("Invalid domain %d, failed to scale data\n", cfg);
 		return v;
 	}
+
+	/*
+	 * Some Atom series processors (BYT/BSW) use 2^ESU microjoules.
+	 *
+	 * TODO: this looks hacky, it's better to refactor scale-up mechanism
+	 * to compromise the main stream processors and Atom ones.
+	 */
+	if (is_baytrail)
+		return v << rapl_hw_unit[cfg - 1];
+
 	/*
 	 * scale delta to smallest unit (1/2^32)
 	 * users must then scale back: count * 1/(1e9*2^32) to get Joules
@@ -452,6 +472,14 @@ RAPL_EVENT_ATTR_STR(energy-ram.scale,     rapl_ram_scale, "2.3283064365386962890
 RAPL_EVENT_ATTR_STR(energy-gpu.scale,     rapl_gpu_scale, "2.3283064365386962890625e-10");
 RAPL_EVENT_ATTR_STR(energy-psys.scale,   rapl_psys_scale, "2.3283064365386962890625e-10");
 
+/*
+ * Some Atom series processors (BYT/BSW) have fixed
+ * energy status unit (ESU) in smallest unit of microjoule,
+ * and its increment is in 2^ESU microjoules.
+ */
+RAPL_EVENT_ATTR_STR(energy-cores.scale, rapl_byt_cores_scale, "1.0e-6");
+RAPL_EVENT_ATTR_STR(energy-pkg.scale, rapl_byt_pkg_scale, "1.0e-6");
+
 static struct attribute *rapl_events_srv_attr[] = {
 	EVENT_PTR(rapl_cores),
 	EVENT_PTR(rapl_pkg),
@@ -530,6 +558,18 @@ static struct attribute *rapl_events_knl_attr[] = {
 
 	EVENT_PTR(rapl_pkg_scale),
 	EVENT_PTR(rapl_ram_scale),
+	NULL,
+};
+
+static struct attribute *rapl_events_byt_attr[] = {
+	EVENT_PTR(rapl_cores),
+	EVENT_PTR(rapl_pkg),
+
+	EVENT_PTR(rapl_cores_unit),
+	EVENT_PTR(rapl_pkg_unit),
+
+	EVENT_PTR(rapl_byt_cores_scale),
+	EVENT_PTR(rapl_byt_pkg_scale),
 	NULL,
 };
 
@@ -617,7 +657,7 @@ static int rapl_cpu_prepare(unsigned int cpu)
 	return 0;
 }
 
-static int rapl_check_hw_unit(bool apply_quirk)
+static int rapl_check_hw_unit(enum rapl_quirk apply_quirk)
 {
 	u64 msr_rapl_power_unit_bits;
 	int i;
@@ -634,8 +674,18 @@ static int rapl_check_hw_unit(bool apply_quirk)
 	 * "Intel Xeon Processor E5-1600 and E5-2600 v3 Product Families, V2
 	 * of 2. Datasheet, September 2014, Reference Number: 330784-001 "
 	 */
-	if (apply_quirk)
+	if (apply_quirk == RAPL_HSX_QUIRK)
 		rapl_hw_unit[RAPL_IDX_RAM_NRG_STAT] = 16;
+
+	/*
+	 * Some Atom processors (BYT/BSW) have 2^ESU microjoules increment,
+	 * refer to Software Developers' Manual, Vol. 3C, Order No. 325384,
+	 * Table 35-8 of MSR_RAPL_POWER_UNIT
+	 */
+	if (apply_quirk == RAPL_BYT_QUIRK)
+		is_baytrail = true;
+	else
+		is_baytrail = false;
 
 	/*
 	 * Calculate the timer rate:
@@ -702,45 +752,51 @@ static int __init init_rapl_pmus(void)
 	{ X86_VENDOR_INTEL, 6, model, X86_FEATURE_ANY, (unsigned long)&init }
 
 struct intel_rapl_init_fun {
-	bool apply_quirk;
+	enum rapl_quirk apply_quirk;
 	int cntr_mask;
 	struct attribute **attrs;
 };
 
 static const struct intel_rapl_init_fun snb_rapl_init __initconst = {
-	.apply_quirk = false,
+	.apply_quirk = 0,
 	.cntr_mask = RAPL_IDX_CLN,
 	.attrs = rapl_events_cln_attr,
 };
 
 static const struct intel_rapl_init_fun hsx_rapl_init __initconst = {
-	.apply_quirk = true,
+	.apply_quirk = RAPL_HSX_QUIRK,
 	.cntr_mask = RAPL_IDX_SRV,
 	.attrs = rapl_events_srv_attr,
 };
 
 static const struct intel_rapl_init_fun hsw_rapl_init __initconst = {
-	.apply_quirk = false,
+	.apply_quirk = 0,
 	.cntr_mask = RAPL_IDX_HSW,
 	.attrs = rapl_events_hsw_attr,
 };
 
 static const struct intel_rapl_init_fun snbep_rapl_init __initconst = {
-	.apply_quirk = false,
+	.apply_quirk = 0,
 	.cntr_mask = RAPL_IDX_SRV,
 	.attrs = rapl_events_srv_attr,
 };
 
 static const struct intel_rapl_init_fun knl_rapl_init __initconst = {
-	.apply_quirk = true,
+	.apply_quirk = RAPL_HSX_QUIRK,
 	.cntr_mask = RAPL_IDX_KNL,
 	.attrs = rapl_events_knl_attr,
 };
 
 static const struct intel_rapl_init_fun skl_rapl_init __initconst = {
-	.apply_quirk = false,
+	.apply_quirk = 0,
 	.cntr_mask = RAPL_IDX_SKL_CLN,
 	.attrs = rapl_events_skl_attr,
+};
+
+static const struct intel_rapl_init_fun byt_rapl_init __initconst = {
+	.apply_quirk = RAPL_BYT_QUIRK,
+	.cntr_mask = RAPL_IDX_BYT,
+	.attrs = rapl_events_byt_attr,
 };
 
 static const struct x86_cpu_id rapl_cpu_match[] __initconst = {
@@ -766,6 +822,8 @@ static const struct x86_cpu_id rapl_cpu_match[] __initconst = {
 	X86_RAPL_MODEL_MATCH(INTEL_FAM6_SKYLAKE_DESKTOP, skl_rapl_init),
 	X86_RAPL_MODEL_MATCH(INTEL_FAM6_SKYLAKE_X,	 hsx_rapl_init),
 
+	X86_RAPL_MODEL_MATCH(INTEL_FAM6_ATOM_SILVERMONT1, byt_rapl_init),
+	X86_RAPL_MODEL_MATCH(INTEL_FAM6_ATOM_AIRMONT, byt_rapl_init),
 	X86_RAPL_MODEL_MATCH(INTEL_FAM6_ATOM_GOLDMONT, hsw_rapl_init),
 	{},
 };
@@ -776,7 +834,7 @@ static int __init rapl_pmu_init(void)
 {
 	const struct x86_cpu_id *id;
 	struct intel_rapl_init_fun *rapl_init;
-	bool apply_quirk;
+	enum rapl_quirk apply_quirk;
 	int ret;
 
 	id = x86_match_cpu(rapl_cpu_match);
