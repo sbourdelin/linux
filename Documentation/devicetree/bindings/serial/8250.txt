@@ -45,6 +45,7 @@ Optional properties:
 - {rts,cts,dtr,dsr,rng,dcd}-gpios: specify a GPIO for RTS/CTS/DTR/DSR/RI/DCD
   line respectively. It will use specified GPIO instead of the peripheral
   function pin for the UART feature. If unsure, don't specify this property.
+- tx-loadsz: the number of bytes that can be loaded into the TX FIFO.
 
 Note:
 * fsl,ns16550:
