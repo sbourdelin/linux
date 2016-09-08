@@ -663,23 +663,24 @@ static int gen8_write_pdp(struct drm_i915_gem_request *req,
 			  unsigned entry,
 			  dma_addr_t addr)
 {
-	struct intel_ring *ring = req->ring;
 	struct intel_engine_cs *engine = req->engine;
+	u32 *rbuf;
 	int ret;
 
 	BUG_ON(entry >= 4);
 
-	ret = intel_ring_begin(req, 6);
+	ret = intel_ring_begin(req, 6, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(1));
-	intel_ring_emit_reg(ring, GEN8_RING_PDP_UDW(engine, entry));
-	intel_ring_emit(ring, upper_32_bits(addr));
-	intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(1));
-	intel_ring_emit_reg(ring, GEN8_RING_PDP_LDW(engine, entry));
-	intel_ring_emit(ring, lower_32_bits(addr));
-	intel_ring_advance(ring);
+	*rbuf++ = MI_LOAD_REGISTER_IMM(1);
+	*rbuf++ = GEN8_RING_PDP_UDW(engine, entry).reg;
+	*rbuf++ = upper_32_bits(addr);
+	*rbuf++ = MI_LOAD_REGISTER_IMM(1);
+	*rbuf++ = GEN8_RING_PDP_LDW(engine, entry).reg;
+	*rbuf++ = lower_32_bits(addr);
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -1655,8 +1656,8 @@ static uint32_t get_pd_offset(struct i915_hw_ppgtt *ppgtt)
 static int hsw_mm_switch(struct i915_hw_ppgtt *ppgtt,
 			 struct drm_i915_gem_request *req)
 {
-	struct intel_ring *ring = req->ring;
 	struct intel_engine_cs *engine = req->engine;
+	u32 *rbuf;
 	int ret;
 
 	/* NB: TLBs must be flushed and invalidated before a switch */
@@ -1664,17 +1665,18 @@ static int hsw_mm_switch(struct i915_hw_ppgtt *ppgtt,
 	if (ret)
 		return ret;
 
-	ret = intel_ring_begin(req, 6);
+	ret = intel_ring_begin(req, 6, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(2));
-	intel_ring_emit_reg(ring, RING_PP_DIR_DCLV(engine));
-	intel_ring_emit(ring, PP_DIR_DCLV_2G);
-	intel_ring_emit_reg(ring, RING_PP_DIR_BASE(engine));
-	intel_ring_emit(ring, get_pd_offset(ppgtt));
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_advance(ring);
+	*rbuf++ = MI_LOAD_REGISTER_IMM(2);
+	*rbuf++ = RING_PP_DIR_DCLV(engine).reg;
+	*rbuf++ = PP_DIR_DCLV_2G;
+	*rbuf++ = RING_PP_DIR_BASE(engine).reg;
+	*rbuf++ = get_pd_offset(ppgtt);
+	*rbuf++ = MI_NOOP;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -1682,8 +1684,8 @@ static int hsw_mm_switch(struct i915_hw_ppgtt *ppgtt,
 static int gen7_mm_switch(struct i915_hw_ppgtt *ppgtt,
 			  struct drm_i915_gem_request *req)
 {
-	struct intel_ring *ring = req->ring;
 	struct intel_engine_cs *engine = req->engine;
+	u32 *rbuf;
 	int ret;
 
 	/* NB: TLBs must be flushed and invalidated before a switch */
@@ -1691,17 +1693,18 @@ static int gen7_mm_switch(struct i915_hw_ppgtt *ppgtt,
 	if (ret)
 		return ret;
 
-	ret = intel_ring_begin(req, 6);
+	ret = intel_ring_begin(req, 6, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(2));
-	intel_ring_emit_reg(ring, RING_PP_DIR_DCLV(engine));
-	intel_ring_emit(ring, PP_DIR_DCLV_2G);
-	intel_ring_emit_reg(ring, RING_PP_DIR_BASE(engine));
-	intel_ring_emit(ring, get_pd_offset(ppgtt));
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_advance(ring);
+	*rbuf++ = MI_LOAD_REGISTER_IMM(2);
+	*rbuf++ = RING_PP_DIR_DCLV(engine).reg;
+	*rbuf++ = PP_DIR_DCLV_2G;
+	*rbuf++ = RING_PP_DIR_BASE(engine).reg;
+	*rbuf++ = get_pd_offset(ppgtt);
+	*rbuf++ = MI_NOOP;
+
+	intel_ring_advance(req->ring);
 
 	/* XXX: RCS is the only one to auto invalidate the TLBs? */
 	if (engine->id != RCS) {

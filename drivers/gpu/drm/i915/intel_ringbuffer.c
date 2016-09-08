@@ -61,8 +61,7 @@ void intel_ring_update_space(struct intel_ring *ring)
 static int
 gen2_render_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 {
-	struct intel_ring *ring = req->ring;
-	u32 cmd;
+	u32 cmd, *rbuf;
 	int ret;
 
 	cmd = MI_FLUSH;
@@ -70,13 +69,14 @@ gen2_render_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 	if (mode & EMIT_INVALIDATE)
 		cmd |= MI_READ_FLUSH;
 
-	ret = intel_ring_begin(req, 2);
+	ret = intel_ring_begin(req, 2, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, cmd);
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_advance(ring);
+	*rbuf++ = cmd;
+	*rbuf++ = MI_NOOP;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -84,8 +84,7 @@ gen2_render_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 static int
 gen4_render_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 {
-	struct intel_ring *ring = req->ring;
-	u32 cmd;
+	u32 cmd, *rbuf;
 	int ret;
 
 	/*
@@ -123,13 +122,14 @@ gen4_render_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 			cmd |= MI_INVALIDATE_ISP;
 	}
 
-	ret = intel_ring_begin(req, 2);
+	ret = intel_ring_begin(req, 2, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, cmd);
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_advance(ring);
+	*rbuf++ = cmd;
+	*rbuf++ = MI_NOOP;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -174,35 +174,37 @@ gen4_render_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 static int
 intel_emit_post_sync_nonzero_flush(struct drm_i915_gem_request *req)
 {
-	struct intel_ring *ring = req->ring;
 	u32 scratch_addr =
 		i915_ggtt_offset(req->engine->scratch) + 2 * CACHELINE_BYTES;
+	u32 *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 6);
+	ret = intel_ring_begin(req, 6, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, GFX_OP_PIPE_CONTROL(5));
-	intel_ring_emit(ring, PIPE_CONTROL_CS_STALL |
-			PIPE_CONTROL_STALL_AT_SCOREBOARD);
-	intel_ring_emit(ring, scratch_addr | PIPE_CONTROL_GLOBAL_GTT);
-	intel_ring_emit(ring, 0); /* low dword */
-	intel_ring_emit(ring, 0); /* high dword */
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_advance(ring);
+	*rbuf++ = GFX_OP_PIPE_CONTROL(5);
+	*rbuf++ = PIPE_CONTROL_CS_STALL |
+		  PIPE_CONTROL_STALL_AT_SCOREBOARD;
+	*rbuf++ = scratch_addr | PIPE_CONTROL_GLOBAL_GTT;
+	*rbuf++ = 0; /* low dword */
+	*rbuf++ = 0; /* high dword */
+	*rbuf++ = MI_NOOP;
 
-	ret = intel_ring_begin(req, 6);
+	intel_ring_advance(req->ring);
+
+	ret = intel_ring_begin(req, 6, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, GFX_OP_PIPE_CONTROL(5));
-	intel_ring_emit(ring, PIPE_CONTROL_QW_WRITE);
-	intel_ring_emit(ring, scratch_addr | PIPE_CONTROL_GLOBAL_GTT);
-	intel_ring_emit(ring, 0);
-	intel_ring_emit(ring, 0);
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_advance(ring);
+	*rbuf++ = GFX_OP_PIPE_CONTROL(5);
+	*rbuf++ = PIPE_CONTROL_QW_WRITE;
+	*rbuf++ = scratch_addr | PIPE_CONTROL_GLOBAL_GTT;
+	*rbuf++ = 0;
+	*rbuf++ = 0;
+	*rbuf++ = MI_NOOP;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -210,10 +212,9 @@ intel_emit_post_sync_nonzero_flush(struct drm_i915_gem_request *req)
 static int
 gen6_render_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 {
-	struct intel_ring *ring = req->ring;
 	u32 scratch_addr =
 		i915_ggtt_offset(req->engine->scratch) + 2 * CACHELINE_BYTES;
-	u32 flags = 0;
+	u32 *rbuf, flags = 0;
 	int ret;
 
 	/* Force SNB workarounds for PIPE_CONTROL flushes */
@@ -247,15 +248,16 @@ gen6_render_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 		flags |= PIPE_CONTROL_QW_WRITE | PIPE_CONTROL_CS_STALL;
 	}
 
-	ret = intel_ring_begin(req, 4);
+	ret = intel_ring_begin(req, 4, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, GFX_OP_PIPE_CONTROL(4));
-	intel_ring_emit(ring, flags);
-	intel_ring_emit(ring, scratch_addr | PIPE_CONTROL_GLOBAL_GTT);
-	intel_ring_emit(ring, 0);
-	intel_ring_advance(ring);
+	*rbuf++ = GFX_OP_PIPE_CONTROL(4);
+	*rbuf++ = flags;
+	*rbuf++ = scratch_addr | PIPE_CONTROL_GLOBAL_GTT;
+	*rbuf++ = 0;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -263,20 +265,20 @@ gen6_render_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 static int
 gen7_render_ring_cs_stall_wa(struct drm_i915_gem_request *req)
 {
-	struct intel_ring *ring = req->ring;
+	u32 *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 4);
+	ret = intel_ring_begin(req, 4, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, GFX_OP_PIPE_CONTROL(4));
-	intel_ring_emit(ring,
-			PIPE_CONTROL_CS_STALL |
-			PIPE_CONTROL_STALL_AT_SCOREBOARD);
-	intel_ring_emit(ring, 0);
-	intel_ring_emit(ring, 0);
-	intel_ring_advance(ring);
+	*rbuf++ = GFX_OP_PIPE_CONTROL(4);
+	*rbuf++ = PIPE_CONTROL_CS_STALL |
+		  PIPE_CONTROL_STALL_AT_SCOREBOARD;
+	*rbuf++ = 0;
+	*rbuf++ = 0;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -284,10 +286,9 @@ gen7_render_ring_cs_stall_wa(struct drm_i915_gem_request *req)
 static int
 gen7_render_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 {
-	struct intel_ring *ring = req->ring;
 	u32 scratch_addr =
 		i915_ggtt_offset(req->engine->scratch) + 2 * CACHELINE_BYTES;
-	u32 flags = 0;
+	u32 *rbuf, flags = 0;
 	int ret;
 
 	/*
@@ -332,15 +333,16 @@ gen7_render_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 		gen7_render_ring_cs_stall_wa(req);
 	}
 
-	ret = intel_ring_begin(req, 4);
+	ret = intel_ring_begin(req, 4, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, GFX_OP_PIPE_CONTROL(4));
-	intel_ring_emit(ring, flags);
-	intel_ring_emit(ring, scratch_addr);
-	intel_ring_emit(ring, 0);
-	intel_ring_advance(ring);
+	*rbuf++ = GFX_OP_PIPE_CONTROL(4);
+	*rbuf++ = flags;
+	*rbuf++ = scratch_addr;
+	*rbuf++ = 0;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -349,20 +351,21 @@ static int
 gen8_emit_pipe_control(struct drm_i915_gem_request *req,
 		       u32 flags, u32 scratch_addr)
 {
-	struct intel_ring *ring = req->ring;
+	u32 *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 6);
+	ret = intel_ring_begin(req, 6, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, GFX_OP_PIPE_CONTROL(6));
-	intel_ring_emit(ring, flags);
-	intel_ring_emit(ring, scratch_addr);
-	intel_ring_emit(ring, 0);
-	intel_ring_emit(ring, 0);
-	intel_ring_emit(ring, 0);
-	intel_ring_advance(ring);
+	*rbuf++ = GFX_OP_PIPE_CONTROL(6);
+	*rbuf++ = flags;
+	*rbuf++ = scratch_addr;
+	*rbuf++ = 0;
+	*rbuf++ = 0;
+	*rbuf++ = 0;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -615,8 +618,8 @@ out:
 
 static int intel_ring_workarounds_emit(struct drm_i915_gem_request *req)
 {
-	struct intel_ring *ring = req->ring;
 	struct i915_workarounds *w = &req->i915->workarounds;
+	u32 *rbuf;
 	int ret, i;
 
 	if (w->count == 0)
@@ -626,18 +629,18 @@ static int intel_ring_workarounds_emit(struct drm_i915_gem_request *req)
 	if (ret)
 		return ret;
 
-	ret = intel_ring_begin(req, (w->count * 2 + 2));
+	ret = intel_ring_begin(req, w->count * 2 + 2, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(w->count));
+	*rbuf++ = MI_LOAD_REGISTER_IMM(w->count);
 	for (i = 0; i < w->count; i++) {
-		intel_ring_emit_reg(ring, w->reg[i].addr);
-		intel_ring_emit(ring, w->reg[i].value);
+		*rbuf++ = w->reg[i].addr.reg;
+		*rbuf++ = w->reg[i].value;
 	}
-	intel_ring_emit(ring, MI_NOOP);
+	*rbuf++ = MI_NOOP;
 
-	intel_ring_advance(ring);
+	intel_ring_advance(req->ring);
 
 	ret = req->engine->emit_flush(req, EMIT_BARRIER);
 	if (ret)
@@ -1263,14 +1266,14 @@ static void render_ring_cleanup(struct intel_engine_cs *engine)
 
 static int gen8_rcs_signal(struct drm_i915_gem_request *req)
 {
-	struct intel_ring *ring = req->ring;
 	struct drm_i915_private *dev_priv = req->i915;
 	struct intel_engine_cs *waiter;
 	enum intel_engine_id id;
+	u32 *rbuf;
 	int ret, num_rings;
 
 	num_rings = INTEL_INFO(dev_priv)->num_rings;
-	ret = intel_ring_begin(req, (num_rings-1) * 8);
+	ret = intel_ring_begin(req, (num_rings-1) * 8, &rbuf);
 	if (ret)
 		return ret;
 
@@ -1279,35 +1282,33 @@ static int gen8_rcs_signal(struct drm_i915_gem_request *req)
 		if (gtt_offset == MI_SEMAPHORE_SYNC_INVALID)
 			continue;
 
-		intel_ring_emit(ring, GFX_OP_PIPE_CONTROL(6));
-		intel_ring_emit(ring,
-				PIPE_CONTROL_GLOBAL_GTT_IVB |
-				PIPE_CONTROL_QW_WRITE |
-				PIPE_CONTROL_CS_STALL);
-		intel_ring_emit(ring, lower_32_bits(gtt_offset));
-		intel_ring_emit(ring, upper_32_bits(gtt_offset));
-		intel_ring_emit(ring, req->fence.seqno);
-		intel_ring_emit(ring, 0);
-		intel_ring_emit(ring,
-				MI_SEMAPHORE_SIGNAL |
-				MI_SEMAPHORE_TARGET(waiter->hw_id));
-		intel_ring_emit(ring, 0);
+		*rbuf++ = GFX_OP_PIPE_CONTROL(6);
+		*rbuf++ = PIPE_CONTROL_GLOBAL_GTT_IVB |
+			  PIPE_CONTROL_QW_WRITE |
+			  PIPE_CONTROL_CS_STALL;
+		*rbuf++ = lower_32_bits(gtt_offset);
+		*rbuf++ = upper_32_bits(gtt_offset);
+		*rbuf++ = req->fence.seqno;
+		*rbuf++ = 0;
+		*rbuf++ = MI_SEMAPHORE_SIGNAL |
+			  MI_SEMAPHORE_TARGET(waiter->hw_id);
+		*rbuf++ = 0;
 	}
-	intel_ring_advance(ring);
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
 
 static int gen8_xcs_signal(struct drm_i915_gem_request *req)
 {
-	struct intel_ring *ring = req->ring;
 	struct drm_i915_private *dev_priv = req->i915;
 	struct intel_engine_cs *waiter;
 	enum intel_engine_id id;
+	u32 *rbuf;
 	int ret, num_rings;
 
 	num_rings = INTEL_INFO(dev_priv)->num_rings;
-	ret = intel_ring_begin(req, (num_rings-1) * 6);
+	ret = intel_ring_begin(req, (num_rings-1) * 6, &rbuf);
 	if (ret)
 		return ret;
 
@@ -1316,32 +1317,28 @@ static int gen8_xcs_signal(struct drm_i915_gem_request *req)
 		if (gtt_offset == MI_SEMAPHORE_SYNC_INVALID)
 			continue;
 
-		intel_ring_emit(ring,
-				(MI_FLUSH_DW + 1) | MI_FLUSH_DW_OP_STOREDW);
-		intel_ring_emit(ring,
-				lower_32_bits(gtt_offset) |
-				MI_FLUSH_DW_USE_GTT);
-		intel_ring_emit(ring, upper_32_bits(gtt_offset));
-		intel_ring_emit(ring, req->fence.seqno);
-		intel_ring_emit(ring,
-				MI_SEMAPHORE_SIGNAL |
-				MI_SEMAPHORE_TARGET(waiter->hw_id));
-		intel_ring_emit(ring, 0);
+		*rbuf++ = (MI_FLUSH_DW + 1) | MI_FLUSH_DW_OP_STOREDW;
+		*rbuf++ = lower_32_bits(gtt_offset) | MI_FLUSH_DW_USE_GTT;
+		*rbuf++ = upper_32_bits(gtt_offset);
+		*rbuf++ = req->fence.seqno;
+		*rbuf++ = MI_SEMAPHORE_SIGNAL |
+			  MI_SEMAPHORE_TARGET(waiter->hw_id);
+		*rbuf++ = 0;
 	}
-	intel_ring_advance(ring);
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
 
 static int gen6_signal(struct drm_i915_gem_request *req)
 {
-	struct intel_ring *ring = req->ring;
 	struct drm_i915_private *dev_priv = req->i915;
 	struct intel_engine_cs *engine;
+	u32 *rbuf;
 	int ret, num_rings;
 
 	num_rings = INTEL_INFO(dev_priv)->num_rings;
-	ret = intel_ring_begin(req, round_up((num_rings-1) * 3, 2));
+	ret = intel_ring_begin(req, round_up((num_rings-1) * 3, 2), &rbuf);
 	if (ret)
 		return ret;
 
@@ -1353,16 +1350,17 @@ static int gen6_signal(struct drm_i915_gem_request *req)
 
 		mbox_reg = req->engine->semaphore.mbox.signal[engine->hw_id];
 		if (i915_mmio_reg_valid(mbox_reg)) {
-			intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(1));
-			intel_ring_emit_reg(ring, mbox_reg);
-			intel_ring_emit(ring, req->fence.seqno);
+			*rbuf++ = MI_LOAD_REGISTER_IMM(1);
+			*rbuf++ = mbox_reg.reg;
+			*rbuf++ = req->fence.seqno;
 		}
 	}
 
 	/* If num_dwords was rounded, make sure the tail pointer is correct */
 	if (num_rings % 2 == 0)
-		intel_ring_emit(ring, MI_NOOP);
-	intel_ring_advance(ring);
+		*rbuf++ = MI_NOOP;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -1378,16 +1376,18 @@ static void i9xx_submit_request(struct drm_i915_gem_request *request)
 static int i9xx_emit_request(struct drm_i915_gem_request *req)
 {
 	struct intel_ring *ring = req->ring;
+	u32 *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 4);
+	ret = intel_ring_begin(req, 4, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, MI_STORE_DWORD_INDEX);
-	intel_ring_emit(ring, I915_GEM_HWS_INDEX << MI_STORE_DWORD_INDEX_SHIFT);
-	intel_ring_emit(ring, req->fence.seqno);
-	intel_ring_emit(ring, MI_USER_INTERRUPT);
+	*rbuf++ = MI_STORE_DWORD_INDEX;
+	*rbuf++ = I915_GEM_HWS_INDEX << MI_STORE_DWORD_INDEX_SHIFT;
+	*rbuf++ = req->fence.seqno;
+	*rbuf++ = MI_USER_INTERRUPT;
+
 	intel_ring_advance(ring);
 
 	req->tail = ring->tail;
@@ -1418,6 +1418,7 @@ static int gen8_render_emit_request(struct drm_i915_gem_request *req)
 {
 	struct intel_engine_cs *engine = req->engine;
 	struct intel_ring *ring = req->ring;
+	u32 *rbuf;
 	int ret;
 
 	if (engine->semaphore.signal) {
@@ -1426,21 +1427,22 @@ static int gen8_render_emit_request(struct drm_i915_gem_request *req)
 			return ret;
 	}
 
-	ret = intel_ring_begin(req, 8);
+	ret = intel_ring_begin(req, 8, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, GFX_OP_PIPE_CONTROL(6));
-	intel_ring_emit(ring, (PIPE_CONTROL_GLOBAL_GTT_IVB |
-			       PIPE_CONTROL_CS_STALL |
-			       PIPE_CONTROL_QW_WRITE));
-	intel_ring_emit(ring, intel_hws_seqno_address(engine));
-	intel_ring_emit(ring, 0);
-	intel_ring_emit(ring, i915_gem_request_get_seqno(req));
+	*rbuf++ = GFX_OP_PIPE_CONTROL(6);
+	*rbuf++ = (PIPE_CONTROL_GLOBAL_GTT_IVB |
+		  PIPE_CONTROL_CS_STALL |
+		  PIPE_CONTROL_QW_WRITE);
+	*rbuf++ = intel_hws_seqno_address(engine);
+	*rbuf++ = 0;
+	*rbuf++ = i915_gem_request_get_seqno(req);
 	/* We're thrashing one dword of HWS. */
-	intel_ring_emit(ring, 0);
-	intel_ring_emit(ring, MI_USER_INTERRUPT);
-	intel_ring_emit(ring, MI_NOOP);
+	*rbuf++ = 0;
+	*rbuf++ = MI_USER_INTERRUPT;
+	*rbuf++ = MI_NOOP;
+
 	intel_ring_advance(ring);
 
 	req->tail = ring->tail;
@@ -1460,24 +1462,24 @@ static int
 gen8_ring_sync_to(struct drm_i915_gem_request *req,
 		  struct drm_i915_gem_request *signal)
 {
-	struct intel_ring *ring = req->ring;
 	struct drm_i915_private *dev_priv = req->i915;
 	u64 offset = GEN8_WAIT_OFFSET(req->engine, signal->engine->id);
 	struct i915_hw_ppgtt *ppgtt;
+	u32 *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 4);
+	ret = intel_ring_begin(req, 4, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring,
-			MI_SEMAPHORE_WAIT |
-			MI_SEMAPHORE_GLOBAL_GTT |
-			MI_SEMAPHORE_SAD_GTE_SDD);
-	intel_ring_emit(ring, signal->fence.seqno);
-	intel_ring_emit(ring, lower_32_bits(offset));
-	intel_ring_emit(ring, upper_32_bits(offset));
-	intel_ring_advance(ring);
+	*rbuf++ = MI_SEMAPHORE_WAIT |
+		  MI_SEMAPHORE_GLOBAL_GTT |
+		  MI_SEMAPHORE_SAD_GTE_SDD;
+	*rbuf++ = signal->fence.seqno;
+	*rbuf++ = lower_32_bits(offset);
+	*rbuf++ = upper_32_bits(offset);
+
+	intel_ring_advance(req->ring);
 
 	/* When the !RCS engines idle waiting upon a semaphore, they lose their
 	 * pagetables and we must reload them before executing the batch.
@@ -1494,28 +1496,29 @@ static int
 gen6_ring_sync_to(struct drm_i915_gem_request *req,
 		  struct drm_i915_gem_request *signal)
 {
-	struct intel_ring *ring = req->ring;
 	u32 dw1 = MI_SEMAPHORE_MBOX |
 		  MI_SEMAPHORE_COMPARE |
 		  MI_SEMAPHORE_REGISTER;
 	u32 wait_mbox = signal->engine->semaphore.mbox.wait[req->engine->hw_id];
+	u32 *rbuf;
 	int ret;
 
 	WARN_ON(wait_mbox == MI_SEMAPHORE_SYNC_INVALID);
 
-	ret = intel_ring_begin(req, 4);
+	ret = intel_ring_begin(req, 4, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, dw1 | wait_mbox);
+	*rbuf++ = dw1 | wait_mbox;
 	/* Throughout all of the GEM code, seqno passed implies our current
 	 * seqno is >= the last seqno executed. However for hardware the
 	 * comparison is strictly greater than.
 	 */
-	intel_ring_emit(ring, signal->fence.seqno - 1);
-	intel_ring_emit(ring, 0);
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_advance(ring);
+	*rbuf++ = signal->fence.seqno - 1;
+	*rbuf++ = 0;
+	*rbuf++ = MI_NOOP;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -1616,16 +1619,17 @@ i8xx_irq_disable(struct intel_engine_cs *engine)
 static int
 bsd_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 {
-	struct intel_ring *ring = req->ring;
+	u32 *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 2);
+	ret = intel_ring_begin(req, 2, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, MI_FLUSH);
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_advance(ring);
+	*rbuf++ = MI_FLUSH;
+	*rbuf++ = MI_NOOP;
+
+	intel_ring_advance(req->ring);
 	return 0;
 }
 
@@ -1691,20 +1695,20 @@ i965_emit_bb_start(struct drm_i915_gem_request *req,
 		   u64 offset, u32 length,
 		   unsigned int dispatch_flags)
 {
-	struct intel_ring *ring = req->ring;
+	u32 *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 2);
+	ret = intel_ring_begin(req, 2, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring,
-			MI_BATCH_BUFFER_START |
-			MI_BATCH_GTT |
-			(dispatch_flags & I915_DISPATCH_SECURE ?
-			 0 : MI_BATCH_NON_SECURE_I965));
-	intel_ring_emit(ring, offset);
-	intel_ring_advance(ring);
+	*rbuf++ = MI_BATCH_BUFFER_START |
+		  MI_BATCH_GTT |
+		  (dispatch_flags & I915_DISPATCH_SECURE ?
+		  0 : MI_BATCH_NON_SECURE_I965);
+	*rbuf++ = offset;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -1720,26 +1724,28 @@ i830_emit_bb_start(struct drm_i915_gem_request *req,
 {
 	struct intel_ring *ring = req->ring;
 	u32 cs_offset = i915_ggtt_offset(req->engine->scratch);
+	u32 *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 6);
+	ret = intel_ring_begin(req, 6, &rbuf);
 	if (ret)
 		return ret;
 
 	/* Evict the invalid PTE TLBs */
-	intel_ring_emit(ring, COLOR_BLT_CMD | BLT_WRITE_RGBA);
-	intel_ring_emit(ring, BLT_DEPTH_32 | BLT_ROP_COLOR_COPY | 4096);
-	intel_ring_emit(ring, I830_TLB_ENTRIES << 16 | 4); /* load each page */
-	intel_ring_emit(ring, cs_offset);
-	intel_ring_emit(ring, 0xdeadbeef);
-	intel_ring_emit(ring, MI_NOOP);
+	*rbuf++ = COLOR_BLT_CMD | BLT_WRITE_RGBA;
+	*rbuf++ = BLT_DEPTH_32 | BLT_ROP_COLOR_COPY | 4096;
+	*rbuf++ = I830_TLB_ENTRIES << 16 | 4; /* load each page */
+	*rbuf++ = cs_offset;
+	*rbuf++ = 0xdeadbeef;
+	*rbuf++ = MI_NOOP;
+
 	intel_ring_advance(ring);
 
 	if ((dispatch_flags & I915_DISPATCH_PINNED) == 0) {
 		if (len > I830_BATCH_LIMIT)
 			return -ENOSPC;
 
-		ret = intel_ring_begin(req, 6 + 2);
+		ret = intel_ring_begin(req, 6 + 2, &rbuf);
 		if (ret)
 			return ret;
 
@@ -1747,29 +1753,30 @@ i830_emit_bb_start(struct drm_i915_gem_request *req,
 		 * stable batch scratch bo area (so that the CS never
 		 * stumbles over its tlb invalidation bug) ...
 		 */
-		intel_ring_emit(ring, SRC_COPY_BLT_CMD | BLT_WRITE_RGBA);
-		intel_ring_emit(ring,
-				BLT_DEPTH_32 | BLT_ROP_SRC_COPY | 4096);
-		intel_ring_emit(ring, DIV_ROUND_UP(len, 4096) << 16 | 4096);
-		intel_ring_emit(ring, cs_offset);
-		intel_ring_emit(ring, 4096);
-		intel_ring_emit(ring, offset);
+		*rbuf++ = SRC_COPY_BLT_CMD | BLT_WRITE_RGBA;
+		*rbuf++ = BLT_DEPTH_32 | BLT_ROP_SRC_COPY | 4096;
+		*rbuf++ = DIV_ROUND_UP(len, 4096) << 16 | 4096;
+		*rbuf++ = cs_offset;
+		*rbuf++ = 4096;
+		*rbuf++ = offset;
 
-		intel_ring_emit(ring, MI_FLUSH);
-		intel_ring_emit(ring, MI_NOOP);
+		*rbuf++ = MI_FLUSH;
+		*rbuf++ = MI_NOOP;
+
 		intel_ring_advance(ring);
 
 		/* ... and execute it. */
 		offset = cs_offset;
 	}
 
-	ret = intel_ring_begin(req, 2);
+	ret = intel_ring_begin(req, 2, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, MI_BATCH_BUFFER_START | MI_BATCH_GTT);
-	intel_ring_emit(ring, offset | (dispatch_flags & I915_DISPATCH_SECURE ?
-					0 : MI_BATCH_NON_SECURE));
+	*rbuf++ = MI_BATCH_BUFFER_START | MI_BATCH_GTT;
+	*rbuf++ = offset | (dispatch_flags & I915_DISPATCH_SECURE ?
+		  0 : MI_BATCH_NON_SECURE);
+
 	intel_ring_advance(ring);
 
 	return 0;
@@ -1780,17 +1787,18 @@ i915_emit_bb_start(struct drm_i915_gem_request *req,
 		   u64 offset, u32 len,
 		   unsigned int dispatch_flags)
 {
-	struct intel_ring *ring = req->ring;
+	u32 *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 2);
+	ret = intel_ring_begin(req, 2, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, MI_BATCH_BUFFER_START | MI_BATCH_GTT);
-	intel_ring_emit(ring, offset | (dispatch_flags & I915_DISPATCH_SECURE ?
-					0 : MI_BATCH_NON_SECURE));
-	intel_ring_advance(ring);
+	*rbuf++ = MI_BATCH_BUFFER_START | MI_BATCH_GTT;
+	*rbuf++ = offset | (dispatch_flags & I915_DISPATCH_SECURE ?
+		  0 : MI_BATCH_NON_SECURE);
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -2181,7 +2189,7 @@ int intel_ring_alloc_request_extras(struct drm_i915_gem_request *request)
 
 	request->ring = request->engine->buffer;
 
-	ret = intel_ring_begin(request, 0);
+	ret = __intel_ring_begin(request, 0);
 	if (ret)
 		return ret;
 
@@ -2237,7 +2245,7 @@ static int wait_for_space(struct drm_i915_gem_request *req, int bytes)
 	return 0;
 }
 
-int intel_ring_begin(struct drm_i915_gem_request *req, int num_dwords)
+int __intel_ring_begin(struct drm_i915_gem_request *req, int num_dwords)
 {
 	struct intel_ring *ring = req->ring;
 	int remain_actual = ring->size - ring->tail;
@@ -2295,18 +2303,19 @@ int intel_ring_cacheline_align(struct drm_i915_gem_request *req)
 	struct intel_ring *ring = req->ring;
 	int num_dwords =
 		(ring->tail & (CACHELINE_BYTES - 1)) / sizeof(uint32_t);
+	u32 *rbuf;
 	int ret;
 
 	if (num_dwords == 0)
 		return 0;
 
 	num_dwords = CACHELINE_BYTES / sizeof(uint32_t) - num_dwords;
-	ret = intel_ring_begin(req, num_dwords);
+	ret = intel_ring_begin(req, num_dwords, &rbuf);
 	if (ret)
 		return ret;
 
 	while (num_dwords--)
-		intel_ring_emit(ring, MI_NOOP);
+		*rbuf++ = MI_NOOP;
 
 	intel_ring_advance(ring);
 
@@ -2352,11 +2361,10 @@ static void gen6_bsd_submit_request(struct drm_i915_gem_request *request)
 
 static int gen6_bsd_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 {
-	struct intel_ring *ring = req->ring;
-	uint32_t cmd;
+	u32 cmd, *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 4);
+	ret = intel_ring_begin(req, 4, &rbuf);
 	if (ret)
 		return ret;
 
@@ -2380,16 +2388,18 @@ static int gen6_bsd_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 	if (mode & EMIT_INVALIDATE)
 		cmd |= MI_INVALIDATE_TLB | MI_INVALIDATE_BSD;
 
-	intel_ring_emit(ring, cmd);
-	intel_ring_emit(ring, I915_GEM_HWS_SCRATCH_ADDR | MI_FLUSH_DW_USE_GTT);
+	*rbuf++ = cmd;
+	*rbuf++ = I915_GEM_HWS_SCRATCH_ADDR | MI_FLUSH_DW_USE_GTT;
 	if (INTEL_GEN(req->i915) >= 8) {
-		intel_ring_emit(ring, 0); /* upper addr */
-		intel_ring_emit(ring, 0); /* value */
+		*rbuf++ = 0; /* upper addr */
+		*rbuf++ = 0; /* value */
 	} else  {
-		intel_ring_emit(ring, 0);
-		intel_ring_emit(ring, MI_NOOP);
+		*rbuf++ = 0;
+		*rbuf++ = MI_NOOP;
 	}
-	intel_ring_advance(ring);
+
+	intel_ring_advance(req->ring);
+
 	return 0;
 }
 
@@ -2398,23 +2408,24 @@ gen8_emit_bb_start(struct drm_i915_gem_request *req,
 		   u64 offset, u32 len,
 		   unsigned int dispatch_flags)
 {
-	struct intel_ring *ring = req->ring;
 	bool ppgtt = USES_PPGTT(req->i915) &&
 			!(dispatch_flags & I915_DISPATCH_SECURE);
+	u32 *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 4);
+	ret = intel_ring_begin(req, 4, &rbuf);
 	if (ret)
 		return ret;
 
 	/* FIXME(BDW): Address space and security selectors. */
-	intel_ring_emit(ring, MI_BATCH_BUFFER_START_GEN8 | (ppgtt<<8) |
-			(dispatch_flags & I915_DISPATCH_RS ?
-			 MI_BATCH_RESOURCE_STREAMER : 0));
-	intel_ring_emit(ring, lower_32_bits(offset));
-	intel_ring_emit(ring, upper_32_bits(offset));
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_advance(ring);
+	*rbuf++ = MI_BATCH_BUFFER_START_GEN8 | (ppgtt<<8) |
+		  (dispatch_flags & I915_DISPATCH_RS ?
+		  MI_BATCH_RESOURCE_STREAMER : 0);
+	*rbuf++ = lower_32_bits(offset);
+	*rbuf++ = upper_32_bits(offset);
+	*rbuf++ = MI_NOOP;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -2424,22 +2435,22 @@ hsw_emit_bb_start(struct drm_i915_gem_request *req,
 		  u64 offset, u32 len,
 		  unsigned int dispatch_flags)
 {
-	struct intel_ring *ring = req->ring;
+	u32 *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 2);
+	ret = intel_ring_begin(req, 2, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring,
-			MI_BATCH_BUFFER_START |
-			(dispatch_flags & I915_DISPATCH_SECURE ?
-			 0 : MI_BATCH_PPGTT_HSW | MI_BATCH_NON_SECURE_HSW) |
-			(dispatch_flags & I915_DISPATCH_RS ?
-			 MI_BATCH_RESOURCE_STREAMER : 0));
+	*rbuf++ = MI_BATCH_BUFFER_START |
+		  (dispatch_flags & I915_DISPATCH_SECURE ?
+		  0 : MI_BATCH_PPGTT_HSW | MI_BATCH_NON_SECURE_HSW) |
+		  (dispatch_flags & I915_DISPATCH_RS ?
+		  MI_BATCH_RESOURCE_STREAMER : 0);
 	/* bit0-7 is the length on GEN6+ */
-	intel_ring_emit(ring, offset);
-	intel_ring_advance(ring);
+	*rbuf++ = offset;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -2449,20 +2460,20 @@ gen6_emit_bb_start(struct drm_i915_gem_request *req,
 		   u64 offset, u32 len,
 		   unsigned int dispatch_flags)
 {
-	struct intel_ring *ring = req->ring;
+	u32 *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 2);
+	ret = intel_ring_begin(req, 2, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring,
-			MI_BATCH_BUFFER_START |
-			(dispatch_flags & I915_DISPATCH_SECURE ?
-			 0 : MI_BATCH_NON_SECURE_I965));
+	*rbuf++ = MI_BATCH_BUFFER_START |
+		  (dispatch_flags & I915_DISPATCH_SECURE ?
+		  0 : MI_BATCH_NON_SECURE_I965);
 	/* bit0-7 is the length on GEN6+ */
-	intel_ring_emit(ring, offset);
-	intel_ring_advance(ring);
+	*rbuf++ = offset;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -2471,11 +2482,10 @@ gen6_emit_bb_start(struct drm_i915_gem_request *req,
 
 static int gen6_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 {
-	struct intel_ring *ring = req->ring;
-	uint32_t cmd;
+	u32 cmd, *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 4);
+	ret = intel_ring_begin(req, 4, &rbuf);
 	if (ret)
 		return ret;
 
@@ -2498,17 +2508,17 @@ static int gen6_ring_flush(struct drm_i915_gem_request *req, u32 mode)
 	 */
 	if (mode & EMIT_INVALIDATE)
 		cmd |= MI_INVALIDATE_TLB;
-	intel_ring_emit(ring, cmd);
-	intel_ring_emit(ring,
-			I915_GEM_HWS_SCRATCH_ADDR | MI_FLUSH_DW_USE_GTT);
+	*rbuf++ = cmd;
+	*rbuf++ = I915_GEM_HWS_SCRATCH_ADDR | MI_FLUSH_DW_USE_GTT;
 	if (INTEL_GEN(req->i915) >= 8) {
-		intel_ring_emit(ring, 0); /* upper addr */
-		intel_ring_emit(ring, 0); /* value */
+		*rbuf++ = 0; /* upper addr */
+		*rbuf++ = 0; /* value */
 	} else  {
-		intel_ring_emit(ring, 0);
-		intel_ring_emit(ring, MI_NOOP);
+		*rbuf++ = 0;
+		*rbuf++ = MI_NOOP;
 	}
-	intel_ring_advance(ring);
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }

@@ -443,7 +443,24 @@ void intel_engine_cleanup(struct intel_engine_cs *engine);
 
 int intel_ring_alloc_request_extras(struct drm_i915_gem_request *request);
 
-int __must_check intel_ring_begin(struct drm_i915_gem_request *req, int n);
+int __must_check __intel_ring_begin(struct drm_i915_gem_request *req, int n);
+
+static inline int __must_check
+intel_ring_begin(struct drm_i915_gem_request *req, int n, u32 **rbuf)
+{
+	struct intel_ring *ring = req->ring;
+	int ret;
+
+	ret = __intel_ring_begin(req, n);
+	if (unlikely(ret))
+		return ret;
+
+	*rbuf = (u32 *)(ring->vaddr + ring->tail);
+	ring->tail += n * sizeof(u32);
+
+	return 0;
+}
+
 int __must_check intel_ring_cacheline_align(struct drm_i915_gem_request *req);
 
 static inline void intel_ring_emit(struct intel_ring *ring, u32 data)

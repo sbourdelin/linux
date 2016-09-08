@@ -276,23 +276,23 @@ int intel_mocs_init_engine(struct intel_engine_cs *engine)
 static int emit_mocs_control_table(struct drm_i915_gem_request *req,
 				   const struct drm_i915_mocs_table *table)
 {
-	struct intel_ring *ring = req->ring;
 	enum intel_engine_id engine = req->engine->id;
 	unsigned int index;
+	u32 *rbuf;
 	int ret;
 
 	if (WARN_ON(table->size > GEN9_NUM_MOCS_ENTRIES))
 		return -ENODEV;
 
-	ret = intel_ring_begin(req, 2 + 2 * GEN9_NUM_MOCS_ENTRIES);
+	ret = intel_ring_begin(req, 2 + 2 * GEN9_NUM_MOCS_ENTRIES, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(GEN9_NUM_MOCS_ENTRIES));
+	*rbuf++ = MI_LOAD_REGISTER_IMM(GEN9_NUM_MOCS_ENTRIES);
 
 	for (index = 0; index < table->size; index++) {
-		intel_ring_emit_reg(ring, mocs_register(engine, index));
-		intel_ring_emit(ring, table->table[index].control_value);
+		*rbuf++ = mocs_register(engine, index).reg;
+		*rbuf++ = table->table[index].control_value;
 	}
 
 	/*
@@ -304,12 +304,13 @@ static int emit_mocs_control_table(struct drm_i915_gem_request *req,
 	 * that value to all the used entries.
 	 */
 	for (; index < GEN9_NUM_MOCS_ENTRIES; index++) {
-		intel_ring_emit_reg(ring, mocs_register(engine, index));
-		intel_ring_emit(ring, table->table[0].control_value);
+		*rbuf++ = mocs_register(engine, index).reg;
+		*rbuf++ = table->table[0].control_value;
 	}
 
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_advance(ring);
+	*rbuf++ = MI_NOOP;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
@@ -336,29 +337,28 @@ static inline u32 l3cc_combine(const struct drm_i915_mocs_table *table,
 static int emit_mocs_l3cc_table(struct drm_i915_gem_request *req,
 				const struct drm_i915_mocs_table *table)
 {
-	struct intel_ring *ring = req->ring;
+	u32 *rbuf;
 	unsigned int i;
 	int ret;
 
 	if (WARN_ON(table->size > GEN9_NUM_MOCS_ENTRIES))
 		return -ENODEV;
 
-	ret = intel_ring_begin(req, 2 + GEN9_NUM_MOCS_ENTRIES);
+	ret = intel_ring_begin(req, 2 + GEN9_NUM_MOCS_ENTRIES, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring,
-			MI_LOAD_REGISTER_IMM(GEN9_NUM_MOCS_ENTRIES / 2));
+	*rbuf++ = MI_LOAD_REGISTER_IMM(GEN9_NUM_MOCS_ENTRIES / 2);
 
 	for (i = 0; i < table->size/2; i++) {
-		intel_ring_emit_reg(ring, GEN9_LNCFCMOCS(i));
-		intel_ring_emit(ring, l3cc_combine(table, 2*i, 2*i+1));
+		*rbuf++ = GEN9_LNCFCMOCS(i).reg;
+		*rbuf++ = l3cc_combine(table, 2*i, 2*i+1);
 	}
 
 	if (table->size & 0x01) {
 		/* Odd table size - 1 left over */
-		intel_ring_emit_reg(ring, GEN9_LNCFCMOCS(i));
-		intel_ring_emit(ring, l3cc_combine(table, 2*i, 0));
+		*rbuf++ = GEN9_LNCFCMOCS(i).reg;
+		*rbuf++ = l3cc_combine(table, 2*i, 0);
 		i++;
 	}
 
@@ -368,12 +368,13 @@ static int emit_mocs_l3cc_table(struct drm_i915_gem_request *req,
 	 * they are reserved by the hardware.
 	 */
 	for (; i < GEN9_NUM_MOCS_ENTRIES / 2; i++) {
-		intel_ring_emit_reg(ring, GEN9_LNCFCMOCS(i));
-		intel_ring_emit(ring, l3cc_combine(table, 0, 0));
+		*rbuf++ = GEN9_LNCFCMOCS(i).reg;
+		*rbuf++ = l3cc_combine(table, 0, 0);
 	}
 
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_advance(ring);
+	*rbuf++ = MI_NOOP;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }

@@ -11677,12 +11677,11 @@ static int intel_gen2_queue_flip(struct drm_device *dev,
 				 struct drm_i915_gem_request *req,
 				 uint32_t flags)
 {
-	struct intel_ring *ring = req->ring;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
-	u32 flip_mask;
+	u32 flip_mask, *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 6);
+	ret = intel_ring_begin(req, 6, &rbuf);
 	if (ret)
 		return ret;
 
@@ -11693,13 +11692,14 @@ static int intel_gen2_queue_flip(struct drm_device *dev,
 		flip_mask = MI_WAIT_FOR_PLANE_B_FLIP;
 	else
 		flip_mask = MI_WAIT_FOR_PLANE_A_FLIP;
-	intel_ring_emit(ring, MI_WAIT_FOR_EVENT | flip_mask);
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_emit(ring, MI_DISPLAY_FLIP |
-			MI_DISPLAY_FLIP_PLANE(intel_crtc->plane));
-	intel_ring_emit(ring, fb->pitches[0]);
-	intel_ring_emit(ring, intel_crtc->flip_work->gtt_offset);
-	intel_ring_emit(ring, 0); /* aux display base address, unused */
+
+	*rbuf++ = MI_WAIT_FOR_EVENT | flip_mask;
+	*rbuf++ = MI_NOOP;
+	*rbuf++ = MI_DISPLAY_FLIP |
+		  MI_DISPLAY_FLIP_PLANE(intel_crtc->plane);
+	*rbuf++ = fb->pitches[0];
+	*rbuf++ = intel_crtc->flip_work->gtt_offset;
+	*rbuf++ = 0; /* aux display base address, unused */
 
 	return 0;
 }
@@ -11711,12 +11711,11 @@ static int intel_gen3_queue_flip(struct drm_device *dev,
 				 struct drm_i915_gem_request *req,
 				 uint32_t flags)
 {
-	struct intel_ring *ring = req->ring;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
-	u32 flip_mask;
+	u32 flip_mask, *rbuf;
 	int ret;
 
-	ret = intel_ring_begin(req, 6);
+	ret = intel_ring_begin(req, 6, &rbuf);
 	if (ret)
 		return ret;
 
@@ -11724,13 +11723,14 @@ static int intel_gen3_queue_flip(struct drm_device *dev,
 		flip_mask = MI_WAIT_FOR_PLANE_B_FLIP;
 	else
 		flip_mask = MI_WAIT_FOR_PLANE_A_FLIP;
-	intel_ring_emit(ring, MI_WAIT_FOR_EVENT | flip_mask);
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_emit(ring, MI_DISPLAY_FLIP_I915 |
-			MI_DISPLAY_FLIP_PLANE(intel_crtc->plane));
-	intel_ring_emit(ring, fb->pitches[0]);
-	intel_ring_emit(ring, intel_crtc->flip_work->gtt_offset);
-	intel_ring_emit(ring, MI_NOOP);
+
+	*rbuf++ = MI_WAIT_FOR_EVENT | flip_mask;
+	*rbuf++ = MI_NOOP;
+	*rbuf++ = MI_DISPLAY_FLIP_I915 |
+		  MI_DISPLAY_FLIP_PLANE(intel_crtc->plane);
+	*rbuf++ = fb->pitches[0];
+	*rbuf++ = intel_crtc->flip_work->gtt_offset;
+	*rbuf++ = MI_NOOP;
 
 	return 0;
 }
@@ -11742,13 +11742,13 @@ static int intel_gen4_queue_flip(struct drm_device *dev,
 				 struct drm_i915_gem_request *req,
 				 uint32_t flags)
 {
-	struct intel_ring *ring = req->ring;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	u32 *rbuf;
 	uint32_t pf, pipesrc;
 	int ret;
 
-	ret = intel_ring_begin(req, 4);
+	ret = intel_ring_begin(req, 4, &rbuf);
 	if (ret)
 		return ret;
 
@@ -11756,11 +11756,11 @@ static int intel_gen4_queue_flip(struct drm_device *dev,
 	 * Display Registers (which do not change across a page-flip)
 	 * so we need only reprogram the base address.
 	 */
-	intel_ring_emit(ring, MI_DISPLAY_FLIP |
-			MI_DISPLAY_FLIP_PLANE(intel_crtc->plane));
-	intel_ring_emit(ring, fb->pitches[0]);
-	intel_ring_emit(ring, intel_crtc->flip_work->gtt_offset |
-			intel_fb_modifier_to_tiling(fb->modifier[0]));
+	*rbuf++ = MI_DISPLAY_FLIP |
+		  MI_DISPLAY_FLIP_PLANE(intel_crtc->plane);
+	*rbuf++ = fb->pitches[0];
+	*rbuf++ = intel_crtc->flip_work->gtt_offset |
+		  intel_fb_modifier_to_tiling(fb->modifier[0]);
 
 	/* XXX Enabling the panel-fitter across page-flip is so far
 	 * untested on non-native modes, so ignore it for now.
@@ -11768,7 +11768,7 @@ static int intel_gen4_queue_flip(struct drm_device *dev,
 	 */
 	pf = 0;
 	pipesrc = I915_READ(PIPESRC(intel_crtc->pipe)) & 0x0fff0fff;
-	intel_ring_emit(ring, pf | pipesrc);
+	*rbuf++ = pf | pipesrc;
 
 	return 0;
 }
@@ -11780,21 +11780,21 @@ static int intel_gen6_queue_flip(struct drm_device *dev,
 				 struct drm_i915_gem_request *req,
 				 uint32_t flags)
 {
-	struct intel_ring *ring = req->ring;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	u32 *rbuf;
 	uint32_t pf, pipesrc;
 	int ret;
 
-	ret = intel_ring_begin(req, 4);
+	ret = intel_ring_begin(req, 4, &rbuf);
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ring, MI_DISPLAY_FLIP |
-			MI_DISPLAY_FLIP_PLANE(intel_crtc->plane));
-	intel_ring_emit(ring, fb->pitches[0] |
-			intel_fb_modifier_to_tiling(fb->modifier[0]));
-	intel_ring_emit(ring, intel_crtc->flip_work->gtt_offset);
+	*rbuf++ = MI_DISPLAY_FLIP |
+		  MI_DISPLAY_FLIP_PLANE(intel_crtc->plane);
+	*rbuf++ = fb->pitches[0] |
+		  intel_fb_modifier_to_tiling(fb->modifier[0]);
+	*rbuf++ = intel_crtc->flip_work->gtt_offset;
 
 	/* Contrary to the suggestions in the documentation,
 	 * "Enable Panel Fitter" does not seem to be required when page
@@ -11804,7 +11804,7 @@ static int intel_gen6_queue_flip(struct drm_device *dev,
 	 */
 	pf = 0;
 	pipesrc = I915_READ(PIPESRC(intel_crtc->pipe)) & 0x0fff0fff;
-	intel_ring_emit(ring, pf | pipesrc);
+	*rbuf++ = pf | pipesrc;
 
 	return 0;
 }
@@ -11816,8 +11816,8 @@ static int intel_gen7_queue_flip(struct drm_device *dev,
 				 struct drm_i915_gem_request *req,
 				 uint32_t flags)
 {
-	struct intel_ring *ring = req->ring;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	u32 *rbuf;
 	uint32_t plane_bit = 0;
 	int len, ret;
 
@@ -11862,7 +11862,7 @@ static int intel_gen7_queue_flip(struct drm_device *dev,
 	if (ret)
 		return ret;
 
-	ret = intel_ring_begin(req, len);
+	ret = intel_ring_begin(req, len, &rbuf);
 	if (ret)
 		return ret;
 
@@ -11876,31 +11876,30 @@ static int intel_gen7_queue_flip(struct drm_device *dev,
 	 * to zero does lead to lockups within MI_DISPLAY_FLIP.
 	 */
 	if (req->engine->id == RCS) {
-		intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(1));
-		intel_ring_emit_reg(ring, DERRMR);
-		intel_ring_emit(ring, ~(DERRMR_PIPEA_PRI_FLIP_DONE |
-					  DERRMR_PIPEB_PRI_FLIP_DONE |
-					  DERRMR_PIPEC_PRI_FLIP_DONE));
+		*rbuf++ = MI_LOAD_REGISTER_IMM(1);
+		*rbuf++ = DERRMR.reg;
+		*rbuf++ = ~(DERRMR_PIPEA_PRI_FLIP_DONE |
+			   DERRMR_PIPEB_PRI_FLIP_DONE |
+			   DERRMR_PIPEC_PRI_FLIP_DONE);
 		if (IS_GEN8(dev))
-			intel_ring_emit(ring, MI_STORE_REGISTER_MEM_GEN8 |
-					      MI_SRM_LRM_GLOBAL_GTT);
+			*rbuf++ = MI_STORE_REGISTER_MEM_GEN8 |
+				  MI_SRM_LRM_GLOBAL_GTT;
 		else
-			intel_ring_emit(ring, MI_STORE_REGISTER_MEM |
-					      MI_SRM_LRM_GLOBAL_GTT);
-		intel_ring_emit_reg(ring, DERRMR);
-		intel_ring_emit(ring,
-				i915_ggtt_offset(req->engine->scratch) + 256);
+			*rbuf++ = MI_STORE_REGISTER_MEM |
+				  MI_SRM_LRM_GLOBAL_GTT;
+		*rbuf++ = DERRMR.reg;
+		*rbuf++ = i915_ggtt_offset(req->engine->scratch) + 256;
 		if (IS_GEN8(dev)) {
-			intel_ring_emit(ring, 0);
-			intel_ring_emit(ring, MI_NOOP);
+			*rbuf++ = 0;
+			*rbuf++ = MI_NOOP;
 		}
 	}
 
-	intel_ring_emit(ring, MI_DISPLAY_FLIP_I915 | plane_bit);
-	intel_ring_emit(ring, fb->pitches[0] |
-			intel_fb_modifier_to_tiling(fb->modifier[0]));
-	intel_ring_emit(ring, intel_crtc->flip_work->gtt_offset);
-	intel_ring_emit(ring, (MI_NOOP));
+	*rbuf++ = MI_DISPLAY_FLIP_I915 | plane_bit;
+	*rbuf++ = fb->pitches[0] |
+		  intel_fb_modifier_to_tiling(fb->modifier[0]);
+	*rbuf++ = intel_crtc->flip_work->gtt_offset;
+	*rbuf++ = MI_NOOP;
 
 	return 0;
 }

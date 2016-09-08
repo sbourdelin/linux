@@ -577,7 +577,6 @@ static inline int
 mi_set_context(struct drm_i915_gem_request *req, u32 hw_flags)
 {
 	struct drm_i915_private *dev_priv = req->i915;
-	struct intel_ring *ring = req->ring;
 	struct intel_engine_cs *engine = req->engine;
 	u32 flags = hw_flags | MI_MM_SPACE_GTT;
 	const int num_rings =
@@ -585,6 +584,7 @@ mi_set_context(struct drm_i915_gem_request *req, u32 hw_flags)
 		i915.semaphores ?
 		INTEL_INFO(dev_priv)->num_rings - 1 :
 		0;
+	u32 *rbuf;
 	int len, ret;
 
 	/* w/a: If Flush TLB Invalidation Mode is enabled, driver must do a TLB
@@ -609,70 +609,61 @@ mi_set_context(struct drm_i915_gem_request *req, u32 hw_flags)
 	if (INTEL_GEN(dev_priv) >= 7)
 		len += 2 + (num_rings ? 4*num_rings + 6 : 0);
 
-	ret = intel_ring_begin(req, len);
+	ret = intel_ring_begin(req, len, &rbuf);
 	if (ret)
 		return ret;
 
 	/* WaProgramMiArbOnOffAroundMiSetContext:ivb,vlv,hsw,bdw,chv */
 	if (INTEL_GEN(dev_priv) >= 7) {
-		intel_ring_emit(ring, MI_ARB_ON_OFF | MI_ARB_DISABLE);
+		*rbuf++ = MI_ARB_ON_OFF | MI_ARB_DISABLE;
 		if (num_rings) {
 			struct intel_engine_cs *signaller;
 
-			intel_ring_emit(ring,
-					MI_LOAD_REGISTER_IMM(num_rings));
+			*rbuf++ = MI_LOAD_REGISTER_IMM(num_rings);
 			for_each_engine(signaller, dev_priv) {
 				if (signaller == engine)
 					continue;
 
-				intel_ring_emit_reg(ring,
-						    RING_PSMI_CTL(signaller->mmio_base));
-				intel_ring_emit(ring,
-						_MASKED_BIT_ENABLE(GEN6_PSMI_SLEEP_MSG_DISABLE));
+				*rbuf++ = RING_PSMI_CTL(signaller->mmio_base).reg;
+				*rbuf++ = _MASKED_BIT_ENABLE(GEN6_PSMI_SLEEP_MSG_DISABLE);
 			}
 		}
 	}
 
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_emit(ring, MI_SET_CONTEXT);
-	intel_ring_emit(ring,
-			i915_ggtt_offset(req->ctx->engine[RCS].state) | flags);
+	*rbuf++ = MI_NOOP;
+	*rbuf++ = MI_SET_CONTEXT;
+	*rbuf++ = i915_ggtt_offset(req->ctx->engine[RCS].state) | flags;
 	/*
 	 * w/a: MI_SET_CONTEXT must always be followed by MI_NOOP
 	 * WaMiSetContext_Hang:snb,ivb,vlv
 	 */
-	intel_ring_emit(ring, MI_NOOP);
+	*rbuf++ = MI_NOOP;
 
 	if (INTEL_GEN(dev_priv) >= 7) {
 		if (num_rings) {
 			struct intel_engine_cs *signaller;
 			i915_reg_t last_reg = {}; /* keep gcc quiet */
 
-			intel_ring_emit(ring,
-					MI_LOAD_REGISTER_IMM(num_rings));
+			*rbuf++ = MI_LOAD_REGISTER_IMM(num_rings);
 			for_each_engine(signaller, dev_priv) {
 				if (signaller == engine)
 					continue;
 
 				last_reg = RING_PSMI_CTL(signaller->mmio_base);
-				intel_ring_emit_reg(ring, last_reg);
-				intel_ring_emit(ring,
-						_MASKED_BIT_DISABLE(GEN6_PSMI_SLEEP_MSG_DISABLE));
+				*rbuf++ = last_reg.reg;
+				*rbuf++ = _MASKED_BIT_DISABLE(GEN6_PSMI_SLEEP_MSG_DISABLE);
 			}
 
 			/* Insert a delay before the next switch! */
-			intel_ring_emit(ring,
-					MI_STORE_REGISTER_MEM |
-					MI_SRM_LRM_GLOBAL_GTT);
-			intel_ring_emit_reg(ring, last_reg);
-			intel_ring_emit(ring,
-					i915_ggtt_offset(engine->scratch));
-			intel_ring_emit(ring, MI_NOOP);
+			*rbuf++ = MI_STORE_REGISTER_MEM | MI_SRM_LRM_GLOBAL_GTT;
+			*rbuf++ = last_reg.reg;
+			*rbuf++ = i915_ggtt_offset(engine->scratch);
+			*rbuf++ = MI_NOOP;
 		}
-		intel_ring_emit(ring, MI_ARB_ON_OFF | MI_ARB_ENABLE);
+		*rbuf++ = MI_ARB_ON_OFF | MI_ARB_ENABLE;
 	}
 
-	intel_ring_advance(ring);
+	intel_ring_advance(req->ring);
 
 	return ret;
 }
@@ -680,13 +671,13 @@ mi_set_context(struct drm_i915_gem_request *req, u32 hw_flags)
 static int remap_l3(struct drm_i915_gem_request *req, int slice)
 {
 	u32 *remap_info = req->i915->l3_parity.remap_info[slice];
-	struct intel_ring *ring = req->ring;
+	u32 *rbuf;
 	int i, ret;
 
 	if (!remap_info)
 		return 0;
 
-	ret = intel_ring_begin(req, GEN7_L3LOG_SIZE/4 * 2 + 2);
+	ret = intel_ring_begin(req, GEN7_L3LOG_SIZE/4 * 2 + 2, &rbuf);
 	if (ret)
 		return ret;
 
@@ -695,13 +686,14 @@ static int remap_l3(struct drm_i915_gem_request *req, int slice)
 	 * here because no other code should access these registers other than
 	 * at initialization time.
 	 */
-	intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(GEN7_L3LOG_SIZE/4));
+	*rbuf++ = MI_LOAD_REGISTER_IMM(GEN7_L3LOG_SIZE/4);
 	for (i = 0; i < GEN7_L3LOG_SIZE/4; i++) {
-		intel_ring_emit_reg(ring, GEN7_L3LOG(slice, i));
-		intel_ring_emit(ring, remap_info[i]);
+		*rbuf++ = GEN7_L3LOG(slice, i).reg;
+		*rbuf++ = remap_info[i];
 	}
-	intel_ring_emit(ring, MI_NOOP);
-	intel_ring_advance(ring);
+	*rbuf++ = MI_NOOP;
+
+	intel_ring_advance(req->ring);
 
 	return 0;
 }
