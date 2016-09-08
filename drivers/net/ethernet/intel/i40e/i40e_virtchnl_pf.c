@@ -1049,6 +1049,7 @@ int i40e_alloc_vf_netdev(struct i40e_vf *vf, u16 vf_num)
 	priv->vf = &(pf->vf[vf_num]);
 
 	netdev->netdev_ops = &i40e_vf_netdev_ops;
+	i40e_set_vf_netdev_ethtool_ops(netdev);
 
 	netif_carrier_off(netdev);
 	netif_tx_disable(netdev);
