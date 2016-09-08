@@ -612,6 +612,8 @@ int tcf_action_init(struct net *net, struct nlattr *nla,
 			goto err;
 		}
 		act->order = i;
+		if (ovr)
+			act->tcfa_refcnt+=1;
 		list_add_tail(&act->list, actions);
 	}
 	return 0;
@@ -856,6 +858,15 @@ tcf_del_notify(struct net *net, struct nlmsghdr *n, struct list_head *actions,
 	return ret;
 }
 
+static void cleanup_a(struct list_head *actions)
+{
+	struct tc_action *a, *tmp;
+
+	list_for_each_entry_safe(a, tmp, actions, list) {
+		list_del(&a->list);
+	}
+}
+
 static int
 tca_action_gd(struct net *net, struct nlattr *nla, struct nlmsghdr *n,
 	      u32 portid, int event)
@@ -883,6 +894,7 @@ tca_action_gd(struct net *net, struct nlattr *nla, struct nlmsghdr *n,
 			goto err;
 		}
 		act->order = i;
+		act->tcfa_refcnt+=1;
 		list_add_tail(&act->list, &actions);
 	}
 
@@ -892,10 +904,12 @@ tca_action_gd(struct net *net, struct nlattr *nla, struct nlmsghdr *n,
 		ret = tcf_del_notify(net, n, &actions, portid);
 		if (ret)
 			goto err;
+		cleanup_a(&actions);
 		return ret;
 	}
 err:
 	tcf_action_destroy(&actions, 0);
+	cleanup_a(&actions);
 	return ret;
 }
 
@@ -931,10 +945,10 @@ tcf_action_add(struct net *net, struct nlattr *nla, struct nlmsghdr *n,
 	LIST_HEAD(actions);
 
 	ret = tcf_action_init(net, nla, NULL, NULL, ovr, 0, &actions);
-	if (ret)
-		return ret;
 
-	return tcf_add_notify(net, n, &actions, portid);
+	ret = tcf_add_notify(net, n, &actions, portid);
+	cleanup_a(&actions);
+	return ret;
 }
 
 static int tc_ctl_action(struct sk_buff *skb, struct nlmsghdr *n)
