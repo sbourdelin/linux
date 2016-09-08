@@ -228,6 +228,14 @@ int dwc3_gadget_ep0_queue(struct usb_ep *ep, struct usb_request *request,
 	int				ret;
 
 	spin_lock_irqsave(&dwc->lock, flags);
+	if (dwc->pullups_connected == false) {
+		dwc3_trace(trace_dwc3_ep0,
+			"queuing request %p to %s when gadget is disconnected",
+			request, dep->name);
+		ret = -ESHUTDOWN;
+		goto out;
+	}
+
 	if (!dep->endpoint.desc) {
 		dwc3_trace(trace_dwc3_ep0,
 				"trying to queue request %p to disabled %s",

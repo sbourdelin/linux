@@ -1040,6 +1040,13 @@ static int __dwc3_gadget_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req)
 	struct dwc3		*dwc = dep->dwc;
 	int			ret;
 
+	if (dwc->pullups_connected == false) {
+		dwc3_trace(trace_dwc3_gadget,
+			"queuing request %p to %s when gadget is disconnected",
+			&req->request, dep->endpoint.name);
+		return -ESHUTDOWN;
+	}
+
 	if (!dep->endpoint.desc) {
 		dwc3_trace(trace_dwc3_gadget,
 				"trying to queue request %p to disabled %s",
@@ -1434,6 +1441,13 @@ static int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on, int suspend)
 	if (pm_runtime_suspended(dwc->dev))
 		return 0;
 
+	/*
+	 * Per databook, when we want to stop the gadget, if a control transfer
+	 * is still in process, complete it and get the core into setup phase.
+	 */
+	if (!is_on && dwc->ep0state != EP0_SETUP_PHASE)
+		return -EBUSY;
+
 	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
 	if (is_on) {
 		if (dwc->revision <= DWC3_REVISION_187A) {
@@ -1481,12 +1495,20 @@ static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 	struct dwc3		*dwc = gadget_to_dwc(g);
 	unsigned long		flags;
 	int			ret;
+	int			timeout = 500;
 
 	is_on = !!is_on;
 
-	spin_lock_irqsave(&dwc->lock, flags);
-	ret = dwc3_gadget_run_stop(dwc, is_on, false);
-	spin_unlock_irqrestore(&dwc->lock, flags);
+	do {
+		spin_lock_irqsave(&dwc->lock, flags);
+		ret = dwc3_gadget_run_stop(dwc, is_on, false);
+		spin_unlock_irqrestore(&dwc->lock, flags);
+
+		if (ret != -EBUSY)
+			break;
+
+		udelay(10);
+	} while (--timeout);
 
 	return ret;
 }
@@ -1990,7 +2012,7 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 	 * dwc3_gadget_giveback(). If that happens, we're just gonna return 1
 	 * early on so DWC3_EP_BUSY flag gets cleared
 	 */
-	if (!dep->endpoint.desc)
+	if (!dep->endpoint.desc || dwc->pullups_connected == false)
 		return 1;
 
 	if (usb_endpoint_xfer_isoc(dep->endpoint.desc) &&
@@ -2064,7 +2086,7 @@ static void dwc3_endpoint_transfer_complete(struct dwc3 *dwc,
 	 * dwc3_gadget_giveback(). If that happens, we're just gonna return 1
 	 * early on so DWC3_EP_BUSY flag gets cleared
 	 */
-	if (!dep->endpoint.desc)
+	if (!dep->endpoint.desc || dwc->pullups_connected == false)
 		return;
 
 	if (!usb_endpoint_xfer_isoc(dep->endpoint.desc)) {
