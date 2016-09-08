@@ -16,13 +16,60 @@
 #include <linux/interrupt.h>
 #include <uapi/linux/rtc.h>
 
+#ifdef CONFIG_RTC_LIB
 extern int rtc_month_days(unsigned int month, unsigned int year);
-extern int rtc_year_days(unsigned int day, unsigned int month, unsigned int year);
+extern int rtc_year_days(unsigned int day, unsigned int month,
+			 unsigned int year);
 extern int rtc_valid_tm(struct rtc_time *tm);
 extern time64_t rtc_tm_to_time64(struct rtc_time *tm);
 extern void rtc_time64_to_tm(time64_t time, struct rtc_time *tm);
 ktime_t rtc_tm_to_ktime(struct rtc_time tm);
 struct rtc_time rtc_ktime_to_tm(ktime_t kt);
+#else
+static inline int rtc_month_days(unsigned int month, unsigned int year)
+{
+	return 0;
+}
+
+static inline int rtc_year_days(unsigned int day, unsigned int month,
+				unsigned int year)
+{
+	return 0;
+}
+
+static inline int rtc_valid_tm(struct rtc_time *tm)
+{
+	return 0;
+}
+
+static inline time64_t rtc_tm_to_time64(struct rtc_time *tm)
+{
+	time64_t ret;
+
+	memset(&ret, 0, sizeof(time64_t));
+	return ret;
+}
+
+static inline void rtc_time64_to_tm(time64_t time, struct rtc_time *tm)
+{
+}
+
+static inline ktime_t rtc_tm_to_ktime(struct rtc_time tm)
+{
+	ktime_t ret;
+
+	memset(&ret, 0, sizeof(ktime_t));
+	return ret;
+}
+
+static inline struct rtc_time rtc_ktime_to_tm(ktime_t kt)
+{
+	struct rtc_time ret;
+
+	memset(&ret, 0, sizeof(struct rtc_time));
+	return ret;
+}
+#endif
 
 /*
  * rtc_tm_sub - Return the difference in seconds.
