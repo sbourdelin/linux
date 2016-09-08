@@ -442,7 +442,56 @@ print_block_size(struct device *dev, struct device_attribute *attr,
 	return sprintf(buf, "%lx\n", get_memory_block_size());
 }
 
+#ifdef CONFIG_NUMA
+static ssize_t dump_zonelist(char *buf, struct zonelist *zonelist)
+{
+	unsigned int i;
+	ssize_t count = 0;
+
+	for (i = 0; zonelist->_zonerefs[i].zone; i++) {
+		count += sprintf(buf + count,
+			"\t\t(%d) (node %d) (%-7s 0x%pK)\n", i,
+			zonelist->_zonerefs[i].zone->zone_pgdat->node_id,
+			zone_names[zonelist->_zonerefs[i].zone_idx],
+			(void *) zonelist->_zonerefs[i].zone);
+	}
+	return count;
+}
+
+static ssize_t dump_zonelists(char *buf)
+{
+	struct zonelist *zonelist;
+	unsigned int node;
+	ssize_t count = 0;
+
+	for_each_online_node(node) {
+		zonelist = &(NODE_DATA(node)->
+				node_zonelists[ZONELIST_FALLBACK]);
+		count += sprintf(buf + count, "[NODE (%d)]\n", node);
+		count += sprintf(buf + count, "\tZONELIST_FALLBACK\n");
+		count += dump_zonelist(buf + count, zonelist);
+
+		zonelist = &(NODE_DATA(node)->
+				node_zonelists[ZONELIST_NOFALLBACK]);
+		count += sprintf(buf + count, "\tZONELIST_NOFALLBACK\n");
+		count += dump_zonelist(buf + count, zonelist);
+	}
+	return count;
+}
+
+static ssize_t
+print_system_zone_details(struct device *dev, struct device_attribute *attr,
+		 char *buf)
+{
+	return dump_zonelists(buf);
+}
+#endif
+
+
 static DEVICE_ATTR(block_size_bytes, 0444, print_block_size, NULL);
+#ifdef CONFIG_NUMA
+static DEVICE_ATTR(system_zone_details, 0444, print_system_zone_details, NULL);
+#endif
 
 /*
  * Memory auto online policy.
@@ -783,6 +832,9 @@ static struct attribute *memory_root_attrs[] = {
 #endif
 
 	&dev_attr_block_size_bytes.attr,
+#ifdef CONFIG_NUMA
+	&dev_attr_system_zone_details.attr,
+#endif
 	&dev_attr_auto_online_blocks.attr,
 	NULL
 };
