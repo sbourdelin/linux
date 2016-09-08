@@ -21,6 +21,10 @@ Required Properties:
   - interrupts: Interrupt specifier
   - interrupt-parent: Phandle for the interrupt controller that services
 		      interrupts for this device.
+Optional Properties:
+- xlnx-fails-without-test-cd: when present, the controller doesn't work when
+  the CD line is not connected properly, and the line is not connected
+  properly. Test mode can be used to force the controller to function.
 
 Required Properties for "arasan,sdhci-5.1":
   - phys: From PHY bindings: Phandle for the Generic PHY for arasan.
