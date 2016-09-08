@@ -20,6 +20,8 @@
 #include <linux/timer.h>
 #include <linux/rtnetlink.h>
 
+#include <net/codel.h>
+#include <net/codel_impl.h>
 #include <net/mac80211.h>
 #include "ieee80211_i.h"
 #include "driver-ops.h"
@@ -325,6 +327,10 @@ struct sta_info *sta_info_alloc(struct ieee80211_sub_if_data *sdata,
 	INIT_WORK(&sta->drv_deliver_wk, sta_deliver_ps_frames);
 	INIT_WORK(&sta->ampdu_mlme.work, ieee80211_ba_session_work);
 	mutex_init(&sta->ampdu_mlme.mtx);
+
+	codel_params_init(&sta->cparams.cparams);
+	sta->cparams.cparams.ecn = true;
+
 #ifdef CONFIG_MAC80211_MESH
 	if (ieee80211_vif_is_mesh(&sdata->vif)) {
 		sta->mesh = kzalloc(sizeof(*sta->mesh), gfp);
@@ -2313,4 +2319,35 @@ unsigned long ieee80211_sta_last_active(struct sta_info *sta)
 	if (time_after(stats->last_rx, sta->status_stats.last_ack))
 		return stats->last_rx;
 	return sta->status_stats.last_ack;
+}
+
+void sta_update_codel_params(struct sta_info *sta)
+{
+	u64 now = ktime_get_ns();
+	u32 thr;
+	bool slow;
+
+	if (likely(now - sta->cparams.update_time < STA_CPARAMS_HYSTERESIS))
+		return;
+
+	thr = sta_get_expected_throughput(sta);
+	slow = !!(thr && thr < STA_SLOW_THRESHOLD);
+
+	if (likely(slow == sta->cparams.slow))
+		return;
+
+	net_info_ratelimited("%pM: updating CoDel params - throughput %d slow %s\n",
+			sta->addr, thr, slow ? "true" : "false");
+
+	if (slow) {
+		sta->cparams.cparams.target = MS2TIME(50);
+		sta->cparams.cparams.interval = MS2TIME(300);
+		sta->cparams.cparams.ecn = false;
+	} else {
+		sta->cparams.cparams.target = MS2TIME(5);
+		sta->cparams.cparams.interval = MS2TIME(100);
+		sta->cparams.cparams.ecn = true;
+	}
+	sta->cparams.update_time = now;
+	sta->cparams.slow = slow;
 }

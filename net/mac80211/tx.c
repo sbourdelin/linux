@@ -1339,11 +1339,18 @@ static struct sk_buff *fq_tin_dequeue_func(struct fq *fq,
 	struct codel_vars *cvars;
 	struct codel_params *cparams;
 	struct codel_stats *cstats;
+	struct sta_info *sta;
 
 	local = container_of(fq, struct ieee80211_local, fq);
 	txqi = container_of(tin, struct txq_info, tin);
-	cparams = &local->cparams;
 	cstats = &local->cstats;
+
+	if (txqi->txq.sta) {
+		sta = container_of(txqi->txq.sta, struct sta_info, sta);
+		cparams = &sta->cparams.cparams;
+	} else
+		cparams = &local->cparams;
+
 
 	if (flow == &txqi->def_flow)
 		cvars = &txqi->def_cvars;
@@ -1547,6 +1554,11 @@ static bool ieee80211_tx_frags(struct ieee80211_local *local,
 
 		txqi = ieee80211_get_txq(local, vif, sta, skb);
 		if (txqi) {
+			if (sta) {
+				struct sta_info *sti = container_of(sta, struct sta_info, sta);
+				sta_update_codel_params(sti);
+			}
+
 			info->control.vif = vif;
 
 			__skb_unlink(skb, skbs);
