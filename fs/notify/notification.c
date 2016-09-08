@@ -84,12 +84,12 @@ void fsnotify_destroy_event(struct fsnotify_group *group,
  * added to the queue, 1 if the event was merged with some other queued event,
  * 2 if the queue of events has overflown.
  */
-int fsnotify_add_event(struct fsnotify_group *group,
-		       struct fsnotify_event *event,
-		       int (*merge)(struct list_head *,
-				    struct fsnotify_event *))
+enum fsn_add_event_ret fsnotify_add_event(
+		struct fsnotify_group *group,
+		struct fsnotify_event *event,
+		int (*merge)(struct list_head *, struct fsnotify_event *))
 {
-	int ret = 0;
+	enum fsn_add_event_ret ret = AE_INSERTED;
 	struct list_head *list = &group->notification_list;
 
 	pr_debug("%s: group=%p event=%p\n", __func__, group, event);
@@ -97,7 +97,7 @@ int fsnotify_add_event(struct fsnotify_group *group,
 	mutex_lock(&group->notification_mutex);
 
 	if (group->q_len >= group->max_events) {
-		ret = 2;
+		ret = AE_OVERFLOW;
 		/* Queue overflow event only if it isn't already queued */
 		if (!list_empty(&group->overflow_event->list)) {
 			mutex_unlock(&group->notification_mutex);
@@ -108,10 +108,12 @@ int fsnotify_add_event(struct fsnotify_group *group,
 	}
 
 	if (!list_empty(list) && merge) {
-		ret = merge(list, event);
-		if (ret) {
+		int merge_ret;
+
+		merge_ret = merge(list, event);
+		if (merge_ret) {
 			mutex_unlock(&group->notification_mutex);
-			return ret;
+			return AE_MERGED;
 		}
 	}
 

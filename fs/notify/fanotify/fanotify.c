@@ -192,6 +192,7 @@ static int fanotify_handle_event(struct fsnotify_group *group,
 				 const unsigned char *file_name, u32 cookie)
 {
 	int ret = 0;
+	enum fsn_add_event_ret ae_ret;
 	struct fanotify_event_info *event;
 	struct fsnotify_event *fsn_event;
 
@@ -218,10 +219,10 @@ static int fanotify_handle_event(struct fsnotify_group *group,
 		return -ENOMEM;
 
 	fsn_event = &event->fse;
-	ret = fsnotify_add_event(group, fsn_event, fanotify_merge);
-	if (ret) {
+	ae_ret = fsnotify_add_event(group, fsn_event, fanotify_merge);
+	if (ae_ret != AE_INSERTED) {
 		/* Permission events shouldn't be merged */
-		BUG_ON(ret == 1 && mask & FAN_ALL_PERM_EVENTS);
+		BUG_ON(ae_ret == AE_MERGED && mask & FAN_ALL_PERM_EVENTS);
 		/* Our event wasn't used in the end. Free it. */
 		fsnotify_destroy_event(group, fsn_event);
 

@@ -299,11 +299,17 @@ extern int fsnotify_fasync(int fd, struct file *file, int on);
 /* Free event from memory */
 extern void fsnotify_destroy_event(struct fsnotify_group *group,
 				   struct fsnotify_event *event);
+/* Return values of fsnotify_add_event() */
+enum fsn_add_event_ret {
+	AE_INSERTED,	/* Event was added in the queue */
+	AE_MERGED,	/* Event was merged with another event, passed event unused */
+	AE_OVERFLOW,	/* Queue overflow, passed event unused */
+};
 /* attach the event to the group notification queue */
-extern int fsnotify_add_event(struct fsnotify_group *group,
-			      struct fsnotify_event *event,
-			      int (*merge)(struct list_head *,
-					   struct fsnotify_event *));
+extern enum fsn_add_event_ret fsnotify_add_event(
+		struct fsnotify_group *group,
+		struct fsnotify_event *event,
+		int (*merge)(struct list_head *, struct fsnotify_event *));
 /* Remove passed event from groups notification queue */
 extern void fsnotify_remove_event(struct fsnotify_group *group, struct fsnotify_event *event);
 /* true if the group notification queue is empty */

@@ -72,7 +72,7 @@ int inotify_handle_event(struct fsnotify_group *group,
 	struct inotify_inode_mark *i_mark;
 	struct inotify_event_info *event;
 	struct fsnotify_event *fsn_event;
-	int ret;
+	enum fsn_add_event_ret ret;
 	int len = 0;
 	int alloc_len = sizeof(struct inotify_event_info);
 
@@ -109,7 +109,7 @@ int inotify_handle_event(struct fsnotify_group *group,
 		strcpy(event->name, file_name);
 
 	ret = fsnotify_add_event(group, fsn_event, inotify_merge);
-	if (ret) {
+	if (ret != AE_INSERTED) {
 		/* Our event wasn't used in the end. Free it. */
 		fsnotify_destroy_event(group, fsn_event);
 	}
