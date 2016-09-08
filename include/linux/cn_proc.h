@@ -26,6 +26,7 @@ void proc_id_connector(struct task_struct *task, int which_id);
 void proc_sid_connector(struct task_struct *task);
 void proc_ptrace_connector(struct task_struct *task, int which_id);
 void proc_comm_connector(struct task_struct *task);
+void proc_ns_connector(struct task_struct *task, int type, int change, u64 old_inum, u64 inum);
 void proc_coredump_connector(struct task_struct *task);
 void proc_exit_connector(struct task_struct *task);
 #else
@@ -43,6 +44,9 @@ static inline void proc_sid_connector(struct task_struct *task)
 {}
 
 static inline void proc_comm_connector(struct task_struct *task)
+{}
+
+static inline void proc_ns_connector(struct task_struct *task, int type, int change, u64 old_inum, u64 inum)
 {}
 
 static inline void proc_ptrace_connector(struct task_struct *task,

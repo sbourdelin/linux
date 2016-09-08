@@ -55,7 +55,8 @@ struct proc_event {
 		PROC_EVENT_SID  = 0x00000080,
 		PROC_EVENT_PTRACE = 0x00000100,
 		PROC_EVENT_COMM = 0x00000200,
-		/* "next" should be 0x00000400 */
+		PROC_EVENT_NM   = 0x00000400,
+		/* "next" should be 0x00000800 */
 		/* "last" is the last process event: exit,
 		 * while "next to last" is coredumping event */
 		PROC_EVENT_COREDUMP = 0x40000000,
@@ -111,6 +112,19 @@ struct proc_event {
 			__kernel_pid_t process_tgid;
 			char           comm[16];
 		} comm;
+
+		struct nm_proc_event {
+			__kernel_pid_t process_pid;
+			__kernel_pid_t process_tgid;
+			__u32 type;   /* CLONE_NEWNS, CLONE_NEWPID, ... */
+			enum reason {
+				PROC_NM_REASON_CLONE = 0x00000001,
+				PROC_NM_REASON_SET   = 0x00000002, /* setns or unshare */
+				PROC_NM_REASON_LAST  = 0x80000000,
+			} reason;
+			__u64 old_inum;
+			__u64 inum;
+		} nm;
 
 		struct coredump_proc_event {
 			__kernel_pid_t process_pid;

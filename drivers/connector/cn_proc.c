@@ -246,6 +246,34 @@ void proc_comm_connector(struct task_struct *task)
 	send_msg(msg);
 }
 
+void proc_ns_connector(struct task_struct *task, int type, int reason, u64 old_inum, u64 inum)
+{
+	struct cn_msg *msg;
+	struct proc_event *ev;
+	__u8 buffer[CN_PROC_MSG_SIZE] __aligned(8);
+
+	if (atomic_read(&proc_event_num_listeners) < 1)
+		return;
+
+	msg = buffer_to_cn_msg(buffer);
+	ev = (struct proc_event *)msg->data;
+	memset(&ev->event_data, 0, sizeof(ev->event_data));
+	ev->timestamp_ns = ktime_get_ns();
+	ev->what = PROC_EVENT_NM;
+	ev->event_data.nm.process_pid  = task->pid;
+	ev->event_data.nm.process_tgid = task->tgid;
+	ev->event_data.nm.type = type;
+	ev->event_data.nm.reason = reason;
+	ev->event_data.nm.old_inum = old_inum;
+	ev->event_data.nm.inum = inum;
+
+	memcpy(&msg->id, &cn_proc_event_id, sizeof(msg->id));
+	msg->ack = 0; /* not used */
+	msg->len = sizeof(*ev);
+	msg->flags = 0; /* not used */
+	send_msg(msg);
+}
+
 void proc_coredump_connector(struct task_struct *task)
 {
 	struct cn_msg *msg;

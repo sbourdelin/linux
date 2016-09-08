@@ -26,6 +26,7 @@
 #include <linux/file.h>
 #include <linux/syscalls.h>
 #include <linux/cgroup.h>
+#include <linux/cn_proc.h>
 
 static struct kmem_cache *nsproxy_cachep;
 
@@ -139,6 +140,8 @@ int copy_namespaces(unsigned long flags, struct task_struct *tsk)
 	struct nsproxy *old_ns = tsk->nsproxy;
 	struct user_namespace *user_ns = task_cred_xxx(tsk, user_ns);
 	struct nsproxy *new_ns;
+	struct ns_common *mntns;
+	u64 old_mntns_inum = 0;
 
 	if (likely(!(flags & (CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWIPC |
 			      CLONE_NEWPID | CLONE_NEWNET |
@@ -165,7 +168,41 @@ int copy_namespaces(unsigned long flags, struct task_struct *tsk)
 	if (IS_ERR(new_ns))
 		return  PTR_ERR(new_ns);
 
+	mntns = mntns_operations.get(tsk);
+	if (mntns) {
+		old_mntns_inum = mntns->inum;
+		mntns_operations.put(mntns);
+	}
+
 	tsk->nsproxy = new_ns;
+
+	if (old_ns && new_ns) {
+		struct ns_common *mntns;
+		u64 new_mntns_inum = 0;
+		mntns = mntns_operations.get(tsk);
+		if (mntns) {
+			new_mntns_inum = mntns->inum;
+			mntns_operations.put(mntns);
+		}
+		if (old_ns->mnt_ns != new_ns->mnt_ns)
+			proc_ns_connector(tsk, CLONE_NEWNS, PROC_NM_REASON_CLONE, old_mntns_inum, new_mntns_inum);
+
+		if (old_ns->uts_ns != new_ns->uts_ns)
+			proc_ns_connector(tsk, CLONE_NEWUTS, PROC_NM_REASON_CLONE, old_ns->uts_ns->ns.inum, new_ns->uts_ns->ns.inum);
+
+		if (old_ns->ipc_ns != new_ns->ipc_ns)
+			proc_ns_connector(tsk, CLONE_NEWIPC, PROC_NM_REASON_CLONE, old_ns->ipc_ns->ns.inum, new_ns->ipc_ns->ns.inum);
+
+		if (old_ns->net_ns != new_ns->net_ns)
+			proc_ns_connector(tsk, CLONE_NEWNET, PROC_NM_REASON_CLONE, old_ns->net_ns->ns.inum, new_ns->net_ns->ns.inum);
+
+		if (old_ns->cgroup_ns != new_ns->cgroup_ns)
+			proc_ns_connector(tsk, CLONE_NEWCGROUP, PROC_NM_REASON_CLONE, old_ns->cgroup_ns->ns.inum, new_ns->cgroup_ns->ns.inum);
+
+		if (old_ns->pid_ns_for_children != new_ns->pid_ns_for_children)
+			proc_ns_connector(tsk, CLONE_NEWPID, PROC_NM_REASON_CLONE, old_ns->pid_ns_for_children->ns.inum, new_ns->pid_ns_for_children->ns.inum);
+	}
+
 	return 0;
 }
 
@@ -216,13 +253,47 @@ out:
 void switch_task_namespaces(struct task_struct *p, struct nsproxy *new)
 {
 	struct nsproxy *ns;
+	struct ns_common *mntns;
+	u64 old_mntns_inum = 0;
 
 	might_sleep();
+
+	mntns = mntns_operations.get(p);
+	if (mntns) {
+		old_mntns_inum = mntns->inum;
+		mntns_operations.put(mntns);
+	}
 
 	task_lock(p);
 	ns = p->nsproxy;
 	p->nsproxy = new;
 	task_unlock(p);
+
+	if (ns && new) {
+		u64 new_mntns_inum = 0;
+		mntns = mntns_operations.get(p);
+		if (mntns) {
+			new_mntns_inum = mntns->inum;
+			mntns_operations.put(mntns);
+		}
+		if (ns->mnt_ns != new->mnt_ns)
+			proc_ns_connector(p, CLONE_NEWNS, PROC_NM_REASON_SET, old_mntns_inum, new_mntns_inum);
+
+		if (ns->uts_ns != new->uts_ns)
+			proc_ns_connector(p, CLONE_NEWUTS, PROC_NM_REASON_SET, ns->uts_ns->ns.inum, new->uts_ns->ns.inum);
+
+		if (ns->ipc_ns != new->ipc_ns)
+			proc_ns_connector(p, CLONE_NEWIPC, PROC_NM_REASON_SET, ns->ipc_ns->ns.inum, new->ipc_ns->ns.inum);
+
+		if (ns->net_ns != new->net_ns)
+			proc_ns_connector(p, CLONE_NEWNET, PROC_NM_REASON_SET, ns->net_ns->ns.inum, new->net_ns->ns.inum);
+
+		if (ns->cgroup_ns != new->cgroup_ns)
+			proc_ns_connector(p, CLONE_NEWCGROUP, PROC_NM_REASON_SET, ns->cgroup_ns->ns.inum, new->cgroup_ns->ns.inum);
+
+		if (ns->pid_ns_for_children != new->pid_ns_for_children)
+			proc_ns_connector(p, CLONE_NEWPID, PROC_NM_REASON_SET, ns->pid_ns_for_children->ns.inum, new->pid_ns_for_children->ns.inum);
+	}
 
 	if (ns && atomic_dec_and_test(&ns->count))
 		free_nsproxy(ns);
