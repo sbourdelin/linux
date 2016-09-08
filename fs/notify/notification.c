@@ -96,6 +96,11 @@ enum fsn_add_event_ret fsnotify_add_event(
 
 	mutex_lock(&group->notification_mutex);
 
+	if (group->shutdown) {
+		mutex_unlock(&group->notification_mutex);
+		return AE_SHUTDOWN;
+	}
+
 	if (group->q_len >= group->max_events) {
 		ret = AE_OVERFLOW;
 		/* Queue overflow event only if it isn't already queued */
