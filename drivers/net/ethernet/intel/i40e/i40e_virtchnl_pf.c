@@ -1003,6 +1003,90 @@ complete_reset:
 	clear_bit(__I40E_VF_DISABLE, &pf->state);
 }
 
+static int i40e_vf_netdev_open(struct net_device *dev)
+{
+	return 0;
+}
+
+static int i40e_vf_netdev_stop(struct net_device *dev)
+{
+	return 0;
+}
+
+static const struct net_device_ops i40e_vf_netdev_ops = {
+	.ndo_open       = i40e_vf_netdev_open,
+	.ndo_stop       = i40e_vf_netdev_stop,
+};
+
+/**
+ * i40e_alloc_vf_netdev
+ * @vf: pointer to the VF structure
+ * @vf_num: VF number
+ *
+ * Create VF representor/control netdev
+ **/
+int i40e_alloc_vf_netdev(struct i40e_vf *vf, u16 vf_num)
+{
+	struct net_device *netdev;
+	char netdev_name[IFNAMSIZ];
+	struct i40e_vf_netdev_priv *priv;
+	struct i40e_pf *pf = vf->pf;
+	struct i40e_vsi *vsi = pf->vsi[pf->lan_vsi];
+	int err;
+
+	snprintf(netdev_name, IFNAMSIZ, "%s-vf%d", vsi->netdev->name, vf_num);
+	netdev = alloc_netdev(sizeof(struct i40e_vf_netdev_priv), netdev_name,
+			      NET_NAME_UNKNOWN, ether_setup);
+	if (!netdev) {
+		dev_err(&pf->pdev->dev, "alloc_netdev failed for vf:%d\n",
+			vf_num);
+		return -ENOMEM;
+	}
+
+	pf->vf[vf_num].ctrl_netdev = netdev;
+
+	priv = netdev_priv(netdev);
+	priv->vf = &(pf->vf[vf_num]);
+
+	netdev->netdev_ops = &i40e_vf_netdev_ops;
+
+	netif_carrier_off(netdev);
+	netif_tx_disable(netdev);
+
+	err = register_netdev(netdev);
+	if (err) {
+		dev_err(&pf->pdev->dev, "register_netdev failed for vf: %s\n",
+			vf->ctrl_netdev->name);
+		free_netdev(netdev);
+		return err;
+	}
+
+	dev_info(&pf->pdev->dev, "VF representor(%s) created for VF %d\n",
+		 vf->ctrl_netdev->name, vf_num);
+
+	return 0;
+}
+
+/**
+ * i40e_free_vf_netdev
+ * @vf: pointer to the VF structure
+ *
+ * Free VF representor/control netdev
+ **/
+void i40e_free_vf_netdev(struct i40e_vf *vf)
+{
+	struct i40e_pf *pf = vf->pf;
+
+	if (!vf->ctrl_netdev)
+		return;
+
+	dev_info(&pf->pdev->dev, "Freeing VF representor(%s)\n",
+		 vf->ctrl_netdev->name);
+
+	unregister_netdev(vf->ctrl_netdev);
+	free_netdev(vf->ctrl_netdev);
+}
+
 /**
  * i40e_free_vfs
  * @pf: pointer to the PF structure
@@ -1045,6 +1129,8 @@ void i40e_free_vfs(struct i40e_pf *pf)
 			i40e_free_vf_res(&pf->vf[i]);
 		/* disable qp mappings */
 		i40e_disable_vf_mappings(&pf->vf[i]);
+
+		i40e_free_vf_netdev(&pf->vf[i]);
 	}
 
 	kfree(pf->vf);
@@ -1111,6 +1197,8 @@ int i40e_alloc_vfs(struct i40e_pf *pf, u16 num_alloc_vfs)
 		vfs[i].spoofchk = true;
 		/* VF resources get allocated during reset */
 		i40e_reset_vf(&vfs[i], false);
+
+		i40e_alloc_vf_netdev(&vfs[i], i);
 
 	}
 	pf->num_alloc_vfs = num_alloc_vfs;
