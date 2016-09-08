@@ -841,7 +841,17 @@ static void lpt_enable_backlight(struct intel_connector *connector)
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
 	struct intel_panel *panel = &connector->panel;
-	u32 pch_ctl1, pch_ctl2;
+	u32 pch_ctl1, pch_ctl2, mul;
+
+	if (HAS_PCH_LPT(dev_priv)) {
+		mul = I915_READ(SOUTH_CHICKEN2);
+		mul &= ~LPT_PWM_GRANULARITY;
+		I915_WRITE(SOUTH_CHICKEN2, mul | panel->backlight.pwm_granularity);
+	} else {
+		mul = I915_READ(SOUTH_CHICKEN1);
+		mul &= ~SPT_PWM_GRANULARITY;
+		I915_WRITE(SOUTH_CHICKEN1, mul | panel->backlight.pwm_granularity);
+	}
 
 	pch_ctl1 = I915_READ(BLC_PWM_PCH_CTL1);
 	if (pch_ctl1 & BLM_PCH_PWM_ENABLE) {
@@ -1413,13 +1423,20 @@ static int lpt_setup_backlight(struct intel_connector *connector, enum pipe unus
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
 	struct intel_panel *panel = &connector->panel;
-	u32 pch_ctl1, pch_ctl2, val;
+	u32 pch_ctl1, pch_ctl2, val, mul;
 
 	pch_ctl1 = I915_READ(BLC_PWM_PCH_CTL1);
 	panel->backlight.active_low_pwm = pch_ctl1 & BLM_PCH_POLARITY;
 
 	pch_ctl2 = I915_READ(BLC_PWM_PCH_CTL2);
 	panel->backlight.max = pch_ctl2 >> 16;
+
+	if (HAS_PCH_LPT(dev_priv))
+		mul = I915_READ(SOUTH_CHICKEN2) & LPT_PWM_GRANULARITY;
+	else
+		mul = I915_READ(SOUTH_CHICKEN1) & SPT_PWM_GRANULARITY;
+
+	panel->backlight.pwm_granularity = mul;
 
 	if (!panel->backlight.max)
 		panel->backlight.max = get_backlight_max_vbt(connector);
