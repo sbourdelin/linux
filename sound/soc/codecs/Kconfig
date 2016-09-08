@@ -459,6 +459,13 @@ config SND_SOC_CS42XX8_I2C
 	select SND_SOC_CS42XX8
 	select REGMAP_I2C
 
+config SND_SOC_CS4341
+	tristate "Cirrus Logic CS4341 CODEC"
+	depends on SPI_MASTER
+	select REGMAP_SPI
+	help
+	  Enable support for Cirrus Logic (Crystal) CS4341 CODEC.
+
 # Cirrus Logic CS4349 HiFi DAC
 config SND_SOC_CS4349
 	tristate "Cirrus Logic CS4349 CODEC"

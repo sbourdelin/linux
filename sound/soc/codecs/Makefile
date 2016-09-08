@@ -50,6 +50,7 @@ snd-soc-cs4271-i2c-objs := cs4271-i2c.o
 snd-soc-cs4271-spi-objs := cs4271-spi.o
 snd-soc-cs42xx8-objs := cs42xx8.o
 snd-soc-cs42xx8-i2c-objs := cs42xx8-i2c.o
+snd-soc-cs4341-objs := cs4341.o
 snd-soc-cs4349-objs := cs4349.o
 snd-soc-cs47l24-objs := cs47l24.o
 snd-soc-cs53l30-objs := cs53l30.o
