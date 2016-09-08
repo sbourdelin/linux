@@ -37,6 +37,7 @@ extern int unsynchronized_tsc(void);
 extern int check_tsc_unstable(void);
 extern unsigned long native_calibrate_cpu(void);
 extern unsigned long native_calibrate_tsc(void);
+extern unsigned long cpu_khz_from_cpuid(void);
 extern unsigned long long native_sched_clock_from_tsc(u64 tsc);
 
 extern int tsc_clocksource_reliable;

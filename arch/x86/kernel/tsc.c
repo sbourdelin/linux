@@ -699,7 +699,7 @@ unsigned long native_calibrate_tsc(void)
 	return crystal_khz * ebx_numerator / eax_denominator;
 }
 
-static unsigned long cpu_khz_from_cpuid(void)
+unsigned long cpu_khz_from_cpuid(void)
 {
 	unsigned int eax_base_mhz, ebx_max_mhz, ecx_bus_mhz, edx;
 
