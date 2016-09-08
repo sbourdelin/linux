@@ -1,0 +1,15 @@
+Cirrus Logic CS4341 DT bindings
+
+Required properties:
+ - compatible: "cirrus,cs4341a"
+
+For required properties on SPI, please consult
+Documentation/devicetree/bindings/spi/spi-bus.txt
+
+Example:
+	codec: cs4341@0 {
+		#sound-dai-cells = <0>;
+		compatible = "cirrus,cs4341a";
+		reg = <0>;
+		spi-max-frequency = <6000000>;
+	};
