@@ -551,8 +551,11 @@ static void hci_uart_tty_receive(struct tty_struct *tty, const u8 *data,
 	if (!hu || tty != hu->tty)
 		return;
 
-	if (!test_bit(HCI_UART_PROTO_READY, &hu->flags))
+	if (!test_bit(HCI_UART_PROTO_READY, &hu->flags)) {
+		if (hu->proto->recv_for_prepare)
+			hu->proto->recv_for_prepare(hu, data, count);
 		return;
+	}
 
 	/* It does not need a lock here as it is already protected by a mutex in
 	 * tty caller
@@ -639,6 +642,12 @@ static int hci_uart_set_proto(struct hci_uart *hu, int id)
 		return err;
 
 	hu->proto = p;
+	if (p->prepare) {
+		err = p->prepare(hu);
+		if (err)
+			return err;
+	}
+
 	set_bit(HCI_UART_PROTO_READY, &hu->flags);
 
 	err = hci_uart_register_dev(hu);
