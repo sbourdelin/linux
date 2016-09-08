@@ -121,6 +121,7 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 	struct file *new_file;
 	loff_t old_pos = 0;
 	loff_t new_pos = 0;
+	int try_copy_file = 0;
 	int error = 0;
 
 	if (len == 0)
@@ -136,6 +137,13 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 		goto out_fput;
 	}
 
+	/*
+	 * When copying up within the same fs, try to use fs's copy_file_range
+	 */
+	if (file_inode(old_file)->i_sb == file_inode(new_file)->i_sb) {
+		try_copy_file = (new_file->f_op->copy_file_range != NULL);
+	}
+
 	/* FIXME: copy up sparse files efficiently */
 	while (len) {
 		size_t this_len = OVL_COPY_UP_CHUNK_SIZE;
@@ -149,9 +157,23 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 			break;
 		}
 
-		bytes = do_splice_direct(old_file, &old_pos,
-					 new_file, &new_pos,
-					 this_len, SPLICE_F_MOVE);
+		if (try_copy_file) {
+			bytes = new_file->f_op->copy_file_range(
+					old_file, old_pos,
+					new_file, new_pos,
+					len, 0);
+			if (bytes == -EOPNOTSUPP) {
+				try_copy_file = 0;
+				continue;
+			} else if (bytes > 0) {
+				old_pos += bytes;
+				new_pos += bytes;
+			}
+		} else {
+			bytes = do_splice_direct(old_file, &old_pos,
+					new_file, &new_pos,
+					this_len, SPLICE_F_MOVE);
+		}
 		if (bytes <= 0) {
 			error = bytes;
 			break;
