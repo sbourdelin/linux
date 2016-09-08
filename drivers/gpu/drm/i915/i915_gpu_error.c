@@ -576,6 +576,13 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 		}
 	}
 
+	obj = error->guc_log;
+	if (obj) {
+		err_printf(m, "GuC log buffer = 0x%08x\n",
+			   lower_32_bits(obj->gtt_offset));
+		print_error_obj(m, obj);
+	}
+
 	if (error->overlay)
 		intel_overlay_print_error_state(m, error->overlay);
 
@@ -656,6 +663,7 @@ static void i915_error_state_free(struct kref *error_ref)
 	}
 
 	i915_error_object_free(error->semaphore);
+	i915_error_object_free(error->guc_log);
 
 	for (i = 0; i < ARRAY_SIZE(error->active_bo); i++)
 		kfree(error->active_bo[i]);
@@ -1302,6 +1310,17 @@ static void i915_capture_pinned_buffers(struct drm_i915_private *dev_priv,
 	error->pinned_bo = bo;
 }
 
+static void i915_gem_capture_guc_log_buffer(struct drm_i915_private *dev_priv,
+					    struct drm_i915_error_state *error)
+{
+	/* Capturing log buf contents won't be useful if logging was disabled */
+	if (!dev_priv->guc.log.vma || (i915.guc_log_level < 0))
+		return;
+
+	error->guc_log = i915_error_object_create(dev_priv,
+						  dev_priv->guc.log.vma);
+}
+
 /* Capture all registers which don't fit into another category. */
 static void i915_capture_reg_state(struct drm_i915_private *dev_priv,
 				   struct drm_i915_error_state *error)
@@ -1453,6 +1472,7 @@ void i915_capture_error_state(struct drm_i915_private *dev_priv,
 	i915_gem_record_rings(dev_priv, error);
 	i915_capture_active_buffers(dev_priv, error);
 	i915_capture_pinned_buffers(dev_priv, error);
+	i915_gem_capture_guc_log_buffer(dev_priv, error);
 
 	do_gettimeofday(&error->time);
 
