@@ -193,7 +193,7 @@ unsigned int sbitmap_weight(const struct sbitmap *sb)
 EXPORT_SYMBOL_GPL(sbitmap_weight);
 
 int sbitmap_queue_init_node(struct sbitmap_queue *sbq, unsigned int depth,
-			    int shift, gfp_t flags, int node)
+			    int shift, bool round_robin, gfp_t flags, int node)
 {
 	int ret;
 	int i;
@@ -225,6 +225,8 @@ int sbitmap_queue_init_node(struct sbitmap_queue *sbq, unsigned int depth,
 		init_waitqueue_head(&sbq->ws[i].wait);
 		atomic_set(&sbq->ws[i].wait_cnt, sbq->wake_batch);
 	}
+
+	sbq->round_robin = round_robin;
 	return 0;
 }
 EXPORT_SYMBOL_GPL(sbitmap_queue_init_node);
@@ -262,7 +264,7 @@ static struct sbq_wait_state *sbq_wake_ptr(struct sbitmap_queue *sbq)
 }
 
 void sbitmap_queue_clear(struct sbitmap_queue *sbq, unsigned int nr,
-			 bool round_robin, unsigned int cpu)
+			 unsigned int cpu)
 {
 	struct sbq_wait_state *ws;
 	int wait_cnt;
@@ -286,7 +288,7 @@ void sbitmap_queue_clear(struct sbitmap_queue *sbq, unsigned int nr,
 	}
 
 update_cache:
-	if (likely(!round_robin))
+	if (likely(!sbq->round_robin))
 		*per_cpu_ptr(sbq->alloc_hint, cpu) = nr;
 }
 EXPORT_SYMBOL_GPL(sbitmap_queue_clear);
