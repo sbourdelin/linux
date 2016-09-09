@@ -735,6 +735,9 @@ cannot_free:
 	return REMOVED_FAIL;
 }
 
+static unsigned long kswapd_exclusive = NUMA_NO_NODE;
+static DECLARE_WAIT_QUEUE_HEAD(kswapd_contended_wait);
+
 static unsigned long remove_mapping_list(struct list_head *mapping_list,
 					 struct list_head *free_pages,
 					 struct list_head *ret_pages)
@@ -755,8 +758,28 @@ continue_removal:
 
 		list_del(&page->lru);
 		if (!mapping) {
+			pg_data_t *pgdat = page_pgdat(page);
 			mapping = page_mapping(page);
-			spin_lock_irqsave(&mapping->tree_lock, flags);
+
+			/* Account for trylock contentions in kswapd */
+			if (!current_is_kswapd() ||
+			    pgdat->node_id == kswapd_exclusive) {
+				spin_lock_irqsave(&mapping->tree_lock, flags);
+			} else {
+				/* Account for contended pages and contended kswapds */
+				if (!spin_trylock_irqsave(&mapping->tree_lock, flags)) {
+					/* Stall kswapd once for 10ms on contention */
+					if (cmpxchg(&kswapd_exclusive, NUMA_NO_NODE, pgdat->node_id) != NUMA_NO_NODE) {
+						DEFINE_WAIT(wait);
+						prepare_to_wait(&kswapd_contended_wait,
+							&wait, TASK_INTERRUPTIBLE);
+						io_schedule_timeout(HZ/100);
+						finish_wait(&kswapd_contended_wait, &wait);
+					}
+
+					spin_lock_irqsave(&mapping->tree_lock, flags);
+				}
+			}
 		}
 
 		switch (__remove_mapping(mapping, page, true, &freepage)) {
@@ -3207,6 +3230,7 @@ static void age_active_anon(struct pglist_data *pgdat,
 static bool zone_balanced(struct zone *zone, int order, int classzone_idx)
 {
 	unsigned long mark = high_wmark_pages(zone);
+	unsigned long nid;
 
 	if (!zone_watermark_ok_safe(zone, order, mark, classzone_idx))
 		return false;
@@ -3217,6 +3241,12 @@ static bool zone_balanced(struct zone *zone, int order, int classzone_idx)
 	 */
 	clear_bit(PGDAT_CONGESTED, &zone->zone_pgdat->flags);
 	clear_bit(PGDAT_DIRTY, &zone->zone_pgdat->flags);
+
+	nid = zone->zone_pgdat->node_id;
+	if (nid == kswapd_exclusive) {
+		cmpxchg(&kswapd_exclusive, nid, NUMA_NO_NODE);
+		wake_up_interruptible(&kswapd_contended_wait);
+	}
 
 	return true;
 }
