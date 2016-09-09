@@ -50,6 +50,8 @@ MODULE_PARM_DESC(oom_pages, "pages to free on OOM");
 static struct vfsmount *balloon_mnt;
 #endif
 
+static unsigned long fail_count;
+
 struct virtio_balloon {
 	struct virtio_device *vdev;
 	struct virtqueue *inflate_vq, *deflate_vq, *stats_vq;
@@ -361,6 +363,8 @@ static int virtballoon_oom_notify(struct notifier_block *self,
 	unsigned long *freed;
 	unsigned num_freed_pages;
 
+	fail_count++;
+
 	vb = container_of(self, struct virtio_balloon, nb);
 	if (!virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_DEFLATE_ON_OOM))
 		return NOTIFY_OK;
@@ -386,10 +390,21 @@ static void update_balloon_size_func(struct work_struct *work)
 {
 	struct virtio_balloon *vb;
 	s64 diff;
+	static unsigned long fc;
+
+	if (fc == 0)
+		fc = fail_count;
 
 	vb = container_of(work, struct virtio_balloon,
 			  update_balloon_size_work);
 	diff = towards_target(vb);
+
+	if (fc != fail_count) {
+		fc = fail_count;
+		/* Don't inflate balloon after oom notification */
+		if (diff > 0)
+			return;
+	}
 
 	if (diff > 0)
 		diff -= fill_balloon(vb, diff);
