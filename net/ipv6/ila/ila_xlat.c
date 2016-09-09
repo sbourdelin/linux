@@ -30,34 +30,6 @@ struct ila_net {
 	bool hooks_registered;
 };
 
-#define	LOCKS_PER_CPU 10
-
-static int alloc_ila_locks(struct ila_net *ilan)
-{
-	unsigned int i, size;
-	unsigned int nr_pcpus = num_possible_cpus();
-
-	nr_pcpus = min_t(unsigned int, nr_pcpus, 32UL);
-	size = roundup_pow_of_two(nr_pcpus * LOCKS_PER_CPU);
-
-	if (sizeof(spinlock_t) != 0) {
-#ifdef CONFIG_NUMA
-		if (size * sizeof(spinlock_t) > PAGE_SIZE)
-			ilan->locks = vmalloc(size * sizeof(spinlock_t));
-		else
-#endif
-		ilan->locks = kmalloc_array(size, sizeof(spinlock_t),
-					    GFP_KERNEL);
-		if (!ilan->locks)
-			return -ENOMEM;
-		for (i = 0; i < size; i++)
-			spin_lock_init(&ilan->locks[i]);
-	}
-	ilan->locks_mask = size - 1;
-
-	return 0;
-}
-
 static u32 hashrnd __read_mostly;
 static __always_inline void __ila_hash_secret_init(void)
 {
@@ -561,14 +533,16 @@ static const struct genl_ops ila_nl_ops[] = {
 	},
 };
 
-#define ILA_HASH_TABLE_SIZE 1024
+#define LOCKS_PER_CPU 10
+#define MAX_LOCKS 1024
 
 static __net_init int ila_init_net(struct net *net)
 {
 	int err;
 	struct ila_net *ilan = net_generic(net, ila_net_id);
 
-	err = alloc_ila_locks(ilan);
+	err = alloc_bucket_spinlocks(&ilan->locks, &ilan->locks_mask,
+				     MAX_LOCKS, LOCKS_PER_CPU, GFP_KERNEL);
 	if (err)
 		return err;
 
@@ -583,7 +557,7 @@ static __net_exit void ila_exit_net(struct net *net)
 
 	rhashtable_free_and_destroy(&ilan->rhash_table, ila_free_cb, NULL);
 
-	kvfree(ilan->locks);
+	free_bucket_spinlocks(ilan->locks);
 
 	if (ilan->hooks_registered)
 		nf_unregister_net_hooks(net, ila_nf_hook_ops,
