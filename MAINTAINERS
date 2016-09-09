@@ -2230,7 +2230,8 @@ F:	drivers/input/touchscreen/atmel_mxt_ts.c
 F:	include/linux/platform_data/atmel_mxt_ts.h
 
 ATTO EXPRESSSAS SAS/SATA RAID SCSI DRIVER
-M:	Bradley Grove <linuxdrivers@attotech.com>
+M:	Bradley Grove <bgrove@attotech.com>
+M:	ATTO Linux Driver Support <linuxdrivers@attotech.com>
 L:	linux-scsi@vger.kernel.org
 W:	http://www.attotech.com
 S:	Supported
