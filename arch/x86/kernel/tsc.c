@@ -688,11 +688,19 @@ unsigned long native_calibrate_tsc(void)
 		switch (boot_cpu_data.x86_model) {
 		case 0x4E:	/* SKL */
 		case 0x5E:	/* SKL */
+		case 0x8E:	/* KBL */
+		case 0x9E:	/* KBL */
 			crystal_khz = 24000;	/* 24.0 MHz */
+			break;
+		case 0x55:	/* SKX */
+			crystal_khz = 25000;	/* 25.0 MHz */
 			break;
 		case 0x5C:	/* BXT */
 			crystal_khz = 19200;	/* 19.2 MHz */
 			break;
+		default:
+			crystal_khz = 0;
+
 		}
 	}
 
