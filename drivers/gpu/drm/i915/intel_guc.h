@@ -151,7 +151,6 @@ struct intel_guc {
 
 static inline int intel_slpc_enabled(void)
 {
-	WARN_ON(i915.enable_slpc < 0);
 	return i915.enable_slpc;
 }
 
