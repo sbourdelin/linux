@@ -598,7 +598,7 @@ static int inet_diag_bc_run(const struct nlattr *_bc,
 			struct inet_diag_markcond *cond;
 
 			cond = (struct inet_diag_markcond *)(op + 1);
-			if ((entry->mark & cond->mask) != cond->mark)
+			if ((entry->mark ^ cond->mark) & cond->mask)
 				yes = 0;
 			break;
 		}
