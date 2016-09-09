@@ -1395,7 +1395,7 @@ static void riocm_ch_free(struct kref *ref)
 	complete(&ch->comp_close);
 }
 
-static int riocm_send_close(struct rio_channel *ch)
+static int riocm_send_close(struct rio_channel *ch, gfp_t gfp)
 {
 	struct rio_ch_chan_hdr *hdr;
 	int ret;
@@ -1404,7 +1404,7 @@ static int riocm_send_close(struct rio_channel *ch)
 	 * Send CH_CLOSE notification to the remote RapidIO device
 	 */
 
-	hdr = kzalloc(sizeof(*hdr), GFP_KERNEL);
+	hdr = kzalloc(sizeof(*hdr), gfp);
 	if (hdr == NULL)
 		return -ENOMEM;
 
@@ -1450,7 +1450,7 @@ static int riocm_ch_close(struct rio_channel *ch)
 
 	state = riocm_exch(ch, RIO_CM_DESTROYING);
 	if (state == RIO_CM_CONNECTED)
-		riocm_send_close(ch);
+		riocm_send_close(ch, GFP_KERNEL);
 
 	complete_all(&ch->comp);
 
@@ -2254,7 +2254,7 @@ static int rio_cm_shutdown(struct notifier_block *nb, unsigned long code,
 	idr_for_each_entry(&ch_idr, ch, i) {
 		riocm_debug(EXIT, "close ch %d", ch->id);
 		if (ch->state == RIO_CM_CONNECTED)
-			riocm_send_close(ch);
+			riocm_send_close(ch, GFP_ATOMIC);
 	}
 	spin_unlock_bh(&idr_lock);
 
