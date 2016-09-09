@@ -2284,10 +2284,18 @@ static int intel_runtime_suspend(struct device *kdev)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	int ret;
 
-	if (WARN_ON_ONCE(!(dev_priv->rps.enabled && intel_enable_rc6())))
+	if (WARN_ON_ONCE(!intel_enable_rc6()))
 		return -ENODEV;
 
-	if (WARN_ON_ONCE(!HAS_RUNTIME_PM(dev)))
+	/*
+	 * Once RC6 and RPS enabling is separated for non-GEN9 platforms
+	 * below check should be removed.
+	*/
+	if (!IS_GEN9(dev_priv))
+		if (WARN_ON_ONCE(!dev_priv->rps.enabled))
+			return -ENODEV;
+
+	if (WARN_ON_ONCE(!HAS_RUNTIME_PM(dev_priv)))
 		return -ENODEV;
 
 	DRM_DEBUG_KMS("Suspending device\n");
@@ -2391,7 +2399,7 @@ static int intel_runtime_resume(struct device *kdev)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	int ret = 0;
 
-	if (WARN_ON_ONCE(!HAS_RUNTIME_PM(dev)))
+	if (WARN_ON_ONCE(!HAS_RUNTIME_PM(dev_priv)))
 		return -ENODEV;
 
 	DRM_DEBUG_KMS("Resuming device\n");
