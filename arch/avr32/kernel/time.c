@@ -142,7 +142,9 @@ void __init time_init(void)
 	/* setup COMPARE clockevent */
 	comparator.mult = div_sc(counter_hz, NSEC_PER_SEC, comparator.shift);
 	comparator.max_delta_ns = clockevent_delta2ns((u32)~0, &comparator);
+	comparator.max_delta_ticks = (u32)~0;
 	comparator.min_delta_ns = clockevent_delta2ns(50, &comparator) + 1;
+	comparator.min_delta_ticks = 50;
 	comparator.cpumask = cpumask_of(0);
 
 	sysreg_write(COMPARE, 0);
