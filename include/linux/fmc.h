@@ -10,7 +10,6 @@
 #ifndef __LINUX_FMC_H__
 #define __LINUX_FMC_H__
 #include <linux/types.h>
-#include <linux/moduleparam.h>
 #include <linux/device.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>
