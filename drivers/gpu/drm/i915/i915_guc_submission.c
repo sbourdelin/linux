@@ -47,7 +47,7 @@
  * Firmware writes a success/fail code back to the action register after
  * processes the request. The kernel driver polls waiting for this update and
  * then proceeds.
- * See host2guc_action()
+ * See i915_guc_action()
  *
  * Doorbells:
  * Doorbells are interrupts to uKernel. A doorbell is a single cache line (QW)
@@ -75,7 +75,7 @@ static inline bool host2guc_action_response(struct drm_i915_private *dev_priv,
 	return GUC2HOST_IS_RESPONSE(val);
 }
 
-static int host2guc_action(struct intel_guc *guc, u32 *data, u32 len)
+int i915_guc_action(struct intel_guc *guc, u32 *data, u32 len)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
 	u32 status;
@@ -139,7 +139,7 @@ static int host2guc_allocate_doorbell(struct intel_guc *guc,
 	data[0] = HOST2GUC_ACTION_ALLOCATE_DOORBELL;
 	data[1] = client->ctx_index;
 
-	return host2guc_action(guc, data, 2);
+	return i915_guc_action(guc, data, 2);
 }
 
 static int host2guc_release_doorbell(struct intel_guc *guc,
@@ -150,7 +150,7 @@ static int host2guc_release_doorbell(struct intel_guc *guc,
 	data[0] = HOST2GUC_ACTION_DEALLOCATE_DOORBELL;
 	data[1] = client->ctx_index;
 
-	return host2guc_action(guc, data, 2);
+	return i915_guc_action(guc, data, 2);
 }
 
 static int host2guc_sample_forcewake(struct intel_guc *guc,
@@ -167,7 +167,7 @@ static int host2guc_sample_forcewake(struct intel_guc *guc,
 		/* bit 0 and 1 are for Render and Media domain separately */
 		data[1] = GUC_FORCEWAKE_RENDER | GUC_FORCEWAKE_MEDIA;
 
-	return host2guc_action(guc, data, ARRAY_SIZE(data));
+	return i915_guc_action(guc, data, ARRAY_SIZE(data));
 }
 
 /*
@@ -620,7 +620,7 @@ static void i915_guc_submit(struct drm_i915_gem_request *rq)
  *
  * Return:	A i915_vma if successful, otherwise an ERR_PTR.
  */
-static struct i915_vma *guc_allocate_vma(struct intel_guc *guc, u32 size)
+struct i915_vma *guc_allocate_vma(struct intel_guc *guc, u32 size)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
 	struct drm_i915_gem_object *obj;
@@ -1064,7 +1064,7 @@ int intel_guc_suspend(struct drm_device *dev)
 	/* first page is shared data with GuC */
 	data[2] = i915_ggtt_offset(ctx->engine[RCS].state);
 
-	return host2guc_action(guc, data, ARRAY_SIZE(data));
+	return i915_guc_action(guc, data, ARRAY_SIZE(data));
 }
 
 
@@ -1089,5 +1089,5 @@ int intel_guc_resume(struct drm_device *dev)
 	/* first page is shared data with GuC */
 	data[2] = i915_ggtt_offset(ctx->engine[RCS].state);
 
-	return host2guc_action(guc, data, ARRAY_SIZE(data));
+	return i915_guc_action(guc, data, ARRAY_SIZE(data));
 }
