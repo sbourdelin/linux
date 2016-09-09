@@ -677,7 +677,8 @@ struct intel_csr {
 	func(has_snoop) sep \
 	func(has_ddi) sep \
 	func(has_fpga_dbg) sep \
-	func(has_pooled_eu)
+	func(has_pooled_eu) sep \
+	func(has_slpc)
 
 #define DEFINE_FLAG(name) u8 name:1
 #define SEP_SEMICOLON ;
@@ -2811,6 +2812,7 @@ struct drm_i915_cmd_table {
 #define HAS_GUC(dev)		(INTEL_INFO(dev)->has_guc)
 #define HAS_GUC_UCODE(dev)	(HAS_GUC(dev))
 #define HAS_GUC_SCHED(dev)	(HAS_GUC(dev))
+#define HAS_SLPC(dev)		(INTEL_INFO(dev)->has_slpc)
 
 #define HAS_RESOURCE_STREAMER(dev) (INTEL_INFO(dev)->has_resource_streamer)
 
