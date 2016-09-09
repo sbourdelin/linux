@@ -270,8 +270,8 @@ static void cn23xx_enable_error_reporting(struct octeon_device *oct)
 
 	regval |= 0xf; /* Enable Link error reporting */
 
-	dev_dbg(&oct->pci_dev->dev, "OCTEON[%d]: Enabling PCI-E error reporting..\n",
-		oct->octeon_id);
+	pr_devel("OCTEON[%d]: Enabling PCI-E error reporting..\n",
+		 oct->octeon_id);
 	pci_write_config_dword(oct->pci_dev, CN23XX_CONFIG_PCIE_DEVCTL, regval);
 }
 

@@ -19,6 +19,7 @@
 * This file may also be available under a different license from Cavium.
 * Contact Cavium, Inc. for more information
 **********************************************************************/
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #include <linux/pci.h>
 #include <linux/netdevice.h>
 #include "liquidio_common.h"
@@ -37,8 +38,8 @@ static void lio_cn68xx_set_dpi_regs(struct octeon_device *oct)
 	u32 fifo_sizes[6] = { 3, 3, 1, 1, 1, 8 };
 
 	lio_pci_writeq(oct, CN6XXX_DPI_DMA_CTL_MASK, CN6XXX_DPI_DMA_CONTROL);
-	dev_dbg(&oct->pci_dev->dev, "DPI_DMA_CONTROL: 0x%016llx\n",
-		lio_pci_readq(oct, CN6XXX_DPI_DMA_CONTROL));
+	pr_devel("DPI_DMA_CONTROL: 0x%016llx\n",
+		 lio_pci_readq(oct, CN6XXX_DPI_DMA_CONTROL));
 
 	for (i = 0; i < 6; i++) {
 		/* Prevent service of instruction queue for all DMA engines
@@ -47,8 +48,8 @@ static void lio_cn68xx_set_dpi_regs(struct octeon_device *oct)
 		 */
 		lio_pci_writeq(oct, 0, CN6XXX_DPI_DMA_ENG_ENB(i));
 		lio_pci_writeq(oct, fifo_sizes[i], CN6XXX_DPI_DMA_ENG_BUF(i));
-		dev_dbg(&oct->pci_dev->dev, "DPI_ENG_BUF%d: 0x%016llx\n", i,
-			lio_pci_readq(oct, CN6XXX_DPI_DMA_ENG_BUF(i)));
+		pr_devel("DPI_ENG_BUF%d: 0x%016llx\n", i,
+			 lio_pci_readq(oct, CN6XXX_DPI_DMA_ENG_BUF(i)));
 	}
 
 	/* DPI_SLI_PRT_CFG has MPS and MRRS settings that will be set
@@ -56,8 +57,8 @@ static void lio_cn68xx_set_dpi_regs(struct octeon_device *oct)
 	 */
 
 	lio_pci_writeq(oct, 1, CN6XXX_DPI_CTL);
-	dev_dbg(&oct->pci_dev->dev, "DPI_CTL: 0x%016llx\n",
-		lio_pci_readq(oct, CN6XXX_DPI_CTL));
+	pr_devel("DPI_CTL: 0x%016llx\n",
+		 lio_pci_readq(oct, CN6XXX_DPI_CTL));
 }
 
 static int lio_cn68xx_soft_reset(struct octeon_device *oct)

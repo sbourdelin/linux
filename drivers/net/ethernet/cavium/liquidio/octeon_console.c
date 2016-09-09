@@ -19,10 +19,10 @@
 * This file may also be available under a different license from Cavium.
 * Contact Cavium, Inc. for more information
 **********************************************************************/
-
 /**
  * @file octeon_console.c
  */
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #include <linux/pci.h>
 #include <linux/netdevice.h>
 #include <linux/crc32.h>
@@ -267,8 +267,8 @@ static int __cvmx_bootmem_check_version(struct octeon_device *oct,
 		(u32)CVMX_BOOTMEM_DESC_GET_FIELD(oct, major_version);
 	minor_version =
 		(u32)CVMX_BOOTMEM_DESC_GET_FIELD(oct, minor_version);
-	dev_dbg(&oct->pci_dev->dev, "%s: major_version=%d\n", __func__,
-		major_version);
+	pr_devel("%s: major_version=%d\n", __func__,
+		 major_version);
 	if ((major_version > 3) ||
 	    (exact_match && major_version != exact_match)) {
 		dev_err(&oct->pci_dev->dev, "bootmem ver mismatch %d.%d addr:0x%llx\n",
@@ -391,7 +391,7 @@ int octeon_console_send_cmd(struct octeon_device *oct, char *cmd_str,
 {
 	u32 len = (u32)strlen(cmd_str);
 
-	dev_dbg(&oct->pci_dev->dev, "sending \"%s\" to bootloader\n", cmd_str);
+	pr_devel("sending \"%s\" to bootloader\n", cmd_str);
 
 	if (len > BOOTLOADER_PCI_WRITE_BUFFER_STR_LEN - 1) {
 		dev_err(&oct->pci_dev->dev, "Command string too long, max length is: %d\n",
@@ -428,8 +428,8 @@ int octeon_console_send_cmd(struct octeon_device *oct, char *cmd_str,
 int octeon_wait_for_bootloader(struct octeon_device *oct,
 			       u32 wait_time_hundredths)
 {
-	dev_dbg(&oct->pci_dev->dev, "waiting %d0 ms for bootloader\n",
-		wait_time_hundredths);
+	pr_devel("waiting %d0 ms for bootloader\n",
+		 wait_time_hundredths);
 
 	if (octeon_mem_access_ok(oct))
 		return -1;
@@ -569,8 +569,8 @@ int octeon_init_consoles(struct octeon_device *oct)
 			num_consoles));
 	oct->console_desc_addr = addr;
 
-	dev_dbg(&oct->pci_dev->dev, "Initialized consoles. %d available\n",
-		oct->num_consoles);
+	pr_devel("Initialized consoles. %d available\n",
+		 oct->num_consoles);
 
 	return ret;
 }

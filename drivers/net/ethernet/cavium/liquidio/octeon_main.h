@@ -66,7 +66,7 @@ void octeon_update_tx_completion_counters(void *buf, int reqtype,
 					  unsigned int *bytes_compl);
 void octeon_report_tx_completion_to_bql(void *txq, unsigned int pkts_compl,
 					unsigned int bytes_compl);
-
+void octeon_pf_changed_vf_macaddr(struct octeon_device *oct, u8 *mac);
 /** Swap 8B blocks */
 static inline void octeon_swap_8B_data(u64 *data, u32 blocks)
 {
@@ -84,8 +84,8 @@ static inline void octeon_swap_8B_data(u64 *data, u32 blocks)
   */
 static inline void octeon_unmap_pci_barx(struct octeon_device *oct, int baridx)
 {
-	dev_dbg(&oct->pci_dev->dev, "Freeing PCI mapped regions for Bar%d\n",
-		baridx);
+	pr_devel("Freeing PCI mapped regions for Bar%d\n",
+		 baridx);
 
 	if (oct->mmio[baridx].done)
 		iounmap(oct->mmio[baridx].hw_addr);
@@ -125,9 +125,9 @@ static inline int octeon_map_pci_barx(struct octeon_device *oct,
 		ioremap(oct->mmio[baridx].start, mapped_len);
 	oct->mmio[baridx].mapped_len = mapped_len;
 
-	dev_dbg(&oct->pci_dev->dev, "BAR%d start: 0x%llx mapped %u of %u bytes\n",
-		baridx, oct->mmio[baridx].start, mapped_len,
-		oct->mmio[baridx].len);
+	pr_devel("BAR%d start: 0x%llx mapped %u of %u bytes\n",
+		 baridx, oct->mmio[baridx].start, mapped_len,
+		 oct->mmio[baridx].len);
 
 	if (!oct->mmio[baridx].hw_addr) {
 		dev_err(&oct->pci_dev->dev, "error ioremap for bar %d\n",
