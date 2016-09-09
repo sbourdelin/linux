@@ -47,7 +47,7 @@ static void __init *pcal9555a_platform_data(void *info)
 	if (nr >= PCAL9555A_NUM) {
 		pr_err("%s: Too many instances, only %d supported\n", __func__,
 		       PCAL9555A_NUM);
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	pcal9555a = &pcal9555a_pdata[nr++];

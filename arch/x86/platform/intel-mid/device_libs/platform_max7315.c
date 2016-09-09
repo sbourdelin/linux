@@ -31,7 +31,7 @@ static void __init *max7315_platform_data(void *info)
 	if (nr == MAX7315_NUM) {
 		pr_err("too many max7315s, we only support %d\n",
 				MAX7315_NUM);
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 	/* we have several max7315 on the board, we only need load several
 	 * instances of the same pca953x driver to cover them
