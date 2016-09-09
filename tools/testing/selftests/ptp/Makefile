@@ -1,8 +1,8 @@
-# List of programs to build
-hostprogs-y := testptp
+TEST_PROGS := testptp
+LDLIBS += -lrt
+all: $(TEST_PROGS)
 
-# Tell kbuild to always build the programs
-always := $(hostprogs-y)
+include ../lib.mk
 
-HOSTCFLAGS_testptp.o += -I$(objtree)/usr/include
-HOSTLOADLIBES_testptp := -lrt
+clean:
+	rm -fr testptp
