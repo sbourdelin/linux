@@ -35,12 +35,15 @@ static struct syscall_metadata **syscalls_metadata;
 static inline bool arch_syscall_match_sym_name(const char *sym, const char *name)
 {
 	/*
-	 * Only compare after the "sys" prefix. Archs that use
+	 * Only compare after the "sys" or "compat_sys" prefix. Archs that use
 	 * syscall wrappers may have syscalls symbols aliases prefixed
 	 * with ".SyS" or ".sys" instead of "sys", leading to an unwanted
 	 * mismatch.
 	 */
-	return !strcmp(sym + 3, name + 3);
+	int prefix_len = 3;
+	if (!strncasecmp(sym, "compat_", 7))
+		prefix_len = 10;
+	return !strcmp(sym + prefix_len, name + prefix_len);
 }
 #endif
 
