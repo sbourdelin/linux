@@ -303,6 +303,7 @@
 		resets = <&cru SRST_PCIE_CORE>, <&cru SRST_PCIE_MGMT>,
 			 <&cru SRST_PCIE_MGMT_STICKY>, <&cru SRST_PCIE_PIPE>;
 		reset-names = "core", "mgmt", "mgmt-sticky", "pipe";
+		power-domains = <&power RK3399_PD_PERIHP>;
 		status = "disabled";
 
 		pcie0_intc: interrupt-controller {
@@ -320,6 +321,7 @@
 		clock-names = "hclk_host0", "hclk_host0_arb";
 		phys = <&u2phy0_host>;
 		phy-names = "usb";
+		power-domains = <&power RK3399_PD_PERIHP>;
 		status = "disabled";
 	};
 
@@ -329,6 +331,7 @@
 		interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH 0>;
 		clocks = <&cru HCLK_HOST0>, <&cru HCLK_HOST0_ARB>;
 		clock-names = "hclk_host0", "hclk_host0_arb";
+		power-domains = <&power RK3399_PD_PERIHP>;
 		status = "disabled";
 	};
 
@@ -340,6 +343,7 @@
 		clock-names = "hclk_host1", "hclk_host1_arb";
 		phys = <&u2phy1_host>;
 		phy-names = "usb";
+		power-domains = <&power RK3399_PD_PERIHP>;
 		status = "disabled";
 	};
 
@@ -349,6 +353,7 @@
 		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH 0>;
 		clocks = <&cru HCLK_HOST1>, <&cru HCLK_HOST1_ARB>;
 		clock-names = "hclk_host1", "hclk_host1_arb";
+		power-domains = <&power RK3399_PD_PERIHP>;
 		status = "disabled";
 	};
 
@@ -699,6 +704,20 @@
 		compatible = "syscon";
 		reg = <0x0 0xffa5c000 0x0 0x20>;
 	};
+	qos_pcie: qos@ffa60080 {
+		compatible = "syscon";
+		reg = <0x0 0xffa60080 0x0 0x20>;
+	};
+
+	qos_usb_host0: qos@ffa60100 {
+		compatible = "syscon";
+		reg = <0x0 0xffa60100 0x0 0x20>;
+	};
+
+	qos_usb_host1: qos@ffa60180 {
+		compatible = "syscon";
+		reg = <0x0 0xffa60180 0x0 0x20>;
+	};
 
 	qos_hdcp: qos@ffa90000 {
 		compatible = "syscon";
@@ -768,6 +787,11 @@
 	qos_vop_little: qos@ffad0000 {
 		compatible = "syscon";
 		reg = <0x0 0xffad0000 0x0 0x20>;
+	};
+
+	qos_perihp: qos@ffad8080 {
+		compatible = "syscon";
+		reg = <0x0 0xffad8080 0x0 0x20>;
 	};
 
 	qos_gpu: qos@ffae0000 {
@@ -841,6 +865,16 @@
 				reg = <RK3399_PD_GMAC>;
 				clocks = <&cru ACLK_GMAC>;
 				pm_qos = <&qos_gmac>;
+			};
+			pd_perihp@RK3399_PD_PERIHP {
+				reg = <RK3399_PD_PERIHP>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				clocks = <&cru ACLK_PERIHP>;
+				pm_qos = <&qos_perihp>,
+					 <&qos_pcie>,
+					 <&qos_usb_host0>,
+					 <&qos_usb_host1>;
 			};
 			pd_vio@RK3399_PD_VIO {
 				reg = <RK3399_PD_VIO>;
