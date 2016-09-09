@@ -1,5 +1,7 @@
-# List of programs to build
-hostprogs-y := dnotify_test
+TEST_PROGS := dnotify_test
+all: $(TEST_PROGS)
 
-# Tell kbuild to always build the programs
-always := $(hostprogs-y)
+include ../lib.mk
+
+clean:
+	rm -fr dnotify_test
