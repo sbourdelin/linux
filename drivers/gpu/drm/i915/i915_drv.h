@@ -2212,7 +2212,7 @@ struct drm_i915_gem_object {
 	 * This is set if the object has been written to since last bound
 	 * to the GTT
 	 */
-	unsigned int dirty:1;
+	unsigned int __dirty:1;
 
 	/**
 	 * Advice: are the backing pages purgeable?
@@ -3157,6 +3157,26 @@ static inline void i915_gem_object_pin_pages(struct drm_i915_gem_object *obj)
 {
 	BUG_ON(obj->pages == NULL);
 	obj->pages_pin_count++;
+}
+
+/*
+ * Flag the object content as having changed since the last call to
+ * i915_gem_object_pin_pages() above, so that the new content is not
+ * lost after the next call to i915_gem_object_unpin_pages() below
+ */
+static inline void i915_gem_object_set_dirty(struct drm_i915_gem_object *obj)
+{
+	obj->__dirty = true;
+}
+
+static inline void i915_gem_object_clear_dirty(struct drm_i915_gem_object *obj)
+{
+	obj->__dirty = false;
+}
+
+static inline bool i915_gem_object_is_dirty(struct drm_i915_gem_object *obj)
+{
+	return obj->__dirty;
 }
 
 static inline void i915_gem_object_unpin_pages(struct drm_i915_gem_object *obj)

@@ -707,6 +707,8 @@ static int intel_lr_context_pin(struct i915_gem_context *ctx,
 				struct intel_engine_cs *engine)
 {
 	struct intel_context *ce = &ctx->engine[engine->id];
+	struct intel_ring *ring = ce->ring;
+	struct drm_i915_gem_object *ctx_obj;
 	void *vaddr;
 	u32 *lrc_reg_state;
 	int ret;
@@ -721,24 +723,24 @@ static int intel_lr_context_pin(struct i915_gem_context *ctx,
 	if (ret)
 		goto err;
 
-	vaddr = i915_gem_object_pin_map(ce->state->obj, I915_MAP_WB);
+	ctx_obj = ce->state->obj;
+	vaddr = i915_gem_object_pin_map(ctx_obj, I915_MAP_WB);
 	if (IS_ERR(vaddr)) {
 		ret = PTR_ERR(vaddr);
 		goto unpin_vma;
 	}
 
-	lrc_reg_state = vaddr + LRC_STATE_PN * PAGE_SIZE;
-
-	ret = intel_ring_pin(ce->ring);
+	ret = intel_ring_pin(ring);
 	if (ret)
 		goto unpin_map;
 
-	intel_lr_context_descriptor_update(ctx, engine);
+	i915_gem_object_set_dirty(ctx_obj);
 
-	lrc_reg_state[CTX_RING_BUFFER_START+1] =
-		i915_ggtt_offset(ce->ring->vma);
+	lrc_reg_state = vaddr + LRC_STATE_PN * PAGE_SIZE;
+	lrc_reg_state[CTX_RING_BUFFER_START+1] = i915_ggtt_offset(ring->vma);
 	ce->lrc_reg_state = lrc_reg_state;
-	ce->state->obj->dirty = true;
+
+	intel_lr_context_descriptor_update(ctx, engine);
 
 	/* Invalidate GuC TLB. */
 	if (i915.enable_guc_submission) {
@@ -1921,7 +1923,7 @@ populate_lr_context(struct i915_gem_context *ctx,
 		DRM_DEBUG_DRIVER("Could not map object pages! (%d)\n", ret);
 		return ret;
 	}
-	ctx_obj->dirty = true;
+	i915_gem_object_set_dirty(ctx_obj);
 
 	/* The second page of the context object contains some fields which must
 	 * be set up prior to the first execution. */
@@ -2134,23 +2136,24 @@ void intel_lr_context_resume(struct drm_i915_private *dev_priv)
 
 	for_each_engine(engine, dev_priv) {
 		struct intel_context *ce = &ctx->engine[engine->id];
+		struct drm_i915_gem_object *ctx_obj;
 		void *vaddr;
 		uint32_t *reg_state;
 
 		if (!ce->state)
 			continue;
 
-		vaddr = i915_gem_object_pin_map(ce->state->obj, I915_MAP_WB);
+		ctx_obj = ce->state->obj;
+		vaddr = i915_gem_object_pin_map(ctx_obj, I915_MAP_WB);
 		if (WARN_ON(IS_ERR(vaddr)))
 			continue;
 
 		reg_state = vaddr + LRC_STATE_PN * PAGE_SIZE;
-
 		reg_state[CTX_RING_HEAD+1] = 0;
 		reg_state[CTX_RING_TAIL+1] = 0;
 
-		ce->state->obj->dirty = true;
-		i915_gem_object_unpin_map(ce->state->obj);
+		i915_gem_object_set_dirty(ctx_obj);
+		i915_gem_object_unpin_map(ctx_obj);
 
 		ce->ring->head = 0;
 		ce->ring->tail = 0;

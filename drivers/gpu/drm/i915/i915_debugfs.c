@@ -160,7 +160,7 @@ describe_obj(struct seq_file *m, struct drm_i915_gem_object *obj)
 		   i915_gem_active_get_seqno(&obj->last_write,
 					     &obj->base.dev->struct_mutex),
 		   i915_cache_level_str(dev_priv, obj->cache_level),
-		   obj->dirty ? " dirty" : "",
+		   i915_gem_object_is_dirty(obj) ? " dirty" : "",
 		   obj->madv == I915_MADV_DONTNEED ? " purgeable" : "");
 	if (obj->base.name)
 		seq_printf(m, " (name: %d)", obj->base.name);

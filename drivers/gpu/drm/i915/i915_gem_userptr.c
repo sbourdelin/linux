@@ -674,23 +674,25 @@ i915_gem_userptr_put_pages(struct drm_i915_gem_object *obj)
 {
 	struct sgt_iter sgt_iter;
 	struct page *page;
+	bool dirty;
 
 	BUG_ON(obj->userptr.work != NULL);
 	__i915_gem_userptr_set_active(obj, false);
 
-	if (obj->madv != I915_MADV_WILLNEED)
-		obj->dirty = 0;
-
 	i915_gem_gtt_finish_object(obj);
 
+	if (obj->madv != I915_MADV_WILLNEED)
+		i915_gem_object_clear_dirty(obj);
+
+	dirty = i915_gem_object_is_dirty(obj);
 	for_each_sgt_page(page, sgt_iter, obj->pages) {
-		if (obj->dirty)
+		if (dirty)
 			set_page_dirty(page);
 
 		mark_page_accessed(page);
 		put_page(page);
 	}
-	obj->dirty = 0;
+	i915_gem_object_clear_dirty(obj);
 
 	sg_free_table(obj->pages);
 	kfree(obj->pages);
