@@ -44,37 +44,35 @@ static inline bool arch_syscall_match_sym_name(const char *sym, const char *name
 }
 #endif
 
-#ifdef ARCH_TRACE_IGNORE_COMPAT_SYSCALLS
+#ifdef ARCH_COMPAT_SYSCALL_NUMBERS_OVERLAP
 /*
  * Some architectures that allow for 32bit applications
  * to run on a 64bit kernel, do not map the syscalls for
  * the 32bit tasks the same as they do for 64bit tasks.
  *
- *     *cough*x86*cough*
- *
- * In such a case, instead of reporting the wrong syscalls,
- * simply ignore them.
- *
- * For an arch to ignore the compat syscalls it needs to
- * define ARCH_TRACE_IGNORE_COMPAT_SYSCALLS as well as
+ * If a set of syscall numbers for 32-bit tasks overlaps
+ * the set of syscall numbers for 64-bit tasks, define
+ * ARCH_COMPAT_SYSCALL_NUMBERS_OVERLAP as well as
  * define the function arch_trace_is_compat_syscall() to let
- * the tracing system know that it should ignore it.
+ * the tracing system know that a compat syscall is being handled.
  */
-static int
-trace_get_syscall_nr(struct task_struct *task, struct pt_regs *regs)
+static inline bool trace_is_compat_syscall(struct pt_regs *regs)
 {
-	if (unlikely(arch_trace_is_compat_syscall(regs)))
-		return -1;
-
-	return syscall_get_nr(task, regs);
+	return arch_trace_is_compat_syscall(regs);
 }
 #else
+static inline bool trace_is_compat_syscall(struct pt_regs *regs)
+{
+	return false;
+}
+#endif /* ARCH_COMPAT_SYSCALL_NUMBERS_OVERLAP */
+
 static inline int
 trace_get_syscall_nr(struct task_struct *task, struct pt_regs *regs)
 {
 	return syscall_get_nr(task, regs);
 }
-#endif /* ARCH_TRACE_IGNORE_COMPAT_SYSCALLS */
+
 
 static __init struct syscall_metadata *
 find_syscall_meta(unsigned long syscall)
@@ -98,9 +96,9 @@ find_syscall_meta(unsigned long syscall)
 	return NULL;
 }
 
-static struct syscall_metadata *syscall_nr_to_meta(int nr)
+static struct syscall_metadata *trace_syscall_nr_to_meta(int nr)
 {
-	if (!syscalls_metadata || nr >= NR_syscalls || nr < 0)
+	if (!syscalls_metadata || nr >= FTRACE_SYSCALL_CNT || nr < 0)
 		return NULL;
 
 	return syscalls_metadata[nr];
@@ -110,7 +108,7 @@ const char *get_syscall_name(int syscall)
 {
 	struct syscall_metadata *entry;
 
-	entry = syscall_nr_to_meta(syscall);
+	entry = trace_syscall_nr_to_meta(syscall);
 	if (!entry)
 		return NULL;
 
@@ -130,7 +128,7 @@ print_syscall_enter(struct trace_iterator *iter, int flags,
 
 	trace = (typeof(trace))ent;
 	syscall = trace->nr;
-	entry = syscall_nr_to_meta(syscall);
+	entry = trace_syscall_nr_to_meta(syscall);
 
 	if (!entry)
 		goto end;
@@ -176,7 +174,7 @@ print_syscall_exit(struct trace_iterator *iter, int flags,
 
 	trace = (typeof(trace))ent;
 	syscall = trace->nr;
-	entry = syscall_nr_to_meta(syscall);
+	entry = trace_syscall_nr_to_meta(syscall);
 
 	if (!entry) {
 		trace_seq_putc(s, '\n');
@@ -321,6 +319,9 @@ static void ftrace_syscall_enter(void *data, struct pt_regs *regs, long id)
 	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
 		return;
 
+	if (trace_is_compat_syscall(regs))
+		syscall_nr += NR_syscalls;
+
 	/* Here we're inside tp handler's rcu_read_lock_sched (__DO_TRACE) */
 	trace_file = rcu_dereference_sched(tr->enter_syscall_files[syscall_nr]);
 	if (!trace_file)
@@ -329,7 +330,7 @@ static void ftrace_syscall_enter(void *data, struct pt_regs *regs, long id)
 	if (trace_trigger_soft_disabled(trace_file))
 		return;
 
-	sys_data = syscall_nr_to_meta(syscall_nr);
+	sys_data = trace_syscall_nr_to_meta(syscall_nr);
 	if (!sys_data)
 		return;
 
@@ -368,6 +369,9 @@ static void ftrace_syscall_exit(void *data, struct pt_regs *regs, long ret)
 	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
 		return;
 
+	if (trace_is_compat_syscall(regs))
+		syscall_nr += NR_syscalls;
+
 	/* Here we're inside tp handler's rcu_read_lock_sched (__DO_TRACE()) */
 	trace_file = rcu_dereference_sched(tr->exit_syscall_files[syscall_nr]);
 	if (!trace_file)
@@ -376,7 +380,7 @@ static void ftrace_syscall_exit(void *data, struct pt_regs *regs, long ret)
 	if (trace_trigger_soft_disabled(trace_file))
 		return;
 
-	sys_data = syscall_nr_to_meta(syscall_nr);
+	sys_data = trace_syscall_nr_to_meta(syscall_nr);
 	if (!sys_data)
 		return;
 
@@ -415,7 +419,7 @@ static int reg_event_syscall_enter(struct trace_event_file *file,
 			goto out_unlock;
 	}
 
-	for (num = 0; num < NR_syscalls; num++) {
+	for (num = 0; num < FTRACE_SYSCALL_CNT; num++) {
 		if (syscalls_metadata[num] &&
 		    arch_syscall_match_sym_name(syscalls_metadata[num]->name,
 				    name))
@@ -438,7 +442,7 @@ static void unreg_event_syscall_enter(struct trace_event_file *file,
 	name = ((const struct syscall_metadata *)call->data)->name;
 	mutex_lock(&syscall_trace_lock);
 	tr->sys_refcount_enter--;
-	for (num = 0; num < NR_syscalls; num++) {
+	for (num = 0; num < FTRACE_SYSCALL_CNT; num++) {
 		if (syscalls_metadata[num] &&
 		   arch_syscall_match_sym_name(syscalls_metadata[num]->name,
 				   name))
@@ -466,7 +470,7 @@ static int reg_event_syscall_exit(struct trace_event_file *file,
 			goto out_unlock;
 	}
 
-	for (num = 0; num < NR_syscalls; num++) {
+	for (num = 0; num < FTRACE_SYSCALL_CNT; num++) {
 		if (syscalls_metadata[num] &&
 		    arch_syscall_match_sym_name(syscalls_metadata[num]->name,
 				    name))
@@ -490,7 +494,7 @@ static void unreg_event_syscall_exit(struct trace_event_file *file,
 
 	mutex_lock(&syscall_trace_lock);
 	tr->sys_refcount_exit--;
-	for (num = 0; num < NR_syscalls; num++) {
+	for (num = 0; num < FTRACE_SYSCALL_CNT; num++) {
 		if (syscalls_metadata[num] &&
 		   arch_syscall_match_sym_name(syscalls_metadata[num]->name,
 				   name))
@@ -542,38 +546,47 @@ struct trace_event_class __refdata event_class_syscall_exit = {
 	.raw_init	= init_syscall_trace,
 };
 
-unsigned long __init __weak arch_syscall_addr(int nr)
+unsigned long __init __weak arch_syscall_addr(int nr, int compat)
 {
 	return (unsigned long)sys_call_table[nr];
 }
 
-void __init init_ftrace_syscalls(void)
+void __init init_ftrace_syscalls_meta(int compat)
 {
 	struct syscall_metadata *meta;
 	unsigned long addr;
 	int i;
 
-	syscalls_metadata = kcalloc(NR_syscalls, sizeof(*syscalls_metadata),
-				    GFP_KERNEL);
+	for (i = 0; i < NR_syscalls; i++) {
+		addr = arch_syscall_addr(i, compat);
+		meta = find_syscall_meta(addr);
+		if (!meta)
+			continue;
+
+		syscalls_metadata[compat * NR_syscalls + i] = meta;
+	}
+}
+
+void __init init_ftrace_syscalls(void)
+{
+	syscalls_metadata = kcalloc(FTRACE_SYSCALL_CNT,
+				    sizeof(*syscalls_metadata), GFP_KERNEL);
 	if (!syscalls_metadata) {
 		WARN_ON(1);
 		return;
 	}
 
-	for (i = 0; i < NR_syscalls; i++) {
-		addr = arch_syscall_addr(i);
-		meta = find_syscall_meta(addr);
-		if (!meta)
-			continue;
-
-		syscalls_metadata[i] = meta;
-	}
+	init_ftrace_syscalls_meta(0);
+#ifdef ARCH_COMPAT_SYSCALL_NUMBERS_OVERLAP
+	if (IS_ENABLED(CONFIG_COMPAT))
+		init_ftrace_syscalls_meta(1);
+#endif
 }
 
 #ifdef CONFIG_PERF_EVENTS
 
-static DECLARE_BITMAP(enabled_perf_enter_syscalls, NR_syscalls);
-static DECLARE_BITMAP(enabled_perf_exit_syscalls, NR_syscalls);
+static DECLARE_BITMAP(enabled_perf_enter_syscalls, FTRACE_SYSCALL_CNT);
+static DECLARE_BITMAP(enabled_perf_exit_syscalls, FTRACE_SYSCALL_CNT);
 static int sys_perf_refcount_enter;
 static int sys_perf_refcount_exit;
 
@@ -589,10 +602,14 @@ static void perf_syscall_enter(void *ignore, struct pt_regs *regs, long id)
 	syscall_nr = trace_get_syscall_nr(current, regs);
 	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
 		return;
+
+	if (trace_is_compat_syscall(regs))
+		syscall_nr += NR_syscalls;
+
 	if (!test_bit(syscall_nr, enabled_perf_enter_syscalls))
 		return;
 
-	sys_data = syscall_nr_to_meta(syscall_nr);
+	sys_data = trace_syscall_nr_to_meta(syscall_nr);
 	if (!sys_data)
 		return;
 
@@ -635,7 +652,7 @@ static int perf_sysenter_enable(struct trace_event_call *call)
 		}
 	}
 
-	for (num = 0; num < NR_syscalls; num++) {
+	for (num = 0; num < FTRACE_SYSCALL_CNT; num++) {
 		if (syscalls_metadata[num] &&
 		    arch_syscall_match_sym_name(syscalls_metadata[num]->name,
 				    name))
@@ -657,7 +674,7 @@ static void perf_sysenter_disable(struct trace_event_call *call)
 
 	mutex_lock(&syscall_trace_lock);
 	sys_perf_refcount_enter--;
-	for (num = 0; num < NR_syscalls; num++) {
+	for (num = 0; num < FTRACE_SYSCALL_CNT; num++) {
 		if (syscalls_metadata[num] &&
 		    arch_syscall_match_sym_name(syscalls_metadata[num]->name,
 				    name))
@@ -680,10 +697,14 @@ static void perf_syscall_exit(void *ignore, struct pt_regs *regs, long ret)
 	syscall_nr = trace_get_syscall_nr(current, regs);
 	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
 		return;
+
+	if (trace_is_compat_syscall(regs))
+		syscall_nr += NR_syscalls;
+
 	if (!test_bit(syscall_nr, enabled_perf_exit_syscalls))
 		return;
 
-	sys_data = syscall_nr_to_meta(syscall_nr);
+	sys_data = trace_syscall_nr_to_meta(syscall_nr);
 	if (!sys_data)
 		return;
 
@@ -723,7 +744,7 @@ static int perf_sysexit_enable(struct trace_event_call *call)
 		}
 	}
 
-	for (num = 0; num < NR_syscalls; num++) {
+	for (num = 0; num < FTRACE_SYSCALL_CNT; num++) {
 		if (syscalls_metadata[num] &&
 		    arch_syscall_match_sym_name(syscalls_metadata[num]->name,
 				    name))
@@ -745,7 +766,7 @@ static void perf_sysexit_disable(struct trace_event_call *call)
 
 	mutex_lock(&syscall_trace_lock);
 	sys_perf_refcount_exit--;
-	for (num = 0; num < NR_syscalls; num++) {
+	for (num = 0; num < FTRACE_SYSCALL_CNT; num++) {
 		if (syscalls_metadata[num] &&
 		    arch_syscall_match_sym_name(syscalls_metadata[num]->name,
 				    name))

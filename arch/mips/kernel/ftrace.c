@@ -412,7 +412,7 @@ out:
 #ifdef CONFIG_FTRACE_SYSCALLS
 
 #ifdef CONFIG_32BIT
-unsigned long __init arch_syscall_addr(int nr)
+unsigned long __init arch_syscall_addr(int nr, int compat)
 {
 	return (unsigned long)sys_call_table[nr - __NR_O32_Linux];
 }
@@ -420,7 +420,7 @@ unsigned long __init arch_syscall_addr(int nr)
 
 #ifdef CONFIG_64BIT
 
-unsigned long __init arch_syscall_addr(int nr)
+unsigned long __init arch_syscall_addr(int nr, int compat)
 {
 #ifdef CONFIG_MIPS32_N32
 	if (nr >= __NR_N32_Linux && nr <= __NR_N32_Linux + __NR_N32_Linux_syscalls)

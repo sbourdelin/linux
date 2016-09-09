@@ -28,6 +28,7 @@
 #include <asm/kprobes.h>
 #include <asm/ftrace.h>
 #include <asm/nops.h>
+#include <asm/syscall.h>
 
 #ifdef CONFIG_DYNAMIC_FTRACE
 
@@ -1035,3 +1036,16 @@ void prepare_ftrace_return(unsigned long self_addr, unsigned long *parent,
 	}
 }
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+
+#ifdef CONFIG_FTRACE_SYSCALLS
+
+unsigned long arch_syscall_addr(int nr, int compat)
+{
+#if defined(CONFIG_X86_64) && defined(CONFIG_IA32_EMULATION)
+	if (compat)
+		return (unsigned long)ia32_sys_call_table[nr];
+#endif
+	return (unsigned long)sys_call_table[nr];
+}
+
+#endif /* CONFIG_FTRACE_SYSCALLS */

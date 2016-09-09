@@ -938,7 +938,7 @@ static inline void  disable_trace_on_warning(void) { }
 
 #ifdef CONFIG_FTRACE_SYSCALLS
 
-unsigned long arch_syscall_addr(int nr);
+unsigned long arch_syscall_addr(int nr, int compat);
 
 #endif /* CONFIG_FTRACE_SYSCALLS */
 

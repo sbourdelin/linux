@@ -47,15 +47,7 @@ int ftrace_int3_handler(struct pt_regs *regs);
 #if defined(CONFIG_FTRACE_SYSCALLS) && defined(CONFIG_IA32_EMULATION)
 #include <asm/compat.h>
 
-/*
- * Because ia32 syscalls do not map to x86_64 syscall numbers
- * this screws up the trace output when tracing a ia32 task.
- * Instead of reporting bogus syscalls, just do not trace them.
- *
- * If the user really wants these, then they should use the
- * raw syscall tracepoints with filtering.
- */
-#define ARCH_TRACE_IGNORE_COMPAT_SYSCALLS 1
+#define ARCH_COMPAT_SYSCALL_NUMBERS_OVERLAP 1
 static inline bool arch_trace_is_compat_syscall(struct pt_regs *regs)
 {
 	if (in_compat_syscall())
