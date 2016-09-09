@@ -1738,10 +1738,18 @@ static int e1000_setup_rx_resources(struct e1000_adapter *adapter,
 	struct pci_dev *pdev = adapter->pdev;
 	int size, desc_len;
 
+	size = sizeof(struct e1000_rx_buffer_bundle) *
+			E1000_XDP_XMIT_BUNDLE_MAX;
+	rxdr->xdp_buffer = vzalloc(size);
+	if (!rxdr->xdp_buffer)
+		return -ENOMEM;
+
 	size = sizeof(struct e1000_rx_buffer) * rxdr->count;
 	rxdr->buffer_info = vzalloc(size);
-	if (!rxdr->buffer_info)
+	if (!rxdr->buffer_info) {
+		vfree(rxdr->xdp_buffer);
 		return -ENOMEM;
+	}
 
 	desc_len = sizeof(struct e1000_rx_desc);
 
@@ -1754,6 +1762,7 @@ static int e1000_setup_rx_resources(struct e1000_adapter *adapter,
 					GFP_KERNEL);
 	if (!rxdr->desc) {
 setup_rx_desc_die:
+		vfree(rxdr->xdp_buffer);
 		vfree(rxdr->buffer_info);
 		return -ENOMEM;
 	}
@@ -2086,6 +2095,9 @@ static void e1000_free_rx_resources(struct e1000_adapter *adapter,
 	struct pci_dev *pdev = adapter->pdev;
 
 	e1000_clean_rx_ring(adapter, rx_ring);
+
+	vfree(rx_ring->xdp_buffer);
+	rx_ring->xdp_buffer = NULL;
 
 	vfree(rx_ring->buffer_info);
 	rx_ring->buffer_info = NULL;
@@ -3369,33 +3381,52 @@ static void e1000_tx_map_rxpage(struct e1000_tx_ring *tx_ring,
 }
 
 static void e1000_xmit_raw_frame(struct e1000_rx_buffer *rx_buffer_info,
-				 unsigned int len,
-				 struct net_device *netdev,
-				 struct e1000_adapter *adapter)
+				 __u32 len,
+				 struct e1000_adapter *adapter,
+				 struct e1000_tx_ring *tx_ring)
 {
-	struct netdev_queue *txq = netdev_get_tx_queue(netdev, 0);
-	struct e1000_hw *hw = &adapter->hw;
-	struct e1000_tx_ring *tx_ring;
-
 	if (len > E1000_MAX_DATA_PER_TXD)
 		return;
+
+	if (E1000_DESC_UNUSED(tx_ring) < 2)
+		return;
+
+	e1000_tx_map_rxpage(tx_ring, rx_buffer_info, len);
+	e1000_tx_queue(adapter, tx_ring, 0/*tx_flags*/, 1);
+}
+
+static void e1000_xdp_xmit_bundle(struct e1000_rx_buffer_bundle *buffer_info,
+				  struct net_device *netdev,
+				  struct e1000_adapter *adapter)
+{
+	struct netdev_queue *txq = netdev_get_tx_queue(netdev, 0);
+	struct e1000_tx_ring *tx_ring = adapter->tx_ring;
+	struct e1000_hw *hw = &adapter->hw;
+	int i = 0;
 
 	/* e1000 only support a single txq at the moment so the queue is being
 	 * shared with stack. To support this requires locking to ensure the
 	 * stack and XDP are not running at the same time. Devices with
 	 * multiple queues should allocate a separate queue space.
+	 *
+	 * To amortize the locking cost e1000 bundles the xmits and sends as
+	 * many as possible until either running out of descriptors or failing.
 	 */
 	HARD_TX_LOCK(netdev, txq, smp_processor_id());
 
-	tx_ring = adapter->tx_ring;
-
-	if (E1000_DESC_UNUSED(tx_ring) < 2) {
-		HARD_TX_UNLOCK(netdev, txq);
-		return;
+	for (; i < E1000_XDP_XMIT_BUNDLE_MAX && buffer_info[i].buffer; i++) {
+		e1000_xmit_raw_frame(buffer_info[i].buffer,
+				     buffer_info[i].length,
+				     adapter, tx_ring);
+		buffer_info[i].buffer->rxbuf.page = NULL;
+		buffer_info[i].buffer = NULL;
+		buffer_info[i].length = 0;
+		i++;
 	}
 
-	e1000_tx_map_rxpage(tx_ring, rx_buffer_info, len);
-	e1000_tx_queue(adapter, tx_ring, 0/*tx_flags*/, 1);
+	/* kick hardware to send bundle and return control back to the stack */
+	writel(tx_ring->next_to_use, hw->hw_addr + tx_ring->tdt);
+	mmiowb();
 
 	writel(tx_ring->next_to_use, hw->hw_addr + tx_ring->tdt);
 	mmiowb();
@@ -4281,9 +4312,10 @@ static bool e1000_clean_jumbo_rx_irq(struct e1000_adapter *adapter,
 	struct bpf_prog *prog;
 	u32 length;
 	unsigned int i;
-	int cleaned_count = 0;
+	int cleaned_count = 0, xdp_xmit = 0;
 	bool cleaned = false;
 	unsigned int total_rx_bytes = 0, total_rx_packets = 0;
+	struct e1000_rx_buffer_bundle *xdp_bundle = rx_ring->xdp_buffer;
 
 	rcu_read_lock(); /* rcu lock needed here to protect xdp programs */
 	prog = READ_ONCE(adapter->prog);
@@ -4338,13 +4370,13 @@ static bool e1000_clean_jumbo_rx_irq(struct e1000_adapter *adapter,
 			case XDP_PASS:
 				break;
 			case XDP_TX:
+				xdp_bundle[xdp_xmit].buffer = buffer_info;
+				xdp_bundle[xdp_xmit].length = length;
 				dma_sync_single_for_device(&pdev->dev,
 							   dma,
 							   length,
 							   DMA_TO_DEVICE);
-				e1000_xmit_raw_frame(buffer_info, length,
-						     netdev, adapter);
-				buffer_info->rxbuf.page = NULL;
+				xdp_xmit++;
 			case XDP_DROP:
 			default:
 				/* re-use mapped page. keep buffer_info->dma
@@ -4486,8 +4518,14 @@ next_desc:
 
 		/* return some buffers to hardware, one at a time is too slow */
 		if (unlikely(cleaned_count >= E1000_RX_BUFFER_WRITE)) {
+			if (xdp_xmit)
+				e1000_xdp_xmit_bundle(xdp_bundle,
+						      netdev,
+						      adapter);
+
 			adapter->alloc_rx_buf(adapter, rx_ring, cleaned_count);
 			cleaned_count = 0;
+			xdp_xmit = 0;
 		}
 
 		/* use prefetched values */
@@ -4498,8 +4536,11 @@ next_desc:
 	rx_ring->next_to_clean = i;
 
 	cleaned_count = E1000_DESC_UNUSED(rx_ring);
-	if (cleaned_count)
+	if (cleaned_count) {
+		if (xdp_xmit)
+			e1000_xdp_xmit_bundle(xdp_bundle, netdev, adapter);
 		adapter->alloc_rx_buf(adapter, rx_ring, cleaned_count);
+	}
 
 	adapter->total_rx_packets += total_rx_packets;
 	adapter->total_rx_bytes += total_rx_bytes;
