@@ -1114,7 +1114,7 @@ static int slpc_enable_disable_get(struct drm_device *dev, u64 *val,
 	return ret;
 }
 
-static int slpc_enable_disable_set(struct drm_device *dev, u64 val,
+int slpc_enable_disable_set(struct drm_device *dev, u64 val,
 				   enum slpc_param_id enable_id,
 				   enum slpc_param_id disable_id)
 {
