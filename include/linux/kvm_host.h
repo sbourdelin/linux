@@ -1087,6 +1087,8 @@ static inline void kvm_make_request(int req, struct kvm_vcpu *vcpu)
 
 static inline bool kvm_check_request(int req, struct kvm_vcpu *vcpu)
 {
+	if (likely(!vcpu->requests))
+		return false;
 	if (test_bit(req, &vcpu->requests)) {
 		clear_bit(req, &vcpu->requests);
 
