@@ -1925,45 +1925,23 @@ static int shmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 }
 
 unsigned long shmem_get_unmapped_area(struct file *file,
-				      unsigned long uaddr, unsigned long len,
+				      unsigned long addr, unsigned long len,
 				      unsigned long pgoff, unsigned long flags)
 {
-	unsigned long (*get_area)(struct file *,
-		unsigned long, unsigned long, unsigned long, unsigned long);
-	unsigned long addr;
-	unsigned long offset;
-	unsigned long inflated_len;
-	unsigned long inflated_addr;
-	unsigned long inflated_offset;
-
-	if (len > TASK_SIZE)
-		return -ENOMEM;
-
-	get_area = current->mm->get_unmapped_area;
-	addr = get_area(file, uaddr, len, pgoff, flags);
+	loff_t off = (loff_t)pgoff << PAGE_SHIFT;
 
 	if (!IS_ENABLED(CONFIG_TRANSPARENT_HUGE_PAGECACHE))
-		return addr;
-	if (IS_ERR_VALUE(addr))
-		return addr;
-	if (addr & ~PAGE_MASK)
-		return addr;
-	if (addr > TASK_SIZE - len)
-		return addr;
-
+		goto out;
 	if (shmem_huge == SHMEM_HUGE_DENY)
-		return addr;
-	if (len < HPAGE_PMD_SIZE)
-		return addr;
-	if (flags & MAP_FIXED)
-		return addr;
+		goto out;
+
 	/*
 	 * Our priority is to support MAP_SHARED mapped hugely;
 	 * and support MAP_PRIVATE mapped hugely too, until it is COWed.
 	 * But if caller specified an address hint, respect that as before.
 	 */
-	if (uaddr)
-		return addr;
+	if (addr)
+		goto out;
 
 	if (shmem_huge != SHMEM_HUGE_FORCE) {
 		struct super_block *sb;
@@ -1977,39 +1955,19 @@ unsigned long shmem_get_unmapped_area(struct file *file,
 			 * for "/dev/zero", to create a shared anonymous object.
 			 */
 			if (IS_ERR(shm_mnt))
-				return addr;
+				goto out;
 			sb = shm_mnt->mnt_sb;
 		}
 		if (SHMEM_SB(sb)->huge == SHMEM_HUGE_NEVER)
-			return addr;
+			goto out;
 	}
 
-	offset = (pgoff << PAGE_SHIFT) & (HPAGE_PMD_SIZE-1);
-	if (offset && offset + len < 2 * HPAGE_PMD_SIZE)
-		return addr;
-	if ((addr & (HPAGE_PMD_SIZE-1)) == offset)
+	addr = __thp_get_unmapped_area(file, len, off, flags, HPAGE_PMD_SIZE);
+	if (addr)
 		return addr;
 
-	inflated_len = len + HPAGE_PMD_SIZE - PAGE_SIZE;
-	if (inflated_len > TASK_SIZE)
-		return addr;
-	if (inflated_len < len)
-		return addr;
-
-	inflated_addr = get_area(NULL, 0, inflated_len, 0, flags);
-	if (IS_ERR_VALUE(inflated_addr))
-		return addr;
-	if (inflated_addr & ~PAGE_MASK)
-		return addr;
-
-	inflated_offset = inflated_addr & (HPAGE_PMD_SIZE-1);
-	inflated_addr += offset - inflated_offset;
-	if (inflated_offset > offset)
-		inflated_addr += HPAGE_PMD_SIZE;
-
-	if (inflated_addr > TASK_SIZE - len)
-		return addr;
-	return inflated_addr;
+ out:
+	return current->mm->get_unmapped_area(file, addr, len, pgoff, flags);
 }
 
 #ifdef CONFIG_NUMA

@@ -90,6 +90,9 @@ extern unsigned long transparent_hugepage_flags;
 extern unsigned long thp_get_unmapped_area(struct file *filp,
 		unsigned long addr, unsigned long len, unsigned long pgoff,
 		unsigned long flags);
+extern unsigned long __thp_get_unmapped_area(struct file *filp,
+		unsigned long len, loff_t off, unsigned long flags,
+		unsigned long size);
 
 extern void prep_transhuge_page(struct page *page);
 extern void free_transhuge_page(struct page *page);
@@ -175,6 +178,13 @@ static inline void prep_transhuge_page(struct page *page) {}
 #define transparent_hugepage_flags 0UL
 
 #define thp_get_unmapped_area	NULL
+
+static inline unsigned long __thp_get_unmapped_area(struct file *filp,
+		unsigned long len, loff_t off, unsigned long flags,
+		unsigned long size)
+{
+	return 0;
+}
 
 static inline int
 split_huge_page_to_list(struct page *page, struct list_head *list)
