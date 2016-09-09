@@ -643,7 +643,7 @@ static int count_mm_mlocked_page_nr(struct mm_struct *mm,
 	for (; vma ; vma = vma->vm_next) {
 		if (start + len <=  vma->vm_start)
 			break;
-		if (vma->vm_flags && VM_LOCKED) {
+		if (vma->vm_flags & VM_LOCKED) {
 			if (start > vma->vm_start)
 				count -= (start - vma->vm_start);
 			if (start + len < vma->vm_end) {
