@@ -1083,6 +1083,9 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 
 	intel_runtime_pm_get(dev_priv);
 
+	if (intel_slpc_active(dev_priv))
+		seq_puts(m, "SLPC Active\n");
+
 	if (IS_GEN5(dev_priv)) {
 		u16 rgvswctl = I915_READ16(MEMSWCTL);
 		u16 rgvstat = I915_READ16(MEMSTAT_ILK);
@@ -1250,15 +1253,21 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 		seq_printf(m, "Max overclocked frequency: %dMHz\n",
 			   intel_gpu_freq(dev_priv, dev_priv->rps.max_freq));
 
-		seq_printf(m, "Current freq: %d MHz\n",
-			   intel_gpu_freq(dev_priv, dev_priv->rps.cur_freq));
+		if (!intel_slpc_active(dev_priv)) {
+			seq_printf(m, "Current freq: %d MHz\n",
+				   intel_gpu_freq(dev_priv,
+						  dev_priv->rps.cur_freq));
+			seq_printf(m, "Idle freq: %d MHz\n",
+				   intel_gpu_freq(dev_priv,
+						  dev_priv->rps.idle_freq));
+			seq_printf(m, "Boost freq: %d MHz\n",
+				   intel_gpu_freq(dev_priv,
+						  dev_priv->rps.boost_freq));
+		}
+
 		seq_printf(m, "Actual freq: %d MHz\n", cagf);
-		seq_printf(m, "Idle freq: %d MHz\n",
-			   intel_gpu_freq(dev_priv, dev_priv->rps.idle_freq));
 		seq_printf(m, "Min freq: %d MHz\n",
 			   intel_gpu_freq(dev_priv, dev_priv->rps.min_freq));
-		seq_printf(m, "Boost freq: %d MHz\n",
-			   intel_gpu_freq(dev_priv, dev_priv->rps.boost_freq));
 		seq_printf(m, "Max freq: %d MHz\n",
 			   intel_gpu_freq(dev_priv, dev_priv->rps.max_freq));
 		seq_printf(m,
@@ -2314,6 +2323,9 @@ static int i915_rps_boost_info(struct seq_file *m, void *data)
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
 	struct drm_device *dev = &dev_priv->drm;
 	struct drm_file *file;
+
+	if (intel_slpc_active(dev_priv))
+		return -ENODEV;
 
 	seq_printf(m, "RPS enabled? %d\n", dev_priv->rps.enabled);
 	seq_printf(m, "GPU busy? %s [%x]\n",
