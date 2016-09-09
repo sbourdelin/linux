@@ -189,6 +189,7 @@ struct slpc_shared_data {
 struct intel_slpc {
 	struct i915_vma *vma;
 	bool enabled;
+	bool first_enable;
 };
 
 /* intel_slpc.c */
