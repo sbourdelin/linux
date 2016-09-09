@@ -35,8 +35,7 @@ struct inet_diag_handler {
 struct inet_connection_sock;
 int inet_sk_diag_fill(struct sock *sk, struct inet_connection_sock *icsk,
 		      struct sk_buff *skb, const struct inet_diag_req_v2 *req,
-		      struct user_namespace *user_ns,
-		      u32 pid, u32 seq, u16 nlmsg_flags,
+		      const struct sk_buff *in_skb, u16 nlmsg_flags,
 		      const struct nlmsghdr *unlh, bool net_admin);
 void inet_diag_dump_icsk(struct inet_hashinfo *h, struct sk_buff *skb,
 			 struct netlink_callback *cb,
@@ -56,7 +55,8 @@ void inet_diag_msg_common_fill(struct inet_diag_msg *r, struct sock *sk);
 
 int inet_diag_msg_attrs_fill(struct sock *sk, struct sk_buff *skb,
 			     struct inet_diag_msg *r, int ext,
-			     struct user_namespace *user_ns, bool net_admin);
+			     const struct sk_buff *in_skb,
+			     bool net_admin);
 
 extern int  inet_diag_register(const struct inet_diag_handler *handler);
 extern void inet_diag_unregister(const struct inet_diag_handler *handler);
