@@ -34,8 +34,12 @@ static void *tca6416_platform_data(void *info)
 	gpio_base = get_gpio_by_name(base_pin_name);
 	intr = get_gpio_by_name(intr_pin_name);
 
-	if (gpio_base < 0)
+	if (gpio_base < 0) {
+		pr_warn("%s: falling back to dynamic gpio allocation\n",
+			__func__);
 		return NULL;
+	}
+
 	tca6416.gpio_base = gpio_base;
 	if (intr >= 0) {
 		i2c_info->irq = intr + INTEL_MID_IRQ_OFFSET;

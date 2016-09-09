@@ -42,8 +42,11 @@ void __init ipc_device_handler(struct sfi_device_table_entry *pentry,
 	 * On Medfield the platform device creation is handled by the MSIC
 	 * MFD driver so we don't need to do it here.
 	 */
-	if (intel_mid_has_msic())
+	if (intel_mid_has_msic()) {
+		pr_err("%s: device %s will be handled by MSIC mfd driver\n",
+		       __func__, pentry->name);
 		return;
+	}
 
 	pdev = platform_device_alloc(pentry->name, 0);
 	if (pdev == NULL) {

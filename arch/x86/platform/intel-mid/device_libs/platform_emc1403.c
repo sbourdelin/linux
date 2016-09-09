@@ -15,17 +15,27 @@
 #include <linux/i2c.h>
 #include <asm/intel-mid.h>
 
+#define EMC1403_THERMAL_INT		"thermal_int"
+#define EMC1403_THERMAL_ALERT_INT	"thermal_alert"
+
 static void __init *emc1403_platform_data(void *info)
 {
 	static short intr2nd_pdata;
 	struct i2c_board_info *i2c_info = info;
-	int intr = get_gpio_by_name("thermal_int");
-	int intr2nd = get_gpio_by_name("thermal_alert");
+	int intr = get_gpio_by_name(EMC1403_THERMAL_INT);
+	int intr2nd = get_gpio_by_name(EMC1403_THERMAL_ALERT_INT);
 
-	if (intr < 0)
+	if (intr < 0) {
+		pr_err("%s: Can't find %s GPIO interrupt\n", __func__,
+		       EMC1403_THERMAL_INT);
 		return NULL;
-	if (intr2nd < 0)
+	}
+
+	if (intr2nd < 0) {
+		pr_err("%s: Can't find %s GPIO interrupt\n", __func__,
+		       EMC1403_THERMAL_ALERT_INT);
 		return NULL;
+	}
 
 	i2c_info->irq = intr + INTEL_MID_IRQ_OFFSET;
 	intr2nd_pdata = intr2nd + INTEL_MID_IRQ_OFFSET;

@@ -41,8 +41,11 @@ static void __init *pcal9555a_platform_data(void *info)
 	intr = get_gpio_by_name(intr_pin_name);
 
 	/* Check if the SFI record valid */
-	if (gpio_base == -1)
+	if (gpio_base == -1) {
+		pr_warn("%s: falling back to dynamic gpio allocation\n",
+			__func__);
 		return NULL;
+	}
 
 	if (nr >= PCAL9555A_NUM) {
 		pr_err("%s: Too many instances, only %d supported\n", __func__,
