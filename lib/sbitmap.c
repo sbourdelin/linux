@@ -202,6 +202,12 @@ int sbitmap_queue_init_node(struct sbitmap_queue *sbq, unsigned int depth,
 	if (ret)
 		return ret;
 
+	sbq->alloc_hint = alloc_percpu_gfp(unsigned int, flags);
+	if (!sbq->alloc_hint) {
+		sbitmap_free(&sbq->sb);
+		return -ENOMEM;
+	}
+
 	sbq->wake_batch = SBQ_WAKE_BATCH;
 	if (sbq->wake_batch > depth / SBQ_WAIT_QUEUES)
 		sbq->wake_batch = max(1U, depth / SBQ_WAIT_QUEUES);
@@ -210,6 +216,7 @@ int sbitmap_queue_init_node(struct sbitmap_queue *sbq, unsigned int depth,
 
 	sbq->ws = kzalloc_node(SBQ_WAIT_QUEUES * sizeof(*sbq->ws), flags, node);
 	if (!sbq->ws) {
+		free_percpu(sbq->alloc_hint);
 		sbitmap_free(&sbq->sb);
 		return -ENOMEM;
 	}
@@ -254,7 +261,8 @@ static struct sbq_wait_state *sbq_wake_ptr(struct sbitmap_queue *sbq)
 	return NULL;
 }
 
-void sbitmap_queue_clear(struct sbitmap_queue *sbq, unsigned int nr)
+void sbitmap_queue_clear(struct sbitmap_queue *sbq, unsigned int nr,
+			 bool round_robin, unsigned int cpu)
 {
 	struct sbq_wait_state *ws;
 	int wait_cnt;
@@ -266,7 +274,7 @@ void sbitmap_queue_clear(struct sbitmap_queue *sbq, unsigned int nr)
 
 	ws = sbq_wake_ptr(sbq);
 	if (!ws)
-		return;
+		goto update_cache;
 
 	wait_cnt = atomic_dec_return(&ws->wait_cnt);
 	if (unlikely(wait_cnt < 0))
@@ -276,6 +284,10 @@ void sbitmap_queue_clear(struct sbitmap_queue *sbq, unsigned int nr)
 		sbq_index_atomic_inc(&sbq->wake_index);
 		wake_up(&ws->wait);
 	}
+
+update_cache:
+	if (likely(!round_robin))
+		*per_cpu_ptr(sbq->alloc_hint, cpu) = nr;
 }
 EXPORT_SYMBOL_GPL(sbitmap_queue_clear);
 
