@@ -1527,7 +1527,7 @@ However, as I learned from Matt Mackall's
 <a href="http://elinux.org/Linux_Tiny-FAQ">bloatwatch</a>
 efforts, memory footprint is critically important on single-CPU systems with
 non-preemptible (<tt>CONFIG_PREEMPT=n</tt>) kernels, and thus
-<a href="https://lkml.kernel.org/g/20090113221724.GA15307@linux.vnet.ibm.com">tiny RCU</a>
+<a href="http://lkml.org/lkml/2009/1/14/449">tiny RCU</a>
 was born.
 Josh Triplett has since taken over the small-memory banner with his
 <a href="https://tiny.wiki.kernel.org/">Linux kernel tinification</a>
@@ -1975,7 +1975,7 @@ guard against mishaps and misuse:
 	and cleaned up with <tt>destroy_rcu_head()</tt>.
 	Mathieu Desnoyers made me aware of this requirement, and also
 	supplied the needed
-	<a href="https://lkml.kernel.org/g/20100319013024.GA28456@Krystal">patch</a>.
+	<a href="https://lkml.org/lkml/2010/3/18/417">patch</a>.
 <li>	An infinite loop in an RCU read-side critical section will
 	eventually trigger an RCU CPU stall warning splat, with
 	the duration of &ldquo;eventually&rdquo; being controlled by the
@@ -2088,7 +2088,7 @@ be hidden behind a <tt>CONFIG_RCU_EXPERT</tt> <tt>Kconfig</tt> option.
 <p>
 This all should be quite obvious, but the fact remains that
 Linus Torvalds recently had to
-<a href="https://lkml.kernel.org/g/CA+55aFy4wcCwaL4okTs8wXhGZ5h-ibecy_Meg9C4MNQrUnwMcg@mail.gmail.com">remind</a>
+<a href="https://lkml.org/lkml/2015/4/14/616">remind</a>
 me of this requirement.
 
 <h3><a name="Firmware Interface">Firmware Interface</a></h3>
@@ -2229,7 +2229,7 @@ Thankfully, RCU update-side primitives, including
 The name notwithstanding, some Linux-kernel architectures
 can have nested NMIs, which RCU must handle correctly.
 Andy Lutomirski
-<a href="https://lkml.kernel.org/g/CALCETrXLq1y7e_dKFPgou-FKHB6Pu-r8+t-6Ds+8=va7anBWDA@mail.gmail.com">surprised me</a>
+<a href="https://lkml.org/lkml/2014/11/21/642">surprised me</a>
 with this requirement;
 he also kindly surprised me with
 <a href="https://lkml.kernel.org/g/CALCETrXSY9JpW3uE6H8WYk81sg56qasA2aqmjMPsq5dOtzso=g@mail.gmail.com">an algorithm</a>
