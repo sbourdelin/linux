@@ -150,6 +150,7 @@ struct e1000_adapter;
  */
 struct e1000_tx_buffer {
 	struct sk_buff *skb;
+	struct page *page;
 	dma_addr_t dma;
 	unsigned long time_stamp;
 	u16 length;
@@ -279,6 +280,7 @@ struct e1000_adapter {
 			     struct e1000_rx_ring *rx_ring,
 			     int cleaned_count);
 	struct e1000_rx_ring *rx_ring;      /* One per active queue */
+	struct bpf_prog *prog;
 	struct napi_struct napi;
 
 	int num_tx_queues;
