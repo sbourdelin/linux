@@ -1040,6 +1040,13 @@ static int __dwc3_gadget_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req)
 	struct dwc3		*dwc = dep->dwc;
 	int			ret;
 
+	if (!dwc->pullups_connected) {
+		dwc3_trace(trace_dwc3_gadget,
+			"queuing request %p to %s when gadget is disconnected",
+			&req->request, dep->endpoint.name);
+		return -ESHUTDOWN;
+	}
+
 	if (!dep->endpoint.desc) {
 		dwc3_trace(trace_dwc3_gadget,
 				"trying to queue request %p to disabled %s",
@@ -1984,13 +1991,12 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 		if (ret)
 			break;
 	}
-
 	/*
 	 * Our endpoint might get disabled by another thread during
 	 * dwc3_gadget_giveback(). If that happens, we're just gonna return 1
 	 * early on so DWC3_EP_BUSY flag gets cleared
 	 */
-	if (!dep->endpoint.desc)
+	if (!dep->endpoint.desc || !dwc->pullups_connected)
 		return 1;
 
 	if (usb_endpoint_xfer_isoc(dep->endpoint.desc) &&
@@ -2064,7 +2070,7 @@ static void dwc3_endpoint_transfer_complete(struct dwc3 *dwc,
 	 * dwc3_gadget_giveback(). If that happens, we're just gonna return 1
 	 * early on so DWC3_EP_BUSY flag gets cleared
 	 */
-	if (!dep->endpoint.desc)
+	if (!dep->endpoint.desc || !dwc->pullups_connected)
 		return;
 
 	if (!usb_endpoint_xfer_isoc(dep->endpoint.desc)) {
