@@ -65,6 +65,108 @@ static void host2guc_slpc_shutdown(struct drm_i915_private *dev_priv)
 	host2guc_slpc(dev_priv, data, 4);
 }
 
+static void host2guc_slpc_set_param(struct drm_i915_private *dev_priv,
+				    enum slpc_param_id id, u32 value)
+{
+	u32 data[4];
+
+	data[0] = HOST2GUC_ACTION_SLPC_REQUEST;
+	data[1] = SLPC_EVENT(SLPC_EVENT_PARAMETER_SET, 2);
+	data[2] = (u32) id;
+	data[3] = value;
+
+	host2guc_slpc(dev_priv, data, 4);
+}
+
+static void host2guc_slpc_unset_param(struct drm_i915_private *dev_priv,
+				      enum slpc_param_id id)
+{
+	u32 data[3];
+
+	data[0] = HOST2GUC_ACTION_SLPC_REQUEST;
+	data[1] = SLPC_EVENT(SLPC_EVENT_PARAMETER_UNSET, 1);
+	data[2] = (u32) id;
+
+	host2guc_slpc(dev_priv, data, 3);
+}
+
+void intel_slpc_unset_param(struct drm_i915_private *dev_priv,
+			    enum slpc_param_id id)
+{
+	struct drm_i915_gem_object *obj;
+	struct page *page;
+	struct slpc_shared_data *data = NULL;
+
+	obj = dev_priv->guc.slpc.vma->obj;
+	if (obj) {
+		page = i915_gem_object_get_page(obj, 0);
+		if (page)
+			data = kmap_atomic(page);
+	}
+
+	if (data) {
+		data->override_parameters_set_bits[id >> 5]
+							&= (~(1 << (id % 32)));
+		data->override_parameters_values[id] = 0;
+		kunmap_atomic(data);
+
+		host2guc_slpc_unset_param(dev_priv, id);
+	}
+}
+
+void intel_slpc_set_param(struct drm_i915_private *dev_priv,
+			  enum slpc_param_id id,
+			  u32 value)
+{
+	struct drm_i915_gem_object *obj;
+	struct page *page;
+	struct slpc_shared_data *data = NULL;
+
+	obj = dev_priv->guc.slpc.vma->obj;
+	if (obj) {
+		page = i915_gem_object_get_page(obj, 0);
+		if (page)
+			data = kmap_atomic(page);
+	}
+
+	if (data) {
+		data->override_parameters_set_bits[id >> 5]
+							|= (1 << (id % 32));
+		data->override_parameters_values[id] = value;
+		kunmap_atomic(data);
+
+		host2guc_slpc_set_param(dev_priv, id, value);
+	}
+}
+
+void intel_slpc_get_param(struct drm_i915_private *dev_priv,
+			  enum slpc_param_id id,
+			  int *overriding, u32 *value)
+{
+	struct drm_i915_gem_object *obj;
+	struct page *page;
+	struct slpc_shared_data *data = NULL;
+	u32 bits;
+
+	obj = dev_priv->guc.slpc.vma->obj;
+	if (obj) {
+		page = i915_gem_object_get_page(obj, 0);
+		if (page)
+			data = kmap_atomic(page);
+	}
+
+	if (data) {
+		if (overriding) {
+			bits = data->override_parameters_set_bits[id >> 5];
+			*overriding = (0 != (bits & (1 << (id % 32))));
+		}
+		if (value)
+			*value = data->override_parameters_values[id];
+
+		kunmap_atomic(data);
+	}
+}
+
 static unsigned int slpc_get_platform_sku(struct drm_i915_private *dev_priv)
 {
 	enum slpc_platform_sku platform_sku;

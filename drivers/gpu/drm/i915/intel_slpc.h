@@ -64,6 +64,29 @@ enum slpc_event_id {
 #define SLPC_EVENT(id, argc) ((u32) (id) << 8 | (argc))
 #define SLPC_EVENT_STATUS_MASK	0xFF
 
+enum slpc_param_id {
+	SLPC_PARAM_TASK_ENABLE_GTPERF = 0,
+	SLPC_PARAM_TASK_DISABLE_GTPERF = 1,
+	SLPC_PARAM_TASK_ENABLE_BALANCER = 2,
+	SLPC_PARAM_TASK_DISABLE_BALANCER = 3,
+	SLPC_PARAM_TASK_ENABLE_DCC = 4,
+	SLPC_PARAM_TASK_DISABLE_DCC = 5,
+	SLPC_PARAM_GLOBAL_MIN_GT_UNSLICE_FREQ_MHZ = 6,
+	SLPC_PARAM_GLOBAL_MAX_GT_UNSLICE_FREQ_MHZ = 7,
+	SLPC_PARAM_GLOBAL_MIN_GT_SLICE_FREQ_MHZ = 8,
+	SLPC_PARAM_GLOBAL_MAX_GT_SLICE_FREQ_MHZ = 9,
+	SLPC_PARAM_GTPERF_THRESHOLD_MAX_FPS = 10,
+	SLPC_PARAM_GLOBAL_DISABLE_GT_FREQ_MANAGEMENT = 11,
+	SLPC_PARAM_GTPERF_ENABLE_FRAMERATE_STALLING = 12,
+	SLPC_PARAM_GLOBAL_DISABLE_RC6_MODE_CHANGE = 13,
+	SLPC_PARAM_GLOBAL_OC_UNSLICE_FREQ_MHZ = 14,
+	SLPC_PARAM_GLOBAL_OC_SLICE_FREQ_MHZ = 15,
+	SLPC_PARAM_GLOBAL_ENABLE_IA_GT_BALANCING = 16,
+	SLPC_PARAM_GLOBAL_ENABLE_ADAPTIVE_BURST_TURBO = 17,
+	SLPC_PARAM_GLOBAL_ENABLE_EVAL_MODE = 18,
+	SLPC_PARAM_GLOBAL_ENABLE_BALANCER_IN_NON_GAMING_MODE = 19,
+};
+
 enum slpc_global_state {
 	SLPC_GLOBAL_STATE_NOT_RUNNING = 0,
 	SLPC_GLOBAL_STATE_INITIALIZING = 1,
@@ -169,5 +192,12 @@ void intel_slpc_cleanup(struct drm_i915_private *dev_priv);
 void intel_slpc_suspend(struct drm_i915_private *dev_priv);
 void intel_slpc_disable(struct drm_i915_private *dev_priv);
 void intel_slpc_enable(struct drm_i915_private *dev_priv);
-
+void intel_slpc_unset_param(struct drm_i915_private *dev_priv,
+			    enum slpc_param_id id);
+void intel_slpc_set_param(struct drm_i915_private *dev_priv,
+			  enum slpc_param_id id,
+			  u32 value);
+void intel_slpc_get_param(struct drm_i915_private *dev_priv,
+			  enum slpc_param_id id,
+			  int *overriding, u32 *value);
 #endif
