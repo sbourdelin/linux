@@ -138,15 +138,34 @@ static void dwc_desc_put(struct dw_dma_chan *dwc, struct dw_desc *desc)
 	dwc->descs_allocated--;
 }
 
-static void dwc_initialize(struct dw_dma_chan *dwc)
+static void dwc_initialize_chan_idma32(struct dw_dma_chan *dwc)
 {
-	struct dw_dma *dw = to_dw_dma(dwc->chan.device);
+	u32 cfghi = 0;
+	u32 cfglo = 0;
+
+	/* Enforce FIFO drain when channel is suspended */
+	cfglo |= IDMA32C_CFGL_CH_DRAIN;
+
+	/* Set default burst alignment */
+	cfglo |= IDMA32C_CFGL_DST_BURST_ALIGN | IDMA32C_CFGL_SRC_BURST_ALIGN;
+
+	/* Low 4 bits of the request lines */
+	cfghi |= IDMA32C_CFGH_DST_PER(dwc->dws.dst_id & 0xf);
+	cfghi |= IDMA32C_CFGH_SRC_PER(dwc->dws.src_id & 0xf);
+
+	/* Request line extension (2 bits) */
+	cfghi |= IDMA32C_CFGH_DST_PER_EXT(dwc->dws.dst_id >> 4 & 0x3);
+	cfghi |= IDMA32C_CFGH_SRC_PER_EXT(dwc->dws.src_id >> 4 & 0x3);
+
+	channel_writel(dwc, CFG_LO, cfglo);
+	channel_writel(dwc, CFG_HI, cfghi);
+}
+
+static void dwc_initialize_chan_dw(struct dw_dma_chan *dwc)
+{
 	u32 cfghi = DWC_CFGH_FIFO_MODE;
 	u32 cfglo = DWC_CFGL_CH_PRIOR(dwc->priority);
 	bool hs_polarity = dwc->dws.hs_polarity;
-
-	if (test_bit(DW_DMA_IS_INITIALIZED, &dwc->flags))
-		return;
 
 	cfghi |= DWC_CFGH_DST_PER(dwc->dws.dst_id);
 	cfghi |= DWC_CFGH_SRC_PER(dwc->dws.src_id);
@@ -156,6 +175,19 @@ static void dwc_initialize(struct dw_dma_chan *dwc)
 
 	channel_writel(dwc, CFG_LO, cfglo);
 	channel_writel(dwc, CFG_HI, cfghi);
+}
+
+static void dwc_initialize(struct dw_dma_chan *dwc)
+{
+	struct dw_dma *dw = to_dw_dma(dwc->chan.device);
+
+	if (test_bit(DW_DMA_IS_INITIALIZED, &dwc->flags))
+		return;
+
+	if (dw->pdata->is_idma32)
+		dwc_initialize_chan_idma32(dwc);
+	else
+		dwc_initialize_chan_dw(dwc);
 
 	/* Enable interrupts */
 	channel_set_bit(dw, MASK.XFER, dwc->mask);
@@ -187,7 +219,15 @@ static inline void dwc_chan_disable(struct dw_dma *dw, struct dw_dma_chan *dwc)
 static u32 bytes2block(struct dw_dma_chan *dwc, size_t bytes,
 			  unsigned int width, size_t *len)
 {
+	struct dw_dma *dw = to_dw_dma(dwc->chan.device);
 	u32 block;
+
+	if (dw->pdata->is_idma32) {
+		block = min_t(u32, bytes, dwc->block_size);
+		*len = block;
+
+		return block;
+	}
 
 	block = min_t(u32, bytes >> width, dwc->block_size);
 	*len = block << width;
@@ -197,6 +237,11 @@ static u32 bytes2block(struct dw_dma_chan *dwc, size_t bytes,
 
 static size_t block2bytes(struct dw_dma_chan *dwc, u32 block, u32 width)
 {
+	struct dw_dma *dw = to_dw_dma(dwc->chan.device);
+
+	if (dw->pdata->is_idma32)
+		return IDMA32C_CTLH_BLOCK_TS(block);
+
 	return DWC_CTLH_BLOCK_TS(block) << width;
 }
 
@@ -911,6 +956,7 @@ static int dwc_config(struct dma_chan *chan, struct dma_slave_config *sconfig)
 {
 	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
 	struct dma_slave_config *sc = &dwc->dma_sconfig;
+	struct dw_dma *dw = to_dw_dma(chan->device);
 	/*
 	 * Fix sconfig's burst size according to dw_dmac. We need to convert
 	 * them as:
@@ -918,7 +964,7 @@ static int dwc_config(struct dma_chan *chan, struct dma_slave_config *sconfig)
 	 *
 	 * NOTE: burst size 2 is not supported by DesignWare controller.
 	 */
-	u32 s = 2;
+	u32 s = dw->pdata->is_idma32 ? 1 : 2;
 
 	/* Check if chan will be configured for slave transfers */
 	if (!is_slave_direction(sconfig->direction))
@@ -1081,6 +1127,26 @@ static void dwc_issue_pending(struct dma_chan *chan)
 }
 
 /*----------------------------------------------------------------------*/
+
+static void idma32_fifo_partition(struct dw_dma *dw)
+{
+	u64 value = IDMA32C_FP_PSIZE_CH0(128) | IDMA32C_FP_PSIZE_CH1(128) |
+		    IDMA32C_FP_UPDATE;
+	u64 fifo_partition = 0;
+
+	if (!dw->pdata->is_idma32)
+		return;
+
+	/* Fill FIFO_PARTITION low bits (Channels 0..3) */
+	fifo_partition |= value << 0;
+
+	/* Fill FIFO_PARTITION high bits (Channels 4..7) */
+	fifo_partition |= value << 32;
+
+	/* Program FIFO Partition registers - 128 bytes for each channel */
+	idma32_writeq(dw, FIFO_PARTITION1, fifo_partition);
+	idma32_writeq(dw, FIFO_PARTITION0, fifo_partition);
+}
 
 static void dw_dma_off(struct dw_dma *dw)
 {
@@ -1501,6 +1567,8 @@ int dw_dma_probe(struct dw_dma_chip *chip)
 	/* Force dma off, just in case */
 	dw_dma_off(dw);
 
+	idma32_fifo_partition(dw);
+
 	/* Create a pool of consistent memory blocks for hardware descriptors */
 	dw->desc_pool = dmam_pool_create("dw_dmac_desc_pool", chip->dev,
 					 sizeof(struct dw_desc), 4, 0);
@@ -1661,6 +1729,8 @@ EXPORT_SYMBOL_GPL(dw_dma_disable);
 int dw_dma_enable(struct dw_dma_chip *chip)
 {
 	struct dw_dma *dw = chip->dw;
+
+	idma32_fifo_partition(dw);
 
 	dw_dma_on(dw);
 	return 0;
