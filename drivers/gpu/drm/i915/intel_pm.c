@@ -6598,6 +6598,8 @@ void intel_init_gt_powersave(struct drm_i915_private *dev_priv)
 		intel_runtime_pm_get(dev_priv);
 	}
 
+	sanitize_slpc_option(dev_priv);
+
 	mutex_lock(&dev_priv->drm.struct_mutex);
 	mutex_lock(&dev_priv->rps.hw_lock);
 
