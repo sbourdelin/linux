@@ -184,6 +184,22 @@ static inline void dwc_chan_disable(struct dw_dma *dw, struct dw_dma_chan *dwc)
 		cpu_relax();
 }
 
+static u32 bytes2block(struct dw_dma_chan *dwc, size_t bytes,
+			  unsigned int width, size_t *len)
+{
+	u32 block;
+
+	block = min_t(u32, bytes >> width, dwc->block_size);
+	*len = block << width;
+
+	return block;
+}
+
+static size_t block2bytes(struct dw_dma_chan *dwc, u32 block, u32 width)
+{
+	return DWC_CTLH_BLOCK_TS(block) << width;
+}
+
 /*----------------------------------------------------------------------*/
 
 /* Perform single block transfer */
@@ -332,7 +348,7 @@ static inline u32 dwc_get_sent(struct dw_dma_chan *dwc)
 	u32 ctlhi = channel_readl(dwc, CTL_HI);
 	u32 ctllo = channel_readl(dwc, CTL_LO);
 
-	return (ctlhi & DWC_CTLH_BLOCK_TS_MASK) * (1 << (ctllo >> 4 & 7));
+	return block2bytes(dwc, ctlhi, ctllo >> 4 & 7);
 }
 
 static void dwc_scan_descriptors(struct dw_dma *dw, struct dw_dma_chan *dwc)
@@ -692,10 +708,7 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
 			| DWC_CTLL_FC_M2M;
 	prev = first = NULL;
 
-	for (offset = 0; offset < len; offset += xfer_count << src_width) {
-		xfer_count = min_t(size_t, (len - offset) >> src_width,
-					   dwc->block_size);
-
+	for (offset = 0; offset < len; offset += xfer_count) {
 		desc = dwc_desc_get(dwc);
 		if (!desc)
 			goto err_desc_get;
@@ -703,8 +716,8 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
 		lli_write(desc, sar, src + offset);
 		lli_write(desc, dar, dest + offset);
 		lli_write(desc, ctllo, ctllo);
-		lli_write(desc, ctlhi, xfer_count);
-		desc->len = xfer_count << src_width;
+		lli_write(desc, ctlhi, bytes2block(dwc, len - offset, src_width, &xfer_count));
+		desc->len = xfer_count;
 
 		if (!first) {
 			first = desc;
@@ -775,7 +788,8 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
 
 		for_each_sg(sgl, sg, sg_len, i) {
 			struct dw_desc	*desc;
-			u32		len, dlen, mem;
+			u32		len, mem;
+			size_t		dlen;
 
 			mem = sg_dma_address(sg);
 			len = sg_dma_len(sg);
@@ -790,16 +804,7 @@ slave_sg_todev_fill_desc:
 			lli_write(desc, sar, mem);
 			lli_write(desc, dar, reg);
 			lli_write(desc, ctllo, ctllo | DWC_CTLL_SRC_WIDTH(mem_width));
-			if ((len >> mem_width) > dwc->block_size) {
-				dlen = dwc->block_size << mem_width;
-				mem += dlen;
-				len -= dlen;
-			} else {
-				dlen = len;
-				len = 0;
-			}
-
-			lli_write(desc, ctlhi, dlen >> mem_width);
+			lli_write(desc, ctlhi, bytes2block(dwc, len, mem_width, &dlen));
 			desc->len = dlen;
 
 			if (!first) {
@@ -809,6 +814,9 @@ slave_sg_todev_fill_desc:
 				list_add_tail(&desc->desc_node, &first->tx_list);
 			}
 			prev = desc;
+
+			mem += dlen;
+			len -= dlen;
 			total_len += dlen;
 
 			if (len)
@@ -828,7 +836,8 @@ slave_sg_todev_fill_desc:
 
 		for_each_sg(sgl, sg, sg_len, i) {
 			struct dw_desc	*desc;
-			u32		len, dlen, mem;
+			u32		len, mem;
+			size_t		dlen;
 
 			mem = sg_dma_address(sg);
 			len = sg_dma_len(sg);
@@ -843,15 +852,7 @@ slave_sg_fromdev_fill_desc:
 			lli_write(desc, sar, reg);
 			lli_write(desc, dar, mem);
 			lli_write(desc, ctllo, ctllo | DWC_CTLL_DST_WIDTH(mem_width));
-			if ((len >> reg_width) > dwc->block_size) {
-				dlen = dwc->block_size << reg_width;
-				mem += dlen;
-				len -= dlen;
-			} else {
-				dlen = len;
-				len = 0;
-			}
-			lli_write(desc, ctlhi, dlen >> reg_width);
+			lli_write(desc, ctlhi, bytes2block(dwc, len, reg_width, &dlen));
 			desc->len = dlen;
 
 			if (!first) {
@@ -861,6 +862,9 @@ slave_sg_fromdev_fill_desc:
 				list_add_tail(&desc->desc_node, &first->tx_list);
 			}
 			prev = desc;
+
+			mem += dlen;
+			len -= dlen;
 			total_len += dlen;
 
 			if (len)
