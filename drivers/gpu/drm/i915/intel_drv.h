@@ -1707,7 +1707,12 @@ bool chv_phy_powergate_ch(struct drm_i915_private *dev_priv, enum dpio_phy phy,
 
 static inline int intel_slpc_active(struct drm_i915_private *dev_priv)
 {
-	return 0;
+	int ret = 0;
+
+	if (dev_priv->guc.slpc.vma && dev_priv->guc.slpc.enabled)
+		ret = 1;
+
+	return ret;
 }
 
 /* intel_pm.c */
