@@ -168,7 +168,7 @@ static int __init acpi_parse_madt(struct acpi_table_header *table)
  */
 static int acpi_register_lapic(int id, u32 acpiid, u8 enabled)
 {
-	unsigned int ver = 0;
+	u8 ver = 0;
 	int cpu;
 
 	if (id >= MAX_LOCAL_APIC) {

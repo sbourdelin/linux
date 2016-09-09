@@ -1836,7 +1836,7 @@ void __init register_lapic_address(unsigned long address)
 	}
 }
 
-int apic_version[MAX_LOCAL_APIC];
+u8 apic_version[MAX_LOCAL_APIC];
 
 /*
  * Local APIC interrupts
@@ -2026,7 +2026,7 @@ void disconnect_bsp_APIC(int virt_wire_setup)
 	apic_write(APIC_LVT1, value);
 }
 
-int generic_processor_info(int apicid, int version)
+int generic_processor_info(int apicid, u8 version)
 {
 	int cpu, max = nr_cpu_ids;
 	bool boot_cpu_detected = physid_isset(boot_cpu_physical_apicid,

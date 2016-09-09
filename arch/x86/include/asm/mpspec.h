@@ -6,7 +6,7 @@
 #include <asm/x86_init.h>
 #include <asm/apicdef.h>
 
-extern int apic_version[];
+extern u8 apic_version[];
 extern int pic_mode;
 
 #ifdef CONFIG_X86_32
@@ -85,7 +85,7 @@ static inline void early_reserve_e820_mpc_new(void) { }
 #define default_get_smp_config x86_init_uint_noop
 #endif
 
-int generic_processor_info(int apicid, int version);
+int generic_processor_info(int apicid, u8 version);
 
 #define PHYSID_ARRAY_SIZE	BITS_TO_LONGS(MAX_LOCAL_APIC)
 
