@@ -255,6 +255,10 @@ config XPS
 	depends on SMP
 	default y
 
+config NET_EXT_RESOLVER
+	bool
+	default n
+
 config HWBM
        bool
 
