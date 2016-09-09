@@ -94,7 +94,6 @@ enum clock_event_state {
  * @tick_resume:	resume clkevt device
  * @broadcast:		function to broadcast events
  * @min_delta_ticks:	minimum delta value in ticks stored for reconfiguration
- * @min_delta_ns:	minimum delta value in ns
  * @name:		ptr to clock event name
  * @rating:		variable to rate clock event devices
  * @irq:		IRQ number (only for non CPU local devices)
@@ -127,7 +126,6 @@ struct clock_event_device {
 	void			(*suspend)(struct clock_event_device *);
 	void			(*resume)(struct clock_event_device *);
 	unsigned long		min_delta_ticks;
-	u64			min_delta_ns;
 
 	const char		*name;
 	int			rating;
