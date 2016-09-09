@@ -1707,7 +1707,11 @@ bool chv_phy_powergate_ch(struct drm_i915_private *dev_priv, enum dpio_phy phy,
 
 static inline int intel_slpc_active(struct drm_i915_private *dev_priv)
 {
+	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
 	int ret = 0;
+
+	if (guc_fw->guc_fw_load_status != GUC_FIRMWARE_SUCCESS)
+		return ret;
 
 	if (dev_priv->guc.slpc.vma && dev_priv->guc.slpc.enabled)
 		ret = 1;
