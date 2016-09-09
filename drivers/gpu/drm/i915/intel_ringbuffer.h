@@ -443,7 +443,7 @@ void intel_engine_cleanup(struct intel_engine_cs *engine);
 
 int intel_ring_alloc_request_extras(struct drm_i915_gem_request *request);
 
-int __must_check intel_ring_begin(struct drm_i915_gem_request *req, int n);
+u32 __must_check *intel_ring_begin(struct drm_i915_gem_request *req, int n);
 int __must_check intel_ring_cacheline_align(struct drm_i915_gem_request *req);
 
 static inline void intel_ring_emit(struct intel_ring *ring, u32 data)
@@ -457,16 +457,13 @@ static inline void intel_ring_emit_reg(struct intel_ring *ring, i915_reg_t reg)
 	intel_ring_emit(ring, i915_mmio_reg_offset(reg));
 }
 
-static inline void intel_ring_advance(struct intel_ring *ring)
+static inline void intel_ring_advance(struct intel_ring *ring, u32 *rbuf)
 {
-	/* Dummy function.
-	 *
-	 * This serves as a placeholder in the code so that the reader
-	 * can compare against the preceding intel_ring_begin() and
-	 * check that the number of dwords emitted matches the space
-	 * reserved for the command packet (i.e. the value passed to
-	 * intel_ring_begin()).
-	 */
+	unsigned int written = (void *)rbuf - (ring->vaddr + ring->tail);
+
+	GEM_BUG_ON(ring->tail + written <= ring->size);
+
+	ring->tail += written;
 }
 
 static inline u32 intel_ring_offset(struct intel_ring *ring, u32 value)

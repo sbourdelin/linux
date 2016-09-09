@@ -1358,25 +1358,25 @@ i915_gem_execbuffer_move_to_active(struct list_head *vmas,
 static int
 i915_reset_gen7_sol_offsets(struct drm_i915_gem_request *req)
 {
-	struct intel_ring *ring = req->ring;
-	int ret, i;
+	u32 *rbuf;
+	int i;
 
 	if (!IS_GEN7(req->i915) || req->engine->id != RCS) {
 		DRM_DEBUG("sol reset is gen7/rcs only\n");
 		return -EINVAL;
 	}
 
-	ret = intel_ring_begin(req, 4 * 3);
-	if (ret)
-		return ret;
+	rbuf = intel_ring_begin(req, 4 * 3);
+	if (IS_ERR(rbuf))
+		return PTR_ERR(rbuf);
 
 	for (i = 0; i < 4; i++) {
-		intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(1));
-		intel_ring_emit_reg(ring, GEN7_SO_WRITE_OFFSET(i));
-		intel_ring_emit(ring, 0);
+		*rbuf++ = MI_LOAD_REGISTER_IMM(1);
+		*rbuf++ = GEN7_SO_WRITE_OFFSET(i).reg;
+		*rbuf++ = 0;
 	}
 
-	intel_ring_advance(ring);
+	intel_ring_advance(req->ring, rbuf);
 
 	return 0;
 }
@@ -1483,17 +1483,18 @@ execbuf_submit(struct i915_execbuffer_params *params,
 
 	if (params->engine->id == RCS &&
 	    instp_mode != dev_priv->relative_constants_mode) {
-		struct intel_ring *ring = params->request->ring;
+		u32 *rbuf;
 
-		ret = intel_ring_begin(params->request, 4);
-		if (ret)
-			return ret;
+		rbuf = intel_ring_begin(params->request, 4);
+		if (IS_ERR(rbuf))
+			return PTR_ERR(rbuf);
 
-		intel_ring_emit(ring, MI_NOOP);
-		intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(1));
-		intel_ring_emit_reg(ring, INSTPM);
-		intel_ring_emit(ring, instp_mask << 16 | instp_mode);
-		intel_ring_advance(ring);
+		*rbuf++ = MI_NOOP;
+		*rbuf++ = MI_LOAD_REGISTER_IMM(1);
+		*rbuf++ = INSTPM.reg;
+		*rbuf++ = instp_mask << 16 | instp_mode;
+
+		intel_ring_advance(params->request->ring, rbuf);
 
 		dev_priv->relative_constants_mode = instp_mode;
 	}
