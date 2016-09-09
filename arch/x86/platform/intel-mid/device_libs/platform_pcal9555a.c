@@ -34,6 +34,12 @@ static void __init *pcal9555a_platform_data(void *info)
 	char intr_pin_name[SFI_NAME_LEN + 1];
 	int gpio_base, intr;
 
+	if (nr >= PCAL9555A_NUM) {
+		pr_err("%s: Too many instances, only %d supported\n", __func__,
+		       PCAL9555A_NUM);
+		return ERR_PTR(-ENOMEM);
+	}
+
 	snprintf(base_pin_name, sizeof(base_pin_name), "%s_base", type);
 	snprintf(intr_pin_name, sizeof(intr_pin_name), "%s_int", type);
 
@@ -45,12 +51,6 @@ static void __init *pcal9555a_platform_data(void *info)
 		pr_warn("%s: falling back to dynamic gpio allocation\n",
 			__func__);
 		return NULL;
-	}
-
-	if (nr >= PCAL9555A_NUM) {
-		pr_err("%s: Too many instances, only %d supported\n", __func__,
-		       PCAL9555A_NUM);
-		return ERR_PTR(-ENOMEM);
 	}
 
 	pcal9555a = &pcal9555a_pdata[nr++];
