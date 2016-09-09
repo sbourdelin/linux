@@ -54,6 +54,7 @@ enum octeon_pci_swap_mode {
 };
 
 #define  OCTEON_OUTPUT_INTR   (2)
+#define  OCTEON_MBOX_INTR     (4)
 #define  OCTEON_ALL_INTR      0xff
 
 /*---------------   PCI BAR1 index registers -------------*/
@@ -209,6 +210,10 @@ struct octeon_fn_list {
 
 	irqreturn_t (*process_interrupt_regs)(void *);
 	u64 (*msix_interrupt_handler)(void *);
+
+	int (*setup_mbox)(struct octeon_device *);
+	int (*free_mbox)(struct octeon_device *);
+
 	int (*soft_reset)(struct octeon_device *);
 	int (*setup_device_regs)(struct octeon_device *);
 	void (*bar1_idx_setup)(struct octeon_device *, u64, u32, int);
@@ -349,6 +354,7 @@ struct octeon_ioq_vector {
 	int		        iq_index;
 	int		        droq_index;
 	int			vector;
+	struct octeon_mbox     *mbox;
 	struct cpumask		affinity_mask;
 	u32			ioq_num;
 };

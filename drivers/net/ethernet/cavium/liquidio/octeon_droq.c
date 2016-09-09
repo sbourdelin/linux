@@ -19,6 +19,7 @@
 * This file may also be available under a different license from Cavium.
 * Contact Cavium, Inc. for more information
 **********************************************************************/
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #include <linux/pci.h>
 #include <linux/netdevice.h>
 #include <linux/vmalloc.h>
@@ -211,7 +212,7 @@ int octeon_delete_droq(struct octeon_device *oct, u32 q_no)
 {
 	struct octeon_droq *droq = oct->droq[q_no];
 
-	dev_dbg(&oct->pci_dev->dev, "%s[%d]\n", __func__, q_no);
+	pr_devel("%s[%d]\n", __func__, q_no);
 
 	octeon_droq_destroy_ring_buffers(oct, droq);
 	vfree(droq->recv_buf_list);
@@ -243,7 +244,7 @@ int octeon_init_droq(struct octeon_device *oct,
 	int orig_node = dev_to_node(&oct->pci_dev->dev);
 	int numa_node = cpu_to_node(q_no % num_online_cpus());
 
-	dev_dbg(&oct->pci_dev->dev, "%s[%d]\n", __func__, q_no);
+	pr_devel("%s[%d]\n", __func__, q_no);
 
 	droq = oct->droq[q_no];
 	memset(droq, 0, OCT_DROQ_SIZE);
@@ -290,10 +291,10 @@ int octeon_init_droq(struct octeon_device *oct,
 		return 1;
 	}
 
-	dev_dbg(&oct->pci_dev->dev, "droq[%d]: desc_ring: virt: 0x%p, dma: %lx\n",
-		q_no, droq->desc_ring, droq->desc_ring_dma);
-	dev_dbg(&oct->pci_dev->dev, "droq[%d]: num_desc: %d\n", q_no,
-		droq->max_count);
+	pr_devel("droq[%d]: desc_ring: virt: 0x%p, dma: %lx\n",
+		 q_no, droq->desc_ring, droq->desc_ring_dma);
+	pr_devel("droq[%d]: num_desc: %d\n", q_no,
+		 droq->max_count);
 
 	droq->info_list =
 		cnnic_numa_alloc_aligned_dma((droq->max_count *
@@ -327,8 +328,8 @@ int octeon_init_droq(struct octeon_device *oct,
 	droq->pkts_per_intr = c_pkts_per_intr;
 	droq->refill_threshold = c_refill_threshold;
 
-	dev_dbg(&oct->pci_dev->dev, "DROQ INIT: max_empty_descs: %d\n",
-		droq->max_empty_descs);
+	pr_devel("DROQ INIT: max_empty_descs: %d\n",
+		 droq->max_empty_descs);
 
 	spin_lock_init(&droq->lock);
 
@@ -628,9 +629,6 @@ octeon_droq_fast_process_packets(struct octeon_device *oct,
 			dev_err(&oct->pci_dev->dev,
 				"DROQ[%d] idx: %d len:0, pkt_cnt: %d\n",
 				droq->q_no, droq->read_idx, pkt_count);
-			print_hex_dump_bytes("", DUMP_PREFIX_ADDRESS,
-					     (u8 *)info,
-					     OCT_DROQ_INFO_SIZE);
 			break;
 		}
 
@@ -978,8 +976,8 @@ int octeon_create_droq(struct octeon_device *oct,
 	int numa_node = cpu_to_node(q_no % num_online_cpus());
 
 	if (oct->droq[q_no]) {
-		dev_dbg(&oct->pci_dev->dev, "Droq already in use. Cannot create droq %d again\n",
-			q_no);
+		pr_devel("Droq already in use. Cannot create droq %d again\n",
+			 q_no);
 		return 1;
 	}
 
@@ -1000,8 +998,8 @@ int octeon_create_droq(struct octeon_device *oct,
 
 	oct->num_oqs++;
 
-	dev_dbg(&oct->pci_dev->dev, "%s: Total number of OQ: %d\n", __func__,
-		oct->num_oqs);
+	pr_devel("%s: Total number of OQ: %d\n", __func__,
+		 oct->num_oqs);
 
 	/* Global Droq register settings */
 
