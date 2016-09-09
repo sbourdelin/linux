@@ -1324,6 +1324,202 @@ static const struct file_operations i915_slpc_dcc_fops = {
 	.llseek	 = seq_lseek
 };
 
+static int i915_slpc_info(struct seq_file *m, void *unused)
+{
+	struct drm_info_node *node = m->private;
+	struct drm_device *dev = node->minor->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_i915_gem_object *obj;
+	struct page *page;
+	void *pv = NULL;
+	struct slpc_shared_data data;
+	struct slpc_task_state_data *task_data;
+	int i, value;
+	enum slpc_global_state global_state;
+	enum slpc_platform_sku platform_sku;
+	enum slpc_power_plan power_plan;
+	enum slpc_power_source power_source;
+
+	if (!intel_slpc_active(dev_priv))
+		return -ENODEV;
+
+	obj = dev_priv->guc.slpc.vma->obj;
+	if (obj) {
+		intel_slpc_query_task_state(dev_priv);
+
+		page = i915_gem_object_get_page(obj, 0);
+		if (page)
+			pv = kmap_atomic(page);
+	}
+
+	if (pv) {
+		data = *(struct slpc_shared_data *) pv;
+		kunmap_atomic(pv);
+
+		seq_printf(m, "shared data size: %d\n", data.shared_data_size);
+
+		global_state = (enum slpc_global_state) data.global_state;
+		seq_printf(m, "global state: %d (", global_state);
+		switch (global_state) {
+		case SLPC_GLOBAL_STATE_NOT_RUNNING:
+			seq_puts(m, "not running)\n");
+			break;
+		case SLPC_GLOBAL_STATE_INITIALIZING:
+			seq_puts(m, "initializing)\n");
+			break;
+		case SLPC_GLOBAL_STATE_RESETTING:
+			seq_puts(m, "resetting)\n");
+			break;
+		case SLPC_GLOBAL_STATE_RUNNING:
+			seq_puts(m, "running)\n");
+			break;
+		case SLPC_GLOBAL_STATE_SHUTTING_DOWN:
+			seq_puts(m, "shutting down)\n");
+			break;
+		case SLPC_GLOBAL_STATE_ERROR:
+			seq_puts(m, "error)\n");
+			break;
+		default:
+			seq_puts(m, "unknown)\n");
+			break;
+		}
+
+		platform_sku = (enum slpc_platform_sku)
+				data.platform_info.platform_sku;
+		seq_printf(m, "sku: %d (", platform_sku);
+		switch (platform_sku) {
+		case SLPC_PLATFORM_SKU_UNDEFINED:
+			seq_puts(m, "undefined)\n");
+			break;
+		case SLPC_PLATFORM_SKU_ULX:
+			seq_puts(m, "ULX)\n");
+			break;
+		case SLPC_PLATFORM_SKU_ULT:
+			seq_puts(m, "ULT)\n");
+			break;
+		case SLPC_PLATFORM_SKU_T:
+			seq_puts(m, "T)\n");
+			break;
+		case SLPC_PLATFORM_SKU_MOBL:
+			seq_puts(m, "Mobile)\n");
+			break;
+		case SLPC_PLATFORM_SKU_DT:
+			seq_puts(m, "DT)\n");
+			break;
+		case SLPC_PLATFORM_SKU_UNKNOWN:
+		default:
+			seq_puts(m, "unknown)\n");
+			break;
+		}
+		seq_printf(m, "slice count: %d\n",
+			   data.platform_info.slice_count);
+
+		seq_printf(m, "power plan/source: 0x%x\n\tplan:\t",
+			   data.platform_info.power_plan_source);
+		power_plan = (enum slpc_power_plan) SLPC_POWER_PLAN(
+					data.platform_info.power_plan_source);
+		power_source = (enum slpc_power_source) SLPC_POWER_SOURCE(
+					data.platform_info.power_plan_source);
+		switch (power_plan) {
+		case SLPC_POWER_PLAN_UNDEFINED:
+			seq_puts(m, "undefined");
+			break;
+		case SLPC_POWER_PLAN_BATTERY_SAVER:
+			seq_puts(m, "battery saver");
+			break;
+		case SLPC_POWER_PLAN_BALANCED:
+			seq_puts(m, "balanced");
+			break;
+		case SLPC_POWER_PLAN_PERFORMANCE:
+			seq_puts(m, "performance");
+			break;
+		case SLPC_POWER_PLAN_UNKNOWN:
+		default:
+			seq_puts(m, "unknown");
+			break;
+		}
+		seq_puts(m, "\n\tsource:\t");
+		switch (power_source) {
+		case SLPC_POWER_SOURCE_UNDEFINED:
+			seq_puts(m, "undefined\n");
+			break;
+		case SLPC_POWER_SOURCE_AC:
+			seq_puts(m, "AC\n");
+			break;
+		case SLPC_POWER_SOURCE_DC:
+			seq_puts(m, "DC\n");
+			break;
+		case SLPC_POWER_SOURCE_UNKNOWN:
+		default:
+			seq_puts(m, "unknown\n");
+			break;
+		}
+
+		seq_printf(m, "IA frequency (MHz):\n\tP0: %d\n\tP1: %d\n\tPe: %d\n\tPn: %d\n",
+			   data.platform_info.P0_freq * 50,
+			   data.platform_info.P1_freq * 50,
+			   data.platform_info.Pe_freq * 50,
+			   data.platform_info.Pn_freq * 50);
+
+		task_data = &data.task_state_data;
+		seq_printf(m, "task state data: 0x%08x 0x%08x\n",
+			   task_data->bitfield1, task_data->bitfield2);
+
+		seq_printf(m, "\tgtperf task active: %s\n",
+			   yesno(task_data->gtperf_task_active));
+		seq_printf(m, "\tgtperf stall possible: %s\n",
+			   yesno(task_data->gtperf_stall_possible));
+		seq_printf(m, "\tgtperf gaming mode: %s\n",
+			   yesno(task_data->gtperf_gaming_mode));
+		seq_printf(m, "\tgtperf target fps: %d\n",
+			   task_data->gtperf_target_fps);
+
+		seq_printf(m, "\tdcc task active: %s\n",
+			   yesno(task_data->dcc_task_active));
+		seq_printf(m, "\tin dcc: %s\n",
+			   yesno(task_data->in_dcc));
+		seq_printf(m, "\tin dct: %s\n",
+			   yesno(task_data->in_dct));
+		seq_printf(m, "\tfreq switch active: %d\n",
+			   task_data->freq_switch_active);
+
+		seq_printf(m, "\tibc enabled: %s\n",
+			   yesno(task_data->ibc_enabled));
+		seq_printf(m, "\tibc active: %s\n",
+			   yesno(task_data->ibc_active));
+		seq_printf(m, "\tpg1 enabled: %s\n",
+			   yesno(task_data->pg1_enabled));
+		seq_printf(m, "\tpg1 active: %s\n",
+			   yesno(task_data->pg1_active));
+
+		seq_printf(m, "\tunslice max freq: %d\n",
+			   task_data->freq_unslice_max);
+		seq_printf(m, "\tunslice min freq: %d\n",
+			   task_data->freq_unslice_min);
+		seq_printf(m, "\tslice max freq: %d\n",
+			   task_data->freq_slice_max);
+		seq_printf(m, "\tslice min freq: %d\n",
+			   task_data->freq_slice_min);
+
+		seq_puts(m, "override parameter bitfield\n");
+		for (i = 0; i < SLPC_OVERRIDE_BITFIELD_SIZE; i++)
+			seq_printf(m, "%d: 0x%08x\n", i,
+				   data.override_parameters_set_bits[i]);
+
+		seq_puts(m, "override parameters (only non-zero shown)\n");
+		for (i = 0; i < SLPC_MAX_OVERRIDE_PARAMETERS; i++) {
+			value = data.override_parameters_values[i];
+			if (value)
+				seq_printf(m, "%d: 0x%8x\n", i, value);
+		}
+
+	} else {
+		seq_puts(m, "no SLPC info available\n");
+	}
+
+	return 0;
+}
+
 static int i915_frequency_info(struct seq_file *m, void *unused)
 {
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
@@ -5517,6 +5713,7 @@ static const struct drm_info_list i915_debugfs_list[] = {
 	{"i915_guc_info", i915_guc_info, 0},
 	{"i915_guc_load_status", i915_guc_load_status_info, 0},
 	{"i915_guc_log_dump", i915_guc_log_dump, 0},
+	{"i915_slpc_info", i915_slpc_info, 0},
 	{"i915_frequency_info", i915_frequency_info, 0},
 	{"i915_hangcheck_info", i915_hangcheck_info, 0},
 	{"i915_drpc_info", i915_drpc_info, 0},

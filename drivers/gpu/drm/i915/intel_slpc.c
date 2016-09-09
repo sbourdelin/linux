@@ -167,6 +167,25 @@ void intel_slpc_get_param(struct drm_i915_private *dev_priv,
 	}
 }
 
+static void host2guc_slpc_query_task_state(struct drm_i915_private *dev_priv)
+{
+	u32 data[4];
+	u32 shared_data_gtt_offset = i915_ggtt_offset(dev_priv->guc.slpc.vma);
+
+	data[0] = HOST2GUC_ACTION_SLPC_REQUEST;
+	data[1] = SLPC_EVENT(SLPC_EVENT_QUERY_TASK_STATE, 2);
+	data[2] = shared_data_gtt_offset;
+	data[3] = 0;
+
+	host2guc_slpc(dev_priv, data, 4);
+}
+
+void intel_slpc_query_task_state(struct drm_i915_private *dev_priv)
+{
+	if (intel_slpc_active(dev_priv))
+		host2guc_slpc_query_task_state(dev_priv);
+}
+
 static unsigned int slpc_get_platform_sku(struct drm_i915_private *dev_priv)
 {
 	enum slpc_platform_sku platform_sku;
