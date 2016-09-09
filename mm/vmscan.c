@@ -771,6 +771,15 @@ continue_removal:
 					/* Stall kswapd once for 10ms on contention */
 					if (cmpxchg(&kswapd_exclusive, NUMA_NO_NODE, pgdat->node_id) != NUMA_NO_NODE) {
 						DEFINE_WAIT(wait);
+
+						/*
+						 * Tag the pgdat as congested as it may
+						 * indicate contention with a heavy
+						 * writer that should stall on
+						 * wait_iff_congested.
+						 */
+						set_bit(PGDAT_CONGESTED, &pgdat->flags);
+
 						prepare_to_wait(&kswapd_contended_wait,
 							&wait, TASK_INTERRUPTIBLE);
 						io_schedule_timeout(HZ/100);
