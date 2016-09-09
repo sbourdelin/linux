@@ -622,18 +622,47 @@ static pageout_t pageout(struct page *page, struct address_space *mapping,
 }
 
 /*
+ * Finalise the mapping removal without the mapping lock held. The pages
+ * are placed on the free_list and the caller is expected to drop the
+ * final reference.
+ */
+static void finalise_remove_mapping_list(struct list_head *swapcache,
+				    struct list_head *filecache,
+				    void (*freepage)(struct page *),
+				    struct list_head *free_list)
+{
+	struct page *page;
+
+	list_for_each_entry(page, swapcache, lru) {
+		swp_entry_t swap = { .val = page_private(page) };
+		swapcache_free(swap);
+		set_page_private(page, 0);
+	}
+
+	list_for_each_entry(page, filecache, lru)
+		freepage(page);
+
+	list_splice_init(swapcache, free_list);
+	list_splice_init(filecache, free_list);
+}
+
+enum remove_mapping {
+	REMOVED_FAIL,
+	REMOVED_SWAPCACHE,
+	REMOVED_FILECACHE
+};
+
+/*
  * Same as remove_mapping, but if the page is removed from the mapping, it
  * gets returned with a refcount of 0.
  */
-static int __remove_mapping(struct address_space *mapping, struct page *page,
-			    bool reclaimed)
+static enum remove_mapping __remove_mapping(struct address_space *mapping,
+				struct page *page, bool reclaimed,
+				void (**freepage)(struct page *))
 {
-	unsigned long flags;
-
 	BUG_ON(!PageLocked(page));
 	BUG_ON(mapping != page_mapping(page));
 
-	spin_lock_irqsave(&mapping->tree_lock, flags);
 	/*
 	 * The non racy check for a busy page.
 	 *
@@ -668,16 +697,17 @@ static int __remove_mapping(struct address_space *mapping, struct page *page,
 	}
 
 	if (PageSwapCache(page)) {
-		swp_entry_t swap = { .val = page_private(page) };
+		unsigned long swapval = page_private(page);
+		swp_entry_t swap = { .val = swapval };
 		mem_cgroup_swapout(page, swap);
 		__delete_from_swap_cache(page);
-		spin_unlock_irqrestore(&mapping->tree_lock, flags);
-		swapcache_free(swap);
+		set_page_private(page, swapval);
+		return REMOVED_SWAPCACHE;
 	} else {
-		void (*freepage)(struct page *);
 		void *shadow = NULL;
 
-		freepage = mapping->a_ops->freepage;
+		*freepage = mapping->a_ops->freepage;
+
 		/*
 		 * Remember a shadow entry for reclaimed file cache in
 		 * order to detect refaults, thus thrashing, later on.
@@ -698,17 +728,76 @@ static int __remove_mapping(struct address_space *mapping, struct page *page,
 		    !mapping_exiting(mapping) && !dax_mapping(mapping))
 			shadow = workingset_eviction(mapping, page);
 		__delete_from_page_cache(page, shadow);
-		spin_unlock_irqrestore(&mapping->tree_lock, flags);
-
-		if (freepage != NULL)
-			freepage(page);
+		return REMOVED_FILECACHE;
 	}
 
-	return 1;
-
 cannot_free:
-	spin_unlock_irqrestore(&mapping->tree_lock, flags);
-	return 0;
+	return REMOVED_FAIL;
+}
+
+static unsigned long remove_mapping_list(struct list_head *mapping_list,
+					 struct list_head *free_pages,
+					 struct list_head *ret_pages)
+{
+	unsigned long flags;
+	struct address_space *mapping = NULL;
+	void (*freepage)(struct page *) = NULL;
+	LIST_HEAD(swapcache);
+	LIST_HEAD(filecache);
+	struct page *page, *tmp;
+	unsigned long nr_reclaimed = 0;
+
+continue_removal:
+	list_for_each_entry_safe(page, tmp, mapping_list, lru) {
+		/* Batch removals under one tree lock at a time */
+		if (mapping && page_mapping(page) != mapping)
+			continue;
+
+		list_del(&page->lru);
+		if (!mapping) {
+			mapping = page_mapping(page);
+			spin_lock_irqsave(&mapping->tree_lock, flags);
+		}
+
+		switch (__remove_mapping(mapping, page, true, &freepage)) {
+		case REMOVED_FILECACHE:
+			/*
+			 * At this point, we have no other references and there
+			 * is no way to pick any more up (removed from LRU,
+			 * removed from pagecache). Can use non-atomic bitops
+			 * now (and we obviously don't have to worry about
+			 * waking up a process  waiting on the page lock,
+			 * because there are no references.
+			 */
+			__ClearPageLocked(page);
+			if (freepage)
+				list_add(&page->lru, &filecache);
+			else
+				list_add(&page->lru, free_pages);
+			nr_reclaimed++;
+			break;
+		case REMOVED_SWAPCACHE:
+			/* See FILECACHE case as to why non-atomic is safe */
+			__ClearPageLocked(page);
+			list_add(&page->lru, &swapcache);
+			nr_reclaimed++;
+			break;
+		case REMOVED_FAIL:
+			unlock_page(page);
+			list_add(&page->lru, ret_pages);
+		}
+	}
+
+	if (mapping) {
+		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+		finalise_remove_mapping_list(&swapcache, &filecache, freepage, free_pages);
+		mapping = NULL;
+	}
+
+	if (!list_empty(mapping_list))
+		goto continue_removal;
+
+	return nr_reclaimed;
 }
 
 /*
@@ -719,16 +808,42 @@ cannot_free:
  */
 int remove_mapping(struct address_space *mapping, struct page *page)
 {
-	if (__remove_mapping(mapping, page, false)) {
+	unsigned long flags;
+	LIST_HEAD(swapcache);
+	LIST_HEAD(filecache);
+	void (*freepage)(struct page *) = NULL;
+	swp_entry_t swap;
+	int ret = 0;
+
+	spin_lock_irqsave(&mapping->tree_lock, flags);
+	freepage = mapping->a_ops->freepage;
+	ret = __remove_mapping(mapping, page, false, &freepage);
+	spin_unlock_irqrestore(&mapping->tree_lock, flags);
+
+	if (ret != REMOVED_FAIL) {
 		/*
 		 * Unfreezing the refcount with 1 rather than 2 effectively
 		 * drops the pagecache ref for us without requiring another
 		 * atomic operation.
 		 */
 		page_ref_unfreeze(page, 1);
-		return 1;
 	}
-	return 0;
+
+	switch (ret) {
+	case REMOVED_FILECACHE:
+		if (freepage)
+			freepage(page);
+		return 1;
+	case REMOVED_SWAPCACHE:
+		swap.val = page_private(page);
+		swapcache_free(swap);
+		set_page_private(page, 0);
+		return 1;
+	case REMOVED_FAIL:
+		return 0;
+	}
+
+	BUG();
 }
 
 /**
@@ -910,6 +1025,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 {
 	LIST_HEAD(ret_pages);
 	LIST_HEAD(free_pages);
+	LIST_HEAD(mapping_pages);
 	int pgactivate = 0;
 	unsigned long nr_unqueued_dirty = 0;
 	unsigned long nr_dirty = 0;
@@ -1206,17 +1322,14 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		}
 
 lazyfree:
-		if (!mapping || !__remove_mapping(mapping, page, true))
+		if (!mapping)
 			goto keep_locked;
 
-		/*
-		 * At this point, we have no other references and there is
-		 * no way to pick any more up (removed from LRU, removed
-		 * from pagecache). Can use non-atomic bitops now (and
-		 * we obviously don't have to worry about waking up a process
-		 * waiting on the page lock, because there are no references.
-		 */
-		__ClearPageLocked(page);
+		list_add(&page->lru, &mapping_pages);
+		if (ret == SWAP_LZFREE)
+			count_vm_event(PGLAZYFREED);
+		continue;
+
 free_it:
 		if (ret == SWAP_LZFREE)
 			count_vm_event(PGLAZYFREED);
@@ -1251,6 +1364,7 @@ keep:
 		VM_BUG_ON_PAGE(PageLRU(page) || PageUnevictable(page), page);
 	}
 
+	nr_reclaimed += remove_mapping_list(&mapping_pages, &free_pages, &ret_pages);
 	mem_cgroup_uncharge_list(&free_pages);
 	try_to_unmap_flush();
 	free_hot_cold_page_list(&free_pages, true);
