@@ -17,6 +17,7 @@
 #include <linux/module.h>
 #include <linux/smp.h>
 #include <linux/device.h>
+#include <asm/bitsperlong.h>
 
 #include "tick-internal.h"
 
@@ -336,6 +337,9 @@ int clockevents_program_event(struct clock_event_device *dev, ktime_t expires,
 	delta = max(delta, (int64_t) dev->min_delta_ns);
 
 	clc = ((unsigned long long) delta * dev->mult) >> dev->shift;
+
+	clc = min_t(unsigned long, clc, dev->max_delta_ticks);
+
 	rc = dev->set_next_event((unsigned long) clc, dev);
 
 	return (rc && force) ? clockevents_program_min_delta(dev) : rc;
@@ -444,15 +448,59 @@ EXPORT_SYMBOL_GPL(clockevents_unbind_device);
 
 static void __clockevents_update_bounds(struct clock_event_device *dev)
 {
+	u64 max_delta_ns;
+
 	if (!(dev->features & CLOCK_EVT_FEAT_ONESHOT))
 		return;
+
+	/*
+	 * max_delta_ns is <= the maximum value such that the ns to
+	 * cycles conversion in clockevents_program_event() doesn't
+	 * overflow. It follows that is has to fulfill the following
+	 * constraints:
+	 * 1.) mult * max_delta_ns <= ULLONG_MAX
+	 * 2.) (mult * max_delta_ns) >> shift <= ULONG_MAX
+	 * On 32 bit archs, 2.) is stricter because shift <= 32 always
+	 * holds, otherwise 1.) is.
+	 *
+	 * If CLOCK_EVT_FEAT_NO_ADJUST is not set, the actual
+	 * ->max_delta_ns is set to a value equal to 8/9 of the
+	 * maximum one possible. This gives some room for increasing
+	 * mult by up to 12.5% which is just enough to compensate for
+	 * the up to 11% mono clock frequency adjustments made by the
+	 * timekeeping core, c.f. timekeeping_adjust().
+	 *
+	 */
+#if BITS_PER_LONG == 32
+	/*
+	 * Set the lower BITS_PER_LONG + dev->shift bits.
+	 * Note: dev->shift can be 32, so avoid undefined behaviour.
+	 * The ^= below is really a |= here. However the former is the
+	 * common idiom and recognizable by gcc.
+	 */
+	max_delta_ns = (u64)1 << (BITS_PER_LONG + dev->shift - 1);
+	max_delta_ns ^= (dev->max_delta_ns - 1);
+#else
+	max_delta_ns = U64_MAX;
+#endif
+	if (unlikely(!dev->mult)) {
+		dev->mult = 1;
+		WARN_ON(1);
+	}
+	do_div(max_delta_ns, dev->mult);
+	dev->max_delta_ns = max_delta_ns;
+	if (!(dev->features & CLOCK_EVT_FEAT_NO_ADJUST)) {
+		/* reduce by 1/9 */
+		do_div(max_delta_ns, 9);
+		++max_delta_ns; /* round up */
+		dev->max_delta_ns -= max_delta_ns;
+	}
 
 	/*
 	 * cev_delta2ns() never returns values less than 1us and thus,
 	 * we'll never program any ced with anything less.
 	 */
 	dev->min_delta_ns = cev_delta2ns(dev->min_delta_ticks, dev, false);
-	dev->max_delta_ns = cev_delta2ns(dev->max_delta_ticks, dev, true);
 }
 
 /**
