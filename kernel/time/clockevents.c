@@ -658,11 +658,11 @@ int clockevents_update_freq(struct clock_event_device *dev, u32 freq)
 	unsigned long flags;
 	int ret;
 
-	local_irq_save(flags);
+	raw_spin_lock_irqsave(&clockevents_lock, flags);
 	ret = tick_broadcast_update_freq(dev, freq);
 	if (ret == -ENODEV)
 		ret = __clockevents_update_freq(dev, freq);
-	local_irq_restore(flags);
+	raw_spin_unlock_irqrestore(&clockevents_lock, flags);
 	return ret;
 }
 
