@@ -1050,6 +1050,7 @@ static int dwc3_probe(struct platform_device *pdev)
 		goto err0;
 
 	spin_lock_init(&dwc->lock);
+	init_completion(&dwc->ep0_completed);
 
 	if (!dev->dma_mask) {
 		dev->dma_mask = dev->parent->dma_mask;

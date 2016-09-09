@@ -286,6 +286,7 @@ static void dwc3_ep0_stall_and_restart(struct dwc3 *dwc)
 
 	dwc->ep0state = EP0_SETUP_PHASE;
 	dwc3_ep0_out_start(dwc);
+	complete(&dwc->ep0_completed);
 }
 
 int __dwc3_gadget_ep0_set_halt(struct usb_ep *ep, int value)
@@ -935,6 +936,7 @@ static void dwc3_ep0_complete_status(struct dwc3 *dwc,
 
 	dwc->ep0state = EP0_SETUP_PHASE;
 	dwc3_ep0_out_start(dwc);
+	complete(&dwc->ep0_completed);
 }
 
 static void dwc3_ep0_xfer_complete(struct dwc3 *dwc,
