@@ -21,14 +21,7 @@ struct ila_map {
 	struct rcu_head rcu;
 };
 
-static unsigned int ila_net_id;
-
-struct ila_net {
-	struct rhashtable rhash_table;
-	spinlock_t *locks; /* Bucket locks for entry manipulation */
-	unsigned int locks_mask;
-	bool hooks_registered;
-};
+unsigned int ila_net_id;
 
 static u32 hashrnd __read_mostly;
 static __always_inline void __ila_hash_secret_init(void)
@@ -546,6 +539,10 @@ static __net_init int ila_init_net(struct net *net)
 	if (err)
 		return err;
 
+	/* Resolver net is create on demand when LWT ILA resolver route
+	 * is made.
+	 */
+
 	rhashtable_init(&ilan->rhash_table, &rht_params);
 
 	return 0;
@@ -556,6 +553,8 @@ static __net_exit void ila_exit_net(struct net *net)
 	struct ila_net *ilan = net_generic(net, ila_net_id);
 
 	rhashtable_free_and_destroy(&ilan->rhash_table, ila_free_cb, NULL);
+
+	ila_exit_resolver_net(ilan);
 
 	free_bucket_spinlocks(ilan->locks);
 

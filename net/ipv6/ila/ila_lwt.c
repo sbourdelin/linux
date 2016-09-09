@@ -9,6 +9,7 @@
 #include <net/ip.h>
 #include <net/ip6_fib.h>
 #include <net/lwtunnel.h>
+#include <net/netns/generic.h>
 #include <net/protocol.h>
 #include <uapi/linux/ila.h>
 #include "ila.h"
@@ -121,6 +122,14 @@ static int ila_build_state(struct net_device *dev, struct nlattr *nla,
 			LWTUNNEL_STATE_INPUT_REDIRECT;
 
 	*ts = newts;
+
+	if (cfg6->fc_dst_len >= sizeof(struct ila_addr)) {
+		struct net *net = dev_net(dev);
+		struct ila_net *ilan = net_generic(net, ila_net_id);
+
+		/* Cancel any pending resolution on this address */
+		ila_rslv_resolved(ilan, iaddr);
+	}
 
 	return 0;
 }
