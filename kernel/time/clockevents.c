@@ -626,6 +626,39 @@ void __clockevents_adjust_freq(struct clock_event_device *dev)
 							mult_cs_raw);
 }
 
+void clockevents_adjust_all_freqs(u32 mult_cs_mono, u32 mult_cs_raw)
+{
+	u32 last_mult_raw = 0, last_shift = 0, last_mult_adjusted = 0;
+	u32 mult_raw, shift;
+	unsigned long flags;
+	struct clock_event_device *dev;
+
+	raw_spin_lock_irqsave(&clockevents_lock, flags);
+	list_for_each_entry(dev, &clockevent_devices, list) {
+		if (!(dev->features & CLOCK_EVT_FEAT_ONESHOT) ||
+		     (dev->features & CLOCK_EVT_FEAT_NO_ADJUST))
+			continue;
+
+		/*
+		 * The cached last_mult_adjusted is only valid if
+		 * shift == last_shift. Otherwise, it could exceed
+		 * what is allowed by ->max_delta_ns.
+		 */
+		mult_raw = dev->mult;
+		shift = dev->shift;
+		if (mult_raw != last_mult_raw || shift != last_shift) {
+			last_mult_raw = mult_raw;
+			last_shift = shift;
+			last_mult_adjusted =
+				__clockevents_calc_adjust_freq(mult_raw,
+							mult_cs_mono,
+							mult_cs_raw);
+		}
+		dev->mult_adjusted = last_mult_adjusted;
+	}
+	raw_spin_unlock_irqrestore(&clockevents_lock, flags);
+}
+
 int __clockevents_update_freq(struct clock_event_device *dev, u32 freq)
 {
 	clockevents_config(dev, freq);
