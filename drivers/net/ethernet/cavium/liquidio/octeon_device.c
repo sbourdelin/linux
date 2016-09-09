@@ -19,6 +19,7 @@
 * This file may also be available under a different license from Cavium.
 * Contact Cavium, Inc. for more information
 **********************************************************************/
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #include <linux/pci.h>
 #include <linux/netdevice.h>
 #include <linux/vmalloc.h>
@@ -1028,8 +1029,7 @@ octeon_register_dispatch_fn(struct octeon_device *oct,
 	if (!pfn) {
 		struct octeon_dispatch *dispatch;
 
-		dev_dbg(&oct->pci_dev->dev,
-			"Adding opcode to dispatch list linked list\n");
+		pr_devel("Adding opcode to dispatch list linked list\n");
 		dispatch = (struct octeon_dispatch *)
 			   vmalloc(sizeof(struct octeon_dispatch));
 		if (!dispatch) {
@@ -1113,9 +1113,9 @@ int octeon_core_drv_init(struct octeon_recv_info *recv_info, void *buf)
 	cs = &core_setup[oct->octeon_id];
 
 	if (recv_pkt->buffer_size[0] != sizeof(*cs)) {
-		dev_dbg(&oct->pci_dev->dev, "Core setup bytes expected %u found %d\n",
-			(u32)sizeof(*cs),
-			recv_pkt->buffer_size[0]);
+		pr_devel("Core setup bytes expected %u found %d\n",
+			 (u32)sizeof(*cs),
+			 recv_pkt->buffer_size[0]);
 	}
 
 	memcpy(cs, get_rbd(recv_pkt->buffer_ptr[0]), sizeof(*cs));

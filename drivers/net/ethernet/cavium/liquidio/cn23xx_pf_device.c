@@ -312,11 +312,12 @@ static void cn23xx_setup_global_mac_regs(struct octeon_device *oct)
 	u64 reg_val;
 	u16 mac_no = oct->pcie_port;
 	u16 pf_num = oct->pf_num;
+	u64 temp;
 
 	/* programming SRN and TRS for each MAC(0..3)  */
 
-	dev_dbg(&oct->pci_dev->dev, "%s:Using pcie port %d\n",
-		__func__, mac_no);
+	pr_devel("%s:Using pcie port %d\n",
+		 __func__, mac_no);
 	/* By default, mapping all 64 IOQs to  a single MACs */
 
 	reg_val =
@@ -333,13 +334,21 @@ static void cn23xx_setup_global_mac_regs(struct octeon_device *oct)
 	/* setting TRS <23:16> */
 	reg_val = reg_val |
 		  (oct->sriov_info.trs << CN23XX_PKT_MAC_CTL_RINFO_TRS_BIT_POS);
+	/* setting RPVF <39:32> */
+	temp = oct->sriov_info.rings_per_vf & 0xff;
+	reg_val |= (temp << CN23XX_PKT_MAC_CTL_RINFO_RPVF_BIT_POS);
+
+	/* setting NVFS <55:48> */
+	temp = oct->sriov_info.num_vfs & 0xff;
+	reg_val |= (temp << CN23XX_PKT_MAC_CTL_RINFO_NVFS_BIT_POS);
+
 	/* write these settings to MAC register */
 	octeon_write_csr64(oct, CN23XX_SLI_PKT_MAC_RINFO64(mac_no, pf_num),
 			   reg_val);
 
-	dev_dbg(&oct->pci_dev->dev, "SLI_PKT_MAC(%d)_PF(%d)_RINFO : 0x%016llx\n",
-		mac_no, pf_num, (u64)octeon_read_csr64
-		(oct, CN23XX_SLI_PKT_MAC_RINFO64(mac_no, pf_num)));
+	pr_devel("SLI_PKT_MAC(%d)_PF(%d)_RINFO : 0x%016llx\n",
+		 mac_no, pf_num, (u64)octeon_read_csr64
+		 (oct, CN23XX_SLI_PKT_MAC_RINFO64(mac_no, pf_num)));
 }
 
 static int cn23xx_reset_io_queues(struct octeon_device *oct)
@@ -404,6 +413,7 @@ static int cn23xx_pf_setup_global_input_regs(struct octeon_device *oct)
 	u64 intr_threshold, reg_val;
 	struct octeon_instr_queue *iq;
 	struct octeon_cn23xx_pf *cn23xx = (struct octeon_cn23xx_pf *)oct->chip;
+	u64 vf_num;
 
 	pf_num = oct->pf_num;
 
@@ -420,6 +430,16 @@ static int cn23xx_pf_setup_global_input_regs(struct octeon_device *oct)
 	*/
 	for (q_no = 0; q_no < ern; q_no++) {
 		reg_val = oct->pcie_port << CN23XX_PKT_INPUT_CTL_MAC_NUM_POS;
+
+		/* for VF assigned queues. */
+		if (q_no < oct->sriov_info.pf_srn) {
+			vf_num = q_no / oct->sriov_info.rings_per_vf;
+			vf_num += 1; /* VF1, VF2,........ */
+		} else {
+			vf_num = 0;
+		}
+
+		reg_val |= vf_num << CN23XX_PKT_INPUT_CTL_VF_NUM_POS;
 		reg_val |= pf_num << CN23XX_PKT_INPUT_CTL_PF_NUM_POS;
 
 		octeon_write_csr64(oct, CN23XX_SLI_IQ_PKT_CONTROL64(q_no),
@@ -590,8 +610,8 @@ static void cn23xx_setup_iq_regs(struct octeon_device *oct, u32 iq_no)
 	    (u8 *)oct->mmio[0].hw_addr + CN23XX_SLI_IQ_DOORBELL(iq_no);
 	iq->inst_cnt_reg =
 	    (u8 *)oct->mmio[0].hw_addr + CN23XX_SLI_IQ_INSTR_COUNT64(iq_no);
-	dev_dbg(&oct->pci_dev->dev, "InstQ[%d]:dbell reg @ 0x%p instcnt_reg @ 0x%p\n",
-		iq_no, iq->doorbell_reg, iq->inst_cnt_reg);
+	pr_devel("InstQ[%d]:dbell reg @ 0x%p instcnt_reg @ 0x%p\n",
+		 iq_no, iq->doorbell_reg, iq->inst_cnt_reg);
 
 	/* Store the current instruction counter (used in flush_iq
 	 * calculation)
@@ -822,7 +842,7 @@ static u64 cn23xx_pf_msix_interrupt_handler(void *dev)
 	u64 ret = 0;
 	struct octeon_droq *droq = oct->droq[ioq_vector->droq_index];
 
-	dev_dbg(&oct->pci_dev->dev, "In %s octeon_dev @ %p\n", __func__, oct);
+	pr_devel("In %s octeon_dev @ %p\n", __func__, oct);
 
 	if (!droq) {
 		dev_err(&oct->pci_dev->dev, "23XX bringup FIXME: oct pfnum:%d ioq_vector->ioq_num :%d droq is NULL\n",
@@ -862,7 +882,7 @@ static irqreturn_t cn23xx_interrupt_handler(void *dev)
 	struct octeon_cn23xx_pf *cn23xx = (struct octeon_cn23xx_pf *)oct->chip;
 	u64 intr64;
 
-	dev_dbg(&oct->pci_dev->dev, "In %s octeon_dev @ %p\n", __func__, oct);
+	pr_devel("In %s octeon_dev @ %p\n", __func__, oct);
 	intr64 = readq(cn23xx->intr_sum_reg64);
 
 	oct->int_status = 0;
@@ -983,8 +1003,8 @@ static void cn23xx_get_pcie_qlmport(struct octeon_device *oct)
 {
 	oct->pcie_port = (octeon_read_csr(oct, CN23XX_SLI_MAC_NUMBER)) & 0xff;
 
-	dev_dbg(&oct->pci_dev->dev, "OCTEON: CN23xx uses PCIE Port %d\n",
-		oct->pcie_port);
+	pr_devel("OCTEON: CN23xx uses PCIE Port %d\n",
+		 oct->pcie_port);
 }
 
 static void cn23xx_get_pf_num(struct octeon_device *oct)
@@ -1046,11 +1066,27 @@ static void cn23xx_setup_reg_address(struct octeon_device *oct)
 	    CN23XX_SLI_MAC_PF_INT_ENB64(oct->pcie_port, oct->pf_num);
 }
 
+static u32 lower_pow(u32 num)
+{
+	u32 n = num > 0 ? num - 1 : 0;
+
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	n++;
+
+	return ((n > num) ? (n >> 1) : n);
+}
+
 static int cn23xx_sriov_config(struct octeon_device *oct)
 {
 	u32 total_rings;
 	struct octeon_cn23xx_pf *cn23xx = (struct octeon_cn23xx_pf *)oct->chip;
 	/* num_vfs is already filled for us */
+	u32 num_vfs = oct->sriov_info.num_vfs;
+	u32 rings_per_vf, max_vfs;
 	u32 pf_srn, num_pf_rings;
 
 	cn23xx->conf =
@@ -1058,40 +1094,150 @@ static int cn23xx_sriov_config(struct octeon_device *oct)
 	switch (oct->rev_id) {
 	case OCTEON_CN23XX_REV_1_0:
 		total_rings = CN23XX_MAX_RINGS_PER_PF_PASS_1_0;
+		max_vfs = CN23XX_MAX_VFS_PER_PF_PASS_1_0;
 		break;
 	case OCTEON_CN23XX_REV_1_1:
 		total_rings = CN23XX_MAX_RINGS_PER_PF_PASS_1_1;
+		max_vfs = CN23XX_MAX_VFS_PER_PF_PASS_1_1;
 		break;
 	default:
 		total_rings = CN23XX_MAX_RINGS_PER_PF;
+		max_vfs = CN23XX_MAX_VFS_PER_PF;
 		break;
 	}
-	if (!oct->sriov_info.num_pf_rings) {
-		if (total_rings > num_present_cpus())
-			num_pf_rings = num_present_cpus();
-		else
-			num_pf_rings = total_rings;
-	} else {
-		num_pf_rings = oct->sriov_info.num_pf_rings;
 
-		if (num_pf_rings > total_rings) {
-			dev_warn(&oct->pci_dev->dev,
-				 "num_queues_per_pf requested %u is more than available rings. Reducing to %u\n",
-				 num_pf_rings, total_rings);
-			num_pf_rings = total_rings;
+	if (num_vfs > min((total_rings - 1), max_vfs)) {
+		dev_warn(&oct->pci_dev->dev, "num_vfs requested %u is more than available rings. Reducing to %u\n",
+			 num_vfs, min((total_rings - 1), max_vfs));
+		num_vfs = min((total_rings - 1), max_vfs);
+	}
+
+	if (!num_vfs) {
+		pr_devel("num_vfs is zero, SRIOV is not enabled...\n");
+
+		if (oct->sriov_info.rings_per_vf > 0)
+			dev_warn(&oct->pci_dev->dev, "num_queues_per_vf is ignored because num_vfs=0.\n");
+
+		rings_per_vf = 0;
+
+		if (!oct->sriov_info.num_pf_rings) {
+			if (total_rings > num_present_cpus())
+				num_pf_rings = num_present_cpus();
+			else
+				num_pf_rings = total_rings;
+		} else {
+			num_pf_rings = oct->sriov_info.num_pf_rings;
+
+			if (num_pf_rings > total_rings) {
+				dev_warn(&oct->pci_dev->dev,
+					 "num_queues_per_pf requested %u is more than available rings. Reducing to %u\n",
+					 num_pf_rings, total_rings);
+				num_pf_rings = total_rings;
+			}
+		}
+
+		total_rings = num_pf_rings;
+
+	} else {
+		if (!oct->sriov_info.rings_per_vf) {
+			if (oct->sriov_info.num_pf_rings > 0) {
+				num_pf_rings = oct->sriov_info.num_pf_rings;
+				if (num_pf_rings > (total_rings - num_vfs)) {
+					num_pf_rings = total_rings - num_vfs;
+					dev_warn(&oct->pci_dev->dev,
+						 "num_queues_per_pf requested %u is more than available rings. Reducing to %u\n",
+						 oct->sriov_info.num_pf_rings,
+						 num_pf_rings);
+				}
+				rings_per_vf = lower_pow(
+						(total_rings - num_pf_rings) /
+						num_vfs);
+				rings_per_vf = min_t(u32, rings_per_vf,
+						     CN23XX_MAX_RINGS_PER_VF);
+			} else {
+				if ((oct->rev_id == OCTEON_CN23XX_REV_1_0) &&
+				    (num_vfs >= LIOLUT_RING_DISTRIBUTION)) {
+					rings_per_vf = 1;
+					total_rings = num_vfs + 1;
+				} else if (oct->rev_id ==
+					   OCTEON_CN23XX_REV_1_0) {
+					rings_per_vf =
+						liolut_num_vfs_to_rings_per_vf
+						[num_vfs];
+				} else {
+					rings_per_vf = lower_pow(total_rings /
+								 (num_vfs + 1));
+				}
+				rings_per_vf = min_t(u32, rings_per_vf,
+						     CN23XX_MAX_RINGS_PER_VF);
+				num_pf_rings = total_rings -
+					(rings_per_vf * num_vfs);
+
+				if (num_pf_rings > num_present_cpus()) {
+					num_pf_rings = num_present_cpus();
+					total_rings = num_pf_rings +
+						rings_per_vf * num_vfs;
+				}
+			}
+		} else {
+			u32 i;
+
+			i = lower_pow((total_rings - 1) / num_vfs);
+
+			if (oct->sriov_info.rings_per_vf >
+			    min_t(u32, i, CN23XX_MAX_RINGS_PER_VF)) {
+				rings_per_vf = min_t(u32, i,
+						     CN23XX_MAX_RINGS_PER_VF);
+				dev_warn(&oct->pci_dev->dev,
+					 "num_queues_per_vf requested %u is more than available rings. Reducing to %u\n",
+					 oct->sriov_info.rings_per_vf,
+					 rings_per_vf);
+			} else {
+				rings_per_vf = lower_pow(
+						oct->sriov_info.rings_per_vf);
+
+				if (rings_per_vf !=
+				    oct->sriov_info.rings_per_vf) {
+					dev_warn(&oct->pci_dev->dev,
+						 "num_queues_per_vf requested %u is not power of two. Reducing to %u\n",
+						 oct->sriov_info.rings_per_vf,
+						 rings_per_vf);
+				}
+			}
+
+			if (!oct->sriov_info.num_pf_rings) {
+				num_pf_rings = total_rings -
+					(rings_per_vf * num_vfs);
+			} else {
+				num_pf_rings = oct->sriov_info.num_pf_rings;
+
+				if ((num_pf_rings + (num_vfs * rings_per_vf)) >
+				    total_rings) {
+					num_pf_rings = total_rings -
+						(rings_per_vf * num_vfs);
+					dev_warn(&oct->pci_dev->dev,
+						 "num_queues_per_pf requested %u is more than available rings. Reducing to %u\n",
+						 oct->sriov_info.num_pf_rings,
+						 num_pf_rings);
+				}
+			}
 		}
 	}
 
-	total_rings = num_pf_rings;
+	total_rings = num_pf_rings + (num_vfs * rings_per_vf);
+
 	/* the first ring of the pf */
 	pf_srn = total_rings - num_pf_rings;
 
 	oct->sriov_info.trs = total_rings;
+	oct->sriov_info.num_vfs = num_vfs;
+	oct->sriov_info.rings_per_vf = rings_per_vf;
 	oct->sriov_info.pf_srn = pf_srn;
 	oct->sriov_info.num_pf_rings = num_pf_rings;
-	dev_dbg(&oct->pci_dev->dev, "trs:%d pf_srn:%d num_pf_rings:%d\n",
-		oct->sriov_info.trs, oct->sriov_info.pf_srn,
-		oct->sriov_info.num_pf_rings);
+	pr_devel("trs:%d num_vfs:%d rings_per_vf:%d pf_srn:%d num_pf_rings:%d\n",
+		 oct->sriov_info.trs, oct->sriov_info.num_vfs,
+		 oct->sriov_info.rings_per_vf, oct->sriov_info.pf_srn,
+		 oct->sriov_info.num_pf_rings);
 	return 0;
 }
 
@@ -1187,45 +1333,45 @@ void cn23xx_dump_iq_regs(struct octeon_device *oct)
 {
 	u32 regval, q_no;
 
-	dev_dbg(&oct->pci_dev->dev, "SLI_IQ_DOORBELL_0 [0x%x]: 0x%016llx\n",
-		CN23XX_SLI_IQ_DOORBELL(0),
-		CVM_CAST64(octeon_read_csr64
-			(oct, CN23XX_SLI_IQ_DOORBELL(0))));
+	pr_devel("SLI_IQ_DOORBELL_0 [0x%x]: 0x%016llx\n",
+		 CN23XX_SLI_IQ_DOORBELL(0),
+		 CVM_CAST64(octeon_read_csr64
+			 (oct, CN23XX_SLI_IQ_DOORBELL(0))));
 
-	dev_dbg(&oct->pci_dev->dev, "SLI_IQ_BASEADDR_0 [0x%x]: 0x%016llx\n",
-		CN23XX_SLI_IQ_BASE_ADDR64(0),
-		CVM_CAST64(octeon_read_csr64
-			(oct, CN23XX_SLI_IQ_BASE_ADDR64(0))));
+	pr_devel("SLI_IQ_BASEADDR_0 [0x%x]: 0x%016llx\n",
+		 CN23XX_SLI_IQ_BASE_ADDR64(0),
+		 CVM_CAST64(octeon_read_csr64
+			 (oct, CN23XX_SLI_IQ_BASE_ADDR64(0))));
 
-	dev_dbg(&oct->pci_dev->dev, "SLI_IQ_FIFO_RSIZE_0 [0x%x]: 0x%016llx\n",
-		CN23XX_SLI_IQ_SIZE(0),
-		CVM_CAST64(octeon_read_csr64(oct, CN23XX_SLI_IQ_SIZE(0))));
+	pr_devel("SLI_IQ_FIFO_RSIZE_0 [0x%x]: 0x%016llx\n",
+		 CN23XX_SLI_IQ_SIZE(0),
+		 CVM_CAST64(octeon_read_csr64(oct, CN23XX_SLI_IQ_SIZE(0))));
 
-	dev_dbg(&oct->pci_dev->dev, "SLI_CTL_STATUS [0x%x]: 0x%016llx\n",
-		CN23XX_SLI_CTL_STATUS,
-		CVM_CAST64(octeon_read_csr64(oct, CN23XX_SLI_CTL_STATUS)));
+	pr_devel("SLI_CTL_STATUS [0x%x]: 0x%016llx\n",
+		 CN23XX_SLI_CTL_STATUS,
+		 CVM_CAST64(octeon_read_csr64(oct, CN23XX_SLI_CTL_STATUS)));
 
 	for (q_no = 0; q_no < CN23XX_MAX_INPUT_QUEUES; q_no++) {
-		dev_dbg(&oct->pci_dev->dev, "SLI_PKT[%d]_INPUT_CTL [0x%x]: 0x%016llx\n",
-			q_no, CN23XX_SLI_IQ_PKT_CONTROL64(q_no),
-			CVM_CAST64(octeon_read_csr64
-				(oct,
-					CN23XX_SLI_IQ_PKT_CONTROL64(q_no))));
+		pr_devel("SLI_PKT[%d]_INPUT_CTL [0x%x]: 0x%016llx\n",
+			 q_no, CN23XX_SLI_IQ_PKT_CONTROL64(q_no),
+			 CVM_CAST64(octeon_read_csr64
+				 (oct,
+					 CN23XX_SLI_IQ_PKT_CONTROL64(q_no))));
 	}
 
 	pci_read_config_dword(oct->pci_dev, CN23XX_CONFIG_PCIE_DEVCTL, &regval);
-	dev_dbg(&oct->pci_dev->dev, "Config DevCtl [0x%x]: 0x%08x\n",
-		CN23XX_CONFIG_PCIE_DEVCTL, regval);
+	pr_devel("Config DevCtl [0x%x]: 0x%08x\n",
+		 CN23XX_CONFIG_PCIE_DEVCTL, regval);
 
-	dev_dbg(&oct->pci_dev->dev, "SLI_PRT[%d]_CFG [0x%llx]: 0x%016llx\n",
-		oct->pcie_port, CN23XX_DPI_SLI_PRTX_CFG(oct->pcie_port),
-		CVM_CAST64(lio_pci_readq(
-			oct, CN23XX_DPI_SLI_PRTX_CFG(oct->pcie_port))));
+	pr_devel("SLI_PRT[%d]_CFG [0x%llx]: 0x%016llx\n",
+		 oct->pcie_port, CN23XX_DPI_SLI_PRTX_CFG(oct->pcie_port),
+		 CVM_CAST64(lio_pci_readq(
+			 oct, CN23XX_DPI_SLI_PRTX_CFG(oct->pcie_port))));
 
-	dev_dbg(&oct->pci_dev->dev, "SLI_S2M_PORT[%d]_CTL [0x%x]: 0x%016llx\n",
-		oct->pcie_port, CN23XX_SLI_S2M_PORTX_CTL(oct->pcie_port),
-		CVM_CAST64(octeon_read_csr64(
-			oct, CN23XX_SLI_S2M_PORTX_CTL(oct->pcie_port))));
+	pr_devel("SLI_S2M_PORT[%d]_CTL [0x%x]: 0x%016llx\n",
+		 oct->pcie_port, CN23XX_SLI_S2M_PORTX_CTL(oct->pcie_port),
+		 CVM_CAST64(octeon_read_csr64(
+			 oct, CN23XX_SLI_S2M_PORTX_CTL(oct->pcie_port))));
 }
 
 int cn23xx_fw_loaded(struct octeon_device *oct)

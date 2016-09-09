@@ -322,11 +322,18 @@ struct octeon_pf_vf_hs_word {
 };
 
 struct octeon_sriov_info {
+	/* Number of rings assigned to VF */
+	u32	rings_per_vf;
+
+	/* Number of VF devices enabled */
+	u32	num_vfs;
+
 	/* Actual rings left for PF device */
 	u32	num_pf_rings;
 
-	/* SRN of PF usable IO queues   */
+	/* SRN of PF usable IO queues */
 	u32	pf_srn;
+
 	/* total pf rings */
 	u32	trs;
 

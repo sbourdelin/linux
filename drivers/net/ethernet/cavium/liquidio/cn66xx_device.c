@@ -19,6 +19,7 @@
 * This file may also be available under a different license from Cavium.
 * Contact Cavium, Inc. for more information
 **********************************************************************/
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #include <linux/pci.h>
 #include <linux/netdevice.h>
 #include "liquidio_common.h"
@@ -34,7 +35,7 @@ int lio_cn6xxx_soft_reset(struct octeon_device *oct)
 {
 	octeon_write_csr64(oct, CN6XXX_WIN_WR_MASK_REG, 0xFF);
 
-	dev_dbg(&oct->pci_dev->dev, "BIST enabled for soft reset\n");
+	pr_devel("BIST enabled for soft reset\n");
 
 	lio_pci_writeq(oct, 1, CN6XXX_CIU_SOFT_BIST);
 	octeon_write_csr64(oct, CN6XXX_SLI_SCRATCH1, 0x1234ULL);
@@ -53,7 +54,7 @@ int lio_cn6xxx_soft_reset(struct octeon_device *oct)
 		return 1;
 	}
 
-	dev_dbg(&oct->pci_dev->dev, "Reset completed\n");
+	pr_devel("Reset completed\n");
 	octeon_write_csr64(oct, CN6XXX_WIN_WR_MASK_REG, 0xFF);
 
 	return 0;
@@ -71,7 +72,7 @@ void lio_cn6xxx_enable_error_reporting(struct octeon_device *oct)
 
 	val |= 0xf;          /* Enable Link error reporting */
 
-	dev_dbg(&oct->pci_dev->dev, "Enabling PCI-E error reporting..\n");
+	pr_devel("Enabling PCI-E error reporting..\n");
 	pci_write_config_dword(oct->pci_dev, CN6XXX_PCIE_DEVCTL, val);
 }
 
@@ -289,8 +290,8 @@ void lio_cn6xxx_setup_iq_regs(struct octeon_device *oct, u32 iq_no)
 	iq->doorbell_reg = oct->mmio[0].hw_addr + CN6XXX_SLI_IQ_DOORBELL(iq_no);
 	iq->inst_cnt_reg = oct->mmio[0].hw_addr
 			   + CN6XXX_SLI_IQ_INSTR_COUNT(iq_no);
-	dev_dbg(&oct->pci_dev->dev, "InstQ[%d]:dbell reg @ 0x%p instcnt_reg @ 0x%p\n",
-		iq_no, iq->doorbell_reg, iq->inst_cnt_reg);
+	pr_devel("InstQ[%d]:dbell reg @ 0x%p instcnt_reg @ 0x%p\n",
+		 iq_no, iq->doorbell_reg, iq->inst_cnt_reg);
 
 	/* Store the current instruction counter
 	 * (used in flush_iq calculation)
@@ -508,7 +509,7 @@ static void lio_cn6xxx_get_pcie_qlmport(struct octeon_device *oct)
 	 */
 	oct->pcie_port = octeon_read_csr(oct, CN6XXX_SLI_MAC_NUMBER) & 0xff;
 
-	dev_dbg(&oct->pci_dev->dev, "Using PCIE Port %d\n", oct->pcie_port);
+	pr_devel("Using PCIE Port %d\n", oct->pcie_port);
 }
 
 static void

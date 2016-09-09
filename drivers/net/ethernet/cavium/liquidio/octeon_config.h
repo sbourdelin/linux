@@ -65,6 +65,11 @@
 #define   DEFAULT_NUM_NIC_PORTS_68XX_210NV  2
 
 /* CN23xx  IQ configuration macros */
+#define   CN23XX_MAX_VFS_PER_PF_PASS_1_0 8
+#define   CN23XX_MAX_VFS_PER_PF_PASS_1_1 31
+#define   CN23XX_MAX_VFS_PER_PF          63
+#define   CN23XX_MAX_RINGS_PER_VF        8
+
 #define   CN23XX_MAX_RINGS_PER_PF_PASS_1_0 12
 #define   CN23XX_MAX_RINGS_PER_PF_PASS_1_1 32
 #define   CN23XX_MAX_RINGS_PER_PF          64
