@@ -328,6 +328,18 @@ static void nfs4_setup_readdir(u64 cookie, __be32 *verifier, struct dentry *dent
 	kunmap_atomic(start);
 }
 
+static void nfs4_free_revoked_stateid(struct nfs_server *server,
+		const nfs4_stateid *stateid,
+		struct rpc_cred *cred)
+{
+	const struct nfs4_minor_version_ops *ops = server->nfs_client->cl_mvops;
+	nfs4_stateid tmp;
+
+	nfs4_stateid_copy(&tmp, stateid);
+	tmp.type = NFS4_REVOKED_STATEID_TYPE;
+	ops->test_and_free_expired(server, &tmp, cred);
+}
+
 static long nfs4_update_delay(long *timeout)
 {
 	long ret;
@@ -2983,9 +2995,12 @@ static void nfs4_close_done(struct rpc_task *task, void *data)
 			break;
 		case -NFS4ERR_ADMIN_REVOKED:
 		case -NFS4ERR_STALE_STATEID:
+		case -NFS4ERR_EXPIRED:
+			nfs4_free_revoked_stateid(server,
+					&calldata->arg.stateid,
+					task->tk_msg.rpc_cred);
 		case -NFS4ERR_OLD_STATEID:
 		case -NFS4ERR_BAD_STATEID:
-		case -NFS4ERR_EXPIRED:
 			if (!nfs4_stateid_match(&calldata->arg.stateid,
 						&state->open_stateid)) {
 				rpc_restart_call_prepare(task);
@@ -5477,10 +5492,13 @@ static void nfs4_delegreturn_done(struct rpc_task *task, void *calldata)
 		renew_lease(data->res.server, data->timestamp);
 	case -NFS4ERR_ADMIN_REVOKED:
 	case -NFS4ERR_DELEG_REVOKED:
+	case -NFS4ERR_EXPIRED:
+		nfs4_free_revoked_stateid(data->res.server,
+				data->args.stateid,
+				task->tk_msg.rpc_cred);
 	case -NFS4ERR_BAD_STATEID:
 	case -NFS4ERR_OLD_STATEID:
 	case -NFS4ERR_STALE_STATEID:
-	case -NFS4ERR_EXPIRED:
 		task->tk_status = 0;
 		if (data->roc)
 			pnfs_roc_set_barrier(data->inode, data->roc_barrier);
@@ -5745,10 +5763,14 @@ static void nfs4_locku_done(struct rpc_task *task, void *data)
 			if (nfs4_update_lock_stateid(calldata->lsp,
 					&calldata->res.stateid))
 				break;
+		case -NFS4ERR_ADMIN_REVOKED:
+		case -NFS4ERR_EXPIRED:
+			nfs4_free_revoked_stateid(calldata->server,
+					&calldata->arg.stateid,
+					task->tk_msg.rpc_cred);
 		case -NFS4ERR_BAD_STATEID:
 		case -NFS4ERR_OLD_STATEID:
 		case -NFS4ERR_STALE_STATEID:
-		case -NFS4ERR_EXPIRED:
 			if (!nfs4_stateid_match(&calldata->arg.stateid,
 						&calldata->lsp->ls_stateid))
 				rpc_restart_call_prepare(task);
