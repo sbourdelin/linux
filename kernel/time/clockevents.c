@@ -246,19 +246,14 @@ static int clockevents_increase_min_delta(struct clock_event_device *dev)
  */
 static int clockevents_program_min_delta(struct clock_event_device *dev)
 {
-	unsigned long long clc;
-	int64_t delta;
 	int i;
 
 	for (i = 0;;) {
-		delta = dev->min_delta_ns;
-
 		if (clockevent_state_shutdown(dev))
 			return 0;
 
 		dev->retries++;
-		clc = ((unsigned long long) delta * dev->mult) >> dev->shift;
-		if (dev->set_next_event((unsigned long) clc, dev) == 0)
+		if (!dev->set_next_event(dev->min_delta_ticks_adjusted, dev))
 			return 0;
 
 		if (++i > 2) {
@@ -284,17 +279,11 @@ static int clockevents_program_min_delta(struct clock_event_device *dev)
  */
 static int clockevents_program_min_delta(struct clock_event_device *dev)
 {
-	unsigned long long clc;
-	int64_t delta;
-
-	delta = dev->min_delta_ns;
-
 	if (clockevent_state_shutdown(dev))
 		return 0;
 
 	dev->retries++;
-	clc = ((unsigned long long) delta * dev->mult) >> dev->shift;
-	return dev->set_next_event((unsigned long) clc, dev);
+	return dev->set_next_event(dev->min_delta_ticks_adjusted, dev);
 }
 
 #endif /* CONFIG_GENERIC_CLOCKEVENTS_MIN_ADJUST */
