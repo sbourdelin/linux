@@ -156,7 +156,7 @@ void intel_disable_shared_dpll(struct intel_crtc *crtc)
 	unsigned crtc_mask = 1 << drm_crtc_index(&crtc->base);
 
 	/* PCH only available on ILK+ */
-	if (INTEL_INFO(dev)->gen < 5)
+	if (INTEL_GEN(dev_priv) < 5)
 		return;
 
 	if (pll == NULL)
