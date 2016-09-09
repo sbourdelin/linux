@@ -105,4 +105,14 @@ config USB_DWC3_ST
 	  inside (i.e. STiH407).
 	  Say 'Y' or 'M' if you have one such device.
 
+config USB_DWC3_OCTEON
+	bool "Cavium OCTEON III Platforms"
+	depends on CPU_CAVIUM_OCTEON || COMPILE_TEST
+	depends on OF
+	default USB_DWC3
+	help
+	  Cavium OCTEON III SoCs with one DesignWare Core USB3 IP
+	  inside (i.e. cn71xx and cn78xx).
+	  Say 'Y' or 'M' if you have one such device.
+
 endif
