@@ -7665,6 +7665,15 @@ W:	http://www.mellanox.com
 Q:	http://patchwork.ozlabs.org/project/netdev/list/
 F:	drivers/net/ethernet/mellanox/mlxsw/
 
+MELLANOX MLXCPLD I2C DRIVER
+M:	Vadim Pasternak <vadimp@mellanox.com>
+M:	Michael Shych <michaelsh@mellanox.com>
+L:	linux-i2c@vger.kernel.org
+S:	Supported
+W:	http://www.mellanox.com
+F:	drivers/i2c/busses/i2c-mlxcpld.c
+F:	Documentation/i2c/busses/i2c-mlxcpld
+
 SOFT-ROCE DRIVER (rxe)
 M:	Moni Shoua <monis@mellanox.com>
 L:	linux-rdma@vger.kernel.org
