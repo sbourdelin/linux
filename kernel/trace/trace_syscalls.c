@@ -404,17 +404,26 @@ static int reg_event_syscall_enter(struct trace_event_file *file,
 	struct trace_array *tr = file->tr;
 	int ret = 0;
 	int num;
+	const char *name;
 
-	num = ((struct syscall_metadata *)call->data)->syscall_nr;
-	if (WARN_ON_ONCE(num < 0 || num >= NR_syscalls))
-		return -ENOSYS;
+	name = ((const struct syscall_metadata *)call->data)->name;
+
 	mutex_lock(&syscall_trace_lock);
-	if (!tr->sys_refcount_enter)
+	if (!tr->sys_refcount_enter) {
 		ret = register_trace_sys_enter(ftrace_syscall_enter, tr);
-	if (!ret) {
-		rcu_assign_pointer(tr->enter_syscall_files[num], file);
-		tr->sys_refcount_enter++;
+		if (ret)
+			goto out_unlock;
 	}
+
+	for (num = 0; num < NR_syscalls; num++) {
+		if (syscalls_metadata[num] &&
+		    arch_syscall_match_sym_name(syscalls_metadata[num]->name,
+				    name))
+			rcu_assign_pointer(tr->enter_syscall_files[num], file);
+	}
+	tr->sys_refcount_enter++;
+
+out_unlock:
 	mutex_unlock(&syscall_trace_lock);
 	return ret;
 }
@@ -424,13 +433,17 @@ static void unreg_event_syscall_enter(struct trace_event_file *file,
 {
 	struct trace_array *tr = file->tr;
 	int num;
+	const char *name;
 
-	num = ((struct syscall_metadata *)call->data)->syscall_nr;
-	if (WARN_ON_ONCE(num < 0 || num >= NR_syscalls))
-		return;
+	name = ((const struct syscall_metadata *)call->data)->name;
 	mutex_lock(&syscall_trace_lock);
 	tr->sys_refcount_enter--;
-	RCU_INIT_POINTER(tr->enter_syscall_files[num], NULL);
+	for (num = 0; num < NR_syscalls; num++) {
+		if (syscalls_metadata[num] &&
+		   arch_syscall_match_sym_name(syscalls_metadata[num]->name,
+				   name))
+			RCU_INIT_POINTER(tr->enter_syscall_files[num], NULL);
+	}
 	if (!tr->sys_refcount_enter)
 		unregister_trace_sys_enter(ftrace_syscall_enter, tr);
 	mutex_unlock(&syscall_trace_lock);
@@ -442,17 +455,26 @@ static int reg_event_syscall_exit(struct trace_event_file *file,
 	struct trace_array *tr = file->tr;
 	int ret = 0;
 	int num;
+	const char *name;
 
-	num = ((struct syscall_metadata *)call->data)->syscall_nr;
-	if (WARN_ON_ONCE(num < 0 || num >= NR_syscalls))
-		return -ENOSYS;
+	name = ((const struct syscall_metadata *)call->data)->name;
+
 	mutex_lock(&syscall_trace_lock);
-	if (!tr->sys_refcount_exit)
-		ret = register_trace_sys_exit(ftrace_syscall_exit, tr);
-	if (!ret) {
-		rcu_assign_pointer(tr->exit_syscall_files[num], file);
-		tr->sys_refcount_exit++;
+	if (!tr->sys_refcount_exit) {
+		ret = register_trace_sys_enter(ftrace_syscall_exit, tr);
+		if (ret)
+			goto out_unlock;
 	}
+
+	for (num = 0; num < NR_syscalls; num++) {
+		if (syscalls_metadata[num] &&
+		    arch_syscall_match_sym_name(syscalls_metadata[num]->name,
+				    name))
+			rcu_assign_pointer(tr->exit_syscall_files[num], file);
+	}
+	tr->sys_refcount_exit++;
+
+out_unlock:
 	mutex_unlock(&syscall_trace_lock);
 	return ret;
 }
@@ -462,13 +484,18 @@ static void unreg_event_syscall_exit(struct trace_event_file *file,
 {
 	struct trace_array *tr = file->tr;
 	int num;
+	const char *name;
 
-	num = ((struct syscall_metadata *)call->data)->syscall_nr;
-	if (WARN_ON_ONCE(num < 0 || num >= NR_syscalls))
-		return;
+	name = ((const struct syscall_metadata *)call->data)->name;
+
 	mutex_lock(&syscall_trace_lock);
 	tr->sys_refcount_exit--;
-	RCU_INIT_POINTER(tr->exit_syscall_files[num], NULL);
+	for (num = 0; num < NR_syscalls; num++) {
+		if (syscalls_metadata[num] &&
+		   arch_syscall_match_sym_name(syscalls_metadata[num]->name,
+				   name))
+			RCU_INIT_POINTER(tr->exit_syscall_files[num], NULL);
+	}
 	if (!tr->sys_refcount_exit)
 		unregister_trace_sys_exit(ftrace_syscall_exit, tr);
 	mutex_unlock(&syscall_trace_lock);
@@ -477,14 +504,6 @@ static void unreg_event_syscall_exit(struct trace_event_file *file,
 static int __init init_syscall_trace(struct trace_event_call *call)
 {
 	int id;
-	int num;
-
-	num = ((struct syscall_metadata *)call->data)->syscall_nr;
-	if (num < 0 || num >= NR_syscalls) {
-		pr_debug("syscall %s metadata not mapped, disabling ftrace event\n",
-				((struct syscall_metadata *)call->data)->name);
-		return -ENOSYS;
-	}
 
 	if (set_syscall_print_fmt(call) < 0)
 		return -ENOMEM;
@@ -547,7 +566,6 @@ void __init init_ftrace_syscalls(void)
 		if (!meta)
 			continue;
 
-		meta->syscall_nr = i;
 		syscalls_metadata[i] = meta;
 	}
 }
@@ -603,19 +621,29 @@ static int perf_sysenter_enable(struct trace_event_call *call)
 {
 	int ret = 0;
 	int num;
+	const char *name;
 
-	num = ((struct syscall_metadata *)call->data)->syscall_nr;
+	name = ((const struct syscall_metadata *)call->data)->name;
 
 	mutex_lock(&syscall_trace_lock);
-	if (!sys_perf_refcount_enter)
+	if (!sys_perf_refcount_enter) {
 		ret = register_trace_sys_enter(perf_syscall_enter, NULL);
-	if (ret) {
-		pr_info("event trace: Could not activate"
+		if (ret) {
+			pr_info("event trace: Could not activate"
 				"syscall entry trace point");
-	} else {
-		set_bit(num, enabled_perf_enter_syscalls);
-		sys_perf_refcount_enter++;
+			goto out_unlock;
+		}
 	}
+
+	for (num = 0; num < NR_syscalls; num++) {
+		if (syscalls_metadata[num] &&
+		    arch_syscall_match_sym_name(syscalls_metadata[num]->name,
+				    name))
+			set_bit(num, enabled_perf_enter_syscalls);
+	}
+	sys_perf_refcount_enter++;
+
+out_unlock:
 	mutex_unlock(&syscall_trace_lock);
 	return ret;
 }
@@ -623,12 +651,18 @@ static int perf_sysenter_enable(struct trace_event_call *call)
 static void perf_sysenter_disable(struct trace_event_call *call)
 {
 	int num;
+	const char *name;
 
-	num = ((struct syscall_metadata *)call->data)->syscall_nr;
+	name = ((const struct syscall_metadata *)call->data)->name;
 
 	mutex_lock(&syscall_trace_lock);
 	sys_perf_refcount_enter--;
-	clear_bit(num, enabled_perf_enter_syscalls);
+	for (num = 0; num < NR_syscalls; num++) {
+		if (syscalls_metadata[num] &&
+		    arch_syscall_match_sym_name(syscalls_metadata[num]->name,
+				    name))
+			clear_bit(num, enabled_perf_enter_syscalls);
+	}
 	if (!sys_perf_refcount_enter)
 		unregister_trace_sys_enter(perf_syscall_enter, NULL);
 	mutex_unlock(&syscall_trace_lock);
@@ -675,19 +709,29 @@ static int perf_sysexit_enable(struct trace_event_call *call)
 {
 	int ret = 0;
 	int num;
+	const char *name;
 
-	num = ((struct syscall_metadata *)call->data)->syscall_nr;
+	name = ((const struct syscall_metadata *)call->data)->name;
 
 	mutex_lock(&syscall_trace_lock);
-	if (!sys_perf_refcount_exit)
+	if (!sys_perf_refcount_exit) {
 		ret = register_trace_sys_exit(perf_syscall_exit, NULL);
-	if (ret) {
-		pr_info("event trace: Could not activate"
+		if (ret) {
+			pr_info("event trace: Could not activate"
 				"syscall exit trace point");
-	} else {
-		set_bit(num, enabled_perf_exit_syscalls);
-		sys_perf_refcount_exit++;
+			goto out_unlock;
+		}
 	}
+
+	for (num = 0; num < NR_syscalls; num++) {
+		if (syscalls_metadata[num] &&
+		    arch_syscall_match_sym_name(syscalls_metadata[num]->name,
+				    name))
+			set_bit(num, enabled_perf_exit_syscalls);
+	}
+	sys_perf_refcount_exit++;
+
+out_unlock:
 	mutex_unlock(&syscall_trace_lock);
 	return ret;
 }
@@ -695,12 +739,18 @@ static int perf_sysexit_enable(struct trace_event_call *call)
 static void perf_sysexit_disable(struct trace_event_call *call)
 {
 	int num;
+	const char *name;
 
-	num = ((struct syscall_metadata *)call->data)->syscall_nr;
+	name = ((const struct syscall_metadata *)call->data)->name;
 
 	mutex_lock(&syscall_trace_lock);
 	sys_perf_refcount_exit--;
-	clear_bit(num, enabled_perf_exit_syscalls);
+	for (num = 0; num < NR_syscalls; num++) {
+		if (syscalls_metadata[num] &&
+		    arch_syscall_match_sym_name(syscalls_metadata[num]->name,
+				    name))
+			clear_bit(num, enabled_perf_exit_syscalls);
+	}
 	if (!sys_perf_refcount_exit)
 		unregister_trace_sys_exit(perf_syscall_exit, NULL);
 	mutex_unlock(&syscall_trace_lock);
