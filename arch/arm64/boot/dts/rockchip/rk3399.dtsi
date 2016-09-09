@@ -703,10 +703,12 @@
 		compatible = "syscon";
 		reg = <0x0 0xffa58000 0x0 0x20>;
 	};
+
 	qos_gmac: qos@ffa5c000 {
 		compatible = "syscon";
 		reg = <0x0 0xffa5c000 0x0 0x20>;
 	};
+
 	qos_pcie: qos@ffa60080 {
 		compatible = "syscon";
 		reg = <0x0 0xffa60080 0x0 0x20>;
@@ -721,6 +723,17 @@
 		compatible = "syscon";
 		reg = <0x0 0xffa60180 0x0 0x20>;
 	};
+
+	qos_usb_otg0: qos@ffa70000 {
+		compatible = "syscon";
+		reg = <0x0 0xffa70000 0x0 0x20>;
+	};
+
+	qos_usb_otg1: qos@ffa70080 {
+		compatible = "syscon";
+		reg = <0x0 0xffa70080 0x0 0x20>;
+	};
+
 	qos_sd: qos@ffa74000 {
 		compatible = "syscon";
 		reg = <0x0 0xffa74000 0x0 0x20>;
@@ -899,6 +912,12 @@
 				reg = <RK3399_PD_SDIOAUDIO>;
 				clocks = <&cru HCLK_SDIO>;
 				pm_qos = <&qos_sdioaudio>;
+			};
+			pd_usb3@RK3399_PD_USB3 {
+				reg = <RK3399_PD_USB3>;
+				clocks = <&cru ACLK_USB3>;
+				pm_qos = <&qos_usb_otg0>,
+					 <&qos_usb_otg1>;
 			};
 			pd_vio@RK3399_PD_VIO {
 				reg = <RK3399_PD_VIO>;
