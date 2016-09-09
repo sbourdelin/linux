@@ -34,17 +34,19 @@ struct ce_unbind {
 	int res;
 };
 
+static void __clockevents_adjust_freq(struct clock_event_device *dev);
+
 static u64 cev_delta2ns(unsigned long latch, struct clock_event_device *evt,
 			bool ismax)
 {
 	u64 clc = (u64) latch << evt->shift;
 	u64 rnd;
 
-	if (unlikely(!evt->mult)) {
-		evt->mult = 1;
+	if (unlikely(!evt->mult_adjusted)) {
+		evt->mult_adjusted = 1;
 		WARN_ON(1);
 	}
-	rnd = (u64) evt->mult - 1;
+	rnd = (u64) evt->mult_adjusted - 1;
 
 	/*
 	 * Upper bound sanity check. If the backwards conversion is
@@ -73,10 +75,10 @@ static u64 cev_delta2ns(unsigned long latch, struct clock_event_device *evt,
 	 * Also omit the add if it would overflow the u64 boundary.
 	 */
 	if ((~0ULL - clc > rnd) &&
-	    (!ismax || evt->mult <= (1ULL << evt->shift)))
+	    (!ismax || evt->mult_adjusted <= (1ULL << evt->shift)))
 		clc += rnd;
 
-	do_div(clc, evt->mult);
+	do_div(clc, evt->mult_adjusted);
 
 	/* Deltas less than 1usec are pointless noise */
 	return clc > 1000 ? clc : 1000;
@@ -165,8 +167,8 @@ void clockevents_switch_state(struct clock_event_device *dev,
 		 * on it, so fix it up and emit a warning:
 		 */
 		if (clockevent_state_oneshot(dev)) {
-			if (unlikely(!dev->mult)) {
-				dev->mult = 1;
+			if (unlikely(!dev->mult_adjusted)) {
+				dev->mult_adjusted = 1;
 				WARN_ON(1);
 			}
 		}
@@ -229,8 +231,9 @@ static int clockevents_increase_min_delta(struct clock_event_device *dev)
 	if (min_delta_ns > MIN_DELTA_LIMIT)
 		min_delta_ns = MIN_DELTA_LIMIT;
 
-	dev->min_delta_ticks_adjusted = (unsigned long)((min_delta_ns *
-						dev->mult) >> dev->shift);
+	dev->min_delta_ticks_adjusted =
+		(unsigned long)((min_delta_ns * dev->mult_adjusted) >>
+				dev->shift);
 	dev->min_delta_ticks_adjusted = max(dev->min_delta_ticks_adjusted,
 						dev->min_delta_ticks);
 
@@ -330,7 +333,7 @@ int clockevents_program_event(struct clock_event_device *dev, ktime_t expires,
 
 	delta = min(delta, (int64_t) dev->max_delta_ns);
 
-	clc = ((unsigned long long) delta * dev->mult) >> dev->shift;
+	clc = ((unsigned long long) delta * dev->mult_adjusted) >> dev->shift;
 
 	clc = min_t(unsigned long, clc, dev->max_delta_ticks);
 	clc = max_t(unsigned long, clc, dev->min_delta_ticks_adjusted);
@@ -497,7 +500,8 @@ static void __clockevents_update_bounds(struct clock_event_device *dev)
 	 */
 	dev->min_delta_ticks_adjusted =
 		max(dev->min_delta_ticks,
-			(unsigned long)((1000ULL * dev->mult) >> dev->shift));
+			(unsigned long)((1000ULL * dev->mult_adjusted) >>
+					dev->shift));
 }
 
 /**
@@ -516,6 +520,7 @@ void clockevents_register_device(struct clock_event_device *dev)
 		dev->cpumask = cpumask_of(smp_processor_id());
 	}
 
+	__clockevents_adjust_freq(dev);
 	__clockevents_update_bounds(dev);
 
 	raw_spin_lock_irqsave(&clockevents_lock, flags);
@@ -570,9 +575,61 @@ void clockevents_config_and_register(struct clock_event_device *dev,
 }
 EXPORT_SYMBOL_GPL(clockevents_config_and_register);
 
+static u32 __clockevents_calc_adjust_freq(u32 mult_ce_raw, u32 mult_cs_mono,
+					u32 mult_cs_raw)
+{
+	u64 adj;
+	int sign;
+
+	if (mult_cs_raw >= mult_cs_mono) {
+		sign = 0;
+		adj = mult_cs_raw - mult_cs_mono;
+	} else {
+		sign = 1;
+		adj = mult_cs_mono - mult_cs_raw;
+	}
+
+	adj *= mult_ce_raw;
+	adj += mult_cs_mono / 2;
+	do_div(adj, mult_cs_mono);
+
+	if (!sign) {
+		/*
+		 * Never increase mult by more than 12.5%,
+		 * c.f. __clockevents_update_bounds().
+		 */
+		adj = min_t(u64, adj, mult_ce_raw / 8);
+		if (U32_MAX - mult_ce_raw < adj)
+			return U32_MAX;
+		return mult_ce_raw + (u32)adj;
+	}
+	if (adj >= mult_ce_raw)
+		return 1;
+	return mult_ce_raw - (u32)adj;
+}
+
+void __clockevents_adjust_freq(struct clock_event_device *dev)
+{
+	u32 mult_cs_mono, mult_cs_raw;
+
+	if (!(dev->features & CLOCK_EVT_FEAT_ONESHOT))
+		return;
+
+	if (dev->features & CLOCK_EVT_FEAT_NO_ADJUST) {
+		dev->mult_adjusted = dev->mult;
+		return;
+	}
+
+	timekeeping_get_mono_mult(&mult_cs_mono, &mult_cs_raw);
+	dev->mult_adjusted = __clockevents_calc_adjust_freq(dev->mult,
+							mult_cs_mono,
+							mult_cs_raw);
+}
+
 int __clockevents_update_freq(struct clock_event_device *dev, u32 freq)
 {
 	clockevents_config(dev, freq);
+	__clockevents_adjust_freq(dev);
 	__clockevents_update_bounds(dev);
 
 	if (clockevent_state_oneshot(dev))

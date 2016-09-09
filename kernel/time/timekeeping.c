@@ -329,6 +329,20 @@ static inline s64 timekeeping_cycles_to_ns(struct tk_read_base *tkr,
 	return timekeeping_delta_to_ns(tkr, delta);
 }
 
+void timekeeping_get_mono_mult(u32 *mult_cs_mono, u32 *mult_cs_raw)
+{
+	unsigned int seq;
+	struct tk_read_base *tkr_mono = &tk_core.timekeeper.tkr_mono;
+
+	/* The seqlock protects us from a racing change_clocksource(). */
+	do {
+		seq = read_seqcount_begin(&tk_core.seq);
+
+		*mult_cs_mono = tkr_mono->mult;
+		*mult_cs_raw = tkr_mono->clock->mult;
+	} while (read_seqcount_retry(&tk_core.seq, seq));
+}
+
 /**
  * update_fast_timekeeper - Update the fast and NMI safe monotonic timekeeper.
  * @tkr: Timekeeping readout base from which we take the update
