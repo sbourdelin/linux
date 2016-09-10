@@ -343,8 +343,7 @@ static int __init cfag12864b_init(void)
 	if (cfag12864b_buffer == NULL) {
 		printk(KERN_ERR CFAG12864B_NAME ": ERROR: "
 			"can't get a free page\n");
-		ret = -ENOMEM;
-		goto none;
+		return -ENOMEM;
 	}
 
 	cfag12864b_cache = kmalloc_array(CFAG12864B_SIZE,
@@ -370,8 +369,6 @@ cachealloced:
 
 bufferalloced:
 	free_page((unsigned long) cfag12864b_buffer);
-
-none:
 	return ret;
 }
 
