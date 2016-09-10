@@ -1747,7 +1747,7 @@ static int receive_Barrier(struct drbd_connection *connection, struct packet_inf
 
 		/* receiver context, in the writeout path of the other node.
 		 * avoid potential distributed deadlock */
-		epoch = kmalloc(sizeof(struct drbd_epoch), GFP_NOIO);
+		epoch = kmalloc(sizeof(*epoch), GFP_NOIO);
 		if (epoch)
 			break;
 		else
@@ -1760,7 +1760,7 @@ static int receive_Barrier(struct drbd_connection *connection, struct packet_inf
 		drbd_flush(connection);
 
 		if (atomic_read(&connection->current_epoch->epoch_size)) {
-			epoch = kmalloc(sizeof(struct drbd_epoch), GFP_NOIO);
+			epoch = kmalloc(sizeof(*epoch), GFP_NOIO);
 			if (epoch)
 				break;
 		}
