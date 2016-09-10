@@ -3697,7 +3697,7 @@ static int receive_protocol(struct drbd_connection *connection, struct packet_in
 		}
 	}
 
-	new_net_conf = kmalloc(sizeof(struct net_conf), GFP_KERNEL);
+	new_net_conf = kmalloc(sizeof(*new_net_conf), GFP_KERNEL);
 	if (!new_net_conf) {
 		drbd_err(connection, "Allocation of new net_conf failed\n");
 		goto disconnect;
