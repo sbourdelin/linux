@@ -126,6 +126,17 @@ int stop_one_cpu(unsigned int cpu, cpu_stop_fn_t fn, void *arg)
 	cpu_stop_init_done(&done, 1);
 	if (!cpu_stop_queue_work(cpu, &work))
 		return -ENOENT;
+
+#if defined(CONFIG_PREEMPT_NONE)
+	/*
+	 * Makes the stopper thread run as soon as possible.
+	 * And if the caller is TASK_RUNNING, keeps the caller TASK_RUNNING.
+	 * It's special useful for some callers which are expected to be
+	 * TASK_ON_RQ_QUEUED.
+	 * sched_exec does benefit from this improvement.
+	 */
+	schedule();
+#endif
 	wait_for_completion(&done.completion);
 	return done.ret;
 }
