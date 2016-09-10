@@ -4179,7 +4179,7 @@ static int receive_uuids(struct drbd_connection *connection, struct packet_info 
 	struct drbd_device *device;
 	struct p_uuids *p = pi->data;
 	u64 *p_uuid;
-	int i, updated_uuids = 0;
+	int i, updated_uuids;
 
 	peer_device = conn_peer_device(connection, pi->vnr);
 	if (!peer_device)
@@ -4206,6 +4206,7 @@ static int receive_uuids(struct drbd_connection *connection, struct packet_info 
 		return -EIO;
 	}
 
+	updated_uuids = 0;
 	if (get_ldev(device)) {
 		int skip_initial_sync =
 			device->state.conn == C_CONNECTED &&
