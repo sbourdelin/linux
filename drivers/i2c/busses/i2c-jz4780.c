@@ -133,10 +133,10 @@ static const char * const jz4780_i2c_abrt_src[] = {
 
 #define JZ4780_I2C_ENB_I2C		BIT(0)
 
-#define JZ4780_I2CSHCNT_ADJUST(n)	(((n) - 8) < 6 ? 6 : ((n) - 8))
-#define JZ4780_I2CSLCNT_ADJUST(n)	(((n) - 1) < 8 ? 8 : ((n) - 1))
-#define JZ4780_I2CFHCNT_ADJUST(n)	(((n) - 8) < 6 ? 6 : ((n) - 8))
-#define JZ4780_I2CFLCNT_ADJUST(n)	(((n) - 1) < 8 ? 8 : ((n) - 1))
+#define JZ4780_I2CSHCNT_ADJUST(n)	(max(6, (n) - 8))
+#define JZ4780_I2CSLCNT_ADJUST(n)	(max(8, (n) - 1))
+#define JZ4780_I2CFHCNT_ADJUST(n)	(max(6, (n) - 8))
+#define JZ4780_I2CFLCNT_ADJUST(n)	(max(8, (n) - 1))
 
 #define JZ4780_I2C_FIFO_LEN	16
 #define TX_LEVEL		3
