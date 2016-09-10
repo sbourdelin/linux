@@ -3863,7 +3863,6 @@ static int receive_SyncParam(struct drbd_connection *connection, struct packet_i
 		if (!new_disk_conf) {
 			put_ldev(device);
 			mutex_unlock(&connection->resource->conf_update);
-			drbd_err(device, "Allocation of new disk_conf failed\n");
 			return -ENOMEM;
 		}
 
@@ -3938,7 +3937,6 @@ static int receive_SyncParam(struct drbd_connection *connection, struct packet_i
 			if (fifo_size != device->rs_plan_s->size) {
 				new_plan = fifo_alloc(fifo_size);
 				if (!new_plan) {
-					drbd_err(device, "kmalloc of fifo_buffer failed");
 					put_ldev(device);
 					goto disconnect;
 				}
@@ -3948,10 +3946,8 @@ static int receive_SyncParam(struct drbd_connection *connection, struct packet_i
 		if (verify_tfm || csums_tfm) {
 			new_net_conf = kzalloc(sizeof(*new_net_conf),
 					       GFP_KERNEL);
-			if (!new_net_conf) {
-				drbd_err(device, "Allocation of new net_conf failed\n");
+			if (!new_net_conf)
 				goto disconnect;
-			}
 
 			*new_net_conf = *old_net_conf;
 
