@@ -4088,7 +4088,6 @@ static int receive_sizes(struct drbd_connection *connection, struct packet_info 
 			new_disk_conf = kzalloc(sizeof(*new_disk_conf),
 						GFP_KERNEL);
 			if (!new_disk_conf) {
-				drbd_err(device, "Allocation of new disk_conf failed\n");
 				put_ldev(device);
 				return -ENOMEM;
 			}
