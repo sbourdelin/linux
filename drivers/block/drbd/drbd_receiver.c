@@ -3691,17 +3691,13 @@ static int receive_protocol(struct drbd_connection *connection, struct packet_in
 		hash_size = crypto_ahash_digestsize(peer_integrity_tfm);
 		int_dig_in = kmalloc(hash_size, GFP_KERNEL);
 		int_dig_vv = kmalloc(hash_size, GFP_KERNEL);
-		if (!(int_dig_in && int_dig_vv)) {
-			drbd_err(connection, "Allocation of buffers for data integrity checking failed\n");
+		if (!(int_dig_in && int_dig_vv))
 			goto disconnect;
-		}
 	}
 
 	new_net_conf = kmalloc(sizeof(*new_net_conf), GFP_KERNEL);
-	if (!new_net_conf) {
-		drbd_err(connection, "Allocation of new net_conf failed\n");
+	if (!new_net_conf)
 		goto disconnect;
-	}
 
 	mutex_lock(&connection->data.mutex);
 	mutex_lock(&connection->resource->conf_update);
