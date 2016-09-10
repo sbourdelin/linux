@@ -1102,6 +1102,7 @@ struct station_info {
 	struct cfg80211_tid_stats pertid[IEEE80211_NUM_TIDS + 1];
 };
 
+#if IS_ENABLED(CONFIG_CFG80211)
 /**
  * cfg80211_get_station - retrieve information about a given station
  * @dev: the device where the station is supposed to be connected to
@@ -1114,6 +1115,14 @@ struct station_info {
  */
 int cfg80211_get_station(struct net_device *dev, const u8 *mac_addr,
 			 struct station_info *sinfo);
+#else
+static inline int cfg80211_get_station(struct net_device *dev,
+				       const u8 *mac_addr,
+				       struct station_info *sinfo)
+{
+	return -ENOENT;
+}
+#endif
 
 /**
  * enum monitor_flags - monitor flags
@@ -2423,7 +2432,8 @@ struct cfg80211_qos_map {
  *	cases, the result of roaming is indicated with a call to
  *	cfg80211_roamed() or cfg80211_roamed_bss().
  *	(invoked with the wireless_dev mutex held)
- * @disconnect: Disconnect from the BSS/ESS.
+ * @disconnect: Disconnect from the BSS/ESS. Once done, call
+ *	cfg80211_disconnected().
  *	(invoked with the wireless_dev mutex held)
  *
  * @join_ibss: Join the specified IBSS (or create if necessary). Once done, call
