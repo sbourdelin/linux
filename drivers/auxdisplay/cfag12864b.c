@@ -338,7 +338,7 @@ static int __init cfag12864b_init(void)
 	BUILD_BUG_ON(PAGE_SIZE < CFAG12864B_SIZE);
 
 	cfag12864b_buffer = (unsigned char *) get_zeroed_page(GFP_KERNEL);
-	if (cfag12864b_buffer == NULL) {
+	if (!cfag12864b_buffer) {
 		printk(KERN_ERR CFAG12864B_NAME ": ERROR: "
 			"can't get a free page\n");
 		return -ENOMEM;
@@ -351,7 +351,7 @@ static int __init cfag12864b_init(void)
 		goto free_buffer;
 
 	cfag12864b_workqueue = create_singlethread_workqueue(CFAG12864B_NAME);
-	if (cfag12864b_workqueue == NULL)
+	if (!cfag12864b_workqueue)
 		goto free_cache;
 
 	cfag12864b_clear();
