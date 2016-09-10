@@ -5208,7 +5208,7 @@ static int drbd_do_features(struct drbd_connection *connection)
 {
 	/* ASSERT current == connection->receiver ... */
 	struct p_connection_features *p;
-	const int expect = sizeof(struct p_connection_features);
+	const int expect = sizeof(*p);
 	struct packet_info pi;
 	int err;
 
