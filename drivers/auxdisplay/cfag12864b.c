@@ -351,9 +351,6 @@ static int __init cfag12864b_init(void)
 					 sizeof(*cfag12864b_cache),
 					 GFP_KERNEL);
 	if (cfag12864b_cache == NULL) {
-		printk(KERN_ERR CFAG12864B_NAME ": ERROR: "
-			"can't alloc cache buffer (%i bytes)\n",
-			CFAG12864B_SIZE);
 		ret = -ENOMEM;
 		goto bufferalloced;
 	}
