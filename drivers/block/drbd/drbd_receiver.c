@@ -4036,7 +4036,7 @@ static int receive_sizes(struct drbd_connection *connection, struct packet_info 
 	struct o_qlim *o = (connection->agreed_features & DRBD_FF_WSAME) ? p->qlim : NULL;
 	enum determine_dev_size dd = DS_UNCHANGED;
 	sector_t p_size, p_usize, p_csize, my_usize;
-	int ldsc = 0; /* local disk size changed */
+	int ldsc; /* local disk size changed */
 	enum dds_flags ddsf;
 
 	peer_device = conn_peer_device(connection, pi->vnr);
@@ -4141,6 +4141,7 @@ static int receive_sizes(struct drbd_connection *connection, struct packet_info 
 		drbd_set_my_capacity(device, p_csize ?: p_usize ?: p_size);
 	}
 
+	ldsc = 0;
 	if (get_ldev(device)) {
 		if (device->ldev->known_size != drbd_get_capacity(device->ldev->backing_bdev)) {
 			device->ldev->known_size = drbd_get_capacity(device->ldev->backing_bdev);
