@@ -969,11 +969,12 @@ static int throtl_dispatch_tg(struct throtl_grp *tg)
 
 static int throtl_select_dispatch(struct throtl_service_queue *parent_sq)
 {
-	unsigned int nr_disp = 0;
+	unsigned int sum_disp = 0;
 
 	while (1) {
 		struct throtl_grp *tg = throtl_rb_first(parent_sq);
 		struct throtl_service_queue *sq = &tg->service_queue;
+		unsigned int nr_disp;
 
 		if (!tg)
 			break;
@@ -983,16 +984,23 @@ static int throtl_select_dispatch(struct throtl_service_queue *parent_sq)
 
 		throtl_dequeue_tg(tg);
 
-		nr_disp += throtl_dispatch_tg(tg);
+		throtl_log(sq, "dispatch queued=%u/%u",
+				   sq->nr_queued[READ], sq->nr_queued[WRITE]);
+
+		nr_disp = throtl_dispatch_tg(tg);
+
+		throtl_log(sq, "dispatch disp=%u", nr_disp);
+
+		sum_disp += nr_disp;
 
 		if (sq->nr_queued[0] || sq->nr_queued[1])
 			tg_update_disptime(tg);
 
-		if (nr_disp >= throtl_quantum)
+		if (sum_disp >= throtl_quantum)
 			break;
 	}
 
-	return nr_disp;
+	return sum_disp;
 }
 
 /**
@@ -1026,13 +1034,8 @@ again:
 	dispatched = false;
 
 	while (true) {
-		throtl_log(sq, "dispatch nr_queued=%u read=%u write=%u",
-			   sq->nr_queued[READ] + sq->nr_queued[WRITE],
-			   sq->nr_queued[READ], sq->nr_queued[WRITE]);
-
 		ret = throtl_select_dispatch(sq);
 		if (ret) {
-			throtl_log(sq, "bios disp=%u", ret);
 			dispatched = true;
 		}
 
