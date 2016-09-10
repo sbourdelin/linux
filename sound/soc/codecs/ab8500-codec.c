@@ -42,7 +42,7 @@
 #include <sound/initval.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include "ab8500-codec.h"
 

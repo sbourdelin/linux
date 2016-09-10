@@ -23,7 +23,7 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "es8328.h"
 
 static const unsigned int rates_12288[] = {

@@ -16,7 +16,7 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <linux/platform_data/adau17x1.h>
 
 #include "adau17x1.h"

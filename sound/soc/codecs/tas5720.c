@@ -29,7 +29,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include "tas5720.h"
 

@@ -187,7 +187,7 @@
 #include <sound/info.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "xonar.h"
 #include "cm9780.h"
 #include "pcm1796.h"

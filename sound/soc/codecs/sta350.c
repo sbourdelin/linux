@@ -38,7 +38,7 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include <sound/sta350.h>
 #include "sta350.h"

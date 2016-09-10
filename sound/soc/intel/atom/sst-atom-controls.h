@@ -24,7 +24,7 @@
 #define __SST_ATOM_CONTROLS_H__
 
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 enum {
 	MERR_DPCM_AUDIO = 0,

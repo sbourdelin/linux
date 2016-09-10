@@ -20,7 +20,7 @@
 #include <sound/ac97_codec.h>
 #include <sound/initval.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "wm9712.h"
 
 #define WM9712_VENDOR_ID 0x574d4c12

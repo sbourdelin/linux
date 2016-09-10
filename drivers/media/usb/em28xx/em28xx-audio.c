@@ -41,7 +41,7 @@
 #include <sound/info.h>
 #include <sound/initval.h>
 #include <sound/control.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/ac97_codec.h>
 #include <media/v4l2-common.h>
 #include "em28xx.h"

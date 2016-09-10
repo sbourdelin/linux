@@ -29,7 +29,7 @@
 #include <linux/regulator/consumer.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/cs4271.h>
 #include "cs4271.h"
 

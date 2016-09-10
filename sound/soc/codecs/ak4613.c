@@ -22,7 +22,7 @@
 #include <linux/regmap.h>
 #include <sound/soc.h>
 #include <sound/pcm_params.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #define PW_MGMT1	0x00 /* Power Management 1 */
 #define PW_MGMT2	0x01 /* Power Management 2 */

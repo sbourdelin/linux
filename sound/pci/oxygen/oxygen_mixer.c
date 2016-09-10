@@ -21,7 +21,7 @@
 #include <sound/ac97_codec.h>
 #include <sound/asoundef.h>
 #include <sound/control.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "oxygen.h"
 #include "cm9780.h"
 

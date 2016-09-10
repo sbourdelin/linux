@@ -30,7 +30,7 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/pcm_params.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include "max9860.h"
 

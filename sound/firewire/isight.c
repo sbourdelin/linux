@@ -18,7 +18,7 @@
 #include <sound/core.h>
 #include <sound/initval.h>
 #include <sound/pcm.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "lib.h"
 #include "iso-resources.h"
 #include "packets-buffer.h"

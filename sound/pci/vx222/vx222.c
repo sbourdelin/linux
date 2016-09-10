@@ -25,7 +25,7 @@
 #include <linux/module.h>
 #include <sound/core.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "vx222.h"
 
 #define CARD_NAME "VX222"

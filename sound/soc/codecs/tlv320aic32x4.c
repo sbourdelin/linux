@@ -42,7 +42,7 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include "tlv320aic32x4.h"
 

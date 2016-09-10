@@ -27,7 +27,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <sound/core.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/info.h>
 
 #include "ice1712.h"

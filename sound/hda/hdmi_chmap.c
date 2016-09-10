@@ -4,7 +4,7 @@
 
 #include <linux/module.h>
 #include <sound/control.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/hda_chmap.h>
 
 /*

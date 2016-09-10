@@ -69,7 +69,7 @@ have {FL/FR/RL/RR} channel map, _PAIRED type would allow you to swap
 only {RL/RR/FL/FR} while _VAR type would allow even swapping FL and
 RR.
 
-These new TLV types are defined in sound/tlv.h.
+These new TLV types are defined in uapi/sound/tlv.h.
 
 The available channel position values are defined in sound/asound.h,
 here is a cut:

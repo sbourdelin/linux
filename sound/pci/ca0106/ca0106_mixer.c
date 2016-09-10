@@ -69,7 +69,7 @@
 #include <sound/pcm.h>
 #include <sound/ac97_codec.h>
 #include <sound/info.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <linux/io.h>
 
 #include "ca0106.h"

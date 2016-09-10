@@ -35,7 +35,7 @@
 #include <sound/core.h>
 #include <sound/emu10k1.h>
 #include <linux/delay.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include "p17v.h"
 

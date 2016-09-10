@@ -30,7 +30,7 @@
 #include "pcxhr_hwdep.h"
 #include "pcxhr_core.h"
 #include <sound/control.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/asoundef.h>
 #include "pcxhr_mixer.h"
 #include "pcxhr_mix22.h"

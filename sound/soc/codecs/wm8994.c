@@ -28,7 +28,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <trace/events/asoc.h>
 
 #include <linux/mfd/wm8994/core.h>

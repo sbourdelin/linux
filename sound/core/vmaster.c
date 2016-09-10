@@ -13,7 +13,7 @@
 #include <linux/export.h>
 #include <sound/core.h>
 #include <sound/control.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 /*
  * a subset of information returned via ctl info callback

@@ -37,7 +37,7 @@
 #include <sound/control.h>
 #include <sound/hwdep.h>
 #include <sound/info.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include "usbaudio.h"
 #include "mixer.h"

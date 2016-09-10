@@ -16,7 +16,7 @@
 #include <linux/pm_runtime.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include <linux/mfd/arizona/core.h>
 #include <linux/mfd/arizona/registers.h>

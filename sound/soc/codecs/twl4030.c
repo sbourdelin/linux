@@ -36,7 +36,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 /* Register descriptions are here */
 #include <linux/mfd/twl4030-audio.h>

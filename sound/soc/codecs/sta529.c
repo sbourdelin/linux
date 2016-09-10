@@ -27,7 +27,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 /* STA529 Register offsets */
 #define	 STA529_FFXCFG0		0x00

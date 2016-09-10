@@ -38,7 +38,7 @@
 #include <linux/moduleparam.h>
 
 #include <sound/core.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/emu10k1.h>
 
 #if 0		/* for testing purposes - digital out -> capture */

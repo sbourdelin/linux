@@ -22,7 +22,7 @@
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/pcm.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "oxygen.h"
 #include "xonar_dg.h"
 #include "cs4245.h"

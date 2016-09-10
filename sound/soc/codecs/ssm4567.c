@@ -21,7 +21,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #define SSM4567_REG_POWER_CTRL		0x00
 #define SSM4567_REG_AMP_SNS_CTRL		0x01

@@ -29,7 +29,7 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <sound/core.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <linux/slab.h>
 
 #include "ice1712.h"

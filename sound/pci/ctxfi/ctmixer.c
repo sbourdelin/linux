@@ -23,7 +23,7 @@
 #include <sound/control.h>
 #include <sound/asoundef.h>
 #include <sound/pcm.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 enum CT_SUM_CTL {
 	SUM_IN_F,

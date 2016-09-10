@@ -25,7 +25,7 @@
 #include <sound/mpu401.h>
 #include <sound/hwdep.h>
 #include <sound/ac97_codec.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #ifndef CHIP_AU8820
 #include "au88x0_eq.h"

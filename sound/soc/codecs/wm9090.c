@@ -29,7 +29,7 @@
 #include <linux/slab.h>
 #include <sound/initval.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/wm9090.h>
 
 #include "wm9090.h"

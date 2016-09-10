@@ -30,7 +30,7 @@
 #include <sound/soc.h>
 #include <sound/jack.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/wm5100.h>
 
 #include "wm5100.h"

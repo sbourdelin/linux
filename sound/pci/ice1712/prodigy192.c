@@ -64,7 +64,7 @@
 #include "envy24ht.h"
 #include "prodigy192.h"
 #include "stac946x.h"
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 struct prodigy192_spec {
 	struct ak4114 *ak4114;

@@ -24,7 +24,7 @@
 #include <linux/ioport.h>
 #include <linux/io.h>
 #include <sound/core.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/ad1816a.h>
 
 #include <asm/dma.h>

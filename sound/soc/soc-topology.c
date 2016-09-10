@@ -33,7 +33,7 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/soc-topology.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 /*
  * We make several passes over the data (since it wont necessarily be ordered)

@@ -24,7 +24,7 @@
 #include <linux/delay.h>
 #include <sound/core.h>
 #include <sound/control.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "wm8766.h"
 
 /* low-level access */

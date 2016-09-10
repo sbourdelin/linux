@@ -6,7 +6,7 @@
  */
 
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/soc-dapm.h>
 #include <sound/soc-dai.h>
 #include <sound/pcm.h>

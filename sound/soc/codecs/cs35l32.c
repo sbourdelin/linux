@@ -30,7 +30,7 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <dt-bindings/sound/cs35l32.h>
 
 #include "cs35l32.h"

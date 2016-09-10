@@ -53,7 +53,7 @@
 #include "ice1712.h"
 #include "envy24ht.h"
 #include "phase.h"
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 /* AC97 register cache for Phase28 */
 struct phase28_spec {

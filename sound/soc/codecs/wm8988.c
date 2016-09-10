@@ -22,7 +22,7 @@
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/soc.h>
 #include <sound/initval.h>
 

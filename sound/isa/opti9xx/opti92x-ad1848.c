@@ -32,7 +32,7 @@
 #include <linux/io.h>
 #include <asm/dma.h>
 #include <sound/core.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/wss.h>
 #include <sound/mpu401.h>
 #include <sound/opl3.h>

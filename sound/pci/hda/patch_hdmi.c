@@ -36,7 +36,7 @@
 #include <sound/core.h>
 #include <sound/jack.h>
 #include <sound/asoundef.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/hdaudio.h>
 #include <sound/hda_i915.h>
 #include <sound/hda_chmap.h>

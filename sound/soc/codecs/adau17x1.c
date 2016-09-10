@@ -16,7 +16,7 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <linux/gcd.h>
 #include <linux/i2c.h>
 #include <linux/spi/spi.h>

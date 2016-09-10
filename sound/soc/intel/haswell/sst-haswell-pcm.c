@@ -26,7 +26,7 @@
 #include <sound/pcm_params.h>
 #include <sound/dmaengine_pcm.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/compress_driver.h>
 
 #include "../haswell/sst-haswell-ipc.h"

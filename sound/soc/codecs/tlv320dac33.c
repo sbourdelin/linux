@@ -36,7 +36,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include <sound/tlv320dac33-plat.h>
 #include "tlv320dac33.h"

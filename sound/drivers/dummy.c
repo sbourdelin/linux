@@ -30,7 +30,7 @@
 #include <linux/module.h>
 #include <sound/core.h>
 #include <sound/control.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/pcm.h>
 #include <sound/rawmidi.h>
 #include <sound/info.h>

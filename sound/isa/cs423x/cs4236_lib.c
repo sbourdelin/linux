@@ -88,7 +88,7 @@
 #include <sound/wss.h>
 #include <sound/asoundef.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 /*
  *

@@ -27,7 +27,7 @@
 #include <pcmcia/ciscode.h>
 #include <pcmcia/cisreg.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 /*
  */

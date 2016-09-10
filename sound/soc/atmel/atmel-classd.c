@@ -17,7 +17,7 @@
 #include <sound/core.h>
 #include <sound/dmaengine_pcm.h>
 #include <sound/pcm_params.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "atmel-classd.h"
 
 struct atmel_classd_pdata {

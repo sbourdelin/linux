@@ -31,7 +31,7 @@
 #include <sound/core.h>
 #include "hda_codec.h"
 #include <sound/asoundef.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/initval.h>
 #include <sound/jack.h>
 #include "hda_local.h"

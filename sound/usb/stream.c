@@ -24,7 +24,7 @@
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/control.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include "usbaudio.h"
 #include "card.h"

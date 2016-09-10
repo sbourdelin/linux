@@ -27,7 +27,7 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #define PCM1681_PCM_FORMATS (SNDRV_PCM_FMTBIT_S16_LE  |		\
 			     SNDRV_PCM_FMTBIT_S24_LE)

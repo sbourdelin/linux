@@ -21,7 +21,7 @@
 
 #include <sound/core.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 static const struct reg_default lm4857_default_regs[] = {
 	{ 0x0, 0x00 },

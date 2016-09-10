@@ -23,7 +23,7 @@
 #include <linux/module.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/ac97_codec.h>
 #include <sound/mpu401.h>
 #include <sound/opl3.h>

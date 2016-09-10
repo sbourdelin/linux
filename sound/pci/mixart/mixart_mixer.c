@@ -30,7 +30,7 @@
 #include "mixart_core.h"
 #include "mixart_hwdep.h"
 #include <sound/control.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "mixart_mixer.h"
 
 static u32 mixart_analog_level[256] = {

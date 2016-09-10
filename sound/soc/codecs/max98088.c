@@ -21,7 +21,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <linux/slab.h>
 #include <asm/div64.h>
 #include <sound/max98088.h>

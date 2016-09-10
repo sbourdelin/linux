@@ -25,7 +25,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 /* DA7210 register space */
 #define DA7210_PAGE_CONTROL		0x00

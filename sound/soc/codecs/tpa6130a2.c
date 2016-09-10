@@ -29,7 +29,7 @@
 #include <linux/slab.h>
 #include <sound/tpa6130a2-plat.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/regmap.h>

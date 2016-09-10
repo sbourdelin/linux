@@ -33,7 +33,7 @@
 #include <sound/control.h>
 #include <sound/initval.h>
 
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 
 #include "cx23885.h"

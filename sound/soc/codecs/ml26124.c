@@ -28,7 +28,7 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "ml26124.h"
 
 #define DVOL_CTL_DVMUTE_ON		BIT(4)	/* Digital volume MUTE On */

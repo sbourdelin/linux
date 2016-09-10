@@ -60,7 +60,7 @@
 #include <sound/cs8427.h>
 #include <sound/info.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include <sound/asoundef.h>
 

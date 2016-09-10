@@ -17,7 +17,7 @@
 
 #include <sound/core.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/max9768.h>
 
 /* "Registers" */

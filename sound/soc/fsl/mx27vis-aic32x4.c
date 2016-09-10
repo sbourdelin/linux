@@ -31,7 +31,7 @@
 #include <sound/pcm.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <asm/mach-types.h>
 
 #include "../codecs/tlv320aic32x4.h"

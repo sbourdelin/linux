@@ -37,7 +37,7 @@
 #include <sound/pcm_params.h>
 #include <sound/control.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include "cx25821.h"
 #include "cx25821-reg.h"

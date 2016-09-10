@@ -25,7 +25,7 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/jack.h>
 #include <linux/workqueue.h>
 #include <sound/rt298.h>

@@ -41,7 +41,7 @@
 #include <sound/pcm_params.h>
 #include <sound/info.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/hwdep.h>
 
 MODULE_LICENSE("GPL");

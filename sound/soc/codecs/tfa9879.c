@@ -16,7 +16,7 @@
 #include <linux/i2c.h>
 #include <linux/regmap.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/pcm_params.h>
 
 #include "tfa9879.h"

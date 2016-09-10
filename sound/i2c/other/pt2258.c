@@ -21,7 +21,7 @@
 
 #include <sound/core.h>
 #include <sound/control.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/i2c.h>
 #include <sound/pt2258.h>
 #include <linux/module.h>

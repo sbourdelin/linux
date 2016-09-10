@@ -14,7 +14,7 @@
 #include <linux/regmap.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "max9867.h"
 
 static const char *const max9867_spmode[] = {

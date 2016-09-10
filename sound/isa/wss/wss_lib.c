@@ -35,7 +35,7 @@
 #include <sound/core.h>
 #include <sound/wss.h>
 #include <sound/pcm_params.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include <asm/dma.h>
 #include <asm/irq.h>

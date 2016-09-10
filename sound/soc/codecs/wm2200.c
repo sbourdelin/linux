@@ -29,7 +29,7 @@
 #include <sound/soc.h>
 #include <sound/jack.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/wm2200.h>
 
 #include "wm2200.h"

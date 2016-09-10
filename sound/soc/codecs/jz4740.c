@@ -25,7 +25,7 @@
 #include <sound/pcm_params.h>
 #include <sound/initval.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #define JZ4740_REG_CODEC_1 0x0
 #define JZ4740_REG_CODEC_2 0x4

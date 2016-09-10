@@ -17,7 +17,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #define ICS43432_RATE_MIN 7190 /* Hz, from data sheet */
 #define ICS43432_RATE_MAX 52800  /* Hz, from data sheet */

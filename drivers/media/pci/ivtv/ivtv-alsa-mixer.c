@@ -30,7 +30,7 @@
 
 #include <sound/core.h>
 #include <sound/control.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include "ivtv-alsa.h"
 #include "ivtv-driver.h"

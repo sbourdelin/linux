@@ -32,7 +32,7 @@
 #include <sound/pcm.h>
 #include <sound/rawmidi.h>
 #include <sound/ac97_codec.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/opl3.h>
 #include <sound/initval.h>
 

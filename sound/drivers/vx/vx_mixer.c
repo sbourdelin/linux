@@ -22,7 +22,7 @@
 
 #include <sound/core.h>
 #include <sound/control.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/vx_core.h>
 #include "vx_cmd.h"
 

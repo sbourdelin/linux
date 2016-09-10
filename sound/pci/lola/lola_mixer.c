@@ -25,7 +25,7 @@
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "lola.h"
 
 static int lola_init_pin(struct lola *chip, struct lola_pin *pin,

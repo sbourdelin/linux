@@ -33,7 +33,7 @@
 
 #include <sound/core.h>
 #include <sound/info.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #include "ice1712.h"
 #include "envy24ht.h"

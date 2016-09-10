@@ -33,7 +33,7 @@
 #include <linux/regmap.h>
 #include <sound/soc.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 
 #define PW_MGMT1	0x00
 #define PW_MGMT2	0x01

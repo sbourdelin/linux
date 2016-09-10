@@ -24,7 +24,7 @@
 
 #include <linux/slab.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "sst-mfld-platform.h"
 #include "sst-atom-controls.h"
 

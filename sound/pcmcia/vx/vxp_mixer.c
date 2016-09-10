@@ -22,7 +22,7 @@
 
 #include <sound/core.h>
 #include <sound/control.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include "vxpocket.h"
 
 #define MIC_LEVEL_MIN	0

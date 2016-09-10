@@ -23,7 +23,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/of_device.h>
 #include <sound/core.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>

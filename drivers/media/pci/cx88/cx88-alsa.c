@@ -39,7 +39,7 @@
 #include <sound/pcm_params.h>
 #include <sound/control.h>
 #include <sound/initval.h>
-#include <sound/tlv.h>
+#include <uapi/sound/tlv.h>
 #include <media/i2c/wm8775.h>
 
 #include "cx88.h"
