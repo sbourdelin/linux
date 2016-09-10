@@ -840,7 +840,7 @@ static int ks_wlan_get_frag(struct net_device *dev,
 /*------------------------------------------------------------------*/
 /* Wireless Handler : set Mode of Operation */
 static int ks_wlan_set_mode(struct net_device *dev,
-			    struct iw_request_info *info, __u32 * uwrq,
+			    struct iw_request_info *info, __u32 *uwrq,
 			    char *extra)
 {
 	struct ks_wlan_private *priv =
