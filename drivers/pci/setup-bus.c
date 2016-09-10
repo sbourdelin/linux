@@ -1852,10 +1852,15 @@ dump:
 void __init pci_assign_unassigned_resources(void)
 {
 	struct pci_bus *root_bus;
+	acpi_handle root_handle;
 
 	list_for_each_entry(root_bus, &pci_root_buses, node) {
 		pci_assign_unassigned_root_bus_resources(root_bus);
-		acpi_ioapic_add(ACPI_HANDLE(root_bus->bridge));
+		root_handle = ACPI_HANDLE(root_bus->bridge);
+
+		/* make sure the root bridge has a companion ACPI device */
+		if (root_handle)
+			acpi_ioapic_add(root_handle);
 	}
 }
 
