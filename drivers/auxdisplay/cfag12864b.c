@@ -351,23 +351,21 @@ static int __init cfag12864b_init(void)
 					 GFP_KERNEL);
 	if (cfag12864b_cache == NULL) {
 		ret = -ENOMEM;
-		goto bufferalloced;
+		goto free_buffer;
 	}
 
 	cfag12864b_workqueue = create_singlethread_workqueue(CFAG12864B_NAME);
 	if (cfag12864b_workqueue == NULL)
-		goto cachealloced;
+		goto free_cache;
 
 	cfag12864b_clear();
 	cfag12864b_on();
 
 	cfag12864b_inited = 1;
 	return 0;
-
-cachealloced:
+ free_cache:
 	kfree(cfag12864b_cache);
-
-bufferalloced:
+ free_buffer:
 	free_page((unsigned long) cfag12864b_buffer);
 	return ret;
 }
