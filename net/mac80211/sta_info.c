@@ -20,6 +20,7 @@
 #include <linux/timer.h>
 #include <linux/rtnetlink.h>
 
+#include <net/codel.h>
 #include <net/mac80211.h>
 #include "ieee80211_i.h"
 #include "driver-ops.h"
@@ -418,6 +419,8 @@ struct sta_info *sta_info_alloc(struct ieee80211_sub_if_data *sdata,
 	}
 
 	sta->sta.max_rc_amsdu_len = IEEE80211_MAX_MPDU_LEN_HT_BA;
+
+	sta_update_codel_params(sta, 0);
 
 	sta_dbg(sdata, "Allocated STA %pM\n", sta->sta.addr);
 
@@ -2306,6 +2309,15 @@ u32 sta_get_expected_throughput(struct sta_info *sta)
 	return thr;
 }
 
+void ieee80211_sta_set_expected_throughput(struct ieee80211_sta *pubsta,
+					   u32 thr)
+{
+	struct sta_info *sta = container_of(pubsta, struct sta_info, sta);
+
+	sta_update_codel_params(sta, thr);
+}
+EXPORT_SYMBOL(ieee80211_sta_set_expected_throughput);
+
 unsigned long ieee80211_sta_last_active(struct sta_info *sta)
 {
 	struct ieee80211_sta_rx_stats *stats = sta_get_last_rx_stats(sta);
@@ -2313,4 +2325,27 @@ unsigned long ieee80211_sta_last_active(struct sta_info *sta)
 	if (time_after(stats->last_rx, sta->status_stats.last_ack))
 		return stats->last_rx;
 	return sta->status_stats.last_ack;
+}
+
+void sta_update_codel_params(struct sta_info *sta, u32 thr)
+{
+	u64 now = ktime_get_ns();
+
+	if (!sta->sdata->local->ops->wake_tx_queue)
+		return;
+
+	if (now - sta->cparams.update_time < STA_CPARAMS_HYSTERESIS)
+		return;
+
+	if (thr && thr < STA_SLOW_THRESHOLD) {
+		sta->cparams.params.target = MS2TIME(50);
+		sta->cparams.params.interval = MS2TIME(300);
+		sta->cparams.params.ecn = false;
+	} else {
+		sta->cparams.params.target = MS2TIME(20);
+		sta->cparams.params.interval = MS2TIME(100);
+		sta->cparams.params.ecn = true;
+	}
+	sta->cparams.params.ce_threshold = CODEL_DISABLED_THRESHOLD;
+	sta->cparams.update_time = now;
 }

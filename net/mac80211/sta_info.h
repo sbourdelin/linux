@@ -384,6 +384,14 @@ struct ieee80211_sta_rx_stats {
 	u64 msdu[IEEE80211_NUM_TIDS + 1];
 };
 
+#define STA_CPARAMS_HYSTERESIS (2L * NSEC_PER_SEC)
+#define STA_SLOW_THRESHOLD     8000 /* 8 Mbps */
+
+struct sta_codel_params {
+	struct codel_params params;
+	u64 update_time;
+};
+
 /**
  * struct sta_info - STA information
  *
@@ -437,6 +445,7 @@ struct ieee80211_sta_rx_stats {
  * @known_smps_mode: the smps_mode the client thinks we are in. Relevant for
  *	AP only.
  * @cipher_scheme: optional cipher scheme for this station
+ * @cparams: CoDel parameters for this station.
  * @reserved_tid: reserved TID (if any, otherwise IEEE80211_TID_UNRESERVED)
  * @fast_tx: TX fastpath information
  * @fast_rx: RX fastpath information
@@ -539,6 +548,8 @@ struct sta_info {
 
 	enum ieee80211_smps_mode known_smps_mode;
 	const struct ieee80211_cipher_scheme *cipher_scheme;
+
+	struct sta_codel_params cparams;
 
 	u8 reserved_tid;
 
@@ -713,6 +724,7 @@ void sta_set_rate_info_tx(struct sta_info *sta,
 void sta_set_sinfo(struct sta_info *sta, struct station_info *sinfo);
 
 u32 sta_get_expected_throughput(struct sta_info *sta);
+void sta_update_codel_params(struct sta_info *sta, u32 thr);
 
 void ieee80211_sta_expire(struct ieee80211_sub_if_data *sdata,
 			  unsigned long exp_time);
