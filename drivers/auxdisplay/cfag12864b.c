@@ -329,8 +329,6 @@ EXPORT_SYMBOL_GPL(cfag12864b_isinited);
 
 static int __init cfag12864b_init(void)
 {
-	int ret;
-
 	/* ks0108_init() must be called first */
 	if (!ks0108_isinited()) {
 		printk(KERN_ERR CFAG12864B_NAME ": ERROR: "
@@ -349,10 +347,8 @@ static int __init cfag12864b_init(void)
 	cfag12864b_cache = kmalloc_array(CFAG12864B_SIZE,
 					 sizeof(*cfag12864b_cache),
 					 GFP_KERNEL);
-	if (cfag12864b_cache == NULL) {
-		ret = -ENOMEM;
+	if (!cfag12864b_cache)
 		goto free_buffer;
-	}
 
 	cfag12864b_workqueue = create_singlethread_workqueue(CFAG12864B_NAME);
 	if (cfag12864b_workqueue == NULL)
@@ -367,7 +363,7 @@ static int __init cfag12864b_init(void)
 	kfree(cfag12864b_cache);
  free_buffer:
 	free_page((unsigned long) cfag12864b_buffer);
-	return ret;
+	return -ENOMEM;
 }
 
 static void __exit cfag12864b_exit(void)
