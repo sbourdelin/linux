@@ -329,13 +329,13 @@ EXPORT_SYMBOL_GPL(cfag12864b_isinited);
 
 static int __init cfag12864b_init(void)
 {
-	int ret = -EINVAL;
+	int ret;
 
 	/* ks0108_init() must be called first */
 	if (!ks0108_isinited()) {
 		printk(KERN_ERR CFAG12864B_NAME ": ERROR: "
 			"ks0108 is not initialized\n");
-		goto none;
+		return -EINVAL;
 	}
 	BUILD_BUG_ON(PAGE_SIZE < CFAG12864B_SIZE);
 
