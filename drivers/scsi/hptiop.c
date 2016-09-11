@@ -1590,7 +1590,7 @@ static void hptiop_remove(struct pci_dev *pcidev)
 	scsi_host_put(host);
 }
 
-static struct hptiop_adapter_ops hptiop_itl_ops = {
+static const struct hptiop_adapter_ops hptiop_itl_ops = {
 	.family            = INTEL_BASED_IOP,
 	.iop_wait_ready    = iop_wait_ready_itl,
 	.internal_memalloc = hptiop_internal_memalloc_itl,
@@ -1609,7 +1609,7 @@ static struct hptiop_adapter_ops hptiop_itl_ops = {
 	.host_phy_flag     = cpu_to_le64(0),
 };
 
-static struct hptiop_adapter_ops hptiop_mv_ops = {
+static const struct hptiop_adapter_ops hptiop_mv_ops = {
 	.family            = MV_BASED_IOP,
 	.iop_wait_ready    = iop_wait_ready_mv,
 	.internal_memalloc = hptiop_internal_memalloc_mv,
@@ -1628,7 +1628,7 @@ static struct hptiop_adapter_ops hptiop_mv_ops = {
 	.host_phy_flag     = cpu_to_le64(0),
 };
 
-static struct hptiop_adapter_ops hptiop_mvfrey_ops = {
+static const struct hptiop_adapter_ops hptiop_mvfrey_ops = {
 	.family            = MVFREY_BASED_IOP,
 	.iop_wait_ready    = iop_wait_ready_mvfrey,
 	.internal_memalloc = hptiop_internal_memalloc_mvfrey,
