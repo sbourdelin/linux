@@ -316,6 +316,39 @@ static const struct iio_info ad9833_info = {
 	.driver_module = THIS_MODULE,
 };
 
+#if defined(CONFIG_OF)
+static struct ad9834_platform_data *ad9834_parse_dt(struct spi_device *spi)
+{
+	struct ad9834_platform_data *pdata;
+	struct device_node *np = spi->dev.of_node;
+
+	pdata = devm_kzalloc(&spi->dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata)
+		return ERR_PTR(-ENOMEM);
+
+	if (of_property_read_u32(np, "mclk", &pdata->mclk))
+		return ERR_PTR(-ENODEV);
+	if (of_property_read_u32(np, "freq0", &pdata->freq0))
+		return ERR_PTR(-ENODEV);
+	if (of_property_read_u32(np, "freq1", &pdata->freq1))
+		return ERR_PTR(-ENODEV);
+	if (of_property_read_u16(np, "phase0", &pdata->phase0))
+		return ERR_PTR(-ENODEV);
+	if (of_property_read_u16(np, "phase1", &pdata->phase1))
+		return ERR_PTR(-ENODEV);
+	pdata->en_div2 = of_property_read_bool(np, "en_div2");
+	pdata->en_signbit_msb_out = of_property_read_bool(np,
+					"en_signbit_msb_out");
+
+	return pdata;
+}
+#else
+static struct ad9834_platform_data *ad9834_parse_dt(struct spi_device *spi)
+{
+	return NULL;
+}
+#endif
+
 static int ad9834_probe(struct spi_device *spi)
 {
 	struct ad9834_platform_data *pdata = dev_get_platdata(&spi->dev);
@@ -323,6 +356,12 @@ static int ad9834_probe(struct spi_device *spi)
 	struct iio_dev *indio_dev;
 	struct regulator *reg;
 	int ret;
+
+	if (!pdata && spi->dev.of_node) {
+		pdata = ad9834_parse_dt(spi);
+		if (IS_ERR(pdata))
+			return PTR_ERR(pdata);
+	}
 
 	if (!pdata) {
 		dev_dbg(&spi->dev, "no platform data?\n");
