@@ -264,7 +264,7 @@ static void com20020pci_remove(struct pci_dev *pdev)
 	}
 }
 
-static struct com20020_pci_card_info card_info_10mbit = {
+static const struct com20020_pci_card_info card_info_10mbit = {
 	.name = "ARC-PCI",
 	.devcount = 1,
 	.chan_map_tbl = {
@@ -277,7 +277,7 @@ static struct com20020_pci_card_info card_info_10mbit = {
 	.flags = ARC_CAN_10MBIT,
 };
 
-static struct com20020_pci_card_info card_info_5mbit = {
+static const struct com20020_pci_card_info card_info_5mbit = {
 	.name = "ARC-PCI",
 	.devcount = 1,
 	.chan_map_tbl = {
@@ -290,7 +290,7 @@ static struct com20020_pci_card_info card_info_5mbit = {
 	.flags = ARC_IS_5MBIT,
 };
 
-static struct com20020_pci_card_info card_info_sohard = {
+static const struct com20020_pci_card_info card_info_sohard = {
 	.name = "PLX-PCI",
 	.devcount = 1,
 	/* SOHARD needs PCI base addr 4 */
@@ -304,7 +304,7 @@ static struct com20020_pci_card_info card_info_sohard = {
 	.flags = ARC_CAN_10MBIT,
 };
 
-static struct com20020_pci_card_info card_info_eae_arc1 = {
+static const struct com20020_pci_card_info card_info_eae_arc1 = {
 	.name = "EAE PLX-PCI ARC1",
 	.devcount = 1,
 	.chan_map_tbl = {
@@ -329,7 +329,7 @@ static struct com20020_pci_card_info card_info_eae_arc1 = {
 	.flags = ARC_CAN_10MBIT,
 };
 
-static struct com20020_pci_card_info card_info_eae_ma1 = {
+static const struct com20020_pci_card_info card_info_eae_ma1 = {
 	.name = "EAE PLX-PCI MA1",
 	.devcount = 2,
 	.chan_map_tbl = {
