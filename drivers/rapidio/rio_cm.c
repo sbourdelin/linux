@@ -1395,38 +1395,34 @@ static void riocm_ch_free(struct kref *ref)
 	complete(&ch->comp_close);
 }
 
+/*
+ * Send CH_CLOSE notification to the remote RapidIO device
+ */
 static int riocm_send_close(struct rio_channel *ch)
 {
-	struct rio_ch_chan_hdr *hdr;
 	int ret;
-
-	/*
-	 * Send CH_CLOSE notification to the remote RapidIO device
-	 */
-
-	hdr = kzalloc(sizeof(*hdr), GFP_KERNEL);
-	if (hdr == NULL)
-		return -ENOMEM;
-
-	hdr->bhdr.src_id = htonl(ch->loc_destid);
-	hdr->bhdr.dst_id = htonl(ch->rem_destid);
-	hdr->bhdr.src_mbox = cmbox;
-	hdr->bhdr.dst_mbox = cmbox;
-	hdr->bhdr.type = RIO_CM_CHAN;
-	hdr->ch_op = CM_CONN_CLOSE;
-	hdr->dst_ch = htons(ch->rem_channel);
-	hdr->src_ch = htons(ch->id);
+	struct rio_ch_chan_hdr hdr = {
+		.bhdr = {
+			.src_id = htonl(ch->loc_destid),
+			.dst_id = htonl(ch->rem_destid),
+			.src_mbox = cmbox,
+			.dst_mbox = cmbox,
+			.type = RIO_CM_CHAN,
+		},
+		.ch_op = CM_CONN_CLOSE,
+		.dst_ch = htons(ch->rem_channel),
+		.src_ch = htons(ch->id),
+	};
 
 	/* ATTN: the function call below relies on the fact that underlying
 	 * add_outb_message() routine copies TX data into its internal transfer
 	 * buffer. Needs to be reviewed if switched to direct buffer mode.
 	 */
-	ret = riocm_post_send(ch->cmdev, ch->rdev, hdr, sizeof(*hdr));
+	ret = riocm_post_send(ch->cmdev, ch->rdev, &hdr, sizeof(hdr));
 
 	if (ret == -EBUSY && !riocm_queue_req(ch->cmdev, ch->rdev,
-					      hdr, sizeof(*hdr)))
+					      &hdr, sizeof(hdr)))
 		return 0;
-	kfree(hdr);
 
 	if (ret)
 		riocm_error("ch(%d) send CLOSE failed (ret=%d)", ch->id, ret);
