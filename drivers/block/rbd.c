@@ -5833,7 +5833,6 @@ again:
 static int rbd_dev_image_id(struct rbd_device *rbd_dev)
 {
 	int ret;
-	size_t size;
 	char *object_name;
 	void *response;
 	char *image_id;
@@ -5854,17 +5853,16 @@ static int rbd_dev_image_id(struct rbd_device *rbd_dev)
 	 * First, see if the format 2 image id file exists, and if
 	 * so, get the image's persistent id from it.
 	 */
-	size = sizeof (RBD_ID_PREFIX) + strlen(rbd_dev->spec->image_name);
-	object_name = kmalloc(size, GFP_NOIO);
+	object_name = kmalloc(sizeof(RBD_ID_PREFIX)
+			      + strlen(rbd_dev->spec->image_name),
+			      GFP_NOIO);
 	if (!object_name)
 		return -ENOMEM;
 	sprintf(object_name, "%s%s", RBD_ID_PREFIX, rbd_dev->spec->image_name);
 	dout("rbd id object name is %s\n", object_name);
 
 	/* Response will be an encoded string, which includes a length */
-
-	size = sizeof (__le32) + RBD_IMAGE_ID_LEN_MAX;
-	response = kzalloc(size, GFP_NOIO);
+	response = kzalloc(sizeof(__le32) + RBD_IMAGE_ID_LEN_MAX, GFP_NOIO);
 	if (!response) {
 		ret = -ENOMEM;
 		goto out;
