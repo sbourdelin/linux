@@ -44,7 +44,7 @@ struct crc64_table {
 };
 
 
-static struct crc64_table CRC64_ECMA_182 = {
+static const struct crc64_table CRC64_ECMA_182 = {
 	CRC64_DEFAULT_INITVAL,
 	{
 		0x0000000000000000ULL,
