@@ -65,6 +65,15 @@
 		regulator-boot-on;
 		regulator-always-on;
 	};
+
+	reg_usb_otg_vbus: usb_otg_vbus {
+		compatible = "regulator-fixed";
+		regulator-name = "usb_otg_vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		regulator-boot-on;
+		regulator-always-on;
+	};
 };
 
 &can1 {
@@ -121,6 +130,14 @@
 
 &usbh1 {
 	vbus-supply = <&reg_usb_h1_vbus>;
+	disable-over-current;
+	status = "okay";
+};
+
+&usbotg {
+	vbus-supply = <&reg_usb_otg_vbus>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usbotg>;
 	disable-over-current;
 	status = "okay";
 };
@@ -196,6 +213,12 @@
 		fsl,pins = <
 			MX6QDL_PAD_KEY_COL0__UART4_TX_DATA 0x1b0b1
 			MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
+		>;
+	};
+
+	pinctrl_usbotg: usbotggrp {
+		fsl,pins = <
+			MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x17059
 		>;
 	};
 
