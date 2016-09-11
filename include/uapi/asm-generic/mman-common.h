@@ -72,4 +72,7 @@
 #define MAP_HUGE_SHIFT	26
 #define MAP_HUGE_MASK	0x3f
 
+#define MINCORE_DAX	1		/* indicate pages that are dax-mapped */
+#define MINCORE_ORDER	2		/* retrieve hardware mapping-size-order */
+
 #endif /* __ASM_GENERIC_MMAN_COMMON_H */
