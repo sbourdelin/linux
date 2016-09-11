@@ -166,7 +166,7 @@ static bool aspeed_sig_expr_set(const struct aspeed_sig_expr *expr,
 				bool enable, struct regmap *map)
 {
 	int i;
-	bool ret;
+	int ret;
 
 	ret = aspeed_sig_expr_eval(expr, enable, map);
 	if (ret)
