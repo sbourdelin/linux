@@ -297,7 +297,7 @@ struct telemetry_debugfs_conf {
 
 static struct telemetry_debugfs_conf *debugfs_conf;
 
-static struct telemetry_debugfs_conf telem_apl_debugfs_conf = {
+static const struct telemetry_debugfs_conf telem_apl_debugfs_conf = {
 	.pss_idle_data = telem_apl_pss_idle_data,
 	.pcs_idle_blkd_data = telem_apl_pcs_idle_blkd_data,
 	.pcs_s0ix_blkd_data = telem_apl_pcs_s0ix_blkd_data,
