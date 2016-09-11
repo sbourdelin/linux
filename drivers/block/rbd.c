@@ -1064,7 +1064,7 @@ static int rbd_header_from_disk(struct rbd_device *rbd_dev,
 	header->snap_sizes = snap_sizes;
 
 	return 0;
-out_2big:
+ out_2big:
 	ret = -EIO;
 	kfree(snap_sizes);
  free_names:
