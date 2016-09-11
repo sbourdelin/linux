@@ -1083,5 +1083,16 @@ intel_opregion_get_panel_type(struct drm_i915_private *dev_priv)
 		return -ENODEV;
 	}
 
+	/*
+	 * FIXME On Terra Mobile Ultrabook 1450 II (Intel Core i5-3337U) the
+	 * OpRegion panel type (0) results in tiled ("mosaic") display bug,
+	 * whereas the VBT panel type (7) gives a normal display.
+	 * Let's ignore the OpRegion panel type for this chip.
+	 */
+	if (IS_IVYBRIDGE(dev_priv) && IS_MOBILE(dev_priv)) {
+		DRM_DEBUG_KMS("Ignoring OpRegion panel type (%d)\n", ret - 1);
+		return -ENODEV;
+	}
+
 	return ret - 1;
 }
