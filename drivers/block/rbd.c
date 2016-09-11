@@ -5865,7 +5865,7 @@ static int rbd_dev_image_id(struct rbd_device *rbd_dev)
 	response = kzalloc(sizeof(__le32) + RBD_IMAGE_ID_LEN_MAX, GFP_NOIO);
 	if (!response) {
 		ret = -ENOMEM;
-		goto out;
+		goto free_name;
 	}
 
 	/* If it doesn't exist we'll assume it's a format 1 image */
@@ -5893,8 +5893,8 @@ static int rbd_dev_image_id(struct rbd_device *rbd_dev)
 		rbd_dev->spec->image_id = image_id;
 		dout("image_id is %s\n", image_id);
 	}
-out:
 	kfree(response);
+ free_name:
 	kfree(object_name);
 
 	return ret;
