@@ -110,6 +110,10 @@ static const char *const rapl_domain_names[NR_RAPL_DOMAINS] __initconst = {
 #define RAPL_IDX_KNL	(1<<RAPL_IDX_PKG_NRG_STAT|\
 			 1<<RAPL_IDX_RAM_NRG_STAT)
 
+/* Baytrail/Braswell clients have PP0, PKG */
+#define RAPL_IDX_BYT	(1<<RAPL_IDX_PP0_NRG_STAT|\
+			 1<<RAPL_IDX_PKG_NRG_STAT)
+
 /*
  * event code: LSB 8 bits, passed in attr->config
  * any other bit is reserved
@@ -134,6 +138,12 @@ static struct perf_pmu_events_attr event_attr_##v = {				\
 	.attr		= __ATTR(_name, 0444, perf_event_sysfs_show, NULL),	\
 	.id		= 0,							\
 	.event_str	= str,							\
+};
+
+enum rapl_quirk {
+	RAPL_NO_QUIRK = 0,
+	RAPL_HSX_QUIRK,
+	RAPL_BYT_QUIRK,
 };
 
 struct rapl_pmu {
@@ -458,6 +468,14 @@ RAPL_EVENT_ATTR_STR(energy-ram.scale,     rapl_ram_scale, "2.3283064365386962890
 RAPL_EVENT_ATTR_STR(energy-gpu.scale,     rapl_gpu_scale, "2.3283064365386962890625e-10");
 RAPL_EVENT_ATTR_STR(energy-psys.scale,   rapl_psys_scale, "2.3283064365386962890625e-10");
 
+/*
+ * Some Atom series processors (BYT/BSW) have fixed
+ * energy status unit (ESU) in smallest unit of microjoule,
+ * and its increment is in 2^ESU microjoules.
+ */
+RAPL_EVENT_ATTR_STR(energy-cores.scale, rapl_byt_cores_scale, "1.0e-6");
+RAPL_EVENT_ATTR_STR(energy-pkg.scale, rapl_byt_pkg_scale, "1.0e-6");
+
 static struct attribute *rapl_events_srv_attr[] = {
 	EVENT_PTR(rapl_cores),
 	EVENT_PTR(rapl_pkg),
@@ -536,6 +554,18 @@ static struct attribute *rapl_events_knl_attr[] = {
 
 	EVENT_PTR(rapl_pkg_scale),
 	EVENT_PTR(rapl_ram_scale),
+	NULL,
+};
+
+static struct attribute *rapl_events_byt_attr[] = {
+	EVENT_PTR(rapl_cores),
+	EVENT_PTR(rapl_pkg),
+
+	EVENT_PTR(rapl_cores_unit),
+	EVENT_PTR(rapl_pkg_unit),
+
+	EVENT_PTR(rapl_byt_cores_scale),
+	EVENT_PTR(rapl_byt_pkg_scale),
 	NULL,
 };
 
@@ -632,6 +662,23 @@ static void rapl_hsx_quirk(void)
 	 * of 2. Datasheet, September 2014, Reference Number: 330784-001 "
 	 */
 	rapl_hw_unit[RAPL_IDX_RAM_NRG_STAT] = 16;
+}
+
+static void rapl_byt_quirk(void)
+{
+	int i;
+
+	/*
+	 * Some Atom processors (BYT/BSW) have 2^ESU microjoules
+	 * increment, refer to Software Developers' Manual, Vol. 3C,
+	 * Order No. 325384, Table 35-8 of MSR_RAPL_POWER_UNIT.
+	 *
+	 * TODO: In order to fit BYT/BSW quirk model, here remind
+	 *	 this generates timer rate in 80ms; by default
+	 *	 ESU of BYT/BSW is 5, so it leads (1000/200)*2^4.
+	 */
+	for (i = 0; i < NR_RAPL_DOMAINS; i++)
+		rapl_hw_unit[i] = 32 - rapl_hw_unit[i];
 }
 
 static int rapl_check_hw_unit(const struct intel_rapl_model_desc *model)
@@ -745,6 +792,12 @@ static const struct intel_rapl_model_desc skl_rapl_init __initconst = {
 	.attrs		= rapl_events_skl_attr,
 };
 
+static const struct intel_rapl_model_desc byt_rapl_init __initconst = {
+	.quirk		= rapl_byt_quirk,
+	.cntr_mask	= RAPL_IDX_BYT,
+	.attrs		= rapl_events_byt_attr,
+};
+
 static const struct x86_cpu_id rapl_cpu_match[] __initconst = {
 	X86_RAPL_MODEL_MATCH(INTEL_FAM6_SANDYBRIDGE,   snb_rapl_init),
 	X86_RAPL_MODEL_MATCH(INTEL_FAM6_SANDYBRIDGE_X, snbep_rapl_init),
@@ -768,6 +821,8 @@ static const struct x86_cpu_id rapl_cpu_match[] __initconst = {
 	X86_RAPL_MODEL_MATCH(INTEL_FAM6_SKYLAKE_DESKTOP, skl_rapl_init),
 	X86_RAPL_MODEL_MATCH(INTEL_FAM6_SKYLAKE_X,	 hsx_rapl_init),
 
+	X86_RAPL_MODEL_MATCH(INTEL_FAM6_ATOM_SILVERMONT1, byt_rapl_init),
+	X86_RAPL_MODEL_MATCH(INTEL_FAM6_ATOM_AIRMONT, byt_rapl_init),
 	X86_RAPL_MODEL_MATCH(INTEL_FAM6_ATOM_GOLDMONT, hsw_rapl_init),
 	{},
 };
