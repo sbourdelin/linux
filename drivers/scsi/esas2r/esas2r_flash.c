@@ -54,7 +54,7 @@
 
 #define ESAS2R_FS_DRVR_VER 2
 
-static struct esas2r_sas_nvram default_sas_nvram = {
+static const struct esas2r_sas_nvram default_sas_nvram = {
 	{ 'E',	'S',  'A',  'S'			     }, /* signature          */
 	SASNVR_VERSION,                                 /* version            */
 	0,                                              /* checksum           */
