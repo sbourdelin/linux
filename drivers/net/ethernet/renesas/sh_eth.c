@@ -654,7 +654,7 @@ static void sh_eth_set_rate_sh7724(struct net_device *ndev)
 }
 
 /* SH7724 */
-static struct sh_eth_cpu_data sh7724_data = {
+static const struct sh_eth_cpu_data sh7724_data = {
 	.set_duplex	= sh_eth_set_duplex,
 	.set_rate	= sh_eth_set_rate_sh7724,
 
@@ -692,7 +692,7 @@ static void sh_eth_set_rate_sh7757(struct net_device *ndev)
 }
 
 /* SH7757 */
-static struct sh_eth_cpu_data sh7757_data = {
+static const struct sh_eth_cpu_data sh7757_data = {
 	.set_duplex	= sh_eth_set_duplex,
 	.set_rate	= sh_eth_set_rate_sh7757,
 
@@ -757,7 +757,7 @@ static void sh_eth_set_rate_giga(struct net_device *ndev)
 }
 
 /* SH7757(GETHERC) */
-static struct sh_eth_cpu_data sh7757_data_giga = {
+static const struct sh_eth_cpu_data sh7757_data_giga = {
 	.chip_reset	= sh_eth_chip_reset_giga,
 	.set_duplex	= sh_eth_set_duplex,
 	.set_rate	= sh_eth_set_rate_giga,
@@ -788,7 +788,7 @@ static struct sh_eth_cpu_data sh7757_data_giga = {
 };
 
 /* SH7734 */
-static struct sh_eth_cpu_data sh7734_data = {
+static const struct sh_eth_cpu_data sh7734_data = {
 	.chip_reset	= sh_eth_chip_reset,
 	.set_duplex	= sh_eth_set_duplex,
 	.set_rate	= sh_eth_set_rate_gether,
@@ -817,7 +817,7 @@ static struct sh_eth_cpu_data sh7734_data = {
 };
 
 /* SH7763 */
-static struct sh_eth_cpu_data sh7763_data = {
+static const struct sh_eth_cpu_data sh7763_data = {
 	.chip_reset	= sh_eth_chip_reset,
 	.set_duplex	= sh_eth_set_duplex,
 	.set_rate	= sh_eth_set_rate_gether,
@@ -844,7 +844,7 @@ static struct sh_eth_cpu_data sh7763_data = {
 	.irq_flags	= IRQF_SHARED,
 };
 
-static struct sh_eth_cpu_data sh7619_data = {
+static const struct sh_eth_cpu_data sh7619_data = {
 	.register_type	= SH_ETH_REG_FAST_SH3_SH2,
 
 	.eesipr_value	= DMAC_M_RFRMER | DMAC_M_ECI | 0x003fffff,
@@ -855,7 +855,7 @@ static struct sh_eth_cpu_data sh7619_data = {
 	.hw_swap	= 1,
 };
 
-static struct sh_eth_cpu_data sh771x_data = {
+static const struct sh_eth_cpu_data sh771x_data = {
 	.register_type	= SH_ETH_REG_FAST_SH3_SH2,
 
 	.eesipr_value	= DMAC_M_RFRMER | DMAC_M_ECI | 0x003fffff,
