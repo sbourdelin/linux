@@ -85,7 +85,7 @@ static void rvfree(void *mem, unsigned long size)
 	vfree(mem);
 }
 
-static struct fb_var_screeninfo vfb_default = {
+static const struct fb_var_screeninfo vfb_default = {
 	.xres =		640,
 	.yres =		480,
 	.xres_virtual =	640,
