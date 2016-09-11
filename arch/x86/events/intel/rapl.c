@@ -152,6 +152,12 @@ struct rapl_pmus {
 	struct rapl_pmu		*pmus[];
 };
 
+struct intel_rapl_model_desc {
+	void			(*quirk)(void);
+	int			cntr_mask;
+	struct attribute	**attrs;
+};
+
  /* 1/2^hw_unit Joule */
 static int rapl_hw_unit[NR_RAPL_DOMAINS] __read_mostly;
 static struct rapl_pmus *rapl_pmus;
@@ -617,7 +623,18 @@ static int rapl_cpu_prepare(unsigned int cpu)
 	return 0;
 }
 
-static int rapl_check_hw_unit(bool apply_quirk)
+static void rapl_hsx_quirk(void)
+{
+	/*
+	 * DRAM domain on HSW server and KNL has fixed energy unit which can be
+	 * different than the unit from power unit MSR. See
+	 * "Intel Xeon Processor E5-1600 and E5-2600 v3 Product Families, V2
+	 * of 2. Datasheet, September 2014, Reference Number: 330784-001 "
+	 */
+	rapl_hw_unit[RAPL_IDX_RAM_NRG_STAT] = 16;
+}
+
+static int rapl_check_hw_unit(const struct intel_rapl_model_desc *model)
 {
 	u64 msr_rapl_power_unit_bits;
 	int i;
@@ -628,14 +645,9 @@ static int rapl_check_hw_unit(bool apply_quirk)
 	for (i = 0; i < NR_RAPL_DOMAINS; i++)
 		rapl_hw_unit[i] = (msr_rapl_power_unit_bits >> 8) & 0x1FULL;
 
-	/*
-	 * DRAM domain on HSW server and KNL has fixed energy unit which can be
-	 * different than the unit from power unit MSR. See
-	 * "Intel Xeon Processor E5-1600 and E5-2600 v3 Product Families, V2
-	 * of 2. Datasheet, September 2014, Reference Number: 330784-001 "
-	 */
-	if (apply_quirk)
-		rapl_hw_unit[RAPL_IDX_RAM_NRG_STAT] = 16;
+	/* Apply quirk before initializing the timer rate */
+	if (model->quirk)
+		model->quirk();
 
 	/*
 	 * Calculate the timer rate:
@@ -701,46 +713,36 @@ static int __init init_rapl_pmus(void)
 #define X86_RAPL_MODEL_MATCH(model, init)	\
 	{ X86_VENDOR_INTEL, 6, model, X86_FEATURE_ANY, (unsigned long)&init }
 
-struct intel_rapl_init_fun {
-	bool apply_quirk;
-	int cntr_mask;
-	struct attribute **attrs;
+static const struct intel_rapl_model_desc snb_rapl_init __initconst = {
+	.cntr_mask	= RAPL_IDX_CLN,
+	.attrs		= rapl_events_cln_attr,
 };
 
-static const struct intel_rapl_init_fun snb_rapl_init __initconst = {
-	.apply_quirk = false,
-	.cntr_mask = RAPL_IDX_CLN,
-	.attrs = rapl_events_cln_attr,
+static const struct intel_rapl_model_desc hsx_rapl_init __initconst = {
+	.quirk		= rapl_hsx_quirk,
+	.cntr_mask	= RAPL_IDX_SRV,
+	.attrs		= rapl_events_srv_attr,
 };
 
-static const struct intel_rapl_init_fun hsx_rapl_init __initconst = {
-	.apply_quirk = true,
-	.cntr_mask = RAPL_IDX_SRV,
-	.attrs = rapl_events_srv_attr,
+static const struct intel_rapl_model_desc hsw_rapl_init __initconst = {
+	.cntr_mask	= RAPL_IDX_HSW,
+	.attrs		= rapl_events_hsw_attr,
 };
 
-static const struct intel_rapl_init_fun hsw_rapl_init __initconst = {
-	.apply_quirk = false,
-	.cntr_mask = RAPL_IDX_HSW,
-	.attrs = rapl_events_hsw_attr,
+static const struct intel_rapl_model_desc snbep_rapl_init __initconst = {
+	.cntr_mask	= RAPL_IDX_SRV,
+	.attrs		= rapl_events_srv_attr,
 };
 
-static const struct intel_rapl_init_fun snbep_rapl_init __initconst = {
-	.apply_quirk = false,
-	.cntr_mask = RAPL_IDX_SRV,
-	.attrs = rapl_events_srv_attr,
+static const struct intel_rapl_model_desc knl_rapl_init __initconst = {
+	.quirk		= rapl_hsx_quirk,
+	.cntr_mask	= RAPL_IDX_KNL,
+	.attrs		= rapl_events_knl_attr,
 };
 
-static const struct intel_rapl_init_fun knl_rapl_init __initconst = {
-	.apply_quirk = true,
-	.cntr_mask = RAPL_IDX_KNL,
-	.attrs = rapl_events_knl_attr,
-};
-
-static const struct intel_rapl_init_fun skl_rapl_init __initconst = {
-	.apply_quirk = false,
-	.cntr_mask = RAPL_IDX_SKL_CLN,
-	.attrs = rapl_events_skl_attr,
+static const struct intel_rapl_model_desc skl_rapl_init __initconst = {
+	.cntr_mask	= RAPL_IDX_SKL_CLN,
+	.attrs		= rapl_events_skl_attr,
 };
 
 static const struct x86_cpu_id rapl_cpu_match[] __initconst = {
@@ -774,21 +776,19 @@ MODULE_DEVICE_TABLE(x86cpu, rapl_cpu_match);
 
 static int __init rapl_pmu_init(void)
 {
+	const struct intel_rapl_model_desc *model;
 	const struct x86_cpu_id *id;
-	struct intel_rapl_init_fun *rapl_init;
-	bool apply_quirk;
 	int ret;
 
 	id = x86_match_cpu(rapl_cpu_match);
 	if (!id)
 		return -ENODEV;
 
-	rapl_init = (struct intel_rapl_init_fun *)id->driver_data;
-	apply_quirk = rapl_init->apply_quirk;
-	rapl_cntr_mask = rapl_init->cntr_mask;
-	rapl_pmu_events_group.attrs = rapl_init->attrs;
+	model = (struct intel_rapl_model_desc *)id->driver_data;
+	rapl_cntr_mask = model->cntr_mask;
+	rapl_pmu_events_group.attrs = model->attrs;
 
-	ret = rapl_check_hw_unit(apply_quirk);
+	ret = rapl_check_hw_unit(model);
 	if (ret)
 		return ret;
 
