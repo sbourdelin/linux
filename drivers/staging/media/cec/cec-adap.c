@@ -1,7 +1,8 @@
 /*
  * cec-adap.c - HDMI Consumer Electronics Control framework - CEC adapter
  *
- * Copyright 2016 Cisco Systems, Inc. and/or its affiliates. All rights reserved.
+ * Copyright 2016 Cisco Systems, Inc. and/or its affiliates.
+ * All rights reserved.
  *
  * This program is free software; you may redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -64,7 +65,8 @@ static int cec_log_addr2idx(const struct cec_adapter *adap, u8 log_addr)
 	return -1;
 }
 
-static unsigned int cec_log_addr2dev(const struct cec_adapter *adap, u8 log_addr)
+static unsigned int cec_log_addr2dev(const struct cec_adapter *adap,
+				     u8 log_addr)
 {
 	int i = cec_log_addr2idx(adap, log_addr);
 
@@ -330,9 +332,11 @@ int cec_thread_func(void *_adap)
 			 * see if the adapter is disabled in which case the
 			 * transmit should be canceled.
 			 */
-			err = wait_event_interruptible_timeout(adap->kthread_waitq,
+			err = wait_event_interruptible_timeout(
+				adap->kthread_waitq,
 				kthread_should_stop() ||
-				(!adap->is_configured && !adap->is_configuring) ||
+				(!adap->is_configured &&
+				 !adap->is_configuring) ||
 				(!adap->transmitting &&
 				 !list_empty(&adap->transmit_queue)),
 				msecs_to_jiffies(CEC_XFER_TIMEOUT_MS));
@@ -1527,13 +1531,15 @@ static int cec_receive_notify(struct cec_adapter *adap, struct cec_msg *msg,
 		/* Do nothing for CEC switches using addr 15 */
 		if (devtype == CEC_OP_PRIM_DEVTYPE_SWITCH && dest_laddr == 15)
 			return 0;
-		cec_msg_report_physical_addr(&tx_cec_msg, adap->phys_addr, devtype);
+		cec_msg_report_physical_addr(&tx_cec_msg,
+					     adap->phys_addr, devtype);
 		return cec_transmit_msg(adap, &tx_cec_msg, false);
 
 	case CEC_MSG_GIVE_DEVICE_VENDOR_ID:
 		if (adap->log_addrs.vendor_id == CEC_VENDOR_ID_NONE)
 			return cec_feature_abort(adap, msg);
-		cec_msg_device_vendor_id(&tx_cec_msg, adap->log_addrs.vendor_id);
+		cec_msg_device_vendor_id(&tx_cec_msg,
+					 adap->log_addrs.vendor_id);
 		return cec_transmit_msg(adap, &tx_cec_msg, false);
 
 	case CEC_MSG_ABORT:
@@ -1559,7 +1565,7 @@ static int cec_receive_notify(struct cec_adapter *adap, struct cec_msg *msg,
 		 * Unprocessed messages are aborted if userspace isn't doing
 		 * any processing either.
 		 */
-		if (!is_broadcast && !is_reply && !adap->follower_cnt &&
+		if (is_directed && !is_reply && !adap->follower_cnt &&
 		    !adap->cec_follower && msg->msg[1] != CEC_MSG_FEATURE_ABORT)
 			return cec_feature_abort(adap, msg);
 		break;

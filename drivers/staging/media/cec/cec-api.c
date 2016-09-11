@@ -1,7 +1,8 @@
 /*
  * cec-api.c - HDMI Consumer Electronics Control framework - API
  *
- * Copyright 2016 Cisco Systems, Inc. and/or its affiliates. All rights reserved.
+ * Copyright 2016 Cisco Systems, Inc. and/or its affiliates.
+ * All rights reserved.
  *
  * This program is free software; you may redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -548,7 +549,8 @@ static int cec_release(struct inode *inode, struct file *filp)
 	mutex_lock(&adap->lock);
 	while (!list_empty(&fh->xfer_list)) {
 		struct cec_data *data =
-			list_first_entry(&fh->xfer_list, struct cec_data, xfer_list);
+			list_first_entry(&fh->xfer_list,
+					 struct cec_data, xfer_list);
 
 		data->blocking = false;
 		data->fh = NULL;
