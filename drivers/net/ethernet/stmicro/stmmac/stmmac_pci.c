@@ -141,7 +141,7 @@ static struct stmmac_pci_dmi_data quark_pci_dmi_data[] = {
 	{}
 };
 
-static struct stmmac_pci_info quark_pci_info = {
+static const struct stmmac_pci_info quark_pci_info = {
 	.setup = quark_default_data,
 	.dmi = quark_pci_dmi_data,
 };
