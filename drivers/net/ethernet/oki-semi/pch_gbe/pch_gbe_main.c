@@ -2729,7 +2729,7 @@ static int pch_gbe_minnow_platform_init(struct pci_dev *pdev)
 	return ret;
 }
 
-static struct pch_gbe_privdata pch_gbe_minnow_privdata = {
+static const struct pch_gbe_privdata pch_gbe_minnow_privdata = {
 	.phy_tx_clk_delay = true,
 	.phy_disable_hibernate = true,
 	.platform_init = pch_gbe_minnow_platform_init,
