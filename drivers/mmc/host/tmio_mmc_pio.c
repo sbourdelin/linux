@@ -387,10 +387,45 @@ static void tmio_mmc_transfer_data(struct tmio_mmc_host *host,
 {
 	int is_read = host->data->flags & MMC_DATA_READ;
 	u8  *buf8;
+	u32 data;
 
 	/*
 	 * Transfer the data
 	 */
+	if (host->pdata->flags & TMIO_MMC_32BIT_DATA_PORT) {
+		if (is_read)
+			sd_ctrl_read32_rep(host, CTL_SD_DATA_PORT, (u32 *)buf,
+					   count >> 2);
+		else
+			sd_ctrl_write32_rep(host, CTL_SD_DATA_PORT, (u32 *)buf,
+					    count >> 2);
+
+		/* if count was multiple of 4 */
+		if (!(count & 0x3))
+			return;
+
+		buf8 = (u8 *)(buf + (count >> 2));
+		count %= 4;
+
+		if (is_read) {
+			sd_ctrl_read32_rep(host, CTL_SD_DATA_PORT, &data, 1);
+			while (count--) {
+				*buf8 = data & 0xFF;
+				data = data >> 8;
+				buf8++;
+			}
+		} else {
+			data = *buf8++;
+			if (count > 1)
+				data |= (*buf8++ << 8);
+			if (count > 2)
+				data |= (*buf8++ << 16);
+			sd_ctrl_write32_rep(host, CTL_SD_DATA_PORT, &data, 1);
+		}
+
+		return;
+	}
+
 	if (is_read)
 		sd_ctrl_read16_rep(host, CTL_SD_DATA_PORT, buf, count >> 1);
 	else
