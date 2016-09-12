@@ -1128,6 +1128,9 @@ struct netdev_xdp {
  * int (*ndo_get_irq_info)(struct net_device *dev,
  *			   struct netpolicy_dev_info *info);
  *	This function is used to get irq information of rx and tx queues
+ * int (*ndo_set_net_policy)(struct net_device *dev,
+ *			     enum netpolicy_name name);
+ *	This function is used to set per device net policy by name
  *
  */
 struct net_device_ops {
@@ -1319,6 +1322,8 @@ struct net_device_ops {
 						      struct netpolicy_info *info);
 	int			(*ndo_get_irq_info)(struct net_device *dev,
 						    struct netpolicy_dev_info *info);
+	int			(*ndo_set_net_policy)(struct net_device *dev,
+						      enum netpolicy_name name);
 #endif /* CONFIG_NETPOLICY */
 };
 
