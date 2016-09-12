@@ -159,15 +159,16 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 			break;
 		}
 
-		bytes = do_splice_direct(old_file, &old_pos,
-					 new_file, &new_pos,
-					 this_len, SPLICE_F_MOVE);
+		bytes = vfs_copy_file_range(old_file, old_pos,
+					    new_file, new_pos,
+					    this_len, 0);
 		if (bytes <= 0) {
 			error = bytes;
 			break;
 		}
-		WARN_ON(old_pos != new_pos);
 
+		old_pos += bytes;
+		new_pos += bytes;
 		len -= bytes;
 	}
 
