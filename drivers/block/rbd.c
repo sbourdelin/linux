@@ -5465,13 +5465,13 @@ static int rbd_dev_v2_snap_context(struct rbd_device *rbd_dev)
 				reply_buf, size);
 	dout("%s: rbd_obj_method_sync returned %d\n", __func__, ret);
 	if (ret < 0)
-		goto out;
+		goto free_buffer;
 
 	p = reply_buf;
 	end = reply_buf + ret;
 	ret = -ERANGE;
-	ceph_decode_64_safe(&p, end, seq, out);
-	ceph_decode_32_safe(&p, end, snap_count, out);
+	ceph_decode_64_safe(&p, end, seq, free_buffer);
+	ceph_decode_32_safe(&p, end, snap_count, free_buffer);
 
 	/*
 	 * Make sure the reported number of snapshot ids wouldn't go
@@ -5482,16 +5482,16 @@ static int rbd_dev_v2_snap_context(struct rbd_device *rbd_dev)
 	if (snap_count > (SIZE_MAX - sizeof (struct ceph_snap_context))
 				 / sizeof (u64)) {
 		ret = -EINVAL;
-		goto out;
+		goto free_buffer;
 	}
 	if (!ceph_has_room(&p, end, snap_count * sizeof (__le64)))
-		goto out;
+		goto free_buffer;
 	ret = 0;
 
 	snapc = ceph_create_snap_context(snap_count, GFP_KERNEL);
 	if (!snapc) {
 		ret = -ENOMEM;
-		goto out;
+		goto free_buffer;
 	}
 	snapc->seq = seq;
 	for (i = 0; i < snap_count; i++)
@@ -5502,7 +5502,7 @@ static int rbd_dev_v2_snap_context(struct rbd_device *rbd_dev)
 
 	dout("  snap context seq = %llu, snap_count = %u\n",
 		(unsigned long long)seq, (unsigned int)snap_count);
-out:
+ free_buffer:
 	kfree(reply_buf);
 
 	return ret;
