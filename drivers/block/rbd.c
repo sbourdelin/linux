@@ -2394,7 +2394,7 @@ static void rbd_img_obj_callback(struct rbd_obj_request *obj_request)
 
 	spin_lock_irq(&img_request->completion_lock);
 	if (which != img_request->next_completion)
-		goto out;
+		goto unlock;
 
 	for_each_obj_request_from(img_request, obj_request) {
 		rbd_assert(more);
@@ -2408,7 +2408,7 @@ static void rbd_img_obj_callback(struct rbd_obj_request *obj_request)
 
 	rbd_assert(more ^ (which == img_request->obj_request_count));
 	img_request->next_completion = which;
-out:
+ unlock:
 	spin_unlock_irq(&img_request->completion_lock);
 	rbd_img_request_put(img_request);
 
