@@ -3120,7 +3120,7 @@ static void rbd_img_parent_read(struct rbd_obj_request *obj_request)
 						obj_request->length);
 	result = -ENOMEM;
 	if (!img_request)
-		goto out_err;
+		goto status_indication;
 
 	if (obj_request->type == OBJ_REQUEST_BIO)
 		result = rbd_img_request_fill(img_request, OBJ_REQUEST_BIO,
@@ -3129,17 +3129,17 @@ static void rbd_img_parent_read(struct rbd_obj_request *obj_request)
 		result = rbd_img_request_fill(img_request, OBJ_REQUEST_PAGES,
 						obj_request->pages);
 	if (result)
-		goto out_err;
+		goto put_request;
 
 	img_request->callback = rbd_img_parent_read_callback;
 	result = rbd_img_request_submit(img_request);
 	if (result)
-		goto out_err;
+		goto put_request;
 
 	return;
-out_err:
-	if (img_request)
-		rbd_img_request_put(img_request);
+ put_request:
+	rbd_img_request_put(img_request);
+ status_indication:
 	obj_request->result = result;
 	obj_request->xferred = 0;
 	obj_request_done_set(obj_request);
