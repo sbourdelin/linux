@@ -2630,6 +2630,29 @@ config TS5500
 
 endif # X86_32
 
+config MLX_PLATFORM
+	tristate "Mellanox Technologies platform support"
+	depends on X86_64
+	depends on PCI
+	depends on DMI
+	depends on I2C_MLXCPLD
+	depends on I2C_MUX_REG
+	select HWMON
+	select PMBUS
+	select LM75
+	select NEW_LEDS
+	select LEDS_CLASS
+	select LEDS_TRIGGERS
+	select LEDS_TRIGGER_TIMER
+	select LEDS_MLXCPLD
+	---help---
+	  This option enables system support for the Mellanox Technologies
+	  platform.
+
+	  Say Y here if you are building a kernel for Mellanox system.
+
+	  Otherwise, say N.
+
 config AMD_NB
 	def_bool y
 	depends on CPU_SUP_AMD && PCI
