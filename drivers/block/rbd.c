@@ -2897,7 +2897,7 @@ static int rbd_img_obj_exists_submit(struct rbd_obj_request *obj_request)
 	struct rbd_obj_request *stat_request;
 	struct rbd_device *rbd_dev;
 	struct ceph_osd_client *osdc;
-	struct page **pages = NULL;
+	struct page **pages;
 	u32 page_count;
 	size_t size;
 	int ret;
