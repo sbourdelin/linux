@@ -417,10 +417,7 @@ void ptlrpc_request_cache_fini(void)
 
 struct ptlrpc_request *ptlrpc_request_cache_alloc(gfp_t flags)
 {
-	struct ptlrpc_request *req;
-
-	req = kmem_cache_zalloc(request_cache, flags);
-	return req;
+	return kmem_cache_zalloc(request_cache, flags);
 }
 
 void ptlrpc_request_cache_free(struct ptlrpc_request *req)

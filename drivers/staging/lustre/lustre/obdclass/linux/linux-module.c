@@ -152,10 +152,7 @@ EXPORT_SYMBOL(obd_ioctl_getdata);
 
 int obd_ioctl_popdata(void __user *arg, void *data, int len)
 {
-	int err;
-
-	err = copy_to_user(arg, data, len) ? -EFAULT : 0;
-	return err;
+	return copy_to_user(arg, data, len) ? -EFAULT : 0;
 }
 EXPORT_SYMBOL(obd_ioctl_popdata);
 

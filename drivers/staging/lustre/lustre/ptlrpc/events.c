@@ -525,10 +525,7 @@ static void ptlrpc_ni_fini(void)
 
 static lnet_pid_t ptl_get_pid(void)
 {
-	lnet_pid_t pid;
-
-	pid = LNET_PID_LUSTRE;
-	return pid;
+	return LNET_PID_LUSTRE;
 }
 
 static int ptlrpc_ni_init(void)

@@ -708,11 +708,7 @@ void rtl8723a_bcn_valid(struct rtw_adapter *padapter)
 
 bool rtl8723a_get_bcn_valid(struct rtw_adapter *padapter)
 {
-	bool retval;
-
-	retval = (rtl8723au_read8(padapter, REG_TDECTRL + 2) & BIT(0)) ? true : false;
-
-	return retval;
+	return !!(rtl8723au_read8(padapter, REG_TDECTRL + 2) & BIT(0));
 }
 
 void rtl8723a_set_beacon_interval(struct rtw_adapter *padapter, u16 interval)

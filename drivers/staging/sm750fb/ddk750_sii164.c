@@ -36,12 +36,8 @@ static char *gDviCtrlChipName = "Silicon Image SiI 164";
  */
 unsigned short sii164GetVendorID(void)
 {
-	unsigned short vendorID;
-
-	vendorID = ((unsigned short) i2cReadReg(SII164_I2C_ADDRESS, SII164_VENDOR_ID_HIGH) << 8) |
-		    (unsigned short) i2cReadReg(SII164_I2C_ADDRESS, SII164_VENDOR_ID_LOW);
-
-	return vendorID;
+	return (i2cReadReg(SII164_I2C_ADDRESS, SII164_VENDOR_ID_HIGH) << 8) |
+		i2cReadReg(SII164_I2C_ADDRESS, SII164_VENDOR_ID_LOW);
 }
 
 /*
@@ -53,12 +49,8 @@ unsigned short sii164GetVendorID(void)
  */
 unsigned short sii164GetDeviceID(void)
 {
-	unsigned short deviceID;
-
-	deviceID = ((unsigned short) i2cReadReg(SII164_I2C_ADDRESS, SII164_DEVICE_ID_HIGH) << 8) |
-		    (unsigned short) i2cReadReg(SII164_I2C_ADDRESS, SII164_DEVICE_ID_LOW);
-
-	return deviceID;
+	return (i2cReadReg(SII164_I2C_ADDRESS, SII164_DEVICE_ID_HIGH) << 8) |
+		i2cReadReg(SII164_I2C_ADDRESS, SII164_DEVICE_ID_LOW);
 }
 
 
