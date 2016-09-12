@@ -50,6 +50,11 @@ static void netpolicy_free_dev_info(struct netpolicy_dev_info *d_info)
 	kfree(d_info->tx_irq);
 }
 
+static u32 netpolicy_get_cpu_information(void)
+{
+	return num_online_cpus();
+}
+
 const char *policy_name[NET_POLICY_MAX] = {
 	"NONE"
 };
