@@ -590,5 +590,14 @@ config TILE_SROM
 
 source "drivers/char/xillybus/Kconfig"
 
+config HDD_HP_BTN
+	tristate "Advantech CPCI-1502 hard disk hot swap button driver"
+	default n
+	help
+	  This driver enables the support for the hard disk hot swap button driver.
+	  ACPI6-B provide hot-plug buttons for each SAS HDD, and an interrupt (IRQ5) is generated when pressing button.
+	  The module catches IRQ5,then raises signal to user space application after checking corresponding status register to get HDD status. 
+	  It also provides ioctl method which response to CPLD to notify LED on/off.
+
 endmenu
 
