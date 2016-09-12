@@ -538,6 +538,9 @@ int netpolicy_pick_queue(struct netpolicy_instance *instance, bool is_rx)
 	if (!policy_validate(instance))
 		return -EINVAL;
 
+	if (dev->netpolicy->queue_pair)
+		is_rx = true;
+
 	/* fast path */
 	rcu_read_lock();
 	version = rcu_dereference(dev->netpolicy->sys_info.version)->major;
