@@ -1,7 +1,7 @@
 /*
  * This file is part of the Chelsio T4 Ethernet driver for Linux.
  *
- * Copyright (c) 2003-2014 Chelsio Communications, Inc. All rights reserved.
+ * Copyright (c) 2003-2016 Chelsio Communications, Inc. All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -121,6 +121,9 @@
  * selects for a particular field being present.  These fields, when present
  * in the Compressed Filter Tuple, have the following widths in bits.
  */
+#define FT_FIRST_S                      FCOE_S
+#define FT_LAST_S                       FRAGMENTATION_S
+
 #define FT_FCOE_W                       1
 #define FT_PORT_W                       3
 #define FT_VNIC_ID_W                    17

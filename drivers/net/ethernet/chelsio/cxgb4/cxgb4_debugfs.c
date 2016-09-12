@@ -1,7 +1,7 @@
 /*
  * This file is part of the Chelsio T4 Ethernet driver for Linux.
  *
- * Copyright (c) 2003-2014 Chelsio Communications, Inc. All rights reserved.
+ * Copyright (c) 2003-2016 Chelsio Communications, Inc. All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -45,6 +45,7 @@
 #include "cxgb4_debugfs.h"
 #include "clip_tbl.h"
 #include "l2t.h"
+#include "cxgb4_filter.h"
 
 /* generic seq_file support for showing a table of size rows x width. */
 static void *seq_tab_get_idx(struct seq_tab *tb, loff_t pos)
@@ -3272,6 +3273,7 @@ int t4_setup_debugfs(struct adapter *adap)
 		{ "tids", &tid_info_debugfs_fops, S_IRUSR, 0},
 		{ "blocked_fl", &blocked_fl_fops, S_IRUSR | S_IWUSR, 0 },
 		{ "meminfo", &meminfo_fops, S_IRUSR, 0 },
+		{ "filters", &filters_debugfs_fops, S_IRUSR, 0 },
 	};
 
 	/* Debug FS nodes common to all T5 and later adapters.

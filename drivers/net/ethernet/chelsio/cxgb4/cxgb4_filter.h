@@ -37,6 +37,8 @@
 
 #include "t4_msg.h"
 
+extern const struct file_operations filters_debugfs_fops;
+
 void filter_rpl(struct adapter *adap, const struct cpl_set_tcb_rpl *rpl);
 void clear_filter(struct adapter *adap, struct filter_entry *f);
 
