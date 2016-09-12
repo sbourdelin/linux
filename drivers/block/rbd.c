@@ -6002,7 +6002,7 @@ static int rbd_dev_device_setup(struct rbd_device *rbd_dev)
 	if (!single_major) {
 		ret = register_blkdev(0, rbd_dev->name);
 		if (ret < 0)
-			goto err_out_unlock;
+			goto unlock;
 
 		rbd_dev->major = ret;
 		rbd_dev->minor = 0;
@@ -6015,11 +6015,11 @@ static int rbd_dev_device_setup(struct rbd_device *rbd_dev)
 
 	ret = rbd_init_disk(rbd_dev);
 	if (ret)
-		goto err_out_blkdev;
+		goto check_single;
 
 	ret = rbd_dev_mapping_set(rbd_dev);
 	if (ret)
-		goto err_out_disk;
+		goto free_disk;
 
 	set_capacity(rbd_dev->disk, rbd_dev->mapping.size / SECTOR_SIZE);
 	set_disk_ro(rbd_dev->disk, rbd_dev->mapping.read_only);
@@ -6027,7 +6027,7 @@ static int rbd_dev_device_setup(struct rbd_device *rbd_dev)
 	dev_set_name(&rbd_dev->dev, "%d", rbd_dev->dev_id);
 	ret = device_add(&rbd_dev->dev);
 	if (ret)
-		goto err_out_mapping;
+		goto clear_mapping;
 
 	/* Everything's ready.  Announce the disk to the world. */
 
@@ -6044,15 +6044,14 @@ static int rbd_dev_device_setup(struct rbd_device *rbd_dev)
 		rbd_dev->header.features);
 
 	return ret;
-
-err_out_mapping:
+ clear_mapping:
 	rbd_dev_mapping_clear(rbd_dev);
-err_out_disk:
+ free_disk:
 	rbd_free_disk(rbd_dev);
-err_out_blkdev:
+ check_single:
 	if (!single_major)
 		unregister_blkdev(rbd_dev->major, rbd_dev->name);
-err_out_unlock:
+ unlock:
 	up_write(&rbd_dev->header_rwsem);
 	return ret;
 }
