@@ -29,6 +29,7 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/init.h>
+#include <linux/irq.h>
 #include <linux/seq_file.h>
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
@@ -127,6 +128,38 @@ err:
 	netpolicy_free_sys_map(dev);
 	free_cpumask_var(cpumask);
 	return -ENOMEM;
+}
+
+static void netpolicy_clear_affinity(struct net_device *dev)
+{
+	struct netpolicy_sys_info *s_info = &dev->netpolicy->sys_info;
+	u32 i;
+
+	for (i = 0; i < s_info->avail_rx_num; i++) {
+		irq_clear_status_flags(s_info->rx[i].irq, IRQ_NO_BALANCING);
+		irq_set_affinity_hint(s_info->rx[i].irq, cpu_online_mask);
+	}
+
+	for (i = 0; i < s_info->avail_tx_num; i++) {
+		irq_clear_status_flags(s_info->tx[i].irq, IRQ_NO_BALANCING);
+		irq_set_affinity_hint(s_info->tx[i].irq, cpu_online_mask);
+	}
+}
+
+static void netpolicy_set_affinity(struct net_device *dev)
+{
+	struct netpolicy_sys_info *s_info = &dev->netpolicy->sys_info;
+	u32 i;
+
+	for (i = 0; i < s_info->avail_rx_num; i++) {
+		irq_set_status_flags(s_info->rx[i].irq, IRQ_NO_BALANCING);
+		irq_set_affinity_hint(s_info->rx[i].irq, cpumask_of(s_info->rx[i].cpu));
+	}
+
+	for (i = 0; i < s_info->avail_tx_num; i++) {
+		irq_set_status_flags(s_info->tx[i].irq, IRQ_NO_BALANCING);
+		irq_set_affinity_hint(s_info->tx[i].irq, cpumask_of(s_info->tx[i].cpu));
+	}
 }
 
 const char *policy_name[NET_POLICY_MAX] = {
