@@ -78,6 +78,14 @@ long kvmppc_alloc_hpt(struct kvm *kvm, u32 *htab_orderp)
 			--order;
 	}
 
+	/*
+	 * Fallback in case the userspace has provided a size via ioctl.
+	 * Try allocating the same order pages from the page allocator.
+	 */
+	if (!hpt && order > PPC_MIN_HPT_ORDER && htab_orderp)
+		hpt = __get_free_pages(GFP_KERNEL|__GFP_ZERO|__GFP_REPEAT|
+			__GFP_NOWARN, order - PAGE_SHIFT);
+
 	if (!hpt)
 		return -ENOMEM;
 
