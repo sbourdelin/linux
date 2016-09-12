@@ -3285,8 +3285,8 @@ struct netdev_queue *netdev_pick_tx(struct net_device *dev,
 #ifdef CONFIG_NETPOLICY
 			struct netpolicy_instance *instance;
 
-			queue_index = -1;
-			if (dev->netpolicy && sk) {
+			queue_index = sk_tx_queue_get(sk);
+			if ((queue_index < 0) && dev->netpolicy && sk) {
 				instance = netpolicy_find_instance(sk);
 				if (instance) {
 					if (!instance->dev)

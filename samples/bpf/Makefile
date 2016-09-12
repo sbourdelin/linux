@@ -85,6 +85,7 @@ always += xdp2_kern.o
 always += test_current_task_under_cgroup_kern.o
 always += trace_event_kern.o
 always += sampleip_kern.o
+always += netpolicy_kern.o
 
 HOSTCFLAGS += -I$(objtree)/usr/include
 

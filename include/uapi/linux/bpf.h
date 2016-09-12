@@ -398,6 +398,14 @@ enum bpf_func_id {
 	 */
 	BPF_FUNC_skb_change_tail,
 
+	/**
+	 * bpf_netpolicy(skb)
+	 * Netpolicy tc extension. Search for proper Tx queue
+	 * @skb: pointer to skb
+	 * Return: 0 on success or negative error
+	 */
+	BPF_FUNC_netpolicy,
+
 	__BPF_FUNC_MAX_ID,
 };
 

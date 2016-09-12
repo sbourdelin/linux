@@ -88,6 +88,8 @@ static int (*bpf_l4_csum_replace)(void *ctx, int off, int from, int to, int flag
 	(void *) BPF_FUNC_l4_csum_replace;
 static int (*bpf_skb_under_cgroup)(void *ctx, void *map, int index) =
 	(void *) BPF_FUNC_skb_under_cgroup;
+static int (*bpf_netpolicy)(void *ctx) =
+	(void *) BPF_FUNC_netpolicy;
 
 #if defined(__x86_64__)
 

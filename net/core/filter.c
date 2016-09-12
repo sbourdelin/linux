@@ -2322,6 +2322,38 @@ static const struct bpf_func_proto bpf_skb_set_tunnel_opt_proto = {
 	.arg3_type	= ARG_CONST_STACK_SIZE,
 };
 
+#ifdef CONFIG_NETPOLICY
+static u64 bpf_netpolicy(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5)
+{
+	struct sk_buff *skb = (struct sk_buff *) (unsigned long) r1;
+	struct netpolicy_instance *instance;
+	struct net_device *dev = skb->dev;
+	struct sock *sk = skb->sk;
+	int queue_index;
+
+	if (dev->netpolicy && sk) {
+		instance = netpolicy_find_instance(sk);
+		if (instance) {
+			if (!instance->dev)
+				instance->dev = dev;
+			queue_index = netpolicy_pick_queue(instance, false);
+			if ((queue_index >= 0) && sk_fullsock(sk) &&
+			    rcu_access_pointer(sk->sk_dst_cache))
+				sk_tx_queue_set(sk, queue_index);
+		}
+	}
+
+	return 0;
+}
+
+static const struct bpf_func_proto bpf_netpolicy_proto = {
+	.func		= bpf_netpolicy,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_CTX,
+};
+#endif
+
 static const struct bpf_func_proto *
 bpf_get_skb_set_tunnel_proto(enum bpf_func_id which)
 {
@@ -2480,6 +2512,10 @@ tc_cls_act_func_proto(enum bpf_func_id func_id)
 		return &bpf_get_smp_processor_id_proto;
 	case BPF_FUNC_skb_under_cgroup:
 		return &bpf_skb_under_cgroup_proto;
+#ifdef CONFIG_NETPOLICY
+	case BPF_FUNC_netpolicy:
+		return &bpf_netpolicy_proto;
+#endif
 	default:
 		return sk_filter_func_proto(func_id);
 	}
