@@ -40,6 +40,7 @@
 #include <linux/ctype.h>
 #include <linux/cpu.h>
 #include <linux/hashtable.h>
+#include <linux/sched.h>
 
 struct netpolicy_record {
 	struct hlist_node	hash_node;
@@ -292,6 +293,184 @@ static void netpolicy_record_clear_dev_node(struct net_device *dev)
 	}
 	spin_unlock_bh(&np_hashtable_lock);
 }
+
+static struct netpolicy_object *get_avail_object(struct net_device *dev,
+						 enum netpolicy_name policy,
+						 struct netpolicy_instance *instance,
+						 bool is_rx)
+{
+	int avail_cpu_num = cpumask_weight(tsk_cpus_allowed(instance->task));
+	int dir = is_rx ? NETPOLICY_RX : NETPOLICY_TX;
+	struct netpolicy_object *tmp, *obj = NULL;
+	unsigned long load = 0, min_load = -1;
+	struct netpolicy_cpu_load *cpu_load;
+	int i = 0, val = -1;
+
+	/* Check if net policy is supported */
+	if (!dev || !dev->netpolicy)
+		goto exit;
+
+	/* The system should have queues which support the request policy. */
+	if ((policy != dev->netpolicy->cur_policy) &&
+	    (dev->netpolicy->cur_policy != NET_POLICY_MIX))
+		goto exit;
+
+	if (!avail_cpu_num)
+		goto exit;
+
+	cpu_load = kcalloc(avail_cpu_num, sizeof(*cpu_load), GFP_KERNEL);
+	if (!cpu_load)
+		goto exit;
+
+	spin_lock_bh(&dev->np_ob_list_lock);
+
+	/* find the lowest load and remove obvious high load objects */
+	list_for_each_entry(tmp, &dev->netpolicy->obj_list[dir][policy], list) {
+		if (!cpumask_test_cpu(tmp->cpu, tsk_cpus_allowed(instance->task)))
+			continue;
+
+#ifdef CONFIG_SMP
+		/* normalized load */
+		load = weighted_cpuload(tmp->cpu) * 100 / capacity_of(tmp->cpu);
+
+		if ((min_load != -1) &&
+		    load > (min_load + LOAD_TOLERANCE))
+			continue;
+#endif
+		cpu_load[i].load = load;
+		cpu_load[i].obj = tmp;
+		if ((min_load == -1) ||
+		    (load < min_load))
+			min_load = load;
+		i++;
+	}
+	avail_cpu_num = i;
+	spin_unlock_bh(&dev->np_ob_list_lock);
+
+	for (i = 0; i < avail_cpu_num; i++) {
+		if (cpu_load[i].load > (min_load + LOAD_TOLERANCE))
+			continue;
+
+		tmp = cpu_load[i].obj;
+		if ((val > atomic_read(&tmp->refcnt)) ||
+		    (val == -1)) {
+			val = atomic_read(&tmp->refcnt);
+			obj = tmp;
+		}
+	}
+
+	if (!obj)
+		goto free_load;
+
+	atomic_inc(&obj->refcnt);
+
+free_load:
+	kfree(cpu_load);
+exit:
+	return obj;
+}
+
+static int get_avail_queue(struct netpolicy_instance *instance, bool is_rx)
+{
+	struct netpolicy_record *old_record, *new_record;
+	struct net_device *dev = instance->dev;
+	unsigned long ptr_id = (uintptr_t)instance->ptr;
+	int queue = -1;
+
+	spin_lock_bh(&np_hashtable_lock);
+	old_record = netpolicy_record_search(ptr_id);
+	if (!old_record) {
+		pr_warn("NETPOLICY: doesn't registered. Remove net policy settings!\n");
+		instance->policy = NET_POLICY_INVALID;
+		goto err;
+	}
+
+	if (is_rx && old_record->rx_obj) {
+		queue = old_record->rx_obj->queue;
+	} else if (!is_rx && old_record->tx_obj) {
+		queue = old_record->tx_obj->queue;
+	} else {
+		new_record = kzalloc(sizeof(*new_record), GFP_KERNEL);
+		if (!new_record)
+			goto err;
+		memcpy(new_record, old_record, sizeof(*new_record));
+
+		if (is_rx) {
+			new_record->rx_obj = get_avail_object(dev, new_record->policy,
+							      instance, is_rx);
+			if (!new_record->dev)
+				new_record->dev = dev;
+			if (!new_record->rx_obj) {
+				kfree(new_record);
+				goto err;
+			}
+			queue = new_record->rx_obj->queue;
+		} else {
+			new_record->tx_obj = get_avail_object(dev, new_record->policy,
+							      instance, is_rx);
+			if (!new_record->dev)
+				new_record->dev = dev;
+			if (!new_record->tx_obj) {
+				kfree(new_record);
+				goto err;
+			}
+			queue = new_record->tx_obj->queue;
+		}
+		/* update record */
+		hlist_replace_rcu(&old_record->hash_node, &new_record->hash_node);
+		kfree(old_record);
+	}
+err:
+	spin_unlock_bh(&np_hashtable_lock);
+	return queue;
+}
+
+static inline bool policy_validate(struct netpolicy_instance *instance)
+{
+	struct net_device *dev = instance->dev;
+	enum netpolicy_name cur_policy;
+
+	cur_policy = dev->netpolicy->cur_policy;
+	if ((instance->policy == NET_POLICY_NONE) ||
+	    (cur_policy == NET_POLICY_NONE))
+		return false;
+
+	if (((cur_policy != NET_POLICY_MIX) && (cur_policy != instance->policy)) ||
+	    ((cur_policy == NET_POLICY_MIX) && (instance->policy == NET_POLICY_CPU))) {
+		pr_warn("NETPOLICY: %s current device policy %s doesn't support required policy %s! Remove net policy settings!\n",
+			dev->name, policy_name[cur_policy],
+			policy_name[instance->policy]);
+		return false;
+	}
+	return true;
+}
+
+/**
+ * netpolicy_pick_queue() - Find proper queue
+ * @instance:	NET policy per socket/task instance info
+ * @is_rx:	RX queue or TX queue
+ *
+ * This function intends to find the proper queue according to policy.
+ * For selecting the proper queue, currently it uses round-robin algorithm
+ * to find the available object from the given policy object list.
+ * The selected object will be stored in hashtable. So it does not need to
+ * go through the whole object list every time.
+ *
+ * Return: negative on failure, otherwise on the assigned queue
+ */
+int netpolicy_pick_queue(struct netpolicy_instance *instance, bool is_rx)
+{
+	struct net_device *dev = instance->dev;
+
+	if (!dev || !dev->netpolicy)
+		return -EINVAL;
+
+	if (!policy_validate(instance))
+		return -EINVAL;
+
+	return get_avail_queue(instance, is_rx);
+}
+EXPORT_SYMBOL(netpolicy_pick_queue);
 
 /**
  * netpolicy_register() - Register per socket/task policy request

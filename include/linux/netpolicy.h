@@ -85,7 +85,14 @@ struct netpolicy_instance {
 	struct net_device	*dev;
 	enum netpolicy_name	policy; /* required policy */
 	void			*ptr;   /* pointers */
+	struct task_struct	*task;
 };
+
+struct netpolicy_cpu_load {
+	unsigned long		load;
+	struct netpolicy_object	*obj;
+};
+#define LOAD_TOLERANCE	5
 
 /* check if policy is valid */
 static inline int is_net_policy_valid(enum netpolicy_name policy)
@@ -98,6 +105,7 @@ extern void update_netpolicy_sys_map(void);
 extern int netpolicy_register(struct netpolicy_instance *instance,
 			      enum netpolicy_name policy);
 extern void netpolicy_unregister(struct netpolicy_instance *instance);
+extern int netpolicy_pick_queue(struct netpolicy_instance *instance, bool is_rx);
 #else
 static inline void update_netpolicy_sys_map(void)
 {
@@ -112,6 +120,10 @@ static inline void netpolicy_unregister(struct netpolicy_instance *instance)
 {
 }
 
+static inline int netpolicy_pick_queue(struct netpolicy_instance *instance, bool is_rx)
+{
+	return 0;
+}
 #endif
 
 #endif /*__LINUX_NETPOLICY_H*/
