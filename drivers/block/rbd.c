@@ -2879,7 +2879,7 @@ static void rbd_img_obj_exists_callback(struct rbd_obj_request *obj_request)
 		obj_request_existence_set(orig_request, false);
 	} else if (result) {
 		orig_request->result = result;
-		goto out;
+		goto complete_request;
 	}
 
 	/*
@@ -2887,8 +2887,8 @@ static void rbd_img_obj_exists_callback(struct rbd_obj_request *obj_request)
 	 * whether the target object exists.
 	 */
 	orig_request->result = rbd_img_obj_request_submit(orig_request);
-out:
 	if (orig_request->result)
+ complete_request:
 		rbd_obj_request_complete(orig_request);
 }
 
