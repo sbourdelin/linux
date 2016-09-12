@@ -107,10 +107,7 @@ void thread__put(struct thread *thread)
 
 struct comm *thread__comm(const struct thread *thread)
 {
-	if (list_empty(&thread->comm_list))
-		return NULL;
-
-	return list_first_entry(&thread->comm_list, struct comm, list);
+	return list_first_entry_or_null(&thread->comm_list, struct comm, list);
 }
 
 struct comm *thread__exec_comm(const struct thread *thread)
