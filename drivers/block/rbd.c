@@ -3297,7 +3297,7 @@ static int rbd_request_lock(struct rbd_device *rbd_dev)
 				   &reply_pages, &reply_len);
 	if (ret && ret != -ETIMEDOUT) {
 		rbd_warn(rbd_dev, "failed to request lock: %d", ret);
-		goto out;
+		goto release_page_vector;
 	}
 
 	if (reply_len > 0 && reply_len <= PAGE_SIZE) {
@@ -3321,7 +3321,7 @@ static int rbd_request_lock(struct rbd_device *rbd_dev)
 				rbd_warn(rbd_dev,
 					 "duplicate lock owners detected");
 				ret = -EIO;
-				goto out;
+				goto release_page_vector;
 			}
 
 			lock_owner_responded = true;
@@ -3342,14 +3342,12 @@ static int rbd_request_lock(struct rbd_device *rbd_dev)
 		rbd_warn(rbd_dev, "no lock owners detected");
 		ret = -ETIMEDOUT;
 	}
-
-out:
+ release_page_vector:
 	ceph_release_page_vector(reply_pages, calc_pages_for(0, reply_len));
 	return ret;
-
-e_inval:
+ e_inval:
 	ret = -EINVAL;
-	goto out;
+	goto release_page_vector;
 }
 
 static void wake_requests(struct rbd_device *rbd_dev, bool wake_all)
