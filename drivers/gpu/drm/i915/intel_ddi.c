@@ -1745,7 +1745,7 @@ static void intel_ddi_post_disable(struct intel_encoder *intel_encoder,
 	if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev))
 		I915_WRITE(DPLL_CTRL2, (I915_READ(DPLL_CTRL2) |
 					DPLL_CTRL2_DDI_CLK_OFF(port)));
-	else if (INTEL_INFO(dev)->gen < 9)
+	else if (INTEL_GEN(dev_priv) < 9)
 		I915_WRITE(PORT_CLK_SEL(port), PORT_CLK_SEL_NONE);
 
 	if (type == INTEL_OUTPUT_HDMI) {
@@ -1814,7 +1814,7 @@ static void intel_enable_ddi(struct intel_encoder *intel_encoder,
 	} else if (type == INTEL_OUTPUT_EDP) {
 		struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
 
-		if (port == PORT_A && INTEL_INFO(dev)->gen < 9)
+		if (port == PORT_A && INTEL_GEN(dev_priv) < 9)
 			intel_dp_stop_link_train(intel_dp);
 
 		intel_edp_backlight_on(intel_dp);

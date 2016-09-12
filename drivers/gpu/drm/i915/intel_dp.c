@@ -1502,7 +1502,7 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 		intel_fixed_panel_mode(intel_connector->panel.fixed_mode,
 				       adjusted_mode);
 
-		if (INTEL_INFO(dev)->gen >= 9) {
+		if (INTEL_GEN(dev_priv) >= 9) {
 			int ret;
 			ret = skl_update_scaler_crtc(pipe_config);
 			if (ret)
@@ -2908,7 +2908,7 @@ intel_dp_voltage_max(struct intel_dp *intel_dp)
 
 	if (IS_BROXTON(dev))
 		return DP_TRAIN_VOLTAGE_SWING_LEVEL_3;
-	else if (INTEL_INFO(dev)->gen >= 9) {
+	else if (INTEL_GEN(dev_priv) >= 9) {
 		if (dev_priv->vbt.edp.low_vswing && port == PORT_A)
 			return DP_TRAIN_VOLTAGE_SWING_LEVEL_3;
 		return DP_TRAIN_VOLTAGE_SWING_LEVEL_2;
@@ -4801,7 +4801,7 @@ bool intel_dp_is_edp(struct drm_device *dev, enum port port)
 	 * eDP not supported on g4x. so bail out early just
 	 * for a bit extra safety in case the VBT is bonkers.
 	 */
-	if (INTEL_INFO(dev)->gen < 5)
+	if (INTEL_GEN(dev_priv) < 5)
 		return false;
 
 	if (port == PORT_A)
@@ -5401,7 +5401,7 @@ intel_dp_drrs_init(struct intel_connector *intel_connector,
 	INIT_DELAYED_WORK(&dev_priv->drrs.work, intel_edp_drrs_downclock_work);
 	mutex_init(&dev_priv->drrs.mutex);
 
-	if (INTEL_INFO(dev)->gen <= 6) {
+	if (INTEL_GEN(dev_priv) <= 6) {
 		DRM_DEBUG_KMS("DRRS supported for Gen7 and above\n");
 		return NULL;
 	}
@@ -5575,7 +5575,7 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 	intel_dp->pps_pipe = INVALID_PIPE;
 
 	/* intel_dp vfuncs */
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_GEN(dev_priv) >= 9)
 		intel_dp->get_aux_clock_divider = skl_get_aux_clock_divider;
 	else if (IS_HASWELL(dev) || IS_BROADWELL(dev))
 		intel_dp->get_aux_clock_divider = hsw_get_aux_clock_divider;
@@ -5584,7 +5584,7 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 	else
 		intel_dp->get_aux_clock_divider = g4x_get_aux_clock_divider;
 
-	if (INTEL_INFO(dev)->gen >= 9)
+	if (INTEL_GEN(dev_priv) >= 9)
 		intel_dp->get_aux_send_ctl = skl_get_aux_send_ctl;
 	else
 		intel_dp->get_aux_send_ctl = g4x_get_aux_send_ctl;
@@ -5734,7 +5734,7 @@ bool intel_dp_init(struct drm_device *dev,
 	} else {
 		intel_encoder->pre_enable = g4x_pre_enable_dp;
 		intel_encoder->enable = g4x_enable_dp;
-		if (INTEL_INFO(dev)->gen >= 5)
+		if (INTEL_GEN(dev_priv) >= 5)
 			intel_encoder->post_disable = ilk_post_disable_dp;
 	}
 

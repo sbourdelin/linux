@@ -1106,7 +1106,7 @@ static void intel_tv_pre_enable(struct intel_encoder *encoder,
 
 	set_color_conversion(dev_priv, color_conversion);
 
-	if (INTEL_INFO(dev)->gen >= 4)
+	if (INTEL_GEN(dev_priv) >= 4)
 		I915_WRITE(TV_CLR_KNOBS, 0x00404000);
 	else
 		I915_WRITE(TV_CLR_KNOBS, 0x00606000);

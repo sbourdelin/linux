@@ -180,7 +180,7 @@ static void i9xx_load_csc_matrix(struct drm_crtc_state *crtc_state)
 	I915_WRITE(PIPE_CSC_PREOFF_ME(pipe), 0);
 	I915_WRITE(PIPE_CSC_PREOFF_LO(pipe), 0);
 
-	if (INTEL_INFO(dev)->gen > 6) {
+	if (INTEL_GEN(dev_priv) > 6) {
 		uint16_t postoff = 0;
 
 		if (intel_crtc_state->limited_color_range)
