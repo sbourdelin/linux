@@ -5256,9 +5256,9 @@ static char *rbd_dev_image_name(struct rbd_device *rbd_dev)
 	void *p;
 	void *end;
 	size_t size;
-	void *reply_buf = NULL;
-	size_t len = 0;
-	char *image_name = NULL;
+	void *reply_buf;
+	size_t len;
+	char *image_name;
 	int ret;
 
 	rbd_assert(!rbd_dev->spec->image_name);
