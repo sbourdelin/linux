@@ -5421,7 +5421,7 @@ static int rbd_spec_fill_names(struct rbd_device *rbd_dev)
 	snap_name = rbd_snap_name(rbd_dev, spec->snap_id);
 	if (IS_ERR(snap_name)) {
 		ret = PTR_ERR(snap_name);
-		goto out_err;
+		goto free_name;
 	}
 
 	spec->pool_name = pool_name;
@@ -5429,8 +5429,7 @@ static int rbd_spec_fill_names(struct rbd_device *rbd_dev)
 	spec->snap_name = snap_name;
 
 	return 0;
-
-out_err:
+ free_name:
 	kfree(image_name);
 	kfree(pool_name);
 	return ret;
