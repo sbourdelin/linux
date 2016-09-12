@@ -1098,7 +1098,6 @@ int inet_diag_handler_get_info(struct sk_buff *skb, struct sock *sk)
 
 	handler = inet_diag_lock_handler(sk->sk_protocol);
 	if (IS_ERR(handler)) {
-		inet_diag_unlock_handler(handler);
 		nlmsg_cancel(skb, nlh);
 		return PTR_ERR(handler);
 	}
