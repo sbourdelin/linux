@@ -36,6 +36,20 @@
 #include <net/net_namespace.h>
 #include <net/rtnetlink.h>
 
+static int netpolicy_get_dev_info(struct net_device *dev,
+				  struct netpolicy_dev_info *d_info)
+{
+	if (!dev->netdev_ops->ndo_get_irq_info)
+		return -ENOTSUPP;
+	return dev->netdev_ops->ndo_get_irq_info(dev, d_info);
+}
+
+static void netpolicy_free_dev_info(struct netpolicy_dev_info *d_info)
+{
+	kfree(d_info->rx_irq);
+	kfree(d_info->tx_irq);
+}
+
 const char *policy_name[NET_POLICY_MAX] = {
 	"NONE"
 };

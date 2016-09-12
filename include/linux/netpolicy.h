@@ -23,6 +23,13 @@ enum netpolicy_name {
 
 extern const char *policy_name[];
 
+struct netpolicy_dev_info {
+	u32	rx_num;
+	u32	tx_num;
+	u32	*rx_irq;
+	u32	*tx_irq;
+};
+
 struct netpolicy_info {
 	enum netpolicy_name	cur_policy;
 	unsigned long avail_policy[BITS_TO_LONGS(NET_POLICY_MAX)];
