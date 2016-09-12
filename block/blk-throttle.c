@@ -591,13 +591,20 @@ static inline void throtl_extend_slice(struct throtl_grp *tg, bool rw,
 		   tg->slice_end[rw], jiffies);
 }
 
+static bool throtl_is_delayed_disp(struct throtl_grp *tg, bool rw)
+{
+	return (time_after(jiffies, tg->slice_end[rw]) &&
+			!tg->bytes_disp[rw] && !tg->io_disp[rw] &&
+			tg->service_queue.nr_queued[rw]) ? true : false;
+}
+
 /* Determine if previously allocated or extended slice is complete or not */
 static bool throtl_slice_used(struct throtl_grp *tg, bool rw)
 {
 	if (time_in_range(jiffies, tg->slice_start[rw], tg->slice_end[rw]))
 		return false;
 
-	return 1;
+	return true;
 }
 
 /* Trim the used slices and adjust slice start accordingly */
@@ -782,7 +789,7 @@ static bool tg_may_dispatch(struct throtl_grp *tg, struct bio *bio,
 	 * existing slice to make sure it is at least throtl_slice interval
 	 * long since now.
 	 */
-	if (throtl_slice_used(tg, rw))
+	if (throtl_slice_used(tg, rw) && !throtl_is_delayed_disp(tg, rw))
 		throtl_start_new_slice(tg, rw);
 	else {
 		if (time_before(tg->slice_end[rw], jiffies + throtl_slice))
