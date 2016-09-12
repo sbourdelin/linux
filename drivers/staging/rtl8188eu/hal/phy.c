@@ -1292,7 +1292,7 @@ void rtl88eu_phy_iq_calibrate(struct adapter *adapt, bool recovery)
 		rOFDM0_RxIQExtAnta};
 	bool is2t;
 
-	is2t = (dm_odm->RFType == ODM_2T2R) ? true : false;
+	is2t = dm_odm->RFType == ODM_2T2R;
 
 	if (!(dm_odm->SupportAbility & ODM_RF_CALIBRATION))
 		return;
