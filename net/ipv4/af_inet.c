@@ -754,6 +754,71 @@ ssize_t inet_sendpage(struct socket *sock, struct page *page, int offset,
 }
 EXPORT_SYMBOL(inet_sendpage);
 
+static void sock_netpolicy_manage_flow(struct sock *sk, struct msghdr *msg)
+{
+#ifdef CONFIG_NETPOLICY
+	struct netpolicy_instance *instance;
+	struct netpolicy_flow_spec *flow;
+	bool change = false;
+	int queue;
+
+	instance = netpolicy_find_instance(sk);
+	if (!instance)
+		return;
+
+	if (!instance->dev)
+		return;
+
+	flow = &instance->flow;
+	/* TODO: need to change here and add more protocol support */
+	if (sk->sk_family != AF_INET)
+		return;
+	if ((sk->sk_protocol == IPPROTO_TCP) &&
+	    (sk->sk_type == SOCK_STREAM)) {
+		if ((flow->flow_type != TCP_V4_FLOW) ||
+		    (flow->spec.tcp_udp_ip4_spec.ip4src != sk->sk_daddr) ||
+		    (flow->spec.tcp_udp_ip4_spec.psrc != sk->sk_dport) ||
+		    (flow->spec.tcp_udp_ip4_spec.ip4dst != sk->sk_rcv_saddr) ||
+		    (flow->spec.tcp_udp_ip4_spec.pdst != htons(sk->sk_num)))
+			change = true;
+		if (change) {
+			flow->flow_type = TCP_V4_FLOW;
+			flow->spec.tcp_udp_ip4_spec.ip4src = sk->sk_daddr;
+			flow->spec.tcp_udp_ip4_spec.psrc = sk->sk_dport;
+			flow->spec.tcp_udp_ip4_spec.ip4dst = sk->sk_rcv_saddr;
+			flow->spec.tcp_udp_ip4_spec.pdst = htons(sk->sk_num);
+		}
+	} else if ((sk->sk_protocol == IPPROTO_UDP) &&
+		   (sk->sk_type == SOCK_DGRAM)) {
+			DECLARE_SOCKADDR(struct sockaddr_in *, sin, msg->msg_name);
+
+			if (!sin || !sin->sin_addr.s_addr || !sin->sin_port)
+				return;
+			if ((flow->flow_type != UDP_V4_FLOW) ||
+			    (flow->spec.tcp_udp_ip4_spec.ip4src != sin->sin_addr.s_addr) ||
+			    (flow->spec.tcp_udp_ip4_spec.psrc != sin->sin_port) ||
+			    (flow->spec.tcp_udp_ip4_spec.ip4dst != sk->sk_rcv_saddr) ||
+			    (flow->spec.tcp_udp_ip4_spec.pdst != htons(sk->sk_num)))
+				change = true;
+			if (change) {
+				flow->flow_type = UDP_V4_FLOW;
+				flow->spec.tcp_udp_ip4_spec.ip4src = sin->sin_addr.s_addr;
+				flow->spec.tcp_udp_ip4_spec.psrc = sin->sin_port;
+				flow->spec.tcp_udp_ip4_spec.ip4dst = sk->sk_rcv_saddr;
+				flow->spec.tcp_udp_ip4_spec.pdst = htons(sk->sk_num);
+			}
+	} else {
+		return;
+	}
+
+	queue = netpolicy_pick_queue(instance, true);
+	if (queue < 0)
+		return;
+	if ((queue != atomic_read(&instance->rule_queue)) || change)
+		netpolicy_set_rules(instance);
+#endif
+}
+
 int inet_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 		 int flags)
 {
@@ -767,6 +832,12 @@ int inet_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 				   flags & ~MSG_DONTWAIT, &addr_len);
 	if (err >= 0)
 		msg->msg_namelen = addr_len;
+
+	/* The dev info, src address and port information for UDP
+	 * can only be retrieved after processing the msg.
+	 */
+	sock_netpolicy_manage_flow(sk, msg);
+
 	return err;
 }
 EXPORT_SYMBOL(inet_recvmsg);

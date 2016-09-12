@@ -37,6 +37,8 @@ enum netpolicy_traffic {
 	NETPOLICY_RXTX,
 };
 
+#define NETPOLICY_INVALID_QUEUE	-1
+#define NETPOLICY_INVALID_LOC	NETPOLICY_INVALID_QUEUE
 #define POLICY_NAME_LEN_MAX	64
 extern const char *policy_name[];
 
@@ -81,11 +83,34 @@ struct netpolicy_info {
 	struct list_head	obj_list[NETPOLICY_RXTX][NET_POLICY_MAX];
 };
 
+struct netpolicy_tcpudpip4_spec {
+	/* source and Destination host and port */
+	__be32	ip4src;
+	__be32	ip4dst;
+	__be16	psrc;
+	__be16	pdst;
+};
+
+union netpolicy_flow_union {
+	struct netpolicy_tcpudpip4_spec	tcp_udp_ip4_spec;
+};
+
+struct netpolicy_flow_spec {
+	__u32	flow_type;
+	union netpolicy_flow_union	spec;
+};
+
 struct netpolicy_instance {
 	struct net_device	*dev;
 	enum netpolicy_name	policy; /* required policy */
 	void			*ptr;   /* pointers */
 	struct task_struct	*task;
+	int			location;	/* rule location */
+	atomic_t		rule_queue;	/* queue set by rule */
+	struct work_struct	fc_wk;		/* flow classification work */
+	atomic_t		fc_wk_cnt;	/* flow classification work number */
+	struct netpolicy_flow_spec	flow;	/* flow information */
+
 };
 
 struct netpolicy_cpu_load {
@@ -106,6 +131,7 @@ extern int netpolicy_register(struct netpolicy_instance *instance,
 			      enum netpolicy_name policy);
 extern void netpolicy_unregister(struct netpolicy_instance *instance);
 extern int netpolicy_pick_queue(struct netpolicy_instance *instance, bool is_rx);
+extern void netpolicy_set_rules(struct netpolicy_instance *instance);
 #else
 static inline void update_netpolicy_sys_map(void)
 {
@@ -123,6 +149,10 @@ static inline void netpolicy_unregister(struct netpolicy_instance *instance)
 static inline int netpolicy_pick_queue(struct netpolicy_instance *instance, bool is_rx)
 {
 	return 0;
+}
+
+static inline void netpolicy_set_rules(struct netpolicy_instance *instance)
+{
 }
 #endif
 

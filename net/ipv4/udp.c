@@ -1780,6 +1780,10 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 	if (sk) {
 		int ret;
 
+#ifdef CONFIG_NETPOLICY
+		/* Record dev info before it's discarded in udp_queue_rcv_skb */
+		sk->sk_netpolicy.dev = skb->dev;
+#endif
 		if (inet_get_convert_csum(sk) && uh->check && !IS_UDPLITE(sk))
 			skb_checksum_try_convert(skb, IPPROTO_UDP, uh->check,
 						 inet_compute_pseudo);
