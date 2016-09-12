@@ -22,6 +22,9 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
+
+#include <linux/cacheflush.h>
+
 #include "ion_priv.h"
 
 static void *ion_page_pool_alloc_pages(struct ion_page_pool *pool)
@@ -30,9 +33,7 @@ static void *ion_page_pool_alloc_pages(struct ion_page_pool *pool)
 
 	if (!page)
 		return NULL;
-	if (!pool->cached)
-		ion_pages_sync_for_device(NULL, page, PAGE_SIZE << pool->order,
-					  DMA_BIDIRECTIONAL);
+	kernel_force_cache_clean(page, PAGE_SIZE << pool->order);
 	return page;
 }
 
