@@ -1634,6 +1634,7 @@ enum netdev_priv_flags {
  *	@proc_dev:	device node in proc to configure device net policy
  *	@netpolicy:	NET policy related information of net device
  *	@np_lock:	protect the state of NET policy
+ *	@np_ob_list_lock:	protect the net policy object list
  *
  *	FIXME: cleanup struct net_device such that network protocol info
  *	moves out.
@@ -1908,6 +1909,7 @@ struct net_device {
 #endif /* CONFIG_PROC_FS */
 	struct netpolicy_info	*netpolicy;
 	spinlock_t		np_lock;
+	spinlock_t		np_ob_list_lock;
 #endif /* CONFIG_NETPOLICY */
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)

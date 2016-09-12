@@ -36,6 +36,7 @@
 #include <linux/netdevice.h>
 #include <net/net_namespace.h>
 #include <net/rtnetlink.h>
+#include <linux/sort.h>
 
 static int netpolicy_get_dev_info(struct net_device *dev,
 				  struct netpolicy_dev_info *d_info)
@@ -162,11 +163,31 @@ static void netpolicy_set_affinity(struct net_device *dev)
 	}
 }
 
+static void netpolicy_free_obj_list(struct net_device *dev)
+{
+	int i, j;
+	struct netpolicy_object *obj, *tmp;
+
+	spin_lock(&dev->np_ob_list_lock);
+	for (i = 0; i < NETPOLICY_RXTX; i++) {
+		for (j = NET_POLICY_NONE; j < NET_POLICY_MAX; j++) {
+			if (list_empty(&dev->netpolicy->obj_list[i][j]))
+				continue;
+			list_for_each_entry_safe(obj, tmp, &dev->netpolicy->obj_list[i][j], list) {
+				list_del(&obj->list);
+				kfree(obj);
+			}
+		}
+	}
+	spin_unlock(&dev->np_ob_list_lock);
+}
+
 static int netpolicy_disable(struct net_device *dev)
 {
 	if (dev->netpolicy->irq_affinity)
 		netpolicy_clear_affinity(dev);
 	netpolicy_free_sys_map(dev);
+	netpolicy_free_obj_list(dev);
 
 	return 0;
 }
@@ -206,6 +227,213 @@ static int netpolicy_enable(struct net_device *dev)
 const char *policy_name[NET_POLICY_MAX] = {
 	"NONE"
 };
+
+static u32 cpu_to_queue(struct net_device *dev,
+			u32 cpu, bool is_rx)
+{
+	struct netpolicy_sys_info *s_info = &dev->netpolicy->sys_info;
+	int i;
+
+	if (is_rx) {
+		for (i = 0; i < s_info->avail_rx_num; i++) {
+			if (s_info->rx[i].cpu == cpu)
+				return s_info->rx[i].queue;
+		}
+	} else {
+		for (i = 0; i < s_info->avail_tx_num; i++) {
+			if (s_info->tx[i].cpu == cpu)
+				return s_info->tx[i].queue;
+		}
+	}
+
+	return ~0;
+}
+
+static int netpolicy_add_obj(struct net_device *dev,
+			     u32 cpu, bool is_rx,
+			     enum netpolicy_name policy)
+{
+	struct netpolicy_object *obj;
+	int dir = is_rx ? NETPOLICY_RX : NETPOLICY_TX;
+
+	obj = kzalloc(sizeof(*obj), GFP_ATOMIC);
+	if (!obj)
+		return -ENOMEM;
+	obj->cpu = cpu;
+	obj->queue = cpu_to_queue(dev, cpu, is_rx);
+	list_add_tail(&obj->list, &dev->netpolicy->obj_list[dir][policy]);
+
+	return 0;
+}
+
+struct sort_node {
+	int	node;
+	int	distance;
+};
+
+static inline int node_distance_cmp(const void *a, const void *b)
+{
+	const struct sort_node *_a = a;
+	const struct sort_node *_b = b;
+
+	return _a->distance - _b->distance;
+}
+
+static int _netpolicy_gen_obj_list(struct net_device *dev, bool is_rx,
+				   enum netpolicy_name policy,
+				   struct sort_node *nodes, int num_node,
+				   struct cpumask *node_avail_cpumask)
+{
+	cpumask_var_t node_tmp_cpumask, sibling_tmp_cpumask;
+	struct cpumask *node_assigned_cpumask;
+	int i, ret = -ENOMEM;
+	u32 cpu;
+
+	if (!alloc_cpumask_var(&node_tmp_cpumask, GFP_ATOMIC))
+		return ret;
+	if (!alloc_cpumask_var(&sibling_tmp_cpumask, GFP_ATOMIC))
+		goto alloc_fail1;
+
+	node_assigned_cpumask = kcalloc(num_node, sizeof(struct cpumask), GFP_ATOMIC);
+	if (!node_assigned_cpumask)
+		goto alloc_fail2;
+
+	/* Don't share physical core */
+	for (i = 0; i < num_node; i++) {
+		if (cpumask_weight(&node_avail_cpumask[nodes[i].node]) == 0)
+			continue;
+		spin_lock(&dev->np_ob_list_lock);
+		cpumask_copy(node_tmp_cpumask, &node_avail_cpumask[nodes[i].node]);
+		while (cpumask_weight(node_tmp_cpumask)) {
+			cpu = cpumask_first(node_tmp_cpumask);
+
+			/* push to obj list */
+			ret = netpolicy_add_obj(dev, cpu, is_rx, policy);
+			if (ret) {
+				spin_unlock(&dev->np_ob_list_lock);
+				goto err;
+			}
+
+			cpumask_set_cpu(cpu, &node_assigned_cpumask[nodes[i].node]);
+			cpumask_and(sibling_tmp_cpumask, node_tmp_cpumask, topology_sibling_cpumask(cpu));
+			cpumask_xor(node_tmp_cpumask, node_tmp_cpumask, sibling_tmp_cpumask);
+		}
+		spin_unlock(&dev->np_ob_list_lock);
+	}
+
+	for (i = 0; i < num_node; i++) {
+		cpumask_xor(node_tmp_cpumask, &node_avail_cpumask[nodes[i].node], &node_assigned_cpumask[nodes[i].node]);
+		if (cpumask_weight(node_tmp_cpumask) == 0)
+			continue;
+		spin_lock(&dev->np_ob_list_lock);
+		for_each_cpu(cpu, node_tmp_cpumask) {
+			/* push to obj list */
+			ret = netpolicy_add_obj(dev, cpu, is_rx, policy);
+			if (ret) {
+				spin_unlock(&dev->np_ob_list_lock);
+				goto err;
+			}
+			cpumask_set_cpu(cpu, &node_assigned_cpumask[nodes[i].node]);
+		}
+		spin_unlock(&dev->np_ob_list_lock);
+	}
+
+err:
+	kfree(node_assigned_cpumask);
+alloc_fail2:
+	free_cpumask_var(sibling_tmp_cpumask);
+alloc_fail1:
+	free_cpumask_var(node_tmp_cpumask);
+
+	return ret;
+}
+
+static int netpolicy_gen_obj_list(struct net_device *dev,
+				  enum netpolicy_name policy)
+{
+	struct netpolicy_sys_info *s_info = &dev->netpolicy->sys_info;
+	struct cpumask *node_avail_cpumask;
+	struct sort_node *nodes;
+	int i, ret, node = 0;
+	int num_nodes = 1;
+	u32 cpu;
+#ifdef CONFIG_NUMA
+	int dev_node = 0;
+	int val;
+#endif
+	/* The network performance for objects could be different
+	 * because of the queue and cpu topology.
+	 * The objects will be ordered accordingly,
+	 * and put high performance object in the front.
+	 *
+	 * The priority rules as below,
+	 * - The local object. (Local means cpu and queue are in the same node.)
+	 * - The cpu in the object is the only logical core in physical core.
+	 *   The sibiling core's object has not been added in the object list yet.
+	 * - The rest of objects
+	 *
+	 * So the order of object list is as below:
+	 * 1. Local core + the only logical core
+	 * 2. Remote core + the only logical core
+	 * 3. Local core + the core's sibling is already in the object list
+	 * 4. Remote core + the core's sibling is already in the object list
+	 */
+#ifdef CONFIG_NUMA
+	dev_node = dev_to_node(dev->dev.parent);
+	num_nodes = num_online_nodes();
+#endif
+
+	nodes = kcalloc(num_nodes, sizeof(*nodes), GFP_ATOMIC);
+	if (!nodes)
+		return -ENOMEM;
+
+	node_avail_cpumask = kcalloc(num_nodes, sizeof(struct cpumask), GFP_ATOMIC);
+	if (!node_avail_cpumask) {
+		kfree(nodes);
+		return -ENOMEM;
+	}
+
+#ifdef CONFIG_NUMA
+	/* order the node from near to far */
+	for_each_node_mask(i, node_online_map) {
+		val = node_distance(dev_node, i);
+		nodes[node].node = i;
+		nodes[node].distance = val;
+		node++;
+	}
+	sort(nodes, num_nodes, sizeof(*nodes),
+	     node_distance_cmp, NULL);
+#else
+	nodes[0].node = 0;
+#endif
+
+	for (i = 0; i < s_info->avail_rx_num; i++) {
+		cpu = s_info->rx[i].cpu;
+		cpumask_set_cpu(cpu, &node_avail_cpumask[cpu_to_node(cpu)]);
+	}
+	ret = _netpolicy_gen_obj_list(dev, true, policy, nodes,
+				      node, node_avail_cpumask);
+	if (ret)
+		goto err;
+
+	for (i = 0; i < node; i++)
+		cpumask_clear(&node_avail_cpumask[nodes[i].node]);
+
+	for (i = 0; i < s_info->avail_tx_num; i++) {
+		cpu = s_info->tx[i].cpu;
+		cpumask_set_cpu(cpu, &node_avail_cpumask[cpu_to_node(cpu)]);
+	}
+	ret = _netpolicy_gen_obj_list(dev, false, policy, nodes,
+				      node, node_avail_cpumask);
+	if (ret)
+		goto err;
+
+err:
+	kfree(nodes);
+	kfree(node_avail_cpumask);
+	return ret;
+}
+
 #ifdef CONFIG_PROC_FS
 
 static int net_policy_proc_show(struct seq_file *m, void *v)
@@ -261,7 +489,7 @@ static int netpolicy_proc_dev_init(struct net *net, struct net_device *dev)
 
 int init_netpolicy(struct net_device *dev)
 {
-	int ret;
+	int ret, i, j;
 
 	spin_lock(&dev->np_lock);
 	ret = 0;
@@ -284,7 +512,15 @@ int init_netpolicy(struct net_device *dev)
 	if (ret) {
 		kfree(dev->netpolicy);
 		dev->netpolicy = NULL;
+		goto unlock;
 	}
+
+	spin_lock(&dev->np_ob_list_lock);
+	for (i = 0; i < NETPOLICY_RXTX; i++) {
+		for (j = NET_POLICY_NONE; j < NET_POLICY_MAX; j++)
+			INIT_LIST_HEAD(&dev->netpolicy->obj_list[i][j]);
+	}
+	spin_unlock(&dev->np_ob_list_lock);
 
 unlock:
 	spin_unlock(&dev->np_lock);

@@ -21,6 +21,12 @@ enum netpolicy_name {
 	NET_POLICY_MAX,
 };
 
+enum netpolicy_traffic {
+	NETPOLICY_RX		= 0,
+	NETPOLICY_TX,
+	NETPOLICY_RXTX,
+};
+
 extern const char *policy_name[];
 
 struct netpolicy_dev_info {
@@ -46,12 +52,21 @@ struct netpolicy_sys_info {
 	struct netpolicy_sys_map	*tx;
 };
 
+struct netpolicy_object {
+	struct list_head	list;
+	u32			cpu;
+	u32			queue;
+	atomic_t		refcnt;
+};
+
 struct netpolicy_info {
 	enum netpolicy_name	cur_policy;
 	unsigned long avail_policy[BITS_TO_LONGS(NET_POLICY_MAX)];
 	bool irq_affinity;
 	/* cpu and queue mapping information */
 	struct netpolicy_sys_info	sys_info;
+	/* List of policy objects 0 rx 1 tx */
+	struct list_head	obj_list[NETPOLICY_RXTX][NET_POLICY_MAX];
 };
 
 #endif /*__LINUX_NETPOLICY_H*/
