@@ -9085,6 +9085,20 @@ static const struct net_device_ops i40e_netdev_ops = {
 	.ndo_bridge_setlink	= i40e_ndo_bridge_setlink,
 };
 
+static int i40e_sw_attr_get(struct net_device *dev, struct switchdev_attr *attr)
+{
+	struct i40e_netdev_priv *np = netdev_priv(dev);
+	struct i40e_pf *pf = np->vsi->back;
+	int err = 0;
+
+	err = __i40e_sw_attr_get(pf, attr);
+	return err;
+}
+
+static const struct switchdev_ops i40e_switchdev_ops = {
+	.switchdev_port_attr_get	= i40e_sw_attr_get,
+};
+
 /**
  * i40e_config_netdev - Setup the netdev flags
  * @vsi: the VSI being configured
@@ -9182,6 +9196,9 @@ static int i40e_config_netdev(struct i40e_vsi *vsi)
 	netdev->netdev_ops = &i40e_netdev_ops;
 	netdev->watchdog_timeo = 5 * HZ;
 	i40e_set_ethtool_ops(netdev);
+#ifdef CONFIG_NET_SWITCHDEV
+	netdev->switchdev_ops = &i40e_switchdev_ops;
+#endif
 #ifdef I40E_FCOE
 	i40e_fcoe_config_netdev(netdev, vsi);
 #endif
