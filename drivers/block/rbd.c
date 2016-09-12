@@ -2920,7 +2920,7 @@ static int rbd_img_obj_exists_submit(struct rbd_obj_request *obj_request)
 	stat_request = rbd_obj_request_create(obj_request->object_name, 0, 0,
 							OBJ_REQUEST_PAGES);
 	if (!stat_request)
-		goto out;
+		goto put_request;
 
 	rbd_obj_request_get(obj_request);
 	stat_request->obj_request = obj_request;
@@ -2932,7 +2932,7 @@ static int rbd_img_obj_exists_submit(struct rbd_obj_request *obj_request)
 	stat_request->osd_req = rbd_osd_req_create(rbd_dev, OBJ_OP_READ, 1,
 						   stat_request);
 	if (!stat_request->osd_req)
-		goto out;
+		goto put_request;
 	stat_request->callback = rbd_img_obj_exists_callback;
 
 	osd_req_op_init(stat_request->osd_req, 0, CEPH_OSD_OP_STAT, 0);
@@ -2942,8 +2942,8 @@ static int rbd_img_obj_exists_submit(struct rbd_obj_request *obj_request)
 
 	osdc = &rbd_dev->rbd_client->client->osdc;
 	ret = rbd_obj_request_submit(osdc, stat_request);
-out:
 	if (ret)
+ put_request:
 		rbd_obj_request_put(obj_request);
 
 	return ret;
