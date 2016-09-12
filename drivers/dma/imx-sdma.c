@@ -947,7 +947,6 @@ static void sdma_set_watermarklevel_for_p2p(struct sdma_channel *sdmac)
 static int sdma_config_channel(struct dma_chan *chan)
 {
 	struct sdma_channel *sdmac = to_sdma_chan(chan);
-	int ret;
 
 	sdma_disable_channel(chan);
 
@@ -999,9 +998,7 @@ static int sdma_config_channel(struct dma_chan *chan)
 		sdmac->watermark_level = 0; /* FIXME: M3_BASE_ADDRESS */
 	}
 
-	ret = sdma_load_context(sdmac);
-
-	return ret;
+	return sdma_load_context(sdmac);
 }
 
 static int sdma_set_channel_priority(struct sdma_channel *sdmac,
@@ -1520,13 +1517,9 @@ out:
 static int sdma_get_firmware(struct sdma_engine *sdma,
 		const char *fw_name)
 {
-	int ret;
-
-	ret = request_firmware_nowait(THIS_MODULE,
-			FW_ACTION_HOTPLUG, fw_name, sdma->dev,
-			GFP_KERNEL, sdma, sdma_load_firmware);
-
-	return ret;
+	return request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG, fw_name,
+				       sdma->dev, GFP_KERNEL, sdma,
+				       sdma_load_firmware);
 }
 
 static int sdma_init(struct sdma_engine *sdma)

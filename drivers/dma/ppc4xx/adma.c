@@ -2780,7 +2780,6 @@ static struct dma_async_tx_descriptor *ppc440spe_adma_prep_dma_xor_zero_sum(
 		struct dma_chan *chan, dma_addr_t *src, unsigned int src_cnt,
 		size_t len, enum sum_check_flags *result, unsigned long flags)
 {
-	struct dma_async_tx_descriptor *tx;
 	dma_addr_t pq[2];
 
 	/* validate P, disable Q */
@@ -2788,10 +2787,9 @@ static struct dma_async_tx_descriptor *ppc440spe_adma_prep_dma_xor_zero_sum(
 	pq[1] = 0;
 	flags |= DMA_PREP_PQ_DISABLE_Q;
 
-	tx = ppc440spe_adma_prep_dma_pqzero_sum(chan, pq, &src[1],
-						src_cnt - 1, 0, len,
-						result, flags);
-	return tx;
+	return ppc440spe_adma_prep_dma_pqzero_sum(chan, pq, &src[1],
+						  src_cnt - 1, 0, len,
+						  result, flags);
 }
 
 /**
@@ -4363,7 +4361,6 @@ static ssize_t store_ppc440spe_r6enable(struct device_driver *dev,
 
 static ssize_t show_ppc440spe_r6poly(struct device_driver *dev, char *buf)
 {
-	ssize_t size = 0;
 	u32 reg;
 
 #ifdef CONFIG_440SP
@@ -4375,9 +4372,9 @@ static ssize_t show_ppc440spe_r6poly(struct device_driver *dev, char *buf)
 	reg &= 0xFF;
 #endif
 
-	size = snprintf(buf, PAGE_SIZE, "PPC440SP(e) RAID-6 driver "
-			"uses 0x1%02x polynomial.\n", reg);
-	return size;
+	return snprintf(buf, PAGE_SIZE,
+			"PPC440SP(e) RAID-6 driver uses 0x1%02x polynomial.\n",
+			reg);
 }
 
 static ssize_t store_ppc440spe_r6poly(struct device_driver *dev,

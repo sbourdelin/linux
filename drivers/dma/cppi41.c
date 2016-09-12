@@ -339,11 +339,7 @@ static irqreturn_t cppi41_irq(int irq, void *data)
 
 static dma_cookie_t cppi41_tx_submit(struct dma_async_tx_descriptor *tx)
 {
-	dma_cookie_t cookie;
-
-	cookie = dma_cookie_assign(tx);
-
-	return cookie;
+	return dma_cookie_assign(tx);
 }
 
 static int cppi41_dma_alloc_chan_resources(struct dma_chan *chan)
@@ -433,11 +429,7 @@ static u32 get_host_pd0(u32 length)
 
 static u32 get_host_pd1(struct cppi41_channel *c)
 {
-	u32 reg;
-
-	reg = 0;
-
-	return reg;
+	return 0;
 }
 
 static u32 get_host_pd2(struct cppi41_channel *c)
@@ -452,12 +444,8 @@ static u32 get_host_pd2(struct cppi41_channel *c)
 
 static u32 get_host_pd3(u32 length)
 {
-	u32 reg;
-
 	/* PD3 = packet size */
-	reg = length;
-
-	return reg;
+	return length;
 }
 
 static u32 get_host_pd6(u32 length)
@@ -473,20 +461,12 @@ static u32 get_host_pd6(u32 length)
 
 static u32 get_host_pd4_or_7(u32 addr)
 {
-	u32 reg;
-
-	reg = addr;
-
-	return reg;
+	return addr;
 }
 
 static u32 get_host_pd5(void)
 {
-	u32 reg;
-
-	reg = 0;
-
-	return reg;
+	return 0;
 }
 
 static struct dma_async_tx_descriptor *cppi41_dma_prep_slave_sg(

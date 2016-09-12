@@ -337,9 +337,7 @@ static struct tegra_dma_sg_req *tegra_dma_sg_req_get(
 	}
 	spin_unlock_irqrestore(&tdc->lock, flags);
 
-	sg_req = kzalloc(sizeof(struct tegra_dma_sg_req), GFP_NOWAIT);
-
-	return sg_req;
+	return kzalloc(sizeof(struct tegra_dma_sg_req), GFP_NOWAIT);
 }
 
 static int tegra_dma_slave_config(struct dma_chan *dc,
