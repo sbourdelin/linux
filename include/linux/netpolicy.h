@@ -49,6 +49,7 @@ struct netpolicy_sys_info {
 struct netpolicy_info {
 	enum netpolicy_name	cur_policy;
 	unsigned long avail_policy[BITS_TO_LONGS(NET_POLICY_MAX)];
+	bool irq_affinity;
 	/* cpu and queue mapping information */
 	struct netpolicy_sys_info	sys_info;
 };
