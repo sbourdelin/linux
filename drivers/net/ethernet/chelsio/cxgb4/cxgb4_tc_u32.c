@@ -279,6 +279,98 @@ out:
 	return ret;
 }
 
+int cxgb4_delete_knode(struct net_device *dev, __be16 protocol,
+		       struct tc_cls_u32_offload *cls)
+{
+	struct adapter *adapter = netdev2adap(dev);
+	struct cxgb4_tc_u32_table *t;
+	struct cxgb4_link *link = NULL;
+	struct filter_ctx ctx;
+	u32 handle, uhtid;
+	unsigned int filter_id;
+	unsigned int max_tids;
+	unsigned int i, j;
+	int ret;
+
+	if (!can_tc_u32_offload(dev))
+		return -EOPNOTSUPP;
+
+	/* Fetch the location to delete the filter. */
+	filter_id = (cls->knode.handle & 0xFFFFF);
+
+	if (filter_id > adapter->tids.nftids) {
+		dev_err(adapter->pdev_dev,
+			"Location %d out of range for deletion. Max: %d\n",
+			filter_id, adapter->tids.nftids);
+		return -ERANGE;
+	}
+
+	t = adapter->tc_u32;
+	handle = cls->knode.handle;
+	uhtid = TC_U32_USERHTID(cls->knode.handle);
+
+	/* Ensure that uhtid is either root u32 (i.e. 0x800)
+	 * or a a valid linked bucket.
+	 */
+	if (uhtid != 0x800 && uhtid >= t->size)
+		return -EINVAL;
+
+	/* Delete the specified filter */
+	if (uhtid != 0x800) {
+		link = &t->table[uhtid - 1];
+		if (!link->link_handle)
+			return -EINVAL;
+
+		if (!test_bit(filter_id, link->tid_map))
+			return -EINVAL;
+	}
+
+	init_completion(&ctx.completion);
+
+	ret = cxgb4_del_filter(dev, filter_id, &ctx);
+	if (ret)
+		goto out;
+
+	/* Wait for reply */
+	ret = wait_for_completion_timeout(&ctx.completion, 10 * HZ);
+	if (!ret)
+		return -ETIMEDOUT;
+
+	ret = ctx.result;
+	if (!ret && link)
+		clear_bit(filter_id, link->tid_map);
+
+	/* If a link is being deleted, then delete all filters
+	 * associated with the link.
+	 */
+	max_tids = adapter->tids.nftids;
+	for (i = 0; i < t->size; i++) {
+		link = &t->table[i];
+
+		if (link->link_handle == handle) {
+			for (j = 0; j < max_tids; j++) {
+				if (!test_bit(j, link->tid_map))
+					continue;
+
+				ret = cxgb4_del_filter(dev, j, NULL);
+				if (ret)
+					goto out;
+
+				clear_bit(j, link->tid_map);
+			}
+
+			/* Clear the link state */
+			link->match_field = NULL;
+			link->link_handle = 0;
+			memset(&link->fs, 0, sizeof(link->fs));
+			break;
+		}
+	}
+
+out:
+	return ret;
+}
+
 void cxgb4_cleanup_tc_u32(struct adapter *adap)
 {
 	struct cxgb4_tc_u32_table *t;

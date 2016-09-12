@@ -3047,6 +3047,8 @@ int cxgb_setup_tc(struct net_device *dev, u32 handle, __be16 proto,
 		case TC_CLSU32_NEW_KNODE:
 		case TC_CLSU32_REPLACE_KNODE:
 			return cxgb4_config_knode(dev, proto, tc->cls_u32);
+		case TC_CLSU32_DELETE_KNODE:
+			return cxgb4_delete_knode(dev, proto, tc->cls_u32);
 		default:
 			return -EOPNOTSUPP;
 		}
@@ -5155,7 +5157,8 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		netdev->hw_features = NETIF_F_SG | TSO_FLAGS |
 			NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
 			NETIF_F_RXCSUM | NETIF_F_RXHASH |
-			NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX;
+			NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX |
+			NETIF_F_HW_TC;
 		if (highdma)
 			netdev->hw_features |= NETIF_F_HIGHDMA;
 		netdev->features |= netdev->hw_features;
