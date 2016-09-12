@@ -1,7 +1,8 @@
 /*
  * cec-core.c - HDMI Consumer Electronics Control framework - Core
  *
- * Copyright 2016 Cisco Systems, Inc. and/or its affiliates. All rights reserved.
+ * Copyright 2016 Cisco Systems, Inc. and/or its affiliates.
+ * All rights reserved.
  *
  * This program is free software; you may redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -195,7 +196,8 @@ static void cec_devnode_unregister(struct cec_devnode *devnode)
 
 struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
 					 void *priv, const char *name, u32 caps,
-					 u8 available_las, struct device *parent)
+					 u8 available_las,
+					 struct device *parent)
 {
 	struct cec_adapter *adap;
 	int res;
@@ -311,7 +313,8 @@ int cec_register_adapter(struct cec_adapter *adap)
 	if (!top_cec_dir)
 		return 0;
 
-	adap->cec_dir = debugfs_create_dir(dev_name(&adap->devnode.dev), top_cec_dir);
+	adap->cec_dir = debugfs_create_dir(dev_name(&adap->devnode.dev),
+					   top_cec_dir);
 	if (IS_ERR_OR_NULL(adap->cec_dir)) {
 		pr_warn("cec-%s: Failed to create debugfs dir\n", adap->name);
 		return 0;

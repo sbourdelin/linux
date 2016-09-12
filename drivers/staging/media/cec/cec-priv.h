@@ -1,7 +1,8 @@
 /*
  * cec-priv.h - HDMI Consumer Electronics Control internal header
  *
- * Copyright 2016 Cisco Systems, Inc. and/or its affiliates. All rights reserved.
+ * Copyright 2016 Cisco Systems, Inc. and/or its affiliates.
+ * All rights reserved.
  *
  * This program is free software; you may redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
