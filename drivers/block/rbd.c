@@ -3900,12 +3900,11 @@ static int rbd_register_watch(struct rbd_device *rbd_dev)
 	rbd_assert(rbd_dev->watch_state == RBD_WATCH_STATE_UNREGISTERED);
 	ret = __rbd_register_watch(rbd_dev);
 	if (ret)
-		goto out;
+		goto unlock;
 
 	rbd_dev->watch_state = RBD_WATCH_STATE_REGISTERED;
 	rbd_dev->watch_cookie = rbd_dev->watch_handle->linger_id;
-
-out:
+ unlock:
 	mutex_unlock(&rbd_dev->watch_mutex);
 	return ret;
 }
