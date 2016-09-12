@@ -10702,6 +10702,68 @@ static void i40e_get_platform_mac_addr(struct pci_dev *pdev, struct i40e_pf *pf)
 }
 
 /**
+ * i40e_devlink_eswitch_mode_get
+ *
+ * @devlink: pointer to devlink struct
+ * @mode: sr-iov switch mode pointer
+ *
+ * Returns the switch mode of the associated PF in the @mode pointer.
+ */
+static int i40e_devlink_eswitch_mode_get(struct devlink *devlink, u16 *mode)
+{
+	struct i40e_pf *pf = devlink_priv(devlink);
+
+	*mode = pf->eswitch_mode;
+
+	return 0;
+}
+
+/**
+ * i40e_devlink_eswitch_mode_set
+ *
+ * @devlink: pointer to devlink struct
+ * @mode: sr-iov switch mode
+ *
+ * Set the switch mode of the associated PF.
+ * Returns 0 on success and -EOPNOTSUPP on error.
+ */
+static int i40e_devlink_eswitch_mode_set(struct devlink *devlink, u16 mode)
+{
+	struct i40e_pf *pf = devlink_priv(devlink);
+	struct i40e_vf *vf;
+	int i, err = 0;
+
+	if (mode == pf->eswitch_mode)
+		goto done;
+
+	switch (mode) {
+	case DEVLINK_ESWITCH_MODE_LEGACY:
+		for (i = 0; i < pf->num_alloc_vfs; i++) {
+			vf = &(pf->vf[i]);
+			i40e_free_vf_netdev(vf);
+		}
+		pf->eswitch_mode = mode;
+		break;
+	case DEVLINK_ESWITCH_MODE_SWITCHDEV:
+		pf->eswitch_mode = mode;
+		for (i = 0; i < pf->num_alloc_vfs; i++) {
+			vf = &(pf->vf[i]);
+			i40e_alloc_vf_netdev(vf, i);
+		}
+		break;
+	default:
+		err = -EOPNOTSUPP;
+	}
+done:
+	return err;
+}
+
+static const struct devlink_ops i40e_devlink_ops = {
+	.eswitch_mode_get = i40e_devlink_eswitch_mode_get,
+	.eswitch_mode_set = i40e_devlink_eswitch_mode_set,
+};
+
+/**
  * i40e_probe - Device initialization routine
  * @pdev: PCI device information struct
  * @ent: entry in i40e_pci_tbl
@@ -10718,6 +10780,7 @@ static int i40e_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct i40e_pf *pf;
 	struct i40e_hw *hw;
 	static u16 pfs_found;
+	struct devlink *devlink;
 	u16 wol_nvm_bits;
 	u16 link_status;
 	int err;
@@ -10751,19 +10814,27 @@ static int i40e_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	pci_enable_pcie_error_reporting(pdev);
 	pci_set_master(pdev);
 
+	devlink = devlink_alloc(&i40e_devlink_ops, sizeof(*pf));
+	if (!devlink) {
+		dev_err(&pdev->dev, "devlink_alloc failed\n");
+		err = -ENOMEM;
+		goto err_devlink_alloc;
+	}
+
 	/* Now that we have a PCI connection, we need to do the
 	 * low level device setup.  This is primarily setting up
 	 * the Admin Queue structures and then querying for the
 	 * device's current profile information.
 	 */
-	pf = kzalloc(sizeof(*pf), GFP_KERNEL);
-	if (!pf) {
-		err = -ENOMEM;
-		goto err_pf_alloc;
-	}
+	pf = devlink_priv(devlink);
 	pf->next_vsi = 0;
 	pf->pdev = pdev;
 	set_bit(__I40E_DOWN, &pf->state);
+
+	pf->eswitch_mode = DEVLINK_ESWITCH_MODE_SWITCHDEV;
+	err = devlink_register(devlink, &pdev->dev);
+	if (err)
+		goto err_devlink_register;
 
 	hw = &pf->hw;
 	hw->back = pf;
@@ -11235,8 +11306,10 @@ err_adminq_setup:
 err_pf_reset:
 	iounmap(hw->hw_addr);
 err_ioremap:
-	kfree(pf);
-err_pf_alloc:
+	devlink_unregister(devlink);
+err_devlink_register:
+	devlink_free(devlink);
+err_devlink_alloc:
 	pci_disable_pcie_error_reporting(pdev);
 	pci_release_mem_regions(pdev);
 err_pci_reg:
@@ -11258,6 +11331,7 @@ static void i40e_remove(struct pci_dev *pdev)
 {
 	struct i40e_pf *pf = pci_get_drvdata(pdev);
 	struct i40e_hw *hw = &pf->hw;
+	struct devlink *devlink = priv_to_devlink(pf);
 	i40e_status ret_code;
 	int i;
 
@@ -11348,7 +11422,8 @@ static void i40e_remove(struct pci_dev *pdev)
 	kfree(pf->vsi);
 
 	iounmap(hw->hw_addr);
-	kfree(pf);
+	devlink_unregister(devlink);
+	devlink_free(devlink);
 	pci_release_mem_regions(pdev);
 
 	pci_disable_pcie_error_reporting(pdev);
