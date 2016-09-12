@@ -546,9 +546,7 @@ void dmabounce_unregister_dev(struct device *dev)
 	set_dma_ops(dev, NULL);
 
 	if (!device_info) {
-		dev_warn(dev,
-			 "Never registered with dmabounce but attempting"
-			 "to unregister!\n");
+		dev_warn(dev, "Never registered with dmabounce but attempting to unregister!\n");
 		return;
 	}
 
