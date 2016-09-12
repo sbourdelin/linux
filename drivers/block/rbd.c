@@ -2588,8 +2588,7 @@ static int rbd_img_request_fill(struct rbd_img_request *img_request,
 	}
 
 	return 0;
-
-out_unwind:
+ out_unwind:
 	for_each_obj_request_safe(img_request, obj_request, next_obj_request)
 		rbd_img_obj_request_del(img_request, obj_request);
 
