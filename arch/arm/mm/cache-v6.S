@@ -333,3 +333,11 @@ ENDPROC(v6_dma_unmap_area)
 
 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
 	define_cache_functions v6
+
+ENTRY(v6_force_dcache_invalidate)
+	ret     lr
+ENDPROC(v6_force_dcache_invalidate)
+
+ENTRY(v6_force_dcache_clean)
+	ret     lr
+ENDPROC(v6_force_dcache_clean)

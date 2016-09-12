@@ -449,6 +449,8 @@ ENDPROC(xscale_dma_unmap_area)
 	a0_alias flush_kern_dcache_area
 	a0_alias dma_flush_range
 	a0_alias dma_unmap_area
+	a0_alias force_dcache_clean
+	a0_alias force_dcache_invalidate
 
 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
 	define_cache_functions xscale_80200_A0_A1
@@ -460,6 +462,13 @@ ENTRY(cpu_xscale_dcache_clean_area)
 	bhi	1b
 	ret	lr
 
+ENTRY(xscale_force_dcache_invalidate)
+	ret     lr
+ENDPROC(xscale_force_dcache_invalidate)
+
+ENTRY(xscale_force_dcache_clean)
+	ret     lr
+ENDPROC(xscale_force_dcache_clean)
 /* =============================== PageTable ============================== */
 
 /*

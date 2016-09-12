@@ -439,6 +439,8 @@ ENDPROC(feroceon_dma_unmap_area)
 	range_alias coherent_kern_range
 	range_alias coherent_user_range
 	range_alias dma_unmap_area
+	range_alias force_dcache_clean
+	range_alias force_dcache_invalidate
 
 	define_cache_functions feroceon_range
 
@@ -462,6 +464,15 @@ ENTRY(cpu_feroceon_dcache_clean_area)
 #endif
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
 	ret	lr
+
+ENTRY(feroceon_force_dcache_invalidate)
+        ret     lr
+ENDPROC(feroceon_force_dcache_invalidate)
+
+ENTRY(feroceon_force_dcache_clean)
+        ret     lr
+ENDPROC(feroceon_force_dcache_clean)
+
 
 /* =============================== PageTable ============================== */
 

@@ -45,6 +45,12 @@ ENDPROC(nop_coherent_user_range)
 	.globl nop_dma_unmap_area
 	.equ nop_dma_unmap_area, nop_flush_icache_all
 
+	.globl nop_force_dcache_clean
+	.equ nop_force_dcache_clean, nop_flush_icache_all
+
+	.globl nop_force_dcache_invalidate
+	.equ nop_force_dcache_invalidate, nop_flush_icache_all
+
 	__INITDATA
 
 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)

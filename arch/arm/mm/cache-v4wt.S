@@ -200,6 +200,14 @@ ENDPROC(v4wt_dma_map_area)
 	.globl	v4wt_flush_kern_cache_louis
 	.equ	v4wt_flush_kern_cache_louis, v4wt_flush_kern_cache_all
 
+ENTRY(v4wt_force_dcache_invalidate)
+	ret     lr
+ENDPROC(v4wt_force_dcache_invalidate)
+
+ENTRY(v4wt_force_dcache_clean)
+	ret     lr
+ENDPROC(v4wt_force_dcache_clean)
+
 	__INITDATA
 
 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)

@@ -338,6 +338,14 @@ ENTRY(cpu_arm922_dcache_clean_area)
 #endif
 	ret	lr
 
+ENTRY(arm922_force_dcache_invalidate)
+        ret     lr
+ENDPROC(arm922_force_dcache_invalidate)
+
+ENTRY(arm922_force_dcache_clean)
+        ret     lr
+ENDPROC(arm922_force_dcache_clean)
+
 /* =============================== PageTable ============================== */
 
 /*

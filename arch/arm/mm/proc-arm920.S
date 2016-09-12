@@ -334,6 +334,14 @@ ENTRY(cpu_arm920_dcache_clean_area)
 	bhi	1b
 	ret	lr
 
+ENTRY(arm920_force_dcache_invalidate)
+	ret     lr
+ENDPROC(arm920_force_dcache_invalidate)
+
+ENTRY(arm920_force_dcache_clean)
+	ret     lr
+ENDPROC(arm920_force_dcache_clean)
+
 /* =============================== PageTable ============================== */
 
 /*

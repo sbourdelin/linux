@@ -442,6 +442,19 @@ ENTRY(v7_dma_unmap_area)
 	ret	lr
 ENDPROC(v7_dma_unmap_area)
 
+
+ENTRY(v7_force_dcache_invalidate)
+	add	r1, r1, r0
+	b	v7_dma_inv_range
+	ret	lr
+ENDPROC(v7_force_dcache_invalidate)
+
+ENTRY(v7_force_dcache_clean)
+	add	r1, r1, r0
+	b	v7_dma_clean_range
+	ret	lr
+ENDPROC(v7_force_dcache_clean)
+
 	__INITDATA
 
 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)

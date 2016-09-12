@@ -343,6 +343,15 @@ ENDPROC(xsc3_dma_unmap_area)
 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
 	define_cache_functions xsc3
 
+ENTRY(xsc3_force_dcache_clean)
+	ret	lr
+ENDPROC(xsc3_force_dcache_clean)
+
+ENTRY(xsc3_force_dcache_invalidate)
+	ret	lr
+ENDPROC(xsc3_force_dcache_invalidate)
+
+
 ENTRY(cpu_xsc3_dcache_clean_area)
 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean L1 D line
 	add	r0, r0, #CACHELINESIZE

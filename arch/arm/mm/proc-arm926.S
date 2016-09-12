@@ -355,6 +355,14 @@ ENTRY(cpu_arm926_dcache_clean_area)
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
 	ret	lr
 
+ENTRY(arm926_force_dcache_invalidate)
+        ret     lr
+ENDPROC(arm926_force_dcache_invalidate)
+
+ENTRY(arm926_force_dcache_clean)
+        ret     lr
+ENDPROC(arm926_force_dcache_clean)
+
 /* =============================== PageTable ============================== */
 
 /*

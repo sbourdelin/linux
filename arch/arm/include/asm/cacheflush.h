@@ -116,6 +116,9 @@ struct cpu_cache_fns {
 	void (*dma_unmap_area)(const void *, size_t, int);
 
 	void (*dma_flush_range)(const void *, const void *);
+
+	void (*force_dcache_clean)(void *, size_t);
+	void (*force_dcache_invalidate)(void *, size_t);
 };
 
 /*
@@ -133,6 +136,8 @@ extern struct cpu_cache_fns cpu_cache;
 #define __cpuc_coherent_kern_range	cpu_cache.coherent_kern_range
 #define __cpuc_coherent_user_range	cpu_cache.coherent_user_range
 #define __cpuc_flush_dcache_area	cpu_cache.flush_kern_dcache_area
+#define __cpuc_force_dcache_clean	cpu_cache.force_dcache_clean
+#define __cpuc_force_dcache_invalidate	cpu_cache.force_dcache_invalidate
 
 /*
  * These are private to the dma-mapping API.  Do not use directly.
@@ -152,6 +157,8 @@ extern void __cpuc_flush_user_range(unsigned long, unsigned long, unsigned int);
 extern void __cpuc_coherent_kern_range(unsigned long, unsigned long);
 extern int  __cpuc_coherent_user_range(unsigned long, unsigned long);
 extern void __cpuc_flush_dcache_area(void *, size_t);
+extern void __cpuc_force_dcache_clean(void *, size_t);
+extern void __cpuc_force_dcache_invalidate(void *, size_t);
 
 /*
  * These are private to the dma-mapping API.  Do not use directly.
@@ -517,5 +524,9 @@ static inline void secure_flush_area(const void *addr, size_t size)
 	__cpuc_flush_dcache_area((void *)addr, size);
 	outer_flush_range(phys, phys + size);
 }
+
+#define ARCH_HAS_FORCE_CACHE 1
+void kernel_force_cache_clean(struct page *page, size_t size);
+void kernel_force_cache_invalidate(struct page *page, size_t size);
 
 #endif
