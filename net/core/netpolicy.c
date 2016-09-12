@@ -409,6 +409,9 @@ static int get_avail_queue(struct netpolicy_instance *instance, bool is_rx)
 	unsigned long ptr_id = (uintptr_t)instance->ptr;
 	int queue = -1;
 
+	if (atomic_read(&dev->netpolicy->cur_rec_num) > dev->netpolicy->max_rec_num)
+		return queue;
+
 	spin_lock_bh(&np_hashtable_lock);
 	old_record = netpolicy_record_search(ptr_id);
 	if (!old_record) {
@@ -430,8 +433,10 @@ static int get_avail_queue(struct netpolicy_instance *instance, bool is_rx)
 		if (is_rx) {
 			new_record->rx_obj = get_avail_object(dev, new_record->policy,
 							      instance, is_rx);
-			if (!new_record->dev)
+			if (!new_record->dev) {
 				new_record->dev = dev;
+				atomic_inc(&dev->netpolicy->cur_rec_num);
+			}
 			if (!new_record->rx_obj) {
 				kfree(new_record);
 				goto err;
@@ -440,8 +445,10 @@ static int get_avail_queue(struct netpolicy_instance *instance, bool is_rx)
 		} else {
 			new_record->tx_obj = get_avail_object(dev, new_record->policy,
 							      instance, is_rx);
-			if (!new_record->dev)
+			if (!new_record->dev) {
 				new_record->dev = dev;
+				atomic_inc(&dev->netpolicy->cur_rec_num);
+			}
 			if (!new_record->tx_obj) {
 				kfree(new_record);
 				goto err;
@@ -685,12 +692,17 @@ int netpolicy_register(struct netpolicy_instance *instance,
 		       enum netpolicy_name policy)
 {
 	unsigned long ptr_id = (uintptr_t)instance->ptr;
+	struct net_device *dev = instance->dev;
 	struct netpolicy_record *new, *old;
 
 	if (!is_net_policy_valid(policy)) {
 		instance->policy = NET_POLICY_INVALID;
 		return -EINVAL;
 	}
+
+	if (dev && dev->netpolicy &&
+	    (atomic_read(&dev->netpolicy->cur_rec_num) > dev->netpolicy->max_rec_num))
+		return -ENOSPC;
 
 	new = kzalloc(sizeof(*new), GFP_KERNEL);
 	if (!new) {
@@ -715,6 +727,8 @@ int netpolicy_register(struct netpolicy_instance *instance,
 		new->dev = instance->dev;
 		new->policy = policy;
 		hash_add_rcu(np_record_hash, &new->hash_node, ptr_id);
+		if (dev && dev->netpolicy)
+			atomic_inc(&dev->netpolicy->cur_rec_num);
 	}
 	instance->policy = policy;
 	spin_unlock_bh(&np_hashtable_lock);
@@ -761,6 +775,8 @@ void netpolicy_unregister(struct netpolicy_instance *instance)
 		/* The record cannot be share. It can be safely free. */
 		put_queue(record->dev, record->rx_obj, record->tx_obj);
 		kfree(record);
+		if (dev && dev->netpolicy)
+			atomic_dec(&dev->netpolicy->cur_rec_num);
 	}
 	instance->policy = NET_POLICY_INVALID;
 	spin_unlock_bh(&np_hashtable_lock);
@@ -1297,6 +1313,9 @@ int init_netpolicy(struct net_device *dev)
 		dev->netpolicy = NULL;
 		goto unlock;
 	}
+
+	if (!dev->netpolicy->max_rec_num)
+		dev->netpolicy->max_rec_num = NETPOLICY_MAX_RECORD_NUM;
 
 	spin_lock(&dev->np_ob_list_lock);
 	for (i = 0; i < NETPOLICY_RXTX; i++) {

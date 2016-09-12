@@ -40,6 +40,7 @@ enum netpolicy_traffic {
 #define NETPOLICY_INVALID_QUEUE	-1
 #define NETPOLICY_INVALID_LOC	NETPOLICY_INVALID_QUEUE
 #define POLICY_NAME_LEN_MAX	64
+#define NETPOLICY_MAX_RECORD_NUM	7000
 extern const char *policy_name[];
 
 struct netpolicy_dev_info {
@@ -88,6 +89,9 @@ struct netpolicy_info {
 	struct netpolicy_sys_info	sys_info;
 	/* List of policy objects 0 rx 1 tx */
 	struct list_head	obj_list[NETPOLICY_RXTX][NET_POLICY_MAX];
+	/* for record number limitation */
+	int			max_rec_num;
+	atomic_t		cur_rec_num;
 };
 
 struct netpolicy_tcpudpip4_spec {
