@@ -39,7 +39,7 @@ int intel_svm_alloc_pasid_tables(struct intel_iommu *iommu)
 	struct page *pages;
 	int order;
 
-	order = ecap_pss(iommu->ecap) + 7 - PAGE_SHIFT;
+	order = ecap_pss(iommu->ecap) + 4 - PAGE_SHIFT;
 	if (order < 0)
 		order = 0;
 
