@@ -136,6 +136,16 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 		goto out_fput;
 	}
 
+	/*
+	 * Try to use clone_file_range to clone up within the same fs.
+	 * On failure to clone entire file, fallback to copy loop.
+	 */
+	error = vfs_clone_file_range(old_file, 0, new_file, 0, len);
+	if (error == -EXDEV || error == -EOPNOTSUPP)
+		error = 0;
+	else
+		len = 0;
+
 	/* FIXME: copy up sparse files efficiently */
 	while (len) {
 		size_t this_len = OVL_COPY_UP_CHUNK_SIZE;
