@@ -383,6 +383,7 @@ static int ci_usb_phy_init(struct ci_hdrc *ci)
 	case USBPHY_INTERFACE_MODE_UTMI:
 	case USBPHY_INTERFACE_MODE_UTMIW:
 	case USBPHY_INTERFACE_MODE_HSIC:
+	case USBPHY_INTERFACE_MODE_ULPI:
 		ret = _ci_usb_phy_init(ci);
 		if (!ret)
 			hw_wait_phy_stable();
@@ -390,7 +391,6 @@ static int ci_usb_phy_init(struct ci_hdrc *ci)
 			return ret;
 		hw_phymode_configure(ci);
 		break;
-	case USBPHY_INTERFACE_MODE_ULPI:
 	case USBPHY_INTERFACE_MODE_SERIAL:
 		hw_phymode_configure(ci);
 		ret = _ci_usb_phy_init(ci);
