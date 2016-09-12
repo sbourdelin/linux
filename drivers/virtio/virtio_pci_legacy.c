@@ -212,12 +212,12 @@ int virtio_pci_legacy_probe(struct virtio_pci_device *vp_dev)
 		return -ENODEV;
 	}
 
-	rc = dma_set_mask_and_coherent(&pci_dev->dev, DMA_BIT_MASK(64));
+	rc = dma_set_mask_and_coherent(&pci_dev->dev, DMA_BIT_MASK(44));
 	if (rc)
 		rc = dma_set_mask_and_coherent(&pci_dev->dev,
 						DMA_BIT_MASK(32));
 	if (rc)
-		dev_warn(&pci_dev->dev, "Failed to enable 64-bit or 32-bit DMA.  Trying to continue, but this might not work.\n");
+		dev_warn(&pci_dev->dev, "Failed to enable 44-bit or 32-bit DMA.  Trying to continue, but this might not work.\n");
 
 	rc = pci_request_region(pci_dev, 0, "virtio-pci-legacy");
 	if (rc)
