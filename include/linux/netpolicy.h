@@ -30,9 +30,27 @@ struct netpolicy_dev_info {
 	u32	*tx_irq;
 };
 
+struct netpolicy_sys_map {
+	u32	cpu;
+	u32	queue;
+	u32	irq;
+};
+
+struct netpolicy_sys_info {
+	/*
+	 * Record the cpu and queue 1:1 mapping
+	 */
+	u32				avail_rx_num;
+	struct netpolicy_sys_map	*rx;
+	u32				avail_tx_num;
+	struct netpolicy_sys_map	*tx;
+};
+
 struct netpolicy_info {
 	enum netpolicy_name	cur_policy;
 	unsigned long avail_policy[BITS_TO_LONGS(NET_POLICY_MAX)];
+	/* cpu and queue mapping information */
+	struct netpolicy_sys_info	sys_info;
 };
 
 #endif /*__LINUX_NETPOLICY_H*/
