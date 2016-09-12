@@ -6506,20 +6506,20 @@ static int __init rbd_init(void)
 	rbd_wq = alloc_workqueue(RBD_DRV_NAME, WQ_MEM_RECLAIM, 0);
 	if (!rbd_wq) {
 		rc = -ENOMEM;
-		goto err_out_slab;
+		goto exit_slab;
 	}
 
 	if (single_major) {
 		rbd_major = register_blkdev(0, RBD_DRV_NAME);
 		if (rbd_major < 0) {
 			rc = rbd_major;
-			goto err_out_wq;
+			goto destroy_workqueue;
 		}
 	}
 
 	rc = rbd_sysfs_init();
 	if (rc)
-		goto err_out_blkdev;
+		goto check_single;
 
 	if (single_major)
 		pr_info("loaded (major %d)\n", rbd_major);
@@ -6527,13 +6527,12 @@ static int __init rbd_init(void)
 		pr_info("loaded\n");
 
 	return 0;
-
-err_out_blkdev:
+ check_single:
 	if (single_major)
 		unregister_blkdev(rbd_major, RBD_DRV_NAME);
-err_out_wq:
+ destroy_workqueue:
 	destroy_workqueue(rbd_wq);
-err_out_slab:
+ exit_slab:
 	rbd_slab_exit();
 	return rc;
 }
