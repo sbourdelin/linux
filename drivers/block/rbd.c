@@ -4352,17 +4352,17 @@ static int rbd_dev_v1_header_info(struct rbd_device *rbd_dev)
 		ret = rbd_obj_read_sync(rbd_dev, rbd_dev->header_oid.name,
 				       0, size, ondisk);
 		if (ret < 0)
-			goto out;
+			goto free_header;
 		if ((size_t)ret < size) {
 			ret = -ENXIO;
 			rbd_warn(rbd_dev, "short header read (want %zd got %d)",
 				size, ret);
-			goto out;
+			goto free_header;
 		}
 		if (!rbd_dev_ondisk_valid(ondisk)) {
 			ret = -ENXIO;
 			rbd_warn(rbd_dev, "invalid header");
-			goto out;
+			goto free_header;
 		}
 
 		names_size = le64_to_cpu(ondisk->snap_names_len);
@@ -4371,7 +4371,7 @@ static int rbd_dev_v1_header_info(struct rbd_device *rbd_dev)
 	} while (snap_count != want_count);
 
 	ret = rbd_header_from_disk(rbd_dev, ondisk);
-out:
+ free_header:
 	kfree(ondisk);
 
 	return ret;
