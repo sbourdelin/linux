@@ -2280,4 +2280,13 @@ extern int sysctl_optmem_max;
 extern __u32 sysctl_wmem_default;
 extern __u32 sysctl_rmem_default;
 
+/* Return netpolicy instance information from socket. */
+static inline struct netpolicy_instance *netpolicy_find_instance(struct sock *sk)
+{
+#ifdef CONFIG_NETPOLICY
+	if (is_net_policy_valid(sk->sk_netpolicy.policy))
+		return &sk->sk_netpolicy;
+#endif
+	return NULL;
+}
 #endif	/* _SOCK_H */
