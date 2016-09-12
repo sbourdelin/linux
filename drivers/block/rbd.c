@@ -5017,7 +5017,7 @@ static int rbd_dev_v2_object_prefix(struct rbd_device *rbd_dev)
 				reply_buf, RBD_OBJ_PREFIX_LEN_MAX);
 	dout("%s: rbd_obj_method_sync returned %d\n", __func__, ret);
 	if (ret < 0)
-		goto out;
+		goto free_buffer;
 
 	p = reply_buf;
 	rbd_dev->header.object_prefix = ceph_extract_encoded_string(&p,
@@ -5030,7 +5030,7 @@ static int rbd_dev_v2_object_prefix(struct rbd_device *rbd_dev)
 	} else {
 		dout("  object_prefix = %s\n", rbd_dev->header.object_prefix);
 	}
-out:
+ free_buffer:
 	kfree(reply_buf);
 
 	return ret;
