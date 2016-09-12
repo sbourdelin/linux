@@ -2789,18 +2789,18 @@ static int rbd_img_obj_parent_read_full(struct rbd_obj_request *obj_request)
 	if (IS_ERR(pages)) {
 		result = PTR_ERR(pages);
 		pages = NULL;
-		goto out_err;
+		goto status_indication;
 	}
 
 	result = -ENOMEM;
 	parent_request = rbd_parent_request_create(obj_request,
 						img_offset, length);
 	if (!parent_request)
-		goto out_err;
+		goto release_page_vector;
 
 	result = rbd_img_request_fill(parent_request, OBJ_REQUEST_PAGES, pages);
 	if (result)
-		goto out_err;
+		goto put_request;
 	parent_request->copyup_pages = pages;
 	parent_request->copyup_page_count = page_count;
 
@@ -2813,11 +2813,11 @@ static int rbd_img_obj_parent_read_full(struct rbd_obj_request *obj_request)
 	parent_request->copyup_page_count = 0;
 	parent_request->obj_request = NULL;
 	rbd_obj_request_put(obj_request);
-out_err:
-	if (pages)
-		ceph_release_page_vector(pages, page_count);
-	if (parent_request)
-		rbd_img_request_put(parent_request);
+ put_request:
+	rbd_img_request_put(parent_request);
+ release_page_vector:
+	ceph_release_page_vector(pages, page_count);
+ status_indication:
 	obj_request->result = result;
 	obj_request->xferred = 0;
 	obj_request_done_set(obj_request);
