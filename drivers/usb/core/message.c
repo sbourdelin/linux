@@ -1860,6 +1860,12 @@ free_interfaces:
 		intf->dev.type = &usb_if_device_type;
 		intf->dev.groups = usb_interface_groups;
 		intf->dev.dma_mask = dev->dev.dma_mask;
+		/* Propagate dma_pfn_offset to USB interface.
+		 * This is especially required by mass storage interface
+		 * which relies on SCSI layer and scsi_calculate_bounce_limit()
+		 * to set the bounce buffer limit based on dma_pfn_offset.
+		 */
+		intf->dev.dma_pfn_offset = dev->dev.dma_pfn_offset;
 		INIT_WORK(&intf->reset_ws, __usb_queue_reset_device);
 		intf->minor = -1;
 		device_initialize(&intf->dev);
