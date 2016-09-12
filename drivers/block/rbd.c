@@ -1421,12 +1421,12 @@ static struct bio *bio_chain_clone_range(struct bio **bio_src,
 
 		if (!bi) {
 			rbd_warn(NULL, "bio_chain exhausted with %u left", len);
-			goto out_err;	/* EINVAL; ran out of bio's */
+			goto put_chain;	/* EINVAL; ran out of bio's */
 		}
 		bi_size = min_t(unsigned int, bi->bi_iter.bi_size - off, len);
 		bio = bio_clone_range(bi, off, bi_size, gfpmask);
 		if (!bio)
-			goto out_err;	/* ENOMEM */
+			goto put_chain;	/* ENOMEM */
 
 		*end = bio;
 		end = &bio->bi_next;
@@ -1442,7 +1442,7 @@ static struct bio *bio_chain_clone_range(struct bio **bio_src,
 	*offset = off;
 
 	return chain;
-out_err:
+ put_chain:
 	bio_chain_put(chain);
 
 	return NULL;
