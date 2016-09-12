@@ -5276,14 +5276,14 @@ static char *rbd_dev_image_name(struct rbd_device *rbd_dev)
 	size = sizeof (__le32) + RBD_IMAGE_NAME_LEN_MAX;
 	reply_buf = kmalloc(size, GFP_KERNEL);
 	if (!reply_buf)
-		goto out;
+		goto free_id;
 
 	ret = rbd_obj_method_sync(rbd_dev, RBD_DIRECTORY,
 				"rbd", "dir_get_name",
 				image_id, image_id_size,
 				reply_buf, size);
 	if (ret < 0)
-		goto out;
+		goto free_buffer;
 	p = reply_buf;
 	end = reply_buf + ret;
 
@@ -5292,8 +5292,9 @@ static char *rbd_dev_image_name(struct rbd_device *rbd_dev)
 		image_name = NULL;
 	else
 		dout("%s: name is %s len is %zd\n", __func__, image_name, len);
-out:
+ free_buffer:
 	kfree(reply_buf);
+ free_id:
 	kfree(image_id);
 
 	return image_name;
