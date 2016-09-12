@@ -3033,10 +3033,9 @@ static int rbd_img_request_submit(struct rbd_img_request *img_request)
 	for_each_obj_request_safe(img_request, obj_request, next_obj_request) {
 		ret = rbd_img_obj_request_submit(obj_request);
 		if (ret)
-			goto out_put_ireq;
+			goto put_request;
 	}
-
-out_put_ireq:
+ put_request:
 	rbd_img_request_put(img_request);
 	return ret;
 }
