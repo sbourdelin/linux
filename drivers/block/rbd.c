@@ -6181,7 +6181,7 @@ static ssize_t do_rbd_add(struct bus_type *bus,
 			  const char *buf,
 			  size_t count)
 {
-	struct rbd_device *rbd_dev = NULL;
+	struct rbd_device *rbd_dev;
 	struct ceph_options *ceph_opts = NULL;
 	struct rbd_options *rbd_opts = NULL;
 	struct rbd_spec *spec = NULL;
