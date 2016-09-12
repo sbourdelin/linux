@@ -46,6 +46,8 @@
 #include <asm/octeon/cvmx-smix-defs.h>
 #include <asm/octeon/cvmx-asxx-defs.h>
 
+#include <linux/if_ether.h>
+
 /**
  * cvmx_override_pko_queue_priority(int ipd_port, uint64_t
  * priorities[16]) is a function pointer. It is meant to allow
@@ -918,7 +920,8 @@ int __cvmx_helper_errata_fix_ipd_ptr_alignment(void)
 		p64 = (uint64_t *) cvmx_phys_to_ptr(pkt_buffer.s.addr);
 		p64[0] = 0xffffffffffff0000ull;
 		p64[1] = 0x08004510ull;
-		p64[2] = ((uint64_t) (size - 14) << 48) | 0x5ae740004000ull;
+		p64[2] = ((uint64_t) (size - ETH_HLEN) << 48)
+			| 0x5ae740004000ull;
 		p64[3] = 0x3a5fc0a81073c0a8ull;
 
 		for (i = 0; i < num_segs; i++) {
@@ -954,11 +957,13 @@ int __cvmx_helper_errata_fix_ipd_ptr_alignment(void)
 			       1 << INDEX(FIX_IPD_OUTPORT));
 
 		cvmx_write_csr(CVMX_GMXX_RXX_JABBER
-			       (INDEX(FIX_IPD_OUTPORT),
-				INTERFACE(FIX_IPD_OUTPORT)), 65392 - 14 - 4);
+				(INDEX(FIX_IPD_OUTPORT),
+					INTERFACE(FIX_IPD_OUTPORT)),
+				CVMX_IPD_MAX_MTU - ETH_HLEN - ETH_FCS_LEN);
 		cvmx_write_csr(CVMX_GMXX_RXX_FRM_MAX
-			       (INDEX(FIX_IPD_OUTPORT),
-				INTERFACE(FIX_IPD_OUTPORT)), 65392 - 14 - 4);
+				(INDEX(FIX_IPD_OUTPORT),
+					INTERFACE(FIX_IPD_OUTPORT)),
+				CVMX_IPD_MAX_MTU - ETH_HLEN - ETH_FCS_LEN);
 
 		cvmx_pko_send_packet_prepare(FIX_IPD_OUTPORT,
 					     cvmx_pko_get_base_queue
