@@ -24,6 +24,35 @@
  *	  is too difficult for users.
  * 	So, it is a big challenge to get good network performance.
  *
+ * NET policy supports four policies per device, and three policies per task
+ * and per socket. For using NET policy, the device policy must be set in
+ * advance. The task policy or socket policy must be compatible with device
+ * policy.
+ *
+ * BULK policy		This policy is designed for high throughput. It can be
+ *			applied to either device policy or task/socket policy.
+ *			If it is applied to device policy, the only compatible
+ *			task/socket policy is BULK policy itself.
+ * CPU policy		This policy is designed for high throughput and lower
+ *			CPU utilization. It can be applied to either device
+ *			policy or task/socket policy. If it is applied to
+ *			device policy, the only compatible task/socket policy
+ *			is CPU policy itself.
+ * LATENCY policy	This policy is designed for low latency. It can be
+ *			applied to either device policy or task/socket policy.
+ *			If it is applied to device policy, the only compatible
+ *			task/socket policy is LATENCY policy itself.
+ * MIX policy		This policy can only be applied to device policy. It
+ *			is compatible with BULK and LATENCY policy. This
+ *			policy is designed for the case which miscellaneous
+ *			types of workload running on the device.
+ *
+ * The device policy changes the system configuration and reorganize the
+ * resource on the device, but it does not change the packets behavior.
+ * The task policy and socket policy redirect the packets to get good
+ * performance. If both task policy and socket policy are set in the same
+ * task, task policy will be applied. The task policy can also be inherited by
+ * children.
  */
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -444,6 +473,12 @@ static inline bool policy_validate(struct netpolicy_instance *instance)
 			policy_name[instance->policy]);
 		return false;
 	}
+
+	/* task policy is dominant policy */
+	if (is_net_policy_valid(current->task_netpolicy.policy) &&
+	    (current->task_netpolicy.policy != instance->policy))
+		return false;
+
 	return true;
 }
 

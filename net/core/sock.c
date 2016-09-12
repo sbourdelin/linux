@@ -1006,7 +1006,13 @@ set_rcvbuf:
 
 #ifdef CONFIG_NETPOLICY
 	case SO_NETPOLICY:
-		ret = netpolicy_register(&sk->sk_netpolicy, val);
+		if (is_net_policy_valid(current->task_netpolicy.policy) &&
+		    (current->task_netpolicy.policy != val)) {
+			printk_ratelimited(KERN_WARNING "NETPOLICY: new policy is not compatible with task netpolicy\n");
+			ret = -EINVAL;
+		} else {
+			ret = netpolicy_register(&sk->sk_netpolicy, val);
+		}
 		break;
 #endif
 	default:
@@ -1599,6 +1605,8 @@ struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority)
 
 #ifdef CONFIG_NETPOLICY
 		newsk->sk_netpolicy.ptr = (void *)newsk;
+		if (is_net_policy_valid(current->task_netpolicy.policy))
+			newsk->sk_netpolicy.policy = NET_POLICY_INVALID;
 		if (is_net_policy_valid(newsk->sk_netpolicy.policy))
 			netpolicy_register(&newsk->sk_netpolicy, newsk->sk_netpolicy.policy);
 

@@ -2072,6 +2072,31 @@ static int prctl_get_tid_address(struct task_struct *me, int __user **tid_addr)
 }
 #endif
 
+#ifdef CONFIG_NETPOLICY
+static int prctl_set_netpolicy(struct task_struct *me, int policy)
+{
+	return netpolicy_register(&me->task_netpolicy, policy);
+}
+
+static int prctl_get_netpolicy(struct task_struct *me, unsigned long adr)
+{
+	return put_user(me->task_netpolicy.policy, (int __user *)adr);
+}
+
+#else /* CONFIG_NETPOLICY */
+
+static int prctl_set_netpolicy(struct task_struct *me, int policy)
+{
+	return -EINVAL;
+}
+
+static int prctl_get_netpolicy(struct task_struct *me, unsigned long adr)
+{
+	return -EINVAL;
+}
+
+#endif /* CONFIG_NETPOLICY */
+
 SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		unsigned long, arg4, unsigned long, arg5)
 {
@@ -2269,6 +2294,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		break;
 	case PR_GET_FP_MODE:
 		error = GET_FP_MODE(me);
+		break;
+	case PR_SET_NETPOLICY:
+		error = prctl_set_netpolicy(me, arg2);
+		break;
+	case PR_GET_NETPOLICY:
+		error = prctl_get_netpolicy(me, arg2);
 		break;
 	default:
 		error = -EINVAL;

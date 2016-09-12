@@ -1484,6 +1484,7 @@ void sock_edemux(struct sk_buff *skb);
 #define sock_edemux(skb) sock_efree(skb)
 #endif
 
+void sock_setnetpolicy(struct socket *sock);
 int sock_setsockopt(struct socket *sock, int level, int op,
 		    char __user *optval, unsigned int optlen);
 
@@ -2280,10 +2281,19 @@ extern int sysctl_optmem_max;
 extern __u32 sysctl_wmem_default;
 extern __u32 sysctl_rmem_default;
 
-/* Return netpolicy instance information from socket. */
+/* Return netpolicy instance information from either task or socket.
+ * If both task and socket have netpolicy instance information,
+ * using task's and unregistering socket's. Because task policy is
+ * dominant policy
+ */
 static inline struct netpolicy_instance *netpolicy_find_instance(struct sock *sk)
 {
 #ifdef CONFIG_NETPOLICY
+	if (is_net_policy_valid(current->task_netpolicy.policy)) {
+		if (is_net_policy_valid(sk->sk_netpolicy.policy))
+			netpolicy_unregister(&sk->sk_netpolicy);
+		return &current->task_netpolicy;
+	}
 	if (is_net_policy_valid(sk->sk_netpolicy.policy))
 		return &sk->sk_netpolicy;
 #endif

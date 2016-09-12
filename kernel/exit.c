@@ -858,6 +858,10 @@ void do_exit(long code)
 	if (unlikely(current->pi_state_cache))
 		kfree(current->pi_state_cache);
 #endif
+#ifdef CONFIG_NETPOLICY
+	if (is_net_policy_valid(current->task_netpolicy.policy))
+		netpolicy_unregister(&current->task_netpolicy);
+#endif
 	/*
 	 * Make sure we are holding no locks:
 	 */

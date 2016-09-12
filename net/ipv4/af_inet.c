@@ -766,8 +766,11 @@ static void sock_netpolicy_manage_flow(struct sock *sk, struct msghdr *msg)
 	if (!instance)
 		return;
 
-	if (!instance->dev)
-		return;
+	if (!instance->dev) {
+		if (!sk->sk_netpolicy.dev)
+			return;
+		instance->dev = sk->sk_netpolicy.dev;
+	}
 
 	flow = &instance->flow;
 	/* TODO: need to change here and add more protocol support */

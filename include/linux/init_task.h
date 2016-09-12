@@ -183,6 +183,14 @@ extern struct task_group root_task_group;
 # define INIT_KASAN(tsk)
 #endif
 
+#ifdef CONFIG_NETPOLICY
+#define INIT_NETPOLICY(tsk)						\
+	.task_netpolicy.policy = NET_POLICY_INVALID,			\
+	.task_netpolicy.dev = NULL,					\
+	.task_netpolicy.ptr = (void *)&tsk,
+#else
+#define INIT_NETPOLICY(tsk)
+#endif
 /*
  *  INIT_TASK is used to set up the first task table, touch at
  * your own risk!. Base=0, limit=0x1fffff (=2MB)
@@ -260,6 +268,7 @@ extern struct task_group root_task_group;
 	INIT_VTIME(tsk)							\
 	INIT_NUMA_BALANCING(tsk)					\
 	INIT_KASAN(tsk)							\
+	INIT_NETPOLICY(tsk)						\
 }
 
 
