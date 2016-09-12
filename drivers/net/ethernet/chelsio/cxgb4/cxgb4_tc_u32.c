@@ -32,6 +32,9 @@
  * SOFTWARE.
  */
 
+#include <net/tc_act/tc_gact.h>
+#include <net/tc_act/tc_mirred.h>
+
 #include "cxgb4.h"
 #include "cxgb4_tc_u32_parse.h"
 #include "cxgb4_tc_u32.h"
@@ -79,6 +82,59 @@ static int fill_match_fields(struct adapter *adap,
 		if (!found)
 			return -EINVAL;
 	}
+
+	return 0;
+}
+
+/* Fill ch_filter_specification with parsed action. */
+static int fill_action_fields(struct adapter *adap,
+			      struct ch_filter_specification *fs,
+			      struct tc_cls_u32_offload *cls)
+{
+	const struct tc_action *a;
+	struct tcf_exts *exts;
+	LIST_HEAD(actions);
+	unsigned int num_actions = 0;
+	bool found = false;
+
+	exts = cls->knode.exts;
+	if (tc_no_actions(exts))
+		return -EINVAL;
+
+	tcf_exts_to_list(exts, &actions);
+	list_for_each_entry(a, &actions, list) {
+		/* Don't allow more than one action per rule. */
+		if (num_actions)
+			return -EINVAL;
+
+		/* Drop in hardware. */
+		if (is_tcf_gact_shot(a)) {
+			fs->action = FILTER_DROP;
+			found = true;
+		}
+
+		/* Re-direct to specified port in hardware. */
+		if (is_tcf_mirred_redirect(a)) {
+			struct net_device *n_dev;
+			unsigned int i, index;
+
+			index = tcf_mirred_ifindex(a);
+			for_each_port(adap, i) {
+				n_dev = adap->port[i];
+				if (index == n_dev->ifindex) {
+					fs->action = FILTER_SWITCH;
+					fs->eport = i;
+					break;
+				}
+			}
+			found = true;
+		}
+
+		num_actions++;
+	}
+
+	if (!found)
+		return -EINVAL;
 
 	return 0;
 }
@@ -233,6 +289,13 @@ int cxgb4_config_knode(struct net_device *dev, __be16 protocol,
 	}
 
 	ret = fill_match_fields(adapter, &fs, cls, start, false);
+	if (ret)
+		goto out;
+
+	/* Fill ch_filter_specification action fields to be shipped to
+	 * hardware.
+	 */
+	ret = fill_action_fields(adapter, &fs, cls);
 	if (ret)
 		goto out;
 
