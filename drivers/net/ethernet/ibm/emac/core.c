@@ -2688,7 +2688,6 @@ static const struct net_device_ops emac_netdev_ops = {
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_set_mac_address	= eth_mac_addr,
 	.ndo_start_xmit		= emac_start_xmit,
-	.ndo_change_mtu		= eth_change_mtu,
 };
 
 static const struct net_device_ops emac_gige_netdev_ops = {

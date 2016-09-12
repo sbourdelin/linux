@@ -519,7 +519,7 @@ ltq_etop_tx(struct sk_buff *skb, struct net_device *dev)
 static int
 ltq_etop_change_mtu(struct net_device *dev, int new_mtu)
 {
-	int ret = eth_change_mtu(dev, new_mtu);
+	dev->mtu = new_mtu;
 
 	if (!ret) {
 		struct ltq_etop_priv *priv = netdev_priv(dev);
