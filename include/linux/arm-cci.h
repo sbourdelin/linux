@@ -30,8 +30,10 @@ struct device_node;
 
 #ifdef CONFIG_ARM_CCI
 extern bool cci_probed(void);
+extern asmlinkage void __naked cci_enable_port_for_self(void);
 #else
 static inline bool cci_probed(void) { return false; }
+static inline void ci_enable_port_for_self(void) { return; }
 #endif
 
 #ifdef CONFIG_ARM_CCI400_PORT_CTRL
