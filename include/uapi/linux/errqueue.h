@@ -1,6 +1,7 @@
 #ifndef _UAPI_LINUX_ERRQUEUE_H
 #define _UAPI_LINUX_ERRQUEUE_H
 
+#include <linux/time.h>
 #include <linux/types.h>
 
 struct sock_extended_err {
