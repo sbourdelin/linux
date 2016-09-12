@@ -39,6 +39,7 @@ extern int cci_ace_get_port(struct device_node *dn);
 extern int cci_disable_port_by_cpu(u64 mpidr);
 extern int __cci_control_port_by_device(struct device_node *dn, bool enable);
 extern int __cci_control_port_by_index(u32 port, bool enable);
+extern asmlinkage void __naked cci_enable_port_for_self(void);
 #else
 static inline int cci_ace_get_port(struct device_node *dn)
 {
@@ -53,6 +54,9 @@ static inline int __cci_control_port_by_device(struct device_node *dn,
 static inline int __cci_control_port_by_index(u32 port, bool enable)
 {
 	return -ENODEV;
+}
+static inline void ci_enable_port_for_self(void)
+{
 }
 #endif
 
