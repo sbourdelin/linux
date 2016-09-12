@@ -6454,14 +6454,14 @@ static int rbd_slab_init(void)
 	rbd_assert(!rbd_obj_request_cache);
 	rbd_obj_request_cache = KMEM_CACHE(rbd_obj_request, 0);
 	if (!rbd_obj_request_cache)
-		goto out_err;
+		goto destroy_cache;
 
 	rbd_assert(!rbd_segment_name_cache);
 	rbd_segment_name_cache = kmem_cache_create("rbd_segment_name",
 					CEPH_MAX_OID_NAME_LEN + 1, 1, 0, NULL);
 	if (rbd_segment_name_cache)
 		return 0;
-out_err:
+ destroy_cache:
 	kmem_cache_destroy(rbd_obj_request_cache);
 	rbd_obj_request_cache = NULL;
 
