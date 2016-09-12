@@ -22,6 +22,12 @@ enum netpolicy_name {
 	NET_POLICY_BULK,
 	NET_POLICY_LATENCY,
 	NET_POLICY_MAX,
+
+	/*
+	 * Mixture of the above policy
+	 * Can only be set as global policy.
+	 */
+	NET_POLICY_MIX,
 };
 
 enum netpolicy_traffic {
@@ -67,6 +73,7 @@ struct netpolicy_info {
 	enum netpolicy_name	cur_policy;
 	unsigned long avail_policy[BITS_TO_LONGS(NET_POLICY_MAX)];
 	bool irq_affinity;
+	bool has_mix_policy;
 	/* cpu and queue mapping information */
 	struct netpolicy_sys_info	sys_info;
 	/* List of policy objects 0 rx 1 tx */
