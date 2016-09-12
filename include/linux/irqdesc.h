@@ -2,6 +2,7 @@
 #define _LINUX_IRQDESC_H
 
 #include <linux/rcupdate.h>
+#include <linux/kobject.h>
 
 /*
  * Core internal functions to deal with irq descriptors
@@ -45,6 +46,7 @@ struct pt_regs;
  * @rcu:		rcu head for delayed free
  * @dir:		/proc/irq/ procfs entry
  * @name:		flow handler name for /proc/interrupts output
+ * @kobj:		kobject used to represent this struct in sysfs
  */
 struct irq_desc {
 	struct irq_common_data	irq_common_data;
@@ -92,6 +94,7 @@ struct irq_desc {
 	int			parent_irq;
 	struct module		*owner;
 	const char		*name;
+	struct kobject		kobj;
 } ____cacheline_internodealigned_in_smp;
 
 #ifdef CONFIG_SPARSE_IRQ
