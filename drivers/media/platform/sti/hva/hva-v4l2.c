@@ -15,8 +15,6 @@
 #include "hva.h"
 #include "hva-hw.h"
 
-#define HVA_NAME "st-hva"
-
 #define MIN_FRAMES	1
 #define MIN_STREAMS	1
 
@@ -1181,6 +1179,8 @@ static int hva_open(struct file *file)
 	/* default parameters for frame and stream */
 	set_default_params(ctx);
 
+	hva_dbg_ctx_create(ctx);
+
 	dev_info(dev, "%s encoder instance created\n", ctx->name);
 
 	return 0;
@@ -1222,6 +1222,8 @@ static int hva_release(struct file *file)
 
 	v4l2_fh_del(&ctx->fh);
 	v4l2_fh_exit(&ctx->fh);
+
+	hva_dbg_ctx_remove(ctx);
 
 	dev_info(dev, "%s encoder instance released\n", ctx->name);
 
@@ -1347,6 +1349,8 @@ static int hva_probe(struct platform_device *pdev)
 		goto err_hw;
 	}
 
+	hva_debugfs_create(hva);
+
 	hva->work_queue = create_workqueue(HVA_NAME);
 	if (!hva->work_queue) {
 		dev_err(dev, "%s %s failed to allocate work queue\n",
@@ -1368,6 +1372,7 @@ static int hva_probe(struct platform_device *pdev)
 err_work_queue:
 	destroy_workqueue(hva->work_queue);
 err_v4l2:
+	hva_debugfs_remove(hva);
 	v4l2_device_unregister(&hva->v4l2_dev);
 err_hw:
 	hva_hw_remove(hva);
@@ -1385,6 +1390,8 @@ static int hva_remove(struct platform_device *pdev)
 	destroy_workqueue(hva->work_queue);
 
 	hva_hw_remove(hva);
+
+	hva_debugfs_remove(hva);
 
 	v4l2_device_unregister(&hva->v4l2_dev);
 
