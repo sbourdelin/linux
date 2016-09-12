@@ -5950,7 +5950,7 @@ out_err:
  */
 static int rbd_dev_probe_parent(struct rbd_device *rbd_dev, int depth)
 {
-	struct rbd_device *parent = NULL;
+	struct rbd_device *parent;
 	int ret;
 
 	if (!rbd_dev->parent_spec)
@@ -5959,13 +5959,13 @@ static int rbd_dev_probe_parent(struct rbd_device *rbd_dev, int depth)
 	if (++depth > RBD_MAX_PARENT_CHAIN_LEN) {
 		pr_info("parent chain is too long (%d)\n", depth);
 		ret = -EINVAL;
-		goto out_err;
+		goto unparent_device;
 	}
 
 	parent = __rbd_dev_create(rbd_dev->rbd_client, rbd_dev->parent_spec);
 	if (!parent) {
 		ret = -ENOMEM;
-		goto out_err;
+		goto unparent_device;
 	}
 
 	/*
@@ -5977,15 +5977,15 @@ static int rbd_dev_probe_parent(struct rbd_device *rbd_dev, int depth)
 
 	ret = rbd_dev_image_probe(parent, depth);
 	if (ret < 0)
-		goto out_err;
+		goto destroy_device;
 
 	rbd_dev->parent = parent;
 	atomic_set(&rbd_dev->parent_ref, 1);
 	return 0;
-
-out_err:
-	rbd_dev_unparent(rbd_dev);
+ destroy_device:
 	rbd_dev_destroy(parent);
+ unparent_device:
+	rbd_dev_unparent(rbd_dev);
 	return ret;
 }
 
