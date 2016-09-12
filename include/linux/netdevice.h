@@ -1618,6 +1618,8 @@ enum netdev_priv_flags {
  *			switch driver and used to set the phys state of the
  *			switch port.
  *
+ *	@proc_dev:	device node in proc to configure device net policy
+ *
  *	FIXME: cleanup struct net_device such that network protocol info
  *	moves out.
  */
@@ -1885,6 +1887,11 @@ struct net_device {
 	struct lock_class_key	*qdisc_tx_busylock;
 	struct lock_class_key	*qdisc_running_key;
 	bool			proto_down;
+#ifdef CONFIG_NETPOLICY
+#ifdef CONFIG_PROC_FS
+	struct proc_dir_entry	*proc_dev;
+#endif /* CONFIG_PROC_FS */
+#endif /* CONFIG_NETPOLICY */
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
 

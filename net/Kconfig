@@ -205,6 +205,13 @@ source "net/bridge/netfilter/Kconfig"
 
 endif
 
+config NETPOLICY
+	depends on NET
+	bool "Net policy support"
+	default n
+	---help---
+	Net policy support
+
 source "net/dccp/Kconfig"
 source "net/sctp/Kconfig"
 source "net/rds/Kconfig"
