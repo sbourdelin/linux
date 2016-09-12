@@ -3440,13 +3440,13 @@ static int find_watcher(struct rbd_device *rbd_dev,
 			     rbd_dev, cid.gid, cid.handle);
 			rbd_set_owner_cid(rbd_dev, &cid);
 			ret = 1;
-			goto out;
+			goto free_watchers;
 		}
 	}
 
 	dout("%s rbd_dev %p no watchers\n", __func__, rbd_dev);
 	ret = 0;
-out:
+free_watchers:
 	kfree(watchers);
 	return ret;
 }
