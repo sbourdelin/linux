@@ -718,19 +718,19 @@ static struct rbd_client *rbd_client_create(struct ceph_options *ceph_opts)
 	dout("%s:\n", __func__);
 	rbdc = kmalloc(sizeof(struct rbd_client), GFP_KERNEL);
 	if (!rbdc)
-		goto out_opt;
+		goto check_input;
 
 	kref_init(&rbdc->kref);
 	INIT_LIST_HEAD(&rbdc->node);
 
 	rbdc->client = ceph_create_client(ceph_opts, rbdc, 0, 0);
 	if (IS_ERR(rbdc->client))
-		goto out_rbdc;
+		goto free_rbdc;
 	ceph_opts = NULL; /* Now rbdc->client is responsible for ceph_opts */
 
 	ret = ceph_open_session(rbdc->client);
 	if (ret < 0)
-		goto out_client;
+		goto destroy_client;
 
 	spin_lock(&rbd_client_list_lock);
 	list_add_tail(&rbdc->node, &rbd_client_list);
@@ -739,11 +739,11 @@ static struct rbd_client *rbd_client_create(struct ceph_options *ceph_opts)
 	dout("%s: rbdc %p\n", __func__, rbdc);
 
 	return rbdc;
-out_client:
+ destroy_client:
 	ceph_destroy_client(rbdc->client);
-out_rbdc:
+ free_rbdc:
 	kfree(rbdc);
-out_opt:
+ check_input:
 	if (ceph_opts)
 		ceph_destroy_options(ceph_opts);
 	dout("%s: error %d\n", __func__, ret);
