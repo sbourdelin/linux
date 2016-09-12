@@ -5532,18 +5532,18 @@ static const char *rbd_dev_v2_snap_name(struct rbd_device *rbd_dev,
 	dout("%s: rbd_obj_method_sync returned %d\n", __func__, ret);
 	if (ret < 0) {
 		snap_name = ERR_PTR(ret);
-		goto out;
+		goto free_buffer;
 	}
 
 	p = reply_buf;
 	end = reply_buf + ret;
 	snap_name = ceph_extract_encoded_string(&p, end, NULL, GFP_KERNEL);
 	if (IS_ERR(snap_name))
-		goto out;
+		goto free_buffer;
 
 	dout("  snap_id 0x%016llx snap_name = %s\n",
 		(unsigned long long)snap_id, snap_name);
-out:
+ free_buffer:
 	kfree(reply_buf);
 
 	return snap_name;
