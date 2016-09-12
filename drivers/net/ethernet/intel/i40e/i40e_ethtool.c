@@ -3116,3 +3116,75 @@ void i40e_set_ethtool_ops(struct net_device *netdev)
 {
 	netdev->ethtool_ops = &i40e_ethtool_ops;
 }
+
+/* As the VF Port representor(VFPR) represents the switch port corresponding
+ * to a VF, the tx_ and rx_ strings are swapped to indicate that the frames
+ * transmitted from VF are received on VFPR and the frames received on VF are
+ * transmitted from VFPR.
+ */
+static const char i40e_vf_netdev_ethtool_sset[][ETH_GSTRING_LEN] = {
+	"tx_bytes",
+	"tx_unicast",
+	"tx_multicast",
+	"tx_broadcast",
+	"tx_discards",
+	"tx_errors",
+	"rx_bytes",
+	"rx_unicast",
+	"rx_multicast",
+	"rx_broadcast",
+	"rx_discards",
+	"rx_unknown_protocol",
+};
+
+#define I40E_VF_NETDEV_ETHTOOL_STAT_COUNT \
+			ARRAY_SIZE(i40e_vf_netdev_ethtool_sset)
+
+static void i40e_vf_netdev_ethtool_get_strings(struct net_device *dev,
+					       u32 stringset,
+					       u8 *ethtool_strings)
+{
+	switch (stringset) {
+	case ETH_SS_STATS:
+		memcpy(ethtool_strings, &i40e_vf_netdev_ethtool_sset,
+		       sizeof(i40e_vf_netdev_ethtool_sset));
+		break;
+	}
+}
+
+static int i40e_vf_netdev_ethtool_get_sset_count(struct net_device *dev,
+						 int stringset)
+{
+	switch (stringset) {
+	case ETH_SS_STATS:
+		return I40E_VF_NETDEV_ETHTOOL_STAT_COUNT;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static void i40e_vf_netdev_ethtool_get_stats(struct net_device *dev,
+				struct ethtool_stats *target_ethtool_stats,
+				u64 *target_stat_values)
+{
+	struct i40e_vf_netdev_priv *priv = netdev_priv(dev);
+	struct i40e_vf *vf = priv->vf;
+	struct i40e_pf *pf = vf->pf;
+	struct i40e_vsi *vsi;
+
+	vsi = pf->vsi[vf->lan_vsi_idx];
+	i40e_update_stats(vsi);
+	memcpy(target_stat_values, &vsi->eth_stats,
+	       I40E_VF_NETDEV_ETHTOOL_STAT_COUNT * 8);
+}
+
+static const struct ethtool_ops i40e_vf_netdev_ethtool_ops = {
+	.get_strings		= i40e_vf_netdev_ethtool_get_strings,
+	.get_ethtool_stats	= i40e_vf_netdev_ethtool_get_stats,
+	.get_sset_count		= i40e_vf_netdev_ethtool_get_sset_count,
+};
+
+void i40e_set_vf_netdev_ethtool_ops(struct net_device *netdev)
+{
+	netdev->ethtool_ops = &i40e_vf_netdev_ethtool_ops;
+}
