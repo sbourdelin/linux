@@ -6108,7 +6108,7 @@ static int rbd_dev_image_probe(struct rbd_device *rbd_dev, int depth)
 
 	ret = rbd_dev_header_name(rbd_dev);
 	if (ret)
-		goto err_out_format;
+		goto status_indication;
 
 	if (!depth) {
 		ret = rbd_register_watch(rbd_dev);
@@ -6117,13 +6117,13 @@ static int rbd_dev_image_probe(struct rbd_device *rbd_dev, int depth)
 				pr_info("image %s/%s does not exist\n",
 					rbd_dev->spec->pool_name,
 					rbd_dev->spec->image_name);
-			goto err_out_format;
+			goto status_indication;
 		}
 	}
 
 	ret = rbd_dev_header_info(rbd_dev);
 	if (ret)
-		goto err_out_watch;
+		goto check_input;
 
 	/*
 	 * If this image is the one being mapped, we have pool name and
@@ -6141,13 +6141,13 @@ static int rbd_dev_image_probe(struct rbd_device *rbd_dev, int depth)
 				rbd_dev->spec->pool_name,
 				rbd_dev->spec->image_name,
 				rbd_dev->spec->snap_name);
-		goto err_out_probe;
+		goto unprobe_device;
 	}
 
 	if (rbd_dev->header.features & RBD_FEATURE_LAYERING) {
 		ret = rbd_dev_v2_parent_info(rbd_dev);
 		if (ret)
-			goto err_out_probe;
+			goto unprobe_device;
 
 		/*
 		 * Need to warn users if this image is the one being
@@ -6160,18 +6160,17 @@ static int rbd_dev_image_probe(struct rbd_device *rbd_dev, int depth)
 
 	ret = rbd_dev_probe_parent(rbd_dev, depth);
 	if (ret)
-		goto err_out_probe;
+		goto unprobe_device;
 
 	dout("discovered format %u image, header name is %s\n",
 		rbd_dev->image_format, rbd_dev->header_oid.name);
 	return 0;
-
-err_out_probe:
+ unprobe_device:
 	rbd_dev_unprobe(rbd_dev);
-err_out_watch:
+ check_input:
 	if (!depth)
 		rbd_unregister_watch(rbd_dev);
-err_out_format:
+ status_indication:
 	rbd_dev->image_format = 0;
 	kfree(rbd_dev->spec->image_id);
 	rbd_dev->spec->image_id = NULL;
