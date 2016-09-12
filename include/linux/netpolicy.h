@@ -80,4 +80,12 @@ struct netpolicy_info {
 	struct list_head	obj_list[NETPOLICY_RXTX][NET_POLICY_MAX];
 };
 
+#ifdef CONFIG_NETPOLICY
+extern void update_netpolicy_sys_map(void);
+#else
+static inline void update_netpolicy_sys_map(void)
+{
+}
+#endif
+
 #endif /*__LINUX_NETPOLICY_H*/

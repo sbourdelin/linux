@@ -1703,6 +1703,7 @@ static noinline_for_stack int ethtool_set_channels(struct net_device *dev,
 {
 	struct ethtool_channels channels, max;
 	u32 max_rx_in_use = 0;
+	int ret;
 
 	if (!dev->ethtool_ops->set_channels || !dev->ethtool_ops->get_channels)
 		return -EOPNOTSUPP;
@@ -1726,7 +1727,12 @@ static noinline_for_stack int ethtool_set_channels(struct net_device *dev,
 	    (channels.combined_count + channels.rx_count) <= max_rx_in_use)
 	    return -EINVAL;
 
-	return dev->ethtool_ops->set_channels(dev, &channels);
+	ret = dev->ethtool_ops->set_channels(dev, &channels);
+#ifdef CONFIG_NETPOLICY
+	if (!ret)
+		update_netpolicy_sys_map();
+#endif
+	return ret;
 }
 
 static int ethtool_get_pauseparam(struct net_device *dev, void __user *useraddr)

@@ -893,6 +893,7 @@ unlock:
 		}
 	}
 }
+EXPORT_SYMBOL(update_netpolicy_sys_map);
 
 static int netpolicy_cpu_callback(struct notifier_block *nfb,
 				  unsigned long action, void *hcpu)
