@@ -78,6 +78,7 @@
 #include "clip_tbl.h"
 #include "l2t.h"
 #include "sched.h"
+#include "cxgb4_tc_u32.h"
 
 char cxgb4_driver_name[] = KBUILD_MODNAME;
 
@@ -3027,6 +3028,33 @@ static int cxgb_set_tx_maxrate(struct net_device *dev, int index, u32 rate)
 	return err;
 }
 
+int cxgb_setup_tc(struct net_device *dev, u32 handle, __be16 proto,
+		  struct tc_to_netdev *tc)
+{
+	struct adapter *adap = netdev2adap(dev);
+	struct port_info *pi = netdev2pinfo(dev);
+
+	if (!(adap->flags & FULL_INIT_DONE)) {
+		dev_err(adap->pdev_dev,
+			"Failed to setup tc on port %d. Link Down?\n",
+			pi->port_id);
+		return -EINVAL;
+	}
+
+	if (TC_H_MAJ(handle) == TC_H_MAJ(TC_H_INGRESS) &&
+	    tc->type == TC_SETUP_CLSU32) {
+		switch (tc->cls_u32->command) {
+		case TC_CLSU32_NEW_KNODE:
+		case TC_CLSU32_REPLACE_KNODE:
+			return cxgb4_config_knode(dev, proto, tc->cls_u32);
+		default:
+			return -EOPNOTSUPP;
+		}
+	}
+
+	return -EOPNOTSUPP;
+}
+
 static const struct net_device_ops cxgb4_netdev_ops = {
 	.ndo_open             = cxgb_open,
 	.ndo_stop             = cxgb_close,
@@ -3050,6 +3078,7 @@ static const struct net_device_ops cxgb4_netdev_ops = {
 	.ndo_busy_poll        = cxgb_busy_poll,
 #endif
 	.ndo_set_tx_maxrate   = cxgb_set_tx_maxrate,
+	.ndo_setup_tc         = cxgb_setup_tc,
 };
 
 #ifdef CONFIG_PCI_IOV
@@ -4781,6 +4810,7 @@ static void free_some_resources(struct adapter *adapter)
 	t4_free_mem(adapter->l2t);
 	t4_cleanup_sched(adapter);
 	t4_free_mem(adapter->tids.tid_tab);
+	cxgb4_cleanup_tc_u32(adapter);
 	kfree(adapter->sge.egr_map);
 	kfree(adapter->sge.ingr_map);
 	kfree(adapter->sge.starving_fl);
@@ -5213,6 +5243,12 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		dev_warn(&pdev->dev, "could not allocate TID table, "
 			 "continuing\n");
 		adapter->params.offload = 0;
+	} else {
+		adapter->tc_u32 = cxgb4_init_tc_u32(adapter,
+						    CXGB4_MAX_LINK_HANDLE);
+		if (!adapter->tc_u32)
+			dev_warn(&pdev->dev,
+				 "could not offload tc u32, continuing\n");
 	}
 
 	if (is_offload(adapter)) {
