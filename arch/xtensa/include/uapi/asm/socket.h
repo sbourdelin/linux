@@ -101,4 +101,6 @@
 
 #define SO_CNX_ADVICE		53
 
+#define SO_NETPOLICY		54
+
 #endif	/* _XTENSA_SOCKET_H */

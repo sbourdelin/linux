@@ -1003,6 +1003,12 @@ set_rcvbuf:
 		if (val == 1)
 			dst_negative_advice(sk);
 		break;
+
+#ifdef CONFIG_NETPOLICY
+	case SO_NETPOLICY:
+		ret = netpolicy_register(&sk->sk_netpolicy, val);
+		break;
+#endif
 	default:
 		ret = -ENOPROTOOPT;
 		break;
@@ -1263,6 +1269,11 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 		v.val = sk->sk_incoming_cpu;
 		break;
 
+#ifdef CONFIG_NETPOLICY
+	case SO_NETPOLICY:
+		v.val = sk->sk_netpolicy.policy;
+		break;
+#endif
 	default:
 		/* We implement the SO_SNDLOWAT etc to not be settable
 		 * (1003.1g 7).
@@ -1402,6 +1413,12 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 
 		sock_update_classid(&sk->sk_cgrp_data);
 		sock_update_netprioidx(&sk->sk_cgrp_data);
+
+#ifdef CONFIG_NETPOLICY
+		sk->sk_netpolicy.dev = NULL;
+		sk->sk_netpolicy.ptr = (void *)sk;
+		sk->sk_netpolicy.policy = NET_POLICY_INVALID;
+#endif
 	}
 
 	return sk;
@@ -1439,6 +1456,10 @@ static void __sk_destruct(struct rcu_head *head)
 	put_pid(sk->sk_peer_pid);
 	if (likely(sk->sk_net_refcnt))
 		put_net(sock_net(sk));
+#ifdef CONFIG_NETPOLICY
+	if (is_net_policy_valid(sk->sk_netpolicy.policy))
+		netpolicy_unregister(&sk->sk_netpolicy);
+#endif
 	sk_prot_free(sk->sk_prot_creator, sk);
 }
 
@@ -1575,6 +1596,13 @@ struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority)
 		if (sock_needs_netstamp(sk) &&
 		    newsk->sk_flags & SK_FLAGS_TIMESTAMP)
 			net_enable_timestamp();
+
+#ifdef CONFIG_NETPOLICY
+		newsk->sk_netpolicy.ptr = (void *)newsk;
+		if (is_net_policy_valid(newsk->sk_netpolicy.policy))
+			netpolicy_register(&newsk->sk_netpolicy, newsk->sk_netpolicy.policy);
+
+#endif
 	}
 out:
 	return newsk;
