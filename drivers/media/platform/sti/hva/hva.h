@@ -153,6 +153,27 @@ struct hva_stream {
 #define to_hva_stream(vb) \
 	container_of(vb, struct hva_stream, vbuf)
 
+/**
+ * struct hva_ctx_dbg - instance context debug info
+ *
+ * @is_valid_period: true if the sequence is valid for performance
+ * @begin:           start time of last HW task
+ * @total_duration:  total HW processing durations in 0.1ms
+ * @cnt_duration:    number of HW processings
+ * @sys_errors:      number of system errors (memory, resource, pm..)
+ * @encode_errors:   number of encoding errors (hw/driver errors)
+ * @frame_errors:    number of frame errors (format, size, header...)
+ */
+struct hva_ctx_dbg {
+	bool	is_valid_period;
+	ktime_t	begin;
+	u32	total_duration;
+	u32	cnt_duration;
+	u32	sys_errors;
+	u32	encode_errors;
+	u32	frame_errors;
+};
+
 struct hva_dev;
 struct hva_enc;
 
@@ -182,6 +203,7 @@ struct hva_enc;
  * @priv:            private codec data for this instance, allocated
  *                   by encoder @open time
  * @hw_err:          true if hardware error detected
+ * @dbg:             context debug info
  */
 struct hva_ctx {
 	struct hva_dev		        *hva_dev;
@@ -207,6 +229,7 @@ struct hva_ctx {
 	struct hva_enc			*enc;
 	void				*priv;
 	bool				hw_err;
+	struct hva_ctx_dbg		dbg;
 };
 
 #define HVA_FLAG_STREAMINFO	0x0001
@@ -311,5 +334,9 @@ struct hva_enc {
 	int		(*encode)(struct hva_ctx *ctx, struct hva_frame *frame,
 				  struct hva_stream *stream);
 };
+
+char *hva_dbg_summary(struct hva_ctx *ctx);
+void hva_dbg_perf_begin(struct hva_ctx *ctx);
+void hva_dbg_perf_end(struct hva_ctx *ctx, struct hva_stream *stream);
 
 #endif /* HVA_H */

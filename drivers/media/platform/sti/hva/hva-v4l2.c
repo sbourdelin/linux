@@ -614,19 +614,17 @@ static int hva_s_ctrl(struct v4l2_ctrl *ctrl)
 		break;
 	case V4L2_CID_MPEG_VIDEO_H264_PROFILE:
 		ctx->ctrls.profile = ctrl->val;
-		if (ctx->flags & HVA_FLAG_STREAMINFO)
-			snprintf(ctx->streaminfo.profile,
-				 sizeof(ctx->streaminfo.profile),
-				 "%s profile",
-				 v4l2_ctrl_get_menu(ctrl->id)[ctrl->val]);
+		snprintf(ctx->streaminfo.profile,
+			 sizeof(ctx->streaminfo.profile),
+			 "%s profile",
+			 v4l2_ctrl_get_menu(ctrl->id)[ctrl->val]);
 		break;
 	case V4L2_CID_MPEG_VIDEO_H264_LEVEL:
 		ctx->ctrls.level = ctrl->val;
-		if (ctx->flags & HVA_FLAG_STREAMINFO)
-			snprintf(ctx->streaminfo.level,
-				 sizeof(ctx->streaminfo.level),
-				 "level %s",
-				 v4l2_ctrl_get_menu(ctrl->id)[ctrl->val]);
+		snprintf(ctx->streaminfo.level,
+			 sizeof(ctx->streaminfo.level),
+			 "level %s",
+			 v4l2_ctrl_get_menu(ctrl->id)[ctrl->val]);
 		break;
 	case V4L2_CID_MPEG_VIDEO_H264_ENTROPY_MODE:
 		ctx->ctrls.entropy_mode = ctrl->val;
@@ -793,6 +791,8 @@ static void hva_run_work(struct work_struct *work)
 	/* protect instance against reentrancy */
 	mutex_lock(&ctx->lock);
 
+	hva_dbg_perf_begin(ctx);
+
 	src_buf = v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
 	dst_buf = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
 
@@ -811,6 +811,8 @@ static void hva_run_work(struct work_struct *work)
 		dst_buf->vb2_buf.timestamp = src_buf->vb2_buf.timestamp;
 		dst_buf->field = V4L2_FIELD_NONE;
 		dst_buf->sequence = ctx->stream_num - 1;
+
+		hva_dbg_perf_end(ctx, stream);
 
 		v4l2_m2m_buf_done(src_buf, VB2_BUF_STATE_DONE);
 		v4l2_m2m_buf_done(dst_buf, VB2_BUF_STATE_DONE);
@@ -1026,6 +1028,8 @@ err:
 			v4l2_m2m_buf_done(vbuf, VB2_BUF_STATE_QUEUED);
 	}
 
+	ctx->dbg.sys_errors++;
+
 	return ret;
 }
 
@@ -1150,6 +1154,7 @@ static int hva_open(struct file *file)
 	if (ret) {
 		dev_err(dev, "%s [x:x] failed to setup controls\n",
 			HVA_PREFIX);
+		ctx->dbg.sys_errors++;
 		goto err_fh;
 	}
 	ctx->fh.ctrl_handler = &ctx->ctrl_handler;
@@ -1162,6 +1167,7 @@ static int hva_open(struct file *file)
 		ret = PTR_ERR(ctx->fh.m2m_ctx);
 		dev_err(dev, "%s failed to initialize m2m context (%d)\n",
 			HVA_PREFIX, ret);
+		ctx->dbg.sys_errors++;
 		goto err_ctrls;
 	}
 
@@ -1205,6 +1211,10 @@ static int hva_release(struct file *file)
 		hva->instances[ctx->id] = NULL;
 		hva->nb_of_instances--;
 	}
+
+	/* trace a summary of instance before closing (debug purpose) */
+	if (ctx->flags & HVA_FLAG_STREAMINFO)
+		dev_info(dev, "%s %s\n", ctx->name, hva_dbg_summary(ctx));
 
 	v4l2_m2m_ctx_release(ctx->fh.m2m_ctx);
 
