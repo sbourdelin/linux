@@ -563,6 +563,7 @@ int alternatives_text_reserved(void *start, void *end)
 	u8 *text_start = start;
 	u8 *text_end = end;
 
+	mutex_lock(&smp_alt);
 	list_for_each_entry(mod, &smp_alt_modules, next) {
 		if (mod->text > text_end || mod->text_end < text_start)
 			continue;
@@ -573,6 +574,7 @@ int alternatives_text_reserved(void *start, void *end)
 				return 1;
 		}
 	}
+	mutex_unlock(&smp_alt);	
 
 	return 0;
 }
