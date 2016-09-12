@@ -2687,7 +2687,7 @@ rbd_img_obj_parent_read_full_callback(struct rbd_img_request *img_request)
 	}
 
 	if (img_result)
-		goto out_err;
+		goto status_indication;
 
 	/*
 	 * The original osd request is of no use to use any more.
@@ -2698,7 +2698,7 @@ rbd_img_obj_parent_read_full_callback(struct rbd_img_request *img_request)
 	img_result = -ENOMEM;
 	osd_req = rbd_osd_req_create_copyup(orig_request);
 	if (!osd_req)
-		goto out_err;
+		goto status_indication;
 	rbd_osd_req_destroy(orig_request->osd_req);
 	orig_request->osd_req = osd_req;
 	orig_request->copyup_pages = pages;
@@ -2721,7 +2721,7 @@ rbd_img_obj_parent_read_full_callback(struct rbd_img_request *img_request)
 	img_result = rbd_obj_request_submit(osdc, orig_request);
 	if (!img_result)
 		return;
-out_err:
+ status_indication:
 	/* Record the error code and complete the request */
 
 	orig_request->result = img_result;
