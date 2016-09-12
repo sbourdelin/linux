@@ -157,6 +157,214 @@ fail:
 	return TEST_FAIL;
 }
 
+/* FPR */
+int show_fpr(pid_t child, unsigned long *fpr)
+{
+	struct fpr_regs *regs;
+	int ret, i;
+
+	regs = (struct fpr_regs *) malloc(sizeof(struct fpr_regs));
+	ret = ptrace(PTRACE_GETFPREGS, child, NULL, regs);
+	if (ret) {
+		perror("ptrace(PTRACE_GETREGSET) failed");
+		return TEST_FAIL;
+	}
+
+	if (fpr) {
+		for (i = 0; i < 32; i++)
+			fpr[i] = regs->fpr[i];
+	}
+	return TEST_PASS;
+}
+
+int write_fpr(pid_t child, unsigned long val)
+{
+	struct fpr_regs *regs;
+	int ret, i;
+
+	regs = (struct fpr_regs *) malloc(sizeof(struct fpr_regs));
+	ret = ptrace(PTRACE_GETFPREGS, child, NULL, regs);
+	if (ret) {
+		perror("ptrace(PTRACE_GETREGSET) failed");
+		return TEST_FAIL;
+	}
+
+	for (i = 0; i < 32; i++)
+		regs->fpr[i] = val;
+
+	ret = ptrace(PTRACE_SETFPREGS, child, NULL, regs);
+	if (ret) {
+		perror("ptrace(PTRACE_GETREGSET) failed");
+		return TEST_FAIL;
+	}
+	return TEST_PASS;
+}
+
+int show_ckpt_fpr(pid_t child, unsigned long *fpr)
+{
+	struct fpr_regs *regs;
+	struct iovec iov;
+	int ret, i;
+
+	regs = (struct fpr_regs *) malloc(sizeof(struct fpr_regs));
+	iov.iov_base = regs;
+	iov.iov_len = sizeof(struct fpr_regs);
+
+	ret = ptrace(PTRACE_GETREGSET, child, NT_PPC_TM_CFPR, &iov);
+	if (ret) {
+		perror("ptrace(PTRACE_GETREGSET) failed");
+		return TEST_FAIL;
+	}
+
+	if (fpr) {
+		for (i = 0; i < 32; i++)
+			fpr[i] = regs->fpr[i];
+	}
+
+	return TEST_PASS;
+}
+
+int write_ckpt_fpr(pid_t child, unsigned long val)
+{
+	struct fpr_regs *regs;
+	struct iovec iov;
+	int ret, i;
+
+	regs = (struct fpr_regs *) malloc(sizeof(struct fpr_regs));
+	iov.iov_base = regs;
+	iov.iov_len = sizeof(struct fpr_regs);
+
+	ret = ptrace(PTRACE_GETREGSET, child, NT_PPC_TM_CFPR, &iov);
+	if (ret) {
+		perror("ptrace(PTRACE_GETREGSET) failed");
+		return TEST_FAIL;
+	}
+
+	for (i = 0; i < 32; i++)
+		regs->fpr[i] = val;
+
+	ret = ptrace(PTRACE_SETREGSET, child, NT_PPC_TM_CFPR, &iov);
+	if (ret) {
+		perror("ptrace(PTRACE_GETREGSET) failed");
+		return TEST_FAIL;
+	}
+	return TEST_PASS;
+}
+
+/* GPR */
+int show_gpr(pid_t child, unsigned long *gpr)
+{
+	struct pt_regs *regs;
+	int ret, i;
+
+	regs = (struct pt_regs *) malloc(sizeof(struct pt_regs));
+	if (!regs) {
+		perror("malloc() failed");
+		return TEST_FAIL;
+	}
+
+	ret = ptrace(PTRACE_GETREGS, child, NULL, regs);
+	if (ret) {
+		perror("ptrace(PTRACE_GETREGSET) failed");
+		return TEST_FAIL;
+	}
+
+	if (gpr) {
+		for (i = 14; i < 32; i++)
+			gpr[i-14] = regs->gpr[i];
+	}
+
+	return TEST_PASS;
+}
+
+int write_gpr(pid_t child, unsigned long val)
+{
+	struct pt_regs *regs;
+	int i, ret;
+
+	regs = (struct pt_regs *) malloc(sizeof(struct pt_regs));
+	if (!regs) {
+		perror("malloc() failed");
+		return TEST_FAIL;
+	}
+
+	ret = ptrace(PTRACE_GETREGS, child, NULL, regs);
+	if (ret) {
+		perror("ptrace(PTRACE_GETREGSET) failed");
+		return TEST_FAIL;
+	}
+
+	for (i = 14; i < 32; i++)
+		regs->gpr[i] = val;
+
+	ret = ptrace(PTRACE_SETREGS, child, NULL, regs);
+	if (ret) {
+		perror("ptrace(PTRACE_GETREGSET) failed");
+		return TEST_FAIL;
+	}
+	return TEST_PASS;
+}
+
+int show_ckpt_gpr(pid_t child, unsigned long *gpr)
+{
+	struct pt_regs *regs;
+	struct iovec iov;
+	int ret, i;
+
+	regs = (struct pt_regs *) malloc(sizeof(struct pt_regs));
+	if (!regs) {
+		perror("malloc() failed");
+		return TEST_FAIL;
+	}
+
+	iov.iov_base = (u64 *) regs;
+	iov.iov_len = sizeof(struct pt_regs);
+
+	ret = ptrace(PTRACE_GETREGSET, child, NT_PPC_TM_CGPR, &iov);
+	if (ret) {
+		perror("ptrace(PTRACE_GETREGSET) failed");
+		return TEST_FAIL;
+	}
+
+	if (gpr) {
+		for (i = 14; i < 32; i++)
+			gpr[i-14] = regs->gpr[i];
+	}
+
+	return TEST_PASS;
+}
+
+int write_ckpt_gpr(pid_t child, unsigned long val)
+{
+	struct pt_regs *regs;
+	struct iovec iov;
+	int ret, i;
+
+	regs = (struct pt_regs *) malloc(sizeof(struct pt_regs));
+	if (!regs) {
+		perror("malloc() failed\n");
+		return TEST_FAIL;
+	}
+	iov.iov_base = (u64 *) regs;
+	iov.iov_len = sizeof(struct pt_regs);
+
+	ret = ptrace(PTRACE_GETREGSET, child, NT_PPC_TM_CGPR, &iov);
+	if (ret) {
+		perror("ptrace(PTRACE_GETREGSET) failed");
+		return TEST_FAIL;
+	}
+
+	for (i = 14; i < 32; i++)
+		regs->gpr[i] = val;
+
+	ret = ptrace(PTRACE_SETREGSET, child, NT_PPC_TM_CGPR, &iov);
+	if (ret) {
+		perror("ptrace(PTRACE_GETREGSET) failed");
+		return TEST_FAIL;
+	}
+	return TEST_PASS;
+}
+
 /* Analyse TEXASR after TM failure */
 inline unsigned long get_tfiar(void)
 {
@@ -223,3 +431,6 @@ void analyse_texasr(unsigned long texasr)
 
 	printf("TFIAR :%lx\n", get_tfiar());
 }
+
+void store_gpr(unsigned long *addr);
+void store_fpr(float *addr);
