@@ -101,6 +101,11 @@ void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios);
  */
 void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios);
 
+/*
+ * Return true if both CTS and RTS are used with GPIOs
+ */
+bool mctrl_gpio_use_rtscts(struct mctrl_gpios *gpios);
+
 #else /* GPIOLIB */
 
 static inline
@@ -150,6 +155,11 @@ static inline void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios)
 
 static inline void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios)
 {
+}
+
+static inline bool mctrl_gpio_use_rtscts(struct mctrl_gpios *gpios)
+{
+	return false;
 }
 
 #endif /* GPIOLIB */
