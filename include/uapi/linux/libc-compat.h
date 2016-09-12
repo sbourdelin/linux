@@ -165,6 +165,43 @@
 #define __UAPI_DEF_XATTR		1
 #endif
 
+/* Definitions for time.h */
+#if defined(__timespec_defined)
+#define __UAPI_DEF_TIMESPEC		0
+#else
+#define __UAPI_DEF_TIMESPEC		1
+#endif
+
+#if defined(_TIME_H) && defined(__USE_POSIX199309)
+#define __UAPI_DEF_ITIMERSPEC		0
+#else
+#define __UAPI_DEF_ITIMERSPEC		1
+#endif
+
+/* Definitions for sys/time.h */
+#if defined(_SYS_TIME_H)
+#define __UAPI_DEF_TIMEVAL		0
+#define __UAPI_DEF_ITIMERVAL		0
+#define __UAPI_DEF_ITIMER_WHICH		0
+#else
+#define __UAPI_DEF_TIMEVAL		1
+#define __UAPI_DEF_ITIMERVAL		1
+#define __UAPI_DEF_ITIMER_WHICH		1
+#endif
+
+/* Definitions for bits/time.h */
+#if defined(_BITS_TIME_H)
+#define __UAPI_DEF_ABSTIME		0
+#else
+#define __UAPI_DEF_ABSTIME		1
+#endif
+
+#if defined(_SYS_TIME_H) && defined(__USE_BSD)
+#define __UAPI_DEF_TIMEZONE		0
+#else
+#define __UAPI_DEF_TIMEZONE		1
+#endif
+
 /* If we did not see any headers from any supported C libraries,
  * or we are being included in the kernel, then define everything
  * that we need. */
@@ -207,6 +244,19 @@
 
 /* Definitions for xattr.h */
 #define __UAPI_DEF_XATTR		1
+
+/* Definitions for time.h */
+#define __UAPI_DEF_TIMESPEC		1
+#define __UAPI_DEF_ITIMERSPEC		1
+
+/* Definitions for sys/time.h */
+#define __UAPI_DEF_TIMEVAL		1
+#define __UAPI_DEF_ITIMERVAL		1
+#define __UAPI_DEF_ITIMER_WHICH		1
+#define __UAPI_DEF_TIMEZONE		1
+
+/* Definitions for bits/time.h */
+#define __UAPI_DEF_ABSTIME		1
 
 #endif /* __GLIBC__ */
 
