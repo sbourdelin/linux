@@ -3950,7 +3950,7 @@ static void rbd_reregister_watch(struct work_struct *work)
 
 	mutex_lock(&rbd_dev->watch_mutex);
 	if (rbd_dev->watch_state != RBD_WATCH_STATE_ERROR)
-		goto fail_unlock;
+		goto unlock;
 
 	ret = __rbd_register_watch(rbd_dev);
 	if (ret) {
@@ -3959,7 +3959,7 @@ static void rbd_reregister_watch(struct work_struct *work)
 			queue_delayed_work(rbd_dev->task_wq,
 					   &rbd_dev->watch_dwork,
 					   RBD_RETRY_DELAY);
-		goto fail_unlock;
+		goto unlock;
 	}
 
 	rbd_dev->watch_state = RBD_WATCH_STATE_REGISTERED;
@@ -3980,8 +3980,7 @@ static void rbd_reregister_watch(struct work_struct *work)
 	up_write(&rbd_dev->lock_rwsem);
 	wake_requests(rbd_dev, true);
 	return;
-
-fail_unlock:
+ unlock:
 	mutex_unlock(&rbd_dev->watch_mutex);
 	up_write(&rbd_dev->lock_rwsem);
 }
