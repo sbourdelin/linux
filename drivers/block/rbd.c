@@ -3381,20 +3381,20 @@ static int get_lock_owner_info(struct rbd_device *rbd_dev,
 
 	if (*num_lockers == 0) {
 		dout("%s rbd_dev %p no lockers detected\n", __func__, rbd_dev);
-		goto out;
+		goto free_tag;
 	}
 
 	if (strcmp(lock_tag, RBD_LOCK_TAG)) {
 		rbd_warn(rbd_dev, "locked by external mechanism, tag %s",
 			 lock_tag);
 		ret = -EBUSY;
-		goto out;
+		goto free_tag;
 	}
 
 	if (lock_type == CEPH_CLS_LOCK_SHARED) {
 		rbd_warn(rbd_dev, "shared lock type detected");
 		ret = -EBUSY;
-		goto out;
+		goto free_tag;
 	}
 
 	if (strncmp((*lockers)[0].id.cookie, RBD_LOCK_COOKIE_PREFIX,
@@ -3402,10 +3402,8 @@ static int get_lock_owner_info(struct rbd_device *rbd_dev,
 		rbd_warn(rbd_dev, "locked by external mechanism, cookie %s",
 			 (*lockers)[0].id.cookie);
 		ret = -EBUSY;
-		goto out;
 	}
-
-out:
+ free_tag:
 	kfree(lock_tag);
 	return ret;
 }
