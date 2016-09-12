@@ -184,10 +184,6 @@ ENDPIPROC(__dma_flush_range)
  *	- dir	- DMA direction
  */
 ENTRY(__dma_map_area)
-	add	x1, x1, x0
-	cmp	w2, #DMA_FROM_DEVICE
-	b.eq	__dma_inv_range
-	b	__dma_clean_range
 ENDPIPROC(__dma_map_area)
 
 /*
@@ -202,3 +198,23 @@ ENTRY(__dma_unmap_area)
 	b.ne	__dma_inv_range
 	ret
 ENDPIPROC(__dma_unmap_area)
+
+/*
+ *	__force_dcache_clean(start, size)
+ *	- start	- kernel virtual start address
+ *	- size	- size of region
+ */
+ENTRY(__force_dcache_clean)
+	add	x1, x1, x0
+	b	__dma_clean_range
+ENDPROC(__force_dcache_clean)
+
+/*
+ *	__force_dcache_invalidate(start, size)
+ *	- start	- kernel virtual start address
+ *	- size	- size of region
+ */
+ENTRY(__force_dcache_invalidate)
+	add	x1, x1, x0
+	b	__dma_inv_range
+ENDPROC(__force_dcache_invalidate)

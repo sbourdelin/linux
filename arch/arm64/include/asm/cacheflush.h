@@ -87,6 +87,9 @@ extern void __dma_map_area(const void *, size_t, int);
 extern void __dma_unmap_area(const void *, size_t, int);
 extern void __dma_flush_range(const void *, const void *);
 
+extern void __force_dcache_clean(const void *, size_t);
+extern void __force_dcache_invalidate(const void *, size_t);
+
 /*
  * Copy user data from/to a page which is mapped into a different
  * processes address space.  Really, we want to allow our "user
@@ -148,5 +151,10 @@ int set_memory_ro(unsigned long addr, int numpages);
 int set_memory_rw(unsigned long addr, int numpages);
 int set_memory_x(unsigned long addr, int numpages);
 int set_memory_nx(unsigned long addr, int numpages);
+
+#define ARCH_HAS_FORCE_CACHE 1
+
+void kernel_force_cache_clean(struct page *page, size_t size);
+void kernel_force_cache_invalidate(struct page *page, size_t size);
 
 #endif

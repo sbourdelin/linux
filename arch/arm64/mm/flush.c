@@ -20,6 +20,7 @@
 #include <linux/export.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/cacheflush.h>
 #include <asm/cachetype.h>
@@ -94,3 +95,13 @@ EXPORT_SYMBOL(flush_dcache_page);
  * Additional functions defined in assembly.
  */
 EXPORT_SYMBOL(flush_icache_range);
+
+void kernel_force_cache_clean(struct page *page, size_t size)
+{
+	__force_dcache_clean(page_address(page), size);
+}
+
+void kernel_force_cache_invalidate(struct page *page, size_t size)
+{
+	__force_dcache_invalidate(page_address(page), size);
+}
