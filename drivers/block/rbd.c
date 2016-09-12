@@ -4930,23 +4930,22 @@ static struct rbd_device *rbd_dev_create(struct rbd_client *rbdc,
 					 minor_to_rbd_dev_id(1 << MINORBITS),
 					 GFP_KERNEL);
 	if (rbd_dev->dev_id < 0)
-		goto fail_rbd_dev;
+		goto free_device;
 
 	sprintf(rbd_dev->name, RBD_DRV_NAME "%d", rbd_dev->dev_id);
 	rbd_dev->task_wq = alloc_ordered_workqueue("%s-tasks", WQ_MEM_RECLAIM,
 						   rbd_dev->name);
 	if (!rbd_dev->task_wq)
-		goto fail_dev_id;
+		goto remove_id;
 
 	/* we have a ref from do_rbd_add() */
 	__module_get(THIS_MODULE);
 
 	dout("%s rbd_dev %p dev_id %d\n", __func__, rbd_dev, rbd_dev->dev_id);
 	return rbd_dev;
-
-fail_dev_id:
+ remove_id:
 	ida_simple_remove(&rbd_dev_id_ida, rbd_dev->dev_id);
-fail_rbd_dev:
+ free_device:
 	rbd_dev_free(rbd_dev);
 	return NULL;
 }
