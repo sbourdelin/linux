@@ -225,8 +225,7 @@ static int sr_late_init(struct omap_sr *sr_info)
 
 error:
 	list_del(&sr_info->node);
-	dev_err(&sr_info->pdev->dev, "%s: ERROR in registering"
-		"interrupt handler. Smartreflex will"
+	dev_err(&sr_info->pdev->dev, "%s: ERROR in registering interrupt handler. Smartreflex will "
 		"not function as desired\n", __func__);
 
 	return ret;
@@ -387,7 +386,7 @@ int sr_configure_errgen(struct omap_sr *sr)
 		vpboundint_st = ERRCONFIG_VPBOUNDINTST_V2;
 		break;
 	default:
-		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex"
+		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex "
 			"module without specifying the ip\n", __func__);
 		return -EINVAL;
 	}
@@ -440,7 +439,7 @@ int sr_disable_errgen(struct omap_sr *sr)
 		vpboundint_st = ERRCONFIG_VPBOUNDINTST_V2;
 		break;
 	default:
-		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex"
+		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex "
 			"module without specifying the ip\n", __func__);
 		return -EINVAL;
 	}
@@ -504,7 +503,7 @@ int sr_configure_minmax(struct omap_sr *sr)
 		senp_shift = SRCONFIG_SENPENABLE_V2_SHIFT;
 		break;
 	default:
-		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex"
+		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex "
 			"module without specifying the ip\n", __func__);
 		return -EINVAL;
 	}
@@ -537,7 +536,7 @@ int sr_configure_minmax(struct omap_sr *sr)
 			IRQENABLE_MCUBOUNDSINT | IRQENABLE_MCUDISABLEACKINT);
 		break;
 	default:
-		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex"
+		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex "
 			"module without specifying the ip\n", __func__);
 		return -EINVAL;
 	}
@@ -571,7 +570,7 @@ int sr_enable(struct omap_sr *sr, unsigned long volt)
 	volt_data = omap_voltage_get_voltdata(sr->voltdm, volt);
 
 	if (IS_ERR(volt_data)) {
-		dev_warn(&sr->pdev->dev, "%s: Unable to get voltage table"
+		dev_warn(&sr->pdev->dev, "%s: Unable to get voltage table "
 			"for nominal voltage %ld\n", __func__, volt);
 		return PTR_ERR(volt_data);
 	}
@@ -704,7 +703,7 @@ void omap_sr_enable(struct voltagedomain *voltdm)
 		return;
 
 	if (!sr_class || !(sr_class->enable) || !(sr_class->configure)) {
-		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
+		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not "
 			"registered\n", __func__);
 		return;
 	}
@@ -736,7 +735,7 @@ void omap_sr_disable(struct voltagedomain *voltdm)
 		return;
 
 	if (!sr_class || !(sr_class->disable)) {
-		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
+		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not "
 			"registered\n", __func__);
 		return;
 	}
@@ -768,7 +767,7 @@ void omap_sr_disable_reset_volt(struct voltagedomain *voltdm)
 		return;
 
 	if (!sr_class || !(sr_class->disable)) {
-		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
+		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not "
 			"registered\n", __func__);
 		return;
 	}
