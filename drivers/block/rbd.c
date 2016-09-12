@@ -654,15 +654,14 @@ static int rbd_ioctl_set_ro(struct rbd_device *rbd_dev, unsigned long arg)
 	/* prevent others open this device */
 	if (rbd_dev->open_count > 1) {
 		ret = -EBUSY;
-		goto out;
+		goto unlock;
 	}
 
 	if (rbd_dev->mapping.read_only != ro) {
 		rbd_dev->mapping.read_only = ro;
 		ro_changed = true;
 	}
-
-out:
+ unlock:
 	spin_unlock_irq(&rbd_dev->lock);
 	/* set_disk_ro() may sleep, so call it after releasing rbd_dev->lock */
 	if (ret == 0 && ro_changed)
