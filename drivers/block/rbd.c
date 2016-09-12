@@ -3077,7 +3077,7 @@ static void rbd_img_parent_read_callback(struct rbd_img_request *img_request)
 
 	obj_request->result = img_result;
 	if (obj_request->result)
-		goto out;
+		goto callback;
 
 	/*
 	 * We need to zero anything beyond the parent overlap
@@ -3099,7 +3099,7 @@ static void rbd_img_parent_read_callback(struct rbd_img_request *img_request)
 	} else {
 		obj_request->xferred = img_xferred;
 	}
-out:
+ callback:
 	rbd_img_obj_request_read_callback(obj_request);
 	rbd_obj_request_complete(obj_request);
 }
