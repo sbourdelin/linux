@@ -4500,12 +4500,12 @@ static int rbd_init_disk(struct rbd_device *rbd_dev)
 
 	err = blk_mq_alloc_tag_set(&rbd_dev->tag_set);
 	if (err)
-		goto out_disk;
+		goto put_disk;
 
 	q = blk_mq_init_queue(&rbd_dev->tag_set);
 	if (IS_ERR(q)) {
 		err = PTR_ERR(q);
-		goto out_tag_set;
+		goto free_tag_set;
 	}
 
 	queue_flag_set_unlocked(QUEUE_FLAG_NONROT, q);
@@ -4537,9 +4537,9 @@ static int rbd_init_disk(struct rbd_device *rbd_dev)
 	rbd_dev->disk = disk;
 
 	return 0;
-out_tag_set:
+ free_tag_set:
 	blk_mq_free_tag_set(&rbd_dev->tag_set);
-out_disk:
+ put_disk:
 	put_disk(disk);
 	return err;
 }
