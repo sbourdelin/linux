@@ -60,11 +60,12 @@
 static void i965_write_fence_reg(struct drm_i915_fence_reg *fence,
 				 struct i915_vma *vma)
 {
+	struct drm_i915_private *dev_priv = fence->i915;
 	i915_reg_t fence_reg_lo, fence_reg_hi;
 	int fence_pitch_shift;
 	u64 val;
 
-	if (INTEL_INFO(fence->i915)->gen >= 6) {
+	if (INTEL_GEN(dev_priv) >= 6) {
 		fence_reg_lo = FENCE_REG_GEN6_LO(fence->id);
 		fence_reg_hi = FENCE_REG_GEN6_HI(fence->id);
 		fence_pitch_shift = GEN6_FENCE_PITCH_SHIFT;
@@ -92,8 +93,6 @@ static void i965_write_fence_reg(struct drm_i915_fence_reg *fence,
 	}
 
 	if (!pipelined) {
-		struct drm_i915_private *dev_priv = fence->i915;
-
 		/* To w/a incoherency with non-atomic 64-bit register updates,
 		 * we split the 64-bit update into two 32-bit writes. In order
 		 * for a partial fence not to be evaluated between writes, we
@@ -448,7 +447,7 @@ i915_gem_detect_bit_6_swizzle(struct drm_device *dev)
 	uint32_t swizzle_x = I915_BIT_6_SWIZZLE_UNKNOWN;
 	uint32_t swizzle_y = I915_BIT_6_SWIZZLE_UNKNOWN;
 
-	if (INTEL_INFO(dev)->gen >= 8 || IS_VALLEYVIEW(dev)) {
+	if (INTEL_GEN(dev_priv) >= 8 || IS_VALLEYVIEW(dev_priv)) {
 		/*
 		 * On BDW+, swizzling is not used. We leave the CPU memory
 		 * controller in charge of optimizing memory accesses without
@@ -458,7 +457,7 @@ i915_gem_detect_bit_6_swizzle(struct drm_device *dev)
 		 */
 		swizzle_x = I915_BIT_6_SWIZZLE_NONE;
 		swizzle_y = I915_BIT_6_SWIZZLE_NONE;
-	} else if (INTEL_INFO(dev)->gen >= 6) {
+	} else if (INTEL_GEN(dev_priv) >= 6) {
 		if (dev_priv->preserve_bios_swizzle) {
 			if (I915_READ(DISP_ARB_CTL) &
 			    DISP_TILE_SURFACE_SWIZZLING) {
