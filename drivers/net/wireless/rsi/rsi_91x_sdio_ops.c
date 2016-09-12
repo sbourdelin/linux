@@ -36,7 +36,7 @@ static int rsi_sdio_master_access_msword(struct rsi_hw *adapter,
 
 	byte = (u8)(ms_word & 0x00FF);
 
-	rsi_dbg(INIT_ZONE,
+	rsi_dbg(INFO_ZONE,
 		"%s: MASTER_ACCESS_MSBYTE:0x%x\n", __func__, byte);
 
 	status = rsi_sdio_write_register(adapter,
@@ -52,7 +52,7 @@ static int rsi_sdio_master_access_msword(struct rsi_hw *adapter,
 
 	byte = (u8)(ms_word >> 8);
 
-	rsi_dbg(INIT_ZONE, "%s:MASTER_ACCESS_LSBYTE:0x%x\n", __func__, byte);
+	rsi_dbg(INFO_ZONE, "%s:MASTER_ACCESS_LSBYTE:0x%x\n", __func__, byte);
 	status = rsi_sdio_write_register(adapter,
 					 function,
 					 SDIO_MASTER_ACCESS_LSBYTE,
@@ -435,7 +435,7 @@ void rsi_interrupt_handler(struct rsi_hw *adapter)
 				} else {
 					rsi_dbg(ERR_ZONE,
 						"%s: Firmware Status is 0x%x\n",
-						__func__ , fw_status);
+						__func__, fw_status);
 					rsi_sdio_ack_intr(common->priv,
 							  (1 << FW_ASSERT_IND));
 				}
