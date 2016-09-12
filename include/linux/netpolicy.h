@@ -17,6 +17,7 @@
 #define __LINUX_NETPOLICY_H
 
 enum netpolicy_name {
+	NET_POLICY_INVALID	= -1,
 	NET_POLICY_NONE		= 0,
 	NET_POLICY_CPU,
 	NET_POLICY_BULK,
@@ -80,12 +81,37 @@ struct netpolicy_info {
 	struct list_head	obj_list[NETPOLICY_RXTX][NET_POLICY_MAX];
 };
 
+struct netpolicy_instance {
+	struct net_device	*dev;
+	enum netpolicy_name	policy; /* required policy */
+	void			*ptr;   /* pointers */
+};
+
+/* check if policy is valid */
+static inline int is_net_policy_valid(enum netpolicy_name policy)
+{
+	return ((policy < NET_POLICY_MAX) && (policy > NET_POLICY_INVALID));
+}
+
 #ifdef CONFIG_NETPOLICY
 extern void update_netpolicy_sys_map(void);
+extern int netpolicy_register(struct netpolicy_instance *instance,
+			      enum netpolicy_name policy);
+extern void netpolicy_unregister(struct netpolicy_instance *instance);
 #else
 static inline void update_netpolicy_sys_map(void)
 {
 }
+
+static inline int netpolicy_register(struct netpolicy_instance *instance,
+				     enum netpolicy_name policy)
+{	return 0;
+}
+
+static inline void netpolicy_unregister(struct netpolicy_instance *instance)
+{
+}
+
 #endif
 
 #endif /*__LINUX_NETPOLICY_H*/

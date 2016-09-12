@@ -39,6 +39,19 @@
 #include <linux/sort.h>
 #include <linux/ctype.h>
 #include <linux/cpu.h>
+#include <linux/hashtable.h>
+
+struct netpolicy_record {
+	struct hlist_node	hash_node;
+	unsigned long		ptr_id;
+	enum netpolicy_name	policy;
+	struct net_device	*dev;
+	struct netpolicy_object	*rx_obj;
+	struct netpolicy_object	*tx_obj;
+};
+
+static DEFINE_HASHTABLE(np_record_hash, 10);
+static DEFINE_SPINLOCK(np_hashtable_lock);
 
 static int netpolicy_get_dev_info(struct net_device *dev,
 				  struct netpolicy_dev_info *d_info)
@@ -225,6 +238,143 @@ static int netpolicy_enable(struct net_device *dev)
 	netpolicy_free_dev_info(&d_info);
 	return 0;
 }
+
+static struct netpolicy_record *netpolicy_record_search(unsigned long ptr_id)
+{
+	struct netpolicy_record *rec = NULL;
+
+	hash_for_each_possible_rcu(np_record_hash, rec, hash_node, ptr_id) {
+		if (rec->ptr_id == ptr_id)
+			break;
+	}
+
+	return rec;
+}
+
+static void put_queue(struct net_device *dev,
+		      struct netpolicy_object *rx_obj,
+		      struct netpolicy_object *tx_obj)
+{
+	if (!dev || !dev->netpolicy)
+		return;
+
+	if (rx_obj)
+		atomic_dec(&rx_obj->refcnt);
+	if (tx_obj)
+		atomic_dec(&tx_obj->refcnt);
+}
+
+static void netpolicy_record_clear_obj(void)
+{
+	struct netpolicy_record *rec;
+	int i;
+
+	spin_lock(&np_hashtable_lock);
+	hash_for_each_rcu(np_record_hash, i, rec, hash_node) {
+		put_queue(rec->dev, rec->rx_obj, rec->tx_obj);
+		rec->rx_obj = NULL;
+		rec->tx_obj = NULL;
+	}
+	spin_unlock(&np_hashtable_lock);
+}
+
+static void netpolicy_record_clear_dev_node(struct net_device *dev)
+{
+	struct netpolicy_record *rec;
+	int i;
+
+	spin_lock_bh(&np_hashtable_lock);
+	hash_for_each_rcu(np_record_hash, i, rec, hash_node) {
+		if (rec->dev == dev) {
+			hash_del_rcu(&rec->hash_node);
+			kfree(rec);
+		}
+	}
+	spin_unlock_bh(&np_hashtable_lock);
+}
+
+/**
+ * netpolicy_register() - Register per socket/task policy request
+ * @instance:	NET policy per socket/task instance info
+ * @policy:	request NET policy
+ *
+ * This function intends to register per socket/task policy request.
+ * If it's the first time to register, an record will be created and
+ * inserted into RCU hash table.
+ *
+ * The record includes ptr, policy and object info. ptr of the socket/task
+ * is the key to search the record in hash table. Object will be assigned
+ * until the first packet is received/transmitted.
+ *
+ * Return: 0 on success, others on failure
+ */
+int netpolicy_register(struct netpolicy_instance *instance,
+		       enum netpolicy_name policy)
+{
+	unsigned long ptr_id = (uintptr_t)instance->ptr;
+	struct netpolicy_record *new, *old;
+
+	if (!is_net_policy_valid(policy)) {
+		instance->policy = NET_POLICY_INVALID;
+		return -EINVAL;
+	}
+
+	new = kzalloc(sizeof(*new), GFP_KERNEL);
+	if (!new) {
+		instance->policy = NET_POLICY_INVALID;
+		return -ENOMEM;
+	}
+
+	spin_lock_bh(&np_hashtable_lock);
+	/* Check it in mapping table */
+	old = netpolicy_record_search(ptr_id);
+	if (old) {
+		if (old->policy != policy) {
+			put_queue(old->dev, old->rx_obj, old->tx_obj);
+			old->rx_obj = NULL;
+			old->tx_obj = NULL;
+			old->policy = policy;
+		}
+		kfree(new);
+	} else {
+		new->ptr_id = ptr_id;
+		new->dev = instance->dev;
+		new->policy = policy;
+		hash_add_rcu(np_record_hash, &new->hash_node, ptr_id);
+	}
+	instance->policy = policy;
+	spin_unlock_bh(&np_hashtable_lock);
+
+	return 0;
+}
+EXPORT_SYMBOL(netpolicy_register);
+
+/**
+ * netpolicy_unregister() - Unregister per socket/task policy request
+ * @instance:	NET policy per socket/task instance info
+ *
+ * This function intends to unregister policy request by del related record
+ * from hash table.
+ *
+ */
+void netpolicy_unregister(struct netpolicy_instance *instance)
+{
+	struct netpolicy_record *record;
+	unsigned long ptr_id = (uintptr_t)instance->ptr;
+
+	spin_lock_bh(&np_hashtable_lock);
+	/* del from hash table */
+	record = netpolicy_record_search(ptr_id);
+	if (record) {
+		hash_del_rcu(&record->hash_node);
+		/* The record cannot be share. It can be safely free. */
+		put_queue(record->dev, record->rx_obj, record->tx_obj);
+		kfree(record);
+	}
+	instance->policy = NET_POLICY_INVALID;
+	spin_unlock_bh(&np_hashtable_lock);
+}
+EXPORT_SYMBOL(netpolicy_unregister);
 
 const char *policy_name[NET_POLICY_MAX] = {
 	"NONE",
@@ -833,6 +983,7 @@ static int netpolicy_notify(struct notifier_block *this,
 		break;
 	case NETDEV_GOING_DOWN:
 		uninit_netpolicy(dev);
+		netpolicy_record_clear_dev_node(dev);
 #ifdef CONFIG_PROC_FS
 		proc_remove(dev->proc_dev);
 		dev->proc_dev = NULL;
@@ -871,6 +1022,8 @@ void update_netpolicy_sys_map(void)
 
 			dev->netpolicy->cur_policy = NET_POLICY_NONE;
 
+			/* clear mapping table */
+			netpolicy_record_clear_obj();
 			/* rebuild everything */
 			netpolicy_disable(dev);
 			netpolicy_enable(dev);
