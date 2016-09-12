@@ -5084,7 +5084,7 @@ static int rbd_dev_v2_parent_info(struct rbd_device *rbd_dev)
 {
 	struct rbd_spec *parent_spec;
 	size_t size;
-	void *reply_buf = NULL;
+	void *reply_buf;
 	__le64 snapid;
 	void *p;
 	void *end;
