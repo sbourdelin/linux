@@ -55,14 +55,20 @@ struct netpolicy_sys_map {
 	u32	irq;
 };
 
+struct netpolicy_sys_map_version {
+	struct rcu_head		rcu;
+	int			major;
+};
+
 struct netpolicy_sys_info {
 	/*
 	 * Record the cpu and queue 1:1 mapping
 	 */
-	u32				avail_rx_num;
-	struct netpolicy_sys_map	*rx;
-	u32				avail_tx_num;
-	struct netpolicy_sys_map	*tx;
+	u32					avail_rx_num;
+	struct netpolicy_sys_map		*rx;
+	u32					avail_tx_num;
+	struct netpolicy_sys_map		*tx;
+	struct netpolicy_sys_map_version __rcu	*version;
 };
 
 struct netpolicy_object {
@@ -110,7 +116,14 @@ struct netpolicy_instance {
 	struct work_struct	fc_wk;		/* flow classification work */
 	atomic_t		fc_wk_cnt;	/* flow classification work number */
 	struct netpolicy_flow_spec	flow;	/* flow information */
-
+	/* For fast path */
+	atomic_t		rx_queue;
+	atomic_t		tx_queue;
+	struct work_struct	get_rx_wk;
+	atomic_t		get_rx_wk_cnt;
+	struct work_struct	get_tx_wk;
+	atomic_t		get_tx_wk_cnt;
+	int			sys_map_version;
 };
 
 struct netpolicy_cpu_load {

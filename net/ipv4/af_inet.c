@@ -760,7 +760,6 @@ static void sock_netpolicy_manage_flow(struct sock *sk, struct msghdr *msg)
 	struct netpolicy_instance *instance;
 	struct netpolicy_flow_spec *flow;
 	bool change = false;
-	int queue;
 
 	instance = netpolicy_find_instance(sk);
 	if (!instance)
@@ -814,10 +813,8 @@ static void sock_netpolicy_manage_flow(struct sock *sk, struct msghdr *msg)
 		return;
 	}
 
-	queue = netpolicy_pick_queue(instance, true);
-	if (queue < 0)
-		return;
-	if ((queue != atomic_read(&instance->rule_queue)) || change)
+	if ((atomic_read(&instance->rx_queue) != atomic_read(&instance->rule_queue)) ||
+	    change)
 		netpolicy_set_rules(instance);
 #endif
 }
