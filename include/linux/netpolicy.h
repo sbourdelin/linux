@@ -18,6 +18,9 @@
 
 enum netpolicy_name {
 	NET_POLICY_NONE		= 0,
+	NET_POLICY_CPU,
+	NET_POLICY_BULK,
+	NET_POLICY_LATENCY,
 	NET_POLICY_MAX,
 };
 

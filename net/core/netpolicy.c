@@ -226,7 +226,10 @@ static int netpolicy_enable(struct net_device *dev)
 }
 
 const char *policy_name[NET_POLICY_MAX] = {
-	"NONE"
+	"NONE",
+	"CPU",
+	"BULK",
+	"LATENCY"
 };
 
 static u32 cpu_to_queue(struct net_device *dev,
