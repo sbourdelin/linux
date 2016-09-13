@@ -438,8 +438,7 @@ static int uninorth_create_gatt_table(struct agp_bridge_data *bridge)
 	return 0;
  free_page_array:
 	kfree(uninorth_priv.pages_arr);
-	if (table)
-		free_pages((unsigned long)table, page_order);
+	free_pages((unsigned long)table, page_order);
 	return -ENOMEM;
 }
 
