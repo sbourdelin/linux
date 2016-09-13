@@ -20,6 +20,7 @@ Required properties:
 - mediatek,ethsys: phandle to the syscon node that handles the port setup
 - mediatek,pctl: phandle to the syscon node that handles the ports slew rate
 	and driver current
+- mediatek,hwlro: set to enable HW LRO functions of PDMA rx rings
 
 Optional properties:
 - interrupt-parent: Should be the phandle for the interrupt controller
@@ -51,6 +52,7 @@ eth: ethernet@1b100000 {
 	reset-names = "eth";
 	mediatek,ethsys = <&ethsys>;
 	mediatek,pctl = <&syscfg_pctl_a>;
+	mediatek,hwlro;
 	#address-cells = <1>;
 	#size-cells = <0>;
 
