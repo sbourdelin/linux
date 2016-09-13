@@ -2395,35 +2395,22 @@ static int hns_roce_v1_m_qp(struct ib_qp *ibqp, const struct ib_qp_attr *attr,
 	if (cur_state == IB_QPS_INIT && new_state == IB_QPS_INIT) {
 		/* Memory barrier */
 		wmb();
-		if (hr_qp->ibqp.qp_type == IB_QPT_GSI) {
-			/* SW update GSI rq header */
-			reg_val = roce_read(hr_dev, ROCEE_QP1C_CFG3_0_REG +
-					    QP1C_CFGN_OFFSET * hr_qp->phy_port);
-			roce_set_field(reg_val,
-				       ROCEE_QP1C_CFG3_0_ROCEE_QP1C_RQ_HEAD_M,
-				       ROCEE_QP1C_CFG3_0_ROCEE_QP1C_RQ_HEAD_S,
-				       hr_qp->rq.head);
-			roce_write(hr_dev, ROCEE_QP1C_CFG3_0_REG +
-				   QP1C_CFGN_OFFSET * hr_qp->phy_port, reg_val);
-		} else {
-			rq_db.u32_4 = 0;
-			rq_db.u32_8 = 0;
 
-			roce_set_field(rq_db.u32_4, RQ_DOORBELL_U32_4_RQ_HEAD_M,
-				       RQ_DOORBELL_U32_4_RQ_HEAD_S,
-				       hr_qp->rq.head);
-			roce_set_field(rq_db.u32_8, RQ_DOORBELL_U32_8_QPN_M,
-				       RQ_DOORBELL_U32_8_QPN_S, hr_qp->qpn);
-			roce_set_field(rq_db.u32_8, RQ_DOORBELL_U32_8_CMD_M,
-				       RQ_DOORBELL_U32_8_CMD_S, 1);
-			roce_set_bit(rq_db.u32_8, RQ_DOORBELL_U32_8_HW_SYNC_S,
-				     1);
+		roce_set_field(doorbell[0], RQ_DOORBELL_U32_4_RQ_HEAD_M,
+			       RQ_DOORBELL_U32_4_RQ_HEAD_S, hr_qp->rq.head);
+		roce_set_field(doorbell[1], RQ_DOORBELL_U32_8_QPN_M,
+			       RQ_DOORBELL_U32_8_QPN_S, hr_qp->qpn);
+		roce_set_field(doorbell[1], RQ_DOORBELL_U32_8_CMD_M,
+			       RQ_DOORBELL_U32_8_CMD_S, 1);
+		roce_set_bit(doorbell[1], RQ_DOORBELL_U32_8_HW_SYNC_S, 1);
 
-			doorbell[0] = rq_db.u32_4;
-			doorbell[1] = rq_db.u32_8;
-
-			hns_roce_write64_k(doorbell, hr_qp->rq.db_reg_l);
+		if (ibqp->uobject) {
+			hr_qp->rq.db_reg_l = hr_dev->reg_base +
+				     ROCEE_DB_OTHERS_L_0_REG +
+				     DB_REG_OFFSET * hr_dev->priv_uar.index;
 		}
+
+		hns_roce_write64_k(doorbell, hr_qp->rq.db_reg_l);
 	}
 
 	hr_qp->state = new_state;
