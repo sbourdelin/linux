@@ -61,6 +61,14 @@ static void sas_resume_port(struct asd_sas_phy *phy)
 	 * 2/ force the next revalidation to check all expander phys
 	 */
 	list_for_each_entry(dev, &port->dev_list, dev_list_node) {
+		int rc;
+
+		rc = sas_notify_lldd_dev_found(dev);
+		if (rc)
+			sas_unregister_dev(port, dev);
+	}
+
+	list_for_each_entry(dev, &port->expander_list, dev_list_node) {
 		int i, rc;
 
 		rc = sas_notify_lldd_dev_found(dev);
@@ -173,7 +181,7 @@ static void sas_form_port(struct asd_sas_phy *phy)
 	spin_unlock_irqrestore(&sas_ha->phy_port_lock, flags);
 
 	if (!port->port) {
-		port->port = sas_port_alloc(phy->phy->dev.parent, port->id);
+		port->port = sas_port_alloc_num(phy->phy->dev.parent);
 		BUG_ON(!port->port);
 		sas_port_add(port->port);
 	}
@@ -317,7 +325,7 @@ static void sas_init_port(struct asd_sas_port *port,
 	port->id = i;
 	INIT_LIST_HEAD(&port->dev_list);
 	INIT_LIST_HEAD(&port->disco_list);
-	INIT_LIST_HEAD(&port->destroy_list);
+	INIT_LIST_HEAD(&port->expander_list);
 	spin_lock_init(&port->phy_list_lock);
 	INIT_LIST_HEAD(&port->phy_list);
 	port->ha = sas_ha;
