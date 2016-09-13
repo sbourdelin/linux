@@ -247,10 +247,10 @@ static int virtblk_get_id(struct gendisk *disk, char *id_str)
 
 	err = blk_rq_map_kern(q, req, id_str, VIRTIO_BLK_ID_BYTES, GFP_KERNEL);
 	if (err)
-		goto out;
+		goto put_request;
 
 	err = blk_execute_rq(vblk->disk->queue, vblk->disk, req, false);
-out:
+ put_request:
 	blk_put_request(req);
 	return err;
 }
