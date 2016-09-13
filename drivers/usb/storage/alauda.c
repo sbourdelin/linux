@@ -425,7 +425,7 @@ static int alauda_init_media(struct us_data *us)
 
 	usb_stor_dbg(us, "Media signature: %4ph\n", data);
 	media_info = alauda_card_find_id(data[1]);
-	if (media_info == NULL) {
+	if (!media_info) {
 		pr_warn("alauda_init_media: Unrecognised media signature: %4ph\n",
 			data);
 		return USB_STOR_TRANSPORT_ERROR;
@@ -579,7 +579,7 @@ static int alauda_read_map(struct us_data *us, unsigned int zone)
 	unsigned int zone_base_pba = zone * zonesize;
 	u16 *lba_to_pba = kcalloc(zonesize, sizeof(u16), GFP_NOIO);
 	u16 *pba_to_lba = kcalloc(zonesize, sizeof(u16), GFP_NOIO);
-	if (lba_to_pba == NULL || pba_to_lba == NULL) {
+	if (!lba_to_pba || !pba_to_lba) {
 		result = USB_STOR_TRANSPORT_ERROR;
 		goto error;
 	}
@@ -693,8 +693,8 @@ out:
  */
 static void alauda_ensure_map_for_zone(struct us_data *us, unsigned int zone)
 {
-	if (MEDIA_INFO(us).lba_to_pba[zone] == NULL
-		|| MEDIA_INFO(us).pba_to_lba[zone] == NULL)
+	if (!MEDIA_INFO(us).lba_to_pba[zone]
+		|| !MEDIA_INFO(us).pba_to_lba[zone])
 		alauda_read_map(us, zone);
 }
 
@@ -939,7 +939,7 @@ static int alauda_read_data(struct us_data *us, unsigned long address,
 
 	len = min(sectors, blocksize) * (pagesize + 64);
 	buffer = kmalloc(len, GFP_NOIO);
-	if (buffer == NULL) {
+	if (!buffer) {
 		printk(KERN_WARNING "alauda_read_data: Out of memory\n");
 		return USB_STOR_TRANSPORT_ERROR;
 	}
@@ -1033,7 +1033,7 @@ static int alauda_write_data(struct us_data *us, unsigned long address,
 
 	len = min(sectors, blocksize) * pagesize;
 	buffer = kmalloc(len, GFP_NOIO);
-	if (buffer == NULL) {
+	if (!buffer) {
 		printk(KERN_WARNING "alauda_write_data: Out of memory\n");
 		return USB_STOR_TRANSPORT_ERROR;
 	}
@@ -1043,7 +1043,7 @@ static int alauda_write_data(struct us_data *us, unsigned long address,
 	 * overwrite parts with the new data, and manipulate the redundancy data
 	 */
 	blockbuffer = kmalloc((pagesize + 64) * blocksize, GFP_NOIO);
-	if (blockbuffer == NULL) {
+	if (!blockbuffer) {
 		printk(KERN_WARNING "alauda_write_data: Out of memory\n");
 		kfree(buffer);
 		return USB_STOR_TRANSPORT_ERROR;
