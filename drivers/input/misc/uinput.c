@@ -564,7 +564,7 @@ static int uinput_setup_device_legacy(struct uinput_device *udev,
 static ssize_t uinput_inject_events(struct uinput_device *udev,
 				    const char __user *buffer, size_t count)
 {
-	struct input_event ev;
+	struct raw_input_event ev;
 	size_t bytes = 0;
 
 	if (count != 0 && count < input_event_size())
@@ -610,7 +610,7 @@ static ssize_t uinput_write(struct file *file, const char __user *buffer,
 }
 
 static bool uinput_fetch_next_event(struct uinput_device *udev,
-				    struct input_event *event)
+				    struct raw_input_event *event)
 {
 	bool have_event;
 
@@ -630,7 +630,7 @@ static bool uinput_fetch_next_event(struct uinput_device *udev,
 static ssize_t uinput_events_to_user(struct uinput_device *udev,
 				     char __user *buffer, size_t count)
 {
-	struct input_event event;
+	struct raw_input_event event;
 	size_t read = 0;
 
 	while (read + input_event_size() <= count &&

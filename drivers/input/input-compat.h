@@ -17,8 +17,13 @@
 
 #ifdef CONFIG_COMPAT
 
-struct input_event_compat {
-	struct compat_timeval time;
+struct input_timeval_compat {
+	compat_ulong_t tv_sec;
+	compat_ulong_t tv_usec;
+};
+
+struct raw_input_event_compat {
+	struct input_timeval_compat time;
 	__u16 type;
 	__u16 code;
 	__s32 value;
@@ -55,24 +60,24 @@ struct ff_effect_compat {
 
 static inline size_t input_event_size(void)
 {
-	return (in_compat_syscall() && !COMPAT_USE_64BIT_TIME) ?
-		sizeof(struct input_event_compat) : sizeof(struct input_event);
+	return in_compat_syscall() ? sizeof(struct raw_input_event_compat) :
+				     sizeof(struct raw_input_event);
 }
 
 #else
 
 static inline size_t input_event_size(void)
 {
-	return sizeof(struct input_event);
+	return sizeof(struct raw_input_event);
 }
 
 #endif /* CONFIG_COMPAT */
 
 int input_event_from_user(const char __user *buffer,
-			 struct input_event *event);
+			 struct raw_input_event *event);
 
 int input_event_to_user(char __user *buffer,
-			const struct input_event *event);
+			const struct raw_input_event *event);
 
 int input_ff_effect_from_user(const char __user *buffer, size_t size,
 			      struct ff_effect *effect);

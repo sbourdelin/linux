@@ -60,7 +60,7 @@ struct evdev_client {
 	bool revoked;
 	unsigned long *evmasks[EV_CNT];
 	unsigned int bufsize;
-	struct input_event buffer[];
+	struct raw_input_event buffer[];
 };
 
 static size_t evdev_get_mask_cnt(unsigned int type)
@@ -113,7 +113,7 @@ static void __evdev_flush_queue(struct evdev_client *client, unsigned int type)
 	unsigned int i, head, num;
 	unsigned int mask = client->bufsize - 1;
 	bool is_report;
-	struct input_event *ev;
+	struct raw_input_event *ev;
 
 	BUG_ON(type == EV_SYN);
 
@@ -155,7 +155,7 @@ static void __evdev_flush_queue(struct evdev_client *client, unsigned int type)
 
 static void __evdev_queue_syn_dropped(struct evdev_client *client)
 {
-	struct input_event ev;
+	struct raw_input_event ev;
 	ktime_t time;
 	struct timespec64 ts;
 
@@ -232,7 +232,7 @@ static int evdev_set_clk_type(struct evdev_client *client, unsigned int clkid)
 }
 
 static void __pass_event(struct evdev_client *client,
-			 const struct input_event *event)
+			 const struct raw_input_event *event)
 {
 	client->buffer[client->head++] = *event;
 	client->head &= client->bufsize - 1;
@@ -264,7 +264,7 @@ static void evdev_pass_values(struct evdev_client *client,
 {
 	struct evdev *evdev = client->evdev;
 	const struct input_value *v;
-	struct input_event event;
+	struct raw_input_event event;
 	struct timespec64 ts;
 	bool wakeup = false;
 
@@ -504,7 +504,7 @@ static int evdev_open(struct inode *inode, struct file *file)
 	struct evdev *evdev = container_of(inode->i_cdev, struct evdev, cdev);
 	unsigned int bufsize = evdev_compute_buffer_size(evdev->handle.dev);
 	unsigned int size = sizeof(struct evdev_client) +
-					bufsize * sizeof(struct input_event);
+				bufsize * sizeof(struct raw_input_event);
 	struct evdev_client *client;
 	int error;
 
@@ -539,7 +539,7 @@ static ssize_t evdev_write(struct file *file, const char __user *buffer,
 {
 	struct evdev_client *client = file->private_data;
 	struct evdev *evdev = client->evdev;
-	struct input_event event;
+	struct raw_input_event event;
 	int retval = 0;
 
 	if (count != 0 && count < input_event_size())
@@ -572,7 +572,7 @@ static ssize_t evdev_write(struct file *file, const char __user *buffer,
 }
 
 static int evdev_fetch_next_event(struct evdev_client *client,
-				  struct input_event *event)
+				  struct raw_input_event *event)
 {
 	int have_event;
 
@@ -594,7 +594,7 @@ static ssize_t evdev_read(struct file *file, char __user *buffer,
 {
 	struct evdev_client *client = file->private_data;
 	struct evdev *evdev = client->evdev;
-	struct input_event event;
+	struct raw_input_event event;
 	size_t read = 0;
 	int error;
 
@@ -1080,7 +1080,7 @@ static long evdev_do_ioctl(struct file *file, unsigned int cmd,
 	switch (cmd) {
 
 	case EVIOCGVERSION:
-		return put_user(EV_VERSION, ip);
+		return put_user(EV_VERSION_1_2, ip);
 
 	case EVIOCGID:
 		if (copy_to_user(p, &dev->id, sizeof(struct input_id)))

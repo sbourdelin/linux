@@ -21,7 +21,23 @@
 /*
  * The event structure itself
  */
+struct input_timeval {
+	__kernel_ulong_t tv_sec;
+	__kernel_ulong_t tv_usec;
+};
 
+struct raw_input_event {
+	struct input_timeval time;
+	__u16 type;
+	__u16 code;
+	__s32 value;
+};
+
+/* Userspace structure.
+ * Definition maintained here for userspace that is not yet updated to use
+ * struct raw_input_event.
+ * Not to be used anywhere within the kernel.
+ */
 struct input_event {
 	struct timeval time;
 	__u16 type;
@@ -29,11 +45,32 @@ struct input_event {
 	__s32 value;
 };
 
+static inline void
+raw_input_to_input_event(struct raw_input_event *raw, struct input_event *ev)
+{
+	ev->time.tv_sec = raw->time.tv_sec;
+	ev->time.tv_usec = raw->time.tv_usec;
+	ev->type = raw->type;
+	ev->code = raw->code;
+	ev->value = raw->value;
+}
+
+static inline void
+input_to_raw_event(struct input_event *ev, struct raw_input_event *raw)
+{
+	raw->time.tv_sec = ev->time.tv_sec;
+	raw->time.tv_usec = ev->time.tv_usec;
+	raw->type = ev->type;
+	raw->code = ev->code;
+	raw->value = ev->value;
+}
+
 /*
  * Protocol version.
  */
 
 #define EV_VERSION		0x010001
+#define EV_VERSION_1_2          0x010002
 
 /*
  * IOCTLs (0x00 - 0x7f)
