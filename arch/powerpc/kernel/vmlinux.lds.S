@@ -44,11 +44,52 @@ SECTIONS
  * Text, read only data and other permanent read-only sections
  */
 
+	_text = .;
+	_stext = .;
+
+#ifdef CONFIG_PPC64
+	/*
+	 * Head text.
+	 * This needs to be in its own output section to avoid ld placing
+	 * branch trampoline stubs randomly throughout the fixed sections,
+	 * which it will do (even if the branch comes from another section)
+	 * in order to optimize stub generation.
+	 */
+	.head.text : AT(ADDR(.head.text) - LOAD_OFFSET) {
+		KEEP(*(.head.text.first_256B));
+#ifndef CONFIG_PPC_BOOK3S
+		. = 0x100;
+#else
+		KEEP(*(.head.text.real_vectors));
+		*(.head.text.real_trampolines);
+		KEEP(*(.head.text.virt_vectors));
+		*(.head.text.virt_trampolines);
+#if defined(CONFIG_PPC_PSERIES) || defined(CONFIG_PPC_POWERNV)
+		KEEP(*(.head.data.fwnmi_page));
+		. = 0x8000;
+#else
+		. = 0x7000;
+#endif
+#endif
+		/*
+		 * The offsets above are specified in order to catch the linker
+		 * adding branch stubs in one of the fixed sections, which
+		 * breaks the fixed section offsets (see head-64.h) and that
+		 * can't be caught by the assembler. If the build died here,
+		 * code in head is referencing labels it can't reach.
+		 *
+		 * Linker stub generation could be allowed in "trampoline"
+		 * sections if necessary, if they were put into their own
+		 * output sections and the fixed section code adjusted to
+		 * avoid complete padding of those sections (their offsets
+		 * would be specified here in the linker script).
+		 */
+	} :kernel
+#endif
+
 	/* Text and gots */
 	.text : AT(ADDR(.text) - LOAD_OFFSET) {
 		ALIGN_FUNCTION();
-		HEAD_TEXT
-		_text = .;
 		/* careful! __ftr_alt_* sections need to be close to .text */
 		*(.text .fixup __ftr_alt_* .ref.text)
 		SCHED_TEXT

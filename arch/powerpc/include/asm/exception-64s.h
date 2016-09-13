@@ -89,9 +89,9 @@
  * low halfword of the address, but for Kdump we need the whole low
  * word.
  */
-#define LOAD_HANDLER(reg, label)					\
 	/* Handlers must be within 64K of kbase, which must be 64k aligned */ \
-	ori	reg,reg,(label)-_stext;	/* virt addr of handler ... */
+#define LOAD_HANDLER(reg, label)					\
+	ori	reg,reg,ABS_ADDR(label);
 
 /* Exception register prefixes */
 #define EXC_HV	H
