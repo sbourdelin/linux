@@ -46,11 +46,28 @@ static int uinput_dev_event(struct input_dev *dev,
 			    unsigned int type, unsigned int code, int value)
 {
 	struct uinput_device	*udev = input_get_drvdata(dev);
+	struct timespec64	ts;
+	ktime_t kt;
 
 	udev->buff[udev->head].type = type;
 	udev->buff[udev->head].code = code;
 	udev->buff[udev->head].value = value;
-	do_gettimeofday(&udev->buff[udev->head].time);
+
+	kt = ktime_get();
+	switch (udev->clk_type) {
+	case CLOCK_REALTIME:
+		ts = ktime_to_timespec64(ktime_mono_to_real(kt));
+		break;
+	case CLOCK_MONOTONIC:
+		ts = ktime_to_timespec64(kt);
+		break;
+	case CLOCK_BOOTTIME:
+		ts = ktime_to_timespec64(ktime_mono_to_any(kt, TK_OFFS_BOOT));
+		break;
+	}
+
+	udev->buff[udev->head].time.tv_sec = ts.tv_sec;
+	udev->buff[udev->head].time.tv_usec = ts.tv_nsec / NSEC_PER_USEC;
 	udev->head = (udev->head + 1) % UINPUT_BUFFER_SIZE;
 
 	wake_up_interruptible(&udev->waitq);
@@ -295,6 +312,7 @@ static int uinput_create_device(struct uinput_device *udev)
 	if (error)
 		goto fail2;
 
+	udev->clk_type = CLOCK_REALTIME;
 	udev->state = UIST_CREATED;
 
 	return 0;
@@ -302,6 +320,38 @@ static int uinput_create_device(struct uinput_device *udev)
  fail2:	input_ff_destroy(dev);
  fail1: uinput_destroy_device(udev);
 	return error;
+}
+
+static int uinput_set_clk_type(struct uinput_device *udev, unsigned int clkid)
+{
+	unsigned int clk_type;
+
+	if (udev->state != UIST_CREATED)
+		return -EINVAL;
+
+	switch (clkid) {
+	/* Realtime clock is only valid until year 2038.*/
+	case CLOCK_REALTIME:
+		clk_type = CLOCK_REALTIME;
+		break;
+	case CLOCK_MONOTONIC:
+		clk_type = CLOCK_MONOTONIC;
+		break;
+	case CLOCK_BOOTTIME:
+		clk_type = CLOCK_BOOTTIME;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (udev->clk_type != clk_type) {
+		udev->clk_type = clk_type;
+
+		/* Flush pending events */
+		uinput_flush_requests(udev);
+	}
+
+	return 0;
 }
 
 static int uinput_open(struct inode *inode, struct file *file)
@@ -787,6 +837,7 @@ static long uinput_ioctl_handler(struct file *file, unsigned int cmd,
 	char			*phys;
 	const char		*name;
 	unsigned int		size;
+	int			clock_id;
 
 	retval = mutex_lock_interruptible(&udev->mutex);
 	if (retval)
@@ -816,6 +867,11 @@ static long uinput_ioctl_handler(struct file *file, unsigned int cmd,
 		case UI_DEV_SETUP:
 			retval = uinput_dev_setup(udev, p);
 			goto out;
+
+		case UI_SET_CLOCKID:
+			if (copy_from_user(&clock_id, p, sizeof(unsigned int)))
+				return -EFAULT;
+			return uinput_set_clk_type(udev, clock_id);
 
 		/* UI_ABS_SETUP is handled in the variable size ioctls */
 
