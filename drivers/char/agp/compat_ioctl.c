@@ -209,24 +209,24 @@ long compat_agp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	if ((agp_fe.current_controller == NULL) &&
 	    (cmd != AGPIOC_ACQUIRE32)) {
 		ret_val = -EINVAL;
-		goto ioctl_out;
+		goto unlock;
 	}
 	if ((agp_fe.backend_acquired != true) &&
 	    (cmd != AGPIOC_ACQUIRE32)) {
 		ret_val = -EBUSY;
-		goto ioctl_out;
+		goto unlock;
 	}
 	if (cmd != AGPIOC_ACQUIRE32) {
 		if (!(test_bit(AGP_FF_IS_CONTROLLER, &curr_priv->access_flags))) {
 			ret_val = -EPERM;
-			goto ioctl_out;
+			goto unlock;
 		}
 		/* Use the original pid of the controller,
 		 * in case it's threaded */
 
 		if (agp_fe.current_controller->pid != curr_priv->my_pid) {
 			ret_val = -EBUSY;
-			goto ioctl_out;
+			goto unlock;
 		}
 	}
 
@@ -274,8 +274,7 @@ long compat_agp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case AGPIOC_CHIPSET_FLUSH32:
 		break;
 	}
-
-ioctl_out:
+ unlock:
 	DBG("ioctl returns %d\n", ret_val);
 	mutex_unlock(&(agp_fe.agp_mutex));
 	return ret_val;
