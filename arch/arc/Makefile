@@ -95,6 +95,11 @@ LIBGCC	:= $(shell $(CC) $(cflags-y) --print-libgcc-file-name)
 # Modules with short calls might break for calls into builtin-kernel
 KBUILD_CFLAGS_MODULE	+= -mlong-calls -mno-millicode
 
+# toss away debug section, ifdef not allowed in the linker script
+ifndef CONFIG_DEBUG_INFO
+KBUILD_LDFLAGS_MODULE += -T $(srctree)/arch/arc/kernel/module.lds
+endif
+
 # Finally dump eveything into kernel build system
 KBUILD_CFLAGS	+= $(cflags-y)
 KBUILD_AFLAGS	+= $(KBUILD_CFLAGS)
