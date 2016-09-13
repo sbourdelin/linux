@@ -1,0 +1,21 @@
+* Sensortek STK331X I2C Light&Proximity sensor
+
+Required properties:
+- compatible: should be "sensortek,STK3310" or "sensortek,STK3311"
+- reg: the I2C address of the device
+- interrupt-parent: phandle to the parent interrupt controller
+- interrupts: interrupt mapping for GPIO IRQ
+
+Example:
+	&i2c1 {
+		/* ... */
+
+		stk3310@48 {
+			compatible = "sensortek,STK3310";
+			reg = <0x48>;
+			interrupt-parent = <&gpio1>;
+			interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
+		};
+
+		/* ... */
+	};
