@@ -178,11 +178,8 @@ static struct fence **get_fences(struct sync_file *sync_file, int *num_fences)
 static void add_fence(struct fence **fences, int *i, struct fence *fence)
 {
 	fences[*i] = fence;
-
-	if (!fence_is_signaled(fence)) {
-		fence_get(fence);
-		(*i)++;
-	}
+	fence_get(fence);
+	(*i)++;
 }
 
 /**
