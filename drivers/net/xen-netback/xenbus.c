@@ -303,6 +303,7 @@ static int netback_probe(struct xenbus_device *dev,
 
 	be->dev = dev;
 	dev_set_drvdata(&dev->dev, be);
+	be->state = XenbusStateInitialising;
 
 	sg = 1;
 
@@ -548,6 +549,15 @@ static void set_backend_state(struct backend_info *be,
 {
 	while (be->state != state) {
 		switch (be->state) {
+		case XenbusStateInitialising:
+			switch (state) {
+			case XenbusStateClosed:
+				backend_switch_state(be, XenbusStateClosed);
+				break;
+			default:
+				BUG();
+			}
+			break;
 		case XenbusStateClosed:
 			switch (state) {
 			case XenbusStateInitWait:
