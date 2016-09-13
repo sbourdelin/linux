@@ -374,9 +374,9 @@ static inline struct hstate *hstate_vma(struct vm_area_struct *vma)
 	return hstate_file(vma->vm_file);
 }
 
-static inline unsigned long huge_page_size(struct hstate *h)
+static inline u64 huge_page_size(struct hstate *h)
 {
-	return (unsigned long)PAGE_SIZE << h->order;
+	return (u64)PAGE_SIZE << h->order;
 }
 
 extern unsigned long vma_kernel_pagesize(struct vm_area_struct *vma);
