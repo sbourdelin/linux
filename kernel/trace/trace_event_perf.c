@@ -6,10 +6,12 @@
  */
 
 #include <linux/module.h>
+#include <linux/notifier.h>
 #include <linux/kprobes.h>
 #include "trace.h"
 
 static char __percpu *perf_trace_buf[PERF_NR_CONTEXTS];
+static RAW_NOTIFIER_HEAD(perf_trace_notifier_list);
 
 /*
  * Force it to be aligned to unsigned long to avoid misaligned accesses
@@ -84,6 +86,26 @@ static int perf_trace_event_perm(struct trace_event_call *tp_event,
 		return -EPERM;
 
 	return 0;
+}
+
+int perf_trace_notifier_register(struct notifier_block *nb)
+{
+	return raw_notifier_chain_register(&perf_trace_notifier_list, nb);
+}
+
+int perf_trace_notifier_unregister(struct notifier_block *nb)
+{
+	return raw_notifier_chain_unregister(&perf_trace_notifier_list, nb);
+}
+
+static void perf_trace_notify(enum trace_reg event, struct perf_event *p_event)
+{
+	/*
+	 * We use raw notifiers here as we are called with the
+	 * event_mutex held.
+	 */
+	raw_notifier_call_chain(&perf_trace_notifier_list,
+				     event, p_event);
 }
 
 static int perf_trace_event_reg(struct trace_event_call *tp_event,
@@ -176,6 +198,7 @@ out:
 static int perf_trace_event_open(struct perf_event *p_event)
 {
 	struct trace_event_call *tp_event = p_event->tp_event;
+	perf_trace_notify(TRACE_REG_PERF_OPEN, p_event);
 	return tp_event->class->reg(tp_event, TRACE_REG_PERF_OPEN, p_event);
 }
 
@@ -183,6 +206,7 @@ static void perf_trace_event_close(struct perf_event *p_event)
 {
 	struct trace_event_call *tp_event = p_event->tp_event;
 	tp_event->class->reg(tp_event, TRACE_REG_PERF_CLOSE, p_event);
+	perf_trace_notify(TRACE_REG_PERF_CLOSE, p_event);
 }
 
 static int perf_trace_event_init(struct trace_event_call *tp_event,
