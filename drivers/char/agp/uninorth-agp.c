@@ -406,7 +406,7 @@ static int uninorth_create_gatt_table(struct agp_bridge_data *bridge)
 						sizeof(*uninorth_priv.pages_arr),
 						GFP_KERNEL);
 	if (uninorth_priv.pages_arr == NULL)
-		goto enomem;
+		goto free_page_array;
 
 	table_end = table + ((PAGE_SIZE * (1 << page_order)) - 1);
 
@@ -436,8 +436,7 @@ static int uninorth_create_gatt_table(struct agp_bridge_data *bridge)
 		bridge->gatt_table[i] = scratch_value;
 
 	return 0;
-
-enomem:
+ free_page_array:
 	kfree(uninorth_priv.pages_arr);
 	if (table)
 		free_pages((unsigned long)table, page_order);
