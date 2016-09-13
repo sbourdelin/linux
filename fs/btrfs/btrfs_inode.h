@@ -24,6 +24,7 @@
 #include "extent_io.h"
 #include "ordered-data.h"
 #include "delayed-inode.h"
+#include "encrypt.h"
 
 /*
  * ordered_data_close is set by truncate when a file that used
@@ -207,6 +208,11 @@ struct btrfs_inode {
 	struct rw_semaphore dio_sem;
 
 	struct inode vfs_inode;
+
+	unsigned char key_payload[BTRFS_CRYPTO_KEY_SIZE];
+	u32 key_len;
+	unsigned char cryptoiv[BTRFS_CRYPTO_IV_SIZE];
+	u32 iv_len;
 };
 
 extern unsigned char btrfs_filetype_table[];

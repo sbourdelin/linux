@@ -17,30 +17,46 @@
  */
 
 #include <linux/hashtable.h>
+#include <linux/random.h>
 #include "props.h"
 #include "btrfs_inode.h"
 #include "hash.h"
 #include "transaction.h"
 #include "xattr.h"
 #include "compression.h"
+#include "encrypt.h"
 
 #define BTRFS_PROP_HANDLERS_HT_BITS 8
 static DEFINE_HASHTABLE(prop_handlers_ht, BTRFS_PROP_HANDLERS_HT_BITS);
 
+#define BTRFS_PROP_INHERIT_NONE		(1U << 0)
+#define BTRFS_PROP_INHERIT_FOR_DIR	(1U << 1)
+#define BTRFS_PROP_INHERIT_FOR_CLONE	(1U << 2)
+#define BTRFS_PROP_INHERIT_FOR_SUBVOL	(1U << 3)
+
 struct prop_handler {
 	struct hlist_node node;
 	const char *xattr_name;
-	int (*validate)(const char *value, size_t len);
+	int (*validate)(struct inode *inode, const char *value, size_t len);
 	int (*apply)(struct inode *inode, const char *value, size_t len);
 	const char *(*extract)(struct inode *inode);
 	int inheritable;
 };
 
-static int prop_compression_validate(const char *value, size_t len);
+static int prop_compression_validate(struct inode *inode, const char *value, size_t len);
 static int prop_compression_apply(struct inode *inode,
 				  const char *value,
 				  size_t len);
 static const char *prop_compression_extract(struct inode *inode);
+
+static int prop_encrypt_validate(struct inode *inode, const char *value, size_t len);
+static int prop_encrypt_apply(struct inode *inode,
+				  const char *value, size_t len);
+static const char *prop_encrypt_extract(struct inode *inode);
+static int prop_cryptoiv_validate(struct inode *inode, const char *value, size_t len);
+static int prop_cryptoiv_apply(struct inode *inode,
+				  const char *value, size_t len);
+static const char *prop_cryptoiv_extract(struct inode *inode);
 
 static struct prop_handler prop_handlers[] = {
 	{
@@ -48,7 +64,27 @@ static struct prop_handler prop_handlers[] = {
 		.validate = prop_compression_validate,
 		.apply = prop_compression_apply,
 		.extract = prop_compression_extract,
-		.inheritable = 1
+		.inheritable = BTRFS_PROP_INHERIT_FOR_DIR| \
+				BTRFS_PROP_INHERIT_FOR_CLONE| \
+				BTRFS_PROP_INHERIT_FOR_SUBVOL,
+	},
+	{
+		.xattr_name = XATTR_BTRFS_PREFIX "encrypt",
+		.validate = prop_encrypt_validate,
+		.apply = prop_encrypt_apply,
+		.extract = prop_encrypt_extract,
+		.inheritable = BTRFS_PROP_INHERIT_FOR_DIR| \
+				BTRFS_PROP_INHERIT_FOR_CLONE| \
+				BTRFS_PROP_INHERIT_FOR_SUBVOL,
+	},
+	{
+		.xattr_name = XATTR_BTRFS_PREFIX "cryptoiv",
+		.validate = prop_cryptoiv_validate,
+		.apply = prop_cryptoiv_apply,
+		.extract = prop_cryptoiv_extract,
+		.inheritable = BTRFS_PROP_INHERIT_FOR_DIR| \
+				BTRFS_PROP_INHERIT_FOR_CLONE| \
+				BTRFS_PROP_INHERIT_FOR_SUBVOL,
 	},
 };
 
@@ -127,15 +163,19 @@ static int __btrfs_set_prop(struct btrfs_trans_handle *trans,
 		return ret;
 	}
 
-	ret = handler->validate(value, value_len);
-	if (ret)
+	ret = handler->validate(inode, value, value_len);
+	if (ret) {
 		return ret;
+	}
 	ret = __btrfs_setxattr(trans, inode, handler->xattr_name,
 			       value, value_len, flags);
-	if (ret)
-		return ret;
-	ret = handler->apply(inode, value, value_len);
 	if (ret) {
+		return ret;
+	}
+	ret = handler->apply(inode, value, value_len);
+	if (ret && ret != -EKEYREJECTED) {
+		pr_err("BTRFS: property apply failed %s %d %s %lu\n",
+					name, ret, value, value_len);
 		__btrfs_setxattr(trans, inode, handler->xattr_name,
 				 NULL, 0, flags);
 		return ret;
@@ -143,7 +183,7 @@ static int __btrfs_set_prop(struct btrfs_trans_handle *trans,
 
 	set_bit(BTRFS_INODE_HAS_PROPS, &BTRFS_I(inode)->runtime_flags);
 
-	return 0;
+	return ret;
 }
 
 int btrfs_set_prop(struct inode *inode,
@@ -276,13 +316,15 @@ static void inode_prop_iterator(void *ctx,
 	int ret;
 
 	ret = handler->apply(inode, value, len);
-	if (unlikely(ret))
-		btrfs_warn(root->fs_info,
+	if (unlikely(ret)) {
+		if (ret != -ENOKEY && ret != -EKEYREVOKED)
+			btrfs_warn(root->fs_info,
 			   "error applying prop %s to ino %llu (root %llu): %d",
 			   handler->xattr_name, btrfs_ino(inode),
 			   root->root_key.objectid, ret);
-	else
+	} else {
 		set_bit(BTRFS_INODE_HAS_PROPS, &BTRFS_I(inode)->runtime_flags);
+	}
 }
 
 int btrfs_load_inode_props(struct inode *inode, struct btrfs_path *path)
@@ -294,6 +336,20 @@ int btrfs_load_inode_props(struct inode *inode, struct btrfs_path *path)
 	ret = iterate_object_props(root, path, ino, inode_prop_iterator, inode);
 
 	return ret;
+}
+
+static int btrfs_create_iv(char **ivdata, unsigned int ivsize)
+{
+	char *tmp;
+	tmp = kmalloc(ivsize+1, GFP_KERNEL);
+	if (!tmp)
+		return -ENOMEM;
+	get_random_bytes(tmp, ivsize);
+	tmp[ivsize] = '\0';
+
+	*ivdata = tmp;
+
+	return 0;
 }
 
 static int inherit_props(struct btrfs_trans_handle *trans,
@@ -313,6 +369,10 @@ static int inherit_props(struct btrfs_trans_handle *trans,
 		const char *value;
 		u64 num_bytes;
 
+		/*
+		 * BTRFS_CRYPTO_fixme:
+		 * should be inheritable only by files inode type
+		 */
 		if (!h->inheritable)
 			continue;
 
@@ -323,13 +383,37 @@ static int inherit_props(struct btrfs_trans_handle *trans,
 		num_bytes = btrfs_calc_trans_metadata_size(root, 1);
 		ret = btrfs_block_rsv_add(root, trans->block_rsv,
 					  num_bytes, BTRFS_RESERVE_NO_FLUSH);
-		if (ret)
+		if (ret) {
+			if (!strcmp(h->xattr_name, "btrfs.encrypt") ||
+				!strcmp(h->xattr_name, "btrfs.cryptoiv"))
+				kfree(value);
 			goto out;
-		ret = __btrfs_set_prop(trans, inode, h->xattr_name,
+		}
+		if (!strcmp(h->xattr_name, "btrfs.cryptoiv"))
+			ret = __btrfs_set_prop(trans, inode, h->xattr_name,
+				       value, BTRFS_CRYPTO_IV_SIZE, 0);
+		else
+			ret = __btrfs_set_prop(trans, inode, h->xattr_name,
 				       value, strlen(value), 0);
+		if (ret) {
+			pr_err("BTRFS: %lu failed to inherit '%s': %d\n",
+					inode->i_ino, h->xattr_name, ret);
+			if (!strcmp(h->xattr_name, "btrfs.encrypt") ||
+				!strcmp(h->xattr_name, "btrfs.cryptoiv"))
+				btrfs_disable_encrypt_inode(inode);
+			dump_stack();
+		}
+
 		btrfs_block_rsv_release(root, trans->block_rsv, num_bytes);
-		if (ret)
+		if (ret) {
+			if (!strcmp(h->xattr_name, "btrfs.encrypt") ||
+				!strcmp(h->xattr_name, "btrfs.cryptoiv"))
+				kfree(value);
 			goto out;
+		}
+		if (!strcmp(h->xattr_name, "btrfs.encrypt") ||
+			!strcmp(h->xattr_name, "btrfs.cryptoiv"))
+			kfree(value);
 	}
 	ret = 0;
 out:
@@ -376,8 +460,11 @@ int btrfs_subvol_inherit_props(struct btrfs_trans_handle *trans,
 	return ret;
 }
 
-static int prop_compression_validate(const char *value, size_t len)
+static int prop_compression_validate(struct inode *inode, const char *value, size_t len)
 {
+	if (BTRFS_I(inode)->force_compress == BTRFS_ENCRYPT_AES)
+		return -ENOTSUPP;
+
 	if (!strncmp("lzo", value, len))
 		return 0;
 	else if (!strncmp("zlib", value, len))
@@ -426,4 +513,218 @@ static const char *prop_compression_extract(struct inode *inode)
 	return NULL;
 }
 
+static int btrfs_split_key_type(const char *val, size_t len,
+					char *tfm, char *keytag)
+{
+	char *tmp;
+	char *tmp2;
+	char tmp1[BTRFS_CRYPTO_KEYTAG_SIZE + BTRFS_CRYPTO_TFM_NAME_SIZE + 1];
 
+	if (len > BTRFS_CRYPTO_KEYTAG_SIZE + BTRFS_CRYPTO_TFM_NAME_SIZE) {
+		return -EINVAL;
+	}
+	memcpy(tmp1, val, len);
+	tmp1[len] = '\0';
+	tmp = tmp1;
+	tmp2 = strsep(&tmp, "@");
+	if (!tmp2)
+		return -EINVAL;
+
+	if (strlen(tmp2) > BTRFS_CRYPTO_TFM_NAME_SIZE ||
+			strlen(tmp) > BTRFS_CRYPTO_KEYTAG_SIZE)
+		return -EINVAL;
+
+	strcpy(tfm, tmp2);
+	strcpy(keytag, tmp);
+
+	return 0;
+}
+
+/*
+ * The required foramt in the value is <crypto_algo>@<key_tag>
+ * eg: btrfs.encrypt="ctr(aes)@btrfs:61e0d004"
+ */
+static int prop_encrypt_validate(struct inode *inode,
+					const char *value, size_t len)
+{
+	int ret;
+	size_t keylen;
+	char keytag[BTRFS_CRYPTO_KEYTAG_SIZE + 1];
+	char keyalgo[BTRFS_CRYPTO_TFM_NAME_SIZE + 1];
+
+	if (BTRFS_I(inode)->force_compress == BTRFS_COMPRESS_ZLIB ||
+		BTRFS_I(inode)->force_compress == BTRFS_COMPRESS_LZO)
+		return -ENOTSUPP;
+
+	if (!len)
+		return 0;
+
+	if (len > (BTRFS_CRYPTO_TFM_NAME_SIZE + BTRFS_CRYPTO_KEYTAG_SIZE ))
+		return -EINVAL;
+
+	ret = btrfs_split_key_type(value, len, keyalgo, keytag);
+	if (ret) {
+		pr_err("BTRFS: %lu mal formed value '%s' %lu\n",
+					inode->i_ino, value, len);
+		return ret;
+	}
+
+	keylen = get_encrypt_type_len(keyalgo);
+	if (!keylen)
+		return -ENOTSUPP;
+
+	ret = btrfs_check_keytag(keytag);
+	if (!ret)
+		return ret;
+
+	ret = btrfs_validate_keytag(inode, keytag);
+	// check if its newly being set
+	if (ret == -ENOTSUPP)
+		ret = 0;
+
+	return ret;
+}
+
+static int prop_encrypt_apply(struct inode *inode,
+				const char *value, size_t len)
+{
+	int ret;
+	u64 root_flags;
+	char keytag[BTRFS_CRYPTO_KEYTAG_SIZE];
+	char keyalgo[BTRFS_CRYPTO_TFM_NAME_SIZE];
+	struct btrfs_root_item *root_item;
+	struct btrfs_root *root;
+
+	root_item = &(BTRFS_I(inode)->root->root_item);
+	root = BTRFS_I(inode)->root;
+
+	if (len == 0) {
+		/* means disable encryption */
+		return -EOPNOTSUPP;
+	}
+
+	ret = btrfs_split_key_type(value, len, keyalgo, keytag);
+	if (ret)
+		return ret;
+
+	/* do it only for the subvol or snapshot */
+	if (btrfs_ino(inode) == BTRFS_FIRST_FREE_OBJECTID) {
+		if (!root_item->crypto_keyhash) {
+			pr_info("BTRFS: subvol %pU enable encryption '%s'\n",
+							root_item->uuid, keyalgo);
+			/*
+			 * We are here when xattribute being set for the first time
+			 */
+			ret = btrfs_set_keyhash(inode, keytag);
+			if (!ret) {
+				root_flags = btrfs_root_flags(root_item);
+				btrfs_set_root_flags(root_item,
+					root_flags | BTRFS_ROOT_SUBVOL_ENCRYPT);
+
+				strncpy(root_item->encrypt_algo, keyalgo,
+						BTRFS_CRYPTO_TFM_NAME_SIZE);
+			}
+		} else {
+			ret = btrfs_validate_keytag(inode, keytag);
+		}
+		if (!ret)
+			strncpy(root->crypto_keytag, keytag,
+						BTRFS_CRYPTO_KEYTAG_SIZE);
+	}
+
+	if (!ret) {
+		BTRFS_I(inode)->flags |= BTRFS_INODE_ENCRYPT;
+		BTRFS_I(inode)->force_compress = get_encrypt_type_index(keyalgo);
+	}
+
+	return ret;
+}
+
+static int tuplet_encrypt_tfm_and_tag(char *val_out, char *tfm, char *tag)
+{
+	char tmp_tag[BTRFS_CRYPTO_KEYTAG_SIZE + 1];
+	char tmp_tfm[BTRFS_CRYPTO_TFM_NAME_SIZE + 1];
+	int sz = BTRFS_CRYPTO_TFM_NAME_SIZE + BTRFS_CRYPTO_KEYTAG_SIZE + 1;
+
+	memcpy(tmp_tag, tag, BTRFS_CRYPTO_KEYTAG_SIZE);
+	memcpy(tmp_tfm, tfm, BTRFS_CRYPTO_TFM_NAME_SIZE);
+
+	tmp_tag[BTRFS_CRYPTO_KEYTAG_SIZE] = '\0';
+	tmp_tfm[BTRFS_CRYPTO_TFM_NAME_SIZE] = '\0';
+
+	return snprintf(val_out, sz, "%s@%s", tmp_tfm, tmp_tag);
+}
+
+static const char *prop_encrypt_extract(struct inode *inode)
+{
+	struct btrfs_root *root;
+	char val[BTRFS_CRYPTO_TFM_NAME_SIZE + BTRFS_CRYPTO_KEYTAG_SIZE + 1];
+
+	if (!(BTRFS_I(inode)->flags & BTRFS_INODE_ENCRYPT))
+		return NULL;
+
+	root = BTRFS_I(inode)->root;
+
+	tuplet_encrypt_tfm_and_tag(val, root->root_item.encrypt_algo,
+							root->crypto_keytag);
+
+	return kstrdup(val, GFP_NOFS);
+}
+
+static int prop_cryptoiv_validate(struct inode *inode,
+					const char *value, size_t len)
+{
+	if (len < BTRFS_CRYPTO_IV_SIZE)
+		return -EINVAL;
+
+	return 0;
+}
+
+static int prop_cryptoiv_apply(struct inode *inode,
+				const char *value, size_t len)
+{
+	int ret;
+	char *tmp_val;
+
+	if (!strlen(BTRFS_I(inode)->root->crypto_keytag))
+		return -ENOKEY;
+
+	tmp_val = kmemdup(value, len, GFP_KERNEL);
+	/* decrypt iv and apply to binode */
+	ret = btrfs_cipher_iv(0, inode, tmp_val, len);
+	if (ret) {
+		pr_err("BTRFS: %lu prop_cryptoiv_apply failed ret %d len %lu\n",
+			inode->i_ino, ret, len);
+		return ret;
+	}
+
+	memcpy(BTRFS_I(inode)->cryptoiv, tmp_val, len);
+	BTRFS_I(inode)->iv_len = len;
+
+	kfree(tmp_val);
+	return 0;
+}
+
+static const char *prop_cryptoiv_extract(struct inode *inode)
+{
+	int ret;
+	char *ivdata = NULL;
+
+	if (!(BTRFS_I(inode)->flags & BTRFS_INODE_ENCRYPT))
+		return NULL;
+
+	ret = btrfs_create_iv(&ivdata, BTRFS_CRYPTO_IV_SIZE);
+	if (ret)
+		return NULL;
+
+	/* Encrypt iv with master key */
+	ret = btrfs_cipher_iv(1, inode, ivdata,
+					BTRFS_CRYPTO_IV_SIZE);
+	if (ret) {
+		pr_err("BTRFS Error: %lu iv encrypt failed: %d\n",
+						inode->i_ino, ret);
+		kfree(ivdata);
+		return NULL;
+	}
+	return ivdata;
+}

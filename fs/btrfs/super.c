@@ -59,10 +59,10 @@
 #include "free-space-cache.h"
 #include "backref.h"
 #include "tests/btrfs-tests.h"
-
 #include "qgroup.h"
 #define CREATE_TRACE_POINTS
 #include <trace/events/btrfs.h>
+#include "encrypt.h"
 
 static const struct super_operations btrfs_super_ops;
 static struct file_system_type btrfs_fs_type;
@@ -91,6 +91,9 @@ const char *btrfs_decode_error(int errno)
 		break;
 	case -ENOENT:
 		errstr = "No such entry";
+		break;
+	case -ENOKEY:
+		errstr = "Required key not available";
 		break;
 	}
 
@@ -491,6 +494,15 @@ int btrfs_parse_options(struct btrfs_root *root, char *options,
 				btrfs_clear_opt(info->mount_opt, NODATASUM);
 				btrfs_set_fs_incompat(info, COMPRESS_LZO);
 				no_compress = 0;
+#if BTRFS_CRYPTO_TEST_ENABLE_BYMNTOPT
+			} else if (strcmp(args[0].from, "ctr(aes)") == 0) {
+				compress_type = "ctr(aes)";
+				info->compress_type = BTRFS_ENCRYPT_AES;
+				btrfs_set_opt(info->mount_opt, COMPRESS);
+				btrfs_clear_opt(info->mount_opt, NODATACOW);
+				btrfs_clear_opt(info->mount_opt, NODATASUM);
+				no_compress = 0;
+#endif
 			} else if (strncmp(args[0].from, "no", 2) == 0) {
 				compress_type = "no";
 				btrfs_clear_opt(info->mount_opt, COMPRESS);
@@ -1208,10 +1220,19 @@ static int btrfs_show_options(struct seq_file *seq, struct dentry *dentry)
 					     num_online_cpus() + 2, 8))
 		seq_printf(seq, ",thread_pool=%d", info->thread_pool_size);
 	if (btrfs_test_opt(root, COMPRESS)) {
-		if (info->compress_type == BTRFS_COMPRESS_ZLIB)
+		switch(info->compress_type) {
+		case BTRFS_COMPRESS_ZLIB:
 			compress_type = "zlib";
-		else
+			break;
+		case BTRFS_COMPRESS_LZO:
 			compress_type = "lzo";
+			break;
+		case BTRFS_ENCRYPT_AES:
+			compress_type = "ctr(aes)";
+			break;
+		default:
+			compress_type = "error";
+		}
 		if (btrfs_test_opt(root, FORCE_COMPRESS))
 			seq_printf(seq, ",compress-force=%s", compress_type);
 		else

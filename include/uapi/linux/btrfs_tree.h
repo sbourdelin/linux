@@ -593,6 +593,7 @@ struct btrfs_dir_item {
  * still visible as a directory
  */
 #define BTRFS_ROOT_SUBVOL_DEAD		(1ULL << 48)
+#define BTRFS_ROOT_SUBVOL_ENCRYPT	(1ULL << 49)
 
 struct btrfs_root_item {
 	struct btrfs_inode_item inode;
@@ -636,7 +637,10 @@ struct btrfs_root_item {
 	struct btrfs_timespec otime;
 	struct btrfs_timespec stime;
 	struct btrfs_timespec rtime;
-	__le64 reserved[8]; /* for future */
+	char encrypt_algo[16];
+	__le32 crypto_keylen;
+	__le32 crypto_keyhash;
+	__le64 reserved[3]; /* for future */
 } __attribute__ ((__packed__));
 
 /*

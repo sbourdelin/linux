@@ -50,6 +50,7 @@
 #include "sysfs.h"
 #include "qgroup.h"
 #include "compression.h"
+#include "encrypt.h"
 
 #ifdef CONFIG_X86
 #include <asm/cpufeature.h>
@@ -1302,6 +1303,8 @@ static void __setup_root(u32 nodesize, u32 sectorsize, u32 stripesize,
 	root->anon_dev = 0;
 
 	spin_lock_init(&root->root_item_lock);
+
+	memset(root->crypto_keytag, 0, BTRFS_CRYPTO_KEYTAG_SIZE);
 }
 
 static struct btrfs_root *btrfs_alloc_root(struct btrfs_fs_info *fs_info,

@@ -2144,8 +2144,15 @@ static noinline int btrfs_ioctl_tree_search(struct file *file,
 	int ret;
 	size_t buf_size;
 
+	/*
+	 * Allow tree serach by non root, so that non root
+	 * user can find info about the subvol they own/create.
+	 * BTRFS_CRYPTO_fixme: check if safe?.
+	 */
+#if 0
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
+#endif
 
 	uargs = (struct btrfs_ioctl_search_args __user *)argp;
 
@@ -2622,6 +2629,27 @@ static int btrfs_ioctl_defrag(struct file *file, void __user *argp)
 			}
 			/* compression requires us to start the IO */
 			if ((range->flags & BTRFS_DEFRAG_RANGE_COMPRESS)) {
+#if !(BTRFS_CRYPTO_TEST_BYDUMMYKEY | BTRFS_CRYPTO_TEST_BYDUMMYENC)
+				/*
+				 * Check if user is trying to encrypt the file/root
+				 * which isn't under an encrypt subvol, as their isn't
+				 * key for that, unless we are under the defines
+				 * BTRFS_CRYPTO_TEST_BYDUMMYKEY or
+				 * BTRFS_CRYPTO_TEST_BYDUMMYENC
+				 * which means its testing context so don't really
+				 * worry about the key.
+				 */
+				if (range->compress_type == BTRFS_ENCRYPT_AES) {
+					u64 root_flags = btrfs_root_flags(&root->root_item);
+					/*
+					 * Presence of a valid key is already been verified
+					 * at the permission, just reject encrypt compress
+					 * type on a non encrypt subvol.
+					 */
+					if (!(root_flags & BTRFS_ROOT_SUBVOL_ENCRYPT))
+						return -EOPNOTSUPP;
+				}
+#endif
 				range->flags |= BTRFS_DEFRAG_RANGE_START_IO;
 				range->extent_thresh = (u32)-1;
 			}
@@ -3844,6 +3872,41 @@ out:
 	return ret;
 }
 
+static int btrfs_encode_check_fops(struct btrfs_root *src,
+			struct btrfs_root *dest, int fops)
+{
+#if 0
+	u64 src_flags;
+	u64 dest_flags;
+
+	src_flags = btrfs_root_flags(&src->root_item);
+	dest_flags = btrfs_root_flags(&dest->root_item);
+
+	if (src_flags & BTRFS_ROOT_SUBVOL_ENCRYPT)
+		return -EOPNOTSUPP;
+
+	if (dest_flags & BTRFS_ROOT_SUBVOL_ENCRYPT)
+		return -EOPNOTSUPP;
+
+	return 0;
+#else
+
+	switch(fops) {
+	case 1: //clone; not tested for per file compress/encrypt
+		if (src == dest)
+			return 0;
+
+		if (src->root_item.crypto_keyhash ==
+			dest->root_item.crypto_keyhash)
+			return 0;
+
+		return -EOPNOTSUPP;
+		break;
+	}
+	return -EINVAL;
+#endif
+}
+
 static noinline int btrfs_clone_files(struct file *file, struct file *file_src,
 					u64 off, u64 olen, u64 destoff)
 {
@@ -3872,6 +3935,10 @@ static noinline int btrfs_clone_files(struct file *file, struct file *file_src,
 	if (file_src->f_path.mnt != file->f_path.mnt ||
 	    src->i_sb != inode->i_sb)
 		return -EXDEV;
+
+	ret = btrfs_encode_check_fops(BTRFS_I(src)->root, root, 1);
+	if (ret)
+		return ret;
 
 	/* don't make the dst file partly checksummed */
 	if ((BTRFS_I(src)->flags & BTRFS_INODE_NODATASUM) !=

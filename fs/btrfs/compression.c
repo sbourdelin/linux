@@ -41,6 +41,7 @@
 #include "compression.h"
 #include "extent_io.h"
 #include "extent_map.h"
+#include "encrypt.h"
 
 struct compressed_bio {
 	/* number of bios pending for this compressed extent */
@@ -83,7 +84,7 @@ struct compressed_bio {
 
 static int btrfs_decompress_biovec(int type, struct page **pages_in,
 				   u64 disk_start, struct bio_vec *bvec,
-				   int vcnt, size_t srclen);
+				   int vcnt, size_t srclen, struct bio *bio);
 
 static inline int compressed_bio_size(struct btrfs_root *root,
 				      unsigned long disk_size)
@@ -180,9 +181,9 @@ static void end_compressed_bio_read(struct bio *bio)
 				      cb->start,
 				      cb->orig_bio->bi_io_vec,
 				      cb->orig_bio->bi_vcnt,
-				      cb->compressed_len);
+				      cb->compressed_len, cb->orig_bio);
 csum_failed:
-	if (ret)
+	if (ret && ret != -ENOKEY)
 		cb->errors = 1;
 
 	/* release the compressed pages */
@@ -754,14 +755,20 @@ static struct {
 static const struct btrfs_compress_op * const btrfs_compress_op[] = {
 	&btrfs_zlib_compress,
 	&btrfs_lzo_compress,
+	&btrfs_encrypt_ops,
 };
 
 void __init btrfs_init_compress(void)
 {
 	int i;
+	int type;
 
 	for (i = 0; i < BTRFS_COMPRESS_TYPES; i++) {
 		struct list_head *workspace;
+
+		type = i + 1;
+		if (type == BTRFS_ENCRYPT_AES)
+			continue;
 
 		INIT_LIST_HEAD(&btrfs_comp_ws[i].idle_ws);
 		spin_lock_init(&btrfs_comp_ws[i].ws_lock);
@@ -801,6 +808,10 @@ static struct list_head *find_workspace(int type)
 	atomic_t *total_ws		= &btrfs_comp_ws[idx].total_ws;
 	wait_queue_head_t *ws_wait	= &btrfs_comp_ws[idx].ws_wait;
 	int *free_ws			= &btrfs_comp_ws[idx].free_ws;
+
+	if (type == BTRFS_ENCRYPT_AES)
+		return NULL;
+
 again:
 	spin_lock(ws_lock);
 	if (!list_empty(idle_ws)) {
@@ -867,6 +878,9 @@ static void free_workspace(int type, struct list_head *workspace)
 	wait_queue_head_t *ws_wait	= &btrfs_comp_ws[idx].ws_wait;
 	int *free_ws			= &btrfs_comp_ws[idx].free_ws;
 
+	if (!workspace)
+		return;
+
 	spin_lock(ws_lock);
 	if (*free_ws < num_online_cpus()) {
 		list_add(workspace, idle_ws);
@@ -894,8 +908,12 @@ static void free_workspaces(void)
 {
 	struct list_head *workspace;
 	int i;
+	int type;
 
 	for (i = 0; i < BTRFS_COMPRESS_TYPES; i++) {
+		type = i + 1;
+		if (type == BTRFS_ENCRYPT_AES)
+			continue;
 		while (!list_empty(&btrfs_comp_ws[i].idle_ws)) {
 			workspace = btrfs_comp_ws[i].idle_ws.next;
 			list_del(workspace);
@@ -931,7 +949,7 @@ int btrfs_compress_pages(int type, struct address_space *mapping,
 			 unsigned long *out_pages,
 			 unsigned long *total_in,
 			 unsigned long *total_out,
-			 unsigned long max_out)
+			 unsigned long max_out, int flags)
 {
 	struct list_head *workspace;
 	int ret;
@@ -942,7 +960,7 @@ int btrfs_compress_pages(int type, struct address_space *mapping,
 						      start, len, pages,
 						      nr_dest_pages, out_pages,
 						      total_in, total_out,
-						      max_out);
+						      max_out, flags);
 	free_workspace(type, workspace);
 	return ret;
 }
@@ -965,7 +983,7 @@ int btrfs_compress_pages(int type, struct address_space *mapping,
  */
 static int btrfs_decompress_biovec(int type, struct page **pages_in,
 				   u64 disk_start, struct bio_vec *bvec,
-				   int vcnt, size_t srclen)
+				   int vcnt, size_t srclen, struct bio *bio)
 {
 	struct list_head *workspace;
 	int ret;

@@ -40,6 +40,7 @@
 #include "extent_io.h"
 #include "extent_map.h"
 #include "async-thread.h"
+#include "encrypt.h"
 
 struct btrfs_trans_handle;
 struct btrfs_transaction;
@@ -1257,6 +1258,8 @@ struct btrfs_root {
 
 	/* For qgroup metadata space reserve */
 	atomic_t qgroup_meta_rsv;
+
+	char crypto_keytag[BTRFS_CRYPTO_KEYTAG_SIZE];
 };
 
 /*
@@ -1386,6 +1389,7 @@ do {                                                                   \
 #define BTRFS_INODE_NOATIME		(1 << 9)
 #define BTRFS_INODE_DIRSYNC		(1 << 10)
 #define BTRFS_INODE_COMPRESS		(1 << 11)
+#define BTRFS_INODE_ENCRYPT		(1 << 12)
 
 #define BTRFS_INODE_ROOT_ITEM_INIT	(1 << 31)
 

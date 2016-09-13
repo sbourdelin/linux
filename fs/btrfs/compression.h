@@ -29,7 +29,7 @@ int btrfs_compress_pages(int type, struct address_space *mapping,
 			 unsigned long *out_pages,
 			 unsigned long *total_in,
 			 unsigned long *total_out,
-			 unsigned long max_out);
+			 unsigned long max_out, int flags);
 int btrfs_decompress(int type, unsigned char *data_in, struct page *dest_page,
 		     unsigned long start_byte, size_t srclen, size_t destlen);
 int btrfs_decompress_buf2page(char *buf, unsigned long buf_start,
@@ -53,8 +53,9 @@ enum btrfs_compression_type {
 	BTRFS_COMPRESS_NONE  = 0,
 	BTRFS_COMPRESS_ZLIB  = 1,
 	BTRFS_COMPRESS_LZO   = 2,
-	BTRFS_COMPRESS_TYPES = 2,
-	BTRFS_COMPRESS_LAST  = 3,
+	BTRFS_ENCRYPT_AES    = 3,
+	BTRFS_COMPRESS_TYPES = 3,
+	BTRFS_COMPRESS_LAST  = 4,
 };
 
 struct btrfs_compress_op {
@@ -70,7 +71,7 @@ struct btrfs_compress_op {
 			      unsigned long *out_pages,
 			      unsigned long *total_in,
 			      unsigned long *total_out,
-			      unsigned long max_out);
+			      unsigned long max_out, int flags);
 
 	int (*decompress_biovec)(struct list_head *workspace,
 				 struct page **pages_in,
@@ -88,5 +89,6 @@ struct btrfs_compress_op {
 
 extern const struct btrfs_compress_op btrfs_zlib_compress;
 extern const struct btrfs_compress_op btrfs_lzo_compress;
+extern const struct btrfs_compress_op btrfs_encrypt_ops;
 
 #endif
