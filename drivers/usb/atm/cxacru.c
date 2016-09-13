@@ -228,7 +228,7 @@ static ssize_t cxacru_sysfs_show_##_name(struct device *dev, \
 	struct cxacru_data *instance = to_usbatm_driver_data(\
 		to_usb_interface(dev)); \
 \
-	if (instance == NULL) \
+	if (!instance) \
 		return -ENODEV; \
 \
 	return cxacru_sysfs_showattr_##_type(instance->card_info[_value], buf); \
@@ -280,7 +280,7 @@ static ssize_t cxacru_sysfs_showattr_LINK(u32 value, char *buf)
 {
 	static char *str[] = { NULL, "not connected", "connected", "lost" };
 
-	if (unlikely(value >= ARRAY_SIZE(str) || str[value] == NULL))
+	if (unlikely(value >= ARRAY_SIZE(str) || !str[value]))
 		return snprintf(buf, PAGE_SIZE, "%u\n", value);
 	return snprintf(buf, PAGE_SIZE, "%s\n", str[value]);
 }
@@ -323,7 +323,7 @@ static ssize_t cxacru_sysfs_show_mac_address(struct device *dev,
 	struct cxacru_data *instance = to_usbatm_driver_data(
 			to_usb_interface(dev));
 
-	if (instance == NULL || instance->usbatm->atm_dev == NULL)
+	if (!instance || !instance->usbatm->atm_dev)
 		return -ENODEV;
 
 	return snprintf(buf, PAGE_SIZE, "%pM\n",
@@ -338,7 +338,7 @@ static ssize_t cxacru_sysfs_show_adsl_state(struct device *dev,
 			to_usb_interface(dev));
 	u32 value;
 
-	if (instance == NULL)
+	if (!instance)
 		return -ENODEV;
 
 	value = instance->card_info[CXINF_LINE_STARTABLE];
@@ -365,7 +365,7 @@ static ssize_t cxacru_sysfs_store_adsl_state(struct device *dev,
 		return -EINVAL;
 	ret = 0;
 
-	if (instance == NULL)
+	if (!instance)
 		return -ENODEV;
 
 	if (mutex_lock_interruptible(&instance->adsl_state_serialize))
@@ -461,7 +461,7 @@ static ssize_t cxacru_sysfs_store_adsl_config(struct device *dev,
 	if (!capable(CAP_NET_ADMIN))
 		return -EACCES;
 
-	if (instance == NULL)
+	if (!instance)
 		return -ENODEV;
 
 	pos = 0;
