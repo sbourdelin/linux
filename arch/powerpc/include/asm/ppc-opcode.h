@@ -354,14 +354,17 @@
 #define PPC_TLBILX_VA(a, b)	PPC_TLBILX(3, a, b)
 #define PPC_WAIT(w)		stringify_in_c(.long PPC_INST_WAIT | \
 					__PPC_WC(w))
-#define PPC_TLBIE(lp,a) 	stringify_in_c(.long PPC_INST_TLBIE | \
-					       ___PPC_RB(a) | ___PPC_RS(lp))
+#define PPC_TLBIE(rb,lp) 	stringify_in_c(.long PPC_INST_TLBIE | \
+					       ___PPC_RB(rb) | ___PPC_RS(lp))
 #define	PPC_TLBIE_5(rb,rs,ric,prs,r) \
 				stringify_in_c(.long PPC_INST_TLBIE | \
 					___PPC_RB(rb) | ___PPC_RS(rs) | \
 					___PPC_RIC(ric) | ___PPC_PRS(prs) | \
 					___PPC_R(r))
-#define	PPC_TLBIEL(rb,rs,ric,prs,r) \
+#define	PPC_TLBIEL(rb,lp) \
+				stringify_in_c(.long PPC_INST_TLBIEL | \
+					___PPC_RB(rb) | ___PPC_RS(lp))
+#define	PPC_TLBIEL_5(rb,rs,ric,prs,r) \
 				stringify_in_c(.long PPC_INST_TLBIEL | \
 					___PPC_RB(rb) | ___PPC_RS(rs) | \
 					___PPC_RIC(ric) | ___PPC_PRS(prs) | \
