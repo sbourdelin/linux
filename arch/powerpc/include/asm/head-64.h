@@ -18,6 +18,7 @@ exc_##start##_##name:
 #define VECTOR_HANDLER_VIRT_END(name, start, end)
 
 #define COMMON_HANDLER_BEGIN(name)					\
+	.align	7;							\
 	.global name;							\
 name:
 
