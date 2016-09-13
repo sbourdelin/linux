@@ -157,6 +157,7 @@ static void __evdev_queue_syn_dropped(struct evdev_client *client)
 {
 	struct input_event ev;
 	ktime_t time;
+	struct timespec64 ts;
 
 	time = client->clk_type == EV_CLK_REAL ?
 			ktime_get_real() :
@@ -164,7 +165,9 @@ static void __evdev_queue_syn_dropped(struct evdev_client *client)
 				ktime_get() :
 				ktime_get_boottime();
 
-	ev.time = ktime_to_timeval(time);
+	ts = ktime_to_timespec64(time);
+	ev.time.tv_sec = ts.tv_sec;
+	ev.time.tv_usec = ts.tv_nsec / NSEC_PER_USEC;
 	ev.type = EV_SYN;
 	ev.code = SYN_DROPPED;
 	ev.value = 0;
@@ -262,12 +265,15 @@ static void evdev_pass_values(struct evdev_client *client,
 	struct evdev *evdev = client->evdev;
 	const struct input_value *v;
 	struct input_event event;
+	struct timespec64 ts;
 	bool wakeup = false;
 
 	if (client->revoked)
 		return;
 
-	event.time = ktime_to_timeval(ev_time[client->clk_type]);
+	ts = ktime_to_timespec64(ev_time[client->clk_type]);
+	event.time.tv_sec = ts.tv_sec;
+	event.time.tv_usec = ts.tv_nsec / NSEC_PER_USEC;
 
 	/* Interrupts are disabled, just acquire the lock. */
 	spin_lock(&client->buffer_lock);
