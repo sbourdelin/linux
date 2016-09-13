@@ -149,7 +149,7 @@ static int hp_sdc_mlc_in(hil_mlc *mlc, suseconds_t timeout)
 
 	/* Try to down the semaphore */
 	if (down_trylock(&mlc->isem)) {
-		struct timeval tv;
+		struct timespec64 ts;
 		if (priv->emtestmode) {
 			mlc->ipacket[0] =
 				HIL_ERR_INT | (mlc->opacket &
@@ -160,11 +160,11 @@ static int hp_sdc_mlc_in(hil_mlc *mlc, suseconds_t timeout)
 			/* printk(KERN_DEBUG PREFIX ">[%x]\n", mlc->ipacket[0]); */
 			goto wasup;
 		}
-		do_gettimeofday(&tv);
-		tv.tv_usec += USEC_PER_SEC * (tv.tv_sec - mlc->instart.tv_sec);
-		if (tv.tv_usec - mlc->instart.tv_usec > mlc->intimeout) {
+		ktime_get_ts64(&ts);
+		ts.tv_nsec += NSEC_PER_SEC * (ts.tv_sec - mlc->instart.tv_sec);
+		if (ts.tv_nsec - mlc->instart.tv_nsec > mlc->intimeout) {
 			/*	printk("!%i %i",
-				tv.tv_usec - mlc->instart.tv_usec,
+				tv.tv_nsec - mlc->instart.tv_nsec,
 				mlc->intimeout);
 			 */
 			rc = 1;
