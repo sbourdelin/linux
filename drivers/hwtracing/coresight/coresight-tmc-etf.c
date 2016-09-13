@@ -61,6 +61,8 @@ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
 
 static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
 {
+	long val;
+
 	CS_UNLOCK(drvdata->base);
 
 	tmc_flush_and_stop(drvdata);
@@ -68,7 +70,8 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
 	 * When operating in sysFS mode the content of the buffer needs to be
 	 * read before the TMC is disabled.
 	 */
-	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
+	val = local_xchg(&drvdata->mode, CS_MODE_DISABLED);
+	if (val == CS_MODE_SYSFS)
 		tmc_etb_dump_hw(drvdata);
 	tmc_disable_hw(drvdata);
 
@@ -225,7 +228,6 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
 
 static void tmc_disable_etf_sink(struct coresight_device *csdev)
 {
-	long val;
 	unsigned long flags;
 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 
@@ -235,9 +237,8 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev)
 		return;
 	}
 
-	val = local_xchg(&drvdata->mode, CS_MODE_DISABLED);
 	/* Disable the TMC only if it needs to */
-	if (val != CS_MODE_DISABLED)
+	if (local_read(&drvdata->mode) != CS_MODE_DISABLED)
 		tmc_etb_disable_hw(drvdata);
 
 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
