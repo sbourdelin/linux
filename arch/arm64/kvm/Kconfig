@@ -19,6 +19,9 @@ if VIRTUALIZATION
 config KVM_ARM_VGIC_V3
 	bool
 
+config KVM_PERF_TRACE
+        bool
+
 config KVM
 	bool "Kernel-based Virtual Machine (KVM) support"
 	depends on OF
@@ -39,6 +42,7 @@ config KVM
 	select HAVE_KVM_MSI
 	select HAVE_KVM_IRQCHIP
 	select HAVE_KVM_IRQ_ROUTING
+	select KVM_PERF_TRACE if EVENT_TRACING && PERF_EVENTS
 	---help---
 	  Support hosting virtualized guest machines.
 	  We don't support KVM with 16K page tables yet, due to the multiple

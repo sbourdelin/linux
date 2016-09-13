@@ -345,6 +345,14 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
 int kvm_perf_init(void);
 int kvm_perf_teardown(void);
 
+#if !defined(CONFIG_KVM_PERF_TRACE)
+static inline int kvm_perf_trace_init(void) { return 0; }
+static inline int kvm_perf_trace_teardown(void) { return 0; }
+#else
+int kvm_perf_trace_init(void);
+int kvm_perf_trace_teardown(void);
+#endif
+
 struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
 
 static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
