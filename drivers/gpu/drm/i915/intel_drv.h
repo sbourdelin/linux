@@ -52,13 +52,16 @@
  */
 #define _wait_for(COND, US, W) ({ \
 	unsigned long timeout__ = jiffies + usecs_to_jiffies(US) + 1;	\
-	int ret__ = 0;							\
-	while (!(COND)) {						\
-		if (time_after(jiffies, timeout__)) {			\
-			if (!(COND))					\
-				ret__ = -ETIMEDOUT;			\
+	int ret__;							\
+	for (;;) {							\
+		if (time_after(jiffies, timeout__))			\
+			ret__ = -ETIMEDOUT;				\
+		if (COND) {						\
+			ret__ = 0;					\
 			break;						\
 		}							\
+		if (ret__)						\
+			break;						\
 		if ((W) && drm_can_sleep()) {				\
 			usleep_range((W), (W)*2);			\
 		} else {						\
