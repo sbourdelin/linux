@@ -1442,7 +1442,7 @@ static int free_pool_huge_page(struct hstate *h, nodemask_t *nodes_allowed,
 static void dissolve_free_huge_page(struct page *page)
 {
 	spin_lock(&hugetlb_lock);
-	if (PageHuge(page) && !page_count(page)) {
+	if (PageHuge(page) && !page_count(page) && PageHead(page)) {
 		struct hstate *h = page_hstate(page);
 		int nid = page_to_nid(page);
 		list_del(&page->lru);
