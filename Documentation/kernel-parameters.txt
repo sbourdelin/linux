@@ -3023,9 +3023,10 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 				window. The default value is 64 megabytes.
 		resource_alignment=
 				Format:
-				[<order of align>@][<domain>:]<bus>:<slot>.<func>[; ...]
-				[<order of align>@]pci:<vendor>:<device>\
-						[:<subvendor>:<subdevice>][; ...]
+				[<order of align>@][noresize@][<domain>:]
+				<bus>:<slot>.<func>[; ...]
+				[<order of align>@][noresize@]pci:<vendor>:<device>
+				[:<subvendor>:<subdevice>][; ...]
 				Specifies alignment and device to reassign
 				aligned memory resources.
 				If <order of align> is not specified,
@@ -3036,6 +3037,8 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 				instances of a device, the PCI vendor,
 				device, subvendor, and subdevice may be
 				specified, e.g., 4096@pci:8086:9c22:103c:198f
+				noresize: Don't change the resources' sizes when
+				reassigning alignment.
 		ecrc=		Enable/disable PCIe ECRC (transaction layer
 				end-to-end CRC checking).
 				bios: Use BIOS/firmware settings. This is the
