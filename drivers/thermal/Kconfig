@@ -399,4 +399,9 @@ config GENERIC_ADC_THERMAL
 	  to this driver. This driver reports the temperature by reading ADC
 	  channel and converts it to temperature based on lookup table.
 
+config BCM2835_THERMAL
+       tristate "Thermal sensors on bcm2835 SoC"
+       help
+         Support for thermal sensors on Broadcom bcm2835 SoCs.
+
 endif
