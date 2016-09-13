@@ -236,6 +236,7 @@ struct switchdev_obj;
 struct switchdev_obj_port_fdb;
 struct switchdev_obj_port_mdb;
 struct switchdev_obj_port_vlan;
+struct switchdev_obj_ipv4_fib;
 
 struct dsa_switch_ops {
 	struct list_head	list;
@@ -385,6 +386,18 @@ struct dsa_switch_ops {
 	int	(*port_mdb_dump)(struct dsa_switch *ds, int port,
 				 struct switchdev_obj_port_mdb *mdb,
 				 int (*cb)(struct switchdev_obj *obj));
+
+	/*
+	 * IPV4 routing
+	 */
+	int	(*ipv4_fib_prepare)(struct dsa_switch *ds, int port,
+				    const struct switchdev_obj_ipv4_fib *fib4,
+				    struct switchdev_trans *trans);
+	int	(*ipv4_fib_add)(struct dsa_switch *ds, int port,
+				const struct switchdev_obj_ipv4_fib *fib4,
+				struct switchdev_trans *trans);
+	int	(*ipv4_fib_del)(struct dsa_switch *ds, int port,
+				const struct switchdev_obj_ipv4_fib *fib4);
 };
 
 void register_switch_driver(struct dsa_switch_ops *type);

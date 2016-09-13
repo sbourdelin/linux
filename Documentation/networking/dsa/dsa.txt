@@ -607,6 +607,24 @@ of DSA, would be the its port-based VLAN, used by the associated bridge device.
   function that the driver has to call for each MAC address known to be behind
   the given port. A switchdev object is used to carry the VID and MDB info.
 
+Route offloading
+----------------
+
+- ipv4_fib_prepare: routing layer function invoked to prepare the installation
+  of an ipv4 route into the switches routing database. If the operation is not
+  supported this function should return -EOPNOTSUPP. No hardware setup must be
+  done in this function. See ipv4_fib_add for this and details.
+
+- ipv4_fib_add: routing layer function invoked when a new ipv4 route should be
+  installed into the routing database of the switch, it should be programmed
+  with the route for the specified VLAN ID of the device that the route applies
+  to.
+
+- ipv4_fib_del: routing layer function invoked when an ipv4 route should be
+  removed from the routing database, the switch hardware should be programmed
+  to delete the specified MAC address of the nexthop from the specified VLAN ID
+  if it was mapped into the forwarding database.
+
 TODO
 ====
 
