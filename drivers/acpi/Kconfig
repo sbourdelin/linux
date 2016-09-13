@@ -461,6 +461,22 @@ source "drivers/acpi/nfit/Kconfig"
 source "drivers/acpi/apei/Kconfig"
 source "drivers/acpi/dptf/Kconfig"
 
+config ACPI_WATCHDOG
+	bool
+
+config ACPI_WDAT_WDT
+	tristate "ACPI Watchdog Action Table (WDAT)"
+	depends on WATCHDOG_CORE
+	select ACPI_WATCHDOG
+	help
+	  This driver adds support for systems with ACPI Watchdog Action
+	  Table (WDAT) table. Servers typically have this but it can be
+	  found on some desktop machines as well. This driver will take
+	  over the native iTCO watchdog driver found on many Intel CPUs.
+
+	  To compile this driver as module, choose M here: the module will
+	  be called wdat_wdt.
+
 config ACPI_EXTLOG
 	tristate "Extended Error Log support"
 	depends on X86_MCE && X86_LOCAL_APIC
