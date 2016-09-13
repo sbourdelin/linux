@@ -98,11 +98,10 @@ static int compat_agpioc_reserve_wrap(struct agp_file_private *priv, void __user
 		if (ureserve.seg_count >= 16384)
 			return -EINVAL;
 
-		usegment = kmalloc_array(ureserve.seg_count,
-					 sizeof(*usegment),
-					 GFP_KERNEL);
-		if (!usegment)
-			return -ENOMEM;
+		usegment = memdup_user((void __user *) ureserve.seg_list,
+				       sizeof(*usegment) * ureserve.seg_count);
+		if (IS_ERR(usegment))
+			return PTR_ERR(usegment);
 
 		ksegment = kmalloc_array(kreserve.seg_count,
 					 sizeof(*ksegment),
@@ -110,13 +109,6 @@ static int compat_agpioc_reserve_wrap(struct agp_file_private *priv, void __user
 		if (!ksegment) {
 			kfree(usegment);
 			return -ENOMEM;
-		}
-
-		if (copy_from_user(usegment, (void __user *) ureserve.seg_list,
-				   sizeof(*usegment) * ureserve.seg_count)) {
-			kfree(usegment);
-			kfree(ksegment);
-			return -EFAULT;
 		}
 
 		for (seg = 0; seg < ureserve.seg_count; seg++) {
