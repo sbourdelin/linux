@@ -334,6 +334,38 @@ static int dsa_slave_port_mdb_dump(struct net_device *dev,
 	return -EOPNOTSUPP;
 }
 
+static int dsa_slave_ipv4_fib_add(struct net_device *dev,
+				  const struct switchdev_obj_ipv4_fib *fib4,
+				  struct switchdev_trans *trans)
+{
+	struct dsa_slave_priv *p = netdev_priv(dev);
+	struct dsa_switch *ds = p->parent;
+	int ret;
+
+	if (!ds->ops->ipv4_fib_prepare || !ds->ops->ipv4_fib_add)
+		return -EOPNOTSUPP;
+
+	if (switchdev_trans_ph_prepare(trans))
+		ret = ds->ops->ipv4_fib_prepare(ds, p->port, fib4, trans);
+	else
+		ret = ds->ops->ipv4_fib_add(ds, p->port, fib4, trans);
+
+	return ret;
+}
+
+static int dsa_slave_ipv4_fib_del(struct net_device *dev,
+				  const struct switchdev_obj_ipv4_fib *fib4)
+{
+	struct dsa_slave_priv *p = netdev_priv(dev);
+	struct dsa_switch *ds = p->parent;
+	int ret = -EOPNOTSUPP;
+
+	if (ds->ops->ipv4_fib_del)
+		ret = ds->ops->ipv4_fib_del(ds, p->port, fib4);
+
+	return ret;
+}
+
 static int dsa_slave_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct dsa_slave_priv *p = netdev_priv(dev);
@@ -465,6 +497,11 @@ static int dsa_slave_port_obj_add(struct net_device *dev,
 					      SWITCHDEV_OBJ_PORT_VLAN(obj),
 					      trans);
 		break;
+	case SWITCHDEV_OBJ_ID_IPV4_FIB:
+		err = dsa_slave_ipv4_fib_add(dev,
+					     SWITCHDEV_OBJ_IPV4_FIB(obj),
+					     trans);
+		break;
 	default:
 		err = -EOPNOTSUPP;
 		break;
@@ -489,6 +526,10 @@ static int dsa_slave_port_obj_del(struct net_device *dev,
 	case SWITCHDEV_OBJ_ID_PORT_VLAN:
 		err = dsa_slave_port_vlan_del(dev,
 					      SWITCHDEV_OBJ_PORT_VLAN(obj));
+		break;
+	case SWITCHDEV_OBJ_ID_IPV4_FIB:
+		err = dsa_slave_ipv4_fib_del(dev,
+					     SWITCHDEV_OBJ_IPV4_FIB(obj));
 		break;
 	default:
 		err = -EOPNOTSUPP;
