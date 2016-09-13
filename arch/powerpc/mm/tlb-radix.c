@@ -35,7 +35,7 @@ static inline void __tlbiel_pid(unsigned long pid, int set,
 	r = 1;   /* raidx format */
 
 	asm volatile("ptesync": : :"memory");
-	asm volatile(PPC_TLBIEL(%0, %4, %3, %2, %1)
+	asm volatile(PPC_TLBIEL_5(%0, %4, %3, %2, %1)
 		     : : "r"(rb), "i"(r), "i"(prs), "i"(ric), "r"(rs) : "memory");
 	asm volatile("ptesync": : :"memory");
 }
@@ -80,7 +80,7 @@ static inline void _tlbiel_va(unsigned long va, unsigned long pid,
 	r = 1;   /* raidx format */
 
 	asm volatile("ptesync": : :"memory");
-	asm volatile(PPC_TLBIEL(%0, %4, %3, %2, %1)
+	asm volatile(PPC_TLBIEL_5(%0, %4, %3, %2, %1)
 		     : : "r"(rb), "i"(r), "i"(prs), "i"(ric), "r"(rs) : "memory");
 	asm volatile("ptesync": : :"memory");
 }
