@@ -10,7 +10,7 @@
 #include <linux/bpf.h> /* for enum bpf_reg_type */
 #include <linux/filter.h> /* for MAX_BPF_STACK */
 
-struct reg_state {
+struct bpf_reg_state {
 	enum bpf_reg_type type;
 	union {
 		/* valid when type == CONST_IMM | PTR_TO_STACK | UNKNOWN_VALUE */
@@ -41,16 +41,16 @@ enum bpf_stack_slot_type {
 /* state of the program:
  * type of all registers and stack info
  */
-struct verifier_state {
-	struct reg_state regs[MAX_BPF_REG];
+struct bpf_verifier_state {
+	struct bpf_reg_state regs[MAX_BPF_REG];
 	u8 stack_slot_type[MAX_BPF_STACK];
-	struct reg_state spilled_regs[MAX_BPF_STACK / BPF_REG_SIZE];
+	struct bpf_reg_state spilled_regs[MAX_BPF_STACK / BPF_REG_SIZE];
 };
 
 /* linked list of verifier states used to prune search */
-struct verifier_state_list {
-	struct verifier_state state;
-	struct verifier_state_list *next;
+struct bpf_verifier_state_list {
+	struct bpf_verifier_state state;
+	struct bpf_verifier_state_list *next;
 };
 
 struct bpf_insn_aux_data {
@@ -59,21 +59,21 @@ struct bpf_insn_aux_data {
 
 #define MAX_USED_MAPS 64 /* max number of maps accessed by one eBPF program */
 
-struct verifier_env;
+struct bpf_verifier_env;
 struct bpf_ext_parser_ops {
-	int (*insn_hook)(struct verifier_env *env,
+	int (*insn_hook)(struct bpf_verifier_env *env,
 			 int insn_idx, int prev_insn_idx);
 };
 
 /* single container for all structs
  * one verifier_env per bpf_check() call
  */
-struct verifier_env {
+struct bpf_verifier_env {
 	struct bpf_prog *prog;		/* eBPF program being verified */
-	struct verifier_stack_elem *head; /* stack of verifier states to be processed */
+	struct bpf_verifier_stack_elem *head; /* stack of verifier states to be processed */
 	int stack_size;			/* number of states to be processed */
-	struct verifier_state cur_state; /* current verifier state */
-	struct verifier_state_list **explored_states; /* search pruning optimization */
+	struct bpf_verifier_state cur_state; /* current verifier state */
+	struct bpf_verifier_state_list **explored_states; /* search pruning optimization */
 	const struct bpf_ext_parser_ops *pops; /* external parser ops */
 	void *ppriv; /* pointer to external parser's private data */
 	struct bpf_map *used_maps[MAX_USED_MAPS]; /* array of map's used by eBPF program */
