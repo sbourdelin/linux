@@ -257,11 +257,11 @@ static struct port *find_port_by_vtermno(u32 vtermno)
 	list_for_each_entry(cons, &pdrvdata.consoles, list) {
 		if (cons->vtermno == vtermno) {
 			port = container_of(cons, struct port, cons);
-			goto out;
+			goto unlock;
 		}
 	}
 	port = NULL;
-out:
+ unlock:
 	spin_unlock_irqrestore(&pdrvdata_lock, flags);
 	return port;
 }
@@ -276,11 +276,11 @@ static struct port *find_port_by_devt_in_portdev(struct ports_device *portdev,
 	list_for_each_entry(port, &portdev->ports, list) {
 		if (port->cdev->dev == dev) {
 			kref_get(&port->kref);
-			goto out;
+			goto unlock;
 		}
 	}
 	port = NULL;
-out:
+ unlock:
 	spin_unlock_irqrestore(&portdev->ports_lock, flags);
 
 	return port;
@@ -296,10 +296,10 @@ static struct port *find_port_by_devt(dev_t dev)
 	list_for_each_entry(portdev, &pdrvdata.portdevs, list) {
 		port = find_port_by_devt_in_portdev(portdev, dev);
 		if (port)
-			goto out;
+			goto unlock;
 	}
 	port = NULL;
-out:
+ unlock:
 	spin_unlock_irqrestore(&pdrvdata_lock, flags);
 	return port;
 }
@@ -312,9 +312,9 @@ static struct port *find_port_by_id(struct ports_device *portdev, u32 id)
 	spin_lock_irqsave(&portdev->ports_lock, flags);
 	list_for_each_entry(port, &portdev->ports, list)
 		if (port->id == id)
-			goto out;
+			goto unlock;
 	port = NULL;
-out:
+ unlock:
 	spin_unlock_irqrestore(&portdev->ports_lock, flags);
 
 	return port;
@@ -329,9 +329,9 @@ static struct port *find_port_by_vq(struct ports_device *portdev,
 	spin_lock_irqsave(&portdev->ports_lock, flags);
 	list_for_each_entry(port, &portdev->ports, list)
 		if (port->in_vq == vq || port->out_vq == vq)
-			goto out;
+			goto unlock;
 	port = NULL;
-out:
+ unlock:
 	spin_unlock_irqrestore(&portdev->ports_lock, flags);
 	return port;
 }
