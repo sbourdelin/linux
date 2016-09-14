@@ -1149,6 +1149,7 @@ static int tusb_musb_init(struct musb *musb)
 				ret);
 		goto done;
 	}
+	tusb_musb_disable(musb);
 	musb->isr = tusb_musb_interrupt;
 
 	musb->xceiv->set_power = tusb_draw_power;

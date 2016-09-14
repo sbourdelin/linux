@@ -93,6 +93,8 @@ struct sunxi_glue {
 	struct notifier_block	host_nb;
 };
 
+static void sunxi_musb_disable(struct musb *musb);
+
 /* phy_power_on / off may sleep, so we use a workqueue  */
 static void sunxi_musb_work(struct work_struct *work)
 {
@@ -265,6 +267,7 @@ static int sunxi_musb_init(struct musb *musb)
 	if (ret)
 		goto error_unregister_notifier;
 
+	sunxi_musb_disable(musb);
 	musb->isr = sunxi_musb_interrupt;
 
 	/* Stop the musb-core from doing runtime pm (not supported on sunxi) */

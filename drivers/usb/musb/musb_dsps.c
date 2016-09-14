@@ -441,6 +441,7 @@ static int dsps_musb_init(struct musb *musb)
 	/* Reset the musb */
 	musb_writel(reg_base, wrp->control, (1 << wrp->reset));
 
+	dsps_musb_disable(musb);
 	musb->isr = dsps_interrupt;
 
 	/* reset the otgdisable bit, needed for host mode to work */

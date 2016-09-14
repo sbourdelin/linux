@@ -432,6 +432,7 @@ static int davinci_musb_init(struct musb *musb)
 		revision, __raw_readl(USB_PHY_CTRL),
 		musb_readb(tibase, DAVINCI_USB_CTRL_REG));
 
+	davinci_musb_disable(musb);
 	musb->isr = davinci_musb_interrupt;
 	return 0;
 

@@ -440,6 +440,7 @@ static int da8xx_musb_init(struct musb *musb)
 		 rev, __raw_readl(CFGCHIP2),
 		 musb_readb(reg_base, DA8XX_USB_CTRL_REG));
 
+	da8xx_musb_disable(musb);
 	musb->isr = da8xx_musb_interrupt;
 	return 0;
 fail:

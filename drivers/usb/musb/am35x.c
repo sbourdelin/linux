@@ -381,6 +381,7 @@ static int am35x_musb_init(struct musb *musb)
 
 	msleep(5);
 
+	am35x_musb_disable(musb);
 	musb->isr = am35x_musb_interrupt;
 
 	/* clear level interrupt */
