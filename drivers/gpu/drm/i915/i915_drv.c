@@ -1328,17 +1328,6 @@ void i915_driver_unload(struct drm_device *dev)
 	i915_driver_cleanup_early(dev_priv);
 }
 
-static int i915_driver_open(struct drm_device *dev, struct drm_file *file)
-{
-	int ret;
-
-	ret = i915_gem_open(dev, file);
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
 /**
  * i915_driver_lastclose - clean up after all DRM clients have exited
  * @dev: DRM device
@@ -2575,7 +2564,7 @@ static struct drm_driver driver = {
 	.driver_features =
 	    DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM | DRIVER_PRIME |
 	    DRIVER_RENDER | DRIVER_MODESET,
-	.open = i915_driver_open,
+	.open = i915_gem_open,
 	.lastclose = i915_driver_lastclose,
 	.preclose = i915_driver_preclose,
 	.postclose = i915_driver_postclose,
