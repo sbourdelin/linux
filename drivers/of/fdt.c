@@ -1022,8 +1022,10 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 				     int depth, void *data)
 {
 	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
+	const char *status;
 	const __be32 *reg, *endp;
 	int l;
+	bool add_memory;
 
 	/* We are scanning "memory" nodes only */
 	if (type == NULL) {
@@ -1044,6 +1046,9 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 
 	endp = reg + (l / sizeof(__be32));
 
+	status = of_get_flat_dt_prop(node, "status", NULL);
+	add_memory = !status || !strcmp(status, "okay");
+
 	pr_debug("memory scan node %s, reg size %d,\n", uname, l);
 
 	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
@@ -1056,6 +1061,9 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 			continue;
 		pr_debug(" - %llx ,  %llx\n", (unsigned long long)base,
 		    (unsigned long long)size);
+
+		if (!add_memory)
+			continue;
 
 		early_init_dt_add_memory_arch(base, size);
 	}
