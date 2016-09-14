@@ -1657,7 +1657,7 @@ static bool __atime_needs_update(const struct path *path, struct inode *inode,
 	if ((mnt->mnt_flags & MNT_NODIRATIME) && S_ISDIR(inode->i_mode))
 		return false;
 
-	now = current_fs_time(inode->i_sb);
+	now = current_time(inode);
 
 	if (!relatime_need_update(path, inode, now, rcu))
 		return false;
@@ -1696,7 +1696,7 @@ void touch_atime(const struct path *path)
 	 * We may also fail on filesystems that have the ability to make parts
 	 * of the fs read only, e.g. subvolumes in Btrfs.
 	 */
-	now = current_fs_time(inode->i_sb);
+	now = current_time(inode);
 	update_time(inode, &now, S_ATIME);
 	__mnt_drop_write(mnt);
 skip_update:
@@ -1819,7 +1819,7 @@ int file_update_time(struct file *file)
 	if (IS_NOCMTIME(inode))
 		return 0;
 
-	now = current_fs_time(inode->i_sb);
+	now = current_time(inode);
 	if (!timespec_equal(&inode->i_mtime, &now))
 		sync_it = S_MTIME;
 
