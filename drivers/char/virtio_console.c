@@ -634,14 +634,14 @@ static ssize_t __send_to_port(struct port *port, struct scatterlist *sg,
 
 	if (err) {
 		in_count = 0;
-		goto done;
+		goto unlock;
 	}
 
 	if (out_vq->num_free == 0)
 		port->outvq_full = true;
 
 	if (nonblock)
-		goto done;
+		goto unlock;
 
 	/*
 	 * Wait till the host acknowledges it pushed out the data we
@@ -655,7 +655,7 @@ static ssize_t __send_to_port(struct port *port, struct scatterlist *sg,
 	while (!virtqueue_get_buf(out_vq, &len)
 		&& !virtqueue_is_broken(out_vq))
 		cpu_relax();
-done:
+ unlock:
 	spin_unlock_irqrestore(&port->outvq_lock, flags);
 
 	port->stats.bytes_sent += in_count;
