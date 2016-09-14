@@ -28,6 +28,8 @@ struct fib_rule {
 	u32			pref;
 	int			suppress_ifgroup;
 	int			suppress_prefixlen;
+	int			iifgroup;
+	int			oifgroup;
 	char			iifname[IFNAMSIZ];
 	char			oifname[IFNAMSIZ];
 	struct rcu_head		rcu;
@@ -92,7 +94,9 @@ struct fib_rules_ops {
 	[FRA_SUPPRESS_PREFIXLEN] = { .type = NLA_U32 }, \
 	[FRA_SUPPRESS_IFGROUP] = { .type = NLA_U32 }, \
 	[FRA_GOTO]	= { .type = NLA_U32 }, \
-	[FRA_L3MDEV]	= { .type = NLA_U8 }
+	[FRA_L3MDEV]	= { .type = NLA_U8 }, \
+	[FRA_IIFGROUP] = { .type = NLA_U32 }, \
+	[FRA_OIFGROUP] = { .type = NLA_U32 }
 
 static inline void fib_rule_get(struct fib_rule *rule)
 {

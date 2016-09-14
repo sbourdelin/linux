@@ -51,6 +51,8 @@ enum {
 	FRA_OIFNAME,
 	FRA_PAD,
 	FRA_L3MDEV,	/* iif or oif is l3mdev goto its table */
+	FRA_IIFGROUP,	/* interface group */
+	FRA_OIFGROUP,
 	__FRA_MAX
 };
 

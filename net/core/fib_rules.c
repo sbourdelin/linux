@@ -37,6 +37,9 @@ int fib_default_rule_add(struct fib_rules_ops *ops,
 	r->suppress_prefixlen = -1;
 	r->suppress_ifgroup = -1;
 
+	r->iifgroup = -1;
+	r->oifgroup = -1;
+
 	/* The lock is not required here, the list in unreacheable
 	 * at the moment this function is called */
 	list_add_tail(&r->list, &ops->rules_list);
@@ -193,6 +196,30 @@ static int fib_rule_match(struct fib_rule *rule, struct fib_rules_ops *ops,
 	if (rule->l3mdev && !l3mdev_fib_rule_match(rule->fr_net, fl, arg))
 		goto out;
 
+	if (rule->iifgroup != -1) {
+		struct net_device *dev;
+
+		rcu_read_lock();
+		dev = dev_get_by_index_rcu(rule->fr_net, fl->flowi_iif);
+		if (!dev || dev->group != rule->iifgroup) {
+			rcu_read_unlock();
+			goto out;
+		}
+		rcu_read_unlock();
+	}
+
+	if (rule->oifgroup != -1) {
+		struct net_device *dev;
+
+		rcu_read_lock();
+		dev = dev_get_by_index_rcu(rule->fr_net, fl->flowi_oif);
+		if (!dev || dev->group != rule->oifgroup) {
+			rcu_read_unlock();
+			goto out;
+		}
+		rcu_read_unlock();
+	}
+
 	ret = ops->match(rule, fl, flags);
 out:
 	return (rule->flags & FIB_RULE_INVERT) ? !ret : ret;
@@ -305,6 +332,12 @@ static int rule_exists(struct fib_rules_ops *ops, struct fib_rule_hdr *frh,
 		if (r->l3mdev != rule->l3mdev)
 			continue;
 
+		if (r->iifgroup != rule->iifgroup)
+			continue;
+
+		if (r->oifgroup != rule->oifgroup)
+			continue;
+
 		if (!ops->compare(r, frh, tb))
 			continue;
 		return 1;
@@ -390,6 +423,16 @@ int fib_nl_newrule(struct sk_buff *skb, struct nlmsghdr *nlh)
 #endif
 			goto errout_free;
 	}
+
+	if (tb[FRA_IIFGROUP])
+		rule->iifgroup = nla_get_u32(tb[FRA_IIFGROUP]);
+	else
+		rule->iifgroup = -1;
+
+	if (tb[FRA_OIFGROUP])
+		rule->oifgroup = nla_get_u32(tb[FRA_OIFGROUP]);
+	else
+		rule->oifgroup = -1;
 
 	rule->action = frh->action;
 	rule->flags = frh->flags;
@@ -552,6 +595,14 @@ int fib_nl_delrule(struct sk_buff *skb, struct nlmsghdr *nlh)
 		    (rule->l3mdev != nla_get_u8(tb[FRA_L3MDEV])))
 			continue;
 
+		if (tb[FRA_IIFGROUP] &&
+		    (rule->iifgroup != nla_get_u32(tb[FRA_IIFGROUP])))
+			continue;
+
+		if (tb[FRA_OIFGROUP] &&
+		    (rule->oifgroup != nla_get_u32(tb[FRA_OIFGROUP])))
+			continue;
+
 		if (!ops->compare(rule, frh, tb))
 			continue;
 
@@ -679,7 +730,11 @@ static int fib_nl_fill_rule(struct sk_buff *skb, struct fib_rule *rule,
 	    (rule->tun_id &&
 	     nla_put_be64(skb, FRA_TUN_ID, rule->tun_id, FRA_PAD)) ||
 	    (rule->l3mdev &&
-	     nla_put_u8(skb, FRA_L3MDEV, rule->l3mdev)))
+	     nla_put_u8(skb, FRA_L3MDEV, rule->l3mdev)) ||
+	    ((rule->iifgroup != -1) &&
+	     nla_put_u32(skb, FRA_IIFGROUP, rule->iifgroup)) ||
+	    ((rule->oifgroup != -1) &&
+	     nla_put_u32(skb, FRA_OIFGROUP, rule->oifgroup)))
 		goto nla_put_failure;
 
 	if (rule->suppress_ifgroup != -1) {
