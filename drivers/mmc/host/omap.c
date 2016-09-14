@@ -1016,7 +1016,7 @@ mmc_omap_prepare_data(struct mmc_omap_host *host, struct mmc_request *req)
 
 		/* Only reconfigure if we have a different burst size */
 		if (*bp != burst) {
-			struct dma_slave_config cfg;
+			struct dma_slave_config cfg = {};
 
 			cfg.src_addr = host->phys_base + OMAP_MMC_REG(host, DATA);
 			cfg.dst_addr = host->phys_base + OMAP_MMC_REG(host, DATA);
