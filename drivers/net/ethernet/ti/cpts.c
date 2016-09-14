@@ -251,7 +251,7 @@ static void cpts_overflow_check(struct work_struct *work)
 	cpts_write32(cpts, TS_PEND_EN, int_enable);
 	cpts_ptp_gettime(&cpts->info, &ts);
 	pr_debug("cpts overflow check at %lld.%09lu\n", ts.tv_sec, ts.tv_nsec);
-	schedule_delayed_work(&cpts->overflow_work, CPTS_OVERFLOW_PERIOD);
+	schedule_delayed_work(&cpts->overflow_work, cpts->ov_check_period);
 }
 
 static int cpts_match(struct sk_buff *skb, unsigned int ptp_class,
@@ -391,7 +391,7 @@ int cpts_register(struct cpts *cpts)
 	}
 	cpts->phc_index = ptp_clock_index(cpts->clock);
 
-	schedule_delayed_work(&cpts->overflow_work, CPTS_OVERFLOW_PERIOD);
+	schedule_delayed_work(&cpts->overflow_work, cpts->ov_check_period);
 	return 0;
 
 err_ptp:
@@ -427,9 +427,6 @@ static void cpts_calc_mult_shift(struct cpts *cpts)
 	u64 ns;
 	u64 frac;
 
-	if (cpts->cc_mult || cpts->cc.shift)
-		return;
-
 	freq = clk_get_rate(cpts->refclk);
 
 	/* Calc the maximum number of seconds which we can run before
@@ -442,11 +439,20 @@ static void cpts_calc_mult_shift(struct cpts *cpts)
 	else if (maxsec > 600 && cpts->cc.mask > UINT_MAX)
 		maxsec = 600;
 
+	/* Calc overflow check period (maxsec / 2) */
+	cpts->ov_check_period = (HZ * maxsec) / 2;
+	dev_info(cpts->dev, "cpts: overflow check period %lu\n",
+		 cpts->ov_check_period);
+
+	if (cpts->cc_mult || cpts->cc.shift)
+		return;
+
 	clocks_calc_mult_shift(&mult, &shift, freq, NSEC_PER_SEC, maxsec);
 
 	cpts->cc_mult = mult;
 	cpts->cc.mult = mult;
 	cpts->cc.shift = shift;
+
 	/* Check calculations and inform if not precise */
 	frac = 0;
 	ns = cyclecounter_cyc2ns(&cpts->cc, freq, cpts->cc.mask, &frac);
