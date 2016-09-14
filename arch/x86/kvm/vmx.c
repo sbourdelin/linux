@@ -6345,7 +6345,7 @@ static void wakeup_handler(void)
 
 static __init int hardware_setup(void)
 {
-	int r = -ENOMEM, i, msr;
+	int r = -ENOMEM, i;
 
 	rdmsrl_safe(MSR_EFER, &host_efer);
 
@@ -6472,18 +6472,6 @@ static __init int hardware_setup(void)
 			vmx_msr_bitmap_longmode, PAGE_SIZE);
 
 	set_bit(0, vmx_vpid_bitmap); /* 0 is reserved for host */
-
-	for (msr = 0x800; msr <= 0x8ff; msr++)
-		vmx_disable_intercept_msr_read_x2apic(msr);
-
-	/* TMCCT */
-	vmx_enable_intercept_msr_read_x2apic(0x839);
-	/* TPR */
-	vmx_disable_intercept_msr_write_x2apic(0x808);
-	/* EOI */
-	vmx_disable_intercept_msr_write_x2apic(0x80b);
-	/* SELF-IPI */
-	vmx_disable_intercept_msr_write_x2apic(0x83f);
 
 	if (enable_ept) {
 		kvm_mmu_set_mask_ptes(VMX_EPT_READABLE_MASK,
@@ -8444,12 +8432,7 @@ static void vmx_set_virtual_x2apic_mode(struct kvm_vcpu *vcpu, bool set)
 		return;
 	}
 
-	/*
-	 * There is not point to enable virtualize x2apic without enable
-	 * apicv
-	 */
-	if (!cpu_has_vmx_virtualize_x2apic_mode() ||
-				!kvm_vcpu_apicv_active(vcpu))
+	if (!cpu_has_vmx_virtualize_x2apic_mode())
 		return;
 
 	if (!cpu_need_tpr_shadow(vcpu))
@@ -8458,8 +8441,28 @@ static void vmx_set_virtual_x2apic_mode(struct kvm_vcpu *vcpu, bool set)
 	sec_exec_control = vmcs_read32(SECONDARY_VM_EXEC_CONTROL);
 
 	if (set) {
+		int msr;
+
 		sec_exec_control &= ~SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
 		sec_exec_control |= SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE;
+
+		if (kvm_vcpu_apicv_active(vcpu)) {
+			for (msr = 0x800; msr <= 0x8ff; msr++)
+				vmx_disable_intercept_msr_read_x2apic(msr);
+
+			/* TMCCT */
+			vmx_enable_intercept_msr_read_x2apic(0x839);
+			/* TPR */
+			vmx_disable_intercept_msr_write_x2apic(0x808);
+			/* EOI */
+			vmx_disable_intercept_msr_write_x2apic(0x80b);
+			/* SELF-IPI */
+			vmx_disable_intercept_msr_write_x2apic(0x83f);
+		} else if (vmx_exec_control(to_vmx(vcpu)) & CPU_BASED_TPR_SHADOW) {
+			/* TPR */
+			vmx_disable_intercept_msr_read_x2apic(0x808);
+			vmx_disable_intercept_msr_write_x2apic(0x808);
+		}
 	} else {
 		sec_exec_control &= ~SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE;
 		sec_exec_control |= SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
