@@ -431,7 +431,7 @@ static struct port_buffer *alloc_buf(struct virtqueue *vq, size_t buf_size,
 	buf = kmalloc(sizeof(*buf) + sizeof(struct scatterlist) * pages,
 		      GFP_KERNEL);
 	if (!buf)
-		goto fail;
+		goto exit;
 
 	buf->sgpages = pages;
 	if (pages > 0) {
@@ -451,7 +451,7 @@ static struct port_buffer *alloc_buf(struct virtqueue *vq, size_t buf_size,
 		 * in dma-coherent.c
 		 */
 		if (!vq->vdev->dev.parent || !vq->vdev->dev.parent->parent)
-			goto free_buf;
+			goto free_buffer;
 		buf->dev = vq->vdev->dev.parent->parent;
 
 		/* Increase device refcnt to avoid freeing it */
@@ -464,15 +464,14 @@ static struct port_buffer *alloc_buf(struct virtqueue *vq, size_t buf_size,
 	}
 
 	if (!buf->buf)
-		goto free_buf;
+		goto free_buffer;
 	buf->len = 0;
 	buf->offset = 0;
 	buf->size = buf_size;
 	return buf;
-
-free_buf:
+ free_buffer:
 	kfree(buf);
-fail:
+ exit:
 	return NULL;
 }
 
