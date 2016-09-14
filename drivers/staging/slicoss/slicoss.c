@@ -924,8 +924,8 @@ err_unlock_irq:
 static void slic_link_upr_complete(struct adapter *adapter, u32 isr)
 {
 	struct slic_shmemory *sm = &adapter->shmem;
-	struct slic_shmem_data *sm_data = sm->shmem_data;
-	u32 lst = sm_data->lnkstatus;
+	struct slic_shmem_data __iomem *sm_data = sm->shmem_data;
+	u32 lst = IOMEM_GET_FIELD32(sm_data, lnkstatus);
 	uint linkup;
 	unsigned char linkspeed;
 	unsigned char linkduplex;
