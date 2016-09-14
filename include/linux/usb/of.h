@@ -11,7 +11,7 @@
 #include <linux/usb/otg.h>
 #include <linux/usb/phy.h>
 
-#if IS_ENABLED(CONFIG_OF)
+#if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_USB_COMMON)
 enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *np, int arg0);
 bool of_usb_host_tpl_support(struct device_node *np);
 int of_usb_update_otg_caps(struct device_node *np,
