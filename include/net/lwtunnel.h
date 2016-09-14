@@ -33,9 +33,9 @@ struct lwtunnel_state {
 };
 
 struct lwtunnel_encap_ops {
-	int (*build_state)(struct net_device *dev, struct nlattr *encap,
-			   unsigned int family, const void *cfg,
-			   struct lwtunnel_state **ts);
+	int (*build_state)(struct net *net, struct net_device *dev,
+			   struct nlattr *encap, unsigned int family,
+			   const void *cfg, struct lwtunnel_state **ts);
 	int (*output)(struct net *net, struct sock *sk, struct sk_buff *skb);
 	int (*input)(struct sk_buff *skb);
 	int (*fill_encap)(struct sk_buff *skb,
@@ -106,8 +106,8 @@ int lwtunnel_encap_add_ops(const struct lwtunnel_encap_ops *op,
 			   unsigned int num);
 int lwtunnel_encap_del_ops(const struct lwtunnel_encap_ops *op,
 			   unsigned int num);
-int lwtunnel_build_state(struct net_device *dev, u16 encap_type,
-			 struct nlattr *encap,
+int lwtunnel_build_state(struct net *net, struct net_device *dev,
+			 u16 encap_type, struct nlattr *encap,
 			 unsigned int family, const void *cfg,
 			 struct lwtunnel_state **lws);
 int lwtunnel_fill_encap(struct sk_buff *skb,

@@ -126,9 +126,9 @@ drop:
 	return -EINVAL;
 }
 
-static int mpls_build_state(struct net_device *dev, struct nlattr *nla,
-			    unsigned int family, const void *cfg,
-			    struct lwtunnel_state **ts)
+static int mpls_build_state(struct net *net, struct net_device *dev,
+			    struct nlattr *nla, unsigned int family,
+			    const void *cfg, struct lwtunnel_state **ts)
 {
 	struct mpls_iptunnel_encap *tun_encap_info;
 	struct nlattr *tb[MPLS_IPTUNNEL_MAX + 1];
