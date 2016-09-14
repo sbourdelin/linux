@@ -24,7 +24,7 @@ static const char *const regulator_states[PM_SUSPEND_MAX + 1] = {
 	[PM_SUSPEND_MAX]	= "regulator-state-disk",
 };
 
-static void of_get_regulation_constraints(struct device_node *np,
+static int of_get_regulation_constraints(struct device_node *np,
 					struct regulator_init_data **init_data,
 					const struct regulator_desc *desc)
 {
@@ -97,6 +97,40 @@ static void of_get_regulation_constraints(struct device_node *np,
 	ret = of_property_read_u32(np, "regulator-settle-time-down-us", &pval);
 	if (!ret)
 		constraints->settle_time_down = pval;
+
+	ret = of_property_read_u32(np, "regulator-safe-fall-percent", &pval);
+	if (!ret) {
+		constraints->safe_fall_percent = pval;
+
+		if (constraints->safe_fall_percent > 100) {
+			pr_err("%s: regulator-safe-fall-percent (%u) > 100\n",
+			       np->name, constraints->safe_fall_percent);
+			return -EINVAL;
+		}
+	}
+
+	ret = of_property_read_u32(np, "regulator-slowest-decay-rate", &pval);
+	if (!ret) {
+		constraints->slowest_decay_rate = pval;
+
+		/* We use the value as int and as divider; sanity check */
+		if (constraints->slowest_decay_rate == 0) {
+			pr_err("%s: regulator-slowest-decay-rate must not be 0\n",
+			       np->name);
+			return -EINVAL;
+		} else if (constraints->slowest_decay_rate > INT_MAX) {
+			pr_err("%s: regulator-slowest-decay-rate (%u) too big\n",
+			       np->name, constraints->slowest_decay_rate);
+			return -EINVAL;
+		}
+	}
+
+	if (constraints->safe_fall_percent &&
+	    !constraints->slowest_decay_rate) {
+		pr_err("%s: regulator-safe-fall-percent requires regulator-slowest-decay-rate\n",
+		       np->name);
+		return -EINVAL;
+	}
 
 	constraints->soft_start = of_property_read_bool(np,
 					"regulator-soft-start");
@@ -178,6 +212,8 @@ static void of_get_regulation_constraints(struct device_node *np,
 		suspend_state = NULL;
 		suspend_np = NULL;
 	}
+
+	return 0;
 }
 
 /**
@@ -203,7 +239,9 @@ struct regulator_init_data *of_get_regulator_init_data(struct device *dev,
 	if (!init_data)
 		return NULL; /* Out of memory? */
 
-	of_get_regulation_constraints(node, &init_data, desc);
+	if (of_get_regulation_constraints(node, &init_data, desc))
+		return NULL;
+
 	return init_data;
 }
 EXPORT_SYMBOL_GPL(of_get_regulator_init_data);

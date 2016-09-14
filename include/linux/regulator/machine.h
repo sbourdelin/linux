@@ -154,6 +154,8 @@ struct regulation_constraints {
 	unsigned int enable_time;
 	unsigned int settle_time_up;
 	unsigned int settle_time_down;
+	unsigned int slowest_decay_rate;
+	unsigned int safe_fall_percent;
 
 	unsigned int active_discharge;
 

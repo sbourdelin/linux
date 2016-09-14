@@ -105,8 +105,8 @@ static int _regulator_get_current_limit(struct regulator_dev *rdev);
 static unsigned int _regulator_get_mode(struct regulator_dev *rdev);
 static int _notifier_call_chain(struct regulator_dev *rdev,
 				  unsigned long event, void *data);
-static int _regulator_do_set_voltage(struct regulator_dev *rdev,
-				     int min_uV, int max_uV);
+static int _regulator_set_voltage(struct regulator_dev *rdev,
+				  int min_uV, int max_uV);
 static struct regulator *create_regulator(struct regulator_dev *rdev,
 					  struct device *dev,
 					  const char *supply_name);
@@ -910,7 +910,7 @@ static int machine_constraints_voltage(struct regulator_dev *rdev,
 		if (target_min != current_uV || target_max != current_uV) {
 			rdev_info(rdev, "Bringing %duV into %d-%duV\n",
 				  current_uV, target_min, target_max);
-			ret = _regulator_do_set_voltage(
+			ret = _regulator_set_voltage(
 				rdev, target_min, target_max);
 			if (ret < 0) {
 				rdev_err(rdev,
@@ -2872,6 +2872,45 @@ out:
 	return ret;
 }
 
+static int _regulator_set_voltage(struct regulator_dev *rdev,
+				  int min_uV, int max_uV)
+{
+	int safe_fall_percent = rdev->constraints->safe_fall_percent;
+	int slowest_decay_rate = rdev->constraints->slowest_decay_rate;
+	int orig_uV = _regulator_get_voltage(rdev);
+	int uV = orig_uV;
+	int ret;
+
+	/* If we're rising or we're falling but don't need to slow; easy */
+	if (min_uV >= uV || !safe_fall_percent)
+		return _regulator_do_set_voltage(rdev, min_uV, max_uV);
+
+	while (uV > min_uV) {
+		int max_drop_uV = (uV * safe_fall_percent) / 100;
+		int next_uV;
+		int delay;
+
+		/* Make sure no infinite loop even in crazy cases */
+		if (max_drop_uV == 0)
+			max_drop_uV = 1;
+
+		next_uV = max_t(int, min_uV, uV - max_drop_uV);
+		delay = DIV_ROUND_UP(uV - next_uV, slowest_decay_rate);
+
+		ret = _regulator_do_set_voltage(rdev, uV, next_uV);
+		if (ret) {
+			/* Try to go back to original */
+			_regulator_do_set_voltage(rdev, uV, orig_uV);
+			return ret;
+		}
+
+		usleep_range(delay, delay + DIV_ROUND_UP(delay, 10));
+		uV = next_uV;
+	}
+
+	return 0;
+}
+
 static int regulator_set_voltage_unlocked(struct regulator *regulator,
 					  int min_uV, int max_uV)
 {
@@ -2962,7 +3001,7 @@ static int regulator_set_voltage_unlocked(struct regulator *regulator,
 		}
 	}
 
-	ret = _regulator_do_set_voltage(rdev, min_uV, max_uV);
+	ret = _regulator_set_voltage(rdev, min_uV, max_uV);
 	if (ret < 0)
 		goto out2;
 
@@ -3138,7 +3177,7 @@ int regulator_sync_voltage(struct regulator *regulator)
 	if (ret < 0)
 		goto out;
 
-	ret = _regulator_do_set_voltage(rdev, min_uV, max_uV);
+	ret = _regulator_set_voltage(rdev, min_uV, max_uV);
 
 out:
 	mutex_unlock(&rdev->mutex);
