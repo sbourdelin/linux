@@ -12,7 +12,8 @@
  */
 #define RTNL_FAMILY_IPMR		128
 #define RTNL_FAMILY_IP6MR		129
-#define RTNL_FAMILY_MAX			129
+#define RTNL_FAMILY_ILA			130
+#define RTNL_FAMILY_MAX			130
 
 /****
  *		Routing/neighbour discovery messages.
@@ -143,6 +144,9 @@ enum {
 #define RTM_NEWSTATS RTM_NEWSTATS
 	RTM_GETSTATS = 94,
 #define RTM_GETSTATS RTM_GETSTATS
+
+	RTM_ADDR_RESOLVE = 95,
+#define RTM_ADDR_RESOLVE RTM_ADDR_RESOLVE
 
 	__RTM_MAX,
 #define RTM_MAX		(((__RTM_MAX + 3) & ~3) - 1)
@@ -656,6 +660,8 @@ enum rtnetlink_groups {
 #define RTNLGRP_MPLS_ROUTE	RTNLGRP_MPLS_ROUTE
 	RTNLGRP_NSID,
 #define RTNLGRP_NSID		RTNLGRP_NSID
+	RTNLGRP_ILA_NOTIFY,
+#define RTNLGRP_ILA_NOTIFY	RTNLGRP_ILA_NOTIFY
 	__RTNLGRP_MAX
 };
 #define RTNLGRP_MAX	(__RTNLGRP_MAX - 1)
