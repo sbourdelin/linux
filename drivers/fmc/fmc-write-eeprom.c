@@ -159,10 +159,7 @@ static struct fmc_driver fwe_drv = {
 
 static int fwe_init(void)
 {
-	int ret;
-
-	ret = fmc_driver_register(&fwe_drv);
-	return ret;
+	return fmc_driver_register(&fwe_drv);
 }
 
 static void fwe_exit(void)

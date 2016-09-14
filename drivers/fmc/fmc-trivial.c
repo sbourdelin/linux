@@ -90,10 +90,7 @@ FMC_PARAM_GATEWARE(t_drv);
 
 static int t_init(void)
 {
-	int ret;
-
-	ret = fmc_driver_register(&t_drv);
-	return ret;
+	return fmc_driver_register(&t_drv);
 }
 
 static void t_exit(void)

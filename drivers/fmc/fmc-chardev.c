@@ -184,10 +184,7 @@ static int fc_remove(struct fmc_device *fmc)
 
 static int fc_init(void)
 {
-	int ret;
-
-	ret = fmc_driver_register(&fc_drv);
-	return ret;
+	return fmc_driver_register(&fc_drv);
 }
 
 static void fc_exit(void)
