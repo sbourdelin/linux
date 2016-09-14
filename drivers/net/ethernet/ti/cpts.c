@@ -31,8 +31,6 @@
 
 #include "cpts.h"
 
-#ifdef CONFIG_TI_CPTS
-
 #define cpts_read32(c, r)	__raw_readl(&c->reg->r)
 #define cpts_write32(c, v, r)	__raw_writel(v, &c->reg->r)
 
@@ -350,12 +348,9 @@ void cpts_tx_timestamp(struct cpts *cpts, struct sk_buff *skb)
 	skb_tstamp_tx(skb, &ssh);
 }
 
-#endif /*CONFIG_TI_CPTS*/
-
 int cpts_register(struct device *dev, struct cpts *cpts,
 		  u32 mult, u32 shift)
 {
-#ifdef CONFIG_TI_CPTS
 	int err, i;
 	unsigned long flags;
 
@@ -391,18 +386,15 @@ int cpts_register(struct device *dev, struct cpts *cpts,
 	schedule_delayed_work(&cpts->overflow_work, CPTS_OVERFLOW_PERIOD);
 
 	cpts->phc_index = ptp_clock_index(cpts->clock);
-#endif
 	return 0;
 }
 
 void cpts_unregister(struct cpts *cpts)
 {
-#ifdef CONFIG_TI_CPTS
 	if (cpts->clock) {
 		ptp_clock_unregister(cpts->clock);
 		cancel_delayed_work_sync(&cpts->overflow_work);
 	}
 	if (cpts->refclk)
 		cpts_clk_release(cpts);
-#endif
 }
