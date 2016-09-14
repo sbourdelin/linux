@@ -27,6 +27,7 @@ my $emacs = 0;
 my $terse = 0;
 my $showfile = 0;
 my $file = 0;
+my $force = 0;
 my $git = 0;
 my %git_commits = ();
 my $check = 0;
@@ -187,6 +188,7 @@ GetOptions(
 	'terse!'	=> \$terse,
 	'showfile!'	=> \$showfile,
 	'f|file!'	=> \$file,
+	'force!'	=> \$force,
 	'g|git!'	=> \$git,
 	'subjective!'	=> \$check,
 	'strict!'	=> \$check,
@@ -833,6 +835,10 @@ if ($git) {
 my $vname;
 for my $filename (@ARGV) {
 	my $FILE;
+	if (!$force && $file && $filename !~ m@^drivers/staging/@) {
+		warn "$P: checking '$filename' is not supported\n";
+		next;
+	}
 	if ($git) {
 		open($FILE, '-|', "git format-patch -M --stdout -1 $filename") ||
 			die "$P: $filename: git format-patch failed - $!\n";
