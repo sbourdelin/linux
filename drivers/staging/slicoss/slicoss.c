@@ -2087,15 +2087,15 @@ static irqreturn_t slic_interrupt(int irq, void *dev_id)
 	struct net_device *dev = dev_id;
 	struct adapter *adapter = netdev_priv(dev);
 	struct slic_shmemory *sm = &adapter->shmem;
-	struct slic_shmem_data *sm_data = sm->shmem_data;
+	struct slic_shmem_data __iomem *sm_data = sm->shmem_data;
 	u32 isr;
 
-	if (sm_data->isr) {
+	if (IOMEM_GET_FIELD32(sm_data, isr)) {
 		slic_write32(adapter, SLIC_REG_ICR, ICR_INT_MASK);
 		slic_flush_write(adapter);
 
-		isr = sm_data->isr;
-		sm_data->isr = 0;
+		isr = IOMEM_GET_FIELD32(sm_data, isr);
+		IOMEM_SET_FIELD32(0, sm_data, isr);
 		adapter->num_isrs++;
 		switch (adapter->card->state) {
 		case CARD_UP:
