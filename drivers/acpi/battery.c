@@ -69,6 +69,7 @@ MODULE_LICENSE("GPL");
 static async_cookie_t async_cookie;
 static int battery_bix_broken_package;
 static int battery_notification_delay_ms;
+static int battery_avoid_bix;
 static unsigned int cache_time = 1000;
 module_param(cache_time, uint, 0644);
 MODULE_PARM_DESC(cache_time, "cache time in milliseconds");
@@ -434,10 +435,15 @@ static int acpi_battery_get_info(struct acpi_battery *battery)
 {
 	int result = -EFAULT;
 	acpi_status status = 0;
-	char *name = test_bit(ACPI_BATTERY_XINFO_PRESENT, &battery->flags) ?
-			"_BIX" : "_BIF";
+	bool use_bix = !battery_avoid_bix &&
+			test_bit(ACPI_BATTERY_XINFO_PRESENT, &battery->flags);
+
+	char *name = use_bix ? "_BIX" : "_BIF";
 
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+
+	if (battery_avoid_bix)
+		dev_dbg(&battery->device->dev, "ACPI _BIX method blacklisted on this hardware, avoiding.");
 
 	if (!acpi_battery_present(battery))
 		return 0;
@@ -451,11 +457,11 @@ static int acpi_battery_get_info(struct acpi_battery *battery)
 		return -ENODEV;
 	}
 
-	if (battery_bix_broken_package)
+	if (use_bix && battery_bix_broken_package)
 		result = extract_package(battery, buffer.pointer,
 				extended_info_offsets + 1,
 				ARRAY_SIZE(extended_info_offsets) - 1);
-	else if (test_bit(ACPI_BATTERY_XINFO_PRESENT, &battery->flags))
+	else if (use_bix)
 		result = extract_package(battery, buffer.pointer,
 				extended_info_offsets,
 				ARRAY_SIZE(extended_info_offsets));
@@ -1136,6 +1142,12 @@ battery_notification_delay_quirk(const struct dmi_system_id *d)
 	return 0;
 }
 
+static int __init
+battery_avoid_bix_quirk(const struct dmi_system_id *d)
+{
+	battery_avoid_bix = 1;
+	return 0;
+}
 static const struct dmi_system_id bat_dmi_table[] __initconst = {
 	{
 		.callback = battery_bix_broken_package_quirk,
@@ -1153,6 +1165,15 @@ static const struct dmi_system_id bat_dmi_table[] __initconst = {
 			DMI_MATCH(DMI_PRODUCT_NAME, "Aspire V5-573G"),
 		},
 	},
+	{
+		.callback = battery_avoid_bix_quirk,
+		.ident = "Lenovo Yogo 3000",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "LENOVO"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "80M1"),
+		},
+	},
+
 	{},
 };
 
