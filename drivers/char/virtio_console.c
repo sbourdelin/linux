@@ -2309,7 +2309,7 @@ static int __init init(void)
 	err = register_virtio_driver(&virtio_console);
 	if (err < 0) {
 		pr_err("Error %d registering virtio driver\n", err);
-		goto free;
+		goto remove;
 	}
 	err = register_virtio_driver(&virtio_rproc_serial);
 	if (err < 0) {
@@ -2318,9 +2318,9 @@ static int __init init(void)
 		goto unregister;
 	}
 	return 0;
-unregister:
+ unregister:
 	unregister_virtio_driver(&virtio_console);
-free:
+ remove:
 	debugfs_remove_recursive(pdrvdata.debugfs_dir);
 	class_destroy(pdrvdata.class);
 	return err;
