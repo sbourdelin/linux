@@ -132,6 +132,29 @@ void cpts_rx_timestamp(struct cpts *cpts, struct sk_buff *skb);
 void cpts_tx_timestamp(struct cpts *cpts, struct sk_buff *skb);
 int cpts_register(struct device *dev, struct cpts *cpts, u32 mult, u32 shift);
 void cpts_unregister(struct cpts *cpts);
+
+static inline void cpts_rx_enable(struct cpts *cpts, int enable)
+{
+	if (cpts)
+		cpts->rx_enable = enable;
+}
+
+static inline bool cpts_is_rx_enabled(struct cpts *cpts)
+{
+	return cpts && !!cpts->rx_enable;
+}
+
+static inline void cpts_tx_enable(struct cpts *cpts, int enable)
+{
+	if (cpts)
+		cpts->tx_enable = enable;
+}
+
+static inline bool cpts_is_tx_enabled(struct cpts *cpts)
+{
+	return cpts && !!cpts->tx_enable;
+}
+
 #else
 static inline void cpts_rx_timestamp(struct cpts *cpts, struct sk_buff *skb)
 {
@@ -148,6 +171,24 @@ cpts_register(struct device *dev, struct cpts *cpts, u32 mult, u32 shift)
 
 static inline void cpts_unregister(struct cpts *cpts)
 {
+}
+
+static inline void cpts_rx_enable(struct cpts *cpts, int enable)
+{
+}
+
+static inline bool cpts_is_rx_enabled(struct cpts *cpts)
+{
+	return false;
+}
+
+static inline void cpts_tx_enable(struct cpts *cpts, int enable)
+{
+}
+
+static inline bool cpts_is_tx_enabled(struct cpts *cpts)
+{
+	return false;
 }
 #endif
 
