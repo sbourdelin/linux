@@ -3,4 +3,4 @@
 #
 
 obj-$(CONFIG_PCI_ENDPOINT)		:= pci-epc-core.o pci-epf-core.o \
-					   pci-ep-cfs.o
+					   pci-ep-cfs.o functions/

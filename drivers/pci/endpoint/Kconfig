@@ -19,5 +19,7 @@ config PCI_ENDPOINT
 
 	   If in doubt, say "N" to disable Endpoint support.
 
+source "drivers/pci/endpoint/functions/Kconfig"
+
 endmenu
 
