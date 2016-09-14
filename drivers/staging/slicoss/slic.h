@@ -554,6 +554,13 @@ static inline void slic_flush_write(struct adapter *adapter)
 	ioread32(_base);						\
 })
 
+#define IOMEM_SET_FIELD32(value, base, member)				\
+({									\
+	char __iomem *_base = (char __iomem *)base;			\
+	_base += offsetof(typeof(*base), member);			\
+	iowrite32(value, _base);					\
+})
+
 #define UPDATE_STATS(largestat, newstat, oldstat)                        \
 {                                                                        \
 	if ((newstat) < (oldstat))                                       \
