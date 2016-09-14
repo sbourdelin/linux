@@ -1058,7 +1058,7 @@ static int port_fops_open(struct inode *inode, struct file *filp)
 	 */
 	if (is_console_port(port)) {
 		ret = -ENXIO;
-		goto out;
+		goto put_ref;
 	}
 
 	/* Allow only one process to open a particular port at a time */
@@ -1066,7 +1066,7 @@ static int port_fops_open(struct inode *inode, struct file *filp)
 	if (port->guest_connected) {
 		spin_unlock_irq(&port->inbuf_lock);
 		ret = -EBUSY;
-		goto out;
+		goto put_ref;
 	}
 
 	port->guest_connected = true;
@@ -1087,7 +1087,7 @@ static int port_fops_open(struct inode *inode, struct file *filp)
 	send_control_msg(filp->private_data, VIRTIO_CONSOLE_PORT_OPEN, 1);
 
 	return 0;
-out:
+ put_ref:
 	kref_put(&port->kref, remove_port);
 	return ret;
 }
