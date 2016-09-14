@@ -2037,7 +2037,7 @@ static int virtcons_probe(struct virtio_device *vdev)
 	portdev = kmalloc(sizeof(*portdev), GFP_KERNEL);
 	if (!portdev) {
 		err = -ENOMEM;
-		goto fail;
+		goto exit;
 	}
 
 	/* Attach this portdev to this virtio_device, and vice-versa. */
@@ -2051,7 +2051,7 @@ static int virtcons_probe(struct virtio_device *vdev)
 			"Error %d registering chrdev for device %u\n",
 			portdev->chr_major, vdev->index);
 		err = portdev->chr_major;
-		goto free;
+		goto free_port;
 	}
 
 	multiport = false;
@@ -2068,7 +2068,7 @@ static int virtcons_probe(struct virtio_device *vdev)
 	err = init_vqs(portdev);
 	if (err < 0) {
 		dev_err(&vdev->dev, "Error %d initializing vqs\n", err);
-		goto free_chrdev;
+		goto unregister;
 	}
 
 	spin_lock_init(&portdev->ports_lock);
@@ -2091,7 +2091,7 @@ static int virtcons_probe(struct virtio_device *vdev)
 			dev_err(&vdev->dev,
 				"Error allocating buffers for control queue\n");
 			err = -ENOMEM;
-			goto free_vqs;
+			goto send_control_message;
 		}
 	} else {
 		/*
@@ -2121,17 +2121,16 @@ static int virtcons_probe(struct virtio_device *vdev)
 		wait_for_completion(&early_console_added);
 
 	return 0;
-
-free_vqs:
+ send_control_message:
 	/* The host might want to notify mgmt sw about device add failure */
 	__send_control_msg(portdev, VIRTIO_CONSOLE_BAD_ID,
 			   VIRTIO_CONSOLE_DEVICE_READY, 0);
 	remove_vqs(portdev);
-free_chrdev:
+ unregister:
 	unregister_chrdev(portdev->chr_major, "virtio-portsdev");
-free:
+ free_port:
 	kfree(portdev);
-fail:
+ exit:
 	return err;
 }
 
