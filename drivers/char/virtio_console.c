@@ -842,7 +842,7 @@ static ssize_t port_fops_write(struct file *filp, const char __user *ubuf,
 	ret = copy_from_user(buf->buf, ubuf, count);
 	if (ret) {
 		ret = -EFAULT;
-		goto free_buf;
+		goto free_buffer;
 	}
 
 	/*
@@ -857,11 +857,10 @@ static ssize_t port_fops_write(struct file *filp, const char __user *ubuf,
 	ret = __send_to_port(port, sg, 1, count, buf, nonblock);
 
 	if (nonblock && ret > 0)
-		goto out;
-
-free_buf:
+		goto exit;
+ free_buffer:
 	free_buf(buf, true);
-out:
+ exit:
 	return ret;
 }
 
