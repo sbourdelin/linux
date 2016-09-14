@@ -167,10 +167,12 @@ static void __init cpg_mstp_clocks_init(struct device_node *np)
 	unsigned int i;
 
 	group = kzalloc(sizeof(*group), GFP_KERNEL);
+	if (!group)
+		return;
+
 	clks = kmalloc_array(MSTP_MAX_CLOCKS, sizeof(*clks), GFP_KERNEL);
-	if (group == NULL || clks == NULL) {
+	if (!clks) {
 		kfree(group);
-		kfree(clks);
 		return;
 	}
 
