@@ -146,7 +146,6 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 	/* Can't clone, so now we try to copy the data */
 	error = 0;
 
-	/* FIXME: copy up sparse files efficiently */
 	while (len) {
 		size_t this_len = OVL_COPY_UP_CHUNK_SIZE;
 		long bytes;
@@ -159,15 +158,16 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 			break;
 		}
 
-		bytes = do_splice_direct(old_file, &old_pos,
-					 new_file, &new_pos,
-					 this_len, SPLICE_F_MOVE);
+		bytes = vfs_copy_file_range(old_file, old_pos,
+					    new_file, new_pos,
+					    this_len, 0);
 		if (bytes <= 0) {
 			error = bytes;
 			break;
 		}
-		WARN_ON(old_pos != new_pos);
 
+		old_pos += bytes;
+		new_pos += bytes;
 		len -= bytes;
 	}
 out:
