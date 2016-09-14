@@ -1502,10 +1502,6 @@ ssize_t vfs_copy_file_range(struct file *file_in, loff_t pos_in,
 	    (file_out->f_flags & O_APPEND))
 		return -EBADF;
 
-	/* this could be relaxed once a method supports cross-fs copies */
-	if (inode_in->i_sb != inode_out->i_sb)
-		return -EXDEV;
-
 	if (len == 0)
 		return 0;
 
@@ -1514,7 +1510,9 @@ ssize_t vfs_copy_file_range(struct file *file_in, loff_t pos_in,
 		return ret;
 
 	ret = -EOPNOTSUPP;
-	if (file_out->f_op->copy_file_range)
+	/* copy_file_range() method does not support cross-fs copies */
+	if (inode_in->i_sb == inode_out->i_sb &&
+	    file_out->f_op->copy_file_range)
 		ret = file_out->f_op->copy_file_range(file_in, pos_in, file_out,
 						      pos_out, len, flags);
 	if (ret == -EOPNOTSUPP)
@@ -1568,6 +1566,14 @@ SYSCALL_DEFINE6(copy_file_range, int, fd_in, loff_t __user *, off_in,
 	} else {
 		pos_out = f_out.file->f_pos;
 	}
+
+	/*
+	 * vfs_copy_file_range() can do cross-fs copy, but we want to
+	 * fulfill the guaranty to userland that copy_file_range syscall
+	 * does not allow cross-fs copy
+	 */
+	if (file_inode(f_in.file)->i_sb != file_inode(f_out.file)->i_sb)
+		return -EXDEV;
 
 	ret = vfs_copy_file_range(f_in.file, pos_in, f_out.file, pos_out, len,
 				  flags);
