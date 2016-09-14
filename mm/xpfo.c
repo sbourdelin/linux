@@ -203,3 +203,11 @@ inline bool xpfo_page_is_unmapped(struct page *page)
 
 	return test_bit(PAGE_EXT_XPFO_UNMAPPED, &lookup_page_ext(page)->flags);
 }
+
+inline bool xpfo_page_is_kernel(struct page *page)
+{
+	if (!static_branch_unlikely(&xpfo_inited))
+		return false;
+
+	return test_bit(PAGE_EXT_XPFO_KERNEL, &lookup_page_ext(page)->flags);
+}

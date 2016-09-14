@@ -24,6 +24,7 @@ extern void xpfo_alloc_page(struct page *page, int order, gfp_t gfp);
 extern void xpfo_free_page(struct page *page, int order);
 
 extern bool xpfo_page_is_unmapped(struct page *page);
+extern bool xpfo_page_is_kernel(struct page *page);
 
 #else /* !CONFIG_XPFO */
 
@@ -33,6 +34,7 @@ static inline void xpfo_alloc_page(struct page *page, int order, gfp_t gfp) { }
 static inline void xpfo_free_page(struct page *page, int order) { }
 
 static inline bool xpfo_page_is_unmapped(struct page *page) { return false; }
+static inline bool xpfo_page_is_kernel(struct page *page) { return false; }
 
 #endif /* CONFIG_XPFO */
 
