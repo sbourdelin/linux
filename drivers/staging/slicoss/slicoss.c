@@ -1004,8 +1004,9 @@ static void slic_upr_request_complete(struct adapter *adapter, u32 isr)
 	switch (upr->upr_request) {
 	case SLIC_UPR_STATS: {
 		struct slic_shmemory *sm = &adapter->shmem;
-		struct slic_shmem_data *sm_data = sm->shmem_data;
-		struct slic_stats *stats = &sm_data->stats;
+		struct slic_shmem_data __iomem *sm_data = sm->shmem_data;
+		struct slic_stats __iomem *stats =
+					IOMEM_GET_FIELDADDR(sm_data, stats);
 		struct slic_stats *old = &adapter->inicstats_prev;
 		struct slicnet_stats *stst = &adapter->slic_stats;
 
@@ -1015,48 +1016,62 @@ static void slic_upr_request_complete(struct adapter *adapter, u32 isr)
 			break;
 		}
 
-		UPDATE_STATS_GB(stst->tcp.xmit_tcp_segs, stats->xmit_tcp_segs,
+		UPDATE_STATS_GB(stst->tcp.xmit_tcp_segs,
+				IOMEM_GET_FIELD64(stats, xmit_tcp_segs),
 				old->xmit_tcp_segs);
 
-		UPDATE_STATS_GB(stst->tcp.xmit_tcp_bytes, stats->xmit_tcp_bytes,
+		UPDATE_STATS_GB(stst->tcp.xmit_tcp_bytes,
+				IOMEM_GET_FIELD64(stats, xmit_tcp_bytes),
 				old->xmit_tcp_bytes);
 
-		UPDATE_STATS_GB(stst->tcp.rcv_tcp_segs, stats->rcv_tcp_segs,
+		UPDATE_STATS_GB(stst->tcp.rcv_tcp_segs,
+				IOMEM_GET_FIELD64(stats, rcv_tcp_segs),
 				old->rcv_tcp_segs);
 
-		UPDATE_STATS_GB(stst->tcp.rcv_tcp_bytes, stats->rcv_tcp_bytes,
+		UPDATE_STATS_GB(stst->tcp.rcv_tcp_bytes,
+				IOMEM_GET_FIELD64(stats, rcv_tcp_bytes),
 				old->rcv_tcp_bytes);
 
-		UPDATE_STATS_GB(stst->iface.xmt_bytes, stats->xmit_bytes,
+		UPDATE_STATS_GB(stst->iface.xmt_bytes,
+				IOMEM_GET_FIELD64(stats, xmit_bytes),
 				old->xmit_bytes);
 
-		UPDATE_STATS_GB(stst->iface.xmt_ucast, stats->xmit_unicasts,
+		UPDATE_STATS_GB(stst->iface.xmt_ucast,
+				IOMEM_GET_FIELD64(stats, xmit_unicasts),
 				old->xmit_unicasts);
 
-		UPDATE_STATS_GB(stst->iface.rcv_bytes, stats->rcv_bytes,
+		UPDATE_STATS_GB(stst->iface.rcv_bytes,
+				IOMEM_GET_FIELD64(stats, rcv_bytes),
 				old->rcv_bytes);
 
-		UPDATE_STATS_GB(stst->iface.rcv_ucast, stats->rcv_unicasts,
+		UPDATE_STATS_GB(stst->iface.rcv_ucast,
+				IOMEM_GET_FIELD64(stats, rcv_unicasts),
 				old->rcv_unicasts);
 
-		UPDATE_STATS_GB(stst->iface.xmt_errors, stats->xmit_collisions,
+		UPDATE_STATS_GB(stst->iface.xmt_errors,
+				IOMEM_GET_FIELD64(stats, xmit_collisions),
 				old->xmit_collisions);
 
 		UPDATE_STATS_GB(stst->iface.xmt_errors,
-				stats->xmit_excess_collisions,
+				IOMEM_GET_FIELD64(stats,
+						  xmit_excess_collisions),
 				old->xmit_excess_collisions);
 
-		UPDATE_STATS_GB(stst->iface.xmt_errors, stats->xmit_other_error,
+		UPDATE_STATS_GB(stst->iface.xmt_errors,
+				IOMEM_GET_FIELD64(stats, xmit_other_error),
 				old->xmit_other_error);
 
-		UPDATE_STATS_GB(stst->iface.rcv_errors, stats->rcv_other_error,
+		UPDATE_STATS_GB(stst->iface.rcv_errors,
+				IOMEM_GET_FIELD64(stats, rcv_other_error),
 				old->rcv_other_error);
 
-		UPDATE_STATS_GB(stst->iface.rcv_discards, stats->rcv_drops,
+		UPDATE_STATS_GB(stst->iface.rcv_discards,
+				IOMEM_GET_FIELD64(stats, rcv_drops),
 				old->rcv_drops);
 
-		if (stats->rcv_drops > old->rcv_drops)
-			adapter->rcv_drops += (stats->rcv_drops -
+		if (IOMEM_GET_FIELD64(stats, rcv_drops) > old->rcv_drops)
+			adapter->rcv_drops +=
+					(IOMEM_GET_FIELD64(stats, rcv_drops) -
 					       old->rcv_drops);
 		memcpy_fromio(old, stats, sizeof(*stats));
 		break;
