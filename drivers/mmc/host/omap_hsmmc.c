@@ -1409,7 +1409,7 @@ static int omap_hsmmc_pre_dma_transfer(struct omap_hsmmc_host *host,
 static int omap_hsmmc_setup_dma_transfer(struct omap_hsmmc_host *host,
 					struct mmc_request *req)
 {
-	struct dma_slave_config cfg;
+	struct dma_slave_config cfg = {};
 	struct dma_async_tx_descriptor *tx;
 	int ret = 0, i;
 	struct mmc_data *data = req->data;
