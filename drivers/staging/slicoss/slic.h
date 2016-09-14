@@ -540,6 +540,13 @@ static inline void slic_flush_write(struct adapter *adapter)
 	ioread32(adapter->regs + SLIC_REG_HOSTID);
 }
 
+#define IOMEM_GET_FIELDADDR(base, member)				\
+({									\
+	char __iomem *_base = (char __iomem *)base;			\
+	_base += offsetof(typeof(*base), member);			\
+	(void __iomem *)_base;						\
+})
+
 #define UPDATE_STATS(largestat, newstat, oldstat)                        \
 {                                                                        \
 	if ((newstat) < (oldstat))                                       \
