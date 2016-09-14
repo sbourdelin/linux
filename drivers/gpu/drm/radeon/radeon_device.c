@@ -36,6 +36,7 @@
 #include <linux/efi.h>
 #include "radeon_reg.h"
 #include "radeon.h"
+#include "radeon_drv.h"
 #include "atom.h"
 
 static const char radeon_family_name[][16] = {

@@ -119,4 +119,9 @@
 long radeon_drm_ioctl(struct file *filp,
 		      unsigned int cmd, unsigned long arg);
 
+#if defined(CONFIG_DEBUG_FS)
+int radeon_debugfs_init(struct drm_minor *minor);
+void radeon_debugfs_cleanup(struct drm_minor *minor);
+#endif
+
 #endif				/* __RADEON_DRV_H__ */

@@ -156,11 +156,6 @@ void radeon_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
 extern long radeon_kms_compat_ioctl(struct file *filp, unsigned int cmd,
 				    unsigned long arg);
 
-#if defined(CONFIG_DEBUG_FS)
-int radeon_debugfs_init(struct drm_minor *minor);
-void radeon_debugfs_cleanup(struct drm_minor *minor);
-#endif
-
 /* atpx handler */
 #if defined(CONFIG_VGA_SWITCHEROO)
 void radeon_register_atpx_handler(void);
