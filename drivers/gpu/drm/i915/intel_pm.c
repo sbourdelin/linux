@@ -3589,11 +3589,11 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 		case 2:
 			y_min_scanlines = 8;
 			break;
-		default:
-			WARN(1, "Unsupported pixel depth for rotation");
 		case 4:
 			y_min_scanlines = 4;
 			break;
+		default:
+			return -EINVAL;
 		}
 	} else {
 		y_min_scanlines = 4;
