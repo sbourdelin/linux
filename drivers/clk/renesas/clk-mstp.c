@@ -171,7 +171,6 @@ static void __init cpg_mstp_clocks_init(struct device_node *np)
 	if (group == NULL || clks == NULL) {
 		kfree(group);
 		kfree(clks);
-		pr_err("%s: failed to allocate group\n", __func__);
 		return;
 	}
 
