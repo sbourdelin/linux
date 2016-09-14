@@ -212,12 +212,17 @@ int virtio_pci_legacy_probe(struct virtio_pci_device *vp_dev)
 		return -ENODEV;
 	}
 
-	rc = dma_set_mask_and_coherent(&pci_dev->dev, DMA_BIT_MASK(64));
+	/*
+	 * The virtio ring base address is expressed as a 32-bit PFN, with a
+	 * page size of 1 << VIRTIO_PCI_QUEUE_ADDR_SHIFT.
+	 */
+	rc = dma_set_mask_and_coherent(&pci_dev->dev,
+				DMA_BIT_MASK(32 + VIRTIO_PCI_QUEUE_ADDR_SHIFT));
 	if (rc)
 		rc = dma_set_mask_and_coherent(&pci_dev->dev,
 						DMA_BIT_MASK(32));
 	if (rc)
-		dev_warn(&pci_dev->dev, "Failed to enable 64-bit or 32-bit DMA.  Trying to continue, but this might not work.\n");
+		dev_warn(&pci_dev->dev, "Failed to enable %d-bit or 32-bit DMA.  Trying to continue, but this might not work.\n", 32 + VIRTIO_PCI_QUEUE_ADDR_SHIFT);
 
 	rc = pci_request_region(pci_dev, 0, "virtio-pci-legacy");
 	if (rc)
