@@ -161,7 +161,7 @@ static int page_size_mask;
 
 static void __init probe_page_size_mask(void)
 {
-#if !defined(CONFIG_KMEMCHECK)
+#if !defined(CONFIG_KMEMCHECK) && !defined(CONFIG_XPFO)
 	/*
 	 * For CONFIG_KMEMCHECK or pagealloc debugging, identity mapping will
 	 * use small pages.
