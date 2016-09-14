@@ -256,19 +256,18 @@ int cpg_mstp_attach_dev(struct generic_pm_domain *unused, struct device *dev)
 					   &clkspec)) {
 		if (of_device_is_compatible(clkspec.np,
 					    "renesas,cpg-mstp-clocks"))
-			goto found;
+			goto get_clk;
 
 		/* BSC on r8a73a4/sh73a0 uses zb_clk instead of an mstp clock */
 		if (!strcmp(clkspec.np->name, "zb_clk"))
-			goto found;
+			goto get_clk;
 
 		of_node_put(clkspec.np);
 		i++;
 	}
 
 	return 0;
-
-found:
+ get_clk:
 	clk = of_clk_get_from_provider(&clkspec);
 	of_node_put(clkspec.np);
 
@@ -278,20 +277,19 @@ found:
 	error = pm_clk_create(dev);
 	if (error) {
 		dev_err(dev, "pm_clk_create failed %d\n", error);
-		goto fail_put;
+		goto put_clk;
 	}
 
 	error = pm_clk_add_clk(dev, clk);
 	if (error) {
 		dev_err(dev, "pm_clk_add_clk %pC failed %d\n", clk, error);
-		goto fail_destroy;
+		goto destroy_clk;
 	}
 
 	return 0;
-
-fail_destroy:
+ destroy_clk:
 	pm_clk_destroy(dev);
-fail_put:
+ put_clk:
 	clk_put(clk);
 	return error;
 }
