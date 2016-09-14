@@ -4343,6 +4343,32 @@ static int nf_tables_check_loops(const struct nft_ctx *ctx,
 }
 
 /**
+ *	nft_parse_u32_check - parse a u32 value to store the value into a
+ *			      smaller resource.
+ *
+ *	@attr: netlink attribute
+ *	@maxlen: maximum value to be stored in dest
+ *	@dest: pointer to the resource
+ *
+ *	Parse and store a given u32 value into a resource. Returns an error
+ *	ERANGE if the value will overload the maxlen, otherwise a 0 will be
+ *	returned and the value is stored into dest.
+ */
+unsigned int nft_parse_u32_check(const struct nlattr *attr, int maxlen,
+				 u32 *dest)
+{
+	int reg;
+
+	reg = ntohl(nla_get_be32(attr));
+	if (reg > maxlen)
+		return -ERANGE;
+
+	*dest = reg;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(nft_parse_u32_check);
+
+/**
  *	nft_parse_register - parse a register value from a netlink attribute
  *
  *	@attr: netlink attribute
