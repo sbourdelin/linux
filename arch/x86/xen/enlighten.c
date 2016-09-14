@@ -1050,6 +1050,9 @@ static u64 xen_read_msr_safe(unsigned int msr, int *err)
 #endif
 			val &= ~X2APIC_ENABLE;
 		break;
+	case MSR_PLATFORM_INFO:
+		val &= ~CPUID_FAULTING_SUPPORT;
+		break;
 	}
 	return val;
 }
