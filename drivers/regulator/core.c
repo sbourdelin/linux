@@ -2746,19 +2746,23 @@ static int _regulator_call_set_voltage_sel(struct regulator_dev *rdev,
 static int _regulator_set_voltage_time(struct regulator_dev *rdev,
 				       int old_uV, int new_uV)
 {
+	unsigned int settle_time = 0;
 	unsigned int ramp_delay = 0;
+
+	if (new_uV > old_uV)
+		settle_time = rdev->constraints->settle_time_up;
+	else if (new_uV < old_uV)
+		settle_time = rdev->constraints->settle_time_down;
 
 	if (rdev->constraints->ramp_delay)
 		ramp_delay = rdev->constraints->ramp_delay;
 	else if (rdev->desc->ramp_delay)
 		ramp_delay = rdev->desc->ramp_delay;
 
-	if (ramp_delay == 0) {
-		rdev_warn(rdev, "ramp_delay not set\n");
-		return 0;
-	}
+	if (ramp_delay == 0)
+		return settle_time;
 
-	return DIV_ROUND_UP(abs(new_uV - old_uV), ramp_delay);
+	return settle_time + DIV_ROUND_UP(abs(new_uV - old_uV), ramp_delay);
 }
 
 static int _regulator_do_set_voltage(struct regulator_dev *rdev,
@@ -3071,8 +3075,8 @@ EXPORT_SYMBOL_GPL(regulator_set_voltage_time);
  * Provided with the starting and target voltage selectors, this function
  * returns time in microseconds required to rise or fall to this new voltage
  *
- * Drivers providing ramp_delay in regulation_constraints can use this as their
- * set_voltage_time_sel() operation.
+ * Drivers providing ramp_delay or settle_time in regulation_constraints can
+ * use this as their set_voltage_time_sel() operation.
  */
 int regulator_set_voltage_time_sel(struct regulator_dev *rdev,
 				   unsigned int old_selector,

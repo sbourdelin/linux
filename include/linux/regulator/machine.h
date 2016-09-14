@@ -108,6 +108,8 @@ struct regulator_state {
  * @initial_state: Suspend state to set by default.
  * @initial_mode: Mode to set at startup.
  * @ramp_delay: Time to settle down after voltage change (unit: uV/us)
+ * @settle_time_up: Time to settle down after voltage increase (unit: uV/us)
+ * @settle_time_down: Time to settle down after voltage decrease (unit: uV/us)
  * @active_discharge: Enable/disable active discharge. The enum
  *		      regulator_active_discharge values are used for
  *		      initialisation.
@@ -150,6 +152,8 @@ struct regulation_constraints {
 
 	unsigned int ramp_delay;
 	unsigned int enable_time;
+	unsigned int settle_time_up;
+	unsigned int settle_time_down;
 
 	unsigned int active_discharge;
 

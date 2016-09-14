@@ -90,6 +90,14 @@ static void of_get_regulation_constraints(struct device_node *np,
 	if (!ret)
 		constraints->enable_time = pval;
 
+	ret = of_property_read_u32(np, "regulator-settle-time-up-us", &pval);
+	if (!ret)
+		constraints->settle_time_up = pval;
+
+	ret = of_property_read_u32(np, "regulator-settle-time-down-us", &pval);
+	if (!ret)
+		constraints->settle_time_down = pval;
+
 	constraints->soft_start = of_property_read_bool(np,
 					"regulator-soft-start");
 	ret = of_property_read_u32(np, "regulator-active-discharge", &pval);

@@ -21,6 +21,10 @@ Optional properties:
   design requires. This property describes the total system ramp time
   required due to the combination of internal ramping of the regulator itself,
   and board design issues such as trace capacitance and load on the supply.
+- regulator-settle-time-up-us: Time to settle down after a voltage increase
+  (unit: us). For regulators with a ramp delay the two values are added.
+- regulator-settle-time-down-us: Time to settle down after a voltage decrease
+  (unit: us). For regulators with a ramp delay the two values are added.
 - regulator-soft-start: Enable soft start so that voltage ramps slowly
 - regulator-state-mem sub-root node for Suspend-to-RAM mode
   : suspend to memory, the device goes to sleep, but all data stored in memory,
