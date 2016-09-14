@@ -2230,7 +2230,7 @@ static int slic_if_init(struct adapter *adapter, unsigned long *flags)
 	struct sliccard *card = adapter->card;
 	struct net_device *dev = adapter->netdev;
 	struct slic_shmemory *sm = &adapter->shmem;
-	struct slic_shmem_data *sm_data = sm->shmem_data;
+	struct slic_shmem_data __iomem *sm_data = sm->shmem_data;
 	int rc;
 
 	/* adapter should be down at this point */
@@ -2314,7 +2314,7 @@ static int slic_if_init(struct adapter *adapter, unsigned long *flags)
 	/*
 	 *    clear any pending events, then enable interrupts
 	 */
-	sm_data->isr = 0;
+	IOMEM_SET_FIELD32(0, sm_data, isr);
 	slic_write32(adapter, SLIC_REG_ISR, 0);
 	slic_write32(adapter, SLIC_REG_ICR, ICR_INT_ON);
 
@@ -2603,7 +2603,7 @@ static void slic_config_pci(struct pci_dev *pcidev)
 static int slic_card_init(struct sliccard *card, struct adapter *adapter)
 {
 	struct slic_shmemory *sm = &adapter->shmem;
-	struct slic_shmem_data *sm_data = sm->shmem_data;
+	struct slic_shmem_data __iomem *sm_data = sm->shmem_data;
 	struct slic_eeprom *peeprom;
 	struct oslic_eeprom *pOeeprom;
 	dma_addr_t phys_config;
@@ -2666,9 +2666,9 @@ static int slic_card_init(struct sliccard *card, struct adapter *adapter)
 		}
 
 		for (;;) {
-			if (sm_data->isr) {
-				if (sm_data->isr & ISR_UPC) {
-					sm_data->isr = 0;
+			if (IOMEM_GET_FIELD32(sm_data, isr)) {
+				if (IOMEM_GET_FIELD32(sm_data, isr) & ISR_UPC) {
+					IOMEM_SET_FIELD32(0, sm_data, isr);
 					slic_write64(adapter, SLIC_REG_ISP, 0,
 						     0);
 					slic_write32(adapter, SLIC_REG_ISR, 0);
@@ -2678,7 +2678,7 @@ static int slic_card_init(struct sliccard *card, struct adapter *adapter)
 					break;
 				}
 
-				sm_data->isr = 0;
+				IOMEM_SET_FIELD32(0, sm_data, isr);
 				slic_write32(adapter, SLIC_REG_ISR, 0);
 				slic_flush_write(adapter);
 			} else {
