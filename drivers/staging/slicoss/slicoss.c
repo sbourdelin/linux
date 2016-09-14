@@ -2883,7 +2883,7 @@ static int slic_init_adapter(struct net_device *netdev,
 	if (!sm_data)
 		return -ENOMEM;
 
-	sm->shmem_data = sm_data;
+	sm->shmem_data = (struct slic_shmem_data __force __iomem *)sm_data;
 	sm->isr_phaddr = phaddr;
 	sm->lnkstatus_phaddr = phaddr + offsetof(struct slic_shmem_data,
 						 lnkstatus);
