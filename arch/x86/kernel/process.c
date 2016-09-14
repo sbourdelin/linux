@@ -193,6 +193,69 @@ int set_tsc_mode(unsigned int val)
 	return 0;
 }
 
+static void switch_cpuid_faulting(bool on)
+{
+	if (on)
+		msr_set_bit(MSR_MISC_FEATURES_ENABLES, 0);
+	else
+		msr_clear_bit(MSR_MISC_FEATURES_ENABLES, 0);
+}
+
+static void disable_cpuid(void)
+{
+	preempt_disable();
+	if (!test_and_set_thread_flag(TIF_NOCPUID))
+		/*
+		 * Must flip the CPU state synchronously with
+		 * TIF_NOCPUID in the current running context.
+		 */
+		switch_cpuid_faulting(true);
+	preempt_enable();
+}
+
+static void enable_cpuid(void)
+{
+	preempt_disable();
+	if (test_and_clear_thread_flag(TIF_NOCPUID))
+		/*
+		 * Must flip the CPU state synchronously with
+		 * TIF_NOCPUID in the current running context.
+		 */
+		switch_cpuid_faulting(false);
+	preempt_enable();
+}
+
+int get_cpuid_mode(unsigned long adr)
+{
+	unsigned int val;
+
+	if (test_thread_flag(TIF_NOCPUID))
+		val = ARCH_CPUID_SIGSEGV;
+	else
+		val = ARCH_CPUID_ENABLE;
+
+	return put_user(val, (unsigned int __user *)adr);
+}
+
+int set_cpuid_mode(struct task_struct *task, unsigned long val)
+{
+	/* Only disable/enable_cpuid() if it is supported on this hardware. */
+	bool cpuid_fault_supported = static_cpu_has(X86_FEATURE_CPUID_FAULT);
+
+	if (val == ARCH_CPUID_ENABLE && cpuid_fault_supported) {
+		if (task_no_new_privs(task) && test_thread_flag(TIF_NOCPUID))
+			return -EACCES;
+
+		enable_cpuid();
+	} else if (val == ARCH_CPUID_SIGSEGV && cpuid_fault_supported) {
+		disable_cpuid();
+	} else {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 void __switch_to_xtra(struct task_struct *prev_p, struct task_struct *next_p,
 		      struct tss_struct *tss)
 {
@@ -210,6 +273,15 @@ void __switch_to_xtra(struct task_struct *prev_p, struct task_struct *next_p,
 			debugctl |= DEBUGCTLMSR_BTF;
 
 		update_debugctlmsr(debugctl);
+	}
+
+	if (test_tsk_thread_flag(prev_p, TIF_NOCPUID) ^
+	    test_tsk_thread_flag(next_p, TIF_NOCPUID)) {
+		/* prev and next are different */
+		if (test_tsk_thread_flag(next_p, TIF_NOCPUID))
+			switch_cpuid_faulting(true);
+		else
+			switch_cpuid_faulting(false);
 	}
 
 	if (test_tsk_thread_flag(prev_p, TIF_NOTSC) ^
@@ -635,6 +707,15 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long arg2)
 		break;
 	}
 #endif
+	case ARCH_GET_CPUID: {
+		ret = get_cpuid_mode(arg2);
+		break;
+	}
+	case ARCH_SET_CPUID: {
+		ret = set_cpuid_mode(task, arg2);
+		break;
+	}
+
 	default:
 		ret = -EINVAL;
 		break;
