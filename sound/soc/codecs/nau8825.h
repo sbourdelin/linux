@@ -433,6 +433,7 @@ struct nau8825 {
 	struct snd_soc_dapm_context *dapm;
 	struct snd_soc_jack *jack;
 	struct clk *mclk;
+	struct delayed_work softmute_work;
 	struct work_struct xtalk_work;
 	struct semaphore xtalk_sem;
 	int irq;
@@ -459,10 +460,12 @@ struct nau8825 {
 	int xtalk_event_mask;
 	bool xtalk_protect;
 	int imp_rms[NAU8825_XTALK_IMM];
+	int sidetone;
 };
 
 int nau8825_enable_jack_detect(struct snd_soc_codec *codec,
 				struct snd_soc_jack *jack);
+int nau8825_soft_mute(struct snd_soc_codec *codec, int mute);
 
 
 #endif  /* __NAU8825_H__ */
