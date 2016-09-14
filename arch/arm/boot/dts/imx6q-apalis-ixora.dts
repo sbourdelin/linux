@@ -55,7 +55,6 @@
 		     "fsl,imx6q";
 
 	aliases {
-		i2c0 = &i2cddc;
 		i2c1 = &i2c1;
 		i2c2 = &i2c2;
 		i2c3 = &i2c3;
@@ -186,11 +185,6 @@
 };
 
 &hdmi {
-	ddc-i2c-bus = <&i2cddc>;
-	status = "okay";
-};
-
-&i2cddc {
 	status = "okay";
 };
 
