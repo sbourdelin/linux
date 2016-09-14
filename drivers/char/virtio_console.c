@@ -947,17 +947,17 @@ static ssize_t port_fops_splice_write(struct pipe_inode_info *pipe,
 	pipe_lock(pipe);
 	if (!pipe->nrbufs) {
 		ret = 0;
-		goto error_out;
+		goto unlock;
 	}
 
 	ret = wait_port_writable(port, filp->f_flags & O_NONBLOCK);
 	if (ret < 0)
-		goto error_out;
+		goto unlock;
 
 	buf = alloc_buf(port->out_vq, 0, pipe->nrbufs);
 	if (!buf) {
 		ret = -ENOMEM;
-		goto error_out;
+		goto unlock;
 	}
 
 	sgl.n = 0;
@@ -973,8 +973,7 @@ static ssize_t port_fops_splice_write(struct pipe_inode_info *pipe,
 	if (unlikely(ret <= 0))
 		free_buf(buf, true);
 	return ret;
-
-error_out:
+ unlock:
 	pipe_unlock(pipe);
 	return ret;
 }
