@@ -1399,7 +1399,7 @@ static int add_port(struct ports_device *portdev, u32 id)
 	port = kmalloc(sizeof(*port), GFP_KERNEL);
 	if (!port) {
 		err = -ENOMEM;
-		goto fail;
+		goto send_control_message;
 	}
 	kref_init(&port->kref);
 
@@ -1434,7 +1434,7 @@ static int add_port(struct ports_device *portdev, u32 id)
 	if (err < 0) {
 		dev_err(&port->portdev->vdev->dev,
 			"Error %d adding cdev for port %u\n", err, id);
-		goto free_cdev;
+		goto delete_cdev;
 	}
 	port->dev = device_create(pdrvdata.class, &port->portdev->vdev->dev,
 				  devt, port, "vport%up%u",
@@ -1444,7 +1444,7 @@ static int add_port(struct ports_device *portdev, u32 id)
 		dev_err(&port->portdev->vdev->dev,
 			"Error %d creating device for port %u\n",
 			err, id);
-		goto free_cdev;
+		goto delete_cdev;
 	}
 
 	spin_lock_init(&port->inbuf_lock);
@@ -1456,7 +1456,7 @@ static int add_port(struct ports_device *portdev, u32 id)
 	if (!nr_added_bufs) {
 		dev_err(port->dev, "Error allocating inbufs\n");
 		err = -ENOMEM;
-		goto free_device;
+		goto destroy_device;
 	}
 
 	if (is_rproc_serial(port->portdev->vdev))
@@ -1473,7 +1473,7 @@ static int add_port(struct ports_device *portdev, u32 id)
 		 */
 		err = init_port_console(port);
 		if (err)
-			goto free_inbufs;
+			goto free_buffers;
 	}
 
 	spin_lock_irq(&portdev->ports_lock);
@@ -1500,17 +1500,16 @@ static int add_port(struct ports_device *portdev, u32 id)
 							 &port_debugfs_ops);
 	}
 	return 0;
-
-free_inbufs:
+ free_buffers:
 	while ((buf = virtqueue_detach_unused_buf(port->in_vq)))
 		free_buf(buf, true);
-free_device:
+ destroy_device:
 	device_destroy(pdrvdata.class, port->dev->devt);
-free_cdev:
+ delete_cdev:
 	cdev_del(port->cdev);
-free_port:
+ free_port:
 	kfree(port);
-fail:
+ send_control_message:
 	/* The host might want to notify management sw about port add failure */
 	__send_control_msg(portdev, id, VIRTIO_CONSOLE_PORT_READY, 0);
 	return err;
