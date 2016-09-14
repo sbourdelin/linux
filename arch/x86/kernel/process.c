@@ -20,6 +20,7 @@
 #include <linux/cpuidle.h>
 #include <trace/events/power.h>
 #include <linux/hw_breakpoint.h>
+#include <linux/syscalls.h>
 #include <asm/cpu.h>
 #include <asm/apic.h>
 #include <asm/syscalls.h>
@@ -32,6 +33,7 @@
 #include <asm/tlbflush.h>
 #include <asm/mce.h>
 #include <asm/vm86.h>
+#include <asm/prctl.h>
 
 /*
  * per-CPU TSS segments. Threads are completely 'soft' on Linux,
@@ -566,4 +568,82 @@ unsigned long get_wchan(struct task_struct *p)
 		fp = READ_ONCE_NOCHECK(*(unsigned long *)fp);
 	} while (count++ < 16 && p->state != TASK_RUNNING);
 	return 0;
+}
+
+long do_arch_prctl(struct task_struct *task, int code, unsigned long arg2)
+{
+	int ret = 0;
+	int doit = task == current;
+	int is_32 = IS_ENABLED(CONFIG_IA32_EMULATION) && test_thread_flag(TIF_IA32);
+	int cpu;
+
+	switch (code) {
+#ifdef CONFIG_X86_64
+	case ARCH_SET_GS:
+		if (is_32)
+			return -EINVAL;
+		if (arg2 >= TASK_SIZE_MAX)
+			return -EPERM;
+		cpu = get_cpu();
+		task->thread.gsindex = 0;
+		task->thread.gsbase = arg2;
+		if (doit) {
+			load_gs_index(0);
+			ret = wrmsrl_safe(MSR_KERNEL_GS_BASE, arg2);
+		}
+		put_cpu();
+		break;
+	case ARCH_SET_FS:
+		if (is_32)
+			return -EINVAL;
+		/* Not strictly needed for fs, but do it for symmetry
+		   with gs */
+		if (arg2 >= TASK_SIZE_MAX)
+			return -EPERM;
+		cpu = get_cpu();
+		task->thread.fsindex = 0;
+		task->thread.fsbase = arg2;
+		if (doit) {
+			/* set the selector to 0 to not confuse __switch_to */
+			loadsegment(fs, 0);
+			ret = wrmsrl_safe(MSR_FS_BASE, arg2);
+		}
+		put_cpu();
+		break;
+	case ARCH_GET_FS: {
+		unsigned long base;
+
+		if (is_32)
+			return -EINVAL;
+		if (doit)
+			rdmsrl(MSR_FS_BASE, base);
+		else
+			base = task->thread.fsbase;
+		ret = put_user(base, (unsigned long __user *)arg2);
+		break;
+	}
+	case ARCH_GET_GS: {
+		unsigned long base;
+
+		if (is_32)
+			return -EINVAL;
+		if (doit)
+			rdmsrl(MSR_KERNEL_GS_BASE, base);
+		else
+			base = task->thread.gsbase;
+		ret = put_user(base, (unsigned long __user *)arg2);
+		break;
+	}
+#endif
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
+SYSCALL_DEFINE2(arch_prctl, int, code, unsigned long, arg2)
+{
+	return do_arch_prctl(current, code, arg2);
 }
