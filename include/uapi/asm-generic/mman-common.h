@@ -72,4 +72,6 @@
 #define MAP_HUGE_SHIFT	26
 #define MAP_HUGE_MASK	0x3f
 
+#define MINCORE_ORDER	1		/* retrieve hardware mapping-size-order */
+
 #endif /* __ASM_GENERIC_MMAN_COMMON_H */

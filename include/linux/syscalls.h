@@ -467,6 +467,8 @@ asmlinkage long sys_munlockall(void);
 asmlinkage long sys_madvise(unsigned long start, size_t len, int behavior);
 asmlinkage long sys_mincore(unsigned long start, size_t len,
 				unsigned char __user * vec);
+asmlinkage long sys_mincore2(unsigned long start, size_t len,
+				unsigned char __user * vec, int flags);
 
 asmlinkage long sys_pivot_root(const char __user *new_root,
 				const char __user *put_old);
