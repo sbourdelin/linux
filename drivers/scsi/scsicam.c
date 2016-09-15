@@ -207,7 +207,8 @@ EXPORT_SYMBOL(scsi_partsize);
  *
  * WORKING                                                    X3T9.2
  * DRAFT                                                        792D
- * see http://www.t10.org/ftp/t10/drafts/cam/cam-r12b.pdf
+ * 'cam-r12b.pdf' document on http://www.t10.org/t10docs.htm
+ * (registration required)
  *
  *                                                        Revision 6
  *                                                         10-MAR-94
