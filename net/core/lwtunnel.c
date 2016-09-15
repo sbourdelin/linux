@@ -39,6 +39,8 @@ static const char *lwtunnel_encap_str(enum lwtunnel_encap_types encap_type)
 		return "MPLS";
 	case LWTUNNEL_ENCAP_ILA:
 		return "ILA";
+	case LWTUNNEL_ENCAP_ILA_NOTIFY:
+		return "ILA_NOTIFY";
 	case LWTUNNEL_ENCAP_IP6:
 	case LWTUNNEL_ENCAP_IP:
 	case LWTUNNEL_ENCAP_NONE:
@@ -96,9 +98,10 @@ int lwtunnel_encap_del_ops(const struct lwtunnel_encap_ops *ops,
 }
 EXPORT_SYMBOL(lwtunnel_encap_del_ops);
 
-int lwtunnel_build_state(struct net_device *dev, u16 encap_type,
-			 struct nlattr *encap, unsigned int family,
-			 const void *cfg, struct lwtunnel_state **lws)
+int lwtunnel_build_state(struct net *net, struct net_device *dev,
+			 u16 encap_type, struct nlattr *encap,
+			 unsigned int family, const void *cfg,
+			 struct lwtunnel_state **lws)
 {
 	const struct lwtunnel_encap_ops *ops;
 	int ret = -EINVAL;
@@ -123,7 +126,7 @@ int lwtunnel_build_state(struct net_device *dev, u16 encap_type,
 	}
 #endif
 	if (likely(ops && ops->build_state))
-		ret = ops->build_state(dev, encap, family, cfg, lws);
+		ret = ops->build_state(net, dev, encap, family, cfg, lws);
 	rcu_read_unlock();
 
 	return ret;

@@ -511,7 +511,8 @@ static int fib_get_nhs(struct fib_info *fi, struct rtnexthop *rtnh,
 					goto err_inval;
 				if (cfg->fc_oif)
 					dev = __dev_get_by_index(net, cfg->fc_oif);
-				ret = lwtunnel_build_state(dev, nla_get_u16(
+				ret = lwtunnel_build_state(net, dev,
+							   nla_get_u16(
 							   nla_entype),
 							   nla,  AF_INET, cfg,
 							   &lwtstate);
@@ -610,7 +611,7 @@ static int fib_encap_match(struct net *net, u16 encap_type,
 
 	if (oif)
 		dev = __dev_get_by_index(net, oif);
-	ret = lwtunnel_build_state(dev, encap_type, encap,
+	ret = lwtunnel_build_state(net, dev, encap_type, encap,
 				   AF_INET, cfg, &lwtstate);
 	if (!ret) {
 		result = lwtunnel_cmp_encap(lwtstate, nh->nh_lwtstate);
@@ -1098,7 +1099,7 @@ struct fib_info *fib_create_info(struct fib_config *cfg)
 				goto err_inval;
 			if (cfg->fc_oif)
 				dev = __dev_get_by_index(net, cfg->fc_oif);
-			err = lwtunnel_build_state(dev, cfg->fc_encap_type,
+			err = lwtunnel_build_state(net, dev, cfg->fc_encap_type,
 						   cfg->fc_encap, AF_INET, cfg,
 						   &lwtstate);
 			if (err)
