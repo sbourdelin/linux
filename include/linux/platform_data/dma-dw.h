@@ -37,10 +37,7 @@ struct dw_dma_slave {
 /**
  * struct dw_dma_platform_data - Controller configuration parameters
  * @nr_channels: Number of channels supported by hardware (max 8)
- * @is_private: The device channels should be marked as private and not for
- *	by the general purpose DMA channel allocator.
- * @is_memcpy: The device channels do support memory-to-memory transfers.
- * @is_nollp: The device channels does not support multi block transfers.
+ * @quirks: Bit field with platform quirks
  * @chan_allocation_order: Allocate channels starting from 0 or 7
  * @chan_priority: Set channel priority increasing from 0 to 7 or 7 to 0.
  * @block_size: Maximum block size supported by the controller
@@ -50,9 +47,18 @@ struct dw_dma_slave {
  */
 struct dw_dma_platform_data {
 	unsigned int	nr_channels;
-	bool		is_private;
-	bool		is_memcpy;
-	bool		is_nollp;
+/* Only use quirks from platform data structure */
+#define QUIRKS_ONLY_USED	0
+/*
+ * The device channels should be marked as private and not for
+ * by the general purpose DMA channel allocator.
+ */
+#define QUIRKS_IS_PRIVATE	1
+/* The device channels do support memory-to-memory transfers. */
+#define QUIRKS_IS_MEMCPY	2
+/* The device channels do not support multi block transfers. */
+#define QUIRKS_IS_NOLLP		3
+	unsigned long	quirks;
 #define CHAN_ALLOCATION_ASCENDING	0	/* zero to seven */
 #define CHAN_ALLOCATION_DESCENDING	1	/* seven to zero */
 	unsigned char	chan_allocation_order;

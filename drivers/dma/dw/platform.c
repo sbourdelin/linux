@@ -12,6 +12,7 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/bitops.h>
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/clk.h>
@@ -111,41 +112,48 @@ dw_dma_parse_dt(struct platform_device *pdev)
 		return NULL;
 	}
 
-	if (of_property_read_u32(np, "dma-masters", &nr_masters))
-		return NULL;
-	if (nr_masters < 1 || nr_masters > DW_DMA_MAX_NR_MASTERS)
-		return NULL;
-
-	if (of_property_read_u32(np, "dma-channels", &nr_channels))
-		return NULL;
-
 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata)
 		return NULL;
 
+	set_bit(QUIRKS_ONLY_USED, &pdata->quirks);
+
+	if (of_property_read_bool(np, "is-private"))
+		set_bit(QUIRKS_IS_PRIVATE, &pdata->quirks);
+
+	if (of_property_read_bool(np, "is-memcpy"))
+		set_bit(QUIRKS_IS_MEMCPY, &pdata->quirks);
+
+	if (of_property_read_bool(np, "is-nollp"))
+		set_bit(QUIRKS_IS_NOLLP, &pdata->quirks);
+
+	if (of_property_read_u32(np, "dma-masters", &nr_masters))
+		return pdata;
+	if (nr_masters < 1 || nr_masters > DW_DMA_MAX_NR_MASTERS)
+		return pdata;
+
 	pdata->nr_masters = nr_masters;
+
+	if (of_property_read_u32(np, "dma-channels", &nr_channels))
+		return pdata;
+
 	pdata->nr_channels = nr_channels;
 
-	if (of_property_read_bool(np, "is_private"))
-		pdata->is_private = true;
-
-	if (!of_property_read_u32(np, "chan_allocation_order", &tmp))
+	if (!of_property_read_u32(np, "chan-allocation-order", &tmp))
 		pdata->chan_allocation_order = (unsigned char)tmp;
 
-	if (!of_property_read_u32(np, "chan_priority", &tmp))
+	if (!of_property_read_u32(np, "chan-priority", &tmp))
 		pdata->chan_priority = tmp;
 
-	if (!of_property_read_u32(np, "block_size", &tmp))
+	if (!of_property_read_u32(np, "block-size", &tmp))
 		pdata->block_size = tmp;
 
 	if (!of_property_read_u32_array(np, "data-width", arr, nr_masters)) {
 		for (tmp = 0; tmp < nr_masters; tmp++)
 			pdata->data_width[tmp] = arr[tmp];
-	} else if (!of_property_read_u32_array(np, "data_width", arr, nr_masters)) {
-		for (tmp = 0; tmp < nr_masters; tmp++)
-			pdata->data_width[tmp] = BIT(arr[tmp] & 0x07);
 	}
 
+	clear_bit(QUIRKS_ONLY_USED, &pdata->quirks);
 	return pdata;
 }
 #else

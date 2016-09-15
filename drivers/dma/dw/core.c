@@ -1451,10 +1451,25 @@ int dw_dma_probe(struct dw_dma_chip *chip)
 
 	dw->regs = chip->regs;
 	chip->dw = dw;
+	/* Reassign the platform data pointer */
+	pdata = dw->pdata;
 
 	pm_runtime_get_sync(chip->dev);
 
-	if (!chip->pdata) {
+	if ((!chip->pdata) ||
+	   (chip->pdata && test_bit(QUIRKS_ONLY_USED, &chip->pdata->quirks))) {
+
+		/*
+		 * Fill quirks with the default values in case of pdata absence
+		 */
+		if (!chip->pdata) {
+			set_bit(QUIRKS_IS_PRIVATE, &pdata->quirks);
+			set_bit(QUIRKS_IS_MEMCPY, &pdata->quirks);
+			set_bit(QUIRKS_IS_NOLLP, &pdata->quirks);
+		} else {
+			pdata->quirks = chip->pdata->quirks;
+		}
+
 		dw_params = dma_readl(dw, DW_PARAMS);
 		dev_dbg(chip->dev, "DW_PARAMS: 0x%08x\n", dw_params);
 
@@ -1463,9 +1478,6 @@ int dw_dma_probe(struct dw_dma_chip *chip)
 			err = -EINVAL;
 			goto err_pdata;
 		}
-
-		/* Reassign the platform data pointer */
-		pdata = dw->pdata;
 
 		/* Get hardware configuration parameters */
 		pdata->nr_channels = (dw_params >> DW_PARAMS_NR_CHAN & 7) + 1;
@@ -1477,8 +1489,6 @@ int dw_dma_probe(struct dw_dma_chip *chip)
 		pdata->block_size = dma_readl(dw, MAX_BLK_SIZE);
 
 		/* Fill platform data with the default values */
-		pdata->is_private = true;
-		pdata->is_memcpy = true;
 		pdata->chan_allocation_order = CHAN_ALLOCATION_ASCENDING;
 		pdata->chan_priority = CHAN_PRIORITY_ASCENDING;
 	} else if (chip->pdata->nr_channels > DW_DMA_MAX_NR_CHANNELS) {
@@ -1486,9 +1496,6 @@ int dw_dma_probe(struct dw_dma_chip *chip)
 		goto err_pdata;
 	} else {
 		memcpy(dw->pdata, chip->pdata, sizeof(*dw->pdata));
-
-		/* Reassign the platform data pointer */
-		pdata = dw->pdata;
 	}
 
 	dw->chan = devm_kcalloc(chip->dev, pdata->nr_channels, sizeof(*dw->chan),
@@ -1569,7 +1576,7 @@ int dw_dma_probe(struct dw_dma_chip *chip)
 				(dwc_params >> DWC_PARAMS_MBLK_EN & 0x1) == 0;
 		} else {
 			dwc->block_size = pdata->block_size;
-			dwc->nollp = pdata->is_nollp;
+			dwc->nollp = test_bit(QUIRKS_IS_NOLLP, &pdata->quirks);
 		}
 	}
 
@@ -1582,9 +1589,9 @@ int dw_dma_probe(struct dw_dma_chip *chip)
 
 	/* Set capabilities */
 	dma_cap_set(DMA_SLAVE, dw->dma.cap_mask);
-	if (pdata->is_private)
+	if (test_bit(QUIRKS_IS_PRIVATE, &pdata->quirks))
 		dma_cap_set(DMA_PRIVATE, dw->dma.cap_mask);
-	if (pdata->is_memcpy)
+	if (test_bit(QUIRKS_IS_MEMCPY, &pdata->quirks))
 		dma_cap_set(DMA_MEMCPY, dw->dma.cap_mask);
 
 	dw->dma.dev = chip->dev;
