@@ -526,6 +526,14 @@ static struct queue_sysfs_entry queue_dax_entry = {
 	.show = queue_dax_show,
 };
 
+#ifdef CONFIG_BLK_DEV_THROTTLING
+static struct queue_sysfs_entry throtl_slice_entry = {
+	.attr = {.name = "throttling_slice", .mode = S_IRUGO | S_IWUSR },
+	.show = blk_throtl_slice_show,
+	.store = blk_throtl_slice_store,
+};
+#endif
+
 static struct attribute *default_attrs[] = {
 	&queue_requests_entry.attr,
 	&queue_ra_entry.attr,
@@ -553,6 +561,9 @@ static struct attribute *default_attrs[] = {
 	&queue_poll_entry.attr,
 	&queue_wc_entry.attr,
 	&queue_dax_entry.attr,
+#ifdef CONFIG_BLK_DEV_THROTTLING
+	&throtl_slice_entry.attr,
+#endif
 	NULL,
 };
 
