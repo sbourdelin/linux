@@ -1627,6 +1627,11 @@ static int exec_binprm(struct linux_binprm *bprm)
 	return ret;
 }
 
+void __weak arch_post_exec(void)
+{
+	/* Do nothing by default */
+}
+
 /*
  * sys_execve() executes a new program.
  */
@@ -1743,6 +1748,7 @@ static int do_execveat_common(int fd, struct filename *filename,
 	/* execve succeeded */
 	current->fs->in_exec = 0;
 	current->in_execve = 0;
+	arch_post_exec();
 	acct_update_integrals(current);
 	task_numa_free(current);
 	free_bprm(bprm);
