@@ -52,11 +52,11 @@ struct virt_dma_desc *vchan_find_desc(struct virt_dma_chan *, dma_cookie_t);
  * @vd: virtual descriptor to prepare
  * @tx_flags: flags argument passed in to prepare function
  */
+extern dma_cookie_t vchan_tx_submit(struct dma_async_tx_descriptor *);
+extern int vchan_tx_desc_free(struct dma_async_tx_descriptor *);
 static inline struct dma_async_tx_descriptor *vchan_tx_prep(struct virt_dma_chan *vc,
 	struct virt_dma_desc *vd, unsigned long tx_flags)
 {
-	extern dma_cookie_t vchan_tx_submit(struct dma_async_tx_descriptor *);
-	extern int vchan_tx_desc_free(struct dma_async_tx_descriptor *);
 	unsigned long flags;
 
 	dma_async_tx_descriptor_init(&vd->tx, &vc->chan);
