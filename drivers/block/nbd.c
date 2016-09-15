@@ -599,8 +599,8 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *nbd,
 			return -EINVAL;
 
 		sreq = blk_mq_alloc_request(bdev_get_queue(bdev), WRITE, 0);
-		if (!sreq)
-			return -ENOMEM;
+		if (IS_ERR(sreq))
+			return PTR_ERR(sreq);
 
 		mutex_unlock(&nbd->tx_lock);
 		fsync_bdev(bdev);
@@ -956,7 +956,8 @@ static int __init nbd_init(void)
 		 * These structs are big so we dynamically allocate them.
 		 */
 		disk->queue = blk_mq_init_queue(&nbd_dev[i].tag_set);
-		if (!disk->queue) {
+		if (IS_ERR(disk->queue)) {
+			err = PTR_ERR(disk->queue);
 			blk_mq_free_tag_set(&nbd_dev[i].tag_set);
 			put_disk(disk);
 			goto out;
