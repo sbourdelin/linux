@@ -567,3 +567,13 @@ unsigned long get_wchan(struct task_struct *p)
 	} while (count++ < 16 && p->state != TASK_RUNNING);
 	return 0;
 }
+
+long do_arch_prctl_common(struct task_struct *task, int code, unsigned long arg2)
+{
+	return -EINVAL;
+}
+
+asmlinkage long compat_sys_arch_prctl(int code, unsigned long arg2)
+{
+	return do_arch_prctl_common(current, code, arg2);
+}
