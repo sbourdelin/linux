@@ -48,6 +48,12 @@ void pnv_cxl_phb_set_peer_afu(struct pci_dev *dev, struct cxl_afu *afu);
 
 #endif
 
+struct pnv_php_event {
+	bool			added;
+	struct pnv_php_slot	*php_slot;
+	struct work_struct	work;
+};
+
 struct pnv_php_slot {
 	struct hotplug_slot		slot;
 	struct hotplug_slot_info	slot_info;
@@ -60,6 +66,9 @@ struct pnv_php_slot {
 #define PNV_PHP_STATE_POPULATED		2
 #define PNV_PHP_STATE_OFFLINE		3
 	int				state;
+	int				irq;
+	struct workqueue_struct		*wq;
+	struct pnv_php_event		*event;
 	struct device_node		*dn;
 	struct pci_dev			*pdev;
 	struct pci_bus			*bus;
