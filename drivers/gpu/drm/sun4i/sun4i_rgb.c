@@ -240,7 +240,7 @@ int sun4i_rgb_init(struct drm_device *drm)
 	ret = drm_encoder_init(drm,
 			       &rgb->encoder,
 			       &sun4i_rgb_enc_funcs,
-			       DRM_MODE_ENCODER_NONE,
+			       DRM_MODE_ENCODER_DPI,
 			       NULL);
 	if (ret) {
 		dev_err(drm->dev, "Couldn't initialise the rgb encoder\n");
@@ -255,7 +255,7 @@ int sun4i_rgb_init(struct drm_device *drm)
 					 &sun4i_rgb_con_helper_funcs);
 		ret = drm_connector_init(drm, &rgb->connector,
 					 &sun4i_rgb_con_funcs,
-					 DRM_MODE_CONNECTOR_Unknown);
+					 DRM_MODE_CONNECTOR_DPI);
 		if (ret) {
 			dev_err(drm->dev, "Couldn't initialise the rgb connector\n");
 			goto err_cleanup_connector;
