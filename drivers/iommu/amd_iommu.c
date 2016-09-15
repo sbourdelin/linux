@@ -137,6 +137,7 @@ struct iommu_dev_data {
 	bool pri_tlp;			  /* PASID TLB required for
 					     PPR completions */
 	u32 errata;			  /* Bitmap for errata to apply */
+	bool domain_updated;
 };
 
 /*
@@ -1708,6 +1709,15 @@ static void set_dte_entry(u16 devid, struct protection_domain *domain, bool ats)
 {
 	u64 pte_root = 0;
 	u64 flags = 0;
+	struct iommu_dev_data *dev_data;
+	struct amd_iommu *iommu = amd_iommu_rlookup_table[devid];
+
+	dev_data = find_dev_data(devid);
+        if (!dev_data)
+                return;
+
+	if (translation_pre_enabled(iommu) && !dev_data->domain_updated)
+		return;
 
 	if (domain->mode != PAGE_MODE_NONE)
 		pte_root = virt_to_phys(domain->pt_root);
@@ -1756,6 +1766,14 @@ static void set_dte_entry(u16 devid, struct protection_domain *domain, bool ats)
 
 static void clear_dte_entry(u16 devid)
 {
+	struct iommu_dev_data *dev_data;
+	struct amd_iommu *iommu = amd_iommu_rlookup_table[devid];
+
+	dev_data = find_dev_data(devid);
+        if (!dev_data)
+                return;
+	if (translation_pre_enabled(iommu) && !dev_data->domain_updated)
+		return;
 	/* remove entry from the device table seen by the hardware */
 	amd_iommu_dev_table[devid].data[0]  = DTE_FLAG_V | DTE_FLAG_TV;
 	amd_iommu_dev_table[devid].data[1] &= DTE_FLAG_MASK;
