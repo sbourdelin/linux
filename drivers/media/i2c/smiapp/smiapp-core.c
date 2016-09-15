@@ -2530,25 +2530,6 @@ static int smiapp_register_subdev(struct smiapp_sensor *sensor,
 	return 0;
 }
 
-static int smiapp_register_subdevs(struct smiapp_sensor *sensor)
-{
-	int rval;
-
-	if (sensor->scaler) {
-		rval = smiapp_register_subdev(
-			sensor, sensor->binner, sensor->scaler,
-			SMIAPP_PAD_SRC, SMIAPP_PAD_SINK,
-			MEDIA_LNK_FL_ENABLED | MEDIA_LNK_FL_IMMUTABLE);
-		if (rval < 0)
-			return rval;
-	}
-
-	return smiapp_register_subdev(
-		sensor, sensor->pixel_array, sensor->binner,
-		SMIAPP_PA_PAD_SRC, SMIAPP_PAD_SINK,
-		MEDIA_LNK_FL_ENABLED | MEDIA_LNK_FL_IMMUTABLE);
-}
-
 static void smiapp_cleanup(struct smiapp_sensor *sensor)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(&sensor->src->sd);
@@ -2557,6 +2538,31 @@ static void smiapp_cleanup(struct smiapp_sensor *sensor)
 	device_remove_file(&client->dev, &dev_attr_ident);
 
 	smiapp_free_controls(sensor);
+}
+
+static int smiapp_registered(struct v4l2_subdev *subdev)
+{
+	struct smiapp_sensor *sensor = to_smiapp_sensor(subdev);
+	int rval;
+
+	if (sensor->scaler) {
+		rval = smiapp_register_subdev(
+			sensor, sensor->binner, sensor->scaler,
+			SMIAPP_PAD_SRC, SMIAPP_PAD_SINK,
+			MEDIA_LNK_FL_ENABLED | MEDIA_LNK_FL_IMMUTABLE);
+		if (rval < 0)
+			goto out_err;
+	}
+
+	return smiapp_register_subdev(
+		sensor, sensor->pixel_array, sensor->binner,
+		SMIAPP_PA_PAD_SRC, SMIAPP_PAD_SINK,
+		MEDIA_LNK_FL_ENABLED | MEDIA_LNK_FL_IMMUTABLE);
+
+out_err:
+	smiapp_cleanup(sensor);
+
+	return rval;
 }
 
 static void smiapp_create_subdev(struct smiapp_sensor *sensor,
@@ -2817,25 +2823,6 @@ out_power_off:
 	return rval;
 }
 
-static int smiapp_registered(struct v4l2_subdev *subdev)
-{
-	struct smiapp_sensor *sensor = to_smiapp_sensor(subdev);
-	struct i2c_client *client = v4l2_get_subdevdata(subdev);
-	int rval;
-
-	if (!client->dev.of_node) {
-		rval = smiapp_init(sensor);
-		if (rval)
-			return rval;
-	}
-
-	rval = smiapp_register_subdevs(sensor);
-	if (rval)
-		smiapp_cleanup(sensor);
-
-	return rval;
-}
-
 static int smiapp_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	struct smiapp_subdev *ssd = to_smiapp_subdev(sd);
@@ -3077,11 +3064,9 @@ static int smiapp_probe(struct i2c_client *client,
 	sensor->src->sensor = sensor;
 	sensor->src->pads[0].flags = MEDIA_PAD_FL_SOURCE;
 
-	if (client->dev.of_node) {
-		rval = smiapp_init(sensor);
-		if (rval)
-			goto out_media_entity_cleanup;
-	}
+	rval = smiapp_init(sensor);
+	if (rval)
+		goto out_media_entity_cleanup;
 
 	rval = media_entity_pads_init(&sensor->src->sd.entity, 2,
 				 sensor->src->pads);
