@@ -8498,11 +8498,6 @@ static int i40e_sw_init(struct i40e_pf *pf)
 	int err = 0;
 	int size;
 
-	pf->msg_enable = netif_msg_init(debug,
-					NETIF_MSG_DRV    |
-					NETIF_MSG_PROBE  |
-					NETIF_MSG_LINK);
-
 	/* Set default capability flags */
 	pf->flags = I40E_FLAG_RX_CSUM_ENABLED |
 		    I40E_FLAG_MSI_ENABLED     |
@@ -10812,10 +10807,13 @@ static int i40e_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	mutex_init(&hw->aq.asq_mutex);
 	mutex_init(&hw->aq.arq_mutex);
 
-	if (debug != -1) {
-		pf->msg_enable = pf->hw.debug_mask;
-		pf->msg_enable = debug;
-	}
+	/* enable debug prints if requested */
+	pf->msg_enable = netif_msg_init(debug,
+					NETIF_MSG_DRV   |
+					NETIF_MSG_PROBE |
+					NETIF_MSG_LINK);
+	if (debug != -1)
+		pf->hw.debug_mask = pf->msg_enable;
 
 	/* do a special CORER for clearing PXE mode once at init */
 	if (hw->revision_id == 0 &&
