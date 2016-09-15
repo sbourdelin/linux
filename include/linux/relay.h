@@ -20,6 +20,7 @@
 #include <linux/poll.h>
 #include <linux/kref.h>
 #include <linux/irq_work.h>
+#include <linux/percpu.h>
 
 /*
  * Tracks changes to rchan/rchan_buf structs
