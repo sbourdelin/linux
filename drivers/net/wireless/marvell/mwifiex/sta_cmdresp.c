@@ -1049,8 +1049,10 @@ mwifiex_create_custom_regdomain(struct mwifiex_private *priv,
 		enum nl80211_band band;
 
 		chan = *buf++;
-		if (!chan)
+		if (!chan) {
+			kfree(regd);
 			return NULL;
+		}
 		chflags = *buf++;
 		band = (chan <= 14) ? NL80211_BAND_2GHZ : NL80211_BAND_5GHZ;
 		freq = ieee80211_channel_to_frequency(chan, band);
