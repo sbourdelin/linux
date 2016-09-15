@@ -195,3 +195,21 @@ config HIGH_RES_TIMERS
 
 endmenu
 endif
+
+config POSIX_TIMERS
+	bool "Posix Clocks & timers" if EMBEDDED
+	default y
+	help
+	  This includes native support for POSIX timers to the kernel.
+	  Most embedded systems may have no use for them and therefore they
+	  can be configured out to reduce the size of the kernel image.
+
+	  When this option is disabled, the following syscalls won't be
+	  available: timer_create, timer_gettime: timer_getoverrun,
+	  timer_settime, timer_delete, clock_adjtime. Furthermore, the
+	  clock_settime, clock_gettime, clock_getres and clock_nanosleep
+	  syscalls will be limited to CLOCK_REALTIME and CLOCK_MONOTONIC
+	  only.
+
+	  If unsure say y.
+
