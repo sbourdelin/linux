@@ -549,6 +549,31 @@ config X86_INTEL_QUARK
 	  Say Y here if you have a Quark based system such as the Arduino
 	  compatible Intel Galileo.
 
+config MLX_PLATFORM
+	tristate "Mellanox Technologies platform support"
+	depends on X86_64
+	depends on X86_EXTENDED_PLATFORM
+	depends on PCI
+	depends on DMI
+	depends on I2C_MLXCPLD
+	depends on I2C_MUX_REG
+	select HWMON
+	select PMBUS
+	select SENSORS_PMBUS
+	select LM75
+	select NEW_LEDS
+	select LEDS_CLASS
+	select LEDS_TRIGGERS
+	select LEDS_TRIGGER_TIMER
+	select LEDS_MLXCPLD
+	---help---
+	  This option enables system support for the Mellanox Technologies
+	  platform.
+
+	  Say Y here if you are building a kernel for Mellanox system.
+
+	  Otherwise, say N.
+
 config X86_INTEL_LPSS
 	bool "Intel Low Power Subsystem Support"
 	depends on X86 && ACPI
