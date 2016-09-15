@@ -1712,6 +1712,10 @@ int class_check_uuid(struct obd_uuid *uuid, __u64 nid);
 void class_init_uuidlist(void);
 void class_exit_uuidlist(void);
 
+/*linux-module.c*/
+int class_procfs_init(void);
+int class_procfs_clean(void);
+
 /* class_obd.c */
 extern char obd_jobid_node[];
 extern struct miscdevice obd_psdev;

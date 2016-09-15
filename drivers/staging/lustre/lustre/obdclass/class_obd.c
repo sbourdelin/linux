@@ -446,8 +446,6 @@ static int obd_init_checks(void)
 	return ret;
 }
 
-extern int class_procfs_init(void);
-extern int class_procfs_clean(void);
 
 static int __init obdclass_init(void)
 {
