@@ -32,6 +32,7 @@
  */
 #define IRQ_DISABLE_MASK_NONE		0
 #define IRQ_DISABLE_MASK_LINUX		1
+#define IRQ_DISABLE_MASK_PMU		2
 
 #endif /* CONFIG_PPC64 */
 
