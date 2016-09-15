@@ -81,6 +81,20 @@ static inline notrace unsigned long soft_enabled_set_return(unsigned long enable
 	return flags;
 }
 
+static inline notrace unsigned long soft_enabled_or_return(unsigned long enable)
+{
+	unsigned long flags, zero;
+
+	asm volatile(
+		"mr %1,%3; lbz %0,%2(13); or %1,%0,%1; stb %1,%2(13)"
+		: "=r" (flags), "=&r"(zero)
+		: "i" (offsetof(struct paca_struct, soft_enabled)),\
+		  "r" (enable)
+		: "memory");
+
+	return flags;
+}
+
 static inline unsigned long arch_local_save_flags(void)
 {
 	return soft_enabled_return();
@@ -105,13 +119,66 @@ static inline unsigned long arch_local_irq_save(void)
 
 static inline bool arch_irqs_disabled_flags(unsigned long flags)
 {
-	return flags == IRQ_DISABLE_MASK_LINUX;
+	return (flags);
 }
 
 static inline bool arch_irqs_disabled(void)
 {
 	return arch_irqs_disabled_flags(arch_local_save_flags());
 }
+
+static inline void powerpc_local_irq_pmu_restore(unsigned long flags)
+{
+	arch_local_irq_restore(flags);
+}
+
+static inline unsigned long powerpc_local_irq_pmu_disable(void)
+{
+	return soft_enabled_or_return(IRQ_DISABLE_MASK_LINUX | IRQ_DISABLE_MASK_PMU);
+}
+
+static inline unsigned long powerpc_local_irq_pmu_save(void)
+{
+	return powerpc_local_irq_pmu_disable();
+}
+
+#define raw_local_irq_pmu_save(flags)					\
+	do {								\
+		typecheck(unsigned long, flags);			\
+		flags = powerpc_local_irq_pmu_save();			\
+	} while(0)
+
+#define raw_local_irq_pmu_restore(flags)				\
+	do {								\
+		typecheck(unsigned long, flags);			\
+		powerpc_local_irq_pmu_restore(flags);			\
+	} while(0)
+
+#ifdef CONFIG_TRACE_IRQFLAGS
+#define local_irq_pmu_save(flags)		\
+	do {					\
+		raw_local_irq_pmu_save(flags);	\
+		trace_hardirqs_off();		\
+	} while(0)
+#define local_irq_pmu_restore(flags)			\
+	do {						\
+		if (raw_irqs_disabled_flags(flags)) {   \
+			raw_local_irq_pmu_restore(flags);\
+			trace_hardirqs_off();		\
+		} else {				\
+			trace_hardirqs_on();		\
+			raw_local_irq_pmu_restore(flags);\
+		}					\
+	} while(0)
+#else
+#define local_irq_pmu_save(flags)		\
+	do {					\
+		raw_local_irq_pmu_save(flags);	\
+	} while(0)
+#define local_irq_pmu_restore(flags)			\
+	do { raw_local_irq_pmu_restore(flags); } while (0)
+#endif /* CONFIG_TRACE_IRQFLAGS */
+
 
 #ifdef CONFIG_PPC_BOOK3E
 #define __hard_irq_enable()	asm volatile("wrteei 1" : : : "memory")
