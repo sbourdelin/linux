@@ -47,11 +47,22 @@ When the OS is not in control of the management interface (i.e. it's a guest),
 the channel nodes appear on their own, not under a management node.
 
 Required properties:
-- compatible: must contain "qcom,hidma-1.0"
+- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
+for MSI capable HW.
 - reg: Addresses for the transfer and event channel
 - interrupts: Should contain the event interrupt
 - desc-count: Number of asynchronous requests this channel can handle
 - iommus: required a iommu node
+
+Optional properties for MSI:
+- msi-parent: pointer to the MSI controller object with the DeviceID in use.
+
+Example:
+ msi_parent: <&msi0 0x80024>
+
+msi0 is the MSI controller in the system. Bits 0-5 is the channel ID. 4
+is the channel ID. Bits 5-8 is the instance number. This is for the HIDMA
+instance 1.
 
 Example:
 
