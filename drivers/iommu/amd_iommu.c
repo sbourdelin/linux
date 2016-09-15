@@ -2310,6 +2310,10 @@ static dma_addr_t __map_single(struct device *dev,
 	unsigned int pages;
 	int prot = 0;
 	int i;
+	struct iommu_dev_data *dev_data = get_dev_data(dev);
+	struct protection_domain *domain = get_domain(dev);
+	u16 alias = amd_iommu_alias_table[dev_data->devid];
+	struct amd_iommu *iommu = amd_iommu_rlookup_table[dev_data->devid];
 
 	pages = iommu_num_pages(paddr, size, PAGE_SIZE);
 	paddr &= PAGE_MASK;
@@ -2319,6 +2323,13 @@ static dma_addr_t __map_single(struct device *dev,
 		goto out;
 
 	prot = dir2prot(direction);
+	if (translation_pre_enabled(iommu) && !dev_data->domain_updated) {
+               dev_data->domain_updated = true;
+               set_dte_entry(dev_data->devid, domain, dev_data->ats.enabled);
+               if (alias != dev_data->devid)
+                       set_dte_entry(alias, domain, dev_data->ats.enabled);
+               device_flush_dte(dev_data);
+       }
 
 	start = address;
 	for (i = 0; i < pages; ++i) {
@@ -2470,6 +2481,9 @@ static int map_sg(struct device *dev, struct scatterlist *sglist,
 	struct scatterlist *s;
 	unsigned long address;
 	u64 dma_mask;
+	struct iommu_dev_data *dev_data = get_dev_data(dev);
+	u16 alias = amd_iommu_alias_table[dev_data->devid];
+	struct amd_iommu *iommu = amd_iommu_rlookup_table[dev_data->devid];
 
 	domain = get_domain(dev);
 	if (IS_ERR(domain))
@@ -2485,6 +2499,13 @@ static int map_sg(struct device *dev, struct scatterlist *sglist,
 		goto out_err;
 
 	prot = dir2prot(direction);
+	if (translation_pre_enabled(iommu) && !dev_data->domain_updated) {
+               dev_data->domain_updated = true;
+               set_dte_entry(dev_data->devid, domain, dev_data->ats.enabled);
+               if (alias != dev_data->devid)
+                       set_dte_entry(alias, domain, dev_data->ats.enabled);
+               device_flush_dte(dev_data);
+       }
 
 	/* Map all sg entries */
 	for_each_sg(sglist, s, nelems, i) {
