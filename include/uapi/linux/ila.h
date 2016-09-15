@@ -42,4 +42,13 @@ enum {
 	ILA_CSUM_NO_ACTION,
 };
 
+enum {
+	ILA_NOTIFY_ATTR_UNSPEC,
+	ILA_NOTIFY_ATTR_TIMEOUT,		/* u32 */
+
+	__ILA_NOTIFY_ATTR_MAX,
+};
+
+#define ILA_NOTIFY_ATTR_MAX	(__ILA_NOTIFY_ATTR_MAX - 1)
+
 #endif /* _UAPI_LINUX_ILA_H */

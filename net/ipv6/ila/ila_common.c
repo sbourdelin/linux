@@ -157,7 +157,13 @@ static int __init ila_init(void)
 	if (ret)
 		goto fail_xlat;
 
+	ret = ila_rslv_init();
+	if (ret)
+		goto fail_rslv;
+
 	return 0;
+fail_rslv:
+	ila_xlat_fini();
 fail_xlat:
 	ila_lwt_fini();
 fail_lwt:
@@ -168,6 +174,7 @@ static void __exit ila_fini(void)
 {
 	ila_xlat_fini();
 	ila_lwt_fini();
+	ila_rslv_fini();
 }
 
 module_init(ila_init);

@@ -15,6 +15,7 @@
 #include <linux/ip.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/rhashtable.h>
 #include <linux/socket.h>
 #include <linux/skbuff.h>
 #include <linux/types.h>
@@ -22,6 +23,16 @@
 #include <net/ip.h>
 #include <net/protocol.h>
 #include <uapi/linux/ila.h>
+
+extern unsigned int ila_net_id;
+
+struct ila_net {
+	struct rhashtable rhash_table;
+	spinlock_t *locks; /* Bucket locks for entry manipulation */
+	unsigned int locks_mask;
+	bool hooks_registered;
+	struct net_rslv *nrslv;
+};
 
 struct ila_locator {
 	union {
@@ -114,9 +125,14 @@ void ila_update_ipv6_locator(struct sk_buff *skb, struct ila_params *p,
 
 void ila_init_saved_csum(struct ila_params *p);
 
+void ila_rslv_resolved(struct ila_net *ilan, struct ila_addr *iaddr);
 int ila_lwt_init(void);
 void ila_lwt_fini(void);
 int ila_xlat_init(void);
 void ila_xlat_fini(void);
+int ila_rslv_init(void);
+void ila_rslv_fini(void);
+int ila_init_resolver_net(struct ila_net *ilan);
+void ila_exit_resolver_net(struct ila_net *ilan);
 
 #endif /* __ILA_H */
