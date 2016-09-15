@@ -191,6 +191,7 @@ struct gpio_chip {
 	unsigned int		irq_default_type;
 	int			irq_parent;
 	struct lock_class_key	*lock_key;
+	unsigned long		*valid_mask;
 #endif
 
 #if defined(CONFIG_OF_GPIO)
