@@ -1084,8 +1084,13 @@ static int pt_event_addr_filters_validate(struct list_head *filters)
 		if (!filter->range || !filter->size)
 			return -EOPNOTSUPP;
 
-		if (!filter->inode && !kernel_ip(filter->offset))
-			return -EINVAL;
+		if (!filter->inode) {
+			if (!kernel_ip(filter->offset))
+				return -EINVAL;
+
+			if (!kernel_ip(filter->offset + filter->size))
+				return -EINVAL;
+		}
 
 		if (++range > pt_cap_get(PT_CAP_num_address_ranges))
 			return -EOPNOTSUPP;
