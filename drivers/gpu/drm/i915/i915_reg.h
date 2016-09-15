@@ -1748,6 +1748,12 @@ enum skl_disp_power_wells {
 #define RING_INDIRECT_CTX_OFFSET(base)	_MMIO((base)+0x1c8) /* gen8+ */
 #define RING_CTX_TIMESTAMP(base)	_MMIO((base)+0x3a8) /* gen8+ */
 
+// 64 bit, low 32 preserved
+#define IOTLB_INVALID(base) _MMIO((base)+0x508 + 4) /* gen8+ */
+#define   IOTLB_INVALID_IVT (1<<31)
+#define   IOTLB_GLOBAL_INV_REQ (1<<28)
+#define   IOTLB_INVALID_IAIG (1<<25)
+
 #define ERROR_GEN6	_MMIO(0x40a0)
 #define GEN7_ERR_INT	_MMIO(0x44040)
 #define   ERR_INT_POISON		(1<<31)

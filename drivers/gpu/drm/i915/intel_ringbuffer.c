@@ -477,7 +477,25 @@ static void intel_ring_setup_status_page(struct intel_engine_cs *engine)
 	 * arises: do we still need this and if so how should we go about
 	 * invalidating the TLB?
 	 */
-	if (IS_GEN(dev_priv, 6, 7)) {
+	/* Respond to this question:
+	 *  According to mobile-5th-gen-core-family-datasheet-vol-2 from Intel
+	 *  There are registers for invalidation, set those registers will
+	 *  cause the hardware to perform IOTLB invalidation.
+	 */
+	if (IS_GEN8(dev_priv)) {
+		i915_reg_t reg = IOTLB_INVALID(engine->mmio_base);
+
+		/* ring should be idle before issuing a sync flush*/
+		WARN_ON((I915_READ_MODE(engine) & MODE_IDLE) == 0);
+
+		I915_WRITE(reg, 0x0 | IOTLB_INVALID_IVT | IOTLB_GLOBAL_INV_REQ);
+
+		if (intel_wait_for_register(dev_priv,
+					    reg, IOTLB_INVALID_IAIG, 0,
+					    1000))
+			DRM_ERROR("%s: wait for TLB invalidation timed out\n",
+				  engine->name);
+	} else	if (IS_GEN(dev_priv, 6, 7)) {
 		i915_reg_t reg = RING_INSTPM(engine->mmio_base);
 
 		/* ring should be idle before issuing a sync flush*/

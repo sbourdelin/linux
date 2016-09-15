@@ -2820,6 +2820,12 @@ static unsigned int gen8_get_total_gtt_size(u16 bdw_gmch_ctl)
 	if (bdw_gmch_ctl > 4)
 		bdw_gmch_ctl = 4;
 #endif
+#ifdef CONFIG_X86_64
+	/* Limit 64b platforms to a 4GB GGTT */
+	/* DMA 4GB protection */
+	if (bdw_gmch_ctl > 8)
+		bdw_gmch_ctl = 8;
+#endif
 
 	return bdw_gmch_ctl << 20;
 }

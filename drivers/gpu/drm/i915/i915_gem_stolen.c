@@ -364,47 +364,44 @@ static void gen8_get_stolen_reserved(struct drm_i915_private *dev_priv,
 				     unsigned long *base, unsigned long *size)
 {
 	uint32_t reg_val = I915_READ(GEN6_STOLEN_RESERVED);
+	unsigned long stolen_top;
+	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 
 	*base = reg_val & GEN6_STOLEN_RESERVED_ADDR_MASK;
 
 	switch (reg_val & GEN8_STOLEN_RESERVED_SIZE_MASK) {
 	case GEN8_STOLEN_RESERVED_1M:
-		*size = 1024 * 1024;
+		*size = 1 << 10 << 10;
 		break;
 	case GEN8_STOLEN_RESERVED_2M:
-		*size = 2 * 1024 * 1024;
+		*size = 2 << 10 << 10;
 		break;
 	case GEN8_STOLEN_RESERVED_4M:
-		*size = 4 * 1024 * 1024;
+		*size = 4 << 10 << 10;
 		break;
 	case GEN8_STOLEN_RESERVED_8M:
-		*size = 8 * 1024 * 1024;
+		*size = 8 << 10 << 10;
 		break;
 	default:
-		*size = 8 * 1024 * 1024;
-		MISSING_CASE(reg_val & GEN8_STOLEN_RESERVED_SIZE_MASK);
+		/* Whatever if it is a BDW device or SKL device
+		 * Or others devices..
+		 * This way is always going to work on 5th
+		 * generation Intel Processer
+		 */
+		stolen_top = dev_priv->mm.stolen_base + ggtt->stolen_size;
+
+		*base = reg_val & GEN6_STOLEN_RESERVED_ADDR_MASK;
+
+		/* MLIMIT - MBASE => PEG */
+		/*   -- mobile-5th-gen-core-family-datasheet-vol-2.pdf */
+		if (*base == 0) {
+			*size = 0;
+			MISSING_CASE(reg_val & GEN8_STOLEN_RESERVED_SIZE_MASK);
+		} else
+			*size = stolen_top - *base;
+
+		break;
 	}
-}
-
-static void bdw_get_stolen_reserved(struct drm_i915_private *dev_priv,
-				    unsigned long *base, unsigned long *size)
-{
-	struct i915_ggtt *ggtt = &dev_priv->ggtt;
-	uint32_t reg_val = I915_READ(GEN6_STOLEN_RESERVED);
-	unsigned long stolen_top;
-
-	stolen_top = dev_priv->mm.stolen_base + ggtt->stolen_size;
-
-	*base = reg_val & GEN6_STOLEN_RESERVED_ADDR_MASK;
-
-	/* On these platforms, the register doesn't have a size field, so the
-	 * size is the distance between the base and the top of the stolen
-	 * memory. We also have the genuine case where base is zero and there's
-	 * nothing reserved. */
-	if (*base == 0)
-		*size = 0;
-	else
-		*size = stolen_top - *base;
 }
 
 int i915_gem_init_stolen(struct drm_device *dev)
@@ -454,14 +451,14 @@ int i915_gem_init_stolen(struct drm_device *dev)
 		gen7_get_stolen_reserved(dev_priv, &reserved_base,
 					 &reserved_size);
 		break;
+	case 8:
+		gen8_get_stolen_reserved(dev_priv, &reserved_base,
+					 &reserved_size);
+		break;
 	default:
-		if (IS_BROADWELL(dev_priv) ||
-		    IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev))
-			bdw_get_stolen_reserved(dev_priv, &reserved_base,
-						&reserved_size);
-		else
-			gen8_get_stolen_reserved(dev_priv, &reserved_base,
-						 &reserved_size);
+		// FIXME: This seemed like going to work
+		gen8_get_stolen_reserved(dev_priv, &reserved_base,
+				 &reserved_size);
 		break;
 	}
 
