@@ -677,6 +677,7 @@ static void show_smap_vma_flags(struct seq_file *m, struct vm_area_struct *vma)
 #endif
 #ifdef CONFIG_ARCH_USES_HIGH_VMA_FLAGS
 		[ilog2(VM_SYNC)]	= "sn",
+		[ilog2(VM_DAX)]		= "dx",
 #endif
 	};
 	size_t i;
