@@ -21,6 +21,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/of_platform.h>
 #include <linux/spi/flash.h>
+#include <linux/mtd/cfi.h>
 #include <linux/mtd/spi-nor.h>
 
 /* Define max times to check status register before we give up. */
