@@ -518,13 +518,14 @@ static int wd719x_host_reset(struct scsi_cmnd *cmd)
 	int result;
 
 	dev_info(&wd->pdev->dev, "host reset requested\n");
-	spin_lock_irqsave(wd->sh->host_lock, flags);
+
 	/* Try to reinit the RISC */
 	if (wd719x_chip_init(wd) == 0)
 		result = SUCCESS;
 	else
 		result = FAILED;
 
+	spin_lock_irqsave(wd->sh->host_lock, flags);
 	/* flush all SCBs */
 	list_for_each_entry_safe(scb, tmp, &wd->active_scbs, list) {
 		struct scsi_cmnd *tmp_cmd = scb->cmd;
