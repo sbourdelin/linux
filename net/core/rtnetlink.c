@@ -2686,8 +2686,14 @@ static int rtnl_dump_all(struct sk_buff *skb, struct netlink_callback *cb)
 	int idx;
 	int s_idx = cb->family;
 
-	if (s_idx == 0)
+	if (s_idx == 0) {
+		if (unspec_dump_ifaddr(skb, cb))
+			return skb->len;
+		memset(&cb->args[0], 0, sizeof(cb->args));
+		cb->prev_seq = 0;
+		cb->seq = 0;
 		s_idx = 1;
+	}
 	for (idx = 1; idx <= RTNL_FAMILY_MAX; idx++) {
 		int type = cb->nlh->nlmsg_type-RTM_BASE;
 		if (idx < s_idx || idx == PF_PACKET)
