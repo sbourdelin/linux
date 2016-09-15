@@ -28,8 +28,9 @@
 #include <linux/sched.h>
 #include <linux/i2c.h>
 #include <drm/drm_dp_helper.h>
-#include <drm/drm_dp_aux_dev.h>
 #include <drm/drmP.h>
+
+#include "drm_crtc_helper_internal.h"
 
 /**
  * DOC: dp helpers
@@ -223,7 +224,7 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 			err = ret;
 	}
 
-	DRM_DEBUG_KMS("too many retries, giving up\n");
+	DRM_DEBUG_KMS("Too many retries, giving up. First error: %d\n", err);
 	ret = err;
 
 unlock:
@@ -574,7 +575,17 @@ static int drm_dp_i2c_do_msg(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 			if (ret == -EBUSY)
 				continue;
 
-			DRM_DEBUG_KMS("transaction failed: %d\n", ret);
+			/*
+			 * While timeouts can be errors, they're usually normal
+			 * behavior (for instance, when a driver tries to
+			 * communicate with a non-existant DisplayPort device).
+			 * Avoid spamming the kernel log with timeout errors.
+			 */
+			if (ret == -ETIMEDOUT)
+				DRM_DEBUG_KMS_RATELIMITED("transaction timed out\n");
+			else
+				DRM_DEBUG_KMS("transaction failed: %d\n", ret);
+
 			return ret;
 		}
 
@@ -790,6 +801,12 @@ static void unlock_bus(struct i2c_adapter *i2c, unsigned int flags)
 	mutex_unlock(&i2c_to_aux(i2c)->hw_mutex);
 }
 
+static const struct i2c_lock_operations drm_dp_i2c_lock_ops = {
+	.lock_bus = lock_bus,
+	.trylock_bus = trylock_bus,
+	.unlock_bus = unlock_bus,
+};
+
 /**
  * drm_dp_aux_init() - minimally initialise an aux channel
  * @aux: DisplayPort AUX channel
@@ -807,9 +824,7 @@ void drm_dp_aux_init(struct drm_dp_aux *aux)
 	aux->ddc.algo_data = aux;
 	aux->ddc.retries = 3;
 
-	aux->ddc.lock_bus = lock_bus;
-	aux->ddc.trylock_bus = trylock_bus;
-	aux->ddc.unlock_bus = unlock_bus;
+	aux->ddc.lock_ops = &drm_dp_i2c_lock_ops;
 }
 EXPORT_SYMBOL(drm_dp_aux_init);
 
