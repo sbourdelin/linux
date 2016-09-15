@@ -1581,6 +1581,8 @@ int of_genpd_add_provider_onecell(struct device_node *np,
 	mutex_lock(&gpd_list_lock);
 
 	for (i = 0; i < data->num_domains; i++) {
+		if (!data->domains[i])
+			continue;
 		if (!pm_genpd_present(data->domains[i]))
 			goto error;
 
