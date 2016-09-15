@@ -45,6 +45,12 @@ static DEFINE_IDR(devfreq_idr);
  * @freq_table_size:	Size of the @freq_table and @power_table
  * @power_ops:	Pointer to devfreq_cooling_power, used to generate the
  *		@power_table.
+ * @flags:	Flags which are used by the devfreq cooling framework
+ *		to use different features like:
+ *		- GET_DIRECT_DYNAMIC_POWER: direct call to drivers'
+ *		code to get dynamic power;
+ *		The flags are provided by the driver's code during
+ *		registration to the devfreq cooling subsystem.
  */
 struct devfreq_cooling_device {
 	int id;
@@ -55,6 +61,7 @@ struct devfreq_cooling_device {
 	u32 *freq_table;
 	size_t freq_table_size;
 	struct devfreq_cooling_power *power_ops;
+	unsigned long flags;
 };
 
 /**
@@ -200,26 +207,14 @@ freq_get_state(struct devfreq_cooling_device *dfc, unsigned long freq)
 	return THERMAL_CSTATE_INVALID;
 }
 
-/**
- * get_static_power() - calculate the static power
- * @dfc:	Pointer to devfreq cooling device
- * @freq:	Frequency in Hz
- *
- * Calculate the static power in milliwatts using the supplied
- * get_static_power().  The current voltage is calculated using the
- * OPP library.  If no get_static_power() was supplied, assume the
- * static power is negligible.
- */
 static unsigned long
-get_static_power(struct devfreq_cooling_device *dfc, unsigned long freq)
+devfreq_cooling_freq2voltage(struct devfreq_cooling_device *dfc,
+			     unsigned long freq)
 {
 	struct devfreq *df = dfc->devfreq;
 	struct device *dev = df->dev.parent;
 	unsigned long voltage;
 	struct dev_pm_opp *opp;
-
-	if (!dfc->power_ops->get_static_power)
-		return 0;
 
 	rcu_read_lock();
 
@@ -235,31 +230,59 @@ get_static_power(struct devfreq_cooling_device *dfc, unsigned long freq)
 		dev_warn_ratelimited(dev,
 				     "Failed to get voltage for frequency %lu: %ld\n",
 				     freq, IS_ERR(opp) ? PTR_ERR(opp) : 0);
-		return 0;
 	}
+
+	return voltage;
+}
+
+/**
+ * get_static_power() - calculate the static power
+ * @dfc:	Pointer to devfreq cooling device
+ * @freq:	Frequency in Hz
+ *
+ * Calculate the static power in milliwatts using the supplied
+ * get_static_power(). The current voltage is calculated using the
+ * OPP library. If no get_static_power() was supplied, assume the
+ * static power is negligible.
+ */
+static unsigned long
+get_static_power(struct devfreq_cooling_device *dfc, unsigned long freq)
+{
+	struct devfreq *df = dfc->devfreq;
+	unsigned long voltage;
+
+	if (!dfc->power_ops->get_static_power)
+		return 0;
+
+	voltage = devfreq_cooling_freq2voltage(dfc, freq);
+	if (!voltage)
+		return 0;
 
 	return dfc->power_ops->get_static_power(df, voltage);
 }
 
 /**
- * get_dynamic_power - calculate the dynamic power
+ * get_simple_dynamic_power - calculate the simple dynamic power
  * @dfc:	Pointer to devfreq cooling device
  * @freq:	Frequency in Hz
- * @voltage:	Voltage in millivolts
  *
  * Calculate the dynamic power in milliwatts consumed by the device at
- * frequency @freq and voltage @voltage.  If the get_dynamic_power()
- * was supplied as part of the devfreq_cooling_power struct, then that
- * function is used.  Otherwise, a simple power model (Pdyn = Coeff *
- * Voltage^2 * Frequency) is used.
+ * frequency @freq and voltage. A simple power model
+ * (pdyn = coeff * voltage^2 * frequency) is used. This function is used only
+ * during the registeration of a new driver, precisely - when the power table
+ * is calculated.
  */
 static unsigned long
-get_dynamic_power(struct devfreq_cooling_device *dfc, unsigned long freq,
-		  unsigned long voltage)
+get_simple_dynamic_power(struct devfreq_cooling_device *dfc, unsigned long freq)
 {
 	u64 power;
 	u32 freq_mhz;
+	unsigned long voltage;
 	struct devfreq_cooling_power *dfc_power = dfc->power_ops;
+
+	voltage = devfreq_cooling_freq2voltage(dfc, freq);
+	if (!voltage)
+		return 0;
 
 	if (dfc_power->get_dynamic_power)
 		return dfc_power->get_dynamic_power(dfc->devfreq, freq,
@@ -270,6 +293,33 @@ get_dynamic_power(struct devfreq_cooling_device *dfc, unsigned long freq,
 	do_div(power, 1000000000);
 
 	return power;
+}
+
+/**
+ * get_direct_dynamic_power - calculate the dynamic power
+ * @dfc:	pointer to devfreq cooling device
+ * @freq:	frequency in hz
+ *
+ * Calculate the dynamic power in milliwatts consumed by the device at
+ * frequency @freq and voltage. The driver's function registered
+ * to get_dynamic_power() is used to get more accurate value. The driver
+ * registered to the devfreq cooling interface has to provide the
+ * needed functions (get_dynamic_power() and power2state()),
+ * otherwise the registration fails when the GET_DIRECT_DYNAMIC_POWER flag
+ * is set.
+ */
+static unsigned long
+get_direct_dynamic_power(struct devfreq_cooling_device *dfc, unsigned long freq)
+{
+	unsigned long voltage;
+	struct devfreq_cooling_power *dfc_power = dfc->power_ops;
+
+	voltage = devfreq_cooling_freq2voltage(dfc, freq);
+	if (!voltage)
+		return 0;
+
+	return dfc_power->get_dynamic_power(dfc->devfreq, freq,
+						    voltage);
 }
 
 static int devfreq_cooling_get_requested_power(struct thermal_cooling_device *cdev,
@@ -288,7 +338,10 @@ static int devfreq_cooling_get_requested_power(struct thermal_cooling_device *cd
 	if (state == THERMAL_CSTATE_INVALID)
 		return -EAGAIN;
 
-	dyn_power = dfc->power_table[state];
+	if (dfc->flags & GET_DIRECT_DYNAMIC_POWER)
+		dyn_power = get_direct_dynamic_power(dfc, freq);
+	else
+		dyn_power = dfc->power_table[state];
 
 	/* Scale dynamic power for utilization */
 	dyn_power = (dyn_power * status->busy_time) / status->total_time;
@@ -312,6 +365,7 @@ static int devfreq_cooling_state2power(struct thermal_cooling_device *cdev,
 	struct devfreq_cooling_device *dfc = cdev->devdata;
 	unsigned long freq;
 	u32 static_power;
+	unsigned long dyn_power;
 
 	if (state < 0 || state >= dfc->freq_table_size)
 		return -EINVAL;
@@ -319,7 +373,12 @@ static int devfreq_cooling_state2power(struct thermal_cooling_device *cdev,
 	freq = dfc->freq_table[state];
 	static_power = get_static_power(dfc, freq);
 
-	*power = dfc->power_table[state] + static_power;
+	if (dfc->flags & GET_DIRECT_DYNAMIC_POWER)
+		dyn_power = get_direct_dynamic_power(dfc, freq);
+	else
+		dyn_power = dfc->power_table[state];
+
+	*power = dyn_power + static_power;
 	return 0;
 }
 
@@ -336,24 +395,28 @@ static int devfreq_cooling_power2state(struct thermal_cooling_device *cdev,
 	u32 static_power;
 	int i;
 
-	static_power = get_static_power(dfc, freq);
+	if (dfc->flags & GET_DIRECT_DYNAMIC_POWER)
+		*state = dfc->power_ops->power2state(df, power);
+	else {
+		static_power = get_static_power(dfc, freq);
 
-	dyn_power = power - static_power;
-	dyn_power = dyn_power > 0 ? dyn_power : 0;
+		dyn_power = power - static_power;
+		dyn_power = dyn_power > 0 ? dyn_power : 0;
 
-	/* Scale dynamic power for utilization */
-	busy_time = status->busy_time ?: 1;
-	dyn_power = (dyn_power * status->total_time) / busy_time;
+		/* Scale dynamic power for utilization */
+		busy_time = status->busy_time ?: 1;
+		dyn_power = (dyn_power * status->total_time) / busy_time;
 
-	/*
-	 * Find the first cooling state that is within the power
-	 * budget for dynamic power.
-	 */
-	for (i = 0; i < dfc->freq_table_size - 1; i++)
-		if (dyn_power >= dfc->power_table[i])
-			break;
+		/*
+		 * Find the first cooling state that is within the power
+		 * budget for dynamic power.
+		 */
+		for (i = 0; i < dfc->freq_table_size - 1; i++)
+			if (dyn_power >= dfc->power_table[i])
+				break;
+		*state = i;
+	}
 
-	*state = i;
 	trace_thermal_power_devfreq_limit(cdev, freq, *state, power);
 	return 0;
 }
@@ -391,10 +454,12 @@ static int devfreq_cooling_gen_tables(struct devfreq_cooling_device *dfc)
 	u32 *power_table = NULL;
 	u32 *freq_table;
 	int i;
+	bool generate_power_table = !(dfc->flags & GET_DIRECT_DYNAMIC_POWER) &&
+		dfc->power_ops;
 
 	num_opps = dev_pm_opp_get_opp_count(dev);
 
-	if (dfc->power_ops) {
+	if (generate_power_table) {
 		power_table = kcalloc(num_opps, sizeof(*power_table),
 				      GFP_KERNEL);
 		if (!power_table)
@@ -421,12 +486,10 @@ static int devfreq_cooling_gen_tables(struct devfreq_cooling_device *dfc)
 			goto free_tables;
 		}
 
-		voltage = dev_pm_opp_get_voltage(opp) / 1000; /* mV */
-
 		rcu_read_unlock();
 
-		if (dfc->power_ops) {
-			power_dyn = get_dynamic_power(dfc, freq, voltage);
+		if (generate_power_table) {
+			power_dyn = get_simple_dynamic_power(dfc, freq);
 
 			dev_dbg(dev, "Dynamic power table: %lu MHz @ %lu mV: %lu = %lu mW\n",
 				freq / 1000000, voltage, power_dyn, power_dyn);
@@ -437,7 +500,7 @@ static int devfreq_cooling_gen_tables(struct devfreq_cooling_device *dfc)
 		freq_table[i] = freq;
 	}
 
-	if (dfc->power_ops)
+	if (generate_power_table)
 		dfc->power_table = power_table;
 
 	dfc->freq_table = freq_table;
@@ -459,6 +522,15 @@ free_power_table:
  * @np:	Pointer to OF device_node.
  * @df:	Pointer to devfreq device.
  * @dfc_power:	Pointer to devfreq_cooling_power.
+ * @flags:	Flags which are used by the devfreq cooling framework
+ *		to use different features. Flags:
+ *		- GET_DIRECT_DYNAMIC_POWER: direct call to drivers'
+ *		code to get dynamic power. If this flag is set, the driver
+ *		should implement and provide functions: get_dynamic_power() and
+ *		power2state(). If there are no such functions, while the flag is
+ *		set, the registration will fail.
+ *		The flags are provided by the driver's code during
+ *		registration to the devfreq cooling subsystem.
  *
  * Register a devfreq cooling device.  The available OPPs must be
  * registered on the device.
@@ -470,7 +542,8 @@ free_power_table:
  */
 struct thermal_cooling_device *
 of_devfreq_cooling_register_power(struct device_node *np, struct devfreq *df,
-				  struct devfreq_cooling_power *dfc_power)
+				  struct devfreq_cooling_power *dfc_power,
+				  unsigned long flags)
 {
 	struct thermal_cooling_device *cdev;
 	struct devfreq_cooling_device *dfc;
@@ -482,9 +555,22 @@ of_devfreq_cooling_register_power(struct device_node *np, struct devfreq *df,
 		return ERR_PTR(-ENOMEM);
 
 	dfc->devfreq = df;
+	dfc->flags = flags;
+
+	if ((flags & GET_DIRECT_DYNAMIC_POWER) && !dfc_power) {
+		err = -EINVAL;
+		goto free_dfc;
+	}
 
 	if (dfc_power) {
 		dfc->power_ops = dfc_power;
+
+		if ((flags & GET_DIRECT_DYNAMIC_POWER) &&
+		    (!dfc_power->get_dynamic_power ||
+		     !dfc_power->power2state)) {
+			err = -EINVAL;
+			goto free_dfc;
+		}
 
 		devfreq_cooling_ops.get_requested_power =
 			devfreq_cooling_get_requested_power;
@@ -537,7 +623,7 @@ EXPORT_SYMBOL_GPL(of_devfreq_cooling_register_power);
 struct thermal_cooling_device *
 of_devfreq_cooling_register(struct device_node *np, struct devfreq *df)
 {
-	return of_devfreq_cooling_register_power(np, df, NULL);
+	return of_devfreq_cooling_register_power(np, df, NULL, 0);
 }
 EXPORT_SYMBOL_GPL(of_devfreq_cooling_register);
 

@@ -19,16 +19,26 @@
 
 #include <linux/devfreq.h>
 #include <linux/thermal.h>
+#include <linux/bitops.h>
 
+/* Flags for the devfreq cooling interface. */
+#define GET_DIRECT_DYNAMIC_POWER BIT(0)
 
 /**
  * struct devfreq_cooling_power - Devfreq cooling power ops
  * @get_static_power:	Take voltage, in mV, and return the static power
  *			in mW.  If NULL, the static power is assumed
  *			to be 0.
- * @get_dynamic_power:	Take voltage, in mV, and frequency, in HZ, and
- *			return the dynamic power draw in mW.  If NULL,
- *			a simple power model is used.
+ * @get_dynamic_power:	Take voltage, in mV, and frequency, in HZ, and return
+ *			the dynamic power draw in mW. This function is called
+ *			every time when the GET_DIRECT_DYNAMIC_POWER flag is
+ *			set and the thermal framework calculates the current
+ *			power for this device. If the flag is not set and this
+ *			is NULL, a simple power model is used.
+ * @power2state:	It receives the maximum power that the device should
+ *			consume and it should return the needed 'state'.
+ *			This function should be registered when the flag
+ *			GET_DIRECT_DYNAMIC_POWER is set.
  * @dyn_power_coeff:	Coefficient for the simple dynamic power model in
  *			mW/(MHz mV mV).
  *			If get_dynamic_power() is NULL, then the
@@ -41,6 +51,7 @@ struct devfreq_cooling_power {
 	unsigned long (*get_dynamic_power)(struct devfreq *devfreq,
 					   unsigned long freq,
 					   unsigned long voltage);
+	unsigned long (*power2state)(struct devfreq *devfreq, u32 power);
 	unsigned long dyn_power_coeff;
 };
 
@@ -48,7 +59,8 @@ struct devfreq_cooling_power {
 
 struct thermal_cooling_device *
 of_devfreq_cooling_register_power(struct device_node *np, struct devfreq *df,
-				  struct devfreq_cooling_power *dfc_power);
+				  struct devfreq_cooling_power *dfc_power,
+				  unsigned long flags);
 struct thermal_cooling_device *
 of_devfreq_cooling_register(struct device_node *np, struct devfreq *df);
 struct thermal_cooling_device *devfreq_cooling_register(struct devfreq *df);
@@ -56,9 +68,10 @@ void devfreq_cooling_unregister(struct thermal_cooling_device *dfc);
 
 #else /* !CONFIG_DEVFREQ_THERMAL */
 
-struct thermal_cooling_device *
+struct inline thermal_cooling_device *
 of_devfreq_cooling_register_power(struct device_node *np, struct devfreq *df,
-				  struct devfreq_cooling_power *dfc_power)
+				  struct devfreq_cooling_power *dfc_power,
+				  unsigned long flags)
 {
 	return ERR_PTR(-EINVAL);
 }
