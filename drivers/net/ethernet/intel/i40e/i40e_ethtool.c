@@ -987,8 +987,6 @@ static void i40e_set_msglevel(struct net_device *netdev, u32 data)
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_pf *pf = np->vsi->back;
 
-	if (I40E_DEBUG_USER & data)
-		pf->hw.debug_mask = data;
 	pf->msg_enable = data;
 }
 

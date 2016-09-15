@@ -6665,16 +6665,19 @@ static int i40e_get_capabilities(struct i40e_pf *pf)
 		}
 	} while (err);
 
-	if (pf->hw.debug_mask & I40E_DEBUG_USER)
-		dev_info(&pf->pdev->dev,
-			 "pf=%d, num_vfs=%d, msix_pf=%d, msix_vf=%d, fd_g=%d, fd_b=%d, pf_max_q=%d num_vsi=%d\n",
-			 pf->hw.pf_id, pf->hw.func_caps.num_vfs,
-			 pf->hw.func_caps.num_msix_vectors,
-			 pf->hw.func_caps.num_msix_vectors_vf,
-			 pf->hw.func_caps.fd_filters_guaranteed,
-			 pf->hw.func_caps.fd_filters_best_effort,
-			 pf->hw.func_caps.num_tx_qp,
-			 pf->hw.func_caps.num_vsis);
+	i40e_debug(&pf->hw, I40E_DEBUG_INIT,
+		   "HW Capabilities: PF-id[%d] num_vfs=%d, msix_pf=%d, msix_vf=%d\n",
+		   pf->hw.pf_id,
+		   pf->hw.func_caps.num_vfs,
+		   pf->hw.func_caps.num_msix_vectors,
+		   pf->hw.func_caps.num_msix_vectors_vf);
+	i40e_debug(&pf->hw, I40E_DEBUG_INIT,
+		   "HW Capabilities: PF-id[%d] fd_g=%d, fd_b=%d, pf_max_qp=%d num_vsis=%d\n",
+		   pf->hw.pf_id,
+		   pf->hw.func_caps.fd_filters_guaranteed,
+		   pf->hw.func_caps.fd_filters_best_effort,
+		   pf->hw.func_caps.num_tx_qp,
+		   pf->hw.func_caps.num_vsis);
 
 #define DEF_NUM_VSI (1 + (pf->hw.func_caps.fcoe ? 1 : 0) \
 		       + pf->hw.func_caps.num_vfs)
@@ -8495,14 +8498,10 @@ static int i40e_sw_init(struct i40e_pf *pf)
 	int err = 0;
 	int size;
 
-	pf->msg_enable = netif_msg_init(I40E_DEFAULT_MSG_ENABLE,
-				(NETIF_MSG_DRV|NETIF_MSG_PROBE|NETIF_MSG_LINK));
-	if (debug != -1 && debug != I40E_DEFAULT_MSG_ENABLE) {
-		if (I40E_DEBUG_USER & debug)
-			pf->hw.debug_mask = debug;
-		pf->msg_enable = netif_msg_init((debug & ~I40E_DEBUG_USER),
-						I40E_DEFAULT_MSG_ENABLE);
-	}
+	pf->msg_enable = netif_msg_init(debug,
+					NETIF_MSG_DRV    |
+					NETIF_MSG_PROBE  |
+					NETIF_MSG_LINK);
 
 	/* Set default capability flags */
 	pf->flags = I40E_FLAG_RX_CSUM_ENABLED |

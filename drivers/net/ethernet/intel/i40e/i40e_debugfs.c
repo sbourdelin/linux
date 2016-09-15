@@ -1210,12 +1210,6 @@ static ssize_t i40e_dbg_command_write(struct file *filp,
 		u32 level;
 		cnt = sscanf(&cmd_buf[10], "%i", &level);
 		if (cnt) {
-			if (I40E_DEBUG_USER & level) {
-				pf->hw.debug_mask = level;
-				dev_info(&pf->pdev->dev,
-					 "set hw.debug_mask = 0x%08x\n",
-					 pf->hw.debug_mask);
-			}
 			pf->msg_enable = level;
 			dev_info(&pf->pdev->dev, "set msg_enable = 0x%08x\n",
 				 pf->msg_enable);
