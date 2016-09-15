@@ -394,7 +394,7 @@ static int wm8994_device_init(struct wm8994 *wm8994, int irq)
 		goto err;
 	}
 		
-	ret = devm_regulator_bulk_get(wm8994->dev, wm8994->num_supplies,
+	ret = regulator_bulk_get(wm8994->dev, wm8994->num_supplies,
 				 wm8994->supplies);
 	if (ret != 0) {
 		dev_err(wm8994->dev, "Failed to get supplies: %d\n", ret);
@@ -405,7 +405,7 @@ static int wm8994_device_init(struct wm8994 *wm8994, int irq)
 				    wm8994->supplies);
 	if (ret != 0) {
 		dev_err(wm8994->dev, "Failed to enable supplies: %d\n", ret);
-		goto err;
+		goto err_regulator_put;
 	}
 
 	ret = wm8994_reg_read(wm8994, WM8994_SOFTWARE_RESET);
@@ -596,6 +596,9 @@ err_irq:
 err_enable:
 	regulator_bulk_disable(wm8994->num_supplies,
 			       wm8994->supplies);
+err_regulator_put:
+	for (i = wm8994->num_supplies - 1; i >= 0; i--)
+		regulator_put(wm8994->supplies[i].consumer);
 err:
 	mfd_remove_devices(wm8994->dev);
 	return ret;
@@ -603,10 +606,13 @@ err:
 
 static void wm8994_device_exit(struct wm8994 *wm8994)
 {
+	int i;
 	pm_runtime_disable(wm8994->dev);
 	wm8994_irq_exit(wm8994);
 	regulator_bulk_disable(wm8994->num_supplies,
 			       wm8994->supplies);
+	for (i = wm8994->num_supplies - 1; i >= 0; i--)
+		regulator_put(wm8994->supplies[i].consumer);
 	mfd_remove_devices(wm8994->dev);
 }
 
