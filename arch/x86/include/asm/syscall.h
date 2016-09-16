@@ -249,4 +249,13 @@ static inline int syscall_get_arch(void)
 }
 #endif	/* CONFIG_X86_32 */
 
+#ifdef CONFIG_FTRACE_SYSCALLS
+static inline
+int arch_trace_syscall_get_nr(struct task_struct *task, struct pt_regs *regs)
+{
+	return syscall_get_nr(task, regs) & __SYSCALL_MASK;
+}
+#define arch_trace_syscall_get_nr arch_trace_syscall_get_nr
+#endif /* CONFIG_FTRACE_SYSCALLS */
+
 #endif	/* _ASM_X86_SYSCALL_H */
