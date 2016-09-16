@@ -603,7 +603,7 @@ out:
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 
 #if defined(CONFIG_FTRACE_SYSCALLS) && defined(CONFIG_PPC64)
-unsigned long __init arch_syscall_addr(int nr)
+unsigned long __init arch_syscall_addr(int nr, bool compat)
 {
 	return sys_call_table[nr*2];
 }

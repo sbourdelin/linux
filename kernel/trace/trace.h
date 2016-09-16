@@ -234,8 +234,21 @@ struct trace_array {
 #ifdef CONFIG_FTRACE_SYSCALLS
 	int			sys_refcount_enter;
 	int			sys_refcount_exit;
-	struct trace_event_file __rcu *enter_syscall_files[NR_syscalls];
-	struct trace_event_file __rcu *exit_syscall_files[NR_syscalls];
+
+#if (defined ARCH_COMPAT_SYSCALL_NUMBERS_OVERLAP) && (defined CONFIG_COMPAT)
+
+#ifdef NR_compat_syscalls
+#define FTRACE_SYSCALL_CNT (NR_syscalls + NR_compat_syscalls)
+#else /* !NR_compat_syscalls */
+#define FTRACE_SYSCALL_CNT (2 * NR_syscalls)
+#endif /* NR_compat_syscalls */
+
+#else
+#define FTRACE_SYSCALL_CNT (NR_syscalls)
+#endif
+
+	struct trace_event_file __rcu *enter_syscall_files[FTRACE_SYSCALL_CNT];
+	struct trace_event_file __rcu *exit_syscall_files[FTRACE_SYSCALL_CNT];
 #endif
 	int			stop_count;
 	int			clock_id;
