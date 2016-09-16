@@ -478,7 +478,7 @@ void __init orion_ge00_switch_init(struct dsa_platform_data *d)
 	for (i = 0; i < d->nr_chips; i++)
 		d->chip[i].host_dev = &orion_ge_mvmdio.dev;
 
-	platform_device_register_data(NULL, "dsa", 0, d, sizeof(d));
+	platform_device_register_data(NULL, "dsa", 0, d, sizeof(*d));
 }
 
 /*****************************************************************************
