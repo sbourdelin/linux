@@ -24,6 +24,7 @@
 
 #include <clocksource/arm_arch_timer.h>
 #include <asm/arch_timer.h>
+#include <asm/kvm_emulate.h>
 
 #include <kvm/arm_vgic.h>
 #include <kvm/arm_arch_timer.h>
@@ -170,16 +171,45 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
 {
 	int ret;
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+	struct kvm_run *run = vcpu->run;
 
-	BUG_ON(!vgic_initialized(vcpu->kvm));
+	BUG_ON(irqchip_in_kernel(vcpu->kvm) && !vgic_initialized(vcpu->kvm));
 
 	timer->active_cleared_last = false;
 	timer->irq.level = new_level;
-	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
+	trace_kvm_timer_update_irq(vcpu->vcpu_id, host_vtimer_irq,
 				   timer->irq.level);
-	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
-					 timer->irq.irq,
-					 timer->irq.level);
+
+	if (irqchip_in_kernel(vcpu->kvm) && vgic_initialized(vcpu->kvm)) {
+		/* Fire the timer in the VGIC */
+
+		ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
+						 timer->irq.irq,
+						 timer->irq.level);
+	} else if (!vcpu->arch.user_space_arm_timers) {
+		/* User space has not activated timer use */
+		ret = 0;
+	} else {
+		/*
+		 * Set PENDING_TIMER so that user space can handle the event if
+		 *
+		 *   1) Level is high
+		 *   2) The vtimer is not suppressed by user space
+		 *   3) We are not in the timer trigger exit path
+		 */
+		if (new_level &&
+		    !(run->request_interrupt_window & KVM_IRQWINDOW_VTIMER) &&
+		    (run->exit_reason != KVM_EXIT_ARM_TIMER)) {
+			/* KVM_REQ_PENDING_TIMER means vtimer triggered */
+			kvm_make_request(KVM_REQ_PENDING_TIMER, vcpu);
+		}
+
+		/* Force a new level high check on next entry */
+		timer->irq.level = 0;
+
+		ret = 0;
+	}
+
 	WARN_ON(ret);
 }
 
@@ -197,7 +227,8 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
 	 * because the guest would never see the interrupt.  Instead wait
 	 * until we call this function from kvm_timer_flush_hwstate.
 	 */
-	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
+	if ((irqchip_in_kernel(vcpu->kvm) && !vgic_initialized(vcpu->kvm)) ||
+	    !timer->enabled)
 		return -ENODEV;
 
 	if (kvm_timer_should_fire(vcpu) != timer->irq.level)
@@ -275,35 +306,57 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
 	* to ensure that hardware interrupts from the timer triggers a guest
 	* exit.
 	*/
-	phys_active = timer->irq.level ||
-			kvm_vgic_map_is_active(vcpu, timer->irq.irq);
+	if (irqchip_in_kernel(vcpu->kvm) && vgic_initialized(vcpu->kvm)) {
+		phys_active = timer->irq.level ||
+				kvm_vgic_map_is_active(vcpu, timer->irq.irq);
 
-	/*
-	 * We want to avoid hitting the (re)distributor as much as
-	 * possible, as this is a potentially expensive MMIO access
-	 * (not to mention locks in the irq layer), and a solution for
-	 * this is to cache the "active" state in memory.
-	 *
-	 * Things to consider: we cannot cache an "active set" state,
-	 * because the HW can change this behind our back (it becomes
-	 * "clear" in the HW). We must then restrict the caching to
-	 * the "clear" state.
-	 *
-	 * The cache is invalidated on:
-	 * - vcpu put, indicating that the HW cannot be trusted to be
-	 *   in a sane state on the next vcpu load,
-	 * - any change in the interrupt state
-	 *
-	 * Usage conditions:
-	 * - cached value is "active clear"
-	 * - value to be programmed is "active clear"
-	 */
-	if (timer->active_cleared_last && !phys_active)
-		return;
+		/*
+		 * We want to avoid hitting the (re)distributor as much as
+		 * possible, as this is a potentially expensive MMIO access
+		 * (not to mention locks in the irq layer), and a solution for
+		 * this is to cache the "active" state in memory.
+		 *
+		 * Things to consider: we cannot cache an "active set" state,
+		 * because the HW can change this behind our back (it becomes
+		 * "clear" in the HW). We must then restrict the caching to
+		 * the "clear" state.
+		 *
+		 * The cache is invalidated on:
+		 * - vcpu put, indicating that the HW cannot be trusted to be
+		 *   in a sane state on the next vcpu load,
+		 * - any change in the interrupt state
+		 *
+		 * Usage conditions:
+		 * - cached value is "active clear"
+		 * - value to be programmed is "active clear"
+		 */
+		if (timer->active_cleared_last && !phys_active)
+			return;
 
-	ret = irq_set_irqchip_state(host_vtimer_irq,
-				    IRQCHIP_STATE_ACTIVE,
-				    phys_active);
+		ret = irq_set_irqchip_state(host_vtimer_irq,
+					    IRQCHIP_STATE_ACTIVE,
+					    phys_active);
+	} else {
+		/* User space tells us whether the timer is in active mode */
+		phys_active = vcpu->run->request_interrupt_window &
+			      KVM_IRQWINDOW_VTIMER;
+
+		/* However if the line is high, we exit anyway, so we want
+		 * to keep the IRQ masked */
+		phys_active = phys_active || timer->irq.level;
+
+		/*
+		 * So we can just explicitly mask or unmask the IRQ, gaining
+		 * more compatibility with oddball irq controllers.
+		 */
+		if (phys_active)
+			disable_percpu_irq(host_vtimer_irq);
+		else
+			enable_percpu_irq(host_vtimer_irq, 0);
+
+		ret = 0;
+	}
+
 	WARN_ON(ret);
 
 	timer->active_cleared_last = !phys_active;
@@ -479,6 +532,10 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
 	if (timer->enabled)
 		return 0;
 
+	/* No need to route physical IRQs when we don't use the vgic */
+	if (!irqchip_in_kernel(vcpu->kvm))
+		goto no_vgic;
+
 	/*
 	 * Find the physical IRQ number corresponding to the host_vtimer_irq
 	 */
@@ -502,6 +559,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
 	if (ret)
 		return ret;
 
+no_vgic:
 
 	/*
 	 * There is a potential race here between VCPUs starting for the first
