@@ -440,7 +440,7 @@ static struct dfs_node {
 
 static int __init init_mce_inject(void)
 {
-	unsigned int i;
+	int i;
 	u64 cap;
 
 	rdmsrl(MSR_IA32_MCG_CAP, cap);
@@ -450,7 +450,7 @@ static int __init init_mce_inject(void)
 	if (!dfs_inj)
 		return -EINVAL;
 
-	for (i = 0; i < ARRAY_SIZE(dfs_fls); i++) {
+	for (i = 0; i < (int)ARRAY_SIZE(dfs_fls); i++) {
 		dfs_fls[i].d = debugfs_create_file(dfs_fls[i].name,
 						    dfs_fls[i].perm,
 						    dfs_inj,
