@@ -43,6 +43,8 @@
 #define PSSCR_HV_TEMPLATE	PSSCR_ESL | PSSCR_EC | \
 				PSSCR_PSLL_MASK | PSSCR_TR_MASK | \
 				PSSCR_MTL_MASK
+#define PSSCR_HV_TEMPLATE_LITE	PSSCR_PSLL_MASK | PSSCR_TR_MASK | \
+				 PSSCR_MTL_MASK
 
 	.text
 
@@ -246,6 +248,20 @@ enter_winkle:
 
 	IDLE_STATE_ENTER_SEQ_NORET(PPC_WINKLE)
 
+
+/*
+ * power_enter_stop_lite : This will resume the wake up from
+ * idle at the subsequent instruction.
+ *
+ * Caller should set ESL=EC=0 in PSSCR before calling
+ * this function.
+ *
+ */
+power_enter_stop_lite:
+	IDLE_STATE_ENTER_SEQ(PPC_STOP)
+7:	li	r3,0  /* Since we didn't lose state, return 0 */
+	b 	pnv_wakeup_noloss
+
 /*
  * r3 - requested stop state
  */
@@ -333,13 +349,19 @@ ALT_FTR_SECTION_END_NESTED_IFSET(CPU_FTR_ARCH_207S, 66);		\
 
 /*
  * r3 - requested stop state
+ * r4 - Indicates if the lite variant with ESL=EC=0 should be executed.
  */
 _GLOBAL(power9_idle_stop)
-	LOAD_REG_IMMEDIATE(r4, PSSCR_HV_TEMPLATE)
-	or	r4,r4,r3
+	cmpdi	r4, 1
+	bne	4f
+	LOAD_REG_IMMEDIATE(r4, PSSCR_HV_TEMPLATE_LITE)
+	LOAD_REG_ADDR(r5,power_enter_stop_lite)
+	b 	5f
+4:	LOAD_REG_IMMEDIATE(r4, PSSCR_HV_TEMPLATE)
+	LOAD_REG_ADDR(r5,power_enter_stop)
+5:	or	r4,r4,r3
 	mtspr	SPRN_PSSCR, r4
 	li	r4, 1
-	LOAD_REG_ADDR(r5,power_enter_stop)
 	b	pnv_powersave_common
 	/* No return */
 /*

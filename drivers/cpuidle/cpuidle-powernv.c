@@ -102,7 +102,21 @@ static int stop_loop(struct cpuidle_device *dev,
 		     int index)
 {
 	ppc64_runlatch_off();
-	power9_idle_stop(stop_psscr_table[index]);
+	power9_idle_stop(stop_psscr_table[index], 0);
+	ppc64_runlatch_on();
+	return index;
+}
+
+/*
+ * This function calls stop instruction with
+ * ESL and EC bits set to 0.
+ */
+static int stop_lite_loop(struct cpuidle_device *dev,
+		     struct cpuidle_driver *drv,
+		     int index)
+{
+	ppc64_runlatch_off();
+	power9_idle_stop(stop_psscr_table[index], 1);
 	ppc64_runlatch_on();
 	return index;
 }
@@ -273,7 +287,13 @@ static int powernv_add_idle_states(void)
 				names[i], CPUIDLE_NAME_LEN);
 			powernv_states[nr_idle_states].flags = 0;
 
-			powernv_states[nr_idle_states].enter = stop_loop;
+			if (flags[i] & OPAL_PM_WAKEUP_AT_NEXT_INST) {
+				powernv_states[nr_idle_states].enter =
+					stop_lite_loop;
+			} else {
+				powernv_states[nr_idle_states].enter =
+					stop_loop;
+			}
 			stop_psscr_table[nr_idle_states] = psscr_val[i];
 		}
 

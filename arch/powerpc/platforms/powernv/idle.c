@@ -244,8 +244,15 @@ static DEVICE_ATTR(fastsleep_workaround_applyonce, 0600,
 static void power9_idle(void)
 {
 	/* Requesting stop state 0 */
-	power9_idle_stop(0);
+	power9_idle_stop(0, 0);
 }
+
+static void power9_idle_lite(void)
+{
+	/* Requesting stop state 0 with ESL=EC=0 */
+	power9_idle_stop(0, 1);
+}
+
 /*
  * First deep stop state. Used to figure out when to save/restore
  * hypervisor context.
@@ -414,8 +421,12 @@ static int __init pnv_init_idle_states(void)
 
 	if (supported_cpuidle_states & OPAL_PM_NAP_ENABLED)
 		ppc_md.power_save = power7_idle;
-	else if (supported_cpuidle_states & OPAL_PM_STOP_INST_FAST)
-		ppc_md.power_save = power9_idle;
+	else if (supported_cpuidle_states & OPAL_PM_STOP_INST_FAST) {
+		if (supported_cpuidle_states & OPAL_PM_WAKEUP_AT_NEXT_INST)
+			ppc_md.power_save = power9_idle_lite;
+		else
+			ppc_md.power_save = power9_idle;
+	}
 
 out:
 	return 0;
