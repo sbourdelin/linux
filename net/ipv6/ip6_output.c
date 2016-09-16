@@ -380,9 +380,13 @@ int ip6_forward(struct sk_buff *skb)
 	struct ipv6hdr *hdr = ipv6_hdr(skb);
 	struct inet6_skb_parm *opt = IP6CB(skb);
 	struct net *net = dev_net(dst->dev);
+	struct inet6_dev *idev = __in6_dev_get(skb->dev);
 	u32 mtu;
 
 	if (net->ipv6.devconf_all->forwarding == 0)
+		goto error;
+
+	if (idev && !idev->cnf.forwarding)
 		goto error;
 
 	if (skb->pkt_type != PACKET_HOST)
