@@ -294,6 +294,42 @@ int rt_mutex_get_effective_prio(struct task_struct *task, int newprio)
 }
 
 /*
+ * Get the effective policy based on the current prio value.
+ */
+int rt_mutex_get_effective_policy(int policy, int prio)
+{
+	if (dl_prio(prio))
+		return SCHED_DEADLINE;
+
+	/* With RT, the default class is SCHED_FIFO. */
+	if (rt_prio(prio)) {
+		if (policy == SCHED_RR)
+			return SCHED_RR;
+		return SCHED_FIFO;
+	}
+
+	/* With fair, the default class is SCHED_NORMAL. */
+	switch (policy) {
+	case SCHED_NORMAL:
+	case SCHED_IDLE:
+	case SCHED_BATCH:
+		return policy;
+	}
+	return SCHED_NORMAL;
+}
+
+/*
+ * Get the effective rt priority based on the current prio value.
+ */
+int rt_mutex_get_effective_rt_prio(int prio)
+{
+	if (!rt_prio(prio))
+		return 0;
+
+	return MAX_RT_PRIO - 1 - prio;
+}
+
+/*
  * Adjust the priority of a task, after its pi_waiters got modified.
  *
  * This can be both boosting and unboosting. task->pi_lock must be held.

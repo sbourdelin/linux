@@ -25,6 +25,8 @@ static inline bool tsk_is_pi_blocked(struct task_struct *tsk)
 {
 	return tsk->pi_blocked_on != NULL;
 }
+extern int rt_mutex_get_effective_policy(int policy, int prio);
+extern int rt_mutex_get_effective_rt_prio(int prio);
 #else
 static inline int rt_mutex_getprio(struct task_struct *p)
 {
@@ -45,6 +47,14 @@ static inline struct task_struct *rt_mutex_get_top_task(struct task_struct *task
 static inline bool tsk_is_pi_blocked(struct task_struct *tsk)
 {
 	return false;
+}
+static inline int rt_mutex_get_effective_policy(int policy, int prio);
+{
+	return policy;
+}
+static inline int rt_mutex_get_effective_rt_prio(int prio)
+{
+	return task->rt_priority;
 }
 #endif
 
