@@ -148,7 +148,7 @@ struct ib_mr *mlx4_ib_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
 	/* Force registering the memory as writable. */
 	/* Used for memory re-registeration. HCA protects the access */
 	mr->umem = ib_umem_get(pd->uobject->context, start, length,
-			       access_flags | IB_ACCESS_LOCAL_WRITE, 0);
+			       access_flags | IB_ACCESS_LOCAL_WRITE);
 	if (IS_ERR(mr->umem)) {
 		err = PTR_ERR(mr->umem);
 		goto err_free;
@@ -230,8 +230,7 @@ int mlx4_ib_rereg_user_mr(struct ib_mr *mr, int flags,
 		ib_umem_release(mmr->umem);
 		mmr->umem = ib_umem_get(mr->uobject->context, start, length,
 					mr_access_flags |
-					IB_ACCESS_LOCAL_WRITE,
-					0);
+					IB_ACCESS_LOCAL_WRITE);
 		if (IS_ERR(mmr->umem)) {
 			err = PTR_ERR(mmr->umem);
 			/* Prevent mlx4_ib_dereg_mr from free'ing invalid pointer */

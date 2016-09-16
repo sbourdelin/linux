@@ -77,15 +77,11 @@ static void __ib_umem_release(struct ib_device *dev, struct ib_umem *umem, int d
  * @addr: userspace virtual address to start at
  * @size: length of region to pin
  * @access: IB_ACCESS_xxx flags for memory being pinned
- * @dmasync: flush in-flight DMA when the memory region is written
  */
 struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
-			    size_t size, int access, int dmasync)
+			    size_t size, int access)
 {
-	unsigned long dma_attrs = 0;
-	if (dmasync)
-		dma_attrs |= DMA_ATTR_WRITE_BARRIER;
-	return ib_umem_get_attrs(context, addr, size, access, DMA_BIDIRECTIONAL, dma_attrs);
+	return ib_umem_get_attrs(context, addr, size, access, DMA_BIDIRECTIONAL, 0);
 }
 EXPORT_SYMBOL(ib_umem_get);
 

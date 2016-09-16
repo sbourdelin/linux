@@ -910,6 +910,7 @@ static struct ib_mr *mthca_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
 	int i, k, entry;
 	int err = 0;
 	int write_mtt_size;
+	unsigned long dma_attrs = 0;
 
 	if (udata->inlen - sizeof (struct ib_uverbs_cmd_hdr) < sizeof ucmd) {
 		if (!to_mucontext(pd->uobject->context)->reg_mr_warned) {
@@ -926,8 +927,11 @@ static struct ib_mr *mthca_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
 	if (!mr)
 		return ERR_PTR(-ENOMEM);
 
-	mr->umem = ib_umem_get(pd->uobject->context, start, length, acc,
-			       ucmd.mr_attrs & MTHCA_MR_DMASYNC);
+	if (ucmd.mr_attrs & MTHCA_MR_DMASYNC)
+		dma_attrs |= DMA_ATTR_WRITE_BARRIER;
+
+	mr->umem = ib_umem_get_attrs(pd->uobject->context, start, length, acc,
+				DMA_BIDIRECTIONAL, dma_attrs);
 
 	if (IS_ERR(mr->umem)) {
 		err = PTR_ERR(mr->umem);
