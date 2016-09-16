@@ -13,6 +13,10 @@ menuconfig FSL_DPAA
 	  that allows software and accelerators on the datapath to acquire and
 	  release buffers in order to build frames.
 
+	  The Queue Manager (QMan) is a hardware queue management block
+	  that allows software and accelerators on the datapath to enqueue and
+	  dequeue frames in order to communicate.
+
 if FSL_DPAA
 
 config FSL_DPAA_CHECKING
