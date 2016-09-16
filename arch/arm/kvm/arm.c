@@ -878,6 +878,23 @@ static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
 	return ret;
 }
 
+static int kvm_vcpu_ioctl_enable_cap(struct kvm_vcpu *vcpu,
+				     struct kvm_enable_cap *cap)
+{
+	int r;
+
+	if (cap->flags)
+		return -EINVAL;
+
+	switch (cap->cap) {
+	default:
+		r = -EINVAL;
+		break;
+	}
+
+	return r;
+}
+
 long kvm_arch_vcpu_ioctl(struct file *filp,
 			 unsigned int ioctl, unsigned long arg)
 {
@@ -940,6 +957,14 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 		if (copy_from_user(&attr, argp, sizeof(attr)))
 			return -EFAULT;
 		return kvm_arm_vcpu_has_attr(vcpu, &attr);
+	}
+	case KVM_ENABLE_CAP:
+	{
+		struct kvm_enable_cap cap;
+
+		if (copy_from_user(&cap, argp, sizeof(cap)))
+			return -EFAULT;
+		return kvm_vcpu_ioctl_enable_cap(vcpu, &cap);
 	}
 	default:
 		return -EINVAL;
