@@ -605,6 +605,10 @@ out:
 #if defined(CONFIG_FTRACE_SYSCALLS) && defined(CONFIG_PPC64)
 unsigned long __init arch_syscall_addr(int nr, bool compat)
 {
+#ifdef CONFIG_COMPAT
+	if (compat)
+		return sys_call_table[nr*2+1];
+#endif
 	return sys_call_table[nr*2];
 }
 #endif /* CONFIG_FTRACE_SYSCALLS && CONFIG_PPC64 */
