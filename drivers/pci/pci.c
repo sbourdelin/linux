@@ -51,6 +51,10 @@ static void pci_pme_list_scan(struct work_struct *work);
 static LIST_HEAD(pci_pme_list);
 static DEFINE_MUTEX(pci_pme_list_mutex);
 static DECLARE_DELAYED_WORK(pci_pme_work, pci_pme_list_scan);
+static void pci_dev_lock(struct pci_dev *dev);
+static void pci_dev_unlock(struct pci_dev *dev);
+static void pci_bus_save_and_disable(struct pci_bus *bus);
+static void pci_bus_restore(struct pci_bus *bus);
 
 struct pci_pme_device {
 	struct list_head list;
@@ -3888,7 +3892,17 @@ static int pci_parent_bus_reset(struct pci_dev *dev, int probe)
 	if (probe)
 		return 0;
 
+	if (!probe) {
+		pci_dev_unlock(dev);
+		pci_bus_save_and_disable(dev->bus);
+	}
+
 	pci_reset_bridge_secondary_bus(dev->bus->self);
+
+	if (!probe) {
+		pci_bus_restore(dev->bus);
+		pci_dev_lock(dev);
+	}
 
 	return 0;
 }
