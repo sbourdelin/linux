@@ -24,7 +24,7 @@
 #include <linux/input.h>
 #include <linux/input/navpoint.h>
 #include <linux/lcd.h>
-#include <linux/mfd/htc-egpio.h>
+#include <linux/platform_data/gpio-htc-egpio.h>
 #include <linux/mfd/asic3.h>
 #include <linux/mtd/physmap.h>
 #include <linux/pda_power.h>
