@@ -210,23 +210,26 @@ int clockevents_tick_resume(struct clock_event_device *dev)
  */
 static int clockevents_increase_min_delta(struct clock_event_device *dev)
 {
+	u64 min_delta_ns = cev_delta2ns(dev->min_delta_ticks_adjusted, dev,
+					false);
+
 	/* Nothing to do if we already reached the limit */
-	if (dev->min_delta_ns >= MIN_DELTA_LIMIT) {
+	if (min_delta_ns >= MIN_DELTA_LIMIT) {
 		printk_deferred(KERN_WARNING
 				"CE: Reprogramming failure. Giving up\n");
 		dev->next_event.tv64 = KTIME_MAX;
 		return -ETIME;
 	}
 
-	if (dev->min_delta_ns < 5000)
-		dev->min_delta_ns = 5000;
+	if (min_delta_ns < 5000)
+		min_delta_ns = 5000;
 	else
-		dev->min_delta_ns += dev->min_delta_ns >> 1;
+		min_delta_ns += min_delta_ns >> 1;
 
-	if (dev->min_delta_ns > MIN_DELTA_LIMIT)
-		dev->min_delta_ns = MIN_DELTA_LIMIT;
+	if (min_delta_ns > MIN_DELTA_LIMIT)
+		min_delta_ns = MIN_DELTA_LIMIT;
 
-	dev->min_delta_ticks_adjusted = (unsigned long)((dev->min_delta_ns *
+	dev->min_delta_ticks_adjusted = (unsigned long)((min_delta_ns *
 						dev->mult) >> dev->shift);
 	dev->min_delta_ticks_adjusted = max(dev->min_delta_ticks_adjusted,
 						dev->min_delta_ticks);
@@ -234,7 +237,7 @@ static int clockevents_increase_min_delta(struct clock_event_device *dev)
 	printk_deferred(KERN_WARNING
 			"CE: %s increased min_delta_ns to %llu nsec\n",
 			dev->name ? dev->name : "?",
-			(unsigned long long) dev->min_delta_ns);
+			(unsigned long long) min_delta_ns);
 	return 0;
 }
 
