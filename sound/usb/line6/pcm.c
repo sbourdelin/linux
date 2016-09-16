@@ -146,16 +146,20 @@ get_stream(struct snd_line6_pcm *line6pcm, int direction)
 }
 
 /* allocate a buffer if not opened yet;
- * call this in line6pcm.state_change mutex
+ * call this in line6pcm.state_mutex
  */
 static int line6_buffer_acquire(struct snd_line6_pcm *line6pcm,
-				struct line6_pcm_stream *pstr, int type)
+				struct line6_pcm_stream *pstr, int direction, int type)
 {
+	const int pkt_size =
+		(direction == SNDRV_PCM_STREAM_PLAYBACK) ?
+			line6pcm->max_packet_size_out :
+			line6pcm->max_packet_size_in;
+
 	/* Invoked multiple times in a row so allocate once only */
 	if (!test_and_set_bit(type, &pstr->opened) && !pstr->buffer) {
 		pstr->buffer = kmalloc(line6pcm->line6->iso_buffers *
-                                      LINE6_ISO_PACKETS *
-                                      line6pcm->max_packet_size, GFP_KERNEL);
+				       LINE6_ISO_PACKETS * pkt_size, GFP_KERNEL);
 		if (!pstr->buffer)
 			return -ENOMEM;
 	}
@@ -163,12 +167,11 @@ static int line6_buffer_acquire(struct snd_line6_pcm *line6pcm,
 }
 
 /* free a buffer if all streams are closed;
- * call this in line6pcm.state_change mutex
+ * call this in line6pcm.state_mutex
  */
 static void line6_buffer_release(struct snd_line6_pcm *line6pcm,
 				 struct line6_pcm_stream *pstr, int type)
 {
-
 	clear_bit(type, &pstr->opened);
 	if (!pstr->opened) {
 		line6_wait_clear_audio_urbs(line6pcm, pstr);
@@ -195,6 +198,7 @@ static int line6_stream_start(struct snd_line6_pcm *line6pcm, int direction,
 		else
 			ret = line6_submit_audio_in_all_urbs(line6pcm);
 	}
+
 	if (ret < 0)
 		clear_bit(type, &pstr->running);
 	spin_unlock_irqrestore(&pstr->lock, flags);
@@ -530,12 +534,12 @@ int line6_init_pcm(struct usb_line6 *line6,
 	line6pcm->volume_monitor = 255;
 	line6pcm->line6 = line6;
 
-	/* Read and write buffers are sized identically, so choose minimum */
-	line6pcm->max_packet_size = min(
-			usb_maxpacket(line6->usbdev,
-				usb_rcvisocpipe(line6->usbdev, ep_read), 0),
-			usb_maxpacket(line6->usbdev,
-				usb_sndisocpipe(line6->usbdev, ep_write), 1));
+	line6pcm->max_packet_size_in =
+		usb_maxpacket(line6->usbdev,
+			usb_rcvisocpipe(line6->usbdev, ep_read), 0);
+	line6pcm->max_packet_size_out =
+		usb_maxpacket(line6->usbdev,
+			usb_sndisocpipe(line6->usbdev, ep_write), 1);
 
 	spin_lock_init(&line6pcm->out.lock);
 	spin_lock_init(&line6pcm->in.lock);
