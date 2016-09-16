@@ -3193,8 +3193,6 @@ static int ibmvscsis_rdma(struct ibmvscsis_cmd *cmd, struct scatterlist *sg,
 					 server_ioba);
 		} else {
 			/* write to client */
-			struct srp_cmd *srp = (struct srp_cmd *)iue->sbuf->buf;
-
 			if (!READ_CMD(srp->cdb))
 				print_hex_dump_bytes(" data:", DUMP_PREFIX_NONE,
 						     sg_virt(sgp), buf_len);
