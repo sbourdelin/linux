@@ -1905,7 +1905,7 @@ static void skd_send_internal_skspcl(struct skd_device *skdev,
 		break;
 
 	default:
-		SKD_ASSERT("Don't know what to send");
+		pr_err("Don't know what to send");
 		return;
 
 	}
@@ -2105,7 +2105,7 @@ static void skd_complete_internal(struct skd_device *skdev,
 		break;
 
 	default:
-		SKD_ASSERT("we didn't send this");
+		pr_err("we didn't send this");
 	}
 }
 
