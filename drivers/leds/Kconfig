@@ -659,6 +659,17 @@ config LEDS_MLXCPLD
 	  This option enabled support for the LEDs on the Mellanox
 	  boards. Say Y to enabled these.
 
+config LEDS_NCP5623
+	tristate "LED Support for NCP5623 I2C chip"
+	depends on LEDS_CLASS
+	depends on I2C
+	help
+	  This option enables support for LEDs connected to NCP5623
+	  LED driver chips accessed via the I2C bus.
+	  Driver supports brightness control.
+
+	  Say Y to enable this driver.
+
 comment "LED Triggers"
 source "drivers/leds/trigger/Kconfig"
 
