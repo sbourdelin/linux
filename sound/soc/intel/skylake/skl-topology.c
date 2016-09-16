@@ -1588,7 +1588,7 @@ static int skl_tplg_fill_pins_info(struct device *dev,
 		break;
 
 	default:
-		dev_err(dev, "Invalid direction value");
+		dev_err(dev, "Invalid direction value\n");
 		return -EINVAL;
 	}
 
@@ -1626,7 +1626,7 @@ static int skl_tplg_fill_fmt(struct device *dev,
 		break;
 
 	default:
-		dev_err(dev, "Invalid direction value");
+		dev_err(dev, "Invalid direction value\n");
 		return -EINVAL;
 	}
 
@@ -1664,7 +1664,7 @@ static int skl_tplg_fill_fmt(struct device *dev,
 		break;
 
 	default:
-		dev_err(dev, "Invalid token %d", tkn);
+		dev_err(dev, "Invalid token %d\n", tkn);
 		return -EINVAL;
 	}
 
@@ -1677,7 +1677,7 @@ static int skl_tplg_get_uuid(struct device *dev, struct skl_module_cfg *mconfig,
 	if (uuid_tkn->token == SKL_TKN_UUID)
 		memcpy(&mconfig->guid, &uuid_tkn->uuid, 16);
 	else {
-		dev_err(dev, "Not an UUID token tkn %d", uuid_tkn->token);
+		dev_err(dev, "Not an UUID token tkn %d\n", uuid_tkn->token);
 		return -EINVAL;
 	}
 
@@ -1913,7 +1913,7 @@ static int skl_tplg_get_tokens(struct device *dev,
 
 		switch (array->type) {
 		case SND_SOC_TPLG_TUPLE_TYPE_STRING:
-			dev_warn(dev, "no string tokens expected for skl tplg");
+			dev_warn(dev, "no string tokens expected for skl tplg\n");
 			continue;
 
 		case SND_SOC_TPLG_TUPLE_TYPE_UUID:
@@ -1966,7 +1966,7 @@ static int skl_tplg_get_desc_blocks(struct device *dev,
 		return tkn_elem->value;
 
 	default:
-		dev_err(dev, "Invalid descriptor token %d", tkn_elem->token);
+		dev_err(dev, "Invalid descriptor token %d\n", tkn_elem->token);
 		break;
 	}
 
@@ -2226,7 +2226,7 @@ static int skl_tplg_fill_str_mfest_tkn(struct device *dev,
 		break;
 
 	default:
-		dev_err(dev, "Not a string token %d", str_elem->token);
+		dev_err(dev, "Not a string token %d\n", str_elem->token);
 		break;
 	}
 
@@ -2267,7 +2267,7 @@ static int skl_tplg_get_int_tkn(struct device *dev,
 		break;
 
 	default:
-		dev_err(dev, "Not a manifest token %d", tkn_elem->token);
+		dev_err(dev, "Not a manifest token %d\n", tkn_elem->token);
 		return -EINVAL;
 	}
 
@@ -2306,7 +2306,7 @@ static int skl_tplg_get_manifest_tkn(struct device *dev,
 			continue;
 
 		case SND_SOC_TPLG_TUPLE_TYPE_UUID:
-			dev_warn(dev, "no uuid tokens for skl tplf manifest");
+			dev_warn(dev, "no uuid tokens for skl tplf manifest\n");
 			continue;
 
 		default:
