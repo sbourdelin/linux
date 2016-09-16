@@ -154,7 +154,8 @@ static inline int set_av_attr(struct ocrdma_dev *dev, struct ocrdma_ah *ah,
 	return status;
 }
 
-struct ib_ah *ocrdma_create_ah(struct ib_pd *ibpd, struct ib_ah_attr *attr)
+struct ib_ah *ocrdma_create_ah(struct ib_pd *ibpd, struct ib_ah_attr *attr,
+			struct ib_udata *udata)
 {
 	u32 *ahid_addr;
 	int status;
@@ -203,7 +204,7 @@ struct ib_ah *ocrdma_create_ah(struct ib_pd *ibpd, struct ib_ah_attr *attr)
 						      &sgid_attr.ndev->ifindex,
 						      NULL);
 		if (status) {
-			pr_err("%s(): Failed to resolve dmac from gid." 
+			pr_err("%s(): Failed to resolve dmac from gid."
 				"status = %d\n", __func__, status);
 			goto av_conf_err;
 		}
