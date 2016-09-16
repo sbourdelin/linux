@@ -3202,8 +3202,10 @@ struct kvm_run {
 	/* in */
 	__u8 request_interrupt_window;
 
-Request that KVM_RUN return when it becomes possible to inject external
+[x86] Request that KVM_RUN return when it becomes possible to inject external
 interrupts into the guest.  Useful in conjunction with KVM_INTERRUPT.
+[arm*] Bits set to 1 in here mask IRQ lines that would otherwise potentially
+trigger forever. Useful with KVM_CAP_ARM_TIMER.
 
 	__u8 padding1[7];
 
@@ -3519,6 +3521,16 @@ Hyper-V SynIC state change. Notification is used to remap SynIC
 event/message pages and to enable/disable SynIC messages/events processing
 in userspace.
 
+		/* KVM_EXIT_ARM_TIMER */
+		struct {
+			__u8 timesource;
+		} arm_timer;
+
+Indicates that a timer triggered that user space needs to handle and
+potentially mask with vcpu->run->request_interrupt_window to allow the
+guest to proceed. This only happens for timers that got enabled through
+KVM_CAP_ARM_TIMER.
+
 		/* Fix the size of the union. */
 		char padding[256];
 	};
@@ -3738,6 +3750,16 @@ It allows the Config3.MSAP bit to be set to enable the use of MSA by the guest.
 Once this is done the KVM_REG_MIPS_VEC_* and KVM_REG_MIPS_MSA_* registers can be
 accessed, and the Config5.MSAEn bit is accessible via the KVM API and also from
 the guest.
+
+6.11 KVM_CAP_ARM_TIMER
+
+Architectures: arm, arm64
+Target: vcpu
+Parameters: args[0] contains a bitmap of timers to enable
+
+This capability allows to route per-core timers into user space. When it's
+enabled, the enabled timers trigger KVM_EXIT_ARM_TIMER guest exits when they
+are pending, unless masked by vcpu->run->request_interrupt_window.
 
 7. Capabilities that can be enabled on VMs
 ------------------------------------------
