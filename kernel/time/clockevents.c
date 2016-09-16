@@ -252,7 +252,6 @@ static int clockevents_program_min_delta(struct clock_event_device *dev)
 
 	for (i = 0;;) {
 		delta = dev->min_delta_ns;
-		dev->next_event = ktime_add_ns(ktime_get(), delta);
 
 		if (clockevent_state_shutdown(dev))
 			return 0;
@@ -289,7 +288,6 @@ static int clockevents_program_min_delta(struct clock_event_device *dev)
 	int64_t delta;
 
 	delta = dev->min_delta_ns;
-	dev->next_event = ktime_add_ns(ktime_get(), delta);
 
 	if (clockevent_state_shutdown(dev))
 		return 0;
