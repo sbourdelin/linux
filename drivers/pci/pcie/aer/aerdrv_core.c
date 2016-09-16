@@ -403,7 +403,7 @@ static pci_ers_result_t broadcast_error_message(struct pci_dev *dev,
  */
 static pci_ers_result_t default_reset_link(struct pci_dev *dev)
 {
-	pci_reset_bridge_secondary_bus(dev);
+	pci_reset_bus(dev->subordinate);
 	dev_printk(KERN_DEBUG, &dev->dev, "downstream link has been reset\n");
 	return PCI_ERS_RESULT_RECOVERED;
 }
