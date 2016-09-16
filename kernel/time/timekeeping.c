@@ -1910,6 +1910,8 @@ static __always_inline void timekeeping_freqadjust(struct timekeeper *tk,
 
 	/* scale the corrections */
 	timekeeping_apply_adjustment(tk, offset, negative, adj_scale);
+	clockevents_adjust_all_freqs(tk->tkr_mono.mult,
+				tk->tkr_mono.clock->mult);
 }
 
 /*
