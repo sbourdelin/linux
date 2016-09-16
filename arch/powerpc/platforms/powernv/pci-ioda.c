@@ -3522,6 +3522,7 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 	const __be32 *prop32;
 	int len;
 	unsigned int segno;
+	bool capi_mode = false;
 	u64 phb_id;
 	void *aux;
 	long rc;
@@ -3737,8 +3738,17 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 	 * shutdown PCI devices correctly. We already got IODA table
 	 * cleaned out. So we have to issue PHB reset to stop all PCI
 	 * transactions from previous kernel.
+	 *
+	 * Additionally, if the PHB is in CAPI mode, we also need to
+	 * reset it to get it out of CAPI mode.
 	 */
-	if (is_kdump_kernel()) {
+	if (opal_check_token(OPAL_PCI_GET_PHB_CAPI_MODE) &&
+	    opal_pci_get_phb_capi_mode(phb_id) == OPAL_PHB_CAPI_MODE_CAPI) {
+		pr_info("  PHB in CAPI mode, reset required\n");
+		capi_mode = true;
+	}
+
+	if (is_kdump_kernel() || capi_mode) {
 		pr_info("  Issue PHB reset ...\n");
 		pnv_eeh_phb_reset(hose, EEH_RESET_FUNDAMENTAL);
 		pnv_eeh_phb_reset(hose, EEH_RESET_DEACTIVATE);
