@@ -472,8 +472,6 @@ static int xs_nospace(struct rpc_task *task)
 
 	spin_unlock_bh(&xprt->transport_lock);
 
-	/* Race breaker in case memory is freed before above code is called */
-	sk->sk_write_space(sk);
 	return ret;
 }
 
@@ -1679,6 +1677,22 @@ static void xs_tcp_write_space(struct sock *sk)
 	read_unlock_bh(&sk->sk_callback_lock);
 }
 
+static bool xs_udp_have_write_space(struct rpc_xprt *xprt)
+{
+	struct sock_xprt *transport = container_of(xprt, struct sock_xprt, xprt);
+	struct sock *sk = transport->inet;
+
+	return sock_writeable(sk);
+}
+
+static bool xs_tcp_have_write_space(struct rpc_xprt *xprt)
+{
+	struct sock_xprt *transport = container_of(xprt, struct sock_xprt, xprt);
+	struct sock *sk = transport->inet;
+
+	return sk_stream_is_writeable(sk);
+}
+
 static void xs_udp_do_set_buffer_size(struct rpc_xprt *xprt)
 {
 	struct sock_xprt *transport = container_of(xprt, struct sock_xprt, xprt);
@@ -2664,6 +2678,7 @@ static struct rpc_xprt_ops xs_local_ops = {
 	.connect		= xs_local_connect,
 	.buf_alloc		= rpc_malloc,
 	.buf_free		= rpc_free,
+	.have_write_space       = xs_udp_have_write_space,
 	.send_request		= xs_local_send_request,
 	.set_retrans_timeout	= xprt_set_retrans_timeout_def,
 	.close			= xs_close,
@@ -2683,6 +2698,7 @@ static struct rpc_xprt_ops xs_udp_ops = {
 	.connect		= xs_connect,
 	.buf_alloc		= rpc_malloc,
 	.buf_free		= rpc_free,
+	.have_write_space       = xs_udp_have_write_space,
 	.send_request		= xs_udp_send_request,
 	.set_retrans_timeout	= xprt_set_retrans_timeout_rtt,
 	.timer			= xs_udp_timer,
@@ -2704,6 +2720,7 @@ static struct rpc_xprt_ops xs_tcp_ops = {
 	.connect		= xs_connect,
 	.buf_alloc		= rpc_malloc,
 	.buf_free		= rpc_free,
+	.have_write_space       = xs_tcp_have_write_space,
 	.send_request		= xs_tcp_send_request,
 	.set_retrans_timeout	= xprt_set_retrans_timeout_def,
 	.close			= xs_tcp_shutdown,

@@ -502,6 +502,10 @@ void xprt_wait_for_buffer_space(struct rpc_task *task, rpc_action action)
 
 	task->tk_timeout = RPC_IS_SOFT(task) ? req->rq_timeout : 0;
 	rpc_sleep_on(&xprt->pending, task, action);
+
+	/* Write space notification may race with putting task to sleep. */
+	if (xprt->ops->have_write_space(xprt))
+		rpc_wake_up_queued_task(&xprt->pending, task);
 }
 EXPORT_SYMBOL_GPL(xprt_wait_for_buffer_space);
 
