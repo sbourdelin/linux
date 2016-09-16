@@ -276,6 +276,7 @@ extern void syscall_unregfunc(void);
 
 #define DEFINE_TRACE_FN(name, reg, unreg)
 #define DEFINE_TRACE(name)
+#define DEFINE_TRACE_MAP(name, map)
 #define EXPORT_TRACEPOINT_SYMBOL_GPL(name)
 #define EXPORT_TRACEPOINT_SYMBOL(name)
 
@@ -466,6 +467,13 @@ extern void syscall_unregfunc(void);
  *
  * A set of (un)registration functions can be passed to the variant
  * TRACE_EVENT_FN to perform any (un)registration work.
+ *
+ * TRACE_EVENT_MAP can be used to create alternate versions of a
+ * TRACE_EVENT without modifying the instrumented code. It connects
+ * a different probe to an existing tracepoint, so other fields can be
+ * extracted. The "name" field is the name of the original TRACE_EVENT,
+ * the "map" field is the name of the alias. They can be enabled
+ * independently.
  */
 
 #define DECLARE_EVENT_CLASS(name, proto, args, tstruct, assign, print)
@@ -493,9 +501,10 @@ extern void syscall_unregfunc(void);
 			      struct, assign, print)		\
 	DECLARE_TRACE_CONDITION(name, PARAMS(proto),		\
 				PARAMS(args), PARAMS(cond))
-
 #define TRACE_EVENT_FLAGS(event, flag)
 
 #define TRACE_EVENT_PERF_PERM(event, expr...)
+
+#define TRACE_EVENT_MAP(name, map, proto, args, struct, assign, print)
 
 #endif /* ifdef TRACE_EVENT (see note above) */

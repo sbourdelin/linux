@@ -86,5 +86,12 @@ static inline void perf_test_probe_##call(void)				\
 #define DEFINE_EVENT_PRINT(template, name, proto, args, print)	\
 	DEFINE_EVENT(template, name, PARAMS(proto), PARAMS(args))
 
+#undef DEFINE_EVENT_MAP
+#define DEFINE_EVENT_MAP(template, call, map, proto, args)		\
+static inline void perf_test_probe_##map(void)				\
+{									\
+	check_trace_callback_type_##call(perf_trace_##template);	\
+}
+
 #include TRACE_INCLUDE(TRACE_INCLUDE_FILE)
 #endif /* CONFIG_PERF_EVENTS */
