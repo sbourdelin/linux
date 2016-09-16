@@ -967,16 +967,18 @@ ssize_t ib_uverbs_reg_mr(struct ib_uverbs_file *file,
 	struct ib_pd                *pd;
 	struct ib_mr                *mr;
 	int                          ret;
+	size_t resp_size = sizeof resp;
 
-	if (out_len < sizeof resp)
-		return -ENOSPC;
+	if (out_len < resp_size) {
+		resp_size = out_len;
+	}
 
 	if (copy_from_user(&cmd, buf, sizeof cmd))
 		return -EFAULT;
 
 	INIT_UDATA(&udata, buf + sizeof cmd,
 		   (unsigned long) cmd.response + sizeof resp,
-		   in_len - sizeof cmd, out_len - sizeof resp);
+		   in_len - sizeof cmd, out_len - resp_size);
 
 	if ((cmd.start & ~PAGE_MASK) != (cmd.hca_va & ~PAGE_MASK))
 		return -EINVAL;
@@ -1030,7 +1032,7 @@ ssize_t ib_uverbs_reg_mr(struct ib_uverbs_file *file,
 	resp.mr_handle = uobj->id;
 
 	if (copy_to_user((void __user *) (unsigned long) cmd.response,
-			 &resp, sizeof resp)) {
+			 &resp, resp_size)) {
 		ret = -EFAULT;
 		goto err_copy;
 	}
