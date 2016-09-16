@@ -1,0 +1,96 @@
+#!/bin/bash
+#
+# Translate stack dump function offsets.
+#
+# addr2line doesn't work with KASLR addresses.  This works similarly to
+# addr2line, but instead takes the 'func+0x123' format as input:
+#
+#   $ ./scripts/faddr2line vmlinux meminfo_proc_show+0x5/0x568
+#   fs/proc/meminfo.c:27
+#
+# If the address is part of an inlined function, the full inline call chain is
+# printed:
+#
+#   $ ./scripts/faddr2line vmlinux native_write_msr+0x6/0x27
+#   arch/x86/include/asm/msr.h:121
+#   include/linux/jump_label.h:125
+#   arch/x86/include/asm/msr.h:125
+#
+# The function size after the '/' in the input is optional, but recommended.
+# It's used to help disambiguate any duplicate symbol names, which can occur
+# rarely.  If the size is omitted for a duplicate symbol then it's possible for
+# multiple code sites to be printed:
+#
+#   $ ./scripts/faddr2line vmlinux raw_ioctl+0x5
+#   drivers/char/raw.c:122
+#   net/ipv4/raw.c:876
+
+set -o errexit
+set -o nounset
+
+usage() {
+	echo "usage: faddr2line <object file> <func+offset>" >&2
+	exit 1
+}
+
+die() {
+	echo "ERROR: $1" >&2
+	exit 1
+}
+
+command -v awk >/dev/null 2>&1 || die "awk isn't installed"
+command -v readelf >/dev/null 2>&1 || die "readelf isn't installed"
+command -v addr2line >/dev/null 2>&1 || die "addr2line isn't installed"
+
+[[ $# != 2 ]] && usage
+
+objfile=$1
+[[ ! -f $objfile ]] && die "can't find objfile $objfile"
+
+func_addr=$2
+func=${func_addr%+*}
+offset=${func_addr#*+}
+offset=${offset%/*}
+size=
+[[ $func_addr =~ "/" ]] && size=${func_addr#*/}
+
+if [[ -z $func ]] || [[ -z $offset ]] || [[ $func = $func_addr ]]; then
+	die "bad func+offset $func_addr"
+fi
+
+# Go through each of the object's symbols which match the func name.
+# In rare cases there might be duplicates.
+while read symbol; do
+	fields=($symbol)
+	sym_base=0x${fields[1]}
+	sym_size=${fields[2]}
+	sym_type=${fields[3]}
+
+	# calculate the address
+	addr=$(($sym_base + $offset))
+	if [[ -z $addr ]] || [[ $addr = 0 ]]; then
+		die "bad address: $sym_base + $offset"
+	fi
+	hexaddr=0x$(printf %x $addr)
+
+	# weed out non-function symbols
+	if [[ $sym_type != "FUNC" ]]; then
+		echo "skipping $func address at $hexaddr due to non-function symbol"
+		continue
+	fi
+
+	# if the user provided a size, make sure it matches the symbol's size
+	if [[ -n $size ]] && [[ $size -ne $sym_size ]]; then
+		echo "skipping $func address at $hexaddr due to size mismatch ($size != $sym_size)"
+		continue;
+	fi
+
+	# make sure the provided offset is within the symbol's range
+	if [[ $offset -gt $sym_size ]]; then
+		echo "skipping $func address at $hexaddr due to size mismatch ($offset <= $sym_size)"
+		continue
+	fi
+
+	addr2line -ie $objfile $hexaddr
+
+done < <(readelf -s $objfile | awk -v f=$func '$8 == f {print}')
