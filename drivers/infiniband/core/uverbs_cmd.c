@@ -2471,11 +2471,29 @@ ssize_t ib_uverbs_destroy_qp(struct ib_uverbs_file *file,
 	return in_len;
 }
 
-static void *alloc_wr(size_t wr_size, __u32 num_sge)
+static void *alloc_wr(struct ib_qp *qp, size_t wr_size, __u32 num_sge)
 {
-	return kmalloc(ALIGN(wr_size, sizeof (struct ib_sge)) +
-			 num_sge * sizeof (struct ib_sge), GFP_KERNEL);
+	void *wr;
+	size_t xrc_ext = qp->qp_type == IB_QPT_XRC_INI ?
+		sizeof(struct ib_xrc_wr) - sizeof(struct ib_send_wr) :
+		0;
+
+	wr = kmalloc(ALIGN(wr_size + xrc_ext, sizeof (struct ib_sge)) +
+		num_sge * sizeof (struct ib_sge), GFP_KERNEL);
+	if (unlikely(!wr))
+		return wr;
+
+	return wr + xrc_ext;
 };
+
+static void free_wr(struct ib_qp *qp, struct ib_send_wr *wr)
+{
+	void *d;
+	if (unlikely(!wr))
+		return;
+	d = qp->qp_type == IB_QPT_XRC_INI ? xrc_wr(wr) : (void *)wr;
+	kfree(d);
+}
 
 ssize_t ib_uverbs_post_send(struct ib_uverbs_file *file,
 			    struct ib_device *ib_dev,
@@ -2511,6 +2529,7 @@ ssize_t ib_uverbs_post_send(struct ib_uverbs_file *file,
 		goto out;
 
 	is_ud = qp->qp_type == IB_QPT_UD;
+
 	sg_ind = 0;
 	last = NULL;
 	for (i = 0; i < cmd.wr_count; ++i) {
@@ -2536,7 +2555,7 @@ ssize_t ib_uverbs_post_send(struct ib_uverbs_file *file,
 			}
 
 			next_size = sizeof(*ud);
-			ud = alloc_wr(next_size, user_wr->num_sge);
+			ud = alloc_wr(qp, next_size, user_wr->num_sge);
 			if (!ud) {
 				ret = -ENOMEM;
 				goto out_put;
@@ -2558,7 +2577,7 @@ ssize_t ib_uverbs_post_send(struct ib_uverbs_file *file,
 			struct ib_rdma_wr *rdma;
 
 			next_size = sizeof(*rdma);
-			rdma = alloc_wr(next_size, user_wr->num_sge);
+			rdma = alloc_wr(qp, next_size, user_wr->num_sge);
 			if (!rdma) {
 				ret = -ENOMEM;
 				goto out_put;
@@ -2573,7 +2592,7 @@ ssize_t ib_uverbs_post_send(struct ib_uverbs_file *file,
 			struct ib_atomic_wr *atomic;
 
 			next_size = sizeof(*atomic);
-			atomic = alloc_wr(next_size, user_wr->num_sge);
+			atomic = alloc_wr(qp, next_size, user_wr->num_sge);
 			if (!atomic) {
 				ret = -ENOMEM;
 				goto out_put;
@@ -2589,7 +2608,7 @@ ssize_t ib_uverbs_post_send(struct ib_uverbs_file *file,
 			   user_wr->opcode == IB_WR_SEND_WITH_IMM ||
 			   user_wr->opcode == IB_WR_SEND_WITH_INV) {
 			next_size = sizeof(*next);
-			next = alloc_wr(next_size, user_wr->num_sge);
+			next = alloc_wr(qp, next_size, user_wr->num_sge);
 			if (!next) {
 				ret = -ENOMEM;
 				goto out_put;
@@ -2605,6 +2624,11 @@ ssize_t ib_uverbs_post_send(struct ib_uverbs_file *file,
 					(__be32 __force) user_wr->ex.imm_data;
 		} else if (user_wr->opcode == IB_WR_SEND_WITH_INV) {
 			next->ex.invalidate_rkey = user_wr->ex.invalidate_rkey;
+		}
+
+		if (qp->qp_type == IB_QPT_XRC_INI) {
+			struct ib_xrc_wr *xrc = xrc_wr(next);
+			xrc->remote_srqn = user_wr->xrc_remote_srq_num;
 		}
 
 		if (!last)
@@ -2655,7 +2679,7 @@ out_put:
 		if (is_ud && ud_wr(wr)->ah)
 			put_ah_read(ud_wr(wr)->ah);
 		next = wr->next;
-		kfree(wr);
+		free_wr(qp, wr);
 		wr = next;
 	}
 
