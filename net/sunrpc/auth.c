@@ -538,6 +538,14 @@ rpcauth_cache_enforce_limit(void)
 	rpcauth_cache_do_shrink(nr_to_scan);
 }
 
+static unsigned int
+rpcauth_hash_acred(struct auth_cred *acred, unsigned int hashbits)
+{
+	return hash_64(from_kgid(&init_user_ns, acred->gid) |
+		(from_kuid(&init_user_ns, acred->uid) << (sizeof(gid_t) * 8)),
+		hashbits);
+}
+
 /*
  * Look up a process' credentials in the authentication cache
  */
@@ -551,7 +559,7 @@ rpcauth_lookup_credcache(struct rpc_auth *auth, struct auth_cred * acred,
 			*entry, *new;
 	unsigned int nr;
 
-	nr = hash_long(from_kuid(&init_user_ns, acred->uid), cache->hashbits);
+	nr = rpcauth_hash_acred(acred, cache->hashbits);
 
 	rcu_read_lock();
 	hlist_for_each_entry_rcu(entry, &cache->hashtable[nr], cr_hash) {
