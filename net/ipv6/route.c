@@ -1989,6 +1989,14 @@ static struct rt6_info *ip6_route_info_create(struct fib6_config *cfg)
 			if (cfg->fc_table)
 				grt = ip6_nh_lookup_table(net, cfg, gw_addr);
 
+			if (grt) {
+				if (grt->rt6i_flags & RTF_GATEWAY ||
+				    (dev && dev != grt->dst.dev)) {
+					ip6_rt_put(grt);
+					grt = NULL;
+				}
+			}
+
 			if (!grt)
 				grt = rt6_lookup(net, gw_addr, NULL,
 						 cfg->fc_ifindex, 1);
