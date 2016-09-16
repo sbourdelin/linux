@@ -813,6 +813,12 @@ static int handle_outgoing_dr_smp(struct ib_mad_agent_private *mad_agent_priv,
 			goto out;
 	}
 
+	/* If device does not define the optional process_mad function it means that
+	 * everything is handled in hardware:
+	 */
+	if (!device->process_mad)
+		goto out;
+
 	local = kmalloc(sizeof *local, GFP_ATOMIC);
 	if (!local) {
 		ret = -ENOMEM;
