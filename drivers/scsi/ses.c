@@ -86,7 +86,7 @@ static void init_device_slot_control(unsigned char *dest_desc,
 static int ses_recv_diag(struct scsi_device *sdev, int page_code,
 			 void *buf, int bufflen)
 {
-	int ret;
+	int ret, retries = SES_RETRIES;
 	unsigned char cmd[] = {
 		RECEIVE_DIAGNOSTIC,
 		1,		/* Set PCV bit */
@@ -96,11 +96,14 @@ static int ses_recv_diag(struct scsi_device *sdev, int page_code,
 		0
 	};
 	unsigned char recv_page_code;
+	struct scsi_sense_hdr sshdr;
 
-	ret =  scsi_execute_req(sdev, cmd, DMA_FROM_DEVICE, buf, bufflen,
-				NULL, SES_TIMEOUT, SES_RETRIES, NULL);
-	if (unlikely(!ret))
-		return ret;
+	do {
+		memset(&sshdr, 0, sizeof(sshdr));
+		ret =  scsi_execute_req(sdev, cmd, DMA_FROM_DEVICE, buf, bufflen,
+					&sshdr, SES_TIMEOUT, retries, NULL);
+	} while (scsi_sense_valid(&sshdr) &&
+		 sshdr.sense_key == UNIT_ATTENTION && --retries);
 
 	recv_page_code = ((unsigned char *)buf)[0];
 
