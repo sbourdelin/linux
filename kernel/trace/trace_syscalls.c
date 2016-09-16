@@ -74,7 +74,11 @@ static inline bool trace_is_compat_syscall(struct pt_regs *regs)
 static inline int
 trace_get_syscall_nr(struct task_struct *task, struct pt_regs *regs)
 {
+#ifdef arch_trace_syscall_get_nr
+	return arch_trace_syscall_get_nr(task, regs);
+#else
 	return syscall_get_nr(task, regs);
+#endif
 }
 
 
