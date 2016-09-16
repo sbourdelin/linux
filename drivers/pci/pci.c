@@ -3833,6 +3833,16 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
 	return 0;
 }
 
+static int pci_dev_probe_crs(struct pci_dev *dev, void *data)
+{
+	u32 l;
+
+	pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &l,
+				   60 * 1000);
+
+	return 0;
+}
+
 void pci_reset_secondary_bus(struct pci_dev *dev)
 {
 	u16 ctrl;
@@ -3874,6 +3884,7 @@ void __weak pcibios_reset_secondary_bus(struct pci_dev *dev)
 void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
 {
 	pcibios_reset_secondary_bus(dev);
+	pci_walk_bus(dev->subordinate, pci_dev_probe_crs, NULL);
 }
 EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
 
