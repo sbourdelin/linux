@@ -1803,6 +1803,30 @@ static struct rt6_info *ip6_nh_lookup_table(struct net *net,
 	return rt;
 }
 
+static int ip6_nh_valid(struct rt6_info *grt,
+			struct net_device **dev, struct inet6_dev **idev) {
+	int ret = 0;
+
+	if (!grt)
+		goto out;
+	if (grt->rt6i_flags & RTF_GATEWAY)
+		goto out;
+	if (*dev) {
+		if (*dev != grt->dst.dev)
+			goto out;
+	} else {
+		*dev = grt->dst.dev;
+		*idev = grt->rt6i_idev;
+		dev_hold(*dev);
+		in6_dev_hold(*idev);
+	}
+	ret = 1;
+out:
+	if (grt)
+		ip6_rt_put(grt);
+	return ret;
+}
+
 static struct rt6_info *ip6_route_info_create(struct fib6_config *cfg)
 {
 	struct net *net = cfg->fc_nlinfo.nl_net;
@@ -1986,33 +2010,15 @@ static struct rt6_info *ip6_route_info_create(struct fib6_config *cfg)
 			if (!(gwa_type & IPV6_ADDR_UNICAST))
 				goto out;
 
+			err = -EHOSTUNREACH;
 			if (cfg->fc_table)
 				grt = ip6_nh_lookup_table(net, cfg, gw_addr);
-
-			if (!grt)
+			if (!ip6_nh_valid(grt, &dev, &idev)) {
 				grt = rt6_lookup(net, gw_addr, NULL,
 						 cfg->fc_ifindex, 1);
-
-			err = -EHOSTUNREACH;
-			if (!grt)
-				goto out;
-			if (dev) {
-				if (dev != grt->dst.dev) {
-					ip6_rt_put(grt);
+				if (!ip6_nh_valid(grt, &dev, &idev))
 					goto out;
-				}
-			} else {
-				dev = grt->dst.dev;
-				idev = grt->rt6i_idev;
-				dev_hold(dev);
-				in6_dev_hold(grt->rt6i_idev);
 			}
-			if (!(grt->rt6i_flags & RTF_GATEWAY))
-				err = 0;
-			ip6_rt_put(grt);
-
-			if (err)
-				goto out;
 		}
 		err = -EINVAL;
 		if (!dev || (dev->flags & IFF_LOOPBACK))
