@@ -56,6 +56,7 @@ static void __hot prepare_ftrace_return(unsigned long *parent,
 }
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 
+#ifdef CONFIG_FUNCTION_TRACER
 void notrace __hot ftrace_function_trampoline(unsigned long parent,
 				unsigned long self_addr,
 				unsigned long org_sp_gr3)
@@ -85,4 +86,18 @@ void notrace __hot ftrace_function_trampoline(unsigned long parent,
 	}
 #endif
 }
+#endif /* CONFIG_FUNCTION_TRACER */
+#if (defined CONFIG_FTRACE_SYSCALLS) && (defined CONFIG_64BIT)
+extern const unsigned int sys_call_table64[];
 
+unsigned long __init arch_syscall_addr(int nr, bool compat)
+{
+#ifdef CONFIG_COMPAT
+	if (compat)
+		return (unsigned long)sys_call_table[nr];
+#endif /* CONFIG_COMPAT */
+
+	return (unsigned long)sys_call_table64[nr];
+}
+
+#endif /* CONFIG_FTRACE_SYSCALLS && CONFIG_64BIT */
