@@ -906,6 +906,7 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
 							length, tx_index,
 							&doorbell_pending))
 					goto consumed;
+				goto next;
 				break;
 			default:
 				bpf_warn_invalid_xdp_action(act);
