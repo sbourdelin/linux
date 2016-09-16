@@ -795,6 +795,18 @@ static int pca953x_probe(struct i2c_client *client,
 
 	mutex_init(&chip->i2c_lock);
 
+	/*
+	 * If the i2c adapter we're connected to is multiplexed (which is
+	 * indicated by it having a parent adapter) we need to use a
+	 * different lock subclass. It's caused by the fact that in a rare
+	 * case of using an i2c-gpio multiplexer controlled by a gpio
+	 * provided by an expander using the same driver, lockdep would
+	 * incorrectly detect a deadlock, since we'd take a second lock
+	 * of the same class without releasing the first one.
+	 */
+	if (i2c_parent_is_i2c_adapter(client->adapter))
+		lockdep_set_subclass(&chip->i2c_lock, SINGLE_DEPTH_NESTING);
+
 	/* initialize cached registers from their original values.
 	 * we can't share this chip with another i2c master.
 	 */
