@@ -3249,6 +3249,11 @@ void __init tcp_init(void)
 	unsigned int i;
 
 	sock_skb_cb_check_size(sizeof(struct tcp_skb_cb));
+	/* Assert the alignment of first_tx_mstamp and delivered_mstamp on
+	 * the 8-byte boundary.
+	 */
+	BUILD_BUG_ON(offsetof(struct tcp_skb_cb, tx.first_tx_mstamp) % 8 != 0);
+	BUILD_BUG_ON(offsetof(struct tcp_skb_cb, tx.delivered_mstamp) % 8 != 0);
 
 	percpu_counter_init(&tcp_sockets_allocated, 0, GFP_KERNEL);
 	percpu_counter_init(&tcp_orphan_count, 0, GFP_KERNEL);
