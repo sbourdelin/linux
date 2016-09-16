@@ -1521,7 +1521,7 @@ static int chv_gpio_probe(struct chv_pinctrl *pctrl, int irq)
 	chip->parent = pctrl->dev;
 	chip->base = -1;
 
-	ret = gpiochip_add_data(chip, pctrl);
+	ret = devm_gpiochip_add_data(pctrl->dev, chip, pctrl);
 	if (ret) {
 		dev_err(pctrl->dev, "Failed to register gpiochip\n");
 		return ret;
@@ -1533,7 +1533,7 @@ static int chv_gpio_probe(struct chv_pinctrl *pctrl, int irq)
 					     range->base, range->npins);
 		if (ret) {
 			dev_err(pctrl->dev, "failed to add GPIO pin range\n");
-			goto fail;
+			return ret;
 		}
 
 		offset += range->npins;
@@ -1546,17 +1546,12 @@ static int chv_gpio_probe(struct chv_pinctrl *pctrl, int irq)
 				   handle_bad_irq, IRQ_TYPE_NONE);
 	if (ret) {
 		dev_err(pctrl->dev, "failed to add IRQ chip\n");
-		goto fail;
+		return ret;
 	}
 
 	gpiochip_set_chained_irqchip(chip, &chv_gpio_irqchip, irq,
 				     chv_gpio_irq_handler);
 	return 0;
-
-fail:
-	gpiochip_remove(chip);
-
-	return ret;
 }
 
 static int chv_pinctrl_probe(struct platform_device *pdev)
@@ -1620,15 +1615,6 @@ static int chv_pinctrl_probe(struct platform_device *pdev)
 		return ret;
 
 	platform_set_drvdata(pdev, pctrl);
-
-	return 0;
-}
-
-static int chv_pinctrl_remove(struct platform_device *pdev)
-{
-	struct chv_pinctrl *pctrl = platform_get_drvdata(pdev);
-
-	gpiochip_remove(&pctrl->chip);
 
 	return 0;
 }
@@ -1729,7 +1715,6 @@ MODULE_DEVICE_TABLE(acpi, chv_pinctrl_acpi_match);
 
 static struct platform_driver chv_pinctrl_driver = {
 	.probe = chv_pinctrl_probe,
-	.remove = chv_pinctrl_remove,
 	.driver = {
 		.name = "cherryview-pinctrl",
 		.pm = &chv_pinctrl_pm_ops,
