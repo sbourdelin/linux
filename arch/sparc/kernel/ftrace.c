@@ -145,3 +145,17 @@ unsigned long prepare_ftrace_return(unsigned long parent,
 	return return_hooker;
 }
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+
+#if (defined CONFIG_FTRACE_SYSCALLS) && (defined CONFIG_COMPAT)
+extern const unsigned int sys_call_table[];
+extern const unsigned int sys_call_table32[];
+
+unsigned long __init arch_syscall_addr(int nr, bool compat)
+{
+	if (compat)
+		return (unsigned long)sys_call_table32[nr];
+
+	return (unsigned long)sys_call_table[nr];
+}
+
+#endif /* CONFIG_FTRACE_SYSCALLS && CONFIG_COMPAT */
