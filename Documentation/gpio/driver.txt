@@ -256,6 +256,11 @@ associated irqdomain and resource allocation callbacks, the gpiolib has
 some helpers that can be enabled by selecting the GPIOLIB_IRQCHIP Kconfig
 symbol:
 
+* gpiochip_irqchip_exclude_irq(): excludes given GPIO from IRQ domain
+  created for the gpiochip. This is useful if the GPIO for some reason
+  cannot be used as IRQ at all. Note this must be called before
+  gpiochip_irqchip_add().
+
 * gpiochip_irqchip_add(): adds an irqchip to a gpiochip. It will pass
   the struct gpio_chip* for the chip to all IRQ callbacks, so the callbacks
   need to embed the gpio_chip in its state container and obtain a pointer

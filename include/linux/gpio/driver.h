@@ -112,6 +112,8 @@ enum single_ended_mode {
  *	initialization, provided by GPIO driver
  * @irq_parent: GPIO IRQ chip parent/bank linux irq number,
  *	provided by GPIO driver
+ * @irq_valid_mask: If not %NULL holds bitmask of GPIOs which are valid to
+ *	be included in IRQ domain of the chip
  * @lock_key: per GPIO IRQ chip lockdep class
  *
  * A gpio_chip can help platforms abstract various sources of GPIOs so
@@ -190,6 +192,7 @@ struct gpio_chip {
 	irq_flow_handler_t	irq_handler;
 	unsigned int		irq_default_type;
 	int			irq_parent;
+	unsigned long		*irq_valid_mask;
 	struct lock_class_key	*lock_key;
 #endif
 
@@ -260,6 +263,8 @@ int bgpio_init(struct gpio_chip *gc, struct device *dev,
 
 #ifdef CONFIG_GPIOLIB_IRQCHIP
 
+int gpiochip_irqchip_exclude_irq(struct gpio_chip *gpiochip,
+				 unsigned int offset);
 void gpiochip_set_chained_irqchip(struct gpio_chip *gpiochip,
 		struct irq_chip *irqchip,
 		int parent_irq,
