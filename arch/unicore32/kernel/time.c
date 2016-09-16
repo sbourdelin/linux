@@ -89,11 +89,7 @@ void __init time_init(void)
 
 	clockevents_calc_mult_shift(&ckevt_puv3_osmr0, CLOCK_TICK_RATE, 5);
 
-	ckevt_puv3_osmr0.max_delta_ns =
-		clockevent_delta2ns(0x7fffffff, &ckevt_puv3_osmr0);
 	ckevt_puv3_osmr0.max_delta_ticks = 0x7fffffff;
-	ckevt_puv3_osmr0.min_delta_ns =
-		clockevent_delta2ns(MIN_OSCR_DELTA * 2, &ckevt_puv3_osmr0) + 1;
 	ckevt_puv3_osmr0.min_delta_ticks = MIN_OSCR_DELTA * 2;
 	ckevt_puv3_osmr0.cpumask = cpumask_of(0);
 

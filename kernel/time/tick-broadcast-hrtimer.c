@@ -83,8 +83,6 @@ static struct clock_event_device ce_broadcast_hrtimer = {
 				  CLOCK_EVT_FEAT_HRTIMER,
 	.rating			= 0,
 	.bound_on		= -1,
-	.min_delta_ns		= 1,
-	.max_delta_ns		= KTIME_MAX,
 	.min_delta_ticks	= 1,
 	.max_delta_ticks	= ULONG_MAX,
 	.mult			= 1,
