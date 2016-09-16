@@ -751,8 +751,9 @@ static struct ib_qp *ib_create_xrc_qp(struct ib_qp *qp,
 	return qp;
 }
 
-struct ib_qp *ib_create_qp(struct ib_pd *pd,
-			   struct ib_qp_init_attr *qp_init_attr)
+struct ib_qp *ib_create_qp_ex(struct ib_pd *pd,
+			struct ib_qp_init_attr *qp_init_attr,
+			struct ib_udata *udata)
 {
 	struct ib_device *device = pd ? pd->device : qp_init_attr->xrcd->device;
 	struct ib_qp *qp;
@@ -835,6 +836,14 @@ struct ib_qp *ib_create_qp(struct ib_pd *pd,
 				 device->attrs.max_sge_rd);
 
 	return qp;
+}
+EXPORT_SYMBOL(ib_create_qp_ex);
+
+
+struct ib_qp *ib_create_qp(struct ib_pd *pd,
+			   struct ib_qp_init_attr *qp_init_attr)
+{
+	return ib_create_qp_ex(pd, qp_init_attr,NULL);
 }
 EXPORT_SYMBOL(ib_create_qp);
 

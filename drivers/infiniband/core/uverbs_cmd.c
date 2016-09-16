@@ -1907,7 +1907,7 @@ static int create_qp(struct ib_uverbs_file *file,
 		}
 
 	if (cmd->qp_type == IB_QPT_XRC_TGT)
-		qp = ib_create_qp(pd, &attr);
+		qp = ib_create_qp_ex(pd, &attr, uhw);
 	else
 		qp = device->create_qp(pd, &attr, uhw);
 
