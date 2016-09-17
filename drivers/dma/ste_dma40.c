@@ -2225,7 +2225,7 @@ d40_prep_sg(struct dma_chan *dchan, struct scatterlist *sg_src,
 
 	desc = d40_prep_desc(chan, sg_src, sg_len, dma_flags);
 	if (desc == NULL)
-		goto err;
+		goto unlock;
 
 	if (sg_next(&sg_src[sg_len - 1]) == sg_src)
 		desc->cyclic = true;
@@ -2245,7 +2245,7 @@ d40_prep_sg(struct dma_chan *dchan, struct scatterlist *sg_src,
 	if (ret) {
 		chan_err(chan, "Failed to prepare %s sg job: %d\n",
 			 chan_is_logical(chan) ? "log" : "phy", ret);
-		goto err;
+		goto free_desc;
 	}
 
 	/*
@@ -2257,10 +2257,9 @@ d40_prep_sg(struct dma_chan *dchan, struct scatterlist *sg_src,
 	spin_unlock_irqrestore(&chan->lock, flags);
 
 	return &desc->txd;
-
-err:
-	if (desc)
-		d40_desc_free(chan, desc);
+ free_desc:
+	d40_desc_free(chan, desc);
+ unlock:
 	spin_unlock_irqrestore(&chan->lock, flags);
 	return NULL;
 }
