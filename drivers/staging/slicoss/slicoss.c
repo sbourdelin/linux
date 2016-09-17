@@ -1694,9 +1694,10 @@ static void slic_init_cleanup(struct adapter *adapter)
 
 	if (adapter->shmem.shmem_data) {
 		struct slic_shmemory *sm = &adapter->shmem;
-		struct slic_shmem_data *sm_data = sm->shmem_data;
+		struct slic_shmem_data __iomem *sm_data = sm->shmem_data;
 
-		pci_free_consistent(adapter->pcidev, sizeof(*sm_data), sm_data,
+		pci_free_consistent(adapter->pcidev, sizeof(*sm_data),
+				    (void __force *)sm_data,
 				    sm->isr_phaddr);
 	}
 
