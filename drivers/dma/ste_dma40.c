@@ -1580,7 +1580,7 @@ static void dma_tasklet(unsigned long data)
 		/* Check if we have reached here for cyclic job */
 		d40d = d40_first_active_get(d40c);
 		if (d40d == NULL || !d40d->cyclic)
-			goto err;
+			goto check_pending_tx;
 	}
 
 	if (!d40d->cyclic)
@@ -1622,8 +1622,7 @@ static void dma_tasklet(unsigned long data)
 		dmaengine_desc_callback_invoke(&cb, NULL);
 
 	return;
-
-err:
+ check_pending_tx:
 	/* Rescue manouver if receiving double interrupts */
 	if (d40c->pending_tx > 0)
 		d40c->pending_tx--;
