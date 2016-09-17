@@ -1805,7 +1805,7 @@ static bool numamigrate_update_ratelimit(pg_data_t *pgdat,
 	return false;
 }
 
-static int numamigrate_isolate_page(pg_data_t *pgdat, struct page *page)
+static bool numamigrate_isolate_page(pg_data_t *pgdat, struct page *page)
 {
 	int page_lru;
 
@@ -1813,10 +1813,10 @@ static int numamigrate_isolate_page(pg_data_t *pgdat, struct page *page)
 
 	/* Avoid migrating to a node that is nearly full */
 	if (!migrate_balanced_pgdat(pgdat, 1UL << compound_order(page)))
-		return 0;
+		return false;
 
 	if (isolate_lru_page(page))
-		return 0;
+		return false;
 
 	/*
 	 * migrate_misplaced_transhuge_page() skips page migration's usual
@@ -1827,7 +1827,7 @@ static int numamigrate_isolate_page(pg_data_t *pgdat, struct page *page)
 	 */
 	if (PageTransHuge(page) && page_count(page) != 3) {
 		putback_lru_page(page);
-		return 0;
+		return false;
 	}
 
 	page_lru = page_is_file_cache(page);
@@ -1840,7 +1840,7 @@ static int numamigrate_isolate_page(pg_data_t *pgdat, struct page *page)
 	 * disappearing underneath us during migration.
 	 */
 	put_page(page);
-	return 1;
+	return true;
 }
 
 bool pmd_trans_migrating(pmd_t pmd)
@@ -1854,11 +1854,11 @@ bool pmd_trans_migrating(pmd_t pmd)
  * node. Caller is expected to have an elevated reference count on
  * the page that will be dropped by this function before returning.
  */
-int migrate_misplaced_page(struct page *page, struct vm_area_struct *vma,
+bool migrate_misplaced_page(struct page *page, struct vm_area_struct *vma,
 			   int node)
 {
 	pg_data_t *pgdat = NODE_DATA(node);
-	int isolated;
+	bool isolated;
 	int nr_remaining;
 	LIST_HEAD(migratepages);
 
@@ -1893,7 +1893,7 @@ int migrate_misplaced_page(struct page *page, struct vm_area_struct *vma,
 					page_is_file_cache(page));
 			putback_lru_page(page);
 		}
-		isolated = 0;
+		isolated = false;
 	} else
 		count_vm_numa_event(NUMA_PAGE_MIGRATE);
 	BUG_ON(!list_empty(&migratepages));
@@ -1901,7 +1901,7 @@ int migrate_misplaced_page(struct page *page, struct vm_area_struct *vma,
 
 out:
 	put_page(page);
-	return 0;
+	return false;
 }
 #endif /* CONFIG_NUMA_BALANCING */
 
@@ -1910,7 +1910,7 @@ out:
  * Migrates a THP to a given target node. page must be locked and is unlocked
  * before returning.
  */
-int migrate_misplaced_transhuge_page(struct mm_struct *mm,
+bool migrate_misplaced_transhuge_page(struct mm_struct *mm,
 				struct vm_area_struct *vma,
 				pmd_t *pmd, pmd_t entry,
 				unsigned long address,
@@ -1918,7 +1918,7 @@ int migrate_misplaced_transhuge_page(struct mm_struct *mm,
 {
 	spinlock_t *ptl;
 	pg_data_t *pgdat = NODE_DATA(node);
-	int isolated = 0;
+	bool isolated;
 	struct page *new_page = NULL;
 	int page_lru = page_is_file_cache(page);
 	unsigned long mmun_start = address & HPAGE_PMD_MASK;
@@ -2052,7 +2052,7 @@ out_dropref:
 out_unlock:
 	unlock_page(page);
 	put_page(page);
-	return 0;
+	return false;
 }
 #endif /* CONFIG_NUMA_BALANCING */
 

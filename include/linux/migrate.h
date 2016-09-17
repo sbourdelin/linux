@@ -88,34 +88,34 @@ static inline void __ClearPageMovable(struct page *page)
 
 #ifdef CONFIG_NUMA_BALANCING
 extern bool pmd_trans_migrating(pmd_t pmd);
-extern int migrate_misplaced_page(struct page *page,
-				  struct vm_area_struct *vma, int node);
+extern bool migrate_misplaced_page(struct page *page,
+				   struct vm_area_struct *vma, int node);
 #else
 static inline bool pmd_trans_migrating(pmd_t pmd)
 {
 	return false;
 }
-static inline int migrate_misplaced_page(struct page *page,
-					 struct vm_area_struct *vma, int node)
+static inline bool migrate_misplaced_page(struct page *page,
+					  struct vm_area_struct *vma, int node)
 {
-	return -EAGAIN; /* can't migrate now */
+	return false;
 }
 #endif /* CONFIG_NUMA_BALANCING */
 
 #if defined(CONFIG_NUMA_BALANCING) && defined(CONFIG_TRANSPARENT_HUGEPAGE)
-extern int migrate_misplaced_transhuge_page(struct mm_struct *mm,
+extern bool migrate_misplaced_transhuge_page(struct mm_struct *mm,
 			struct vm_area_struct *vma,
 			pmd_t *pmd, pmd_t entry,
 			unsigned long address,
 			struct page *page, int node);
 #else
-static inline int migrate_misplaced_transhuge_page(struct mm_struct *mm,
+static inline bool migrate_misplaced_transhuge_page(struct mm_struct *mm,
 			struct vm_area_struct *vma,
 			pmd_t *pmd, pmd_t entry,
 			unsigned long address,
 			struct page *page, int node)
 {
-	return -EAGAIN;
+	return false;
 }
 #endif /* CONFIG_NUMA_BALANCING && CONFIG_TRANSPARENT_HUGEPAGE*/
 
