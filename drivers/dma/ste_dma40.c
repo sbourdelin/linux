@@ -1057,7 +1057,7 @@ static int __d40_execute_command_phy(struct d40_chan *d40c,
 			D40_CHAN_POS(d40c->phy_chan->num);
 
 		if (status == D40_DMA_SUSPENDED || status == D40_DMA_STOP)
-			goto done;
+			goto unlock;
 	}
 
 	wmask = 0xffffffff & ~(D40_CHAN_POS_MASK(d40c->phy_chan->num));
@@ -1093,7 +1093,7 @@ static int __d40_execute_command_phy(struct d40_chan *d40c,
 		}
 
 	}
-done:
+ unlock:
 	spin_unlock_irqrestore(&d40c->base->execmd_lock, flags);
 	return ret;
 }
