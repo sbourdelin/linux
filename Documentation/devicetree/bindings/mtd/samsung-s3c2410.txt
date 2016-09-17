@@ -1,0 +1,70 @@
+* Samsung S3C2410 and compatible NAND flash controller
+
+Required properties:
+- compatible : The possible values are:
+	"samsung,s3c2410-nand"
+	"samsung,s3c2412-nand"
+	"samsung,s3c2440-nand"
+	"samsung,s3c6400-nand"
+- reg : register's location and length.
+- #address-cells, #size-cells : see nand.txt
+- clocks : phandle to the nand controller clock
+- clock-names : must contain "nand"
+
+Optional properties:
+- samsung,tacls : time for active CLE/ALE to nWE/nOE
+- samsung,twrph0 : active time for nWE/nOE
+- samsung,twrph1 : time for release CLE/ALE from nWE/nOE inactive
+- samsung,ignore_unset_ecc : boolean to ignore error when we have
+                             0xff,0xff,0xff read ECC, on the
+                             assumption that it is an un-eccd page
+
+Optional children nodes:
+Children nodes representing the available nand chips.
+
+Optional children properties:
+- nand-ecc-mode : see nand.txt
+- nand-on-flash-bbt : see nand.txt
+
+Each children device node may optionally contain a 'partitions' sub-node,
+which further contains sub-nodes describing the flash partition mapping.
+See partition.txt for more detail.
+
+Example:
+
+nand@4e000000 {
+	compatible = "samsung,s3c2440-nand";
+	reg = <0x4e000000 0x40>;
+
+	#address-cells = <1>;
+        #size-cells = <0>;
+
+	clocks = <&clocks HCLK_NAND>;
+	clock-names = "nand";
+
+	samsung,tacls = <0>;
+	samsung,twrph0 = <25>;
+	samsung,twrph1 = <15>;
+	samsung,ignore_unset_ecc;
+
+	nand@0 {
+		nand-ecc-mode = "soft";
+		nand-on-flash-bbt;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0 0x040000>;
+			};
+
+			partition@40000 {
+				label = "kernel";
+				reg = <0x040000 0x500000>;
+			};
+		};
+	};
+};
