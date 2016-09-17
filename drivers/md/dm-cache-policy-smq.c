@@ -14,7 +14,6 @@
 #include <linux/mutex.h>
 #include <linux/vmalloc.h>
 #include <linux/math64.h>
-#include <linux/hash.h>
 
 #define DM_MSG_PREFIX "cache-policy-smq"
 
