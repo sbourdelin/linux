@@ -540,12 +540,44 @@ static inline void slic_flush_write(struct adapter *adapter)
 	ioread32(adapter->regs + SLIC_REG_HOSTID);
 }
 
+#define IOMEM_GET_FIELDADDR(base, member)				\
+({									\
+	char __iomem *_base = (char __iomem *)base;			\
+	_base += offsetof(typeof(*base), member);			\
+	(void __iomem *)_base;						\
+})
+
 #define IOMEM_GET_FIELD32(base, member)					\
 ({									\
 	char __iomem *_base = (char __iomem *)base;			\
 	_base += offsetof(typeof(*base), member);			\
 	ioread32(_base);						\
 })
+
+#ifdef CONFIG_64BIT
+#define IOMEM_GET_FIELD64(base, member)					\
+({									\
+	char __iomem *_base = (char __iomem *)base;			\
+	_base += offsetof(typeof(*base), member);			\
+	readq(_base);							\
+})
+#else
+#define IOMEM_GET_FIELD64(base, member)					\
+({									\
+	char __iomem *_base = (char __iomem *)base;			\
+	u64 val;							\
+	_base += offsetof(typeof(*base), member);			\
+	val = ((u64)ioread8(_base + 7)) << 56;				\
+	val += ((u64)ioread8(_base + 6)) << 48;				\
+	val += ((u64)ioread8(_base + 5)) << 40;				\
+	val += ((u64)ioread8(_base + 4)) << 32;				\
+	val += ((u64)ioread8(_base + 3)) << 24;				\
+	val += ((u64)ioread8(_base + 2)) << 16;				\
+	val += ((u64)ioread8(_base + 1)) << 8;				\
+	val += ioread8(_base);						\
+	le64_to_cpu(val);						\
+})
+#endif
 
 #define UPDATE_STATS(largestat, newstat, oldstat)                        \
 {                                                                        \
