@@ -2398,7 +2398,7 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
 		err = d40_config_memcpy(d40c);
 		if (err) {
 			chan_err(d40c, "Failed to configure memcpy channel\n");
-			goto fail;
+			goto mark_last_busy;
 		}
 	}
 
@@ -2406,7 +2406,7 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
 	if (err) {
 		chan_err(d40c, "Failed to allocate channel\n");
 		d40c->configured = false;
-		goto fail;
+		goto mark_last_busy;
 	}
 
 	pm_runtime_get_sync(d40c->base->dev);
@@ -2440,7 +2440,7 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
 	 */
 	if (is_free_phy)
 		d40_config_write(d40c);
-fail:
+ mark_last_busy:
 	pm_runtime_mark_last_busy(d40c->base->dev);
 	pm_runtime_put_autosuspend(d40c->base->dev);
 	spin_unlock_irqrestore(&d40c->lock, flags);
