@@ -1,0 +1,7 @@
+Sharp 15" LQ150X1LG11 XGA TFT LCD panel
+
+Required properties:
+- compatible: should be "sharp,lq150x1lg11"
+
+This binding is compatible with the simple-panel binding, which is specified
+in simple-panel.txt in this directory.
