@@ -1314,6 +1314,7 @@ static void rtsx_usb_update_led(struct work_struct *work)
 		container_of(work, struct rtsx_usb_sdmmc, led_work);
 	struct rtsx_ucr *ucr = host->ucr;
 
+	pm_runtime_get_sync(sdmmc_dev(host));
 	mutex_lock(&ucr->dev_mutex);
 
 	if (host->led.brightness == LED_OFF)
@@ -1322,6 +1323,7 @@ static void rtsx_usb_update_led(struct work_struct *work)
 		rtsx_usb_turn_on_led(ucr);
 
 	mutex_unlock(&ucr->dev_mutex);
+	pm_runtime_put(sdmmc_dev(host));
 }
 #endif
 
