@@ -399,7 +399,7 @@ static int fw_cfg_build_symlink(struct kset *dir,
 			dir = to_kset(ko);
 		} else {
 			/* create new subdirectory kset */
-			subdir = kzalloc(sizeof(struct kset), GFP_KERNEL);
+			subdir = kzalloc(sizeof(*subdir), GFP_KERNEL);
 			if (!subdir) {
 				ret = -ENOMEM;
 				break;
