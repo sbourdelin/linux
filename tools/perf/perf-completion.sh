@@ -162,7 +162,11 @@ __perf_main ()
 	elif [[ $prev == @("-e"|"--event") &&
 		$prev_skip_opts == @(record|stat|top) ]]; then
 		evts=$($cmd list --raw-dump)
+		old="$cur"
+		cur="${cur/*[,{]/}"
+		prefix=${old%$cur}
 		__perfcomp_colon "$evts" "$cur"
+		COMPREPLY=("${prefix}${COMPREPLY[0]}")
 	else
 		# List subcommands for perf commands
 		if [[ $prev_skip_opts == @(kvm|kmem|mem|lock|sched|
