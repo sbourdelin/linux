@@ -224,6 +224,9 @@ static int __ptrace_may_access(struct task_struct *task, unsigned int mode,
 	kuid_t caller_uid;
 	kgid_t caller_gid;
 
+	WARN_ON(!mutex_is_locked(&task->signal->cred_guard_mutex) &&
+		!mutex_is_locked(&task->signal->cred_guard_light));
+
 	if (!(mode & PTRACE_MODE_FSCREDS) == !(mode & PTRACE_MODE_REALCREDS)) {
 		WARN(1, "denying ptrace access check without PTRACE_MODE_*CREDS\n");
 		return -EPERM;
