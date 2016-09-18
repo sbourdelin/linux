@@ -135,6 +135,25 @@ struct pid_entry {
 		NULL, &proc_single_file_operations,	\
 		{ .proc_show = show } )
 
+static int lock_trace(struct seq_file *m, struct task_struct *task,
+		      unsigned int mode)
+{
+	int err = mutex_lock_killable(&task->signal->cred_guard_light);
+
+	if (err)
+		return err;
+	if (!proc_ptrace_may_access_seq(task, mode | PTRACE_MODE_FSCREDS, m)) {
+		mutex_unlock(&task->signal->cred_guard_light);
+		return -EPERM;
+	}
+	return 0;
+}
+
+static void unlock_trace(struct task_struct *task)
+{
+	mutex_unlock(&task->signal->cred_guard_light);
+}
+
 /*
  * Count the number of hardlinks for the pid_entry table, excluding the .
  * and .. links.
@@ -428,35 +447,19 @@ static int proc_pid_wchan(struct seq_file *m, struct pid_namespace *ns,
 	unsigned long wchan;
 	char symname[KSYM_NAME_LEN];
 
-	wchan = get_wchan(task);
+	if (lock_trace(m, task, PTRACE_MODE_READ) == 0) {
+		wchan = get_wchan(task);
+		unlock_trace(task);
+		if (wchan && !lookup_symbol_name(wchan, symname)) {
+			seq_printf(m, "%s", symname);
+			return 0;
+		}
+	}
 
-	if (wchan &&
-	    proc_ptrace_may_access_seq(task, PTRACE_MODE_READ_FSCREDS, m) &&
-	    !lookup_symbol_name(wchan, symname))
-		seq_printf(m, "%s", symname);
-	else
-		seq_putc(m, '0');
-
+	seq_putc(m, '0');
 	return 0;
 }
 #endif /* CONFIG_KALLSYMS */
-
-static int lock_trace(struct seq_file *m, struct task_struct *task)
-{
-	int err = mutex_lock_killable(&task->signal->cred_guard_mutex);
-	if (err)
-		return err;
-	if (!proc_ptrace_may_access_seq(task, PTRACE_MODE_ATTACH_FSCREDS, m)) {
-		mutex_unlock(&task->signal->cred_guard_mutex);
-		return -EPERM;
-	}
-	return 0;
-}
-
-static void unlock_trace(struct task_struct *task)
-{
-	mutex_unlock(&task->signal->cred_guard_mutex);
-}
 
 #ifdef CONFIG_STACKTRACE
 
@@ -479,7 +482,7 @@ static int proc_pid_stack(struct seq_file *m, struct pid_namespace *ns,
 	trace.entries		= entries;
 	trace.skip		= 0;
 
-	err = lock_trace(m, task);
+	err = lock_trace(m, task, PTRACE_MODE_ATTACH);
 	if (!err) {
 		save_stack_trace_tsk(task, &trace);
 
@@ -661,7 +664,7 @@ static int proc_pid_syscall(struct seq_file *m, struct pid_namespace *ns,
 	unsigned long args[6], sp, pc;
 	int res;
 
-	res = lock_trace(m, task);
+	res = lock_trace(m, task, PTRACE_MODE_ATTACH);
 	if (res)
 		return res;
 
@@ -685,21 +688,36 @@ static int proc_pid_syscall(struct seq_file *m, struct pid_namespace *ns,
 /*                       Here the fs part begins                        */
 /************************************************************************/
 
-/* permission checks */
-static int proc_fd_access_allowed(struct inode *inode)
+/* permission checks.
+ * If this returns 1, you'll have to unlock_trace(*taskp) afterwards.
+ */
+static int proc_fd_access_allowed_lock(struct inode *inode,
+					 struct task_struct **taskp)
 {
 	struct task_struct *task;
 	int allowed = 0;
-	/* Allow access to a task's file descriptors if it is us or we
-	 * may use ptrace attach to the process and find out that
-	 * information.
-	 */
+
 	task = get_proc_task(inode);
-	if (task) {
-		allowed = ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS);
+	if (!task)
+		return 0;
+	if (mutex_lock_killable(&task->signal->cred_guard_light))
+		goto out_put;
+	allowed = ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS);
+	if (!allowed)
+		mutex_unlock(&task->signal->cred_guard_light);
+out_put:
+	if (allowed)
+		*taskp = task;
+	else
 		put_task_struct(task);
-	}
+
 	return allowed;
+}
+
+static void proc_fd_access_allowed_unlock(struct task_struct *task)
+{
+	mutex_unlock(&task->signal->cred_guard_light);
+	put_task_struct(task);
 }
 
 int proc_setattr(struct dentry *dentry, struct iattr *attr)
@@ -722,6 +740,7 @@ int proc_setattr(struct dentry *dentry, struct iattr *attr)
 /*
  * May current process learn task's sched/cmdline info (for hide_pid_min=1)
  * or euid/egid (for hide_pid_min=2)?
+ * NOTE: When you call this, you must hold cred_guard_mutex or cred_guard_light.
  */
 static bool has_pid_permissions(struct pid_namespace *pid,
 				 struct task_struct *task,
@@ -1600,15 +1619,17 @@ static const char *proc_pid_get_link(struct dentry *dentry,
 {
 	struct path path;
 	int error = -EACCES;
+	struct task_struct *task;
 
 	if (!dentry)
 		return ERR_PTR(-ECHILD);
 
 	/* Are we allowed to snoop on the tasks file descriptors? */
-	if (!proc_fd_access_allowed(inode))
+	if (!proc_fd_access_allowed_lock(inode, &task))
 		goto out;
 
 	error = PROC_I(inode)->op.proc_get_link(dentry, &path);
+	proc_fd_access_allowed_unlock(task);
 	if (error)
 		goto out;
 
@@ -1647,12 +1668,14 @@ static int proc_pid_readlink(struct dentry * dentry, char __user * buffer, int b
 	int error = -EACCES;
 	struct inode *inode = d_inode(dentry);
 	struct path path;
+	struct task_struct *task;
 
 	/* Are we allowed to snoop on the tasks file descriptors? */
-	if (!proc_fd_access_allowed(inode))
+	if (!proc_fd_access_allowed_lock(inode, &task))
 		goto out;
 
 	error = PROC_I(inode)->op.proc_get_link(dentry, &path);
+	proc_fd_access_allowed_unlock(task);
 	if (error)
 		goto out;
 
@@ -2047,17 +2070,15 @@ static struct dentry *proc_map_files_lookup(struct inode *dir,
 	if (!task)
 		goto out;
 
-	result = -EACCES;
-	if (!ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS))
+	mm = mm_access(task, PTRACE_MODE_READ_FSCREDS);
+	if (IS_ERR(mm))
+		result = PTR_ERR(mm);
+	if (IS_ERR_OR_NULL(mm))
 		goto out_put_task;
 
 	result = -ENOENT;
 	if (dname_to_vma_addr(dentry, &vm_start, &vm_end))
-		goto out_put_task;
-
-	mm = get_task_mm(task);
-	if (!mm)
-		goto out_put_task;
+		goto out_put_mm;
 
 	down_read(&mm->mmap_sem);
 	vma = find_exact_vma(mm, vm_start, vm_end);
@@ -2070,6 +2091,7 @@ static struct dentry *proc_map_files_lookup(struct inode *dir,
 
 out_no_vma:
 	up_read(&mm->mmap_sem);
+out_put_mm:
 	mmput(mm);
 out_put_task:
 	put_task_struct(task);
@@ -2839,7 +2861,7 @@ static const struct file_operations proc_setgroups_operations = {
 static int proc_pid_personality(struct seq_file *m, struct pid_namespace *ns,
 				struct pid *pid, struct task_struct *task)
 {
-	int err = lock_trace(m, task);
+	int err = lock_trace(m, task, PTRACE_MODE_ATTACH);
 	if (!err) {
 		seq_printf(m, "%08x\n", task->personality);
 		unlock_trace(task);

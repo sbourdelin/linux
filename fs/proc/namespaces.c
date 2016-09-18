@@ -49,11 +49,18 @@ static const char *proc_ns_get_link(struct dentry *dentry,
 	if (!task)
 		return error;
 
+	error = ERR_PTR(mutex_lock_killable(&task->signal->cred_guard_light));
+	if (error)
+		goto out_put_task;
+
+	error = ERR_PTR(-EACCES);
 	if (ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS)) {
 		error = ns_get_path(&ns_path, task, ns_ops);
 		if (!error)
 			nd_jump_link(&ns_path);
 	}
+	mutex_unlock(&task->signal->cred_guard_light);
+out_put_task:
 	put_task_struct(task);
 	return error;
 }
@@ -70,11 +77,18 @@ static int proc_ns_readlink(struct dentry *dentry, char __user *buffer, int bufl
 	if (!task)
 		return res;
 
+	res = mutex_lock_killable(&task->signal->cred_guard_light);
+	if (res)
+		goto out_put_task;
+
+	res = -EACCES;
 	if (ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS)) {
 		res = ns_get_name(name, sizeof(name), task, ns_ops);
 		if (res >= 0)
 			res = readlink_copy(buffer, buflen, name);
 	}
+	mutex_unlock(&task->signal->cred_guard_light);
+out_put_task:
 	put_task_struct(task);
 	return res;
 }

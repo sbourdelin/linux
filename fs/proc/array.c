@@ -410,9 +410,15 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 	unsigned long rsslim = 0;
 	char tcomm[sizeof(task->comm)];
 	unsigned long flags;
+	int err;
 
 	state = *get_task_state(task);
 	vsize = eip = esp = 0;
+
+	err = mutex_lock_killable(&task->signal->cred_guard_light);
+	if (err)
+		return err;
+
 	permitted = proc_ptrace_may_access_seq(task,
 			PTRACE_MODE_READ_FSCREDS | PTRACE_MODE_NOAUDIT, m);
 	mm = get_task_mm(task);
@@ -568,6 +574,7 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 	seq_putc(m, '\n');
 	if (mm)
 		mmput(mm);
+	mutex_unlock(&task->signal->cred_guard_light);
 	return 0;
 }
 
