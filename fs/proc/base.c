@@ -2484,6 +2484,18 @@ out:
 }
 
 #ifdef CONFIG_SECURITY
+static int proc_pid_attr_open(struct inode *inode, struct file *file)
+{
+	u64 *opener_privunit_id;
+
+	opener_privunit_id = kmalloc(sizeof(u64), GFP_KERNEL);
+	if (opener_privunit_id == NULL)
+		return -ENOMEM;
+	*opener_privunit_id = current->self_privunit_id;
+	file->private_data = opener_privunit_id;
+	return 0;
+}
+
 static ssize_t proc_pid_attr_read(struct file * file, char __user * buf,
 				  size_t count, loff_t *ppos)
 {
@@ -2512,6 +2524,7 @@ static ssize_t proc_pid_attr_write(struct file * file, const char __user * buf,
 	void *page;
 	ssize_t length;
 	struct task_struct *task = get_proc_task(inode);
+	u64 *opener_privunit_id = file->private_data;
 
 	length = -ESRCH;
 	if (!task)
@@ -2535,9 +2548,29 @@ static ssize_t proc_pid_attr_write(struct file * file, const char __user * buf,
 	if (length < 0)
 		goto out_free;
 
+	/*
+	 * Ensure that a process can't be tricked into writing into its own attr
+	 * files without intending to do so.
+	 *
+	 * SELinux has a rule that prevents anyone other than `task` from
+	 * writing, but if the fd stays open across execve, or is sent across a
+	 * unix domain socket or whatever, that is bypassable.
+	 * Same thing in AppArmor and in Smack.
+	 *
+	 * To prevent this, compare the opener's exec_id with the target's to
+	 * ensure that they're in the same task group and no exec happened in
+	 * the meantime.
+	 *
+	 * Why is this a file and not a prctl or whatever. :/
+	 */
+	length = -EACCES;
+	if (*opener_privunit_id != task->self_privunit_id)
+		goto out_unlock;
+
 	length = security_setprocattr(task,
 				      (char*)file->f_path.dentry->d_name.name,
 				      page, count);
+out_unlock:
 	mutex_unlock(&task->signal->cred_guard_mutex);
 out_free:
 	kfree(page);
@@ -2547,10 +2580,20 @@ out_no_task:
 	return length;
 }
 
+static int proc_pid_attr_release(struct inode *inode, struct file *file)
+{
+	u64 *opener_privunit_id = file->private_data;
+
+	kfree(opener_privunit_id);
+	return 0;
+}
+
 static const struct file_operations proc_pid_attr_operations = {
+	.open		= proc_pid_attr_open,
 	.read		= proc_pid_attr_read,
 	.write		= proc_pid_attr_write,
 	.llseek		= generic_file_llseek,
+	.release	= proc_pid_attr_release,
 };
 
 static const struct pid_entry attr_dir_stuff[] = {
