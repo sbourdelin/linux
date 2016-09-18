@@ -224,12 +224,14 @@ static struct ctl_table udplite_sysctl_table[] = {
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "nf_conntrack_udplite_timeout_stream",
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
+		.namespaced	= true,
 	},
 	{ }
 };

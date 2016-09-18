@@ -729,7 +729,8 @@ static struct ctl_table ip4_frags_ns_ctl_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
-		.extra1		= &init_net.ipv4.frags.low_thresh
+		.extra1		= &init_net.ipv4.frags.low_thresh,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "ipfrag_low_thresh",
@@ -738,7 +739,8 @@ static struct ctl_table ip4_frags_ns_ctl_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &zero,
-		.extra2		= &init_net.ipv4.frags.high_thresh
+		.extra2		= &init_net.ipv4.frags.high_thresh,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "ipfrag_time",
@@ -746,6 +748,7 @@ static struct ctl_table ip4_frags_ns_ctl_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "ipfrag_max_dist",
@@ -753,7 +756,8 @@ static struct ctl_table ip4_frags_ns_ctl_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
-		.extra1		= &zero
+		.extra1		= &zero,
+		.namespaced	= true,
 	},
 	{ }
 };

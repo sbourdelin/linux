@@ -481,6 +481,7 @@ static int netfilter_log_sysctl_init(struct net *net)
 				nf_log_proc_dostring;
 			nf_log_sysctl_table[i].extra1 =
 				(void *)(unsigned long) i;
+			nf_log_sysctl_table[i].namespaced = true;
 		}
 	}
 

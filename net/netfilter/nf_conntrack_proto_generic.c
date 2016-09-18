@@ -148,6 +148,7 @@ static struct ctl_table generic_sysctl_table[] = {
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
+		.namespaced	= true,
 	},
 	{ }
 };
@@ -158,6 +159,7 @@ static struct ctl_table generic_compat_sysctl_table[] = {
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
+		.namespaced	= true,
 	},
 	{ }
 };

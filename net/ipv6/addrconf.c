@@ -6046,6 +6046,7 @@ static int __addrconf_sysctl_register(struct net *net, char *dev_name,
 		table[i].data += (char *)p - (char *)&ipv6_devconf;
 		table[i].extra1 = idev; /* embedded; no ref */
 		table[i].extra2 = net;
+		table[i].namespaced = true;
 	}
 
 	snprintf(path, sizeof(path), "net/ipv6/conf/%s", dev_name);

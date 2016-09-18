@@ -1067,6 +1067,7 @@ static struct ctl_table ipv6_icmp_table_template[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_ms_jiffies,
+		.namespaced	= true,
 	},
 	{ },
 };

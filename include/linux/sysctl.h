@@ -116,6 +116,7 @@ struct ctl_table
 	struct ctl_table_poll *poll;
 	void *extra1;
 	void *extra2;
+	bool namespaced;		/* allow writes in unpriv netns? */
 };
 
 struct ctl_node {

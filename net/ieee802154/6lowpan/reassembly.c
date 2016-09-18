@@ -456,7 +456,8 @@ static struct ctl_table lowpan_frags_ns_ctl_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
-		.extra1		= &init_net.ieee802154_lowpan.frags.low_thresh
+		.extra1		= &init_net.ieee802154_lowpan.frags.low_thresh,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "6lowpanfrag_low_thresh",
@@ -465,7 +466,8 @@ static struct ctl_table lowpan_frags_ns_ctl_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &zero,
-		.extra2		= &init_net.ieee802154_lowpan.frags.high_thresh
+		.extra2		= &init_net.ieee802154_lowpan.frags.high_thresh,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "6lowpanfrag_time",
@@ -473,6 +475,7 @@ static struct ctl_table lowpan_frags_ns_ctl_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
+		.namespaced	= true,
 	},
 	{ }
 };

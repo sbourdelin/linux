@@ -2166,6 +2166,7 @@ static int ipv4_doint_and_flush(struct ctl_table *ctl, int write,
 		.mode		= mval, \
 		.proc_handler	= proc, \
 		.extra1		= &ipv4_devconf, \
+		.namespaced	= true, \
 	}
 
 #define DEVINET_SYSCTL_RW_ENTRY(attr, name) \
@@ -2310,6 +2311,7 @@ static struct ctl_table ctl_forward_entry[] = {
 		.proc_handler	= devinet_sysctl_forward,
 		.extra1		= &ipv4_devconf,
 		.extra2		= &init_net,
+		.namespaced	= true,
 	},
 	{ },
 };

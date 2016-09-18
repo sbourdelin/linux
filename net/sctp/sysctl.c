@@ -473,8 +473,10 @@ int sctp_sysctl_net_register(struct net *net)
 	if (!table)
 		return -ENOMEM;
 
-	for (i = 0; table[i].data; i++)
+	for (i = 0; table[i].data; i++) {
 		table[i].data += (char *)(&net->sctp) - (char *)&init_net.sctp;
+		table[i].namespaced = true;
+	}
 
 	net->sctp.sysctl_header = register_net_sysctl(net, "net/sctp", table);
 	if (net->sctp.sysctl_header == NULL) {

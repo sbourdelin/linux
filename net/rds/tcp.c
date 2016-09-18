@@ -68,6 +68,7 @@ static struct ctl_table rds_tcp_sysctl_table[] = {
 		.mode           = 0644,
 		.proc_handler   = rds_tcp_skbuf_handler,
 		.extra1		= &rds_tcp_min_sndbuf,
+		.namespaced	= true,
 	},
 #define	RDS_TCP_RCVBUF	1
 	{
@@ -77,6 +78,7 @@ static struct ctl_table rds_tcp_sysctl_table[] = {
 		.mode           = 0644,
 		.proc_handler   = rds_tcp_skbuf_handler,
 		.extra1		= &rds_tcp_min_rcvbuf,
+		.namespaced	= true,
 	},
 	{ }
 };

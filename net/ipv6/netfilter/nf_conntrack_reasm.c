@@ -72,6 +72,7 @@ static struct ctl_table nf_ct_frag6_sysctl_table[] = {
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "nf_conntrack_frag6_low_thresh",
@@ -80,7 +81,8 @@ static struct ctl_table nf_ct_frag6_sysctl_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &zero,
-		.extra2		= &init_net.nf_frag.frags.high_thresh
+		.extra2		= &init_net.nf_frag.frags.high_thresh,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "nf_conntrack_frag6_high_thresh",
@@ -88,7 +90,8 @@ static struct ctl_table nf_ct_frag6_sysctl_table[] = {
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
-		.extra1		= &init_net.nf_frag.frags.low_thresh
+		.extra1		= &init_net.nf_frag.frags.low_thresh,
+		.namespaced	= true,
 	},
 	{ }
 };

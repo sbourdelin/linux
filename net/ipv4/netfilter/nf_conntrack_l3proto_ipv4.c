@@ -218,6 +218,7 @@ static struct ctl_table ip_ct_sysctl_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0444,
 		.proc_handler	= proc_dointvec,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "ip_conntrack_buckets",
@@ -230,6 +231,7 @@ static struct ctl_table ip_ct_sysctl_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "ip_conntrack_log_invalid",
@@ -238,6 +240,7 @@ static struct ctl_table ip_ct_sysctl_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &log_invalid_proto_min,
 		.extra2		= &log_invalid_proto_max,
+		.namespaced	= true,
 	},
 	{ }
 };

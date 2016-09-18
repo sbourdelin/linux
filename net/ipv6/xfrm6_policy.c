@@ -321,6 +321,7 @@ static struct ctl_table xfrm6_policy_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler   = proc_dointvec,
+		.namespaced	= true,
 	},
 	{ }
 };

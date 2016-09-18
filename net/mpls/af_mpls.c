@@ -863,6 +863,7 @@ static const struct ctl_table mpls_dev_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 		.data		= MPLS_PERDEV_SYSCTL_OFFSET(input_enabled),
+		.namespaced	= true,
 	},
 	{ }
 };
@@ -1648,6 +1649,7 @@ static const struct ctl_table mpls_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= mpls_platform_labels,
+		.namespaced	= true,
 	},
 	{ }
 };

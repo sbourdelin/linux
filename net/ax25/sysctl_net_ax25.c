@@ -158,8 +158,10 @@ int ax25_register_dev_sysctl(ax25_dev *ax25_dev)
 	if (!table)
 		return -ENOMEM;
 
-	for (k = 0; k < AX25_MAX_VALUES; k++)
+	for (k = 0; k < AX25_MAX_VALUES; k++) {
 		table[k].data = &ax25_dev->values[k];
+		table[k].namespaced = true;
+	}
 
 	snprintf(path, sizeof(path), "net/ax25/%s", ax25_dev->dev->name);
 	ax25_dev->sysheader = register_net_sysctl(&init_net, path, table);

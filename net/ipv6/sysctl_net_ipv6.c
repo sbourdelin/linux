@@ -30,21 +30,24 @@ static struct ctl_table ipv6_table_template[] = {
 		.data		= &init_net.ipv6.sysctl.bindv6only,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec
+		.proc_handler	= proc_dointvec,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "anycast_src_echo_reply",
 		.data		= &init_net.ipv6.sysctl.anycast_src_echo_reply,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec
+		.proc_handler	= proc_dointvec,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "flowlabel_consistency",
 		.data		= &init_net.ipv6.sysctl.flowlabel_consistency,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec
+		.proc_handler	= proc_dointvec,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "auto_flowlabels",
@@ -53,14 +56,16 @@ static struct ctl_table ipv6_table_template[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &auto_flowlabels_min,
-		.extra2		= &auto_flowlabels_max
+		.extra2		= &auto_flowlabels_max,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "fwmark_reflect",
 		.data		= &init_net.ipv6.sysctl.fwmark_reflect,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec
+		.proc_handler	= proc_dointvec,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "idgen_retries",
@@ -68,6 +73,7 @@ static struct ctl_table ipv6_table_template[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "idgen_delay",
@@ -75,20 +81,23 @@ static struct ctl_table ipv6_table_template[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "flowlabel_state_ranges",
 		.data		= &init_net.ipv6.sysctl.flowlabel_state_ranges,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec
+		.proc_handler	= proc_dointvec,
+		.namespaced	= true,
 	},
 	{
 		.procname	= "ip_nonlocal_bind",
 		.data		= &init_net.ipv6.sysctl.ip_nonlocal_bind,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec
+		.proc_handler	= proc_dointvec,
+		.namespaced	= true,
 	},
 	{ }
 };
