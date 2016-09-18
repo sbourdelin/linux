@@ -1446,6 +1446,7 @@ struct ath5k_hw {
 
 	/* Calibration mask */
 	u8			ah_cal_mask;
+	bool			tx99_active;
 
 	/*
 	 * Function pointers

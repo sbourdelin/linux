@@ -991,6 +991,50 @@ static const struct file_operations fops_eeprom = {
 };
 
 
+static ssize_t read_file_tx99(struct file *file, char __user *user_buf,
+			      size_t count, loff_t *ppos)
+{
+	char buf[3];
+	struct ath5k_hw *ah = file->private_data;
+
+	if (!ah->tx99_active)
+		buf[0] = '0';
+	else
+		buf[0] = '1';
+	buf[1] = '\n';
+	buf[2] = '\0';
+	return simple_read_from_buffer(user_buf, count, ppos, buf, 2);
+}
+
+static ssize_t write_file_tx99(struct file *file, const char __user *user_buf,
+			       size_t count, loff_t *ppos)
+{
+	char buf[32];
+	size_t buf_size;
+	struct ath5k_hw *ah = file->private_data;
+
+	buf_size = min(count, (sizeof(buf)-1));
+	if (copy_from_user(buf, user_buf, buf_size))
+		return -EFAULT;
+
+	buf[buf_size] = '\0';
+
+	if (buf[0] == '0')
+		ath5k_tx99_cw_stop(ah);
+	else if (buf[0] == '1')
+		ath5k_tx99_cw_start(ah);
+
+	return count;
+}
+
+static const struct file_operations fops_tx99 = {
+	.read = read_file_tx99,
+	.write = write_file_tx99,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
 void
 ath5k_debug_init_device(struct ath5k_hw *ah)
 {
@@ -1029,6 +1073,9 @@ ath5k_debug_init_device(struct ath5k_hw *ah)
 
 	debugfs_create_bool("32khz_clock", S_IWUSR | S_IRUSR, phydir,
 			    &ah->ah_use_32khz_clock);
+
+	debugfs_create_file("tx99", S_IRUSR | S_IWUSR, phydir,
+			    ah, &fops_tx99);
 }
 
 /* functions used in other places */
