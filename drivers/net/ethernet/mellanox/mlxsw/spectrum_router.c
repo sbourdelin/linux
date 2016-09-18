@@ -1753,8 +1753,8 @@ mlxsw_sp_fib_entry_find(struct mlxsw_sp *mlxsw_sp,
 					 fib4->fi->fib_dev);
 }
 
-void mlxsw_sp_fib_entry_put(struct mlxsw_sp *mlxsw_sp,
-			    struct mlxsw_sp_fib_entry *fib_entry)
+static void mlxsw_sp_fib_entry_put(struct mlxsw_sp *mlxsw_sp,
+				   struct mlxsw_sp_fib_entry *fib_entry)
 {
 	struct mlxsw_sp_vr *vr = fib_entry->vr;
 

@@ -248,7 +248,8 @@ static void mlxsw_sp_span_entry_destroy(struct mlxsw_sp *mlxsw_sp,
 	span_entry->used = false;
 }
 
-struct mlxsw_sp_span_entry *mlxsw_sp_span_entry_find(struct mlxsw_sp_port *port)
+static struct
+mlxsw_sp_span_entry *mlxsw_sp_span_entry_find(struct mlxsw_sp_port *port)
 {
 	struct mlxsw_sp *mlxsw_sp = port->mlxsw_sp;
 	int i;
@@ -262,7 +263,8 @@ struct mlxsw_sp_span_entry *mlxsw_sp_span_entry_find(struct mlxsw_sp_port *port)
 	return NULL;
 }
 
-struct mlxsw_sp_span_entry *mlxsw_sp_span_entry_get(struct mlxsw_sp_port *port)
+static struct
+mlxsw_sp_span_entry *mlxsw_sp_span_entry_get(struct mlxsw_sp_port *port)
 {
 	struct mlxsw_sp_span_entry *span_entry;
 
