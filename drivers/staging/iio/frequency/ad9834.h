@@ -53,6 +53,7 @@
 struct ad9834_state {
 	struct spi_device		*spi;
 	struct regulator		*reg;
+	struct clk				*clk;
 	unsigned int			mclk;
 	unsigned short			control;
 	unsigned short			devid;
