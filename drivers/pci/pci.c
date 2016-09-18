@@ -545,7 +545,7 @@ static void pci_restore_bars(struct pci_dev *dev)
 		return;
 
 	for (i = 0; i < PCI_BRIDGE_RESOURCES; i++)
-		pci_update_resource(dev, i);
+		pci_update_resource(dev, i, false);
 }
 
 static const struct pci_platform_pm_ops *pci_platform_pm;
