@@ -143,31 +143,42 @@ COMPAT_SYSCALL_DEFINE3(get_robust_list, int, pid,
 	if (!futex_cmpxchg_enabled)
 		return -ENOSYS;
 
-	rcu_read_lock();
-
-	ret = -ESRCH;
-	if (!pid)
+	if (!pid) {
 		p = current;
-	else {
+		get_task_struct(p);
+	} else {
+		rcu_read_lock();
 		p = find_task_by_vpid(pid);
-		if (!p)
-			goto err_unlock;
+		/* pin the task to permit dropping the RCU read lock before
+		 * acquiring the mutex
+		 */
+		get_task_struct(p);
+		rcu_read_unlock();
 	}
+	if (!p)
+		return -ESRCH;
+
+	ret = mutex_lock_killable(&p->signal->cred_guard_light);
+	if (ret)
+		goto err_put;
 
 	ret = -EPERM;
 	if (!ptrace_may_access(p, PTRACE_MODE_READ_REALCREDS))
 		goto err_unlock;
 
 	head = p->compat_robust_list;
-	rcu_read_unlock();
+
+	mutex_unlock(&p->signal->cred_guard_light);
+	put_task_struct(p);
 
 	if (put_user(sizeof(*head), len_ptr))
 		return -EFAULT;
 	return put_user(ptr_to_compat(head), head_ptr);
 
 err_unlock:
-	rcu_read_unlock();
-
+	mutex_unlock(&current->signal->cred_guard_light);
+err_put:
+	put_task_struct(p);
 	return ret;
 }
 
