@@ -1297,8 +1297,8 @@ static int bcm_qspi_resume(struct device *dev)
 #endif /* CONFIG_PM_SLEEP */
 
 const struct dev_pm_ops bcm_qspi_pm_ops = {
-	.suspend = bcm_qspi_suspend,
-	.resume  = bcm_qspi_resume,
+	SET_SYSTEM_SLEEP_PM_OPS(bcm_qspi_suspend,
+				bcm_qspi_resume)
 };
 /* pm_ops to be called by SoC specific platform driver */
 EXPORT_SYMBOL_GPL(bcm_qspi_pm_ops);
