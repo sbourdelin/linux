@@ -1281,6 +1281,25 @@ void would_dump(struct linux_binprm *bprm, struct file *file)
 }
 EXPORT_SYMBOL(would_dump);
 
+static DEFINE_PER_CPU(u64, exec_counter);
+static int __init init_exec_counters(void)
+{
+	unsigned int cpu;
+
+	for_each_possible_cpu(cpu) {
+		per_cpu(exec_counter, cpu) = (u64)cpu;
+	}
+
+	return 0;
+}
+early_initcall(init_exec_counters);
+
+void increment_privunit_counter(void)
+{
+	BUILD_BUG_ON(NR_CPUS > (1 << 16));
+	current->self_privunit_id = this_cpu_add_return(exec_counter, NR_CPUS);
+}
+
 void setup_new_exec(struct linux_binprm * bprm)
 {
 	arch_pick_mmap_layout(current->mm);
@@ -1314,7 +1333,7 @@ void setup_new_exec(struct linux_binprm * bprm)
 
 	/* An exec changes our domain. We are no longer part of the thread
 	   group */
-	current->self_exec_id++;
+	increment_privunit_counter();
 	flush_signal_handlers(current, 0);
 	do_close_on_exec(current->files);
 }
