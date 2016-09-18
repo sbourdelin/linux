@@ -535,13 +535,16 @@ static int fw_cfg_sysfs_probe(struct platform_device *pdev)
 		return -EBUSY;
 
 	/* create by_key and by_name subdirs of /sys/firmware/qemu_fw_cfg/ */
-	err = -ENOMEM;
 	fw_cfg_sel_ko = kobject_create_and_add("by_key", fw_cfg_top_ko);
-	if (!fw_cfg_sel_ko)
+	if (!fw_cfg_sel_ko) {
+		err = -ENOMEM;
 		goto exit;
+	}
 	fw_cfg_fname_kset = kset_create_and_add("by_name", NULL, fw_cfg_top_ko);
-	if (!fw_cfg_fname_kset)
+	if (!fw_cfg_fname_kset) {
+		err = -ENOMEM;
 		goto cleanup_object;
+	}
 
 	/* initialize fw_cfg device i/o from platform data */
 	err = fw_cfg_do_platform_probe(pdev);
