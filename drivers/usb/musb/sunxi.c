@@ -187,8 +187,18 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
 	 * normally babble never happens treat it as disconnect.
 	 */
 	if ((musb->int_usb & MUSB_INTR_BABBLE) && is_host_active(musb)) {
+		struct sunxi_glue *glue =
+				dev_get_drvdata(musb->controller->parent);
+
+		dev_warn(musb->controller->parent, "babble, treating as disconnect\n");
+
 		musb->int_usb &= ~MUSB_INTR_BABBLE;
 		musb->int_usb |= MUSB_INTR_DISCONNECT;
+		/*
+		 * Fix the musb controller sometimes getting stuck in
+		 * bdevice state after a babble error.
+		 */
+		sun4i_usb_phy_force_session_end(glue->phy);
 	}
 
 	if ((musb->int_usb & MUSB_INTR_RESET) && !is_host_active(musb)) {
