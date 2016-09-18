@@ -462,4 +462,6 @@ int hns_cpld_led_set_id(struct hns_mac_cb *mac_cb,
 			enum hnae_led_state status);
 void hns_mac_set_promisc(struct hns_mac_cb *mac_cb, u8 en);
 
+void hns_dsaf_srst_chns(struct dsaf_device *dsaf_dev, u32 msk, bool dereset);
+void hns_dsaf_roce_srst(struct dsaf_device *dsaf_dev, bool dereset);
 #endif /* _HNS_DSAF_MAC_H */
