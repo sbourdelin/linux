@@ -458,7 +458,7 @@ static int fw_cfg_register_file(const struct fw_cfg_file *f)
 		return -ENOMEM;
 
 	/* set file entry information */
-	memcpy(&entry->f, f, sizeof(struct fw_cfg_file));
+	memcpy(&entry->f, f, sizeof(*f));
 
 	/* register entry under "/sys/firmware/qemu_fw_cfg/by_key/" */
 	err = kobject_init_and_add(&entry->kobj, &fw_cfg_sysfs_entry_ktype,
