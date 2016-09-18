@@ -538,42 +538,41 @@ static int fw_cfg_sysfs_probe(struct platform_device *pdev)
 	err = -ENOMEM;
 	fw_cfg_sel_ko = kobject_create_and_add("by_key", fw_cfg_top_ko);
 	if (!fw_cfg_sel_ko)
-		goto err_sel;
+		goto exit;
 	fw_cfg_fname_kset = kset_create_and_add("by_name", NULL, fw_cfg_top_ko);
 	if (!fw_cfg_fname_kset)
-		goto err_name;
+		goto cleanup_object;
 
 	/* initialize fw_cfg device i/o from platform data */
 	err = fw_cfg_do_platform_probe(pdev);
 	if (err)
-		goto err_probe;
+		goto unregister;
 
 	/* get revision number, add matching top-level attribute */
 	fw_cfg_read_blob(FW_CFG_ID, &fw_cfg_rev, 0, sizeof(fw_cfg_rev));
 	fw_cfg_rev = le32_to_cpu(fw_cfg_rev);
 	err = sysfs_create_file(fw_cfg_top_ko, &fw_cfg_rev_attr.attr);
 	if (err)
-		goto err_rev;
+		goto cleanup_io;
 
 	/* process fw_cfg file directory entry, registering each file */
 	err = fw_cfg_register_dir_entries();
 	if (err)
-		goto err_dir;
+		goto cleanup_cache;
 
 	/* success */
 	pr_debug("fw_cfg: loaded.\n");
 	return 0;
-
-err_dir:
+ cleanup_cache:
 	fw_cfg_sysfs_cache_cleanup();
 	sysfs_remove_file(fw_cfg_top_ko, &fw_cfg_rev_attr.attr);
-err_rev:
+ cleanup_io:
 	fw_cfg_io_cleanup();
-err_probe:
+ unregister:
 	fw_cfg_kset_unregister_recursive(fw_cfg_fname_kset);
-err_name:
+ cleanup_object:
 	fw_cfg_kobj_cleanup(fw_cfg_sel_ko);
-err_sel:
+ exit:
 	return err;
 }
 
