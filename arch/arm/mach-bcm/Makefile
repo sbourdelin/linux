@@ -50,6 +50,9 @@ ifeq ($(CONFIG_ARCH_BCM_5301X),y)
 obj-$(CONFIG_SMP)		+= platsmp.o
 endif
 
+# BCM53573
+obj-$(CONFIG_ARCH_BCM_53573)	+= bcm_53573.o
+
 # BCM63XXx
 ifeq ($(CONFIG_ARCH_BCM_63XX),y)
 obj-y				+= bcm63xx.o
