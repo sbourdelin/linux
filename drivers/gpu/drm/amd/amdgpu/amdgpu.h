@@ -2464,6 +2464,7 @@ struct amdgpu_afmt_acr {
 };
 
 struct amdgpu_afmt_acr amdgpu_afmt_acr(uint32_t clock);
+extern void amdgpu_pm_acpi_event_handler(struct amdgpu_device *adev);
 
 /* amdgpu_acpi.c */
 #if defined(CONFIG_ACPI)
