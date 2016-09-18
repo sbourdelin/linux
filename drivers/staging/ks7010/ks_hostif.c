@@ -24,7 +24,6 @@ extern int ks_wlan_hw_tx(struct ks_wlan_private *priv, void *p,
 			 unsigned long size,
 			 void (*complete_handler) (void *arg1, void *arg2),
 			 void *arg1, void *arg2);
-extern void send_packet_complete(void *, void *);
 
 extern void ks_wlan_hw_wakeup_request(struct ks_wlan_private *priv);
 extern int ks_wlan_hw_power_save(struct ks_wlan_private *priv);
