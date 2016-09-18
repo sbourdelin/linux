@@ -1238,6 +1238,10 @@ int flush_old_exec(struct linux_binprm * bprm)
 	if (retval)
 		goto out;
 
+	retval = mutex_lock_killable(&current->signal->cred_guard_light);
+	if (retval)
+		goto out;
+
 	/*
 	 * Must be called _before_ exec_mmap() as bprm->mm is
 	 * not visibile until then. This also enables the update
@@ -1251,7 +1255,7 @@ int flush_old_exec(struct linux_binprm * bprm)
 	acct_arg_size(bprm, 0);
 	retval = exec_mmap(bprm->mm);
 	if (retval)
-		goto out;
+		goto out_unlock;
 
 	bprm->mm = NULL;		/* We're using it now */
 
@@ -1263,6 +1267,8 @@ int flush_old_exec(struct linux_binprm * bprm)
 
 	return 0;
 
+out_unlock:
+	mutex_unlock(&current->signal->cred_guard_light);
 out:
 	return retval;
 }
@@ -1386,6 +1392,7 @@ void install_exec_creds(struct linux_binprm *bprm)
 	 * credentials; any time after this it may be unlocked.
 	 */
 	security_bprm_committed_creds(bprm);
+	mutex_unlock(&current->signal->cred_guard_light);
 	mutex_unlock(&current->signal->cred_guard_mutex);
 }
 EXPORT_SYMBOL(install_exec_creds);
@@ -1753,6 +1760,12 @@ static int do_execveat_common(int fd, struct filename *filename,
 	return retval;
 
 out:
+	if (!bprm->mm && bprm->cred) {
+		/* failure after flush_old_exec(), but before
+		 * install_exec_creds()
+		 */
+		mutex_unlock(&current->signal->cred_guard_light);
+	}
 	if (bprm->mm) {
 		acct_arg_size(bprm, 0);
 		mmput(bprm->mm);

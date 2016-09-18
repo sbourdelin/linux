@@ -283,6 +283,16 @@ ok:
 	return security_ptrace_access_check(task, mode);
 }
 
+/*
+ * NOTE: When you call this function, you need to ensure that the target task
+ * can't acquire (via setuid execve) credentials between the ptrace access
+ * check and the privileged access. The recommended way to do this is to hold
+ * one of task->signal->{cred_guard_mutex,cred_guard_light} while calling this
+ * function and performing the requested access.
+ *
+ * This function may only be used if access is requested in the name of
+ * current_cred().
+ */
 bool ptrace_may_access(struct task_struct *task, unsigned int mode)
 {
 	int err;

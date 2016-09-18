@@ -808,6 +808,16 @@ struct signal_struct {
 	struct mutex cred_guard_mutex;	/* guard against foreign influences on
 					 * credential calculations
 					 * (notably. ptrace) */
+	/*
+	 * Lightweight version of cred_guard_mutex; used to prevent race
+	 * conditions where a user can gain information about the post-execve
+	 * state of a task to which access should only be granted pre-execve.
+	 * Hold this mutex while performing remote task inspection associated
+	 * with a security check.
+	 * This mutex MUST NOT be used in cases where anything changes about
+	 * the security properties of a running execve().
+	 */
+	struct mutex cred_guard_light;
 };
 
 /*
