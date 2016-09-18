@@ -81,7 +81,9 @@ void amdgpu_gfx_scratch_free(struct amdgpu_device *adev, uint32_t reg)
  * The bitmask of CUs to be disabled in the shader array determined by se and
  * sh is stored in mask[se * max_sh + sh].
  */
-void amdgpu_gfx_parse_disable_cu(unsigned *mask, unsigned max_se, unsigned max_sh)
+void amdgpu_gfx_parse_disable_cu(unsigned int *mask,
+				unsigned int max_se,
+				unsigned int max_sh)
 {
 	unsigned se, sh, cu;
 	const char *p;
