@@ -23,4 +23,11 @@
  */
 void sun4i_usb_phy_set_squelch_detect(struct phy *phy, bool enabled);
 
+/**
+ * sun4i_usb_force_session_end() - Force the current session to end
+ *				   by reporting VBus low for 200+ ms
+ * @phy: reference to a sun4i usb phy
+ */
+void sun4i_usb_phy_force_session_end(struct phy *phy);
+
 #endif

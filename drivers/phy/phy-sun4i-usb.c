@@ -469,6 +469,17 @@ void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
 }
 EXPORT_SYMBOL_GPL(sun4i_usb_phy_set_squelch_detect);
 
+void sun4i_usb_phy_force_session_end(struct phy *_phy)
+{
+	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+
+	data->id_det = -1;
+	data->force_session_end = true;
+	queue_delayed_work(system_wq, &data->detect, 0);
+}
+EXPORT_SYMBOL_GPL(sun4i_usb_phy_force_session_end);
+
 static const struct phy_ops sun4i_usb_phy_ops = {
 	.init		= sun4i_usb_phy_init,
 	.exit		= sun4i_usb_phy_exit,
