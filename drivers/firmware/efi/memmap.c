@@ -221,8 +221,8 @@ void __init efi_memmap_insert(struct efi_memory_map *old_memmap, void *buf,
 	void *old, *new;
 
 	/* modifying range */
-	m_start = mem->range.start;
-	m_end = mem->range.end;
+	m_start = mem->range.start & ~(u64)EFI_PAGE_SIZE;
+	m_end = ALIGN(mem->range.end, EFI_PAGE_SIZE) - 1;
 	m_attr = mem->attribute;
 
 	for (old = old_memmap->map, new = buf;
