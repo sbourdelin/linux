@@ -118,4 +118,6 @@ static inline void lmv_le_to_cpu(union lmv_mds_md *lmv_dst,
 	}
 }
 
+int lmv_pack_md(union lmv_mds_md **lmmp, const struct lmv_stripe_md *lsm,
+		int stripe_count);
 #endif
