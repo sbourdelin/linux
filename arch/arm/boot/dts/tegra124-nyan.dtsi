@@ -434,7 +434,7 @@
 			usb2-0 {
 				vbus-supply = <&vdd_usb1_vbus>;
 				status = "okay";
-				mode = "otg";
+				mode = "host";
 			};
 
 			usb2-1 {
