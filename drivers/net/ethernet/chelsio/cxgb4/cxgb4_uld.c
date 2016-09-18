@@ -175,7 +175,8 @@ freeout:
 	return err;
 }
 
-int setup_sge_queues_uld(struct adapter *adap, unsigned int uld_type, bool lro)
+static int
+setup_sge_queues_uld(struct adapter *adap, unsigned int uld_type, bool lro)
 {
 	struct sge_uld_rxq_info *rxq_info = adap->sge.uld_rxq_info[uld_type];
 
@@ -202,7 +203,7 @@ static void t4_free_uld_rxqs(struct adapter *adap, int n,
 	}
 }
 
-void free_sge_queues_uld(struct adapter *adap, unsigned int uld_type)
+static void free_sge_queues_uld(struct adapter *adap, unsigned int uld_type)
 {
 	struct sge_uld_rxq_info *rxq_info = adap->sge.uld_rxq_info[uld_type];
 
@@ -214,8 +215,8 @@ void free_sge_queues_uld(struct adapter *adap, unsigned int uld_type)
 		kfree(rxq_info->msix_tbl);
 }
 
-int cfg_queues_uld(struct adapter *adap, unsigned int uld_type,
-		   const struct cxgb4_pci_uld_info *uld_info)
+static int cfg_queues_uld(struct adapter *adap, unsigned int uld_type,
+			  const struct cxgb4_pci_uld_info *uld_info)
 {
 	struct sge *s = &adap->sge;
 	struct sge_uld_rxq_info *rxq_info;
@@ -273,7 +274,7 @@ int cfg_queues_uld(struct adapter *adap, unsigned int uld_type,
 	return 0;
 }
 
-void free_queues_uld(struct adapter *adap, unsigned int uld_type)
+static void free_queues_uld(struct adapter *adap, unsigned int uld_type)
 {
 	struct sge_uld_rxq_info *rxq_info = adap->sge.uld_rxq_info[uld_type];
 
@@ -282,7 +283,8 @@ void free_queues_uld(struct adapter *adap, unsigned int uld_type)
 	kfree(rxq_info);
 }
 
-int request_msix_queue_irqs_uld(struct adapter *adap, unsigned int uld_type)
+static int
+request_msix_queue_irqs_uld(struct adapter *adap, unsigned int uld_type)
 {
 	struct sge_uld_rxq_info *rxq_info = adap->sge.uld_rxq_info[uld_type];
 	int idx, bmap_idx, err = 0;
@@ -307,7 +309,8 @@ unwind:
 	return err;
 }
 
-void free_msix_queue_irqs_uld(struct adapter *adap, unsigned int uld_type)
+static void
+free_msix_queue_irqs_uld(struct adapter *adap, unsigned int uld_type)
 {
 	struct sge_uld_rxq_info *rxq_info = adap->sge.uld_rxq_info[uld_type];
 	int idx;
@@ -321,7 +324,7 @@ void free_msix_queue_irqs_uld(struct adapter *adap, unsigned int uld_type)
 	}
 }
 
-void name_msix_vecs_uld(struct adapter *adap, unsigned int uld_type)
+static void name_msix_vecs_uld(struct adapter *adap, unsigned int uld_type)
 {
 	struct sge_uld_rxq_info *rxq_info = adap->sge.uld_rxq_info[uld_type];
 	int n = sizeof(adap->msix_info_ulds[0].desc);
@@ -361,7 +364,7 @@ static void quiesce_rx(struct adapter *adap, struct sge_rspq *q)
 	}
 }
 
-void enable_rx_uld(struct adapter *adap, unsigned int uld_type)
+static void enable_rx_uld(struct adapter *adap, unsigned int uld_type)
 {
 	struct sge_uld_rxq_info *rxq_info = adap->sge.uld_rxq_info[uld_type];
 	int idx;
@@ -370,7 +373,7 @@ void enable_rx_uld(struct adapter *adap, unsigned int uld_type)
 		enable_rx(adap, &rxq_info->uldrxq[idx].rspq);
 }
 
-void quiesce_rx_uld(struct adapter *adap, unsigned int uld_type)
+static void quiesce_rx_uld(struct adapter *adap, unsigned int uld_type)
 {
 	struct sge_uld_rxq_info *rxq_info = adap->sge.uld_rxq_info[uld_type];
 	int idx;
