@@ -1,0 +1,229 @@
+			     ====================
+			     PTRACE ACCESS CHECKS
+			     ====================
+
+By: Jann Horn <jann@thejh.net>
+
+=====
+INTRO
+=====
+
+This file describes the rules for ptrace() and ptrace()-like access to another
+task (inspecting or modifying the virtual memory of another process, inspecting
+another task's register state, inspecting another task's open files and so on).
+
+This kind of access is particularly security-sensitive because it often allows
+the caller to take complete control over the remote process. Therefore, the
+kernel must be very careful here.
+
+There are various kernel APIs that grant debugging access to other processes.
+
+
+===========================
+ORDINARY DEBUGGING SYSCALLS
+===========================
+
+The following ordinary syscalls grant debugging-like access:
+
+ - ptrace() grants R+W access to registers and virtual memory
+ - process_vm_readv() / process_vm_writev() grant R/W access to virtual memory
+ - get_robust_list() reveals an address from the target task, which would be
+   useful e.g. for an ASLR bypass
+ - perf_event_open()
+ - (kcmp() reveals a very small amount of information)
+
+These syscalls use the caller's *real* UID/GID and his *permitted* capability
+set (for historical reasons) to determine the permitted access using
+ptrace_may_access(..., PTRACE_MODE_REALCREDS | ...). This function is
+responsible for ensuring that the caller can't steal any privileges using the
+debugging access; in other words, it has to ensure that the caller's credentials
+are (more or less) a superset of the target's credentials. Namespaces aside,
+these rules work as follows:
+
+Introspection, including cross-thread introspection, is always allowed. This
+means that it is unsafe to use any of the debugging APIs on behalf of another,
+untrusted process unless it is verified somehow that the target pid does not
+actually belong to the calling process - dropping privileges is not sufficient.
+
+root (to be more precise, a process with CAP_SYS_PTRACE effective) can always
+use these debugging APIs on any process - unless a LSM denies the access.
+
+For normal users, there are more checks:
+
+ - The real uid of the caller must be equal to ruid, euid and suid of the target
+   task, same thing for the gids. All of the uids and gids of the target (apart
+   from the fs*id) are checked here because a privileged process might stash his
+   privileged uid into any one of them. (checked in __ptrace_may_access())
+   (Note: This doesn't cover the supplementary GIDs.)
+ - The permitted capabilities of the caller must be a superset of the permitted
+   capabilities of the target. (checked in cap_ptrace_access_check())
+ - The target process must be dumpable. What this means is explained in the next
+   section.
+
+
+===========
+DUMPABILITY
+===========
+
+Originally, the dumpability rule didn't exist - as long as a process had ruid,
+euid and suid set to the uid of a user (same thing with the gids), that user was
+able to gain debugging access to the process. This was problematic: It meant
+that if a setuid binary opened some important file, then dropped all privileges,
+the user was able to debug the process and steal its file descriptor - which is
+also a form of privilege! Other issues are e.g. that when a process drops its
+privileges, it might still have secrets in memory that the user isn't meant to
+see.
+
+Therefore, a process now becomes "nondumpable" when it:
+
+ - changes its euid / egid
+ - changes its fsuid / fsgid
+ - changes its permitted capability set
+
+These checks are in commit_creds().
+
+When a process is nondumpable, you need to have the CAP_SYS_PTRACE capability to
+access it - just having the same uids is not enough anymore.
+
+The most interesting part of dumpability is what happens on execve().
+(Non-)Dumpability is not inherited; instead, it is recalculated in
+setup_new_exec() and commit_creds(): A process will be nondumpable after
+execve() if its post-setuid-bit-handling euid and ruid or egid and rgid aren't
+the same. Additionally, it will be nondumpable if execve() changes its
+credentials in a way that commit_creds() triggers on (as described above).
+
+In effect, this means that normally, when a setuid/setgid binary executes
+another program, the other program is still protected by nondumpability (and
+also by secure execution).
+
+(Additionally, a process will be nondumpable if the euid doesn't have read
+access to the executed binary, which can be the case if the binary is
+executable, but not readable; however, this restriction is irrelevant from a
+security perspective because it isn't enforced consistently, neither through
+AT_SECURE nor for bprm->unsafe. In other words, you can e.g. be attached to such
+a binary via ptrace while it is executed, or you can LD_PRELOAD a library into
+it that dumps its memory. If this was fixed, it would be important to keep
+namespacing issues in mind, in particular the interaction with
+LSM_UNSAFE_PTRACE_CAP, the privileged kind of ptrace that works across setuid
+execve.)
+
+Dumpability and the secure exec flag can be affected by the following "unsafe
+execution" rules. When a process with ruid != euid executes another program and
+an unsafe execution is detected, *ITS EUID WILL BE DROPPED TO ITS RUID* by
+cap_bprm_set_creds() (unless it has CAP_SETUID effective in the init user ns).
+Unsafe execution means one of the following:
+
+ - LSM_UNSAFE_PTRACE: An unprivileged process is currently attached via ptrace.
+ - LSM_UNSAFE_NO_NEW_PRIVS: The current thread turned on NO_NEW_PRIVS.
+ - LSM_UNSAFE_SHARE: The fs struct is shared with a non-thread.
+
+
+=====================
+FILESYSTEM DEBUG APIS
+=====================
+
+The pid / tgid entries in procfs contain various entries that allow debugging
+access to a process. Interesting entries are:
+
+ - auxv permits an ASLR bypass
+ - cwd can permit bypassing filesystem restrictions in some cases
+ - environ can leak secret tokens
+ - fd can permit bypassing filesystem restrictions or leak access to things like
+   pipes
+ - maps permits an ASLR bypass
+ - mem grants R+W access to process memory
+ - stat permits an ASLR bypass
+
+Of these, all use both a normal filesystem DAC check (where the file owner is
+the process owner for a dumpable process, root for a nondumpable process) and a
+ptrace_may_access() check; however, the DAC check may be modified, and the
+ptrace_may_access() is performed under PTRACE_FSCREDS, meaning that instead of
+the caller's ruid, rgid and permitted capabilities, the fsuid, fsgid and
+effective capabilities are used, causing the case where a daemon drops its euid
+prior to accessing a file for the user to be treated correctly for this check.
+
+NEEDS ATTENTION:
+Special-case rules that permit introspection become a big problem here. In
+particular, if a setuid binary runs with dropped privileges (ruid=euid=user and
+suid=0 or so), it is still able to open the following entries under /proc/self:
+
+ - cwd (because normal DAC rules always permit symlink access, proc_pid_get_link
+   only checks for ptrace access and proc_cwd_link doesn't check anything)
+ - fd (same as cwd for the entries inside; the directory itself has an override
+   on the permission handler that makes introspection possible even if the
+   normal DAC rules would forbid it)
+ - maps (mode 0444, so DAC doesn't restrict anything)
+ - stat (mode 0444, and anyone can read from it; however, the interesting
+     pointers are only printed if the file opener has ptrace access to the
+     target process)
+
+In particular the fd directory is dangerous: Imagine a privileged process that
+creates some important pipe using pipe() with a dropped EUID and later performs
+writes with user-specified data on a file at a user-specified path with the same
+dropped EUID. An attacker could let the root-owned process reference the pipe as
+/proc/$pid/fd/3 and let the privileged process write to it.
+
+If necessary, it might make sense to introduce some "enable/disable
+introspection" prctl that can be used by userspace to disambiguate whether an
+access is intended to be introspection.
+
+
+Note that in all cases in which the DAC check permits access but a ptrace access
+check later on (in the VFS open handler or afterwards) restricts access,
+faccessat() is broken. However, that's probably not a real problem because
+faccessat() is racy anyway.
+
+
+===============
+USER NAMESPACES
+===============
+
+When ptrace_may_access() checks for CAP_SYS_PTRACE, the capability doesn't need
+to be active in the init namespace or in the current namespace; having it in the
+namespace of the ptrace target is sufficient. There are currently no further
+restrictions on this, meaning that the behavior of a task that creates or enters
+a user namespace is somewhat unintuitive:
+
+ - If a nondumpable task enters a user namespace, it will still be
+   nondumpable - but because the owner of the namespace is capable relative to
+   it when viewing the namespace from outside, this will often cause a
+   nondumpable task to effectively become dumpable because of a setns() /
+   clone() / unshare() call.
+
+ - The root user of a namespace can ptrace any process that enters the namespace
+   (via setns()) - immediately. This means that a process that wants to enter an
+   untrusted namespace from outside needs to be *very* careful to drop any
+   privileges it might have - uids, open file descriptors, secret data that's
+   still in memory, the controlling TTY and so on. (This also means that a
+   namespace owner who is unprivileged outside the namespace can't safely enter
+   the namespace if he doesn't trust the namespace root user: He needs
+   euid==ns->owner to enter the namespace, but must not have euid==ns->owner
+   after having entered the namespace. To get around this, it is necessary to
+   introduce a third namespace between the other two.)
+
+One way to make it easier for userspace to get this right might be to bind
+dumpability to namespaces, as follows: Let a task become nondumpable on
+setns() / clone(CLONE_NEWUSER) / unshare(CLONE_NEWUSER). Record the current
+namespace on dumpable -> nondumpable transition as "dumpability namespace".
+Require the caller to be privileged in the target's dumpability namespace, not
+just the target's current namespace.
+
+=============
+FUSE AND CUSE
+=============
+
+Anyone who can open /dev/cuse (root-owned, mode 0600) can arbitrarily read and
+write to the memory of various system processes (to be more precise, any process
+that opens files in /dev when they appear or so, then calls ioctl() on them; in
+particular, acpid does this) without further checks on capabilities or so.
+
+NEEDS ATTENTION:
+FUSE is more accessible than CUSE, but also more strict. ioctl() replies are
+restricted in location and size based on the ioctl command number (size) and the
+argument (location), but the ability to interactively control the replies to VFS
+method calls is still scary. Therefore, FUSE by default rejects filesystem
+access by anyone except the filesystem owner. This isn't done using the normal
+ptrace check, though; instead, fuse_allow_current_process() is used, which only
+looks at the UIDs and GIDs and therefore is a very simplified version of the
+normal ptrace access check. In particular, this provides no protection for
+setcap binaries.
