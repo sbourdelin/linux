@@ -491,17 +491,17 @@ static int fw_cfg_register_dir_entries(void)
 	int ret = 0;
 	u32 count, i;
 	struct fw_cfg_file *dir;
-	size_t dir_size;
 
 	fw_cfg_read_blob(FW_CFG_FILE_DIR, &count, 0, sizeof(count));
 	count = be32_to_cpu(count);
-	dir_size = count * sizeof(struct fw_cfg_file);
-
-	dir = kmalloc(dir_size, GFP_KERNEL);
+	dir = kmalloc_array(count, sizeof(*dir), GFP_KERNEL);
 	if (!dir)
 		return -ENOMEM;
 
-	fw_cfg_read_blob(FW_CFG_FILE_DIR, dir, sizeof(count), dir_size);
+	fw_cfg_read_blob(FW_CFG_FILE_DIR,
+			 dir,
+			 sizeof(count),
+			 sizeof(*dir) * count);
 
 	for (i = 0; i < count; i++) {
 		dir[i].size = be32_to_cpu(dir[i].size);
