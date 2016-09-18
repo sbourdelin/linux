@@ -1050,7 +1050,7 @@ out:
 	return ret;
 }
 
-int analogix_dp_get_modes(struct drm_connector *connector)
+static int analogix_dp_get_modes(struct drm_connector *connector)
 {
 	struct analogix_dp_device *dp = to_dp(connector);
 	struct edid *edid = (struct edid *)dp->edid;
@@ -1093,7 +1093,7 @@ static const struct drm_connector_helper_funcs analogix_dp_connector_helper_func
 	.best_encoder = analogix_dp_best_encoder,
 };
 
-enum drm_connector_status
+static enum drm_connector_status
 analogix_dp_detect(struct drm_connector *connector, bool force)
 {
 	struct analogix_dp_device *dp = to_dp(connector);
