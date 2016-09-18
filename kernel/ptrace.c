@@ -302,6 +302,13 @@ ok:
 bool ptrace_may_access(struct task_struct *task, unsigned int mode)
 {
 	int err;
+
+	/* If you have to check for ptrace access from a VFS method, use
+	 * ptrace_may_access_noncurrent() instead.
+	 */
+	if (WARN_ON(current->in_unprivileged_vfs != 0))
+		return false;
+
 	task_lock(task);
 	err = __ptrace_may_access(task, mode, current_cred(),
 				  &current->self_privunit_id);

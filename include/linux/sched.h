@@ -1473,6 +1473,10 @@ struct task_struct {
 	atomic_t usage;
 	unsigned int flags;	/* per process flags, defined below */
 	unsigned int ptrace;
+	/* depth of VFS read/write; non-zero values let certain privilege checks
+	 * fail with a warning
+	 */
+	unsigned int in_unprivileged_vfs;
 
 #ifdef CONFIG_SMP
 	struct llist_node wake_entry;

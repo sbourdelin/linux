@@ -1459,9 +1459,11 @@ rw_common:
 
 		if (rw == WRITE)
 			file_start_write(file);
+		current->in_unprivileged_vfs++;
 
 		ret = iter_op(req, &iter);
 
+		current->in_unprivileged_vfs--;
 		if (rw == WRITE)
 			file_end_write(file);
 		kfree(iovec);

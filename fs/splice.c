@@ -1134,7 +1134,7 @@ static long do_splice_to(struct file *in, loff_t *ppos,
 {
 	ssize_t (*splice_read)(struct file *, loff_t *,
 			       struct pipe_inode_info *, size_t, unsigned int);
-	int ret;
+	long ret;
 
 	if (unlikely(!(in->f_mode & FMODE_READ)))
 		return -EBADF;
@@ -1151,7 +1151,11 @@ static long do_splice_to(struct file *in, loff_t *ppos,
 	else
 		splice_read = default_file_splice_read;
 
-	return splice_read(in, ppos, pipe, len, flags);
+	current->in_unprivileged_vfs++;
+	ret = splice_read(in, ppos, pipe, len, flags);
+	current->in_unprivileged_vfs--;
+
+	return ret;
 }
 
 /**
@@ -1334,7 +1338,9 @@ long do_splice_direct(struct file *in, loff_t *ppos, struct file *out,
 	if (unlikely(ret < 0))
 		return ret;
 
+	current->in_unprivileged_vfs++;
 	ret = splice_direct_to_actor(in, &sd, direct_splice_actor);
+	current->in_unprivileged_vfs--;
 	if (ret > 0)
 		*ppos = sd.pos;
 
@@ -1401,7 +1407,9 @@ static long do_splice(struct file *in, loff_t __user *off_in,
 			return ret;
 
 		file_start_write(out);
+		current->in_unprivileged_vfs++;
 		ret = do_splice_from(ipipe, out, &offset, len, flags);
+		current->in_unprivileged_vfs--;
 		file_end_write(out);
 
 		if (!off_out)

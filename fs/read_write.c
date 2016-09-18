@@ -472,7 +472,9 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 	if (!ret) {
 		if (count > MAX_RW_COUNT)
 			count =  MAX_RW_COUNT;
+		current->in_unprivileged_vfs++;
 		ret = __vfs_read(file, buf, count, pos);
+		current->in_unprivileged_vfs--;
 		if (ret > 0) {
 			fsnotify_access(file);
 			add_rchar(current, ret);
@@ -557,7 +559,9 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 		if (count > MAX_RW_COUNT)
 			count =  MAX_RW_COUNT;
 		file_start_write(file);
+		current->in_unprivileged_vfs++;
 		ret = __vfs_write(file, buf, count, pos);
+		current->in_unprivileged_vfs--;
 		if (ret > 0) {
 			fsnotify_modify(file);
 			add_wchar(current, ret);
@@ -838,12 +842,14 @@ static ssize_t do_readv_writev(int type, struct file *file,
 		iter_fn = file->f_op->write_iter;
 		file_start_write(file);
 	}
+	current->in_unprivileged_vfs++;
 
 	if (iter_fn)
 		ret = do_iter_readv_writev(file, &iter, pos, iter_fn, flags);
 	else
 		ret = do_loop_readv_writev(file, &iter, pos, fn, flags);
 
+	current->in_unprivileged_vfs--;
 	if (type != READ)
 		file_end_write(file);
 
@@ -1063,12 +1069,14 @@ static ssize_t compat_do_readv_writev(int type, struct file *file,
 		iter_fn = file->f_op->write_iter;
 		file_start_write(file);
 	}
+	current->in_unprivileged_vfs++;
 
 	if (iter_fn)
 		ret = do_iter_readv_writev(file, &iter, pos, iter_fn, flags);
 	else
 		ret = do_loop_readv_writev(file, &iter, pos, fn, flags);
 
+	current->in_unprivileged_vfs--;
 	if (type != READ)
 		file_end_write(file);
 
@@ -1369,7 +1377,9 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 		fl = SPLICE_F_NONBLOCK;
 #endif
 	file_start_write(out.file);
+	current->in_unprivileged_vfs++;
 	retval = do_splice_direct(in.file, &pos, out.file, &out_pos, count, fl);
+	current->in_unprivileged_vfs--;
 	file_end_write(out.file);
 
 	if (retval > 0) {
@@ -1512,6 +1522,7 @@ ssize_t vfs_copy_file_range(struct file *file_in, loff_t pos_in,
 	ret = mnt_want_write_file(file_out);
 	if (ret)
 		return ret;
+	current->in_unprivileged_vfs++;
 
 	ret = -EOPNOTSUPP;
 	if (file_out->f_op->copy_file_range)
@@ -1521,6 +1532,7 @@ ssize_t vfs_copy_file_range(struct file *file_in, loff_t pos_in,
 		ret = do_splice_direct(file_in, &pos_in, file_out, &pos_out,
 				len > MAX_RW_COUNT ? MAX_RW_COUNT : len, 0);
 
+	current->in_unprivileged_vfs--;
 	if (ret > 0) {
 		fsnotify_access(file_in);
 		add_rchar(current, ret);
