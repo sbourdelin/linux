@@ -72,7 +72,8 @@ struct timezone;
 extern int cap_capable(const struct cred *cred, struct user_namespace *ns,
 		       int cap, int audit);
 extern int cap_settime(const struct timespec64 *ts, const struct timezone *tz);
-extern int cap_ptrace_access_check(struct task_struct *child, unsigned int mode);
+extern int cap_ptrace_access_check(struct task_struct *child, unsigned int mode,
+				   const struct cred *cred);
 extern int cap_ptrace_traceme(struct task_struct *parent);
 extern int cap_capget(struct task_struct *target, kernel_cap_t *effective, kernel_cap_t *inheritable, kernel_cap_t *permitted);
 extern int cap_capset(struct cred *new, const struct cred *old,
@@ -191,7 +192,8 @@ int security_binder_transfer_binder(struct task_struct *from,
 				    struct task_struct *to);
 int security_binder_transfer_file(struct task_struct *from,
 				  struct task_struct *to, struct file *file);
-int security_ptrace_access_check(struct task_struct *child, unsigned int mode);
+int security_ptrace_access_check(struct task_struct *child, unsigned int mode,
+				 const struct cred *cred);
 int security_ptrace_traceme(struct task_struct *parent);
 int security_capget(struct task_struct *target,
 		    kernel_cap_t *effective,
@@ -414,9 +416,9 @@ static inline int security_binder_transfer_file(struct task_struct *from,
 }
 
 static inline int security_ptrace_access_check(struct task_struct *child,
-					     unsigned int mode)
+			unsigned int mode, const struct cred *cred)
 {
-	return cap_ptrace_access_check(child, mode);
+	return cap_ptrace_access_check(child, mode, cred);
 }
 
 static inline int security_ptrace_traceme(struct task_struct *parent)

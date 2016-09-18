@@ -94,14 +94,22 @@ static void apparmor_cred_transfer(struct cred *new, const struct cred *old)
 }
 
 static int apparmor_ptrace_access_check(struct task_struct *child,
-					unsigned int mode)
+				 unsigned int mode, const struct cred *cred)
 {
-	return aa_ptrace(current, child, mode);
+	struct aa_profile *tracer_p = aa_get_profile(aa_cred_profile(cred));
+	int res = aa_ptrace(tracer_p, child, mode);
+
+	aa_put_profile(tracer_p);
+	return res;
 }
 
 static int apparmor_ptrace_traceme(struct task_struct *parent)
 {
-	return aa_ptrace(parent, current, PTRACE_MODE_ATTACH);
+	struct aa_profile *tracer_p = aa_get_task_profile(parent);
+	int res = aa_ptrace(tracer_p, current, PTRACE_MODE_ATTACH);
+
+	aa_put_profile(tracer_p);
+	return res;
 }
 
 /* Derived from security/commoncap.c:cap_capget */

@@ -2133,10 +2133,10 @@ static int selinux_binder_transfer_file(struct task_struct *from,
 }
 
 static int selinux_ptrace_access_check(struct task_struct *child,
-				     unsigned int mode)
+				     unsigned int mode, const struct cred *cred)
 {
 	if (mode & PTRACE_MODE_READ) {
-		u32 sid = current_sid();
+		u32 sid = cred_sid(cred);
 		u32 csid = task_sid(child);
 		return avc_has_perm(sid, csid, SECCLASS_FILE, FILE__READ, NULL);
 	}

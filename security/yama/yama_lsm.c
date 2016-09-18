@@ -347,7 +347,7 @@ static int ptracer_exception_found(struct task_struct *tracer,
  * Returns 0 if following the ptrace is allowed, -ve on error.
  */
 static int yama_ptrace_access_check(struct task_struct *child,
-				    unsigned int mode)
+				    unsigned int mode, const struct cred *cred)
 {
 	int rc = 0;
 
@@ -359,7 +359,9 @@ static int yama_ptrace_access_check(struct task_struct *child,
 			break;
 		case YAMA_SCOPE_RELATIONAL:
 			rcu_read_lock();
-			if (!task_is_descendant(current, child) &&
+			/* fail open for some procfs-based ATTACH accesses! */
+			if ((mode & PTRACE_MODE_NON_CURRENT) == 0 &&
+			    !task_is_descendant(current, child) &&
 			    !ptracer_exception_found(current, child) &&
 			    !ns_capable(__task_cred(child)->user_ns, CAP_SYS_PTRACE))
 				rc = -EPERM;
@@ -367,7 +369,8 @@ static int yama_ptrace_access_check(struct task_struct *child,
 			break;
 		case YAMA_SCOPE_CAPABILITY:
 			rcu_read_lock();
-			if (!ns_capable(__task_cred(child)->user_ns, CAP_SYS_PTRACE))
+			if (security_capable(cred, __task_cred(child)->user_ns,
+					     CAP_SYS_PTRACE) != 0)
 				rc = -EPERM;
 			rcu_read_unlock();
 			break;

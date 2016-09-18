@@ -66,6 +66,9 @@ extern void exit_ptrace(struct task_struct *tracer, struct list_head *dead);
 #define PTRACE_MODE_ATTACH_FSCREDS (PTRACE_MODE_ATTACH | PTRACE_MODE_FSCREDS)
 #define PTRACE_MODE_ATTACH_REALCREDS (PTRACE_MODE_ATTACH | PTRACE_MODE_REALCREDS)
 
+/* ignore relationship between current and target task */
+#define PTRACE_MODE_NON_CURRENT 0x20
+
 /**
  * ptrace_may_access - check whether the caller is permitted to access
  * a target task.
@@ -81,6 +84,8 @@ extern void exit_ptrace(struct task_struct *tracer, struct list_head *dead);
  * process_vm_writev or ptrace (and should use the real credentials).
  */
 extern bool ptrace_may_access(struct task_struct *task, unsigned int mode);
+bool ptrace_may_access_noncurrent(struct task_struct *task, unsigned int mode,
+		const struct cred *cred, const u64 *privunit_id);
 
 static inline int ptrace_reparented(struct task_struct *child)
 {

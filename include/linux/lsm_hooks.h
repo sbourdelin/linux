@@ -1147,6 +1147,7 @@
  *	attributes would be changed by the execve.
  *	@child contains the task_struct structure for the target process.
  *	@mode contains the PTRACE_MODE flags indicating the form of access.
+ *	@cred contains the caller's credentials
  *	Return 0 if permission is granted.
  * @ptrace_traceme:
  *	Check that the @parent process has sufficient permission to trace the
@@ -1315,7 +1316,7 @@ union security_list_options {
 					struct file *file);
 
 	int (*ptrace_access_check)(struct task_struct *child,
-					unsigned int mode);
+			unsigned int mode, const struct cred *cred);
 	int (*ptrace_traceme)(struct task_struct *parent);
 	int (*capget)(struct task_struct *target, kernel_cap_t *effective,
 			kernel_cap_t *inheritable, kernel_cap_t *permitted);

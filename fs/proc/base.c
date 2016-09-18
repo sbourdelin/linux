@@ -430,8 +430,9 @@ static int proc_pid_wchan(struct seq_file *m, struct pid_namespace *ns,
 
 	wchan = get_wchan(task);
 
-	if (wchan && ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS)
-			&& !lookup_symbol_name(wchan, symname))
+	if (wchan &&
+	    proc_ptrace_may_access_seq(task, PTRACE_MODE_READ_FSCREDS, m) &&
+	    !lookup_symbol_name(wchan, symname))
 		seq_printf(m, "%s", symname);
 	else
 		seq_putc(m, '0');
@@ -440,12 +441,12 @@ static int proc_pid_wchan(struct seq_file *m, struct pid_namespace *ns,
 }
 #endif /* CONFIG_KALLSYMS */
 
-static int lock_trace(struct task_struct *task)
+static int lock_trace(struct seq_file *m, struct task_struct *task)
 {
 	int err = mutex_lock_killable(&task->signal->cred_guard_mutex);
 	if (err)
 		return err;
-	if (!ptrace_may_access(task, PTRACE_MODE_ATTACH_FSCREDS)) {
+	if (!proc_ptrace_may_access_seq(task, PTRACE_MODE_ATTACH_FSCREDS, m)) {
 		mutex_unlock(&task->signal->cred_guard_mutex);
 		return -EPERM;
 	}
@@ -478,7 +479,7 @@ static int proc_pid_stack(struct seq_file *m, struct pid_namespace *ns,
 	trace.entries		= entries;
 	trace.skip		= 0;
 
-	err = lock_trace(task);
+	err = lock_trace(m, task);
 	if (!err) {
 		save_stack_trace_tsk(task, &trace);
 
@@ -660,7 +661,7 @@ static int proc_pid_syscall(struct seq_file *m, struct pid_namespace *ns,
 	unsigned long args[6], sp, pc;
 	int res;
 
-	res = lock_trace(task);
+	res = lock_trace(m, task);
 	if (res)
 		return res;
 
@@ -770,7 +771,7 @@ static const struct inode_operations proc_def_inode_operations = {
 
 static int proc_single_show(struct seq_file *m, void *v)
 {
-	struct inode *inode = m->private;
+	struct inode *inode = m->file->f_inode;
 	struct pid_namespace *ns;
 	struct pid *pid;
 	struct task_struct *task;
@@ -790,14 +791,35 @@ static int proc_single_show(struct seq_file *m, void *v)
 
 static int proc_single_open(struct inode *inode, struct file *filp)
 {
-	return single_open(filp, proc_single_show, inode);
+	int ret;
+	u64 *privunit_id = kmalloc(sizeof(u64), GFP_KERNEL);
+
+	if (privunit_id == NULL)
+		return -ENOMEM;
+	*privunit_id = current->self_privunit_id;
+
+	ret = single_open(filp, proc_single_show, privunit_id);
+
+	if (ret)
+		kfree(privunit_id);
+	return ret;
+}
+
+static int proc_single_release(struct inode *inode, struct file *filp)
+{
+	struct seq_file *seq = filp->private_data;
+	u64 *privunit_id = seq->private;
+
+	kfree(privunit_id);
+
+	return single_release(inode, filp);
 }
 
 static const struct file_operations proc_single_file_operations = {
 	.open		= proc_single_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
-	.release	= single_release,
+	.release	= proc_single_release,
 };
 
 
@@ -2157,10 +2179,29 @@ out:
 	return ret;
 }
 
+int proc_open_get_privunit_id(struct inode *inode, struct file *filp)
+{
+	u64 *privunit_id = kmalloc(sizeof(u64), GFP_KERNEL);
+
+	if (privunit_id == NULL)
+		return -ENOMEM;
+	*privunit_id = current->self_privunit_id;
+	filp->private_data = privunit_id;
+	return 0;
+}
+
+int proc_release_put_privunit_id(struct inode *inode, struct file *filp)
+{
+	kfree((u64 *)filp->private_data);
+	return 0;
+}
+
 static const struct file_operations proc_map_files_operations = {
 	.read		= generic_read_dir,
 	.iterate_shared	= proc_map_files_readdir,
 	.llseek		= generic_file_llseek,
+	.open		= proc_open_get_privunit_id,
+	.release	= proc_release_put_privunit_id,
 };
 
 #ifdef CONFIG_CHECKPOINT_RESTORE
@@ -2614,7 +2655,7 @@ static int do_io_accounting(struct task_struct *task, struct seq_file *m, int wh
 	if (result)
 		return result;
 
-	if (!ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS)) {
+	if (!proc_ptrace_may_access_seq(task, PTRACE_MODE_READ_FSCREDS, m)) {
 		result = -EACCES;
 		goto out_unlock;
 	}
@@ -2798,7 +2839,7 @@ static const struct file_operations proc_setgroups_operations = {
 static int proc_pid_personality(struct seq_file *m, struct pid_namespace *ns,
 				struct pid *pid, struct task_struct *task)
 {
-	int err = lock_trace(task);
+	int err = lock_trace(m, task);
 	if (!err) {
 		seq_printf(m, "%08x\n", task->personality);
 		unlock_trace(task);

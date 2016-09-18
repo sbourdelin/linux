@@ -133,14 +133,14 @@ int cap_settime(const struct timespec64 *ts, const struct timezone *tz)
  * Determine whether a process may access another, returning 0 if permission
  * granted, -ve if denied.
  */
-int cap_ptrace_access_check(struct task_struct *child, unsigned int mode)
+int cap_ptrace_access_check(struct task_struct *child, unsigned int mode,
+			    const struct cred *cred)
 {
 	int ret = 0;
-	const struct cred *cred, *child_cred;
+	const struct cred *child_cred;
 	const kernel_cap_t *caller_caps;
 
 	rcu_read_lock();
-	cred = current_cred();
 	child_cred = __task_cred(child);
 	if (mode & PTRACE_MODE_FSCREDS)
 		caller_caps = &cred->cap_effective;
@@ -149,7 +149,7 @@ int cap_ptrace_access_check(struct task_struct *child, unsigned int mode)
 	if (cred->user_ns == child_cred->user_ns &&
 	    cap_issubset(child_cred->cap_permitted, *caller_caps))
 		goto out;
-	if (ns_capable(child_cred->user_ns, CAP_SYS_PTRACE))
+	if (security_capable(cred, child_cred->user_ns, CAP_SYS_PTRACE) == 0)
 		goto out;
 	ret = -EPERM;
 out:

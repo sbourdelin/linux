@@ -413,7 +413,8 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 
 	state = *get_task_state(task);
 	vsize = eip = esp = 0;
-	permitted = ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS | PTRACE_MODE_NOAUDIT);
+	permitted = proc_ptrace_may_access_seq(task,
+			PTRACE_MODE_READ_FSCREDS | PTRACE_MODE_NOAUDIT, m);
 	mm = get_task_mm(task);
 	if (mm) {
 		vsize = task_vsize(mm);

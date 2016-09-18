@@ -408,7 +408,8 @@ static inline unsigned int smk_ptrace_mode(unsigned int mode)
 
 /**
  * smk_ptrace_rule_check - helper for ptrace access
- * @tracer: tracer process
+ * @tracer: tracer process - only used for auditing if @tracer_cred is set
+ * @tracer_cred: creds for checks, may be different from @tracer's creds
  * @tracee_known: label entry of the process that's about to be traced
  * @mode: ptrace attachment mode (PTRACE_MODE_*)
  * @func: name of the function that called us, used for audit
@@ -416,6 +417,7 @@ static inline unsigned int smk_ptrace_mode(unsigned int mode)
  * Returns 0 on access granted, -error on error
  */
 static int smk_ptrace_rule_check(struct task_struct *tracer,
+				 const struct cred *tracer_cred,
 				 struct smack_known *tracee_known,
 				 unsigned int mode, const char *func)
 {
@@ -431,7 +433,9 @@ static int smk_ptrace_rule_check(struct task_struct *tracer,
 	}
 
 	rcu_read_lock();
-	tsp = __task_cred(tracer)->security;
+	if (tracer_cred == NULL)
+		tracer_cred = __task_cred(tracer);
+	tsp = tracer_cred->security;
 	tracer_known = smk_of_task(tsp);
 
 	if ((mode & PTRACE_MODE_ATTACH) &&
@@ -476,13 +480,14 @@ static int smk_ptrace_rule_check(struct task_struct *tracer,
  *
  * Do the capability checks.
  */
-static int smack_ptrace_access_check(struct task_struct *ctp, unsigned int mode)
+static int smack_ptrace_access_check(struct task_struct *ctp, unsigned int mode,
+				     const struct cred *cred)
 {
 	struct smack_known *skp;
 
 	skp = smk_of_task_struct(ctp);
 
-	return smk_ptrace_rule_check(current, skp, mode, __func__);
+	return smk_ptrace_rule_check(current, cred, skp, mode, __func__);
 }
 
 /**
@@ -500,7 +505,8 @@ static int smack_ptrace_traceme(struct task_struct *ptp)
 
 	skp = smk_of_task(current_security());
 
-	rc = smk_ptrace_rule_check(ptp, skp, PTRACE_MODE_ATTACH, __func__);
+	rc = smk_ptrace_rule_check(ptp, NULL, skp, PTRACE_MODE_ATTACH,
+				   __func__);
 	return rc;
 }
 
@@ -941,7 +947,7 @@ static int smack_bprm_set_creds(struct linux_binprm *bprm)
 		rcu_read_lock();
 		tracer = ptrace_parent(current);
 		if (likely(tracer != NULL))
-			rc = smk_ptrace_rule_check(tracer,
+			rc = smk_ptrace_rule_check(tracer, NULL,
 						   isp->smk_task,
 						   PTRACE_MODE_ATTACH,
 						   __func__);

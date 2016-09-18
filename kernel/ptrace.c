@@ -206,18 +206,20 @@ static int ptrace_check_attach(struct task_struct *child, bool ignore_state)
 	return ret;
 }
 
-static int ptrace_has_cap(struct user_namespace *ns, unsigned int mode)
+static int ptrace_has_cap(const struct cred *cred, struct user_namespace *ns,
+			  unsigned int mode)
 {
 	if (mode & PTRACE_MODE_NOAUDIT)
-		return has_ns_capability_noaudit(current, ns, CAP_SYS_PTRACE);
+		return security_capable_noaudit(cred, ns, CAP_SYS_PTRACE) == 0;
 	else
-		return has_ns_capability(current, ns, CAP_SYS_PTRACE);
+		return security_capable(cred, ns, CAP_SYS_PTRACE) == 0;
 }
 
 /* Returns 0 on success, -errno on denial. */
-static int __ptrace_may_access(struct task_struct *task, unsigned int mode)
+static int __ptrace_may_access(struct task_struct *task, unsigned int mode,
+			       const struct cred *cred, const u64 *privunit_id)
 {
-	const struct cred *cred = current_cred(), *tcred;
+	const struct cred *tcred;
 	int dumpable = 0;
 	kuid_t caller_uid;
 	kgid_t caller_gid;
@@ -237,8 +239,9 @@ static int __ptrace_may_access(struct task_struct *task, unsigned int mode)
 	 */
 
 	/* Don't let security modules deny introspection */
-	if (same_thread_group(task, current))
+	if (*privunit_id == task->self_privunit_id)
 		return 0;
+
 	rcu_read_lock();
 	if (mode & PTRACE_MODE_FSCREDS) {
 		caller_uid = cred->fsuid;
@@ -263,7 +266,7 @@ static int __ptrace_may_access(struct task_struct *task, unsigned int mode)
 	    gid_eq(caller_gid, tcred->sgid) &&
 	    gid_eq(caller_gid, tcred->gid))
 		goto ok;
-	if (ptrace_has_cap(tcred->user_ns, mode))
+	if (ptrace_has_cap(cred, tcred->user_ns, mode))
 		goto ok;
 	rcu_read_unlock();
 	return -EPERM;
@@ -274,13 +277,13 @@ ok:
 		dumpable = get_dumpable(task->mm);
 	rcu_read_lock();
 	if (dumpable != SUID_DUMP_USER &&
-	    !ptrace_has_cap(__task_cred(task)->user_ns, mode)) {
+	    !ptrace_has_cap(cred, __task_cred(task)->user_ns, mode)) {
 		rcu_read_unlock();
 		return -EPERM;
 	}
 	rcu_read_unlock();
 
-	return security_ptrace_access_check(task, mode);
+	return security_ptrace_access_check(task, mode, cred);
 }
 
 /*
@@ -297,7 +300,21 @@ bool ptrace_may_access(struct task_struct *task, unsigned int mode)
 {
 	int err;
 	task_lock(task);
-	err = __ptrace_may_access(task, mode);
+	err = __ptrace_may_access(task, mode, current_cred(),
+				  &current->self_privunit_id);
+	task_unlock(task);
+	return !err;
+}
+
+bool ptrace_may_access_noncurrent(struct task_struct *task, unsigned int mode,
+				  const struct cred *cred,
+				  const u64 *privunit_id)
+{
+	int err;
+
+	task_lock(task);
+	err = __ptrace_may_access(task, mode | PTRACE_MODE_NON_CURRENT, cred,
+				  privunit_id);
 	task_unlock(task);
 	return !err;
 }
@@ -338,7 +355,8 @@ static int ptrace_attach(struct task_struct *task, long request,
 		goto out;
 
 	task_lock(task);
-	retval = __ptrace_may_access(task, PTRACE_MODE_ATTACH_REALCREDS);
+	retval = __ptrace_may_access(task, PTRACE_MODE_ATTACH_REALCREDS,
+	    current_cred(), &current->self_privunit_id);
 	task_unlock(task);
 	if (retval)
 		goto unlock_creds;

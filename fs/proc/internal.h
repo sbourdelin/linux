@@ -14,6 +14,9 @@
 #include <linux/spinlock.h>
 #include <linux/atomic.h>
 #include <linux/binfmts.h>
+#include <linux/ptrace.h>
+#include <linux/pid.h>
+#include <linux/seq_file.h>
 
 struct ctl_table_header;
 struct mempolicy;
@@ -134,6 +137,15 @@ out:
 	return ~0U;
 }
 
+static inline bool proc_ptrace_may_access_seq(struct task_struct *task,
+			unsigned int mode, struct seq_file *m)
+{
+	const u64 *privunit_id = m->private;
+
+	return ptrace_may_access_noncurrent(task, mode, m->file->f_cred,
+					    privunit_id);
+}
+
 /*
  * Offset of the first process in the /proc root directory..
  */
@@ -168,6 +180,8 @@ extern int pid_delete_dentry(const struct dentry *);
 extern int proc_pid_readdir(struct file *, struct dir_context *);
 extern struct dentry *proc_pid_lookup(struct inode *, struct dentry *, unsigned int);
 extern loff_t mem_lseek(struct file *, loff_t, int);
+extern int proc_open_get_privunit_id(struct inode *, struct file *);
+extern int proc_release_put_privunit_id(struct inode *, struct file *);
 
 /* Lookups */
 typedef int instantiate_t(struct inode *, struct dentry *,

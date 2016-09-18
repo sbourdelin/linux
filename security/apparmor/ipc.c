@@ -82,7 +82,7 @@ int aa_may_ptrace(struct aa_profile *tracer, struct aa_profile *tracee,
  *
  * Returns: %0 else error code if permission denied or error
  */
-int aa_ptrace(struct task_struct *tracer, struct task_struct *tracee,
+int aa_ptrace(struct aa_profile *tracer_p, struct task_struct *tracee,
 	      unsigned int mode)
 {
 	/*
@@ -94,7 +94,6 @@ int aa_ptrace(struct task_struct *tracer, struct task_struct *tracee,
 	 *       - tracer profile has CAP_SYS_PTRACE
 	 */
 
-	struct aa_profile *tracer_p = aa_get_task_profile(tracer);
 	int error = 0;
 
 	if (!unconfined(tracer_p)) {
@@ -105,7 +104,6 @@ int aa_ptrace(struct task_struct *tracer, struct task_struct *tracee,
 
 		aa_put_profile(tracee_p);
 	}
-	aa_put_profile(tracer_p);
 
 	return error;
 }

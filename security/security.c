@@ -154,9 +154,10 @@ int security_binder_transfer_file(struct task_struct *from,
 	return call_int_hook(binder_transfer_file, 0, from, to, file);
 }
 
-int security_ptrace_access_check(struct task_struct *child, unsigned int mode)
+int security_ptrace_access_check(struct task_struct *child, unsigned int mode,
+				 const struct cred *cred)
 {
-	return call_int_hook(ptrace_access_check, 0, child, mode);
+	return call_int_hook(ptrace_access_check, 0, child, mode, cred);
 }
 
 int security_ptrace_traceme(struct task_struct *parent)
