@@ -2183,13 +2183,21 @@ restart:
 
 		if (!evt_num_known) {
 			evt_num++;
+			if (strlen(syms->alias))
+				evt_num++;
 			continue;
 		}
 
 		if (!name_only && strlen(syms->alias))
 			snprintf(name, MAX_NAME_LEN, "%s OR %s", syms->symbol, syms->alias);
-		else
+		else {
+			if (strlen(syms->alias)) {
+				evt_list[evt_i++] = strdup(syms->alias);
+				if (evt_list[evt_i - 1]  == NULL)
+					goto out_enomem;
+			}
 			strncpy(name, syms->symbol, MAX_NAME_LEN);
+		}
 
 		evt_list[evt_i] = strdup(name);
 		if (evt_list[evt_i] == NULL)
