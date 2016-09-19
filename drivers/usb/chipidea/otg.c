@@ -109,19 +109,20 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
 {
 	enum ci_role role = ci_otg_role(ci);
 
-	if (role != ci->role) {
-		dev_dbg(ci->dev, "switching from %s to %s\n",
-			ci_role(ci)->name, ci->roles[role]->name);
+	if (role == ci->role)
+		return;
 
-		ci_role_stop(ci);
+	dev_dbg(ci->dev, "switching from %s to %s\n",
+		ci_role(ci)->name, ci->roles[role]->name);
 
-		if (role == CI_ROLE_GADGET)
-			/* wait vbus lower than OTGSC_BSV */
-			hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
-					CI_VBUS_STABLE_TIMEOUT_MS);
+	ci_role_stop(ci);
 
-		ci_role_start(ci, role);
-	}
+	if (role == CI_ROLE_GADGET)
+		/* wait vbus lower than OTGSC_BSV */
+		hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
+				CI_VBUS_STABLE_TIMEOUT_MS);
+
+	ci_role_start(ci, role);
 }
 /**
  * ci_otg_work - perform otg (vbus/id) event handle
