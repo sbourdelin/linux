@@ -46,7 +46,7 @@
 #include <linux/kref.h>
 #include <linux/slab.h>
 #include <linux/task_io_accounting_ops.h>
-#include <linux/module.h>
+#include <linux/export.h>
 
 #include <linux/nfs_fs.h>
 #include <linux/nfs_page.h>

@@ -8,7 +8,6 @@
 
 #include <linux/completion.h>
 #include <linux/ip.h>
-#include <linux/module.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/svcsock.h>
 #include <linux/nfs_fs.h>

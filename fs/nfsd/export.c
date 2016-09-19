@@ -13,7 +13,6 @@
 
 #include <linux/slab.h>
 #include <linux/namei.h>
-#include <linux/module.h>
 #include <linux/exportfs.h>
 #include <linux/sunrpc/svc_xprt.h>
 

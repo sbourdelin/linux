@@ -7,7 +7,7 @@
  * NFS namespace
  */
 
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/dcache.h>
 #include <linux/gfp.h>
 #include <linux/mount.h>

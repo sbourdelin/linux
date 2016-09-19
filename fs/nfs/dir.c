@@ -17,7 +17,8 @@
  *  6 Jun 1999	Cache readdir lookups in the page cache. -DaveM
  */
 
-#include <linux/module.h>
+#include <linux/moduleparam.h>
+#include <linux/export.h>
 #include <linux/time.h>
 #include <linux/errno.h>
 #include <linux/stat.h>

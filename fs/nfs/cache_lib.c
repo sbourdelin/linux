@@ -6,7 +6,6 @@
  * Copyright (c) 2009 Trond Myklebust <Trond.Myklebust@netapp.com>
  */
 #include <linux/kmod.h>
-#include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/mount.h>
 #include <linux/namei.h>

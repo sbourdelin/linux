@@ -10,7 +10,7 @@
 #include <linux/nfs_fs.h>
 #include <linux/nfs_page.h>
 #include <linux/sunrpc/addr.h>
-#include <linux/module.h>
+#include <linux/export.h>
 
 #include "nfs4session.h"
 #include "internal.h"

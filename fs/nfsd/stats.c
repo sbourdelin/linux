@@ -22,7 +22,6 @@
  */
 
 #include <linux/seq_file.h>
-#include <linux/module.h>
 #include <linux/sunrpc/stats.h>
 #include <net/net_namespace.h>
 

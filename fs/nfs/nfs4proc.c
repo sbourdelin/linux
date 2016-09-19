@@ -51,7 +51,7 @@
 #include <linux/nfs_mount.h>
 #include <linux/namei.h>
 #include <linux/mount.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/xattr.h>
 #include <linux/utsname.h>
 #include <linux/freezer.h>

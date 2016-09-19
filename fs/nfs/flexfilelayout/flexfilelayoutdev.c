@@ -8,7 +8,7 @@
 
 #include <linux/nfs_fs.h>
 #include <linux/vmalloc.h>
-#include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/sunrpc/addr.h>
 
 #include "../internal.h"

@@ -30,7 +30,7 @@
 
 #include <linux/nfs_fs.h>
 #include <linux/vmalloc.h>
-#include <linux/module.h>
+#include <linux/moduleparam.h>
 
 #include "../internal.h"
 #include "../nfs4session.h"
