@@ -241,6 +241,9 @@ int dwc3_send_gadget_ep_cmd(struct dwc3_ep *dep, unsigned cmd,
 	int			susphy = false;
 	int			ret = -EINVAL;
 
+	if (!dwc->pullups_connected)
+		return -ESHUTDOWN;
+
 	/*
 	 * Synopsys Databook 2.60a states, on section 6.3.2.5.[1-8], that if
 	 * we're issuing an endpoint command, we must check if
