@@ -887,6 +887,13 @@ static u16 append_eir_data_to_buf(struct hci_dev *hdev, u8 *eir)
 		eir_len = eir_append_data(eir, eir_len, EIR_CLASS_OF_DEV,
 					  hdev->dev_class, 3);
 
+	if (hci_dev_test_flag(hdev, HCI_LE_ENABLED)) {
+		u16 appearance = cpu_to_le16(hdev->appearance);
+
+		eir_len = eir_append_data(eir, eir_len, EIR_APPEARANCE,
+					  (u8 *)&appearance, 2);
+	}
+
 	name_len = strlen(hdev->dev_name);
 	eir_len = eir_append_data(eir, eir_len, EIR_NAME_COMPLETE,
 				  hdev->dev_name, name_len);
