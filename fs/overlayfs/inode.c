@@ -30,13 +30,14 @@ static int ovl_copy_up_truncate(struct dentry *dentry)
 	old_cred = ovl_override_creds(dentry->d_sb);
 	err = vfs_getattr(&lowerpath, &stat);
 	if (err)
-		goto out_dput_parent;
+		goto out_revert;
 
 	stat.size = 0;
 	err = ovl_copy_up_one(parent, dentry, &lowerpath, &stat);
 
-out_dput_parent:
+out_revert:
 	revert_creds(old_cred);
+out_dput_parent:
 	dput(parent);
 	return err;
 }
