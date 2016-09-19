@@ -12,7 +12,7 @@
  */
 
 #define FSCACHE_DEBUG_LEVEL OPERATION
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 #include "internal.h"

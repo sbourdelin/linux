@@ -10,7 +10,7 @@
  */
 
 #define FSCACHE_DEBUG_LEVEL PAGE
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/fscache-cache.h>
 #include <linux/buffer_head.h>
 #include <linux/pagevec.h>

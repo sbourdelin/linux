@@ -10,7 +10,8 @@
  */
 
 #define FSCACHE_DEBUG_LEVEL CACHE
-#include <linux/module.h>
+#include <linux/export.h>
+#include <linux/kobject.h>
 #include <linux/slab.h>
 #include "internal.h"
 
