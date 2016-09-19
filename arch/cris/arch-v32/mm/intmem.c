@@ -29,7 +29,7 @@ struct intmem_allocation {
 static struct list_head intmem_allocations;
 static void* intmem_virtual;
 
-static void crisv32_intmem_init(void)
+static int __init crisv32_intmem_init(void)
 {
 	static int initiated = 0;
 	if (!initiated) {
@@ -44,6 +44,8 @@ static void crisv32_intmem_init(void)
 		alloc->status = STATUS_FREE;
 		list_add_tail(&alloc->entry, &intmem_allocations);
 	}
+
+	return 0;
 }
 
 void* crisv32_intmem_alloc(unsigned size, unsigned align)
