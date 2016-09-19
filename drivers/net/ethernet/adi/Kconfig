@@ -55,10 +55,14 @@ config BFIN_RX_DESC_NUM
 	---help---
 	  Set the number of buffer packets used in driver.
 
+config BFIN_MAC_HAS_HWSTAMP
+	def_tristate BFIN_MAC
+	depends on BF518
+	select PTP_1588_CLOCK_SELECTED
+
 config BFIN_MAC_USE_HWSTAMP
 	bool "Use IEEE 1588 hwstamp"
-	depends on BFIN_MAC && BF518
-	select PTP_1588_CLOCK
+	depends on BFIN_MAC_HAS_HWSTAMP && PTP_1588_CLOCK
 	default y
 	---help---
 	  To support the IEEE 1588 Precision Time Protocol (PTP), select y here
