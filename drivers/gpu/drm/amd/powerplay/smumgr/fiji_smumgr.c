@@ -187,7 +187,7 @@ int fiji_copy_bytes_to_smc(struct pp_smumgr *smumgr,
 	return 0;
 }
 
-int fiji_program_jump_on_start(struct pp_smumgr *smumgr)
+static int fiji_program_jump_on_start(struct pp_smumgr *smumgr)
 {
 	static const unsigned char data[] = { 0xE0, 0x00, 0x80, 0x40 };
 
@@ -201,7 +201,7 @@ int fiji_program_jump_on_start(struct pp_smumgr *smumgr)
 *
 * @param    smumgr  the address of the powerplay hardware manager.
 */
-bool fiji_is_smc_ram_running(struct pp_smumgr *smumgr)
+static bool fiji_is_smc_ram_running(struct pp_smumgr *smumgr)
 {
 	return ((0 == SMUM_READ_VFPF_INDIRECT_FIELD(smumgr->device,
 			CGS_IND_REG__SMC,
@@ -217,7 +217,7 @@ bool fiji_is_smc_ram_running(struct pp_smumgr *smumgr)
 * @param    msg the message to send.
 * @return   The response that came from the SMC.
 */
-int fiji_send_msg_to_smc(struct pp_smumgr *smumgr, uint16_t msg)
+static int fiji_send_msg_to_smc(struct pp_smumgr *smumgr, uint16_t msg)
 {
 	if (!fiji_is_smc_ram_running(smumgr))
 		return -1;
@@ -240,7 +240,7 @@ int fiji_send_msg_to_smc(struct pp_smumgr *smumgr, uint16_t msg)
  * @param    parameter: the parameter to send
  * @return   The response that came from the SMC.
  */
-int fiji_send_msg_to_smc_with_parameter(struct pp_smumgr *smumgr,
+static int fiji_send_msg_to_smc_with_parameter(struct pp_smumgr *smumgr,
 		uint16_t msg, uint32_t parameter)
 {
 	if (!fiji_is_smc_ram_running(smumgr))
@@ -267,7 +267,7 @@ int fiji_send_msg_to_smc_with_parameter(struct pp_smumgr *smumgr,
 * @param    parameter: the parameter to send
 * @return   The response that came from the SMC.
 */
-int fiji_send_msg_to_smc_with_parameter_without_waiting(
+static int fiji_send_msg_to_smc_with_parameter_without_waiting(
 		struct pp_smumgr *smumgr, uint16_t msg, uint32_t parameter)
 {
 	if (1 != SMUM_READ_FIELD(smumgr->device, SMC_RESP_0, SMC_RESP)) {
@@ -661,7 +661,7 @@ static int fiji_start_smu_in_non_protection_mode(struct pp_smumgr *smumgr)
 	return result;
 }
 
-int fiji_setup_pwr_virus(struct pp_smumgr *smumgr)
+static int fiji_setup_pwr_virus(struct pp_smumgr *smumgr)
 {
 	int i, result = -1;
 	uint32_t reg, data;
@@ -726,7 +726,7 @@ static int fiji_start_avfs_btc(struct pp_smumgr *smumgr)
 	return result;
 }
 
-int fiji_setup_pm_fuse_for_avfs(struct pp_smumgr *smumgr)
+static int fiji_setup_pm_fuse_for_avfs(struct pp_smumgr *smumgr)
 {
 	int result = 0;
 	uint32_t table_start;
@@ -762,7 +762,7 @@ int fiji_setup_pm_fuse_for_avfs(struct pp_smumgr *smumgr)
 	return result;
 }
 
-int fiji_setup_graphics_level_structure(struct pp_smumgr *smumgr)
+static int fiji_setup_graphics_level_structure(struct pp_smumgr *smumgr)
 {
 	int32_t vr_config;
 	uint32_t table_start;
@@ -801,7 +801,7 @@ int fiji_setup_graphics_level_structure(struct pp_smumgr *smumgr)
 }
 
 /* Work in Progress */
-int fiji_restore_vft_table(struct pp_smumgr *smumgr)
+static int fiji_restore_vft_table(struct pp_smumgr *smumgr)
 {
 	struct fiji_smumgr *priv = (struct fiji_smumgr *)(smumgr->backend);
 
@@ -813,7 +813,7 @@ int fiji_restore_vft_table(struct pp_smumgr *smumgr)
 }
 
 /* Work in Progress */
-int fiji_save_vft_table(struct pp_smumgr *smumgr)
+static int fiji_save_vft_table(struct pp_smumgr *smumgr)
 {
 	struct fiji_smumgr *priv = (struct fiji_smumgr *)(smumgr->backend);
 
@@ -824,7 +824,7 @@ int fiji_save_vft_table(struct pp_smumgr *smumgr)
 		return -EINVAL;
 }
 
-int fiji_avfs_event_mgr(struct pp_smumgr *smumgr, bool smu_started)
+static int fiji_avfs_event_mgr(struct pp_smumgr *smumgr, bool smu_started)
 {
 	struct fiji_smumgr *priv = (struct fiji_smumgr *)(smumgr->backend);
 

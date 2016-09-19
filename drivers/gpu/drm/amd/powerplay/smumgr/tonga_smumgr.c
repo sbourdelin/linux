@@ -143,7 +143,7 @@ out:
 }
 
 
-int tonga_program_jump_on_start(struct pp_smumgr *smumgr)
+static int tonga_program_jump_on_start(struct pp_smumgr *smumgr)
 {
 	static const unsigned char pData[] = { 0xE0, 0x00, 0x80, 0x40 };
 
