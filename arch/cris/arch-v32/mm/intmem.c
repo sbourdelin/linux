@@ -93,6 +93,7 @@ void* crisv32_intmem_alloc(unsigned size, unsigned align)
 
 void crisv32_intmem_free(void* addr)
 {
+	struct intmem_allocation* intmem_head;
 	struct intmem_allocation* allocation;
 	struct intmem_allocation* tmp;
 
@@ -102,6 +103,8 @@ void crisv32_intmem_free(void* addr)
 	preempt_disable();
 	crisv32_intmem_init();
 
+	intmem_head = list_entry(&intmem_allocations,
+				 struct intmem_allocation, entry);
 	list_for_each_entry_safe(allocation, tmp, &intmem_allocations, entry) {
 		if (allocation->offset == (int)(addr - intmem_virtual)) {
 			struct intmem_allocation *prev =
@@ -113,14 +116,14 @@ void crisv32_intmem_free(void* addr)
 
 			allocation->status = STATUS_FREE;
 			/* Join with prev and/or next if also free */
-			if ((prev != &intmem_allocations) &&
+			if ((prev != intmem_head) &&
 					(prev->status == STATUS_FREE)) {
 				prev->size += allocation->size;
 				list_del(&allocation->entry);
 				kfree(allocation);
 				allocation = prev;
 			}
-			if ((next != &intmem_allocations) &&
+			if ((next != intmem_head) &&
 					(next->status == STATUS_FREE)) {
 				allocation->size += next->size;
 				list_del(&next->entry);
