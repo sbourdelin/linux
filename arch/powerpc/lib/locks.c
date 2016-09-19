@@ -23,6 +23,7 @@
 #include <asm/hvcall.h>
 #include <asm/smp.h>
 
+#ifndef CONFIG_QUEUED_SPINLOCKS
 void __spin_yield(arch_spinlock_t *lock)
 {
 	unsigned int lock_value, holder_cpu, yield_count;
@@ -42,6 +43,7 @@ void __spin_yield(arch_spinlock_t *lock)
 		get_hard_smp_processor_id(holder_cpu), yield_count);
 }
 EXPORT_SYMBOL_GPL(__spin_yield);
+#endif
 
 /*
  * Waiting for a read lock or a write lock on a rwlock...
@@ -67,4 +69,61 @@ void __rw_yield(arch_rwlock_t *rw)
 	plpar_hcall_norets(H_CONFER,
 		get_hard_smp_processor_id(holder_cpu), yield_count);
 }
+#endif
+
+#ifdef CONFIG_QUEUED_SPINLOCKS
+/*
+ * This forbid we load an old value in another LL/SC. Because the SC here force
+ * another LL/SC repeat. So we guarantee all loads in another LL and SC will
+ * read correct value.
+ */
+static inline u32 atomic_read_sync(atomic_t *v)
+{
+	u32 val;
+
+	__asm__ __volatile__(
+"1:	" PPC_LWARX(%0, 0, %2, 0) "\n"
+"	stwcx. %0, 0, %2\n"
+"	bne- 1b\n"
+	: "=&r" (val), "+m" (*v)
+	: "r" (v)
+	: "cr0", "xer");
+
+	return val;
+}
+
+void queued_spin_unlock_wait(struct qspinlock *lock)
+{
+
+	u32 val;
+
+	smp_mb();
+
+	/*
+	 * copied from generic queue_spin_unlock_wait with little modification
+	 */
+	for (;;) {
+		/* need _sync, as we might race with another LL/SC in lock()*/
+		val = atomic_read_sync(&lock->val);
+
+		if (!val) /* not locked, we're done */
+			goto done;
+
+		if (val & _Q_LOCKED_MASK) /* locked, go wait for unlock */
+			break;
+
+		/* not locked, but pending, wait until we observe the lock */
+		cpu_relax();
+	}
+
+	/*
+	 * any unlock is good. And need not _sync, as ->val is set by the SC in
+	 * unlock(), any loads in lock() must see the correct value.
+	 */
+	while (atomic_read(&lock->val) & _Q_LOCKED_MASK)
+		cpu_relax();
+done:
+	smp_mb();
+}
+EXPORT_SYMBOL(queued_spin_unlock_wait);
 #endif
