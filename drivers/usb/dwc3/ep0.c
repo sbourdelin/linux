@@ -311,6 +311,8 @@ void dwc3_ep0_out_start(struct dwc3 *dwc)
 	ret = dwc3_ep0_start_trans(dwc, 0, dwc->ctrl_req_addr, 8,
 			DWC3_TRBCTL_CONTROL_SETUP, false);
 	WARN_ON(ret < 0);
+
+	complete(&dwc->ep0_in_setup);
 }
 
 static struct dwc3_ep *dwc3_wIndex_to_dep(struct dwc3 *dwc, __le16 wIndex_le)
