@@ -61,7 +61,7 @@
 		regulator-min-microvolt = <1200000>;
 		regulator-max-microvolt = <1200000>;
 		regulator-always-on;
-		voltage-table = <1000000 100>,
+		voltage-table = <1000000 0>,
 				<1200000 42>;
 		status = "okay";
 	};
