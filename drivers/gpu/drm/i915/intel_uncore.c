@@ -816,6 +816,42 @@ unclaimed_reg_debug(struct drm_i915_private *dev_priv,
 	__unclaimed_reg_debug(dev_priv, reg, read, before);
 }
 
+/*
+ * Decoupled MMIO access for only 1 DWORD
+ */
+static void __gen9_decoupled_mmio_access(struct drm_i915_private *dev_priv,
+					 uint32_t reg, u32 *ptr_data,
+					 enum forcewake_domains fw_engine, int operation)
+{
+	enum power_domains pd_engine;
+	u32 ctrl_reg_data = 0;
+
+	if (operation == GEN9_DECOUPLED_OP_WRITE)
+		__raw_i915_write32(dev_priv,
+				GEN9_DECOUPLED_REG0_DW0,
+				*ptr_data);
+
+	pd_engine = (fw_engine == (FORCEWAKE_RENDER || FORCEWAKE_BLITTER)) ? \
+		     !(fw_engine >> 1) : (fw_engine >> 1); \
+
+	ctrl_reg_data |= reg;
+	ctrl_reg_data |= (operation << GEN9_DECOUPLED_OP_SHIFT);
+	ctrl_reg_data |= (pd_engine << GEN9_DECOUPLED_PD_SHIFT);
+	__raw_i915_write32(dev_priv, GEN9_DECOUPLED_REG0_DW1, ctrl_reg_data);
+
+	ctrl_reg_data |= GEN9_DECOUPLED_DW1_GO;
+	__raw_i915_write32(dev_priv, GEN9_DECOUPLED_REG0_DW1, ctrl_reg_data);
+
+	if (wait_for_atomic((__raw_i915_read32(dev_priv,
+			GEN9_DECOUPLED_REG0_DW1) & GEN9_DECOUPLED_DW1_GO) == 0,
+			FORCEWAKE_ACK_TIMEOUT_MS))
+		DRM_ERROR("Decoupled MMIO wait timed out\n");
+
+	if (operation == GEN9_DECOUPLED_OP_READ)
+		*ptr_data = __raw_i915_read32(dev_priv,
+				GEN9_DECOUPLED_REG0_DW0);
+}
+
 #define GEN2_READ_HEADER(x) \
 	u##x val = 0; \
 	assert_rpm_wakelock_held(dev_priv);
@@ -892,6 +928,20 @@ static inline void __force_wake_auto(struct drm_i915_private *dev_priv,
 		dev_priv->uncore.funcs.force_wake_get(dev_priv, fw_domains);
 }
 
+static inline bool __is_forcewake_active(struct drm_i915_private *dev_priv,
+					 enum forcewake_domains fw_domains)
+{
+	struct intel_uncore_forcewake_domain *domain;
+
+	/* Ideally GCC would be constant-fold and eliminate this loop */
+	for_each_fw_domain_masked(domain, fw_domains, dev_priv) {
+		if (domain->wake_count)
+			fw_domains &= ~domain->mask;
+	}
+
+	return fw_domains ? 0 : 1;
+}
+
 #define __gen6_read(x) \
 static u##x \
 gen6_read##x(struct drm_i915_private *dev_priv, i915_reg_t reg, bool trace) { \
@@ -940,6 +990,37 @@ gen9_read##x(struct drm_i915_private *dev_priv, i915_reg_t reg, bool trace) { \
 	GEN6_READ_FOOTER; \
 }
 
+#define __gen9_decoupled_read(x) \
+static u##x \
+gen9_decoupled_read##x(struct drm_i915_private *dev_priv, i915_reg_t reg, bool trace) { \
+	enum forcewake_domains fw_engine; \
+	GEN6_READ_HEADER(x); \
+	fw_engine = __gen9_reg_read_fw_domains(offset); \
+	if (fw_engine && x%32 == 0) { \
+		if (__is_forcewake_active(dev_priv, fw_engine)) \
+			__raw_i915_write##x(dev_priv, reg, val); \
+		else { \
+			unsigned i; \
+			u32 *ptr_data = (u32 *) &val; \
+			for (i = 0; i < x/32; i++) \
+				__gen9_decoupled_mmio_access(dev_priv, \
+						(offset + i*4), \
+						ptr_data + i, \
+						fw_engine, \
+						GEN9_DECOUPLED_OP_READ); \
+		} \
+	} else { \
+		if (fw_engine) \
+			__force_wake_auto(dev_priv, fw_engine); \
+		val = __raw_i915_read##x(dev_priv, reg); \
+	} \
+	GEN6_READ_FOOTER; \
+}
+
+__gen9_decoupled_read(8)
+__gen9_decoupled_read(16)
+__gen9_decoupled_read(32)
+__gen9_decoupled_read(64)
 __gen9_read(8)
 __gen9_read(16)
 __gen9_read(32)
@@ -1107,6 +1188,34 @@ gen9_write##x(struct drm_i915_private *dev_priv, i915_reg_t reg, u##x val, \
 	GEN6_WRITE_FOOTER; \
 }
 
+#define __gen9_decoupled_write(x) \
+static void \
+gen9_decoupled_write##x(struct drm_i915_private *dev_priv, i915_reg_t reg, u##x val, \
+		bool trace) { \
+	enum forcewake_domains fw_engine; \
+	GEN6_WRITE_HEADER; \
+	fw_engine = __gen9_reg_write_fw_domains(offset); \
+	if (fw_engine && x == 32) { \
+		u32 *ptr_data = (u32 *) &val; \
+		if (__is_forcewake_active(dev_priv, fw_engine)) \
+			__raw_i915_write##x(dev_priv, reg, val); \
+		else \
+			__gen9_decoupled_mmio_access(dev_priv, \
+				offset, \
+				ptr_data, \
+				fw_engine, \
+				GEN9_DECOUPLED_OP_WRITE); \
+	} else { \
+		if (fw_engine) \
+			__force_wake_auto(dev_priv, fw_engine); \
+		__raw_i915_write##x(dev_priv, reg, val); \
+	} \
+	GEN6_WRITE_FOOTER; \
+}
+
+__gen9_decoupled_write(8)
+__gen9_decoupled_write(16)
+__gen9_decoupled_write(32)
 __gen9_write(8)
 __gen9_write(16)
 __gen9_write(32)
@@ -1328,8 +1437,13 @@ void intel_uncore_init(struct drm_i915_private *dev_priv)
 	switch (INTEL_INFO(dev_priv)->gen) {
 	default:
 	case 9:
-		ASSIGN_WRITE_MMIO_VFUNCS(gen9);
-		ASSIGN_READ_MMIO_VFUNCS(gen9);
+		if (HAS_DECOUPLED_MMIO(dev_priv)) {
+			ASSIGN_WRITE_MMIO_VFUNCS(gen9_decoupled);
+			ASSIGN_READ_MMIO_VFUNCS(gen9_decoupled);
+		} else {
+			ASSIGN_WRITE_MMIO_VFUNCS(gen9);
+			ASSIGN_READ_MMIO_VFUNCS(gen9);
+		}
 		break;
 	case 8:
 		if (IS_CHERRYVIEW(dev_priv)) {
