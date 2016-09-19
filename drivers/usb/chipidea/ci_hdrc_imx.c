@@ -147,6 +147,8 @@ static struct imx_usbmisc_data *usbmisc_get_init_data(struct device *dev)
 	if (of_find_property(np, "external-vbus-divider", NULL))
 		data->evdo = 1;
 
+	if (of_find_property(np, "disable-int60ck", NULL))
+		data->disable_int60ck = 1;
 
 	if (of_usb_get_phy_mode(np) == USBPHY_INTERFACE_MODE_ULPI)
 		data->ulpi = 1;
