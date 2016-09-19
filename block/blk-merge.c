@@ -202,6 +202,21 @@ void blk_queue_split(struct request_queue *q, struct bio **bio,
 	case REQ_OP_WRITE_SAME:
 		split = blk_bio_write_same_split(q, *bio, bs, &nsegs);
 		break;
+	case REQ_OP_ZONE_REPORT:
+	case REQ_OP_ZONE_RESET:
+	case REQ_OP_ZONE_OPEN:
+	case REQ_OP_ZONE_CLOSE:
+	case REQ_OP_ZONE_FINISH:
+		/*
+		 * For these commands, bi_size is either 0 to specify
+		 * operation on the entire block device sector range,
+		 * or a zone size for operation on a single zone.
+		 * Since a zone size may be much bigger than the maximum
+		 * allowed BIO size, we cannot use blk_bio_segment_split.
+		 */
+		split = NULL;
+		nsegs = 0;
+		break;
 	default:
 		split = blk_bio_segment_split(q, *bio, q->bio_split, &nsegs);
 		break;
@@ -241,11 +256,19 @@ static unsigned int __blk_recalc_rq_segments(struct request_queue *q,
 	 * This should probably be returning 0, but blk_add_request_payload()
 	 * (Christoph!!!!)
 	 */
-	if (bio_op(bio) == REQ_OP_DISCARD || bio_op(bio) == REQ_OP_SECURE_ERASE)
+	switch(bio_op(bio)) {
+	case REQ_OP_DISCARD:
+	case REQ_OP_SECURE_ERASE:
+	case REQ_OP_WRITE_SAME:
+	case REQ_OP_ZONE_REPORT:
+	case REQ_OP_ZONE_RESET:
+	case REQ_OP_ZONE_OPEN:
+	case REQ_OP_ZONE_CLOSE:
+	case REQ_OP_ZONE_FINISH:
 		return 1;
-
-	if (bio_op(bio) == REQ_OP_WRITE_SAME)
-		return 1;
+	default:
+		break;
+	}
 
 	fbio = bio;
 	cluster = blk_queue_cluster(q);

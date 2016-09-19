@@ -229,6 +229,26 @@ enum rq_flag_bits {
 #define REQ_HASHED		(1ULL << __REQ_HASHED)
 #define REQ_MQ_INFLIGHT		(1ULL << __REQ_MQ_INFLIGHT)
 
+/*
+ * Note on zone operations:
+ * All REQ_OP_ZONE_* commands do not have a payload and share a common
+ * interface for specifying operation range:
+ * (1) bio->bi_iter.bi_sector and bio->bi_iter.bi_size set to 0:
+ *     the command is to operate on ALL zones of the device.
+ * (2) bio->bi_iter.bi_sector is set to a zone start sector and
+ *     bio->bi_iter.bi_size is set to the zone size in bytes:
+ *     the command is to operate on only the specified zone.
+ * Operation:
+ * REQ_OP_ZONE_REPORT: Request information for all zones or for a single zone.
+ * REQ_OP_ZONE_RESET: Reset the write pointer of all zones or of a single zone.
+ * REQ_OP_ZONE_OPEN: Explicitely open the maximum allowed number of zones or
+ *                   a single zone. For the former case, the zones that will
+ *                   actually be open are chosen by the disk.
+ * REQ_OP_ZONE_CLOSE: Close all implicitely or explicitely open zones or
+ *                    a single zone.
+ * REQ_OP_ZONE_FINISH: Transition one or all open and closed zones to the full
+ *                     condition.
+ */
 enum req_op {
 	REQ_OP_READ,
 	REQ_OP_WRITE,
@@ -236,9 +256,14 @@ enum req_op {
 	REQ_OP_SECURE_ERASE,	/* request to securely erase sectors */
 	REQ_OP_WRITE_SAME,	/* write same block many times */
 	REQ_OP_FLUSH,		/* request for cache flush */
+	REQ_OP_ZONE_REPORT,	/* Get zone information */
+	REQ_OP_ZONE_RESET,	/* Reset a zone write pointer */
+	REQ_OP_ZONE_OPEN,	/* Explicitely open a zone */
+	REQ_OP_ZONE_CLOSE,	/* Close an open zone */
+	REQ_OP_ZONE_FINISH,	/* Finish a zone */
 };
 
-#define REQ_OP_BITS 3
+#define REQ_OP_BITS 4
 
 typedef unsigned int blk_qc_t;
 #define BLK_QC_T_NONE	-1U
