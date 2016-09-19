@@ -261,6 +261,15 @@ struct blk_queue_tag {
 #define BLK_SCSI_MAX_CMDS	(256)
 #define BLK_SCSI_CMD_PER_LONG	(BLK_SCSI_MAX_CMDS / (sizeof(long) * 8))
 
+/*
+ * Zoned block device models (zoned limit).
+ */
+enum blk_zoned_model {
+	BLK_ZONED_NONE,	/* Regular block device */
+	BLK_ZONED_HA, 	/* Host-aware zoned block device */
+	BLK_ZONED_HM,	/* Host-managed zoned block device */
+};
+
 struct queue_limits {
 	unsigned long		bounce_pfn;
 	unsigned long		seg_boundary_mask;
@@ -290,6 +299,7 @@ struct queue_limits {
 	unsigned char		cluster;
 	unsigned char		discard_zeroes_data;
 	unsigned char		raid_partial_stripes_expensive;
+	unsigned char		zoned;
 };
 
 struct request_queue {
@@ -625,6 +635,11 @@ static inline bool queue_is_rq_based(struct request_queue *q)
 static inline unsigned int blk_queue_cluster(struct request_queue *q)
 {
 	return q->limits.cluster;
+}
+
+static inline unsigned int blk_queue_zoned(struct request_queue *q)
+{
+	return q->limits.zoned;
 }
 
 /*
@@ -1350,6 +1365,16 @@ static inline unsigned int bdev_write_same(struct block_device *bdev)
 
 	if (q)
 		return q->limits.max_write_same_sectors;
+
+	return 0;
+}
+
+static inline unsigned int bdev_zoned(struct block_device *bdev)
+{
+	struct request_queue *q = bdev_get_queue(bdev);
+
+	if (q)
+		return blk_queue_zoned(q);
 
 	return 0;
 }
