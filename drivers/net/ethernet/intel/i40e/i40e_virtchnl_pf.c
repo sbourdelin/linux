@@ -1027,6 +1027,60 @@ static const struct net_device_ops i40e_vf_netdev_ops = {
 };
 
 /**
+ * __i40e_sw_attr_get
+ * @pf: pointer to the PF structure
+ * @attr: pointer to switchdev_attr structure
+ *
+ * Get switchdev port attributes
+ **/
+int __i40e_sw_attr_get(struct i40e_pf *pf, struct switchdev_attr *attr)
+{
+	struct i40e_hw *hw = &pf->hw;
+
+	if (!(pf->flags & I40E_FLAG_SRIOV_ENABLED))
+		return -EOPNOTSUPP;
+
+	switch (attr->id) {
+	case SWITCHDEV_ATTR_ID_PORT_PARENT_ID:
+		if (!(pf->flags & I40E_FLAG_PORT_ID_VALID))
+			return -EOPNOTSUPP;
+
+		attr->u.ppid.id_len = min_t(int, sizeof(hw->mac.port_addr),
+					    sizeof(attr->u.ppid.id));
+		memcpy(&attr->u.ppid.id, hw->mac.port_addr,
+		       attr->u.ppid.id_len);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+/**
+ * i40e_vf_netdev_sw_attr_get
+ * @dev: target device
+ * @attr: pointer to switchdev_attr structure
+ *
+ * Handler for switchdev API to get port attributes for VF Port Representor
+ **/
+static int i40e_vf_netdev_sw_attr_get(struct net_device *dev,
+				      struct switchdev_attr *attr)
+{
+	struct i40e_vf_netdev_priv *priv = netdev_priv(dev);
+	struct i40e_vf *vf = priv->vf;
+	struct i40e_pf *pf = vf->pf;
+	int err = 0;
+
+	err = __i40e_sw_attr_get(pf, attr);
+	return err;
+}
+
+static const struct switchdev_ops i40e_vf_netdev_switchdev_ops = {
+	.switchdev_port_attr_get	= i40e_vf_netdev_sw_attr_get,
+};
+
+/**
  * i40e_alloc_vf_netdev
  * @vf: pointer to the VF structure
  * @vf_num: VF number
@@ -1058,6 +1112,9 @@ int i40e_alloc_vf_netdev(struct i40e_vf *vf, u16 vf_num)
 
 	netdev->netdev_ops = &i40e_vf_netdev_ops;
 	i40e_set_vf_netdev_ethtool_ops(netdev);
+#ifdef CONFIG_NET_SWITCHDEV
+	netdev->switchdev_ops = &i40e_vf_netdev_switchdev_ops;
+#endif
 
 	netif_carrier_off(netdev);
 	netif_tx_disable(netdev);
