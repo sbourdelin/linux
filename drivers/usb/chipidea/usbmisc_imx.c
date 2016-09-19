@@ -199,30 +199,40 @@ static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
 	val |= MX53_USB_PLL_DIV_24_MHZ;
 	writel(val, usbmisc->base + MX53_USB_OTG_PHY_CTRL_1_OFFSET);
 
-	if (data->disable_oc) {
-		spin_lock_irqsave(&usbmisc->lock, flags);
-		switch (data->index) {
-		case 0:
+	spin_lock_irqsave(&usbmisc->lock, flags);
+
+	switch (data->index) {
+	case 0:
+		if (data->disable_oc) {
 			reg = usbmisc->base + MX53_USB_OTG_PHY_CTRL_0_OFFSET;
 			val = readl(reg) | MX53_BM_OVER_CUR_DIS_OTG;
-			break;
-		case 1:
+			writel(val, reg);
+		}
+		break;
+	case 1:
+		if (data->disable_oc) {
 			reg = usbmisc->base + MX53_USB_OTG_PHY_CTRL_0_OFFSET;
 			val = readl(reg) | MX53_BM_OVER_CUR_DIS_H1;
-			break;
-		case 2:
+			writel(val, reg);
+		}
+		break;
+	case 2:
+		if (data->disable_oc) {
 			reg = usbmisc->base + MX53_USB_UH2_CTRL_OFFSET;
 			val = readl(reg) | MX53_BM_OVER_CUR_DIS_UHx;
-			break;
-		case 3:
+			writel(val, reg);
+		}
+		break;
+	case 3:
+		if (data->disable_oc) {
 			reg = usbmisc->base + MX53_USB_UH3_CTRL_OFFSET;
 			val = readl(reg) | MX53_BM_OVER_CUR_DIS_UHx;
-			break;
-		}
-		if (reg && val)
 			writel(val, reg);
-		spin_unlock_irqrestore(&usbmisc->lock, flags);
+		}
+		break;
 	}
+
+	spin_unlock_irqrestore(&usbmisc->lock, flags);
 
 	return 0;
 }
