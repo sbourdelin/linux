@@ -30,6 +30,9 @@ int pcibus_to_node(struct pci_bus *bus);
 				 cpu_all_mask :				\
 				 cpumask_of_node(pcibus_to_node(bus)))
 
+int cpu_to_node(int cpu);
+#define cpu_to_node cpu_to_node
+
 #endif /* CONFIG_NUMA */
 
 #include <asm-generic/topology.h>

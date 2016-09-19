@@ -130,6 +130,24 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
 	cpu_to_node_map[cpu] = nid;
 }
 
+int cpu_to_node(int cpu)
+{
+	int nid;
+
+	/*
+	 * Return 0 for unknown mapping so that we report something
+	 * sensible if firmware doesn't supply a proper mapping.
+	 */
+	if (cpu < 0 || cpu >= NR_CPUS)
+		return 0;
+
+	nid = cpu_to_node_map[cpu];
+	if (nid == NUMA_NO_NODE)
+		nid = 0;
+	return nid;
+}
+EXPORT_SYMBOL(cpu_to_node);
+
 /**
  * numa_add_memblk - Set node id to memblk
  * @nid: NUMA node ID of the new memblk
