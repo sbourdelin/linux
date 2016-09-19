@@ -182,6 +182,9 @@ bool enable_call()
 {
 	unsigned head = (ring_size - 1) & guest.last_used_idx;
 
+	if (!(ring[head].flags & DESC_HW))
+		return false;
+
 	event->call_index = guest.last_used_idx;
 	/* Flush call index write */
 	/* Barrier D (for pairing) */
@@ -214,6 +217,9 @@ void disable_kick()
 bool enable_kick()
 {
 	unsigned head = (ring_size - 1) & host.used_idx;
+
+	if (ring[head].flags & DESC_HW)
+		return false;
 
 	event->kick_index = host.used_idx;
 	/* Barrier C (for pairing) */
