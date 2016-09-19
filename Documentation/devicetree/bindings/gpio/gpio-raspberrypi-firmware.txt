@@ -1,0 +1,22 @@
+Raspberry Pi power domain driver
+
+Required properties:
+
+- compatible:		Should be "raspberrypi,firmware-gpio"
+- gpio-controller:	Marks the device node as a gpio controller
+- #gpio-cells:		Should be <2> for GPIO number and flags
+- ngpios:		Number of GPIO lines to control.  See gpio.txt
+- firmware:		Reference to the RPi firmware device node
+- raspberrypi,firmware-gpio-offset:
+			Number the firmware uses for the first GPIO line
+			  controlled by this driver
+
+Example:
+fxl6408: firmware-gpio-128 {
+	compatible = "raspberrypi,firmware-gpio";
+	gpio-controller;
+	#gpio-cells = <2>;
+	firmware = <&firmware>;
+	ngpios = <8>;
+	raspberrypi,firmware-gpio-offset = <128>;
+};
