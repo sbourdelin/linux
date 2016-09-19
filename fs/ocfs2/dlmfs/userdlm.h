@@ -27,7 +27,6 @@
 #ifndef USERDLM_H
 #define USERDLM_H
 
-#include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/types.h>
 #include <linux/workqueue.h>

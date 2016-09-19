@@ -29,7 +29,6 @@
 
 #include <linux/signal.h>
 
-#include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/types.h>
 #include <linux/crc32.h>

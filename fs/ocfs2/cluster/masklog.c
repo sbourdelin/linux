@@ -19,7 +19,7 @@
  * Boston, MA 021110-1307, USA.
  */
 
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/kernel.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>

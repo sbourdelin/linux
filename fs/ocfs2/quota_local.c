@@ -6,7 +6,6 @@
 #include <linux/slab.h>
 #include <linux/quota.h>
 #include <linux/quotaops.h>
-#include <linux/module.h>
 
 #include <cluster/masklog.h>
 

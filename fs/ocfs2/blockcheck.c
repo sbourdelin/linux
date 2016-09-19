@@ -23,7 +23,6 @@
 #include <linux/buffer_head.h>
 #include <linux/bitops.h>
 #include <linux/debugfs.h>
-#include <linux/module.h>
 #include <linux/fs.h>
 #include <asm/byteorder.h>
 

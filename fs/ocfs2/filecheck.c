@@ -19,7 +19,6 @@
 
 #include <linux/list.h>
 #include <linux/spinlock.h>
-#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/kmod.h>
 #include <linux/fs.h>

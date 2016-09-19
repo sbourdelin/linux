@@ -33,7 +33,6 @@
 #include <linux/falloc.h>
 #include <linux/sort.h>
 #include <linux/init.h>
-#include <linux/module.h>
 #include <linux/string.h>
 #include <linux/security.h>
 
