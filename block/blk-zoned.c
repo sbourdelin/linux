@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/rbtree.h>
 #include <linux/blkdev.h>
+#include <linux/blkzoned.h>
 
 void blk_init_zones(struct request_queue *q)
 {
@@ -335,4 +336,118 @@ int blkdev_finish_zone(struct block_device *bdev,
 {
 	return blkdev_issue_zone_action(bdev, sector, REQ_OP_ZONE_FINISH,
 					gfp_mask);
+}
+
+static int blkdev_report_zone_ioctl(struct block_device *bdev,
+				    void __user *argp)
+{
+	struct blk_zone *zone;
+	struct blkzone z;
+
+	if (copy_from_user(&z, argp, sizeof(struct blkzone)))
+		return -EFAULT;
+
+	zone = blk_lookup_zone(bdev_get_queue(bdev), z.start);
+	if (!zone)
+		return -EINVAL;
+
+	memset(&z, 0, sizeof(struct blkzone));
+
+	blk_lock_zone(zone);
+
+	blk_wait_for_zone_update(zone);
+
+	z.len = zone->len;
+	z.start = zone->start;
+	z.wp = zone->wp;
+	z.type = zone->type;
+	z.cond = zone->cond;
+	z.non_seq = zone->non_seq;
+	z.reset = zone->reset;
+
+	blk_unlock_zone(zone);
+
+	if (copy_to_user(argp, &z, sizeof(struct blkzone)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static int blkdev_zone_action_ioctl(struct block_device *bdev,
+				    unsigned cmd, void __user *argp)
+{
+	unsigned int op;
+	u64 sector;
+
+	if (get_user(sector, (u64 __user *)argp))
+		return -EFAULT;
+
+	switch (cmd) {
+	case BLKRESETZONE:
+		op = REQ_OP_ZONE_RESET;
+		break;
+	case BLKOPENZONE:
+		op = REQ_OP_ZONE_OPEN;
+		break;
+	case BLKCLOSEZONE:
+		op = REQ_OP_ZONE_CLOSE;
+		break;
+	case BLKFINISHZONE:
+		op = REQ_OP_ZONE_FINISH;
+		break;
+	}
+
+	return blkdev_issue_zone_action(bdev, sector, op, GFP_KERNEL);
+}
+
+/**
+ * Called from blkdev_ioctl.
+ */
+int blkdev_zone_ioctl(struct block_device *bdev, fmode_t mode,
+		      unsigned cmd, unsigned long arg)
+{
+	void __user *argp = (void __user *)arg;
+	struct request_queue *q;
+	int ret;
+
+	if (!argp)
+		return -EINVAL;
+
+	q = bdev_get_queue(bdev);
+	if (!q)
+		return -ENXIO;
+
+	if (!blk_queue_zoned(q))
+		return -ENOTTY;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+
+	switch (cmd) {
+	case BLKREPORTZONE:
+		ret = blkdev_report_zone_ioctl(bdev, argp);
+		break;
+	case BLKUPDATEZONES:
+		if (!(mode & FMODE_WRITE)) {
+			ret = -EBADF;
+			break;
+		}
+		ret = blkdev_update_zones(bdev, GFP_KERNEL);
+		break;
+	case BLKRESETZONE:
+	case BLKOPENZONE:
+	case BLKCLOSEZONE:
+	case BLKFINISHZONE:
+		if (!(mode & FMODE_WRITE)) {
+			ret = -EBADF;
+			break;
+		}
+		ret = blkdev_zone_action_ioctl(bdev, cmd, argp);
+		break;
+	default:
+		ret = -ENOTTY;
+		break;
+	}
+
+	return ret;
 }

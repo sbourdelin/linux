@@ -3,6 +3,7 @@
 #include <linux/export.h>
 #include <linux/gfp.h>
 #include <linux/blkpg.h>
+#include <linux/blkzoned.h>
 #include <linux/hdreg.h>
 #include <linux/backing-dev.h>
 #include <linux/fs.h>
@@ -513,6 +514,13 @@ int blkdev_ioctl(struct block_device *bdev, fmode_t mode, unsigned cmd,
 				BLKDEV_DISCARD_SECURE);
 	case BLKZEROOUT:
 		return blk_ioctl_zeroout(bdev, mode, arg);
+	case BLKUPDATEZONES:
+	case BLKREPORTZONE:
+	case BLKRESETZONE:
+	case BLKOPENZONE:
+	case BLKCLOSEZONE:
+	case BLKFINISHZONE:
+		return blkdev_zone_ioctl(bdev, mode, cmd, arg);
 	case HDIO_GETGEO:
 		return blkdev_getgeo(bdev, argp);
 	case BLKRAGET:

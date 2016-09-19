@@ -405,9 +405,16 @@ extern int blkdev_reset_zone(struct block_device *, sector_t, gfp_t);
 extern int blkdev_open_zone(struct block_device *, sector_t, gfp_t);
 extern int blkdev_close_zone(struct block_device *, sector_t, gfp_t);
 extern int blkdev_finish_zone(struct block_device *, sector_t, gfp_t);
+extern int blkdev_zone_ioctl(struct block_device *, fmode_t, unsigned int,
+			     unsigned long);
 #else /* CONFIG_BLK_DEV_ZONED */
 static inline void blk_init_zones(struct request_queue *q) { };
 static inline void blk_drop_zones(struct request_queue *q) { };
+static inline int blkdev_zone_ioctl(struct block_device *bdev, fmode_t mode,
+				    unsigned cmd, unsigned long arg)
+{
+	return -ENOTTY;
+}
 #endif /* CONFIG_BLK_DEV_ZONED */
 
 struct request_queue {
