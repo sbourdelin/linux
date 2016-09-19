@@ -131,7 +131,7 @@ static int set_platform_caps(struct pp_hwmgr *hwmgr, uint32_t powerplay_caps)
 /**
  * Private Function to get the PowerPlay Table Address.
  */
-const void *get_powerplay_table(struct pp_hwmgr *hwmgr)
+static const void *get_powerplay_table(struct pp_hwmgr *hwmgr)
 {
 	int index = GetIndexIntoMasterTable(DATA, PowerPlayInfo);
 

@@ -136,7 +136,7 @@ static int iceland_read_clock_registers(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int iceland_get_memory_type(struct pp_hwmgr *hwmgr)
+static int iceland_get_memory_type(struct pp_hwmgr *hwmgr)
 {
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 	uint32_t temp;
@@ -162,7 +162,7 @@ int iceland_update_uvd_dpm(struct pp_hwmgr *hwmgr, bool bgate)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int iceland_enable_acpi_power_management(struct pp_hwmgr *hwmgr)
+static int iceland_enable_acpi_power_management(struct pp_hwmgr *hwmgr)
 {
 	PHM_WRITE_VFPF_INDIRECT_FIELD(hwmgr->device, CGS_IND_REG__SMC, GENERAL_PWRMGT, STATIC_PM_EN, 1);
 
@@ -175,7 +175,7 @@ int iceland_enable_acpi_power_management(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int iceland_get_mc_microcode_version(struct pp_hwmgr *hwmgr)
+static int iceland_get_mc_microcode_version(struct pp_hwmgr *hwmgr)
 {
 	cgs_write_register(hwmgr->device, mmMC_SEQ_IO_DEBUG_INDEX, 0x9F);
 
@@ -262,7 +262,7 @@ static void iceland_trim_voltage_table_to_fit_state_table(
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int iceland_enable_voltage_control(struct pp_hwmgr *hwmgr)
+static int iceland_enable_voltage_control(struct pp_hwmgr *hwmgr)
 {
 	/* enable voltage control */
 	PHM_WRITE_VFPF_INDIRECT_FIELD(hwmgr->device, CGS_IND_REG__SMC, GENERAL_PWRMGT, VOLT_PWRMGT_EN, 1);
@@ -298,7 +298,7 @@ static int iceland_get_svi2_voltage_table(struct pp_hwmgr *hwmgr,
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int iceland_construct_voltage_tables(struct pp_hwmgr *hwmgr)
+static int iceland_construct_voltage_tables(struct pp_hwmgr *hwmgr)
 {
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 	int result;
@@ -380,12 +380,12 @@ int iceland_construct_voltage_tables(struct pp_hwmgr *hwmgr)
 
 /*---------------------------MC----------------------------*/
 
-uint8_t iceland_get_memory_module_index(struct pp_hwmgr *hwmgr)
+static uint8_t iceland_get_memory_module_index(struct pp_hwmgr *hwmgr)
 {
 	return (uint8_t) (0xFF & (cgs_read_register(hwmgr->device, mmBIOS_SCRATCH_4) >> 16));
 }
 
-bool iceland_check_s0_mc_reg_index(uint16_t inReg, uint16_t *outReg)
+static bool iceland_check_s0_mc_reg_index(uint16_t inReg, uint16_t *outReg)
 {
 	bool result = true;
 
@@ -478,7 +478,7 @@ bool iceland_check_s0_mc_reg_index(uint16_t inReg, uint16_t *outReg)
 	return result;
 }
 
-int iceland_set_s0_mc_reg_index(phw_iceland_mc_reg_table *table)
+static int iceland_set_s0_mc_reg_index(phw_iceland_mc_reg_table *table)
 {
 	uint32_t i;
 	uint16_t address;
@@ -491,7 +491,9 @@ int iceland_set_s0_mc_reg_index(phw_iceland_mc_reg_table *table)
 	return 0;
 }
 
-int iceland_copy_vbios_smc_reg_table(const pp_atomctrl_mc_reg_table *table, phw_iceland_mc_reg_table *ni_table)
+static int
+iceland_copy_vbios_smc_reg_table(const pp_atomctrl_mc_reg_table *table,
+		phw_iceland_mc_reg_table *ni_table)
 {
 	uint8_t i, j;
 
@@ -690,7 +692,8 @@ static int iceland_initialize_mc_reg_table(struct pp_hwmgr *hwmgr)
  * @param   hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int iceland_program_static_screen_threshold_parameters(struct pp_hwmgr *hwmgr)
+static int
+iceland_program_static_screen_threshold_parameters(struct pp_hwmgr *hwmgr)
 {
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 
@@ -712,7 +715,7 @@ int iceland_program_static_screen_threshold_parameters(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int iceland_enable_display_gap(struct pp_hwmgr *hwmgr)
+static int iceland_enable_display_gap(struct pp_hwmgr *hwmgr)
 {
 	uint32_t display_gap = cgs_read_ind_register(hwmgr->device,
 							CGS_IND_REG__SMC, ixCG_DISPLAY_GAP_CNTL);
@@ -735,7 +738,7 @@ int iceland_enable_display_gap(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int iceland_program_voting_clients(struct pp_hwmgr *hwmgr)
+static int iceland_program_voting_clients(struct pp_hwmgr *hwmgr)
 {
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 
@@ -781,7 +784,7 @@ static int iceland_upload_firmware(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int iceland_process_firmware_header(struct pp_hwmgr *hwmgr)
+static int iceland_process_firmware_header(struct pp_hwmgr *hwmgr)
 {
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 
@@ -873,7 +876,7 @@ int iceland_process_firmware_header(struct pp_hwmgr *hwmgr)
 * Copy one arb setting to another and then switch the active set.
 * arbFreqSrc and arbFreqDest is one of the MC_CG_ARB_FREQ_Fx constants.
 */
-int iceland_copy_and_switch_arb_sets(struct pp_hwmgr *hwmgr,
+static int iceland_copy_and_switch_arb_sets(struct pp_hwmgr *hwmgr,
 		uint32_t arbFreqSrc, uint32_t arbFreqDest)
 {
 	uint32_t mc_arb_dram_timing;
@@ -930,7 +933,7 @@ int iceland_copy_and_switch_arb_sets(struct pp_hwmgr *hwmgr,
  * @return   always 0
  * This function is to be called from the SetPowerState table.
  */
-int iceland_initial_switch_from_arb_f0_to_f1(struct pp_hwmgr *hwmgr)
+static int iceland_initial_switch_from_arb_f0_to_f1(struct pp_hwmgr *hwmgr)
 {
 	return iceland_copy_and_switch_arb_sets(hwmgr, MC_CG_ARB_FREQ_F0, MC_CG_ARB_FREQ_F1);
 }
@@ -1414,7 +1417,7 @@ int iceland_populate_vddc_vid(struct pp_hwmgr *hwmgr)
  * @return   always 0
  */
 
-int iceland_populate_smc_voltage_tables(struct pp_hwmgr *hwmgr,
+static int iceland_populate_smc_voltage_tables(struct pp_hwmgr *hwmgr,
 	SMU71_Discrete_DpmTable *table)
 {
 	int result;
@@ -1456,7 +1459,7 @@ static uint32_t iceland_get_dpm_level_enable_mask_value(
 	return mask_value;
 }
 
-int iceland_populate_memory_timing_parameters(
+static int iceland_populate_memory_timing_parameters(
 		struct pp_hwmgr *hwmgr,
 		uint32_t engine_clock,
 		uint32_t memory_clock,
@@ -1492,7 +1495,7 @@ int iceland_populate_memory_timing_parameters(
  * @return   always 0
  * This function is to be called from the SetPowerState table.
  */
-int iceland_program_memory_timing_parameters(struct pp_hwmgr *hwmgr)
+static int iceland_program_memory_timing_parameters(struct pp_hwmgr *hwmgr)
 {
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 	int result = 0;
@@ -2014,7 +2017,8 @@ static int iceland_populate_single_memory_level(
  * @param    mclk        the MCLK value to be used in the decision if MVDD should be high or low.
  * @param    voltage     the SMC VOLTAGE structure to be populated
  */
-int iceland_populate_mvdd_value(struct pp_hwmgr *hwmgr, uint32_t mclk, SMU71_Discrete_VoltageLevel *voltage)
+static int iceland_populate_mvdd_value(struct pp_hwmgr *hwmgr, uint32_t mclk,
+		SMU71_Discrete_VoltageLevel *voltage)
 {
 	const iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 	uint32_t i = 0;
@@ -2193,7 +2197,7 @@ static int iceland_find_boot_level(struct iceland_single_dpm_table *table, uint3
  * @param    engine_clock the engine clock to use to populate the structure
  * @param    sclk        the SMC SCLK structure to be populated
  */
-int iceland_calculate_sclk_params(struct pp_hwmgr *hwmgr,
+static int iceland_calculate_sclk_params(struct pp_hwmgr *hwmgr,
 		uint32_t engine_clock, SMU71_Discrete_GraphicsLevel *sclk)
 {
 	const iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
@@ -2606,7 +2610,7 @@ static int iceland_populate_smc_initial_state(struct pp_hwmgr *hwmgr)
  * @param    pInput  the pointer to input data (PowerState)
  * @return   always 0
  */
-int iceland_init_smc_table(struct pp_hwmgr *hwmgr)
+static int iceland_init_smc_table(struct pp_hwmgr *hwmgr)
 {
 	int result;
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
@@ -2791,7 +2795,8 @@ int iceland_init_smc_table(struct pp_hwmgr *hwmgr)
 	return result;
 }
 
-int iceland_populate_mc_reg_address(struct pp_hwmgr *hwmgr, SMU71_Discrete_MCRegisters *mc_reg_table)
+static int iceland_populate_mc_reg_address(struct pp_hwmgr *hwmgr,
+		SMU71_Discrete_MCRegisters *mc_reg_table)
 {
 	const struct iceland_hwmgr *data = (struct iceland_hwmgr *)(hwmgr->backend);
 
@@ -2815,7 +2820,7 @@ int iceland_populate_mc_reg_address(struct pp_hwmgr *hwmgr, SMU71_Discrete_MCReg
 }
 
 /* convert register values from driver to SMC format */
-void iceland_convert_mc_registers(
+static void iceland_convert_mc_registers(
 	const phw_iceland_mc_reg_entry * pEntry,
 	SMU71_Discrete_MCRegisterSet *pData,
 	uint32_t numEntries, uint32_t validflag)
@@ -2831,7 +2836,7 @@ void iceland_convert_mc_registers(
 }
 
 /* find the entry in the memory range table, then populate the value to SMC's iceland_mc_reg_table */
-int iceland_convert_mc_reg_table_entry_to_smc(
+static int iceland_convert_mc_reg_table_entry_to_smc(
 		struct pp_hwmgr *hwmgr,
 		const uint32_t memory_clock,
 		SMU71_Discrete_MCRegisterSet *mc_reg_table_data
@@ -2856,7 +2861,7 @@ int iceland_convert_mc_reg_table_entry_to_smc(
 	return 0;
 }
 
-int iceland_convert_mc_reg_table_to_smc(struct pp_hwmgr *hwmgr,
+static int iceland_convert_mc_reg_table_to_smc(struct pp_hwmgr *hwmgr,
 		SMU71_Discrete_MCRegisters *mc_reg_table)
 {
 	int result = 0;
@@ -2878,7 +2883,7 @@ int iceland_convert_mc_reg_table_to_smc(struct pp_hwmgr *hwmgr,
 	return result;
 }
 
-int iceland_populate_initial_mc_reg_table(struct pp_hwmgr *hwmgr)
+static int iceland_populate_initial_mc_reg_table(struct pp_hwmgr *hwmgr)
 {
 	int result;
 	struct iceland_hwmgr *data = (struct iceland_hwmgr *)(hwmgr->backend);
@@ -2896,21 +2901,22 @@ int iceland_populate_initial_mc_reg_table(struct pp_hwmgr *hwmgr)
 			(uint8_t *)&data->mc_reg_table, sizeof(SMU71_Discrete_MCRegisters), data->sram_end);
 }
 
-int iceland_notify_smc_display_change(struct pp_hwmgr *hwmgr, bool has_display)
+static int
+iceland_notify_smc_display_change(struct pp_hwmgr *hwmgr, bool has_display)
 {
 	PPSMC_Msg msg = has_display? (PPSMC_Msg)PPSMC_HasDisplay : (PPSMC_Msg)PPSMC_NoDisplay;
 
 	return (smum_send_msg_to_smc(hwmgr->smumgr, msg) == 0) ?  0 : -1;
 }
 
-int iceland_enable_sclk_control(struct pp_hwmgr *hwmgr)
+static int iceland_enable_sclk_control(struct pp_hwmgr *hwmgr)
 {
 	PHM_WRITE_VFPF_INDIRECT_FIELD(hwmgr->device, CGS_IND_REG__SMC, SCLK_PWRMGT_CNTL, SCLK_PWRMGT_OFF, 0);
 
 	return 0;
 }
 
-int iceland_enable_sclk_mclk_dpm(struct pp_hwmgr *hwmgr)
+static int iceland_enable_sclk_mclk_dpm(struct pp_hwmgr *hwmgr)
 {
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 
@@ -2954,7 +2960,7 @@ int iceland_enable_sclk_mclk_dpm(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int iceland_start_dpm(struct pp_hwmgr *hwmgr)
+static int iceland_start_dpm(struct pp_hwmgr *hwmgr)
 {
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 
@@ -3905,7 +3911,7 @@ static int iceland_get_num_of_entries(struct pp_hwmgr *hwmgr)
 
 static const unsigned long PhwIceland_Magic = (unsigned long)(PHM_VIslands_Magic);
 
-struct iceland_power_state *cast_phw_iceland_power_state(
+static struct iceland_power_state *cast_phw_iceland_power_state(
 				  struct pp_hw_power_state *hw_ps)
 {
 	if (hw_ps == NULL)
@@ -4077,7 +4083,7 @@ static bool iceland_is_dpm_running(struct pp_hwmgr *hwmgr)
  * @param    n     :  DPM level
  * @return   The response that came from the SMC.
  */
-int iceland_dpm_force_state(struct pp_hwmgr *hwmgr, uint32_t n)
+static int iceland_dpm_force_state(struct pp_hwmgr *hwmgr, uint32_t n)
 {
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 
@@ -4100,7 +4106,7 @@ int iceland_dpm_force_state(struct pp_hwmgr *hwmgr, uint32_t n)
  * @param    n     :  DPM level
  * @return   The response that came from the SMC.
  */
-int iceland_dpm_force_state_mclk(struct pp_hwmgr *hwmgr, uint32_t n)
+static int iceland_dpm_force_state_mclk(struct pp_hwmgr *hwmgr, uint32_t n)
 {
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 
@@ -4123,7 +4129,7 @@ int iceland_dpm_force_state_mclk(struct pp_hwmgr *hwmgr, uint32_t n)
  * @param    n     :  DPM level
  * @return   The response that came from the SMC.
  */
-int iceland_dpm_force_state_pcie(struct pp_hwmgr *hwmgr, uint32_t n)
+static int iceland_dpm_force_state_pcie(struct pp_hwmgr *hwmgr, uint32_t n)
 {
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 
@@ -4229,7 +4235,7 @@ static int iceland_force_dpm_lowest(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int iceland_unforce_dpm_levels(struct pp_hwmgr *hwmgr)
+static int iceland_unforce_dpm_levels(struct pp_hwmgr *hwmgr)
 {
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 
@@ -4293,7 +4299,7 @@ static int iceland_force_dpm_level(struct pp_hwmgr *hwmgr,
 	return ret;
 }
 
-const struct iceland_power_state *cast_const_phw_iceland_power_state(
+static const struct iceland_power_state *cast_const_phw_iceland_power_state(
 				 const struct pp_hw_power_state *hw_ps)
 {
 	if (hw_ps == NULL)
@@ -4629,7 +4635,7 @@ static int iceland_update_vce_dpm(struct pp_hwmgr *hwmgr, const void *input)
 	return 0;
 }
 
-int iceland_update_sclk_threshold(struct pp_hwmgr *hwmgr)
+static int iceland_update_sclk_threshold(struct pp_hwmgr *hwmgr)
 {
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
 
@@ -4769,7 +4775,7 @@ static int iceland_notify_link_speed_change_after_state_change(struct pp_hwmgr *
 	return 0;
 }
 
-int iceland_upload_dpm_level_enable_mask(struct pp_hwmgr *hwmgr)
+static int iceland_upload_dpm_level_enable_mask(struct pp_hwmgr *hwmgr)
 {
 	PPSMC_Result result;
 	iceland_hwmgr *data = (iceland_hwmgr *)(hwmgr->backend);
@@ -5142,7 +5148,8 @@ iceland_print_current_perforce_level(struct pp_hwmgr *hwmgr, struct seq_file *m)
 	seq_printf(m, "vce    %sabled\n", data->vce_power_gated ? "dis" : "en");
 }
 
-int iceland_notify_smc_display_config_after_ps_adjustment(struct pp_hwmgr *hwmgr)
+static int
+iceland_notify_smc_display_config_after_ps_adjustment(struct pp_hwmgr *hwmgr)
 {
 	uint32_t num_active_displays = 0;
 	struct cgs_display_info info = {0};
@@ -5166,7 +5173,7 @@ int iceland_notify_smc_display_config_after_ps_adjustment(struct pp_hwmgr *hwmgr
 * @param    hwmgr  the address of the powerplay hardware manager.
 * @return   always OK
 */
-int iceland_program_display_gap(struct pp_hwmgr *hwmgr)
+static int iceland_program_display_gap(struct pp_hwmgr *hwmgr)
 {
 	uint32_t num_active_displays = 0;
 	uint32_t display_gap = cgs_read_ind_register(hwmgr->device, CGS_IND_REG__SMC, ixCG_DISPLAY_GAP_CNTL);
@@ -5209,7 +5216,7 @@ int iceland_program_display_gap(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int iceland_display_configuration_changed_task(struct pp_hwmgr *hwmgr)
+static int iceland_display_configuration_changed_task(struct pp_hwmgr *hwmgr)
 {
 	iceland_program_display_gap(hwmgr);
 
@@ -5347,7 +5354,8 @@ static inline bool iceland_are_power_levels_equal(const struct iceland_performan
 		  (pl1->pcie_lane == pl2->pcie_lane));
 }
 
-int iceland_check_states_equal(struct pp_hwmgr *hwmgr, const struct pp_hw_power_state *pstate1,
+static int iceland_check_states_equal(struct pp_hwmgr *hwmgr,
+		const struct pp_hw_power_state *pstate1,
 		const struct pp_hw_power_state *pstate2, bool *equal)
 {
 	const struct iceland_power_state *psa = cast_const_phw_iceland_power_state(pstate1);
