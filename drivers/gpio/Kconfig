@@ -136,6 +136,14 @@ config GPIO_BCM_KONA
 	help
 	  Turn on GPIO support for Broadcom "Kona" chips.
 
+config GPIO_RASPBERRYPI
+	tristate "Raspberry Pi firmware-based GPIO access"
+	depends on OF_GPIO && RASPBERRYPI_FIRMWARE && (ARCH_BCM2835 || COMPILE_TEST)
+	help
+	  Turns on support for using the Raspberry Pi firmware to
+	  control GPIO pins.  Used for access to the FXL6408 GPIO
+	  expander on the Pi 3.
+
 config GPIO_BRCMSTB
 	tristate "BRCMSTB GPIO support"
 	default y if (ARCH_BRCMSTB || BMIPS_GENERIC)
