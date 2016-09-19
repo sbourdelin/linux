@@ -179,8 +179,12 @@ void queued_spin_unlock_wait(struct qspinlock *lock)
 	 * any unlock is good. And need not _sync, as ->val is set by the SC in
 	 * unlock(), any loads in lock() must see the correct value.
 	 */
-	while (atomic_read(&lock->val) & _Q_LOCKED_MASK)
-		cpu_relax();
+	while (atomic_read(&lock->val) & _Q_LOCKED_MASK) {
+		HMT_low();
+		if (SHARED_PROCESSOR)
+			__spin_yield_cpu(spin_lock_holder(lock), 0);
+	}
+	HMT_medium();
 done:
 	smp_mb();
 }
