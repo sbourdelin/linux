@@ -24,6 +24,7 @@
 #include <linux/rcupdate.h>
 #include <linux/percpu-refcount.h>
 #include <linux/scatterlist.h>
+#include <linux/bit_spinlock.h>
 
 struct module;
 struct scsi_ioctl_command;
@@ -302,6 +303,113 @@ struct queue_limits {
 	unsigned char		zoned;
 };
 
+#ifdef CONFIG_BLK_DEV_ZONED
+
+enum blk_zone_type {
+	BLK_ZONE_TYPE_UNKNOWN,
+	BLK_ZONE_TYPE_CONVENTIONAL,
+	BLK_ZONE_TYPE_SEQWRITE_REQ,
+	BLK_ZONE_TYPE_SEQWRITE_PREF,
+};
+
+enum blk_zone_cond {
+	BLK_ZONE_COND_NO_WP,
+	BLK_ZONE_COND_EMPTY,
+	BLK_ZONE_COND_IMP_OPEN,
+	BLK_ZONE_COND_EXP_OPEN,
+	BLK_ZONE_COND_CLOSED,
+	BLK_ZONE_COND_READONLY = 0xd,
+	BLK_ZONE_COND_FULL,
+	BLK_ZONE_COND_OFFLINE,
+};
+
+enum blk_zone_flags {
+	BLK_ZONE_LOCKED,
+	BLK_ZONE_WRITE_LOCKED,
+	BLK_ZONE_IN_UPDATE,
+};
+
+/**
+ * Zone descriptor. On 64-bits architectures,
+ * this will align on sizeof(long), i.e. 64 B,
+ * and use 64 B.
+ */
+struct blk_zone {
+	struct rb_node	node;
+	unsigned long 	flags;
+	sector_t	len;
+	sector_t 	start;
+	sector_t 	wp;
+	unsigned int 	type : 4;
+	unsigned int	cond : 4;
+	unsigned int	non_seq : 1;
+	unsigned int	reset : 1;
+};
+
+#define blk_zone_is_seq_req(z)	((z)->type == BLK_ZONE_TYPE_SEQWRITE_REQ)
+#define blk_zone_is_seq_pref(z)	((z)->type == BLK_ZONE_TYPE_SEQWRITE_PREF)
+#define blk_zone_is_seq(z)	(blk_zone_is_seq_req(z) || blk_zone_is_seq_pref(z))
+#define blk_zone_is_conv(z) 	((z)->type == BLK_ZONE_TYPE_CONVENTIONAL)
+
+#define blk_zone_is_readonly(z)	((z)->cond == BLK_ZONE_COND_READONLY)
+#define blk_zone_is_offline(z) 	((z)->cond == BLK_ZONE_COND_OFFLINE)
+#define blk_zone_is_full(z)	((z)->cond == BLK_ZONE_COND_FULL)
+#define blk_zone_is_empty(z)	((z)->cond == BLK_ZONE_COND_EMPTY)
+#define blk_zone_is_open(z)	((z)->cond == BLK_ZONE_COND_EXP_OPEN)
+
+static inline void blk_lock_zone(struct blk_zone *zone)
+{
+	bit_spin_lock(BLK_ZONE_LOCKED, &zone->flags);
+}
+
+static inline int blk_trylock_zone(struct blk_zone *zone)
+{
+	return bit_spin_trylock(BLK_ZONE_LOCKED, &zone->flags);
+}
+
+static inline void blk_unlock_zone(struct blk_zone *zone)
+{
+	bit_spin_unlock(BLK_ZONE_LOCKED, &zone->flags);
+}
+
+static inline int blk_try_write_lock_zone(struct blk_zone *zone)
+{
+	return !test_and_set_bit(BLK_ZONE_WRITE_LOCKED, &zone->flags);
+}
+
+static inline void blk_write_unlock_zone(struct blk_zone *zone)
+{
+	clear_bit_unlock(BLK_ZONE_WRITE_LOCKED, &zone->flags);
+	smp_mb__after_atomic();
+}
+
+extern void blk_init_zones(struct request_queue *);
+extern void blk_drop_zones(struct request_queue *);
+extern struct blk_zone *blk_insert_zone(struct request_queue *,
+					struct blk_zone *);
+extern struct blk_zone *blk_lookup_zone(struct request_queue *, sector_t);
+
+extern int blkdev_update_zones(struct block_device *, gfp_t);
+extern void blk_wait_for_zone_update(struct blk_zone *);
+#define blk_zone_in_update(z)	test_bit(BLK_ZONE_IN_UPDATE, &(z)->flags)
+static inline void blk_clear_zone_update(struct blk_zone *zone)
+{
+	clear_bit_unlock(BLK_ZONE_IN_UPDATE, &zone->flags);
+	smp_mb__after_atomic();
+	wake_up_bit(&zone->flags, BLK_ZONE_IN_UPDATE);
+}
+
+extern struct blk_zone *blkdev_report_zone(struct block_device *,
+					   sector_t, bool, gfp_t);
+extern int blkdev_reset_zone(struct block_device *, sector_t, gfp_t);
+extern int blkdev_open_zone(struct block_device *, sector_t, gfp_t);
+extern int blkdev_close_zone(struct block_device *, sector_t, gfp_t);
+extern int blkdev_finish_zone(struct block_device *, sector_t, gfp_t);
+#else /* CONFIG_BLK_DEV_ZONED */
+static inline void blk_init_zones(struct request_queue *q) { };
+static inline void blk_drop_zones(struct request_queue *q) { };
+#endif /* CONFIG_BLK_DEV_ZONED */
+
 struct request_queue {
 	/*
 	 * Together with queue_head for cacheline sharing
@@ -402,6 +510,11 @@ struct request_queue {
 	struct device		*dev;
 	int			rpm_status;
 	unsigned int		nr_pending;
+#endif
+
+#ifdef CONFIG_BLK_DEV_ZONED
+	spinlock_t		zones_lock;
+	struct rb_root		zones;
 #endif
 
 	/*

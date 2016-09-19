@@ -590,6 +590,8 @@ void blk_cleanup_queue(struct request_queue *q)
 		blk_mq_free_queue(q);
 	percpu_ref_exit(&q->q_usage_counter);
 
+	blk_drop_zones(q);
+
 	spin_lock_irq(lock);
 	if (q->queue_lock != &q->__queue_lock)
 		q->queue_lock = &q->__queue_lock;
@@ -727,6 +729,8 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 	INIT_LIST_HEAD(&q->blkg_list);
 #endif
 	INIT_DELAYED_WORK(&q->delay_work, blk_delay_work);
+
+	blk_init_zones(q);
 
 	kobject_init(&q->kobj, &blk_queue_ktype);
 
