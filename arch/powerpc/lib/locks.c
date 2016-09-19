@@ -23,6 +23,65 @@
 #include <asm/hvcall.h>
 #include <asm/smp.h>
 
+/*
+ * confer our slices to a specified cpu and return. If it is already running or
+ * cpu is -1, then we will check confer. If confer is NULL, we will return
+ * otherwise we confer our slices to lpar.
+ */
+void __spin_yield_cpu(int cpu, int confer)
+{
+	unsigned int holder_cpu = cpu, yield_count;
+
+	if (cpu == -1)
+		goto yield_to_lpar;
+
+	BUG_ON(holder_cpu >= nr_cpu_ids);
+	yield_count = be32_to_cpu(lppaca_of(holder_cpu).yield_count);
+
+	/* if cpu is running, confer slices to lpar conditionally*/
+	if ((yield_count & 1) == 0)
+		goto yield_to_lpar;
+
+	plpar_hcall_norets(H_CONFER,
+		get_hard_smp_processor_id(holder_cpu), yield_count);
+	return;
+
+yield_to_lpar:
+	if (confer)
+		plpar_hcall_norets(H_CONFER, -1, 0);
+}
+EXPORT_SYMBOL_GPL(__spin_yield_cpu);
+
+void __spin_wake_cpu(int cpu)
+{
+	unsigned int holder_cpu = cpu;
+
+	BUG_ON(holder_cpu >= nr_cpu_ids);
+	/*
+	 * NOTE: we should always do this hcall regardless of
+	 * the yield_count of the holder_cpu.
+	 * as thers might be a case like below;
+	 * CPU 	1				2
+	 *				yielded = true
+	 *	if (yielded)
+	 * 	__spin_wake_cpu()
+	 * 				__spin_yield_cpu()
+	 *
+	 * So we might lose a wake if we check the yield_count and
+	 * return directly if the holder_cpu is running.
+	 * IOW. do NOT code like below.
+	 *  yield_count = be32_to_cpu(lppaca_of(holder_cpu).yield_count);
+	 *  if ((yield_count & 1) == 0)
+	 *  	return;
+	 *
+	 * a PROD hcall marks the target_cpu proded, which cause the next cede or confer
+	 * called on the target_cpu invalid.
+	 */
+	plpar_hcall_norets(H_PROD,
+		get_hard_smp_processor_id(holder_cpu));
+}
+EXPORT_SYMBOL_GPL(__spin_wake_cpu);
+
 #ifndef CONFIG_QUEUED_SPINLOCKS
 void __spin_yield(arch_spinlock_t *lock)
 {
