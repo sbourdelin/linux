@@ -260,6 +260,7 @@ struct intel_panel {
 		u32 level;
 		u32 min;
 		u32 max;
+		bool pwm_alternate_increment;
 		bool enabled;
 		bool combination_mode;	/* gen 2/4 only */
 		bool active_low_pwm;
