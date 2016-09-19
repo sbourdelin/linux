@@ -2886,8 +2886,13 @@ static inline void exit_thread(struct task_struct *tsk)
 extern void exit_files(struct task_struct *);
 extern void __cleanup_sighand(struct sighand_struct *);
 
+#ifdef CONFIG_POSIX_TIMERS
 extern void exit_itimers(struct signal_struct *);
 extern void flush_itimer_signals(void);
+#else
+static inline void exit_itimers(struct signal_struct *s) {}
+static inline void flush_itimer_signals(void) {}
+#endif
 
 extern void do_group_exit(int);
 
@@ -3335,7 +3340,12 @@ static __always_inline bool need_resched(void)
  * Thread group CPU time accounting.
  */
 void thread_group_cputime(struct task_struct *tsk, struct task_cputime *times);
+#ifdef CONFIG_POSIX_TIMERS
 void thread_group_cputimer(struct task_struct *tsk, struct task_cputime *times);
+#else
+static inline void thread_group_cputimer(struct task_struct *tsk,
+					 struct task_cputime *times) {}
+#endif
 
 /*
  * Reevaluate whether the task has signals pending delivery.

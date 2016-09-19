@@ -10,7 +10,7 @@ config PTP_1588_CLOCK_SELECTED
 config PTP_1588_CLOCK
 	tristate "PTP clock support"
 	default PTP_1588_CLOCK_SELECTED
-	depends on NET
+	depends on NET && POSIX_TIMERS
 	select PPS
 	select NET_PTP_CLASSIFY
 	help
