@@ -44,6 +44,8 @@ alternative_else_nop_endif
 	ldp	x14, x15, [x1, #96]
 	ldp	x16, x17, [x1, #112]
 
+	dmb	nshld // In case x0 (for stnp) is dependent on a load
+
 	mov	x18, #(PAGE_SIZE - 128)
 	add	x1, x1, #128
 1:

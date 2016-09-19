@@ -673,6 +673,7 @@ ENTRY(cpu_switch_to)
 	ldp	x27, x28, [x8], #16
 	ldp	x29, x9, [x8], #16
 	ldr	lr, [x8]
+	dmb	nshld	// Existence of instructions with loose load-use dependencies (e.g. ldnp/stnp) make this barrier necessary
 	mov	sp, x9
 	and	x9, x9, #~(THREAD_SIZE - 1)
 	msr	sp_el0, x9
