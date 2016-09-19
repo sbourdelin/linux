@@ -4308,7 +4308,8 @@ static const struct pci_error_handlers cxgb4_eeh = {
 static inline bool is_x_10g_port(const struct link_config *lc)
 {
 	return (lc->supported & FW_PORT_CAP_SPEED_10G) != 0 ||
-	       (lc->supported & FW_PORT_CAP_SPEED_40G) != 0;
+	       (lc->supported & FW_PORT_CAP_SPEED_40G) != 0 ||
+	       (lc->supported & FW_PORT_CAP_SPEED_100G) != 0;
 }
 
 static inline void init_rspq(struct adapter *adap, struct sge_rspq *q,

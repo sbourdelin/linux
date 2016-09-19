@@ -3628,7 +3628,7 @@ void t4_ulprx_read_la(struct adapter *adap, u32 *la_buf)
 
 #define ADVERT_MASK (FW_PORT_CAP_SPEED_100M | FW_PORT_CAP_SPEED_1G |\
 		     FW_PORT_CAP_SPEED_10G | FW_PORT_CAP_SPEED_40G | \
-		     FW_PORT_CAP_ANEG)
+		     FW_PORT_CAP_SPEED_100G | FW_PORT_CAP_ANEG)
 
 /**
  *	t4_link_l1cfg - apply link configuration to MAC/PHY
