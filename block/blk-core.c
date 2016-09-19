@@ -2341,6 +2341,17 @@ void blk_account_io_start(struct request *rq, bool new_io)
 	part_stat_unlock();
 }
 
+static void blk_prep_end_request(struct request *rq, int error)
+{
+	/*
+	 * Mark this request as started so we don't trigger
+	 * any debug logic in the end I/O path.
+	 */
+        rq->cmd_flags |= REQ_QUIET;
+        blk_start_request(rq);
+        __blk_end_request_all(rq, error);
+}
+
 /**
  * blk_peek_request - peek at the top of a request queue
  * @q: request queue to peek at
@@ -2408,9 +2419,10 @@ struct request *blk_peek_request(struct request_queue *q)
 			break;
 
 		ret = q->prep_rq_fn(q, rq);
-		if (ret == BLKPREP_OK) {
-			break;
-		} else if (ret == BLKPREP_DEFER) {
+		switch(ret) {
+		case BLKPREP_OK:
+			goto out;
+		case BLKPREP_DEFER:
 			/*
 			 * the request may have been (partially) prepped.
 			 * we need to keep this request in the front to
@@ -2425,25 +2437,23 @@ struct request *blk_peek_request(struct request_queue *q)
 				 */
 				--rq->nr_phys_segments;
 			}
-
 			rq = NULL;
+			goto out;
+		case BLKPREP_KILL:
+			blk_prep_end_request(rq, -EIO);
 			break;
-		} else if (ret == BLKPREP_KILL || ret == BLKPREP_INVALID) {
-			int err = (ret == BLKPREP_INVALID) ? -EREMOTEIO : -EIO;
-
-			rq->cmd_flags |= REQ_QUIET;
-			/*
-			 * Mark this request as started so we don't trigger
-			 * any debug logic in the end I/O path.
-			 */
-			blk_start_request(rq);
-			__blk_end_request_all(rq, err);
-		} else {
+		case BLKPREP_INVALID:
+			blk_prep_end_request(rq, -EREMOTEIO);
+			break;
+		case BLKPREP_DONE:
+			blk_prep_end_request(rq, 0);
+			break;
+		default:
 			printk(KERN_ERR "%s: bad return=%d\n", __func__, ret);
 			break;
 		}
 	}
-
+out:
 	return rq;
 }
 EXPORT_SYMBOL(blk_peek_request);
