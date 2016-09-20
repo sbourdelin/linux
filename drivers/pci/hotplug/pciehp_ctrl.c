@@ -371,6 +371,7 @@ static void interrupt_event_handler(struct work_struct *work)
 		handle_button_press_event(p_slot);
 		break;
 	case INT_POWER_FAULT:
+		ctrl->power_fault_detected = 0;
 		if (!POWER_CTRL(ctrl))
 			break;
 		pciehp_set_attention_status(p_slot, 1);
