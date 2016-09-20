@@ -31,7 +31,10 @@ Optional properties:
 Required properties:
 - compatible: Should be "mediatek,eth-mac"
 - reg: The number of the MAC
-- phy-handle: see ethernet.txt file in the same directory.
+- phy-handle: see ethernet.txt file in the same directory and
+	the additional phy-mode "tgrmii" is provided in order to connect
+	with the internal switch MT7530 which is only applicable when reg
+	is equal to 0.
 
 Example:
 
