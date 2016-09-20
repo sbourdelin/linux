@@ -142,6 +142,7 @@
 #include <linux/sctp.h>
 #include <linux/crash_dump.h>
 #include <net/xdp.h>
+#include <linux/filter.h>
 
 #include "net-sysfs.h"
 
@@ -6635,6 +6636,32 @@ int dev_change_proto_down(struct net_device *dev, bool proto_down)
 }
 EXPORT_SYMBOL(dev_change_proto_down);
 
+static u32 dev_bpf_prog_run_xdp(const void *priv,
+				struct xdp_buff *xdp)
+{
+	const struct bpf_prog *prog = (const struct bpf_prog *)priv;
+	u32 ret;
+
+	rcu_read_lock();
+	ret = BPF_PROG_RUN(prog, (void *)xdp);
+	rcu_read_unlock();
+
+	return ret;
+}
+
+static void dev_bpf_prog_put_xdp(const void *priv)
+{
+	bpf_prog_put((struct bpf_prog *)priv);
+}
+
+struct xdp_hook_ops xdp_bpf_hook_ops = {
+	.hook = dev_bpf_prog_run_xdp,
+	.put_priv = dev_bpf_prog_put_xdp,
+	.priority = 0,
+};
+
+static DEFINE_MUTEX(xdp_bpf_lock);
+
 /**
  *	dev_change_xdp_fd - set or clear a bpf program for a device rx path
  *	@dev: device
@@ -6644,22 +6671,23 @@ EXPORT_SYMBOL(dev_change_proto_down);
  */
 int dev_change_xdp_fd(struct net_device *dev, int fd)
 {
-	const struct net_device_ops *ops = dev->netdev_ops;
 	struct bpf_prog *prog = NULL;
-	struct netdev_xdp xdp = {};
 	int err;
 
-	if (!ops->ndo_xdp)
+	if (!(dev->features & NETIF_F_XDP))
 		return -EOPNOTSUPP;
+
 	if (fd >= 0) {
 		prog = bpf_prog_get_type(fd, BPF_PROG_TYPE_XDP);
 		if (IS_ERR(prog))
 			return PTR_ERR(prog);
 	}
 
-	xdp.command = XDP_SETUP_PROG;
-	xdp.prog = prog;
-	err = ops->ndo_xdp(dev, &xdp);
+	mutex_lock(&xdp_bpf_lock); /* Since xdp_bpf_hook_ops is modified */
+	xdp_bpf_hook_ops.priv = prog;
+	err = xdp_change_dev_hook(dev, &xdp_bpf_hook_ops);
+	mutex_unlock(&xdp_bpf_lock);
+
 	if (err < 0 && prog)
 		bpf_prog_put(prog);
 

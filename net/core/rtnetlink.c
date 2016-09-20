@@ -56,6 +56,7 @@
 #include <net/fib_rules.h>
 #include <net/rtnetlink.h>
 #include <net/net_namespace.h>
+#include <net/xdp.h>
 
 struct rtnl_link {
 	rtnl_doit_func		doit;
@@ -897,7 +898,7 @@ static size_t rtnl_xdp_size(const struct net_device *dev)
 {
 	size_t xdp_size = nla_total_size(1);	/* XDP_ATTACHED */
 
-	if (!dev->netdev_ops->ndo_xdp)
+	if (!(dev->features & NETIF_F_XDP))
 		return 0;
 	else
 		return xdp_size;
@@ -1226,20 +1227,19 @@ static int rtnl_fill_link_ifmap(struct sk_buff *skb, struct net_device *dev)
 
 static int rtnl_xdp_fill(struct sk_buff *skb, struct net_device *dev)
 {
-	struct netdev_xdp xdp_op = {};
 	struct nlattr *xdp;
+	struct xdp_hook_ops ret;
 	int err;
 
-	if (!dev->netdev_ops->ndo_xdp)
-		return 0;
 	xdp = nla_nest_start(skb, IFLA_XDP);
 	if (!xdp)
 		return -EMSGSIZE;
-	xdp_op.command = XDP_QUERY_PROG;
-	err = dev->netdev_ops->ndo_xdp(dev, &xdp_op);
-	if (err)
+
+	err = xdp_find_dev_hook(dev, &xdp_bpf_hook_ops, &ret);
+	if (err && err != -ENOENT)
 		goto err_cancel;
-	err = nla_put_u8(skb, IFLA_XDP_ATTACHED, xdp_op.prog_attached);
+
+	err = nla_put_u8(skb, IFLA_XDP_ATTACHED, !err);
 	if (err)
 		goto err_cancel;
 
