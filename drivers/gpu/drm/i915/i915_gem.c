@@ -1459,6 +1459,30 @@ write_origin(struct drm_i915_gem_object *obj, unsigned domain)
 		obj->frontbuffer_ggtt_origin : ORIGIN_CPU);
 }
 
+static void i915_gem_object_bump_inactive_ggtt(struct drm_i915_gem_object *obj)
+{
+	struct drm_i915_private *i915;
+	struct list_head *list;
+	struct i915_vma *vma;
+
+	list_for_each_entry(vma, &obj->vma_list, obj_link) {
+		if (!i915_vma_is_ggtt(vma))
+			continue;
+
+		if (i915_vma_is_active(vma))
+			continue;
+
+		if (!drm_mm_node_allocated(&vma->node))
+			continue;
+
+		list_move_tail(&vma->vm_link, &vma->vm->inactive_list);
+	}
+
+	i915 = to_i915(obj->base.dev);
+	list = obj->bind_count ? &i915->mm.bound_list : &i915->mm.unbound_list;
+	list_move_tail(&obj->global_list, list);
+}
+
 /**
  * Called when user space prepares to use an object with the CPU, either
  * through the mmap ioctl's mapping or a GTT mapping.
@@ -1500,25 +1524,40 @@ i915_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 				   MAX_SCHEDULE_TIMEOUT,
 				   to_rps_client(file));
 	if (ret)
-		goto err;
+		goto err_unlocked;
+
+	/* Flush and acquire obj->pages so that we are coherent through
+	 * direct access in memory with previous cached writes through
+	 * shmemfs and that our cache domain tracking remains valid.
+	 * For example, if the obj->filp was moved to swap without us
+	 * being notified and releasing the pages, we would mistakenly
+	 * continue to assume that the obj remained out of the CPU cached
+	 * domain.
+	 */
+	ret = i915_gem_object_pin_pages(obj);
+	if (ret)
+		goto err_unlocked;
 
 	ret = i915_mutex_lock_interruptible(dev);
 	if (ret)
-		goto err;
+		goto err_pages;
 
 	if (read_domains & I915_GEM_DOMAIN_GTT)
 		ret = i915_gem_object_set_to_gtt_domain(obj, write_domain != 0);
 	else
 		ret = i915_gem_object_set_to_cpu_domain(obj, write_domain != 0);
 
+	/* And bump the LRU for this access */
+	i915_gem_object_bump_inactive_ggtt(obj);
+
+	mutex_unlock(&dev->struct_mutex);
+
 	if (write_domain != 0)
 		intel_fb_obj_invalidate(obj, write_origin(obj, write_domain));
 
-	i915_gem_object_put(obj);
-	mutex_unlock(&dev->struct_mutex);
-	return ret;
-
-err:
+err_pages:
+	i915_gem_object_unpin_pages(obj);
+err_unlocked:
 	i915_gem_object_put_unlocked(obj);
 	return ret;
 }
@@ -1741,6 +1780,10 @@ int i915_gem_fault(struct vm_area_struct *area, struct vm_fault *vmf)
 	if (ret)
 		goto err;
 
+	ret = i915_gem_object_pin_pages(obj);
+	if (ret)
+		goto err;
+
 	intel_runtime_pm_get(dev_priv);
 
 	ret = i915_mutex_lock_interruptible(dev);
@@ -1822,6 +1865,7 @@ err_unlock:
 	mutex_unlock(&dev->struct_mutex);
 err_rpm:
 	intel_runtime_pm_put(dev_priv);
+	i915_gem_object_unpin_pages(obj);
 err:
 	switch (ret) {
 	case -EIO:
@@ -3205,24 +3249,6 @@ i915_gem_object_flush_cpu_write_domain(struct drm_i915_gem_object *obj)
 					    I915_GEM_DOMAIN_CPU);
 }
 
-static void i915_gem_object_bump_inactive_ggtt(struct drm_i915_gem_object *obj)
-{
-	struct i915_vma *vma;
-
-	list_for_each_entry(vma, &obj->vma_list, obj_link) {
-		if (!i915_vma_is_ggtt(vma))
-			continue;
-
-		if (i915_vma_is_active(vma))
-			continue;
-
-		if (!drm_mm_node_allocated(&vma->node))
-			continue;
-
-		list_move_tail(&vma->vm_link, &vma->vm->inactive_list);
-	}
-}
-
 /**
  * Moves a single object to the GTT read, and possibly write domain.
  * @obj: object to act on
@@ -3278,7 +3304,7 @@ i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj, bool write)
 	/* It should now be out of any other write domains, and we can update
 	 * the domain values for our changes.
 	 */
-	BUG_ON((obj->base.write_domain & ~I915_GEM_DOMAIN_GTT) != 0);
+	GEM_BUG_ON((obj->base.write_domain & ~I915_GEM_DOMAIN_GTT) != 0);
 	obj->base.read_domains |= I915_GEM_DOMAIN_GTT;
 	if (write) {
 		obj->base.read_domains = I915_GEM_DOMAIN_GTT;
@@ -3290,10 +3316,7 @@ i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj, bool write)
 					    old_read_domains,
 					    old_write_domain);
 
-	/* And bump the LRU for this access */
-	i915_gem_object_bump_inactive_ggtt(obj);
 	i915_gem_object_unpin_pages(obj);
-
 	return 0;
 }
 
@@ -3656,7 +3679,7 @@ i915_gem_object_set_to_cpu_domain(struct drm_i915_gem_object *obj, bool write)
 	/* It should now be out of any other write domains, and we can update
 	 * the domain values for our changes.
 	 */
-	BUG_ON((obj->base.write_domain & ~I915_GEM_DOMAIN_CPU) != 0);
+	GEM_BUG_ON((obj->base.write_domain & ~I915_GEM_DOMAIN_CPU) != 0);
 
 	/* If we're writing through the CPU, then the GPU read domains will
 	 * need to be invalidated at next use.
