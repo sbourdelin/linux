@@ -1441,15 +1441,17 @@ static int free_pool_huge_page(struct hstate *h, nodemask_t *nodes_allowed,
  */
 static void dissolve_free_huge_page(struct page *page)
 {
+	struct page *head = compound_head(page);
+
 	spin_lock(&hugetlb_lock);
-	if (PageHuge(page) && !page_count(page)) {
-		struct hstate *h = page_hstate(page);
-		int nid = page_to_nid(page);
-		list_del(&page->lru);
+	if (!page_count(head)) {
+		struct hstate *h = page_hstate(head);
+		int nid = page_to_nid(head);
+		list_del(&head->lru);
 		h->free_huge_pages--;
 		h->free_huge_pages_node[nid]--;
 		h->max_huge_pages--;
-		update_and_free_page(h, page);
+		update_and_free_page(h, head);
 	}
 	spin_unlock(&hugetlb_lock);
 }
@@ -1466,9 +1468,9 @@ void dissolve_free_huge_pages(unsigned long start_pfn, unsigned long end_pfn)
 	if (!hugepages_supported())
 		return;
 
-	VM_BUG_ON(!IS_ALIGNED(start_pfn, 1 << minimum_order));
 	for (pfn = start_pfn; pfn < end_pfn; pfn += 1 << minimum_order)
-		dissolve_free_huge_page(pfn_to_page(pfn));
+		if (PageHuge(pfn_to_page(pfn)))
+			dissolve_free_huge_page(pfn_to_page(pfn));
 }
 
 /*
