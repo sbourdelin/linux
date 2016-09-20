@@ -53,6 +53,7 @@ enum DP_QEDR_MODULE {
 	QEDR_MSG_SQ = 0x80000,
 	QEDR_MSG_QP = (QEDR_MSG_SQ | QEDR_MSG_RQ),
 	QEDR_MSG_MR = 0x100000,
+	QEDR_MSG_GSI = 0x200000,
 	QEDR_MSG_MISC = 0x400000,
 };
 
@@ -146,6 +147,10 @@ struct qedr_dev {
 	u8			num_hwfns;
 	uint			wq_multiplier;
 	u8			gsi_ll2_mac_address[ETH_ALEN];
+	int			gsi_qp_created;
+	struct qedr_cq		*gsi_sqcq;
+	struct qedr_cq		*gsi_rqcq;
+	struct qedr_qp		*gsi_qp;
 };
 
 #define QEDR_MAX_SQ_PBL			(0x8000)
@@ -244,6 +249,9 @@ struct qedr_cq {
 
 	u16 icid;
 
+	/* Lock to protect completion handler */
+	spinlock_t comp_handler_lock;
+
 	/* Lock to protect multiplem CQ's */
 	spinlock_t cq_lock;
 	u8 arm_flags;
@@ -290,6 +298,7 @@ struct qedr_qp_hwq_info {
 	u16 prod;
 	u16 cons;
 	u16 wqe_cons;
+	u16 gsi_cons;
 	u16 max_wr;
 
 	/* DB */
@@ -364,6 +373,7 @@ struct qedr_qp {
 		struct ib_sge sg_list[RDMA_MAX_SGE_PER_RQ_WQE];
 		u8 wqe_size;
 
+		u8 smac[ETH_ALEN];
 		u16 vlan_id;
 		int rc;
 	} *rqe_wr_id;
@@ -470,6 +480,11 @@ static inline struct qedr_cq *get_qedr_cq(struct ib_cq *ibcq)
 static inline struct qedr_qp *get_qedr_qp(struct ib_qp *ibqp)
 {
 	return container_of(ibqp, struct qedr_qp, ibqp);
+}
+
+static inline struct qedr_ah *get_qedr_ah(struct ib_ah *ibah)
+{
+	return container_of(ibah, struct qedr_ah, ibah);
 }
 
 static inline struct qedr_mr *get_qedr_mr(struct ib_mr *ibmr)
