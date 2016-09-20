@@ -29,6 +29,7 @@
 
 #include <generated/utsrelease.h>
 #include <linux/stop_machine.h>
+#include <linux/zlib.h>
 #include "i915_drv.h"
 
 #ifdef CONFIG_DRM_I915_CAPTURE_ERROR
@@ -175,6 +176,110 @@ static void i915_error_puts(struct drm_i915_error_state_buf *e,
 #define err_printf(e, ...) i915_error_printf(e, __VA_ARGS__)
 #define err_puts(e, s) i915_error_puts(e, s)
 
+#ifdef CONFIG_DRM_I915_COMPRESS_ERROR
+
+static bool compress_init(struct z_stream_s *zstream)
+{
+	memset(zstream, 0, sizeof(*zstream));
+
+	zstream->workspace =
+		kmalloc(zlib_deflate_workspacesize(MAX_WBITS, MAX_MEM_LEVEL),
+			GFP_ATOMIC | __GFP_NOWARN);
+	if (!zstream->workspace)
+		return NULL;
+
+	if (zlib_deflateInit(zstream, Z_DEFAULT_COMPRESSION) != Z_OK) {
+		kfree(zstream->workspace);
+		return false;
+	}
+
+	return true;
+}
+
+static int compress_page(struct z_stream_s *zstream,
+			 void *src,
+			 struct drm_i915_error_object *dst)
+{
+	zstream->next_in = src;
+	zstream->avail_in = PAGE_SIZE;
+
+	do {
+		if (zstream->avail_out == 0) {
+			unsigned long page;
+
+			page = __get_free_page(GFP_ATOMIC | __GFP_NOWARN);
+			if (!page)
+				return -ENOMEM;
+
+			dst->pages[dst->page_count++] = (void *)page;
+
+			zstream->next_out = (void *)page;
+			zstream->avail_out = PAGE_SIZE;
+		}
+
+		if (zlib_deflate(zstream, Z_SYNC_FLUSH) != Z_OK)
+			return -EIO;
+
+		/* Fallback to uncompressed if we increase size? */
+		if (0 && zstream->total_out > zstream->total_in)
+			return -E2BIG;
+	} while (zstream->avail_in);
+
+	return 0;
+}
+
+static void compress_fini(struct z_stream_s *zstream,
+			  struct drm_i915_error_object *dst)
+{
+	if (dst) {
+		zlib_deflate(zstream, Z_FINISH);
+		dst->unused = zstream->avail_out;
+	}
+
+	zlib_deflateEnd(zstream);
+	kfree(zstream->workspace);
+}
+
+static void err_compression_marker(struct drm_i915_error_state_buf *m)
+{
+	err_puts(m, ":");
+}
+
+#else
+
+static bool compress_init(struct z_stream_s *zstream)
+{
+	return true;
+}
+
+static int compress_page(struct z_stream_s *zstream,
+			 void *src,
+			 struct drm_i915_error_object *dst)
+{
+	unsigned long page;
+
+	page = __get_free_page(GFP_ATOMIC | __GFP_NOWARN);
+	if (!page)
+		return -ENOMEM;
+
+	dst->pages[dst->page_count++] =
+		memcpy((void *)page, src, PAGE_SIZE);
+
+	return 0;
+}
+
+static void compress_fini(struct z_stream_s *zstream,
+			  struct drm_i915_error_object *dst)
+{
+}
+
+static void err_compression_marker(struct drm_i915_error_state_buf *m)
+{
+	err_puts(m, "~");
+}
+
+#endif
+
 static void print_error_buffers(struct drm_i915_error_state_buf *m,
 				const char *name,
 				struct drm_i915_error_buffer *err,
@@ -310,12 +415,30 @@ void i915_error_printf(struct drm_i915_error_state_buf *e, const char *f, ...)
 	va_end(args);
 }
 
+static bool
+ascii85_encode(u32 in, char *out)
+{
+	int i;
+
+	if (in == 0)
+		return false;
+
+	out[5] = '\0';
+	for (i = 5; i--; ) {
+		out[i] = '!' + in % 85;
+		in /= 85;
+	}
+
+	return true;
+}
+
 static void print_error_obj(struct drm_i915_error_state_buf *m,
 			    struct intel_engine_cs *engine,
 			    const char *name,
 			    struct drm_i915_error_object *obj)
 {
-	int page, offset, elt;
+	char out[6];
+	int page;
 
 	if (!obj)
 		return;
@@ -327,13 +450,23 @@ static void print_error_obj(struct drm_i915_error_state_buf *m,
 			   lower_32_bits(obj->gtt_offset));
 	}
 
-	for (page = offset = 0; page < obj->page_count; page++) {
-		for (elt = 0; elt < PAGE_SIZE/4; elt++) {
-			err_printf(m, "%08x :  %08x\n", offset,
-				   obj->pages[page][elt]);
-			offset += 4;
+	err_compression_marker(m);
+	for (page = 0; page < obj->page_count; page++) {
+		int i, len;
+
+		len = PAGE_SIZE;
+		if (page == obj->page_count - 1)
+			len -= obj->unused;
+		len = (len + 3) / 4;
+
+		for (i = 0; i < len; i++) {
+			if (ascii85_encode(obj->pages[page][i], out))
+				err_puts(m, out);
+			else
+				err_puts(m, "z");
 		}
 	}
+	err_puts(m, "\n");
 }
 
 static void err_print_capabilities(struct drm_i915_error_state_buf *m,
@@ -619,20 +752,6 @@ static void i915_error_state_free(struct kref *error_ref)
 	kfree(error);
 }
 
-static int compress_page(void *src, struct drm_i915_error_object *dst)
-{
-	unsigned long page;
-
-	page = __get_free_page(GFP_ATOMIC | __GFP_NOWARN);
-	if (!page)
-		return -ENOMEM;
-
-	dst->pages[dst->page_count++] = (void *)page;
-
-	memcpy((void *)page, src, PAGE_SIZE);
-	return 0;
-}
-
 static struct drm_i915_error_object *
 i915_error_object_create(struct drm_i915_private *i915,
 			 struct i915_vma *vma)
@@ -640,6 +759,7 @@ i915_error_object_create(struct drm_i915_private *i915,
 	struct i915_ggtt *ggtt = &i915->ggtt;
 	const u64 slot = ggtt->gpu_error.start;
 	struct drm_i915_error_object *dst;
+	struct z_stream_s zstream;
 	unsigned long num_pages;
 	struct sgt_iter iter;
 	dma_addr_t dma;
@@ -648,6 +768,7 @@ i915_error_object_create(struct drm_i915_private *i915,
 		return NULL;
 
 	num_pages = min_t(u64, vma->size, vma->obj->base.size) >> PAGE_SHIFT;
+	num_pages = DIV_ROUND_UP(10 * num_pages, 8); /* worstcase zlib growth */
 	dst = kmalloc(sizeof(*dst) + num_pages * sizeof(u32 *),
 		      GFP_ATOMIC | __GFP_NOWARN);
 	if (!dst)
@@ -655,6 +776,12 @@ i915_error_object_create(struct drm_i915_private *i915,
 
 	dst->gtt_offset = vma->node.start;
 	dst->page_count = 0;
+	dst->unused = 0;
+
+	if (!compress_init(&zstream)) {
+		kfree(dst);
+		return NULL;
+	}
 
 	for_each_sgt_dma(dma, iter, vma->pages) {
 		void __iomem *s;
@@ -664,7 +791,7 @@ i915_error_object_create(struct drm_i915_private *i915,
 				       I915_CACHE_NONE, 0);
 
 		s = io_mapping_map_atomic_wc(&ggtt->mappable, slot);
-		ret = compress_page((void * __force)s, dst);
+		ret = compress_page(&zstream, (void  __force *)s, dst);
 		io_mapping_unmap_atomic(s);
 
 		if (ret)
@@ -679,6 +806,7 @@ unwind:
 	dst = NULL;
 
 out:
+	compress_fini(&zstream, dst);
 	ggtt->base.clear_range(&ggtt->base, slot, PAGE_SIZE, true);
 	return dst;
 }
