@@ -1811,6 +1811,9 @@ try_onemore:
 	if (err)
 		goto free_proc;
 
+	if (!retry)
+		goto skip_recovery;
+
 	/* recover fsynced data */
 	if (!test_opt(sbi, DISABLE_ROLL_FORWARD)) {
 		/*
@@ -1843,7 +1846,7 @@ try_onemore:
 			goto free_kobj;
 		}
 	}
-
+skip_recovery:
 	/* recover_fsync_data() cleared this already */
 	clear_sbi_flag(sbi, SBI_POR_DOING);
 
