@@ -2292,6 +2292,15 @@ i915_gem_object_put_pages_gtt(struct drm_i915_gem_object *obj)
 	kfree(obj->pages);
 }
 
+static void __i915_gem_object_reset_page_iter(struct drm_i915_gem_object *obj)
+{
+	struct radix_tree_iter iter;
+	void **slot;
+
+	radix_tree_for_each_slot(slot, &obj->get_page.radix, &iter, 0)
+		radix_tree_delete(&obj->get_page.radix, iter.index);
+}
+
 int
 i915_gem_object_put_pages(struct drm_i915_gem_object *obj)
 {
@@ -2323,6 +2332,8 @@ i915_gem_object_put_pages(struct drm_i915_gem_object *obj)
 
 		obj->mapping = NULL;
 	}
+
+	__i915_gem_object_reset_page_iter(obj);
 
 	ops->put_pages(obj);
 	obj->pages = NULL;
@@ -2488,8 +2499,8 @@ i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
 
 	list_add_tail(&obj->global_list, &dev_priv->mm.unbound_list);
 
-	obj->get_page.sg = obj->pages->sgl;
-	obj->get_page.last = 0;
+	obj->get_page.sg_pos = obj->pages->sgl;
+	obj->get_page.sg_idx = 0;
 
 	return 0;
 }
@@ -4234,6 +4245,8 @@ void i915_gem_object_init(struct drm_i915_gem_object *obj,
 
 	obj->frontbuffer_ggtt_origin = ORIGIN_GTT;
 	obj->madv = I915_MADV_WILLNEED;
+	INIT_RADIX_TREE(&obj->get_page.radix, GFP_KERNEL);
+	mutex_init(&obj->get_page.lock);
 
 	i915_gem_info_add_obj(to_i915(obj->base.dev), obj->base.size);
 }
@@ -4884,21 +4897,6 @@ void i915_gem_track_fb(struct drm_i915_gem_object *old,
 	}
 }
 
-/* Like i915_gem_object_get_page(), but mark the returned page dirty */
-struct page *
-i915_gem_object_get_dirty_page(struct drm_i915_gem_object *obj, int n)
-{
-	struct page *page;
-
-	/* Only default objects have per-page dirty tracking */
-	if (WARN_ON(!i915_gem_object_has_struct_page(obj)))
-		return NULL;
-
-	page = i915_gem_object_get_page(obj, n);
-	set_page_dirty(page);
-	return page;
-}
-
 /* Allocate a new GEM object and fill it with the supplied data */
 struct drm_i915_gem_object *
 i915_gem_object_create_from_data(struct drm_device *dev,
@@ -4938,4 +4936,121 @@ i915_gem_object_create_from_data(struct drm_device *dev,
 fail:
 	i915_gem_object_put(obj);
 	return ERR_PTR(ret);
+}
+
+static struct scatterlist *
+__i915_gem_object_get_sg(struct drm_i915_gem_object *obj,
+			 unsigned long n, unsigned int *offset)
+{
+	struct scatterlist *sg = obj->pages->sgl;
+	int idx = 0;
+
+	while (idx + __sg_page_count(sg) <= n) {
+		idx += __sg_page_count(sg++);
+		if (unlikely(sg_is_chain(sg)))
+			sg = sg_chain_ptr(sg);
+	}
+
+	*offset = n - idx;
+	return sg;
+}
+
+struct scatterlist *
+i915_gem_object_get_sg(struct drm_i915_gem_object *obj,
+		       unsigned long n,
+		       unsigned int *offset)
+{
+	struct i915_gem_object_page_iter *iter = &obj->get_page;
+	struct scatterlist *sg;
+
+	GEM_BUG_ON(n >= obj->base.size >> PAGE_SHIFT);
+	GEM_BUG_ON(obj->pages_pin_count == 0);
+
+	if (n < READ_ONCE(iter->sg_idx))
+		goto lookup;
+
+	mutex_lock(&iter->lock);
+	if (n >= iter->sg_idx &&
+	    n < iter->sg_idx + __sg_page_count(iter->sg_pos)) {
+		sg = iter->sg_pos;
+		*offset = n - iter->sg_idx;
+		mutex_unlock(&iter->lock);
+		return sg;
+	}
+
+	while (iter->sg_idx <= n) {
+		unsigned long exception;
+		unsigned int count, i;
+
+		radix_tree_insert(&iter->radix,
+				  iter->sg_idx,
+				  iter->sg_pos);
+
+		exception =
+			RADIX_TREE_EXCEPTIONAL_ENTRY |
+			iter->sg_idx << RADIX_TREE_EXCEPTIONAL_SHIFT;
+		count = __sg_page_count(iter->sg_pos);
+		for (i = 1; i < count; i++)
+			radix_tree_insert(&iter->radix,
+					  iter->sg_idx + i,
+					  (void *)exception);
+
+		iter->sg_idx += count;
+		iter->sg_pos = __sg_next(iter->sg_pos);
+	}
+	mutex_unlock(&iter->lock);
+
+lookup:
+	rcu_read_lock();
+	sg = radix_tree_lookup(&iter->radix, n);
+	rcu_read_unlock();
+
+	if (unlikely(!sg))
+		return __i915_gem_object_get_sg(obj, n, offset);
+
+	*offset = 0;
+	if (unlikely(radix_tree_exception(sg))) {
+		unsigned long base =
+			(unsigned long)sg >> RADIX_TREE_EXCEPTIONAL_SHIFT;
+		sg = radix_tree_lookup(&iter->radix, base);
+		*offset = n - base;
+	}
+	return sg;
+}
+
+struct page *
+i915_gem_object_get_page(struct drm_i915_gem_object *obj, unsigned long n)
+{
+	struct scatterlist *sg;
+	unsigned int offset;
+
+	GEM_BUG_ON(!i915_gem_object_has_struct_page(obj));
+
+	sg = i915_gem_object_get_sg(obj, n, &offset);
+	return nth_page(sg_page(sg), offset);
+}
+
+/* Like i915_gem_object_get_page(), but mark the returned page dirty */
+struct page *
+i915_gem_object_get_dirty_page(struct drm_i915_gem_object *obj,
+			       unsigned long n)
+{
+	struct page *page;
+
+	page = i915_gem_object_get_page(obj, n);
+	if (!obj->dirty)
+		set_page_dirty(page);
+
+	return page;
+}
+
+dma_addr_t
+i915_gem_object_get_dma_address(struct drm_i915_gem_object *obj,
+				unsigned long n)
+{
+	struct scatterlist *sg;
+	unsigned int offset;
+
+	sg = i915_gem_object_get_sg(obj, n, &offset);
+	return sg_dma_address(sg) + (offset << PAGE_SHIFT);
 }

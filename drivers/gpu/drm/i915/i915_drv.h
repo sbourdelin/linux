@@ -2261,9 +2261,12 @@ struct drm_i915_gem_object {
 
 	struct sg_table *pages;
 	int pages_pin_count;
-	struct get_page {
-		struct scatterlist *sg;
-		int last;
+	struct i915_gem_object_page_iter {
+		struct scatterlist *sg_pos;
+		unsigned long sg_idx;
+
+		struct radix_tree_root radix;
+		struct mutex lock;
 	} get_page;
 	void *mapping;
 
@@ -3152,45 +3155,21 @@ static inline int __sg_page_count(struct scatterlist *sg)
 	return sg->length >> PAGE_SHIFT;
 }
 
+struct scatterlist *
+i915_gem_object_get_sg(struct drm_i915_gem_object *obj,
+		       unsigned long n, unsigned int *offset);
+
 struct page *
-i915_gem_object_get_dirty_page(struct drm_i915_gem_object *obj, int n);
+i915_gem_object_get_page(struct drm_i915_gem_object *obj,
+			 unsigned long n);
 
-static inline dma_addr_t
-i915_gem_object_get_dma_address(struct drm_i915_gem_object *obj, int n)
-{
-	if (n < obj->get_page.last) {
-		obj->get_page.sg = obj->pages->sgl;
-		obj->get_page.last = 0;
-	}
+struct page *
+i915_gem_object_get_dirty_page(struct drm_i915_gem_object *obj,
+			       unsigned long n);
 
-	while (obj->get_page.last + __sg_page_count(obj->get_page.sg) <= n) {
-		obj->get_page.last += __sg_page_count(obj->get_page.sg++);
-		if (unlikely(sg_is_chain(obj->get_page.sg)))
-			obj->get_page.sg = sg_chain_ptr(obj->get_page.sg);
-	}
-
-	return sg_dma_address(obj->get_page.sg) + ((n - obj->get_page.last) << PAGE_SHIFT);
-}
-
-static inline struct page *
-i915_gem_object_get_page(struct drm_i915_gem_object *obj, int n)
-{
-	if (WARN_ON(n >= obj->base.size >> PAGE_SHIFT))
-		return NULL;
-
-	if (n < obj->get_page.last) {
-		obj->get_page.sg = obj->pages->sgl;
-		obj->get_page.last = 0;
-	}
-
-	while (obj->get_page.last + __sg_page_count(obj->get_page.sg) <= n) {
-		obj->get_page.last += __sg_page_count(obj->get_page.sg++);
-		if (unlikely(sg_is_chain(obj->get_page.sg)))
-			obj->get_page.sg = sg_chain_ptr(obj->get_page.sg);
-	}
-
-	return nth_page(sg_page(obj->get_page.sg), n - obj->get_page.last);
-}
+dma_addr_t
+i915_gem_object_get_dma_address(struct drm_i915_gem_object *obj,
+				unsigned long n);
 
 static inline void i915_gem_object_pin_pages(struct drm_i915_gem_object *obj)
 {
