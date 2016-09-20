@@ -179,10 +179,16 @@ static void __init cpg_mstp_clocks_init(struct device_node *np)
 	group->data.clks = clks;
 
 	group->smstpcr = of_iomap(np, 0);
-	group->mstpsr = of_iomap(np, 1);
-
 	if (group->smstpcr == NULL) {
 		pr_err("%s: failed to remap SMSTPCR\n", __func__);
+		kfree(group);
+		kfree(clks);
+		return;
+	}
+	group->mstpsr = of_iomap(np, 1);
+	if (group->mstpsr == NULL) {
+		pr_err("%s: failed to remap MSTPCR\n", __func__);
+		iounmap(group->smstpcr);
 		kfree(group);
 		kfree(clks);
 		return;
@@ -236,6 +242,10 @@ static void __init cpg_mstp_clocks_init(struct device_node *np)
 		} else {
 			pr_err("%s: failed to register %s %s clock (%ld)\n",
 			       __func__, np->name, name, PTR_ERR(clks[clkidx]));
+			iounmap(group->smstpcr);
+			iounmap(group->mstpsr);
+			kfree(group);
+			kfree(clks);
 		}
 	}
 
