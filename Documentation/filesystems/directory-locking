@@ -23,7 +23,7 @@ RENAME_EXCHANGE in flags argument) lock both.  In any case,
 if the target already exists, lock it.  If the source is a non-directory,
 lock it.  If we need to lock both, lock them in inode pointer order.
 Then call the method.  All locks are exclusive.
-NB: we might get away with locking the the source (and target in exchange
+NB: we might get away with locking the source (and target in exchange
 case) shared.
 
 5) link creation.  Locking rules:
