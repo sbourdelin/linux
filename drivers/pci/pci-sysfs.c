@@ -449,6 +449,30 @@ static ssize_t sriov_totalvfs_show(struct device *dev,
 	return sprintf(buf, "%u\n", pci_sriov_get_totalvfs(pdev));
 }
 
+static ssize_t sriov_totalvfs_store(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	u16 max_vfs;
+	int ret;
+
+	ret = kstrtou16(buf, 0, &max_vfs);
+	if (ret < 0)
+		return ret;
+
+	if (pdev->driver) {
+		dev_info(&pdev->dev,
+			 "Can't change totalvfs while driver is attached\n");
+		return -EUSERS;
+	}
+
+	ret = pci_sriov_set_totalvfs(pdev, max_vfs);
+	if (ret)
+		return ret;
+
+	return count;
+}
 
 static ssize_t sriov_numvfs_show(struct device *dev,
 				 struct device_attribute *attr,
@@ -516,7 +540,9 @@ static ssize_t sriov_numvfs_store(struct device *dev,
 	return count;
 }
 
-static struct device_attribute sriov_totalvfs_attr = __ATTR_RO(sriov_totalvfs);
+static struct device_attribute sriov_totalvfs_attr =
+		__ATTR(sriov_totalvfs, (S_IRUGO|S_IWUSR|S_IWGRP),
+		       sriov_totalvfs_show, sriov_totalvfs_store);
 static struct device_attribute sriov_numvfs_attr =
 		__ATTR(sriov_numvfs, (S_IRUGO|S_IWUSR|S_IWGRP),
 		       sriov_numvfs_show, sriov_numvfs_store);
