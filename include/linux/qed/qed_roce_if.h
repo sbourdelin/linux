@@ -332,6 +332,7 @@ struct qed_rdma_ops {
 	void (*rdma_remove_user)(void *rdma_cxt, u16 dpi);
 	int (*rdma_stop)(void *rdma_cxt);
 	struct qed_rdma_device* (*rdma_query_device)(void *rdma_cxt);
+	struct qed_rdma_port* (*rdma_query_port)(void *rdma_cxt);
 	int (*rdma_get_start_sb)(struct qed_dev *cdev);
 	int (*rdma_get_min_cnq_msix)(struct qed_dev *cdev);
 	void (*rdma_cnq_prod_update)(void *rdma_cxt, u8 cnq_index, u16 prod);

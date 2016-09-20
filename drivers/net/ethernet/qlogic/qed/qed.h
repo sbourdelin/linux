@@ -53,7 +53,7 @@ enum qed_mcp_protocol_type;
 static inline u32 qed_db_addr(u32 cid, u32 DEMS)
 {
 	u32 db_addr = FIELD_VALUE(DB_LEGACY_ADDR_DEMS, DEMS) |
-		      FIELD_VALUE(DB_LEGACY_ADDR_ICID, cid);
+		      (cid * QED_PF_DEMS_SIZE);
 
 	return db_addr;
 }

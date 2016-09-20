@@ -158,7 +158,7 @@ static int qed_rdma_alloc(struct qed_hwfn *p_hwfn,
 		return rc;
 	}
 
-	p_rdma_info = p_rdma_info;
+	p_hwfn->p_rdma_info = p_rdma_info;
 	p_rdma_info->proto = PROTOCOLID_ROCE;
 
 	num_cons = qed_cxt_get_proto_cid_count(p_hwfn, p_rdma_info->proto, 0);
@@ -664,6 +664,22 @@ int qed_rdma_add_user(void *rdma_cxt,
 	return rc;
 }
 
+struct qed_rdma_port *qed_rdma_query_port(void *rdma_cxt)
+{
+	struct qed_hwfn *p_hwfn = (struct qed_hwfn *)rdma_cxt;
+	struct qed_rdma_port *p_port = p_hwfn->p_rdma_info->port;
+
+	DP_VERBOSE(p_hwfn, QED_MSG_RDMA, "RDMA Query port\n");
+
+	/* Link may have changed */
+	p_port->port_state = p_hwfn->mcp_info->link_output.link_up ?
+			     QED_RDMA_PORT_UP : QED_RDMA_PORT_DOWN;
+
+	p_port->link_speed = p_hwfn->mcp_info->link_output.speed;
+
+	return p_port;
+}
+
 struct qed_rdma_device *qed_rdma_query_device(void *rdma_cxt)
 {
 	struct qed_hwfn *p_hwfn = (struct qed_hwfn *)rdma_cxt;
@@ -872,6 +888,7 @@ static const struct qed_rdma_ops qed_rdma_ops_pass = {
 	.rdma_add_user = &qed_rdma_add_user,
 	.rdma_remove_user = &qed_rdma_remove_user,
 	.rdma_stop = &qed_rdma_stop,
+	.rdma_query_port = &qed_rdma_query_port,
 	.rdma_query_device = &qed_rdma_query_device,
 	.rdma_get_start_sb = &qed_rdma_get_sb_start,
 	.rdma_get_rdma_int = &qed_rdma_get_int,
