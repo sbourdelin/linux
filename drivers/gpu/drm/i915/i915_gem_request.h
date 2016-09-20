@@ -214,6 +214,8 @@ int
 i915_gem_request_await_object(struct drm_i915_gem_request *to,
 			      struct drm_i915_gem_object *obj,
 			      bool write);
+int i915_gem_request_await_fence(struct drm_i915_gem_request *req,
+				 struct fence *fence);
 
 void __i915_add_request(struct drm_i915_gem_request *req, bool flush_caches);
 #define i915_add_request(req) \
