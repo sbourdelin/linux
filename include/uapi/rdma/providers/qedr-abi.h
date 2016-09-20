@@ -24,4 +24,23 @@ struct qedr_alloc_ucontext_resp {
 	u32 sges_per_srq_wr;
 	int max_cqes;
 };
+
+struct qedr_alloc_pd_ureq {
+       u64 rsvd1;
+};
+
+struct qedr_alloc_pd_uresp {
+       u32 pd_id;
+};
+
+struct qedr_create_cq_ureq {
+       uint64_t addr;
+       size_t len;
+};
+
+struct qedr_create_cq_uresp {
+       u32 db_offset;
+       u16 icid;
+};
+
 #endif /* __QEDR_USER_H__ */
