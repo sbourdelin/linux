@@ -813,7 +813,9 @@ static int arizona_of_get_core_pdata(struct arizona *arizona)
 	int count = 0;
 
 	pdata->reset = of_get_named_gpio(arizona->dev->of_node, "wlf,reset", 0);
-	if (pdata->reset < 0) {
+	if (pdata->reset == -EPROBE_DEFER) {
+		return pdata->reset;
+	} else if (pdata->reset < 0) {
 		dev_err(arizona->dev, "Reset gpio missing/malformed: %d\n",
 			pdata->reset);
 
@@ -1011,11 +1013,14 @@ int arizona_dev_init(struct arizona *arizona)
 	dev_set_drvdata(arizona->dev, arizona);
 	mutex_init(&arizona->clk_lock);
 
-	if (dev_get_platdata(arizona->dev))
+	if (dev_get_platdata(arizona->dev)) {
 		memcpy(&arizona->pdata, dev_get_platdata(arizona->dev),
 		       sizeof(arizona->pdata));
-	else
-		arizona_of_get_core_pdata(arizona);
+	} else {
+		ret = arizona_of_get_core_pdata(arizona);
+		if (ret < 0)
+			return ret;
+	}
 
 	BUILD_BUG_ON(ARRAY_SIZE(arizona->mclk) != ARRAY_SIZE(mclk_name));
 	for (i = 0; i < ARRAY_SIZE(arizona->mclk); i++) {
