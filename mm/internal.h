@@ -71,6 +71,12 @@ static inline void set_page_refcounted(struct page *page)
 	set_page_count(page, 1);
 }
 
+/**
+ * check whether range [@s0, @e0) has intersection with [@s1, @e1)
+ */
+#define is_range_overlay(s0, e0, s1, e1) \
+	(((s1) >= (e0) || (s0) >= (e1)) ? false : true)
+
 extern unsigned long highest_memmap_pfn;
 
 /*

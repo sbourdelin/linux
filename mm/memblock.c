@@ -85,20 +85,14 @@ static inline phys_addr_t memblock_cap_size(phys_addr_t base, phys_addr_t *size)
 /*
  * Address comparison utilities
  */
-static unsigned long __init_memblock memblock_addrs_overlap(phys_addr_t base1, phys_addr_t size1,
-				       phys_addr_t base2, phys_addr_t size2)
-{
-	return ((base1 < (base2 + size2)) && (base2 < (base1 + size1)));
-}
-
 bool __init_memblock memblock_overlaps_region(struct memblock_type *type,
 					phys_addr_t base, phys_addr_t size)
 {
 	unsigned long i;
 
 	for (i = 0; i < type->cnt; i++)
-		if (memblock_addrs_overlap(base, size, type->regions[i].base,
-					   type->regions[i].size))
+		if (is_range_overlay(base, base + size, type->regions[i].base,
+				type->regions[i].base + type->regions[i].size))
 			break;
 	return i < type->cnt;
 }
