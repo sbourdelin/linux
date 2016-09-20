@@ -18,7 +18,7 @@
 struct vxlanhdr {
 	__be32 vx_flags;
 	__be32 vx_vni;
-};
+} __packed;
 
 /* VXLAN header flags. */
 #define VXLAN_HF_VNI	cpu_to_be32(BIT(27))
