@@ -1836,7 +1836,7 @@ static int init_status_page(struct intel_engine_cs *engine)
 	unsigned int flags;
 	int ret;
 
-	obj = i915_gem_object_create(&engine->i915->drm, 4096);
+	obj = i915_gem_object_create_internal(&engine->i915->drm, 4096);
 	if (IS_ERR(obj)) {
 		DRM_ERROR("Failed to allocate status page\n");
 		return PTR_ERR(obj);
