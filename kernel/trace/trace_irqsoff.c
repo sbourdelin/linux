@@ -13,8 +13,13 @@
 #include <linux/uaccess.h>
 #include <linux/module.h>
 #include <linux/ftrace.h>
+#include <linux/percpu-defs.h>
+#include <trace/events/sched.h>
 
 #include "trace.h"
+
+#define CREATE_TRACE_POINTS
+#include <trace/events/latency.h>
 
 static struct trace_array		*irqsoff_trace __read_mostly;
 static int				tracer_enabled __read_mostly;
@@ -298,11 +303,18 @@ static bool report_latency(struct trace_array *tr, cycle_t delta)
 	return true;
 }
 
+static inline void latency_preemptirqsoff_timing(enum latency_type type,
+						 cycle_t delta)
+{
+	trace_latency_preemptirqsoff(type, (u64) delta);
+}
+
 static void
 check_critical_timing(struct trace_array *tr,
 		      struct trace_array_cpu *data,
 		      unsigned long parent_ip,
-		      int cpu)
+		      int cpu,
+		      enum latency_type ltype)
 {
 	cycle_t T0, T1, delta;
 	unsigned long flags;
@@ -312,6 +324,7 @@ check_critical_timing(struct trace_array *tr,
 	T1 = ftrace_now(cpu);
 	delta = T1-T0;
 
+	latency_preemptirqsoff_timing(ltype, delta);
 	local_save_flags(flags);
 
 	pc = preempt_count();
@@ -351,7 +364,8 @@ out:
 }
 
 static inline void
-start_critical_timing(unsigned long ip, unsigned long parent_ip)
+start_critical_timing(unsigned long ip, unsigned long parent_ip,
+		      enum latency_type ltype)
 {
 	int cpu;
 	struct trace_array *tr = irqsoff_trace;
@@ -387,7 +401,8 @@ start_critical_timing(unsigned long ip, unsigned long parent_ip)
 }
 
 static inline void
-stop_critical_timing(unsigned long ip, unsigned long parent_ip)
+stop_critical_timing(unsigned long ip, unsigned long parent_ip,
+		     enum latency_type ltype)
 {
 	int cpu;
 	struct trace_array *tr = irqsoff_trace;
@@ -414,7 +429,7 @@ stop_critical_timing(unsigned long ip, unsigned long parent_ip)
 
 	local_save_flags(flags);
 	__trace_function(tr, ip, parent_ip, flags, preempt_count());
-	check_critical_timing(tr, data, parent_ip ? : ip, cpu);
+	check_critical_timing(tr, data, parent_ip ? : ip, cpu, ltype);
 	data->critical_start = 0;
 	atomic_dec(&data->disabled);
 }
@@ -423,14 +438,14 @@ stop_critical_timing(unsigned long ip, unsigned long parent_ip)
 void start_critical_timings(void)
 {
 	if (preempt_trace() || irq_trace())
-		start_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
+		start_critical_timing(CALLER_ADDR0, CALLER_ADDR1, LT_CRITTIME);
 }
 EXPORT_SYMBOL_GPL(start_critical_timings);
 
 void stop_critical_timings(void)
 {
 	if (preempt_trace() || irq_trace())
-		stop_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
+		stop_critical_timing(CALLER_ADDR0, CALLER_ADDR1, LT_CRITTIME);
 }
 EXPORT_SYMBOL_GPL(stop_critical_timings);
 
@@ -439,13 +454,13 @@ EXPORT_SYMBOL_GPL(stop_critical_timings);
 void time_hardirqs_on(unsigned long a0, unsigned long a1)
 {
 	if (!preempt_trace() && irq_trace())
-		stop_critical_timing(a0, a1);
+		stop_critical_timing(a0, a1, LT_IRQ);
 }
 
 void time_hardirqs_off(unsigned long a0, unsigned long a1)
 {
 	if (!preempt_trace() && irq_trace())
-		start_critical_timing(a0, a1);
+		start_critical_timing(a0, a1, LT_IRQ);
 }
 
 #else /* !CONFIG_PROVE_LOCKING */
@@ -472,28 +487,28 @@ inline void print_irqtrace_events(struct task_struct *curr)
 void trace_hardirqs_on(void)
 {
 	if (!preempt_trace() && irq_trace())
-		stop_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
+		stop_critical_timing(CALLER_ADDR0, CALLER_ADDR1, LT_IRQ);
 }
 EXPORT_SYMBOL(trace_hardirqs_on);
 
 void trace_hardirqs_off(void)
 {
 	if (!preempt_trace() && irq_trace())
-		start_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
+		start_critical_timing(CALLER_ADDR0, CALLER_ADDR1, LT_IRQ);
 }
 EXPORT_SYMBOL(trace_hardirqs_off);
 
 __visible void trace_hardirqs_on_caller(unsigned long caller_addr)
 {
 	if (!preempt_trace() && irq_trace())
-		stop_critical_timing(CALLER_ADDR0, caller_addr);
+		stop_critical_timing(CALLER_ADDR0, caller_addr, LT_IRQ);
 }
 EXPORT_SYMBOL(trace_hardirqs_on_caller);
 
 __visible void trace_hardirqs_off_caller(unsigned long caller_addr)
 {
 	if (!preempt_trace() && irq_trace())
-		start_critical_timing(CALLER_ADDR0, caller_addr);
+		start_critical_timing(CALLER_ADDR0, caller_addr, LT_IRQ);
 }
 EXPORT_SYMBOL(trace_hardirqs_off_caller);
 
@@ -504,13 +519,13 @@ EXPORT_SYMBOL(trace_hardirqs_off_caller);
 void trace_preempt_on(unsigned long a0, unsigned long a1)
 {
 	if (preempt_trace() && !irq_trace())
-		stop_critical_timing(a0, a1);
+		stop_critical_timing(a0, a1, LT_PREEMPT);
 }
 
 void trace_preempt_off(unsigned long a0, unsigned long a1)
 {
 	if (preempt_trace() && !irq_trace())
-		start_critical_timing(a0, a1);
+		start_critical_timing(a0, a1, LT_PREEMPT);
 }
 #endif /* CONFIG_PREEMPT_TRACER */
 
