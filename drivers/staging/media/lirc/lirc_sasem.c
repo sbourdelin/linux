@@ -388,11 +388,8 @@ static ssize_t vfd_write(struct file *file, const char __user *buf,
 	}
 
 	data_buf = memdup_user(buf, n_bytes);
-	if (IS_ERR(data_buf)) {
-		retval = PTR_ERR(data_buf);
-		data_buf = NULL;
-		goto exit;
-	}
+	if (IS_ERR(data_buf))
+		return PTR_ERR(data_buf);
 
 	memcpy(context->tx.data_buf, data_buf, n_bytes);
 
