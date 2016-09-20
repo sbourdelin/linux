@@ -616,7 +616,7 @@ i915_gem_create(struct drm_file *file,
 
 	ret = drm_gem_handle_create(file, &obj->base, &handle);
 	/* drop reference from allocate - handle holds it now */
-	i915_gem_object_put_unlocked(obj);
+	i915_gem_object_put(obj);
 	if (ret)
 		return ret;
 
@@ -1115,7 +1115,7 @@ i915_gem_pread_ioctl(struct drm_device *dev, void *data,
 
 	i915_gem_object_unpin_pages(obj);
 out:
-	i915_gem_object_put_unlocked(obj);
+	i915_gem_object_put(obj);
 	return ret;
 }
 
@@ -1451,7 +1451,7 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 
 	i915_gem_object_unpin_pages(obj);
 err:
-	i915_gem_object_put_unlocked(obj);
+	i915_gem_object_put(obj);
 	return ret;
 }
 
@@ -1561,7 +1561,7 @@ i915_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 err_pages:
 	i915_gem_object_unpin_pages(obj);
 err_unlocked:
-	i915_gem_object_put_unlocked(obj);
+	i915_gem_object_put(obj);
 	return ret;
 }
 
@@ -1592,7 +1592,7 @@ i915_gem_sw_finish_ioctl(struct drm_device *dev, void *data,
 		}
 	}
 
-	i915_gem_object_put_unlocked(obj);
+	i915_gem_object_put(obj);
 	return err;
 }
 
@@ -1638,7 +1638,7 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 	 * pages from.
 	 */
 	if (!obj->base.filp) {
-		i915_gem_object_put_unlocked(obj);
+		i915_gem_object_put(obj);
 		return -EINVAL;
 	}
 
@@ -1650,7 +1650,7 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 		struct vm_area_struct *vma;
 
 		if (down_write_killable(&mm->mmap_sem)) {
-			i915_gem_object_put_unlocked(obj);
+			i915_gem_object_put(obj);
 			return -EINTR;
 		}
 		vma = find_vma(mm, addr);
@@ -1664,7 +1664,7 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 		/* This may race, but that's ok, it only gets set */
 		WRITE_ONCE(obj->frontbuffer_ggtt_origin, ORIGIN_CPU);
 	}
-	i915_gem_object_put_unlocked(obj);
+	i915_gem_object_put(obj);
 	if (IS_ERR((void *)addr))
 		return addr;
 
@@ -2074,7 +2074,7 @@ i915_gem_mmap_gtt(struct drm_file *file,
 	if (ret == 0)
 		*offset = drm_vma_node_offset_addr(&obj->base.vma_node);
 
-	i915_gem_object_put_unlocked(obj);
+	i915_gem_object_put(obj);
 	return ret;
 }
 
@@ -2871,8 +2871,7 @@ i915_gem_wait_ioctl(struct drm_device *dev, void *data, struct drm_file *file)
 			args->timeout_ns = 0;
 	}
 
-	i915_gem_object_put_unlocked(obj);
-
+	i915_gem_object_put(obj);
 	return ret;
 }
 
