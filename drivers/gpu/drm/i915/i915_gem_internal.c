@@ -38,7 +38,8 @@ static void __i915_gem_object_free_pages(struct sg_table *st)
 	kfree(st);
 }
 
-static int i915_gem_object_get_pages_internal(struct drm_i915_gem_object *obj)
+static struct sg_table *
+i915_gem_object_get_pages_internal(struct drm_i915_gem_object *obj)
 {
 	const unsigned int npages = obj->base.size / PAGE_SIZE;
 	struct sg_table *st;
@@ -49,11 +50,11 @@ static int i915_gem_object_get_pages_internal(struct drm_i915_gem_object *obj)
 
 	st = kmalloc(sizeof(*st), GFP_KERNEL);
 	if (!st)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	if (sg_alloc_table(st, npages, GFP_KERNEL)) {
 		kfree(st);
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	sg = st->sgl;
@@ -95,25 +96,24 @@ static int i915_gem_object_get_pages_internal(struct drm_i915_gem_object *obj)
 	if (!swiotlb_nr_tbl())
 #endif
 		sg_mark_end(sg);
-	obj->mm.pages = st;
 
-	if (i915_gem_gtt_prepare_object(obj)) {
-		obj->mm.pages = NULL;
+	if (i915_gem_gtt_prepare_pages(obj, st))
 		goto err;
-	}
 
 	obj->mm.madv = I915_MADV_DONTNEED;
-	return 0;
+	return st;
 
 err:
 	sg_mark_end(sg);
 	__i915_gem_object_free_pages(st);
-	return -ENOMEM;
+	return ERR_PTR(-ENOMEM);
 }
 
-static void i915_gem_object_put_pages_internal(struct drm_i915_gem_object *obj)
+static void i915_gem_object_put_pages_internal(struct drm_i915_gem_object *obj,
+					       struct sg_table *pages)
 {
-	__i915_gem_object_free_pages(obj->mm.pages);
+	i915_gem_gtt_finish_pages(obj, pages);
+	__i915_gem_object_free_pages(pages);
 
 	obj->mm.dirty = false;
 	obj->mm.madv = I915_MADV_WILLNEED;

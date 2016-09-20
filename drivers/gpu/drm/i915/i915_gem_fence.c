@@ -638,7 +638,8 @@ i915_gem_swizzle_page(struct page *page)
  * by swapping them out and back in again).
  */
 void
-i915_gem_object_do_bit_17_swizzle(struct drm_i915_gem_object *obj)
+i915_gem_object_do_bit_17_swizzle(struct drm_i915_gem_object *obj,
+				  struct sg_table *pages)
 {
 	struct sgt_iter sgt_iter;
 	struct page *page;
@@ -648,10 +649,9 @@ i915_gem_object_do_bit_17_swizzle(struct drm_i915_gem_object *obj)
 		return;
 
 	i = 0;
-	for_each_sgt_page(page, sgt_iter, obj->mm.pages) {
+	for_each_sgt_page(page, sgt_iter, pages) {
 		char new_bit_17 = page_to_phys(page) >> 17;
-		if ((new_bit_17 & 0x1) !=
-		    (test_bit(i, obj->bit_17) != 0)) {
+		if ((new_bit_17 & 0x1) != (test_bit(i, obj->bit_17) != 0)) {
 			i915_gem_swizzle_page(page);
 			set_page_dirty(page);
 		}
@@ -668,15 +668,15 @@ i915_gem_object_do_bit_17_swizzle(struct drm_i915_gem_object *obj)
  * be called before the backing storage can be unpinned.
  */
 void
-i915_gem_object_save_bit_17_swizzle(struct drm_i915_gem_object *obj)
+i915_gem_object_save_bit_17_swizzle(struct drm_i915_gem_object *obj,
+				    struct sg_table *pages)
 {
 	struct sgt_iter sgt_iter;
 	struct page *page;
-	int page_count = obj->base.size >> PAGE_SHIFT;
 	int i;
 
 	if (obj->bit_17 == NULL) {
-		obj->bit_17 = kcalloc(BITS_TO_LONGS(page_count),
+		obj->bit_17 = kcalloc(BITS_TO_LONGS(obj->base.size >> PAGE_SHIFT),
 				      sizeof(long), GFP_KERNEL);
 		if (obj->bit_17 == NULL) {
 			DRM_ERROR("Failed to allocate memory for bit 17 "
@@ -687,7 +687,7 @@ i915_gem_object_save_bit_17_swizzle(struct drm_i915_gem_object *obj)
 
 	i = 0;
 
-	for_each_sgt_page(page, sgt_iter, obj->mm.pages) {
+	for_each_sgt_page(page, sgt_iter, pages) {
 		if (page_to_phys(page) & (1 << 17))
 			__set_bit(i, obj->bit_17);
 		else
