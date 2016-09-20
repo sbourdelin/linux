@@ -563,6 +563,9 @@ static void i915_gem_fini(struct drm_device *dev)
 	i915_gem_context_fini(dev);
 	mutex_unlock(&dev->struct_mutex);
 
+	synchronize_rcu();
+	flush_work(&dev_priv->mm.free_work);
+
 	WARN_ON(!list_empty(&to_i915(dev)->context_list));
 }
 
