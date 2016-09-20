@@ -514,6 +514,8 @@ static const struct attribute *vlv_attrs[] = {
 	NULL,
 };
 
+#ifdef CONFIG_DRM_I915_CAPTURE_ERROR
+
 static ssize_t error_state_read(struct file *filp, struct kobject *kobj,
 				struct bin_attribute *attr, char *buf,
 				loff_t off, size_t count)
@@ -571,6 +573,8 @@ static struct bin_attribute error_state_attr = {
 	.write = error_state_write,
 };
 
+#endif
+
 void i915_setup_sysfs(struct drm_i915_private *dev_priv)
 {
 	struct device *kdev = dev_priv->drm.primary->kdev;
@@ -617,17 +621,21 @@ void i915_setup_sysfs(struct drm_i915_private *dev_priv)
 	if (ret)
 		DRM_ERROR("RPS sysfs setup failed\n");
 
+#ifdef CONFIG_DRM_I915_CAPTURE_ERROR
 	ret = sysfs_create_bin_file(&kdev->kobj,
 				    &error_state_attr);
 	if (ret)
 		DRM_ERROR("error_state sysfs setup failed\n");
+#endif
 }
 
 void i915_teardown_sysfs(struct drm_i915_private *dev_priv)
 {
 	struct device *kdev = dev_priv->drm.primary->kdev;
 
+#ifdef CONFIG_DRM_I915_CAPTURE_ERROR
 	sysfs_remove_bin_file(&kdev->kobj, &error_state_attr);
+#endif
 	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
 		sysfs_remove_files(&kdev->kobj, vlv_attrs);
 	else

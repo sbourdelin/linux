@@ -30,6 +30,8 @@
 #include <generated/utsrelease.h>
 #include "i915_drv.h"
 
+#ifdef CONFIG_DRM_I915_CAPTURE_ERROR
+
 static const char *engine_str(int engine)
 {
 	switch (engine) {
@@ -1435,6 +1437,9 @@ void i915_capture_error_state(struct drm_i915_private *dev_priv,
 	struct drm_i915_error_state *error;
 	unsigned long flags;
 
+	if (!i915.error_capture)
+		return;
+
 	if (READ_ONCE(dev_priv->gpu_error.first_error))
 		return;
 
@@ -1519,6 +1524,8 @@ void i915_destroy_error_state(struct drm_device *dev)
 	if (error)
 		kref_put(&error->ref, i915_error_state_free);
 }
+
+#endif
 
 const char *i915_cache_level_str(struct drm_i915_private *i915, int type)
 {
