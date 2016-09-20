@@ -238,8 +238,9 @@ static int i915_gem_check_wedge(struct drm_i915_private *dev_priv)
 static int i915_gem_init_global_seqno(struct drm_i915_private *dev_priv,
 				      u32 seqno)
 {
+	struct i915_gem_timeline *timeline;
 	struct intel_engine_cs *engine;
-	int ret;
+	int ret, i;
 
 	/* Carefully retire all requests without writing to the rings */
 	ret = i915_gem_wait_for_idle(dev_priv,
@@ -261,6 +262,14 @@ static int i915_gem_init_global_seqno(struct drm_i915_private *dev_priv,
 	/* Finally reset hw state */
 	for_each_engine(engine, dev_priv)
 		intel_engine_init_global_seqno(engine, seqno);
+
+	list_for_each_entry(timeline, &dev_priv->gt.timelines, link) {
+		for (i = 0; i < ARRAY_SIZE(timeline->engine); i++) {
+			struct intel_timeline *tl = &timeline->engine[i];
+
+			memset(tl->sync_seqno, 0, sizeof(tl->sync_seqno));
+		}
+	}
 
 	return 0;
 }
@@ -456,7 +465,7 @@ static int
 i915_gem_request_await_request(struct drm_i915_gem_request *to,
 			       struct drm_i915_gem_request *from)
 {
-	int idx, ret;
+	int ret;
 
 	GEM_BUG_ON(to == from);
 
@@ -476,8 +485,7 @@ i915_gem_request_await_request(struct drm_i915_gem_request *to,
 		return ret < 0 ? ret : 0;
 	}
 
-	idx = intel_engine_sync_index(from->engine, to->engine);
-	if (from->global_seqno <= from->engine->semaphore.sync_seqno[idx])
+	if (from->global_seqno <= to->timeline->sync_seqno[from->engine->id])
 		return 0;
 
 	trace_i915_gem_ring_sync_to(to, from);
@@ -495,7 +503,7 @@ i915_gem_request_await_request(struct drm_i915_gem_request *to,
 			return ret;
 	}
 
-	from->engine->semaphore.sync_seqno[idx] = from->global_seqno;
+	to->timeline->sync_seqno[from->engine->id] = from->global_seqno;
 	return 0;
 }
 

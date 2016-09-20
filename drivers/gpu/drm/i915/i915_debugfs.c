@@ -3176,15 +3176,6 @@ static int i915_semaphore_status(struct seq_file *m, void *unused)
 		seq_putc(m, '\n');
 	}
 
-	seq_puts(m, "\nSync seqno:\n");
-	for_each_engine(engine, dev_priv) {
-		for (j = 0; j < num_rings; j++)
-			seq_printf(m, "  0x%08x ",
-				   engine->semaphore.sync_seqno[j]);
-		seq_putc(m, '\n');
-	}
-	seq_putc(m, '\n');
-
 	intel_runtime_pm_put(dev_priv);
 	mutex_unlock(&dev->struct_mutex);
 	return 0;
