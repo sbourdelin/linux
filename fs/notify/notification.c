@@ -63,7 +63,8 @@ EXPORT_SYMBOL_GPL(fsnotify_get_cookie);
 /* return true if the notify queue is empty, false otherwise */
 bool fsnotify_notify_queue_is_empty(struct fsnotify_group *group)
 {
-	BUG_ON(!spin_is_locked(&group->notification_lock));
+	BUG_ON(IS_ENABLED(CONFIG_SMP) &&
+	       !spin_is_locked(&group->notification_lock));
 	return list_empty(&group->notification_list) ? true : false;
 }
 
@@ -148,7 +149,8 @@ struct fsnotify_event *fsnotify_remove_first_event(struct fsnotify_group *group)
 {
 	struct fsnotify_event *event;
 
-	BUG_ON(!spin_is_locked(&group->notification_lock));
+	BUG_ON(IS_ENABLED(CONFIG_SMP) &&
+	       !spin_is_locked(&group->notification_lock));
 
 	pr_debug("%s: group=%p\n", __func__, group);
 
@@ -170,7 +172,8 @@ struct fsnotify_event *fsnotify_remove_first_event(struct fsnotify_group *group)
  */
 struct fsnotify_event *fsnotify_peek_first_event(struct fsnotify_group *group)
 {
-	BUG_ON(!spin_is_locked(&group->notification_lock));
+	BUG_ON(IS_ENABLED(CONFIG_SMP) &&
+	       !spin_is_locked(&group->notification_lock));
 
 	return list_first_entry(&group->notification_list,
 				struct fsnotify_event, list);
