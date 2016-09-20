@@ -2028,6 +2028,7 @@ struct __drm_connnectors_state {
 
 /**
  * struct drm_atomic_state - the global state object for atomic updates
+ * @ref: count of all references to this state
  * @dev: parent DRM device
  * @allow_modeset: allow full modeset
  * @legacy_cursor_update: hint to enforce legacy cursor IOCTL semantics
@@ -2039,6 +2040,8 @@ struct __drm_connnectors_state {
  * @acquire_ctx: acquire context for this atomic modeset state update
  */
 struct drm_atomic_state {
+	struct kref ref;
+
 	struct drm_device *dev;
 	bool allow_modeset : 1;
 	bool legacy_cursor_update : 1;
