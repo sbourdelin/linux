@@ -21,6 +21,7 @@
 #include <asm/fpswa.h>
 #include <asm/intrinsics.h>
 #include <asm/processor.h>
+#include <asm/exception.h>
 #include <asm/uaccess.h>
 #include <asm/setup.h>
 

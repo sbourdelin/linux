@@ -23,6 +23,7 @@
 #include <asm/processor.h>
 #include <asm/rse.h>
 #include <asm/uaccess.h>
+#include <asm/exception.h>
 #include <asm/unaligned.h>
 
 extern int die_if_kernel(char *str, struct pt_regs *regs, long err);
