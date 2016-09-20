@@ -603,8 +603,8 @@ static int isl29018_chip_init(struct isl29018_chip *chip)
 		return status;
 	}
 
-	status = isl29018_set_integration_time(chip,
-			isl29018_int_utimes[chip->type][chip->int_time]);
+	status = isl29018_set_integration_time(
+			chip, isl29018_int_utimes[chip->type][chip->int_time]);
 	if (status < 0) {
 		dev_err(dev, "Init of isl29018 fails\n");
 		return status;
