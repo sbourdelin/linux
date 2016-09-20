@@ -48,6 +48,19 @@ static bool mutex_is_locked_by(struct mutex *mutex, struct task_struct *task)
 #endif
 }
 
+static bool i915_gem_shrinker_lock(struct drm_device *dev, bool *unlock)
+{
+	if (!mutex_trylock(&dev->struct_mutex)) {
+		if (!mutex_is_locked_by(&dev->struct_mutex, current))
+			return false;
+
+		*unlock = false;
+	} else
+		*unlock = true;
+
+	return true;
+}
+
 static bool any_vma_pinned(struct drm_i915_gem_object *obj)
 {
 	struct i915_vma *vma;
@@ -66,6 +79,9 @@ static bool swap_available(void)
 
 static bool can_release_pages(struct drm_i915_gem_object *obj)
 {
+	if (!obj->mm.pages)
+		return false;
+
 	/* Only shmemfs objects are backed by swap */
 	if (!obj->base.filp)
 		return false;
@@ -78,7 +94,7 @@ static bool can_release_pages(struct drm_i915_gem_object *obj)
 	 * to the GPU, simply unbinding from the GPU is not going to succeed
 	 * in releasing our pin count on the pages themselves.
 	 */
-	if (obj->mm.pages_pin_count > obj->bind_count)
+	if (atomic_read(&obj->mm.pages_pin_count) > obj->bind_count)
 		return false;
 
 	if (any_vma_pinned(obj))
@@ -135,6 +151,10 @@ i915_gem_shrink(struct drm_i915_private *dev_priv,
 		{ NULL, 0 },
 	}, *phase;
 	unsigned long count = 0;
+	bool unlock;
+
+	if (!i915_gem_shrinker_lock(&dev_priv->drm, &unlock))
+		return 0;
 
 	trace_i915_gem_shrink(dev_priv, target, flags);
 	i915_gem_retire_requests(dev_priv);
@@ -198,8 +218,10 @@ i915_gem_shrink(struct drm_i915_private *dev_priv,
 
 			i915_gem_object_get(obj);
 
-			if (unsafe_drop_pages(obj))
+			if (unsafe_drop_pages(obj)) {
+				__i915_gem_object_invalidate(obj);
 				count += obj->base.size >> PAGE_SHIFT;
+			}
 
 			i915_gem_object_put(obj);
 		}
@@ -210,6 +232,9 @@ i915_gem_shrink(struct drm_i915_private *dev_priv,
 		intel_runtime_pm_put(dev_priv);
 
 	i915_gem_retire_requests(dev_priv);
+	if (unlock)
+		mutex_unlock(&dev_priv->drm.struct_mutex);
+
 	/* expedite the RCU grace period to free some request slabs */
 	synchronize_rcu_expedited();
 
@@ -241,19 +266,6 @@ unsigned long i915_gem_shrink_all(struct drm_i915_private *dev_priv)
 	rcu_barrier(); /* wait until our RCU delayed slab frees are completed */
 
 	return freed;
-}
-
-static bool i915_gem_shrinker_lock(struct drm_device *dev, bool *unlock)
-{
-	if (!mutex_trylock(&dev->struct_mutex)) {
-		if (!mutex_is_locked_by(&dev->struct_mutex, current))
-			return false;
-
-		*unlock = false;
-	} else
-		*unlock = true;
-
-	return true;
 }
 
 static unsigned long
