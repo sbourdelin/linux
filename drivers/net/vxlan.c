@@ -1751,15 +1751,17 @@ static int vxlan_build_skb(struct sk_buff *skb, struct dst_entry *dst,
 		goto out_free;
 
 	vxh = (struct vxlanhdr *) __skb_push(skb, sizeof(*vxh));
-	vxh->vx_flags = VXLAN_HF_VNI;
-	vxh->vx_vni = vxlan_vni_field(vni);
+	put_unaligned(VXLAN_HF_VNI, &vxh->vx_flags);
+	put_unaligned(vxlan_vni_field(vni), &vxh->vx_vni);
 
 	if (type & SKB_GSO_TUNNEL_REMCSUM) {
 		unsigned int start;
+		__be32 tmpvni = get_unaligned(&vxh->vx_vni);
 
 		start = skb_checksum_start_offset(skb) - sizeof(struct vxlanhdr);
-		vxh->vx_vni |= vxlan_compute_rco(start, skb->csum_offset);
-		vxh->vx_flags |= VXLAN_HF_RCO;
+		tmpvni |= vxlan_compute_rco(start, skb->csum_offset);
+		put_unaligned(tmpvni, &vxh->vx_vni);
+		put_unaligned(VXLAN_HF_VNI | VXLAN_HF_RCO, &vxh->vx_flags);
 
 		if (!skb_is_gso(skb)) {
 			skb->ip_summed = CHECKSUM_NONE;
