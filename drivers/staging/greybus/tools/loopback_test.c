@@ -40,31 +40,31 @@ static struct dict dict[] = {
 
 struct loopback_results {
 	float latency_avg;
-	uint32_t latency_max;
-	uint32_t latency_min;
-	uint32_t latency_jitter;
+	u32 latency_max;
+	u32 latency_min;
+	u32 latency_jitter;
 
 	float request_avg;
-	uint32_t request_max;
-	uint32_t request_min;
-	uint32_t request_jitter;
+	u32 request_max;
+	u32 request_min;
+	u32 request_jitter;
 
 	float throughput_avg;
-	uint32_t throughput_max;
-	uint32_t throughput_min;
-	uint32_t throughput_jitter;
+	u32 throughput_max;
+	u32 throughput_min;
+	u32 throughput_jitter;
 
 	float apbridge_unipro_latency_avg;
-	uint32_t apbridge_unipro_latency_max;
-	uint32_t apbridge_unipro_latency_min;
-	uint32_t apbridge_unipro_latency_jitter;
+	u32 apbridge_unipro_latency_max;
+	u32 apbridge_unipro_latency_min;
+	u32 apbridge_unipro_latency_jitter;
 
 	float gbphy_firmware_latency_avg;
-	uint32_t gbphy_firmware_latency_max;
-	uint32_t gbphy_firmware_latency_min;
-	uint32_t gbphy_firmware_latency_jitter;
+	u32 gbphy_firmware_latency_max;
+	u32 gbphy_firmware_latency_min;
+	u32 gbphy_firmware_latency_jitter;
 
-	uint32_t error;
+	u32 error;
 };
 
 struct loopback_device {
@@ -110,7 +110,7 @@ static inline int device_enabled(struct loopback_test *t, int dev_idx);
 #define GET_MAX(field)							\
 static int get_##field##_aggregate(struct loopback_test *t)		\
 {									\
-	uint32_t max = 0;						\
+	u32 max = 0;						\
 	int i;								\
 	for (i = 0; i < t->device_count; i++) {				\
 		if (!device_enabled(t, i))				\
@@ -124,7 +124,7 @@ static int get_##field##_aggregate(struct loopback_test *t)		\
 #define GET_MIN(field)							\
 static int get_##field##_aggregate(struct loopback_test *t)		\
 {									\
-	uint32_t min = ~0;						\
+	u32 min = ~0;						\
 	int i;								\
 	for (i = 0; i < t->device_count; i++) {				\
 		if (!device_enabled(t, i))				\
@@ -138,8 +138,8 @@ static int get_##field##_aggregate(struct loopback_test *t)		\
 #define GET_AVG(field)							\
 static int get_##field##_aggregate(struct loopback_test *t)		\
 {									\
-	uint32_t val = 0;						\
-	uint32_t count = 0;						\
+	u32 val = 0;						\
+	u32 count = 0;						\
 	int i;								\
 	for (i = 0; i < t->device_count; i++) {				\
 		if (!device_enabled(t, i))				\
