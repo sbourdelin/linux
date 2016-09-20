@@ -81,7 +81,7 @@ act2000_isa_interrupt(int dummy, void *dev_id)
 		netdev_warn(dev, "act2000: errIRQ\n");
 	}
 	if (istatus)
-		printk(KERN_DEBUG "act2000: ?IRQ %d %02x\n", card->irq, istatus);
+		netdev_warn(dev, "act2000: ?IRQ %d %02x\n", card->irq, istatus);
 	return IRQ_HANDLED;
 }
 
@@ -382,7 +382,7 @@ act2000_isa_getid(act2000_card *card)
 		*p = '\0';
 	printk(KERN_INFO "act2000: Firmware-ID: %s\n", fid.revision);
 	if (card->flags & ACT2000_FLAGS_IVALID) {
-		printk(KERN_DEBUG "Enabling Interrupts ...\n");
+		netdev_dbg(dev, "Enabling Interrupts ...\n");
 		act2000_isa_enable_irq(card);
 	}
 	return 0;
