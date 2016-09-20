@@ -12022,7 +12022,7 @@ static void intel_mmio_flip_work_func(struct work_struct *w)
 
 	if (work->flip_queued_req)
 		WARN_ON(i915_wait_request(work->flip_queued_req,
-					  0, NULL, NO_WAITBOOST));
+					  0, MAX_SCHEDULE_TIMEOUT) < 0);
 
 	/* For framebuffer backed by dmabuf, wait for fence */
 	resv = i915_gem_object_get_dmabuf_resv(obj);
@@ -14065,19 +14065,21 @@ static int intel_atomic_prepare_commit(struct drm_device *dev,
 		for_each_plane_in_state(state, plane, plane_state, i) {
 			struct intel_plane_state *intel_plane_state =
 				to_intel_plane_state(plane_state);
+			long timeout;
 
 			if (!intel_plane_state->wait_req)
 				continue;
 
-			ret = i915_wait_request(intel_plane_state->wait_req,
-						I915_WAIT_INTERRUPTIBLE,
-						NULL, NULL);
-			if (ret) {
+			timeout = i915_wait_request(intel_plane_state->wait_req,
+						    I915_WAIT_INTERRUPTIBLE,
+						    MAX_SCHEDULE_TIMEOUT);
+			if (timeout < 0) {
 				/* Any hang should be swallowed by the wait */
-				WARN_ON(ret == -EIO);
+				WARN_ON(timeout == -EIO);
 				mutex_lock(&dev->struct_mutex);
 				drm_atomic_helper_cleanup_planes(dev, state);
 				mutex_unlock(&dev->struct_mutex);
+				ret = timeout;
 				break;
 			}
 		}
@@ -14279,7 +14281,7 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 	bool hw_check = intel_state->modeset;
 	unsigned long put_domains[I915_MAX_PIPES] = {};
 	unsigned crtc_vblank_mask = 0;
-	int i, ret;
+	int i;
 
 	for_each_plane_in_state(state, plane, plane_state, i) {
 		struct intel_plane_state *intel_plane_state =
@@ -14288,11 +14290,10 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 		if (!intel_plane_state->wait_req)
 			continue;
 
-		ret = i915_wait_request(intel_plane_state->wait_req,
-					0, NULL, NULL);
 		/* EIO should be eaten, and we can't get interrupted in the
 		 * worker, and blocking commits have waited already. */
-		WARN_ON(ret);
+		WARN_ON(i915_wait_request(intel_plane_state->wait_req,
+					  0, MAX_SCHEDULE_TIMEOUT) < 0);
 	}
 
 	drm_atomic_helper_wait_for_dependencies(state);
@@ -14643,6 +14644,7 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 	if (old_obj) {
 		struct drm_crtc_state *crtc_state =
 			drm_atomic_get_existing_crtc_state(new_state->state, plane->state->crtc);
+		long timeout = 0;
 
 		/* Big Hammer, we also need to ensure that any pending
 		 * MI_WAIT_FOR_EVENT inside a user batch buffer on the
@@ -14656,11 +14658,15 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 		 * can safely continue.
 		 */
 		if (needs_modeset(crtc_state))
-			ret = i915_gem_object_wait_rendering(old_obj, true);
-		if (ret) {
+			timeout = i915_gem_object_wait(old_obj,
+						       I915_WAIT_INTERRUPTIBLE |
+						       I915_WAIT_LOCKED,
+						       MAX_SCHEDULE_TIMEOUT,
+						       NULL);
+		if (timeout < 0) {
 			/* GPU hangs should have been swallowed by the wait */
-			WARN_ON(ret == -EIO);
-			return ret;
+			WARN_ON(timeout == -EIO);
+			return timeout;
 		}
 	}
 
