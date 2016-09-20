@@ -35,6 +35,8 @@ struct intel_timeline {
 	u64 fence_context;
 	u32 last_submitted_seqno;
 
+	spinlock_t lock;
+
 	/**
 	 * List of breadcrumbs associated with GPU requests currently
 	 * outstanding.

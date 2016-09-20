@@ -77,22 +77,26 @@ static void intel_breadcrumbs_fake_irq(unsigned long data)
 
 static void irq_enable(struct intel_engine_cs *engine)
 {
+	unsigned long flags;
+
 	/* Enabling the IRQ may miss the generation of the interrupt, but
 	 * we still need to force the barrier before reading the seqno,
 	 * just in case.
 	 */
 	engine->breadcrumbs.irq_posted = true;
 
-	spin_lock_irq(&engine->i915->irq_lock);
+	spin_lock_irqsave(&engine->i915->irq_lock, flags);
 	engine->irq_enable(engine);
-	spin_unlock_irq(&engine->i915->irq_lock);
+	spin_unlock_irqrestore(&engine->i915->irq_lock, flags);
 }
 
 static void irq_disable(struct intel_engine_cs *engine)
 {
-	spin_lock_irq(&engine->i915->irq_lock);
+	unsigned long flags;
+
+	spin_lock_irqsave(&engine->i915->irq_lock, flags);
 	engine->irq_disable(engine);
-	spin_unlock_irq(&engine->i915->irq_lock);
+	spin_unlock_irqrestore(&engine->i915->irq_lock, flags);
 
 	engine->breadcrumbs.irq_posted = false;
 }

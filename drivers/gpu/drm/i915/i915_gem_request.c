@@ -34,12 +34,6 @@ static const char *i915_fence_get_driver_name(struct fence *fence)
 
 static const char *i915_fence_get_timeline_name(struct fence *fence)
 {
-	/* Timelines are bound by eviction to a VM. However, since
-	 * we only have a global seqno at the moment, we only have
-	 * a single timeline. Note that each timeline will have
-	 * multiple execution contexts (fence contexts) as we allow
-	 * engines within a single timeline to execute in parallel.
-	 */
 	return to_request(fence)->timeline->common->name;
 }
 
@@ -64,18 +58,6 @@ static signed long i915_fence_wait(struct fence *fence,
 	return i915_wait_request(to_request(fence), interruptible, timeout);
 }
 
-static void i915_fence_value_str(struct fence *fence, char *str, int size)
-{
-	snprintf(str, size, "%u", fence->seqno);
-}
-
-static void i915_fence_timeline_value_str(struct fence *fence, char *str,
-					  int size)
-{
-	snprintf(str, size, "%u",
-		 intel_engine_get_seqno(to_request(fence)->engine));
-}
-
 static void i915_fence_release(struct fence *fence)
 {
 	struct drm_i915_gem_request *req = to_request(fence);
@@ -90,8 +72,6 @@ const struct fence_ops i915_fence_ops = {
 	.signaled = i915_fence_signaled,
 	.wait = i915_fence_wait,
 	.release = i915_fence_release,
-	.fence_value_str = i915_fence_value_str,
-	.timeline_value_str = i915_fence_timeline_value_str,
 };
 
 int i915_gem_request_add_to_client(struct drm_i915_gem_request *req,
@@ -144,7 +124,10 @@ static void i915_gem_request_retire(struct drm_i915_gem_request *request)
 	struct i915_gem_active *active, *next;
 
 	trace_i915_gem_request_retire(request);
+
+	spin_lock_irq(&request->engine->timeline->lock);
 	list_del_init(&request->link);
+	spin_unlock_irq(&request->engine->timeline->lock);
 
 	/* We know the GPU must have read the request to have
 	 * sent us the seqno + interrupt, so use the position
@@ -310,6 +293,12 @@ static int reserve_global_seqno(struct drm_i915_private *i915)
 	return 0;
 }
 
+static u32 __timeline_get_seqno(struct i915_gem_timeline *tl)
+{
+	/* next_seqno only incremented under a mutex */
+	return tl->next_seqno.counter++;
+}
+
 static u32 timeline_get_seqno(struct i915_gem_timeline *tl)
 {
 	return atomic_inc_return(&tl->next_seqno);
@@ -320,17 +309,42 @@ submit_notify(struct i915_sw_fence *fence, enum i915_sw_fence_notify state)
 {
 	struct drm_i915_gem_request *request =
 		container_of(fence, typeof(*request), submit);
+	struct intel_timeline *timeline;
+	struct intel_engine_cs *engine = request->engine;
+	unsigned long flags;
+	u32 seqno;
 
 	/* Will be called from irq-context when using foreign DMA fences */
 
-	switch (state) {
-	case FENCE_COMPLETE:
-		request->engine->submit_request(request);
-		break;
+	if (state != FENCE_COMPLETE)
+		return NOTIFY_DONE;
 
-	case FENCE_FREE:
-		break;
-	}
+	timeline = engine->timeline;
+	GEM_BUG_ON(timeline == request->timeline);
+
+	spin_lock_irqsave(&timeline->lock, flags);
+
+	seqno = timeline_get_seqno(timeline->common);
+	GEM_BUG_ON(seqno == 0);
+
+	request->previous_seqno = timeline->last_submitted_seqno;
+	timeline->last_submitted_seqno = seqno;
+
+	spin_lock_nested(&request->lock, SINGLE_DEPTH_NESTING);
+	request->global_seqno = seqno;
+	if (test_bit(FENCE_FLAG_ENABLE_SIGNAL_BIT, &request->fence.flags))
+		intel_engine_enable_signaling(request);
+	spin_unlock(&request->lock);
+
+	engine->emit_request(request, request->ring->vaddr + request->postfix);
+
+	spin_lock_nested(&request->timeline->lock, SINGLE_DEPTH_NESTING);
+	list_move_tail(&request->link, &timeline->requests);
+	spin_unlock(&request->timeline->lock);
+
+	engine->submit_request(request);
+
+	spin_unlock_irqrestore(&timeline->lock, flags);
 
 	return NOTIFY_DONE;
 }
@@ -409,24 +423,24 @@ i915_gem_request_alloc(struct intel_engine_cs *engine,
 		goto err_unreserve;
 	}
 
-	req->timeline = engine->timeline;
+	req->timeline = i915_gem_context_lookup_timeline(ctx, engine);
 
 	spin_lock_init(&req->lock);
 	fence_init(&req->fence,
 		   &i915_fence_ops,
 		   &req->lock,
 		   req->timeline->fence_context,
-		   timeline_get_seqno(req->timeline->common));
+		   __timeline_get_seqno(req->timeline->common));
 
 	i915_sw_fence_init(&req->submit, submit_notify);
 
 	INIT_LIST_HEAD(&req->active_list);
 	req->i915 = dev_priv;
 	req->engine = engine;
-	req->global_seqno = req->fence.seqno;
 	req->ctx = i915_gem_context_get(ctx);
 
 	/* No zalloc, must clear what we need by hand */
+	req->global_seqno = 0;
 	req->previous_context = NULL;
 	req->file_priv = NULL;
 	req->batch = NULL;
@@ -677,8 +691,6 @@ void __i915_add_request(struct drm_i915_gem_request *request, bool flush_caches)
 	err = intel_ring_begin(request, engine->emit_request_sz);
 	GEM_BUG_ON(err);
 	request->postfix = ring->tail;
-
-	engine->emit_request(request, request->ring->vaddr + request->postfix);
 	ring->tail += engine->emit_request_sz * sizeof(u32);
 
 	/* Seal the request and mark it as pending execution. Note that
@@ -693,12 +705,15 @@ void __i915_add_request(struct drm_i915_gem_request *request, bool flush_caches)
 		i915_sw_fence_await_sw_fence(&request->submit, &prev->submit,
 					     &request->submitq, GFP_NOWAIT);
 
-	request->emitted_jiffies = jiffies;
-	request->previous_seqno = timeline->last_submitted_seqno;
+	spin_lock_irq(&timeline->lock);
+	list_add_tail(&request->link, &timeline->requests);
+	spin_unlock_irq(&timeline->lock);
+
 	timeline->last_submitted_seqno = request->fence.seqno;
 	i915_gem_active_set(&timeline->last_request, request);
-	list_add_tail(&request->link, &timeline->requests);
+
 	list_add_tail(&request->ring_link, &ring->request_list);
+	request->emitted_jiffies = jiffies;
 
 	i915_gem_mark_busy(engine);
 

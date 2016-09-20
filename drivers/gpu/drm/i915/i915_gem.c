@@ -2558,6 +2558,7 @@ static void i915_gem_reset_engine(struct intel_engine_cs *engine)
 {
 	struct drm_i915_gem_request *request;
 	struct i915_gem_context *incomplete_ctx;
+	struct intel_timeline *timeline;
 	bool ring_hung;
 
 	/* Ensure irq handler finishes, and not run again. */
@@ -2595,6 +2596,10 @@ static void i915_gem_reset_engine(struct intel_engine_cs *engine)
 	list_for_each_entry_continue(request, &engine->timeline->requests, link)
 		if (request->ctx == incomplete_ctx)
 			reset_request(request);
+
+	timeline = i915_gem_context_lookup_timeline(incomplete_ctx, engine);
+	list_for_each_entry(request, &timeline->requests, link)
+		reset_request(request);
 }
 
 void i915_gem_reset(struct drm_i915_private *dev_priv)
