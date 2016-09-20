@@ -223,6 +223,10 @@ static void ftgmac100_start_hw(struct ftgmac100 *priv, int speed)
 {
 	int maccr = MACCR_ENABLE_ALL;
 
+	if (of_machine_is_compatible("aspeed,ast2500")) {
+		maccr &= ~FTGMAC100_MACCR_PHY_LINK_LEVEL;
+	}
+
 	switch (speed) {
 	default:
 	case 10:
