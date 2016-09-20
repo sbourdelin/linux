@@ -395,7 +395,7 @@ int ima_restore_measurement_list(loff_t size, void *buf)
 			hdr_v1->template_name_len =
 			    le32_to_cpu(hdr_v1->template_name_len);
 
-		if ((hdr_v1->template_name_len > MAX_TEMPLATE_NAME_LEN) ||
+		if ((hdr_v1->template_name_len >= MAX_TEMPLATE_NAME_LEN) ||
 		    ((bufp + hdr_v1->template_name_len) > bufendp)) {
 			pr_err("attempting to restore a template name \
 				that is too long\n");
