@@ -161,7 +161,7 @@ cleanup:
 	return ret;
 }
 
-void intel_engine_init_seqno(struct intel_engine_cs *engine, u32 seqno)
+void intel_engine_init_global_seqno(struct intel_engine_cs *engine, u32 seqno)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
 
@@ -197,7 +197,7 @@ void intel_engine_init_seqno(struct intel_engine_cs *engine, u32 seqno)
 	intel_write_status_page(engine, I915_GEM_HWS_INDEX, seqno);
 	if (engine->irq_seqno_barrier)
 		engine->irq_seqno_barrier(engine);
-	engine->last_submitted_seqno = seqno;
+	engine->timeline->last_submitted_seqno = seqno;
 
 	engine->hangcheck.seqno = seqno;
 
@@ -215,10 +215,9 @@ void intel_engine_init_hangcheck(struct intel_engine_cs *engine)
 		i915_queue_hangcheck(engine->i915);
 }
 
-static void intel_engine_init_requests(struct intel_engine_cs *engine)
+static void intel_engine_init_timeline(struct intel_engine_cs *engine)
 {
-	init_request_active(&engine->last_request, NULL);
-	INIT_LIST_HEAD(&engine->request_list);
+	engine->timeline = &engine->i915->gt.global_timeline.engine[engine->id];
 }
 
 /**
@@ -235,9 +234,7 @@ void intel_engine_setup_common(struct intel_engine_cs *engine)
 	INIT_LIST_HEAD(&engine->execlist_queue);
 	spin_lock_init(&engine->execlist_lock);
 
-	engine->fence_context = fence_context_alloc(1);
-
-	intel_engine_init_requests(engine);
+	intel_engine_init_timeline(engine);
 	intel_engine_init_hangcheck(engine);
 	i915_gem_batch_pool_init(engine, &engine->batch_pool);
 

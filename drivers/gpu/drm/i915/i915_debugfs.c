@@ -579,7 +579,7 @@ static int i915_gem_pageflip_info(struct seq_file *m, void *data)
 				seq_printf(m, "Flip queued on %s at seqno %x, next seqno %x [current breadcrumb %x], completed? %d\n",
 					   engine->name,
 					   i915_gem_request_get_seqno(work->flip_queued_req),
-					   dev_priv->next_seqno,
+					   dev_priv->gt.global_timeline.next_seqno,
 					   intel_engine_get_seqno(engine),
 					   i915_gem_request_completed(work->flip_queued_req));
 			} else
@@ -670,13 +670,13 @@ static int i915_gem_request_info(struct seq_file *m, void *data)
 		int count;
 
 		count = 0;
-		list_for_each_entry(req, &engine->request_list, link)
+		list_for_each_entry(req, &engine->timeline->requests, link)
 			count++;
 		if (count == 0)
 			continue;
 
 		seq_printf(m, "%s requests: %d\n", engine->name, count);
-		list_for_each_entry(req, &engine->request_list, link) {
+		list_for_each_entry(req, &engine->timeline->requests, link) {
 			struct pid *pid = req->ctx->pid;
 			struct task_struct *task;
 
@@ -1054,15 +1054,8 @@ static int
 i915_next_seqno_get(void *data, u64 *val)
 {
 	struct drm_i915_private *dev_priv = data;
-	int ret;
 
-	ret = mutex_lock_interruptible(&dev_priv->drm.struct_mutex);
-	if (ret)
-		return ret;
-
-	*val = dev_priv->next_seqno;
-	mutex_unlock(&dev_priv->drm.struct_mutex);
-
+	*val = READ_ONCE(dev_priv->gt.global_timeline.next_seqno);
 	return 0;
 }
 
@@ -1077,7 +1070,7 @@ i915_next_seqno_set(void *data, u64 val)
 	if (ret)
 		return ret;
 
-	ret = i915_gem_set_seqno(dev, val);
+	ret = i915_gem_set_global_seqno(dev, val);
 	mutex_unlock(&dev->struct_mutex);
 
 	return ret;
@@ -1336,7 +1329,7 @@ static int i915_hangcheck_info(struct seq_file *m, void *unused)
 		seq_printf(m, "\tseqno = %x [current %x, last %x]\n",
 			   engine->hangcheck.seqno,
 			   seqno[id],
-			   engine->last_submitted_seqno);
+			   engine->timeline->last_submitted_seqno);
 		seq_printf(m, "\twaiters? %s, fake irq active? %s\n",
 			   yesno(intel_engine_has_waiter(engine)),
 			   yesno(test_bit(engine->id,
