@@ -52,7 +52,7 @@ uint debug;
 module_param(debug, uint, 0);
 MODULE_PARM_DESC(debug, "Default debug msglevel");
 
-static LIST_HEAD(qedr_dev_list);
+#define QEDR_WQ_MULTIPLIER_DFT	(3)
 
 void qedr_ib_dispatch_event(struct qedr_dev *dev, u8 port_num,
 			    enum ib_event_type type)
@@ -99,7 +99,11 @@ static int qedr_register_device(struct qedr_dev *dev)
 				     QEDR_UVERBS(CREATE_CQ) |
 				     QEDR_UVERBS(RESIZE_CQ) |
 				     QEDR_UVERBS(DESTROY_CQ) |
-				     QEDR_UVERBS(REQ_NOTIFY_CQ);
+				     QEDR_UVERBS(REQ_NOTIFY_CQ) |
+				     QEDR_UVERBS(CREATE_QP) |
+				     QEDR_UVERBS(MODIFY_QP) |
+				     QEDR_UVERBS(QUERY_QP) |
+				     QEDR_UVERBS(DESTROY_QP);
 
 	dev->ibdev.phys_port_cnt = 1;
 	dev->ibdev.num_comp_vectors = dev->num_cnq;
@@ -123,6 +127,11 @@ static int qedr_register_device(struct qedr_dev *dev)
 	dev->ibdev.destroy_cq = qedr_destroy_cq;
 	dev->ibdev.resize_cq = qedr_resize_cq;
 	dev->ibdev.req_notify_cq = qedr_arm_cq;
+
+	dev->ibdev.create_qp = qedr_create_qp;
+	dev->ibdev.modify_qp = qedr_modify_qp;
+	dev->ibdev.query_qp = qedr_query_qp;
+	dev->ibdev.destroy_qp = qedr_destroy_qp;
 
 	dev->ibdev.query_pkey = qedr_query_pkey;
 
@@ -618,6 +627,8 @@ static struct qedr_dev *qedr_add(struct qed_dev *cdev, struct pci_dev *pdev,
 		DP_ERR(dev, "not enough CNQ resources.\n");
 		goto init_err;
 	}
+
+	dev->wq_multiplier = QEDR_WQ_MULTIPLIER_DFT;
 
 	qedr_pci_set_atomic(dev, pdev);
  

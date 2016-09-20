@@ -43,4 +43,39 @@ struct qedr_create_cq_uresp {
        u16 icid;
 };
 
+struct qedr_create_qp_ureq {
+       u32 qp_handle_hi;
+       u32 qp_handle_lo;
+
+       /* SQ */
+       /* user space virtual address of SQ buffer */
+       u64 sq_addr;
+
+       /* length of SQ buffer */
+       size_t sq_len;
+
+       /* RQ */
+       /* user space virtual address of RQ buffer */
+       u64 rq_addr;
+
+       /* length of RQ buffer */
+       size_t rq_len;
+};
+
+struct qedr_create_qp_uresp {
+       u32 qp_id;
+       int atomic_supported;
+
+       /* SQ */
+       u32 sq_db_offset;
+       u16 sq_icid;
+
+       /* RQ */
+       u32 rq_db_offset;
+       u16 rq_icid;
+
+       u32 rq_db2_offset;
+};
+
 #endif /* __QEDR_USER_H__ */
+
