@@ -6473,17 +6473,23 @@ static __init int hardware_setup(void)
 
 	set_bit(0, vmx_vpid_bitmap); /* 0 is reserved for host */
 
-	for (msr = 0x800; msr <= 0x8ff; msr++)
-		vmx_disable_intercept_msr_read_x2apic(msr);
+	if (enable_apicv) {
+		for (msr = 0x800; msr <= 0x8ff; msr++)
+			vmx_disable_intercept_msr_read_x2apic(msr);
 
-	/* TMCCT */
-	vmx_enable_intercept_msr_read_x2apic(0x839);
-	/* TPR */
-	vmx_disable_intercept_msr_write_x2apic(0x808);
-	/* EOI */
-	vmx_disable_intercept_msr_write_x2apic(0x80b);
-	/* SELF-IPI */
-	vmx_disable_intercept_msr_write_x2apic(0x83f);
+		/* TMCCT */
+		vmx_enable_intercept_msr_read_x2apic(0x839);
+		/* TPR */
+		vmx_disable_intercept_msr_write_x2apic(0x808);
+		/* EOI */
+		vmx_disable_intercept_msr_write_x2apic(0x80b);
+		/* SELF-IPI */
+		vmx_disable_intercept_msr_write_x2apic(0x83f);
+	} else if (cpu_has_vmx_tpr_shadow()) {
+		/* TPR */
+		vmx_disable_intercept_msr_read_x2apic(0x808);
+		vmx_disable_intercept_msr_write_x2apic(0x808);
+	}
 
 	if (enable_ept) {
 		kvm_mmu_set_mask_ptes(VMX_EPT_READABLE_MASK,
@@ -8444,12 +8450,7 @@ static void vmx_set_virtual_x2apic_mode(struct kvm_vcpu *vcpu, bool set)
 		return;
 	}
 
-	/*
-	 * There is not point to enable virtualize x2apic without enable
-	 * apicv
-	 */
-	if (!cpu_has_vmx_virtualize_x2apic_mode() ||
-				!kvm_vcpu_apicv_active(vcpu))
+	if (!cpu_has_vmx_virtualize_x2apic_mode())
 		return;
 
 	if (!cpu_need_tpr_shadow(vcpu))
