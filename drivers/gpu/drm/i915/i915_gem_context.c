@@ -929,20 +929,29 @@ int i915_switch_context(struct drm_i915_gem_request *req)
 int i915_gem_switch_to_kernel_context(struct drm_i915_private *dev_priv)
 {
 	struct intel_engine_cs *engine;
+	struct i915_gem_timeline *timeline;
 
 	for_each_engine(engine, dev_priv) {
 		struct drm_i915_gem_request *req;
 		int ret;
 
-		if (engine->last_context == NULL)
-			continue;
-
-		if (engine->last_context == dev_priv->kernel_context)
-			continue;
-
 		req = i915_gem_request_alloc(engine, dev_priv->kernel_context);
 		if (IS_ERR(req))
 			return PTR_ERR(req);
+
+		/* Queue this switch after all other activity */
+		list_for_each_entry(timeline, &dev_priv->gt.timelines, link) {
+			struct drm_i915_gem_request *prev;
+			struct intel_timeline *tl;
+
+			tl = &timeline->engine[engine->id];
+			prev = i915_gem_active_raw(&tl->last_request,
+						   &dev_priv->drm.struct_mutex);
+			if (prev)
+				i915_sw_fence_await_sw_fence(&req->submit,
+							     &prev->submit,
+							     NULL, GFP_KERNEL);
+		}
 
 		ret = i915_switch_context(req);
 		i915_add_request_no_flush(req);
