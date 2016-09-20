@@ -275,3 +275,7 @@ report:
 	report_usercopy(ptr, n, to_user, err);
 }
 EXPORT_SYMBOL(__check_object_size);
+
+void __skip_check_object_size(void)
+{ }
+EXPORT_SYMBOL(__skip_check_object_size);

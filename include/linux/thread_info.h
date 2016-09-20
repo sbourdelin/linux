@@ -115,14 +115,20 @@ static inline int arch_within_stack_frames(const void * const stack,
 #endif
 
 #ifdef CONFIG_HARDENED_USERCOPY
-extern void __check_object_size(const void *ptr, unsigned long n,
+extern void __compiletime_warning("dynamic usercopy")
+__check_object_size(const void *ptr, unsigned long n,
 					bool to_user);
+
+extern void __compiletime_warning("builtin-const usercopy")
+__skip_check_object_size(void);
 
 static __always_inline void check_object_size(const void *ptr, unsigned long n,
 					      bool to_user)
 {
 	if (!__builtin_constant_p(n))
 		__check_object_size(ptr, n, to_user);
+	else
+		__skip_check_object_size();
 }
 #else
 static inline void check_object_size(const void *ptr, unsigned long n,
