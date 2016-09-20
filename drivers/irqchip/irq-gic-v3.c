@@ -623,6 +623,8 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
 
 		tlist = gic_compute_target_list(&cpu, mask, cluster_id);
 		gic_send_sgi(cluster_id, tlist, irq);
+		if (cpu >= nr_cpu_ids)
+			break;
 	}
 
 	/* Force the above writes to ICC_SGI1R_EL1 to be executed */
