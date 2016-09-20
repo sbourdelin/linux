@@ -2525,7 +2525,7 @@ i915_gem_find_active_request(struct intel_engine_cs *engine)
 	 * not need an engine->irq_seqno_barrier() before the seqno reads.
 	 */
 	list_for_each_entry(request, &engine->timeline->requests, link) {
-		if (i915_gem_request_completed(request))
+		if (__i915_gem_request_completed(request))
 			continue;
 
 		if (!i915_sw_fence_done(&request->submit))
@@ -2575,7 +2575,7 @@ static void i915_gem_reset_engine(struct intel_engine_cs *engine)
 		return;
 
 	DRM_DEBUG_DRIVER("resetting %s to restart from tail of request 0x%x\n",
-			 engine->name, request->fence.seqno);
+			 engine->name, request->global_seqno);
 
 	/* Setup the CS to resume from the breadcrumb of the hung request */
 	engine->reset_hw(engine, request);

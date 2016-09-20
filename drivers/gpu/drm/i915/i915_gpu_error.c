@@ -1168,7 +1168,7 @@ static void engine_record_requests(struct intel_engine_cs *engine,
 		}
 
 		erq = &ee->requests[count++];
-		erq->seqno = request->fence.seqno;
+		erq->seqno = request->global_seqno;
 		erq->jiffies = request->emitted_jiffies;
 		erq->head = request->head;
 		erq->tail = request->tail;

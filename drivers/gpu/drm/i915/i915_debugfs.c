@@ -683,7 +683,7 @@ static int i915_gem_request_info(struct seq_file *m, void *data)
 			rcu_read_lock();
 			task = pid ? pid_task(pid, PIDTYPE_PID) : NULL;
 			seq_printf(m, "    %x @ %d: %s [%d]\n",
-				   req->fence.seqno,
+				   req->global_seqno,
 				   (int) (jiffies - req->emitted_jiffies),
 				   task ? task->comm : "<unknown>",
 				   task ? task->pid : -1);
