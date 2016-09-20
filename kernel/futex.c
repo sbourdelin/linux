@@ -3423,7 +3423,8 @@ static inline int futex_set_waiters_unlocked(u32 __user *uaddr, u32 *puval)
  * Return: 0 if futex acquired, < 0 if an error happens.
  */
 static int futex_spin_on_owner(u32 __user *uaddr, u32 vpid,
-			       struct futex_state *state)
+			       struct futex_state *state,
+			       struct hrtimer_sleeper *timeout)
 {
 	int ret, loop = TO_SPIN_THRESHOLD;
 	u32 uval, curval;
@@ -3483,8 +3484,11 @@ static int futex_spin_on_owner(u32 __user *uaddr, u32 vpid,
 			continue;
 		}
 
-		/* Check for signal */
-		if (signal_pending(current)) {
+		/* Check for timeout & signal */
+		if (timeout && !timeout->task) {
+			ret = -ETIMEDOUT;
+			break;
+		} else if (signal_pending(current)) {
 			ret = -EINTR;
 			break;
 		}
@@ -3594,6 +3598,12 @@ efault:
  * This function is not inlined so that it can show up in stack trace for
  * analysis purpose.
  *
+ * The timeout functionality isn't as precise as other other futex types
+ * as timer expiration will not be detected while waiting in the
+ * serialization mutex. One possible solution is to modify the expiration
+ * function to send out a signal as well so as to break the thread out of
+ * the mutex code if we really want more precise timeout.
+ *
  * Return:
  *  < 0 - an error happens
  *  0   - acquires the lock via futex_spin_on_owner()
@@ -3601,8 +3611,9 @@ efault:
  *  2   - lock handed off from unlocker
  */
 static noinline int
-futex_lock_to(u32 __user *uaddr, unsigned int flags)
+futex_lock_to(u32 __user *uaddr, unsigned int flags, ktime_t *time)
 {
+	struct hrtimer_sleeper timeout, *to = NULL;
 	struct futex_hash_bucket *hb;
 	union futex_key key = FUTEX_KEY_INIT;
 	struct futex_state *state;
@@ -3626,6 +3637,8 @@ futex_lock_to(u32 __user *uaddr, unsigned int flags)
 
 	if (refill_futex_state_cache())
 		return -ENOMEM;
+
+	futex_set_timer(time, &to, &timeout, flags, current->timer_slack_ns);
 
 	ret = get_futex_key(uaddr, flags & FLAGS_SHARED, &key, VERIFY_WRITE);
 	if (unlikely(ret))
@@ -3651,10 +3664,15 @@ futex_lock_to(u32 __user *uaddr, unsigned int flags)
 	/*
 	 * Acquiring the serialization mutex.
 	 */
-	if (state->type != TYPE_TO)
+	if (state->type != TYPE_TO) {
 		ret = -EINVAL;
-	else
+	} else {
+		if (to)
+			hrtimer_start_expires(&to->timer, HRTIMER_MODE_ABS);
 		ret = mutex_lock_interruptible(&state->mutex);
+		if (ret && to && !timeout.task)
+			ret = -ETIMEDOUT;
+	}
 
 	if (unlikely(ret))
 		/*
@@ -3667,7 +3685,7 @@ futex_lock_to(u32 __user *uaddr, unsigned int flags)
 	 * As the mutex owner, we can now spin on the futex word as well as
 	 * the active-ness of the futex owner.
 	 */
-	ret = futex_spin_on_owner(uaddr, vpid, state);
+	ret = futex_spin_on_owner(uaddr, vpid, state, to ? &timeout : NULL);
 
 	mutex_unlock(&state->mutex);
 
@@ -3684,6 +3702,10 @@ out_put_state_key:
 	put_futex_key(&key);
 
 out:
+	if (to) {
+		hrtimer_cancel(&to->timer);
+		destroy_hrtimer_on_stack(&to->timer);
+	}
 	return ret;
 }
 
@@ -3831,7 +3853,7 @@ long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 		return futex_requeue(uaddr, flags, uaddr2, val, val2, &val3, 1);
 #ifdef CONFIG_SMP
 	case FUTEX_LOCK_TO:
-		return futex_lock_to(uaddr, flags);
+		return futex_lock_to(uaddr, flags, timeout);
 	case FUTEX_UNLOCK_TO:
 		return futex_unlock_to(uaddr, flags);
 #endif
@@ -3850,7 +3872,7 @@ SYSCALL_DEFINE6(futex, u32 __user *, uaddr, int, op, u32, val,
 	int cmd = op & FUTEX_CMD_MASK;
 
 	if (utime && (cmd == FUTEX_WAIT || cmd == FUTEX_LOCK_PI ||
-		      cmd == FUTEX_WAIT_BITSET ||
+		      cmd == FUTEX_WAIT_BITSET || cmd == FUTEX_LOCK_TO ||
 		      cmd == FUTEX_WAIT_REQUEUE_PI)) {
 		if (unlikely(should_fail_futex(!(op & FUTEX_PRIVATE_FLAG))))
 			return -EFAULT;
