@@ -1,0 +1,24 @@
+What:		/sys/class/mips-rproc/rproc#/firmware
+Date:		August 2015
+Contact:	Lisa Parratt <lisa.parratt@imgtec.com>
+Description:	MIPS VPE remoteproc start
+
+	This node only exists when a VPE is considered offline by Linux. Writes
+	to this file will start firmware running on a VPE.
+
+	If the VPE is idle, specifying a name will cause a remoteproc instance
+	to be allocated, which will cause the core to be stolen, the firmware
+	image to be loaded, and the remoteproc instance to be started.
+	Otherwise, the operation will fail.
+
+What:		/sys/class/mips-rproc/rproc#/stop
+Date:		August 2015
+Contact:	Lisa Parratt <lisa.parratt@imgtec.com>
+Description:	MIPS VPE remoteproc stop
+
+	This node only exists when a VPE is considered offline by Linux. Writes
+	to this file will stop firmware running on a VPE.
+
+	If the VPE is running a remote proc instance, the instance will be
+	stopped, the core returned, and the instance freed.
+	Otherwise, the operation will fail.
