@@ -3718,5 +3718,5 @@ void i915_vma_unpin_and_release(struct i915_vma **p_vma)
 		return;
 
 	i915_vma_unpin(vma);
-	i915_vma_put(vma);
+	i915_vma_put_internal(vma);
 }

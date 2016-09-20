@@ -1826,7 +1826,7 @@ static void cleanup_status_page(struct intel_engine_cs *engine)
 
 	i915_vma_unpin(vma);
 	i915_gem_object_unpin_map(vma->obj);
-	i915_vma_put(vma);
+	i915_vma_put_internal(vma);
 }
 
 static int init_status_page(struct intel_engine_cs *engine)
@@ -2023,7 +2023,7 @@ intel_engine_create_ring(struct intel_engine_cs *engine, int size)
 void
 intel_ring_free(struct intel_ring *ring)
 {
-	i915_vma_put(ring->vma);
+	i915_vma_put_internal(ring->vma);
 	kfree(ring);
 }
 

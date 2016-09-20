@@ -225,6 +225,6 @@ int i915_gem_render_state_init(struct drm_i915_gem_request *req)
 err_unpin:
 	i915_vma_unpin(so.vma);
 err_obj:
-	i915_gem_object_put(obj);
+	__i915_gem_object_release_unless_active(obj);
 	return ret;
 }
