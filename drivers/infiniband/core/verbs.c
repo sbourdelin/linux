@@ -1400,6 +1400,9 @@ struct ib_mr *ib_get_dma_mr(struct ib_pd *pd, int mr_access_flags)
 	if (err)
 		return ERR_PTR(err);
 
+	if (mr_access_flags & IB_ACCESS_MW_BIND)
+		return ERR_PTR(-EINVAL);
+
 	mr = pd->device->get_dma_mr(pd, mr_access_flags);
 
 	if (!IS_ERR(mr)) {
