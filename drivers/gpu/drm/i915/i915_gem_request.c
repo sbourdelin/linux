@@ -678,7 +678,7 @@ void __i915_add_request(struct drm_i915_gem_request *request, bool flush_caches)
 				   &request->i915->drm.struct_mutex);
 	if (prev)
 		i915_sw_fence_await_sw_fence(&request->submit, &prev->submit,
-					     &request->submitq);
+					     &request->submitq, GFP_NOWAIT);
 
 	request->emitted_jiffies = jiffies;
 	request->previous_seqno = engine->last_submitted_seqno;
