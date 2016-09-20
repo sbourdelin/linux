@@ -1405,6 +1405,8 @@ static int i9xx_emit_request(struct drm_i915_gem_request *req)
 	return 0;
 }
 
+static const int i9xx_emit_request_sz = 4;
+
 /**
  * gen6_sema_emit_request - Update the semaphore mailbox registers
  *
@@ -1457,6 +1459,8 @@ static int gen8_render_emit_request(struct drm_i915_gem_request *req)
 
 	return 0;
 }
+
+static const int gen8_render_emit_request_sz = 8;
 
 /**
  * intel_ring_sync - sync the waiter to the signaller on seqno
@@ -2677,8 +2681,21 @@ static void intel_ring_default_vfuncs(struct drm_i915_private *dev_priv,
 	engine->reset_hw = reset_ring_common;
 
 	engine->emit_request = i9xx_emit_request;
-	if (i915.semaphores)
+	engine->emit_request_sz = i9xx_emit_request_sz;
+	if (i915.semaphores) {
+		int num_rings;
+
 		engine->emit_request = gen6_sema_emit_request;
+
+		num_rings = hweight32(INTEL_INFO(dev_priv)->ring_mask) - 1;
+		if (INTEL_GEN(dev_priv) >= 8) {
+			engine->emit_request_sz += num_rings * 6;
+		} else {
+			engine->emit_request_sz += num_rings * 3;
+			if (num_rings & 1)
+				engine->emit_request_sz++;
+		}
+	}
 	engine->submit_request = i9xx_submit_request;
 
 	if (INTEL_GEN(dev_priv) >= 8)
@@ -2706,9 +2723,17 @@ int intel_init_render_ring_buffer(struct intel_engine_cs *engine)
 	if (INTEL_GEN(dev_priv) >= 8) {
 		engine->init_context = intel_rcs_ctx_init;
 		engine->emit_request = gen8_render_emit_request;
+		engine->emit_request_sz = gen8_render_emit_request_sz;
 		engine->emit_flush = gen8_render_ring_flush;
-		if (i915.semaphores)
+		if (i915.semaphores) {
+			int num_rings;
+
 			engine->semaphore.signal = gen8_rcs_signal;
+
+			num_rings =
+				hweight32(INTEL_INFO(dev_priv)->ring_mask) - 1;
+			engine->emit_request_sz += num_rings * 6;
+		}
 	} else if (INTEL_GEN(dev_priv) >= 6) {
 		engine->init_context = intel_rcs_ctx_init;
 		engine->emit_flush = gen7_render_ring_flush;
