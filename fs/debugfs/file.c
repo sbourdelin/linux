@@ -195,7 +195,6 @@ static int full_proxy_release(struct inode *inode, struct file *filp)
 	const struct dentry *dentry = F_DENTRY(filp);
 	const struct file_operations *real_fops = REAL_FOPS_DEREF(dentry);
 	const struct file_operations *proxy_fops = filp->f_op;
-	int r = 0;
 
 	/*
 	 * We must not protect this against removal races here: the
@@ -204,7 +203,7 @@ static int full_proxy_release(struct inode *inode, struct file *filp)
 	 * ->i_private is still being meaningful here.
 	 */
 	if (real_fops->release)
-		r = real_fops->release(inode, filp);
+		real_fops->release(inode, filp);
 
 	replace_fops(filp, d_inode(dentry)->i_fop);
 	kfree((void *)proxy_fops);
