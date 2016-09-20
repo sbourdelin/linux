@@ -825,7 +825,7 @@ struct netdev_xdp {
 	enum xdp_netdev_command command;
 	union {
 		/* XDP_SETUP_PROG */
-		struct bpf_prog *prog;
+		struct xdp_prog *prog;
 		/* XDP_QUERY_PROG */
 		bool prog_attached;
 	};

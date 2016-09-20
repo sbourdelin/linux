@@ -437,6 +437,20 @@ struct xdp_buff {
 	void *data_end;
 };
 
+struct xdp_prog {
+	u64		flags;
+	struct bpf_prog *bpf;
+	atomic_t	refcnt;
+	struct rcu_head	rcu; // Do we need RCU freeing? likely right?
+
+	/* Data associated with XDP program goes here */
+
+} ____cacheline_aligned_in_smp;
+
+struct xdp_prog *xdp_prog_alloc(struct bpf_prog *bpf);
+struct xdp_prog *xdp_prog_add(struct xdp_prog *xdp, int users);
+void xdp_prog_put(struct xdp_prog *prog);
+
 /* compute the linear packet data range [data, data_end) which
  * will be accessed by cls_bpf and act_bpf programs
  */

@@ -2912,3 +2912,53 @@ out:
 	release_sock(sk);
 	return ret;
 }
+
+struct xdp_prog *xdp_prog_alloc(struct bpf_prog *bpf)
+{
+	struct xdp_prog *xdp;
+
+	xdp = kzalloc(sizeof(*xdp), GFP_KERNEL);
+	if (!xdp)
+		return ERR_PTR(-ENOMEM);
+
+	/* Note dev_change_xdp_fd() already refcnt inc on bpf prog */
+	xdp->bpf = bpf;
+
+	return xdp;
+}
+EXPORT_SYMBOL(xdp_prog_alloc);
+
+struct xdp_prog *xdp_prog_add(struct xdp_prog *xdp, int users)
+{
+	struct bpf_prog *bpf;
+
+	bpf = bpf_prog_add(xdp->bpf, users);
+	if (IS_ERR(bpf)) {
+		return (void*)bpf; /* it is already a PTR_ERR */
+	}
+	atomic_add(users, &xdp->refcnt);
+
+	return xdp;
+}
+EXPORT_SYMBOL(xdp_prog_add);
+
+void __xdp_prog_put_rcu(struct rcu_head *rcu)
+{
+	struct xdp_prog *xdp = container_of(rcu, struct xdp_prog, rcu);
+
+	/* Release reference to (future) xdp_port_table here */
+
+	/* Release refcnt from dev_change_xdp_fd() calling bpf_prog_get_type()*/
+	bpf_prog_put(xdp->bpf);
+
+	kfree(xdp);
+}
+
+void xdp_prog_put(struct xdp_prog *prog)
+{
+	bpf_prog_put(prog->bpf);
+	if (atomic_dec_and_test(&prog->refcnt)) {
+		call_rcu(&prog->rcu, __xdp_prog_put_rcu);
+	}
+}
+EXPORT_SYMBOL(xdp_prog_put);

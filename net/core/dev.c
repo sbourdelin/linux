@@ -6643,23 +6643,30 @@ EXPORT_SYMBOL(dev_change_proto_down);
 int dev_change_xdp_fd(struct net_device *dev, int fd)
 {
 	const struct net_device_ops *ops = dev->netdev_ops;
-	struct bpf_prog *prog = NULL;
+	struct xdp_prog *prog = NULL;
+	struct bpf_prog *bpf;
 	struct netdev_xdp xdp = {};
 	int err;
 
 	if (!ops->ndo_xdp)
 		return -EOPNOTSUPP;
 	if (fd >= 0) {
-		prog = bpf_prog_get_type(fd, BPF_PROG_TYPE_XDP);
-		if (IS_ERR(prog))
+		bpf = bpf_prog_get_type(fd, BPF_PROG_TYPE_XDP); /* inc refcnt */
+		if (IS_ERR(bpf))
+			return PTR_ERR(bpf);
+
+		prog = xdp_prog_alloc(bpf);
+		if (IS_ERR(prog)) {
+			bpf_prog_put(prog->bpf);
 			return PTR_ERR(prog);
+		}
 	}
 
 	xdp.command = XDP_SETUP_PROG;
 	xdp.prog = prog;
 	err = ops->ndo_xdp(dev, &xdp);
 	if (err < 0 && prog)
-		bpf_prog_put(prog);
+		bpf_prog_put(prog->bpf);
 
 	return err;
 }

@@ -2622,11 +2622,11 @@ static int mlx4_en_set_tx_maxrate(struct net_device *dev, int queue_index, u32 m
 	return err;
 }
 
-static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
+static int mlx4_xdp_set(struct net_device *dev, struct xdp_prog *prog)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct mlx4_en_dev *mdev = priv->mdev;
-	struct bpf_prog *old_prog;
+	struct xdp_prog *old_prog;
 	int xdp_ring_num;
 	int port_up = 0;
 	int err;
@@ -2639,7 +2639,7 @@ static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 	 */
 	if (priv->xdp_ring_num == xdp_ring_num) {
 		if (prog) {
-			prog = bpf_prog_add(prog, priv->rx_ring_num - 1);
+			prog = xdp_prog_add(prog, priv->rx_ring_num);
 			if (IS_ERR(prog))
 				return PTR_ERR(prog);
 		}
@@ -2650,7 +2650,7 @@ static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 					lockdep_is_held(&mdev->state_lock));
 			rcu_assign_pointer(priv->rx_ring[i]->xdp_prog, prog);
 			if (old_prog)
-				bpf_prog_put(old_prog);
+				xdp_prog_put(old_prog);
 		}
 		mutex_unlock(&mdev->state_lock);
 		return 0;
@@ -2669,7 +2669,7 @@ static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 	}
 
 	if (prog) {
-		prog = bpf_prog_add(prog, priv->rx_ring_num - 1);
+		prog = xdp_prog_add(prog, priv->rx_ring_num);
 		if (IS_ERR(prog))
 			return PTR_ERR(prog);
 	}
@@ -2690,7 +2690,7 @@ static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 					lockdep_is_held(&mdev->state_lock));
 		rcu_assign_pointer(priv->rx_ring[i]->xdp_prog, prog);
 		if (old_prog)
-			bpf_prog_put(old_prog);
+			xdp_prog_put(old_prog);
 	}
 
 	if (port_up) {

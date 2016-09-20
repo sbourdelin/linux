@@ -535,13 +535,13 @@ void mlx4_en_destroy_rx_ring(struct mlx4_en_priv *priv,
 {
 	struct mlx4_en_dev *mdev = priv->mdev;
 	struct mlx4_en_rx_ring *ring = *pring;
-	struct bpf_prog *old_prog;
+	struct xdp_prog *old_prog;
 
 	old_prog = rcu_dereference_protected(
 					ring->xdp_prog,
 					lockdep_is_held(&mdev->state_lock));
 	if (old_prog)
-		bpf_prog_put(old_prog);
+		xdp_prog_put(old_prog);
 	mlx4_free_hwq_res(mdev->dev, &ring->wqres, size * stride + TXBB_SIZE);
 	vfree(ring->rx_info);
 	ring->rx_info = NULL;
@@ -783,7 +783,8 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
 	struct mlx4_en_rx_ring *ring = priv->rx_ring[cq->ring];
 	struct mlx4_en_rx_alloc *frags;
 	struct mlx4_en_rx_desc *rx_desc;
-	struct bpf_prog *xdp_prog;
+	struct xdp_prog *xdp_prog;
+	struct bpf_prog *bpf_prog;
 	int doorbell_pending;
 	struct sk_buff *skb;
 	int tx_index;
@@ -805,6 +806,7 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
 	/* Protect accesses to: ring->xdp_prog, priv->mac_hash list */
 	rcu_read_lock();
 	xdp_prog = rcu_dereference(ring->xdp_prog);
+	bpf_prog = rcu_dereference(xdp_prog->bpf);
 	doorbell_pending = 0;
 	tx_index = (priv->tx_ring_num - priv->xdp_ring_num) + cq->ring;
 
@@ -897,7 +899,7 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
 							frags[0].page_offset;
 			xdp.data_end = xdp.data + length;
 
-			act = bpf_prog_run_xdp(xdp_prog, &xdp);
+			act = bpf_prog_run_xdp(bpf_prog, &xdp);
 			switch (act) {
 			case XDP_PASS:
 				break;
