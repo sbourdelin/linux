@@ -267,6 +267,8 @@ int i915_gem_set_seqno(struct drm_device *dev, u32 seqno)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	int ret;
 
+	lockdep_assert_held(&dev_priv->drm.struct_mutex);
+
 	if (seqno == 0)
 		return -EINVAL;
 
@@ -602,6 +604,7 @@ void __i915_add_request(struct drm_i915_gem_request *request, bool flush_caches)
 	u32 reserved_tail;
 	int ret;
 
+	lockdep_assert_held(&request->i915->drm.struct_mutex);
 	trace_i915_gem_request_add(request);
 
 	/*
