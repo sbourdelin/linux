@@ -109,6 +109,11 @@ struct ath10k_dump_file_data {
 	u8 data[0];
 } __packed;
 
+struct ath10k_debug_cal_data {
+	u32 len;
+	u8 buf[0];
+};
+
 void ath10k_info(struct ath10k *ar, const char *fmt, ...)
 {
 	struct va_format vaf = {
@@ -1454,7 +1459,8 @@ static const struct file_operations fops_fw_dbglog = {
 static int ath10k_debug_cal_data_open(struct inode *inode, struct file *file)
 {
 	struct ath10k *ar = inode->i_private;
-	void *buf;
+	struct ath10k_debug_cal_data *data;
+	u32 len;
 	u32 hi_addr;
 	__le32 addr;
 	int ret;
@@ -1467,11 +1473,14 @@ static int ath10k_debug_cal_data_open(struct inode *inode, struct file *file)
 		goto err;
 	}
 
-	buf = vmalloc(ar->hw_params.cal_data_len);
-	if (!buf) {
+	len = ar->hw_params.cal_data_len;
+	data = vmalloc(sizeof(struct ath10k_debug_cal_data) + len);
+	if (!data) {
 		ret = -ENOMEM;
 		goto err;
 	}
+
+	data->len = len;
 
 	hi_addr = host_interest_item_address(HI_ITEM(hi_board_data));
 
@@ -1481,21 +1490,20 @@ static int ath10k_debug_cal_data_open(struct inode *inode, struct file *file)
 		goto err_vfree;
 	}
 
-	ret = ath10k_hif_diag_read(ar, le32_to_cpu(addr), buf,
-				   ar->hw_params.cal_data_len);
+	ret = ath10k_hif_diag_read(ar, le32_to_cpu(addr), data->buf, len);
 	if (ret) {
 		ath10k_warn(ar, "failed to read calibration data: %d\n", ret);
 		goto err_vfree;
 	}
 
-	file->private_data = buf;
+	file->private_data = data;
 
 	mutex_unlock(&ar->conf_mutex);
 
 	return 0;
 
 err_vfree:
-	vfree(buf);
+	vfree(data);
 
 err:
 	mutex_unlock(&ar->conf_mutex);
@@ -1507,11 +1515,10 @@ static ssize_t ath10k_debug_cal_data_read(struct file *file,
 					  char __user *user_buf,
 					  size_t count, loff_t *ppos)
 {
-	struct ath10k *ar = file->private_data;
-	void *buf = file->private_data;
+	struct ath10k_debug_cal_data *data = file->private_data;
 
 	return simple_read_from_buffer(user_buf, count, ppos,
-				       buf, ar->hw_params.cal_data_len);
+				       data->buf, data->len);
 }
 
 static int ath10k_debug_cal_data_release(struct inode *inode,
