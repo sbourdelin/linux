@@ -1830,7 +1830,7 @@ static void genpd_dev_pm_detach(struct device *dev, bool power_off)
 {
 	struct generic_pm_domain *pd;
 	unsigned int i;
-	int ret = 0;
+	int count, ret = 0;
 
 	pd = genpd_lookup_dev(dev);
 	if (!pd)
@@ -1855,6 +1855,19 @@ static void genpd_dev_pm_detach(struct device *dev, bool power_off)
 
 	/* Check if PM domain can be powered off after removing this device. */
 	genpd_queue_power_off_work(pd);
+
+	count = of_count_phandle_with_args(dev->of_node, "power-domains",
+					   "#power-domain-cells");
+	if (count > 1) {
+		cancel_work_sync(&pd->power_off_work);
+
+		ret = pm_genpd_remove(pd);
+		if (ret < 0)
+			dev_err(dev, "failed to remove PM domain %s: %d\n",
+				pd->name, ret);
+
+		kfree(pd);
+	}
 }
 
 static void genpd_dev_pm_sync(struct device *dev)
@@ -1902,6 +1915,73 @@ out:
 
 }
 
+static int genpd_dev_pm_attach_one(struct device *dev)
+{
+	struct generic_pm_domain *pd;
+	int ret;
+
+	mutex_lock(&gpd_list_lock);
+	pd = genpd_dev_pm_lookup(dev, 0);
+	if (IS_ERR(pd)) {
+		mutex_unlock(&gpd_list_lock);
+		return PTR_ERR(pd);
+	}
+
+	ret = genpd_dev_pm_attach_device(dev, pd);
+	mutex_unlock(&gpd_list_lock);
+
+	return ret;
+}
+
+static int genpd_dev_pm_attach_many(struct device *dev, unsigned int count)
+{
+	struct generic_pm_domain *pd, *parent;
+	unsigned int i;
+	int ret;
+
+	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
+	if (!pd)
+		return -ENOMEM;
+
+	pd->name = dev_name(dev);
+
+	ret = pm_genpd_init(pd, NULL, true);
+	if (ret < 0)
+		goto err_free;
+
+	mutex_lock(&gpd_list_lock);
+	for (i = 0; i < count; i++) {
+		parent = genpd_dev_pm_lookup(dev, i);
+		if (IS_ERR(parent)) {
+			ret = PTR_ERR(parent);
+			goto err_remove;
+		}
+
+		ret = genpd_add_subdomain(parent, pd);
+		if (ret < 0)
+			goto err_remove;
+
+	}
+
+	ret = genpd_dev_pm_attach_device(dev, pd);
+	if (ret < 0)
+		goto err_remove;
+
+	mutex_unlock(&gpd_list_lock);
+
+	return ret;
+
+err_remove:
+	WARN_ON(genpd_remove(pd));
+
+	mutex_unlock(&gpd_list_lock);
+
+err_free:
+	kfree(pd);
+
+	return ret;
+}
+
 /**
  * genpd_dev_pm_attach - Attach a device to its PM domain using DT.
  * @dev: Device to attach.
@@ -1919,8 +1999,7 @@ out:
  */
 int genpd_dev_pm_attach(struct device *dev)
 {
-	struct generic_pm_domain *pd;
-	int ret;
+	int count;
 
 	if (!dev->of_node)
 		return -ENODEV;
@@ -1928,17 +2007,12 @@ int genpd_dev_pm_attach(struct device *dev)
 	if (dev->pm_domain)
 		return -EEXIST;
 
-	mutex_lock(&gpd_list_lock);
-	pd = genpd_dev_pm_lookup(dev, 0);
-	if (IS_ERR(pd)) {
-		mutex_unlock(&gpd_list_lock);
-		return -EPROBE_DEFER;
-	}
-
-	ret = genpd_dev_pm_attach_device(dev, pd);
-	mutex_lock(&gpd_list_lock);
-
-	return ret;
+	count = of_count_phandle_with_args(dev->of_node, "power-domains",
+					   "#power-domain-cells");
+	if (count > 1)
+		return genpd_dev_pm_attach_many(dev, count);
+	else
+		return genpd_dev_pm_attach_one(dev);
 }
 EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
 #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
