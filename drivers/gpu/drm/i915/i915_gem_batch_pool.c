@@ -114,8 +114,7 @@ i915_gem_batch_pool_get(struct i915_gem_batch_pool *pool,
 
 	list_for_each_entry(tmp, list, batch_pool_link) {
 		/* The batches are strictly LRU ordered */
-		if (!i915_gem_active_is_idle(&tmp->last_read[pool->engine->id],
-					     &tmp->base.dev->struct_mutex))
+		if (i915_gem_object_is_active(tmp))
 			break;
 
 		if (tmp->base.size >= size) {
