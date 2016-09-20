@@ -420,7 +420,7 @@ static int __init __uniphier_cache_init(struct device_node *np,
 		pr_err("L%d: cache-line-size is unspecified or invalid\n",
 		       *cache_level);
 		ret = -EINVAL;
-		goto err;
+		goto iounmap;
 	}
 
 	if (of_property_read_u32(np, "cache-sets", &data->nsets) ||
@@ -428,7 +428,7 @@ static int __init __uniphier_cache_init(struct device_node *np,
 		pr_err("L%d: cache-sets is unspecified or invalid\n",
 		       *cache_level);
 		ret = -EINVAL;
-		goto err;
+		goto iounmap;
 	}
 
 	if (of_property_read_u32(np, "cache-size", &cache_size) ||
@@ -436,7 +436,7 @@ static int __init __uniphier_cache_init(struct device_node *np,
 		pr_err("L%d: cache-size is unspecified or invalid\n",
 		       *cache_level);
 		ret = -EINVAL;
-		goto err;
+		goto iounmap;
 	}
 
 	data->way_present_mask =
@@ -446,21 +446,21 @@ static int __init __uniphier_cache_init(struct device_node *np,
 	if (!data->ctrl_base) {
 		pr_err("L%d: failed to map control register\n", *cache_level);
 		ret = -ENOMEM;
-		goto err;
+		goto iounmap;
 	}
 
 	data->rev_base = of_iomap(np, 1);
 	if (!data->rev_base) {
 		pr_err("L%d: failed to map revision register\n", *cache_level);
 		ret = -ENOMEM;
-		goto err;
+		goto iounmap;
 	}
 
 	data->op_base = of_iomap(np, 2);
 	if (!data->op_base) {
 		pr_err("L%d: failed to map operation register\n", *cache_level);
 		ret = -ENOMEM;
-		goto err;
+		goto iounmap;
 	}
 
 	data->way_ctrl_base = data->ctrl_base + 0xc00;
@@ -510,7 +510,7 @@ static int __init __uniphier_cache_init(struct device_node *np,
 	of_node_put(next_np);
 
 	return ret;
-err:
+iounmap:
 	iounmap(data->op_base);
 	iounmap(data->rev_base);
 	iounmap(data->ctrl_base);
