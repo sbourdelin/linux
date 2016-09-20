@@ -2543,10 +2543,8 @@ out_free1:
 
 		r = -ENOMEM;
 		kvm_regs = memdup_user(argp, sizeof(*kvm_regs));
-		if (IS_ERR(kvm_regs)) {
-			r = PTR_ERR(kvm_regs);
-			goto out;
-		}
+		if (IS_ERR(kvm_regs))
+			return PTR_ERR(kvm_regs);
 		r = kvm_arch_vcpu_ioctl_set_regs(vcpu, kvm_regs);
 		kfree(kvm_regs);
 		break;
@@ -2567,11 +2565,8 @@ out_free1:
 	}
 	case KVM_SET_SREGS: {
 		kvm_sregs = memdup_user(argp, sizeof(*kvm_sregs));
-		if (IS_ERR(kvm_sregs)) {
-			r = PTR_ERR(kvm_sregs);
-			kvm_sregs = NULL;
-			goto out;
-		}
+		if (IS_ERR(kvm_sregs))
+			return PTR_ERR(kvm_sregs);
 		r = kvm_arch_vcpu_ioctl_set_sregs(vcpu, kvm_sregs);
 		break;
 	}
@@ -2659,11 +2654,8 @@ out_free1:
 	}
 	case KVM_SET_FPU: {
 		fpu = memdup_user(argp, sizeof(*fpu));
-		if (IS_ERR(fpu)) {
-			r = PTR_ERR(fpu);
-			fpu = NULL;
-			goto out;
-		}
+		if (IS_ERR(fpu))
+			return PTR_ERR(fpu);
 		r = kvm_arch_vcpu_ioctl_set_fpu(vcpu, fpu);
 		break;
 	}
