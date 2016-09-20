@@ -175,7 +175,7 @@ static int ppgtt_bind_vma(struct i915_vma *vma,
 {
 	u32 pte_flags = 0;
 
-	vma->pages = vma->obj->pages;
+	vma->pages = vma->obj->mm.pages;
 
 	/* Currently applicable only to VLV */
 	if (vma->obj->gt_ro)
@@ -2295,7 +2295,7 @@ void i915_gem_suspend_gtt_mappings(struct drm_device *dev)
 int i915_gem_gtt_prepare_object(struct drm_i915_gem_object *obj)
 {
 	if (!dma_map_sg(&obj->base.dev->pdev->dev,
-			obj->pages->sgl, obj->pages->nents,
+			obj->mm.pages->sgl, obj->mm.pages->nents,
 			PCI_DMA_BIDIRECTIONAL))
 		return -ENOSPC;
 
@@ -2685,7 +2685,7 @@ void i915_gem_gtt_finish_object(struct drm_i915_gem_object *obj)
 		}
 	}
 
-	dma_unmap_sg(kdev, obj->pages->sgl, obj->pages->nents,
+	dma_unmap_sg(kdev, obj->mm.pages->sgl, obj->mm.pages->nents,
 		     PCI_DMA_BIDIRECTIONAL);
 }
 
@@ -3526,7 +3526,7 @@ intel_rotate_fb_obj_pages(const struct intel_rotation_info *rot_info,
 
 	/* Populate source page list from the object. */
 	i = 0;
-	for_each_sgt_dma(dma_addr, sgt_iter, obj->pages)
+	for_each_sgt_dma(dma_addr, sgt_iter, obj->mm.pages)
 		page_addr_list[i++] = dma_addr;
 
 	GEM_BUG_ON(i != n_pages);
@@ -3576,7 +3576,7 @@ intel_partial_pages(const struct i915_ggtt_view *view,
 
 	sg = st->sgl;
 	st->nents = 0;
-	for_each_sg_page(obj->pages->sgl, &obj_sg_iter, obj->pages->nents,
+	for_each_sg_page(obj->mm.pages->sgl, &obj_sg_iter, obj->mm.pages->nents,
 		view->params.partial.offset)
 	{
 		if (st->nents >= view->params.partial.size)
@@ -3607,7 +3607,7 @@ i915_get_ggtt_vma_pages(struct i915_vma *vma)
 		return 0;
 
 	if (vma->ggtt_view.type == I915_GGTT_VIEW_NORMAL)
-		vma->pages = vma->obj->pages;
+		vma->pages = vma->obj->mm.pages;
 	else if (vma->ggtt_view.type == I915_GGTT_VIEW_ROTATED)
 		vma->pages =
 			intel_rotate_fb_obj_pages(&vma->ggtt_view.params.rotated, vma->obj);

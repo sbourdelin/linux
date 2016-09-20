@@ -28,10 +28,11 @@
 
 static void __i915_gem_object_free_pages(struct sg_table *st)
 {
-	struct sg_page_iter sg_iter;
+	struct sgt_iter iter;
+	struct page *page;
 
-	for_each_sg_page(st->sgl, &sg_iter, st->nents, 0)
-		put_page(sg_page_iter_page(&sg_iter));
+	for_each_sgt_page(page, iter, st)
+		put_page(page);
 
 	sg_free_table(st);
 	kfree(st);
@@ -94,14 +95,14 @@ static int i915_gem_object_get_pages_internal(struct drm_i915_gem_object *obj)
 	if (!swiotlb_nr_tbl())
 #endif
 		sg_mark_end(sg);
-	obj->pages = st;
+	obj->mm.pages = st;
 
 	if (i915_gem_gtt_prepare_object(obj)) {
-		obj->pages = NULL;
+		obj->mm.pages = NULL;
 		goto err;
 	}
 
-	obj->madv = I915_MADV_DONTNEED;
+	obj->mm.madv = I915_MADV_DONTNEED;
 	return 0;
 
 err:
@@ -112,10 +113,10 @@ err:
 
 static void i915_gem_object_put_pages_internal(struct drm_i915_gem_object *obj)
 {
-	__i915_gem_object_free_pages(obj->pages);
+	__i915_gem_object_free_pages(obj->mm.pages);
 
-	obj->dirty = 0;
-	obj->madv = I915_MADV_WILLNEED;
+	obj->mm.dirty = false;
+	obj->mm.madv = I915_MADV_WILLNEED;
 }
 
 static const struct drm_i915_gem_object_ops i915_gem_object_internal_ops = {
