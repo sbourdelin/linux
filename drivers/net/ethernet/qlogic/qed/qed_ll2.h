@@ -24,6 +24,12 @@
 
 #define QED_MAX_NUM_OF_LL2_CONNECTIONS                    (4)
 
+enum qed_ll2_roce_flavor_type {
+	QED_LL2_ROCE,
+	QED_LL2_RROCE,
+	MAX_QED_LL2_ROCE_FLAVOR_TYPE
+};
+
 enum qed_ll2_conn_type {
 	QED_LL2_TYPE_RESERVED,
 	QED_LL2_TYPE_ISCSI,
@@ -199,6 +205,7 @@ int qed_ll2_prepare_tx_packet(struct qed_hwfn *p_hwfn,
 			      u16 vlan,
 			      u8 bd_flags,
 			      u16 l4_hdr_offset_w,
+			      enum qed_ll2_roce_flavor_type qed_roce_flavor,
 			      dma_addr_t first_frag,
 			      u16 first_frag_len, void *cookie, u8 notify_fw);
 
