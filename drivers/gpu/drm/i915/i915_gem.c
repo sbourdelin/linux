@@ -1121,10 +1121,10 @@ out:
  */
 
 static inline int
-fast_user_write(struct io_mapping *mapping,
-		loff_t page_base, int page_offset,
-		char __user *user_data,
-		int length)
+ggtt_write(struct io_mapping *mapping,
+	   loff_t page_base, int page_offset,
+	   char __user *user_data,
+	   int length)
 {
 	void __iomem *vaddr_atomic;
 	void *vaddr;
@@ -1136,28 +1136,15 @@ fast_user_write(struct io_mapping *mapping,
 	unwritten = __copy_from_user_inatomic_nocache(vaddr,
 						      user_data, length);
 	io_mapping_unmap_atomic(vaddr_atomic);
-	return unwritten;
-}
 
-static inline unsigned long
-slow_user_access(struct io_mapping *mapping,
-		 uint64_t page_base, int page_offset,
-		 char __user *user_data,
-		 unsigned long length, bool pwrite)
-{
-	void __iomem *ioaddr;
-	void *vaddr;
-	uint64_t unwritten;
+	if (unwritten) {
+		vaddr_atomic = io_mapping_map_wc(mapping, page_base, PAGE_SIZE);
+		/* We can use the cpu mem copy function because this is X86. */
+		vaddr = (void __force*)vaddr_atomic + page_offset;
+		unwritten = copy_from_user(vaddr, user_data, length);
+		io_mapping_unmap(vaddr_atomic);
+	}
 
-	ioaddr = io_mapping_map_wc(mapping, page_base, PAGE_SIZE);
-	/* We can use the cpu mem copy function because this is X86. */
-	vaddr = (void __force *)ioaddr + page_offset;
-	if (pwrite)
-		unwritten = __copy_from_user(vaddr, user_data, length);
-	else
-		unwritten = __copy_to_user(user_data, vaddr, length);
-
-	io_mapping_unmap(ioaddr);
 	return unwritten;
 }
 
@@ -1170,22 +1157,19 @@ slow_user_access(struct io_mapping *mapping,
  * @file: drm file pointer
  */
 static int
-i915_gem_gtt_pwrite_fast(struct drm_i915_private *i915,
-			 struct drm_i915_gem_object *obj,
-			 struct drm_i915_gem_pwrite *args,
-			 struct drm_file *file)
+i915_gem_gtt_pwrite_fast(struct drm_i915_gem_object *obj,
+			 const struct drm_i915_gem_pwrite *args)
 {
-	struct i915_ggtt *ggtt = &i915->ggtt;
-	struct drm_device *dev = obj->base.dev;
-	struct i915_vma *vma;
+	struct i915_ggtt *ggtt = &to_i915(obj->base.dev)->ggtt;
 	struct drm_mm_node node;
-	uint64_t remain, offset;
-	char __user *user_data;
+	struct i915_vma *vma;
+	u64 remain, offset;
+	void __user *user_data;
 	int ret;
-	bool hit_slow_path = false;
 
-	if (i915_gem_object_is_tiled(obj))
-		return -EFAULT;
+	ret = mutex_lock_interruptible(&obj->base.dev->struct_mutex);
+	if (ret)
+		return ret;
 
 	vma = i915_gem_object_ggtt_pin(obj, NULL, 0, 0,
 				       PIN_MAPPABLE | PIN_NONBLOCK);
@@ -1201,21 +1185,17 @@ i915_gem_gtt_pwrite_fast(struct drm_i915_private *i915,
 	if (IS_ERR(vma)) {
 		ret = insert_mappable_node(ggtt, &node, PAGE_SIZE);
 		if (ret)
-			goto out;
-
-		ret = i915_gem_object_pin_pages(obj);
-		if (ret) {
-			remove_mappable_node(&node);
-			goto out;
-		}
+			goto out_unlock;
+		GEM_BUG_ON(!node.allocated);
 	}
 
 	ret = i915_gem_object_set_to_gtt_domain(obj, true);
 	if (ret)
 		goto out_unpin;
 
+	mutex_unlock(&obj->base.dev->struct_mutex);
+
 	intel_fb_obj_invalidate(obj, ORIGIN_CPU);
-	obj->mm.dirty = true;
 
 	user_data = u64_to_user_ptr(args->data_ptr);
 	offset = args->offset;
@@ -1246,92 +1226,36 @@ i915_gem_gtt_pwrite_fast(struct drm_i915_private *i915,
 		 * If the object is non-shmem backed, we retry again with the
 		 * path that handles page fault.
 		 */
-		if (fast_user_write(&ggtt->mappable, page_base,
-				    page_offset, user_data, page_length)) {
-			hit_slow_path = true;
-			mutex_unlock(&dev->struct_mutex);
-			if (slow_user_access(&ggtt->mappable,
-					     page_base,
-					     page_offset, user_data,
-					     page_length, true)) {
-				ret = -EFAULT;
-				mutex_lock(&dev->struct_mutex);
-				goto out_flush;
-			}
-
-			mutex_lock(&dev->struct_mutex);
+		if (ggtt_write(&ggtt->mappable, page_base, page_offset,
+			       user_data, page_length)) {
+			ret = -EFAULT;
+			break;
 		}
 
 		remain -= page_length;
 		user_data += page_length;
 		offset += page_length;
 	}
-
-out_flush:
-	if (hit_slow_path) {
-		if (ret == 0 &&
-		    (obj->base.read_domains & I915_GEM_DOMAIN_GTT) == 0) {
-			/* The user has modified the object whilst we tried
-			 * reading from it, and we now have no idea what domain
-			 * the pages should be in. As we have just been touching
-			 * them directly, flush everything back to the GTT
-			 * domain.
-			 */
-			ret = i915_gem_object_set_to_gtt_domain(obj, false);
-		}
-	}
-
 	intel_fb_obj_flush(obj, false, ORIGIN_CPU);
+
+	mutex_lock(&obj->base.dev->struct_mutex);
 out_unpin:
 	if (node.allocated) {
 		wmb();
 		ggtt->base.clear_range(&ggtt->base,
 				       node.start, node.size,
 				       true);
-		i915_gem_object_unpin_pages(obj);
 		remove_mappable_node(&node);
 	} else {
 		i915_vma_unpin(vma);
 	}
-out:
+out_unlock:
+	mutex_unlock(&obj->base.dev->struct_mutex);
 	return ret;
 }
 
-/* Per-page copy function for the shmem pwrite fastpath.
- * Flushes invalid cachelines before writing to the target if
- * needs_clflush_before is set and flushes out any written cachelines after
- * writing if needs_clflush is set. */
 static int
-shmem_pwrite_fast(struct page *page, int shmem_page_offset, int page_length,
-		  char __user *user_data,
-		  bool page_do_bit17_swizzling,
-		  bool needs_clflush_before,
-		  bool needs_clflush_after)
-{
-	char *vaddr;
-	int ret;
-
-	if (unlikely(page_do_bit17_swizzling))
-		return -EINVAL;
-
-	vaddr = kmap_atomic(page);
-	if (needs_clflush_before)
-		drm_clflush_virt_range(vaddr + shmem_page_offset,
-				       page_length);
-	ret = __copy_from_user_inatomic(vaddr + shmem_page_offset,
-					user_data, page_length);
-	if (needs_clflush_after)
-		drm_clflush_virt_range(vaddr + shmem_page_offset,
-				       page_length);
-	kunmap_atomic(vaddr);
-
-	return ret ? -EFAULT : 0;
-}
-
-/* Only difference to the fast-path function is that this can handle bit17
- * and uses non-atomic copy and kmap functions. */
-static int
-shmem_pwrite_slow(struct page *page, int shmem_page_offset, int page_length,
+shmem_pwrite_slow(struct page *page, int offset, int length,
 		  char __user *user_data,
 		  bool page_do_bit17_swizzling,
 		  bool needs_clflush_before,
@@ -1342,124 +1266,112 @@ shmem_pwrite_slow(struct page *page, int shmem_page_offset, int page_length,
 
 	vaddr = kmap(page);
 	if (unlikely(needs_clflush_before || page_do_bit17_swizzling))
-		shmem_clflush_swizzled_range(vaddr + shmem_page_offset,
-					     page_length,
+		shmem_clflush_swizzled_range(vaddr + offset, length,
 					     page_do_bit17_swizzling);
 	if (page_do_bit17_swizzling)
-		ret = __copy_from_user_swizzled(vaddr, shmem_page_offset,
-						user_data,
-						page_length);
+		ret = __copy_from_user_swizzled(vaddr, offset, user_data,
+						length);
 	else
-		ret = __copy_from_user(vaddr + shmem_page_offset,
-				       user_data,
-				       page_length);
+		ret = __copy_from_user(vaddr + offset, user_data, length);
 	if (needs_clflush_after)
-		shmem_clflush_swizzled_range(vaddr + shmem_page_offset,
-					     page_length,
+		shmem_clflush_swizzled_range(vaddr + offset, length,
 					     page_do_bit17_swizzling);
 	kunmap(page);
 
 	return ret ? -EFAULT : 0;
 }
 
+/* Per-page copy function for the shmem pwrite fastpath.
+ * Flushes invalid cachelines before writing to the target if
+ * needs_clflush_before is set and flushes out any written cachelines after
+ * writing if needs_clflush is set. */
 static int
-i915_gem_shmem_pwrite(struct drm_device *dev,
-		      struct drm_i915_gem_object *obj,
-		      struct drm_i915_gem_pwrite *args,
-		      struct drm_file *file)
+shmem_pwrite(struct page *page, int offset, int len, char __user *user_data,
+	     bool page_do_bit17_swizzling,
+	     bool needs_clflush_before,
+	     bool needs_clflush_after)
 {
-	ssize_t remain;
-	loff_t offset;
-	char __user *user_data;
-	int shmem_page_offset, page_length, ret = 0;
-	int obj_do_bit17_swizzling, page_do_bit17_swizzling;
-	int hit_slowpath = 0;
-	unsigned int needs_clflush;
-	struct sg_page_iter sg_iter;
+	int ret;
 
-	ret = i915_gem_obj_prepare_shmem_write(obj, &needs_clflush);
+	ret = -ENODEV;
+	if (!page_do_bit17_swizzling) {
+		char *vaddr = kmap_atomic(page);
+
+		if (needs_clflush_before)
+			drm_clflush_virt_range(vaddr + offset, len);
+		ret = __copy_from_user_inatomic(vaddr + offset, user_data, len);
+		if (needs_clflush_after)
+			drm_clflush_virt_range(vaddr + offset, len);
+
+		kunmap_atomic(vaddr);
+	}
+	if (ret == 0)
+		return ret;
+
+	return shmem_pwrite_slow(page, offset, len, user_data,
+				 page_do_bit17_swizzling,
+				 needs_clflush_before,
+				 needs_clflush_after);
+}
+
+static int
+i915_gem_shmem_pwrite(struct drm_i915_gem_object *obj,
+		      const struct drm_i915_gem_pwrite *args)
+{
+	void __user *user_data;
+	u64 remain;
+	unsigned int obj_do_bit17_swizzling;
+	unsigned int partial_cacheline_write;
+	unsigned int needs_clflush;
+	unsigned int offset, idx;
+	int ret;
+
+	ret = mutex_lock_interruptible(&obj->base.dev->struct_mutex);
 	if (ret)
 		return ret;
 
-	obj_do_bit17_swizzling = i915_gem_object_needs_bit17_swizzle(obj);
+	ret = i915_gem_obj_prepare_shmem_write(obj, &needs_clflush);
+	mutex_unlock(&obj->base.dev->struct_mutex);
+	if (ret)
+		return ret;
+
+	obj_do_bit17_swizzling = 0;
+	if (i915_gem_object_needs_bit17_swizzle(obj))
+		obj_do_bit17_swizzling = 1 << 17;
+
+	/* If we don't overwrite a cacheline completely we need to be
+	 * careful to have up-to-date data by first clflushing. Don't
+	 * overcomplicate things and flush the entire patch.
+	 */
+	partial_cacheline_write = 0;
+	if (needs_clflush & CLFLUSH_BEFORE)
+		partial_cacheline_write = boot_cpu_data.x86_clflush_size - 1;
+
 	user_data = u64_to_user_ptr(args->data_ptr);
-	offset = args->offset;
 	remain = args->size;
+	offset = offset_in_page(args->offset);
+	for (idx = args->offset >> PAGE_SHIFT; remain; idx++) {
+		struct page *page = i915_gem_object_get_page(obj, idx);
+		int length;
 
-	for_each_sg_page(obj->mm.pages->sgl, &sg_iter, obj->mm.pages->nents,
-			 offset >> PAGE_SHIFT) {
-		struct page *page = sg_page_iter_page(&sg_iter);
-		int partial_cacheline_write;
+		length = remain;
+		if (offset + length > PAGE_SIZE)
+			length = PAGE_SIZE - offset;
 
-		if (remain <= 0)
+		ret = shmem_pwrite(page, offset, length, user_data,
+				   page_to_phys(page) & obj_do_bit17_swizzling,
+				   (offset | length) & partial_cacheline_write,
+				   needs_clflush & CLFLUSH_AFTER);
+		if (ret)
 			break;
 
-		/* Operation in this page
-		 *
-		 * shmem_page_offset = offset within page in shmem file
-		 * page_length = bytes to copy for this page
-		 */
-		shmem_page_offset = offset_in_page(offset);
-
-		page_length = remain;
-		if ((shmem_page_offset + page_length) > PAGE_SIZE)
-			page_length = PAGE_SIZE - shmem_page_offset;
-
-		/* If we don't overwrite a cacheline completely we need to be
-		 * careful to have up-to-date data by first clflushing. Don't
-		 * overcomplicate things and flush the entire patch. */
-		partial_cacheline_write = needs_clflush & CLFLUSH_BEFORE &&
-			((shmem_page_offset | page_length)
-				& (boot_cpu_data.x86_clflush_size - 1));
-
-		page_do_bit17_swizzling = obj_do_bit17_swizzling &&
-			(page_to_phys(page) & (1 << 17)) != 0;
-
-		ret = shmem_pwrite_fast(page, shmem_page_offset, page_length,
-					user_data, page_do_bit17_swizzling,
-					partial_cacheline_write,
-					needs_clflush & CLFLUSH_AFTER);
-		if (ret == 0)
-			goto next_page;
-
-		hit_slowpath = 1;
-		mutex_unlock(&dev->struct_mutex);
-		ret = shmem_pwrite_slow(page, shmem_page_offset, page_length,
-					user_data, page_do_bit17_swizzling,
-					partial_cacheline_write,
-					needs_clflush & CLFLUSH_AFTER);
-
-		mutex_lock(&dev->struct_mutex);
-
-		if (ret)
-			goto out;
-
-next_page:
-		remain -= page_length;
-		user_data += page_length;
-		offset += page_length;
+		remain -= length;
+		user_data += length;
+		offset = 0;
 	}
-
-out:
-	i915_gem_obj_finish_shmem_access(obj);
-
-	if (hit_slowpath) {
-		/*
-		 * Fixup: Flush cpu caches in case we didn't flush the dirty
-		 * cachelines in-line while writing and the object moved
-		 * out of the cpu write domain while we've dropped the lock.
-		 */
-		if (!(needs_clflush & CLFLUSH_AFTER) &&
-		    obj->base.write_domain != I915_GEM_DOMAIN_CPU) {
-			if (i915_gem_clflush_object(obj, obj->pin_display))
-				needs_clflush |= CLFLUSH_AFTER;
-		}
-	}
-
-	if (needs_clflush & CLFLUSH_AFTER)
-		i915_gem_chipset_flush(to_i915(dev));
 
 	intel_fb_obj_flush(obj, false, ORIGIN_CPU);
+	i915_gem_obj_finish_shmem_access(obj);
 	return ret;
 }
 
@@ -1475,7 +1387,6 @@ int
 i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 		      struct drm_file *file)
 {
-	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_i915_gem_pwrite *args = data;
 	struct drm_i915_gem_object *obj;
 	int ret;
@@ -1487,13 +1398,6 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 		       u64_to_user_ptr(args->data_ptr),
 		       args->size))
 		return -EFAULT;
-
-	if (likely(!i915.prefault_disable)) {
-		ret = fault_in_multipages_readable(u64_to_user_ptr(args->data_ptr),
-						   args->size);
-		if (ret)
-			return -EFAULT;
-	}
 
 	obj = i915_gem_object_lookup(file, args->handle);
 	if (!obj)
@@ -1516,11 +1420,9 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 	if (ret)
 		goto err;
 
-	intel_runtime_pm_get(dev_priv);
-
-	ret = i915_mutex_lock_interruptible(dev);
+	ret = i915_gem_object_pin_pages(obj);
 	if (ret)
-		goto err_rpm;
+		goto err;
 
 	ret = -EFAULT;
 	/* We can only do the GTT pwrite on untiled buffers, as otherwise
@@ -1531,7 +1433,7 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 	 */
 	if (!i915_gem_object_has_struct_page(obj) ||
 	    cpu_write_needs_clflush(obj)) {
-		ret = i915_gem_gtt_pwrite_fast(dev_priv, obj, args, file);
+		ret = i915_gem_gtt_pwrite_fast(obj, args);
 		/* Note that the gtt paths might fail with non-page-backed user
 		 * pointers (e.g. gtt mappings when moving data between
 		 * textures). Fallback to the shmem path in that case. */
@@ -1541,17 +1443,10 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 		if (obj->phys_handle)
 			ret = i915_gem_phys_pwrite(obj, args, file);
 		else
-			ret = i915_gem_shmem_pwrite(dev, obj, args, file);
+			ret = i915_gem_shmem_pwrite(obj, args);
 	}
 
-	i915_gem_object_put(obj);
-	mutex_unlock(&dev->struct_mutex);
-	intel_runtime_pm_put(dev_priv);
-
-	return ret;
-
-err_rpm:
-	intel_runtime_pm_put(dev_priv);
+	i915_gem_object_unpin_pages(obj);
 err:
 	i915_gem_object_put_unlocked(obj);
 	return ret;
