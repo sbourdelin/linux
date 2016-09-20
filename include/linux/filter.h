@@ -16,6 +16,7 @@
 #include <linux/capability.h>
 
 #include <net/sch_generic.h>
+#include <net/xdp.h>
 
 #include <asm/cacheflush.h>
 
@@ -429,11 +430,6 @@ struct sk_filter {
 
 struct bpf_skb_data_end {
 	struct qdisc_skb_cb qdisc_cb;
-	void *data_end;
-};
-
-struct xdp_buff {
-	void *data;
 	void *data_end;
 };
 

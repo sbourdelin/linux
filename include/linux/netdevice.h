@@ -324,6 +324,7 @@ struct napi_struct {
 	struct sk_buff		*skb;
 	struct hrtimer		timer;
 	struct list_head	dev_list;
+	struct list_head	xdp_hook_list;
 	struct hlist_node	napi_hash_node;
 	unsigned int		napi_id;
 };
@@ -819,6 +820,14 @@ enum xdp_netdev_command {
 	 * return true if a program is currently attached and running.
 	 */
 	XDP_QUERY_PROG,
+	/* Initialize XDP in the device. Called the first time an XDP hook
+	 * hook is being set on the device.
+	 */
+	XDP_DEV_INIT,
+	/* XDP is finished on the device. Called after the last XDP hook
+	 * has been removed from a device.
+	 */
+	XDP_DEV_FINISH,
 };
 
 struct netdev_xdp {
@@ -1663,6 +1672,8 @@ struct net_device {
 	struct list_head	close_list;
 	struct list_head	ptype_all;
 	struct list_head	ptype_specific;
+	struct list_head        xdp_hook_list;
+	unsigned int		xdp_hook_cnt;
 
 	struct {
 		struct list_head upper;
