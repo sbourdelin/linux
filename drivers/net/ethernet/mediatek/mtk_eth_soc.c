@@ -135,6 +135,26 @@ static int mtk_mdio_read(struct mii_bus *bus, int phy_addr, int phy_reg)
 	return _mtk_mdio_read(eth, phy_addr, phy_reg);
 }
 
+static int mtk_of_get_phy_mode(struct mtk_mac *mac, struct device_node *np)
+{
+	int phy_mode, err;
+	const char *pm;
+
+	phy_mode = of_get_phy_mode(np);
+
+	if (phy_mode >= 0)
+		return phy_mode;
+	err = of_property_read_string(np, "phy-mode", &pm);
+	if (err < 0)
+		return err;
+	if (!strcasecmp(pm, "trgmii")) {
+		mac->trgmii = true;
+		/* TRGMII could be compatible with RGMII */
+		return PHY_INTERFACE_MODE_RGMII;
+	} else
+		return -ENODEV;
+}
+
 static void mtk_phy_link_adjust(struct net_device *dev)
 {
 	struct mtk_mac *mac = netdev_priv(dev);
@@ -207,7 +227,7 @@ static int mtk_phy_connect_node(struct mtk_eth *eth, struct mtk_mac *mac,
 		return -EINVAL;
 	}
 	addr = be32_to_cpu(*_addr);
-	phy_mode = of_get_phy_mode(phy_node);
+	phy_mode = mtk_of_get_phy_mode(mac, phy_node);
 	if (phy_mode < 0) {
 		dev_err(eth->dev, "incorrect phy-mode %d\n", phy_mode);
 		return -EINVAL;
@@ -243,7 +263,7 @@ static int mtk_phy_connect(struct mtk_mac *mac)
 	if (!np)
 		return -ENODEV;
 
-	switch (of_get_phy_mode(np)) {
+	switch (mtk_of_get_phy_mode(mac, np)) {
 	case PHY_INTERFACE_MODE_RGMII_TXID:
 	case PHY_INTERFACE_MODE_RGMII_RXID:
 	case PHY_INTERFACE_MODE_RGMII_ID:
