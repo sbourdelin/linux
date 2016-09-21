@@ -3369,8 +3369,22 @@ static void __sched notrace __schedule(bool preempt)
 			 * If a worker went to sleep, notify and ask workqueue
 			 * whether it wants to wake up a task to maintain
 			 * concurrency.
+			 *
+			 * Also the following stack is possible:
+			 *    oops_end()
+			 *    do_exit()
+			 *    schedule()
+			 *
+			 * If panic_on_oops is not set and oops happens on
+			 * a workqueue execution path, thread will be killed.
+			 * That is definitly sad, but not to make the situation
+			 * even worse we have to ignore dead tasks in order not
+			 * to step on zeroed out members (e.g. t->vfork_done is
+			 * already NULL on that path, since we were called by
+			 * do_exit()))
 			 */
-			if (prev->flags & PF_WQ_WORKER) {
+			if (prev->flags & PF_WQ_WORKER &&
+			    prev->state != TASK_DEAD) {
 				struct task_struct *to_wakeup;
 
 				to_wakeup = wq_worker_sleeping(prev);
