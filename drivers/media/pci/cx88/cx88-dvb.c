@@ -1779,6 +1779,7 @@ static int cx8802_dvb_probe(struct cx8802_driver *drv)
 		if (fe == NULL) {
 			printk(KERN_ERR "%s() failed to get frontend(%d)\n",
 					__func__, i);
+			err = -ENODEV;
 			goto fail_probe;
 		}
 		q = &fe->dvb.dvbq;
