@@ -432,10 +432,8 @@ struct grave_page {
 	unsigned int reads_done;
 };
 
-#define NS_MAX_DEVICES 32
-
 /* MTD structure for NAND controller */
-static struct mtd_info *ns_mtds[NS_MAX_DEVICES];
+static struct mtd_info *ns_mtds[NANDSIM_MAX_DEVICES];
 static DEFINE_MUTEX(ns_mtd_mutex);
 
 static struct dentry *dfs_root;
@@ -2648,7 +2646,7 @@ static int ns_ctrl_destroy_instance(struct ns_destroy_instance_req *req)
 	struct nand_chip *chip;
 	struct nandsim *ns;
 
-	if (id < 0 || id >= NS_MAX_DEVICES)
+	if (id < 0 || id >= NANDSIM_MAX_DEVICES)
 		return -EINVAL;
 
 	mutex_lock(&ns_mtd_mutex);
@@ -2758,13 +2756,13 @@ struct mtd_info *ns_new_instance(struct nandsim_params *nsparam)
 	}
 
 	mutex_lock(&ns_mtd_mutex);
-	for (i = 0; i < NS_MAX_DEVICES; i++) {
+	for (i = 0; i < NANDSIM_MAX_DEVICES; i++) {
 		if (!ns_mtds[i])
 			break;
 	}
 
-	if (i == NS_MAX_DEVICES) {
-		pr_err("Cannot allocate more than %i instances!\n", NS_MAX_DEVICES);
+	if (i == NANDSIM_MAX_DEVICES) {
+		pr_err("Cannot allocate more than %i instances!\n", NANDSIM_MAX_DEVICES);
 		retval = -ENFILE;
 		mutex_unlock(&ns_mtd_mutex);
 		goto error;
@@ -2984,7 +2982,7 @@ static void ns_destroy_all(void)
 	int i;
 
 	mutex_lock(&ns_mtd_mutex);
-	for (i = 0; i < NS_MAX_DEVICES; i++)
+	for (i = 0; i < NANDSIM_MAX_DEVICES; i++)
 		if (ns_mtds[i])
 			WARN_ON(ns_destroy_instance(ns_mtds[i]) != 0);
 	mutex_unlock(&ns_mtd_mutex);
