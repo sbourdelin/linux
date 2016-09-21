@@ -2470,6 +2470,45 @@ static void ns_nand_read_buf(struct mtd_info *mtd, u_char *buf, int len)
 	return;
 }
 
+static int ns_ctrl_new_instance(struct ns_new_instance_req *req)
+{
+	struct mtd_info *nsmtd;
+	struct nand_chip *chip;
+	struct nandsim *ns;
+	struct nandsim_params *nsparam = kzalloc(sizeof(*nsparam), GFP_KERNEL);
+
+	if (!nsparam)
+		return -ENOMEM;
+
+	memcpy(nsparam->id_bytes, req->id_bytes, sizeof(nsparam->id_bytes));
+	nsparam->bus_width = req->bus_width;
+	nsparam->file_fd = req->file_fd;
+
+	switch (req->backend) {
+		case NANDSIM_BACKEND_RAM:
+			nsparam->bops = &ns_ram_bops;
+		break;
+		case NANDSIM_BACKEND_FILE:
+			nsparam->bops = &ns_file_bops;
+		break;
+
+		default:
+			kfree(nsparam);
+			return -EINVAL;
+	}
+
+	nsmtd = ns_new_instance(nsparam);
+	kfree(nsparam);
+
+	if (IS_ERR(nsmtd))
+		return PTR_ERR(nsmtd);
+
+	chip = mtd_to_nand(nsmtd);
+	ns = nand_get_controller_data(chip);
+
+	return ns->index;
+}
+
 static long ns_ctrl_ioctl(struct file *file, unsigned int cmd,
 			  unsigned long arg)
 {
@@ -2764,7 +2803,7 @@ static int __init ns_init_default(void)
 	nsparam->cache_file = cache_file;
 	nsparam->bbt = bbt;
 	nsparam->bch = bch;
-	nsparam->id_bytes = id_bytes;
+	memcpy(nsparam->id_bytes, id_bytes, sizeof(nsparam->id_bytes));
 
 	if (!nsparam->cache_file)
 		nsparam->bops = &ns_ram_bops;

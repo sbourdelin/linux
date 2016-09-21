@@ -2,6 +2,7 @@
 #define __LINUX_NANDSIM_H__
 
 #include <linux/mtd/mtd.h>
+#include <mtd/nandsim-user.h>
 
 struct nandsim_params {
 	unsigned int access_delay;
@@ -22,7 +23,7 @@ struct nandsim_params {
 	char *cache_file;
 	unsigned int bbt;
 	unsigned int bch;
-	unsigned char *id_bytes;
+	unsigned char id_bytes[8];
 	unsigned int file_fd;
 	struct ns_backend_ops *bops;
 };
