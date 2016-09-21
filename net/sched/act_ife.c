@@ -708,11 +708,13 @@ static int tcf_ife_encode(struct sk_buff *skb, const struct tc_action *a,
 	   where ORIGDATA = original ethernet header ...
 	 */
 	u16 metalen = ife_get_sz(skb, ife);
-	int hdrm = metalen + skb->dev->hard_header_len + IFE_METAHDRLEN;
-	unsigned int skboff = skb->dev->hard_header_len;
 	u32 at = G_TC_AT(skb->tc_verd);
-	int new_len = skb->len + hdrm;
 	bool exceed_mtu = false;
+	unsigned int skboff;
+	int total_push;
+	int reserve;
+	int new_len;
+	int hdrm;
 	int err;
 
 	if (at & AT_EGRESS) {
@@ -723,6 +725,22 @@ static int tcf_ife_encode(struct sk_buff *skb, const struct tc_action *a,
 	spin_lock(&ife->tcf_lock);
 	bstats_update(&ife->tcf_bstats, skb);
 	tcf_lastuse_update(&ife->tcf_tm);
+
+	if (at & AT_EGRESS) {
+		/* on egress, reserve space for hard_header_len instead of
+		 * mac_len
+		 */
+		skb_reset_mac_len(skb);
+		hdrm = metalen + skb->mac_len + IFE_METAHDRLEN;
+		total_push = hdrm;
+		reserve = metalen + skb->dev->hard_header_len + IFE_METAHDRLEN;
+	} else {
+		/* on ingress, push mac_len as it already get parsed from tc */
+		hdrm = metalen + skb->mac_len + IFE_METAHDRLEN;
+		total_push = hdrm + skb->mac_len;
+		reserve = total_push;
+	}
+	new_len =  skb->len + hdrm;
 
 	if (!metalen) {		/* no metadata to send */
 		/* abuse overlimits to count when we allow packet
@@ -742,19 +760,17 @@ static int tcf_ife_encode(struct sk_buff *skb, const struct tc_action *a,
 
 	iethh = eth_hdr(skb);
 
-	err = skb_cow_head(skb, hdrm);
+	err = skb_cow_head(skb, reserve);
 	if (unlikely(err)) {
 		ife->tcf_qstats.drops++;
 		spin_unlock(&ife->tcf_lock);
 		return TC_ACT_SHOT;
 	}
 
-	if (!(at & AT_EGRESS))
-		skb_push(skb, skb->dev->hard_header_len);
-
-	__skb_push(skb, hdrm);
+	__skb_push(skb, total_push);
 	memcpy(skb->data, iethh, skb->mac_len);
 	skb_reset_mac_header(skb);
+	skboff += skb->mac_len;
 	oethh = eth_hdr(skb);
 
 	/*total metadata length */
@@ -792,7 +808,7 @@ static int tcf_ife_encode(struct sk_buff *skb, const struct tc_action *a,
 	oethh->h_proto = htons(ife->eth_type);
 
 	if (!(at & AT_EGRESS))
-		skb_pull(skb, skb->dev->hard_header_len);
+		skb_pull(skb, skb->mac_len);
 
 	spin_unlock(&ife->tcf_lock);
 
