@@ -266,9 +266,14 @@ void oops_end(unsigned long flags, struct pt_regs *regs, int signr)
 	/*
 	 * We're not going to return, but we might be on an IST stack or
 	 * have very little stack space left.  Rewind the stack and kill
-	 * the task.
+	 * the task.  But kthread is a special case, since kthread uses
+	 * stack to keep completion structure to be woken on vfork_done
+	 * completion.
 	 */
-	rewind_stack_do_exit(signr);
+	if (current->flags & PF_KTHREAD)
+		do_exit(signr);
+	else
+		rewind_stack_do_exit(signr);
 }
 NOKPROBE_SYMBOL(oops_end);
 
