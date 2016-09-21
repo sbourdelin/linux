@@ -216,10 +216,11 @@ static int qxl_device_init(struct qxl_device *qdev,
 	qdev->slot_id_bits = qdev->rom->slot_id_bits;
 	qdev->va_slot_mask =
 		(~(uint64_t)0) >> (qdev->slot_id_bits + qdev->slot_gen_bits);
-
-	qdev->mem_slots =
-		kmalloc(qdev->n_mem_slots * sizeof(struct qxl_memslot),
-			GFP_KERNEL);
+	qdev->mem_slots = kmalloc_array(qdev->n_mem_slots,
+					sizeof(*qdev->mem_slots),
+					GFP_KERNEL);
+	if (!qdev->mem_slots)
+		return -ENOMEM;
 
 	idr_init(&qdev->release_idr);
 	spin_lock_init(&qdev->release_idr_lock);
