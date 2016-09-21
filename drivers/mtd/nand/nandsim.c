@@ -2900,10 +2900,35 @@ out:
 static long ns_ctrl_ioctl(struct file *file, unsigned int cmd,
 			  unsigned long arg)
 {
-	if (!capable(CAP_SYS_RESOURCE))
-		return -EPERM;
+	int ret;
+	void __user *argp = (void __user *)arg;
 
-	return -ENOTTY;
+	if (!capable(CAP_SYS_RESOURCE)) {
+		ret = -EPERM;
+		goto out;
+	}
+
+	switch (cmd) {
+		case NANDSIM_IOC_NEW_INSTANCE:
+		{
+			struct ns_new_instance_req req;
+
+			ret = copy_from_user(&req, argp, sizeof(struct ns_new_instance_req));
+			if (ret) {
+				ret = -EFAULT;
+				goto out;
+			}
+
+			ret = ns_ctrl_new_instance(&req, argp + sizeof(req));
+			break;
+		}
+
+		default:
+			ret = -ENOTTY;
+	}
+
+out:
+	return ret;
 }
 
 #ifdef CONFIG_COMPAT
