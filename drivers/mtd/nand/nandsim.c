@@ -2893,6 +2893,56 @@ out:
 	return ret;
 }
 
+static void ns_put_device(struct mtd_info *);
+static int ns_get_device(struct mtd_info *);
+
+static int ns_ctrl_info_instance(struct ns_info_instance_req *req)
+{
+	struct mtd_info *nsmtd;
+	int id = req->id, ret = 0;
+	struct nand_chip *chip;
+	struct nandsim *ns;
+	struct ns_file_data *file_data;
+	char buf[NANDSIM_FILENAME_SIZE];
+	char *tmp;
+
+	if (id < 0 || id >= NANDSIM_MAX_DEVICES)
+		return -EINVAL;
+
+	mutex_lock(&ns_mtd_mutex);
+	nsmtd = ns_mtds[id];
+	if (nsmtd) {
+		ret = ns_get_device(nsmtd);
+		if (ret)
+			goto out;
+		chip = mtd_to_nand(nsmtd);
+		ns = nand_get_controller_data(chip);
+		req->no_oob = ns->no_oob;
+		memcpy(req->id_bytes, ns->ids, 8);
+		req->parts_num = ns->nbparts;
+		if (ns->bops == &ns_cachefile_bops) {
+			req->backend = NANDSIM_BACKEND_CACHEFILE;
+		} else if (ns->bops == &ns_file_bops) {
+			req->backend = NANDSIM_BACKEND_FILE;
+			file_data = ns->backend_data;
+			tmp = d_path(&file_data->file->f_path, buf, NANDSIM_FILENAME_SIZE);
+			memcpy(req->filename, tmp, NANDSIM_FILENAME_SIZE);
+		} else if (ns->bops == &ns_ram_bops) {
+			req->backend = NANDSIM_BACKEND_RAM;
+		} else {
+			req->backend = -1;
+		}
+
+		ns_put_device(nsmtd);
+	} else {
+		ret = -EINVAL;
+	}
+out:
+	mutex_unlock(&ns_mtd_mutex);
+	return ret;
+
+}
+
 static long ns_ctrl_ioctl(struct file *file, unsigned int cmd,
 			  unsigned long arg)
 {
@@ -2929,6 +2979,21 @@ static long ns_ctrl_ioctl(struct file *file, unsigned int cmd,
 			}
 
 			ret = ns_ctrl_destroy_instance(&req);
+			break;
+		}
+		case NANDSIM_IOC_INFO_INSTANCE:
+		{
+			struct ns_info_instance_req req;
+
+			ret = copy_from_user(&req, argp, sizeof(struct ns_info_instance_req));
+			if (ret) {
+				ret = -EFAULT;
+				goto out;
+			}
+			ret = ns_ctrl_info_instance(&req);
+			if (ret)
+				goto out;
+			ret = copy_to_user(argp, &req, sizeof(struct ns_info_instance_req));
 			break;
 		}
 

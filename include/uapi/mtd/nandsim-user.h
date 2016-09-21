@@ -7,9 +7,11 @@
 
 #define NANDSIM_IOC_NEW_INSTANCE _IOW(NANDSIM_IOC_MAGIC, 0, struct ns_new_instance_req)
 #define NANDSIM_IOC_DESTROY_INSTANCE _IOW(NANDSIM_IOC_MAGIC, 1, struct ns_destroy_instance_req)
+#define NANDSIM_IOC_INFO_INSTANCE _IOW(NANDSIM_IOC_MAGIC, 2, struct ns_info_instance_req)
 
 #define NANDSIM_MAX_DEVICES 32
 #define NANDSIM_MAX_PARTS 32
+#define NANDSIM_FILENAME_SIZE 64
 
 enum ns_backend_type {
 	NANDSIM_BACKEND_RAM = 0,
@@ -97,6 +99,15 @@ struct ns_simelement_prop {
 struct ns_destroy_instance_req {
 	__s8 id;
 	__s8 padding[7];
+} __packed;
+
+struct ns_info_instance_req {
+	__s8 id;
+	__s8 no_oob;
+	__s8 id_bytes[8];
+	__s8 parts_num;
+	__s8 backend;
+	__u8 filename[NANDSIM_FILENAME_SIZE];
 } __packed;
 
 #endif /* __NANDSIM_USER_H__ */
