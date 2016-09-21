@@ -1172,6 +1172,157 @@ out:
 	return ret;
 }
 
+static inline int __udp_forward(struct udp_sock *up, int freed, int rmem)
+{
+	return atomic_read(&up->mem_allocated) - freed - rmem;
+}
+
+static int skb_unref(struct sk_buff *skb)
+{
+	if (likely(atomic_read(&skb->users) == 1))
+		smp_rmb();
+	else if (likely(!atomic_dec_and_test(&skb->users)))
+		return 0;
+
+	return skb->truesize;
+}
+
+static inline int udp_try_release(struct sock *sk, int *fwd, int partial)
+{
+	struct udp_sock *up = udp_sk(sk);
+	int freed_old, freed_new, amt;
+
+	freed_old = atomic_read(&up->mem_freed);
+	*fwd = __udp_forward(up, freed_old, atomic_read(&sk->sk_rmem_alloc));
+	if (*fwd < SK_MEM_QUANTUM + partial)
+		return 0;
+
+	/* we can have concurrent release; if we catch any conflict
+	 * via atomic_cmpxchg, let only one of them relase the memory
+	 */
+	amt = sk_mem_pages(*fwd - partial) << SK_MEM_QUANTUM_SHIFT;
+	freed_new = atomic_cmpxchg(&up->mem_freed, freed_old, freed_old + amt);
+	return (freed_new == freed_old) ? amt : 0;
+}
+
+/* reclaim the allocated forward memory, except 'partial' quanta */
+static void skb_release_mem_udp(struct sock *sk, int partial)
+{
+	int fwd, delta = udp_try_release(sk, &fwd, partial);
+
+	if (delta)
+		__sk_mem_reduce_allocated(sk, delta >> SK_MEM_QUANTUM_SHIFT);
+	sk->sk_forward_alloc = fwd - delta;
+}
+
+void skb_free_udp(struct sock *sk, struct sk_buff *skb)
+{
+	int size = skb_unref(skb);
+
+	if (!size)
+		return;
+
+	trace_kfree_skb(skb, __builtin_return_address(0));
+	__kfree_skb(skb);
+	skb_release_mem_udp(sk, 1);
+}
+EXPORT_SYMBOL_GPL(skb_free_udp);
+
+void skb_consume_udp(struct sock *sk, struct sk_buff *skb, int len)
+{
+	int size = skb_unref(skb);
+
+	if (unlikely(READ_ONCE(sk->sk_peek_off) >= 0)) {
+		bool slow = lock_sock_fast(sk);
+
+		sk_peek_offset_bwd(sk, len);
+		unlock_sock_fast(sk, slow);
+	}
+	if (!size)
+		return;
+
+	__kfree_skb(skb);
+	skb_release_mem_udp(sk, 1);
+}
+EXPORT_SYMBOL_GPL(skb_consume_udp);
+
+static void udp_queue_purge(struct sock *sk, struct sk_buff_head *list,
+			    int partial)
+{
+	struct sk_buff *skb;
+	int size;
+
+	while ((skb = __skb_dequeue(list)) != NULL) {
+		size = skb_unref(skb);
+		if (size) {
+			trace_kfree_skb(skb, udp_queue_purge);
+			__kfree_skb(skb);
+		}
+	}
+	skb_release_mem_udp(sk, partial);
+}
+
+int udp_rmem_schedule(struct sock *sk, struct sk_buff *skb)
+{
+	int alloc, freed, fwd, amt, delta, rmem, err = -ENOMEM;
+	struct udp_sock *up = udp_sk(sk);
+
+	rmem = atomic_add_return(skb->truesize, &sk->sk_rmem_alloc);
+	if (rmem > sk->sk_rcvbuf)
+		goto drop;
+
+	freed = atomic_read(&up->mem_freed);
+	fwd = __udp_forward(up, freed, rmem);
+	if (fwd > 0)
+		goto no_alloc;
+
+	amt = sk_mem_pages(skb->truesize);
+	delta = amt << SK_MEM_QUANTUM_SHIFT;
+	if (!__sk_mem_raise_allocated(sk, delta, amt, SK_MEM_RECV)) {
+		err = -ENOBUFS;
+		goto drop;
+	}
+
+	/* if we have some skbs in the error queue, the forward allocation could
+	 * be understimated, even below 0; avoid exporting such values
+	 */
+	alloc = atomic_add_return(delta, &up->mem_allocated);
+	fwd = alloc - freed - rmem;
+	if (fwd < 0)
+		fwd = SK_MEM_QUANTUM;
+
+no_alloc:
+	sk->sk_forward_alloc = fwd;
+	skb_orphan(skb);
+	skb->sk = sk;
+	skb->destructor = sock_rmem_free;
+	return 0;
+
+drop:
+	atomic_sub(skb->truesize, &sk->sk_rmem_alloc);
+	atomic_inc(&sk->sk_drops);
+	return err;
+}
+EXPORT_SYMBOL_GPL(udp_rmem_schedule);
+
+static void udp_destruct_sock(struct sock *sk)
+{
+	/* reclaim completely the forward allocated memory */
+	udp_queue_purge(sk, &sk->sk_receive_queue, 0);
+	inet_sock_destruct(sk);
+}
+
+int udp_init_sock(struct sock *sk)
+{
+	struct udp_sock *up = udp_sk(sk);
+
+	atomic_set(&up->mem_allocated, 0);
+	atomic_set(&up->mem_freed, 0);
+	sk->sk_destruct = udp_destruct_sock;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(udp_init_sock);
+
 /**
  *	first_packet_length	- return length of first packet in receive queue
  *	@sk: socket
