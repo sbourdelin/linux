@@ -56,8 +56,6 @@
 
 #define NANDSIM_FIRST_ID_BYTE  0x98
 #define NANDSIM_SECOND_ID_BYTE 0x39
-#define NANDSIM_THIRD_ID_BYTE  0xFF /* No byte */
-#define NANDSIM_FOURTH_ID_BYTE 0xFF /* No byte */
 #define NANDSIM_ACCESS_DELAY 25
 #define NANDSIM_PROGRAMM_DELAY 200
 #define NANDSIM_ERASE_DELAY 2
@@ -87,9 +85,7 @@ static unsigned int bch;
 static u_char id_bytes[8] = {
 	[0] = NANDSIM_FIRST_ID_BYTE,
 	[1] = NANDSIM_SECOND_ID_BYTE,
-	[2] = NANDSIM_THIRD_ID_BYTE,
-	[3] = NANDSIM_FOURTH_ID_BYTE,
-	[4 ... 7] = 0xFF,
+	[2 ... 7] = 0xFF,
 };
 static bool defaults = true;
 
@@ -3064,14 +3060,7 @@ struct mtd_info *ns_new_instance(struct nandsim_params *nsparam)
 	 * Perform minimum nandsim structure initialization to handle
 	 * the initial ID read command correctly
 	 */
-	if (id_bytes[6] != 0xFF || id_bytes[7] != 0xFF)
-		nand->geom.idbytes = 8;
-	else if (id_bytes[4] != 0xFF || id_bytes[5] != 0xFF)
-		nand->geom.idbytes = 6;
-	else if (id_bytes[2] != 0xFF || id_bytes[3] != 0xFF)
-		nand->geom.idbytes = 4;
-	else
-		nand->geom.idbytes = 2;
+	nand->geom.idbytes = sizeof(id_bytes);
 	nand->regs.status = NS_STATUS_OK(nand);
 	nand->nxstate = STATE_UNKNOWN;
 	nand->options |= OPT_PAGE512; /* temporary value */
