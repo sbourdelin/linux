@@ -306,6 +306,7 @@ static int __init integrator_cp_of_init(struct device_node *np)
 	clk = of_clk_get(np, 0);
 	if (IS_ERR(clk)) {
 		pr_err("Failed to get clock");
+		iounmap(base);
 		return PTR_ERR(clk);
 	}
 
