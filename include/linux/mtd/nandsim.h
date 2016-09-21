@@ -47,25 +47,6 @@ struct nandsim_geom {
 	uint idbytes;       /* the number ID bytes that this chip outputs */
 };
 
-/* NAND flash internal registers */
-struct nandsim_regs {
-	unsigned command; /* the command register */
-	u_char   status;  /* the status register */
-	uint     row;     /* the page number */
-	uint     column;  /* the offset within page */
-	uint     count;   /* internal counter */
-	uint     num;     /* number of bytes which must be processed */
-	uint     off;     /* fixed page offset */
-};
-
-/*
- * A union to represent flash memory contents and flash buffer.
- */
-union ns_mem {
-	u_char *byte;    /* for byte access */
-	uint16_t *word;  /* for 16-bit word access */
-};
-
 struct nandsim;
 struct ns_backend_ops {
 	void (*erase_sector)(struct nandsim *ns);
@@ -79,9 +60,19 @@ struct ns_backend_ops {
 struct mtd_info *ns_new_instance(struct nandsim_params *nsparam);
 int ns_destroy_instance(struct mtd_info *nsmtd);
 struct nandsim_geom *nandsim_get_geom(struct nandsim *ns);
-struct nandsim_regs *nandsim_get_regs(struct nandsim *ns);
 void nandsim_set_backend_data(struct nandsim *ns, void *data);
 void *nandsim_get_backend_data(struct nandsim *ns);
-union ns_mem *nandsim_get_buf(struct nandsim *ns);
 
+void __ns_file_read_page(struct nandsim *ns, int num,
+			 int (*read_fn)(struct nandsim *ns, char *addr,
+					unsigned long count, loff_t offset));
+
+int __ns_file_prog_page(struct nandsim *ns, int num, char *file_buf,
+			int (*read_fn)(struct nandsim *ns, char *addr,
+				       unsigned long count, loff_t offset),
+			ssize_t (*write_fn)(struct nandsim *ns, const char *buf,
+					    size_t count, loff_t pos));
+void __ns_file_erase_sector(struct nandsim *ns, char *file_buf,
+			    ssize_t (*write_fn)(struct nandsim *ns, const char *buf,
+						size_t count, loff_t pos));
 #endif /* __LINUX_NANDSIM_H__ */

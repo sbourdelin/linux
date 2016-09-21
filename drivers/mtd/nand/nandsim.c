@@ -302,6 +302,14 @@ struct nandsim_debug_info {
 	struct dentry *dfs_wear_report;
 };
 
+/*
+ * A union to represent flash memory contents and flash buffer.
+ */
+union ns_mem {
+	u_char *byte;    /* for byte access */
+	uint16_t *word;  /* for 16-bit word access */
+};
+
 struct ns_ram_data {
 	/* The simulated NAND flash pages array */
 	union ns_mem *pages;
@@ -350,7 +358,17 @@ struct nandsim {
 	/* Internal buffer of page + OOB size bytes */
 	union ns_mem buf;
 	struct nandsim_geom geom;
-	struct nandsim_regs regs;
+
+	/* NAND flash internal registers */
+	struct {
+		unsigned int command; /* the command register */
+		u_char   status;  /* the status register */
+		uint     row;     /* the page number */
+		uint     column;  /* the offset within page */
+		uint     count;   /* internal counter */
+		uint     num;     /* number of bytes which must be processed */
+		uint     off;     /* fixed page offset */
+	} regs;
 
 	/* NAND flash lines state */
         struct {
@@ -773,12 +791,6 @@ struct nandsim_geom *nandsim_get_geom(struct nandsim *ns)
 }
 EXPORT_SYMBOL_GPL(nandsim_get_geom);
 
-struct nandsim_regs *nandsim_get_regs(struct nandsim *ns)
-{
-	return &ns->regs;
-}
-EXPORT_SYMBOL_GPL(nandsim_get_regs);
-
 void nandsim_set_backend_data(struct nandsim *ns, void *data)
 {
 	ns->backend_data = data;
@@ -790,12 +802,6 @@ void *nandsim_get_backend_data(struct nandsim *ns)
 	return ns->backend_data;
 }
 EXPORT_SYMBOL_GPL(nandsim_get_backend_data);
-
-union ns_mem *nandsim_get_buf(struct nandsim *ns)
-{
-	return &ns->buf;
-}
-EXPORT_SYMBOL_GPL(nandsim_get_buf);
 
 static void ns_ram_destroy(struct nandsim *ns)
 {
@@ -1706,9 +1712,10 @@ static void ns_cachefile_read_page(struct nandsim *ns, int num)
 	}
 }
 
-static void ns_file_read_page(struct nandsim *ns, int num)
+void __ns_file_read_page(struct nandsim *ns, int num,
+			 int (*read_fn)(struct nandsim *ns, char *addr,
+					unsigned long count, loff_t offset))
 {
-	struct ns_file_data *data = ns->backend_data;
 	loff_t pos;
 	ssize_t tx;
 
@@ -1734,11 +1741,25 @@ static void ns_file_read_page(struct nandsim *ns, int num)
 	}
 
 	pos = (loff_t)NS_RAW_OFFSET(ns) + ns->regs.off;
-	tx = kernel_read(data->file, pos, ns->buf.byte, num);
+	tx = read_fn(ns, ns->buf.byte, num, pos);
 	if (tx == 0)
 		memset(ns->buf.byte, 0xff, num);
 	else if (tx != num)
 		NS_ERR("read_page: read error for page %d ret %ld\n", ns->regs.row, (long)tx);
+}
+EXPORT_SYMBOL_GPL(__ns_file_read_page);
+
+static inline int do_kernel_read(struct nandsim *ns, char *addr,
+				 unsigned long count, loff_t offset)
+{
+	struct ns_file_data *data = ns->backend_data;
+
+	return kernel_read(data->file, offset, addr, count);
+}
+
+static void ns_file_read_page(struct nandsim *ns, int num)
+{
+	__ns_file_read_page(ns, num, do_kernel_read);
 }
 
 static void ns_ram_erase_sector(struct nandsim *ns)
@@ -1771,23 +1792,41 @@ static void ns_cachefile_erase_sector(struct nandsim *ns)
 	}
 }
 
-static void ns_file_erase_sector(struct nandsim *ns)
+static inline ssize_t do_kernel_write(struct nandsim *ns, const char *addr,
+				      size_t count, loff_t offset)
+{
+	struct ns_file_data *data = ns->backend_data;
+
+	return kernel_write(data->file, addr, count, offset);
+}
+
+
+void __ns_file_erase_sector(struct nandsim *ns, char *file_buf,
+			    ssize_t (*write_fn)(struct nandsim *ns, const char *buf,
+			    size_t count, loff_t pos))
 {
 	int i;
 	loff_t pos;
 	ssize_t tx;
 	unsigned int pagesz = ns->no_oob ? ns->geom.pgsz : ns->geom.pgszoob;
-	struct ns_file_data *data = ns->backend_data;
 
-	memset(data->file_buf, 0xff, pagesz);
+	memset(file_buf, 0xff, pagesz);
 
 	for (i = 0; i < ns->geom.pgsec; i++) {
 		pos = (loff_t)(ns->regs.row + i) * pagesz;
-		tx = kernel_write(data->file, data->file_buf, pagesz, pos);
+		tx = write_fn(ns, file_buf, pagesz, pos);
 		if (tx != pagesz) {
 			NS_ERR("prog_page: write error for page %d ret %ld\n", ns->regs.row, (long)tx);
 		}
 	}
+}
+EXPORT_SYMBOL_GPL(__ns_file_erase_sector);
+
+static void ns_file_erase_sector(struct nandsim *ns)
+{
+	struct ns_file_data *data = ns->backend_data;
+
+	__ns_file_erase_sector(ns, data->file_buf, do_kernel_write);
 }
 
 static int ns_ram_prog_page(struct nandsim *ns, int num)
@@ -1863,13 +1902,16 @@ static int ns_cachefile_prog_page(struct nandsim *ns, int num)
 	return 0;
 }
 
-static int ns_file_prog_page(struct nandsim *ns, int num)
+int __ns_file_prog_page(struct nandsim *ns, int num, char *file_buf,
+			int (*read_fn)(struct nandsim *ns, char *addr,
+				       unsigned long count, loff_t offset),
+			ssize_t (*write_fn)(struct nandsim *ns, const char *buf,
+					    size_t count, loff_t pos))
 {
 	int i;
 	loff_t off;
 	ssize_t tx;
 	u_char *pg_off;
-	struct ns_file_data *data = ns->backend_data;
 
 	NS_DBG("prog_page: writing page %d\n", ns->regs.row);
 
@@ -1885,10 +1927,10 @@ static int ns_file_prog_page(struct nandsim *ns, int num)
 			num -= pg_write_end - ns->geom.pgsz;
 	}
 
-	pg_off = data->file_buf + ns->regs.column + ns->regs.off;
+	pg_off = file_buf + ns->regs.column + ns->regs.off;
 	off = (loff_t)NS_RAW_OFFSET(ns) + ns->regs.off;
 
-	tx = kernel_read(data->file, off, pg_off, num);
+	tx = read_fn(ns, pg_off, num, off);
 	if (tx == 0)
 		memset(pg_off, 0xff, num);
 	else if (tx != num) {
@@ -1899,13 +1941,22 @@ static int ns_file_prog_page(struct nandsim *ns, int num)
 	for (i = 0; i < num; i++)
 		pg_off[i] &= ns->buf.byte[i];
 
-	tx = kernel_write(data->file, pg_off, num, off);
+	tx = write_fn(ns, pg_off, num, off);
 	if (tx != num) {
 		NS_ERR("prog_page: write error for page %d ret %ld\n", ns->regs.row, (long)tx);
 		return -1;
 	}
 
 	return 0;
+}
+EXPORT_SYMBOL_GPL(__ns_file_prog_page);
+
+static int ns_file_prog_page(struct nandsim *ns, int num)
+{
+	struct ns_file_data *data = ns->backend_data;
+
+	return __ns_file_prog_page(ns, num, data->file_buf, do_kernel_read,
+				   do_kernel_write);
 }
 
 static struct ns_backend_ops ns_ram_bops = {
