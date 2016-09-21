@@ -55,14 +55,14 @@ This describes the OPPs belonging to a device. This node can have following
 properties:
 
 Required properties:
-- compatible: Allow OPPs to express their compatibility. It should be:
-  "operating-points-v2".
-
 - OPP nodes: One or more OPP nodes describing voltage-current-frequency
   combinations. Their name isn't significant but their phandle can be used to
   reference an OPP.
 
 Optional properties:
+- compatible: Allow OPPs to express their compatibility. It should be
+  "operating-points-v2" or a vendor specific string.
+
 - opp-shared: Indicates that device nodes using this OPP Table Node's phandle
   switch their DVFS state together, i.e. they share clock/voltage/current lines.
   Missing property means devices have independent clock/voltage/current lines,
