@@ -630,6 +630,22 @@ err:
 	return ret;
 }
 
+static int octeon_i2c_check_bus(struct octeon_i2c *i2c)
+{
+	int stat, lines;
+
+	stat = octeon_i2c_stat_read(i2c);
+
+	/* get I2C line state */
+	lines = octeon_i2c_read_int(i2c) & (TWSI_INT_SCL | TWSI_INT_SDA);
+
+	if (stat == STAT_IDLE && lines == (TWSI_INT_SCL | TWSI_INT_SDA))
+		return 0;
+
+	/* bus check failed, try to recover */
+	return octeon_i2c_recovery(i2c);
+}
+
 /**
  * octeon_i2c_xfer - The driver's master_xfer function
  * @adap: Pointer to the i2c_adapter structure
@@ -642,6 +658,10 @@ int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
 	struct octeon_i2c *i2c = i2c_get_adapdata(adap);
 	int i, ret = 0;
+
+	ret = octeon_i2c_check_bus(i2c);
+	if (ret)
+		goto out;
 
 	if (num == 1) {
 		if (msgs[0].len > 0 && msgs[0].len <= 8) {
