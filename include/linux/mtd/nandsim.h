@@ -72,6 +72,7 @@ struct ns_backend_ops {
 	void (*read_page)(struct nandsim *ns, int num);
 	int (*init)(struct nandsim *ns, struct nandsim_params *nsparam);
 	void (*destroy)(struct nandsim *ns);
+	char *name;
 };
 
 struct mtd_info *ns_new_instance(struct nandsim_params *nsparam);

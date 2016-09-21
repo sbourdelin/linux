@@ -976,6 +976,7 @@ static int init_nandsim(struct mtd_info *mtd, struct nandsim_params *nsparam)
 
 	ns->bops = nsparam->bops;
 
+	NS_INFO("Using backend: %s\n", ns->bops->name);
 	if ((ret = ns->bops->init(ns, nsparam)) != 0) {
 		NS_ERR("Unable to initialize simulator backend: %i\n", ret);
 		return ret;
@@ -1880,6 +1881,7 @@ static struct ns_backend_ops ns_ram_bops = {
 	.read_page = ns_ram_read_page,
 	.init = ns_ram_init,
 	.destroy = ns_ram_destroy,
+	.name = "ram",
 };
 
 static struct ns_backend_ops ns_cachefile_bops = {
@@ -1888,6 +1890,7 @@ static struct ns_backend_ops ns_cachefile_bops = {
 	.read_page = ns_cachefile_read_page,
 	.init = ns_cachefile_init,
 	.destroy = ns_cachefile_destroy,
+	.name = "cache_file",
 };
 
 static struct ns_backend_ops ns_file_bops = {
@@ -1896,6 +1899,7 @@ static struct ns_backend_ops ns_file_bops = {
 	.read_page = ns_file_read_page,
 	.init = ns_file_init,
 	.destroy = ns_file_destroy,
+	.name = "file",
 };
 
 /*
