@@ -3705,12 +3705,13 @@ int skb_cow_data(struct sk_buff *skb, int tailbits, struct sk_buff **trailer)
 }
 EXPORT_SYMBOL_GPL(skb_cow_data);
 
-static void sock_rmem_free(struct sk_buff *skb)
+void sock_rmem_free(struct sk_buff *skb)
 {
 	struct sock *sk = skb->sk;
 
 	atomic_sub(skb->truesize, &sk->sk_rmem_alloc);
 }
+EXPORT_SYMBOL_GPL(sock_rmem_free);
 
 /*
  * Note: We dont mem charge error packets (no sk_forward_alloc changes)
