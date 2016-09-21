@@ -12,7 +12,7 @@ struct nandsim_params {
 	unsigned int input_cycle;
 	unsigned int bus_width;
 	unsigned int do_delays;
-	unsigned long *parts;
+	unsigned int *parts;
 	unsigned int parts_num;
 	char *badblocks;
 	char *weakblocks;
