@@ -2922,6 +2922,19 @@ static long ns_ctrl_ioctl(struct file *file, unsigned int cmd,
 			ret = ns_ctrl_new_instance(&req, argp + sizeof(req));
 			break;
 		}
+		case NANDSIM_IOC_DESTROY_INSTANCE:
+		{
+			struct ns_destroy_instance_req req;
+
+			ret = copy_from_user(&req, argp, sizeof(struct ns_destroy_instance_req));
+			if (ret) {
+				ret = -EFAULT;
+				goto out;
+			}
+
+			ret = ns_ctrl_destroy_instance(&req);
+			break;
+		}
 
 		default:
 			ret = -ENOTTY;
