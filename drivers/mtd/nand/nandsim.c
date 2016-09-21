@@ -54,50 +54,26 @@
 #include <linux/mutex.h>
 #include <linux/file.h>
 
-/* Default simulator parameters values */
-#if !defined(CONFIG_NANDSIM_FIRST_ID_BYTE)  || \
-    !defined(CONFIG_NANDSIM_SECOND_ID_BYTE) || \
-    !defined(CONFIG_NANDSIM_THIRD_ID_BYTE)  || \
-    !defined(CONFIG_NANDSIM_FOURTH_ID_BYTE)
-#define CONFIG_NANDSIM_FIRST_ID_BYTE  0x98
-#define CONFIG_NANDSIM_SECOND_ID_BYTE 0x39
-#define CONFIG_NANDSIM_THIRD_ID_BYTE  0xFF /* No byte */
-#define CONFIG_NANDSIM_FOURTH_ID_BYTE 0xFF /* No byte */
-#endif
+#define NANDSIM_FIRST_ID_BYTE  0x98
+#define NANDSIM_SECOND_ID_BYTE 0x39
+#define NANDSIM_THIRD_ID_BYTE  0xFF /* No byte */
+#define NANDSIM_FOURTH_ID_BYTE 0xFF /* No byte */
+#define NANDSIM_ACCESS_DELAY 25
+#define NANDSIM_PROGRAMM_DELAY 200
+#define NANDSIM_ERASE_DELAY 2
+#define NANDSIM_OUTPUT_CYCLE 40
+#define NANDSIM_INPUT_CYCLE  50
+#define NANDSIM_BUS_WIDTH  8
+#define NANDSIM_DO_DELAYS  0
 
-#ifndef CONFIG_NANDSIM_ACCESS_DELAY
-#define CONFIG_NANDSIM_ACCESS_DELAY 25
-#endif
-#ifndef CONFIG_NANDSIM_PROGRAMM_DELAY
-#define CONFIG_NANDSIM_PROGRAMM_DELAY 200
-#endif
-#ifndef CONFIG_NANDSIM_ERASE_DELAY
-#define CONFIG_NANDSIM_ERASE_DELAY 2
-#endif
-#ifndef CONFIG_NANDSIM_OUTPUT_CYCLE
-#define CONFIG_NANDSIM_OUTPUT_CYCLE 40
-#endif
-#ifndef CONFIG_NANDSIM_INPUT_CYCLE
-#define CONFIG_NANDSIM_INPUT_CYCLE  50
-#endif
-#ifndef CONFIG_NANDSIM_BUS_WIDTH
-#define CONFIG_NANDSIM_BUS_WIDTH  8
-#endif
-#ifndef CONFIG_NANDSIM_DO_DELAYS
-#define CONFIG_NANDSIM_DO_DELAYS  0
-#endif
-#ifndef CONFIG_NANDSIM_MAX_PARTS
-#define CONFIG_NANDSIM_MAX_PARTS  32
-#endif
-
-static uint access_delay   = CONFIG_NANDSIM_ACCESS_DELAY;
-static uint programm_delay = CONFIG_NANDSIM_PROGRAMM_DELAY;
-static uint erase_delay    = CONFIG_NANDSIM_ERASE_DELAY;
-static uint output_cycle   = CONFIG_NANDSIM_OUTPUT_CYCLE;
-static uint input_cycle    = CONFIG_NANDSIM_INPUT_CYCLE;
-static uint bus_width      = CONFIG_NANDSIM_BUS_WIDTH;
-static uint do_delays      = CONFIG_NANDSIM_DO_DELAYS;
-static unsigned long parts[CONFIG_NANDSIM_MAX_PARTS];
+static uint access_delay   = NANDSIM_ACCESS_DELAY;
+static uint programm_delay = NANDSIM_PROGRAMM_DELAY;
+static uint erase_delay    = NANDSIM_ERASE_DELAY;
+static uint output_cycle   = NANDSIM_OUTPUT_CYCLE;
+static uint input_cycle    = NANDSIM_INPUT_CYCLE;
+static uint bus_width      = NANDSIM_BUS_WIDTH;
+static uint do_delays      = NANDSIM_DO_DELAYS;
+static unsigned long parts[NANDSIM_MAX_PARTS];
 static unsigned int parts_num;
 static char *badblocks = NULL;
 static char *weakblocks = NULL;
@@ -109,10 +85,10 @@ static char *cache_file = NULL;
 static unsigned int bbt;
 static unsigned int bch;
 static u_char id_bytes[8] = {
-	[0] = CONFIG_NANDSIM_FIRST_ID_BYTE,
-	[1] = CONFIG_NANDSIM_SECOND_ID_BYTE,
-	[2] = CONFIG_NANDSIM_THIRD_ID_BYTE,
-	[3] = CONFIG_NANDSIM_FOURTH_ID_BYTE,
+	[0] = NANDSIM_FIRST_ID_BYTE,
+	[1] = NANDSIM_SECOND_ID_BYTE,
+	[2] = NANDSIM_THIRD_ID_BYTE,
+	[3] = NANDSIM_FOURTH_ID_BYTE,
 	[4 ... 7] = 0xFF,
 };
 static bool defaults = true;
@@ -304,8 +280,8 @@ struct nandsim {
 	unsigned int index;
 	unsigned int refcnt;
 	spinlock_t refcnt_lock;
-	struct mtd_partition partitions[CONFIG_NANDSIM_MAX_PARTS];
 	bool destroying;
+	struct mtd_partition partitions[NANDSIM_MAX_PARTS];
 	unsigned int nbparts;
 
 	uint busw;              /* flash chip bus width (8 or 16) */
