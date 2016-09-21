@@ -594,7 +594,9 @@ static unsigned long lazy_max_pages(void)
 {
 	unsigned int log;
 
-	log = fls(num_online_cpus());
+	log = num_online_cpus();
+	if (log > 1)
+		log = (unsigned int)get_count_order(log);
 
 	return log * (32UL * 1024 * 1024 / PAGE_SIZE);
 }
