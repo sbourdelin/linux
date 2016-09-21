@@ -291,6 +291,22 @@ static unsigned long cached_align;
 
 static unsigned long vmap_area_pcpu_hole;
 
+static inline struct vmap_area *next_vmap_area(struct vmap_area *va)
+{
+	if (list_is_last(&va->list, &vmap_area_list))
+		return  NULL;
+	else
+		return list_next_entry(va, list);
+}
+
+static inline struct vmap_area *prev_vmap_area(struct vmap_area *va)
+{
+	if (list_is_first(&va->list, &vmap_area_list))
+		return  NULL;
+	else
+		return list_prev_entry(va, list);
+}
+
 static struct vmap_area *__find_vmap_area(unsigned long addr)
 {
 	struct rb_node *n = vmap_area_root.rb_node;
@@ -1112,7 +1128,7 @@ void vm_unmap_ram(const void *mem, unsigned int count)
 
 	BUG_ON(!addr);
 	BUG_ON(addr < VMALLOC_START);
-	BUG_ON(addr > VMALLOC_END);
+	BUG_ON(addr >= VMALLOC_END);
 	BUG_ON(!PAGE_ALIGNED(addr));
 
 	debug_check_no_locks_freed(mem, size);
@@ -2296,10 +2312,6 @@ void free_vm_area(struct vm_struct *area)
 EXPORT_SYMBOL_GPL(free_vm_area);
 
 #ifdef CONFIG_SMP
-static struct vmap_area *node_to_va(struct rb_node *n)
-{
-	return n ? rb_entry(n, struct vmap_area, rb_node) : NULL;
-}
 
 /**
  * pvm_find_next_prev - find the next and prev vmap_area surrounding @end
@@ -2335,10 +2347,10 @@ static bool pvm_find_next_prev(unsigned long end,
 
 	if (va->va_end > end) {
 		*pnext = va;
-		*pprev = node_to_va(rb_prev(&(*pnext)->rb_node));
+		*pprev = prev_vmap_area(va);
 	} else {
 		*pprev = va;
-		*pnext = node_to_va(rb_next(&(*pprev)->rb_node));
+		*pnext = next_vmap_area(va);
 	}
 	return true;
 }
@@ -2373,7 +2385,7 @@ static unsigned long pvm_determine_end(struct vmap_area **pnext,
 
 	while (*pprev && (*pprev)->va_end > addr) {
 		*pnext = *pprev;
-		*pprev = node_to_va(rb_prev(&(*pnext)->rb_node));
+		*pprev = prev_vmap_area(*pnext);
 	}
 
 	return addr;
@@ -2413,31 +2425,34 @@ struct vm_struct **pcpu_get_vm_areas(const unsigned long *offsets,
 	struct vm_struct **vms;
 	int area, area2, last_area, term_area;
 	unsigned long base, start, end, last_end;
+	unsigned long start2, end2;
 	bool purged = false;
 
 	/* verify parameters and allocate data structures */
+	if (nr_vms < 1)
+		return NULL;
 	BUG_ON(offset_in_page(align) || !is_power_of_2(align));
-	for (last_area = 0, area = 0; area < nr_vms; area++) {
+
+	last_area = nr_vms - 1;
+	BUG_ON(!IS_ALIGNED(offsets[last_area], align));
+	BUG_ON(!IS_ALIGNED(sizes[last_area], align));
+	for (area = 0; area < nr_vms - 1; area++) {
 		start = offsets[area];
 		end = start + sizes[area];
 
 		/* is everything aligned properly? */
-		BUG_ON(!IS_ALIGNED(offsets[area], align));
-		BUG_ON(!IS_ALIGNED(sizes[area], align));
+		BUG_ON(!IS_ALIGNED(start, align));
+		BUG_ON(!IS_ALIGNED(end, align));
 
 		/* detect the area with the highest address */
 		if (start > offsets[last_area])
 			last_area = area;
 
-		for (area2 = 0; area2 < nr_vms; area2++) {
-			unsigned long start2 = offsets[area2];
-			unsigned long end2 = start2 + sizes[area2];
+		for (area2 = area + 1; area2 < nr_vms; area2++) {
+			start2 = offsets[area2];
+			end2 = start2 + sizes[area2];
 
-			if (area2 == area)
-				continue;
-
-			BUG_ON(start2 >= start && start2 < end);
-			BUG_ON(end2 <= end && end2 > start);
+			BUG_ON(is_range_overlay(start, end, start2, end2));
 		}
 	}
 	last_end = offsets[last_area] + sizes[last_area];
@@ -2507,7 +2522,7 @@ retry:
 		 */
 		if (prev && prev->va_end > base + start)  {
 			next = prev;
-			prev = node_to_va(rb_prev(&next->rb_node));
+			prev = prev_vmap_area(next);
 			base = pvm_determine_end(&next, &prev, align) - end;
 			term_area = area;
 			continue;

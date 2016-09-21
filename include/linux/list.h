@@ -194,6 +194,17 @@ static inline int list_is_last(const struct list_head *list,
 }
 
 /**
+ * list_is_first - tests whether @list is the first entry in list @head
+ * @list: the entry to test
+ * @head: the head of the list
+ */
+static inline int list_is_first(const struct list_head *list,
+				const struct list_head *head)
+{
+	return list->prev == head;
+}
+
+/**
  * list_empty - tests whether a list is empty
  * @head: the list to test.
  */
