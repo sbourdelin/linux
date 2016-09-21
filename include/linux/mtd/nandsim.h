@@ -75,7 +75,7 @@ struct ns_backend_ops {
 };
 
 struct mtd_info *ns_new_instance(struct nandsim_params *nsparam);
-void ns_destroy_instance(struct mtd_info *nsmtd);
+int ns_destroy_instance(struct mtd_info *nsmtd);
 struct nandsim_geom *nandsim_get_geom(struct nandsim *ns);
 struct nandsim_regs *nandsim_get_regs(struct nandsim *ns);
 void nandsim_set_backend_data(struct nandsim *ns, void *data);

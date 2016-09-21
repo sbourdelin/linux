@@ -39,6 +39,7 @@
 #include <linux/mtd/nandsim.h>
 #include <linux/delay.h>
 #include <linux/list.h>
+#include <linux/spinlock.h>
 #include <linux/random.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
@@ -328,7 +329,10 @@ struct ns_file_data {
  */
 struct nandsim {
 	unsigned int index;
+	unsigned int refcnt;
+	spinlock_t refcnt_lock;
 	struct mtd_partition partitions[CONFIG_NANDSIM_MAX_PARTS];
+	bool destroying;
 	unsigned int nbparts;
 
 	uint busw;              /* flash chip bus width (8 or 16) */
@@ -2509,6 +2513,41 @@ static int ns_ctrl_new_instance(struct ns_new_instance_req *req)
 	return ns->index;
 }
 
+static int ns_ctrl_destroy_instance(struct ns_destroy_instance_req *req)
+{
+	struct mtd_info *nsmtd;
+	int id = req->id, ret = 0;
+	struct nand_chip *chip;
+	struct nandsim *ns;
+
+	if (id < 0 || id >= NS_MAX_DEVICES)
+		return -EINVAL;
+
+	mutex_lock(&ns_mtd_mutex);
+	nsmtd = ns_mtds[id];
+	if (nsmtd) {
+		chip = mtd_to_nand(nsmtd);
+		ns = nand_get_controller_data(chip);
+		spin_lock(&ns->refcnt_lock);
+		if (ns->refcnt > 0) {
+			ret = -EBUSY;
+			spin_unlock(&ns->refcnt_lock);
+			goto out;
+		}
+		ns->destroying = true;
+		spin_unlock(&ns->refcnt_lock);
+		ret = ns_destroy_instance(nsmtd);
+		if (ret)
+			goto out;
+		ns_mtds[id] = NULL;
+	}
+
+out:
+	mutex_unlock(&ns_mtd_mutex);
+
+	return ret;
+}
+
 static long ns_ctrl_ioctl(struct file *file, unsigned int cmd,
 			  unsigned long arg)
 {
@@ -2542,6 +2581,32 @@ static struct miscdevice nandsim_ctrl_cdev = {
 	.name = "nandsim_ctrl",
 	.fops = &nansim_ctrl_fops,
 };
+
+static void ns_put_device(struct mtd_info *mtd)
+{
+	struct nand_chip *chip = mtd_to_nand(mtd);
+	struct nandsim *ns = nand_get_controller_data(chip);
+
+	spin_lock(&ns->refcnt_lock);
+	ns->refcnt -= 1;
+	spin_unlock(&ns->refcnt_lock);
+}
+
+static int ns_get_device(struct mtd_info *mtd)
+{
+	int ret = 0;
+	struct nand_chip *chip = mtd_to_nand(mtd);
+	struct nandsim *ns = nand_get_controller_data(chip);
+
+	spin_lock(&ns->refcnt_lock);
+	if (ns->destroying)
+		ret = -EBUSY;
+	else
+		ns->refcnt += 1;
+	spin_unlock(&ns->refcnt_lock);
+
+	return ret;
+}
 
 struct mtd_info *ns_new_instance(struct nandsim_params *nsparam)
 {
@@ -2587,6 +2652,7 @@ struct mtd_info *ns_new_instance(struct nandsim_params *nsparam)
 	INIT_LIST_HEAD(&nand->grave_pages);
 	INIT_LIST_HEAD(&nand->weak_pages);
 	INIT_LIST_HEAD(&nand->weak_blocks);
+	spin_lock_init(&nand->refcnt_lock);
 
 	/*
 	 * Register simulator's callbacks.
@@ -2637,6 +2703,8 @@ struct mtd_info *ns_new_instance(struct nandsim_params *nsparam)
 	}
 
 	nsmtd->owner = THIS_MODULE;
+	nsmtd->_get_device = ns_get_device;
+	nsmtd->_put_device = ns_put_device;
 
 	if ((retval = parse_weakblocks(nand, nsparam->weakblocks)) != 0)
 		goto error;
@@ -2750,11 +2818,16 @@ error:
 }
 EXPORT_SYMBOL_GPL(ns_new_instance);
 
-void ns_destroy_instance(struct mtd_info *nsmtd)
+int ns_destroy_instance(struct mtd_info *nsmtd)
 {
+	int i, ret;
 	struct nand_chip *chip = mtd_to_nand(nsmtd);
 	struct nandsim *ns = nand_get_controller_data(chip);
-	int i;
+
+	ret = mtd_device_unregister(nsmtd);
+	if (ret)
+		return ret;
+	nand_cleanup(nsmtd);
 
 	nandsim_debugfs_remove(ns);
 	free_lists(ns);
@@ -2763,6 +2836,8 @@ void ns_destroy_instance(struct mtd_info *nsmtd)
 	for (i = 0;i < ARRAY_SIZE(ns->partitions); ++i)
 		kfree(ns->partitions[i].name);
 	kfree(mtd_to_nand(nsmtd));        /* Free other structures */
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(ns_destroy_instance);
 
@@ -2773,7 +2848,7 @@ static void ns_destroy_all(void)
 	mutex_lock(&ns_mtd_mutex);
 	for (i = 0; i < NS_MAX_DEVICES; i++)
 		if (ns_mtds[i])
-			ns_destroy_instance(ns_mtds[i]);
+			WARN_ON(ns_destroy_instance(ns_mtds[i]) != 0);
 	mutex_unlock(&ns_mtd_mutex);
 }
 
