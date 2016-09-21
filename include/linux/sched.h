@@ -1052,6 +1052,8 @@ static inline int cpu_numa_flags(void)
 }
 #endif
 
+int arch_asym_cpu_priority(int cpu);
+
 struct sched_domain_attr {
 	int relax_domain_level;
 };
