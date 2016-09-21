@@ -306,7 +306,7 @@ int qxl_driver_load(struct drm_device *dev, unsigned long flags)
 	struct qxl_device *qdev;
 	int r;
 
-	qdev = kzalloc(sizeof(struct qxl_device), GFP_KERNEL);
+	qdev = kzalloc(sizeof(*qdev), GFP_KERNEL);
 	if (qdev == NULL)
 		return -ENOMEM;
 
