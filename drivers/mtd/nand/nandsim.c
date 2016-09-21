@@ -2585,6 +2585,16 @@ static int ns_ctrl_new_instance(struct ns_new_instance_req *req)
 	nsparam->file_fd = req->file_fd;
 	nsparam->no_oob = !!req->no_oob;
 
+	if (req->parts_num > NANDSIM_MAX_PARTS || req->parts_num < 0) {
+		kfree(nsparam);
+		return -EINVAL;
+	}
+
+	if (req->parts_num > 0) {
+		nsparam->parts_num = req->parts_num;
+		memcpy(nsparam->parts, req->parts, sizeof(nsparam->parts));
+	}
+
 	switch (req->backend) {
 		case NANDSIM_BACKEND_RAM:
 			nsparam->bops = &ns_ram_bops;
@@ -2979,7 +2989,7 @@ static int __init ns_init_default(void)
 	nsparam->input_cycle = input_cycle;
 	nsparam->bus_width = bus_width;
 	nsparam->do_delays = do_delays;
-	nsparam->parts = parts;
+	memcpy(nsparam->parts, parts, sizeof(nsparam->parts));
 	nsparam->parts_num = parts_num;
 	nsparam->badblocks = badblocks;
 	nsparam->weakblocks = weakblocks;
