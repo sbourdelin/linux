@@ -198,9 +198,6 @@ MODULE_PARM_DESC(defaults,	 "Register a MTD during module load using default val
 #define NS_RAW_OFFSET(ns) \
 	(((ns)->regs.row * ((ns)->no_oob ? (ns)->geom.pgsz : (ns)->geom.pgszoob)) + (ns)->regs.column)
 
-/* Calculate the OOB offset in flash RAM image by (row, column) address */
-#define NS_RAW_OFFSET_OOB(ns) (NS_RAW_OFFSET(ns) + ns->geom.pgsz)
-
 /* After a command is input, the simulator goes to one of the following states */
 #define STATE_CMD_READ0        0x00000001 /* read data from the beginning of page */
 #define STATE_CMD_READ1        0x00000002 /* read data from the second half of page */
