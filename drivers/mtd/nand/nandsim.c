@@ -328,6 +328,7 @@ union ns_mem {
  * The structure which describes all the internal simulator data.
  */
 struct nandsim {
+	unsigned int index;
 	struct mtd_partition partitions[CONFIG_NANDSIM_MAX_PARTS];
 	unsigned int nbparts;
 
@@ -483,6 +484,8 @@ struct grave_page {
 /* MTD structure for NAND controller */
 static struct mtd_info *ns_mtds[NS_MAX_DEVICES];
 
+static struct dentry *dfs_root;
+
 static inline struct nandsim *chip_to_ns(struct nand_chip *chip)
 {
 	return (struct nandsim *)(chip + 1);
@@ -560,6 +563,23 @@ static const struct file_operations dfs_fops = {
 	.release	= single_release,
 };
 
+static int nandsim_debugfs_init(void)
+{
+	if (!IS_ENABLED(CONFIG_DEBUG_FS))
+		return 0;
+
+	dfs_root = debugfs_create_dir("nandsim", NULL);
+	if (IS_ERR_OR_NULL(dfs_root)) {
+		int err = dfs_root ? -ENODEV : PTR_ERR(dfs_root);
+
+		NS_ERR("cannot create \"nandsim\" debugfs directory, err %d\n",
+			err);
+		return err;
+	}
+
+	return 0;
+}
+
 /**
  * nandsim_debugfs_create - initialize debugfs
  * @dev: nandsim device description object
@@ -572,15 +592,21 @@ static int nandsim_debugfs_create(struct nandsim *dev)
 	struct nandsim_debug_info *dbg = &dev->dbg;
 	struct dentry *dent;
 	int err;
+	char *dirname;
 
 	if (!IS_ENABLED(CONFIG_DEBUG_FS))
 		return 0;
 
-	dent = debugfs_create_dir("nandsim", NULL);
+	dirname = kasprintf(GFP_KERNEL, "nandsim%i", dev->index);
+	if (!dirname)
+		return -ENOMEM;
+
+	dent = debugfs_create_dir(dirname, dfs_root);
+	kfree(dirname);
 	if (IS_ERR_OR_NULL(dent)) {
 		int err = dent ? -ENODEV : PTR_ERR(dent);
 
-		NS_ERR("cannot create \"nandsim\" debugfs directory, err %d\n",
+		NS_ERR("cannot create nandsim debugfs sub-directory, err %d\n",
 			err);
 		return err;
 	}
@@ -2336,6 +2362,7 @@ static int ns_new_instance(struct nandsim_params *nsparam)
 	nsmtd = ns_mtds[0] = nand_to_mtd(chip);
 	nand = chip_to_ns(chip);
 	nand_set_controller_data(chip, (void *)nand);
+	nand->index = 0;
 
 	INIT_LIST_HEAD(&nand->weak_blocks);
 	INIT_LIST_HEAD(&nand->grave_pages);
@@ -2557,6 +2584,10 @@ static int __init ns_init_module(void)
 {
 	int ret;
 
+	ret = nandsim_debugfs_init();
+	if (ret)
+		return ret;
+
 	ret = ns_init_default();
 	if (ret)
 		return ret;
@@ -2569,6 +2600,7 @@ static void __exit ns_cleanup_module(void)
 {
 	ns_cleanup_default();
 	misc_deregister(&nandsim_ctrl_cdev);
+	debugfs_remove_recursive(dfs_root);
 }
 module_exit(ns_cleanup_module);
 
