@@ -461,6 +461,18 @@ struct grave_page {
 /* MTD structure for NAND controller */
 static struct mtd_info *ns_mtds[NS_MAX_DEVICES];
 
+static inline struct nandsim *chip_to_ns(struct nand_chip *chip)
+{
+	return (struct nandsim *)(chip + 1);
+}
+
+static inline struct mtd_info *ns_to_mtd(struct nandsim *ns)
+{
+	struct nand_chip *chip = ((struct nand_chip *)ns - 1);
+
+	return nand_to_mtd(chip);
+}
+
 static int nandsim_debugfs_show(struct seq_file *m, void *private)
 {
 	struct nandsim *ns = (struct nandsim *)m->private;
@@ -1462,8 +1474,7 @@ static int do_read_error(struct nandsim *ns, int num)
 
 static void do_bit_flips(struct nandsim *ns, int num)
 {
-	struct nand_chip *chip = ((struct nand_chip *)ns - 1);
-	struct mtd_info *nsmtd = nand_to_mtd(chip);
+	struct mtd_info *nsmtd = ns_to_mtd(ns);
 
 	if (ns->bitflips && prandom_u32() < (1 << 22)) {
 		int flips = 1;
@@ -2300,7 +2311,7 @@ static int __init ns_init_default(void)
 
 	WARN_ON(ns_mtds[0]);
 	nsmtd = ns_mtds[0] = nand_to_mtd(chip);
-	nand = (struct nandsim *)(chip + 1);
+	nand = chip_to_ns(chip);
 	nand_set_controller_data(chip, (void *)nand);
 
 	INIT_LIST_HEAD(&nand->weak_blocks);
