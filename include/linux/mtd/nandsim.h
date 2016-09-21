@@ -11,7 +11,7 @@ struct nandsim_params {
 	unsigned int output_cycle;
 	unsigned int input_cycle;
 	unsigned int bus_width;
-	unsigned int do_delays;
+	bool do_delays;
 	unsigned int parts[NANDSIM_MAX_PARTS];
 	unsigned int parts_num;
 	char *badblocks;

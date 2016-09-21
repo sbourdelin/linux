@@ -2593,11 +2593,37 @@ static int ns_ctrl_new_instance(struct ns_new_instance_req *req)
 	nsparam->bus_width = req->bus_width;
 	nsparam->file_fd = req->file_fd;
 	nsparam->no_oob = !!req->no_oob;
+	nsparam->bbt = req->bbt_mode;
+	nsparam->bch = req->bch_strength;
+	nsparam->bitflips = req->bitflips;
+	nsparam->overridesize = req->overridesize;
 
-	if (req->parts_num > NANDSIM_MAX_PARTS || req->parts_num < 0) {
-		kfree(nsparam);
-		return -EINVAL;
+	if (req->bch_strength && req->no_oob)
+		goto err_inval;
+
+	if (req->access_delay && req->program_delay && req->erase_delay &&
+	    req->output_cycle && req->input_cycle) {
+		if (req->access_delay > MAX_UDELAY_MS * 1000)
+			goto err_inval;
+		if (req->program_delay > MAX_UDELAY_MS * 1000)
+			goto err_inval;
+		if (req->erase_delay > 1000)
+			goto err_inval;
+		if (req->output_cycle > MAX_UDELAY_MS * 1000)
+			goto err_inval;
+		if (req->input_cycle > MAX_UDELAY_MS * 1000)
+			goto err_inval;
+
+		nsparam->access_delay = req->access_delay;
+		nsparam->program_delay = req->program_delay;
+		nsparam->erase_delay = req->erase_delay;
+		nsparam->output_cycle = req->output_cycle;
+		nsparam->input_cycle = req->input_cycle;
+		nsparam->do_delays = true;
 	}
+
+	if (req->parts_num > NANDSIM_MAX_PARTS || req->parts_num < 0)
+		goto err_inval;
 
 	if (req->parts_num > 0) {
 		nsparam->parts_num = req->parts_num;
@@ -2618,8 +2644,7 @@ static int ns_ctrl_new_instance(struct ns_new_instance_req *req)
 		break;
 
 		default:
-			kfree(nsparam);
-			return -EINVAL;
+			goto err_inval;
 	}
 
 	nsmtd = ns_new_instance(nsparam);
@@ -2632,6 +2657,10 @@ static int ns_ctrl_new_instance(struct ns_new_instance_req *req)
 	ns = nand_get_controller_data(chip);
 
 	return ns->index;
+
+err_inval:
+	kfree(nsparam);
+	return -EINVAL;
 }
 
 static int ns_ctrl_destroy_instance(struct ns_destroy_instance_req *req)
