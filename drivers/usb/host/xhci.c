@@ -231,7 +231,7 @@ static int xhci_free_msi(struct xhci_hcd *xhci)
 static int xhci_setup_msi(struct xhci_hcd *xhci)
 {
 	int ret;
-	struct pci_dev  *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
+	struct pci_dev  *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
 
 	ret = pci_enable_msi(pdev);
 	if (ret) {
@@ -257,7 +257,7 @@ static int xhci_setup_msi(struct xhci_hcd *xhci)
  */
 static void xhci_free_irq(struct xhci_hcd *xhci)
 {
-	struct pci_dev *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
+	struct pci_dev *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
 	int ret;
 
 	/* return if using legacy interrupt */
@@ -280,7 +280,7 @@ static int xhci_setup_msix(struct xhci_hcd *xhci)
 {
 	int i, ret = 0;
 	struct usb_hcd *hcd = xhci_to_hcd(xhci);
-	struct pci_dev *pdev = to_pci_dev(hcd->self.controller);
+	struct pci_dev *pdev = to_pci_dev(hcd->self.sysdev);
 
 	/*
 	 * calculate number of msi-x vectors supported.
@@ -335,7 +335,7 @@ free_entries:
 static void xhci_cleanup_msix(struct xhci_hcd *xhci)
 {
 	struct usb_hcd *hcd = xhci_to_hcd(xhci);
-	struct pci_dev *pdev = to_pci_dev(hcd->self.controller);
+	struct pci_dev *pdev = to_pci_dev(hcd->self.sysdev);
 
 	if (xhci->quirks & XHCI_PLAT)
 		return;
@@ -374,7 +374,7 @@ static int xhci_try_enable_msi(struct usb_hcd *hcd)
 	if (xhci->quirks & XHCI_PLAT)
 		return 0;
 
-	pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
+	pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
 	/*
 	 * Some Fresco Logic host controllers advertise MSI, but fail to
 	 * generate interrupts.  Don't even try to enable MSI.
@@ -743,7 +743,7 @@ void xhci_shutdown(struct usb_hcd *hcd)
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 
 	if (xhci->quirks & XHCI_SPURIOUS_REBOOT)
-		usb_disable_xhci_ports(to_pci_dev(hcd->self.controller));
+		usb_disable_xhci_ports(to_pci_dev(hcd->self.sysdev));
 
 	spin_lock_irq(&xhci->lock);
 	xhci_halt(xhci);
@@ -760,7 +760,7 @@ void xhci_shutdown(struct usb_hcd *hcd)
 
 	/* Yet another workaround for spurious wakeups at shutdown with HSW */
 	if (xhci->quirks & XHCI_SPURIOUS_WAKEUP)
-		pci_set_power_state(to_pci_dev(hcd->self.controller), PCI_D3hot);
+		pci_set_power_state(to_pci_dev(hcd->self.sysdev), PCI_D3hot);
 }
 
 #ifdef CONFIG_PM
@@ -3603,7 +3603,7 @@ void xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev)
 	 * if no devices remain.
 	 */
 	if (xhci->quirks & XHCI_RESET_ON_RESUME)
-		pm_runtime_put_noidle(hcd->self.controller);
+		pm_runtime_put_noidle(hcd->self.sysdev);
 #endif
 
 	ret = xhci_check_args(hcd, udev, NULL, 0, true, __func__);
@@ -3743,7 +3743,7 @@ int xhci_alloc_dev(struct usb_hcd *hcd, struct usb_device *udev)
 	 * suspend if there is a device attached.
 	 */
 	if (xhci->quirks & XHCI_RESET_ON_RESUME)
-		pm_runtime_get_noresume(hcd->self.controller);
+		pm_runtime_get_noresume(hcd->self.sysdev);
 #endif
 
 
@@ -4832,7 +4832,7 @@ int xhci_get_frame(struct usb_hcd *hcd)
 int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 {
 	struct xhci_hcd		*xhci;
-	struct device		*dev = hcd->self.controller;
+	struct device		*dev = hcd->self.sysdev;
 	int			retval;
 
 	/* Accept arbitrarily long scatter-gather lists */
