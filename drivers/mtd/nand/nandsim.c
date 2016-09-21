@@ -44,6 +44,9 @@
 #include <linux/pagemap.h>
 #include <linux/seq_file.h>
 #include <linux/debugfs.h>
+#include <linux/compat.h>
+#include <linux/miscdevice.h>
+#include <linux/major.h>
 
 /* Default simulator parameters values */
 #if !defined(CONFIG_NANDSIM_FIRST_ID_BYTE)  || \
@@ -2226,10 +2229,41 @@ static void ns_nand_read_buf(struct mtd_info *mtd, u_char *buf, int len)
 	return;
 }
 
-/*
- * Module initialization function
- */
-static int __init ns_init_module(void)
+static long ns_ctrl_ioctl(struct file *file, unsigned int cmd,
+			  unsigned long arg)
+{
+	if (!capable(CAP_SYS_RESOURCE))
+		return -EPERM;
+
+	return -ENOTTY;
+}
+
+#ifdef CONFIG_COMPAT
+static long ns_ctrl_compat_ioctl(struct file *file, unsigned int cmd,
+				 unsigned long arg)
+{
+	unsigned long translated_arg = (unsigned long)compat_ptr(arg);
+
+	return ns_ctrl_ioctl(file, cmd, translated_arg);
+}
+#else
+#define ns_ctrl_compat_ioctl NULL
+#endif
+
+static const struct file_operations nansim_ctrl_fops = {
+	.owner          = THIS_MODULE,
+	.unlocked_ioctl = ns_ctrl_ioctl,
+	.compat_ioctl   = ns_ctrl_compat_ioctl,
+	.llseek         = no_llseek,
+};
+
+static struct miscdevice nandsim_ctrl_cdev = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "nandsim_ctrl",
+	.fops = &nansim_ctrl_fops,
+};
+
+static int __init ns_init_default(void)
 {
 	struct nand_chip *chip;
 	struct nandsim *nand;
@@ -2404,12 +2438,7 @@ error:
 	return retval;
 }
 
-module_init(ns_init_module);
-
-/*
- * Module clean-up function
- */
-static void __exit ns_cleanup_module(void)
+static void __exit ns_cleanup_default(void)
 {
 	struct nand_chip *chip = mtd_to_nand(nsmtd);
 	struct nandsim *ns = nand_get_controller_data(chip);
@@ -2424,6 +2453,23 @@ static void __exit ns_cleanup_module(void)
 	free_lists();
 }
 
+static int __init ns_init_module(void)
+{
+	int ret;
+
+	ret = ns_init_default();
+	if (ret)
+		return ret;
+
+	return misc_register(&nandsim_ctrl_cdev);
+}
+module_init(ns_init_module);
+
+static void __exit ns_cleanup_module(void)
+{
+	ns_cleanup_default();
+	misc_deregister(&nandsim_ctrl_cdev);
+}
 module_exit(ns_cleanup_module);
 
 MODULE_LICENSE ("GPL");
