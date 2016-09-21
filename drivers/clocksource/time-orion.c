@@ -119,20 +119,22 @@ static int __init orion_timer_init(struct device_node *np)
 	clk = of_clk_get(np, 0);
 	if (IS_ERR(clk)) {
 		pr_err("%s: unable to get clk\n", np->name);
+		iounmap(timer_base);
 		return PTR_ERR(clk);
 	}
 
 	ret = clk_prepare_enable(clk);
 	if (ret) {
 		pr_err("Failed to prepare clock");
-		return ret;
+		goto err_iounmap;
 	}
 
 	/* we are only interested in timer1 irq */
 	irq = irq_of_parse_and_map(np, 1);
 	if (irq <= 0) {
 		pr_err("%s: unable to parse timer1 irq\n", np->name);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_iounmap;
 	}
 
 	/* setup timer0 as free-running clocksource */
@@ -147,7 +149,7 @@ static int __init orion_timer_init(struct device_node *np)
 				    clocksource_mmio_readl_down);
 	if (ret) {
 		pr_err("Failed to initialize mmio timer");
-		return ret;
+		goto err_iounmap;
 	}
 
 	sched_clock_register(orion_read_sched_clock, 32, clk_get_rate(clk));
@@ -156,7 +158,7 @@ static int __init orion_timer_init(struct device_node *np)
 	ret = setup_irq(irq, &orion_clkevt_irq);
 	if (ret) {
 		pr_err("%s: unable to setup irq\n", np->name);
-		return ret;
+		goto err_iounmap;
 	}
 
 	ticks_per_jiffy = (clk_get_rate(clk) + HZ/2) / HZ;
@@ -166,5 +168,10 @@ static int __init orion_timer_init(struct device_node *np)
 					ORION_ONESHOT_MIN, ORION_ONESHOT_MAX);
 
 	return 0;
+
+err_iounmap:
+	iounmap(timer_base);
+	return ret;
+
 }
 CLOCKSOURCE_OF_DECLARE(orion_timer, "marvell,orion-timer", orion_timer_init);
