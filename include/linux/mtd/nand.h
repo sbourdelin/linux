@@ -39,6 +39,7 @@ extern int nand_scan_ident(struct mtd_info *mtd, int max_chips,
 extern int nand_scan_tail(struct mtd_info *mtd);
 
 /* Free resources held by the NAND device */
+extern void nand_cleanup(struct mtd_info *mtd);
 extern void nand_release(struct mtd_info *mtd);
 
 /* Internal helper for board drivers which need to override command function */
