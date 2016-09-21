@@ -770,6 +770,9 @@ static void ns_ram_destroy(struct nandsim *ns)
 	struct ns_ram_data *data = ns->backend_data;
 	int i;
 
+	if (!data)
+		return;
+
 	for (i = 0; i < ns->geom.pgnum; i++) {
 		if (data->pages[i].byte)
 			kmem_cache_free(data->nand_pages_slab,
@@ -784,14 +787,21 @@ static void ns_cachefile_destroy(struct nandsim *ns)
 {
 	struct ns_cachefile_data *data = ns->backend_data;
 
+	if (!data)
+		return;
+
 	kfree(data->file_buf);
 	vfree(data->pages_written);
 	filp_close(data->cfile, NULL);
+	kfree(data);
 }
 
 static void ns_file_destroy(struct nandsim *ns)
 {
 	struct ns_file_data *data = ns->backend_data;
+
+	if (!data)
+		return;
 
 	kfree(data->file_buf);
 	fput(data->file);
