@@ -23,6 +23,7 @@ struct nandsim_params {
 	unsigned int bbt;
 	unsigned int bch;
 	unsigned char *id_bytes;
+	unsigned int file_fd;
 	struct ns_backend_ops *bops;
 };
 

@@ -49,6 +49,7 @@
 #include <linux/miscdevice.h>
 #include <linux/major.h>
 #include <linux/mutex.h>
+#include <linux/file.h>
 
 /* Default simulator parameters values */
 #if !defined(CONFIG_NANDSIM_FIRST_ID_BYTE)  || \
@@ -314,6 +315,12 @@ struct ns_cachefile_data {
 	void *file_buf;
 	struct page *held_pages[NS_MAX_HELD_PAGES];
 	int held_cnt;
+};
+
+struct ns_file_data {
+	struct file *file;
+	void *file_buf;
+	bool ro;
 };
 
 /*
@@ -671,6 +678,59 @@ err_close:
 	return err;
 }
 
+static int ns_file_init(struct nandsim *ns, struct nandsim_params *nsparam)
+{
+	int ret;
+	struct file *file;
+	struct inode *inode;
+	struct ns_file_data *data = kzalloc(sizeof(*data), GFP_KERNEL);
+
+	if (!data) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	file = fget(nsparam->file_fd);
+	if (!file) {
+		ret = -EBADF;
+		goto out_free;
+	}
+
+	inode = file->f_mapping->host;
+	if (!S_ISREG(inode->i_mode) && !S_ISBLK(inode->i_mode)) {
+		NS_ERR("alloc_device: Backend file is not a regular file nor a block device\n");
+		ret = -EINVAL;
+		goto out_put;
+	}
+
+	if (!(file->f_mode & FMODE_WRITE)) {
+		NS_ERR("alloc_device: Backend file is not writeable\n");
+		ret = -EINVAL;
+		goto out_put;
+	}
+
+	data->file = file;
+
+	data->file_buf = kmalloc(ns->geom.pgszoob, GFP_KERNEL);
+	if (!data->file_buf) {
+		NS_ERR("alloc_device: unable to allocate file buf\n");
+		ret = -ENOMEM;
+		goto out_put;
+	}
+
+	ns->backend_data = data;
+	ret = 0;
+
+	return ret;
+
+out_put:
+	fput(file);
+out_free:
+	kfree(data);
+out:
+	return ret;
+}
+
 struct nandsim_geom *nandsim_get_geom(struct nandsim *ns)
 {
 	return &ns->geom;
@@ -723,6 +783,15 @@ static void ns_cachefile_destroy(struct nandsim *ns)
 	kfree(data->file_buf);
 	vfree(data->pages_written);
 	filp_close(data->cfile, NULL);
+}
+
+static void ns_file_destroy(struct nandsim *ns)
+{
+	struct ns_file_data *data = ns->backend_data;
+
+	kfree(data->file_buf);
+	fput(data->file);
+	kfree(data);
 }
 
 static char *get_partition_name(struct nandsim *ns, int i)
@@ -1587,6 +1656,22 @@ static void ns_cachefile_read_page(struct nandsim *ns, int num)
 	}
 }
 
+static void ns_file_read_page(struct nandsim *ns, int num)
+{
+	struct ns_file_data *data = ns->backend_data;
+	loff_t pos;
+	ssize_t tx;
+
+	NS_DBG("read_page: page %d written, reading from %d\n",
+		ns->regs.row, ns->regs.column + ns->regs.off);
+	pos = (loff_t)NS_RAW_OFFSET(ns) + ns->regs.off;
+	tx = kernel_read(data->file, pos, ns->buf.byte, num);
+	if (tx == 0)
+		memset(ns->buf.byte, 0xff, num);
+	else if (tx != num)
+		NS_ERR("read_page: read error for page %d ret %ld\n", ns->regs.row, (long)tx);
+}
+
 static void ns_ram_erase_sector(struct nandsim *ns)
 {
 	union ns_mem *mypage;
@@ -1613,6 +1698,24 @@ static void ns_cachefile_erase_sector(struct nandsim *ns)
 		if (__test_and_clear_bit(ns->regs.row + i,
 					 data->pages_written)) {
 			NS_DBG("erase_sector: freeing page %d\n", ns->regs.row + i);
+		}
+	}
+}
+
+static void ns_file_erase_sector(struct nandsim *ns)
+{
+	int i;
+	loff_t pos;
+	ssize_t tx;
+	struct ns_file_data *data = ns->backend_data;
+
+	memset(data->file_buf, 0xff, ns->geom.pgszoob);
+
+	for (i = 0; i < ns->geom.pgsec; i++) {
+		pos = (loff_t)(ns->regs.row + i) * ns->geom.pgszoob;
+		tx = kernel_write(data->file, data->file_buf, ns->geom.pgszoob, pos);
+		if (tx != ns->geom.pgszoob) {
+			NS_ERR("prog_page: write error for page %d ret %ld\n", ns->regs.row, (long)tx);
 		}
 	}
 }
@@ -1690,6 +1793,39 @@ static int ns_cachefile_prog_page(struct nandsim *ns, int num)
 	return 0;
 }
 
+static int ns_file_prog_page(struct nandsim *ns, int num)
+{
+	int i;
+	loff_t off;
+	ssize_t tx;
+	u_char *pg_off;
+	struct ns_file_data *data = ns->backend_data;
+
+	NS_DBG("prog_page: writing page %d\n", ns->regs.row);
+
+	pg_off = data->file_buf + ns->regs.column + ns->regs.off;
+	off = (loff_t)NS_RAW_OFFSET(ns) + ns->regs.off;
+
+	tx = kernel_read(data->file, off, pg_off, num);
+	if (tx == 0)
+		memset(pg_off, 0xff, num);
+	else if (tx != num) {
+		NS_ERR("prog_page: read error for page %d ret %ld\n", ns->regs.row, (long)tx);
+		return -1;
+	}
+
+	for (i = 0; i < num; i++)
+		pg_off[i] &= ns->buf.byte[i];
+
+	tx = kernel_write(data->file, pg_off, num, off);
+	if (tx != num) {
+		NS_ERR("prog_page: write error for page %d ret %ld\n", ns->regs.row, (long)tx);
+		return -1;
+	}
+
+	return 0;
+}
+
 static struct ns_backend_ops ns_ram_bops = {
 	.erase_sector = ns_ram_erase_sector,
 	.prog_page = ns_ram_prog_page,
@@ -1706,6 +1842,13 @@ static struct ns_backend_ops ns_cachefile_bops = {
 	.destroy = ns_cachefile_destroy,
 };
 
+static struct ns_backend_ops ns_file_bops = {
+	.erase_sector = ns_file_erase_sector,
+	.prog_page = ns_file_prog_page,
+	.read_page = ns_file_read_page,
+	.init = ns_file_init,
+	.destroy = ns_file_destroy,
+};
 
 /*
  * If state has any action bit, perform this action.
