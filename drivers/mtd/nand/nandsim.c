@@ -312,6 +312,7 @@ struct ns_ram_data {
 
 struct ns_cachefile_data {
 	struct file *cfile; /* Open file */
+	bool file_opened; /* False when we operate on an already opened file */
 	unsigned long *pages_written; /* Which pages have been written */
 	void *file_buf;
 	struct page *held_pages[NS_MAX_HELD_PAGES];
@@ -637,25 +638,70 @@ static int ns_ram_init(struct nandsim *ns, struct nandsim_params *nsparam)
 	return 0;
 }
 
+static struct file *get_file_from_nsparam(struct nandsim_params *nsparam, bool *opened)
+{
+	int err;
+	struct file *file;
+	struct inode *inode;
+
+	if (nsparam->cache_file) {
+		file = filp_open(nsparam->cache_file, O_CREAT | O_RDWR | O_LARGEFILE, 0600);
+		if (IS_ERR(file))
+			return file;
+
+		*opened = true;
+	} else {
+		file = fget(nsparam->file_fd);
+		if (!file)
+			return ERR_PTR(-EBADF);
+
+		*opened = false;
+	}
+
+	inode = file->f_mapping->host;
+	if (!S_ISREG(inode->i_mode) && !S_ISBLK(inode->i_mode)) {
+		NS_ERR("alloc_device: Backend file is not a regular file nor a block device\n");
+		err = -EINVAL;
+		goto out;
+	}
+
+	if (!(file->f_mode & FMODE_CAN_READ)) {
+		NS_ERR("alloc_device: cache file not readable\n");
+		err = -EINVAL;
+		goto out;
+	}
+
+	if (!(file->f_mode & FMODE_CAN_WRITE)) {
+		NS_ERR("alloc_device: cache file not writeable\n");
+		err = -EINVAL;
+		goto out;
+	}
+
+	return file;
+
+out:
+	if (*opened)
+		filp_close(file, NULL);
+	else
+		fput(file);
+
+	return ERR_PTR(err);
+}
+
 static int ns_cachefile_init(struct nandsim *ns, struct nandsim_params *nsparam)
 {
-	struct file *cfile;
 	int err;
 	struct ns_cachefile_data *data = kzalloc(sizeof(*data), GFP_KERNEL);
 
-	cfile = filp_open(nsparam->cache_file, O_CREAT | O_RDWR | O_LARGEFILE, 0600);
-	if (IS_ERR(cfile))
-		return PTR_ERR(cfile);
-	if (!(cfile->f_mode & FMODE_CAN_READ)) {
-		NS_ERR("alloc_device: cache file not readable\n");
-		err = -EINVAL;
-		goto err_close;
+	if (!data)
+		return -ENOMEM;
+
+	data->cfile = get_file_from_nsparam(nsparam, &data->file_opened);
+	if (IS_ERR(data->cfile)) {
+		err = PTR_ERR(data->cfile);
+		goto out;
 	}
-	if (!(cfile->f_mode & FMODE_CAN_WRITE)) {
-		NS_ERR("alloc_device: cache file not writeable\n");
-		err = -EINVAL;
-		goto err_close;
-	}
+
 	data->pages_written = vzalloc(BITS_TO_LONGS(ns->geom.pgnum) *
 				    sizeof(unsigned long));
 	if (!data->pages_written) {
@@ -669,7 +715,6 @@ static int ns_cachefile_init(struct nandsim *ns, struct nandsim_params *nsparam)
 		err = -ENOMEM;
 		goto err_free;
 	}
-	data->cfile = cfile;
 
 	ns->backend_data = data;
 
@@ -678,15 +723,16 @@ static int ns_cachefile_init(struct nandsim *ns, struct nandsim_params *nsparam)
 err_free:
 	vfree(data->pages_written);
 err_close:
-	filp_close(cfile, NULL);
+	filp_close(data->cfile, NULL);
+out:
+	kfree(data);
 	return err;
 }
 
 static int ns_file_init(struct nandsim *ns, struct nandsim_params *nsparam)
 {
 	int ret;
-	struct file *file;
-	struct inode *inode;
+	bool dummy;
 	struct ns_file_data *data = kzalloc(sizeof(*data), GFP_KERNEL);
 
 	if (!data) {
@@ -694,26 +740,11 @@ static int ns_file_init(struct nandsim *ns, struct nandsim_params *nsparam)
 		goto out;
 	}
 
-	file = fget(nsparam->file_fd);
-	if (!file) {
-		ret = -EBADF;
+	data->file = get_file_from_nsparam(nsparam, &dummy);
+	if (IS_ERR(data->file)) {
+		ret = PTR_ERR(data->file);
 		goto out_free;
 	}
-
-	inode = file->f_mapping->host;
-	if (!S_ISREG(inode->i_mode) && !S_ISBLK(inode->i_mode)) {
-		NS_ERR("alloc_device: Backend file is not a regular file nor a block device\n");
-		ret = -EINVAL;
-		goto out_put;
-	}
-
-	if (!(file->f_mode & FMODE_WRITE)) {
-		NS_ERR("alloc_device: Backend file is not writeable\n");
-		ret = -EINVAL;
-		goto out_put;
-	}
-
-	data->file = file;
 
 	data->file_buf = kmalloc(ns->geom.pgszoob, GFP_KERNEL);
 	if (!data->file_buf) {
@@ -728,7 +759,7 @@ static int ns_file_init(struct nandsim *ns, struct nandsim_params *nsparam)
 	return ret;
 
 out_put:
-	fput(file);
+	fput(data->file);
 out_free:
 	kfree(data);
 out:
@@ -792,7 +823,10 @@ static void ns_cachefile_destroy(struct nandsim *ns)
 
 	kfree(data->file_buf);
 	vfree(data->pages_written);
-	filp_close(data->cfile, NULL);
+	if (data->file_opened)
+		filp_close(data->cfile, NULL);
+	else
+		fput(data->cfile);
 	kfree(data);
 }
 
