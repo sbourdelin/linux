@@ -212,10 +212,6 @@ static int qxl_device_init(struct qxl_device *qdev,
 	/* TODO - slot initialization should happen on reset. where is our
 	 * reset handler? */
 	qdev->n_mem_slots = qdev->rom->slots_end;
-	qdev->slot_gen_bits = qdev->rom->slot_gen_bits;
-	qdev->slot_id_bits = qdev->rom->slot_id_bits;
-	qdev->va_slot_mask =
-		(~(uint64_t)0) >> (qdev->slot_id_bits + qdev->slot_gen_bits);
 	qdev->mem_slots = kmalloc_array(qdev->n_mem_slots,
 					sizeof(*qdev->mem_slots),
 					GFP_KERNEL);
@@ -260,7 +256,10 @@ static int qxl_device_init(struct qxl_device *qdev,
 
 
 	INIT_WORK(&qdev->gc_work, qxl_gc_work);
-
+	qdev->slot_gen_bits = qdev->rom->slot_gen_bits;
+	qdev->slot_id_bits = qdev->rom->slot_id_bits;
+	qdev->va_slot_mask =
+		(~(uint64_t)0) >> (qdev->slot_id_bits + qdev->slot_gen_bits);
 	return 0;
 }
 
