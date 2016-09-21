@@ -1946,8 +1946,9 @@ static bool symbol__read_kptr_restrict(void)
 	if (fp != NULL) {
 		char line[8];
 
+
 		if (fgets(line, sizeof(line), fp) != NULL)
-			value = (geteuid() != 0) ?
+			value = ((geteuid() != 0) || (getuid() != 0)) ?
 					(atoi(line) != 0) :
 					(atoi(line) == 2);
 
