@@ -659,6 +659,11 @@ found:
 				goto out_sem;
 			}
 		}
+		if ((map->m_flags & EXT4_MAP_NEW) &&
+		    !(map->m_flags & EXT4_MAP_UNWRITTEN)) {
+			ext4_clear_inode_state(inode, EXT4_STATE_IS_SYNCING);
+			ext4_set_inode_state(inode, EXT4_STATE_HAS_ALLOCATED);
+		}
 
 		/*
 		 * If the extent has been zeroed out, we don't need to update
@@ -3532,20 +3537,47 @@ static ssize_t ext4_direct_IO_read(struct kiocb *iocb, struct iov_iter *iter)
 	struct inode *inode = iocb->ki_filp->f_mapping->host;
 	ssize_t ret;
 
-	if (ext4_should_dioread_nolock(inode)) {
+	inode_dio_begin(inode);
+	smp_mb();
+	if (ext4_should_dioread_nolock(inode))
+		unlocked = 1;
+	else if (!ext4_has_inline_data(inode)) {
+		struct ext4_map_blocks map;
+		loff_t offset = iocb->ki_pos;
+		loff_t end = offset + iov_iter_count(iter) - 1;
+		ext4_lblk_t iblock = offset >> inode->i_blkbits;
+		int wanted = ((offset + end) >> inode->i_blkbits) - iblock + 1;
+		int ret;
+
 		/*
-		 * Nolock dioread optimization may be dynamically disabled
-		 * via ext4_inode_block_unlocked_dio(). Check inode's state
-		 * while holding extra i_dio_count ref.
+		 * If the blocks we are going to read are all
+		 * allocated and initialized, and we haven't allocated
+		 * any blocks to this inode recently, it is safe to do
+		 * an unlocked DIO read.  (We do this check with
+		 * i_dio_count elevated, so we don't have to worry
+		 * about any racing truncate or punch hole
+		 * operations.)
 		 */
-		inode_dio_begin(inode);
-		smp_mb();
-		if (unlikely(ext4_test_inode_state(inode,
-						    EXT4_STATE_DIOREAD_LOCK)))
-			inode_dio_end(inode);
-		else
+		while (wanted) {
+			map.m_lblk = iblock;
+			map.m_len = wanted;
+
+			ret = ext4_map_blocks(NULL, inode, &map, 0);
+			if ((ret <= 0) ||
+			    (map.m_flags & EXT4_MAP_UNWRITTEN))
+				break;
+			iblock += ret;
+			wanted -= ret;
+		}
+		if ((wanted == 0) &&
+		    !ext4_test_inode_state(inode, EXT4_STATE_HAS_ALLOCATED))
 			unlocked = 1;
 	}
+	if (unlocked &&
+	    unlikely(ext4_test_inode_state(inode,
+					   EXT4_STATE_DIOREAD_LOCK)))
+		unlocked = 0;
+
 	if (IS_DAX(inode)) {
 		ret = dax_do_io(iocb, inode, iter, ext4_dio_get_block,
 				NULL, unlocked ? 0 : DIO_LOCKING);
@@ -3555,8 +3587,7 @@ static ssize_t ext4_direct_IO_read(struct kiocb *iocb, struct iov_iter *iter)
 					   NULL, NULL,
 					   unlocked ? 0 : DIO_LOCKING);
 	}
-	if (unlocked)
-		inode_dio_end(inode);
+	inode_dio_end(inode);
 	return ret;
 }
 

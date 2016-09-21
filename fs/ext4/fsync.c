@@ -96,6 +96,7 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 	struct inode *inode = file->f_mapping->host;
 	struct ext4_inode_info *ei = EXT4_I(inode);
 	journal_t *journal = EXT4_SB(inode->i_sb)->s_journal;
+	unsigned long old_state;
 	int ret = 0, err;
 	tid_t commit_tid;
 	bool needs_barrier = false;
@@ -112,6 +113,8 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 		goto out;
 	}
 
+	if (ext4_test_inode_state(inode, EXT4_STATE_HAS_ALLOCATED))
+		ext4_set_inode_state(inode, EXT4_STATE_IS_SYNCING);
 	if (!journal) {
 		ret = __generic_file_fsync(file, start, end, datasync);
 		if (!ret)
@@ -155,6 +158,26 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 			ret = err;
 	}
 out:
+#if (BITS_PER_LONG < 64)
+	old_state = READ_ONCE(ei->i_state_flags);
+	if (old_state & (1 << EXT4_STATE_IS_SYNCING)) {
+		unsigned long new_state;
+
+		new_state = old_state & ~((1 << EXT4_STATE_IS_SYNCING) |
+					  (1 << EXT4_STATE_HAS_ALLOCATED));
+		cmpxchg(&ei->i_state_flags, old_state, new_state);
+	}
+#else
+	old_state = READ_ONCE(ei->i_flags);
+	if (old_state & (1UL << (32 + EXT4_STATE_IS_SYNCING))) {
+		unsigned long new_state;
+
+		new_state = old_state &
+			~((1UL << (32 + EXT4_STATE_IS_SYNCING)) |
+			  (1UL << (32 + EXT4_STATE_HAS_ALLOCATED)));
+		cmpxchg(&ei->i_flags, old_state, new_state);
+	}
+#endif
 	trace_ext4_sync_file_exit(inode, ret);
 	return ret;
 }

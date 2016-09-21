@@ -1566,6 +1566,10 @@ enum {
 					   nolocking */
 	EXT4_STATE_MAY_INLINE_DATA,	/* may have in-inode data */
 	EXT4_STATE_EXT_PRECACHED,	/* extents have been precached */
+	EXT4_STATE_HAS_ALLOCATED,	/* there may be some unwritten,
+					   allocated blocks */
+	EXT4_STATE_IS_SYNCING,		/* potentially allocated blocks
+					   are being synced  */
 };
 
 #define EXT4_INODE_BIT_FNS(name, field, offset)				\
