@@ -725,7 +725,8 @@ retry:
 		/* If the input pool is getting full, send some
 		 * entropy to the blocking pool until it is 75% full.
 		 */
-		if (entropy_bits > random_write_wakeup_bits &&
+		if (keventd_up() &&
+		    entropy_bits > random_write_wakeup_bits &&
 		    r->initialized &&
 		    r->entropy_total >= 2*random_read_wakeup_bits) {
 			struct entropy_store *other = &blocking_pool;
