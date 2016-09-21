@@ -732,9 +732,9 @@ static void free_device(struct nandsim *ns)
 	}
 }
 
-static char __init *get_partition_name(int i)
+static char *get_partition_name(struct nandsim *ns, int i)
 {
-	return kasprintf(GFP_KERNEL, "NAND simulator partition %d", i);
+	return kasprintf(GFP_KERNEL, "nandsim%d_%d", ns->index, i);
 }
 
 /*
@@ -818,7 +818,7 @@ static int init_nandsim(struct mtd_info *mtd, struct nandsim_params *nsparam)
 			NS_ERR("bad partition size.\n");
 			return -EINVAL;
 		}
-		ns->partitions[i].name   = get_partition_name(i);
+		ns->partitions[i].name = get_partition_name(ns, i);
 		if (!ns->partitions[i].name) {
 			NS_ERR("unable to allocate memory.\n");
 			return -ENOMEM;
@@ -834,7 +834,7 @@ static int init_nandsim(struct mtd_info *mtd, struct nandsim_params *nsparam)
 			NS_ERR("too many partitions.\n");
 			return -EINVAL;
 		}
-		ns->partitions[i].name   = get_partition_name(i);
+		ns->partitions[i].name = get_partition_name(ns, i);
 		if (!ns->partitions[i].name) {
 			NS_ERR("unable to allocate memory.\n");
 			return -ENOMEM;
