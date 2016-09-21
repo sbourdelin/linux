@@ -44,6 +44,12 @@ config HOSTFS
           If you'd like to be able to work with files stored on the host,
           say Y or M here; otherwise say N.
 
+config UML_NANDSIM
+	tristate "UML nandsim backend"
+	help
+	  Use a file on the host directly as backend for nandsim.
+	  For more help, see modinfo unand.
+
 config MCONSOLE
 	bool "Management console"
 	depends on PROC_FS
