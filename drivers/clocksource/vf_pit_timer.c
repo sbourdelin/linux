@@ -178,16 +178,20 @@ static int __init pit_timer_init(struct device_node *np)
 	clkevt_base = timer_base + PITn_OFFSET(3);
 
 	irq = irq_of_parse_and_map(np, 0);
-	if (irq <= 0)
-		return -EINVAL;
+	if (irq <= 0) {
+		ret = -EINVAL;
+		goto iounmap;
+	}
 
 	pit_clk = of_clk_get(np, 0);
-	if (IS_ERR(pit_clk))
-		return PTR_ERR(pit_clk);
+	if (IS_ERR(pit_clk)) {
+		ret = PTR_ERR(pit_clk);
+		goto iounmap;
+	}
 
 	ret = clk_prepare_enable(pit_clk);
 	if (ret)
-		return ret;
+		goto iounmap;
 
 	clk_rate = clk_get_rate(pit_clk);
 	cycle_per_jiffy = clk_rate / (HZ);
@@ -197,8 +201,12 @@ static int __init pit_timer_init(struct device_node *np)
 
 	ret = pit_clocksource_init(clk_rate);
 	if (ret)
-		return ret;
+		goto iounmap;
 
 	return pit_clockevent_init(clk_rate, irq);
+
+iounmap:
+	iounmap(timer_base);
+	return ret;
 }
 CLOCKSOURCE_OF_DECLARE(vf610, "fsl,vf610-pit", pit_timer_init);
