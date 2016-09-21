@@ -14,9 +14,10 @@ struct nandsim_params {
 	bool do_delays;
 	unsigned int parts[NANDSIM_MAX_PARTS];
 	unsigned int parts_num;
-	char *badblocks;
-	char *weakblocks;
-	char *weakpages;
+	struct list_head *bad_blocks;
+	struct list_head *weak_blocks;
+	struct list_head *weak_pages;
+	struct list_head *grave_pages;
 	unsigned int bitflips;
 	char *gravepages;
 	unsigned int overridesize;
