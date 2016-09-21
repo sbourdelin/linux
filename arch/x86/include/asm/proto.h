@@ -30,6 +30,8 @@ void x86_report_nx(void);
 
 extern int reboot_force;
 
-long do_arch_prctl(struct task_struct *task, int code, unsigned long addr);
+#ifdef CONFIG_X86_64
+long do_arch_prctl_64(struct task_struct *task, int code, unsigned long arg2);
+#endif
 
 #endif /* _ASM_X86_PROTO_H */
