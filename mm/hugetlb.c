@@ -1441,23 +1441,30 @@ static int free_pool_huge_page(struct hstate *h, nodemask_t *nodes_allowed,
  */
 static void dissolve_free_huge_page(struct page *page)
 {
+	struct page *head = compound_head(page);
+	struct hstate *h;
+	int nid;
+
+	if (page_count(head))
+		return;
+
+	h = page_hstate(head);
+	nid = page_to_nid(head);
+
 	spin_lock(&hugetlb_lock);
-	if (PageHuge(page) && !page_count(page)) {
-		struct hstate *h = page_hstate(page);
-		int nid = page_to_nid(page);
-		list_del(&page->lru);
-		h->free_huge_pages--;
-		h->free_huge_pages_node[nid]--;
-		h->max_huge_pages--;
-		update_and_free_page(h, page);
-	}
+	list_del(&head->lru);
+	h->free_huge_pages--;
+	h->free_huge_pages_node[nid]--;
+	h->max_huge_pages--;
+	update_and_free_page(h, head);
 	spin_unlock(&hugetlb_lock);
 }
 
 /*
  * Dissolve free hugepages in a given pfn range. Used by memory hotplug to
  * make specified memory blocks removable from the system.
- * Note that start_pfn should aligned with (minimum) hugepage size.
+ * Note that this will dissolve a free gigantic hugepage completely, if any
+ * part of it lies within the given range.
  */
 void dissolve_free_huge_pages(unsigned long start_pfn, unsigned long end_pfn)
 {
@@ -1466,9 +1473,9 @@ void dissolve_free_huge_pages(unsigned long start_pfn, unsigned long end_pfn)
 	if (!hugepages_supported())
 		return;
 
-	VM_BUG_ON(!IS_ALIGNED(start_pfn, 1 << minimum_order));
 	for (pfn = start_pfn; pfn < end_pfn; pfn += 1 << minimum_order)
-		dissolve_free_huge_page(pfn_to_page(pfn));
+		if (PageHuge(pfn_to_page(pfn)))
+			dissolve_free_huge_page(pfn_to_page(pfn));
 }
 
 /*
