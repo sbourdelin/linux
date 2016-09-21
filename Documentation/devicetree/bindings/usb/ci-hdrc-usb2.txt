@@ -84,6 +84,7 @@ i.mx specific properties
 - over-current-active-high: over current signal polarity is high active,
   typically over current signal polarity is low active.
 - external-vbus-divider: enables off-chip resistor divider for Vbus
+- disable-int60ck: disable internal 60MHz clock for usb host2 or host3 on imx53
 
 Example:
 
