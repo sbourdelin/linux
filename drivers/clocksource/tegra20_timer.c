@@ -180,6 +180,7 @@ static int __init tegra20_init_timer(struct device_node *np)
 	tegra_timer_irq.irq = irq_of_parse_and_map(np, 2);
 	if (tegra_timer_irq.irq <= 0) {
 		pr_err("Failed to map timer IRQ\n");
+		iounmap(timer_reg_base);
 		return -EINVAL;
 	}
 
@@ -216,6 +217,7 @@ static int __init tegra20_init_timer(struct device_node *np)
 				    clocksource_mmio_readl_up);
 	if (ret) {
 		pr_err("Failed to register clocksource\n");
+		iounmap(timer_reg_base);
 		return ret;
 	}
 
@@ -227,6 +229,7 @@ static int __init tegra20_init_timer(struct device_node *np)
 	ret = setup_irq(tegra_timer_irq.irq, &tegra_timer_irq);
 	if (ret) {
 		pr_err("Failed to register timer IRQ: %d\n", ret);
+		iounmap(timer_reg_base);
 		return ret;
 	}
 
