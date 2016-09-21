@@ -64,7 +64,7 @@ static int ioremap_pte_range(pmd_t *pmd, unsigned long addr,
 		BUG_ON(!pte_none(*pte));
 		set_pte_at(&init_mm, addr, pte, pfn_pte(pfn, prot));
 		pfn++;
-	} while (pte++, addr += PAGE_SIZE, addr != end);
+	} while (pte++, addr += PAGE_SIZE, addr < end && addr >= PAGE_SIZE);
 	return 0;
 }
 
@@ -129,7 +129,9 @@ int ioremap_page_range(unsigned long addr,
 	int err;
 
 	BUG_ON(addr >= end);
+	WARN_ON(!PAGE_ALIGNED(addr) || !PAGE_ALIGNED(end));
 
+	addr = round_down(addr, PAGE_SIZE);
 	start = addr;
 	phys_addr -= addr;
 	pgd = pgd_offset_k(addr);
