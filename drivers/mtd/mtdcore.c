@@ -654,17 +654,22 @@ int mtd_device_unregister(struct mtd_info *master)
 {
 	int err;
 
-	if (master->_reboot)
-		unregister_reboot_notifier(&master->reboot_notifier);
-
 	err = del_mtd_partitions(master);
 	if (err)
 		return err;
 
 	if (!device_is_registered(&master->dev))
-		return 0;
+		goto unregister;
 
-	return del_mtd_device(master);
+	err = del_mtd_device(master);
+	if (err)
+		return err;
+
+unregister:
+	if (master->_reboot)
+		unregister_reboot_notifier(&master->reboot_notifier);
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(mtd_device_unregister);
 
