@@ -2536,8 +2536,13 @@ static int ns_ctrl_new_instance(struct ns_new_instance_req *req)
 		case NANDSIM_BACKEND_RAM:
 			nsparam->bops = &ns_ram_bops;
 		break;
+
 		case NANDSIM_BACKEND_FILE:
 			nsparam->bops = &ns_file_bops;
+		break;
+
+		case NANDSIM_BACKEND_CACHEFILE:
+			nsparam->bops = &ns_cachefile_bops;
 		break;
 
 		default:
