@@ -80,7 +80,7 @@ EXPORT_SYMBOL_GPL(irq_domain_free_fwnode);
 
 /**
  * __irq_domain_add() - Allocate a new irq_domain data structure
- * @of_node: optional device-tree node of the interrupt controller
+ * @fwnode: optional FW node of the interrupt controller
  * @size: Size of linear map; 0 for radix mapping only
  * @hwirq_max: Maximum number of interrupts supported by controller
  * @direct_max: Maximum value of direct maps; Use ~0 for no limit; 0 for no
