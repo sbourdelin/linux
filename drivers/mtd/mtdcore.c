@@ -500,8 +500,6 @@ int del_mtd_device(struct mtd_info *mtd)
 	}
 
 	if (mtd->usecount) {
-		printk(KERN_NOTICE "Removing MTD device #%d (%s) with use count %d\n",
-		       mtd->index, mtd->name, mtd->usecount);
 		ret = -EBUSY;
 	} else {
 		/* No need to get a refcount on the module containing
