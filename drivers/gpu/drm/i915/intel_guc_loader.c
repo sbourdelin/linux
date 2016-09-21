@@ -720,6 +720,13 @@ void intel_guc_init(struct drm_device *dev)
 	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
 	const char *fw_path;
 
+	if (!HAS_GUC(dev)) {
+		i915.enable_guc_loading = 0;
+		i915.enable_guc_submission = 0;
+		fw_path = NULL;
+		return;
+	}
+
 	/* A negative value means "use platform default" */
 	if (i915.enable_guc_loading < 0)
 		i915.enable_guc_loading = HAS_GUC_UCODE(dev);
