@@ -85,6 +85,8 @@ static inline const char *acpi_dev_name(struct acpi_device *adev)
 	return dev_name(&adev->dev);
 }
 
+struct device *acpi_get_first_physical_node(struct acpi_device *adev);
+
 enum acpi_irq_model_id {
 	ACPI_IRQ_MODEL_PIC = 0,
 	ACPI_IRQ_MODEL_IOAPIC,
@@ -634,6 +636,11 @@ static inline const char *acpi_dev_name(struct acpi_device *adev)
 	return NULL;
 }
 
+static inline struct device *acpi_get_first_physical_node(struct acpi_device *adev)
+{
+	return NULL;
+}
+
 static inline void acpi_early_init(void) { }
 static inline void acpi_subsystem_init(void) { }
 
@@ -750,6 +757,12 @@ static inline int acpi_reconfig_notifier_unregister(struct notifier_block *nb)
 }
 
 #endif	/* !CONFIG_ACPI */
+
+#ifdef CONFIG_ACPI_HOTPLUG_IOAPIC
+int acpi_ioapic_add(acpi_handle root);
+#else
+static inline int acpi_ioapic_add(acpi_handle root) { return 0; }
+#endif
 
 #ifdef CONFIG_ACPI
 void acpi_os_set_prepare_sleep(int (*func)(u8 sleep_state,
