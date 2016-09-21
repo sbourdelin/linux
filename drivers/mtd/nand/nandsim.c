@@ -894,8 +894,10 @@ static int init_nandsim(struct mtd_info *mtd, struct nandsim_params *nsparam)
 
 	ns->bops = nsparam->bops;
 
-	if ((ret = ns->bops->init(ns, nsparam)) != 0)
+	if ((ret = ns->bops->init(ns, nsparam)) != 0) {
+		NS_ERR("Unable to initialize simulator backend: %i\n", ret);
 		return ret;
+	}
 
 	/* Allocate / initialize the internal buffer */
 	ns->buf.byte = kmalloc(ns->geom.pgszoob, GFP_KERNEL);
