@@ -185,9 +185,6 @@ MODULE_PARM_DESC(defaults,	 "Register a MTD during module load using default val
 #define NS_MDELAY(ns, us) \
 	do { if (ns->do_delays) mdelay(us); } while (0)
 
-/* Is the nandsim structure initialized ? */
-#define NS_IS_INITIALIZED(ns) ((ns)->geom.totsz != 0)
-
 /* Good operation completion status */
 #define NS_STATUS_OK(ns) (NAND_STATUS_READY | (NAND_STATUS_WP * ((ns)->lines.wp == 0)))
 
@@ -838,11 +835,6 @@ static int init_nandsim(struct mtd_info *mtd, struct nandsim_params *nsparam)
 	int i, ret = 0;
 	uint64_t remains;
 	uint64_t next_offset;
-
-	if (NS_IS_INITIALIZED(ns)) {
-		pr_err("init_nandsim: nandsim is already initialized\n");
-		return -EIO;
-	}
 
 	/* Force mtd to not do delays */
 	chip->chip_delay = 0;
