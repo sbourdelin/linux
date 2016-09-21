@@ -4799,6 +4799,15 @@ static int may_commit_transaction(struct btrfs_root *root,
 {
 	struct btrfs_block_rsv *delayed_rsv = &root->fs_info->delayed_block_rsv;
 	struct btrfs_trans_handle *trans;
+	struct btrfs_fs_info *fs_info = root->fs_info;
+
+	/*
+	 * shrink_delalloc() may not write enough delalloc bytes, so here we
+	 * have a last try. Please don't remove these, because these can fix
+	 * some false enospc error in some extreme cases.
+	 */
+	btrfs_start_delalloc_roots(fs_info, 0, -1);
+	btrfs_wait_ordered_roots(fs_info, -1, 0, (u64)-1);
 
 	trans = (struct btrfs_trans_handle *)current->journal_info;
 	if (trans)
