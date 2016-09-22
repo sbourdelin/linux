@@ -209,25 +209,27 @@ void __init tilcdc_convert_slave_node(void)
 		return;
 
 	lcdc = of_find_matching_node(NULL, tilcdc_of_match);
-	slave = of_find_matching_node(NULL, tilcdc_slave_of_match);
+	if (!of_device_is_available(lcdc))
+		goto free_table;
 
-	if (!slave || !of_device_is_available(lcdc))
-		goto out;
+	slave = of_find_matching_node(NULL, tilcdc_slave_of_match);
+	if (!slave)
+		goto put_node_lcdc;
 
 	i2c = of_parse_phandle(slave, "i2c", 0);
 	if (!i2c) {
 		pr_err("%s: Can't find i2c node trough phandle\n", __func__);
-		goto out;
+		goto put_node_slave;
 	}
 
 	overlay = tilcdc_get_overlay(&kft);
 	if (!overlay)
-		goto out;
+		goto put_node_i2c;
 
 	encoder = of_find_matching_node(overlay, tilcdc_tda998x_of_match);
 	if (!encoder) {
 		pr_err("%s: Failed to find tda998x node\n", __func__);
-		goto out;
+		goto put_node_i2c;
 	}
 
 	tilcdc_copy_props(slave, encoder, tilcdc_slave_props, &kft);
@@ -238,10 +240,10 @@ void __init tilcdc_convert_slave_node(void)
 			continue;
 		if (!strncmp("i2c", (char *)prop->value, prop->length))
 			if (tilcdc_prop_str_update(prop, i2c->full_name, &kft))
-				goto out;
+				goto put_node_fragment;
 		if (!strncmp("lcdc", (char *)prop->value, prop->length))
 			if (tilcdc_prop_str_update(prop, lcdc->full_name, &kft))
-				goto out;
+				goto put_node_fragment;
 	}
 
 	tilcdc_node_disable(slave);
@@ -252,12 +254,16 @@ void __init tilcdc_convert_slave_node(void)
 	else
 		pr_info("%s: ti,tilcdc,slave node successfully converted\n",
 			__func__);
-out:
-	kfree_table_free(&kft);
-	of_node_put(i2c);
-	of_node_put(slave);
-	of_node_put(lcdc);
+ put_node_fragment:
 	of_node_put(fragment);
+ put_node_i2c:
+	of_node_put(i2c);
+ put_node_slave:
+	of_node_put(slave);
+ put_node_lcdc:
+	of_node_put(lcdc);
+ free_table:
+	kfree_table_free(&kft);
 }
 
 int __init tilcdc_slave_compat_init(void)
