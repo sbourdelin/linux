@@ -110,7 +110,7 @@ static void p80211req_handle_action(struct wlandevice *wlandev, u32 *data,
 ----------------------------------------------------------------*/
 int p80211req_dorequest(struct wlandevice *wlandev, u8 *msgbuf)
 {
-	struct p80211msg *msg = (struct p80211msg *) msgbuf;
+	struct p80211msg *msg = (struct p80211msg *)msgbuf;
 
 	/* Check to make sure the MSD is running */
 	if (!((wlandev->msdstate == WLAN_MSD_HWPRESENT &&
