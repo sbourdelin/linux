@@ -720,6 +720,7 @@ static void __init early_mmu_set_memory_limit(void)
 /* boot cpu only */
 void __init early_init_mmu(void)
 {
+	current_mmu_mode = MMU_MODE_NOHASH;
 	early_init_mmu_global();
 	early_init_this_mmu();
 	early_mmu_set_memory_limit();
@@ -772,6 +773,7 @@ void setup_initial_memory_limit(phys_addr_t first_memblock_base,
 #else /* ! CONFIG_PPC64 */
 void __init early_init_mmu(void)
 {
+	current_mmu_mode = MMU_MODE_NOHASH32;
 #ifdef CONFIG_PPC_47x
 	early_init_mmu_47x();
 #endif

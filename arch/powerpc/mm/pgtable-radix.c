@@ -324,6 +324,8 @@ void __init radix__early_init_mmu(void)
 {
 	unsigned long lpcr;
 
+	current_mmu_mode = MMU_MODE_RADIX;
+
 #ifdef CONFIG_PPC_64K_PAGES
 	/* PAGE_SIZE mappings */
 	mmu_virtual_psize = MMU_PAGE_64K;
