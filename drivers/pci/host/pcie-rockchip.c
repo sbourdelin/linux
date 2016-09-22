@@ -95,6 +95,11 @@
 #define   PCIE_CORE_PL_CONF_SPEED_MASK		0x00000018
 #define   PCIE_CORE_PL_CONF_LANE_MASK		0x00000006
 #define   PCIE_CORE_PL_CONF_LANE_SHIFT		1
+#define PCIE_CORE_TXCREDIT_CFG1		(PCIE_CORE_CTRL_MGMT_BASE + 0x020)
+#define   PCIE_CORE_TXCREDIT_CFG1_MUI_MASK	0xFFFF0000
+#define   PCIE_CORE_TXCREDIT_CFG1_MUI_SHIFT	16
+#define   PCIE_CORE_TXCREDIT_CFG1_MUI_ENCODE(x) \
+		(((x) >> 3) << PCIE_CORE_TXCREDIT_CFG1_MUI_SHIFT)
 #define PCIE_CORE_INT_STATUS		(PCIE_CORE_CTRL_MGMT_BASE + 0x20c)
 #define   PCIE_CORE_INT_PRFPE			BIT(0)
 #define   PCIE_CORE_INT_CRFPE			BIT(1)
@@ -522,6 +527,12 @@ static int rockchip_pcie_init_port(struct rockchip_pcie *rockchip)
 	status =  0x1 << ((status & PCIE_CORE_PL_CONF_LANE_MASK) >>
 			  PCIE_CORE_PL_CONF_LANE_MASK);
 	dev_dbg(dev, "current link width is x%d\n", status);
+
+	/* Update credit update interval */
+	status = rockchip_pcie_read(rockchip, PCIE_CORE_TXCREDIT_CFG1);
+	status &= ~PCIE_CORE_TXCREDIT_CFG1_MUI_MASK;
+	status |= PCIE_CORE_TXCREDIT_CFG1_MUI_ENCODE(24000);	/* ns */
+	rockchip_pcie_write(rockchip, status, PCIE_CORE_TXCREDIT_CFG1);
 
 	rockchip_pcie_write(rockchip, ROCKCHIP_VENDOR_ID,
 			    PCIE_RC_CONFIG_VENDOR);
