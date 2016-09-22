@@ -5,7 +5,7 @@
 #include <linux/if.h>
 
 /* timings are in milliseconds. */
-#define XT_HASHLIMIT_SCALE 10000
+#define XT_HASHLIMIT_SCALE_v1 10000
 /* 1/10,000 sec period => max of 10,000/sec.  Min rate is then 429490
  * seconds, or one packet every 59 hours.
  */
