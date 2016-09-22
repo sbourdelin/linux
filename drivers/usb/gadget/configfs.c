@@ -60,6 +60,11 @@ struct gadget_info {
 	bool use_os_desc;
 	char b_vendor_code;
 	char qw_sign[OS_STRING_QW_SIGN_LEN];
+#ifdef CONFIG_USB_CONFIGFS_UEVENT
+	bool connected;
+	bool sw_connected;
+	struct work_struct work;
+#endif
 };
 
 static inline struct gadget_info *to_gadget_info(struct config_item *item)
@@ -1197,6 +1202,57 @@ int composite_dev_prepare(struct usb_composite_driver *composite,
 int composite_os_desc_req_prepare(struct usb_composite_dev *cdev,
 				  struct usb_ep *ep0);
 
+#ifdef CONFIG_USB_CONFIGFS_UEVENT
+static void configfs_work(struct work_struct *data)
+{
+	struct gadget_info *gi = container_of(data, struct gadget_info, work);
+	struct usb_composite_dev *cdev = &gi->cdev;
+	char *disconnected[2] = { "USB_STATE=DISCONNECTED", NULL };
+	char *connected[2] = { "USB_STATE=CONNECTED", NULL };
+	char *configured[2] = { "USB_STATE=CONFIGURED", NULL };
+	/* 0-connected 1-configured 2-disconnected */
+	bool status[3] = { false, false, false };
+	unsigned long flags;
+	bool uevent_sent = false;
+
+	spin_lock_irqsave(&cdev->lock, flags);
+	if (cdev->config && gi->connected)
+		status[1] = true;
+
+	if (gi->connected != gi->sw_connected) {
+		if (gi->connected)
+			status[0] = true;
+		else
+			status[2] = true;
+		gi->sw_connected = gi->connected;
+	}
+	spin_unlock_irqrestore(&cdev->lock, flags);
+
+	if (status[0]) {
+		kobject_uevent_env(&gi->dev->kobj, KOBJ_CHANGE, connected);
+		pr_info("%s: sent uevent %s\n", __func__, connected[0]);
+		uevent_sent = true;
+	}
+
+	if (status[1]) {
+		kobject_uevent_env(&gi->dev->kobj, KOBJ_CHANGE, configured);
+		pr_info("%s: sent uevent %s\n", __func__, configured[0]);
+		uevent_sent = true;
+	}
+
+	if (status[2]) {
+		kobject_uevent_env(&gi->dev->kobj, KOBJ_CHANGE, disconnected);
+		pr_info("%s: sent uevent %s\n", __func__, disconnected[0]);
+		uevent_sent = true;
+	}
+
+	if (!uevent_sent) {
+		pr_info("%s: did not send uevent (%d %d %p)\n", __func__,
+			gi->connected, gi->sw_connected, cdev->config);
+	}
+}
+#endif
+
 static void purge_configs_funcs(struct gadget_info *gi)
 {
 	struct usb_configuration	*c;
@@ -1386,13 +1442,60 @@ static void configfs_composite_unbind(struct usb_gadget *gadget)
 	set_gadget_data(gadget, NULL);
 }
 
+#ifdef CONFIG_USB_CONFIGFS_UEVENT
+static int configfs_setup(struct usb_gadget *gadget,
+			  const struct usb_ctrlrequest *c)
+{
+	struct usb_composite_dev *cdev = get_gadget_data(gadget);
+	struct gadget_info *gi = container_of(cdev, struct gadget_info, cdev);
+	int value = -EOPNOTSUPP;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cdev->lock, flags);
+	if (!gi->connected) {
+		gi->connected = 1;
+		schedule_work(&gi->work);
+	}
+	spin_unlock_irqrestore(&cdev->lock, flags);
+
+	value = composite_setup(gadget, c);
+
+	spin_lock_irqsave(&cdev->lock, flags);
+	if (c->bRequest == USB_REQ_SET_CONFIGURATION && cdev->config)
+		schedule_work(&gi->work);
+	spin_unlock_irqrestore(&cdev->lock, flags);
+
+	return value;
+}
+
+static void configfs_disconnect(struct usb_gadget *gadget)
+{
+	struct usb_composite_dev *cdev = get_gadget_data(gadget);
+	struct gadget_info *gi = container_of(cdev, struct gadget_info, cdev);
+	unsigned long flags;
+
+	spin_lock_irqsave(&cdev->lock, flags);
+	gi->connected = 0;
+	schedule_work(&gi->work);
+	spin_unlock_irqrestore(&cdev->lock, flags);
+
+	composite_disconnect(gadget);
+}
+#endif
+
 static const struct usb_gadget_driver configfs_driver_template = {
 	.bind           = configfs_composite_bind,
 	.unbind         = configfs_composite_unbind,
 
+#ifdef CONFIG_USB_CONFIGFS_UEVENT
+	.setup          = configfs_setup,
+	.reset          = configfs_disconnect,
+	.disconnect     = configfs_disconnect,
+#else
 	.setup          = composite_setup,
 	.reset          = composite_disconnect,
 	.disconnect     = composite_disconnect,
+#endif
 
 	.suspend	= composite_suspend,
 	.resume		= composite_resume,
@@ -1452,6 +1555,10 @@ static struct config_group *gadgets_make(
 
 	gi->composite.gadget_driver.function = kstrdup(name, GFP_KERNEL);
 	gi->composite.name = gi->composite.gadget_driver.function;
+
+#ifdef CONFIG_USB_CONFIGFS_UEVENT
+	INIT_WORK(&gi->work, configfs_work);
+#endif
 
 	if (!gi->composite.gadget_driver.function)
 		goto err;
