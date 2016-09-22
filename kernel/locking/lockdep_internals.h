@@ -54,18 +54,26 @@ enum {
  * table (if it's not there yet), and we check it for lock order
  * conflicts and deadlocks.
  */
+#ifdef CONFIG_PROVE_LOCKING_PLUS
 #define MAX_LOCKDEP_ENTRIES	32768UL
 
 #define MAX_LOCKDEP_CHAINS_BITS	16
-#define MAX_LOCKDEP_CHAINS	(1UL << MAX_LOCKDEP_CHAINS_BITS)
-
-#define MAX_LOCKDEP_CHAIN_HLOCKS (MAX_LOCKDEP_CHAINS*5)
 
 /*
  * Stack-trace: tightly packed array of stack backtrace
  * addresses. Protected by the hash_lock.
  */
 #define MAX_STACK_TRACE_ENTRIES	524288UL
+#else
+#define MAX_LOCKDEP_ENTRIES	16384UL
+#define MAX_LOCKDEP_CHAINS_BITS	15
+#define MAX_STACK_TRACE_ENTRIES	262144UL
+#endif
+
+#define MAX_LOCKDEP_CHAINS	(1UL << MAX_LOCKDEP_CHAINS_BITS)
+
+#define MAX_LOCKDEP_CHAIN_HLOCKS (MAX_LOCKDEP_CHAINS*5)
+
 
 extern struct list_head all_lock_classes;
 extern struct lock_chain lock_chains[];
