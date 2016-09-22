@@ -1971,7 +1971,7 @@ int ip_route_input_noref(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 	   route cache entry is created eventually.
 	 */
 	if (ipv4_is_multicast(daddr)) {
-		struct in_device *in_dev = __in_dev_get_rcu(dev);
+		struct in_device *in_dev = __in_dev_get_rcu(skb->dev);
 
 		if (in_dev) {
 			int our = ip_check_mc_rcu(in_dev, daddr, saddr,
