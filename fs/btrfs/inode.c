@@ -8866,7 +8866,8 @@ again:
 	 * 2) Not written to disk
 	 *    This means the reserved space should be freed here.
 	 */
-	btrfs_qgroup_free_data(inode, page_start, PAGE_SIZE);
+	if (PageDirty(page))
+		btrfs_qgroup_free_data(inode, page_start, PAGE_SIZE);
 	if (!inode_evicting) {
 		clear_extent_bit(tree, page_start, page_end,
 				 EXTENT_LOCKED | EXTENT_DIRTY |
