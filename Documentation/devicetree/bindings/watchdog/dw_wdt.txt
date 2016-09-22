@@ -10,6 +10,9 @@ Required Properties:
 Optional Properties:
 
 - interrupts	: The interrupt used for the watchdog timeout warning.
+- resets	: phandle pointing to the system reset controller with
+		line index for the watchdog.
+- reset-names	: must be set to "dw-wdt".
 
 Example:
 
@@ -18,4 +21,6 @@ Example:
 		reg = <0xffd02000 0x1000>;
 		interrupts = <0 171 4>;
 		clocks = <&per_base_clk>;
+		resets = <&rst WDT0_RESET>;
+		reset-names = "dw-wdt";
 	};
