@@ -358,7 +358,13 @@ static inline void smp_prepare_cpus(unsigned int maxcpus) { }
  * parsing is performed in place, and we should allow a component to
  * store reference of name/value for future reference.
  */
-static void __init setup_command_line(char *command_line)
+static void __init
+#ifdef CONFIG_PPC64
+	#if  GCC_VERSION > 50301
+		__attribute__((optimize("-O1")))
+	#endif
+#endif
+		setup_command_line(char *command_line)
 {
 	saved_command_line =
 		memblock_virt_alloc(strlen(boot_command_line) + 1, 0);
