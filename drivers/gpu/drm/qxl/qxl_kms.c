@@ -149,7 +149,7 @@ static int qxl_device_init(struct qxl_device *qdev,
 			io_mapping_create_wc(qdev->surfaceram_base,
 					     qdev->surfaceram_size);
 	}
-	if (qdev->surface_mapping == NULL) {
+	if (!qdev->surface_mapping) {
 		/* 64bit surface bar not present (or mapping failed) */
 		sb = 1;
 		qdev->surfaceram_base = pci_resource_start(pdev, sb);
@@ -288,7 +288,7 @@ int qxl_driver_unload(struct drm_device *dev)
 {
 	struct qxl_device *qdev = dev->dev_private;
 
-	if (qdev == NULL)
+	if (!qdev)
 		return 0;
 
 	drm_vblank_cleanup(dev);
@@ -307,7 +307,7 @@ int qxl_driver_load(struct drm_device *dev, unsigned long flags)
 	int r;
 
 	qdev = kzalloc(sizeof(*qdev), GFP_KERNEL);
-	if (qdev == NULL)
+	if (!qdev)
 		return -ENOMEM;
 
 	dev->dev_private = qdev;
