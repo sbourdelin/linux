@@ -30,6 +30,11 @@ extern struct mmu_psize_def mmu_psize_defs[MMU_PAGE_COUNT];
 
 #ifndef __ASSEMBLY__
 /*
+ * current MMU mode
+ */
+extern unsigned int current_mmu_mode;
+
+/*
  * ISA 3.0 partiton and process table entry format
  */
 struct prtb_entry {

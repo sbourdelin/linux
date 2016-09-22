@@ -63,6 +63,12 @@
 
 #ifdef CONFIG_PPC_BOOK3S_64
 /*
+ * current MMU mode
+ */
+unsigned int current_mmu_mode;
+EXPORT_SYMBOL(current_mmu_mode);
+
+/*
  * partition table and process table for ISA 3.0
  */
 struct prtb_entry *process_tb;

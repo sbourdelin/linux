@@ -2,6 +2,12 @@
 #define _ASM_POWERPC_BOOK3S_64_PGTABLE_H_
 
 /*
+ * Possible MMU modes
+ */
+#define HASH_MMU_MODE		0
+#define RADIX_MMU_MODE		1
+
+/*
  * Common bits between hash and Radix page table
  */
 #define _PAGE_BIT_SWAP_TYPE	0
