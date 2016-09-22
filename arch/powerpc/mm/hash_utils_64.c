@@ -911,6 +911,8 @@ void __init hash__early_init_devtree(void)
 
 void __init hash__early_init_mmu(void)
 {
+	current_mmu_mode = MMU_MODE_HASH;
+
 	htab_init_page_sizes();
 
 	/*

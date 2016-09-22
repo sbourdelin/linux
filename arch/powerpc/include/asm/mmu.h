@@ -199,6 +199,21 @@ static inline void mmu_clear_feature(unsigned long feature)
 
 extern unsigned int __start___mmu_ftr_fixup, __stop___mmu_ftr_fixup;
 
+/*
+ * Possible MMU modes
+ */
+#define MMU_MODE_NONE           0
+#define MMU_MODE_RADIX          1
+#define MMU_MODE_HASH           2
+#define MMU_MODE_HASH32         3
+#define MMU_MODE_NOHASH         4
+#define MMU_MODE_NOHASH32       5
+
+/*
+ * current MMU mode
+ */
+extern unsigned int current_mmu_mode __read_mostly;
+
 #ifdef CONFIG_PPC64
 /* This is our real memory area size on ppc64 server, on embedded, we
  * make it match the size our of bolted TLB area
@@ -218,7 +233,12 @@ static inline void assert_pte_locked(struct mm_struct *mm, unsigned long addr)
 #ifdef CONFIG_PPC_RADIX_MMU
 static inline bool radix_enabled(void)
 {
-	return mmu_has_feature(MMU_FTR_TYPE_RADIX);
+	if (current_mmu_mode == MMU_MODE_RADIX)
+		return true;
+	else if (current_mmu_mode != MMU_MODE_NONE)
+		return false;
+	else
+		return mmu_has_feature(MMU_FTR_TYPE_RADIX);
 }
 
 static inline bool early_radix_enabled(void)

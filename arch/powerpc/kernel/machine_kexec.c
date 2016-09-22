@@ -77,6 +77,9 @@ void arch_crash_save_vmcoreinfo(void)
 	VMCOREINFO_SYMBOL(contig_page_data);
 #endif
 #if defined(CONFIG_PPC64) && defined(CONFIG_SPARSEMEM_VMEMMAP)
+#ifdef CONFIG_PPC_BOOK3S
+	VMCOREINFO_SYMBOL(current_mmu_mode);
+#endif
 	VMCOREINFO_SYMBOL(vmemmap_list);
 	VMCOREINFO_SYMBOL(mmu_vmemmap_psize);
 	VMCOREINFO_SYMBOL(mmu_psize_defs);

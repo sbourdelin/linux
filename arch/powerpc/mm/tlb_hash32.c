@@ -170,4 +170,5 @@ EXPORT_SYMBOL(flush_tlb_range);
 
 void __init early_init_mmu(void)
 {
+	current_mmu_mode = MMU_MODE_HASH32;
 }

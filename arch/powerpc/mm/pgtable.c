@@ -31,6 +31,12 @@
 #include <asm/tlbflush.h>
 #include <asm/tlb.h>
 
+/*
+ * current MMU mode
+ */
+unsigned int current_mmu_mode __read_mostly = MMU_MODE_NONE;
+EXPORT_SYMBOL(current_mmu_mode);
+
 static inline int is_exec_fault(void)
 {
 	return current->thread.regs && TRAP(current->thread.regs) == 0x400;
