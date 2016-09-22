@@ -23,6 +23,13 @@
 #define LINUX_PCI_REGS_H
 
 /*
+ * Under PCI, each device has 256 bytes of configuration address space.
+ * Under PCIe, each device has 4096 bytes of configuration address space.
+ */
+#define PCI_CFG_SPACE_SIZE	256
+#define PCI_CFG_SPACE_EXP_SIZE	4096
+
+/*
  * Under PCI, each device has 256 bytes of configuration address space,
  * of which the first 64 bytes are standardized as follows:
  */
