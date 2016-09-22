@@ -267,18 +267,21 @@ static int __init nmdk_timer_of_init(struct device_node *node)
 	pclk = of_clk_get_by_name(node, "apb_pclk");
 	if (IS_ERR(pclk)) {
 		pr_err("could not get apb_pclk");
+		iounmap(base);
 		return PTR_ERR(pclk);
 	}
 
 	clk = of_clk_get_by_name(node, "timclk");
 	if (IS_ERR(clk)) {
 		pr_err("could not get timclk");
+		iounmap(base);
 		return PTR_ERR(clk);
 	}
 
 	irq = irq_of_parse_and_map(node, 0);
 	if (irq <= 0) {
 		pr_err("Can't parse IRQ");
+		iounmap(base);
 		return -EINVAL;
 	}
 
