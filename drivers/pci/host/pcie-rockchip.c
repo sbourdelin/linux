@@ -1078,6 +1078,7 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
 		goto err_vpcie;
 
 	/* Get the I/O and memory ranges from DT */
+	io_size = 0;
 	resource_list_for_each_entry(win, &res) {
 		switch (resource_type(win->res)) {
 		case IORESOURCE_IO:
