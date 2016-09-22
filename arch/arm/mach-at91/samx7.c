@@ -16,6 +16,16 @@
 #include "generic.h"
 #include "soc.h"
 
+
+#ifdef CONFIG_PM
+/* This function has to be defined for various drivers that are using it */
+int at91_suspend_entering_slow_clock(void)
+{
+	return 0;
+}
+EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
+#endif
+
 static const struct at91_soc samx7_socs[] = {
 	AT91_SOC(SAME70Q21_CIDR_MATCH, SAME70Q21_EXID_MATCH,
 		 "same70q21", "samx7"),
