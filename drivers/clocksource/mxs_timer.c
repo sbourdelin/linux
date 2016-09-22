@@ -235,12 +235,13 @@ static int __init mxs_timer_init(struct device_node *np)
 	timer_clk = of_clk_get(np, 0);
 	if (IS_ERR(timer_clk)) {
 		pr_err("%s: failed to get clk\n", __func__);
+		iounmap(mxs_timrot_base);
 		return PTR_ERR(timer_clk);
 	}
 
 	ret = clk_prepare_enable(timer_clk);
 	if (ret)
-		return ret;
+		goto error_iounmap;
 
 	/*
 	 * Initialize timers to a known state
@@ -280,17 +281,24 @@ static int __init mxs_timer_init(struct device_node *np)
 	/* init and register the timer to the framework */
 	ret = mxs_clocksource_init(timer_clk);
 	if (ret)
-		return ret;
+		goto error_iounmap;
 
 	ret = mxs_clockevent_init(timer_clk);
 	if (ret)
-		return ret;
+		goto error_iounmap;
 
 	/* Make irqs happen */
 	irq = irq_of_parse_and_map(np, 0);
-	if (irq <= 0)
-		return -EINVAL;
+	if (irq <= 0) {
+		ret = -EINVAL;
+		goto error_iounmap;
+	}
 
 	return setup_irq(irq, &mxs_timer_irq);
+
+error_iounmap:
+	iounmap(mxs_timrot_base);
+	return ret;
+
 }
 CLOCKSOURCE_OF_DECLARE(mxs, "fsl,timrot", mxs_timer_init);
