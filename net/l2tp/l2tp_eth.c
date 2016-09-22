@@ -30,6 +30,9 @@
 #include <net/xfrm.h>
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
+#include <linux/udp.h>
 
 #include "l2tp_core.h"
 
@@ -206,6 +209,46 @@ static void l2tp_eth_show(struct seq_file *m, void *arg)
 }
 #endif
 
+static void l2tp_eth_adjust_mtu(struct l2tp_tunnel *tunnel,
+				struct l2tp_session *session,
+				struct net_device *dev)
+{
+	unsigned int overhead = 0;
+	struct dst_entry *dst;
+
+	if (session->mtu != 0) {
+		dev->mtu = session->mtu;
+		dev->needed_headroom += session->hdr_len;
+		if (tunnel->encap == L2TP_ENCAPTYPE_UDP)
+			dev->needed_headroom += sizeof(struct udphdr);
+		return;
+	}
+	overhead = session->hdr_len;
+	/* Adjust MTU, factor overhead - underlay L3 hdr, overlay L2 hdr*/
+	if (tunnel->sock->sk_family == AF_INET)
+		overhead += (ETH_HLEN + sizeof(struct iphdr));
+	else if (tunnel->sock->sk_family == AF_INET6)
+		overhead += (ETH_HLEN + sizeof(struct ipv6hdr));
+	/* Additionally, if the encap is UDP, account for UDP header size */
+	if (tunnel->encap == L2TP_ENCAPTYPE_UDP)
+		overhead += sizeof(struct udphdr);
+	/* If PMTU discovery was enabled, use discovered MTU on L2TP device */
+	dst = sk_dst_get(tunnel->sock);
+	if (dst) {
+		u32 pmtu = dst_mtu(dst);
+
+		if (pmtu != 0)
+			dev->mtu = pmtu;
+		dst_release(dst);
+	}
+	/* else (no PMTUD) L2TP dev MTU defaulted to Ethernet MTU in caller */
+	session->mtu = dev->mtu - overhead;
+	dev->mtu = session->mtu;
+	dev->needed_headroom += session->hdr_len;
+	if (tunnel->encap == L2TP_ENCAPTYPE_UDP)
+		dev->needed_headroom += sizeof(struct udphdr);
+}
+
 static int l2tp_eth_create(struct net *net, u32 tunnel_id, u32 session_id, u32 peer_session_id, struct l2tp_session_cfg *cfg)
 {
 	struct net_device *dev;
@@ -255,11 +298,8 @@ static int l2tp_eth_create(struct net *net, u32 tunnel_id, u32 session_id, u32 p
 	}
 
 	dev_net_set(dev, net);
-	if (session->mtu == 0)
-		session->mtu = dev->mtu - session->hdr_len;
-	dev->mtu = session->mtu;
-	dev->needed_headroom += session->hdr_len;
 
+	l2tp_eth_adjust_mtu(tunnel, session, dev);
 	priv = netdev_priv(dev);
 	priv->dev = dev;
 	priv->session = session;
