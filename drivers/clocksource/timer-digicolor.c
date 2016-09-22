@@ -167,12 +167,14 @@ static int __init digicolor_timer_init(struct device_node *node)
 	irq = irq_of_parse_and_map(node, dc_timer_dev.timer_id);
 	if (irq <= 0) {
 		pr_err("Can't parse IRQ");
+		iounmap(dc_timer_dev.base);
 		return -EINVAL;
 	}
 
 	clk = of_clk_get(node, 0);
 	if (IS_ERR(clk)) {
 		pr_err("Can't get timer clock");
+		iounmap(dc_timer_dev.base);
 		return PTR_ERR(clk);
 	}
 	clk_prepare_enable(clk);
@@ -192,6 +194,7 @@ static int __init digicolor_timer_init(struct device_node *node)
 			  &dc_timer_dev.ce);
 	if (ret) {
 		pr_warn("request of timer irq %d failed (%d)\n", irq, ret);
+		iounmap(dc_timer_dev.base);
 		return ret;
 	}
 
