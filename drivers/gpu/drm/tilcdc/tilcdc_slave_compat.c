@@ -196,8 +196,7 @@ static const char * const tilcdc_slave_props[] __initconst = {
 
 void __init tilcdc_convert_slave_node(void)
 {
-	struct device_node *slave = NULL, *lcdc = NULL;
-	struct device_node *i2c = NULL, *fragment = NULL;
+	struct device_node *slave, *lcdc, *i2c, *fragment;
 	struct device_node *overlay, *encoder;
 	struct property *prop;
 	/* For all memory needed for the overlay tree. This memory can
