@@ -758,9 +758,11 @@ static int __init net_ns_init(void)
 
 	register_pernet_subsys(&net_ns_ops);
 
+	rtnl_lock();
 	rtnl_register(PF_UNSPEC, RTM_NEWNSID, rtnl_net_newid, NULL, NULL);
 	rtnl_register(PF_UNSPEC, RTM_GETNSID, rtnl_net_getid, rtnl_net_dumpid,
 		      NULL);
+	rtnl_unlock();
 
 	return 0;
 }
