@@ -852,7 +852,7 @@ struct mm_struct *mm_access(struct task_struct *task, unsigned int mode)
 	struct mm_struct *mm;
 	int err;
 
-	err =  mutex_lock_killable(&task->signal->cred_guard_mutex);
+	err =  mutex_lock_interruptible(&task->signal->cred_guard_mutex);
 	if (err)
 		return ERR_PTR(err);
 

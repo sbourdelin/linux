@@ -91,6 +91,10 @@ static int sig_ignored(struct task_struct *t, int sig, bool force)
 	if (!sig_task_ignored(t, sig, force))
 		return 0;
 
+	/* Do not ignore signals sent from child to the parent */
+	if (current->ptrace && current->parent == t)
+		return 0;
+
 	/*
 	 * Tracers may want to know about even ignored signals.
 	 */
