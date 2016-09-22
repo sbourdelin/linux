@@ -9,6 +9,7 @@
 
 #include "ipvlan.h"
 
+#ifdef CONFIG_NETFILTER
 static u32 ipvl_nf_hook_refcnt = 0;
 
 static struct nf_hook_ops ipvl_nfops[] __read_mostly = {
@@ -25,6 +26,7 @@ static struct nf_hook_ops ipvl_nfops[] __read_mostly = {
 		.priority = INT_MAX,
 	},
 };
+#endif
 
 static struct l3mdev_ops ipvl_l3mdev_ops __read_mostly = {
 	.l3mdev_l3_rcv = ipvlan_l3_rcv,
@@ -37,6 +39,7 @@ static void ipvlan_adjust_mtu(struct ipvl_dev *ipvlan, struct net_device *dev)
 
 static int ipvlan_register_nf_hook(void)
 {
+#ifdef CONFIG_NETFILTER
 	int err = 0;
 
 	if (!ipvl_nf_hook_refcnt) {
@@ -48,15 +51,20 @@ static int ipvlan_register_nf_hook(void)
 	}
 
 	return err;
+#else
+	return -EINVAL;
+#endif
 }
 
 static void ipvlan_unregister_nf_hook(void)
 {
+#ifdef CONFIG_NETFILTER
 	WARN_ON(!ipvl_nf_hook_refcnt);
 
 	ipvl_nf_hook_refcnt--;
 	if (!ipvl_nf_hook_refcnt)
 		_nf_unregister_hooks(ipvl_nfops, ARRAY_SIZE(ipvl_nfops));
+#endif
 }
 
 static int ipvlan_set_port_mode(struct ipvl_port *port, u16 nval)
