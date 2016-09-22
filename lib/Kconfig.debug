@@ -1084,6 +1084,16 @@ config PROVE_LOCKING
 
 	 For more details, see Documentation/locking/lockdep-design.txt.
 
+config PROVE_LOCKING_PLUS
+	bool "Reserve extra space for prove locking correctness"
+	depends on PROVE_LOCKING
+	default n
+	help
+	 This feature reserves more space for lockdep entries, lock chains
+	 and stack traces to debug large configurations. This could add
+	 about additional 4MB static memory to kernel size. This is not
+	 suitable for embedded or other limited memory configurations.
+
 config LOCKDEP
 	bool
 	depends on DEBUG_KERNEL && TRACE_IRQFLAGS_SUPPORT && STACKTRACE_SUPPORT && LOCKDEP_SUPPORT
