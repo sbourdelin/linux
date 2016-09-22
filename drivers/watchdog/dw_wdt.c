@@ -31,6 +31,7 @@
 #include <linux/pm.h>
 #include <linux/platform_device.h>
 #include <linux/reboot.h>
+#include <linux/reset.h>
 #include <linux/watchdog.h>
 
 #define WDOG_CONTROL_REG_OFFSET		    0x00
@@ -56,6 +57,7 @@ struct dw_wdt {
 	struct clk		*clk;
 	struct notifier_block	restart_handler;
 	struct watchdog_device	wdd;
+	struct reset_control	*rst;
 };
 
 #define to_dw_wdt(wdd)	container_of(wdd, struct dw_wdt, wdd)
@@ -231,6 +233,10 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	dw_wdt->rst = devm_reset_control_get(&pdev->dev, "dw-wdt");
+	if (IS_ERR(dw_wdt->rst))
+		dev_warn(dev, "No reset lines. Will not be able to stop once started.\n");
+
 	wdd = &dw_wdt->wdd;
 	wdd->info = &dw_wdt_ident;
 	wdd->ops = &dw_wdt_ops;
@@ -267,6 +273,9 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
 	ret = register_restart_handler(&dw_wdt->restart_handler);
 	if (ret)
 		pr_warn("cannot register restart handler\n");
+
+	if (dw_wdt->rst)
+		reset_control_deassert(dw_wdt->rst);
 
 	return 0;
 
