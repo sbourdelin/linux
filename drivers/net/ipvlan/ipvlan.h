@@ -128,6 +128,7 @@ bool ipvlan_addr_busy(struct ipvl_port *port, void *iaddr, bool is_v6);
 void ipvlan_ht_addr_del(struct ipvl_addr *addr);
 struct sk_buff *ipvlan_l3_rcv(struct net_device *dev, struct sk_buff *skb,
 			      u16 proto);
+struct nf_hook_state;
 unsigned int ipvlan_nf_input(void *priv, struct sk_buff *skb,
 			     const struct nf_hook_state *state);
 #endif /* __IPVLAN_H */
