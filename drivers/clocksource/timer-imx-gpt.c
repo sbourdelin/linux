@@ -489,12 +489,17 @@ static int __init mxc_timer_init_dt(struct device_node *np,  enum imx_gpt_type t
 		return -ENOMEM;
 
 	imxtm->base = of_iomap(np, 0);
-	if (!imxtm->base)
+	if (!imxtm->base) {
+		kfree(imxtm);
 		return -ENXIO;
+	}
 
 	imxtm->irq = irq_of_parse_and_map(np, 0);
-	if (imxtm->irq <= 0)
+	if (imxtm->irq <= 0) {
+		iounmap(imxtm->base);
+		kfree(imxtm);
 		return -EINVAL;
+	}
 
 	imxtm->clk_ipg = of_clk_get_by_name(np, "ipg");
 
@@ -506,8 +511,11 @@ static int __init mxc_timer_init_dt(struct device_node *np,  enum imx_gpt_type t
 	imxtm->type = type;
 
 	ret = _mxc_timer_init(imxtm);
-	if (ret)
+	if (ret) {
+		iounmap(imxtm->base);
+		kfree(imxtm);
 		return ret;
+	}
 
 	initialized = 1;
 
