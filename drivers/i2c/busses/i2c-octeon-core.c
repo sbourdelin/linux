@@ -630,6 +630,31 @@ err:
 	return ret;
 }
 
+static int octeon_i2c_check_bus(struct octeon_i2c *i2c)
+{
+	u64 end = get_jiffies_64() + i2c->adap.timeout;
+	int stat, lines;
+
+	while (time_before64(get_jiffies_64(), end)) {
+		stat = octeon_i2c_stat_read(i2c);
+
+		/* get I2C line state */
+		lines = octeon_i2c_read_int(i2c) & (TWSI_INT_SCL | TWSI_INT_SDA);
+
+		if (stat == STAT_IDLE && lines == (TWSI_INT_SCL | TWSI_INT_SDA))
+			return 0;
+
+		if (stat == STAT_LOST_ARB_38 || stat == STAT_LOST_ARB_68 ||
+		    stat == STAT_LOST_ARB_78 || stat == STAT_LOST_ARB_B0)
+			break;
+
+		usleep_range(I2C_OCTEON_EVENT_WAIT / 2, I2C_OCTEON_EVENT_WAIT);
+	}
+
+	/* bus check failed, try to recover */
+	return octeon_i2c_recovery(i2c);
+}
+
 /**
  * octeon_i2c_xfer - The driver's master_xfer function
  * @adap: Pointer to the i2c_adapter structure
@@ -642,6 +667,10 @@ int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
 	struct octeon_i2c *i2c = i2c_get_adapdata(adap);
 	int i, ret = 0;
+
+	ret = octeon_i2c_check_bus(i2c);
+	if (ret)
+		goto out;
 
 	if (num == 1) {
 		if (msgs[0].len > 0 && msgs[0].len <= 8) {
