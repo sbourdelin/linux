@@ -101,6 +101,12 @@ struct perf_branch_stack {
 	struct perf_branch_entry	entries[0];
 };
 
+struct perf_aux_record {
+	u64		size;
+	unsigned long	from;
+	unsigned long	to;
+};
+
 struct task_struct;
 
 /*
@@ -532,6 +538,7 @@ struct swevent_hlist {
 #define PERF_ATTACH_GROUP	0x02
 #define PERF_ATTACH_TASK	0x04
 #define PERF_ATTACH_TASK_DATA	0x08
+#define PERF_ATTACH_SAMPLING	0x10
 
 struct perf_cgroup;
 struct ring_buffer;
@@ -690,6 +697,9 @@ struct perf_event {
 	u64				(*clock)(void);
 	perf_overflow_handler_t		overflow_handler;
 	void				*overflow_handler_context;
+
+	struct perf_event		*aux_sampler;
+	atomic_long_t			aux_samplees_count;
 
 #ifdef CONFIG_EVENT_TRACING
 	struct trace_event_call		*tp_event;
@@ -888,6 +898,7 @@ struct perf_sample_data {
 	 */
 	u64				addr;
 	struct perf_raw_record		*raw;
+	struct perf_aux_record		aux;
 	struct perf_branch_stack	*br_stack;
 	u64				period;
 	u64				weight;
@@ -937,6 +948,7 @@ static inline void perf_sample_data_init(struct perf_sample_data *data,
 	/* remaining struct members initialized in perf_prepare_sample() */
 	data->addr = addr;
 	data->raw  = NULL;
+	data->aux.from = data->aux.to = data->aux.size = 0;
 	data->br_stack = NULL;
 	data->period = period;
 	data->weight = 0;

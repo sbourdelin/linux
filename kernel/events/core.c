@@ -2422,6 +2422,25 @@ static void _perf_event_enable(struct perf_event *event)
 {
 	struct perf_event_context *ctx = event->ctx;
 
+	if (event->aux_sampler) {
+		struct perf_event_context *sctx = event->aux_sampler->ctx;
+
+		lockdep_assert_held(&ctx->mutex);
+
+		if (sctx != ctx) {
+			sctx = perf_event_ctx_lock_nested(event->aux_sampler,
+							  SINGLE_DEPTH_NESTING);
+			if (WARN_ON_ONCE(!sctx))
+				goto done;
+		}
+
+		_perf_event_enable(event->aux_sampler);
+
+		if (sctx != ctx)
+			perf_event_ctx_unlock(event->aux_sampler, sctx);
+	}
+
+done:
 	raw_spin_lock_irq(&ctx->lock);
 	if (event->state >= PERF_EVENT_STATE_INACTIVE ||
 	    event->state <  PERF_EVENT_STATE_ERROR) {
@@ -3855,6 +3874,8 @@ static void unaccount_freq_event(void)
 		atomic_dec(&nr_freq_events);
 }
 
+static void perf_aux_sampler_fini(struct perf_event *event);
+
 static void unaccount_event(struct perf_event *event)
 {
 	bool dec = false;
@@ -3885,6 +3906,9 @@ static void unaccount_event(struct perf_event *event)
 		if (!atomic_add_unless(&perf_sched_count, -1, 1))
 			schedule_delayed_work(&perf_sched_work, HZ);
 	}
+
+	if ((event->attr.sample_type & PERF_SAMPLE_AUX))
+		perf_aux_sampler_fini(event);
 
 	unaccount_event_cpu(event, event->cpu);
 
@@ -3992,6 +4016,23 @@ static void _free_event(struct perf_event *event)
 	irq_work_sync(&event->pending);
 
 	unaccount_event(event);
+
+	if (kernel_rb_event(event)) {
+		struct perf_event_context *ctx = event->ctx;
+		unsigned long flags;
+
+		/*
+		 * This event may not be explicitly freed by
+		 * perf_event_release_kernel(), we still need to remove it
+		 * from its context.
+		 */
+		raw_spin_lock_irqsave(&ctx->lock, flags);
+		list_del_event(event, ctx);
+		raw_spin_unlock_irqrestore(&ctx->lock, flags);
+
+		ring_buffer_unaccount(event->rb, false);
+		rb_free_kernel(event->rb, event);
+	}
 
 	if (event->rb) {
 		/*
@@ -5455,6 +5496,232 @@ perf_output_sample_ustack(struct perf_output_handle *handle, u64 dump_size,
 	}
 }
 
+struct perf_event *__find_sampling_counter(struct perf_event_context *ctx,
+					   struct perf_event *event,
+					   struct task_struct *task)
+{
+	struct perf_event *sampler = NULL;
+
+	list_for_each_entry(sampler, &ctx->event_list, event_entry) {
+		if (kernel_rb_event(sampler) &&
+		    sampler->cpu                  == event->cpu &&
+		    sampler->attr.type            == event->attr.aux_sample_type &&
+		    sampler->attr.config          == event->attr.aux_sample_config &&
+		    sampler->attr.exclude_hv      == event->attr.exclude_hv &&
+		    sampler->attr.exclude_idle    == event->attr.exclude_idle &&
+		    sampler->attr.exclude_user    == event->attr.exclude_user &&
+		    sampler->attr.exclude_kernel  == event->attr.exclude_kernel &&
+		    sampler->attr.aux_sample_size >= event->attr.aux_sample_size &&
+		    atomic_long_inc_not_zero(&sampler->refcount))
+			return sampler;
+	}
+
+	return NULL;
+}
+
+struct perf_event *find_sampling_counter(struct pmu *pmu,
+					 struct perf_event *event,
+					 struct task_struct *task)
+{
+	struct perf_event *sampler = NULL;
+	struct perf_cpu_context *cpuctx;
+	struct perf_event_context *ctx;
+	unsigned long flags;
+
+	if (!task) {
+		if (!cpu_online(event->cpu))
+			return NULL;
+
+		cpuctx = per_cpu_ptr(pmu->pmu_cpu_context, event->cpu);
+		ctx = &cpuctx->ctx;
+		raw_spin_lock_irqsave(&ctx->lock, flags);
+	} else {
+		ctx = perf_lock_task_context(task, pmu->task_ctx_nr, &flags);
+
+		if (!ctx)
+			return NULL;
+	}
+
+	sampler = __find_sampling_counter(ctx, event, task);
+	raw_spin_unlock_irqrestore(&ctx->lock, flags);
+
+	return sampler;
+}
+
+/*
+ * Sampling AUX data in perf events is done by means of a kernel event that
+ * collects data to its own ring_buffer. This data gets copied out into sampled
+ * event's SAMPLE_AUX records every time the sampled event overflows. One such
+ * kernel event (sampler) can be used to provide samples for multiple events
+ * (samplees) on the same context if their attributes match. Each samplee
+ * holds a reference to the sampler event; the last one out frees the sampler;
+ * perf_event_exit_task() is instructed not to free samplers directly.
+ */
+static int perf_aux_sampler_init(struct perf_event *event,
+				 struct task_struct *task,
+				 struct pmu *pmu)
+{
+	struct perf_event_attr attr;
+	struct perf_event *sampler;
+	unsigned long nr_pages;
+	int ret;
+
+	if (!pmu || !pmu->setup_aux)
+		return -ENOTSUPP;
+
+	sampler = find_sampling_counter(pmu, event, task);
+	if (!sampler) {
+		memset(&attr, 0, sizeof(attr));
+		attr.type            = pmu->type;
+		attr.config          = event->attr.aux_sample_config;
+		attr.disabled        = 1; /* see below */
+		attr.enable_on_exec  = event->attr.enable_on_exec;
+		attr.exclude_hv      = event->attr.exclude_hv;
+		attr.exclude_idle    = event->attr.exclude_idle;
+		attr.exclude_user    = event->attr.exclude_user;
+		attr.exclude_kernel  = event->attr.exclude_kernel;
+		attr.aux_sample_size = event->attr.aux_sample_size;
+
+		sampler = perf_event_create_kernel_counter(&attr, event->cpu,
+							   task, NULL, NULL);
+		if (IS_ERR(sampler))
+			return PTR_ERR(sampler);
+
+		nr_pages = 1ul << __get_order(event->attr.aux_sample_size);
+
+		ret = rb_alloc_kernel(sampler, 0, nr_pages);
+		if (ret) {
+			perf_event_release_kernel(sampler);
+			return ret;
+		}
+
+		/*
+		 * This event will be freed by the last exiting samplee;
+		 * perf_event_exit_task() should skip it over.
+		 */
+		sampler->attach_state |= PERF_ATTACH_SAMPLING;
+	}
+
+	event->aux_sampler = sampler;
+
+	if (!atomic_long_inc_return(&sampler->aux_samplees_count)) {
+		/*
+		 * enable the sampler here unless the original event wants
+		 * to stay disabled
+		 */
+		if (!event->attr.disabled)
+			perf_event_enable(sampler);
+	}
+
+	return 0;
+}
+
+static void perf_aux_sampler_fini(struct perf_event *event)
+{
+	struct perf_event *sampler = event->aux_sampler;
+
+	if (!sampler)
+		return;
+
+	/*
+	 * We're holding a reference to the sampler, so it's always
+	 * valid here.
+	 */
+	if (atomic_long_dec_and_test(&sampler->aux_samplees_count))
+		perf_event_disable(sampler);
+
+	/* can be last */
+	put_event(sampler);
+
+	event->aux_sampler = NULL;
+}
+
+static unsigned long perf_aux_sampler_trace(struct perf_event *event,
+					    struct perf_sample_data *data)
+{
+	struct perf_event *sampler = event->aux_sampler;
+	struct ring_buffer *rb;
+	int *disable_count;
+
+	data->aux.size = 0;
+
+	if (!sampler || READ_ONCE(sampler->state) != PERF_EVENT_STATE_ACTIVE)
+		goto out;
+
+	if (READ_ONCE(sampler->oncpu) != smp_processor_id())
+		goto out;
+
+	/*
+	 * Non-zero disable count here means that we, being the NMI
+	 * context, are racing with pmu::add or pmu::del, both of which
+	 * may lead to a dangling hardware event and all manner of mayhem.
+	 */
+	disable_count = this_cpu_ptr(sampler->pmu->pmu_disable_count);
+	if (*disable_count)
+		goto out;
+
+	perf_pmu_disable(sampler->pmu);
+
+	rb = ring_buffer_get(sampler);
+	if (!rb) {
+		perf_pmu_enable(sampler->pmu);
+		goto out;
+	}
+
+	sampler->pmu->stop(sampler, PERF_EF_UPDATE);
+
+	data->aux.to = local_read(&rb->aux_head);
+
+	if (data->aux.to < sampler->attr.aux_sample_size)
+		data->aux.from = rb->aux_nr_pages * PAGE_SIZE +
+			data->aux.to - sampler->attr.aux_sample_size;
+	else
+		data->aux.from = data->aux.to -
+			sampler->attr.aux_sample_size;
+	data->aux.size = ALIGN(sampler->attr.aux_sample_size, sizeof(u64));
+	ring_buffer_put(rb);
+
+out:
+	return data->aux.size;
+}
+
+static void perf_aux_sampler_output(struct perf_event *event,
+				    struct perf_output_handle *handle,
+				    struct perf_sample_data *data)
+{
+	struct perf_event *sampler = event->aux_sampler;
+	struct ring_buffer *rb;
+	unsigned long pad;
+	int ret;
+
+	if (WARN_ON_ONCE(!sampler || !data->aux.size))
+		goto out_enable;
+
+	rb = ring_buffer_get(sampler);
+	if (WARN_ON_ONCE(!rb))
+		goto out_enable;
+
+	ret = rb_output_aux(rb, data->aux.from, data->aux.to,
+			    (aux_copyfn)perf_output_copy, handle);
+	if (ret < 0) {
+		pr_warn_ratelimited("failed to copy trace data\n");
+		goto out;
+	}
+
+	pad = data->aux.size - ret;
+	if (pad) {
+		u64 p = 0;
+
+		perf_output_copy(handle, &p, pad);
+	}
+out:
+	ring_buffer_put(rb);
+	sampler->pmu->start(sampler, 0);
+
+out_enable:
+	perf_pmu_enable(sampler->pmu);
+}
+
 static void __perf_event_header__init_id(struct perf_event_header *header,
 					 struct perf_sample_data *data,
 					 struct perf_event *event)
@@ -5774,6 +6041,13 @@ void perf_output_sample(struct perf_output_handle *handle,
 		}
 	}
 
+	if (sample_type & PERF_SAMPLE_AUX) {
+		perf_output_put(handle, data->aux.size);
+
+		if (data->aux.size)
+			perf_aux_sampler_output(event, handle, data);
+	}
+
 	if (!event->attr.watermark) {
 		int wakeup_events = event->attr.wakeup_events;
 
@@ -5904,6 +6178,14 @@ void perf_prepare_sample(struct perf_event_header *header,
 
 			size += hweight64(mask) * sizeof(u64);
 		}
+
+		header->size += size;
+	}
+
+	if (sample_type & PERF_SAMPLE_AUX) {
+		u64 size = sizeof(u64);
+
+		size += perf_aux_sampler_trace(event, data);
 
 		header->size += size;
 	}
@@ -6108,6 +6390,8 @@ static void perf_event_addr_filters_exec(struct perf_event *event, void *data)
 	if (restart)
 		event->addr_filters_gen++;
 	raw_spin_unlock_irqrestore(&ifh->lock, flags);
+
+	perf_pmu_enable(event->pmu);
 
 	if (restart)
 		perf_event_stop(event, 1);
@@ -6672,6 +6956,8 @@ static void __perf_addr_filters_adjust(struct perf_event *event, void *data)
 	if (restart)
 		event->addr_filters_gen++;
 	raw_spin_unlock_irqrestore(&ifh->lock, flags);
+
+	perf_pmu_enable(event->pmu);
 
 	if (restart)
 		perf_event_stop(event, 1);
@@ -9076,10 +9362,27 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 	}
 
 	if (!event->parent) {
+		if (event->attr.sample_type & PERF_SAMPLE_AUX) {
+			struct pmu *aux_pmu;
+			int idx;
+
+			err = -EINVAL;
+
+			idx = srcu_read_lock(&pmus_srcu);
+			aux_pmu = __perf_find_pmu(event->attr.aux_sample_type);
+			if (aux_pmu)
+				err = perf_aux_sampler_init(event, task,
+							    aux_pmu);
+			srcu_read_unlock(&pmus_srcu, idx);
+
+			if (err)
+				goto err_addr_filters;
+		}
+
 		if (event->attr.sample_type & PERF_SAMPLE_CALLCHAIN) {
 			err = get_callchain_buffers(attr->sample_max_stack);
 			if (err)
-				goto err_addr_filters;
+				goto err_aux_sampler;
 		}
 	}
 
@@ -9087,6 +9390,9 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 	account_event(event);
 
 	return event;
+
+err_aux_sampler:
+	perf_aux_sampler_fini(event);
 
 err_addr_filters:
 	kfree(event->addr_filters_offs);
@@ -9915,6 +10221,13 @@ perf_event_exit_event(struct perf_event *child_event,
 		      struct task_struct *child)
 {
 	struct perf_event *parent_event = child_event->parent;
+
+	/*
+	 * Skip over samplers, they are released by the last holder
+	 * of their reference.
+	 */
+	if (child_event->attach_state & PERF_ATTACH_SAMPLING)
+		return;
 
 	/*
 	 * Do not destroy the 'original' grouping; because of the context
