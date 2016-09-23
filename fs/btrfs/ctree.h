@@ -126,6 +126,8 @@ static inline unsigned long btrfs_chunk_item_size(int num_stripes)
 #define BTRFS_OLD_BACKREF_REV		0
 #define BTRFS_MIXED_BACKREF_REV		1
 
+#define EFSCORRUPTED			EUCLEAN /* Filesystem is corrupted */
+
 /*
  * every tree block (leaf or node) starts with this header.
  */

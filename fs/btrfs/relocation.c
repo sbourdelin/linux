@@ -2707,7 +2707,14 @@ static int do_relocation(struct btrfs_trans_handle *trans,
 
 		bytenr = btrfs_node_blockptr(upper->eb, slot);
 		if (lowest) {
-			BUG_ON(bytenr != node->bytenr);
+			if (bytenr != node->bytenr) {
+				btrfs_err(root->fs_info,
+		"lowest leaf/node mismatch: bytenr %llu node->bytenr %llu slot %d upper %llu",
+					  bytenr, node->bytenr, slot,
+					  upper->eb->start);
+				err = -EFSCORRUPTED;
+				goto next;
+			}
 		} else {
 			if (node->eb->start == bytenr)
 				goto next;
