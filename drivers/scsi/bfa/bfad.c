@@ -1498,7 +1498,7 @@ bfad_pci_error_detected(struct pci_dev *pdev, pci_channel_state_t state)
 	return ret;
 }
 
-int
+static int
 restart_bfa(struct bfad_s *bfad)
 {
 	unsigned long flags;
