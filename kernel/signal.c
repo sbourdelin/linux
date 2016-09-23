@@ -2485,6 +2485,16 @@ void __set_current_blocked(const sigset_t *newset)
 {
 	struct task_struct *tsk = current;
 
+	/*
+	 * In case the signal mask hasn't changed, we won't need to take
+	 * the lock. The current blocked mask can be modified by other CPUs.
+	 * To be safe, we need to do an atomic read without lock. As a result,
+	 * this check will only be done on 64-bit architectures.
+	 */
+	if ((_NSIG_WORDS == 1) &&
+	    (READ_ONCE(tsk->blocked.sig[0]) == newset->sig[0]))
+		return;
+
 	spin_lock_irq(&tsk->sighand->siglock);
 	__set_task_blocked(tsk, newset);
 	spin_unlock_irq(&tsk->sighand->siglock);
