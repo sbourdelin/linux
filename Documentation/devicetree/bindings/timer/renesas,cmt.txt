@@ -48,10 +48,15 @@ Required Properties:
 		(CMT[01])
     - "renesas,cmt-48-r8a7791" for the r8a7791 48-bit CMT
 		(CMT[01])
+    - "renesas,cmt-48-r8a7793" for the r8a7793 48-bit CMT
+		(CMT[01])
+    - "renesas,cmt-48-r8a7794" for the r8a7793 48-bit CMT
+		(CMT[01])
     - "renesas,cmt-48-gen2" for all second generation 48-bit CMT
-		(CMT[01] on r8a73a4, r8a7790 and r8a7791)
+		(CMT[01] on r8a73a4, r8a7790, r8a7791, r8a7793, r8a7794)
 		This is a fallback for the renesas,cmt-48-r8a73a4,
-		renesas,cmt-48-r8a7790 and renesas,cmt-48-r8a7791 entries.
+		renesas,cmt-48-r8a7790, renesas,cmt-48-r8a7791,
+		renesas,cmt-48-r8a7793 and renesas,cmt-48-r8a7794 entries.
 
   - reg: base address and length of the registers block for the timer module.
   - interrupts: interrupt-specifier for the timer, one per channel.
