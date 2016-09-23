@@ -103,6 +103,64 @@ DEFINE_EVENT(sched_wakeup_template, sched_wakeup_new,
 	     TP_PROTO(struct task_struct *p),
 	     TP_ARGS(p));
 
+TRACE_EVENT_MAP(sched_waking, sched_waking_prio,
+
+	TP_PROTO(struct task_struct *p),
+
+	TP_ARGS(p),
+
+	TP_STRUCT__entry(
+		__array(	char,	comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	pid			)
+		__field(	int,	target_cpu		)
+		__field( 	unsigned int,	policy		)
+		__field( 	int,	nice			)
+		__field( 	unsigned int,	rt_priority	)
+		__field( 	u64,	dl_runtime		)
+		__field( 	u64,	dl_deadline		)
+		__field( 	u64,	dl_period		)
+		__array(	char,	top_waiter_comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	top_waiter_pid		)
+	),
+
+	TP_fast_assign(
+		struct task_struct *top_waiter = rt_mutex_get_top_task(p);
+
+		memcpy(__entry->comm, p->comm, TASK_COMM_LEN);
+		__entry->pid		= p->pid;
+		__entry->target_cpu	= task_cpu(p);
+		__entry->policy		= effective_policy(
+						p->policy, p->prio);
+		__entry->nice		= task_nice(p);
+		__entry->rt_priority	= effective_rt_prio(
+						p->prio);
+		__entry->dl_runtime	= dl_prio(p->prio) ?
+						p->dl.dl_runtime : 0;
+		__entry->dl_deadline	= dl_prio(p->prio) ?
+						p->dl.dl_deadline : 0;
+		__entry->dl_period	= dl_prio(p->prio) ?
+						p->dl.dl_period : 0;
+		if (top_waiter) {
+			memcpy(__entry->top_waiter_comm, top_waiter->comm,
+					TASK_COMM_LEN);
+			__entry->top_waiter_pid	= top_waiter->pid;
+		} else {
+			__entry->top_waiter_comm[0] = '\0';
+			__entry->top_waiter_pid	= -1;
+		}
+	),
+
+	TP_printk("comm=%s, pid=%d, target_cpu=%03d, policy=%s, "
+			"nice=%d, rt_priority=%u, dl_runtime=%Lu, "
+			"dl_deadline=%Lu, dl_period=%Lu, "
+			"top_waiter_comm=%s, top_waiter_pid=%d",
+		  __entry->comm, __entry->pid, __entry->target_cpu,
+		  __print_symbolic(__entry->policy, SCHEDULING_POLICY),
+		  __entry->nice, __entry->rt_priority, __entry->dl_runtime,
+		  __entry->dl_deadline, __entry->dl_period,
+		  __entry->top_waiter_comm, __entry->top_waiter_pid)
+);
+
 #ifdef CREATE_TRACE_POINTS
 static inline long __trace_sched_switch_state(bool preempt, struct task_struct *p)
 {
@@ -159,6 +217,121 @@ TRACE_EVENT(sched_switch,
 				{ 1024, "N" }) : "R",
 		__entry->prev_state & TASK_STATE_MAX ? "+" : "",
 		__entry->next_comm, __entry->next_pid, __entry->next_prio)
+);
+
+/*
+ * Tracepoint for task switches, performed by the scheduler:
+ */
+TRACE_EVENT_MAP(sched_switch, sched_switch_prio,
+	TP_PROTO(bool preempt,
+		 struct task_struct *prev,
+		 struct task_struct *next),
+
+	TP_ARGS(preempt, prev, next),
+
+	TP_STRUCT__entry(
+		__array(	char,	prev_comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	prev_pid			)
+		__field(	long,	prev_state			)
+		__field( 	unsigned int,	prev_policy		)
+		__field( 	int,	prev_nice			)
+		__field( 	unsigned int,	prev_rt_priority	)
+		__field( 	u64,	prev_dl_runtime			)
+		__field( 	u64,	prev_dl_deadline		)
+		__field( 	u64,	prev_dl_period			)
+		__array(	char,	prev_top_waiter_comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	prev_top_waiter_pid		)
+		__array(	char,	next_comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	next_pid			)
+		__field( 	unsigned int,	next_policy		)
+		__field( 	int,	next_nice			)
+		__field( 	unsigned int,	next_rt_priority	)
+		__field( 	u64,	next_dl_runtime			)
+		__field( 	u64,	next_dl_deadline		)
+		__field( 	u64,	next_dl_period			)
+		__array(	char,	next_top_waiter_comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	next_top_waiter_pid		)
+	),
+
+	TP_fast_assign(
+		struct task_struct *prev_top = rt_mutex_get_top_task(prev);
+		struct task_struct *next_top = rt_mutex_get_top_task(next);
+
+		memcpy(__entry->prev_comm, prev->comm, TASK_COMM_LEN);
+		__entry->prev_pid		= prev->pid;
+		__entry->prev_state		= __trace_sched_switch_state(
+							preempt, prev);
+		__entry->prev_policy		= effective_policy(
+							prev->policy, prev->prio);
+		__entry->prev_nice		= task_nice(prev);
+		__entry->prev_rt_priority	= effective_rt_prio(
+							prev->prio);
+		__entry->prev_dl_runtime	= dl_prio(prev->prio) ?
+							prev->dl.dl_runtime : 0;
+		__entry->prev_dl_deadline	= dl_prio(prev->prio) ?
+							prev->dl.dl_deadline : 0;
+		__entry->prev_dl_period		= dl_prio(prev->prio) ?
+							prev->dl.dl_period : 0;
+		if (prev_top) {
+			memcpy(__entry->prev_top_waiter_comm, prev_top->comm,
+					TASK_COMM_LEN);
+			__entry->prev_top_waiter_pid	= prev_top->pid;
+		} else {
+			__entry->prev_top_waiter_comm[0] = '\0';
+			__entry->prev_top_waiter_pid	= -1;
+		}
+
+		memcpy(__entry->next_comm, next->comm, TASK_COMM_LEN);
+		__entry->next_pid		= next->pid;
+		__entry->next_policy		= effective_policy(
+							next->policy, prev->prio);
+		__entry->next_nice		= task_nice(next);
+		__entry->next_rt_priority	= effective_rt_prio(
+							next->prio);
+		__entry->next_dl_runtime	= dl_prio(next->prio) ?
+							next->dl.dl_runtime : 0;
+		__entry->next_dl_deadline	= dl_prio(next->prio) ?
+							next->dl.dl_deadline : 0;
+		__entry->next_dl_period		= dl_prio(next->prio) ?
+							next->dl.dl_period : 0;
+		if (next_top) {
+			memcpy(__entry->next_top_waiter_comm, next_top->comm,
+					TASK_COMM_LEN);
+			__entry->next_top_waiter_pid	= next_top->pid;
+		} else {
+			__entry->next_top_waiter_comm[0] = '\0';
+			__entry->next_top_waiter_pid	= -1;
+		}
+	),
+
+	TP_printk("prev_comm=%s, prev_pid=%d, prev_policy=%s, prev_nice=%d, "
+			"prev_rt_priority=%u, prev_dl_runtime=%Lu, "
+			"prev_dl_deadline=%Lu, prev_dl_period=%Lu, "
+			"prev_state=%s%s, prev_top_waiter_comm=%s, "
+			"prev_top_waiter_pid=%d ==> next_comm=%s, next_pid=%d, "
+			"next_policy=%s, next_nice=%d, next_rt_priority=%u, "
+			"next_dl_runtime=%Lu, next_dl_deadline=%Lu, "
+			"next_dl_period=%Lu, next_top_waiter_comm=%s, "
+			"next_top_waiter_pid=%d",
+		__entry->prev_comm, __entry->prev_pid,
+		__print_symbolic(__entry->prev_policy, SCHEDULING_POLICY),
+		__entry->prev_nice, __entry->prev_rt_priority,
+		__entry->prev_dl_runtime, __entry->prev_dl_deadline,
+		__entry->prev_dl_period,
+		__entry->prev_state & (TASK_STATE_MAX-1) ?
+		  __print_flags(__entry->prev_state & (TASK_STATE_MAX-1), "|",
+				{ 1, "S"} , { 2, "D" }, { 4, "T" }, { 8, "t" },
+				{ 16, "Z" }, { 32, "X" }, { 64, "x" },
+				{ 128, "K" }, { 256, "W" }, { 512, "P" },
+				{ 1024, "N" }) : "R",
+		__entry->prev_state & TASK_STATE_MAX ? "+" : "",
+		__entry->prev_top_waiter_comm, __entry->prev_top_waiter_pid,
+		__entry->next_comm, __entry->next_pid,
+		__print_symbolic(__entry->next_policy, SCHEDULING_POLICY),
+		__entry->next_nice, __entry->next_rt_priority,
+		__entry->next_dl_runtime, __entry->next_dl_deadline,
+		__entry->next_dl_period, __entry->next_top_waiter_comm,
+		__entry->next_top_waiter_pid)
 );
 
 /*
@@ -286,6 +459,55 @@ TRACE_EVENT(sched_process_fork,
 	TP_printk("comm=%s pid=%d child_comm=%s child_pid=%d",
 		__entry->parent_comm, __entry->parent_pid,
 		__entry->child_comm, __entry->child_pid)
+);
+
+TRACE_EVENT_MAP(sched_process_fork, sched_process_fork_prio,
+
+	TP_PROTO(struct task_struct *parent, struct task_struct *child),
+
+	TP_ARGS(parent, child),
+
+	TP_STRUCT__entry(
+		__array(	char,	parent_comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	parent_pid			)
+		__array(	char,	child_comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	child_pid			)
+		__field( 	unsigned int,	child_policy		)
+		__field( 	int,	child_nice			)
+		__field( 	unsigned int,	child_rt_priority	)
+		__field( 	u64,	child_dl_runtime		)
+		__field( 	u64,	child_dl_deadline		)
+		__field( 	u64,	child_dl_period			)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->parent_comm, parent->comm, TASK_COMM_LEN);
+		__entry->parent_pid	= parent->pid;
+		memcpy(__entry->child_comm, child->comm, TASK_COMM_LEN);
+		__entry->child_pid	= child->pid;
+		__entry->child_policy		= effective_policy(
+							child->policy, child->prio);
+		__entry->child_nice		= task_nice(child);
+		__entry->child_rt_priority	= effective_rt_prio(
+							child->prio);
+		__entry->child_dl_runtime	= dl_prio(child->prio) ?
+							child->dl.dl_runtime : 0;
+		__entry->child_dl_deadline	= dl_prio(child->prio) ?
+							child->dl.dl_deadline : 0;
+		__entry->child_dl_period	= dl_prio(child->prio) ?
+							child->dl.dl_period : 0;
+	),
+
+	TP_printk("comm=%s, pid=%d, child_comm=%s, child_pid=%d, "
+			"child_policy=%s, child_nice=%d, "
+			"child_rt_priority=%u, child_dl_runtime=%Lu, "
+			"child_dl_deadline=%Lu, child_dl_period=%Lu",
+		__entry->parent_comm, __entry->parent_pid,
+		__entry->child_comm, __entry->child_pid,
+		__print_symbolic(__entry->child_policy, SCHEDULING_POLICY),
+		__entry->child_nice, __entry->child_rt_priority,
+		__entry->child_dl_runtime, __entry->child_dl_deadline,
+		__entry->child_dl_period)
 );
 
 /*
