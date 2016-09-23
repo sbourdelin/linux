@@ -513,6 +513,8 @@ static int bq24190_register_reset(struct bq24190_dev_info *bdi)
 	int ret, limit = 100;
 	u8 v;
 
+	bdi->first_time = true;
+
 	/* Reset the registers */
 	ret = bq24190_write_mask(bdi, BQ24190_REG_POC,
 			BQ24190_REG_POC_RESET_MASK,
@@ -1375,7 +1377,6 @@ static int bq24190_probe(struct i2c_client *client,
 	bdi->model = id->driver_data;
 	strncpy(bdi->model_name, id->name, I2C_NAME_SIZE);
 	mutex_init(&bdi->f_reg_lock);
-	bdi->first_time = true;
 	bdi->charger_health_valid = false;
 	bdi->battery_health_valid = false;
 	bdi->battery_status_valid = false;
