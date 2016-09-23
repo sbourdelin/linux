@@ -8780,6 +8780,18 @@ static int perf_try_init_event(struct pmu *pmu, struct perf_event *event)
 	return ret;
 }
 
+/* call under pmus_srcu */
+static struct pmu *__perf_find_pmu(u32 type)
+{
+	struct pmu *pmu;
+
+	rcu_read_lock();
+	pmu = idr_find(&pmu_idr, type);
+	rcu_read_unlock();
+
+	return pmu;
+}
+
 static struct pmu *perf_init_event(struct perf_event *event)
 {
 	struct pmu *pmu = NULL;
@@ -8788,9 +8800,7 @@ static struct pmu *perf_init_event(struct perf_event *event)
 
 	idx = srcu_read_lock(&pmus_srcu);
 
-	rcu_read_lock();
-	pmu = idr_find(&pmu_idr, event->attr.type);
-	rcu_read_unlock();
+	pmu = __perf_find_pmu(event->attr.type);
 	if (pmu) {
 		ret = perf_try_init_event(pmu, event);
 		if (ret)
