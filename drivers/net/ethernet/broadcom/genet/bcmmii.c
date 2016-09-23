@@ -183,9 +183,9 @@ void bcmgenet_mii_reset(struct net_device *dev)
 	if (GENET_IS_V4(priv))
 		return;
 
-	if (dev->phydev) {
-		phy_init_hw(dev->phydev);
-		phy_start_aneg(dev->phydev);
+	if (priv->phydev) {
+		phy_init_hw(priv->phydev);
+		phy_start_aneg(priv->phydev);
 	}
 }
 
@@ -382,6 +382,8 @@ int bcmgenet_mii_probe(struct net_device *dev)
 			return -ENODEV;
 		}
 	}
+
+	priv->phydev = phydev;
 
 	/* Configure port multiplexer based on what the probed PHY device since
 	 * reading the 'max-speed' property determines the maximum supported
@@ -605,6 +607,7 @@ static int bcmgenet_mii_pd_init(struct bcmgenet_priv *priv)
 
 	}
 
+	priv->phydev = phydev;
 	priv->phy_interface = pd->phy_interface;
 
 	return 0;
