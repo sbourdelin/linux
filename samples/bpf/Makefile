@@ -74,6 +74,7 @@ always += parse_varlen.o parse_simple.o parse_ldabs.o
 always += test_cgrp2_tc_kern.o
 always += xdp1_kern.o
 always += xdp2_kern.o
+always += ilarouter_tc.o
 
 HOSTCFLAGS += -I$(objtree)/usr/include
 
