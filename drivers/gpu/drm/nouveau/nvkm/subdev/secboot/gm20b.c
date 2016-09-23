@@ -142,7 +142,7 @@ gm20b_tegra_read_wpr(struct gm200_secboot *gsb)
 	mc = ioremap(TEGRA_MC_BASE, 0xd00);
 	if (!mc) {
 		nvkm_error(&sb->subdev, "Cannot map Tegra MC registers\n");
-		return PTR_ERR(mc);
+		return -ENOMEM;
 	}
 	gsb->wpr_addr = ioread32_native(mc + MC_SECURITY_CARVEOUT2_BOM_0) |
 	      ((u64)ioread32_native(mc + MC_SECURITY_CARVEOUT2_BOM_HI_0) << 32);
