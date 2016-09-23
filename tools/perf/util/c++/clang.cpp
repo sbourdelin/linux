@@ -15,6 +15,11 @@
 #include "clang/CodeGen/CodeGenAction.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include <memory>
 
 #include "clang.h"
@@ -101,6 +106,48 @@ getModuleFromSource(llvm::opt::ArgStringList CFlags, StringRef Path)
 {
 	IntrusiveRefCntPtr<vfs::FileSystem> VFS(vfs::getRealFileSystem());
 	return getModuleFromSource(std::move(CFlags), Path, VFS);
+}
+
+std::unique_ptr<llvm::SmallVectorImpl<char>>
+getBPFObjectFromModule(llvm::Module *Module)
+{
+	using namespace llvm;
+
+	LLVMInitializeBPFTargetInfo();
+	LLVMInitializeBPFTarget();
+	LLVMInitializeBPFTargetMC();
+	LLVMInitializeBPFAsmPrinter();
+
+	std::string TargetTriple("bpf-pc-linux");
+	std::string Error;
+	const Target* Target = TargetRegistry::lookupTarget(TargetTriple, Error);
+	if (!Target) {
+		llvm::errs() << Error;
+		return std::unique_ptr<llvm::SmallVectorImpl<char>>(nullptr);
+	}
+
+	llvm::TargetOptions Opt;
+	Optional<Reloc::Model> RM = Optional<Reloc::Model>();
+	TargetMachine *TargetMachine =
+		Target->createTargetMachine(TargetTriple,
+					    "generic", "",
+					    Opt, RM);
+
+	Module->setDataLayout(TargetMachine->createDataLayout());
+	Module->setTargetTriple(TargetTriple);
+
+	std::unique_ptr<SmallVectorImpl<char>> Buffer(new SmallVector<char, 0>());
+	raw_svector_ostream ostream(*Buffer);
+
+	legacy::PassManager PM;
+	if (TargetMachine->addPassesToEmitFile(PM, ostream,
+					       TargetMachine::CGFT_ObjectFile)) {
+		llvm::errs() << "TargetMachine can't emit a file of this type\n";
+		return std::unique_ptr<llvm::SmallVectorImpl<char>>(nullptr);;
+	}
+	PM.run(*Module);
+
+	return std::move(Buffer);
 }
 
 }
