@@ -3071,6 +3071,7 @@ static int kvm_vcpu_ioctl_x86_set_vcpu_events(struct kvm_vcpu *vcpu,
 			else
 				clear_bit(KVM_APIC_INIT, &vcpu->arch.apic->pending_events);
 		}
+		kvm_mmu_reset_context(vcpu);
 	}
 
 	kvm_make_request(KVM_REQ_EVENT, vcpu);
