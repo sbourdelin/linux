@@ -1257,7 +1257,7 @@ void prism2sta_processing_defer(struct work_struct *data)
 			}
 			prism2mgmt_bytestr2pstr(
 					(struct hfa384x_bytestr *) &ssid,
-					(p80211pstrd_t *) &wlandev->ssid);
+					(struct p80211pstrd *)&wlandev->ssid);
 
 			/* Collect the port status */
 			result = hfa384x_drvr_getconfig16(hw,
@@ -1338,7 +1338,7 @@ void prism2sta_processing_defer(struct work_struct *data)
 			return;
 		}
 		prism2mgmt_bytestr2pstr((struct hfa384x_bytestr *) &ssid,
-					(p80211pstrd_t *) &wlandev->ssid);
+					(struct p80211pstrd *)&wlandev->ssid);
 
 		hw->link_status = HFA384x_LINK_CONNECTED;
 		netif_carrier_on(wlandev->netdev);
@@ -1917,7 +1917,7 @@ void prism2sta_commsqual_defer(struct work_struct *data)
 	struct wlandevice *wlandev = hw->wlandev;
 	hfa384x_bytestr32_t ssid;
 	struct p80211msg_dot11req_mibget msg;
-	p80211item_uint32_t *mibitem = (p80211item_uint32_t *)
+	struct p80211item_uint32 *mibitem = (struct p80211item_uint32 *)
 						&msg.mibattribute.data;
 	int result = 0;
 
@@ -1994,7 +1994,7 @@ void prism2sta_commsqual_defer(struct work_struct *data)
 		return;
 	}
 	prism2mgmt_bytestr2pstr((struct hfa384x_bytestr *) &ssid,
-				(p80211pstrd_t *) &wlandev->ssid);
+				(struct p80211pstrd *)&wlandev->ssid);
 
 	/* Reschedule timer */
 	mod_timer(&hw->commsqual_timer, jiffies + HZ);
