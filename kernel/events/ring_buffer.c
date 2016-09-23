@@ -578,6 +578,40 @@ void ring_buffer_unaccount(struct ring_buffer *rb, bool aux)
 	free_uid(rb->mmap_user);
 }
 
+/*
+ * Copy out AUX data from a ring_buffer using a supplied callback.
+ */
+long rb_output_aux(struct ring_buffer *rb, unsigned long from,
+		   unsigned long to, aux_copyfn copyfn, void *data)
+{
+	unsigned long tocopy, remainder, len = 0;
+	void *addr;
+
+	from &= (rb->aux_nr_pages << PAGE_SHIFT) - 1;
+	to &= (rb->aux_nr_pages << PAGE_SHIFT) - 1;
+
+	do {
+		tocopy = PAGE_SIZE - offset_in_page(from);
+		if (to > from)
+			tocopy = min(tocopy, to - from);
+		if (!tocopy)
+			break;
+
+		addr = rb->aux_pages[from >> PAGE_SHIFT];
+		addr += offset_in_page(from);
+
+		remainder = copyfn(data, addr, tocopy);
+		if (remainder)
+			return -EFAULT;
+
+		len += tocopy;
+		from += tocopy;
+		from &= (rb->aux_nr_pages << PAGE_SHIFT) - 1;
+	} while (to != from);
+
+	return len;
+}
+
 #define PERF_AUX_GFP	(GFP_KERNEL | __GFP_ZERO | __GFP_NOWARN | __GFP_NORETRY)
 
 static struct page *rb_alloc_aux_page(int node, int order)
@@ -747,6 +781,55 @@ void rb_free_aux(struct ring_buffer *rb)
 
 		__rb_free_aux(rb);
 	}
+}
+
+/*
+ * Allocate a ring_buffer for a kernel event and attach it to this event.
+ * This ring_buffer will not participate in mmap operations and set_output,
+ * so ring_buffer_attach() and related complications do not apply.
+ */
+int rb_alloc_kernel(struct perf_event *event, int nr_pages, int aux_nr_pages)
+{
+	struct ring_buffer *rb;
+	int ret, pgoff = nr_pages + 1;
+
+	/*
+	 * Use overwrite mode (!RING_BUFFER_WRITABLE) for both data and aux
+	 * areas as we don't want wakeups or interrupts.
+	 */
+	rb = rb_alloc(NULL, nr_pages, 0, event->cpu, 0);
+	if (IS_ERR(rb))
+		return PTR_ERR(rb);
+
+	ret = rb_alloc_aux(rb, event, pgoff, aux_nr_pages, 0, 0);
+	if (ret) {
+		rb_free(rb);
+		return ret;
+	}
+
+	/*
+	 * These buffers never get mmapped; so the only use of the
+	 * aux_mmap_count is to enable AUX transactions
+	 * (see perf_aux_output_begin()).
+	 */
+	atomic_set(&rb->aux_mmap_count, 1);
+
+	/*
+	 * Kernel counters don't need ring buffer wakeups, therefore we don't
+	 * use ring_buffer_attach() here and event->rb_entry stays empty.
+	 */
+	rcu_assign_pointer(event->rb, rb);
+
+	return 0;
+}
+
+void rb_free_kernel(struct ring_buffer *rb, struct perf_event *event)
+{
+	WARN_ON_ONCE(atomic_read(&rb->refcount) != 1);
+	atomic_set(&rb->aux_mmap_count, 0);
+	rcu_assign_pointer(event->rb, NULL);
+	rb_free_aux(rb);
+	rb_free(rb);
 }
 
 #ifndef CONFIG_PERF_USE_VMALLOC
