@@ -3142,7 +3142,7 @@ enqueue_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *se)
 	int migrated, decayed;
 
 	migrated = !sa->last_update_time;
-	if (!migrated) {
+	if (!migrated && se->sum_exec_runtime) {
 		__update_load_avg(now, cpu_of(rq_of(cfs_rq)), sa,
 			se->on_rq * scale_load_down(se->load.weight),
 			cfs_rq->curr == se, NULL);
