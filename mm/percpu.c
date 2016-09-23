@@ -1824,23 +1824,25 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 	max_upa = upa;
 
 	/* group cpus according to their proximity */
-	for_each_possible_cpu(cpu) {
-		group = 0;
-	next_group:
+	group = 0;
+	for_each_possible_cpu(cpu)
 		for_each_possible_cpu(tcpu) {
-			if (cpu == tcpu)
-				break;
-			if (group_map[tcpu] == group && cpu_distance_fn &&
-			    (cpu_distance_fn(cpu, tcpu) > LOCAL_DISTANCE ||
-			     cpu_distance_fn(tcpu, cpu) > LOCAL_DISTANCE)) {
+			if (tcpu == cpu) {
+				group_map[cpu] = group;
+				group_cnt[group] = 1;
 				group++;
-				nr_groups = max(nr_groups, group + 1);
-				goto next_group;
+				break;
+			}
+
+			if (!cpu_distance_fn ||
+			    (cpu_distance_fn(cpu, tcpu) == LOCAL_DISTANCE &&
+			     cpu_distance_fn(tcpu, cpu) == LOCAL_DISTANCE)) {
+				group_map[cpu] = group_map[tcpu];
+				group_cnt[group_map[cpu]]++;
+				break;
 			}
 		}
-		group_map[cpu] = group;
-		group_cnt[group]++;
-	}
+	nr_groups = group;
 
 	/*
 	 * Expand unit size until address space usage goes over 75%
