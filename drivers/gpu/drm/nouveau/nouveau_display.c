@@ -851,8 +851,7 @@ nouveau_finish_page_flip(struct nouveau_channel *chan,
 			/* Give up ownership of vblank for page-flipped crtc */
 			drm_crtc_vblank_put(s->crtc);
 		}
-	}
-	else {
+	} else {
 		/* Give up ownership of vblank for page-flipped crtc */
 		drm_crtc_vblank_put(s->crtc);
 	}
