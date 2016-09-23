@@ -937,6 +937,9 @@ int acpi_dev_get_property(struct acpi_device *adev, const char *name,
 int acpi_node_get_property_reference(struct fwnode_handle *fwnode,
 				     const char *name, size_t index,
 				     struct acpi_reference_args *args);
+int acpi_node_get_property_reference_fixed_args(struct fwnode_handle *fwnode,
+				const char *name, size_t index, size_t num_args,
+				struct acpi_reference_args *args);
 
 int acpi_node_prop_get(struct fwnode_handle *fwnode, const char *propname,
 		       void **valptr);
