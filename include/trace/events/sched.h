@@ -658,6 +658,102 @@ TRACE_EVENT(sched_pi_setprio,
 			__entry->oldprio, __entry->newprio)
 );
 
+/*
+ * Extract the complete scheduling information from the before
+ * and after the change of priority.
+ */
+TRACE_EVENT_MAP(sched_pi_setprio, sched_pi_update_prio,
+
+	TP_PROTO(struct task_struct *tsk, int newprio),
+
+	TP_ARGS(tsk, newprio),
+
+	TP_STRUCT__entry(
+		__array( char,	comm,	TASK_COMM_LEN	)
+		__field( pid_t,	pid			)
+		__field( unsigned int,	old_policy	)
+		__field( int,	old_nice		)
+		__field( unsigned int,	old_rt_priority	)
+		__field( u64,	old_dl_runtime		)
+		__field( u64,	old_dl_deadline		)
+		__field( u64,	old_dl_period		)
+		__array( char,	top_waiter_comm,	TASK_COMM_LEN	)
+		__field( pid_t,	top_waiter_pid		)
+		__field( unsigned int,	new_policy	)
+		__field( int,	new_nice		)
+		__field( unsigned int,	new_rt_priority	)
+		__field( u64,	new_dl_runtime		)
+		__field( u64,	new_dl_deadline		)
+		__field( u64,	new_dl_period		)
+	),
+
+	TP_fast_assign(
+		struct task_struct *top_waiter = rt_mutex_get_top_task(tsk);
+
+		memcpy(__entry->comm, tsk->comm, TASK_COMM_LEN);
+		__entry->pid			= tsk->pid;
+		__entry->old_policy		= effective_policy(
+							tsk->policy, tsk->prio);
+		__entry->old_nice		= task_nice(tsk);
+		__entry->old_rt_priority	= effective_rt_prio(
+							tsk->prio);
+		__entry->old_dl_runtime	= dl_prio(tsk->prio) ?
+							tsk->dl.dl_runtime : 0;
+		__entry->old_dl_deadline	= dl_prio(tsk->prio) ?
+							tsk->dl.dl_deadline : 0;
+		__entry->old_dl_period		= dl_prio(tsk->prio) ?
+							tsk->dl.dl_period : 0;
+		if (top_waiter) {
+			memcpy(__entry->top_waiter_comm, top_waiter->comm, TASK_COMM_LEN);
+			__entry->top_waiter_pid		= top_waiter->pid;
+			/*
+			 * The effective policy depends on the current policy of
+			 * the target task.
+			 */
+			__entry->new_policy		= effective_policy(
+								tsk->policy, top_waiter->prio);
+			__entry->new_nice		= task_nice(top_waiter);
+			__entry->new_rt_priority	= effective_rt_prio(
+								top_waiter->prio);
+			__entry->new_dl_runtime	= dl_prio(top_waiter->prio) ?
+								top_waiter->dl.dl_runtime : 0;
+			__entry->new_dl_deadline	= dl_prio(top_waiter->prio) ?
+								top_waiter->dl.dl_deadline : 0;
+			__entry->new_dl_period	= dl_prio(top_waiter->prio) ?
+								top_waiter->dl.dl_period : 0;
+		} else {
+			__entry->top_waiter_comm[0]	= '\0';
+			__entry->top_waiter_pid		= -1;
+			__entry->new_policy		= 0;
+			__entry->new_nice		= 0;
+			__entry->new_rt_priority	= 0;
+			__entry->new_dl_runtime	= 0;
+			__entry->new_dl_deadline	= 0;
+			__entry->new_dl_period	= 0;
+		}
+	),
+
+	TP_printk("comm=%s, pid=%d, old_policy=%s, old_nice=%d, "
+			"old_rt_priority=%u, old_dl_runtime=%Lu, "
+			"old_dl_deadline=%Lu, old_dl_period=%Lu, "
+			"top_waiter_comm=%s, top_waiter_pid=%d, new_policy=%s, "
+			"new_nice=%d, new_rt_priority=%u, "
+			"new_dl_runtime=%Lu, new_dl_deadline=%Lu, "
+			"new_dl_period=%Lu",
+		__entry->comm, __entry->pid,
+		__print_symbolic(__entry->old_policy, SCHEDULING_POLICY),
+		__entry->old_nice, __entry->old_rt_priority,
+		__entry->old_dl_runtime, __entry->old_dl_deadline,
+		__entry->old_dl_period,
+		__entry->top_waiter_comm, __entry->top_waiter_pid,
+		__entry->new_policy >= 0 ?
+			__print_symbolic(__entry->new_policy,
+				SCHEDULING_POLICY) : "",
+		__entry->new_nice, __entry->new_rt_priority,
+		__entry->new_dl_runtime, __entry->new_dl_deadline,
+		__entry->new_dl_period)
+);
+
 #ifdef CONFIG_DETECT_HUNG_TASK
 TRACE_EVENT(sched_process_hang,
 	TP_PROTO(struct task_struct *tsk),
