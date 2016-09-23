@@ -3509,6 +3509,8 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	enum compact_result compact_result;
 	int compaction_retries = 0;
 	int no_progress_loops = 0;
+	unsigned long alloc_start = jiffies;
+	unsigned int stall_timeout = 10 * HZ;
 
 	/*
 	 * In the slowpath, we sanity check order to avoid ever trying to
@@ -3682,6 +3684,15 @@ retry:
 		no_progress_loops = 0;
 	else
 		no_progress_loops++;
+
+	/* Make sure we know about allocations which stall for too long */
+	if (!(gfp_mask & __GFP_NOWARN) && time_after(jiffies, alloc_start + stall_timeout)) {
+		pr_warn("%s: page alloction stalls for %ums: order:%u mode:%#x(%pGg)\n",
+				current->comm, jiffies_to_msecs(jiffies-alloc_start),
+				order, gfp_mask, &gfp_mask);
+		stall_timeout += 10 * HZ;
+		dump_stack();
+	}
 
 	if (should_reclaim_retry(gfp_mask, order, ac, alloc_flags,
 				 did_some_progress > 0, no_progress_loops))
