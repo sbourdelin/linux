@@ -256,7 +256,7 @@ static noinline int i2cdev_ioctl_rdwr(struct i2c_client *client,
 		return -EINVAL;
 
 	rdwr_pa = memdup_user(rdwr_arg.msgs,
-			      rdwr_arg.nmsgs * sizeof(struct i2c_msg));
+			      rdwr_arg.nmsgs * sizeof(*rdwr_pa));
 	if (IS_ERR(rdwr_pa))
 		return PTR_ERR(rdwr_pa);
 
