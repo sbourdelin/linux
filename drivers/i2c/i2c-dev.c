@@ -555,7 +555,7 @@ static int i2cdev_attach_adapter(struct device *dev, void *dummy)
 	i2c_dev->cdev.owner = THIS_MODULE;
 	res = cdev_add(&i2c_dev->cdev, MKDEV(I2C_MAJOR, adap->nr), 1);
 	if (res)
-		goto error_cdev;
+		goto put_i2c;
 
 	/* register this i2c device with the driver core */
 	i2c_dev->dev = device_create(i2c_dev_class, &adap->dev,
@@ -563,15 +563,15 @@ static int i2cdev_attach_adapter(struct device *dev, void *dummy)
 				     "i2c-%d", adap->nr);
 	if (IS_ERR(i2c_dev->dev)) {
 		res = PTR_ERR(i2c_dev->dev);
-		goto error;
+		goto delete_cdev;
 	}
 
 	pr_debug("i2c-dev: adapter [%s] registered as minor %d\n",
 		 adap->name, adap->nr);
 	return 0;
-error:
+delete_cdev:
 	cdev_del(&i2c_dev->cdev);
-error_cdev:
+put_i2c:
 	put_i2c_dev(i2c_dev);
 	return res;
 }
