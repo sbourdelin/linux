@@ -27,7 +27,8 @@ static std::unique_ptr<llvm::LLVMContext> LLVMCtx;
 using namespace clang;
 
 static CompilerInvocation *
-createCompilerInvocation(StringRef& Path, DiagnosticsEngine& Diags)
+createCompilerInvocation(llvm::opt::ArgStringList CFlags, StringRef& Path,
+			 DiagnosticsEngine& Diags)
 {
 	llvm::opt::ArgStringList CCArgs {
 		"-cc1",
@@ -43,6 +44,8 @@ createCompilerInvocation(StringRef& Path, DiagnosticsEngine& Diags)
 		"-Wno-unused-value",
 		"-Wno-pointer-sign",
 		"-x", "c"};
+
+	CCArgs.append(CFlags.begin(), CFlags.end());
 	CompilerInvocation *CI = tooling::newInvocation(&Diags, CCArgs);
 
 	FrontendOptions& Opts = CI->getFrontendOpts();
@@ -52,8 +55,8 @@ createCompilerInvocation(StringRef& Path, DiagnosticsEngine& Diags)
 }
 
 static std::unique_ptr<llvm::Module>
-getModuleFromSource(StringRef Path,
-		    IntrusiveRefCntPtr<vfs::FileSystem> VFS)
+getModuleFromSource(llvm::opt::ArgStringList CFlags,
+		    StringRef Path, IntrusiveRefCntPtr<vfs::FileSystem> VFS)
 {
 	CompilerInstance Clang;
 	Clang.createDiagnostics();
@@ -61,7 +64,8 @@ getModuleFromSource(StringRef Path,
 	Clang.setVirtualFileSystem(&*VFS);
 
 	IntrusiveRefCntPtr<CompilerInvocation> CI =
-		createCompilerInvocation(Path, Clang.getDiagnostics());
+		createCompilerInvocation(std::move(CFlags), Path,
+					 Clang.getDiagnostics());
 	Clang.setInvocation(&*CI);
 
 	std::unique_ptr<CodeGenAction> Act(new EmitLLVMOnlyAction(&*LLVMCtx));
@@ -72,7 +76,8 @@ getModuleFromSource(StringRef Path,
 }
 
 std::unique_ptr<llvm::Module>
-getModuleFromSource(StringRef Name, StringRef Content)
+getModuleFromSource(llvm::opt::ArgStringList CFlags,
+		    StringRef Name, StringRef Content)
 {
 	using namespace vfs;
 
@@ -88,14 +93,14 @@ getModuleFromSource(StringRef Name, StringRef Content)
 	OverlayFS->pushOverlay(MemFS);
 	MemFS->addFile(Twine(Name), 0, llvm::MemoryBuffer::getMemBuffer(Content));
 
-	return getModuleFromSource(Name, OverlayFS);
+	return getModuleFromSource(std::move(CFlags), Name, OverlayFS);
 }
 
 std::unique_ptr<llvm::Module>
-getModuleFromSource(StringRef Path)
+getModuleFromSource(llvm::opt::ArgStringList CFlags, StringRef Path)
 {
 	IntrusiveRefCntPtr<vfs::FileSystem> VFS(vfs::getRealFileSystem());
-	return getModuleFromSource(Path, VFS);
+	return getModuleFromSource(std::move(CFlags), Path, VFS);
 }
 
 }
