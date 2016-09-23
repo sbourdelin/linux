@@ -8,6 +8,34 @@
 #include <linux/tracepoint.h>
 #include <linux/binfmts.h>
 
+#define SCHEDULING_POLICY				\
+	EM( SCHED_NORMAL,	"SCHED_NORMAL")		\
+	EM( SCHED_FIFO,		"SCHED_FIFO")		\
+	EM( SCHED_RR,		"SCHED_RR")		\
+	EM( SCHED_BATCH,	"SCHED_BATCH")		\
+	EM( SCHED_IDLE,		"SCHED_IDLE")		\
+	EMe(SCHED_DEADLINE,	"SCHED_DEADLINE")
+
+/*
+ * First define the enums in the above macros to be exported to userspace
+ * via TRACE_DEFINE_ENUM().
+ */
+#undef EM
+#undef EMe
+#define EM(a, b)	TRACE_DEFINE_ENUM(a);
+#define EMe(a, b)	TRACE_DEFINE_ENUM(a);
+
+SCHEDULING_POLICY
+
+/*
+ * Now redefine the EM() and EMe() macros to map the enums to the strings
+ * that will be printed in the output.
+ */
+#undef EM
+#undef EMe
+#define EM(a, b)	{a, b},
+#define EMe(a, b)	{a, b}
+
 /*
  * Tracepoint for calling kthread_stop, performed to end a kthread:
  */
@@ -879,6 +907,46 @@ TRACE_EVENT(sched_wake_idle_without_ipi,
 	),
 
 	TP_printk("cpu=%d", __entry->cpu)
+);
+
+/*
+ * Tracepoint for showing scheduling priority changes.
+ */
+TRACE_EVENT(sched_update_prio,
+
+	TP_PROTO(struct task_struct *tsk),
+
+	TP_ARGS(tsk),
+
+	TP_STRUCT__entry(
+		__array( char,	comm,	TASK_COMM_LEN	)
+		__field( pid_t,	pid			)
+		__field( unsigned int,	policy		)
+		__field( int,	nice			)
+		__field( unsigned int,	rt_priority	)
+		__field( u64,	dl_runtime		)
+		__field( u64,	dl_deadline		)
+		__field( u64,	dl_period		)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->comm, tsk->comm, TASK_COMM_LEN);
+		__entry->pid		= tsk->pid;
+		__entry->policy		= tsk->policy;
+		__entry->nice		= task_nice(tsk);
+		__entry->rt_priority	= tsk->rt_priority;
+		__entry->dl_runtime	= tsk->dl.dl_runtime;
+		__entry->dl_deadline	= tsk->dl.dl_deadline;
+		__entry->dl_period	= tsk->dl.dl_period;
+	),
+
+	TP_printk("comm=%s pid=%d, policy=%s, nice=%d, rt_priority=%u, "
+			"dl_runtime=%Lu, dl_deadline=%Lu, dl_period=%Lu",
+			__entry->comm, __entry->pid,
+			__print_symbolic(__entry->policy, SCHEDULING_POLICY),
+			__entry->nice, __entry->rt_priority,
+			__entry->dl_runtime, __entry->dl_deadline,
+			__entry->dl_period)
 );
 #endif /* _TRACE_SCHED_H */
 
