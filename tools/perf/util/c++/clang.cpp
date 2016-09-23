@@ -26,6 +26,8 @@
 
 #include "clang.h"
 #include "clang-c.h"
+#include "llvm-utils-cxx.h"
+#include "util-cxx.h"
 
 namespace perf {
 
@@ -152,6 +154,72 @@ getBPFObjectFromModule(llvm::Module *Module)
 	return std::move(Buffer);
 }
 
+class ClangOptions {
+	llvm::SmallString<PATH_MAX> FileName;
+	char *kbuild_dir;
+	char *kbuild_include_opts;
+	llvm::SmallString<64> kernel_ver_def;
+public:
+	ClangOptions(const char *filename) : FileName(filename),
+					     kbuild_dir(NULL),
+					     kbuild_include_opts(NULL),
+					     kernel_ver_def("")
+	{
+		llvm::sys::fs::make_absolute(FileName);
+
+		unsigned int kernel_ver;
+		if (!fetch_kernel_version(&kernel_ver, NULL, 0))
+			kernel_ver_def = "-DLINUX_VERSION_CODE=" + std::to_string(kernel_ver);
+
+		llvm__get_kbuild_opts(&kbuild_dir, &kbuild_include_opts);
+		if (!kbuild_dir || !kbuild_include_opts) {
+			free(kbuild_dir);
+			free(kbuild_include_opts);
+			kbuild_dir = kbuild_include_opts = NULL;
+		}
+	}
+
+	~ClangOptions()
+	{
+		free(kbuild_dir);
+		free(kbuild_include_opts);
+	}
+
+	void getCFlags(opt::ArgStringList &CFlags)
+	{
+		CFlags.push_back(kernel_ver_def.c_str());
+
+		if (!kbuild_dir || !kbuild_include_opts)
+			return;
+		CFlags.push_back("-working-directory");
+		CFlags.push_back(kbuild_dir);
+
+		SmallVector<StringRef, 0> Terms;
+		StringRef Opts(kbuild_include_opts);
+		Opts.split(Terms, ' ');
+
+		for (auto i = Terms.begin(); i != Terms.end(); i++)
+			kbuild_include_opts[i->end() - Opts.begin()] = '\0';
+
+		for (auto i = Terms.begin(); i != Terms.end(); i++) {
+			if (i->startswith("-I"))
+				CFlags.push_back(i->begin());
+			else if (*i == "-include") {
+				CFlags.push_back((i++)->begin());
+				/* Let clang report this error */
+				if (i == Terms.end())
+					break;
+				CFlags.push_back(i->begin());
+			}
+		}
+	}
+
+	const char *getFileName(void)
+	{
+		return FileName.c_str();
+	}
+};
+
 }
 
 extern "C" {
@@ -175,11 +243,11 @@ int perf_clang__compile_bpf(const char *_filename,
 	if (!p_obj_buf || !p_obj_buf_sz)
 		return -EINVAL;
 
-	llvm::SmallString<PATH_MAX> FileName(_filename);
-	llvm::sys::fs::make_absolute(FileName);
-
+	ClangOptions Opts(_filename);
 	llvm::opt::ArgStringList CFlags;
-	auto M = getModuleFromSource(std::move(CFlags), FileName.data());
+
+	Opts.getCFlags(CFlags);
+	auto M = getModuleFromSource(std::move(CFlags), Opts.getFileName());
 	if (!M)
 		return  -EINVAL;
 	auto O = getBPFObjectFromModule(&*M);
