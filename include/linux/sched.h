@@ -2576,6 +2576,8 @@ union thread_union {
 	struct thread_info thread_info;
 	unsigned long stack[THREAD_SIZE/sizeof(long)];
 };
+extern int effective_policy(int policy, int prio);
+extern int effective_rt_prio(int prio);
 
 #ifndef __HAVE_ARCH_KSTACK_END
 static inline int kstack_end(void *addr)
