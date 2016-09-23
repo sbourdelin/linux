@@ -112,6 +112,20 @@ static void ondemand_powersave_bias_init(struct cpufreq_policy *policy)
 	dbs_info->freq_lo = 0;
 }
 
+/*
+ * Calculate the next frequency proportional to load
+ */
+static unsigned int generic_map_load_to_freq(struct cpufreq_policy *policy,
+					unsigned int load)
+{
+	unsigned int min_f, max_f;
+
+	min_f = policy->cpuinfo.min_freq;
+	max_f = policy->cpuinfo.max_freq;
+
+	return (min_f + load * (max_f - min_f) / 100);
+}
+
 static void dbs_freq_increase(struct cpufreq_policy *policy, unsigned int freq)
 {
 	struct policy_dbs_info *policy_dbs = policy->governor_data;
@@ -150,12 +164,9 @@ static void od_update(struct cpufreq_policy *policy)
 			policy_dbs->rate_mult = dbs_data->sampling_down_factor;
 		dbs_freq_increase(policy, policy->max);
 	} else {
-		/* Calculate the next frequency proportional to load */
-		unsigned int freq_next, min_f, max_f;
+		unsigned int freq_next;
 
-		min_f = policy->cpuinfo.min_freq;
-		max_f = policy->cpuinfo.max_freq;
-		freq_next = min_f + load * (max_f - min_f) / 100;
+		freq_next = od_ops.map_load_to_freq(policy, load);
 
 		/* No longer fully busy, reset rate_mult */
 		policy_dbs->rate_mult = 1;
@@ -410,6 +421,7 @@ static void od_start(struct cpufreq_policy *policy)
 
 static struct od_ops od_ops = {
 	.powersave_bias_target = generic_powersave_bias_target,
+	.map_load_to_freq = generic_map_load_to_freq,
 };
 
 static struct dbs_governor od_dbs_gov = {
@@ -475,6 +487,19 @@ void od_unregister_powersave_bias_handler(void)
 	od_set_powersave_bias(0);
 }
 EXPORT_SYMBOL_GPL(od_unregister_powersave_bias_handler);
+
+void od_register_map_load_to_freq_handler(unsigned int (*f)
+					(struct cpufreq_policy *, unsigned int))
+{
+	od_ops.map_load_to_freq = f;
+}
+EXPORT_SYMBOL_GPL(od_register_map_load_to_freq_handler);
+
+void od_unregister_map_load_to_freq_handler(void)
+{
+	od_ops.map_load_to_freq = generic_map_load_to_freq;
+}
+EXPORT_SYMBOL_GPL(od_unregister_map_load_to_freq_handler);
 
 static int __init cpufreq_gov_dbs_init(void)
 {
