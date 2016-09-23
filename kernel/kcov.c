@@ -54,7 +54,8 @@ void notrace __sanitizer_cov_trace_pc(void)
 	 * We are interested in code coverage as a function of a syscall inputs,
 	 * so we ignore code executed in interrupts.
 	 */
-	if (!t || in_interrupt())
+	if (!t || (preempt_count() & (HARDIRQ_MASK | SOFTIRQ_OFFSET
+							| NMI_MASK)))
 		return;
 	mode = READ_ONCE(t->kcov_mode);
 	if (mode == KCOV_MODE_TRACE) {
