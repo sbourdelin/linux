@@ -47,6 +47,7 @@ enum {
 	FAULT_DIR_DEPTH,
 	FAULT_EVICT_INODE,
 	FAULT_IO,
+	FAULT_CHECKPOINT,
 	FAULT_MAX,
 };
 
@@ -79,6 +80,8 @@ static inline bool time_to_inject(int type)
 	else if (type == FAULT_EVICT_INODE && !IS_FAULT_SET(type))
 		return false;
 	else if (type == FAULT_IO && !IS_FAULT_SET(type))
+		return false;
+	else if (type == FAULT_CHECKPOINT && !IS_FAULT_SET(type))
 		return false;
 
 	atomic_inc(&f2fs_fault.inject_ops);
@@ -1853,6 +1856,10 @@ static inline int f2fs_readonly(struct super_block *sb)
 
 static inline bool f2fs_cp_error(struct f2fs_sb_info *sbi)
 {
+#ifdef CONFIG_F2FS_FAULT_INJECTION
+	if (time_to_inject(FAULT_CHECKPOINT))
+		return true;
+#endif
 	return is_set_ckpt_flags(sbi, CP_ERROR_FLAG);
 }
 
