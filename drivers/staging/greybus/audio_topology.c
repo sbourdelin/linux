@@ -171,6 +171,9 @@ static int gbcodec_mixer_ctl_info(struct snd_kcontrol *kcontrol,
 	data = (struct gbaudio_ctl_pvt *)kcontrol->private_value;
 	info = (struct gb_audio_ctl_elem_info *)data->info;
 
+	module = find_gb_module(gbcodec, kcontrol->id.name);
+	if (!module)
+		return -EINVAL;
 	if (!info) {
 		dev_err(module->dev, "NULL info for %s\n", uinfo->id.name);
 		return -EINVAL;
@@ -192,9 +195,6 @@ static int gbcodec_mixer_ctl_info(struct snd_kcontrol *kcontrol,
 		uinfo->value.enumerated.items = max;
 		if (uinfo->value.enumerated.item > max - 1)
 			uinfo->value.enumerated.item = max - 1;
-		module = find_gb_module(gbcodec, kcontrol->id.name);
-		if (!module)
-			return -EINVAL;
 		name = gbaudio_map_controlid(module, data->ctl_id,
 					     uinfo->value.enumerated.item);
 		strlcpy(uinfo->value.enumerated.name, name, NAME_SIZE);
