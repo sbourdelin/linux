@@ -50,4 +50,7 @@ int llvm__compile_bpf(const char *path, void **p_obj_buf, size_t *p_obj_buf_sz);
 
 /* This function is for test__llvm() use only */
 int llvm__search_clang(void);
+
+/* This function is reused by builtin clang support */
+void llvm__get_kbuild_opts(char **kbuild_dir, char **kbuild_include_opts);
 #endif
