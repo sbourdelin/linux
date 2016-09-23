@@ -117,7 +117,7 @@ struct bio {
  * Flags starting here get preserved by bio_reset() - this includes
  * BVEC_POOL_IDX()
  */
-#define BIO_RESET_BITS	10
+#define BIO_RESET_BITS	9
 
 /*
  * We support 6 different bvec pools, the last one is magic in that it
