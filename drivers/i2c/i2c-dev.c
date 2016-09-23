@@ -147,7 +147,7 @@ static ssize_t i2cdev_read(struct file *file, char __user *buf, size_t count,
 		count = 8192;
 
 	tmp = kmalloc(count, GFP_KERNEL);
-	if (tmp == NULL)
+	if (!tmp)
 		return -ENOMEM;
 
 	pr_debug("i2c-dev: i2c-%d reading %zu bytes.\n",
@@ -263,7 +263,7 @@ static noinline int i2cdev_ioctl_rdwr(struct i2c_client *client,
 	data_ptrs = kmalloc_array(rdwr_arg.nmsgs,
 				  sizeof(*data_ptrs),
 				  GFP_KERNEL);
-	if (data_ptrs == NULL) {
+	if (!data_ptrs) {
 		kfree(rdwr_pa);
 		return -ENOMEM;
 	}
@@ -374,7 +374,7 @@ static noinline int i2cdev_ioctl_smbus(struct i2c_client *client,
 				      client->flags, data_arg.read_write,
 				      data_arg.command, data_arg.size, NULL);
 
-	if (data_arg.data == NULL) {
+	if (!data_arg.data) {
 		dev_dbg(&client->adapter->dev,
 			"data is NULL pointer in ioctl I2C_SMBUS.\n");
 		return -EINVAL;
