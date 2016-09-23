@@ -210,6 +210,15 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 			c->x86_coreid_bits = get_count_order((ebx >> 16) & 0xff);
 	}
 
+	if ((c->x86_model >= 5) || (c->x86 > 6)) {
+		unsigned val[2];
+
+		/* get processor flags from MSR 0x17 */
+		rdmsr(MSR_IA32_PLATFORM_ID, val[0], val[1]);
+		c->platform_id = (val[1] >> 18) & 7;
+		c->has_platform_id = true;
+	}
+
 	check_mpx_erratum(c);
 }
 
