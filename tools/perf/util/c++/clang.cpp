@@ -13,8 +13,10 @@
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Tooling/Tooling.h"
 #include "clang/CodeGen/CodeGenAction.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
@@ -164,7 +166,7 @@ void perf_clang__cleanup(void)
 	llvm::llvm_shutdown();
 }
 
-int perf_clang__compile_bpf(const char *filename,
+int perf_clang__compile_bpf(const char *_filename,
 			    void **p_obj_buf,
 			    size_t *p_obj_buf_sz)
 {
@@ -173,8 +175,11 @@ int perf_clang__compile_bpf(const char *filename,
 	if (!p_obj_buf || !p_obj_buf_sz)
 		return -EINVAL;
 
+	llvm::SmallString<PATH_MAX> FileName(_filename);
+	llvm::sys::fs::make_absolute(FileName);
+
 	llvm::opt::ArgStringList CFlags;
-	auto M = getModuleFromSource(std::move(CFlags), filename);
+	auto M = getModuleFromSource(std::move(CFlags), FileName.data());
 	if (!M)
 		return  -EINVAL;
 	auto O = getBPFObjectFromModule(&*M);
