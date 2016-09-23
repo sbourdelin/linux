@@ -39,6 +39,8 @@
 
 #include <acpi/processor.h>
 
+#include "cpufreq_governor.h"
+
 #define PCC_VERSION	"1.10.00"
 #define POLL_LOOPS 	300
 
@@ -534,6 +536,12 @@ out_free:
 	return ret;
 }
 
+static unsigned int pcc_map_load_to_freq(struct cpufreq_policy *policy,
+					unsigned int load)
+{
+	return (load * policy->cpuinfo.max_freq / 100);
+}
+
 static int pcc_cpufreq_cpu_init(struct cpufreq_policy *policy)
 {
 	unsigned int cpu = policy->cpu;
@@ -555,6 +563,8 @@ static int pcc_cpufreq_cpu_init(struct cpufreq_policy *policy)
 	policy->min = policy->cpuinfo.min_freq =
 		ioread32(&pcch_hdr->minimum_frequency) * 1000;
 
+	od_register_map_load_to_freq_handler(pcc_map_load_to_freq);
+
 	pr_debug("init: policy->max is %d, policy->min is %d\n",
 		policy->max, policy->min);
 out:
@@ -563,6 +573,7 @@ out:
 
 static int pcc_cpufreq_cpu_exit(struct cpufreq_policy *policy)
 {
+	od_unregister_map_load_to_freq_handler();
 	return 0;
 }
 
