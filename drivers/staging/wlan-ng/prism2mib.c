@@ -266,7 +266,7 @@ int prism2mgmt_mibset_mibget(struct wlandevice *wlandev, void *msgp)
 	u16 which;
 
 	struct p80211msg_dot11req_mibset *msg = msgp;
-	p80211itemd_t *mibitem;
+	struct p80211itemd *mibitem;
 
 	msg->resultcode.status = P80211ENUM_msgitem_status_data_ok;
 	msg->resultcode.data = P80211ENUM_resultcode_success;
@@ -284,7 +284,7 @@ int prism2mgmt_mibset_mibget(struct wlandevice *wlandev, void *msgp)
 	 ** MIB table.
 	 */
 
-	mibitem = (p80211itemd_t *) msg->mibattribute.data;
+	mibitem = (struct p80211itemd *)msg->mibattribute.data;
 
 	for (mib = mibtab; mib->did != 0; mib++)
 		if (mib->did == mibitem->did && (mib->flag & which))
@@ -379,7 +379,7 @@ static int prism2mib_bytearea2pstr(struct mibrec *mib,
 				   void *data)
 {
 	int result;
-	p80211pstrd_t *pstr = data;
+	struct p80211pstrd *pstr = data;
 	u8 bytebuf[MIB_TMP_MAXLEN];
 
 	if (isget) {
@@ -533,7 +533,7 @@ static int prism2mib_wepdefaultkey(struct mibrec *mib,
 				   void *data)
 {
 	int result;
-	p80211pstrd_t *pstr = data;
+	struct p80211pstrd *pstr = data;
 	u8 bytebuf[MIB_TMP_MAXLEN];
 	u16 len;
 
@@ -705,7 +705,7 @@ static int prism2mib_priv(struct mibrec *mib,
 			  hfa384x_t *hw,
 			  struct p80211msg_dot11req_mibset *msg, void *data)
 {
-	p80211pstrd_t *pstr = data;
+	struct p80211pstrd *pstr = data;
 
 	switch (mib->did) {
 	case DIDmib_lnx_lnxConfigTable_lnxRSNAIE:{
@@ -752,7 +752,7 @@ static int prism2mib_priv(struct mibrec *mib,
  */
 
 void prism2mgmt_pstr2bytestr(struct hfa384x_bytestr *bytestr,
-			     p80211pstrd_t *pstr)
+			     struct p80211pstrd *pstr)
 {
 	bytestr->len = cpu_to_le16((u16) (pstr->len));
 	memcpy(bytestr->data, pstr->data, pstr->len);
@@ -774,7 +774,7 @@ void prism2mgmt_pstr2bytestr(struct hfa384x_bytestr *bytestr,
  */
 
 void prism2mgmt_bytestr2pstr(struct hfa384x_bytestr *bytestr,
-			     p80211pstrd_t *pstr)
+			     struct p80211pstrd *pstr)
 {
 	pstr->len = (u8) (le16_to_cpu((u16) (bytestr->len)));
 	memcpy(pstr->data, bytestr->data, pstr->len);
@@ -795,7 +795,7 @@ void prism2mgmt_bytestr2pstr(struct hfa384x_bytestr *bytestr,
  *
  */
 
-void prism2mgmt_bytearea2pstr(u8 *bytearea, p80211pstrd_t *pstr, int len)
+void prism2mgmt_bytearea2pstr(u8 *bytearea, struct p80211pstrd *pstr, int len)
 {
 	pstr->len = (u8) len;
 	memcpy(pstr->data, bytearea, len);

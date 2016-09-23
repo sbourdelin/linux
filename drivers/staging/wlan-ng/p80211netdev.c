@@ -614,9 +614,9 @@ static int p80211knetdev_set_mac_address(netdevice_t *dev, void *addr)
 {
 	struct sockaddr *new_addr = addr;
 	struct p80211msg_dot11req_mibset dot11req;
-	p80211item_unk392_t *mibattr;
-	p80211item_pstr6_t *macaddr;
-	p80211item_uint32_t *resultcode;
+	struct p80211item_unk392 *mibattr;
+	struct p80211item_pstr6 *macaddr;
+	struct p80211item_uint32 *resultcode;
 	int result;
 
 	/* If we're running, we don't allow MAC address changes */
@@ -625,7 +625,7 @@ static int p80211knetdev_set_mac_address(netdevice_t *dev, void *addr)
 
 	/* Set up some convenience pointers. */
 	mibattr = &dot11req.mibattribute;
-	macaddr = (p80211item_pstr6_t *) &mibattr->data;
+	macaddr = (struct p80211item_pstr6 *)&mibattr->data;
 	resultcode = &dot11req.resultcode;
 
 	/* Set up a dot11req_mibset */
