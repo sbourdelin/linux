@@ -65,6 +65,15 @@ TRACE_MAKE_SYSTEM_STR();
 			     PARAMS(print));		       \
 	DEFINE_EVENT(name, name, PARAMS(proto), PARAMS(args));
 
+#undef TRACE_EVENT_MAP
+#define TRACE_EVENT_MAP(name, map, proto, args, tstruct, assign, print) \
+	DECLARE_EVENT_CLASS(map,			       \
+			     PARAMS(proto),		       \
+			     PARAMS(args),		       \
+			     PARAMS(tstruct),		       \
+			     PARAMS(assign),		       \
+			     PARAMS(print));		       \
+	DEFINE_EVENT_MAP(map, name, map, PARAMS(proto), PARAMS(args));
 
 #undef __field
 #define __field(type, item)		type	item;
@@ -107,6 +116,11 @@ TRACE_MAKE_SYSTEM_STR();
 #define DEFINE_EVENT(template, name, proto, args)	\
 	static struct trace_event_call	__used		\
 	__attribute__((__aligned__(4))) event_##name
+
+#undef DEFINE_EVENT_MAP
+#define DEFINE_EVENT_MAP(template, name, map, proto, args)	\
+	static struct trace_event_call	__used		\
+	__attribute__((__aligned__(4))) event_##map
 
 #undef DEFINE_EVENT_FN
 #define DEFINE_EVENT_FN(template, name, proto, args, reg, unreg)	\
@@ -190,6 +204,9 @@ TRACE_MAKE_SYSTEM_STR();
 
 #undef DEFINE_EVENT
 #define DEFINE_EVENT(template, name, proto, args)
+
+#undef DEFINE_EVENT_MAP
+#define DEFINE_EVENT_MAP(template, name, map, proto, args)
 
 #undef DEFINE_EVENT_PRINT
 #define DEFINE_EVENT_PRINT(template, name, proto, args, print)	\
@@ -426,6 +443,9 @@ trace_event_define_fields_##call(struct trace_event_call *event_call)	\
 #undef DEFINE_EVENT
 #define DEFINE_EVENT(template, name, proto, args)
 
+#undef DEFINE_EVENT_MAP
+#define DEFINE_EVENT_MAP(template, name, map, proto, args)
+
 #undef DEFINE_EVENT_PRINT
 #define DEFINE_EVENT_PRINT(template, name, proto, args, print)	\
 	DEFINE_EVENT(template, name, PARAMS(proto), PARAMS(args))
@@ -505,6 +525,9 @@ static inline notrace int trace_event_get_offsets_##call(		\
 
 #undef DEFINE_EVENT
 #define DEFINE_EVENT(template, name, proto, args)
+
+#undef DEFINE_EVENT_MAP
+#define DEFINE_EVENT_MAP(template, name, map, proto, args)
 
 #undef DEFINE_EVENT_PRINT
 #define DEFINE_EVENT_PRINT(template, name, proto, args, print)	\
@@ -700,6 +723,13 @@ static inline void ftrace_test_probe_##call(void)			\
 	check_trace_callback_type_##call(trace_event_raw_event_##template); \
 }
 
+#undef DEFINE_EVENT_MAP
+#define DEFINE_EVENT_MAP(template, call, map, proto, args)		\
+static inline void ftrace_test_probe_##map(void)			\
+{									\
+	check_trace_callback_type_##call(trace_event_raw_event_##template); \
+}
+
 #undef DEFINE_EVENT_PRINT
 #define DEFINE_EVENT_PRINT(template, name, proto, args, print)
 
@@ -748,6 +778,26 @@ static struct trace_event_call __used event_##call = {			\
 };									\
 static struct trace_event_call __used					\
 __attribute__((section("_ftrace_events"))) *__event_##call = &event_##call
+
+#undef DEFINE_EVENT_MAP
+#define DEFINE_EVENT_MAP(_template, _call, _map, _proto, _args)		\
+									\
+static struct trace_event_map event_map_##_map = {			\
+	.tp = &__tracepoint_##_call,					\
+	.name = #_map,							\
+};									\
+									\
+static struct trace_event_call __used event_##_map = {			\
+	.class			= &event_class_##_template,		\
+	{								\
+		.map			= &event_map_##_map,		\
+	},								\
+	.event.funcs		= &trace_event_type_funcs_##_template,	\
+	.print_fmt		= print_fmt_##_template,		\
+	.flags			= TRACE_EVENT_FL_TRACEPOINT | TRACE_EVENT_FL_MAP,\
+};									\
+static struct trace_event_call __used					\
+__attribute__((section("_ftrace_events"))) *__event_##_map = &event_##_map
 
 #undef DEFINE_EVENT_PRINT
 #define DEFINE_EVENT_PRINT(template, call, proto, args, print)		\
