@@ -515,6 +515,14 @@ be vanished or the reverse -- new added.
 This file is only present if the CONFIG_MMU kernel configuration option is
 enabled.
 
+Note: for both /proc/PID/maps and /proc/PID/smaps readings, it's
+possible in race conditions, that the mappings printed may not be that
+up-to-date, because during each read walking, the task's mappings may have
+changed, this typically happens in multithread cases. But anyway in each single
+read these can be guarunteed: 1) the mapped addresses doesn't go backward; 2) no
+overlaps 3) if there is something at a given vaddr during the entirety of the
+life of the smaps/maps walk, there will be some output for it.
+
 The /proc/PID/clear_refs is used to reset the PG_Referenced and ACCESSED/YOUNG
 bits on both physical and virtual pages associated with a process, and the
 soft-dirty bit on pte (see Documentation/vm/soft-dirty.txt for details).
