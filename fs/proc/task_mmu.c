@@ -147,7 +147,7 @@ m_next_vma(struct proc_maps_private *priv, struct vm_area_struct *vma)
 static void m_cache_vma(struct seq_file *m, struct vm_area_struct *vma)
 {
 	if (m->count < m->size)	/* vma is copied successfully */
-		m->version = m_next_vma(m->private, vma) ? vma->vm_start : -1UL;
+		m->version = m_next_vma(m->private, vma) ? vma->vm_end : -1UL;
 }
 
 static void *m_start(struct seq_file *m, loff_t *ppos)
@@ -176,14 +176,14 @@ static void *m_start(struct seq_file *m, loff_t *ppos)
 
 	if (last_addr) {
 		vma = find_vma(mm, last_addr);
-		if (vma && (vma = m_next_vma(priv, vma)))
+		if (vma)
 			return vma;
 	}
 
 	m->version = 0;
 	if (pos < mm->map_count) {
 		for (vma = mm->mmap; pos; pos--) {
-			m->version = vma->vm_start;
+			m->version = vma->vm_end;
 			vma = vma->vm_next;
 		}
 		return vma;
@@ -293,7 +293,7 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 	vm_flags_t flags = vma->vm_flags;
 	unsigned long ino = 0;
 	unsigned long long pgoff = 0;
-	unsigned long start, end;
+	unsigned long end, start = m->version;
 	dev_t dev = 0;
 	const char *name = NULL;
 
@@ -304,8 +304,13 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
 	}
 
+	/*
+	 * the region [0, m->version) has already been handled, do not
+	 * handle it doubly.
+	 */
+	start = max(vma->vm_start, start);
+
 	/* We don't show the stack guard page in /proc/maps */
-	start = vma->vm_start;
 	if (stack_guard_page_start(vma, start))
 		start += PAGE_SIZE;
 	end = vma->vm_end;
@@ -786,7 +791,7 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 		   "KernelPageSize: %8lu kB\n"
 		   "MMUPageSize:    %8lu kB\n"
 		   "Locked:         %8lu kB\n",
-		   (vma->vm_end - vma->vm_start) >> 10,
+		   (vma->vm_end - max(vma->vm_start, m->version)) >> 10,
 		   mss.resident >> 10,
 		   (unsigned long)(mss.pss >> (10 + PSS_SHIFT)),
 		   mss.shared_clean  >> 10,
