@@ -10,6 +10,7 @@
 #include <linux/serial.h>
 #include <linux/serial_reg.h>
 #include <linux/slab.h>
+#include "hscx.h"
 
 #define MAX_MODEM_BUF	256
 #define WAKEUP_CHARS	(MAX_MODEM_BUF / 2)
@@ -419,7 +420,6 @@ static void rs_interrupt_elsa(struct IsdnCardState *cs)
 #endif
 }
 
-extern int open_hscxstate(struct IsdnCardState *cs, struct BCState *bcs);
 extern void modehscx(struct BCState *bcs, int mode, int bc);
 extern void hscx_l2l1(struct PStack *st, int pr, void *arg);
 

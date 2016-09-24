@@ -39,3 +39,4 @@ extern void modehscx(struct BCState *bcs, int mode, int bc);
 extern void clear_pending_hscx_ints(struct IsdnCardState *cs);
 extern void inithscx(struct IsdnCardState *cs);
 extern void inithscxisac(struct IsdnCardState *cs, int part);
+int open_hscxstate(struct IsdnCardState *cs, struct BCState *bcs);
