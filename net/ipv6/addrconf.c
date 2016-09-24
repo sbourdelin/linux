@@ -187,6 +187,7 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.dad_transmits		= 1,
 	.rtr_solicits		= MAX_RTR_SOLICITATIONS,
 	.rtr_solicit_interval	= RTR_SOLICITATION_INTERVAL,
+	.rtr_solicit_max_interval = RTR_SOLICITATION_MAX_INTERVAL,
 	.rtr_solicit_delay	= MAX_RTR_SOLICITATION_DELAY,
 	.use_tempaddr		= 0,
 	.temp_valid_lft		= TEMP_VALID_LIFETIME,
@@ -232,6 +233,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.dad_transmits		= 1,
 	.rtr_solicits		= MAX_RTR_SOLICITATIONS,
 	.rtr_solicit_interval	= RTR_SOLICITATION_INTERVAL,
+	.rtr_solicit_max_interval = RTR_SOLICITATION_MAX_INTERVAL,
 	.rtr_solicit_delay	= MAX_RTR_SOLICITATION_DELAY,
 	.use_tempaddr		= 0,
 	.temp_valid_lft		= TEMP_VALID_LIFETIME,
@@ -4891,6 +4893,8 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_RTR_SOLICITS] = cnf->rtr_solicits;
 	array[DEVCONF_RTR_SOLICIT_INTERVAL] =
 		jiffies_to_msecs(cnf->rtr_solicit_interval);
+	array[DEVCONF_RTR_SOLICIT_MAX_INTERVAL] =
+		jiffies_to_msecs(cnf->rtr_solicit_max_interval);
 	array[DEVCONF_RTR_SOLICIT_DELAY] =
 		jiffies_to_msecs(cnf->rtr_solicit_delay);
 	array[DEVCONF_FORCE_MLD_VERSION] = cnf->force_mld_version;
@@ -5766,6 +5770,13 @@ static const struct ctl_table addrconf_sysctl[] = {
 	{
 		.procname	= "router_solicitation_interval",
 		.data		= &ipv6_devconf.rtr_solicit_interval,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_jiffies,
+	},
+	{
+		.procname	= "router_solicitation_max_interval",
+		.data		= &ipv6_devconf.rtr_solicit_max_interval,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
