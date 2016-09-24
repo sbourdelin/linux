@@ -17,6 +17,7 @@
 #include "xdi_adapter.h"
 #include "diva_pci.h"
 #include "diva.h"
+#include "helpers.h"
 
 #ifdef CONFIG_ISDN_DIVAS_PRIPCI
 #include "os_pri.h"
