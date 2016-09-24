@@ -545,22 +545,21 @@ static ssize_t evdev_write(struct file *file, const char __user *buffer,
 
 	if (!evdev->exist || client->revoked) {
 		retval = -ENODEV;
-		goto out;
+		goto unlock;
 	}
 
 	while (retval + input_event_size() <= count) {
 
 		if (input_event_from_user(buffer + retval, &event)) {
 			retval = -EFAULT;
-			goto out;
+			goto unlock;
 		}
 		retval += input_event_size();
 
 		input_inject_event(&evdev->handle,
 				   event.type, event.code, event.value);
 	}
-
- out:
+unlock:
 	mutex_unlock(&evdev->mutex);
 	return retval;
 }
@@ -1292,12 +1291,11 @@ static long evdev_ioctl_handler(struct file *file, unsigned int cmd,
 
 	if (!evdev->exist || client->revoked) {
 		retval = -ENODEV;
-		goto out;
+		goto unlock;
 	}
 
 	retval = evdev_do_ioctl(file, cmd, p, compat_mode);
-
- out:
+unlock:
 	mutex_unlock(&evdev->mutex);
 	return retval;
 }
