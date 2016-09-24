@@ -1350,3 +1350,63 @@ static inline struct pci_dev *hisax_find_pci_device(unsigned int vendor,
 }
 
 #endif
+
+#if CARD_TELES3
+int setup_teles3(struct IsdnCard *card);
+#endif
+
+#if CARD_TELESPCI
+int setup_telespci(struct IsdnCard *card);
+#endif
+
+#if CARD_S0BOX
+int setup_s0box(struct IsdnCard *card);
+#endif
+
+#if CARD_AVM_A1_PCMCIA
+int setup_avm_a1_pcmcia(struct IsdnCard *card);
+#endif
+
+#if CARD_FRITZPCI
+int setup_avm_pcipnp(struct IsdnCard *card);
+#endif
+
+#if CARD_ELSA
+int setup_elsa(struct IsdnCard *card);
+#endif
+
+#if CARD_DIEHLDIVA
+int setup_diva(struct IsdnCard *card);
+#endif
+
+#if CARD_SEDLBAUER
+int setup_sedlbauer(struct IsdnCard *card);
+#endif
+
+#if CARD_HFC_PCI
+int setup_hfcpci(struct IsdnCard *card);
+#endif
+
+#if CARD_HFC_SX
+int setup_hfcsx(struct IsdnCard *card);
+#endif
+
+#if CARD_NICCY
+int setup_niccy(struct IsdnCard *card);
+#endif
+
+#if CARD_BKM_A4T
+int setup_bkm_a4t(struct IsdnCard *card);
+#endif
+
+#if CARD_SCT_QUADRO
+int setup_sct_quadro(struct IsdnCard *card);
+#endif
+
+#if CARD_GAZEL
+int setup_gazel(struct IsdnCard *card);
+#endif
+
+#if CARD_W6692
+int setup_w6692(struct IsdnCard *card);
+#endif

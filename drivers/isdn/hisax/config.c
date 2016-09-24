@@ -460,40 +460,12 @@ __setup("hisax=", HiSax_setup);
 extern int setup_teles0(struct IsdnCard *card);
 #endif
 
-#if CARD_TELES3
-extern int setup_teles3(struct IsdnCard *card);
-#endif
-
-#if CARD_S0BOX
-extern int setup_s0box(struct IsdnCard *card);
-#endif
-
-#if CARD_TELESPCI
-extern int setup_telespci(struct IsdnCard *card);
-#endif
-
 #if CARD_AVM_A1
 extern int setup_avm_a1(struct IsdnCard *card);
 #endif
 
-#if CARD_AVM_A1_PCMCIA
-extern int setup_avm_a1_pcmcia(struct IsdnCard *card);
-#endif
-
-#if CARD_FRITZPCI
-extern int setup_avm_pcipnp(struct IsdnCard *card);
-#endif
-
-#if CARD_ELSA
-extern int setup_elsa(struct IsdnCard *card);
-#endif
-
 #if CARD_IX1MICROR2
 extern int setup_ix1micro(struct IsdnCard *card);
-#endif
-
-#if CARD_DIEHLDIVA
-extern int setup_diva(struct IsdnCard *card);
 #endif
 
 #if CARD_ASUSCOM
@@ -502,10 +474,6 @@ extern int setup_asuscom(struct IsdnCard *card);
 
 #if CARD_TELEINT
 extern int setup_TeleInt(struct IsdnCard *card);
-#endif
-
-#if CARD_SEDLBAUER
-extern int setup_sedlbauer(struct IsdnCard *card);
 #endif
 
 #if CARD_SPORTSTER
@@ -524,40 +492,12 @@ extern int setup_netjet_s(struct IsdnCard *card);
 extern int setup_hfcs(struct IsdnCard *card);
 #endif
 
-#if CARD_HFC_PCI
-extern int setup_hfcpci(struct IsdnCard *card);
-#endif
-
-#if CARD_HFC_SX
-extern int setup_hfcsx(struct IsdnCard *card);
-#endif
-
-#if CARD_NICCY
-extern int setup_niccy(struct IsdnCard *card);
-#endif
-
 #if CARD_ISURF
 extern int setup_isurf(struct IsdnCard *card);
 #endif
 
 #if CARD_HSTSAPHIR
 extern int setup_saphir(struct IsdnCard *card);
-#endif
-
-#if CARD_BKM_A4T
-extern int setup_bkm_a4t(struct IsdnCard *card);
-#endif
-
-#if CARD_SCT_QUADRO
-extern int setup_sct_quadro(struct IsdnCard *card);
-#endif
-
-#if CARD_GAZEL
-extern int setup_gazel(struct IsdnCard *card);
-#endif
-
-#if CARD_W6692
-extern int setup_w6692(struct IsdnCard *card);
 #endif
 
 #if CARD_NETJET_U
