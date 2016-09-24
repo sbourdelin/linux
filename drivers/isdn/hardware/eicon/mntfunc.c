@@ -29,11 +29,6 @@ static DESCRIPTOR MAdapter;
 static DESCRIPTOR MaintDescriptor =
 { IDI_DIMAINT, 0, 0, (IDI_CALL) diva_maint_prtComp };
 
-extern int diva_os_copy_to_user(void *os_handle, void __user *dst,
-				const void *src, int length);
-extern int diva_os_copy_from_user(void *os_handle, void *dst,
-				  const void __user *src, int length);
-
 static void no_printf(unsigned char *x, ...)
 {
 	/* dummy debug function */

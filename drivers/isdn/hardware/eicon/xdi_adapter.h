@@ -67,4 +67,10 @@ typedef struct _diva_os_xdi_adapter {
 	dword dsp_mask;
 } diva_os_xdi_adapter_t;
 
+void diva_add_slave_adapter(diva_os_xdi_adapter_t *a);
+int diva_card_read_xlog(diva_os_xdi_adapter_t *a);
+
+int create_adapter_proc(diva_os_xdi_adapter_t *a);
+void remove_adapter_proc(diva_os_xdi_adapter_t *a);
+
 #endif

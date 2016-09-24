@@ -22,19 +22,6 @@ static void *diva_xdiLoadFileFile = NULL;
 static dword diva_xdiLoadFileLength = 0;
 
 /*
-**  IMPORTS
-*/
-extern void prepare_qBri_functions(PISDN_ADAPTER IoAdapter);
-extern void prepare_qBri2_functions(PISDN_ADAPTER IoAdapter);
-extern void diva_xdi_display_adapter_features(int card);
-extern void diva_add_slave_adapter(diva_os_xdi_adapter_t *a);
-
-extern int qBri_FPGA_download(PISDN_ADAPTER IoAdapter);
-extern void start_qBri_hardware(PISDN_ADAPTER IoAdapter);
-
-extern int diva_card_read_xlog(diva_os_xdi_adapter_t *a);
-
-/*
 **  LOCALS
 */
 static unsigned long _4bri_bar_length[4] = {

@@ -46,10 +46,6 @@ char *DRIVERRELEASE_MNT = "2.0";
 static wait_queue_head_t msgwaitq;
 static unsigned long opened;
 
-extern int mntfunc_init(int *, void **, unsigned long);
-extern void mntfunc_finit(void);
-extern int maint_read_write(void __user *buf, int count);
-
 /*
  *  helper functions
  */

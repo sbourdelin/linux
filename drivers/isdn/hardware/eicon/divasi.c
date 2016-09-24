@@ -48,9 +48,6 @@ static char *DRIVERLNAME = "diva_idi";
 static char *DEVNAME = "DivasIDI";
 char *DRIVERRELEASE_IDI = "2.0";
 
-extern int idifunc_init(void);
-extern void idifunc_finit(void);
-
 /*
  *  helper functions
  */

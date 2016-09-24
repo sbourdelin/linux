@@ -55,9 +55,6 @@ static void diva_release_appl(struct capi_ctr *, __u16);
 static char *diva_procinfo(struct capi_ctr *);
 static u16 diva_send_message(struct capi_ctr *,
 			     diva_os_message_buffer_s *);
-extern void diva_os_set_controller_struct(struct capi_ctr *);
-
-extern void DIVA_DIDD_Read(DESCRIPTOR *, int);
 
 /*
  * debug

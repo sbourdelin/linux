@@ -84,7 +84,6 @@ static void api_save_msg(API_PARSE *in, byte *format, API_SAVE *out);
 static void api_load_msg(API_SAVE *in, API_PARSE *out);
 
 word api_remove_start(void);
-void api_remove_complete(void);
 
 static void plci_remove(PLCI *);
 static void diva_get_extended_adapter_features(DIVA_CAPI_ADAPTER *a);
@@ -224,19 +223,9 @@ static void diva_free_dma_descriptor(PLCI *plci, int nr);
 /* external function prototypes                                     */
 /*------------------------------------------------------------------*/
 
-extern byte MapController(byte);
 extern byte UnMapController(byte);
 #define MapId(Id)(((Id) & 0xffffff00L) | MapController((byte)(Id)))
 #define UnMapId(Id)(((Id) & 0xffffff00L) | UnMapController((byte)(Id)))
-
-void sendf(APPL *, word, dword, word, byte *, ...);
-void *TransmitBufferSet(APPL *appl, dword ref);
-void *TransmitBufferGet(APPL *appl, void *p);
-void TransmitBufferFree(APPL *appl, void *p);
-void *ReceiveBufferGet(APPL *appl, int Num);
-
-int fax_head_line_time(char *buffer);
-
 
 /*------------------------------------------------------------------*/
 /* Global data definitions                                          */

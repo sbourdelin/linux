@@ -28,8 +28,6 @@
 
 PISDN_ADAPTER IoAdapters[MAX_ADAPTER];
 extern IDI_CALL Requests[MAX_ADAPTER];
-extern int create_adapter_proc(diva_os_xdi_adapter_t *a);
-extern void remove_adapter_proc(diva_os_xdi_adapter_t *a);
 
 #define DivaIdiReqFunc(N)						\
 	static void DivaIdiRequest##N(ENTITY *e)			\

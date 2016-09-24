@@ -1358,3 +1358,9 @@ extern word li_total_channels;
 #define NCPI_MDM_DCD_ON_RECEIVED   0x80
 
 /*------------------------------------------------------------------*/
+
+void sendf(APPL *, word, dword, word, byte *, ...);
+void *TransmitBufferSet(APPL *appl, dword ref);
+void *TransmitBufferGet(APPL *appl, void *p);
+void TransmitBufferFree(APPL *appl, void *p);
+void *ReceiveBufferGet(APPL *appl, int Num);

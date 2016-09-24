@@ -179,3 +179,49 @@ typedef void (IDI_CALL_LINK_T *didd_adapter_change_callback_t)(void IDI_CALL_ENT
 #define DI_VOICE_OVER_IP  0x0800 /* Voice over IP support */
 typedef void (IDI_CALL_LINK_T *_IDI_CALL)(void *, ENTITY *);
 #endif
+
+int diddfunc_init(void);
+void diddfunc_finit(void);
+
+void DIVA_DIDD_Read(void *, int);
+
+int divasfunc_init(int dbgmask);
+void divasfunc_exit(void);
+irqreturn_t diva_os_irq_wrapper(int irq, void *context);
+void diva_xdi_display_adapter_features(int card);
+int create_divas_proc(void);
+void remove_divas_proc(void);
+void prepare_maestra_functions(PISDN_ADAPTER IoAdapter);
+void start_qBri_hardware(PISDN_ADAPTER IoAdapter);
+int qBri_FPGA_download(PISDN_ADAPTER IoAdapter);
+void prepare_qBri_functions(PISDN_ADAPTER IoAdapter);
+void prepare_qBri2_functions(PISDN_ADAPTER IoAdapter);
+
+void prepare_pri_functions(PISDN_ADAPTER IoAdapter);
+void prepare_pri2_functions(PISDN_ADAPTER IoAdapter);
+
+int diva_os_copy_to_user(void *os_handle, void __user *dst,
+			 const void *src, int length);
+int diva_os_copy_from_user(void *os_handle, void *dst,
+			   const void __user *src, int length);
+
+int mntfunc_init(int *, void **, unsigned long);
+void mntfunc_finit(void);
+int maint_read_write(void __user *buf, int count);
+
+void diva_os_wakeup_read(void *os_context);
+void diva_os_wakeup_close(void *os_context);
+
+int idifunc_init(void);
+void idifunc_finit(void);
+
+void diva_user_mode_idi_remove_adapter(int);
+int diva_user_mode_idi_create_adapter(const DESCRIPTOR *, int);
+
+void divas_get_version(char *);
+void diva_get_vserial_number(PISDN_ADAPTER IoAdapter, char *buf);
+
+byte MapController(byte);
+
+int fax_head_line_time(char *buffer);
+void api_remove_complete(void);

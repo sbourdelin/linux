@@ -36,5 +36,6 @@ typedef struct _diva_card {
  */
 int init_capifunc(void);
 void finit_capifunc(void);
+void diva_os_set_controller_struct(struct capi_ctr *);
 
 #endif /* __CAPIFUNC_H__ */

@@ -34,8 +34,6 @@
 
 
 extern PISDN_ADAPTER IoAdapters[MAX_ADAPTER];
-extern void divas_get_version(char *);
-extern void diva_get_vserial_number(PISDN_ADAPTER IoAdapter, char *buf);
 
 /*********************************************************
  ** Functions for /proc interface / File operations

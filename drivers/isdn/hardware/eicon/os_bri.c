@@ -19,13 +19,6 @@
 #include "dsrv_bri.h"
 
 /*
-**  IMPORTS
-*/
-extern void prepare_maestra_functions(PISDN_ADAPTER IoAdapter);
-extern void diva_xdi_display_adapter_features(int card);
-extern int diva_card_read_xlog(diva_os_xdi_adapter_t *a);
-
-/*
 **  LOCALS
 */
 static int bri_bar_length[3] = {
