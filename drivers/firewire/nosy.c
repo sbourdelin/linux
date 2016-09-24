@@ -566,6 +566,11 @@ add_card(struct pci_dev *dev, const struct pci_device_id *unused)
 
 	lynx->registers = ioremap_nocache(pci_resource_start(dev, 0),
 					  PCILYNX_MAX_REGISTER);
+	if (lynx->registers == NULL) {
+		dev_err(&dev->dev, "Failed to map registers\n");
+		ret = -ENOMEM;
+		goto fail_deallocate2;
+	}
 
 	lynx->rcv_start_pcl = pci_alloc_consistent(lynx->pci_device,
 				sizeof(struct pcl), &lynx->rcv_start_pcl_bus);
@@ -679,6 +684,8 @@ fail_deallocate:
 		pci_free_consistent(lynx->pci_device, PAGE_SIZE,
 				lynx->rcv_buffer, lynx->rcv_buffer_bus);
 	iounmap(lynx->registers);
+
+fail_deallocate2:
 	kfree(lynx);
 
 fail_disable:
