@@ -1028,16 +1028,16 @@ static ssize_t iio_buffer_store_watermark(struct device *dev,
 
 	if (val > buffer->length) {
 		ret = -EINVAL;
-		goto out;
+		goto unlock;
 	}
 
 	if (iio_buffer_is_active(indio_dev->buffer)) {
 		ret = -EBUSY;
-		goto out;
+		goto unlock;
 	}
 
 	buffer->watermark = val;
-out:
+unlock:
 	mutex_unlock(&indio_dev->mlock);
 
 	return ret ? ret : len;
