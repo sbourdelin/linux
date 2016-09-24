@@ -310,7 +310,7 @@ static int iio_scan_mask_set(struct iio_dev *indio_dev,
 	trialmask = kmalloc_array(BITS_TO_LONGS(indio_dev->masklength),
 				  sizeof(*trialmask),
 				  GFP_KERNEL);
-	if (trialmask == NULL)
+	if (!trialmask)
 		return -ENOMEM;
 	if (!indio_dev->masklength) {
 		WARN(1, "Trying to set scanmask prior to registering buffer\n");
@@ -711,7 +711,7 @@ static int iio_verify_update(struct iio_dev *indio_dev,
 	/* What scan mask do we actually have? */
 	compound_mask = kcalloc(BITS_TO_LONGS(indio_dev->masklength),
 				sizeof(long), GFP_KERNEL);
-	if (compound_mask == NULL)
+	if (!compound_mask)
 		return -ENOMEM;
 
 	scan_timestamp = false;
@@ -736,7 +736,7 @@ static int iio_verify_update(struct iio_dev *indio_dev,
 				    compound_mask,
 				    strict_scanmask);
 		kfree(compound_mask);
-		if (scan_mask == NULL)
+		if (!scan_mask)
 			return -EINVAL;
 	} else {
 	    scan_mask = compound_mask;
@@ -940,7 +940,7 @@ int iio_update_buffers(struct iio_dev *indio_dev,
 		goto out_unlock;
 	}
 
-	if (indio_dev->info == NULL) {
+	if (!indio_dev->info) {
 		ret = -ENODEV;
 		goto out_unlock;
 	}
@@ -1130,11 +1130,11 @@ int iio_buffer_alloc_sysfs_and_mask(struct iio_dev *indio_dev)
 				indio_dev->scan_index_timestamp =
 					channels[i].scan_index;
 		}
-		if (indio_dev->masklength && buffer->scan_mask == NULL) {
+		if (indio_dev->masklength && !buffer->scan_mask) {
 			buffer->scan_mask = kcalloc(BITS_TO_LONGS(indio_dev->masklength),
 						    sizeof(*buffer->scan_mask),
 						    GFP_KERNEL);
-			if (buffer->scan_mask == NULL) {
+			if (!buffer->scan_mask) {
 				ret = -ENOMEM;
 				goto error_cleanup_dynamic;
 			}
@@ -1146,7 +1146,7 @@ int iio_buffer_alloc_sysfs_and_mask(struct iio_dev *indio_dev)
 	buffer->scan_el_group.attrs = kcalloc(attrcount + 1,
 					      sizeof(buffer->scan_el_group.attrs[0]),
 					      GFP_KERNEL);
-	if (buffer->scan_el_group.attrs == NULL) {
+	if (!buffer->scan_el_group.attrs) {
 		ret = -ENOMEM;
 		goto error_free_scan_mask;
 	}
@@ -1291,7 +1291,7 @@ static int iio_buffer_add_demux(struct iio_buffer *buffer,
 		(*p)->length += length;
 	} else {
 		*p = kmalloc(sizeof(**p), GFP_KERNEL);
-		if (*p == NULL)
+		if (!*p)
 			return -ENOMEM;
 		(*p)->from = in_loc;
 		(*p)->to = out_loc;
@@ -1356,7 +1356,7 @@ static int iio_buffer_update_demux(struct iio_dev *indio_dev,
 		in_loc += length;
 	}
 	buffer->demux_bounce = kzalloc(out_loc, GFP_KERNEL);
-	if (buffer->demux_bounce == NULL) {
+	if (!buffer->demux_bounce) {
 		ret = -ENOMEM;
 		goto error_clear_mux_table;
 	}
