@@ -982,7 +982,7 @@ static ssize_t iio_buffer_store_enable(struct device *dev,
 	inlist = iio_buffer_is_active(indio_dev->buffer);
 	/* Already in desired state */
 	if (inlist == requested_state)
-		goto done;
+		goto unlock;
 
 	if (requested_state)
 		ret = __iio_update_buffers(indio_dev,
@@ -990,8 +990,7 @@ static ssize_t iio_buffer_store_enable(struct device *dev,
 	else
 		ret = __iio_update_buffers(indio_dev,
 					 NULL, indio_dev->buffer);
-
-done:
+unlock:
 	mutex_unlock(&indio_dev->mlock);
 	return (ret < 0) ? ret : len;
 }
