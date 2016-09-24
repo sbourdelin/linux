@@ -363,22 +363,21 @@ static ssize_t iio_scan_el_store(struct device *dev,
 	mutex_lock(&indio_dev->mlock);
 	if (iio_buffer_is_active(indio_dev->buffer)) {
 		ret = -EBUSY;
-		goto error_ret;
+		goto unlock;
 	}
 	ret = iio_scan_mask_query(indio_dev, buffer, this_attr->address);
 	if (ret < 0)
-		goto error_ret;
+		goto unlock;
 	if (!state && ret) {
 		ret = iio_scan_mask_clear(buffer, this_attr->address);
 		if (ret)
-			goto error_ret;
+			goto unlock;
 	} else if (state && !ret) {
 		ret = iio_scan_mask_set(indio_dev, buffer, this_attr->address);
 		if (ret)
-			goto error_ret;
+			goto unlock;
 	}
-
-error_ret:
+unlock:
 	mutex_unlock(&indio_dev->mlock);
 
 	return ret < 0 ? ret : len;
