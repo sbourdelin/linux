@@ -48,6 +48,8 @@
 static LIST_HEAD(rxe_dev_list);
 static spinlock_t dev_list_lock; /* spinlock for device list */
 
+static struct rxe_recv_sockets recv_sockets;
+
 struct rxe_dev *net_to_rxe(struct net_device *ndev)
 {
 	struct rxe_dev *rxe;
@@ -80,9 +82,6 @@ struct rxe_dev *get_rxe_by_name(const char* name)
 	spin_unlock_bh(&dev_list_lock);
 	return found;
 }
-
-
-struct rxe_recv_sockets recv_sockets;
 
 static __be64 rxe_mac_to_eui64(struct net_device *ndev)
 {
@@ -277,7 +276,8 @@ static struct socket *rxe_setup_udp_tunnel(struct net *net, __be16 port,
 
 static void rxe_release_udp_tunnel(struct socket *sk)
 {
-	udp_tunnel_sock_release(sk);
+	if (sk)
+		udp_tunnel_sock_release(sk);
 }
 
 static void prepare_udp_hdr(struct sk_buff *skb, __be16 src_port,
@@ -668,6 +668,7 @@ int rxe_net_init(void)
 
 	spin_lock_init(&dev_list_lock);
 
+#if IS_ENABLED(CONFIG_IPV6)
 	recv_sockets.sk6 = rxe_setup_udp_tunnel(&init_net,
 			htons(ROCE_V2_UDP_DPORT), true);
 	if (IS_ERR(recv_sockets.sk6)) {
@@ -675,7 +676,7 @@ int rxe_net_init(void)
 		pr_err("rxe: Failed to create IPv6 UDP tunnel\n");
 		return -1;
 	}
-
+#endif
 	recv_sockets.sk4 = rxe_setup_udp_tunnel(&init_net,
 			htons(ROCE_V2_UDP_DPORT), false);
 	if (IS_ERR(recv_sockets.sk4)) {
@@ -688,8 +689,8 @@ int rxe_net_init(void)
 
 	err = register_netdevice_notifier(&rxe_net_notifier);
 	if (err) {
-		rxe_release_udp_tunnel(recv_sockets.sk6);
 		rxe_release_udp_tunnel(recv_sockets.sk4);
+		rxe_release_udp_tunnel(recv_sockets.sk6);
 		pr_err("rxe: Failed to rigister netdev notifier\n");
 	}
 
@@ -698,11 +699,8 @@ int rxe_net_init(void)
 
 void rxe_net_exit(void)
 {
-	if (recv_sockets.sk6)
-		rxe_release_udp_tunnel(recv_sockets.sk6);
-
-	if (recv_sockets.sk4)
-		rxe_release_udp_tunnel(recv_sockets.sk4);
+	rxe_release_udp_tunnel(recv_sockets.sk4);
+	rxe_release_udp_tunnel(recv_sockets.sk6);
 
 	unregister_netdevice_notifier(&rxe_net_notifier);
 }
