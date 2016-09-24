@@ -505,10 +505,10 @@ static ssize_t iio_buffer_write_length(struct device *dev,
 		ret = 0;
 	}
 	if (ret)
-		goto out;
+		goto unlock;
 	if (buffer->length && buffer->length < buffer->watermark)
 		buffer->watermark = buffer->length;
-out:
+unlock:
 	mutex_unlock(&indio_dev->mlock);
 
 	return ret ? ret : len;
