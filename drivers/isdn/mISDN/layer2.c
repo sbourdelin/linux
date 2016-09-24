@@ -459,15 +459,6 @@ IsDISC(u_char *data)
 	return (data[0] & 0xef) == DISC;
 }
 
-inline int
-IsRR(u_char *data, struct layer2 *l2)
-{
-	if (test_bit(FLG_MOD128, &l2->flag))
-		return data[0] == RR;
-	else
-		return (data[0] & 0xf) == 1;
-}
-
 static inline int
 IsSFrame(u_char *data, struct layer2 *l2)
 {
