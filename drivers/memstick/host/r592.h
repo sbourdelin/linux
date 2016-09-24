@@ -172,4 +172,6 @@ struct r592_device {
 #define dbg_verbose(format, ...)	__dbg(2, format, ## __VA_ARGS__)
 #define dbg_reg(format, ...)		__dbg(3, format, ## __VA_ARGS__)
 
+const char *memstick_debug_get_tpc_name(int tpc);
+
 #endif
