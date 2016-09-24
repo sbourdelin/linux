@@ -234,7 +234,7 @@ struct moschip_port {
 
 	spinlock_t pool_lock;
 	struct urb *write_urb_pool[NUM_URBS];
-	char busy[NUM_URBS];
+	int busy[NUM_URBS];
 	bool read_urb_busy;
 
 	/* For device(s) with LED indicator */
@@ -1139,8 +1139,7 @@ static int mos7840_chars_in_buffer(struct tty_struct *tty)
 	spin_lock_irqsave(&mos7840_port->pool_lock, flags);
 	for (i = 0; i < NUM_URBS; ++i) {
 		if (mos7840_port->busy[i]) {
-			struct urb *urb = mos7840_port->write_urb_pool[i];
-			chars += urb->transfer_buffer_length;
+			chars += mos7840_port->busy[i];
 		}
 	}
 	spin_unlock_irqrestore(&mos7840_port->pool_lock, flags);
@@ -1323,10 +1322,11 @@ static int mos7840_write(struct tty_struct *tty, struct usb_serial_port *port,
 	/* try to find a free urb in the list */
 	urb = NULL;
 
+	transfer_size = min(count, URB_TRANSFER_BUFFER_SIZE);
 	spin_lock_irqsave(&mos7840_port->pool_lock, flags);
 	for (i = 0; i < NUM_URBS; ++i) {
 		if (!mos7840_port->busy[i]) {
-			mos7840_port->busy[i] = 1;
+			mos7840_port->busy[i] = transfer_size;
 			urb = mos7840_port->write_urb_pool[i];
 			dev_dbg(&port->dev, "URB:%d\n", i);
 			break;
@@ -1345,7 +1345,6 @@ static int mos7840_write(struct tty_struct *tty, struct usb_serial_port *port,
 		if (!urb->transfer_buffer)
 			goto exit;
 	}
-	transfer_size = min(count, URB_TRANSFER_BUFFER_SIZE);
 
 	memcpy(urb->transfer_buffer, current_position, transfer_size);
 
