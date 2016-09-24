@@ -161,6 +161,7 @@ static inline void *hsi_client_drvdata(struct hsi_client *cl)
 int hsi_register_port_event(struct hsi_client *cl,
 			void (*handler)(struct hsi_client *, unsigned long));
 int hsi_unregister_port_event(struct hsi_client *cl);
+void ssi_waketest(struct hsi_client *cl, unsigned int enable);
 
 /**
  * struct hsi_client_driver - Driver associated to an HSI client
