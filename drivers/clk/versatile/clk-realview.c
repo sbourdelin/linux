@@ -10,6 +10,7 @@
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/clk-provider.h>
+#include <linux/platform_data/clk-realview.h>
 
 #include "clk-icst.h"
 
