@@ -655,30 +655,6 @@ static int tonga_enable_sclk_control(struct pp_hwmgr *hwmgr)
 }
 
 /**
- * Send a message to the SMC and return a parameter
- *
- * @param    hwmgr:  the address of the powerplay hardware manager.
- * @param    msg: the message to send.
- * @param    parameter: pointer to the received parameter
- * @return   The response that came from the SMC.
- */
-PPSMC_Result tonga_send_msg_to_smc_return_parameter(
-		struct pp_hwmgr *hwmgr,
-		PPSMC_Msg msg,
-		uint32_t *parameter)
-{
-	int result;
-
-	result = smum_send_msg_to_smc(hwmgr->smumgr, msg);
-
-	if ((0 == result) && parameter) {
-		*parameter = cgs_read_register(hwmgr->device, mmSMC_MSG_ARG_0);
-	}
-
-	return result;
-}
-
-/**
  * force DPM power State
  *
  * @param    hwmgr:  the address of the powerplay hardware manager.
@@ -750,21 +726,6 @@ static int tonga_dpm_force_state_pcie(struct pp_hwmgr *hwmgr, uint32_t n)
 								n) ? 0 : 1);
 
 	return 0;
-}
-
-/**
- * Set the initial state by calling SMC to switch to this state directly
- *
- * @param    hwmgr  the address of the powerplay hardware manager.
- * @return   always 0
- */
-static int tonga_set_boot_state(struct pp_hwmgr *hwmgr)
-{
-	/*
-	* SMC only stores one state that SW will ask to switch too,
-	* so we switch the the just uploaded one
-	*/
-	return (0 == tonga_disable_sclk_mclk_dpm(hwmgr)) ? 0 : 1;
 }
 
 /**
@@ -2853,34 +2814,6 @@ static int tonga_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int tonga_populate_smc_initial_state(struct pp_hwmgr *hwmgr,
-		const struct tonga_power_state *bootState)
-{
-	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
-	struct phm_ppt_v1_information *pptable_info = (struct phm_ppt_v1_information *)(hwmgr->pptable);
-	uint8_t count, level;
-
-	count = (uint8_t) (pptable_info->vdd_dep_on_sclk->count);
-	for (level = 0; level < count; level++) {
-		if (pptable_info->vdd_dep_on_sclk->entries[level].clk >=
-			bootState->performance_levels[0].engine_clock) {
-			data->smc_state_table.GraphicsBootLevel = level;
-			break;
-		}
-	}
-
-	count = (uint8_t) (pptable_info->vdd_dep_on_mclk->count);
-	for (level = 0; level < count; level++) {
-		if (pptable_info->vdd_dep_on_mclk->entries[level].clk >=
-			bootState->performance_levels[0].memory_clock) {
-			data->smc_state_table.MemoryBootLevel = level;
-			break;
-		}
-	}
-
-	return 0;
-}
-
 /**
  * Initializes the SMC table and uploads it
  *
@@ -4507,17 +4440,6 @@ static int tonga_disable_dpm_tasks(struct pp_hwmgr *hwmgr)
 	tmp_result = tonga_reset_to_default(hwmgr);
 	PP_ASSERT_WITH_CODE((0 == tmp_result),
 		"Failed to reset to default!", result = tmp_result);
-
-	return result;
-}
-
-int tonga_reset_asic_tasks(struct pp_hwmgr *hwmgr)
-{
-	int result;
-
-	result = tonga_set_boot_state(hwmgr);
-	if (0 != result)
-		printk(KERN_ERR "[ powerplay ] Failed to reset asic via set boot state! \n");
 
 	return result;
 }

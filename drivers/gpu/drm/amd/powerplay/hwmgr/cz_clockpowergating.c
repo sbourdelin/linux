@@ -61,48 +61,6 @@ int cz_phm_set_asic_block_gating(struct pp_hwmgr *hwmgr, enum PHM_AsicBlock bloc
 	return ret;
 }
 
-
-bool cz_phm_is_safe_for_asic_block(struct pp_hwmgr *hwmgr, const struct pp_hw_power_state *state, enum PHM_AsicBlock block)
-{
-	return true;
-}
-
-
-int cz_phm_enable_disable_gfx_power_gating(struct pp_hwmgr *hwmgr, bool enable)
-{
-	return 0;
-}
-
-int cz_phm_smu_power_up_down_pcie(struct pp_hwmgr *hwmgr, uint32_t target, bool up, uint32_t args)
-{
-	/* TODO */
-	return 0;
-}
-
-int cz_phm_initialize_display_phy_access(struct pp_hwmgr *hwmgr, bool initialize, bool accesshw)
-{
-	/* TODO */
-	return 0;
-}
-
-int cz_phm_get_display_phy_access_info(struct pp_hwmgr *hwmgr)
-{
-	/* TODO */
-	return 0;
-}
-
-int cz_phm_gate_unused_display_phys(struct pp_hwmgr *hwmgr)
-{
-	/* TODO */
-	return 0;
-}
-
-int cz_phm_ungate_all_display_phys(struct pp_hwmgr *hwmgr)
-{
-	/* TODO */
-	return 0;
-}
-
 static int cz_tf_uvd_power_gating_initialize(struct pp_hwmgr *hwmgr, void *pInput, void *pOutput, void *pStorage, int Result)
 {
 	return 0;

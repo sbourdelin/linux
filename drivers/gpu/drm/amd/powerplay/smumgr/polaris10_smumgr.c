@@ -81,49 +81,6 @@ static int polaris10_set_smc_sram_address(struct pp_smumgr *smumgr, uint32_t smc
 }
 
 /**
-* Copy bytes from SMC RAM space into driver memory.
-*
-* @param    smumgr  the address of the powerplay SMU manager.
-* @param    smc_start_address the start address in the SMC RAM to copy bytes from
-* @param    src the byte array to copy the bytes to.
-* @param    byte_count the number of bytes to copy.
-*/
-int polaris10_copy_bytes_from_smc(struct pp_smumgr *smumgr, uint32_t smc_start_address, uint32_t *dest, uint32_t byte_count, uint32_t limit)
-{
-	uint32_t data;
-	uint32_t addr;
-	uint8_t *dest_byte;
-	uint8_t i, data_byte[4] = {0};
-	uint32_t *pdata = (uint32_t *)&data_byte;
-
-	PP_ASSERT_WITH_CODE((0 == (3 & smc_start_address)), "SMC address must be 4 byte aligned.", return -1;);
-	PP_ASSERT_WITH_CODE((limit > (smc_start_address + byte_count)), "SMC address is beyond the SMC RAM area.", return -1);
-
-	addr = smc_start_address;
-
-	while (byte_count >= 4) {
-		polaris10_read_smc_sram_dword(smumgr, addr, &data, limit);
-
-		*dest = PP_SMC_TO_HOST_UL(data);
-
-		dest += 1;
-		byte_count -= 4;
-		addr += 4;
-	}
-
-	if (byte_count) {
-		polaris10_read_smc_sram_dword(smumgr, addr, &data, limit);
-		*pdata = PP_SMC_TO_HOST_UL(data);
-	/* Cast dest into byte type in dest_byte.  This way, we don't overflow if the allocated memory is not 4-byte aligned. */
-		dest_byte = (uint8_t *)dest;
-		for (i = 0; i < byte_count; i++)
-			dest_byte[i] = data_byte[i];
-	}
-
-	return 0;
-}
-
-/**
 * Copy bytes from an array into the SMC RAM space.
 *
 * @param    pSmuMgr  the address of the powerplay SMU manager.
@@ -264,23 +221,6 @@ polaris10_send_msg_to_smc(struct pp_smumgr *smumgr, uint16_t msg)
 	return 0;
 }
 
-
-/**
-* Send a message to the SMC, and do not wait for its response.
-*
-* @param    smumgr  the address of the powerplay hardware manager.
-* @param    msg the message to send.
-* @return   Always return 0.
-*/
-static int
-polaris10_send_msg_to_smc_without_waiting(struct pp_smumgr *smumgr,
-		uint16_t msg)
-{
-	cgs_write_register(smumgr->device, mmSMC_MESSAGE_0, msg);
-
-	return 0;
-}
-
 /**
 * Send a message to the SMC with parameter
 *
@@ -304,22 +244,6 @@ polaris10_send_msg_to_smc_with_parameter(struct pp_smumgr *smumgr,
 	return polaris10_send_msg_to_smc(smumgr, msg);
 }
 
-
-/**
-* Send a message to the SMC with parameter, do not wait for response
-*
-* @param    smumgr:  the address of the powerplay hardware manager.
-* @param    msg: the message to send.
-* @param    parameter: the parameter to send
-* @return   The response that came from the SMC.
-*/
-int polaris10_send_msg_to_smc_with_parameter_without_waiting(struct pp_smumgr *smumgr, uint16_t msg, uint32_t parameter)
-{
-	cgs_write_register(smumgr->device, mmSMC_MSG_ARG_0, parameter);
-
-	return polaris10_send_msg_to_smc_without_waiting(smumgr, msg);
-}
-
 static int polaris10_send_msg_to_smc_offset(struct pp_smumgr *smumgr)
 {
 	cgs_write_register(smumgr->device, mmSMC_MSG_ARG_0, 0x20000);
@@ -333,24 +257,6 @@ static int polaris10_send_msg_to_smc_offset(struct pp_smumgr *smumgr)
 
 	return 0;
 }
-
-/**
-* Wait until the SMC is doing nithing. Doing nothing means that the SMC is either turned off or it is sitting on the STOP instruction.
-*
-* @param    smumgr  the address of the powerplay hardware manager.
-* @param    msg the message to send.
-* @return   The response that came from the SMC.
-*/
-int polaris10_wait_for_smc_inactive(struct pp_smumgr *smumgr)
-{
-	/* If the SMC is not even on it qualifies as inactive. */
-	if (!polaris10_is_smc_ram_running(smumgr))
-		return -1;
-
-	SMUM_WAIT_VFPF_INDIRECT_FIELD(smumgr, SMC_IND, SMC_SYSCON_CLOCK_CNTL_0, cken, 0);
-	return 0;
-}
-
 
 /**
 * Upload the SMC firmware to the SMC microcontroller.

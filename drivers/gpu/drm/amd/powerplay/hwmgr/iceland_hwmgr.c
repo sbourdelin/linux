@@ -1143,34 +1143,6 @@ static int iceland_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-/**
- * @brief PhwIceland_GetVoltageOrder
- *  Returns index of requested voltage record in lookup(table)
- * @param hwmgr - pointer to hardware manager
- * @param lookutab - lookup list to search in
- * @param voltage - voltage to look for
- * @return 0 on success
- */
-uint8_t iceland_get_voltage_index(phm_ppt_v1_voltage_lookup_table *look_up_table,
-		uint16_t voltage)
-{
-	uint8_t count = (uint8_t) (look_up_table->count);
-	uint8_t i;
-
-	PP_ASSERT_WITH_CODE((NULL != look_up_table), "Lookup Table empty.", return 0;);
-	PP_ASSERT_WITH_CODE((0 != count), "Lookup Table empty.", return 0;);
-
-	for (i = 0; i < count; i++) {
-		/* find first voltage equal or bigger than requested */
-		if (look_up_table->entries[i].us_vdd >= voltage)
-			return i;
-	}
-
-	/* voltage is bigger than max voltage in the table */
-	return i-1;
-}
-
-
 static int iceland_get_std_voltage_value_sidd(struct pp_hwmgr *hwmgr,
 		pp_atomctrl_voltage_table_entry *tab, uint16_t *hi,
 		uint16_t *lo)
@@ -1556,27 +1528,6 @@ static int iceland_populate_smc_uvd_level(struct pp_hwmgr *hwmgr,
 					SMU71_Discrete_DpmTable *table)
 {
 	return 0;
-}
-
-uint8_t iceland_get_voltage_id(pp_atomctrl_voltage_table *voltage_table,
-		uint32_t voltage)
-{
-	uint8_t count = (uint8_t) (voltage_table->count);
-	uint8_t i = 0;
-
-	PP_ASSERT_WITH_CODE((NULL != voltage_table),
-		"Voltage Table empty.", return 0;);
-	PP_ASSERT_WITH_CODE((0 != count),
-		"Voltage Table empty.", return 0;);
-
-	for (i = 0; i < count; i++) {
-		/* find first voltage bigger than requested */
-		if (voltage_table->entries[i].value >= voltage)
-			return i;
-	}
-
-	/* voltage is bigger than max voltage in the table */
-	return i - 1;
 }
 
 static int iceland_populate_smc_vce_level(struct pp_hwmgr *hwmgr,
