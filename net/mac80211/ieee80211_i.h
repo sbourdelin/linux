@@ -289,6 +289,7 @@ struct ieee80211_if_ap {
 
 	struct ps_data ps;
 	atomic_t num_mcast_sta; /* number of stations receiving multicast */
+	atomic_t num_mcast_sta_if; /* num_mcast_sta w/o sta in AP_VLAN */
 	enum ieee80211_smps_mode req_smps, /* requested smps mode */
 			 driver_smps_mode; /* smps mode request */
 
@@ -305,6 +306,7 @@ struct ieee80211_if_vlan {
 
 	/* used for all tx if the VLAN is configured to 4-addr mode */
 	struct sta_info __rcu *sta;
+	atomic_t num_mcast_sta_if; /* number of stations receiving multicast */
 };
 
 struct mesh_stats {
@@ -1494,6 +1496,58 @@ ieee80211_have_rx_timestamp(struct ieee80211_rx_status *status)
 	    !(status->flag & (RX_FLAG_HT | RX_FLAG_VHT)))
 		return true;
 	return false;
+}
+
+static inline void
+ieee80211_vif_inc_num_mcast(struct ieee80211_sub_if_data *sdata)
+{
+	if (sdata->vif.type != NL80211_IFTYPE_AP &&
+	    sdata->vif.type != NL80211_IFTYPE_AP_VLAN)
+		return;
+
+	if (sdata->vif.type == NL80211_IFTYPE_AP)
+		atomic_inc(&sdata->u.ap.num_mcast_sta_if);
+	else if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
+		atomic_inc(&sdata->u.vlan.num_mcast_sta_if);
+
+	if (sdata->vif.type != NL80211_IFTYPE_AP_VLAN ||
+	    !sdata->u.vlan.sta) /* except 4addr mode */
+		atomic_inc(&sdata->bss->num_mcast_sta);
+}
+
+static inline void
+ieee80211_vif_dec_num_mcast(struct ieee80211_sub_if_data *sdata)
+{
+	if (sdata->vif.type != NL80211_IFTYPE_AP &&
+	    sdata->vif.type != NL80211_IFTYPE_AP_VLAN)
+		return;
+
+	if (sdata->vif.type == NL80211_IFTYPE_AP)
+		atomic_dec(&sdata->u.ap.num_mcast_sta_if);
+	else if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
+		atomic_dec(&sdata->u.vlan.num_mcast_sta_if);
+
+	if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN &&
+	    sdata->u.vlan.sta)
+		return; /* 4addr mode */
+
+	atomic_dec(&sdata->bss->num_mcast_sta);
+}
+
+/**
+ * @returns number of multicast stations connected
+ *  -1 if unsupported (no-AP, 4addr mode)
+ */
+static inline int
+ieee80211_vif_get_num_mcast_if(struct ieee80211_sub_if_data *sdata)
+{
+	if (sdata->vif.type == NL80211_IFTYPE_AP)
+		return atomic_read(&sdata->u.ap.num_mcast_sta_if);
+	else if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN &&
+		 !sdata->u.vlan.sta)
+		return atomic_read(&sdata->u.vlan.num_mcast_sta_if);
+	else
+		return -1;
 }
 
 u64 ieee80211_calculate_rx_timestamp(struct ieee80211_local *local,
