@@ -334,8 +334,7 @@ static capidrv_plci *new_plci(capidrv_contr *card, int chan)
 	capidrv_plci *plcip;
 
 	plcip = kzalloc(sizeof(capidrv_plci), GFP_ATOMIC);
-
-	if (plcip == NULL)
+	if (!plcip)
 		return NULL;
 
 	plcip->state = ST_PLCI_NONE;
@@ -403,8 +402,7 @@ static inline capidrv_ncci *new_ncci(capidrv_contr *card,
 	capidrv_ncci *nccip;
 
 	nccip = kzalloc(sizeof(capidrv_ncci), GFP_ATOMIC);
-
-	if (nccip == NULL)
+	if (!nccip)
 		return NULL;
 
 	nccip->ncci = ncci;
@@ -757,7 +755,7 @@ static inline int new_bchan(capidrv_contr *card)
 {
 	int i;
 	for (i = 0; i < card->nbchan; i++) {
-		if (card->bchans[i].plcip == NULL) {
+		if (!card->bchans[i].plcip) {
 			card->bchans[i].disconnecting = 0;
 			return i;
 		}
@@ -2192,7 +2190,7 @@ static void enable_dchannel_trace(capidrv_contr *card)
 		       card->name, errcode);
 		return;
 	}
-	if (strstr(manufacturer, "AVM") == NULL) {
+	if (!strstr(manufacturer, "AVM")) {
 		printk(KERN_ERR "%s: not from AVM, no d-channel trace possible (%s)\n",
 		       card->name, manufacturer);
 		return;
