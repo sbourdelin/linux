@@ -59,6 +59,19 @@ struct iio_const_attr {
 	struct iio_dev_attr iio_dev_attr_##_name		\
 	= IIO_ATTR(_name, _mode, _show, _store, _addr)
 
+#define IIO_DEVICE_ATTR_RO(_name, _addr)			\
+	struct iio_dev_attr iio_dev_attr_##_name		\
+	= IIO_ATTR(_name, S_IRUGO, _name##_show, NULL, _addr)
+
+#define IIO_DEVICE_ATTR_WO(_name, _addr)			\
+	struct iio_dev_attr iio_dev_attr_##_name		\
+	= IIO_ATTR(_name, S_IWUSR, NULL, _name##_store, _addr)
+
+#define IIO_DEVICE_ATTR_RW(_name, _addr)			            \
+	struct iio_dev_attr iio_dev_attr_##_name		            \
+	= IIO_ATTR(_name, (S_IWUSR | S_IRUGO), _name##_show, _name##_store, \
+		   _addr)
+
 #define IIO_DEVICE_ATTR_NAMED(_vname, _name, _mode, _show, _store, _addr) \
 	struct iio_dev_attr iio_dev_attr_##_vname			\
 	= IIO_ATTR(_name, _mode, _show, _store, _addr)
