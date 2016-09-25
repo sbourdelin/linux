@@ -471,7 +471,6 @@ static int capidrv_add_ack(struct capidrv_ncci *nccip,
 
 	n = kmalloc(sizeof(struct ncci_datahandle_queue), GFP_ATOMIC);
 	if (!n) {
-		printk(KERN_ERR "capidrv: kmalloc ncci_datahandle failed\n");
 		return -1;
 	}
 	n->next = NULL;
@@ -513,7 +512,6 @@ static void send_message(capidrv_contr *card, _cmsg *cmsg)
 	len = CAPIMSG_LEN(cmsg->buf);
 	skb = alloc_skb(len, GFP_ATOMIC);
 	if (!skb) {
-		printk(KERN_ERR "capidrv::send_message: can't allocate mem\n");
 		return;
 	}
 	memcpy(skb_put(skb, len), cmsg->buf, len);
@@ -2111,8 +2109,6 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 	if (skb_headroom(skb) < msglen) {
 		struct sk_buff *nskb = skb_realloc_headroom(skb, msglen);
 		if (!nskb) {
-			printk(KERN_ERR "capidrv-%d: if_sendbuf: no memory\n",
-			       card->contrnr);
 			(void)capidrv_del_ack(nccip, datahandle);
 			return 0;
 		}
@@ -2259,8 +2255,6 @@ static int capidrv_addcontr(u16 contr, struct capi_profile *profp)
 		return -1;
 	}
 	if (!(card = kzalloc(sizeof(capidrv_contr), GFP_ATOMIC))) {
-		printk(KERN_WARNING
-		       "capidrv: (%s) Could not allocate contr-struct.\n", id);
 		return -1;
 	}
 	card->owner = THIS_MODULE;
@@ -2272,8 +2266,6 @@ static int capidrv_addcontr(u16 contr, struct capi_profile *profp)
 				     sizeof(capidrv_bchan),
 				     GFP_ATOMIC);
 	if (!card->bchans) {
-		printk(KERN_WARNING
-		       "capidrv: (%s) Could not allocate bchan-structs.\n", id);
 		module_put(card->owner);
 		kfree(card);
 		return -1;
