@@ -1808,6 +1808,7 @@ ieee80211_tx_multicast_to_unicast(struct ieee80211_sub_if_data *sdata,
 		sta = rcu_dereference(sdata->u.vlan.sta);
 		if (sta) /* 4addr */
 			return 0;
+		prev = rcu_dereference(sdata->u.vlan.sta0);
 	case NL80211_IFTYPE_AP:
 		break;
 	default:
@@ -1839,6 +1840,9 @@ ieee80211_tx_multicast_to_unicast(struct ieee80211_sub_if_data *sdata,
 		return 0;
 	}
 
+	if (prev)
+		goto skip_lookup;
+
 	/* clone packets and update destination mac */
 	list_for_each_entry_rcu(sta, &local->sta_list, list) {
 		if (sdata != sta->sdata)
@@ -1862,6 +1866,7 @@ ieee80211_tx_multicast_to_unicast(struct ieee80211_sub_if_data *sdata,
 		prev = sta;
 	}
 
+skip_lookup:
 	if (likely(prev)) {
 		ieee80211_tx_dnat(skb, prev);
 		return 0;

@@ -67,6 +67,7 @@ static int ieee80211_change_iface(struct wiphy *wiphy,
 	if (type == NL80211_IFTYPE_AP_VLAN &&
 	    params && params->use_4addr == 0) {
 		RCU_INIT_POINTER(sdata->u.vlan.sta, NULL);
+		RCU_INIT_POINTER(sdata->u.vlan.sta0, NULL);
 		ieee80211_check_fast_rx_iface(sdata);
 	} else if (type == NL80211_IFTYPE_STATION &&
 		   params && params->use_4addr >= 0) {
@@ -1379,8 +1380,13 @@ static int ieee80211_change_station(struct wiphy *wiphy,
 		sta->sdata = vlansdata;
 		ieee80211_check_fast_xmit(sta);
 
-		if (test_sta_flag(sta, WLAN_STA_AUTHORIZED))
-			ieee80211_vif_inc_num_mcast(sta->sdata);
+		if (test_sta_flag(sta, WLAN_STA_AUTHORIZED) &&
+		    ieee80211_vif_inc_num_mcast(sta->sdata) == 1 &&
+		    sta->sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
+			rcu_assign_pointer(vlansdata->u.vlan.sta0, sta);
+		else if (sta->sdata->vif.type == NL80211_IFTYPE_AP_VLAN &&
+			 test_sta_flag(sta, WLAN_STA_AUTHORIZED))
+			RCU_INIT_POINTER(vlansdata->u.vlan.sta0, NULL);
 
 		ieee80211_send_layer2_update(sta);
 	}

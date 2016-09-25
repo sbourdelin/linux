@@ -162,11 +162,28 @@ struct sta_info *sta_info_get(struct ieee80211_sub_if_data *sdata,
 			      const u8 *addr)
 {
 	struct ieee80211_local *local = sdata->local;
-	struct sta_info *sta;
+	struct sta_info *sta = NULL;
 	struct rhash_head *tmp;
 	const struct bucket_table *tbl;
 
 	rcu_read_lock();
+
+	if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN &&
+	    !sdata->u.vlan.sta)
+		sta = rcu_dereference(sdata->u.vlan.sta0);
+
+	WARN_ONCE((sta && sta->sdata != sdata),
+		  "sdata->u.vlan.sta0->sdata != sdata");
+
+	if (sta && sta->sdata == sdata &&
+	    ether_addr_equal(sta->sta.addr, addr)) {
+		rcu_read_unlock();
+		/* this is safe as the caller must already hold
+		 * another rcu read section or the mutex
+		 */
+		return sta;
+	}
+
 	tbl = rht_dereference_rcu(local->sta_hash.tbl, &local->sta_hash);
 
 	for_each_sta_info(local, tbl, addr, sta, tmp) {
@@ -919,6 +936,10 @@ static int __must_check __sta_info_destroy_part1(struct sta_info *sta)
 	if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN &&
 	    rcu_access_pointer(sdata->u.vlan.sta) == sta)
 		RCU_INIT_POINTER(sdata->u.vlan.sta, NULL);
+
+	if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN &&
+	    rcu_access_pointer(sdata->u.vlan.sta0) == sta)
+		RCU_INIT_POINTER(sdata->u.vlan.sta0, NULL);
 
 	return 0;
 }
@@ -1883,6 +1904,9 @@ int sta_info_move_state(struct sta_info *sta,
 				ieee80211_recalc_p2p_go_ps_allowed(sta->sdata);
 		} else if (sta->sta_state == IEEE80211_STA_AUTHORIZED) {
 			ieee80211_vif_dec_num_mcast(sta->sdata);
+			if (sta->sdata->vif.type == NL80211_IFTYPE_AP_VLAN &&
+			    rcu_access_pointer(sta->sdata->u.vlan.sta0) == sta)
+				RCU_INIT_POINTER(sta->sdata->u.vlan.sta0, NULL);
 			clear_bit(WLAN_STA_AUTHORIZED, &sta->_flags);
 			ieee80211_clear_fast_xmit(sta);
 			ieee80211_clear_fast_rx(sta);
@@ -1890,7 +1914,12 @@ int sta_info_move_state(struct sta_info *sta,
 		break;
 	case IEEE80211_STA_AUTHORIZED:
 		if (sta->sta_state == IEEE80211_STA_ASSOC) {
-			ieee80211_vif_inc_num_mcast(sta->sdata);
+			if (ieee80211_vif_inc_num_mcast(sta->sdata) == 1 &&
+			    sta->sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
+				rcu_assign_pointer(sta->sdata->u.vlan.sta0,
+						   sta);
+			else if (sta->sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
+				RCU_INIT_POINTER(sta->sdata->u.vlan.sta0, NULL);
 			set_bit(WLAN_STA_AUTHORIZED, &sta->_flags);
 			ieee80211_check_fast_xmit(sta);
 			ieee80211_check_fast_rx(sta);

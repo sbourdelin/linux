@@ -307,6 +307,8 @@ struct ieee80211_if_vlan {
 
 	/* used for all tx if the VLAN is configured to 4-addr mode */
 	struct sta_info __rcu *sta;
+	/* the one and only authenticated station in non 4-addr mode if set */
+	struct sta_info __rcu *sta0;
 	atomic_t num_mcast_sta_if; /* number of stations receiving multicast */
 };
 
@@ -1499,21 +1501,25 @@ ieee80211_have_rx_timestamp(struct ieee80211_rx_status *status)
 	return false;
 }
 
-static inline void
+static inline int
 ieee80211_vif_inc_num_mcast(struct ieee80211_sub_if_data *sdata)
 {
+	int ret;
+
 	if (sdata->vif.type != NL80211_IFTYPE_AP &&
 	    sdata->vif.type != NL80211_IFTYPE_AP_VLAN)
-		return;
+		return -1;
 
 	if (sdata->vif.type == NL80211_IFTYPE_AP)
-		atomic_inc(&sdata->u.ap.num_mcast_sta_if);
+		ret = atomic_inc_return(&sdata->u.ap.num_mcast_sta_if);
 	else if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
-		atomic_inc(&sdata->u.vlan.num_mcast_sta_if);
+		ret = atomic_inc_return(&sdata->u.vlan.num_mcast_sta_if);
 
 	if (sdata->vif.type != NL80211_IFTYPE_AP_VLAN ||
 	    !sdata->u.vlan.sta) /* except 4addr mode */
 		atomic_inc(&sdata->bss->num_mcast_sta);
+
+	return ret;
 }
 
 static inline void
