@@ -1211,7 +1211,8 @@ static int nvme_rdma_conn_rejected(struct nvme_rdma_queue *queue,
 			(struct nvme_rdma_cm_rej *)ev->param.conn.private_data;
 
 		dev_err(queue->ctrl->ctrl.device,
-			"Connect rejected, status %d.", le16_to_cpu(rej->sts));
+			"Connect rejected, status %d.\n",
+			le16_to_cpu(rej->sts));
 		/* XXX: Think of something clever to do here... */
 	} else {
 		dev_err(queue->ctrl->ctrl.device,
