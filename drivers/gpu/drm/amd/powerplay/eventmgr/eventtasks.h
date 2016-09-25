@@ -58,6 +58,8 @@ int pem_task_un_block_hw_access(struct pp_eventmgr *eventmgr, struct pem_event_d
 int pem_task_reset_display_phys_access(struct pp_eventmgr *eventmgr, struct pem_event_data *event_data);
 int pem_task_set_cpu_power_state(struct pp_eventmgr *eventmgr, struct pem_event_data *event_data);
 int pem_task_notify_smc_display_config_after_power_state_adjustment(struct pp_eventmgr *eventmgr, struct pem_event_data *event_data);
+int pem_task_enable_clock_power_gating(struct pp_eventmgr *eventmgr,
+		struct pem_event_data *event_data);
 /*powersaving*/
 
 int pem_task_set_power_source(struct pp_eventmgr *eventmgr, struct pem_event_data *event_data);

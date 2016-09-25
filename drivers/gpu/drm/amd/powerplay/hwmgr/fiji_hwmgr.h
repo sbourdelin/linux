@@ -346,5 +346,6 @@ int fiji_update_uvd_dpm(struct pp_hwmgr *hwmgr, bool bgate);
 int fiji_update_samu_dpm(struct pp_hwmgr *hwmgr, bool bgate);
 int fiji_update_acp_dpm(struct pp_hwmgr *hwmgr, bool bgate);
 int fiji_enable_disable_vce_dpm(struct pp_hwmgr *hwmgr, bool enable);
+int fiji_hwmgr_init(struct pp_hwmgr *hwmgr);
 
 #endif /* _FIJI_HWMGR_H_ */

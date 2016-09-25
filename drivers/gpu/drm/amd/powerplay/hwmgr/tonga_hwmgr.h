@@ -398,5 +398,11 @@ int tonga_enable_disable_uvd_dpm(struct pp_hwmgr *hwmgr, bool enable);
 int tonga_enable_disable_vce_dpm(struct pp_hwmgr *hwmgr, bool enable);
 uint32_t tonga_get_xclk(struct pp_hwmgr *hwmgr);
 
+int
+tonga_initializa_dynamic_state_adjustment_rule_settings(struct pp_hwmgr *hwmgr);
+int tonga_get_mc_microcode_version(struct pp_hwmgr *hwmgr);
+int tonga_notify_smc_display_config_after_ps_adjustment(struct pp_hwmgr *hwmgr);
+int tonga_notify_smc_display_change(struct pp_hwmgr *hwmgr, bool has_display);
+
 #endif
 
