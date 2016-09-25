@@ -209,7 +209,7 @@ static int megasas_get_ld_vf_affiliation(struct megasas_instance *instance,
 int megasas_check_mpio_paths(struct megasas_instance *instance,
 			     struct scsi_cmnd *scmd);
 
-int
+static int
 megasas_issue_dcmd(struct megasas_instance *instance, struct megasas_cmd *cmd)
 {
 	instance->instancet->fire_cmd(instance,
@@ -2057,7 +2057,7 @@ megasas_internal_reset_defer_cmds(struct megasas_instance *instance);
 static void
 process_fw_state_change_wq(struct work_struct *work);
 
-void megasas_do_ocr(struct megasas_instance *instance)
+static void megasas_do_ocr(struct megasas_instance *instance)
 {
 	if ((instance->pdev->device == PCI_DEVICE_ID_LSI_SAS1064R) ||
 	(instance->pdev->device == PCI_DEVICE_ID_DELL_PERC5) ||
@@ -3981,7 +3981,7 @@ int megasas_alloc_cmds(struct megasas_instance *instance)
  * Return 0 for only Fusion adapter, if driver load/unload is not in progress
  * or FW is not under OCR.
  */
-inline int
+static inline int
 dcmd_timeout_ocr_possible(struct megasas_instance *instance) {
 
 	if (!instance->ctrl_context)
