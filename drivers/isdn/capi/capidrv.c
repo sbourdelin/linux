@@ -470,9 +470,8 @@ static int capidrv_add_ack(struct capidrv_ncci *nccip,
 	struct ncci_datahandle_queue *n, **pp;
 
 	n = kmalloc(sizeof(struct ncci_datahandle_queue), GFP_ATOMIC);
-	if (!n) {
+	if (!n)
 		return -1;
-	}
 	n->next = NULL;
 	n->datahandle = datahandle;
 	n->len = len;
@@ -511,9 +510,8 @@ static void send_message(capidrv_contr *card, _cmsg *cmsg)
 	}
 	len = CAPIMSG_LEN(cmsg->buf);
 	skb = alloc_skb(len, GFP_ATOMIC);
-	if (!skb) {
+	if (!skb)
 		return;
-	}
 	memcpy(skb_put(skb, len), cmsg->buf, len);
 	if (capi20_put_message(&global.ap, skb) != CAPI_NOERROR)
 		kfree_skb(skb);
@@ -976,13 +974,12 @@ static void handle_controller(_cmsg *cmsg)
 		if (debugmode)
 			printk(KERN_DEBUG "capidrv-%d: listenconf Info=0x%4x (%s) cipmask=0x%x\n",
 			       card->contrnr, cmsg->Info, capi_info2str(cmsg->Info), card->cipmask);
-		if (cmsg->Info) {
+		if (cmsg->Info)
 			listen_change_state(card, EV_LISTEN_CONF_ERROR);
-		} else if (card->cipmask == 0) {
+		else if (card->cipmask == 0)
 			listen_change_state(card, EV_LISTEN_CONF_EMPTY);
-		} else {
+		     else
 			listen_change_state(card, EV_LISTEN_CONF_OK);
-		}
 		break;
 
 	case CAPI_MANUFACTURER_IND:	/* Controller */
@@ -1263,11 +1260,10 @@ static void handle_plci(_cmsg *cmsg)
 			goto notfound;
 
 		plcip->plci = cmsg->adr.adrPLCI;
-		if (cmsg->Info) {
+		if (cmsg->Info)
 			plci_change_state(card, plcip, EV_PLCI_CONNECT_CONF_ERROR);
-		} else {
+		else
 			plci_change_state(card, plcip, EV_PLCI_CONNECT_CONF_OK);
-		}
 		break;
 
 	case CAPI_CONNECT_ACTIVE_IND:	/* plci */
@@ -1476,10 +1472,9 @@ static void handle_ncci(_cmsg *cmsg)
 		goto ignored;
 
 	case CAPI_DATA_B3_CONF:	/* ncci */
-		if (cmsg->Info) {
+		if (cmsg->Info)
 			printk(KERN_WARNING "CAPI_DATA_B3_CONF: Info %x - %s\n",
 			       cmsg->Info, capi_info2str(cmsg->Info));
-		}
 		nccip = find_ncci(card, cmsg->adr.adrNCCI);
 		if (!nccip)
 			goto notfound;
@@ -2319,9 +2314,8 @@ static int capidrv_addcontr(u16 contr, struct capi_profile *profp)
 	}
 	card->myid = card->interface.channels;
 	memset(card->bchans, 0, sizeof(capidrv_bchan) * card->nbchan);
-	for (i = 0; i < card->nbchan; i++) {
+	for (i = 0; i < card->nbchan; i++)
 		card->bchans[i].contr = card;
-	}
 
 	spin_lock_irqsave(&global_lock, flags);
 	card->next = global.contr_list;
@@ -2354,10 +2348,9 @@ static int capidrv_delcontr(u16 contr)
 	isdn_ctrl cmd;
 
 	spin_lock_irqsave(&global_lock, flags);
-	for (card = global.contr_list; card; card = card->next) {
+	for (card = global.contr_list; card; card = card->next)
 		if (card->contrnr == contr)
 			break;
-	}
 	if (!card) {
 		spin_unlock_irqrestore(&global_lock, flags);
 		printk(KERN_ERR "capidrv: delcontr: no contr %u\n", contr);
@@ -2504,9 +2497,8 @@ static int __init capidrv_init(void)
 
 	global.ap.recv_message = capidrv_recv_message;
 	errcode = capi20_register(&global.ap);
-	if (errcode) {
+	if (errcode)
 		return -EIO;
-	}
 
 	register_capictr_notifier(&capictr_nb);
 
