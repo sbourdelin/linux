@@ -138,7 +138,7 @@ int tonga_fan_ctrl_set_default_mode(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int tonga_fan_ctrl_start_smc_fan_control(struct pp_hwmgr *hwmgr)
+static int tonga_fan_ctrl_start_smc_fan_control(struct pp_hwmgr *hwmgr)
 {
 	int result;
 
@@ -360,7 +360,8 @@ int tonga_thermal_stop_thermal_controller(struct pp_hwmgr *hwmgr)
 * @param    Result the last failure code
 * @return   result from set temperature range routine
 */
-int tf_tonga_thermal_setup_fan_table(struct pp_hwmgr *hwmgr, void *input, void *output, void *storage, int result)
+static int tf_tonga_thermal_setup_fan_table(struct pp_hwmgr *hwmgr,
+		void *input, void *output, void *storage, int result)
 {
 	struct tonga_hwmgr *data = (struct tonga_hwmgr *)(hwmgr->backend);
 	SMU72_Discrete_FanTable fan_table = { FDO_MODE_HARDWARE };
@@ -451,7 +452,9 @@ int tf_tonga_thermal_setup_fan_table(struct pp_hwmgr *hwmgr, void *input, void *
 * @param    Result the last failure code
 * @return   result from set temperature range routine
 */
-int tf_tonga_thermal_start_smc_fan_control(struct pp_hwmgr *hwmgr, void *input, void *output, void *storage, int result)
+static int
+tf_tonga_thermal_start_smc_fan_control(struct pp_hwmgr *hwmgr, void *input,
+		void *output, void *storage, int result)
 {
 /* If the fantable setup has failed we could have disabled PHM_PlatformCaps_MicrocodeFanControl even after this function was included in the table.
  * Make sure that we still think controlling the fan is OK.

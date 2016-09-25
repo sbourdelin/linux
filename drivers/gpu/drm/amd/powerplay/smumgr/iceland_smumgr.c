@@ -164,7 +164,7 @@ static void iceland_pp_reset_smc(struct pp_smumgr *smumgr)
 				  rst_reg, 1);
 }
 
-int iceland_program_jump_on_start(struct pp_smumgr *smumgr)
+static int iceland_program_jump_on_start(struct pp_smumgr *smumgr)
 {
 	static const unsigned char pData[] = { 0xE0, 0x00, 0x80, 0x40 };
 

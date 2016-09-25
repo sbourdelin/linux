@@ -211,7 +211,7 @@ static int polaris10_program_jump_on_start(struct pp_smumgr *smumgr)
 *
 * @param    smumgr  the address of the powerplay hardware manager.
 */
-bool polaris10_is_smc_ram_running(struct pp_smumgr *smumgr)
+static bool polaris10_is_smc_ram_running(struct pp_smumgr *smumgr)
 {
 	return ((0 == SMUM_READ_VFPF_INDIRECT_FIELD(smumgr->device, CGS_IND_REG__SMC, SMC_SYSCON_CLOCK_CNTL_0, ck_disable))
 	&& (0x20100 <= cgs_read_ind_register(smumgr->device, CGS_IND_REG__SMC, ixSMC_PC_C)));
@@ -236,7 +236,8 @@ static bool polaris10_is_hw_avfs_present(struct pp_smumgr *smumgr)
 * @param    msg the message to send.
 * @return   The response that came from the SMC.
 */
-int polaris10_send_msg_to_smc(struct pp_smumgr *smumgr, uint16_t msg)
+static int
+polaris10_send_msg_to_smc(struct pp_smumgr *smumgr, uint16_t msg)
 {
 	int ret;
 
@@ -271,7 +272,9 @@ int polaris10_send_msg_to_smc(struct pp_smumgr *smumgr, uint16_t msg)
 * @param    msg the message to send.
 * @return   Always return 0.
 */
-int polaris10_send_msg_to_smc_without_waiting(struct pp_smumgr *smumgr, uint16_t msg)
+static int
+polaris10_send_msg_to_smc_without_waiting(struct pp_smumgr *smumgr,
+		uint16_t msg)
 {
 	cgs_write_register(smumgr->device, mmSMC_MESSAGE_0, msg);
 
@@ -286,7 +289,9 @@ int polaris10_send_msg_to_smc_without_waiting(struct pp_smumgr *smumgr, uint16_t
 * @param    parameter: the parameter to send
 * @return   The response that came from the SMC.
 */
-int polaris10_send_msg_to_smc_with_parameter(struct pp_smumgr *smumgr, uint16_t msg, uint32_t parameter)
+static int
+polaris10_send_msg_to_smc_with_parameter(struct pp_smumgr *smumgr,
+		uint16_t msg, uint32_t parameter)
 {
 	if (!polaris10_is_smc_ram_running(smumgr)) {
 		return -1;
@@ -315,7 +320,7 @@ int polaris10_send_msg_to_smc_with_parameter_without_waiting(struct pp_smumgr *s
 	return polaris10_send_msg_to_smc_without_waiting(smumgr, msg);
 }
 
-int polaris10_send_msg_to_smc_offset(struct pp_smumgr *smumgr)
+static int polaris10_send_msg_to_smc_offset(struct pp_smumgr *smumgr)
 {
 	cgs_write_register(smumgr->device, mmSMC_MSG_ARG_0, 0x20000);
 
@@ -479,7 +484,7 @@ int polaris10_write_smc_sram_dword(struct pp_smumgr *smumgr, uint32_t smc_addr, 
 }
 
 
-int polaris10_smu_fini(struct pp_smumgr *smumgr)
+static int polaris10_smu_fini(struct pp_smumgr *smumgr)
 {
 	if (smumgr->backend) {
 		kfree(smumgr->backend);
@@ -685,7 +690,7 @@ static int polaris10_perform_btc(struct pp_smumgr *smumgr)
 }
 
 
-int polaris10_setup_graphics_level_structure(struct pp_smumgr *smumgr)
+static int polaris10_setup_graphics_level_structure(struct pp_smumgr *smumgr)
 {
 	uint32_t vr_config;
 	uint32_t dpm_table_start;
@@ -739,7 +744,8 @@ int polaris10_setup_graphics_level_structure(struct pp_smumgr *smumgr)
 	return 0;
 }
 
-int polaris10_avfs_event_mgr(struct pp_smumgr *smumgr, bool SMU_VFT_INTACT)
+static int
+polaris10_avfs_event_mgr(struct pp_smumgr *smumgr, bool SMU_VFT_INTACT)
 {
 	struct polaris10_smumgr *smu_data = (struct polaris10_smumgr *)(smumgr->backend);
 

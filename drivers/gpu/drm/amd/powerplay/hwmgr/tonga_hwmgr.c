@@ -114,7 +114,7 @@ typedef enum DPM_EVENT_SRC DPM_EVENT_SRC;
 
 static const unsigned long PhwTonga_Magic = (unsigned long)(PHM_VIslands_Magic);
 
-struct tonga_power_state *cast_phw_tonga_power_state(
+static struct tonga_power_state *cast_phw_tonga_power_state(
 				  struct pp_hw_power_state *hw_ps)
 {
 	if (hw_ps == NULL)
@@ -127,7 +127,7 @@ struct tonga_power_state *cast_phw_tonga_power_state(
 	return (struct tonga_power_state *)hw_ps;
 }
 
-const struct tonga_power_state *cast_const_phw_tonga_power_state(
+static const struct tonga_power_state *cast_const_phw_tonga_power_state(
 				 const struct pp_hw_power_state *hw_ps)
 {
 	if (hw_ps == NULL)
@@ -140,7 +140,7 @@ const struct tonga_power_state *cast_const_phw_tonga_power_state(
 	return (const struct tonga_power_state *)hw_ps;
 }
 
-int tonga_add_voltage(struct pp_hwmgr *hwmgr,
+static int tonga_add_voltage(struct pp_hwmgr *hwmgr,
 	phm_ppt_v1_voltage_lookup_table *look_up_table,
 	phm_ppt_v1_voltage_lookup_record *record)
 {
@@ -181,7 +181,7 @@ int tonga_notify_smc_display_change(struct pp_hwmgr *hwmgr, bool has_display)
 	return (smum_send_msg_to_smc(hwmgr->smumgr, msg) == 0) ?  0 : -1;
 }
 
-uint8_t tonga_get_voltage_id(pp_atomctrl_voltage_table *voltage_table,
+static uint8_t tonga_get_voltage_id(pp_atomctrl_voltage_table *voltage_table,
 		uint32_t voltage)
 {
 	uint8_t count = (uint8_t) (voltage_table->count);
@@ -211,7 +211,8 @@ uint8_t tonga_get_voltage_id(pp_atomctrl_voltage_table *voltage_table,
  * @param voltage - voltage to look for
  * @return 0 on success
  */
-uint8_t tonga_get_voltage_index(phm_ppt_v1_voltage_lookup_table *look_up_table,
+static uint8_t
+tonga_get_voltage_index(phm_ppt_v1_voltage_lookup_table *look_up_table,
 		uint16_t voltage)
 {
 	uint8_t count = (uint8_t) (look_up_table->count);
@@ -268,7 +269,7 @@ static uint32_t tonga_get_dpm_level_enable_mask_value(
  *
  * @param    hwmgr  the address of the powerplay hardware manager.
  */
-void tonga_initialize_dpm_defaults(struct pp_hwmgr *hwmgr)
+static void tonga_initialize_dpm_defaults(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 	phw_tonga_ulv_parm *ulv = &(data->ulv);
@@ -405,7 +406,7 @@ static int tonga_get_sclk_for_voltage_evv(struct pp_hwmgr *hwmgr,
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   2 if vddgfx returned is greater than 2V or if BIOS
  */
-int tonga_get_evv_voltage(struct pp_hwmgr *hwmgr)
+static int tonga_get_evv_voltage(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 	struct phm_ppt_v1_information *pptable_info = (struct phm_ppt_v1_information *)(hwmgr->pptable);
@@ -477,7 +478,7 @@ int tonga_get_evv_voltage(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int tonga_enable_sclk_mclk_dpm(struct pp_hwmgr *hwmgr)
+static int tonga_enable_sclk_mclk_dpm(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 
@@ -521,7 +522,7 @@ int tonga_enable_sclk_mclk_dpm(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int tonga_start_dpm(struct pp_hwmgr *hwmgr)
+static int tonga_start_dpm(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 
@@ -565,7 +566,7 @@ int tonga_start_dpm(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int tonga_disable_sclk_mclk_dpm(struct pp_hwmgr *hwmgr)
+static int tonga_disable_sclk_mclk_dpm(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 
@@ -604,7 +605,7 @@ int tonga_disable_sclk_mclk_dpm(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int tonga_stop_dpm(struct pp_hwmgr *hwmgr)
+static int tonga_stop_dpm(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 
@@ -646,7 +647,7 @@ int tonga_stop_dpm(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int tonga_enable_sclk_control(struct pp_hwmgr *hwmgr)
+static int tonga_enable_sclk_control(struct pp_hwmgr *hwmgr)
 {
 	PHM_WRITE_VFPF_INDIRECT_FIELD(hwmgr->device, CGS_IND_REG__SMC, SCLK_PWRMGT_CNTL, SCLK_PWRMGT_OFF, 0);
 
@@ -684,7 +685,7 @@ PPSMC_Result tonga_send_msg_to_smc_return_parameter(
  * @param    n     :  DPM level
  * @return   The response that came from the SMC.
  */
-int tonga_dpm_force_state(struct pp_hwmgr *hwmgr, uint32_t n)
+static int tonga_dpm_force_state(struct pp_hwmgr *hwmgr, uint32_t n)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 	uint32_t level_mask = 1 << n;
@@ -709,7 +710,7 @@ int tonga_dpm_force_state(struct pp_hwmgr *hwmgr, uint32_t n)
  * @param    n     :  DPM level
  * @return   The response that came from the SMC.
  */
-int tonga_dpm_force_state_mclk(struct pp_hwmgr *hwmgr, uint32_t n)
+static int tonga_dpm_force_state_mclk(struct pp_hwmgr *hwmgr, uint32_t n)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 	uint32_t level_mask = 1 << n;
@@ -734,7 +735,7 @@ int tonga_dpm_force_state_mclk(struct pp_hwmgr *hwmgr, uint32_t n)
  * @param    n     :  DPM level
  * @return   The response that came from the SMC.
  */
-int tonga_dpm_force_state_pcie(struct pp_hwmgr *hwmgr, uint32_t n)
+static int tonga_dpm_force_state_pcie(struct pp_hwmgr *hwmgr, uint32_t n)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 
@@ -757,7 +758,7 @@ int tonga_dpm_force_state_pcie(struct pp_hwmgr *hwmgr, uint32_t n)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_set_boot_state(struct pp_hwmgr *hwmgr)
+static int tonga_set_boot_state(struct pp_hwmgr *hwmgr)
 {
 	/*
 	* SMC only stores one state that SW will ask to switch too,
@@ -857,7 +858,7 @@ static int tonga_process_firmware_header(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_read_clock_registers(struct pp_hwmgr *hwmgr)
+static int tonga_read_clock_registers(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 
@@ -901,7 +902,7 @@ int tonga_read_clock_registers(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_get_memory_type(struct pp_hwmgr *hwmgr)
+static int tonga_get_memory_type(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 	uint32_t temp;
@@ -921,7 +922,7 @@ int tonga_get_memory_type(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_enable_acpi_power_management(struct pp_hwmgr *hwmgr)
+static int tonga_enable_acpi_power_management(struct pp_hwmgr *hwmgr)
 {
 	PHM_WRITE_VFPF_INDIRECT_FIELD(hwmgr->device, CGS_IND_REG__SMC, GENERAL_PWRMGT, STATIC_PM_EN, 1);
 
@@ -934,7 +935,7 @@ int tonga_enable_acpi_power_management(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_init_power_gate_state(struct pp_hwmgr *hwmgr)
+static int tonga_init_power_gate_state(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 
@@ -953,7 +954,7 @@ int tonga_init_power_gate_state(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_check_for_dpm_running(struct pp_hwmgr *hwmgr)
+static int tonga_check_for_dpm_running(struct pp_hwmgr *hwmgr)
 {
 	/*
 	 * We return the status of Voltage Control instead of checking SCLK/MCLK DPM
@@ -969,7 +970,7 @@ int tonga_check_for_dpm_running(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_check_for_dpm_stopped(struct pp_hwmgr *hwmgr)
+static int tonga_check_for_dpm_stopped(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 
@@ -1123,7 +1124,7 @@ static void tonga_trim_voltage_table_to_fit_state_table(
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_construct_voltage_tables(struct pp_hwmgr *hwmgr)
+static int tonga_construct_voltage_tables(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 	struct phm_ppt_v1_information *pptable_info = (struct phm_ppt_v1_information *)(hwmgr->pptable);
@@ -1385,7 +1386,7 @@ static int tonga_populate_cac_tables(struct pp_hwmgr *hwmgr,
  * @return   always 0
  */
 
-int tonga_populate_smc_voltage_tables(struct pp_hwmgr *hwmgr,
+static int tonga_populate_smc_voltage_tables(struct pp_hwmgr *hwmgr,
 	SMU72_Discrete_DpmTable *table)
 {
 	int result;
@@ -1530,12 +1531,12 @@ static int tonga_get_dependecy_volt_by_clk(struct pp_hwmgr *hwmgr,
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_reset_to_default(struct pp_hwmgr *hwmgr)
+static int tonga_reset_to_default(struct pp_hwmgr *hwmgr)
 {
 	return (smum_send_msg_to_smc(hwmgr->smumgr, PPSMC_MSG_ResetToDefaults) == 0) ? 0 : 1;
 }
 
-int tonga_populate_memory_timing_parameters(
+static int tonga_populate_memory_timing_parameters(
 		struct pp_hwmgr *hwmgr,
 		uint32_t engine_clock,
 		uint32_t memory_clock,
@@ -1571,7 +1572,7 @@ int tonga_populate_memory_timing_parameters(
  * @return   always 0
  * This function is to be called from the SetPowerState table.
  */
-int tonga_program_memory_timing_parameters(struct pp_hwmgr *hwmgr)
+static int tonga_program_memory_timing_parameters(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 	int result = 0;
@@ -2109,7 +2110,8 @@ static int tonga_populate_single_memory_level(
  * @param    mclk        the MCLK value to be used in the decision if MVDD should be high or low.
  * @param    voltage     the SMC VOLTAGE structure to be populated
  */
-int tonga_populate_mvdd_value(struct pp_hwmgr *hwmgr, uint32_t mclk, SMIO_Pattern *smio_pattern)
+static int tonga_populate_mvdd_value(struct pp_hwmgr *hwmgr, uint32_t mclk,
+		SMIO_Pattern *smio_pattern)
 {
 	const tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 	struct phm_ppt_v1_information *pptable_info = (struct phm_ppt_v1_information *)(hwmgr->pptable);
@@ -2333,7 +2335,7 @@ static int tonga_populate_smc_boot_level(struct pp_hwmgr *hwmgr,
  * @param    engine_clock the engine clock to use to populate the structure
  * @param    sclk        the SMC SCLK structure to be populated
  */
-int tonga_calculate_sclk_params(struct pp_hwmgr *hwmgr,
+static int tonga_calculate_sclk_params(struct pp_hwmgr *hwmgr,
 		uint32_t engine_clock, SMU72_Discrete_GraphicsLevel *sclk)
 {
 	const tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
@@ -3123,7 +3125,7 @@ static void tonga_apply_dal_minimum_voltage_request(struct pp_hwmgr *hwmgr)
 	return;
 }
 
-int tonga_upload_dpm_level_enable_mask(struct pp_hwmgr *hwmgr)
+static int tonga_upload_dpm_level_enable_mask(struct pp_hwmgr *hwmgr)
 {
 	PPSMC_Result result;
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
@@ -3165,7 +3167,7 @@ int tonga_upload_dpm_level_enable_mask(struct pp_hwmgr *hwmgr)
 }
 
 
-int tonga_force_dpm_highest(struct pp_hwmgr *hwmgr)
+static int tonga_force_dpm_highest(struct pp_hwmgr *hwmgr)
 {
 	uint32_t level, tmp;
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
@@ -3329,7 +3331,7 @@ static int tonga_set_private_var_based_on_pptale(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int tonga_unforce_dpm_levels(struct pp_hwmgr *hwmgr)
+static int tonga_unforce_dpm_levels(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 	int result = 1;
@@ -3590,7 +3592,7 @@ static int tonga_patch_clock_voltage_limits_with_vddgfx_leakage(
 	return 0;
 }
 
-int tonga_sort_lookup_table(struct pp_hwmgr *hwmgr,
+static int tonga_sort_lookup_table(struct pp_hwmgr *hwmgr,
 		phm_ppt_v1_voltage_lookup_table *lookup_table)
 {
 	uint32_t table_size, i, j;
@@ -3666,7 +3668,7 @@ static int tonga_complete_dependency_tables(struct pp_hwmgr *hwmgr)
 	return result;
 }
 
-int tonga_init_sclk_threshold(struct pp_hwmgr *hwmgr)
+static int tonga_init_sclk_threshold(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 	data->low_sclk_interrupt_threshold = 0;
@@ -3674,7 +3676,7 @@ int tonga_init_sclk_threshold(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int tonga_setup_asic_task(struct pp_hwmgr *hwmgr)
+static int tonga_setup_asic_task(struct pp_hwmgr *hwmgr)
 {
 	int tmp_result, result = 0;
 
@@ -3711,7 +3713,7 @@ int tonga_setup_asic_task(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_enable_voltage_control(struct pp_hwmgr *hwmgr)
+static int tonga_enable_voltage_control(struct pp_hwmgr *hwmgr)
 {
 	/* enable voltage control */
 	PHM_WRITE_VFPF_INDIRECT_FIELD(hwmgr->device, CGS_IND_REG__SMC, GENERAL_PWRMGT, VOLT_PWRMGT_EN, 1);
@@ -3724,7 +3726,7 @@ int tonga_enable_voltage_control(struct pp_hwmgr *hwmgr)
  *
  * @param    hwmgr  the address of the powerplay hardware manager.
  */
-bool cf_tonga_voltage_control(const struct pp_hwmgr *hwmgr)
+static bool cf_tonga_voltage_control(const struct pp_hwmgr *hwmgr)
 {
 	const struct tonga_hwmgr *data = (struct tonga_hwmgr *)(hwmgr->backend);
 
@@ -3733,12 +3735,12 @@ bool cf_tonga_voltage_control(const struct pp_hwmgr *hwmgr)
 
 /*---------------------------MC----------------------------*/
 
-uint8_t tonga_get_memory_modile_index(struct pp_hwmgr *hwmgr)
+static uint8_t tonga_get_memory_modile_index(struct pp_hwmgr *hwmgr)
 {
 	return (uint8_t) (0xFF & (cgs_read_register(hwmgr->device, mmBIOS_SCRATCH_4) >> 16));
 }
 
-bool tonga_check_s0_mc_reg_index(uint16_t inReg, uint16_t *outReg)
+static bool tonga_check_s0_mc_reg_index(uint16_t inReg, uint16_t *outReg)
 {
 	bool result = true;
 
@@ -3831,7 +3833,7 @@ bool tonga_check_s0_mc_reg_index(uint16_t inReg, uint16_t *outReg)
 	return result;
 }
 
-int tonga_set_s0_mc_reg_index(phw_tonga_mc_reg_table *table)
+static int tonga_set_s0_mc_reg_index(phw_tonga_mc_reg_table *table)
 {
 	uint32_t i;
 	uint16_t address;
@@ -3844,7 +3846,9 @@ int tonga_set_s0_mc_reg_index(phw_tonga_mc_reg_table *table)
 	return 0;
 }
 
-int tonga_copy_vbios_smc_reg_table(const pp_atomctrl_mc_reg_table *table, phw_tonga_mc_reg_table *ni_table)
+static int
+tonga_copy_vbios_smc_reg_table(const pp_atomctrl_mc_reg_table *table,
+		phw_tonga_mc_reg_table *ni_table)
 {
 	uint8_t i, j;
 
@@ -3883,7 +3887,8 @@ int tonga_copy_vbios_smc_reg_table(const pp_atomctrl_mc_reg_table *table, phw_to
  * @param    table the address of MCRegTable
  * @return   always 0
  */
-int tonga_set_mc_special_registers(struct pp_hwmgr *hwmgr, phw_tonga_mc_reg_table *table)
+static int tonga_set_mc_special_registers(struct pp_hwmgr *hwmgr,
+		phw_tonga_mc_reg_table *table)
 {
 	uint8_t i, j, k;
 	uint32_t temp_reg;
@@ -3965,7 +3970,7 @@ int tonga_set_mc_special_registers(struct pp_hwmgr *hwmgr, phw_tonga_mc_reg_tabl
 	return 0;
 }
 
-int tonga_set_valid_flag(phw_tonga_mc_reg_table *table)
+static int tonga_set_valid_flag(phw_tonga_mc_reg_table *table)
 {
 	uint8_t i, j;
 	for (i = 0; i < table->last; i++) {
@@ -4039,7 +4044,7 @@ static int tonga_initialize_mc_reg_table(struct pp_hwmgr *hwmgr)
 * Copy one arb setting to another and then switch the active set.
 * arbFreqSrc and arbFreqDest is one of the MC_CG_ARB_FREQ_Fx constants.
 */
-int tonga_copy_and_switch_arb_sets(struct pp_hwmgr *hwmgr,
+static int tonga_copy_and_switch_arb_sets(struct pp_hwmgr *hwmgr,
 		uint32_t arbFreqSrc, uint32_t arbFreqDest)
 {
 	uint32_t mc_arb_dram_timing;
@@ -4096,7 +4101,7 @@ int tonga_copy_and_switch_arb_sets(struct pp_hwmgr *hwmgr,
  * @return   always 0
  * This function is to be called from the SetPowerState table.
  */
-int tonga_initial_switch_from_arb_f0_to_f1(struct pp_hwmgr *hwmgr)
+static int tonga_initial_switch_from_arb_f0_to_f1(struct pp_hwmgr *hwmgr)
 {
 	return tonga_copy_and_switch_arb_sets(hwmgr, MC_CG_ARB_FREQ_F0, MC_CG_ARB_FREQ_F1);
 }
@@ -4107,7 +4112,7 @@ int tonga_initial_switch_from_arb_f0_to_f1(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_init_arb_table_index(struct pp_hwmgr *hwmgr)
+static int tonga_init_arb_table_index(struct pp_hwmgr *hwmgr)
 {
 	const tonga_hwmgr *data = (struct tonga_hwmgr *)(hwmgr->backend);
 	uint32_t tmp;
@@ -4132,7 +4137,8 @@ int tonga_init_arb_table_index(struct pp_hwmgr *hwmgr)
 			data->arb_table_start,  tmp, data->sram_end);
 }
 
-int tonga_populate_mc_reg_address(struct pp_hwmgr *hwmgr, SMU72_Discrete_MCRegisters *mc_reg_table)
+static int tonga_populate_mc_reg_address(struct pp_hwmgr *hwmgr,
+		SMU72_Discrete_MCRegisters *mc_reg_table)
 {
 	const struct tonga_hwmgr *data = (struct tonga_hwmgr *)(hwmgr->backend);
 
@@ -4156,7 +4162,7 @@ int tonga_populate_mc_reg_address(struct pp_hwmgr *hwmgr, SMU72_Discrete_MCRegis
 }
 
 /*convert register values from driver to SMC format */
-void tonga_convert_mc_registers(
+static void tonga_convert_mc_registers(
 	const phw_tonga_mc_reg_entry * pEntry,
 	SMU72_Discrete_MCRegisterSet *pData,
 	uint32_t numEntries, uint32_t validflag)
@@ -4172,7 +4178,7 @@ void tonga_convert_mc_registers(
 }
 
 /* find the entry in the memory range table, then populate the value to SMC's tonga_mc_reg_table */
-int tonga_convert_mc_reg_table_entry_to_smc(
+static int tonga_convert_mc_reg_table_entry_to_smc(
 		struct pp_hwmgr *hwmgr,
 		const uint32_t memory_clock,
 		SMU72_Discrete_MCRegisterSet *mc_reg_table_data
@@ -4197,7 +4203,7 @@ int tonga_convert_mc_reg_table_entry_to_smc(
 	return 0;
 }
 
-int tonga_convert_mc_reg_table_to_smc(struct pp_hwmgr *hwmgr,
+static int tonga_convert_mc_reg_table_to_smc(struct pp_hwmgr *hwmgr,
 		SMU72_Discrete_MCRegisters *mc_reg_table)
 {
 	int result = 0;
@@ -4219,7 +4225,7 @@ int tonga_convert_mc_reg_table_to_smc(struct pp_hwmgr *hwmgr,
 	return result;
 }
 
-int tonga_populate_initial_mc_reg_table(struct pp_hwmgr *hwmgr)
+static int tonga_populate_initial_mc_reg_table(struct pp_hwmgr *hwmgr)
 {
 	int result;
 	struct tonga_hwmgr *data = (struct tonga_hwmgr *)(hwmgr->backend);
@@ -4243,7 +4249,8 @@ int tonga_populate_initial_mc_reg_table(struct pp_hwmgr *hwmgr)
  * @param   hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_program_static_screen_threshold_parameters(struct pp_hwmgr *hwmgr)
+static int
+tonga_program_static_screen_threshold_parameters(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 
@@ -4265,7 +4272,7 @@ int tonga_program_static_screen_threshold_parameters(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_enable_display_gap(struct pp_hwmgr *hwmgr)
+static int tonga_enable_display_gap(struct pp_hwmgr *hwmgr)
 {
 	uint32_t display_gap = cgs_read_ind_register(hwmgr->device,
 							CGS_IND_REG__SMC, ixCG_DISPLAY_GAP_CNTL);
@@ -4288,7 +4295,7 @@ int tonga_enable_display_gap(struct pp_hwmgr *hwmgr)
  * @param    hwmgr  the address of the powerplay hardware manager.
  * @return   always 0
  */
-int tonga_program_voting_clients(struct pp_hwmgr *hwmgr)
+static int tonga_program_voting_clients(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
 
@@ -4392,7 +4399,7 @@ static int tonga_disable_thermal_auto_throttle(struct pp_hwmgr *hwmgr)
 	return tonga_disable_auto_throttle_source(hwmgr, PHM_AutoThrottleSource_Thermal);
 }
 
-int tonga_enable_dpm_tasks(struct pp_hwmgr *hwmgr)
+static int tonga_enable_dpm_tasks(struct pp_hwmgr *hwmgr)
 {
 	int tmp_result, result = 0;
 
@@ -4481,7 +4488,7 @@ int tonga_enable_dpm_tasks(struct pp_hwmgr *hwmgr)
 	return result;
 }
 
-int tonga_disable_dpm_tasks(struct pp_hwmgr *hwmgr)
+static int tonga_disable_dpm_tasks(struct pp_hwmgr *hwmgr)
 {
 	int tmp_result, result = 0;
 
@@ -4515,7 +4522,7 @@ int tonga_reset_asic_tasks(struct pp_hwmgr *hwmgr)
 	return result;
 }
 
-int tonga_hwmgr_backend_fini(struct pp_hwmgr *hwmgr)
+static int tonga_hwmgr_backend_fini(struct pp_hwmgr *hwmgr)
 {
 	return phm_hwmgr_backend_fini(hwmgr);
 }
@@ -4526,7 +4533,7 @@ int tonga_hwmgr_backend_fini(struct pp_hwmgr *hwmgr)
  * @param   hwmgr the address of the powerplay hardware manager.
  * @return   1 if success; otherwise appropriate error code.
  */
-int tonga_hwmgr_backend_init(struct pp_hwmgr *hwmgr)
+static int tonga_hwmgr_backend_init(struct pp_hwmgr *hwmgr)
 {
 	int result = 0;
 	SMU72_Discrete_DpmTable  *table = NULL;
@@ -4930,7 +4937,7 @@ static int tonga_apply_state_adjust_rules(struct pp_hwmgr *hwmgr,
 	return 0;
 }
 
-int tonga_get_power_state_size(struct pp_hwmgr *hwmgr)
+static int tonga_get_power_state_size(struct pp_hwmgr *hwmgr)
 {
 	return sizeof(struct tonga_power_state);
 }
@@ -5869,7 +5876,7 @@ int tonga_notify_smc_display_config_after_ps_adjustment(struct pp_hwmgr *hwmgr)
 * @param    hwmgr  the address of the powerplay hardware manager.
 * @return   always OK
 */
-int tonga_program_display_gap(struct pp_hwmgr *hwmgr)
+static int tonga_program_display_gap(struct pp_hwmgr *hwmgr)
 {
 	struct tonga_hwmgr *data = (struct tonga_hwmgr *)(hwmgr->backend);
 	uint32_t num_active_displays = 0;
@@ -5913,7 +5920,7 @@ int tonga_program_display_gap(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int tonga_display_configuration_changed_task(struct pp_hwmgr *hwmgr)
+static int tonga_display_configuration_changed_task(struct pp_hwmgr *hwmgr)
 {
 
 	tonga_program_display_gap(hwmgr);
@@ -5971,7 +5978,7 @@ uint32_t tonga_get_xclk(struct pp_hwmgr *hwmgr)
 	return reference_clock;
 }
 
-int tonga_dpm_set_interrupt_state(void *private_data,
+static int tonga_dpm_set_interrupt_state(void *private_data,
 					 unsigned src_id, unsigned type,
 					 int enabled)
 {
@@ -6011,7 +6018,7 @@ int tonga_dpm_set_interrupt_state(void *private_data,
 	return 0;
 }
 
-int tonga_register_internal_thermal_interrupt(struct pp_hwmgr *hwmgr,
+static int tonga_register_internal_thermal_interrupt(struct pp_hwmgr *hwmgr,
 					const void *thermal_interrupt_info)
 {
 	int result;
@@ -6038,7 +6045,8 @@ int tonga_register_internal_thermal_interrupt(struct pp_hwmgr *hwmgr,
 	return 0;
 }
 
-bool tonga_check_smc_update_required_for_display_configuration(struct pp_hwmgr *hwmgr)
+static bool tonga_check_smc_update_required_for_display_configuration(
+			struct pp_hwmgr *hwmgr)
 {
 	struct tonga_hwmgr *data = (struct tonga_hwmgr *)(hwmgr->backend);
 	bool is_update_required = false;
@@ -6066,7 +6074,9 @@ static inline bool tonga_are_power_levels_equal(const struct tonga_performance_l
 		  (pl1->pcie_lane == pl2->pcie_lane));
 }
 
-int tonga_check_states_equal(struct pp_hwmgr *hwmgr, const struct pp_hw_power_state *pstate1, const struct pp_hw_power_state *pstate2, bool *equal)
+static int tonga_check_states_equal(struct pp_hwmgr *hwmgr,
+		const struct pp_hw_power_state *pstate1,
+		const struct pp_hw_power_state *pstate2, bool *equal)
 {
 	const struct tonga_power_state *psa = cast_const_phw_tonga_power_state(pstate1);
 	const struct tonga_power_state *psb = cast_const_phw_tonga_power_state(pstate2);
