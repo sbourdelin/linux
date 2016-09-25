@@ -945,6 +945,9 @@ void __init initmem_init(void)
 	max_low_pfn = memblock_end_of_DRAM() >> PAGE_SHIFT;
 	max_pfn = max_low_pfn;
 
+	/* bottom-up allocation may have been set by movable_node */
+	memblock_set_bottom_up(false);
+
 	if (parse_numa_properties())
 		setup_nonnuma();
 	else
