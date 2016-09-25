@@ -753,13 +753,13 @@ void ieee80211_amsdu_to_8023s(struct sk_buff *skb, struct sk_buff_head *list,
 	u16 ethertype;
 	u8 *payload;
 	int offset = 0, remaining, err;
-	struct ethhdr eth;
+	struct ethhdr eth, eth_80211;
 	bool reuse_frag = skb->head_frag && !skb_has_frag_list(skb);
 	bool reuse_skb = false;
 	bool last = false;
 
 	if (has_80211_header) {
-		err = __ieee80211_data_to_8023(skb, &eth, addr, iftype);
+		err = __ieee80211_data_to_8023(skb, &eth_80211, addr, iftype);
 		if (err)
 			goto out;
 	}
@@ -773,6 +773,13 @@ void ieee80211_amsdu_to_8023s(struct sk_buff *skb, struct sk_buff_head *list,
 		len = ntohs(eth.h_proto);
 		subframe_len = sizeof(struct ethhdr) + len;
 		padding = (4 - subframe_len) & 0x3;
+
+		if (unlikely(has_80211_header &&
+			     (iftype == NL80211_IFTYPE_AP ||
+			      iftype == NL80211_IFTYPE_AP_VLAN) &&
+			     ether_addr_equal(eth_80211.h_source, eth.h_source))
+		   )
+			goto purge;
 
 		/* the last MSDU has no padding */
 		remaining = skb->len - offset;
