@@ -75,7 +75,7 @@ static void tilcdc_fb_output_poll_changed(struct drm_device *dev)
 	drm_fbdev_cma_hotplug_event(priv->fbdev);
 }
 
-int tilcdc_atomic_check(struct drm_device *dev,
+static int tilcdc_atomic_check(struct drm_device *dev,
 			struct drm_atomic_state *state)
 {
 	int ret;
