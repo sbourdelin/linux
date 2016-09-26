@@ -451,6 +451,9 @@ int intel_bts_interrupt(void)
 	s64 old_head;
 	int err = -ENOSPC, handled = 0;
 
+	if (!x86_pmu.bts)
+		return 0;
+
 	/*
 	 * The only surefire way of knowing if this NMI is ours is by checking
 	 * the write ptr against the PMI threshold.
