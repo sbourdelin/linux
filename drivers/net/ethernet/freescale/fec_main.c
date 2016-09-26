@@ -1818,6 +1818,8 @@ static int fec_enet_mdio_write(struct mii_bus *bus, int mii_id, int regnum,
 		netdev_err(fep->netdev, "MDIO write timeout\n");
 		ret  = -ETIMEDOUT;
 	}
+	else
+		ret = 0;
 
 	pm_runtime_mark_last_busy(dev);
 	pm_runtime_put_autosuspend(dev);
