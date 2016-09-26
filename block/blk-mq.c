@@ -94,7 +94,7 @@ void blk_mq_wake_waiters(struct request_queue *q)
 	 * dying, we need to ensure that processes currently waiting on
 	 * the queue are notified as well.
 	 */
-	wake_up_all(&q->mq_freeze_wq);
+	wake_up_all(&q->freeze_wq);
 }
 
 bool blk_mq_can_queue(struct blk_mq_hw_ctx *hctx)
@@ -2036,7 +2036,7 @@ void blk_mq_free_queue(struct request_queue *q)
 static void blk_mq_queue_reinit(struct request_queue *q,
 				const struct cpumask *online_mask)
 {
-	WARN_ON_ONCE(!atomic_read(&q->mq_freeze_depth));
+	WARN_ON_ONCE(!atomic_read(&q->freeze_depth));
 
 	blk_mq_sysfs_unregister(q);
 

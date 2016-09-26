@@ -659,9 +659,9 @@ int blk_queue_enter(struct request_queue *q, bool nowait)
 		if (nowait)
 			return -EBUSY;
 
-		ret = wait_event_interruptible(q->mq_freeze_wq,
-				!atomic_read(&q->mq_freeze_depth) ||
-				blk_queue_dying(q));
+		ret = wait_event_interruptible(q->freeze_wq,
+					       !atomic_read(&q->freeze_depth) ||
+					       blk_queue_dying(q));
 		if (blk_queue_dying(q))
 			return -ENODEV;
 		if (ret)
@@ -679,14 +679,14 @@ static void blk_queue_usage_counter_release(struct percpu_ref *ref)
 	struct request_queue *q =
 		container_of(ref, struct request_queue, q_usage_counter);
 
-	wake_up_all(&q->mq_freeze_wq);
+	wake_up_all(&q->freeze_wq);
 }
 
 void blk_freeze_queue_start(struct request_queue *q)
 {
 	int freeze_depth;
 
-	freeze_depth = atomic_inc_return(&q->mq_freeze_depth);
+	freeze_depth = atomic_inc_return(&q->freeze_depth);
 	if (freeze_depth == 1) {
 		percpu_ref_kill(&q->q_usage_counter);
 		if (q->mq_ops)
@@ -698,12 +698,12 @@ void blk_freeze_queue_start(struct request_queue *q)
 
 void blk_freeze_queue_wait(struct request_queue *q)
 {
-	wait_event(q->mq_freeze_wq, percpu_ref_is_zero(&q->q_usage_counter));
+	wait_event(q->freeze_wq, percpu_ref_is_zero(&q->q_usage_counter));
 }
 
 /*
  * Guarantee no request is in use, so we can change any data structure of
- * the queue afterward. Increases q->mq_freeze_depth and waits until
+ * the queue afterward. Increases q->freeze_depth and waits until
  * q->q_usage_counter drops to zero.
  */
 void blk_freeze_queue(struct request_queue *q)
@@ -716,11 +716,11 @@ void blk_unfreeze_queue(struct request_queue *q)
 {
 	int freeze_depth;
 
-	freeze_depth = atomic_dec_return(&q->mq_freeze_depth);
+	freeze_depth = atomic_dec_return(&q->freeze_depth);
 	WARN_ON_ONCE(freeze_depth < 0);
 	if (!freeze_depth) {
 		percpu_ref_reinit(&q->q_usage_counter);
-		wake_up_all(&q->mq_freeze_wq);
+		wake_up_all(&q->freeze_wq);
 	}
 }
 
@@ -790,7 +790,7 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 	q->bypass_depth = 1;
 	__set_bit(QUEUE_FLAG_BYPASS, &q->queue_flags);
 
-	init_waitqueue_head(&q->mq_freeze_wq);
+	init_waitqueue_head(&q->freeze_wq);
 
 	/*
 	 * Init percpu_ref in atomic mode so that it's faster to shutdown.
