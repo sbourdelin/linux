@@ -359,6 +359,7 @@ enum {
 	STRIPE_R5C_FROZEN,	/* r5c_cache frozen and being written out */
 	STRIPE_R5C_WRITTEN,	/* ready for r5c_handle_stripe_written() */
 	STRIPE_R5C_PRIORITY,	/* high priority stripe for log reclaim */
+	STRIPE_R5C_PREFLUSH,	/* need to flush journal device */
 };
 
 #define STRIPE_EXPAND_SYNC_FLAGS \
