@@ -689,7 +689,10 @@ void blk_freeze_queue_start(struct request_queue *q)
 	freeze_depth = atomic_inc_return(&q->mq_freeze_depth);
 	if (freeze_depth == 1) {
 		percpu_ref_kill(&q->q_usage_counter);
-		blk_mq_run_hw_queues(q, false);
+		if (q->mq_ops)
+			blk_mq_run_hw_queues(q, false);
+		else if (q->request_fn)
+			blk_run_queue(q);
 	}
 }
 
@@ -700,17 +703,11 @@ void blk_freeze_queue_wait(struct request_queue *q)
 
 /*
  * Guarantee no request is in use, so we can change any data structure of
- * the queue afterward.
+ * the queue afterward. Increases q->mq_freeze_depth and waits until
+ * q->q_usage_counter drops to zero.
  */
 void blk_freeze_queue(struct request_queue *q)
 {
-	/*
-	 * In the !blk_mq case we are only calling this to kill the
-	 * q_usage_counter, otherwise this increases the freeze depth
-	 * and waits for it to return to zero.  For this reason there is
-	 * no blk_unfreeze_queue(), and blk_freeze_queue() is not
-	 * exported to drivers as the only user for unfreeze is blk_mq.
-	 */
 	blk_freeze_queue_start(q);
 	blk_freeze_queue_wait(q);
 }
