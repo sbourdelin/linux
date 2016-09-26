@@ -664,4 +664,6 @@ r5c_handle_stripe_written(struct r5conf *conf, struct stripe_head *sh);
 extern void r5c_freeze_stripe_for_reclaim(struct stripe_head *sh);
 extern void r5c_do_reclaim(struct r5conf *conf);
 extern int r5c_flush_cache(struct r5conf *conf, int num);
+extern struct md_sysfs_entry r5c_state;
+
 #endif
