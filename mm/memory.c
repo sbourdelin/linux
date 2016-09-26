@@ -3590,6 +3590,11 @@ static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 
 		barrier();
 		if (pmd_trans_huge(orig_pmd) || pmd_devmap(orig_pmd)) {
+			if (unlikely(is_pmd_migration_entry(orig_pmd))) {
+				pmd_migration_entry_wait(mm, fe.pmd);
+				return 0;
+			}
+
 			if (pmd_protnone(orig_pmd))
 				return do_huge_pmd_numa_page(&fe, orig_pmd);
 

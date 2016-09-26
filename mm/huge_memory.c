@@ -787,6 +787,19 @@ int copy_huge_pmd(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		goto out_unlock;
 	}
 
+	if (unlikely(is_pmd_migration_entry(pmd))) {
+		swp_entry_t entry = pmd_to_swp_entry(pmd);
+
+		if (is_write_migration_entry(entry)) {
+			make_migration_entry_read(&entry);
+			pmd = swp_entry_to_pmd(entry);
+			set_pmd_at(src_mm, addr, src_pmd, pmd);
+		}
+		set_pmd_at(dst_mm, addr, dst_pmd, pmd);
+		ret = 0;
+		goto out_unlock;
+	}
+
 	src_page = pmd_page(pmd);
 	VM_BUG_ON_PAGE(!PageHead(src_page), src_page);
 	get_page(src_page);
@@ -952,6 +965,9 @@ int do_huge_pmd_wp_page(struct fault_env *fe, pmd_t orig_pmd)
 	if (unlikely(!pmd_same(*fe->pmd, orig_pmd)))
 		goto out_unlock;
 
+	if (unlikely(is_pmd_migration_entry(*fe->pmd)))
+		goto out_unlock;
+
 	page = pmd_page(orig_pmd);
 	VM_BUG_ON_PAGE(!PageCompound(page) || !PageHead(page), page);
 	/*
@@ -1077,7 +1093,15 @@ struct page *follow_trans_huge_pmd(struct vm_area_struct *vma,
 	if ((flags & FOLL_NUMA) && pmd_protnone(*pmd))
 		goto out;
 
-	page = pmd_page(*pmd);
+	if (is_pmd_migration_entry(*pmd)) {
+		swp_entry_t entry;
+		entry = pmd_to_swp_entry(*pmd);
+		if (!is_migration_entry(entry))
+			goto out;
+		page = pfn_to_page(swp_offset(entry));
+	} else
+		page = pmd_page(*pmd);
+
 	VM_BUG_ON_PAGE(!PageHead(page) && !is_zone_device_page(page), page);
 	if (flags & FOLL_TOUCH)
 		touch_pmd(vma, addr, pmd);
@@ -1273,6 +1297,9 @@ bool madvise_free_huge_pmd(struct mmu_gather *tlb, struct vm_area_struct *vma,
 	if (is_huge_zero_pmd(orig_pmd))
 		goto out;
 
+	if (unlikely(is_pmd_migration_entry(orig_pmd)))
+		goto out;
+
 	page = pmd_page(orig_pmd);
 	/*
 	 * If other processes are mapping this page, we couldn't discard
@@ -1348,21 +1375,40 @@ int zap_huge_pmd(struct mmu_gather *tlb, struct vm_area_struct *vma,
 		spin_unlock(ptl);
 		tlb_remove_page(tlb, pmd_page(orig_pmd));
 	} else {
-		struct page *page = pmd_page(orig_pmd);
-		page_remove_rmap(page, true);
-		VM_BUG_ON_PAGE(page_mapcount(page) < 0, page);
-		VM_BUG_ON_PAGE(!PageHead(page), page);
-		if (PageAnon(page)) {
+		struct page *page;
+		int migration = 0;
+
+		if (!is_pmd_migration_entry(orig_pmd)) {
+			page = pmd_page(orig_pmd);
+			page_remove_rmap(page, true);
+			VM_BUG_ON_PAGE(page_mapcount(page) < 0, page);
+			VM_BUG_ON_PAGE(!PageHead(page), page);
+			if (PageAnon(page)) {
+				pgtable_t pgtable;
+				pgtable = pgtable_trans_huge_withdraw(tlb->mm, pmd);
+				pte_free(tlb->mm, pgtable);
+				atomic_long_dec(&tlb->mm->nr_ptes);
+				add_mm_counter(tlb->mm, MM_ANONPAGES, -HPAGE_PMD_NR);
+			} else {
+				add_mm_counter(tlb->mm, MM_FILEPAGES, -HPAGE_PMD_NR);
+			}
+		} else {
+			swp_entry_t entry;
 			pgtable_t pgtable;
+
+			entry = pmd_to_swp_entry(orig_pmd);
+			free_swap_and_cache(entry); /* waring in failure? */
+
+			add_mm_counter(tlb->mm, MM_ANONPAGES, -HPAGE_PMD_NR);
 			pgtable = pgtable_trans_huge_withdraw(tlb->mm, pmd);
 			pte_free(tlb->mm, pgtable);
 			atomic_long_dec(&tlb->mm->nr_ptes);
-			add_mm_counter(tlb->mm, MM_ANONPAGES, -HPAGE_PMD_NR);
-		} else {
-			add_mm_counter(tlb->mm, MM_FILEPAGES, -HPAGE_PMD_NR);
+
+			migration = 1;
 		}
 		spin_unlock(ptl);
-		tlb_remove_page_size(tlb, page, HPAGE_PMD_SIZE);
+		if (!migration)
+			tlb_remove_page_size(tlb, page, HPAGE_PMD_SIZE);
 	}
 	return 1;
 }
@@ -1441,6 +1487,11 @@ int change_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 		 * local/remote hits to the zero page are not interesting.
 		 */
 		if (prot_numa && is_huge_zero_pmd(*pmd)) {
+			spin_unlock(ptl);
+			return ret;
+		}
+
+		if (is_pmd_migration_entry(*pmd)) {
 			spin_unlock(ptl);
 			return ret;
 		}
@@ -1656,6 +1707,11 @@ void __split_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 
 	if (pmd_trans_huge(*pmd)) {
 		page = pmd_page(*pmd);
+
+		if (is_pmd_migration_entry(*pmd)) {
+			goto out;
+		}
+
 		if (PageMlocked(page))
 			clear_page_mlock(page);
 	} else if (!pmd_devmap(*pmd))
