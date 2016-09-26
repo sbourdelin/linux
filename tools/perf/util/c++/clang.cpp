@@ -27,10 +27,18 @@
 
 #include "clang.h"
 #include "clang-c.h"
+#include "clang-bpf-includes.h"
 #include "llvm-utils-cxx.h"
 #include "util-cxx.h"
 
 namespace perf {
+
+static struct BPFHeader {
+	llvm::StringRef Path;
+	llvm::StringRef Content;
+} BPFHeaders[] = {
+	{"/virtual/bpf-funcs.h", clang_builtin_bpf_funcs_str},
+};
 
 static std::unique_ptr<llvm::LLVMContext> LLVMCtx;
 
@@ -56,12 +64,33 @@ createCompilerInvocation(llvm::opt::ArgStringList CFlags, StringRef& Path,
 		"-x", "c"};
 
 	CCArgs.append(CFlags.begin(), CFlags.end());
+	for (BPFHeader &h : BPFHeaders) {
+		CCArgs.append(1, "-include");
+		CCArgs.append(1, h.Path.begin());
+	}
+
 	CompilerInvocation *CI = tooling::newInvocation(&Diags, CCArgs);
 
 	FrontendOptions& Opts = CI->getFrontendOpts();
 	Opts.Inputs.clear();
 	Opts.Inputs.emplace_back(Path, IK_C);
 	return CI;
+}
+
+static IntrusiveRefCntPtr<vfs::FileSystem>
+addBPFHeaders(IntrusiveRefCntPtr<vfs::FileSystem> VFS)
+{
+	using namespace vfs;
+
+	llvm::IntrusiveRefCntPtr<OverlayFileSystem> OverlayFS(
+			new OverlayFileSystem(VFS));
+	llvm::IntrusiveRefCntPtr<InMemoryFileSystem> MemFS(
+			new InMemoryFileSystem(true));
+	OverlayFS->pushOverlay(MemFS);
+
+	for (BPFHeader &h : BPFHeaders)
+		MemFS->addFile(h.Path, 0, llvm::MemoryBuffer::getMemBuffer(h.Content));
+	return OverlayFS;
 }
 
 static std::unique_ptr<llvm::Module>
@@ -71,7 +100,8 @@ getModuleFromSource(llvm::opt::ArgStringList CFlags,
 	CompilerInstance Clang;
 	Clang.createDiagnostics();
 
-	Clang.setVirtualFileSystem(&*VFS);
+	IntrusiveRefCntPtr<vfs::FileSystem> OverlayVFS = addBPFHeaders(VFS);
+	Clang.setVirtualFileSystem(&*OverlayVFS);
 
 	IntrusiveRefCntPtr<CompilerInvocation> CI =
 		createCompilerInvocation(std::move(CFlags), Path,
