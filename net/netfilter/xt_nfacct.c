@@ -28,7 +28,7 @@ static bool nfacct_mt(const struct sk_buff *skb, struct xt_action_param *par)
 
 	overquota = nfnl_acct_overquota(par->net, skb, info->nfacct);
 
-	return overquota == NFACCT_UNDERQUOTA ? false : true;
+	return !(overquota == NFACCT_UNDERQUOTA);
 }
 
 static int
