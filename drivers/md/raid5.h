@@ -227,6 +227,8 @@ struct stripe_head {
 	struct r5l_io_unit	*log_io;
 	struct list_head	log_list;
 	atomic_t		dev_in_cache;
+	sector_t		log_start; /* first meta block on the journal */
+	struct list_head	r5c; /* for r5c_cache->stripe_in_cache */
 	/**
 	 * struct stripe_operations
 	 * @target - STRIPE_OP_COMPUTE_BLK target
@@ -356,6 +358,7 @@ enum {
 				 * in conf->r5c_full_stripe_list) */
 	STRIPE_R5C_FROZEN,	/* r5c_cache frozen and being written out */
 	STRIPE_R5C_WRITTEN,	/* ready for r5c_handle_stripe_written() */
+	STRIPE_R5C_PRIORITY,	/* high priority stripe for log reclaim */
 };
 
 #define STRIPE_EXPAND_SYNC_FLAGS \
@@ -442,6 +445,26 @@ struct r5worker_group {
 	int stripes_cnt;
 };
 
+enum r5_cache_state {
+	R5_INACTIVE_BLOCKED,	/* release of inactive stripes blocked,
+				 * waiting for 25% to be free
+				 */
+	R5_ALLOC_MORE,		/* It might help to allocate another
+				 * stripe.
+				 */
+	R5_DID_ALLOC,		/* A stripe was allocated, don't allocate
+				 * more until at least one has been
+				 * released.  This avoids flooding
+				 * the cache.
+				 */
+	R5C_LOG_TIGHT,		/* journal device space tight, need to
+				 * prioritize stripes at last_checkpoint
+				 */
+	R5C_LOG_CRITICAL,	/* journal device is running out of space,
+				 * only process stripes at last_checkpoint
+				 */
+};
+
 struct r5conf {
 	struct hlist_head	*stripe_hashtbl;
 	/* only protect corresponding hash list and inactive_list */
@@ -480,6 +503,7 @@ struct r5conf {
 
 	struct list_head	handle_list; /* stripes needing handling */
 	struct list_head	hold_list; /* preread ready stripes */
+	struct list_head	r5c_priority_list; /* high priority stripes for reclaim */
 	struct list_head	delayed_list; /* stripes that have plugged requests */
 	struct list_head	bitmap_list; /* stripes delaying awaiting bitmap update */
 	struct bio		*retry_read_aligned; /* currently retrying aligned bios   */
@@ -543,17 +567,6 @@ struct r5conf {
 	wait_queue_head_t	wait_for_stripe;
 	wait_queue_head_t	wait_for_overlap;
 	unsigned long		cache_state;
-#define R5_INACTIVE_BLOCKED	1	/* release of inactive stripes blocked,
-					 * waiting for 25% to be free
-					 */
-#define R5_ALLOC_MORE		2	/* It might help to allocate another
-					 * stripe.
-					 */
-#define R5_DID_ALLOC		4	/* A stripe was allocated, don't allocate
-					 * more until at least one has been
-					 * released.  This avoids flooding
-					 * the cache.
-					 */
 	struct shrinker		shrinker;
 	int			pool_size; /* number of disks in stripeheads in pool */
 	spinlock_t		device_lock;
@@ -665,5 +678,7 @@ extern void r5c_freeze_stripe_for_reclaim(struct stripe_head *sh);
 extern void r5c_do_reclaim(struct r5conf *conf);
 extern int r5c_flush_cache(struct r5conf *conf, int num);
 extern struct md_sysfs_entry r5c_state;
+extern void r5c_check_stripe_cache_usage(struct r5conf *conf);
+extern void r5c_check_cached_full_stripe(struct r5conf *conf);
 
 #endif

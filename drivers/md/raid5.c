@@ -301,7 +301,9 @@ static void do_release_stripe(struct r5conf *conf, struct stripe_head *sh,
 		else {
 			clear_bit(STRIPE_DELAYED, &sh->state);
 			clear_bit(STRIPE_BIT_DELAY, &sh->state);
-			if (conf->worker_cnt_per_group == 0) {
+			if (test_bit(STRIPE_R5C_PRIORITY, &sh->state))
+				list_add_tail(&sh->lru, &conf->r5c_priority_list);
+			else if (conf->worker_cnt_per_group == 0) {
 				list_add_tail(&sh->lru, &conf->handle_list);
 			} else {
 				raid5_wakeup_stripe_thread(sh);
@@ -327,6 +329,7 @@ static void do_release_stripe(struct r5conf *conf, struct stripe_head *sh,
 				if (test_and_clear_bit(STRIPE_R5C_PARTIAL_STRIPE, &sh->state))
 					atomic_dec(&conf->r5c_cached_partial_stripes);
 				list_add_tail(&sh->lru, &conf->r5c_full_stripe_list);
+				r5c_check_cached_full_stripe(conf);
 			} else {
 				/* not full stripe */
 				if (!test_and_set_bit(STRIPE_R5C_PARTIAL_STRIPE,
@@ -697,9 +700,14 @@ raid5_get_active_stripe(struct r5conf *conf, sector_t sector,
 			}
 			if (noblock && sh == NULL)
 				break;
+
+			r5c_check_stripe_cache_usage(conf);
 			if (!sh) {
+				unsigned long before_jiffies;
 				set_bit(R5_INACTIVE_BLOCKED,
 					&conf->cache_state);
+				r5l_wake_reclaim(conf->log, 0);
+				before_jiffies = jiffies;
 				wait_event_lock_irq(
 					conf->wait_for_stripe,
 					!list_empty(conf->inactive_list + hash) &&
@@ -708,6 +716,9 @@ raid5_get_active_stripe(struct r5conf *conf, sector_t sector,
 					 || !test_bit(R5_INACTIVE_BLOCKED,
 						      &conf->cache_state)),
 					*(conf->hash_locks + hash));
+				before_jiffies = jiffies - before_jiffies;
+				if (before_jiffies > 20)
+					pr_debug("%s: wait for sh takes %lu jiffies\n", __func__, before_jiffies);
 				clear_bit(R5_INACTIVE_BLOCKED,
 					  &conf->cache_state);
 			} else {
@@ -915,18 +926,20 @@ static void ops_run_io(struct stripe_head *sh, struct stripe_head_state *s)
 	struct r5conf *conf = sh->raid_conf;
 	int i, disks = sh->disks;
 	struct stripe_head *head_sh = sh;
+	int ret;
 
 	might_sleep();
 
 	if (s->to_cache) {
-		if (r5c_cache_data(conf->log, sh, s) == 0)
+		ret = r5c_cache_data(conf->log, sh, s);
+		if (ret == 0 || ret == -ENOSPC)
 			return;
-		/* array is too big that meta data size > PAGE_SIZE  */
-		r5c_freeze_stripe_for_reclaim(sh);
 	}
 
-	if (r5l_write_stripe(conf->log, sh) == 0)
+	ret = r5l_write_stripe(conf->log, sh);
+	if (ret == 0 || ret == -ENOSPC)
 		return;
+
 	for (i = disks; i--; ) {
 		int op, op_flags = 0;
 		int replace_only = 0;
@@ -2045,8 +2058,10 @@ static struct stripe_head *alloc_stripe(struct kmem_cache *sc, gfp_t gfp,
 		spin_lock_init(&sh->batch_lock);
 		INIT_LIST_HEAD(&sh->batch_list);
 		INIT_LIST_HEAD(&sh->lru);
+		INIT_LIST_HEAD(&sh->r5c);
 		atomic_set(&sh->count, 1);
 		atomic_set(&sh->dev_in_cache, 0);
+		sh->log_start = MaxSector;
 		for (i = 0; i < disks; i++) {
 			struct r5dev *dev = &sh->dev[i];
 
@@ -5057,7 +5072,9 @@ static struct stripe_head *__get_priority_stripe(struct r5conf *conf, int group)
 	struct list_head *handle_list = NULL;
 	struct r5worker_group *wg = NULL;
 
-	if (conf->worker_cnt_per_group == 0) {
+	if (!list_empty(&conf->r5c_priority_list))
+		handle_list = &conf->r5c_priority_list;
+	else if (conf->worker_cnt_per_group == 0) {
 		handle_list = &conf->handle_list;
 	} else if (group != ANY_GROUP) {
 		handle_list = &conf->worker_groups[group].handle_list;
@@ -6049,7 +6066,6 @@ static void raid5d(struct md_thread *thread)
 			md_check_recovery(mddev);
 			spin_lock_irq(&conf->device_lock);
 		}
-		r5c_do_reclaim(conf);
 	}
 	pr_debug("%d stripes handled\n", handled);
 
@@ -6675,6 +6691,7 @@ static struct r5conf *setup_conf(struct mddev *mddev)
 	init_waitqueue_head(&conf->wait_for_overlap);
 	INIT_LIST_HEAD(&conf->handle_list);
 	INIT_LIST_HEAD(&conf->hold_list);
+	INIT_LIST_HEAD(&conf->r5c_priority_list);
 	INIT_LIST_HEAD(&conf->delayed_list);
 	INIT_LIST_HEAD(&conf->bitmap_list);
 	bio_list_init(&conf->return_bi);
