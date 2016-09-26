@@ -9,6 +9,7 @@
 #define BPF_ANY 0
 #define BPF_MAP_TYPE_ARRAY 2
 
+#ifndef BPF_HELPER_DEFINED
 struct bpf_map_def {
 	unsigned int type;
 	unsigned int key_size;
@@ -17,6 +18,7 @@ struct bpf_map_def {
 };
 
 #define SEC(NAME) __attribute__((section(NAME), used))
+#endif
 
 #ifndef BPF_FUNCS_DEFINED
 #define BPF_FUNC_map_lookup_elem 1
