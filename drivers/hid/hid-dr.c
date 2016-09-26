@@ -274,6 +274,8 @@ static int dr_probe(struct hid_device *hdev, const struct hid_device_id *id)
 			hid_hw_stop(hdev);
 			goto err;
 		}
+		/* has only 5 axes and reuses X, Y */
+		hdev->quirks |= HID_QUIRK_REUSE_AXES;
 		break;
 	}
 
