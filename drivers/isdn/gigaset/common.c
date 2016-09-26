@@ -710,10 +710,13 @@ struct cardstate *gigaset_initcs(struct gigaset_driver *drv, int channels,
 	cs->mode = M_UNKNOWN;
 	cs->mstate = MS_UNINITIALIZED;
 	cs->bcs = kmalloc_array(channels, sizeof(*cs->bcs), GFP_KERNEL);
+	if (!cs->bcs)
+		goto report_failure;
+
 	cs->inbuf = kmalloc(sizeof(*cs->inbuf), GFP_KERNEL);
-	if (!cs->bcs || !cs->inbuf) {
-		goto error;
-	}
+	if (!cs->inbuf)
+		goto free_bcs;
+
 	++cs->cs_init;
 
 	gig_dbg(DEBUG_INIT, "setting up at_state");
@@ -737,14 +740,14 @@ struct cardstate *gigaset_initcs(struct gigaset_driver *drv, int channels,
 	gig_dbg(DEBUG_INIT, "setting up iif");
 	if (gigaset_isdn_regdev(cs, modulename) < 0) {
 		pr_err("error registering ISDN device\n");
-		goto error;
+		goto free_bcs;
 	}
 
 	make_valid(cs, VALID_ID);
 	++cs->cs_init;
 	gig_dbg(DEBUG_INIT, "setting up hw");
 	if (cs->ops->initcshw(cs) < 0)
-		goto error;
+		goto free_bcs;
 
 	++cs->cs_init;
 
@@ -759,7 +762,7 @@ struct cardstate *gigaset_initcs(struct gigaset_driver *drv, int channels,
 		gig_dbg(DEBUG_INIT, "setting up bcs[%d]", i);
 		if (gigaset_initbcs(cs->bcs + i, cs, i) < 0) {
 			pr_err("could not allocate channel %d data\n", i);
-			goto error;
+			goto free_bcs;
 		}
 	}
 
@@ -772,8 +775,9 @@ struct cardstate *gigaset_initcs(struct gigaset_driver *drv, int channels,
 
 	gig_dbg(DEBUG_INIT, "cs initialized");
 	return cs;
-
-error:
+free_bcs:
+	kfree(cs->bcs);
+report_failure:
 	gig_dbg(DEBUG_INIT, "failed");
 	gigaset_freecs(cs);
 	return NULL;
