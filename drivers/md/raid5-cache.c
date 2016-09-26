@@ -2044,6 +2044,10 @@ void r5c_handle_stripe_written(struct r5conf *conf,
 		spin_unlock_irqrestore(&conf->log->stripe_in_cache_lock, flags);
 		sh->log_start = MaxSector;
 		clear_bit(STRIPE_R5C_PRIORITY, &sh->state);
+
+		if (test_and_clear_bit(STRIPE_FULL_WRITE, &sh->state))
+			if (atomic_dec_and_test(&conf->pending_full_writes))
+				md_wakeup_thread(conf->mddev->thread);
 	}
 
 	if (do_wakeup)
