@@ -62,6 +62,7 @@ createCompilerInvocation(llvm::opt::ArgStringList CFlags, StringRef& Path,
 		"-vectorize-slp",
 		"-Wno-unused-value",
 		"-Wno-pointer-sign",
+		"-DPERF_BUILTIN_CLANG=1"
 		"-x", "c"};
 
 	CCArgs.append(CFlags.begin(), CFlags.end());
