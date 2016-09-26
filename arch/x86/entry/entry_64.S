@@ -1045,7 +1045,9 @@ ENTRY(error_entry)
 	 * gsbase and proceed.  We'll fix up the exception and land in
 	 * .Lgs_change's error handler with kernel gsbase.
 	 */
-	jmp	.Lerror_entry_from_usermode_swapgs
+	SWAPGS
+	TRACE_IRQS_OFF
+	ret
 
 .Lbstep_iret:
 	/* Fix truncated RIP */
