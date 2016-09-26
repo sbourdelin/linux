@@ -24,6 +24,7 @@
 #include <linux/rcupdate.h>
 #include <linux/percpu-refcount.h>
 #include <linux/scatterlist.h>
+#include <linux/blkzoned.h>
 
 struct module;
 struct scsi_ioctl_command;
@@ -304,48 +305,6 @@ struct queue_limits {
 
 #ifdef CONFIG_BLK_DEV_ZONED
 
-/*
- * Zone type.
- */
-enum blk_zone_type {
-	BLK_ZONE_TYPE_UNKNOWN,
-	BLK_ZONE_TYPE_CONVENTIONAL,
-	BLK_ZONE_TYPE_SEQWRITE_REQ,
-	BLK_ZONE_TYPE_SEQWRITE_PREF,
-};
-
-/*
- * Zone condition.
- */
-enum blk_zone_cond {
-	BLK_ZONE_COND_NO_WP,
-	BLK_ZONE_COND_EMPTY,
-	BLK_ZONE_COND_IMP_OPEN,
-	BLK_ZONE_COND_EXP_OPEN,
-	BLK_ZONE_COND_CLOSED,
-	BLK_ZONE_COND_READONLY = 0xd,
-	BLK_ZONE_COND_FULL,
-	BLK_ZONE_COND_OFFLINE,
-};
-
-/*
- * Zone descriptor for BLKREPORTZONE.
- * start, len and wp use the regulare 512 B sector unit,
- * regardless of the device logical block size. The overall
- * structure size is 64 B to match the ZBC/ZAC defined zone descriptor
- * and allow support for future additional zone information.
- */
-struct blk_zone {
-	u64	start;		/* Zone start sector */
-	u64	len;		/* Zone length in number of sectors */
-	u64	wp;		/* Zone write pointer position */
-	u8	type;		/* Zone type */
-	u8	cond;		/* Zone condition */
-	u8	non_seq;	/* Non-sequential write resources active */
-	u8	reset;		/* Reset write pointer recommended */
-	u8	reserved[36];
-};
-
 struct blk_zone_report_hdr {
 	unsigned int	nr_zones;
 	u8		padding[60];
@@ -356,6 +315,28 @@ extern int blkdev_report_zones(struct block_device *,
 				unsigned int *, gfp_t);
 extern int blkdev_reset_zones(struct block_device *, sector_t,
 				sector_t, gfp_t);
+
+extern int blkdev_report_zones_ioctl(struct block_device *, fmode_t,
+				     unsigned int, unsigned long);
+extern int blkdev_reset_zones_ioctl(struct block_device *, fmode_t,
+				    unsigned int, unsigned long);
+
+#else /* CONFIG_BLK_DEV_ZONED */
+
+static inline int blkdev_report_zones_ioctl(struct block_device *bdev,
+					    fmode_t mode, unsigned int cmd,
+					    unsigned long arg)
+{
+	return -ENOTTY;
+}
+
+static inline int blkdev_reset_zones_ioctl(struct block_device *bdev,
+					   fmode_t mode, unsigned int cmd,
+					   unsigned long arg)
+{
+	return -ENOTTY;
+}
+
 #endif /* CONFIG_BLK_DEV_ZONED */
 
 struct request_queue {
