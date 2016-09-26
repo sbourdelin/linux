@@ -3102,7 +3102,7 @@ void scheduler_tick(void)
 u64 scheduler_tick_max_deferment(void)
 {
 	struct rq *rq = this_rq();
-	unsigned long next, now = READ_ONCE(jiffies);
+	unsigned long next, now = jiffies;
 
 	next = rq->last_sched_tick + HZ;
 

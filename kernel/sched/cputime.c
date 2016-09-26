@@ -722,7 +722,7 @@ void thread_group_cputime_adjusted(struct task_struct *p, cputime_t *ut, cputime
 #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
 static cputime_t vtime_delta(struct task_struct *tsk)
 {
-	unsigned long now = READ_ONCE(jiffies);
+	unsigned long now = jiffies;
 
 	if (time_before(now, (unsigned long)tsk->vtime_snap))
 		return 0;
@@ -732,7 +732,7 @@ static cputime_t vtime_delta(struct task_struct *tsk)
 
 static cputime_t get_vtime_delta(struct task_struct *tsk)
 {
-	unsigned long now = READ_ONCE(jiffies);
+	unsigned long now = jiffies;
 	cputime_t delta, other;
 
 	/*

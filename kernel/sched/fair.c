@@ -4813,7 +4813,7 @@ static void cpu_load_update_idle(struct rq *this_rq)
 	if (weighted_cpuload(cpu_of(this_rq)))
 		return;
 
-	cpu_load_update_nohz(this_rq, READ_ONCE(jiffies), 0);
+	cpu_load_update_nohz(this_rq, jiffies, 0);
 }
 
 /*
@@ -4839,7 +4839,7 @@ void cpu_load_update_nohz_start(void)
  */
 void cpu_load_update_nohz_stop(void)
 {
-	unsigned long curr_jiffies = READ_ONCE(jiffies);
+	unsigned long curr_jiffies = jiffies;
 	struct rq *this_rq = this_rq();
 	unsigned long load;
 
@@ -4862,7 +4862,7 @@ static void cpu_load_update_periodic(struct rq *this_rq, unsigned long load)
 {
 #ifdef CONFIG_NO_HZ_COMMON
 	/* See the mess around cpu_load_update_nohz(). */
-	this_rq->last_load_update_tick = READ_ONCE(jiffies);
+	this_rq->last_load_update_tick = jiffies;
 #endif
 	cpu_load_update(this_rq, load, 1);
 }
@@ -4875,7 +4875,7 @@ void cpu_load_update_active(struct rq *this_rq)
 	unsigned long load = weighted_cpuload(cpu_of(this_rq));
 
 	if (tick_nohz_tick_stopped())
-		cpu_load_update_nohz(this_rq, READ_ONCE(jiffies), load);
+		cpu_load_update_nohz(this_rq, jiffies, load);
 	else
 		cpu_load_update_periodic(this_rq, load);
 }
