@@ -2633,6 +2633,71 @@ void qed_rdma_remove_user(void *rdma_cxt, u16 dpi)
 	spin_unlock_bh(&p_hwfn->p_rdma_info->lock);
 }
 
+void qed_ll2b_complete_tx_gsi_packet(struct qed_hwfn *p_hwfn,
+				     u8 connection_handle,
+				     void *cookie,
+				     dma_addr_t first_frag_addr,
+				     bool b_last_fragment, bool b_last_packet)
+{
+	struct qed_roce_ll2_packet *packet = cookie;
+	struct qed_roce_ll2_info *roce_ll2 = p_hwfn->ll2;
+
+	roce_ll2->cbs.tx_cb(roce_ll2->cb_cookie, packet);
+}
+
+void qed_ll2b_release_tx_gsi_packet(struct qed_hwfn *p_hwfn,
+				    u8 connection_handle,
+				    void *cookie,
+				    dma_addr_t first_frag_addr,
+				    bool b_last_fragment, bool b_last_packet)
+{
+	qed_ll2b_complete_tx_gsi_packet(p_hwfn, connection_handle,
+					cookie, first_frag_addr,
+					b_last_fragment, b_last_packet);
+}
+
+void qed_ll2b_complete_rx_gsi_packet(struct qed_hwfn *p_hwfn,
+				     u8 connection_handle,
+				     void *cookie,
+				     dma_addr_t rx_buf_addr,
+				     u16 data_length,
+				     u8 data_length_error,
+				     u16 parse_flags,
+				     u16 vlan,
+				     u32 src_mac_addr_hi,
+				     u16 src_mac_addr_lo, bool b_last_packet)
+{
+	struct qed_roce_ll2_info *roce_ll2 = p_hwfn->ll2;
+	struct qed_roce_ll2_rx_params params;
+	struct qed_dev *cdev = p_hwfn->cdev;
+	struct qed_roce_ll2_packet pkt;
+
+	DP_VERBOSE(cdev,
+		   QED_MSG_LL2,
+		   "roce ll2 rx complete: bus_addr=%p, len=%d, data_len_err=%d\n",
+		   (void *)(uintptr_t)rx_buf_addr,
+		   data_length, data_length_error);
+
+	memset(&pkt, 0, sizeof(pkt));
+	pkt.n_seg = 1;
+	pkt.payload[0].baddr = rx_buf_addr;
+	pkt.payload[0].len = data_length;
+
+	memset(&params, 0, sizeof(params));
+	params.vlan_id = vlan;
+	*((u32 *)&params.smac[0]) = ntohl(src_mac_addr_hi);
+	*((u16 *)&params.smac[4]) = ntohs(src_mac_addr_lo);
+
+	if (data_length_error) {
+		DP_ERR(cdev,
+		       "roce ll2 rx complete: data length error %d, length=%d\n",
+		       data_length_error, data_length);
+		params.rc = -EINVAL;
+	}
+
+	roce_ll2->cbs.rx_cb(roce_ll2->cb_cookie, &pkt, &params);
+}
+
 static int qed_roce_ll2_set_mac_filter(struct qed_dev *cdev,
 				       u8 *old_mac_address,
 				       u8 *new_mac_address)
@@ -2717,6 +2782,7 @@ static int qed_roce_ll2_start(struct qed_dev *cdev,
 	ll2_params.tx_dest = CORE_TX_DEST_NW;
 	ll2_params.ai_err_packet_too_big = LL2_DROP_PACKET;
 	ll2_params.ai_err_no_buf = LL2_DROP_PACKET;
+	ll2_params.gsi_enable = true;
 
 	rc = qed_ll2_acquire_connection(QED_LEADING_HWFN(cdev), &ll2_params,
 					params->max_rx_buffers,
