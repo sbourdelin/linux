@@ -60,37 +60,9 @@ static void blk_mq_hctx_clear_pending(struct blk_mq_hw_ctx *hctx,
 
 void blk_mq_freeze_queue_start(struct request_queue *q)
 {
-	int freeze_depth;
-
-	freeze_depth = atomic_inc_return(&q->mq_freeze_depth);
-	if (freeze_depth == 1) {
-		percpu_ref_kill(&q->q_usage_counter);
-		blk_mq_run_hw_queues(q, false);
-	}
+	blk_freeze_queue_start(q);
 }
 EXPORT_SYMBOL_GPL(blk_mq_freeze_queue_start);
-
-static void blk_mq_freeze_queue_wait(struct request_queue *q)
-{
-	wait_event(q->mq_freeze_wq, percpu_ref_is_zero(&q->q_usage_counter));
-}
-
-/*
- * Guarantee no request is in use, so we can change any data structure of
- * the queue afterward.
- */
-void blk_freeze_queue(struct request_queue *q)
-{
-	/*
-	 * In the !blk_mq case we are only calling this to kill the
-	 * q_usage_counter, otherwise this increases the freeze depth
-	 * and waits for it to return to zero.  For this reason there is
-	 * no blk_unfreeze_queue(), and blk_freeze_queue() is not
-	 * exported to drivers as the only user for unfreeze is blk_mq.
-	 */
-	blk_mq_freeze_queue_start(q);
-	blk_mq_freeze_queue_wait(q);
-}
 
 void blk_mq_freeze_queue(struct request_queue *q)
 {
@@ -104,14 +76,7 @@ EXPORT_SYMBOL_GPL(blk_mq_freeze_queue);
 
 void blk_mq_unfreeze_queue(struct request_queue *q)
 {
-	int freeze_depth;
-
-	freeze_depth = atomic_dec_return(&q->mq_freeze_depth);
-	WARN_ON_ONCE(freeze_depth < 0);
-	if (!freeze_depth) {
-		percpu_ref_reinit(&q->q_usage_counter);
-		wake_up_all(&q->mq_freeze_wq);
-	}
+	blk_unfreeze_queue(q);
 }
 EXPORT_SYMBOL_GPL(blk_mq_unfreeze_queue);
 
@@ -2108,7 +2073,7 @@ static void blk_mq_queue_reinit_work(void)
 	list_for_each_entry(q, &all_q_list, all_q_node)
 		blk_mq_freeze_queue_start(q);
 	list_for_each_entry(q, &all_q_list, all_q_node) {
-		blk_mq_freeze_queue_wait(q);
+		blk_freeze_queue_wait(q);
 
 		/*
 		 * timeout handler can't touch hw queue during the

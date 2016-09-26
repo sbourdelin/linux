@@ -66,6 +66,9 @@ void __blk_queue_free_tags(struct request_queue *q);
 bool __blk_end_bidi_request(struct request *rq, int error,
 			    unsigned int nr_bytes, unsigned int bidi_bytes);
 void blk_freeze_queue(struct request_queue *q);
+void blk_freeze_queue_start(struct request_queue *q);
+void blk_freeze_queue_wait(struct request_queue *q);
+void blk_unfreeze_queue(struct request_queue *q);
 
 static inline void blk_queue_enter_live(struct request_queue *q)
 {
