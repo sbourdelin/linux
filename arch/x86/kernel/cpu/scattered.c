@@ -24,6 +24,16 @@ enum cpuid_regs {
 	CR_EBX
 };
 
+static bool supports_cpuid_faulting(void)
+{
+	unsigned int lo, hi;
+
+	if (rdmsr_safe(MSR_PLATFORM_INFO, &lo, &hi))
+		return false;
+
+	return lo & PLATINFO_CPUID_FAULT;
+}
+
 void init_scattered_cpuid_features(struct cpuinfo_x86 *c)
 {
 	u32 max_level;
@@ -54,4 +64,7 @@ void init_scattered_cpuid_features(struct cpuinfo_x86 *c)
 		if (regs[cb->reg] & (1 << cb->bit))
 			set_cpu_cap(c, cb->feature);
 	}
+
+	if (supports_cpuid_faulting())
+		set_cpu_cap(c, X86_FEATURE_CPUID_FAULT);
 }
