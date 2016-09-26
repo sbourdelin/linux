@@ -682,18 +682,20 @@ static void blk_queue_usage_counter_release(struct percpu_ref *ref)
 	wake_up_all(&q->freeze_wq);
 }
 
-void blk_freeze_queue_start(struct request_queue *q)
+bool blk_freeze_queue_start(struct request_queue *q, bool kill_percpu_ref)
 {
 	int freeze_depth;
 
 	freeze_depth = atomic_inc_return(&q->freeze_depth);
 	if (freeze_depth == 1) {
-		percpu_ref_kill(&q->q_usage_counter);
+		if (kill_percpu_ref)
+			percpu_ref_kill(&q->q_usage_counter);
 		if (q->mq_ops)
 			blk_mq_run_hw_queues(q, false);
 		else if (q->request_fn)
 			blk_run_queue(q);
 	}
+	return freeze_depth == 1;
 }
 
 void blk_freeze_queue_wait(struct request_queue *q)
@@ -708,21 +710,75 @@ void blk_freeze_queue_wait(struct request_queue *q)
  */
 void blk_freeze_queue(struct request_queue *q)
 {
-	blk_freeze_queue_start(q);
+	blk_freeze_queue_start(q, true);
 	blk_freeze_queue_wait(q);
 }
 
-void blk_unfreeze_queue(struct request_queue *q)
+static bool __blk_unfreeze_queue(struct request_queue *q,
+				 bool reinit_percpu_ref)
 {
 	int freeze_depth;
 
 	freeze_depth = atomic_dec_return(&q->freeze_depth);
 	WARN_ON_ONCE(freeze_depth < 0);
 	if (!freeze_depth) {
-		percpu_ref_reinit(&q->q_usage_counter);
+		if (reinit_percpu_ref)
+			percpu_ref_reinit(&q->q_usage_counter);
 		wake_up_all(&q->freeze_wq);
 	}
+	return freeze_depth == 0;
 }
+
+void blk_unfreeze_queue(struct request_queue *q)
+{
+	__blk_unfreeze_queue(q, true);
+}
+
+/**
+ * blk_quiesce_queue() - wait until all pending queue_rq calls have finished
+ *
+ * Prevent that new I/O requests are queued and wait until all pending
+ * queue_rq() calls have finished. Must not be called if the queue has already
+ * been frozen. Additionally, freezing the queue after having quiesced the
+ * queue and before resuming the queue is not allowed.
+ *
+ * Note: this function does not prevent that the struct request end_io()
+ * callback function is invoked.
+ */
+void blk_quiesce_queue(struct request_queue *q)
+{
+	spin_lock_irq(q->queue_lock);
+	WARN_ON_ONCE(blk_queue_quiescing(q));
+	queue_flag_set(QUEUE_FLAG_QUIESCING, q);
+	spin_unlock_irq(q->queue_lock);
+
+	WARN_ON_ONCE(!blk_freeze_queue_start(q, false));
+	synchronize_rcu();
+
+	spin_lock_irq(q->queue_lock);
+	WARN_ON_ONCE(!blk_queue_quiescing(q));
+	queue_flag_clear(QUEUE_FLAG_QUIESCING, q);
+	spin_unlock_irq(q->queue_lock);
+}
+EXPORT_SYMBOL_GPL(blk_quiesce_queue);
+
+/**
+ * blk_resume_queue() - resume request processing
+ *
+ * The caller is responsible for serializing blk_quiesce_queue() and
+ * blk_resume_queue().
+ */
+void blk_resume_queue(struct request_queue *q)
+{
+	WARN_ON_ONCE(!__blk_unfreeze_queue(q, false));
+	WARN_ON_ONCE(blk_queue_quiescing(q));
+
+	if (q->mq_ops)
+		blk_mq_run_hw_queues(q, false);
+	else
+		blk_run_queue(q);
+}
+EXPORT_SYMBOL_GPL(blk_resume_queue);
 
 static void blk_rq_timed_out_timer(unsigned long data)
 {

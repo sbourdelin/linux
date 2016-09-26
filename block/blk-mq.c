@@ -60,7 +60,7 @@ static void blk_mq_hctx_clear_pending(struct blk_mq_hw_ctx *hctx,
 
 void blk_mq_freeze_queue_start(struct request_queue *q)
 {
-	blk_freeze_queue_start(q);
+	blk_freeze_queue_start(q, true);
 }
 EXPORT_SYMBOL_GPL(blk_mq_freeze_queue_start);
 
@@ -437,6 +437,9 @@ static void blk_mq_requeue_work(struct work_struct *work)
 	struct request *rq, *next;
 	unsigned long flags;
 
+	if (blk_queue_quiescing(q))
+		return;
+
 	spin_lock_irqsave(&q->requeue_lock, flags);
 	list_splice_init(&q->requeue_list, &rq_list);
 	spin_unlock_irqrestore(&q->requeue_lock, flags);
@@ -753,6 +756,8 @@ static void __blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx)
 	 */
 	flush_busy_ctxs(hctx, &rq_list);
 
+	rcu_read_lock();
+
 	/*
 	 * If we have previous entries on our dispatch list, grab them
 	 * and stuff them at the front for more fair dispatch.
@@ -832,8 +837,11 @@ static void __blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx)
 		 *
 		 * blk_mq_run_hw_queue() already checks the STOPPED bit
 		 **/
-		blk_mq_run_hw_queue(hctx, true);
+		if (!blk_queue_quiescing(q))
+			blk_mq_run_hw_queue(hctx, true);
 	}
+
+	rcu_read_unlock();
 }
 
 /*
@@ -1285,7 +1293,7 @@ static blk_qc_t blk_mq_make_request(struct request_queue *q, struct bio *bio)
 		blk_mq_bio_to_request(rq, bio);
 
 		/*
-		 * We do limited pluging. If the bio can be merged, do that.
+		 * We do limited plugging. If the bio can be merged, do that.
 		 * Otherwise the existing request in the plug list will be
 		 * issued. So the plug list will have one request at most
 		 */
@@ -1305,9 +1313,13 @@ static blk_qc_t blk_mq_make_request(struct request_queue *q, struct bio *bio)
 		blk_mq_put_ctx(data.ctx);
 		if (!old_rq)
 			goto done;
-		if (!blk_mq_direct_issue_request(old_rq, &cookie))
-			goto done;
-		blk_mq_insert_request(old_rq, false, true, true);
+
+		rcu_read_lock();
+		if (blk_queue_quiescing(q) ||
+		    blk_mq_direct_issue_request(old_rq, &cookie) != 0)
+			blk_mq_insert_request(old_rq, false, true, true);
+		rcu_read_unlock();
+
 		goto done;
 	}
 
