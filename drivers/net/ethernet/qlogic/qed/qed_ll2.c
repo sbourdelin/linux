@@ -1026,6 +1026,7 @@ static void qed_ll2_prepare_tx_packet_set_bd(struct qed_hwfn *p_hwfn,
 					     u16 vlan,
 					     u8 bd_flags,
 					     u16 l4_hdr_offset_w,
+					     enum core_roce_flavor_type type,
 					     dma_addr_t first_frag,
 					     u16 first_frag_len)
 {
@@ -1045,6 +1046,9 @@ static void qed_ll2_prepare_tx_packet_set_bd(struct qed_hwfn *p_hwfn,
 	SET_FIELD(start_bd->bitfield0, CORE_TX_BD_NBDS, num_of_bds);
 	DMA_REGPAIR_LE(start_bd->addr, first_frag);
 	start_bd->nbytes = cpu_to_le16(first_frag_len);
+
+	SET_FIELD(start_bd->bd_flags.as_bitfield, CORE_TX_BD_FLAGS_ROCE_FLAV,
+		  type);
 
 	DP_VERBOSE(p_hwfn,
 		   (NETIF_MSG_TX_QUEUED | QED_MSG_LL2),
@@ -1137,11 +1141,13 @@ int qed_ll2_prepare_tx_packet(struct qed_hwfn *p_hwfn,
 			      u16 vlan,
 			      u8 bd_flags,
 			      u16 l4_hdr_offset_w,
+			      enum qed_ll2_roce_flavor_type qed_roce_flavor,
 			      dma_addr_t first_frag,
 			      u16 first_frag_len, void *cookie, u8 notify_fw)
 {
 	struct qed_ll2_tx_packet *p_curp = NULL;
 	struct qed_ll2_info *p_ll2_conn = NULL;
+	enum core_roce_flavor_type roce_flavor;
 	struct qed_ll2_tx_queue *p_tx;
 	struct qed_chain *p_tx_chain;
 	unsigned long flags;
@@ -1174,6 +1180,15 @@ int qed_ll2_prepare_tx_packet(struct qed_hwfn *p_hwfn,
 		goto out;
 	}
 
+	if (qed_roce_flavor == QED_LL2_ROCE) {
+		roce_flavor = CORE_ROCE;
+	} else if (qed_roce_flavor == QED_LL2_RROCE) {
+		roce_flavor = CORE_RROCE;
+	} else {
+		rc = -EINVAL;
+		goto out;
+	}
+
 	/* Prepare packet and BD, and perhaps send a doorbell to FW */
 	qed_ll2_prepare_tx_packet_set(p_hwfn, p_tx, p_curp,
 				      num_of_bds, first_frag,
@@ -1181,6 +1196,7 @@ int qed_ll2_prepare_tx_packet(struct qed_hwfn *p_hwfn,
 	qed_ll2_prepare_tx_packet_set_bd(p_hwfn, p_ll2_conn, p_curp,
 					 num_of_bds, CORE_TX_DEST_NW,
 					 vlan, bd_flags, l4_hdr_offset_w,
+					 roce_flavor,
 					 first_frag, first_frag_len);
 
 	qed_ll2_tx_packet_notify(p_hwfn, p_ll2_conn);
@@ -1625,8 +1641,8 @@ static int qed_ll2_start_xmit(struct qed_dev *cdev, struct sk_buff *skb)
 	rc = qed_ll2_prepare_tx_packet(QED_LEADING_HWFN(cdev),
 				       cdev->ll2->handle,
 				       1 + skb_shinfo(skb)->nr_frags,
-				       vlan, flags, 0, mapping,
-				       skb->len, skb, 1);
+				       vlan, flags, 0, 0 /* RoCE FLAVOR */,
+				       mapping, skb->len, skb, 1);
 	if (rc)
 		goto err;
 
