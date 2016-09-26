@@ -1085,7 +1085,7 @@ static int hns_nic_net_set_mac_address(struct net_device *ndev, void *p)
 	return 0;
 }
 
-void hns_nic_update_stats(struct net_device *netdev)
+static void hns_nic_update_stats(struct net_device *netdev)
 {
 	struct hns_nic_priv *priv = netdev_priv(netdev);
 	struct hnae_handle *h = priv->ae_handle;
@@ -1373,7 +1373,7 @@ static int hns_nic_do_ioctl(struct net_device *netdev, struct ifreq *ifr,
 
 /* use only for netconsole to poll with the device without interrupt */
 #ifdef CONFIG_NET_POLL_CONTROLLER
-void hns_nic_poll_controller(struct net_device *ndev)
+static void hns_nic_poll_controller(struct net_device *ndev)
 {
 	struct hns_nic_priv *priv = netdev_priv(ndev);
 	unsigned long flags;
@@ -1486,7 +1486,7 @@ static netdev_features_t hns_nic_fix_features(
  *
  * return void
  */
-void hns_set_multicast_list(struct net_device *ndev)
+static void hns_set_multicast_list(struct net_device *ndev)
 {
 	struct hns_nic_priv *priv = netdev_priv(ndev);
 	struct hnae_handle *h = priv->ae_handle;
@@ -1504,7 +1504,7 @@ void hns_set_multicast_list(struct net_device *ndev)
 	}
 }
 
-void hns_nic_set_rx_mode(struct net_device *ndev)
+static void hns_nic_set_rx_mode(struct net_device *ndev)
 {
 	struct hns_nic_priv *priv = netdev_priv(ndev);
 	struct hnae_handle *h = priv->ae_handle;
@@ -1519,8 +1519,9 @@ void hns_nic_set_rx_mode(struct net_device *ndev)
 	hns_set_multicast_list(ndev);
 }
 
-struct rtnl_link_stats64 *hns_nic_get_stats64(struct net_device *ndev,
-					      struct rtnl_link_stats64 *stats)
+static struct rtnl_link_stats64 *
+hns_nic_get_stats64(struct net_device *ndev,
+		    struct rtnl_link_stats64 *stats)
 {
 	int idx = 0;
 	u64 tx_bytes = 0;
