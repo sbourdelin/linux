@@ -338,7 +338,7 @@ static bool is_reachable_path(struct hda_codec *codec,
 {
 	if (!from_nid || !to_nid)
 		return false;
-	return snd_hda_get_conn_index(codec, to_nid, from_nid, true) >= 0;
+	return snd_hda_get_conn_index(codec, to_nid, from_nid, 0, true) >= 0;
 }
 
 /* nid, dir and idx */
@@ -397,7 +397,7 @@ static bool __parse_nid_path(struct hda_codec *codec,
 	else if (to_nid == (hda_nid_t)(-anchor_nid))
 		return false; /* hit the exclusive nid */
 
-	nums = snd_hda_get_conn_list(codec, to_nid, &conn);
+	nums = snd_hda_get_conn_list(codec, to_nid, 0, &conn);
 	for (i = 0; i < nums; i++) {
 		if (conn[i] != from_nid) {
 			/* special case: when from_nid is 0,
@@ -696,9 +696,9 @@ static bool is_stereo_amps(struct hda_codec *codec, hda_nid_t nid, int dir)
 		return true;
 	if (dir != HDA_INPUT || get_wcaps_type(wcaps) != AC_WID_AUD_MIX)
 		return false;
-	if (snd_hda_get_num_conns(codec, nid) != 1)
+	if (snd_hda_get_num_conns(codec, nid, 0) != 1)
 		return false;
-	if (snd_hda_get_connections(codec, nid, &conn, 1) < 0)
+	if (snd_hda_get_connections(codec, nid, 0, &conn, 1) < 0)
 		return false;
 	return !!(get_wcaps(codec, conn) & AC_WCAP_STEREO);
 }
@@ -791,7 +791,7 @@ static void activate_amp_in(struct hda_codec *codec, struct nid_path *path,
 	int type;
 	hda_nid_t nid = path->path[i];
 
-	nums = snd_hda_get_conn_list(codec, nid, &conn);
+	nums = snd_hda_get_conn_list(codec, nid, 0, &conn);
 	type = get_wcaps_type(get_wcaps(codec, nid));
 	if (type == AC_WID_PIN ||
 	    (type == AC_WID_AUD_IN && codec->single_adc_amp)) {
@@ -1060,7 +1060,7 @@ static int add_sw_ctl(struct hda_codec *codec, const char *pfx, int cidx,
 	val = amp_val_replace_channels(val, chs);
 	if (get_amp_direction_(val) == HDA_INPUT) {
 		hda_nid_t nid = get_amp_nid_(val);
-		int nums = snd_hda_get_num_conns(codec, nid);
+		int nums = snd_hda_get_num_conns(codec, nid, 0);
 		if (nums > 1) {
 			type = HDA_CTL_BIND_MUTE;
 			val |= nums << 19;
@@ -3002,7 +3002,7 @@ static bool look_for_mix_leaf_ctls(struct hda_codec *codec, hda_nid_t mix_nid,
 	const hda_nid_t *list;
 	hda_nid_t nid;
 
-	idx = snd_hda_get_conn_index(codec, mix_nid, pin, true);
+	idx = snd_hda_get_conn_index(codec, mix_nid, pin, 0, true);
 	if (idx < 0)
 		return false;
 
@@ -3015,7 +3015,7 @@ static bool look_for_mix_leaf_ctls(struct hda_codec *codec, hda_nid_t mix_nid,
 		return true;
 
 	/* check leaf node */
-	num_conns = snd_hda_get_conn_list(codec, mix_nid, &list);
+	num_conns = snd_hda_get_conn_list(codec, mix_nid, 0, &list);
 	if (num_conns < idx)
 		return false;
 	nid = list[idx];
@@ -4760,7 +4760,7 @@ static void mute_all_mixer_nid(struct hda_codec *codec, hda_nid_t mix)
 	const hda_nid_t *conn;
 	bool has_amp;
 
-	nums = snd_hda_get_conn_list(codec, mix, &conn);
+	nums = snd_hda_get_conn_list(codec, mix, 0, &conn);
 	has_amp = nid_has_mute(codec, mix, HDA_INPUT);
 	for (i = 0; i < nums; i++) {
 		if (has_amp)

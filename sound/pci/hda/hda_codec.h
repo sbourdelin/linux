@@ -329,11 +329,12 @@ snd_hda_codec_write(struct hda_codec *codec, hda_nid_t nid, int flags,
 #define snd_hda_get_sub_nodes(codec, nid, start_nid) \
 	snd_hdac_get_sub_nodes(&(codec)->core, nid, start_nid)
 int snd_hda_get_connections(struct hda_codec *codec, hda_nid_t nid,
-			    hda_nid_t *conn_list, int max_conns);
+			    int dev_id, hda_nid_t *conn_list,
+			    int max_conns);
 static inline int
-snd_hda_get_num_conns(struct hda_codec *codec, hda_nid_t nid)
+snd_hda_get_num_conns(struct hda_codec *codec, hda_nid_t nid, int dev_id)
 {
-	return snd_hda_get_connections(codec, nid, NULL, 0);
+	return snd_hda_get_connections(codec, nid, dev_id, NULL, 0);
 }
 
 #define snd_hda_get_raw_connections(codec, nid, list, max_conns) \
@@ -341,12 +342,12 @@ snd_hda_get_num_conns(struct hda_codec *codec, hda_nid_t nid)
 #define snd_hda_get_num_raw_conns(codec, nid) \
 	snd_hdac_get_connections(&(codec)->core, nid, NULL, 0);
 
-int snd_hda_get_conn_list(struct hda_codec *codec, hda_nid_t nid,
+int snd_hda_get_conn_list(struct hda_codec *codec, hda_nid_t nid, int dev_id,
 			  const hda_nid_t **listp);
-int snd_hda_override_conn_list(struct hda_codec *codec, hda_nid_t nid, int nums,
-			  const hda_nid_t *list);
+int snd_hda_override_conn_list(struct hda_codec *codec, hda_nid_t nid,
+			       int dev_id, int nums, const hda_nid_t *list);
 int snd_hda_get_conn_index(struct hda_codec *codec, hda_nid_t mux,
-			   hda_nid_t nid, int recursive);
+			   hda_nid_t nid, int dev_id, int recursive);
 int snd_hda_get_devices(struct hda_codec *codec, hda_nid_t nid,
 			u8 *dev_list, int max_devices);
 

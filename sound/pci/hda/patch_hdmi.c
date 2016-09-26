@@ -1198,7 +1198,7 @@ static int hdmi_read_pin_conn(struct hda_codec *codec, int pin_idx)
 		return -EINVAL;
 	}
 
-	per_pin->num_mux_nids = snd_hda_get_connections(codec, pin_nid,
+	per_pin->num_mux_nids = snd_hda_get_connections(codec, pin_nid, 0,
 							per_pin->mux_nids,
 							HDA_MAX_CONNECTIONS);
 
@@ -2224,14 +2224,16 @@ static void intel_haswell_fixup_connect_list(struct hda_codec *codec,
 	hda_nid_t conns[4];
 	int nconns;
 
-	nconns = snd_hda_get_connections(codec, nid, conns, ARRAY_SIZE(conns));
+	nconns = snd_hda_get_connections(codec, nid, 0, conns,
+					 ARRAY_SIZE(conns));
 	if (nconns == spec->num_cvts &&
 	    !memcmp(conns, spec->cvt_nids, spec->num_cvts * sizeof(hda_nid_t)))
 		return;
 
 	/* override pins connection list */
 	codec_dbg(codec, "hdmi: haswell: override pin connection 0x%x\n", nid);
-	snd_hda_override_conn_list(codec, nid, spec->num_cvts, spec->cvt_nids);
+	snd_hda_override_conn_list(codec, nid, 0, spec->num_cvts,
+				   spec->cvt_nids);
 }
 
 #define INTEL_VENDOR_NID 0x08

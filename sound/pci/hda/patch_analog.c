@@ -466,7 +466,7 @@ static int ad1983_auto_smux_enum_info(struct snd_kcontrol *kcontrol,
 	static const char * const texts2[] = { "PCM", "ADC" };
 	static const char * const texts3[] = { "PCM", "ADC1", "ADC2" };
 	hda_nid_t dig_out = spec->gen.multiout.dig_out_nid;
-	int num_conns = snd_hda_get_num_conns(codec, dig_out);
+	int num_conns = snd_hda_get_num_conns(codec, dig_out, 0);
 
 	if (num_conns == 2)
 		return snd_hda_enum_helper_info(kcontrol, uinfo, 2, texts2);
@@ -493,7 +493,7 @@ static int ad1983_auto_smux_enum_put(struct snd_kcontrol *kcontrol,
 	struct ad198x_spec *spec = codec->spec;
 	unsigned int val = ucontrol->value.enumerated.item[0];
 	hda_nid_t dig_out = spec->gen.multiout.dig_out_nid;
-	int num_conns = snd_hda_get_num_conns(codec, dig_out);
+	int num_conns = snd_hda_get_num_conns(codec, dig_out, 0);
 
 	if (val >= num_conns)
 		return -EINVAL;
@@ -521,7 +521,7 @@ static int ad1983_add_spdif_mux_ctl(struct hda_codec *codec)
 
 	if (!dig_out)
 		return 0;
-	num_conns = snd_hda_get_num_conns(codec, dig_out);
+	num_conns = snd_hda_get_num_conns(codec, dig_out, 0);
 	if (num_conns != 2 && num_conns != 3)
 		return 0;
 	if (!snd_hda_gen_add_kctl(&spec->gen, NULL, &ad1983_auto_smux_mixer))
@@ -546,8 +546,10 @@ static int patch_ad1983(struct hda_codec *codec)
 	set_beep_amp(spec, 0x10, 0, HDA_OUTPUT);
 
 	/* limit the loopback routes not to confuse the parser */
-	snd_hda_override_conn_list(codec, 0x0c, ARRAY_SIZE(conn_0c), conn_0c);
-	snd_hda_override_conn_list(codec, 0x0d, ARRAY_SIZE(conn_0d), conn_0d);
+	snd_hda_override_conn_list(codec, 0x0c, 0, ARRAY_SIZE(conn_0c),
+				   conn_0c);
+	snd_hda_override_conn_list(codec, 0x0d, 0, ARRAY_SIZE(conn_0d),
+				   conn_0d);
 
 	err = ad198x_parse_auto_config(codec, false);
 	if (err < 0)
@@ -745,7 +747,7 @@ static int ad1988_auto_smux_enum_info(struct snd_kcontrol *kcontrol,
 	static const char * const texts[] = {
 		"PCM", "ADC1", "ADC2", "ADC3",
 	};
-	int num_conns = snd_hda_get_num_conns(codec, 0x0b) + 1;
+	int num_conns = snd_hda_get_num_conns(codec, 0x0b, 0) + 1;
 	if (num_conns > 4)
 		num_conns = 4;
 	return snd_hda_enum_helper_info(kcontrol, uinfo, num_conns, texts);
@@ -768,7 +770,7 @@ static int ad1988_auto_smux_enum_put(struct snd_kcontrol *kcontrol,
 	struct ad198x_spec *spec = codec->spec;
 	unsigned int val = ucontrol->value.enumerated.item[0];
 	struct nid_path *path;
-	int num_conns = snd_hda_get_num_conns(codec, 0x0b) + 1;
+	int num_conns = snd_hda_get_num_conns(codec, 0x0b, 0) + 1;
 
 	if (val >= num_conns)
 		return -EINVAL;
@@ -856,7 +858,7 @@ static int ad1988_add_spdif_mux_ctl(struct hda_codec *codec)
 	    get_wcaps_type(get_wcaps(codec, 0x1d)) != AC_WID_AUD_MIX)
 		return 0;
 
-	num_conns = snd_hda_get_num_conns(codec, 0x0b) + 1;
+	num_conns = snd_hda_get_num_conns(codec, 0x0b, 0) + 1;
 	if (num_conns != 3 && num_conns != 4)
 		return 0;
 

@@ -867,7 +867,7 @@ static int add_secret_dac_path(struct hda_codec *codec)
 
 	if (!spec->gen.mixer_nid)
 		return 0;
-	nums = snd_hda_get_connections(codec, spec->gen.mixer_nid, conn,
+	nums = snd_hda_get_connections(codec, spec->gen.mixer_nid, 0, conn,
 				       ARRAY_SIZE(conn) - 1);
 	for (i = 0; i < nums; i++) {
 		if (get_wcaps_type(get_wcaps(codec, conn[i])) == AC_WID_AUD_OUT)
@@ -882,7 +882,7 @@ static int add_secret_dac_path(struct hda_codec *codec)
 			conn[nums++] = nid;
 			return snd_hda_override_conn_list(codec,
 							  spec->gen.mixer_nid,
-							  nums, conn);
+							  0, nums, conn);
 		}
 	}
 	return 0;
@@ -1082,8 +1082,10 @@ static void fix_vt1802_connections(struct hda_codec *codec)
 	static hda_nid_t conn_24[] = { 0x14, 0x1c };
 	static hda_nid_t conn_33[] = { 0x1c };
 
-	snd_hda_override_conn_list(codec, 0x24, ARRAY_SIZE(conn_24), conn_24);
-	snd_hda_override_conn_list(codec, 0x33, ARRAY_SIZE(conn_33), conn_33);
+	snd_hda_override_conn_list(codec, 0x24, 0, ARRAY_SIZE(conn_24),
+				   conn_24);
+	snd_hda_override_conn_list(codec, 0x33, 0, ARRAY_SIZE(conn_33),
+				   conn_33);
 }
 
 /* patch for vt2002P */
