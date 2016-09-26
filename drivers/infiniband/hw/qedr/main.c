@@ -87,7 +87,14 @@ static int qedr_register_device(struct qedr_dev *dev)
 
 	dev->ibdev.uverbs_cmd_mask = QEDR_UVERBS(GET_CONTEXT) |
 				     QEDR_UVERBS(QUERY_DEVICE) |
-				     QEDR_UVERBS(QUERY_PORT);
+				     QEDR_UVERBS(QUERY_PORT) |
+				     QEDR_UVERBS(ALLOC_PD) |
+				     QEDR_UVERBS(DEALLOC_PD) |
+				     QEDR_UVERBS(CREATE_COMP_CHANNEL) |
+				     QEDR_UVERBS(CREATE_CQ) |
+				     QEDR_UVERBS(RESIZE_CQ) |
+				     QEDR_UVERBS(DESTROY_CQ) |
+				     QEDR_UVERBS(REQ_NOTIFY_CQ);
 
 	dev->ibdev.phys_port_cnt = 1;
 	dev->ibdev.num_comp_vectors = dev->num_cnq;
@@ -104,6 +111,16 @@ static int qedr_register_device(struct qedr_dev *dev)
 	dev->ibdev.alloc_ucontext = qedr_alloc_ucontext;
 	dev->ibdev.dealloc_ucontext = qedr_dealloc_ucontext;
 	dev->ibdev.mmap = qedr_mmap;
+
+	dev->ibdev.alloc_pd = qedr_alloc_pd;
+	dev->ibdev.dealloc_pd = qedr_dealloc_pd;
+
+	dev->ibdev.create_cq = qedr_create_cq;
+	dev->ibdev.destroy_cq = qedr_destroy_cq;
+	dev->ibdev.resize_cq = qedr_resize_cq;
+	dev->ibdev.req_notify_cq = qedr_arm_cq;
+
+	dev->ibdev.query_pkey = qedr_query_pkey;
 
 	dev->ibdev.dma_device = &dev->pdev->dev;
  
@@ -324,6 +341,7 @@ static irqreturn_t qedr_irq_handler(int irq, void *handle)
 {
 	u16 hw_comp_cons, sw_comp_cons;
 	struct qedr_cnq *cnq = handle;
+	struct qedr_cq *cq;
 
 	qed_sb_ack(cnq->sb, IGU_INT_DISABLE, 0);
 
@@ -336,6 +354,11 @@ static irqreturn_t qedr_irq_handler(int irq, void *handle)
 	rmb();
 
 	while (sw_comp_cons != hw_comp_cons) {
+		if (cq->ibcq.comp_handler) {
+			(*cq->ibcq.comp_handler) (&cq->ibcq, cq->ibcq.cq_context);
+		}
+
+	
 		sw_comp_cons = qed_chain_get_cons_idx(&cnq->pbl);
 		cnq->n_comp++;
 	}
