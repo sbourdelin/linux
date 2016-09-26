@@ -102,6 +102,7 @@ int qed_rdma_alloc_tid(void *rdma_cxt, u32 *tid);
 int qed_rdma_deregister_tid(void *rdma_cxt, u32 tid);
 void qed_rdma_free_tid(void *rdma_cxt, u32 tid);
 struct qed_rdma_device *qed_rdma_query_device(void *rdma_cxt);
+struct qed_rdma_port *qed_rdma_query_port(void *rdma_cxt);
 int
 qed_rdma_register_tid(void *rdma_cxt,
 		      struct qed_rdma_register_tid_in_params *params);

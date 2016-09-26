@@ -1480,6 +1480,7 @@ static int qed_hw_get_resc(struct qed_hwfn *p_hwfn)
 	resc_num[QED_ILT] = PXP_NUM_ILT_RECORDS_BB / num_funcs;
 	resc_num[QED_LL2_QUEUE] = MAX_NUM_LL2_RX_QUEUES / num_funcs;
 	resc_num[QED_RDMA_CNQ_RAM] = NUM_OF_CMDQS_CQS / num_funcs;
+	resc_num[QED_RDMA_STATS_QUEUE] = RDMA_NUM_STATISTIC_COUNTERS_BB / num_funcs;
 
 	for (i = 0; i < QED_MAX_RESC; i++)
 		resc_start[i] = resc_num[i] * enabled_func_idx;
