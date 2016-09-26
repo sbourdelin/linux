@@ -1049,6 +1049,7 @@ config PROVE_LOCKING
 	select DEBUG_MUTEXES
 	select DEBUG_LOCK_ALLOC
 	select TRACE_IRQFLAGS
+	select PROVE_LOCKING_SMALL if SPARC
 	default n
 	help
 	 This feature enables the kernel to prove that all locking
@@ -1083,6 +1084,22 @@ config PROVE_LOCKING
 	 arbitrary combination of these separate locking variants.
 
 	 For more details, see Documentation/locking/lockdep-design.txt.
+
+config PROVE_LOCKING_SMALL
+	bool "Limit the space for prove locking correctness"
+	depends on PROVE_LOCKING && SPARC
+	help
+	 This feature limits the space used for "Lock debugging: prove
+	 locking correctness" by about 4MB. In sparc system, all the
+	 kernel's code, data, and bss, must have locked translations in
+	 the TLB so that it does not hit TLB misses. The current sparc
+	 chips have 8 TLB entries available that may be locked down, and
+	 with a 4mb page size, this gives a maximum of 32mb of memory for
+	 the kernel size. With PROVE_LOCKING feature, the kernel size could
+	 grow beyond this limit and causing system bootup issues. With
+	 this option, kernel limits the size of the entries of lock_chains,
+	 stack_trace etc. to debug PROVE_LOCKING so that kernel size fits
+	 in 32MB. This is only visible for SPARC.
 
 config LOCKDEP
 	bool
