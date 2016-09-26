@@ -1,0 +1,61 @@
+* Microsemi - vsc8531 Giga bit ethernet phy
+
+Required properties:
+- compatible	: Should contain phy id as "ethernet-phy-idAAAA.BBBB"
+		  If the phy's identifier is known then the list may contain an entry
+		  of the form: "ethernet-phy-idAAAA.BBBB" where
+		  AAAA - The value of the 16 bit Phy Identifier 1 register as
+			 4 hex digits. This is the chip vendor OUI bits 3:18
+		  BBBB - The value of the 16 bit Phy Identifier 2 register as
+			 4 hex digits. This is the chip vendor OUI bits 19:24,
+			 followed by 10 bits of a vendor specific ID.
+- reg		: The ID number for the phy, usually a small integer
+
+Optional properties:
+- vsc8531,edge-rate	: Edge rate sets the drive strength of the MAC
+			  interface output signals.  Changing the drive
+			  strength will affect the edge rate of the output
+			  signal.  The goal of this setting is to help
+			  reduce electrical emission (EMI) by being able
+			  to reprogram drive strength and in effect slow
+			  down the edge rate if desired.  Table 5 shows the
+			  impact to the edge rate per VDDMAC supply for each
+			  drive strength setting. Default edge rate is set as
+			  Fastest edge rate (i.e. 7).
+			  Ref: Table:1 - Edge rate change below.
+
+Note: see dt-bindings/net/mscc-vsc8531.h for applicable values
+
+Table: 1 - Edge rate change
+-----------------------------------------------------------------------------|
+|                             Edge Rate Change (VDDMAC)                      |
+|									     |
+| Reg Setting	3.3V		2.5V		1.8V		1.5V         |
+|----------------------------------------------------------------------------|
+| 111 		Default		Deafult		Default		Default      |
+| (Fastest)					(recommended)	(recommended)|
+|----------------------------------------------------------------------------|
+| 110		-2%		-3%		-5%		-6%          |
+|----------------------------------------------------------------------------|
+| 101		-4%		-6%		-9%		-14%         |
+|----------------------------------------------------------------------------|
+| 100		-7%		-10%		-16%		-21%         |
+|		(recommended)	(recommended)                                |
+|----------------------------------------------------------------------------|
+| 011		-10%		-14%		-23%		-29%         |
+|----------------------------------------------------------------------------|
+| 010		-17%		-23%		-35%		-42%         |
+|----------------------------------------------------------------------------|
+| 001		-29%		-37%		-52%		-58%         |
+|----------------------------------------------------------------------------|
+| 000		-53%		-63%		-76%		-77%         |
+| (slowest)								     |
+|----------------------------------------------------------------------------|
+
+Example:
+
+        vsc8531_0: ethernet-phy@0 {
+                compatible = "ethernet-phy-id0007.0570";
+                reg = <0>;
+                vsc8531,edge-rate = /bits/ 8 <MSCC_EDGE_RATE_CNTL_FASTEST>;
+        };
