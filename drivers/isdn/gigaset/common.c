@@ -712,7 +712,6 @@ struct cardstate *gigaset_initcs(struct gigaset_driver *drv, int channels,
 	cs->bcs = kmalloc_array(channels, sizeof(*cs->bcs), GFP_KERNEL);
 	cs->inbuf = kmalloc(sizeof(*cs->inbuf), GFP_KERNEL);
 	if (!cs->bcs || !cs->inbuf) {
-		pr_err("out of memory\n");
 		goto error;
 	}
 	++cs->cs_init;
