@@ -2075,9 +2075,8 @@ int bitmap_resize(struct bitmap *bitmap, sector_t blocks,
 				unsigned long k;
 
 				/* deallocate the page memory */
-				for (k = 0; k < page; k++) {
+				for (k = 0; k < page; k++)
 					kfree(new_bp[k].map);
-				}
 
 				/* restore some fields from old_counts */
 				bitmap->counts.bp = old_counts.bp;
