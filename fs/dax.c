@@ -157,8 +157,6 @@ static ssize_t dax_io(struct inode *inode, struct iov_iter *iter,
 		.addr = ERR_PTR(-EIO),
 	};
 	unsigned blkbits = inode->i_blkbits;
-	sector_t file_blks = (i_size_read(inode) + (1 << blkbits) - 1)
-								>> blkbits;
 
 	if (rw == READ)
 		end = min(end, i_size_read(inode));
@@ -185,9 +183,8 @@ static ssize_t dax_io(struct inode *inode, struct iov_iter *iter,
 				 * We allow uninitialized buffers for writes
 				 * beyond EOF as those cannot race with faults
 				 */
-				WARN_ON_ONCE(
-					(buffer_new(bh) && block < file_blks) ||
-					(rw == WRITE && buffer_unwritten(bh)));
+				WARN_ON_ONCE(rw == WRITE &&
+					     buffer_unwritten(bh));
 			} else {
 				unsigned done = bh->b_size -
 						(bh_max - (pos - first));
@@ -898,7 +895,7 @@ int dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 	}
 
 	/* Filesystem should not return unwritten buffers to us! */
-	WARN_ON_ONCE(buffer_unwritten(&bh) || buffer_new(&bh));
+	WARN_ON_ONCE(buffer_unwritten(&bh));
 	error = dax_insert_mapping(mapping, bh.b_bdev, to_sector(&bh, inode),
 			bh.b_size, &entry, vma, vmf);
  unlock_entry:
@@ -1007,7 +1004,7 @@ int dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 		if (get_block(inode, block, &bh, 1) != 0)
 			return VM_FAULT_SIGBUS;
 		alloc = true;
-		WARN_ON_ONCE(buffer_unwritten(&bh) || buffer_new(&bh));
+		WARN_ON_ONCE(buffer_unwritten(&bh));
 	}
 
 	bdev = bh.b_bdev;
