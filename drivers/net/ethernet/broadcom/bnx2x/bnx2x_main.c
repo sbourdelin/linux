@@ -4339,16 +4339,18 @@ static void bnx2x_attn_int_deasserted3(struct bnx2x *bp, u32 attn)
 	}
 
 	if (attn & EVEREST_LATCHED_ATTN_IN_USE_MASK) {
-		BNX2X_ERR("LATCHED attention 0x%08x (masked)\n", attn);
-		if (attn & BNX2X_GRC_TIMEOUT) {
-			val = CHIP_IS_E1(bp) ? 0 :
-					REG_RD(bp, MISC_REG_GRC_TIMEOUT_ATTN);
-			BNX2X_ERR("GRC time-out 0x%08x\n", val);
-		}
-		if (attn & BNX2X_GRC_RSV) {
-			val = CHIP_IS_E1(bp) ? 0 :
-					REG_RD(bp, MISC_REG_GRC_RSV_ATTN);
-			BNX2X_ERR("GRC reserved 0x%08x\n", val);
+		if (!bnx2x_is_reading_regs()) {
+			BNX2X_ERR("LATCHED attention 0x%08x (masked)\n", attn);
+			if (attn & BNX2X_GRC_TIMEOUT) {
+				val = CHIP_IS_E1(bp) ? 0 :
+				      REG_RD(bp, MISC_REG_GRC_TIMEOUT_ATTN);
+				BNX2X_ERR("GRC time-out 0x%08x\n", val);
+			}
+			if (attn & BNX2X_GRC_RSV) {
+				val = CHIP_IS_E1(bp) ? 0 :
+				      REG_RD(bp, MISC_REG_GRC_RSV_ATTN);
+				BNX2X_ERR("GRC reserved 0x%08x\n", val);
+			}
 		}
 		REG_WR(bp, MISC_REG_AEU_CLR_LATCH_SIGNAL, 0x7ff);
 	}

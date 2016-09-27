@@ -2053,6 +2053,7 @@ void bnx2x_update_coalesce(struct bnx2x *bp);
 int bnx2x_get_cur_phy_idx(struct bnx2x *bp);
 
 bool bnx2x_port_after_undi(struct bnx2x *bp);
+bool bnx2x_is_reading_regs(void);
 
 static inline u32 reg_poll(struct bnx2x *bp, u32 reg, u32 expected, int ms,
 			   int wait)

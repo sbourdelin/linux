@@ -29,6 +29,8 @@
 #include "bnx2x_dump.h"
 #include "bnx2x_init.h"
 
+static int bnx2x_reading_regs;
+
 /* Note: in the format strings below %s is replaced by the queue-name which is
  * either its index or 'fcoe' for the fcoe queue. Make sure the format string
  * length does not exceed ETH_GSTRING_LEN - MAX_QUEUE_NAME_LEN + 2
@@ -981,17 +983,22 @@ static void bnx2x_get_regs(struct net_device *dev,
 	memcpy(p, &dump_hdr, sizeof(struct dump_header));
 	p += dump_hdr.header_size + 1;
 
-	/* This isn't really an error, but since attention handling is going
-	 * to print the GRC timeouts using this macro, we use the same.
+	/* Actually read the registers - we use bnx2x_reading_regs to
+	 * avoid multiple unnecessary error messages to be printed on
+	 * kernel log when reading registers, like GRC timeouts.
 	 */
-	BNX2X_ERR("Generating register dump. Might trigger harmless GRC timeouts\n");
-
-	/* Actually read the registers */
+	bnx2x_reading_regs = 1;
 	__bnx2x_get_regs(bp, p);
+	bnx2x_reading_regs = 0;
 
 	/* Re-enable parity attentions */
 	bnx2x_clear_blocks_parity(bp);
 	bnx2x_enable_blocks_parity(bp);
+}
+
+inline bool bnx2x_is_reading_regs(void)
+{
+	return !!bnx2x_reading_regs;
 }
 
 static int bnx2x_get_preset_regs_len(struct net_device *dev, u32 preset)
