@@ -251,36 +251,6 @@ expired:
 	xfrm_pol_put(xp);
 }
 
-static struct flow_cache_object *xfrm_policy_flo_get(struct flow_cache_object *flo)
-{
-	struct xfrm_policy *pol = container_of(flo, struct xfrm_policy, flo);
-
-	if (unlikely(pol->walk.dead))
-		flo = NULL;
-	else
-		xfrm_pol_hold(pol);
-
-	return flo;
-}
-
-static int xfrm_policy_flo_check(struct flow_cache_object *flo)
-{
-	struct xfrm_policy *pol = container_of(flo, struct xfrm_policy, flo);
-
-	return !pol->walk.dead;
-}
-
-static void xfrm_policy_flo_delete(struct flow_cache_object *flo)
-{
-	xfrm_pol_put(container_of(flo, struct xfrm_policy, flo));
-}
-
-static const struct flow_cache_ops xfrm_policy_fc_ops = {
-	.get = xfrm_policy_flo_get,
-	.check = xfrm_policy_flo_check,
-	.delete = xfrm_policy_flo_delete,
-};
-
 /* Allocate xfrm_policy. Not used here, it is supposed to be used by pfkeyv2
  * SPD calls.
  */
@@ -303,7 +273,6 @@ struct xfrm_policy *xfrm_policy_alloc(struct net *net, gfp_t gfp)
 				(unsigned long)policy);
 		setup_timer(&policy->polq.hold_timer, xfrm_policy_queue_process,
 			    (unsigned long)policy);
-		policy->flo.ops = &xfrm_policy_fc_ops;
 	}
 	return policy;
 }
@@ -799,7 +768,6 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 	else
 		hlist_add_head(&policy->bydst, chain);
 	__xfrm_policy_link(policy, dir);
-	atomic_inc(&net->xfrm.flow_cache_genid);
 
 	/* After previous checking, family can either be AF_INET or AF_INET6 */
 	if (policy->family == AF_INET)
@@ -1188,59 +1156,11 @@ __xfrm_policy_lookup(struct net *net, const struct flowi *fl, u16 family, u8 dir
 	return xfrm_policy_lookup_bytype(net, XFRM_POLICY_TYPE_MAIN, fl, family, dir);
 }
 
-static int flow_to_policy_dir(int dir)
-{
-	if (XFRM_POLICY_IN == FLOW_DIR_IN &&
-	    XFRM_POLICY_OUT == FLOW_DIR_OUT &&
-	    XFRM_POLICY_FWD == FLOW_DIR_FWD)
-		return dir;
-
-	switch (dir) {
-	default:
-	case FLOW_DIR_IN:
-		return XFRM_POLICY_IN;
-	case FLOW_DIR_OUT:
-		return XFRM_POLICY_OUT;
-	case FLOW_DIR_FWD:
-		return XFRM_POLICY_FWD;
-	}
-}
-
-static struct flow_cache_object *
+static struct xfrm_policy *
 xfrm_policy_lookup(struct net *net, const struct flowi *fl, u16 family,
-		   u8 dir, struct flow_cache_object *old_obj, void *ctx)
+		   u8 dir, void *ctx)
 {
-	struct xfrm_policy *pol;
-
-	if (old_obj)
-		xfrm_pol_put(container_of(old_obj, struct xfrm_policy, flo));
-
-	pol = __xfrm_policy_lookup(net, fl, family, flow_to_policy_dir(dir));
-	if (IS_ERR_OR_NULL(pol))
-		return ERR_CAST(pol);
-
-	/* Resolver returns two references:
-	 * one for cache and one for caller of flow_cache_lookup() */
-	xfrm_pol_hold(pol);
-
-	return &pol->flo;
-}
-
-static inline int policy_to_flow_dir(int dir)
-{
-	if (XFRM_POLICY_IN == FLOW_DIR_IN &&
-	    XFRM_POLICY_OUT == FLOW_DIR_OUT &&
-	    XFRM_POLICY_FWD == FLOW_DIR_FWD)
-		return dir;
-	switch (dir) {
-	default:
-	case XFRM_POLICY_IN:
-		return FLOW_DIR_IN;
-	case XFRM_POLICY_OUT:
-		return FLOW_DIR_OUT;
-	case XFRM_POLICY_FWD:
-		return FLOW_DIR_FWD;
-	}
+	return __xfrm_policy_lookup(net, fl, family, dir);
 }
 
 static struct xfrm_policy *xfrm_sk_policy_lookup(const struct sock *sk, int dir,
@@ -1263,7 +1183,7 @@ static struct xfrm_policy *xfrm_sk_policy_lookup(const struct sock *sk, int dir,
 			}
 			err = security_xfrm_policy_lookup(pol->security,
 						      fl->flowi_secid,
-						      policy_to_flow_dir(dir));
+						      dir);
 			if (!err && !xfrm_pol_hold_rcu(pol))
 				goto again;
 			else if (err == -ESRCH)
@@ -1551,56 +1471,6 @@ static inline int xfrm_get_tos(const struct flowi *fl, int family)
 	return tos;
 }
 
-static struct flow_cache_object *xfrm_bundle_flo_get(struct flow_cache_object *flo)
-{
-	struct xfrm_dst *xdst = container_of(flo, struct xfrm_dst, flo);
-	struct dst_entry *dst = &xdst->u.dst;
-
-	if (xdst->route == NULL) {
-		/* Dummy bundle - if it has xfrms we were not
-		 * able to build bundle as template resolution failed.
-		 * It means we need to try again resolving. */
-		if (xdst->num_xfrms > 0)
-			return NULL;
-	} else if (dst->flags & DST_XFRM_QUEUE) {
-		return NULL;
-	} else {
-		/* Real bundle */
-		if (stale_bundle(dst))
-			return NULL;
-	}
-
-	dst_hold(dst);
-	return flo;
-}
-
-static int xfrm_bundle_flo_check(struct flow_cache_object *flo)
-{
-	struct xfrm_dst *xdst = container_of(flo, struct xfrm_dst, flo);
-	struct dst_entry *dst = &xdst->u.dst;
-
-	if (!xdst->route)
-		return 0;
-	if (stale_bundle(dst))
-		return 0;
-
-	return 1;
-}
-
-static void xfrm_bundle_flo_delete(struct flow_cache_object *flo)
-{
-	struct xfrm_dst *xdst = container_of(flo, struct xfrm_dst, flo);
-	struct dst_entry *dst = &xdst->u.dst;
-
-	dst_free(dst);
-}
-
-static const struct flow_cache_ops xfrm_bundle_fc_ops = {
-	.get = xfrm_bundle_flo_get,
-	.check = xfrm_bundle_flo_check,
-	.delete = xfrm_bundle_flo_delete,
-};
-
 static inline struct xfrm_dst *xfrm_alloc_dst(struct net *net, int family)
 {
 	struct xfrm_policy_afinfo *afinfo = xfrm_policy_get_afinfo(family);
@@ -1622,13 +1492,12 @@ static inline struct xfrm_dst *xfrm_alloc_dst(struct net *net, int family)
 	default:
 		BUG();
 	}
-	xdst = dst_alloc(dst_ops, NULL, 0, DST_OBSOLETE_NONE, 0);
+	xdst = dst_alloc(dst_ops, NULL, 0, DST_OBSOLETE_NONE, DST_NOCACHE);
 
 	if (likely(xdst)) {
 		struct dst_entry *dst = &xdst->u.dst;
 
 		memset(dst + 1, 0, sizeof(*xdst) - sizeof(*dst));
-		xdst->flo.ops = &xfrm_bundle_fc_ops;
 	} else
 		xdst = ERR_PTR(-ENOBUFS);
 
@@ -2104,81 +1973,43 @@ free_dst:
 	goto out;
 }
 
-static struct flow_cache_object *
-xfrm_bundle_lookup(struct net *net, const struct flowi *fl, u16 family, u8 dir,
-		   struct flow_cache_object *oldflo, void *ctx)
+static struct xfrm_dst *
+xfrm_bundle_lookup(struct net *net, const struct flowi *fl, u16 family, u8 dir, struct xfrm_flo *xflo)
 {
-	struct xfrm_flo *xflo = (struct xfrm_flo *)ctx;
 	struct xfrm_policy *pols[XFRM_POLICY_TYPE_MAX];
-	struct xfrm_dst *xdst, *new_xdst;
-	int num_pols = 0, num_xfrms = 0, i, err, pol_dead;
-
-	/* Check if the policies from old bundle are usable */
-	xdst = NULL;
-	if (oldflo) {
-		xdst = container_of(oldflo, struct xfrm_dst, flo);
-		num_pols = xdst->num_pols;
-		num_xfrms = xdst->num_xfrms;
-		pol_dead = 0;
-		for (i = 0; i < num_pols; i++) {
-			pols[i] = xdst->pols[i];
-			pol_dead |= pols[i]->walk.dead;
-		}
-		if (pol_dead) {
-			dst_free(&xdst->u.dst);
-			xdst = NULL;
-			num_pols = 0;
-			num_xfrms = 0;
-			oldflo = NULL;
-		}
-	}
+	struct xfrm_dst *xdst;
+	int num_pols = 0, num_xfrms = 0, err;
 
 	/* Resolve policies to use if we couldn't get them from
 	 * previous cache entry */
-	if (xdst == NULL) {
-		num_pols = 1;
-		pols[0] = __xfrm_policy_lookup(net, fl, family,
-					       flow_to_policy_dir(dir));
-		err = xfrm_expand_policies(fl, family, pols,
+	num_pols = 1;
+	pols[0] = __xfrm_policy_lookup(net, fl, family, dir);
+	err = xfrm_expand_policies(fl, family, pols,
 					   &num_pols, &num_xfrms);
-		if (err < 0)
-			goto inc_error;
-		if (num_pols == 0)
-			return NULL;
-		if (num_xfrms <= 0)
-			goto make_dummy_bundle;
-	}
+	if (err < 0)
+		goto inc_error;
+	if (num_pols == 0)
+		return NULL;
+	if (num_xfrms <= 0)
+		goto make_dummy_bundle;
 
-	new_xdst = xfrm_resolve_and_create_bundle(pols, num_pols, fl, family,
+	xdst = xfrm_resolve_and_create_bundle(pols, num_pols, fl, family,
 						  xflo->dst_orig);
-	if (IS_ERR(new_xdst)) {
-		err = PTR_ERR(new_xdst);
+	if (IS_ERR(xdst)) {
+		err = PTR_ERR(xdst);
 		if (err != -EAGAIN)
 			goto error;
-		if (oldflo == NULL)
-			goto make_dummy_bundle;
-		dst_hold(&xdst->u.dst);
-		return oldflo;
-	} else if (new_xdst == NULL) {
+		goto make_dummy_bundle;
+	} else if (xdst == NULL) {
 		num_xfrms = 0;
-		if (oldflo == NULL)
-			goto make_dummy_bundle;
-		xdst->num_xfrms = 0;
-		dst_hold(&xdst->u.dst);
-		return oldflo;
-	}
-
-	/* Kill the previous bundle */
-	if (xdst) {
-		/* The policies were stolen for newly generated bundle */
-		xdst->num_pols = 0;
-		dst_free(&xdst->u.dst);
+		goto make_dummy_bundle;
 	}
 
 	/* Flow cache does not have reference, it dst_free()'s,
 	 * but we do need to return one reference for original caller */
-	dst_hold(&new_xdst->u.dst);
-	return &new_xdst->flo;
+	dst_hold(&xdst->u.dst);
+
+	return xdst;
 
 make_dummy_bundle:
 	/* We found policies, but there's no bundles to instantiate:
@@ -2194,15 +2025,12 @@ make_dummy_bundle:
 	memcpy(xdst->pols, pols, sizeof(struct xfrm_policy *) * num_pols);
 
 	dst_hold(&xdst->u.dst);
-	return &xdst->flo;
+	return xdst;
 
 inc_error:
 	XFRM_INC_STATS(net, LINUX_MIB_XFRMOUTPOLERROR);
 error:
-	if (xdst != NULL)
-		dst_free(&xdst->u.dst);
-	else
-		xfrm_pols_put(pols, num_pols);
+	xfrm_pols_put(pols, num_pols);
 	return ERR_PTR(err);
 }
 
@@ -2233,11 +2061,10 @@ struct dst_entry *xfrm_lookup(struct net *net, struct dst_entry *dst_orig,
 			      const struct sock *sk, int flags)
 {
 	struct xfrm_policy *pols[XFRM_POLICY_TYPE_MAX];
-	struct flow_cache_object *flo;
 	struct xfrm_dst *xdst;
 	struct dst_entry *dst, *route;
 	u16 family = dst_orig->ops->family;
-	u8 dir = policy_to_flow_dir(XFRM_POLICY_OUT);
+	u8 dir = XFRM_POLICY_OUT;
 	int i, err, num_pols, num_xfrms = 0, drop_pols = 0;
 
 	dst = NULL;
@@ -2289,15 +2116,13 @@ struct dst_entry *xfrm_lookup(struct net *net, struct dst_entry *dst_orig,
 		    !net->xfrm.policy_count[XFRM_POLICY_OUT])
 			goto nopol;
 
-		flo = flow_cache_lookup(net, fl, family, dir,
-					xfrm_bundle_lookup, &xflo);
-		if (flo == NULL)
+		xdst = xfrm_bundle_lookup(net, fl, family, dir, &xflo);
+		if (xdst == NULL)
 			goto nopol;
-		if (IS_ERR(flo)) {
-			err = PTR_ERR(flo);
+		if (IS_ERR(xdst)) {
+			err = PTR_ERR(xdst);
 			goto dropdst;
 		}
-		xdst = container_of(flo, struct xfrm_dst, flo);
 
 		num_pols = xdst->num_pols;
 		num_xfrms = xdst->num_xfrms;
@@ -2496,12 +2321,10 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 	int pi;
 	int reverse;
 	struct flowi fl;
-	u8 fl_dir;
 	int xerr_idx = -1;
 
 	reverse = dir & ~XFRM_POLICY_MASK;
 	dir &= XFRM_POLICY_MASK;
-	fl_dir = policy_to_flow_dir(dir);
 
 	if (__xfrm_decode_session(skb, &fl, family, reverse) < 0) {
 		XFRM_INC_STATS(net, LINUX_MIB_XFRMINHDRERROR);
@@ -2533,16 +2356,8 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 		}
 	}
 
-	if (!pol) {
-		struct flow_cache_object *flo;
-
-		flo = flow_cache_lookup(net, &fl, family, fl_dir,
-					xfrm_policy_lookup, NULL);
-		if (IS_ERR_OR_NULL(flo))
-			pol = ERR_CAST(flo);
-		else
-			pol = container_of(flo, struct xfrm_policy, flo);
-	}
+	if (!pol)
+		pol = xfrm_policy_lookup(net, &fl, family, dir, NULL);
 
 	if (IS_ERR(pol)) {
 		XFRM_INC_STATS(net, LINUX_MIB_XFRMINPOLERROR);
@@ -2730,17 +2545,6 @@ static struct dst_entry *xfrm_negative_advice(struct dst_entry *dst)
 	return dst;
 }
 
-void xfrm_garbage_collect(struct net *net)
-{
-	flow_cache_flush(net);
-}
-EXPORT_SYMBOL(xfrm_garbage_collect);
-
-static void xfrm_garbage_collect_deferred(struct net *net)
-{
-	flow_cache_flush_deferred(net);
-}
-
 static void xfrm_init_pmtu(struct dst_entry *dst)
 {
 	do {
@@ -2876,8 +2680,6 @@ int xfrm_policy_register_afinfo(struct xfrm_policy_afinfo *afinfo)
 			dst_ops->link_failure = xfrm_link_failure;
 		if (likely(dst_ops->neigh_lookup == NULL))
 			dst_ops->neigh_lookup = xfrm_neigh_lookup;
-		if (likely(afinfo->garbage_collect == NULL))
-			afinfo->garbage_collect = xfrm_garbage_collect_deferred;
 		rcu_assign_pointer(xfrm_policy_afinfo[afinfo->family], afinfo);
 	}
 	spin_unlock(&xfrm_policy_afinfo_lock);
@@ -2911,26 +2713,10 @@ int xfrm_policy_unregister_afinfo(struct xfrm_policy_afinfo *afinfo)
 		dst_ops->check = NULL;
 		dst_ops->negative_advice = NULL;
 		dst_ops->link_failure = NULL;
-		afinfo->garbage_collect = NULL;
 	}
 	return err;
 }
 EXPORT_SYMBOL(xfrm_policy_unregister_afinfo);
-
-static int xfrm_dev_event(struct notifier_block *this, unsigned long event, void *ptr)
-{
-	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
-
-	switch (event) {
-	case NETDEV_DOWN:
-		xfrm_garbage_collect(dev_net(dev));
-	}
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block xfrm_dev_notifier = {
-	.notifier_call	= xfrm_dev_event,
-};
 
 #ifdef CONFIG_XFRM_STATISTICS
 static int __net_init xfrm_statistics_init(struct net *net)
@@ -3007,8 +2793,6 @@ static int __net_init xfrm_policy_init(struct net *net)
 	INIT_LIST_HEAD(&net->xfrm.policy_all);
 	INIT_WORK(&net->xfrm.policy_hash_work, xfrm_hash_resize);
 	INIT_WORK(&net->xfrm.policy_hthresh.work, xfrm_hash_rebuild);
-	if (net_eq(net, &init_net))
-		register_netdevice_notifier(&xfrm_dev_notifier);
 	return 0;
 
 out_bydst:
@@ -3068,9 +2852,6 @@ static int __net_init xfrm_net_init(struct net *net)
 	rv = xfrm_sysctl_init(net);
 	if (rv < 0)
 		goto out_sysctl;
-	rv = flow_cache_init(net);
-	if (rv < 0)
-		goto out;
 
 	/* Initialize the per-net locks here */
 	spin_lock_init(&net->xfrm.xfrm_state_lock);
@@ -3079,8 +2860,6 @@ static int __net_init xfrm_net_init(struct net *net)
 
 	return 0;
 
-out:
-	xfrm_sysctl_fini(net);
 out_sysctl:
 	xfrm_policy_fini(net);
 out_policy:
@@ -3093,7 +2872,6 @@ out_statistics:
 
 static void __net_exit xfrm_net_exit(struct net *net)
 {
-	flow_cache_fini(net);
 	xfrm_sysctl_fini(net);
 	xfrm_policy_fini(net);
 	xfrm_state_fini(net);

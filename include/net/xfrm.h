@@ -280,7 +280,6 @@ struct xfrm_dst;
 struct xfrm_policy_afinfo {
 	unsigned short		family;
 	struct dst_ops		*dst_ops;
-	void			(*garbage_collect)(struct net *net);
 	struct dst_entry	*(*dst_lookup)(struct net *net,
 					       int tos, int oif,
 					       const xfrm_address_t *saddr,
@@ -527,7 +526,6 @@ struct xfrm_policy {
 	atomic_t		refcnt;
 	struct timer_list	timer;
 
-	struct flow_cache_object flo;
 	atomic_t		genid;
 	u32			priority;
 	u32			index;
@@ -941,7 +939,6 @@ struct xfrm_dst {
 		struct rt6_info		rt6;
 	} u;
 	struct dst_entry *route;
-	struct flow_cache_object flo;
 	struct xfrm_policy *pols[XFRM_POLICY_TYPE_MAX];
 	int num_pols, num_xfrms;
 #ifdef CONFIG_XFRM_SUB_POLICY

@@ -194,57 +194,6 @@ static inline struct flowi *flowidn_to_flowi(struct flowidn *fldn)
 	return container_of(fldn, struct flowi, u.dn);
 }
 
-typedef unsigned long flow_compare_t;
-
-static inline size_t flow_key_size(u16 family)
-{
-	switch (family) {
-	case AF_INET:
-		BUILD_BUG_ON(sizeof(struct flowi4) % sizeof(flow_compare_t));
-		return sizeof(struct flowi4) / sizeof(flow_compare_t);
-	case AF_INET6:
-		BUILD_BUG_ON(sizeof(struct flowi6) % sizeof(flow_compare_t));
-		return sizeof(struct flowi6) / sizeof(flow_compare_t);
-	case AF_DECnet:
-		BUILD_BUG_ON(sizeof(struct flowidn) % sizeof(flow_compare_t));
-		return sizeof(struct flowidn) / sizeof(flow_compare_t);
-	}
-	return 0;
-}
-
-#define FLOW_DIR_IN	0
-#define FLOW_DIR_OUT	1
-#define FLOW_DIR_FWD	2
-
-struct net;
-struct sock;
-struct flow_cache_ops;
-
-struct flow_cache_object {
-	const struct flow_cache_ops *ops;
-};
-
-struct flow_cache_ops {
-	struct flow_cache_object *(*get)(struct flow_cache_object *);
-	int (*check)(struct flow_cache_object *);
-	void (*delete)(struct flow_cache_object *);
-};
-
-typedef struct flow_cache_object *(*flow_resolve_t)(
-		struct net *net, const struct flowi *key, u16 family,
-		u8 dir, struct flow_cache_object *oldobj, void *ctx);
-
-struct flow_cache_object *flow_cache_lookup(struct net *net,
-					    const struct flowi *key, u16 family,
-					    u8 dir, flow_resolve_t resolver,
-					    void *ctx);
-int flow_cache_init(struct net *net);
-void flow_cache_fini(struct net *net);
-
-void flow_cache_flush(struct net *net);
-void flow_cache_flush_deferred(struct net *net);
-extern atomic_t flow_cache_genid;
-
 __u32 __get_hash_from_flowi6(const struct flowi6 *fl6, struct flow_keys *keys);
 
 static inline __u32 get_hash_from_flowi6(const struct flowi6 *fl6)
@@ -262,5 +211,4 @@ static inline __u32 get_hash_from_flowi4(const struct flowi4 *fl4)
 
 	return __get_hash_from_flowi4(fl4, &keys);
 }
-
 #endif
