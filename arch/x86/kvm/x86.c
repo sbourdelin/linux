@@ -6658,6 +6658,13 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	kvm_x86_ops->prepare_guest_switch(vcpu);
 	if (vcpu->fpu_active)
 		kvm_load_guest_fpu(vcpu);
+
+	/*
+	 * Disable IRQs before setting IN_GUEST_MODE, so that
+	 * posted interrupts with vcpu->mode == IN_GUEST_MODE
+	 * always result in virtual interrupt delivery.
+	 */
+	local_irq_disable();
 	vcpu->mode = IN_GUEST_MODE;
 
 	srcu_read_unlock(&vcpu->kvm->srcu, vcpu->srcu_idx);
@@ -6670,8 +6677,6 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	 * Please see the comment in kvm_flush_remote_tlbs.
 	 */
 	smp_mb__after_srcu_read_unlock();
-
-	local_irq_disable();
 
 	if (vcpu->mode == EXITING_GUEST_MODE || vcpu->requests
 	    || need_resched() || signal_pending(current)) {
