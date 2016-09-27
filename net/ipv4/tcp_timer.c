@@ -192,6 +192,8 @@ static int tcp_write_timeout(struct sock *sk)
 			if (tp->syn_data && icsk->icsk_retransmits == 1)
 				NET_INC_STATS(sock_net(sk),
 					      LINUX_MIB_TCPFASTOPENACTIVEFAIL);
+		} else if (!tp->syn_data && !tp->syn_fastopen) {
+			sk_rethink_txhash(sk);
 		}
 		retry_until = icsk->icsk_syn_retries ? : net->ipv4.sysctl_tcp_syn_retries;
 		syn_set = true;
@@ -213,6 +215,8 @@ static int tcp_write_timeout(struct sock *sk)
 			tcp_mtu_probing(icsk, sk);
 
 			dst_negative_advice(sk);
+		} else if (prandom_u32_max(100) < sysctl_tcp_rto_txhash_prob) {
+			sk_rethink_txhash(sk);
 		}
 
 		retry_until = net->ipv4.sysctl_tcp_retries2;

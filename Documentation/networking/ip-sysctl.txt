@@ -472,6 +472,17 @@ tcp_max_reordering - INTEGER
 	if paths are using per packet load balancing (like bonding rr mode)
 	Default: 300
 
+tcp_rto_txhash_prob - INTEGER
+	Probability [0 to 100] that we will recalculate txhash when a
+	packet is resent due to an RTO and the RTO for this packet has
+	fired less than tcp_retries1 times. It is always recalculated
+	after tcp_retries_times.
+
+	Setting it to 100 helps re-route around failed (or very congested
+	paths) as soon as possible. Otherwise application health checks may
+	fail and the connection may be terminated before the txhash has
+	a chance to change.
+
 tcp_retrans_collapse - BOOLEAN
 	Bug-to-bug compatibility with some broken printers.
 	On retransmit try to send bigger packets to work around bugs in
