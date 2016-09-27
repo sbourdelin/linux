@@ -1338,13 +1338,8 @@ static int first_packet_length(struct sock *sk)
 	res = skb ? skb->len : -1;
 	spin_unlock_bh(&rcvq->lock);
 
-	if (!skb_queue_empty(&list_kill)) {
-		bool slow = lock_sock_fast(sk);
-
+	if (!skb_queue_empty(&list_kill))
 		__skb_queue_purge(&list_kill);
-		sk_mem_reclaim_partial(sk);
-		unlock_sock_fast(sk, slow);
-	}
 	return res;
 }
 
@@ -1393,7 +1388,6 @@ int udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int noblock,
 	int err;
 	int is_udplite = IS_UDPLITE(sk);
 	bool checksum_valid = false;
-	bool slow;
 
 	if (flags & MSG_ERRQUEUE)
 		return ip_recv_error(sk, msg, len, addr_len);
@@ -1434,13 +1428,12 @@ try_again:
 	}
 
 	if (unlikely(err)) {
-		trace_kfree_skb(skb, udp_recvmsg);
 		if (!peeked) {
 			atomic_inc(&sk->sk_drops);
 			UDP_INC_STATS(sock_net(sk),
 				      UDP_MIB_INERRORS, is_udplite);
 		}
-		skb_free_datagram_locked(sk, skb);
+		kfree_skb(skb);
 		return err;
 	}
 
@@ -1465,16 +1458,15 @@ try_again:
 	if (flags & MSG_TRUNC)
 		err = ulen;
 
-	__skb_free_datagram_locked(sk, skb, peeking ? -err : err);
+	skb_consume_udp(sk, skb, peeking ? -err : err);
 	return err;
 
 csum_copy_err:
-	slow = lock_sock_fast(sk);
-	if (!skb_kill_datagram(sk, skb, flags)) {
+	if (!__sk_queue_drop_skb(sk, skb, flags)) {
 		UDP_INC_STATS(sock_net(sk), UDP_MIB_CSUMERRORS, is_udplite);
 		UDP_INC_STATS(sock_net(sk), UDP_MIB_INERRORS, is_udplite);
 	}
-	unlock_sock_fast(sk, slow);
+	kfree_skb(skb);
 
 	/* starting over for a new packet, but check if we need to yield */
 	cond_resched();
@@ -1593,7 +1585,7 @@ static int __udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		sk_incoming_cpu_update(sk);
 	}
 
-	rc = __sock_queue_rcv_skb(sk, skb);
+	rc = udp_rmem_schedule(sk, skb);
 	if (rc < 0) {
 		int is_udplite = IS_UDPLITE(sk);
 
@@ -1607,8 +1599,8 @@ static int __udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		return -1;
 	}
 
+	__sock_enqueue_skb(sk, skb);
 	return 0;
-
 }
 
 static struct static_key udp_encap_needed __read_mostly;
@@ -1630,7 +1622,6 @@ EXPORT_SYMBOL(udp_encap_enable);
 int udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	struct udp_sock *up = udp_sk(sk);
-	int rc;
 	int is_udplite = IS_UDPLITE(sk);
 
 	/*
@@ -1723,19 +1714,8 @@ int udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		goto drop;
 	}
 
-	rc = 0;
-
 	ipv4_pktinfo_prepare(sk, skb);
-	bh_lock_sock(sk);
-	if (!sock_owned_by_user(sk))
-		rc = __udp_queue_rcv_skb(sk, skb);
-	else if (sk_add_backlog(sk, skb, sk->sk_rcvbuf)) {
-		bh_unlock_sock(sk);
-		goto drop;
-	}
-	bh_unlock_sock(sk);
-
-	return rc;
+	return __udp_queue_rcv_skb(sk, skb);
 
 csum_error:
 	__UDP_INC_STATS(sock_net(sk), UDP_MIB_CSUMERRORS, is_udplite);
@@ -2345,6 +2325,7 @@ struct proto udp_prot = {
 	.connect	   = ip4_datagram_connect,
 	.disconnect	   = udp_disconnect,
 	.ioctl		   = udp_ioctl,
+	.init		   = udp_init_sock,
 	.destroy	   = udp_destroy_sock,
 	.setsockopt	   = udp_setsockopt,
 	.getsockopt	   = udp_getsockopt,
@@ -2357,7 +2338,10 @@ struct proto udp_prot = {
 	.unhash		   = udp_lib_unhash,
 	.rehash		   = udp_v4_rehash,
 	.get_port	   = udp_v4_get_port,
+	.enter_memory_pressure = udp_enter_memory_pressure,
+	.sockets_allocated = &udp_sockets_allocated,
 	.memory_allocated  = &udp_memory_allocated,
+	.memory_pressure   = &udp_memory_pressure,
 	.sysctl_mem	   = sysctl_udp_mem,
 	.sysctl_wmem	   = &sysctl_udp_wmem_min,
 	.sysctl_rmem	   = &sysctl_udp_rmem_min,
@@ -2641,6 +2625,7 @@ void __init udp_init(void)
 {
 	unsigned long limit;
 
+	percpu_counter_init(&udp_sockets_allocated, 0, GFP_KERNEL);
 	udp_table_init(&udp_table, "UDP");
 	limit = nr_free_buffer_pages() / 8;
 	limit = max(limit, 128UL);
