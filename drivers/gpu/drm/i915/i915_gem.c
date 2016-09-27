@@ -4399,12 +4399,25 @@ i915_gem_init_hw(struct drm_device *dev)
 
 	intel_mocs_init_l3cc_table(dev);
 
+	/*
+	 * Mask all interrupts to know which interrupts are needed by GuC.
+	 * Restore host side interrupt masks post load.
+	*/
+	I915_WRITE(GEN6_PMINTRMSK, gen6_sanitize_rps_pm_mask(dev_priv, ~0u));
+
 	/* We can't enable contexts until all firmware is loaded */
 	ret = intel_guc_setup(dev);
 	if (ret)
 		goto out;
 
 out:
+	/*
+	 * Below write will ensure mask for RPS interrupts is restored back
+	 * w.r.t cur_freq, particularly post reset.
+	 */
+	I915_WRITE(GEN6_PMINTRMSK,
+		   gen6_rps_pm_mask(dev_priv, dev_priv->rps.cur_freq));
+
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 	return ret;
 }
