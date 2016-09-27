@@ -6079,10 +6079,18 @@ sub process {
 # Mode permission misuses where it seems decimal should be octal
 # This uses a shortcut match to avoid unnecessary uses of a slow foreach loop
 		if ($^V && $^V ge 5.10.0 &&
-		    $line =~ /$mode_perms_search/) {
+		    defined $stat &&
+		    $stat =~ /^.\s*$mode_perms_search/) {
 			foreach my $entry (@mode_permission_funcs) {
 				my $func = $entry->[0];
 				my $arg_pos = $entry->[1];
+
+				my $lc = $stat =~ tr@\n@@;
+				$lc = $lc + $linenr;
+				my $stat_real = raw_line($linenr, 0);
+				for (my $count = $linenr + 1; $count <= $lc; $count++) {
+					$stat_real = $stat_real . "\n" . raw_line($count, 0);
+				}
 
 				my $skip_args = "";
 				if ($arg_pos > 1) {
@@ -6090,17 +6098,17 @@ sub process {
 					$skip_args = "(?:\\s*$FuncArg\\s*,\\s*){$arg_pos,$arg_pos}";
 				}
 				my $test = "\\b$func\\s*\\(${skip_args}($FuncArg(?:\\|\\s*$FuncArg)*)\\s*[,\\)]";
-				if ($line =~ /$test/) {
+				if ($stat =~ /$test/) {
 					my $val = $1;
 					$val = $6 if ($skip_args ne "");
 					if (($val =~ /^$Int$/ && $val !~ /^$Octal$/) ||
 					    ($val =~ /^$Octal$/ && length($val) ne 4)) {
 						ERROR("NON_OCTAL_PERMISSIONS",
-						      "Use 4 digit octal (0777) not decimal permissions\n" . $herecurr);
+						      "Use 4 digit octal (0777) not decimal permissions\n" . $stat_real);
 					}
 					if ($val =~ /^$Octal$/ && (oct($val) & 02)) {
 						ERROR("EXPORTED_WORLD_WRITABLE",
-						      "Exporting writable files is usually an error. Consider more restrictive permissions.\n" . $herecurr);
+						      "Exporting writable files is usually an error. Consider more restrictive permissions.\n" . $stat_real);
 					}
 					if ($val =~ /\b$mode_perms_string_search\b/) {
 						my $to = 0;
@@ -6109,9 +6117,12 @@ sub process {
 						}
 						my $new = sprintf("%04o", $to);
 						if (WARN("SYMBOLIC_PERMS",
-							 "Symbolic permissions are not preferred. Consider using octal permissions $new.\n" . $herecurr) &&
+							 "Symbolic permissions are not preferred. Consider using octal permissions $new.\n" . $stat_real) &&
 						    $fix) {
-							$fixed[$fixlinenr] =~ s/\Q$val\E/$new/;
+							$lc = $stat =~ tr@\n@@;
+							for (my $count = $fixlinenr; $count <= $fixlinenr + $lc; $count++) {
+								$fixed[$count] =~ s/\Q$val\E/$new/;
+							}
 						}
 					}
 				}
