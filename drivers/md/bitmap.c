@@ -791,9 +791,9 @@ static int bitmap_storage_alloc(struct bitmap_storage *store,
 
 	/* We need 4 bits per page, rounded up to a multiple
 	 * of sizeof(unsigned long) */
-	store->filemap_attr = kzalloc(
-		roundup(DIV_ROUND_UP(num_pages*4, 8), sizeof(unsigned long)),
-		GFP_KERNEL);
+	store->filemap_attr = kzalloc(roundup(DIV_ROUND_UP(num_pages * 4, 8),
+					      sizeof(*store->filemap_attr)),
+				      GFP_KERNEL);
 	if (!store->filemap_attr)
 		return -ENOMEM;
 
