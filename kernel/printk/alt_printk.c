@@ -69,6 +69,9 @@ atomic_t nmi_message_lost;
 #define MAX_ALT_PRINTK_CTX	1
 #endif
 
+#define CTX_ENTRY_FLUSHING	2
+#define CTX_ENTRY_FLUSHING_RECURSION	(CTX_ENTRY_FLUSHING + 1)
+
 struct alt_printk_ctx {
 	atomic_t	idx;
 	unsigned int	entry_count;
@@ -189,10 +192,15 @@ void alt_printk_enter(void)
 	 *     will see ->entry_count > 2.
 	 */
 	ctx->entry_count++;
-	if (ctx->entry_count > 1)
+	if (ctx->entry_count == CTX_ENTRY_FLUSHING)
 		return;
 
-	/* @TODO: do something sensible in case of printk() recursion */
+	/*
+	 * Once ->entry_coun == CTX_ENTRY_FLUSHING_RECURSION printk()
+	 * switches to alt_printk() buffers.
+	 */
+	if (ctx->entry_count > CTX_ENTRY_FLUSHING_RECURSION)
+		return;
 
 	__lockless_printk_enter(vprintk_alt);
 }
@@ -202,9 +210,21 @@ void alt_printk_exit(void)
 {
 	struct alt_printk_ctx *ctx = this_cpu_ptr(&alt_printk_ctx);
 
-	if (ctx->entry_count == 1)
+	/*
+	 * If we are returning from a normal alt_printk context or
+	 * from printk() recursion -- switch back to default printk.
+	 */
+	if (ctx->entry_count == 1 ||
+			ctx->entry_count == CTX_ENTRY_FLUSHING_RECURSION)
 		__lockless_printk_exit();
 	ctx->entry_count--;
+}
+
+bool recursed_printk_call(void)
+{
+	struct alt_printk_ctx *ctx = this_cpu_ptr(&alt_printk_ctx);
+
+	return oops_in_progress && (ctx->entry_count > CTX_ENTRY_FLUSHING);
 }
 
 static void alt_printk_flush_line(const char *text, int len)

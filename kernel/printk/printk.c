@@ -1748,18 +1748,14 @@ asmlinkage int vprintk_emit(int facility, int level,
 			    const char *dict, size_t dictlen,
 			    const char *fmt, va_list args)
 {
-	static bool recursion_bug;
 	static char textbuf[LOG_LINE_MAX];
 	char *text = textbuf;
 	size_t text_len = 0;
 	enum log_flags lflags = 0;
 	unsigned long flags;
-	int this_cpu;
 	int printed_len = 0;
 	int nmi_message_lost;
 	bool in_sched = false;
-	/* cpu currently holding logbuf_lock in this function */
-	static unsigned int logbuf_cpu = UINT_MAX;
 
 	if (level == LOGLEVEL_SCHED) {
 		level = LOGLEVEL_DEFAULT;
@@ -1770,42 +1766,13 @@ asmlinkage int vprintk_emit(int facility, int level,
 	printk_delay();
 
 	local_irq_save(flags);
-	this_cpu = smp_processor_id();
-
-	/*
-	 * Ouch, printk recursed into itself!
-	 */
-	if (unlikely(logbuf_cpu == this_cpu)) {
-		/*
-		 * If a crash is occurring during printk() on this CPU,
-		 * then try to get the crash message out but make sure
-		 * we can't deadlock. Otherwise just return to avoid the
-		 * recursion and return - but flag the recursion so that
-		 * it can be printed at the next appropriate moment:
-		 */
-		if (!oops_in_progress && !lockdep_recursing(current)) {
-			recursion_bug = true;
-			local_irq_restore(flags);
-			return 0;
-		}
-		zap_locks();
-	}
-
 	alt_printk_enter();
+
+	if (recursed_printk_call())
+		zap_locks();
+
 	/* This stops the holder of console_sem just where we want him */
 	raw_spin_lock(&logbuf_lock);
-	logbuf_cpu = this_cpu;
-
-	if (unlikely(recursion_bug)) {
-		static const char recursion_msg[] =
-			"BUG: recent printk recursion!";
-
-		recursion_bug = false;
-		/* emit KERN_CRIT message */
-		printed_len += log_store(0, 2, LOG_PREFIX|LOG_NEWLINE, 0,
-					 NULL, 0, recursion_msg,
-					 strlen(recursion_msg));
-	}
 
 	nmi_message_lost = get_nmi_message_lost();
 	if (unlikely(nmi_message_lost)) {
@@ -1898,7 +1865,6 @@ asmlinkage int vprintk_emit(int facility, int level,
 						 dict, dictlen, text, text_len);
 	}
 
-	logbuf_cpu = UINT_MAX;
 	raw_spin_unlock(&logbuf_lock);
 	alt_printk_exit();
 	local_irq_restore(flags);

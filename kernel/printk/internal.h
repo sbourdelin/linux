@@ -34,11 +34,16 @@ DECLARE_PER_CPU(printk_func_t, printk_func);
 
 void alt_printk_enter(void);
 void alt_printk_exit(void);
+bool recursed_printk_call(void);
 
 #else
 
 void alt_printk_enter(void) { }
 void alt_printk_exit(void) { }
+bool recursed_printk_call(void)
+{
+	return false;
+}
 
 #endif /* CONFIG_PRINTK */
 
