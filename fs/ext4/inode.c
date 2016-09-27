@@ -3292,11 +3292,6 @@ int ext4_dax_get_block(struct inode *inode, sector_t iblock,
 		if (ret < 0)
 			return ret;
 	}
-	/*
-	 * At least for now we have to clear BH_New so that DAX code
-	 * doesn't attempt to zero blocks again in a racy way.
-	 */
-	clear_buffer_new(bh_result);
 	return 0;
 }
 #else
