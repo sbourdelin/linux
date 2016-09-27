@@ -303,7 +303,7 @@ static void write_page(struct bitmap *bitmap, struct page *page, int wait)
 
 		if (wait)
 			wait_event(bitmap->write_wait,
-				   atomic_read(&bitmap->pending_writes)==0);
+				   atomic_read(&bitmap->pending_writes) == 0);
 	}
 	if (test_bit(BITMAP_WRITE_ERROR, &bitmap->flags))
 		bitmap_file_kick(bitmap);
@@ -400,7 +400,7 @@ static int read_page(struct file *file, unsigned long index,
 	page->index = index;
 
 	wait_event(bitmap->write_wait,
-		   atomic_read(&bitmap->pending_writes)==0);
+		   atomic_read(&bitmap->pending_writes) == 0);
 	if (test_bit(BITMAP_WRITE_ERROR, &bitmap->flags)) {
 		ret = -EIO;
 report_failure:
@@ -1003,7 +1003,7 @@ void bitmap_unplug(struct bitmap *bitmap)
 	}
 	if (bitmap->storage.file)
 		wait_event(bitmap->write_wait,
-			   atomic_read(&bitmap->pending_writes)==0);
+			   atomic_read(&bitmap->pending_writes) == 0);
 	else
 		md_super_wait(bitmap->mddev);
 
