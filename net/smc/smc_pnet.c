@@ -223,6 +223,9 @@ out:
 					       pnetelem->ib_port);
 		if (rc)
 			return rc;
+		rc = smc_ib_setup_per_ibdev(smcibdev);
+		if (rc)
+			return rc;
 		smcibdev->initialized = 1;
 	}
 	return rc;

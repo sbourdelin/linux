@@ -391,6 +391,7 @@ static void smc_wr_init_sge(struct smc_link *lnk)
 		lnk->wr_tx_sges[i].addr =
 			lnk->wr_tx_dma_addr + i * SMC_WR_BUF_SIZE;
 		lnk->wr_tx_sges[i].length = SMC_WR_TX_SIZE;
+		lnk->wr_tx_sges[i].lkey = lnk->mr_tx->lkey;
 		lnk->wr_tx_ibs[i].next = NULL;
 		lnk->wr_tx_ibs[i].sg_list = &lnk->wr_tx_sges[i];
 		lnk->wr_tx_ibs[i].num_sge = 1;
@@ -402,6 +403,7 @@ static void smc_wr_init_sge(struct smc_link *lnk)
 		lnk->wr_rx_sges[i].addr =
 			lnk->wr_rx_dma_addr + i * SMC_WR_BUF_SIZE;
 		lnk->wr_rx_sges[i].length = SMC_WR_BUF_SIZE;
+		lnk->wr_rx_sges[i].lkey = lnk->mr_tx->lkey;
 		lnk->wr_rx_ibs[i].next = NULL;
 		lnk->wr_rx_ibs[i].sg_list = &lnk->wr_rx_sges[i];
 		lnk->wr_rx_ibs[i].num_sge = 1;
