@@ -1824,9 +1824,7 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	 */
 	params->request->batch = params->batch;
 
-	ret = i915_gem_request_add_to_client(params->request, file);
-	if (ret)
-		goto err_request;
+	i915_gem_request_add_to_client(params->request, file);
 
 	/*
 	 * Save assorted stuff away to pass through to *_submission().
@@ -1841,8 +1839,7 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	params->ctx                     = ctx;
 
 	ret = execbuf_submit(params, args, &eb->vmas);
-err_request:
-	__i915_add_request(params->request, ret == 0);
+	__i915_add_request(params->request, true);
 
 err_batch_unpin:
 	/*
