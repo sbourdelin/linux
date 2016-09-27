@@ -1707,19 +1707,6 @@ config PERF_EVENTS
 
 	  Say Y if unsure.
 
-config DEBUG_PERF_USE_VMALLOC
-	default n
-	bool "Debug: use vmalloc to back perf mmap() buffers"
-	depends on PERF_EVENTS && DEBUG_KERNEL && !PPC
-	select PERF_USE_VMALLOC
-	help
-	 Use vmalloc memory to back perf mmap() buffers.
-
-	 Mostly useful for debugging the vmalloc code on platforms
-	 that don't require it.
-
-	 Say N if unsure.
-
 endmenu
 
 config VM_EVENT_COUNTERS
