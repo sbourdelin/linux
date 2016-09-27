@@ -6524,6 +6524,38 @@ int dev_set_mtu(struct net_device *dev, int new_mtu)
 EXPORT_SYMBOL(dev_set_mtu);
 
 /**
+ *	dev_set_env_hdr_len - Set max envelope header length
+ *	@dev: device
+ *	@new_len: new length
+ */
+int dev_set_env_hdr_len(struct net_device *dev, int new_len)
+{
+	const struct net_device_ops *ops = dev->netdev_ops;
+	int err;
+
+	if (!ops->ndo_set_env_hdr_len)
+		return -EOPNOTSUPP;
+
+	if (new_len < 0)
+		return -EINVAL;
+
+	if (!netif_device_present(dev))
+		return -ENODEV;
+
+	if (new_len == dev->env_hdr_len)
+		return 0;
+
+	err = ops->ndo_set_env_hdr_len(dev, new_len);
+	if (err)
+		return err;
+
+	dev->env_hdr_len = new_len;
+
+	return 0;
+}
+EXPORT_SYMBOL(dev_set_env_hdr_len);
+
+/**
  *	dev_set_group - Change group this device belongs to
  *	@dev: device
  *	@new_group: group this device should belong to

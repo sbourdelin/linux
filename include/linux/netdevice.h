@@ -1132,6 +1132,10 @@ struct netdev_xdp {
  * int (*ndo_xdp)(struct net_device *dev, struct netdev_xdp *xdp);
  *	This function is used to set or query state related to XDP on the
  *	netdevice. See definition of enum xdp_netdev_command for details.
+ * int (*ndo_set_env_hdr_len)(struct net_device *dev, int hdr_len);
+ *	This function is used to set the maximum header size of envelope
+ *	frames. The device must accept the size of MTU + envelope header
+ *	size on packet reception.
  *
  */
 struct net_device_ops {
@@ -1323,6 +1327,8 @@ struct net_device_ops {
 						       int needed_headroom);
 	int			(*ndo_xdp)(struct net_device *dev,
 					   struct netdev_xdp *xdp);
+	int			(*ndo_set_env_hdr_len)(struct net_device *dev,
+						       int hdr_len);
 };
 
 /**
@@ -1506,6 +1512,7 @@ enum netdev_priv_flags {
  *	@if_port:	Selectable AUI, TP, ...
  *	@dma:		DMA channel
  *	@mtu:		Interface MTU value
+ *	@env_hdr_len:	Additional encapsulation header length to MTU
  *	@type:		Interface hardware type
  *	@hard_header_len: Maximum hardware header length.
  *
@@ -1726,6 +1733,7 @@ struct net_device {
 	unsigned char		dma;
 
 	unsigned int		mtu;
+	unsigned int		env_hdr_len;
 	unsigned short		type;
 	unsigned short		hard_header_len;
 
@@ -3300,6 +3308,7 @@ int dev_change_name(struct net_device *, const char *);
 int dev_set_alias(struct net_device *, const char *, size_t);
 int dev_change_net_namespace(struct net_device *, struct net *, const char *);
 int dev_set_mtu(struct net_device *, int);
+int dev_set_env_hdr_len(struct net_device *, int);
 void dev_set_group(struct net_device *, int);
 int dev_set_mac_address(struct net_device *, struct sockaddr *);
 int dev_change_carrier(struct net_device *, bool new_carrier);
@@ -4231,6 +4240,18 @@ static inline bool netif_reduces_vlan_mtu(struct net_device *dev)
 {
 	/* TODO: reserve and use an additional IFF bit, if we get more users */
 	return dev->priv_flags & IFF_MACSEC;
+}
+
+/* return envelope header length */
+static inline int netif_get_env_hdr_len(struct net_device *dev)
+{
+	if (dev->netdev_ops->ndo_set_env_hdr_len)
+		return dev->env_hdr_len;
+
+	if (netif_reduces_vlan_mtu(dev))
+		return 0;
+
+	return 4; /* VLAN_HLEN */
 }
 
 extern struct pernet_operations __net_initdata loopback_net_ops;
