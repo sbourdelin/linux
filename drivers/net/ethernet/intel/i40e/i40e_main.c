@@ -11246,8 +11246,9 @@ static int i40e_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 						       pf->main_vsi_seid);
 
 	if ((pf->hw.device_id == I40E_DEV_ID_10G_BASE_T) ||
-	    (pf->hw.device_id == I40E_DEV_ID_10G_BASE_T4))
-		pf->flags |= I40E_FLAG_HAVE_10GBASET_PHY;
+	    (pf->hw.device_id == I40E_DEV_ID_10G_BASE_T4) ||
+	    (pf->hw.device_id == I40E_DEV_ID_1G_BASE_T_X722))
+		pf->flags |= I40E_FLAG_HAVE_BASET_PHY;
 
 	/* print a string summarizing features */
 	i40e_print_features(pf);
