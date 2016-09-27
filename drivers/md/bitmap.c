@@ -750,7 +750,7 @@ static int bitmap_storage_alloc(struct bitmap_storage *store,
 				unsigned long chunks, int with_super,
 				int slot_number)
 {
-	int pnum, offset = 0;
+	int pnum, offset;
 	unsigned long num_pages;
 	unsigned long bytes;
 
