@@ -62,7 +62,9 @@ void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
 void nl80211_send_roamed(struct cfg80211_registered_device *rdev,
 			 struct net_device *netdev, const u8 *bssid,
 			 const u8 *req_ie, size_t req_ie_len,
-			 const u8 *resp_ie, size_t resp_ie_len, gfp_t gfp);
+			 const u8 *resp_ie, size_t resp_ie_len, gfp_t gfp,
+			 const u8 authorized, const u8 *key_replay_ctr,
+			 const u8 *key_kck, const u8 *key_kek);
 void nl80211_send_disconnected(struct cfg80211_registered_device *rdev,
 			       struct net_device *netdev, u16 reason,
 			       const u8 *ie, size_t ie_len, bool from_ap);

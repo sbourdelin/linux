@@ -341,7 +341,7 @@ void rtw_cfg80211_indicate_connect(struct rtw_adapter *padapter)
 				sizeof(struct ieee80211_hdr_3addr) + 6,
 				pmlmepriv->assoc_rsp_len -
 				sizeof(struct ieee80211_hdr_3addr) - 6,
-				GFP_ATOMIC);
+				GFP_ATOMIC, NULL, NULL, NULL, 0);
 	} else {
 		cfg80211_connect_result(padapter->pnetdev,
 					cur_network->network.MacAddress,

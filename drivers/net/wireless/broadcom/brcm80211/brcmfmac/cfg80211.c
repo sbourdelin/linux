@@ -5450,7 +5450,8 @@ done:
 	kfree(buf);
 	cfg80211_roamed(ndev, notify_channel, (u8 *)profile->bssid,
 			conn_info->req_ie, conn_info->req_ie_len,
-			conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL);
+			conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL,
+			NULL, NULL, NULL, 0);
 	brcmf_dbg(CONN, "Report roaming result\n");
 
 	set_bit(BRCMF_VIF_STATUS_CONNECTED, &ifp->vif->sme_state);

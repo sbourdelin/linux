@@ -809,7 +809,8 @@ void ath6kl_cfg80211_connect_event(struct ath6kl_vif *vif, u16 channel,
 	} else if (vif->sme_state == SME_CONNECTED) {
 		/* inform roam event to cfg80211 */
 		cfg80211_roamed_bss(vif->ndev, bss, assoc_req_ie, assoc_req_len,
-				    assoc_resp_ie, assoc_resp_len, GFP_KERNEL);
+				    assoc_resp_ie, assoc_resp_len, GFP_KERNEL,
+				    NULL, NULL, NULL, 0);
 	}
 }
 

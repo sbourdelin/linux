@@ -1873,6 +1873,9 @@ enum nl80211_commands {
  * @NL80211_ATTR_MESH_PEER_AID: Association ID for the mesh peer (u16). This is
  *	used to pull the stored data for mesh peer in power save state.
  *
+ * @NL80211_ATTR_AUTHORIZED: flag attribute, if set indicates that the
+ *      connection is authorized.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2266,6 +2269,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_MEASUREMENT_DURATION_MANDATORY,
 
 	NL80211_ATTR_MESH_PEER_AID,
+
+	NL80211_ATTR_AUTHORIZED,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -3687,6 +3692,9 @@ enum nl80211_key_attributes {
 	NL80211_KEY_DEFAULT_MGMT,
 	NL80211_KEY_TYPE,
 	NL80211_KEY_DEFAULT_TYPES,
+	NL80211_KEY_REPLAY_CTR,
+	NL80211_KEY_KCK,
+	NL80211_KEY_KEK,
 
 	/* keep last */
 	__NL80211_KEY_AFTER_LAST,
@@ -4563,6 +4571,8 @@ enum nl80211_feature_flags {
  *	configuration (AP/mesh) with HT rates.
  * @NL80211_EXT_FEATURE_BEACON_RATE_VHT: Driver supports beacon rate
  *	configuration (AP/mesh) with VHT rates.
+ * @NL80211_EXT_FEATURE_KEY_MGMT_OFFLOAD: This driver supports key management
+ *	auth offload.
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
@@ -4577,6 +4587,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_BEACON_RATE_LEGACY,
 	NL80211_EXT_FEATURE_BEACON_RATE_HT,
 	NL80211_EXT_FEATURE_BEACON_RATE_VHT,
+	NL80211_EXT_FEATURE_KEY_MGMT_OFFLOAD,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,

@@ -231,8 +231,12 @@ struct cfg80211_event {
 		struct {
 			const u8 *req_ie;
 			const u8 *resp_ie;
+			const u8 *key_replay_ctr;
+			const u8 *key_kck;
+			const u8 *key_kek;
 			size_t req_ie_len;
 			size_t resp_ie_len;
+			u8 authorized;
 			struct cfg80211_bss *bss;
 		} rm;
 		struct {
@@ -396,7 +400,9 @@ int cfg80211_disconnect(struct cfg80211_registered_device *rdev,
 void __cfg80211_roamed(struct wireless_dev *wdev,
 		       struct cfg80211_bss *bss,
 		       const u8 *req_ie, size_t req_ie_len,
-		       const u8 *resp_ie, size_t resp_ie_len);
+		       const u8 *resp_ie, size_t resp_ie_len,
+		       const u8 authorized, const u8 *key_replay_ctr,
+		       const u8 *key_kck, const u8 *key_kek);
 int cfg80211_mgd_wext_connect(struct cfg80211_registered_device *rdev,
 			      struct wireless_dev *wdev);
 

@@ -4865,7 +4865,9 @@ void cfg80211_roamed(struct net_device *dev,
 		     struct ieee80211_channel *channel,
 		     const u8 *bssid,
 		     const u8 *req_ie, size_t req_ie_len,
-		     const u8 *resp_ie, size_t resp_ie_len, gfp_t gfp);
+		     const u8 *resp_ie, size_t resp_ie_len, gfp_t gfp,
+		     const u8 *key_replay_ctr, const u8 *ptk_kck,
+		     const u8 *ptk_kek, const u8 authorized);
 
 /**
  * cfg80211_roamed_bss - notify cfg80211 of roaming
@@ -4891,7 +4893,9 @@ void cfg80211_roamed(struct net_device *dev,
  */
 void cfg80211_roamed_bss(struct net_device *dev, struct cfg80211_bss *bss,
 			 const u8 *req_ie, size_t req_ie_len,
-			 const u8 *resp_ie, size_t resp_ie_len, gfp_t gfp);
+			 const u8 *resp_ie, size_t resp_ie_len, gfp_t gfp,
+			 const u8 *key_replay_ctr, const u8 *ptk_kck,
+			 const u8 *ptk_kek, const u8 authorized);
 
 /**
  * cfg80211_disconnected - notify cfg80211 that connection was dropped

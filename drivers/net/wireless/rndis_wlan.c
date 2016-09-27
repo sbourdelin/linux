@@ -2838,7 +2838,8 @@ static void rndis_wlan_do_link_up_work(struct usbnet *usbdev)
 			cfg80211_roamed(usbdev->net,
 					get_current_channel(usbdev, NULL),
 					bssid, req_ie, req_ie_len,
-					resp_ie, resp_ie_len, GFP_KERNEL);
+					resp_ie, resp_ie_len, GFP_KERNEL,
+					NULL, NULL, NULL, 0);
 	} else if (priv->infra_mode == NDIS_80211_INFRA_ADHOC)
 		cfg80211_ibss_joined(usbdev->net, bssid,
 				     get_current_channel(usbdev, NULL),

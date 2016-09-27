@@ -960,7 +960,9 @@ void cfg80211_process_wdev_events(struct wireless_dev *wdev)
 		case EVENT_ROAMED:
 			__cfg80211_roamed(wdev, ev->rm.bss, ev->rm.req_ie,
 					  ev->rm.req_ie_len, ev->rm.resp_ie,
-					  ev->rm.resp_ie_len);
+					  ev->rm.resp_ie_len, ev->rm.authorized,
+					  ev->rm.key_replay_ctr, ev->rm.key_kck,
+					  ev->rm.key_kek);
 			break;
 		case EVENT_DISCONNECTED:
 			__cfg80211_disconnected(wdev->netdev,

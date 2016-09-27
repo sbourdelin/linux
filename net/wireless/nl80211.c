@@ -928,7 +928,9 @@ static int nl80211_key_allowed(struct wireless_dev *wdev)
 	case NL80211_IFTYPE_ADHOC:
 	case NL80211_IFTYPE_STATION:
 	case NL80211_IFTYPE_P2P_CLIENT:
-		if (!wdev->current_bss)
+		if (!wdev->current_bss &&
+		    !wiphy_ext_feature_isset(wdev->wiphy,
+		    NL80211_EXT_FEATURE_KEY_MGMT_OFFLOAD))
 			return -ENOLINK;
 		break;
 	case NL80211_IFTYPE_UNSPECIFIED:
@@ -12481,7 +12483,9 @@ void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
 void nl80211_send_roamed(struct cfg80211_registered_device *rdev,
 			 struct net_device *netdev, const u8 *bssid,
 			 const u8 *req_ie, size_t req_ie_len,
-			 const u8 *resp_ie, size_t resp_ie_len, gfp_t gfp)
+			 const u8 *resp_ie, size_t resp_ie_len, gfp_t gfp,
+			 const u8 authorized, const u8 *key_replay_ctr,
+			 const u8 *key_kck, const u8 *key_kek)
 {
 	struct sk_buff *msg;
 	void *hdr;
@@ -12503,6 +12507,17 @@ void nl80211_send_roamed(struct cfg80211_registered_device *rdev,
 	     nla_put(msg, NL80211_ATTR_REQ_IE, req_ie_len, req_ie)) ||
 	    (resp_ie &&
 	     nla_put(msg, NL80211_ATTR_RESP_IE, resp_ie_len, resp_ie)))
+		goto nla_put_failure;
+
+	if (wiphy_ext_feature_isset(&rdev->wiphy,
+				    NL80211_EXT_FEATURE_KEY_MGMT_OFFLOAD) &&
+	    (nla_put_u8(msg, NL80211_ATTR_AUTHORIZED, authorized) ||
+	    (key_replay_ctr && nla_put(msg, NL80211_KEY_REPLAY_CTR,
+	     NL80211_REPLAY_CTR_LEN, key_replay_ctr)) ||
+	    (key_kck &&
+	     nla_put(msg, NL80211_KEY_KCK, NL80211_KCK_LEN, key_kck)) ||
+	    (key_kek &&
+	     nla_put(msg, NL80211_KEY_KEK, NL80211_KEK_LEN, key_kek))))
 		goto nla_put_failure;
 
 	genlmsg_end(msg, hdr);

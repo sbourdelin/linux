@@ -807,7 +807,9 @@ EXPORT_SYMBOL(cfg80211_connect_bss);
 void __cfg80211_roamed(struct wireless_dev *wdev,
 		       struct cfg80211_bss *bss,
 		       const u8 *req_ie, size_t req_ie_len,
-		       const u8 *resp_ie, size_t resp_ie_len)
+		       const u8 *resp_ie, size_t resp_ie_len,
+		       const u8 authorized, const u8 *key_replay_ctr,
+		       const u8 *key_kck, const u8 *key_kek)
 {
 #ifdef CONFIG_CFG80211_WEXT
 	union iwreq_data wrqu;
@@ -831,7 +833,8 @@ void __cfg80211_roamed(struct wireless_dev *wdev,
 	nl80211_send_roamed(wiphy_to_rdev(wdev->wiphy),
 			    wdev->netdev, bss->bssid,
 			    req_ie, req_ie_len, resp_ie, resp_ie_len,
-			    GFP_KERNEL);
+			    GFP_KERNEL, authorized, key_replay_ctr,
+			    key_kck, key_kek);
 
 #ifdef CONFIG_CFG80211_WEXT
 	if (req_ie) {
@@ -865,7 +868,9 @@ void cfg80211_roamed(struct net_device *dev,
 		     struct ieee80211_channel *channel,
 		     const u8 *bssid,
 		     const u8 *req_ie, size_t req_ie_len,
-		     const u8 *resp_ie, size_t resp_ie_len, gfp_t gfp)
+		     const u8 *resp_ie, size_t resp_ie_len, gfp_t gfp,
+		     const u8 *key_replay_ctr, const u8 *ptk_kck,
+		     const u8 *ptk_kek, const u8 authorized)
 {
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
 	struct cfg80211_bss *bss;
@@ -877,7 +882,8 @@ void cfg80211_roamed(struct net_device *dev,
 		return;
 
 	cfg80211_roamed_bss(dev, bss, req_ie, req_ie_len, resp_ie,
-			    resp_ie_len, gfp);
+			    resp_ie_len, gfp, key_replay_ctr, ptk_kck,
+			    ptk_kek, authorized);
 }
 EXPORT_SYMBOL(cfg80211_roamed);
 
@@ -885,7 +891,9 @@ EXPORT_SYMBOL(cfg80211_roamed);
 void cfg80211_roamed_bss(struct net_device *dev,
 			 struct cfg80211_bss *bss, const u8 *req_ie,
 			 size_t req_ie_len, const u8 *resp_ie,
-			 size_t resp_ie_len, gfp_t gfp)
+			 size_t resp_ie_len, gfp_t gfp,
+			 const u8 *key_replay_ctr, const u8 *ptk_kck,
+			 const u8 *ptk_kek, const u8 authorized)
 {
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
 	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wdev->wiphy);
@@ -908,6 +916,14 @@ void cfg80211_roamed_bss(struct net_device *dev,
 	ev->rm.resp_ie = ((u8 *)ev) + sizeof(*ev) + req_ie_len;
 	ev->rm.resp_ie_len = resp_ie_len;
 	memcpy((void *)ev->rm.resp_ie, resp_ie, resp_ie_len);
+	ev->rm.key_replay_ctr = ((u8 *)ev) + sizeof(*ev) + resp_ie_len;
+	memcpy((void *)ev->rm.key_replay_ctr, key_replay_ctr,
+	       NL80211_REPLAY_CTR_LEN);
+	ev->rm.key_kck = ((u8 *)ev) + sizeof(*ev) + NL80211_REPLAY_CTR_LEN;
+	memcpy((void *)ev->rm.key_kck, ptk_kck, NL80211_KCK_LEN);
+	ev->rm.key_kek = ((u8 *)ev) + sizeof(*ev) + NL80211_KCK_LEN;
+	memcpy((void *)ev->rm.key_kek, ptk_kek, NL80211_KEK_LEN);
+	ev->rm.authorized = authorized;
 	ev->rm.bss = bss;
 
 	spin_lock_irqsave(&wdev->event_lock, flags);
