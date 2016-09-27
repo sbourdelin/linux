@@ -31,10 +31,6 @@ extern raw_spinlock_t logbuf_lock;
  * via per-CPU variable.
  */
 DECLARE_PER_CPU(printk_func_t, printk_func);
-static inline __printf(1, 0) int vprintk_func(const char *fmt, va_list args)
-{
-	return this_cpu_read(printk_func)(fmt, args);
-}
 
 void alt_printk_enter(void);
 void alt_printk_exit(void);
