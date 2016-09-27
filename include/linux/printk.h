@@ -131,17 +131,17 @@ void early_printk(const char *s, ...) { }
 #endif
 
 #ifdef CONFIG_PRINTK_NMI
-extern void printk_nmi_init(void);
+extern void alt_printk_init(void);
 extern void printk_nmi_enter(void);
 extern void printk_nmi_exit(void);
-extern void printk_nmi_flush(void);
-extern void printk_nmi_flush_on_panic(void);
+extern void alt_printk_flush(void);
+extern void alt_printk_flush_on_panic(void);
 #else
-static inline void printk_nmi_init(void) { }
+static inline void alt_printk_init(void) { }
 static inline void printk_nmi_enter(void) { }
 static inline void printk_nmi_exit(void) { }
-static inline void printk_nmi_flush(void) { }
-static inline void printk_nmi_flush_on_panic(void) { }
+static inline void alt_printk_flush(void) { }
+static inline void alt_printk_flush_on_panic(void) { }
 #endif /* PRINTK_NMI */
 
 #ifdef CONFIG_PRINTK
