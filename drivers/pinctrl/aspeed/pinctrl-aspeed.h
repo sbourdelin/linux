@@ -266,6 +266,8 @@
 #define SCUA8           0xA8 /* Multi-function Pin Control #9 */
 #define HW_STRAP2       0xD0 /* Strapping */
 
+#define SIORD30		SIG_DESC_TO_REG(ASPEED_IP_SIO, 0x30)
+
  /**
   * A signal descriptor, which describes the register, bits and the
   * enable/disable values that should be compared or written.
