@@ -2032,7 +2032,7 @@ int bitmap_resize(struct bitmap *bitmap, sector_t blocks,
 					   mddev_is_clustered(bitmap->mddev)
 					   ? bitmap->cluster_slot : 0);
 	if (ret)
-		goto err;
+		return ret;
 
 	pages = DIV_ROUND_UP(chunks, PAGE_COUNTER_RATIO);
 
