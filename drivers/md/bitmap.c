@@ -759,7 +759,6 @@ static int bitmap_storage_alloc(struct bitmap_storage *store,
 		bytes += sizeof(bitmap_super_t);
 
 	num_pages = DIV_ROUND_UP(bytes, PAGE_SIZE);
-	offset = slot_number * num_pages;
 	store->filemap = kmalloc_array(num_pages,
 				       sizeof(*store->filemap),
 				       GFP_KERNEL);
@@ -772,6 +771,7 @@ static int bitmap_storage_alloc(struct bitmap_storage *store,
 			return -ENOMEM;
 	}
 
+	offset = slot_number * num_pages;
 	pnum = 0;
 	if (store->sb_page) {
 		store->filemap[0] = store->sb_page;
