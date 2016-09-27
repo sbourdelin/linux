@@ -57,6 +57,9 @@ Most gamepads have the following features:
   - Rumble
     Many devices provide force-feedback features. But are mostly just
     simple rumble motors.
+  - Motion-tracking
+    Gamepads may include motion-tracking sensors like accelerometers and
+    gyroscopes.
 
 3. Detection
 ~~~~~~~~~~~~
@@ -138,8 +141,6 @@ Triggers:
   Upper trigger buttons are reported as BTN_TR or ABS_HAT1X (right) and BTN_TL
   or ABS_HAT1Y (left). Lower trigger buttons are reported as BTN_TR2 or
   ABS_HAT2X (right/ZR) and BTN_TL2 or ABS_HAT2Y (left/ZL).
-  If only one trigger-button combination is present (upper+lower), they are
-  reported as "right" triggers (BTN_TR/ABS_HAT1X).
     (ABS trigger values start at 0, pressure is reported as positive values)
 
 Menu-Pad:
@@ -154,6 +155,10 @@ Menu-Pad:
 
 Rumble:
   Rumble is advertised as FF_RUMBLE.
+
+Motion-tracking:
+  Motion-tracking is defined in ./Documentation/input/motion-tracking.txt and
+  gamepads shall comply to the rules defined there.
 
 ----------------------------------------------------------------------------
   Written 2013 by David Herrmann <dh.herrmann@gmail.com>

@@ -763,6 +763,13 @@
 #define ABS_MAX			0x3f
 #define ABS_CNT			(ABS_MAX+1)
 
+#define ABS_GYRO_X		0x40	/* Gyroscope X axis */
+#define ABS_GYRO_Y		0x41	/* Gyroscope Y axis */
+#define ABS_GYRO_Z		0x42	/* Gyroscope Z axis */
+#define ABS_ACCEL_X		0x43	/* Accelerometer X axis */
+#define ABS_ACCEL_Y		0x44	/* Accelerometer Y axis */
+#define ABS_ACCEL_Z		0x45	/* Accelerometer Z axis */
+
 /*
  * Due to API restrictions the legacy evdev API only supports ABS values up to
  * ABS_MAX/CNT. Use the extended *ABS2 ioctls to operate on the full range of
