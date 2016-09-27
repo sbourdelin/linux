@@ -2130,8 +2130,12 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
 		atmel_uart_writel(port, ATMEL_US_TTGR,
 				  port->rs485.delay_rts_after_send);
 		mode |= ATMEL_US_USMODE_RS485;
-	} else if (termios->c_cflag & CRTSCTS) {
-		/* RS232 with hardware handshake (RTS/CTS) */
+	} else if ((termios->c_cflag & CRTSCTS) &&
+		   !mctrl_gpio_use_rtscts(atmel_port->gpios)) {
+		/*
+		 * RS232 with hardware handshake (RTS/CTS)
+		 * handled by the controller.
+		 */
 		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
 			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
 			termios->c_cflag &= ~CRTSCTS;
@@ -2139,7 +2143,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
 			mode |= ATMEL_US_USMODE_HWHS;
 		}
 	} else {
-		/* RS232 without hadware handshake */
+		/* RS232 without hardware handshake or controlled by GPIOs */
 		mode |= ATMEL_US_USMODE_NORMAL;
 	}
 
