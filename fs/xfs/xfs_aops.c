@@ -1245,11 +1245,8 @@ __xfs_get_blocks(
 		goto out_unlock;
 	}
 
-	if (IS_DAX(inode) && create) {
+	if (IS_DAX(inode) && create)
 		ASSERT(!ISUNWRITTEN(&imap));
-		/* zeroing is not needed at a higher layer */
-		new = 0;
-	}
 
 	/* trim mapping down to size requested */
 	xfs_map_trim_size(inode, iblock, bh_result, &imap, offset, size);
