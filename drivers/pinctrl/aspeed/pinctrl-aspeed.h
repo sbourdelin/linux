@@ -232,6 +232,15 @@
  * group.
  */
 
+#define ASPEED_IP_SCU	0
+#define ASPEED_IP_SIO	1
+#define ASPEED_IP_GFX	2
+#define ASPEED_IP_LPC	3
+
+#define SIG_DESC_TO_REG(ip, offset)	(((ip) << 24) | (offset))
+#define SIG_DESC_IP_FROM_REG(reg)	(((reg) >> 24) & GENMASK(7, 0))
+#define SIG_DESC_OFFSET_FROM_REG(reg)	((reg) & GENMASK(11, 0))
+
 /*
  * The "Multi-function Pins Mapping and Control" table in the SoC datasheet
  * references registers by the device/offset mnemonic. The register macros
@@ -261,7 +270,10 @@
   * A signal descriptor, which describes the register, bits and the
   * enable/disable values that should be compared or written.
   *
-  * @reg: The register offset from base in bytes
+  * @reg: Split into three fields:
+  *       31:24: IP selector
+  *       23:12: Reserved
+  *       11:0: Register offset
   * @mask: The mask to apply to the register. The lowest set bit of the mask is
   *        used to derive the shift value.
   * @enable: The value that enables the function. Value should be in the LSBs,
@@ -270,7 +282,7 @@
   *           LSBs, not at the position of the mask.
   */
 struct aspeed_sig_desc {
-	unsigned int reg;
+	u32 reg;
 	u32 mask;
 	u32 enable;
 	u32 disable;
