@@ -1910,7 +1910,7 @@ int bitmap_copy_from_slot(struct mddev *mddev, int slot,
 
 	rv = bitmap_init_from_disk(bitmap, 0);
 	if (rv)
-		goto err;
+		goto free_bitmap;
 
 	counts = &bitmap->counts;
 	for (j = 0; j < counts->chunks; j++) {
@@ -1937,7 +1937,7 @@ int bitmap_copy_from_slot(struct mddev *mddev, int slot,
 	bitmap_unplug(mddev->bitmap);
 	*low = lo;
 	*high = hi;
-err:
+free_bitmap:
 	bitmap_free(bitmap);
 	return rv;
 }
