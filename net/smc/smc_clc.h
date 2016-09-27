@@ -106,6 +106,6 @@ int smc_clc_wait_msg(struct smc_sock *, void *, int, u8);
 int smc_clc_send_decline(struct smc_sock *, u32, u8);
 int smc_clc_send_proposal(struct smc_sock *, struct smc_ib_device *, u8);
 int smc_clc_send_confirm(struct smc_sock *);
-int smc_clc_send_accept(struct smc_sock *);
+int smc_clc_send_accept(struct smc_sock *, int);
 
 #endif
