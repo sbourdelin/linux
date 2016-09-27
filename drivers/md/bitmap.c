@@ -1818,22 +1818,22 @@ struct bitmap *bitmap_create(struct mddev *mddev, int slot)
 			err = -EINVAL;
 	}
 	if (err)
-		goto error;
+		goto free_bitmap;
 
 	bitmap->daemon_lastrun = jiffies;
 	err = bitmap_resize(bitmap, blocks, mddev->bitmap_info.chunksize, 1);
 	if (err)
-		goto error;
+		goto free_bitmap;
 
 	printk(KERN_INFO "created bitmap (%lu pages) for device %s\n",
 	       bitmap->counts.pages, bmname(bitmap));
 
 	err = test_bit(BITMAP_WRITE_ERROR, &bitmap->flags) ? -EIO : 0;
 	if (err)
-		goto error;
+		goto free_bitmap;
 
 	return bitmap;
- error:
+free_bitmap:
 	bitmap_free(bitmap);
 	return ERR_PTR(err);
 }
