@@ -663,7 +663,7 @@ enum {
 	LED_SYNC_ON	= 1<<3,	/* Use Sync Wire to switch LED */
 	LED_SYNC_OFF	= 1<<2,	/* Disable Sync Wire Input */
 	LED_ON	= 1<<1,	/* switch LED on */
-	LED_OFF	= 1<<0,	/* switch LED off */
+	LED_REG_OFF	= 1<<0,	/* switch LED off */
 };
 
 /* Receive GMAC FIFO (YUKON) */
