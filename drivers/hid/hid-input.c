@@ -1411,7 +1411,7 @@ static bool hidinput_has_been_populated(struct hid_input *hidinput)
 	for (i = 0; i < BITS_TO_LONGS(REL_CNT); i++)
 		r |= hidinput->input->relbit[i];
 
-	for (i = 0; i < BITS_TO_LONGS(ABS_CNT); i++)
+	for (i = 0; i < BITS_TO_LONGS(ABS_CNT2); i++)
 		r |= hidinput->input->absbit[i];
 
 	for (i = 0; i < BITS_TO_LONGS(MSC_CNT); i++)

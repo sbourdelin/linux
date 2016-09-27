@@ -31,9 +31,12 @@ struct input_event {
 
 /*
  * Protocol version.
+ * 0x010000: original version
+ * 0x010001: support for long scancodes
+ * 0x010002: added ABS_CNT2/ABS_MAX2, EVIOCGABS2, EVIOCSABS2
  */
 
-#define EV_VERSION		0x010001
+#define EV_VERSION		0x010002
 
 /*
  * IOCTLs (0x00 - 0x7f)
@@ -72,6 +75,35 @@ struct input_absinfo {
 	__s32 fuzz;
 	__s32 flat;
 	__s32 resolution;
+};
+
+/**
+ * struct input_absinfo2 - used by EVIOCGABS2/EVIOCSABS2 ioctls
+ * @code: First ABS code to query
+ * @cnt: Number of ABS codes to query starting at @code
+ * @info: #@cnt absinfo structures to get/set abs parameters for all codes
+ *
+ * This structure is used by the EVIOC[G/S]ABS2 ioctls which do the same as
+ * the legacy EVIOC[G/S]ABS ioctls but avoid encoding the ABS code in the ioctl
+ * number. This allows a much wider range of ABS codes. Furthermore, it allows
+ * to query multiple codes with a single call. Applications are discouraged
+ * from using EVIC[G/S]ABS except on older kernels without EVIOC[G/S]ABS2
+ * support.
+ *
+ * For axes not present on the device and for axes exceeding the kernel's
+ * built-in ABS_CNT2 maximum, EVIOCGABS2 sets all values in the struct absinfo
+ * to 0. Applications are recommended to use this API in conjunction with
+ * EVIOCGBIT to determine axes present on the device.
+ * Similar to how EVIOCABS2 returns 0 for axes, which are not present,
+ * EVIOCSABS2 silenty ignores write requests to these axes. In addition,
+ * EVIOCABS2 ignores write requests to ABS_MT_SlOT since it is an immutable
+ * axis and hence cannot be modified, so the respective value is silently
+ * ignored.
+ */
+struct input_absinfo2 {
+	__u32 code;
+	__u32 cnt;
+	struct input_absinfo info[1];
 };
 
 /**
@@ -160,6 +192,9 @@ struct input_mask {
 
 #define EVIOCGRAB		_IOW('E', 0x90, int)			/* Grab/Release device */
 #define EVIOCREVOKE		_IOW('E', 0x91, int)			/* Revoke device access */
+
+#define EVIOCGABS2		_IOR('E', 0x92, struct input_absinfo2)	/* get abs value/limits */
+#define EVIOCSABS2		_IOW('E', 0x93, struct input_absinfo2)	/* set abs value/limits */
 
 /**
  * EVIOCGMASK - Retrieve current event mask

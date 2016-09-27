@@ -386,7 +386,7 @@ static void hil_dev_pointer_setup(struct hil_dev *ptr)
 					0, HIL_IDD_AXIS_MAX(idd, i - 3), 0, 0);
 
 #ifdef TABLET_AUTOADJUST
-		for (i = 0; i < ABS_MAX; i++) {
+		for (i = 0; i < ABS_MAX2; i++) {
 			int diff = input_abs_get_max(input_dev, ABS_X + i) / 10;
 			input_abs_set_min(input_dev, ABS_X + i,
 				input_abs_get_min(input_dev, ABS_X + i) + diff);

@@ -815,7 +815,7 @@ static int handle_eviocgbit(struct input_dev *dev,
 	case      0: bits = dev->evbit;  len = EV_MAX;  break;
 	case EV_KEY: bits = dev->keybit; len = KEY_MAX; break;
 	case EV_REL: bits = dev->relbit; len = REL_MAX; break;
-	case EV_ABS: bits = dev->absbit; len = ABS_MAX; break;
+	case EV_ABS: bits = dev->absbit; len = ABS_MAX2; break;
 	case EV_MSC: bits = dev->mscbit; len = MSC_MAX; break;
 	case EV_LED: bits = dev->ledbit; len = LED_MAX; break;
 	case EV_SND: bits = dev->sndbit; len = SND_MAX; break;
@@ -825,6 +825,93 @@ static int handle_eviocgbit(struct input_dev *dev,
 	}
 
 	return bits_to_user(bits, len, size, p, compat_mode);
+}
+
+static int evdev_handle_get_abs2(struct input_dev *dev, void __user *p)
+{
+	u32 code, cnt, valid_cnt, i;
+	struct input_absinfo2 __user *pinfo = p;
+	struct input_absinfo abs;
+
+	if (copy_from_user(&code, &pinfo->code, sizeof(code)))
+		return -EFAULT;
+	if (copy_from_user(&cnt, &pinfo->cnt, sizeof(cnt)))
+		return -EFAULT;
+	if (!cnt)
+		return 0;
+
+	if (!dev->absinfo)
+		valid_cnt = 0;
+	else if (code > ABS_MAX2)
+		valid_cnt = 0;
+	else if (code + cnt <= code || code + cnt > ABS_MAX2)
+		valid_cnt = ABS_MAX2 - code + 1;
+	else
+		valid_cnt = cnt;
+
+	for (i = 0; i < valid_cnt; ++i) {
+		/*
+		 * Take event lock to ensure that we are not
+		 * copying data while EVIOCSABS2 changes it.
+		 * Might be inconsistent, otherwise.
+		 */
+		spin_lock_irq(&dev->event_lock);
+		abs = dev->absinfo[code + i];
+		spin_unlock_irq(&dev->event_lock);
+
+		if (copy_to_user(&pinfo->info[i], &abs, sizeof(abs)))
+			return -EFAULT;
+	}
+
+	memset(&abs, 0, sizeof(abs));
+	for (i = valid_cnt; i < cnt; ++i)
+		if (copy_to_user(&pinfo->info[i], &abs, sizeof(abs)))
+			return -EFAULT;
+
+	return valid_cnt;
+}
+
+static int evdev_handle_set_abs2(struct input_dev *dev, void __user *p)
+{
+	struct input_absinfo2 __user *pinfo = p;
+	struct input_absinfo *abs;
+	u32 code, cnt, i;
+	size_t size;
+
+	if (!dev->absinfo)
+		return 0;
+	if (copy_from_user(&code, &pinfo->code, sizeof(code)))
+		return -EFAULT;
+	if (copy_from_user(&cnt, &pinfo->cnt, sizeof(cnt)))
+		return -EFAULT;
+	if (!cnt || code > ABS_MAX2)
+		return 0;
+
+	if (code + cnt <= code || code + cnt > ABS_MAX2)
+		cnt = ABS_MAX2 - code + 1;
+
+	size = cnt * sizeof(*abs);
+	abs = memdup_user(pinfo->info, size);
+	if (IS_ERR(abs))
+		return PTR_ERR(abs);
+
+	/*
+	 * Take event lock to ensure that we are not
+	 * changing device parameters in the middle
+	 * of event.
+	 */
+	spin_lock_irq(&dev->event_lock);
+	for (i = 0; i < cnt; ++i) {
+		/* silently drop ABS_MT_SLOT */
+		if (code + i == ABS_MT_SLOT)
+			continue;
+
+		dev->absinfo[code + i] = abs[i];
+	}
+	spin_unlock_irq(&dev->event_lock);
+
+	kfree(abs);
+	return 0;
 }
 
 static int evdev_handle_get_keycode(struct input_dev *dev, void __user *p)
@@ -1154,6 +1241,12 @@ static long evdev_do_ioctl(struct file *file, unsigned int cmd,
 			return -EFAULT;
 
 		return evdev_set_clk_type(client, i);
+
+	case EVIOCGABS2:
+		return evdev_handle_get_abs2(dev, p);
+
+	case EVIOCSABS2:
+		return evdev_handle_set_abs2(dev, p);
 
 	case EVIOCGKEYCODE:
 		return evdev_handle_get_keycode(dev, p);

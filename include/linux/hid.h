@@ -886,7 +886,7 @@ static inline void hid_map_usage(struct hid_input *hidinput,
 	switch (type) {
 	case EV_ABS:
 		*bit = input->absbit;
-		*max = ABS_MAX;
+		*max = ABS_MAX2;
 		break;
 	case EV_REL:
 		*bit = input->relbit;

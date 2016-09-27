@@ -129,7 +129,7 @@ struct input_dev {
 	unsigned long evbit[BITS_TO_LONGS(EV_CNT)];
 	unsigned long keybit[BITS_TO_LONGS(KEY_CNT)];
 	unsigned long relbit[BITS_TO_LONGS(REL_CNT)];
-	unsigned long absbit[BITS_TO_LONGS(ABS_CNT)];
+	unsigned long absbit[BITS_TO_LONGS(ABS_CNT2)];
 	unsigned long mscbit[BITS_TO_LONGS(MSC_CNT)];
 	unsigned long ledbit[BITS_TO_LONGS(LED_CNT)];
 	unsigned long sndbit[BITS_TO_LONGS(SND_CNT)];
@@ -210,8 +210,8 @@ struct input_dev {
 #error "REL_MAX and INPUT_DEVICE_ID_REL_MAX do not match"
 #endif
 
-#if ABS_MAX != INPUT_DEVICE_ID_ABS_MAX
-#error "ABS_MAX and INPUT_DEVICE_ID_ABS_MAX do not match"
+#if ABS_MAX2 != INPUT_DEVICE_ID_ABS_MAX
+#error "ABS_MAX2 and INPUT_DEVICE_ID_ABS_MAX do not match"
 #endif
 
 #if MSC_MAX != INPUT_DEVICE_ID_MSC_MAX

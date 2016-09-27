@@ -361,7 +361,7 @@ static int uinput_validate_absbits(struct input_dev *dev)
 	 * Check if absmin/absmax/absfuzz/absflat are sane.
 	 */
 
-	for_each_set_bit(cnt, dev->absbit, ABS_CNT) {
+	for_each_set_bit(cnt, dev->absbit, ABS_CNT2) {
 		if (!dev->absinfo)
 			return -EINVAL;
 
@@ -429,7 +429,7 @@ static int uinput_abs_setup(struct uinput_device *udev,
 	if (copy_from_user(&setup, arg, size))
 		return -EFAULT;
 
-	if (setup.code > ABS_MAX)
+	if (setup.code > ABS_MAX2)
 		return -ERANGE;
 
 	dev = udev->dev;
@@ -492,7 +492,7 @@ static int uinput_setup_device_legacy(struct uinput_device *udev,
 	dev->id.product	= user_dev->id.product;
 	dev->id.version	= user_dev->id.version;
 
-	for (i = 0; i < ABS_CNT; i++) {
+	for (i = 0; i < ABS_CNT2; i++) {
 		input_abs_set_max(dev, i, user_dev->absmax[i]);
 		input_abs_set_min(dev, i, user_dev->absmin[i]);
 		input_abs_set_fuzz(dev, i, user_dev->absfuzz[i]);
@@ -832,7 +832,7 @@ static long uinput_ioctl_handler(struct file *file, unsigned int cmd,
 			goto out;
 
 		case UI_SET_ABSBIT:
-			retval = uinput_set_bit(arg, absbit, ABS_MAX);
+			retval = uinput_set_bit(arg, absbit, ABS_MAX2);
 			goto out;
 
 		case UI_SET_MSCBIT:

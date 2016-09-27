@@ -310,7 +310,7 @@ static int input_get_disposition(struct input_dev *dev,
 		break;
 
 	case EV_ABS:
-		if (is_event_supported(code, dev->absbit, ABS_MAX))
+		if (is_event_supported(code, dev->absbit, ABS_MAX2))
 			disposition = input_handle_abs_event(dev, code, &value);
 
 		break;
@@ -481,7 +481,7 @@ EXPORT_SYMBOL(input_inject_event);
 void input_alloc_absinfo(struct input_dev *dev)
 {
 	if (!dev->absinfo)
-		dev->absinfo = kcalloc(ABS_CNT, sizeof(struct input_absinfo),
+		dev->absinfo = kcalloc(ABS_CNT2, sizeof(struct input_absinfo),
 					GFP_KERNEL);
 
 	WARN(!dev->absinfo, "%s(): kcalloc() failed?\n", __func__);
@@ -965,7 +965,7 @@ static const struct input_device_id *input_match_device(struct input_handler *ha
 		if (!bitmap_subset(id->relbit, dev->relbit, REL_MAX))
 			continue;
 
-		if (!bitmap_subset(id->absbit, dev->absbit, ABS_MAX))
+		if (!bitmap_subset(id->absbit, dev->absbit, ABS_MAX2))
 			continue;
 
 		if (!bitmap_subset(id->mscbit, dev->mscbit, MSC_MAX))
@@ -1158,7 +1158,7 @@ static int input_devices_seq_show(struct seq_file *seq, void *v)
 	if (test_bit(EV_REL, dev->evbit))
 		input_seq_print_bitmap(seq, "REL", dev->relbit, REL_MAX);
 	if (test_bit(EV_ABS, dev->evbit))
-		input_seq_print_bitmap(seq, "ABS", dev->absbit, ABS_MAX);
+		input_seq_print_bitmap(seq, "ABS", dev->absbit, ABS_MAX2);
 	if (test_bit(EV_MSC, dev->evbit))
 		input_seq_print_bitmap(seq, "MSC", dev->mscbit, MSC_MAX);
 	if (test_bit(EV_LED, dev->evbit))
@@ -1344,7 +1344,7 @@ static int input_print_modalias(char *buf, int size, struct input_dev *id,
 	len += input_print_modalias_bits(buf + len, size - len,
 				'r', id->relbit, 0, REL_MAX);
 	len += input_print_modalias_bits(buf + len, size - len,
-				'a', id->absbit, 0, ABS_MAX);
+				'a', id->absbit, 0, ABS_MAX2);
 	len += input_print_modalias_bits(buf + len, size - len,
 				'm', id->mscbit, 0, MSC_MAX);
 	len += input_print_modalias_bits(buf + len, size - len,
@@ -1603,7 +1603,7 @@ static int input_dev_uevent(struct device *device, struct kobj_uevent_env *env)
 	if (test_bit(EV_REL, dev->evbit))
 		INPUT_ADD_HOTPLUG_BM_VAR("REL=", dev->relbit, REL_MAX);
 	if (test_bit(EV_ABS, dev->evbit))
-		INPUT_ADD_HOTPLUG_BM_VAR("ABS=", dev->absbit, ABS_MAX);
+		INPUT_ADD_HOTPLUG_BM_VAR("ABS=", dev->absbit, ABS_MAX2);
 	if (test_bit(EV_MSC, dev->evbit))
 		INPUT_ADD_HOTPLUG_BM_VAR("MSC=", dev->mscbit, MSC_MAX);
 	if (test_bit(EV_LED, dev->evbit))
@@ -1980,7 +1980,7 @@ static unsigned int input_estimate_events_per_packet(struct input_dev *dev)
 	events = mt_slots + 1; /* count SYN_MT_REPORT and SYN_REPORT */
 
 	if (test_bit(EV_ABS, dev->evbit))
-		for_each_set_bit(i, dev->absbit, ABS_CNT)
+		for_each_set_bit(i, dev->absbit, ABS_CNT2)
 			events += input_is_mt_axis(i) ? mt_slots : 1;
 
 	if (test_bit(EV_REL, dev->evbit))

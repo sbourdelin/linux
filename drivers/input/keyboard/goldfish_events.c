@@ -90,8 +90,8 @@ static void events_import_abs_params(struct event_dev *edev)
 	__raw_writel(PAGE_ABSDATA, addr + REG_SET_PAGE);
 
 	count = __raw_readl(addr + REG_LEN) / sizeof(val);
-	if (count > ABS_MAX)
-		count = ABS_MAX;
+	if (count > ABS_MAX2)
+		count = ABS_MAX2;
 
 	for (i = 0; i < count; i++) {
 		if (!test_bit(i, input_dev->absbit))
@@ -158,7 +158,7 @@ static int events_probe(struct platform_device *pdev)
 	events_import_bits(edev, input_dev->evbit, EV_SYN, EV_MAX);
 	events_import_bits(edev, input_dev->keybit, EV_KEY, KEY_MAX);
 	events_import_bits(edev, input_dev->relbit, EV_REL, REL_MAX);
-	events_import_bits(edev, input_dev->absbit, EV_ABS, ABS_MAX);
+	events_import_bits(edev, input_dev->absbit, EV_ABS, ABS_MAX2);
 	events_import_bits(edev, input_dev->mscbit, EV_MSC, MSC_MAX);
 	events_import_bits(edev, input_dev->ledbit, EV_LED, LED_MAX);
 	events_import_bits(edev, input_dev->sndbit, EV_SND, SND_MAX);

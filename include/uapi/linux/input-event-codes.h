@@ -755,9 +755,21 @@
 #define ABS_MT_TOOL_X		0x3c	/* Center X tool position */
 #define ABS_MT_TOOL_Y		0x3d	/* Center Y tool position */
 
-
+/*
+ * ABS_MAX/CNT is limited to a maximum of 0x3f due to the design of EVIOCGABS
+ * and EVIOCSABS ioctls. Other kernel APIs like uinput also hardcoded it. Do
+ * not modify this value and instead use the extended ABS_MAX2/CNT2 API.
+ */
 #define ABS_MAX			0x3f
 #define ABS_CNT			(ABS_MAX+1)
+
+/*
+ * Due to API restrictions the legacy evdev API only supports ABS values up to
+ * ABS_MAX/CNT. Use the extended *ABS2 ioctls to operate on the full range of
+ * ABS values supported by the kernel.
+ */
+#define ABS_MAX2		0x4f
+#define ABS_CNT2		(ABS_MAX2+1)
 
 /*
  * Switch events
