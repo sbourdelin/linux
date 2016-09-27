@@ -555,6 +555,16 @@ config I2C_GPIO
 	  This is a very simple bitbanging I2C driver utilizing the
 	  arch-neutral GPIO API to control the SCL and SDA lines.
 
+config I2C_HIBVT
+	tristate "Hisilicon BVT I2C Controller"
+	depends on ARCH_HISI
+	help
+	  Say Y here to include support for Hisilicon BVT I2C controller in the
+	  Hisilicon BVT SoCs.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-hibvt.
+
 config I2C_HIGHLANDER
 	tristate "Highlander FPGA SMBus interface"
 	depends on SH_HIGHLANDER
