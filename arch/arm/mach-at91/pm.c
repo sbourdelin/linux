@@ -54,7 +54,7 @@ static struct {
 	int memctrl;
 } at91_pm_data;
 
-void __iomem *at91_ramc_base[2];
+static void __iomem *at91_ramc_base[2];
 
 static int at91_pm_valid_state(suspend_state_t state)
 {
