@@ -181,7 +181,8 @@ struct ssp_device {
 enum {
 	SAS_DEV_GONE,
 	SAS_DEV_FOUND, /* device notified to lldd */
-	SAS_DEV_DESTROY,
+	SAS_DEV_PROBE_FAIL,/* device probe fail */
+	SAS_DEV_DESTROY, /* device will be destroyed from system */
 	SAS_DEV_EH_PENDING,
 	SAS_DEV_LU_RESET,
 	SAS_DEV_RESET,
@@ -268,7 +269,7 @@ struct asd_sas_port {
 	spinlock_t dev_list_lock;
 	struct list_head dev_list;
 	struct list_head disco_list;
-	struct list_head destroy_list;
+	struct list_head expander_list;
 	enum   sas_linkrate linkrate;
 
 	struct sas_work work;
