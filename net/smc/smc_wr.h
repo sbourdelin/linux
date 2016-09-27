@@ -90,6 +90,8 @@ int smc_wr_tx_get_free_slot(struct smc_link *, smc_wr_tx_handler,
 int smc_wr_tx_put_slot(struct smc_link *, struct smc_wr_tx_pend_priv *);
 int smc_wr_tx_send(struct smc_link *, struct smc_wr_tx_pend_priv *);
 void smc_wr_tx_cq_handler(struct ib_cq *, void *);
+bool smc_wr_tx_has_pending(struct smc_link *, u8,
+			   smc_wr_tx_filter, unsigned long);
 void smc_wr_tx_dismiss_slots(struct smc_link *, u8,
 			     smc_wr_tx_filter, smc_wr_tx_dismisser,
 			     unsigned long);
