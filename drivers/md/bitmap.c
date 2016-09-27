@@ -154,7 +154,7 @@ static int read_sb_page(struct mddev *mddev, loff_t offset,
 	sector_t target;
 
 	rdev_for_each(rdev, mddev) {
-		if (! test_bit(In_sync, &rdev->flags)
+		if (!test_bit(In_sync, &rdev->flags)
 		    || test_bit(Faulty, &rdev->flags))
 			continue;
 
