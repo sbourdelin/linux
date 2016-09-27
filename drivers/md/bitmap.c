@@ -2187,11 +2187,11 @@ location_store(struct mddev *mddev, const char *buf, size_t len)
 	if (mddev->pers) {
 		if (!mddev->pers->quiesce) {
 			rv = -EBUSY;
-			goto out;
+			goto unlock;
 		}
 		if (mddev->recovery || mddev->sync_thread) {
 			rv = -EBUSY;
-			goto out;
+			goto unlock;
 		}
 	}
 
@@ -2200,7 +2200,7 @@ location_store(struct mddev *mddev, const char *buf, size_t len)
 		/* bitmap already configured.  Only option is to clear it */
 		if (strncmp(buf, "none", 4) != 0) {
 			rv = -EBUSY;
-			goto out;
+			goto unlock;
 		}
 		if (mddev->pers) {
 			mddev->pers->quiesce(mddev, 1);
@@ -2221,23 +2221,23 @@ location_store(struct mddev *mddev, const char *buf, size_t len)
 		else if (strncmp(buf, "file:", 5) == 0) {
 			/* Not supported yet */
 			rv = -EINVAL;
-			goto out;
+			goto unlock;
 		} else {
 			if (buf[0] == '+')
 				rv = kstrtoll(buf+1, 10, &offset);
 			else
 				rv = kstrtoll(buf, 10, &offset);
 			if (rv)
-				goto out;
+				goto unlock;
 			if (offset == 0) {
 				rv = -EINVAL;
-				goto out;
+				goto unlock;
 			}
 			if (mddev->bitmap_info.external == 0 &&
 			    mddev->major_version == 0 &&
 			    offset != mddev->bitmap_info.default_offset) {
 				rv = -EINVAL;
-				goto out;
+				goto unlock;
 			}
 			mddev->bitmap_info.offset = offset;
 			if (mddev->pers) {
@@ -2255,7 +2255,7 @@ location_store(struct mddev *mddev, const char *buf, size_t len)
 				mddev->pers->quiesce(mddev, 0);
 				if (rv) {
 					bitmap_destroy(mddev);
-					goto out;
+					goto unlock;
 				}
 			}
 		}
@@ -2268,7 +2268,7 @@ location_store(struct mddev *mddev, const char *buf, size_t len)
 		md_wakeup_thread(mddev->thread);
 	}
 	rv = 0;
-out:
+unlock:
 	mddev_unlock(mddev);
 	if (rv)
 		return rv;
