@@ -2037,10 +2037,9 @@ int bitmap_resize(struct bitmap *bitmap, sector_t blocks,
 	pages = DIV_ROUND_UP(chunks, PAGE_COUNTER_RATIO);
 
 	new_bp = kzalloc(pages * sizeof(*new_bp), GFP_KERNEL);
-	ret = -ENOMEM;
 	if (!new_bp) {
 		bitmap_file_unmap(&store);
-		goto err;
+		return -ENOMEM;
 	}
 
 	if (!init)
@@ -2160,8 +2159,6 @@ int bitmap_resize(struct bitmap *bitmap, sector_t blocks,
 		bitmap_unplug(bitmap);
 		bitmap->mddev->pers->quiesce(bitmap->mddev, 0);
 	}
-	ret = 0;
-err:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(bitmap_resize);
