@@ -2821,7 +2821,7 @@ static int kvm_vcpu_ioctl_get_lapic(struct kvm_vcpu *vcpu,
 				    struct kvm_lapic_state *s)
 {
 	if (vcpu->arch.apicv_active)
-		kvm_x86_ops->sync_pir_to_irr(vcpu);
+		kvm_x86_ops->sync_pir_to_irr(vcpu, false);
 
 	return kvm_apic_get_state(vcpu, s);
 }
@@ -6448,7 +6448,7 @@ static void vcpu_scan_ioapic(struct kvm_vcpu *vcpu)
 		kvm_scan_ioapic_routes(vcpu, vcpu->arch.ioapic_handled_vectors);
 	else {
 		if (vcpu->arch.apicv_active)
-			kvm_x86_ops->sync_pir_to_irr(vcpu);
+			kvm_x86_ops->sync_pir_to_irr(vcpu, false);
 		kvm_ioapic_scan_entry(vcpu, vcpu->arch.ioapic_handled_vectors);
 	}
 	bitmap_or((ulong *)eoi_exit_bitmap, vcpu->arch.ioapic_handled_vectors,
@@ -6611,8 +6611,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		 * virtual interrupt delivery.
 		 */
 		if (vcpu->arch.apicv_active)
-			kvm_x86_ops->hwapic_irr_update(vcpu,
-				kvm_lapic_find_highest_irr(vcpu));
+			kvm_x86_ops->sync_pir_to_irr(vcpu, true);
 	}
 
 	if (kvm_check_request(KVM_REQ_EVENT, vcpu) || req_int_win) {

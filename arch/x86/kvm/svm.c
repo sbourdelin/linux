@@ -4383,7 +4383,7 @@ static void svm_load_eoi_exitmap(struct kvm_vcpu *vcpu, u64 *eoi_exit_bitmap)
 	return;
 }
 
-static void svm_sync_pir_to_irr(struct kvm_vcpu *vcpu)
+static void svm_sync_pir_to_irr(struct kvm_vcpu *vcpu, bool sync_rvi)
 {
 	return;
 }
