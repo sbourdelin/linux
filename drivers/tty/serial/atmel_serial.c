@@ -2131,19 +2131,23 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
 				  port->rs485.delay_rts_after_send);
 		mode |= ATMEL_US_USMODE_RS485;
 	} else if ((termios->c_cflag & CRTSCTS) &&
-		   !mctrl_gpio_use_rtscts(atmel_port->gpios)) {
+		   !mctrl_gpio_use_rtscts(atmel_port->gpios) &&
+		   (atmel_use_pdc_rx(port) || atmel_use_fifo(port))) {
 		/*
-		 * RS232 with hardware handshake (RTS/CTS)
-		 * handled by the controller.
+		 * Automatic hardware handshake (RTS/CTS) only work with
+		 * FIFOs or PDC.
+		 * Meaning that on SAM9x5 the controller can't handle
+		 * the hardware handshake (no FIFOs nor PDC on these platforms).
 		 */
-		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
-			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
-			termios->c_cflag &= ~CRTSCTS;
-		} else {
-			mode |= ATMEL_US_USMODE_HWHS;
-		}
+		mode |= ATMEL_US_USMODE_HWHS;
 	} else {
-		/* RS232 without hardware handshake or controlled by GPIOs */
+		/*
+		 * Other cases are:
+		 * - RS232 without hardware handshake
+		 * - RS232 with hardware handshake and:
+		 *   - controller unable to handle CTS/RTS by itself
+		 *   - or CTS/RTS handled by GPIOs
+		 */
 		mode |= ATMEL_US_USMODE_NORMAL;
 	}
 
