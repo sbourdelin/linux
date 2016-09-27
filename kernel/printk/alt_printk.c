@@ -40,7 +40,6 @@
  */
 DEFINE_PER_CPU(printk_func_t, printk_func) = vprintk_default;
 static int alt_printk_irq_ready;
-atomic_t nmi_message_lost;
 
 #define ALT_LOG_BUF_LEN ((1 << CONFIG_ALT_PRINTK_LOG_BUF_SHIFT) -	\
 			 sizeof(atomic_t) - sizeof(struct irq_work))
@@ -50,7 +49,11 @@ struct alt_printk_seq_buf {
 	struct irq_work		work;	/* IRQ work that flushes the buffer */
 	unsigned char		buffer[ALT_LOG_BUF_LEN];
 };
+
+#ifdef CONFIG_PRINTK_NMI
 static DEFINE_PER_CPU(struct alt_printk_seq_buf, nmi_print_seq);
+atomic_t nmi_message_lost;
+#endif
 
 /*
  * There can be two alt_printk contexts at most - a `normal' alt_printk
@@ -320,8 +323,12 @@ void alt_printk_flush(void)
 {
 	int cpu;
 
-	for_each_possible_cpu(cpu)
-		__alt_printk_flush(&per_cpu(nmi_print_seq, cpu).work);
+	for_each_possible_cpu(cpu) {
+		if (IS_ENABLED(CONFIG_PRINTK_NMI))
+			__alt_printk_flush(&per_cpu(nmi_print_seq, cpu).work);
+
+		__alt_printk_flush(&per_cpu(alt_print_seq, cpu).work);
+	}
 }
 
 /**
@@ -356,12 +363,14 @@ void __init alt_printk_init(void)
 	int cpu;
 
 	for_each_possible_cpu(cpu) {
-		struct alt_printk_seq_buf *s = &per_cpu(nmi_print_seq, cpu);
+		struct alt_printk_seq_buf *s = &per_cpu(alt_print_seq, cpu);
 
 		init_irq_work(&s->work, __alt_printk_flush);
 
-		s = &per_cpu(alt_print_seq, cpu);
-		init_irq_work(&s->work, __alt_printk_flush);
+		if (IS_ENABLED(CONFIG_PRINTK_NMI)) {
+			s = &per_cpu(nmi_print_seq, cpu);
+			init_irq_work(&s->work, __alt_printk_flush);
+		}
 	}
 
 	/* Make sure that IRQ works are initialized before enabling. */
@@ -372,6 +381,7 @@ void __init alt_printk_init(void)
 	alt_printk_flush();
 }
 
+#ifdef CONFIG_PRINTK_NMI
 /*
  * Safe printk() for NMI context. It uses a per-CPU buffer to
  * store the message. NMIs are not nested, so there is always only
@@ -399,3 +409,4 @@ void printk_nmi_exit(void)
 {
 	__lockless_printk_exit();
 }
+#endif /* CONFIG_PRINTK_NMI */
