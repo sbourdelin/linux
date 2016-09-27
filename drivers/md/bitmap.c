@@ -367,7 +367,7 @@ static int read_page(struct file *file, unsigned long index,
 	bh = alloc_page_buffers(page, 1<<inode->i_blkbits, 0);
 	if (!bh) {
 		ret = -ENOMEM;
-		goto out;
+		goto report_failure;
 	}
 	attach_page_buffers(page, bh);
 	block = index << (PAGE_SHIFT - inode->i_blkbits);
@@ -379,7 +379,7 @@ static int read_page(struct file *file, unsigned long index,
 			if (bh->b_blocknr == 0) {
 				/* Cannot use this file! */
 				ret = -EINVAL;
-				goto out;
+				goto report_failure;
 			}
 			bh->b_bdev = inode->i_sb->s_bdev;
 			if (count < (1<<inode->i_blkbits))
@@ -401,14 +401,14 @@ static int read_page(struct file *file, unsigned long index,
 
 	wait_event(bitmap->write_wait,
 		   atomic_read(&bitmap->pending_writes)==0);
-	if (test_bit(BITMAP_WRITE_ERROR, &bitmap->flags))
+	if (test_bit(BITMAP_WRITE_ERROR, &bitmap->flags)) {
 		ret = -EIO;
-out:
-	if (ret)
+report_failure:
 		printk(KERN_ALERT "md: bitmap read error: (%dB @ %llu): %d\n",
 			(int)PAGE_SIZE,
 			(unsigned long long)index << PAGE_SHIFT,
 			ret);
+	}
 	return ret;
 }
 
