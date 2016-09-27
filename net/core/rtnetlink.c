@@ -943,7 +943,8 @@ static noinline size_t if_nlmsg_size(const struct net_device *dev,
 	       + nla_total_size(MAX_PHYS_ITEM_ID_LEN) /* IFLA_PHYS_SWITCH_ID */
 	       + nla_total_size(IFNAMSIZ) /* IFLA_PHYS_PORT_NAME */
 	       + rtnl_xdp_size(dev) /* IFLA_XDP */
-	       + nla_total_size(1); /* IFLA_PROTO_DOWN */
+	       + nla_total_size(1) /* IFLA_PROTO_DOWN */
+	       + nla_total_size(4); /* IFLA_ENV_HDR_LEN */
 
 }
 
@@ -1321,7 +1322,8 @@ static int rtnl_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 	     nla_put_string(skb, IFLA_IFALIAS, dev->ifalias)) ||
 	    nla_put_u32(skb, IFLA_CARRIER_CHANGES,
 			atomic_read(&dev->carrier_changes)) ||
-	    nla_put_u8(skb, IFLA_PROTO_DOWN, dev->proto_down))
+	    nla_put_u8(skb, IFLA_PROTO_DOWN, dev->proto_down) ||
+	    nla_put_u32(skb, IFLA_ENV_HDR_LEN, netif_get_env_hdr_len(dev)))
 		goto nla_put_failure;
 
 	if (rtnl_fill_link_ifmap(skb, dev))
@@ -1458,6 +1460,7 @@ static const struct nla_policy ifla_policy[IFLA_MAX+1] = {
 	[IFLA_LINK_NETNSID]	= { .type = NLA_S32 },
 	[IFLA_PROTO_DOWN]	= { .type = NLA_U8 },
 	[IFLA_XDP]		= { .type = NLA_NESTED },
+	[IFLA_ENV_HDR_LEN]	= { .type = NLA_U32 },
 };
 
 static const struct nla_policy ifla_info_policy[IFLA_INFO_MAX+1] = {
@@ -2174,6 +2177,13 @@ static int do_setlink(const struct sk_buff *skb,
 		}
 	}
 
+	if (tb[IFLA_ENV_HDR_LEN]) {
+		err = dev_set_env_hdr_len(dev, nla_get_u32(tb[IFLA_ENV_HDR_LEN]));
+		if (err < 0)
+			goto errout;
+		status |= DO_SETLINK_MODIFIED;
+	}
+
 errout:
 	if (status & DO_SETLINK_MODIFIED) {
 		if (status & DO_SETLINK_NOTIFY)
@@ -2378,6 +2388,8 @@ struct net_device *rtnl_create_link(struct net *net,
 		dev->link_mode = nla_get_u8(tb[IFLA_LINKMODE]);
 	if (tb[IFLA_GROUP])
 		dev_set_group(dev, nla_get_u32(tb[IFLA_GROUP]));
+	if (tb[IFLA_ENV_HDR_LEN])
+		dev->env_hdr_len = nla_get_u32(tb[IFLA_ENV_HDR_LEN]);
 
 	return dev;
 
