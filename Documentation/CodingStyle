@@ -911,8 +911,19 @@ The compiler will constant-fold the conditional away, and include or exclude
 the block of code just as with an #ifdef, so this will not add any runtime
 overhead.  However, this approach still allows the C compiler to see the code
 inside the block, and check it for correctness (syntax, types, symbol
-references, etc).  Thus, you still have to use an #ifdef if the code inside the
-block references symbols that will not exist if the condition is not met.
+references, etc).
+
+Because the compiler processes the block, you have to use an #ifdef instead
+of IS_ENABLED() when code inside the block references symbols that will not
+exist if the condition is not met.  Different CONFIG_FOO autoconf.h symbols
+are generated for modular Kconfig options than for builtin ones, so you
+need "#if defined(CONFIG_FOO) || defined(CONFIG_FOO_MODULE)" if FOO can be
+a module:
+
+	.config			include/generated/autoconf.h
+	------------		----------------------------
+	CONFIG_FOO=y		#define CONFIG_FOO 1
+	CONFIG_FOO=m		#define CONFIG_FOO_MODULE 1
 
 At the end of any non-trivial #if or #ifdef block (more than a few lines),
 place a comment after the #endif on the same line, noting the conditional

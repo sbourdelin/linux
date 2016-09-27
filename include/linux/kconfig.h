@@ -60,7 +60,8 @@
 
 /*
  * IS_ENABLED(CONFIG_FOO) evaluates to 1 if CONFIG_FOO is set to 'y' or 'm',
- * 0 otherwise.
+ * 0 otherwise.  Note that CONFIG_FOO=y results in "#define CONFIG_FOO 1"
+ * in autoconf.h, while CONFIG_FOO=m results in "#define CONFIG_FOO_MODULE 1"
  */
 #define IS_ENABLED(option) __or(IS_BUILTIN(option), IS_MODULE(option))
 
