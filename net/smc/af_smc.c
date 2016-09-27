@@ -39,6 +39,7 @@
 #include "smc_tx.h"
 #include "smc_rx.h"
 #include "smc_close.h"
+#include "smc_proc.h"
 
 static DEFINE_MUTEX(smc_create_lgr_pending);	/* serialize link group
 						 * creation
@@ -118,11 +119,14 @@ out:
 
 static void smc_destruct(struct sock *sk)
 {
+	struct smc_sock *smc = smc_sk(sk);
+
 	if (sk->sk_state != SMC_CLOSED)
 		return;
 	if (!sock_flag(sk, SOCK_DEAD))
 		return;
 
+	smc_proc_sock_list_del(smc);
 	sk_refcnt_debug_dec(sk);
 }
 
@@ -151,6 +155,7 @@ static struct sock *smc_sock_alloc(struct net *net, struct socket *sock)
 	INIT_LIST_HEAD(&smc->accept_q);
 	spin_lock_init(&smc->accept_q_lock);
 	INIT_DELAYED_WORK(&smc->sock_put_work, smc_close_sock_put_work);
+	smc_proc_sock_list_add(smc);
 
 	return sk;
 }
@@ -1327,8 +1332,16 @@ static int __init smc_init(void)
 		goto out_sock;
 	}
 
+	rc = smc_proc_init();
+	if (rc) {
+		pr_err("%s: smc_proc_init fails with %d\n", __func__, rc);
+		goto out_ibclient;
+	}
+
 	return 0;
 
+out_ibclient:
+	smc_ib_unregister_client();
 out_sock:
 	sock_unregister(PF_SMC);
 out_proto:
@@ -1351,6 +1364,7 @@ static void __exit smc_exit(void)
 		list_del_init(&lgr->list);
 		smc_lgr_free(lgr); /* free link group */
 	}
+	smc_proc_exit();
 	smc_ib_unregister_client();
 	sock_unregister(PF_SMC);
 	proto_unregister(&smc_proto);

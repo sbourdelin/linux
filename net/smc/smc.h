@@ -163,6 +163,7 @@ struct smc_connection {
 
 struct smc_sock {				/* smc sock container */
 	struct sock		sk;
+	struct list_head	proc_list;	/* smc socket list */
 	struct socket		*clcsock;	/* internal tcp socket */
 	struct smc_connection	conn;		/* smc connection */
 	struct sockaddr		*addr;		/* inet connect address */
