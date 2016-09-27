@@ -2035,8 +2035,7 @@ int bitmap_resize(struct bitmap *bitmap, sector_t blocks,
 		return ret;
 
 	pages = DIV_ROUND_UP(chunks, PAGE_COUNTER_RATIO);
-
-	new_bp = kzalloc(pages * sizeof(*new_bp), GFP_KERNEL);
+	new_bp = kcalloc(pages, sizeof(*new_bp), GFP_KERNEL);
 	if (!new_bp) {
 		bitmap_file_unmap(&store);
 		return -ENOMEM;
