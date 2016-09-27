@@ -36,6 +36,11 @@ typedef void (*smc_wr_tx_handler)(struct smc_wr_tx_pend_priv *,
 				  struct smc_link *,
 				  enum ib_wc_status);
 
+typedef bool (*smc_wr_tx_filter)(struct smc_wr_tx_pend_priv *,
+				 unsigned long);
+
+typedef void (*smc_wr_tx_dismisser)(struct smc_wr_tx_pend_priv *);
+
 struct smc_wr_rx_handler {
 	struct hlist_node	list;	/* hash table collision resolution */
 	void			(*handler)(struct ib_wc *, void *);
@@ -85,6 +90,9 @@ int smc_wr_tx_get_free_slot(struct smc_link *, smc_wr_tx_handler,
 int smc_wr_tx_put_slot(struct smc_link *, struct smc_wr_tx_pend_priv *);
 int smc_wr_tx_send(struct smc_link *, struct smc_wr_tx_pend_priv *);
 void smc_wr_tx_cq_handler(struct ib_cq *, void *);
+void smc_wr_tx_dismiss_slots(struct smc_link *, u8,
+			     smc_wr_tx_filter, smc_wr_tx_dismisser,
+			     unsigned long);
 
 int smc_wr_rx_register_handler(struct smc_wr_rx_handler *);
 int smc_wr_rx_post_init(struct smc_link *);
