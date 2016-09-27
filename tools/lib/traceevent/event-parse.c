@@ -4952,6 +4952,7 @@ static void pretty_print(struct trace_seq *s, void *data, int size, struct event
 			case 'i':
 			case 'x':
 			case 'X':
+			case 'o':
 			case 'u':
 				if (!arg) {
 					do_warning_event(event, "no argument match");
