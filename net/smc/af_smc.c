@@ -20,6 +20,7 @@
 #include <net/sock.h>
 
 #include "smc.h"
+#include "smc_ib.h"
 #include "smc_pnet.h"
 
 static void smc_set_keepalive(struct sock *sk, int val)
@@ -605,8 +606,16 @@ static int __init smc_init(void)
 		goto out_proto;
 	}
 
+	rc = smc_ib_register_client();
+	if (rc) {
+		pr_err("%s: ib_register fails with %d\n", __func__, rc);
+		goto out_sock;
+	}
+
 	return 0;
 
+out_sock:
+	sock_unregister(PF_SMC);
 out_proto:
 	proto_unregister(&smc_proto);
 out_pnet:
@@ -616,6 +625,7 @@ out_pnet:
 
 static void __exit smc_exit(void)
 {
+	smc_ib_unregister_client();
 	sock_unregister(PF_SMC);
 	proto_unregister(&smc_proto);
 	smc_pnet_exit();

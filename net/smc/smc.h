@@ -33,4 +33,9 @@ static inline struct smc_sock *smc_sk(const struct sock *sk)
 {
 	return (struct smc_sock *)sk;
 }
+
+#define SMC_SYSTEMID_LEN		8
+
+extern u8	local_systemid[SMC_SYSTEMID_LEN]; /* unique system identifier */
+
 #endif	/* _SMC_H */

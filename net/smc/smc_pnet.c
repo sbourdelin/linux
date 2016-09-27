@@ -18,6 +18,7 @@
 
 #include <rdma/ib_verbs.h>
 
+#include "smc_ib.h"
 #include "smc_pnet.h"
 
 #define SMC_MAX_PNET_ID_LEN	16	/* Max. length of PNET id */
@@ -185,6 +186,8 @@ static bool smc_pnet_same_ibname(struct smc_pnetentry *a, char *name, u8 ibport)
 static int smc_pnet_add_ib(struct smc_pnetentry *pnetelem, char *name,
 			   u8 ibport)
 {
+	struct smc_ib_device *smcibdev = NULL;
+	struct smc_ib_device *dev;
 	struct smc_pnetentry *p;
 	int rc = -EEXIST;
 
@@ -196,10 +199,32 @@ static int smc_pnet_add_ib(struct smc_pnetentry *pnetelem, char *name,
 	if (pnetelem->ib_name[0] == '\0') {
 		strncpy(pnetelem->ib_name, name, sizeof(pnetelem->ib_name));
 		pnetelem->ib_port = ibport;
+		spin_lock(&smc_ib_devices.lock);
+		/* using string ib_name, search smcibdev in global list */
+		list_for_each_entry(dev, &smc_ib_devices.list, list) {
+			if (!strncmp(dev->ibdev->name, pnetelem->ib_name,
+				     sizeof(pnetelem->ib_name))) {
+				smcibdev = dev;
+				break;
+			}
+		}
+		spin_unlock(&smc_ib_devices.lock);
 		rc = 0;
 	}
 out:
 	write_unlock(&smc_pnettable.lock);
+	if (smcibdev && !smcibdev->initialized) {
+		/* ib dev already existed [dev coldplug].
+		 * Complements: smc_ib_add_dev() [dev hotplug],
+		 * smc_ib_global_event_handler() [port hotplug].
+		 * Function call chain can sleep so outside of our locks.
+		 */
+		rc = smc_ib_remember_port_attr(smcibdev,
+					       pnetelem->ib_port);
+		if (rc)
+			return rc;
+		smcibdev->initialized = 1;
+	}
 	return rc;
 }
 
@@ -506,5 +531,78 @@ bad2:
 bad1:
 	kset_unregister(smc_pnettable.kset);
 bad0:
+	return rc;
+}
+
+/* Scan the pnet table and find an IB device given the pnetid entry.
+ * Return infiniband device and port number if an active port is found.
+ * This function is called under smc_pnettable.lock.
+ */
+static void smc_pnet_ib_dev_by_pnet(struct smc_pnetentry *pnetelem,
+				    struct smc_ib_device **smcibdev, u8 *ibport)
+{
+	struct smc_ib_device *dev;
+
+	*smcibdev = NULL;
+	*ibport = 0;
+	spin_lock(&smc_ib_devices.lock);
+	/* using string ib->ib_name, search ibdev in global list */
+	list_for_each_entry(dev, &smc_ib_devices.list, list) {
+		if (!strncmp(dev->ibdev->name, pnetelem->ib_name,
+			     sizeof(pnetelem->ib_name)) &&
+		    smc_ib_port_active(dev, pnetelem->ib_port)) {
+			*smcibdev = dev;
+			*ibport = pnetelem->ib_port;
+			break;
+		}
+	}
+	spin_unlock(&smc_ib_devices.lock);
+}
+
+/* PNET table analysis for a given sock:
+ * determine ib_device and port belonging to used internal TCP socket
+ * ethernet interface.
+ */
+void smc_pnet_find_roce_resource(struct sock *sk,
+				 struct smc_ib_device **smcibdev, u8 *ibport)
+{
+	struct dst_entry *dst = sk_dst_get(sk);
+	struct smc_pnetentry *pnetelem;
+
+	*smcibdev = NULL;
+	*ibport = 0;
+
+	if (!dst)
+		return;
+	if (!dst->dev)
+		goto out_rel;
+	read_lock(&smc_pnettable.lock);
+	list_for_each_entry(pnetelem, &smc_pnettable.pnetlist, list) {
+		if (!strncmp(dst->dev->name, pnetelem->if_name, IFNAMSIZ)) {
+			smc_pnet_ib_dev_by_pnet(pnetelem, smcibdev, ibport);
+			break;
+		}
+	}
+	read_unlock(&smc_pnettable.lock);
+out_rel:
+	dst_release(dst);
+}
+
+/* Returns true if a specific ib_device and port is in the PNET table. */
+bool smc_pnet_exists_in_table(struct smc_ib_device *smcibdev, u8 ibport)
+{
+	struct smc_pnetentry *pnetelem;
+	int rc = false;
+
+	read_lock(&smc_pnettable.lock);
+	list_for_each_entry(pnetelem, &smc_pnettable.pnetlist, list) {
+		if (!strncmp(smcibdev->ibdev->name, pnetelem->ib_name,
+			     IB_DEVICE_NAME_MAX) &&
+		    ibport == pnetelem->ib_port) {
+			rc = true;
+			break;
+		}
+	}
+	read_unlock(&smc_pnettable.lock);
 	return rc;
 }

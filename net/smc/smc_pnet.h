@@ -13,6 +13,13 @@
 
 #define SMC_MAX_PORTS		2	/* Max # of ports */
 
+#include <net/sock.h>
+
+struct smc_ib_device;
+
+bool smc_pnet_exists_in_table(struct smc_ib_device *, u8);
+void smc_pnet_find_roce_resource(struct sock *, struct smc_ib_device **, u8 *);
+
 int smc_pnet_init(void) __init;
 void smc_pnet_exit(void);
 
