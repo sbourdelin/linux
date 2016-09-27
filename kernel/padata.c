@@ -30,7 +30,7 @@
 #include <linux/slab.h>
 #include <linux/sysfs.h>
 #include <linux/rcupdate.h>
-#include <linux/module.h>
+#include <linux/init.h>
 
 #define MAX_OBJ_NUM 1000
 
@@ -1043,11 +1043,6 @@ static __init int padata_driver_init(void)
 	hp_online = ret;
 	return 0;
 }
-module_init(padata_driver_init);
+device_initcall(padata_driver_init);
 
-static __exit void padata_driver_exit(void)
-{
-	cpuhp_remove_multi_state(hp_online);
-}
-module_exit(padata_driver_exit);
 #endif
