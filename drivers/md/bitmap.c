@@ -1064,7 +1064,7 @@ static int bitmap_init_from_disk(struct bitmap *bitmap, sector_t start)
 		       bmname(bitmap),
 		       (unsigned long) i_size_read(file->f_mapping->host),
 		       store->bytes);
-		goto err;
+		goto report_failure;
 	}
 
 	oldindex = ~0L;
@@ -1098,7 +1098,7 @@ static int bitmap_init_from_disk(struct bitmap *bitmap, sector_t start)
 					index + node_offset, count);
 
 			if (ret)
-				goto err;
+				goto report_failure;
 
 			oldindex = index;
 
@@ -1116,7 +1116,7 @@ static int bitmap_init_from_disk(struct bitmap *bitmap, sector_t start)
 				ret = -EIO;
 				if (test_bit(BITMAP_WRITE_ERROR,
 					     &bitmap->flags))
-					goto err;
+					goto report_failure;
 			}
 		}
 		paddr = kmap_atomic(page);
@@ -1143,8 +1143,7 @@ static int bitmap_init_from_disk(struct bitmap *bitmap, sector_t start)
 	       bit_cnt, chunks);
 
 	return 0;
-
- err:
+report_failure:
 	printk(KERN_INFO "%s: bitmap initialisation failed: %d\n",
 	       bmname(bitmap), ret);
 	return ret;
