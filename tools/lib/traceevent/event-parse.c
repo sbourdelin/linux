@@ -5066,6 +5066,9 @@ static void pretty_print(struct trace_seq *s, void *data, int size, struct event
 				arg = arg->next;
 				break;
 			default:
+				do_warning_event(event,
+						 "%s: unknown format '%%%c'",
+						 __func__, *ptr);
 				trace_seq_printf(s, ">%c<", *ptr);
 
 			}
