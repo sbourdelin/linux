@@ -14,7 +14,6 @@
  * hardware.
  */
 
-#include <linux/module.h>
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/io.h>
@@ -402,7 +401,4 @@ static struct platform_driver qcom_ebi2_driver = {
 		.of_match_table = qcom_ebi2_of_match,
 	},
 };
-module_platform_driver(qcom_ebi2_driver);
-MODULE_AUTHOR("Linus Walleij <linus.walleij@linaro.org>");
-MODULE_DESCRIPTION("Qualcomm EBI2 driver");
-MODULE_LICENSE("GPL");
+builtin_platform_driver(qcom_ebi2_driver);
