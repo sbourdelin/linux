@@ -110,25 +110,25 @@ static int prism2sta_globalsetup(struct wlandevice *wlandev);
 static int prism2sta_setmulticast(struct wlandevice *wlandev, netdevice_t *dev);
 
 static void prism2sta_inf_handover(struct wlandevice *wlandev,
-				   hfa384x_InfFrame_t *inf);
+				   struct hfa384x_InfFrame *inf);
 static void prism2sta_inf_tallies(struct wlandevice *wlandev,
-				  hfa384x_InfFrame_t *inf);
+				  struct hfa384x_InfFrame *inf);
 static void prism2sta_inf_hostscanresults(struct wlandevice *wlandev,
-					  hfa384x_InfFrame_t *inf);
+					  struct hfa384x_InfFrame *inf);
 static void prism2sta_inf_scanresults(struct wlandevice *wlandev,
-				      hfa384x_InfFrame_t *inf);
+				      struct hfa384x_InfFrame *inf);
 static void prism2sta_inf_chinforesults(struct wlandevice *wlandev,
-					hfa384x_InfFrame_t *inf);
+					struct hfa384x_InfFrame *inf);
 static void prism2sta_inf_linkstatus(struct wlandevice *wlandev,
-				     hfa384x_InfFrame_t *inf);
+				     struct hfa384x_InfFrame *inf);
 static void prism2sta_inf_assocstatus(struct wlandevice *wlandev,
-				      hfa384x_InfFrame_t *inf);
+				      struct hfa384x_InfFrame *inf);
 static void prism2sta_inf_authreq(struct wlandevice *wlandev,
-				  hfa384x_InfFrame_t *inf);
+				  struct hfa384x_InfFrame *inf);
 static void prism2sta_inf_authreq_defer(struct wlandevice *wlandev,
-					hfa384x_InfFrame_t *inf);
+					struct hfa384x_InfFrame *inf);
 static void prism2sta_inf_psusercnt(struct wlandevice *wlandev,
-				    hfa384x_InfFrame_t *inf);
+				    struct hfa384x_InfFrame *inf);
 
 /*
  * prism2sta_open
@@ -960,7 +960,7 @@ exit:
  *	interrupt
  */
 static void prism2sta_inf_handover(struct wlandevice *wlandev,
-				   hfa384x_InfFrame_t *inf)
+				   struct hfa384x_InfFrame *inf)
 {
 	pr_debug("received infoframe:HANDOVER (unhandled)\n");
 }
@@ -983,7 +983,7 @@ static void prism2sta_inf_handover(struct wlandevice *wlandev,
  *	interrupt
  */
 static void prism2sta_inf_tallies(struct wlandevice *wlandev,
-				  hfa384x_InfFrame_t *inf)
+				  struct hfa384x_InfFrame *inf)
 {
 	hfa384x_t *hw = wlandev->priv;
 	u16 *src16;
@@ -1029,7 +1029,7 @@ static void prism2sta_inf_tallies(struct wlandevice *wlandev,
  *	interrupt
  */
 static void prism2sta_inf_scanresults(struct wlandevice *wlandev,
-				      hfa384x_InfFrame_t *inf)
+				      struct hfa384x_InfFrame *inf)
 {
 	hfa384x_t *hw = wlandev->priv;
 	int nbss;
@@ -1084,7 +1084,7 @@ static void prism2sta_inf_scanresults(struct wlandevice *wlandev,
  *	interrupt
  */
 static void prism2sta_inf_hostscanresults(struct wlandevice *wlandev,
-					  hfa384x_InfFrame_t *inf)
+					  struct hfa384x_InfFrame *inf)
 {
 	hfa384x_t *hw = wlandev->priv;
 	int nbss;
@@ -1097,7 +1097,7 @@ static void prism2sta_inf_hostscanresults(struct wlandevice *wlandev,
 
 	kfree(hw->scanresults);
 
-	hw->scanresults = kmemdup(inf, sizeof(hfa384x_InfFrame_t), GFP_ATOMIC);
+	hw->scanresults = kmemdup(inf, sizeof(struct hfa384x_InfFrame), GFP_ATOMIC);
 
 	if (nbss == 0)
 		nbss = -1;
@@ -1125,7 +1125,7 @@ static void prism2sta_inf_hostscanresults(struct wlandevice *wlandev,
  *	interrupt
  */
 static void prism2sta_inf_chinforesults(struct wlandevice *wlandev,
-					hfa384x_InfFrame_t *inf)
+					struct hfa384x_InfFrame *inf)
 {
 	hfa384x_t *hw = wlandev->priv;
 	unsigned int i, n;
@@ -1177,10 +1177,10 @@ void prism2sta_processing_defer(struct work_struct *data)
 	/* First let's process the auth frames */
 	{
 		struct sk_buff *skb;
-		hfa384x_InfFrame_t *inf;
+		struct hfa384x_InfFrame *inf;
 
 		while ((skb = skb_dequeue(&hw->authq))) {
-			inf = (hfa384x_InfFrame_t *)skb->data;
+			inf = (struct hfa384x_InfFrame *)skb->data;
 			prism2sta_inf_authreq_defer(wlandev, inf);
 		}
 
@@ -1438,7 +1438,7 @@ void prism2sta_processing_defer(struct work_struct *data)
  *	interrupt
  */
 static void prism2sta_inf_linkstatus(struct wlandevice *wlandev,
-				     hfa384x_InfFrame_t *inf)
+				     struct hfa384x_InfFrame *inf)
 {
 	hfa384x_t *hw = wlandev->priv;
 
@@ -1466,7 +1466,7 @@ static void prism2sta_inf_linkstatus(struct wlandevice *wlandev,
  *	interrupt
  */
 static void prism2sta_inf_assocstatus(struct wlandevice *wlandev,
-				      hfa384x_InfFrame_t *inf)
+				      struct hfa384x_InfFrame *inf)
 {
 	hfa384x_t *hw = wlandev->priv;
 	struct hfa384x_AssocStatus rec;
@@ -1527,7 +1527,7 @@ static void prism2sta_inf_assocstatus(struct wlandevice *wlandev,
  *
  */
 static void prism2sta_inf_authreq(struct wlandevice *wlandev,
-				  hfa384x_InfFrame_t *inf)
+				  struct hfa384x_InfFrame *inf)
 {
 	hfa384x_t *hw = wlandev->priv;
 	struct sk_buff *skb;
@@ -1542,7 +1542,7 @@ static void prism2sta_inf_authreq(struct wlandevice *wlandev,
 }
 
 static void prism2sta_inf_authreq_defer(struct wlandevice *wlandev,
-					hfa384x_InfFrame_t *inf)
+					struct hfa384x_InfFrame *inf)
 {
 	hfa384x_t *hw = wlandev->priv;
 	struct hfa384x_authenticateStation_data rec;
@@ -1716,7 +1716,7 @@ static void prism2sta_inf_authreq_defer(struct wlandevice *wlandev,
  *	interrupt
  */
 static void prism2sta_inf_psusercnt(struct wlandevice *wlandev,
-				    hfa384x_InfFrame_t *inf)
+				    struct hfa384x_InfFrame *inf)
 {
 	hfa384x_t *hw = wlandev->priv;
 
@@ -1740,7 +1740,7 @@ static void prism2sta_inf_psusercnt(struct wlandevice *wlandev,
  * Call context:
  *	interrupt
  */
-void prism2sta_ev_info(struct wlandevice *wlandev, hfa384x_InfFrame_t *inf)
+void prism2sta_ev_info(struct wlandevice *wlandev, struct hfa384x_InfFrame *inf)
 {
 	inf->infotype = le16_to_cpu(inf->infotype);
 	/* Dispatch */
