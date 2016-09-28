@@ -42,9 +42,17 @@ static	int			loops = LOOPS_DEFAULT;
 /* Use processes by default: */
 static bool			threaded;
 
+/*
+ * Use non-packet (normal) I/O mode by default.
+ * In packet mode, each write is a separate packet.
+ */
+static bool			packet_mode;
+
 static const struct option options[] = {
 	OPT_INTEGER('l', "loop",	&loops,		"Specify number of loops"),
 	OPT_BOOLEAN('T', "threaded",	&threaded,	"Specify threads/process based task setup"),
+	OPT_BOOLEAN('P', "packet mode",	&packet_mode,
+		    "Specify packet I/O mode - "),
 	OPT_END()
 };
 
@@ -84,6 +92,7 @@ int bench_sched_pipe(int argc, const char **argv, const char *prefix __maybe_unu
 	unsigned long long result_usec = 0;
 	int nr_threads = 2;
 	int t;
+	int flags = 0;
 
 	/*
 	 * why does "ret" exist?
@@ -94,6 +103,18 @@ int bench_sched_pipe(int argc, const char **argv, const char *prefix __maybe_unu
 	pid_t pid, retpid __maybe_unused;
 
 	argc = parse_options(argc, argv, options, bench_sched_pipe_usage, 0);
+
+	if (packet_mode) {
+		/* BUG_ON doesn't make sense exit if pipe2() fails */
+		flags = O_DIRECT;
+		ret = pipe2(pipe_1, flags);
+		if (ret)
+			exit(1);
+		ret = pipe2(pipe_2, flags);
+		if (ret)
+			exit(1);
+		printf("Running sched-pipe in packet I/O mode\n\n");
+	}
 
 	BUG_ON(pipe(pipe_1));
 	BUG_ON(pipe(pipe_2));
