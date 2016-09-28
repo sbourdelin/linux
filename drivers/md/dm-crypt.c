@@ -383,7 +383,7 @@ static int crypt_iv_essiv_ctr(struct crypt_config *cc, struct dm_target *ti,
 	if (!salt) {
 		ti->error = "Error kmallocing salt storage in ESSIV";
 		err = -ENOMEM;
-		goto bad;
+		goto free_hash;
 	}
 
 	cc->iv_gen_private.essiv.salt = salt;
@@ -398,11 +398,8 @@ static int crypt_iv_essiv_ctr(struct crypt_config *cc, struct dm_target *ti,
 	cc->iv_private = essiv_tfm;
 
 	return 0;
-
-bad:
-	if (hash_tfm && !IS_ERR(hash_tfm))
-		crypto_free_ahash(hash_tfm);
-	kfree(salt);
+free_hash:
+	crypto_free_ahash(hash_tfm);
 	return err;
 }
 
