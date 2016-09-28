@@ -121,10 +121,13 @@ static void update_range(struct sw_flow_match *match,
 	} while (0)
 
 static bool match_validate(const struct sw_flow_match *match,
-			   u64 key_attrs, u64 mask_attrs, bool log)
+			   u64 mask_attrs, bool log)
 {
 	u64 key_expected = 1 << OVS_KEY_ATTR_ETHERNET;
-	u64 mask_allowed = key_attrs;  /* At most allow all key attributes */
+	u64 mask_allowed;
+
+	/* At most allow all key attributes */
+	mask_allowed = match->key_attrs;
 
 	/* The following mask attributes allowed only if they
 	 * pass the validation tests. */
@@ -237,10 +240,10 @@ static bool match_validate(const struct sw_flow_match *match,
 		}
 	}
 
-	if ((key_attrs & key_expected) != key_expected) {
+	if ((match->key_attrs & key_expected) != key_expected) {
 		/* Key attributes check failed. */
 		OVS_NLERR(log, "Missing key (keys=%llx, expected=%llx)",
-			  (unsigned long long)key_attrs,
+			  (unsigned long long)match->key_attrs,
 			  (unsigned long long)key_expected);
 		return false;
 	}
@@ -1399,7 +1402,8 @@ int ovs_nla_get_match(struct net *net, struct sw_flow_match *match,
 			goto free_newmask;
 	}
 
-	if (!match_validate(match, key_attrs, mask_attrs, log))
+	match->key_attrs = key_attrs;
+	if (!match_validate(match, mask_attrs, log))
 		err = -EINVAL;
 
 free_newmask:

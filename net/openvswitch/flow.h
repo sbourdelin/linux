@@ -72,6 +72,7 @@ struct sw_flow_match {
 	struct sw_flow_key *key;
 	struct sw_flow_key_range range;
 	struct sw_flow_mask *mask;
+	u64 key_attrs;
 };
 
 #define MAX_UFID_LENGTH 16 /* 128 bits */
