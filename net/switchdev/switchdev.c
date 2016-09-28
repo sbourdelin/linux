@@ -1286,6 +1286,64 @@ void switchdev_fib_ipv4_abort(struct fib_info *fi)
 }
 EXPORT_SYMBOL_GPL(switchdev_fib_ipv4_abort);
 
+/**
+ *	switchdev_sw_flow_add - Program a flow into a switch port
+ *
+ *	@dev: port device
+ *      @key: flow key
+ *      @mask: flow mask
+ *      @attrs: attributes present in key
+ *	@actions: actions of the flow
+ *	@actions_len: length of @actions
+ *
+ *	Program a flow into a port device where the flow is expressed as
+ *	an Open vSwitch flow key, mask, attributes, and actions
+ */
+int switchdev_sw_flow_add(struct net_device *dev,
+			  const struct sw_flow_key *key,
+			  const struct sw_flow_key *mask,
+			  u64 attrs, const struct nlattr *actions,
+			  u32 actions_len)
+{
+	struct switchdev_obj_sw_flow sw_flow = {
+		.obj.id = SWITCHDEV_OBJ_SW_FLOW,
+		.key = key,
+		.mask = mask,
+		.attrs = attrs,
+		.actions = actions,
+		.actions_len = actions_len,
+	};
+
+	return switchdev_port_obj_add(dev, &sw_flow.obj);
+}
+EXPORT_SYMBOL_GPL(switchdev_sw_flow_add);
+
+/**
+ *	switchdev_sw_flow_del - Delete flow from switch
+ *
+ *	@dev: port device
+ *      @key: flow key
+ *      @mask: flow mask
+ *      @attrs: attributes present in key
+ *
+ *	Delete a flow from a device where the flow is expressed as
+ *	an Open vSwitch flow key, mask and attributes.
+ */
+int switchdev_sw_flow_del(struct net_device *dev,
+			  const struct sw_flow_key *key,
+			  const struct sw_flow_key *mask, u64 attrs)
+{
+	struct switchdev_obj_sw_flow sw_flow = {
+		.obj.id = SWITCHDEV_OBJ_SW_FLOW,
+		.key = key,
+		.mask = mask,
+		.attrs = attrs,
+	};
+
+	return switchdev_port_obj_del(dev, &sw_flow.obj);
+}
+EXPORT_SYMBOL_GPL(switchdev_sw_flow_del);
+
 bool switchdev_port_same_parent_id(struct net_device *a,
 				   struct net_device *b)
 {

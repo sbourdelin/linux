@@ -71,6 +71,7 @@ enum switchdev_obj_id {
 	SWITCHDEV_OBJ_ID_IPV4_FIB,
 	SWITCHDEV_OBJ_ID_PORT_FDB,
 	SWITCHDEV_OBJ_ID_PORT_MDB,
+	SWITCHDEV_OBJ_SW_FLOW,
 };
 
 struct switchdev_obj {
@@ -127,6 +128,19 @@ struct switchdev_obj_port_mdb {
 
 #define SWITCHDEV_OBJ_PORT_MDB(obj) \
 	container_of(obj, struct switchdev_obj_port_mdb, obj)
+
+/* SWITCHDEV_OBJ_ID_PORT_SW_FLOW */
+struct switchdev_obj_sw_flow {
+	struct switchdev_obj obj;
+	const struct sw_flow_key *key;
+	const struct sw_flow_key *mask;
+	u64 attrs;
+	const struct nlattr *actions;
+	u32 actions_len;
+};
+
+#define SWITCHDEV_OBJ_SW_FLOW(obj) \
+	container_of(obj, struct switchdev_obj_sw_flow, obj)
 
 void switchdev_trans_item_enqueue(struct switchdev_trans *trans,
 				  void *data, void (*destructor)(void const *),
@@ -223,6 +237,13 @@ int switchdev_port_fdb_del(struct ndmsg *ndm, struct nlattr *tb[],
 int switchdev_port_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb,
 			    struct net_device *dev,
 			    struct net_device *filter_dev, int *idx);
+int switchdev_sw_flow_add(struct net_device *dev,
+			  const struct sw_flow_key *key,
+			  const struct sw_flow_key *mask, u64 attrs,
+			  const struct nlattr *actions, u32 actions_len);
+int switchdev_sw_flow_del(struct net_device *dev,
+			  const struct sw_flow_key *key,
+			  const struct sw_flow_key *mask, u64 attrs);
 void switchdev_port_fwd_mark_set(struct net_device *dev,
 				 struct net_device *group_dev,
 				 bool joining);
@@ -345,6 +366,24 @@ static inline int switchdev_port_fdb_dump(struct sk_buff *skb,
 					  int *idx)
 {
        return *idx;
+}
+
+static inline int switchdev_sw_flow_add(struct net_device *dev,
+					const struct sw_flow_key *key,
+					const struct sw_flow_key *mask,
+					u64 attrs,
+					const struct nlattr *actions,
+					u32 actions_len)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int switchdev_sw_flow_del(struct net_device *dev,
+					const struct sw_flow_key *key,
+					const struct sw_flow_key *mask,
+					u64 attrs)
+{
+	return -EOPNOTSUPP;
 }
 
 static inline bool switchdev_port_same_parent_id(struct net_device *a,
