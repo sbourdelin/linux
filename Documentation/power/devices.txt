@@ -331,8 +331,8 @@ the phases are:
 	prepare callback can be used to indicate to the PM core that it may
 	safely leave the device in runtime suspend (if runtime-suspended
 	already), provided that all of the device's descendants are also left in
-	runtime suspend.  Namely, if the prepare callback returns a positive
-	number and that happens for all of the descendants of the device too,
+	runtime suspend.  Namely, if the prepare callback returns RPM_SUSPENDED
+	and that happens for all of the descendants of the device too,
 	and all of them (including the device itself) are runtime-suspended, the
 	PM core will skip the suspend, suspend_late and	suspend_noirq suspend
 	phases as well as the resume_noirq, resume_early and resume phases of
@@ -344,7 +344,7 @@ the phases are:
 	Note that this direct-complete procedure applies even if the device is
 	disabled for runtime PM; only the runtime-PM status matters.  It follows
 	that if a device has system-sleep callbacks but does not support runtime
-	PM, then its prepare callback must never return a positive value.  This
+	PM, then its prepare callback must never return RPM_SUSPENDED.  This
 	is because all devices are initially set to runtime-suspended with
 	runtime PM disabled.
 
@@ -422,7 +422,7 @@ When resuming from freeze, standby or memory sleep, the phases are:
 	the resume callbacks occur; it's not necessary to wait until the
 	complete phase.
 
-	Moreover, if the preceding prepare callback returned a positive number,
+	Moreover, if the preceding prepare callback returned RPM_SUSPENDED,
 	the device may have been left in runtime suspend throughout the whole
 	system suspend and resume (the suspend, suspend_late, suspend_noirq
 	phases of system suspend and the resume_noirq, resume_early, resume

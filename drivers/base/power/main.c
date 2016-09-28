@@ -1603,14 +1603,18 @@ unlock:
 		return ret;
 	}
 	/*
-	 * A positive return value from ->prepare() means "this device appears
+	 * A return value of RPM_SUSPENDED from ->prepare() means "this device appears
 	 * to be runtime-suspended and its state is fine, so if it really is
 	 * runtime-suspended, you can leave it in that state provided that you
 	 * will do the same thing with all of its descendants".  This only
 	 * applies to suspend transitions, however.
 	 */
 	spin_lock_irq(&dev->power.lock);
-	dev->power.direct_complete = ret > 0 && state.event == PM_EVENT_SUSPEND;
+	if (ret > 0 && state.event == PM_EVENT_SUSPEND) {
+		dev->power.direct_complete = true;
+		if (ret != RPM_SUSPENDED)
+			dev_warn(dev, "->prepare() should return RPM_SUSPENDED.\n");
+	}
 	spin_unlock_irq(&dev->power.lock);
 	return 0;
 }

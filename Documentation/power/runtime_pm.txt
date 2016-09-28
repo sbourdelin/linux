@@ -667,7 +667,7 @@ suspend began in the suspended state.
 
 To this end, the PM core provides a mechanism allowing some coordination between
 different levels of device hierarchy.  Namely, if a system suspend .prepare()
-callback returns a positive number for a device, that indicates to the PM core
+callback returns RPM_SUSPENDED for a device, that indicates to the PM core
 that the device appears to be runtime-suspended and its state is fine, so it
 may be left in runtime suspend provided that all of its descendants are also
 left in runtime suspend.  If that happens, the PM core will not execute any
