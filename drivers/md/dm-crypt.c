@@ -699,13 +699,13 @@ static int crypt_iv_tcw_whitening(struct crypt_config *cc,
 	for (i = 0; i < 4; i++) {
 		r = crypto_shash_init(desc);
 		if (r)
-			goto out;
+			goto zero_memory;
 		r = crypto_shash_update(desc, &buf[i * 4], 4);
 		if (r)
-			goto out;
+			goto zero_memory;
 		r = crypto_shash_final(desc, &buf[i * 4]);
 		if (r)
-			goto out;
+			goto zero_memory;
 	}
 	crypto_xor(&buf[0], &buf[12], 4);
 	crypto_xor(&buf[4], &buf[8], 4);
@@ -713,7 +713,7 @@ static int crypt_iv_tcw_whitening(struct crypt_config *cc,
 	/* apply whitening (8 bytes) to whole sector */
 	for (i = 0; i < ((1 << SECTOR_SHIFT) / 8); i++)
 		crypto_xor(data + i * 8, buf, 8);
-out:
+zero_memory:
 	memzero_explicit(buf, sizeof(buf));
 	return r;
 }
