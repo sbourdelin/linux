@@ -145,9 +145,11 @@ static int queue_userspace_packet(struct datapath *dp, struct sk_buff *,
 				  uint32_t cutlen);
 
 /* Must be called with rcu_read_lock. */
-static struct datapath *get_dp_rcu(struct net *net, int dp_ifindex)
+struct datapath *get_dp_rcu(struct net *net, int dp_ifindex)
 {
 	struct net_device *dev = dev_get_by_index_rcu(net, dp_ifindex);
+
+	WARN_ON_ONCE(!rcu_read_lock_held());
 
 	if (dev) {
 		struct vport *vport = ovs_internal_dev_get_vport(dev);

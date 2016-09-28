@@ -154,6 +154,8 @@ int lockdep_ovsl_is_held(void);
 #define lockdep_ovsl_is_held()	1
 #endif
 
+struct datapath *get_dp_rcu(struct net *net, int dp_ifindex);
+
 #define ASSERT_OVSL()		WARN_ON(!lockdep_ovsl_is_held())
 #define ovsl_dereference(p)					\
 	rcu_dereference_protected(p, lockdep_ovsl_is_held())
