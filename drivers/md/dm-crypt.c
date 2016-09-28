@@ -1490,7 +1490,7 @@ static int crypt_setkey_allcpus(struct crypt_config *cc)
 
 static int crypt_set_key(struct crypt_config *cc, char *key)
 {
-	int r = -EINVAL;
+	int r;
 	int key_string_len = strlen(key);
 
 	/* The key size may not be changed. */
