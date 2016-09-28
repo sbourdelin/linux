@@ -955,7 +955,8 @@ int v9fs_vfs_rmdir(struct inode *i, struct dentry *d)
 
 int
 v9fs_vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
-		struct inode *new_dir, struct dentry *new_dentry)
+		struct inode *new_dir, struct dentry *new_dentry,
+		unsigned int flags)
 {
 	int retval;
 	struct inode *old_inode;
@@ -965,6 +966,9 @@ v9fs_vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	struct p9_fid *olddirfid;
 	struct p9_fid *newdirfid;
 	struct p9_wstat wstat;
+
+	if (flags)
+		return -EINVAL;
 
 	p9_debug(P9_DEBUG_VFS, "\n");
 	retval = 0;
@@ -1094,7 +1098,7 @@ static int v9fs_vfs_setattr(struct dentry *dentry, struct iattr *iattr)
 	struct p9_wstat wstat;
 
 	p9_debug(P9_DEBUG_VFS, "\n");
-	retval = inode_change_ok(d_inode(dentry), iattr);
+	retval = setattr_prepare(dentry, iattr);
 	if (retval)
 		return retval;
 

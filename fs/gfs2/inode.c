@@ -187,6 +187,10 @@ struct inode *gfs2_inode_lookup(struct super_block *sb, unsigned int type,
 		}
 
 		gfs2_set_iop(inode);
+
+		inode->i_atime.tv_sec = 0;
+		inode->i_atime.tv_nsec = 0;
+
 		unlock_new_inode(inode);
 	}
 
@@ -1932,7 +1936,7 @@ static int gfs2_setattr(struct dentry *dentry, struct iattr *attr)
 	if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
 		goto out;
 
-	error = inode_change_ok(inode, attr);
+	error = setattr_prepare(dentry, attr);
 	if (error)
 		goto out;
 
@@ -2054,7 +2058,7 @@ const struct inode_operations gfs2_dir_iops = {
 	.mkdir = gfs2_mkdir,
 	.rmdir = gfs2_unlink,
 	.mknod = gfs2_mknod,
-	.rename2 = gfs2_rename2,
+	.rename = gfs2_rename2,
 	.permission = gfs2_permission,
 	.setattr = gfs2_setattr,
 	.getattr = gfs2_getattr,

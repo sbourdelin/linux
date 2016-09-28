@@ -57,6 +57,8 @@ SECTIONS
 		KPROBES_TEXT
 		IRQENTRY_TEXT
 		SOFTIRQENTRY_TEXT
+		MEM_KEEP(init.text)
+		MEM_KEEP(exit.text)
 
 #ifdef CONFIG_PPC32
 		*(.got1)
