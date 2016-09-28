@@ -329,10 +329,8 @@ static int init_origin_hash(void)
 	_origins = kmalloc_array(ORIGIN_HASH_SIZE,
 				 sizeof(*_origins),
 				 GFP_KERNEL);
-	if (!_origins) {
-		DMERR("unable to allocate memory for _origins");
+	if (!_origins)
 		return -ENOMEM;
-	}
 	for (i = 0; i < ORIGIN_HASH_SIZE; i++)
 		INIT_LIST_HEAD(_origins + i);
 
@@ -340,7 +338,6 @@ static int init_origin_hash(void)
 				    sizeof(*_dm_origins),
 				    GFP_KERNEL);
 	if (!_dm_origins) {
-		DMERR("unable to allocate memory for _dm_origins");
 		kfree(_origins);
 		return -ENOMEM;
 	}
