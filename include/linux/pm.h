@@ -786,4 +786,7 @@ enum dpm_order {
 	DPM_ORDER_DEV_LAST,
 };
 
+/* The device is OK to remain runtime-suspended during suspend.*/
+#define DPM_DIRECT_COMPLETE 1
+
 #endif /* _LINUX_PM_H */
