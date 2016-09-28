@@ -2931,9 +2931,6 @@ static int ofdpa_port_sw_flow_match(struct ofdpa_port *ofdpa_port,
 		return -ENOTSUPP;
 
 	if (flow->attrs | BIT_ULL(OVS_KEY_ATTR_IPV4)) {
-		if (mask->ip.frag)
-			/* There is no IP frag match in OF-DPA */
-			return -ENOTSUPP;
 		if (mask->ipv4.addr.src != cpu_to_be32(0) ||
 		    mask->ipv4.addr.dst != cpu_to_be32(0))
 			/* Rocker doesn't implement these matches */
