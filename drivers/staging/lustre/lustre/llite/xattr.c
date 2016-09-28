@@ -34,6 +34,7 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/selinux.h>
+#include <linux/xattr.h>
 
 #define DEBUG_SUBSYSTEM S_LLITE
 
@@ -149,8 +150,9 @@ int ll_setxattr_common(struct inode *inode, const char *name,
 	return 0;
 }
 
-int ll_setxattr(struct dentry *dentry, struct inode *inode,
-		const char *name, const void *value, size_t size, int flags)
+static int ll_setxattr(struct dentry *dentry, struct inode *inode,
+		       const char *name, const void *value, size_t size,
+		       int flags)
 {
 	LASSERT(inode);
 	LASSERT(name);
@@ -202,7 +204,7 @@ int ll_setxattr(struct dentry *dentry, struct inode *inode,
 				  OBD_MD_FLXATTR);
 }
 
-int ll_removexattr(struct dentry *dentry, const char *name)
+static int ll_removexattr(struct dentry *dentry, const char *name)
 {
 	struct inode *inode = d_inode(dentry);
 
@@ -351,8 +353,8 @@ out:
 	return rc;
 }
 
-ssize_t ll_getxattr(struct dentry *dentry, struct inode *inode,
-		    const char *name, void *buffer, size_t size)
+static ssize_t ll_getxattr(struct dentry *dentry, struct inode *inode,
+			   const char *name, void *buffer, size_t size)
 {
 	LASSERT(inode);
 	LASSERT(name);
@@ -518,3 +520,33 @@ out:
 
 	return rc;
 }
+
+static int lustre_xattr_get(const struct xattr_handler *handler,
+			    struct dentry *dentry, struct inode *inode,
+			    const char *name, void *buffer, size_t size)
+{
+	return ll_getxattr(dentry, inode, name, buffer, size);
+}
+
+static int lustre_xattr_set(const struct xattr_handler *handler,
+			    struct dentry *dentry, struct inode *inode,
+			    const char *name, const void *value, size_t size,
+			    int flags)
+{
+	if (!value) {
+		BUG_ON(flags != XATTR_REPLACE);
+		return ll_removexattr(dentry, name);
+	}
+	return ll_setxattr(dentry, inode, name, value, size, flags);
+}
+
+const struct xattr_handler lustre_xattr_handler = {
+	.prefix = "",  /* match anything */
+	.get = lustre_xattr_get,
+	.set = lustre_xattr_set,
+};
+
+const struct xattr_handler *lustre_xattr_handlers[] = {
+	&lustre_xattr_handler,
+	NULL
+};

@@ -421,6 +421,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt,
 #if THREAD_SIZE >= 8192 /*b=17630*/
 	sb->s_export_op = &lustre_export_operations;
 #endif
+	sb->s_xattr = lustre_xattr_handlers;
 
 	/* make root inode
 	 * XXX: move this to after cbd setup?
