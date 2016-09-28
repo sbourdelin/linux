@@ -574,6 +574,36 @@ int switchdev_port_obj_dump(struct net_device *dev, struct switchdev_obj *obj,
 }
 EXPORT_SYMBOL_GPL(switchdev_port_obj_dump);
 
+/**
+ *	switchdev_port_obj_get - Get port object
+ *
+ *	@dev: port device
+ *	@obj: object to get
+ */
+int switchdev_port_obj_get(struct net_device *dev, struct switchdev_obj *obj)
+{
+	const struct switchdev_ops *ops = dev->switchdev_ops;
+	struct net_device *lower_dev;
+	struct list_head *iter;
+	int err = -EOPNOTSUPP;
+
+	if (ops && ops->switchdev_port_obj_get)
+		return ops->switchdev_port_obj_get(dev, obj);
+
+	/* Switch device port(s) may be stacked under
+	 * bond/team/vlan dev, so recurse down to get objects on
+	 * first port at bottom of stack.
+	 */
+
+	netdev_for_each_lower_dev(dev, lower_dev, iter) {
+		err = switchdev_port_obj_get(lower_dev, obj);
+		break;
+	}
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(switchdev_port_obj_get);
+
 static RAW_NOTIFIER_HEAD(switchdev_notif_chain);
 
 /**
@@ -1310,8 +1340,10 @@ int switchdev_sw_flow_add(struct net_device *dev,
 		.key = key,
 		.mask = mask,
 		.attrs = attrs,
-		.actions = actions,
-		.actions_len = actions_len,
+		.actions = {
+			.actions = actions,
+			.len = actions_len,
+		},
 	};
 
 	return switchdev_port_obj_add(dev, &sw_flow.obj);
@@ -1343,6 +1375,35 @@ int switchdev_sw_flow_del(struct net_device *dev,
 	return switchdev_port_obj_del(dev, &sw_flow.obj);
 }
 EXPORT_SYMBOL_GPL(switchdev_sw_flow_del);
+
+/**
+ *	switchdev_sw_flow_get_stats - Get statistics of a flow from switch
+ *
+ *	@dev: port device
+ *      @key: flow key
+ *      @mask: flow mask
+ *      @attrs: attributes present in key
+ *	@stats: statistics to fill in
+ *
+ *	Get statistics of a flow from a device where the flow is expressed as
+ *	an Open vSwitch flow key, mask and attributes.
+ */
+int switchdev_sw_flow_get_stats(struct net_device *dev,
+				 const struct sw_flow_key *key,
+				 const struct sw_flow_key *mask, u64 attrs,
+				 struct switchdev_obj_stats *stats)
+{
+	struct switchdev_obj_sw_flow sw_flow = {
+		.obj.id = SWITCHDEV_OBJ_SW_FLOW,
+		.key = key,
+		.mask = mask,
+		.attrs = attrs,
+		.stats = stats,
+	};
+
+	return switchdev_port_obj_get(dev, &sw_flow.obj);
+}
+EXPORT_SYMBOL_GPL(switchdev_sw_flow_get_stats);
 
 bool switchdev_port_same_parent_id(struct net_device *a,
 				   struct net_device *b)

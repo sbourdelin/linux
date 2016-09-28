@@ -74,6 +74,12 @@ enum switchdev_obj_id {
 	SWITCHDEV_OBJ_SW_FLOW,
 };
 
+struct switchdev_obj_stats {
+	unsigned long rx_packets;
+	unsigned long rx_bytes;
+	unsigned long last_used;
+};
+
 struct switchdev_obj {
 	struct net_device *orig_dev;
 	enum switchdev_obj_id id;
@@ -135,8 +141,13 @@ struct switchdev_obj_sw_flow {
 	const struct sw_flow_key *key;
 	const struct sw_flow_key *mask;
 	u64 attrs;
-	const struct nlattr *actions;
-	u32 actions_len;
+	union {
+		struct {
+			const struct nlattr *actions;
+			u32 len;
+		} actions;
+		struct switchdev_obj_stats *stats;
+	};
 };
 
 #define SWITCHDEV_OBJ_SW_FLOW(obj) \
@@ -161,6 +172,8 @@ typedef int switchdev_obj_dump_cb_t(struct switchdev_obj *obj);
  * @switchdev_port_obj_del: Delete an object from port (see switchdev_obj_*).
  *
  * @switchdev_port_obj_dump: Dump port objects (see switchdev_obj_*).
+ *
+ * @switchdev_port_obj_get: Get an object from port (see switchdev_obj_*).
  */
 struct switchdev_ops {
 	int	(*switchdev_port_attr_get)(struct net_device *dev,
@@ -176,6 +189,8 @@ struct switchdev_ops {
 	int	(*switchdev_port_obj_dump)(struct net_device *dev,
 					   struct switchdev_obj *obj,
 					   switchdev_obj_dump_cb_t *cb);
+	int	(*switchdev_port_obj_get)(struct net_device *dev,
+					  struct switchdev_obj *obj);
 };
 
 enum switchdev_notifier_type {
@@ -212,6 +227,7 @@ int switchdev_port_obj_del(struct net_device *dev,
 			   const struct switchdev_obj *obj);
 int switchdev_port_obj_dump(struct net_device *dev, struct switchdev_obj *obj,
 			    switchdev_obj_dump_cb_t *cb);
+int switchdev_port_obj_get(struct net_device *dev, struct switchdev_obj *obj);
 int register_switchdev_notifier(struct notifier_block *nb);
 int unregister_switchdev_notifier(struct notifier_block *nb);
 int call_switchdev_notifiers(unsigned long val, struct net_device *dev,
@@ -244,6 +260,10 @@ int switchdev_sw_flow_add(struct net_device *dev,
 int switchdev_sw_flow_del(struct net_device *dev,
 			  const struct sw_flow_key *key,
 			  const struct sw_flow_key *mask, u64 attrs);
+int switchdev_sw_flow_get_stats(struct net_device *dev,
+				const struct sw_flow_key *key,
+				const struct sw_flow_key *mask, u64 attrs,
+				struct switchdev_obj_stats *stats);
 void switchdev_port_fwd_mark_set(struct net_device *dev,
 				 struct net_device *group_dev,
 				 bool joining);
@@ -283,6 +303,12 @@ static inline int switchdev_port_obj_del(struct net_device *dev,
 static inline int switchdev_port_obj_dump(struct net_device *dev,
 					  const struct switchdev_obj *obj,
 					  switchdev_obj_dump_cb_t *cb)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int switchdev_port_obj_get(struct net_device *dev,
+					 struct switchdev_obj *obj)
 {
 	return -EOPNOTSUPP;
 }
@@ -384,6 +410,15 @@ static inline int switchdev_sw_flow_del(struct net_device *dev,
 					u64 attrs)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline int switchdev_ovs_flow_get_stats(struct net_device *dev,
+					       const struct sw_flow_key *key,
+					       const struct sw_flow_key *mask,
+					       u64 attrs,
+					       struct switchdev_obj_stats *stats)
+{
+	return 0;
 }
 
 static inline bool switchdev_port_same_parent_id(struct net_device *a,
