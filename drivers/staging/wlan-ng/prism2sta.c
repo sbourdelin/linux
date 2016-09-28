@@ -670,7 +670,7 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* Compatibility range, Modem supplier */
 	result = hfa384x_drvr_getconfig(hw, HFA384x_RID_MFISUPRANGE,
 					&hw->cap_sup_mfi,
-					sizeof(hfa384x_caplevel_t));
+					sizeof(struct hfa384x_caplevel));
 	if (result) {
 		netdev_err(wlandev->netdev, "Failed to retrieve MFISUPRANGE\n");
 		goto failed;
@@ -694,7 +694,7 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* Compatibility range, Controller supplier */
 	result = hfa384x_drvr_getconfig(hw, HFA384x_RID_CFISUPRANGE,
 					&hw->cap_sup_cfi,
-					sizeof(hfa384x_caplevel_t));
+					sizeof(struct hfa384x_caplevel));
 	if (result) {
 		netdev_err(wlandev->netdev, "Failed to retrieve CFISUPRANGE\n");
 		goto failed;
@@ -718,7 +718,7 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* Compatibility range, Primary f/w supplier */
 	result = hfa384x_drvr_getconfig(hw, HFA384x_RID_PRISUPRANGE,
 					&hw->cap_sup_pri,
-					sizeof(hfa384x_caplevel_t));
+					sizeof(struct hfa384x_caplevel));
 	if (result) {
 		netdev_err(wlandev->netdev, "Failed to retrieve PRISUPRANGE\n");
 		goto failed;
@@ -742,7 +742,7 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* Compatibility range, Station f/w supplier */
 	result = hfa384x_drvr_getconfig(hw, HFA384x_RID_STASUPRANGE,
 					&hw->cap_sup_sta,
-					sizeof(hfa384x_caplevel_t));
+					sizeof(struct hfa384x_caplevel));
 	if (result) {
 		netdev_err(wlandev->netdev, "Failed to retrieve STASUPRANGE\n");
 		goto failed;
@@ -774,7 +774,7 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* Compatibility range, primary f/w actor, CFI supplier */
 	result = hfa384x_drvr_getconfig(hw, HFA384x_RID_PRI_CFIACTRANGES,
 					&hw->cap_act_pri_cfi,
-					sizeof(hfa384x_caplevel_t));
+					sizeof(struct hfa384x_caplevel));
 	if (result) {
 		netdev_err(wlandev->netdev, "Failed to retrieve PRI_CFIACTRANGES\n");
 		goto failed;
@@ -798,7 +798,7 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* Compatibility range, sta f/w actor, CFI supplier */
 	result = hfa384x_drvr_getconfig(hw, HFA384x_RID_STA_CFIACTRANGES,
 					&hw->cap_act_sta_cfi,
-					sizeof(hfa384x_caplevel_t));
+					sizeof(struct hfa384x_caplevel));
 	if (result) {
 		netdev_err(wlandev->netdev, "Failed to retrieve STA_CFIACTRANGES\n");
 		goto failed;
@@ -822,7 +822,7 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* Compatibility range, sta f/w actor, MFI supplier */
 	result = hfa384x_drvr_getconfig(hw, HFA384x_RID_STA_MFIACTRANGES,
 					&hw->cap_act_sta_mfi,
-					sizeof(hfa384x_caplevel_t));
+					sizeof(struct hfa384x_caplevel));
 	if (result) {
 		netdev_err(wlandev->netdev, "Failed to retrieve STA_MFIACTRANGES\n");
 		goto failed;
