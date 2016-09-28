@@ -1612,6 +1612,19 @@ eb_select_engine(struct drm_i915_private *dev_priv,
 	return engine;
 }
 
+static void i915_gem_request_add_to_client(struct drm_i915_gem_request *req,
+					   struct drm_file *file)
+{
+	struct drm_i915_file_private *file_priv = file->driver_priv;
+
+	GEM_BUG_ON(req->file_priv);
+
+	spin_lock(&file_priv->mm.lock);
+	req->file_priv = file_priv;
+	list_add_tail(&req->client_list, &file_priv->mm.request_list);
+	spin_unlock(&file_priv->mm.lock);
+}
+
 static int
 i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 		       struct drm_file *file,
@@ -1824,9 +1837,7 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	 */
 	params->request->batch = params->batch;
 
-	ret = i915_gem_request_add_to_client(params->request, file);
-	if (ret)
-		goto err_request;
+	i915_gem_request_add_to_client(params->request, file);
 
 	/*
 	 * Save assorted stuff away to pass through to *_submission().
@@ -1841,8 +1852,7 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	params->ctx                     = ctx;
 
 	ret = execbuf_submit(params, args, &eb->vmas);
-err_request:
-	__i915_add_request(params->request, ret == 0);
+	__i915_add_request(params->request, true);
 
 err_batch_unpin:
 	/*
