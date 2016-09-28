@@ -223,13 +223,24 @@ static int squashfs_xattr_handler_get(const struct xattr_handler *handler,
 		buffer, size);
 }
 
+static int squashfs_xattr_handler_set(const struct xattr_handler *handler,
+				      struct dentry *unused,
+				      struct inode *inode,
+				      const char *name,
+				      const void *buffer, size_t size,
+				      int flags)
+{
+	return -EOPNOTSUPP;
+}
+
 /*
  * User namespace support
  */
 static const struct xattr_handler squashfs_xattr_user_handler = {
 	.prefix	= XATTR_USER_PREFIX,
 	.flags	= SQUASHFS_XATTR_USER,
-	.get	= squashfs_xattr_handler_get
+	.get	= squashfs_xattr_handler_get,
+	.set	= squashfs_xattr_handler_set,
 };
 
 /*
@@ -244,7 +255,8 @@ static const struct xattr_handler squashfs_xattr_trusted_handler = {
 	.prefix	= XATTR_TRUSTED_PREFIX,
 	.flags	= SQUASHFS_XATTR_TRUSTED,
 	.list	= squashfs_trusted_xattr_handler_list,
-	.get	= squashfs_xattr_handler_get
+	.get	= squashfs_xattr_handler_get,
+	.set	= squashfs_xattr_handler_set,
 };
 
 /*
@@ -253,7 +265,8 @@ static const struct xattr_handler squashfs_xattr_trusted_handler = {
 static const struct xattr_handler squashfs_xattr_security_handler = {
 	.prefix	= XATTR_SECURITY_PREFIX,
 	.flags	= SQUASHFS_XATTR_SECURITY,
-	.get	= squashfs_xattr_handler_get
+	.get	= squashfs_xattr_handler_get,
+	.set	= squashfs_xattr_handler_set,
 };
 
 static const struct xattr_handler *squashfs_xattr_handler(int type)
