@@ -1948,7 +1948,7 @@ static int i40e_set_phys_id(struct net_device *netdev,
 		break;
 	case ETHTOOL_ID_INACTIVE:
 		if (!(pf->flags & I40E_FLAG_HAVE_BASET_PHY)) {
-			i40e_led_set(hw, false, pf->led_status);
+			i40e_led_set(hw, pf->led_status, false);
 		} else {
 			ret = i40e_led_set_phy(hw, false, pf->led_status,
 					       (pf->phy_led_val |
