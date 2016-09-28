@@ -2149,6 +2149,20 @@ static int selinux_ptrace_traceme(struct task_struct *parent)
 	return task_has_perm(parent, current, PROCESS__PTRACE);
 }
 
+static int selinux_forced_write(struct vm_area_struct *vma,
+				const struct cred *subject_cred,
+				const struct cred *object_cred)
+{
+	/* Permitting a write to readonly memory is fine - making the readonly
+	 * memory executable afterwards would require EXECMOD permission because
+	 * anon_vma would be non-NULL.
+	 */
+	if ((vma->vm_flags & VM_EXEC) == 0)
+		return 0;
+
+	return cred_has_perm(subject_cred, object_cred, PROCESS__EXECMEM);
+}
+
 static int selinux_capget(struct task_struct *target, kernel_cap_t *effective,
 			  kernel_cap_t *inheritable, kernel_cap_t *permitted)
 {
@@ -6033,6 +6047,7 @@ static struct security_hook_list selinux_hooks[] = {
 
 	LSM_HOOK_INIT(ptrace_access_check, selinux_ptrace_access_check),
 	LSM_HOOK_INIT(ptrace_traceme, selinux_ptrace_traceme),
+	LSM_HOOK_INIT(forced_write, selinux_forced_write),
 	LSM_HOOK_INIT(capget, selinux_capget),
 	LSM_HOOK_INIT(capset, selinux_capset),
 	LSM_HOOK_INIT(capable, selinux_capable),
