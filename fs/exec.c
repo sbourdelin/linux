@@ -204,7 +204,7 @@ static struct page *get_arg_page(struct linux_binprm *bprm, unsigned long pos,
 	 * doing the exec and bprm->mm is the new process's mm.
 	 */
 	ret = get_user_pages_remote(current, bprm->mm, pos, 1, write,
-			1, &page, NULL);
+			0, &page, NULL);
 	if (ret <= 0)
 		return NULL;
 
