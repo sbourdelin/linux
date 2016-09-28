@@ -889,6 +889,7 @@ static void alua_rtpg_queue(struct alua_port_group *pg,
 		/* Do not queue if the worker is already running */
 		if (!(pg->flags & ALUA_PG_RUNNING)) {
 			kref_get(&pg->kref);
+			scsi_device_get(sdev);
 			start_queue = 1;
 		}
 	}
