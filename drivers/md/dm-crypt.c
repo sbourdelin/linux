@@ -1495,20 +1495,19 @@ static int crypt_set_key(struct crypt_config *cc, char *key)
 
 	/* The key size may not be changed. */
 	if (cc->key_size != (key_string_len >> 1))
-		goto out;
+		goto set_memory;
 
 	/* Hyphen (which gives a key_size of zero) means there is no key. */
 	if (!cc->key_size && strcmp(key, "-"))
-		goto out;
+		goto set_memory;
 
 	if (cc->key_size && crypt_decode_key(cc->key, key, cc->key_size) < 0)
-		goto out;
+		goto set_memory;
 
 	set_bit(DM_CRYPT_KEY_VALID, &cc->flags);
 
 	r = crypt_setkey_allcpus(cc);
-
-out:
+set_memory:
 	/* Hex key string not needed after here, so wipe it. */
 	memset(key, '0', key_string_len);
 
