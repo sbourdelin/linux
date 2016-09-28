@@ -2859,6 +2859,21 @@ static bool rocker_port_dev_check(const struct net_device *dev)
 	return dev->netdev_ops == &rocker_port_netdev_ops;
 }
 
+bool rocker_port_dev_cmp_rocker(const struct net_device *a,
+				const struct net_device *b)
+{
+	struct rocker_port *rocker_port_a, *rocker_port_b;
+
+	if (!rocker_port_dev_check(a) || !rocker_port_dev_check(b))
+		return false;
+
+
+	rocker_port_a = netdev_priv(a);
+	rocker_port_b = netdev_priv(b);
+
+	return rocker_port_a->rocker == rocker_port_b->rocker;
+}
+
 static int rocker_netdevice_event(struct notifier_block *unused,
 				  unsigned long event, void *ptr)
 {

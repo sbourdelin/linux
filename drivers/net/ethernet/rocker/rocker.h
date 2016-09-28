@@ -85,6 +85,10 @@ int rocker_cmd_exec(struct rocker_port *rocker_port, bool nowait,
 int rocker_port_set_learning(struct rocker_port *rocker_port,
 			     bool learning);
 
+/* True if a and b are ports on the same rocker switch */
+bool rocker_port_dev_cmp_rocker(const struct net_device *a,
+				const struct net_device *b);
+
 struct rocker_world_ops {
 	const char *kind;
 	size_t priv_size;
