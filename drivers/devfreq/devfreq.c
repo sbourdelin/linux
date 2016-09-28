@@ -604,7 +604,10 @@ struct devfreq *devfreq_add_device(struct device *dev,
 	return devfreq;
 
 err_init:
+	mutex_lock(&devfreq_list_lock);
 	list_del(&devfreq->node);
+	mutex_unlock(&devfreq_list_lock);
+
 	device_unregister(&devfreq->dev);
 err_out:
 	return ERR_PTR(err);
