@@ -45,7 +45,7 @@ Example:
 * HDLC
 
 Currently defined compatibles:
-- fsl,ucc-hdlc
+- "fsl,ucc-hdlc", "fsl,ls1043-ucc-hdlc"
 
 Properties for fsl,ucc-hdlc:
 - rx-clock-name
