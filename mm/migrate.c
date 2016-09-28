@@ -168,8 +168,11 @@ void putback_movable_pages(struct list_head *l)
 			continue;
 		}
 		list_del(&page->lru);
-		dec_node_page_state(page, NR_ISOLATED_ANON +
-				page_is_file_cache(page));
+		if (PageLRU(page))
+			dec_node_page_state(page, NR_ISOLATED_ANON +
+					page_is_file_cache(page));
+		else
+			dec_node_page_state(page, NR_ISOLATED_NONLRU);
 		/*
 		 * We isolated non-lru movable page so here we can use
 		 * __PageMovable because LRU page's mapping cannot have
@@ -1121,8 +1124,11 @@ out:
 		 * restored.
 		 */
 		list_del(&page->lru);
-		dec_node_page_state(page, NR_ISOLATED_ANON +
-				page_is_file_cache(page));
+		if (PageLRU(page))
+			dec_node_page_state(page, NR_ISOLATED_ANON +
+					page_is_file_cache(page));
+		else
+			dec_node_page_state(page, NR_ISOLATED_NONLRU);
 	}
 
 	/*

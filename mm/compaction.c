@@ -638,16 +638,21 @@ isolate_freepages_range(struct compact_control *cc,
 static void acct_isolated(struct zone *zone, struct compact_control *cc)
 {
 	struct page *page;
-	unsigned int count[2] = { 0, };
+	unsigned int count[3] = { 0, };
 
 	if (list_empty(&cc->migratepages))
 		return;
 
-	list_for_each_entry(page, &cc->migratepages, lru)
-		count[!!page_is_file_cache(page)]++;
+	list_for_each_entry(page, &cc->migratepages, lru) {
+		if (PageLRU(page))
+			count[!!page_is_file_cache(page)]++;
+		else
+			count[2]++;
+	}
 
 	mod_node_page_state(zone->zone_pgdat, NR_ISOLATED_ANON, count[0]);
 	mod_node_page_state(zone->zone_pgdat, NR_ISOLATED_FILE, count[1]);
+	mod_node_page_state(zone->zone_pgdat, NR_ISOLATED_NONLRU, count[2]);
 }
 
 /* Similar to reclaim, but different enough that they don't share logic */
@@ -659,6 +664,7 @@ static bool too_many_isolated(struct zone *zone)
 			node_page_state(zone->zone_pgdat, NR_INACTIVE_ANON);
 	active = node_page_state(zone->zone_pgdat, NR_ACTIVE_FILE) +
 			node_page_state(zone->zone_pgdat, NR_ACTIVE_ANON);
+	/* Is it necessary to add NR_ISOLATED_NONLRU?? */
 	isolated = node_page_state(zone->zone_pgdat, NR_ISOLATED_FILE) +
 			node_page_state(zone->zone_pgdat, NR_ISOLATED_ANON);
 
