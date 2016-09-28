@@ -122,6 +122,8 @@ struct rocker_world_ops {
 				    struct switchdev_trans *trans);
 	int (*port_obj_sw_flow_del)(struct rocker_port *rocker_port,
 				    const struct switchdev_obj_sw_flow *sw_flow);
+	int (*port_obj_sw_flow_get_stats)(struct rocker_port *rocker_port,
+					  const struct switchdev_obj_sw_flow *sw_flow);
 	int (*port_obj_fib4_add)(struct rocker_port *rocker_port,
 				 const struct switchdev_obj_ipv4_fib *fib4,
 				 struct switchdev_trans *trans);

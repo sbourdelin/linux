@@ -1703,6 +1703,16 @@ static int rocker_world_port_obj_sw_flow_del(struct rocker_port *rocker_port,
 	return wops->port_obj_sw_flow_del(rocker_port, sw_flow);
 }
 
+static int rocker_world_port_obj_sw_flow_get_stats(struct rocker_port *rocker_port,
+				const struct switchdev_obj_sw_flow *sw_flow)
+{
+	struct rocker_world_ops *wops = rocker_port->rocker->wops;
+
+	if (!wops->port_obj_sw_flow_get_stats)
+		return -EOPNOTSUPP;
+	return wops->port_obj_sw_flow_get_stats(rocker_port, sw_flow);
+}
+
 static int rocker_world_port_master_linked(struct rocker_port *rocker_port,
 					   struct net_device *master)
 {
@@ -2197,12 +2207,32 @@ static int rocker_port_obj_dump(struct net_device *dev,
 	return err;
 }
 
+static int rocker_port_obj_get(struct net_device *dev,
+			       struct switchdev_obj *obj)
+{
+	struct rocker_port *rocker_port = netdev_priv(dev);
+	int err = 0;
+
+	switch (obj->id) {
+	case SWITCHDEV_OBJ_SW_FLOW:
+		err = rocker_world_port_obj_sw_flow_get_stats(rocker_port,
+						 SWITCHDEV_OBJ_SW_FLOW(obj));
+		break;
+	default:
+		err = -EOPNOTSUPP;
+		break;
+	}
+
+	return err;
+}
+
 static const struct switchdev_ops rocker_port_switchdev_ops = {
 	.switchdev_port_attr_get	= rocker_port_attr_get,
 	.switchdev_port_attr_set	= rocker_port_attr_set,
 	.switchdev_port_obj_add		= rocker_port_obj_add,
 	.switchdev_port_obj_del		= rocker_port_obj_del,
 	.switchdev_port_obj_dump	= rocker_port_obj_dump,
+	.switchdev_port_obj_get		= rocker_port_obj_get,
 };
 
 /********************
