@@ -2181,18 +2181,6 @@ int i40e_sync_vsi_filters(struct i40e_vsi *vsi)
 						     hw->aq.asq_last_status));
 			}
 		}
-		aq_ret = i40e_aq_set_vsi_broadcast(&vsi->back->hw,
-						   vsi->seid,
-						   cur_promisc, NULL);
-		if (aq_ret) {
-			retval = i40e_aq_rc_to_posix(aq_ret,
-						     pf->hw.aq.asq_last_status);
-			dev_info(&pf->pdev->dev,
-				 "set brdcast promisc failed, err %s, aq_err %s\n",
-					 i40e_stat_str(hw, aq_ret),
-					 i40e_aq_str(hw,
-						     hw->aq.asq_last_status));
-		}
 	}
 out:
 	/* if something went wrong then set the changed flag so we try again */
