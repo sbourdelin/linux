@@ -14,7 +14,7 @@ Required properties (I2C):
 - reg: I2C slave address
 
 Required properties (SPI):
-- compatible: "google,cros-ec-spi"
+- compatible: "google,cros-ec-spi" or "ni,cros-ec-spi"
 - reg: SPI chip select
 
 Optional properties (SPI):
