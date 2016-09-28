@@ -2020,7 +2020,7 @@ static int crypt_message(struct dm_target *ti, unsigned argc, char **argv)
 	int ret = -EINVAL;
 
 	if (argc < 2)
-		goto error;
+		goto show_warning;
 
 	if (!strcasecmp(argv[0], "key")) {
 		if (!test_bit(DM_CRYPT_SUSPENDED, &cc->flags)) {
@@ -2044,8 +2044,7 @@ static int crypt_message(struct dm_target *ti, unsigned argc, char **argv)
 			return crypt_wipe_key(cc);
 		}
 	}
-
-error:
+show_warning:
 	DMWARN("unrecognised message received.");
 	return -EINVAL;
 }
