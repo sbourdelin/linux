@@ -4878,7 +4878,7 @@ static void gen6_set_rps_thresholds(struct drm_i915_private *dev_priv, u8 val)
 	dev_priv->rps.last_adj = 0;
 }
 
-static u32 gen6_rps_pm_mask(struct drm_i915_private *dev_priv, u8 val)
+u32 gen6_rps_pm_mask(struct drm_i915_private *dev_priv, u8 val)
 {
 	u32 mask = 0;
 

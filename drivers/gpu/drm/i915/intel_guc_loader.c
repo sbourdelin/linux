@@ -483,6 +483,12 @@ int intel_guc_setup(struct drm_device *dev)
 
 	guc_interrupts_release(dev_priv);
 
+	/*
+	 * Mask all interrupts to know which interrupts are needed by GuC.
+	 * Restore host side interrupt masks post load.
+	*/
+	I915_WRITE(GEN6_PMINTRMSK, gen6_sanitize_rps_pm_mask(dev_priv, ~0u));
+
 	guc_fw->guc_fw_load_status = GUC_FIRMWARE_PENDING;
 
 	DRM_DEBUG_DRIVER("GuC fw status: fetch %s, load %s\n",
@@ -531,6 +537,13 @@ int intel_guc_setup(struct drm_device *dev)
 			goto fail;
 		guc_interrupts_capture(dev_priv);
 	}
+
+	/*
+	 * Below write will ensure mask for RPS interrupts is restored back
+	 * w.r.t cur_freq, particularly post reset.
+	 */
+	I915_WRITE(GEN6_PMINTRMSK,
+		   gen6_rps_pm_mask(dev_priv, dev_priv->rps.cur_freq));
 
 	return 0;
 
