@@ -376,8 +376,7 @@ static int crypt_iv_essiv_ctr(struct crypt_config *cc, struct dm_target *ti,
 	hash_tfm = crypto_alloc_ahash(opts, 0, CRYPTO_ALG_ASYNC);
 	if (IS_ERR(hash_tfm)) {
 		ti->error = "Error initializing ESSIV hash";
-		err = PTR_ERR(hash_tfm);
-		goto bad;
+		return PTR_ERR(hash_tfm);
 	}
 
 	salt = kzalloc(crypto_ahash_digestsize(hash_tfm), GFP_KERNEL);
