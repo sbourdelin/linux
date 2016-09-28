@@ -1682,6 +1682,27 @@ rocker_world_port_obj_fdb_dump(const struct rocker_port *rocker_port,
 	return wops->port_obj_fdb_dump(rocker_port, fdb, cb);
 }
 
+static int rocker_world_port_obj_sw_flow_add(struct rocker_port *rocker_port,
+				const struct switchdev_obj_sw_flow *sw_flow,
+				struct switchdev_trans *trans)
+{
+	struct rocker_world_ops *wops = rocker_port->rocker->wops;
+
+	if (!wops->port_obj_sw_flow_add)
+		return -EOPNOTSUPP;
+	return wops->port_obj_sw_flow_add(rocker_port, sw_flow, trans);
+}
+
+static int rocker_world_port_obj_sw_flow_del(struct rocker_port *rocker_port,
+				const struct switchdev_obj_sw_flow *sw_flow)
+{
+	struct rocker_world_ops *wops = rocker_port->rocker->wops;
+
+	if (!wops->port_obj_sw_flow_del)
+		return -EOPNOTSUPP;
+	return wops->port_obj_sw_flow_del(rocker_port, sw_flow);
+}
+
 static int rocker_world_port_master_linked(struct rocker_port *rocker_port,
 					   struct net_device *master)
 {
@@ -2106,6 +2127,11 @@ static int rocker_port_obj_add(struct net_device *dev,
 						    SWITCHDEV_OBJ_PORT_FDB(obj),
 						    trans);
 		break;
+	case SWITCHDEV_OBJ_SW_FLOW:
+		err = rocker_world_port_obj_sw_flow_add(rocker_port,
+							 SWITCHDEV_OBJ_SW_FLOW(obj),
+							 trans);
+		break;
 	default:
 		err = -EOPNOTSUPP;
 		break;
@@ -2132,6 +2158,10 @@ static int rocker_port_obj_del(struct net_device *dev,
 	case SWITCHDEV_OBJ_ID_PORT_FDB:
 		err = rocker_world_port_obj_fdb_del(rocker_port,
 						    SWITCHDEV_OBJ_PORT_FDB(obj));
+		break;
+	case SWITCHDEV_OBJ_SW_FLOW:
+		err = rocker_world_port_obj_sw_flow_del(rocker_port,
+							 SWITCHDEV_OBJ_SW_FLOW(obj));
 		break;
 	default:
 		err = -EOPNOTSUPP;

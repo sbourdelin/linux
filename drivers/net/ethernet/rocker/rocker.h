@@ -117,6 +117,11 @@ struct rocker_world_ops {
 	int (*port_obj_vlan_dump)(const struct rocker_port *rocker_port,
 				  struct switchdev_obj_port_vlan *vlan,
 				  switchdev_obj_dump_cb_t *cb);
+	int (*port_obj_sw_flow_add)(struct rocker_port *rocker_port,
+				    const struct switchdev_obj_sw_flow *sw_flow,
+				    struct switchdev_trans *trans);
+	int (*port_obj_sw_flow_del)(struct rocker_port *rocker_port,
+				    const struct switchdev_obj_sw_flow *sw_flow);
 	int (*port_obj_fib4_add)(struct rocker_port *rocker_port,
 				 const struct switchdev_obj_ipv4_fib *fib4,
 				 struct switchdev_trans *trans);
