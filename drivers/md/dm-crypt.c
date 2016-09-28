@@ -362,9 +362,9 @@ static void crypt_iv_essiv_dtr(struct crypt_config *cc)
 static int crypt_iv_essiv_ctr(struct crypt_config *cc, struct dm_target *ti,
 			      const char *opts)
 {
-	struct crypto_cipher *essiv_tfm = NULL;
-	struct crypto_ahash *hash_tfm = NULL;
-	u8 *salt = NULL;
+	struct crypto_cipher *essiv_tfm;
+	struct crypto_ahash *hash_tfm;
+	u8 *salt;
 	int err;
 
 	if (!opts) {
