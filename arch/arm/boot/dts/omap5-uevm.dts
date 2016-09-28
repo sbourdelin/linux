@@ -17,6 +17,66 @@
 		device_type = "memory";
 		reg = <0x80000000 0x7F000000>; /* 2032 MB */
 	};
+
+	evm_leds {
+		compatible = "gpio-leds";
+
+		led@1 {
+			label = "omap5:red:led";
+			gpios = <&gpio9 17 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "mmc0";
+			default-state = "off";
+		};
+
+		led@2 {
+			label = "omap5:green:led";
+			gpios = <&gpio9 18 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "mmc1";
+			default-state = "off";
+		};
+
+		led@3 {
+			label = "omap5:blue:led";
+			gpios = <&gpio9 19 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "mmc2";
+			default-state = "off";
+		};
+
+		led@4 {
+			label = "omap5:green:led1";
+			gpios = <&gpio9 2 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "heartbeat";
+			default-state = "off";
+		};
+
+		led@5 {
+			label = "omap5:green:led2";
+			gpios = <&gpio9 3 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "default-on";
+			default-state = "off";
+		};
+
+		led@6 {
+			label = "omap5:green:led3";
+			gpios = <&gpio9 4 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "heartbeat";
+			default-state = "off";
+		};
+
+		led@7 {
+			label = "omap5:green:led4";
+			gpios = <&gpio9 5 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "default-on";
+			default-state = "off";
+		};
+
+		led@8 {
+			label = "omap5:green:led5";
+			gpios = <&gpio9 6 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "heartbeat";
+			default-state = "off";
+		};
+	};
 };
 
 &hdmi {
