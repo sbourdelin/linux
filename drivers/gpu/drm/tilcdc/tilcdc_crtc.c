@@ -320,23 +320,63 @@ static bool tilcdc_crtc_mode_fixup(struct drm_crtc *crtc,
 	return true;
 }
 
+/*
+ * Calculate the percentage difference between the requested pixel clock rate
+ * and the effective rate resulting from calculating the clock divider value.
+ */
+static unsigned int tilcdc_pclk_diff(unsigned long rate,
+				     unsigned long real_rate)
+{
+	int r = rate / 100, rr = real_rate / 100;
+
+	return (unsigned int)(abs(((rr - r) * 100) / r));
+}
+
 static void tilcdc_crtc_set_clk(struct drm_crtc *crtc)
 {
 	struct drm_device *dev = crtc->dev;
 	struct tilcdc_drm_private *priv = dev->dev_private;
 	struct tilcdc_crtc *tilcdc_crtc = to_tilcdc_crtc(crtc);
-	const unsigned clkdiv = 2; /* using a fixed divider of 2 */
+	unsigned long rate, real_rate;
+	unsigned int clkdiv;
 	int ret;
+
+	clkdiv = 2; /* first try using a standard divider of 2 */
 
 	/* mode.clock is in KHz, set_rate wants parameter in Hz */
 	ret = clk_set_rate(priv->clk, crtc->mode.clock * 1000 * clkdiv);
+	rate = clk_get_rate(priv->clk);
 	if (ret < 0) {
-		dev_err(dev->dev, "failed to set display clock rate to: %d\n",
-			crtc->mode.clock);
-		return;
+		/*
+		 * If we fail to set the clock rate (some architectures don't
+		 * use the common clock framework yet and may not implement
+		 * all the clk API calls for every clock), try the next best
+		 * thing: adjusting the clock divider, unless clk_get_rate()
+		 * failed as well.
+		 */
+		if (!rate) {
+			/* Nothing more we can do. Just bail out. */
+			dev_err(dev->dev,
+				"failed to set the pixel clock - unable to read current lcdc clock rate\n");
+			return;
+		}
+
+		clkdiv = DIV_ROUND_CLOSEST(rate, (crtc->mode.clock * 1000));
+
+		/*
+		 * Emit a warning if the real clock rate resulting from the
+		 * calculated divider differs much from the requested rate.
+		 *
+		 * 5% is an arbitrary value - LCDs are usually quite tolerant
+		 * about pixel clock rates.
+		 */
+		real_rate = clkdiv * crtc->mode.clock * 1000;
+
+		WARN_ONCE(tilcdc_pclk_diff(rate, real_rate) > 5,
+			  "real pixel clock rate diverged from the requested rate more than 5%%\n");
 	}
 
-	tilcdc_crtc->lcd_fck_rate = clk_get_rate(priv->clk);
+	tilcdc_crtc->lcd_fck_rate = rate;
 
 	DBG("lcd_clk=%u, mode clock=%d, div=%u",
 	    tilcdc_crtc->lcd_fck_rate, crtc->mode.clock, clkdiv);
