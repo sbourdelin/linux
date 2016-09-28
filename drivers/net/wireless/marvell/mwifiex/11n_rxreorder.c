@@ -30,7 +30,8 @@
  * layer.
  */
 static int mwifiex_11n_dispatch_amsdu_pkt(struct mwifiex_private *priv,
-					  struct sk_buff *skb)
+					  struct sk_buff *skb,
+					  const u8 *ta)
 {
 	struct rxpd *local_rx_pd = (struct rxpd *)(skb->data);
 	int ret;
@@ -45,7 +46,7 @@ static int mwifiex_11n_dispatch_amsdu_pkt(struct mwifiex_private *priv,
 		skb_trim(skb, le16_to_cpu(local_rx_pd->rx_pkt_length));
 
 		ieee80211_amsdu_to_8023s(skb, &list, priv->curr_addr,
-					 priv->wdev.iftype, 0, false);
+					 priv->wdev.iftype, 0, ta);
 
 		while (!skb_queue_empty(&list)) {
 			struct rx_packet_hdr *rx_hdr;
@@ -76,9 +77,10 @@ static int mwifiex_11n_dispatch_amsdu_pkt(struct mwifiex_private *priv,
 /* This function will process the rx packet and forward it to kernel/upper
  * layer.
  */
-static int mwifiex_11n_dispatch_pkt(struct mwifiex_private *priv, void *payload)
+static int mwifiex_11n_dispatch_pkt(struct mwifiex_private *priv, void *payload,
+				    const u8 *ta)
 {
-	int ret = mwifiex_11n_dispatch_amsdu_pkt(priv, payload);
+	int ret = mwifiex_11n_dispatch_amsdu_pkt(priv, payload, ta);
 
 	if (!ret)
 		return 0;
@@ -119,7 +121,7 @@ mwifiex_11n_dispatch_pkt_until_start_win(struct mwifiex_private *priv,
 		}
 		spin_unlock_irqrestore(&priv->rx_pkt_lock, flags);
 		if (rx_tmp_ptr)
-			mwifiex_11n_dispatch_pkt(priv, rx_tmp_ptr);
+			mwifiex_11n_dispatch_pkt(priv, rx_tmp_ptr, tbl->ta);
 	}
 
 	spin_lock_irqsave(&priv->rx_pkt_lock, flags);
@@ -161,7 +163,7 @@ mwifiex_11n_scan_and_dispatch(struct mwifiex_private *priv,
 		rx_tmp_ptr = tbl->rx_reorder_ptr[i];
 		tbl->rx_reorder_ptr[i] = NULL;
 		spin_unlock_irqrestore(&priv->rx_pkt_lock, flags);
-		mwifiex_11n_dispatch_pkt(priv, rx_tmp_ptr);
+		mwifiex_11n_dispatch_pkt(priv, rx_tmp_ptr, tbl->ta);
 	}
 
 	spin_lock_irqsave(&priv->rx_pkt_lock, flags);
@@ -568,12 +570,12 @@ int mwifiex_11n_rx_reorder_pkt(struct mwifiex_private *priv,
 	tbl = mwifiex_11n_get_rx_reorder_tbl(priv, tid, ta);
 	if (!tbl) {
 		if (pkt_type != PKT_TYPE_BAR)
-			mwifiex_11n_dispatch_pkt(priv, payload);
+			mwifiex_11n_dispatch_pkt(priv, payload, ta);
 		return ret;
 	}
 
 	if ((pkt_type == PKT_TYPE_AMSDU) && !tbl->amsdu) {
-		mwifiex_11n_dispatch_pkt(priv, payload);
+		mwifiex_11n_dispatch_pkt(priv, payload, ta);
 		return ret;
 	}
 

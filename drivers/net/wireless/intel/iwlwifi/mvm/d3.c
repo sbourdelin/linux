@@ -1436,7 +1436,8 @@ static void iwl_mvm_report_wakeup_reasons(struct iwl_mvm *mvm,
 
 			memcpy(skb_put(pkt, pktsize), pktdata, pktsize);
 
-			if (ieee80211_data_to_8023(pkt, vif->addr, vif->type))
+			if (ieee80211_data_to_8023(pkt, NULL, vif->addr,
+			    vif->type))
 				goto report;
 			wakeup.packet = pkt->data;
 			wakeup.packet_present_len = pkt->len;
