@@ -144,6 +144,44 @@ static struct vport *netdev_create(const struct vport_parms *parms)
 	return ovs_netdev_link(vport, parms->name);
 }
 
+
+#ifdef CONFIG_NET_SWITCHDEV
+void ovs_netdev_clear_hw_flows(struct vport *vport)
+{
+	struct net_device *upper_dev;
+	struct table_instance *ti;
+	struct datapath *dp;
+	u32 i;
+
+	upper_dev = netdev_master_upper_dev_get(vport->dev);
+
+	rcu_read_lock();
+	dp = get_dp_rcu(dev_net(upper_dev), upper_dev->ifindex);
+	if (!dp) {
+		net_warn_ratelimited("%s: could not get datapath",
+				     vport->dev->name);
+		goto err;
+	}
+
+	ti = rcu_dereference(dp->table.ti);
+
+	for (i = 0; i < ti->n_buckets; i++) {
+		struct hlist_head *head = flex_array_get(ti->buckets, i);
+		struct sw_flow *flow;
+
+		hlist_for_each_entry_rcu(flow, head,
+					 flow_table.node[ti->node_ver])
+			if (flow->key.phy.in_port == vport->port_no)
+				ovs_hw_flow_del(dp, flow);
+	}
+
+err:
+	rcu_read_unlock();
+}
+#else
+void ovs_netdev_clear_hw_flows(struct netdev *dev) {}
+#endif
+
 static void vport_netdev_free(struct rcu_head *rcu)
 {
 	struct vport *vport = container_of(rcu, struct vport, rcu);
@@ -158,6 +196,7 @@ void ovs_netdev_detach_dev(struct vport *vport)
 	ASSERT_RTNL();
 	vport->dev->priv_flags &= ~IFF_OVS_DATAPATH;
 	netdev_rx_handler_unregister(vport->dev);
+	ovs_netdev_clear_hw_flows(vport);
 	netdev_upper_dev_unlink(vport->dev,
 				netdev_master_upper_dev_get(vport->dev));
 	dev_set_promiscuity(vport->dev, -1);

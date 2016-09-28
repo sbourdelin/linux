@@ -53,6 +53,177 @@
 #include "flow_netlink.h"
 #include "vport.h"
 
+#ifdef CONFIG_NET_SWITCHDEV
+/* Must be called with ovs_mutex or rcu_read_lock. */
+static int ovs_hw_flow(const struct datapath *dp,
+		       struct sw_flow *flow, u64 key_attrs,
+		       const struct sw_flow_actions *acts)
+{
+	struct vport *vport;
+	int err;
+
+	if (!(flow->key_attrs | BIT_ULL(OVS_KEY_ATTR_IN_PORT)))
+		return -ENOTSUPP;
+
+	vport = ovs_lookup_vport(dp, flow->key.phy.in_port);
+	if (!vport)
+		return -EINVAL;
+
+	if (acts) {
+		struct nlattr *actions;
+
+		actions = ovs_switchdev_flow_actions(dp, acts->actions,
+						     acts->actions_len);
+		if (IS_ERR(actions))
+			return PTR_ERR(actions);
+
+		rtnl_lock();
+		err = switchdev_sw_flow_add(vport->dev, &flow->key,
+					    &flow->mask->key, key_attrs,
+					    actions, acts->actions_len);
+		rtnl_unlock();
+		kfree(actions);
+
+		flow->key_attrs = key_attrs;
+	} else {
+		rtnl_lock();
+		err = switchdev_sw_flow_del(vport->dev, &flow->key,
+					    &flow->mask->key, key_attrs);
+		rtnl_unlock();
+	}
+
+	return err;
+}
+
+void ovs_hw_flow_new(const struct datapath *dp, struct sw_flow *flow,
+		     u64 key_attrs, const struct sw_flow_actions *acts)
+{
+	if (ovs_hw_flow(dp, flow, key_attrs, acts) < 0)
+		flow->hw_flow_present = false;
+	else
+		flow->hw_flow_present = true;
+
+	memset(&flow->hw_stats, 0, sizeof flow->hw_stats);
+	memset(&flow->hw_stats_offset, 0, sizeof flow->hw_stats_offset);
+	memset(&flow->hw_stats_base, 0, sizeof flow->hw_stats_base);
+}
+
+void ovs_hw_flow_del(const struct datapath *dp, struct sw_flow *flow)
+{
+	int err;
+
+	if (!flow->hw_flow_present)
+		return;
+
+	err = ovs_hw_flow(dp, flow, flow->key_attrs, NULL);
+	if (err) {
+		net_warn_ratelimited("openvswitch: could not delete hardware flow: %d\n", err);
+		return;
+	}
+
+	flow->hw_flow_present = false;
+
+	flow->hw_stats_base.rx_packets += flow->hw_stats.rx_packets -
+		flow->hw_stats_offset.rx_packets;
+	flow->hw_stats_base.rx_bytes += flow->hw_stats.rx_bytes -
+		flow->hw_stats_offset.rx_bytes;
+
+	/* In case flow is once again programmed into hardware by
+	 * ovs_hw_flow_set()
+	 */
+	memset(&flow->hw_stats, 0, sizeof flow->hw_stats);
+	memset(&flow->hw_stats_offset, 0, sizeof flow->hw_stats_offset);
+}
+
+void ovs_hw_flow_set(const struct datapath *dp, struct sw_flow *flow,
+		     u64 key_attrs, const struct sw_flow_actions *acts)
+{
+	int err;
+
+	/* Try to add flow to hardware.
+	 * This may succeed where even if the flow was previously not added
+	 * to hardware. e.g. because the vport for the output action exists
+	 * but did not earlier.
+	 */
+	err = ovs_hw_flow(dp, flow, key_attrs, acts);
+	if (err < 0) {
+		ovs_hw_flow_del(dp, flow);
+		flow->hw_flow_present = false;
+	} else {
+		flow->hw_flow_present = true;
+	}
+}
+
+/* Must be called with ovs_mutex or rcu_read_lock. */
+/* XXX: ovs_hw_flow_stats_add should probably update tcp_flags.
+ *
+ * However an implication of that would be that the hardware to which
+ * offloads is being made a) supports tracking tcp_flags and b) by
+ * implication parses L4 headers.  If that is a requirement of allowing
+ * Open vSwitch flows to be programmed into hardware, then so be it. But if
+ * it is a hard requirement then it may eliminate some hardware options.
+ */
+int ovs_hw_flow_stats_add(struct sw_flow *flow, int dp_ifindex,
+			  struct sk_buff *skb, struct ovs_flow_stats *stats,
+			  unsigned long *used)
+{
+	struct net *net = sock_net(skb->sk);
+	const struct datapath *dp;
+	struct vport *vport;
+	int err;
+
+	/* Residual statistics from flow programmed into and then
+	 * removed from hardware. */
+	stats->n_packets += flow->hw_stats_base.rx_packets;
+	stats->n_bytes += flow->hw_stats_base.rx_bytes;
+
+	if (!flow->hw_flow_present)
+		return 0;
+
+	dp = get_dp_rcu(net, dp_ifindex);
+	if (!dp)
+		return -EINVAL;
+
+	/* This is not called unless ovs_hw_flow() has previously succeeded
+	 * and thus the flow has an in_port.
+	 */
+	vport = ovs_lookup_vport(dp, flow->key.phy.in_port);
+	if (!vport)
+		return -EINVAL;
+
+	err = switchdev_sw_flow_get_stats(vport->dev, &flow->key,
+					  &flow->mask->key, flow->key_attrs,
+					  &flow->hw_stats);
+	if (err)
+		return err;
+
+	stats->n_packets += flow->hw_stats.rx_packets -
+		flow->hw_stats_offset.rx_packets;
+	stats->n_bytes += flow->hw_stats.rx_bytes -
+		flow->hw_stats_offset.rx_bytes;
+	/* The aim of the condition here is to provide a zero value
+	 * if the flow programmed into hardware has not been used
+	 * since stats were last reset. This is in keeping with
+	 * the treatment of software flows.
+	 */
+	if (flow->hw_stats.last_used > flow->hw_stats_offset.last_used)
+		*used = max(*used, flow->hw_stats.last_used);
+
+	return 0;
+}
+
+/* Called with ovs_mutex. */
+static void ovs_hw_flow_stats_clear(struct sw_flow *flow)
+{
+	flow->hw_stats_offset = flow->hw_stats;
+}
+
+#else /* CONFIG_NET_SWITCHDEV */
+
+static void ovs_hw_flow_stats_clear(struct sw_flow *flow) {}
+
+#endif /* CONFIG_NET_SWITCHDEV */
+
 u64 ovs_flow_used_time(unsigned long flow_jiffies)
 {
 	struct timespec cur_ts;
@@ -181,6 +352,8 @@ void ovs_flow_stats_clear(struct sw_flow *flow)
 			spin_unlock_bh(&stats->lock);
 		}
 	}
+
+	ovs_hw_flow_stats_clear(flow);
 }
 
 static int check_header(struct sk_buff *skb, int len)

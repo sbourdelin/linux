@@ -50,6 +50,7 @@
 #include <net/vxlan.h>
 
 #include "flow_netlink.h"
+#include "vport.h"
 
 struct ovs_len_tbl {
 	int len;
@@ -2648,3 +2649,44 @@ int ovs_nla_put_actions(const struct nlattr *attr, int len, struct sk_buff *skb)
 
 	return 0;
 }
+
+#ifdef CONFIG_NET_SWITCHDEV
+struct nlattr *ovs_switchdev_flow_actions(const struct datapath *dp,
+					  const struct nlattr *acts, u32 len)
+{
+	struct nlattr *new_acts;
+	struct nlattr *a;
+	int rem, err;
+
+	new_acts = kmalloc(len, GFP_KERNEL);
+	if (!new_acts)
+		return ERR_PTR(-ENOMEM);
+
+	memcpy(new_acts, acts, len);
+
+	for (a = new_acts, rem = len; rem > 0; a = nla_next(a, &rem)) {
+		int type = nla_type(a);
+		struct vport *vport;
+
+		/* Only support output actions at this time */
+		if (type != OVS_ACTION_ATTR_OUTPUT) {
+			err = -ENOTSUPP;
+			goto err;
+		}
+
+		/* Convert ODP ports number to ifindex. */
+		vport = ovs_lookup_vport(dp, nla_get_u32(a));
+		if (!vport) {
+			err = -ENOTSUPP;
+			goto err;
+		}
+		*(u32 *)nla_data(a) = vport->dev->ifindex;
+	}
+
+	return new_acts;
+
+err:
+	kfree(new_acts);
+	return ERR_PTR(err);
+}
+#endif

@@ -76,4 +76,7 @@ int ovs_nla_put_actions(const struct nlattr *attr,
 void ovs_nla_free_flow_actions(struct sw_flow_actions *);
 void ovs_nla_free_flow_actions_rcu(struct sw_flow_actions *);
 
+struct nlattr *ovs_switchdev_flow_actions(const struct datapath *dp,
+					  const struct nlattr *acts, u32 len);
+
 #endif /* flow_netlink.h */

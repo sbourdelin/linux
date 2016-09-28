@@ -35,8 +35,10 @@
 #include <net/inet_ecn.h>
 #include <net/ip_tunnels.h>
 #include <net/dst_metadata.h>
+#include <net/switchdev.h>
 
 struct sk_buff;
+struct datapath;
 
 /* Store options at the end of the array if they are less than the
  * maximum size. This allows us to get the benefits of variable length
@@ -113,6 +115,20 @@ struct sw_flow {
 	struct sw_flow_id id;
 	struct sw_flow_mask *mask;
 	struct sw_flow_actions __rcu *sf_acts;
+#ifdef CONFIG_NET_SWITCHDEV
+	bool hw_flow_present;		  /* true is flow is programmed
+					     into hardware. */
+	/* unused unless flow has been programmed in hardware. */
+	u64 key_attrs;
+	struct switchdev_obj_stats hw_stats; /* stats most recently read
+					      * from hardware, or zeroed if
+					      * not read yet. */
+	struct switchdev_obj_stats hw_stats_offset; /* Set to hw_stats when
+						     * stats are cleared. */
+	struct switchdev_obj_stats hw_stats_base; /* Set to hw_stats when
+						   * flow is removed from
+						   * hardware. */
+#endif
 	struct flow_stats __rcu *stats[]; /* One for each CPU.  First one
 					   * is allocated at flow creation time,
 					   * the rest are allocated on demand
@@ -160,4 +176,47 @@ int ovs_flow_key_extract_userspace(struct net *net, const struct nlattr *attr,
 				   struct sk_buff *skb,
 				   struct sw_flow_key *key, bool log);
 
+#ifdef CONFIG_NET_SWITCHDEV
+/* Must be called with ovs_mutex or rcu_read_lock. */
+void ovs_hw_flow_new(const struct datapath *dp,
+		     struct sw_flow *flow, u64 key_attrs,
+		     const struct sw_flow_actions *acts);
+
+/* Must be called with ovs_mutex or rcu_read_lock. */
+void ovs_hw_flow_del(const struct datapath *dp, struct sw_flow *flow);
+
+/* Must be called with ovs_mutex or rcu_read_lock. */
+void ovs_hw_flow_set(const struct datapath *dp, struct sw_flow *flow,
+		     u64 key_attrs, const struct sw_flow_actions *acts);
+
+/* Must be called with ovs_mutex or rcu_read_lock. */
+int ovs_hw_flow_stats_add(struct sw_flow *flow, int dp_ifindex,
+			  struct sk_buff *skb, struct ovs_flow_stats *stats,
+			  unsigned long *used);
+#else /* CONFIG_NET_SWITCHDEV */
+static inline void ovs_hw_flow_new(const struct datapath *dp,
+				   struct sw_flow *flow, u64 key_attrs,
+				   const struct sw_flow_actions *acts)
+{
+	return 0;
+}
+
+static inline void ovs_hw_flow_del(const struct datapath *dp,
+				   struct sw_flow *flow){}
+
+static inline void ovs_hw_flow_set(const struct datapath *dp,
+				   struct sw_flow *flow, u64 key_attrs,
+				   const struct sw_flow_actions *acts)
+{
+	return 0;
+}
+
+static inline int ovs_hw_flow_stats_add(struct sw_flow *flow, int dp_ifindex,
+					struct sk_buff *skb,
+					struct ovs_flow_stats *stats,
+					unsigned long *used)
+{
+	return 0;
+}
+#endif /* CONFIG_NET_SWITCHDEV */
 #endif /* flow.h */

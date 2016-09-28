@@ -506,6 +506,11 @@ struct ovs_key_ct_labels {
  * @OVS_FLOW_ATTR_UFID_FLAGS: A 32-bit value of OR'd %OVS_UFID_F_*
  * flags that provide alternative semantics for flow installation and
  * retrieval. Optional for all requests.
+ * @OVS_FLOW_ATTR_HW_REQ: A 32-bit value giving a OVS_HW_FLOW_REQ_*.
+ * Present in requests if it would not be OVS_FLOW_HW_REQ_DEFAULT.
+ * @OVS_FLOW_ATTR_HW_STATUS: A 32-bit value giving a OVS_HW_FLOW_STATUS_*.
+ * Ignored in all requests. Present in notifications if it would not be
+ * OVS_FLOW_HW_STATUS_NOT_PRESENT.
  *
  * These attributes follow the &struct ovs_header within the Generic Netlink
  * payload for %OVS_FLOW_* commands.
@@ -524,10 +529,41 @@ enum ovs_flow_attr {
 	OVS_FLOW_ATTR_UFID,      /* Variable length unique flow identifier. */
 	OVS_FLOW_ATTR_UFID_FLAGS,/* u32 of OVS_UFID_F_*. */
 	OVS_FLOW_ATTR_PAD,
+	OVS_FLOW_ATTR_HW_REQ,    /* u32 which is one of OVS_HW_FLOW_REQ_*. */
+	OVS_FLOW_ATTR_HW_STATUS, /* s32 which is one of OVS_HW_FLOW_STATUS_* or
+				  * a negative errno. */
 	__OVS_FLOW_ATTR_MAX
 };
 
 #define OVS_FLOW_ATTR_MAX (__OVS_FLOW_ATTR_MAX - 1)
+
+/**
+ * enum ovs_flow_hw_req - Attributes for requesting programming of a flow into software and hardware.
+ * @OVS_FLOW_HW_REQ_DEFAULT: Use default determined by implementation
+ * @OVS_FLOW_HW_REQ_SKIP_HW: Do not program flow into hardware
+ *
+ * Influence programming of flow into software and hardware.
+ */
+enum ovs_flow_hw_req {
+	OVS_FLOW_HW_REQ_DEFAULT,
+	OVS_FLOW_HW_REQ_SKIP_HW,
+	__OVS_FLOW_HW_MAX,
+};
+
+/**
+ * enum ovs_flow_hw_status - Status of attempt to program flow into hardware
+ * @OVS_FLOW_HW_STATUS_NOT_PRESENT: Flow was not programmed into hardware
+ * because: it was not requested; it was removed from hardware as requested;
+ * programming flows into hardware is not supported by the datapath.
+ * @OVS_FLOW_HW_STATUS_PRESENT: Flow is programmed into hardware
+ *
+ * Status of request of programming programming flow into hardware.
+ */
+enum ovs_flow_hw_status {
+	OVS_FLOW_HW_STATUS_NOT_PRESENT,
+	OVS_FLOW_HW_STATUS_PRESENT,
+	__OVS_FLOW_HW_STATUS_MAX,
+};
 
 /**
  * Omit attributes for notifications.

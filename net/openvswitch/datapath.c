@@ -50,6 +50,7 @@
 #include <net/genetlink.h>
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
+#include <net/switchdev.h>
 
 #include "datapath.h"
 #include "flow.h"
@@ -762,7 +763,7 @@ static size_t ovs_flow_cmd_msg_size(const struct sw_flow_actions *acts,
 }
 
 /* Called with ovs_mutex or RCU read lock. */
-static int ovs_flow_cmd_fill_stats(const struct sw_flow *flow,
+static int ovs_flow_cmd_fill_stats(struct sw_flow *flow, int dp_ifindex,
 				   struct sk_buff *skb)
 {
 	struct ovs_flow_stats stats;
@@ -770,6 +771,7 @@ static int ovs_flow_cmd_fill_stats(const struct sw_flow *flow,
 	unsigned long used;
 
 	ovs_flow_stats_get(flow, &stats, &used, &tcp_flags);
+	ovs_hw_flow_stats_add(flow, dp_ifindex, skb, &stats, &used);
 
 	if (used &&
 	    nla_put_u64_64bit(skb, OVS_FLOW_ATTR_USED, ovs_flow_used_time(used),
@@ -829,8 +831,20 @@ static int ovs_flow_cmd_fill_actions(const struct sw_flow *flow,
 	return 0;
 }
 
+static int ovs_hw_flow_put_status(const struct sw_flow *flow,
+				  struct sk_buff *skb)
+{
+#ifdef CONFIG_NET_SWITCHDEV
+       if (flow->hw_flow_present &&
+	   nla_put_s32(skb, OVS_FLOW_ATTR_HW_STATUS,
+		       OVS_FLOW_HW_STATUS_NOT_PRESENT))
+	       return -EMSGSIZE;
+#endif
+       return 0;
+}
+
 /* Called with ovs_mutex or RCU read lock. */
-static int ovs_flow_cmd_fill_info(const struct sw_flow *flow, int dp_ifindex,
+static int ovs_flow_cmd_fill_info(struct sw_flow *flow, int dp_ifindex,
 				  struct sk_buff *skb, u32 portid,
 				  u32 seq, u32 flags, u8 cmd, u32 ufid_flags)
 {
@@ -861,7 +875,11 @@ static int ovs_flow_cmd_fill_info(const struct sw_flow *flow, int dp_ifindex,
 			goto error;
 	}
 
-	err = ovs_flow_cmd_fill_stats(flow, skb);
+	err = ovs_flow_cmd_fill_stats(flow, dp_ifindex, skb);
+	if (err)
+		goto error;
+
+	err = ovs_hw_flow_put_status(flow, skb);
 	if (err)
 		goto error;
 
@@ -901,7 +919,7 @@ static struct sk_buff *ovs_flow_cmd_alloc_info(const struct sw_flow_actions *act
 }
 
 /* Called with ovs_mutex. */
-static struct sk_buff *ovs_flow_cmd_build_info(const struct sw_flow *flow,
+static struct sk_buff *ovs_flow_cmd_build_info(struct sw_flow *flow,
 					       int dp_ifindex,
 					       struct genl_info *info, u8 cmd,
 					       bool always, u32 ufid_flags)
@@ -933,6 +951,7 @@ static int ovs_flow_cmd_new(struct sk_buff *skb, struct genl_info *info)
 	struct sw_flow_actions *acts;
 	struct sw_flow_match match;
 	u32 ufid_flags = ovs_nla_get_ufid_flags(a[OVS_FLOW_ATTR_UFID_FLAGS]);
+	enum ovs_flow_hw_req hw_req = OVS_FLOW_HW_REQ_DEFAULT;
 	int error;
 	bool log = !a[OVS_FLOW_ATTR_PROBE];
 
@@ -945,6 +964,15 @@ static int ovs_flow_cmd_new(struct sk_buff *skb, struct genl_info *info)
 	if (!a[OVS_FLOW_ATTR_ACTIONS]) {
 		OVS_NLERR(log, "Flow actions attr not present in new flow.");
 		goto error;
+	}
+
+	if (a[OVS_FLOW_ATTR_HW_REQ]) {
+		hw_req = nla_get_u32(a[OVS_FLOW_ATTR_HW_REQ]);
+
+		if (hw_req > OVS_FLOW_HW_REQ_SKIP_HW) {
+			OVS_NLERR(log, "Unsupported hardware flow request for new flow.");
+			goto error;
+		}
 	}
 
 	/* Most of the time we need to allocate a new flow, do it before
@@ -1012,6 +1040,9 @@ static int ovs_flow_cmd_new(struct sk_buff *skb, struct genl_info *info)
 			goto err_unlock_ovs;
 		}
 
+		if (hw_req == OVS_FLOW_HW_REQ_DEFAULT)
+			ovs_hw_flow_new(dp, new_flow, match.key_attrs, acts);
+
 		if (unlikely(reply)) {
 			error = ovs_flow_cmd_fill_info(new_flow,
 						       ovs_header->dp_ifindex,
@@ -1036,6 +1067,7 @@ static int ovs_flow_cmd_new(struct sk_buff *skb, struct genl_info *info)
 			error = -EEXIST;
 			goto err_unlock_ovs;
 		}
+
 		/* The flow identifier has to be the same for flow updates.
 		 * Look for any overlapping flow.
 		 */
@@ -1050,6 +1082,12 @@ static int ovs_flow_cmd_new(struct sk_buff *skb, struct genl_info *info)
 				goto err_unlock_ovs;
 			}
 		}
+
+		if (hw_req == OVS_FLOW_HW_REQ_DEFAULT)
+			ovs_hw_flow_set(dp, flow, match.key_attrs, acts);
+		else
+			ovs_hw_flow_del(dp, flow);
+
 		/* Update actions. */
 		old_acts = ovsl_dereference(flow->sf_acts);
 		rcu_assign_pointer(flow->sf_acts, acts);
@@ -1120,9 +1158,26 @@ static int ovs_flow_cmd_set(struct sk_buff *skb, struct genl_info *info)
 	struct sw_flow_match match;
 	struct sw_flow_id sfid;
 	u32 ufid_flags = ovs_nla_get_ufid_flags(a[OVS_FLOW_ATTR_UFID_FLAGS]);
-	int error = 0;
+	enum ovs_flow_hw_req hw_req = OVS_FLOW_HW_REQ_DEFAULT;
+	int error;
 	bool log = !a[OVS_FLOW_ATTR_PROBE];
 	bool ufid_present;
+
+	/* Extract key. */
+	error = -EINVAL;
+	if (!a[OVS_FLOW_ATTR_KEY]) {
+		OVS_NLERR(log, "Flow key attribute not present in set flow.");
+		goto error;
+	}
+
+	if (a[OVS_FLOW_ATTR_HW_REQ]) {
+		hw_req = nla_get_u32(a[OVS_FLOW_ATTR_HW_REQ]);
+
+		if (hw_req > OVS_FLOW_HW_REQ_SKIP_HW) {
+			OVS_NLERR(log, "Unsupported hardware flow request for new flow.");
+			goto error;
+		}
+	}
 
 	ufid_present = ovs_nla_get_ufid(&sfid, a[OVS_FLOW_ATTR_UFID], log);
 	if (a[OVS_FLOW_ATTR_KEY]) {
@@ -1207,6 +1262,12 @@ static int ovs_flow_cmd_set(struct sk_buff *skb, struct genl_info *info)
 	/* Clear stats. */
 	if (a[OVS_FLOW_ATTR_CLEAR])
 		ovs_flow_stats_clear(flow);
+
+	if (hw_req == OVS_FLOW_HW_REQ_DEFAULT)
+		ovs_hw_flow_set(dp, flow, match.key_attrs, acts);
+	else
+		ovs_hw_flow_del(dp, flow);
+
 	ovs_unlock();
 
 	if (reply)
@@ -1329,6 +1390,8 @@ static int ovs_flow_cmd_del(struct sk_buff *skb, struct genl_info *info)
 		err = -ENOENT;
 		goto unlock;
 	}
+
+	ovs_hw_flow_del(dp, flow);
 
 	ovs_flow_tbl_remove(&dp->table, flow);
 	ovs_unlock();
