@@ -50,8 +50,6 @@
 #define BCM2835_I2C_S_CLKT	BIT(9)
 #define BCM2835_I2C_S_LEN	BIT(10) /* Fake bit for SW error reporting */
 
-#define BCM2835_I2C_BITMSK_S	0x03FF
-
 #define BCM2835_I2C_CDIV_MIN	0x0002
 #define BCM2835_I2C_CDIV_MAX	0xFFFE
 
@@ -117,14 +115,11 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
 	u32 val, err;
 
 	val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
-	val &= BCM2835_I2C_BITMSK_S;
-	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_S, val);
 
 	err = val & (BCM2835_I2C_S_CLKT | BCM2835_I2C_S_ERR);
 	if (err) {
 		i2c_dev->msg_err = err;
-		complete(&i2c_dev->completion);
-		return IRQ_HANDLED;
+		goto complete;
 	}
 
 	if (val & BCM2835_I2C_S_DONE) {
@@ -137,21 +132,38 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
 			i2c_dev->msg_err = BCM2835_I2C_S_LEN;
 		else
 			i2c_dev->msg_err = 0;
-		complete(&i2c_dev->completion);
-		return IRQ_HANDLED;
+		goto complete;
 	}
 
 	if (val & BCM2835_I2C_S_TXW) {
+		if (!i2c_dev->msg_buf_remaining) {
+			i2c_dev->msg_err = val | BCM2835_I2C_S_LEN;
+			goto complete;
+		}
+
 		bcm2835_fill_txfifo(i2c_dev);
 		return IRQ_HANDLED;
 	}
 
 	if (val & BCM2835_I2C_S_RXR) {
+		if (!i2c_dev->msg_buf_remaining) {
+			i2c_dev->msg_err = val | BCM2835_I2C_S_LEN;
+			goto complete;
+		}
+
 		bcm2835_drain_rxfifo(i2c_dev);
 		return IRQ_HANDLED;
 	}
 
 	return IRQ_NONE;
+
+complete:
+	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
+	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_S, BCM2835_I2C_S_CLKT |
+			   BCM2835_I2C_S_ERR | BCM2835_I2C_S_DONE);
+	complete(&i2c_dev->completion);
+
+	return IRQ_HANDLED;
 }
 
 static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
@@ -181,8 +193,9 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
 
 	time_left = wait_for_completion_timeout(&i2c_dev->completion,
 						BCM2835_I2C_TIMEOUT);
-	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
 	if (!time_left) {
+		bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C,
+				   BCM2835_I2C_C_CLEAR);
 		dev_err(i2c_dev->dev, "i2c transfer timed out\n");
 		return -ETIMEDOUT;
 	}
