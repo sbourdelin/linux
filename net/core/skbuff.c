@@ -4561,6 +4561,8 @@ int skb_vlan_push(struct sk_buff *skb, __be16 vlan_proto, u16 vlan_tci)
 
 		skb->protocol = skb->vlan_proto;
 		skb->mac_len += VLAN_HLEN;
+		if (offset)
+			offset += VLAN_HLEN;
 
 		skb_postpush_rcsum(skb, skb->data + (2 * ETH_ALEN), VLAN_HLEN);
 		__skb_pull(skb, offset);
