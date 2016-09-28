@@ -261,6 +261,7 @@ static enum power_supply_property bq27000_battery_props[] = {
 	POWER_SUPPLY_PROP_POWER_AVG,
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_MANUFACTURER,
+	POWER_SUPPLY_PROP_POLL_INTERVAL,
 };
 
 static enum power_supply_property bq27010_battery_props[] = {
@@ -281,6 +282,7 @@ static enum power_supply_property bq27010_battery_props[] = {
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_MANUFACTURER,
+	POWER_SUPPLY_PROP_POLL_INTERVAL,
 };
 
 static enum power_supply_property bq27500_battery_props[] = {
@@ -299,6 +301,7 @@ static enum power_supply_property bq27500_battery_props[] = {
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_MANUFACTURER,
+	POWER_SUPPLY_PROP_POLL_INTERVAL,
 };
 
 static enum power_supply_property bq27530_battery_props[] = {
@@ -317,6 +320,7 @@ static enum power_supply_property bq27530_battery_props[] = {
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
 	POWER_SUPPLY_PROP_MANUFACTURER,
+	POWER_SUPPLY_PROP_POLL_INTERVAL,
 };
 
 static enum power_supply_property bq27541_battery_props[] = {
@@ -336,6 +340,7 @@ static enum power_supply_property bq27541_battery_props[] = {
 	POWER_SUPPLY_PROP_POWER_AVG,
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_MANUFACTURER,
+	POWER_SUPPLY_PROP_POLL_INTERVAL,
 };
 
 static enum power_supply_property bq27545_battery_props[] = {
@@ -354,6 +359,7 @@ static enum power_supply_property bq27545_battery_props[] = {
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
 	POWER_SUPPLY_PROP_POWER_AVG,
 	POWER_SUPPLY_PROP_MANUFACTURER,
+	POWER_SUPPLY_PROP_POLL_INTERVAL,
 };
 
 static enum power_supply_property bq27421_battery_props[] = {
@@ -369,6 +375,7 @@ static enum power_supply_property bq27421_battery_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_NOW,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
 	POWER_SUPPLY_PROP_MANUFACTURER,
+	POWER_SUPPLY_PROP_POLL_INTERVAL,
 };
 
 #define BQ27XXX_PROP(_id, _prop)		\
@@ -927,11 +934,42 @@ static int bq27xxx_battery_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_MANUFACTURER:
 		val->strval = BQ27XXX_MANUFACTURER;
 		break;
+	case POWER_SUPPLY_PROP_POLL_INTERVAL:
+		val->intval = poll_interval;
+		break;
 	default:
 		return -EINVAL;
 	}
 
 	return ret;
+}
+
+static int bq27xxx_battery_set_property(struct power_supply *psy,
+					enum power_supply_property psp,
+					const union power_supply_propval *val)
+{
+	struct bq27xxx_device_info *di = power_supply_get_drvdata(psy);
+
+	if (psp != POWER_SUPPLY_PROP_POLL_INTERVAL)
+		return -EINVAL;
+
+	if (poll_interval == val->intval)
+		return 0;
+
+	poll_interval = val->intval;
+	cancel_delayed_work_sync(&di->work);
+	schedule_delayed_work(&di->work, 0);
+
+	return 0;
+}
+
+static int bq27xxx_property_is_writeable(struct power_supply *psy,
+					 enum power_supply_property psp)
+{
+	if (psp == POWER_SUPPLY_PROP_POLL_INTERVAL)
+		return 1;
+
+	return 0;
 }
 
 static void bq27xxx_external_power_changed(struct power_supply *psy)
@@ -960,6 +998,8 @@ int bq27xxx_battery_setup(struct bq27xxx_device_info *di)
 	psy_desc->properties = bq27xxx_battery_props[di->chip].props;
 	psy_desc->num_properties = bq27xxx_battery_props[di->chip].size;
 	psy_desc->get_property = bq27xxx_battery_get_property;
+	psy_desc->set_property = bq27xxx_battery_set_property;
+	psy_desc->property_is_writeable = bq27xxx_property_is_writeable;
 	psy_desc->external_power_changed = bq27xxx_external_power_changed;
 
 	di->bat = power_supply_register_no_ws(di->dev, psy_desc, &psy_cfg);
