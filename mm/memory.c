@@ -3852,6 +3852,7 @@ EXPORT_SYMBOL_GPL(generic_access_phys);
  * given task for page fault accounting.
  */
 static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
+		const struct cred *subject_cred, const struct cred *object_cred,
 		unsigned long addr, void *buf, int len, int write)
 {
 	struct vm_area_struct *vma;
@@ -3864,8 +3865,8 @@ static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		void *maddr;
 		struct page *page = NULL;
 
-		ret = get_user_pages_remote(tsk, mm, addr, 1,
-				write, 1, &page, &vma);
+		ret = get_user_pages_remote(tsk, mm, subject_cred, object_cred,
+				addr, 1, write, 1, &page, &vma);
 		if (ret <= 0) {
 #ifndef CONFIG_HAVE_IOREMAP_PROT
 			break;
@@ -3921,28 +3922,35 @@ static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
  *
  * The caller must hold a reference on @mm.
  */
-int access_remote_vm(struct mm_struct *mm, unsigned long addr,
-		void *buf, int len, int write)
+int access_remote_vm(struct mm_struct *mm, const struct cred *subject_cred,
+		     const struct cred *object_cred, unsigned long addr,
+		     void *buf, int len, int write)
 {
-	return __access_remote_vm(NULL, mm, addr, buf, len, write);
+	return __access_remote_vm(NULL, mm, subject_cred, object_cred, addr,
+				  buf, len, write);
 }
 
 /*
  * Access another process' address space.
  * Source/target buffer must be kernel space,
- * Do not walk the page table directly, use get_user_pages
+ * Do not walk the page table directly, use get_user_pages.
+ * @tsk must be ptrace-stopped by current.
  */
 int access_process_vm(struct task_struct *tsk, unsigned long addr,
 		void *buf, int len, int write)
 {
 	struct mm_struct *mm;
 	int ret;
+	const struct cred *object_cred;
 
 	mm = get_task_mm(tsk);
 	if (!mm)
 		return 0;
+	object_cred = get_task_cred(tsk);
 
-	ret = __access_remote_vm(tsk, mm, addr, buf, len, write);
+	ret = __access_remote_vm(tsk, mm, current_cred(), object_cred, addr,
+				 buf, len, write);
+	put_cred(object_cred);
 	mmput(mm);
 
 	return ret;

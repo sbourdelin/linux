@@ -1349,15 +1349,15 @@ static int get_user_page_nowait(unsigned long start, int write,
 	if (write)
 		flags |= FOLL_WRITE;
 
-	return __get_user_pages(current, current->mm, start, 1, flags, page,
-			NULL, NULL);
+	return __get_user_pages(current, current->mm, NULL, NULL, start, 1,
+			flags, page, NULL, NULL);
 }
 
 static inline int check_user_page_hwpoison(unsigned long addr)
 {
 	int rc, flags = FOLL_TOUCH | FOLL_HWPOISON | FOLL_WRITE;
 
-	rc = __get_user_pages(current, current->mm, addr, 1,
+	rc = __get_user_pages(current, current->mm, NULL, NULL, addr, 1,
 			      flags, NULL, NULL, NULL);
 	return rc == -EHWPOISON;
 }
@@ -1415,7 +1415,8 @@ static int hva_to_pfn_slow(unsigned long addr, bool *async, bool write_fault,
 		npages = get_user_page_nowait(addr, write_fault, page);
 		up_read(&current->mm->mmap_sem);
 	} else
-		npages = __get_user_pages_unlocked(current, current->mm, addr, 1,
+		npages = __get_user_pages_unlocked(current, current->mm, NULL,
+						   NULL, addr, 1,
 						   write_fault, 0, page,
 						   FOLL_TOUCH|FOLL_HWPOISON);
 	if (npages != 1)

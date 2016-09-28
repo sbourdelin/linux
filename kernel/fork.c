@@ -847,7 +847,8 @@ struct mm_struct *get_task_mm(struct task_struct *task)
 }
 EXPORT_SYMBOL_GPL(get_task_mm);
 
-struct mm_struct *mm_access(struct task_struct *task, unsigned int mode)
+struct mm_struct *mm_access(struct task_struct *task,
+			    const struct cred **object_cred, unsigned int mode)
 {
 	struct mm_struct *mm;
 	int err;
@@ -862,6 +863,9 @@ struct mm_struct *mm_access(struct task_struct *task, unsigned int mode)
 		mmput(mm);
 		mm = ERR_PTR(-EACCES);
 	}
+	if (!IS_ERR_OR_NULL(mm) && object_cred)
+		*object_cred = get_task_cred(task);
+
 	mutex_unlock(&task->signal->cred_guard_mutex);
 
 	return mm;

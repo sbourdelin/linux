@@ -110,6 +110,8 @@ unsigned int kobjsize(const void *objp)
 }
 
 long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
+		      const struct cred *subject_cred,
+		      const struct cred *object_cred,
 		      unsigned long start, unsigned long nr_pages,
 		      unsigned int foll_flags, struct page **pages,
 		      struct vm_area_struct **vmas, int *nonblocking)
@@ -170,8 +172,8 @@ long get_user_pages(unsigned long start, unsigned long nr_pages,
 	if (force)
 		flags |= FOLL_FORCE;
 
-	return __get_user_pages(current, current->mm, start, nr_pages, flags,
-				pages, vmas, NULL);
+	return __get_user_pages(current, current->mm, NULL, NULL, start,
+				nr_pages, flags, pages, vmas, NULL);
 }
 EXPORT_SYMBOL(get_user_pages);
 
@@ -184,14 +186,16 @@ long get_user_pages_locked(unsigned long start, unsigned long nr_pages,
 EXPORT_SYMBOL(get_user_pages_locked);
 
 long __get_user_pages_unlocked(struct task_struct *tsk, struct mm_struct *mm,
+			       const struct cred *subject_cred,
+			       const struct cred *object_cred,
 			       unsigned long start, unsigned long nr_pages,
 			       int write, int force, struct page **pages,
 			       unsigned int gup_flags)
 {
 	long ret;
 	down_read(&mm->mmap_sem);
-	ret = __get_user_pages(tsk, mm, start, nr_pages, gup_flags, pages,
-				NULL, NULL);
+	ret = __get_user_pages(tsk, mm, subject_cred, object_cred, start,
+				nr_pages, gup_flags, pages, NULL, NULL);
 	up_read(&mm->mmap_sem);
 	return ret;
 }
@@ -200,8 +204,9 @@ EXPORT_SYMBOL(__get_user_pages_unlocked);
 long get_user_pages_unlocked(unsigned long start, unsigned long nr_pages,
 			     int write, int force, struct page **pages)
 {
-	return __get_user_pages_unlocked(current, current->mm, start, nr_pages,
-					 write, force, pages, 0);
+	return __get_user_pages_unlocked(current, current->mm, NULL, NULL,
+					 start, nr_pages, write, force, pages,
+					 0);
 }
 EXPORT_SYMBOL(get_user_pages_unlocked);
 
@@ -1858,8 +1863,9 @@ static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
  *
  * The caller must hold a reference on @mm.
  */
-int access_remote_vm(struct mm_struct *mm, unsigned long addr,
-		void *buf, int len, int write)
+int access_remote_vm(struct mm_struct *mm, const struct cred *subject_cred,
+		const struct cred *object_cred, unsigned long addr, void *buf,
+		int len, int write)
 {
 	return __access_remote_vm(NULL, mm, addr, buf, len, write);
 }

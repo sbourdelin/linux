@@ -113,6 +113,11 @@ struct pid_entry {
 	union proc_op op;
 };
 
+struct mem_private {
+	struct mm_struct *mm;
+	const struct cred *object_cred;
+};
+
 #define NOD(NAME, MODE, IOP, FOP, OP) {			\
 	.name = (NAME),					\
 	.len  = sizeof(NAME) - 1,			\
@@ -252,7 +257,7 @@ static ssize_t proc_pid_cmdline_read(struct file *file, char __user *buf,
 	 * Inherently racy -- command line shares address space
 	 * with code and data.
 	 */
-	rv = access_remote_vm(mm, arg_end - 1, &c, 1, 0);
+	rv = access_remote_vm(mm, NULL, NULL, arg_end - 1, &c, 1, 0);
 	if (rv <= 0)
 		goto out_free_page;
 
@@ -270,7 +275,8 @@ static ssize_t proc_pid_cmdline_read(struct file *file, char __user *buf,
 			int nr_read;
 
 			_count = min3(count, len, PAGE_SIZE);
-			nr_read = access_remote_vm(mm, p, page, _count, 0);
+			nr_read = access_remote_vm(mm, NULL, NULL, p, page,
+						   _count, 0);
 			if (nr_read < 0)
 				rv = nr_read;
 			if (nr_read <= 0)
@@ -305,7 +311,8 @@ static ssize_t proc_pid_cmdline_read(struct file *file, char __user *buf,
 			bool final;
 
 			_count = min3(count, len, PAGE_SIZE);
-			nr_read = access_remote_vm(mm, p, page, _count, 0);
+			nr_read = access_remote_vm(mm, NULL, NULL, p, page,
+						   _count, 0);
 			if (nr_read < 0)
 				rv = nr_read;
 			if (nr_read <= 0)
@@ -354,7 +361,8 @@ skip_argv:
 			bool final;
 
 			_count = min3(count, len, PAGE_SIZE);
-			nr_read = access_remote_vm(mm, p, page, _count, 0);
+			nr_read = access_remote_vm(mm, NULL, NULL, p, page,
+						   _count, 0);
 			if (nr_read < 0)
 				rv = nr_read;
 			if (nr_read <= 0)
@@ -403,7 +411,7 @@ static const struct file_operations proc_pid_cmdline_ops = {
 static int proc_pid_auxv(struct seq_file *m, struct pid_namespace *ns,
 			 struct pid *pid, struct task_struct *task)
 {
-	struct mm_struct *mm = mm_access(task, PTRACE_MODE_READ_FSCREDS);
+	struct mm_struct *mm = mm_access(task, NULL, PTRACE_MODE_READ_FSCREDS);
 	if (mm && !IS_ERR(mm)) {
 		unsigned int nwords = 0;
 		do {
@@ -801,13 +809,15 @@ static const struct file_operations proc_single_file_operations = {
 };
 
 
-struct mm_struct *proc_mem_open(struct inode *inode, unsigned int mode)
+struct mm_struct *proc_mem_open(struct inode *inode,
+				const struct cred **object_cred,
+				unsigned int mode)
 {
 	struct task_struct *task = get_proc_task(inode);
 	struct mm_struct *mm = ERR_PTR(-ESRCH);
 
 	if (task) {
-		mm = mm_access(task, mode | PTRACE_MODE_FSCREDS);
+		mm = mm_access(task, object_cred, mode | PTRACE_MODE_FSCREDS);
 		put_task_struct(task);
 
 		if (!IS_ERR_OR_NULL(mm)) {
@@ -823,7 +833,7 @@ struct mm_struct *proc_mem_open(struct inode *inode, unsigned int mode)
 
 static int __mem_open(struct inode *inode, struct file *file, unsigned int mode)
 {
-	struct mm_struct *mm = proc_mem_open(inode, mode);
+	struct mm_struct *mm = proc_mem_open(inode, NULL, mode);
 
 	if (IS_ERR(mm))
 		return PTR_ERR(mm);
@@ -834,18 +844,36 @@ static int __mem_open(struct inode *inode, struct file *file, unsigned int mode)
 
 static int mem_open(struct inode *inode, struct file *file)
 {
-	int ret = __mem_open(inode, file, PTRACE_MODE_ATTACH);
+	struct mem_private *private = kmalloc(sizeof(*private), GFP_KERNEL);
+	struct mm_struct *mm;
+
+	if (!private)
+		return -ENOMEM;
+
+	mm = proc_mem_open(inode, &private->object_cred, PTRACE_MODE_ATTACH);
+
+	if (!mm)
+		private->object_cred = NULL;
+
+	if (IS_ERR(mm)) {
+		kfree(private);
+		return PTR_ERR(mm);
+	}
+
+	private->mm = mm;
+	file->private_data = private;
 
 	/* OK to pass negative loff_t, we can catch out-of-range */
 	file->f_mode |= FMODE_UNSIGNED_OFFSET;
 
-	return ret;
+	return 0;
 }
 
 static ssize_t mem_rw(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos, int write)
 {
-	struct mm_struct *mm = file->private_data;
+	struct mem_private *private = file->private_data;
+	struct mm_struct *mm = private->mm;
 	unsigned long addr = *ppos;
 	ssize_t copied;
 	char *page;
@@ -869,7 +897,9 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
 			break;
 		}
 
-		this_len = access_remote_vm(mm, addr, page, this_len, write);
+		this_len = access_remote_vm(mm, file->f_cred,
+					    private->object_cred, addr,
+					    page, this_len, write);
 		if (!this_len) {
 			if (!copied)
 				copied = -EIO;
@@ -924,9 +954,13 @@ loff_t mem_lseek(struct file *file, loff_t offset, int orig)
 
 static int mem_release(struct inode *inode, struct file *file)
 {
-	struct mm_struct *mm = file->private_data;
-	if (mm)
-		mmdrop(mm);
+	struct mem_private *private = file->private_data;
+
+	if (private->mm) {
+		mmdrop(private->mm);
+		put_cred(private->object_cred);
+	}
+	kfree(private);
 	return 0;
 }
 
@@ -981,7 +1015,7 @@ static ssize_t environ_read(struct file *file, char __user *buf,
 		max_len = min_t(size_t, PAGE_SIZE, count);
 		this_len = min(max_len, this_len);
 
-		retval = access_remote_vm(mm, (env_start + src),
+		retval = access_remote_vm(mm, NULL, NULL, (env_start + src),
 			page, this_len, 0);
 
 		if (retval <= 0) {
@@ -1873,7 +1907,7 @@ static int map_files_d_revalidate(struct dentry *dentry, unsigned int flags)
 	if (!task)
 		goto out_notask;
 
-	mm = mm_access(task, PTRACE_MODE_READ_FSCREDS);
+	mm = mm_access(task, NULL, PTRACE_MODE_READ_FSCREDS);
 	if (IS_ERR_OR_NULL(mm))
 		goto out;
 

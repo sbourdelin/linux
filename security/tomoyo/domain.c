@@ -880,7 +880,7 @@ bool tomoyo_dump_page(struct linux_binprm *bprm, unsigned long pos,
 	 * (represented by bprm).  'current' is the process doing
 	 * the execve().
 	 */
-	if (get_user_pages_remote(current, bprm->mm, pos, 1,
+	if (get_user_pages_remote(current, bprm->mm, NULL, NULL, pos, 1,
 				0, 1, &page, NULL) <= 0)
 		return false;
 #else

@@ -164,6 +164,13 @@ int security_ptrace_traceme(struct task_struct *parent)
 	return call_int_hook(ptrace_traceme, 0, parent);
 }
 
+int security_forced_write(struct vm_area_struct *vma,
+			  const struct cred *subject_cred,
+			  const struct cred *object_cred)
+{
+	return call_int_hook(forced_write, 0, vma, subject_cred, object_cred);
+}
+
 int security_capget(struct task_struct *target,
 		     kernel_cap_t *effective,
 		     kernel_cap_t *inheritable,
@@ -1582,6 +1589,7 @@ struct security_hook_heads security_hook_heads = {
 		LIST_HEAD_INIT(security_hook_heads.ptrace_access_check),
 	.ptrace_traceme =
 		LIST_HEAD_INIT(security_hook_heads.ptrace_traceme),
+	.forced_write =	LIST_HEAD_INIT(security_hook_heads.forced_write),
 	.capget =	LIST_HEAD_INIT(security_hook_heads.capget),
 	.capset =	LIST_HEAD_INIT(security_hook_heads.capset),
 	.capable =	LIST_HEAD_INIT(security_hook_heads.capable),

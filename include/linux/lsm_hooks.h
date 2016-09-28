@@ -1154,6 +1154,11 @@
  *	to the @parent process for tracing.
  *	@parent contains the task_struct structure for debugger process.
  *	Return 0 if permission is granted.
+ * @forced_write:
+ *	Check whether @subject_cred is permitted to forcibly write to the
+ *	non-writable mapping @vma that belongs to a process with objective
+ *	credentials @object_cred.
+ *	Return 0 if permission is granted.
  * @capget:
  *	Get the @effective, @inheritable, and @permitted capability sets for
  *	the @target process.  The hook may also perform permission checking to
@@ -1317,6 +1322,9 @@ union security_list_options {
 	int (*ptrace_access_check)(struct task_struct *child,
 					unsigned int mode);
 	int (*ptrace_traceme)(struct task_struct *parent);
+	int (*forced_write)(struct vm_area_struct *vma,
+				const struct cred *subject_cred,
+				const struct cred *object_cred);
 	int (*capget)(struct task_struct *target, kernel_cap_t *effective,
 			kernel_cap_t *inheritable, kernel_cap_t *permitted);
 	int (*capset)(struct cred *new, const struct cred *old,
@@ -1629,6 +1637,7 @@ struct security_hook_heads {
 	struct list_head binder_transfer_file;
 	struct list_head ptrace_access_check;
 	struct list_head ptrace_traceme;
+	struct list_head forced_write;
 	struct list_head capget;
 	struct list_head capset;
 	struct list_head capable;
