@@ -64,6 +64,7 @@ static bool loopdefault = 0;
 module_param(loopdefault, bool, S_IRUGO|S_IWUSR);
 
 static struct usb_zero_options gzero_options = {
+	.verify_rx_data = GZERO_VERIFY_RX_DATA,
 	.isoc_interval = GZERO_ISOC_INTERVAL,
 	.isoc_maxpacket = GZERO_ISOC_MAXPACKET,
 	.bulk_buflen = GZERO_BULK_BUFLEN,
@@ -236,6 +237,9 @@ module_param_named(buflen, gzero_options.bulk_buflen, uint, 0);
 module_param_named(pattern, gzero_options.pattern, uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(pattern, "0 = all zeroes, 1 = mod63, 2 = none");
 
+module_param_named(verify, gzero_options.verify_rx_data, uint, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(verify, "Verification of received data : 0 = No, 1 = Yes");
+
 module_param_named(isoc_interval, gzero_options.isoc_interval, uint,
 		S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(isoc_interval, "1 - 16");
@@ -290,6 +294,7 @@ static int zero_bind(struct usb_composite_dev *cdev)
 
 	ss_opts =  container_of(func_inst_ss, struct f_ss_opts, func_inst);
 	ss_opts->pattern = gzero_options.pattern;
+	ss_opts->verify_rx_data = gzero_options.verify_rx_data;
 	ss_opts->isoc_interval = gzero_options.isoc_interval;
 	ss_opts->isoc_maxpacket = gzero_options.isoc_maxpacket;
 	ss_opts->isoc_mult = gzero_options.isoc_mult;
