@@ -1522,15 +1522,6 @@ bool pxad_filter_fn(struct dma_chan *chan, void *param)
 }
 EXPORT_SYMBOL_GPL(pxad_filter_fn);
 
-int pxad_toggle_reserved_channel(int legacy_channel)
-{
-	if (legacy_unavailable & (BIT(legacy_channel)))
-		return -EBUSY;
-	legacy_reserved ^= BIT(legacy_channel);
-	return 0;
-}
-EXPORT_SYMBOL_GPL(pxad_toggle_reserved_channel);
-
 module_platform_driver(pxad_driver);
 
 MODULE_DESCRIPTION("Marvell PXA Peripheral DMA Driver");
