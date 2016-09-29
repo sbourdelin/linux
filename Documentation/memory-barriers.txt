@@ -490,13 +490,17 @@ And a couple of implicit varieties:
      the subsection "MMIO write barrier").  In addition, a RELEASE+ACQUIRE
      pair is -not- guaranteed to act as a full memory barrier.  However, after
      an ACQUIRE on a given variable, all memory accesses preceding any prior
-     RELEASE on that same variable are guaranteed to be visible.  In other
-     words, within a given variable's critical section, all accesses of all
-     previous critical sections for that variable are guaranteed to have
-     completed.
+     RELEASE on that same variable in that same chain of RELEASE+ACQUIRE
+     pairs are guaranteed to be visible.  In other words, within a given
+     variable's critical section, all accesses of all previous critical
+     sections for that variable are guaranteed to have completed.
 
      This means that ACQUIRE acts as a minimal "acquire" operation and
      RELEASE acts as a minimal "release" operation.
+
+     However, please note that a chain of RELEASE+ACQUIRE pairs may be
+     broken by a store by another thread that overwrites the RELEASE
+     operation's store before the ACQUIRE operation's read.
 
 A subset of the atomic operations described in atomic_ops.txt have ACQUIRE
 and RELEASE variants in addition to fully-ordered and relaxed (no barrier
