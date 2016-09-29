@@ -503,6 +503,92 @@ static ssize_t phys_switch_id_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(phys_switch_id);
 
+#ifdef CONFIG_XPS_FLOWS
+static void xps_dev_flow_table_release(struct rcu_head *rcu)
+{
+	struct xps_dev_flow_table *table = container_of(rcu,
+	    struct xps_dev_flow_table, rcu);
+	vfree(table);
+}
+
+static int change_xps_dev_flow_table_cnt(struct net_device *dev,
+					 unsigned long count)
+{
+	unsigned long mask;
+	struct xps_dev_flow_table *table, *old_table;
+	static DEFINE_SPINLOCK(xps_dev_flow_lock);
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	if (count) {
+		mask = count - 1;
+		/* mask = roundup_pow_of_two(count) - 1;
+		 * without overflows...
+		 */
+		while ((mask | (mask >> 1)) != mask)
+			mask |= (mask >> 1);
+		/* On 64 bit arches, must check mask fits in table->mask (u32),
+		 * and on 32bit arches, must check
+		 * XPS_DEV_FLOW_TABLE_SIZE(mask + 1) doesn't overflow.
+		 */
+#if BITS_PER_LONG > 32
+		if (mask > (unsigned long)(u32)mask)
+			return -EINVAL;
+#else
+		if (mask > (ULONG_MAX - XPS_DEV_FLOW_TABLE_SIZE(1))
+				/ sizeof(struct xps_dev_flow)) {
+			/* Enforce a limit to prevent overflow */
+			return -EINVAL;
+		}
+#endif
+		table = vmalloc(XPS_DEV_FLOW_TABLE_SIZE(mask + 1));
+		if (!table)
+			return -ENOMEM;
+
+		table->mask = mask;
+		for (count = 0; count <= mask; count++)
+			table->flows[count].queue_index = -1;
+	} else
+		table = NULL;
+
+	spin_lock(&xps_dev_flow_lock);
+	old_table = rcu_dereference_protected(dev->xps_flow_table,
+					      lockdep_is_held(&xps_dev_flow_lock));
+	rcu_assign_pointer(dev->xps_flow_table, table);
+	spin_unlock(&xps_dev_flow_lock);
+
+	if (old_table)
+		call_rcu(&old_table->rcu, xps_dev_flow_table_release);
+
+	return 0;
+}
+
+static ssize_t xps_dev_flow_table_cnt_store(struct device *dev,
+					    struct device_attribute *attr,
+					    const char *buf, size_t len)
+{
+	return netdev_store(dev, attr, buf, len, change_xps_dev_flow_table_cnt);
+}
+
+static ssize_t xps_dev_flow_table_cnt_show(struct device *dev,
+			    struct device_attribute *attr, char *buf)
+{
+	struct net_device *netdev = to_net_dev(dev);
+	struct xps_dev_flow_table *table;
+	unsigned int cnt = 0;
+
+	rcu_read_lock();
+	table = rcu_dereference(netdev->xps_flow_table);
+	if (table)
+		cnt = table->mask + 1;
+	rcu_read_unlock();
+
+	return sprintf(buf, fmt_dec, cnt);
+}
+DEVICE_ATTR_RW(xps_dev_flow_table_cnt);
+#endif /* CONFIG_XPS_FLOWS */
+
 static struct attribute *net_class_attrs[] = {
 	&dev_attr_netdev_group.attr,
 	&dev_attr_type.attr,
@@ -531,6 +617,9 @@ static struct attribute *net_class_attrs[] = {
 	&dev_attr_phys_port_name.attr,
 	&dev_attr_phys_switch_id.attr,
 	&dev_attr_proto_down.attr,
+#ifdef CONFIG_XPS_FLOWS
+	&dev_attr_xps_dev_flow_table_cnt.attr,
+#endif
 	NULL,
 };
 ATTRIBUTE_GROUPS(net_class);

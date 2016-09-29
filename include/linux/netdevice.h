@@ -736,6 +736,27 @@ struct xps_dev_maps {
     (nr_cpu_ids * sizeof(struct xps_map *)))
 #endif /* CONFIG_XPS */
 
+#ifdef CONFIG_XPS_FLOWS
+struct xps_dev_flow {
+	union {
+		u64	v64;
+		struct {
+			int		queue_index;
+			unsigned int	queue_ptr;
+		};
+	};
+};
+
+struct xps_dev_flow_table {
+	unsigned int mask;
+	struct rcu_head rcu;
+	struct xps_dev_flow flows[0];
+};
+#define XPS_DEV_FLOW_TABLE_SIZE(_num) (sizeof(struct xps_dev_flow_table) + \
+	((_num) * sizeof(struct xps_dev_flow)))
+
+#endif /* CONFIG_XPS_FLOWS */
+
 #define TC_MAX_QUEUE	16
 #define TC_BITMASK	15
 /* HW offloaded queuing disciplines txq count and offset maps */
@@ -1824,6 +1845,9 @@ struct net_device {
 
 #ifdef CONFIG_XPS
 	struct xps_dev_maps __rcu *xps_maps;
+#endif
+#ifdef CONFIG_XPS_FLOWS
+	struct xps_dev_flow_table __rcu *xps_flow_table;
 #endif
 #ifdef CONFIG_NET_CLS_ACT
 	struct tcf_proto __rcu  *egress_cl_list;
