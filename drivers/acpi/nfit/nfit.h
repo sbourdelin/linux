@@ -161,11 +161,17 @@ struct acpi_nfit_desc {
 	struct list_head list;
 	struct kernfs_node *scrub_count_state;
 	unsigned int scrub_count;
+	unsigned int scrub_mode;
 	unsigned int cancel:1;
 	unsigned long dimm_cmd_force_en;
 	unsigned long bus_cmd_force_en;
 	int (*blk_do_io)(struct nd_blk_region *ndbr, resource_size_t dpa,
 			void *iobuf, u64 len, int rw);
+};
+
+enum scrub_mode {
+	MCE_SCRUB_ON = 1,
+	MCE_SCRUB_OFF = 2,
 };
 
 enum nd_blk_mmio_selector {

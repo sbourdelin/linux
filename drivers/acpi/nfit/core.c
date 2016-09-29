@@ -909,6 +909,14 @@ static ssize_t scrub_show(struct device *dev,
 	return rc;
 }
 
+/*
+ * The 'scrub' attribute can only have following values written to it:
+ * '1': Start an on-demand scrub, and enable a full scrub to happen if a
+ *      machine check exception for a memory error is received.
+ * '2': Switch to the default mode where a machine check will only insert
+ *      the address on which the memory error was received into the poison
+ *      and badblocks lists.
+ */
 static ssize_t scrub_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
@@ -919,15 +927,24 @@ static ssize_t scrub_store(struct device *dev,
 	rc = kstrtol(buf, 0, &val);
 	if (rc)
 		return rc;
-	if (val != 1)
-		return -EINVAL;
 
 	device_lock(dev);
 	nd_desc = dev_get_drvdata(dev);
 	if (nd_desc) {
 		struct acpi_nfit_desc *acpi_desc = to_acpi_desc(nd_desc);
 
-		rc = acpi_nfit_ars_rescan(acpi_desc);
+		switch (val) {
+		case MCE_SCRUB_ON:
+			rc = acpi_nfit_ars_rescan(acpi_desc);
+			acpi_desc->scrub_mode = MCE_SCRUB_ON;
+			break;
+		case MCE_SCRUB_OFF:
+			acpi_desc->scrub_mode = MCE_SCRUB_OFF;
+			break;
+		default:
+			rc = -EINVAL;
+			break;
+		}
 	}
 	device_unlock(dev);
 	if (rc)
