@@ -1190,6 +1190,7 @@ static void output_lat_thread(struct perf_sched *sched, struct work_atoms *work_
 	int i;
 	int ret;
 	u64 avg;
+	u64 max_lat_at_sec, max_lat_at_msec;
 
 	if (!work_list->nb_atoms)
 		return;
@@ -1212,11 +1213,18 @@ static void output_lat_thread(struct perf_sched *sched, struct work_atoms *work_
 
 	avg = work_list->total_lat / work_list->nb_atoms;
 
-	printf("|%11.3f ms |%9" PRIu64 " | avg:%9.3f ms | max:%9.3f ms | max at: %13.6f s\n",
+	/*
+	 * Avoid round up with printf to prevent event time discrepency
+	 * between sched script and latency.
+	 */
+	max_lat_at_sec = work_list->max_lat_at / NSECS_PER_SEC;
+	max_lat_at_msec = (work_list->max_lat_at -
+			   max_lat_at_sec * NSECS_PER_SEC) / MSECS_PER_SEC;
+	printf("+%11.3f ms |%9" PRIu64 " | avg:%9.3f ms | max:%9.3f ms | max at: %6lu.%06lu s\n",
 	      (double)work_list->total_runtime / 1e6,
 		 work_list->nb_atoms, (double)avg / 1e6,
 		 (double)work_list->max_lat / 1e6,
-		 (double)work_list->max_lat_at / 1e9);
+		 max_lat_at_sec, max_lat_at_msec);
 }
 
 static int pid_cmp(struct work_atoms *l, struct work_atoms *r)
