@@ -1460,7 +1460,7 @@ static void pending_complete(void *context, int success)
 		down_write(&s->lock);
 		__invalidate_snapshot(s, -EIO);
 		error = 1;
-		goto out;
+		goto remove_exception;
 	}
 
 	e = alloc_completed_exception(GFP_NOIO);
@@ -1468,7 +1468,7 @@ static void pending_complete(void *context, int success)
 		down_write(&s->lock);
 		__invalidate_snapshot(s, -ENOMEM);
 		error = 1;
-		goto out;
+		goto remove_exception;
 	}
 	*e = pe->e;
 
@@ -1476,7 +1476,7 @@ static void pending_complete(void *context, int success)
 	if (!s->valid) {
 		free_completed_exception(e);
 		error = 1;
-		goto out;
+		goto remove_exception;
 	}
 
 	/* Check for conflicting reads */
@@ -1487,8 +1487,7 @@ static void pending_complete(void *context, int success)
 	 * in-flight exception from the list.
 	 */
 	dm_insert_exception(&s->complete, e);
-
-out:
+remove_exception:
 	dm_remove_exception(&pe->e);
 	snapshot_bios = bio_list_get(&pe->snapshot_bios);
 	origin_bios = bio_list_get(&pe->origin_bios);
