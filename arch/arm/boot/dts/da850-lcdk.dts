@@ -50,6 +50,40 @@
 			system-clock-frequency = <24576000>;
 		};
 	};
+
+	panel {
+		compatible = "ti,tilcdc,panel";
+		pinctrl-names = "default";
+		pinctrl-0 = <&lcd_pins>;
+		status = "okay";
+
+		panel-info {
+			ac-bias           = <0>;
+			ac-bias-intrpt    = <0>;
+			dma-burst-sz      = <16>;
+			bpp               = <16>;
+			fdd               = <255>;
+			sync-edge         = <0>;
+			sync-ctrl         = <0>;
+			raster-order      = <0>;
+			fifo-th           = <5>;
+		};
+
+		display-timings {
+			native-mode = <&svga_timings>;
+			svga_timings: 800x600 {
+				clock-frequency = <37500000>;
+				hactive = <800>;
+				hback-porch = <140>;
+				hfront-porch = <40>;
+				hsync-len = <128>;
+				vactive = <600>;
+				vback-porch = <23>;
+				vfront-porch = <1>;
+				vsync-len = <4>;
+			};
+		};
+	};
 };
 
 &pmx_core {
@@ -82,6 +116,28 @@
 			0x20 0x11111111  0xffffffff
 			/* EMA_A[1], EMA_A[2] */
 			0x30 0x01100000  0x0ff00000
+		>;
+	};
+
+	lcd_pins: pinmux_lcd_pins {
+		pinctrl-single,bits = <
+			/*
+			 * LCD_D[2], LCD_D[3], LCD_D[4], LCD_D[5],
+			 * LCD_D[6], LCD_D[7]
+			 */
+			0x40 0x22222200 0xffffff00
+			/*
+			 * LCD_D[10], LCD_D[11], LCD_D[12], LCD_D[13],
+			 * LCD_D[14], LCD_D[15], LCD_D[0], LCD_D[1]
+			 */
+			0x44 0x22222222 0xffffffff
+			/* LCD_D[8], LCD_D[9] */
+			0x48 0x00000022 0x000000ff
+
+			/* LCD_PCLK */
+			0x48 0x02000000 0x0f000000
+			/* LCD_AC_ENB_CS, LCD_VSYNC, LCD_HSYNC */
+			0x4c 0x02000022 0x0f0000ff
 		>;
 	};
 };
@@ -218,4 +274,8 @@
 			};
 		};
 	};
+};
+
+&lcdc {
+	status = "okay";
 };
