@@ -6,6 +6,7 @@
 #ifndef __G_ZERO_H
 #define __G_ZERO_H
 
+#define GZERO_VERIFY_RX_DATA	1
 #define GZERO_BULK_BUFLEN	4096
 #define GZERO_QLEN		32
 #define GZERO_ISOC_INTERVAL	4
@@ -15,6 +16,7 @@
 
 struct usb_zero_options {
 	unsigned pattern;
+	unsigned verify_rx_data;
 	unsigned isoc_interval;
 	unsigned isoc_maxpacket;
 	unsigned isoc_mult;
@@ -28,6 +30,7 @@ struct usb_zero_options {
 struct f_ss_opts {
 	struct usb_function_instance func_inst;
 	unsigned pattern;
+	unsigned verify_rx_data;
 	unsigned isoc_interval;
 	unsigned isoc_maxpacket;
 	unsigned isoc_mult;
