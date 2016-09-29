@@ -399,6 +399,14 @@
 				<&edma0 0 1>;
 			dma-names = "tx", "rx";
 		};
+
+		lcdc: lcdc@213000 {
+			compatible = "ti,am33xx-tilcdc";
+			reg = <0x213000 0x1000>;
+			interrupt-parent = <&intc>;
+			interrupts = <52>;
+			status = "disabled";
+		};
 	};
 	aemif: aemif@68000000 {
 		compatible = "ti,da850-aemif";
