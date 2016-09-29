@@ -515,6 +515,8 @@ struct snd_soc_tplg_pcm {
 struct snd_soc_tplg_link_config {
 	__le32 size;            /* in bytes of this structure */
 	__le32 id;              /* unique ID - used to match */
+	char name[SNDRV_CTL_ELEM_ID_NAME_MAXLEN]; /* name - used to match */
+	char stream_name[SNDRV_CTL_ELEM_ID_NAME_MAXLEN]; /* stream name - used to match */
 	struct snd_soc_tplg_stream stream[SND_SOC_TPLG_STREAM_CONFIG_MAX]; /* supported configs playback and captrure */
 	__le32 num_streams;     /* number of streams */
 	struct snd_soc_tplg_hw_config hw_config[SND_SOC_TPLG_HW_CONFIG_MAX]; /* hw configs */
