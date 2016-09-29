@@ -598,7 +598,9 @@ between the address load and the data load:
 This enforces the occurrence of one of the two implications, and prevents the
 third possibility from arising.
 
-A data-dependency barrier must also order against dependent writes:
+However, writes are never speculated, so it is not necessary (but is
+good documentation practice) to use data-dependency barrier to order
+against dependent writes:
 
 	CPU 1		      CPU 2
 	===============	      ===============
@@ -607,11 +609,11 @@ A data-dependency barrier must also order against dependent writes:
 	<write barrier>
 	WRITE_ONCE(P, &B);
 			      Q = READ_ONCE(P);
-			      <data dependency barrier>
 			      *Q = 5;
 
-The data-dependency barrier must order the read into Q with the store
-into *Q.  This prohibits this outcome:
+The prohibition against speculating writes means that even without a
+data-dependency barrier, the system must order the read into Q with the
+store into *Q.  This prohibits this outcome:
 
 	(Q == &B) && (B == 4)
 
