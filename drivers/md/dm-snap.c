@@ -904,7 +904,7 @@ static void flush_bios(struct bio *bio);
 
 static int remove_single_exception_chunk(struct dm_snapshot *s)
 {
-	struct bio *b = NULL;
+	struct bio *b;
 	int r;
 	chunk_t old_chunk = s->first_merging_chunk + s->num_merging_chunks - 1;
 
