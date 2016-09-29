@@ -357,7 +357,7 @@ struct hfa384x_bytestr {
 } __packed;
 
 typedef struct hfa384x_bytestr32 {
-	u16 len;
+	__le16 len;
 	u8 data[32];
 } __packed hfa384x_bytestr32_t;
 
@@ -672,16 +672,16 @@ typedef struct hfa384x_ChInfoResult {
 
 /*--  Inquiry Frame, Diagnose: Host Scan Results & Subfields--*/
 typedef struct hfa384x_HScanResultSub {
-	u16 chid;
-	u16 anl;
-	u16 sl;
+	__le16 chid;
+	__le16 anl;
+	__le16 sl;
 	u8 bssid[WLAN_BSSID_LEN];
-	u16 bcnint;
-	u16 capinfo;
+	__le16 bcnint;
+	__le16 capinfo;
 	hfa384x_bytestr32_t ssid;
 	u8 supprates[10];	/* 802.11 info element */
 	u16 proberesp_rate;
-	u16 atim;
+	__le16 atim;
 } __packed hfa384x_HScanResultSub_t;
 
 typedef struct hfa384x_HScanResult {
