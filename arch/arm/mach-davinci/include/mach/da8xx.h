@@ -56,6 +56,8 @@ extern unsigned int da850_max_speed;
 #define DA8XX_SYSCFG0_VIRT(x)	(da8xx_syscfg0_base + (x))
 #define DA8XX_JTAG_ID_REG	0x18
 #define DA8XX_HOST1CFG_REG	0x44
+#define DA8XX_MSTPRI1_REG	0x114
+#define DA8XX_MSTPRI2_REG	0x118
 #define DA8XX_CHIPSIG_REG	0x174
 #define DA8XX_CFGCHIP0_REG	0x17c
 #define DA8XX_CFGCHIP1_REG	0x180
@@ -79,6 +81,8 @@ extern unsigned int da850_max_speed;
 #define DA8XX_AEMIF_CTL_BASE	0x68000000
 #define DA8XX_SHARED_RAM_BASE	0x80000000
 #define DA8XX_ARM_RAM_BASE	0xffff0000
+#define DA8XX_DDR_CTL_BASE	0xB0000000
+#define DA8XX_PBBPR_REG		0x00000020
 
 void da830_init(void);
 void da850_init(void);

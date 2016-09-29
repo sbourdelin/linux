@@ -44,9 +44,52 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
 
 #ifdef CONFIG_ARCH_DAVINCI_DA850
 
+/*
+ * Adjust the default memory settings to cope with the LCDC
+ *
+ * REVISIT: This issue occurs on other davinci boards as well. Find
+ * a proper system-wide fix.
+ */
+static void da850_lcdc_adjust_memory_bandwidth(void)
+{
+	void __iomem *cfg_mstpri1_base;
+	void __iomem *cfg_mstpri2_base;
+	void __iomem *emifb;
+	u32 val;
+
+	/*
+	 * Default master priorities in reg 0 are all lower by default than LCD
+	 * which is set below to 0. Hence don't need to change here.
+	 */
+
+	/* set EDMA30TC0 and TC1 to lower than LCDC (4 < 0) */
+	cfg_mstpri1_base = DA8XX_SYSCFG0_VIRT(DA8XX_MSTPRI1_REG);
+	val = __raw_readl(cfg_mstpri1_base);
+	val &= 0xFFFF00FF;
+	val |= 4 << 8;             /* 0-high, 7-low priority*/
+	val |= 4 << 12;            /* 0-high, 7-low priority*/
+	__raw_writel(val, cfg_mstpri1_base);
+
+	/*
+	 * Reconfigure the LCDC priority to the highest to ensure that
+	 * the throughput/latency requirements for the LCDC are met.
+	 */
+	cfg_mstpri2_base = DA8XX_SYSCFG0_VIRT(DA8XX_MSTPRI2_REG);
+
+	val = __raw_readl(cfg_mstpri2_base);
+	val &= 0x0fffffff;
+	__raw_writel(val, cfg_mstpri2_base);
+
+	/* set BPRIO */
+	emifb = ioremap(DA8XX_DDR_CTL_BASE, SZ_4K);
+	__raw_writel(0x20, emifb + DA8XX_PBBPR_REG);
+	iounmap(emifb);
+}
+
 static void __init da850_init_machine(void)
 {
 	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
+	da850_lcdc_adjust_memory_bandwidth();
 }
 
 static const char *const da850_boards_compat[] __initconst = {
