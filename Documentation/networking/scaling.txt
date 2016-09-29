@@ -400,6 +400,26 @@ transport layer is responsible for setting ooo_okay appropriately. TCP,
 for instance, sets the flag when all data for a connection has been
 acknowledged.
 
+XPS: Transmit Socketless Flow Steering
+======================================
+
+Not all flows have an associated socket in which the transmit queue and
+ooo information can be saved. For instance, packets being transmitted over
+OVS for VMs do not have a socket that is visible to the kernel. To allow
+XPS to be effectively used a flow hash table is employed to save queue and
+ooo information for such socketless flows.
+
+The idea is that transmit queues are saved for socketless flows in a
+flow table that is indexed by skbuff hash. The flow table entries have
+two values: the queue_index and the head cnt of packets from the TX
+queue. When a packet is being sent without an associated socket the
+hash table is consulted which returns the queue_index to use. The
+returned queue is compared to the queue that would be selected by XPS.
+If they are are different the XPS queue is selected only if the tail cnt
+in the TX queue advances beyond the recorded head cnt. This checks if
+sending the packet on the new queue could cause ooo packets for the
+flow.
+
 ==== XPS Configuration
 
 XPS is only available if the kconfig symbol CONFIG_XPS is enabled (on by
@@ -408,6 +428,12 @@ configured. To enable XPS, the bitmap of CPUs that may use a transmit
 queue is configured using the sysfs file entry:
 
 /sys/class/net/<dev>/queues/tx-<n>/xps_cpus
+
+Transmit socketless flow steering is enabled by setting the number of
+entries in the XPS flow table. This is configured in the sysfs file
+entry:
+
+/sys/class/net/<dev>/xps_dev_flow_table_cnt
 
 == Suggested Configuration
 
