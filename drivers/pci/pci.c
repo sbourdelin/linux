@@ -4957,6 +4957,9 @@ static resource_size_t pci_specified_resource_alignment(struct pci_dev *dev)
 	resource_size_t align = 0;
 	char *p;
 
+#ifdef PCIBIOS_DEFAULT_ALIGNMENT
+	align = PCIBIOS_DEFAULT_ALIGNMENT;
+#endif
 	spin_lock(&resource_alignment_lock);
 	p = resource_alignment_param;
 	if (pci_has_flag(PCI_PROBE_ONLY)) {
