@@ -991,7 +991,7 @@ static int pnv_pci_vf_resource_shift(struct pci_dev *dev, int offset)
 		dev_info(&dev->dev, "VF BAR%d: %pR shifted to %pR (%sabling %d VFs shifted by %d)\n",
 			 i, &res2, res, (offset > 0) ? "En" : "Dis",
 			 num_vfs, offset);
-		pci_update_resource(dev, i + PCI_IOV_RESOURCES);
+		pci_update_resource(dev, i + PCI_IOV_RESOURCES, true);
 	}
 	return 0;
 }

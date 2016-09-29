@@ -26,7 +26,7 @@
 #include "pci.h"
 
 
-void pci_update_resource(struct pci_dev *dev, int resno)
+void pci_update_resource(struct pci_dev *dev, int resno, bool mmio_force_on)
 {
 	struct pci_bus_region region;
 	bool disable;
@@ -81,7 +81,8 @@ void pci_update_resource(struct pci_dev *dev, int resno)
 	 * disable decoding so that a half-updated BAR won't conflict
 	 * with another device.
 	 */
-	disable = (res->flags & IORESOURCE_MEM_64) && !dev->mmio_always_on;
+	disable = (res->flags & IORESOURCE_MEM_64) &&
+		  !mmio_force_on && !dev->mmio_always_on;
 	if (disable) {
 		pci_read_config_word(dev, PCI_COMMAND, &cmd);
 		pci_write_config_word(dev, PCI_COMMAND,
@@ -310,7 +311,7 @@ int pci_assign_resource(struct pci_dev *dev, int resno)
 	res->flags &= ~IORESOURCE_STARTALIGN;
 	dev_info(&dev->dev, "BAR %d: assigned %pR\n", resno, res);
 	if (resno < PCI_BRIDGE_RESOURCES)
-		pci_update_resource(dev, resno);
+		pci_update_resource(dev, resno, false);
 
 	return 0;
 }
@@ -350,7 +351,7 @@ int pci_reassign_resource(struct pci_dev *dev, int resno, resource_size_t addsiz
 	dev_info(&dev->dev, "BAR %d: reassigned %pR (expanded by %#llx)\n",
 		 resno, res, (unsigned long long) addsize);
 	if (resno < PCI_BRIDGE_RESOURCES)
-		pci_update_resource(dev, resno);
+		pci_update_resource(dev, resno, false);
 
 	return 0;
 }

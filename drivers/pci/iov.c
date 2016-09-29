@@ -511,7 +511,7 @@ static void sriov_restore_state(struct pci_dev *dev)
 		return;
 
 	for (i = PCI_IOV_RESOURCES; i <= PCI_IOV_RESOURCE_END; i++)
-		pci_update_resource(dev, i);
+		pci_update_resource(dev, i, false);
 
 	pci_write_config_dword(dev, iov->pos + PCI_SRIOV_SYS_PGSIZE, iov->pgsz);
 	pci_iov_set_numvfs(dev, iov->num_VFs);
