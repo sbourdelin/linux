@@ -70,14 +70,25 @@
 		};
 
 		display-timings {
-			native-mode = <&svga_timings>;
-			svga_timings: 800x600 {
+			native-mode = <&svga_timing0>;
+			svga_timing0: 800x600 {
 				clock-frequency = <37500000>;
 				hactive = <800>;
 				hback-porch = <140>;
 				hfront-porch = <40>;
 				hsync-len = <128>;
 				vactive = <600>;
+				vback-porch = <23>;
+				vfront-porch = <1>;
+				vsync-len = <4>;
+			};
+			svga_timing1: 1024x768 {
+				clock-frequency = <72000000>;
+				hactive = <1024>;
+				hback-porch = <140>;
+				hfront-porch = <40>;
+				hsync-len = <128>;
+				vactive = <768>;
 				vback-porch = <23>;
 				vfront-porch = <1>;
 				vsync-len = <4>;
