@@ -494,27 +494,10 @@ static int acpi_irq_pci_sharing_penalty(int irq)
 
 static int acpi_irq_get_penalty(int irq)
 {
-	int penalty = 0;
-
-	/*
-	* Penalize IRQ used by ACPI SCI. If ACPI SCI pin attributes conflict
-	* with PCI IRQ attributes, mark ACPI SCI as ISA_ALWAYS so it won't be
-	* use for PCI IRQs.
-	*/
-	if (irq == acpi_gbl_FADT.sci_interrupt) {
-		u32 type = irq_get_trigger_type(irq) & IRQ_TYPE_SENSE_MASK;
-
-		if (type != IRQ_TYPE_LEVEL_LOW)
-			penalty += PIRQ_PENALTY_ISA_ALWAYS;
-		else
-			penalty += PIRQ_PENALTY_PCI_USING;
-	}
-
 	if (irq < ACPI_MAX_ISA_IRQS)
-		return penalty + acpi_isa_irq_penalty[irq];
+		return acpi_isa_irq_penalty[irq];
 
-	penalty += acpi_irq_pci_sharing_penalty(irq);
-	return penalty;
+	return acpi_irq_pci_sharing_penalty(irq);
 }
 
 int __init acpi_irq_penalty_init(void)
@@ -619,6 +602,10 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
 			    acpi_device_bid(link->device));
 		return -ENODEV;
 	} else {
+		if (link->irq.active < ACPI_MAX_ISA_IRQS)
+			acpi_isa_irq_penalty[link->irq.active] +=
+				PIRQ_PENALTY_PCI_USING;
+
 		printk(KERN_WARNING PREFIX "%s [%s] enabled at IRQ %d\n",
 		       acpi_device_name(link->device),
 		       acpi_device_bid(link->device), link->irq.active);
@@ -879,6 +866,17 @@ bool acpi_isa_irq_available(int irq)
 {
 	return irq >= 0 && (irq >= ARRAY_SIZE(acpi_isa_irq_penalty) ||
 		    acpi_irq_get_penalty(irq) < PIRQ_PENALTY_ISA_ALWAYS);
+}
+
+void acpi_penalize_sci_irq(int irq, int trigger, int polarity)
+{
+	if (irq >= 0 && irq < ARRAY_SIZE(acpi_isa_irq_penalty)) {
+		if (trigger != ACPI_MADT_TRIGGER_LEVEL ||
+		    polarity != ACPI_MADT_POLARITY_ACTIVE_LOW)
+			acpi_isa_irq_penalty[irq] += PIRQ_PENALTY_ISA_ALWAYS;
+		else
+			acpi_isa_irq_penalty[irq] += PIRQ_PENALTY_PCI_USING;
+	}
 }
 
 /*
