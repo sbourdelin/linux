@@ -805,6 +805,46 @@ static void acpi_gpiochip_free_regions(struct acpi_gpio_chip *achip)
 	}
 }
 
+static void acpi_gpiochip_set_names(struct acpi_gpio_chip *achip)
+{
+	struct gpio_chip *chip = achip->chip;
+	struct gpio_device *gdev = chip->gpiodev;
+	const char **names;
+	int ret, i;
+
+	ret = device_property_read_string_array(chip->parent, "gpio-line-names",
+						NULL, 0);
+	if (ret < 0)
+		return;
+
+	if (ret != gdev->ngpio) {
+		dev_warn(chip->parent,
+			 "names %d do not match number of GPIOs %d\n", ret,
+			 gdev->ngpio);
+		return;
+	}
+
+	names = kcalloc(gdev->ngpio, sizeof(*names), GFP_KERNEL);
+	if (!names)
+		return;
+
+	ret = device_property_read_string_array(chip->parent, "gpio-line-names",
+						names, gdev->ngpio);
+	if (ret < 0) {
+		dev_warn(chip->parent, "Failed to read GPIO line names\n");
+		return;
+	}
+
+	/*
+	 * It is fine to assign the name, it will be allocated as long as
+	 * the ACPI device exists.
+	 */
+	for (i = 0; i < gdev->ngpio; i++)
+		gdev->descs[i].name = names[i];
+
+	kfree(names);
+}
+
 void acpi_gpiochip_add(struct gpio_chip *chip)
 {
 	struct acpi_gpio_chip *acpi_gpio;
@@ -834,6 +874,9 @@ void acpi_gpiochip_add(struct gpio_chip *chip)
 		kfree(acpi_gpio);
 		return;
 	}
+
+	if (!chip->names)
+		acpi_gpiochip_set_names(acpi_gpio);
 
 	acpi_gpiochip_request_regions(acpi_gpio);
 	acpi_walk_dep_device_list(handle);
