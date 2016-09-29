@@ -285,23 +285,30 @@ static int rmi_i2c_probe(struct i2c_client *client,
 	retval = rmi_set_page(rmi_i2c, 0);
 	if (retval) {
 		dev_err(&client->dev, "Failed to set page select to 0.\n");
-		return retval;
+		goto error_disable;
 	}
 
 	retval = rmi_register_transport_device(&rmi_i2c->xport);
 	if (retval) {
 		dev_err(&client->dev, "Failed to register transport driver at 0x%.2X.\n",
 			client->addr);
-		return retval;
+		goto error_disable;
 	}
 
 	retval = rmi_i2c_init_irq(client);
 	if (retval < 0)
-		return retval;
+		goto error_unregister;
 
 	dev_info(&client->dev, "registered rmi i2c driver at %#04x.\n",
 			client->addr);
 	return 0;
+
+error_unregister:
+	rmi_unregister_transport_device(&rmi_i2c->xport);
+error_disable:
+	regulator_bulk_disable(ARRAY_SIZE(rmi_i2c->supplies),
+			       rmi_i2c->supplies);
+	return retval;
 }
 
 static int rmi_i2c_remove(struct i2c_client *client)
