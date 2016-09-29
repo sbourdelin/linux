@@ -1102,7 +1102,7 @@ static int snapshot_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 {
 	struct dm_snapshot *s;
 	int i;
-	int r = -EINVAL;
+	int r;
 	char *origin_path, *cow_path;
 	dev_t origin_dev, cow_dev;
 	unsigned args_used, num_flush_bios = 1;
