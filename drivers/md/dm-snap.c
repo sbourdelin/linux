@@ -1675,7 +1675,7 @@ static int snapshot_map(struct dm_target *ti, struct bio *bio)
 	struct dm_snapshot *s = ti->private;
 	int r = DM_MAPIO_REMAPPED;
 	chunk_t chunk;
-	struct dm_snap_pending_exception *pe = NULL;
+	struct dm_snap_pending_exception *pe;
 
 	init_tracked_chunk(bio);
 
