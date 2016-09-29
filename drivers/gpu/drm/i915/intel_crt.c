@@ -459,8 +459,8 @@ static bool intel_crt_detect_hotplug(struct drm_connector *connector)
 	return ret;
 }
 
-static struct edid *intel_crt_get_edid(struct drm_connector *connector,
-				struct i2c_adapter *i2c)
+static struct edid *__intel_crt_get_edid(struct drm_connector *connector,
+					 struct i2c_adapter *i2c)
 {
 	struct edid *edid;
 
@@ -473,59 +473,50 @@ static struct edid *intel_crt_get_edid(struct drm_connector *connector,
 		intel_gmbus_force_bit(i2c, false);
 	}
 
+	if (edid && edid->input & DRM_EDID_INPUT_DIGITAL) {
+		DRM_DEBUG_KMS("EDID reports a digital output, ignoring for this VGA connector\n");
+		kfree(edid);
+		edid = NULL;
+	}
+
 	return edid;
 }
 
-/* local version of intel_ddc_get_modes() to use intel_crt_get_edid() */
-static int intel_crt_ddc_get_modes(struct drm_connector *connector,
-				struct i2c_adapter *adapter)
+static struct edid *intel_crt_get_edid(struct drm_connector *connector)
 {
-	struct edid *edid;
-	int ret;
-
-	edid = intel_crt_get_edid(connector, adapter);
-	if (!edid)
-		return 0;
-
-	ret = intel_connector_update_modes(connector, edid);
-	kfree(edid);
-
-	return ret;
-}
-
-static bool intel_crt_detect_ddc(struct drm_connector *connector)
-{
-	struct intel_crt *crt = intel_attached_crt(connector);
-	struct drm_i915_private *dev_priv = to_i915(crt->base.base.dev);
-	struct edid *edid;
+#define HAS_DVI_I(p) 1 /* XXX anything with HDMI, i.e. g33+ */
+	struct drm_i915_private *dev_priv = to_i915(connector->dev);
 	struct i2c_adapter *i2c;
-
-	BUG_ON(crt->base.type != INTEL_OUTPUT_ANALOG);
+	struct edid *edid;
 
 	i2c = intel_gmbus_get_adapter(dev_priv, dev_priv->vbt.crt_ddc_pin);
-	edid = intel_crt_get_edid(connector, i2c);
-
-	if (edid) {
-		bool is_digital = edid->input & DRM_EDID_INPUT_DIGITAL;
-
+	edid = __intel_crt_get_edid(connector, i2c);
+	if (!edid && HAS_DVI_I(dev_priv)) {
 		/*
 		 * This may be a DVI-I connector with a shared DDC
 		 * link between analog and digital outputs, so we
 		 * have to check the EDID input spec of the attached device.
 		 */
-		if (!is_digital) {
-			DRM_DEBUG_KMS("CRT detected via DDC:0x50 [EDID]\n");
-			return true;
-		}
-
-		DRM_DEBUG_KMS("CRT not detected via DDC:0x50 [EDID reports a digital panel]\n");
-	} else {
-		DRM_DEBUG_KMS("CRT not detected via DDC:0x50 [no valid EDID found]\n");
+		i2c = intel_gmbus_get_adapter(dev_priv, GMBUS_PIN_DPB);
+		edid = __intel_crt_get_edid(connector, i2c);
 	}
 
-	kfree(edid);
+	return edid;
+}
 
-	return false;
+static bool intel_crt_detect_ddc(struct drm_connector *connector)
+{
+	struct edid *edid;
+
+	kfree(to_intel_connector(connector)->detect_edid);
+	to_intel_connector(connector)->detect_edid = NULL;
+
+	edid = intel_crt_get_edid(connector);
+	if (!edid)
+		return false;
+
+	to_intel_connector(connector)->detect_edid = edid;
+	return true;
 }
 
 static enum drm_connector_status
@@ -727,30 +718,13 @@ static void intel_crt_destroy(struct drm_connector *connector)
 
 static int intel_crt_get_modes(struct drm_connector *connector)
 {
-	struct drm_device *dev = connector->dev;
-	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct intel_crt *crt = intel_attached_crt(connector);
-	struct intel_encoder *intel_encoder = &crt->base;
-	enum intel_display_power_domain power_domain;
-	int ret;
-	struct i2c_adapter *i2c;
+	struct edid *edid;
 
-	power_domain = intel_display_port_power_domain(intel_encoder);
-	intel_display_power_get(dev_priv, power_domain);
+	edid = to_intel_connector(connector)->detect_edid;
+	if (!edid)
+		return 0;
 
-	i2c = intel_gmbus_get_adapter(dev_priv, dev_priv->vbt.crt_ddc_pin);
-	ret = intel_crt_ddc_get_modes(connector, i2c);
-	if (ret || !IS_G4X(dev))
-		goto out;
-
-	/* Try to probe digital port for output in DVI-I -> VGA mode. */
-	i2c = intel_gmbus_get_adapter(dev_priv, GMBUS_PIN_DPB);
-	ret = intel_crt_ddc_get_modes(connector, i2c);
-
-out:
-	intel_display_power_put(dev_priv, power_domain);
-
-	return ret;
+	return intel_connector_update_modes(connector, edid);
 }
 
 static int intel_crt_set_property(struct drm_connector *connector,
