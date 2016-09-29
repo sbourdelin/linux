@@ -2058,19 +2058,18 @@ static int make_indexed_dir(handle_t *handle, struct ext4_filename *fname,
 		retval = PTR_ERR(de);
 		goto out_frames;
 	}
-	dx_release(frames);
 
 	retval = add_dirent_to_buf(handle, fname, dir, inode, de, bh);
-	brelse(bh);
-	return retval;
 out_frames:
 	/*
 	 * Even if the block split failed, we have to properly write
 	 * out all the changes we did so far. Otherwise we can end up
 	 * with corrupted filesystem.
 	 */
-	ext4_mark_inode_dirty(handle, dir);
+	if (retval)
+		ext4_mark_inode_dirty(handle, dir);
 	dx_release(frames);
+	brelse(bh);
 	return retval;
 }
 
