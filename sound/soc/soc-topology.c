@@ -1708,19 +1708,18 @@ static int soc_tplg_pcm_elems_load(struct soc_tplg *tplg,
 	}
 
 	/* create the FE DAIs and DAI links */
-	pcm = (struct snd_soc_tplg_pcm *)tplg->pos;
 	for (i = 0; i < count; i++) {
+		pcm = (struct snd_soc_tplg_pcm *)tplg->pos;
 		if (pcm->size != sizeof(*pcm)) {
 			dev_err(tplg->dev, "ASoC: invalid pcm size\n");
 			return -EINVAL;
 		}
 
 		soc_tplg_pcm_create(tplg, pcm);
-		pcm++;
+		tplg->pos += (sizeof(*pcm) + pcm->priv.size);
 	}
 
 	dev_dbg(tplg->dev, "ASoC: adding %d PCM DAIs\n", count);
-	tplg->pos += sizeof(struct snd_soc_tplg_pcm) * count;
 
 	return 0;
 }

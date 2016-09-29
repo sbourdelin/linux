@@ -446,6 +446,7 @@ struct snd_soc_tplg_pcm {
 	struct snd_soc_tplg_stream_caps caps[2]; /* playback and capture for DAI */
 	__le32 flag_mask;       /* bitmask of flags to configure */
 	__le32 flags;           /* SND_SOC_TPLG_LNK_FLGBIT_* flag value */
+	struct snd_soc_tplg_private priv;
 } __attribute__((packed));
 
 
