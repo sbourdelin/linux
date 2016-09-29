@@ -1920,10 +1920,8 @@ static inline void sock_poll_wait(struct file *filp,
 
 static inline void skb_set_hash_from_sk(struct sk_buff *skb, struct sock *sk)
 {
-	if (sk->sk_txhash) {
-		skb->l4_hash = 1;
-		skb->hash = sk->sk_txhash;
-	}
+	if (sk->sk_txhash)
+		__skb_set_sw_hash(skb, sk->sk_txhash, true);
 }
 
 void skb_set_owner_w(struct sk_buff *skb, struct sock *sk);
