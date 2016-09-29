@@ -1147,6 +1147,19 @@ static ssize_t bql_show_inflight(struct netdev_queue *queue,
 static struct netdev_queue_attribute bql_inflight_attribute =
 	__ATTR(inflight, S_IRUGO, bql_show_inflight, NULL);
 
+static ssize_t bql_show_inflight_pkts(struct netdev_queue *queue,
+				      struct netdev_queue_attribute *attr,
+				      char *buf)
+{
+	struct dql *dql = &queue->dql;
+
+	return sprintf(buf, "%u\n",
+		       dql->num_enqueue_ops - dql->num_completed_ops);
+}
+
+static struct netdev_queue_attribute bql_inflight_pkts_attribute =
+	__ATTR(inflight_pkts, S_IRUGO, bql_show_inflight_pkts, NULL);
+
 #define BQL_ATTR(NAME, FIELD)						\
 static ssize_t bql_show_ ## NAME(struct netdev_queue *queue,		\
 				 struct netdev_queue_attribute *attr,	\
@@ -1176,6 +1189,7 @@ static struct attribute *dql_attrs[] = {
 	&bql_limit_min_attribute.attr,
 	&bql_hold_time_attribute.attr,
 	&bql_inflight_attribute.attr,
+	&bql_inflight_pkts_attribute.attr,
 	NULL
 };
 

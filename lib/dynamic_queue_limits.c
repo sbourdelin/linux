@@ -14,7 +14,7 @@
 #define AFTER_EQ(A, B) ((int)((A) - (B)) >= 0)
 
 /* Records completed count and recalculates the queue limit */
-void dql_completed(struct dql *dql, unsigned int count)
+void dql_completed(struct dql *dql, unsigned int count, unsigned int ops)
 {
 	unsigned int inprogress, prev_inprogress, limit;
 	unsigned int ovlimit, completed, num_queued;
@@ -108,6 +108,7 @@ void dql_completed(struct dql *dql, unsigned int count)
 	dql->prev_ovlimit = ovlimit;
 	dql->prev_last_obj_cnt = dql->last_obj_cnt;
 	dql->num_completed = completed;
+	dql->num_completed_ops += ops;
 	dql->prev_num_queued = num_queued;
 }
 EXPORT_SYMBOL(dql_completed);

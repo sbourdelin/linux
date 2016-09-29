@@ -43,6 +43,8 @@ struct dql {
 	unsigned int	adj_limit;		/* limit + num_completed */
 	unsigned int	last_obj_cnt;		/* Count at last queuing */
 
+	unsigned int	num_enqueue_ops;	/* Number of queue operations */
+
 	/* Fields accessed only by completion path (dql_completed) */
 
 	unsigned int	limit ____cacheline_aligned_in_smp; /* Current limit */
@@ -54,6 +56,8 @@ struct dql {
 
 	unsigned int	lowest_slack;		/* Lowest slack found */
 	unsigned long	slack_start_time;	/* Time slacks seen */
+
+	unsigned int	num_completed_ops;	/* Number of complete ops */
 
 	/* Configuration */
 	unsigned int	max_limit;		/* Max limit */
@@ -83,6 +87,7 @@ static inline void dql_queued(struct dql *dql, unsigned int count)
 	barrier();
 
 	dql->num_queued += count;
+	dql->num_enqueue_ops++;
 }
 
 /* Returns how many objects can be queued, < 0 indicates over limit. */
@@ -92,7 +97,7 @@ static inline int dql_avail(const struct dql *dql)
 }
 
 /* Record number of completed objects and recalculate the limit. */
-void dql_completed(struct dql *dql, unsigned int count);
+void dql_completed(struct dql *dql, unsigned int count, unsigned int ops);
 
 /* Reset dql state */
 void dql_reset(struct dql *dql);

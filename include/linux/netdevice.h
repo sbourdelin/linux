@@ -3015,7 +3015,7 @@ static inline void netdev_tx_completed_queue(struct netdev_queue *dev_queue,
 	if (unlikely(!bytes))
 		return;
 
-	dql_completed(&dev_queue->dql, bytes);
+	dql_completed(&dev_queue->dql, bytes, pkts);
 
 	/*
 	 * Without the memory barrier there is a small possiblity that
