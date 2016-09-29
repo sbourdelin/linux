@@ -45,6 +45,7 @@ struct f_sourcesink {
 	int			cur_alt;
 
 	unsigned pattern;
+	unsigned verify_rx_data;
 	unsigned isoc_interval;
 	unsigned isoc_maxpacket;
 	unsigned isoc_mult;
@@ -537,7 +538,7 @@ static void source_sink_complete(struct usb_ep *ep, struct usb_request *req)
 	switch (status) {
 
 	case 0:				/* normal completion? */
-		if (ep == ss->out_ep) {
+		if (ss->verify_rx_data && (ep == ss->out_ep)) {
 			check_read_data(ss, req);
 			if (ss->pattern != 2)
 				memset(req->buf, 0x55, req->length);
@@ -615,7 +616,7 @@ static int source_sink_start_ep(struct f_sourcesink *ss, bool is_in,
 		req->complete = source_sink_complete;
 		if (is_in)
 			reinit_write_data(ep, req);
-		else if (ss->pattern != 2)
+		else if (ss->verify_rx_data && (ss->pattern != 2))
 			memset(req->buf, 0x55, req->length);
 
 		status = usb_ep_queue(ep, req, GFP_ATOMIC);
@@ -851,6 +852,7 @@ static struct usb_function *source_sink_alloc_func(
 	mutex_unlock(&ss_opts->lock);
 
 	ss->pattern = ss_opts->pattern;
+	ss->verify_rx_data = ss_opts->verify_rx_data;
 	ss->isoc_interval = ss_opts->isoc_interval;
 	ss->isoc_maxpacket = ss_opts->isoc_maxpacket;
 	ss->isoc_mult = ss_opts->isoc_mult;
