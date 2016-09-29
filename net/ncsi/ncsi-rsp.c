@@ -111,7 +111,6 @@ static int ncsi_rsp_handler_dp(struct ncsi_request *nr)
 	struct ncsi_dev_priv *ndp = nr->ndp;
 	struct ncsi_package *np;
 	struct ncsi_channel *nc;
-	unsigned long flags;
 
 	/* Find the package */
 	rsp = (struct ncsi_rsp_pkt *)skb_network_header(nr->rsp);
@@ -121,11 +120,8 @@ static int ncsi_rsp_handler_dp(struct ncsi_request *nr)
 		return -ENODEV;
 
 	/* Change state of all channels attached to the package */
-	NCSI_FOR_EACH_CHANNEL(np, nc) {
-		spin_lock_irqsave(&nc->lock, flags);
-		nc->state = NCSI_CHANNEL_INACTIVE;
-		spin_unlock_irqrestore(&nc->lock, flags);
-	}
+	NCSI_FOR_EACH_CHANNEL(np, nc)
+		WRITE_ONCE(nc->state, NCSI_CHANNEL_INACTIVE);
 
 	return 0;
 }
@@ -184,7 +180,6 @@ static int ncsi_rsp_handler_rc(struct ncsi_request *nr)
 	struct ncsi_rsp_pkt *rsp;
 	struct ncsi_dev_priv *ndp = nr->ndp;
 	struct ncsi_channel *nc;
-	unsigned long flags;
 
 	/* Find the package and channel */
 	rsp = (struct ncsi_rsp_pkt *)skb_network_header(nr->rsp);
@@ -194,9 +189,7 @@ static int ncsi_rsp_handler_rc(struct ncsi_request *nr)
 		return -ENODEV;
 
 	/* Update state for the specified channel */
-	spin_lock_irqsave(&nc->lock, flags);
-	nc->state = NCSI_CHANNEL_INACTIVE;
-	spin_unlock_irqrestore(&nc->lock, flags);
+	WRITE_ONCE(nc->state, NCSI_CHANNEL_INACTIVE);
 
 	return 0;
 }

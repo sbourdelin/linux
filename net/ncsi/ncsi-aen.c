@@ -53,6 +53,7 @@ static int ncsi_aen_handler_lsc(struct ncsi_dev_priv *ndp,
 	struct ncsi_aen_lsc_pkt *lsc;
 	struct ncsi_channel *nc;
 	struct ncsi_channel_mode *ncm;
+	int old_state;
 	unsigned long old_data;
 	unsigned long flags;
 
@@ -70,12 +71,14 @@ static int ncsi_aen_handler_lsc(struct ncsi_dev_priv *ndp,
 	if (!((old_data ^ ncm->data[2]) & 0x1) ||
 	    !list_empty(&nc->link))
 		return 0;
-	if (!(nc->state == NCSI_CHANNEL_INACTIVE && (ncm->data[2] & 0x1)) &&
-	    !(nc->state == NCSI_CHANNEL_ACTIVE && !(ncm->data[2] & 0x1)))
+
+	old_state = READ_ONCE(nc->state);
+	if (!(old_state == NCSI_CHANNEL_INACTIVE && (ncm->data[2] & 0x1)) &&
+	    !(old_state == NCSI_CHANNEL_ACTIVE && !(ncm->data[2] & 0x1)))
 		return 0;
 
 	if (!(ndp->flags & NCSI_DEV_HWA) &&
-	    nc->state == NCSI_CHANNEL_ACTIVE)
+	    old_state == NCSI_CHANNEL_ACTIVE)
 		ndp->flags |= NCSI_DEV_RESHUFFLE;
 
 	ncsi_stop_channel_monitor(nc);
@@ -90,6 +93,7 @@ static int ncsi_aen_handler_cr(struct ncsi_dev_priv *ndp,
 			       struct ncsi_aen_pkt_hdr *h)
 {
 	struct ncsi_channel *nc;
+	int old_state;
 	unsigned long flags;
 
 	/* Find the NCSI channel */
@@ -97,13 +101,14 @@ static int ncsi_aen_handler_cr(struct ncsi_dev_priv *ndp,
 	if (!nc)
 		return -ENODEV;
 
+	old_state = READ_ONCE(nc->state);
 	if (!list_empty(&nc->link) ||
-	    nc->state != NCSI_CHANNEL_ACTIVE)
+	    old_state != NCSI_CHANNEL_ACTIVE)
 		return 0;
 
 	ncsi_stop_channel_monitor(nc);
+	WRITE_ONCE(nc->state, NCSI_CHANNEL_INACTIVE);
 	spin_lock_irqsave(&ndp->lock, flags);
-	xchg(&nc->state, NCSI_CHANNEL_INACTIVE);
 	list_add_tail_rcu(&nc->link, &ndp->channel_queue);
 	spin_unlock_irqrestore(&ndp->lock, flags);
 
@@ -116,6 +121,7 @@ static int ncsi_aen_handler_hncdsc(struct ncsi_dev_priv *ndp,
 	struct ncsi_channel *nc;
 	struct ncsi_channel_mode *ncm;
 	struct ncsi_aen_hncdsc_pkt *hncdsc;
+	int old_state;
 	unsigned long flags;
 
 	/* Find the NCSI channel */
@@ -127,8 +133,9 @@ static int ncsi_aen_handler_hncdsc(struct ncsi_dev_priv *ndp,
 	ncm = &nc->modes[NCSI_MODE_LINK];
 	hncdsc = (struct ncsi_aen_hncdsc_pkt *)h;
 	ncm->data[3] = ntohl(hncdsc->status);
+	old_state = READ_ONCE(nc->state);
 	if (!list_empty(&nc->link) ||
-	    nc->state != NCSI_CHANNEL_ACTIVE ||
+	    old_state != NCSI_CHANNEL_ACTIVE ||
 	    (ncm->data[3] & 0x1))
 		return 0;
 

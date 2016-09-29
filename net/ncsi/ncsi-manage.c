@@ -143,7 +143,7 @@ static void ncsi_report_link(struct ncsi_dev_priv *ndp, bool force_down)
 	NCSI_FOR_EACH_PACKAGE(ndp, np) {
 		NCSI_FOR_EACH_CHANNEL(np, nc) {
 			if (!list_empty(&nc->link) ||
-			    nc->state != NCSI_CHANNEL_ACTIVE)
+			    READ_ONCE(nc->state) != NCSI_CHANNEL_ACTIVE)
 				continue;
 
 			if (nc->modes[NCSI_MODE_LINK].data[2] & 0x1) {
@@ -166,7 +166,7 @@ static void ncsi_channel_monitor(unsigned long data)
 	bool enabled;
 	unsigned int timeout;
 	unsigned long flags;
-	int ret;
+	int old_state, ret;
 
 	spin_lock_irqsave(&nc->lock, flags);
 	timeout = nc->timeout;
@@ -175,8 +175,10 @@ static void ncsi_channel_monitor(unsigned long data)
 
 	if (!enabled || !list_empty(&nc->link))
 		return;
-	if (nc->state != NCSI_CHANNEL_INACTIVE &&
-	    nc->state != NCSI_CHANNEL_ACTIVE)
+
+	old_state = READ_ONCE(nc->state);
+	if (old_state != NCSI_CHANNEL_INACTIVE &&
+	    old_state != NCSI_CHANNEL_ACTIVE)
 		return;
 
 	if (!(timeout % 2)) {
@@ -195,11 +197,11 @@ static void ncsi_channel_monitor(unsigned long data)
 
 	if (timeout + 1 >= 3) {
 		if (!(ndp->flags & NCSI_DEV_HWA) &&
-		    nc->state == NCSI_CHANNEL_ACTIVE)
+		    old_state == NCSI_CHANNEL_ACTIVE)
 			ncsi_report_link(ndp, true);
 
+		WRITE_ONCE(nc->state, NCSI_CHANNEL_INACTIVE);
 		spin_lock_irqsave(&ndp->lock, flags);
-		xchg(&nc->state, NCSI_CHANNEL_INACTIVE);
 		list_add_tail_rcu(&nc->link, &ndp->channel_queue);
 		spin_unlock_irqrestore(&ndp->lock, flags);
 		ncsi_process_next_channel(ndp);
@@ -266,7 +268,7 @@ struct ncsi_channel *ncsi_add_channel(struct ncsi_package *np, unsigned char id)
 
 	nc->id = id;
 	nc->package = np;
-	nc->state = NCSI_CHANNEL_INACTIVE;
+	WRITE_ONCE(nc->state, NCSI_CHANNEL_INACTIVE);
 	nc->enabled = false;
 	setup_timer(&nc->timer, ncsi_channel_monitor, (unsigned long)nc);
 	spin_lock_init(&nc->lock);
@@ -309,7 +311,7 @@ static void ncsi_remove_channel(struct ncsi_channel *nc)
 		kfree(ncf);
 	}
 
-	nc->state = NCSI_CHANNEL_INACTIVE;
+	WRITE_ONCE(nc->state, NCSI_CHANNEL_INACTIVE);
 	spin_unlock_irqrestore(&nc->lock, flags);
 	ncsi_stop_channel_monitor(nc);
 
@@ -556,7 +558,7 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 
 		break;
 	case ncsi_dev_state_suspend_done:
-		xchg(&nc->state, NCSI_CHANNEL_INACTIVE);
+		WRITE_ONCE(nc->state, NCSI_CHANNEL_INACTIVE);
 		ncsi_process_next_channel(ndp);
 
 		break;
@@ -676,9 +678,9 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 		break;
 	case ncsi_dev_state_config_done:
 		if (nc->modes[NCSI_MODE_LINK].data[2] & 0x1)
-			xchg(&nc->state, NCSI_CHANNEL_ACTIVE);
+			WRITE_ONCE(nc->state, NCSI_CHANNEL_ACTIVE);
 		else
-			xchg(&nc->state, NCSI_CHANNEL_INACTIVE);
+			WRITE_ONCE(nc->state, NCSI_CHANNEL_INACTIVE);
 
 		ncsi_start_channel_monitor(nc);
 		ncsi_process_next_channel(ndp);
@@ -708,7 +710,7 @@ static int ncsi_choose_active_channel(struct ncsi_dev_priv *ndp)
 	NCSI_FOR_EACH_PACKAGE(ndp, np) {
 		NCSI_FOR_EACH_CHANNEL(np, nc) {
 			if (!list_empty(&nc->link) ||
-			    nc->state != NCSI_CHANNEL_INACTIVE)
+			    READ_ONCE(nc->state) != NCSI_CHANNEL_INACTIVE)
 				continue;
 
 			if (!found)
@@ -770,7 +772,8 @@ static int ncsi_enable_hwa(struct ncsi_dev_priv *ndp)
 	spin_lock_irqsave(&ndp->lock, flags);
 	NCSI_FOR_EACH_PACKAGE(ndp, np) {
 		NCSI_FOR_EACH_CHANNEL(np, nc) {
-			WARN_ON_ONCE(nc->state != NCSI_CHANNEL_INACTIVE ||
+			WARN_ON_ONCE(READ_ONCE(nc->state) !=
+				     NCSI_CHANNEL_INACTIVE ||
 				     !list_empty(&nc->link));
 			ncsi_stop_channel_monitor(nc);
 			list_add_tail_rcu(&nc->link, &ndp->channel_queue);
@@ -987,7 +990,8 @@ int ncsi_process_next_channel(struct ncsi_dev_priv *ndp)
 		goto out;
 	}
 
-	old_state = xchg(&nc->state, NCSI_CHANNEL_INVISIBLE);
+	old_state = READ_ONCE(nc->state);
+	WRITE_ONCE(nc->state, NCSI_CHANNEL_INVISIBLE);
 	list_del_init(&nc->link);
 
 	spin_unlock_irqrestore(&ndp->lock, flags);
@@ -1006,7 +1010,7 @@ int ncsi_process_next_channel(struct ncsi_dev_priv *ndp)
 		break;
 	default:
 		netdev_err(ndp->ndev.dev, "Invalid state 0x%x on %d:%d\n",
-			   nc->state, nc->package->id, nc->id);
+			   READ_ONCE(nc->state), nc->package->id, nc->id);
 		ncsi_report_link(ndp, false);
 		return -EINVAL;
 	}
@@ -1166,7 +1170,8 @@ int ncsi_start_dev(struct ncsi_dev *nd)
 	/* Reset channel's state and start over */
 	NCSI_FOR_EACH_PACKAGE(ndp, np) {
 		NCSI_FOR_EACH_CHANNEL(np, nc) {
-			old_state = xchg(&nc->state, NCSI_CHANNEL_INACTIVE);
+			old_state = READ_ONCE(nc->state);
+			WRITE_ONCE(nc->state, NCSI_CHANNEL_INACTIVE);
 			WARN_ON_ONCE(!list_empty(&nc->link) ||
 				     old_state == NCSI_CHANNEL_INVISIBLE);
 		}
