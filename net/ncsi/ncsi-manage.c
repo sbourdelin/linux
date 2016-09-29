@@ -1161,9 +1161,7 @@ EXPORT_SYMBOL_GPL(ncsi_register_dev);
 int ncsi_start_dev(struct ncsi_dev *nd)
 {
 	struct ncsi_dev_priv *ndp = TO_NCSI_DEV_PRIV(nd);
-	struct ncsi_package *np;
-	struct ncsi_channel *nc;
-	int old_state, ret;
+	int ret;
 
 	if (nd->state != ncsi_dev_state_registered &&
 	    nd->state != ncsi_dev_state_functional)
@@ -1175,16 +1173,6 @@ int ncsi_start_dev(struct ncsi_dev *nd)
 		return 0;
 	}
 
-	/* Reset channel's state and start over */
-	NCSI_FOR_EACH_PACKAGE(ndp, np) {
-		NCSI_FOR_EACH_CHANNEL(np, nc) {
-			old_state = READ_ONCE(nc->state);
-			WRITE_ONCE(nc->state, NCSI_CHANNEL_INACTIVE);
-			WARN_ON_ONCE(!list_empty(&nc->link) ||
-				     old_state == NCSI_CHANNEL_INVISIBLE);
-		}
-	}
-
 	if (ndp->flags & NCSI_DEV_HWA)
 		ret = ncsi_enable_hwa(ndp);
 	else
@@ -1193,6 +1181,29 @@ int ncsi_start_dev(struct ncsi_dev *nd)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(ncsi_start_dev);
+
+void ncsi_stop_dev(struct ncsi_dev *nd)
+{
+	struct ncsi_dev_priv *ndp = TO_NCSI_DEV_PRIV(nd);
+	struct ncsi_package *np;
+	struct ncsi_channel *nc;
+	int old_state;
+
+	/* Stop the channel monitor and reset channel's state */
+	NCSI_FOR_EACH_PACKAGE(ndp, np) {
+		NCSI_FOR_EACH_CHANNEL(np, nc) {
+			ncsi_stop_channel_monitor(nc);
+
+			old_state = READ_ONCE(nc->state);
+			WRITE_ONCE(nc->state, NCSI_CHANNEL_INACTIVE);
+			WARN_ON_ONCE(!list_empty(&nc->link) ||
+				     old_state == NCSI_CHANNEL_INVISIBLE);
+		}
+	}
+
+	ncsi_report_link(ndp, true);
+}
+EXPORT_SYMBOL_GPL(ncsi_stop_dev);
 
 void ncsi_unregister_dev(struct ncsi_dev *nd)
 {
