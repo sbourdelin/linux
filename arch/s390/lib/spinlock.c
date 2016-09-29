@@ -37,7 +37,7 @@ static inline void _raw_compare_and_delay(unsigned int *lock, unsigned int old)
 	asm(".insn rsy,0xeb0000000022,%0,0,%1" : : "d" (old), "Q" (*lock));
 }
 
-static inline int cpu_is_preempted(int cpu)
+int arch_vcpu_is_preempted(int cpu)
 {
 	if (test_cpu_flag_of(CIF_ENABLED_WAIT, cpu))
 		return 0;
@@ -45,6 +45,7 @@ static inline int cpu_is_preempted(int cpu)
 		return 0;
 	return 1;
 }
+EXPORT_SYMBOL(arch_vcpu_is_preempted);
 
 void arch_spin_lock_wait(arch_spinlock_t *lp)
 {
