@@ -20,6 +20,7 @@
 
 #include <linux/seq_file.h>
 #include <linux/mm_types.h>
+#include <linux/list.h>
 
 struct addr_marker {
 	unsigned long start_address;
@@ -31,6 +32,8 @@ struct ptdump_info {
 	const struct addr_marker	*markers;
 	unsigned long			base_addr;
 	unsigned long			max_addr;
+	/* Internal, do not touch */
+	struct list_head		node;
 };
 
 int ptdump_register(struct ptdump_info *info, const char *name);
@@ -43,6 +46,13 @@ static inline int ptdump_debugfs_create(struct ptdump_info *info,
 {
 	return 0;
 }
+#endif
+void ptdump_check_wx(void);
+
+#ifdef CONFIG_DEBUG_WX
+#define debug_checkwx()	ptdump_check_wx()
+#else
+#define debug_checkwx()	do { } while (0)
 #endif
 
 #else

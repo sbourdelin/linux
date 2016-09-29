@@ -29,6 +29,8 @@
 #include <asm/pgtable-hwdef.h>
 #include <asm/ptdump.h>
 
+static LIST_HEAD(dump_info);
+
 static const struct addr_marker address_markers[] = {
 #ifdef CONFIG_KASAN
 	{ KASAN_SHADOW_START,		"Kasan shadow start" },
@@ -74,6 +76,8 @@ struct pg_state {
 	unsigned long start_address;
 	unsigned level;
 	u64 current_prot;
+	bool check_wx;
+	unsigned long wx_pages;
 };
 
 struct prot_bits {
@@ -219,6 +223,15 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
 		unsigned long delta;
 
 		if (st->current_prot) {
+			if (st->check_wx &&
+			((st->current_prot & PTE_RDONLY) != PTE_RDONLY) &&
+			((st->current_prot & PTE_PXN) != PTE_PXN)) {
+				WARN_ONCE(1, "arm64/mm: Found insecure W+X mapping at address %p/%pS\n",
+					 (void *)st->start_address,
+					 (void *)st->start_address);
+				st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
+			}
+
 			pt_dump_seq_printf(st->seq, "0x%016lx-0x%016lx   ",
 				   st->start_address, addr);
 
@@ -341,6 +354,7 @@ static void ptdump_initialize(struct ptdump_info *info)
 int ptdump_register(struct ptdump_info *info, const char *name)
 {
 	ptdump_initialize(info);
+	list_add(&info->node, &dump_info);
 	return ptdump_debugfs_create(info, name);
 }
 
@@ -349,6 +363,28 @@ static struct ptdump_info kernel_ptdump_info = {
 	.markers	= address_markers,
 	.base_addr	= VA_START,
 };
+
+void ptdump_check_wx(void)
+{
+	struct ptdump_info *info;
+
+	list_for_each_entry(info, &dump_info, node) {
+		struct pg_state st = {
+			.seq = NULL,
+			.marker = info->markers,
+			.check_wx = true,
+		};
+
+		__walk_pgd(&st, info->mm, info->base_addr);
+		note_page(&st, 0, 0, 0);
+		if (st.wx_pages)
+			pr_info("Checked W+X mappings (%p): FAILED, %lu W+X pages found\n",
+				info->mm,
+				st.wx_pages);
+		else
+			pr_info("Checked W+X mappings (%p): passed, no W+X pages found\n", info->mm);
+	}
+}
 
 static int ptdump_init(void)
 {
