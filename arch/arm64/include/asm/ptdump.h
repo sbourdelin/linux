@@ -16,8 +16,9 @@
 #ifndef __ASM_PTDUMP_H
 #define __ASM_PTDUMP_H
 
-#ifdef CONFIG_ARM64_PTDUMP
+#ifdef CONFIG_ARM64_PTDUMP_CORE
 
+#include <linux/seq_file.h>
 #include <linux/mm_types.h>
 
 struct addr_marker {
@@ -33,12 +34,22 @@ struct ptdump_info {
 };
 
 int ptdump_register(struct ptdump_info *info, const char *name);
+void ptdump_walk_pgd(struct seq_file *s, struct ptdump_info *info);
+#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
+int ptdump_debugfs_create(struct ptdump_info *info, const char *name);
+#else
+static inline int ptdump_debugfs_create(struct ptdump_info *info,
+					const char *name)
+{
+	return 0;
+}
+#endif
 
 #else
 static inline int ptdump_register(struct ptdump_info *info, const char *name)
 {
 	return 0;
 }
-#endif /* CONFIG_ARM64_PTDUMP */
+#endif /* CONFIG_ARM64_PTDUMP_CORE */
 
 #endif /* __ASM_PTDUMP_H */
