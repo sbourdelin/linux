@@ -1450,9 +1450,9 @@ static void pending_complete(void *context, int success)
 	struct dm_snap_pending_exception *pe = context;
 	struct dm_exception *e;
 	struct dm_snapshot *s = pe->snap;
-	struct bio *origin_bios = NULL;
-	struct bio *snapshot_bios = NULL;
-	struct bio *full_bio = NULL;
+	struct bio *origin_bios;
+	struct bio *snapshot_bios;
+	struct bio *full_bio;
 	int error = 0;
 
 	if (!success) {
