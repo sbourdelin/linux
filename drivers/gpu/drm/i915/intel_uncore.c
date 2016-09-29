@@ -648,7 +648,7 @@ static const struct intel_forcewake_range __vlv_fw_ranges[] = {
 	GEN_FW_RANGE(0x30000, 0x3ffff, FORCEWAKE_MEDIA),
 };
 
-#define __vlv_reg_read_fw_domains(offset) \
+#define __fwtable_reg_read_fw_domains(offset) \
 ({ \
 	enum forcewake_domains __fwd = 0; \
 	if (NEEDS_FORCE_WAKE((offset))) \
@@ -706,14 +706,6 @@ static const struct intel_forcewake_range __chv_fw_ranges[] = {
 	GEN_FW_RANGE(0x30000, 0x37fff, FORCEWAKE_MEDIA),
 };
 
-#define __chv_reg_read_fw_domains(offset) \
-({ \
-	enum forcewake_domains __fwd = 0; \
-	if (NEEDS_FORCE_WAKE((offset))) \
-		__fwd = find_fw_domain(dev_priv, offset); \
-	__fwd; \
-})
-
 #define __chv_reg_write_fw_domains(offset) \
 ({ \
 	enum forcewake_domains __fwd = 0; \
@@ -757,14 +749,6 @@ static const struct intel_forcewake_range __gen9_fw_ranges[] = {
 	GEN_FW_RANGE(0x24800, 0x2ffff, FORCEWAKE_BLITTER),
 	GEN_FW_RANGE(0x30000, 0x3ffff, FORCEWAKE_MEDIA),
 };
-
-#define __gen9_reg_read_fw_domains(offset) \
-({ \
-	enum forcewake_domains __fwd = 0; \
-	if (NEEDS_FORCE_WAKE((offset))) \
-		__fwd = find_fw_domain(dev_priv, offset); \
-	__fwd; \
-})
 
 static const i915_reg_t gen9_shadowed_regs[] = {
 	RING_TAIL(RENDER_RING_BASE),
@@ -926,7 +910,7 @@ static u##x \
 vlv_read##x(struct drm_i915_private *dev_priv, i915_reg_t reg, bool trace) { \
 	enum forcewake_domains fw_engine; \
 	GEN6_READ_HEADER(x); \
-	fw_engine = __vlv_reg_read_fw_domains(offset); \
+	fw_engine = __fwtable_reg_read_fw_domains(offset); \
 	if (fw_engine) \
 		__force_wake_auto(dev_priv, fw_engine); \
 	val = __raw_i915_read##x(dev_priv, reg); \
@@ -938,7 +922,7 @@ static u##x \
 chv_read##x(struct drm_i915_private *dev_priv, i915_reg_t reg, bool trace) { \
 	enum forcewake_domains fw_engine; \
 	GEN6_READ_HEADER(x); \
-	fw_engine = __chv_reg_read_fw_domains(offset); \
+	fw_engine = __fwtable_reg_read_fw_domains(offset); \
 	if (fw_engine) \
 		__force_wake_auto(dev_priv, fw_engine); \
 	val = __raw_i915_read##x(dev_priv, reg); \
@@ -950,7 +934,7 @@ static u##x \
 gen9_read##x(struct drm_i915_private *dev_priv, i915_reg_t reg, bool trace) { \
 	enum forcewake_domains fw_engine; \
 	GEN6_READ_HEADER(x); \
-	fw_engine = __gen9_reg_read_fw_domains(offset); \
+	fw_engine = __fwtable_reg_read_fw_domains(offset); \
 	if (fw_engine) \
 		__force_wake_auto(dev_priv, fw_engine); \
 	val = __raw_i915_read##x(dev_priv, reg); \
@@ -1829,18 +1813,18 @@ intel_uncore_forcewake_for_read(struct drm_i915_private *dev_priv,
 
 	switch (INTEL_GEN(dev_priv)) {
 	case 9:
-		fw_domains = __gen9_reg_read_fw_domains(i915_mmio_reg_offset(reg));
+		fw_domains = __fwtable_reg_read_fw_domains(i915_mmio_reg_offset(reg));
 		break;
 	case 8:
 		if (IS_CHERRYVIEW(dev_priv))
-			fw_domains = __chv_reg_read_fw_domains(i915_mmio_reg_offset(reg));
+			fw_domains = __fwtable_reg_read_fw_domains(i915_mmio_reg_offset(reg));
 		else
 			fw_domains = __gen6_reg_read_fw_domains(i915_mmio_reg_offset(reg));
 		break;
 	case 7:
 	case 6:
 		if (IS_VALLEYVIEW(dev_priv))
-			fw_domains = __vlv_reg_read_fw_domains(i915_mmio_reg_offset(reg));
+			fw_domains = __fwtable_reg_read_fw_domains(i915_mmio_reg_offset(reg));
 		else
 			fw_domains = __gen6_reg_read_fw_domains(i915_mmio_reg_offset(reg));
 		break;
