@@ -247,6 +247,10 @@ MODULE_PARM_DESC(isoc_maxpacket, "0 - 1023 (fs), 0 - 1024 (hs/ss)");
 module_param_named(isoc_mult, gzero_options.isoc_mult, uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(isoc_mult, "0 - 2 (hs/ss only)");
 
+module_param_named(bulk_maxburst, gzero_options.bulk_maxburst, uint,
+		S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(bulk_maxburst, "0 - 15 (ss only)");
+
 module_param_named(isoc_maxburst, gzero_options.isoc_maxburst, uint,
 		S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(isoc_maxburst, "0 - 15 (ss only)");
@@ -294,6 +298,7 @@ static int zero_bind(struct usb_composite_dev *cdev)
 	ss_opts->isoc_maxpacket = gzero_options.isoc_maxpacket;
 	ss_opts->isoc_mult = gzero_options.isoc_mult;
 	ss_opts->isoc_maxburst = gzero_options.isoc_maxburst;
+	ss_opts->bulk_maxburst = gzero_options.bulk_maxburst;
 	ss_opts->bulk_buflen = gzero_options.bulk_buflen;
 	ss_opts->bulk_qlen = gzero_options.ss_bulk_qlen;
 	ss_opts->iso_qlen = gzero_options.ss_iso_qlen;
