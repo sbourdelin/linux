@@ -30,7 +30,11 @@ struct cpuidle_driver powernv_idle_driver = {
 static int max_idle_state;
 static struct cpuidle_state *cpuidle_state_table;
 
-static u64 stop_psscr_table[CPUIDLE_STATE_MAX];
+struct stop_psscr_table {
+	u64 val;
+	u64 mask;
+};
+static struct stop_psscr_table stop_psscr_table[CPUIDLE_STATE_MAX];
 
 static u64 snooze_timeout;
 static bool snooze_timeout_en;
@@ -102,7 +106,8 @@ static int stop_loop(struct cpuidle_device *dev,
 		     int index)
 {
 	ppc64_runlatch_off();
-	power9_idle_stop(stop_psscr_table[index]);
+	power9_idle_stop(stop_psscr_table[index].val,
+			stop_psscr_table[index].mask);
 	ppc64_runlatch_on();
 	return index;
 }
@@ -186,6 +191,7 @@ static int powernv_add_idle_states(void)
 	u32 residency_ns[CPUIDLE_STATE_MAX];
 	u32 flags[CPUIDLE_STATE_MAX];
 	u64 psscr_val[CPUIDLE_STATE_MAX];
+	u64 psscr_mask[CPUIDLE_STATE_MAX];
 	const char *names[CPUIDLE_STATE_MAX];
 	int i, rc;
 
@@ -233,14 +239,22 @@ static int powernv_add_idle_states(void)
 
 	/*
 	 * If the idle states use stop instruction, probe for psscr values
-	 * which are necessary to specify required stop level.
+	 * and psscr mask which are necessary to specify required stop level.
 	 */
-	if (flags[0] & (OPAL_PM_STOP_INST_FAST | OPAL_PM_STOP_INST_DEEP))
+	if (flags[0] & (OPAL_PM_STOP_INST_FAST | OPAL_PM_STOP_INST_DEEP)) {
 		if (of_property_read_u64_array(power_mgt,
 		    "ibm,cpu-idle-state-psscr", psscr_val, dt_idle_states)) {
-			pr_warn("cpuidle-powernv: missing ibm,cpu-idle-states-psscr in DT\n");
+			pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-psscr in DT\n");
 			goto out;
 		}
+
+		if (of_property_read_u64_array(power_mgt,
+			"ibm,cpu-idle-state-psscr-mask", psscr_mask,
+						dt_idle_states)) {
+			pr_warn("cpuidle-powernv:Missing ibm,cpu-idle-state-psscr-mask in DT\n");
+			goto out;
+		}
+	}
 
 	rc = of_property_read_u32_array(power_mgt,
 		"ibm,cpu-idle-state-residency-ns", residency_ns, dt_idle_states);
@@ -274,7 +288,8 @@ static int powernv_add_idle_states(void)
 			powernv_states[nr_idle_states].flags = 0;
 
 			powernv_states[nr_idle_states].enter = stop_loop;
-			stop_psscr_table[nr_idle_states] = psscr_val[i];
+			stop_psscr_table[nr_idle_states].val = psscr_val[i];
+			stop_psscr_table[nr_idle_states].mask = psscr_mask[i];
 		}
 
 		/*
@@ -299,7 +314,8 @@ static int powernv_add_idle_states(void)
 
 			powernv_states[nr_idle_states].flags = CPUIDLE_FLAG_TIMER_STOP;
 			powernv_states[nr_idle_states].enter = stop_loop;
-			stop_psscr_table[nr_idle_states] = psscr_val[i];
+			stop_psscr_table[nr_idle_states].val = psscr_val[i];
+			stop_psscr_table[nr_idle_states].mask = psscr_mask[i];
 		}
 #endif
 		powernv_states[nr_idle_states].exit_latency =
