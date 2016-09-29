@@ -1046,7 +1046,7 @@ static void error_bios(struct bio *bio);
 static void merge_callback(int read_err, unsigned long write_err, void *context)
 {
 	struct dm_snapshot *s = context;
-	struct bio *b = NULL;
+	struct bio *b;
 
 	if (read_err || write_err) {
 		if (read_err)
