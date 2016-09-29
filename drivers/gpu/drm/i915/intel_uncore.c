@@ -905,9 +905,9 @@ gen6_read##x(struct drm_i915_private *dev_priv, i915_reg_t reg, bool trace) { \
 	GEN6_READ_FOOTER; \
 }
 
-#define __vlv_read(x) \
+#define __fwtbl_read(x) \
 static u##x \
-vlv_read##x(struct drm_i915_private *dev_priv, i915_reg_t reg, bool trace) { \
+fwtbl_read##x(struct drm_i915_private *dev_priv, i915_reg_t reg, bool trace) { \
 	enum forcewake_domains fw_engine; \
 	GEN6_READ_HEADER(x); \
 	fw_engine = __fwtable_reg_read_fw_domains(offset); \
@@ -917,50 +917,16 @@ vlv_read##x(struct drm_i915_private *dev_priv, i915_reg_t reg, bool trace) { \
 	GEN6_READ_FOOTER; \
 }
 
-#define __chv_read(x) \
-static u##x \
-chv_read##x(struct drm_i915_private *dev_priv, i915_reg_t reg, bool trace) { \
-	enum forcewake_domains fw_engine; \
-	GEN6_READ_HEADER(x); \
-	fw_engine = __fwtable_reg_read_fw_domains(offset); \
-	if (fw_engine) \
-		__force_wake_auto(dev_priv, fw_engine); \
-	val = __raw_i915_read##x(dev_priv, reg); \
-	GEN6_READ_FOOTER; \
-}
-
-#define __gen9_read(x) \
-static u##x \
-gen9_read##x(struct drm_i915_private *dev_priv, i915_reg_t reg, bool trace) { \
-	enum forcewake_domains fw_engine; \
-	GEN6_READ_HEADER(x); \
-	fw_engine = __fwtable_reg_read_fw_domains(offset); \
-	if (fw_engine) \
-		__force_wake_auto(dev_priv, fw_engine); \
-	val = __raw_i915_read##x(dev_priv, reg); \
-	GEN6_READ_FOOTER; \
-}
-
-__gen9_read(8)
-__gen9_read(16)
-__gen9_read(32)
-__gen9_read(64)
-__chv_read(8)
-__chv_read(16)
-__chv_read(32)
-__chv_read(64)
-__vlv_read(8)
-__vlv_read(16)
-__vlv_read(32)
-__vlv_read(64)
+__fwtbl_read(8)
+__fwtbl_read(16)
+__fwtbl_read(32)
+__fwtbl_read(64)
 __gen6_read(8)
 __gen6_read(16)
 __gen6_read(32)
 __gen6_read(64)
 
-#undef __gen9_read
-#undef __chv_read
-#undef __vlv_read
+#undef __fwtbl_read
 #undef __gen6_read
 #undef GEN6_READ_FOOTER
 #undef GEN6_READ_HEADER
@@ -1319,13 +1285,13 @@ void intel_uncore_init(struct drm_i915_private *dev_priv)
 	case 9:
 		ASSIGN_FW_DOMAINS_TABLE(__gen9_fw_ranges);
 		ASSIGN_WRITE_MMIO_VFUNCS(gen9);
-		ASSIGN_READ_MMIO_VFUNCS(gen9);
+		ASSIGN_READ_MMIO_VFUNCS(fwtbl);
 		break;
 	case 8:
 		if (IS_CHERRYVIEW(dev_priv)) {
 			ASSIGN_FW_DOMAINS_TABLE(__chv_fw_ranges);
 			ASSIGN_WRITE_MMIO_VFUNCS(chv);
-			ASSIGN_READ_MMIO_VFUNCS(chv);
+			ASSIGN_READ_MMIO_VFUNCS(fwtbl);
 
 		} else {
 			ASSIGN_WRITE_MMIO_VFUNCS(gen8);
@@ -1338,7 +1304,7 @@ void intel_uncore_init(struct drm_i915_private *dev_priv)
 
 		if (IS_VALLEYVIEW(dev_priv)) {
 			ASSIGN_FW_DOMAINS_TABLE(__vlv_fw_ranges);
-			ASSIGN_READ_MMIO_VFUNCS(vlv);
+			ASSIGN_READ_MMIO_VFUNCS(fwtbl);
 		} else {
 			ASSIGN_READ_MMIO_VFUNCS(gen6);
 		}
