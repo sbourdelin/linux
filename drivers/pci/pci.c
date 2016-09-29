@@ -5086,15 +5086,10 @@ void pci_reassigndev_resource_alignment(struct pci_dev *dev)
 		}
 
 		size = resource_size(r);
-		if (size < align) {
-			size = align;
-			dev_info(&dev->dev,
-				"Rounding up size of resource #%d to %#llx.\n",
-				i, (unsigned long long)size);
-		}
-		r->flags |= IORESOURCE_UNSET;
-		r->end = size - 1;
-		r->start = 0;
+		r->flags &= ~IORESOURCE_SIZEALIGN;
+		r->flags |= IORESOURCE_STARTALIGN | IORESOURCE_UNSET;
+		r->start = max(align, size);
+		r->end = r->start + size - 1;
 	}
 	/* Need to disable bridge's resource window,
 	 * to enable the kernel to reassign new resource
