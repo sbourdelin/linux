@@ -49,6 +49,7 @@
 #include "i915_trace.h"
 #include "i915_vgpu.h"
 #include "intel_drv.h"
+#include "intel_guc.h"
 
 static struct drm_driver driver;
 
@@ -338,6 +339,9 @@ static int i915_getparam(struct drm_device *dev, void *data,
 		 * INTEL_INFO(), a feature macro, or similar.
 		 */
 		value = 1;
+		break;
+	case I915_PARAM_HAS_GUC:
+		value = intel_is_guc_valid(dev_priv);
 		break;
 	default:
 		DRM_DEBUG("Unknown parameter %d\n", param->param);
