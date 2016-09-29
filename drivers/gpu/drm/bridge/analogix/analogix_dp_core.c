@@ -106,6 +106,9 @@ int analogix_dp_enable_psr(struct device *dev)
 	if (!dp->psr_support)
 		return -EINVAL;
 
+	if (dp->dpms_mode != DRM_MODE_DPMS_ON)
+		return -EBUSY;
+
 	/* Prepare VSC packet as per EDP 1.4 spec, Table 6.9 */
 	memset(&psr_vsc, 0, sizeof(psr_vsc));
 	psr_vsc.sdp_header.HB0 = 0;
@@ -128,6 +131,9 @@ int analogix_dp_disable_psr(struct device *dev)
 
 	if (!dp->psr_support)
 		return -EINVAL;
+
+	if (dp->dpms_mode != DRM_MODE_DPMS_ON)
+		return -EBUSY;
 
 	/* Prepare VSC packet as per EDP 1.4 spec, Table 6.9 */
 	memset(&psr_vsc, 0, sizeof(psr_vsc));
@@ -1097,6 +1103,8 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
 	if (dp->dpms_mode != DRM_MODE_DPMS_ON)
 		return;
 
+	dp->dpms_mode = DRM_MODE_DPMS_OFF;
+
 	if (dp->plat_data->panel) {
 		if (drm_panel_disable(dp->plat_data->panel)) {
 			DRM_ERROR("failed to disable the panel\n");
@@ -1115,8 +1123,6 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
 	ret = analogix_dp_prepare_panel(dp, false, true);
 	if (ret)
 		DRM_ERROR("failed to setup the panel ret = %d\n", ret);
-
-	dp->dpms_mode = DRM_MODE_DPMS_OFF;
 }
 
 static void analogix_dp_bridge_mode_set(struct drm_bridge *bridge,
