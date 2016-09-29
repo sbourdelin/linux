@@ -266,6 +266,11 @@ void wait_for_unix_gc(void)
 	wait_event(unix_gc_wait, gc_in_progress == false);
 }
 
+void unix_gc_barrier(void)
+{
+	spin_unlock_wait(&unix_gc_lock);
+}
+
 /* The external entry point: unix_gc() */
 void unix_gc(void)
 {
