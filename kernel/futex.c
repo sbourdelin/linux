@@ -228,6 +228,8 @@ struct futex_state {
 	struct task_struct *owner;
 	atomic_t refcount;
 
+	u32 handoff_pid;	/* For TP futexes only */
+
 	enum futex_type type;
 	union futex_key key;
 };
@@ -898,6 +900,7 @@ static int refill_futex_state_cache(void)
 
 	/* pi_mutex gets initialized later */
 	state->owner = NULL;
+	state->handoff_pid = 0;
 	atomic_set(&state->refcount, 1);
 	state->key = FUTEX_KEY_INIT;
 
@@ -3303,8 +3306,9 @@ void exit_robust_list(struct task_struct *curr)
  *
  * Within the kernel, trylocks are done ignoring the FUTEX_WAITERS bit. The
  * purpose of this FUTEX_WAITERS bit is to make the unlocker wake up the
- * serialization mutex owner. Not having the FUTEX_WAITERS bit set doesn't
- * mean there is no waiter in the kernel.
+ * serialization mutex owner or the hand off the lock directly to the top
+ * waiter. Not having the FUTEX_WAITERS bit set doesn't mean there is no
+ * waiter in the kernel.
  *
  * Like PI futexes, TP futexes are orthogonal to robust futexes can be
  * used together.
@@ -3319,6 +3323,19 @@ void exit_robust_list(struct task_struct *curr)
  * structure or invalid pid. In both cases, the top waiter will take over
  * the ownership of the futex.
  */
+
+/*
+ * Spinning and sleeping thresholds for enabling lock handoff and prevent
+ * lock starvation.
+ *
+ * The current threshold values setting is kind of arbitrary. Setting them
+ * too low will impact the amount of lock stealing possible thus reducing
+ * performance. Setting them too high may make the top waiter wait too long
+ * before getting the lock. The current set of values are a bit on the
+ * high side to ensure adequate performance.
+ */
+#define TP_SPIN_THRESHOLD       (1 << 14)
+#define TP_SLEEP_DECREMENT      (TP_SPIN_THRESHOLD/64)
 
 /**
  * lookup_futex_state - Looking up the futex state structure.
@@ -3398,6 +3415,7 @@ static inline int put_futex_state_unlocked(struct futex_state *state)
  * If waiter is true
  * then
  *   don't preserve the flag bits;
+ *   check for handoff (futex word == own pid)
  * else
  *   preserve the flag bits
  * endif
@@ -3415,6 +3433,9 @@ static inline int futex_trylock(u32 __user *uaddr, u32 vpid, u32 *puval,
 		return -EFAULT;
 
 	*puval = uval;
+
+	if (waiter && (uval & FUTEX_TID_MASK) == vpid)
+		return 1;
 
 	if (uval & FUTEX_TID_MASK)
 		return 0;	/* Trylock fails */
@@ -3478,7 +3499,7 @@ static inline int futex_set_waiters_bit(u32 __user *uaddr, u32 *puval)
 static int futex_spin_on_owner(u32 __user *uaddr, u32 vpid,
 			       struct futex_state *state)
 {
-	int ret;
+	int ret, loop = TP_SPIN_THRESHOLD;
 	u32 uval;
 	u32 owner_pid = 0;
 	struct task_struct *owner_task = NULL;
@@ -3486,7 +3507,7 @@ static int futex_spin_on_owner(u32 __user *uaddr, u32 vpid,
 
 	WRITE_ONCE(state->owner, current);
 	preempt_disable();
-	for (;;) {
+	for (;; loop--) {
 		ret = futex_trylock(uaddr, vpid, &uval, true);
 		if (ret)
 			break;
@@ -3544,6 +3565,18 @@ static int futex_spin_on_owner(u32 __user *uaddr, u32 vpid,
 			break;
 		}
 
+		/*
+		 * Enable lock handoff if the threshold reaches 0.
+		 * We also need to set the FUTEX_WAITERS bit to make sure
+		 * that futex lock holder will initiate the handoff at
+		 * unlock time.
+		 */
+		if ((loop <= 0) && !READ_ONCE(state->handoff_pid)) {
+			WRITE_ONCE(state->handoff_pid, vpid);
+			if (futex_set_waiters_bit(uaddr, &uval) < 0)
+				goto efault;
+		}
+
 		if (owner_task->on_cpu) {
 			cpu_relax();
 			continue;
@@ -3587,8 +3620,10 @@ static int futex_spin_on_owner(u32 __user *uaddr, u32 vpid,
 		 * lock stealing happen in between setting the FUTEX_WAITERS
 		 * and setting state to TASK_INTERRUPTIBLE.
 		 */
-		if (!(uval & FUTEX_OWNER_DIED) && (uval & FUTEX_WAITERS))
+		if (!(uval & FUTEX_OWNER_DIED) && (uval & FUTEX_WAITERS)) {
 			schedule_preempt_disabled();
+			loop -= TP_SLEEP_DECREMENT;
+		}
 		__set_current_state(TASK_RUNNING);
 	}
 out:
@@ -3605,6 +3640,7 @@ out:
 	 * Cleanup futex state.
 	 */
 	WRITE_ONCE(state->owner, NULL);
+	WRITE_ONCE(state->handoff_pid, 0);
 	return ret;
 
 efault:
@@ -3728,6 +3764,7 @@ out:
 static int futex_unlock(u32 __user *uaddr, unsigned int flags)
 {
 	u32 uval, vpid = task_pid_vnr(current);
+	u32 newpid = 0;
 	union futex_key key = FUTEX_KEY_INIT;
 	struct futex_hash_bucket *hb;
 	struct futex_state *state = NULL;
@@ -3761,6 +3798,10 @@ static int futex_unlock(u32 __user *uaddr, unsigned int flags)
 		goto out_put_key;
 	}
 
+	newpid = READ_ONCE(state->handoff_pid);
+	if (newpid)
+		WRITE_ONCE(state->handoff_pid, 0);
+
 	owner = READ_ONCE(state->owner);
 	if (owner)
 		wake_q_add(&wake_q, owner);
@@ -3768,13 +3809,13 @@ static int futex_unlock(u32 __user *uaddr, unsigned int flags)
 	spin_unlock(&hb->fs_lock);
 
 	/*
-	 * Unlock the futex.
+	 * Unlock the futex or handoff to the next owner.
 	 * The flag bits are not preserved to encourage more lock stealing.
 	 */
 	for (;;) {
 		u32 old = uval;
 
-		if (cmpxchg_futex_value(&uval, uaddr, old, 0)) {
+		if (cmpxchg_futex_value(&uval, uaddr, old, newpid)) {
 			ret = -EFAULT;
 			break;
 		}
