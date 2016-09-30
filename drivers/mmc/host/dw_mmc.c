@@ -3266,7 +3266,7 @@ EXPORT_SYMBOL(dw_mci_remove);
 
 
 
-#ifdef CONFIG_PM_SLEEP
+#ifdef CONFIG_PM
 /*
  * TODO: we should probably disable the clock to the card in the suspend path.
  */
@@ -3324,7 +3324,63 @@ int dw_mci_resume(struct dw_mci *host)
 	return 0;
 }
 EXPORT_SYMBOL(dw_mci_resume);
-#endif /* CONFIG_PM_SLEEP */
+
+int dw_mci_runtime_suspend(struct dw_mci *host)
+{
+	printk("dw_mci_runtime_suspend\n");
+
+	if (host->use_dma && host->dma_ops->exit)
+		host->dma_ops->exit(host);
+
+	clk_disable_unprepare(host->ciu_clk);
+
+	return 0;
+}
+EXPORT_SYMBOL(dw_mci_runtime_suspend);
+
+int dw_mci_runtime_resume(struct dw_mci *host)
+{
+	int ret = 0;
+	int i;
+
+	printk("dw_mci_runtime_resume\n");
+
+	ret = clk_prepare_enable(host->ciu_clk);
+	if (ret)
+		return ret;
+
+	if (host->use_dma && host->dma_ops->init)
+		host->dma_ops->init(host);
+
+	mci_writel(host, FIFOTH, host->fifoth_val);
+	host->prev_blksz = 0;
+
+	mci_writel(host, TMOUT, 0xFFFFFFFF);
+	mci_writel(host, RINTSTS, 0xFFFFFFFF);
+	mci_writel(host, INTMASK, SDMMC_INT_CMD_DONE |
+				  SDMMC_INT_DATA_OVER |
+				  SDMMC_INT_TXDR | SDMMC_INT_RXDR |
+				  DW_MCI_ERROR_FLAGS);
+	mci_writel(host, CTRL, SDMMC_CTRL_INT_ENABLE);
+
+	for (i = 0; i < host->num_slots; i++) {
+		struct dw_mci_slot *slot = host->slot[i];
+
+		if (!slot)
+			continue;
+
+		if (slot->mmc->pm_flags & MMC_PM_KEEP_POWER) {
+			dw_mci_set_ios(slot->mmc, &slot->mmc->ios);
+			dw_mci_setup_bus(slot, true);
+		}
+	}
+
+	dw_mci_enable_cd(host);
+
+	return ret;
+}
+EXPORT_SYMBOL(dw_mci_runtime_resume);
+#endif /* CONFIG_PM */
 
 static int __init dw_mci_init(void)
 {
