@@ -587,6 +587,7 @@ static struct snd_pcm_hardware azx_pcm_hw = {
 	.periods_min =		2,
 	.periods_max =		AZX_MAX_FRAG,
 	.fifo_size =		0,
+	.max_inflight_bytes = 128 /* default value for all legacy HDAudio controllers, override as needed */
 };
 
 static int azx_pcm_open(struct snd_pcm_substream *substream)
