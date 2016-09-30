@@ -439,6 +439,8 @@ this_cpu_ops.txt
 	- List rationale behind and the way to use this_cpu operations.
 thermal/
 	- directory with information on managing thermal issues (CPU/temp)
+tp-futex.txt
+	- Documentation on lightweight throughput-optimized futexes.
 trace/
 	- directory with info on tracing technologies within linux
 unaligned-memory-access.txt
