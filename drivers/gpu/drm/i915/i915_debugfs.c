@@ -2046,84 +2046,6 @@ static int i915_dump_lrc(struct seq_file *m, void *unused)
 	return 0;
 }
 
-static int i915_execlists(struct seq_file *m, void *data)
-{
-	struct drm_i915_private *dev_priv = node_to_i915(m->private);
-	struct drm_device *dev = &dev_priv->drm;
-	struct intel_engine_cs *engine;
-	u32 status_pointer;
-	u8 read_pointer;
-	u8 write_pointer;
-	u32 status;
-	u32 ctx_id;
-	struct list_head *cursor;
-	int i, ret;
-
-	if (!i915.enable_execlists) {
-		seq_puts(m, "Logical Ring Contexts are disabled\n");
-		return 0;
-	}
-
-	ret = mutex_lock_interruptible(&dev->struct_mutex);
-	if (ret)
-		return ret;
-
-	intel_runtime_pm_get(dev_priv);
-
-	for_each_engine(engine, dev_priv) {
-		struct drm_i915_gem_request *head_req = NULL;
-		int count = 0;
-
-		seq_printf(m, "%s\n", engine->name);
-
-		status = I915_READ(RING_EXECLIST_STATUS_LO(engine));
-		ctx_id = I915_READ(RING_EXECLIST_STATUS_HI(engine));
-		seq_printf(m, "\tExeclist status: 0x%08X, context: %u\n",
-			   status, ctx_id);
-
-		status_pointer = I915_READ(RING_CONTEXT_STATUS_PTR(engine));
-		seq_printf(m, "\tStatus pointer: 0x%08X\n", status_pointer);
-
-		read_pointer = GEN8_CSB_READ_PTR(status_pointer);
-		write_pointer = GEN8_CSB_WRITE_PTR(status_pointer);
-		if (read_pointer > write_pointer)
-			write_pointer += GEN8_CSB_ENTRIES;
-		seq_printf(m, "\tRead pointer: 0x%08X, write pointer 0x%08X\n",
-			   read_pointer, write_pointer);
-
-		for (i = 0; i < GEN8_CSB_ENTRIES; i++) {
-			status = I915_READ(RING_CONTEXT_STATUS_BUF_LO(engine, i));
-			ctx_id = I915_READ(RING_CONTEXT_STATUS_BUF_HI(engine, i));
-
-			seq_printf(m, "\tStatus buffer %d: 0x%08X, context: %u\n",
-				   i, status, ctx_id);
-		}
-
-		spin_lock_bh(&engine->execlist_lock);
-		list_for_each(cursor, &engine->execlist_queue)
-			count++;
-		head_req = list_first_entry_or_null(&engine->execlist_queue,
-						    struct drm_i915_gem_request,
-						    execlist_link);
-		spin_unlock_bh(&engine->execlist_lock);
-
-		seq_printf(m, "\t%d requests in queue\n", count);
-		if (head_req) {
-			seq_printf(m, "\tHead request context: %u\n",
-				   head_req->ctx->hw_id);
-			seq_printf(m, "\tHead request tail: %u\n",
-				   head_req->tail);
-		}
-
-		seq_putc(m, '\n');
-	}
-
-	intel_runtime_pm_put(dev_priv);
-	mutex_unlock(&dev->struct_mutex);
-
-	return 0;
-}
-
 static const char *swizzle_string(unsigned swizzle)
 {
 	switch (swizzle) {
@@ -3133,6 +3055,104 @@ static int i915_display_info(struct seq_file *m, void *unused)
 	drm_modeset_unlock_all(dev);
 	intel_runtime_pm_put(dev_priv);
 
+	return 0;
+}
+
+static int i915_engine_info(struct seq_file *m, void *unused)
+{
+	struct drm_i915_private *dev_priv = node_to_i915(m->private);
+	struct intel_engine_cs *engine;
+	int ret;
+
+	ret = mutex_lock_interruptible(&dev_priv->drm.struct_mutex);
+	if (ret)
+		return ret;
+
+	for_each_engine(engine, dev_priv) {
+		struct intel_breadcrumbs *b = &engine->breadcrumbs;
+		struct drm_i915_gem_request *rq;
+		struct rb_node *rb;
+		int count;
+
+		seq_printf(m, "%s\n", engine->name);
+		seq_printf(m, "\tcurrent seqno %d, last %d\n",
+			   intel_engine_get_seqno(engine),
+			   engine->last_submitted_seqno);
+
+		count = 0;
+		list_for_each_entry(rq, &engine->request_list, link)
+			count++;
+		seq_printf(m, "\t%d submitted requests\n", count);
+
+		if (count > 0 ) {
+			rq = list_first_entry(&engine->request_list,
+					      struct drm_i915_gem_request, link);
+			seq_printf(m, "\t\tfirst  %d\n", rq->fence.seqno);
+
+			rq = list_last_entry(&engine->request_list,
+					     struct drm_i915_gem_request, link);
+			seq_printf(m, "\t\tlast   %d\n", rq->fence.seqno);
+		}
+
+		rq = i915_gem_find_active_request(engine);
+		if (rq)
+			seq_printf(m, "\t\tactive %d\n", rq->fence.seqno);
+
+		seq_printf(m, "\tRING_START: 0x%08x [0x%08x]\n",
+			   I915_READ(RING_START(engine->mmio_base)),
+			   rq ? i915_ggtt_offset(rq->ring->vma) : 0);
+		seq_printf(m, "\tRING_HEAD: 0x%04x [0x%04x]\n",
+			   I915_READ(RING_HEAD(engine->mmio_base)) & HEAD_ADDR,
+			   rq ? rq->ring->head : 0);
+		seq_printf(m, "\tRING_TAIL: 0x%04x [0x%04x]\n",
+			   I915_READ(RING_TAIL(engine->mmio_base)) & TAIL_ADDR,
+			   rq ? rq->ring->tail : 0);
+
+		if (i915.enable_execlists) {
+			u32 ptr, read, write;
+
+			seq_printf(m, "\tExeclist status: 0x%08x %08x\n",
+				   I915_READ(RING_EXECLIST_STATUS_LO(engine)),
+				   I915_READ(RING_EXECLIST_STATUS_HI(engine)));
+
+			ptr = I915_READ(RING_CONTEXT_STATUS_PTR(engine));
+			read = GEN8_CSB_READ_PTR(ptr);
+			write = GEN8_CSB_WRITE_PTR(ptr);
+			seq_printf(m, "\tExeclist CSB read %d, write %d\n",
+				   read, write);
+
+			if (read > write)
+				write += GEN8_CSB_ENTRIES;
+			while (read < write) {
+				unsigned int idx = ++read % GEN8_CSB_ENTRIES;
+
+				seq_printf(m, "\tExeclist CSB[%d]: 0x%08x, context: %d\n",
+					   idx,
+					   I915_READ(RING_CONTEXT_STATUS_BUF_LO(engine, idx)),
+					   I915_READ(RING_CONTEXT_STATUS_BUF_HI(engine, idx)));
+			}
+		} else if (INTEL_GEN(dev_priv) > 6) {
+			seq_printf(m, "\tPP_DIR_BASE: 0x%08x\n",
+				   I915_READ(RING_PP_DIR_BASE(engine)));
+			seq_printf(m, "\tPP_DIR_BASE_READ: 0x%08x\n",
+				   I915_READ(RING_PP_DIR_BASE_READ(engine)));
+			seq_printf(m, "\tPP_DIR_DCLV: 0x%08x\n",
+				   I915_READ(RING_PP_DIR_DCLV(engine)));
+		}
+
+		spin_lock(&b->lock);
+		for (rb = rb_first(&b->waiters); rb; rb = rb_next(rb)) {
+			struct intel_wait *w = container_of(rb, typeof(*w), node);
+
+			seq_printf(m, "\t%s [%d] waiting for %d\n",
+				   w->tsk->comm, w->tsk->pid, w->seqno);
+		}
+		spin_unlock(&b->lock);
+
+		seq_printf(m, "\n");
+	}
+
+	mutex_unlock(&dev_priv->drm.struct_mutex);
 	return 0;
 }
 
@@ -5290,7 +5310,6 @@ static const struct drm_info_list i915_debugfs_list[] = {
 	{"i915_gem_framebuffer", i915_gem_framebuffer_info, 0},
 	{"i915_context_status", i915_context_status, 0},
 	{"i915_dump_lrc", i915_dump_lrc, 0},
-	{"i915_execlists", i915_execlists, 0},
 	{"i915_forcewake_domains", i915_forcewake_domains, 0},
 	{"i915_swizzle_info", i915_swizzle_info, 0},
 	{"i915_ppgtt_info", i915_ppgtt_info, 0},
@@ -5302,6 +5321,7 @@ static const struct drm_info_list i915_debugfs_list[] = {
 	{"i915_power_domain_info", i915_power_domain_info, 0},
 	{"i915_dmc_info", i915_dmc_info, 0},
 	{"i915_display_info", i915_display_info, 0},
+	{"i915_engine_info", i915_engine_info, 0},
 	{"i915_semaphore_status", i915_semaphore_status, 0},
 	{"i915_shared_dplls_info", i915_shared_dplls_info, 0},
 	{"i915_dp_mst_info", i915_dp_mst_info, 0},
