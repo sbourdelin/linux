@@ -2581,8 +2581,6 @@ static void i915_gem_reset_engine(struct intel_engine_cs *engine)
 	struct i915_gem_context *incomplete_ctx;
 	bool ring_hung;
 
-	/* Ensure irq handler finishes, and not run again. */
-	tasklet_kill(&engine->irq_tasklet);
 	if (engine->irq_seqno_barrier)
 		engine->irq_seqno_barrier(engine);
 
@@ -2623,6 +2621,11 @@ void i915_gem_reset(struct drm_i915_private *dev_priv)
 	struct intel_engine_cs *engine;
 
 	i915_gem_retire_requests(dev_priv);
+
+	/* Ensure irq handler finishes, and not run again. */
+	synchronize_irq(dev_priv->drm.irq);
+	for_each_engine(engine, dev_priv)
+		tasklet_kill(&engine->irq_tasklet);
 
 	for_each_engine(engine, dev_priv)
 		i915_gem_reset_engine(engine);
