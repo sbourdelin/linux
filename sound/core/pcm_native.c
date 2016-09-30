@@ -292,6 +292,7 @@ int snd_pcm_hw_refine(struct snd_pcm_substream *substream,
 
 	params->info = 0;
 	params->fifo_size = 0;
+	params->max_inflight_bytes = 0;
 	if (params->rmask & (1 << SNDRV_PCM_HW_PARAM_SAMPLE_BITS))
 		params->msbits = 0;
 	if (params->rmask & (1 << SNDRV_PCM_HW_PARAM_RATE)) {
@@ -448,6 +449,12 @@ int snd_pcm_hw_refine(struct snd_pcm_substream *substream,
 			if (changed < 0)
 				return changed;
 		}
+	}
+	if (!params->max_inflight_bytes) {
+		changed = substream->ops->ioctl(substream,
+				SNDRV_PCM_IOCTL1_MAX_INFLIGHT_BYTES, params);
+		if (changed < 0)
+			return changed;
 	}
 	params->rmask = 0;
 	return 0;

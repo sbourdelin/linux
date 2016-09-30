@@ -56,6 +56,7 @@ struct snd_pcm_hardware {
 	unsigned int periods_min;	/* min # of periods */
 	unsigned int periods_max;	/* max # of periods */
 	size_t fifo_size;		/* fifo size in bytes */
+	unsigned int max_inflight_bytes;/* hw_ptr precision/fuzziness, e.g. due to DMA transfers */
 };
 
 struct snd_pcm_substream;
@@ -105,6 +106,7 @@ struct snd_pcm_ops {
 #define SNDRV_PCM_IOCTL1_CHANNEL_INFO	2
 #define SNDRV_PCM_IOCTL1_GSTATE		3
 #define SNDRV_PCM_IOCTL1_FIFO_SIZE	4
+#define SNDRV_PCM_IOCTL1_MAX_INFLIGHT_BYTES	5
 
 #define SNDRV_PCM_TRIGGER_STOP		0
 #define SNDRV_PCM_TRIGGER_START		1

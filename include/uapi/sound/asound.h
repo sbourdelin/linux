@@ -393,8 +393,9 @@ struct snd_pcm_hw_params {
 	unsigned int msbits;		/* R: used most significant bits */
 	unsigned int rate_num;		/* R: rate numerator */
 	unsigned int rate_den;		/* R: rate denominator */
-	snd_pcm_uframes_t fifo_size;	/* R: chip FIFO size in frames */
-	unsigned char reserved[64];	/* reserved for future */
+	snd_pcm_uframes_t fifo_size;	/* R: chip FIFO size in frames, indicates buffering after hw_ptr updates */
+	unsigned int max_inflight_bytes;/* R: typically DMA burst in bytes, indicates buffering before hw_ptr updates */
+	unsigned char reserved[60];	/* reserved for future */
 };
 
 enum {

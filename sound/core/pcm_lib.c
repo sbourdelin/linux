@@ -1827,6 +1827,23 @@ static int snd_pcm_lib_ioctl_fifo_size(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int snd_pcm_lib_ioctl_max_inflight_bytes(
+	struct snd_pcm_substream *substream,
+	void *arg)
+{
+	struct snd_pcm_hw_params *params = arg;
+
+	params->max_inflight_bytes = substream->runtime->hw.max_inflight_bytes;
+	/*
+	 * Sanity check that max_inflight_bytes isn't larger than buffer_size,
+	 * couldn't think of any other checks
+	 */
+	if (params->max_inflight_bytes > substream->runtime->buffer_size)
+		params->max_inflight_bytes = substream->runtime->buffer_size;
+
+	return 0;
+}
+
 /**
  * snd_pcm_lib_ioctl - a generic PCM ioctl callback
  * @substream: the pcm substream instance
@@ -1850,6 +1867,9 @@ int snd_pcm_lib_ioctl(struct snd_pcm_substream *substream,
 		return snd_pcm_lib_ioctl_channel_info(substream, arg);
 	case SNDRV_PCM_IOCTL1_FIFO_SIZE:
 		return snd_pcm_lib_ioctl_fifo_size(substream, arg);
+	case SNDRV_PCM_IOCTL1_MAX_INFLIGHT_BYTES:
+		return snd_pcm_lib_ioctl_max_inflight_bytes(substream, arg);
+
 	}
 	return -ENXIO;
 }
