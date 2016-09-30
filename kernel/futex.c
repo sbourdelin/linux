@@ -3491,9 +3491,10 @@ static inline int futex_set_waiters_bit(u32 __user *uaddr, u32 *puval)
 
 /**
  * futex_spin_on_owner - Optimistically spin on futex owner
- * @uaddr: futex address
- * @vpid:  PID of current task
- * @state: futex state object
+ * @uaddr:   futex address
+ * @vpid:    PID of current task
+ * @state:   futex state object
+ * @timeout: hrtimer_sleeper structure
  *
  * Spin on the futex word while the futex owner is active. Otherwise, set
  * the FUTEX_WAITERS bit and go to sleep.
@@ -3509,7 +3510,8 @@ static inline int futex_set_waiters_bit(u32 __user *uaddr, u32 *puval)
  * Return: 0 if futex acquired, < 0 if an error happens.
  */
 static int futex_spin_on_owner(u32 __user *uaddr, u32 vpid,
-			       struct futex_state *state)
+			       struct futex_state *state,
+			       struct hrtimer_sleeper *timeout)
 {
 	int ret, loop = TP_SPIN_THRESHOLD;
 	u32 uval;
@@ -3570,6 +3572,12 @@ static int futex_spin_on_owner(u32 __user *uaddr, u32 vpid,
 			__set_current_state(TASK_RUNNING);
 			schedule_preempt_disabled();
 			continue;
+		}
+
+
+		if (timeout && !timeout->task) {
+			ret = -ETIMEDOUT;
+			break;
 		}
 
 		if (signal_pending(current)) {
@@ -3671,13 +3679,21 @@ efault:
  * This function is not inlined so that it can show up separately in perf
  * profile for performance analysis purpose.
  *
+ * The timeout functionality isn't as precise as other other futex types
+ * as timer expiration will not be detected while waiting in the
+ * serialization mutex. One possible solution is to modify the expiration
+ * function to send out a signal as well so as to break the thread out of
+ * the mutex code if we really want more precise timeout.
+ *
  * Return: TP_LOCK_ACQUIRED - lock acquired normally
  *	   TP_LOCK_HANDOFF  - lock handed off directly from unlocker
  *	   TP_LOCK_STOLEN   - lock stolen
  *	   < 0		    - an error happens
  */
-static noinline int futex_lock(u32 __user *uaddr, unsigned int flags)
+static noinline int
+futex_lock(u32 __user *uaddr, unsigned int flags, ktime_t *time)
 {
+	struct hrtimer_sleeper timeout, *to;
 	struct futex_hash_bucket *hb;
 	union futex_key key = FUTEX_KEY_INIT;
 	struct futex_state *state;
@@ -3702,6 +3718,8 @@ static noinline int futex_lock(u32 __user *uaddr, unsigned int flags)
 	if (refill_futex_state_cache())
 		return -ENOMEM;
 
+	to = futex_setup_timer(time, &timeout, flags, current->timer_slack_ns);
+
 	ret = get_futex_key(uaddr, flags & FLAGS_SHARED, &key, VERIFY_WRITE);
 	if (unlikely(ret))
 		goto out;
@@ -3725,12 +3743,17 @@ static noinline int futex_lock(u32 __user *uaddr, unsigned int flags)
 	/*
 	 * Acquiring the serialization mutex.
 	 */
-	if (!state)
+	if (!state) {
 		ret = -ENOMEM;
-	else if (state->type != TYPE_TP)
+	} else if (state->type != TYPE_TP) {
 		ret = -EINVAL;
-	else
+	} else {
+		if (to)
+			hrtimer_start_expires(&to->timer, HRTIMER_MODE_ABS);
 		ret = mutex_lock_interruptible(&state->mutex);
+		if (to && !timeout.task)
+			ret = -ETIMEDOUT;
+	}
 
 	/*
 	 * If we got a signal or has some other error, we need to abort
@@ -3743,7 +3766,7 @@ static noinline int futex_lock(u32 __user *uaddr, unsigned int flags)
 	 * As the mutex owner, we can now spin on the futex word as well as
 	 * the active-ness of the futex owner.
 	 */
-	ret = futex_spin_on_owner(uaddr, vpid, state);
+	ret = futex_spin_on_owner(uaddr, vpid, state, to ? &timeout : NULL);
 
 	mutex_unlock(&state->mutex);
 
@@ -3764,6 +3787,10 @@ out_put_state_key:
 	put_futex_key(&key);
 
 out:
+	if (to) {
+		hrtimer_cancel(&to->timer);
+		destroy_hrtimer_on_stack(&to->timer);
+	}
 	return ret;
 }
 
@@ -3910,7 +3937,7 @@ long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 		return futex_requeue(uaddr, flags, uaddr2, val, val2, &val3, 1);
 #ifdef CONFIG_SMP
 	case FUTEX_LOCK:
-		return futex_lock(uaddr, flags);
+		return futex_lock(uaddr, flags, timeout);
 	case FUTEX_UNLOCK:
 		return futex_unlock(uaddr, flags);
 #endif
@@ -3929,7 +3956,7 @@ SYSCALL_DEFINE6(futex, u32 __user *, uaddr, int, op, u32, val,
 	int cmd = op & FUTEX_CMD_MASK;
 
 	if (utime && (cmd == FUTEX_WAIT || cmd == FUTEX_LOCK_PI ||
-		      cmd == FUTEX_WAIT_BITSET ||
+		      cmd == FUTEX_WAIT_BITSET || cmd == FUTEX_LOCK ||
 		      cmd == FUTEX_WAIT_REQUEUE_PI)) {
 		if (unlikely(should_fail_futex(!(op & FUTEX_PRIVATE_FLAG))))
 			return -EFAULT;
