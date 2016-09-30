@@ -554,7 +554,8 @@ static inline void neo_parse_lsr(struct dgnc_board *brd, uint port)
 		 * Rx Oruns. Exar says that an orun will NOT corrupt
 		 * the FIFO. It will just replace the holding register
 		 * with this new data byte. So basically just ignore this.
-		 * Probably we should eventually have an orun stat in our driver...
+		 * Probably we should eventually have an orun stat in our
+		 * driver...
 		 */
 		ch->ch_err_overrun++;
 	}
