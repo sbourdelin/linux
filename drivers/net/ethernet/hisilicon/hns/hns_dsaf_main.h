@@ -449,7 +449,10 @@ void hns_dsaf_srst_chns(struct dsaf_device *dsaf_dev, u32 msk, bool enable);
 
 void hns_dsaf_roce_srst(struct dsaf_device *dsaf_dev, bool enable);
 
+int hns_dsaf_roce_reset(struct fwnode_handle *dsaf_fwnode, bool enable);
+
 int hns_dsaf_ae_init(struct dsaf_device *dsaf_dev);
+
 void hns_dsaf_ae_uninit(struct dsaf_device *dsaf_dev);
 
 void hns_dsaf_update_stats(struct dsaf_device *dsaf_dev, u32 inode_num);
