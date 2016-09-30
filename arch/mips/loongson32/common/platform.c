@@ -23,10 +23,6 @@
 #include <dma.h>
 #include <nand.h>
 
-#define LS1X_RTC_CTRL	((void __iomem *)KSEG1ADDR(LS1X_RTC_BASE + 0x40))
-#define RTC_EXTCLK_OK	(BIT(5) | BIT(8))
-#define RTC_EXTCLK_EN	BIT(8)
-
 /* 8250/16550 compatible UART */
 #define LS1X_UART(_id)						\
 	{							\
@@ -68,15 +64,6 @@ void __init ls1x_serial_set_uartclk(struct platform_device *pdev)
 
 	for (p = pdev->dev.platform_data; p->flags != 0; ++p)
 		p->uartclk = clk_get_rate(clk);
-}
-
-void __init ls1x_rtc_set_extclk(struct platform_device *pdev)
-{
-	u32 val;
-
-	val = __raw_readl(LS1X_RTC_CTRL);
-	if (!(val & RTC_EXTCLK_OK))
-		__raw_writel(val | RTC_EXTCLK_EN, LS1X_RTC_CTRL);
 }
 
 /* CPUFreq */
@@ -357,6 +344,15 @@ struct platform_device ls1x_ehci_pdev = {
 };
 
 /* Real Time Clock */
+void __init ls1x_rtc_set_extclk(struct platform_device *pdev)
+{
+	u32 val;
+
+	val = __raw_readl(LS1X_RTC_CTRL);
+	if (!(val & RTC_EXTCLK_OK))
+		__raw_writel(val | RTC_EXTCLK_EN, LS1X_RTC_CTRL);
+}
+
 struct platform_device ls1x_rtc_pdev = {
 	.name		= "ls1x-rtc",
 	.id		= -1,
