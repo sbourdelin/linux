@@ -2380,4 +2380,23 @@ void megasas_update_sdev_properties(struct scsi_device *sdev);
 int megasas_reset_fusion(struct Scsi_Host *shost, int reason);
 int megasas_task_abort_fusion(struct scsi_cmnd *scmd);
 int megasas_reset_target_fusion(struct scsi_cmnd *scmd);
+
+struct megasas_cmd *megasas_get_cmd(struct megasas_instance *instance);
+void
+megasas_return_cmd(struct megasas_instance *instance, struct megasas_cmd *cmd);
+int
+megasas_issue_polled(struct megasas_instance *instance,
+		     struct megasas_cmd *cmd);
+void megaraid_sas_kill_hba(struct megasas_instance *instance);
+void
+megasas_check_and_restore_queue_depth(struct megasas_instance *instance);
+void megasas_start_timer(struct megasas_instance *instance,
+			 struct timer_list *timer,
+			 void *fn, unsigned long interval);
+int
+megasas_sriov_start_heartbeat(struct megasas_instance *instance, int initial);
+void megasas_sriov_heartbeat_handler(unsigned long instance_addr);
+void megasas_free_cmds(struct megasas_instance *instance);
+int megasas_alloc_cmds(struct megasas_instance *instance);
+
 #endif				/*LSI_MEGARAID_SAS_H */
