@@ -1,0 +1,62 @@
+HiSilicon Flash Memory Controller
+
+The HiSilicon Flash Memory Controller(FMC) is a feature-rich controller
+that supports SPI Nor, SPI Nand and Parallel Nand devices. This document
+describes the binding for HiSilicon FMC device and its sub-notes.
+
+Required properties:
+- compatible : Should be "hisilicon,hisi-fmc".
+- reg : Offset and length of the register set for the controller device.
+- reg-names : Must include the following two entries: "control", "memory".
+- address-cells : Should be 1.
+- size-cells : Should be 0.
+- clocks : A phandle to the HiSilicon FMC controller clock.
+
+Optional sub-nodes:
+	- spi-nor:
+	Required properties:
+		- compatible : "hisilicon,fmc-spi-nor"
+	see "Documentation/devicetree/bindings/mtd/hisilicon,fmc-spi-nor.txt
+
+	- spi-nand:
+	Required properties:
+		- compatible : "hisilicon,fmc-spi-nand"
+		- reg : The chipselect for spi-nand devices
+		- address-cells : Should be 1.
+		- size-cells : Should be 0.
+
+	- nand:
+	Required properties:
+		- compatible : "hisilicon,fmc-nand"
+		- reg : The chipselect for nand devices
+		- address-cells : Should be 1.
+		- size-cells : Should be 0.
+
+Example:
+fmc: flash-memory-controller@10000000 {
+		 compatible = "hisilicon,hisi-fmc";
+		 reg = <0x10000000 0x1000>, <0x14000000 0x1000000>;
+		 reg-names = "control", "memory";
+		 clocks = <&crg FMC_CLK>;
+
+		 hisfc:spi-nor {
+				   compatible = "hisilicon,fmc-spi-nor";
+				   #address-cells = <1>;
+				   #size-cells = <0>;
+				   hi_sfc@0 {
+					   compatible = "jedec,spi-nor";
+					   reg = <0>;
+				   };
+				/*
+				 * Here you can add the spi nor flash devices.
+				 * They share the same spi nor controller, but
+				 * have different chipselect.
+				 */
+		};
+
+		/*
+		 * Here you can add spi nand and nand sub-nodes. It depends
+		 * on the board-grade design.
+		 */
+
+};
