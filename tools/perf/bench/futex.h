@@ -86,6 +86,31 @@ futex_cmp_requeue(u_int32_t *uaddr, u_int32_t val, u_int32_t *uaddr2, int nr_wak
 		 val, opflags);
 }
 
+#ifndef FUTEX_LOCK
+#define FUTEX_LOCK	13
+#endif
+#ifndef FUTEX_UNLOCK
+#define FUTEX_UNLOCK	14
+#endif
+
+/**
+ * futex_lock() - lock the TP futex
+ */
+static inline int
+futex_lock(u_int32_t *uaddr, struct timespec *timeout, int opflags)
+{
+	return futex(uaddr, FUTEX_LOCK, 0, timeout, NULL, 0, opflags);
+}
+
+/**
+ * futex_unlock() - unlock the TP futex
+ */
+static inline int
+futex_unlock(u_int32_t *uaddr, int opflags)
+{
+	return futex(uaddr, FUTEX_UNLOCK, 0, NULL, NULL, 0, opflags);
+}
+
 #ifndef HAVE_PTHREAD_ATTR_SETAFFINITY_NP
 #include <pthread.h>
 static inline int pthread_attr_setaffinity_np(pthread_attr_t *attr,
