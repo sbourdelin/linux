@@ -40,7 +40,6 @@
  * were handled or when IRQs are blocked.
  */
 static int alt_printk_irq_ready;
-atomic_t nmi_message_lost;
 
 #define ALT_LOG_BUF_LEN ((1 << CONFIG_ALT_PRINTK_LOG_BUF_SHIFT) -	\
 			 sizeof(atomic_t) - sizeof(struct irq_work))
@@ -50,11 +49,15 @@ struct alt_printk_seq_buf {
 	struct irq_work		work;	/* IRQ work that flushes the buffer */
 	unsigned char		buffer[ALT_LOG_BUF_LEN];
 };
-static DEFINE_PER_CPU(struct alt_printk_seq_buf, nmi_print_seq);
 
 static DEFINE_PER_CPU(struct alt_printk_seq_buf, alt_print_seq);
 static DEFINE_PER_CPU(int, alt_printk_ctx);
 static DEFINE_PER_CPU(unsigned long, alt_printk_irq_flags);
+
+#ifdef CONFIG_PRINTK_NMI
+static DEFINE_PER_CPU(struct alt_printk_seq_buf, nmi_print_seq);
+atomic_t nmi_message_lost;
+#endif
 
 static int alt_printk_log_store(struct alt_printk_seq_buf *s,
 		const char *fmt, va_list args)
@@ -204,8 +207,12 @@ void alt_printk_flush(void)
 {
 	int cpu;
 
-	for_each_possible_cpu(cpu)
+	for_each_possible_cpu(cpu) {
+#ifdef CONFIG_PRINTK_NMI
 		__alt_printk_flush(&per_cpu(nmi_print_seq, cpu).work);
+#endif
+		__alt_printk_flush(&per_cpu(alt_print_seq, cpu).work);
+	}
 }
 
 /**
@@ -235,6 +242,8 @@ void alt_printk_flush_on_panic(void)
 	alt_printk_flush();
 }
 
+#ifdef CONFIG_PRINTK_NMI
+
 /*
  * Safe printk() for NMI context. It uses a per-CPU buffer to
  * store the message. NMIs are not nested, so there is always only
@@ -262,6 +271,15 @@ void printk_nmi_exit(void)
 {
 	this_cpu_and(alt_printk_ctx, ~ALT_PRINTK_NMI_CONTEXT_MASK);
 }
+
+#else
+
+static int vprintk_nmi(const char *fmt, va_list args)
+{
+	return 0;
+}
+
+#endif /* CONFIG_PRINTK_NMI */
 
 /*
  * Lockless printk(), to avoid deadlocks should the printk() recurse
@@ -317,12 +335,14 @@ void __init alt_printk_init(void)
 	int cpu;
 
 	for_each_possible_cpu(cpu) {
-		struct alt_printk_seq_buf *s = &per_cpu(nmi_print_seq, cpu);
+		struct alt_printk_seq_buf *s = &per_cpu(alt_print_seq, cpu);
 
 		init_irq_work(&s->work, __alt_printk_flush);
 
-		s = &per_cpu(alt_print_seq, cpu);
+#ifdef CONFIG_PRINTK_NMI
+		s = &per_cpu(nmi_print_seq, cpu);
 		init_irq_work(&s->work, __alt_printk_flush);
+#endif
 	}
 
 	/* Make sure that IRQ works are initialized before enabling. */
