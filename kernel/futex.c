@@ -207,6 +207,11 @@ struct futex_state {
 	struct list_head list;
 
 	/*
+	 * Can link to fs_head in the owning hash bucket.
+	 */
+	struct list_head fs_list;
+
+	/*
 	 * The PI object:
 	 */
 	struct rt_mutex pi_mutex;
@@ -262,11 +267,24 @@ static const struct futex_q futex_q_init = {
  * Hash buckets are shared by all the futex_keys that hash to the same
  * location.  Each key may have multiple futex_q structures, one for each task
  * waiting on a futex.
+ *
+ * Alternatively (in SMP), a key can be associated with a unique futex_state
+ * object where multiple waiters waiting for that futex can queue up in that
+ * futex_state object without using the futex_q structure. A separate
+ * futex_state lock (fs_lock) is used for processing those futex_state objects.
  */
 struct futex_hash_bucket {
 	atomic_t waiters;
 	spinlock_t lock;
 	struct plist_head chain;
+
+#ifdef CONFIG_SMP
+	/*
+	 * Fields for managing futex_state object list
+	 */
+	spinlock_t fs_lock;
+	struct list_head fs_head;
+#endif
 } ____cacheline_aligned_in_smp;
 
 /*
@@ -867,6 +885,8 @@ static int refill_futex_state_cache(void)
 		return -ENOMEM;
 
 	INIT_LIST_HEAD(&state->list);
+	INIT_LIST_HEAD(&state->fs_list);
+
 	/* pi_mutex gets initialized later */
 	state->owner = NULL;
 	atomic_set(&state->refcount, 1);
@@ -3356,6 +3376,10 @@ static int __init futex_init(void)
 		atomic_set(&futex_queues[i].waiters, 0);
 		plist_head_init(&futex_queues[i].chain);
 		spin_lock_init(&futex_queues[i].lock);
+#ifdef CONFIG_SMP
+		INIT_LIST_HEAD(&futex_queues[i].fs_head);
+		spin_lock_init(&futex_queues[i].fs_lock);
+#endif
 	}
 
 	return 0;
