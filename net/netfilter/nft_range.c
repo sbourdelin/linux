@@ -40,6 +40,8 @@ static void nft_range_eval(const struct nft_expr *expr,
 	case NFT_RANGE_NEQ:
 		mismatch = (d1 >= 0 && d2 <= 0);
 		break;
+	default:
+		mismatch = 0;
 	}
 
 	if (mismatch)
