@@ -290,7 +290,7 @@ static int channel_attr_groups_set(struct gb_channel *channel,
 		return 0;
 
 	/* Set attributes based in the channel flags */
-	channel->attrs = kcalloc(size + 1, sizeof(**channel->attrs),
+	channel->attrs = kcalloc(size + 1, sizeof(struct attribute *),
 				 GFP_KERNEL);
 	if (!channel->attrs)
 		return -ENOMEM;
