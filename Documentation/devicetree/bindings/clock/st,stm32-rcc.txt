@@ -8,7 +8,9 @@ Please also refer to clock-bindings.txt in this directory for common clock
 controller binding usage.
 
 Required properties:
-- compatible: Should be "st,stm32f42xx-rcc"
+- compatible: Should be:
+  "st,stm32f42xx-rcc"
+  "st,stm32f46xx-rcc"
 - reg: should be register base and length as documented in the
   datasheet
 - #clock-cells: 2, device nodes should specify the clock in their "clocks"
