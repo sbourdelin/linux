@@ -1411,10 +1411,12 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
 	}
 
 	pm_runtime_enable(dev);
+	pm_runtime_get_sync(dev);
 
 	phy_power_on(dp->phy);
 
 	analogix_dp_init_dp(dp);
+	pm_runtime_put_sync(dev);
 
 	ret = devm_request_threaded_irq(&pdev->dev, dp->irq,
 					analogix_dp_hardirq,
