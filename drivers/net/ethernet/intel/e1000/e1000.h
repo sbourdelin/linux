@@ -133,6 +133,8 @@ struct e1000_adapter;
 #define E1000_TX_QUEUE_WAKE	16
 /* How many Rx Buffers do we bundle into one write to the hardware ? */
 #define E1000_RX_BUFFER_WRITE	16 /* Must be power of 2 */
+/* How many XDP XMIT buffers to bundle into one xmit transaction */
+#define E1000_XDP_XMIT_BUNDLE_MAX E1000_RX_BUFFER_WRITE
 
 #define AUTO_ALL_MODES		0
 #define E1000_EEPROM_82544_APM	0x0004
@@ -166,6 +168,11 @@ struct e1000_rx_buffer {
 		u8 *data; /* else, netdev_alloc_frag */
 	} rxbuf;
 	dma_addr_t dma;
+};
+
+struct e1000_rx_buffer_bundle {
+	struct e1000_rx_buffer *buffer;
+	u32 length;
 };
 
 struct e1000_tx_ring {
@@ -205,6 +212,9 @@ struct e1000_rx_ring {
 	/* array of buffer information structs */
 	struct e1000_rx_buffer *buffer_info;
 	struct sk_buff *rx_skb_top;
+
+	/* array of XDP buffer information structs */
+	struct e1000_rx_buffer_bundle *xdp_buffer;
 
 	/* cpu for rx queue */
 	int cpu;
