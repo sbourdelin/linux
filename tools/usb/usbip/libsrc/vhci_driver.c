@@ -314,6 +314,25 @@ int usbip_vhci_get_free_port(void)
 	return -1;
 }
 
+struct usbip_imported_device *usbip_vhci_find_device(char *host, char *busid)
+{
+	int ret;
+	char rhost[NI_MAXHOST] = "unknown host";
+	char rserv[NI_MAXSERV] = "unknown port";
+	char rbusid[SYSFS_BUS_ID_SIZE];
+
+	for (int i = 0; i < vhci_driver->nports; i++) {
+		ret = read_record(vhci_driver->idev[i].port, rhost, NI_MAXHOST,
+				rserv, NI_MAXSERV, rbusid);
+		if (!ret &&
+			!strncmp(host, rhost, NI_MAXHOST) &&
+			!strncmp(busid, rbusid, SYSFS_BUS_ID_SIZE)) {
+			return vhci_driver->idev + i;
+		}
+	}
+	return NULL;
+}
+
 int usbip_vhci_attach_device2(uint8_t port, int sockfd, uint32_t devid,
 		uint32_t speed) {
 	char buff[200]; /* what size should be ? */

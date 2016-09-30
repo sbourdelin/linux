@@ -46,6 +46,7 @@ int  usbip_vhci_refresh_device_list(void);
 
 
 int usbip_vhci_get_free_port(void);
+struct usbip_imported_device *usbip_vhci_find_device(char *host, char *busid);
 int usbip_vhci_attach_device2(uint8_t port, int sockfd, uint32_t devid,
 		uint32_t speed);
 
