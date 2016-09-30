@@ -343,14 +343,14 @@ static struct qed_tid_seg *qed_cxt_tid_seg_info(struct qed_hwfn *p_hwfn,
 	return NULL;
 }
 
-void qed_cxt_set_srq_count(struct qed_hwfn *p_hwfn, u32 num_srqs)
+static void qed_cxt_set_srq_count(struct qed_hwfn *p_hwfn, u32 num_srqs)
 {
 	struct qed_cxt_mngr *p_mgr = p_hwfn->p_cxt_mngr;
 
 	p_mgr->srq_count = num_srqs;
 }
 
-u32 qed_cxt_get_srq_count(struct qed_hwfn *p_hwfn)
+static u32 qed_cxt_get_srq_count(struct qed_hwfn *p_hwfn)
 {
 	struct qed_cxt_mngr *p_mgr = p_hwfn->p_cxt_mngr;
 
@@ -386,14 +386,14 @@ u32 qed_cxt_get_proto_cid_count(struct qed_hwfn *p_hwfn,
 	return p_hwfn->p_cxt_mngr->conn_cfg[type].cid_count;
 }
 
-u32 qed_cxt_get_proto_cid_start(struct qed_hwfn *p_hwfn,
-				enum protocol_type type)
+static u32 qed_cxt_get_proto_cid_start(struct qed_hwfn *p_hwfn,
+				       enum protocol_type type)
 {
 	return p_hwfn->p_cxt_mngr->acquired[type].start_cid;
 }
 
-u32 qed_cxt_get_proto_tid_count(struct qed_hwfn *p_hwfn,
-				enum protocol_type type)
+static u32 qed_cxt_get_proto_tid_count(struct qed_hwfn *p_hwfn,
+				       enum protocol_type type)
 {
 	u32 cnt = 0;
 	int i;
@@ -1798,8 +1798,8 @@ int qed_cxt_get_cid_info(struct qed_hwfn *p_hwfn, struct qed_cxt_info *p_info)
 	return 0;
 }
 
-void qed_rdma_set_pf_params(struct qed_hwfn *p_hwfn,
-			    struct qed_rdma_pf_params *p_params)
+static void qed_rdma_set_pf_params(struct qed_hwfn *p_hwfn,
+				   struct qed_rdma_pf_params *p_params)
 {
 	u32 num_cons, num_tasks, num_qps, num_mrs, num_srqs;
 	enum protocol_type proto;
