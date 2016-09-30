@@ -86,4 +86,105 @@
 #define STXVD2X(xs, ra, rb)	.long (0x7c000798 | VSX_XX1((xs), (ra), (rb)))
 #define LXVD2X(xs, ra, rb)	.long (0x7c000698 | VSX_XX1((xs), (ra), (rb)))
 
+#define ASM_LOAD_GPR_IMMED(_asm_symbol_name_immed) \
+		"li 14, %[" #_asm_symbol_name_immed "];" \
+		"li 15, %[" #_asm_symbol_name_immed "];" \
+		"li 16, %[" #_asm_symbol_name_immed "];" \
+		"li 17, %[" #_asm_symbol_name_immed "];" \
+		"li 18, %[" #_asm_symbol_name_immed "];" \
+		"li 19, %[" #_asm_symbol_name_immed "];" \
+		"li 20, %[" #_asm_symbol_name_immed "];" \
+		"li 21, %[" #_asm_symbol_name_immed "];" \
+		"li 22, %[" #_asm_symbol_name_immed "];" \
+		"li 23, %[" #_asm_symbol_name_immed "];" \
+		"li 24, %[" #_asm_symbol_name_immed "];" \
+		"li 25, %[" #_asm_symbol_name_immed "];" \
+		"li 26, %[" #_asm_symbol_name_immed "];" \
+		"li 27, %[" #_asm_symbol_name_immed "];" \
+		"li 28, %[" #_asm_symbol_name_immed "];" \
+		"li 29, %[" #_asm_symbol_name_immed "];" \
+		"li 30, %[" #_asm_symbol_name_immed "];" \
+		"li 31, %[" #_asm_symbol_name_immed "];"
+
+#define ASM_LOAD_FPR_SINGLE_PRECISION(_asm_symbol_name_addr) \
+		"lfs 0, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 1, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 2, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 3, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 4, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 5, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 6, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 7, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 8, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 9, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 10, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 11, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 12, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 13, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 14, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 15, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 16, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 17, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 18, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 19, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 20, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 21, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 22, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 23, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 24, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 25, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 26, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 27, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 28, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 29, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 30, 0(%[" #_asm_symbol_name_addr "]);" \
+		"lfs 31, 0(%[" #_asm_symbol_name_addr "]);"
+
+#define PUSH_FPU(pos) \
+	stfd	f14, pos(sp); \
+	stfd	f15, pos+8(sp); \
+	stfd	f16, pos+16(sp); \
+	stfd	f17, pos+24(sp); \
+	stfd	f18, pos+32(sp); \
+	stfd	f19, pos+40(sp); \
+	stfd	f20, pos+48(sp); \
+	stfd	f21, pos+56(sp); \
+	stfd	f22, pos+64(sp); \
+	stfd	f23, pos+72(sp); \
+	stfd	f24, pos+80(sp); \
+	stfd	f25, pos+88(sp); \
+	stfd	f26, pos+96(sp); \
+	stfd	f27, pos+104(sp); \
+	stfd	f28, pos+112(sp); \
+	stfd	f29, pos+120(sp); \
+	stfd	f30, pos+128(sp); \
+	stfd	f31, pos+136(sp);
+
+#define POP_FPU(pos) \
+	lfd	f14, pos(sp); \
+	lfd	f15, pos+8(sp); \
+	lfd	f16, pos+16(sp); \
+	lfd	f17, pos+24(sp); \
+	lfd	f18, pos+32(sp); \
+	lfd	f19, pos+40(sp); \
+	lfd	f20, pos+48(sp); \
+	lfd	f21, pos+56(sp); \
+	lfd	f22, pos+64(sp); \
+	lfd	f23, pos+72(sp); \
+	lfd	f24, pos+80(sp); \
+	lfd	f25, pos+88(sp); \
+	lfd	f26, pos+96(sp); \
+	lfd	f27, pos+104(sp); \
+	lfd	f28, pos+112(sp); \
+	lfd	f29, pos+120(sp); \
+	lfd	f30, pos+128(sp); \
+	lfd	f31, pos+136(sp);
+
+#ifndef __ASSEMBLER__
+void store_gpr(unsigned long *addr);
+void load_gpr(unsigned long *addr);
+void load_fpr_single_precision(float *addr);
+void store_fpr_single_precision(float *addr);
+#endif /* end of __ASSEMBLER__ */
+
 #endif /* _SELFTESTS_POWERPC_REG_H */

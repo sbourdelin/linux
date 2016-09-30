@@ -8,49 +8,11 @@
  */
 
 #include "basic_asm.h"
-
-#define PUSH_FPU(pos) \
-	stfd	f14,pos(sp); \
-	stfd	f15,pos+8(sp); \
-	stfd	f16,pos+16(sp); \
-	stfd	f17,pos+24(sp); \
-	stfd	f18,pos+32(sp); \
-	stfd	f19,pos+40(sp); \
-	stfd	f20,pos+48(sp); \
-	stfd	f21,pos+56(sp); \
-	stfd	f22,pos+64(sp); \
-	stfd	f23,pos+72(sp); \
-	stfd	f24,pos+80(sp); \
-	stfd	f25,pos+88(sp); \
-	stfd	f26,pos+96(sp); \
-	stfd	f27,pos+104(sp); \
-	stfd	f28,pos+112(sp); \
-	stfd	f29,pos+120(sp); \
-	stfd	f30,pos+128(sp); \
-	stfd	f31,pos+136(sp);
-
-#define POP_FPU(pos) \
-	lfd	f14,pos(sp); \
-	lfd	f15,pos+8(sp); \
-	lfd	f16,pos+16(sp); \
-	lfd	f17,pos+24(sp); \
-	lfd	f18,pos+32(sp); \
-	lfd	f19,pos+40(sp); \
-	lfd	f20,pos+48(sp); \
-	lfd	f21,pos+56(sp); \
-	lfd	f22,pos+64(sp); \
-	lfd	f23,pos+72(sp); \
-	lfd	f24,pos+80(sp); \
-	lfd	f25,pos+88(sp); \
-	lfd	f26,pos+96(sp); \
-	lfd	f27,pos+104(sp); \
-	lfd	f28,pos+112(sp); \
-	lfd	f29,pos+120(sp); \
-	lfd	f30,pos+128(sp); \
-	lfd	f31,pos+136(sp);
+#include "reg.h"
 
 # Careful calling this, it will 'clobber' fpu (by design)
 # Don't call this from C
+# double precision
 FUNC_START(load_fpu)
 	lfd	f14,0(r3)
 	lfd	f15,8(r3)
