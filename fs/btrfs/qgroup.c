@@ -1061,8 +1061,12 @@ static int __qgroup_excl_accounting(struct btrfs_fs_info *fs_info,
 	WARN_ON(sign < 0 && qgroup->excl < num_bytes);
 	qgroup->excl += sign * num_bytes;
 	qgroup->excl_cmpr += sign * num_bytes;
-	if (sign > 0)
-		qgroup->reserved -= num_bytes;
+	if (sign > 0) {
+		if (WARN_ON(qgroup->reserved < num_bytes))
+			qgroup->reserved = 0;
+		else
+			qgroup->reserved -= num_bytes;
+	}
 
 	qgroup_dirty(fs_info, qgroup);
 
@@ -1082,8 +1086,12 @@ static int __qgroup_excl_accounting(struct btrfs_fs_info *fs_info,
 		qgroup->rfer_cmpr += sign * num_bytes;
 		WARN_ON(sign < 0 && qgroup->excl < num_bytes);
 		qgroup->excl += sign * num_bytes;
-		if (sign > 0)
-			qgroup->reserved -= num_bytes;
+		if (sign > 0) {
+			if (WARN_ON(qgroup->reserved < num_bytes))
+				qgroup->reserved = 0;
+			else
+				qgroup->reserved -= num_bytes;
+		}
 		qgroup->excl_cmpr += sign * num_bytes;
 		qgroup_dirty(fs_info, qgroup);
 
@@ -2201,7 +2209,10 @@ void btrfs_qgroup_free_refroot(struct btrfs_fs_info *fs_info,
 
 		qg = u64_to_ptr(unode->aux);
 
-		qg->reserved -= num_bytes;
+		if (WARN_ON(qgroup->reserved < num_bytes))
+			qgroup->reserved = 0;
+		else
+			qgroup->reserved -= num_bytes;
 
 		list_for_each_entry(glist, &qg->groups, next_group) {
 			ret = ulist_add(fs_info->qgroup_ulist,
