@@ -98,6 +98,29 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
 	return 0;
 }
 
+static void analogix_dp_set_dpms_mode(struct analogix_dp_device *dp, int mode)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&dp->dpms_mode_lock, flags);
+	dp->dpms_mode = mode;
+	spin_unlock_irqrestore(&dp->dpms_mode_lock, flags);
+
+}
+
+static int analogix_dp_get_dpms_mode(struct analogix_dp_device *dp)
+{
+	unsigned long flags;
+	int mode;
+
+	spin_lock_irqsave(&dp->dpms_mode_lock, flags);
+	mode = dp->dpms_mode;
+	spin_unlock_irqrestore(&dp->dpms_mode_lock, flags);
+
+	return mode;
+}
+
+
 int analogix_dp_enable_psr(struct device *dev)
 {
 	struct analogix_dp_device *dp = dev_get_drvdata(dev);
@@ -105,6 +128,9 @@ int analogix_dp_enable_psr(struct device *dev)
 
 	if (!dp->psr_support)
 		return -EINVAL;
+
+	if (analogix_dp_get_dpms_mode(dp) != DRM_MODE_DPMS_ON)
+		return -EBUSY;
 
 	/* Prepare VSC packet as per EDP 1.4 spec, Table 6.9 */
 	memset(&psr_vsc, 0, sizeof(psr_vsc));
@@ -128,6 +154,9 @@ int analogix_dp_disable_psr(struct device *dev)
 
 	if (!dp->psr_support)
 		return -EINVAL;
+
+	if (analogix_dp_get_dpms_mode(dp) != DRM_MODE_DPMS_ON)
+		return -EBUSY;
 
 	/* Prepare VSC packet as per EDP 1.4 spec, Table 6.9 */
 	memset(&psr_vsc, 0, sizeof(psr_vsc));
@@ -1073,7 +1102,7 @@ static void analogix_dp_bridge_enable(struct drm_bridge *bridge)
 {
 	struct analogix_dp_device *dp = bridge->driver_private;
 
-	if (dp->dpms_mode == DRM_MODE_DPMS_ON)
+	if (analogix_dp_get_dpms_mode(dp) == DRM_MODE_DPMS_ON)
 		return;
 
 	pm_runtime_get_sync(dp->dev);
@@ -1086,7 +1115,7 @@ static void analogix_dp_bridge_enable(struct drm_bridge *bridge)
 	enable_irq(dp->irq);
 	analogix_dp_commit(dp);
 
-	dp->dpms_mode = DRM_MODE_DPMS_ON;
+	analogix_dp_set_dpms_mode(dp, DRM_MODE_DPMS_ON);
 }
 
 static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
@@ -1094,8 +1123,10 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
 	struct analogix_dp_device *dp = bridge->driver_private;
 	int ret;
 
-	if (dp->dpms_mode != DRM_MODE_DPMS_ON)
+	if (analogix_dp_get_dpms_mode(dp) != DRM_MODE_DPMS_ON)
 		return;
+
+	analogix_dp_set_dpms_mode(dp, DRM_MODE_DPMS_OFF);
 
 	if (dp->plat_data->panel) {
 		if (drm_panel_disable(dp->plat_data->panel)) {
@@ -1115,8 +1146,6 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
 	ret = analogix_dp_prepare_panel(dp, false, true);
 	if (ret)
 		DRM_ERROR("failed to setup the panel ret = %d\n", ret);
-
-	dp->dpms_mode = DRM_MODE_DPMS_OFF;
 }
 
 static void analogix_dp_bridge_mode_set(struct drm_bridge *bridge,
@@ -1299,7 +1328,9 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
 	dev_set_drvdata(dev, dp);
 
 	dp->dev = &pdev->dev;
-	dp->dpms_mode = DRM_MODE_DPMS_OFF;
+
+	spin_lock_init(&dp->dpms_mode_lock);
+	analogix_dp_set_dpms_mode(dp, DRM_MODE_DPMS_OFF);
 
 	mutex_init(&dp->panel_lock);
 	dp->panel_is_modeset = false;

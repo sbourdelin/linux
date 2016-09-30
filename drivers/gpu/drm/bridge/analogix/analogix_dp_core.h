@@ -166,6 +166,7 @@ struct analogix_dp_device {
 	struct link_train	link_train;
 	struct phy		*phy;
 	int			dpms_mode;
+	spinlock_t		dpms_mode_lock;
 	int			hpd_gpio;
 	bool                    force_hpd;
 	bool			psr_support;
