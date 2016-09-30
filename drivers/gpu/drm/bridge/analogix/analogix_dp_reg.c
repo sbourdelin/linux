@@ -992,10 +992,12 @@ void analogix_dp_enable_psr_crc(struct analogix_dp_device *dp)
 	writel(PSR_VID_CRC_ENABLE, dp->reg_base + ANALOGIX_DP_CRC_CON);
 }
 
-void analogix_dp_send_psr_spd(struct analogix_dp_device *dp,
-			      struct edp_vsc_psr *vsc)
+int analogix_dp_send_psr_spd(struct analogix_dp_device *dp,
+			     struct edp_vsc_psr *vsc)
 {
+	unsigned long timeout;
 	unsigned int val;
+	u8 sink;
 
 	/* don't send info frame */
 	val = readl(dp->reg_base + ANALOGIX_DP_PKT_SEND_CTL);
@@ -1036,6 +1038,25 @@ void analogix_dp_send_psr_spd(struct analogix_dp_device *dp,
 	val = readl(dp->reg_base + ANALOGIX_DP_PKT_SEND_CTL);
 	val |= IF_EN;
 	writel(val, dp->reg_base + ANALOGIX_DP_PKT_SEND_CTL);
+
+	timeout = jiffies + DP_TIMEOUT_PSR_LOOP_MS;
+	while (time_before(jiffies, timeout)) {
+		val = drm_dp_dpcd_readb(&dp->aux, DP_PSR_STATUS, &sink);
+		if (val != 1) {
+			dev_err(dp->dev, "PSR_STATUS read failed ret=%d", val);
+			return -EBUSY;
+		}
+
+		if ((vsc->DB1 && sink == DP_PSR_SINK_ACTIVE_RFB) ||
+		    (!vsc->DB1 && sink == DP_PSR_SINK_INACTIVE))
+			return 0;
+
+		usleep_range(1000, 1500);
+	}
+
+	dev_warn(dp->dev, "Failed to apply PSR, sink state was [%x]", sink);
+
+	return -ETIMEDOUT;
 }
 
 ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,

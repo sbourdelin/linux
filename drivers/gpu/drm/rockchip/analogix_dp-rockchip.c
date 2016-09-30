@@ -102,10 +102,10 @@ static void analogix_dp_psr_work(struct work_struct *work)
 	struct rockchip_dp_device *dp =
 				container_of(work, typeof(*dp), psr_work);
 	struct drm_crtc *crtc = dp->encoder.crtc;
-	int psr_state = dp->psr_state;
+	unsigned long flags;
+	unsigned int psr_state;
 	int vact_end;
 	int ret;
-	unsigned long flags;
 
 	if (!crtc)
 		return;
@@ -120,11 +120,13 @@ static void analogix_dp_psr_work(struct work_struct *work)
 	}
 
 	spin_lock_irqsave(&dp->psr_lock, flags);
+	psr_state = dp->psr_state;
+	spin_unlock_irqrestore(&dp->psr_lock, flags);
+
 	if (psr_state == EDP_VSC_PSR_STATE_ACTIVE)
 		analogix_dp_enable_psr(dp->dev);
 	else
 		analogix_dp_disable_psr(dp->dev);
-	spin_unlock_irqrestore(&dp->psr_lock, flags);
 }
 
 static int rockchip_dp_pre_init(struct rockchip_dp_device *dp)
