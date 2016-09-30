@@ -382,6 +382,7 @@ static int pca963x_probe(struct i2c_client *client,
 
 		pca963x[i].led_cdev.name = pca963x[i].name;
 		pca963x[i].led_cdev.brightness_set_blocking = pca963x_led_set;
+		pca963x[i].led_cdev.flags = LED_CORE_SUSPENDRESUME;
 
 		if (pdata && pdata->blink_type == PCA963X_HW_BLINK)
 			pca963x[i].led_cdev.blink_set = pca963x_blink_set;
@@ -422,10 +423,40 @@ static int pca963x_remove(struct i2c_client *client)
 	return 0;
 }
 
+static int pca963x_set_power(struct i2c_client *client, bool state)
+{
+	return i2c_smbus_write_byte_data(client, PCA963X_MODE1,
+					 state ? 0 : BIT(4));
+}
+
+static int pca963x_suspend(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+
+	return pca963x_set_power(client, false);
+}
+
+static int pca963x_resume(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	int ret;
+
+	ret = pca963x_set_power(client, true);
+
+	/* wait for oscillator enabling */
+	if (!ret)
+		usleep_range(500, 1000);
+
+	return ret;
+}
+
+static SIMPLE_DEV_PM_OPS(pca963x_pm, pca963x_suspend, pca963x_resume);
+
 static struct i2c_driver pca963x_driver = {
 	.driver = {
 		.name	= "leds-pca963x",
 		.of_match_table = of_match_ptr(of_pca963x_match),
+		.pm	= &pca963x_pm,
 	},
 	.probe	= pca963x_probe,
 	.remove	= pca963x_remove,
