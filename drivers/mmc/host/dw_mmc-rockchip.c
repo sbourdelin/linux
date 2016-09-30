@@ -13,6 +13,7 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/dw_mmc.h>
 #include <linux/of_address.h>
+#include <linux/mmc/slot-gpio.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 
@@ -366,13 +367,28 @@ static int dw_mci_rockchip_remove(struct platform_device *pdev)
 static int dw_mci_rockchip_runtime_suspend(struct device *dev)
 {
 	struct dw_mci *host = dev_get_drvdata(dev);
+	int ret;
 
-	return dw_mci_runtime_suspend(host);
+	ret = dw_mci_runtime_suspend(host);
+	if (ret)
+		return ret;
+
+	if (mmc_can_gpio_cd(host->slot[0]->mmc)) {
+		clk_disable_unprepare(host->biu_clk);
+		pm_runtime_put(dev);
+	}
+
+	return 0;
 }
 
 static int dw_mci_rockchip_runtime_resume(struct device *dev)
 {
 	struct dw_mci *host = dev_get_drvdata(dev);
+
+	if (mmc_can_gpio_cd(host->slot[0]->mmc)) {
+		pm_runtime_get_sync(dev);
+		clk_prepare_enable(host->biu_clk);
+	}
 
 	return dw_mci_runtime_resume(host);
 }
