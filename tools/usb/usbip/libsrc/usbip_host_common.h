@@ -38,7 +38,7 @@ struct usbip_host_driver_ops {
 	void (*close)(struct usbip_host_driver *hdriver);
 	int (*refresh_device_list)(struct usbip_host_driver *hdriver);
 	struct usbip_exported_device * (*get_device)(
-		struct usbip_host_driver *hdriver, int num);
+		struct usbip_host_driver *hdriver, char *busid);
 
 	int (*read_device)(struct udev_device *sdev,
 			   struct usbip_usb_device *dev);
@@ -86,11 +86,11 @@ static inline int usbip_refresh_device_list(struct usbip_host_driver *hdriver)
 }
 
 static inline struct usbip_exported_device *
-usbip_get_device(struct usbip_host_driver *hdriver, int num)
+usbip_get_device(struct usbip_host_driver *hdriver, char *busid)
 {
 	if (!hdriver->ops.get_device)
 		return NULL;
-	return hdriver->ops.get_device(hdriver, num);
+	return hdriver->ops.get_device(hdriver, busid);
 }
 
 /* Helper functions for implementing driver backend */
@@ -99,6 +99,6 @@ void usbip_generic_driver_close(struct usbip_host_driver *hdriver);
 int usbip_generic_refresh_device_list(struct usbip_host_driver *hdriver);
 int usbip_export_device(struct usbip_exported_device *edev, int sockfd);
 struct usbip_exported_device *usbip_generic_get_device(
-		struct usbip_host_driver *hdriver, int num);
+		struct usbip_host_driver *hdriver, char *busid);
 
 #endif /* __USBIP_HOST_COMMON_H */
