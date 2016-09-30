@@ -1,7 +1,8 @@
 #
 # README for usbip-utils
 #
-# Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
+# Copyright (C) 2015 Nobuo Iwata
+#               2011 matt mooney <mfm@muteddisk.com>
 #               2005-2008 Takahiro Hirofuchi
 
 
@@ -36,41 +37,70 @@
 
 
 [Usage]
-    server:# (Physically attach your USB device.)
+Device-side: a machine has USB device(s).
+Application-side: a machine runs an application software uses remote USB device.
 
-    server:# insmod usbip-core.ko
-    server:# insmod usbip-host.ko
+1) Connect from application-side to device-side.
 
-    server:# usbipd -D
+    dev:# (Physically attach your USB device.)
+
+    dev:# insmod usbip-core.ko
+    dev:# insmod usbip-host.ko
+
+    dev:# usbipd -D
 	- Start usbip daemon.
 
-    server:# usbip list -l
-	- List driver assignments for USB devices.
+    dev:# usbip list -l
+	- List driver assignments for USB devices and their busid.
 
-    server:# usbip bind --busid 1-2
-	- Bind usbip-host.ko to the device with busid 1-2.
-	- The USB device 1-2 is now exportable to other hosts!
-	- Use `usbip unbind --busid 1-2' to stop exporting the device.
+    dev:# usbip bind --busid <busid>
+	- Bind usbip-host.ko to the device with <busid>.
+	- The USB device with <busid> is now exportable to other hosts!
+	- Use `usbip unbind --busid <busid>` to stop exporting the device.
 
-    client:# insmod usbip-core.ko
-    client:# insmod vhci-hcd.ko
+    app:# insmod usbip-core.ko
+    app:# insmod vhci-hcd.ko
 
-    client:# usbip list --remote <host>
+    app:# usbip list --remote <host>
 	- List exported USB devices on the <host>.
 
-    client:# usbip attach --remote <host> --busid 1-2
+    app:# usbip attach --remote <host> --busid <busid>
 	- Connect the remote USB device.
 
-    client:# usbip port
+    app:# usbip port
 	- Show virtual port status.
 
-    client:# usbip detach --port <port>
+    app:# usbip detach --port <port>
 	- Detach the USB device.
+
+2) Connect from device-side to application-side.
+
+    app:# insmod usbip-core.ko
+    app:# insmod vhci-hcd.ko
+
+    app:# usbipa -D
+	- Start usbip daemon.
+
+    dev:# (Physically attach your USB device.)
+
+    dev:# insmod usbip-core.ko
+    dev:# insmod usbip-host.ko
+
+    dev:# usbip list -l
+	- List driver assignments for USB devices and their busid.
+
+    dev:# usbip connect --remote <host> --busid <busid>
+	- Bind usbip-host.ko to the device with <busid>.
+	- The USB device of <busid> is connected to remote host!
+
+    dev:# usbip disconnect --remote <host> --busid <busid>
+	- The USB device with <busid> is disconnected from remote host.
+	- Unbind usbip-host.ko from the device.
 
 
 [Example]
 ---------------------------
-	SERVER SIDE
+	DEVICE SIDE
 ---------------------------
 Physically attach your USB devices to this host.
 
@@ -131,7 +161,7 @@ Mark the device of busid 3-3.2 as exportable:
     ...
 
 ---------------------------
-	CLIENT SIDE
+     APPLICATION SIDE
 ---------------------------
 First, let's list available remote devices that are marked as
 exportable on the host.
@@ -170,7 +200,7 @@ Attach a remote USB device:
     deux:# usbip attach --remote 10.0.0.3 --busid 1-1
     port 0 attached
 
-Show the devices attached to this client:
+Show the devices attached to this machine:
 
     deux:# usbip port
     Port 00: <Port in Use> at Full Speed(12Mbps)
