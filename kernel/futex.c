@@ -193,6 +193,7 @@ int __read_mostly futex_cmpxchg_enabled;
 
 enum futex_type {
 	TYPE_PI = 0,
+	TYPE_TP,
 };
 
 /*
@@ -212,10 +213,18 @@ struct futex_state {
 	struct list_head fs_list;
 
 	/*
-	 * The PI object:
+	 * The PI or mutex object:
 	 */
-	struct rt_mutex pi_mutex;
+	union {
+		struct rt_mutex pi_mutex;
+		struct mutex mutex;
+	};
 
+	/*
+	 * For PI futex, owner is the task that owns the futex.
+	 * For TP futex, owner is the mutex lock holder that is either
+	 * spinning on the futex owner or sleeping.
+	 */
 	struct task_struct *owner;
 	atomic_t refcount;
 
@@ -3239,6 +3248,484 @@ void exit_robust_list(struct task_struct *curr)
 				   curr, pip);
 }
 
+#ifdef CONFIG_SMP
+/*
+ * Throughput-Optimized (TP) Futexes
+ * ---------------------------------
+ *
+ * Userspace mutual exclusion locks can be implemented either by using the
+ * wait-wake (WW) futexes or the PI futexes. The WW futexes have much higher
+ * throughput but can't guarantee minimal latency for high priority processes
+ * like the PI futexes. Even then, the overhead of WW futexes in userspace
+ * locking primitives can easily become a performance bottleneck on system
+ * with a large number of cores.
+ *
+ * The throughput-optimized (TP) futex is a new futex implementation that
+ * provides higher throughput than WW futex via the use of following
+ * two techniques:
+ *  1) Optimistic spinning when futex owner is actively running
+ *  2) Lock stealing
+ *
+ * Optimistic spinning isn't present in other futexes. Lock stealing is
+ * possible in WW futexes, but isn't actively encouraged like the
+ * TP futexes. The downside, however, is in the much higher variance of
+ * the response times. Since there is no point in supporting optimistic
+ * spinning on UP system, this new futex type is only available in SMP
+ * system.
+ *
+ * The TP futexes are as versatile as the WW futexes. The TP futexes are
+ * mainly for mutex-like exclusive user space locks. On the other hand,
+ * WW futexes can also used be implement other synchronization primitives
+ * like conditional variables or read/write locks.
+ *
+ * The use of TP futexes is very similar to the PI futexes. Locking is done
+ * by atomically transiting the futex from 0 to the task's thread ID.
+ * Unlocking is done by atomically changing the futex from thread ID to 0.
+ * Any failure to do so will require calls to the kernel to do the locking
+ * and unlocking.
+ *
+ * Within the kernel, trylocks are done ignoring the FUTEX_WAITERS bit. The
+ * purpose of this FUTEX_WAITERS bit is to make the unlocker wake up the
+ * serialization mutex owner. Not having the FUTEX_WAITERS bit set doesn't
+ * mean there is no waiter in the kernel.
+ *
+ * Like PI futexes, TP futexes are orthogonal to robust futexes can be
+ * used together.
+ *
+ * Unlike the other futexes, the futex_q structures aren't used. Instead,
+ * they will queue up in the serialization mutex of the futex state container
+ * queued in the hash bucket.
+ */
+
+/**
+ * lookup_futex_state - Looking up the futex state structure.
+ * @hb:		 hash bucket
+ * @key:	 futex key
+ * @search_only: Boolean search only (no allocation) flag
+ *
+ * This function differs from lookup_pi_state() in that it searches the fs_head
+ * in the hash bucket instead of the waiters in the plist. The HB fs_lock must
+ * be held before calling it. If the search_only flag isn't set, a new state
+ * structure will be pushed into the list and returned if there is no matching
+ * key.
+ *
+ * The reference count won't be incremented for search_only call as the
+ * futex state object won't be destroyed while the fs_lock is being held.
+ *
+ * Return: The matching futex state object or a newly allocated one.
+ *	   NULL if not found in search only lookup.
+ */
+static struct futex_state *
+lookup_futex_state(struct futex_hash_bucket *hb, union futex_key *key,
+		   bool search_only)
+{
+	struct futex_state *state;
+
+	list_for_each_entry(state, &hb->fs_head, fs_list)
+		if (match_futex(key, &state->key)) {
+			if (!search_only)
+				atomic_inc(&state->refcount);
+			return state;
+		}
+
+	if (search_only)
+		return NULL;
+
+	/*
+	 * Push a new one into the list and return it.
+	 */
+	state = alloc_futex_state();
+	state->type = TYPE_TP;
+	state->key = *key;
+	list_add(&state->fs_list, &hb->fs_head);
+	WARN_ON(atomic_read(&state->refcount) != 1);
+
+	/*
+	 * Initialize the mutex structure.
+	 */
+	mutex_init(&state->mutex);
+	WARN_ON(!list_empty(&state->list));
+	return state;
+}
+
+/**
+ * put_futex_state_unlocked - fast dropping futex state reference count
+ * @state: the futex state to be dropped
+ *
+ * This function is used to decrement the reference count in the futex state
+ * object while not holding the HB fs_lock. It can fail.
+ *
+ * Return: 1 if successful and 0 if the reference count is going to be
+ *	   decremented to 0 and hence has to be done under lock.
+ */
+static inline int put_futex_state_unlocked(struct futex_state *state)
+{
+	return atomic_add_unless(&state->refcount, -1, 1);
+}
+
+/**
+ * futex_trylock - try to lock the userspace futex word (0 => vpid).
+ * @uaddr  - futex address
+ * @puval  - storage location for current futex value
+ * @waiter - true for top waiter, false otherwise
+ *
+ * The HB fs_lock should NOT be held while calling this function.
+ * The flag bits are ignored in the trylock.
+ *
+ * If waiter is true
+ * then
+ *   don't preserve the flag bits;
+ * else
+ *   preserve the flag bits
+ * endif
+ *
+ * Return: 1 if lock acquired;
+ *	   0 if lock acquisition failed;
+ *	   -EFAULT if an error happened.
+ */
+static inline int futex_trylock(u32 __user *uaddr, u32 vpid, u32 *puval,
+				const bool waiter)
+{
+	u32 uval, flags = 0;
+
+	if (unlikely(get_futex_value(&uval, uaddr)))
+		return -EFAULT;
+
+	*puval = uval;
+
+	if (uval & FUTEX_TID_MASK)
+		return 0;	/* Trylock fails */
+
+	if (!waiter)
+		flags |= (uval & ~FUTEX_TID_MASK);
+
+	if (unlikely(cmpxchg_futex_value(puval, uaddr, uval, vpid|flags)))
+		return -EFAULT;
+
+	return *puval == uval;
+}
+
+/**
+ * futex_set_waiters_bit - set the FUTEX_WAITERS bit without fs_lock
+ * @uaddr: futex address
+ * @puval: pointer to current futex value
+ *
+ * Return: 0 if successful or < 0 if an error happen.
+ *	   futex value pointed by puval will be set to current value.
+ */
+static inline int futex_set_waiters_bit(u32 __user *uaddr, u32 *puval)
+{
+	u32 curval, uval = *puval;
+
+	while (!(uval & FUTEX_WAITERS)) {
+		/*
+		 * Set the FUTEX_WAITERS bit.
+		 */
+		if (cmpxchg_futex_value(&curval, uaddr, uval,
+					uval | FUTEX_WAITERS))
+			return -EFAULT;
+		if (curval == uval) {
+			*puval = uval | FUTEX_WAITERS;
+			break;
+		}
+		uval = curval;
+	}
+	return 0;
+}
+
+/**
+ * futex_spin_on_owner - Optimistically spin on futex owner
+ * @uaddr: futex address
+ * @vpid:  PID of current task
+ * @state: futex state object
+ *
+ * Spin on the futex word while the futex owner is active. Otherwise, set
+ * the FUTEX_WAITERS bit and go to sleep.
+ *
+ * As we take a reference to the futex owner's task structure, we don't need
+ * to use RCU to ensure that the task structure is valid.
+ *
+ * The function will directly grab the lock if the owner is dying or the pid
+ * is invalid. That should take care of the problem of dead lock owners
+ * unless the pid wraps around and the preceived owner is not the real owner.
+ * To guard against this case, we will have to use the robust futex feature.
+ *
+ * Return: 0 if futex acquired, < 0 if an error happens.
+ */
+static int futex_spin_on_owner(u32 __user *uaddr, u32 vpid,
+			       struct futex_state *state)
+{
+	int ret;
+	u32 uval;
+	u32 owner_pid = 0;
+	struct task_struct *owner_task = NULL;
+
+	WRITE_ONCE(state->owner, current);
+	preempt_disable();
+	for (;;) {
+		ret = futex_trylock(uaddr, vpid, &uval, true);
+		if (ret)
+			break;
+
+		if ((uval & FUTEX_TID_MASK) != owner_pid) {
+			if (owner_task)
+				put_task_struct(owner_task);
+
+			owner_pid  = uval & FUTEX_TID_MASK;
+			owner_task = futex_find_get_task(owner_pid);
+		}
+
+		if (need_resched()) {
+			__set_current_state(TASK_RUNNING);
+			schedule_preempt_disabled();
+			continue;
+		}
+
+		if (signal_pending(current)) {
+			ret = -EINTR;
+			break;
+		}
+
+		if (owner_task->on_cpu) {
+			cpu_relax();
+			continue;
+		}
+
+		/*
+		 * If the owner isn't active, we need to go to sleep after
+		 * making sure that the FUTEX_WAITERS bit is set.
+		 */
+		if (futex_set_waiters_bit(uaddr, &uval) < 0)
+			goto efault;
+
+		/*
+		 * Do a trylock after setting the task state to make
+		 * sure we won't miss a wakeup.
+		 *
+		 * Futex owner		Mutex owner
+		 * -----------		-----------
+		 * unlock		set state
+		 * MB			MB
+		 * read state		trylock
+		 * wakeup		sleep
+		 */
+		set_current_state(TASK_INTERRUPTIBLE);
+		ret = futex_trylock(uaddr, vpid, &uval, true);
+		if (ret) {
+			__set_current_state(TASK_RUNNING);
+			break;
+		}
+
+		/*
+		 * Don't sleep if the owner has died or the FUTEX_WAITERS bit
+		 * was cleared. The latter case can happen when unlock and
+		 * lock stealing happen in between setting the FUTEX_WAITERS
+		 * and setting state to TASK_INTERRUPTIBLE.
+		 */
+		if (!(uval & FUTEX_OWNER_DIED) && (uval & FUTEX_WAITERS))
+			schedule_preempt_disabled();
+		__set_current_state(TASK_RUNNING);
+	}
+out:
+	preempt_enable();
+	if (owner_task)
+		put_task_struct(owner_task);
+
+	/*
+	 * Cleanup futex state.
+	 */
+	WRITE_ONCE(state->owner, NULL);
+	return ret;
+
+efault:
+	ret = -EFAULT;
+	goto out;
+}
+
+/*
+ * Userspace tried a 0 -> TID atomic transition of the futex value
+ * and failed. The kernel side here does the whole locking operation.
+ * The kernel mutex will be used for serialization. Once becoming the
+ * sole mutex lock owner, it will spin on the futex owner's task structure
+ * to see if it is running. It will also spin on the futex word so as to grab
+ * the lock as soon as it is free.
+ *
+ * This function is not inlined so that it can show up separately in perf
+ * profile for performance analysis purpose.
+ *
+ * Return: 0   - lock acquired
+ *	   < 0 - an error happens
+ */
+static noinline int futex_lock(u32 __user *uaddr, unsigned int flags)
+{
+	struct futex_hash_bucket *hb;
+	union futex_key key = FUTEX_KEY_INIT;
+	struct futex_state *state;
+	u32 uval, vpid = task_pid_vnr(current);
+	int ret;
+
+
+	/*
+	 * Stealing lock and preserve the flag bits.
+	 */
+	ret = futex_trylock(uaddr, vpid, &uval, false);
+	if (ret)
+		goto out;
+
+	/*
+	 * Detect deadlocks.
+	 */
+	if (unlikely(((uval & FUTEX_TID_MASK) == vpid) ||
+			should_fail_futex(true)))
+		return -EDEADLK;
+
+	if (refill_futex_state_cache())
+		return -ENOMEM;
+
+	ret = get_futex_key(uaddr, flags & FLAGS_SHARED, &key, VERIFY_WRITE);
+	if (unlikely(ret))
+		goto out;
+
+	hb = hash_futex(&key);
+	spin_lock(&hb->fs_lock);
+
+	/*
+	 * Locate the futex state by looking up the futex state list in the
+	 * hash bucket. If it isn't found, create a new one and put it into
+	 * the list.
+	 */
+	state = lookup_futex_state(hb, &key, false);
+
+	/*
+	 * We don't need to hold the lock after looking up the futex state
+	 * as we have incremented the reference count.
+	 */
+	spin_unlock(&hb->fs_lock);
+
+	/*
+	 * Acquiring the serialization mutex.
+	 */
+	if (!state)
+		ret = -ENOMEM;
+	else if (state->type != TYPE_TP)
+		ret = -EINVAL;
+	else
+		ret = mutex_lock_interruptible(&state->mutex);
+
+	/*
+	 * If we got a signal or has some other error, we need to abort
+	 * the lock operation and return.
+	 */
+	if (unlikely(ret))
+		goto out_put_state_key;
+
+	/*
+	 * As the mutex owner, we can now spin on the futex word as well as
+	 * the active-ness of the futex owner.
+	 */
+	ret = futex_spin_on_owner(uaddr, vpid, state);
+
+	mutex_unlock(&state->mutex);
+
+out_put_state_key:
+	if (!put_futex_state_unlocked(state)) {
+		/*
+		 * May need to free the futex state object and so must be
+		 * under the lock. If the reference count is really going
+		 * to reach 0, we also need to dequeue the futex state
+		 * from the hash bucket list.
+		 */
+		spin_lock(&hb->fs_lock);
+		if (atomic_read(&state->refcount) == 1)
+			list_del_init(&state->fs_list);
+		put_futex_state(state);
+		spin_unlock(&hb->fs_lock);
+	}
+	put_futex_key(&key);
+
+out:
+	return (ret < 0) ? ret : 0;
+}
+
+/*
+ * Userspace attempted a TID -> 0 atomic transition, and failed.
+ * This is the in-kernel slowpath: we look up the futex state (if any),
+ * and wakeup the mutex owner.
+ *
+ * Return: 1 if a wakeup is attempt, 0 if no task to wake,
+ *	   or < 0 when an error happens.
+ */
+static int futex_unlock(u32 __user *uaddr, unsigned int flags)
+{
+	u32 uval, vpid = task_pid_vnr(current);
+	union futex_key key = FUTEX_KEY_INIT;
+	struct futex_hash_bucket *hb;
+	struct futex_state *state = NULL;
+	struct task_struct *owner = NULL;
+	int ret;
+	WAKE_Q(wake_q);
+
+	if (get_user(uval, uaddr))
+		return -EFAULT;
+
+	if ((uval & FUTEX_TID_MASK) != vpid)
+		return -EPERM;
+
+	if (!(uval & FUTEX_WAITERS))
+		return -EINVAL;
+
+	ret = get_futex_key(uaddr, flags & FLAGS_SHARED, &key, VERIFY_WRITE);
+	if (ret)
+		return ret;
+
+	hb = hash_futex(&key);
+	spin_lock(&hb->fs_lock);
+
+	/*
+	 * Check the hash bucket only for matching futex state.
+	 */
+	state = lookup_futex_state(hb, &key, true);
+	if (!state || (state->type != TYPE_TP)) {
+		ret = -EINVAL;
+		spin_unlock(&hb->fs_lock);
+		goto out_put_key;
+	}
+
+	owner = READ_ONCE(state->owner);
+	if (owner)
+		wake_q_add(&wake_q, owner);
+
+	spin_unlock(&hb->fs_lock);
+
+	/*
+	 * Unlock the futex.
+	 * The flag bits are not preserved to encourage more lock stealing.
+	 */
+	for (;;) {
+		u32 old = uval;
+
+		if (cmpxchg_futex_value(&uval, uaddr, old, 0)) {
+			ret = -EFAULT;
+			break;
+		}
+		if (old == uval)
+			break;
+	}
+
+out_put_key:
+	put_futex_key(&key);
+	if (owner) {
+		/*
+		 * No error would have happened if owner defined.
+		 */
+		wake_up_q(&wake_q);
+		return 1;
+	}
+
+	return ret;
+}
+#endif /* CONFIG_SMP */
+
 long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 		u32 __user *uaddr2, u32 val2, u32 val3)
 {
@@ -3261,6 +3748,10 @@ long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 	case FUTEX_TRYLOCK_PI:
 	case FUTEX_WAIT_REQUEUE_PI:
 	case FUTEX_CMP_REQUEUE_PI:
+#ifdef CONFIG_SMP
+	case FUTEX_LOCK:
+	case FUTEX_UNLOCK:
+#endif
 		if (!futex_cmpxchg_enabled)
 			return -ENOSYS;
 	}
@@ -3292,6 +3783,12 @@ long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 					     uaddr2);
 	case FUTEX_CMP_REQUEUE_PI:
 		return futex_requeue(uaddr, flags, uaddr2, val, val2, &val3, 1);
+#ifdef CONFIG_SMP
+	case FUTEX_LOCK:
+		return futex_lock(uaddr, flags);
+	case FUTEX_UNLOCK:
+		return futex_unlock(uaddr, flags);
+#endif
 	}
 	return -ENOSYS;
 }
