@@ -794,6 +794,21 @@ static int get_futex_value_locked(u32 *dest, u32 __user *from)
 	return ret ? -EFAULT : 0;
 }
 
+/*
+ * The equivalents of the above cmpxchg_futex_value_locked() and
+ * get_futex_value_locked which are called without the hash bucket lock
+ * and so can have page fault enabled.
+ */
+static inline int cmpxchg_futex_value(u32 *curval, u32 __user *uaddr,
+				      u32 uval, u32 newval)
+{
+	return futex_atomic_cmpxchg_inatomic(curval, uaddr, uval, newval);
+}
+
+static inline int get_futex_value(u32 *dest, u32 __user *from)
+{
+	return __get_user(*dest, from);
+}
 
 /*
  * PI code:
