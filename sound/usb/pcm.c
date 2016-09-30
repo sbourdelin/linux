@@ -713,7 +713,8 @@ static int configure_endpoint(struct snd_usb_substream *subs)
 static int snd_usb_hw_params(struct snd_pcm_substream *substream,
 			     struct snd_pcm_hw_params *hw_params)
 {
-	struct snd_usb_substream *subs = substream->runtime->private_data;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct snd_usb_substream *subs = runtime->private_data;
 	struct audioformat *fmt;
 	int ret;
 
@@ -728,7 +729,6 @@ static int snd_usb_hw_params(struct snd_pcm_substream *substream,
 	subs->buffer_periods = params_periods(hw_params);
 	subs->channels = params_channels(hw_params);
 	subs->cur_rate = params_rate(hw_params);
-
 	fmt = find_format(subs);
 	if (!fmt) {
 		dev_dbg(&subs->dev->dev,
@@ -748,6 +748,26 @@ static int snd_usb_hw_params(struct snd_pcm_substream *substream,
 	subs->interface = fmt->iface;
 	subs->altset_idx = fmt->altset_idx;
 	subs->need_setup_ep = true;
+
+	/*
+	 * worst-case max_inflight_bytes is one URB (MAX_PACKS ms),
+	 * multiply by size of 1ms packet for this format. The delay
+	 * can be larger since there are up to MAX_URBS submitted,
+	 * we only track the max number of bytes transferred when one
+	 * URB is submitted.
+	 */
+	runtime->hw.max_inflight_bytes = DIV_ROUND_UP(
+		MAX_PACKS * subs->cur_rate * subs->channels *
+		snd_pcm_format_width(subs->pcm_format), 8 * 1000);
+
+	/*
+	 * The number of packets cannot exceed the ring buffer size, reflect
+	 * constraints for low-latency usages
+	 */
+	if (runtime->hw.max_inflight_bytes >
+		subs->period_bytes * subs->buffer_periods)
+		runtime->hw.max_inflight_bytes =
+			subs->period_bytes * subs->buffer_periods;
 
 	return 0;
 }
@@ -851,6 +871,7 @@ static struct snd_pcm_hardware snd_usb_hardware =
 	.info =			SNDRV_PCM_INFO_MMAP |
 				SNDRV_PCM_INFO_MMAP_VALID |
 				SNDRV_PCM_INFO_BATCH |
+				SNDRV_PCM_INFO_NO_PERIOD_WAKEUP |
 				SNDRV_PCM_INFO_INTERLEAVED |
 				SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				SNDRV_PCM_INFO_PAUSE,
@@ -1225,6 +1246,7 @@ static int snd_usb_pcm_open(struct snd_pcm_substream *substream, int direction)
 	subs->interface = -1;
 	subs->altset_idx = 0;
 	runtime->hw = snd_usb_hardware;
+	runtime->hw.max_inflight_bytes = 0; /* will be set in hw_params() */
 	runtime->private_data = subs;
 	subs->pcm_substream = substream;
 	/* runtime PM is also done there */
@@ -1328,7 +1350,7 @@ static void retire_capture_urb(struct snd_usb_substream *subs,
 		}
 	}
 
-	if (period_elapsed)
+	if (period_elapsed && !runtime->no_period_wakeup)
 		snd_pcm_period_elapsed(subs->pcm_substream);
 }
 
@@ -1542,7 +1564,7 @@ static void prepare_playback_urb(struct snd_usb_substream *subs,
 
 	spin_unlock_irqrestore(&subs->lock, flags);
 	urb->transfer_buffer_length = bytes;
-	if (period_elapsed)
+	if (period_elapsed && !runtime->no_period_wakeup)
 		snd_pcm_period_elapsed(subs->pcm_substream);
 }
 
