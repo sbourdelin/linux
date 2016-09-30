@@ -951,6 +951,8 @@ out:
 out_no_progress:
 	decoder->state.insn_op = intel_pt_insn->op;
 	decoder->state.insn_len = intel_pt_insn->length;
+	memcpy(decoder->state.insn, intel_pt_insn->buf,
+	       sizeof(decoder->state.insn));
 
 	if (decoder->tx_flags & INTEL_PT_IN_TX)
 		decoder->state.flags |= INTEL_PT_IN_TX;

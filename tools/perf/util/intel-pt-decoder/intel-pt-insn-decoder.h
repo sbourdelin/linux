@@ -20,7 +20,7 @@
 #include <stdint.h>
 
 #define INTEL_PT_INSN_DESC_MAX		32
-#define INTEL_PT_INSN_DBG_BUF_SZ	16
+#define INTEL_PT_INSN_DBG_BUF_SZ	16 /* Must be >= MAX_INSN */
 
 enum intel_pt_insn_op {
 	INTEL_PT_OP_OTHER,

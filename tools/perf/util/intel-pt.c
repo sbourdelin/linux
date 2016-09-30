@@ -143,6 +143,7 @@ struct intel_pt_queue {
 	u32 flags;
 	u16 insn_len;
 	u64 last_insn_cnt;
+	char insn[MAX_INSN];
 };
 
 static void intel_pt_dump(struct intel_pt *pt __maybe_unused,
@@ -900,6 +901,7 @@ static void intel_pt_sample_flags(struct intel_pt_queue *ptq)
 		if (ptq->state->flags & INTEL_PT_IN_TX)
 			ptq->flags |= PERF_IP_FLAG_IN_TX;
 		ptq->insn_len = ptq->state->insn_len;
+		memcpy(ptq->insn, ptq->state->insn, MAX_INSN);
 	}
 }
 
@@ -1080,6 +1082,7 @@ static int intel_pt_synth_branch_sample(struct intel_pt_queue *ptq)
 	sample.cpu = ptq->cpu;
 	sample.flags = ptq->flags;
 	sample.insn_len = ptq->insn_len;
+	memcpy(sample.insn, ptq->insn, MAX_INSN);
 
 	/*
 	 * perf report cannot handle events without a branch stack when using
@@ -1141,6 +1144,7 @@ static int intel_pt_synth_instruction_sample(struct intel_pt_queue *ptq)
 	sample.cpu = ptq->cpu;
 	sample.flags = ptq->flags;
 	sample.insn_len = ptq->insn_len;
+	memcpy(sample.insn, ptq->insn, MAX_INSN);
 
 	ptq->last_insn_cnt = ptq->state->tot_insn_cnt;
 
@@ -1203,6 +1207,7 @@ static int intel_pt_synth_transaction_sample(struct intel_pt_queue *ptq)
 	sample.cpu = ptq->cpu;
 	sample.flags = ptq->flags;
 	sample.insn_len = ptq->insn_len;
+	memcpy(sample.insn, ptq->insn, MAX_INSN);
 
 	if (pt->synth_opts.callchain) {
 		thread_stack__sample(ptq->thread, ptq->chain,
