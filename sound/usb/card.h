@@ -148,6 +148,7 @@ struct snd_usb_substream {
 
 	int last_frame_number;          /* stored frame number */
 	int last_delay;                 /* stored delay */
+	int start_delay;                /* initial delay due to empty frames */
 
 	struct {
 		int marker;

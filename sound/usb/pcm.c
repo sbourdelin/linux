@@ -86,6 +86,7 @@ static snd_pcm_uframes_t snd_usb_pcm_pointer(struct snd_pcm_substream *substream
 	hwptr_done = subs->hwptr_done;
 	substream->runtime->delay = snd_usb_pcm_delay(subs,
 						substream->runtime->rate);
+	substream->runtime->delay += subs->start_delay;
 	spin_unlock(&subs->lock);
 	return hwptr_done / (substream->runtime->frame_bits >> 3);
 }
@@ -858,8 +859,33 @@ static int snd_usb_pcm_prepare(struct snd_pcm_substream *substream)
 
 	/* for playback, submit the URBs now; otherwise, the first hwptr_done
 	 * updates for all URBs would happen at the same time when starting */
-	if (subs->direction == SNDRV_PCM_STREAM_PLAYBACK)
+	if (subs->direction == SNDRV_PCM_STREAM_PLAYBACK) {
 		ret = start_endpoints(subs, true);
+
+		/*
+		 * Since we submit empty URBS, the constant initial delay will
+		 * not be recovered and will be added to the dynamic delay
+		 * measured with the frame counter. Worst-case the
+		 * startup delay can be (MAX_URBS-1) * MAX_PACKS = 12ms
+		 */
+		if (ret == 0) {
+			struct snd_usb_endpoint *ep = subs->data_endpoint;
+			int total_packs = 0;
+			int i;
+
+			for (i = 0; i < ep->nurbs - 1; i++) {
+				struct snd_urb_ctx *u = &ep->urb[i];
+
+				total_packs += u->packets;
+			}
+			subs->start_delay = DIV_ROUND_UP(total_packs *
+							 subs->cur_rate, 1000);
+			if (subs->start_delay)
+				dev_dbg(&subs->dev->dev,
+					"Initial delay for EP @%p: %d frames\n",
+					ep, subs->start_delay);
+		}
+	}
 
  unlock:
 	snd_usb_unlock_shutdown(subs->stream->chip);
@@ -1549,6 +1575,7 @@ static void prepare_playback_urb(struct snd_usb_substream *subs,
 	runtime->delay = subs->last_delay;
 	runtime->delay += frames;
 	subs->last_delay = runtime->delay;
+	runtime->delay += subs->start_delay;
 
 	/* realign last_frame_number */
 	subs->last_frame_number = usb_get_current_frame_number(subs->dev);
@@ -1597,8 +1624,7 @@ static void retire_playback_urb(struct snd_usb_substream *subs,
 		subs->last_delay = 0;
 	else
 		subs->last_delay -= processed;
-	runtime->delay = subs->last_delay;
-
+	runtime->delay = subs->last_delay + subs->start_delay;
 	/*
 	 * Report when delay estimate is off by more than 2ms.
 	 * The error should be lower than 2ms since the estimate relies
