@@ -464,20 +464,23 @@ static u32 xt_hashlimit_len_to_chunks(u32 len)
 static u64 user2credits(u64 user, int revision)
 {
 	if (revision == 1) {
+		u32 user32 = user; /* use 32-bit division */
+
 		/* If multiplying would overflow... */
-		if (user > 0xFFFFFFFF / (HZ*CREDITS_PER_JIFFY_v1))
+		if (user32 > 0xFFFFFFFF / (HZ*CREDITS_PER_JIFFY_v1))
 			/* Divide first. */
-			return (user / XT_HASHLIMIT_SCALE) *\
+			return (user32 / XT_HASHLIMIT_SCALE) *
 						HZ * CREDITS_PER_JIFFY_v1;
 
-		return (user * HZ * CREDITS_PER_JIFFY_v1) \
-						/ XT_HASHLIMIT_SCALE;
+		return (user32 * HZ * CREDITS_PER_JIFFY_v1) /
+						XT_HASHLIMIT_SCALE;
 	} else {
 		if (user > 0xFFFFFFFFFFFFFFFF / (HZ*CREDITS_PER_JIFFY))
-			return (user / XT_HASHLIMIT_SCALE_v2) *\
-						HZ * CREDITS_PER_JIFFY;
+			return div_u64_u64(user, XT_HASHLIMIT_SCALE_v2) *
+					   HZ * CREDITS_PER_JIFFY;
 
-		return (user * HZ * CREDITS_PER_JIFFY) / XT_HASHLIMIT_SCALE_v2;
+		return div_u64_u64(user * HZ * CREDITS_PER_JIFFY,
+				   XT_HASHLIMIT_SCALE_v2);
 	}
 }
 
