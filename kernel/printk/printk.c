@@ -1791,7 +1791,7 @@ asmlinkage int vprintk_emit(int facility, int level,
 		zap_locks();
 	}
 
-	lockdep_off();
+	alt_printk_enter();
 	/* This stops the holder of console_sem just where we want him */
 	raw_spin_lock(&logbuf_lock);
 	logbuf_cpu = this_cpu;
@@ -1900,12 +1900,11 @@ asmlinkage int vprintk_emit(int facility, int level,
 
 	logbuf_cpu = UINT_MAX;
 	raw_spin_unlock(&logbuf_lock);
-	lockdep_on();
+	alt_printk_exit();
 	local_irq_restore(flags);
 
 	/* If called from the scheduler, we can not call up(). */
 	if (!in_sched) {
-		lockdep_off();
 		/*
 		 * Try to acquire and then immediately release the console
 		 * semaphore.  The release will print out buffers and wake up
@@ -1913,7 +1912,6 @@ asmlinkage int vprintk_emit(int facility, int level,
 		 */
 		if (console_trylock())
 			console_unlock();
-		lockdep_on();
 	}
 
 	return printed_len;
@@ -2236,8 +2234,15 @@ EXPORT_SYMBOL(console_lock);
  */
 int console_trylock(void)
 {
-	if (down_trylock_console_sem())
+	int lock_failed;
+
+	alt_printk_enter();
+	lock_failed = down_trylock_console_sem();
+	alt_printk_exit();
+
+	if (lock_failed)
 		return 0;
+
 	if (console_suspended) {
 		up_console_sem();
 		return 0;
@@ -2392,7 +2397,9 @@ again:
 		size_t len;
 		int level;
 
-		raw_spin_lock_irqsave(&logbuf_lock, flags);
+		local_irq_save(flags);
+		alt_printk_enter();
+		raw_spin_lock(&logbuf_lock);
 		if (seen_seq != log_next_seq) {
 			wake_klogd = true;
 			seen_seq = log_next_seq;
@@ -2453,6 +2460,7 @@ skip:
 		stop_critical_timings();	/* don't trace print latency */
 		call_console_drivers(level, ext_text, ext_len, text, len);
 		start_critical_timings();
+		alt_printk_exit();
 		local_irq_restore(flags);
 
 		if (do_cond_resched)
@@ -2476,7 +2484,9 @@ skip:
 	 */
 	raw_spin_lock(&logbuf_lock);
 	retry = console_seq != log_next_seq;
-	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
+	raw_spin_unlock(&logbuf_lock);
+	alt_printk_exit();
+	local_irq_restore(flags);
 
 	if (retry && console_trylock())
 		goto again;
