@@ -46,7 +46,8 @@
  * @dev:		the actual misc device
  * @buffers:		an rb tree of all the existing buffers
  * @buffer_lock:	lock protecting the tree of buffers
- * @lock:		rwsem protecting the tree of heaps and clients
+ * @client_lock:	rwsem protecting the tree of clients
+ * @heap_lock:		rwsem protecting the tree of heaps
  * @heaps:		list of all the heaps in the system
  * @user_clients:	list of all the clients created from userspace
  */
@@ -54,7 +55,8 @@ struct ion_device {
 	struct miscdevice dev;
 	struct rb_root buffers;
 	struct mutex buffer_lock;
-	struct rw_semaphore lock;
+	struct rw_semaphore client_lock;
+	struct rw_semaphore heap_lock;
 	struct plist_head heaps;
 	long (*custom_ioctl)(struct ion_client *client, unsigned int cmd,
 			     unsigned long arg);
@@ -146,7 +148,7 @@ static inline void ion_buffer_page_clean(struct page **page)
 	*page = (struct page *)((unsigned long)(*page) & ~(1UL));
 }
 
-/* this function should only be called while dev->lock is held */
+/* this function should only be called while dev->heap_lock is held */
 static void ion_buffer_add(struct ion_device *dev,
 			   struct ion_buffer *buffer)
 {
@@ -172,7 +174,7 @@ static void ion_buffer_add(struct ion_device *dev,
 	rb_insert_color(&buffer->node, &dev->buffers);
 }
 
-/* this function should only be called while dev->lock is held */
+/* this function should only be called while dev->heap_lock is held */
 static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 				     struct ion_device *dev,
 				     unsigned long len,
@@ -511,7 +513,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	if (!len)
 		return ERR_PTR(-EINVAL);
 
-	down_read(&dev->lock);
+	down_read(&dev->heap_lock);
 	plist_for_each_entry(heap, &dev->heaps, node) {
 		/* if the caller didn't specify this heap id */
 		if (!((1 << heap->id) & heap_id_mask))
@@ -520,7 +522,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		if (!IS_ERR(buffer))
 			break;
 	}
-	up_read(&dev->lock);
+	up_read(&dev->heap_lock);
 
 	if (buffer == NULL)
 		return ERR_PTR(-ENODEV);
@@ -713,7 +715,7 @@ static int is_client_alive(struct ion_client *client)
 	node = ion_root_client->rb_node;
 	dev = container_of(ion_root_client, struct ion_device, clients);
 
-	down_read(&dev->lock);
+	down_read(&dev->client_lock);
 	while (node) {
 		tmp = rb_entry(node, struct ion_client, node);
 		if (client < tmp) {
@@ -721,12 +723,12 @@ static int is_client_alive(struct ion_client *client)
 		} else if (client > tmp) {
 			node = node->rb_right;
 		} else {
-			up_read(&dev->lock);
+			up_read(&dev->client_lock);
 			return 1;
 		}
 	}
 
-	up_read(&dev->lock);
+	up_read(&dev->client_lock);
 	return 0;
 }
 
@@ -841,12 +843,12 @@ struct ion_client *ion_client_create(struct ion_device *dev,
 	if (!client->name)
 		goto err_free_client;
 
-	down_write(&dev->lock);
+	down_write(&dev->client_lock);
 	client->display_serial = ion_get_client_serial(&dev->clients, name);
 	client->display_name = kasprintf(
 		GFP_KERNEL, "%s-%d", name, client->display_serial);
 	if (!client->display_name) {
-		up_write(&dev->lock);
+		up_write(&dev->client_lock);
 		goto err_free_client_name;
 	}
 	p = &dev->clients.rb_node;
@@ -873,7 +875,7 @@ struct ion_client *ion_client_create(struct ion_device *dev,
 			path, client->display_name);
 	}
 
-	up_write(&dev->lock);
+	up_write(&dev->client_lock);
 
 	return client;
 
@@ -903,12 +905,12 @@ void ion_client_destroy(struct ion_client *client)
 
 	idr_destroy(&client->idr);
 
-	down_write(&dev->lock);
+	down_write(&dev->client_lock);
 	if (client->task)
 		put_task_struct(client->task);
 	rb_erase(&client->node, &dev->clients);
 	debugfs_remove_recursive(client->debug_root);
-	up_write(&dev->lock);
+	up_write(&dev->client_lock);
 
 	kfree(client->display_name);
 	kfree(client->name);
@@ -1603,7 +1605,7 @@ void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 		ion_heap_init_shrinker(heap);
 
 	heap->dev = dev;
-	down_write(&dev->lock);
+	down_write(&dev->heap_lock);
 	/*
 	 * use negative heap->id to reverse the priority -- when traversing
 	 * the list later attempt higher id numbers first
@@ -1638,7 +1640,7 @@ void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 		}
 	}
 
-	up_write(&dev->lock);
+	up_write(&dev->heap_lock);
 }
 EXPORT_SYMBOL(ion_device_add_heap);
 
@@ -1685,7 +1687,8 @@ debugfs_done:
 	idev->custom_ioctl = custom_ioctl;
 	idev->buffers = RB_ROOT;
 	mutex_init(&idev->buffer_lock);
-	init_rwsem(&idev->lock);
+	init_rwsem(&idev->client_lock);
+	init_rwsem(&idev->heap_lock);
 	plist_head_init(&idev->heaps);
 	idev->clients = RB_ROOT;
 	ion_root_client = &idev->clients;
