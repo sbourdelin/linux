@@ -126,7 +126,7 @@ struct sched_attr {
 	u64 sched_period;
 };
 
-struct futex_pi_state;
+struct futex_state;
 struct robust_list_head;
 struct bio_list;
 struct fs_struct;
@@ -1772,7 +1772,7 @@ struct task_struct {
 	struct compat_robust_list_head __user *compat_robust_list;
 #endif
 	struct list_head pi_state_list;
-	struct futex_pi_state *pi_state_cache;
+	struct futex_state *pi_state_cache;
 #endif
 #ifdef CONFIG_PERF_EVENTS
 	struct perf_event_context *perf_event_ctxp[perf_nr_task_contexts];
