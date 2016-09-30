@@ -3337,7 +3337,17 @@ void exit_robust_list(struct task_struct *curr)
 #define TP_SPIN_THRESHOLD       (1 << 14)
 #define TP_SLEEP_DECREMENT      (TP_SPIN_THRESHOLD/64)
 
-/**
+/*
+ * futex_lock() returned values to identify how the lock is acquired:
+ * 0 - steals the lock
+ * 1 - top waiter (mutex owner) acquires the lock
+ * 2 - handed off the lock
+ */
+#define TP_LOCK_STOLEN		0
+#define TP_LOCK_ACQUIRED	1
+#define TP_LOCK_HANDOFF		2
+
+ /**
  * lookup_futex_state - Looking up the futex state structure.
  * @hb:		 hash bucket
  * @key:	 futex key
@@ -3420,9 +3430,11 @@ static inline int put_futex_state_unlocked(struct futex_state *state)
  *   preserve the flag bits
  * endif
  *
- * Return: 1 if lock acquired;
+ * Return: TP_LOCK_ACQUIRED if lock acquired;
+ *	   TP_LOCK_HANDOFF if lock was handed off;
  *	   0 if lock acquisition failed;
  *	   -EFAULT if an error happened.
+ *	   *puval will contain the latest futex value when trylock fails.
  */
 static inline int futex_trylock(u32 __user *uaddr, u32 vpid, u32 *puval,
 				const bool waiter)
@@ -3435,7 +3447,7 @@ static inline int futex_trylock(u32 __user *uaddr, u32 vpid, u32 *puval,
 	*puval = uval;
 
 	if (waiter && (uval & FUTEX_TID_MASK) == vpid)
-		return 1;
+		return TP_LOCK_HANDOFF;
 
 	if (uval & FUTEX_TID_MASK)
 		return 0;	/* Trylock fails */
@@ -3446,7 +3458,7 @@ static inline int futex_trylock(u32 __user *uaddr, u32 vpid, u32 *puval,
 	if (unlikely(cmpxchg_futex_value(puval, uaddr, uval, vpid|flags)))
 		return -EFAULT;
 
-	return *puval == uval;
+	return (*puval == uval) ? TP_LOCK_ACQUIRED : 0;
 }
 
 /**
@@ -3659,8 +3671,10 @@ efault:
  * This function is not inlined so that it can show up separately in perf
  * profile for performance analysis purpose.
  *
- * Return: 0   - lock acquired
- *	   < 0 - an error happens
+ * Return: TP_LOCK_ACQUIRED - lock acquired normally
+ *	   TP_LOCK_HANDOFF  - lock handed off directly from unlocker
+ *	   TP_LOCK_STOLEN   - lock stolen
+ *	   < 0		    - an error happens
  */
 static noinline int futex_lock(u32 __user *uaddr, unsigned int flags)
 {
@@ -3676,7 +3690,7 @@ static noinline int futex_lock(u32 __user *uaddr, unsigned int flags)
 	 */
 	ret = futex_trylock(uaddr, vpid, &uval, false);
 	if (ret)
-		goto out;
+		return (ret < 0) ? ret : TP_LOCK_STOLEN;
 
 	/*
 	 * Detect deadlocks.
@@ -3750,7 +3764,7 @@ out_put_state_key:
 	put_futex_key(&key);
 
 out:
-	return (ret < 0) ? ret : 0;
+	return ret;
 }
 
 /*
