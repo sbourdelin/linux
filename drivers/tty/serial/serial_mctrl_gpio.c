@@ -72,6 +72,13 @@ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
 }
 EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
 
+bool mctrl_gpio_use_rtscts(struct mctrl_gpios *gpios)
+{
+	return mctrl_gpio_to_gpiod(gpios, UART_GPIO_CTS) &&
+		mctrl_gpio_to_gpiod(gpios, UART_GPIO_RTS);
+}
+EXPORT_SYMBOL_GPL(mctrl_gpio_use_rtscts);
+
 unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
 {
 	enum mctrl_gpio_idx i;
