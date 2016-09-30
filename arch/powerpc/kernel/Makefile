@@ -36,8 +36,9 @@ obj-y				:= cputable.o ptrace.o syscalls.o \
 				   process.o systbl.o idle.o \
 				   signal.o sysfs.o cacheinfo.o time.o \
 				   prom.o traps.o setup-common.o \
-				   udbg.o misc.o io.o dma.o misc_$(BITS).o \
-				   of_platform.o prom_parse.o
+				   udbg.o misc.o io.o dma.o \
+				   misc_$(CONFIG_WORD_SIZE).o of_platform.o \
+				   prom_parse.o
 obj-$(CONFIG_PPC64)		+= setup_64.o sys_ppc32.o \
 				   signal_64.o ptrace32.o \
 				   paca.o nvram_64.o firmware.o
@@ -74,23 +75,23 @@ obj-$(CONFIG_HIBERNATION)	+= swsusp.o suspend.o
 ifeq ($(CONFIG_FSL_BOOKE),y)
 obj-$(CONFIG_HIBERNATION)	+= swsusp_booke.o
 else
-obj-$(CONFIG_HIBERNATION)	+= swsusp_$(BITS).o
+obj-$(CONFIG_HIBERNATION)	+= swsusp_$(CONFIG_WORD_SIZE).o
 endif
 obj64-$(CONFIG_HIBERNATION)	+= swsusp_asm64.o
-obj-$(CONFIG_MODULES)		+= module.o module_$(BITS).o
+obj-$(CONFIG_MODULES)		+= module.o module_$(CONFIG_WORD_SIZE).o
 obj-$(CONFIG_44x)		+= cpu_setup_44x.o
 obj-$(CONFIG_PPC_FSL_BOOK3E)	+= cpu_setup_fsl_booke.o
 obj-$(CONFIG_PPC_DOORBELL)	+= dbell.o
 obj-$(CONFIG_JUMP_LABEL)	+= jump_label.o
 
-extra-y				:= head_$(BITS).o
+extra-y				:= head_$(CONFIG_WORD_SIZE).o
 extra-$(CONFIG_40x)		:= head_40x.o
 extra-$(CONFIG_44x)		:= head_44x.o
 extra-$(CONFIG_FSL_BOOKE)	:= head_fsl_booke.o
 extra-$(CONFIG_8xx)		:= head_8xx.o
 extra-y				+= vmlinux.lds
 
-obj-$(CONFIG_RELOCATABLE)	+= reloc_$(BITS).o
+obj-$(CONFIG_RELOCATABLE)	+= reloc_$(CONFIG_WORD_SIZE).o
 
 obj-$(CONFIG_PPC32)		+= entry_32.o setup_32.o
 obj-$(CONFIG_PPC64)		+= dma-iommu.o iommu.o
