@@ -8,7 +8,7 @@ all: $(TEST_PROGS) $(TEST_FILES)
 
 $(TEST_PROGS): ../harness.c
 
-prot_sao: ../utils.c
+prot_sao: ../utility/utils.c
 
 include ../../lib.mk
 

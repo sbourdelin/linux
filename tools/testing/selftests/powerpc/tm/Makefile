@@ -3,7 +3,7 @@ TEST_PROGS := tm-resched-dscr tm-syscall tm-signal-msr-resv tm-signal-stack \
 
 all: $(TEST_PROGS)
 
-$(TEST_PROGS): ../harness.c ../utils.c
+$(TEST_PROGS): ../harness.c ../utility/utils.c
 
 CFLAGS += -mhtm
 

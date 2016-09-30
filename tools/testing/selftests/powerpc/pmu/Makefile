@@ -2,7 +2,7 @@ noarg:
 	$(MAKE) -C ../
 
 TEST_PROGS := count_instructions l3_bank_test per_event_excludes
-EXTRA_SOURCES := ../harness.c event.c lib.c ../utils.c
+EXTRA_SOURCES := ../harness.c event.c lib.c ../utility/utils.c
 
 all: $(TEST_PROGS) ebb
 
@@ -12,7 +12,7 @@ $(TEST_PROGS): $(EXTRA_SOURCES)
 count_instructions: loop.S count_instructions.c $(EXTRA_SOURCES)
 	$(CC) $(CFLAGS) -m64 -o $@ $^
 
-per_event_excludes: ../utils.c
+per_event_excludes: ../utility/utils.c
 
 include ../../lib.mk
 

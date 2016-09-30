@@ -7,7 +7,7 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-#include "../basic_asm.h"
+#include "basic_asm.h"
 
 #define PUSH_FPU(pos) \
 	stfd	f14,pos(sp); \

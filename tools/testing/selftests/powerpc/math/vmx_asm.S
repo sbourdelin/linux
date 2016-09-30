@@ -7,7 +7,7 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-#include "../basic_asm.h"
+#include "basic_asm.h"
 
 # POS MUST BE 16 ALIGNED!
 #define PUSH_VMX(pos,reg) \
