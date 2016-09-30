@@ -37,6 +37,7 @@ static inline int get_nmi_message_lost(void)
 
 #define ALT_PRINTK_CONTEXT_MASK		0x07ffffff
 #define ALT_PRINTK_NMI_CONTEXT_MASK	0x08000000
+#define ALT_PRINTK_RECURSION_MASK	0x10000000
 
 extern raw_spinlock_t logbuf_lock;
 

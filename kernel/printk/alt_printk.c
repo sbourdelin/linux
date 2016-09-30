@@ -150,6 +150,13 @@ static void __alt_printk_flush(struct irq_work *work)
 more:
 	len = atomic_read(&s->len);
 
+	if (this_cpu_read(alt_printk_ctx) & ALT_PRINTK_RECURSION_MASK) {
+		const char *msg = "BUG: recent printk recursion!\n";
+
+		this_cpu_and(alt_printk_ctx, ~ALT_PRINTK_RECURSION_MASK);
+		alt_printk_flush_line(msg, strlen(msg));
+	}
+
 	/*
 	 * This is just a paranoid check that nobody has manipulated
 	 * the buffer an unexpected way. If we printed something then
@@ -290,6 +297,8 @@ static int vprintk_alt(const char *fmt, va_list args)
 {
 	struct alt_printk_seq_buf *s = this_cpu_ptr(&alt_print_seq);
 
+	/* There is only one way to get here -- a printk recursion. */
+	this_cpu_or(alt_printk_ctx, ALT_PRINTK_RECURSION_MASK);
 	return alt_printk_log_store(s, fmt, args);
 }
 
