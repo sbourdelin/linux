@@ -1,0 +1,27 @@
+Broadcom STB AVS CPUfreq driver
+===============================
+
+"AVS" is the name of a firmware developed at Broadcom. It derives its
+name from the technique called "Adaptive Voltage Scaling". Adaptive
+voltage scaling was the original purpose of this firmware. The AVS
+firmware still supports "AVS mode", where all it does is adaptive
+voltage scaling. However, on some newer Broadcom SoCs, the AVS
+Firmware, despite its unchanged name, also supports DFS mode and DVFS
+mode.
+
+In the context of this document and the related driver, "AVS" by itself
+always means the Broadcom firmware and never refers to the technique
+called "Adaptive Voltage Scaling".
+
+The Broadcom STB AVS CPUfreq driver provides voltage and frequency
+scaling on Broadcom SoCs using AVS firmware with support for DFS and
+DVFS. The AVS firmware is running on its own co-processor. The driver
+supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
+systems which share clock and voltage across all CPUs.
+
+Actual voltage and frequency scaling is done solely by the AVS firmware.
+This driver does not change frequency or voltage itself. It provides a
+standard CPUfreq interface to the rest of the kernel and to userland. It
+interfaces with the AVS firmware to effect the requested changes and to
+report back the current system status in a way that is expected by existing
+tools.
