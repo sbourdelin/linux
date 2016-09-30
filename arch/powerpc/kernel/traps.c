@@ -117,7 +117,7 @@ static int die_owner = -1;
 static unsigned int die_nest_count;
 static int die_counter;
 
-static unsigned __kprobes long oops_begin(struct pt_regs *regs)
+static unsigned long oops_begin(struct pt_regs *regs)
 {
 	int cpu;
 	unsigned long flags;
@@ -144,8 +144,9 @@ static unsigned __kprobes long oops_begin(struct pt_regs *regs)
 		pmac_backlight_unblank();
 	return flags;
 }
+NOKPROBE_SYMBOL(oops_begin);
 
-static void __kprobes oops_end(unsigned long flags, struct pt_regs *regs,
+static void oops_end(unsigned long flags, struct pt_regs *regs,
 			       int signr)
 {
 	bust_spinlocks(0);
@@ -196,8 +197,9 @@ static void __kprobes oops_end(unsigned long flags, struct pt_regs *regs,
 		panic("Fatal exception");
 	do_exit(signr);
 }
+NOKPROBE_SYMBOL(oops_end);
 
-static int __kprobes __die(const char *str, struct pt_regs *regs, long err)
+static int __die(const char *str, struct pt_regs *regs, long err)
 {
 	printk("Oops: %s, sig: %ld [#%d]\n", str, err, ++die_counter);
 #ifdef CONFIG_PREEMPT
@@ -221,6 +223,7 @@ static int __kprobes __die(const char *str, struct pt_regs *regs, long err)
 
 	return 0;
 }
+NOKPROBE_SYMBOL(__die);
 
 void die(const char *str, struct pt_regs *regs, long err)
 {
@@ -270,7 +273,6 @@ void _exception(int signr, struct pt_regs *regs, int code, unsigned long addr)
 	force_sig_info(signr, &info, current);
 }
 
-#ifdef CONFIG_PPC64
 void system_reset_exception(struct pt_regs *regs)
 {
 	/* See if any machine dependent calls */
@@ -288,6 +290,7 @@ void system_reset_exception(struct pt_regs *regs)
 	/* What should we do here? We could issue a shutdown or hard reset. */
 }
 
+#ifdef CONFIG_PPC64
 /*
  * This function is called in real mode. Strictly no printk's please.
  *
@@ -349,12 +352,11 @@ static inline int check_io_access(struct pt_regs *regs)
 		 * For the debug message, we look at the preceding
 		 * load or store.
 		 */
-		if (*nip == 0x60000000)		/* nop */
+		if (*nip == PPC_INST_NOP)
 			nip -= 2;
-		else if (*nip == 0x4c00012c)	/* isync */
+		else if (*nip == PPC_INST_ISYNC)
 			--nip;
-		if (*nip == 0x7c0004ac || (*nip >> 26) == 3) {
-			/* sync or twi */
+		if (*nip == PPC_INST_SYNC || (*nip >> 26) == OP_TRAP) {
 			unsigned int rb;
 
 			--nip;
@@ -665,6 +667,31 @@ int machine_check_e200(struct pt_regs *regs)
 
 	return 0;
 }
+#elif defined(CONFIG_PPC_8xx)
+int machine_check_8xx(struct pt_regs *regs)
+{
+	unsigned long reason = get_mc_reason(regs);
+
+	pr_err("Machine check in kernel mode.\n");
+	pr_err("Caused by (from SRR1=%lx): ", reason);
+	if (reason & 0x40000000)
+		pr_err("Fetch error at address %lx\n", regs->nip);
+	else
+		pr_err("Data access error at address %lx\n", regs->dar);
+
+#ifdef CONFIG_PCI
+	/* the qspan pci read routines can cause machine checks -- Cort
+	 *
+	 * yuck !!! that totally needs to go away ! There are better ways
+	 * to deal with that than having a wart in the mcheck handler.
+	 * -- BenH
+	 */
+	bad_page_fault(regs, regs->dar, SIGBUS);
+	return 1;
+#else
+	return 0;
+#endif
+}
 #else
 int machine_check_generic(struct pt_regs *regs)
 {
@@ -723,17 +750,6 @@ void machine_check_exception(struct pt_regs *regs)
 
 	if (recover > 0)
 		goto bail;
-
-#if defined(CONFIG_8xx) && defined(CONFIG_PCI)
-	/* the qspan pci read routines can cause machine checks -- Cort
-	 *
-	 * yuck !!! that totally needs to go away ! There are better ways
-	 * to deal with that than having a wart in the mcheck handler.
-	 * -- BenH
-	 */
-	bad_page_fault(regs, regs->dar, SIGBUS);
-	goto bail;
-#endif
 
 	if (debugger_fault_handler(regs))
 		goto bail;
@@ -802,7 +818,7 @@ void RunModeException(struct pt_regs *regs)
 	_exception(SIGTRAP, regs, 0, 0);
 }
 
-void __kprobes single_step_exception(struct pt_regs *regs)
+void single_step_exception(struct pt_regs *regs)
 {
 	enum ctx_state prev_state = exception_enter();
 
@@ -819,6 +835,7 @@ void __kprobes single_step_exception(struct pt_regs *regs)
 bail:
 	exception_exit(prev_state);
 }
+NOKPROBE_SYMBOL(single_step_exception);
 
 /*
  * After we have successfully emulated an instruction, we have to
@@ -1140,7 +1157,7 @@ static int emulate_math(struct pt_regs *regs)
 static inline int emulate_math(struct pt_regs *regs) { return -1; }
 #endif
 
-void __kprobes program_check_exception(struct pt_regs *regs)
+void program_check_exception(struct pt_regs *regs)
 {
 	enum ctx_state prev_state = exception_enter();
 	unsigned int reason = get_reason(regs);
@@ -1260,16 +1277,18 @@ sigill:
 bail:
 	exception_exit(prev_state);
 }
+NOKPROBE_SYMBOL(program_check_exception);
 
 /*
  * This occurs when running in hypervisor mode on POWER6 or later
  * and an illegal instruction is encountered.
  */
-void __kprobes emulation_assist_interrupt(struct pt_regs *regs)
+void emulation_assist_interrupt(struct pt_regs *regs)
 {
 	regs->msr |= REASON_ILLEGAL;
 	program_check_exception(regs);
 }
+NOKPROBE_SYMBOL(emulation_assist_interrupt);
 
 void alignment_exception(struct pt_regs *regs)
 {
@@ -1307,6 +1326,18 @@ void alignment_exception(struct pt_regs *regs)
 		bad_page_fault(regs, regs->dar, sig);
 
 bail:
+	exception_exit(prev_state);
+}
+
+void slb_miss_bad_addr(struct pt_regs *regs)
+{
+	enum ctx_state prev_state = exception_enter();
+
+	if (user_mode(regs))
+		_exception(SIGSEGV, regs, SEGV_BNDERR, regs->dar);
+	else
+		bad_page_fault(regs, regs->dar, SIGSEGV);
+
 	exception_exit(prev_state);
 }
 
@@ -1656,7 +1687,7 @@ static void handle_debug(struct pt_regs *regs, unsigned long debug_status)
 		mtspr(SPRN_DBCR0, current->thread.debug.dbcr0);
 }
 
-void __kprobes DebugException(struct pt_regs *regs, unsigned long debug_status)
+void DebugException(struct pt_regs *regs, unsigned long debug_status)
 {
 	current->thread.debug.dbsr = debug_status;
 
@@ -1717,6 +1748,7 @@ void __kprobes DebugException(struct pt_regs *regs, unsigned long debug_status)
 	} else
 		handle_debug(regs, debug_status);
 }
+NOKPROBE_SYMBOL(DebugException);
 #endif /* CONFIG_PPC_ADV_DEBUG_REGS */
 
 #if !defined(CONFIG_TAU_INT)
