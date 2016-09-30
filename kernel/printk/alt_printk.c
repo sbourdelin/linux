@@ -1,5 +1,5 @@
 /*
- * alt_printk.c - Safe printk in NMI context
+ * alt_printk.c - Safe printk for printk-deadlock-prone contexts
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -32,13 +32,13 @@
  * is later flushed into the main ring buffer via IRQ work.
  *
  * The alternative implementation is chosen transparently
- * via @printk_func per-CPU variable.
+ * by examinig current printk() context mask stored in @alt_printk_ctx
+ * per-CPU variable.
  *
  * The implementation allows to flush the strings also from another CPU.
  * There are situations when we want to make sure that all buffers
  * were handled or when IRQs are blocked.
  */
-DEFINE_PER_CPU(printk_func_t, printk_func) = vprintk_default;
 static int alt_printk_irq_ready;
 atomic_t nmi_message_lost;
 
@@ -52,25 +52,21 @@ struct alt_printk_seq_buf {
 };
 static DEFINE_PER_CPU(struct alt_printk_seq_buf, nmi_print_seq);
 
-/*
- * Safe printk() for NMI context. It uses a per-CPU buffer to
- * store the message. NMIs are not nested, so there is always only
- * one writer running. But the buffer might get flushed from another
- * CPU, so we need to be careful.
- */
-static int vprintk_nmi(const char *fmt, va_list args)
+static DEFINE_PER_CPU(struct alt_printk_seq_buf, alt_print_seq);
+static DEFINE_PER_CPU(int, alt_printk_ctx);
+static DEFINE_PER_CPU(unsigned long, alt_printk_irq_flags);
+
+static int alt_printk_log_store(struct alt_printk_seq_buf *s,
+		const char *fmt, va_list args)
 {
-	struct alt_printk_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
-	int add = 0;
+	int add;
 	size_t len;
 
 again:
 	len = atomic_read(&s->len);
 
-	if (len >= sizeof(s->buffer)) {
-		atomic_inc(&nmi_message_lost);
+	if (len >= sizeof(s->buffer))
 		return 0;
-	}
 
 	/*
 	 * Make sure that all old data have been read before the buffer was
@@ -110,7 +106,6 @@ static void alt_printk_flush_line(const char *text, int len)
 		printk_deferred("%.*s", len, text);
 	else
 		printk("%.*s", len, text);
-
 }
 
 /*
@@ -240,6 +235,83 @@ void alt_printk_flush_on_panic(void)
 	alt_printk_flush();
 }
 
+/*
+ * Safe printk() for NMI context. It uses a per-CPU buffer to
+ * store the message. NMIs are not nested, so there is always only
+ * one writer running. But the buffer might get flushed from another
+ * CPU, so we need to be careful.
+ */
+static int vprintk_nmi(const char *fmt, va_list args)
+{
+	struct alt_printk_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
+	int add;
+
+	add = alt_printk_log_store(s, fmt, args);
+	if (!add)
+		atomic_inc(&nmi_message_lost);
+
+	return add;
+}
+
+void printk_nmi_enter(void)
+{
+	this_cpu_or(alt_printk_ctx, ALT_PRINTK_NMI_CONTEXT_MASK);
+}
+
+void printk_nmi_exit(void)
+{
+	this_cpu_and(alt_printk_ctx, ~ALT_PRINTK_NMI_CONTEXT_MASK);
+}
+
+/*
+ * Lockless printk(), to avoid deadlocks should the printk() recurse
+ * into itself. It uses a per-CPU buffer to store the message, just like
+ * NMI.
+ */
+static int vprintk_alt(const char *fmt, va_list args)
+{
+	struct alt_printk_seq_buf *s = this_cpu_ptr(&alt_print_seq);
+
+	return alt_printk_log_store(s, fmt, args);
+}
+
+/*
+ * Returns with local IRQs disabled.
+ * Can be preempted by NMI.
+ */
+void alt_printk_enter(void)
+{
+	unsigned long flags;
+	int entry_count;
+
+	local_irq_save(flags);
+	if (!(this_cpu_read(alt_printk_ctx) & ALT_PRINTK_CONTEXT_MASK))
+		this_cpu_write(alt_printk_irq_flags, flags);
+	this_cpu_inc(alt_printk_ctx);
+}
+
+/*
+ * Restores local IRQs state saved in alt_printk_enter().
+ * Can be preempted by NMI.
+ */
+void alt_printk_exit(void)
+{
+	this_cpu_dec(alt_printk_ctx);
+	if (!(this_cpu_read(alt_printk_ctx) & ALT_PRINTK_CONTEXT_MASK))
+		local_irq_restore(this_cpu_read(alt_printk_irq_flags));
+}
+
+__printf(1, 0) int vprintk_func(const char *fmt, va_list args)
+{
+	if (this_cpu_read(alt_printk_ctx) & ALT_PRINTK_NMI_CONTEXT_MASK)
+		return vprintk_nmi(fmt, args);
+
+	if (this_cpu_read(alt_printk_ctx) & ALT_PRINTK_CONTEXT_MASK)
+		return vprintk_alt(fmt, args);
+
+	return vprintk_default(fmt, args);
+}
+
 void __init alt_printk_init(void)
 {
 	int cpu;
@@ -247,6 +319,9 @@ void __init alt_printk_init(void)
 	for_each_possible_cpu(cpu) {
 		struct alt_printk_seq_buf *s = &per_cpu(nmi_print_seq, cpu);
 
+		init_irq_work(&s->work, __alt_printk_flush);
+
+		s = &per_cpu(alt_print_seq, cpu);
 		init_irq_work(&s->work, __alt_printk_flush);
 	}
 
@@ -256,14 +331,4 @@ void __init alt_printk_init(void)
 
 	/* Flush pending messages that did not have scheduled IRQ works. */
 	alt_printk_flush();
-}
-
-void printk_nmi_enter(void)
-{
-	this_cpu_write(printk_func, vprintk_nmi);
-}
-
-void printk_nmi_exit(void)
-{
-	this_cpu_write(printk_func, vprintk_default);
 }
