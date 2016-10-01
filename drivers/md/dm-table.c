@@ -538,7 +538,7 @@ static char **realloc_argv(unsigned *array_size, char **old_argv)
  */
 int dm_split_args(int *argc, char ***argvp, char *input)
 {
-	char *start, *end = input, *out, **argv = NULL;
+	char *start, *end = input, *out, **argv;
 	unsigned array_size = 0;
 
 	*argc = 0;
