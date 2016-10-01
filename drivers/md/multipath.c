@@ -408,7 +408,7 @@ static int multipath_run (struct mddev *mddev)
 				   sizeof(*conf->multipaths),
 				   GFP_KERNEL);
 	if (!conf->multipaths)
-		goto out_free_conf;
+		goto free_conf;
 
 	working_disks = 0;
 	rdev_for_each(rdev, mddev) {
@@ -434,18 +434,18 @@ static int multipath_run (struct mddev *mddev)
 	if (!working_disks) {
 		printk(KERN_ERR "multipath: no operational IO paths for %s\n",
 			mdname(mddev));
-		goto out_free_conf;
+		goto free_multipaths;
 	}
 	mddev->degraded = conf->raid_disks - working_disks;
 
 	conf->pool = mempool_create_kmalloc_pool(NR_RESERVED_BUFS,
 						 sizeof(struct multipath_bh));
 	if (!conf->pool)
-		goto out_free_conf;
+		goto free_multipaths;
 
 	mddev->thread = md_register_thread(multipathd, mddev, "multipath");
 	if (!mddev->thread)
-		goto out_free_conf;
+		goto destroy_pool;
 
 	printk(KERN_INFO
 		"multipath: array %s active with %d out of %d IO paths\n",
@@ -457,13 +457,14 @@ static int multipath_run (struct mddev *mddev)
 	md_set_array_sectors(mddev, multipath_size(mddev, 0, 0));
 
 	if (md_integrity_register(mddev))
-		goto out_free_conf;
+		goto destroy_pool;
 
 	return 0;
-
-out_free_conf:
+destroy_pool:
 	mempool_destroy(conf->pool);
+free_multipaths:
 	kfree(conf->multipaths);
+free_conf:
 	kfree(conf);
 	mddev->private = NULL;
 out:
