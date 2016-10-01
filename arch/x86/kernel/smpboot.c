@@ -295,6 +295,11 @@ found:
 	return 0;
 }
 
+int topology_num_packages(void)
+{
+	return logical_packages;
+}
+
 /**
  * topology_phys_to_logical_pkg - Map a physical package id to a logical
  *

@@ -129,9 +129,12 @@ static inline int topology_max_smt_threads(void)
 }
 
 int topology_update_package_map(unsigned int apicid, unsigned int cpu);
+extern int topology_num_packages(void);
 extern int topology_phys_to_logical_pkg(unsigned int pkg);
 #else
 #define topology_max_packages()			(1)
+static inline int
+topology_num_packages(void) { return 1; }
 static inline int
 topology_update_package_map(unsigned int apicid, unsigned int cpu) { return 0; }
 static inline int topology_phys_to_logical_pkg(unsigned int pkg) { return 0; }
