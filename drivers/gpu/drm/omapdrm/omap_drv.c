@@ -635,7 +635,7 @@ static const struct drm_ioctl_desc ioctls[DRM_COMMAND_END - DRM_COMMAND_BASE] = 
  */
 
 /**
- * load - setup chip and create an initial config
+ * dev_load - setup chip and create an initial config
  * @dev: DRM device
  * @flags: startup flags
  *
@@ -733,7 +733,7 @@ static int dev_open(struct drm_device *dev, struct drm_file *file)
 }
 
 /**
- * lastclose - clean up after all DRM clients have exited
+ * dev_lastclose - clean up after all DRM clients have exited
  * @dev: DRM device
  *
  * Take care of cleaning up after all DRM clients have exited.  In the
