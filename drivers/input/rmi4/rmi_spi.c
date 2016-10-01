@@ -466,8 +466,10 @@ static int rmi_spi_probe(struct spi_device *spi)
 	}
 
 	retval = rmi_spi_init_irq(spi);
-	if (retval < 0)
+	if (retval < 0) {
+		rmi_unregister_transport_device(&rmi_spi->xport);
 		return retval;
+	}
 
 	dev_info(&spi->dev, "registered RMI SPI driver\n");
 	return 0;
