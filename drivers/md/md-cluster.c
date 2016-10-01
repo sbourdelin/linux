@@ -201,12 +201,12 @@ static struct dlm_lock_resource *lockres_init(struct mddev *mddev,
 	namelen = strlen(name);
 	res->name = kzalloc(namelen + 1, GFP_KERNEL);
 	if (!res->name)
-		goto out_err;
+		goto free_resource;
 	strlcpy(res->name, name, namelen + 1);
 	if (with_lvb) {
 		res->lksb.sb_lvbptr = kzalloc(LVB_SIZE, GFP_KERNEL);
 		if (!res->lksb.sb_lvbptr)
-			goto out_err;
+			goto free_name;
 		res->flags = DLM_LKF_VALBLK;
 	}
 
@@ -218,15 +218,17 @@ static struct dlm_lock_resource *lockres_init(struct mddev *mddev,
 	ret = dlm_lock_sync(res, DLM_LOCK_NL);
 	if (ret) {
 		pr_err("md-cluster: Unable to lock NL on new lock resource %s\n", name);
-		goto out_err;
+		goto free_lvb;
 	}
 	res->flags &= ~DLM_LKF_EXPEDITE;
 	res->flags |= DLM_LKF_CONVERT;
 
 	return res;
-out_err:
+free_lvb:
 	kfree(res->lksb.sb_lvbptr);
+free_name:
 	kfree(res->name);
+free_resource:
 	kfree(res);
 	return NULL;
 }
