@@ -221,7 +221,7 @@ static long pSeries_lpar_hpte_remove(unsigned long hpte_group)
 	return -1;
 }
 
-static void pSeries_lpar_hptab_clear(void)
+static void __pSeries_lpar_clear_hpt(void)
 {
 	unsigned long size_bytes = 1UL << ppc64_pft_size;
 	unsigned long hpte_count = size_bytes >> 4;
@@ -249,6 +249,18 @@ static void pSeries_lpar_hptab_clear(void)
 					&(ptes[j].pteh), &(ptes[j].ptel));
 		}
 	}
+}
+
+static void pSeries_lpar_hptab_clear(void)
+{
+	int rc;
+
+	do {
+		rc = plpar_hcall_norets(H_CLEAR_HPT);
+	} while (rc == H_CONTINUE);
+
+	if (rc != H_SUCCESS)
+		__pSeries_lpar_clear_hpt();
 
 #ifdef __LITTLE_ENDIAN__
 	/*
