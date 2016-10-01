@@ -706,7 +706,7 @@ static int __sendmsg(struct md_cluster_info *cinfo, struct cluster_msg *cmsg)
 	}
 
 	memcpy(cinfo->message_lockres->lksb.sb_lvbptr, (void *)cmsg,
-			sizeof(struct cluster_msg));
+	       sizeof(*cmsg));
 	/*down-convert EX to CW on Message*/
 	error = dlm_lock_sync(cinfo->message_lockres, DLM_LOCK_CW);
 	if (error) {
