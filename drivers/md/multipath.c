@@ -401,22 +401,14 @@ static int multipath_run (struct mddev *mddev)
 
 	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
 	mddev->private = conf;
-	if (!conf) {
-		printk(KERN_ERR
-			"multipath: couldn't allocate memory for %s\n",
-			mdname(mddev));
+	if (!conf)
 		goto out;
-	}
 
 	conf->multipaths = kcalloc(mddev->raid_disks,
 				   sizeof(*conf->multipaths),
 				   GFP_KERNEL);
-	if (!conf->multipaths) {
-		printk(KERN_ERR
-			"multipath: couldn't allocate memory for %s\n",
-			mdname(mddev));
+	if (!conf->multipaths)
 		goto out_free_conf;
-	}
 
 	working_disks = 0;
 	rdev_for_each(rdev, mddev) {
@@ -448,21 +440,14 @@ static int multipath_run (struct mddev *mddev)
 
 	conf->pool = mempool_create_kmalloc_pool(NR_RESERVED_BUFS,
 						 sizeof(struct multipath_bh));
-	if (conf->pool == NULL) {
-		printk(KERN_ERR
-			"multipath: couldn't allocate memory for %s\n",
-			mdname(mddev));
+	if (!conf->pool)
 		goto out_free_conf;
-	}
 
 	{
 		mddev->thread = md_register_thread(multipathd, mddev,
 						   "multipath");
-		if (!mddev->thread) {
-			printk(KERN_ERR "multipath: couldn't allocate thread"
-				" for %s\n", mdname(mddev));
+		if (!mddev->thread)
 			goto out_free_conf;
-		}
 	}
 
 	printk(KERN_INFO
