@@ -260,7 +260,6 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	struct thread_struct *prev = &prev_p->thread;
 	struct thread_struct *next = &next_p->thread;
 	struct fpu *prev_fpu = &prev->fpu;
-	struct fpu *next_fpu = &next->fpu;
 	int cpu = smp_processor_id();
 	struct tss_struct *tss = &per_cpu(cpu_tss, cpu);
 	unsigned prev_fsindex, prev_gsindex;
@@ -415,8 +414,6 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		prev->gsbase = 0;
 	prev->gsindex = prev_gsindex;
 
-	switch_fpu_finish(next_fpu);
-
 	/*
 	 * Switch the PDA and FPU contexts.
 	 */
@@ -424,6 +421,8 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
 	/* Reload esp0 and ss1.  This changes current_thread_info(). */
 	load_sp0(tss, next);
+
+	switch_fpu_finish();
 
 	/*
 	 * Now maybe reload the debug registers and handle I/O bitmaps

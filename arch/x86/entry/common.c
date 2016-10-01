@@ -27,6 +27,7 @@
 #include <asm/vdso.h>
 #include <asm/uaccess.h>
 #include <asm/cpufeature.h>
+#include <asm/fpu/api.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/syscalls.h>
@@ -196,6 +197,9 @@ __visible inline void prepare_exit_to_usermode(struct pt_regs *regs)
 
 	if (unlikely(cached_flags & EXIT_TO_USERMODE_LOOP_FLAGS))
 		exit_to_usermode_loop(regs, cached_flags);
+
+	if (unlikely(test_and_clear_thread_flag(TIF_LOAD_FPU)))
+		switch_fpu_return();
 
 #ifdef CONFIG_COMPAT
 	/*

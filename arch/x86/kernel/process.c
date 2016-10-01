@@ -32,6 +32,7 @@
 #include <asm/tlbflush.h>
 #include <asm/mce.h>
 #include <asm/vm86.h>
+#include <asm/fpu/types.h>
 
 /*
  * per-CPU TSS segments. Threads are completely 'soft' on Linux,
@@ -189,6 +190,40 @@ int set_tsc_mode(unsigned int val)
 		return -EINVAL;
 
 	return 0;
+}
+
+/*
+ * Set up the userspace FPU context before returning to userspace.
+ */
+void switch_fpu_return(void)
+{
+	struct fpu *fpu = &current->thread.fpu;
+	bool preload;
+	/*
+	 * If the task has used the math, pre-load the FPU on xsave processors
+	 * or if the past 5 consecutive context-switches used math.
+	 */
+	preload = static_cpu_has(X86_FEATURE_FPU) &&
+		  fpu->fpstate_active &&
+		  (use_eager_fpu() || fpu->counter > 5);
+
+	if (preload) {
+		prefetch(&fpu->state);
+		fpu->counter++;
+		__fpregs_activate(fpu);
+		trace_x86_fpu_regs_activated(fpu);
+
+		/* Don't change CR0.TS if we just switch! */
+		if (!__this_cpu_read(fpu_active)) {
+			__fpregs_activate_hw();
+			__this_cpu_write(fpu_active, true);
+		}
+
+		copy_kernel_to_fpregs(&fpu->state);
+	} else if (__this_cpu_read(fpu_active)) {
+		__this_cpu_write(fpu_active, false);
+		__fpregs_deactivate_hw();
+	}
 }
 
 void __switch_to_xtra(struct task_struct *prev_p, struct task_struct *next_p,

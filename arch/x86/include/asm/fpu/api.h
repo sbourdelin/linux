@@ -37,6 +37,11 @@ extern int  irq_ts_save(void);
 extern void irq_ts_restore(int TS_state);
 
 /*
+ * Set up the userspace FPU context before returning to userspace.
+ */
+extern void switch_fpu_return(void);
+
+/*
  * Query the presence of one or more xfeatures. Works on any legacy CPU as well.
  *
  * If 'feature_name' is set then put a human-readable description of

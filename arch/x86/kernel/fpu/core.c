@@ -118,6 +118,8 @@ void __kernel_fpu_begin(void)
 
 	kernel_fpu_disable();
 
+	this_cpu_write(fpu_fpregs_owner_ctx, NULL);
+
 	if (fpu->fpregs_active) {
 		/*
 		 * Ignore return value -- we don't care if reg state
@@ -125,8 +127,10 @@ void __kernel_fpu_begin(void)
 		 */
 		copy_fpregs_to_fpstate(fpu);
 	} else {
-		this_cpu_write(fpu_fpregs_owner_ctx, NULL);
-		__fpregs_activate_hw();
+		if (!__this_cpu_read(fpu_active)) {
+			__this_cpu_write(fpu_active, true);
+			__fpregs_activate_hw();
+		}
 	}
 }
 EXPORT_SYMBOL(__kernel_fpu_begin);
@@ -135,11 +139,10 @@ void __kernel_fpu_end(void)
 {
 	struct fpu *fpu = &current->thread.fpu;
 
-	if (fpu->fpregs_active)
-		copy_kernel_to_fpregs(&fpu->state);
-	else
-		__fpregs_deactivate_hw();
-
+	if (fpu->fpregs_active) {
+		switch_fpu_finish();
+		fpu->fpregs_active = 0;
+	}
 	kernel_fpu_enable();
 }
 EXPORT_SYMBOL(__kernel_fpu_end);

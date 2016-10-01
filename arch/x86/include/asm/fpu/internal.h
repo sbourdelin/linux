@@ -19,6 +19,7 @@
 #include <asm/fpu/xstate.h>
 #include <asm/cpufeature.h>
 #include <asm/trace/fpu.h>
+#include <asm/thread_info.h>
 
 /*
  * High level FPU state handling functions:
@@ -576,13 +577,17 @@ static inline void fpregs_deactivate(struct fpu *fpu)
 /*
  * FPU state switching for scheduling.
  *
- * This is a two-stage process:
+ * This is a three-stage process:
  *
  *  - switch_fpu_prepare() saves the old state.
  *    This is done within the context of the old process.
  *
- *  - switch_fpu_finish() restores the new state
- *    and flips CR0.TS as necessary.
+ *  - switch_fpu_finish() sets TIF_LOAD_CPU, causing FPU state to
+ *    be loaded when the new process returns to userspace.
+ *    This is done with current_task pointing to the new process.
+ *
+ *  - switch_fpu_return() restores the new state and flips CR0.TS as
+ *    necessary. This only runs if the process returns to userspace.
  */
 static inline void
 switch_fpu_prepare(struct fpu *old_fpu, int cpu)
@@ -605,38 +610,9 @@ switch_fpu_prepare(struct fpu *old_fpu, int cpu)
 /*
  * Misc helper functions:
  */
-
-/*
- * Set up the userspace FPU context for the new task.
- */
-static inline void switch_fpu_finish(struct fpu *new_fpu)
+static inline void switch_fpu_finish(void)
 {
-	bool preload;
-	/*
-	 * If the task has used the math, pre-load the FPU on xsave processors
-	 * or if the past 5 consecutive context-switches used math.
-	 */
-	preload = static_cpu_has(X86_FEATURE_FPU) &&
-		  new_fpu->fpstate_active &&
-		  (use_eager_fpu() || new_fpu->counter > 5);
-
-	if (preload) {
-		prefetch(&new_fpu->state);
-		new_fpu->counter++;
-		__fpregs_activate(new_fpu);
-		trace_x86_fpu_regs_activated(new_fpu);
-
-		/* Don't change CR0.TS if we just switch! */
-		if (!__this_cpu_read(fpu_active)) {
-			__fpregs_activate_hw();
-			__this_cpu_write(fpu_active, true);
-		}
-
-		copy_kernel_to_fpregs(&new_fpu->state);
-	} else if (__this_cpu_read(fpu_active)) {
-		__this_cpu_write(fpu_active, false);
-		__fpregs_deactivate_hw();
-	}
+	set_thread_flag(TIF_LOAD_FPU);
 }
 
 /*
