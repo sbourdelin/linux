@@ -275,10 +275,10 @@ static struct suspend_info *read_resync_info(struct mddev *mddev, struct dlm_loc
 	sector_t hi = 0;
 
 	dlm_lock_sync(lockres, DLM_LOCK_CR);
-	memcpy(&ri, lockres->lksb.sb_lvbptr, sizeof(struct resync_info));
+	memcpy(&ri, lockres->lksb.sb_lvbptr, sizeof(ri));
 	hi = le64_to_cpu(ri.hi);
 	if (hi > 0) {
-		s = kzalloc(sizeof(struct suspend_info), GFP_KERNEL);
+		s = kzalloc(sizeof(*s), GFP_KERNEL);
 		if (!s)
 			goto out;
 		s->hi = hi;
