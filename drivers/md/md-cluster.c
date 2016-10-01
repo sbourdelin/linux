@@ -190,7 +190,7 @@ static struct dlm_lock_resource *lockres_init(struct mddev *mddev,
 	int ret, namelen;
 	struct md_cluster_info *cinfo = mddev->cluster_info;
 
-	res = kzalloc(sizeof(struct dlm_lock_resource), GFP_KERNEL);
+	res = kzalloc(sizeof(*res), GFP_KERNEL);
 	if (!res)
 		return NULL;
 	init_waitqueue_head(&res->sync_locking);
