@@ -538,7 +538,7 @@ static char **realloc_argv(unsigned *array_size, char **old_argv)
  */
 int dm_split_args(int *argc, char ***argvp, char *input)
 {
-	char *start, *end = input, *out, **argv;
+	char *start, *end, *out, **argv;
 	unsigned array_size = 0;
 
 	*argc = 0;
@@ -552,6 +552,7 @@ int dm_split_args(int *argc, char ***argvp, char *input)
 	if (!argv)
 		return -ENOMEM;
 
+	end = input;
 	while (1) {
 		/* Skip whitespace */
 		start = skip_spaces(end);
