@@ -443,12 +443,9 @@ static int multipath_run (struct mddev *mddev)
 	if (!conf->pool)
 		goto out_free_conf;
 
-	{
-		mddev->thread = md_register_thread(multipathd, mddev,
-						   "multipath");
-		if (!mddev->thread)
-			goto out_free_conf;
-	}
+	mddev->thread = md_register_thread(multipathd, mddev, "multipath");
+	if (!mddev->thread)
+		goto out_free_conf;
 
 	printk(KERN_INFO
 		"multipath: array %s active with %d out of %d IO paths\n",
