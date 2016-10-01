@@ -171,6 +171,10 @@ int copy_fpstate_to_sigframe(void __user *buf, void __user *buf_fx, int size)
 			(struct _fpstate_32 __user *) buf) ? -1 : 1;
 
 	if (fpregs_active() || using_compacted_format()) {
+		/* Compacted format, but the FP state is not loaded yet. */
+		if (unlikely(!fpu_lazy_skip_restore(&tsk->thread.fpu)))
+			copy_kernel_to_fpregs(&tsk->thread.fpu.state);
+
 		/* Save the live register state to the user directly. */
 		if (copy_fpregs_to_sigframe(buf_fx))
 			return -1;

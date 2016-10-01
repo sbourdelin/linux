@@ -314,6 +314,7 @@ void fpu__activate_curr(struct fpu *fpu)
 		trace_x86_fpu_activate_state(fpu);
 		/* Safe to do for the current task: */
 		fpu->fpstate_active = 1;
+		fpu->last_cpu = -1;
 	}
 }
 EXPORT_SYMBOL_GPL(fpu__activate_curr);
