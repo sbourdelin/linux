@@ -482,8 +482,7 @@ static void process_suspend_info(struct mddev *mddev,
 					lo, hi);
 	cinfo->sync_low = lo;
 	cinfo->sync_hi = hi;
-
-	s = kzalloc(sizeof(struct suspend_info), GFP_KERNEL);
+	s = kzalloc(sizeof(*s), GFP_KERNEL);
 	if (!s)
 		return;
 	s->slot = slot;
