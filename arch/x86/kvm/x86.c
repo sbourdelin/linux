@@ -7370,6 +7370,8 @@ static void fx_init(struct kvm_vcpu *vcpu)
 
 void kvm_load_guest_fpu(struct kvm_vcpu *vcpu)
 {
+	struct fpu *fpu;
+
 	if (vcpu->guest_fpu_loaded)
 		return;
 
@@ -7378,9 +7380,11 @@ void kvm_load_guest_fpu(struct kvm_vcpu *vcpu)
 	 * and assume host would use all available bits.
 	 * Guest xcr0 would be loaded later.
 	 */
+	fpu = &vcpu->arch.guest_fpu;
+
 	vcpu->guest_fpu_loaded = 1;
-	__kernel_fpu_begin();
-	__copy_kernel_to_fpregs(&vcpu->arch.guest_fpu.state);
+	__kernel_fpu_begin(fpu);
+	__copy_kernel_to_fpregs(&fpu->state);
 	trace_kvm_fpu(1);
 }
 

@@ -110,7 +110,7 @@ bool irq_fpu_usable(void)
 }
 EXPORT_SYMBOL(irq_fpu_usable);
 
-void __kernel_fpu_begin(void)
+void __kernel_fpu_begin(struct fpu *kernelfpu)
 {
 	struct fpu *fpu = &current->thread.fpu;
 
@@ -118,7 +118,7 @@ void __kernel_fpu_begin(void)
 
 	kernel_fpu_disable();
 
-	this_cpu_write(fpu_fpregs_owner_ctx, NULL);
+	this_cpu_write(fpu_fpregs_owner_ctx, kernelfpu);
 
 	if (fpu->fpregs_active) {
 		/*
@@ -150,7 +150,7 @@ EXPORT_SYMBOL(__kernel_fpu_end);
 void kernel_fpu_begin(void)
 {
 	preempt_disable();
-	__kernel_fpu_begin();
+	__kernel_fpu_begin(NULL);
 }
 EXPORT_SYMBOL_GPL(kernel_fpu_begin);
 

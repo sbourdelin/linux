@@ -20,7 +20,7 @@
  * All other cases use kernel_fpu_begin/end() which disable preemption
  * during kernel FPU usage.
  */
-extern void __kernel_fpu_begin(void);
+extern void __kernel_fpu_begin(struct fpu *fpu);
 extern void __kernel_fpu_end(void);
 extern void kernel_fpu_begin(void);
 extern void kernel_fpu_end(void);

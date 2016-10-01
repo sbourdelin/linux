@@ -71,7 +71,7 @@ struct efi_scratch {
 ({									\
 	efi_sync_low_kernel_mappings();					\
 	preempt_disable();						\
-	__kernel_fpu_begin();						\
+	__kernel_fpu_begin(NULL);					\
 									\
 	if (efi_scratch.use_pgd) {					\
 		efi_scratch.prev_cr3 = read_cr3();			\
