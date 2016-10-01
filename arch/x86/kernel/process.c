@@ -208,6 +208,9 @@ void switch_fpu_return(void)
 		  (use_eager_fpu() || fpu->counter > 5);
 
 	if (preload) {
+		if (fpu_lazy_skip_restore(fpu))
+			return;
+
 		prefetch(&fpu->state);
 		fpu->counter++;
 		__fpregs_activate(fpu);

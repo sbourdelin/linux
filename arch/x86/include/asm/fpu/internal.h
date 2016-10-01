@@ -575,6 +575,19 @@ static inline void fpregs_deactivate(struct fpu *fpu)
 }
 
 /*
+ * Check whether an FPU's register set is still loaded in the CPU.
+ */
+static inline bool fpu_lazy_skip_restore(struct fpu *fpu)
+{
+	bool still_loaded = (fpu->fpstate_active &&
+			     fpu->last_cpu == raw_smp_processor_id() &&
+			     __this_cpu_read(fpu_fpregs_owner_ctx) == fpu);
+
+	fpu->fpregs_active = still_loaded;
+	return still_loaded;
+}
+
+/*
  * FPU state switching for scheduling.
  *
  * This is a three-stage process:

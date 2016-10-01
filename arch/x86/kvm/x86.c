@@ -7384,7 +7384,12 @@ void kvm_load_guest_fpu(struct kvm_vcpu *vcpu)
 
 	vcpu->guest_fpu_loaded = 1;
 	__kernel_fpu_begin(fpu);
-	__copy_kernel_to_fpregs(&fpu->state);
+
+	if (!fpu_lazy_skip_restore(fpu)) {
+		fpu->last_cpu = raw_smp_processor_id();
+		__copy_kernel_to_fpregs(&fpu->state);
+	}
+
 	trace_kvm_fpu(1);
 }
 
@@ -7396,6 +7401,7 @@ void kvm_put_guest_fpu(struct kvm_vcpu *vcpu)
 	}
 
 	vcpu->guest_fpu_loaded = 0;
+	vcpu->arch.guest_fpu.fpregs_active = 0;
 	copy_fpregs_to_fpstate(&vcpu->arch.guest_fpu);
 	__kernel_fpu_end();
 	++vcpu->stat.fpu_reload;
