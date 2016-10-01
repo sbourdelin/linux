@@ -1223,11 +1223,10 @@ static void unlock_all_bitmaps(struct mddev *mddev)
 
 	/* release other node's bitmap lock if they are existed */
 	if (cinfo->other_bitmap_lockres) {
-		for (i = 0; i < mddev->bitmap_info.nodes - 1; i++) {
-			if (cinfo->other_bitmap_lockres[i]) {
+		for (i = 0; i < mddev->bitmap_info.nodes - 1; i++)
+			if (cinfo->other_bitmap_lockres[i])
 				lockres_free(cinfo->other_bitmap_lockres[i]);
-			}
-		}
+
 		kfree(cinfo->other_bitmap_lockres);
 	}
 }
