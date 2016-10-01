@@ -39,6 +39,7 @@ static DEFINE_PER_CPU(bool, in_kernel_fpu);
  * Track which context is using the FPU on the CPU:
  */
 DEFINE_PER_CPU(struct fpu *, fpu_fpregs_owner_ctx);
+DEFINE_PER_CPU(bool, fpu_active) = false;
 
 static void kernel_fpu_disable(void)
 {

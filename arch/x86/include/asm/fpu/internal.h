@@ -482,6 +482,7 @@ extern int copy_fpstate_to_sigframe(void __user *buf, void __user *fp, int size)
  */
 
 DECLARE_PER_CPU(struct fpu *, fpu_fpregs_owner_ctx);
+DECLARE_PER_CPU(bool, fpu_active);
 
 /*
  * Must be run with preemption disabled: this clears the fpu_fpregs_owner_ctx,
@@ -577,28 +578,15 @@ static inline void fpregs_deactivate(struct fpu *fpu)
  *
  * This is a two-stage process:
  *
- *  - switch_fpu_prepare() saves the old state and
- *    sets the new state of the CR0.TS bit. This is
- *    done within the context of the old process.
+ *  - switch_fpu_prepare() saves the old state.
+ *    This is done within the context of the old process.
  *
- *  - switch_fpu_finish() restores the new state as
- *    necessary.
+ *  - switch_fpu_finish() restores the new state
+ *    and flips CR0.TS as necessary.
  */
-typedef struct { int preload; } fpu_switch_t;
-
-static inline fpu_switch_t
-switch_fpu_prepare(struct fpu *old_fpu, struct fpu *new_fpu, int cpu)
+static inline void
+switch_fpu_prepare(struct fpu *old_fpu, int cpu)
 {
-	fpu_switch_t fpu;
-
-	/*
-	 * If the task has used the math, pre-load the FPU on xsave processors
-	 * or if the past 5 consecutive context-switches used math.
-	 */
-	fpu.preload = static_cpu_has(X86_FEATURE_FPU) &&
-		      new_fpu->fpstate_active &&
-		      (use_eager_fpu() || new_fpu->counter > 5);
-
 	if (old_fpu->fpregs_active) {
 		if (!copy_fpregs_to_fpstate(old_fpu))
 			old_fpu->last_cpu = -1;
@@ -608,29 +596,10 @@ switch_fpu_prepare(struct fpu *old_fpu, struct fpu *new_fpu, int cpu)
 		/* But leave fpu_fpregs_owner_ctx! */
 		old_fpu->fpregs_active = 0;
 		trace_x86_fpu_regs_deactivated(old_fpu);
-
-		/* Don't change CR0.TS if we just switch! */
-		if (fpu.preload) {
-			new_fpu->counter++;
-			__fpregs_activate(new_fpu);
-			trace_x86_fpu_regs_activated(new_fpu);
-			prefetch(&new_fpu->state);
-		} else {
-			__fpregs_deactivate_hw();
-		}
 	} else {
 		old_fpu->counter = 0;
 		old_fpu->last_cpu = -1;
-		if (fpu.preload) {
-			new_fpu->counter++;
-			if (fpu_want_lazy_restore(new_fpu, cpu))
-				fpu.preload = 0;
-			else
-				prefetch(&new_fpu->state);
-			fpregs_activate(new_fpu);
-		}
 	}
-	return fpu;
 }
 
 /*
@@ -638,15 +607,36 @@ switch_fpu_prepare(struct fpu *old_fpu, struct fpu *new_fpu, int cpu)
  */
 
 /*
- * By the time this gets called, we've already cleared CR0.TS and
- * given the process the FPU if we are going to preload the FPU
- * state - all we need to do is to conditionally restore the register
- * state itself.
+ * Set up the userspace FPU context for the new task.
  */
-static inline void switch_fpu_finish(struct fpu *new_fpu, fpu_switch_t fpu_switch)
+static inline void switch_fpu_finish(struct fpu *new_fpu)
 {
-	if (fpu_switch.preload)
+	bool preload;
+	/*
+	 * If the task has used the math, pre-load the FPU on xsave processors
+	 * or if the past 5 consecutive context-switches used math.
+	 */
+	preload = static_cpu_has(X86_FEATURE_FPU) &&
+		  new_fpu->fpstate_active &&
+		  (use_eager_fpu() || new_fpu->counter > 5);
+
+	if (preload) {
+		prefetch(&new_fpu->state);
+		new_fpu->counter++;
+		__fpregs_activate(new_fpu);
+		trace_x86_fpu_regs_activated(new_fpu);
+
+		/* Don't change CR0.TS if we just switch! */
+		if (!__this_cpu_read(fpu_active)) {
+			__fpregs_activate_hw();
+			__this_cpu_write(fpu_active, true);
+		}
+
 		copy_kernel_to_fpregs(&new_fpu->state);
+	} else if (__this_cpu_read(fpu_active)) {
+		__this_cpu_write(fpu_active, false);
+		__fpregs_deactivate_hw();
+	}
 }
 
 /*
