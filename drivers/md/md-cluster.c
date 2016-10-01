@@ -1085,13 +1085,13 @@ static int area_resyncing(struct mddev *mddev, int direction,
 
 	spin_lock_irq(&cinfo->suspend_lock);
 	if (list_empty(&cinfo->suspend_list))
-		goto out;
+		goto unlock;
 	list_for_each_entry(s, &cinfo->suspend_list, list)
 		if (hi > s->lo && lo < s->hi) {
 			ret = 1;
 			break;
 		}
-out:
+unlock:
 	spin_unlock_irq(&cinfo->suspend_lock);
 	return ret;
 }
