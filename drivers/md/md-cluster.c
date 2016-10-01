@@ -620,7 +620,7 @@ static void recv_daemon(struct md_thread *thread)
 	memcpy(&msg, message_lockres->lksb.sb_lvbptr, sizeof(msg));
 	ret = process_recvd_msg(thread->mddev, &msg);
 	if (ret)
-		goto out;
+		goto unlock;
 
 	/*release CR on ack_lockres*/
 	ret = dlm_unlock_sync(ack_lockres);
@@ -634,7 +634,7 @@ static void recv_daemon(struct md_thread *thread)
 	ret = dlm_lock_sync(ack_lockres, DLM_LOCK_CR);
 	if (unlikely(ret != 0))
 		pr_info("lock CR on ack failed return %d\n", ret);
-out:
+unlock:
 	/*release CR on message_lockres*/
 	ret = dlm_unlock_sync(message_lockres);
 	if (unlikely(ret != 0))
