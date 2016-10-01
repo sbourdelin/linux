@@ -617,7 +617,7 @@ static void recv_daemon(struct md_thread *thread)
 	}
 
 	/* read lvb and wake up thread to process this message_lockres */
-	memcpy(&msg, message_lockres->lksb.sb_lvbptr, sizeof(struct cluster_msg));
+	memcpy(&msg, message_lockres->lksb.sb_lvbptr, sizeof(msg));
 	ret = process_recvd_msg(thread->mddev, &msg);
 	if (ret)
 		goto out;
