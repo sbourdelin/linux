@@ -1057,7 +1057,7 @@ static int resync_info_update(struct mddev *mddev, sector_t lo, sector_t hi)
 
 	/* do not send zero again, if we have sent before */
 	if (hi == 0) {
-		memcpy(&ri, cinfo->bitmap_lockres->lksb.sb_lvbptr, sizeof(struct resync_info));
+		memcpy(&ri, cinfo->bitmap_lockres->lksb.sb_lvbptr, sizeof(ri));
 		if (le64_to_cpu(ri.hi) == 0)
 			return 0;
 	}
