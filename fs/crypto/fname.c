@@ -240,7 +240,7 @@ u32 fscrypt_fname_encrypted_size(struct inode *inode, u32 ilen)
 EXPORT_SYMBOL(fscrypt_fname_encrypted_size);
 
 /**
- * fscrypt_fname_crypto_alloc_obuff() -
+ * fscrypt_fname_alloc_buffer() -
  *
  * Allocates an output buffer that is sufficient for the crypto operation
  * specified by the context and the direction.
@@ -265,7 +265,7 @@ int fscrypt_fname_alloc_buffer(struct inode *inode,
 EXPORT_SYMBOL(fscrypt_fname_alloc_buffer);
 
 /**
- * fscrypt_fname_crypto_free_buffer() -
+ * fscrypt_fname_free_buffer() -
  *
  * Frees the buffer allocated for crypto operation.
  */

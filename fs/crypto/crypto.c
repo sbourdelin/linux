@@ -211,7 +211,7 @@ static struct page *alloc_bounce_page(struct fscrypt_ctx *ctx, gfp_t gfp_flags)
 }
 
 /**
- * fscypt_encrypt_page() - Encrypts a page
+ * fscrypt_encrypt_page() - Encrypts a page
  * @inode:          The inode for which the encryption should take place
  * @plaintext_page: The page to encrypt. Must be locked.
  * @gfp_flags:      The gfp flag for memory allocation
@@ -264,7 +264,7 @@ errout:
 EXPORT_SYMBOL(fscrypt_encrypt_page);
 
 /**
- * f2crypt_decrypt_page() - Decrypts a page in-place
+ * fscrypt_decrypt_page() - Decrypts a page in-place
  * @page: The page to decrypt. Must be locked.
  *
  * Decrypts page in-place using the ctx encryption context.
