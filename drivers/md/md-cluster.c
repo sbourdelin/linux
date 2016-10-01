@@ -823,7 +823,7 @@ static int join(struct mddev *mddev, int nodes)
 	int ret, ops_rv;
 	char str[64];
 
-	cinfo = kzalloc(sizeof(struct md_cluster_info), GFP_KERNEL);
+	cinfo = kzalloc(sizeof(*cinfo), GFP_KERNEL);
 	if (!cinfo)
 		return -ENOMEM;
 
