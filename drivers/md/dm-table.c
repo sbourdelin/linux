@@ -296,8 +296,7 @@ static int device_area_is_invalid(struct dm_target *ti, struct dm_dev *dev,
 	 */
 	q = bdev_get_queue(bdev);
 	if (!q || !q->make_request_fn) {
-		DMWARN("%s: %s is not yet initialised: "
-		       "start=%llu, len=%llu, dev_size=%llu",
+		DMWARN("%s: %s is not yet initialised: start=%llu, len=%llu, dev_size=%llu",
 		       dm_device_name(ti->table->md), bdevname(bdev, b),
 		       (unsigned long long)start,
 		       (unsigned long long)len,
@@ -309,8 +308,7 @@ static int device_area_is_invalid(struct dm_target *ti, struct dm_dev *dev,
 		return 0;
 
 	if ((start >= dev_size) || (start + len > dev_size)) {
-		DMWARN("%s: %s too small for target: "
-		       "start=%llu, len=%llu, dev_size=%llu",
+		DMWARN("%s: %s too small for target: start=%llu, len=%llu, dev_size=%llu",
 		       dm_device_name(ti->table->md), bdevname(bdev, b),
 		       (unsigned long long)start,
 		       (unsigned long long)len,
@@ -322,8 +320,7 @@ static int device_area_is_invalid(struct dm_target *ti, struct dm_dev *dev,
 		return 0;
 
 	if (start & (logical_block_size_sectors - 1)) {
-		DMWARN("%s: start=%llu not aligned to h/w "
-		       "logical block size %u of %s",
+		DMWARN("%s: start=%llu not aligned to h/w logical block size %u of %s",
 		       dm_device_name(ti->table->md),
 		       (unsigned long long)start,
 		       limits->logical_block_size, bdevname(bdev, b));
@@ -331,8 +328,7 @@ static int device_area_is_invalid(struct dm_target *ti, struct dm_dev *dev,
 	}
 
 	if (len & (logical_block_size_sectors - 1)) {
-		DMWARN("%s: len=%llu not aligned to h/w "
-		       "logical block size %u of %s",
+		DMWARN("%s: len=%llu not aligned to h/w logical block size %u of %s",
 		       dm_device_name(ti->table->md),
 		       (unsigned long long)len,
 		       limits->logical_block_size, bdevname(bdev, b));
@@ -446,9 +442,7 @@ static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 	}
 
 	if (bdev_stack_limits(limits, bdev, start) < 0)
-		DMWARN("%s: adding target device %s caused an alignment inconsistency: "
-		       "physical_block_size=%u, logical_block_size=%u, "
-		       "alignment_offset=%u, start=%llu",
+		DMWARN("%s: adding target device %s caused an alignment inconsistency: physical_block_size=%u, logical_block_size=%u, alignment_offset=%u, start=%llu",
 		       dm_device_name(ti->table->md), bdevname(bdev, b),
 		       q->limits.physical_block_size,
 		       q->limits.logical_block_size,
@@ -659,8 +653,7 @@ static int validate_hardware_logical_block_alignment(struct dm_table *table,
 	}
 
 	if (remaining) {
-		DMWARN("%s: table line %u (start sect %llu len %llu) "
-		       "not aligned to h/w logical block size %u",
+		DMWARN("%s: table line %u (start sect %llu len %llu) not aligned to h/w logical block size %u",
 		       dm_device_name(table->md), i,
 		       (unsigned long long) ti->begin,
 		       (unsigned long long) ti->len,
@@ -902,8 +895,7 @@ static int dm_table_determine_type(struct dm_table *t)
 			bio_based = 1;
 
 		if (bio_based && request_based) {
-			DMWARN("Inconsistent table: different target types"
-			       " can't be mixed up");
+			DMWARN("Inconsistent table: different target types can't be mixed up");
 			return -EINVAL;
 		}
 	}
@@ -960,8 +952,7 @@ verify_rq_based:
 		struct request_queue *q = bdev_get_queue(dd->dm_dev->bdev);
 
 		if (!blk_queue_stackable(q)) {
-			DMERR("table load rejected: including"
-			      " non-request-stackable devices");
+			DMERR("table load rejected: including non-request-stackable devices");
 			return -EINVAL;
 		}
 
@@ -973,8 +964,7 @@ verify_rq_based:
 		/* verify _all_ devices in the table are blk-mq devices */
 		list_for_each_entry(dd, devices, list)
 			if (!bdev_get_queue(dd->dm_dev->bdev)->mq_ops) {
-				DMERR("table load rejected: not all devices"
-				      " are blk-mq request-stackable");
+				DMERR("table load rejected: not all devices are blk-mq request-stackable");
 				return -EINVAL;
 			}
 
@@ -1374,9 +1364,7 @@ combine_limits:
 		 * for the table.
 		 */
 		if (blk_stack_limits(limits, &ti_limits, 0) < 0)
-			DMWARN("%s: adding target device "
-			       "(start sect %llu len %llu) "
-			       "caused an alignment inconsistency",
+			DMWARN("%s: adding target device (start sect %llu len %llu) caused an alignment inconsistency",
 			       dm_device_name(table->md),
 			       (unsigned long long) ti->begin,
 			       (unsigned long long) ti->len);
