@@ -56,12 +56,18 @@ static int xhci_priv_init_quirk(struct usb_hcd *hcd)
 
 static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
 {
+	struct platform_device	*pdev = to_platform_device(dev);
+	struct device_node	*node = pdev->dev.of_node;
+
 	/*
 	 * As of now platform drivers don't provide MSI support so we ensure
 	 * here that the generic code does not try to make a pci_dev from our
 	 * dev struct in order to setup MSI
 	 */
 	xhci->quirks |= XHCI_PLAT;
+
+	if (node && of_property_read_bool(node, "usb3-fake-doorbell"))
+		xhci->quirks |= XHCI_FAKE_DOORBELL;
 }
 
 /* called during probe() after chip reset completes */
