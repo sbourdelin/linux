@@ -1331,10 +1331,10 @@ unsigned int audit_serial(void)
 }
 
 static inline void audit_get_stamp(struct audit_context *ctx,
-				   struct timespec *t, unsigned int *serial)
+				   struct timespec64 *t, unsigned int *serial)
 {
 	if (!ctx || !auditsc_get_stamp(ctx, t, serial)) {
-		*t = CURRENT_TIME;
+		ktime_get_real_ts64(t);
 		*serial = audit_serial();
 	}
 }
@@ -1376,7 +1376,7 @@ struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
 				     int type)
 {
 	struct audit_buffer	*ab	= NULL;
-	struct timespec		t;
+	struct timespec64	t;
 	unsigned int		uninitialized_var(serial);
 	int reserve = 5; /* Allow atomic callers to go up to five
 			    entries over the normal backlog limit */
@@ -1428,8 +1428,8 @@ struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
 
 	audit_get_stamp(ab->ctx, &t, &serial);
 
-	audit_log_format(ab, "audit(%lu.%03lu:%u): ",
-			 t.tv_sec, t.tv_nsec/1000000, serial);
+	audit_log_format(ab, "audit(%llu.%03lu:%u): ",
+			 (unsigned long long)t.tv_sec, t.tv_nsec/1000000, serial);
 	return ab;
 }
 
