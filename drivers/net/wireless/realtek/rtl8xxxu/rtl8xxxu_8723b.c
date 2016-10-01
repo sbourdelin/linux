@@ -40,7 +40,7 @@
 #include "rtl8xxxu.h"
 #include "rtl8xxxu_regs.h"
 
-static struct rtl8xxxu_reg8val rtl8723b_mac_init_table[] = {
+static const struct rtl8xxxu_reg8val rtl8723b_mac_init_table[] = {
 	{0x02f, 0x30}, {0x035, 0x00}, {0x039, 0x08}, {0x04e, 0xe0},
 	{0x064, 0x00}, {0x067, 0x20}, {0x428, 0x0a}, {0x429, 0x10},
 	{0x430, 0x00}, {0x431, 0x00},
@@ -71,7 +71,7 @@ static struct rtl8xxxu_reg8val rtl8723b_mac_init_table[] = {
 	{0xffff, 0xff},
 };
 
-static struct rtl8xxxu_reg32val rtl8723b_phy_1t_init_table[] = {
+static const struct rtl8xxxu_reg32val rtl8723b_phy_1t_init_table[] = {
 	{0x800, 0x80040000}, {0x804, 0x00000003},
 	{0x808, 0x0000fc00}, {0x80c, 0x0000000a},
 	{0x810, 0x10001331}, {0x814, 0x020c3d10},
@@ -172,7 +172,7 @@ static struct rtl8xxxu_reg32val rtl8723b_phy_1t_init_table[] = {
 	{0xffff, 0xffffffff},
 };
 
-static struct rtl8xxxu_reg32val rtl8xxx_agc_8723bu_table[] = {
+static const struct rtl8xxxu_reg32val rtl8xxx_agc_8723bu_table[] = {
 	{0xc78, 0xfd000001}, {0xc78, 0xfc010001},
 	{0xc78, 0xfb020001}, {0xc78, 0xfa030001},
 	{0xc78, 0xf9040001}, {0xc78, 0xf8050001},

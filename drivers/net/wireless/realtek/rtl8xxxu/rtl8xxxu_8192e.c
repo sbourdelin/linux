@@ -40,7 +40,7 @@
 #include "rtl8xxxu.h"
 #include "rtl8xxxu_regs.h"
 
-static struct rtl8xxxu_reg8val rtl8192e_mac_init_table[] = {
+static const struct rtl8xxxu_reg8val rtl8192e_mac_init_table[] = {
 	{0x011, 0xeb}, {0x012, 0x07}, {0x014, 0x75}, {0x303, 0xa7},
 	{0x428, 0x0a}, {0x429, 0x10}, {0x430, 0x00}, {0x431, 0x00},
 	{0x432, 0x00}, {0x433, 0x01}, {0x434, 0x04}, {0x435, 0x05},
@@ -70,7 +70,7 @@ static struct rtl8xxxu_reg8val rtl8192e_mac_init_table[] = {
 	{0xffff, 0xff},
 };
 
-static struct rtl8xxxu_reg32val rtl8192eu_phy_init_table[] = {
+static const struct rtl8xxxu_reg32val rtl8192eu_phy_init_table[] = {
 	{0x800, 0x80040000}, {0x804, 0x00000003},
 	{0x808, 0x0000fc00}, {0x80c, 0x0000000a},
 	{0x810, 0x10001331}, {0x814, 0x020c3d10},
@@ -202,7 +202,7 @@ static struct rtl8xxxu_reg32val rtl8192eu_phy_init_table[] = {
 	{0xffff, 0xffffffff},
 };
 
-static struct rtl8xxxu_reg32val rtl8xxx_agc_8192eu_std_table[] = {
+static const struct rtl8xxxu_reg32val rtl8xxx_agc_8192eu_std_table[] = {
 	{0xc78, 0xfb000001}, {0xc78, 0xfb010001},
 	{0xc78, 0xfb020001}, {0xc78, 0xfb030001},
 	{0xc78, 0xfb040001}, {0xc78, 0xfb050001},
@@ -271,7 +271,7 @@ static struct rtl8xxxu_reg32val rtl8xxx_agc_8192eu_std_table[] = {
 	{0xffff, 0xffffffff}
 };
 
-static struct rtl8xxxu_reg32val rtl8xxx_agc_8192eu_highpa_table[] = {
+static const struct rtl8xxxu_reg32val rtl8xxx_agc_8192eu_highpa_table[] = {
 	{0xc78, 0xfa000001}, {0xc78, 0xf9010001},
 	{0xc78, 0xf8020001}, {0xc78, 0xf7030001},
 	{0xc78, 0xf6040001}, {0xc78, 0xf5050001},
