@@ -639,9 +639,9 @@ void lc_set(struct lru_cache *lc, unsigned int enr, int index)
 }
 
 /**
- * lc_dump - Dump a complete LRU cache to seq in textual form.
- * @lc: the lru cache to operate on
+ * lc_seq_dump_details - Dump a complete LRU cache to seq in textual form.
  * @seq: the &struct seq_file pointer to seq_printf into
+ * @lc: the lru cache to operate on
  * @utext: user supplied additional "heading" or other info
  * @detail: function pointer the user may provide to dump further details
  * of the object the lc_element is embedded in. May be NULL.
