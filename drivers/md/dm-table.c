@@ -1391,14 +1391,13 @@ combine_limits:
  */
 static void dm_table_verify_integrity(struct dm_table *t)
 {
-	struct gendisk *template_disk = NULL;
-
 	if (t->integrity_supported) {
 		/*
 		 * Verify that the original integrity profile
 		 * matches all the devices in this table.
 		 */
-		template_disk = dm_table_get_integrity_disk(t);
+		struct gendisk *template_disk = dm_table_get_integrity_disk(t);
+
 		if (template_disk &&
 		    blk_integrity_compare(dm_disk(t->md), template_disk) >= 0)
 			return;
