@@ -186,7 +186,7 @@ static int dlm_lock_sync_interruptible(struct dlm_lock_resource *res, int mode,
 static struct dlm_lock_resource *lockres_init(struct mddev *mddev,
 		char *name, void (*bastfn)(void *arg, int mode), int with_lvb)
 {
-	struct dlm_lock_resource *res = NULL;
+	struct dlm_lock_resource *res;
 	int ret, namelen;
 	struct md_cluster_info *cinfo = mddev->cluster_info;
 
