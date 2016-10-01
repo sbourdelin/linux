@@ -200,17 +200,13 @@ static struct dlm_lock_resource *lockres_init(struct mddev *mddev,
 	res->mode = DLM_LOCK_IV;
 	namelen = strlen(name);
 	res->name = kzalloc(namelen + 1, GFP_KERNEL);
-	if (!res->name) {
-		pr_err("md-cluster: Unable to allocate resource name for resource %s\n", name);
+	if (!res->name)
 		goto out_err;
-	}
 	strlcpy(res->name, name, namelen + 1);
 	if (with_lvb) {
 		res->lksb.sb_lvbptr = kzalloc(LVB_SIZE, GFP_KERNEL);
-		if (!res->lksb.sb_lvbptr) {
-			pr_err("md-cluster: Unable to allocate LVB for resource %s\n", name);
+		if (!res->lksb.sb_lvbptr)
 			goto out_err;
-		}
 		res->flags = DLM_LKF_VALBLK;
 	}
 
@@ -852,10 +848,8 @@ static int join(struct mddev *mddev, int nodes)
 	/* Initiate the communication resources */
 	ret = -ENOMEM;
 	cinfo->recv_thread = md_register_thread(recv_daemon, mddev, "cluster_recv");
-	if (!cinfo->recv_thread) {
-		pr_err("md-cluster: cannot allocate memory for recv_thread!\n");
+	if (!cinfo->recv_thread)
 		goto err;
-	}
 	cinfo->message_lockres = lockres_init(mddev, "message", NULL, 1);
 	if (!cinfo->message_lockres)
 		goto err;
@@ -1191,10 +1185,8 @@ static int lock_all_bitmaps(struct mddev *mddev)
 					      sizeof(*cinfo
 						     ->other_bitmap_lockres),
 					      GFP_KERNEL);
-	if (!cinfo->other_bitmap_lockres) {
-		pr_err("md: can't alloc mem for other bitmap locks\n");
+	if (!cinfo->other_bitmap_lockres)
 		return 0;
-	}
 
 	my_slot = slot_number(mddev);
 	for (slot = 0; slot < mddev->bitmap_info.nodes; slot++) {
