@@ -1117,7 +1117,7 @@ static bool integrity_profile_exists(struct gendisk *disk)
  * Get a disk whose integrity profile reflects the table's profile.
  * Returns NULL if integrity support was inconsistent or unavailable.
  */
-static struct gendisk * dm_table_get_integrity_disk(struct dm_table *t)
+static struct gendisk *dm_table_get_integrity_disk(struct dm_table *t)
 {
 	struct list_head *devices = dm_table_get_devices(t);
 	struct dm_dev_internal *dd = NULL;
