@@ -1165,7 +1165,7 @@ no_integrity:
 static int dm_table_register_integrity(struct dm_table *t)
 {
 	struct mapped_device *md = t->md;
-	struct gendisk *template_disk = NULL;
+	struct gendisk *template_disk;
 
 	template_disk = dm_table_get_integrity_disk(t);
 	if (!template_disk)
