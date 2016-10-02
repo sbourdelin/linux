@@ -5,6 +5,7 @@
  *
  * Copyright (C) 2008, 2009 secunet Security Networks AG
  * Copyright (C) 2008, 2009 Steffen Klassert <steffen.klassert@secunet.com>
+ * Copyright (C) 2016 Jason A. Donenfeld <Jason@zx2c4.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -1039,3 +1040,18 @@ void padata_free(struct padata_instance *pinst)
 	kobject_put(&pinst->kobj);
 }
 EXPORT_SYMBOL(padata_free);
+
+/**
+ * padata_queue_len - retreive the number of in progress jobs
+ *
+ * @padata_inst: padata instance from which to read the queue size
+ */
+int padata_queue_len(struct padata_instance *pinst)
+{
+	int len;
+	rcu_read_lock_bh();
+	len = atomic_read(&rcu_dereference_bh(pinst->pd)->refcnt);
+	rcu_read_unlock_bh();
+	return len;
+}
+EXPORT_SYMBOL(padata_queue_len);

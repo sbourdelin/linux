@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2008, 2009 secunet Security Networks AG
  * Copyright (C) 2008, 2009 Steffen Klassert <steffen.klassert@secunet.com>
+ * Copyright (C) 2016 Jason A. Donenfeld <Jason@zx2c4.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -181,4 +182,5 @@ extern int padata_register_cpumask_notifier(struct padata_instance *pinst,
 					    struct notifier_block *nblock);
 extern int padata_unregister_cpumask_notifier(struct padata_instance *pinst,
 					      struct notifier_block *nblock);
+extern int padata_queue_len(struct padata_instance *pinst);
 #endif
