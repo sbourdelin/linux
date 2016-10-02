@@ -258,8 +258,9 @@ static int multipath_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 
 	print_multipath_conf(conf);
 
-	for (path = first; path <= last; path++)
-		if ((p=conf->multipaths+path)->rdev == NULL) {
+	for (path = first; path <= last; path++) {
+		p = conf->multipaths + path;
+		if (!p->rdev) {
 			q = rdev->bdev->bd_disk->queue;
 			disk_stack_limits(mddev->gendisk, rdev->bdev,
 					  rdev->data_offset << 9);
@@ -276,6 +277,7 @@ static int multipath_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 			err = 0;
 			break;
 		}
+	}
 
 	print_multipath_conf(conf);
 
@@ -347,7 +349,8 @@ static void multipathd(struct md_thread *thread)
 		bio = &mp_bh->bio;
 		bio->bi_iter.bi_sector = mp_bh->master_bio->bi_iter.bi_sector;
 
-		if ((mp_bh->path = multipath_map (conf))<0) {
+		mp_bh->path = multipath_map(conf);
+		if (mp_bh->path < 0) {
 			printk(KERN_ALERT "multipath: %s: unrecoverable IO read"
 				" error for block %llu\n",
 				bdevname(bio->bi_bdev,b),
