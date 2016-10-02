@@ -1,0 +1,41 @@
+EEPROM / CSR SMBus-slave interface of IDT 89HPESx devices
+
+Required properties:
+  - compatible : should be "<manufacturer>,<type>"
+		 Basically there is only one manufacturer: idt, but some
+		 compatible devices may be produced in future. Following devices
+		 are supported: 89hpes8nt2, 89hpes12nt3, 89hpes24nt6ag2,
+		 89hpes32nt8ag2, 89hpes32nt8bg2, 89hpes12nt12g2, 89hpes16nt16g2,
+		 89hpes24nt24g2, 89hpes32nt24ag2, 89hpes32nt24bg2;
+		 89hpes12n3, 89hpes12n3a, 89hpes24n3, 89hpes24n3a;
+		 89hpes32h8, 89hpes32h8g2, 89hpes48h12, 89hpes48h12g2,
+		 89hpes48h12ag2, 89hpes16h16, 89hpes22h16, 89hpes22h16g2,
+		 89hpes34h16, 89hpes34h16g2, 89hpes64h16, 89hpes64h16g2,
+		 89hpes64h16ag2;
+		 89hpes12t3g2, 89hpes24t3g2, 89hpes16t4, 89hpes4t4g2,
+		 89hpes10t4g2, 89hpes16t4g2, 89hpes16t4ag2, 89hpes5t5,
+		 89hpes6t5, 89hpes8t5, 89hpes8t5a, 89hpes24t6, 89hpes6t6g2,
+		 89hpes24t6g2, 89hpes16t7, 89hpes32t8, 89hpes32t8g2,
+		 89hpes48t12, 89hpes48t12g2.
+		 Current implementation of the driver doesn't have any device-
+		 specific functionalities. But since each of them differs
+		 by registers mapping, CSRs read/write restrictions can be
+		 added in future.
+  - reg :	 I2C address of the IDT 89HPES device.
+
+Optional properties:
+  - read-only :	 Parameterless property disables writes to the EEPROM
+  - idt,eesize : Size of EEPROM device connected to IDT 89HPES i2c-master bus
+		 (default value is 4096 bytes if option isn't specified)
+  - idt,eeaddr : Custom address of EEPROM device
+		 (If not specified IDT 89HPESx device will try to communicate
+		  with EEPROM sited by default address - 0x50)
+
+Example:
+	idt_pcie_sw@60 {
+		compatible = "idt,89hpes12nt3";
+		reg = <0x60>;
+		read-only;
+		idt,eesize = <65536>;
+		idt,eeaddr = <0x50>;
+	};
