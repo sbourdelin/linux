@@ -139,7 +139,6 @@ static void multipath_make_request(struct mddev *mddev, struct bio *bio)
 	mp_bh->bio.bi_end_io = multipath_end_request;
 	mp_bh->bio.bi_private = mp_bh;
 	generic_make_request(&mp_bh->bio);
-	return;
 }
 
 static void multipath_status(struct seq_file *seq, struct mddev *mddev)
