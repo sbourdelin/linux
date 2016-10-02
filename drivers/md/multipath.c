@@ -106,10 +106,10 @@ static void multipath_end_request(struct bio *bio)
 	rdev_dec_pending(rdev, conf->mddev);
 }
 
-static void multipath_make_request(struct mddev *mddev, struct bio * bio)
+static void multipath_make_request(struct mddev *mddev, struct bio *bio)
 {
 	struct mpconf *conf = mddev->private;
-	struct multipath_bh * mp_bh;
+	struct multipath_bh *mp_bh;
 	struct multipath_info *multipath;
 
 	if (unlikely(bio->bi_opf & REQ_PREFLUSH)) {
