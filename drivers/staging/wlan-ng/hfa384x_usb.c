@@ -173,7 +173,8 @@ hfa384x_usbin_txcompl(struct wlandevice *wlandev, hfa384x_usbin_t *usbin);
 
 static void hfa384x_usbin_rx(struct wlandevice *wlandev, struct sk_buff *skb);
 
-static void hfa384x_usbin_info(struct wlandevice *wlandev, hfa384x_usbin_t *usbin);
+static void hfa384x_usbin_info(struct wlandevice *wlandev,
+			       hfa384x_usbin_t *usbin);
 
 static void hfa384x_usbin_ctlx(hfa384x_t *hw, hfa384x_usbin_t *usbin,
 			       int urb_status);
@@ -3517,7 +3518,8 @@ static void hfa384x_int_rxmonitor(struct wlandevice *wlandev,
 * Call context:
 *	interrupt
 ----------------------------------------------------------------*/
-static void hfa384x_usbin_info(struct wlandevice *wlandev, hfa384x_usbin_t *usbin)
+static void hfa384x_usbin_info(struct wlandevice *wlandev,
+			       hfa384x_usbin_t *usbin)
 {
 	usbin->infofrm.info.framelen =
 	    le16_to_cpu(usbin->infofrm.info.framelen);
