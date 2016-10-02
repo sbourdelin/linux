@@ -485,8 +485,7 @@ static void multipath_free(struct mddev *mddev, void *priv)
 	kfree(conf);
 }
 
-static struct md_personality multipath_personality =
-{
+static struct md_personality multipath_personality = {
 	.name            = "multipath",
 	.level           = LEVEL_MULTIPATH,
 	.owner           = THIS_MODULE,
