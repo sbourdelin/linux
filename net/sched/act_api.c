@@ -331,6 +331,7 @@ EXPORT_SYMBOL(tcf_hashinfo_destroy);
 
 static LIST_HEAD(act_base);
 static DEFINE_RWLOCK(act_mod_lock);
+static DECLARE_WAIT_QUEUE_HEAD(act_mod_wait);
 
 int tcf_register_action(struct tc_action_ops *act,
 			struct pernet_operations *ops)
@@ -349,15 +350,18 @@ int tcf_register_action(struct tc_action_ops *act,
 		}
 	}
 	list_add_tail(&act->head, &act_base);
+	act->pernet_pending = 1;
 	write_unlock(&act_mod_lock);
 
 	ret = register_pernet_subsys(ops);
-	if (ret) {
-		tcf_unregister_action(act, ops);
-		return ret;
-	}
+	write_lock(&act_mod_lock);
+	if (ret)
+		list_del(&act->head);
+	act->pernet_pending = 0;
+	write_unlock(&act_mod_lock);
+	wake_up_all(&act_mod_wait);
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL(tcf_register_action);
 
@@ -366,8 +370,6 @@ int tcf_unregister_action(struct tc_action_ops *act,
 {
 	struct tc_action_ops *a;
 	int err = -ENOENT;
-
-	unregister_pernet_subsys(ops);
 
 	write_lock(&act_mod_lock);
 	list_for_each_entry(a, &act_base, head) {
@@ -378,9 +380,48 @@ int tcf_unregister_action(struct tc_action_ops *act,
 		}
 	}
 	write_unlock(&act_mod_lock);
+
+	if (!err)
+		unregister_pernet_subsys(ops);
+
 	return err;
 }
 EXPORT_SYMBOL(tcf_unregister_action);
+
+static int tcf_module_needed(char *kind)
+{
+	struct tc_action_ops *a;
+	int rc = 0;
+	DEFINE_WAIT_FUNC(wait, woken_wake_function);
+
+	if (!kind)
+		return rc;
+
+	add_wait_queue(&act_mod_wait, &wait);
+	read_lock(&act_mod_lock);
+	for (;;) {
+		list_for_each_entry(a, &act_base, head) {
+			if (strcmp(kind, a->kind) == 0)
+				break;
+		}
+
+		if (!a || strcmp(kind, a->kind) != 0) {
+			rc = 1;
+			break;
+		}
+
+		if  (a->pernet_pending == 0 || signal_pending(current))
+			break;
+
+		read_unlock(&act_mod_lock);
+		wait_woken(&wait, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
+		read_lock(&act_mod_lock);
+	}
+	read_unlock(&act_mod_lock);
+	remove_wait_queue(&act_mod_wait, &wait);
+
+	return rc;
+}
 
 /* lookup by name */
 static struct tc_action_ops *tc_lookup_action_n(char *kind)
@@ -391,11 +432,14 @@ static struct tc_action_ops *tc_lookup_action_n(char *kind)
 		read_lock(&act_mod_lock);
 		list_for_each_entry(a, &act_base, head) {
 			if (strcmp(kind, a->kind) == 0) {
+				if (a->pernet_pending != 0)
+					goto out;
 				if (try_module_get(a->owner))
 					res = a;
 				break;
 			}
 		}
+out:
 		read_unlock(&act_mod_lock);
 	}
 	return res;
@@ -410,11 +454,14 @@ static struct tc_action_ops *tc_lookup_action(struct nlattr *kind)
 		read_lock(&act_mod_lock);
 		list_for_each_entry(a, &act_base, head) {
 			if (nla_strcmp(kind, a->kind) == 0) {
+				if (a->pernet_pending != 0)
+					goto out;
 				if (try_module_get(a->owner))
 					res = a;
 				break;
 			}
 		}
+out:
 		read_unlock(&act_mod_lock);
 	}
 	return res;
@@ -549,7 +596,8 @@ struct tc_action *tcf_action_init_1(struct net *net, struct nlattr *nla,
 	if (a_o == NULL) {
 #ifdef CONFIG_MODULES
 		rtnl_unlock();
-		request_module("act_%s", act_name);
+		if (tcf_module_needed(act_name))
+			request_module("act_%s", act_name);
 		rtnl_lock();
 
 		a_o = tc_lookup_action_n(act_name);

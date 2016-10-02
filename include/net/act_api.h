@@ -107,6 +107,7 @@ struct tc_action_ops {
 	struct list_head head;
 	char    kind[IFNAMSIZ];
 	__u32   type; /* TBD to match kind */
+	__u32   pernet_pending;
 	size_t	size;
 	struct module		*owner;
 	int     (*act)(struct sk_buff *, const struct tc_action *,
