@@ -98,7 +98,7 @@ static void multipath_end_request(struct bio *bio)
 		char b[BDEVNAME_SIZE];
 		md_error(mp_bh->mddev, rdev);
 		printk(KERN_ERR "multipath: %s: rescheduling sector %llu\n",
-		       bdevname(rdev->bdev,b),
+		       bdevname(rdev->bdev, b),
 		       (unsigned long long)bio->bi_iter.bi_sector);
 		multipath_reschedule_retry(mp_bh);
 	} else
@@ -238,8 +238,8 @@ static void print_multipath_conf(struct mpconf *conf)
 		tmp = conf->multipaths + i;
 		if (tmp->rdev)
 			printk(" disk%d, o:%d, dev:%s\n",
-				i,!test_bit(Faulty, &tmp->rdev->flags),
-			       bdevname(tmp->rdev->bdev,b));
+			       i, !test_bit(Faulty, &tmp->rdev->flags),
+			       bdevname(tmp->rdev->bdev, b));
 	}
 }
 
@@ -353,13 +353,13 @@ static void multipathd(struct md_thread *thread)
 		if (mp_bh->path < 0) {
 			printk(KERN_ALERT "multipath: %s: unrecoverable IO read"
 				" error for block %llu\n",
-				bdevname(bio->bi_bdev,b),
+				bdevname(bio->bi_bdev, b),
 				(unsigned long long)bio->bi_iter.bi_sector);
 			multipath_end_bh_io(mp_bh, -EIO);
 		} else {
 			printk(KERN_ERR "multipath: %s: redirecting sector %llu"
 				" to another IO path\n",
-				bdevname(bio->bi_bdev,b),
+				bdevname(bio->bi_bdev, b),
 				(unsigned long long)bio->bi_iter.bi_sector);
 			*bio = *(mp_bh->master_bio);
 			bio->bi_iter.bi_sector +=
@@ -487,18 +487,18 @@ static void multipath_free(struct mddev *mddev, void *priv)
 
 static struct md_personality multipath_personality =
 {
-	.name		= "multipath",
-	.level		= LEVEL_MULTIPATH,
-	.owner		= THIS_MODULE,
-	.make_request	= multipath_make_request,
-	.run		= multipath_run,
-	.free		= multipath_free,
-	.status		= multipath_status,
-	.error_handler	= multipath_error,
-	.hot_add_disk	= multipath_add_disk,
-	.hot_remove_disk= multipath_remove_disk,
-	.size		= multipath_size,
-	.congested	= multipath_congested,
+	.name            = "multipath",
+	.level           = LEVEL_MULTIPATH,
+	.owner           = THIS_MODULE,
+	.make_request    = multipath_make_request,
+	.run             = multipath_run,
+	.free            = multipath_free,
+	.status          = multipath_status,
+	.error_handler   = multipath_error,
+	.hot_add_disk    = multipath_add_disk,
+	.hot_remove_disk = multipath_remove_disk,
+	.size            = multipath_size,
+	.congested       = multipath_congested,
 };
 
 static int __init multipath_init(void)
