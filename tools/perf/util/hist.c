@@ -1,6 +1,7 @@
 #include "util.h"
 #include "build-id.h"
 #include "hist.h"
+#include "map.h"
 #include "session.h"
 #include "sort.h"
 #include "evlist.h"
@@ -970,6 +971,8 @@ iter_add_next_cumulative_entry(struct hist_entry_iter *iter,
 
 	if (symbol_conf.use_callchain)
 		callchain_append(he->callchain, &cursor, sample->period);
+	/* Cleanup temporary cursor. */
+	callchain_cursor_snapshot_rele(&cursor);
 	return 0;
 }
 
@@ -979,6 +982,7 @@ iter_finish_cumulative_entry(struct hist_entry_iter *iter,
 {
 	zfree(&iter->priv);
 	iter->he = NULL;
+	map__zput(al->map);
 
 	return 0;
 }

@@ -439,7 +439,7 @@ fill_node(struct callchain_node *node, struct callchain_cursor *cursor)
 		}
 		call->ip = cursor_node->ip;
 		call->ms.sym = cursor_node->sym;
-		call->ms.map = cursor_node->map;
+		call->ms.map = map__get(cursor_node->map);
 		list_add_tail(&call->list, &node->val);
 
 		callchain_cursor_advance(cursor);
@@ -464,6 +464,7 @@ add_child(struct callchain_node *parent,
 
 		list_for_each_entry_safe(call, tmp, &new->val, list) {
 			list_del(&call->list);
+			map__zput(call->ms.map);
 			free(call);
 		}
 		free(new);
@@ -732,6 +733,7 @@ merge_chain_branch(struct callchain_cursor *cursor,
 		callchain_cursor_append(cursor, list->ip,
 					list->ms.map, list->ms.sym);
 		list_del(&list->list);
+		map__zput(list->ms.map);
 		free(list);
 	}
 
@@ -780,7 +782,8 @@ int callchain_cursor_append(struct callchain_cursor *cursor,
 	}
 
 	node->ip = ip;
-	node->map = map;
+	map__zput(node->map);
+	node->map = map__get(map);
 	node->sym = sym;
 
 	cursor->nr++;
@@ -829,6 +832,8 @@ int fill_callchain_info(struct addr_location *al, struct callchain_cursor_node *
 		if (al->map == NULL)
 			goto out;
 	}
+
+	map__get(al->map);
 
 	if (al->map->groups == &al->machine->kmaps) {
 		if (machine__is_host(al->machine)) {
@@ -947,11 +952,13 @@ static void free_callchain_node(struct callchain_node *node)
 
 	list_for_each_entry_safe(list, tmp, &node->parent_val, list) {
 		list_del(&list->list);
+		map__zput(list->ms.map);
 		free(list);
 	}
 
 	list_for_each_entry_safe(list, tmp, &node->val, list) {
 		list_del(&list->list);
+		map__zput(list->ms.map);
 		free(list);
 	}
 
@@ -1035,6 +1042,7 @@ int callchain_node__make_parent_list(struct callchain_node *node)
 out:
 	list_for_each_entry_safe(chain, new, &head, list) {
 		list_del(&chain->list);
+		map__zput(chain->ms.map);
 		free(chain);
 	}
 	return -ENOMEM;
