@@ -3725,7 +3725,8 @@ static void pci_flr_wait(struct pci_dev *dev)
 
 	do {
 		msleep(100);
-		pci_read_config_dword(dev, PCI_COMMAND, &id);
+		pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
+					   60 * 1000);
 	} while (i++ < 10 && id == ~0);
 
 	if (id == ~0)
