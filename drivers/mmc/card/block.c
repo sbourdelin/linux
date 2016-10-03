@@ -2572,6 +2572,14 @@ static const struct mmc_fixup blk_fixups[] =
 	MMC_FIXUP("V10016", CID_MANFID_KINGSTON, CID_OEMID_ANY, add_quirk_mmc,
 		  MMC_QUIRK_TRIM_BROKEN),
 
+	/*
+	 * Hynix eMMC devices sometimes take 50% longer to resume from sleep.
+	 * Based on a recommendation from Hynix, send a Power-Off Notification
+	 * before going to S3 to restore a resume time consistently within spec.
+	 */
+	MMC_FIXUP(CID_NAME_ANY, CID_MANFID_HYNIX, CID_OEMID_ANY, add_quirk_mmc,
+		  MMC_QUIRK_NOTIFY_POWEROFF_ON_SLEEP),
+
 	END_FIXUP
 };
 
