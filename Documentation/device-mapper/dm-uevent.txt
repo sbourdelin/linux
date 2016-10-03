@@ -30,6 +30,11 @@ void dm_uevent_free(struct dm_uevent *event)
 
 Something went wrong, free the uevent instead of queueing it.
 
+void dm_uevent_add(struct dm_target *ti, enum kobject_action action, char *name)
+
+Helper function that builds and queues a uevent if no additional
+variables need to be added.
+
 void dm_table_event(struct dm_table *t)
 
 Triggers sending of queued uevents as well as waking up processes waiting on

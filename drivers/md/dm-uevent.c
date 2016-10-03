@@ -95,6 +95,32 @@ err_nomem:
 EXPORT_SYMBOL_GPL(dm_uevent_build);
 
 /**
+ * dm_uevent_add - Create and queue a basic uevent
+ *
+ * @ti:		The target to add a uevent for
+ * @action:	The kobject action
+ * @name:	The name of the uevent to add and queue
+ *
+ * If targets wish to create and queue a uevent but don't need to add
+ * extra vars, they can do so more easily by calling this.
+ * This is usually followed by a call to dm_table_event().
+ */
+void dm_uevent_add(struct dm_target *ti, enum kobject_action action, char *name)
+{
+	struct mapped_device *md = dm_table_get_md(ti->table);
+	struct dm_uevent *event;
+
+	event = dm_uevent_build(md, ti, action, name);
+	if (IS_ERR(event)) {
+		DMERR("%s: dm_uevent_build() failed", __func__);
+		return;
+	}
+
+	dm_uevent_queue(md, &event->elist);
+}
+EXPORT_SYMBOL_GPL(dm_uevent_add);
+
+/**
  * dm_send_uevents - send uevents for given list
  *
  * @events:	list of events to send
