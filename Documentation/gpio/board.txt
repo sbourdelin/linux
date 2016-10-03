@@ -6,7 +6,7 @@ Note that it only applies to the new descriptor-based interface. For a
 description of the deprecated integer-based GPIO interface please refer to
 gpio-legacy.txt (actually, there is no real mapping possible with the old
 interface; you just fetch an integer from somewhere and request the
-corresponding GPIO.
+corresponding GPIO).
 
 Platforms that make use of GPIOs must select ARCH_REQUIRE_GPIOLIB (if GPIO usage
 is mandatory) or ARCH_WANT_OPTIONAL_GPIOLIB (if GPIO support can be omitted) in
@@ -165,3 +165,6 @@ signals to 1, i.e. enabling the LEDs. And for the "power" GPIO, which is mapped
 as active-low, its actual signal will be 0 after this code. Contrary to the legacy
 integer GPIO interface, the active-low property is handled during mapping and is
 thus transparent to GPIO consumers.
+
+Set of functions such as gpiod_set_value() is available to work with
+this interface.
