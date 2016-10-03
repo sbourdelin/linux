@@ -19,6 +19,32 @@ Required properties:
 Optional properties:
 - allwinner,pa-gpios: gpio to enable external amplifier
 
+Required properties for "allwinner,sun6i-a31-codec":
+- allwinner,audio-routing: A list of the connections between audio components.
+			   Each entry is a pair of strings, the first being the
+			   connection's sink, the second being the connection's
+			   source. Valid names include:
+
+			   Audio pins on the SoC:
+			   "HP"
+			   "LINEIN"
+			   "LINEOUT"
+			   "MIC1"
+			   "MIC2"
+			   "MIC3"
+
+			   Microphone biases from the SoC:
+			   "HBIAS"
+			   "MBIAS"
+
+			   Board connectors:
+			   "Headphone"
+			   "Headset Mic"
+			   "Line In"
+			   "Line Out"
+			   "Mic"
+			   "Speaker"
+
 Example:
 codec: codec@01c22c00 {
 	#sound-dai-cells = <0>;
@@ -29,4 +55,13 @@ codec: codec@01c22c00 {
 	clock-names = "apb", "codec";
 	dmas = <&dma 0 19>, <&dma 0 19>;
 	dma-names = "rx", "tx";
+	allwinner,pa-gpios = <&pio 7 22 GPIO_ACTIVE_HIGH>; /* PH22 */
+	allwinner,audio-routing =
+		"Headphone", "HP",
+		"Speaker", "LINEOUT",
+		"LINEIN", "Line In",
+		"MIC1",	"MBIAS",
+		"MIC1", "Mic",
+		"MIC2", "HBIAS",
+		"MIC2", "Headset Mic";
 };
