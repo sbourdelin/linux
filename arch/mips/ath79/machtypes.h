@@ -23,6 +23,7 @@ enum ath79_mach_type {
 	ATH79_MACH_DB120,		/* Atheros DB120 reference board */
 	ATH79_MACH_PB44,		/* Atheros PB44 reference board */
 	ATH79_MACH_UBNT_XM,		/* Ubiquiti Networks XM board rev 1.0 */
+	ATH79_MACH_ALOHA_POCKET,	/* HAPROXY Aloha Pocket board */
 };
 
 #endif /* _ATH79_MACHTYPE_H */
