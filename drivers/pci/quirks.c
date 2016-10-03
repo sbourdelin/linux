@@ -4431,3 +4431,24 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
 	}
 }
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
+/*
+ * Workaround FLR issues for 82579
+ * This code disables the FLR (Function Level Reset) via PCIe, in order
+ * to workaround a bug found while using device passthrough, where the
+ * interface would become non-responsive.
+ * NOTE: the FLR bit is Read/Write Once (RWO) in config space, so if
+ * the BIOS or kernel writes this register * then this workaround will
+ * not work.
+ */
+static void quirk_intel_flr_cap_dis(struct pci_dev *dev)
+{
+	int pos = pci_find_capability(dev, PCI_CAP_ID_AF);
+	if (pos) {
+		u8 cap;
+		pci_read_config_byte(dev, pos + PCI_AF_CAP, &cap);
+		cap = cap & (~PCI_AF_CAP_FLR);
+		pci_write_config_byte(dev, pos + PCI_AF_CAP, cap);
+	}
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x1502, quirk_intel_flr_cap_dis);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x1503, quirk_intel_flr_cap_dis);
