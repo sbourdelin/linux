@@ -7,6 +7,18 @@ driver-specific ioctls and implementation notes.
 Questions and remarks can be sent to the Linux UVC development mailing list at
 linux-uvc-devel@lists.berlios.de.
 
+Configuring the driver
+----------------------
+
+The driver is configurable using the following module option:
+
+- allocators:
+
+	memory allocator selection, default is 0. It specifies the way buffers
+	will be allocated.
+
+		- 0: vmalloc
+		- 1: dma-contig
 
 Extension Unit (XU) support
 ---------------------------

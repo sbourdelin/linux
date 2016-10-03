@@ -1757,7 +1757,8 @@ static int uvc_register_video(struct uvc_device *dev,
 	int ret;
 
 	/* Initialize the video buffers queue. */
-	ret = uvc_queue_init(&stream->queue, stream->type, !uvc_no_drop_param);
+	ret = uvc_queue_init(dev, &stream->queue, stream->type,
+			     !uvc_no_drop_param);
 	if (ret)
 		return ret;
 

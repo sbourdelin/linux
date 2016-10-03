@@ -22,6 +22,7 @@
 #include <linux/wait.h>
 #include <media/videobuf2-v4l2.h>
 #include <media/videobuf2-vmalloc.h>
+#include <media/videobuf2-dma-contig.h>
 
 #include "uvcvideo.h"
 
@@ -36,6 +37,12 @@
  * spinlock to protect the IRQ queue that holds the buffers to be processed by
  * the driver.
  */
+
+static unsigned int allocators;
+module_param(allocators, uint, 0444);
+MODULE_PARM_DESC(allocators, " memory allocator selection, default is 0.\n"
+			     "\t\t    0 == vmalloc\n"
+			     "\t\t    1 == dma-contig");
 
 static inline struct uvc_streaming *
 uvc_queue_to_stream(struct uvc_video_queue *queue)
@@ -188,20 +195,30 @@ static const struct vb2_ops uvc_queue_qops = {
 	.stop_streaming = uvc_stop_streaming,
 };
 
-int uvc_queue_init(struct uvc_video_queue *queue, enum v4l2_buf_type type,
-		    int drop_corrupted)
+int uvc_queue_init(struct uvc_device *dev, struct uvc_video_queue *queue,
+		   enum v4l2_buf_type type, int drop_corrupted)
 {
 	int ret;
+	static const struct vb2_mem_ops * const uvc_mem_ops[2] = {
+		&vb2_vmalloc_memops,
+		&vb2_dma_contig_memops,
+	};
+
+	if (allocators == 1)
+		dma_coerce_mask_and_coherent(dev->vdev.dev, DMA_BIT_MASK(32));
+	else if (allocators >= ARRAY_SIZE(uvc_mem_ops))
+		allocators = 0;
 
 	queue->queue.type = type;
 	queue->queue.io_modes = VB2_MMAP | VB2_USERPTR | VB2_DMABUF;
 	queue->queue.drv_priv = queue;
 	queue->queue.buf_struct_size = sizeof(struct uvc_buffer);
 	queue->queue.ops = &uvc_queue_qops;
-	queue->queue.mem_ops = &vb2_vmalloc_memops;
+	queue->queue.mem_ops = uvc_mem_ops[allocators];
 	queue->queue.timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC
 		| V4L2_BUF_FLAG_TSTAMP_SRC_SOE;
 	queue->queue.lock = &queue->mutex;
+	queue->queue.dev = dev->vdev.dev;
 	ret = vb2_queue_init(&queue->queue);
 	if (ret)
 		return ret;
