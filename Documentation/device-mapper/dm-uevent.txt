@@ -22,7 +22,7 @@ Optionally add event-specific data to the generated uevent. e.g. dm-mpath's
 PATH_FAILED and PATH_REINSTATED uevents add path and number-of-remaining-paths
 vars.
 
-void dm_uevent_add(struct mapped_device *md, struct list_head *elist)
+void dm_uevent_queue(struct mapped_device *md, struct list_head *elist)
 
 Hand off the uevent to the device's list of pending events.
 

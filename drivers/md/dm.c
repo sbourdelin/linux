@@ -2426,7 +2426,7 @@ int dm_wait_event(struct mapped_device *md, int event_nr)
 			(event_nr != atomic_read(&md->event_nr)));
 }
 
-void dm_uevent_add(struct mapped_device *md, struct list_head *elist)
+void dm_uevent_queue(struct mapped_device *md, struct list_head *elist)
 {
 	unsigned long flags;
 
@@ -2434,7 +2434,7 @@ void dm_uevent_add(struct mapped_device *md, struct list_head *elist)
 	list_add(elist, &md->uevent_list);
 	spin_unlock_irqrestore(&md->uevent_lock, flags);
 }
-EXPORT_SYMBOL_GPL(dm_uevent_add);
+EXPORT_SYMBOL_GPL(dm_uevent_queue);
 
 /*
  * The gendisk is only valid as long as you have a reference

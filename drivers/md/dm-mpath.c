@@ -1280,7 +1280,7 @@ static void dm_path_uevent(enum dm_uevent_type event_type, struct dm_target *ti,
 		goto err;
 	}
 
-	dm_uevent_add(md, &event->elist);
+	dm_uevent_queue(md, &event->elist);
 	return;
 err:
 	dm_uevent_free(event);
