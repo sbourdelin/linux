@@ -100,7 +100,7 @@
 
 &mmc2_8bit_pins {
 	/* Increase drive strength for DDR modes */
-	allwinner,drive = <SUN4I_PINCTRL_40_MA>;
+	drive-strength = <40>;
 };
 
 &osc32k {
@@ -110,14 +110,14 @@
 
 &pio {
 	led_pins_cubieboard4: led-pins@0 {
-		allwinner,pins = "PH6", "PH17";
-		allwinner,function = "gpio_out";
+		pins = "PH6", "PH17";
+		function = "gpio_out";
 	};
 
 	mmc0_cd_pin_cubieboard4: mmc0_cd_pin@0 {
-		allwinner,pins = "PH18";
-		allwinner,function = "gpio_in";
-		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+		pins = "PH18";
+		function = "gpio_in";
+		bias-pull-up;
 	};
 };
 

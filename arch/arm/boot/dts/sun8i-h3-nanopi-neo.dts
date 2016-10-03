@@ -97,15 +97,15 @@
 
 &pio {
 	leds_opc: led-pins {
-		allwinner,pins = "PA10";
-		allwinner,function = "gpio_out";
+		pins = "PA10";
+		function = "gpio_out";
 	};
 };
 
 &r_pio {
 	leds_r_opc: led-pins {
-		allwinner,pins = "PL10";
-		allwinner,function = "gpio_out";
+		pins = "PL10";
+		function = "gpio_out";
 	};
 };
 
