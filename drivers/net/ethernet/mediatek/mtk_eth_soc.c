@@ -2323,6 +2323,27 @@ free_netdev:
 	return err;
 }
 
+static u32 mtk_get_chip_id(struct mtk_eth *eth)
+{
+	u32 val[2], id[4];
+	u32 chip_id;
+
+	regmap_read(eth->ethsys, ETHSYS_CHIPID0_3, &val[0]);
+	regmap_read(eth->ethsys, ETHSYS_CHIPID4_7, &val[1]);
+
+	id[3] = ((val[0] >> 16) & 0xff) - '0';
+	id[2] = ((val[0] >> 24) & 0xff) - '0';
+	id[1] = (val[1] & 0xff) - '0';
+	id[0] = ((val[1] >> 8) & 0xff) - '0';
+
+	chip_id = (id[3] * 1000) + (id[2] * 100) +
+		  (id[1] * 10) + id[0];
+
+	dev_info(eth->dev, "chip id = %d\n", chip_id);
+
+	return chip_id;
+}
+
 static int mtk_probe(struct platform_device *pdev)
 {
 	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -2387,6 +2408,12 @@ static int mtk_probe(struct platform_device *pdev)
 	err = mtk_hw_init(eth);
 	if (err)
 		return err;
+
+	eth->chip_id = mtk_get_chip_id(eth);
+	if (!eth->chip_id) {
+		dev_err(&pdev->dev, "failed to get chip id\n");
+		return -ENODEV;
+	}
 
 	for_each_child_of_node(pdev->dev.of_node, mac_np) {
 		if (!of_device_is_compatible(mac_np,
