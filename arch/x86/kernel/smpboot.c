@@ -1275,9 +1275,18 @@ __init void prefill_possible_map(void)
 {
 	int i, possible;
 
-	/* no processor from mptable or madt */
-	if (!num_processors)
-		num_processors = 1;
+	/* No boot processor was found in mptable or ACPI MADT */
+	if (!num_processors) {
+		/* Make sure boot cpu is enumerated */
+		if (apic->cpu_present_to_apicid(0) == BAD_APICID &&
+		    apic->apic_id_valid(boot_cpu_physical_apicid))
+			generic_processor_info(boot_cpu_physical_apicid,
+					apic_version[boot_cpu_physical_apicid]);
+		if (!num_processors) {
+			pr_warn("CPU 0 not enumerated in mptable or ACPI MADT\n");
+			num_processors = 1;
+		}
+	}
 
 	i = setup_max_cpus ?: 1;
 	if (setup_possible_cpus == -1) {
