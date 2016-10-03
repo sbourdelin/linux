@@ -170,6 +170,8 @@ struct throtl_data
 
 	unsigned long high_upgrade_time;
 	unsigned long high_downgrade_time;
+
+	unsigned int scale;
 };
 
 static void throtl_pending_timer_fn(unsigned long arg);
@@ -224,12 +226,28 @@ static struct throtl_data *sq_to_td(struct throtl_service_queue *sq)
 static uint64_t tg_bps_limit(struct throtl_grp *tg, int rw)
 {
 	struct blkcg_gq *blkg = tg_to_blkg(tg);
+	struct throtl_data *td;
 	uint64_t ret;
 
 	if (cgroup_subsys_on_dfl(io_cgrp_subsys) && !blkg->parent)
 		return -1;
-	ret = tg->bps[rw][tg->td->limit_index];
-	if (ret == -1 && tg->td->limit_index == LIMIT_HIGH)
+	td = tg->td;
+	ret = tg->bps[rw][td->limit_index];
+	if (td->limit_index == LIMIT_MAX && tg->bps[rw][LIMIT_HIGH] != -1) {
+		uint64_t increase;
+
+		if (td->scale < 4096 && time_after_eq(jiffies,
+		    td->high_upgrade_time + td->scale * td->throtl_slice)) {
+			uint64_t time = jiffies - td->high_upgrade_time;
+
+			do_div(time, td->throtl_slice);
+			td->scale = time;
+		}
+		increase = (tg->bps[rw][LIMIT_HIGH] >> 1) * td->scale;
+		ret = min(tg->bps[rw][LIMIT_MAX],
+			tg->bps[rw][LIMIT_HIGH] + increase);
+	}
+	if (ret == -1 && td->limit_index == LIMIT_HIGH)
 		return tg->bps[rw][LIMIT_MAX];
 
 	return ret;
@@ -238,12 +256,29 @@ static uint64_t tg_bps_limit(struct throtl_grp *tg, int rw)
 static unsigned int tg_iops_limit(struct throtl_grp *tg, int rw)
 {
 	struct blkcg_gq *blkg = tg_to_blkg(tg);
+	struct throtl_data *td;
 	unsigned int ret;
 
 	if (cgroup_subsys_on_dfl(io_cgrp_subsys) && !blkg->parent)
 		return -1;
-	ret = tg->iops[rw][tg->td->limit_index];
-	if (ret == -1 && tg->td->limit_index == LIMIT_HIGH)
+	td = tg->td;
+	ret = tg->iops[rw][td->limit_index];
+	if (td->limit_index == LIMIT_MAX && tg->iops[rw][LIMIT_HIGH] != -1) {
+		uint64_t increase;
+
+		if (td->scale < 4096 && time_after_eq(jiffies,
+		    td->high_upgrade_time + td->scale * td->throtl_slice)) {
+			uint64_t time = jiffies - td->high_upgrade_time;
+
+			do_div(time, td->throtl_slice);
+			td->scale = time;
+		}
+
+		increase = (tg->iops[rw][LIMIT_HIGH] >> 1) * td->scale;
+		ret = min(tg->iops[rw][LIMIT_MAX],
+			tg->iops[rw][LIMIT_HIGH] + (unsigned int)increase);
+	}
+	if (ret == -1 && td->limit_index == LIMIT_HIGH)
 		return tg->iops[rw][LIMIT_MAX];
 	return ret;
 }
@@ -1671,6 +1706,7 @@ static void throtl_upgrade_state(struct throtl_data *td)
 
 	td->limit_index = LIMIT_MAX;
 	td->high_upgrade_time = jiffies;
+	td->scale = 0;
 	rcu_read_lock();
 	blkg_for_each_descendant_post(blkg, pos_css, td->queue->root_blkg) {
 		struct throtl_grp *tg = blkg_to_tg(blkg);
