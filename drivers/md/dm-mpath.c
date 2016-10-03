@@ -1259,12 +1259,12 @@ static void dm_path_uevent(enum dm_uevent_type event_type, struct dm_target *ti,
 		return;
 	}
 
-	event = dm_build_uevent(md,
+	event = dm_uevent_build(md,
 				ti,
 				_dm_mpath_uevent_type_names[event_type].action,
 				_dm_mpath_uevent_type_names[event_type].name);
 	if (IS_ERR(event)) {
-		DMERR("%s: dm_build_uevent() failed", __func__);
+		DMERR("%s: dm_uevent_build() failed", __func__);
 		return;
 	}
 

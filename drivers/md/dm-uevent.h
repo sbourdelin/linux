@@ -42,7 +42,7 @@ enum dm_uevent_type {
 extern int dm_uevent_init(void);
 extern void dm_uevent_exit(void);
 extern void dm_send_uevents(struct list_head *events, struct kobject *kobj);
-struct dm_uevent *dm_build_uevent(struct mapped_device *md,
+struct dm_uevent *dm_uevent_build(struct mapped_device *md,
 					 struct dm_target *ti,
 					 enum kobject_action action,
 					 const char *dm_action);
@@ -61,7 +61,7 @@ static inline void dm_send_uevents(struct list_head *events,
 				   struct kobject *kobj)
 {
 }
-static inline struct dm_uevent *dm_build_uevent(struct mapped_device *md,
+static inline struct dm_uevent *dm_uevent_build(struct mapped_device *md,
 						struct dm_target *ti,
 						enum kobject_action action,
 						const char *dm_action)

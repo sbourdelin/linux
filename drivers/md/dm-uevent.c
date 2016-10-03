@@ -51,7 +51,7 @@ static struct dm_uevent *dm_uevent_alloc(struct mapped_device *md)
 	return event;
 }
 
-struct dm_uevent *dm_build_uevent(struct mapped_device *md,
+struct dm_uevent *dm_uevent_build(struct mapped_device *md,
 					 struct dm_target *ti,
 					 enum kobject_action action,
 					 const char *dm_action)
@@ -92,7 +92,7 @@ err_add:
 err_nomem:
 	return ERR_PTR(-ENOMEM);
 }
-EXPORT_SYMBOL_GPL(dm_build_uevent);
+EXPORT_SYMBOL_GPL(dm_uevent_build);
 
 /**
  * dm_send_uevents - send uevents for given list
