@@ -1429,6 +1429,7 @@ static void check_low_water_mark(struct pool *pool, dm_block_t free_blocks)
 		spin_lock_irqsave(&pool->lock, flags);
 		pool->low_water_triggered = true;
 		spin_unlock_irqrestore(&pool->lock, flags);
+		dm_uevent_add(pool->ti, KOBJ_CHANGE, "THIN_LOW_WATER_DATA");
 		dm_table_event(pool->ti->table);
 	}
 }
@@ -2397,6 +2398,7 @@ static enum pool_mode get_pool_mode(struct pool *pool)
 
 static void notify_of_pool_mode_change(struct pool *pool, const char *new_mode)
 {
+	dm_uevent_add(pool->ti, KOBJ_CHANGE, "THIN_POOL_MODE");
 	dm_table_event(pool->ti->table);
 	DMINFO("%s: switching pool to %s mode",
 	       dm_device_name(pool->pool_md), new_mode);
@@ -3095,6 +3097,7 @@ static void metadata_low_callback(void *context)
 	DMWARN("%s: reached low water mark for metadata device: sending event.",
 	       dm_device_name(pool->pool_md));
 
+	dm_uevent_add(pool->ti, KOBJ_CHANGE, "THIN_LOW_WATER_METADATA");
 	dm_table_event(pool->ti->table);
 }
 
