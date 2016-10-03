@@ -168,5 +168,5 @@ int i915_guc_submission_enable(struct drm_i915_private *dev_priv);
 int i915_guc_wq_reserve(struct drm_i915_gem_request *rq);
 void i915_guc_submission_disable(struct drm_i915_private *dev_priv);
 void i915_guc_submission_fini(struct drm_i915_private *dev_priv);
-
+int intel_is_guc_valid(struct drm_i915_private *dev_priv);
 #endif
