@@ -178,6 +178,11 @@ struct kib_hca_dev {
 	atomic_t           ibh_ref;             /* refcount */
 };
 
+static inline void kib_dereg_mr(struct kib_hca_dev *hdev, struct ib_mr *mr)
+{
+	hdev->ibh_pd->device->dereg_mr(mr);
+}
+
 /** # of seconds to keep pool alive */
 #define IBLND_POOL_DEADLINE     300
 /** # of seconds to retry if allocation failed */

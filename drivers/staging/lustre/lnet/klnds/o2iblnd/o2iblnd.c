@@ -1316,7 +1316,7 @@ static void kiblnd_destroy_fmr_pool(struct kib_fmr_pool *fpo)
 		list_for_each_entry_safe(frd, tmp, &fpo->fast_reg.fpo_pool_list,
 					 frd_list) {
 			list_del(&frd->frd_list);
-			ib_dereg_mr(frd->frd_mr);
+			kib_dereg_mr(fpo->fpo_hdev, frd->frd_mr);
 			LIBCFS_FREE(frd, sizeof(*frd));
 			i++;
 		}
@@ -1422,14 +1422,14 @@ static int kiblnd_alloc_freg_pool(struct kib_fmr_poolset *fps, struct kib_fmr_po
 
 out_middle:
 	if (frd->frd_mr)
-		ib_dereg_mr(frd->frd_mr);
+		kib_dereg_mr(fpo->fpo_hdev, frd->frd_mr);
 	LIBCFS_FREE(frd, sizeof(*frd));
 
 out:
 	list_for_each_entry_safe(frd, tmp, &fpo->fast_reg.fpo_pool_list,
 				 frd_list) {
 		list_del(&frd->frd_list);
-		ib_dereg_mr(frd->frd_mr);
+		kib_dereg_mr(fpo->fpo_hdev, frd->frd_mr);
 		LIBCFS_FREE(frd, sizeof(*frd));
 	}
 
@@ -2288,8 +2288,8 @@ static void kiblnd_hdev_cleanup_mrs(struct kib_hca_dev *hdev)
 	if (!hdev->ibh_mrs)
 		return;
 
-	ib_dereg_mr(hdev->ibh_mrs);
-
+	kib_dereg_mr(hdev, hdev->ibh_mrs);
+	hdev->ibh_pd->device->dereg_mr(hdev->ibh_mrs);
 	hdev->ibh_mrs = NULL;
 }
 
@@ -2316,12 +2316,17 @@ static int kiblnd_hdev_setup_mrs(struct kib_hca_dev *hdev)
 	if (rc)
 		return rc;
 
-	mr = ib_get_dma_mr(hdev->ibh_pd, acflags);
+	mr = hdev->ibh_pd->device->get_dma_mr(hdev->ibh_pd, acflags);
 	if (IS_ERR(mr)) {
-		CERROR("Failed ib_get_dma_mr : %ld\n", PTR_ERR(mr));
+		CERROR("Failed device get_dma_mr : %ld\n", PTR_ERR(mr));
 		kiblnd_hdev_cleanup_mrs(hdev);
 		return PTR_ERR(mr);
 	}
+
+	mr->device = hdev->ibh_pd->device;
+	mr->pd = hdev->ibh_pd;
+	mr->uobject = NULL;
+	mr->need_inval = false;
 
 	hdev->ibh_mrs = mr;
 
