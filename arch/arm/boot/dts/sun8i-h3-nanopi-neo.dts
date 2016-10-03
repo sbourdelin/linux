@@ -99,7 +99,6 @@
 	leds_opc: led-pins {
 		allwinner,pins = "PA10";
 		allwinner,function = "gpio_out";
-		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 	};
 };
@@ -108,7 +107,6 @@
 	leds_r_opc: led-pins {
 		allwinner,pins = "PL10";
 		allwinner,function = "gpio_out";
-		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 	};
 };
