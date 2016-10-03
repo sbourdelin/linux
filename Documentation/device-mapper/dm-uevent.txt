@@ -1,17 +1,52 @@
 The device-mapper uevent code adds the capability to device-mapper to create
 and send kobject uevents (uevents).  Previously device-mapper events were only
-available through the ioctl interface.  The advantage of the uevents interface
-is the event contains environment attributes providing increased context for
+available through the ioctl interface.  The advantages of the uevents interface
+are the event contains environment attributes providing increased context for
 the event avoiding the need to query the state of the device-mapper device after
-the event is received.
+the event is received, and uevents are poll()-able in userspace, whereas the
+ioctl event interface is not.
 
-There are two functions currently for device-mapper events.  The first function
-listed creates the event and the second function sends the event(s).
+There are five functions DM targets should use.
 
-void dm_path_uevent(enum dm_uevent_type event_type, struct dm_target *ti,
-                    const char *path, unsigned nr_valid_paths)
+struct dm_uevent *dm_build_uevent(struct mapped_device *md,
+					 struct dm_target *ti,
+					 enum kobject_action action,
+					 const char *dm_action)
+
+Construct a dm uevent with default DM variables attached(DM_TARGET,
+DM_ACTION, DM_SEQNUM).
+
+int add_uevent_var(struct kobj_uevent_env *env, const char *format, ...)
+
+Optionally add event-specific data to the generated uevent. e.g. dm-mpath's
+PATH_FAILED and PATH_REINSTATED uevents add path and number-of-remaining-paths
+vars.
+
+void dm_uevent_add(struct mapped_device *md, struct list_head *elist)
+
+Hand off the uevent to the device's list of pending events.
+
+void dm_uevent_free(struct dm_uevent *event)
+
+Something went wrong, free the uevent instead of queueing it.
+
+void dm_table_event(struct dm_table *t)
+
+Triggers sending of queued uevents as well as waking up processes waiting on
+the ioctl.
+
+
+The device-mapper uevent code also supplies three functions for device-mapper core
+to call:
+
+int dm_uevent_init(void)
+void dm_uevent_exit(void)
+
+Setup and teardown.
 
 void dm_send_uevents(struct list_head *events, struct kobject *kobj)
+
+Actually send the uevents (called indirectly from dm_table_event, above).
 
 
 The variables added to the uevent environment are:
