@@ -608,14 +608,6 @@ static int vvp_do_vmtruncate(struct inode *inode, size_t size)
 	return result;
 }
 
-static int vvp_io_setattr_trunc(const struct lu_env *env,
-				const struct cl_io_slice *ios,
-				struct inode *inode, loff_t size)
-{
-	inode_dio_wait(inode);
-	return 0;
-}
-
 static int vvp_io_setattr_time(const struct lu_env *env,
 			       const struct cl_io_slice *ios)
 {
@@ -646,15 +638,20 @@ static int vvp_io_setattr_start(const struct lu_env *env,
 {
 	struct cl_io	*io    = ios->cis_io;
 	struct inode	*inode = vvp_object_inode(io->ci_obj);
-	int result = 0;
+	struct ll_inode_info *lli = ll_i2info(inode);
 
-	inode_lock(inode);
-	if (cl_io_is_trunc(io))
-		result = vvp_io_setattr_trunc(env, ios, inode,
-					io->u.ci_setattr.sa_attr.lvb_size);
-	if (!result && io->u.ci_setattr.sa_valid & TIMES_SET_FLAGS)
-		result = vvp_io_setattr_time(env, ios);
-	return result;
+	if (cl_io_is_trunc(io)) {
+		down_write(&lli->lli_trunc_sem);
+		inode_lock(inode);
+		inode_dio_wait(inode);
+	} else {
+		inode_lock(inode);
+	}
+
+	if (io->u.ci_setattr.sa_valid & TIMES_SET_FLAGS)
+		return vvp_io_setattr_time(env, ios);
+
+	return 0;
 }
 
 static void vvp_io_setattr_end(const struct lu_env *env,
@@ -662,14 +659,18 @@ static void vvp_io_setattr_end(const struct lu_env *env,
 {
 	struct cl_io *io    = ios->cis_io;
 	struct inode *inode = vvp_object_inode(io->ci_obj);
+	struct ll_inode_info *lli = ll_i2info(inode);
 
-	if (cl_io_is_trunc(io))
+	if (cl_io_is_trunc(io)) {
 		/* Truncate in memory pages - they must be clean pages
 		 * because osc has already notified to destroy osc_extents.
 		 */
 		vvp_do_vmtruncate(inode, io->u.ci_setattr.sa_attr.lvb_size);
-
-	inode_unlock(inode);
+		inode_unlock(inode);
+		up_write(&lli->lli_trunc_sem);
+	} else {
+		inode_unlock(inode);
+	}
 }
 
 static void vvp_io_setattr_fini(const struct lu_env *env,
@@ -685,6 +686,7 @@ static int vvp_io_read_start(const struct lu_env *env,
 	struct cl_io      *io    = ios->cis_io;
 	struct cl_object  *obj   = io->ci_obj;
 	struct inode      *inode = vvp_object_inode(obj);
+	struct ll_inode_info *lli = ll_i2info(inode);
 	struct file       *file  = vio->vui_fd->fd_file;
 
 	int     result;
@@ -696,6 +698,9 @@ static int vvp_io_read_start(const struct lu_env *env,
 	CLOBINVRNT(env, obj, vvp_object_invariant(obj));
 
 	CDEBUG(D_VFSTRACE, "read: -> [%lli, %lli)\n", pos, pos + cnt);
+
+	if (vio->vui_io_subtype == IO_NORMAL)
+		down_read(&lli->lli_trunc_sem);
 
 	if (!can_populate_pages(env, io, inode))
 		return 0;
@@ -939,9 +944,13 @@ static int vvp_io_write_start(const struct lu_env *env,
 	struct cl_io       *io    = ios->cis_io;
 	struct cl_object   *obj   = io->ci_obj;
 	struct inode       *inode = vvp_object_inode(obj);
+	struct ll_inode_info *lli = ll_i2info(inode);
 	ssize_t result = 0;
 	loff_t pos = io->u.ci_wr.wr.crw_pos;
 	size_t cnt = io->u.ci_wr.wr.crw_count;
+
+	if (vio->vui_io_subtype == IO_NORMAL)
+		down_read(&lli->lli_trunc_sem);
 
 	if (!can_populate_pages(env, io, inode))
 		return 0;
@@ -1026,6 +1035,17 @@ static int vvp_io_write_start(const struct lu_env *env,
 	return result;
 }
 
+static void vvp_io_rw_end(const struct lu_env *env,
+			  const struct cl_io_slice *ios)
+{
+	struct vvp_io *vio = cl2vvp_io(env, ios);
+	struct inode *inode = vvp_object_inode(ios->cis_obj);
+	struct ll_inode_info *lli = ll_i2info(inode);
+
+	if (vio->vui_io_subtype == IO_NORMAL)
+		up_read(&lli->lli_trunc_sem);
+}
+
 static int vvp_io_kernel_fault(struct vvp_fault_io *cfio)
 {
 	struct vm_fault *vmf = cfio->ft_vmf;
@@ -1078,6 +1098,7 @@ static int vvp_io_fault_start(const struct lu_env *env,
 	struct cl_io	*io      = ios->cis_io;
 	struct cl_object    *obj     = io->ci_obj;
 	struct inode        *inode   = vvp_object_inode(obj);
+	struct ll_inode_info *lli = ll_i2info(inode);
 	struct cl_fault_io  *fio     = &io->u.ci_fault;
 	struct vvp_fault_io *cfio    = &vio->u.fault;
 	loff_t	       offset;
@@ -1092,6 +1113,8 @@ static int vvp_io_fault_start(const struct lu_env *env,
 		CWARN("binary "DFID
 		      " changed while waiting for the page fault lock\n",
 		      PFID(lu_object_fid(&obj->co_lu)));
+
+	down_read(&lli->lli_trunc_sem);
 
 	/* offset of the last byte on the page */
 	offset = cl_offset(obj, fio->ft_index + 1) - 1;
@@ -1240,6 +1263,17 @@ out:
 	return result;
 }
 
+static void vvp_io_fault_end(const struct lu_env *env,
+			     const struct cl_io_slice *ios)
+{
+	struct inode *inode = vvp_object_inode(ios->cis_obj);
+	struct ll_inode_info *lli = ll_i2info(inode);
+
+	CLOBINVRNT(env, ios->cis_io->ci_obj,
+		   vvp_object_invariant(ios->cis_io->ci_obj));
+	up_read(&lli->lli_trunc_sem);
+}
+
 static int vvp_io_fsync_start(const struct lu_env *env,
 			      const struct cl_io_slice *ios)
 {
@@ -1269,18 +1303,13 @@ static int vvp_io_read_ahead(const struct lu_env *env,
 	return result;
 }
 
-static void vvp_io_end(const struct lu_env *env, const struct cl_io_slice *ios)
-{
-	CLOBINVRNT(env, ios->cis_io->ci_obj,
-		   vvp_object_invariant(ios->cis_io->ci_obj));
-}
-
 static const struct cl_io_operations vvp_io_ops = {
 	.op = {
 		[CIT_READ] = {
 			.cio_fini	= vvp_io_fini,
 			.cio_lock      = vvp_io_read_lock,
 			.cio_start     = vvp_io_read_start,
+			.cio_end	= vvp_io_rw_end,
 			.cio_advance	= vvp_io_advance,
 		},
 		[CIT_WRITE] = {
@@ -1289,6 +1318,7 @@ static const struct cl_io_operations vvp_io_ops = {
 			.cio_iter_fini = vvp_io_write_iter_fini,
 			.cio_lock      = vvp_io_write_lock,
 			.cio_start     = vvp_io_write_start,
+			.cio_end	= vvp_io_rw_end,
 			.cio_advance   = vvp_io_advance,
 		},
 		[CIT_SETATTR] = {
@@ -1303,7 +1333,7 @@ static const struct cl_io_operations vvp_io_ops = {
 			.cio_iter_init = vvp_io_fault_iter_init,
 			.cio_lock      = vvp_io_fault_lock,
 			.cio_start     = vvp_io_fault_start,
-			.cio_end       = vvp_io_end,
+			.cio_end       = vvp_io_fault_end,
 		},
 		[CIT_FSYNC] = {
 			.cio_start  = vvp_io_fsync_start,
