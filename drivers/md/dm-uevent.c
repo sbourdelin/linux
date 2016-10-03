@@ -29,30 +29,13 @@
 
 #define DM_MSG_PREFIX "uevent"
 
-static const struct {
-	enum dm_uevent_type type;
-	enum kobject_action action;
-	char *name;
-} _dm_uevent_type_names[] = {
-	{DM_UEVENT_PATH_FAILED, KOBJ_CHANGE, "PATH_FAILED"},
-	{DM_UEVENT_PATH_REINSTATED, KOBJ_CHANGE, "PATH_REINSTATED"},
-};
-
 static struct kmem_cache *_dm_event_cache;
 
-struct dm_uevent {
-	struct mapped_device *md;
-	enum kobject_action action;
-	struct kobj_uevent_env ku_env;
-	struct list_head elist;
-	char name[DM_NAME_LEN];
-	char uuid[DM_UUID_LEN];
-};
-
-static void dm_uevent_free(struct dm_uevent *event)
+void dm_uevent_free(struct dm_uevent *event)
 {
 	kmem_cache_free(_dm_event_cache, event);
 }
+EXPORT_SYMBOL_GPL(dm_uevent_free);
 
 static struct dm_uevent *dm_uevent_alloc(struct mapped_device *md)
 {
@@ -68,12 +51,10 @@ static struct dm_uevent *dm_uevent_alloc(struct mapped_device *md)
 	return event;
 }
 
-static struct dm_uevent *dm_build_path_uevent(struct mapped_device *md,
-					      struct dm_target *ti,
-					      enum kobject_action action,
-					      const char *dm_action,
-					      const char *path,
-					      unsigned nr_valid_paths)
+struct dm_uevent *dm_build_uevent(struct mapped_device *md,
+					 struct dm_target *ti,
+					 enum kobject_action action,
+					 const char *dm_action)
 {
 	struct dm_uevent *event;
 
@@ -104,18 +85,6 @@ static struct dm_uevent *dm_build_path_uevent(struct mapped_device *md,
 		goto err_add;
 	}
 
-	if (add_uevent_var(&event->ku_env, "DM_PATH=%s", path)) {
-		DMERR("%s: add_uevent_var() for DM_PATH failed", __func__);
-		goto err_add;
-	}
-
-	if (add_uevent_var(&event->ku_env, "DM_NR_VALID_PATHS=%d",
-			   nr_valid_paths)) {
-		DMERR("%s: add_uevent_var() for DM_NR_VALID_PATHS failed",
-		      __func__);
-		goto err_add;
-	}
-
 	return event;
 
 err_add:
@@ -123,6 +92,7 @@ err_add:
 err_nomem:
 	return ERR_PTR(-ENOMEM);
 }
+EXPORT_SYMBOL_GPL(dm_build_uevent);
 
 /**
  * dm_send_uevents - send uevents for given list
@@ -169,37 +139,6 @@ uevent_free:
 		dm_uevent_free(event);
 	}
 }
-
-/**
- * dm_path_uevent - called to create a new path event and queue it
- *
- * @event_type:	path event type enum
- * @ti:			pointer to a dm_target
- * @path:		string containing pathname
- * @nr_valid_paths:	number of valid paths remaining
- *
- */
-void dm_path_uevent(enum dm_uevent_type event_type, struct dm_target *ti,
-		   const char *path, unsigned nr_valid_paths)
-{
-	struct mapped_device *md = dm_table_get_md(ti->table);
-	struct dm_uevent *event;
-
-	if (event_type >= ARRAY_SIZE(_dm_uevent_type_names)) {
-		DMERR("%s: Invalid event_type %d", __func__, event_type);
-		return;
-	}
-
-	event = dm_build_path_uevent(md, ti,
-				     _dm_uevent_type_names[event_type].action,
-				     _dm_uevent_type_names[event_type].name,
-				     path, nr_valid_paths);
-	if (IS_ERR(event))
-		return;
-
-	dm_uevent_add(md, &event->elist);
-}
-EXPORT_SYMBOL_GPL(dm_path_uevent);
 
 int dm_uevent_init(void)
 {

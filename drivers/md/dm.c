@@ -2434,6 +2434,7 @@ void dm_uevent_add(struct mapped_device *md, struct list_head *elist)
 	list_add(elist, &md->uevent_list);
 	spin_unlock_irqrestore(&md->uevent_lock, flags);
 }
+EXPORT_SYMBOL_GPL(dm_uevent_add);
 
 /*
  * The gendisk is only valid as long as you have a reference

@@ -30,6 +30,15 @@
 #define DM_PG_INIT_DELAY_MSECS 2000
 #define DM_PG_INIT_DELAY_DEFAULT ((unsigned) -1)
 
+static const struct {
+	enum dm_uevent_type type;
+	enum kobject_action action;
+	char *name;
+} _dm_mpath_uevent_type_names[] = {
+	{DM_UEVENT_PATH_FAILED, KOBJ_CHANGE, "PATH_FAILED"},
+	{DM_UEVENT_PATH_REINSTATED, KOBJ_CHANGE, "PATH_REINSTATED"},
+};
+
 /* Path properties */
 struct pgpath {
 	struct list_head list;
@@ -1228,6 +1237,68 @@ static void multipath_dtr(struct dm_target *ti)
 
 	flush_multipath_work(m);
 	free_multipath(m);
+}
+
+static struct dm_uevent *dm_build_path_uevent(struct mapped_device *md,
+					      struct dm_target *ti,
+					      enum kobject_action action,
+					      const char *dm_action,
+					      const char *path,
+					      unsigned nr_valid_paths)
+{
+	struct dm_uevent *event;
+
+	event = dm_build_uevent(md, ti, action, dm_action);
+	if (IS_ERR(event))
+		return event;
+
+	if (add_uevent_var(&event->ku_env, "DM_PATH=%s", path)) {
+		DMERR("%s: add_uevent_var() for DM_PATH failed", __func__);
+		goto err_add;
+	}
+
+	if (add_uevent_var(&event->ku_env, "DM_NR_VALID_PATHS=%d",
+			   nr_valid_paths)) {
+		DMERR("%s: add_uevent_var() for DM_NR_VALID_PATHS failed",
+		      __func__);
+		goto err_add;
+	}
+
+	return event;
+
+err_add:
+	dm_uevent_free(event);
+	return ERR_PTR(-ENOMEM);
+}
+
+/**
+ * dm_path_uevent - called to create a new path event and queue it
+ *
+ * @event_type:	path event type enum
+ * @ti:			pointer to a dm_target
+ * @path:		string containing pathname
+ * @nr_valid_paths:	number of valid paths remaining
+ *
+ */
+static void dm_path_uevent(enum dm_uevent_type event_type, struct dm_target *ti,
+		   const char *path, unsigned nr_valid_paths)
+{
+	struct mapped_device *md = dm_table_get_md(ti->table);
+	struct dm_uevent *event;
+
+	if (event_type >= ARRAY_SIZE(_dm_mpath_uevent_type_names)) {
+		DMERR("%s: Invalid event_type %d", __func__, event_type);
+		return;
+	}
+
+	event = dm_build_path_uevent(md, ti,
+				     _dm_mpath_uevent_type_names[event_type].action,
+				     _dm_mpath_uevent_type_names[event_type].name,
+				     path, nr_valid_paths);
+	if (IS_ERR(event))
+		return;
+
+	dm_uevent_add(md, &event->elist);
 }
 
 /*

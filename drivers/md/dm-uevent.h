@@ -21,6 +21,17 @@
 #ifndef DM_UEVENT_H
 #define DM_UEVENT_H
 
+#include <linux/dm-ioctl.h> // for DM_*_LEN
+
+struct dm_uevent {
+	struct mapped_device *md;
+	enum kobject_action action;
+	struct kobj_uevent_env ku_env;
+	struct list_head elist;
+	char name[DM_NAME_LEN];
+	char uuid[DM_UUID_LEN];
+};
+
 enum dm_uevent_type {
 	DM_UEVENT_PATH_FAILED,
 	DM_UEVENT_PATH_REINSTATED,
@@ -31,9 +42,11 @@ enum dm_uevent_type {
 extern int dm_uevent_init(void);
 extern void dm_uevent_exit(void);
 extern void dm_send_uevents(struct list_head *events, struct kobject *kobj);
-extern void dm_path_uevent(enum dm_uevent_type event_type,
-			   struct dm_target *ti, const char *path,
-			   unsigned nr_valid_paths);
+struct dm_uevent *dm_build_uevent(struct mapped_device *md,
+					 struct dm_target *ti,
+					 enum kobject_action action,
+					 const char *dm_action);
+void dm_uevent_free(struct dm_uevent *event);
 
 #else
 
@@ -48,9 +61,14 @@ static inline void dm_send_uevents(struct list_head *events,
 				   struct kobject *kobj)
 {
 }
-static inline void dm_path_uevent(enum dm_uevent_type event_type,
-				  struct dm_target *ti, const char *path,
-				  unsigned nr_valid_paths)
+static inline struct dm_uevent *dm_build_uevent(struct mapped_device *md,
+						struct dm_target *ti,
+						enum kobject_action action,
+						const char *dm_action)
+{
+	return ERR_PTR(-ENOMEM);
+}
+static void dm_uevent_free(struct dm_uevent *event)
 {
 }
 
