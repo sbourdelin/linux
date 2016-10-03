@@ -2344,6 +2344,14 @@ static u32 mtk_get_chip_id(struct mtk_eth *eth)
 	return chip_id;
 }
 
+static bool mtk_is_hwlro_supported(struct mtk_eth *eth)
+{
+	if (eth->chip_id == MT7623_ETH)
+		return true;
+	else
+		return false;
+}
+
 static int mtk_probe(struct platform_device *pdev)
 {
 	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -2383,8 +2391,6 @@ static int mtk_probe(struct platform_device *pdev)
 		return PTR_ERR(eth->pctl);
 	}
 
-	eth->hwlro = of_property_read_bool(pdev->dev.of_node, "mediatek,hwlro");
-
 	for (i = 0; i < 3; i++) {
 		eth->irq[i] = platform_get_irq(pdev, i);
 		if (eth->irq[i] < 0) {
@@ -2414,6 +2420,8 @@ static int mtk_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to get chip id\n");
 		return -ENODEV;
 	}
+
+	eth->hwlro = mtk_is_hwlro_supported(eth);
 
 	for_each_child_of_node(pdev->dev.of_node, mac_np) {
 		if (!of_device_is_compatible(mac_np,
