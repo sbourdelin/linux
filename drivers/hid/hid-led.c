@@ -67,6 +67,8 @@ union delcom_packet {
 #define DELCOM_RED_LED		1
 #define DELCOM_BLUE_LED		2
 
+#define MAX_REPORT_SIZE		16
+
 struct hidled_device;
 struct hidled_rgb;
 
@@ -100,10 +102,9 @@ struct hidled_device {
 	const struct hidled_config *config;
 	struct hid_device       *hdev;
 	struct hidled_rgb	*rgb;
+	u8			buf[MAX_REPORT_SIZE];
 	struct mutex		lock;
 };
-
-#define MAX_REPORT_SIZE		16
 
 #define to_hidled_led(arg) container_of(arg, struct hidled_led, cdev)
 
@@ -118,13 +119,16 @@ static int hidled_send(struct hidled_device *ldev, __u8 *buf)
 
 	mutex_lock(&ldev->lock);
 
+	/* buffer provided to hid_hw_raw_request must not be on the stack */
+	memcpy(ldev->buf, buf, ldev->config->report_size);
+
 	if (ldev->config->report_type == RAW_REQUEST)
-		ret = hid_hw_raw_request(ldev->hdev, buf[0], buf,
+		ret = hid_hw_raw_request(ldev->hdev, buf[0], ldev->buf,
 					 ldev->config->report_size,
 					 HID_FEATURE_REPORT,
 					 HID_REQ_SET_REPORT);
 	else if (ldev->config->report_type == OUTPUT_REPORT)
-		ret = hid_hw_output_report(ldev->hdev, buf,
+		ret = hid_hw_output_report(ldev->hdev, ldev->buf,
 					   ldev->config->report_size);
 	else
 		ret = -EINVAL;
@@ -147,17 +151,21 @@ static int hidled_recv(struct hidled_device *ldev, __u8 *buf)
 
 	mutex_lock(&ldev->lock);
 
-	ret = hid_hw_raw_request(ldev->hdev, buf[0], buf,
+	memcpy(ldev->buf, buf, ldev->config->report_size);
+
+	ret = hid_hw_raw_request(ldev->hdev, buf[0], ldev->buf,
 				 ldev->config->report_size,
 				 HID_FEATURE_REPORT,
 				 HID_REQ_SET_REPORT);
 	if (ret < 0)
 		goto err;
 
-	ret = hid_hw_raw_request(ldev->hdev, buf[0], buf,
+	ret = hid_hw_raw_request(ldev->hdev, buf[0], ldev->buf,
 				 ldev->config->report_size,
 				 HID_FEATURE_REPORT,
 				 HID_REQ_GET_REPORT);
+
+	memcpy(buf, ldev->buf, ldev->config->report_size);
 err:
 	mutex_unlock(&ldev->lock);
 
