@@ -46,20 +46,20 @@ static unsigned const char riso_kagaku_tbl[] = {
 #define RISO_KAGAKU_IX(r, g, b) riso_kagaku_tbl[((r)?1:0)+((g)?2:0)+((b)?4:0)]
 
 union delcom_packet {
-	__u8 data[8];
+	u8 data[8];
 	struct {
-		__u8 major_cmd;
-		__u8 minor_cmd;
-		__u8 data_lsb;
-		__u8 data_msb;
+		u8 major_cmd;
+		u8 minor_cmd;
+		u8 data_lsb;
+		u8 data_msb;
 	} tx;
 	struct {
-		__u8 cmd;
+		u8 cmd;
 	} rx;
 	struct {
-		__le16 family_code;
-		__le16 security_code;
-		__u8 fw_version;
+		le16 family_code;
+		le16 security_code;
+		u8 fw_version;
 	} fw;
 };
 
@@ -112,7 +112,7 @@ module_param(riso_kagaku_switch_green_blue, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(riso_kagaku_switch_green_blue,
 	"switch green and blue RGB component for Riso Kagaku devices");
 
-static int hidled_send(struct hidled_device *ldev, __u8 *buf)
+static int hidled_send(struct hidled_device *ldev, u8 *buf)
 {
 	int ret;
 
@@ -138,7 +138,7 @@ static int hidled_send(struct hidled_device *ldev, __u8 *buf)
 }
 
 /* reading data is supported for report type RAW_REQUEST only */
-static int hidled_recv(struct hidled_device *ldev, __u8 *buf)
+static int hidled_recv(struct hidled_device *ldev, u8 *buf)
 {
 	int ret;
 
@@ -182,7 +182,7 @@ static int riso_kagaku_write(struct led_classdev *cdev, enum led_brightness br)
 {
 	struct hidled_led *led = to_hidled_led(cdev);
 	struct hidled_rgb *rgb = led->rgb;
-	__u8 buf[MAX_REPORT_SIZE] = {};
+	u8 buf[MAX_REPORT_SIZE] = {};
 
 	buf[1] = riso_kagaku_index(rgb);
 
@@ -193,7 +193,7 @@ static int dream_cheeky_write(struct led_classdev *cdev, enum led_brightness br)
 {
 	struct hidled_led *led = to_hidled_led(cdev);
 	struct hidled_rgb *rgb = led->rgb;
-	__u8 buf[MAX_REPORT_SIZE] = {};
+	u8 buf[MAX_REPORT_SIZE] = {};
 
 	buf[1] = rgb->red.cdev.brightness;
 	buf[2] = rgb->green.cdev.brightness;
@@ -206,7 +206,7 @@ static int dream_cheeky_write(struct led_classdev *cdev, enum led_brightness br)
 
 static int dream_cheeky_init(struct hidled_device *ldev)
 {
-	__u8 buf[MAX_REPORT_SIZE] = {};
+	u8 buf[MAX_REPORT_SIZE] = {};
 
 	/* Dream Cheeky magic */
 	buf[1] = 0x1f;
@@ -222,7 +222,7 @@ static int _thingm_write(struct led_classdev *cdev, enum led_brightness br,
 			 u8 offset)
 {
 	struct hidled_led *led = to_hidled_led(cdev);
-	__u8 buf[MAX_REPORT_SIZE] = { 1, 'c' };
+	u8 buf[MAX_REPORT_SIZE] = { 1, 'c' };
 
 	buf[2] = led->rgb->red.cdev.brightness;
 	buf[3] = led->rgb->green.cdev.brightness;
@@ -254,7 +254,7 @@ static const struct hidled_config hidled_config_thingm_v1 = {
 
 static int thingm_init(struct hidled_device *ldev)
 {
-	__u8 buf[MAX_REPORT_SIZE] = { 1, 'v' };
+	u8 buf[MAX_REPORT_SIZE] = { 1, 'v' };
 	int ret;
 
 	ret = hidled_recv(ldev, buf);
@@ -333,7 +333,7 @@ static int delcom_init(struct hidled_device *ldev)
 static int luxafor_write(struct led_classdev *cdev, enum led_brightness br)
 {
 	struct hidled_led *led = to_hidled_led(cdev);
-	__u8 buf[MAX_REPORT_SIZE] = { [1] = 1 };
+	u8 buf[MAX_REPORT_SIZE] = { [1] = 1 };
 
 	buf[2] = led->rgb->num + 1;
 	buf[3] = led->rgb->red.cdev.brightness;
