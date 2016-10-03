@@ -297,10 +297,16 @@ extern void blk_throtl_exit(struct request_queue *q);
 extern ssize_t blk_throtl_slice_show(struct request_queue *q, char *page);
 extern ssize_t blk_throtl_slice_store(struct request_queue *q,
 	const char *page, size_t count);
+extern ssize_t blk_throtl_idle_threshold_show(struct request_queue *q,
+	char *page);
+extern ssize_t blk_throtl_idle_threshold_store(struct request_queue *q,
+	const char *page, size_t count);
+extern void blk_throtl_bio_endio(struct bio *bio);
 #else /* CONFIG_BLK_DEV_THROTTLING */
 static inline void blk_throtl_drain(struct request_queue *q) { }
 static inline int blk_throtl_init(struct request_queue *q) { return 0; }
 static inline void blk_throtl_exit(struct request_queue *q) { }
+static inline void blk_throtl_bio_endio(struct bio *bio) { }
 #endif /* CONFIG_BLK_DEV_THROTTLING */
 
 #endif /* BLK_INTERNAL_H */
