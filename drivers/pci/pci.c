@@ -4020,6 +4020,12 @@ static void pci_dev_save_and_disable(struct pci_dev *dev)
 
 static void pci_dev_restore(struct pci_dev *dev)
 {
+	u32 l;
+
+	/* see if the device is accessible first */
+	if (!pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &l, 60 * 1000))
+		return;
+
 	pci_restore_state(dev);
 	pci_reset_notify(dev, false);
 }
