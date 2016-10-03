@@ -162,8 +162,10 @@ static void do_flush(struct work_struct *work)
 
 	r = userspace_do_request(lc, lc->uuid, DM_ULOG_FLUSH, NULL, 0, NULL, NULL);
 
-	if (r)
+	if (r) {
+		dm_uevent_add(lc->ti->table, KOBJ_CHANGE, "LOG_FLUSHED");
 		dm_table_event(lc->ti->table);
+	}
 }
 
 /*
@@ -634,8 +636,10 @@ out:
 		mempool_free(fe, flush_entry_pool);
 	}
 
-	if (r)
+	if (r) {
+		dm_uevent_add(lc->ti->table, KOBJ_CHANGE, "LOG_FLUSHED");
 		dm_table_event(lc->ti->table);
+	}
 
 	return r;
 }

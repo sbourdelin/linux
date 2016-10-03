@@ -579,6 +579,7 @@ static void fail_log_device(struct log_c *lc)
 		return;
 
 	lc->log_dev_failed = 1;
+	dm_uevent_add(lc->ti, KOBJ_CHANGE, "LOG_FAILED");
 	dm_table_event(lc->ti->table);
 }
 

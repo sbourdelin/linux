@@ -1443,6 +1443,7 @@ static void __invalidate_snapshot(struct dm_snapshot *s, int err)
 
 	s->valid = 0;
 
+	dm_uevent_add(s->ti, KOBJ_CHANGE, "SNAPSHOT_INVALIDATED");
 	dm_table_event(s->ti->table);
 }
 

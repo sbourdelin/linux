@@ -586,8 +586,10 @@ static void clear_dirty(struct cache *cache, dm_oblock_t oblock, dm_cblock_t cbl
 {
 	if (test_and_clear_bit(from_cblock(cblock), cache->dirty_bitset)) {
 		policy_clear_dirty(cache->policy, oblock);
-		if (atomic_dec_return(&cache->nr_dirty) == 0)
+		if (atomic_dec_return(&cache->nr_dirty) == 0) {
+			dm_uevent_add(cache->ti, KOBJ_CHANGE, "CACHE_CLEAN");
 			dm_table_event(cache->ti->table);
+		}
 	}
 }
 
@@ -978,6 +980,7 @@ static void notify_mode_switch(struct cache *cache, enum cache_metadata_mode mod
 		"fail"
 	};
 
+	dm_uevent_add(cache->ti, KOBJ_CHANGE, "CACHE_MODE_SWITCH");
 	dm_table_event(cache->ti->table);
 	DMINFO("%s: switching cache to %s mode",
 	       cache_device_name(cache), descs[(int)mode]);

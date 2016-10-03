@@ -410,6 +410,7 @@ static void do_recovery(struct mirror_set *ms)
 	if (!ms->in_sync &&
 	    (log->type->get_sync_count(log) == ms->nr_regions)) {
 		/* the sync is complete */
+		dm_uevent_add(ms->ti, KOBJ_CHANGE, "TABLE_SYNCED");
 		dm_table_event(ms->ti->table);
 		ms->in_sync = 1;
 		reset_ms_flags(ms);
