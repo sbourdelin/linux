@@ -56,6 +56,11 @@ KSZ9031:
       - txd2-skew-ps : Skew control of TX data 2 pad
       - txd3-skew-ps : Skew control of TX data 3 pad
 
+    Boolean:
+
+      - enable-edpd : Not related to timing. Specify this property to enable
+                      energy-detect power-down mode in the PHY.
+
 Examples:
 
 	mdio {
@@ -64,6 +69,7 @@ Examples:
 			rxdv-skew-ps = <0>;
 			txc-skew-ps = <3000>;
 			txen-skew-ps = <0>;
+			enable-edpd;
 			reg = <0>;
 		};
 	};
