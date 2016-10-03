@@ -556,19 +556,16 @@
 			i2c0_pins_a: i2c0@0 {
 				allwinner,pins = "PB0", "PB1";
 				allwinner,function = "i2c0";
-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 			};
 
 			i2c1_pins_a: i2c1@0 {
 				allwinner,pins = "PB15", "PB16";
 				allwinner,function = "i2c1";
-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 			};
 
 			i2c2_pins_a: i2c2@0 {
 				allwinner,pins = "PB17", "PB18";
 				allwinner,function = "i2c2";
-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 			};
 
 			mmc0_pins_a: mmc0@0 {
@@ -576,7 +573,6 @@
 						 "PF4", "PF5";
 				allwinner,function = "mmc0";
 				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 			};
 
 			mmc2_pins_a: mmc2@0 {
@@ -591,19 +587,16 @@
 			uart3_pins_a: uart3@0 {
 				allwinner,pins = "PG9", "PG10";
 				allwinner,function = "uart3";
-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 			};
 
 			uart3_pins_cts_rts_a: uart3-cts-rts@0 {
 				allwinner,pins = "PG11", "PG12";
 				allwinner,function = "uart3";
-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 			};
 
 			pwm0_pins: pwm0 {
 				allwinner,pins = "PB2";
 				allwinner,function = "pwm";
-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 			};
 		};
 
