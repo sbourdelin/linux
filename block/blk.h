@@ -294,6 +294,9 @@ static inline struct io_context *create_io_context(gfp_t gfp_mask, int node)
 extern void blk_throtl_drain(struct request_queue *q);
 extern int blk_throtl_init(struct request_queue *q);
 extern void blk_throtl_exit(struct request_queue *q);
+extern ssize_t blk_throtl_slice_show(struct request_queue *q, char *page);
+extern ssize_t blk_throtl_slice_store(struct request_queue *q,
+	const char *page, size_t count);
 #else /* CONFIG_BLK_DEV_THROTTLING */
 static inline void blk_throtl_drain(struct request_queue *q) { }
 static inline int blk_throtl_init(struct request_queue *q) { return 0; }
