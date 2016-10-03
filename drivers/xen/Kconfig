@@ -166,7 +166,7 @@ config SWIOTLB_XEN
 	select SWIOTLB
 
 config XEN_TMEM
-	tristate
+	tristate "Transcendent Memory support for Xen"
 	depends on !ARM && !ARM64
 	default m if (CLEANCACHE || FRONTSWAP)
 	help
