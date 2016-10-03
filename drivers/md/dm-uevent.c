@@ -169,7 +169,6 @@ uevent_free:
 		dm_uevent_free(event);
 	}
 }
-EXPORT_SYMBOL_GPL(dm_send_uevents);
 
 /**
  * dm_path_uevent - called to create a new path event and queue it
