@@ -746,6 +746,7 @@ static const struct sdhci_pci_fixes sdhci_via = {
 	.probe		= via_probe,
 };
 
+
 static int rtsx_probe_slot(struct sdhci_pci_slot *slot)
 {
 	slot->host->mmc->caps2 |= MMC_CAP2_HS200;
@@ -766,6 +767,172 @@ enum amd_chipset_gen {
 	AMD_CHIPSET_NL,
 	AMD_CHIPSET_UNKNOWN,
 };
+
+struct tuning_descriptor {
+	unsigned char tune_around;
+	bool this_tune_ok;
+	bool last_tune_ok;
+	bool valid_front_end;
+	unsigned char valid_front;
+	unsigned char valid_window_max;
+	unsigned char tune_low_max;
+	unsigned char tune_low;
+	unsigned char valid_window;
+	unsigned char tune_result;
+};
+
+static struct sdhci_ops sdhci_pci_ops;
+static struct tuning_descriptor tdescriptor;
+
+static int tuning_reset(struct sdhci_host *host)
+{
+	unsigned int val;
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->lock, flags);
+
+	val = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+	val |= SDHCI_CTRL_PRESET_VAL_ENABLE | SDHCI_CTRL_EXEC_TUNING;
+	sdhci_writew(host, val, SDHCI_HOST_CONTROL2);
+
+	val = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+	val &= ~SDHCI_CTRL_EXEC_TUNING;
+	sdhci_writew(host, val, SDHCI_HOST_CONTROL2);
+
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	return 0;
+}
+
+static int config_tuning_phase(struct sdhci_host *host, unsigned char phase)
+{
+	struct sdhci_pci_slot *slot = sdhci_priv(host);
+	struct pci_dev *pdev = slot->chip->pdev;
+	unsigned int val;
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->lock, flags);
+
+	pci_read_config_dword(pdev, 0xb8, &val);
+	val &= ~0x1f;
+	val |= (0x10800 | (phase << 1));
+	pci_write_config_dword(pdev, 0xb8, val);
+
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	return 0;
+}
+
+static int find_good_phase(struct sdhci_host *host)
+{
+	struct tuning_descriptor *td = &tdescriptor;
+	struct sdhci_pci_slot *slot = sdhci_priv(host);
+	struct pci_dev *pdev = slot->chip->pdev;
+	unsigned int val;
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->lock, flags);
+
+	if (td->this_tune_ok == false)
+		td->valid_front_end = 1;
+
+	if (td->valid_front_end)
+		td->valid_front = td->valid_front;
+	else if (td->this_tune_ok)
+		td->valid_front = td->valid_front + 1;
+
+	if ((!td->this_tune_ok && td->last_tune_ok) ||
+					(td->tune_around == 11)) {
+
+		if (td->valid_window > td->valid_window_max) {
+			td->valid_window_max = td->valid_window;
+			td->tune_low_max = td->tune_low;
+		}
+	}
+
+	if (td->this_tune_ok && (!td->last_tune_ok))
+		td->tune_low = td->tune_around;
+	if (!td->this_tune_ok && td->last_tune_ok)
+		td->valid_window = 0x0;
+	else if (td->this_tune_ok)
+		td->valid_window = td->valid_window + 1;
+
+	td->last_tune_ok = td->this_tune_ok;
+
+	if (td->tune_around == 11) {
+		if ((td->valid_front + td->valid_window) >
+						td->valid_window_max) {
+			if (td->valid_front > td->valid_window)
+				td->tune_result = ((td->valid_front -
+						td->valid_window) >> 1);
+			else
+				td->tune_result = td->tune_low +
+				((td->valid_window + td->valid_front) >> 1);
+		} else {
+			td->tune_result = td->tune_low_max +
+					(td->valid_window_max>>1);
+		}
+
+
+		if (td->tune_result > 0x0b)
+			td->tune_result = 0x0b;
+
+		pci_read_config_dword(pdev, 0xb8, &val);
+		val &= ~0x1f;
+		val |= (0x10800 | (td->tune_result<<1));
+		pci_write_config_dword(pdev, 0xb8, val);
+	}
+
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	return 0;
+}
+
+static int amd_execute_tuning(struct sdhci_host *host, u32 opcode)
+{
+	struct tuning_descriptor *td = &tdescriptor;
+	u8 ctrl;
+
+	tuning_reset(host);
+	memset(td, 0x0, sizeof(struct tuning_descriptor));
+
+	if (host->quirks2 & SDHCI_QUIRK2_CLEAR_TRANSFERMODE_REG_BEFORE_CMD)
+		opcode = MMC_SEND_TUNING_BLOCK_HS200;
+
+	for (td->tune_around = 0; td->tune_around < 12; td->tune_around++) {
+
+		config_tuning_phase(host, td->tune_around);
+
+		if (mmc_send_tuning(host->mmc, opcode, NULL)) {
+			td->this_tune_ok = false;
+			host->mmc->need_retune = 0;
+			mdelay(4);
+			ctrl = SDHCI_RESET_CMD | SDHCI_RESET_DATA;
+			sdhci_writeb(host, ctrl, SDHCI_SOFTWARE_RESET);
+		} else {
+			td->this_tune_ok = true;
+		}
+
+		find_good_phase(host);
+	}
+
+	host->mmc->retune_period = 0;
+
+	return 0;
+}
+
+static int amd_enable_manual_tuning(struct sdhci_pci_slot *slot)
+{
+	struct pci_dev *pdev = slot->chip->pdev;
+	unsigned int val;
+
+	pci_read_config_dword(pdev, 0xd0, &val);
+	val &= 0xffffffcf;
+	val |= 0x30;
+	pci_write_config_dword(pdev, 0xd0, val);
+
+	return 0;
+}
 
 static int amd_probe(struct sdhci_pci_chip *chip)
 {
@@ -791,14 +958,25 @@ static int amd_probe(struct sdhci_pci_chip *chip)
 
 	if ((gen == AMD_CHIPSET_BEFORE_ML) || (gen == AMD_CHIPSET_CZ)) {
 		chip->quirks2 |= SDHCI_QUIRK2_CLEAR_TRANSFERMODE_REG_BEFORE_CMD;
-		chip->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
 	}
 
 	return 0;
 }
 
+static int amd_probe_slot(struct sdhci_pci_slot *slot)
+{
+	struct sdhci_host *host = slot->host;
+
+	if (host->quirks2 & SDHCI_QUIRK2_CLEAR_TRANSFERMODE_REG_BEFORE_CMD) {
+		sdhci_pci_ops.platform_execute_tuning = amd_execute_tuning;
+		amd_enable_manual_tuning(slot);
+	}
+	return 0;
+}
+
 static const struct sdhci_pci_fixes sdhci_amd = {
 	.probe		= amd_probe,
+	.probe_slot	= amd_probe_slot,
 };
 
 static const struct pci_device_id pci_ids[] = {
@@ -1409,7 +1587,7 @@ static int sdhci_pci_select_drive_strength(struct sdhci_host *host,
 					   card_drv, drv_type);
 }
 
-static const struct sdhci_ops sdhci_pci_ops = {
+static struct sdhci_ops sdhci_pci_ops = {
 	.set_clock	= sdhci_set_clock,
 	.enable_dma	= sdhci_pci_enable_dma,
 	.set_bus_width	= sdhci_pci_set_bus_width,
