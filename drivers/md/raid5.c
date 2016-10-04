@@ -6482,8 +6482,8 @@ static struct r5conf *setup_conf(struct mddev *mddev)
 	}
 
 	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
-	if (conf == NULL)
-		goto abort;
+	if (!conf)
+		return ERR_PTR(-ENOMEM);
 	/* Don't enable multi-threading by default*/
 	if (!alloc_thread_groups(conf, 0, &group_cnt, &worker_cnt_per_group,
 				 &new_group)) {
@@ -6646,11 +6646,8 @@ static struct r5conf *setup_conf(struct mddev *mddev)
 	return conf;
 
  abort:
-	if (conf) {
-		free_conf(conf);
-		return ERR_PTR(-EIO);
-	} else
-		return ERR_PTR(-ENOMEM);
+	free_conf(conf);
+	return ERR_PTR(-EIO);
 }
 
 static int only_parity(int raid_disk, int algo, int raid_disks, int max_degraded)
