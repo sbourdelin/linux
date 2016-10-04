@@ -599,6 +599,9 @@
  *
  * @NL80211_CMD_SET_WDS_PEER: Set the MAC address of the peer on a WDS interface.
  *
+ * @NL80211_CMD_SET_AP_UNICAST: Set the multicast to unicast toggle on a AP
+ *                              interface.
+ *
  * @NL80211_CMD_JOIN_MESH: Join a mesh. The mesh ID must be given, and initial
  *	mesh config parameters may be given.
  * @NL80211_CMD_LEAVE_MESH: Leave the mesh network -- no special arguments, the
@@ -1025,6 +1028,8 @@ enum nl80211_commands {
 	NL80211_CMD_WIPHY_REG_CHANGE,
 
 	NL80211_CMD_ABORT_SCAN,
+
+	NL80211_CMD_SET_AP_UNICAST,
 
 	/* add new commands above here */
 
@@ -2260,6 +2265,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_MEASUREMENT_DURATION_MANDATORY,
 
 	NL80211_ATTR_MESH_PEER_AID,
+
+	NL80211_ATTR_UNICAST,
 
 	/* add attributes here, update the policy in nl80211.c */
 

@@ -773,6 +773,12 @@ DEFINE_EVENT(wiphy_netdev_mac_evt, rdev_set_wds_peer,
 	TP_ARGS(wiphy, netdev, mac)
 );
 
+DEFINE_EVENT(wiphy_netdev_mac_evt, rdev_set_ap_unicast,
+	TP_PROTO(struct wiphy *wiphy, struct net_device *netdev,
+		 const bool unicast),
+	TP_ARGS(wiphy, netdev, mac)
+);
+
 TRACE_EVENT(rdev_dump_station,
 	TP_PROTO(struct wiphy *wiphy, struct net_device *netdev, int idx,
 		 u8 *mac),

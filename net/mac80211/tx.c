@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/skbuff.h>
+#include <linux/if_vlan.h>
 #include <linux/etherdevice.h>
 #include <linux/bitmap.h>
 #include <linux/rcupdate.h>
@@ -1775,6 +1776,104 @@ bool ieee80211_tx_prepare_skb(struct ieee80211_hw *hw,
 }
 EXPORT_SYMBOL(ieee80211_tx_prepare_skb);
 
+/* rewrite destination mac address */
+static int ieee80211_change_da(struct sk_buff *skb, struct sta_info *sta)
+{
+	struct ethhdr *eth;
+	int err;
+
+	err = skb_ensure_writable(skb, ETH_HLEN);
+	if (unlikely(err))
+		return err;
+
+	eth = (void *)skb->data;
+	ether_addr_copy(eth->h_dest, sta->sta.addr);
+
+	return 0;
+}
+
+/* Check if multicast to unicast conversion is needed and do it.
+ * Returns 1 if skb was freed and should not be send out. */
+static int
+ieee80211_tx_multicast_to_unicast(struct ieee80211_sub_if_data *sdata,
+				  struct sk_buff *skb, u32  info_flags)
+{
+	struct ieee80211_local *local = sdata->local;
+	const struct ethhdr *eth = (void *)skb->data;
+	const struct vlan_ethhdr *ethvlan = (void *)skb->data;
+	struct sta_info *sta, *prev = NULL;
+	struct sk_buff *cloned_skb;
+	u16 ethertype;
+
+	/* multicast to unicast conversion only for AP interfaces */
+	switch (sdata->vif.type) {
+	case NL80211_IFTYPE_AP_VLAN:
+		sta = rcu_dereference(sdata->u.vlan.sta);
+		if (sta) /* 4addr */
+			return 0;
+	case NL80211_IFTYPE_AP:
+		break;
+	default:
+		return 0;
+	}
+
+	/* check runtime toggle for this bss */
+	if (!sdata->bss->unicast)
+		return 0;
+
+	/* check if this is a multicast frame */
+	if (!is_multicast_ether_addr(eth->h_dest))
+		return 0;
+
+	/* info_flags would not get preserved, used only by TLDS */
+	if (info_flags)
+		return 0;
+
+	/* multicast to unicast conversion only for some payload */
+	ethertype = ntohs(eth->h_proto);
+	if (ethertype == ETH_P_8021Q && skb->len >= VLAN_ETH_HLEN)
+		ethertype = ntohs(ethvlan->h_vlan_encapsulated_proto);
+	switch (ethertype) {
+	case ETH_P_ARP:
+	case ETH_P_IP:
+	case ETH_P_IPV6:
+		break;
+	default:
+		return 0;
+	}
+
+	/* clone packets and update destination mac */
+	list_for_each_entry_rcu(sta, &local->sta_list, list) {
+		if (sdata != sta->sdata)
+			continue;
+		if (unlikely(!memcmp(eth->h_source, sta->sta.addr, ETH_ALEN)))
+			/* do not send back to source */
+			continue;
+		if (unlikely(is_multicast_ether_addr(sta->sta.addr))) {
+			WARN_ONCE(1, "sta with multicast address %pM",
+				  sta->sta.addr);
+			continue;
+		}
+		if (prev) {
+			cloned_skb = skb_clone(skb, GFP_ATOMIC);
+			if (likely(!ieee80211_change_da(cloned_skb, prev)))
+				ieee80211_subif_start_xmit(cloned_skb,
+							   cloned_skb->dev);
+			else
+				dev_kfree_skb(cloned_skb);
+		}
+		prev = sta;
+	}
+
+	if (likely(prev)) {
+		ieee80211_change_da(skb, prev);
+		return 0;
+	}
+
+	/* no STA connected, drop */
+	return 1;
+}
+
 /*
  * Returns false if the frame couldn't be transmitted but was queued instead.
  */
@@ -3357,6 +3456,10 @@ void __ieee80211_subif_start_xmit(struct sk_buff *skb,
 	}
 
 	rcu_read_lock();
+
+	/* AP multicast to unicast conversion */
+	if (ieee80211_tx_multicast_to_unicast(sdata, skb, info_flags))
+		goto out_free;
 
 	if (ieee80211_lookup_ra_sta(sdata, skb, &sta))
 		goto out_free;
