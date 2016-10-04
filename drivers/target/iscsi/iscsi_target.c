@@ -4277,6 +4277,7 @@ int iscsit_close_connection(
 	if (!atomic_read(&sess->session_reinstatement) &&
 	     atomic_read(&sess->session_fall_back_to_erl0)) {
 		spin_unlock_bh(&sess->conn_lock);
+		WARN_ON(atomic_read(&sess->sleep_on_sess_wait_comp));
 		iscsit_close_session(sess);
 
 		return 0;
@@ -4547,7 +4548,6 @@ int iscsit_free_session(struct iscsi_session *sess)
 	int is_last;
 
 	spin_lock_bh(&sess->conn_lock);
-	atomic_set(&sess->sleep_on_sess_wait_comp, 1);
 
 	list_for_each_entry_safe(conn, conn_tmp, &sess->sess_conn_list,
 			conn_list) {
@@ -4575,7 +4575,10 @@ int iscsit_free_session(struct iscsi_session *sess)
 
 	if (atomic_read(&sess->nconn)) {
 		spin_unlock_bh(&sess->conn_lock);
+		atomic_inc(&sess->sleep_on_sess_wait_comp);
 		wait_for_completion(&sess->session_wait_comp);
+		atomic_dec(&sess->sleep_on_sess_wait_comp);
+		WARN_ON(atomic_read(&sess->sleep_on_sess_wait_comp));
 	} else
 		spin_unlock_bh(&sess->conn_lock);
 
@@ -4593,8 +4596,6 @@ void iscsit_stop_session(
 	int is_last;
 
 	spin_lock_bh(&sess->conn_lock);
-	if (session_sleep)
-		atomic_set(&sess->sleep_on_sess_wait_comp, 1);
 
 	if (connection_sleep) {
 		list_for_each_entry_safe(conn, conn_tmp, &sess->sess_conn_list,
@@ -4626,7 +4627,10 @@ void iscsit_stop_session(
 
 	if (session_sleep && atomic_read(&sess->nconn)) {
 		spin_unlock_bh(&sess->conn_lock);
+		atomic_inc(&sess->sleep_on_sess_wait_comp);
 		wait_for_completion(&sess->session_wait_comp);
+		atomic_dec(&sess->sleep_on_sess_wait_comp);
+		WARN_ON(atomic_read(&sess->sleep_on_sess_wait_comp);
 	} else
 		spin_unlock_bh(&sess->conn_lock);
 }
