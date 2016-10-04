@@ -327,7 +327,7 @@ static void fscache_objlist_config(struct fscache_objlist_data *data)
 		goto no_config;
 
 	config = 0;
-	rcu_read_lock();
+	down_read(&key->sem);
 
 	confkey = user_key_payload(key);
 	buf = confkey->data;
@@ -349,7 +349,7 @@ static void fscache_objlist_config(struct fscache_objlist_data *data)
 		}
 	}
 
-	rcu_read_unlock();
+	up_read(&key->sem);
 	key_put(key);
 
 	if (!(config & (FSCACHE_OBJLIST_CONFIG_COOKIE | FSCACHE_OBJLIST_CONFIG_NOCOOKIE)))
