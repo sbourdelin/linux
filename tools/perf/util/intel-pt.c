@@ -143,6 +143,7 @@ struct intel_pt_queue {
 	u32 flags;
 	u16 insn_len;
 	u64 last_insn_cnt;
+	char insn[MAX_INSN];
 };
 
 static void intel_pt_dump(struct intel_pt *pt __maybe_unused,
@@ -315,6 +316,7 @@ struct intel_pt_cache_entry {
 	enum intel_pt_insn_branch	branch;
 	int				length;
 	int32_t				rel;
+	char				insn[MAX_INSN];
 };
 
 static int intel_pt_config_div(const char *var, const char *value, void *data)
@@ -400,6 +402,7 @@ static int intel_pt_cache_add(struct dso *dso, struct machine *machine,
 	e->branch = intel_pt_insn->branch;
 	e->length = intel_pt_insn->length;
 	e->rel = intel_pt_insn->rel;
+	memcpy(e->insn, intel_pt_insn->buf, MAX_INSN);
 
 	err = auxtrace_cache__add(c, offset, &e->entry);
 	if (err)
@@ -436,6 +439,8 @@ static int intel_pt_walk_next_insn(struct intel_pt_insn *intel_pt_insn,
 	u64 offset, start_offset, start_ip;
 	u64 insn_cnt = 0;
 	bool one_map = true;
+
+	intel_pt_insn->length = 0;
 
 	if (to_ip && *ip == to_ip)
 		goto out_no_cache;
@@ -478,6 +483,7 @@ static int intel_pt_walk_next_insn(struct intel_pt_insn *intel_pt_insn,
 				intel_pt_insn->branch = e->branch;
 				intel_pt_insn->length = e->length;
 				intel_pt_insn->rel = e->rel;
+				memcpy(intel_pt_insn->buf, e->insn, MAX_INSN);
 				intel_pt_log_insn_no_data(intel_pt_insn, *ip);
 				return 0;
 			}
@@ -900,6 +906,7 @@ static void intel_pt_sample_flags(struct intel_pt_queue *ptq)
 		if (ptq->state->flags & INTEL_PT_IN_TX)
 			ptq->flags |= PERF_IP_FLAG_IN_TX;
 		ptq->insn_len = ptq->state->insn_len;
+		memcpy(ptq->insn, ptq->state->insn, MAX_INSN);
 	}
 }
 
@@ -1080,6 +1087,7 @@ static int intel_pt_synth_branch_sample(struct intel_pt_queue *ptq)
 	sample.cpu = ptq->cpu;
 	sample.flags = ptq->flags;
 	sample.insn_len = ptq->insn_len;
+	memcpy(sample.insn, ptq->insn, MAX_INSN);
 
 	/*
 	 * perf report cannot handle events without a branch stack when using
@@ -1141,6 +1149,7 @@ static int intel_pt_synth_instruction_sample(struct intel_pt_queue *ptq)
 	sample.cpu = ptq->cpu;
 	sample.flags = ptq->flags;
 	sample.insn_len = ptq->insn_len;
+	memcpy(sample.insn, ptq->insn, MAX_INSN);
 
 	ptq->last_insn_cnt = ptq->state->tot_insn_cnt;
 
@@ -1203,6 +1212,7 @@ static int intel_pt_synth_transaction_sample(struct intel_pt_queue *ptq)
 	sample.cpu = ptq->cpu;
 	sample.flags = ptq->flags;
 	sample.insn_len = ptq->insn_len;
+	memcpy(sample.insn, ptq->insn, MAX_INSN);
 
 	if (pt->synth_opts.callchain) {
 		thread_stack__sample(ptq->thread, ptq->chain,

@@ -20,6 +20,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#define MAX_INSN			16
+
 #include "intel-pt-insn-decoder.h"
 
 #define INTEL_PT_IN_TX		(1 << 0)
@@ -66,6 +68,7 @@ struct intel_pt_state {
 	uint32_t flags;
 	enum intel_pt_insn_op insn_op;
 	int insn_len;
+	char insn[MAX_INSN];
 };
 
 struct intel_pt_insn;
