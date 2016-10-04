@@ -2786,19 +2786,19 @@ static struct r1conf *setup_conf(struct mddev *mddev)
 				GFP_KERNEL);
 	if (!conf->mirrors) {
 		err = -ENOMEM;
-		goto abort;
+		goto free_conf;
 	}
 
 	conf->tmppage = alloc_page(GFP_KERNEL);
 	if (!conf->tmppage) {
 		err = -ENOMEM;
-		goto abort;
+		goto free_mirrors;
 	}
 
 	conf->poolinfo = kzalloc(sizeof(*conf->poolinfo), GFP_KERNEL);
 	if (!conf->poolinfo) {
 		err = -ENOMEM;
-		goto abort;
+		goto put_page;
 	}
 
 	conf->poolinfo->raid_disks = mddev->raid_disks * 2;
@@ -2807,7 +2807,7 @@ static struct r1conf *setup_conf(struct mddev *mddev)
 					  conf->poolinfo);
 	if (!conf->r1bio_pool) {
 		err = -ENOMEM;
-		goto abort;
+		goto free_poolinfo;
 	}
 
 	conf->poolinfo->mddev = mddev;
@@ -2825,7 +2825,7 @@ static struct r1conf *setup_conf(struct mddev *mddev)
 
 		if (disk->rdev) {
 			err = -EINVAL;
-			goto abort;
+			goto destroy_pool;
 		}
 
 		disk->rdev = rdev;
@@ -2866,7 +2866,7 @@ static struct r1conf *setup_conf(struct mddev *mddev)
 				if (!test_bit(In_sync, &disk->rdev->flags)) {
 					/* Original is not in_sync - bad */
 					err = -EIO;
-					goto abort;
+					goto destroy_pool;
 				}
 			}
 		}
@@ -2886,16 +2886,19 @@ static struct r1conf *setup_conf(struct mddev *mddev)
 		       "md/raid1:%s: couldn't allocate thread\n",
 		       mdname(mddev));
 		err = -ENOMEM;
-		goto abort;
+		goto destroy_pool;
 	}
 
 	return conf;
-
- abort:
+destroy_pool:
 	mempool_destroy(conf->r1bio_pool);
+free_poolinfo:
 	kfree(conf->poolinfo);
+put_page:
 	safe_put_page(conf->tmppage);
+free_mirrors:
 	kfree(conf->mirrors);
+free_conf:
 	kfree(conf);
 	return ERR_PTR(err);
 }
