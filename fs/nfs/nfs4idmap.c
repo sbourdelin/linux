@@ -309,7 +309,7 @@ static ssize_t nfs_idmap_get_key(const char *name, size_t namelen,
 		goto out;
 	}
 
-	rcu_read_lock();
+	down_read(&rkey->sem);
 	rkey->perm |= KEY_USR_VIEW;
 
 	ret = key_validate(rkey);
@@ -329,7 +329,7 @@ static ssize_t nfs_idmap_get_key(const char *name, size_t namelen,
 		ret = -EINVAL;
 
 out_up:
-	rcu_read_unlock();
+	up_read(&rkey->sem);
 	key_put(rkey);
 out:
 	return ret;
