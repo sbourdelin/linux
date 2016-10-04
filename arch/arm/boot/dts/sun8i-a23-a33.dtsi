@@ -549,6 +549,13 @@
 				compatible = "allwinner,sun6i-a31-clock-reset";
 				#reset-cells = <1>;
 			};
+
+			codec_analog: codec_analog {
+				compatible = "allwinner,sun8i-codec-analog";
+				interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
+				clock-names = "apb", "codec";
+			};
 		};
 
 		cpucfg@01f01c00 {
