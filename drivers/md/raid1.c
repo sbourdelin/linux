@@ -2882,9 +2882,6 @@ static struct r1conf *setup_conf(struct mddev *mddev)
 
 	conf->thread = md_register_thread(raid1d, mddev, "raid1");
 	if (!conf->thread) {
-		printk(KERN_ERR
-		       "md/raid1:%s: couldn't allocate thread\n",
-		       mdname(mddev));
 		err = -ENOMEM;
 		goto destroy_pool;
 	}
