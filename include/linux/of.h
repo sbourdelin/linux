@@ -159,6 +159,11 @@ static inline struct device_node *to_of_node(struct fwnode_handle *fwnode)
 		container_of(fwnode, struct device_node, fwnode) : NULL;
 }
 
+static inline struct fwnode_handle *of_fwnode_handle(struct device_node *node)
+{
+	return &node->fwnode;
+}
+
 static inline bool of_have_populated_dt(void)
 {
 	return of_root != NULL;
@@ -477,6 +482,11 @@ static inline struct device_node *of_get_next_available_child(
 
 static inline struct device_node *of_find_node_with_property(
 	struct device_node *from, const char *prop_name)
+{
+	return NULL;
+}
+
+static inline struct fwnode_handle *of_fwnode_handle(struct device_node *node)
 {
 	return NULL;
 }
