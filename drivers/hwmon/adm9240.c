@@ -107,6 +107,21 @@ static inline s8 TEMP_TO_REG(long val)
 	return clamp_val(SCALE(val, 1, 1000), -40, 127);
 }
 
+/* 8-bit signed temperature (from Thigh, Tlow etc) */
+static inline int TEMP_FROM_REG(s8 val)
+{
+	return val * 1000;
+}
+
+/* 9-bit signed temperature (from temperature data) */
+static inline int TEMP_FROM_DATA_REG(s16 val)
+{
+	if (val > 255)
+		val -= 512;
+
+	return val * 500;
+}
+
 /* two fans, each with low fan speed limit */
 static inline unsigned int FAN_FROM_REG(u8 reg, u8 div)
 {
@@ -263,7 +278,7 @@ static ssize_t show_temp(struct device *dev, struct device_attribute *dummy,
 		char *buf)
 {
 	struct adm9240_data *data = adm9240_update_device(dev);
-	return sprintf(buf, "%d\n", data->temp * 500); /* 9-bit value */
+	return sprintf(buf, "%d\n", TEMP_FROM_DATA_REG(data->temp));
 }
 
 static ssize_t show_max(struct device *dev, struct device_attribute *devattr,
@@ -271,7 +286,7 @@ static ssize_t show_max(struct device *dev, struct device_attribute *devattr,
 {
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct adm9240_data *data = adm9240_update_device(dev);
-	return sprintf(buf, "%d\n", data->temp_max[attr->index] * 1000);
+	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp_max[attr->index]));
 }
 
 static ssize_t set_max(struct device *dev, struct device_attribute *devattr,
