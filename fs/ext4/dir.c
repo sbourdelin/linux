@@ -651,7 +651,7 @@ int ext4_check_all_de(struct inode *dir, struct buffer_head *bh, void *buf,
 const struct file_operations ext4_dir_operations = {
 	.llseek		= ext4_dir_llseek,
 	.read		= generic_read_dir,
-	.iterate_shared	= ext4_readdir,
+	.iterate	= ext4_readdir,
 	.unlocked_ioctl = ext4_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= ext4_compat_ioctl,
