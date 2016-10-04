@@ -1,0 +1,20 @@
+* Allwinner A23/A33 Analog Codec
+
+This codec must be handled as a PRCM subnode.
+
+Required properties:
+- compatible: must be either "allwinner,sun8i-codec-analog"
+- interrupts: must contain the codec interrupt
+- clocks: a list of phandle + clock-specifer pairs, one for each entry
+  in clock-names.
+- clock-names: should contain followings:
+   - "apb": the parent APB clock for this controller
+   - "codec": the parent module clock
+
+Example, in your prcm subnode:
+codec_analog: codec_analog {
+	compatible = "allwinner,sun8i-codec-analog";
+	interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
+	clock-names = "apb", "codec";
+};
