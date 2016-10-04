@@ -3176,8 +3176,7 @@ static void *raid1_takeover(struct mddev *mddev)
 	return ERR_PTR(-EINVAL);
 }
 
-static struct md_personality raid1_personality =
-{
+static struct md_personality raid1_personality = {
 	.name		= "raid1",
 	.level		= 1,
 	.owner		= THIS_MODULE,
