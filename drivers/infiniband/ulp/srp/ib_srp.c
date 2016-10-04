@@ -2628,6 +2628,15 @@ static int srp_reset_device(struct scsi_cmnd *scmnd)
 	return SUCCESS;
 }
 
+static int srp_scsi_host_reset(struct Scsi_Host *shost, int reset_type)
+{
+	struct srp_target_port *target = host_to_target(shost);
+
+	shost_printk(KERN_EMERG, target->scsi_host, PFX "SRP reset_host called\n");
+
+	return srp_reconnect_rport(target->rport);
+}
+
 static int srp_reset_host(struct scsi_cmnd *scmnd)
 {
 	struct srp_target_port *target = host_to_target(scmnd->device->host);
@@ -2858,6 +2867,7 @@ static struct scsi_host_template srp_template = {
 	.use_clustering			= ENABLE_CLUSTERING,
 	.shost_attrs			= srp_host_attrs,
 	.track_queue_depth		= 1,
+	.host_reset			= srp_scsi_host_reset,
 };
 
 static int srp_sdev_count(struct Scsi_Host *host)
