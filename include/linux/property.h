@@ -284,4 +284,7 @@ static inline struct fwnode_handle *device_fwnode_handle(struct device *dev)
 		return dev->fwnode;
 }
 
+int fwnode_graph_parse_endpoint(struct fwnode_handle *fwnode,
+				struct fwnode_endpoint *endpoint);
+
 #endif /* _LINUX_PROPERTY_H_ */
