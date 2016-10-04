@@ -1438,6 +1438,15 @@ static int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on, int suspend)
 	if (pm_runtime_suspended(dwc->dev))
 		return 0;
 
+	/*
+	 * Per databook, when we want to stop the gadget, if a control transfer
+	 * is still in process, complete it and get the core into setup phase.
+	 */
+	if (!is_on && dwc->ep0state != EP0_SETUP_PHASE) {
+		reinit_completion(&dwc->ep0_in_setup);
+		return -EBUSY;
+	}
+
 	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
 	if (is_on) {
 		if (dwc->revision <= DWC3_REVISION_187A) {
@@ -1488,9 +1497,21 @@ static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 
 	is_on = !!is_on;
 
+try_again:
 	spin_lock_irqsave(&dwc->lock, flags);
 	ret = dwc3_gadget_run_stop(dwc, is_on, false);
 	spin_unlock_irqrestore(&dwc->lock, flags);
+
+	if (ret == -EBUSY) {
+		ret = wait_for_completion_timeout(&dwc->ep0_in_setup,
+						  msecs_to_jiffies(500));
+		if (ret == 0) {
+			dev_err(dwc->dev, "timeout to stop gadget.\n");
+			ret = -ETIMEDOUT;
+		} else {
+			goto try_again;
+		}
+	}
 
 	return ret;
 }
@@ -2918,6 +2939,8 @@ int dwc3_gadget_init(struct dwc3 *dwc)
 		ret = -ENOMEM;
 		goto err4;
 	}
+
+	init_completion(&dwc->ep0_in_setup);
 
 	dwc->gadget.ops			= &dwc3_gadget_ops;
 	dwc->gadget.speed		= USB_SPEED_UNKNOWN;
