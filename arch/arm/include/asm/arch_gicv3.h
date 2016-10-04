@@ -219,15 +219,11 @@ static inline void gic_write_sre(u32 val)
 
 static inline void gic_write_bpr1(u32 val)
 {
-<<<<<<< HEAD
-	asm volatile("mcr " __stringify(ICC_BPR1) : : "r" (val));
-=======
 #if defined(__write_sysreg) && defined(ICC_BPR1)
 	write_sysreg(val, ICC_BPR1);
 #else
 	asm volatile("mcr " __stringify(ICC_BPR1) : : "r" (val));
 #endif
->>>>>>> linux-next/akpm-base
 }
 
 /*

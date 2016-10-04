@@ -170,10 +170,7 @@ ftrace_push_return_trace(unsigned long ret, unsigned long func, int *depth,
 	current->ret_stack[index].ret = ret;
 	current->ret_stack[index].func = func;
 	current->ret_stack[index].calltime = calltime;
-<<<<<<< HEAD
 	current->ret_stack[index].subtime = 0;
-=======
->>>>>>> linux-next/akpm-base
 #ifdef HAVE_FUNCTION_GRAPH_FP_TEST
 	current->ret_stack[index].fp = frame_pointer;
 #endif

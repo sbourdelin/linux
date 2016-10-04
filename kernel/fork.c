@@ -286,7 +286,6 @@ static void account_kernel_stack(struct task_struct *tsk, int account)
 
 	if (vm) {
 		int i;
-<<<<<<< HEAD
 
 		BUG_ON(vm->nr_pages != THREAD_SIZE / PAGE_SIZE);
 
@@ -296,17 +295,6 @@ static void account_kernel_stack(struct task_struct *tsk, int account)
 					    PAGE_SIZE / 1024 * account);
 		}
 
-=======
-
-		BUG_ON(vm->nr_pages != THREAD_SIZE / PAGE_SIZE);
-
-		for (i = 0; i < THREAD_SIZE / PAGE_SIZE; i++) {
-			mod_zone_page_state(page_zone(vm->pages[i]),
-					    NR_KERNEL_STACK_KB,
-					    PAGE_SIZE / 1024 * account);
-		}
-
->>>>>>> linux-next/akpm-base
 		/* All stack pages belong to the same memcg. */
 		memcg_kmem_update_page_stat(vm->pages[0], MEMCG_KERNEL_STACK_KB,
 					    account * (THREAD_SIZE / 1024));

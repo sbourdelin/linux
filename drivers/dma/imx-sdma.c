@@ -670,14 +670,6 @@ static void sdma_event_disable(struct sdma_channel *sdmac, unsigned int event)
 	writel_relaxed(val, sdma->regs + chnenbl);
 }
 
-<<<<<<< HEAD
-=======
-static void sdma_handle_channel_loop(struct sdma_channel *sdmac)
-{
-	dmaengine_desc_get_callback_invoke(&sdmac->desc, NULL);
-}
-
->>>>>>> linux-next/akpm-base
 static void sdma_update_channel_loop(struct sdma_channel *sdmac)
 {
 	struct sdma_buffer_descriptor *bd;
@@ -753,12 +745,9 @@ static void mxc_sdma_handle_channel_normal(unsigned long data)
 
 	dma_cookie_complete(&sdmac->desc);
 
-<<<<<<< HEAD
-=======
 	dmaengine_desc_get_callback_invoke(&sdmac->desc, NULL);
 }
 
->>>>>>> linux-next/akpm-base
 static irqreturn_t sdma_int_handler(int irq, void *dev_id)
 {
 	struct sdma_engine *sdma = dev_id;

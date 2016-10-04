@@ -261,11 +261,7 @@
 #define CLKID_AO_AHB_SRAM	  90
 #define CLKID_AO_AHB_BUS	  91
 #define CLKID_AO_IFACE		  92
-<<<<<<< HEAD
 #define CLKID_AO_I2C		  93
-=======
-/* CLKID_AO_I2C */
->>>>>>> linux-next/akpm-base
 /* CLKID_SD_EMMC_A */
 /* CLKID_SD_EMMC_B */
 /* CLKID_SD_EMMC_C */

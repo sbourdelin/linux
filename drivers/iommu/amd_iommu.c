@@ -1086,15 +1086,9 @@ static int iommu_completion_wait(struct amd_iommu *iommu)
 	ret = __iommu_queue_command_sync(iommu, &cmd, false);
 	if (ret)
 		goto out_unlock;
-<<<<<<< HEAD
 
 	ret = wait_on_sem(&iommu->cmd_sem);
 
-=======
-
-	ret = wait_on_sem(&iommu->cmd_sem);
-
->>>>>>> linux-next/akpm-base
 out_unlock:
 	spin_unlock_irqrestore(&iommu->lock, flags);
 
