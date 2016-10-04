@@ -82,6 +82,9 @@ VERSION
 	global:
 		__vdso_clock_gettime;
 		__vdso_gettimeofday;
+#ifdef CONFIG_VDSO_GETCPU
+		__vdso_getcpu;
+#endif
 	local: *;
 	};
 }

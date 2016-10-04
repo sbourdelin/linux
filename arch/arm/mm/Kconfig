@@ -850,6 +850,16 @@ config VDSO
 	  You must have glibc 2.22 or later for programs to seamlessly
 	  take advantage of this.
 
+config VDSO_GETCPU
+	bool "Enable VDSO for getcpu"
+	depends on VDSO && (CPU_V6K || CPU_V7 || CPU_V7M)
+	help
+	  Say Y to make getcpu a VDSO (fast) call. This is useful if you
+	  want to implement per cpu buffers to avoid cache line bouncing
+	  in user mode.
+	  This mechanism uses the TPIDRURW register so enabling it will break
+	  applications using this register for it's own purpose.
+
 config DMA_CACHE_RWFO
 	bool "Enable read/write for ownership DMA cache maintenance"
 	depends on CPU_V6K && SMP

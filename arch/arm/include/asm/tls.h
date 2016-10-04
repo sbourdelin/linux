@@ -10,10 +10,15 @@
 	.endm
 
 	.macro switch_tls_v6k, base, tp, tpuser, tmp1, tmp2
+#ifdef CONFIG_VDSO_GETCPU
+	ldr	\tpuser, [r2, #TI_CPU]
+#else
 	mrc	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
+	ldr	\tpuser, [r2, #TI_TP_VALUE + 4]
+	str	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
+#endif
 	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
 	mcr	p15, 0, \tpuser, c13, c0, 2	@ and the user r/w register
-	str	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
 	.endm
 
 	.macro switch_tls_v6, base, tp, tpuser, tmp1, tmp2
@@ -22,6 +27,7 @@
 	mov	\tmp2, #0xffff0fff
 	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
 	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
+	ldrne	\tpuser, [r2, #TI_TP_VALUE + 4] @ load the saved user r/w reg
 	mrcne	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
 	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
 	mcrne	p15, 0, \tpuser, c13, c0, 2	@ set user r/w register

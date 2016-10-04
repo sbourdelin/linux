@@ -787,7 +787,6 @@ ENTRY(__switch_to)
  THUMB(	str	sp, [ip], #4		   )
  THUMB(	str	lr, [ip], #4		   )
 	ldr	r4, [r2, #TI_TP_VALUE]
-	ldr	r5, [r2, #TI_TP_VALUE + 4]
 #ifdef CONFIG_CPU_USE_DOMAINS
 	mrc	p15, 0, r6, c3, c0, 0		@ Get domain register
 	str	r6, [r1, #TI_CPU_DOMAIN]	@ Save old domain register

@@ -1,6 +1,9 @@
 hostprogs-y := vdsomunge
 
 obj-vdso := vgettimeofday.o datapage.o
+#ifeq ($(CONFIG_VDSO_GETCPU),y)
+obj-vdso += vgetcpu.o
+#endif
 
 # Build rules
 targets := $(obj-vdso) vdso.so vdso.so.dbg vdso.so.raw vdso.lds
