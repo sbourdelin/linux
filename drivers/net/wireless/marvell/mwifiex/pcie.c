@@ -3013,6 +3013,7 @@ static void mwifiex_unregister_dev(struct mwifiex_adapter *adapter)
 				pci_disable_msi(pdev);
 	       }
 	}
+	card->adapter = NULL;
 }
 
 /* This function initializes the PCI-E host memory space, WCB rings, etc.
