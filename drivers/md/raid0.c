@@ -149,17 +149,21 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 		goto free_conf;
 	}
 
-	err = -ENOMEM;
 	conf->strip_zone = kcalloc(conf->nr_strip_zones,
 				   sizeof(*conf->strip_zone),
 				   GFP_KERNEL);
-	if (!conf->strip_zone)
+	if (!conf->strip_zone) {
+		err = -ENOMEM;
 		goto free_conf;
+	}
+
 	conf->devlist = kcalloc(conf->nr_strip_zones * mddev->raid_disks,
 				sizeof(*conf->devlist),
 				GFP_KERNEL);
-	if (!conf->devlist)
+	if (!conf->devlist) {
+		err = -ENOMEM;
 		goto free_zone;
+	}
 
 	/* The first zone must contain all devices, so here we check that
 	 * there is a proper alignment of slots to devices and find them all
