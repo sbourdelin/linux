@@ -2781,9 +2781,9 @@ static struct r1conf *setup_conf(struct mddev *mddev)
 	if (!conf)
 		goto abort;
 
-	conf->mirrors = kzalloc(sizeof(struct raid1_info)
-				* mddev->raid_disks * 2,
-				 GFP_KERNEL);
+	conf->mirrors = kcalloc(mddev->raid_disks * 2,
+				sizeof(*conf->mirrors),
+				GFP_KERNEL);
 	if (!conf->mirrors)
 		goto abort;
 
