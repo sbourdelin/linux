@@ -463,69 +463,57 @@ struct spar_controlvm_parameters_header {
 /* The following error messages are reserved 100, 101,
  * 201, 202, 401, 402, 403
  */
-/* General Errors------------------------------------------------------[0-99] */
+/* General Errors [0-99] */
 #define CONTROLVM_RESP_SUCCESS                                  0
 #define CONTROLVM_RESP_ERROR_ALREADY_DONE                       1
 #define CONTROLVM_RESP_ERROR_IOREMAP_FAILED                     2
 #define CONTROLVM_RESP_ERROR_KMALLOC_FAILED                     3
 #define CONTROLVM_RESP_ERROR_MESSAGE_ID_UNKNOWN                 4
 #define CONTROLVM_RESP_ERROR_MESSAGE_ID_INVALID_FOR_CLIENT      5
-/* Payload and Parameter Related------------------------------------[400-499] */
-#define CONTROLVM_RESP_ERROR_PAYLOAD_INVALID	400	/* SWITCH_ATTACHEXTPORT,
-							 * DEVICE_CONFIGURE
-							 */
-/* Specified[Packet Structure] Value-------------------------------[500-599] */
-#define CONTROLVM_RESP_ERROR_BUS_INVALID	500	/* SWITCH_ATTACHINTPORT,
-							 * BUS_CONFIGURE,
-							 * DEVICE_CREATE,
-							 * DEVICE_CONFIG
-							 * DEVICE_DESTROY
-							 */
-#define CONTROLVM_RESP_ERROR_DEVICE_INVALID	501 /* SWITCH_ATTACHINTPORT */
-						    /* DEVICE_CREATE,
-						     * DEVICE_CONFIGURE,
-						     * DEVICE_DESTROY
-						     */
-#define CONTROLVM_RESP_ERROR_CHANNEL_INVALID	502 /* DEVICE_CREATE,
-						     * DEVICE_CONFIGURE
-						     */
-/* Partition Driver Callback Interface----------------------[600-699] */
-#define CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_FAILURE 604	/* BUS_CREATE,
-							 * BUS_DESTROY,
-							 * DEVICE_CREATE,
-							 * DEVICE_DESTROY
-							 */
-/* Unable to invoke VIRTPCI callback */
-#define CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_CALLBACK_ERROR 605
-							/* BUS_CREATE,
-							 * BUS_DESTROY,
-							 * DEVICE_CREATE,
-							 * DEVICE_DESTROY
-							 */
-/* VIRTPCI Callback returned error */
-#define CONTROLVM_RESP_ERROR_GENERIC_DRIVER_CALLBACK_ERROR 606
-							/* SWITCH_ATTACHEXTPORT,
-							 * SWITCH_DETACHEXTPORT
-							 * DEVICE_CONFIGURE
-							 */
 
+/* Payload and Parameter Related [400-499] */
+/* SWITCH_ATTACHEXTPORT, DEVICE_CONFIGURE */
+#define CONTROLVM_RESP_ERROR_PAYLOAD_INVALID	400
+
+/* Specified[Packet Structure] Value [500-599] */
+/* SWITCH_ATTACHINTPORT, BUS_CONFIGURE, DEVICE_CREATE, DEVICE_CONFIG,
+ * DEVICE_DESTROY
+ */
+#define CONTROLVM_RESP_ERROR_BUS_INVALID	500
+/* SWITCH_ATTACHINTPORT, DEVICE_CREATE, DEVICE_CONFIGURE, DEVICE_DESTROY */
+#define CONTROLVM_RESP_ERROR_DEVICE_INVALID	501
+ /* DEVICE_CREATE, DEVICE_CONFIGURE */
+#define CONTROLVM_RESP_ERROR_CHANNEL_INVALID	502
+
+/* Partition Driver Callback Interface [600-699] */
+/* Unable to invoke VIRTPCI callback */
+/* BUS_CREATE, BUS_DESTROY, DEVICE_CREATE, DEVICE_DESTROY */
+#define CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_FAILURE 604
+/* BUS_CREATE, BUS_DESTROY, DEVICE_CREATE, DEVICE_DESTROY */
+/* VIRTPCI Callback returned error */
+#define CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_CALLBACK_ERROR 605
+/* SWITCH_ATTACHEXTPORT, SWITCH_DETACHEXTPORT, DEVICE_CONFIGURE */
+#define CONTROLVM_RESP_ERROR_GENERIC_DRIVER_CALLBACK_ERROR 606
 /* generic device callback returned error */
-/* Bus Related------------------------------------------------------[700-799] */
-#define CONTROLVM_RESP_ERROR_BUS_DEVICE_ATTACHED 700	/* BUS_DESTROY */
-/* Channel Related--------------------------------------------------[800-899] */
-#define CONTROLVM_RESP_ERROR_CHANNEL_TYPE_UNKNOWN 800	/* GET_CHANNELINFO,
-							 * DEVICE_DESTROY
-							 */
+
+/* Bus Related [700-799] */
+/* BUS_DESTROY */
+#define CONTROLVM_RESP_ERROR_BUS_DEVICE_ATTACHED 700
+
+/* Channel Related [800-899] */
+/* GET_CHANNELINFO, DEVICE_DESTROY */
+#define CONTROLVM_RESP_ERROR_CHANNEL_TYPE_UNKNOWN 800
 #define CONTROLVM_RESP_ERROR_CHANNEL_SIZE_TOO_SMALL 801	/* DEVICE_CREATE */
-/* Chipset Shutdown Related---------------------------------------[1000-1099] */
+
+/* Chipset Shutdown Related [1000-1099] */
 #define CONTROLVM_RESP_ERROR_CHIPSET_SHUTDOWN_FAILED            1000
 #define CONTROLVM_RESP_ERROR_CHIPSET_SHUTDOWN_ALREADY_ACTIVE    1001
 
-/* Chipset Stop Related-------------------------------------------[1100-1199] */
+/* Chipset Stop Related [1100-1199] */
 #define CONTROLVM_RESP_ERROR_CHIPSET_STOP_FAILED_BUS            1100
 #define CONTROLVM_RESP_ERROR_CHIPSET_STOP_FAILED_SWITCH         1101
 
-/* Device Related-------------------------------------------------[1400-1499] */
+/* Device Related [1400-1499] */
 #define CONTROLVM_RESP_ERROR_DEVICE_UDEV_TIMEOUT                1400
 
-#endif				/* __CONTROLVMCHANNEL_H__ */
+#endif /* __CONTROLVMCHANNEL_H__ */
