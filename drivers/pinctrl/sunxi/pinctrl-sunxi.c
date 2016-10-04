@@ -234,7 +234,7 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
 				pull = PIN_CONFIG_BIAS_PULL_UP;
 			else if (val == 2)
 				pull = PIN_CONFIG_BIAS_PULL_DOWN;
-			pinconfig[j++] = pinconf_to_config_packed(pull, 0);
+			pinconfig[j++] = pinconf_to_config_packed(pull, 1);
 		}
 
 		(*map)[i].data.configs.configs = pinconfig;
