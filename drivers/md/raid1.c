@@ -955,8 +955,7 @@ static void alloc_behind_pages(struct bio *bio, struct r1bio *r1_bio)
 {
 	int i;
 	struct bio_vec *bvec;
-	struct bio_vec *bvecs = kzalloc(bio->bi_vcnt * sizeof(struct bio_vec),
-					GFP_NOIO);
+	struct bio_vec *bvecs = kcalloc(bio->bi_vcnt, sizeof(*bvecs), GFP_NOIO);
 	if (unlikely(!bvecs))
 		return;
 
