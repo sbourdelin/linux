@@ -84,8 +84,11 @@ void mach_get_cmos_time(struct timespec *now)
 
 #ifdef CONFIG_ACPI
 	if (acpi_gbl_FADT.header.revision >= FADT2_REVISION_ID &&
-	    acpi_gbl_FADT.century)
-		century = CMOS_READ(acpi_gbl_FADT.century);
+	    acpi_gbl_FADT.century) {
+		if ((century = CMOS_READ(acpi_gbl_FADT.century)) >
+			RTC_CENTURY_LIMIT)
+			century = 0;
+	}
 #endif
 
 	status = CMOS_READ(RTC_CONTROL);

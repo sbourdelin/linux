@@ -61,8 +61,11 @@ unsigned int mc146818_get_time(struct rtc_time *time)
 #endif
 #ifdef CONFIG_ACPI
 	if (acpi_gbl_FADT.header.revision >= FADT2_REVISION_ID &&
-	    acpi_gbl_FADT.century)
-		century = CMOS_READ(acpi_gbl_FADT.century);
+	    acpi_gbl_FADT.century) {
+		if ((century = CMOS_READ(acpi_gbl_FADT.century)) >
+			RTC_CENTURY_LIMIT)
+			century = 0;
+	}
 #endif
 	ctrl = CMOS_READ(RTC_CONTROL);
 	spin_unlock_irqrestore(&rtc_lock, flags);
