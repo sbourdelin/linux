@@ -173,7 +173,6 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 	cnt = 0;
 	smallest = NULL;
 	dev = conf->devlist;
-	err = -EINVAL;
 	rdev_for_each(rdev1, mddev) {
 		int j = rdev1->raid_disk;
 
@@ -194,17 +193,17 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 		if (j < 0) {
 			pr_err("%s: remove inactive devices before converting to RAID0\n",
 			       mdname(mddev));
-			goto free_device_list;
+			goto e_inval;
 		}
 		if (j >= mddev->raid_disks) {
 			pr_err("%s: bad disk number %d%s",
 			       mdname(mddev), j, " - aborting!\n");
-			goto free_device_list;
+			goto e_inval;
 		}
 		if (dev[j]) {
 			pr_err("%s: multiple devices for %d%s",
 			       mdname(mddev), j, " - aborting!\n");
-			goto free_device_list;
+			goto e_inval;
 		}
 		dev[j] = rdev1;
 
@@ -215,7 +214,7 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 	if (cnt != mddev->raid_disks) {
 		pr_err("%s: too few disks (%d of %d)%s",
 		       mdname(mddev), cnt, mddev->raid_disks, " - aborting!\n");
-		goto free_device_list;
+		goto e_inval;
 	}
 	zone->nb_dev = cnt;
 	zone->zone_end = smallest->sectors * cnt;
@@ -280,6 +279,9 @@ free_conf:
 	kfree(conf);
 	*private_conf = ERR_PTR(err);
 	return err;
+e_inval:
+	err = -EINVAL;
+	goto free_device_list;
 }
 
 /* Find the zone which holds a particular offset
