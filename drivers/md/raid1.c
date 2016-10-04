@@ -220,7 +220,7 @@ static void reschedule_retry(struct r1bio *r1_bio)
 
 	spin_lock_irqsave(&conf->device_lock, flags);
 	list_add(&r1_bio->retry_list, &conf->retry_list);
-	conf->nr_queued ++;
+	conf->nr_queued++;
 	spin_unlock_irqrestore(&conf->device_lock, flags);
 
 	wake_up(&conf->wait_barrier);
@@ -1878,7 +1878,7 @@ static int fix_sync_read_error(struct r1bio *r1_bio)
 		}
 		sectors -= s;
 		sect += s;
-		idx ++;
+		idx++;
 	}
 	set_bit(R1BIO_Uptodate, &r1_bio->state);
 	bio->bi_error = 0;
@@ -2570,7 +2570,7 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 		} else if (!test_bit(In_sync, &rdev->flags)) {
 			bio_set_op_attrs(bio, REQ_OP_WRITE, 0);
 			bio->bi_end_io = end_sync_write;
-			write_targets ++;
+			write_targets++;
 		} else {
 			/* may need to read from here */
 			sector_t first_bad = MaxSector;
