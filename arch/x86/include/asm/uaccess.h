@@ -732,7 +732,7 @@ copy_from_user(void *to, const void __user *from, unsigned long n)
 static __always_inline unsigned long __must_check
 copy_to_user(void __user *to, const void *from, unsigned long n)
 {
-	int sz = __compiletime_object_size(from);
+	int sz = __compiletime_object_size((void *)from);
 
 	kasan_check_read(from, n);
 
