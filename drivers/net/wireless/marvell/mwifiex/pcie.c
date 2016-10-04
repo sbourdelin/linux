@@ -106,9 +106,10 @@ static int mwifiex_pcie_suspend(struct device *dev)
 
 	if (pdev) {
 		card = pci_get_drvdata(pdev);
-		if (!card || !card->adapter) {
+		if (!card || !card->adapter ||
+		    card->adapter->hw_status != MWIFIEX_HW_STATUS_READY) {
 			pr_err("Card or adapter structure is not valid\n");
-			return 0;
+			return -EBUSY;
 		}
 	} else {
 		pr_err("PCIE device is not specified\n");
@@ -142,9 +143,10 @@ static int mwifiex_pcie_resume(struct device *dev)
 
 	if (pdev) {
 		card = pci_get_drvdata(pdev);
-		if (!card || !card->adapter) {
+		if (!card || !card->adapter ||
+		    card->adapter->hw_status != MWIFIEX_HW_STATUS_READY) {
 			pr_err("Card or adapter structure is not valid\n");
-			return 0;
+			return -EBUSY;
 		}
 	} else {
 		pr_err("PCIE device is not specified\n");
