@@ -222,8 +222,7 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 	curr_zone_end = zone->zone_end;
 
 	/* now do the other zones */
-	for (i = 1; i < conf->nr_strip_zones; i++)
-	{
+	for (i = 1; i < conf->nr_strip_zones; i++) {
 		int j;
 
 		zone = conf->strip_zone + i;
@@ -665,8 +664,7 @@ static void raid0_quiesce(struct mddev *mddev, int state)
 {
 }
 
-static struct md_personality raid0_personality=
-{
+static struct md_personality raid0_personality = {
 	.name		= "raid0",
 	.level		= 0,
 	.owner		= THIS_MODULE,
