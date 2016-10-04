@@ -346,8 +346,6 @@ struct inode_operations {
 	int (*rmdir) (struct inode *,struct dentry *);
 	int (*mknod) (struct inode *,struct dentry *,umode_t,dev_t);
 	int (*rename) (struct inode *, struct dentry *,
-			struct inode *, struct dentry *);
-	int (*rename2) (struct inode *, struct dentry *,
 			struct inode *, struct dentry *, unsigned int);
 	int (*readlink) (struct dentry *, char __user *,int);
 	const char *(*get_link) (struct dentry *, struct inode *,
@@ -416,11 +414,8 @@ otherwise noted.
   rename: called by the rename(2) system call to rename the object to
 	have the parent and name given by the second inode and dentry.
 
-  rename2: this has an additional flags argument compared to rename.
-	If no flags are supported by the filesystem then this method
-	need not be implemented.  If some flags are supported then the
-	filesystem must return -EINVAL for any unsupported or unknown
-	flags.  Currently the following flags are implemented:
+	The filesystem must return -EINVAL for any unsupported or
+	unknown	flags.  Currently the following flags are implemented:
 	(1) RENAME_NOREPLACE: this flag indicates that if the target
 	of the rename exists the rename should fail with -EEXIST
 	instead of replacing the target.  The VFS already checks for
@@ -722,7 +717,7 @@ struct address_space_operations {
 
 	The second case is when a request has been made to invalidate
         some or all pages in an address_space.  This can happen
-        through the fadvice(POSIX_FADV_DONTNEED) system call or by the
+        through the fadvise(POSIX_FADV_DONTNEED) system call or by the
         filesystem explicitly requesting it as nfs and 9fs do (when
         they believe the cache may be out of date with storage) by
         calling invalidate_inode_pages2().

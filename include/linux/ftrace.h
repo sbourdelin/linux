@@ -794,7 +794,12 @@ struct ftrace_ret_stack {
 	unsigned long ret;
 	unsigned long func;
 	unsigned long long calltime;
+#ifdef CONFIG_FUNCTION_PROFILER
 	unsigned long long subtime;
+<<<<<<< HEAD
+=======
+#endif
+>>>>>>> linux-next/akpm-base
 #ifdef HAVE_FUNCTION_GRAPH_FP_TEST
 	unsigned long fp;
 #endif

@@ -21,6 +21,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#define DRM_IF_MAJOR 1
+#define DRM_IF_MINOR 4
+
 /* drm_irq.c */
 extern unsigned int drm_timestamp_monotonic;
 
@@ -97,6 +100,9 @@ int drm_debugfs_init(struct drm_minor *minor, int minor_id,
 int drm_debugfs_cleanup(struct drm_minor *minor);
 int drm_debugfs_connector_add(struct drm_connector *connector);
 void drm_debugfs_connector_remove(struct drm_connector *connector);
+int drm_debugfs_crtc_add(struct drm_crtc *crtc);
+void drm_debugfs_crtc_remove(struct drm_crtc *crtc);
+int drm_debugfs_crtc_crc_add(struct drm_crtc *crtc);
 #else
 static inline int drm_debugfs_init(struct drm_minor *minor, int minor_id,
 				   struct dentry *root)
@@ -115,5 +121,18 @@ static inline int drm_debugfs_connector_add(struct drm_connector *connector)
 }
 static inline void drm_debugfs_connector_remove(struct drm_connector *connector)
 {
+}
+
+static inline int drm_debugfs_crtc_add(struct drm_crtc *crtc)
+{
+	return 0;
+}
+static inline void drm_debugfs_crtc_remove(struct drm_crtc *crtc)
+{
+}
+
+static inline int drm_debugfs_crtc_crc_add(struct drm_crtc *crtc)
+{
+	return 0;
 }
 #endif
