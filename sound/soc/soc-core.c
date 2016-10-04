@@ -2175,7 +2175,6 @@ struct snd_kcontrol *snd_soc_cnew(const struct snd_kcontrol_new *_template,
 	char *name = NULL;
 
 	memcpy(&template, _template, sizeof(template));
-	template.index = 0;
 
 	if (!long_name)
 		long_name = template.name;
