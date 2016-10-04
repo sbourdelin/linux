@@ -1,0 +1,17 @@
+* Allwinner A23/A33 audio card
+
+This binding implements the A33 audio card.
+
+Required properties:
+- compatible: must be "allwinner,sun8i-audio"
+- allwinner,audio-codec: must have the phandle of the audio codec
+  ("sun8i-a33-codec", for example).
+- allwinner,i2s-controller: must have the phandle of the DAI
+  ("allwinner,sun4i-a10-i2s", for example)
+
+Example:
+sound {
+	compatible = "allwinner,sun8i-audio";
+	allwinner,audio-codec = <&codec>;
+	allwinner,i2s-controller = <&dai>;
+};
