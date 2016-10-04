@@ -218,9 +218,10 @@ static gen8_pte_t gen8_pte_encode(dma_addr_t addr,
 }
 
 static gen8_pde_t gen8_pde_encode(const dma_addr_t addr,
-				  const enum i915_cache_level level)
+				  const enum i915_cache_level level,
+				  bool valid)
 {
-	gen8_pde_t pde = _PAGE_PRESENT | _PAGE_RW;
+	gen8_pde_t pde = valid ? _PAGE_PRESENT | _PAGE_RW : 0;
 	pde |= addr;
 	if (level != I915_CACHE_NONE)
 		pde |= PPAT_CACHED_PDE_INDEX;
@@ -532,7 +533,8 @@ static void gen8_initialize_pd(struct i915_address_space *vm,
 {
 	gen8_pde_t scratch_pde;
 
-	scratch_pde = gen8_pde_encode(px_dma(vm->scratch_pt), I915_CACHE_LLC);
+	scratch_pde = gen8_pde_encode(px_dma(vm->scratch_pt), I915_CACHE_LLC,
+				      true);
 
 	fill_px(vm->dev, pd, scratch_pde);
 }
@@ -613,7 +615,8 @@ static void gen8_initialize_pdp(struct i915_address_space *vm,
 {
 	gen8_ppgtt_pdpe_t scratch_pdpe;
 
-	scratch_pdpe = gen8_pdpe_encode(px_dma(vm->scratch_pd), I915_CACHE_LLC);
+	scratch_pdpe = gen8_pdpe_encode(px_dma(vm->scratch_pd), I915_CACHE_LLC,
+					true);
 
 	fill_px(vm->dev, pdp, scratch_pdpe);
 }
@@ -624,7 +627,7 @@ static void gen8_initialize_pml4(struct i915_address_space *vm,
 	gen8_ppgtt_pml4e_t scratch_pml4e;
 
 	scratch_pml4e = gen8_pml4e_encode(px_dma(vm->scratch_pdp),
-					  I915_CACHE_LLC);
+					  I915_CACHE_LLC, true);
 
 	fill_px(vm->dev, pml4, scratch_pml4e);
 }
@@ -641,7 +644,8 @@ gen8_setup_page_directory(struct i915_hw_ppgtt *ppgtt,
 		return;
 
 	page_directorypo = kmap_px(pdp);
-	page_directorypo[index] = gen8_pdpe_encode(px_dma(pd), I915_CACHE_LLC);
+	page_directorypo[index] = gen8_pdpe_encode(px_dma(pd), I915_CACHE_LLC,
+						   true);
 	kunmap_px(ppgtt, page_directorypo);
 }
 
@@ -654,7 +658,7 @@ gen8_setup_page_directory_pointer(struct i915_hw_ppgtt *ppgtt,
 	gen8_ppgtt_pml4e_t *pagemap = kmap_px(pml4);
 
 	WARN_ON(!USES_FULL_48BIT_PPGTT(ppgtt->base.dev));
-	pagemap[index] = gen8_pml4e_encode(px_dma(pdp), I915_CACHE_LLC);
+	pagemap[index] = gen8_pml4e_encode(px_dma(pdp), I915_CACHE_LLC, true);
 	kunmap_px(ppgtt, pagemap);
 }
 
@@ -706,7 +710,7 @@ static int gen8_48b_mm_switch(struct i915_hw_ppgtt *ppgtt,
 	return gen8_write_pdp(req, 0, px_dma(&ppgtt->pml4));
 }
 
-static void gen8_ppgtt_clear_pt(struct i915_address_space *vm,
+static bool gen8_ppgtt_clear_pt(struct i915_address_space *vm,
 				struct i915_page_table *pt,
 				uint64_t start,
 				uint64_t length,
@@ -724,9 +728,14 @@ static void gen8_ppgtt_clear_pt(struct i915_address_space *vm,
 						 I915_CACHE_LLC, use_scratch);
 
 	if (WARN_ON(!px_page(pt)))
-		return;
+		return false;
 
 	bitmap_clear(pt->used_ptes, pte_start, num_entries);
+
+	if (bitmap_empty(pt->used_ptes, GEN8_PTES)) {
+		free_pt(vm->dev, pt);
+		return true;
+	}
 
 	pt_vaddr = kmap_px(pt);
 
@@ -734,40 +743,87 @@ static void gen8_ppgtt_clear_pt(struct i915_address_space *vm,
 		pt_vaddr[pte] = scratch_pte;
 
 	kunmap_px(ppgtt, pt_vaddr);
+
+	return false;
 }
 
-static void gen8_ppgtt_clear_pd(struct i915_address_space *vm,
+static bool gen8_ppgtt_clear_pd(struct i915_address_space *vm,
 				struct i915_page_directory *pd,
 				uint64_t start,
 				uint64_t length,
 				bool use_scratch)
 {
+	struct i915_hw_ppgtt *ppgtt = i915_vm_to_ppgtt(vm);
+
 	struct i915_page_table *pt;
 	uint64_t pde;
+
+	gen8_pde_t *pde_vaddr;
+	gen8_pde_t scratch_pde = gen8_pde_encode(px_dma(vm->scratch_pt),
+						 I915_CACHE_LLC, use_scratch);
+	bool reduce;
 
 	gen8_for_each_pde(pt, pd, start, length, pde) {
 		if (WARN_ON(!pd->page_table[pde]))
 			break;
 
-		gen8_ppgtt_clear_pt(vm, pt, start, length, use_scratch);
+		reduce = gen8_ppgtt_clear_pt(vm, pt, start, length,
+					     use_scratch);
+
+		if (reduce) {
+			__clear_bit(pde, pd->used_pdes);
+			pde_vaddr = kmap_px(pd);
+			pde_vaddr[pde] = scratch_pde;
+			kunmap_px(ppgtt, pde_vaddr);
+		}
 	}
+
+	if (bitmap_empty(pd->used_pdes, I915_PDES)) {
+		free_pd(vm->dev, pd);
+		return true;
+	}
+
+	return false;
 }
 
-static void gen8_ppgtt_clear_pdp(struct i915_address_space *vm,
+static bool gen8_ppgtt_clear_pdp(struct i915_address_space *vm,
 				 struct i915_page_directory_pointer *pdp,
 				 uint64_t start,
 				 uint64_t length,
 				 bool use_scratch)
 {
+	struct i915_hw_ppgtt *ppgtt = i915_vm_to_ppgtt(vm);
+
 	struct i915_page_directory *pd;
 	uint64_t pdpe;
+
+	gen8_ppgtt_pdpe_t *pdpe_vaddr;
+	gen8_ppgtt_pdpe_t scratch_pdpe =
+		gen8_pdpe_encode(px_dma(vm->scratch_pd), I915_CACHE_LLC,
+				 use_scratch);
+	bool reduce;
 
 	gen8_for_each_pdpe(pd, pdp, start, length, pdpe) {
 		if (WARN_ON(!pdp->page_directory[pdpe]))
 			break;
 
-		gen8_ppgtt_clear_pd(vm, pd, start, length, use_scratch);
+		reduce = gen8_ppgtt_clear_pd(vm, pd, start, length,
+					     use_scratch);
+
+		if (reduce) {
+			__clear_bit(pdpe, pdp->used_pdpes);
+			pdpe_vaddr = kmap_px(pdp);
+			pdpe_vaddr[pdpe] = scratch_pdpe;
+			kunmap_px(ppgtt, pdpe_vaddr);
+		}
 	}
+
+	if (bitmap_empty(pdp->used_pdpes, I915_PDPES_PER_PDP(vm->dev))) {
+		free_pdp(vm->dev, pdp);
+		return true;
+	}
+
+	return false;
 }
 
 static void gen8_ppgtt_clear_pml4(struct i915_address_space *vm,
@@ -776,14 +832,30 @@ static void gen8_ppgtt_clear_pml4(struct i915_address_space *vm,
 				  uint64_t length,
 				  bool use_scratch)
 {
+	struct i915_hw_ppgtt *ppgtt = i915_vm_to_ppgtt(vm);
+
 	struct i915_page_directory_pointer *pdp;
 	uint64_t pml4e;
+
+	gen8_ppgtt_pml4e_t *pml4e_vaddr;
+	gen8_ppgtt_pml4e_t scratch_pml4e =
+		gen8_pml4e_encode(px_dma(vm->scratch_pdp), I915_CACHE_LLC,
+				  use_scratch);
+	bool reduce;
 
 	gen8_for_each_pml4e(pdp, pml4, start, length, pml4e) {
 		if (WARN_ON(!pml4->pdps[pml4e]))
 			break;
 
-		gen8_ppgtt_clear_pdp(vm, pdp, start, length, use_scratch);
+		reduce = gen8_ppgtt_clear_pdp(vm, pdp, start, length,
+					      use_scratch);
+
+		if (reduce) {
+			__clear_bit(pml4e, pml4->used_pml4es);
+			pml4e_vaddr = kmap_px(pml4);
+			pml4e_vaddr[pml4e] = scratch_pml4e;
+			kunmap_px(ppgtt, pml4e_vaddr);
+		}
 	}
 }
 
@@ -1310,7 +1382,8 @@ static int gen8_alloc_va_range_3lvl(struct i915_address_space *vm,
 
 			/* Map the PDE to the page table */
 			page_directory[pde] = gen8_pde_encode(px_dma(pt),
-							      I915_CACHE_LLC);
+							      I915_CACHE_LLC,
+							      true);
 			trace_i915_page_table_entry_map(&ppgtt->base, pde, pt,
 							gen8_pte_index(start),
 							gen8_pte_count(start, length),
