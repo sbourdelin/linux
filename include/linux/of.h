@@ -23,7 +23,7 @@
 #include <linux/spinlock.h>
 #include <linux/topology.h>
 #include <linux/notifier.h>
-#include <linux/property.h>
+#include <linux/fwnode.h>
 #include <linux/list.h>
 
 #include <asm/byteorder.h>
