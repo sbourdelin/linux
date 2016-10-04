@@ -43,6 +43,7 @@
  */
 
 #include "sun8i-a23-a33.dtsi"
+#include <dt-bindings/dma/sun4i-a10.h>
 
 / {
 	cpus {
@@ -67,6 +68,12 @@
 
 	memory {
 		reg = <0x40000000 0x80000000>;
+	};
+
+	sound {
+		compatible = "allwinner,sun8i-audio";
+		allwinner,audio-codec = <&codec>;
+		allwinner,i2s-controller = <&dai>;
 	};
 
 	soc@01c00000 {
@@ -114,6 +121,32 @@
 			clock-names = "ahb", "mod";
 			resets = <&ccu RST_BUS_SS>;
 			reset-names = "ahb";
+		};
+
+		dai: dai@01c22c00 {
+			#sound-dai-cells = <0>;
+			compatible = "allwinner,sun4i-a10-i2s";
+			reg = <0x01c22c00 0x200>;
+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
+			clock-names = "apb", "mod";
+			resets = <&ccu RST_BUS_CODEC>;
+			reset-names = "apb_reset";
+			dmas = <&dma 15>, /* AUDIO_CODEC port */
+				<&dma 15>; /* AUDIO_CODEC port */
+			dma-names = "rx", "tx";
+			status = "disabled";
+		};
+
+		codec: codec@01c22e00 {
+			#sound-dai-cells = <0>;
+			compatible = "allwinner,sun8i-a33-codec";
+			reg = <0x01c22e00 0x400>; /* SUNXI_AUDIO_PBASE + 0x200 */
+			reg-names = "audio";
+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
+			clock-names = "apb", "codec";
+			status = "disabled";
 		};
 
 		fe0: display-frontend@01e00000 {
