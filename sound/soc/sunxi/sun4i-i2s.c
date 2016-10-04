@@ -17,6 +17,7 @@
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
+#include <linux/reset.h>
 
 #include <sound/dmaengine_pcm.h>
 #include <sound/pcm_params.h>
@@ -589,6 +590,7 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
 {
 	struct sun4i_i2s *i2s;
 	struct resource *res;
+	struct reset_control *reset_apb;
 	void __iomem *regs;
 	int irq, ret;
 
@@ -626,7 +628,19 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Can't get our mod clock\n");
 		return PTR_ERR(i2s->mod_clk);
 	}
-	
+
+	reset_apb = devm_reset_control_get(&pdev->dev, "apb_reset");
+	if (IS_ERR(reset_apb)) {
+		dev_err(&pdev->dev, "Can't get apb reset\n");
+		return PTR_ERR(i2s->mod_clk);
+	}
+
+	ret = reset_control_deassert(reset_apb);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "Can't deassert apb reset (%d)\n", ret);
+		return ret;
+	}
+
 	i2s->playback_dma_data.addr = res->start + SUN4I_I2S_FIFO_TX_REG;
 	i2s->playback_dma_data.maxburst = 4;
 
