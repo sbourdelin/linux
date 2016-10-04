@@ -96,20 +96,6 @@ enum channel_clientstate {
 	  (((o) == CHANNELCLI_BUSY) && ((n) == CHANNELCLI_OWNED)) || (0)) \
 	 ? (1) : (0))
 
-/* Values for ULTRA_CHANNEL_PROTOCOL.CliErrorBoot: */
-/* throttling invalid boot channel statetransition error due to client
- * disabled
- */
-#define ULTRA_CLIERRORBOOT_THROTTLEMSG_DISABLED    0x01
-
-/* throttling invalid boot channel statetransition error due to client
- * not attached
- */
-#define ULTRA_CLIERRORBOOT_THROTTLEMSG_NOTATTACHED 0x02
-
-/* throttling invalid boot channel statetransition error due to busy channel */
-#define ULTRA_CLIERRORBOOT_THROTTLEMSG_BUSY        0x04
-
 /* Values for ULTRA_CHANNEL_PROTOCOL.Features: This define exists so
  * that windows guest can look at the FeatureFlags in the io channel,
  * and configure the windows driver to use interrupts or not based on
