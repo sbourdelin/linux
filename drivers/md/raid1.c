@@ -2779,7 +2779,7 @@ static struct r1conf *setup_conf(struct mddev *mddev)
 
 	conf = kzalloc(sizeof(struct r1conf), GFP_KERNEL);
 	if (!conf)
-		goto abort;
+		return ERR_PTR(-ENOMEM);
 
 	conf->mirrors = kcalloc(mddev->raid_disks * 2,
 				sizeof(*conf->mirrors),
@@ -2880,13 +2880,11 @@ static struct r1conf *setup_conf(struct mddev *mddev)
 	return conf;
 
  abort:
-	if (conf) {
-		mempool_destroy(conf->r1bio_pool);
-		kfree(conf->mirrors);
-		safe_put_page(conf->tmppage);
-		kfree(conf->poolinfo);
-		kfree(conf);
-	}
+	mempool_destroy(conf->r1bio_pool);
+	kfree(conf->poolinfo);
+	safe_put_page(conf->tmppage);
+	kfree(conf->mirrors);
+	kfree(conf);
 	return ERR_PTR(err);
 }
 
