@@ -2776,7 +2776,7 @@ static struct r1conf *setup_conf(struct mddev *mddev)
 	struct md_rdev *rdev;
 	int err;
 
-	conf = kzalloc(sizeof(struct r1conf), GFP_KERNEL);
+	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
 	if (!conf)
 		return ERR_PTR(-ENOMEM);
 
