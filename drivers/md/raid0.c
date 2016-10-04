@@ -146,7 +146,7 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 		       mdname(mddev),
 		       mddev->chunk_sectors << 9, blksize);
 		err = -EINVAL;
-		goto abort;
+		goto free_conf;
 	}
 
 	err = -ENOMEM;
@@ -154,12 +154,12 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 				   sizeof(*conf->strip_zone),
 				   GFP_KERNEL);
 	if (!conf->strip_zone)
-		goto abort;
+		goto free_conf;
 	conf->devlist = kcalloc(conf->nr_strip_zones * mddev->raid_disks,
 				sizeof(*conf->devlist),
 				GFP_KERNEL);
 	if (!conf->devlist)
-		goto abort;
+		goto free_zone;
 
 	/* The first zone must contain all devices, so here we check that
 	 * there is a proper alignment of slots to devices and find them all
@@ -190,17 +190,17 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 			printk(KERN_ERR
 			       "md/raid0:%s: remove inactive devices before converting to RAID0\n",
 			       mdname(mddev));
-			goto abort;
+			goto free_device_list;
 		}
 		if (j >= mddev->raid_disks) {
 			printk(KERN_ERR "md/raid0:%s: bad disk number %d - "
 			       "aborting!\n", mdname(mddev), j);
-			goto abort;
+			goto free_device_list;
 		}
 		if (dev[j]) {
 			printk(KERN_ERR "md/raid0:%s: multiple devices for %d - "
 			       "aborting!\n", mdname(mddev), j);
-			goto abort;
+			goto free_device_list;
 		}
 		dev[j] = rdev1;
 
@@ -211,7 +211,7 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 	if (cnt != mddev->raid_disks) {
 		printk(KERN_ERR "md/raid0:%s: too few disks (%d of %d) - "
 		       "aborting!\n", mdname(mddev), cnt, mddev->raid_disks);
-		goto abort;
+		goto free_device_list;
 	}
 	zone->nb_dev = cnt;
 	zone->zone_end = smallest->sectors * cnt;
@@ -271,9 +271,11 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 	*private_conf = conf;
 
 	return 0;
-abort:
-	kfree(conf->strip_zone);
+free_device_list:
 	kfree(conf->devlist);
+free_zone:
+	kfree(conf->strip_zone);
+free_conf:
 	kfree(conf);
 	*private_conf = ERR_PTR(err);
 	return err;
