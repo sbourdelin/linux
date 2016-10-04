@@ -497,6 +497,9 @@ void intel_audio_codec_enable(struct intel_encoder *intel_encoder)
 	if (!connector)
 		return;
 
+	if (!acomp)
+		return;
+
 	DRM_DEBUG_DRIVER("ELD on [CONNECTOR:%d:%s], [ENCODER:%d:%s]\n",
 			 connector->base.id,
 			 connector->name,
@@ -545,6 +548,9 @@ void intel_audio_codec_disable(struct intel_encoder *intel_encoder)
 	enum port port = intel_encoder->port;
 	struct intel_crtc *crtc = to_intel_crtc(encoder->crtc);
 	enum pipe pipe = crtc->pipe;
+
+	if (!acomp)
+		return;
 
 	if (dev_priv->display.audio_codec_disable)
 		dev_priv->display.audio_codec_disable(intel_encoder);
