@@ -453,4 +453,14 @@ config PHY_NS2_PCIE
 	help
 	  Enable this to support the Broadcom Northstar2 PCIe PHY.
 	  If unsure, say N.
+
+config PHY_NOP
+	tristate "No-Operation PHY transceiver driver"
+	depends on OF || COMPILE_TEST
+	select GENERIC_PHY
+	help
+	  Enable this to support the generic no-operation PHY
+	  transeiver. This driver can be used with consumers
+	  requiring a no-op phy for few of the handlers.
+
 endmenu
