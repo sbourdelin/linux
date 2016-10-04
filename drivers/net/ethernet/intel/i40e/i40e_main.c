@@ -9458,7 +9458,7 @@ static int i40e_add_vsi(struct i40e_vsi *vsi)
 		vsi->seid = ctxt.seid;
 		vsi->id = ctxt.vsi_number;
 	}
-	/* Except FDIR VSI, for all othet VSI set the broadcast filter */
+	/* Except FDIR VSI, for all other VSI set the broadcast filter */
 	if (vsi->type != I40E_VSI_FDIR) {
 		aq_ret = i40e_aq_set_vsi_broadcast(hw, vsi->seid, true, NULL);
 		if (aq_ret) {
