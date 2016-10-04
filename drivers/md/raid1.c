@@ -72,7 +72,7 @@ static void allow_barrier(struct r1conf *conf, sector_t start_next_window,
 			  sector_t bi_sector);
 static void lower_barrier(struct r1conf *conf);
 
-static void * r1bio_pool_alloc(gfp_t gfp_flags, void *data)
+static void *r1bio_pool_alloc(gfp_t gfp_flags, void *data)
 {
 	struct pool_info *pi = data;
 	int size = offsetof(struct r1bio, bios[pi->raid_disks]);
@@ -96,7 +96,7 @@ static void r1bio_pool_free(void *r1_bio, void *data)
 #define CLUSTER_RESYNC_WINDOW_SECTORS (CLUSTER_RESYNC_WINDOW >> 9)
 #define NEXT_NORMALIO_DISTANCE (3 * RESYNC_WINDOW_SECTORS)
 
-static void * r1buf_pool_alloc(gfp_t gfp_flags, void *data)
+static void *r1buf_pool_alloc(gfp_t gfp_flags, void *data)
 {
 	struct pool_info *pi = data;
 	struct r1bio *r1_bio;
@@ -1027,7 +1027,7 @@ static void raid1_unplug(struct blk_plug_cb *cb, bool from_schedule)
 	kfree(plug);
 }
 
-static void raid1_make_request(struct mddev *mddev, struct bio * bio)
+static void raid1_make_request(struct mddev *mddev, struct bio *bio)
 {
 	struct r1conf *conf = mddev->private;
 	struct raid1_info *mirror;
