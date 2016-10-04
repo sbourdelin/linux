@@ -55,7 +55,7 @@ static void dump_zones(struct mddev *mddev)
 	int raid_disks = conf->strip_zone[0].nb_dev;
 	pr_info("configuration for %s - %d zone%s\n",
 	       mdname(mddev),
-	       conf->nr_strip_zones, conf->nr_strip_zones==1?"":"s");
+	       conf->nr_strip_zones, conf->nr_strip_zones == 1 ? "" : "s");
 	for (j = 0; j < conf->nr_strip_zones; j++) {
 		pr_info("zone%d=[", j);
 		for (k = 0; k < conf->strip_zone[j].nb_dev; k++)
@@ -106,9 +106,9 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 		rdev_for_each(rdev2, mddev) {
 			pr_debug("%s:   comparing %s(%llu) with %s(%llu)\n",
 				 mdname(mddev),
-				 bdevname(rdev1->bdev,b),
+				 bdevname(rdev1->bdev, b),
 				 (unsigned long long)rdev1->sectors,
-				 bdevname(rdev2->bdev,b2),
+				 bdevname(rdev2->bdev, b2),
 				 (unsigned long long)rdev2->sectors);
 			if (rdev2 == rdev1) {
 				pr_debug("%s:   END\n",
@@ -232,7 +232,7 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 		smallest = NULL;
 		c = 0;
 
-		for (j=0; j<cnt; j++) {
+		for (j = 0; j < cnt; j++) {
 			rdev = conf->devlist[j];
 			if (rdev->sectors <= zone->dev_start) {
 				pr_debug("%s: checking %s ... nope\n",
@@ -418,8 +418,8 @@ static int raid0_run(struct mddev *mddev)
 		 */
 		int stripe = mddev->raid_disks *
 			(mddev->chunk_sectors << 9) / PAGE_SIZE;
-		if (mddev->queue->backing_dev_info.ra_pages < 2* stripe)
-			mddev->queue->backing_dev_info.ra_pages = 2* stripe;
+		if (mddev->queue->backing_dev_info.ra_pages < 2 * stripe)
+			mddev->queue->backing_dev_info.ra_pages = 2 * stripe;
 	}
 
 	dump_zones(mddev);
