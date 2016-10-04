@@ -197,7 +197,7 @@ static struct adm9240_data *adm9240_update_device(struct device *dev)
 		data->temp = ((i2c_smbus_read_byte_data(client,
 					ADM9240_REG_TEMP) << 8) |
 					i2c_smbus_read_byte_data(client,
-					ADM9240_REG_TEMP_CONF)) / 128;
+					ADM9240_REG_TEMP_CONF));
 
 		for (i = 0; i < 2; i++) { /* read fans */
 			data->fan[i] = i2c_smbus_read_byte_data(client,
@@ -263,7 +263,7 @@ static ssize_t show_temp(struct device *dev, struct device_attribute *dummy,
 		char *buf)
 {
 	struct adm9240_data *data = adm9240_update_device(dev);
-	return sprintf(buf, "%d\n", data->temp * 500); /* 9-bit value */
+	return sprintf(buf, "%d\n", data->temp / 128 * 500); /* 9-bit value */
 }
 
 static ssize_t show_max(struct device *dev, struct device_attribute *devattr,
