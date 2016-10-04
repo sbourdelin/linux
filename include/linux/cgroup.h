@@ -553,6 +553,17 @@ static inline void pr_cont_cgroup_path(struct cgroup *cgrp)
 	pr_cont_kernfs_path(cgrp->kn);
 }
 
+#ifdef CONFIG_CGROUP_NICE_ATTACH
+/*
+ * Default Android check for whether the current process is allowed to move a
+ * task across cgroups, either because CAP_SYS_NICE is set or because the uid
+ * of the calling process is the same as the moved task or because we are
+ * running as root.
+ * Returns 0 if this is allowed, or -EACCES otherwise.
+ */
+int cgroup_nice_allow_attach(struct cgroup_taskset *tset);
+#endif
+
 #else /* !CONFIG_CGROUPS */
 
 struct cgroup_subsys_state;
@@ -644,6 +655,11 @@ copy_cgroup_ns(unsigned long flags, struct user_namespace *user_ns,
 	       struct cgroup_namespace *old_ns)
 {
 	return old_ns;
+}
+
+static inline int subsys_cgroup_allow_attach(void *tset)
+{
+	return -EINVAL;
 }
 
 #endif /* !CONFIG_CGROUPS */

@@ -2100,6 +2100,9 @@ struct cgroup_subsys cpuset_cgrp_subsys = {
 	.css_offline	= cpuset_css_offline,
 	.css_free	= cpuset_css_free,
 	.can_attach	= cpuset_can_attach,
+#ifdef CONFIG_CGROUP_NICE_ATTACH
+	.allow_attach   = cgroup_nice_allow_attach,
+#endif
 	.cancel_attach	= cpuset_cancel_attach,
 	.attach		= cpuset_attach,
 	.post_attach	= cpuset_post_attach,
