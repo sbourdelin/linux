@@ -1,0 +1,166 @@
+Graphs
+
+
+DSD
+---
+
+Device specific data (DSD) [1] is an ACPI feature which can be used to
+describe hardware features that are not directly defined by an
+existing ACPI standard [6]. Besides the usual DSD device and fwnode
+properties [4], the DSD extension also supports hierarchical data
+structure [5] the nodes of which may contain additional properties.
+Functionality-wise this is somewhat equivalent to the phandles in
+Devicetree [2].
+
+The hierarchical data extension [5] may be used to construct a
+tree-like structure with nodes which may contain other nodes (again
+using the hierarchical data extension) or properties (using device and
+fwnode properties [4]).
+
+The data structure may be referenced to elsewhere in the ACPI tables
+by using a hard reference to the device itself and an index to the
+hierarchical data extension array on each depth.
+
+
+Ports and endpoints
+-------------------
+
+The port and endpoint concepts are very similar to those in Devicetree
+[3]. The port represent represent interface in a device, and an
+endpoint represents a connection to that interface.
+
+All port nodes are located under a child node under the device's
+"_DSD" node in hierarchical data extension tree. The first
+hierarchical data extension package list entry of this node must be
+called "ports". Individual ports are declared as child nodes of this
+node. The first package list entry of the hierarchical data extension
+must begin with "port@" string and must be followed by the number of
+the port.
+
+Further on, endpoints are located under the individual port nodes. The
+first hierarchical data extension package list entry of the endpoint
+nodes must begin with "endpoint@" and must be followed by the number
+of the endpoint.
+
+Each port node contains a property extension key "port", the value of
+which is the number of the port node. Similarly, each endpoint node
+must contain "endpoint" property which is the number of the endpoint
+node.
+
+The endpoint reference uses property extension with "remote-endpoint"
+property name followed by a reference in the same package. The
+references to endpoints must be always done both to and from the
+endpoint node. Individual references thus appear as:
+
+    Package() { device, ports_node_index,
+		port_node_index, endpoint_node_index }
+
+A simple example of this is show below:
+
+    Scope (\_SB.PCI0.I2C2)
+    {
+	Device (CAM0)
+	{
+	    Name (_DSD, Package () {
+		ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+		Package () {
+		    Package () { "compatible", Package () { "nokia,smia" } },
+		},
+		ToUUID("dbb8e3e6-5886-4ba6-8795-1319f52a966b"),
+		Package () {
+		    Package () { "ports", "PRTS" },
+		}
+	    })
+	    Name (PRTS, Package() {
+		ToUUID("dbb8e3e6-5886-4ba6-8795-1319f52a966b"),
+		Package () {
+		    Package () { "port@0", "PRT0" },
+		}
+	    })
+	    Name (PRT0, Package() {
+		ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+		Package () {
+		    Package () { "port", 0 },
+		},
+		ToUUID("dbb8e3e6-5886-4ba6-8795-1319f52a966b"),
+		Package () {
+		    Package () { "endpoint@0", "EP0" },
+		}
+	    })
+	    Name (EP0, Package() {
+		ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+		Package () {
+		    Package () { "endpoint", 0 },
+		    Package () { "remote-endpoint", Package() { \_SB.PCI0.ISP, 0, 0, 0 } },
+		}
+	    })
+	}
+    }
+
+    Scope (\_SB.PCI0)
+    {
+	Device (ISP)
+	{
+	    Name (_DSD, Package () {
+		ToUUID("dbb8e3e6-5886-4ba6-8795-1319f52a966b"),
+		Package () {
+		    Package () { "ports", "PRTS" },
+		}
+	    })
+
+	    Name (PRTS, Package() {
+		ToUUID("dbb8e3e6-5886-4ba6-8795-1319f52a966b"),
+		Package () {
+		    Package () { "port@4", "PRT4" },
+		}
+	    })
+
+	    Name (PRT4, Package() {
+		ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+		Package () {
+		    Package () { "port", 4 }, /* CSI-2 port number */
+		},
+		ToUUID("dbb8e3e6-5886-4ba6-8795-1319f52a966b"),
+		Package () {
+		    Package () { "endpoint@0", "EP0" },
+		}
+	    })
+
+	    Name (EP0, Package() {
+		ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+		Package () {
+		    Package () { "endpoint", 0 },
+		    Package () { "remote-endpoint", Package () { \_SB.PCI0.I2C2.CAM0, 0, 0, 0 } },
+		}
+	    })
+	}
+    }
+
+Here, the port 0 of the "CAM0" device is connected to the port 4 of
+the "ISP" device. Note that the port index in the reference is still
+0, as it refers to an entry in the table and not the port node number
+itself.
+
+
+References
+----------
+
+[1] _DSD (Device Specific Data) Implementation Guide.
+    <URL:http://www.uefi.org/sites/default/files/resources/_DSD-implementation-guide-toplevel-1_1.htm>,
+    referenced 2016-10-03.
+
+[2] Devicetree. <URL:http://www.devicetree.org>, referenced 2016-10-03.
+
+[3] Documentation/devicetree/bindings/graph.txt
+
+[4] Device Properties UUID For _DSD.
+    <URL:http://www.uefi.org/sites/default/files/resources/_DSD-device-properties-UUID.pdf>,
+    referenced 2016-10-04.
+
+[5] Hierarchical Data Extension UUID For _DSD.
+    <URL:http://www.uefi.org/sites/default/files/resources/_DSD-hierarchical-data-extension-UUID-v1.pdf>,
+    referenced 2016-10-04.
+
+[6] Advanced Configuration and Power Interface Specification.
+    <URL:http://www.uefi.org/sites/default/files/resources/ACPI_6_1.pdf>,
+    referenced 2016-10-04.
