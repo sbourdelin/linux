@@ -17,11 +17,26 @@
 #include <linux/err.h>
 #include <linux/notifier.h>
 
+struct clk;
 struct dev_pm_opp;
 struct device;
 
 enum dev_pm_opp_event {
 	OPP_EVENT_ADD, OPP_EVENT_REMOVE, OPP_EVENT_ENABLE, OPP_EVENT_DISABLE,
+};
+
+struct dev_pm_opp_info {
+	unsigned long rate;
+	struct dev_pm_opp_supply *supplies;
+};
+
+struct dev_pm_set_rate_data {
+	struct dev_pm_opp_info old_opp;
+	struct dev_pm_opp_info new_opp;
+
+	struct regulator **regulators;
+	unsigned int regulator_count;
+	struct clk *clk;
 };
 
 #if defined(CONFIG_PM_OPP)
