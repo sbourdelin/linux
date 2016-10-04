@@ -326,6 +326,12 @@ static int hisi_spi_nor_register(struct device_node *np,
 	struct hifmc_priv *priv;
 	struct mtd_info *mtd;
 	int ret;
+	static const struct spi_nor_modes modes = {
+		.rd_modes = (SNOR_MODE_SLOW |
+			     SNOR_MODE_1_1_1 |
+			     SNOR_MODE_1_1_4),
+		.wr_modes = SNOR_MODE_1_1_1,
+	};
 
 	nor = devm_kzalloc(dev, sizeof(*nor), GFP_KERNEL);
 	if (!nor)
@@ -362,7 +368,7 @@ static int hisi_spi_nor_register(struct device_node *np,
 	nor->read = hisi_spi_nor_read;
 	nor->write = hisi_spi_nor_write;
 	nor->erase = NULL;
-	ret = spi_nor_scan(nor, NULL, SPI_NOR_QUAD);
+	ret = spi_nor_scan(nor, NULL, &modes);
 	if (ret)
 		return ret;
 

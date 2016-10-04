@@ -1074,6 +1074,12 @@ static int cqspi_setup_flash(struct cqspi_st *cqspi, struct device_node *np)
 	struct mtd_info *mtd;
 	unsigned int cs;
 	int i, ret;
+	static const struct spi_nor_modes modes = {
+		.rd_modes = (SNOR_MODE_SLOW |
+			     SNOR_MODE_1_1_1 |
+			     SNOR_MODE_1_1_4),
+		.wr_modes = SNOR_MODE_1_1_1,
+	};
 
 	/* Get flash device data */
 	for_each_available_child_of_node(dev->of_node, np) {
@@ -1119,7 +1125,7 @@ static int cqspi_setup_flash(struct cqspi_st *cqspi, struct device_node *np)
 			goto err;
 		}
 
-		ret = spi_nor_scan(nor, NULL, SPI_NOR_QUAD);
+		ret = spi_nor_scan(nor, NULL, &modes);
 		if (ret)
 			goto err;
 
