@@ -3081,8 +3081,8 @@ static int raid1_reshape(struct mddev *mddev)
 		kfree(newpoolinfo);
 		return -ENOMEM;
 	}
-	newmirrors = kzalloc(sizeof(struct raid1_info) * raid_disks * 2,
-			     GFP_KERNEL);
+
+	newmirrors = kcalloc(raid_disks * 2, sizeof(*newmirrors), GFP_KERNEL);
 	if (!newmirrors) {
 		kfree(newpoolinfo);
 		mempool_destroy(newpool);
