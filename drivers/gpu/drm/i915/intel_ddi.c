@@ -319,6 +319,19 @@ enum port intel_ddi_get_encoder_port(struct intel_encoder *encoder)
 	}
 }
 
+struct intel_encoder *
+intel_ddi_get_port_encoder(struct drm_i915_private *dev_priv, enum port port)
+{
+	struct intel_encoder *encoder;
+
+	for_each_intel_encoder(&dev_priv->drm, encoder) {
+		if (port == intel_ddi_get_encoder_port(encoder))
+			return encoder;
+	}
+
+	return NULL;
+}
+
 static const struct ddi_buf_trans *
 bdw_get_buf_trans_edp(struct drm_i915_private *dev_priv, int *n_entries)
 {
@@ -582,11 +595,12 @@ void hsw_fdi_link_train(struct drm_crtc *crtc)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	struct intel_encoder *encoder;
-	u32 temp, i, rx_ctl_val, ddi_pll_sel;
+	u32 temp, i, rx_ctl_val;
 
 	for_each_encoder_on_crtc(dev, crtc, encoder) {
 		WARN_ON(encoder->type != INTEL_OUTPUT_ANALOG);
 		intel_prepare_dp_ddi_buffers(encoder);
+		break;
 	}
 
 	/* Set the FDI_RX_MISC pwrdn lanes and the 2 workarounds listed at the
@@ -613,9 +627,7 @@ void hsw_fdi_link_train(struct drm_crtc *crtc)
 	I915_WRITE(FDI_RX_CTL(PIPE_A), rx_ctl_val);
 
 	/* Configure Port Clock Select */
-	ddi_pll_sel = hsw_pll_to_ddi_pll_sel(intel_crtc->config->shared_dpll);
-	I915_WRITE(PORT_CLK_SEL(PORT_E), ddi_pll_sel);
-	WARN_ON(ddi_pll_sel != PORT_CLK_SEL_SPLL);
+	intel_dpll_map_to_encoder(intel_crtc->config->shared_dpll, encoder);
 
 	/* Start the training iterating through available voltages and emphasis,
 	 * testing each value twice. */
@@ -1607,33 +1619,6 @@ uint32_t ddi_signal_levels(struct intel_dp *intel_dp)
 	return DDI_BUF_TRANS_SELECT(level);
 }
 
-void intel_ddi_clk_select(struct intel_encoder *encoder,
-			  struct intel_shared_dpll *pll)
-{
-	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
-	enum port port = intel_ddi_get_encoder_port(encoder);
-
-	if (WARN_ON(!pll))
-		return;
-
-	if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv)) {
-		uint32_t val;
-
-		/* DDI -> PLL mapping  */
-		val = I915_READ(DPLL_CTRL2);
-
-		val &= ~(DPLL_CTRL2_DDI_CLK_OFF(port) |
-			DPLL_CTRL2_DDI_CLK_SEL_MASK(port));
-		val |= (DPLL_CTRL2_DDI_CLK_SEL(pll->id, port) |
-			DPLL_CTRL2_DDI_SEL_OVERRIDE(port));
-
-		I915_WRITE(DPLL_CTRL2, val);
-
-	} else if (INTEL_INFO(dev_priv)->gen < 9) {
-		I915_WRITE(PORT_CLK_SEL(port), hsw_pll_to_ddi_pll_sel(pll));
-	}
-}
-
 static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 				    int link_rate, uint32_t lane_count,
 				    struct intel_shared_dpll *pll,
@@ -1648,7 +1633,7 @@ static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 	if (encoder->type == INTEL_OUTPUT_EDP)
 		intel_edp_panel_on(intel_dp);
 
-	intel_ddi_clk_select(encoder, pll);
+	intel_dpll_map_to_encoder(pll, encoder);
 	intel_prepare_dp_ddi_buffers(encoder);
 	intel_ddi_init_dp_buf_reg(encoder);
 	intel_dp_sink_dpms(intel_dp, DRM_MODE_DPMS_ON);
@@ -1669,7 +1654,7 @@ static void intel_ddi_pre_enable_hdmi(struct intel_encoder *encoder,
 	int level = intel_ddi_hdmi_level(dev_priv, port);
 
 	intel_dp_dual_mode_set_tmds_output(intel_hdmi, true);
-	intel_ddi_clk_select(encoder, pll);
+	intel_dpll_map_to_encoder(pll, encoder);
 	intel_prepare_hdmi_ddi_buffers(encoder);
 	if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))
 		skl_ddi_set_iboost(encoder, level);

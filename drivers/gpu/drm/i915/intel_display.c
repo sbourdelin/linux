@@ -4556,19 +4556,7 @@ static void ironlake_pch_enable(struct drm_crtc *crtc)
 
 	/* We need to program the right clock selection before writing the pixel
 	 * mutliplier into the DPLL. */
-	if (HAS_PCH_CPT(dev)) {
-		u32 sel;
-
-		temp = I915_READ(PCH_DPLL_SEL);
-		temp |= TRANS_DPLL_ENABLE(pipe);
-		sel = TRANS_DPLLB_SEL(pipe);
-		if (intel_crtc->config->shared_dpll ==
-		    intel_get_shared_dpll_by_id(dev_priv, DPLL_ID_PCH_PLL_B))
-			temp |= sel;
-		else
-			temp &= ~sel;
-		I915_WRITE(PCH_DPLL_SEL, temp);
-	}
+	intel_dpll_map_to_crtc(intel_crtc->config->shared_dpll, intel_crtc);
 
 	/* XXX: pch pll's can be enabled any time before we enable the PCH
 	 * transcoder, and we actually should do this to not upset any PCH
@@ -5575,9 +5563,7 @@ static void ironlake_crtc_disable(struct intel_crtc_state *old_crtc_state,
 			I915_WRITE(reg, temp);
 
 			/* disable DPLL_SEL */
-			temp = I915_READ(PCH_DPLL_SEL);
-			temp &= ~(TRANS_DPLL_ENABLE(pipe) | TRANS_DPLLB_SEL(pipe));
-			I915_WRITE(PCH_DPLL_SEL, temp);
+			intel_dpll_map_to_crtc(NULL, intel_crtc);
 		}
 
 		ironlake_fdi_pll_disable(intel_crtc);
@@ -9953,7 +9939,6 @@ static bool ironlake_get_pipe_config(struct intel_crtc *crtc,
 
 	if (I915_READ(PCH_TRANSCONF(crtc->pipe)) & TRANS_ENABLE) {
 		struct intel_shared_dpll *pll;
-		enum intel_dpll_id pll_id;
 
 		pipe_config->has_pch_encoder = true;
 
@@ -9963,23 +9948,7 @@ static bool ironlake_get_pipe_config(struct intel_crtc *crtc,
 
 		ironlake_get_fdi_m_n_config(crtc, pipe_config);
 
-		if (HAS_PCH_IBX(dev_priv)) {
-			/*
-			 * The pipe->pch transcoder and pch transcoder->pll
-			 * mapping is fixed.
-			 */
-			pll_id = (enum intel_dpll_id) crtc->pipe;
-		} else {
-			tmp = I915_READ(PCH_DPLL_SEL);
-			if (tmp & TRANS_DPLLB_SEL(crtc->pipe))
-				pll_id = DPLL_ID_PCH_PLL_B;
-			else
-				pll_id= DPLL_ID_PCH_PLL_A;
-		}
-
-		pipe_config->shared_dpll =
-			intel_get_shared_dpll_by_id(dev_priv, pll_id);
-		pll = pipe_config->shared_dpll;
+		pipe_config->shared_dpll = pll = intel_get_crtc_dpll(crtc);
 
 		WARN_ON(!pll->funcs.get_hw_state(dev_priv, pll,
 						 &pipe_config->dpll_hw_state));
@@ -10459,82 +10428,6 @@ static int haswell_crtc_compute_clock(struct intel_crtc *crtc,
 	return 0;
 }
 
-static void bxt_get_ddi_pll(struct drm_i915_private *dev_priv,
-				enum port port,
-				struct intel_crtc_state *pipe_config)
-{
-	enum intel_dpll_id id;
-
-	switch (port) {
-	case PORT_A:
-		id = DPLL_ID_SKL_DPLL0;
-		break;
-	case PORT_B:
-		id = DPLL_ID_SKL_DPLL1;
-		break;
-	case PORT_C:
-		id = DPLL_ID_SKL_DPLL2;
-		break;
-	default:
-		DRM_ERROR("Incorrect port type\n");
-		return;
-	}
-
-	pipe_config->shared_dpll = intel_get_shared_dpll_by_id(dev_priv, id);
-}
-
-static void skylake_get_ddi_pll(struct drm_i915_private *dev_priv,
-				enum port port,
-				struct intel_crtc_state *pipe_config)
-{
-	enum intel_dpll_id id;
-	u32 temp;
-
-	temp = I915_READ(DPLL_CTRL2) & DPLL_CTRL2_DDI_CLK_SEL_MASK(port);
-	id = temp >> (port * 3 + 1);
-
-	if (WARN_ON(id < SKL_DPLL0 || id > SKL_DPLL3))
-		return;
-
-	pipe_config->shared_dpll = intel_get_shared_dpll_by_id(dev_priv, id);
-}
-
-static void haswell_get_ddi_pll(struct drm_i915_private *dev_priv,
-				enum port port,
-				struct intel_crtc_state *pipe_config)
-{
-	enum intel_dpll_id id;
-	uint32_t ddi_pll_sel = I915_READ(PORT_CLK_SEL(port));
-
-	switch (ddi_pll_sel) {
-	case PORT_CLK_SEL_WRPLL1:
-		id = DPLL_ID_WRPLL1;
-		break;
-	case PORT_CLK_SEL_WRPLL2:
-		id = DPLL_ID_WRPLL2;
-		break;
-	case PORT_CLK_SEL_SPLL:
-		id = DPLL_ID_SPLL;
-		break;
-	case PORT_CLK_SEL_LCPLL_810:
-		id = DPLL_ID_LCPLL_810;
-		break;
-	case PORT_CLK_SEL_LCPLL_1350:
-		id = DPLL_ID_LCPLL_1350;
-		break;
-	case PORT_CLK_SEL_LCPLL_2700:
-		id = DPLL_ID_LCPLL_2700;
-		break;
-	default:
-		MISSING_CASE(ddi_pll_sel);
-		/* fall through */
-	case PORT_CLK_SEL_NONE:
-		return;
-	}
-
-	pipe_config->shared_dpll = intel_get_shared_dpll_by_id(dev_priv, id);
-}
-
 static bool hsw_get_transcoder_state(struct intel_crtc *crtc,
 				     struct intel_crtc_state *pipe_config,
 				     unsigned long *power_domain_mask)
@@ -10639,6 +10532,7 @@ static void haswell_get_ddi_port_state(struct intel_crtc *crtc,
 {
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct intel_encoder *encoder;
 	struct intel_shared_dpll *pll;
 	enum port port;
 	uint32_t tmp;
@@ -10647,14 +10541,8 @@ static void haswell_get_ddi_port_state(struct intel_crtc *crtc,
 
 	port = (tmp & TRANS_DDI_PORT_MASK) >> TRANS_DDI_PORT_SHIFT;
 
-	if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev))
-		skylake_get_ddi_pll(dev_priv, port, pipe_config);
-	else if (IS_BROXTON(dev))
-		bxt_get_ddi_pll(dev_priv, port, pipe_config);
-	else
-		haswell_get_ddi_pll(dev_priv, port, pipe_config);
-
-	pll = pipe_config->shared_dpll;
+	encoder =  intel_ddi_get_port_encoder(dev_priv, port);
+	pipe_config->shared_dpll = pll = intel_get_encoder_dpll(encoder);
 	if (pll) {
 		WARN_ON(!pll->funcs.get_hw_state(dev_priv, pll,
 						 &pipe_config->dpll_hw_state));

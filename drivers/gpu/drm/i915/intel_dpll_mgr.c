@@ -40,6 +40,12 @@
  * Changes to the users are first staged in the atomic state, and then made
  * effective by calling intel_shared_dpll_swap_state() during the atomic
  * commit phase.
+ *
+ * The functions intel_dpll_map_to_crtc(), intel_dpll_map_to_encoder(),
+ * intel_get_crtc_dpll() and intel_get_encoder_dpll() allows the mapping of
+ * dplls to crtcs and encoders to be queried and changed. Whether plls map
+ * to encoders or crtcs depends on the platform. The caller needs to know
+ * which of the functions to use.
  */
 
 struct intel_shared_dpll *
@@ -447,6 +453,54 @@ ibx_get_dpll(struct intel_crtc *crtc, struct intel_crtc_state *crtc_state,
 	return pll;
 }
 
+static struct intel_shared_dpll *
+ibx_get_crtc_dpll(struct intel_crtc *crtc)
+{
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
+	enum intel_dpll_id pll_id;
+	u32 tmp;
+
+	if (HAS_PCH_IBX(dev_priv)) {
+		/*
+		 * The pipe->pch transcoder and pch transcoder->pll
+		 * mapping is fixed.
+		 */
+		pll_id = (enum intel_dpll_id) crtc->pipe;
+	} else {
+		tmp = I915_READ(PCH_DPLL_SEL);
+		if (tmp & TRANS_DPLLB_SEL(crtc->pipe))
+			pll_id = DPLL_ID_PCH_PLL_B;
+		else
+			pll_id= DPLL_ID_PCH_PLL_A;
+	}
+
+	return intel_get_shared_dpll_by_id(dev_priv, pll_id);
+}
+
+static void
+ibx_dpll_map_to_crtc(struct intel_shared_dpll *dpll, struct intel_crtc *crtc)
+{
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
+	enum pipe pipe = crtc->pipe;
+	u32 temp, sel;
+
+	if (!HAS_PCH_CPT(dev_priv))
+		return;
+
+	temp = I915_READ(PCH_DPLL_SEL);
+	if (dpll) {
+		temp |= TRANS_DPLL_ENABLE(pipe);
+		sel = TRANS_DPLLB_SEL(pipe);
+		if (dpll->id ==  DPLL_ID_PCH_PLL_B)
+			temp |= sel;
+		else
+			temp &= ~sel;
+	} else {
+		temp &= ~(TRANS_DPLL_ENABLE(pipe) | TRANS_DPLLB_SEL(pipe));
+	}
+	I915_WRITE(PCH_DPLL_SEL, temp);
+}
+
 static void ibx_dump_hw_state(struct drm_i915_private *dev_priv,
 			      struct intel_dpll_hw_state *hw_state)
 {
@@ -842,6 +896,73 @@ hsw_get_dpll(struct intel_crtc *crtc, struct intel_crtc_state *crtc_state,
 	intel_reference_shared_dpll(pll, crtc_state);
 
 	return pll;
+}
+
+static enum intel_dpll_id hsw_reg_to_pll_id(uint32_t ddi_pll_sel)
+{
+	switch (ddi_pll_sel) {
+	case PORT_CLK_SEL_WRPLL1:
+		return DPLL_ID_WRPLL1;
+	case PORT_CLK_SEL_WRPLL2:
+		return DPLL_ID_WRPLL2;
+	case PORT_CLK_SEL_SPLL:
+		return DPLL_ID_SPLL;
+	case PORT_CLK_SEL_LCPLL_810:
+		return DPLL_ID_LCPLL_810;
+	case PORT_CLK_SEL_LCPLL_1350:
+		return DPLL_ID_LCPLL_1350;
+	case PORT_CLK_SEL_LCPLL_2700:
+		return DPLL_ID_LCPLL_2700;
+	default:
+		MISSING_CASE(ddi_pll_sel);
+		/* fall through */
+	case PORT_CLK_SEL_NONE:
+		return DPLL_ID_PRIVATE;
+	}
+}
+
+static uint32_t hsw_pll_id_to_reg(enum intel_dpll_id id)
+{
+	switch (id) {
+	case DPLL_ID_WRPLL1:
+		return PORT_CLK_SEL_WRPLL1;
+	case DPLL_ID_WRPLL2:
+		return PORT_CLK_SEL_WRPLL2;
+	case DPLL_ID_SPLL:
+		return PORT_CLK_SEL_SPLL;
+	case DPLL_ID_LCPLL_810:
+		return PORT_CLK_SEL_LCPLL_810;
+	case DPLL_ID_LCPLL_1350:
+		return PORT_CLK_SEL_LCPLL_1350;
+	case DPLL_ID_LCPLL_2700:
+		return PORT_CLK_SEL_LCPLL_2700;
+	default:
+		MISSING_CASE(id);
+		/* fall through */
+	case DPLL_ID_PRIVATE:
+		return PORT_CLK_SEL_NONE;
+	}
+}
+
+static struct intel_shared_dpll *
+hsw_get_encoder_dpll(struct intel_encoder *encoder)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	enum port port = intel_ddi_get_encoder_port(encoder);
+	uint32_t ddi_pll_sel = I915_READ(PORT_CLK_SEL(port));
+
+	return intel_get_shared_dpll_by_id(dev_priv,
+					   hsw_reg_to_pll_id(ddi_pll_sel));
+}
+
+static void
+hsw_dpll_map_to_encoder(struct intel_shared_dpll *dpll,
+			struct intel_encoder *encoder)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	enum port port = intel_ddi_get_encoder_port(encoder);
+
+	I915_WRITE(PORT_CLK_SEL(port), hsw_pll_id_to_reg(dpll->id));
 }
 
 static void hsw_dump_hw_state(struct drm_i915_private *dev_priv,
@@ -1406,6 +1527,41 @@ skl_get_dpll(struct intel_crtc *crtc, struct intel_crtc_state *crtc_state,
 	return pll;
 }
 
+static struct intel_shared_dpll *
+skl_get_encoder_dpll(struct intel_encoder *encoder)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	enum port port = intel_ddi_get_encoder_port(encoder);
+	enum intel_dpll_id id;
+	u32 temp;
+
+	temp = I915_READ(DPLL_CTRL2) & DPLL_CTRL2_DDI_CLK_SEL_MASK(port);
+	id = temp >> (port * 3 + 1);
+
+	if (WARN_ON(id < SKL_DPLL0 || id > SKL_DPLL3))
+		return NULL;
+
+	return intel_get_shared_dpll_by_id(dev_priv, id);
+}
+
+static void
+skl_dpll_map_to_encoder(struct intel_shared_dpll *dpll,
+			struct intel_encoder *encoder)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	enum port port = intel_ddi_get_encoder_port(encoder);
+	uint32_t val;
+
+	val = I915_READ(DPLL_CTRL2);
+
+	val &= ~(DPLL_CTRL2_DDI_CLK_OFF(port) |
+		DPLL_CTRL2_DDI_CLK_SEL_MASK(port));
+	val |= (DPLL_CTRL2_DDI_CLK_SEL(dpll->id, port) |
+		DPLL_CTRL2_DDI_SEL_OVERRIDE(port));
+
+	I915_WRITE(DPLL_CTRL2, val);
+}
+
 static void skl_dump_hw_state(struct drm_i915_private *dev_priv,
 			      struct intel_dpll_hw_state *hw_state)
 {
@@ -1812,6 +1968,38 @@ bxt_get_dpll(struct intel_crtc *crtc,
 
 	return pll;
 }
+static struct intel_shared_dpll *
+bxt_get_encoder_dpll(struct intel_encoder *encoder)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	enum port port = intel_ddi_get_encoder_port(encoder);
+	enum intel_dpll_id id;
+
+	switch (port) {
+	case PORT_A:
+		id = DPLL_ID_SKL_DPLL0;
+		break;
+	case PORT_B:
+		id = DPLL_ID_SKL_DPLL1;
+		break;
+	case PORT_C:
+		id = DPLL_ID_SKL_DPLL2;
+		break;
+	default:
+		DRM_ERROR("Incorrect port type\n");
+		return NULL;
+	}
+
+	return intel_get_shared_dpll_by_id(dev_priv, id);
+}
+
+static void
+bxt_dpll_map_to_encoder(struct intel_shared_dpll *dpll,
+			struct intel_encoder *encoder)
+{
+	/* Fixed mapping, nothing to do */
+}
+
 
 static void bxt_dump_hw_state(struct drm_i915_private *dev_priv,
 			      struct intel_dpll_hw_state *hw_state)
@@ -1859,6 +2047,33 @@ static void intel_ddi_pll_init(struct drm_device *dev)
 	}
 }
 
+static void
+noop_dpll_map_to_crtc(struct intel_shared_dpll *dpll, struct intel_crtc *crtc)
+{
+	WARN(1, "Platform does not support mapping DPLLs to CRTCs.");
+}
+
+static struct intel_shared_dpll *
+noop_get_crtc_dpll(struct intel_crtc *crtc)
+{
+	WARN(1, "Platform does not support mapping DPLLs to CRTCs.");
+	return NULL;
+}
+
+static void
+noop_dpll_map_to_encoder(struct intel_shared_dpll *dpll, struct intel_encoder *encoder)
+{
+	WARN(1, "Platform does not support mapping DPLLs to encoders.");
+}
+
+static struct intel_shared_dpll *
+noop_get_encoder_dpll(struct intel_encoder *encoder)
+{
+	WARN(1, "Platform does not support mapping DPLLs to encoders.");
+	return NULL;
+}
+
+
 struct dpll_info {
 	const char *name;
 	const int id;
@@ -1873,6 +2088,14 @@ struct intel_dpll_mgr {
 					      struct intel_crtc_state *crtc_state,
 					      struct intel_encoder *encoder);
 
+	struct intel_shared_dpll *(*get_crtc_dpll)(struct intel_crtc *crtc);
+	struct intel_shared_dpll *(*get_encoder_dpll)(struct intel_encoder *encoder);
+
+	void (*map_to_crtc)(struct intel_shared_dpll *dpll,
+			    struct intel_crtc *crtc);
+	void (*map_to_encoder)(struct intel_shared_dpll *dpll,
+			       struct intel_encoder *encoder);
+
 	void (*dump_hw_state)(struct drm_i915_private *dev_priv,
 			      struct intel_dpll_hw_state *hw_state);
 };
@@ -1886,6 +2109,10 @@ static const struct dpll_info pch_plls[] = {
 static const struct intel_dpll_mgr pch_pll_mgr = {
 	.dpll_info = pch_plls,
 	.get_dpll = ibx_get_dpll,
+	.get_crtc_dpll = ibx_get_crtc_dpll,
+	.map_to_crtc = ibx_dpll_map_to_crtc,
+	.get_encoder_dpll = noop_get_encoder_dpll,
+	.map_to_encoder = noop_dpll_map_to_encoder,
 	.dump_hw_state = ibx_dump_hw_state,
 };
 
@@ -1902,6 +2129,10 @@ static const struct dpll_info hsw_plls[] = {
 static const struct intel_dpll_mgr hsw_pll_mgr = {
 	.dpll_info = hsw_plls,
 	.get_dpll = hsw_get_dpll,
+	.get_crtc_dpll = noop_get_crtc_dpll,
+	.map_to_crtc = noop_dpll_map_to_crtc,
+	.get_encoder_dpll = hsw_get_encoder_dpll,
+	.map_to_encoder = hsw_dpll_map_to_encoder,
 	.dump_hw_state = hsw_dump_hw_state,
 };
 
@@ -1916,6 +2147,10 @@ static const struct dpll_info skl_plls[] = {
 static const struct intel_dpll_mgr skl_pll_mgr = {
 	.dpll_info = skl_plls,
 	.get_dpll = skl_get_dpll,
+	.get_crtc_dpll = noop_get_crtc_dpll,
+	.map_to_crtc = noop_dpll_map_to_crtc,
+	.get_encoder_dpll = skl_get_encoder_dpll,
+	.map_to_encoder = skl_dpll_map_to_encoder,
 	.dump_hw_state = skl_dump_hw_state,
 };
 
@@ -1929,6 +2164,10 @@ static const struct dpll_info bxt_plls[] = {
 static const struct intel_dpll_mgr bxt_pll_mgr = {
 	.dpll_info = bxt_plls,
 	.get_dpll = bxt_get_dpll,
+	.get_crtc_dpll = noop_get_crtc_dpll,
+	.map_to_crtc = noop_dpll_map_to_crtc,
+	.get_encoder_dpll = bxt_get_encoder_dpll,
+	.map_to_encoder = bxt_dpll_map_to_encoder,
 	.dump_hw_state = bxt_dump_hw_state,
 };
 
@@ -2028,6 +2267,66 @@ void intel_release_shared_dpll(struct intel_shared_dpll *dpll,
 
 	shared_dpll_state = intel_atomic_get_shared_dpll_state(state);
 	shared_dpll_state[dpll->id].crtc_mask &= ~(1 << crtc->pipe);
+}
+
+/**
+ * intel_get_crtc_dpll - Get which pll is mapped to a pipe
+ * @crtc: pipe
+ *
+ * Returns the DPLL is mapped to @crtc. NULL indicates no DPLL is mapped to
+ * @crtc.
+ */
+struct intel_shared_dpll *intel_get_crtc_dpll(struct intel_crtc *crtc)
+{
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
+
+	return dev_priv->dpll_mgr->get_crtc_dpll(crtc);
+}
+
+/**
+ * intel_get_encoder_dpll - Get which pll is mapped to an encoder
+ * @encoder: encoder
+ *
+ * Returns the DPLL is mapped to @encoder. NULL indicates no DPLL is mapped to
+ * @encoder.
+ */
+struct intel_shared_dpll *intel_get_encoder_dpll(struct intel_encoder *encoder)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+
+	return dev_priv->dpll_mgr->get_encoder_dpll(encoder);
+}
+
+/**
+ * intel_dpll_map_to_crtc - Map DPLL to pipe
+ * @dpll: dpll to map
+ * @crtc: pipe to map the @dpll to
+ *
+ * For platforms where DPLLs are mapped to crtcs, program the appropriate
+ * bits so that @dpll is mapped to @crtc.
+ */
+void intel_dpll_map_to_crtc(struct intel_shared_dpll *dpll,
+			    struct intel_crtc *crtc)
+{
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
+
+	dev_priv->dpll_mgr->map_to_crtc(dpll, crtc);
+}
+
+/**
+ * intel_dpll_map_to_encoder - Map DPLL to encoder
+ * @dpll: dpll to map
+ * @encoder: encoder to map the @dpll to
+ *
+ * For platforms where DPLLs are mapped to encoders, program the appropriate
+ * bits so that @dpll is mapped to @encoder.
+ */
+void intel_dpll_map_to_encoder(struct intel_shared_dpll *dpll,
+			       struct intel_encoder *encoder)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+
+	dev_priv->dpll_mgr->map_to_encoder(dpll, encoder);
 }
 
 /**

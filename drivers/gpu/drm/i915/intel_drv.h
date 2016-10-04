@@ -1136,8 +1136,6 @@ void intel_crt_init(struct drm_device *dev);
 void intel_crt_reset(struct drm_encoder *encoder);
 
 /* intel_ddi.c */
-void intel_ddi_clk_select(struct intel_encoder *encoder,
-			  struct intel_shared_dpll *pll);
 void intel_ddi_fdi_post_disable(struct intel_encoder *intel_encoder,
 				struct intel_crtc_state *old_crtc_state,
 				struct drm_connector_state *old_conn_state);
@@ -1145,6 +1143,8 @@ void intel_prepare_dp_ddi_buffers(struct intel_encoder *encoder);
 void hsw_fdi_link_train(struct drm_crtc *crtc);
 void intel_ddi_init(struct drm_device *dev, enum port port);
 enum port intel_ddi_get_encoder_port(struct intel_encoder *intel_encoder);
+struct intel_encoder *
+intel_ddi_get_port_encoder(struct drm_i915_private *dev_priv, enum port port);
 bool intel_ddi_get_hw_state(struct intel_encoder *encoder, enum pipe *pipe);
 void intel_ddi_enable_transcoder_func(struct drm_crtc *crtc);
 void intel_ddi_disable_transcoder_func(struct drm_i915_private *dev_priv,

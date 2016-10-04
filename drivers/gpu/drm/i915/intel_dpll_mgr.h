@@ -280,6 +280,13 @@ void intel_disable_shared_dpll(struct intel_crtc *crtc);
 void intel_shared_dpll_swap_state(struct drm_atomic_state *state);
 void intel_shared_dpll_init(struct drm_device *dev);
 
+struct intel_shared_dpll *intel_get_crtc_dpll(struct intel_crtc *crtc);
+struct intel_shared_dpll *intel_get_encoder_dpll(struct intel_encoder *encoder);
+void intel_dpll_map_to_crtc(struct intel_shared_dpll *dpll,
+			    struct intel_crtc *crtc);
+void intel_dpll_map_to_encoder(struct intel_shared_dpll *dpll,
+			       struct intel_encoder *encoder);
+
 void intel_dpll_dump_hw_state(struct drm_i915_private *dev_priv,
 			      struct intel_dpll_hw_state *hw_state);
 
