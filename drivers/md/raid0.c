@@ -680,14 +680,14 @@ static struct md_personality raid0_personality=
 	.congested	= raid0_congested,
 };
 
-static int __init raid0_init (void)
+static int __init raid0_init(void)
 {
-	return register_md_personality (&raid0_personality);
+	return register_md_personality(&raid0_personality);
 }
 
-static void raid0_exit (void)
+static void raid0_exit(void)
 {
-	unregister_md_personality (&raid0_personality);
+	unregister_md_personality(&raid0_personality);
 }
 
 module_init(raid0_init);
