@@ -69,13 +69,15 @@ config OMAP2_DSS_HDMI_COMMON
 
 config OMAP4_DSS_HDMI
 	bool "HDMI support for OMAP4"
-        default y
+	depends on ARCH_OMAP4
+	default y
 	select OMAP2_DSS_HDMI_COMMON
 	help
 	  HDMI support for OMAP4 based SoCs.
 
 config OMAP5_DSS_HDMI
 	bool "HDMI support for OMAP5"
+	depends on SOC_OMAP5 || SOC_DRA7XX
 	default n
 	select OMAP2_DSS_HDMI_COMMON
 	help
