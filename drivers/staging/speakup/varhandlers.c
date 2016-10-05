@@ -323,9 +323,11 @@ char *spk_strlwr(char *s)
 
 char *spk_s2uchar(char *start, char *dest)
 {
-	int val;
+	unsigned long val;
 
-	val = simple_strtoul(skip_spaces(start), &start, 10);
+	if (kstrtoul(start, 10, &val))
+		return NULL;
+
 	if (*start == ',')
 		start++;
 	*dest = (u_char)val;
