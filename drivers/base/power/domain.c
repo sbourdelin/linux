@@ -1937,6 +1937,7 @@ static int read_genpd_state(struct genpd_power_state *genpd_state,
 	latency = entry_latency + exit_latency;
 	genpd_state->power_on_latency_ns = 1000 * latency;
 	genpd_state->power_off_latency_ns = 1000 * entry_latency;
+	genpd_state->provider = &state_node->fwnode;
 
 	return 0;
 }
