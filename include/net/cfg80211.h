@@ -2460,6 +2460,8 @@ struct cfg80211_qos_map {
  *
  * @set_wds_peer: set the WDS peer for a WDS interface
  *
+ * @set_ap_unicast: set the multicast to unicast flag for a AP interface
+ *
  * @rfkill_poll: polls the hw rfkill line, use cfg80211 reporting
  *	functions to adjust rfkill hw state
  *
@@ -2721,6 +2723,9 @@ struct cfg80211_ops {
 
 	int	(*set_wds_peer)(struct wiphy *wiphy, struct net_device *dev,
 				const u8 *addr);
+
+	int	(*set_ap_unicast)(struct wiphy *wiphy, struct net_device *dev,
+				  const bool unicast);
 
 	void	(*rfkill_poll)(struct wiphy *wiphy);
 

@@ -562,6 +562,17 @@ static inline int rdev_set_wds_peer(struct cfg80211_registered_device *rdev,
 	return ret;
 }
 
+static inline int rdev_set_ap_unicast(struct cfg80211_registered_device *rdev,
+				      struct net_device *dev,
+				      const bool unicast)
+{
+	int ret;
+	trace_rdev_set_ap_unicast(&rdev->wiphy, dev, unicast);
+	ret = rdev->ops->set_ap_unicast(&rdev->wiphy, dev, unicast);
+	trace_rdev_return_int(&rdev->wiphy, ret);
+	return ret;
+}
+
 static inline void rdev_rfkill_poll(struct cfg80211_registered_device *rdev)
 {
 	trace_rdev_rfkill_poll(&rdev->wiphy);

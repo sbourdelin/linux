@@ -487,6 +487,34 @@ static ssize_t ieee80211_if_fmt_num_buffered_multicast(
 }
 IEEE80211_IF_FILE_R(num_buffered_multicast);
 
+static ssize_t
+ieee80211_if_fmt_unicast(const struct ieee80211_sub_if_data *sdata,
+			 char *buf, int buflen)
+{
+	const struct ieee80211_if_ap *ifap = &sdata->u.ap;
+
+	return snprintf(buf, buflen, "0x%x\n", ifap->unicast);
+}
+
+static ssize_t
+ieee80211_if_parse_unicast(struct ieee80211_sub_if_data *sdata,
+			   const char *buf, int buflen)
+{
+	struct ieee80211_if_ap *ifap = &sdata->u.ap;
+	u8 val;
+	int ret;
+
+	ret = kstrtou8(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	ifap->unicast = val ? 1 : 0;
+
+	return buflen;
+}
+
+IEEE80211_IF_FILE_RW(unicast);
+
 /* IBSS attributes */
 static ssize_t ieee80211_if_fmt_tsf(
 	const struct ieee80211_sub_if_data *sdata, char *buf, int buflen)
@@ -642,6 +670,7 @@ static void add_ap_files(struct ieee80211_sub_if_data *sdata)
 	DEBUGFS_ADD(dtim_count);
 	DEBUGFS_ADD(num_buffered_multicast);
 	DEBUGFS_ADD_MODE(tkip_mic_test, 0200);
+	DEBUGFS_ADD_MODE(unicast, 0600);
 }
 
 static void add_vlan_files(struct ieee80211_sub_if_data *sdata)
