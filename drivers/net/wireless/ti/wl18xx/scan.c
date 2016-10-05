@@ -41,14 +41,13 @@ static void wl18xx_adjust_channels(struct wl18xx_cmd_scan_params *cmd,
 static int wl18xx_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 			    struct cfg80211_scan_request *req)
 {
-	struct wl18xx_cmd_scan_params *cmd;
+	struct wl18xx_cmd_scan_params *cmd = NULL;
 	struct wlcore_scan_channels *cmd_channels = NULL;
 	int ret;
 
 	cmd = kzalloc(sizeof(*cmd), GFP_KERNEL);
 	if (!cmd) {
-		ret = -ENOMEM;
-		goto out;
+		return -ENOMEM;
 	}
 
 	/* scan on the dev role if the regular one is not started */
@@ -59,7 +58,7 @@ static int wl18xx_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 	if (WARN_ON(cmd->role_id == WL12XX_INVALID_ROLE_ID)) {
 		ret = -EINVAL;
-		goto out;
+		goto err_cmd_free;
 	}
 
 	cmd->scan_type = SCAN_TYPE_SEARCH;
@@ -84,7 +83,7 @@ static int wl18xx_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	cmd_channels = kzalloc(sizeof(*cmd_channels), GFP_KERNEL);
 	if (!cmd_channels) {
 		ret = -ENOMEM;
-		goto out;
+		goto err_cmd_free;
 	}
 
 	wlcore_set_scan_chan_params(wl, cmd_channels, req->channels,
@@ -153,6 +152,7 @@ static int wl18xx_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 out:
 	kfree(cmd_channels);
+err_cmd_free:
 	kfree(cmd);
 	return ret;
 }
@@ -171,7 +171,7 @@ int wl18xx_scan_sched_scan_config(struct wl1271 *wl,
 				  struct cfg80211_sched_scan_request *req,
 				  struct ieee80211_scan_ies *ies)
 {
-	struct wl18xx_cmd_scan_params *cmd;
+	struct wl18xx_cmd_scan_params *cmd = NULL;
 	struct wlcore_scan_channels *cmd_channels = NULL;
 	struct conf_sched_scan_settings *c = &wl->conf.sched_scan;
 	int ret;
@@ -185,15 +185,14 @@ int wl18xx_scan_sched_scan_config(struct wl1271 *wl,
 
 	cmd = kzalloc(sizeof(*cmd), GFP_KERNEL);
 	if (!cmd) {
-		ret = -ENOMEM;
-		goto out;
+		return -ENOMEM;
 	}
 
 	cmd->role_id = wlvif->role_id;
 
 	if (WARN_ON(cmd->role_id == WL12XX_INVALID_ROLE_ID)) {
 		ret = -EINVAL;
-		goto out;
+		goto err_cmd_free;
 	}
 
 	cmd->scan_type = SCAN_TYPE_PERIODIC;
@@ -218,7 +217,7 @@ int wl18xx_scan_sched_scan_config(struct wl1271 *wl,
 	cmd_channels = kzalloc(sizeof(*cmd_channels), GFP_KERNEL);
 	if (!cmd_channels) {
 		ret = -ENOMEM;
-		goto out;
+		goto err_cmd_free;
 	}
 
 	/* configure channels */
@@ -296,6 +295,7 @@ int wl18xx_scan_sched_scan_config(struct wl1271 *wl,
 
 out:
 	kfree(cmd_channels);
+err_cmd_free:
 	kfree(cmd);
 	return ret;
 }
