@@ -3478,8 +3478,8 @@ static int setup_geo(struct geom *geo, struct mddev *mddev, enum geo_type new)
 
 static struct r10conf *setup_conf(struct mddev *mddev)
 {
-	struct r10conf *conf = NULL;
-	int err = -EINVAL;
+	struct r10conf *conf;
+	int err;
 	struct geom geo;
 	int copies;
 
@@ -3489,13 +3489,13 @@ static struct r10conf *setup_conf(struct mddev *mddev)
 		printk(KERN_ERR "md/raid10:%s: chunk size must be "
 		       "at least PAGE_SIZE(%ld) and be a power of 2.\n",
 		       mdname(mddev), PAGE_SIZE);
-		goto out;
+		return ERR_PTR(-EINVAL);
 	}
 
 	if (copies < 2 || copies > mddev->raid_disks) {
 		printk(KERN_ERR "md/raid10:%s: unsupported raid10 layout: 0x%8x\n",
 		       mdname(mddev), mddev->new_layout);
-		goto out;
+		return ERR_PTR(-EINVAL);
 	}
 
 	err = -ENOMEM;
