@@ -1187,6 +1187,9 @@ enum skl_disp_power_wells {
 #define   DPIO_UPAR_SHIFT		30
 
 /* BXT PHY registers */
+#define BXT_PHY1_BASE			0x162000
+#define BXT_PHY0_BASE			0x6C000
+
 #define _BXT_PHY(phy, a, b)		_MMIO_PIPE((phy), (a), (b))
 
 #define BXT_P_CR_GT_DISP_PWRON		_MMIO(0x138090)
@@ -1216,31 +1219,26 @@ enum skl_disp_power_wells {
 #define   PORT_PLL_REF_SEL		(1 << 27)
 #define BXT_PORT_PLL_ENABLE(port)	_MMIO_PORT(port, _PORT_PLL_A, _PORT_PLL_B)
 
-#define _PORT_PLL_EBB_0_A		0x162034
-#define _PORT_PLL_EBB_0_B		0x6C034
-#define _PORT_PLL_EBB_0_C		0x6C340
+#define _PORT_PLL_EBB_0_CH0		0x34
+#define _PORT_PLL_EBB_0_CH1		0x340
 #define   PORT_PLL_P1_SHIFT		13
 #define   PORT_PLL_P1_MASK		(0x07 << PORT_PLL_P1_SHIFT)
 #define   PORT_PLL_P1(x)		((x)  << PORT_PLL_P1_SHIFT)
 #define   PORT_PLL_P2_SHIFT		8
 #define   PORT_PLL_P2_MASK		(0x1f << PORT_PLL_P2_SHIFT)
 #define   PORT_PLL_P2(x)		((x)  << PORT_PLL_P2_SHIFT)
-#define BXT_PORT_PLL_EBB_0(port)	_MMIO_PORT3(port, _PORT_PLL_EBB_0_A, \
-						_PORT_PLL_EBB_0_B,	\
-						_PORT_PLL_EBB_0_C)
+#define BXT_PORT_PLL_EBB_0(base, ch)	\
+	_MMIO((base) + _PIPE((ch), _PORT_PLL_EBB_0_CH0, _PORT_PLL_EBB_0_CH1))
 
-#define _PORT_PLL_EBB_4_A		0x162038
-#define _PORT_PLL_EBB_4_B		0x6C038
-#define _PORT_PLL_EBB_4_C		0x6C344
+#define _PORT_PLL_EBB_4_CH0		0x38
+#define _PORT_PLL_EBB_4_CH1		0x344
 #define   PORT_PLL_10BIT_CLK_ENABLE	(1 << 13)
 #define   PORT_PLL_RECALIBRATE		(1 << 14)
-#define BXT_PORT_PLL_EBB_4(port)	_MMIO_PORT3(port, _PORT_PLL_EBB_4_A, \
-						_PORT_PLL_EBB_4_B,	\
-						_PORT_PLL_EBB_4_C)
+#define BXT_PORT_PLL_EBB_4(base, ch)	\
+	_MMIO((base) + _PIPE((ch), _PORT_PLL_EBB_4_CH0, _PORT_PLL_EBB_4_CH1))
 
-#define _PORT_PLL_0_A			0x162100
-#define _PORT_PLL_0_B			0x6C100
-#define _PORT_PLL_0_C			0x6C380
+#define _PORT_PLL_0_CH0			0x100
+#define _PORT_PLL_0_CH1			0x380
 /* PORT_PLL_0_A */
 #define   PORT_PLL_M2_MASK		0xFF
 /* PORT_PLL_1_A */
@@ -1267,65 +1265,43 @@ enum skl_disp_power_wells {
 #define  PORT_PLL_DCO_AMP_DEFAULT	15
 #define  PORT_PLL_DCO_AMP_MASK		0x3c00
 #define  PORT_PLL_DCO_AMP(x)		((x)<<10)
-#define _PORT_PLL_BASE(port)		_PORT3(port, _PORT_PLL_0_A,	\
-						_PORT_PLL_0_B,		\
-						_PORT_PLL_0_C)
-#define BXT_PORT_PLL(port, idx)		_MMIO(_PORT_PLL_BASE(port) + (idx) * 4)
+#define _PORT_PLL_BASE(base, ch)	\
+	((base) + _PIPE((ch), _PORT_PLL_0_CH0, _PORT_PLL_0_CH1))
+#define BXT_PORT_PLL(base, ch, idx)	\
+	_MMIO(_PORT_PLL_BASE(base, ch) + (idx) * 4)
 
 /* BXT PHY common lane registers */
-#define _PORT_CL1CM_DW0_A		0x162000
-#define _PORT_CL1CM_DW0_BC		0x6C000
+#define BXT_PORT_CL1CM_DW0(base)	_MMIO((base) + 0x0)
 #define   PHY_POWER_GOOD		(1 << 16)
 #define   PHY_RESERVED			(1 << 7)
-#define BXT_PORT_CL1CM_DW0(phy)		_BXT_PHY((phy), _PORT_CL1CM_DW0_BC, \
-							_PORT_CL1CM_DW0_A)
 
-#define _PORT_CL1CM_DW9_A		0x162024
-#define _PORT_CL1CM_DW9_BC		0x6C024
+#define BXT_PORT_CL1CM_DW9(base)	_MMIO((base) + 0x24)
 #define   IREF0RC_OFFSET_SHIFT		8
 #define   IREF0RC_OFFSET_MASK		(0xFF << IREF0RC_OFFSET_SHIFT)
-#define BXT_PORT_CL1CM_DW9(phy)		_BXT_PHY((phy), _PORT_CL1CM_DW9_BC, \
-							_PORT_CL1CM_DW9_A)
 
-#define _PORT_CL1CM_DW10_A		0x162028
-#define _PORT_CL1CM_DW10_BC		0x6C028
+#define BXT_PORT_CL1CM_DW10(base)	_MMIO((base) + 0x28)
 #define   IREF1RC_OFFSET_SHIFT		8
 #define   IREF1RC_OFFSET_MASK		(0xFF << IREF1RC_OFFSET_SHIFT)
-#define BXT_PORT_CL1CM_DW10(phy)	_BXT_PHY((phy), _PORT_CL1CM_DW10_BC, \
-							_PORT_CL1CM_DW10_A)
 
-#define _PORT_CL1CM_DW28_A		0x162070
-#define _PORT_CL1CM_DW28_BC		0x6C070
+#define BXT_PORT_CL1CM_DW28(base)	_MMIO((base) + 0x70)
 #define   OCL1_POWER_DOWN_EN		(1 << 23)
 #define   DW28_OLDO_DYN_PWR_DOWN_EN	(1 << 22)
 #define   SUS_CLK_CONFIG		0x3
-#define BXT_PORT_CL1CM_DW28(phy)	_BXT_PHY((phy), _PORT_CL1CM_DW28_BC, \
-							_PORT_CL1CM_DW28_A)
 
-#define _PORT_CL1CM_DW30_A		0x162078
-#define _PORT_CL1CM_DW30_BC		0x6C078
+#define BXT_PORT_CL1CM_DW30(base)	_MMIO((base) + 0x78)
 #define   OCL2_LDOFUSE_PWR_DIS		(1 << 6)
-#define BXT_PORT_CL1CM_DW30(phy)	_BXT_PHY((phy), _PORT_CL1CM_DW30_BC, \
-							_PORT_CL1CM_DW30_A)
 
 /* The spec defines this only for BXT PHY0, but lets assume that this
  * would exist for PHY1 too if it had a second channel.
  */
-#define _PORT_CL2CM_DW6_A		0x162358
-#define _PORT_CL2CM_DW6_BC		0x6C358
-#define BXT_PORT_CL2CM_DW6(phy)		_BXT_PHY((phy), _PORT_CL2CM_DW6_BC, \
-							_PORT_CL2CM_DW6_A)
+#define BXT_PORT_CL2CM_DW6(base)	_MMIO((base) + 0x358)
 #define   DW6_OLDO_DYN_PWR_DOWN_EN	(1 << 28)
 
 /* BXT PHY Ref registers */
-#define _PORT_REF_DW3_A			0x16218C
-#define _PORT_REF_DW3_BC		0x6C18C
+#define BXT_PORT_REF_DW3(base)		_MMIO((base) + 0x18c)
 #define   GRC_DONE			(1 << 22)
-#define BXT_PORT_REF_DW3(phy)		_BXT_PHY((phy), _PORT_REF_DW3_BC, \
-							_PORT_REF_DW3_A)
 
-#define _PORT_REF_DW6_A			0x162198
-#define _PORT_REF_DW6_BC		0x6C198
+#define BXT_PORT_REF_DW6(base)		_MMIO((base) + 0x198)
 #define   GRC_CODE_SHIFT		24
 #define   GRC_CODE_MASK			(0xFF << GRC_CODE_SHIFT)
 #define   GRC_CODE_FAST_SHIFT		16
@@ -1333,113 +1309,88 @@ enum skl_disp_power_wells {
 #define   GRC_CODE_SLOW_SHIFT		8
 #define   GRC_CODE_SLOW_MASK		(0xFF << GRC_CODE_SLOW_SHIFT)
 #define   GRC_CODE_NOM_MASK		0xFF
-#define BXT_PORT_REF_DW6(phy)		_BXT_PHY((phy), _PORT_REF_DW6_BC,	\
-						      _PORT_REF_DW6_A)
 
-#define _PORT_REF_DW8_A			0x1621A0
-#define _PORT_REF_DW8_BC		0x6C1A0
+#define BXT_PORT_REF_DW8(base)		_MMIO((base) + 0x1a0)
 #define   GRC_DIS			(1 << 15)
 #define   GRC_RDY_OVRD			(1 << 1)
-#define BXT_PORT_REF_DW8(phy)		_BXT_PHY((phy), _PORT_REF_DW8_BC,	\
-						      _PORT_REF_DW8_A)
 
 /* BXT PHY PCS registers */
-#define _PORT_PCS_DW10_LN01_A		0x162428
-#define _PORT_PCS_DW10_LN01_B		0x6C428
-#define _PORT_PCS_DW10_LN01_C		0x6C828
-#define _PORT_PCS_DW10_GRP_A		0x162C28
-#define _PORT_PCS_DW10_GRP_B		0x6CC28
-#define _PORT_PCS_DW10_GRP_C		0x6CE28
-#define BXT_PORT_PCS_DW10_LN01(port)	_MMIO_PORT3(port, _PORT_PCS_DW10_LN01_A, \
-						     _PORT_PCS_DW10_LN01_B, \
-						     _PORT_PCS_DW10_LN01_C)
-#define BXT_PORT_PCS_DW10_GRP(port)	_MMIO_PORT3(port, _PORT_PCS_DW10_GRP_A,  \
-						     _PORT_PCS_DW10_GRP_B,  \
-						     _PORT_PCS_DW10_GRP_C)
+#define _PORT_PCS_DW10_LN01_CH0		0x428
+#define _PORT_PCS_DW10_LN01_CH1		0x828
+#define _PORT_PCS_DW10_GRP_CH0		0xC28
+#define _PORT_PCS_DW10_GRP_CH1		0xE28
 #define   TX2_SWING_CALC_INIT		(1 << 31)
 #define   TX1_SWING_CALC_INIT		(1 << 30)
+#define BXT_PORT_PCS_DW10_LN01(base, ch)	\
+	_MMIO((base) + _PIPE(ch, _PORT_PCS_DW10_LN01_CH0,		\
+			     _PORT_PCS_DW10_LN01_CH1))
+#define BXT_PORT_PCS_DW10_GRP(base, ch)	\
+	_MMIO((base) + _PIPE(ch, _PORT_PCS_DW10_GRP_CH0,		\
+			     _PORT_PCS_DW10_GRP_CH1))
 
-#define _PORT_PCS_DW12_LN01_A		0x162430
-#define _PORT_PCS_DW12_LN01_B		0x6C430
-#define _PORT_PCS_DW12_LN01_C		0x6C830
-#define _PORT_PCS_DW12_LN23_A		0x162630
-#define _PORT_PCS_DW12_LN23_B		0x6C630
-#define _PORT_PCS_DW12_LN23_C		0x6CA30
-#define _PORT_PCS_DW12_GRP_A		0x162c30
-#define _PORT_PCS_DW12_GRP_B		0x6CC30
-#define _PORT_PCS_DW12_GRP_C		0x6CE30
+#define _PORT_PCS_DW12_LN01_CH0		0x430
+#define _PORT_PCS_DW12_LN01_CH1		0x830
+#define _PORT_PCS_DW12_LN23_CH0		0x630
+#define _PORT_PCS_DW12_LN23_CH1		0xA30
+#define _PORT_PCS_DW12_GRP_CH0		0xC30
+#define _PORT_PCS_DW12_GRP_CH1		0xE30
 #define   LANESTAGGER_STRAP_OVRD	(1 << 6)
 #define   LANE_STAGGER_MASK		0x1F
-#define BXT_PORT_PCS_DW12_LN01(port)	_MMIO_PORT3(port, _PORT_PCS_DW12_LN01_A, \
-						     _PORT_PCS_DW12_LN01_B, \
-						     _PORT_PCS_DW12_LN01_C)
-#define BXT_PORT_PCS_DW12_LN23(port)	_MMIO_PORT3(port, _PORT_PCS_DW12_LN23_A, \
-						     _PORT_PCS_DW12_LN23_B, \
-						     _PORT_PCS_DW12_LN23_C)
-#define BXT_PORT_PCS_DW12_GRP(port)	_MMIO_PORT3(port, _PORT_PCS_DW12_GRP_A, \
-						     _PORT_PCS_DW12_GRP_B, \
-						     _PORT_PCS_DW12_GRP_C)
+#define BXT_PORT_PCS_DW12_LN01(base, ch)	\
+	_MMIO((base) + _PIPE(ch, _PORT_PCS_DW12_LN01_CH0, _PORT_PCS_DW12_LN01_CH1))
+#define BXT_PORT_PCS_DW12_LN23(base, ch)	\
+	_MMIO((base) + _PIPE(ch, _PORT_PCS_DW12_LN23_CH0, _PORT_PCS_DW12_LN23_CH1))
+#define BXT_PORT_PCS_DW12_GRP(base, ch)	\
+	_MMIO((base) + _PIPE(ch, _PORT_PCS_DW12_GRP_CH0, _PORT_PCS_DW12_GRP_CH1))
 
 /* BXT PHY TX registers */
 #define _BXT_LANE_OFFSET(lane)           (((lane) >> 1) * 0x200 +	\
 					  ((lane) & 1) * 0x80)
 
-#define _PORT_TX_DW2_LN0_A		0x162508
-#define _PORT_TX_DW2_LN0_B		0x6C508
-#define _PORT_TX_DW2_LN0_C		0x6C908
-#define _PORT_TX_DW2_GRP_A		0x162D08
-#define _PORT_TX_DW2_GRP_B		0x6CD08
-#define _PORT_TX_DW2_GRP_C		0x6CF08
-#define BXT_PORT_TX_DW2_GRP(port)	_MMIO_PORT3(port, _PORT_TX_DW2_GRP_A,  \
-						     _PORT_TX_DW2_GRP_B,  \
-						     _PORT_TX_DW2_GRP_C)
-#define BXT_PORT_TX_DW2_LN0(port)	_MMIO_PORT3(port, _PORT_TX_DW2_LN0_A,  \
-						     _PORT_TX_DW2_LN0_B,  \
-						     _PORT_TX_DW2_LN0_C)
+#define _PORT_TX_DW2_LN0_CH0		0x508
+#define _PORT_TX_DW2_LN0_CH1		0x908
+#define _PORT_TX_DW2_GRP_CH0		0xD08
+#define _PORT_TX_DW2_GRP_CH1		0xF08
 #define   MARGIN_000_SHIFT		16
 #define   MARGIN_000			(0xFF << MARGIN_000_SHIFT)
 #define   UNIQ_TRANS_SCALE_SHIFT	8
 #define   UNIQ_TRANS_SCALE		(0xFF << UNIQ_TRANS_SCALE_SHIFT)
+#define BXT_PORT_TX_DW2_GRP(base, ch)	\
+	_MMIO((base) + _PIPE((ch), _PORT_TX_DW2_GRP_CH0, _PORT_TX_DW2_GRP_CH1))
+#define BXT_PORT_TX_DW2_LN0(base, ch)	\
+	_MMIO((base) + _PIPE((ch), _PORT_TX_DW2_LN0_CH0, _PORT_TX_DW2_LN0_CH1))
 
-#define _PORT_TX_DW3_LN0_A		0x16250C
-#define _PORT_TX_DW3_LN0_B		0x6C50C
-#define _PORT_TX_DW3_LN0_C		0x6C90C
-#define _PORT_TX_DW3_GRP_A		0x162D0C
-#define _PORT_TX_DW3_GRP_B		0x6CD0C
-#define _PORT_TX_DW3_GRP_C		0x6CF0C
-#define BXT_PORT_TX_DW3_GRP(port)	_MMIO_PORT3(port, _PORT_TX_DW3_GRP_A,  \
-						     _PORT_TX_DW3_GRP_B,  \
-						     _PORT_TX_DW3_GRP_C)
-#define BXT_PORT_TX_DW3_LN0(port)	_MMIO_PORT3(port, _PORT_TX_DW3_LN0_A,  \
-						     _PORT_TX_DW3_LN0_B,  \
-						     _PORT_TX_DW3_LN0_C)
+#define _PORT_TX_DW3_LN0_CH0		0x50C
+#define _PORT_TX_DW3_LN0_CH1		0x90C
+#define _PORT_TX_DW3_GRP_CH0		0xD0C
+#define _PORT_TX_DW3_GRP_CH1		0xF0C
 #define   SCALE_DCOMP_METHOD		(1 << 26)
 #define   UNIQUE_TRANGE_EN_METHOD	(1 << 27)
+#define BXT_PORT_TX_DW3_GRP(base, ch)	\
+	_MMIO((base) + _PIPE((ch), _PORT_TX_DW3_GRP_CH0, _PORT_TX_DW3_GRP_CH1))
+#define BXT_PORT_TX_DW3_LN0(base, ch)	\
+	_MMIO((base) + _PIPE((ch), _PORT_TX_DW3_LN0_CH0, _PORT_TX_DW3_LN0_CH1))
 
-#define _PORT_TX_DW4_LN0_A		0x162510
-#define _PORT_TX_DW4_LN0_B		0x6C510
-#define _PORT_TX_DW4_LN0_C		0x6C910
-#define _PORT_TX_DW4_GRP_A		0x162D10
-#define _PORT_TX_DW4_GRP_B		0x6CD10
-#define _PORT_TX_DW4_GRP_C		0x6CF10
-#define BXT_PORT_TX_DW4_LN0(port)	_MMIO_PORT3(port, _PORT_TX_DW4_LN0_A,  \
-						     _PORT_TX_DW4_LN0_B,  \
-						     _PORT_TX_DW4_LN0_C)
-#define BXT_PORT_TX_DW4_GRP(port)	_MMIO_PORT3(port, _PORT_TX_DW4_GRP_A,  \
-						     _PORT_TX_DW4_GRP_B,  \
-						     _PORT_TX_DW4_GRP_C)
+
+#define _PORT_TX_DW4_LN0_CH0		0x510
+#define _PORT_TX_DW4_LN0_CH1		0x910
+#define _PORT_TX_DW4_GRP_CH0		0xD10
+#define _PORT_TX_DW4_GRP_CH1		0xF10
 #define   DEEMPH_SHIFT			24
 #define   DE_EMPHASIS			(0xFF << DEEMPH_SHIFT)
+#define BXT_PORT_TX_DW4_GRP(base, ch)	\
+	_MMIO((base) + _PIPE((ch), _PORT_TX_DW4_GRP_CH0, _PORT_TX_DW4_GRP_CH1))
+#define BXT_PORT_TX_DW4_LN0(base, ch)	\
+	_MMIO((base) + _PIPE((ch), _PORT_TX_DW4_LN0_CH0, _PORT_TX_DW4_LN0_CH1))
 
-#define _PORT_TX_DW14_LN0_A		0x162538
-#define _PORT_TX_DW14_LN0_B		0x6C538
-#define _PORT_TX_DW14_LN0_C		0x6C938
+#define _PORT_TX_DW14_LN0_CH0		0x538
+#define _PORT_TX_DW14_LN0_CH1		0x938
 #define   LATENCY_OPTIM_SHIFT		30
 #define   LATENCY_OPTIM			(1 << LATENCY_OPTIM_SHIFT)
-#define BXT_PORT_TX_DW14_LN(port, lane)	_MMIO(_PORT3((port), _PORT_TX_DW14_LN0_A,   \
-							_PORT_TX_DW14_LN0_B,   \
-							_PORT_TX_DW14_LN0_C) + \
-					 _BXT_LANE_OFFSET(lane))
+#define BXT_PORT_TX_DW14_LN(base, ch, lane)	\
+	_MMIO((base) + _PIPE((ch), _PORT_TX_DW14_LN0_CH0,	\
+				   _PORT_TX_DW14_LN0_CH1) + 	\
+	      _BXT_LANE_OFFSET(lane))
 
 /* UAIMI scratch pad register 1 */
 #define UAIMI_SPR1			_MMIO(0x4F074)
