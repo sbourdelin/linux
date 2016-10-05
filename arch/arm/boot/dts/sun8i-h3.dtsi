@@ -206,6 +206,11 @@
 			#size-cells = <0>;
 		};
 
+		sid: eeprom@01c14200 {
+			compatible = "allwinner,sun7i-a20-sid";
+			reg = <0x01c14200 0x200>;
+		};
+
 		usbphy: phy@01c19400 {
 			compatible = "allwinner,sun8i-h3-usb-phy";
 			reg = <0x01c19400 0x2c>,
