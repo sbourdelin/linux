@@ -420,8 +420,8 @@ unsigned int ieee80211_get_mesh_hdrlen(struct ieee80211s_hdr *meshhdr)
 }
 EXPORT_SYMBOL(ieee80211_get_mesh_hdrlen);
 
-static int __ieee80211_data_to_8023(struct sk_buff *skb, struct ethhdr *ehdr,
-				    const u8 *addr, enum nl80211_iftype iftype)
+int ieee80211_data_to_8023(struct sk_buff *skb, struct ethhdr *ehdr,
+			   const u8 *addr, enum nl80211_iftype iftype)
 {
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
 	struct {
@@ -524,12 +524,6 @@ static int __ieee80211_data_to_8023(struct sk_buff *skb, struct ethhdr *ehdr,
 	memcpy(ehdr, &tmp, sizeof(tmp));
 
 	return 0;
-}
-
-int ieee80211_data_to_8023(struct sk_buff *skb, const u8 *addr,
-			   enum nl80211_iftype iftype)
-{
-	return __ieee80211_data_to_8023(skb, NULL, addr, iftype);
 }
 EXPORT_SYMBOL(ieee80211_data_to_8023);
 
@@ -744,24 +738,41 @@ __ieee80211_amsdu_copy(struct sk_buff *skb, unsigned int hlen,
 }
 
 void ieee80211_amsdu_to_8023s(struct sk_buff *skb, struct sk_buff_head *list,
-			      const u8 *addr, enum nl80211_iftype iftype,
+			      const u8 *addr,
+			      enum nl80211_iftype iftype,
 			      const unsigned int extra_headroom,
-			      bool has_80211_header)
+			      const u8 *ta, const u8 *ra, bool is_4addr,
+			      bool is_tdls_data)
 {
 	unsigned int hlen = ALIGN(extra_headroom, 4);
 	struct sk_buff *frame = NULL;
 	u16 ethertype;
 	u8 *payload;
-	int offset = 0, remaining, err;
+	int offset = 0, remaining;
 	struct ethhdr eth;
 	bool reuse_frag = skb->head_frag && !skb_has_frag_list(skb);
 	bool reuse_skb = false;
 	bool last = false;
 
-	if (has_80211_header) {
-		err = __ieee80211_data_to_8023(skb, &eth, addr, iftype);
-		if (err)
-			goto out;
+	/* limit inner src/dst checks depending on iftype */
+	switch (iftype) {
+	case NL80211_IFTYPE_AP:
+	case NL80211_IFTYPE_AP_VLAN:
+		if (is_4addr)
+			ta = NULL;
+		ra = NULL;
+		break;
+	case NL80211_IFTYPE_ADHOC:
+		break;
+	case NL80211_IFTYPE_STATION:
+		if (is_4addr || !is_tdls_data)
+			ta = NULL;
+		if (is_4addr)
+			ra = NULL;
+		break;
+	default:
+		ta = NULL;
+		ra = NULL;
 	}
 
 	while (!last) {
@@ -773,6 +784,16 @@ void ieee80211_amsdu_to_8023s(struct sk_buff *skb, struct sk_buff_head *list,
 		len = ntohs(eth.h_proto);
 		subframe_len = sizeof(struct ethhdr) + len;
 		padding = (4 - subframe_len) & 0x3;
+
+		if (unlikely(ta && !ether_addr_equal(ta, eth.h_source)))
+			goto purge;
+		/* for unicast frames, we accept multicast inner MSDUs
+		 * to enable multicast to unicast conversion
+		 */
+		if (unlikely(ra && !ether_addr_equal(ra, eth.h_dest) &&
+			     (is_multicast_ether_addr(ra) ||
+			      !is_multicast_ether_addr(eth.h_dest))))
+			goto purge;
 
 		/* the last MSDU has no padding */
 		remaining = skb->len - offset;
@@ -819,7 +840,6 @@ void ieee80211_amsdu_to_8023s(struct sk_buff *skb, struct sk_buff_head *list,
 
  purge:
 	__skb_queue_purge(list);
- out:
 	dev_kfree_skb(skb);
 }
 EXPORT_SYMBOL(ieee80211_amsdu_to_8023s);

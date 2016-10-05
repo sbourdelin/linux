@@ -2145,7 +2145,8 @@ __ieee80211_data_to_8023(struct ieee80211_rx_data *rx, bool *port_control)
 	    sdata->vif.type == NL80211_IFTYPE_AP_VLAN && sdata->u.vlan.sta)
 		return -1;
 
-	ret = ieee80211_data_to_8023(rx->skb, sdata->vif.addr, sdata->vif.type);
+	ret = ieee80211_data_to_8023(rx->skb, NULL, sdata->vif.addr,
+				     sdata->vif.type);
 	if (ret < 0)
 		return ret;
 
@@ -2298,6 +2299,9 @@ ieee80211_rx_h_amsdu(struct ieee80211_rx_data *rx)
 	__le16 fc = hdr->frame_control;
 	struct sk_buff_head frame_list;
 	struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(rx->skb);
+	struct ethhdr eth_80211;
+	bool is_4addr;
+	bool is_tdls_data;
 
 	if (unlikely(!ieee80211_is_data(fc)))
 		return RX_CONTINUE;
@@ -2313,19 +2317,26 @@ ieee80211_rx_h_amsdu(struct ieee80211_rx_data *rx)
 	    !rx->sdata->u.vlan.sta)
 		return RX_DROP_UNUSABLE;
 
-	if (is_multicast_ether_addr(hdr->addr1) &&
-	    ((rx->sdata->vif.type == NL80211_IFTYPE_AP_VLAN &&
-	      rx->sdata->u.vlan.sta) ||
-	     (rx->sdata->vif.type == NL80211_IFTYPE_STATION &&
-	      rx->sdata->u.mgd.use_4addr)))
+	is_4addr = ((rx->sdata->vif.type == NL80211_IFTYPE_AP_VLAN &&
+		     rx->sdata->u.vlan.sta) ||
+		    (rx->sdata->vif.type == NL80211_IFTYPE_STATION &&
+		     rx->sdata->u.mgd.use_4addr));
+	if (is_multicast_ether_addr(hdr->addr1) && is_4addr)
 		return RX_DROP_UNUSABLE;
 
 	skb->dev = dev;
 	__skb_queue_head_init(&frame_list);
 
+	if (ieee80211_data_to_8023(skb, &eth_80211, dev->dev_addr,
+				   rx->sdata->vif.type) < 0)
+		return RX_DROP_UNUSABLE;
+
+	is_tdls_data = !ieee80211_has_tods(fc) && !ieee80211_has_fromds(fc);
 	ieee80211_amsdu_to_8023s(skb, &frame_list, dev->dev_addr,
 				 rx->sdata->vif.type,
-				 rx->local->hw.extra_tx_headroom, true);
+				 rx->local->hw.extra_tx_headroom,
+				 eth_80211.h_source,
+				 eth_80211.h_dest, is_4addr, is_tdls_data);
 
 	while (!skb_queue_empty(&frame_list)) {
 		rx->skb = __skb_dequeue(&frame_list);
