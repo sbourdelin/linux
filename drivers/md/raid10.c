@@ -3554,9 +3554,6 @@ static struct r10conf *setup_conf(struct mddev *mddev)
 	return conf;
 
  out:
-	if (err == -ENOMEM)
-		printk(KERN_ERR "md/raid10:%s: couldn't allocate memory.\n",
-		       mdname(mddev));
 	if (conf) {
 		mempool_destroy(conf->r10bio_pool);
 		kfree(conf->mirrors);
