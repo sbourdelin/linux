@@ -3498,7 +3498,6 @@ static struct r10conf *setup_conf(struct mddev *mddev)
 		return ERR_PTR(-EINVAL);
 	}
 
-	err = -ENOMEM;
 	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
 	if (!conf)
 		return ERR_PTR(-ENOMEM);
@@ -3507,19 +3506,25 @@ static struct r10conf *setup_conf(struct mddev *mddev)
 	conf->mirrors = kcalloc(mddev->raid_disks + max(0, -mddev->delta_disks),
 				sizeof(*conf->mirrors),
 				GFP_KERNEL);
-	if (!conf->mirrors)
+	if (!conf->mirrors) {
+		err = -ENOMEM;
 		goto out;
+	}
 
 	conf->tmppage = alloc_page(GFP_KERNEL);
-	if (!conf->tmppage)
+	if (!conf->tmppage) {
+		err = -ENOMEM;
 		goto out;
+	}
 
 	conf->geo = geo;
 	conf->copies = copies;
 	conf->r10bio_pool = mempool_create(NR_RAID10_BIOS, r10bio_pool_alloc,
 					   r10bio_pool_free, conf);
-	if (!conf->r10bio_pool)
+	if (!conf->r10bio_pool) {
+		err = -ENOMEM;
 		goto out;
+	}
 
 	calc_sectors(conf, mddev->dev_sectors);
 	if (mddev->reshape_position == MaxSector) {
@@ -3547,8 +3552,10 @@ static struct r10conf *setup_conf(struct mddev *mddev)
 	atomic_set(&conf->nr_pending, 0);
 
 	conf->thread = md_register_thread(raid10d, mddev, "raid10");
-	if (!conf->thread)
+	if (!conf->thread) {
+		err = -ENOMEM;
 		goto out;
+	}
 
 	conf->mddev = mddev;
 	return conf;
