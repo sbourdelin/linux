@@ -2306,7 +2306,7 @@ static void shrink_stripes(struct r5conf *conf)
 	conf->slab_cache = NULL;
 }
 
-static void raid5_end_read_request(struct bio * bi)
+static void raid5_end_read_request(struct bio *bi)
 {
 	struct stripe_head *sh = bi->bi_private;
 	struct r5conf *conf = sh->raid_conf;
@@ -4760,7 +4760,7 @@ static struct bio *remove_bio_from_retry(struct r5conf *conf)
  */
 static void raid5_align_endio(struct bio *bi)
 {
-	struct bio* raid_bi  = bi->bi_private;
+	struct bio *raid_bi = bi->bi_private;
 	struct mddev *mddev;
 	struct r5conf *conf;
 	struct md_rdev *rdev;
@@ -4793,7 +4793,7 @@ static int raid5_read_one_chunk(struct mddev *mddev, struct bio *raid_bio)
 {
 	struct r5conf *conf = mddev->private;
 	int dd_idx;
-	struct bio* align_bi;
+	struct bio *align_bi;
 	struct md_rdev *rdev;
 	sector_t end_sector;
 
@@ -5149,7 +5149,7 @@ again:
 	}
 }
 
-static void raid5_make_request(struct mddev *mddev, struct bio * bi)
+static void raid5_make_request(struct mddev *mddev, struct bio *bi)
 {
 	struct r5conf *conf = mddev->private;
 	int dd_idx;
