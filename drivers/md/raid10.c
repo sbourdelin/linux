@@ -1502,7 +1502,7 @@ static void raid10_status(struct seq_file *seq, struct mddev *mddev)
 		seq_printf(seq, "%s", rdev && test_bit(In_sync, &rdev->flags) ? "U" : "_");
 	}
 	rcu_read_unlock();
-	seq_printf(seq, "]");
+	seq_puts(seq, "]");
 }
 
 /* check if there are enough drives for
