@@ -6265,10 +6265,12 @@ static int alloc_thread_groups(struct r5conf *conf, int cnt,
 	}
 	*group_cnt = num_possible_nodes();
 	workers = kcalloc(cnt * *group_cnt, sizeof(*workers), GFP_NOIO);
+	if (!workers)
+		return -ENOMEM;
+
 	*worker_groups = kcalloc(*group_cnt, sizeof(**worker_groups), GFP_NOIO);
-	if (!*worker_groups || !workers) {
+	if (!*worker_groups) {
 		kfree(workers);
-		kfree(*worker_groups);
 		return -ENOMEM;
 	}
 
