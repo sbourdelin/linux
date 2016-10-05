@@ -501,11 +501,10 @@ static int grow_buffers(struct stripe_head *sh, gfp_t gfp)
 	int num = sh->raid_conf->pool_size;
 
 	for (i = 0; i < num; i++) {
-		struct page *page;
+		struct page *page = alloc_page(gfp);
 
-		if (!(page = alloc_page(gfp))) {
+		if (!page)
 			return 1;
-		}
 		sh->dev[i].page = page;
 		sh->dev[i].orig_page = page;
 	}
@@ -6525,8 +6524,8 @@ static struct r5conf *setup_conf(struct mddev *mddev)
 		goto free_conf;
 
 	conf->mddev = mddev;
-
-	if ((conf->stripe_hashtbl = kzalloc(PAGE_SIZE, GFP_KERNEL)) == NULL)
+	conf->stripe_hashtbl = kzalloc(PAGE_SIZE, GFP_KERNEL);
+	if (!conf->stripe_hashtbl)
 		goto free_conf;
 
 	/* We init hash_locks[0] separately to that it can be used
