@@ -24,12 +24,15 @@
  *  comp_t is a 16-bit "floating" point number with a 3-bit base 8
  *  exponent and a 13-bit fraction.
  *  comp2_t is 24-bit with 5-bit base 2 exponent and 20 bit fraction
- *  (leading 1 not stored).
+ *  (leading 1 not stored). And it is described as ac_etime_hi and
+ *  ac_etime_lo in kernel.
  *  See linux/kernel/acct.c for the specific encoding systems used.
  */
 
 typedef __u16	comp_t;
+#ifndef __KERNEL__
 typedef __u32	comp2_t;
+#endif	/* __KERNEL */
 
 /*
  *   accounting file record
@@ -119,6 +122,5 @@ struct acct_v3
 #define ACCT_VERSION	2
 #define AHZ		(HZ)
 #endif	/* __KERNEL */
-
 
 #endif /* _UAPI_LINUX_ACCT_H */

@@ -338,7 +338,7 @@ static comp_t encode_comp_t(unsigned long value)
 
 #if ACCT_VERSION == 1 || ACCT_VERSION == 2
 /*
- * encode an u64 into a comp2_t (24 bits)
+ * encode an u64 into ac_etime_hi and ac_etime_lo (24 bits)
  *
  * Format: 5 bit base 2 exponent, 20 bits mantissa.
  * The leading bit of the mantissa is not stored, but implied for
@@ -348,15 +348,15 @@ static comp_t encode_comp_t(unsigned long value)
 
 #define MANTSIZE2       20                      /* 20 bit mantissa. */
 #define EXPSIZE2        5                       /* 5 bit base 2 exponent. */
-#define MAXFRACT2       ((1ul << MANTSIZE2) - 1) /* Maximum fractional value. */
-#define MAXEXP2         ((1 << EXPSIZE2) - 1)    /* Maximum exponent. */
+#define MAXFRACT2       ((1 << MANTSIZE2) - 1)  /* Maximum fractional value. */
+#define MAXEXP2         ((1 << EXPSIZE2) - 1)   /* Maximum exponent. */
 
-static comp2_t encode_comp2_t(u64 value)
+static void encode_ac_etime_hilo(u64 value, acct_t *ac)
 {
-	int exp, rnd;
+	int exp = (value > (MAXFRACT2 >> 1));
+	int rnd = 0;
+	u32 etime;
 
-	exp = (value > (MAXFRACT2>>1));
-	rnd = 0;
 	while (value > MAXFRACT2) {
 		rnd = value & 1;
 		value >>= 1;
@@ -373,10 +373,12 @@ static comp2_t encode_comp2_t(u64 value)
 
 	if (exp > MAXEXP2) {
 		/* Overflow. Return largest representable number instead. */
-		return (1ul << (MANTSIZE2+EXPSIZE2-1)) - 1;
+		etime = (1 << (MANTSIZE2 + EXPSIZE2 - 1)) - 1;
 	} else {
-		return (value & (MAXFRACT2>>1)) | (exp << (MANTSIZE2-1));
+		etime = (value & (MAXFRACT2 >> 1)) | (exp << (MANTSIZE2 - 1));
 	}
+	ac->ac_etime_hi = etime >> 16;
+	ac->ac_etime_lo = (u16) etime;
 }
 #endif
 
@@ -436,17 +438,12 @@ static void fill_ac(acct_t *ac)
 				(unsigned long) elapsed : (unsigned long) -1l);
 #endif
 #if ACCT_VERSION == 1 || ACCT_VERSION == 2
-	{
-		/* new enlarged etime field */
-		comp2_t etime = encode_comp2_t(elapsed);
-
-		ac->ac_etime_hi = etime >> 16;
-		ac->ac_etime_lo = (u16) etime;
-	}
+	/* new enlarged etime field */
+	encode_ac_etime_hilo(elapsed, ac);
 #endif
 	do_div(elapsed, AHZ);
 	ac->ac_btime = get_seconds() - elapsed;
-#if ACCT_VERSION==2
+#if ACCT_VERSION == 2
 	ac->ac_ahz = AHZ;
 #endif
 
