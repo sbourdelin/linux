@@ -296,6 +296,10 @@ static int dw_spi_transfer_one(struct spi_master *master,
 
 	spi_enable_chip(dws, 0);
 
+	/* Slave select required before transfer can begin. Force in gpio CS */
+	if (gpio_is_valid(spi->cs_gpio))
+		dw_spi_set_cs(spi, 0);
+
 	/* Handle per transfer options for bpw and speed */
 	if (transfer->speed_hz != dws->current_freq) {
 		if (transfer->speed_hz != chip->speed_hz) {
@@ -390,6 +394,10 @@ static void dw_spi_handle_err(struct spi_master *master,
 	if (dws->dma_mapped)
 		dws->dma_ops->dma_stop(dws);
 
+	/* Cleanup Slave Select in gpio CS case */
+	if (gpio_is_valid(msg->spi->cs_gpio))
+		dw_spi_set_cs(msg->spi, 1);
+
 	spi_reset_chip(dws);
 }
 
@@ -439,6 +447,10 @@ static int dw_spi_setup(struct spi_device *spi)
 static void dw_spi_cleanup(struct spi_device *spi)
 {
 	struct chip_data *chip = spi_get_ctldata(spi);
+
+	/* Cleanup Slave Select in gpio CS case */
+	if (gpio_is_valid(spi->cs_gpio))
+		dw_spi_set_cs(spi, 1);
 
 	kfree(chip);
 	spi_set_ctldata(spi, NULL);
