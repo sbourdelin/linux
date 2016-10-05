@@ -4559,7 +4559,7 @@ static int handle_reshape_read_error(struct mddev *mddev,
 			rcu_read_lock();
 			if (success)
 				break;
-		failed:
+failed:
 			slot++;
 			if (slot >= conf->copies)
 				slot = 0;
