@@ -4676,8 +4676,7 @@ static void raid10_finish_reshape(struct mddev *mddev)
 	mddev->reshape_backwards = 0;
 }
 
-static struct md_personality raid10_personality =
-{
+static struct md_personality raid10_personality = {
 	.name		= "raid10",
 	.level		= 10,
 	.owner		= THIS_MODULE,
