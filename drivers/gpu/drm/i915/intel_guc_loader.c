@@ -717,13 +717,16 @@ void intel_guc_init(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
 	const char *fw_path;
-
+	if (!HAS_GUC(dev)) {
+		i915.enable_guc_loading = 0;
+		i915.enable_guc_submission = 0;
+	} else {
 	/* A negative value means "use platform default" */
-	if (i915.enable_guc_loading < 0)
-		i915.enable_guc_loading = HAS_GUC_UCODE(dev);
-	if (i915.enable_guc_submission < 0)
-		i915.enable_guc_submission = HAS_GUC_SCHED(dev);
-
+		if (i915.enable_guc_loading < 0)
+			i915.enable_guc_loading = HAS_GUC_UCODE(dev);
+		if (i915.enable_guc_submission < 0)
+			i915.enable_guc_submission = HAS_GUC_SCHED(dev);
+	}
 	if (!HAS_GUC_UCODE(dev)) {
 		fw_path = NULL;
 	} else if (IS_SKYLAKE(dev)) {
