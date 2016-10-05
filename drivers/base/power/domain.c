@@ -1325,16 +1325,6 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
 		genpd->dev_ops.start = pm_clk_resume;
 	}
 
-	if (genpd->state_idx >= GENPD_MAX_NUM_STATES) {
-		pr_warn("Initial state index out of bounds.\n");
-		genpd->state_idx = GENPD_MAX_NUM_STATES - 1;
-	}
-
-	if (genpd->state_count > GENPD_MAX_NUM_STATES) {
-		pr_warn("Limiting states to  %d\n", GENPD_MAX_NUM_STATES);
-		genpd->state_count = GENPD_MAX_NUM_STATES;
-	}
-
 	/* Use only one "off" state if there were no states declared */
 	if (genpd->state_count == 0)
 		genpd->state_count = 1;
