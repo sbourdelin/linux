@@ -81,6 +81,8 @@ struct sdhci_msm_host {
 	struct clk *clk;	/* main SD/MMC bus clock */
 	struct clk *pclk;	/* SDHC peripheral bus clock */
 	struct clk *bus_clk;	/* SDHC bus voter clock */
+	u32 *clk_table;
+	int clk_table_sz;
 	struct mmc_host *mmc;
 	bool use_14lpp_dll_reset;
 };
@@ -582,6 +584,50 @@ static const struct sdhci_pltfm_data sdhci_msm_pdata = {
 	.ops = &sdhci_msm_ops,
 };
 
+static int sdhci_msm_dt_get_array(struct device *dev, const char *prop_name,
+				u32 **table, int *size)
+{
+	struct device_node *np = dev->of_node;
+	int count, ret;
+	u32 *arr;
+
+	count = of_property_count_elems_of_size(np, prop_name, sizeof(u32));
+	if (count < 0) {
+		dev_warn(dev, "%s: Invalid dt property, err(%d)\n",
+				prop_name, count);
+		return count;
+	}
+
+	arr = kcalloc(count, sizeof(*arr), GFP_KERNEL);
+	if (!arr)
+		return -ENOMEM;
+
+	ret = of_property_read_u32_array(np, prop_name, arr, count);
+	if (ret) {
+		kfree(arr);
+		dev_warn(dev, "%s Invalid dt array property, err(%d)\n",
+				prop_name, ret);
+		return ret;
+	}
+	*table = arr;
+	*size = count;
+	return 0;
+}
+
+void sdhci_msm_populate_dt(struct device *dev,
+						struct sdhci_msm_host *msm_host)
+{
+	int table_sz = 0;
+	u32 *table = NULL;
+
+	if (sdhci_msm_dt_get_array(dev, "clk-rates", &table, &table_sz)) {
+		dev_warn(dev, "failed in DT parsing for supported clk-rates\n");
+		return;
+	}
+	msm_host->clk_table = table;
+	msm_host->clk_table_sz = table_sz;
+}
+
 static int sdhci_msm_probe(struct platform_device *pdev)
 {
 	struct sdhci_host *host;
@@ -607,6 +653,8 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 		goto pltfm_free;
 
 	sdhci_get_of_property(pdev);
+
+	sdhci_msm_populate_dt(&pdev->dev, msm_host);
 
 	/* Setup SDCC bus voter clock. */
 	msm_host->bus_clk = devm_clk_get(&pdev->dev, "bus");
