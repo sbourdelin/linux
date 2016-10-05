@@ -4065,7 +4065,7 @@ static int raid10_start_reshape(struct mddev *mddev)
 	spin_lock_irq(&conf->device_lock);
 	if (conf->mirrors_new) {
 		memcpy(conf->mirrors_new, conf->mirrors,
-		       sizeof(struct raid10_info)*conf->prev.raid_disks);
+		       sizeof(*conf->mirrors_new) * conf->prev.raid_disks);
 		smp_mb();
 		kfree(conf->mirrors_old);
 		conf->mirrors_old = conf->mirrors;
