@@ -78,6 +78,31 @@ EXPORT_SYMBOL(fsl_ifc_find);
 static int fsl_ifc_ctrl_init(struct fsl_ifc_ctrl *ctrl)
 {
 	struct fsl_ifc_global __iomem *ifc = ctrl->gregs;
+	np = of_find_compatible_node(NULL, NULL, "fsl,ifc");
+	if (np) {
+		const u32 *prop;
+
+		prop = of_get_property(np, "#address-cells", NULL);
+		if (prop) {
+			u32 cells;
+			/*
+			 * #address-cells 2 means 36-bit addresses are used
+			 * and the if cspr_ext register is zero, the
+			 * bootloader didn't set it, we'll set it manually
+			 */
+			cells = of_n_addr_cells(np);
+			if ((cells == 2) && !(ifc_in32(&ifc->cspr_cs[0].cspr_ext))) {
+				prop = of_get_property(np, "reg", NULL);
+				if (prop) {
+					u32 extaddr;
+
+					extaddr = *prop; /* get the top nibble for 36-bit */
+					pr_info("fsl-ifc extended 36-bit addressing\n");
+					ifc_out32(extaddr, &ifc->cspr_cs[0].cspr_ext);
+				}
+			}
+		}
+	}
 
 	/*
 	 * Clear all the common status and event registers
