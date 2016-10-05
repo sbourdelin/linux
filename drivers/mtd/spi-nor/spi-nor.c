@@ -81,6 +81,7 @@ struct flash_info {
 					 * to support memory size above 128Mib.
 					 */
 #define SPI_NOR_SKIP_SFDP	BIT(11) /* Skip read of SFDP tables */
+#define SST_BLOCK_PROTECT	BIT(12)	/* use SST Unlock Block-Protection */
 };
 
 #define JEDEC_MFR(info)	((info)->id[0])
@@ -999,6 +1000,11 @@ static const struct flash_info spi_nor_ids[] = {
 	{ "sst25wf040b", INFO(0x621613, 0, 64 * 1024,  8, SECT_4K) },
 	{ "sst25wf040",  INFO(0xbf2504, 0, 64 * 1024,  8, SECT_4K | SST_WRITE) },
 	{ "sst25wf080",  INFO(0xbf2505, 0, 64 * 1024, 16, SECT_4K | SST_WRITE) },
+	{ "sst26vf016b", INFO(0xbf2641, 0, 64 * 1024, 32, SECT_4K | SST_BLOCK_PROTECT) },
+	{ "sst26vf032b", INFO(0xbf2642, 0, 64 * 1024, 64, SECT_4K | SST_BLOCK_PROTECT) },
+	{ "sst26vf064b", INFO(0xbf2643, 0, 64 * 1024, 128, SECT_4K | SST_BLOCK_PROTECT) },
+	{ "sst26wf040b", INFO(0xbf2654, 0, 64 * 1024,  8, SECT_4K | SST_BLOCK_PROTECT) },
+	{ "sst26wf080b", INFO(0xbf2658, 0, 64 * 1024, 16, SECT_4K | SST_BLOCK_PROTECT) },
 
 	/* ST Microelectronics -- newer production may have feature updates */
 	{ "m25p05",  INFO(0x202010,  0,  32 * 1024,   2, 0) },
@@ -1133,6 +1139,14 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
 read_err:
 	spi_nor_unlock_and_unprep(nor, SPI_NOR_OPS_READ);
 	return ret;
+}
+
+static int sst_unlock_block_protection(struct spi_nor *nor)
+{
+	int ret;
+
+	ret = write_enable(nor);
+	return ret ? ret : nor->write_reg(nor, SPINOR_OP_ULBPR, NULL, 0);
 }
 
 static int sst_write(struct mtd_info *mtd, loff_t to, size_t len,
@@ -2306,6 +2320,12 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
 		dev_err(dev, "address width is too large: %u\n",
 			nor->addr_width);
 		return -EINVAL;
+	}
+
+	if (info->flags & SST_BLOCK_PROTECT) {
+		ret = sst_unlock_block_protection(nor);
+		if (ret)
+			return ret;
 	}
 
 	dev_info(dev, "%s (%lld Kbytes)\n", info->name,
