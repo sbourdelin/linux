@@ -5089,7 +5089,7 @@ static void make_discard_request(struct mddev *mddev, struct bio *bi)
 	     logical_sector += STRIPE_SECTORS) {
 		DEFINE_WAIT(w);
 		int d;
-	again:
+again:
 		sh = raid5_get_active_stripe(conf, logical_sector, 0, 0, 0);
 		prepare_to_wait(&conf->wait_for_overlap, &w,
 				TASK_UNINTERRUPTIBLE);
@@ -5204,7 +5204,7 @@ static void raid5_make_request(struct mddev *mddev, struct bio * bi)
 		int seq;
 
 		do_prepare = false;
-	retry:
+retry:
 		seq = read_seqcount_begin(&conf->gen_lock);
 		previous = 0;
 		if (do_prepare)
