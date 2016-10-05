@@ -6613,12 +6613,9 @@ static struct r5conf *setup_conf(struct mddev *mddev)
 	memory = conf->min_nr_stripes * (sizeof(struct stripe_head) +
 		 max_disks * ((sizeof(struct bio) + PAGE_SIZE))) / 1024;
 	atomic_set(&conf->empty_inactive_list_nr, NR_STRIPE_HASH_LOCKS);
-	if (grow_stripes(conf, conf->min_nr_stripes)) {
-		printk(KERN_ERR
-		       "md/raid:%s: couldn't allocate %dkB for buffers\n",
-		       mdname(mddev), memory);
+	if (grow_stripes(conf, conf->min_nr_stripes))
 		goto free_conf;
-	} else
+	else
 		printk(KERN_INFO "md/raid:%s: allocated %dkB\n",
 		       mdname(mddev), memory);
 	/*
@@ -6640,12 +6637,8 @@ static struct r5conf *setup_conf(struct mddev *mddev)
 
 	sprintf(pers_name, "raid%d", mddev->new_level);
 	conf->thread = md_register_thread(raid5d, mddev, pers_name);
-	if (!conf->thread) {
-		printk(KERN_ERR
-		       "md/raid:%s: couldn't allocate thread.\n",
-		       mdname(mddev));
+	if (!conf->thread)
 		goto free_conf;
-	}
 
 	return conf;
 free_conf:
