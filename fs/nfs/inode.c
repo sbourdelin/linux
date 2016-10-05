@@ -708,6 +708,14 @@ static void nfs_init_lock_context(struct nfs_lock_context *l_ctx)
 	atomic_set(&l_ctx->io_count, 0);
 }
 
+static void nfs_init_flock_context(struct nfs_lock_context *l_ctx, struct file *filp)
+{
+	atomic_set(&l_ctx->count, 0);
+	l_ctx->lockowner.l_owner = filp;
+	l_ctx->lockowner.l_pid = 0;
+	atomic_set(&l_ctx->io_count, 0);
+}
+
 static struct nfs_lock_context *__nfs_find_lock_context(struct nfs_open_context *ctx)
 {
 	struct nfs_lock_context *head = &ctx->lock_context;
@@ -799,7 +807,9 @@ void nfs_close_context(struct nfs_open_context *ctx, int is_sync)
 }
 EXPORT_SYMBOL_GPL(nfs_close_context);
 
-struct nfs_open_context *alloc_nfs_open_context(struct dentry *dentry, fmode_t f_mode)
+struct nfs_open_context *alloc_nfs_open_context(struct dentry *dentry,
+						fmode_t f_mode,
+						struct file *filp)
 {
 	struct nfs_open_context *ctx;
 	struct rpc_cred *cred = rpc_lookup_cred();
@@ -819,7 +829,9 @@ struct nfs_open_context *alloc_nfs_open_context(struct dentry *dentry, fmode_t f
 	ctx->flags = 0;
 	ctx->error = 0;
 	nfs_init_lock_context(&ctx->lock_context);
+	nfs_init_flock_context(&ctx->flock_context, filp);
 	ctx->lock_context.open_context = ctx;
+	ctx->flock_context.open_context = ctx;
 	INIT_LIST_HEAD(&ctx->list);
 	ctx->mdsthreshold = NULL;
 	return ctx;
@@ -942,7 +954,7 @@ int nfs_open(struct inode *inode, struct file *filp)
 {
 	struct nfs_open_context *ctx;
 
-	ctx = alloc_nfs_open_context(file_dentry(filp), filp->f_mode);
+	ctx = alloc_nfs_open_context(file_dentry(filp), filp->f_mode, filp);
 	if (IS_ERR(ctx))
 		return PTR_ERR(ctx);
 	nfs_file_set_open_context(filp, ctx);
