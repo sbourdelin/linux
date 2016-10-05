@@ -3501,7 +3501,7 @@ static struct r10conf *setup_conf(struct mddev *mddev)
 	err = -ENOMEM;
 	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
 	if (!conf)
-		goto out;
+		return ERR_PTR(-ENOMEM);
 
 	/* FIXME calc properly */
 	conf->mirrors = kcalloc(mddev->raid_disks + max(0, -mddev->delta_disks),
@@ -3554,12 +3554,10 @@ static struct r10conf *setup_conf(struct mddev *mddev)
 	return conf;
 
  out:
-	if (conf) {
-		mempool_destroy(conf->r10bio_pool);
-		kfree(conf->mirrors);
-		safe_put_page(conf->tmppage);
-		kfree(conf);
-	}
+	mempool_destroy(conf->r10bio_pool);
+	safe_put_page(conf->tmppage);
+	kfree(conf->mirrors);
+	kfree(conf);
 	return ERR_PTR(err);
 }
 
