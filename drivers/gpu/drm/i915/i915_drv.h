@@ -2626,7 +2626,7 @@ struct drm_i915_cmd_table {
 		__e = BITS_PER_LONG - 1; \
 	else \
 		__e = (e) - 1; \
-	!!(INTEL_INFO(p)->gen_mask & GENMASK((__e), (__s))); \
+	!!(dev_priv->info.gen_mask & GENMASK((__e), (__s))); \
 })
 
 /*
