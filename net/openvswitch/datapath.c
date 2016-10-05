@@ -594,6 +594,16 @@ static int ovs_packet_cmd_execute(struct sk_buff *skb, struct genl_info *info)
 	else
 		packet->protocol = htons(ETH_P_802_2);
 
+	if (eth_type_vlan(packet->protocol)) {
+		__skb_pull(packet, ETH_HLEN);
+		skb_reset_network_header(packet);
+		skb_reset_mac_len(packet);
+		packet = skb_vlan_untag(packet);
+		if (unlikely(!packet))
+			goto err;
+		skb_push(packet, ETH_HLEN);
+	}
+
 	/* Set packet's mru */
 	if (a[OVS_PACKET_ATTR_MRU]) {
 		mru = nla_get_u16(a[OVS_PACKET_ATTR_MRU]);
