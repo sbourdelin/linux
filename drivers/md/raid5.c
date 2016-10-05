@@ -7868,8 +7868,7 @@ static void *raid6_takeover(struct mddev *mddev)
 	return setup_conf(mddev);
 }
 
-static struct md_personality raid6_personality =
-{
+static struct md_personality raid6_personality = {
 	.name		= "raid6",
 	.level		= 6,
 	.owner		= THIS_MODULE,
@@ -7891,8 +7890,7 @@ static struct md_personality raid6_personality =
 	.takeover	= raid6_takeover,
 	.congested	= raid5_congested,
 };
-static struct md_personality raid5_personality =
-{
+static struct md_personality raid5_personality = {
 	.name		= "raid5",
 	.level		= 5,
 	.owner		= THIS_MODULE,
@@ -7914,9 +7912,7 @@ static struct md_personality raid5_personality =
 	.takeover	= raid5_takeover,
 	.congested	= raid5_congested,
 };
-
-static struct md_personality raid4_personality =
-{
+static struct md_personality raid4_personality = {
 	.name		= "raid4",
 	.level		= 4,
 	.owner		= THIS_MODULE,
