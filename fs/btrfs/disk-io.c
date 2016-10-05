@@ -3989,7 +3989,7 @@ void close_ctree(struct btrfs_root *root)
 	__btrfs_free_block_rsv(root->orphan_block_rsv);
 	root->orphan_block_rsv = NULL;
 
-	lock_chunks(root);
+	mutex_lock(&fs_info->chunk_mutex);
 	while (!list_empty(&fs_info->pinned_chunks)) {
 		struct extent_map *em;
 
@@ -3998,7 +3998,7 @@ void close_ctree(struct btrfs_root *root)
 		list_del_init(&em->list);
 		free_extent_map(em);
 	}
-	unlock_chunks(root);
+	mutex_unlock(&fs_info->chunk_mutex);
 }
 
 int btrfs_buffer_uptodate(struct extent_buffer *buf, u64 parent_transid,
