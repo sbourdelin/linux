@@ -483,17 +483,13 @@ EXPORT_SYMBOL_GPL(ovs_vport_deferred_free);
 
 static unsigned int packet_length(const struct sk_buff *skb)
 {
-	unsigned int length = skb->len - ETH_HLEN;
-
-	if (skb_vlan_tagged(skb))
-		length -= VLAN_HLEN;
-
 	/* Don't subtract for multiple VLAN tags. Most (all?) drivers allow
 	 * (ETH_LEN + VLAN_HLEN) in addition to the mtu value, but almost none
 	 * account for 802.1ad. e.g. is_skb_forwardable().
+	 * Note that the first VLAN tag is always in skb->vlan_tci, thus not
+	 * accounted for in skb->len.
 	 */
-
-	return length;
+	return skb->len - ETH_HLEN;
 }
 
 void ovs_vport_send(struct vport *vport, struct sk_buff *skb)
