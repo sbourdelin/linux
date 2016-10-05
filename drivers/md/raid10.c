@@ -3508,13 +3508,13 @@ static struct r10conf *setup_conf(struct mddev *mddev)
 				GFP_KERNEL);
 	if (!conf->mirrors) {
 		err = -ENOMEM;
-		goto out;
+		goto free_conf;
 	}
 
 	conf->tmppage = alloc_page(GFP_KERNEL);
 	if (!conf->tmppage) {
 		err = -ENOMEM;
-		goto out;
+		goto kfree_mirrors;
 	}
 
 	conf->geo = geo;
@@ -3523,7 +3523,7 @@ static struct r10conf *setup_conf(struct mddev *mddev)
 					   r10bio_pool_free, conf);
 	if (!conf->r10bio_pool) {
 		err = -ENOMEM;
-		goto out;
+		goto put_page;
 	}
 
 	calc_sectors(conf, mddev->dev_sectors);
@@ -3533,7 +3533,7 @@ static struct r10conf *setup_conf(struct mddev *mddev)
 	} else {
 		if (setup_geo(&conf->prev, mddev, geo_old) != conf->copies) {
 			err = -EINVAL;
-			goto out;
+			goto destroy_pool;
 		}
 		conf->reshape_progress = mddev->reshape_position;
 		if (conf->prev.far_offset)
@@ -3554,16 +3554,18 @@ static struct r10conf *setup_conf(struct mddev *mddev)
 	conf->thread = md_register_thread(raid10d, mddev, "raid10");
 	if (!conf->thread) {
 		err = -ENOMEM;
-		goto out;
+		goto destroy_pool;
 	}
 
 	conf->mddev = mddev;
 	return conf;
-
- out:
+destroy_pool:
 	mempool_destroy(conf->r10bio_pool);
+put_page:
 	safe_put_page(conf->tmppage);
+kfree_mirrors:
 	kfree(conf->mirrors);
+free_conf:
 	kfree(conf);
 	return ERR_PTR(err);
 }
