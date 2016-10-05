@@ -3637,8 +3637,9 @@ sub process {
 			}
 		}
 
-# avoid BUG() or BUG_ON()
-		if ($line =~ /\b(?:BUG|BUG_ON)\b/) {
+# avoid BUG() or BUG_ON() like mechanisms (exclude BUILD_BUG)
+		if ($line =~ /\b((?:[A-Z_]+_)?BUG(?:_ON(?:_[A-Z_]+)?))\s*\(/ &&
+		    $1 !~ /BUILD/) {
 			my $msg_type = \&WARN;
 			$msg_type = \&CHK if ($file);
 			&{$msg_type}("AVOID_BUG",
