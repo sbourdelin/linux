@@ -135,8 +135,7 @@ static inline u16 iproc_pcie_reg_offset(struct iproc_pcie *pcie,
 	return pcie->reg_offsets[reg];
 }
 
-static u32 iproc_pcie_read_reg(struct iproc_pcie *pcie,
-				      enum iproc_pcie_reg reg)
+static u32 iproc_readl(struct iproc_pcie *pcie, enum iproc_pcie_reg reg)
 {
 	u16 offset = iproc_pcie_reg_offset(pcie, reg);
 
@@ -146,8 +145,8 @@ static u32 iproc_pcie_read_reg(struct iproc_pcie *pcie,
 	return readl(pcie->base + offset);
 }
 
-static void iproc_pcie_write_reg(struct iproc_pcie *pcie,
-					enum iproc_pcie_reg reg, u32 val)
+static void iproc_writel(struct iproc_pcie *pcie, enum iproc_pcie_reg reg,
+			 u32 val)
 {
 	u16 offset = iproc_pcie_reg_offset(pcie, reg);
 
@@ -189,8 +188,8 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
 		if (slot > 0 || fn > 0)
 			return NULL;
 
-		iproc_pcie_write_reg(pcie, IPROC_PCIE_CFG_IND_ADDR,
-				     where & CFG_IND_ADDR_MASK);
+		iproc_writel(pcie, IPROC_PCIE_CFG_IND_ADDR,
+			     where & CFG_IND_ADDR_MASK);
 		offset = iproc_pcie_reg_offset(pcie, IPROC_PCIE_CFG_IND_DATA);
 		if (iproc_pcie_reg_is_invalid(offset))
 			return NULL;
@@ -212,7 +211,7 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
 		(fn << CFG_ADDR_FUNC_NUM_SHIFT) |
 		(where & CFG_ADDR_REG_NUM_MASK) |
 		(1 & CFG_ADDR_CFG_TYPE_MASK);
-	iproc_pcie_write_reg(pcie, IPROC_PCIE_CFG_ADDR, val);
+	iproc_writel(pcie, IPROC_PCIE_CFG_ADDR, val);
 	offset = iproc_pcie_reg_offset(pcie, IPROC_PCIE_CFG_DATA);
 	if (iproc_pcie_reg_is_invalid(offset))
 		return NULL;
@@ -231,12 +230,12 @@ static void iproc_pcie_reset(struct iproc_pcie *pcie)
 	u32 val;
 
 	if (pcie->type == IPROC_PCIE_PAXC) {
-		val = iproc_pcie_read_reg(pcie, IPROC_PCIE_CLK_CTRL);
+		val = iproc_readl(pcie, IPROC_PCIE_CLK_CTRL);
 		val &= ~PAXC_RESET_MASK;
-		iproc_pcie_write_reg(pcie, IPROC_PCIE_CLK_CTRL, val);
+		iproc_writel(pcie, IPROC_PCIE_CLK_CTRL, val);
 		udelay(100);
 		val |= PAXC_RESET_MASK;
-		iproc_pcie_write_reg(pcie, IPROC_PCIE_CLK_CTRL, val);
+		iproc_writel(pcie, IPROC_PCIE_CLK_CTRL, val);
 		udelay(100);
 		return;
 	}
@@ -245,14 +244,14 @@ static void iproc_pcie_reset(struct iproc_pcie *pcie)
 	 * Select perst_b signal as reset source. Put the device into reset,
 	 * and then bring it out of reset
 	 */
-	val = iproc_pcie_read_reg(pcie, IPROC_PCIE_CLK_CTRL);
+	val = iproc_readl(pcie, IPROC_PCIE_CLK_CTRL);
 	val &= ~EP_PERST_SOURCE_SELECT & ~EP_MODE_SURVIVE_PERST &
 		~RC_PCIE_RST_OUTPUT;
-	iproc_pcie_write_reg(pcie, IPROC_PCIE_CLK_CTRL, val);
+	iproc_writel(pcie, IPROC_PCIE_CLK_CTRL, val);
 	udelay(250);
 
 	val |= RC_PCIE_RST_OUTPUT;
-	iproc_pcie_write_reg(pcie, IPROC_PCIE_CLK_CTRL, val);
+	iproc_writel(pcie, IPROC_PCIE_CLK_CTRL, val);
 	msleep(100);
 }
 
@@ -270,7 +269,7 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
 	if (pcie->type == IPROC_PCIE_PAXC)
 		return 0;
 
-	val = iproc_pcie_read_reg(pcie, IPROC_PCIE_LINK_STATUS);
+	val = iproc_readl(pcie, IPROC_PCIE_LINK_STATUS);
 	if (!(val & PCIE_PHYLINKUP) || !(val & PCIE_DL_ACTIVE)) {
 		dev_err(pcie->dev, "PHY or data link is INACTIVE!\n");
 		return -ENODEV;
@@ -331,7 +330,7 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
 
 static void iproc_pcie_enable(struct iproc_pcie *pcie)
 {
-	iproc_pcie_write_reg(pcie, IPROC_PCIE_INTX_EN, SYS_RC_INTX_MASK);
+	iproc_writel(pcie, IPROC_PCIE_INTX_EN, SYS_RC_INTX_MASK);
 }
 
 /**
