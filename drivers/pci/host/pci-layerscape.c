@@ -45,7 +45,6 @@ struct ls_pcie_drvdata {
 };
 
 struct ls_pcie {
-	void __iomem *dbi;
 	void __iomem *lut;
 	struct regmap *scfg;
 	struct pcie_port pp;
@@ -59,7 +58,7 @@ static bool ls_pcie_is_bridge(struct ls_pcie *ls_pcie)
 {
 	u32 header_type;
 
-	header_type = ioread8(ls_pcie->dbi + PCI_HEADER_TYPE);
+	header_type = ioread8(ls_pcie->pp.dbi_base + PCI_HEADER_TYPE);
 	header_type &= 0x7f;
 
 	return header_type == PCI_HEADER_TYPE_BRIDGE;
@@ -68,13 +67,15 @@ static bool ls_pcie_is_bridge(struct ls_pcie *ls_pcie)
 /* Clear multi-function bit */
 static void ls_pcie_clear_multifunction(struct ls_pcie *ls_pcie)
 {
-	iowrite8(PCI_HEADER_TYPE_BRIDGE, ls_pcie->dbi + PCI_HEADER_TYPE);
+	iowrite8(PCI_HEADER_TYPE_BRIDGE,
+		 ls_pcie->pp.dbi_base + PCI_HEADER_TYPE);
 }
 
 /* Fix class value */
 static void ls_pcie_fix_class(struct ls_pcie *ls_pcie)
 {
-	iowrite16(PCI_CLASS_BRIDGE_PCI, ls_pcie->dbi + PCI_CLASS_DEVICE);
+	iowrite16(PCI_CLASS_BRIDGE_PCI,
+		  ls_pcie->pp.dbi_base + PCI_CLASS_DEVICE);
 }
 
 /* Drop MSG TLP except for Vendor MSG */
@@ -82,9 +83,9 @@ static void ls_pcie_drop_msg_tlp(struct ls_pcie *ls_pcie)
 {
 	u32 val;
 
-	val = ioread32(ls_pcie->dbi + PCIE_STRFMR1);
+	val = ioread32(ls_pcie->pp.dbi_base + PCIE_STRFMR1);
 	val &= 0xDFFFFFFF;
-	iowrite32(val, ls_pcie->dbi + PCIE_STRFMR1);
+	iowrite32(val, ls_pcie->pp.dbi_base + PCIE_STRFMR1);
 }
 
 static int ls1021_pcie_link_up(struct pcie_port *pp)
@@ -148,11 +149,11 @@ static void ls_pcie_host_init(struct pcie_port *pp)
 {
 	struct ls_pcie *ls_pcie = to_ls_pcie(pp);
 
-	iowrite32(1, ls_pcie->dbi + PCIE_DBI_RO_WR_EN);
+	iowrite32(1, ls_pcie->pp.dbi_base + PCIE_DBI_RO_WR_EN);
 	ls_pcie_fix_class(ls_pcie);
 	ls_pcie_clear_multifunction(ls_pcie);
 	ls_pcie_drop_msg_tlp(ls_pcie);
-	iowrite32(0, ls_pcie->dbi + PCIE_DBI_RO_WR_EN);
+	iowrite32(0, ls_pcie->pp.dbi_base + PCIE_DBI_RO_WR_EN);
 }
 
 static int ls_pcie_msi_host_init(struct pcie_port *pp,
@@ -219,7 +220,6 @@ static int __init ls_add_pcie_port(struct ls_pcie *ls_pcie,
 	int ret;
 
 	pp->dev = &pdev->dev;
-	pp->dbi_base = ls_pcie->dbi;
 	pp->ops = ls_pcie->drvdata->ops;
 
 	ret = dw_pcie_host_init(pp);
@@ -247,14 +247,14 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
-	ls_pcie->dbi = devm_ioremap_resource(&pdev->dev, dbi_base);
-	if (IS_ERR(ls_pcie->dbi)) {
+	ls_pcie->pp.dbi_base = devm_ioremap_resource(&pdev->dev, dbi_base);
+	if (IS_ERR(ls_pcie->pp.dbi_base)) {
 		dev_err(&pdev->dev, "missing *regs* space\n");
-		return PTR_ERR(ls_pcie->dbi);
+		return PTR_ERR(ls_pcie->pp.dbi_base);
 	}
 
 	ls_pcie->drvdata = match->data;
-	ls_pcie->lut = ls_pcie->dbi + ls_pcie->drvdata->lut_offset;
+	ls_pcie->lut = ls_pcie->pp.dbi_base + ls_pcie->drvdata->lut_offset;
 
 	if (!ls_pcie_is_bridge(ls_pcie))
 		return -ENODEV;
