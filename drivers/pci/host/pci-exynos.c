@@ -107,7 +107,7 @@ static u32 exynos_elb_readl(struct exynos_pcie *exynos_pcie, u32 reg)
 	return readl(exynos_pcie->elbi_base + reg);
 }
 
-static void exynos_elb_writel(struct exynos_pcie *exynos_pcie, u32 val, u32 reg)
+static void exynos_elb_writel(struct exynos_pcie *exynos_pcie, u32 reg, u32 val)
 {
 	writel(val, exynos_pcie->elbi_base + reg);
 }
@@ -140,11 +140,11 @@ static void exynos_pcie_sideband_dbi_w_mode(struct exynos_pcie *exynos_pcie,
 	if (on) {
 		val = exynos_elb_readl(exynos_pcie, PCIE_ELBI_SLV_AWMISC);
 		val |= PCIE_ELBI_SLV_DBI_ENABLE;
-		exynos_elb_writel(exynos_pcie, val, PCIE_ELBI_SLV_AWMISC);
+		exynos_elb_writel(exynos_pcie, PCIE_ELBI_SLV_AWMISC, val);
 	} else {
 		val = exynos_elb_readl(exynos_pcie, PCIE_ELBI_SLV_AWMISC);
 		val &= ~PCIE_ELBI_SLV_DBI_ENABLE;
-		exynos_elb_writel(exynos_pcie, val, PCIE_ELBI_SLV_AWMISC);
+		exynos_elb_writel(exynos_pcie, PCIE_ELBI_SLV_AWMISC, val);
 	}
 }
 
@@ -156,11 +156,11 @@ static void exynos_pcie_sideband_dbi_r_mode(struct exynos_pcie *exynos_pcie,
 	if (on) {
 		val = exynos_elb_readl(exynos_pcie, PCIE_ELBI_SLV_ARMISC);
 		val |= PCIE_ELBI_SLV_DBI_ENABLE;
-		exynos_elb_writel(exynos_pcie, val, PCIE_ELBI_SLV_ARMISC);
+		exynos_elb_writel(exynos_pcie, PCIE_ELBI_SLV_ARMISC, val);
 	} else {
 		val = exynos_elb_readl(exynos_pcie, PCIE_ELBI_SLV_ARMISC);
 		val &= ~PCIE_ELBI_SLV_DBI_ENABLE;
-		exynos_elb_writel(exynos_pcie, val, PCIE_ELBI_SLV_ARMISC);
+		exynos_elb_writel(exynos_pcie, PCIE_ELBI_SLV_ARMISC, val);
 	}
 }
 
@@ -170,10 +170,10 @@ static void exynos_pcie_assert_core_reset(struct exynos_pcie *exynos_pcie)
 
 	val = exynos_elb_readl(exynos_pcie, PCIE_CORE_RESET);
 	val &= ~PCIE_CORE_RESET_ENABLE;
-	exynos_elb_writel(exynos_pcie, val, PCIE_CORE_RESET);
-	exynos_elb_writel(exynos_pcie, 0, PCIE_PWR_RESET);
-	exynos_elb_writel(exynos_pcie, 0, PCIE_STICKY_RESET);
-	exynos_elb_writel(exynos_pcie, 0, PCIE_NONSTICKY_RESET);
+	exynos_elb_writel(exynos_pcie, PCIE_CORE_RESET, val);
+	exynos_elb_writel(exynos_pcie, PCIE_PWR_RESET, 0);
+	exynos_elb_writel(exynos_pcie, PCIE_STICKY_RESET, 0);
+	exynos_elb_writel(exynos_pcie, PCIE_NONSTICKY_RESET, 0);
 }
 
 static void exynos_pcie_deassert_core_reset(struct exynos_pcie *exynos_pcie)
@@ -183,11 +183,11 @@ static void exynos_pcie_deassert_core_reset(struct exynos_pcie *exynos_pcie)
 	val = exynos_elb_readl(exynos_pcie, PCIE_CORE_RESET);
 	val |= PCIE_CORE_RESET_ENABLE;
 
-	exynos_elb_writel(exynos_pcie, val, PCIE_CORE_RESET);
-	exynos_elb_writel(exynos_pcie, 1, PCIE_STICKY_RESET);
-	exynos_elb_writel(exynos_pcie, 1, PCIE_NONSTICKY_RESET);
-	exynos_elb_writel(exynos_pcie, 1, PCIE_APP_INIT_RESET);
-	exynos_elb_writel(exynos_pcie, 0, PCIE_APP_INIT_RESET);
+	exynos_elb_writel(exynos_pcie, PCIE_CORE_RESET, val);
+	exynos_elb_writel(exynos_pcie, PCIE_STICKY_RESET, 1);
+	exynos_elb_writel(exynos_pcie, PCIE_NONSTICKY_RESET, 1);
+	exynos_elb_writel(exynos_pcie, PCIE_APP_INIT_RESET, 1);
+	exynos_elb_writel(exynos_pcie, PCIE_APP_INIT_RESET, 0);
 	exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_MAC_RESET);
 }
 
@@ -200,7 +200,7 @@ static void exynos_pcie_assert_phy_reset(struct exynos_pcie *exynos_pcie)
 static void exynos_pcie_deassert_phy_reset(struct exynos_pcie *exynos_pcie)
 {
 	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_GLOBAL_RESET);
-	exynos_elb_writel(exynos_pcie, 1, PCIE_PWR_RESET);
+	exynos_elb_writel(exynos_pcie, PCIE_PWR_RESET, 1);
 	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_COMMON_RESET);
 	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_CMN_REG);
 	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_TRSVREG_RESET);
@@ -330,8 +330,8 @@ static int exynos_pcie_establish_link(struct exynos_pcie *exynos_pcie)
 	exynos_pcie_assert_reset(exynos_pcie);
 
 	/* assert LTSSM enable */
-	exynos_elb_writel(exynos_pcie, PCIE_ELBI_LTSSM_ENABLE,
-			  PCIE_APP_LTSSM_ENABLE);
+	exynos_elb_writel(exynos_pcie, PCIE_APP_LTSSM_ENABLE,
+			  PCIE_ELBI_LTSSM_ENABLE);
 
 	/* check if the link is up or not */
 	if (!dw_pcie_wait_for_link(pp))
@@ -350,7 +350,7 @@ static void exynos_pcie_clear_irq_pulse(struct exynos_pcie *exynos_pcie)
 	u32 val;
 
 	val = exynos_elb_readl(exynos_pcie, PCIE_IRQ_PULSE);
-	exynos_elb_writel(exynos_pcie, val, PCIE_IRQ_PULSE);
+	exynos_elb_writel(exynos_pcie, PCIE_IRQ_PULSE, val);
 }
 
 static void exynos_pcie_enable_irq_pulse(struct exynos_pcie *exynos_pcie)
@@ -360,7 +360,7 @@ static void exynos_pcie_enable_irq_pulse(struct exynos_pcie *exynos_pcie)
 	/* enable INTX interrupt */
 	val = IRQ_INTA_ASSERT | IRQ_INTB_ASSERT |
 		IRQ_INTC_ASSERT | IRQ_INTD_ASSERT;
-	exynos_elb_writel(exynos_pcie, val, PCIE_IRQ_EN_PULSE);
+	exynos_elb_writel(exynos_pcie, PCIE_IRQ_EN_PULSE, val);
 }
 
 static irqreturn_t exynos_pcie_irq_handler(int irq, void *arg)
@@ -389,7 +389,7 @@ static void exynos_pcie_msi_init(struct exynos_pcie *exynos_pcie)
 	/* enable MSI interrupt */
 	val = exynos_elb_readl(exynos_pcie, PCIE_IRQ_EN_LEVEL);
 	val |= IRQ_MSI_ENABLE;
-	exynos_elb_writel(exynos_pcie, val, PCIE_IRQ_EN_LEVEL);
+	exynos_elb_writel(exynos_pcie, PCIE_IRQ_EN_LEVEL, val);
 }
 
 static void exynos_pcie_enable_interrupts(struct exynos_pcie *exynos_pcie)
