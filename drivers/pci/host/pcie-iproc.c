@@ -457,9 +457,6 @@ int iproc_pcie_setup(struct iproc_pcie *iproc_pcie, struct list_head *res)
 	void *sysdata;
 	struct pci_bus *bus;
 
-	if (!iproc_pcie || !iproc_pcie->dev)
-		return -EINVAL;
-
 	ret = devm_request_pci_bus_resources(iproc_pcie->dev, res);
 	if (ret)
 		return ret;
