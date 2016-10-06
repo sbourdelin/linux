@@ -197,9 +197,9 @@ static int armada8k_add_pcie_port(struct armada8k_pcie *armada8k_pcie,
 
 static int armada8k_pcie_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	struct armada8k_pcie *armada8k_pcie;
 	struct pcie_port *pp;
-	struct device *dev = &pdev->dev;
 	struct resource *base;
 	int ret;
 
@@ -215,7 +215,6 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 
 	pp = &armada8k_pcie->pp;
 	pp->dev = dev;
-	platform_set_drvdata(pdev, armada8k_pcie);
 
 	/* Get the dw-pcie unit configuration/control registers base. */
 	base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ctrl");
@@ -230,6 +229,7 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 	if (ret)
 		goto fail;
 
+	platform_set_drvdata(pdev, armada8k_pcie);
 	return 0;
 
 fail:
