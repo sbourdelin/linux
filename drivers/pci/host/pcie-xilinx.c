@@ -118,19 +118,19 @@ struct xilinx_pcie {
 
 static DECLARE_BITMAP(msi_irq_in_use, XILINX_NUM_MSI_IRQS);
 
-static u32 pcie_read(struct xilinx_pcie *xilinx_pcie, u32 reg)
+static u32 xilinx_pcie_readl(struct xilinx_pcie *xilinx_pcie, u32 reg)
 {
 	return readl(xilinx_pcie->reg_base + reg);
 }
 
-static void pcie_write(struct xilinx_pcie *xilinx_pcie, u32 val, u32 reg)
+static void xilinx_pcie_writel(struct xilinx_pcie *xilinx_pcie, u32 val, u32 reg)
 {
 	writel(val, xilinx_pcie->reg_base + reg);
 }
 
 static inline bool xilinx_pcie_link_is_up(struct xilinx_pcie *xilinx_pcie)
 {
-	return (pcie_read(xilinx_pcie, XILINX_PCIE_REG_PSCR) &
+	return (xilinx_pcie_readl(xilinx_pcie, XILINX_PCIE_REG_PSCR) &
 		XILINX_PCIE_REG_PSCR_LNKUP) ? 1 : 0;
 }
 
@@ -141,12 +141,12 @@ static inline bool xilinx_pcie_link_is_up(struct xilinx_pcie *xilinx_pcie)
 static void xilinx_pcie_clear_err_interrupts(struct xilinx_pcie *xilinx_pcie)
 {
 	struct device *dev = xilinx_pcie->dev;
-	unsigned long val = pcie_read(xilinx_pcie, XILINX_PCIE_REG_RPEFR);
+	unsigned long val = xilinx_pcie_readl(xilinx_pcie, XILINX_PCIE_REG_RPEFR);
 
 	if (val & XILINX_PCIE_RPEFR_ERR_VALID) {
 		dev_dbg(dev, "Requester ID %lu\n",
 			val & XILINX_PCIE_RPEFR_REQ_ID);
-		pcie_write(xilinx_pcie, XILINX_PCIE_RPEFR_ALL_MASK,
+		xilinx_pcie_writel(xilinx_pcie, XILINX_PCIE_RPEFR_ALL_MASK,
 			   XILINX_PCIE_REG_RPEFR);
 	}
 }
@@ -343,8 +343,8 @@ static void xilinx_pcie_enable_msi(struct xilinx_pcie *xilinx_pcie)
 
 	xilinx_pcie->msi_pages = __get_free_pages(GFP_KERNEL, 0);
 	msg_addr = virt_to_phys((void *)xilinx_pcie->msi_pages);
-	pcie_write(xilinx_pcie, 0x0, XILINX_PCIE_REG_MSIBASE1);
-	pcie_write(xilinx_pcie, msg_addr, XILINX_PCIE_REG_MSIBASE2);
+	xilinx_pcie_writel(xilinx_pcie, 0x0, XILINX_PCIE_REG_MSIBASE1);
+	xilinx_pcie_writel(xilinx_pcie, msg_addr, XILINX_PCIE_REG_MSIBASE2);
 }
 
 /* INTx Functions */
@@ -387,8 +387,8 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
 	u32 val, mask, status, msi_data;
 
 	/* Read interrupt decode and mask registers */
-	val = pcie_read(xilinx_pcie, XILINX_PCIE_REG_IDR);
-	mask = pcie_read(xilinx_pcie, XILINX_PCIE_REG_IMR);
+	val = xilinx_pcie_readl(xilinx_pcie, XILINX_PCIE_REG_IDR);
+	mask = xilinx_pcie_readl(xilinx_pcie, XILINX_PCIE_REG_IMR);
 
 	status = val & mask;
 	if (!status)
@@ -426,7 +426,7 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
 
 	if (status & XILINX_PCIE_INTR_INTX) {
 		/* INTx interrupt received */
-		val = pcie_read(xilinx_pcie, XILINX_PCIE_REG_RPIFR1);
+		val = xilinx_pcie_readl(xilinx_pcie, XILINX_PCIE_REG_RPIFR1);
 
 		/* Check whether interrupt valid */
 		if (!(val & XILINX_PCIE_RPIFR1_INTR_VALID)) {
@@ -436,7 +436,7 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
 
 		if (!(val & XILINX_PCIE_RPIFR1_MSI_INTR)) {
 			/* Clear interrupt FIFO register 1 */
-			pcie_write(xilinx_pcie, XILINX_PCIE_RPIFR1_ALL_MASK,
+			xilinx_pcie_writel(xilinx_pcie, XILINX_PCIE_RPIFR1_ALL_MASK,
 				   XILINX_PCIE_REG_RPIFR1);
 
 			/* Handle INTx Interrupt */
@@ -449,7 +449,7 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
 
 	if (status & XILINX_PCIE_INTR_MSI) {
 		/* MSI Interrupt */
-		val = pcie_read(xilinx_pcie, XILINX_PCIE_REG_RPIFR1);
+		val = xilinx_pcie_readl(xilinx_pcie, XILINX_PCIE_REG_RPIFR1);
 
 		if (!(val & XILINX_PCIE_RPIFR1_INTR_VALID)) {
 			dev_warn(dev, "RP Intr FIFO1 read error\n");
@@ -457,11 +457,11 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
 		}
 
 		if (val & XILINX_PCIE_RPIFR1_MSI_INTR) {
-			msi_data = pcie_read(xilinx_pcie, XILINX_PCIE_REG_RPIFR2) &
+			msi_data = xilinx_pcie_readl(xilinx_pcie, XILINX_PCIE_REG_RPIFR2) &
 				   XILINX_PCIE_RPIFR2_MSG_DATA;
 
 			/* Clear interrupt FIFO register 1 */
-			pcie_write(xilinx_pcie, XILINX_PCIE_RPIFR1_ALL_MASK,
+			xilinx_pcie_writel(xilinx_pcie, XILINX_PCIE_RPIFR1_ALL_MASK,
 				   XILINX_PCIE_REG_RPIFR1);
 
 			if (IS_ENABLED(CONFIG_PCI_MSI)) {
@@ -500,8 +500,7 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
 
 error:
 	/* Clear the Interrupt Decode register */
-	pcie_write(xilinx_pcie, status, XILINX_PCIE_REG_IDR);
-
+	xilinx_pcie_writel(xilinx_pcie, status, XILINX_PCIE_REG_IDR);
 	return IRQ_HANDLED;
 }
 
@@ -563,19 +562,19 @@ static void xilinx_pcie_init_port(struct xilinx_pcie *xilinx_pcie)
 		dev_info(dev, "PCIe Link is DOWN\n");
 
 	/* Disable all interrupts */
-	pcie_write(xilinx_pcie, ~XILINX_PCIE_IDR_ALL_MASK,
+	xilinx_pcie_writel(xilinx_pcie, ~XILINX_PCIE_IDR_ALL_MASK,
 		   XILINX_PCIE_REG_IMR);
 
 	/* Clear pending interrupts */
-	pcie_write(xilinx_pcie, pcie_read(xilinx_pcie, XILINX_PCIE_REG_IDR) &
+	xilinx_pcie_writel(xilinx_pcie, xilinx_pcie_readl(xilinx_pcie, XILINX_PCIE_REG_IDR) &
 			 XILINX_PCIE_IMR_ALL_MASK,
 		   XILINX_PCIE_REG_IDR);
 
 	/* Enable all interrupts */
-	pcie_write(xilinx_pcie, XILINX_PCIE_IMR_ALL_MASK, XILINX_PCIE_REG_IMR);
+	xilinx_pcie_writel(xilinx_pcie, XILINX_PCIE_IMR_ALL_MASK, XILINX_PCIE_REG_IMR);
 
 	/* Enable the Bridge enable bit */
-	pcie_write(xilinx_pcie, pcie_read(xilinx_pcie, XILINX_PCIE_REG_RPSC) |
+	xilinx_pcie_writel(xilinx_pcie, xilinx_pcie_readl(xilinx_pcie, XILINX_PCIE_REG_RPSC) |
 			 XILINX_PCIE_REG_RPSC_BEN,
 		   XILINX_PCIE_REG_RPSC);
 }
