@@ -78,7 +78,7 @@
 
 struct altera_pcie {
 	struct platform_device	*pdev;
-	void __iomem		*cra_base;
+	void __iomem		*cra_base;	/* DT Cra */
 	int			irq;
 	u8			root_bus_nr;
 	struct irq_domain	*irq_domain;
@@ -549,11 +549,6 @@ static int altera_pcie_parse_dt(struct altera_pcie *altera_pcie)
 	struct platform_device *pdev = altera_pcie->pdev;
 
 	cra = platform_get_resource_byname(pdev, IORESOURCE_MEM, "Cra");
-	if (!cra) {
-		dev_err(&pdev->dev, "no Cra memory resource defined\n");
-		return -ENODEV;
-	}
-
 	altera_pcie->cra_base = devm_ioremap_resource(&pdev->dev, cra);
 	if (IS_ERR(altera_pcie->cra_base)) {
 		dev_err(&pdev->dev, "failed to map cra memory\n");
