@@ -245,9 +245,10 @@ static void stm32f4_rcc_register_pll(const char *hse_clk, const char *hsi_clk)
 	const char   *pllsrc = pllcfgr & BIT(22) ? hse_clk : hsi_clk;
 	unsigned long pllq   = (pllcfgr >> 24) & 0xf;
 
-	clk_register_fixed_factor(NULL, "vco", pllsrc, 0, plln, pllm);
-	clk_register_fixed_factor(NULL, "pll", "vco", 0, 1, pllp);
-	clk_register_fixed_factor(NULL, "pll48", "vco", 0, 1, pllq);
+	clk_register_fixed_factor(NULL, "vco-div", pllsrc, 0, 1, pllm);
+	clk_register_fixed_factor(NULL, "vco-mul", "vco-div", 0, plln, 1);
+	clk_register_fixed_factor(NULL, "pll", "vco-mul", 0, 1, pllp);
+	clk_register_fixed_factor(NULL, "pll48", "vco-mul", 0, 1, pllq);
 }
 
 /*
