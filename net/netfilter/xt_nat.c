@@ -13,6 +13,44 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter/x_tables.h>
 #include <net/netfilter/nf_nat_core.h>
+#include <net/netfilter/nf_nat_l4proto.h>
+#include <linux/netfilter_ipv4/ip_tables.h>
+#include <linux/netfilter_ipv6/ip6_tables.h>
+
+static void xt_nat_probe_proto(const struct xt_tgchk_param *par)
+{
+	const struct ip6t_ip6 *i6;
+	const struct ipt_ip *i;
+	u8 proto, l4proto;
+
+	switch (par->family) {
+	case NFPROTO_IPV4:
+		i = (const struct ipt_ip *)par->entryinfo;
+		if (i->invflags & IPT_INV_PROTO)
+			return;
+		proto = i->proto;
+		break;
+	case NFPROTO_IPV6:
+		i6 = (const struct ip6t_ip6 *)par->entryinfo;
+		if (i6->invflags & IP6T_INV_PROTO)
+			return;
+		proto = i6->proto;
+		break;
+	default:
+		return;
+	}
+
+	switch (proto) {
+	case IPPROTO_UDPLITE:
+	case IPPROTO_SCTP:
+	case IPPROTO_DCCP:
+		rcu_read_lock();
+		l4proto = __nf_nat_l4proto_find(par->family, proto)->l4proto;
+		rcu_read_unlock();
+		if (!l4proto)
+			request_module("nf-nat-l4-%u", proto);
+	}
+}
 
 static int xt_nat_checkentry_v0(const struct xt_tgchk_param *par)
 {
@@ -23,6 +61,13 @@ static int xt_nat_checkentry_v0(const struct xt_tgchk_param *par)
 			par->target->name);
 		return -EINVAL;
 	}
+	xt_nat_probe_proto(par);
+	return 0;
+}
+
+static int xt_nat_checkentry_v1(const struct xt_tgchk_param *par)
+{
+	xt_nat_probe_proto(par);
 	return 0;
 }
 
@@ -129,6 +174,7 @@ static struct xt_target xt_nat_target_reg[] __read_mostly = {
 	{
 		.name		= "SNAT",
 		.revision	= 1,
+		.checkentry     = xt_nat_checkentry_v1,
 		.target		= xt_snat_target_v1,
 		.targetsize	= sizeof(struct nf_nat_range),
 		.table		= "nat",
@@ -139,6 +185,7 @@ static struct xt_target xt_nat_target_reg[] __read_mostly = {
 	{
 		.name		= "DNAT",
 		.revision	= 1,
+		.checkentry     = xt_nat_checkentry_v1,
 		.target		= xt_dnat_target_v1,
 		.targetsize	= sizeof(struct nf_nat_range),
 		.table		= "nat",
