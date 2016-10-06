@@ -55,8 +55,7 @@ static void hisi_apb_writel(struct hisi_pcie *pcie, u32 val, u32 reg)
 }
 
 /* HipXX PCIe host only supports 32-bit config access */
-static int hisi_pcie_cfg_read(struct pcie_port *pp, int where, int size,
-			      u32 *val)
+static int hisi_cfg_read(struct pcie_port *pp, int where, int size, u32 *val)
 {
 	u32 reg;
 	u32 reg_val;
@@ -80,8 +79,7 @@ static int hisi_pcie_cfg_read(struct pcie_port *pp, int where, int size,
 }
 
 /* HipXX PCIe host only supports 32-bit config access */
-static int hisi_pcie_cfg_write(struct pcie_port *pp, int where, int  size,
-				u32 val)
+static int hisi_cfg_write(struct pcie_port *pp, int where, int  size, u32 val)
 {
 	u32 reg_val;
 	u32 reg;
@@ -133,8 +131,8 @@ static int hisi_pcie_link_up(struct pcie_port *pp)
 }
 
 static struct pcie_host_ops hisi_pcie_host_ops = {
-	.rd_own_conf = hisi_pcie_cfg_read,
-	.wr_own_conf = hisi_pcie_cfg_write,
+	.rd_own_conf = hisi_cfg_read,
+	.wr_own_conf = hisi_cfg_write,
 	.link_up = hisi_pcie_link_up,
 };
 
