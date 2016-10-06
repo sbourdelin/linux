@@ -195,6 +195,8 @@ static ssize_t amdgpu_get_pp_num_states(struct device *dev,
 
 	if (adev->pp_enabled)
 		amdgpu_dpm_get_pp_num_states(adev, &data);
+	else
+		data.nums = 0;
 
 	buf_len = snprintf(buf, PAGE_SIZE, "states: %d\n", data.nums);
 	for (i = 0; i < data.nums; i++)
