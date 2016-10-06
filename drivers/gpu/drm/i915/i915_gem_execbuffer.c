@@ -1529,6 +1529,17 @@ execbuf_submit(struct i915_execbuffer_params *params,
 	if (ret)
 		return ret;
 
+	if (i915.enable_guc_submission) {
+		/*
+		 * Check that the GuC has space for the request before
+		 * going any further, as the i915_add_request() call
+		 * later on mustn't fail ...
+		 */
+		ret = i915_guc_wq_reserve(params->request);
+		if (ret)
+			return ret;
+	}
+
 	trace_i915_gem_ring_dispatch(params->request, params->dispatch_flags);
 
 	i915_gem_execbuffer_move_to_active(vmas, params->request);

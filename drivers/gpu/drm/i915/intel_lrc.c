@@ -626,17 +626,6 @@ int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request
 
 	request->ring = ce->ring;
 
-	if (i915.enable_guc_submission) {
-		/*
-		 * Check that the GuC has space for the request before
-		 * going any further, as the i915_add_request() call
-		 * later on mustn't fail ...
-		 */
-		ret = i915_guc_wq_reserve(request);
-		if (ret)
-			return ret;
-	}
-
 	ret = intel_lr_context_pin(request->ctx, engine);
 	if (ret)
 		return ret;
