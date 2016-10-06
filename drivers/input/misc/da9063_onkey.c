@@ -1,5 +1,5 @@
 /*
- * OnKey device driver for DA9063 and DA9062 PMICs
+ * OnKey device driver for DA9063, DA9062 and DA9061 PMICs
  * Copyright (C) 2015  Dialog Semiconductor Ltd.
  *
  * This program is free software; you can redistribute it and/or
@@ -82,9 +82,25 @@ static const struct da906x_chip_config da9062_regs = {
 	.name = "da9062-onkey",
 };
 
+static const struct da906x_chip_config da9061_regs = {
+	/* REGS */
+	.onkey_status = DA9062AA_STATUS_A,
+	.onkey_pwr_signalling = DA9062AA_CONTROL_B,
+	.onkey_fault_log = DA9062AA_FAULT_LOG,
+	.onkey_shutdown = DA9062AA_CONTROL_F,
+	/* MASKS */
+	.onkey_nonkey_mask = DA9062AA_NONKEY_MASK,
+	.onkey_nonkey_lock_mask = DA9062AA_NONKEY_LOCK_MASK,
+	.onkey_key_reset_mask = DA9062AA_KEY_RESET_MASK,
+	.onkey_shutdown_mask = DA9062AA_SHUTDOWN_MASK,
+	/* NAMES */
+	.name = "da9061-onkey",
+};
+
 static const struct of_device_id da9063_compatible_reg_id_table[] = {
 	{ .compatible = "dlg,da9063-onkey", .data = &da9063_regs },
 	{ .compatible = "dlg,da9062-onkey", .data = &da9062_regs },
+	{ .compatible = "dlg,da9061-onkey", .data = &da9061_regs },
 	{ },
 };
 
@@ -149,13 +165,13 @@ static void da9063_poll_on(struct work_struct *work)
 			 * and then send shutdown command
 			 */
 			dev_dbg(&onkey->input->dev,
-				"Sending SHUTDOWN to DA9063 ...\n");
+				"Sending SHUTDOWN to PMIC ...\n");
 			error = regmap_write(onkey->regmap,
 					     config->onkey_shutdown,
 					     config->onkey_shutdown_mask);
 			if (error)
 				dev_err(&onkey->input->dev,
-					"Cannot SHUTDOWN DA9063: %d\n",
+					"Cannot SHUTDOWN PMIC: %d\n",
 					error);
 		}
 	}
@@ -300,6 +316,6 @@ static struct platform_driver da9063_onkey_driver = {
 module_platform_driver(da9063_onkey_driver);
 
 MODULE_AUTHOR("S Twiss <stwiss.opensource@diasemi.com>");
-MODULE_DESCRIPTION("Onkey device driver for Dialog DA9063 and DA9062");
+MODULE_DESCRIPTION("Onkey device driver for Dialog DA9063, DA9062 and DA9061");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:" DA9063_DRVNAME_ONKEY);
