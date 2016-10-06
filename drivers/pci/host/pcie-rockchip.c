@@ -1031,8 +1031,8 @@ static int rockchip_pcie_prog_ib_atu(struct rockchip_pcie *rockchip_pcie,
 
 static int rockchip_pcie_probe(struct platform_device *pdev)
 {
-	struct rockchip_pcie *rockchip_pcie;
 	struct device *dev = &pdev->dev;
+	struct rockchip_pcie *rockchip_pcie;
 	struct pci_bus *bus, *child;
 	struct resource_entry *win;
 	resource_size_t io_base;
@@ -1094,8 +1094,6 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
 	err = rockchip_pcie_init_port(rockchip_pcie);
 	if (err)
 		goto err_vpcie;
-
-	platform_set_drvdata(pdev, rockchip_pcie);
 
 	rockchip_pcie_enable_interrupts(rockchip_pcie);
 
