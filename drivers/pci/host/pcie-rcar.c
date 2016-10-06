@@ -1140,7 +1140,6 @@ static int rcar_pcie_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	rcar_pcie->dev = dev;
-	platform_set_drvdata(pdev, rcar_pcie);
 
 	INIT_LIST_HEAD(&rcar_pcie->resources);
 
