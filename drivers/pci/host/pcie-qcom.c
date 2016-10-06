@@ -87,7 +87,6 @@ struct qcom_pcie_ops {
 
 struct qcom_pcie {
 	struct pcie_port pp;
-	struct device *dev;
 	union qcom_pcie_resources res;
 	void __iomem *parf;
 	void __iomem *elbi;
@@ -135,7 +134,7 @@ static int qcom_pcie_establish_link(struct qcom_pcie *qcom_pcie)
 static int qcom_pcie_get_resources_v0(struct qcom_pcie *qcom_pcie)
 {
 	struct qcom_pcie_resources_v0 *res = &qcom_pcie->res.v0;
-	struct device *dev = qcom_pcie->dev;
+	struct device *dev = qcom_pcie->pp.dev;
 
 	res->vdda = devm_regulator_get(dev, "vdda");
 	if (IS_ERR(res->vdda))
@@ -187,7 +186,7 @@ static int qcom_pcie_get_resources_v0(struct qcom_pcie *qcom_pcie)
 static int qcom_pcie_get_resources_v1(struct qcom_pcie *qcom_pcie)
 {
 	struct qcom_pcie_resources_v1 *res = &qcom_pcie->res.v1;
-	struct device *dev = qcom_pcie->dev;
+	struct device *dev = qcom_pcie->pp.dev;
 
 	res->vdda = devm_regulator_get(dev, "vdda");
 	if (IS_ERR(res->vdda))
@@ -236,7 +235,7 @@ static void qcom_pcie_deinit_v0(struct qcom_pcie *qcom_pcie)
 static int qcom_pcie_init_v0(struct qcom_pcie *qcom_pcie)
 {
 	struct qcom_pcie_resources_v0 *res = &qcom_pcie->res.v0;
-	struct device *dev = qcom_pcie->dev;
+	struct device *dev = qcom_pcie->pp.dev;
 	u32 val;
 	int ret;
 
@@ -358,7 +357,7 @@ static void qcom_pcie_deinit_v1(struct qcom_pcie *qcom_pcie)
 static int qcom_pcie_init_v1(struct qcom_pcie *qcom_pcie)
 {
 	struct qcom_pcie_resources_v1 *res = &qcom_pcie->res.v1;
-	struct device *dev = qcom_pcie->dev;
+	struct device *dev = qcom_pcie->pp.dev;
 	int ret;
 
 	ret = reset_control_deassert(res->core);
@@ -510,7 +509,6 @@ static int qcom_pcie_probe(struct platform_device *pdev)
 
 	pp = &qcom_pcie->pp;
 	qcom_pcie->ops = (struct qcom_pcie_ops *)of_device_get_match_data(dev);
-	qcom_pcie->dev = dev;
 
 	qcom_pcie->reset = devm_gpiod_get_optional(dev, "perst", GPIOD_OUT_LOW);
 	if (IS_ERR(qcom_pcie->reset))
