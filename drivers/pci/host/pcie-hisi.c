@@ -135,10 +135,10 @@ static struct pcie_host_ops hisi_pcie_host_ops = {
 	.link_up = hisi_pcie_link_up,
 };
 
-static int hisi_add_pcie_port(struct pcie_port *pp,
-				     struct platform_device *pdev)
+static int hisi_add_pcie_port(struct hisi_pcie *hisi_pcie,
+			      struct platform_device *pdev)
 {
-	struct hisi_pcie *hisi_pcie = to_hisi_pcie(pp);
+	struct pcie_port *pp = &hisi_pcie->pp;
 	int ret;
 	u32 port_id;
 
@@ -197,7 +197,7 @@ static int hisi_pcie_probe(struct platform_device *pdev)
 		return PTR_ERR(pp->dbi_base);
 	}
 
-	ret = hisi_add_pcie_port(pp, pdev);
+	ret = hisi_add_pcie_port(hisi_pcie, pdev);
 	if (ret)
 		return ret;
 
