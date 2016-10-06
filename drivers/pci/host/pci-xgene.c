@@ -179,9 +179,10 @@ static struct pci_ops xgene_pcie_ops = {
 	.write = pci_generic_config_write32,
 };
 
-static u64 xgene_pcie_set_ib_mask(void __iomem *csr_base, u32 addr,
+static u64 xgene_pcie_set_ib_mask(struct xgene_pcie *xgene_pcie, u32 addr,
 				  u32 flags, u64 size)
 {
+	void __iomem *csr_base = xgene_pcie->csr_base;
 	u64 mask = (~(size - 1) & PCI_BASE_ADDRESS_MEM_MASK) | flags;
 	u32 val32 = 0;
 	u32 val;
@@ -294,8 +295,11 @@ static void xgene_pcie_setup_ob_reg(struct xgene_pcie *xgene_pcie,
 	writel(upper_32_bits(pci_addr), base + 0x14);
 }
 
-static void xgene_pcie_setup_cfg_reg(void __iomem *csr_base, u64 addr)
+static void xgene_pcie_setup_cfg_reg(struct xgene_pcie *xgene_pcie)
 {
+	void __iomem *csr_base = xgene_pcie->csr_base;
+	u64 addr = xgene_pcie->cfg_addr;
+
 	writel(lower_32_bits(addr), csr_base + CFGBARL);
 	writel(upper_32_bits(addr), csr_base + CFGBARH);
 	writel(EN_REG, csr_base + CFGCTL);
@@ -343,17 +347,19 @@ static int xgene_pcie_map_ranges(struct xgene_pcie *xgene_pcie,
 			return -EINVAL;
 		}
 	}
-	xgene_pcie_setup_cfg_reg(xgene_pcie->csr_base, xgene_pcie->cfg_addr);
-
+	xgene_pcie_setup_cfg_reg(xgene_pcie);
 	return 0;
 }
 
-static void xgene_pcie_setup_pims(void *addr, u64 pim, u64 size)
+static void xgene_pcie_setup_pims(struct xgene_pcie *xgene_pcie, u32 pim_reg,
+				  u64 pim, u64 size)
 {
-	writel(lower_32_bits(pim), addr);
-	writel(upper_32_bits(pim) | EN_COHERENCY, addr + 0x04);
-	writel(lower_32_bits(size), addr + 0x10);
-	writel(upper_32_bits(size), addr + 0x14);
+	void __iomem *addr = xgene_pcie->csr_base;
+
+	writel(lower_32_bits(pim), addr + pim_reg);
+	writel(upper_32_bits(pim) | EN_COHERENCY, addr + pim_reg + 0x04);
+	writel(lower_32_bits(size), addr + pim_reg + 0x10);
+	writel(upper_32_bits(size), addr + pim_reg + 0x14);
 }
 
 /*
@@ -387,7 +393,7 @@ static void xgene_pcie_setup_ib_reg(struct xgene_pcie *xgene_pcie,
 	void __iomem *cfg_base = xgene_pcie->cfg_base;
 	struct device *dev = xgene_pcie->dev;
 	void *bar_addr;
-	void *pim_addr;
+	u32 pim_reg;
 	u64 cpu_addr = range->cpu_addr;
 	u64 pci_addr = range->pci_addr;
 	u64 size = range->size;
@@ -408,17 +414,17 @@ static void xgene_pcie_setup_ib_reg(struct xgene_pcie *xgene_pcie,
 	bar_low = pcie_bar_low_val((u32)cpu_addr, flags);
 	switch (region) {
 	case 0:
-		xgene_pcie_set_ib_mask(csr_base, BRIDGE_CFG_4, flags, size);
+		xgene_pcie_set_ib_mask(xgene_pcie, BRIDGE_CFG_4, flags, size);
 		bar_addr = cfg_base + PCI_BASE_ADDRESS_0;
 		writel(bar_low, bar_addr);
 		writel(upper_32_bits(cpu_addr), bar_addr + 0x4);
-		pim_addr = csr_base + PIM1_1L;
+		pim_reg = PIM1_1L;
 		break;
 	case 1:
 		bar_addr = csr_base + IBAR2;
 		writel(bar_low, bar_addr);
 		writel(lower_32_bits(mask), csr_base + IR2MSK);
-		pim_addr = csr_base + PIM2_1L;
+		pim_reg = PIM2_1L;
 		break;
 	case 2:
 		bar_addr = csr_base + IBAR3L;
@@ -426,11 +432,11 @@ static void xgene_pcie_setup_ib_reg(struct xgene_pcie *xgene_pcie,
 		writel(upper_32_bits(cpu_addr), bar_addr + 0x4);
 		writel(lower_32_bits(mask), csr_base + IR3MSKL);
 		writel(upper_32_bits(mask), csr_base + IR3MSKL + 0x4);
-		pim_addr = csr_base + PIM3_1L;
+		pim_reg = PIM3_1L;
 		break;
 	}
 
-	xgene_pcie_setup_pims(pim_addr, pci_addr, ~(size - 1));
+	xgene_pcie_setup_pims(xgene_pcie, pim_reg, pci_addr, ~(size - 1));
 }
 
 static int pci_dma_range_parser_init(struct of_pci_range_parser *parser,
