@@ -69,24 +69,12 @@ struct armada8k_pcie {
 
 #define to_armada8k_pcie(x)	container_of(x, struct armada8k_pcie, pp)
 
-static u32 armada8k_pcie_readl(struct armada8k_pcie *armada8k_pcie, u32 offset)
-{
-	return readl(armada8k_pcie->pp.dbi_base + offset);
-}
-
-static void armada8k_pcie_writel(struct armada8k_pcie *armada8k_pcie,
-				 u32 offset, u32 val)
-{
-	writel(val, armada8k_pcie->pp.dbi_base + offset);
-}
-
 static int armada8k_pcie_link_up(struct pcie_port *pp)
 {
-	struct armada8k_pcie *armada8k_pcie = to_armada8k_pcie(pp);
 	u32 reg;
 	u32 mask = PCIE_GLB_STS_RDLH_LINK_UP | PCIE_GLB_STS_PHY_LINK_UP;
 
-	reg = armada8k_pcie_readl(armada8k_pcie, PCIE_GLOBAL_STATUS_REG);
+	reg = dw_pcie_readl_rc(pp, PCIE_GLOBAL_STATUS_REG);
 	if ((reg & mask) == mask)
 		return 1;
 
@@ -101,49 +89,43 @@ static void armada8k_pcie_establish_link(struct armada8k_pcie *armada8k_pcie)
 
 	if (!dw_pcie_link_up(pp)) {
 		/* Disable LTSSM state machine to enable configuration */
-		reg = armada8k_pcie_readl(armada8k_pcie,
-					  PCIE_GLOBAL_CONTROL_REG);
+		reg = dw_pcie_readl_rc(pp, PCIE_GLOBAL_CONTROL_REG);
 		reg &= ~(PCIE_APP_LTSSM_EN);
-		armada8k_pcie_writel(armada8k_pcie, PCIE_GLOBAL_CONTROL_REG,
-				     reg);
+		dw_pcie_writel_rc(pp, PCIE_GLOBAL_CONTROL_REG, reg);
 	}
 
 	/* Set the device to root complex mode */
-	reg = armada8k_pcie_readl(armada8k_pcie, PCIE_GLOBAL_CONTROL_REG);
+	reg = dw_pcie_readl_rc(pp, PCIE_GLOBAL_CONTROL_REG);
 	reg &= ~(PCIE_DEVICE_TYPE_MASK << PCIE_DEVICE_TYPE_SHIFT);
 	reg |= PCIE_DEVICE_TYPE_RC << PCIE_DEVICE_TYPE_SHIFT;
-	armada8k_pcie_writel(armada8k_pcie, PCIE_GLOBAL_CONTROL_REG, reg);
+	dw_pcie_writel_rc(pp, PCIE_GLOBAL_CONTROL_REG, reg);
 
 	/* Set the PCIe master AxCache attributes */
-	armada8k_pcie_writel(armada8k_pcie, PCIE_ARCACHE_TRC_REG,
-			     ARCACHE_DEFAULT_VALUE);
-	armada8k_pcie_writel(armada8k_pcie, PCIE_AWCACHE_TRC_REG,
-			     AWCACHE_DEFAULT_VALUE);
+	dw_pcie_writel_rc(pp, PCIE_ARCACHE_TRC_REG, ARCACHE_DEFAULT_VALUE);
+	dw_pcie_writel_rc(pp, PCIE_AWCACHE_TRC_REG, AWCACHE_DEFAULT_VALUE);
 
 	/* Set the PCIe master AxDomain attributes */
-	reg = armada8k_pcie_readl(armada8k_pcie, PCIE_ARUSER_REG);
+	reg = dw_pcie_readl_rc(pp, PCIE_ARUSER_REG);
 	reg &= ~(AX_USER_DOMAIN_MASK << AX_USER_DOMAIN_SHIFT);
 	reg |= DOMAIN_OUTER_SHAREABLE << AX_USER_DOMAIN_SHIFT;
-	armada8k_pcie_writel(armada8k_pcie, PCIE_ARUSER_REG, reg);
+	dw_pcie_writel_rc(pp, PCIE_ARUSER_REG, reg);
 
-	reg = armada8k_pcie_readl(armada8k_pcie, PCIE_AWUSER_REG);
+	reg = dw_pcie_readl_rc(pp, PCIE_AWUSER_REG);
 	reg &= ~(AX_USER_DOMAIN_MASK << AX_USER_DOMAIN_SHIFT);
 	reg |= DOMAIN_OUTER_SHAREABLE << AX_USER_DOMAIN_SHIFT;
-	armada8k_pcie_writel(armada8k_pcie, PCIE_AWUSER_REG, reg);
+	dw_pcie_writel_rc(pp, PCIE_AWUSER_REG, reg);
 
 	/* Enable INT A-D interrupts */
-	reg = armada8k_pcie_readl(armada8k_pcie, PCIE_GLOBAL_INT_MASK1_REG);
+	reg = dw_pcie_readl_rc(pp, PCIE_GLOBAL_INT_MASK1_REG);
 	reg |= PCIE_INT_A_ASSERT_MASK | PCIE_INT_B_ASSERT_MASK |
 	       PCIE_INT_C_ASSERT_MASK | PCIE_INT_D_ASSERT_MASK;
-	armada8k_pcie_writel(armada8k_pcie, PCIE_GLOBAL_INT_MASK1_REG, reg);
+	dw_pcie_writel_rc(pp, PCIE_GLOBAL_INT_MASK1_REG, reg);
 
 	if (!dw_pcie_link_up(pp)) {
 		/* Configuration done. Start LTSSM */
-		reg = armada8k_pcie_readl(armada8k_pcie,
-					  PCIE_GLOBAL_CONTROL_REG);
+		reg = dw_pcie_readl_rc(pp, PCIE_GLOBAL_CONTROL_REG);
 		reg |= PCIE_APP_LTSSM_EN;
-		armada8k_pcie_writel(armada8k_pcie, PCIE_GLOBAL_CONTROL_REG,
-				     reg);
+		dw_pcie_writel_rc(pp, PCIE_GLOBAL_CONTROL_REG, reg);
 	}
 
 	/* Wait until the link becomes active again */
@@ -162,6 +144,7 @@ static void armada8k_pcie_host_init(struct pcie_port *pp)
 static irqreturn_t armada8k_pcie_irq_handler(int irq, void *arg)
 {
 	struct armada8k_pcie *armada8k_pcie = arg;
+	struct pcie_port *pp = &armada8k_pcie->pp;
 	u32 val;
 
 	/*
@@ -169,8 +152,8 @@ static irqreturn_t armada8k_pcie_irq_handler(int irq, void *arg)
 	 * PCI device. However, they are also latched into the PCIe
 	 * controller, so we simply discard them.
 	 */
-	val = armada8k_pcie_readl(armada8k_pcie, PCIE_GLOBAL_INT_CAUSE1_REG);
-	armada8k_pcie_writel(armada8k_pcie, PCIE_GLOBAL_INT_CAUSE1_REG, val);
+	val = dw_pcie_readl_rc(pp, PCIE_GLOBAL_INT_CAUSE1_REG);
+	dw_pcie_writel_rc(pp, PCIE_GLOBAL_INT_CAUSE1_REG, val);
 
 	return IRQ_HANDLED;
 }
