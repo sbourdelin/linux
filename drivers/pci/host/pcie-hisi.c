@@ -44,13 +44,12 @@ struct hisi_pcie {
 	struct pcie_soc_ops *soc_ops;
 };
 
-static u32 hisi_pcie_apb_readl(struct hisi_pcie *pcie, u32 reg)
+static u32 hisi_apb_readl(struct hisi_pcie *pcie, u32 reg)
 {
 	return readl(pcie->reg_base + reg);
 }
 
-static void hisi_pcie_apb_writel(struct hisi_pcie *pcie,
-					u32 val, u32 reg)
+static void hisi_apb_writel(struct hisi_pcie *pcie, u32 val, u32 reg)
 {
 	writel(val, pcie->reg_base + reg);
 }
@@ -66,7 +65,7 @@ static int hisi_pcie_cfg_read(struct pcie_port *pp, int where, int size,
 
 	walker += (where & 0x3);
 	reg = where & ~0x3;
-	reg_val = hisi_pcie_apb_readl(pcie, reg);
+	reg_val = hisi_apb_readl(pcie, reg);
 
 	if (size == 1)
 		*val = *(u8 __force *) walker;
@@ -92,15 +91,15 @@ static int hisi_pcie_cfg_write(struct pcie_port *pp, int where, int  size,
 	walker += (where & 0x3);
 	reg = where & ~0x3;
 	if (size == 4)
-		hisi_pcie_apb_writel(pcie, val, reg);
+		hisi_apb_writel(pcie, val, reg);
 	else if (size == 2) {
-		reg_val = hisi_pcie_apb_readl(pcie, reg);
+		reg_val = hisi_apb_readl(pcie, reg);
 		*(u16 __force *) walker = val;
-		hisi_pcie_apb_writel(pcie, reg_val, reg);
+		hisi_apb_writel(pcie, reg_val, reg);
 	} else if (size == 1) {
-		reg_val = hisi_pcie_apb_readl(pcie, reg);
+		reg_val = hisi_apb_readl(pcie, reg);
 		*(u8 __force *) walker = val;
-		hisi_pcie_apb_writel(pcie, reg_val, reg);
+		hisi_apb_writel(pcie, reg_val, reg);
 	} else
 		return PCIBIOS_BAD_REGISTER_NUMBER;
 
@@ -121,8 +120,7 @@ static int hisi_pcie_link_up_hip06(struct hisi_pcie *hisi_pcie)
 {
 	u32 val;
 
-	val = hisi_pcie_apb_readl(hisi_pcie, PCIE_HIP06_CTRL_OFF +
-			PCIE_SYS_STATE4);
+	val = hisi_apb_readl(hisi_pcie, PCIE_HIP06_CTRL_OFF + PCIE_SYS_STATE4);
 
 	return ((val & PCIE_LTSSM_STATE_MASK) == PCIE_LTSSM_LINKUP_STATE);
 }
