@@ -69,4 +69,11 @@
     .rst-content tt.literal,.rst-content tt.literal,.rst-content code.literal {
         color: inherit;
     }
+
+    /* literal blocks (e.g. parsed-literal directive) */
+
+    pre.literal-block {
+        font-size: 12px;
+        line-height: 1.5;
+    }
 }
