@@ -55,6 +55,11 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
 	bcma_set_drvdata(bdev, iproc_pcie);
 
 	iproc_pcie->base = bdev->io_addr;
+	if (!iproc_pcie->base) {
+		dev_err(&bdev->dev, "no controller registers\n");
+		return -ENOMEM;
+	}
+
 	iproc_pcie->base_addr = bdev->addr;
 
 	res_mem.start = bdev->addr_s[0];
