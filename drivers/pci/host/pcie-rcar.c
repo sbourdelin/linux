@@ -907,8 +907,7 @@ err:
 	return err;
 }
 
-static int rcar_pcie_get_resources(struct platform_device *pdev,
-				   struct rcar_pcie *rcar_pcie)
+static int rcar_pcie_get_resources(struct rcar_pcie *rcar_pcie)
 {
 	struct device *dev = rcar_pcie->dev;
 	struct resource res;
@@ -1147,7 +1146,7 @@ static int rcar_pcie_probe(struct platform_device *pdev)
 
 	rcar_pcie_parse_request_of_pci_ranges(rcar_pcie);
 
-	err = rcar_pcie_get_resources(pdev, rcar_pcie);
+	err = rcar_pcie_get_resources(rcar_pcie);
 	if (err < 0) {
 		dev_err(dev, "failed to request resources: %d\n", err);
 		return err;
