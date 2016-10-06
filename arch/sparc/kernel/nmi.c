@@ -153,6 +153,8 @@ static void report_broken_nmi(int cpu, int *prev_nmi_count)
 
 void stop_nmi_watchdog(void *unused)
 {
+	if (!__this_cpu_read(wd_enabled))
+		return;
 	pcr_ops->write_pcr(0, pcr_ops->pcr_nmi_disable);
 	__this_cpu_write(wd_enabled, 0);
 	atomic_dec(&nmi_active);
@@ -207,6 +209,8 @@ error:
 
 void start_nmi_watchdog(void *unused)
 {
+	if (__this_cpu_read(wd_enabled))
+		return;
 	__this_cpu_write(wd_enabled, 1);
 	atomic_inc(&nmi_active);
 
@@ -270,3 +274,25 @@ static int __init setup_nmi_watchdog(char *str)
 	return 0;
 }
 __setup("nmi_watchdog=", setup_nmi_watchdog);
+
+#ifdef CONFIG_LOCKUP_DETECTOR
+void update_arch_nmi_watchdog(void)
+{
+	if (atomic_read(&nmi_active) < 0) {
+		printk(KERN_WARNING
+		       "NMI watchdog cannot be enabled or disabled\n");
+		return;
+	}
+
+	/*
+	 * Check for bit 0. Bit 0 is dedicated for hard lockup detector or
+	 * arch specific nmi and bit 1 for the soft lockup detector. We
+	 * are interested only in bit 0 here.
+	 */
+	if (watchdog_enabled & 1)
+		on_each_cpu(start_nmi_watchdog, NULL, 1);
+	else
+		on_each_cpu(stop_nmi_watchdog, NULL, 1);
+
+}
+#endif
