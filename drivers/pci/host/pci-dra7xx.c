@@ -84,14 +84,15 @@ static void dra7xx_pcie_writel(struct dra7xx_pcie *dra7xx_pcie, u32 offset,
 	writel(value, dra7xx_pcie->base + offset);
 }
 
-static u32 dra7xx_pcie_readl_rc(struct pcie_port *pp, u32 offset)
+static u32 dra7xx_pcie_readl_rc(struct dra7xx_pcie *dra7xx_pcie, u32 offset)
 {
-	return readl(pp->dbi_base + offset);
+	return readl(dra7xx_pcie->pp.dbi_base + offset);
 }
 
-static void dra7xx_pcie_writel_rc(struct pcie_port *pp, u32 offset, u32 value)
+static void dra7xx_pcie_writel_rc(struct dra7xx_pcie *dra7xx_pcie, u32 offset,
+				  u32 value)
 {
-	writel(value, pp->dbi_base + offset);
+	writel(value, dra7xx_pcie->pp.dbi_base + offset);
 }
 
 static int dra7xx_pcie_link_up(struct pcie_port *pp)
@@ -102,9 +103,9 @@ static int dra7xx_pcie_link_up(struct pcie_port *pp)
 	return !!(reg & LINK_UP);
 }
 
-static int dra7xx_pcie_establish_link(struct pcie_port *pp)
+static int dra7xx_pcie_establish_link(struct dra7xx_pcie *dra7xx_pcie)
 {
-	struct dra7xx_pcie *dra7xx_pcie = to_dra7xx_pcie(pp);
+	struct pcie_port *pp = &dra7xx_pcie->pp;
 	u32 reg;
 
 	if (dw_pcie_link_up(pp)) {
@@ -119,10 +120,8 @@ static int dra7xx_pcie_establish_link(struct pcie_port *pp)
 	return dw_pcie_wait_for_link(pp);
 }
 
-static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
+static void dra7xx_pcie_enable_interrupts(struct dra7xx_pcie *dra7xx_pcie)
 {
-	struct dra7xx_pcie *dra7xx_pcie = to_dra7xx_pcie(pp);
-
 	dra7xx_pcie_writel(dra7xx_pcie, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN,
 			   ~INTERRUPTS);
 	dra7xx_pcie_writel(dra7xx_pcie,
@@ -141,6 +140,8 @@ static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
 
 static void dra7xx_pcie_host_init(struct pcie_port *pp)
 {
+	struct dra7xx_pcie *dra7xx_pcie = to_dra7xx_pcie(pp);
+
 	pp->io_base &= DRA7XX_CPU_TO_BUS_ADDR;
 	pp->mem_base &= DRA7XX_CPU_TO_BUS_ADDR;
 	pp->cfg0_base &= DRA7XX_CPU_TO_BUS_ADDR;
@@ -148,10 +149,10 @@ static void dra7xx_pcie_host_init(struct pcie_port *pp)
 
 	dw_pcie_setup_rc(pp);
 
-	dra7xx_pcie_establish_link(pp);
+	dra7xx_pcie_establish_link(dra7xx_pcie);
 	if (IS_ENABLED(CONFIG_PCI_MSI))
 		dw_pcie_msi_init(pp);
-	dra7xx_pcie_enable_interrupts(pp);
+	dra7xx_pcie_enable_interrupts(dra7xx_pcie);
 }
 
 static struct pcie_host_ops dra7xx_pcie_host_ops = {
@@ -195,8 +196,8 @@ static int dra7xx_pcie_init_irq_domain(struct pcie_port *pp)
 
 static irqreturn_t dra7xx_pcie_msi_irq_handler(int irq, void *arg)
 {
-	struct pcie_port *pp = arg;
-	struct dra7xx_pcie *dra7xx_pcie = to_dra7xx_pcie(pp);
+	struct dra7xx_pcie *dra7xx_pcie = arg;
+	struct pcie_port *pp = &dra7xx_pcie->pp;
 	u32 reg;
 
 	reg = dra7xx_pcie_readl(dra7xx_pcie,
@@ -298,7 +299,7 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx_pcie,
 	ret = devm_request_irq(&pdev->dev, pp->irq,
 			       dra7xx_pcie_msi_irq_handler,
 			       IRQF_SHARED | IRQF_NO_THREAD,
-			       "dra7-pcie-msi",	pp);
+			       "dra7-pcie-msi",	dra7xx_pcie);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to request irq\n");
 		return ret;
@@ -450,13 +451,12 @@ err_phy:
 static int dra7xx_pcie_suspend(struct device *dev)
 {
 	struct dra7xx_pcie *dra7xx_pcie = dev_get_drvdata(dev);
-	struct pcie_port *pp = &dra7xx_pcie->pp;
 	u32 val;
 
 	/* clear MSE */
-	val = dra7xx_pcie_readl_rc(pp, PCI_COMMAND);
+	val = dra7xx_pcie_readl_rc(dra7xx_pcie, PCI_COMMAND);
 	val &= ~PCI_COMMAND_MEMORY;
-	dra7xx_pcie_writel_rc(pp, PCI_COMMAND, val);
+	dra7xx_pcie_writel_rc(dra7xx_pcie, PCI_COMMAND, val);
 
 	return 0;
 }
@@ -464,13 +464,12 @@ static int dra7xx_pcie_suspend(struct device *dev)
 static int dra7xx_pcie_resume(struct device *dev)
 {
 	struct dra7xx_pcie *dra7xx_pcie = dev_get_drvdata(dev);
-	struct pcie_port *pp = &dra7xx_pcie->pp;
 	u32 val;
 
 	/* set MSE */
-	val = dra7xx_pcie_readl_rc(pp, PCI_COMMAND);
+	val = dra7xx_pcie_readl_rc(dra7xx_pcie, PCI_COMMAND);
 	val |= PCI_COMMAND_MEMORY;
-	dra7xx_pcie_writel_rc(pp, PCI_COMMAND, val);
+	dra7xx_pcie_writel_rc(dra7xx_pcie, PCI_COMMAND, val);
 
 	return 0;
 }
