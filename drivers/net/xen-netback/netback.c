@@ -168,6 +168,10 @@ static bool xenvif_rx_ring_slots_available(struct xenvif_queue *queue)
 	needed = DIV_ROUND_UP(skb->len, XEN_PAGE_SIZE);
 	if (skb_is_gso(skb))
 		needed++;
+	/* Assume the frontend is capable of handling the hash
+	 * extra_info at this point. This will only ever lead to an
+	 * accurate value or over-estimation.
+	 */
 	if (skb->sw_hash)
 		needed++;
 
@@ -378,9 +382,8 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
 		.npo = npo,
 		.head = *head,
 		.gso_type = XEN_NETIF_GSO_TYPE_NONE,
-		/* xenvif_set_skb_hash() will have either set a s/w
-		 * hash or cleared the hash depending on
-		 * whether the the frontend wants a hash for this skb.
+		/* xenvif_rx_action() will have cleared any hash if
+		 * the frontend is not capable of handling it.
 		 */
 		.hash_present = skb->sw_hash,
 	};
@@ -593,6 +596,14 @@ static void xenvif_rx_action(struct xenvif_queue *queue)
 	       && (skb = xenvif_rx_dequeue(queue)) != NULL) {
 		queue->last_rx_time = jiffies;
 
+		/* If there is no hash algorithm configured make sure
+		 * there is no hash information in the socket buffer
+		 * otherwise it would be incorrectly forwarded to the
+		 * frontend.
+		 */
+		if (vif->hash.alg == XEN_NETIF_CTRL_HASH_ALGORITHM_NONE)
+			skb_clear_hash(skb);
+
 		XENVIF_RX_CB(skb)->meta_slots_used = xenvif_gop_skb(skb, &npo, queue);
 
 		__skb_queue_tail(&rxq, skb);
@@ -667,12 +678,6 @@ static void xenvif_rx_action(struct xenvif_queue *queue)
 		}
 
 		if (skb->sw_hash) {
-			/* Since the skb got here via xenvif_select_queue()
-			 * we know that the hash has been re-calculated
-			 * according to a configuration set by the frontend
-			 * and therefore we know that it is legitimate to
-			 * pass it to the frontend.
-			 */
 			if (resp->flags & XEN_NETRXF_extra_info)
 				extra->flags |= XEN_NETIF_EXTRA_FLAG_MORE;
 			else
