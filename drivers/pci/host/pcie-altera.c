@@ -136,7 +136,7 @@ static void tlp_write_tx(struct altera_pcie *altera_pcie,
 	altera_cra_writel(altera_pcie, RP_TX_CNTRL, tlp_rp_regdata->ctrl);
 }
 
-static bool altera_pcie_valid_config(struct altera_pcie *altera_pcie,
+static bool altera_pcie_valid_device(struct altera_pcie *altera_pcie,
 				     struct pci_bus *bus, int dev)
 {
 	/* If there is no link, then there is no device */
@@ -337,7 +337,7 @@ static int altera_pcie_cfg_read(struct pci_bus *bus, unsigned int devfn,
 	if (altera_pcie_hide_rc_bar(bus, devfn, where))
 		return PCIBIOS_BAD_REGISTER_NUMBER;
 
-	if (!altera_pcie_valid_config(altera_pcie, bus, PCI_SLOT(devfn))) {
+	if (!altera_pcie_valid_device(altera_pcie, bus, PCI_SLOT(devfn))) {
 		*value = 0xffffffff;
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
@@ -354,7 +354,7 @@ static int altera_pcie_cfg_write(struct pci_bus *bus, unsigned int devfn,
 	if (altera_pcie_hide_rc_bar(bus, devfn, where))
 		return PCIBIOS_BAD_REGISTER_NUMBER;
 
-	if (!altera_pcie_valid_config(altera_pcie, bus, PCI_SLOT(devfn)))
+	if (!altera_pcie_valid_device(altera_pcie, bus, PCI_SLOT(devfn)))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
 	return altera_raw_cfg_write(altera_pcie, bus->number, devfn, where,
