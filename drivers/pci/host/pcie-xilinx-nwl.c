@@ -191,7 +191,7 @@ static u32 nwl_pcie_readl(struct nwl_pcie *nwl_pcie, u32 off)
 	return readl(nwl_pcie->breg_base + off);
 }
 
-static void nwl_pcie_writel(struct nwl_pcie *nwl_pcie, u32 val, u32 off)
+static void nwl_pcie_writel(struct nwl_pcie *nwl_pcie, u32 off, u32 val)
 {
 	writel(val, nwl_pcie->breg_base + off);
 }
@@ -327,7 +327,7 @@ static irqreturn_t nwl_pcie_misc_handler(int irq, void *data)
 		dev_info(dev, "Link Bandwidth Management Status bit set\n");
 
 	/* Clear misc interrupt status */
-	nwl_pcie_writel(nwl_pcie, misc_stat, MSGF_MISC_STATUS);
+	nwl_pcie_writel(nwl_pcie, MSGF_MISC_STATUS, misc_stat);
 	return IRQ_HANDLED;
 }
 
@@ -366,7 +366,7 @@ static void nwl_pcie_handle_msi_irq(struct nwl_pcie *nwl_pcie, u32 status_reg)
 
 	while ((status = nwl_pcie_readl(nwl_pcie, status_reg)) != 0) {
 		for_each_set_bit(bit, &status, 32) {
-			nwl_pcie_writel(nwl_pcie, 1 << bit, status_reg);
+			nwl_pcie_writel(nwl_pcie, status_reg, 1 << bit);
 			virq = irq_find_mapping(msi->dev_domain, bit);
 			if (virq)
 				generic_handle_irq(virq);
@@ -587,40 +587,42 @@ static int nwl_pcie_enable_msi(struct nwl_pcie *nwl_pcie, struct pci_bus *bus)
 	}
 
 	/* Enable MSII */
-	nwl_pcie_writel(nwl_pcie, nwl_pcie_readl(nwl_pcie, I_MSII_CONTROL) |
-			  MSII_ENABLE, I_MSII_CONTROL);
+	nwl_pcie_writel(nwl_pcie, I_MSII_CONTROL,
+			nwl_pcie_readl(nwl_pcie, I_MSII_CONTROL) | MSII_ENABLE);
 
 	/* Enable MSII status */
-	nwl_pcie_writel(nwl_pcie, nwl_pcie_readl(nwl_pcie, I_MSII_CONTROL) |
-			  MSII_STATUS_ENABLE, I_MSII_CONTROL);
+	nwl_pcie_writel(nwl_pcie, I_MSII_CONTROL,
+			nwl_pcie_readl(nwl_pcie, I_MSII_CONTROL) |
+				MSII_STATUS_ENABLE);
 
 	/* setup AFI/FPCI range */
 	base = nwl_pcie->phys_pcie_reg_base;
-	nwl_pcie_writel(nwl_pcie, lower_32_bits(base), I_MSII_BASE_LO);
-	nwl_pcie_writel(nwl_pcie, upper_32_bits(base), I_MSII_BASE_HI);
+	nwl_pcie_writel(nwl_pcie, I_MSII_BASE_LO, lower_32_bits(base));
+	nwl_pcie_writel(nwl_pcie, I_MSII_BASE_HI, upper_32_bits(base));
 
 	/*
 	 * For high range MSI interrupts: disable, clear any pending,
 	 * and enable
 	 */
-	nwl_pcie_writel(nwl_pcie, (u32)~MSGF_MSI_SR_HI_MASK, MSGF_MSI_MASK_HI);
+	nwl_pcie_writel(nwl_pcie, MSGF_MSI_MASK_HI, (u32)~MSGF_MSI_SR_HI_MASK);
 
-	nwl_pcie_writel(nwl_pcie, nwl_pcie_readl(nwl_pcie,  MSGF_MSI_STATUS_HI) &
-			  MSGF_MSI_SR_HI_MASK, MSGF_MSI_STATUS_HI);
+	nwl_pcie_writel(nwl_pcie, MSGF_MSI_STATUS_HI,
+			nwl_pcie_readl(nwl_pcie,  MSGF_MSI_STATUS_HI) &
+				MSGF_MSI_SR_HI_MASK);
 
-	nwl_pcie_writel(nwl_pcie, MSGF_MSI_SR_HI_MASK, MSGF_MSI_MASK_HI);
+	nwl_pcie_writel(nwl_pcie, MSGF_MSI_MASK_HI, MSGF_MSI_SR_HI_MASK);
 
 	/*
 	 * For low range MSI interrupts: disable, clear any pending,
 	 * and enable
 	 */
-	nwl_pcie_writel(nwl_pcie, (u32)~MSGF_MSI_SR_LO_MASK, MSGF_MSI_MASK_LO);
+	nwl_pcie_writel(nwl_pcie, MSGF_MSI_MASK_LO, (u32)~MSGF_MSI_SR_LO_MASK);
 
-	nwl_pcie_writel(nwl_pcie, nwl_pcie_readl(nwl_pcie, MSGF_MSI_STATUS_LO) &
-			  MSGF_MSI_SR_LO_MASK, MSGF_MSI_STATUS_LO);
+	nwl_pcie_writel(nwl_pcie, MSGF_MSI_STATUS_LO,
+			nwl_pcie_readl(nwl_pcie, MSGF_MSI_STATUS_LO) &
+				MSGF_MSI_SR_LO_MASK);
 
-	nwl_pcie_writel(nwl_pcie, MSGF_MSI_SR_LO_MASK, MSGF_MSI_MASK_LO);
-
+	nwl_pcie_writel(nwl_pcie, MSGF_MSI_MASK_LO, MSGF_MSI_SR_LO_MASK);
 	return 0;
 err:
 	kfree(msi->bitmap);
@@ -642,25 +644,26 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *nwl_pcie)
 	}
 
 	/* Write bridge_off to breg base */
-	nwl_pcie_writel(nwl_pcie, lower_32_bits(nwl_pcie->phys_breg_base),
-			  E_BREG_BASE_LO);
-	nwl_pcie_writel(nwl_pcie, upper_32_bits(nwl_pcie->phys_breg_base),
-			  E_BREG_BASE_HI);
+	nwl_pcie_writel(nwl_pcie, E_BREG_BASE_LO,
+			lower_32_bits(nwl_pcie->phys_breg_base));
+	nwl_pcie_writel(nwl_pcie, E_BREG_BASE_HI,
+			upper_32_bits(nwl_pcie->phys_breg_base));
 
 	/* Enable BREG */
-	nwl_pcie_writel(nwl_pcie, ~BREG_ENABLE_FORCE & BREG_ENABLE,
-			  E_BREG_CONTROL);
+	nwl_pcie_writel(nwl_pcie, E_BREG_CONTROL,
+			~BREG_ENABLE_FORCE & BREG_ENABLE);
 
 	/* Disable DMA channel registers */
-	nwl_pcie_writel(nwl_pcie, nwl_pcie_readl(nwl_pcie, BRCFG_PCIE_RX0) |
-			  CFG_DMA_REG_BAR, BRCFG_PCIE_RX0);
+	nwl_pcie_writel(nwl_pcie, BRCFG_PCIE_RX0,
+			nwl_pcie_readl(nwl_pcie, BRCFG_PCIE_RX0) |
+				CFG_DMA_REG_BAR);
 
 	/* Enable Ingress subtractive decode translation */
-	nwl_pcie_writel(nwl_pcie, SET_ISUB_CONTROL, I_ISUB_CONTROL);
+	nwl_pcie_writel(nwl_pcie, I_ISUB_CONTROL, SET_ISUB_CONTROL);
 
 	/* Enable msg filtering details */
-	nwl_pcie_writel(nwl_pcie, CFG_ENABLE_MSG_FILTER_MASK,
-			  BRCFG_PCIE_RX_MSG_FILTER);
+	nwl_pcie_writel(nwl_pcie, BRCFG_PCIE_RX_MSG_FILTER,
+			CFG_ENABLE_MSG_FILTER_MASK);
 
 	err = nwl_wait_for_link(nwl_pcie);
 	if (err)
@@ -674,17 +677,18 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *nwl_pcie)
 	}
 
 	/* Enable ECAM */
-	nwl_pcie_writel(nwl_pcie, nwl_pcie_readl(nwl_pcie, E_ECAM_CONTROL) |
-			  E_ECAM_CR_ENABLE, E_ECAM_CONTROL);
+	nwl_pcie_writel(nwl_pcie, E_ECAM_CONTROL,
+			nwl_pcie_readl(nwl_pcie, E_ECAM_CONTROL) |
+				E_ECAM_CR_ENABLE);
 
-	nwl_pcie_writel(nwl_pcie, nwl_pcie_readl(nwl_pcie, E_ECAM_CONTROL) |
-			  (nwl_pcie->ecam_value << E_ECAM_SIZE_SHIFT),
-			  E_ECAM_CONTROL);
+	nwl_pcie_writel(nwl_pcie, E_ECAM_CONTROL,
+			nwl_pcie_readl(nwl_pcie, E_ECAM_CONTROL) |
+				(nwl_pcie->ecam_value << E_ECAM_SIZE_SHIFT));
 
-	nwl_pcie_writel(nwl_pcie, lower_32_bits(nwl_pcie->phys_ecam_base),
-			  E_ECAM_BASE_LO);
-	nwl_pcie_writel(nwl_pcie, upper_32_bits(nwl_pcie->phys_ecam_base),
-			  E_ECAM_BASE_HI);
+	nwl_pcie_writel(nwl_pcie, E_ECAM_BASE_LO,
+			lower_32_bits(nwl_pcie->phys_ecam_base));
+	nwl_pcie_writel(nwl_pcie, E_ECAM_BASE_HI,
+			upper_32_bits(nwl_pcie->phys_ecam_base));
 
 	/* Get bus range */
 	ecam_val = nwl_pcie_readl(nwl_pcie, E_ECAM_CONTROL);
@@ -717,30 +721,32 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *nwl_pcie)
 	}
 
 	/* Disable all misc interrupts */
-	nwl_pcie_writel(nwl_pcie, (u32)~MSGF_MISC_SR_MASKALL, MSGF_MISC_MASK);
+	nwl_pcie_writel(nwl_pcie, MSGF_MISC_MASK, (u32)~MSGF_MISC_SR_MASKALL);
 
 	/* Clear pending misc interrupts */
-	nwl_pcie_writel(nwl_pcie, nwl_pcie_readl(nwl_pcie, MSGF_MISC_STATUS) &
-			  MSGF_MISC_SR_MASKALL, MSGF_MISC_STATUS);
+	nwl_pcie_writel(nwl_pcie, MSGF_MISC_STATUS,
+			nwl_pcie_readl(nwl_pcie, MSGF_MISC_STATUS) &
+				MSGF_MISC_SR_MASKALL);
 
 	/* Enable all misc interrupts */
-	nwl_pcie_writel(nwl_pcie, MSGF_MISC_SR_MASKALL, MSGF_MISC_MASK);
+	nwl_pcie_writel(nwl_pcie, MSGF_MISC_MASK, MSGF_MISC_SR_MASKALL);
 
 
 	/* Disable all legacy interrupts */
-	nwl_pcie_writel(nwl_pcie, (u32)~MSGF_LEG_SR_MASKALL, MSGF_LEG_MASK);
+	nwl_pcie_writel(nwl_pcie, MSGF_LEG_MASK, (u32)~MSGF_LEG_SR_MASKALL);
 
 	/* Clear pending legacy interrupts */
-	nwl_pcie_writel(nwl_pcie, nwl_pcie_readl(nwl_pcie, MSGF_LEG_STATUS) &
-			  MSGF_LEG_SR_MASKALL, MSGF_LEG_STATUS);
+	nwl_pcie_writel(nwl_pcie, MSGF_LEG_STATUS,
+			nwl_pcie_readl(nwl_pcie, MSGF_LEG_STATUS) &
+				MSGF_LEG_SR_MASKALL);
 
 	/* Enable all legacy interrupts */
-	nwl_pcie_writel(nwl_pcie, MSGF_LEG_SR_MASKALL, MSGF_LEG_MASK);
+	nwl_pcie_writel(nwl_pcie, MSGF_LEG_MASK, MSGF_LEG_SR_MASKALL);
 
 	/* Enable the bridge config interrupt */
-	nwl_pcie_writel(nwl_pcie, nwl_pcie_readl(nwl_pcie, BRCFG_INTERRUPT) |
-			  BRCFG_INTERRUPT_MASK, BRCFG_INTERRUPT);
-
+	nwl_pcie_writel(nwl_pcie, BRCFG_INTERRUPT,
+			nwl_pcie_readl(nwl_pcie, BRCFG_INTERRUPT) |
+				BRCFG_INTERRUPT_MASK);
 	return 0;
 }
 
