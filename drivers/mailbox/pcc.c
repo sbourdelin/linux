@@ -55,6 +55,8 @@
  *  clients to be implemented as its Mailbox Client Channels.
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/acpi.h>
 #include <linux/delay.h>
 #include <linux/io.h>
@@ -123,8 +125,8 @@ static int read_register(void __iomem *vaddr, u64 *val, unsigned int bit_width)
 		*val = readq(vaddr);
 		break;
 	default:
-		pr_debug("Error: Cannot read register of %u bit width",
-			bit_width);
+		pr_debug("Error: Cannot read register of %u bit width\n",
+			 bit_width);
 		ret_val = -EFAULT;
 		break;
 	}
@@ -149,8 +151,8 @@ static int write_register(void __iomem *vaddr, u64 val, unsigned int bit_width)
 		writeq(val, vaddr);
 		break;
 	default:
-		pr_debug("Error: Cannot write register of %u bit width",
-			bit_width);
+		pr_debug("Error: Cannot write register of %u bit width\n",
+			 bit_width);
 		ret_val = -EFAULT;
 		break;
 	}
@@ -300,7 +302,7 @@ void pcc_mbox_free_channel(struct mbox_chan *chan)
 		return;
 
 	if (id >= pcc_mbox_ctrl.num_chans) {
-		pr_debug("pcc_mbox_free_channel: Invalid mbox_chan passed\n");
+		pr_debug("%s: Invalid mbox_chan passed\n", __func__);
 		return;
 	}
 
@@ -341,7 +343,7 @@ static int pcc_send_data(struct mbox_chan *chan, void *data)
 	int ret = 0;
 
 	if (id >= pcc_mbox_ctrl.num_chans) {
-		pr_debug("pcc_send_data: Invalid mbox_chan passed\n");
+		pr_debug("%s: Invalid mbox_chan passed\n", __func__);
 		return -ENOENT;
 	}
 
@@ -460,7 +462,7 @@ static int __init acpi_pcc_probe(void)
 			&pcct_tbl_header_size);
 
 	if (ACPI_FAILURE(status) || !pcct_tbl) {
-		pr_warn("PCCT header not found.\n");
+		pr_warn("PCCT header not found\n");
 		return -ENODEV;
 	}
 
@@ -481,12 +483,9 @@ static int __init acpi_pcc_probe(void)
 		return -EINVAL;
 	}
 
-	pcc_mbox_channels = kzalloc(sizeof(struct mbox_chan) *
-			sum, GFP_KERNEL);
-	if (!pcc_mbox_channels) {
-		pr_err("Could not allocate space for PCC mbox channels\n");
+	pcc_mbox_channels = kcalloc(sum, sizeof(struct mbox_chan), GFP_KERNEL);
+	if (!pcc_mbox_channels)
 		return -ENOMEM;
-	}
 
 	pcc_doorbell_vaddr = kcalloc(sum, sizeof(void *), GFP_KERNEL);
 	if (!pcc_doorbell_vaddr) {
@@ -574,7 +573,6 @@ static int pcc_mbox_probe(struct platform_device *pdev)
 
 	pr_info("Registering PCC driver as Mailbox controller\n");
 	ret = mbox_controller_register(&pcc_mbox_ctrl);
-
 	if (ret) {
 		pr_err("Err registering PCC as Mailbox controller: %d\n", ret);
 		ret = -ENODEV;
@@ -603,7 +601,7 @@ static int __init pcc_init(void)
 	ret = acpi_pcc_probe();
 
 	if (ret) {
-		pr_debug("ACPI PCC probe failed.\n");
+		pr_debug("ACPI PCC probe failed\n");
 		return -ENODEV;
 	}
 
