@@ -127,7 +127,7 @@ static u32 exynos_blk_readl(struct exynos_pcie *exynos_pcie, u32 reg)
 	return readl(exynos_pcie->block_base + reg);
 }
 
-static void exynos_blk_writel(struct exynos_pcie *exynos_pcie, u32 val, u32 reg)
+static void exynos_blk_writel(struct exynos_pcie *exynos_pcie, u32 reg, u32 val)
 {
 	writel(val, exynos_pcie->block_base + reg);
 }
@@ -188,23 +188,23 @@ static void exynos_pcie_deassert_core_reset(struct exynos_pcie *exynos_pcie)
 	exynos_elb_writel(exynos_pcie, PCIE_NONSTICKY_RESET, 1);
 	exynos_elb_writel(exynos_pcie, PCIE_APP_INIT_RESET, 1);
 	exynos_elb_writel(exynos_pcie, PCIE_APP_INIT_RESET, 0);
-	exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_MAC_RESET);
+	exynos_blk_writel(exynos_pcie, PCIE_PHY_MAC_RESET, 1);
 }
 
 static void exynos_pcie_assert_phy_reset(struct exynos_pcie *exynos_pcie)
 {
-	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_MAC_RESET);
-	exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_GLOBAL_RESET);
+	exynos_blk_writel(exynos_pcie, PCIE_PHY_MAC_RESET, 0);
+	exynos_blk_writel(exynos_pcie, PCIE_PHY_GLOBAL_RESET, 1);
 }
 
 static void exynos_pcie_deassert_phy_reset(struct exynos_pcie *exynos_pcie)
 {
-	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_GLOBAL_RESET);
+	exynos_blk_writel(exynos_pcie, PCIE_PHY_GLOBAL_RESET, 0);
 	exynos_elb_writel(exynos_pcie, PCIE_PWR_RESET, 1);
-	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_COMMON_RESET);
-	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_CMN_REG);
-	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_TRSVREG_RESET);
-	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_TRSV_RESET);
+	exynos_blk_writel(exynos_pcie, PCIE_PHY_COMMON_RESET, 0);
+	exynos_blk_writel(exynos_pcie, PCIE_PHY_CMN_REG, 0);
+	exynos_blk_writel(exynos_pcie, PCIE_PHY_TRSVREG_RESET, 0);
+	exynos_blk_writel(exynos_pcie, PCIE_PHY_TRSV_RESET, 0);
 }
 
 static void exynos_pcie_power_on_phy(struct exynos_pcie *exynos_pcie)
@@ -321,9 +321,9 @@ static int exynos_pcie_establish_link(struct exynos_pcie *exynos_pcie)
 	exynos_pcie_init_phy(exynos_pcie);
 
 	/* pulse for common reset */
-	exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_COMMON_RESET);
+	exynos_blk_writel(exynos_pcie, PCIE_PHY_COMMON_RESET, 1);
 	udelay(500);
-	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_COMMON_RESET);
+	exynos_blk_writel(exynos_pcie, PCIE_PHY_COMMON_RESET, 0);
 
 	exynos_pcie_deassert_core_reset(exynos_pcie);
 	dw_pcie_setup_rc(pp);
