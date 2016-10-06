@@ -220,9 +220,6 @@ static int __init ls_add_pcie_port(struct ls_pcie *ls_pcie,
 	struct pcie_port *pp = &ls->pp;
 	int ret;
 
-	pp->dev = &pdev->dev;
-	pp->ops = ls_pcie->drvdata->ops;
-
 	ret = dw_pcie_host_init(pp);
 	if (ret) {
 		dev_err(pp->dev, "failed to initialize host\n");
@@ -237,6 +234,7 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	const struct of_device_id *match;
 	struct ls_pcie *ls_pcie;
+	struct pcie_port *pp;
 	struct resource *dbi_base;
 	int ret;
 
@@ -248,6 +246,12 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
 	if (!ls_pcie)
 		return -ENOMEM;
 
+	ls_pcie->drvdata = match->data;
+
+	pp = &ls_pcie->pp;
+	pp->dev = dev;
+	pp->ops = ls_pcie->drvdata->ops;
+
 	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
 	ls_pcie->pp.dbi_base = devm_ioremap_resource(dev, dbi_base);
 	if (IS_ERR(ls_pcie->pp.dbi_base)) {
@@ -255,7 +259,6 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
 		return PTR_ERR(ls_pcie->pp.dbi_base);
 	}
 
-	ls_pcie->drvdata = match->data;
 	ls_pcie->lut = ls_pcie->pp.dbi_base + ls_pcie->drvdata->lut_offset;
 
 	if (!ls_pcie_is_bridge(ls_pcie))
