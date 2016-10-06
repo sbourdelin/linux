@@ -413,12 +413,11 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
 	reg &= ~LTSSM_EN;
 	dra7xx_pcie_writel(dra7xx_pcie, PCIECTRL_DRA7XX_CONF_DEVICE_CMD, reg);
 
-	platform_set_drvdata(pdev, dra7xx_pcie);
-
 	ret = dra7xx_add_pcie_port(dra7xx_pcie, pdev);
 	if (ret < 0)
 		goto err_gpio;
 
+	platform_set_drvdata(pdev, dra7xx_pcie);
 	return 0;
 
 err_gpio:
