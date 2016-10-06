@@ -69,4 +69,7 @@ void nf_nat_l4proto_unique_tuple(const struct nf_nat_l3proto *l3proto,
 int nf_nat_l4proto_nlattr_to_range(struct nlattr *tb[],
 				   struct nf_nat_range *range);
 
+#define MODULE_ALIAS_NF_NAT_L4PROTO(l4protocol) \
+	MODULE_ALIAS("nf-nat-l4-" __stringify(l4protocol))
+
 #endif /*_NF_NAT_L4PROTO_H*/

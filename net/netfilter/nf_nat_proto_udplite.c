@@ -104,3 +104,4 @@ module_exit(nf_nat_proto_udplite_fini);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("UDP-Lite NAT protocol helper");
 MODULE_AUTHOR("Patrick McHardy <kaber@trash.net>");
+MODULE_ALIAS_NF_NAT_L4PROTO(136); /* IPPROTO_UDPLITE */

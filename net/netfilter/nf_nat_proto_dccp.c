@@ -114,3 +114,4 @@ module_exit(nf_nat_proto_dccp_fini);
 MODULE_AUTHOR("Patrick McHardy <kaber@trash.net>");
 MODULE_DESCRIPTION("DCCP NAT protocol helper");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NF_NAT_L4PROTO(33); /* IPPROTO_DCCP */

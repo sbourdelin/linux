@@ -94,3 +94,4 @@ module_exit(nf_nat_proto_sctp_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("SCTP NAT protocol helper");
 MODULE_AUTHOR("Patrick McHardy <kaber@trash.net>");
+MODULE_ALIAS_NF_NAT_L4PROTO(132); /* IPPROTO_SCTP */
