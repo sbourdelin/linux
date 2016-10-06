@@ -610,7 +610,6 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 	struct pcie_port *pp;
 	struct device_node *np = pdev->dev.of_node;
 	struct resource *dbi_base;
-	struct device_node *node = pdev->dev.of_node;
 	int ret;
 
 	imx6_pcie = devm_kzalloc(&pdev->dev, sizeof(*imx6_pcie), GFP_KERNEL);
@@ -689,28 +688,28 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 	}
 
 	/* Grab PCIe PHY Tx Settings */
-	if (of_property_read_u32(node, "fsl,tx-deemph-gen1",
+	if (of_property_read_u32(np, "fsl,tx-deemph-gen1",
 				 &imx6_pcie->tx_deemph_gen1))
 		imx6_pcie->tx_deemph_gen1 = 0;
 
-	if (of_property_read_u32(node, "fsl,tx-deemph-gen2-3p5db",
+	if (of_property_read_u32(np, "fsl,tx-deemph-gen2-3p5db",
 				 &imx6_pcie->tx_deemph_gen2_3p5db))
 		imx6_pcie->tx_deemph_gen2_3p5db = 0;
 
-	if (of_property_read_u32(node, "fsl,tx-deemph-gen2-6db",
+	if (of_property_read_u32(np, "fsl,tx-deemph-gen2-6db",
 				 &imx6_pcie->tx_deemph_gen2_6db))
 		imx6_pcie->tx_deemph_gen2_6db = 20;
 
-	if (of_property_read_u32(node, "fsl,tx-swing-full",
+	if (of_property_read_u32(np, "fsl,tx-swing-full",
 				 &imx6_pcie->tx_swing_full))
 		imx6_pcie->tx_swing_full = 127;
 
-	if (of_property_read_u32(node, "fsl,tx-swing-low",
+	if (of_property_read_u32(np, "fsl,tx-swing-low",
 				 &imx6_pcie->tx_swing_low))
 		imx6_pcie->tx_swing_low = 127;
 
 	/* Limit link speed */
-	ret = of_property_read_u32(pp->dev->of_node, "fsl,max-link-speed",
+	ret = of_property_read_u32(np, "fsl,max-link-speed",
 				   &imx6_pcie->link_gen);
 	if (ret)
 		imx6_pcie->link_gen = 1;
