@@ -40,35 +40,36 @@ MODULE_DEVICE_TABLE(of, iproc_pcie_of_match_table);
 
 static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	const struct of_device_id *of_id;
 	struct iproc_pcie *iproc_pcie;
-	struct device_node *np = pdev->dev.of_node;
+	struct device_node *np = dev->of_node;
 	struct resource reg;
 	resource_size_t iobase = 0;
 	LIST_HEAD(res);
 	int ret;
 
-	of_id = of_match_device(iproc_pcie_of_match_table, &pdev->dev);
+	of_id = of_match_device(iproc_pcie_of_match_table, dev);
 	if (!of_id)
 		return -EINVAL;
 
-	iproc_pcie = devm_kzalloc(&pdev->dev, sizeof(*iproc_pcie), GFP_KERNEL);
+	iproc_pcie = devm_kzalloc(dev, sizeof(*iproc_pcie), GFP_KERNEL);
 	if (!iproc_pcie)
 		return -ENOMEM;
 
-	iproc_pcie->dev = &pdev->dev;
+	iproc_pcie->dev = dev;
 	iproc_pcie->type = (enum iproc_pcie_type)of_id->data;
 	platform_set_drvdata(pdev, iproc_pcie);
 
 	ret = of_address_to_resource(np, 0, &reg);
 	if (ret < 0) {
-		dev_err(iproc_pcie->dev, "unable to obtain controller resources\n");
+		dev_err(dev, "unable to obtain controller resources\n");
 		return ret;
 	}
 
-	iproc_pcie->base = devm_ioremap(iproc_pcie->dev, reg.start, resource_size(&reg));
+	iproc_pcie->base = devm_ioremap(dev, reg.start, resource_size(&reg));
 	if (!iproc_pcie->base) {
-		dev_err(iproc_pcie->dev, "unable to map controller registers\n");
+		dev_err(dev, "unable to map controller registers\n");
 		return -ENOMEM;
 	}
 	iproc_pcie->base_addr = reg.start;
@@ -79,7 +80,7 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
 		ret = of_property_read_u32(np, "brcm,pcie-ob-axi-offset",
 					   &val);
 		if (ret) {
-			dev_err(iproc_pcie->dev,
+			dev_err(dev,
 				"missing brcm,pcie-ob-axi-offset property\n");
 			return ret;
 		}
@@ -88,7 +89,7 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
 		ret = of_property_read_u32(np, "brcm,pcie-ob-window-size",
 					   &val);
 		if (ret) {
-			dev_err(iproc_pcie->dev,
+			dev_err(dev,
 				"missing brcm,pcie-ob-window-size property\n");
 			return ret;
 		}
@@ -101,7 +102,7 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
 	}
 
 	/* PHY use is optional */
-	iproc_pcie->phy = devm_phy_get(&pdev->dev, "pcie-phy");
+	iproc_pcie->phy = devm_phy_get(dev, "pcie-phy");
 	if (IS_ERR(iproc_pcie->phy)) {
 		if (PTR_ERR(iproc_pcie->phy) == -EPROBE_DEFER)
 			return -EPROBE_DEFER;
@@ -110,7 +111,7 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
 
 	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &iobase);
 	if (ret) {
-		dev_err(iproc_pcie->dev,
+		dev_err(dev,
 			"unable to get PCI host bridge resources\n");
 		return ret;
 	}
@@ -119,7 +120,7 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
 
 	ret = iproc_pcie_setup(iproc_pcie, &res);
 	if (ret)
-		dev_err(iproc_pcie->dev, "PCIe controller setup failed\n");
+		dev_err(dev, "PCIe controller setup failed\n");
 
 	pci_free_resource_list(&res);
 
