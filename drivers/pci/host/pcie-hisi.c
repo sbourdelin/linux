@@ -48,7 +48,7 @@ static u32 hisi_apb_readl(struct hisi_pcie *hisi_pcie, u32 reg)
 	return readl(hisi_pcie->pp.dbi_base + reg);
 }
 
-static void hisi_apb_writel(struct hisi_pcie *hisi_pcie, u32 val, u32 reg)
+static void hisi_apb_writel(struct hisi_pcie *hisi_pcie, u32 reg, u32 val)
 {
 	writel(val, hisi_pcie->pp.dbi_base + reg);
 }
@@ -88,15 +88,15 @@ static int hisi_cfg_write(struct pcie_port *pp, int where, int  size, u32 val)
 	walker += (where & 0x3);
 	reg = where & ~0x3;
 	if (size == 4)
-		hisi_apb_writel(hisi_pcie, val, reg);
+		hisi_apb_writel(hisi_pcie, reg, val);
 	else if (size == 2) {
 		reg_val = hisi_apb_readl(hisi_pcie, reg);
 		*(u16 __force *) walker = val;
-		hisi_apb_writel(hisi_pcie, reg_val, reg);
+		hisi_apb_writel(hisi_pcie, reg, reg_val);
 	} else if (size == 1) {
 		reg_val = hisi_apb_readl(hisi_pcie, reg);
 		*(u8 __force *) walker = val;
-		hisi_apb_writel(hisi_pcie, reg_val, reg);
+		hisi_apb_writel(hisi_pcie, reg, reg_val);
 	} else
 		return PCIBIOS_BAD_REGISTER_NUMBER;
 
