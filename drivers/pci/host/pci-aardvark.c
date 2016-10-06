@@ -930,7 +930,6 @@ static int advk_pcie_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	advk_pcie->pdev = pdev;
-	platform_set_drvdata(pdev, advk_pcie);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	advk_pcie->base = devm_ioremap_resource(dev, res);
