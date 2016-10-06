@@ -1,5 +1,5 @@
 /*
- * da9062_wdt.c - WDT device driver for DA9062
+ * Watchdog device driver for DA9062 and DA9061 PMICs
  * Copyright (C) 2015  Dialog Semiconductor Ltd.
  *
  * This program is free software; you can redistribute it and/or
@@ -180,6 +180,11 @@ static const struct watchdog_info da9062_watchdog_info = {
 	.identity = "DA9062 WDT",
 };
 
+static const struct watchdog_info da9061_watchdog_info = {
+	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
+	.identity = "DA9061 WDT",
+};
+
 static const struct watchdog_ops da9062_watchdog_ops = {
 	.owner = THIS_MODULE,
 	.start = da9062_wdt_start,
@@ -188,15 +193,27 @@ static const struct watchdog_ops da9062_watchdog_ops = {
 	.set_timeout = da9062_wdt_set_timeout,
 };
 
+static const struct of_device_id da9062_compatible_id_table[] = {
+	{ .compatible = "dlg,da9062-watchdog", .data = &da9062_watchdog_info },
+	{ .compatible = "dlg,da9061-watchdog", .data = &da9061_watchdog_info },
+	{ },
+};
+
 static int da9062_wdt_probe(struct platform_device *pdev)
 {
 	int ret;
 	struct da9062 *chip;
 	struct da9062_watchdog *wdt;
+	const struct of_device_id *match;
 
 	chip = dev_get_drvdata(pdev->dev.parent);
 	if (!chip)
 		return -EINVAL;
+
+	match = of_match_node(da9062_compatible_id_table,
+			      pdev->dev.of_node);
+	if (!match)
+		return -ENXIO;
 
 	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
 	if (!wdt)
@@ -204,7 +221,7 @@ static int da9062_wdt_probe(struct platform_device *pdev)
 
 	wdt->hw = chip;
 
-	wdt->wdtdev.info = &da9062_watchdog_info;
+	wdt->wdtdev.info = (const struct watchdog_info *)match->data;
 	wdt->wdtdev.ops = &da9062_watchdog_ops;
 	wdt->wdtdev.min_timeout = DA9062_WDT_MIN_TIMEOUT;
 	wdt->wdtdev.max_timeout = DA9062_WDT_MAX_TIMEOUT;
@@ -244,11 +261,12 @@ static struct platform_driver da9062_wdt_driver = {
 	.remove = da9062_wdt_remove,
 	.driver = {
 		.name = "da9062-watchdog",
+		.of_match_table = da9062_compatible_id_table,
 	},
 };
 module_platform_driver(da9062_wdt_driver);
 
 MODULE_AUTHOR("S Twiss <stwiss.opensource@diasemi.com>");
-MODULE_DESCRIPTION("WDT device driver for Dialog DA9062");
+MODULE_DESCRIPTION("WDT device driver for Dialog DA9062 and DA9061");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:da9062-watchdog");
