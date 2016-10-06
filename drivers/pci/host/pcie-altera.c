@@ -389,6 +389,7 @@ static int altera_write_cap_word(struct altera_pcie *altera_pcie, u8 busno,
 
 static void altera_wait_link_retrain(struct altera_pcie *altera_pcie)
 {
+	struct device *dev = &altera_pcie->pdev->dev;
 	u16 reg16;
 	unsigned long start_jiffies;
 
@@ -401,7 +402,7 @@ static void altera_wait_link_retrain(struct altera_pcie *altera_pcie)
 			break;
 
 		if (time_after(jiffies, start_jiffies + LINK_RETRAIN_TIMEOUT)) {
-			dev_err(&altera_pcie->pdev->dev, "link retrain timeout\n");
+			dev_err(dev, "link retrain timeout\n");
 			break;
 		}
 		udelay(100);
@@ -414,7 +415,7 @@ static void altera_wait_link_retrain(struct altera_pcie *altera_pcie)
 			break;
 
 		if (time_after(jiffies, start_jiffies + LINK_UP_TIMEOUT)) {
-			dev_err(&altera_pcie->pdev->dev, "link up timeout\n");
+			dev_err(dev, "link up timeout\n");
 			break;
 		}
 		udelay(100);
@@ -467,12 +468,14 @@ static void altera_pcie_isr(struct irq_desc *desc)
 {
 	struct irq_chip *chip = irq_desc_get_chip(desc);
 	struct altera_pcie *altera_pcie;
+	struct device *dev;
 	unsigned long status;
 	u32 bit;
 	u32 virq;
 
 	chained_irq_enter(chip, desc);
 	altera_pcie = irq_desc_get_handler_data(desc);
+	dev = &altera_pcie->pdev->dev;
 
 	while ((status = altera_cra_readl(altera_pcie, P2A_INT_STATUS)
 		& P2A_INT_STS_ALL) != 0) {
@@ -486,8 +489,7 @@ static void altera_pcie_isr(struct irq_desc *desc)
 			if (virq)
 				generic_handle_irq(virq);
 			else
-				dev_err(&altera_pcie->pdev->dev,
-					"unexpected IRQ, INT%d\n", bit);
+				dev_err(dev, "unexpected IRQ, INT%d\n", bit);
 		}
 	}
 
@@ -546,27 +548,26 @@ static int altera_pcie_init_irq_domain(struct altera_pcie *altera_pcie)
 
 static int altera_pcie_parse_dt(struct altera_pcie *altera_pcie)
 {
-	struct resource *cra;
 	struct platform_device *pdev = altera_pcie->pdev;
+	struct device *dev = &pdev->dev;
+	struct resource *cra;
 
 	cra = platform_get_resource_byname(pdev, IORESOURCE_MEM, "Cra");
-	altera_pcie->cra_base = devm_ioremap_resource(&pdev->dev, cra);
+	altera_pcie->cra_base = devm_ioremap_resource(dev, cra);
 	if (IS_ERR(altera_pcie->cra_base)) {
-		dev_err(&pdev->dev, "failed to map cra memory\n");
+		dev_err(dev, "failed to map cra memory\n");
 		return PTR_ERR(altera_pcie->cra_base);
 	}
 
 	/* setup IRQ */
 	altera_pcie->irq = platform_get_irq(pdev, 0);
 	if (altera_pcie->irq <= 0) {
-		dev_err(&pdev->dev, "failed to get IRQ: %d\n",
-			altera_pcie->irq);
+		dev_err(dev, "failed to get IRQ: %d\n", altera_pcie->irq);
 		return -EINVAL;
 	}
 
 	irq_set_chained_handler_and_data(altera_pcie->irq, altera_pcie_isr,
 					 altera_pcie);
-
 	return 0;
 }
 
@@ -577,13 +578,13 @@ static void altera_pcie_host_init(struct altera_pcie *altera_pcie)
 
 static int altera_pcie_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	struct altera_pcie *altera_pcie;
 	struct pci_bus *bus;
 	struct pci_bus *child;
 	int ret;
 
-	altera_pcie = devm_kzalloc(&pdev->dev, sizeof(*altera_pcie),
-				   GFP_KERNEL);
+	altera_pcie = devm_kzalloc(dev, sizeof(*altera_pcie), GFP_KERNEL);
 	if (!altera_pcie)
 		return -ENOMEM;
 
@@ -591,7 +592,7 @@ static int altera_pcie_probe(struct platform_device *pdev)
 
 	ret = altera_pcie_parse_dt(altera_pcie);
 	if (ret) {
-		dev_err(&pdev->dev, "Parsing DT failed\n");
+		dev_err(dev, "Parsing DT failed\n");
 		return ret;
 	}
 
@@ -599,13 +600,13 @@ static int altera_pcie_probe(struct platform_device *pdev)
 
 	ret = altera_pcie_parse_request_of_pci_ranges(altera_pcie);
 	if (ret) {
-		dev_err(&pdev->dev, "Failed add resources\n");
+		dev_err(dev, "Failed add resources\n");
 		return ret;
 	}
 
 	ret = altera_pcie_init_irq_domain(altera_pcie);
 	if (ret) {
-		dev_err(&pdev->dev, "Failed creating IRQ Domain\n");
+		dev_err(dev, "Failed creating IRQ Domain\n");
 		return ret;
 	}
 
@@ -615,7 +616,7 @@ static int altera_pcie_probe(struct platform_device *pdev)
 	altera_cra_writel(altera_pcie, P2A_INT_ENABLE, P2A_INT_ENA_ALL);
 	altera_pcie_host_init(altera_pcie);
 
-	bus = pci_scan_root_bus(&pdev->dev, altera_pcie->root_bus_nr,
+	bus = pci_scan_root_bus(dev, altera_pcie->root_bus_nr,
 				&altera_pcie_ops, altera_pcie,
 				&altera_pcie->resources);
 	if (!bus)
