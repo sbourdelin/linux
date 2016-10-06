@@ -630,8 +630,6 @@ static int altera_pcie_probe(struct platform_device *pdev)
 		pcie_bus_configure_settings(child);
 
 	pci_bus_add_devices(bus);
-
-	platform_set_drvdata(pdev, altera_pcie);
 	return ret;
 }
 
