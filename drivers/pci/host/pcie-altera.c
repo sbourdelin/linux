@@ -262,9 +262,9 @@ static int tlp_cfg_dword_write(struct altera_pcie *altera_pcie, u8 bus,
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int _altera_pcie_cfg_read(struct altera_pcie *altera_pcie, u8 busno,
-				 unsigned int devfn, int where, int size,
-				 u32 *value)
+static int altera_raw_cfg_read(struct altera_pcie *altera_pcie, u8 busno,
+			       unsigned int devfn, int where, int size,
+			       u32 *value)
 {
 	int ret;
 	u32 data;
@@ -302,9 +302,9 @@ static int _altera_pcie_cfg_read(struct altera_pcie *altera_pcie, u8 busno,
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int _altera_pcie_cfg_write(struct altera_pcie *altera_pcie, u8 busno,
-				  unsigned int devfn, int where, int size,
-				  u32 value)
+static int altera_raw_cfg_write(struct altera_pcie *altera_pcie, u8 busno,
+				unsigned int devfn, int where, int size,
+				u32 value)
 {
 	u32 data32;
 	u32 shift = 8 * (where & 3);
@@ -342,8 +342,8 @@ static int altera_pcie_cfg_read(struct pci_bus *bus, unsigned int devfn,
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
-	return _altera_pcie_cfg_read(altera_pcie, bus->number, devfn, where,
-				     size, value);
+	return altera_raw_cfg_read(altera_pcie, bus->number, devfn, where, size,
+				   value);
 }
 
 static int altera_pcie_cfg_write(struct pci_bus *bus, unsigned int devfn,
@@ -357,8 +357,8 @@ static int altera_pcie_cfg_write(struct pci_bus *bus, unsigned int devfn,
 	if (!altera_pcie_valid_config(altera_pcie, bus, PCI_SLOT(devfn)))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	return _altera_pcie_cfg_write(altera_pcie, bus->number, devfn, where,
-				      size, value);
+	return altera_raw_cfg_write(altera_pcie, bus->number, devfn, where,
+				    size, value);
 }
 
 static struct pci_ops altera_pcie_ops = {
@@ -372,9 +372,9 @@ static int altera_read_cap_word(struct altera_pcie *altera_pcie, u8 busno,
 	u32 data;
 	int ret;
 
-	ret = _altera_pcie_cfg_read(altera_pcie, busno, devfn,
-				    PCIE_CAP_OFFSET + offset, sizeof(*value),
-				    &data);
+	ret = altera_raw_cfg_read(altera_pcie, busno, devfn,
+				  PCIE_CAP_OFFSET + offset, sizeof(*value),
+				  &data);
 	*value = data;
 	return ret;
 }
@@ -382,9 +382,9 @@ static int altera_read_cap_word(struct altera_pcie *altera_pcie, u8 busno,
 static int altera_write_cap_word(struct altera_pcie *altera_pcie, u8 busno,
 				 unsigned int devfn, int offset, u16 value)
 {
-	return _altera_pcie_cfg_write(altera_pcie, busno, devfn,
-				      PCIE_CAP_OFFSET + offset, sizeof(value),
-				      value);
+	return altera_raw_cfg_write(altera_pcie, busno, devfn,
+				    PCIE_CAP_OFFSET + offset, sizeof(value),
+				    value);
 }
 
 static void altera_wait_link_retrain(struct altera_pcie *altera_pcie)
