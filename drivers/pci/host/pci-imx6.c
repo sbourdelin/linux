@@ -96,15 +96,24 @@ struct imx6_pcie {
 #define PHY_RX_OVRD_IN_LO_RX_DATA_EN (1 << 5)
 #define PHY_RX_OVRD_IN_LO_RX_PLL_EN (1 << 3)
 
+static u32 imx6_pcie_readl(struct imx6_pcie *imx6_pcie, u32 offset)
+{
+	return readl(imx6_pcie->pp.dbi_base + offset);
+}
+
+static void imx6_pcie_writel(struct imx6_pcie *imx6_pcie, u32 offset, u32 val)
+{
+	writel(val, imx6_pcie->pp.dbi_base + offset);
+}
+
 static int imx6_pcie_phy_poll_ack(struct imx6_pcie *imx6_pcie, int exp_val)
 {
-	void __iomem *dbi_base = imx6_pcie->pp.dbi_base;
 	u32 val;
 	u32 max_iterations = 10;
 	u32 wait_counter = 0;
 
 	do {
-		val = readl(dbi_base + PCIE_PHY_STAT);
+		val = imx6_pcie_readl(imx6_pcie, PCIE_PHY_STAT);
 		val = (val >> PCIE_PHY_STAT_ACK_LOC) & 0x1;
 		wait_counter++;
 
@@ -119,22 +128,21 @@ static int imx6_pcie_phy_poll_ack(struct imx6_pcie *imx6_pcie, int exp_val)
 
 static int imx6_pcie_phy_wait_ack(struct imx6_pcie *imx6_pcie, int addr)
 {
-	void __iomem *dbi_base = imx6_pcie->pp.dbi_base;
 	u32 val;
 	int ret;
 
 	val = addr << PCIE_PHY_CTRL_DATA_LOC;
-	writel(val, dbi_base + PCIE_PHY_CTRL);
+	imx6_pcie_writel(imx6_pcie, PCIE_PHY_CTRL, val);
 
 	val |= (0x1 << PCIE_PHY_CTRL_CAP_ADR_LOC);
-	writel(val, dbi_base + PCIE_PHY_CTRL);
+	imx6_pcie_writel(imx6_pcie, PCIE_PHY_CTRL, val);
 
 	ret = imx6_pcie_phy_poll_ack(imx6_pcie, 1);
 	if (ret)
 		return ret;
 
 	val = addr << PCIE_PHY_CTRL_DATA_LOC;
-	writel(val, dbi_base + PCIE_PHY_CTRL);
+	imx6_pcie_writel(imx6_pcie, PCIE_PHY_CTRL, val);
 
 	return imx6_pcie_phy_poll_ack(imx6_pcie, 0);
 }
@@ -142,7 +150,6 @@ static int imx6_pcie_phy_wait_ack(struct imx6_pcie *imx6_pcie, int addr)
 /* Read from the 16-bit PCIe PHY control registers (not memory-mapped) */
 static int imx6_pcie_phy_read(struct imx6_pcie *imx6_pcie, int addr, int *data)
 {
-	void __iomem *dbi_base = imx6_pcie->pp.dbi_base;
 	u32 val, phy_ctl;
 	int ret;
 
@@ -152,24 +159,23 @@ static int imx6_pcie_phy_read(struct imx6_pcie *imx6_pcie, int addr, int *data)
 
 	/* assert Read signal */
 	phy_ctl = 0x1 << PCIE_PHY_CTRL_RD_LOC;
-	writel(phy_ctl, dbi_base + PCIE_PHY_CTRL);
+	imx6_pcie_writel(imx6_pcie, PCIE_PHY_CTRL, phy_ctl);
 
 	ret = imx6_pcie_phy_poll_ack(imx6_pcie, 1);
 	if (ret)
 		return ret;
 
-	val = readl(dbi_base + PCIE_PHY_STAT);
+	val = imx6_pcie_readl(imx6_pcie, PCIE_PHY_STAT);
 	*data = val & 0xffff;
 
 	/* deassert Read signal */
-	writel(0x00, dbi_base + PCIE_PHY_CTRL);
+	imx6_pcie_writel(imx6_pcie, PCIE_PHY_CTRL, 0x00);
 
 	return imx6_pcie_phy_poll_ack(imx6_pcie, 0);
 }
 
 static int imx6_pcie_phy_write(struct imx6_pcie *imx6_pcie, int addr, int data)
 {
-	void __iomem *dbi_base = imx6_pcie->pp.dbi_base;
 	u32 var;
 	int ret;
 
@@ -180,11 +186,11 @@ static int imx6_pcie_phy_write(struct imx6_pcie *imx6_pcie, int addr, int data)
 		return ret;
 
 	var = data << PCIE_PHY_CTRL_DATA_LOC;
-	writel(var, dbi_base + PCIE_PHY_CTRL);
+	imx6_pcie_writel(imx6_pcie, PCIE_PHY_CTRL, var);
 
 	/* capture data */
 	var |= (0x1 << PCIE_PHY_CTRL_CAP_DAT_LOC);
-	writel(var, dbi_base + PCIE_PHY_CTRL);
+	imx6_pcie_writel(imx6_pcie, PCIE_PHY_CTRL, var);
 
 	ret = imx6_pcie_phy_poll_ack(imx6_pcie, 1);
 	if (ret)
@@ -192,7 +198,7 @@ static int imx6_pcie_phy_write(struct imx6_pcie *imx6_pcie, int addr, int data)
 
 	/* deassert cap data */
 	var = data << PCIE_PHY_CTRL_DATA_LOC;
-	writel(var, dbi_base + PCIE_PHY_CTRL);
+	imx6_pcie_writel(imx6_pcie, PCIE_PHY_CTRL, var);
 
 	/* wait for ack de-assertion */
 	ret = imx6_pcie_phy_poll_ack(imx6_pcie, 0);
@@ -201,7 +207,7 @@ static int imx6_pcie_phy_write(struct imx6_pcie *imx6_pcie, int addr, int data)
 
 	/* assert wr signal */
 	var = 0x1 << PCIE_PHY_CTRL_WR_LOC;
-	writel(var, dbi_base + PCIE_PHY_CTRL);
+	imx6_pcie_writel(imx6_pcie, PCIE_PHY_CTRL, var);
 
 	/* wait for ack */
 	ret = imx6_pcie_phy_poll_ack(imx6_pcie, 1);
@@ -210,14 +216,14 @@ static int imx6_pcie_phy_write(struct imx6_pcie *imx6_pcie, int addr, int data)
 
 	/* deassert wr signal */
 	var = data << PCIE_PHY_CTRL_DATA_LOC;
-	writel(var, dbi_base + PCIE_PHY_CTRL);
+	imx6_pcie_writel(imx6_pcie, PCIE_PHY_CTRL, var);
 
 	/* wait for ack de-assertion */
 	ret = imx6_pcie_phy_poll_ack(imx6_pcie, 0);
 	if (ret)
 		return ret;
 
-	writel(0x0, dbi_base + PCIE_PHY_CTRL);
+	imx6_pcie_writel(imx6_pcie, PCIE_PHY_CTRL, 0x0);
 
 	return 0;
 }
@@ -286,10 +292,10 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
 
 		if ((gpr1 & IMX6Q_GPR1_PCIE_REF_CLK_EN) &&
 		    (gpr12 & IMX6Q_GPR12_PCIE_CTL_2)) {
-			val = readl(pp->dbi_base + PCIE_PL_PFLR);
+			val = imx6_pcie_readl(imx6_pcie, PCIE_PL_PFLR);
 			val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
 			val |= PCIE_PL_PFLR_FORCE_LINK;
-			writel(val, pp->dbi_base + PCIE_PL_PFLR);
+			imx6_pcie_writel(imx6_pcie, PCIE_PL_PFLR, val);
 
 			regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
 					   IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
@@ -451,8 +457,8 @@ static int imx6_pcie_wait_for_link(struct pcie_port *pp)
 		return 0;
 
 	dev_dbg(pp->dev, "DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
-		readl(pp->dbi_base + PCIE_PHY_DEBUG_R0),
-		readl(pp->dbi_base + PCIE_PHY_DEBUG_R1));
+		imx6_pcie_readl(imx6_pcie, PCIE_PHY_DEBUG_R0),
+		imx6_pcie_readl(imx6_pcie, PCIE_PHY_DEBUG_R1));
 	return -ETIMEDOUT;
 }
 
@@ -462,7 +468,7 @@ static int imx6_pcie_wait_for_speed_change(struct pcie_port *pp)
 	unsigned int retries;
 
 	for (retries = 0; retries < 200; retries++) {
-		tmp = readl(pp->dbi_base + PCIE_LINK_WIDTH_SPEED_CONTROL);
+		tmp = imx6_pcie_readl(imx6_pcie, PCIE_LINK_WIDTH_SPEED_CONTROL);
 		/* Test if the speed change finished. */
 		if (!(tmp & PORT_LOGIC_SPEED_CHANGE))
 			return 0;
@@ -491,10 +497,10 @@ static int imx6_pcie_establish_link(struct pcie_port *pp)
 	 * started in Gen2 mode, there is a possibility the devices on the
 	 * bus will not be detected at all.  This happens with PCIe switches.
 	 */
-	tmp = readl(pp->dbi_base + PCIE_RC_LCR);
+	tmp = imx6_pcie_readl(imx6_pcie, PCIE_RC_LCR);
 	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
 	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
-	writel(tmp, pp->dbi_base + PCIE_RC_LCR);
+	imx6_pcie_writel(imx6_pcie, PCIE_RC_LCR, tmp);
 
 	/* Start LTSSM. */
 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
@@ -508,10 +514,10 @@ static int imx6_pcie_establish_link(struct pcie_port *pp)
 
 	if (imx6_pcie->link_gen == 2) {
 		/* Allow Gen2 mode after the link is up. */
-		tmp = readl(pp->dbi_base + PCIE_RC_LCR);
+		tmp = imx6_pcie_readl(imx6_pcie, PCIE_RC_LCR);
 		tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
 		tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2;
-		writel(tmp, pp->dbi_base + PCIE_RC_LCR);
+		imx6_pcie_writel(imx6_pcie, PCIE_RC_LCR, tmp);
 	} else {
 		dev_info(pp->dev, "Link: Gen2 disabled\n");
 	}
@@ -520,9 +526,9 @@ static int imx6_pcie_establish_link(struct pcie_port *pp)
 	 * Start Directed Speed Change so the best possible speed both link
 	 * partners support can be negotiated.
 	 */
-	tmp = readl(pp->dbi_base + PCIE_LINK_WIDTH_SPEED_CONTROL);
+	tmp = imx6_pcie_readl(imx6_pcie, PCIE_LINK_WIDTH_SPEED_CONTROL);
 	tmp |= PORT_LOGIC_SPEED_CHANGE;
-	writel(tmp, pp->dbi_base + PCIE_LINK_WIDTH_SPEED_CONTROL);
+	imx6_pcie_writel(imx6_pcie, PCIE_LINK_WIDTH_SPEED_CONTROL, tmp);
 
 	ret = imx6_pcie_wait_for_speed_change(pp);
 	if (ret) {
@@ -537,15 +543,15 @@ static int imx6_pcie_establish_link(struct pcie_port *pp)
 		goto err_reset_phy;
 	}
 
-	tmp = readl(pp->dbi_base + PCIE_RC_LCSR);
+	tmp = imx6_pcie_readl(imx6_pcie, PCIE_RC_LCSR);
 	dev_info(pp->dev, "Link up, Gen%i\n", (tmp >> 16) & 0xf);
 	return 0;
 
 err_reset_phy:
 	dev_dbg(pp->dev, "PHY DEBUG_R0=0x%08x DEBUG_R1=0x%08x\n",
-		readl(pp->dbi_base + PCIE_PHY_DEBUG_R0),
-		readl(pp->dbi_base + PCIE_PHY_DEBUG_R1));
-	imx6_pcie_reset_phy(pp);
+		imx6_pcie_readl(imx6_pcie, PCIE_PHY_DEBUG_R0),
+		imx6_pcie_readl(imx6_pcie, PCIE_PHY_DEBUG_R1));
+	imx6_pcie_reset_phy(imx6_pcie);
 
 	return ret;
 }
@@ -568,7 +574,9 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
 
 static int imx6_pcie_link_up(struct pcie_port *pp)
 {
-	return readl(pp->dbi_base + PCIE_PHY_DEBUG_R1) &
+	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+
+	return imx6_pcie_readl(imx6_pcie, PCIE_PHY_DEBUG_R1) &
 			PCIE_PHY_DEBUG_R1_XMLH_LINK_UP;
 }
 
