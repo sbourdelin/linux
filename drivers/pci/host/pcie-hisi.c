@@ -37,9 +37,9 @@ struct pcie_soc_ops {
 };
 
 struct hisi_pcie {
+	struct pcie_port pp;		/* pp.dbi_base is DT rc_dbi */
 	struct regmap *subctrl;
 	u32 port_id;
-	struct pcie_port pp;
 	struct pcie_soc_ops *soc_ops;
 };
 
@@ -178,13 +178,13 @@ static int hisi_pcie_probe(struct platform_device *pdev)
 
 	pp = &hisi_pcie->pp;
 	pp->dev = &pdev->dev;
-	driver = (pdev->dev).driver;
 
+	driver = (pdev->dev).driver;
 	match = of_match_device(driver->of_match_table, &pdev->dev);
 	hisi_pcie->soc_ops = (struct pcie_soc_ops *) match->data;
 
 	hisi_pcie->subctrl =
-	syscon_regmap_lookup_by_compatible("hisilicon,pcie-sas-subctrl");
+	    syscon_regmap_lookup_by_compatible("hisilicon,pcie-sas-subctrl");
 	if (IS_ERR(hisi_pcie->subctrl)) {
 		dev_err(pp->dev, "cannot get subctrl base\n");
 		return PTR_ERR(hisi_pcie->subctrl);
