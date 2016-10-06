@@ -6,5 +6,5 @@
 LIRC Header File
 ****************
 
-.. kernel-include:: $BUILDDIR/lirc.h.rst
+.. kernel-cmd:: parse-headers.pl $srctree/include/uapi/linux/lirc.h lirc.h.exceptions
 

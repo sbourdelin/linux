@@ -6,4 +6,4 @@
 DVB Conditional Access Header File
 **********************************
 
-.. kernel-include:: $BUILDDIR/ca.h.rst
+.. kernel-cmd:: parse-headers.pl $srctree/include/uapi/linux/dvb/ca.h ca.h.exceptions

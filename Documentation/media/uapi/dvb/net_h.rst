@@ -6,4 +6,4 @@
 DVB Network Header File
 ***********************
 
-.. kernel-include:: $BUILDDIR/net.h.rst
+.. kernel-cmd:: parse-headers.pl $srctree/include/uapi/linux/dvb/net.h net.h.exceptions

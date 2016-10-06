@@ -9,10 +9,10 @@ use Text::Tabs;
 my $debug = 0;
 
 if (scalar @ARGV < 2 || scalar @ARGV > 3) {
-	die "Usage:\n\t$0 <file in> <file out> [<exceptions file>]\n";
+	die "Usage:\n\t$0 <file in> [<exceptions file>]\n";
 }
 
-my ($file_in, $file_out, $file_exceptions) = @ARGV;
+my ($file_in, $file_exceptions) = @ARGV;
 
 my $data;
 my %ioctls;
@@ -306,16 +306,13 @@ foreach my $r (keys %typedefs) {
 $data =~ s/\\ \n/\n/g;
 
 #
-# Generate output file
+# print generated content to stdout
 #
 
 my $title = $file_in;
 $title =~ s,.*/,,;
 
-open OUT, "> $file_out" or die "Can't open $file_out";
-print OUT ".. -*- coding: utf-8; mode: rst -*-\n\n";
-print OUT "$title\n";
-print OUT "=" x length($title);
-print OUT "\n\n.. parsed-literal::\n\n";
-print OUT $data;
-close OUT;
+print "$title\n";
+print "=" x length($title);
+print "\n\n.. parsed-literal::\n\n";
+print $data;

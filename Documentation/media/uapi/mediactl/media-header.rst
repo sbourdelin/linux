@@ -6,5 +6,4 @@
 Media Controller Header File
 ****************************
 
-.. kernel-include:: $BUILDDIR/media.h.rst
-
+.. kernel-cmd:: parse-headers.pl $srctree/include/uapi/linux/media.h media.h.exceptions
