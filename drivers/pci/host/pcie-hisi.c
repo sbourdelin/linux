@@ -126,15 +126,16 @@ static int hisi_add_pcie_port(struct hisi_pcie *hisi_pcie,
 			      struct platform_device *pdev)
 {
 	struct pcie_port *pp = &hisi_pcie->pp;
+	struct device *dev = pp->dev;
 	int ret;
 	u32 port_id;
 
-	if (of_property_read_u32(pdev->dev.of_node, "port-id", &port_id)) {
-		dev_err(&pdev->dev, "failed to read port-id\n");
+	if (of_property_read_u32(dev->of_node, "port-id", &port_id)) {
+		dev_err(dev, "failed to read port-id\n");
 		return -EINVAL;
 	}
 	if (port_id > 3) {
-		dev_err(&pdev->dev, "Invalid port-id: %d\n", port_id);
+		dev_err(dev, "Invalid port-id: %d\n", port_id);
 		return -EINVAL;
 	}
 	hisi_pcie->port_id = port_id;
@@ -143,7 +144,7 @@ static int hisi_add_pcie_port(struct hisi_pcie *hisi_pcie,
 
 	ret = dw_pcie_host_init(pp);
 	if (ret) {
-		dev_err(&pdev->dev, "failed to initialize host\n");
+		dev_err(dev, "failed to initialize host\n");
 		return ret;
 	}
 
@@ -152,6 +153,7 @@ static int hisi_add_pcie_port(struct hisi_pcie *hisi_pcie,
 
 static int hisi_pcie_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	struct hisi_pcie *hisi_pcie;
 	struct pcie_port *pp;
 	const struct of_device_id *match;
@@ -159,28 +161,28 @@ static int hisi_pcie_probe(struct platform_device *pdev)
 	struct device_driver *driver;
 	int ret;
 
-	hisi_pcie = devm_kzalloc(&pdev->dev, sizeof(*hisi_pcie), GFP_KERNEL);
+	hisi_pcie = devm_kzalloc(dev, sizeof(*hisi_pcie), GFP_KERNEL);
 	if (!hisi_pcie)
 		return -ENOMEM;
 
 	pp = &hisi_pcie->pp;
-	pp->dev = &pdev->dev;
+	pp->dev = dev;
 
 	driver = (pdev->dev).driver;
-	match = of_match_device(driver->of_match_table, &pdev->dev);
+	match = of_match_device(driver->of_match_table, dev);
 	hisi_pcie->soc_ops = (struct pcie_soc_ops *) match->data;
 
 	hisi_pcie->subctrl =
 	    syscon_regmap_lookup_by_compatible("hisilicon,pcie-sas-subctrl");
 	if (IS_ERR(hisi_pcie->subctrl)) {
-		dev_err(pp->dev, "cannot get subctrl base\n");
+		dev_err(dev, "cannot get subctrl base\n");
 		return PTR_ERR(hisi_pcie->subctrl);
 	}
 
 	reg = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rc_dbi");
-	pp->dbi_base = devm_ioremap_resource(&pdev->dev, reg);
+	pp->dbi_base = devm_ioremap_resource(dev, reg);
 	if (IS_ERR(pp->dbi_base)) {
-		dev_err(pp->dev, "cannot get rc_dbi base\n");
+		dev_err(dev, "cannot get rc_dbi base\n");
 		return PTR_ERR(pp->dbi_base);
 	}
 
@@ -190,7 +192,7 @@ static int hisi_pcie_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, hisi_pcie);
 
-	dev_warn(pp->dev, "only 32-bit config accesses supported; smaller writes may corrupt adjacent RW1C fields\n");
+	dev_warn(dev, "only 32-bit config accesses supported; smaller writes may corrupt adjacent RW1C fields\n");
 
 	return 0;
 }
