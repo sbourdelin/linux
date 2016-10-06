@@ -53,7 +53,6 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
 		return -ENOMEM;
 
 	iproc_pcie->dev = dev;
-	bcma_set_drvdata(bdev, iproc_pcie);
 
 	iproc_pcie->base = bdev->io_addr;
 	if (!iproc_pcie->base) {
@@ -77,6 +76,7 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
 
 	pci_free_resource_list(&res);
 
+	bcma_set_drvdata(bdev, iproc_pcie);
 	return ret;
 }
 
