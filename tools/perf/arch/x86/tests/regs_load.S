@@ -62,14 +62,22 @@ ENTRY(perf_regs_load)
 ENDPROC(perf_regs_load)
 #else
 ENTRY(perf_regs_load)
+#if defined(__x86_64__) && defined(__ILP32__)
+	pushq %rdi
+#else
 	push %edi
+#endif
 	movl 8(%esp), %edi
 	movl %eax, AX(%edi)
 	movl %ebx, BX(%edi)
 	movl %ecx, CX(%edi)
 	movl %edx, DX(%edi)
 	movl %esi, SI(%edi)
+#if defined(__x86_64__) && defined(__ILP32__)
+	popq %rax
+#else
 	pop %eax
+#endif
 	movl %eax, DI(%edi)
 	movl %ebp, BP(%edi)
 
