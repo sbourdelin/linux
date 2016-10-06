@@ -271,14 +271,10 @@ static irqreturn_t dra7xx_pcie_irq_handler(int irq, void *arg)
 static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx_pcie,
 				       struct platform_device *pdev)
 {
-	struct device *dev = &pdev->dev;
-	struct pcie_port *pp;
+	struct pcie_port *pp = &dra7xx_pcie->pp;
+	struct device *dev = pp->dev;
 	struct resource *res;
 	int ret;
-
-	pp = &dra7xx_pcie->pp;
-	pp->dev = dev;
-	pp->ops = &dra7xx_pcie_host_ops;
 
 	pp->irq = platform_get_irq(pdev, 1);
 	if (pp->irq < 0) {
@@ -319,6 +315,7 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
 	struct dra7xx_pcie *dra7xx_pcie;
+	struct pcie_port *pp;
 	u32 reg;
 	int ret;
 	int irq;
@@ -335,6 +332,10 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
 	dra7xx_pcie = devm_kzalloc(dev, sizeof(*dra7xx_pcie), GFP_KERNEL);
 	if (!dra7xx_pcie)
 		return -ENOMEM;
+
+	pp = &dra7xx_pcie->pp;
+	pp->dev = dev;
+	pp->ops = &dra7xx_pcie_host_ops;
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
