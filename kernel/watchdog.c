@@ -46,15 +46,20 @@
 
 static DEFINE_MUTEX(watchdog_proc_mutex);
 
-#ifdef CONFIG_HARDLOCKUP_DETECTOR
-static unsigned long __read_mostly watchdog_enabled = SOFT_WATCHDOG_ENABLED|NMI_WATCHDOG_ENABLED;
+#if defined(CONFIG_HARDLOCKUP_DETECTOR) || defined(CONFIG_HAVE_NMI_WATCHDOG)
+unsigned long __read_mostly watchdog_enabled = SOFT_WATCHDOG_ENABLED|NMI_WATCHDOG_ENABLED;
 #else
-static unsigned long __read_mostly watchdog_enabled = SOFT_WATCHDOG_ENABLED;
+unsigned long __read_mostly watchdog_enabled = SOFT_WATCHDOG_ENABLED;
 #endif
 int __read_mostly nmi_watchdog_enabled;
 int __read_mostly soft_watchdog_enabled;
 int __read_mostly watchdog_user_enabled;
 int __read_mostly watchdog_thresh = 10;
+
+/*
+ * Implemented by arch specific handlers if it defines CONFIG_HAVE_NMI_WATCHDOG
+ */
+void __weak update_arch_nmi_watchdog(void) {}
 
 #ifdef CONFIG_SMP
 int __read_mostly sysctl_softlockup_all_cpu_backtrace;
@@ -840,6 +845,11 @@ static void watchdog_disable_all_cpus(void)
 static int proc_watchdog_update(void)
 {
 	int err = 0;
+
+	/*
+	 * Enable/Disable arch specific nmi watchdogs if there is one
+	 */
+	update_arch_nmi_watchdog();
 
 	/*
 	 * Watchdog threads won't be started if they are already active.
