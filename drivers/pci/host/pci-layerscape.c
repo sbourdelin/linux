@@ -107,18 +107,19 @@ static int ls1021_pcie_link_up(struct pcie_port *pp)
 
 static void ls1021_pcie_host_init(struct pcie_port *pp)
 {
+	struct device *dev = pp->dev;
 	struct ls_pcie *ls_pcie = to_ls_pcie(pp);
 	u32 index[2];
 
-	ls_pcie->scfg = syscon_regmap_lookup_by_phandle(pp->dev->of_node,
+	ls_pcie->scfg = syscon_regmap_lookup_by_phandle(dev->of_node,
 						   "fsl,pcie-scfg");
 	if (IS_ERR(ls_pcie->scfg)) {
-		dev_err(pp->dev, "No syscfg phandle specified\n");
+		dev_err(dev, "No syscfg phandle specified\n");
 		ls_pcie->scfg = NULL;
 		return;
 	}
 
-	if (of_property_read_u32_array(pp->dev->of_node,
+	if (of_property_read_u32_array(dev->of_node,
 				       "fsl,pcie-scfg", index, 2)) {
 		ls_pcie->scfg = NULL;
 		return;
@@ -233,23 +234,24 @@ static int __init ls_add_pcie_port(struct ls_pcie *ls_pcie,
 
 static int __init ls_pcie_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	const struct of_device_id *match;
 	struct ls_pcie *ls_pcie;
 	struct resource *dbi_base;
 	int ret;
 
-	match = of_match_device(ls_pcie_of_match, &pdev->dev);
+	match = of_match_device(ls_pcie_of_match, dev);
 	if (!match)
 		return -ENODEV;
 
-	ls_pcie = devm_kzalloc(&pdev->dev, sizeof(*ls_pcie), GFP_KERNEL);
+	ls_pcie = devm_kzalloc(dev, sizeof(*ls_pcie), GFP_KERNEL);
 	if (!ls_pcie)
 		return -ENOMEM;
 
 	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
-	ls_pcie->pp.dbi_base = devm_ioremap_resource(&pdev->dev, dbi_base);
+	ls_pcie->pp.dbi_base = devm_ioremap_resource(dev, dbi_base);
 	if (IS_ERR(ls_pcie->pp.dbi_base)) {
-		dev_err(&pdev->dev, "missing *regs* space\n");
+		dev_err(dev, "missing *regs* space\n");
 		return PTR_ERR(ls_pcie->pp.dbi_base);
 	}
 
