@@ -166,7 +166,11 @@ __perf_main ()
 			[[:upper:]]*) evts=$($cmd list --raw-dump json | tr a-z A-Z) ;;
 			*) evts=$($cmd list --raw-dump) ;;
 		esac
+		old="$cur"
+		cur="${cur/*[,{]/}"
+		prefix=${old%$cur}
 		__perfcomp_colon "$evts" "$cur"
+		COMPREPLY=("${prefix}${COMPREPLY[0]}")
 	else
 		# List subcommands for perf commands
 		if [[ $prev_skip_opts == @(kvm|kmem|mem|lock|sched|
