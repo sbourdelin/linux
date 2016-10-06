@@ -55,18 +55,19 @@
 #define TLP_PAYLOAD_SIZE		0x01
 #define TLP_READ_TAG			0x1d
 #define TLP_WRITE_TAG			0x10
+#define RP_DEVFN			0
+#define TLP_REQ_ID(bus, devfn)		(((bus) << 8) | (devfn))
 #define TLP_CFG_DW0(altera, bus)					\
     ((((bus == altera->root_bus_nr) ? TLP_FMTTYPE_CFGRD0		\
 				    : TLP_FMTTYPE_CFGRD1) << 24) |	\
      TLP_PAYLOAD_SIZE)
-#define TLP_CFG_DW1(reqid, tag, be)	(((reqid) << 16) | (tag << 8) | (be))
+#define TLP_CFG_DW1(altera, tag, be)	\
+    (((TLP_REQ_ID(altera->root_bus_nr,  RP_DEVFN)) << 16) | (tag << 8) | (be))
 #define TLP_CFG_DW2(bus, devfn, offset)	\
 				(((bus) << 24) | ((devfn) << 16) | (offset))
-#define TLP_REQ_ID(bus, devfn)		(((bus) << 8) | (devfn))
 #define TLP_COMP_STATUS(s)		(((s) >> 12) & 7)
 #define TLP_HDR_SIZE			3
 #define TLP_LOOP			500
-#define RP_DEVFN			0
 
 #define LINK_UP_TIMEOUT			HZ
 #define LINK_RETRAIN_TIMEOUT		HZ
@@ -223,8 +224,7 @@ static int tlp_cfg_dword_read(struct altera_pcie *altera_pcie, u8 bus,
 	u32 headers[TLP_HDR_SIZE];
 
 	headers[0] = TLP_CFG_DW0(altera_pcie, bus);
-	headers[1] = TLP_CFG_DW1(TLP_REQ_ID(altera_pcie->root_bus_nr, RP_DEVFN),
-					TLP_READ_TAG, byte_en);
+	headers[1] = TLP_CFG_DW1(altera_pcie, TLP_READ_TAG, byte_en);
 	headers[2] = TLP_CFG_DW2(bus, devfn, where);
 
 	tlp_write_packet(altera_pcie, headers, 0, false);
@@ -239,8 +239,7 @@ static int tlp_cfg_dword_write(struct altera_pcie *altera_pcie, u8 bus,
 	int ret;
 
 	headers[0] = TLP_CFG_DW0(altera_pcie, bus);
-	headers[1] = TLP_CFG_DW1(TLP_REQ_ID(altera_pcie->root_bus_nr, RP_DEVFN),
-					TLP_WRITE_TAG, byte_en);
+	headers[1] = TLP_CFG_DW1(altera_pcie, TLP_WRITE_TAG, byte_en);
 	headers[2] = TLP_CFG_DW2(bus, devfn, where);
 
 	/* check alignment to Qword */
