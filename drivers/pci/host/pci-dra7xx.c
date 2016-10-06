@@ -67,7 +67,6 @@ struct dra7xx_pcie {
 	void __iomem		*base;
 	struct phy		**phy;
 	int			phy_count;
-	struct device		*dev;
 	struct pcie_port	pp;
 };
 
@@ -225,52 +224,53 @@ static irqreturn_t dra7xx_pcie_msi_irq_handler(int irq, void *arg)
 static irqreturn_t dra7xx_pcie_irq_handler(int irq, void *arg)
 {
 	struct dra7xx_pcie *dra7xx_pcie = arg;
+	struct device *dev = dra7xx_pcie->pp.dev;
 	u32 reg;
 
 	reg = dra7xx_pcie_readl(dra7xx_pcie,
 				PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN);
 
 	if (reg & ERR_SYS)
-		dev_dbg(dra7xx_pcie->dev, "System Error\n");
+		dev_dbg(dev, "System Error\n");
 
 	if (reg & ERR_FATAL)
-		dev_dbg(dra7xx_pcie->dev, "Fatal Error\n");
+		dev_dbg(dev, "Fatal Error\n");
 
 	if (reg & ERR_NONFATAL)
-		dev_dbg(dra7xx_pcie->dev, "Non Fatal Error\n");
+		dev_dbg(dev, "Non Fatal Error\n");
 
 	if (reg & ERR_COR)
-		dev_dbg(dra7xx_pcie->dev, "Correctable Error\n");
+		dev_dbg(dev, "Correctable Error\n");
 
 	if (reg & ERR_AXI)
-		dev_dbg(dra7xx_pcie->dev, "AXI tag lookup fatal Error\n");
+		dev_dbg(dev, "AXI tag lookup fatal Error\n");
 
 	if (reg & ERR_ECRC)
-		dev_dbg(dra7xx_pcie->dev, "ECRC Error\n");
+		dev_dbg(dev, "ECRC Error\n");
 
 	if (reg & PME_TURN_OFF)
-		dev_dbg(dra7xx_pcie->dev,
+		dev_dbg(dev,
 			"Power Management Event Turn-Off message received\n");
 
 	if (reg & PME_TO_ACK)
-		dev_dbg(dra7xx_pcie->dev,
+		dev_dbg(dev,
 			"Power Management Turn-Off Ack message received\n");
 
 	if (reg & PM_PME)
-		dev_dbg(dra7xx_pcie->dev,
+		dev_dbg(dev,
 			"PM Power Management Event message received\n");
 
 	if (reg & LINK_REQ_RST)
-		dev_dbg(dra7xx_pcie->dev, "Link Request Reset\n");
+		dev_dbg(dev, "Link Request Reset\n");
 
 	if (reg & LINK_UP_EVT)
-		dev_dbg(dra7xx_pcie->dev, "Link-up state change\n");
+		dev_dbg(dev, "Link-up state change\n");
 
 	if (reg & CFG_BME_EVT)
-		dev_dbg(dra7xx_pcie->dev, "CFG 'Bus Master Enable' change\n");
+		dev_dbg(dev, "CFG 'Bus Master Enable' change\n");
 
 	if (reg & CFG_MSE_EVT)
-		dev_dbg(dra7xx_pcie->dev, "CFG 'Memory Space Enable' change\n");
+		dev_dbg(dev, "CFG 'Memory Space Enable' change\n");
 
 	dra7xx_pcie_writel(dra7xx_pcie, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN,
 			   reg);
@@ -281,10 +281,10 @@ static irqreturn_t dra7xx_pcie_irq_handler(int irq, void *arg)
 static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx_pcie,
 				       struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	int ret;
 	struct pcie_port *pp;
 	struct resource *res;
-	struct device *dev = &pdev->dev;
 
 	pp = &dra7xx_pcie->pp;
 	pp->dev = dev;
@@ -318,7 +318,7 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx_pcie,
 
 	ret = dw_pcie_host_init(pp);
 	if (ret) {
-		dev_err(dra7xx_pcie->dev, "failed to initialize host\n");
+		dev_err(dev, "failed to initialize host\n");
 		return ret;
 	}
 
@@ -394,7 +394,6 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
 
 	dra7xx_pcie->base = base;
 	dra7xx_pcie->phy = phy;
-	dra7xx_pcie->dev = dev;
 	dra7xx_pcie->phy_count = phy_count;
 
 	pm_runtime_enable(dev);
