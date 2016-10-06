@@ -209,7 +209,6 @@ void intel_engine_init_seqno(struct intel_engine_cs *engine, u32 seqno)
 
 void intel_engine_init_hangcheck(struct intel_engine_cs *engine)
 {
-	memset(&engine->hangcheck, 0, sizeof(engine->hangcheck));
 	clear_bit(engine->id, &engine->i915->gpu_error.missed_irq_rings);
 	if (intel_engine_has_waiter(engine))
 		i915_queue_hangcheck(engine->i915);
