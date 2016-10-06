@@ -214,10 +214,9 @@ static const struct of_device_id ls_pcie_of_match[] = {
 	{ },
 };
 
-static int __init ls_add_pcie_port(struct ls_pcie *ls_pcie,
-				   struct platform_device *pdev)
+static int __init ls_add_pcie_port(struct ls_pcie *ls_pcie)
 {
-	struct pcie_port *pp = &ls->pp;
+	struct pcie_port *pp = &ls_pcie->pp;
 	int ret;
 
 	ret = dw_pcie_host_init(pp);
@@ -264,7 +263,7 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
 	if (!ls_pcie_is_bridge(ls_pcie))
 		return -ENODEV;
 
-	ret = ls_add_pcie_port(ls_pcie, pdev);
+	ret = ls_add_pcie_port(ls_pcie);
 	if (ret < 0)
 		return ret;
 
