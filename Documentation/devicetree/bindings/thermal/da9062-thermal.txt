@@ -1,0 +1,30 @@
+* Dialog DA9062/61 TJUNC Thermal Module
+
+This module is part of the DA9061/DA9062. For more details about entire
+DA9062 and DA9061 chips see Documentation/devicetree/bindings/mfd/da9062.txt
+
+Junction temperature thermal module uses an interrupt signal to identify
+high THERMAL_TRIP_HOT temperatures for the PMIC device.
+
+Required properties:
+
+- compatible: should be one of:
+        dlg,da9061-thermal
+        dlg,da9062-thermal
+
+Optional properties:
+
+- dlg,tjunc-temp-polling-period-ms : Specify the polling period, measured
+    in milliseconds, between thermal zone device update checks.
+
+Example:
+
+	pmic0: da9062@58 {
+
+		thermal {
+			compatible = "dlg,da9062-thermal";
+			dlg,tjunc-temp-polling-period-ms = <3000>;
+		};
+
+	};
+
