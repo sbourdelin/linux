@@ -1296,7 +1296,7 @@ static int __btrfs_write_out_cache(struct btrfs_root *root, struct inode *inode,
 
 	/* Everything is written out, now we dirty the pages in the file. */
 	ret = btrfs_dirty_pages(root, inode, io_ctl->pages, io_ctl->num_pages,
-				0, i_size_read(inode), &cached_state);
+				0, i_size_read(inode), &cached_state, 0);
 	if (ret)
 		goto out_nospc;
 
@@ -3513,6 +3513,7 @@ int btrfs_write_out_ino_cache(struct btrfs_root *root,
 	int ret;
 	struct btrfs_io_ctl io_ctl;
 	bool release_metadata = true;
+	enum btrfs_metadata_reserve_type reserve_type = BTRFS_RESERVE_NORMAL;
 
 	if (!btrfs_test_opt(root->fs_info, INODE_MAP_CACHE))
 		return 0;
@@ -3533,7 +3534,8 @@ int btrfs_write_out_ino_cache(struct btrfs_root *root,
 
 	if (ret) {
 		if (release_metadata)
-			btrfs_delalloc_release_metadata(inode, inode->i_size);
+			btrfs_delalloc_release_metadata(inode, inode->i_size,
+							reserve_type);
 #ifdef DEBUG
 		btrfs_err(root->fs_info,
 			"failed to write free ino cache for root %llu",

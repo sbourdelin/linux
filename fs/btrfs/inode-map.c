@@ -401,6 +401,7 @@ int btrfs_save_ino_cache(struct btrfs_root *root,
 	int ret;
 	int prealloc;
 	bool retry = false;
+	enum btrfs_metadata_reserve_type reserve_type = BTRFS_RESERVE_NORMAL;
 
 	/* only fs tree and subvol/snap needs ino cache */
 	if (root->root_key.objectid != BTRFS_FS_TREE_OBJECTID &&
@@ -488,14 +489,14 @@ again:
 	/* Just to make sure we have enough space */
 	prealloc += 8 * PAGE_SIZE;
 
-	ret = btrfs_delalloc_reserve_space(inode, 0, prealloc);
+	ret = btrfs_delalloc_reserve_space(inode, 0, prealloc, reserve_type);
 	if (ret)
 		goto out_put;
 
 	ret = btrfs_prealloc_file_range_trans(inode, trans, 0, 0, prealloc,
 					      prealloc, prealloc, &alloc_hint);
 	if (ret) {
-		btrfs_delalloc_release_metadata(inode, prealloc);
+		btrfs_delalloc_release_metadata(inode, prealloc, reserve_type);
 		goto out_put;
 	}
 
