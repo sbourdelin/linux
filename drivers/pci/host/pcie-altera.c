@@ -92,12 +92,12 @@ struct tlp_rp_regpair_t {
 	u32 reg1;
 };
 
-static u32 cra_readl(struct altera_pcie *altera_pcie, const u32 reg)
+static u32 altera_cra_readl(struct altera_pcie *altera_pcie, const u32 reg)
 {
 	return readl_relaxed(altera_pcie->cra_base + reg);
 }
 
-static void cra_writel(struct altera_pcie *altera_pcie, const u32 value,
+static void altera_cra_writel(struct altera_pcie *altera_pcie, const u32 value,
 			      const u32 reg)
 {
 	writel_relaxed(value, altera_pcie->cra_base + reg);
@@ -105,7 +105,7 @@ static void cra_writel(struct altera_pcie *altera_pcie, const u32 value,
 
 static bool altera_pcie_link_is_up(struct altera_pcie *altera_pcie)
 {
-	return !!((cra_readl(altera_pcie, RP_LTSSM) & RP_LTSSM_MASK) ==
+	return !!((altera_cra_readl(altera_pcie, RP_LTSSM) & RP_LTSSM_MASK) ==
 			LTSSM_L0);
 }
 
@@ -131,9 +131,9 @@ static bool altera_pcie_hide_rc_bar(struct pci_bus *bus, unsigned int  devfn,
 static void tlp_write_tx(struct altera_pcie *altera_pcie,
 			 struct tlp_rp_regpair_t *tlp_rp_regdata)
 {
-	cra_writel(altera_pcie, tlp_rp_regdata->reg0, RP_TX_REG0);
-	cra_writel(altera_pcie, tlp_rp_regdata->reg1, RP_TX_REG1);
-	cra_writel(altera_pcie, tlp_rp_regdata->ctrl, RP_TX_CNTRL);
+	altera_cra_writel(altera_pcie, tlp_rp_regdata->reg0, RP_TX_REG0);
+	altera_cra_writel(altera_pcie, tlp_rp_regdata->reg1, RP_TX_REG1);
+	altera_cra_writel(altera_pcie, tlp_rp_regdata->ctrl, RP_TX_CNTRL);
 }
 
 static bool altera_pcie_valid_config(struct altera_pcie *altera_pcie,
@@ -165,10 +165,10 @@ static int tlp_read_packet(struct altera_pcie *altera_pcie, u32 *value)
 	 * payload.
 	 */
 	for (i = 0; i < TLP_LOOP; i++) {
-		ctrl = cra_readl(altera_pcie, RP_RXCPL_STATUS);
+		ctrl = altera_cra_readl(altera_pcie, RP_RXCPL_STATUS);
 		if ((ctrl & RP_RXCPL_SOP) || (ctrl & RP_RXCPL_EOP) || sop) {
-			reg0 = cra_readl(altera_pcie, RP_RXCPL_REG0);
-			reg1 = cra_readl(altera_pcie, RP_RXCPL_REG1);
+			reg0 = altera_cra_readl(altera_pcie, RP_RXCPL_REG0);
+			reg1 = altera_cra_readl(altera_pcie, RP_RXCPL_REG1);
 
 			if (ctrl & RP_RXCPL_SOP) {
 				sop = true;
@@ -474,11 +474,11 @@ static void altera_pcie_isr(struct irq_desc *desc)
 	chained_irq_enter(chip, desc);
 	altera_pcie = irq_desc_get_handler_data(desc);
 
-	while ((status = cra_readl(altera_pcie, P2A_INT_STATUS)
+	while ((status = altera_cra_readl(altera_pcie, P2A_INT_STATUS)
 		& P2A_INT_STS_ALL) != 0) {
 		for_each_set_bit(bit, &status, INTX_NUM) {
 			/* clear interrupts */
-			cra_writel(altera_pcie, 1 << bit, P2A_INT_STATUS);
+			altera_cra_writel(altera_pcie, 1 << bit, P2A_INT_STATUS);
 
 			virq = irq_find_mapping(altera_pcie->irq_domain,
 						bit + 1);
@@ -609,9 +609,9 @@ static int altera_pcie_probe(struct platform_device *pdev)
 	}
 
 	/* clear all interrupts */
-	cra_writel(altera_pcie, P2A_INT_STS_ALL, P2A_INT_STATUS);
+	altera_cra_writel(altera_pcie, P2A_INT_STS_ALL, P2A_INT_STATUS);
 	/* enable all interrupts */
-	cra_writel(altera_pcie, P2A_INT_ENA_ALL, P2A_INT_ENABLE);
+	altera_cra_writel(altera_pcie, P2A_INT_ENA_ALL, P2A_INT_ENABLE);
 	altera_pcie_host_init(altera_pcie);
 
 	bus = pci_scan_root_bus(&pdev->dev, altera_pcie->root_bus_nr,
