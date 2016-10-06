@@ -226,6 +226,7 @@ struct stripe_head {
 
 	struct r5l_io_unit	*log_io;
 	struct list_head	log_list;
+	atomic_t		dev_in_cache;
 	/**
 	 * struct stripe_operations
 	 * @target - STRIPE_OP_COMPUTE_BLK target
@@ -263,6 +264,7 @@ struct stripe_head_state {
 	 */
 	int syncing, expanding, expanded, replacing;
 	int locked, uptodate, to_read, to_write, failed, written;
+	int to_cache, want_cache, just_cached;
 	int to_fill, compute, req_compute, non_overwrite;
 	int failed_num[2];
 	int p_failed, q_failed;
@@ -313,6 +315,8 @@ enum r5dev_flags {
 			 */
 	R5_Discard,	/* Discard the stripe */
 	R5_SkipCopy,	/* Don't copy data from bio to stripe cache */
+	R5_Wantcache,	/* Want write data to write cache */
+	R5_InCache,	/* Data in cache */
 };
 
 /*
@@ -348,6 +352,12 @@ enum {
 	STRIPE_LOG_TRAPPED,	/* trapped into log */
 	STRIPE_R5C_FROZEN,	/* r5c_cache frozen and being written out */
 	STRIPE_R5C_WRITTEN,	/* ready for r5c_handle_stripe_written() */
+	STRIPE_R5C_PARTIAL_STRIPE,	/* in r5c cache (to-be/being handled or
+					 * in conf->r5c_partial_stripe_list)
+					 */
+	STRIPE_R5C_FULL_STRIPE,	/* in r5c cache (to-be/being handled or
+				 * in conf->r5c_full_stripe_list)
+				 */
 };
 
 #define STRIPE_EXPAND_SYNC_FLAGS \
@@ -600,6 +610,12 @@ struct r5conf {
 	 */
 	atomic_t		active_stripes;
 	struct list_head	inactive_list[NR_STRIPE_HASH_LOCKS];
+
+	atomic_t		r5c_cached_full_stripes;
+	struct list_head	r5c_full_stripe_list;
+	atomic_t		r5c_cached_partial_stripes;
+	struct list_head	r5c_partial_stripe_list;
+
 	atomic_t		empty_inactive_list_nr;
 	struct llist_head	released_stripes;
 	wait_queue_head_t	wait_for_quiescent;
@@ -720,4 +736,10 @@ r5c_handle_stripe_dirtying(struct r5conf *conf, struct stripe_head *sh,
 			   struct stripe_head_state *s, int disks);
 extern void
 r5c_handle_stripe_written(struct r5conf *conf, struct stripe_head *sh);
+extern void r5l_wake_reclaim(struct r5l_log *log, sector_t space);
+extern void r5c_handle_cached_data_endio(struct r5conf *conf,
+	struct stripe_head *sh, int disks, struct bio_list *return_bi);
+extern int r5c_cache_data(struct r5l_log *log, struct stripe_head *sh,
+			  struct stripe_head_state *s);
+extern void r5c_freeze_stripe_for_reclaim(struct stripe_head *sh);
 #endif
