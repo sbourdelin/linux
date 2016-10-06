@@ -143,6 +143,7 @@
 #define SUN4I_TCON_MAX_CHANNELS		2
 
 struct sun4i_tcon_quirks {
+	int	max_clock;	/* Highest possible dotclock in kHz */
 	bool	is_sun5i;	/* sun5i has undocumented mux */
 	bool	has_channel_1;	/* a33 does not have channel 1 */
 	bool	has_bypass_src;	/* has separate input bypassing CEU */

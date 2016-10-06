@@ -583,6 +583,7 @@ static int sun4i_tcon_remove(struct platform_device *pdev)
 }
 
 const struct sun4i_tcon_quirks sun5i_a13_quirks = {
+	.max_clock	= 63500,
 	.is_sun5i	= true,
 	.has_channel_1	= true,
 	.has_bypass_src	= true,
@@ -590,6 +591,7 @@ const struct sun4i_tcon_quirks sun5i_a13_quirks = {
 };
 
 const struct sun4i_tcon_quirks sun8i_a33_quirks = {
+	.max_clock	= 200000,
 	/* nothing is supported */
 };
 
