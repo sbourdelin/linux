@@ -209,14 +209,14 @@ struct advk_pcie {
 	int root_bus_nr;
 };
 
-static void advk_writel(struct advk_pcie *advk_pcie, u32 val, u64 reg)
-{
-	writel(val, advk_pcie->base + reg);
-}
-
 static u32 advk_readl(struct advk_pcie *advk_pcie, u64 reg)
 {
 	return readl(advk_pcie->base + reg);
+}
+
+static void advk_writel(struct advk_pcie *advk_pcie, u32 val, u64 reg)
+{
+	writel(val, advk_pcie->base + reg);
 }
 
 static int advk_pcie_link_up(struct advk_pcie *advk_pcie)
