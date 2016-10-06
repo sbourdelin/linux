@@ -117,7 +117,7 @@ static u32 exynos_phy_readl(struct exynos_pcie *exynos_pcie, u32 reg)
 	return readl(exynos_pcie->phy_base + reg);
 }
 
-static void exynos_phy_writel(struct exynos_pcie *exynos_pcie, u32 val, u32 reg)
+static void exynos_phy_writel(struct exynos_pcie *exynos_pcie, u32 reg, u32 val)
 {
 	writel(val, exynos_pcie->phy_base + reg);
 }
@@ -213,23 +213,23 @@ static void exynos_pcie_power_on_phy(struct exynos_pcie *exynos_pcie)
 
 	val = exynos_phy_readl(exynos_pcie, PCIE_PHY_COMMON_POWER);
 	val &= ~PCIE_PHY_COMMON_PD_CMN;
-	exynos_phy_writel(exynos_pcie, val, PCIE_PHY_COMMON_POWER);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_COMMON_POWER, val);
 
 	val = exynos_phy_readl(exynos_pcie, PCIE_PHY_TRSV0_POWER);
 	val &= ~PCIE_PHY_TRSV0_PD_TSV;
-	exynos_phy_writel(exynos_pcie, val, PCIE_PHY_TRSV0_POWER);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV0_POWER, val);
 
 	val = exynos_phy_readl(exynos_pcie, PCIE_PHY_TRSV1_POWER);
 	val &= ~PCIE_PHY_TRSV1_PD_TSV;
-	exynos_phy_writel(exynos_pcie, val, PCIE_PHY_TRSV1_POWER);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV1_POWER, val);
 
 	val = exynos_phy_readl(exynos_pcie, PCIE_PHY_TRSV2_POWER);
 	val &= ~PCIE_PHY_TRSV2_PD_TSV;
-	exynos_phy_writel(exynos_pcie, val, PCIE_PHY_TRSV2_POWER);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV2_POWER, val);
 
 	val = exynos_phy_readl(exynos_pcie, PCIE_PHY_TRSV3_POWER);
 	val &= ~PCIE_PHY_TRSV3_PD_TSV;
-	exynos_phy_writel(exynos_pcie, val, PCIE_PHY_TRSV3_POWER);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV3_POWER, val);
 }
 
 static void exynos_pcie_power_off_phy(struct exynos_pcie *exynos_pcie)
@@ -238,61 +238,61 @@ static void exynos_pcie_power_off_phy(struct exynos_pcie *exynos_pcie)
 
 	val = exynos_phy_readl(exynos_pcie, PCIE_PHY_COMMON_POWER);
 	val |= PCIE_PHY_COMMON_PD_CMN;
-	exynos_phy_writel(exynos_pcie, val, PCIE_PHY_COMMON_POWER);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_COMMON_POWER, val);
 
 	val = exynos_phy_readl(exynos_pcie, PCIE_PHY_TRSV0_POWER);
 	val |= PCIE_PHY_TRSV0_PD_TSV;
-	exynos_phy_writel(exynos_pcie, val, PCIE_PHY_TRSV0_POWER);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV0_POWER, val);
 
 	val = exynos_phy_readl(exynos_pcie, PCIE_PHY_TRSV1_POWER);
 	val |= PCIE_PHY_TRSV1_PD_TSV;
-	exynos_phy_writel(exynos_pcie, val, PCIE_PHY_TRSV1_POWER);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV1_POWER, val);
 
 	val = exynos_phy_readl(exynos_pcie, PCIE_PHY_TRSV2_POWER);
 	val |= PCIE_PHY_TRSV2_PD_TSV;
-	exynos_phy_writel(exynos_pcie, val, PCIE_PHY_TRSV2_POWER);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV2_POWER, val);
 
 	val = exynos_phy_readl(exynos_pcie, PCIE_PHY_TRSV3_POWER);
 	val |= PCIE_PHY_TRSV3_PD_TSV;
-	exynos_phy_writel(exynos_pcie, val, PCIE_PHY_TRSV3_POWER);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV3_POWER, val);
 }
 
 static void exynos_pcie_init_phy(struct exynos_pcie *exynos_pcie)
 {
 	/* DCC feedback control off */
-	exynos_phy_writel(exynos_pcie, 0x29, PCIE_PHY_DCC_FEEDBACK);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_DCC_FEEDBACK, 0x29);
 
 	/* set TX/RX impedance */
-	exynos_phy_writel(exynos_pcie, 0xd5, PCIE_PHY_IMPEDANCE);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_IMPEDANCE, 0xd5);
 
 	/* set 50Mhz PHY clock */
-	exynos_phy_writel(exynos_pcie, 0x14, PCIE_PHY_PLL_DIV_0);
-	exynos_phy_writel(exynos_pcie, 0x12, PCIE_PHY_PLL_DIV_1);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_PLL_DIV_0, 0x14);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_PLL_DIV_1, 0x12);
 
 	/* set TX Differential output for lane 0 */
-	exynos_phy_writel(exynos_pcie, 0x7f, PCIE_PHY_TRSV0_DRV_LVL);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV0_DRV_LVL, 0x7f);
 
 	/* set TX Pre-emphasis Level Control for lane 0 to minimum */
-	exynos_phy_writel(exynos_pcie, 0x0, PCIE_PHY_TRSV0_EMP_LVL);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV0_EMP_LVL, 0x0);
 
 	/* set RX clock and data recovery bandwidth */
-	exynos_phy_writel(exynos_pcie, 0xe7, PCIE_PHY_PLL_BIAS);
-	exynos_phy_writel(exynos_pcie, 0x82, PCIE_PHY_TRSV0_RXCDR);
-	exynos_phy_writel(exynos_pcie, 0x82, PCIE_PHY_TRSV1_RXCDR);
-	exynos_phy_writel(exynos_pcie, 0x82, PCIE_PHY_TRSV2_RXCDR);
-	exynos_phy_writel(exynos_pcie, 0x82, PCIE_PHY_TRSV3_RXCDR);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_PLL_BIAS, 0xe7);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV0_RXCDR, 0x82);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV1_RXCDR, 0x82);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV2_RXCDR, 0x82);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV3_RXCDR, 0x82);
 
 	/* change TX Pre-emphasis Level Control for lanes */
-	exynos_phy_writel(exynos_pcie, 0x39, PCIE_PHY_TRSV0_EMP_LVL);
-	exynos_phy_writel(exynos_pcie, 0x39, PCIE_PHY_TRSV1_EMP_LVL);
-	exynos_phy_writel(exynos_pcie, 0x39, PCIE_PHY_TRSV2_EMP_LVL);
-	exynos_phy_writel(exynos_pcie, 0x39, PCIE_PHY_TRSV3_EMP_LVL);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV0_EMP_LVL, 0x39);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV1_EMP_LVL, 0x39);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV2_EMP_LVL, 0x39);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV3_EMP_LVL, 0x39);
 
 	/* set LVCC */
-	exynos_phy_writel(exynos_pcie, 0x20, PCIE_PHY_TRSV0_LVCC);
-	exynos_phy_writel(exynos_pcie, 0xa0, PCIE_PHY_TRSV1_LVCC);
-	exynos_phy_writel(exynos_pcie, 0xa0, PCIE_PHY_TRSV2_LVCC);
-	exynos_phy_writel(exynos_pcie, 0xa0, PCIE_PHY_TRSV3_LVCC);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV0_LVCC, 0x20);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV1_LVCC, 0xa0);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV2_LVCC, 0xa0);
+	exynos_phy_writel(exynos_pcie, PCIE_PHY_TRSV3_LVCC, 0xa0);
 }
 
 static void exynos_pcie_assert_reset(struct exynos_pcie *exynos_pcie)
