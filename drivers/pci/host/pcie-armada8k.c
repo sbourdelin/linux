@@ -72,12 +72,11 @@ struct armada8k_pcie {
 
 static int armada8k_pcie_link_up(struct pcie_port *pp)
 {
-	struct armada8k_pcie *pcie = to_armada8k_pcie(pp);
+	struct armada8k_pcie *armada8k_pcie = to_armada8k_pcie(pp);
 	u32 reg;
 	u32 mask = PCIE_GLB_STS_RDLH_LINK_UP | PCIE_GLB_STS_PHY_LINK_UP;
 
-	reg = readl(pcie->base + PCIE_GLOBAL_STATUS_REG);
-
+	reg = readl(armada8k_pcie->base + PCIE_GLOBAL_STATUS_REG);
 	if ((reg & mask) == mask)
 		return 1;
 
@@ -87,8 +86,8 @@ static int armada8k_pcie_link_up(struct pcie_port *pp)
 
 static void armada8k_pcie_establish_link(struct pcie_port *pp)
 {
-	struct armada8k_pcie *pcie = to_armada8k_pcie(pp);
-	void __iomem *base = pcie->base;
+	struct armada8k_pcie *armada8k_pcie = to_armada8k_pcie(pp);
+	void __iomem *base = armada8k_pcie->base;
 	u32 reg;
 
 	if (!dw_pcie_link_up(pp)) {
@@ -146,8 +145,8 @@ static void armada8k_pcie_host_init(struct pcie_port *pp)
 static irqreturn_t armada8k_pcie_irq_handler(int irq, void *arg)
 {
 	struct pcie_port *pp = arg;
-	struct armada8k_pcie *pcie = to_armada8k_pcie(pp);
-	void __iomem *base = pcie->base;
+	struct armada8k_pcie *armada8k_pcie = to_armada8k_pcie(pp);
+	void __iomem *base = armada8k_pcie->base;
 	u32 val;
 
 	/*
@@ -199,25 +198,25 @@ static int armada8k_add_pcie_port(struct pcie_port *pp,
 
 static int armada8k_pcie_probe(struct platform_device *pdev)
 {
-	struct armada8k_pcie *pcie;
+	struct armada8k_pcie *armada8k_pcie;
 	struct pcie_port *pp;
 	struct device *dev = &pdev->dev;
 	struct resource *base;
 	int ret;
 
-	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
-	if (!pcie)
+	armada8k_pcie = devm_kzalloc(dev, sizeof(*armada8k_pcie), GFP_KERNEL);
+	if (!armada8k_pcie)
 		return -ENOMEM;
 
-	pcie->clk = devm_clk_get(dev, NULL);
-	if (IS_ERR(pcie->clk))
-		return PTR_ERR(pcie->clk);
+	armada8k_pcie->clk = devm_clk_get(dev, NULL);
+	if (IS_ERR(armada8k_pcie->clk))
+		return PTR_ERR(armada8k_pcie->clk);
 
-	clk_prepare_enable(pcie->clk);
+	clk_prepare_enable(armada8k_pcie->clk);
 
-	pp = &pcie->pp;
+	pp = &armada8k_pcie->pp;
 	pp->dev = dev;
-	platform_set_drvdata(pdev, pcie);
+	platform_set_drvdata(pdev, armada8k_pcie);
 
 	/* Get the dw-pcie unit configuration/control registers base. */
 	base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ctrl");
@@ -228,7 +227,7 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	pcie->base = pp->dbi_base + PCIE_VENDOR_REGS_OFFSET;
+	armada8k_pcie->base = pp->dbi_base + PCIE_VENDOR_REGS_OFFSET;
 
 	ret = armada8k_add_pcie_port(pp, pdev);
 	if (ret)
@@ -237,8 +236,8 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 	return 0;
 
 fail:
-	if (!IS_ERR(pcie->clk))
-		clk_disable_unprepare(pcie->clk);
+	if (!IS_ERR(armada8k_pcie->clk))
+		clk_disable_unprepare(armada8k_pcie->clk);
 
 	return ret;
 }
