@@ -1,0 +1,11 @@
+* Dialog Semiconductor DA9062/61 Watchdog Timer
+
+Required properties:
+- compatible: "dlg,da9062-watchdog"
+              "dlg,da9061-watchdog"
+
+Example:
+	watchdog {
+		compatible = "dlg,da9062-watchdog";
+	};
+
