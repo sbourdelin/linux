@@ -94,10 +94,11 @@ static int dra7xx_pcie_link_up(struct pcie_port *pp)
 static int dra7xx_pcie_establish_link(struct dra7xx_pcie *dra7xx_pcie)
 {
 	struct pcie_port *pp = &dra7xx_pcie->pp;
+	struct device *dev = pp->dev;
 	u32 reg;
 
 	if (dw_pcie_link_up(pp)) {
-		dev_err(pp->dev, "link is already up\n");
+		dev_err(dev, "link is already up\n");
 		return 0;
 	}
 
@@ -271,9 +272,9 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx_pcie,
 				       struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	int ret;
 	struct pcie_port *pp;
 	struct resource *res;
+	int ret;
 
 	pp = &dra7xx_pcie->pp;
 	pp->dev = dev;
@@ -285,12 +286,11 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx_pcie,
 		return -EINVAL;
 	}
 
-	ret = devm_request_irq(&pdev->dev, pp->irq,
-			       dra7xx_pcie_msi_irq_handler,
+	ret = devm_request_irq(dev, pp->irq, dra7xx_pcie_msi_irq_handler,
 			       IRQF_SHARED | IRQF_NO_THREAD,
 			       "dra7-pcie-msi",	dra7xx_pcie);
 	if (ret) {
-		dev_err(&pdev->dev, "failed to request irq\n");
+		dev_err(dev, "failed to request irq\n");
 		return ret;
 	}
 
@@ -316,6 +316,9 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx_pcie,
 
 static int __init dra7xx_pcie_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
+	struct device_node *np = dev->of_node;
+	struct dra7xx_pcie *dra7xx_pcie;
 	u32 reg;
 	int ret;
 	int irq;
@@ -324,9 +327,6 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
 	struct phy **phy;
 	void __iomem *base;
 	struct resource *res;
-	struct dra7xx_pcie *dra7xx_pcie;
-	struct device *dev = &pdev->dev;
-	struct device_node *np = dev->of_node;
 	char name[10];
 	int gpio_sel;
 	enum of_gpio_flags flags;
@@ -399,7 +399,7 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
 		ret = devm_gpio_request_one(dev, gpio_sel, gpio_flags,
 					    "pcie_reset");
 		if (ret) {
-			dev_err(&pdev->dev, "gpio%d request failed, ret %d\n",
+			dev_err(dev, "gpio%d request failed, ret %d\n",
 				gpio_sel, ret);
 			goto err_gpio;
 		}
