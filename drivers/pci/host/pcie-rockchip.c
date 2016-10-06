@@ -209,8 +209,8 @@ static u32 rockchip_pcie_readl(struct rockchip_pcie *rockchip_pcie, u32 reg)
 	return readl(rockchip_pcie->apb_base + reg);
 }
 
-static void rockchip_pcie_writel(struct rockchip_pcie *rockchip_pcie, u32 val,
-				 u32 reg)
+static void rockchip_pcie_writel(struct rockchip_pcie *rockchip_pcie, u32 reg,
+				 u32 val)
 {
 	writel(val, rockchip_pcie->apb_base + reg);
 }
@@ -221,7 +221,7 @@ static void rockchip_pcie_enable_bw_int(struct rockchip_pcie *rockchip_pcie)
 
 	status = rockchip_pcie_readl(rockchip_pcie, PCIE_RC_CONFIG_LCS);
 	status |= (PCIE_RC_CONFIG_LCS_LBMIE | PCIE_RC_CONFIG_LCS_LABIE);
-	rockchip_pcie_writel(rockchip_pcie, status, PCIE_RC_CONFIG_LCS);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_RC_CONFIG_LCS, status);
 }
 
 static void rockchip_pcie_clr_bw_int(struct rockchip_pcie *rockchip_pcie)
@@ -230,7 +230,7 @@ static void rockchip_pcie_clr_bw_int(struct rockchip_pcie *rockchip_pcie)
 
 	status = rockchip_pcie_readl(rockchip_pcie, PCIE_RC_CONFIG_LCS);
 	status |= (PCIE_RC_CONFIG_LCS_LBMS | PCIE_RC_CONFIG_LCS_LAMS);
-	rockchip_pcie_writel(rockchip_pcie, status, PCIE_RC_CONFIG_LCS);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_RC_CONFIG_LCS, status);
 }
 
 static void rockchip_pcie_update_txcredit_mui(struct rockchip_pcie *rockchip_pcie)
@@ -241,7 +241,7 @@ static void rockchip_pcie_update_txcredit_mui(struct rockchip_pcie *rockchip_pci
 	val = rockchip_pcie_readl(rockchip_pcie, PCIE_CORE_TXCREDIT_CFG1);
 	val &= ~PCIE_CORE_TXCREDIT_CFG1_MUI_MASK;
 	val |= PCIE_CORE_TXCREDIT_CFG1_MUI_ENCODE(24000);	/* ns */
-	rockchip_pcie_writel(rockchip_pcie, val, PCIE_CORE_TXCREDIT_CFG1);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_CORE_TXCREDIT_CFG1, val);
 }
 
 static int rockchip_pcie_valid_device(struct rockchip_pcie *rockchip_pcie,
@@ -441,14 +441,13 @@ static int rockchip_pcie_init_port(struct rockchip_pcie *rockchip_pcie)
 		return err;
 	}
 
-	rockchip_pcie_writel(rockchip_pcie,
+	rockchip_pcie_writel(rockchip_pcie, PCIE_CLIENT_CONFIG,
 			    PCIE_CLIENT_CONF_ENABLE |
 			    PCIE_CLIENT_LINK_TRAIN_ENABLE |
 			    PCIE_CLIENT_ARI_ENABLE |
 			    PCIE_CLIENT_CONF_LANE_NUM(rockchip_pcie->lanes) |
 			    PCIE_CLIENT_MODE_RC |
-			    PCIE_CLIENT_GEN_SEL_2,
-				PCIE_CLIENT_CONFIG);
+			    PCIE_CLIENT_GEN_SEL_2);
 
 	err = phy_power_on(rockchip_pcie->phy);
 	if (err) {
@@ -492,18 +491,18 @@ static int rockchip_pcie_init_port(struct rockchip_pcie *rockchip_pcie)
 	 */
 	status = rockchip_pcie_readl(rockchip_pcie,
 				     PCIE_RC_CONFIG_L1_SUBSTATE_CTRL2);
-	rockchip_pcie_writel(rockchip_pcie, status,
-			     PCIE_RC_CONFIG_L1_SUBSTATE_CTRL2);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_RC_CONFIG_L1_SUBSTATE_CTRL2,
+			     status);
 
 	/* Fix the transmitted FTS count desired to exit from L0s. */
 	status = rockchip_pcie_readl(rockchip_pcie, PCIE_CORE_CTRL_PLC1);
 	status = (status & PCIE_CORE_CTRL_PLC1_FTS_MASK) |
 		 (PCIE_CORE_CTRL_PLC1_FTS_CNT << PCIE_CORE_CTRL_PLC1_FTS_SHIFT);
-	rockchip_pcie_writel(rockchip_pcie, status, PCIE_CORE_CTRL_PLC1);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_CORE_CTRL_PLC1, status);
 
 	/* Enable Gen1 training */
-	rockchip_pcie_writel(rockchip_pcie, PCIE_CLIENT_LINK_TRAIN_ENABLE,
-			     PCIE_CLIENT_CONFIG);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_CLIENT_CONFIG,
+			PCIE_CLIENT_LINK_TRAIN_ENABLE);
 
 	gpiod_set_value(rockchip_pcie->ep_gpio, 1);
 
@@ -533,7 +532,7 @@ static int rockchip_pcie_init_port(struct rockchip_pcie *rockchip_pcie)
 	 */
 	status = rockchip_pcie_readl(rockchip_pcie, PCIE_RC_CONFIG_LCS);
 	status |= PCIE_RC_CONFIG_LCS_RETRAIN_LINK;
-	rockchip_pcie_writel(rockchip_pcie, status, PCIE_RC_CONFIG_LCS);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_RC_CONFIG_LCS, status);
 
 	timeout = jiffies + msecs_to_jiffies(500);
 	for (;;) {
@@ -558,20 +557,19 @@ static int rockchip_pcie_init_port(struct rockchip_pcie *rockchip_pcie)
 			  PCIE_CORE_PL_CONF_LANE_MASK);
 	dev_dbg(dev, "current link width is x%d\n", status);
 
-	rockchip_pcie_writel(rockchip_pcie, ROCKCHIP_VENDOR_ID,
-			    PCIE_RC_CONFIG_VENDOR);
-	rockchip_pcie_writel(rockchip_pcie,
-			    PCI_CLASS_BRIDGE_PCI << PCIE_RC_CONFIG_SCC_SHIFT,
-			    PCIE_RC_CONFIG_RID_CCR);
-	rockchip_pcie_writel(rockchip_pcie, 0x0, PCIE_RC_BAR_CONF);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_RC_CONFIG_VENDOR,
+			     ROCKCHIP_VENDOR_ID);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_RC_CONFIG_RID_CCR,
+			     PCI_CLASS_BRIDGE_PCI << PCIE_RC_CONFIG_SCC_SHIFT);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_RC_BAR_CONF, 0);
 
-	rockchip_pcie_writel(rockchip_pcie,
-			    (RC_REGION_0_ADDR_TRANS_L + RC_REGION_0_PASS_BITS),
-			    PCIE_CORE_OB_REGION_ADDR0);
-	rockchip_pcie_writel(rockchip_pcie, RC_REGION_0_ADDR_TRANS_H,
-			    PCIE_CORE_OB_REGION_ADDR1);
-	rockchip_pcie_writel(rockchip_pcie, 0x0080000a, PCIE_CORE_OB_REGION_DESC0);
-	rockchip_pcie_writel(rockchip_pcie, 0x0, PCIE_CORE_OB_REGION_DESC1);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_CORE_OB_REGION_ADDR0,
+			RC_REGION_0_ADDR_TRANS_L + RC_REGION_0_PASS_BITS);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_CORE_OB_REGION_ADDR1,
+			RC_REGION_0_ADDR_TRANS_H);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_CORE_OB_REGION_DESC0,
+			     0x0080000a);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_CORE_OB_REGION_DESC1, 0);
 
 	return 0;
 }
@@ -629,15 +627,15 @@ static irqreturn_t rockchip_pcie_subsys_irq_handler(int irq, void *arg)
 		if (sub_reg & PCIE_CORE_INT_MMVC)
 			dev_dbg(dev, "MSI mask register changes\n");
 
-		rockchip_pcie_writel(rockchip_pcie, sub_reg, PCIE_CORE_INT_STATUS);
+		rockchip_pcie_writel(rockchip_pcie, PCIE_CORE_INT_STATUS, sub_reg);
 	} else if (reg & PCIE_CLIENT_INT_PHY) {
 		dev_dbg(dev, "phy link changes\n");
 		rockchip_pcie_update_txcredit_mui(rockchip_pcie);
 		rockchip_pcie_clr_bw_int(rockchip_pcie);
 	}
 
-	rockchip_pcie_writel(rockchip_pcie, reg & PCIE_CLIENT_INT_LOCAL,
-			    PCIE_CLIENT_INT_STATUS);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_CLIENT_INT_STATUS,
+			reg & PCIE_CLIENT_INT_LOCAL);
 
 	return IRQ_HANDLED;
 }
@@ -673,13 +671,13 @@ static irqreturn_t rockchip_pcie_client_irq_handler(int irq, void *arg)
 	if (reg & PCIE_CLIENT_INT_PHY)
 		dev_dbg(dev, "phy interrupt received\n");
 
-	rockchip_pcie_writel(rockchip_pcie, reg & (PCIE_CLIENT_INT_LEGACY_DONE |
-			      PCIE_CLIENT_INT_MSG | PCIE_CLIENT_INT_HOT_RST |
-			      PCIE_CLIENT_INT_DPA | PCIE_CLIENT_INT_FATAL_ERR |
-			      PCIE_CLIENT_INT_NFATAL_ERR |
-			      PCIE_CLIENT_INT_CORR_ERR |
-			      PCIE_CLIENT_INT_PHY),
-		   PCIE_CLIENT_INT_STATUS);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_CLIENT_INT_STATUS,
+			reg & (PCIE_CLIENT_INT_LEGACY_DONE |
+			       PCIE_CLIENT_INT_MSG | PCIE_CLIENT_INT_HOT_RST |
+			       PCIE_CLIENT_INT_DPA | PCIE_CLIENT_INT_FATAL_ERR |
+			       PCIE_CLIENT_INT_NFATAL_ERR |
+			       PCIE_CLIENT_INT_CORR_ERR |
+			       PCIE_CLIENT_INT_PHY));
 
 	return IRQ_HANDLED;
 }
@@ -919,10 +917,9 @@ err_out:
 
 static void rockchip_pcie_enable_interrupts(struct rockchip_pcie *rockchip_pcie)
 {
-	rockchip_pcie_writel(rockchip_pcie, (PCIE_CLIENT_INT_CLI << 16) &
-			    (~PCIE_CLIENT_INT_CLI), PCIE_CLIENT_INT_MASK);
-	rockchip_pcie_writel(rockchip_pcie, (u32)(~PCIE_CORE_INT),
-			    PCIE_CORE_INT_MASK);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_CLIENT_INT_MASK,
+			(PCIE_CLIENT_INT_CLI << 16) & (~PCIE_CLIENT_INT_CLI));
+	rockchip_pcie_writel(rockchip_pcie, PCIE_CORE_INT_MASK, (u32)(~PCIE_CORE_INT));
 
 	rockchip_pcie_enable_bw_int(rockchip_pcie);
 }
@@ -991,14 +988,14 @@ static int rockchip_pcie_prog_ob_atu(struct rockchip_pcie *rockchip_pcie,
 	ob_addr_1 = upper_addr;
 	ob_desc_0 = (1 << 23 | type);
 
-	rockchip_pcie_writel(rockchip_pcie, ob_addr_0,
-			    PCIE_CORE_OB_REGION_ADDR0 + aw_offset);
-	rockchip_pcie_writel(rockchip_pcie, ob_addr_1,
-			    PCIE_CORE_OB_REGION_ADDR1 + aw_offset);
-	rockchip_pcie_writel(rockchip_pcie, ob_desc_0,
-			    PCIE_CORE_OB_REGION_DESC0 + aw_offset);
-	rockchip_pcie_writel(rockchip_pcie, 0,
-			    PCIE_CORE_OB_REGION_DESC1 + aw_offset);
+	rockchip_pcie_writel(rockchip_pcie,
+			     PCIE_CORE_OB_REGION_ADDR0 + aw_offset, ob_addr_0);
+	rockchip_pcie_writel(rockchip_pcie,
+			     PCIE_CORE_OB_REGION_ADDR1 + aw_offset, ob_addr_1);
+	rockchip_pcie_writel(rockchip_pcie,
+			     PCIE_CORE_OB_REGION_DESC0 + aw_offset, ob_desc_0);
+	rockchip_pcie_writel(rockchip_pcie,
+			     PCIE_CORE_OB_REGION_DESC1 + aw_offset, 0);
 
 	return 0;
 }
@@ -1024,8 +1021,10 @@ static int rockchip_pcie_prog_ib_atu(struct rockchip_pcie *rockchip_pcie,
 	ib_addr_0 |= (lower_addr << 8) & PCIE_CORE_IB_REGION_ADDR0_LO_ADDR;
 	ib_addr_1 = upper_addr;
 
-	rockchip_pcie_writel(rockchip_pcie, ib_addr_0, PCIE_RP_IB_ADDR0 + aw_offset);
-	rockchip_pcie_writel(rockchip_pcie, ib_addr_1, PCIE_RP_IB_ADDR1 + aw_offset);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_RP_IB_ADDR0 + aw_offset,
+			     ib_addr_0);
+	rockchip_pcie_writel(rockchip_pcie, PCIE_RP_IB_ADDR1 + aw_offset,
+			     ib_addr_1);
 
 	return 0;
 }
