@@ -572,8 +572,6 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
 	pci_scan_child_bus(bus);
 	pci_assign_unassigned_bus_resources(bus);
 	pci_bus_add_devices(bus);
-
-	platform_set_drvdata(pdev, xgene_pcie);
 	return 0;
 
 error:
