@@ -590,6 +590,21 @@ const struct sun4i_tcon_quirks sun5i_a13_quirks = {
 	.has_dma_src	= true,
 };
 
+const struct sun4i_tcon_quirks sun6i_a31_quirks = {
+	.max_clock	= 200000,
+	.has_channel_1	= true,
+	.has_dma_src	= true,
+	.has_hdmi_mux	= true,
+	.has_dsi_mux	= true,
+};
+
+const struct sun4i_tcon_quirks sun6i_a31s_quirks = {
+	.max_clock	= 200000,
+	.has_channel_1	= true,
+	.has_dma_src	= true,
+	.has_hdmi_mux	= true,
+};
+
 const struct sun4i_tcon_quirks sun8i_a33_quirks = {
 	.max_clock	= 200000,
 	/* nothing is supported */
@@ -597,6 +612,8 @@ const struct sun4i_tcon_quirks sun8i_a33_quirks = {
 
 static const struct of_device_id sun4i_tcon_of_table[] = {
 	{ .compatible = "allwinner,sun5i-a13-tcon", .data = &sun5i_a13_quirks },
+	{ .compatible = "allwinner,sun6i-a31-tcon", .data = &sun6i_a31_quirks },
+	{ .compatible = "allwinner,sun6i-a31s-tcon", .data = &sun6i_a31s_quirks },
 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
 	{ }
 };

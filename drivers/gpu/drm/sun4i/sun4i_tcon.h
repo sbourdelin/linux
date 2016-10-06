@@ -148,6 +148,8 @@ struct sun4i_tcon_quirks {
 	bool	has_channel_1;	/* a33 does not have channel 1 */
 	bool	has_bypass_src;	/* has separate input bypassing CEU */
 	bool	has_dma_src;	/* has DMA input */
+	bool	has_hdmi_mux;	/* HDMI source selector */
+	bool	has_dsi_mux;	/* MIPI DSI source selector */
 };
 
 struct sun4i_tcon {
