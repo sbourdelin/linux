@@ -2715,6 +2715,15 @@ void i915_handle_error(struct drm_i915_private *dev_priv,
 	i915_reset_and_wakeup(dev_priv);
 }
 
+static void assert_pipe_is_active(struct drm_i915_private *dev_priv,
+				  enum pipe pipe)
+{
+	struct intel_crtc *crtc =
+		to_intel_crtc(dev_priv->pipe_to_crtc_mapping[pipe]);
+
+	I915_STATE_WARN_ON(!crtc->base.state->active);
+}
+
 /* Called from drm generic code, passed 'crtc' which
  * we use as a pipe index
  */
@@ -2722,6 +2731,9 @@ static int i8xx_enable_vblank(struct drm_device *dev, unsigned int pipe)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	unsigned long irqflags;
+
+	/* vblank IRQ requires the powerwell, held awake by the CRTC */
+	assert_pipe_is_active(dev_priv, pipe);
 
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
 	i915_enable_pipestat(dev_priv, pipe, PIPE_VBLANK_INTERRUPT_STATUS);
@@ -2734,6 +2746,9 @@ static int i965_enable_vblank(struct drm_device *dev, unsigned int pipe)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	unsigned long irqflags;
+
+	/* vblank IRQ requires the powerwell, held awake by the CRTC */
+	assert_pipe_is_active(dev_priv, pipe);
 
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
 	i915_enable_pipestat(dev_priv, pipe,
@@ -2750,6 +2765,9 @@ static int ironlake_enable_vblank(struct drm_device *dev, unsigned int pipe)
 	uint32_t bit = INTEL_GEN(dev) >= 7 ?
 		DE_PIPE_VBLANK_IVB(pipe) : DE_PIPE_VBLANK(pipe);
 
+	/* vblank IRQ requires the powerwell, held awake by the CRTC */
+	assert_pipe_is_active(dev_priv, pipe);
+
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
 	ilk_enable_display_irq(dev_priv, bit);
 	spin_unlock_irqrestore(&dev_priv->irq_lock, irqflags);
@@ -2761,6 +2779,9 @@ static int gen8_enable_vblank(struct drm_device *dev, unsigned int pipe)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	unsigned long irqflags;
+
+	/* vblank IRQ requires the powerwell, held awake by the CRTC */
+	assert_pipe_is_active(dev_priv, pipe);
 
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
 	bdw_enable_pipe_irq(dev_priv, pipe, GEN8_PIPE_VBLANK);
