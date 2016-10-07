@@ -464,7 +464,7 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 
 			len += scnprintf(buf + len, sizeof(buf), "%s%s",
 					 first ? "" : ", ",
-					 dev_priv->engine[j].name);
+					 dev_priv->engine[j]->name);
 			first = 0;
 		}
 		scnprintf(buf + len, sizeof(buf), ")");
@@ -482,7 +482,7 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 
 		obj = ee->batchbuffer;
 		if (obj) {
-			err_puts(m, dev_priv->engine[i].name);
+			err_puts(m, dev_priv->engine[i]->name);
 			if (ee->pid != -1)
 				err_printf(m, " (submitted by %s [%d])",
 					   ee->comm,
@@ -496,14 +496,14 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 		obj = ee->wa_batchbuffer;
 		if (obj) {
 			err_printf(m, "%s (w/a) --- gtt_offset = 0x%08x\n",
-				   dev_priv->engine[i].name,
+				   dev_priv->engine[i]->name,
 				   lower_32_bits(obj->gtt_offset));
 			print_error_obj(m, obj);
 		}
 
 		if (ee->num_requests) {
 			err_printf(m, "%s --- %d requests\n",
-				   dev_priv->engine[i].name,
+				   dev_priv->engine[i]->name,
 				   ee->num_requests);
 			for (j = 0; j < ee->num_requests; j++) {
 				err_printf(m, "  pid %d, seqno 0x%08x, emitted %ld, head 0x%08x, tail 0x%08x\n",
@@ -517,10 +517,10 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 
 		if (IS_ERR(ee->waiters)) {
 			err_printf(m, "%s --- ? waiters [unable to acquire spinlock]\n",
-				   dev_priv->engine[i].name);
+				   dev_priv->engine[i]->name);
 		} else if (ee->num_waiters) {
 			err_printf(m, "%s --- %d waiters\n",
-				   dev_priv->engine[i].name,
+				   dev_priv->engine[i]->name,
 				   ee->num_waiters);
 			for (j = 0; j < ee->num_waiters; j++) {
 				err_printf(m, " seqno 0x%08x for %s [%d]\n",
@@ -532,7 +532,7 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 
 		if ((obj = ee->ringbuffer)) {
 			err_printf(m, "%s --- ringbuffer = 0x%08x\n",
-				   dev_priv->engine[i].name,
+				   dev_priv->engine[i]->name,
 				   lower_32_bits(obj->gtt_offset));
 			print_error_obj(m, obj);
 		}
@@ -546,7 +546,7 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 				hws_page = &obj->pages[LRC_PPHWSP_PN][0];
 			}
 			err_printf(m, "%s --- HW Status = 0x%08llx\n",
-				   dev_priv->engine[i].name, hws_offset);
+				   dev_priv->engine[i]->name, hws_offset);
 			offset = 0;
 			for (elt = 0; elt < PAGE_SIZE/16; elt += 4) {
 				err_printf(m, "[%04x] %08x %08x %08x %08x\n",
@@ -563,12 +563,12 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 		if (obj) {
 			u64 wa_ctx_offset = obj->gtt_offset;
 			u32 *wa_ctx_page = &obj->pages[0][0];
-			struct intel_engine_cs *engine = &dev_priv->engine[RCS];
+			struct intel_engine_cs *engine = dev_priv->engine[RCS];
 			u32 wa_ctx_size = (engine->wa_ctx.indirect_ctx.size +
 					   engine->wa_ctx.per_ctx.size);
 
 			err_printf(m, "%s --- WA ctx batch buffer = 0x%08llx\n",
-				   dev_priv->engine[i].name, wa_ctx_offset);
+				   dev_priv->engine[i]->name, wa_ctx_offset);
 			offset = 0;
 			for (elt = 0; elt < wa_ctx_size; elt += 4) {
 				err_printf(m, "[%04x] %08x %08x %08x %08x\n",
@@ -583,7 +583,7 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 
 		if ((obj = ee->ctx)) {
 			err_printf(m, "%s --- HW Context = 0x%08x\n",
-				   dev_priv->engine[i].name,
+				   dev_priv->engine[i]->name,
 				   lower_32_bits(obj->gtt_offset));
 			print_error_obj(m, obj);
 		}
@@ -918,7 +918,7 @@ static void gen8_record_semaphore_state(struct drm_i915_error_state *error,
 	if (!error->semaphore)
 		return;
 
-	for_each_engine_id(to, dev_priv, id) {
+	for_each_engine(to, dev_priv, id) {
 		int idx;
 		u16 signal_offset;
 		u32 *tmp;
@@ -1173,14 +1173,14 @@ static void i915_gem_record_rings(struct drm_i915_private *dev_priv,
 		i915_error_object_create(dev_priv, dev_priv->semaphore);
 
 	for (i = 0; i < I915_NUM_ENGINES; i++) {
-		struct intel_engine_cs *engine = &dev_priv->engine[i];
+		struct intel_engine_cs *engine = dev_priv->engine[i];
 		struct drm_i915_error_engine *ee = &error->engine[i];
 		struct drm_i915_gem_request *request;
 
 		ee->pid = -1;
 		ee->engine_id = -1;
 
-		if (!intel_engine_initialized(engine))
+		if (!engine)
 			continue;
 
 		ee->engine_id = i;
@@ -1603,7 +1603,7 @@ void i915_get_engine_instdone(struct drm_i915_private *dev_priv,
 			      enum intel_engine_id engine_id,
 			      struct intel_instdone *instdone)
 {
-	u32 mmio_base = dev_priv->engine[engine_id].mmio_base;
+	u32 mmio_base = dev_priv->engine[engine_id]->mmio_base;
 	int slice;
 	int subslice;
 
