@@ -2098,6 +2098,24 @@ static void reserve_highatomic_pageblock(struct page *page, struct zone *zone,
 	mt = get_pageblock_migratetype(page);
 	if (mt != MIGRATE_HIGHATOMIC &&
 			!is_migrate_isolate(mt) && !is_migrate_cma(mt)) {
+		/*
+		 * If the pageblock cross zone boundaries, we need both
+		 * zone locks but doesn't want to make complex because
+		 * highatomic pageblock is small so that we want to reserve
+		 * sane(?) pageblock.
+		 */
+		unsigned long start_pfn, end_pfn;
+
+		start_pfn = page_to_pfn(page);
+		start_pfn = start_pfn & ~(pageblock_nr_pages - 1);
+
+		if (!zone_spans_pfn(zone, start_pfn))
+			goto out_unlock;
+
+		end_pfn = start_pfn + pageblock_nr_pages - 1;
+		if (!zone_spans_pfn(zone, end_pfn))
+			goto out_unlock;
+
 		zone->nr_reserved_highatomic += pageblock_nr_pages;
 		set_pageblock_migratetype(page, MIGRATE_HIGHATOMIC);
 		move_freepages_block(zone, page, MIGRATE_HIGHATOMIC);
