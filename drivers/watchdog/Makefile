@@ -110,6 +110,7 @@ obj-$(CONFIG_ITCO_WDT) += iTCO_vendor_support.o
 endif
 obj-$(CONFIG_IT8712F_WDT) += it8712f_wdt.o
 obj-$(CONFIG_IT87_WDT) += it87_wdt.o
+obj-$(CONFIG_JNX_PTXPMB_WDT) += ptxpmb_wdt.o
 obj-$(CONFIG_HP_WATCHDOG) += hpwdt.o
 obj-$(CONFIG_KEMPLD_WDT) += kempld_wdt.o
 obj-$(CONFIG_SC1200_WDT) += sc1200wdt.o

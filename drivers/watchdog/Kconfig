@@ -131,6 +131,18 @@ config GPIO_WATCHDOG_ARCH_INITCALL
 	  arch_initcall.
 	  If in doubt, say N.
 
+config JNX_PTXPMB_WDT
+	tristate "Juniper PTX PMB CPLD watchdog"
+	depends on MFD_JUNIPER_CPLD
+	default y if MFD_JUNIPER_CPLD
+	select WATCHDOG_CORE
+	help
+	  Watchdog timer embedded into the boot CPLD on PTX PMB on
+	  relevant Juniper platforms.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called jnx-ptxpmb-wdt.
+
 config MENF21BMC_WATCHDOG
 	tristate "MEN 14F021P00 BMC Watchdog"
 	depends on MFD_MENF21BMC
