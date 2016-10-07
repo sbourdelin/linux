@@ -71,6 +71,12 @@
 #include <asm/div64.h>
 #include "internal.h"
 
+/*
+ * Maximum number of reclaim retries without any progress before OOM killer
+ * is consider as the only way to move forward.
+ */
+#define MAX_RECLAIM_RETRIES 16
+
 /* prevent >1 _updater_ of zone percpu pageset ->high and ->batch fields */
 static DEFINE_MUTEX(pcp_batch_high_lock);
 #define MIN_PERCPU_PAGELIST_FRACTION	(8)
@@ -2107,7 +2113,8 @@ out_unlock:
  * intense memory pressure but failed atomic allocations should be easier
  * to recover from than an OOM.
  */
-static void unreserve_highatomic_pageblock(const struct alloc_context *ac)
+static int unreserve_highatomic_pageblock(const struct alloc_context *ac,
+						int no_progress_loops)
 {
 	struct zonelist *zonelist = ac->zonelist;
 	unsigned long flags;
@@ -2115,15 +2122,40 @@ static void unreserve_highatomic_pageblock(const struct alloc_context *ac)
 	struct zone *zone;
 	struct page *page;
 	int order;
+	int unreserved_pages = 0;
 
 	for_each_zone_zonelist_nodemask(zone, z, zonelist, ac->high_zoneidx,
 								ac->nodemask) {
-		/* Preserve at least one pageblock */
-		if (zone->nr_reserved_highatomic <= pageblock_nr_pages)
+		unsigned long unreserve_pages_max;
+
+		/*
+		 * Try to preserve at least one pageblock but use up before
+		 * OOM kill.
+		 */
+		if (no_progress_loops < MAX_RECLAIM_RETRIES &&
+			zone->nr_reserved_highatomic <= pageblock_nr_pages)
 			continue;
 
 		spin_lock_irqsave(&zone->lock, flags);
-		for (order = 0; order < MAX_ORDER; order++) {
+		if (no_progress_loops < MAX_RECLAIM_RETRIES) {
+			unreserve_pages_max = no_progress_loops *
+					zone->nr_reserved_highatomic /
+					MAX_RECLAIM_RETRIES;
+			unreserve_pages_max = max(unreserve_pages_max,
+						pageblock_nr_pages);
+		} else {
+			/*
+			 * By race with page free functions, !highatomic
+			 * pageblocks can have a free page in highatomic
+			 * migratetype free list. So if we are about to
+			 * kill some process, unreserve every free pages
+			 * in highorderatomic.
+			 */
+			unreserve_pages_max = -1UL;
+		}
+
+		for (order = 0; order < MAX_ORDER &&
+				unreserve_pages_max > 0; order++) {
 			struct free_area *area = &(zone->free_area[order]);
 
 			page = list_first_entry_or_null(
@@ -2151,6 +2183,9 @@ static void unreserve_highatomic_pageblock(const struct alloc_context *ac)
 				zone->nr_reserved_highatomic -= min(
 						pageblock_nr_pages,
 						zone->nr_reserved_highatomic);
+				unreserve_pages_max -= min(pageblock_nr_pages,
+					zone->nr_reserved_highatomic);
+				unreserved_pages += 1 << page_order(page);
 			}
 
 			/*
@@ -2164,11 +2199,11 @@ static void unreserve_highatomic_pageblock(const struct alloc_context *ac)
 			 */
 			set_pageblock_migratetype(page, ac->migratetype);
 			move_freepages_block(zone, page, ac->migratetype);
-			spin_unlock_irqrestore(&zone->lock, flags);
-			return;
 		}
 		spin_unlock_irqrestore(&zone->lock, flags);
 	}
+
+	return unreserved_pages;
 }
 
 /* Remove an element from the buddy allocator from the fallback list */
@@ -3370,7 +3405,6 @@ retry:
 	 * Shrink them them and try again
 	 */
 	if (!page && !drained) {
-		unreserve_highatomic_pageblock(ac);
 		drain_all_pages(NULL);
 		drained = true;
 		goto retry;
@@ -3449,12 +3483,6 @@ bool gfp_pfmemalloc_allowed(gfp_t gfp_mask)
 }
 
 /*
- * Maximum number of reclaim retries without any progress before OOM killer
- * is consider as the only way to move forward.
- */
-#define MAX_RECLAIM_RETRIES 16
-
-/*
  * Checks whether it makes sense to retry the reclaim to make a forward progress
  * for the given allocation request.
  * The reclaim feedback represented by did_some_progress (any progress during
@@ -3489,6 +3517,9 @@ should_reclaim_retry(gfp_t gfp_mask, unsigned order,
 	 */
 	if (*no_progress_loops > MAX_RECLAIM_RETRIES)
 		return false;
+
+	if (unreserve_highatomic_pageblock(ac, *no_progress_loops))
+		return true;
 
 	/*
 	 * Keep reclaiming pages while there is a chance this will lead
