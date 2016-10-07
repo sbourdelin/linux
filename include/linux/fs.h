@@ -2081,10 +2081,21 @@ extern struct dentry *mount_pseudo(struct file_system_type *, char *,
 	unsigned long);
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
-#define fops_get(fops) \
+#define __fops_get(fops) \
 	(((fops) && try_module_get((fops)->owner) ? (fops) : NULL))
 #define fops_put(fops) \
 	do { if (fops) module_put((fops)->owner); } while(0)
+
+#define unowned_fmt "No fops owner at %p in [%s]\n"
+#define fops_unowned(fops) \
+	(is_module_address((unsigned long)(fops)) && !(fops)->owner)
+#define fops_modname(fops) \
+	__module_address((unsigned long)(fops))->name
+#define fops_warn_unowned(fops) \
+	WARN(fops_unowned(fops), unowned_fmt, (fops), fops_modname(fops))
+#define fops_get(fops) \
+	({ fops_warn_unowned(fops); __fops_get(fops); })
+
 /*
  * This one is to be used *ONLY* from ->open() instances.
  * fops must be non-NULL, pinned down *and* module dependencies
