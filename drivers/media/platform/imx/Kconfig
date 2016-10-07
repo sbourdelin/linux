@@ -6,6 +6,13 @@ config MEDIA_IMX
 	  This driver provides a SoC wide media controller device that all
 	  multimedia components in i.MX5 and i.MX6 SoCs can register with.
 
+config MEDIA_IMX_MIPI_CSI2
+	tristate "i.MX MIPI CSI-2 Host Controller"
+	depends on VIDEO_V4L2_SUBDEV_API
+	help
+	  This driver provides support for the MIPI CSI-2 Host Controller that
+	  is connected to the IPU CSI input multiplexers on i.MX6 SoCs.
+
 config VIDEO_IMX_IPU_COMMON
 	tristate
 
