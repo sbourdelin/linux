@@ -1,0 +1,50 @@
+* Juniper PTXPMB CPLD I2C Mux
+
+I2C mux on the PTXPMB CPLD on Juniper series of routers.
+
+Required properties:
+
+  - compatible: Must contain one of the following.
+    "jnx,i2c-mux-ptxpmb-cpld", "jnx,i2c-mux-ngpmb-bcpld"
+  - num-enable: Number of muxes to enable.
+
+  The following required properties are defined externally:
+
+  - Standard I2C mux properties. See i2c-mux.txt in this directory.
+  - I2C child bus nodes. See i2c-mux.txt in this directory.
+
+Optional Properties:
+
+  - num-channels: Number of channels. If not present the default is 8.
+  - base-bus-num: Base bus number. If not present it is 0.
+  - use-force: Use the force method of the controller.
+
+
+Example:
+
+cpld-i2c-mux {
+	compatible = "jnx,i2c-mux-ptxpmb-cpld";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	i2c-parent = <&i2c1>;
+
+	num-enable = <1>;
+
+	i2c@0 {
+		reg = <0>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		/* PMB devices are accessed through FPC */
+
+		temp-sensor@1a { /* FPC */
+			compatible = "maxim,max6697";
+			reg = <0x1a>;
+			smbus-timeout-disable;
+			resistance-cancellation;
+			alert-mask = <0xff>;
+			over-temperature-mask = <0xff>;
+		};
+	};
+};
