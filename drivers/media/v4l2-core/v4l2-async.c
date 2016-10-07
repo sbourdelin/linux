@@ -109,6 +109,7 @@ static int v4l2_async_test_notify(struct v4l2_async_notifier *notifier,
 		if (ret < 0)
 			return ret;
 	}
+
 	/* Move from the global subdevice list to notifier's done */
 	list_move(&sd->async_list, &notifier->done);
 
@@ -158,7 +159,7 @@ int v4l2_async_notifier_register(struct v4l2_device *v4l2_dev,
 				 struct v4l2_async_notifier *notifier)
 {
 	struct v4l2_async_subdev *asd;
-	int ret;
+	struct list_head *tail;
 	int i;
 
 	if (!notifier->num_subdevs || notifier->num_subdevs > V4L2_MAX_SUBDEVS)
@@ -191,17 +192,71 @@ int v4l2_async_notifier_register(struct v4l2_device *v4l2_dev,
 	/* Keep also completed notifiers on the list */
 	list_add(&notifier->list, &notifier_list);
 
+	do {
+		int ret;
+
+		tail = notifier->waiting.prev;
+
+		ret = v4l2_async_test_notify_all(notifier);
+		if (ret < 0) {
+			mutex_unlock(&list_lock);
+			return ret;
+		}
+
+		/*
+		 * If entries were added to the notifier waiting list, check
+		 * again if the corresponding subdevices are already available.
+		 */
+	} while (tail != notifier->waiting.prev);
+
 	mutex_unlock(&list_lock);
 
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL(v4l2_async_notifier_register);
+
+int __v4l2_async_notifier_add_subdev(struct v4l2_async_notifier *notifier,
+				     struct v4l2_async_subdev *asd)
+{
+	struct v4l2_async_subdev *tmp_asd;
+
+	lockdep_assert_held(&list_lock);
+
+	if (asd->match_type != V4L2_ASYNC_MATCH_OF)
+		return -EINVAL;
+
+	/*
+	 * First check if the same notifier is already on the waiting or done
+	 * lists. This can happen if a subdevice with multiple outputs is added
+	 * by all its downstream subdevices.
+	 */
+	list_for_each_entry(tmp_asd, &notifier->waiting, list)
+		if (tmp_asd->match.of.node == asd->match.of.node)
+			return 0;
+	list_for_each_entry(tmp_asd, &notifier->done, list)
+		if (tmp_asd->match.of.node == asd->match.of.node)
+			return 0;
+
+	/*
+	 * Add the new async subdev to the notifier waiting list, so
+	 * v4l2_async_belongs may use it to compare against entries in
+	 * subdev_list.
+	 * In case the subdev matching asd has already been passed in the
+	 * subdev_list walk in v4l2_async_notifier_register, or if
+	 * we are called from v4l2_async_register_subdev, the subdev_list
+	 * will have to be walked again.
+	 */
+	list_add_tail(&asd->list, &notifier->waiting);
+
+	return 0;
+}
 
 void v4l2_async_notifier_unregister(struct v4l2_async_notifier *notifier)
 {
 	struct v4l2_subdev *sd, *tmp;
-	unsigned int notif_n_subdev = notifier->num_subdevs;
-	unsigned int n_subdev = min(notif_n_subdev, V4L2_MAX_SUBDEVS);
+	unsigned int notif_n_subdev = 0;
+	unsigned int n_subdev;
+	struct list_head *list;
 	struct device **dev;
 	int i = 0;
 
@@ -217,6 +272,10 @@ void v4l2_async_notifier_unregister(struct v4l2_async_notifier *notifier)
 	mutex_lock(&list_lock);
 
 	list_del(&notifier->list);
+
+	list_for_each(list, &notifier->done)
+		++notif_n_subdev;
+	n_subdev = min(notif_n_subdev, V4L2_MAX_SUBDEVS);
 
 	list_for_each_entry_safe(sd, tmp, &notifier->done, async_list) {
 		struct device *d;
@@ -294,8 +353,19 @@ int v4l2_async_register_subdev(struct v4l2_subdev *sd)
 	list_for_each_entry(notifier, &notifier_list, list) {
 		struct v4l2_async_subdev *asd = v4l2_async_belongs(notifier, sd);
 		if (asd) {
+			struct list_head *tail = notifier->waiting.prev;
 			int ret = v4l2_async_test_notify(notifier, sd, asd);
+
+			/*
+			 * If entries were added to the notifier waiting list,
+			 * check if the corresponding subdevices are already
+			 * available.
+			 */
+			if (tail != notifier->waiting.prev)
+				ret = v4l2_async_test_notify_all(notifier);
+
 			mutex_unlock(&list_lock);
+
 			return ret;
 		}
 	}

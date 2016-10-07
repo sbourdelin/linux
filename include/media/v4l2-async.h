@@ -114,6 +114,18 @@ int v4l2_async_notifier_register(struct v4l2_device *v4l2_dev,
 				 struct v4l2_async_notifier *notifier);
 
 /**
+ * __v4l2_async_notifier_add_subdev - adds a subdevice to the notifier waitlist
+ *
+ * @v4l2_notifier: notifier the calling subdev is bound to
+ * @asd: asynchronous subdev match
+ *
+ * To be called from inside a subdevices' registered_async callback to add
+ * additional subdevices to the notifier waiting list.
+ */
+int __v4l2_async_notifier_add_subdev(struct v4l2_async_notifier *notifier,
+				     struct v4l2_async_subdev *asd);
+
+/**
  * v4l2_async_notifier_unregister - unregisters a subdevice asynchronous notifier
  *
  * @notifier: pointer to &struct v4l2_async_notifier
