@@ -1367,6 +1367,21 @@ config TWL4030_POWER
 	  and load scripts controlling which resources are switched off/on
 	  or reset when a sleep, wakeup or warm reset event occurs.
 
+config MFD_JUNIPER_CPLD
+	tristate "Juniper PTX PMB CPLD"
+	depends on (PTXPMB_COMMON || JNX_PTX_NGPMB)
+	default y if (PTXPMB_COMMON || JNX_PTX_NGPMB)
+	select MFD_CORE
+	select I2C_MUX_PTXPMB
+	select GPIO_PTXPMB_CPLD
+	select JNX_PTXPMB_WDT
+	help
+	  Select this to enable the PTX PMB CPLD multi-function kernel driver
+	  for the applicable Juniper platforms.
+
+	  This driver can be built as a module. If built as a module it will be
+	  called "ptxpmb-cpld"
+
 config MFD_TWL4030_AUDIO
 	bool "TI TWL4030 Audio"
 	depends on TWL4030_CORE
