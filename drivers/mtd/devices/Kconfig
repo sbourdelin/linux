@@ -144,6 +144,17 @@ config MTD_LART
 	  not need any mapping/chip driver for LART. This one does it all
 	  for you, so go disable all of those if you enabled some of them (:
 
+config JNX_PMB_NVRAM
+	tristate "Juniper FPC PMB NVRAM Driver"
+	depends on (PTXPMB_COMMON || JNX_PTX_NGPMB)
+	default y if (PTXPMB_COMMON || JNX_PTX_NGPMB)
+	help
+	  This driver adds support for NVRAM on Gladiator 3T FPC which is connected
+	  to the BOOTCPLD (cpld_version >= C6).
+
+	  This driver can also be built as a module. When it is so the name of
+	  the module is ngpmb-nvram.
+
 config MTD_MTDRAM
 	tristate "Test driver using RAM"
 	help
