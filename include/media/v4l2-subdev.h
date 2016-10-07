@@ -395,6 +395,7 @@ struct v4l2_subdev_video_ops {
 	int (*g_tvnorms)(struct v4l2_subdev *sd, v4l2_std_id *std);
 	int (*g_tvnorms_output)(struct v4l2_subdev *sd, v4l2_std_id *std);
 	int (*g_input_status)(struct v4l2_subdev *sd, u32 *status);
+	int (*prepare_stream)(struct v4l2_subdev *sd);
 	int (*s_stream)(struct v4l2_subdev *sd, int enable);
 	int (*g_pixelaspect)(struct v4l2_subdev *sd, struct v4l2_fract *aspect);
 	int (*g_parm)(struct v4l2_subdev *sd, struct v4l2_streamparm *param);
