@@ -248,6 +248,13 @@ void ieee80211_set_qos_hdr(struct ieee80211_sub_if_data *sdata,
 	/* preserve EOSP bit */
 	ack_policy = *p & IEEE80211_QOS_CTL_EOSP;
 
+	/* preserve A-MSDU bit for MONITOR interfaces to allow injecting
+	 * A-MSDU frames
+	 */
+	if (info->flags & IEEE80211_TX_CTL_INJECTED ||
+	    info->control.flags & IEEE80211_TX_CTRL_AMSDU)
+		ack_policy |= *p & IEEE80211_QOS_CTL_A_MSDU_PRESENT;
+
 	if (is_multicast_ether_addr(hdr->addr1) ||
 	    sdata->noack_map & BIT(tid)) {
 		ack_policy |= IEEE80211_QOS_CTL_ACK_POLICY_NOACK;
