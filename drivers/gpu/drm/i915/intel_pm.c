@@ -711,14 +711,14 @@ static bool g4x_compute_wm0(struct drm_device *dev,
 			    unsigned int display_latency_ns,
 			    const struct intel_watermark_params *cursor,
 			    unsigned int cursor_latency_ns,
-			    int *plane_wm,
-			    int *cursor_wm)
+			    unsigned int *plane_wm,
+			    unsigned int *cursor_wm)
 {
 	struct drm_crtc *crtc;
 	const struct drm_display_mode *adjusted_mode;
 	int htotal, hdisplay, clock, cpp;
-	int line_time_us, line_count;
-	int entries, tlb_miss;
+	unsigned int line_time_us, line_count, entries;
+	int tlb_miss;
 
 	crtc = intel_get_crtc_for_plane(dev, plane);
 	if (!intel_crtc_active(crtc)) {
@@ -740,7 +740,7 @@ static bool g4x_compute_wm0(struct drm_device *dev,
 		entries += tlb_miss;
 	entries = DIV_ROUND_UP(entries, display->cacheline_size);
 	*plane_wm = entries + display->guard_size;
-	if (*plane_wm > (int)display->max_wm)
+	if (*plane_wm > display->max_wm)
 		*plane_wm = display->max_wm;
 
 	/* Use the large buffer method to calculate cursor watermark */
@@ -752,8 +752,8 @@ static bool g4x_compute_wm0(struct drm_device *dev,
 		entries += tlb_miss;
 	entries = DIV_ROUND_UP(entries, cursor->cacheline_size);
 	*cursor_wm = entries + cursor->guard_size;
-	if (*cursor_wm > (int)cursor->max_wm)
-		*cursor_wm = (int)cursor->max_wm;
+	if (*cursor_wm > cursor->max_wm)
+		*cursor_wm = cursor->max_wm;
 
 	return true;
 }
@@ -766,21 +766,21 @@ static bool g4x_compute_wm0(struct drm_device *dev,
  * must be disabled.
  */
 static bool g4x_check_srwm(struct drm_device *dev,
-			   int display_wm, int cursor_wm,
+			   unsigned int display_wm, unsigned int cursor_wm,
 			   const struct intel_watermark_params *display,
 			   const struct intel_watermark_params *cursor)
 {
-	DRM_DEBUG_KMS("SR watermark: display plane %d, cursor %d\n",
+	DRM_DEBUG_KMS("SR watermark: display plane %u, cursor %u\n",
 		      display_wm, cursor_wm);
 
 	if (display_wm > display->max_wm) {
-		DRM_DEBUG_KMS("display watermark is too large(%d/%u), disabling\n",
+		DRM_DEBUG_KMS("display watermark is too large(%u/%u), disabling\n",
 			      display_wm, display->max_wm);
 		return false;
 	}
 
 	if (cursor_wm > cursor->max_wm) {
-		DRM_DEBUG_KMS("cursor watermark is too large(%d/%u), disabling\n",
+		DRM_DEBUG_KMS("cursor watermark is too large(%u/%u), disabling\n",
 			      cursor_wm, cursor->max_wm);
 		return false;
 	}
@@ -798,15 +798,13 @@ static bool g4x_compute_srwm(struct drm_device *dev,
 			     unsigned int latency_ns,
 			     const struct intel_watermark_params *display,
 			     const struct intel_watermark_params *cursor,
-			     int *display_wm, int *cursor_wm)
+			     unsigned int *display_wm, unsigned int *cursor_wm)
 {
 	struct drm_crtc *crtc;
 	const struct drm_display_mode *adjusted_mode;
 	int hdisplay, htotal, cpp, clock;
-	unsigned long line_time_us;
-	int line_count, line_size;
-	int small, large;
-	int entries;
+	unsigned int line_time_us, line_count, line_size;
+	unsigned int small, large, entries;
 
 	if (!latency_ns) {
 		*display_wm = *cursor_wm = 0;
@@ -836,9 +834,7 @@ static bool g4x_compute_srwm(struct drm_device *dev,
 	entries = DIV_ROUND_UP(entries, cursor->cacheline_size);
 	*cursor_wm = entries + cursor->guard_size;
 
-	return g4x_check_srwm(dev,
-			      *display_wm, *cursor_wm,
-			      display, cursor);
+	return g4x_check_srwm(dev, *display_wm, *cursor_wm, display, cursor);
 }
 
 #define FW_WM_VLV(value, plane) \
@@ -1386,8 +1382,9 @@ static void g4x_update_wm(struct drm_crtc *crtc)
 	struct drm_device *dev = crtc->dev;
 	static const unsigned int sr_latency_ns = 12000;
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	int planea_wm, planeb_wm, cursora_wm, cursorb_wm;
-	int plane_sr, cursor_sr;
+	unsigned int planea_wm, planeb_wm;
+	unsigned int cursora_wm, cursorb_wm;
+	unsigned int plane_sr, cursor_sr;
 	unsigned int enabled = 0;
 	bool cxsr_enabled;
 
@@ -1416,8 +1413,8 @@ static void g4x_update_wm(struct drm_crtc *crtc)
 		plane_sr = cursor_sr = 0;
 	}
 
-	DRM_DEBUG_KMS("Setting FIFO watermarks - A: plane=%d, cursor=%d, "
-		      "B: plane=%d, cursor=%d, SR: plane=%d, cursor=%d\n",
+	DRM_DEBUG_KMS("Setting FIFO watermarks - A: plane=%u, cursor=%u, "
+		      "B: plane=%u, cursor=%u, SR: plane=%u, cursor=%u\n",
 		      planea_wm, cursora_wm,
 		      planeb_wm, cursorb_wm,
 		      plane_sr, cursor_sr);
@@ -1458,8 +1455,7 @@ static void i965_update_wm(struct drm_crtc *unused_crtc)
 		int htotal = adjusted_mode->crtc_htotal;
 		int hdisplay = to_intel_crtc(crtc)->config->pipe_src_w;
 		int cpp = drm_format_plane_cpp(crtc->primary->state->fb->pixel_format, 0);
-		unsigned long line_time_us;
-		int entries;
+		unsigned int line_time_us, entries;
 
 		line_time_us = max(htotal * 1000 / clock, 1);
 
@@ -1518,9 +1514,10 @@ static void i9xx_update_wm(struct drm_crtc *unused_crtc)
 	struct drm_device *dev = unused_crtc->dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	const struct intel_watermark_params *wm_info;
-	uint32_t fwater_lo;
-	uint32_t fwater_hi;
-	int cwm, srwm = 1;
+	u32 fwater_lo;
+	u32 fwater_hi;
+	unsigned int cwm;
+	int srwm = 1;
 	unsigned int fifo_size, planea_wm, planeb_wm;
 	struct drm_crtc *crtc, *enabled = NULL;
 
@@ -1604,8 +1601,7 @@ static void i9xx_update_wm(struct drm_crtc *unused_crtc)
 		int htotal = adjusted_mode->crtc_htotal;
 		int hdisplay = to_intel_crtc(enabled)->config->pipe_src_w;
 		int cpp = drm_format_plane_cpp(enabled->primary->state->fb->pixel_format, 0);
-		unsigned long line_time_us;
-		int entries;
+		unsigned int line_time_us, entries;
 
 		if (IS_I915GM(dev) || IS_I945GM(dev))
 			cpp = 4;
@@ -1616,7 +1612,7 @@ static void i9xx_update_wm(struct drm_crtc *unused_crtc)
 		entries = (((sr_latency_ns / line_time_us) + 1000) / 1000) *
 			cpp * hdisplay;
 		entries = DIV_ROUND_UP(entries, wm_info->cacheline_size);
-		DRM_DEBUG_KMS("self-refresh entries: %d\n", entries);
+		DRM_DEBUG_KMS("self-refresh entries: %u\n", entries);
 		srwm = wm_info->fifo_size - entries;
 		if (srwm < 0)
 			srwm = 1;
@@ -1628,7 +1624,7 @@ static void i9xx_update_wm(struct drm_crtc *unused_crtc)
 			I915_WRITE(FW_BLC_SELF, srwm & 0x3f);
 	}
 
-	DRM_DEBUG_KMS("Setting FIFO watermarks - A: %d, B: %d, C: %d, SR %d\n",
+	DRM_DEBUG_KMS("Setting FIFO watermarks - A: %u, B: %u, C: %u, SR %d\n",
 		      planea_wm, planeb_wm, cwm, srwm);
 
 	fwater_lo = ((planeb_wm & 0x3f) << 16) | (planea_wm & 0x3f);
