@@ -24,6 +24,7 @@ support describing the chip select layout.
 Optional properties:
 - cs-gpios	  - gpios chip select.
 - num-cs	  - total number of chipselects.
+- gpio-ss	  - use internal slave select with gpio chip select.
 
 If cs-gpios is used the number of chip selects will be increased automatically
 with max(cs-gpios > hw cs).
