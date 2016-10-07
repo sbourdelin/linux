@@ -371,6 +371,12 @@ void i915_gem_restore_fences(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	int i;
 
+	/* Note that this may be called outside of struct_mutex, by
+	 * runtime suspend/resume. The barrier we require is enforced by
+	 * rpm itself - all access to fences/GTT are only within an rpm
+	 * wakeref, and to acquire that wakeref you must pass through here.
+	 */
+
 	for (i = 0; i < dev_priv->num_fence_regs; i++) {
 		struct drm_i915_fence_reg *reg = &dev_priv->fence_regs[i];
 		struct i915_vma *vma = reg->vma;
@@ -379,10 +385,15 @@ void i915_gem_restore_fences(struct drm_device *dev)
 		 * Commit delayed tiling changes if we have an object still
 		 * attached to the fence, otherwise just clear the fence.
 		 */
-		if (vma && !i915_gem_object_is_tiled(vma->obj))
+		if (vma && !i915_gem_object_is_tiled(vma->obj)) {
+			list_move(&reg->link, &dev_priv->mm.fence_list);
+			i915_gem_release_mmap(vma->obj);
+			vma->fence = NULL;
 			vma = NULL;
+		}
 
-		fence_update(reg, vma);
+		fence_write(reg, vma);
+		reg->vma = vma;
 	}
 }
 
