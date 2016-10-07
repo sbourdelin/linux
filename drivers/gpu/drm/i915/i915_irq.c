@@ -2723,6 +2723,8 @@ static int i915_enable_vblank(struct drm_device *dev, unsigned int pipe)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	unsigned long irqflags;
 
+	intel_runtime_pm_get(dev_priv);
+
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
 	if (INTEL_INFO(dev)->gen >= 4)
 		i915_enable_pipestat(dev_priv, pipe,
@@ -2742,6 +2744,8 @@ static int ironlake_enable_vblank(struct drm_device *dev, unsigned int pipe)
 	uint32_t bit = (INTEL_INFO(dev)->gen >= 7) ? DE_PIPE_VBLANK_IVB(pipe) :
 						     DE_PIPE_VBLANK(pipe);
 
+	intel_runtime_pm_get(dev_priv);
+
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
 	ilk_enable_display_irq(dev_priv, bit);
 	spin_unlock_irqrestore(&dev_priv->irq_lock, irqflags);
@@ -2753,6 +2757,8 @@ static int valleyview_enable_vblank(struct drm_device *dev, unsigned int pipe)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	unsigned long irqflags;
+
+	intel_runtime_pm_get(dev_priv);
 
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
 	i915_enable_pipestat(dev_priv, pipe,
@@ -2766,6 +2772,8 @@ static int gen8_enable_vblank(struct drm_device *dev, unsigned int pipe)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	unsigned long irqflags;
+
+	intel_runtime_pm_get(dev_priv);
 
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
 	bdw_enable_pipe_irq(dev_priv, pipe, GEN8_PIPE_VBLANK);
@@ -2787,6 +2795,8 @@ static void i915_disable_vblank(struct drm_device *dev, unsigned int pipe)
 			      PIPE_VBLANK_INTERRUPT_STATUS |
 			      PIPE_START_VBLANK_INTERRUPT_STATUS);
 	spin_unlock_irqrestore(&dev_priv->irq_lock, irqflags);
+
+	intel_runtime_pm_put(dev_priv);
 }
 
 static void ironlake_disable_vblank(struct drm_device *dev, unsigned int pipe)
@@ -2799,6 +2809,8 @@ static void ironlake_disable_vblank(struct drm_device *dev, unsigned int pipe)
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
 	ilk_disable_display_irq(dev_priv, bit);
 	spin_unlock_irqrestore(&dev_priv->irq_lock, irqflags);
+
+	intel_runtime_pm_put(dev_priv);
 }
 
 static void valleyview_disable_vblank(struct drm_device *dev, unsigned int pipe)
@@ -2810,6 +2822,8 @@ static void valleyview_disable_vblank(struct drm_device *dev, unsigned int pipe)
 	i915_disable_pipestat(dev_priv, pipe,
 			      PIPE_START_VBLANK_INTERRUPT_STATUS);
 	spin_unlock_irqrestore(&dev_priv->irq_lock, irqflags);
+
+	intel_runtime_pm_put(dev_priv);
 }
 
 static void gen8_disable_vblank(struct drm_device *dev, unsigned int pipe)
@@ -2820,6 +2834,8 @@ static void gen8_disable_vblank(struct drm_device *dev, unsigned int pipe)
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
 	bdw_disable_pipe_irq(dev_priv, pipe, GEN8_PIPE_VBLANK);
 	spin_unlock_irqrestore(&dev_priv->irq_lock, irqflags);
+
+	intel_runtime_pm_put(dev_priv);
 }
 
 static bool
