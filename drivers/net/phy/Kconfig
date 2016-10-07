@@ -25,6 +25,18 @@ config MDIO_BCM_IPROC
 	  This module provides a driver for the MDIO busses found in the
 	  Broadcom iProc SoC's.
 
+config LED_TRIGGER_PHY
+	bool "Support LED triggers for tracking link state"
+	depends on LEDS_TRIGGERS
+	---help---
+	  Adds support for a set of LED trigger events per-PHY.  Link
+	  state change will trigger the events, for consumption by an
+	  LED class driver.  There are triggers for each link speed,
+	  and are of the form:
+	       <mii bus id>:<phy>:<speed>
+
+	  Where speed is one of: 10Mbps, 100Mbps, 1Gbps, 2.5Gbps, or 10Gbps.
+
 config MDIO_BCM_UNIMAC
 	tristate "Broadcom UniMAC MDIO bus controller"
 	depends on HAS_IOMEM
@@ -40,7 +52,6 @@ config MDIO_BITBANG
 	  This module implements the MDIO bus protocol in software,
 	  for use by low level drivers that export the ability to
 	  drive the relevant pins.
-
 	  If in doubt, say N.
 
 config MDIO_BUS_MUX
