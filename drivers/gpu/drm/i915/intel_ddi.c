@@ -1652,7 +1652,15 @@ static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 	intel_prepare_dp_ddi_buffers(encoder);
 	intel_ddi_init_dp_buf_reg(encoder);
 	intel_dp_sink_dpms(intel_dp, DRM_MODE_DPMS_ON);
-	intel_dp_start_link_train(intel_dp);
+	if (!intel_dp_start_link_train(intel_dp)) {
+		DRM_ERROR("Link Training failed at link rate = %d, lane count = %d",
+			  link_rate, lane_count);
+		intel_dp->link_train_failed = true;
+		intel_dp->link_train_failed_link_rate = link_rate;
+		intel_dp->link_train_failed_lane_count = lane_count;
+		/* Schedule a Hotplug Uevent to userspace to start modeset */
+		schedule_work(&dev_priv->i915_modeset_retry_work);
+	}
 	if (port != PORT_A || INTEL_GEN(dev_priv) >= 9)
 		intel_dp_stop_link_train(intel_dp);
 }

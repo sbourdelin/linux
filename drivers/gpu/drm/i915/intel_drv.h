@@ -882,6 +882,10 @@ struct intel_dp {
 	uint32_t DP;
 	int link_rate;
 	uint8_t lane_count;
+	int link_train_failed_link_rate;
+	uint8_t link_train_failed_lane_count;
+	int link_rate_index;
+	bool link_train_failed;
 	uint8_t sink_count;
 	bool link_mst;
 	bool has_audio;
@@ -1389,7 +1393,7 @@ bool intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 void intel_dp_set_link_params(struct intel_dp *intel_dp,
 			      int link_rate, uint8_t lane_count,
 			      bool link_mst);
-void intel_dp_start_link_train(struct intel_dp *intel_dp);
+bool intel_dp_start_link_train(struct intel_dp *intel_dp);
 void intel_dp_stop_link_train(struct intel_dp *intel_dp);
 void intel_dp_sink_dpms(struct intel_dp *intel_dp, int mode);
 void intel_dp_encoder_reset(struct drm_encoder *encoder);
