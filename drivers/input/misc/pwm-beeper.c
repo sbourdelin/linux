@@ -1,5 +1,9 @@
 /*
  *  Copyright (C) 2010, Lars-Peter Clausen <lars@metafoo.de>
+ *
+ *  Copyright (C) 2016, Frieder Schrempf <frieder.schrempf@exceet.de>
+ *  (volume support)
+ *
  *  PWM beeper driver
  *
  *  This program is free software; you can redistribute it and/or modify it
@@ -27,16 +31,77 @@ struct pwm_beeper {
 	struct pwm_device *pwm;
 	struct work_struct work;
 	unsigned long period;
+	unsigned int volume;
+	unsigned int volume_levels[] = {0, 8, 20, 40, 500};
+	unsigned int max_volume_level;
 };
 
 #define HZ_TO_NANOSECONDS(x) (1000000000UL/(x))
+
+static ssize_t beeper_show_volume(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct pwm_beeper *beeper = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", beeper->volume);
+}
+
+static ssize_t beeper_show_max_volume_level(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct pwm_beeper *beeper = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", beeper->max_volume_level);
+}
+
+static ssize_t beeper_store_volume(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int rc;
+	struct pwm_beeper *beeper = dev_get_drvdata(dev);
+	unsigned int volume;
+
+	rc = kstrtouint(buf, 0, &volume);
+	if (rc)
+		return rc;
+
+	rc = -ENXIO;
+	if (volume > beeper->max_volume_level)
+		volume = beeper->max_volume_level;
+	pr_debug("set volume to %u\n", volume);
+	if (beeper->volume != volume)
+		beeper->volume = volume;
+	rc = count;
+
+	return rc;
+}
+
+static DEVICE_ATTR(volume, 0644, beeper_show_volume, beeper_store_volume);
+static DEVICE_ATTR(max_volume_level, 0644, beeper_show_max_volume_level, NULL);
+
+static struct attribute *bp_device_attributes[] = {
+	&dev_attr_volume.attr,
+	&dev_attr_max_volume_level.attr,
+	NULL,
+};
+
+static struct attribute_group bp_device_attr_group = {
+	.attrs = bp_device_attributes,
+};
+
+static const struct attribute_group *bp_device_attr_groups[] = {
+	&bp_device_attr_group,
+	NULL,
+};
 
 static void __pwm_beeper_set(struct pwm_beeper *beeper)
 {
 	unsigned long period = beeper->period;
 
 	if (period) {
-		pwm_config(beeper->pwm, period / 2, period);
+		pwm_config(beeper->pwm,
+			period / 1000 * beeper->volume_levels[beeper->volume],
+			period);
 		pwm_enable(beeper->pwm);
 	} else
 		pwm_disable(beeper->pwm);
@@ -117,6 +182,8 @@ static int pwm_beeper_probe(struct platform_device *pdev)
 
 	INIT_WORK(&beeper->work, pwm_beeper_work);
 
+	beeper->max_volume_level = ARRAY_SIZE(beeper->volume_levels) - 1;
+
 	beeper->input = input_allocate_device();
 	if (!beeper->input) {
 		dev_err(&pdev->dev, "Failed to allocate input device\n");
@@ -139,6 +206,8 @@ static int pwm_beeper_probe(struct platform_device *pdev)
 	beeper->input->close = pwm_beeper_close;
 
 	input_set_drvdata(beeper->input, beeper);
+
+	beeper->input->dev.groups = bp_device_attr_groups;
 
 	error = input_register_device(beeper->input);
 	if (error) {

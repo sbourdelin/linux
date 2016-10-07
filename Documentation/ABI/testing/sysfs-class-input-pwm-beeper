@@ -1,0 +1,17 @@
+What:		/sys/class/input/input(x)/volume
+Date:		April 2016
+KernelVersion:
+Contact:	Frieder Schrempf <frieder.schrempf@exceet.de>
+Description:
+		Control the volume of this pwm-beeper. Values
+		are between 0 and max_volume_level. This file will also
+		show the current volume level stored in the driver.
+
+What:		/sys/class/input/input(x)/max_volume_level
+Date:		April 2016
+KernelVersion:
+Contact:	Frieder Schrempf <frieder.schrempf@exceet.de>
+Description:
+		This file shows the maximum volume level that can be
+		assigned to volume.
+
