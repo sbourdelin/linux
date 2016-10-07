@@ -61,6 +61,17 @@ config I2C_MUX_PINCTRL
 	  This driver can also be built as a module. If so, the module will be
 	  called pinctrl-i2cmux.
 
+config I2C_MUX_PTXPMB
+	tristate "Juniper PTX PMB CPLD I2C multiplexer"
+	depends on MFD_JUNIPER_CPLD
+	default y if MFD_JUNIPER_CPLD
+	help
+	  Select this to enable the Juniper PTX PMB CPLD I2C multiplexer driver
+	  on the relevant Juniper platforms.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-mux-ptxpmb-cpld.
+
 config I2C_MUX_REG
 	tristate "Register-based I2C multiplexer"
 	help
