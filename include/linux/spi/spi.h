@@ -551,6 +551,7 @@ struct spi_master {
 
 	/* gpio chip select */
 	int			*cs_gpios;
+	bool			gpio_ss;
 
 	/* statistics */
 	struct spi_statistics	statistics;

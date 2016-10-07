@@ -697,10 +697,14 @@ static void spi_set_cs(struct spi_device *spi, bool enable)
 	if (spi->mode & SPI_CS_HIGH)
 		enable = !enable;
 
-	if (gpio_is_valid(spi->cs_gpio))
+	if (gpio_is_valid(spi->cs_gpio)) {
 		gpio_set_value(spi->cs_gpio, !enable);
-	else if (spi->master->set_cs)
+		/* Some SPI masters need both GPIO CS & slave_select */
+		if (spi->master->set_cs && spi->master->gpio_ss)
+			spi->master->set_cs(spi, !enable);
+	} else if (spi->master->set_cs) {
 		spi->master->set_cs(spi, !enable);
+	}
 }
 
 #ifdef CONFIG_HAS_DMA
@@ -1844,6 +1848,8 @@ static int of_spi_register_master(struct spi_master *master)
 
 	for (i = 0; i < nb; i++)
 		cs[i] = of_get_named_gpio(np, "cs-gpios", i);
+
+	master->gpio_ss = of_property_read_bool(np, "gpio-ss");
 
 	return 0;
 }
