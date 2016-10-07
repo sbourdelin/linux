@@ -5716,6 +5716,15 @@ out_vdd_off:
 	return false;
 }
 
+static void intel_dp_modeset_retry_work_fn(struct work_struct *work)
+{
+	struct drm_i915_private *dev_priv;
+
+	dev_priv = container_of(work, typeof(*dev_priv), i915_modeset_retry_work);
+	DRM_DEBUG_KMS("\nManasi: Sending Uevent");
+	drm_kms_helper_hotplug_event(&dev_priv->drm);
+}
+
 bool
 intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 			struct intel_connector *intel_connector)
@@ -5727,6 +5736,9 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	enum port port = intel_dig_port->port;
 	int type;
+
+	/* Initialize the work for modeset in case of link train failure */
+	INIT_WORK(&dev_priv->i915_modeset_retry_work, intel_dp_modeset_retry_work_fn);
 
 	if (WARN(intel_dig_port->max_lanes < 1,
 		 "Not enough lanes (%d) for DP on port %c\n",

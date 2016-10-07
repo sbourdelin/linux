@@ -1962,6 +1962,8 @@ struct drm_i915_private {
 
 	struct drm_i915_gem_object *vlv_pctx;
 
+	struct work_struct i915_modeset_retry_work;
+
 #ifdef CONFIG_DRM_FBDEV_EMULATION
 	/* list of fbdev register on this device */
 	struct intel_fbdev *fbdev;
