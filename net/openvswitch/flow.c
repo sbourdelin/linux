@@ -308,9 +308,7 @@ static bool icmp6hdr_ok(struct sk_buff *skb)
 
 /**
  * Parse vlan tag from vlan header.
- * Returns ERROR on memory error.
- * Returns 0 if it encounters a non-vlan or incomplete packet.
- * Returns 1 after successfully parsing vlan tag.
+ * Returns ERROR on memory error, 0 otherwise.
  */
 static int parse_vlan_tag(struct sk_buff *skb, struct vlan_head *key_vh)
 {
@@ -331,34 +329,24 @@ static int parse_vlan_tag(struct sk_buff *skb, struct vlan_head *key_vh)
 	key_vh->tpid = vh->tpid;
 
 	__skb_pull(skb, sizeof(struct vlan_head));
-	return 1;
+	return 0;
 }
 
 static int parse_vlan(struct sk_buff *skb, struct sw_flow_key *key)
 {
-	int res;
-
 	key->eth.vlan.tci = 0;
 	key->eth.vlan.tpid = 0;
 	key->eth.cvlan.tci = 0;
 	key->eth.cvlan.tpid = 0;
 
-	if (likely(skb_vlan_tag_present(skb))) {
-		key->eth.vlan.tci = htons(skb->vlan_tci);
-		key->eth.vlan.tpid = skb->vlan_proto;
-	} else {
-		/* Parse outer vlan tag in the non-accelerated case. */
-		res = parse_vlan_tag(skb, &key->eth.vlan);
-		if (res <= 0)
-			return res;
-	}
+	if (!skb_vlan_tag_present(skb))
+		return 0;
+
+	key->eth.vlan.tci = htons(skb->vlan_tci);
+	key->eth.vlan.tpid = skb->vlan_proto;
 
 	/* Parse inner vlan tag. */
-	res = parse_vlan_tag(skb, &key->eth.cvlan);
-	if (res <= 0)
-		return res;
-
-	return 0;
+	return parse_vlan_tag(skb, &key->eth.cvlan);
 }
 
 static __be16 parse_ethertype(struct sk_buff *skb)
