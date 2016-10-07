@@ -282,6 +282,9 @@ EXPORT_SYMBOL(nr_node_ids);
 EXPORT_SYMBOL(nr_online_nodes);
 #endif
 
+static void dec_highatomic_pageblock(struct zone *zone, struct page *page,
+					int migratetype);
+
 int page_group_by_mobility_disabled __read_mostly;
 
 #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
@@ -1935,7 +1938,14 @@ static void change_pageblock_range(struct page *pageblock_page,
 	int nr_pageblocks = 1 << (start_order - pageblock_order);
 
 	while (nr_pageblocks--) {
-		set_pageblock_migratetype(pageblock_page, migratetype);
+		if (get_pageblock_migratetype(pageblock_page) !=
+			MIGRATE_HIGHATOMIC)
+			set_pageblock_migratetype(pageblock_page,
+							migratetype);
+		else
+			dec_highatomic_pageblock(page_zone(pageblock_page),
+							pageblock_page,
+							migratetype);
 		pageblock_page += pageblock_nr_pages;
 	}
 }
@@ -1996,8 +2006,14 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 
 	/* Claim the whole block if over half of it is free */
 	if (pages >= (1 << (pageblock_order-1)) ||
-			page_group_by_mobility_disabled)
-		set_pageblock_migratetype(page, start_type);
+			page_group_by_mobility_disabled) {
+		int mt = get_pageblock_migratetype(page);
+
+		if (mt != MIGRATE_HIGHATOMIC)
+			set_pageblock_migratetype(page, start_type);
+		else
+			dec_highatomic_pageblock(zone, page, start_type);
+	}
 }
 
 /*
@@ -2035,6 +2051,17 @@ int find_suitable_fallback(struct free_area *area, unsigned int order,
 	}
 
 	return -1;
+}
+
+static void dec_highatomic_pageblock(struct zone *zone, struct page *page,
+					int migratetype)
+{
+	if (zone->nr_reserved_highatomic <= pageblock_nr_pages)
+		return;
+
+	zone->nr_reserved_highatomic -= min(pageblock_nr_pages,
+					zone->nr_reserved_highatomic);
+	set_pageblock_migratetype(page, migratetype);
 }
 
 /*
@@ -2555,9 +2582,14 @@ int __isolate_free_page(struct page *page, unsigned int order)
 		struct page *endpage = page + (1 << order) - 1;
 		for (; page < endpage; page += pageblock_nr_pages) {
 			int mt = get_pageblock_migratetype(page);
-			if (!is_migrate_isolate(mt) && !is_migrate_cma(mt))
-				set_pageblock_migratetype(page,
-							  MIGRATE_MOVABLE);
+			if (!is_migrate_isolate(mt) && !is_migrate_cma(mt)) {
+				if (mt != MIGRATE_HIGHATOMIC)
+					set_pageblock_migratetype(page,
+							MIGRATE_MOVABLE);
+				else
+					dec_highatomic_pageblock(zone, page,
+							MIGRATE_MOVABLE);
+			}
 		}
 	}
 
