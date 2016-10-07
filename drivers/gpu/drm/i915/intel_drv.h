@@ -951,6 +951,8 @@ struct intel_dp {
 	unsigned long compliance_test_type;
 	unsigned long compliance_test_data;
 	bool compliance_test_active;
+	u8 compliance_test_lane_count;
+	u8 compliance_test_link_rate;
 };
 
 struct intel_digital_port {
