@@ -31,7 +31,7 @@ static int dtt200u_power_ctrl(struct dvb_usb_device *d, int onoff)
 	st->data[0] = SET_INIT;
 
 	if (onoff)
-		dvb_usb_generic_write(d, st->data, 2);
+		return dvb_usb_generic_write(d, st->data, 2);
 
 	return 0;
 }
@@ -39,19 +39,20 @@ static int dtt200u_power_ctrl(struct dvb_usb_device *d, int onoff)
 static int dtt200u_streaming_ctrl(struct dvb_usb_adapter *adap, int onoff)
 {
 	struct dtt200u_state *st = adap->dev->priv;
+	int ret;
 
 	st->data[0] = SET_STREAMING;
 	st->data[1] = onoff;
 
-	dvb_usb_generic_write(adap->dev, st->data, 2);
+	ret = dvb_usb_generic_write(adap->dev, st->data, 2);
+	if (ret < 0)
+		return ret;
 
 	if (onoff)
 		return 0;
 
 	st->data[0] = RESET_PID_FILTER;
-	dvb_usb_generic_write(adap->dev, st->data, 1);
-
-	return 0;
+	return dvb_usb_generic_write(adap->dev, st->data, 1);
 }
 
 static int dtt200u_pid_filter(struct dvb_usb_adapter *adap, int index, u16 pid, int onoff)
@@ -72,10 +73,14 @@ static int dtt200u_rc_query(struct dvb_usb_device *d)
 {
 	struct dtt200u_state *st = d->priv;
 	u32 scancode;
+	int ret;
 
 	st->data[0] = GET_RC_CODE;
 
-	dvb_usb_generic_rw(d, st->data, 1, st->data, 5, 0);
+	ret = dvb_usb_generic_rw(d, st->data, 1, st->data, 5, 0);
+	if (ret < 0)
+		return ret;
+
 	if (st->data[0] == 1) {
 		enum rc_type proto = RC_TYPE_NEC;
 
