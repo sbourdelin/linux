@@ -716,6 +716,20 @@ static int key_extract(struct sk_buff *skb, struct sw_flow_key *key)
 	return 0;
 }
 
+static struct sk_buff *vlan_untag(struct sk_buff *skb)
+{
+	if (eth_type_vlan(skb->protocol)) {
+		__skb_pull(skb, ETH_HLEN);
+		skb_reset_network_header(skb);
+		skb_reset_mac_len(skb);
+		skb = skb_vlan_untag(skb);
+		if (unlikely(!skb))
+			return NULL;
+		skb_push(skb, ETH_HLEN);
+	}
+	return skb;
+}
+
 int ovs_flow_key_update(struct sk_buff *skb, struct sw_flow_key *key)
 {
 	return key_extract(skb, key);
@@ -726,6 +740,10 @@ struct sk_buff *ovs_flow_key_extract(const struct ip_tunnel_info *tun_info,
 				     struct sw_flow_key *key)
 {
 	int err;
+
+	skb = vlan_untag(skb);
+	if (!skb)
+		return ERR_PTR(-ENOMEM);
 
 	/* Extract metadata from packet. */
 	if (tun_info) {
@@ -771,6 +789,10 @@ struct sk_buff *ovs_flow_key_extract_userspace(struct net *net,
 					       bool log)
 {
 	int err;
+
+	skb = vlan_untag(skb);
+	if (!skb)
+		return ERR_PTR(-ENOMEM);
 
 	/* Extract metadata from netlink attributes. */
 	err = ovs_nla_get_flow_metadata(net, attr, key, log);
