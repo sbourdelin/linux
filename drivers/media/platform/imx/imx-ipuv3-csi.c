@@ -167,8 +167,16 @@ static int ipucsi_subdev_set_format(struct v4l2_subdev *sd,
 		width = clamp_t(unsigned int, sdformat->format.width, 16, 8192);
 		height = clamp_t(unsigned int, sdformat->format.height, 16, 4096);
 	} else {
-		width = ipucsi->format_mbus[0].width;
-		height = ipucsi->format_mbus[0].height;
+		if (sdformat->format.width <
+		    (ipucsi->format_mbus[0].width * 3 / 4))
+			width = ipucsi->format_mbus[0].width / 2;
+		else
+			width = ipucsi->format_mbus[0].width;
+		if (sdformat->format.height <
+		    (ipucsi->format_mbus[0].height * 3 / 4))
+			height = ipucsi->format_mbus[0].height / 2;
+		else
+			height = ipucsi->format_mbus[0].height;
 	}
 
 	mbusformat = __ipucsi_get_pad_format(sd, cfg, sdformat->pad,
@@ -212,14 +220,14 @@ static int ipucsi_subdev_s_stream(struct v4l2_subdev *sd, int enable)
 		window.width = fmt[0].width;
 		window.height = fmt[0].height;
 		ipu_csi_set_window(ipucsi->csi, &window);
+		ipu_csi_set_downsize(ipucsi->csi,
+				     fmt[0].width == 2 * fmt[1].width,
+				     fmt[0].height == 2 * fmt[1].height);
 
 		/* Is CSI data source MCT (MIPI)? */
 		mux_mct = (mbus_config.type == V4L2_MBUS_CSI2);
-
 		ipu_set_csi_src_mux(ipucsi->ipu, ipucsi->id, mux_mct);
-		if (mux_mct)
-			ipu_csi_set_mipi_datatype(ipucsi->csi, /*VC*/ 0,
-						  &fmt[0]);
+		ipu_csi_set_mipi_datatype(ipucsi->csi, /*VC*/ 0, &fmt[0]);
 
 		ret = ipu_csi_init_interface(ipucsi->csi, &mbus_config,
 					     &fmt[0]);
