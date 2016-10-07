@@ -143,6 +143,7 @@ isil	Intersil
 issi	Integrated Silicon Solutions Inc.
 jdi	Japan Display Inc.
 jedec	JEDEC Solid State Technology Association
+jnx	Juniper Networks, Inc.
 karo	Ka-Ro electronics GmbH
 keithkoep	Keith & Koep GmbH
 keymile	Keymile GmbH
