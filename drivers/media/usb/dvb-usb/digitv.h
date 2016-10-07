@@ -6,6 +6,9 @@
 
 struct digitv_state {
     int is_nxt6000;
+
+    unsigned char sndbuf[7];
+    unsigned char rcvbuf[7];
 };
 
 /* protocol (from usblogging and the SDK:
