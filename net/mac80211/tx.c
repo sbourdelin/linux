@@ -3064,7 +3064,7 @@ static bool ieee80211_amsdu_prepare_head(struct ieee80211_sub_if_data *sdata,
 	int hdr_len = fast_tx->hdr_len - sizeof(rfc1042_header);
 	int subframe_len = skb->len - hdr_len;
 	void *data;
-	u8 *qc;
+	u8 *qc, *bssid;
 
 	if (info->flags & IEEE80211_TX_CTL_RATE_CTRL_PROBE)
 		return false;
@@ -3076,9 +3076,31 @@ static bool ieee80211_amsdu_prepare_head(struct ieee80211_sub_if_data *sdata,
 					 &subframe_len))
 		return false;
 
+	switch (sdata->vif.type) {
+	case NL80211_IFTYPE_STATION:
+		bssid = sdata->u.mgd.bssid;
+		break;
+	case NL80211_IFTYPE_AP:
+	case NL80211_IFTYPE_AP_VLAN:
+		bssid = sdata->vif.addr;
+		break;
+	default:
+		bssid = NULL;
+	}
+
 	amsdu_hdr.h_proto = cpu_to_be16(subframe_len);
 	memcpy(amsdu_hdr.h_source, skb->data + fast_tx->sa_offs, ETH_ALEN);
 	memcpy(amsdu_hdr.h_dest, skb->data + fast_tx->da_offs, ETH_ALEN);
+
+	/* according to IEEE 802.11-2012 8.3.2 table 8-19, the outer SA/DA
+	 * fields needs to be changed to BSSID for A-MSDU frames depending
+	 * on FromDS/ToDS values.
+	 */
+	hdr = data;
+	if (bssid && (hdr->frame_control & cpu_to_le16(IEEE80211_FCTL_FROMDS)))
+		memcpy(amsdu_hdr.h_source, bssid, ETH_ALEN);
+	if (bssid && (hdr->frame_control & cpu_to_le16(IEEE80211_FCTL_TODS)))
+		memcpy(amsdu_hdr.h_dest, bssid, ETH_ALEN);
 
 	data = skb_push(skb, sizeof(amsdu_hdr));
 	memmove(data, data + sizeof(amsdu_hdr), hdr_len);
