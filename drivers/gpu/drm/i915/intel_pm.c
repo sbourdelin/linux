@@ -582,7 +582,7 @@ static const struct intel_watermark_params i845_wm_info = {
  * past the watermark point.  If the FIFO drains completely, a FIFO underrun
  * will occur, and a display engine hang could result.
  */
-static unsigned long intel_calculate_wm(unsigned long clock_in_khz,
+static unsigned long intel_calculate_wm(unsigned int clock_in_khz,
 					const struct intel_watermark_params *wm,
 					int fifo_size, int cpp,
 					unsigned int latency_ns)
