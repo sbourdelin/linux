@@ -22,6 +22,8 @@
 #include <media/v4l2-mediabus.h>
 
 struct device_node;
+struct v4l2_device;
+struct v4l2_subdev;
 
 /**
  * struct v4l2_of_bus_mipi_csi2 - MIPI CSI-2 bus data structure
@@ -95,6 +97,9 @@ void v4l2_of_free_endpoint(struct v4l2_of_endpoint *endpoint);
 int v4l2_of_parse_link(const struct device_node *node,
 		       struct v4l2_of_link *link);
 void v4l2_of_put_link(struct v4l2_of_link *link);
+int v4l2_of_subdev_registered(struct v4l2_subdev *sd);
+struct v4l2_subdev *v4l2_find_subdev_by_node(struct v4l2_device *v4l2_dev,
+					     struct device_node *node);
 #else /* CONFIG_OF */
 
 static inline int v4l2_of_parse_endpoint(const struct device_node *node,
@@ -123,6 +128,13 @@ static inline void v4l2_of_put_link(struct v4l2_of_link *link)
 {
 }
 
+#define v4l2_of_subdev_registered NULL
+
+struct v4l2_subdev *v4l2_find_subdev_by_node(struct v4l2_device *v4l2_dev,
+					     struct device_node *node)
+{
+	return NULL;
+}
 #endif /* CONFIG_OF */
 
 #endif /* _V4L2_OF_H */

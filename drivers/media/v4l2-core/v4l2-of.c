@@ -19,6 +19,7 @@
 #include <linux/types.h>
 
 #include <media/v4l2-of.h>
+#include <media/v4l2-device.h>
 
 static int v4l2_of_parse_csi_bus(const struct device_node *node,
 				 struct v4l2_of_endpoint *endpoint)
@@ -314,3 +315,70 @@ void v4l2_of_put_link(struct v4l2_of_link *link)
 	of_node_put(link->remote_node);
 }
 EXPORT_SYMBOL(v4l2_of_put_link);
+
+struct v4l2_subdev *v4l2_find_subdev_by_node(struct v4l2_device *v4l2_dev,
+					     struct device_node *node)
+{
+	struct v4l2_subdev *sd;
+
+	list_for_each_entry(sd, &v4l2_dev->subdevs, list) {
+		if (sd->of_node == node)
+			return sd;
+	}
+
+	return NULL;
+}
+EXPORT_SYMBOL(v4l2_find_subdev_by_node);
+
+/**
+ * v4l2_of_subdev_registered() - default OF probed subdev registered callback
+ * @subdev: subdevice with initialized entities
+ *
+ * Parse all OF graph endpoints corrensponding to the subdev's entity input pads
+ * and add the remote subdevs to the async subdev notifier.
+ */
+int v4l2_of_subdev_registered(struct v4l2_subdev *sd)
+{
+	struct device_node *ep;
+
+	for_each_endpoint_of_node(sd->of_node, ep) {
+		struct v4l2_of_link link;
+		struct media_entity *entity;
+		unsigned int pad;
+		int ret;
+
+		ret = v4l2_of_parse_link(ep, &link);
+		if (ret)
+			continue;
+
+		/*
+		 * Assume 1:1 correspondence between OF node and entity,
+		 * and between OF port numbers and pad indices.
+		 */
+		entity = &sd->entity;
+		pad = link.local_port;
+
+		if (pad >= entity->num_pads)
+			return -EINVAL;
+
+		/* Add source subdevs to async notifier */
+		if (entity->pads[pad].flags & MEDIA_PAD_FL_SINK) {
+			struct v4l2_async_subdev *asd;
+
+			asd = devm_kzalloc(sd->dev, sizeof(*asd), GFP_KERNEL);
+			if (!asd) {
+				v4l2_of_put_link(&link);
+				return -ENOMEM;
+			}
+
+			asd->match_type = V4L2_ASYNC_MATCH_OF;
+			asd->match.of.node = link.remote_node;
+
+			__v4l2_async_notifier_add_subdev(sd->notifier, asd);
+		}
+
+		v4l2_of_put_link(&link);
+	}
+
+	return 0;
+}
