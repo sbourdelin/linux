@@ -1416,8 +1416,6 @@ static int i915_drm_suspend(struct drm_device *dev)
 	 * properly. */
 	intel_display_set_init_power(dev_priv, true);
 
-	drm_kms_helper_poll_disable(dev);
-
 	pci_save_state(pdev);
 
 	error = i915_gem_suspend(dev);
@@ -1430,11 +1428,12 @@ static int i915_drm_suspend(struct drm_device *dev)
 	intel_guc_suspend(dev);
 
 	intel_display_suspend(dev);
-
 	intel_dp_mst_suspend(dev);
 
 	intel_runtime_pm_disable_interrupts(dev_priv);
+
 	intel_hpd_cancel_work(dev_priv);
+	drm_kms_helper_poll_disable(dev);
 
 	intel_suspend_encoders(dev_priv);
 
