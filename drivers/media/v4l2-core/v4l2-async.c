@@ -371,7 +371,7 @@ int v4l2_async_register_subdev(struct v4l2_subdev *sd)
 	}
 
 	/* None matched, wait for hot-plugging */
-	list_add(&sd->async_list, &subdev_list);
+	list_add_tail(&sd->async_list, &subdev_list);
 
 	mutex_unlock(&list_lock);
 
