@@ -143,6 +143,12 @@ static void internal_set_rx_headroom(struct net_device *dev, int new_hr)
 	dev->needed_headroom = new_hr < 0 ? 0 : new_hr;
 }
 
+static netdev_features_t internal_fix_features(struct net_device *dev,
+					       netdev_features_t features)
+{
+	return features | NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_STAG_TX;
+}
+
 static const struct net_device_ops internal_dev_netdev_ops = {
 	.ndo_open = internal_dev_open,
 	.ndo_stop = internal_dev_stop,
@@ -151,6 +157,7 @@ static const struct net_device_ops internal_dev_netdev_ops = {
 	.ndo_change_mtu = internal_dev_change_mtu,
 	.ndo_get_stats64 = internal_get_stats,
 	.ndo_set_rx_headroom = internal_set_rx_headroom,
+	.ndo_fix_features = internal_fix_features,
 };
 
 static struct rtnl_link_ops internal_dev_link_ops __read_mostly = {
