@@ -372,7 +372,7 @@ void intel_set_memory_cxsr(struct drm_i915_private *dev_priv, bool enable)
  * A value of 5us seems to be a good balance; safe for very low end
  * platforms but not overly aggressive on lower latency configs.
  */
-static const int pessimal_latency_ns = 5000;
+static const unsigned int pessimal_latency_ns = 5000;
 
 #define VLV_FIFO_START(dsparb, dsparb2, lo_shift, hi_shift) \
 	((((dsparb) >> (lo_shift)) & 0xff) | ((((dsparb2) >> (hi_shift)) & 0x1) << 8))
@@ -585,7 +585,7 @@ static const struct intel_watermark_params i845_wm_info = {
 static unsigned long intel_calculate_wm(unsigned long clock_in_khz,
 					const struct intel_watermark_params *wm,
 					int fifo_size, int cpp,
-					unsigned long latency_ns)
+					unsigned int latency_ns)
 {
 	long entries_required, wm_size;
 
@@ -709,9 +709,9 @@ static void pineview_update_wm(struct drm_crtc *unused_crtc)
 static bool g4x_compute_wm0(struct drm_device *dev,
 			    int plane,
 			    const struct intel_watermark_params *display,
-			    int display_latency_ns,
+			    unsigned int display_latency_ns,
 			    const struct intel_watermark_params *cursor,
-			    int cursor_latency_ns,
+			    unsigned int cursor_latency_ns,
 			    int *plane_wm,
 			    int *cursor_wm)
 {
@@ -796,7 +796,7 @@ static bool g4x_check_srwm(struct drm_device *dev,
 
 static bool g4x_compute_srwm(struct drm_device *dev,
 			     int plane,
-			     int latency_ns,
+			     unsigned int latency_ns,
 			     const struct intel_watermark_params *display,
 			     const struct intel_watermark_params *cursor,
 			     int *display_wm, int *cursor_wm)
@@ -1385,7 +1385,7 @@ static void vlv_update_wm(struct drm_crtc *crtc)
 static void g4x_update_wm(struct drm_crtc *crtc)
 {
 	struct drm_device *dev = crtc->dev;
-	static const int sr_latency_ns = 12000;
+	static const unsigned int sr_latency_ns = 12000;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	int planea_wm, planeb_wm, cursora_wm, cursorb_wm;
 	int plane_sr, cursor_sr;
@@ -1453,7 +1453,7 @@ static void i965_update_wm(struct drm_crtc *unused_crtc)
 	crtc = single_enabled_crtc(dev);
 	if (crtc) {
 		/* self-refresh has much higher latency */
-		static const int sr_latency_ns = 12000;
+		static const unsigned int sr_latency_ns = 12000;
 		const struct drm_display_mode *adjusted_mode = &to_intel_crtc(crtc)->config->base.adjusted_mode;
 		int clock = adjusted_mode->crtc_clock;
 		int htotal = adjusted_mode->crtc_htotal;
@@ -1600,7 +1600,7 @@ static void i9xx_update_wm(struct drm_crtc *unused_crtc)
 	/* Calc sr entries for one plane configs */
 	if (HAS_FW_BLC(dev) && enabled) {
 		/* self-refresh has much higher latency */
-		static const int sr_latency_ns = 6000;
+		static const unsigned int sr_latency_ns = 6000;
 		const struct drm_display_mode *adjusted_mode = &to_intel_crtc(enabled)->config->base.adjusted_mode;
 		int clock = adjusted_mode->crtc_clock;
 		int htotal = adjusted_mode->crtc_htotal;
