@@ -1,0 +1,30 @@
+Juniper PTXPMB CPLD GPIO block
+
+Required properties:
+
+- compatible:
+    Must be "jnx,gpio-ptxpmb-cpld"
+
+- #gpio-cells:
+    Should be <2>.  The first cell is the pin number (within the controller's
+    pin space), and the second is used for the following flags:
+	bit[0]: direction (0 = out, 1 = in)
+	bit[1]: init high
+	bit[2]: active low
+
+- gpio-controller:
+    Specifies that the node is a GPIO controller.
+
+Optional properties:
+
+- reg:
+    Address and length of the register set for the device. Usually supplied by
+    the parent MFD driver
+
+Example:
+
+gpio_cpld: cpld_gpio {
+	compatible = "jnx,gpio-ptxpmb-cpld";
+	#gpio-cells = <2>;
+	gpio-controller;
+};
