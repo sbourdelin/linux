@@ -120,7 +120,8 @@ static const struct pci_device_id tw686x_pci_tbl[] = {
 	/* not tested */
 	{PCI_DEVICE(0x1797, 0x6865), .driver_data = 4 | TYPE_SECOND_GEN},
 	/* TW6868 supports 8 A/V channels with an external TW2865 chip -
-	   not supported by the driver */
+	 * not supported by the driver
+	 */
 	{PCI_DEVICE(0x1797, 0x6868), .driver_data = 4}, /* not tested */
 	{PCI_DEVICE(0x1797, 0x6869), .driver_data = 8 | TYPE_SECOND_GEN},
 	{}
