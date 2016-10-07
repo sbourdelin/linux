@@ -31,4 +31,13 @@ int ipu_g_fmt(struct v4l2_format *f, struct v4l2_pix_format *pix);
 int ipu_enum_framesizes(struct file *file, void *fh,
 			struct v4l2_frmsizeenum *fsize);
 
+struct device;
+struct ipu_soc;
+struct v4l2_subdev;
+
+struct ipu_capture *ipu_capture_create(struct device *dev, struct ipu_soc *ipu,
+				       int id, struct v4l2_subdev *sd,
+				       int pad_index);
+void ipu_capture_destroy(struct ipu_capture *capture);
+
 #endif /* __MEDIA_IMX_IPU_H */

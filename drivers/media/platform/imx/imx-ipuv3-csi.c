@@ -61,6 +61,8 @@ struct ipucsi {
 	struct media_pad		subdev_pad[2];
 	struct v4l2_mbus_framefmt	format_mbus[2];
 	struct v4l2_fract		timeperframe[2];
+
+	struct ipu_capture		*capture;
 };
 
 static int ipu_csi_get_mbus_config(struct ipucsi *ipucsi,
@@ -384,6 +386,7 @@ static int ipu_csi_registered(struct v4l2_subdev *sd)
 {
 	struct ipucsi *ipucsi = container_of(sd, struct ipucsi, subdev);
 	struct device_node *rpp;
+	int ret;
 
 	/*
 	 * Add source subdevice to asynchronous subdevice waiting list.
@@ -404,11 +407,33 @@ static int ipu_csi_registered(struct v4l2_subdev *sd)
 		__v4l2_async_notifier_add_subdev(sd->notifier, asd);
 	}
 
+	/*
+	 * Create an ipu_capture instance per CSI.
+	 */
+	ipucsi->capture = ipu_capture_create(ipucsi->dev, ipucsi->ipu,
+					     ipucsi->id, sd, 1);
+	if (IS_ERR(ipucsi->capture)) {
+		ret = PTR_ERR(ipucsi->capture);
+		ipucsi->capture = NULL;
+		v4l2_err(sd->v4l2_dev, "Failed to create capture device for %s: %d\n",
+			 sd->name, ret);
+		return ret;
+	}
+
 	return 0;
+}
+
+static void ipu_csi_unregistered(struct v4l2_subdev *sd)
+{
+	struct ipucsi *ipucsi = container_of(sd, struct ipucsi, subdev);
+
+	if (ipucsi->capture)
+		ipu_capture_destroy(ipucsi->capture);
 }
 
 struct v4l2_subdev_internal_ops ipu_csi_internal_ops = {
 	.registered = ipu_csi_registered,
+	.unregistered = ipu_csi_unregistered,
 };
 
 static int ipucsi_subdev_init(struct ipucsi *ipucsi, struct device_node *node)
