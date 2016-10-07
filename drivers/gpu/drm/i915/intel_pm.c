@@ -582,12 +582,12 @@ static const struct intel_watermark_params i845_wm_info = {
  * past the watermark point.  If the FIFO drains completely, a FIFO underrun
  * will occur, and a display engine hang could result.
  */
-static unsigned long intel_calculate_wm(unsigned int clock_in_khz,
-					const struct intel_watermark_params *wm,
-					unsigned int fifo_size, int cpp,
-					unsigned int latency_ns)
+static unsigned int intel_calculate_wm(unsigned int clock_in_khz,
+				       const struct intel_watermark_params *wm,
+				       unsigned int fifo_size, int cpp,
+				       unsigned int latency_ns)
 {
-	long entries_required, wm_size;
+	int entries_required, wm_size;
 
 	/*
 	 * Note: we need to make sure we don't overflow for various clock &
@@ -595,18 +595,17 @@ static unsigned long intel_calculate_wm(unsigned int clock_in_khz,
 	 * clocks go from a few thousand to several hundred thousand.
 	 * latency is usually a few thousand
 	 */
-	entries_required = ((clock_in_khz / 1000) * cpp * latency_ns) /
-		1000;
+	entries_required = ((clock_in_khz / 1000) * cpp * latency_ns) / 1000;
 	entries_required = DIV_ROUND_UP(entries_required, wm->cacheline_size);
 
-	DRM_DEBUG_KMS("FIFO entries required for mode: %ld\n", entries_required);
+	DRM_DEBUG_KMS("FIFO entries required for mode: %d\n", entries_required);
 
 	wm_size = fifo_size - (entries_required + wm->guard_size);
 
-	DRM_DEBUG_KMS("FIFO watermark level: %ld\n", wm_size);
+	DRM_DEBUG_KMS("FIFO watermark level: %d\n", wm_size);
 
 	/* Don't promote wm_size to unsigned... */
-	if (wm_size > (long)wm->max_wm)
+	if (wm_size > (int)wm->max_wm)
 		wm_size = wm->max_wm;
 	if (wm_size <= 0)
 		wm_size = wm->default_wm;
@@ -646,7 +645,7 @@ static void pineview_update_wm(struct drm_crtc *unused_crtc)
 	struct drm_crtc *crtc;
 	const struct cxsr_latency *latency;
 	u32 reg;
-	unsigned long wm;
+	unsigned int wm;
 
 	latency = intel_get_cxsr_latency(IS_PINEVIEW_G(dev), dev_priv->is_ddr3,
 					 dev_priv->fsb_freq, dev_priv->mem_freq);
@@ -1522,8 +1521,7 @@ static void i9xx_update_wm(struct drm_crtc *unused_crtc)
 	uint32_t fwater_lo;
 	uint32_t fwater_hi;
 	int cwm, srwm = 1;
-	unsigned int fifo_size;
-	int planea_wm, planeb_wm;
+	unsigned int fifo_size, planea_wm, planeb_wm;
 	struct drm_crtc *crtc, *enabled = NULL;
 
 	if (IS_I945GM(dev))
@@ -1548,7 +1546,7 @@ static void i9xx_update_wm(struct drm_crtc *unused_crtc)
 		enabled = crtc;
 	} else {
 		planea_wm = fifo_size - wm_info->guard_size;
-		if (planea_wm > (long)wm_info->max_wm)
+		if (planea_wm > wm_info->max_wm)
 			planea_wm = wm_info->max_wm;
 	}
 
@@ -1573,11 +1571,11 @@ static void i9xx_update_wm(struct drm_crtc *unused_crtc)
 			enabled = NULL;
 	} else {
 		planeb_wm = fifo_size - wm_info->guard_size;
-		if (planeb_wm > (long)wm_info->max_wm)
+		if (planeb_wm > wm_info->max_wm)
 			planeb_wm = wm_info->max_wm;
 	}
 
-	DRM_DEBUG_KMS("FIFO watermarks - A: %d, B: %d\n", planea_wm, planeb_wm);
+	DRM_DEBUG_KMS("FIFO watermarks - A: %u, B: %u\n", planea_wm, planeb_wm);
 
 	if (IS_I915GM(dev) && enabled) {
 		struct drm_i915_gem_object *obj;
@@ -1653,8 +1651,8 @@ static void i845_update_wm(struct drm_crtc *unused_crtc)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_crtc *crtc;
 	const struct drm_display_mode *adjusted_mode;
-	uint32_t fwater_lo;
-	int planea_wm;
+	u32 fwater_lo;
+	unsigned int planea_wm;
 
 	crtc = single_enabled_crtc(dev);
 	if (crtc == NULL)
@@ -1668,7 +1666,7 @@ static void i845_update_wm(struct drm_crtc *unused_crtc)
 	fwater_lo = I915_READ(FW_BLC) & ~0xfff;
 	fwater_lo |= (3<<8) | planea_wm;
 
-	DRM_DEBUG_KMS("Setting FIFO watermarks - A: %d\n", planea_wm);
+	DRM_DEBUG_KMS("Setting FIFO watermarks - A: %u\n", planea_wm);
 
 	I915_WRITE(FW_BLC, fwater_lo);
 }
