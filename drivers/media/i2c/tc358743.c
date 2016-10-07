@@ -1463,6 +1463,14 @@ static int tc358743_g_mbus_config(struct v4l2_subdev *sd,
 	return 0;
 }
 
+static int tc358743_prepare_stream(struct v4l2_subdev *sd)
+{
+	/* Put all lanes in PL-11 state (STOPSTATE) */
+	tc358743_set_csi(sd);
+
+	return 0;
+}
+
 static int tc358743_s_stream(struct v4l2_subdev *sd, int enable)
 {
 	enable_stream(sd, enable);
@@ -1637,6 +1645,7 @@ static const struct v4l2_subdev_video_ops tc358743_video_ops = {
 	.g_dv_timings = tc358743_g_dv_timings,
 	.query_dv_timings = tc358743_query_dv_timings,
 	.g_mbus_config = tc358743_g_mbus_config,
+	.prepare_stream = tc358743_prepare_stream,
 	.s_stream = tc358743_s_stream,
 };
 
