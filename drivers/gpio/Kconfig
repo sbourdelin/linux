@@ -352,6 +352,17 @@ config GPIO_PL061
 	help
 	  Say yes here to support the PrimeCell PL061 GPIO device
 
+config GPIO_PTXPMB_CPLD
+	tristate "PTXPMB CPLD GPIO"
+	depends on MFD_JUNIPER_CPLD
+	default y if MFD_JUNIPER_CPLD
+	help
+	  This driver supports the GPIO interfaces on the PTXPMB CPLD which is
+	  present on the relevant Juniper platforms.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called gpio-ptxpmb-cpld.
+
 config GPIO_PXA
 	bool "PXA GPIO support"
 	depends on ARCH_PXA || ARCH_MMP
