@@ -1,0 +1,170 @@
+What:		/sys/devices/platform/jnx/chassis/platform
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Read only numeric platform ID of the Juniper platform we're
+		running on. Valid platforms IDs are:
+		SANGRIA		85
+		HENDRICKS	156
+		POLARIS		171
+		OMEGA		181
+
+What:		/sys/devices/platform/jnx/chassis/chassis_no
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Read only chassis number.
+
+What:		/sys/devices/platform/jnx/chassis/multichassis
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Read only multichassis status
+		1 if we're on a multichassis system
+		0 otherwise
+
+What:		/sys/devices/platform/jnx/chassis/master
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Read only numeric ID of the master slot.
+
+What:		/sys/devices/platform/jnx/chassis/mastership
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Read for returning non zero if current RE is master
+		Write for relinquishing mastership to other RE
+
+What:		/sys/devices/platform/jnx/chassis/mastership_alive
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Write to update the mastership watchdog alive.
+		The watchdog period is CBD FPGA specific.
+
+What:		/sys/devices/platform/jnx/chassis/mastership_alive_cnt
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Read to return the mastership count number
+		Write to set the mastership count number
+
+What:		/sys/devices/platform/jnx/card/foo[n]
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Symbolic link of the jnx board with the given type
+		foo with an option index number. For instance the
+		first two fan type cards would link like this:
+
+		/sys/devices/platform/jnx/card/fan0 -> ../jnx-09cc.0
+		/sys/devices/platform/jnx/card/fan1 -> ../jnx-09cc.1
+
+What:		/sys/devices/platform/jnx/jnx-XXXX.N/id
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Symbolic link of the jnx board with hexadecimal assembly ID
+		XXXX and platform id index N to it's EEPROM ID device
+
+What:		/sys/devices/platform/jnx/jnx-XXXX.N/i2c-adapter
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Symbolic link of the jnx board with hexadecimal assembly ID
+		XXXX and platform id index N to its i2c-adapter that the
+		EEPROM ID device is located
+
+What:		/sys/devices/platform/jnx-XXXX.N/slot
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Read only number slot ID of the jnx board with hexadecimal
+		assembly ID XXXX and platform id index N
+
+What:		/sys/devices/platform/jnx-XXXX.N/type
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Read only board type ID of the jnx board with hexadecimal
+		assembly ID XXXX and platform id index N.
+		Valid board type IDs:
+		0	Unknown
+		1	RE
+		2	FPC
+		3	SPMB
+		4	CB
+		5	PS
+		6	FAN
+		7	FPM
+		8	CG
+		9	MIDPLANE
+		10	PIC
+		11	SIB
+
+What:		/sys/devices/platform/jnx-XXXX.N/assembly_id
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Read only assembly ID of the local jnx board with hexadecimal
+		assembly ID XXXX and platform id index N which is read from
+		the EEPROM
+
+What:		/sys/devices/platform/jnx-XXXX-local/slot
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Read only number slot ID of the jnx local board with hexadecimal
+		assembly ID XXXX.
+
+What:		/sys/devices/platform/jnx-XXXX-local/type
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Read only board type ID of the jnx local board with hexadecimal
+		assembly ID XXXX.
+		Valid board type IDs:
+		0	Unknown
+		1	RE
+		2	FPC
+		3	SPMB
+		4	CB
+		5	PS
+		6	FAN
+		7	FPM
+		8	CG
+		9	MIDPLANE
+		10	PIC
+		11	SIB
+
+What:		/sys/devices/platform/jnx-XXXX-local/assembly_id
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Read only warmboot status of the jnx local board with
+		hexadecimal assembly ID XXXX.
+
+What:		/sys/devices/platform/jnx-XXXX-local/warmboot
+Date:		Sep 2016
+KernelVersion:	4.8.0-rc7
+Contact:	Georgi Vlaev <gvlaev@juniper.net>
+Description:
+		Read only warmboot status of the jnx local board with
+		hexadecimal assembly ID XXXX.

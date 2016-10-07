@@ -1,0 +1,24 @@
+#
+# Juniper devices
+#
+config JNX_DEVICES
+	bool
+	default n
+
+if JNX_DEVICES
+
+menu "Juniper Devices and Infrastructure"
+
+config JNX_SYSTEM
+	bool "Juniper System Infrastructure"
+	default y
+	help
+	  This driver adds support for Juniper System Infrastructure. It creates
+	  platform devices for the platform, chassis and cards and provides sysfs
+	  attributes for these devices.
+
+	  This driver can not be compiled as a module.
+
+endmenu
+
+endif # JNX_DEVICES
