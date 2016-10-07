@@ -32,7 +32,7 @@ struct pwm_beeper {
 	struct work_struct work;
 	unsigned long period;
 	unsigned int volume;
-	unsigned int volume_levels[] = {0, 8, 20, 40, 500};
+	unsigned int *volume_levels;
 	unsigned int max_volume_level;
 };
 
@@ -161,8 +161,11 @@ static void pwm_beeper_close(struct input_dev *input)
 static int pwm_beeper_probe(struct platform_device *pdev)
 {
 	unsigned long pwm_id = (unsigned long)dev_get_platdata(&pdev->dev);
+	struct device_node *np = pdev->dev.of_node;
 	struct pwm_beeper *beeper;
-	int error;
+	struct property *prop;
+	int error, length;
+	u32 value;
 
 	beeper = kzalloc(sizeof(*beeper), GFP_KERNEL);
 	if (!beeper)
@@ -182,7 +185,47 @@ static int pwm_beeper_probe(struct platform_device *pdev)
 
 	INIT_WORK(&beeper->work, pwm_beeper_work);
 
-	beeper->max_volume_level = ARRAY_SIZE(beeper->volume_levels) - 1;
+	/* determine the number of volume levels */
+	prop = of_find_property(np, "volume-levels", &length);
+	if (!prop) {
+		dev_dbg(&pdev->dev, "no volume levels specified, using max volume\n");
+		beeper->max_volume_level = 1;
+	} else
+		beeper->max_volume_level = length / sizeof(u32);
+
+	/* read volume levels from DT property */
+	if (beeper->max_volume_level > 0) {
+		size_t size = sizeof(*beeper->volume_levels) *
+			beeper->max_volume_level;
+
+		beeper->volume_levels = devm_kzalloc(&(pdev->dev), size,
+			GFP_KERNEL);
+		if (!beeper->volume_levels)
+			return -ENOMEM;
+
+		if (prop) {
+			error = of_property_read_u32_array(np, "volume-levels",
+						beeper->volume_levels,
+						beeper->max_volume_level);
+
+			if (error < 0)
+				return error;
+
+			error = of_property_read_u32(np, "default-volume-level",
+						   &value);
+
+			if (error < 0) {
+				dev_dbg(&pdev->dev, "no default volume specified, using max volume\n");
+				value = beeper->max_volume_level - 1;
+			}
+		} else {
+			beeper->volume_levels[0] = 500;
+			value = 0;
+		}
+
+		beeper->volume = value;
+		beeper->max_volume_level--;
+	}
 
 	beeper->input = input_allocate_device();
 	if (!beeper->input) {
