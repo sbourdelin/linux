@@ -585,6 +585,7 @@ static int mipi_csi2_probe(struct platform_device *pdev)
 	csi2->pads[2].flags = MEDIA_PAD_FL_SOURCE;
 	csi2->pads[3].flags = MEDIA_PAD_FL_SOURCE;
 	csi2->pads[4].flags = MEDIA_PAD_FL_SOURCE;
+	csi2->subdev.entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
 	ret = media_entity_pads_init(&csi2->subdev.entity, MIPI_CSI2_PADS,
 				csi2->pads);
 	if (ret < 0)
