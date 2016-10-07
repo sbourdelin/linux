@@ -377,11 +377,11 @@ static const unsigned int pessimal_latency_ns = 5000;
 #define VLV_FIFO_START(dsparb, dsparb2, lo_shift, hi_shift) \
 	((((dsparb) >> (lo_shift)) & 0xff) | ((((dsparb2) >> (hi_shift)) & 0x1) << 8))
 
-static int vlv_get_fifo_size(struct drm_device *dev,
-			      enum pipe pipe, int plane)
+static unsigned int vlv_get_fifo_size(struct drm_device *dev,
+				      enum pipe pipe, int plane)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	int sprite0_start, sprite1_start, size;
+	unsigned int sprite0_start, sprite1_start, size;
 
 	switch (pipe) {
 		uint32_t dsparb, dsparb2, dsparb3;
@@ -421,7 +421,7 @@ static int vlv_get_fifo_size(struct drm_device *dev,
 		return 0;
 	}
 
-	DRM_DEBUG_KMS("Pipe %c %s %c FIFO size: %d\n",
+	DRM_DEBUG_KMS("Pipe %c %s %c FIFO size: %u\n",
 		      pipe_name(pipe), plane == 0 ? "primary" : "sprite",
 		      plane == 0 ? plane_name(pipe) : sprite_name(pipe, plane - 1),
 		      size);
@@ -429,49 +429,49 @@ static int vlv_get_fifo_size(struct drm_device *dev,
 	return size;
 }
 
-static int i9xx_get_fifo_size(struct drm_device *dev, int plane)
+static unsigned int i9xx_get_fifo_size(struct drm_device *dev, int plane)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	uint32_t dsparb = I915_READ(DSPARB);
-	int size;
+	u32 dsparb = I915_READ(DSPARB);
+	unsigned int size;
 
 	size = dsparb & 0x7f;
 	if (plane)
 		size = ((dsparb >> DSPARB_CSTART_SHIFT) & 0x7f) - size;
 
-	DRM_DEBUG_KMS("FIFO size - (0x%08x) %s: %d\n", dsparb,
+	DRM_DEBUG_KMS("FIFO size - (0x%08x) %s: %u\n", dsparb,
 		      plane ? "B" : "A", size);
 
 	return size;
 }
 
-static int i830_get_fifo_size(struct drm_device *dev, int plane)
+static unsigned int i830_get_fifo_size(struct drm_device *dev, int plane)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	uint32_t dsparb = I915_READ(DSPARB);
-	int size;
+	u32 dsparb = I915_READ(DSPARB);
+	unsigned int size;
 
 	size = dsparb & 0x1ff;
 	if (plane)
 		size = ((dsparb >> DSPARB_BEND_SHIFT) & 0x1ff) - size;
 	size >>= 1; /* Convert to cachelines */
 
-	DRM_DEBUG_KMS("FIFO size - (0x%08x) %s: %d\n", dsparb,
+	DRM_DEBUG_KMS("FIFO size - (0x%08x) %s: %u\n", dsparb,
 		      plane ? "B" : "A", size);
 
 	return size;
 }
 
-static int i845_get_fifo_size(struct drm_device *dev, int plane)
+static unsigned int i845_get_fifo_size(struct drm_device *dev, int plane)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	uint32_t dsparb = I915_READ(DSPARB);
-	int size;
+	u32 dsparb = I915_READ(DSPARB);
+	unsigned int size;
 
 	size = dsparb & 0x7f;
 	size >>= 2; /* Convert to cachelines */
 
-	DRM_DEBUG_KMS("FIFO size - (0x%08x) %s: %d\n", dsparb,
+	DRM_DEBUG_KMS("FIFO size - (0x%08x) %s: %u\n", dsparb,
 		      plane ? "B" : "A",
 		      size);
 
@@ -584,7 +584,7 @@ static const struct intel_watermark_params i845_wm_info = {
  */
 static unsigned long intel_calculate_wm(unsigned int clock_in_khz,
 					const struct intel_watermark_params *wm,
-					int fifo_size, int cpp,
+					unsigned int fifo_size, int cpp,
 					unsigned int latency_ns)
 {
 	long entries_required, wm_size;
@@ -1522,7 +1522,7 @@ static void i9xx_update_wm(struct drm_crtc *unused_crtc)
 	uint32_t fwater_lo;
 	uint32_t fwater_hi;
 	int cwm, srwm = 1;
-	int fifo_size;
+	unsigned int fifo_size;
 	int planea_wm, planeb_wm;
 	struct drm_crtc *crtc, *enabled = NULL;
 
