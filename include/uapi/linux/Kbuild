@@ -8,6 +8,7 @@ header-y += hdlc/
 header-y += hsi/
 header-y += iio/
 header-y += isdn/
+header-y += jnx/
 header-y += mmc/
 header-y += nfsd/
 header-y += raid/
