@@ -222,18 +222,19 @@ loop:
 }
 
 /* On TW6864 and TW6868, all channels share the pair of video DMA SG tables,
-   with 10-bit start_idx and end_idx determining start and end of frame buffer
-   for particular channel.
-   TW6868 with all its 8 channels would be problematic (only 127 SG entries per
-   channel) but we support only 4 channels on this chip anyway (the first
-   4 channels are driven with internal video decoder, the other 4 would require
-   an external TW286x part).
-
-   On TW6865 and TW6869, each channel has its own DMA SG table, with indexes
-   starting with 0. Both chips have complete sets of internal video decoders
-   (respectively 4 or 8-channel).
-
-   All chips have separate SG tables for two video frames. */
+ * with 10-bit start_idx and end_idx determining start and end of frame buffer
+ * for particular channel.
+ * TW6868 with all its 8 channels would be problematic (only 127 SG entries per
+ * channel) but we support only 4 channels on this chip anyway (the first
+ * 4 channels are driven with internal video decoder, the other 4 would require
+ * an external TW286x part).
+ *
+ * On TW6865 and TW6869, each channel has its own DMA SG table, with indexes
+ * starting with 0. Both chips have complete sets of internal video decoders
+ * (respectively 4 or 8-channel).
+ *
+ * All chips have separate SG tables for two video frames.
+ */
 
 static void setup_dma_cfg(struct tw686x_video_channel *vc)
 {
@@ -478,7 +479,8 @@ static int tw686x_enum_input(struct file *file, void *priv,
 			     struct v4l2_input *inp)
 {
 	/* the chip has internal multiplexer, support can be added
-	   if the actual hw uses it */
+	 * if the actual hw uses it
+	 */
 	if (inp->index)
 		return -EINVAL;
 
@@ -676,15 +678,17 @@ int tw686x_kh_video_init(struct tw686x_dev *dev)
 	for (n = 0; n < 2; n++)
 		if (is_second_gen(dev)) {
 			/* TW 6865, TW6869 - each channel needs a pair of
-			   descriptor tables */
+			 * descriptor tables
+			 */
 			for (ch = 0; ch < max_channels(dev); ch++)
 				dev->video_channels[ch].sg_tables[n].size =
 					SG_TABLE_SIZE;
 
 		} else
 			/* TW 6864, TW6868 - we need to allocate a pair of
-			   descriptor tables, common for all channels.
-			   Each table will be bigger than 4 KB. */
+			 * descriptor tables, common for all channels.
+			 * Each table will be bigger than 4 KB.
+			 */
 			dev->video_channels[0].sg_tables[n].size =
 				max_channels(dev) * SG_TABLE_SIZE;
 
