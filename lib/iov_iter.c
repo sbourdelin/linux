@@ -369,6 +369,13 @@ static void memcpy_from_page(char *to, struct page *page, size_t offset, size_t 
 	kunmap_atomic(from);
 }
 
+static void memcpy_from_page_nocache(char *to, struct page *page, size_t offset, size_t len)
+{
+	char *from = kmap_atomic(page);
+	__copy_from_user_inatomic_nocache(to, from, len);
+	kunmap_atomic(from);
+}
+
 static void memcpy_to_page(struct page *page, size_t offset, const char *from, size_t len)
 {
 	char *to = kmap_atomic(page);
@@ -437,8 +444,8 @@ size_t copy_from_iter_nocache(void *addr, size_t bytes, struct iov_iter *i)
 	iterate_and_advance(i, bytes, v,
 		__copy_from_user_nocache((to += v.iov_len) - v.iov_len,
 					 v.iov_base, v.iov_len),
-		memcpy_from_page((to += v.bv_len) - v.bv_len, v.bv_page,
-				 v.bv_offset, v.bv_len),
+		memcpy_from_page_nocache((to += v.bv_len) - v.bv_len,
+					 v.bv_page, v.bv_offset, v.bv_len),
 		memcpy((to += v.iov_len) - v.iov_len, v.iov_base, v.iov_len)
 	)
 
