@@ -35,6 +35,18 @@
  * BYD pad constants
  */
 
+/* Handshake answer of BTP6034 */
+#define BYD_MODEL_BTP6034	0x00E801
+/* Handshake answer of BTP6740 */
+#define BYD_MODEL_BTP6740	0x001155
+/* Handshake answers of BTP8644, BTP10463 and BTP11484 */
+#define BYD_MODEL_BTP8644	0x011155
+
+/* Handshake SETRES byte of BTP6034 and BTP6740 */
+#define BYD_SHAKE_BYTE_A	0x00
+/* Handshake SETRES byte of BTP8644, BTP10463 and BTP11484 */
+#define BYD_SHAKE_BYTE_B	0x03
+
 /*
  * True device resolution is unknown, however experiments show the
  * resolution is about 111 units/mm.
@@ -434,23 +446,59 @@ static void byd_disconnect(struct psmouse *psmouse)
 	}
 }
 
+u32 byd_try_model(u32 model)
+{
+	size_t i;
+
+	u32 byd_model[] = {
+		BYD_MODEL_BTP6034,
+		BYD_MODEL_BTP6740,
+		BYD_MODEL_BTP8644
+	};
+
+	for (i=0; i < ARRAY_SIZE(byd_model); i++) {
+		if (model ==  byd_model[i])
+			return model;
+	}
+
+	return 0;
+}
+
 int byd_detect(struct psmouse *psmouse, bool set_properties)
 {
 	struct ps2dev *ps2dev = &psmouse->ps2dev;
-	u8 param[4] = {0x03, 0x00, 0x00, 0x00};
+	size_t i;
 
-	if (ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES))
-		return -1;
-	if (ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES))
-		return -1;
-	if (ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES))
-		return -1;
-	if (ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES))
-		return -1;
-	if (ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO))
-		return -1;
+	u8 byd_shbyte[] = {
+		BYD_SHAKE_BYTE_A,
+		BYD_SHAKE_BYTE_B
+	};
 
-	if (param[1] != 0x03 || param[2] != 0x64)
+	bool detect = false;
+	for (i=0; i < ARRAY_SIZE(byd_shbyte); i++) {
+		u32 model;
+		u8 param[4] = {byd_shbyte[i], 0x00, 0x00, 0x00};
+
+		if (ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES))
+			return -1;
+		if (ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES))
+			return -1;
+		if (ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES))
+			return -1;
+		if (ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES))
+			return -1;
+		if (ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO))
+			return -1;
+
+		model = param[2];
+		model += param[1] << 8;
+		model += param[0] << 16;
+		model = byd_try_model(model);
+		if (model)
+			detect = true;
+	}
+
+	if (!detect)
 		return -ENODEV;
 
 	psmouse_dbg(psmouse, "BYD touchpad detected\n");
