@@ -455,11 +455,9 @@ int ovs_vport_receive(struct vport *vport, struct sk_buff *skb,
 	}
 
 	/* Extract flow from 'skb' into 'key'. */
-	error = ovs_flow_key_extract(tun_info, skb, &key);
-	if (unlikely(error)) {
-		kfree_skb(skb);
-		return error;
-	}
+	skb = ovs_flow_key_extract(tun_info, skb, &key);
+	if (IS_ERR(skb))
+		return PTR_ERR(skb);
 	ovs_dp_process_packet(skb, &key);
 	return 0;
 }

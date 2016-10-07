@@ -607,10 +607,13 @@ static int ovs_packet_cmd_execute(struct sk_buff *skb, struct genl_info *info)
 	if (IS_ERR(flow))
 		goto err_kfree_skb;
 
-	err = ovs_flow_key_extract_userspace(net, a[OVS_PACKET_ATTR_KEY],
-					     packet, &flow->key, log);
-	if (err)
+	packet = ovs_flow_key_extract_userspace(net, a[OVS_PACKET_ATTR_KEY],
+						packet, &flow->key, log);
+	if (IS_ERR(packet)) {
+		err = PTR_ERR(packet);
+		packet = NULL;
 		goto err_flow_free;
+	}
 
 	err = ovs_nla_copy_actions(net, a[OVS_PACKET_ATTR_ACTIONS],
 				   &flow->key, &acts, log);

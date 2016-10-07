@@ -721,9 +721,12 @@ int ovs_flow_key_update(struct sk_buff *skb, struct sw_flow_key *key)
 	return key_extract(skb, key);
 }
 
-int ovs_flow_key_extract(const struct ip_tunnel_info *tun_info,
-			 struct sk_buff *skb, struct sw_flow_key *key)
+struct sk_buff *ovs_flow_key_extract(const struct ip_tunnel_info *tun_info,
+				     struct sk_buff *skb,
+				     struct sw_flow_key *key)
 {
+	int err;
+
 	/* Extract metadata from packet. */
 	if (tun_info) {
 		key->tun_proto = ip_tunnel_info_af(tun_info);
@@ -753,19 +756,33 @@ int ovs_flow_key_extract(const struct ip_tunnel_info *tun_info,
 	key->ovs_flow_hash = 0;
 	key->recirc_id = 0;
 
-	return key_extract(skb, key);
+	err = key_extract(skb, key);
+	if (err) {
+		kfree_skb(skb);
+		return ERR_PTR(err);
+	}
+	return skb;
 }
 
-int ovs_flow_key_extract_userspace(struct net *net, const struct nlattr *attr,
-				   struct sk_buff *skb,
-				   struct sw_flow_key *key, bool log)
+struct sk_buff *ovs_flow_key_extract_userspace(struct net *net,
+					       const struct nlattr *attr,
+					       struct sk_buff *skb,
+					       struct sw_flow_key *key,
+					       bool log)
 {
 	int err;
 
 	/* Extract metadata from netlink attributes. */
 	err = ovs_nla_get_flow_metadata(net, attr, key, log);
 	if (err)
-		return err;
+		goto err_free;
 
-	return key_extract(skb, key);
+	err = key_extract(skb, key);
+	if (err)
+		goto err_free;
+	return skb;
+
+err_free:
+	kfree_skb(skb);
+	return ERR_PTR(err);
 }
