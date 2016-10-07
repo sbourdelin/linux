@@ -15,6 +15,7 @@
 #include <linux/mmc/card.h>
 #include <linux/of.h>
 #include "sdhci.h"
+#include "sdhci-xenon-phy.h"
 
 /* Register Offset of SD Host Controller SOCP self-defined register */
 #define SDHC_SYS_CFG_INFO			0x0104
@@ -76,6 +77,7 @@
 #define MMC_TIMING_FAKE				0xFF
 
 #define DEFAULT_SDCLK_FREQ			(400000)
+#define LOWEST_SDCLK_FREQ			(100000)
 
 /* Xenon specific Mode Select value */
 #define XENON_SDHCI_CTRL_HS200			0x5
@@ -96,6 +98,15 @@ struct sdhci_xenon_priv {
 
 	/* Slot idx */
 	u8		slot_idx;
+
+	int		phy_type;
+	/*
+	 * Contains board-specific PHY parameters
+	 * passed from device tree.
+	 */
+	void		*phy_params;
+	const struct xenon_phy_ops *phy_ops;
+	struct xenon_emmc_phy_regs *emmc_phy_regs;
 
 	/*
 	 * When initializing card, Xenon has to determine card type and
@@ -131,4 +142,10 @@ static inline int enable_xenon_internal_clk(struct sdhci_host *host)
 
 	return 0;
 }
+
+int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios);
+int xenon_phy_parse_dt(struct device_node *np,
+		       struct sdhci_host *host);
+void xenon_soc_pad_ctrl(struct sdhci_host *host,
+			unsigned char signal_voltage);
 #endif

@@ -7427,6 +7427,7 @@ M:	Ziji Hu <huziji@marvell.com>
 L:	linux-mmc@vger.kernel.org
 S:	Supported
 F:	drivers/mmc/host/sdhci-xenon.*
+F:	drivers/mmc/host/sdhci-xenon-phy.*
 F:	Documentation/devicetree/bindings/mmc/marvell,sdhci-xenon.txt
 
 MATROX FRAMEBUFFER DRIVER

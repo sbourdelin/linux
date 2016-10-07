@@ -224,6 +224,7 @@ static void xenon_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	spin_unlock_irqrestore(&host->lock, flags);
 
 	sdhci_set_ios(mmc, ios);
+	xenon_phy_adj(host, ios);
 
 	if (host->clock > DEFAULT_SDCLK_FREQ) {
 		spin_lock_irqsave(&host->lock, flags);
@@ -308,6 +309,8 @@ static int xenon_start_signal_voltage_switch(struct mmc_host *mmc,
 	 * since keeping internal clock active obeys SD spec.
 	 */
 	enable_xenon_internal_clk(host);
+
+	xenon_soc_pad_ctrl(host, ios->signal_voltage);
 
 	if (priv->card_candidate) {
 		if (mmc_card_mmc(priv->card_candidate))
@@ -453,6 +456,7 @@ static int xenon_probe_dt(struct platform_device *pdev)
 		sdhci_writel(host, reg, SDHC_SYS_EXT_OP_CTRL);
 	}
 
+	err = xenon_phy_parse_dt(np, host);
 	return err;
 }
 
