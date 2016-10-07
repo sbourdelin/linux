@@ -1,0 +1,17 @@
+Juniper's PTXPMB FPGA watchdog driver
+
+Required properties:
+
+- compatible:	Should be "jnx,ptxpmb-wdt"
+
+Optional properties:
+
+- reg : Specifies base physical address and size of the registers. It is
+  optional since the MFD parent driver supplies it, but can be overridden.
+
+Example:
+
+wdt {
+	compatible = "jnx,ptxpmb-wdt";
+	/* no properties defined */
+};
