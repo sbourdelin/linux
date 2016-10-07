@@ -37,8 +37,9 @@ static bool
 gpu_is_idle(struct drm_i915_private *dev_priv)
 {
 	struct intel_engine_cs *engine;
+	enum intel_engine_id iter;
 
-	for_each_engine(engine, dev_priv) {
+	for_each_engine(engine, dev_priv, iter) {
 		if (intel_engine_is_active(engine))
 			return false;
 	}

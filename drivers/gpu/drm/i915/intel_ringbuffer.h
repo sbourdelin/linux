@@ -395,12 +395,6 @@ struct intel_engine_cs {
 	u32 (*get_cmd_length_mask)(u32 cmd_header);
 };
 
-static inline bool
-intel_engine_initialized(const struct intel_engine_cs *engine)
-{
-	return engine->i915 != NULL;
-}
-
 static inline unsigned
 intel_engine_flag(const struct intel_engine_cs *engine)
 {

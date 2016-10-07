@@ -82,12 +82,17 @@ static const struct engine_info {
 	},
 };
 
-static struct intel_engine_cs *
+static int
 intel_engine_setup(struct drm_i915_private *dev_priv,
 		   enum intel_engine_id id)
 {
 	const struct engine_info *info = &intel_engines[id];
-	struct intel_engine_cs *engine = &dev_priv->engine[id];
+	struct intel_engine_cs *engine;
+
+	GEM_BUG_ON(dev_priv->engine[id]);
+	engine = kzalloc(sizeof(*engine), GFP_KERNEL);
+	if (!engine)
+		return -ENOMEM;
 
 	engine->id = id;
 	engine->i915 = dev_priv;
@@ -97,7 +102,8 @@ intel_engine_setup(struct drm_i915_private *dev_priv,
 	engine->mmio_base = info->mmio_base;
 	engine->irq_shift = info->irq_shift;
 
-	return engine;
+	dev_priv->engine[id] = engine;
+	return 0;
 }
 
 /**
@@ -131,7 +137,11 @@ int intel_engines_init(struct drm_device *dev)
 		if (!init)
 			continue;
 
-		ret = init(intel_engine_setup(dev_priv, i));
+		ret = intel_engine_setup(dev_priv, i);
+		if (ret)
+			goto cleanup;
+
+		ret = init(dev_priv->engine[i]);
 		if (ret)
 			goto cleanup;
 
@@ -153,9 +163,9 @@ int intel_engines_init(struct drm_device *dev)
 cleanup:
 	for (i = 0; i < I915_NUM_ENGINES; i++) {
 		if (i915.enable_execlists)
-			intel_logical_ring_cleanup(&dev_priv->engine[i]);
+			intel_logical_ring_cleanup(dev_priv->engine[i]);
 		else
-			intel_engine_cleanup(&dev_priv->engine[i]);
+			intel_engine_cleanup(dev_priv->engine[i]);
 	}
 
 	return ret;
