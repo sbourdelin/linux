@@ -233,6 +233,10 @@ acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 
 	acpi_table_print_madt_entry(header);
 
+	/* the 0xff is an invalid local APIC id */
+	if (processor->id == 0xff)
+		return -EINVAL;
+
 	/*
 	 * We need to register disabled CPU as well to permit
 	 * counting disabled CPUs. This allows us to size
