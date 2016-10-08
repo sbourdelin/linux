@@ -61,7 +61,7 @@ void persistent_ram_free(struct persistent_ram_zone *prz);
 void persistent_ram_zap(struct persistent_ram_zone *prz);
 
 int persistent_ram_write(struct persistent_ram_zone *prz, const void *s,
-			 unsigned int count);
+			 unsigned int count, int lock);
 int persistent_ram_write_user(struct persistent_ram_zone *prz,
 			      const void __user *s, unsigned int count);
 

@@ -260,7 +260,7 @@ static size_t ramoops_write_kmsg_hdr(struct persistent_ram_zone *prz,
 		compressed ? 'C' : 'D');
 	WARN_ON_ONCE(!hdr);
 	len = hdr ? strlen(hdr) : 0;
-	persistent_ram_write(prz, hdr, len);
+	persistent_ram_write(prz, hdr, len, 1);
 	kfree(hdr);
 
 	return len;
@@ -280,17 +280,17 @@ static int notrace ramoops_pstore_write_buf(enum pstore_type_id type,
 	if (type == PSTORE_TYPE_CONSOLE) {
 		if (!cxt->cprz)
 			return -ENOMEM;
-		persistent_ram_write(cxt->cprz, buf, size);
+		persistent_ram_write(cxt->cprz, buf, size, 1);
 		return 0;
 	} else if (type == PSTORE_TYPE_FTRACE) {
 		if (!cxt->fprz)
 			return -ENOMEM;
-		persistent_ram_write(cxt->fprz, buf, size);
+		persistent_ram_write(cxt->fprz, buf, size, 1);
 		return 0;
 	} else if (type == PSTORE_TYPE_PMSG) {
 		if (!cxt->mprz)
 			return -ENOMEM;
-		persistent_ram_write(cxt->mprz, buf, size);
+		persistent_ram_write(cxt->mprz, buf, size, 1);
 		return 0;
 	}
 
@@ -324,7 +324,7 @@ static int notrace ramoops_pstore_write_buf(enum pstore_type_id type,
 	hlen = ramoops_write_kmsg_hdr(prz, compressed);
 	if (size + hlen > prz->buffer_size)
 		size = prz->buffer_size - hlen;
-	persistent_ram_write(prz, buf, size);
+	persistent_ram_write(prz, buf, size, 1);
 
 	cxt->dump_write_cnt = (cxt->dump_write_cnt + 1) % cxt->max_dump_cnt;
 
