@@ -87,7 +87,7 @@ MODULE_PARM_DESC(ramoops_ecc,
 struct ramoops_context {
 	struct persistent_ram_zone **przs;
 	struct persistent_ram_zone *cprz;
-	struct persistent_ram_zone *fprz;
+	struct persistent_ram_zone **fprzs;
 	struct persistent_ram_zone *mprz;
 	phys_addr_t phys_addr;
 	unsigned long size;
@@ -97,6 +97,7 @@ struct ramoops_context {
 	size_t ftrace_size;
 	size_t pmsg_size;
 	int dump_oops;
+	int flags;
 	struct persistent_ram_ecc_info ecc_info;
 	unsigned int max_dump_cnt;
 	unsigned int dump_write_cnt;
@@ -219,9 +220,17 @@ static ssize_t ramoops_pstore_read(u64 *id, enum pstore_type_id *type,
 	if (!prz_ok(prz))
 		prz = ramoops_get_next_prz(&cxt->cprz, &cxt->console_read_cnt,
 					   1, id, type, PSTORE_TYPE_CONSOLE, 0);
-	if (!prz_ok(prz))
-		prz = ramoops_get_next_prz(&cxt->fprz, &cxt->ftrace_read_cnt,
-					   1, id, type, PSTORE_TYPE_FTRACE, 0);
+	if (!prz_ok(prz)) {
+		int max = (cxt->flags & FTRACE_PER_CPU) ? nr_cpu_ids : 1;
+		while (cxt->ftrace_read_cnt < max && !prz) {
+			prz = ramoops_get_next_prz(cxt->fprzs,
+					&cxt->ftrace_read_cnt, max, id, type,
+					PSTORE_TYPE_FTRACE, 0);
+			if (!prz_ok(prz))
+				continue;
+		}
+	}
+
 	if (!prz_ok(prz))
 		prz = ramoops_get_next_prz(&cxt->mprz, &cxt->pmsg_read_cnt,
 					   1, id, type, PSTORE_TYPE_PMSG, 0);
@@ -283,9 +292,23 @@ static int notrace ramoops_pstore_write_buf(enum pstore_type_id type,
 		persistent_ram_write(cxt->cprz, buf, size, 1);
 		return 0;
 	} else if (type == PSTORE_TYPE_FTRACE) {
-		if (!cxt->fprz)
+		int zonenum, lock;
+
+		if (!cxt->fprzs)
 			return -ENOMEM;
-		persistent_ram_write(cxt->fprz, buf, size, 1);
+		/*
+		 * If per-cpu buffers, don't lock. Otherwise there's only
+		 * 1 zone for ftrace (zone 0) and all CPUs share it, so lock.
+		 */
+		if (cxt->flags & FTRACE_PER_CPU) {
+			zonenum = smp_processor_id();
+			lock = 0;
+		} else {
+			zonenum = 0;
+			lock = 1;
+		}
+
+		persistent_ram_write(cxt->fprzs[zonenum], buf, size, lock);
 		return 0;
 	}
 
@@ -349,6 +372,7 @@ static int ramoops_pstore_erase(enum pstore_type_id type, u64 id, int count,
 {
 	struct ramoops_context *cxt = psi->data;
 	struct persistent_ram_zone *prz;
+	int max;
 
 	switch (type) {
 	case PSTORE_TYPE_DMESG:
@@ -360,7 +384,10 @@ static int ramoops_pstore_erase(enum pstore_type_id type, u64 id, int count,
 		prz = cxt->cprz;
 		break;
 	case PSTORE_TYPE_FTRACE:
-		prz = cxt->fprz;
+		max = (cxt->flags & FTRACE_PER_CPU) ? nr_cpu_ids : 1;
+		if (id >= max)
+			return -EINVAL;
+		prz = cxt->fprzs[id];
 		break;
 	case PSTORE_TYPE_PMSG:
 		prz = cxt->mprz;
@@ -391,14 +418,21 @@ static void ramoops_free_przs(struct ramoops_context *cxt)
 {
 	int i;
 
-	if (!cxt->przs)
-		return;
+	/* Free dump PRZs */
+	if (cxt->przs) {
+		for (i = 0; i < cxt->max_dump_cnt; i++)
+			persistent_ram_free(cxt->przs[i]);
 
-	for (i = 0; i < cxt->max_dump_cnt; i++)
-		persistent_ram_free(cxt->przs[i]);
+		kfree(cxt->przs);
+		cxt->max_dump_cnt = 0;
+	}
 
-	kfree(cxt->przs);
-	cxt->max_dump_cnt = 0;
+	/* Free ftrace PRZs */
+	if (cxt->fprzs) {
+		for (i = 0; i < nr_cpu_ids; i++)
+			persistent_ram_free(cxt->przs[i]);
+		kfree(cxt->fprzs);
+	}
 }
 
 static int ramoops_init_przs(struct device *dev, struct ramoops_context *cxt,
@@ -615,6 +649,7 @@ static int ramoops_probe(struct platform_device *pdev)
 	cxt->ftrace_size = pdata->ftrace_size;
 	cxt->pmsg_size = pdata->pmsg_size;
 	cxt->dump_oops = pdata->dump_oops;
+	cxt->flags = pdata->flags;
 	cxt->ecc_info = pdata->ecc_info;
 
 	paddr = cxt->phys_addr;
@@ -630,8 +665,9 @@ static int ramoops_probe(struct platform_device *pdev)
 	if (err)
 		goto fail_init_cprz;
 
-	err = ramoops_init_prz(dev, cxt, &cxt->fprz, &paddr, cxt->ftrace_size,
-			       LINUX_VERSION_CODE);
+	err = ramoops_init_przs(dev, cxt, &cxt->fprzs, &paddr, cxt->ftrace_size,
+				(cxt->flags & FTRACE_PER_CPU) ? nr_cpu_ids : 1,
+				LINUX_VERSION_CODE);
 	if (err)
 		goto fail_init_fprz;
 
@@ -695,7 +731,6 @@ fail_clear:
 	cxt->pstore.bufsize = 0;
 	persistent_ram_free(cxt->mprz);
 fail_init_mprz:
-	persistent_ram_free(cxt->fprz);
 fail_init_fprz:
 	persistent_ram_free(cxt->cprz);
 fail_init_cprz:
@@ -714,7 +749,6 @@ static int ramoops_remove(struct platform_device *pdev)
 	cxt->pstore.bufsize = 0;
 
 	persistent_ram_free(cxt->mprz);
-	persistent_ram_free(cxt->fprz);
 	persistent_ram_free(cxt->cprz);
 	ramoops_free_przs(cxt);
 
@@ -756,6 +790,8 @@ static void ramoops_register_dummy(void)
 	dummy_data->ftrace_size = ramoops_ftrace_size;
 	dummy_data->pmsg_size = ramoops_pmsg_size;
 	dummy_data->dump_oops = dump_oops;
+	dummy_data->flags = FTRACE_PER_CPU;
+
 	/*
 	 * For backwards compatibility ramoops.ecc=1 means 16 bytes ECC
 	 * (using 1 byte for ECC isn't much of use anyway).
