@@ -207,7 +207,8 @@
 
 #define kvm_arm_exception_type	\
 	{0, "IRQ" }, 		\
-	{1, "TRAP" }
+	{1, "SError" }, 	\
+	{2, "TRAP" }
 
 #define ECN(x) { ESR_ELx_EC_##x, #x }
 
