@@ -5472,19 +5472,29 @@ static inline int select_idle_smt(struct task_struct *p, struct sched_domain *sd
  */
 static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int target)
 {
-	struct sched_domain *this_sd = rcu_dereference(*this_cpu_ptr(&sd_llc));
+	struct sched_domain *this_sd;
 	u64 avg_idle = this_rq()->avg_idle;
-	u64 avg_cost = this_sd->avg_scan_cost;
+	u64 avg_cost;
 	u64 time, cost;
 	s64 delta;
 	int cpu, wrap;
+
+	rcu_read_lock();
+	this_sd = rcu_dereference(*this_cpu_ptr(&sd_llc));
+	if (!this_sd) {
+		cpu = -1;
+		goto unlock;
+	}
+	avg_cost = this_sd->avg_scan_cost;
 
 	/*
 	 * Due to large variance we need a large fuzz factor; hackbench in
 	 * particularly is sensitive here.
 	 */
-	if ((avg_idle / 512) < avg_cost)
-		return -1;
+	if ((avg_idle / 512) < avg_cost) {
+		cpu = -1;
+		goto unlock;
+	}
 
 	time = local_clock();
 
@@ -5500,6 +5510,8 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 	delta = (s64)(time - cost) / 8;
 	this_sd->avg_scan_cost += delta;
 
+unlock:
+	rcu_read_unlock();
 	return cpu;
 }
 
