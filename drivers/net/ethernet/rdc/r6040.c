@@ -954,6 +954,74 @@ static void netdev_get_drvinfo(struct net_device *dev,
 	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
 	strlcpy(info->bus_info, pci_name(rp->pdev), sizeof(info->bus_info));
 }
+static int r6040_get_regs_len (struct net_device *dev)
+{
+  return R6040_IO_SIZE;
+}
+
+static void r6040_get_regs (struct net_device *dev, struct ethtool_regs *regs, void *p)
+{
+  struct r6040_private *tp = netdev_priv (dev);
+  u32 __iomem *data = tp->base;
+  u32 *dw = p;
+  int i;
+
+  spin_lock (tp);
+  for (i = 0; i < R6040_IO_SIZE; i += 4)
+    memcpy_fromio (dw++, data++, 4);
+  spin_unlock (tp);
+}
+
+static u32 r6040_get_msglevel (struct net_device *dev)
+{
+  struct r6040_private *tp = netdev_priv (dev);
+
+  return tp->msg_enable;
+}
+
+static void r6040_set_msglevel (struct net_device *dev, u32 value)
+{
+  struct r6040_private *tp = netdev_priv (dev);
+
+  tp->msg_enable = value;
+}
+
+static const char r6040_gstrings[][ETH_GSTRING_LEN] = {
+  "tx_packets",
+  "rx_packets",
+  "tx_errors",
+  "rx_errors",
+  "rx_missed",
+  "align_errors",
+  "tx_single_collisions",
+  "tx_multi_collisions",
+  "unicast",
+  "broadcast",
+  "multicast",
+  "tx_aborted",
+  "tx_underrun",
+};
+
+static int r6040_get_sset_count (struct net_device *dev, int sset)
+{
+  switch (sset)
+    {
+    case ETH_SS_STATS:
+      return ARRAY_SIZE (r6040_gstrings);
+    default:
+      return -EOPNOTSUPP;
+    }
+}
+
+static void r6040_get_strings (struct net_device *dev, u32 stringset, u8 * data)
+{
+  switch (stringset)
+    {
+    case ETH_SS_STATS:
+      memcpy (data, *r6040_gstrings, sizeof (r6040_gstrings));
+      break;
+    }
+}
 
 static const struct ethtool_ops netdev_ethtool_ops = {
 	.get_drvinfo		= netdev_get_drvinfo,
@@ -961,6 +1029,13 @@ static const struct ethtool_ops netdev_ethtool_ops = {
 	.get_ts_info		= ethtool_op_get_ts_info,
 	.get_link_ksettings     = phy_ethtool_get_link_ksettings,
 	.set_link_ksettings     = phy_ethtool_set_link_ksettings,
+	.get_regs_len = r6040_get_regs_len,
+	.get_msglevel = r6040_get_msglevel,
+	.set_msglevel = r6040_set_msglevel,
+	.get_regs = r6040_get_regs,
+	.get_strings = r6040_get_strings,
+	.get_sset_count = r6040_get_sset_count,
+	.get_regs_len = r6040_get_regs_len,
 };
 
 static const struct net_device_ops r6040_netdev_ops = {
