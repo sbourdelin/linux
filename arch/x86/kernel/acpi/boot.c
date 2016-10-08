@@ -203,17 +203,20 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 	apic_id = processor->local_apic_id;
 	enabled = processor->lapic_flags & ACPI_MADT_ENABLED;
 #ifdef CONFIG_X86_X2APIC
+	if (!apic->apic_id_valid(apic_id)) {
+		if (enabled)
+			printk(KERN_WARNING PREFIX "x2apic entry ignored\n");
+		return -EINVAL;
+	}
+
 	/*
-	 * We need to register disabled CPU as well to permit
-	 * counting disabled CPUs. This allows us to size
-	 * cpus_possible_map more accurately, to permit
-	 * to not preallocating memory for all NR_CPUS
-	 * when we use CPU hotplug.
-	 */
-	if (!apic->apic_id_valid(apic_id) && enabled)
-		printk(KERN_WARNING PREFIX "x2apic entry ignored\n");
-	else
-		acpi_register_lapic(apic_id, processor->uid, enabled);
+	* We need to register disabled CPU as well to permit
+	* counting disabled CPUs. This allows us to size
+	* cpus_possible_map more accurately, to permit
+	* to not preallocating memory for all NR_CPUS
+	* when we use CPU hotplug.
+	*/
+	acpi_register_lapic(apic_id, processor->uid, enabled);
 #else
 	printk(KERN_WARNING PREFIX "x2apic entry ignored\n");
 #endif
@@ -225,6 +228,7 @@ static int __init
 acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 {
 	struct acpi_madt_local_apic *processor = NULL;
+	u8 enabled;
 
 	processor = (struct acpi_madt_local_apic *)header;
 
@@ -233,9 +237,14 @@ acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 
 	acpi_table_print_madt_entry(header);
 
+	enabled = processor->lapic_flags & ACPI_MADT_ENABLED;
+
 	/* the 0xff is an invalid local APIC id */
-	if (processor->id == 0xff)
+	if (processor->id == 0xff) {
+		if (enabled)
+			printk(KERN_WARNING PREFIX "lapic entry ignored\n");
 		return -EINVAL;
+	}
 
 	/*
 	 * We need to register disabled CPU as well to permit
@@ -246,7 +255,7 @@ acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 	 */
 	acpi_register_lapic(processor->id,	/* APIC ID */
 			    processor->processor_id, /* ACPI ID */
-			    processor->lapic_flags & ACPI_MADT_ENABLED);
+			    enabled);
 
 	return 0;
 }
