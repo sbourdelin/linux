@@ -79,4 +79,6 @@ int rpmsg_unregister_device(struct device *parent,
 struct device *rpmsg_find_device(struct device *parent,
 				 struct rpmsg_channel_info *chinfo);
 
+int rpmsg_chrdev_register_device(struct rpmsg_device *rpdev);
+
 #endif
