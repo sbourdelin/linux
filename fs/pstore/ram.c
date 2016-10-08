@@ -402,54 +402,74 @@ static void ramoops_free_przs(struct ramoops_context *cxt)
 }
 
 static int ramoops_init_przs(struct device *dev, struct ramoops_context *cxt,
-			     phys_addr_t *paddr, size_t dump_mem_sz)
+			     struct persistent_ram_zone ***przs,
+			     phys_addr_t *paddr, size_t mem_sz,
+			     unsigned int cnt, u32 sig)
 {
 	int err = -ENOMEM;
 	int i;
+	size_t zone_sz;
+	struct persistent_ram_zone **prz_ar;
 
-	if (!cxt->record_size)
-		return 0;
-
-	if (*paddr + dump_mem_sz - cxt->phys_addr > cxt->size) {
-		dev_err(dev, "no room for dumps\n");
+	if (*paddr + mem_sz - cxt->phys_addr > cxt->size) {
+		dev_err(dev, "no room for mem region (0x%zx@0x%llx) in (0x%lx@0x%llx)\n",
+			mem_sz, (unsigned long long)*paddr,
+			cxt->size, (unsigned long long)cxt->phys_addr);
 		return -ENOMEM;
 	}
 
-	cxt->max_dump_cnt = dump_mem_sz / cxt->record_size;
-	if (!cxt->max_dump_cnt)
+	zone_sz = mem_sz / cnt;
+	if (!zone_sz)
 		return -ENOMEM;
 
-	cxt->przs = kzalloc(sizeof(*cxt->przs) * cxt->max_dump_cnt,
-			     GFP_KERNEL);
-	if (!cxt->przs) {
-		dev_err(dev, "failed to initialize a prz array for dumps\n");
-		goto fail_mem;
+	prz_ar = kzalloc(sizeof(**przs) * cnt, GFP_KERNEL);
+	if (!prz_ar) {
+		dev_err(dev, "Failed to initialize prz array\n");
+		return -ENOMEM;
 	}
 
-	for (i = 0; i < cxt->max_dump_cnt; i++) {
-		cxt->przs[i] = persistent_ram_new(*paddr, cxt->record_size, 0,
+	for (i = 0; i < cnt; i++) {
+		prz_ar[i] = persistent_ram_new(*paddr, zone_sz, sig,
 						  &cxt->ecc_info,
 						  cxt->memtype);
-		if (IS_ERR(cxt->przs[i])) {
-			err = PTR_ERR(cxt->przs[i]);
+		if (IS_ERR(prz_ar[i])) {
+			err = PTR_ERR(prz_ar[i]);
 			dev_err(dev, "failed to request mem region (0x%zx@0x%llx): %d\n",
 				cxt->record_size, (unsigned long long)*paddr, err);
 
 			while (i > 0) {
 				i--;
-				persistent_ram_free(cxt->przs[i]);
+				persistent_ram_free(prz_ar[i]);
 			}
-			goto fail_prz;
+			kfree(prz_ar);
+			return err;
 		}
-		*paddr += cxt->record_size;
+		*paddr += zone_sz;
 	}
 
+	*przs = prz_ar;
 	return 0;
-fail_prz:
-	kfree(cxt->przs);
-fail_mem:
-	cxt->max_dump_cnt = 0;
-	return err;
+}
+
+static int ramoops_init_dump_przs(struct device *dev,
+				  struct ramoops_context *cxt,
+				  phys_addr_t *paddr, size_t mem_sz)
+{
+	int ret;
+
+	if (!cxt->record_size)
+		return 0;
+
+	cxt->max_dump_cnt = mem_sz / cxt->record_size;
+	if (!cxt->max_dump_cnt)
+		return -ENOMEM;
+
+	ret = ramoops_init_przs(dev, cxt, &cxt->przs, paddr, mem_sz,
+				cxt->max_dump_cnt, 0);
+	if (ret)
+		cxt->max_dump_cnt = 0;
+
+	return ret;
 }
 
 static int ramoops_init_prz(struct device *dev, struct ramoops_context *cxt,
@@ -601,7 +621,7 @@ static int ramoops_probe(struct platform_device *pdev)
 
 	dump_mem_sz = cxt->size - cxt->console_size - cxt->ftrace_size
 			- cxt->pmsg_size;
-	err = ramoops_init_przs(dev, cxt, &paddr, dump_mem_sz);
+	err = ramoops_init_dump_przs(dev, cxt, &paddr, dump_mem_sz);
 	if (err)
 		goto fail_out;
 
