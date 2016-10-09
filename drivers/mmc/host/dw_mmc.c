@@ -3267,26 +3267,24 @@ EXPORT_SYMBOL(dw_mci_remove);
 
 
 #ifdef CONFIG_PM
-/*
- * TODO: we should probably disable the clock to the card in the suspend path.
- */
-int dw_mci_suspend(struct dw_mci *host)
+int dw_mci_runtime_suspend(struct dw_mci *host)
 {
 	if (host->use_dma && host->dma_ops->exit)
 		host->dma_ops->exit(host);
 
+	clk_disable_unprepare(host->ciu_clk);
+
 	return 0;
 }
-EXPORT_SYMBOL(dw_mci_suspend);
+EXPORT_SYMBOL(dw_mci_runtime_suspend);
 
-int dw_mci_resume(struct dw_mci *host)
+int dw_mci_runtime_resume(struct dw_mci *host)
 {
-	int i, ret;
+	int i, ret = 0;
 
-	if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS)) {
-		ret = -ENODEV;
+	ret = clk_prepare_enable(host->ciu_clk);
+	if (ret)
 		return ret;
-	}
 
 	if (host->use_dma && host->dma_ops->init)
 		host->dma_ops->init(host);
@@ -3322,32 +3320,6 @@ int dw_mci_resume(struct dw_mci *host)
 	dw_mci_enable_cd(host);
 
 	return 0;
-}
-EXPORT_SYMBOL(dw_mci_resume);
-
-int dw_mci_runtime_suspend(struct dw_mci *host)
-{
-	int err = 0;
-
-	err = dw_mci_suspend(host);
-	if (err)
-		return err;
-
-	clk_disable_unprepare(host->ciu_clk);
-
-	return err;
-}
-EXPORT_SYMBOL(dw_mci_runtime_suspend);
-
-int dw_mci_runtime_resume(struct dw_mci *host)
-{
-	int ret = 0;
-
-	ret = clk_prepare_enable(host->ciu_clk);
-	if (ret)
-		return ret;
-
-	return dw_mci_resume(host);
 }
 EXPORT_SYMBOL(dw_mci_runtime_resume);
 #endif /* CONFIG_PM */
