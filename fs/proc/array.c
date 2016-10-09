@@ -163,6 +163,7 @@ static inline void task_state(struct seq_file *m, struct pid_namespace *ns,
 	const struct cred *cred;
 	pid_t ppid, tpid = 0, tgid, ngid;
 	unsigned int max_fds = 0;
+	int hide_pid;
 
 	rcu_read_lock();
 	ppid = pid_alive(p) ?
@@ -183,6 +184,7 @@ static inline void task_state(struct seq_file *m, struct pid_namespace *ns,
 	task_lock(p);
 	if (p->files)
 		max_fds = files_fdtable(p->files)->max_fds;
+	hide_pid = p->hide_pid;
 	task_unlock(p);
 	rcu_read_unlock();
 
@@ -201,6 +203,7 @@ static inline void task_state(struct seq_file *m, struct pid_namespace *ns,
 	seq_put_decimal_ull(m, "\t", from_kgid_munged(user_ns, cred->egid));
 	seq_put_decimal_ull(m, "\t", from_kgid_munged(user_ns, cred->sgid));
 	seq_put_decimal_ull(m, "\t", from_kgid_munged(user_ns, cred->fsgid));
+	seq_put_decimal_ull(m, "\nHidePID:\t", hide_pid);
 	seq_put_decimal_ull(m, "\nFDSize:\t", max_fds);
 
 	seq_puts(m, "\nGroups:\t");

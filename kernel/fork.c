@@ -1560,6 +1560,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 #endif
 
 	p->default_timer_slack_ns = current->timer_slack_ns;
+	p->hide_pid = current->hide_pid;
 
 	task_io_accounting_init(&p->ioac);
 	acct_clear_integrals(p);

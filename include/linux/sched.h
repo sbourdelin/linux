@@ -1572,6 +1572,7 @@ struct task_struct {
 	/* unserialized, strictly 'current' */
 	unsigned in_execve:1; /* bit to tell LSMs we're in execve */
 	unsigned in_iowait:1;
+	unsigned hide_pid:2; /* per-process procfs hidepid= */
 #if !defined(TIF_RESTORE_SIGMASK)
 	unsigned restore_sigmask:1;
 #endif
