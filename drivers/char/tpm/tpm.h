@@ -85,6 +85,10 @@ enum tpm2_capabilities {
 	TPM2_CAP_TPM_PROPERTIES = 6,
 };
 
+enum tpm2_properties {
+	TPM2_PT_FAMILY_INDICATOR	= 0x100,
+};
+
 enum tpm2_startup_types {
 	TPM2_SU_CLEAR	= 0x0000,
 	TPM2_SU_STATE	= 0x0001,
@@ -485,7 +489,7 @@ int tpm2_seal_trusted(struct tpm_chip *chip,
 int tpm2_unseal_trusted(struct tpm_chip *chip,
 			struct trusted_key_payload *payload,
 			struct trusted_key_options *options);
-ssize_t tpm2_get_tpm_pt(struct tpm_chip *chip, u32 property_id,
+ssize_t tpm2_getcap_cmd(struct tpm_chip *chip, u32 cap_id, u32 property_id,
 			u32 *value, const char *desc);
 
 int tpm2_auto_startup(struct tpm_chip *chip);

@@ -528,7 +528,8 @@ static int tpm_tis_gen_interrupt(struct tpm_chip *chip)
 	cap_t cap;
 
 	if (chip->flags & TPM_CHIP_FLAG_TPM2)
-		return tpm2_get_tpm_pt(chip, 0x100, &cap2, desc);
+		return tpm2_getcap_cmd(chip, TPM2_CAP_TPM_PROPERTIES,
+				       TPM2_PT_FAMILY_INDICATOR, &cap2, desc);
 	else
 		return tpm_getcap(chip, TPM_CAP_PROP_TIS_TIMEOUT, &cap, desc);
 }

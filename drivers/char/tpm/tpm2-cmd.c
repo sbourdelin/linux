@@ -111,13 +111,13 @@ struct tpm2_pcr_extend_in {
 	u8				digest[TPM_DIGEST_SIZE];
 } __packed;
 
-struct tpm2_get_tpm_pt_in {
+struct tpm2_getcap_in {
 	__be32	cap_id;
 	__be32	property_id;
 	__be32	property_cnt;
 } __packed;
 
-struct tpm2_get_tpm_pt_out {
+struct tpm2_getcap_out {
 	u8	more_data;
 	__be32	subcap_id;
 	__be32	property_cnt;
@@ -140,8 +140,8 @@ union tpm2_cmd_params {
 	struct	tpm2_pcr_read_in	pcrread_in;
 	struct	tpm2_pcr_read_out	pcrread_out;
 	struct	tpm2_pcr_extend_in	pcrextend_in;
-	struct	tpm2_get_tpm_pt_in	get_tpm_pt_in;
-	struct	tpm2_get_tpm_pt_out	get_tpm_pt_out;
+	struct	tpm2_getcap_in		getcap_in;
+	struct	tpm2_getcap_out		getcap_out;
 	struct	tpm2_get_random_in	getrandom_in;
 	struct	tpm2_get_random_out	getrandom_out;
 };
@@ -434,16 +434,6 @@ int tpm2_get_random(struct tpm_chip *chip, u8 *out, size_t max)
 
 	return total ? total : -EIO;
 }
-
-#define TPM2_GET_TPM_PT_IN_SIZE \
-	(sizeof(struct tpm_input_header) + \
-	 sizeof(struct tpm2_get_tpm_pt_in))
-
-static const struct tpm_input_header tpm2_get_tpm_pt_header = {
-	.tag = cpu_to_be16(TPM2_ST_NO_SESSIONS),
-	.length = cpu_to_be32(TPM2_GET_TPM_PT_IN_SIZE),
-	.ordinal = cpu_to_be32(TPM2_CC_GET_CAPABILITY)
-};
 
 /**
  * Append TPMS_AUTH_COMMAND to the buffer. The buffer must be allocated with
@@ -750,35 +740,43 @@ out:
 	return rc;
 }
 
+#define TPM2_GETCAP_IN_SIZE \
+	(sizeof(struct tpm_input_header) + sizeof(struct tpm2_getcap_in))
+
+static const struct tpm_input_header tpm2_getcap_header = {
+	.tag = cpu_to_be16(TPM2_ST_NO_SESSIONS),
+	.length = cpu_to_be32(TPM2_GETCAP_IN_SIZE),
+	.ordinal = cpu_to_be32(TPM2_CC_GET_CAPABILITY)
+};
+
 /**
- * tpm2_get_tpm_pt() - get value of a TPM_CAP_TPM_PROPERTIES type property
- * @chip:		TPM chip to use.
- * @property_id:	property ID.
- * @value:		output variable.
+ * tpm2_getcap_cmd() - execute a TPM2_GetCapability command
+ * @chip:		TPM chip to use
+ * @cap_id:		capability ID
+ * @property_id:	property ID
+ * @value:		value of the property
  * @desc:		passed to tpm_transmit_cmd()
  *
- * 0 is returned when the operation is successful. If a negative number is
- * returned it remarks a POSIX error code. If a positive number is returned
- * it remarks a TPM error.
+ * Return: same as with tpm_transmit_cmd
  */
-ssize_t tpm2_get_tpm_pt(struct tpm_chip *chip, u32 property_id,  u32 *value,
-			const char *desc)
+ssize_t tpm2_getcap_cmd(struct tpm_chip *chip, u32 cap_id, u32 property_id,
+			u32 *value, const char *desc)
 {
 	struct tpm2_cmd cmd;
 	int rc;
 
-	cmd.header.in = tpm2_get_tpm_pt_header;
-	cmd.params.get_tpm_pt_in.cap_id = cpu_to_be32(TPM2_CAP_TPM_PROPERTIES);
-	cmd.params.get_tpm_pt_in.property_id = cpu_to_be32(property_id);
-	cmd.params.get_tpm_pt_in.property_cnt = cpu_to_be32(1);
+	cmd.header.in = tpm2_getcap_header;
+	cmd.params.getcap_in.cap_id = cpu_to_be32(cap_id);
+	cmd.params.getcap_in.property_id = cpu_to_be32(property_id);
+	cmd.params.getcap_in.property_cnt = cpu_to_be32(1);
 
 	rc = tpm_transmit_cmd(chip, &cmd, sizeof(cmd), 0, desc);
 	if (!rc)
-		*value = be32_to_cpu(cmd.params.get_tpm_pt_out.value);
+		*value = be32_to_cpu(cmd.params.getcap_out.value);
 
 	return rc;
 }
-EXPORT_SYMBOL_GPL(tpm2_get_tpm_pt);
+EXPORT_SYMBOL_GPL(tpm2_getcap_cmd);
 
 #define TPM2_STARTUP_IN_SIZE \
 	(sizeof(struct tpm_input_header) + \
@@ -978,10 +976,10 @@ int tpm2_probe(struct tpm_chip *chip)
 	struct tpm2_cmd cmd;
 	int rc;
 
-	cmd.header.in = tpm2_get_tpm_pt_header;
-	cmd.params.get_tpm_pt_in.cap_id = cpu_to_be32(TPM2_CAP_TPM_PROPERTIES);
-	cmd.params.get_tpm_pt_in.property_id = cpu_to_be32(0x100);
-	cmd.params.get_tpm_pt_in.property_cnt = cpu_to_be32(1);
+	cmd.header.in = tpm2_getcap_header;
+	cmd.params.getcap_in.cap_id = cpu_to_be32(TPM2_CAP_TPM_PROPERTIES);
+	cmd.params.getcap_in.property_id = cpu_to_be32(TPM2_PT_FAMILY_INDICATOR);
+	cmd.params.getcap_in.property_cnt = cpu_to_be32(1);
 
 	rc = tpm_transmit_cmd(chip, &cmd, sizeof(cmd),  0, NULL);
 	if (rc <  0)
