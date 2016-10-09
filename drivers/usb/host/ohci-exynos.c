@@ -219,7 +219,7 @@ static void exynos_ohci_shutdown(struct platform_device *pdev)
 		hcd->driver->shutdown(hcd);
 }
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 static int exynos_ohci_suspend(struct device *dev)
 {
 	struct usb_hcd *hcd = dev_get_drvdata(dev);
@@ -256,18 +256,16 @@ static int exynos_ohci_resume(struct device *dev)
 
 	return 0;
 }
-#else
-#define exynos_ohci_suspend	NULL
-#define exynos_ohci_resume	NULL
-#endif
+
+static const struct dev_pm_ops exynos_ohci_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(exynos_ohci_suspend, exynos_ohci_resume)
+};
+#endif /* CONFIG_PM_SLEEP */
+
+#define DEV_PM_OPS IS_ENABLED(CONFIG_PM_SLEEP) ? &exynos_ohci_pm_ops : NULL
 
 static const struct ohci_driver_overrides exynos_overrides __initconst = {
 	.extra_priv_size =	sizeof(struct exynos_ohci_hcd),
-};
-
-static const struct dev_pm_ops exynos_ohci_pm_ops = {
-	.suspend	= exynos_ohci_suspend,
-	.resume		= exynos_ohci_resume,
 };
 
 #ifdef CONFIG_OF
@@ -285,7 +283,7 @@ static struct platform_driver exynos_ohci_driver = {
 	.shutdown	= exynos_ohci_shutdown,
 	.driver = {
 		.name	= "exynos-ohci",
-		.pm	= &exynos_ohci_pm_ops,
+		.pm	= DEV_PM_OPS,
 		.of_match_table	= of_match_ptr(exynos_ohci_match),
 	}
 };
