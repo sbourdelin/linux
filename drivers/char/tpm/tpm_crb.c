@@ -34,6 +34,15 @@ enum crb_defaults {
 	CRB_ACPI_START_INDEX = 1,
 };
 
+enum crb_loc_ctrl {
+	CRB_LOC_CTRL_REQUEST_ACCESS	= BIT(0),
+	CRB_LOC_CTRL_RELINQUISH		= BIT(1),
+};
+
+enum crb_loc_state {
+	CRB_LOC_STATE_LOC_ASSIGNED	= BIT(1),
+};
+
 enum crb_ctrl_req {
 	CRB_CTRL_REQ_CMD_READY	= BIT(0),
 	CRB_CTRL_REQ_GO_IDLE	= BIT(1),
@@ -98,12 +107,8 @@ struct crb_priv {
  * @dev:  crb device
  * @priv: crb private data
  *
- * Write CRB_CTRL_REQ_GO_IDLE to TPM_CRB_CTRL_REQ
- * The device should respond within TIMEOUT_C by clearing the bit.
- * Anyhow, we do not wait here as a consequent CMD_READY request
- * will be handled correctly even if idle was not completed.
- *
- * The function does nothing for devices with ACPI-start method.
+ * Put device to the idle state and relinquish locality. The function does
+ * nothing for devices with the ACPI-start method.
  *
  * Return: 0 always
  */
@@ -112,6 +117,7 @@ static int __maybe_unused crb_go_idle(struct device *dev, struct crb_priv *priv)
 	if (priv->flags & CRB_FL_ACPI_START)
 		return 0;
 
+	iowrite32(CRB_LOC_CTRL_RELINQUISH, &priv->regs->loc_ctrl);
 	iowrite32(CRB_CTRL_REQ_GO_IDLE, &priv->regs->ctrl_req);
 	/* we don't really care when this settles */
 
@@ -143,11 +149,8 @@ static bool crb_wait_for_reg_32(u32 __iomem *reg, u32 mask, u32 value,
  * @dev:  crb device
  * @priv: crb private data
  *
- * Write CRB_CTRL_REQ_CMD_READY to TPM_CRB_CTRL_REQ
- * and poll till the device acknowledge it by clearing the bit.
- * The device should respond within TIMEOUT_C.
- *
- * The function does nothing for devices with ACPI-start method
+ * Try to wake up the device and request locality. The function does nothing
+ * for devices with the ACPI-start method.
  *
  * Return: 0 on success -ETIME on timeout;
  */
@@ -162,7 +165,16 @@ static int __maybe_unused crb_cmd_ready(struct device *dev,
 				 CRB_CTRL_REQ_CMD_READY /* mask */,
 				 0, /* value */
 				 TPM2_TIMEOUT_C)) {
-		dev_warn(dev, "cmdReady timed out\n");
+		dev_warn(dev, "TPM_CRB_CTRL_REQ_x.cmdReady timed out\n");
+		return -ETIME;
+	}
+
+	iowrite32(CRB_LOC_CTRL_REQUEST_ACCESS, &priv->regs->loc_ctrl);
+	if (!crb_wait_for_reg_32(&priv->regs->loc_state,
+				 CRB_LOC_STATE_LOC_ASSIGNED, /* mask */
+				 CRB_LOC_STATE_LOC_ASSIGNED, /* value */
+				 TPM2_TIMEOUT_C)) {
+		dev_warn(dev, "TPM_LOC_STATE_x.requestAccess timed out\n");
 		return -ETIME;
 	}
 
