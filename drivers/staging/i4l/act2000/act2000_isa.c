@@ -78,10 +78,10 @@ act2000_isa_interrupt(int dummy, void *dev_id)
 	if (istatus & ISA_ISR_ERR) {
 		/* Error Interrupt */
 		istatus &= ISA_ISR_ERR_MASK;
-		printk(KERN_WARNING "act2000: errIRQ\n");
+		pr_warn("act2000: errIRQ\n");
 	}
 	if (istatus)
-		printk(KERN_DEBUG "act2000: ?IRQ %d %02x\n", card->irq, istatus);
+		pr_debug("act2000: ?IRQ %d %02x\n", card->irq, istatus);
 	return IRQ_HANDLED;
 }
 
@@ -147,8 +147,7 @@ act2000_isa_config_irq(act2000_card *card, short irq)
 	if (request_irq(irq, &act2000_isa_interrupt, 0, card->regname, card)) {
 		card->irq = old_irq;
 		card->flags |= ACT2000_FLAGS_IVALID;
-		printk(KERN_WARNING
-		       "act2000: Could not request irq %d\n", irq);
+		pr_warn("act2000: Could not request irq %d\n", irq);
 		return -EBUSY;
 	} else {
 		act2000_isa_select_irq(card);
@@ -246,8 +245,7 @@ act2000_isa_receive(act2000_card *card)
 					card->idat.isa.rcvskb = dev_alloc_skb(card->idat.isa.rcvlen);
 					if (!card->idat.isa.rcvskb) {
 						card->idat.isa.rcvignore = 1;
-						printk(KERN_WARNING
-						       "act2000_isa_receive: no memory\n");
+						pr_warn("act2000_isa_receive: no memory\n");
 						test_and_clear_bit(ACT2000_LOCK_RX, (void *)&card->ilock);
 						return;
 					}
@@ -255,13 +253,12 @@ act2000_isa_receive(act2000_card *card)
 					card->idat.isa.rcvptr = skb_put(card->idat.isa.rcvskb, card->idat.isa.rcvlen - 8);
 				} else {
 					card->idat.isa.rcvidx = 0;
-					printk(KERN_WARNING
-					       "act2000_isa_receive: Invalid CAPI msg\n");
+					pr_warn("act2000_isa_receive: Invalid CAPI msg\n");
 					{
 						int i; __u8 *p; __u8 *t; __u8 tmp[30];
 						for (i = 0, p = (__u8 *)&card->idat.isa.rcvhdr, t = tmp; i < 8; i++)
 							t += sprintf(t, "%02x ", *(p++));
-						printk(KERN_WARNING "act2000_isa_receive: %s\n", tmp);
+						pr_warn("act2000_isa_receive: %s\n", tmp);
 					}
 				}
 			}
@@ -370,21 +367,21 @@ act2000_isa_getid(act2000_card *card)
 		count++;
 	}
 	if (count <= 20) {
-		printk(KERN_WARNING "act2000: No Firmware-ID!\n");
+		pr_warn("act2000: No Firmware-ID!\n");
 		return -ETIME;
 	}
 	*p = '\0';
 	fid.revlen[0] = '\0';
 	if (strcmp(fid.isdn, "ISDN")) {
-		printk(KERN_WARNING "act2000: Wrong Firmware-ID!\n");
+		pr_warn("act2000: Wrong Firmware-ID!\n");
 		return -EPROTO;
 	}
 	p = strchr(fid.revision, '\n');
 	if (p)
 		*p = '\0';
-	printk(KERN_INFO "act2000: Firmware-ID: %s\n", fid.revision);
+	pr_info("act2000: Firmware-ID: %s\n", fid.revision);
 	if (card->flags & ACT2000_FLAGS_IVALID) {
-		printk(KERN_DEBUG "Enabling Interrupts ...\n");
+		pr_debug("Enabling Interrupts ...\n");
 		act2000_isa_enable_irq(card);
 	}
 	return 0;
@@ -426,7 +423,7 @@ act2000_isa_download(act2000_card *card, act2000_ddef __user *cb)
 		}
 		while (c < l) {
 			if (act2000_isa_writeb(card, *b++)) {
-				printk(KERN_WARNING
+				pr_warn(
 				       "act2000: loader timed out"
 				       " len=%d c=%d\n", length, c);
 				kfree(buf);
