@@ -25,12 +25,20 @@
 
 static struct irq_chip jcore_aic;
 
+static void handle_jcore_irq(struct irq_desc *desc)
+{
+	if (irq_is_percpu(irq_desc_get_irq(desc)))
+		handle_percpu_irq(desc);
+	else
+		handle_simple_irq(desc);
+}
+
 static int jcore_aic_irqdomain_map(struct irq_domain *d, unsigned int irq,
 				   irq_hw_number_t hwirq)
 {
 	struct irq_chip *aic = d->host_data;
 
-	irq_set_chip_and_handler(irq, aic, handle_simple_irq);
+	irq_set_chip_and_handler(irq, aic, handle_jcore_irq);
 
 	return 0;
 }
