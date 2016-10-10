@@ -33,6 +33,11 @@
 #include "pfn.h"
 #include "nd.h"
 
+#ifdef CONFIG_XEN
+#include <xen/xen.h>
+#include <xen/pmem.h>
+#endif
+
 static struct device *to_dev(struct pmem_device *pmem)
 {
 	/*
@@ -363,6 +368,26 @@ static int pmem_attach_disk(struct device *dev,
 		return -ENOMEM;
 
 	revalidate_disk(disk);
+
+#ifdef CONFIG_XEN
+	if (xen_initial_domain() && is_nd_pfn_xen(dev)) {
+		uint64_t rsv_off, rsv_size, data_off, data_size;
+		int err;
+
+		rsv_off = le64_to_cpu(pfn_sb->start_pad) +
+			  PFN_PHYS(altmap->reserve);
+		rsv_size = PFN_PHYS(altmap->free);
+		data_off = le32_to_cpu(pfn_sb->start_pad) + pmem->data_offset;
+		data_size = pmem->size - pmem->pfn_pad - pmem->data_offset;
+
+		err = xen_pmem_add(pmem->phys_addr, pmem->size,
+				   rsv_off, rsv_size, data_off, data_size);
+		if (err) {
+			dev_err(dev, "failed to register to Xen\n");
+			return err;
+		}
+	}
+#endif
 
 	return 0;
 }
