@@ -127,7 +127,7 @@ static void create_threads(struct worker *w, pthread_attr_t thread_attr)
 			worker[i].futex = &global_futex;
 
 		CPU_ZERO(&cpu);
-		CPU_SET(i % ncpus, &cpu);
+		CPU_SET(cpu_at_index(i), &cpu);
 
 		if (pthread_attr_setaffinity_np(&thread_attr, sizeof(cpu_set_t), &cpu))
 			err(EXIT_FAILURE, "pthread_attr_setaffinity_np");

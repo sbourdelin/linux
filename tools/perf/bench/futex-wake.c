@@ -97,7 +97,7 @@ static void block_threads(pthread_t *w,
 	/* create and block all threads */
 	for (i = 0; i < nthreads; i++) {
 		CPU_ZERO(&cpu);
-		CPU_SET(i % ncpus, &cpu);
+		CPU_SET(cpu_at_index(i), &cpu);
 
 		if (pthread_attr_setaffinity_np(&thread_attr, sizeof(cpu_set_t), &cpu))
 			err(EXIT_FAILURE, "pthread_attr_setaffinity_np");

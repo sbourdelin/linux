@@ -86,6 +86,35 @@ futex_cmp_requeue(u_int32_t *uaddr, u_int32_t val, u_int32_t *uaddr2, int nr_wak
 		 val, opflags);
 }
 
+static inline int cpu_at_index(int i)
+{
+	static cpu_set_t cpu_set;
+	static int first_time = 1;
+	static int total_cpu;
+	int j = -1;
+
+	if (first_time) {
+		CPU_ZERO(&cpu_set);
+
+		if (sched_getaffinity(0, sizeof(cpu_set), &cpu_set) < 0)
+			return -1;
+
+		first_time = 0;
+		total_cpu = CPU_COUNT(&cpu_set);
+	}
+
+	i = i % total_cpu;
+
+	do {
+		j++;
+		if (CPU_ISSET(j, &cpu_set))
+			i--;
+	} while (i >= 0);
+
+	return j;
+}
+
+
 #ifndef HAVE_PTHREAD_ATTR_SETAFFINITY_NP
 #include <pthread.h>
 static inline int pthread_attr_setaffinity_np(pthread_attr_t *attr,
