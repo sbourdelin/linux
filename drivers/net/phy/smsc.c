@@ -62,6 +62,16 @@ static int smsc_phy_config_init(struct phy_device *phydev)
 			return rc;
 	}
 
+	if (phy_interrupt_is_valid(phydev)) {
+		rc = phy_read(phydev, MII_BMCR);
+		if (rc < 0)
+			return rc;
+
+		rc = phy_write(phydev, MII_BMCR, rc & ~BMCR_ANENABLE);
+		if (rc < 0)
+			return rc;
+	}
+
 	return smsc_phy_ack_interrupt(phydev);
 }
 
