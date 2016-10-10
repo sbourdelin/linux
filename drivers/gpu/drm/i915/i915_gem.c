@@ -2208,19 +2208,69 @@ i915_gem_object_put_pages(struct drm_i915_gem_object *obj)
 	return 0;
 }
 
+struct i915_gem_get_pages_gtt_ctx {
+	struct drm_i915_private *dev_priv;
+	gfp_t gfp;
+	struct address_space *mapping;
+	unsigned int page_count;
+	bool shrunk_all;
+};
+
+static struct page *
+i915_gem_gtt_get_page(void *context, unsigned int page_num)
+{
+	struct i915_gem_get_pages_gtt_ctx *ctx = context;
+	struct page *page;
+
+	if (!ctx->shrunk_all)
+		page = shmem_read_mapping_page_gfp(ctx->mapping, page_num,
+						   ctx->gfp);
+	else
+		page = shmem_read_mapping_page(ctx->mapping, page_num);
+
+	/* Check that the i965g/gm workaround works. */
+	WARN_ON(page && !IS_ERR(page) && (ctx->gfp & __GFP_DMA32) &&
+		(page_to_pfn(page) >= 0x00100000UL));
+
+	return page;
+}
+
+static bool
+i915_gem_gtt_get_page_failed(void *context, unsigned int page_num,
+			     unsigned int err_cnt, int err)
+{
+	struct i915_gem_get_pages_gtt_ctx *ctx = context;
+
+	if (err_cnt > 1)
+		return true;
+
+	if (err_cnt == 0) {
+		i915_gem_shrink(ctx->dev_priv, ctx->page_count,
+				I915_SHRINK_BOUND | I915_SHRINK_UNBOUND |
+				I915_SHRINK_PURGEABLE);
+	} else {
+		i915_gem_shrink_all(ctx->dev_priv);
+		ctx->shrunk_all = true;
+	}
+
+	return false;
+}
+
+static void
+i915_gem_gtt_put_page(void *context, struct page *page)
+{
+	put_page(page);
+}
+
 static int
 i915_gem_object_get_pages_gtt(struct drm_i915_gem_object *obj)
 {
 	struct drm_i915_private *dev_priv = to_i915(obj->base.dev);
-	int page_count, i;
-	struct address_space *mapping;
+	struct i915_gem_get_pages_gtt_ctx ctx;
 	struct sg_table *st;
-	struct scatterlist *sg;
 	struct sgt_iter sgt_iter;
 	struct page *page;
-	unsigned long last_pfn = 0;	/* suppress gcc warning */
 	int ret;
-	gfp_t gfp;
 
 	/* Assert that the object is not currently in any GPU domain. As it
 	 * wasn't in the GTT, there shouldn't be any way it could have been in
@@ -2229,78 +2279,44 @@ i915_gem_object_get_pages_gtt(struct drm_i915_gem_object *obj)
 	BUG_ON(obj->base.read_domains & I915_GEM_GPU_DOMAINS);
 	BUG_ON(obj->base.write_domain & I915_GEM_GPU_DOMAINS);
 
-	st = kmalloc(sizeof(*st), GFP_KERNEL);
-	if (st == NULL)
-		return -ENOMEM;
-
-	page_count = obj->base.size / PAGE_SIZE;
-	if (sg_alloc_table(st, page_count, GFP_KERNEL)) {
-		kfree(st);
-		return -ENOMEM;
-	}
+	ctx.dev_priv = dev_priv;
+	ctx.page_count = obj->base.size / PAGE_SIZE;
+	ctx.shrunk_all = false;
 
 	/* Get the list of pages out of our struct file.  They'll be pinned
 	 * at this point until we release them.
 	 *
 	 * Fail silently without starting the shrinker
 	 */
-	mapping = obj->base.filp->f_mapping;
-	gfp = mapping_gfp_constraint(mapping, ~(__GFP_IO | __GFP_RECLAIM));
-	gfp |= __GFP_NORETRY | __GFP_NOWARN;
-	sg = st->sgl;
-	st->nents = 0;
-	for (i = 0; i < page_count; i++) {
-		page = shmem_read_mapping_page_gfp(mapping, i, gfp);
-		if (IS_ERR(page)) {
-			i915_gem_shrink(dev_priv,
-					page_count,
-					I915_SHRINK_BOUND |
-					I915_SHRINK_UNBOUND |
-					I915_SHRINK_PURGEABLE);
-			page = shmem_read_mapping_page_gfp(mapping, i, gfp);
-		}
-		if (IS_ERR(page)) {
-			/* We've tried hard to allocate the memory by reaping
-			 * our own buffer, now let the real VM do its job and
-			 * go down in flames if truly OOM.
-			 */
-			i915_gem_shrink_all(dev_priv);
-			page = shmem_read_mapping_page(mapping, i);
-			if (IS_ERR(page)) {
-				ret = PTR_ERR(page);
-				goto err_pages;
-			}
-		}
-#ifdef CONFIG_SWIOTLB
-		if (swiotlb_nr_tbl()) {
-			st->nents++;
-			sg_set_page(sg, page, PAGE_SIZE, 0);
-			sg = sg_next(sg);
-			continue;
-		}
-#endif
-		if (!i || page_to_pfn(page) != last_pfn + 1) {
-			if (i)
-				sg = sg_next(sg);
-			st->nents++;
-			sg_set_page(sg, page, PAGE_SIZE, 0);
-		} else {
-			sg->length += PAGE_SIZE;
-		}
-		last_pfn = page_to_pfn(page);
+	ctx.mapping = obj->base.filp->f_mapping;
+	ctx.gfp = mapping_gfp_constraint(ctx.mapping,
+					 ~(__GFP_IO | __GFP_RECLAIM));
+	ctx.gfp |= __GFP_NORETRY | __GFP_NOWARN;
 
-		/* Check that the i965g/gm workaround works. */
-		WARN_ON((gfp & __GFP_DMA32) && (last_pfn >= 0x00100000UL));
+	st = i915_alloc_sg_table(ctx.page_count, &ctx,
+				 i915_gem_gtt_get_page,
+				 i915_gem_gtt_get_page_failed,
+				 i915_gem_gtt_put_page);
+	if (IS_ERR(st)) {
+		ret = PTR_ERR(st);
+		/* shmemfs first checks if there is enough memory to allocate
+		 * the page and reports ENOSPC should there be insufficient,
+		 * along with the usual ENOMEM for a genuine allocation failure.
+		 *
+		 * We use ENOSPC in our driver to mean that we have run out of
+		 * aperture space and so want to translate the error from
+		 * shmemfs back to our usual understanding of ENOMEM.
+		 */
+		if (ret == -ENOSPC)
+			ret = -ENOMEM;
+		return ret;
 	}
-#ifdef CONFIG_SWIOTLB
-	if (!swiotlb_nr_tbl())
-#endif
-		sg_mark_end(sg);
+
 	obj->pages = st;
 
 	ret = i915_gem_gtt_prepare_object(obj);
 	if (ret)
-		goto err_pages;
+		goto err;
 
 	if (i915_gem_object_needs_bit17_swizzle(obj))
 		i915_gem_object_do_bit_17_swizzle(obj);
@@ -2311,23 +2327,11 @@ i915_gem_object_get_pages_gtt(struct drm_i915_gem_object *obj)
 
 	return 0;
 
-err_pages:
-	sg_mark_end(sg);
+err:
 	for_each_sgt_page(page, sgt_iter, st)
 		put_page(page);
 	sg_free_table(st);
 	kfree(st);
-
-	/* shmemfs first checks if there is enough memory to allocate the page
-	 * and reports ENOSPC should there be insufficient, along with the usual
-	 * ENOMEM for a genuine allocation failure.
-	 *
-	 * We use ENOSPC in our driver to mean that we have run out of aperture
-	 * space and so want to translate the error from shmemfs back to our
-	 * usual understanding of ENOMEM.
-	 */
-	if (ret == -ENOSPC)
-		ret = -ENOMEM;
 
 	return ret;
 }

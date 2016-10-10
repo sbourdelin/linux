@@ -730,4 +730,18 @@ static inline struct page *i915_vma_first_page(struct i915_vma *vma)
 	return sg_page(vma->pages->sgl);
 }
 
+typedef struct page *
+(*i915_page_alloc_f)(void *context, unsigned int page_num);
+typedef bool
+(*i915_page_alloc_err_f)(void *context, unsigned int page_num,
+			 unsigned int err_cnt, int err);
+typedef void
+(*i915_page_put_f)(void *context, struct page *page);
+
+struct sg_table *
+i915_alloc_sg_table(unsigned int page_count, void *context,
+		    i915_page_alloc_f page_alloc,
+		    i915_page_alloc_err_f page_alloc_error,
+		    i915_page_put_f page_put);
+
 #endif

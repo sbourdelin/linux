@@ -397,54 +397,34 @@ struct get_pages_work {
 	struct task_struct *task;
 };
 
-#if IS_ENABLED(CONFIG_SWIOTLB)
-#define swiotlb_active() swiotlb_nr_tbl()
-#else
-#define swiotlb_active() 0
-#endif
+struct i915_gem_get_pages_userptr_ctx {
+	struct page **pvec;
+};
 
-static int
-st_set_pages(struct sg_table **st, struct page **pvec, int num_pages)
+static struct page *
+i915_gem_userptr_get_page(void *context, unsigned int page_num)
 {
-	struct scatterlist *sg;
-	int ret, n;
+	struct i915_gem_get_pages_userptr_ctx *ctx = context;
 
-	*st = kmalloc(sizeof(**st), GFP_KERNEL);
-	if (*st == NULL)
-		return -ENOMEM;
-
-	if (swiotlb_active()) {
-		ret = sg_alloc_table(*st, num_pages, GFP_KERNEL);
-		if (ret)
-			goto err;
-
-		for_each_sg((*st)->sgl, sg, num_pages, n)
-			sg_set_page(sg, pvec[n], PAGE_SIZE, 0);
-	} else {
-		ret = sg_alloc_table_from_pages(*st, pvec, num_pages,
-						0, num_pages << PAGE_SHIFT,
-						GFP_KERNEL);
-		if (ret)
-			goto err;
-	}
-
-	return 0;
-
-err:
-	kfree(*st);
-	*st = NULL;
-	return ret;
+	return ctx->pvec[page_num];
 }
 
 static int
 __i915_gem_userptr_set_pages(struct drm_i915_gem_object *obj,
 			     struct page **pvec, int num_pages)
 {
+	struct i915_gem_get_pages_userptr_ctx ctx;
+	struct sg_table *st;
 	int ret;
 
-	ret = st_set_pages(&obj->pages, pvec, num_pages);
-	if (ret)
-		return ret;
+	ctx.pvec = pvec;
+	st = i915_alloc_sg_table(num_pages, &ctx,
+				 i915_gem_userptr_get_page,
+				 NULL, NULL);
+	if (IS_ERR(st))
+		return PTR_ERR(st);
+
+	obj->pages = st;
 
 	ret = i915_gem_gtt_prepare_object(obj);
 	if (ret) {

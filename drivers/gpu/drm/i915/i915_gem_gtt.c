@@ -3703,3 +3703,87 @@ void i915_vma_unpin_and_release(struct i915_vma **p_vma)
 	i915_vma_unpin(vma);
 	i915_vma_put(vma);
 }
+
+struct sg_table *
+i915_alloc_sg_table(unsigned int page_count, void *context,
+		    i915_page_alloc_f page_alloc,
+		    i915_page_alloc_err_f page_alloc_error,
+		    i915_page_put_f page_put)
+{
+	struct sg_table *st;
+	struct scatterlist *sg;
+	struct page *page;
+	struct sgt_iter sgt_iter;
+	unsigned long pfn;
+	unsigned long last_pfn = 0;	/* suppress gcc warning */
+	unsigned int err_cnt = 0;
+	unsigned int i;
+	int err;
+
+	st = kmalloc(sizeof(*st), GFP_KERNEL);
+	if (st == NULL)
+		return ERR_PTR(-ENOMEM);
+
+	if (sg_alloc_table(st, page_count, GFP_KERNEL)) {
+		kfree(st);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	sg = st->sgl;
+	st->nents = 0;
+
+	for (i = 0; i < page_count; i++) {
+retry:
+		page = page_alloc(context, i);
+		if (!page || IS_ERR(page)) {
+			err = page ? PTR_ERR(page) : -ENOMEM;
+
+			if (!page_alloc_error ||
+			    page_alloc_error(context, i, err_cnt, err))
+				goto err_page_alloc;
+			else
+				goto retry;
+
+			err_cnt++;
+		}
+
+#ifdef CONFIG_SWIOTLB
+		if (swiotlb_nr_tbl()) {
+			st->nents++;
+			sg_set_page(sg, page, PAGE_SIZE, 0);
+			sg = sg_next(sg);
+			continue;
+		}
+#endif
+		pfn = page_to_pfn(page);
+
+		if (!i || pfn != last_pfn + 1) {
+			if (i)
+				sg = sg_next(sg);
+			st->nents++;
+			sg_set_page(sg, page, PAGE_SIZE, 0);
+		} else {
+			sg->length += PAGE_SIZE;
+		}
+
+		last_pfn = pfn;
+	}
+
+#ifdef CONFIG_SWIOTLB
+	if (!swiotlb_nr_tbl())
+#endif
+		sg_mark_end(sg);
+
+	return st;
+
+err_page_alloc:
+	sg_mark_end(sg);
+	if (page_put) {
+		for_each_sgt_page(page, sgt_iter, st)
+			page_put(context, page);
+	}
+	sg_free_table(st);
+	kfree(st);
+
+	return ERR_PTR(err);
+}
