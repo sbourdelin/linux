@@ -1469,7 +1469,9 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 	 */
 	if (!i915_gem_object_has_struct_page(obj) ||
 	    cpu_write_needs_clflush(obj)) {
+		intel_runtime_pm_get(dev_priv);
 		ret = i915_gem_gtt_pwrite_fast(dev_priv, obj, args, file);
+		intel_runtime_pm_put(dev_priv);
 		/* Note that the gtt paths might fail with non-page-backed user
 		 * pointers (e.g. gtt mappings when moving data between
 		 * textures). Fallback to the shmem path in that case. */
@@ -1922,9 +1924,13 @@ i915_gem_release_mmap(struct drm_i915_gem_object *obj)
 	/* Serialisation between user GTT access and our code depends upon
 	 * revoking the CPU's PTE whilst the mutex is held. The next user
 	 * pagefault then has to wait until we release the mutex.
+	 *
+	 * Note that RPM complicates somewhat by adding an additional
+	 * requirement that operations to the GGTT be made holding the RPM
+	 * wakeref. This in turns allow us to release the mmap from within
+	 * the RPM suspend code ignoring the struct_mutex serialisation in
+	 * lieu of the RPM barriers.
 	 */
-	lockdep_assert_held(&obj->base.dev->struct_mutex);
-
 	if (!obj->fault_mappable)
 		return;
 
@@ -1948,6 +1954,11 @@ i915_gem_release_all_mmaps(struct drm_i915_private *dev_priv)
 {
 	struct drm_i915_gem_object *obj;
 
+	/* This should only be called by RPM as we require the bound_list
+	 * to be protected by the RPM barriers and not struct_mutex.
+	 * We check that we are holding the wakeref whenever we manipulate
+	 * the dev_priv->mm.bound_list (via assert_rpm_release_all_mmaps).
+	 */
 	list_for_each_entry(obj, &dev_priv->mm.bound_list, global_list)
 		i915_gem_release_mmap(obj);
 }
@@ -2910,9 +2921,11 @@ int i915_vma_unbind(struct i915_vma *vma)
 
 	/* Since the unbound list is global, only move to that list if
 	 * no more VMAs exist. */
-	if (--obj->bind_count == 0)
+	if (--obj->bind_count == 0) {
+		assert_rpm_release_all_mmaps(to_i915(obj->base.dev));
 		list_move_tail(&obj->global_list,
 			       &to_i915(obj->base.dev)->mm.unbound_list);
+	}
 
 	/* And finally now the object is completely decoupled from this vma,
 	 * we can drop its hold on the backing storage and allow it to be
@@ -3098,6 +3111,7 @@ search_free:
 	}
 	GEM_BUG_ON(!i915_gem_valid_gtt_space(vma, obj->cache_level));
 
+	assert_rpm_release_all_mmaps(dev_priv);
 	list_move_tail(&obj->global_list, &dev_priv->mm.bound_list);
 	list_move_tail(&vma->vm_link, &vma->vm->inactive_list);
 	obj->bind_count++;
@@ -3445,7 +3459,6 @@ int i915_gem_get_caching_ioctl(struct drm_device *dev, void *data,
 int i915_gem_set_caching_ioctl(struct drm_device *dev, void *data,
 			       struct drm_file *file)
 {
-	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_i915_gem_caching *args = data;
 	struct drm_i915_gem_object *obj;
 	enum i915_cache_level level;
@@ -3474,11 +3487,9 @@ int i915_gem_set_caching_ioctl(struct drm_device *dev, void *data,
 		return -EINVAL;
 	}
 
-	intel_runtime_pm_get(dev_priv);
-
 	ret = i915_mutex_lock_interruptible(dev);
 	if (ret)
-		goto rpm_put;
+		return ret;
 
 	obj = i915_gem_object_lookup(file, args->handle);
 	if (!obj) {
@@ -3487,13 +3498,9 @@ int i915_gem_set_caching_ioctl(struct drm_device *dev, void *data,
 	}
 
 	ret = i915_gem_object_set_cache_level(obj, level);
-
 	i915_gem_object_put(obj);
 unlock:
 	mutex_unlock(&dev->struct_mutex);
-rpm_put:
-	intel_runtime_pm_put(dev_priv);
-
 	return ret;
 }
 

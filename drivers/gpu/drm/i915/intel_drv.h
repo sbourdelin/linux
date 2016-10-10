@@ -1642,6 +1642,12 @@ assert_rpm_wakelock_held(struct drm_i915_private *dev_priv)
 		DRM_DEBUG_DRIVER("RPM wakelock ref not held during HW access");
 }
 
+static inline void
+assert_rpm_release_all_mmaps(struct drm_i915_private *dev_priv)
+{
+	assert_rpm_wakelock_held(dev_priv);
+}
+
 static inline int
 assert_rpm_atomic_begin(struct drm_i915_private *dev_priv)
 {

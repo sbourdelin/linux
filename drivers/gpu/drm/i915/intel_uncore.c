@@ -1404,7 +1404,7 @@ int i915_reg_read_ioctl(struct drm_device *dev,
 	struct register_whitelist const *entry = whitelist;
 	unsigned size;
 	i915_reg_t offset_ldw, offset_udw;
-	int i, ret = 0;
+	int i, ret;
 
 	for (i = 0; i < ARRAY_SIZE(whitelist); i++, entry++) {
 		if (i915_mmio_reg_offset(entry->offset_ldw) == (reg->offset & -entry->size) &&
@@ -1426,6 +1426,7 @@ int i915_reg_read_ioctl(struct drm_device *dev,
 
 	intel_runtime_pm_get(dev_priv);
 
+	ret = 0;
 	switch (size) {
 	case 8 | 1:
 		reg->val = I915_READ64_2x32(offset_ldw, offset_udw);
@@ -1444,10 +1445,9 @@ int i915_reg_read_ioctl(struct drm_device *dev,
 		break;
 	default:
 		ret = -EINVAL;
-		goto out;
+		break;
 	}
 
-out:
 	intel_runtime_pm_put(dev_priv);
 	return ret;
 }
