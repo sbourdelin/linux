@@ -170,6 +170,7 @@ out:
 struct shutdown_handler {
 	const char *command;
 	void (*cb)(void);
+	bool flag;
 };
 
 static int poweroff_nb(struct notifier_block *cb, unsigned long code, void *unused)
@@ -206,21 +207,22 @@ static void do_reboot(void)
 	ctrl_alt_del();
 }
 
+static struct shutdown_handler shutdown_handlers[] = {
+	{ "poweroff", do_poweroff, true },
+	{ "halt", do_poweroff, false },
+	{ "reboot", do_reboot, true },
+#ifdef CONFIG_HIBERNATE_CALLBACKS
+	{ "suspend", do_suspend, true },
+#endif
+	{NULL, NULL, false },
+};
+
 static void shutdown_handler(struct xenbus_watch *watch,
 			     const char **vec, unsigned int len)
 {
 	char *str;
 	struct xenbus_transaction xbt;
 	int err;
-	static struct shutdown_handler handlers[] = {
-		{ "poweroff",	do_poweroff },
-		{ "halt",	do_poweroff },
-		{ "reboot",	do_reboot   },
-#ifdef CONFIG_HIBERNATE_CALLBACKS
-		{ "suspend",	do_suspend  },
-#endif
-		{NULL, NULL},
-	};
 	static struct shutdown_handler *handler;
 
 	if (shutting_down != SHUTDOWN_INVALID)
@@ -238,7 +240,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 		return;
 	}
 
-	for (handler = &handlers[0]; handler->command; handler++) {
+	for (handler = &shutdown_handlers[0]; handler->command; handler++) {
 		if (strcmp(str, handler->command) == 0)
 			break;
 	}
@@ -309,7 +311,23 @@ static struct notifier_block xen_reboot_nb = {
 
 static int setup_shutdown_watcher(void)
 {
+	static struct shutdown_handler *handler;
 	int err;
+
+	for (handler = &shutdown_handlers[0]; handler->command; handler++) {
+		char *node;
+
+		node = kasprintf(GFP_KERNEL, "feature-%s",
+				 handler->command);
+		if (!node) {
+			pr_err("Failed to allocate feature flag\n");
+			return -ENOMEM;
+		}
+
+		xenbus_printf(XBT_NIL, "control", node, "%u", 1);
+
+		kfree(node);
+	}
 
 	err = register_xenbus_watch(&shutdown_watch);
 	if (err) {
