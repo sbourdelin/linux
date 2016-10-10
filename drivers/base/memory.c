@@ -25,9 +25,10 @@
 #include <linux/atomic.h>
 #include <asm/uaccess.h>
 
-static DEFINE_MUTEX(mem_sysfs_mutex);
-
 #define MEMORY_CLASS_NAME	"memory"
+
+#ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
+static DEFINE_MUTEX(mem_sysfs_mutex);
 
 #define to_memory_block(dev) container_of(dev, struct memory_block, dev)
 
@@ -384,6 +385,7 @@ static ssize_t show_phys_device(struct device *dev,
 	struct memory_block *mem = to_memory_block(dev);
 	return sprintf(buf, "%d\n", mem->phys_device);
 }
+#endif
 
 #ifdef CONFIG_MEMORY_HOTREMOVE
 static ssize_t show_valid_zones(struct device *dev,
@@ -430,6 +432,7 @@ static ssize_t show_valid_zones(struct device *dev,
 static DEVICE_ATTR(valid_zones, 0444, show_valid_zones, NULL);
 #endif
 
+#ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
 static DEVICE_ATTR(phys_index, 0444, show_mem_start_phys_index, NULL);
 static DEVICE_ATTR(state, 0644, show_mem_state, store_mem_state);
 static DEVICE_ATTR(phys_device, 0444, show_phys_device, NULL);
@@ -477,6 +480,7 @@ store_auto_online_blocks(struct device *dev, struct device_attribute *attr,
 
 static DEVICE_ATTR(auto_online_blocks, 0644, show_auto_online_blocks,
 		   store_auto_online_blocks);
+#endif
 
 /*
  * Some architectures will have custom drivers to do this, and
@@ -560,6 +564,7 @@ static DEVICE_ATTR(soft_offline_page, S_IWUSR, NULL, store_soft_offline_page);
 static DEVICE_ATTR(hard_offline_page, S_IWUSR, NULL, store_hard_offline_page);
 #endif
 
+#ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
 /*
  * Note that phys_device is optional.  It is here to allow for
  * differentiation between which *physical* devices each
@@ -726,6 +731,7 @@ out:
 	mutex_unlock(&mem_sysfs_mutex);
 	return ret;
 }
+#endif
 
 #ifdef CONFIG_MEMORY_HOTREMOVE
 static void
@@ -769,11 +775,13 @@ int unregister_memory_section(struct mem_section *section)
 }
 #endif /* CONFIG_MEMORY_HOTREMOVE */
 
+#ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
 /* return true if the memory block is offlined, otherwise, return false */
 bool is_memblock_offlined(struct memory_block *mem)
 {
 	return mem->state == MEM_OFFLINE;
 }
+#endif
 
 static struct attribute *memory_root_attrs[] = {
 #ifdef CONFIG_ARCH_MEMORY_PROBE
@@ -785,8 +793,10 @@ static struct attribute *memory_root_attrs[] = {
 	&dev_attr_hard_offline_page.attr,
 #endif
 
+#ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
 	&dev_attr_block_size_bytes.attr,
 	&dev_attr_auto_online_blocks.attr,
+#endif
 	NULL
 };
 
@@ -802,6 +812,7 @@ static const struct attribute_group *memory_root_attr_groups[] = {
 /*
  * Initialize the sysfs support for memory devices...
  */
+#ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
 int __init memory_dev_init(void)
 {
 	unsigned int i;
@@ -833,3 +844,20 @@ out:
 		printk(KERN_ERR "%s() failed: %d\n", __func__, ret);
 	return ret;
 }
+#else
+static struct bus_type memory_subsys = {
+	.name = MEMORY_CLASS_NAME,
+	.dev_name = MEMORY_CLASS_NAME,
+};
+
+int __init memory_dev_init(void)
+{
+	int ret = 0;
+
+	ret = subsys_system_register(&memory_subsys, memory_root_attr_groups);
+
+	if (ret)
+		pr_err("%s() failed: %d\n", __func__, ret);
+	return ret;
+}
+#endif

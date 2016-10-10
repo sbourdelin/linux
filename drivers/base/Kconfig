@@ -271,6 +271,9 @@ config DMA_CMA
 	  For more information see <include/linux/dma-contiguous.h>.
 	  If unsure, say "n".
 
+config MEMORY_DEVICE
+	def_bool MEMORY_HOTPLUG_SPARSE || MEMORY_FAILURE
+
 if  DMA_CMA
 comment "Default contiguous memory area size:"
 
