@@ -1040,6 +1040,21 @@ static int elan_probe(struct i2c_client *client,
 						I2C_FUNC_SMBUS_BLOCK_DATA |
 						I2C_FUNC_SMBUS_I2C_BLOCK)) {
 		transport_ops = &elan_smbus_ops;
+
+		if (!irq) {
+			if (!i2c_check_functionality(client->adapter,
+					I2C_FUNC_SMBUS_HOST_NOTIFY)) {
+				dev_err(dev, "no Host Notify support\n");
+				return -ENODEV;
+			}
+
+			irq = i2c_smbus_host_notify_to_irq(client);
+			if (irq < 0) {
+				dev_err(dev,
+					"Unable to request a Host Notify IRQ.\n");
+				return irq;
+			}
+		}
 	} else {
 		dev_err(dev, "not a supported I2C/SMBus adapter\n");
 		return -EIO;
