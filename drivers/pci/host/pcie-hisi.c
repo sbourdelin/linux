@@ -44,13 +44,13 @@ struct hisi_pcie {
 	struct pcie_soc_ops *soc_ops;
 };
 
-static inline void hisi_pcie_apb_writel(struct hisi_pcie *pcie,
+static void hisi_pcie_apb_writel(struct hisi_pcie *pcie,
 					u32 val, u32 reg)
 {
 	writel(val, pcie->reg_base + reg);
 }
 
-static inline u32 hisi_pcie_apb_readl(struct hisi_pcie *pcie, u32 reg)
+static u32 hisi_pcie_apb_readl(struct hisi_pcie *pcie, u32 reg)
 {
 	return readl(pcie->reg_base + reg);
 }
