@@ -86,4 +86,9 @@ void nf_conntrack_lock(spinlock_t *lock);
 
 extern spinlock_t nf_conntrack_expect_lock;
 
+extern unsigned int nf_ct_gc_interval;
+extern unsigned int nf_ct_gc_max_buckets_div;
+extern unsigned int nf_ct_gc_max_buckets;
+extern unsigned int nf_ct_gc_max_evicts;
+
 #endif /* _NF_CONNTRACK_CORE_H */

@@ -445,6 +445,8 @@ static void nf_conntrack_standalone_fini_proc(struct net *net)
 /* Sysctl support */
 
 #ifdef CONFIG_SYSCTL
+static int one = 1;
+static int int_max = INT_MAX;
 /* Log invalid packets of a given protocol */
 static int log_invalid_proto_min __read_mostly;
 static int log_invalid_proto_max __read_mostly = 255;
@@ -516,6 +518,40 @@ static struct ctl_table nf_ct_sysctl_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "nf_conntrack_gc_interval",
+		.data		= &nf_ct_gc_interval,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_jiffies,
+	},
+	{
+		.procname	= "nf_conntrack_gc_max_buckets",
+		.data		= &nf_ct_gc_max_buckets,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &one,
+		.extra2		= &int_max,
+	},
+	{
+		.procname	= "nf_conntrack_gc_max_buckets_div",
+		.data		= &nf_ct_gc_max_buckets_div,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &one,
+		.extra2		= &int_max,
+	},
+	{
+		.procname	= "nf_conntrack_gc_max_evicts",
+		.data		= &nf_ct_gc_max_evicts,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &one,
+		.extra2		= &int_max,
 	},
 	{ }
 };

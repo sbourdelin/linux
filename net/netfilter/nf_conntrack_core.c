@@ -83,10 +83,10 @@ static __read_mostly spinlock_t nf_conntrack_locks_all_lock;
 static __read_mostly DEFINE_SPINLOCK(nf_conntrack_locks_all_lock);
 static __read_mostly bool nf_conntrack_locks_all;
 
-#define GC_MAX_BUCKETS_DIV	64u
-#define GC_MAX_BUCKETS		8192u
-#define GC_INTERVAL		(5 * HZ)
-#define GC_MAX_EVICTS		256u
+unsigned int nf_ct_gc_interval = 5 * HZ;
+unsigned int nf_ct_gc_max_buckets = 8192;
+unsigned int nf_ct_gc_max_buckets_div = 64;
+unsigned int nf_ct_gc_max_evicts = 256;
 
 static struct conntrack_gc_work conntrack_gc_work;
 
@@ -936,13 +936,14 @@ static noinline int early_drop(struct net *net, unsigned int _hash)
 static void gc_worker(struct work_struct *work)
 {
 	unsigned int i, goal, buckets = 0, expired_count = 0;
-	unsigned long next_run = GC_INTERVAL;
+	unsigned long next_run = nf_ct_gc_interval;
 	unsigned int ratio, scanned = 0;
 	struct conntrack_gc_work *gc_work;
 
 	gc_work = container_of(work, struct conntrack_gc_work, dwork.work);
 
-	goal = min(nf_conntrack_htable_size / GC_MAX_BUCKETS_DIV, GC_MAX_BUCKETS);
+	goal = min(nf_conntrack_htable_size / nf_ct_gc_max_buckets_div,
+		   nf_ct_gc_max_buckets);
 	i = gc_work->last_bucket;
 
 	do {
@@ -977,7 +978,7 @@ static void gc_worker(struct work_struct *work)
 		rcu_read_unlock();
 		cond_resched_rcu_qs();
 	} while (++buckets < goal &&
-		 expired_count < GC_MAX_EVICTS);
+		 expired_count < nf_ct_gc_max_evicts);
 
 	if (gc_work->exiting)
 		return;
@@ -1885,7 +1886,7 @@ int nf_conntrack_init_start(void)
 	nf_ct_untracked_status_or(IPS_CONFIRMED | IPS_UNTRACKED);
 
 	conntrack_gc_work_init(&conntrack_gc_work);
-	schedule_delayed_work(&conntrack_gc_work.dwork, GC_INTERVAL);
+	schedule_delayed_work(&conntrack_gc_work.dwork, nf_ct_gc_interval);
 
 	return 0;
 

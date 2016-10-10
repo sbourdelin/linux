@@ -37,6 +37,23 @@ nf_conntrack_expect_max - INTEGER
 	Maximum size of expectation table.  Default value is
 	nf_conntrack_buckets / 256. Minimum is 1.
 
+nf_conntrack_gc_interval - INTEGER
+	Maximum interval in second between two run of the conntrack gc. This
+	gc is in charge of removing stale entries. It also impacts the delay
+	before notifying the userland a conntrack deletion.
+	This sysctl is only writeable in the initial net namespace.
+
+nf_conntrack_gc_max_buckets - INTEGER
+nf_conntrack_gc_max_buckets_div - INTEGER
+	During a run, the conntrack gc processes at maximum
+	nf_conntrack_buckets/nf_conntrack_gc_max_buckets_div (and never more
+	than nf_conntrack_gc_max_buckets) entries.
+	These sysctl are only writeable in the initial net namespace.
+
+nf_conntrack_gc_max_evicts - INTEGER
+	The maximum number of entries to be evicted during a run of gc.
+	This sysctl is only writeable in the initial net namespace.
+
 nf_conntrack_frag6_high_thresh - INTEGER
 	default 262144
 
