@@ -30,7 +30,16 @@ static int jcore_aic_irqdomain_map(struct irq_domain *d, unsigned int irq,
 {
 	struct irq_chip *aic = d->host_data;
 
-	irq_set_chip_and_handler(irq, aic, handle_simple_irq);
+	/*
+	 * For the J-Core AIC1 and AIC2, all irqs behave as percpu. Some
+	 * (timer and IPI) can be generated specifically for individual
+	 * CPUs; the rest are directly connected to a particular CPU. None
+	 * are dynamically routable. Use handle_percpu_irq for all cases,
+	 * since it's necessary for the former and safe (and faster) for
+	 * the latter, and there's no way to distinguish them with the
+	 * information available at mapping time.
+	 */
+	irq_set_chip_and_handler(irq, aic, handle_percpu_irq);
 
 	return 0;
 }
