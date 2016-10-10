@@ -8647,9 +8647,12 @@ static void vmx_handle_external_intr(struct kvm_vcpu *vcpu)
 	register void *__sp asm(_ASM_SP);
 
 	/*
-	 * If external interrupt exists, IF bit is set in rflags/eflags on the
-	 * interrupt stack frame, and interrupt will be enabled on a return
-	 * from interrupt handler.
+	 * If external interrupt exists, fakes an interrupt stack and jump to
+	 * idt table to let real handler to handle it. Because most of bits in
+	 * rflags are cleared when VM exit(Intel SDM volum 3, chapter 27.5.3),
+	 * the IF bit is 0 in rflags on the interrupt stack frame, so interrupt
+	 * is still disabled when return from the irq handler, but it will be
+	 * enabled later by the caller.
 	 */
 	if ((exit_intr_info & (INTR_INFO_VALID_MASK | INTR_INFO_INTR_TYPE_MASK))
 			== (INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR)) {
