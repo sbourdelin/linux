@@ -73,24 +73,23 @@ struct dra7xx_pcie {
 
 #define to_dra7xx_pcie(x)	container_of((x), struct dra7xx_pcie, pp)
 
-static inline u32 dra7xx_pcie_readl(struct dra7xx_pcie *pcie, u32 offset)
+static u32 dra7xx_pcie_readl(struct dra7xx_pcie *pcie, u32 offset)
 {
 	return readl(pcie->base + offset);
 }
 
-static inline void dra7xx_pcie_writel(struct dra7xx_pcie *pcie, u32 offset,
+static void dra7xx_pcie_writel(struct dra7xx_pcie *pcie, u32 offset,
 				      u32 value)
 {
 	writel(value, pcie->base + offset);
 }
 
-static inline u32 dra7xx_pcie_readl_rc(struct pcie_port *pp, u32 offset)
+static u32 dra7xx_pcie_readl_rc(struct pcie_port *pp, u32 offset)
 {
 	return readl(pp->dbi_base + offset);
 }
 
-static inline void dra7xx_pcie_writel_rc(struct pcie_port *pp, u32 offset,
-					 u32 value)
+static void dra7xx_pcie_writel_rc(struct pcie_port *pp, u32 offset, u32 value)
 {
 	writel(value, pp->dbi_base + offset);
 }
