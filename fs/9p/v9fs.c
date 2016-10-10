@@ -32,6 +32,7 @@
 #include <linux/parser.h>
 #include <linux/idr.h>
 #include <linux/slab.h>
+#include <linux/pagemap.h>
 #include <net/9p/9p.h>
 #include <net/9p/client.h>
 #include <net/9p/transport.h>
@@ -309,6 +310,49 @@ fail_option_alloc:
 	return ret;
 }
 
+void put_flush_set(struct v9fs_flush_set *fset)
+{
+	if (!fset)
+		return;
+	if (fset->pages)
+		kfree(fset->pages);
+	if (fset->buf)
+		kfree(fset->buf);
+	kfree(fset);
+}
+
+/**
+ * Allocate and initalize flush set
+ * Pre-conditions: valid msize is set
+ */
+int alloc_init_flush_set(struct v9fs_session_info *v9ses)
+{
+	int ret = -ENOMEM;
+	int num_pages;
+	struct v9fs_flush_set *fset = NULL;
+
+	num_pages = v9ses->clnt->msize >> PAGE_SHIFT;
+	if (num_pages < 2)
+		/* speedup impossible */
+		return 0;
+	fset = kzalloc(sizeof(*fset), GFP_KERNEL);
+	if (!fset)
+		goto error;
+	fset->num_pages = num_pages;
+	fset->pages = kzalloc(num_pages * sizeof(*fset->pages), GFP_KERNEL);
+	if (!fset->pages)
+		goto error;
+	fset->buf = kzalloc(num_pages << PAGE_SHIFT, GFP_USER);
+	if (!fset->buf)
+		goto error;
+	spin_lock_init(&(fset->lock));
+	v9ses->flush = fset;
+	return 0;
+ error:
+	put_flush_set(fset);
+	return ret;
+}
+
 /**
  * v9fs_session_init - initialize session
  * @v9ses: session information structure
@@ -443,6 +487,8 @@ void v9fs_session_close(struct v9fs_session_info *v9ses)
 #endif
 	kfree(v9ses->uname);
 	kfree(v9ses->aname);
+
+	put_flush_set(v9ses->flush);
 
 	bdi_destroy(&v9ses->bdi);
 
