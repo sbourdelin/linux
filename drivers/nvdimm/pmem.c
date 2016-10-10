@@ -92,7 +92,12 @@ static int pmem_do_bvec(struct pmem_device *pmem, struct page *page,
 {
 	int rc = 0;
 	bool bad_pmem = false;
-	phys_addr_t pmem_off = sector * 512 + pmem->data_offset;
+	/*
+	 * Only the data area of pfn_xen is mapped, so its offset
+	 * should be calculated from the beginning of the data area.
+	 */
+	phys_addr_t pmem_off = sector * 512 +
+		((pmem->pfn_flags & PFN_XEN) ? 0 : pmem->data_offset);
 	void *pmem_addr = pmem->virt_addr + pmem_off;
 
 	if (unlikely(is_bad_pmem(&pmem->bb, sector, len)))
@@ -194,7 +199,12 @@ __weak long pmem_direct_access(struct block_device *bdev, sector_t sector,
 		      void **kaddr, pfn_t *pfn, long size)
 {
 	struct pmem_device *pmem = bdev->bd_queue->queuedata;
-	resource_size_t offset = sector * 512 + pmem->data_offset;
+	/*
+	 * Only the data area of pfn_xen is mapped, so its offset
+	 * should be calculated from the beginning of the data area.
+	 */
+	resource_size_t offset = sector * 512 +
+		((pmem->pfn_flags & PFN_XEN) ? 0 : pmem->data_offset);
 
 	if (unlikely(is_bad_pmem(&pmem->bb, sector, size)))
 		return -EIO;
@@ -276,7 +286,27 @@ static int pmem_attach_disk(struct device *dev,
 		return -ENOMEM;
 
 	pmem->pfn_flags = PFN_DEV;
-	if (is_nd_pfn(dev)) {
+	if (is_nd_pfn_xen(dev)) {
+		/*
+		 * The reserved area on nd_pfn_xen is used by Xen
+		 * hypervisor other than Linux kernel, so it is not
+		 * necessary and should not be mapped here. We only
+		 * create the memory map for the data area.
+		 */
+		resource_size_t dataoff;
+		size_t datasize;
+
+		pfn_sb = nd_pfn->pfn_sb;
+		dataoff = pmem->phys_addr + le32_to_cpu(pfn_sb->start_pad) +
+			  le64_to_cpu(pfn_sb->dataoff);
+		datasize = resource_size(&pfn_res) - le64_to_cpu(pfn_sb->dataoff);
+		addr = devm_memremap(dev, dataoff, datasize, ARCH_MEMREMAP_PMEM);
+		pmem->data_offset = le64_to_cpu(pfn_sb->dataoff);
+		pmem->pfn_pad = resource_size(res) - resource_size(&pfn_res);
+		pmem->pfn_flags |= PFN_XEN;
+		res = &pfn_res; /* for badblocks populate */
+		res->start += pmem->data_offset;
+	} else if (is_nd_pfn(dev)) {
 		addr = devm_memremap_pages(dev, &pfn_res, &q->q_usage_counter,
 				altmap);
 		pfn_sb = nd_pfn->pfn_sb;

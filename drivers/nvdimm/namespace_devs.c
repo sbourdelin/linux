@@ -1394,6 +1394,8 @@ static ssize_t mode_show(struct device *dev,
 	claim = ndns->claim;
 	if (claim && is_nd_btt(claim))
 		mode = "safe";
+	else if (claim && is_nd_pfn_xen(claim))
+		mode = "xen";
 	else if (claim && is_nd_pfn(claim))
 		mode = "memory";
 	else if (claim && is_nd_dax(claim))

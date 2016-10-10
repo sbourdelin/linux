@@ -45,6 +45,12 @@ bool is_nd_pfn(struct device *dev)
 }
 EXPORT_SYMBOL(is_nd_pfn);
 
+bool is_nd_pfn_xen(struct device *dev)
+{
+	return is_nd_pfn(dev) ? to_nd_pfn(dev)->mode == PFN_MODE_XEN : false;
+}
+EXPORT_SYMBOL(is_nd_pfn_xen);
+
 struct nd_pfn *to_nd_pfn(struct device *dev)
 {
 	struct nd_pfn *nd_pfn = container_of(dev, struct nd_pfn, dev);
@@ -64,6 +70,8 @@ static ssize_t mode_show(struct device *dev,
 		return sprintf(buf, "ram\n");
 	case PFN_MODE_PMEM:
 		return sprintf(buf, "pmem\n");
+	case PFN_MODE_XEN:
+		return sprintf(buf, "xen\n");
 	default:
 		return sprintf(buf, "none\n");
 	}
@@ -88,6 +96,9 @@ static ssize_t mode_store(struct device *dev,
 		} else if (strncmp(buf, "ram\n", n) == 0
 				|| strncmp(buf, "ram", n) == 0)
 			nd_pfn->mode = PFN_MODE_RAM;
+		else if (strncmp(buf, "xen\n", n) == 0
+				|| strncmp(buf, "xen", n) == 0)
+			nd_pfn->mode = PFN_MODE_XEN;
 		else if (strncmp(buf, "none\n", n) == 0
 				|| strncmp(buf, "none", n) == 0)
 			nd_pfn->mode = PFN_MODE_NONE;
@@ -383,6 +394,7 @@ int nd_pfn_validate(struct nd_pfn *nd_pfn, const char *sig)
 	switch (le32_to_cpu(pfn_sb->mode)) {
 	case PFN_MODE_RAM:
 	case PFN_MODE_PMEM:
+	case PFN_MODE_XEN:
 		break;
 	default:
 		return -ENXIO;
@@ -532,11 +544,10 @@ static struct vmem_altmap *__nvdimm_setup_pfn(struct nd_pfn *nd_pfn,
 	res->start += start_pad;
 	res->end -= end_trunc;
 
-	if (nd_pfn->mode == PFN_MODE_RAM) {
+	if (nd_pfn->mode == PFN_MODE_RAM || nd_pfn->mode == PFN_MODE_XEN) {
 		if (offset < SZ_8K)
 			return ERR_PTR(-EINVAL);
 		nd_pfn->npfns = le64_to_cpu(pfn_sb->npfns);
-		altmap = NULL;
 	} else if (nd_pfn->mode == PFN_MODE_PMEM) {
 		nd_pfn->npfns = (resource_size(res) - offset) / PAGE_SIZE;
 		if (le64_to_cpu(nd_pfn->pfn_sb->npfns) > nd_pfn->npfns)
@@ -544,11 +555,15 @@ static struct vmem_altmap *__nvdimm_setup_pfn(struct nd_pfn *nd_pfn,
 					"number of pfns truncated from %lld to %ld\n",
 					le64_to_cpu(nd_pfn->pfn_sb->npfns),
 					nd_pfn->npfns);
+	} else
+		return ERR_PTR(-ENXIO);
+
+	if (nd_pfn->mode == PFN_MODE_PMEM || nd_pfn->mode == PFN_MODE_XEN) {
 		memcpy(altmap, &__altmap, sizeof(*altmap));
 		altmap->free = PHYS_PFN(offset - SZ_8K);
 		altmap->alloc = 0;
 	} else
-		return ERR_PTR(-ENXIO);
+		altmap = NULL;
 
 	return altmap;
 }
@@ -639,7 +654,21 @@ static int nd_pfn_init(struct nd_pfn *nd_pfn)
 	} else if (nd_pfn->mode == PFN_MODE_RAM)
 		offset = ALIGN(start + SZ_8K + dax_label_reserve,
 				nd_pfn->align) - start;
-	else
+	else if (nd_pfn->mode == PFN_MODE_XEN) {
+		/*
+		 * Reserve 64 bytes for each entry of Xen frame table
+		 * and 8 bytes for each entry of Xen M2P table. The
+		 * frame table and M2P table are used by Xen for its
+		 * memory management.
+		 */
+		unsigned long reserved_size;
+		unsigned long nr_pfns = ALIGN(size, SZ_4K) / SZ_4K;
+
+		reserved_size  = ALIGN(64 * nr_pfns, HPAGE_SIZE);
+		reserved_size += ALIGN(8 * nr_pfns, HPAGE_SIZE);
+		offset = ALIGN(start + SZ_8K + reserved_size + dax_label_reserve,
+			       nd_pfn->align) - start;
+	} else
 		return -ENXIO;
 
 	if (offset + start_pad + end_trunc >= size) {

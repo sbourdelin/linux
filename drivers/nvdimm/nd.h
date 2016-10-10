@@ -192,6 +192,7 @@ enum nd_pfn_mode {
 	PFN_MODE_NONE,
 	PFN_MODE_RAM,
 	PFN_MODE_PMEM,
+	PFN_MODE_XEN,
 };
 
 struct nd_pfn {
@@ -272,6 +273,7 @@ struct nd_pfn *to_nd_pfn(struct device *dev);
 #if IS_ENABLED(CONFIG_NVDIMM_PFN)
 int nd_pfn_probe(struct device *dev, struct nd_namespace_common *ndns);
 bool is_nd_pfn(struct device *dev);
+bool is_nd_pfn_xen(struct device *dev);
 struct device *nd_pfn_create(struct nd_region *nd_region);
 struct device *nd_pfn_devinit(struct nd_pfn *nd_pfn,
 		struct nd_namespace_common *ndns);
@@ -285,6 +287,11 @@ static inline int nd_pfn_probe(struct device *dev,
 }
 
 static inline bool is_nd_pfn(struct device *dev)
+{
+	return false;
+}
+
+static inline bool is_nd_pfn_xen(struct device *dev)
 {
 	return false;
 }
