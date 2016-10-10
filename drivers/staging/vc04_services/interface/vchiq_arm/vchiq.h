@@ -38,7 +38,10 @@
 #include "vchiq_util.h"
 
 /* A number of things so that we can test-build the code on non-rpi systems */
-#ifdef CONFIG_COMPILE_TEST
+#if IS_ENABLED(CONFIG_RASPBERRYPI_FIRMWARE)
+
+#else
+
 #ifndef dsb
 #define dsb()
 #endif
@@ -59,14 +62,6 @@
 #define virt_to_dma(a, b)	0
 #endif
 
-#ifndef rpi_firmware_property
-#define rpi_firmware_property(a, b, c, d)	0
-#endif
-
-#ifndef rpi_firmware_get
-#define rpi_firmware_get(a)	0
-#endif
-
-#endif	/* CONFIG_COMPILE_TEST */
+#endif	/* IS_ENABLED(CONFIG_RASPBERRYPI_FIRMWARE) */
 
 #endif
