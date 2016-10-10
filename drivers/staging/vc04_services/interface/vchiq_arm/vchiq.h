@@ -37,4 +37,36 @@
 #include "vchiq_if.h"
 #include "vchiq_util.h"
 
+/* A number of things so that we can test-build the code on non-rpi systems */
+#ifdef CONFIG_COMPILE_TEST
+#ifndef dsb
+#define dsb()
+#endif
+
+#ifndef dmac_flush_range
+#define	dmac_flush_range(a, b)
+#endif
+
+#ifndef dmac_map_area
+#define dmac_map_area(a, b)
+#endif
+
+#ifndef __glue
+#define __glue(a, b)
+#endif
+
+#ifndef virt_to_dma
+#define virt_to_dma(a, b)	0
+#endif
+
+#ifndef rpi_firmware_property
+#define rpi_firmware_property(a, b, c, d)	0
+#endif
+
+#ifndef rpi_firmware_get
+#define rpi_firmware_get(a)	0
+#endif
+
+#endif	/* CONFIG_COMPILE_TEST */
+
 #endif
