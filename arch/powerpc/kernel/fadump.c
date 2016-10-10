@@ -402,8 +402,14 @@ void crash_fadump(struct pt_regs *regs, const char *str)
 {
 	struct fadump_crash_info_header *fdh = NULL;
 
-	if (!fw_dump.dump_registered || !fw_dump.fadumphdr_addr)
+	mutex_lock(&fadump_mutex);
+	if (!fw_dump.dump_registered || !fw_dump.fadumphdr_addr) {
+		mutex_unlock(&fadump_mutex);
 		return;
+	}
+
+	if (crashing_cpu != -1)
+		goto unlock_out;
 
 	fdh = __va(fw_dump.fadumphdr_addr);
 	crashing_cpu = smp_processor_id();
@@ -416,6 +422,9 @@ void crash_fadump(struct pt_regs *regs, const char *str)
 		ppc_save_regs(&fdh->regs);
 
 	fdh->online_mask = *cpu_online_mask;
+
+unlock_out:
+	mutex_unlock(&fadump_mutex);
 
 	/* Call ibm,os-term rtas call to trigger firmware assisted dump */
 	rtas_os_term((char *)str);
