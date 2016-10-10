@@ -555,7 +555,7 @@ static u64 splx_get_pwr_limit(struct iwl_trans *trans, union acpi_object *splx)
 	    splx->package.count != 2 ||
 	    splx->package.elements[0].type != ACPI_TYPE_INTEGER ||
 	    splx->package.elements[0].integer.value != 0) {
-		IWL_ERR(trans, "Unsupported splx structure\n");
+		IWL_WARN(trans, "Unsupported splx structure, not limiting WiFi power\n");
 		return 0;
 	}
 
