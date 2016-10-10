@@ -3374,7 +3374,7 @@ int ieee80211_check_combinations(struct ieee80211_sub_if_data *sdata,
 
 	return cfg80211_check_combinations(local->hw.wiphy,
 					   num_different_channels,
-					   radar_detect, num);
+					   radar_detect, num, 0, false);
 }
 
 static void
@@ -3413,7 +3413,7 @@ int ieee80211_max_num_channels(struct ieee80211_local *local)
 
 	err = cfg80211_iter_combinations(local->hw.wiphy,
 					 num_different_channels, radar_detect,
-					 num, ieee80211_iter_max_chans,
+					 num, 0, false, ieee80211_iter_max_chans,
 					 &max_num_different_channels);
 	if (err < 0)
 		return err;

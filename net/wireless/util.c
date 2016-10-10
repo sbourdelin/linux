@@ -1559,30 +1559,55 @@ bool ieee80211_chandef_to_operating_class(struct cfg80211_chan_def *chandef,
 EXPORT_SYMBOL(ieee80211_chandef_to_operating_class);
 
 int cfg80211_validate_beacon_int(struct cfg80211_registered_device *rdev,
-				 u32 beacon_int)
+				 enum nl80211_iftype iftype, u32 beacon_int)
 {
 	struct wireless_dev *wdev;
+	bool diff_bi = false;
 	int res = 0;
+	u32 bi_prev, tmp_bi, gcd;
+	int iftype_num[NUM_NL80211_IFTYPES];
 
 	if (beacon_int < 10 || beacon_int > 10000)
 		return -EINVAL;
 
+	memset(iftype_num, 0, sizeof(iftype_num));
+	iftype_num[iftype] = 1;
+
+	list_for_each_entry(wdev, &rdev->wiphy.wdev_list, list) {
+		if (!wdev->beacon_interval)
+			continue;
+
+		iftype_num[wdev->iftype]++;
+	}
+
+	/* GCD(n) = n */
+	gcd = beacon_int;
 	list_for_each_entry(wdev, &rdev->wiphy.wdev_list, list) {
 		if (!wdev->beacon_interval)
 			continue;
 		if (wdev->beacon_interval != beacon_int) {
-			res = -EINVAL;
+			diff_bi = true;
+			/* Get the GCD */
+			bi_prev = wdev->beacon_interval;
+			while (bi_prev != 0) {
+				tmp_bi = bi_prev;
+				bi_prev = gcd % bi_prev;
+				gcd = tmp_bi;
+			}
 			break;
 		}
 	}
 
-	return res;
+	res = cfg80211_check_combinations(&rdev->wiphy, 0, 0,
+					  iftype_num, gcd, diff_bi);
+	return (res < 0) ? res : 0;
 }
 
 int cfg80211_iter_combinations(struct wiphy *wiphy,
 			       const int num_different_channels,
 			       const u8 radar_detect,
 			       const int iftype_num[NUM_NL80211_IFTYPES],
+			       const u32 beacon_gcd, bool diff_bi,
 			       void (*iter)(const struct ieee80211_iface_combination *c,
 					    void *data),
 			       void *data)
@@ -1653,6 +1678,14 @@ int cfg80211_iter_combinations(struct wiphy *wiphy,
 		if ((all_iftypes & used_iftypes) != used_iftypes)
 			goto cont;
 
+		if (beacon_gcd) {
+			if (c->beacon_int_min_gcd &&
+			    beacon_gcd < c->beacon_int_min_gcd)
+				return -EINVAL;
+			if (!c->beacon_int_min_gcd && diff_bi)
+				goto cont;
+		}
+
 		/* This combination covered all interface types and
 		 * supported the requested numbers, so we're good.
 		 */
@@ -1677,12 +1710,14 @@ cfg80211_iter_sum_ifcombs(const struct ieee80211_iface_combination *c,
 int cfg80211_check_combinations(struct wiphy *wiphy,
 				const int num_different_channels,
 				const u8 radar_detect,
-				const int iftype_num[NUM_NL80211_IFTYPES])
+				const int iftype_num[NUM_NL80211_IFTYPES],
+				const u32 beacon_gcd, bool diff_bi)
 {
 	int err, num = 0;
 
 	err = cfg80211_iter_combinations(wiphy, num_different_channels,
 					 radar_detect, iftype_num,
+					 beacon_gcd, diff_bi,
 					 cfg80211_iter_sum_ifcombs, &num);
 	if (err)
 		return err;

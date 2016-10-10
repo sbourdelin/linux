@@ -430,7 +430,8 @@ static int brcmf_vif_change_validate(struct brcmf_cfg80211_info *cfg,
 		}
 
 	if (check_combos)
-		ret = cfg80211_check_combinations(cfg->wiphy, 1, 0, iftype_num);
+		ret = cfg80211_check_combinations(cfg->wiphy, 1, 0,
+						  iftype_num, 0, false);
 
 	return ret;
 }
@@ -446,7 +447,8 @@ static int brcmf_vif_add_validate(struct brcmf_cfg80211_info *cfg,
 		iftype_num[pos->wdev.iftype]++;
 
 	iftype_num[new_type]++;
-	return cfg80211_check_combinations(cfg->wiphy, 1, 0, iftype_num);
+	return cfg80211_check_combinations(cfg->wiphy, 1, 0,
+					   iftype_num, 0, false);
 }
 
 static void convert_key_from_CPU(struct brcmf_wsec_key *key,

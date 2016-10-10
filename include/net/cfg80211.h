@@ -3080,6 +3080,12 @@ struct ieee80211_iface_limit {
  *	only in special cases.
  * @radar_detect_widths: bitmap of channel widths supported for radar detection
  * @radar_detect_regions: bitmap of regions supported for radar detection
+ * @beacon_int_min_gcd: This interface combination supports different
+ *	beacon intervals.
+ *	= 0 - all beacon intervals for different interface must be same.
+ *	> 0 - any beacon interval for the interface part of this combination AND
+ *	      *GCD* of all beacon intervals from beaconing interfaces of this
+ *	      combination must be greator or equal to this value.
  *
  * With this structure the driver can describe which interface
  * combinations it supports concurrently.
@@ -3100,7 +3106,7 @@ struct ieee80211_iface_limit {
  *  };
  *
  *
- * 2. Allow #{AP, P2P-GO} <= 8, channels = 1, 8 total:
+ * 2. Allow #{AP, P2P-GO} <= 8, BI min gcd = 10, channels = 1, 8 total:
  *
  *  struct ieee80211_iface_limit limits2[] = {
  *	{ .max = 8, .types = BIT(NL80211_IFTYPE_AP) |
@@ -3111,6 +3117,7 @@ struct ieee80211_iface_limit {
  *	.n_limits = ARRAY_SIZE(limits2),
  *	.max_interfaces = 8,
  *	.num_different_channels = 1,
+ *	.beacon_int_min_gcd = 10,
  *  };
  *
  *
@@ -3138,6 +3145,7 @@ struct ieee80211_iface_combination {
 	bool beacon_int_infra_match;
 	u8 radar_detect_widths;
 	u8 radar_detect_regions;
+	u32 beacon_int_min_gcd;
 };
 
 struct ieee80211_txrx_stypes {
@@ -5583,6 +5591,8 @@ unsigned int ieee80211_get_num_supported_channels(struct wiphy *wiphy);
  * @iftype_num: array with the numbers of interfaces of each interface
  *	type.  The index is the interface type as specified in &enum
  *	nl80211_iftype.
+ * @beacon_gcd: a value specifying GCD of all beaconing interfaces.
+ * @diff_bi: a flag which denotes beacon intervals are different or same.
  *
  * This function can be called by the driver to check whether a
  * combination of interfaces and their types are allowed according to
@@ -5591,7 +5601,8 @@ unsigned int ieee80211_get_num_supported_channels(struct wiphy *wiphy);
 int cfg80211_check_combinations(struct wiphy *wiphy,
 				const int num_different_channels,
 				const u8 radar_detect,
-				const int iftype_num[NUM_NL80211_IFTYPES]);
+				const int iftype_num[NUM_NL80211_IFTYPES],
+				const u32 beacon_gcd, bool diff_bi);
 
 /**
  * cfg80211_iter_combinations - iterate over matching combinations
@@ -5605,6 +5616,8 @@ int cfg80211_check_combinations(struct wiphy *wiphy,
  * @iftype_num: array with the numbers of interfaces of each interface
  *	type.  The index is the interface type as specified in &enum
  *	nl80211_iftype.
+ * @beacon_gcd: a value specifying GCD of all beaconing interfaces.
+ * @diff_bi: a flag which denotes beacon intervals are different or same.
  * @iter: function to call for each matching combination
  * @data: pointer to pass to iter function
  *
@@ -5616,6 +5629,7 @@ int cfg80211_iter_combinations(struct wiphy *wiphy,
 			       const int num_different_channels,
 			       const u8 radar_detect,
 			       const int iftype_num[NUM_NL80211_IFTYPES],
+			       const u32 beacon_gcd, bool diff_bi,
 			       void (*iter)(const struct ieee80211_iface_combination *c,
 					    void *data),
 			       void *data);
