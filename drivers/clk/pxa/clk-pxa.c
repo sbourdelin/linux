@@ -15,8 +15,17 @@
 #include <linux/clkdev.h>
 #include <linux/of.h>
 
+#include <mach/pxa2xx-regs.h>
+#include <mach/smemc.h>
+
 #include <dt-bindings/clock/pxa-clock.h>
 #include "clk-pxa.h"
+
+#define KHz 1000
+#define MHz (1000 * 1000)
+
+#define MDREFR_DB2_MASK		(MDREFR_K2DB2 | MDREFR_K1DB2)
+#define MDREFR_DRI_MASK		0xFFF
 
 DEFINE_SPINLOCK(lock);
 
@@ -105,4 +114,123 @@ int __init clk_pxa_cken_init(const struct desc_clk_cken *clks, int nb_clks)
 void __init clk_pxa_dt_common_init(struct device_node *np)
 {
 	of_clk_add_provider(np, of_clk_src_onecell_get, &onecell_data);
+}
+
+void pxa2xx_core_turbo_switch(bool on)
+{
+	unsigned long flags;
+	unsigned int unused, clkcfg;
+
+	local_irq_save(flags);
+
+	asm("mrc\tp14, 0, %0, c6, c0, 0" : "=r" (clkcfg));
+	clkcfg &= ~CLKCFG_TURBO & ~CLKCFG_HALFTURBO;
+	if (on)
+		clkcfg |= CLKCFG_TURBO;
+	clkcfg |= CLKCFG_FCS;
+
+	asm volatile(
+	"	b	2f\n"
+	"	.align	5\n"
+	"1:	mcr	p14, 0, %1, c6, c0, 0\n"
+	"	b	3f\n"
+	"2:	b	1b\n"
+	"3:	nop\n"
+		: "=&r" (unused)
+		: "r" (clkcfg)
+		: );
+
+	local_irq_restore(flags);
+}
+
+void pxa2xx_cpll_change(struct pxa2xx_freq *freq,
+			u32 (*mdrefr_dri)(unsigned int))
+{
+	unsigned int clkcfg = freq->clkcfg;
+	unsigned int unused, preset_mdrefr, postset_mdrefr;
+	unsigned long flags;
+
+	local_irq_save(flags);
+
+	/* Calculate the next MDREFR.  If we're slowing down the SDRAM clock
+	 * we need to preset the smaller DRI before the change.	 If we're
+	 * speeding up we need to set the larger DRI value after the change.
+	 */
+	preset_mdrefr = postset_mdrefr = __raw_readl(MDREFR);
+	if ((preset_mdrefr & MDREFR_DRI_MASK) > mdrefr_dri(freq->membus_khz)) {
+		preset_mdrefr = (preset_mdrefr & ~MDREFR_DRI_MASK);
+		preset_mdrefr |= mdrefr_dri(freq->membus_khz);
+	}
+	postset_mdrefr =
+		(postset_mdrefr & ~MDREFR_DRI_MASK) |
+		mdrefr_dri(freq->membus_khz);
+
+	/* If we're dividing the memory clock by two for the SDRAM clock, this
+	 * must be set prior to the change.  Clearing the divide must be done
+	 * after the change.
+	 */
+	if (freq->div2) {
+		preset_mdrefr  |= MDREFR_DB2_MASK;
+		postset_mdrefr |= MDREFR_DB2_MASK;
+	} else {
+		postset_mdrefr &= ~MDREFR_DB2_MASK;
+	}
+
+	/* Set new the CCCR and prepare CLKCFG */
+	writel(freq->cccr, CCCR);
+
+	asm volatile(
+	"	ldr	r4, [%1]\n"
+	"	b	2f\n"
+	"	.align	5\n"
+	"1:	str	%3, [%1]		/* preset the MDREFR */\n"
+	"	mcr	p14, 0, %2, c6, c0, 0	/* set CLKCFG[FCS] */\n"
+	"	str	%4, [%1]		/* postset the MDREFR */\n"
+	"	b	3f\n"
+	"2:	b	1b\n"
+	"3:	nop\n"
+	     : "=&r" (unused)
+	     : "r" (MDREFR), "r" (clkcfg), "r" (preset_mdrefr),
+	       "r" (postset_mdrefr)
+	     : "r4", "r5");
+
+	local_irq_restore(flags);
+}
+
+int pxa2xx_determine_rate(struct clk_rate_request *req,
+			  struct pxa2xx_freq *freqs, int nb_freqs)
+{
+	int i, closest_below = -1, closest_above = -1;
+	unsigned long rate;
+
+	for (i = 0; i < nb_freqs; i++) {
+		rate = freqs[i].cpll_khz * KHz;
+		if (rate == req->rate)
+			break;
+		if (rate < req->min_rate)
+			continue;
+		if (rate > req->max_rate)
+			continue;
+		if (rate <= req->rate)
+			closest_below = i;
+		if ((rate >= req->rate) && (closest_above == -1))
+			closest_above = i;
+	}
+
+	req->best_parent_hw = NULL;
+
+	if (i < nb_freqs)
+		return 0;
+
+	if (closest_below >= 0) {
+		req->rate = freqs[closest_below].cpll_khz * KHz;
+		return 0;
+	}
+
+	if (closest_above >= 0) {
+		req->rate = freqs[closest_above].cpll_khz * KHz;
+		return 0;
+	}
+
+	return -EINVAL;
 }
