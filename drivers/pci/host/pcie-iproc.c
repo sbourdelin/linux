@@ -135,7 +135,7 @@ static inline u16 iproc_pcie_reg_offset(struct iproc_pcie *pcie,
 	return pcie->reg_offsets[reg];
 }
 
-static inline u32 iproc_pcie_read_reg(struct iproc_pcie *pcie,
+static u32 iproc_pcie_read_reg(struct iproc_pcie *pcie,
 				      enum iproc_pcie_reg reg)
 {
 	u16 offset = iproc_pcie_reg_offset(pcie, reg);
@@ -146,7 +146,7 @@ static inline u32 iproc_pcie_read_reg(struct iproc_pcie *pcie,
 	return readl(pcie->base + offset);
 }
 
-static inline void iproc_pcie_write_reg(struct iproc_pcie *pcie,
+static void iproc_pcie_write_reg(struct iproc_pcie *pcie,
 					enum iproc_pcie_reg reg, u32 val)
 {
 	u16 offset = iproc_pcie_reg_offset(pcie, reg);
