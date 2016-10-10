@@ -832,9 +832,8 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
  * @member:	the name of the member within the struct.
  *
  */
-#define container_of(ptr, type, member) ({			\
-	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
-	(type *)( (char *)__mptr - offsetof(type,member) );})
+#define container_of(ptr, type, member) \
+	((type *)((char *)(ptr) - offsetof(type, member)))
 
 /**
  * container_of_safe - safe version of container_of
@@ -846,9 +845,9 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
  * @type, return 0.
  */
 #define container_of_safe(ptr, type, member) ({			\
-	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
-        (size_t)__mptr >= offsetof(type,member) ?		\
-	(type *)( (char *)__mptr - offsetof(type,member) ) : (type *)0 ;})
+	char *__mptr = (char *)(ptr);				\
+	(size_t)__mptr >= offsetof(type, member) ?		\
+	(type *)(__mptr - offsetof(type, member)) : (type *)0; })
 
 
 /* Rebuild everything on CONFIG_FTRACE_MCOUNT_RECORD */
