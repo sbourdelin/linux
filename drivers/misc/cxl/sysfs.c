@@ -75,12 +75,22 @@ static ssize_t reset_adapter_store(struct device *device,
 	int val;
 
 	rc = sscanf(buf, "%i", &val);
-	if ((rc != 1) || (val != 1))
+	if ((rc != 1) || (val != 1 && val != -1))
 		return -EINVAL;
 
-	if ((rc = cxl_ops->adapter_reset(adapter)))
-		return rc;
-	return count;
+	/*
+	 * See if we can lock the context mapping that's only allowed
+	 * when there are no contexts attached to the adapter. Once
+	 * taken this will also prevent any context being attached.
+	 */
+	if (val == 1)
+		rc = cxl_adapter_context_lock(adapter);
+
+	/* Perform a forced adapter reset */
+	if (rc >= 0)
+		rc = cxl_ops->adapter_reset(adapter);
+
+	return rc ? rc : count;
 }
 
 static ssize_t load_image_on_perst_show(struct device *device,

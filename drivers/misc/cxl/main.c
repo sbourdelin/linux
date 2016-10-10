@@ -243,8 +243,9 @@ struct cxl *cxl_alloc_adapter(void)
 	if (dev_set_name(&adapter->dev, "card%i", adapter->adapter_num))
 		goto err2;
 
-	return adapter;
+	atomic_set(&adapter->contexts_num, 0);
 
+	return adapter;
 err2:
 	cxl_remove_adapter_nr(adapter);
 err1:
@@ -284,6 +285,27 @@ int cxl_afu_select_best_mode(struct cxl_afu *afu)
 	dev_warn(&afu->dev, "No supported programming modes available\n");
 	/* We don't fail this so the user can inspect sysfs */
 	return 0;
+}
+
+int cxl_adapter_context_get(struct cxl *adapter)
+{
+	int rc;
+
+	rc = atomic_inc_unless_negative(&adapter->contexts_num);
+	return rc >= 0 ? 0 : -EBUSY;
+}
+
+void cxl_adapter_context_put(struct cxl *adapter)
+{
+	atomic_dec_if_positive(&adapter->contexts_num);
+}
+
+int cxl_adapter_context_lock(struct cxl *adapter)
+{
+	int rc;
+	/* no active contexts -> contexts_num == 0 */
+	rc = atomic_cmpxchg(&adapter->contexts_num, 0, -1);
+	return rc ? -EBUSY : 0;
 }
 
 static int __init init_cxl(void)

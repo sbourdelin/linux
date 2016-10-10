@@ -236,10 +236,19 @@ int cxl_start_context(struct cxl_context *ctx, u64 wed,
 		ctx->real_mode = false;
 	}
 
+	/*
+	 * Increment the mapped context count for adapter. This also checks
+	 * if adapter_context_lock is taken.
+	 */
+	rc = cxl_adapter_context_get(ctx->afu->adapter);
+	if (rc)
+		goto out;
+
 	cxl_ctx_get();
 
 	if ((rc = cxl_ops->attach_process(ctx, kernel, wed, 0))) {
 		put_pid(ctx->pid);
+		cxl_adapter_context_put(ctx->afu->adapter);
 		cxl_ctx_put();
 		goto out;
 	}
