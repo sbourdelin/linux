@@ -221,6 +221,15 @@ do {									\
 #endif
 
 /**
+ * smp_release__after_ctrl_dep() - Provide RELEASE ordering after a control dependency
+ *
+ * A control dependency provides a LOAD->STORE order, the additional WMB
+ * provides STORE->STORE order, together they provide {LOAD,STORE}->STORE order,
+ * aka. (store)-RELEASE.
+ */
+#define smp_release__after_ctrl_dep()		smp_wmb()
+
+/**
  * smp_cond_load_acquire() - (Spin) wait for cond with ACQUIRE ordering
  * @ptr: pointer to the variable to wait on
  * @cond: boolean expression to wait for

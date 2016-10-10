@@ -389,7 +389,7 @@ static bool rwsem_optimistic_spin(struct rw_semaphore *sem)
 	if (!rwsem_can_spin_on_owner(sem))
 		goto done;
 
-	if (!osq_lock(&sem->osq))
+	if (!osq_lock_relaxed(&sem->osq))
 		goto done;
 
 	/*
@@ -425,7 +425,7 @@ static bool rwsem_optimistic_spin(struct rw_semaphore *sem)
 		 */
 		cpu_relax_lowlatency();
 	}
-	osq_unlock(&sem->osq);
+	osq_unlock_relaxed(&sem->osq);
 done:
 	preempt_enable();
 	return taken;

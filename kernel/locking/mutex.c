@@ -316,7 +316,7 @@ static bool mutex_optimistic_spin(struct mutex *lock,
 	 * acquire the mutex all at once, the spinners need to take a
 	 * MCS (queued) lock first before spinning on the owner field.
 	 */
-	if (!osq_lock(&lock->osq))
+	if (!osq_lock_relaxed(&lock->osq))
 		goto done;
 
 	while (true) {
@@ -358,7 +358,7 @@ static bool mutex_optimistic_spin(struct mutex *lock,
 			}
 
 			mutex_set_owner(lock);
-			osq_unlock(&lock->osq);
+			osq_unlock_relaxed(&lock->osq);
 			return true;
 		}
 
@@ -380,7 +380,7 @@ static bool mutex_optimistic_spin(struct mutex *lock,
 		cpu_relax_lowlatency();
 	}
 
-	osq_unlock(&lock->osq);
+	osq_unlock_relaxed(&lock->osq);
 done:
 	/*
 	 * If we fell out of the spin path because of need_resched(),

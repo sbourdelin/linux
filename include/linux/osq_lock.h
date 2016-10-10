@@ -29,6 +29,16 @@ static inline void osq_lock_init(struct optimistic_spin_queue *lock)
 	atomic_set(&lock->tail, OSQ_UNLOCKED_VAL);
 }
 
+/*
+ * Versions of osq_lock/unlock that do not imply or guarantee (load)-ACQUIRE
+ * (store)-RELEASE barrier semantics.
+ *
+ * Note that a failed call to either osq_lock() or osq_lock_relaxed() does
+ * not imply barriers... we are next to block.
+ */
+extern bool osq_lock_relaxed(struct optimistic_spin_queue *lock);
+extern void osq_unlock_relaxed(struct optimistic_spin_queue *lock);
+
 extern bool osq_lock(struct optimistic_spin_queue *lock);
 extern void osq_unlock(struct optimistic_spin_queue *lock);
 
