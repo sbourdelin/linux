@@ -292,7 +292,8 @@ static int rockchip_pcie_wr_own_conf(struct rockchip_pcie *rockchip,
 	offset = where & ~0x3;
 
 	if (size == 4) {
-		writel(val, rockchip->apb_base + PCIE_RC_CONFIG_BASE + offset);
+		rockchip_pcie_write(rockchip, val,
+				    PCIE_RC_CONFIG_BASE + offset);
 		return PCIBIOS_SUCCESSFUL;
 	}
 
@@ -303,9 +304,9 @@ static int rockchip_pcie_wr_own_conf(struct rockchip_pcie *rockchip,
 	 * corrupt RW1C bits in adjacent registers.  But the hardware
 	 * doesn't support smaller writes.
 	 */
-	tmp = readl(rockchip->apb_base + PCIE_RC_CONFIG_BASE + offset) & mask;
+	tmp = rockchip_pcie_read(rockchip, PCIE_RC_CONFIG_BASE + offset) & mask;
 	tmp |= val << ((where & 0x3) * 8);
-	writel(tmp, rockchip->apb_base + PCIE_RC_CONFIG_BASE + offset);
+	rockchip_pcie_write(rockchip, tmp, PCIE_RC_CONFIG_BASE + offset);
 
 	return PCIBIOS_SUCCESSFUL;
 }
