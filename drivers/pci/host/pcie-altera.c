@@ -92,13 +92,13 @@ struct tlp_rp_regpair_t {
 	u32 reg1;
 };
 
-static inline void cra_writel(struct altera_pcie *altera_pcie, const u32 value,
+static void cra_writel(struct altera_pcie *altera_pcie, const u32 value,
 			      const u32 reg)
 {
 	writel_relaxed(value, altera_pcie->cra_base + reg);
 }
 
-static inline u32 cra_readl(struct altera_pcie *altera_pcie, const u32 reg)
+static u32 cra_readl(struct altera_pcie *altera_pcie, const u32 reg)
 {
 	return readl_relaxed(altera_pcie->cra_base + reg);
 }
