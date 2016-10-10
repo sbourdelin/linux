@@ -152,16 +152,16 @@ struct rcar_pcie {
 	struct			rcar_msi msi;
 };
 
-static void rcar_pci_write_reg(struct rcar_pcie *pcie, unsigned long val,
-			       unsigned long reg)
-{
-	writel(val, pcie->base + reg);
-}
-
 static unsigned long rcar_pci_read_reg(struct rcar_pcie *pcie,
 				       unsigned long reg)
 {
 	return readl(pcie->base + reg);
+}
+
+static void rcar_pci_write_reg(struct rcar_pcie *pcie, unsigned long val,
+			       unsigned long reg)
+{
+	writel(val, pcie->base + reg);
 }
 
 enum {
