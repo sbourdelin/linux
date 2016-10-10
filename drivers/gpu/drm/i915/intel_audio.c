@@ -57,6 +57,70 @@
  * struct &i915_audio_component_audio_ops @audio_ops is called from i915 driver.
  */
 
+/* DP N/M table */
+#define LC_540M 540000
+#define LC_270M 270000
+#define LC_162M 162000
+
+struct dp_aud_n_m {
+	int sample_rate;
+	int clock;
+	u16 n;
+	u16 m;
+};
+
+static const struct dp_aud_n_m dp_aud_n_m[] = {
+	{ 192000, LC_540M, 5625, 1024 },
+	{ 176400, LC_540M, 9375, 1568 },
+	{ 96000, LC_540M, 5625, 512 },
+	{ 88200, LC_540M, 9375, 784 },
+	{ 48000, LC_540M, 5625, 256 },
+	{ 44100, LC_540M, 9375, 392 },
+	{ 32000, LC_540M, 16875, 512 },
+	{ 192000, LC_270M, 5625, 2048 },
+	{ 176400, LC_270M, 9375, 3136 },
+	{ 96000, LC_270M, 5625, 1024 },
+	{ 88200, LC_270M, 9375, 1568 },
+	{ 48000, LC_270M, 5625, 512 },
+	{ 44100, LC_270M, 9375, 784 },
+	{ 32000, LC_270M, 16875, 1024 },
+	{ 192000, LC_162M, 3375, 2048 },
+	{ 176400, LC_162M, 5625, 3136 },
+	{ 96000, LC_162M, 3375, 1024 },
+	{ 88200, LC_162M, 5625, 1568 },
+	{ 48000, LC_162M, 3375, 512 },
+	{ 44100, LC_162M, 5625, 784 },
+	{ 32000, LC_162M, 10125, 1024 },
+};
+
+static const struct dp_aud_n_m *
+audio_config_dp_get_n_m(struct intel_crtc *intel_crtc, int rate)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(dp_aud_n_m); i++) {
+		if (rate == dp_aud_n_m[i].sample_rate &&
+		    intel_crtc->config->port_clock == dp_aud_n_m[i].clock)
+			return &dp_aud_n_m[i];
+	}
+
+	return NULL;
+}
+
+static int audio_config_dp_get_m(struct intel_crtc *intel_crtc, int rate)
+{
+	const struct dp_aud_n_m *nm = audio_config_dp_get_n_m(intel_crtc, rate);
+
+	return nm ? nm->m : 0;
+}
+
+static int audio_config_dp_get_n(struct intel_crtc *intel_crtc, int rate)
+{
+	const struct dp_aud_n_m *nm = audio_config_dp_get_n_m(intel_crtc, rate);
+
+	return nm ? nm->n : 0;
+}
+
 static const struct {
 	int clock;
 	u32 config;
@@ -225,8 +289,10 @@ hsw_dp_audio_config_update(struct intel_crtc *intel_crtc, enum port port,
 			   const struct drm_display_mode *adjusted_mode)
 {
 	struct drm_i915_private *dev_priv = to_i915(intel_crtc->base.dev);
+	struct i915_audio_component *acomp = dev_priv->audio_component;
+	int rate = acomp ? acomp->aud_sample_rate[port] : 0;
 	enum pipe pipe = intel_crtc->pipe;
-	u32 tmp;
+	u32 tmp, n, m;
 
 	tmp = I915_READ(HSW_AUD_CFG(pipe));
 	tmp &= ~AUD_CONFIG_N_VALUE_INDEX;
@@ -234,7 +300,30 @@ hsw_dp_audio_config_update(struct intel_crtc *intel_crtc, enum port port,
 	tmp &= ~AUD_CONFIG_N_PROG_ENABLE;
 	tmp |= AUD_CONFIG_N_VALUE_INDEX;
 
+	if (intel_crtc->config->port_clock == LC_540M ||
+	    intel_crtc->config->port_clock == LC_270M ||
+	    intel_crtc->config->port_clock == LC_162M) {
+		n = audio_config_dp_get_n(intel_crtc, rate);
+		if (n != 0) {
+			tmp &= ~AUD_CONFIG_N_MASK;
+			tmp |= AUD_CONFIG_N(n);
+			tmp |= AUD_CONFIG_N_PROG_ENABLE;
+		} else {
+			DRM_DEBUG_KMS("no suitable N value is found\n");
+		}
+	}
+
 	I915_WRITE(HSW_AUD_CFG(pipe), tmp);
+
+	m = audio_config_dp_get_m(intel_crtc, rate);
+	if (m) {
+		tmp = I915_READ(HSW_AUD_M_CTS_ENABLE(pipe));
+		tmp &= ~AUD_CONFIG_M_MASK;
+		tmp |= m;
+		tmp |= AUD_M_CTS_M_VALUE_INDEX;
+		tmp |= AUD_M_CTS_M_PROG_ENABLE;
+		I915_WRITE(HSW_AUD_M_CTS_ENABLE(pipe), tmp);
+	}
 }
 
 static void
@@ -267,6 +356,12 @@ hsw_hdmi_audio_config_update(struct intel_crtc *intel_crtc, enum port port,
 	}
 
 	I915_WRITE(HSW_AUD_CFG(pipe), tmp);
+
+	tmp = I915_READ(HSW_AUD_M_CTS_ENABLE(pipe));
+	tmp &= ~AUD_CONFIG_M_MASK;
+	tmp &= ~AUD_M_CTS_M_VALUE_INDEX;
+	tmp |= AUD_M_CTS_M_PROG_ENABLE;
+	I915_WRITE(HSW_AUD_M_CTS_ENABLE(pipe), tmp);
 }
 
 static void
@@ -687,7 +782,8 @@ static int i915_audio_component_sync_audio_rate(struct device *kdev, int port,
 	/* 1. get the pipe */
 	intel_encoder = get_saved_enc(dev_priv, port, pipe);
 	if (!intel_encoder || !intel_encoder->base.crtc ||
-	    intel_encoder->type != INTEL_OUTPUT_HDMI) {
+	    (intel_encoder->type != INTEL_OUTPUT_HDMI &&
+	     intel_encoder->type != INTEL_OUTPUT_DP)) {
 		DRM_DEBUG_KMS("Not valid for port %c\n", port_name(port));
 		err = -ENODEV;
 		goto unlock;
