@@ -44,15 +44,15 @@ struct hisi_pcie {
 	struct pcie_soc_ops *soc_ops;
 };
 
+static u32 hisi_pcie_apb_readl(struct hisi_pcie *pcie, u32 reg)
+{
+	return readl(pcie->reg_base + reg);
+}
+
 static void hisi_pcie_apb_writel(struct hisi_pcie *pcie,
 					u32 val, u32 reg)
 {
 	writel(val, pcie->reg_base + reg);
-}
-
-static u32 hisi_pcie_apb_readl(struct hisi_pcie *pcie, u32 reg)
-{
-	return readl(pcie->reg_base + reg);
 }
 
 /* HipXX PCIe host only supports 32-bit config access */
