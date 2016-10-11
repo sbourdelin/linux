@@ -21,6 +21,7 @@
  * ----------------------------------------------------------------------------
  *
  */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/delay.h>
@@ -158,6 +159,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 	struct resource *mem;
 	int irq, r;
 	u32 acpi_speed, ht = 0;
+	bool isslave = false;
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
@@ -190,6 +192,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 					 &dev->scl_falling_time);
 		device_property_read_u32(&pdev->dev, "clock-frequency",
 					 &dev->clk_freq);
+		isslave = device_property_read_bool(&pdev->dev, "isslave");
 	}
 
 	acpi_speed = i2c_acpi_find_bus_speed(&pdev->dev);
@@ -216,24 +219,46 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 
 	dev->functionality =
 		I2C_FUNC_I2C |
-		I2C_FUNC_10BIT_ADDR |
 		I2C_FUNC_SMBUS_BYTE |
 		I2C_FUNC_SMBUS_BYTE_DATA |
 		I2C_FUNC_SMBUS_WORD_DATA |
 		I2C_FUNC_SMBUS_I2C_BLOCK;
 
-	dev->master_cfg = DW_IC_CON_MASTER | DW_IC_CON_SLAVE_DISABLE |
+	if (!isslave) {
+		dev->master_cfg = DW_IC_CON_MASTER | DW_IC_CON_SLAVE_DISABLE |
 			  DW_IC_CON_RESTART_EN;
+		dev->functionality |= I2C_FUNC_10BIT_ADDR;
+		dev_info(&pdev->dev, "I am registed as a I2C Master!\n");
+		switch (dev->clk_freq) {
+		case 100000:
+			dev->master_cfg |= DW_IC_CON_SPEED_STD;
+			break;
+		case 3400000:
+			dev->master_cfg |= DW_IC_CON_SPEED_HIGH;
+			break;
+		default:
+			dev->master_cfg |= DW_IC_CON_SPEED_FAST;
+		}
+	} else {
+		dev->slave_cfg = DW_IC_CON_RX_FIFO_FULL_HLD_CTRL |
+			  DW_IC_CON_RESTART_EN | DW_IC_CON_STOP_DET_IFADDRESSED |
+			  DW_IC_CON_SPEED_FAST;
 
-	switch (dev->clk_freq) {
-	case 100000:
-		dev->master_cfg |= DW_IC_CON_SPEED_STD;
-		break;
-	case 3400000:
-		dev->master_cfg |= DW_IC_CON_SPEED_HIGH;
-		break;
-	default:
-		dev->master_cfg |= DW_IC_CON_SPEED_FAST;
+		dev->functionality |= I2C_FUNC_SLAVE;
+		dev->functionality &= ~I2C_FUNC_10BIT_ADDR;
+		dev_info(&pdev->dev, "I am registed as a I2C Slave!\n");
+
+		switch (dev->clk_freq) {
+		case 100000:
+			dev->slave_cfg |= DW_IC_CON_SPEED_STD;
+
+		case 3400000:
+			dev->slave_cfg |= DW_IC_CON_SPEED_HIGH;
+			break;
+		default:
+			dev->slave_cfg |= DW_IC_CON_SPEED_FAST;
+
+		}
 	}
 
 	dev->clk = devm_clk_get(&pdev->dev, NULL);
