@@ -906,6 +906,7 @@ static void ion_vm_open(struct vm_area_struct *vma)
 	list_add(&vma_list->list, &buffer->vmas);
 	mutex_unlock(&buffer->lock);
 	pr_debug("%s: adding %p\n", __func__, vma);
+	memtrack_buffer_vm_open(&buffer->memtrack_buffer, vma);
 }
 
 static void ion_vm_close(struct vm_area_struct *vma)
@@ -924,6 +925,7 @@ static void ion_vm_close(struct vm_area_struct *vma)
 		break;
 	}
 	mutex_unlock(&buffer->lock);
+	memtrack_buffer_vm_close(&buffer->memtrack_buffer, vma);
 }
 
 static const struct vm_operations_struct ion_vma_ops = {
@@ -963,7 +965,8 @@ static int ion_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
 	if (ret)
 		pr_err("%s: failure mapping buffer to userspace\n",
 		       __func__);
-
+	else
+		memtrack_buffer_mmap(dma_buf_memtrack_buffer(dmabuf), vma);
 	return ret;
 }
 

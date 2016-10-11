@@ -22,12 +22,19 @@
 #include <linux/rbtree.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
+#include <linux/mm.h>
+
+struct memtrack_vma_list {
+	struct hlist_node node;
+	const struct vm_area_struct *vma;
+};
 
 struct memtrack_handle {
 	struct memtrack_buffer *buffer;
 	struct rb_node node;
 	struct rb_root *root;
 	struct kref refcount;
+	struct hlist_head vma_list;
 };
 
 static struct kmem_cache *memtrack_handle_cache;
@@ -40,8 +47,8 @@ static DEFINE_IDR(mem_idr);
 static DEFINE_IDA(mem_ida);
 #endif
 
-static void memtrack_buffer_install_locked(struct rb_root *root,
-		struct memtrack_buffer *buffer)
+static struct memtrack_handle *memtrack_handle_find_locked(struct rb_root *root,
+		struct memtrack_buffer *buffer, bool alloc)
 {
 	struct rb_node **new = &root->rb_node, *parent = NULL;
 	struct memtrack_handle *handle;
@@ -56,22 +63,38 @@ static void memtrack_buffer_install_locked(struct rb_root *root,
 		} else if (handle->buffer->id < buffer->id) {
 			new = &node->rb_right;
 		} else {
-			kref_get(&handle->refcount);
-			return;
+			return handle;
 		}
 	}
 
-	handle = kmem_cache_alloc(memtrack_handle_cache, GFP_KERNEL);
-	if (!handle)
+	if (alloc) {
+		handle = kmem_cache_alloc(memtrack_handle_cache, GFP_KERNEL);
+		if (!handle)
+			return NULL;
+
+		handle->buffer = buffer;
+		handle->root = root;
+		kref_init(&handle->refcount);
+		INIT_HLIST_HEAD(&handle->vma_list);
+
+		rb_link_node(&handle->node, parent, new);
+		rb_insert_color(&handle->node, root);
+		atomic_inc(&handle->buffer->userspace_handles);
+	}
+
+	return NULL;
+}
+
+static void memtrack_buffer_install_locked(struct rb_root *root,
+		struct memtrack_buffer *buffer)
+{
+	struct memtrack_handle *handle;
+
+	handle = memtrack_handle_find_locked(root, buffer, true);
+	if (handle) {
+		kref_get(&handle->refcount);
 		return;
-
-	handle->buffer = buffer;
-	handle->root = root;
-	kref_init(&handle->refcount);
-
-	rb_link_node(&handle->node, parent, new);
-	rb_insert_color(&handle->node, root);
-	atomic_inc(&handle->buffer->userspace_handles);
+	}
 }
 
 /**
@@ -112,19 +135,41 @@ static void memtrack_handle_destroy(struct kref *ref)
 static void memtrack_buffer_uninstall_locked(struct rb_root *root,
 		struct memtrack_buffer *buffer)
 {
-	struct rb_node *node = root->rb_node;
+	struct memtrack_handle *handle;
 
-	while (node) {
-		struct memtrack_handle *handle = rb_entry(node,
-				struct memtrack_handle, node);
+	handle = memtrack_handle_find_locked(root, buffer, false);
 
-		if (handle->buffer->id > buffer->id) {
-			node = node->rb_left;
-		} else if (handle->buffer->id < buffer->id) {
-			node = node->rb_right;
-		} else {
-			kref_put(&handle->refcount, memtrack_handle_destroy);
-			return;
+	if (handle)
+		kref_put(&handle->refcount, memtrack_handle_destroy);
+}
+
+static void memtrack_buffer_vm_open_locked(struct rb_root *root,
+		struct memtrack_buffer *buffer,
+		struct memtrack_vma_list *vma_list)
+{
+	struct memtrack_handle *handle;
+
+	handle = memtrack_handle_find_locked(root, buffer, false);
+	if (handle)
+		hlist_add_head(&vma_list->node, &handle->vma_list);
+}
+
+static void memtrack_buffer_vm_close_locked(struct rb_root *root,
+		struct memtrack_buffer *buffer,
+		const struct vm_area_struct *vma)
+{
+	struct memtrack_handle *handle;
+
+	handle = memtrack_handle_find_locked(root, buffer, false);
+	if (handle) {
+		struct memtrack_vma_list *vma_list;
+
+		hlist_for_each_entry(vma_list, &handle->vma_list, node) {
+			if (vma_list->vma == vma) {
+				hlist_del(&vma_list->node);
+				kfree(vma_list);
+				return;
+			}
 		}
 	}
 }
@@ -152,6 +197,49 @@ void memtrack_buffer_uninstall(struct memtrack_buffer *buffer,
 	write_unlock_irqrestore(&leader->memtrack_lock, flags);
 }
 EXPORT_SYMBOL(memtrack_buffer_uninstall);
+
+/**
+ * memtrack_buffer_vm_open - account for pages mapped during vm open
+ *
+ * @buffer: the buffer's memtrack entry
+ *
+ * @vma: vma being opened
+ */
+void memtrack_buffer_vm_open(struct memtrack_buffer *buffer,
+		const struct vm_area_struct *vma)
+{
+	unsigned long flags;
+	struct task_struct *leader = current->group_leader;
+	struct memtrack_vma_list *vma_list;
+
+	vma_list = kmalloc(sizeof(*vma_list), GFP_KERNEL);
+	if (WARN_ON(!vma_list))
+		return;
+	vma_list->vma = vma;
+
+	write_lock_irqsave(&leader->memtrack_lock, flags);
+	memtrack_buffer_vm_open_locked(&leader->memtrack_rb, buffer, vma_list);
+	write_unlock_irqrestore(&leader->memtrack_lock, flags);
+}
+EXPORT_SYMBOL(memtrack_buffer_vm_open);
+
+/**
+ * memtrack_buffer_vm_close - account for pages unmapped during vm close
+ *
+ * @buffer: the buffer's memtrack entry
+ * @vma: the vma being closed
+ */
+void memtrack_buffer_vm_close(struct memtrack_buffer *buffer,
+		const struct vm_area_struct *vma)
+{
+	unsigned long flags;
+	struct task_struct *leader = current->group_leader;
+
+	write_lock_irqsave(&leader->memtrack_lock, flags);
+	memtrack_buffer_vm_close_locked(&leader->memtrack_rb, buffer, vma);
+	write_unlock_irqrestore(&leader->memtrack_lock, flags);
+}
+EXPORT_SYMBOL(memtrack_buffer_vm_close);
 
 static int memtrack_id_alloc(struct memtrack_buffer *buffer)
 {
@@ -271,6 +359,33 @@ static struct notifier_block process_notifier_block = {
 	.notifier_call	= process_notifier,
 };
 
+static void show_memtrack_vma(struct seq_file *m,
+		const struct vm_area_struct *vma,
+		const struct memtrack_buffer *buf)
+{
+	unsigned long start = vma->vm_start;
+	unsigned long end = vma->vm_end;
+	unsigned long long pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
+	vm_flags_t flags = vma->vm_flags;
+	vm_flags_t remap_flag = VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP;
+
+	seq_setwidth(m, 50);
+	seq_printf(m, "%68lx-%08lx  %c%c%c%c%c  %08llx",
+			start,
+			end,
+			flags & VM_READ ? 'r' : '-',
+			flags & VM_WRITE ? 'w' : '-',
+			flags & VM_EXEC ? 'x' : '-',
+			flags & VM_MAYSHARE ? 's' : 'p',
+			flags & remap_flag ? '#' : '-',
+			pgoff);
+	if (buf->tag) {
+		seq_pad(m, ' ');
+		seq_puts(m, buf->tag);
+	}
+	seq_putc(m, '\n');
+}
+
 int proc_memtrack(struct seq_file *m, struct pid_namespace *ns, struct pid *pid,
 			struct task_struct *task)
 {
@@ -281,18 +396,23 @@ int proc_memtrack(struct seq_file *m, struct pid_namespace *ns, struct pid *pid,
 	if (RB_EMPTY_ROOT(&task->memtrack_rb))
 		goto done;
 
-	seq_printf(m, "%10.10s: %16.16s: %12.12s: %3.3s: pid:%d\n",
-			"ref_count", "Identifier", "size", "tag", task->pid);
+	seq_printf(m, "%10.10s: %16.16s: %12.12s: %12.12s: %20s: %5s: %8s: pid:%d\n",
+			"ref_count", "Identifier", "size", "tag",
+			"startAddr-endAddr", "Flags", "pgOff", task->pid);
 
 	for (node = rb_first(&task->memtrack_rb); node; node = rb_next(node)) {
 		struct memtrack_handle *handle = rb_entry(node,
 				struct memtrack_handle, node);
 		struct memtrack_buffer *buffer = handle->buffer;
+		struct memtrack_vma_list *vma;
 
-		seq_printf(m, "%10d  %16d  %12zu  %s\n",
+		seq_printf(m, "%10d  %16d  %12zu  %12s\n",
 				atomic_read(&buffer->userspace_handles),
 				buffer->id, buffer->size,
 				buffer->tag ? buffer->tag : "");
+
+		hlist_for_each_entry(vma, &handle->vma_list, node)
+			show_memtrack_vma(m, vma->vma, handle->buffer);
 	}
 
 done:
@@ -308,7 +428,6 @@ static int memtrack_show(struct seq_file *m, void *v)
 
 	seq_printf(m, "%4.4s %12.12s %10s %12.12s %3.3s\n", "pid",
 			"buffer_size", "ref", "Identifier", "tag");
-
 	rcu_read_lock();
 	idr_for_each_entry(&mem_idr, buffer, i)
 		seq_printf(m, "%4d %12zu %10d %12d %s\n", buffer->pid,

@@ -33,12 +33,18 @@ struct memtrack_buffer {
 
 int proc_memtrack(struct seq_file *m, struct pid_namespace *ns, struct pid *pid,
 		struct task_struct *task);
+int proc_memtrack_maps(struct seq_file *m, struct pid_namespace *ns,
+			struct pid *pid, struct task_struct *task);
 int memtrack_buffer_init(struct memtrack_buffer *buffer, size_t size);
 void memtrack_buffer_remove(struct memtrack_buffer *buffer);
 void memtrack_buffer_install(struct memtrack_buffer *buffer,
 		struct task_struct *tsk);
 void memtrack_buffer_uninstall(struct memtrack_buffer *buffer,
 		struct task_struct *tsk);
+void memtrack_buffer_vm_open(struct memtrack_buffer *buffer,
+		const struct vm_area_struct *vma);
+void memtrack_buffer_vm_close(struct memtrack_buffer *buffer,
+		const struct vm_area_struct *vma);
 
 /**
  * memtrack_buffer_set_tag - add a descriptive tag to a memtrack entry
@@ -90,5 +96,28 @@ static inline int memtrack_buffer_set_tag(struct memtrack_buffer *buffer,
 	return -ENOENT;
 }
 
+static inline void memtrack_buffer_vm_open(struct memtrack_buffer *buffer,
+		const struct vm_area_struct *vma)
+{
+}
+
+static inline void memtrack_buffer_vm_close(struct memtrack_buffer *buffer,
+		const struct vm_area_struct *vma)
+{
+}
 #endif /* CONFIG_MEMTRACK */
+
+
+/**
+ * memtrack_buffer_vm_mmap - account for pages mapped to userspace during mmap
+ *
+ * @buffer: the buffer's memtrack entry
+ * @vma: the vma passed to mmap()
+ */
+static inline void memtrack_buffer_mmap(struct memtrack_buffer *buffer,
+		const struct vm_area_struct *vma)
+{
+	memtrack_buffer_vm_open(buffer, vma);
+}
+
 #endif /* _MEMTRACK_ */
