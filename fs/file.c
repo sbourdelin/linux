@@ -282,6 +282,24 @@ static unsigned int count_open_files(struct fdtable *fdt)
 	return i;
 }
 
+static inline void fdt_install(struct fdtable *fdt, int fd, struct file *file,
+		struct task_struct *task)
+{
+	if (file->f_op->installed)
+		file->f_op->installed(file, task);
+	rcu_assign_pointer(fdt->fd[fd], file);
+}
+
+static inline void fdt_uninstall(struct fdtable *fdt, int fd,
+		struct task_struct *task)
+{
+	struct file *old_file = fdt->fd[fd];
+
+	if (old_file->f_op->uninstalled)
+		old_file->f_op->uninstalled(old_file, task);
+	rcu_assign_pointer(fdt->fd[fd], NULL);
+}
+
 /*
  * Allocate a new files structure and copy contents from the
  * passed in files structure.
@@ -543,7 +561,7 @@ repeat:
 	/* Sanity check */
 	if (rcu_access_pointer(fdt->fd[fd]) != NULL) {
 		printk(KERN_WARNING "alloc_fd: slot %d not NULL!\n", fd);
-		rcu_assign_pointer(fdt->fd[fd], NULL);
+		fdt_uninstall(fdt, fd, current);
 	}
 #endif
 
@@ -601,10 +619,11 @@ EXPORT_SYMBOL(put_unused_fd);
  * fd_install() instead.
  */
 
-void __fd_install(struct files_struct *files, unsigned int fd,
+void __fd_install(struct task_struct *task, unsigned int fd,
 		struct file *file)
 {
 	struct fdtable *fdt;
+	struct files_struct *files = task->files;
 
 	might_sleep();
 	rcu_read_lock_sched();
@@ -618,13 +637,13 @@ void __fd_install(struct files_struct *files, unsigned int fd,
 	smp_rmb();
 	fdt = rcu_dereference_sched(files->fdt);
 	BUG_ON(fdt->fd[fd] != NULL);
-	rcu_assign_pointer(fdt->fd[fd], file);
+	fdt_install(fdt, fd, file, task);
 	rcu_read_unlock_sched();
 }
 
 void fd_install(unsigned int fd, struct file *file)
 {
-	__fd_install(current->files, fd, file);
+	__fd_install(current, fd, file);
 }
 
 EXPORT_SYMBOL(fd_install);
@@ -632,10 +651,11 @@ EXPORT_SYMBOL(fd_install);
 /*
  * The same warnings as for __alloc_fd()/__fd_install() apply here...
  */
-int __close_fd(struct files_struct *files, unsigned fd)
+int __close_fd(struct task_struct *task, unsigned fd)
 {
 	struct file *file;
 	struct fdtable *fdt;
+	struct files_struct *files = task->files;
 
 	spin_lock(&files->file_lock);
 	fdt = files_fdtable(files);
@@ -644,7 +664,7 @@ int __close_fd(struct files_struct *files, unsigned fd)
 	file = fdt->fd[fd];
 	if (!file)
 		goto out_unlock;
-	rcu_assign_pointer(fdt->fd[fd], NULL);
+	fdt_uninstall(fdt, fd, task);
 	__clear_close_on_exec(fd, fdt);
 	__put_unused_fd(files, fd);
 	spin_unlock(&files->file_lock);
@@ -679,7 +699,7 @@ void do_close_on_exec(struct files_struct *files)
 			file = fdt->fd[fd];
 			if (!file)
 				continue;
-			rcu_assign_pointer(fdt->fd[fd], NULL);
+			fdt_uninstall(fdt, fd, current);
 			__put_unused_fd(files, fd);
 			spin_unlock(&files->file_lock);
 			filp_close(file, files);
@@ -846,7 +866,7 @@ __releases(&files->file_lock)
 	if (!tofree && fd_is_open(fd, fdt))
 		goto Ebusy;
 	get_file(file);
-	rcu_assign_pointer(fdt->fd[fd], file);
+	fdt_install(fdt, fd, file, current);
 	__set_open_fd(fd, fdt);
 	if (flags & O_CLOEXEC)
 		__set_close_on_exec(fd, fdt);
@@ -870,7 +890,7 @@ int replace_fd(unsigned fd, struct file *file, unsigned flags)
 	struct files_struct *files = current->files;
 
 	if (!file)
-		return __close_fd(files, fd);
+		return __close_fd(current, fd);
 
 	if (fd >= rlimit(RLIMIT_NOFILE))
 		return -EBADF;

@@ -398,7 +398,7 @@ static void task_fd_install(
 	struct binder_proc *proc, unsigned int fd, struct file *file)
 {
 	if (proc->files)
-		__fd_install(proc->files, fd, file);
+		__fd_install(proc->tsk, fd, file);
 }
 
 /*
@@ -411,7 +411,7 @@ static long task_close_fd(struct binder_proc *proc, unsigned int fd)
 	if (proc->files == NULL)
 		return -ESRCH;
 
-	retval = __close_fd(proc->files, fd);
+	retval = __close_fd(proc->tsk, fd);
 	/* can't restart close syscall because file table entry was cleared */
 	if (unlikely(retval == -ERESTARTSYS ||
 		     retval == -ERESTARTNOINTR ||
