@@ -502,7 +502,7 @@ static int pcpu_fit_in_area(struct pcpu_chunk *chunk, int off, int this_size,
 	int cand_off = off;
 
 	while (true) {
-		int head = ALIGN(cand_off, align) - off;
+		int head = roundup(cand_off, align) - off;
 		int page_start, page_end, rs, re;
 
 		if (this_size < head + size)
@@ -879,11 +879,13 @@ static void __percpu *pcpu_alloc(size_t size, size_t align, bool reserved,
 
 	/*
 	 * We want the lowest bit of offset available for in-use/free
-	 * indicator, so force >= 16bit alignment and make size even.
+	 * indicator, so force alignment >= 2 even and make size even.
 	 */
 	if (unlikely(align < 2))
 		align = 2;
 
+	if (WARN_ON_ONCE(!IS_ALIGNED(align, 2)))
+		align = ALIGN(align, 2);
 	size = ALIGN(size, 2);
 
 	if (unlikely(!size || size > PCPU_MIN_UNIT_SIZE || align > PAGE_SIZE)) {
