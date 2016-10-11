@@ -32,6 +32,7 @@
 #include <linux/fs.h>
 #include <linux/fence.h>
 #include <linux/wait.h>
+#include <linux/memtrack.h>
 
 struct device;
 struct dma_buf;
@@ -70,6 +71,8 @@ struct dma_buf_attachment;
  * @vmap: [optional] creates a virtual mapping for the buffer into kernel
  *	  address space. Same restrictions as for vmap and friends apply.
  * @vunmap: [optional] unmaps a vmap from the buffer
+ * @memtrack_buffer: [optional] returns the memtrack entry for this buffer's
+ *        backing pages
  */
 struct dma_buf_ops {
 	int (*attach)(struct dma_buf *, struct device *,
@@ -104,6 +107,7 @@ struct dma_buf_ops {
 
 	void *(*vmap)(struct dma_buf *);
 	void (*vunmap)(struct dma_buf *, void *vaddr);
+	struct memtrack_buffer *(*memtrack_buffer)(struct dma_buf *);
 };
 
 /**
@@ -242,4 +246,5 @@ int dma_buf_mmap(struct dma_buf *, struct vm_area_struct *,
 		 unsigned long);
 void *dma_buf_vmap(struct dma_buf *);
 void dma_buf_vunmap(struct dma_buf *, void *vaddr);
+struct memtrack_buffer *dma_buf_memtrack_buffer(struct dma_buf *dmabuf);
 #endif /* __DMA_BUF_H__ */

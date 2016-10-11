@@ -196,6 +196,7 @@ void ion_buffer_destroy(struct ion_buffer *buffer)
 		buffer->heap->ops->unmap_kernel(buffer->heap, buffer);
 	buffer->heap->ops->free(buffer);
 	vfree(buffer->pages);
+	memtrack_buffer_remove(&buffer->memtrack_buffer);
 	kfree(buffer);
 }
 
@@ -457,6 +458,8 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		ion_handle_put(handle);
 		handle = ERR_PTR(ret);
 	}
+
+	memtrack_buffer_init(&buffer->memtrack_buffer, len);
 
 	return handle;
 }
@@ -1013,6 +1016,16 @@ static int ion_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 	return 0;
 }
 
+static struct memtrack_buffer *ion_memtrack_buffer(struct dma_buf *buffer)
+{
+	if (IS_ENABLED(CONFIG_MEMTRACK) && buffer && buffer->priv) {
+		struct ion_buffer *ion_buffer = buffer->priv;
+
+		return &ion_buffer->memtrack_buffer;
+	}
+	return NULL;
+}
+
 static struct dma_buf_ops dma_buf_ops = {
 	.map_dma_buf = ion_map_dma_buf,
 	.unmap_dma_buf = ion_unmap_dma_buf,
@@ -1024,6 +1037,7 @@ static struct dma_buf_ops dma_buf_ops = {
 	.kunmap_atomic = ion_dma_buf_kunmap,
 	.kmap = ion_dma_buf_kmap,
 	.kunmap = ion_dma_buf_kunmap,
+	.memtrack_buffer = ion_memtrack_buffer,
 };
 
 struct dma_buf *ion_share_dma_buf(struct ion_client *client,

@@ -297,12 +297,32 @@ static long dma_buf_ioctl(struct file *file,
 	}
 }
 
+static void dma_buf_installed(struct file *file, struct task_struct *task)
+{
+	struct memtrack_buffer *memtrack =
+			dma_buf_memtrack_buffer(file->private_data);
+
+	if (memtrack)
+		memtrack_buffer_install(memtrack, task);
+}
+
+static void dma_buf_uninstalled(struct file *file, struct task_struct *task)
+{
+	struct memtrack_buffer *memtrack =
+			dma_buf_memtrack_buffer(file->private_data);
+
+	if (memtrack)
+		memtrack_buffer_uninstall(memtrack, task);
+}
+
 static const struct file_operations dma_buf_fops = {
 	.release	= dma_buf_release,
 	.mmap		= dma_buf_mmap_internal,
 	.llseek		= dma_buf_llseek,
 	.poll		= dma_buf_poll,
 	.unlocked_ioctl	= dma_buf_ioctl,
+	.installed	= dma_buf_installed,
+	.uninstalled	= dma_buf_uninstalled,
 };
 
 /*
@@ -829,6 +849,23 @@ void dma_buf_vunmap(struct dma_buf *dmabuf, void *vaddr)
 	mutex_unlock(&dmabuf->lock);
 }
 EXPORT_SYMBOL_GPL(dma_buf_vunmap);
+
+/**
+ * dma_buf_memtrack_buffer - returns a memtrack entry associated with dma_buf
+ *
+ * @dmabuf:	[in]	pointer to dma_buf
+ *
+ * Returns the struct memtrack_buffer associated with this dma_buf's
+ * backing pages.  If memtrack isn't enabled in the kernel, or the dma_buf
+ * exporter doesn't have memtrack support, returns NULL.
+ */
+struct memtrack_buffer *dma_buf_memtrack_buffer(struct dma_buf *dmabuf)
+{
+	if (!dmabuf->ops->memtrack_buffer)
+		return NULL;
+	return dmabuf->ops->memtrack_buffer(dmabuf);
+}
+EXPORT_SYMBOL_GPL(dma_buf_memtrack_buffer);
 
 #ifdef CONFIG_DEBUG_FS
 static int dma_buf_debug_show(struct seq_file *s, void *unused)
