@@ -1309,6 +1309,42 @@ static void rproc_type_release(struct device *dev)
 	kfree(rproc);
 }
 
+/**
+ * rproc_set_firmware_name() - helper to create a valid firmare name
+ * @rproc: remote processor
+ * @firmware: name of firmware file, can be NULL
+ *
+ * If the caller didn't pass in a firmware name then construct a default name,
+ * otherwise the provided name is copied into the firmware field of struct
+ * rproc. If the name is too long to fit, -EINVAL is returned.
+ *
+ * Returns 0 on success and an appropriate error code otherwise.
+ */
+static int rproc_set_firmware_name(struct rproc *rproc, const char *firmware)
+{
+	char *cp, *template = "rproc-%s-fw";
+	int name_len;
+
+	if (firmware) {
+		name_len = strlen(firmware);
+		cp = memchr(firmware, '\n', name_len);
+		if (cp)
+			name_len = cp - firmware;
+
+		if (name_len > RPROC_MAX_FIRMWARE_NAME_LEN)
+			return -EINVAL;
+
+		strncpy(rproc->firmware, firmware, name_len);
+		rproc->firmware[name_len] = '\0';
+	} else {
+		snprintf(rproc->firmware, RPROC_MAX_FIRMWARE_NAME_LEN,
+			 template, rproc->name);
+	}
+
+	dev_dbg(&rproc->dev, "Using firmware %s\n", rproc->firmware);
+	return 0;
+}
+
 static struct device_type rproc_type = {
 	.name		= "remoteproc",
 	.release	= rproc_type_release,
@@ -1342,35 +1378,14 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
 				const char *firmware, int len)
 {
 	struct rproc *rproc;
-	char *p, *template = "rproc-%s-fw";
-	int name_len = 0;
 
 	if (!dev || !name || !ops)
 		return NULL;
 
-	if (!firmware)
-		/*
-		 * Make room for default firmware name (minus %s plus '\0').
-		 * If the caller didn't pass in a firmware name then
-		 * construct a default name.  We're already glomming 'len'
-		 * bytes onto the end of the struct rproc allocation, so do
-		 * a few more for the default firmware name (but only if
-		 * the caller doesn't pass one).
-		 */
-		name_len = strlen(name) + strlen(template) - 2 + 1;
-
-	rproc = kzalloc(sizeof(struct rproc) + len + name_len, GFP_KERNEL);
+	rproc = kzalloc(sizeof(struct rproc) + len, GFP_KERNEL);
 	if (!rproc)
 		return NULL;
 
-	if (!firmware) {
-		p = (char *)rproc + sizeof(struct rproc) + len;
-		snprintf(p, name_len, template, name);
-	} else {
-		p = (char *)firmware;
-	}
-
-	rproc->firmware = p;
 	rproc->name = name;
 	rproc->ops = ops;
 	rproc->priv = &rproc[1];
@@ -1388,6 +1403,11 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
 	}
 
 	dev_set_name(&rproc->dev, "remoteproc%d", rproc->index);
+
+	if (rproc_set_firmware_name(rproc, firmware)) {
+		put_device(&rproc->dev);
+		return NULL;
+	}
 
 	atomic_set(&rproc->power, 0);
 

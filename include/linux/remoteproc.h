@@ -42,6 +42,8 @@
 #include <linux/idr.h>
 #include <linux/of.h>
 
+#define RPROC_MAX_FIRMWARE_NAME_LEN 128
+
 /**
  * struct resource_table - firmware resource table header
  * @ver: version number
@@ -416,7 +418,7 @@ struct rproc {
 	struct list_head node;
 	struct iommu_domain *domain;
 	const char *name;
-	const char *firmware;
+	char firmware[RPROC_MAX_FIRMWARE_NAME_LEN];
 	void *priv;
 	const struct rproc_ops *ops;
 	struct device dev;
