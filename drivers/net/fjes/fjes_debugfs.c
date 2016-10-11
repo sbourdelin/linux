@@ -97,6 +97,51 @@ static const struct file_operations fjes_dbg_dbg_mode_fops = {
 	.write		= fjes_dbg_dbg_mode_write,
 };
 
+static const char * const ep_status_string[] = {
+	"unshared",
+	"shared",
+	"waiting",
+	"complete",
+};
+
+static int fjes_dbg_status_show(struct seq_file *m, void *v)
+{
+	struct fjes_adapter *adapter = m->private;
+	struct fjes_hw *hw = &adapter->hw;
+	int max_epid = hw->max_epid;
+	int my_epid = hw->my_epid;
+	int epidx;
+
+	seq_puts(m, "EPID\tSTATUS           SAME_ZONE        CONNECTED\n");
+	for (epidx = 0; epidx < max_epid; epidx++) {
+		if (epidx == my_epid) {
+			seq_printf(m, "ep%d\t%-16c %-16c %-16c\n",
+				   epidx, '-', '-', '-');
+		} else {
+			seq_printf(m, "ep%d\t%-16s %-16c %-16c\n",
+				   epidx,
+				   ep_status_string[fjes_hw_get_partner_ep_status(hw, epidx)],
+				   fjes_hw_epid_is_same_zone(hw, epidx) ? 'Y' : 'N',
+				   fjes_hw_epid_is_shared(hw->hw_info.share, epidx) ? 'Y' : 'N');
+		}
+	}
+
+	return 0;
+}
+
+static int fjes_dbg_status_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, fjes_dbg_status_show, inode->i_private);
+}
+
+static const struct file_operations fjes_dbg_status_fops = {
+	.owner		= THIS_MODULE,
+	.open		= fjes_dbg_status_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
 void fjes_dbg_adapter_init(struct fjes_adapter *adapter)
 {
 	const char *name = dev_name(&adapter->plat_dev->dev);
@@ -132,6 +177,12 @@ void fjes_dbg_adapter_init(struct fjes_adapter *adapter)
 		hw->hw_info.trace = NULL;
 		hw->hw_info.trace_size = 0;
 	}
+
+	pfile = debugfs_create_file("status", 0444, adapter->dbg_adapter,
+				    adapter, &fjes_dbg_status_fops);
+	if (!pfile)
+		dev_err(&adapter->plat_dev->dev,
+			"debugfs status for %s failed\n", name);
 }
 
 void fjes_dbg_adapter_exit(struct fjes_adapter *adapter)
