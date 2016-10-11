@@ -18,8 +18,8 @@ targets += purgatory.ro
 KBUILD_CFLAGS := -Wall -Wstrict-prototypes -fno-strict-aliasing \
 		-fno-zero-initialized-in-bss -fno-builtin -ffreestanding \
 		-fno-PIC -fno-PIE -fno-stack-protector  -fno-exceptions \
-		-msoft-float -MD -Os -m$(CONFIG_WORD_SIZE)
-KBUILD_AFLAGS := -fno-exceptions -msoft-float -m$(CONFIG_WORD_SIZE) \
+		-msoft-float -MD -Os -m$(BITS)
+KBUILD_AFLAGS := -fno-exceptions -msoft-float -m$(BITS) \
 		-D__ASSEMBLY__
 
 ifeq ($(CONFIG_CPU_LITTLE_ENDIAN),y)
