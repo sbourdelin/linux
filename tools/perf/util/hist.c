@@ -1,6 +1,7 @@
 #include "util.h"
 #include "build-id.h"
 #include "hist.h"
+#include "map.h"
 #include "session.h"
 #include "sort.h"
 #include "evlist.h"
@@ -979,6 +980,7 @@ iter_finish_cumulative_entry(struct hist_entry_iter *iter,
 {
 	zfree(&iter->priv);
 	iter->he = NULL;
+	map__zput(al->map);
 
 	return 0;
 }
