@@ -1387,11 +1387,7 @@ const struct inode_operations ubifs_dir_inode_operations = {
 	.mkdir       = ubifs_mkdir,
 	.rmdir       = ubifs_rmdir,
 	.mknod       = ubifs_mknod,
-<<<<<<< HEAD
-	.rename     = ubifs_rename,
-=======
 	.rename     = ubifs_rename2,
->>>>>>> linux-next/akpm-base
 	.setattr     = ubifs_setattr,
 	.getattr     = ubifs_getattr,
 	.listxattr   = ubifs_listxattr,

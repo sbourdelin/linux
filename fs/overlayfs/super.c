@@ -274,17 +274,10 @@ static bool ovl_is_opaquedir(struct dentry *dentry)
 	int res;
 	char val;
 
-<<<<<<< HEAD
-	if (!S_ISDIR(inode->i_mode) || !(inode->i_opflags & IOP_XATTR))
-		return false;
-
-	res = __vfs_getxattr(dentry, inode, OVL_XATTR_OPAQUE, &val, 1);
-=======
 	if (!d_is_dir(dentry))
 		return false;
 
 	res = vfs_getxattr(dentry, OVL_XATTR_OPAQUE, &val, 1);
->>>>>>> linux-next/akpm-base
 	if (res == 1 && val == 'y')
 		return true;
 
