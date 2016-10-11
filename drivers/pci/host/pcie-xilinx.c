@@ -118,12 +118,12 @@ struct xilinx_pcie {
 
 static DECLARE_BITMAP(msi_irq_in_use, XILINX_NUM_MSI_IRQS);
 
-static inline u32 pcie_read(struct xilinx_pcie *xilinx_pcie, u32 reg)
+static u32 pcie_read(struct xilinx_pcie *xilinx_pcie, u32 reg)
 {
 	return readl(xilinx_pcie->reg_base + reg);
 }
 
-static inline void pcie_write(struct xilinx_pcie *xilinx_pcie, u32 val, u32 reg)
+static void pcie_write(struct xilinx_pcie *xilinx_pcie, u32 val, u32 reg)
 {
 	writel(val, xilinx_pcie->reg_base + reg);
 }
