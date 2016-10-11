@@ -3583,8 +3583,7 @@ fc_destroy_bsgjob(struct fc_bsg_job *job)
  *                  completed
  * @job:	fc_bsg_job that is complete
  */
-static void
-fc_bsg_jobdone(struct fc_bsg_job *job)
+void fc_bsg_jobdone(struct fc_bsg_job *job)
 {
 	struct request *req = job->req;
 	struct request *rsp = req->next_rq;
@@ -3611,6 +3610,7 @@ fc_bsg_jobdone(struct fc_bsg_job *job)
 	}
 	blk_complete_request(req);
 }
+EXPORT_SYMBOL_GPL(fc_bsg_jobdone);
 
 /**
  * fc_bsg_softirq_done - softirq done routine for destroying the bsg requests
