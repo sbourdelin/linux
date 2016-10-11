@@ -41,10 +41,12 @@ void memtrack_buffer_install(struct memtrack_buffer *buffer,
 		struct task_struct *tsk);
 void memtrack_buffer_uninstall(struct memtrack_buffer *buffer,
 		struct task_struct *tsk);
+void memtrack_buffer_install_fork(struct task_struct *parent,
+		struct task_struct *child);
 void memtrack_buffer_vm_open(struct memtrack_buffer *buffer,
-		const struct vm_area_struct *vma);
+		const struct vm_area_struct *vma, struct task_struct *task);
 void memtrack_buffer_vm_close(struct memtrack_buffer *buffer,
-		const struct vm_area_struct *vma);
+		const struct vm_area_struct *vma, struct task_struct *task);
 
 /**
  * memtrack_buffer_set_tag - add a descriptive tag to a memtrack entry
@@ -90,6 +92,11 @@ static inline void memtrack_buffer_uninstall(struct memtrack_buffer *buffer,
 {
 }
 
+static inline void memtrack_buffer_install_fork(struct task_struct *parent,
+		struct task_struct *child)
+{
+}
+
 static inline int memtrack_buffer_set_tag(struct memtrack_buffer *buffer,
 		const char *tag)
 {
@@ -97,12 +104,12 @@ static inline int memtrack_buffer_set_tag(struct memtrack_buffer *buffer,
 }
 
 static inline void memtrack_buffer_vm_open(struct memtrack_buffer *buffer,
-		const struct vm_area_struct *vma)
+		const struct vm_area_struct *vma, struct task_struct *task)
 {
 }
 
 static inline void memtrack_buffer_vm_close(struct memtrack_buffer *buffer,
-		const struct vm_area_struct *vma)
+		const struct vm_area_struct *vma, struct task_struct *task)
 {
 }
 #endif /* CONFIG_MEMTRACK */
@@ -115,9 +122,9 @@ static inline void memtrack_buffer_vm_close(struct memtrack_buffer *buffer,
  * @vma: the vma passed to mmap()
  */
 static inline void memtrack_buffer_mmap(struct memtrack_buffer *buffer,
-		const struct vm_area_struct *vma)
+		struct vm_area_struct *vma)
 {
-	memtrack_buffer_vm_open(buffer, vma);
+	memtrack_buffer_vm_open(buffer, vma, current);
 }
 
 #endif /* _MEMTRACK_ */

@@ -76,6 +76,7 @@
 #include <linux/compiler.h>
 #include <linux/sysctl.h>
 #include <linux/kcov.h>
+#include <linux/memtrack.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -547,7 +548,8 @@ free_tsk:
 }
 
 #ifdef CONFIG_MMU
-static int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm)
+static int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm,
+		struct task_struct *tsk)
 {
 	struct vm_area_struct *mpnt, *tmp, *prev, **pprev;
 	struct rb_node **rb_link, *rb_parent;
@@ -659,6 +661,11 @@ static int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm)
 
 		if (tmp->vm_ops && tmp->vm_ops->open)
 			tmp->vm_ops->open(tmp);
+
+		if (tmp->vm_ops && tmp->vm_ops->track && tmp->vm_ops->untrack) {
+			tmp->vm_ops->untrack(tmp, current);
+			tmp->vm_ops->track(tmp, tsk);
+		}
 
 		if (retval)
 			goto out;
@@ -1125,7 +1132,7 @@ static struct mm_struct *dup_mm(struct task_struct *tsk)
 	if (!mm_init(mm, tsk))
 		goto fail_nomem;
 
-	err = dup_mmap(mm, oldmm);
+	err = dup_mmap(mm, oldmm, tsk);
 	if (err)
 		goto free_pt;
 
@@ -1235,6 +1242,12 @@ static int copy_files(unsigned long clone_flags, struct task_struct *tsk)
 
 	tsk->files = newf;
 	error = 0;
+#ifdef CONFIG_MEMTRACK
+	if (!(clone_flags & CLONE_THREAD)) {
+		tsk->group_leader = tsk;
+		memtrack_buffer_install_fork(current, tsk);
+	}
+#endif
 out:
 	return error;
 }
@@ -2153,6 +2166,8 @@ static int unshare_fd(unsigned long unshare_flags, struct files_struct **new_fdp
 		*new_fdp = dup_fd(fd, &error);
 		if (!*new_fdp)
 			return error;
+
+		memtrack_buffer_install_fork(current->parent, current);
 	}
 
 	return 0;

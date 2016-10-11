@@ -402,6 +402,9 @@ struct vm_operations_struct {
 	 */
 	struct page *(*find_special_page)(struct vm_area_struct *vma,
 					  unsigned long addr);
+
+	void (*track)(struct vm_area_struct *vma, struct task_struct *task);
+	void (*untrack)(struct vm_area_struct *vma, struct task_struct *task);
 };
 
 struct mmu_gather;

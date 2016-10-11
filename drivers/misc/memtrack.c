@@ -204,12 +204,13 @@ EXPORT_SYMBOL(memtrack_buffer_uninstall);
  * @buffer: the buffer's memtrack entry
  *
  * @vma: vma being opened
+ * @task: task which mapped the pages
  */
 void memtrack_buffer_vm_open(struct memtrack_buffer *buffer,
-		const struct vm_area_struct *vma)
+		const struct vm_area_struct *vma, struct task_struct *task)
 {
 	unsigned long flags;
-	struct task_struct *leader = current->group_leader;
+	struct task_struct *leader = task->group_leader;
 	struct memtrack_vma_list *vma_list;
 
 	vma_list = kmalloc(sizeof(*vma_list), GFP_KERNEL);
@@ -228,18 +229,54 @@ EXPORT_SYMBOL(memtrack_buffer_vm_open);
  *
  * @buffer: the buffer's memtrack entry
  * @vma: the vma being closed
+ * @task: task that mmaped the pages
  */
 void memtrack_buffer_vm_close(struct memtrack_buffer *buffer,
-		const struct vm_area_struct *vma)
+		const struct vm_area_struct *vma, struct task_struct *task)
 {
 	unsigned long flags;
-	struct task_struct *leader = current->group_leader;
+	struct task_struct *leader = task->group_leader;
 
 	write_lock_irqsave(&leader->memtrack_lock, flags);
 	memtrack_buffer_vm_close_locked(&leader->memtrack_rb, buffer, vma);
 	write_unlock_irqrestore(&leader->memtrack_lock, flags);
 }
 EXPORT_SYMBOL(memtrack_buffer_vm_close);
+
+/**
+ * memtrack_buffer_install_fork - Install all parent's handles into
+ *  child.
+ *
+ * @parent: parent task
+ * @child: child task
+ */
+void memtrack_buffer_install_fork(struct task_struct *parent,
+		struct task_struct *child)
+{
+	struct task_struct *leader, *leader_child;
+	struct rb_root *root;
+	struct rb_node *node;
+	unsigned long flags;
+
+	if (!child || !parent)
+		return;
+
+	leader = parent->group_leader;
+	leader_child = child->group_leader;
+	write_lock_irqsave(&leader->memtrack_lock, flags);
+	root = &leader->memtrack_rb;
+	node = rb_first(root);
+	while (node) {
+		struct memtrack_handle *handle;
+
+		handle = rb_entry(node, struct memtrack_handle, node);
+		memtrack_buffer_install_locked(&leader_child->memtrack_rb,
+				handle->buffer);
+		node = rb_next(node);
+	}
+	write_unlock_irqrestore(&leader->memtrack_lock, flags);
+}
+EXPORT_SYMBOL(memtrack_buffer_install_fork);
 
 static int memtrack_id_alloc(struct memtrack_buffer *buffer)
 {

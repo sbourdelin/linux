@@ -906,7 +906,7 @@ static void ion_vm_open(struct vm_area_struct *vma)
 	list_add(&vma_list->list, &buffer->vmas);
 	mutex_unlock(&buffer->lock);
 	pr_debug("%s: adding %p\n", __func__, vma);
-	memtrack_buffer_vm_open(&buffer->memtrack_buffer, vma);
+	memtrack_buffer_vm_open(&buffer->memtrack_buffer, vma, current);
 }
 
 static void ion_vm_close(struct vm_area_struct *vma)
@@ -925,13 +925,51 @@ static void ion_vm_close(struct vm_area_struct *vma)
 		break;
 	}
 	mutex_unlock(&buffer->lock);
-	memtrack_buffer_vm_close(&buffer->memtrack_buffer, vma);
+	memtrack_buffer_vm_close(&buffer->memtrack_buffer, vma, current);
+}
+
+void vm_track(struct vm_area_struct *vma, struct task_struct *task)
+{
+	struct ion_buffer *buffer = vma->vm_private_data;
+
+	memtrack_buffer_vm_open(&buffer->memtrack_buffer, vma, task);
+}
+
+void vm_untrack(struct vm_area_struct *vma, struct task_struct *task)
+{
+	struct ion_buffer *buffer = vma->vm_private_data;
+
+	memtrack_buffer_vm_close(&buffer->memtrack_buffer, vma, task);
 }
 
 static const struct vm_operations_struct ion_vma_ops = {
 	.open = ion_vm_open,
 	.close = ion_vm_close,
 	.fault = ion_vm_fault,
+	.track = vm_track,
+	.untrack = vm_untrack,
+};
+
+static void memtrack_vm_close(struct vm_area_struct *vma)
+{
+	struct ion_buffer *buffer = vma->vm_private_data;
+
+	memtrack_buffer_vm_close(&buffer->memtrack_buffer, vma, current);
+}
+
+static void memtrack_vm_open(struct vm_area_struct *vma)
+{
+	struct ion_buffer *buffer = vma->vm_private_data;
+
+	memtrack_buffer_vm_open(&buffer->memtrack_buffer, vma, current);
+}
+
+static struct vm_operations_struct memtrack_vma_ops = {
+	.open = memtrack_vm_open,
+	.close = memtrack_vm_close,
+	.fault = NULL,
+	.track = vm_track,
+	.untrack = vm_untrack,
 };
 
 static int ion_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
@@ -952,6 +990,9 @@ static int ion_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
 		vma->vm_ops = &ion_vma_ops;
 		ion_vm_open(vma);
 		return 0;
+	} else {
+		vma->vm_private_data = buffer;
+		vma->vm_ops = &memtrack_vma_ops;
 	}
 
 	if (!(buffer->flags & ION_FLAG_CACHED))
