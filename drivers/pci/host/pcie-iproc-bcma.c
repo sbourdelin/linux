@@ -34,28 +34,33 @@ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_BROADCOM, 0x8012, bcma_pcie2_fixup_class);
 static int iproc_pcie_bcma_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 {
 	struct pci_sys_data *sys = dev->sysdata;
-	struct iproc_pcie *pcie = sys->private_data;
-	struct bcma_device *bdev = container_of(pcie->dev, struct bcma_device, dev);
+	struct iproc_pcie *iproc_pcie = sys->private_data;
+	struct bcma_device *bdev = container_of(iproc_pcie->dev, struct bcma_device, dev);
 
 	return bcma_core_irq(bdev, 5);
 }
 
 static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
 {
-	struct iproc_pcie *pcie;
+	struct device *dev = &bdev->dev;
+	struct iproc_pcie *iproc_pcie;
 	LIST_HEAD(res);
 	struct resource res_mem;
 	int ret;
 
-	pcie = devm_kzalloc(&bdev->dev, sizeof(*pcie), GFP_KERNEL);
-	if (!pcie)
+	iproc_pcie = devm_kzalloc(dev, sizeof(*iproc_pcie), GFP_KERNEL);
+	if (!iproc_pcie)
 		return -ENOMEM;
 
-	pcie->dev = &bdev->dev;
-	bcma_set_drvdata(bdev, pcie);
+	iproc_pcie->dev = dev;
 
-	pcie->base = bdev->io_addr;
-	pcie->base_addr = bdev->addr;
+	iproc_pcie->base = bdev->io_addr;
+	if (!iproc_pcie->base) {
+		dev_err(dev, "no controller registers\n");
+		return -ENOMEM;
+	}
+
+	iproc_pcie->base_addr = bdev->addr;
 
 	res_mem.start = bdev->addr_s[0];
 	res_mem.end = bdev->addr_s[0] + SZ_128M - 1;
@@ -63,22 +68,23 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
 	res_mem.flags = IORESOURCE_MEM;
 	pci_add_resource(&res, &res_mem);
 
-	pcie->map_irq = iproc_pcie_bcma_map_irq;
+	iproc_pcie->map_irq = iproc_pcie_bcma_map_irq;
 
-	ret = iproc_pcie_setup(pcie, &res);
+	ret = iproc_pcie_setup(iproc_pcie, &res);
 	if (ret)
-		dev_err(pcie->dev, "PCIe controller setup failed\n");
+		dev_err(dev, "PCIe controller setup failed\n");
 
 	pci_free_resource_list(&res);
 
+	bcma_set_drvdata(bdev, iproc_pcie);
 	return ret;
 }
 
 static void iproc_pcie_bcma_remove(struct bcma_device *bdev)
 {
-	struct iproc_pcie *pcie = bcma_get_drvdata(bdev);
+	struct iproc_pcie *iproc_pcie = bcma_get_drvdata(bdev);
 
-	iproc_pcie_remove(pcie);
+	iproc_pcie_remove(iproc_pcie);
 }
 
 static const struct bcma_device_id iproc_pcie_bcma_table[] = {

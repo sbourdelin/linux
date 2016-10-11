@@ -78,7 +78,7 @@ struct iproc_msi_grp {
  * Only meant to be used on platforms without MSI support integrated into the
  * GIC.
  *
- * @pcie: pointer to iProc PCIe data
+ * @iproc_pcie: pointer to iProc PCIe data
  * @reg_offsets: MSI register offsets
  * @grps: MSI groups
  * @nr_irqs: number of total interrupts connected to GIC
@@ -99,7 +99,7 @@ struct iproc_msi_grp {
  * @msi_addr: MSI address
  */
 struct iproc_msi {
-	struct iproc_pcie *pcie;
+	struct iproc_pcie *iproc_pcie;
 	const u16 (*reg_offsets)[IPROC_MSI_REG_SIZE];
 	struct iproc_msi_grp *grps;
 	int nr_irqs;
@@ -137,18 +137,18 @@ static inline u32 iproc_msi_read_reg(struct iproc_msi *msi,
 				     enum iproc_msi_reg reg,
 				     unsigned int eq)
 {
-	struct iproc_pcie *pcie = msi->pcie;
+	struct iproc_pcie *iproc_pcie = msi->iproc_pcie;
 
-	return readl_relaxed(pcie->base + msi->reg_offsets[eq][reg]);
+	return readl_relaxed(iproc_pcie->base + msi->reg_offsets[eq][reg]);
 }
 
 static inline void iproc_msi_write_reg(struct iproc_msi *msi,
 				       enum iproc_msi_reg reg,
 				       int eq, u32 val)
 {
-	struct iproc_pcie *pcie = msi->pcie;
+	struct iproc_pcie *iproc_pcie = msi->iproc_pcie;
 
-	writel_relaxed(val, pcie->base + msi->reg_offsets[eq][reg]);
+	writel_relaxed(val, iproc_pcie->base + msi->reg_offsets[eq][reg]);
 }
 
 static inline u32 hwirq_to_group(struct iproc_msi *msi, unsigned long hwirq)
@@ -317,7 +317,7 @@ static void iproc_msi_handler(struct irq_desc *desc)
 	struct irq_chip *chip = irq_desc_get_chip(desc);
 	struct iproc_msi_grp *grp;
 	struct iproc_msi *msi;
-	struct iproc_pcie *pcie;
+	struct iproc_pcie *iproc_pcie;
 	u32 eq, head, tail, nr_events;
 	unsigned long hwirq;
 	int virq;
@@ -326,7 +326,7 @@ static void iproc_msi_handler(struct irq_desc *desc)
 
 	grp = irq_desc_get_handler_data(desc);
 	msi = grp->msi;
-	pcie = msi->pcie;
+	iproc_pcie = msi->iproc_pcie;
 	eq = grp->eq;
 
 	/*
@@ -482,7 +482,7 @@ static int iproc_msi_irq_setup(struct iproc_msi *msi, unsigned int cpu)
 {
 	int i, ret;
 	cpumask_var_t mask;
-	struct iproc_pcie *pcie = msi->pcie;
+	struct iproc_pcie *iproc_pcie = msi->iproc_pcie;
 
 	for (i = cpu; i < msi->nr_irqs; i += msi->nr_cpus) {
 		irq_set_chained_handler_and_data(msi->grps[i].gic_irq,
@@ -494,12 +494,12 @@ static int iproc_msi_irq_setup(struct iproc_msi *msi, unsigned int cpu)
 			cpumask_set_cpu(cpu, mask);
 			ret = irq_set_affinity(msi->grps[i].gic_irq, mask);
 			if (ret)
-				dev_err(pcie->dev,
+				dev_err(iproc_pcie->dev,
 					"failed to set affinity for IRQ%d\n",
 					msi->grps[i].gic_irq);
 			free_cpumask_var(mask);
 		} else {
-			dev_err(pcie->dev, "failed to alloc CPU mask\n");
+			dev_err(iproc_pcie->dev, "failed to alloc CPU mask\n");
 			ret = -EINVAL;
 		}
 
@@ -513,7 +513,7 @@ static int iproc_msi_irq_setup(struct iproc_msi *msi, unsigned int cpu)
 	return 0;
 }
 
-int iproc_msi_init(struct iproc_pcie *pcie, struct device_node *node)
+int iproc_msi_init(struct iproc_pcie *iproc_pcie, struct device_node *node)
 {
 	struct iproc_msi *msi;
 	int i, ret;
@@ -525,44 +525,44 @@ int iproc_msi_init(struct iproc_pcie *pcie, struct device_node *node)
 	if (!of_find_property(node, "msi-controller", NULL))
 		return -ENODEV;
 
-	if (pcie->msi)
+	if (iproc_pcie->msi)
 		return -EBUSY;
 
-	msi = devm_kzalloc(pcie->dev, sizeof(*msi), GFP_KERNEL);
+	msi = devm_kzalloc(iproc_pcie->dev, sizeof(*msi), GFP_KERNEL);
 	if (!msi)
 		return -ENOMEM;
 
-	msi->pcie = pcie;
-	pcie->msi = msi;
-	msi->msi_addr = pcie->base_addr;
+	msi->iproc_pcie = iproc_pcie;
+	iproc_pcie->msi = msi;
+	msi->msi_addr = iproc_pcie->base_addr;
 	mutex_init(&msi->bitmap_lock);
 	msi->nr_cpus = num_possible_cpus();
 
 	msi->nr_irqs = of_irq_count(node);
 	if (!msi->nr_irqs) {
-		dev_err(pcie->dev, "found no MSI GIC interrupt\n");
+		dev_err(iproc_pcie->dev, "found no MSI GIC interrupt\n");
 		return -ENODEV;
 	}
 
 	if (msi->nr_irqs > NR_HW_IRQS) {
-		dev_warn(pcie->dev, "too many MSI GIC interrupts defined %d\n",
+		dev_warn(iproc_pcie->dev, "too many MSI GIC interrupts defined %d\n",
 			 msi->nr_irqs);
 		msi->nr_irqs = NR_HW_IRQS;
 	}
 
 	if (msi->nr_irqs < msi->nr_cpus) {
-		dev_err(pcie->dev,
+		dev_err(iproc_pcie->dev,
 			"not enough GIC interrupts for MSI affinity\n");
 		return -EINVAL;
 	}
 
 	if (msi->nr_irqs % msi->nr_cpus != 0) {
 		msi->nr_irqs -= msi->nr_irqs % msi->nr_cpus;
-		dev_warn(pcie->dev, "Reducing number of interrupts to %d\n",
+		dev_warn(iproc_pcie->dev, "Reducing number of interrupts to %d\n",
 			 msi->nr_irqs);
 	}
 
-	switch (pcie->type) {
+	switch (iproc_pcie->type) {
 	case IPROC_PCIE_PAXB:
 		msi->reg_offsets = iproc_msi_reg_paxb;
 		msi->nr_eq_region = 1;
@@ -574,7 +574,7 @@ int iproc_msi_init(struct iproc_pcie *pcie, struct device_node *node)
 		msi->nr_msi_region = msi->nr_irqs;
 		break;
 	default:
-		dev_err(pcie->dev, "incompatible iProc PCIe interface\n");
+		dev_err(iproc_pcie->dev, "incompatible iProc PCIe interface\n");
 		return -EINVAL;
 	}
 
@@ -582,12 +582,12 @@ int iproc_msi_init(struct iproc_pcie *pcie, struct device_node *node)
 		msi->has_inten_reg = true;
 
 	msi->nr_msi_vecs = msi->nr_irqs * EQ_LEN;
-	msi->bitmap = devm_kcalloc(pcie->dev, BITS_TO_LONGS(msi->nr_msi_vecs),
+	msi->bitmap = devm_kcalloc(iproc_pcie->dev, BITS_TO_LONGS(msi->nr_msi_vecs),
 				   sizeof(*msi->bitmap), GFP_KERNEL);
 	if (!msi->bitmap)
 		return -ENOMEM;
 
-	msi->grps = devm_kcalloc(pcie->dev, msi->nr_irqs, sizeof(*msi->grps),
+	msi->grps = devm_kcalloc(iproc_pcie->dev, msi->nr_irqs, sizeof(*msi->grps),
 				 GFP_KERNEL);
 	if (!msi->grps)
 		return -ENOMEM;
@@ -596,7 +596,7 @@ int iproc_msi_init(struct iproc_pcie *pcie, struct device_node *node)
 		unsigned int irq = irq_of_parse_and_map(node, i);
 
 		if (!irq) {
-			dev_err(pcie->dev, "unable to parse/map interrupt\n");
+			dev_err(iproc_pcie->dev, "unable to parse/map interrupt\n");
 			ret = -ENODEV;
 			goto free_irqs;
 		}
@@ -606,7 +606,7 @@ int iproc_msi_init(struct iproc_pcie *pcie, struct device_node *node)
 	}
 
 	/* Reserve memory for event queue and make sure memories are zeroed */
-	msi->eq_cpu = dma_zalloc_coherent(pcie->dev,
+	msi->eq_cpu = dma_zalloc_coherent(iproc_pcie->dev,
 					  msi->nr_eq_region * EQ_MEM_REGION_SIZE,
 					  &msi->eq_dma, GFP_KERNEL);
 	if (!msi->eq_cpu) {
@@ -616,7 +616,7 @@ int iproc_msi_init(struct iproc_pcie *pcie, struct device_node *node)
 
 	ret = iproc_msi_alloc_domains(node, msi);
 	if (ret) {
-		dev_err(pcie->dev, "failed to create MSI domains\n");
+		dev_err(iproc_pcie->dev, "failed to create MSI domains\n");
 		goto free_eq_dma;
 	}
 
@@ -636,7 +636,7 @@ free_msi_irq:
 	iproc_msi_free_domains(msi);
 
 free_eq_dma:
-	dma_free_coherent(pcie->dev, msi->nr_eq_region * EQ_MEM_REGION_SIZE,
+	dma_free_coherent(iproc_pcie->dev, msi->nr_eq_region * EQ_MEM_REGION_SIZE,
 			  msi->eq_cpu, msi->eq_dma);
 
 free_irqs:
@@ -644,14 +644,14 @@ free_irqs:
 		if (msi->grps[i].gic_irq)
 			irq_dispose_mapping(msi->grps[i].gic_irq);
 	}
-	pcie->msi = NULL;
+	iproc_pcie->msi = NULL;
 	return ret;
 }
 EXPORT_SYMBOL(iproc_msi_init);
 
-void iproc_msi_exit(struct iproc_pcie *pcie)
+void iproc_msi_exit(struct iproc_pcie *iproc_pcie)
 {
-	struct iproc_msi *msi = pcie->msi;
+	struct iproc_msi *msi = iproc_pcie->msi;
 	unsigned int i, cpu;
 
 	if (!msi)
@@ -664,7 +664,7 @@ void iproc_msi_exit(struct iproc_pcie *pcie)
 
 	iproc_msi_free_domains(msi);
 
-	dma_free_coherent(pcie->dev, msi->nr_eq_region * EQ_MEM_REGION_SIZE,
+	dma_free_coherent(iproc_pcie->dev, msi->nr_eq_region * EQ_MEM_REGION_SIZE,
 			  msi->eq_cpu, msi->eq_dma);
 
 	for (i = 0; i < msi->nr_irqs; i++) {

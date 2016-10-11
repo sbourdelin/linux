@@ -157,12 +157,12 @@ struct mvebu_pcie_port {
 	u32 saved_pcie_stat;
 };
 
-static inline void mvebu_writel(struct mvebu_pcie_port *port, u32 val, u32 reg)
+static void mvebu_writel(struct mvebu_pcie_port *port, u32 reg, u32 val)
 {
 	writel(val, port->base + reg);
 }
 
-static inline u32 mvebu_readl(struct mvebu_pcie_port *port, u32 reg)
+static u32 mvebu_readl(struct mvebu_pcie_port *port, u32 reg)
 {
 	return readl(port->base + reg);
 }
@@ -184,7 +184,7 @@ static void mvebu_pcie_set_local_bus_nr(struct mvebu_pcie_port *port, int nr)
 	stat = mvebu_readl(port, PCIE_STAT_OFF);
 	stat &= ~PCIE_STAT_BUS;
 	stat |= nr << 8;
-	mvebu_writel(port, stat, PCIE_STAT_OFF);
+	mvebu_writel(port, PCIE_STAT_OFF, stat);
 }
 
 static void mvebu_pcie_set_local_dev_nr(struct mvebu_pcie_port *port, int nr)
@@ -194,7 +194,7 @@ static void mvebu_pcie_set_local_dev_nr(struct mvebu_pcie_port *port, int nr)
 	stat = mvebu_readl(port, PCIE_STAT_OFF);
 	stat &= ~PCIE_STAT_DEV;
 	stat |= nr << 16;
-	mvebu_writel(port, stat, PCIE_STAT_OFF);
+	mvebu_writel(port, PCIE_STAT_OFF, stat);
 }
 
 /*
@@ -212,34 +212,33 @@ static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
 
 	/* First, disable and clear BARs and windows. */
 	for (i = 1; i < 3; i++) {
-		mvebu_writel(port, 0, PCIE_BAR_CTRL_OFF(i));
-		mvebu_writel(port, 0, PCIE_BAR_LO_OFF(i));
-		mvebu_writel(port, 0, PCIE_BAR_HI_OFF(i));
+		mvebu_writel(port, PCIE_BAR_CTRL_OFF(i), 0);
+		mvebu_writel(port, PCIE_BAR_LO_OFF(i), 0);
+		mvebu_writel(port, PCIE_BAR_HI_OFF(i), 0);
 	}
 
 	for (i = 0; i < 5; i++) {
-		mvebu_writel(port, 0, PCIE_WIN04_CTRL_OFF(i));
-		mvebu_writel(port, 0, PCIE_WIN04_BASE_OFF(i));
-		mvebu_writel(port, 0, PCIE_WIN04_REMAP_OFF(i));
+		mvebu_writel(port, PCIE_WIN04_CTRL_OFF(i), 0);
+		mvebu_writel(port, PCIE_WIN04_BASE_OFF(i), 0);
+		mvebu_writel(port, PCIE_WIN04_REMAP_OFF(i), 0);
 	}
 
-	mvebu_writel(port, 0, PCIE_WIN5_CTRL_OFF);
-	mvebu_writel(port, 0, PCIE_WIN5_BASE_OFF);
-	mvebu_writel(port, 0, PCIE_WIN5_REMAP_OFF);
+	mvebu_writel(port, PCIE_WIN5_CTRL_OFF, 0);
+	mvebu_writel(port, PCIE_WIN5_BASE_OFF, 0);
+	mvebu_writel(port, PCIE_WIN5_REMAP_OFF, 0);
 
 	/* Setup windows for DDR banks.  Count total DDR size on the fly. */
 	size = 0;
 	for (i = 0; i < dram->num_cs; i++) {
 		const struct mbus_dram_window *cs = dram->cs + i;
 
-		mvebu_writel(port, cs->base & 0xffff0000,
-			     PCIE_WIN04_BASE_OFF(i));
-		mvebu_writel(port, 0, PCIE_WIN04_REMAP_OFF(i));
-		mvebu_writel(port,
+		mvebu_writel(port, PCIE_WIN04_BASE_OFF(i),
+			     cs->base & 0xffff0000);
+		mvebu_writel(port, PCIE_WIN04_REMAP_OFF(i), 0);
+		mvebu_writel(port, PCIE_WIN04_CTRL_OFF(i),
 			     ((cs->size - 1) & 0xffff0000) |
 			     (cs->mbus_attr << 8) |
-			     (dram->mbus_dram_target_id << 4) | 1,
-			     PCIE_WIN04_CTRL_OFF(i));
+			     (dram->mbus_dram_target_id << 4) | 1);
 
 		size += cs->size;
 	}
@@ -249,10 +248,9 @@ static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
 		size = 1 << fls(size);
 
 	/* Setup BAR[1] to all DRAM banks. */
-	mvebu_writel(port, dram->cs[0].base, PCIE_BAR_LO_OFF(1));
-	mvebu_writel(port, 0, PCIE_BAR_HI_OFF(1));
-	mvebu_writel(port, ((size - 1) & 0xffff0000) | 1,
-		     PCIE_BAR_CTRL_OFF(1));
+	mvebu_writel(port, PCIE_BAR_LO_OFF(1), dram->cs[0].base);
+	mvebu_writel(port, PCIE_BAR_HI_OFF(1), 0);
+	mvebu_writel(port, PCIE_BAR_CTRL_OFF(1), ((size - 1) & 0xffff0000) | 1);
 }
 
 static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
@@ -267,12 +265,12 @@ static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
 	cmd |= PCI_COMMAND_IO;
 	cmd |= PCI_COMMAND_MEMORY;
 	cmd |= PCI_COMMAND_MASTER;
-	mvebu_writel(port, cmd, PCIE_CMD_OFF);
+	mvebu_writel(port, PCIE_CMD_OFF, cmd);
 
 	/* Enable interrupt lines A-D. */
 	mask = mvebu_readl(port, PCIE_MASK_OFF);
 	mask |= PCIE_MASK_ENABLE_INTS;
-	mvebu_writel(port, mask, PCIE_MASK_OFF);
+	mvebu_writel(port, PCIE_MASK_OFF, mask);
 }
 
 static int mvebu_pcie_hw_rd_conf(struct mvebu_pcie_port *port,
@@ -281,8 +279,8 @@ static int mvebu_pcie_hw_rd_conf(struct mvebu_pcie_port *port,
 {
 	void __iomem *conf_data = port->base + PCIE_CONF_DATA_OFF;
 
-	mvebu_writel(port, PCIE_CONF_ADDR(bus->number, devfn, where),
-		     PCIE_CONF_ADDR_OFF);
+	mvebu_writel(port, PCIE_CONF_ADDR_OFF,
+		     PCIE_CONF_ADDR(bus->number, devfn, where));
 
 	switch (size) {
 	case 1:
@@ -305,8 +303,8 @@ static int mvebu_pcie_hw_wr_conf(struct mvebu_pcie_port *port,
 {
 	void __iomem *conf_data = port->base + PCIE_CONF_DATA_OFF;
 
-	mvebu_writel(port, PCIE_CONF_ADDR(bus->number, devfn, where),
-		     PCIE_CONF_ADDR_OFF);
+	mvebu_writel(port, PCIE_CONF_ADDR_OFF,
+		     PCIE_CONF_ADDR(bus->number, devfn, where));
 
 	switch (size) {
 	case 1:
@@ -717,7 +715,7 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
 		if (mask == 0xffff0000)
 			value &= 0xffff;
 
-		mvebu_writel(port, value, PCIE_CAP_PCIEXP + PCI_EXP_DEVCTL);
+		mvebu_writel(port, PCIE_CAP_PCIEXP + PCI_EXP_DEVCTL, value);
 		break;
 
 	case PCISWCAP_EXP_LNKCTL:
@@ -738,11 +736,11 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
 		if (mask == 0xffff0000)
 			value &= 0xffff;
 
-		mvebu_writel(port, value, PCIE_CAP_PCIEXP + PCI_EXP_LNKCTL);
+		mvebu_writel(port, PCIE_CAP_PCIEXP + PCI_EXP_LNKCTL, value);
 		break;
 
 	case PCISWCAP_EXP_RTSTA:
-		mvebu_writel(port, value, PCIE_RC_RTSTA);
+		mvebu_writel(port, PCIE_RC_RTSTA, value);
 		break;
 
 	default:
@@ -1025,7 +1023,7 @@ static int mvebu_pcie_resume(struct device *dev)
 	pcie = dev_get_drvdata(dev);
 	for (i = 0; i < pcie->nports; i++) {
 		struct mvebu_pcie_port *port = pcie->ports + i;
-		mvebu_writel(port, port->saved_pcie_stat, PCIE_STAT_OFF);
+		mvebu_writel(port, PCIE_STAT_OFF, port->saved_pcie_stat);
 		mvebu_pcie_setup_hw(port);
 	}
 
@@ -1190,13 +1188,13 @@ static void mvebu_pcie_powerdown(struct mvebu_pcie_port *port)
 
 static int mvebu_pcie_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	struct mvebu_pcie *pcie;
-	struct device_node *np = pdev->dev.of_node;
+	struct device_node *np = dev->of_node;
 	struct device_node *child;
 	int num, i, ret;
 
-	pcie = devm_kzalloc(&pdev->dev, sizeof(struct mvebu_pcie),
-			    GFP_KERNEL);
+	pcie = devm_kzalloc(dev, sizeof(struct mvebu_pcie), GFP_KERNEL);
 	if (!pcie)
 		return -ENOMEM;
 
@@ -1206,7 +1204,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
 	/* Get the PCIe memory and I/O aperture */
 	mvebu_mbus_get_pcie_mem_aperture(&pcie->mem);
 	if (resource_size(&pcie->mem) == 0) {
-		dev_err(&pdev->dev, "invalid memory aperture size\n");
+		dev_err(dev, "invalid memory aperture size\n");
 		return -EINVAL;
 	}
 
@@ -1224,15 +1222,13 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
 	/* Get the bus range */
 	ret = of_pci_parse_bus_range(np, &pcie->busn);
 	if (ret) {
-		dev_err(&pdev->dev, "failed to parse bus-range property: %d\n",
-			ret);
+		dev_err(dev, "failed to parse bus-range property: %d\n", ret);
 		return ret;
 	}
 
 	num = of_get_available_child_count(pdev->dev.of_node);
 
-	pcie->ports = devm_kcalloc(&pdev->dev, num, sizeof(*pcie->ports),
-				   GFP_KERNEL);
+	pcie->ports = devm_kcalloc(dev, num, sizeof(*pcie->ports), GFP_KERNEL);
 	if (!pcie->ports)
 		return -ENOMEM;
 
@@ -1266,8 +1262,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
 
 		port->base = mvebu_pcie_map_registers(pdev, child, port);
 		if (IS_ERR(port->base)) {
-			dev_err(&pdev->dev, "%s: cannot map registers\n",
-				port->name);
+			dev_err(dev, "%s: cannot map registers\n", port->name);
 			port->base = NULL;
 			mvebu_pcie_powerdown(port);
 			continue;
