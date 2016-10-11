@@ -186,12 +186,12 @@ struct nwl_pcie {
 	struct irq_domain *legacy_irq_domain;
 };
 
-static inline u32 nwl_bridge_readl(struct nwl_pcie *nwl_pcie, u32 off)
+static u32 nwl_bridge_readl(struct nwl_pcie *nwl_pcie, u32 off)
 {
 	return readl(nwl_pcie->breg_base + off);
 }
 
-static inline void nwl_bridge_writel(struct nwl_pcie *nwl_pcie, u32 val, u32 off)
+static void nwl_bridge_writel(struct nwl_pcie *nwl_pcie, u32 val, u32 off)
 {
 	writel(val, nwl_pcie->breg_base + off);
 }
