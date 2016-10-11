@@ -265,8 +265,6 @@ static noinline int cow_file_range_inline(struct btrfs_root *root,
 	if (start > 0 ||
 	    actual_end > root->sectorsize ||
 	    data_len > BTRFS_MAX_INLINE_DATA_SIZE(root) ||
-	    (!compressed_size &&
-	    (actual_end & (root->sectorsize - 1)) == 0) ||
 	    end + 1 < isize ||
 	    data_len > root->fs_info->max_inline) {
 		return 1;
