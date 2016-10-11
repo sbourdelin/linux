@@ -419,11 +419,13 @@ static int piix4_transaction(struct i2c_adapter *piix4_adapter)
 		inb_p(SMBHSTDAT1));
 
 	/* Make sure the SMBus host is ready to start transmitting */
-	if ((temp = inb_p(SMBHSTSTS)) != 0x00) {
+	temp = inb_p(SMBHSTSTS);
+	if (temp != 0x00) {
 		dev_dbg(&piix4_adapter->dev, "SMBus busy (%02x). "
 			"Resetting...\n", temp);
 		outb_p(temp, SMBHSTSTS);
-		if ((temp = inb_p(SMBHSTSTS)) != 0x00) {
+		temp = inb_p(SMBHSTSTS);
+		if (temp != 0x00) {
 			dev_err(&piix4_adapter->dev, "Failed! (%02x)\n", temp);
 			return -EBUSY;
 		} else {
@@ -470,7 +472,8 @@ static int piix4_transaction(struct i2c_adapter *piix4_adapter)
 	if (inb_p(SMBHSTSTS) != 0x00)
 		outb_p(inb(SMBHSTSTS), SMBHSTSTS);
 
-	if ((temp = inb_p(SMBHSTSTS)) != 0x00) {
+	temp = inb_p(SMBHSTSTS);
+	if (temp != 0x00) {
 		dev_err(&piix4_adapter->dev, "Failed reset at end of "
 			"transaction (%02x)\n", temp);
 	}
