@@ -1469,7 +1469,9 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 	 */
 	if (!i915_gem_object_has_struct_page(obj) ||
 	    cpu_write_needs_clflush(obj)) {
+		intel_runtime_pm_get(dev_priv);
 		ret = i915_gem_gtt_pwrite_fast(dev_priv, obj, args, file);
+		intel_runtime_pm_put(dev_priv);
 		/* Note that the gtt paths might fail with non-page-backed user
 		 * pointers (e.g. gtt mappings when moving data between
 		 * textures). Fallback to the shmem path in that case. */
@@ -1851,6 +1853,7 @@ int i915_gem_fault(struct vm_area_struct *area, struct vm_fault *vmf)
 	if (ret)
 		goto err_unpin;
 
+	assert_rpm_wakelock_held(dev_priv);
 	spin_lock(&dev_priv->mm.userfault_lock);
 	list_add(&obj->userfault_link, &dev_priv->mm.userfault_list);
 	spin_unlock(&dev_priv->mm.userfault_lock);
@@ -1933,7 +1936,7 @@ i915_gem_release_mmap(struct drm_i915_gem_object *obj)
 	 * requirement that operations to the GGTT be made holding the RPM
 	 * wakeref.
 	 */
-	lockdep_assert_held(&obj->base.dev->struct_mutex);
+	assert_rpm_wakelock_held(i915);
 
 	spin_lock(&i915->mm.userfault_lock);
 	if (!list_empty(&obj->userfault_link)) {
@@ -3464,7 +3467,6 @@ int i915_gem_get_caching_ioctl(struct drm_device *dev, void *data,
 int i915_gem_set_caching_ioctl(struct drm_device *dev, void *data,
 			       struct drm_file *file)
 {
-	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_i915_gem_caching *args = data;
 	struct drm_i915_gem_object *obj;
 	enum i915_cache_level level;
@@ -3493,11 +3495,9 @@ int i915_gem_set_caching_ioctl(struct drm_device *dev, void *data,
 		return -EINVAL;
 	}
 
-	intel_runtime_pm_get(dev_priv);
-
 	ret = i915_mutex_lock_interruptible(dev);
 	if (ret)
-		goto rpm_put;
+		return ret;
 
 	obj = i915_gem_object_lookup(file, args->handle);
 	if (!obj) {
@@ -3506,13 +3506,9 @@ int i915_gem_set_caching_ioctl(struct drm_device *dev, void *data,
 	}
 
 	ret = i915_gem_object_set_cache_level(obj, level);
-
 	i915_gem_object_put(obj);
 unlock:
 	mutex_unlock(&dev->struct_mutex);
-rpm_put:
-	intel_runtime_pm_put(dev_priv);
-
 	return ret;
 }
 
