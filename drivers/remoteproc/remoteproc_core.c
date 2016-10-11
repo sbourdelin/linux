@@ -1345,6 +1345,68 @@ static int rproc_set_firmware_name(struct rproc *rproc, const char *firmware)
 	return 0;
 }
 
+/**
+ * rproc_change_firmware() - change the loaded firmware on a remote processor
+ * @rproc: remote processor
+ * @firmware: name of firmware file to load, can be NULL
+ *
+ * Attempts to change the firmware loaded for a remote processor. The processor
+ * must be in RPROC_OFFLINE state.
+ *
+ * Any allocated resources for the exiting firmware are released, the new
+ * firmware name is set and then any virtio devices probed.
+ *
+ * Returns 0 on success and an appropriate error code otherwise.
+ *
+ * Note: this function initiates an asynchronous firmware loading
+ * context, which will look for virtio devices supported by the rproc's
+ * firmware.
+ *
+ * If found, those virtio devices will be created and added, so as a result
+ * of registering this remote processor, additional virtio drivers might be
+ * probed.
+ */
+int rproc_change_firmware(struct rproc *rproc, const char *firmware)
+{
+	struct device *dev = &rproc->dev;
+	struct rproc_vdev *rvdev, *rvtmp;
+	int ret;
+
+	ret = mutex_lock_interruptible(&rproc->lock);
+	if (ret) {
+		dev_err(dev, "can't lock rproc %s: %d\n", rproc->name, ret);
+		return -EINVAL;
+	}
+
+	if (rproc->state != RPROC_OFFLINE) {
+		dev_err(dev, "can't change firmware while running\n");
+		ret = -EBUSY;
+		goto out;
+	}
+
+	/* Wait for any pending firmware load */
+	wait_for_completion(&rproc->firmware_loading_complete);
+
+	/* clean up all acquired resources */
+	rproc_resource_cleanup(rproc);
+
+	/* clean up remote vdev entries */
+	list_for_each_entry_safe(rvdev, rvtmp, &rproc->rvdevs, node)
+		rproc_remove_virtio_dev(rvdev);
+
+	/* Free the copy of the resource table */
+	kfree(rproc->cached_table);
+
+	ret = rproc_set_firmware_name(rproc, firmware);
+	if (ret)
+		goto out;
+
+	ret = rproc_add_virtio_devices(rproc);
+out:
+	mutex_unlock(&rproc->lock);
+	return ret;
+}
+
 static struct device_type rproc_type = {
 	.name		= "remoteproc",
 	.release	= rproc_type_release,
