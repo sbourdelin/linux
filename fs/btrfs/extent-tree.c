@@ -3434,6 +3434,7 @@ again:
 
 	spin_lock(&block_group->lock);
 	if (block_group->cached != BTRFS_CACHE_FINISHED ||
+		block_group->fs_info->log_root_recovering ||
 	    !btrfs_test_opt(root->fs_info, SPACE_CACHE)) {
 		/*
 		 * don't bother trying to write stuff out _if_
