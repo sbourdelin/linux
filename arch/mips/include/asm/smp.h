@@ -103,4 +103,5 @@ static inline void arch_send_call_function_ipi_mask(const struct cpumask *mask)
 extern void (*dump_ipi_function_ptr)(void *);
 void dump_send_ipi(void (*dump_ipi_callback)(void *));
 #endif
+
 #endif /* __ASM_SMP_H */
