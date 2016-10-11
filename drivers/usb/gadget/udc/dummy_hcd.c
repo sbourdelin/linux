@@ -1060,6 +1060,7 @@ static int dummy_udc_remove(struct platform_device *pdev)
 
 	device_remove_file(&dum->gadget.dev, &dev_attr_function);
 	usb_del_gadget_udc(&dum->gadget);
+	memset(&dum->gadget, 0, sizeof(dum->gadget));
 	return 0;
 }
 
