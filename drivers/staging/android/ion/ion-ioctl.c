@@ -28,6 +28,7 @@ union ion_ioctl_arg {
 	struct ion_handle_data handle;
 	struct ion_custom_data custom;
 	struct ion_heap_query query;
+	struct ion_tag_data tag;
 };
 
 static int validate_ioctl_arg(unsigned int cmd, union ion_ioctl_arg *arg)
@@ -162,6 +163,22 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case ION_IOC_HEAP_QUERY:
 		ret = ion_query_heaps(client, &data.query);
 		break;
+	case ION_IOC_TAG:
+	{
+#ifdef CONFIG_MEMTRACK
+		struct ion_handle *handle;
+
+		handle = ion_handle_get_by_id(client, data.tag.handle);
+		if (IS_ERR(handle))
+			return PTR_ERR(handle);
+		data.tag.tag[sizeof(data.tag.tag) - 1] = 0;
+		memtrack_buffer_set_tag(&handle->buffer->memtrack_buffer,
+					data.tag.tag);
+#else
+		ret = -ENOTTY;
+#endif
+		break;
+	}
 	default:
 		return -ENOTTY;
 	}

@@ -115,6 +115,22 @@ struct ion_handle_data {
 	ion_user_handle_t handle;
 };
 
+#define ION_MAX_TAG_LEN 32
+
+/**
+ * struct ion_fd_data - metadata passed from userspace for a handle
+ * @handle:	a handle
+ * @tag: a string describing the buffer
+ *
+ * For ION_IOC_TAG userspace populates the handle field with
+ * the handle returned from ion alloc and type contains the memtrack_type which
+ * accurately describes the usage for the memory.
+ */
+struct ion_tag_data {
+	ion_user_handle_t handle;
+	char tag[ION_MAX_TAG_LEN];
+};
+
 /**
  * struct ion_custom_data - metadata passed to/from userspace for a custom ioctl
  * @cmd:	the custom ioctl function to call
@@ -215,6 +231,15 @@ struct ion_heap_query {
  * this will make the buffer in memory coherent.
  */
 #define ION_IOC_SYNC		_IOWR(ION_IOC_MAGIC, 7, struct ion_fd_data)
+
+/**
+ * DOC: ION_IOC_TAG - adds a memtrack descriptor tag to memory
+ *
+ * Takes an ion_tag_data struct with the type field populated with a
+ * memtrack_type and handle populated with a valid opaque handle. The
+ * memtrack_type should accurately define the usage for the memory.
+ */
+#define ION_IOC_TAG		_IOWR(ION_IOC_MAGIC, 8, struct ion_tag_data)
 
 /**
  * DOC: ION_IOC_CUSTOM - call architecture specific ion ioctl
