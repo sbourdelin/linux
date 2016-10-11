@@ -5224,6 +5224,7 @@ static void raid5_make_request(struct mddev *mddev, struct bio * bi)
 	int remaining;
 	DEFINE_WAIT(w);
 	bool do_prepare;
+	bool do_flush = false;
 
 	if (unlikely(bi->bi_opf & REQ_PREFLUSH)) {
 		int ret = r5l_handle_flush_request(conf->log, bi);
@@ -5235,6 +5236,7 @@ static void raid5_make_request(struct mddev *mddev, struct bio * bi)
 			return;
 		}
 		/* ret == -EAGAIN, fallback */
+		do_flush = true;
 	}
 
 	md_write_start(mddev, bi);
@@ -5374,6 +5376,12 @@ static void raid5_make_request(struct mddev *mddev, struct bio * bi)
 				do_prepare = true;
 				goto retry;
 			}
+			if (do_flush) {
+				set_bit(STRIPE_R5C_PREFLUSH, &sh->state);
+				/* we only need flush for one stripe */
+				do_flush = false;
+			}
+
 			set_bit(STRIPE_HANDLE, &sh->state);
 			clear_bit(STRIPE_DELAYED, &sh->state);
 			if ((!sh->batch_head || sh == sh->batch_head) &&
