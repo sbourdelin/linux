@@ -188,11 +188,11 @@ describe_obj(struct seq_file *m, struct drm_i915_gem_object *obj)
 	}
 	if (obj->stolen)
 		seq_printf(m, " (stolen: %08llx)", obj->stolen->start);
-	if (obj->pin_display || obj->fault_mappable) {
+	if (obj->pin_display || !list_empty(&obj->userfault_link)) {
 		char s[3], *t = s;
 		if (obj->pin_display)
 			*t++ = 'p';
-		if (obj->fault_mappable)
+		if (!list_empty(&obj->userfault_link))
 			*t++ = 'f';
 		*t = '\0';
 		seq_printf(m, " (%s mappable)", s);

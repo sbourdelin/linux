@@ -1851,7 +1851,10 @@ int i915_gem_fault(struct vm_area_struct *area, struct vm_fault *vmf)
 	if (ret)
 		goto err_unpin;
 
-	obj->fault_mappable = true;
+	spin_lock(&dev_priv->mm.userfault_lock);
+	list_add(&obj->userfault_link, &dev_priv->mm.userfault_list);
+	spin_unlock(&dev_priv->mm.userfault_lock);
+
 err_unpin:
 	__i915_vma_unpin(vma);
 err_unlock:
@@ -1919,36 +1922,52 @@ err:
 void
 i915_gem_release_mmap(struct drm_i915_gem_object *obj)
 {
+	struct drm_i915_private *i915 = to_i915(obj->base.dev);
+	bool zap = false;
+
 	/* Serialisation between user GTT access and our code depends upon
 	 * revoking the CPU's PTE whilst the mutex is held. The next user
 	 * pagefault then has to wait until we release the mutex.
+	 *
+	 * Note that RPM complicates somewhat by adding an additional
+	 * requirement that operations to the GGTT be made holding the RPM
+	 * wakeref.
 	 */
 	lockdep_assert_held(&obj->base.dev->struct_mutex);
 
-	if (!obj->fault_mappable)
+	spin_lock(&i915->mm.userfault_lock);
+	if (!list_empty(&obj->userfault_link)) {
+		list_del_init(&obj->userfault_link);
+		zap = true;
+	}
+	spin_unlock(&i915->mm.userfault_lock);
+	if (!zap)
 		return;
 
 	drm_vma_node_unmap(&obj->base.vma_node,
 			   obj->base.dev->anon_inode->i_mapping);
 
 	/* Ensure that the CPU's PTE are revoked and there are not outstanding
-	 * memory transactions from userspace before we return. The TLB
-	 * flushing implied above by changing the PTE above *should* be
+	 * memory transactions from userspace before we return. The TLB 
+	 * flushing implied above by changing the PTE above *should* be 
 	 * sufficient, an extra barrier here just provides us with a bit
 	 * of paranoid documentation about our requirement to serialise
-	 * memory writes before touching registers / GSM.
+	 * memory writes before touching registers / GSM. 
 	 */
 	wmb();
-
-	obj->fault_mappable = false;
 }
 
 void
 i915_gem_release_all_mmaps(struct drm_i915_private *dev_priv)
 {
-	struct drm_i915_gem_object *obj;
+	struct drm_i915_gem_object *obj, *on;
+	struct list_head userfault_list;
 
-	list_for_each_entry(obj, &dev_priv->mm.bound_list, global_list)
+	spin_lock(&dev_priv->mm.userfault_lock);
+	list_replace_init(&dev_priv->mm.userfault_list, &userfault_list);
+	spin_unlock(&dev_priv->mm.userfault_lock);
+
+	list_for_each_entry_safe(obj, on, &userfault_list, userfault_link)
 		i915_gem_release_mmap(obj);
 }
 
@@ -4061,6 +4080,7 @@ void i915_gem_object_init(struct drm_i915_gem_object *obj,
 	int i;
 
 	INIT_LIST_HEAD(&obj->global_list);
+	INIT_LIST_HEAD(&obj->userfault_link);
 	for (i = 0; i < I915_NUM_ENGINES; i++)
 		init_request_active(&obj->last_read[i],
 				    i915_gem_object_retire__read);
@@ -4436,6 +4456,7 @@ int i915_gem_init(struct drm_device *dev)
 	int ret;
 
 	mutex_lock(&dev->struct_mutex);
+	spin_lock_init(&dev_priv->mm.userfault_lock);
 
 	if (!i915.enable_execlists) {
 		dev_priv->gt.resume = intel_legacy_submission_resume;
