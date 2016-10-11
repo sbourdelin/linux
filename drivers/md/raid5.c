@@ -220,6 +220,11 @@ static void do_release_stripe(struct r5conf *conf, struct stripe_head *sh,
 {
 	BUG_ON(!list_empty(&sh->lru));
 	BUG_ON(atomic_read(&conf->active_stripes)==0);
+
+	/* When quiesce in r5c write back, make sure the stripe is handled*/
+	if (conf->quiesce && r5c_is_writeback(conf->log))
+		r5c_prepare_stripe_for_release_in_quiesce(sh);
+
 	if (test_bit(STRIPE_HANDLE, &sh->state)) {
 		if (test_bit(STRIPE_DELAYED, &sh->state) &&
 		    !test_bit(STRIPE_PREREAD_ACTIVE, &sh->state))
@@ -256,6 +261,7 @@ static void do_release_stripe(struct r5conf *conf, struct stripe_head *sh,
 				if (test_and_clear_bit(STRIPE_R5C_PARTIAL_STRIPE, &sh->state))
 					atomic_dec(&conf->r5c_cached_partial_stripes);
 				list_add_tail(&sh->lru, &conf->r5c_full_stripe_list);
+				r5c_check_cached_full_stripe(conf);
 			} else {
 				/* partial stripe */
 				if (!test_and_set_bit(STRIPE_R5C_PARTIAL_STRIPE,
@@ -626,9 +632,12 @@ raid5_get_active_stripe(struct r5conf *conf, sector_t sector,
 			}
 			if (noblock && sh == NULL)
 				break;
+
+			r5c_check_stripe_cache_usage(conf);
 			if (!sh) {
 				set_bit(R5_INACTIVE_BLOCKED,
 					&conf->cache_state);
+				r5l_wake_reclaim(conf->log, 0);
 				wait_event_lock_irq(
 					conf->wait_for_stripe,
 					!list_empty(conf->inactive_list + hash) &&
@@ -854,6 +863,7 @@ static void ops_run_io(struct stripe_head *sh, struct stripe_head_state *s)
 
 	if (r5l_write_stripe(conf->log, sh) == 0)
 		return;
+
 	for (i = disks; i--; ) {
 		int op, op_flags = 0;
 		int replace_only = 0;
@@ -1983,8 +1993,10 @@ static struct stripe_head *alloc_stripe(struct kmem_cache *sc, gfp_t gfp,
 		spin_lock_init(&sh->batch_lock);
 		INIT_LIST_HEAD(&sh->batch_list);
 		INIT_LIST_HEAD(&sh->lru);
+		INIT_LIST_HEAD(&sh->r5c);
 		atomic_set(&sh->count, 1);
 		atomic_set(&sh->dev_in_cache, 0);
+		sh->log_start = MaxSector;
 		for (i = 0; i < disks; i++) {
 			struct r5dev *dev = &sh->dev[i];
 
@@ -4738,6 +4750,10 @@ static int raid5_congested(struct mddev *mddev, int bits)
 	 */
 
 	if (test_bit(R5_INACTIVE_BLOCKED, &conf->cache_state))
+		return 1;
+
+	/* Also checks whether there is pressure on r5cache log space */
+	if (test_bit(R5C_LOG_TIGHT, &conf->cache_state))
 		return 1;
 	if (conf->quiesce)
 		return 1;
@@ -7697,6 +7713,7 @@ static void raid5_quiesce(struct mddev *mddev, int state)
 		/* '2' tells resync/reshape to pause so that all
 		 * active stripes can drain
 		 */
+		r5c_flush_cache(conf, 0);
 		conf->quiesce = 2;
 		wait_event_cmd(conf->wait_for_quiescent,
 				    atomic_read(&conf->active_stripes) == 0 &&
