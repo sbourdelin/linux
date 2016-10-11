@@ -267,6 +267,11 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 	    (mode & ~FALLOC_FL_INSERT_RANGE))
 		return -EINVAL;
 
+	/* Unshare range should only be used with allocate mode. */
+	if ((mode & FALLOC_FL_UNSHARE_RANGE) &&
+	    (mode & ~(FALLOC_FL_UNSHARE_RANGE | FALLOC_FL_KEEP_SIZE)))
+		return -EINVAL;
+
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EBADF;
 
@@ -669,13 +674,14 @@ SYSCALL_DEFINE3(fchown, unsigned int, fd, uid_t, user, gid_t, group)
 	if (!f.file)
 		goto out;
 
-	error = mnt_want_write_file(f.file);
-	if (error)
-		goto out_fput;
-	audit_file(f.file);
-	error = chown_common(&f.file->f_path, user, group);
-	mnt_drop_write_file(f.file);
-out_fput:
+	sb_start_write(f.file->f_path.mnt->mnt_sb);
+	error = __mnt_want_write_file(f.file);
+	if (!error) {
+		audit_file(f.file);
+		error = chown_common(&f.file->f_path, user, group);
+		__mnt_drop_write_file(f.file);
+	}
+	sb_end_write(f.file->f_path.mnt->mnt_sb);
 	fdput(f);
 out:
 	return error;

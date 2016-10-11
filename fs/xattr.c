@@ -23,6 +23,60 @@
 #include <linux/posix_acl_xattr.h>
 
 #include <asm/uaccess.h>
+#include "internal.h"
+
+static const char *
+strcmp_prefix(const char *a, const char *a_prefix)
+{
+	while (*a_prefix && *a == *a_prefix) {
+		a++;
+		a_prefix++;
+	}
+	return *a_prefix ? NULL : a;
+}
+
+/*
+ * In order to implement different sets of xattr operations for each xattr
+ * prefix, a filesystem should create a null-terminated array of struct
+ * xattr_handler (one for each prefix) and hang a pointer to it off of the
+ * s_xattr field of the superblock.
+ */
+#define for_each_xattr_handler(handlers, handler)		\
+	if (handlers)						\
+		for ((handler) = *(handlers)++;			\
+			(handler) != NULL;			\
+			(handler) = *(handlers)++)
+
+/*
+ * Find the xattr_handler with the matching prefix.
+ */
+static const struct xattr_handler *
+xattr_resolve_name(struct inode *inode, const char **name)
+{
+	const struct xattr_handler **handlers = inode->i_sb->s_xattr;
+	const struct xattr_handler *handler;
+
+	if (!(inode->i_opflags & IOP_XATTR)) {
+		if (unlikely(is_bad_inode(inode)))
+			return ERR_PTR(-EIO);
+		return ERR_PTR(-EOPNOTSUPP);
+	}
+	for_each_xattr_handler(handlers, handler) {
+		const char *n;
+
+		n = strcmp_prefix(*name, xattr_prefix(handler));
+		if (n) {
+			if (!handler->prefix ^ !*n) {
+				if (*n)
+					continue;
+				return ERR_PTR(-EINVAL);
+			}
+			*name = n;
+			return handler;
+		}
+	}
+	return ERR_PTR(-EOPNOTSUPP);
+}
 
 static const char *
 strcmp_prefix(const char *a, const char *a_prefix)
@@ -493,11 +547,13 @@ SYSCALL_DEFINE5(fsetxattr, int, fd, const char __user *, name,
 	if (!f.file)
 		return error;
 	audit_file(f.file);
-	error = mnt_want_write_file(f.file);
+	sb_start_write(f.file->f_path.mnt->mnt_sb);
+	error = __mnt_want_write_file(f.file);
 	if (!error) {
 		error = setxattr(f.file->f_path.dentry, name, value, size, flags);
-		mnt_drop_write_file(f.file);
+		__mnt_drop_write_file(f.file);
 	}
+	sb_end_write(f.file->f_path.mnt->mnt_sb);
 	fdput(f);
 	return error;
 }
@@ -731,11 +787,13 @@ SYSCALL_DEFINE2(fremovexattr, int, fd, const char __user *, name)
 	if (!f.file)
 		return error;
 	audit_file(f.file);
-	error = mnt_want_write_file(f.file);
+	sb_start_write(f.file->f_path.mnt->mnt_sb);
+	error = __mnt_want_write_file(f.file);
 	if (!error) {
 		error = removexattr(f.file->f_path.dentry, name);
-		mnt_drop_write_file(f.file);
+		__mnt_drop_write_file(f.file);
 	}
+	sb_end_write(f.file->f_path.mnt->mnt_sb);
 	fdput(f);
 	return error;
 }
