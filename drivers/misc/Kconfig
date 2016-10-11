@@ -766,6 +766,22 @@ config PANEL_BOOT_MESSAGE
 	  An empty message will only clear the display at driver init time. Any other
 	  printf()-formatted message is valid with newline and escape codes.
 
+config MEMTRACK
+	tristate "Per-pid memory statistics"
+	default n
+	---help---
+	  Keeps track of shared buffers allocated by the process and
+	  exports them via /proc/<pid>/memtrack.
+
+config MEMTRACK_DEBUG
+	tristate "Per-pid memory statistics debug option"
+	depends on MEMTRACK && DEBUG_FS
+	default n
+	---help---
+	  Keeps track of all shared buffers allocated and exports the list
+	  via /sys/kernel/debug/memtrack.
+
+ source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

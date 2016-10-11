@@ -1954,6 +1954,9 @@ struct task_struct {
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 	/* A live task holds one reference. */
 	atomic_t stack_refcount;
+#ifdef CONFIG_MEMTRACK
+	struct rb_root memtrack_rb;
+	rwlock_t memtrack_lock;
 #endif
 /* CPU-specific state of this task */
 	struct thread_struct thread;
