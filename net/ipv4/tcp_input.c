@@ -101,6 +101,9 @@ int sysctl_tcp_moderate_rcvbuf __read_mostly = 1;
 int sysctl_tcp_early_retrans __read_mostly = 3;
 int sysctl_tcp_invalid_ratelimit __read_mostly = HZ/2;
 
+int sysctl_tcp_retrans_txhash_prob __read_mostly;
+int sysctl_tcp_retrans_txhash_mode __read_mostly;
+
 #define FLAG_DATA		0x01 /* Incoming frame contained data.		*/
 #define FLAG_WIN_UPDATE		0x02 /* Incoming ACK was a window update.	*/
 #define FLAG_DATA_ACKED		0x04 /* This ACK acknowledged new data.		*/
@@ -3673,6 +3676,13 @@ static int tcp_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 	/* See if we can take anything off of the retransmit queue. */
 	flag |= tcp_clean_rtx_queue(sk, prior_fackets, prior_snd_una, &acked,
 				    &sack_state, &now);
+
+	/* Check if we should set txhash (would not cause reordering) */
+	if (tp->txhash_want &&
+	    (tp->packets_out - tp->sacked_out) < tp->reordering) {
+		sk_set_txhash(sk);
+		tp->txhash_want = 0;
+	}
 
 	if (tcp_ack_is_dubious(sk, flag)) {
 		is_dupack = !(flag & (FLAG_SND_UNA_ADVANCED | FLAG_NOT_DUP));

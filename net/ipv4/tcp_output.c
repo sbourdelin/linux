@@ -2738,8 +2738,29 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb, int segs)
 		tp->retrans_out += tcp_skb_pcount(skb);
 
 		/* Save stamp of the first retransmit. */
-		if (!tp->retrans_stamp)
+		if (!tp->retrans_stamp) {
 			tp->retrans_stamp = tcp_skb_timestamp(skb);
+
+			/* Determine if we should reset hash, only done once
+			 * per recovery
+			 */
+			if ((!tp->txhash_rto ||
+			     sysctl_tcp_retrans_txhash_mode > 0) &&
+			    sk->sk_txhash &&
+			    (prandom_u32_max(100) <
+			     sysctl_tcp_retrans_txhash_prob)) {
+				/* If not too much reordering, or RTT is
+				 * small enough that we don't care about
+				 * reordering, then change it now.
+				 * Else, wait until it is safe.
+				 */
+				if ((tp->packets_out - tp->sacked_out) <
+				    tp->reordering)
+					sk_set_txhash(sk);
+				else
+					tp->txhash_want = 1;
+			}
+		}
 
 	} else if (err != -EBUSY) {
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRETRANSFAIL);

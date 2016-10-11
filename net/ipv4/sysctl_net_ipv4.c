@@ -28,6 +28,7 @@
 static int zero;
 static int one = 1;
 static int four = 4;
+static int hundred = 100;
 static int thousand = 1000;
 static int gso_max_segs = GSO_MAX_SEGS;
 static int tcp_retr1_max = 255;
@@ -622,6 +623,23 @@ static struct ctl_table ipv4_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_ms_jiffies,
+	},
+	{
+		.procname	= "tcp_retrans_txhash_prob",
+		.data		= &sysctl_tcp_retrans_txhash_prob,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &hundred,
+	},
+	{
+		.procname	= "tcp_retrans_txhash_mode",
+		.data		= &sysctl_tcp_retrans_txhash_mode,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
 	},
 	{
 		.procname	= "icmp_msgs_per_sec",

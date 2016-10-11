@@ -186,6 +186,8 @@ static int tcp_write_timeout(struct sock *sk)
 
 	if ((1 << sk->sk_state) & (TCPF_SYN_SENT | TCPF_SYN_RECV)) {
 		if (icsk->icsk_retransmits) {
+			tp->txhash_rto = 1;
+			tp->txhash_want = 0;
 			dst_negative_advice(sk);
 			if (tp->syn_fastopen || tp->syn_data)
 				tcp_fastopen_cache_set(sk, 0, NULL, true, 0);
@@ -218,6 +220,8 @@ static int tcp_write_timeout(struct sock *sk)
 		} else {
 			sk_rethink_txhash(sk);
 		}
+		tp->txhash_rto = 1;
+		tp->txhash_want = 0;
 
 		retry_until = net->ipv4.sysctl_tcp_retries2;
 		if (sock_flag(sk, SOCK_DEAD)) {

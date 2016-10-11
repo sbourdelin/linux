@@ -472,6 +472,21 @@ tcp_max_reordering - INTEGER
 	if paths are using per packet load balancing (like bonding rr mode)
 	Default: 300
 
+tcp_retrans_txhash_mode - INTEGER
+	If zero, disable txhash recalculation due to non-RTO retransmissions
+	after an RTO. The idea is that broken paths will trigger an RTO and
+	we don't want going back to that path due to standard retransmissons
+	(flow balancing). The drawback is that balancing is less robust.
+	If greater than zero, can always (probabilistically) recalculate
+	txhash after non-RTO retransmissions.
+
+tcp_retrans_txhash_prob - INTEGER
+	Probability [0 to 100] that we will recalculate txhash when a
+	packet is resent not due to RTO (for RTO txhash is always recalculated).
+	The recalculation of the txhash may be delayed to decrease the
+	likelihood that reordering will trigger retransmissons.
+	The purpose is to help balance the flows among the possible paths.
+
 tcp_retrans_collapse - BOOLEAN
 	Bug-to-bug compatibility with some broken printers.
 	On retransmit try to send bigger packets to work around bugs in
