@@ -1854,9 +1854,7 @@ int i915_gem_fault(struct vm_area_struct *area, struct vm_fault *vmf)
 		goto err_unpin;
 
 	assert_rpm_wakelock_held(dev_priv);
-	spin_lock(&dev_priv->mm.userfault_lock);
 	list_add(&obj->userfault_link, &dev_priv->mm.userfault_list);
-	spin_unlock(&dev_priv->mm.userfault_lock);
 
 err_unpin:
 	__i915_vma_unpin(vma);
@@ -1926,7 +1924,6 @@ void
 i915_gem_release_mmap(struct drm_i915_gem_object *obj)
 {
 	struct drm_i915_private *i915 = to_i915(obj->base.dev);
-	bool zap = false;
 
 	/* Serialisation between user GTT access and our code depends upon
 	 * revoking the CPU's PTE whilst the mutex is held. The next user
@@ -1938,15 +1935,10 @@ i915_gem_release_mmap(struct drm_i915_gem_object *obj)
 	 */
 	assert_rpm_wakelock_held(i915);
 
-	spin_lock(&i915->mm.userfault_lock);
-	if (!list_empty(&obj->userfault_link)) {
-		list_del_init(&obj->userfault_link);
-		zap = true;
-	}
-	spin_unlock(&i915->mm.userfault_lock);
-	if (!zap)
+	if (list_empty(&obj->userfault_link))
 		return;
 
+	list_del_init(&obj->userfault_link);
 	drm_vma_node_unmap(&obj->base.vma_node,
 			   obj->base.dev->anon_inode->i_mapping);
 
@@ -1964,13 +1956,9 @@ void
 i915_gem_release_all_mmaps(struct drm_i915_private *dev_priv)
 {
 	struct drm_i915_gem_object *obj, *on;
-	struct list_head userfault_list;
 
-	spin_lock(&dev_priv->mm.userfault_lock);
-	list_replace_init(&dev_priv->mm.userfault_list, &userfault_list);
-	spin_unlock(&dev_priv->mm.userfault_lock);
-
-	list_for_each_entry_safe(obj, on, &userfault_list, userfault_link)
+	list_for_each_entry_safe(obj, on,
+				 &dev_priv->mm.userfault_list, userfault_link)
 		i915_gem_release_mmap(obj);
 }
 
@@ -4452,7 +4440,6 @@ int i915_gem_init(struct drm_device *dev)
 	int ret;
 
 	mutex_lock(&dev->struct_mutex);
-	spin_lock_init(&dev_priv->mm.userfault_lock);
 
 	if (!i915.enable_execlists) {
 		dev_priv->gt.resume = intel_legacy_submission_resume;
