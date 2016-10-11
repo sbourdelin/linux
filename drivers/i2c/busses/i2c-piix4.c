@@ -102,7 +102,7 @@
  * PIIX4. DANGEROUS!
  */
 static int force;
-module_param (force, int, 0);
+module_param(force, int, 0);
 MODULE_PARM_DESC(force, "Forcibly enable the PIIX4. DANGEROUS!");
 
 /*
@@ -110,7 +110,7 @@ MODULE_PARM_DESC(force, "Forcibly enable the PIIX4. DANGEROUS!");
  * the PIIX4 at the given address. VERY DANGEROUS!
  */
 static int force_addr;
-module_param (force_addr, int, 0);
+module_param(force_addr, int, 0);
 MODULE_PARM_DESC(force_addr,
 		 "Forcibly enable the PIIX4 at the given address. "
 		 "EXTREMELY DANGEROUS!");
@@ -204,7 +204,7 @@ static int piix4_setup(struct pci_dev *PIIX4_dev,
 	} else {
 		pci_read_config_word(PIIX4_dev, SMBBA, &piix4_smba);
 		piix4_smba &= 0xfff0;
-		if(piix4_smba == 0) {
+		if (piix4_smba == 0) {
 			dev_err(&PIIX4_dev->dev, "SMBus base address "
 				"uninitialized - upgrade BIOS or use "
 				"force_addr=0xaddr\n");
@@ -664,7 +664,7 @@ static const struct pci_device_id piix4_ids[] = {
 	{ 0, }
 };
 
-MODULE_DEVICE_TABLE (pci, piix4_ids);
+MODULE_DEVICE_TABLE(pci, piix4_ids);
 
 static struct i2c_adapter *piix4_main_adapters[PIIX4_MAX_ADAPTERS];
 static struct i2c_adapter *piix4_aux_adapter;
