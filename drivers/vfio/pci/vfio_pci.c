@@ -838,6 +838,7 @@ static long vfio_pci_ioctl(void *device_data,
 			return -EFAULT;
 
 		if (hdr.argsz < minsz || hdr.index >= VFIO_PCI_NUM_IRQS ||
+		    hdr.count >= (U32_MAX - hdr.start) ||
 		    hdr.flags & ~(VFIO_IRQ_SET_DATA_TYPE_MASK |
 				  VFIO_IRQ_SET_ACTION_TYPE_MASK))
 			return -EINVAL;
@@ -908,6 +909,9 @@ static long vfio_pci_ioctl(void *device_data,
 			return ret;
 
 		WARN_ON(!fill.max); /* Should always be at least one */
+
+		if (hdr.count > fill.max)
+			hdr.count = fill.max;
 
 		/*
 		 * If there's enough space, fill it now, otherwise return
