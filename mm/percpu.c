@@ -36,8 +36,8 @@
  * chunk maps unnecessarily.
  *
  * Allocation state in each chunk is kept using an array of integers
- * on chunk->map.  A positive value in the map represents a free
- * region and negative allocated.  Allocation inside a chunk is done
+ * on chunk->map.  A LSB cleared value in the map represents a free
+ * region and set allocated.  Allocation inside a chunk is done
  * by scanning this map sequentially and serving the first matching
  * entry.  This is mostly copied from the percpu_modalloc() allocator.
  * Chunks can be determined from the address using the index field
@@ -93,9 +93,9 @@
 #endif
 #ifndef __pcpu_ptr_to_addr
 #define __pcpu_ptr_to_addr(ptr)						\
-	(void __force *)((unsigned long)(ptr) +				\
-			 (unsigned long)pcpu_base_addr -		\
-			 (unsigned long)__per_cpu_start)
+	(void __force *)((unsigned long)(ptr) -				\
+			 (unsigned long)__per_cpu_start +		\
+			 (unsigned long)pcpu_base_addr)
 #endif
 #else	/* CONFIG_SMP */
 /* on UP, it's always identity mapped */
@@ -583,6 +583,11 @@ static int pcpu_alloc_area(struct pcpu_chunk *chunk, int size, int align,
 		 * merge'em.  Note that 'small' is defined as smaller
 		 * than sizeof(int), which is very small but isn't too
 		 * uncommon for percpu allocations.
+		 *
+		 * it is unnecessary to append i > 0 to make sure p[-1]
+		 * available: the offset of the first area is 0 and is aligned
+		 * very well, no head free area is left if segments one piece
+		 * from it
 		 */
 		if (head && (head < sizeof(int) || !(p[-1] & 1))) {
 			*p = off += head;
@@ -1705,8 +1710,9 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 
 	/* link the first chunk in */
 	pcpu_first_chunk = dchunk ?: schunk;
-	pcpu_nr_empty_pop_pages +=
-		pcpu_count_occupied_pages(pcpu_first_chunk, 1);
+	if (pcpu_first_chunk != pcpu_reserved_chunk)
+		pcpu_nr_empty_pop_pages +=
+				pcpu_count_occupied_pages(pcpu_first_chunk, 1);
 	pcpu_chunk_relocate(pcpu_first_chunk, -1);
 
 	/* we're done */
@@ -2254,7 +2260,7 @@ void __init setup_per_cpu_areas(void)
 
 	ai->dyn_size = unit_size;
 	ai->unit_size = unit_size;
-	ai->atom_size = unit_size;
+	ai->atom_size = PAGE_SIZE;
 	ai->alloc_size = unit_size;
 	ai->groups[0].nr_units = 1;
 	ai->groups[0].cpu_map[0] = 0;
@@ -2278,6 +2284,9 @@ void __init percpu_init_late(void)
 	struct pcpu_chunk *chunk;
 	unsigned long flags;
 	int i;
+
+	if (pcpu_first_chunk == pcpu_reserved_chunk)
+		target_chunks[1] = NULL;
 
 	for (i = 0; (chunk = target_chunks[i]); i++) {
 		int *map;
