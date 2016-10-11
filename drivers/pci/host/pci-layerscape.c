@@ -45,57 +45,58 @@ struct ls_pcie_drvdata {
 };
 
 struct ls_pcie {
-	void __iomem *dbi;
+	struct pcie_port pp;		/* pp.dbi_base is DT regs */
 	void __iomem *lut;
 	struct regmap *scfg;
-	struct pcie_port pp;
 	const struct ls_pcie_drvdata *drvdata;
 	int index;
 };
 
 #define to_ls_pcie(x)	container_of(x, struct ls_pcie, pp)
 
-static bool ls_pcie_is_bridge(struct ls_pcie *pcie)
+static bool ls_pcie_is_bridge(struct ls_pcie *ls_pcie)
 {
 	u32 header_type;
 
-	header_type = ioread8(pcie->dbi + PCI_HEADER_TYPE);
+	header_type = ioread8(ls_pcie->pp.dbi_base + PCI_HEADER_TYPE);
 	header_type &= 0x7f;
 
 	return header_type == PCI_HEADER_TYPE_BRIDGE;
 }
 
 /* Clear multi-function bit */
-static void ls_pcie_clear_multifunction(struct ls_pcie *pcie)
+static void ls_pcie_clear_multifunction(struct ls_pcie *ls_pcie)
 {
-	iowrite8(PCI_HEADER_TYPE_BRIDGE, pcie->dbi + PCI_HEADER_TYPE);
+	iowrite8(PCI_HEADER_TYPE_BRIDGE,
+		 ls_pcie->pp.dbi_base + PCI_HEADER_TYPE);
 }
 
 /* Fix class value */
-static void ls_pcie_fix_class(struct ls_pcie *pcie)
+static void ls_pcie_fix_class(struct ls_pcie *ls_pcie)
 {
-	iowrite16(PCI_CLASS_BRIDGE_PCI, pcie->dbi + PCI_CLASS_DEVICE);
+	iowrite16(PCI_CLASS_BRIDGE_PCI,
+		  ls_pcie->pp.dbi_base + PCI_CLASS_DEVICE);
 }
 
 /* Drop MSG TLP except for Vendor MSG */
-static void ls_pcie_drop_msg_tlp(struct ls_pcie *pcie)
+static void ls_pcie_drop_msg_tlp(struct ls_pcie *ls_pcie)
 {
 	u32 val;
 
-	val = ioread32(pcie->dbi + PCIE_STRFMR1);
+	val = ioread32(ls_pcie->pp.dbi_base + PCIE_STRFMR1);
 	val &= 0xDFFFFFFF;
-	iowrite32(val, pcie->dbi + PCIE_STRFMR1);
+	iowrite32(val, ls_pcie->pp.dbi_base + PCIE_STRFMR1);
 }
 
 static int ls1021_pcie_link_up(struct pcie_port *pp)
 {
+	struct ls_pcie *ls_pcie = to_ls_pcie(pp);
 	u32 state;
-	struct ls_pcie *pcie = to_ls_pcie(pp);
 
-	if (!pcie->scfg)
+	if (!ls_pcie->scfg)
 		return 0;
 
-	regmap_read(pcie->scfg, SCFG_PEXMSCPORTSR(pcie->index), &state);
+	regmap_read(ls_pcie->scfg, SCFG_PEXMSCPORTSR(ls_pcie->index), &state);
 	state = (state >> LTSSM_STATE_SHIFT) & LTSSM_STATE_MASK;
 
 	if (state < LTSSM_PCIE_L0)
@@ -106,36 +107,37 @@ static int ls1021_pcie_link_up(struct pcie_port *pp)
 
 static void ls1021_pcie_host_init(struct pcie_port *pp)
 {
-	struct ls_pcie *pcie = to_ls_pcie(pp);
+	struct device *dev = pp->dev;
+	struct ls_pcie *ls_pcie = to_ls_pcie(pp);
 	u32 index[2];
 
-	pcie->scfg = syscon_regmap_lookup_by_phandle(pp->dev->of_node,
-						     "fsl,pcie-scfg");
-	if (IS_ERR(pcie->scfg)) {
-		dev_err(pp->dev, "No syscfg phandle specified\n");
-		pcie->scfg = NULL;
+	ls_pcie->scfg = syscon_regmap_lookup_by_phandle(dev->of_node,
+						   "fsl,pcie-scfg");
+	if (IS_ERR(ls_pcie->scfg)) {
+		dev_err(dev, "No syscfg phandle specified\n");
+		ls_pcie->scfg = NULL;
 		return;
 	}
 
-	if (of_property_read_u32_array(pp->dev->of_node,
+	if (of_property_read_u32_array(dev->of_node,
 				       "fsl,pcie-scfg", index, 2)) {
-		pcie->scfg = NULL;
+		ls_pcie->scfg = NULL;
 		return;
 	}
-	pcie->index = index[1];
+	ls_pcie->index = index[1];
 
 	dw_pcie_setup_rc(pp);
 
-	ls_pcie_drop_msg_tlp(pcie);
+	ls_pcie_drop_msg_tlp(ls_pcie);
 }
 
 static int ls_pcie_link_up(struct pcie_port *pp)
 {
-	struct ls_pcie *pcie = to_ls_pcie(pp);
+	struct ls_pcie *ls_pcie = to_ls_pcie(pp);
 	u32 state;
 
-	state = (ioread32(pcie->lut + PCIE_LUT_DBG) >>
-		 pcie->drvdata->ltssm_shift) &
+	state = (ioread32(ls_pcie->lut + PCIE_LUT_DBG) >>
+		 ls_pcie->drvdata->ltssm_shift) &
 		 LTSSM_STATE_MASK;
 
 	if (state < LTSSM_PCIE_L0)
@@ -146,13 +148,13 @@ static int ls_pcie_link_up(struct pcie_port *pp)
 
 static void ls_pcie_host_init(struct pcie_port *pp)
 {
-	struct ls_pcie *pcie = to_ls_pcie(pp);
+	struct ls_pcie *ls_pcie = to_ls_pcie(pp);
 
-	iowrite32(1, pcie->dbi + PCIE_DBI_RO_WR_EN);
-	ls_pcie_fix_class(pcie);
-	ls_pcie_clear_multifunction(pcie);
-	ls_pcie_drop_msg_tlp(pcie);
-	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);
+	iowrite32(1, ls_pcie->pp.dbi_base + PCIE_DBI_RO_WR_EN);
+	ls_pcie_fix_class(ls_pcie);
+	ls_pcie_clear_multifunction(ls_pcie);
+	ls_pcie_drop_msg_tlp(ls_pcie);
+	iowrite32(0, ls_pcie->pp.dbi_base + PCIE_DBI_RO_WR_EN);
 }
 
 static int ls_pcie_msi_host_init(struct pcie_port *pp,
@@ -212,15 +214,10 @@ static const struct of_device_id ls_pcie_of_match[] = {
 	{ },
 };
 
-static int __init ls_add_pcie_port(struct pcie_port *pp,
-				   struct platform_device *pdev)
+static int __init ls_add_pcie_port(struct ls_pcie *ls_pcie)
 {
+	struct pcie_port *pp = &ls_pcie->pp;
 	int ret;
-	struct ls_pcie *pcie = to_ls_pcie(pp);
-
-	pp->dev = &pdev->dev;
-	pp->dbi_base = pcie->dbi;
-	pp->ops = pcie->drvdata->ops;
 
 	ret = dw_pcie_host_init(pp);
 	if (ret) {
@@ -233,37 +230,44 @@ static int __init ls_add_pcie_port(struct pcie_port *pp,
 
 static int __init ls_pcie_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	const struct of_device_id *match;
-	struct ls_pcie *pcie;
+	struct ls_pcie *ls_pcie;
+	struct pcie_port *pp;
 	struct resource *dbi_base;
 	int ret;
 
-	match = of_match_device(ls_pcie_of_match, &pdev->dev);
+	match = of_match_device(ls_pcie_of_match, dev);
 	if (!match)
 		return -ENODEV;
 
-	pcie = devm_kzalloc(&pdev->dev, sizeof(*pcie), GFP_KERNEL);
-	if (!pcie)
+	ls_pcie = devm_kzalloc(dev, sizeof(*ls_pcie), GFP_KERNEL);
+	if (!ls_pcie)
 		return -ENOMEM;
 
+	ls_pcie->drvdata = match->data;
+
+	pp = &ls_pcie->pp;
+	pp->dev = dev;
+	pp->ops = ls_pcie->drvdata->ops;
+
 	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
-	pcie->dbi = devm_ioremap_resource(&pdev->dev, dbi_base);
-	if (IS_ERR(pcie->dbi)) {
-		dev_err(&pdev->dev, "missing *regs* space\n");
-		return PTR_ERR(pcie->dbi);
+	ls_pcie->pp.dbi_base = devm_ioremap_resource(dev, dbi_base);
+	if (IS_ERR(ls_pcie->pp.dbi_base)) {
+		dev_err(dev, "missing *regs* space\n");
+		return PTR_ERR(ls_pcie->pp.dbi_base);
 	}
 
-	pcie->drvdata = match->data;
-	pcie->lut = pcie->dbi + pcie->drvdata->lut_offset;
+	ls_pcie->lut = ls_pcie->pp.dbi_base + ls_pcie->drvdata->lut_offset;
 
-	if (!ls_pcie_is_bridge(pcie))
+	if (!ls_pcie_is_bridge(ls_pcie))
 		return -ENODEV;
 
-	ret = ls_add_pcie_port(&pcie->pp, pdev);
+	ret = ls_add_pcie_port(ls_pcie);
 	if (ret < 0)
 		return ret;
 
-	platform_set_drvdata(pdev, pcie);
+	platform_set_drvdata(pdev, ls_pcie);
 
 	return 0;
 }
