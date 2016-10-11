@@ -78,16 +78,6 @@ xattr_resolve_name(struct inode *inode, const char **name)
 	return ERR_PTR(-EOPNOTSUPP);
 }
 
-static const char *
-strcmp_prefix(const char *a, const char *a_prefix)
-{
-	while (*a_prefix && *a == *a_prefix) {
-		a++;
-		a_prefix++;
-	}
-	return *a_prefix ? NULL : a;
-}
-
 /*
  * In order to implement different sets of xattr operations for each xattr
  * prefix, a filesystem should create a null-terminated array of struct
@@ -99,37 +89,6 @@ strcmp_prefix(const char *a, const char *a_prefix)
 		for ((handler) = *(handlers)++;			\
 			(handler) != NULL;			\
 			(handler) = *(handlers)++)
-
-/*
- * Find the xattr_handler with the matching prefix.
- */
-static const struct xattr_handler *
-xattr_resolve_name(struct inode *inode, const char **name)
-{
-	const struct xattr_handler **handlers = inode->i_sb->s_xattr;
-	const struct xattr_handler *handler;
-
-	if (!(inode->i_opflags & IOP_XATTR)) {
-		if (unlikely(is_bad_inode(inode)))
-			return ERR_PTR(-EIO);
-		return ERR_PTR(-EOPNOTSUPP);
-	}
-	for_each_xattr_handler(handlers, handler) {
-		const char *n;
-
-		n = strcmp_prefix(*name, xattr_prefix(handler));
-		if (n) {
-			if (!handler->prefix ^ !*n) {
-				if (*n)
-					continue;
-				return ERR_PTR(-EINVAL);
-			}
-			*name = n;
-			return handler;
-		}
-	}
-	return ERR_PTR(-EOPNOTSUPP);
-}
 
 /*
  * Check permissions for extended attribute access.  This is a bit complicated
