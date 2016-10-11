@@ -345,7 +345,9 @@ enum {
 	STRIPE_BITMAP_PENDING,	/* Being added to bitmap, don't add
 				 * to batch yet.
 				 */
-	STRIPE_LOG_TRAPPED, /* trapped into log */
+	STRIPE_LOG_TRAPPED,	/* trapped into log */
+	STRIPE_R5C_FROZEN,	/* r5c_cache frozen and being written out */
+	STRIPE_R5C_WRITTEN,	/* ready for r5c_handle_stripe_written() */
 };
 
 #define STRIPE_EXPAND_SYNC_FLAGS \
@@ -712,4 +714,10 @@ extern void r5l_stripe_write_finished(struct stripe_head *sh);
 extern int r5l_handle_flush_request(struct r5l_log *log, struct bio *bio);
 extern void r5l_quiesce(struct r5l_log *log, int state);
 extern bool r5l_log_disk_error(struct r5conf *conf);
+extern bool r5c_is_writeback(struct r5l_log *log);
+extern int
+r5c_handle_stripe_dirtying(struct r5conf *conf, struct stripe_head *sh,
+			   struct stripe_head_state *s, int disks);
+extern void
+r5c_handle_stripe_written(struct r5conf *conf, struct stripe_head *sh);
 #endif
