@@ -9,6 +9,7 @@
  */
 #include <linux/module.h>
 #include <linux/clk-provider.h>
+#include <linux/clkdev.h>
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/of.h>
@@ -185,6 +186,10 @@ static struct clk *_of_fixed_factor_clk_setup(struct device_node *node)
 		clk_unregister(clk);
 		return ERR_PTR(ret);
 	}
+
+#ifdef CONFIG_CLKDEV_LOOKUP
+	clk_register_clkdev(clk, clk_name, 0);
+#endif
 
 	return clk;
 }
