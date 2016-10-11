@@ -32,7 +32,7 @@
  * bsg_destroy_job - routine to teardown/delete a bsg job
  * @job: bsg_job that is to be torn down
  */
-static void bsg_destroy_job(struct kref *kref)
+void bsg_destroy_job(struct kref *kref)
 {
 	struct bsg_job *job = container_of(kref, struct bsg_job, kref);
 
@@ -42,6 +42,7 @@ static void bsg_destroy_job(struct kref *kref)
 	kfree(job->reply_payload.sg_list);
 	kfree(job);
 }
+EXPORT_SYMBOL_GPL(bsg_destroy_job);
 
 /**
  * bsg_job_done - completion routine for bsg requests
