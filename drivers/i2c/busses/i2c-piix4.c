@@ -482,9 +482,9 @@ static int piix4_transaction(struct i2c_adapter *piix4_adapter)
 }
 
 /* Return negative errno on error. */
-static s32 piix4_access(struct i2c_adapter * adap, u16 addr,
+static s32 piix4_access(struct i2c_adapter *adap, u16 addr,
 		 unsigned short flags, char read_write,
-		 u8 command, int size, union i2c_smbus_data * data)
+		 u8 command, int size, union i2c_smbus_data *data)
 {
 	struct i2c_piix4_adapdata *adapdata = i2c_get_adapdata(adap);
 	unsigned short piix4_smba = adapdata->smba;
