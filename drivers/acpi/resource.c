@@ -416,7 +416,7 @@ static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
 
 	res->flags = acpi_dev_irq_flags(triggering, polarity, shareable);
 	irq = acpi_register_gsi(NULL, gsi, triggering, polarity);
-	if (irq >= 0) {
+	if (irq > 0) {
 		res->start = irq;
 		res->end = irq;
 	} else {
