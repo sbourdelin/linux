@@ -29,6 +29,7 @@ void init_scattered_cpuid_features(struct cpuinfo_x86 *c)
 	u32 max_level;
 	u32 regs[4];
 	const struct cpuid_bit *cb;
+	u64 misc_thd_enable;
 
 	static const struct cpuid_bit cpuid_bits[] = {
 		{ X86_FEATURE_INTEL_PT,		CR_EBX,25, 0x00000007, 0 },
@@ -54,4 +55,8 @@ void init_scattered_cpuid_features(struct cpuinfo_x86 *c)
 		if (regs[cb->reg] & (1 << cb->bit))
 			set_cpu_cap(c, cb->feature);
 	}
+
+	rdmsrl(MSR_PHI_MISC_THD_FEATURE, misc_thd_enable);
+	if ((misc_thd_enable & MSR_PHI_MISC_THD_FEATURE_R3MWAIT) != 0)
+		set_cpu_cap(c, X86_FEATURE_PHIR3MWAIT);
 }
