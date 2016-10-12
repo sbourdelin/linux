@@ -972,6 +972,61 @@ static int rproc_update_resource_table_entry(struct rproc *rproc,
 	return !updated;
 }
 
+static struct resource_table*
+rproc_add_resource_table_entry(struct rproc *rproc,
+			       struct rproc_request_resource *request,
+			       struct resource_table *old_table, int *tablesz)
+{
+	struct resource_table *table;
+	struct fw_rsc_hdr h;
+	void *new_rsc_loc;
+	void *fw_header_loc;
+	void *start_of_rscs;
+	int new_rsc_offset;
+	int size = *tablesz;
+	int i;
+
+	h.type = request->type;
+
+	new_rsc_offset = size;
+
+	/*
+	 * Allocate another contiguous chunk of memory, large enough to
+	 * contain the new, expanded resource table.
+	 *
+	 * The +4 is for the extra offset[] element in the top level header
+	 */
+	size += sizeof(struct fw_rsc_hdr) + request->size + 4;
+	table = devm_kmemdup(&rproc->dev, old_table, size, GFP_KERNEL);
+	if (!table)
+		return ERR_PTR(-ENOMEM);
+
+	/* Shunt table by 4 Bytes to account for the extra offset[] element */
+	start_of_rscs = (void *)table + table->offset[0];
+	memmove(start_of_rscs + 4,
+		start_of_rscs, new_rsc_offset - table->offset[0]);
+	new_rsc_offset += 4;
+
+	/* Update existing resource entry's offsets */
+	for (i = 0; i < table->num; i++)
+		table->offset[i] += 4;
+
+	/* Update the top level 'resource table' header */
+	table->offset[table->num] = new_rsc_offset;
+	table->num++;
+
+	/* Copy new firmware header into table */
+	fw_header_loc = (void *)table + new_rsc_offset;
+	memcpy(fw_header_loc, &h, sizeof(h));
+
+	/* Copy new resource entry into table */
+	new_rsc_loc = (void *)fw_header_loc + sizeof(h);
+	memcpy(new_rsc_loc, request->resource, request->size);
+
+	*tablesz = size;
+	return table;
+}
+
 /*
  * take a firmware and boot a remote processor with it.
  */
