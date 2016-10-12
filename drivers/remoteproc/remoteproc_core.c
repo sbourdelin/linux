@@ -1066,7 +1066,8 @@ rproc_apply_resource_overrides(struct rproc *rproc,
 	}
 
 
-	rproc_dump_resource_table(rproc, table, size);
+	if (IS_ENABLED(DEBUG) || IS_ENABLED(CONFIG_DYNAMIC_DEBUG))
+		rproc_dump_resource_table(rproc, table, size);
 
 	if (!table) {
 		size = sizeof(*table);
@@ -1100,7 +1101,8 @@ rproc_apply_resource_overrides(struct rproc *rproc,
 		*orig_table = table;
 	}
 
-	rproc_dump_resource_table(rproc, table, size);
+	if (IS_ENABLED(DEBUG) || IS_ENABLED(CONFIG_DYNAMIC_DEBUG))
+		rproc_dump_resource_table(rproc, table, size);
 
 	*tablesz = size;
 
