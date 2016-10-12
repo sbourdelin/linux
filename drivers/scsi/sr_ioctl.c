@@ -179,8 +179,7 @@ static int sr_play_trkind(struct cdrom_device_info *cdi,
 }
 
 /* We do our own retries because we want to know what the specific
-   error code is.  Normally the UNIT_ATTENTION code will automatically
-   clear after one error */
+   error code is. */
 
 int sr_do_ioctl(Scsi_CD *cd, struct packet_command *cgc)
 {
@@ -220,8 +219,6 @@ int sr_do_ioctl(Scsi_CD *cd, struct packet_command *cgc)
 			if (!cgc->quiet)
 				sr_printk(KERN_INFO, cd,
 					  "disc change detected.\n");
-			if (retries++ < 10)
-				goto retry;
 			err = -ENOMEDIUM;
 			break;
 		case NOT_READY:	/* This happens if there is no disc in drive */
