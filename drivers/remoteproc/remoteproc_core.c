@@ -50,7 +50,7 @@ static LIST_HEAD(rproc_list);
 typedef int (*rproc_handle_resources_t)(struct rproc *rproc,
 				struct resource_table *table, int len);
 typedef int (*rproc_handle_resource_t)(struct rproc *rproc,
-				 void *, int offset, int avail);
+				 void *, int offset);
 
 /* Unique indices for remoteproc devices */
 static DEFINE_IDA(rproc_dev_index);
@@ -300,7 +300,6 @@ void rproc_free_vring(struct rproc_vring *rvring)
  * rproc_handle_vdev() - handle a vdev fw resource
  * @rproc: the remote processor
  * @rsc: the vring resource descriptor
- * @avail: size of available data (for sanity checking the image)
  *
  * This resource entry requests the host to statically register a virtio
  * device (vdev), and setup everything needed to support it. It contains
@@ -324,18 +323,11 @@ void rproc_free_vring(struct rproc_vring *rvring)
  * Returns 0 on success, or an appropriate error code otherwise
  */
 static int rproc_handle_vdev(struct rproc *rproc, struct fw_rsc_vdev *rsc,
-			     int offset, int avail)
+			     int offset)
 {
 	struct device *dev = &rproc->dev;
 	struct rproc_vdev *rvdev;
 	int i, ret;
-
-	/* make sure resource isn't truncated */
-	if (sizeof(*rsc) + rsc->num_of_vrings * sizeof(struct fw_rsc_vdev_vring)
-			+ rsc->config_len > avail) {
-		dev_err(dev, "vdev rsc is truncated\n");
-		return -EINVAL;
-	}
 
 	/* make sure reserved bytes are zeroes */
 	if (rsc->reserved[0] || rsc->reserved[1]) {
@@ -388,7 +380,6 @@ free_rvdev:
  * rproc_handle_trace() - handle a shared trace buffer resource
  * @rproc: the remote processor
  * @rsc: the trace resource descriptor
- * @avail: size of available data (for sanity checking the image)
  *
  * In case the remote processor dumps trace logs into memory,
  * export it via debugfs.
@@ -401,17 +392,12 @@ free_rvdev:
  * Returns 0 on success, or an appropriate error code otherwise
  */
 static int rproc_handle_trace(struct rproc *rproc, struct fw_rsc_trace *rsc,
-			      int offset, int avail)
+			      int offset)
 {
 	struct rproc_mem_entry *trace;
 	struct device *dev = &rproc->dev;
 	void *ptr;
 	char name[15];
-
-	if (sizeof(*rsc) > avail) {
-		dev_err(dev, "trace rsc is truncated\n");
-		return -EINVAL;
-	}
 
 	/* make sure reserved bytes are zeroes */
 	if (rsc->reserved) {
@@ -459,7 +445,6 @@ static int rproc_handle_trace(struct rproc *rproc, struct fw_rsc_trace *rsc,
  * rproc_handle_devmem() - handle devmem resource entry
  * @rproc: remote processor handle
  * @rsc: the devmem resource entry
- * @avail: size of available data (for sanity checking the image)
  *
  * Remote processors commonly need to access certain on-chip peripherals.
  *
@@ -481,7 +466,7 @@ static int rproc_handle_trace(struct rproc *rproc, struct fw_rsc_trace *rsc,
  * are outside those ranges.
  */
 static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
-			       int offset, int avail)
+			       int offset)
 {
 	struct rproc_mem_entry *mapping;
 	struct device *dev = &rproc->dev;
@@ -490,11 +475,6 @@ static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
 	/* no point in handling this resource without a valid iommu domain */
 	if (!rproc->domain)
 		return -EINVAL;
-
-	if (sizeof(*rsc) > avail) {
-		dev_err(dev, "devmem rsc is truncated\n");
-		return -EINVAL;
-	}
 
 	/* make sure reserved bytes are zeroes */
 	if (rsc->reserved) {
@@ -537,7 +517,6 @@ out:
  * rproc_handle_carveout() - handle phys contig memory allocation requests
  * @rproc: rproc handle
  * @rsc: the resource entry
- * @avail: size of available data (for image validation)
  *
  * This function will handle firmware requests for allocation of physically
  * contiguous memory regions.
@@ -553,18 +532,13 @@ out:
  */
 static int rproc_handle_carveout(struct rproc *rproc,
 				 struct fw_rsc_carveout *rsc,
-				 int offset, int avail)
+				 int offset)
 {
 	struct rproc_mem_entry *carveout, *mapping;
 	struct device *dev = &rproc->dev;
 	dma_addr_t dma;
 	void *va;
 	int ret;
-
-	if (sizeof(*rsc) > avail) {
-		dev_err(dev, "carveout rsc is truncated\n");
-		return -EINVAL;
-	}
 
 	/* make sure reserved bytes are zeroes */
 	if (rsc->reserved) {
@@ -674,7 +648,7 @@ free_carv:
 }
 
 static int rproc_count_vrings(struct rproc *rproc, struct fw_rsc_vdev *rsc,
-			      int offset, int avail)
+			      int offset)
 {
 	/* Summarize the number of notification IDs */
 	rproc->max_notifyid += rsc->num_of_vrings;
@@ -708,14 +682,7 @@ static int rproc_handle_resources(struct rproc *rproc, int len,
 	for (i = 0; i < rproc->table_ptr->num; i++) {
 		int offset = rproc->table_ptr->offset[i];
 		struct fw_rsc_hdr *hdr = (void *)rproc->table_ptr + offset;
-		int avail = len - offset - sizeof(*hdr);
 		void *rsc = (void *)hdr + sizeof(*hdr);
-
-		/* make sure table isn't truncated */
-		if (avail < 0) {
-			dev_err(dev, "rsc table is truncated\n");
-			return -EINVAL;
-		}
 
 		dev_dbg(dev, "rsc: type %d\n", hdr->type);
 
@@ -728,7 +695,7 @@ static int rproc_handle_resources(struct rproc *rproc, int len,
 		if (!handler)
 			continue;
 
-		ret = handler(rproc, rsc, offset + sizeof(*hdr), avail);
+		ret = handler(rproc, rsc, offset + sizeof(*hdr));
 		if (ret)
 			break;
 	}
