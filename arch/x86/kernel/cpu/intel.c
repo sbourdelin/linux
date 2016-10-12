@@ -61,6 +61,14 @@ void check_mpx_erratum(struct cpuinfo_x86 *c)
 	}
 }
 
+static int phir3mwait = 1;
+static int __init phir3mwait_disable(char *value)
+{
+	phir3mwait = 0;
+	return 1;
+}
+__setup("intel-phir3mwait=disable", phir3mwait_disable);
+
 static void early_init_intel(struct cpuinfo_x86 *c)
 {
 	u64 misc_enable;
@@ -211,6 +219,25 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 	}
 
 	check_mpx_erratum(c);
+
+	/*
+	* Setting ring 3 MONITOR/MWAIT for all threads
+	* when CPU is Xeon Phi Family x200
+	* This can be disabled with phir3mwait=disable cmdline switch.
+	* We preserve the reserved values and set only 2nd bit.
+	* Ref:
+	* https://software.intel.com/en-us/blogs/2016/10/06/intel-xeon-phi-product-family-x200-knl-user-mode-ring-3-monitor-and-mwait
+	*/
+	if (c->x86 == 6 &&
+	    c->x86_model == INTEL_FAM6_XEON_PHI_KNL &&
+	    phir3mwait) {
+		u64 prev;
+
+		rdmsrl(MSR_PHI_MISC_THD_FEATURE, prev);
+		if ((prev & MSR_PHI_MISC_THD_FEATURE_R3MWAIT) == 0)
+			wrmsrl(MSR_PHI_MISC_THD_FEATURE,
+			       prev | MSR_PHI_MISC_THD_FEATURE_R3MWAIT);
+	}
 }
 
 #ifdef CONFIG_X86_32
