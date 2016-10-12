@@ -603,6 +603,10 @@ config IOSF_MBI_DEBUG
 
 	  If you don't require the option or are in doubt, say N.
 
+config P2SB
+	tristate
+	depends on PCI
+
 config X86_RDC321X
 	bool "RDC R-321x SoC"
 	depends on X86_32
