@@ -785,6 +785,69 @@ static void rproc_resource_cleanup(struct rproc *rproc)
 		rproc_remove_virtio_dev(rvdev);
 }
 
+static int rproc_resource_table_sanity_check(struct rproc *rproc,
+		struct resource_table *table_ptr, int len)
+{
+	struct device *dev = &rproc->dev;
+	int i;
+
+	if (len < sizeof(*table_ptr))
+		goto out;
+
+	for (i = 0; i < table_ptr->num; i++) {
+		int offset = table_ptr->offset[i];
+		struct fw_rsc_hdr *hdr = (void *)table_ptr + offset;
+		int avail = len - offset - sizeof(*hdr);
+		void *rsc = (void *)hdr + sizeof(*hdr);
+		struct fw_rsc_vdev *v;
+
+		/* Make sure table isn't truncated */
+		if (avail < 0)
+			goto out;
+
+		if (offset == FW_RSC_ADDR_ANY || offset == 0) {
+			dev_err(dev, "Entry %d: bad offset value %x\n", i, offset);
+			return -EINVAL;
+		}
+
+		dev_dbg(dev, "rsc: type %d\n", hdr->type);
+
+		switch (hdr->type) {
+		case RSC_CARVEOUT:
+			avail -= sizeof(struct fw_rsc_carveout);
+			break;
+		case RSC_DEVMEM:
+			avail -= sizeof(struct fw_rsc_devmem);
+			break;
+		case RSC_TRACE:
+			avail -= sizeof(struct fw_rsc_trace);
+			break;
+		case RSC_VDEV:
+			v = rsc;
+			avail -= sizeof(struct fw_rsc_vdev);
+			if (avail < 0)
+				goto out;
+
+			avail -= v->num_of_vrings * sizeof(struct fw_rsc_vdev_vring)
+				 + v->config_len;
+			break;
+		default:
+			dev_err(&rproc->dev, "Unsupported resource type: %d\n",
+				hdr->type);
+			return -EINVAL;
+		}
+		if (avail < 0)
+			goto out;
+	}
+
+	return 0;
+
+out:
+	dev_err(dev, "Invalid resource table format\n");
+	dump_stack();
+	return -EINVAL;
+}
+
 static void rproc_dump_resource_table(struct rproc *rproc,
 				      struct resource_table *table, int size)
 {
@@ -1243,6 +1306,13 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	table = rproc_find_rsc_table(rproc, fw, &tablesz);
 	if (!table) {
 		dev_err(dev, "Failed to find resource table\n");
+		goto clean_up;
+	}
+
+	/*  Verify resource table consistency */
+	ret = rproc_resource_table_sanity_check(rproc, table, tablesz);
+	if (ret) {
+		dev_err(dev, "Failed to get valid resource table,%d\n", ret);
 		goto clean_up;
 	}
 
