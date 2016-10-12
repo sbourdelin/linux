@@ -800,11 +800,13 @@ void nfs4_close_sync(struct nfs4_state *state, fmode_t fmode)
  * that is compatible with current->files
  */
 static struct nfs4_lock_state *
-__nfs4_find_lock_state(struct nfs4_state *state, fl_owner_t fl_owner)
+__nfs4_find_lock_state(struct nfs4_state *state,
+		       fl_owner_t fl_owner, fl_owner_t fl_owner2)
 {
 	struct nfs4_lock_state *pos;
 	list_for_each_entry(pos, &state->lock_states, ls_locks) {
-		if (pos->ls_owner != fl_owner)
+		if (pos->ls_owner != fl_owner &&
+		    pos->ls_owner != fl_owner2)
 			continue;
 		atomic_inc(&pos->ls_count);
 		return pos;
@@ -857,7 +859,7 @@ static struct nfs4_lock_state *nfs4_get_lock_state(struct nfs4_state *state, fl_
 	
 	for(;;) {
 		spin_lock(&state->state_lock);
-		lsp = __nfs4_find_lock_state(state, owner);
+		lsp = __nfs4_find_lock_state(state, owner, 0);
 		if (lsp != NULL)
 			break;
 		if (new != NULL) {
@@ -946,18 +948,21 @@ static int nfs4_copy_lock_stateid(nfs4_stateid *dst,
 	 * and we can choose a lock context relevant for the current process
 	 */
 	struct nfs4_lock_state *lsp;
-	fl_owner_t fl_owner;
+	fl_owner_t fl_owner, fl_flock_owner;
 	int ret = -ENOENT;
 
 	if (test_bit(LK_STATE_IN_USE, &state->flags) == 0)
 		goto out;
 
-	if (l_ctx == NULL)
+	if (l_ctx == NULL) {
 		fl_owner = current->files;
-	else
+		fl_flock_owner = 0;
+	} else {
 		fl_owner = l_ctx->lockowner.l_owner;
+		fl_flock_owner = l_ctx->open_context->flock_owner;
+	}
 	spin_lock(&state->state_lock);
-	lsp = __nfs4_find_lock_state(state, fl_owner);
+	lsp = __nfs4_find_lock_state(state, fl_owner, fl_flock_owner);
 	if (lsp && test_bit(NFS_LOCK_LOST, &lsp->ls_flags))
 		ret = -EIO;
 	else if (lsp != NULL && test_bit(NFS_LOCK_INITIALIZED, &lsp->ls_flags) != 0) {
