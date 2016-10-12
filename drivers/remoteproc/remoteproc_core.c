@@ -956,8 +956,7 @@ static int rproc_update_resource_table_entry(struct rproc *rproc,
 			tblc = rsc;
 			newc = request->resource;
 
-			if (strncmp(newc->name, tblc->name,
-				    sizeof(*tblc->name)))
+			if (strncmp(newc->name, tblc->name, 32))
 				break;
 
 			memcpy(tblc, newc, request->size);
