@@ -679,6 +679,9 @@ static int rproc_handle_resources(struct rproc *rproc, struct resource_table *ta
 	rproc_handle_resource_t handler;
 	int ret = 0, i;
 
+	if (!table_ptr)
+		return ret;
+
 	for (i = 0; i < table_ptr->num; i++) {
 		int offset = table_ptr->offset[i];
 		struct fw_rsc_hdr *hdr = (void *)table_ptr + offset;
@@ -1272,8 +1275,8 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	/* look for the resource table */
 	table = rproc_find_rsc_table(rproc, fw, &tablesz);
 	if (!table) {
-		dev_err(dev, "Failed to find resource table\n");
-		goto clean_up;
+		rproc->cached_table = table;
+		goto skip_resources;
 	}
 
 	/*  Verify resource table consistency */
@@ -1293,6 +1296,7 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	if (!rproc->cached_table)
 		goto clean_up;
 
+skip_resources:
 	rproc->table_ptr = rproc->cached_table;
 
 	if (!list_empty(&rproc->override_resources)) {
