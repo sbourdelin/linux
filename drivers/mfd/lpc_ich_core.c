@@ -70,6 +70,8 @@
 #include <linux/mfd/lpc_ich.h>
 #include <linux/platform_data/itco_wdt.h>
 
+#include "lpc_ich_apl.h"
+
 #define ACPIBASE		0x40
 #define ACPIBASE_GPE_OFF	0x28
 #define ACPIBASE_GPE_END	0x2f
@@ -1027,6 +1029,9 @@ static int lpc_ich_probe(struct pci_dev *dev,
 		if (!ret)
 			cell_added = true;
 	}
+
+	if (!lpc_ich_add_gpio(dev, priv->chipset))
+		cell_added = true;
 
 	/*
 	 * We only care if at least one or none of the cells registered

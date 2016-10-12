@@ -162,6 +162,10 @@ obj-$(CONFIG_MFD_INTEL_QUARK_I2C_GPIO)	+= intel_quark_i2c_gpio.o
 obj-$(CONFIG_LPC_SCH)		+= lpc_sch.o
 lpc_ich-objs		:= lpc_ich_core.o
 obj-$(CONFIG_LPC_ICH)		+= lpc_ich.o
+lpc_ich-objs		:= lpc_ich_core.o
+ifeq ($(CONFIG_X86_INTEL_IVI),y)
+lpc_ich-objs += lpc_ich_apl.o
+endif
 obj-$(CONFIG_MFD_RDC321X)	+= rdc321x-southbridge.o
 obj-$(CONFIG_MFD_JANZ_CMODIO)	+= janz-cmodio.o
 obj-$(CONFIG_MFD_JZ4740_ADC)	+= jz4740-adc.o
