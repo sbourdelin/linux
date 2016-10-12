@@ -980,7 +980,8 @@ static int rproc_verify_resource_table_entry(struct rproc *rproc,
 
 static int rproc_update_resource_table_entry(struct rproc *rproc,
 				struct rproc_request_resource *request,
-				struct resource_table *table, int size)
+				struct resource_table *table, int size,
+				bool force)
 {
 	struct fw_rsc_carveout *tblc, *newc;
 	struct fw_rsc_devmem *tbld, *newd;
@@ -1005,7 +1006,8 @@ static int rproc_update_resource_table_entry(struct rproc *rproc,
 			if (strncmp(newc->name, tblc->name, 32))
 				break;
 
-			memcpy(tblc, newc, request->size);
+			if (tblc->pa == FW_RSC_ADDR_ANY || force)
+				memcpy(tblc, newc, request->size);
 
 			return updated;
 		case RSC_DEVMEM:
@@ -1143,7 +1145,7 @@ rproc_apply_resource_overrides(struct rproc *rproc,
 
 		/* If we already have a table, update it with the new values. */
 		updated = rproc_update_resource_table_entry(rproc, resource,
-							    table, size);
+						table, size, false);
 		if (updated < 0) {
 			table = ERR_PTR(updated);
 			goto out;
