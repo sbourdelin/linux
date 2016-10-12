@@ -958,7 +958,7 @@ static int nfs4_copy_lock_stateid(nfs4_stateid *dst,
 		fl_owner = current->files;
 		fl_flock_owner = 0;
 	} else {
-		fl_owner = l_ctx->lockowner.l_owner;
+		fl_owner = l_ctx->lockowner;
 		fl_flock_owner = l_ctx->open_context->flock_owner;
 	}
 	spin_lock(&state->state_lock);
