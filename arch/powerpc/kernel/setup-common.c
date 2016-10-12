@@ -804,6 +804,9 @@ static __init void print_system_info(void)
 	pr_info("mmu_features      = 0x%08x\n", cur_cpu_spec->mmu_features);
 #ifdef CONFIG_PPC64
 	pr_info("firmware_features = 0x%016lx\n", powerpc_firmware_features);
+
+	if (get_paca()->kernelbase != PAGE_OFFSET)
+		pr_info("kernelbase        = 0x%llx\n", get_paca()->kernelbase);
 #endif
 
 #ifdef CONFIG_PPC_STD_MMU_64

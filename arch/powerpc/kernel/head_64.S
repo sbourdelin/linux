@@ -111,7 +111,11 @@ __secondary_hold_acknowledge:
 	.globl	__run_at_load
 __run_at_load:
 DEFINE_FIXED_SYMBOL(__run_at_load)
+#ifdef CONFIG_RELOCATABLE_TEST
+	.long	0x1		/* Test relocation, do not relocate to 0 */
+#else
 	.long	0x72756e30	/* "run0" -- relocate to 0 by default */
+#endif
 #endif
 
 	. = 0x60
