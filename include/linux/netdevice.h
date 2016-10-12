@@ -2199,6 +2199,11 @@ struct offload_callbacks {
 	struct sk_buff		**(*gro_receive)(struct sk_buff **head,
 						 struct sk_buff *skb);
 	int			(*gro_complete)(struct sk_buff *skb, int nhoff);
+	int			(*flow_dissect)(const struct sk_buff *skb,
+		void *data, int hlen,
+		int *nhoff, u8 *ip_proto,
+		__be16 *proto,
+		 struct flow_dissector_key_addrs *key_addrs);
 };
 
 struct packet_offload {

@@ -203,4 +203,12 @@ static inline void *skb_flow_dissector_target(struct flow_dissector *flow_dissec
 	return ((char *)target_container) + flow_dissector->offset[key_id];
 }
 
+/* Return codes from per socket flow dissector (e.g. UDP) */
+enum {
+	FLOW_DIS_RET_PASS = 0,
+	FLOW_DIS_RET_BAD,
+	FLOW_DIS_RET_IPPROTO,
+	FLOW_DIS_RET_PROTO,
+};
+
 #endif

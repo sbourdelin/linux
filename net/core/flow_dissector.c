@@ -8,6 +8,8 @@
 #include <net/ipv6.h>
 #include <net/gre.h>
 #include <net/pptp.h>
+#include <net/protocol.h>
+#include <net/udp.h>
 #include <linux/igmp.h>
 #include <linux/icmp.h>
 #include <linux/sctp.h>
@@ -56,6 +58,20 @@ void skb_flow_dissector_init(struct flow_dissector *flow_dissector,
 				   FLOW_DISSECTOR_KEY_BASIC));
 }
 EXPORT_SYMBOL(skb_flow_dissector_init);
+
+static struct static_key udp_flow_dissect __read_mostly;
+
+void udp_flow_dissect_enable(void)
+{
+	static_key_slow_inc(&udp_flow_dissect);
+}
+EXPORT_SYMBOL(udp_flow_dissect_enable);
+
+void udp_flow_dissect_disable(void)
+{
+	static_key_slow_dec(&udp_flow_dissect);
+}
+EXPORT_SYMBOL(udp_flow_dissect_disable);
 
 /**
  * __skb_flow_get_ports - extract the upper layer ports and return them
@@ -115,7 +131,7 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
 {
 	struct flow_dissector_key_control *key_control;
 	struct flow_dissector_key_basic *key_basic;
-	struct flow_dissector_key_addrs *key_addrs;
+	struct flow_dissector_key_addrs *key_addrs = NULL;
 	struct flow_dissector_key_ports *key_ports;
 	struct flow_dissector_key_tags *key_tags;
 	struct flow_dissector_key_vlan *key_vlan;
@@ -245,7 +261,7 @@ ipv6:
 	}
 	case htons(ETH_P_8021AD):
 	case htons(ETH_P_8021Q): {
-		const struct vlan_hdr *vlan;
+		const struct vlan_hdr *vlan = NULL;
 
 		if (skb_vlan_tag_present(skb))
 			proto = skb->protocol;
@@ -535,6 +551,59 @@ ip_proto_again:
 	case IPPROTO_MPLS:
 		proto = htons(ETH_P_MPLS_UC);
 		goto mpls;
+	case IPPROTO_UDP:
+	{
+		const struct net_offload **offloads;
+		const struct net_offload *ops;
+		int ret;
+
+		if (!static_key_false(&udp_flow_dissect))
+			break;
+
+		if (!key_addrs)
+			break;
+
+		/* See if there is a flow dissector for UDP protocol */
+
+		switch (key_control->addr_type) {
+		case FLOW_DISSECTOR_KEY_IPV4_ADDRS:
+			offloads = inet_offloads;
+			break;
+		case FLOW_DISSECTOR_KEY_IPV6_ADDRS:
+			offloads = inet6_offloads;
+			break;
+		default:
+			goto udp_finish;
+		}
+
+		rcu_read_lock();
+
+		ops = rcu_dereference(offloads[IPPROTO_UDP]);
+
+		if (!ops || !ops->callbacks.flow_dissect) {
+			rcu_read_unlock();
+			break;
+		}
+
+		ret = ops->callbacks.flow_dissect(skb, data, hlen, &nhoff,
+						  &ip_proto, &proto, key_addrs);
+
+		rcu_read_unlock();
+
+		switch (ret) {
+		case FLOW_DIS_RET_IPPROTO:
+			goto ip_proto_again;
+		case FLOW_DIS_RET_PROTO:
+			goto again;
+		case FLOW_DIS_RET_BAD:
+			goto out_bad;
+		case FLOW_DIS_RET_PASS:
+		default:
+			break;
+		}
+udp_finish:
+		break;
+	}
 	default:
 		break;
 	}
