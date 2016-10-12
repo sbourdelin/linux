@@ -271,7 +271,7 @@ int topology_update_package_map(unsigned int apicid, unsigned int cpu)
 	if (!physical_package_map)
 		return 0;
 
-	if (pkg >= max_physical_pkg_id)
+	if (!apic->apic_id_valid(apicid) || pkg >= max_physical_pkg_id)
 		return -EINVAL;
 
 	/* Set the logical package id */
@@ -310,7 +310,7 @@ EXPORT_SYMBOL(topology_phys_to_logical_pkg);
 
 static void __init smp_init_package_map(void)
 {
-	unsigned int ncpus, cpu;
+	unsigned int ncpus;
 	size_t size;
 
 	/*
@@ -342,7 +342,6 @@ static void __init smp_init_package_map(void)
 	}
 
 	__max_logical_packages = DIV_ROUND_UP(total_cpus, ncpus);
-	logical_packages = 0;
 
 	/*
 	 * Possibly larger than what we need as the number of apic ids per
@@ -354,19 +353,6 @@ static void __init smp_init_package_map(void)
 	memset(physical_to_logical_pkg, 0xff, size);
 	size = BITS_TO_LONGS(max_physical_pkg_id) * sizeof(unsigned long);
 	physical_package_map = kzalloc(size, GFP_KERNEL);
-
-	for_each_present_cpu(cpu) {
-		unsigned int apicid = apic->cpu_present_to_apicid(cpu);
-
-		if (apicid == BAD_APICID || !apic->apic_id_valid(apicid))
-			continue;
-		if (!topology_update_package_map(apicid, cpu))
-			continue;
-		pr_warn("CPU %u APICId %x disabled\n", cpu, apicid);
-		per_cpu(x86_bios_cpu_apicid, cpu) = BAD_APICID;
-		set_cpu_possible(cpu, false);
-		set_cpu_present(cpu, false);
-	}
 
 	if (logical_packages > __max_logical_packages) {
 		pr_warn("Detected more packages (%u), then computed by BIOS data (%u).\n",
@@ -385,7 +371,6 @@ void __init smp_store_boot_cpu_info(void)
 
 	*c = boot_cpu_data;
 	c->cpu_index = id;
-	smp_init_package_map();
 }
 
 /*
@@ -1296,6 +1281,7 @@ void __init native_smp_prepare_cpus(unsigned int max_cpus)
 	 * Setup boot CPU information
 	 */
 	smp_store_boot_cpu_info(); /* Final full version of the data */
+	smp_init_package_map();
 	cpumask_copy(cpu_callin_mask, cpumask_of(0));
 	mb();
 
