@@ -876,8 +876,8 @@ static void rproc_dump_resource_table(struct rproc *rproc,
 
 			break;
 		default:
-			dev_dbg(dev, "Invalid resource type found: %d [hdr: %p]\n",
-				hdr->type, hdr);
+			dev_dbg(dev, "Entry %d: Invalid resource type found: %d [hdr: %p]\n",
+				i, hdr->type, hdr);
 			return;
 		}
 	}
