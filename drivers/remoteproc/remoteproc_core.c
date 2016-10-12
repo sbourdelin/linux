@@ -985,6 +985,7 @@ static int rproc_update_resource_table_entry(struct rproc *rproc,
 	struct fw_rsc_carveout *tblc, *newc;
 	struct fw_rsc_devmem *tbld, *newd;
 	struct fw_rsc_trace *tblt, *newt;
+	struct fw_rsc_vdev *tblv, *newv;
 	int updated = true;
 	int i;
 
@@ -1027,6 +1028,20 @@ static int rproc_update_resource_table_entry(struct rproc *rproc,
 				break;
 
 			memcpy(tblt, newt, request->size);
+
+			return updated;
+		case RSC_VDEV:
+			tblv = rsc;
+			newv = request->resource;
+			if (newv->id != tblv->id)
+				break;
+
+			if (request->size > (sizeof(*tblv) +
+				    tblv->num_of_vrings * sizeof(struct fw_rsc_vdev_vring) +
+				    tblv->config_len))
+				return -ENOSPC;
+
+			memcpy(tblv, newv, request->size);
 
 			return updated;
 		default:
