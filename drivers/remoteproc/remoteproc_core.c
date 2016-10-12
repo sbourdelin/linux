@@ -672,16 +672,16 @@ static rproc_handle_resource_t rproc_vdev_handler[RSC_LAST] = {
 };
 
 /* handle firmware resource entries before booting the remote processor */
-static int rproc_handle_resources(struct rproc *rproc, int len,
-				  rproc_handle_resource_t handlers[RSC_LAST])
+static int rproc_handle_resources(struct rproc *rproc, struct resource_table *table_ptr,
+				  int len, rproc_handle_resource_t handlers[RSC_LAST])
 {
 	struct device *dev = &rproc->dev;
 	rproc_handle_resource_t handler;
 	int ret = 0, i;
 
-	for (i = 0; i < rproc->table_ptr->num; i++) {
-		int offset = rproc->table_ptr->offset[i];
-		struct fw_rsc_hdr *hdr = (void *)rproc->table_ptr + offset;
+	for (i = 0; i < table_ptr->num; i++) {
+		int offset = table_ptr->offset[i];
+		struct fw_rsc_hdr *hdr = (void *)table_ptr + offset;
 		void *rsc = (void *)hdr + sizeof(*hdr);
 
 		dev_dbg(dev, "rsc: type %d\n", hdr->type);
@@ -1309,14 +1309,16 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	rproc->max_notifyid = -1;
 
 	/* look for virtio devices and register them */
-	ret = rproc_handle_resources(rproc, tablesz, rproc_vdev_handler);
+	ret = rproc_handle_resources(rproc, rproc->cached_table, tablesz,
+				     rproc_vdev_handler);
 	if (ret) {
 		dev_err(dev, "Failed to handle vdev resources: %d\n", ret);
 		goto clean_up;
 	}
 
 	/* handle fw resources which are required to boot rproc */
-	ret = rproc_handle_resources(rproc, tablesz, rproc_loading_handlers);
+	ret = rproc_handle_resources(rproc, rproc->cached_table, tablesz,
+				     rproc_loading_handlers);
 	if (ret) {
 		dev_err(dev, "Failed to process resources: %d\n", ret);
 		goto clean_up_resources;
