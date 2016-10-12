@@ -236,6 +236,7 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 		rdmsrl(MSR_PHI_MISC_THD_FEATURE_ENABLE, prev);
 		wrmsrl(MSR_PHI_MISC_THD_FEATURE_ENABLE,
 		       prev | MSR_PHI_MISC_THD_FEATURE_ENABLE_R3MWAIT);
+		set_cpu_cap(c, X86_FEATURE_PHIR3MWAIT);
 	}
 }
 
