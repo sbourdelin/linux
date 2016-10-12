@@ -1562,7 +1562,10 @@ static int sip_help_tcp(struct sk_buff *skb, unsigned int protoff,
 			hooks->seq_adjust(skb, protoff, tdiff);
 	}
 
-	return ret;
+	/* Due TCP fragmentation we cant assume full SIP messages all the time.
+	 * Therefore Accept all packets, even unparsable.
+	 */
+	return NF_ACCEPT;
 }
 
 static int sip_help_udp(struct sk_buff *skb, unsigned int protoff,
