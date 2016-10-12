@@ -324,11 +324,31 @@ struct rproc_mem_entry {
 };
 
 /**
+ * enum rproc_request_action - types of actions associated to a resource
+ * request
+ *
+ * @RSC_ACT_CHECK:	  request to verify this resource with firmware one
+ * @RSC_ACT_UPDATE:	  request to update firmware resource table with associated
+ *			  resource if possible
+ * @RSC_ACT_FORCE_UPDATE: force firmware resource table update with associated
+ *		          resource
+ * @RSC_ACT_LAST:         just keep this one at the end
+ *
+ */
+enum rproc_request_action {
+	RSC_ACT_VERIFY		= 0,
+	RSC_ACT_UPDATE		= 1,
+	RSC_ACT_FORCE_UPDATE	= 2,
+	RSC_ACT_LAST		= 3,
+};
+
+/**
  * struct rproc_requested_resources - add a resource to the resource table
  *
  * @resource:	pointer to a 'struct fw_rsc_*' resource
  * @type:	'fw_resource_type' resource type
  * @size:	size of resource
+ * @action:	action associated the resource
  * @node:	list node
  *
  * Resources can be added by platform-specific rproc drivers calling
@@ -339,6 +359,7 @@ struct rproc_request_resource {
 	void *resource;
 	u32 type;
 	u32 size;
+	u32 action;
 	struct list_head node;
 };
 
@@ -506,7 +527,7 @@ struct rproc_vdev {
 	u32 rsc_offset;
 };
 
-int rproc_request_resource(struct rproc *rproc, u32 type, void *res);
+int rproc_request_resource(struct rproc *rproc, u32 type, u32 action, void *res);
 struct rproc *rproc_get_by_phandle(phandle phandle);
 struct rproc *rproc_alloc(struct device *dev, const char *name,
 			  const struct rproc_ops *ops,

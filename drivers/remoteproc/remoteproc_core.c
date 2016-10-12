@@ -870,7 +870,7 @@ static void rproc_dump_resource_table(struct rproc *rproc,
 	}
 }
 
-int rproc_request_resource(struct rproc *rproc, u32 type, void *resource)
+int rproc_request_resource(struct rproc *rproc, u32 type, u32 action, void *resource)
 {
 	struct device *dev = &rproc->dev;
 	struct rproc_request_resource *request;
@@ -879,6 +879,9 @@ int rproc_request_resource(struct rproc *rproc, u32 type, void *resource)
 	request = devm_kzalloc(dev, sizeof(*request), GFP_KERNEL);
 	if (!request)
 		return -ENOMEM;
+
+	if (action >= RSC_ACT_LAST)
+		return -EINVAL;
 
 	switch (type) {
 	case RSC_CARVEOUT:
@@ -902,6 +905,7 @@ int rproc_request_resource(struct rproc *rproc, u32 type, void *resource)
 	memcpy(request->resource, resource, size);
 	request->type = type;
 	request->size = size;
+	request->action = action;
 
 	list_add_tail(&request->node, &rproc->override_resources);
 
