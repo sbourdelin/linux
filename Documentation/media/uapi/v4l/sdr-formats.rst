@@ -17,3 +17,6 @@ These formats are used for :ref:`SDR <sdr>` interface only.
     pixfmt-sdr-cs08
     pixfmt-sdr-cs14le
     pixfmt-sdr-ru12le
+    pixfmt-sdr-scu16be
+    pixfmt-sdr-scu18be
+    pixfmt-sdr-scu20be
