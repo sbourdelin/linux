@@ -874,6 +874,7 @@ int rproc_request_resource(struct rproc *rproc, u32 type, u32 action, void *reso
 {
 	struct device *dev = &rproc->dev;
 	struct rproc_request_resource *request;
+	struct fw_rsc_vdev *v;
 	int size;
 
 	request = devm_kzalloc(dev, sizeof(*request), GFP_KERNEL);
@@ -892,6 +893,12 @@ int rproc_request_resource(struct rproc *rproc, u32 type, u32 action, void *reso
 		break;
 	case RSC_TRACE:
 		size = sizeof(struct fw_rsc_trace);
+		break;
+	case RSC_VDEV:
+		v = resource;
+		size = sizeof(struct fw_rsc_vdev);
+		size += v->num_of_vrings * sizeof(struct fw_rsc_vdev_vring);
+		size += v->config_len;
 		break;
 	default:
 		dev_err(dev, "Unsupported resource type: %d\n", type);
