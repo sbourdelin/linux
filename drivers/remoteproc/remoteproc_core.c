@@ -808,6 +808,8 @@ static void rproc_dump_resource_table(struct rproc *rproc,
 		int offset = table->offset[i];
 		struct fw_rsc_hdr *hdr = (void *)table + offset;
 		void *rsc = (void *)hdr + sizeof(*hdr);
+		unsigned char *cfg;
+		int len;
 
 		switch (hdr->type) {
 		case RSC_CARVEOUT:
@@ -861,6 +863,17 @@ static void rproc_dump_resource_table(struct rproc *rproc,
 				dev_dbg(dev, "    Physical Address 0x%x\n\n",
 					v->vring[j].pa);
 			}
+
+			dev_dbg(dev, "  Config table\n");
+			cfg = (unsigned char *)(&v->vring[v->num_of_vrings]);
+			len = 0;
+			do {
+				j = min(16, (int)(v->config_len - len));
+				dev_dbg(dev, "    Config[%2d-%2d] = %*phC\n",
+					len, len + j - 1, j, cfg + len);
+				len += j;
+			} while (len < v->config_len);
+
 			break;
 		default:
 			dev_dbg(dev, "Invalid resource type found: %d [hdr: %p]\n",
