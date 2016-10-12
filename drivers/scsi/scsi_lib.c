@@ -47,6 +47,9 @@ struct kmem_cache *scsi_sdb_cache;
  */
 #define SCSI_QUEUE_DELAY	3
 
+/* Maximum number of retries when a scsi command triggers an Unit Attention. */
+#define UNIT_ATTENTION_RETRIES 5
+
 static void
 scsi_set_blocked(struct scsi_cmnd *cmd, int reason)
 {
@@ -164,7 +167,7 @@ void scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 	__scsi_queue_insert(cmd, reason, 1);
 }
 /**
- * scsi_execute - insert request and wait for the result
+ * __scsi_execute - insert request and wait for the result
  * @sdev:	scsi device
  * @cmd:	scsi command
  * @data_direction: data direction
@@ -179,10 +182,10 @@ void scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
  * returns the req->errors value which is the scsi_cmnd result
  * field.
  */
-int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
-		 int data_direction, void *buffer, unsigned bufflen,
-		 unsigned char *sense, int timeout, int retries, u64 flags,
-		 int *resid)
+int __scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
+		   int data_direction, void *buffer, unsigned bufflen,
+		   unsigned char *sense, int timeout, int retries, u64 flags,
+		   int *resid)
 {
 	struct request *req;
 	int write = (data_direction == DMA_TO_DEVICE);
@@ -226,6 +229,40 @@ int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	blk_put_request(req);
 
 	return ret;
+}
+
+int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
+		 int data_direction, void *buffer, unsigned bufflen,
+		 unsigned char *sense, int timeout, int retries, u64 flags,
+		 int *resid)
+{
+	int result;
+	int retry = UNIT_ATTENTION_RETRIES;
+	bool priv_sense = false;
+
+	if (!sense) {
+		sense = kzalloc(SCSI_SENSE_BUFFERSIZE, GFP_NOIO);
+		priv_sense = true;
+		if (!sense)
+			return DRIVER_ERROR << 24;
+	}
+
+	while (retry--) {
+		result = __scsi_execute(sdev, cmd, data_direction, buffer,
+					bufflen, sense, timeout, retries,
+					flags, resid);
+
+		if (!scsi_sense_unit_attention(sense))
+			break;
+
+		if (retry)
+			memset(sense, 0, SCSI_SENSE_BUFFERSIZE);
+	}
+
+	if (priv_sense)
+		kfree(sense);
+
+	return result;
 }
 EXPORT_SYMBOL(scsi_execute);
 
