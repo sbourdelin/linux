@@ -109,6 +109,48 @@ be specified as
 
   perf stat -e cpu/event=0xa8,umask=0x1,name=LSD.UOPS_CYCLES,cmask=1/ ...
 
+EVENT PARAMETERS
+----------------
+
+The pmu// syntax in perf uses parameters to configure the event for the
+PMU.
+
+For a list of available parameters for each PMU please use
+
+  ls /sys/devices/*/format
+
+Common parameters are
+
+. event=NUM: Event code
+. umask=NUM: Event umask
+
+In addition perf supports some extra parameters to further configure then
+event
+
+. name=name: Use name to display the event in perf
+. period=NUM: Use sampling period NUM for the event. Similar to the -c parameter,
+but only applies to this event.  Only valid for perf record and top.
+. freq=NUM:  Use sampling frequency NUM for the event. Similar to the -c parameter,
+but only applies to this event.  Only valid for perf record and top.
+. branch_type=TYPE: Enable last branch sampling for event. TYPE is the same
+as the argument to perf record's -j option. Use any to be equivalent to -b.
+when no is specified branch sampling is disabled for this event. Only valid
+for perf record and top.
+. time=NUM:  When NUM is non zero collect a time stamp for the event.
+. call-graph=type: Enable call graph mode for the event. When no is specified call
+graph is disabled. The parameters are the as to the --call-graph option of
+perf record. Only valid for perf record and top.
+. stack-size=BYTES: For dwarf unwinding call graph mode limit the number of stack
+bytes collected to BYTES.
+. max-stack=NUM:  For call graph mode limit the number of entries to NUM.
+. inherit:  Inherit the event to child processes.
+. no-inherit: Do not inherit the event to child processes.
+. overwrite: Enable overwrite mode in the perf buffer.
+. no-overwrite: Do not enable overwrite mode in the perf buffer.
+. config=NUM: Configure config parameter in perf event attribute.
+. config1=NUM:  Configure config1 parameter in perf event attribute.
+. config2=NUM:  Configure config2 parameter in perf event attribute.
+
 PER SOCKET PMUS
 ---------------
 
