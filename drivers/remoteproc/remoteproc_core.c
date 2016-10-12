@@ -909,6 +909,69 @@ int rproc_request_resource(struct rproc *rproc, u32 type, void *resource)
 }
 EXPORT_SYMBOL(rproc_request_resource);
 
+static int rproc_update_resource_table_entry(struct rproc *rproc,
+				struct rproc_request_resource *request,
+				struct resource_table *table, int size)
+{
+	struct fw_rsc_carveout *tblc, *newc;
+	struct fw_rsc_devmem *tbld, *newd;
+	struct fw_rsc_trace *tblt, *newt;
+	int updated = true;
+	int i;
+
+	for (i = 0; i < table->num; i++) {
+		int offset = table->offset[i];
+		struct fw_rsc_hdr *hdr = (void *)table + offset;
+		void *rsc = (void *)hdr + sizeof(*hdr);
+
+		if (request->type != hdr->type)
+			continue;
+
+		switch (hdr->type) {
+		case RSC_CARVEOUT:
+			tblc = rsc;
+			newc = request->resource;
+
+			if (strncmp(newc->name, tblc->name,
+				    sizeof(*tblc->name)))
+				break;
+
+			memcpy(tblc, newc, request->size);
+
+			return updated;
+		case RSC_DEVMEM:
+			tbld = rsc;
+			newd = request->resource;
+
+			if (strncmp(newd->name, tbld->name,
+				    sizeof(*tbld->name)))
+				break;
+
+			memcpy(tbld, newd, request->size);
+
+			return updated;
+		case RSC_TRACE:
+			tblt = rsc;
+			newt = request->resource;
+
+			if (strncmp(newt->name, tblt->name,
+				    sizeof(*tblt->name)))
+				break;
+
+			memcpy(tblt, newt, request->size);
+
+			return updated;
+		default:
+			dev_err(&rproc->dev,
+				"Unsupported resource type: %d\n",
+				hdr->type);
+			return -EINVAL;
+		}
+	}
+
+	return !updated;
+}
+
 /*
  * take a firmware and boot a remote processor with it.
  */
