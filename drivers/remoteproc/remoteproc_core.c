@@ -785,6 +785,45 @@ static void rproc_resource_cleanup(struct rproc *rproc)
 		rproc_remove_virtio_dev(rvdev);
 }
 
+int rproc_request_resource(struct rproc *rproc, u32 type, void *resource)
+{
+	struct device *dev = &rproc->dev;
+	struct rproc_request_resource *request;
+	int size;
+
+	request = devm_kzalloc(dev, sizeof(*request), GFP_KERNEL);
+	if (!request)
+		return -ENOMEM;
+
+	switch (type) {
+	case RSC_CARVEOUT:
+		size = sizeof(struct fw_rsc_carveout);
+		break;
+	case RSC_DEVMEM:
+		size = sizeof(struct fw_rsc_devmem);
+		break;
+	case RSC_TRACE:
+		size = sizeof(struct fw_rsc_trace);
+		break;
+	default:
+		dev_err(dev, "Unsupported resource type: %d\n", type);
+		return -EINVAL;
+	}
+
+	request->resource = devm_kzalloc(dev, size, GFP_KERNEL);
+	if (!request->resource)
+		return -ENOMEM;
+
+	memcpy(request->resource, resource, size);
+	request->type = type;
+	request->size = size;
+
+	list_add_tail(&request->node, &rproc->override_resources);
+
+	return 0;
+}
+EXPORT_SYMBOL(rproc_request_resource);
+
 /*
  * take a firmware and boot a remote processor with it.
  */
@@ -1370,6 +1409,7 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
 	INIT_LIST_HEAD(&rproc->mappings);
 	INIT_LIST_HEAD(&rproc->traces);
 	INIT_LIST_HEAD(&rproc->rvdevs);
+	INIT_LIST_HEAD(&rproc->override_resources);
 
 	INIT_WORK(&rproc->crash_handler, rproc_crash_handler_work);
 	init_completion(&rproc->crash_comp);

@@ -323,6 +323,25 @@ struct rproc_mem_entry {
 	struct list_head node;
 };
 
+/**
+ * struct rproc_requested_resources - add a resource to the resource table
+ *
+ * @resource:	pointer to a 'struct fw_rsc_*' resource
+ * @type:	'fw_resource_type' resource type
+ * @size:	size of resource
+ * @node:	list node
+ *
+ * Resources can be added by platform-specific rproc drivers calling
+ * rproc_request_resource()
+ *
+ */
+struct rproc_request_resource {
+	void *resource;
+	u32 type;
+	u32 size;
+	struct list_head node;
+};
+
 struct rproc;
 
 /**
@@ -428,6 +447,7 @@ struct rproc {
 	int num_traces;
 	struct list_head carveouts;
 	struct list_head mappings;
+	struct list_head override_resources;
 	struct completion firmware_loading_complete;
 	u32 bootaddr;
 	struct list_head rvdevs;
@@ -486,6 +506,7 @@ struct rproc_vdev {
 	u32 rsc_offset;
 };
 
+int rproc_request_resource(struct rproc *rproc, u32 type, void *res);
 struct rproc *rproc_get_by_phandle(phandle phandle);
 struct rproc *rproc_alloc(struct device *dev, const char *name,
 			  const struct rproc_ops *ops,
