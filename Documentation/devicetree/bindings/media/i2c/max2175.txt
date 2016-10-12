@@ -1,0 +1,60 @@
+Maxim Integrated MAX2175 RF to Bits tuner
+-----------------------------------------
+
+The MAX2175 IC is an advanced analog/digital hybrid-radio receiver with
+RF to Bits® front-end designed for software-defined radio solutions.
+
+Required properties:
+--------------------
+- compatible: "maxim,max2175" for MAX2175 RF-to-bits tuner.
+- clocks: phandle to the fixed xtal clock.
+- clock-names: name of the fixed xtal clock.
+- port: video interface child port node of a tuner that defines the local
+  and remote endpoints. The remote endpoint is assumed to be an SDR device
+  that is capable of receiving the digital samples from the tuner.
+
+Optional properties:
+--------------------
+- maxim,slave	   : empty property indicates this is a slave of another
+		     master tuner. This is used to define two tuners in
+		     diversity mode (1 master, 1 slave). By default each
+		     tuner is an individual master.
+- maxim,refout-load: load capacitance value (in pF) on reference output
+		     drive level. The mapping of these load values to
+		     respective bit values are given below.
+		     0 - Reference output disabled
+		     1 - 10pF load
+		     2 - 20pF load
+		     3 - 30pF load
+		     4 - 40pF load
+		     5 - 60pF load
+		     6 - 70pF load
+
+Example:
+--------
+
+Board specific DTS file
+
+/* Fixed XTAL clock node */
+maxim_xtal: maximextal {
+	compatible = "fixed-clock";
+	#clock-cells = <0>;
+	clock-frequency = <36864000>;
+};
+
+/* A tuner device instance under i2c bus */
+max2175_0: tuner@60 {
+	#clock-cells = <0>;
+	compatible = "maxim,max2175";
+	reg = <0x60>;
+	clocks = <&maxim_xtal>;
+	clock-names = "xtal";
+	maxim,refout-load = <10>;
+
+	port {
+		max2175_0_ep: endpoint {
+			remote-endpoint = <&slave_rx_v4l2_sdr_device>;
+		};
+	};
+
+};
