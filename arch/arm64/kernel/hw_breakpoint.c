@@ -349,7 +349,7 @@ int arch_check_bp_in_kernelspace(struct perf_event *bp)
  * to generic breakpoint descriptions.
  */
 int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
-			   int *gen_len, int *gen_type)
+			   int *gen_len, int *gen_type, int *offset)
 {
 	/* Type */
 	switch (ctrl.type) {
@@ -369,8 +369,10 @@ int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
 		return -EINVAL;
 	}
 
+	*offset = ffs(ctrl.len) - 1;
+
 	/* Len */
-	switch (ctrl.len) {
+	switch (ctrl.len >> *offset) {
 	case ARM_BREAKPOINT_LEN_1:
 		*gen_len = HW_BREAKPOINT_LEN_1;
 		break;
@@ -517,17 +519,16 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
 		default:
 			return -EINVAL;
 		}
-
-		info->address &= ~alignment_mask;
-		info->ctrl.len <<= offset;
 	} else {
 		if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE)
 			alignment_mask = 0x3;
 		else
 			alignment_mask = 0x7;
-		if (info->address & alignment_mask)
-			return -EINVAL;
+		offset = info->address & alignment_mask;
 	}
+
+	info->address &= ~alignment_mask;
+	info->ctrl.len <<= offset;
 
 	/*
 	 * Disallow per-task kernel breakpoints since these would
@@ -671,6 +672,7 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
 	struct debug_info *debug_info;
 	struct arch_hw_breakpoint *info;
 	struct arch_hw_breakpoint_ctrl ctrl;
+	u32 lens, lene;
 
 	slots = this_cpu_ptr(wp_on_reg);
 	debug_info = &current->thread.debug;
@@ -684,25 +686,22 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
 			goto unlock;
 
 		info = counter_arch_bp(wp);
-		/* AArch32 watchpoints are either 4 or 8 bytes aligned. */
-		if (is_compat_task()) {
-			if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
-				alignment_mask = 0x7;
-			else
-				alignment_mask = 0x3;
-		} else {
-			alignment_mask = 0x7;
-		}
 
-		/* Check if the watchpoint value matches. */
+		/* Check if the watchpoint value and byte select match. */
 		val = read_wb_reg(AARCH64_DBG_REG_WVR, i);
-		if (val != (addr & ~alignment_mask))
-			goto unlock;
-
-		/* Possible match, check the byte address select to confirm. */
 		ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
 		decode_ctrl_reg(ctrl_reg, &ctrl);
-		if (!((1 << (addr & alignment_mask)) & ctrl.len))
+		lens = ffs(ctrl.len) - 1;
+		lene = fls(ctrl.len) - 1;
+		/*
+		 * Ideally, a read/write type information such as
+		 * byte/hw/word/dw would have provided a good check. But
+		 * I do not see such possibility. So, considering that max
+		 * rd/wr size as 8, i.e. this watchpoint interrupt would
+		 * have generated because any of the address from `addr` to
+		 * `addr + 7` would have been accessed.
+		 */
+		if (addr + 7 < val + lens || addr > val + lene)
 			goto unlock;
 
 		/*
