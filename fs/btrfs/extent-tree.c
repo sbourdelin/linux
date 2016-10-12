@@ -4693,12 +4693,13 @@ static inline int calc_reclaim_items_nr(struct btrfs_root *root, u64 to_reclaim)
 /*
  * shrink metadata reservation for delalloc
  */
-static void shrink_delalloc(struct btrfs_root *root, u64 to_reclaim, u64 orig,
-			    bool wait_ordered)
+static void shrink_delalloc(struct btrfs_root *root, u64 orig,
+			    bool wait_ordered, int reclaim_priority)
 {
 	struct btrfs_block_rsv *block_rsv;
 	struct btrfs_space_info *space_info;
 	struct btrfs_trans_handle *trans;
+	u64 to_reclaim;
 	u64 delalloc_bytes;
 	u64 max_reclaim;
 	long time_left;
@@ -4706,22 +4707,35 @@ static void shrink_delalloc(struct btrfs_root *root, u64 to_reclaim, u64 orig,
 	int loops;
 	int items;
 	enum btrfs_reserve_flush_enum flush;
+	int items_to_wait;
+
+	if (reclaim_priority < 0)
+		reclaim_priority = 0;
+
+	delalloc_bytes = percpu_counter_sum_positive(
+				&root->fs_info->delalloc_bytes);
+	if (reclaim_priority >= 3)
+		to_reclaim = delalloc_bytes;
+	else
+		to_reclaim = orig * (2 << (reclaim_priority + 1));
 
 	/* Calc the number of the pages we need flush for space reservation */
 	items = calc_reclaim_items_nr(root, to_reclaim);
 	to_reclaim = (u64)items * EXTENT_SIZE_PER_ITEM;
+	if (reclaim_priority >= 3)
+		items_to_wait = -1;
+	else
+		items_to_wait = items;
 
 	trans = (struct btrfs_trans_handle *)current->journal_info;
 	block_rsv = &root->fs_info->delalloc_block_rsv;
 	space_info = block_rsv->space_info;
 
-	delalloc_bytes = percpu_counter_sum_positive(
-						&root->fs_info->delalloc_bytes);
 	if (delalloc_bytes == 0) {
 		if (trans)
 			return;
 		if (wait_ordered)
-			btrfs_wait_ordered_roots(root->fs_info, items,
+			btrfs_wait_ordered_roots(root->fs_info, items_to_wait,
 						 0, (u64)-1);
 		return;
 	}
@@ -4766,7 +4780,7 @@ skip_async:
 
 		loops++;
 		if (wait_ordered && !trans) {
-			btrfs_wait_ordered_roots(root->fs_info, items,
+			btrfs_wait_ordered_roots(root->fs_info, items_to_wait,
 						 0, (u64)-1);
 		} else {
 			time_left = schedule_timeout_killable(1);
@@ -4839,7 +4853,7 @@ struct reserve_ticket {
 
 static int flush_space(struct btrfs_root *root,
 		       struct btrfs_space_info *space_info, u64 num_bytes,
-		       u64 orig_bytes, int state)
+		       int state, int reclaim_priority)
 {
 	struct btrfs_trans_handle *trans;
 	int nr;
@@ -4863,8 +4877,8 @@ static int flush_space(struct btrfs_root *root,
 		break;
 	case FLUSH_DELALLOC:
 	case FLUSH_DELALLOC_WAIT:
-		shrink_delalloc(root, num_bytes * 2, orig_bytes,
-				state == FLUSH_DELALLOC_WAIT);
+		shrink_delalloc(root, num_bytes, state == FLUSH_DELALLOC_WAIT,
+				reclaim_priority);
 		break;
 	case ALLOC_CHUNK:
 		trans = btrfs_join_transaction(root);
@@ -4880,7 +4894,7 @@ static int flush_space(struct btrfs_root *root,
 			ret = 0;
 		break;
 	case COMMIT_TRANS:
-		ret = may_commit_transaction(root, space_info, orig_bytes, 0);
+		ret = may_commit_transaction(root, space_info, num_bytes, 0);
 		break;
 	default:
 		ret = -ENOSPC;
@@ -4888,7 +4902,7 @@ static int flush_space(struct btrfs_root *root,
 	}
 
 	trace_btrfs_flush_space(root->fs_info, space_info->flags, num_bytes,
-				orig_bytes, state, ret);
+				state, ret);
 	return ret;
 }
 
@@ -4970,7 +4984,7 @@ static void btrfs_async_reclaim_metadata_space(struct work_struct *work)
 	struct btrfs_space_info *space_info;
 	u64 to_reclaim;
 	int flush_state;
-	int commit_cycles = 0;
+	int reclaim_priority = 0;
 	u64 last_tickets_id;
 
 	fs_info = container_of(work, struct btrfs_fs_info, async_reclaim_work);
@@ -4993,7 +5007,7 @@ static void btrfs_async_reclaim_metadata_space(struct work_struct *work)
 		int ret;
 
 		ret = flush_space(fs_info->fs_root, space_info, to_reclaim,
-			    to_reclaim, flush_state);
+				  flush_state, reclaim_priority);
 		spin_lock(&space_info->lock);
 		if (list_empty(&space_info->tickets)) {
 			space_info->flush = 0;
@@ -5009,13 +5023,12 @@ static void btrfs_async_reclaim_metadata_space(struct work_struct *work)
 		} else {
 			last_tickets_id = space_info->tickets_id;
 			flush_state = FLUSH_DELAYED_ITEMS_NR;
-			if (commit_cycles)
-				commit_cycles--;
+			reclaim_priority = 0;
 		}
 
 		if (flush_state > COMMIT_TRANS) {
-			commit_cycles++;
-			if (commit_cycles > 2) {
+			reclaim_priority++;
+			if (reclaim_priority > 3) {
 				wake_all_tickets(&space_info->tickets);
 				space_info->flush = 0;
 			} else {
@@ -5049,7 +5062,7 @@ static void priority_reclaim_metadata_space(struct btrfs_fs_info *fs_info,
 
 	do {
 		flush_space(fs_info->fs_root, space_info, to_reclaim,
-			    to_reclaim, flush_state);
+			    flush_state, 1);
 		flush_state++;
 		spin_lock(&space_info->lock);
 		if (ticket->bytes == 0) {
