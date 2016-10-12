@@ -933,6 +933,51 @@ int rproc_request_resource(struct rproc *rproc, u32 type, u32 action, void *reso
 }
 EXPORT_SYMBOL(rproc_request_resource);
 
+static int rproc_verify_resource_table_entry(struct rproc *rproc,
+				struct rproc_request_resource *request,
+				struct resource_table *table, int size)
+{
+	struct fw_rsc_carveout *tblc, *newc;
+	int i;
+
+	for (i = 0; i < table->num; i++) {
+		int offset = table->offset[i];
+		struct fw_rsc_hdr *hdr = (void *)table + offset;
+		void *rsc = (void *)hdr + sizeof(*hdr);
+
+		if (request->type != hdr->type)
+			continue;
+
+		switch (hdr->type) {
+		case RSC_CARVEOUT:
+			tblc = rsc;
+			newc = request->resource;
+
+			if (strncmp(newc->name, tblc->name, 32))
+				break;
+
+			/* Verify firmware resource is part of rproc one. */
+			if (tblc->pa != FW_RSC_ADDR_ANY) {
+				int pa_offset = tblc->pa - newc->pa;
+
+				if (pa_offset < 0)
+					return -EINVAL;
+
+				if (pa_offset + tblc->len > newc->len)
+					return -EINVAL;
+			}
+			return 0;
+		default:
+			dev_err(&rproc->dev,
+				"Unsupported resource type: %d\n",
+				hdr->type);
+			return -EINVAL;
+		}
+	}
+
+	return -EINVAL;
+}
+
 static int rproc_update_resource_table_entry(struct rproc *rproc,
 				struct rproc_request_resource *request,
 				struct resource_table *table, int size)
