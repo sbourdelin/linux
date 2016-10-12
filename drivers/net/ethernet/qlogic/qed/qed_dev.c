@@ -890,7 +890,7 @@ qed_hw_init_pf_doorbell_bar(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt)
 		n_cpus = 1;
 		rc = qed_hw_init_dpi_size(p_hwfn, p_ptt, pwm_regsize, n_cpus);
 
-		if (cond)
+		if (IS_ENABLED(CONFIG_INFINIBAND_QEDR) && cond)
 			qed_rdma_dpm_bar(p_hwfn, p_ptt);
 	}
 
@@ -1422,19 +1422,18 @@ static void qed_hw_set_feat(struct qed_hwfn *p_hwfn)
 	u32 *feat_num = p_hwfn->hw_info.feat_num;
 	int num_features = 1;
 
-#if IS_ENABLED(CONFIG_INFINIBAND_QEDR)
 	/* Roce CNQ each requires: 1 status block + 1 CNQ. We divide the
 	 * status blocks equally between L2 / RoCE but with consideration as
 	 * to how many l2 queues / cnqs we have
 	 */
-	if (p_hwfn->hw_info.personality == QED_PCI_ETH_ROCE) {
+	if (IS_ENABLED(CONFIG_INFINIBAND_QEDR) &&
+	    p_hwfn->hw_info.personality == QED_PCI_ETH_ROCE) {
 		num_features++;
 
 		feat_num[QED_RDMA_CNQ] =
 			min_t(u32, RESC_NUM(p_hwfn, QED_SB) / num_features,
 			      RESC_NUM(p_hwfn, QED_RDMA_CNQ_RAM));
 	}
-#endif
 	feat_num[QED_PF_L2_QUE] = min_t(u32, RESC_NUM(p_hwfn, QED_SB) /
 						num_features,
 					RESC_NUM(p_hwfn, QED_L2_QUEUE));

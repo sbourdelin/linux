@@ -108,7 +108,7 @@ config QEDE
 	  This enables the support for ...
 
 config INFINIBAND_QEDR
-	tristate "QLogic qede RoCE sources [debug]"
+	bool "QLogic qede RoCE sources [debug]"
 	depends on QEDE && 64BIT
 	select QED_LL2
 	default n

@@ -208,9 +208,5 @@ int qed_rdma_modify_qp(void *rdma_cxt, struct qed_rdma_qp *qp,
 int qed_rdma_query_qp(void *rdma_cxt, struct qed_rdma_qp *qp,
 		      struct qed_rdma_query_qp_out_params *out_params);
 
-#if IS_ENABLED(CONFIG_INFINIBAND_QEDR)
 void qed_rdma_dpm_bar(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt);
-#else
-void qed_rdma_dpm_bar(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt) {}
-#endif
 #endif
