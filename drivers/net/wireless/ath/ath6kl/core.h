@@ -799,6 +799,9 @@ struct ath6kl {
 			const char *testscript;
 		} fw;
 
+		const struct htc_service_connect_req *services;
+		u32 service_count;
+
 		const char *fw_board;
 		const char *fw_default_board;
 	} hw;

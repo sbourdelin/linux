@@ -32,6 +32,94 @@
 #include "hif-ops.h"
 #include "htc-ops.h"
 
+const struct htc_service_connect_req ar600x_services[] = {
+	{
+		.svc_id = WMI_CONTROL_SVC,
+		.ep_cb = {
+			.tx_comp_multi = ath6kl_tx_complete,
+			.rx = ath6kl_rx,
+			.rx_refill = ath6kl_rx_refill,
+			.tx_full = ath6kl_tx_queue_full,
+			.rx_refill_thresh = ATH6KL_MAX_RX_BUFFERS / 4,
+		},
+		.max_txq_depth = MAX_DEFAULT_SEND_QUEUE_DEPTH,
+	},
+	{
+		.svc_id = WMI_DATA_BE_SVC,
+		.conn_flags = HTC_CONN_FLGS_REDUCE_CRED_DRIB |
+			      HTC_CONN_FLGS_THRESH_LVL_HALF,
+		.ep_cb = {
+			.tx_comp_multi = ath6kl_tx_complete,
+			.rx = ath6kl_rx,
+			.rx_refill = ath6kl_rx_refill,
+			.tx_full = ath6kl_tx_queue_full,
+			.rx_refill_thresh = ATH6KL_MAX_RX_BUFFERS / 4,
+			.rx_alloc_thresh = ATH6KL_BUFFER_SIZE,
+			.rx_allocthresh = ath6kl_alloc_amsdu_rxbuf,
+		},
+		.max_txq_depth = MAX_DEFAULT_SEND_QUEUE_DEPTH,
+		.flags = HTC_FLGS_TX_BNDL_PAD_EN,
+		.max_rxmsg_sz = WMI_MAX_TX_DATA_FRAME_LENGTH,
+	},
+	{
+		.svc_id = WMI_DATA_BK_SVC,
+		.conn_flags = HTC_CONN_FLGS_REDUCE_CRED_DRIB |
+			      HTC_CONN_FLGS_THRESH_LVL_HALF,
+		.ep_cb = {
+			.tx_comp_multi = ath6kl_tx_complete,
+			.rx = ath6kl_rx,
+			.rx_refill = ath6kl_rx_refill,
+			.tx_full = ath6kl_tx_queue_full,
+			.rx_refill_thresh = ATH6KL_MAX_RX_BUFFERS / 4,
+			.rx_alloc_thresh = ATH6KL_BUFFER_SIZE,
+			.rx_allocthresh = ath6kl_alloc_amsdu_rxbuf,
+		},
+		.max_txq_depth = MAX_DEFAULT_SEND_QUEUE_DEPTH,
+		.flags = HTC_FLGS_TX_BNDL_PAD_EN,
+		.max_rxmsg_sz = WMI_MAX_TX_DATA_FRAME_LENGTH,
+	},
+	{
+		.svc_id = WMI_DATA_VI_SVC,
+		.conn_flags = HTC_CONN_FLGS_REDUCE_CRED_DRIB |
+			      HTC_CONN_FLGS_THRESH_LVL_HALF,
+		.ep_cb = {
+			.tx_comp_multi = ath6kl_tx_complete,
+			.rx = ath6kl_rx,
+			.rx_refill = ath6kl_rx_refill,
+			.tx_full = ath6kl_tx_queue_full,
+			.rx_refill_thresh = ATH6KL_MAX_RX_BUFFERS / 4,
+			.rx_alloc_thresh = ATH6KL_BUFFER_SIZE,
+			.rx_allocthresh = ath6kl_alloc_amsdu_rxbuf,
+		},
+		.max_txq_depth = MAX_DEFAULT_SEND_QUEUE_DEPTH,
+		.flags = HTC_FLGS_TX_BNDL_PAD_EN,
+		.max_rxmsg_sz = WMI_MAX_TX_DATA_FRAME_LENGTH,
+	},
+	/* VO service, this is currently not mapped to a WMI
+	 * priority stream due to historical reasons. WMI originally
+	 * defined 3 priorities over 3 mailboxes We can change this when
+	 * WMI is reworked so that priorities are not dependent on
+	 * mailboxes.
+	 */
+	{
+		.svc_id = WMI_DATA_VO_SVC,
+		.conn_flags = HTC_CONN_FLGS_REDUCE_CRED_DRIB |
+			      HTC_CONN_FLGS_THRESH_LVL_HALF,
+		.ep_cb = {
+			.tx_comp_multi = ath6kl_tx_complete,
+			.rx = ath6kl_rx,
+			.rx_refill = ath6kl_rx_refill,
+			.tx_full = ath6kl_tx_queue_full,
+			.rx_refill_thresh = ATH6KL_MAX_RX_BUFFERS / 4,
+			.rx_alloc_thresh = ATH6KL_BUFFER_SIZE,
+			.rx_allocthresh = ath6kl_alloc_amsdu_rxbuf,
+		},
+		.max_txq_depth = MAX_DEFAULT_SEND_QUEUE_DEPTH,
+		.flags = HTC_FLGS_TX_BNDL_PAD_EN,
+		.max_rxmsg_sz = WMI_MAX_TX_DATA_FRAME_LENGTH,
+	},
+};
+
 static const struct ath6kl_hw hw_list[] = {
 	{
 		.id				= AR6003_HW_2_0_VERSION,
@@ -57,6 +145,8 @@ static const struct ath6kl_hw hw_list[] = {
 
 		.fw_board		= AR6003_HW_2_0_BOARD_DATA_FILE,
 		.fw_default_board	= AR6003_HW_2_0_DEFAULT_BOARD_DATA_FILE,
+		.services		= ar600x_services,
+		.service_count		= ARRAY_SIZE(ar600x_services),
 	},
 	{
 		.id				= AR6003_HW_2_1_1_VERSION,
@@ -82,6 +172,8 @@ static const struct ath6kl_hw hw_list[] = {
 
 		.fw_board		= AR6003_HW_2_1_1_BOARD_DATA_FILE,
 		.fw_default_board = AR6003_HW_2_1_1_DEFAULT_BOARD_DATA_FILE,
+		.services		= ar600x_services,
+		.service_count		= ARRAY_SIZE(ar600x_services),
 	},
 	{
 		.id				= AR6004_HW_1_0_VERSION,
@@ -102,6 +194,8 @@ static const struct ath6kl_hw hw_list[] = {
 
 		.fw_board		= AR6004_HW_1_0_BOARD_DATA_FILE,
 		.fw_default_board	= AR6004_HW_1_0_DEFAULT_BOARD_DATA_FILE,
+		.services		= ar600x_services,
+		.service_count		= ARRAY_SIZE(ar600x_services),
 	},
 	{
 		.id				= AR6004_HW_1_1_VERSION,
@@ -121,6 +215,8 @@ static const struct ath6kl_hw hw_list[] = {
 
 		.fw_board		= AR6004_HW_1_1_BOARD_DATA_FILE,
 		.fw_default_board	= AR6004_HW_1_1_DEFAULT_BOARD_DATA_FILE,
+		.services		= ar600x_services,
+		.service_count		= ARRAY_SIZE(ar600x_services),
 	},
 	{
 		.id				= AR6004_HW_1_2_VERSION,
@@ -140,6 +236,8 @@ static const struct ath6kl_hw hw_list[] = {
 		},
 		.fw_board		= AR6004_HW_1_2_BOARD_DATA_FILE,
 		.fw_default_board	= AR6004_HW_1_2_DEFAULT_BOARD_DATA_FILE,
+		.services		= ar600x_services,
+		.service_count		= ARRAY_SIZE(ar600x_services),
 	},
 	{
 		.id				= AR6004_HW_1_3_VERSION,
@@ -163,6 +261,8 @@ static const struct ath6kl_hw hw_list[] = {
 
 		.fw_board               = AR6004_HW_1_3_BOARD_DATA_FILE,
 		.fw_default_board       = AR6004_HW_1_3_DEFAULT_BOARD_DATA_FILE,
+		.services		= ar600x_services,
+		.service_count		= ARRAY_SIZE(ar600x_services),
 	},
 	{
 		.id				= AR6004_HW_3_0_VERSION,
@@ -186,6 +286,8 @@ static const struct ath6kl_hw hw_list[] = {
 
 		.fw_board		= AR6004_HW_3_0_BOARD_DATA_FILE,
 		.fw_default_board	= AR6004_HW_3_0_DEFAULT_BOARD_DATA_FILE,
+		.services		= ar600x_services,
+		.service_count		= ARRAY_SIZE(ar600x_services),
 	},
 };
 
@@ -280,8 +382,7 @@ static inline void set_ac2_ep_map(struct ath6kl *ar,
 
 /* connect to a service */
 static int ath6kl_connectservice(struct ath6kl *ar,
-				 struct htc_service_connect_req  *con_req,
-				 char *desc)
+				 const struct htc_service_connect_req  *con_req)
 {
 	int status;
 	struct htc_service_connect_resp response;
@@ -290,8 +391,8 @@ static int ath6kl_connectservice(struct ath6kl *ar,
 
 	status = ath6kl_htc_conn_service(ar->htc_target, con_req, &response);
 	if (status) {
-		ath6kl_err("failed to connect to %s service status:%d\n",
-			   desc, status);
+		ath6kl_err("failed to connect to %x service status: %d\n",
+			   con_req->svc_id, status);
 		return status;
 	}
 
@@ -323,80 +424,12 @@ static int ath6kl_connectservice(struct ath6kl *ar,
 
 static int ath6kl_init_service_ep(struct ath6kl *ar)
 {
-	struct htc_service_connect_req connect;
+	int i;
 
-	memset(&connect, 0, sizeof(connect));
-
-	/* these fields are the same for all service endpoints */
-	connect.ep_cb.tx_comp_multi = ath6kl_tx_complete;
-	connect.ep_cb.rx = ath6kl_rx;
-	connect.ep_cb.rx_refill = ath6kl_rx_refill;
-	connect.ep_cb.tx_full = ath6kl_tx_queue_full;
-
-	/*
-	 * Set the max queue depth so that our ath6kl_tx_queue_full handler
-	 * gets called.
-	*/
-	connect.max_txq_depth = MAX_DEFAULT_SEND_QUEUE_DEPTH;
-	connect.ep_cb.rx_refill_thresh = ATH6KL_MAX_RX_BUFFERS / 4;
-	if (!connect.ep_cb.rx_refill_thresh)
-		connect.ep_cb.rx_refill_thresh++;
-
-	/* connect to control service */
-	connect.svc_id = WMI_CONTROL_SVC;
-	if (ath6kl_connectservice(ar, &connect, "WMI CONTROL"))
-		return -EIO;
-
-	connect.flags |= HTC_FLGS_TX_BNDL_PAD_EN;
-
-	/*
-	 * Limit the HTC message size on the send path, although e can
-	 * receive A-MSDU frames of 4K, we will only send ethernet-sized
-	 * (802.3) frames on the send path.
-	 */
-	connect.max_rxmsg_sz = WMI_MAX_TX_DATA_FRAME_LENGTH;
-
-	/*
-	 * To reduce the amount of committed memory for larger A_MSDU
-	 * frames, use the recv-alloc threshold mechanism for larger
-	 * packets.
-	 */
-	connect.ep_cb.rx_alloc_thresh = ATH6KL_BUFFER_SIZE;
-	connect.ep_cb.rx_allocthresh = ath6kl_alloc_amsdu_rxbuf;
-
-	/*
-	 * For the remaining data services set the connection flag to
-	 * reduce dribbling, if configured to do so.
-	 */
-	connect.conn_flags |= HTC_CONN_FLGS_REDUCE_CRED_DRIB;
-	connect.conn_flags &= ~HTC_CONN_FLGS_THRESH_MASK;
-	connect.conn_flags |= HTC_CONN_FLGS_THRESH_LVL_HALF;
-
-	connect.svc_id = WMI_DATA_BE_SVC;
-
-	if (ath6kl_connectservice(ar, &connect, "WMI DATA BE"))
-		return -EIO;
-
-	/* connect to back-ground map this to WMI LOW_PRI */
-	connect.svc_id = WMI_DATA_BK_SVC;
-	if (ath6kl_connectservice(ar, &connect, "WMI DATA BK"))
-		return -EIO;
-
-	/* connect to Video service, map this to HI PRI */
-	connect.svc_id = WMI_DATA_VI_SVC;
-	if (ath6kl_connectservice(ar, &connect, "WMI DATA VI"))
-		return -EIO;
-
-	/*
-	 * Connect to VO service, this is currently not mapped to a WMI
-	 * priority stream due to historical reasons. WMI originally
-	 * defined 3 priorities over 3 mailboxes We can change this when
-	 * WMI is reworked so that priorities are not dependent on
-	 * mailboxes.
-	 */
-	connect.svc_id = WMI_DATA_VO_SVC;
-	if (ath6kl_connectservice(ar, &connect, "WMI DATA VO"))
-		return -EIO;
+	for (i = 0; i < ar->hw.service_count; i++) {
+		if (ath6kl_connectservice(ar, &ar->hw.services[i]))
+			return -EIO;
+	}
 
 	return 0;
 }

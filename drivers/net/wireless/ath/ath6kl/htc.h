@@ -550,7 +550,7 @@ struct ath6kl_htc_ops {
 	int (*wait_target)(struct htc_target *target);
 	int (*start)(struct htc_target *target);
 	int (*conn_service)(struct htc_target *target,
-			    struct htc_service_connect_req *req,
+			    const struct htc_service_connect_req *req,
 			    struct htc_service_connect_resp *resp);
 	int  (*tx)(struct htc_target *target, struct htc_packet *packet);
 	void (*stop)(struct htc_target *target);

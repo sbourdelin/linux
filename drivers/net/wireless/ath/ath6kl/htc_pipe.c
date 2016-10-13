@@ -1226,7 +1226,7 @@ static u8 htc_get_credit_alloc(struct htc_target *target, u16 service_id)
 }
 
 static int ath6kl_htc_pipe_conn_service(struct htc_target *target,
-		     struct htc_service_connect_req *conn_req,
+		     const struct htc_service_connect_req *conn_req,
 		     struct htc_service_connect_resp *conn_resp)
 {
 	struct ath6kl *ar = target->dev->ar;

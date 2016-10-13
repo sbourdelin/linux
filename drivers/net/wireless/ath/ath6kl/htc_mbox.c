@@ -2386,7 +2386,7 @@ static void ath6kl_htc_mbox_flush_rx_buf(struct htc_target *target)
 }
 
 static int ath6kl_htc_mbox_conn_service(struct htc_target *target,
-			    struct htc_service_connect_req *conn_req,
+			    const struct htc_service_connect_req *conn_req,
 			    struct htc_service_connect_resp *conn_resp)
 {
 	struct htc_packet *rx_pkt = NULL;

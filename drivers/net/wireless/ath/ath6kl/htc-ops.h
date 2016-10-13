@@ -36,7 +36,7 @@ static inline int ath6kl_htc_start(struct htc_target *target)
 }
 
 static inline int ath6kl_htc_conn_service(struct htc_target *target,
-					  struct htc_service_connect_req *req,
+					  const struct htc_service_connect_req *req,
 					  struct htc_service_connect_resp *resp)
 {
 	return target->dev->ar->htc_ops->conn_service(target, req, resp);
