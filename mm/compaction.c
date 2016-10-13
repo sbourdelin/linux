@@ -643,8 +643,10 @@ static void acct_isolated(struct zone *zone, struct compact_control *cc)
 	if (list_empty(&cc->migratepages))
 		return;
 
-	list_for_each_entry(page, &cc->migratepages, lru)
-		count[!!page_is_file_cache(page)]++;
+	list_for_each_entry(page, &cc->migratepages, lru) {
+		if (likely(!__PageMovable(page)))
+			count[!!page_is_file_cache(page)]++;
+	}
 
 	mod_node_page_state(zone->zone_pgdat, NR_ISOLATED_ANON, count[0]);
 	mod_node_page_state(zone->zone_pgdat, NR_ISOLATED_FILE, count[1]);
