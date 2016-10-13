@@ -187,15 +187,24 @@ int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	struct request *req;
 	int write = (data_direction == DMA_TO_DEVICE);
 	int ret = DRIVER_ERROR << 24;
+	bool priv_sense = false;
 
+	if (!sense) {
+		sense = kzalloc(SCSI_SENSE_BUFFERSIZE, GFP_NOIO);
+		if (!sense)
+			return ret;
+		priv_sense = true;
+	}
+
+ retry:
 	req = blk_get_request(sdev->request_queue, write, __GFP_RECLAIM);
 	if (IS_ERR(req))
-		return ret;
+		goto free_sense;
 	blk_rq_set_block_pc(req);
 
 	if (bufflen &&	blk_rq_map_kern(sdev->request_queue, req,
 					buffer, bufflen, __GFP_RECLAIM))
-		goto out;
+		goto put_req;
 
 	req->cmd_len = COMMAND_SIZE(cmd[0]);
 	memcpy(req->cmd, cmd, req->cmd_len);
@@ -210,6 +219,13 @@ int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	 */
 	blk_execute_rq(req->q, NULL, req, 1);
 
+	if (scsi_sense_unit_attention(sense) && req->retries > 0) {
+		memset(sense, 0, SCSI_SENSE_BUFFERSIZE);
+		retries = req->retries - 1;
+		blk_put_request(req);
+		goto retry;
+	}
+
 	/*
 	 * Some devices (USB mass-storage in particular) may transfer
 	 * garbage data together with a residue indicating that the data
@@ -222,8 +238,13 @@ int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	if (resid)
 		*resid = req->resid_len;
 	ret = req->errors;
- out:
+
+ put_req:
 	blk_put_request(req);
+
+ free_sense:
+	if (priv_sense)
+		kfree(sense);
 
 	return ret;
 }

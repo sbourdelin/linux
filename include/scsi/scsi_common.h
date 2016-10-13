@@ -58,6 +58,15 @@ static inline bool scsi_sense_valid(const struct scsi_sense_hdr *sshdr)
 	return (sshdr->response_code & 0x70) == 0x70;
 }
 
+static inline bool scsi_sense_unit_attention(const char *sense)
+{
+	int resp = sense[0] & 0x7f;
+
+	return ((resp & 0x70) &&
+		((resp >= 0x72 && (sense[1] & 0xf) == UNIT_ATTENTION) ||
+		 (resp < 0x72 && (sense[2] & 0xf) == UNIT_ATTENTION)));
+}
+
 extern bool scsi_normalize_sense(const u8 *sense_buffer, int sb_len,
 				 struct scsi_sense_hdr *sshdr);
 
