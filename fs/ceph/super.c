@@ -821,7 +821,8 @@ static struct dentry *ceph_real_mount(struct ceph_fs_client *fsc)
 	dout("mount start %p\n", fsc);
 	mutex_lock(&fsc->client->mount_mutex);
 
-	if (!fsc->sb->s_root) {
+	root = fsc->sb->s_root;
+	if (!root) {
 		const char *path;
 		err = __ceph_open_session(fsc->client, started);
 		if (err < 0)
