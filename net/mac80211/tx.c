@@ -3059,11 +3059,12 @@ static bool ieee80211_amsdu_prepare_head(struct ieee80211_sub_if_data *sdata,
 	struct ieee80211_local *local = sdata->local;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_hdr *hdr;
-	struct ethhdr amsdu_hdr;
+	struct ethhdr *amsdu_hdr;
 	int hdr_len = fast_tx->hdr_len - sizeof(rfc1042_header);
 	int subframe_len = skb->len - hdr_len;
 	void *data;
-	u8 *qc;
+	u8 *qc, *h_80211_src, *h_80211_dst;
+	const u8 *bssid;
 
 	if (info->flags & IEEE80211_TX_CTL_RATE_CTRL_PROBE)
 		return false;
@@ -3071,19 +3072,44 @@ static bool ieee80211_amsdu_prepare_head(struct ieee80211_sub_if_data *sdata,
 	if (info->control.flags & IEEE80211_TX_CTRL_AMSDU)
 		return true;
 
-	if (!ieee80211_amsdu_realloc_pad(local, skb, sizeof(amsdu_hdr),
+	if (!ieee80211_amsdu_realloc_pad(local, skb, sizeof(*amsdu_hdr),
 					 &subframe_len))
 		return false;
 
-	amsdu_hdr.h_proto = cpu_to_be16(subframe_len);
-	memcpy(amsdu_hdr.h_source, skb->data + fast_tx->sa_offs, ETH_ALEN);
-	memcpy(amsdu_hdr.h_dest, skb->data + fast_tx->da_offs, ETH_ALEN);
-
-	data = skb_push(skb, sizeof(amsdu_hdr));
-	memmove(data, data + sizeof(amsdu_hdr), hdr_len);
-	memcpy(data + hdr_len, &amsdu_hdr, sizeof(amsdu_hdr));
-
+	data = skb_push(skb, sizeof(*amsdu_hdr));
+	memmove(data, data + sizeof(*amsdu_hdr), hdr_len);
 	hdr = data;
+	amsdu_hdr = data + hdr_len;
+	/* h_80211_src/dst is addr* field within hdr */
+	h_80211_src = data + fast_tx->sa_offs;
+	h_80211_dst = data + fast_tx->da_offs;
+
+	amsdu_hdr->h_proto = cpu_to_be16(subframe_len);
+	memcpy(amsdu_hdr->h_source, h_80211_src, ETH_ALEN);
+	memcpy(amsdu_hdr->h_dest, h_80211_dst, ETH_ALEN);
+
+	/* according to IEEE 802.11-2012 8.3.2 table 8-19, the outer SA/DA
+	 * fields needs to be changed to BSSID for A-MSDU frames depending
+	 * on FromDS/ToDS values.
+	 */
+	switch (sdata->vif.type) {
+	case NL80211_IFTYPE_STATION:
+		bssid = sdata->u.mgd.bssid;
+		break;
+	case NL80211_IFTYPE_AP:
+	case NL80211_IFTYPE_AP_VLAN:
+		bssid = sdata->vif.addr;
+		break;
+	default:
+		bssid = NULL;
+	}
+
+	if (bssid && ieee80211_has_fromds(hdr->frame_control))
+		memcpy(h_80211_src, bssid, ETH_ALEN);
+
+	if (bssid && ieee80211_has_tods(hdr->frame_control))
+		memcpy(h_80211_dst, bssid, ETH_ALEN);
+
 	qc = ieee80211_get_qos_ctl(hdr);
 	*qc |= IEEE80211_QOS_CTL_A_MSDU_PRESENT;
 
