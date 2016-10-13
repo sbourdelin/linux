@@ -16,20 +16,20 @@
 /*
  * Helper macro for exception table entries
  */
-#define EX_TABLE(_fault, _target)	\
-	".section __ex_table,\"a\"\n"	\
-		PPC_LONG_ALIGN "\n"	\
-		PPC_LONG #_fault "\n"	\
-		PPC_LONG #_target "\n"	\
+#define EX_TABLE(_fault, _target)			\
+	".section __ex_table,\"a\"\n"			\
+		".balign 4\n"				\
+		".long (" #_fault  ") - . \n"		\
+		".long (" #_target ") - . \n"		\
 	".previous\n"
 
 #else /* __ASSEMBLY__ */
 
-#define EX_TABLE(_fault, _target)	\
-	.section __ex_table,"a"	;	\
-		PPC_LONG_ALIGN ;	\
-		PPC_LONG _fault	;	\
-		PPC_LONG _target ;	\
+#define EX_TABLE(_fault, _target)			\
+	.section __ex_table,"a"	;			\
+		.balign 4;				\
+		.long (_fault) - . ;			\
+		.long (_target) - . ;			\
 	.previous
 
 #endif /* __ASSEMBLY__ */
