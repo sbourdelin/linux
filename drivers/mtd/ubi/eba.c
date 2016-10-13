@@ -600,6 +600,7 @@ retry:
 		goto out_put;
 	}
 
+	vid_hdr = ubi_get_vid_hdr(vidb);
 	ubi_assert(vid_hdr->vol_type == UBI_VID_DYNAMIC);
 
 	mutex_lock(&ubi->buf_mutex);
