@@ -40,6 +40,47 @@
  */
 #define R5L_POOL_SIZE	4
 
+enum r5c_state {
+	R5C_STATE_NO_CACHE = 0,
+	R5C_STATE_WRITE_THROUGH = 1,
+	R5C_STATE_WRITE_BACK = 2,
+	R5C_STATE_CACHE_BROKEN = 3,
+};
+
+/*
+ * raid5 cache state machine
+ *
+ * The RAID cache works in two major states for each stripe: write state and
+ * reclaim state. These states are controlled by flags STRIPE_R5C_FROZEN and
+ * STRIPE_R5C_WRITTEN
+ *
+ * STRIPE_R5C_FROZEN is the key flag to differentiate write state and reclaim
+ * state. The write state runs w/ STRIPE_R5C_FROZEN == 0. While the reclaim
+ * state runs w/ STRIPE_R5C_FROZEN == 1.
+ *
+ * STRIPE_R5C_WRITTEN is a helper flag to bring the stripe back from reclaim
+ * state to write state. Specifically, STRIPE_R5C_WRITTEN triggers clean up
+ * process in r5c_handle_stripe_written. STRIPE_R5C_WRITTEN is set when data
+ * and parity of a stripe is all in journal device; and cleared when the data
+ * and parity are all in RAID disks.
+ *
+ * The following is another way to show how STRIPE_R5C_FROZEN and
+ * STRIPE_R5C_WRITTEN work:
+ *
+ * write state: STRIPE_R5C_FROZEN = 0 STRIPE_R5C_WRITTEN = 0
+ * reclaim state: STRIPE_R5C_FROZEN = 1
+ *
+ * write => reclaim: set STRIPE_R5C_FROZEN in r5c_freeze_stripe_for_reclaim
+ * reclaim => write:
+ * 1. write parity to journal, when finished, set STRIPE_R5C_WRITTEN
+ * 2. write data/parity to raid disks, when finished, clear both
+ *    STRIPE_R5C_FROZEN and STRIPE_R5C_WRITTEN
+ *
+ * In write through mode (journal only) the stripe also goes through these
+ * state change, except that STRIPE_R5C_FROZEN is set on write in
+ * r5c_handle_stripe_dirtying().
+ */
+
 struct r5l_log {
 	struct md_rdev *rdev;
 
@@ -96,6 +137,9 @@ struct r5l_log {
 	spinlock_t no_space_stripes_lock;
 
 	bool need_cache_flush;
+
+	/* for r5c_cache */
+	enum r5c_state r5c_state;
 };
 
 /*
@@ -133,6 +177,11 @@ enum r5l_io_unit_state {
 	IO_UNIT_STRIPE_END = 3,	/* stripes data finished writing to raid */
 };
 
+bool r5c_is_writeback(struct r5l_log *log)
+{
+	return (log != NULL && log->r5c_state == R5C_STATE_WRITE_BACK);
+}
+
 static sector_t r5l_ring_add(struct r5l_log *log, sector_t start, sector_t inc)
 {
 	start += inc;
@@ -168,12 +217,44 @@ static void __r5l_set_io_unit_state(struct r5l_io_unit *io,
 	io->state = state;
 }
 
+/*
+ * Freeze the stripe, thus send the stripe into reclaim path.
+ *
+ * In current implementation, STRIPE_R5C_FROZEN is also set in write through
+ * mode (in r5c_handle_stripe_dirtying). This does not change the behavior of
+ * for write through mode.
+ */
+void r5c_freeze_stripe_for_reclaim(struct stripe_head *sh)
+{
+	struct r5conf *conf = sh->raid_conf;
+	struct r5l_log *log = conf->log;
+
+	if (!log)
+		return;
+	WARN_ON(test_bit(STRIPE_R5C_FROZEN, &sh->state));
+	set_bit(STRIPE_R5C_FROZEN, &sh->state);
+}
+
+static void r5c_finish_cache_stripe(struct stripe_head *sh)
+{
+	struct r5l_log *log = sh->raid_conf->log;
+
+	if (log->r5c_state == R5C_STATE_WRITE_THROUGH) {
+		BUG_ON(!test_bit(STRIPE_R5C_FROZEN, &sh->state));
+		set_bit(STRIPE_R5C_WRITTEN, &sh->state);
+	} else
+		BUG(); /* write back logic in next patch */
+}
+
 static void r5l_io_run_stripes(struct r5l_io_unit *io)
 {
 	struct stripe_head *sh, *next;
 
 	list_for_each_entry_safe(sh, next, &io->stripe_list, log_list) {
 		list_del_init(&sh->log_list);
+
+		r5c_finish_cache_stripe(sh);
+
 		set_bit(STRIPE_HANDLE, &sh->state);
 		raid5_release_stripe(sh);
 	}
@@ -412,18 +493,19 @@ static int r5l_log_stripe(struct r5l_log *log, struct stripe_head *sh,
 		r5l_append_payload_page(log, sh->dev[i].page);
 	}
 
-	if (sh->qd_idx >= 0) {
+	if (parity_pages == 2) {
 		r5l_append_payload_meta(log, R5LOG_PAYLOAD_PARITY,
 					sh->sector, sh->dev[sh->pd_idx].log_checksum,
 					sh->dev[sh->qd_idx].log_checksum, true);
 		r5l_append_payload_page(log, sh->dev[sh->pd_idx].page);
 		r5l_append_payload_page(log, sh->dev[sh->qd_idx].page);
-	} else {
+	} else if (parity_pages == 1) {
 		r5l_append_payload_meta(log, R5LOG_PAYLOAD_PARITY,
 					sh->sector, sh->dev[sh->pd_idx].log_checksum,
 					0, false);
 		r5l_append_payload_page(log, sh->dev[sh->pd_idx].page);
-	}
+	} else
+		BUG_ON(parity_pages != 0);
 
 	list_add_tail(&sh->log_list, &io->stripe_list);
 	atomic_inc(&io->pending_stripe);
@@ -454,6 +536,8 @@ int r5l_write_stripe(struct r5l_log *log, struct stripe_head *sh)
 		clear_bit(STRIPE_LOG_TRAPPED, &sh->state);
 		return -EAGAIN;
 	}
+
+	WARN_ON(!test_bit(STRIPE_R5C_FROZEN, &sh->state));
 
 	for (i = 0; i < sh->disks; i++) {
 		void *addr;
@@ -1101,6 +1185,39 @@ static void r5l_write_super(struct r5l_log *log, sector_t cp)
 	set_bit(MD_CHANGE_DEVS, &mddev->flags);
 }
 
+int r5c_handle_stripe_dirtying(struct r5conf *conf,
+			       struct stripe_head *sh,
+			       struct stripe_head_state *s,
+			       int disks)
+{
+	struct r5l_log *log = conf->log;
+
+	if (!log || test_bit(STRIPE_R5C_FROZEN, &sh->state))
+		return -EAGAIN;
+
+	if (conf->log->r5c_state == R5C_STATE_WRITE_THROUGH ||
+	    conf->mddev->degraded != 0) {
+		/* write through mode */
+		r5c_freeze_stripe_for_reclaim(sh);
+		return -EAGAIN;
+	}
+	BUG();  /* write back logic in next commit */
+	return 0;
+}
+
+/*
+ * clean up the stripe (clear STRIPE_R5C_FROZEN etc.) after the stripe is
+ * committed to RAID disks
+*/
+void r5c_handle_stripe_written(struct r5conf *conf,
+			       struct stripe_head *sh)
+{
+	if (!test_and_clear_bit(STRIPE_R5C_WRITTEN, &sh->state))
+		return;
+	WARN_ON(!test_bit(STRIPE_R5C_FROZEN, &sh->state));
+	clear_bit(STRIPE_R5C_FROZEN, &sh->state);
+}
+
 static int r5l_load_log(struct r5l_log *log)
 {
 	struct md_rdev *rdev = log->rdev;
@@ -1235,6 +1352,8 @@ int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev)
 
 	INIT_LIST_HEAD(&log->no_space_stripes);
 	spin_lock_init(&log->no_space_stripes_lock);
+
+	log->r5c_state = R5C_STATE_WRITE_THROUGH;
 
 	if (r5l_load_log(log))
 		goto error;
