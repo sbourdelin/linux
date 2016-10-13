@@ -57,6 +57,8 @@ enum r5c_state {
 	R5C_STATE_CACHE_BROKEN = 3,
 };
 
+static char *r5c_state_str[] = {"no-cache", "write-through",
+				"write-back", "cache-broken"};
 /*
  * raid5 cache state machine
  *
@@ -1521,6 +1523,91 @@ void r5c_flush_cache(struct r5conf *conf, int num)
 			break;
 	}
 }
+
+ssize_t r5c_state_show(struct mddev *mddev, char *page)
+{
+	struct r5conf *conf = mddev->private;
+	int val = 0;
+	int ret;
+
+	if (conf->log)
+		val = conf->log->r5c_state;
+	else if (test_bit(MD_HAS_JOURNAL, &mddev->flags))
+		val = R5C_STATE_CACHE_BROKEN;
+
+	switch (val) {
+	case R5C_STATE_NO_CACHE:
+		ret = snprintf(page, PAGE_SIZE, "%s\n", r5c_state_str[val]);
+		break;
+	case R5C_STATE_CACHE_BROKEN:
+		ret = snprintf(page, PAGE_SIZE, "%s [%s]\n",
+			       r5c_state_str[R5C_STATE_NO_CACHE],
+			       r5c_state_str[R5C_STATE_CACHE_BROKEN]);
+		break;
+	case R5C_STATE_WRITE_THROUGH:
+		ret = snprintf(page, PAGE_SIZE, "[%s] %s\n",
+			       r5c_state_str[R5C_STATE_WRITE_THROUGH],
+			       r5c_state_str[R5C_STATE_WRITE_BACK]);
+		break;
+	case R5C_STATE_WRITE_BACK:
+		ret = snprintf(page, PAGE_SIZE, "%s [%s]\n",
+			       r5c_state_str[R5C_STATE_WRITE_THROUGH],
+			       r5c_state_str[R5C_STATE_WRITE_BACK]);
+		break;
+	default:
+		pr_err("md/raid:%s: Detected invalid r5c_state %d\n",
+		       mdname(mddev), val);
+	}
+	return ret;
+}
+
+ssize_t r5c_state_store(struct mddev *mddev, const char *page, size_t len)
+{
+	struct r5conf *conf = mddev->private;
+	struct r5l_log *log = conf->log;
+	int val = -1, i;
+
+	for (i = 0; i < sizeof(r5c_state_str) / sizeof(r5c_state_str[0]); i++)
+		if (strlen(r5c_state_str[i]) == len - 1 &&
+		    strncmp(page, r5c_state_str[i], len - 1) == 0) {
+			val = i;
+			break;
+		}
+	if (val == -1)
+		return -EINVAL;
+
+	if (!log && val != R5C_STATE_NO_CACHE)
+		return -EINVAL;
+
+	if (val < R5C_STATE_NO_CACHE || val > R5C_STATE_WRITE_BACK)
+		return -EINVAL;
+	if (val == R5C_STATE_NO_CACHE) {
+		if (conf->log &&
+		    !test_bit(Faulty, &log->rdev->flags)) {
+			pr_err("md/raid:%s: journal device is in use, cannot remove it\n",
+			       mdname(mddev));
+			return -EINVAL;
+		}
+	}
+
+	if (log) {
+		mddev_suspend(mddev);
+		conf->log->r5c_state = val;
+		mddev_resume(mddev);
+	}
+
+	if (val == R5C_STATE_NO_CACHE) {
+		clear_bit(MD_HAS_JOURNAL, &mddev->flags);
+		set_bit(MD_UPDATE_SB_FLAGS, &mddev->flags);
+	}
+	pr_info("md/raid:%s: setting r5c cache mode to %d: %s\n",
+		mdname(mddev), val, r5c_state_str[val]);
+	return len;
+}
+
+struct md_sysfs_entry
+r5c_state = __ATTR(r5c_state, S_IRUGO | S_IWUSR,
+		   r5c_state_show, r5c_state_store);
 
 int r5c_handle_stripe_dirtying(struct r5conf *conf,
 			       struct stripe_head *sh,
