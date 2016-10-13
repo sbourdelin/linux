@@ -408,7 +408,7 @@ static enum htc_send_queue_result htc_try_send(struct htc_target *target,
 		}
 	}
 
-	if (!ep->pipe.tx_credit_flow_enabled) {
+	if (!ep->tx_credit_flow_enabled) {
 		tx_resources =
 		    ath6kl_hif_pipe_get_free_queue_number(ar,
 							  ep->pipe.pipeid_ul);
@@ -452,7 +452,7 @@ static enum htc_send_queue_result htc_try_send(struct htc_target *target,
 		if (get_queue_depth(&ep->txq) == 0)
 			break;
 
-		if (ep->pipe.tx_credit_flow_enabled) {
+		if (ep->tx_credit_flow_enabled) {
 			/*
 			 * Credit based mechanism provides flow control
 			 * based on target transmit resource availability,
@@ -482,7 +482,7 @@ static enum htc_send_queue_result htc_try_send(struct htc_target *target,
 		/* send what we can */
 		htc_issue_packets(target, ep, &send_queue);
 
-		if (!ep->pipe.tx_credit_flow_enabled) {
+		if (!ep->tx_credit_flow_enabled) {
 			pipeid = ep->pipe.pipeid_ul;
 			tx_resources =
 			    ath6kl_hif_pipe_get_free_queue_number(ar, pipeid);
@@ -768,7 +768,7 @@ static int ath6kl_htc_pipe_tx_complete(struct ath6kl *ar, struct sk_buff *skb)
 	}
 	skb = NULL;
 
-	if (!ep->pipe.tx_credit_flow_enabled) {
+	if (!ep->tx_credit_flow_enabled) {
 		/*
 		 * note: when using TX credit flow, the re-checking of queues
 		 * happens when credits flow back from the target. in the
@@ -1194,7 +1194,7 @@ static void reset_endpoint_states(struct htc_target *target)
 		INIT_LIST_HEAD(&ep->pipe.tx_lookup_queue);
 		INIT_LIST_HEAD(&ep->rx_bufq);
 		ep->target = target;
-		ep->pipe.tx_credit_flow_enabled = true;
+		ep->tx_credit_flow_enabled = true;
 	}
 }
 
@@ -1399,8 +1399,8 @@ static int ath6kl_htc_pipe_conn_service(struct htc_target *target,
 		   ep->svc_id, ep->pipe.pipeid_ul,
 		   ep->pipe.pipeid_dl, ep->eid);
 
-	if (disable_credit_flowctrl && ep->pipe.tx_credit_flow_enabled) {
-		ep->pipe.tx_credit_flow_enabled = false;
+	if (disable_credit_flowctrl && ep->tx_credit_flow_enabled) {
+		ep->tx_credit_flow_enabled = false;
 		ath6kl_dbg(ATH6KL_DBG_HTC,
 			   "SVC: 0x%4.4X ep:%d TX flow control off\n",
 			   ep->svc_id, assigned_epid);

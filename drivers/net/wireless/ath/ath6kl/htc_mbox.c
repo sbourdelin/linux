@@ -603,7 +603,7 @@ static void ath6kl_htc_tx_pkts_get(struct htc_target *target,
 				   struct htc_endpoint *endpoint,
 				   struct list_head *queue)
 {
-	int req_cred;
+	int req_cred = 0;
 	u8 flags;
 	struct htc_packet *packet;
 	unsigned int len;
@@ -623,7 +623,8 @@ static void ath6kl_htc_tx_pkts_get(struct htc_target *target,
 		len = CALC_TXRX_PADDED_LEN(target,
 					   packet->act_len + HTC_HDR_LENGTH);
 
-		if (htc_check_credits(target, endpoint, &flags,
+		if (endpoint->tx_credit_flow_enabled &&
+		    htc_check_credits(target, endpoint, &flags,
 				      packet->endpoint, len, &req_cred))
 			break;
 
@@ -2434,6 +2435,7 @@ static int ath6kl_htc_mbox_conn_service(struct htc_target *target,
 	struct htc_conn_service_msg *conn_msg;
 	struct htc_endpoint *endpoint;
 	enum htc_endpoint_id assigned_ep = ENDPOINT_MAX;
+	bool disable_credit_flowctrl = false;
 	unsigned int max_msg_sz = 0;
 	int status = 0;
 	u16 msg_id;
@@ -2458,6 +2460,10 @@ static int ath6kl_htc_mbox_conn_service(struct htc_target *target,
 		conn_msg->msg_id = cpu_to_le16(HTC_MSG_CONN_SVC_ID);
 		conn_msg->svc_id = cpu_to_le16(conn_req->svc_id);
 		conn_msg->conn_flags = cpu_to_le16(conn_req->conn_flags);
+
+		if (conn_req->conn_flags &
+		    HTC_CONN_FLGS_DISABLE_CRED_FLOW_CTRL)
+			disable_credit_flowctrl = true;
 
 		set_htc_pkt_info(tx_pkt, NULL, (u8 *) conn_msg,
 				 sizeof(*conn_msg) + conn_msg->svc_meta_len,
@@ -2562,6 +2568,13 @@ static int ath6kl_htc_mbox_conn_service(struct htc_target *target,
 	/* save local connection flags */
 	endpoint->conn_flags = conn_req->flags;
 
+	if (disable_credit_flowctrl && endpoint->tx_credit_flow_enabled) {
+		endpoint->tx_credit_flow_enabled = false;
+		ath6kl_dbg(ATH6KL_DBG_HTC,
+			   "SVC: 0x%4.4X ep:%d TX flow control off\n",
+			   endpoint->svc_id, assigned_ep);
+	}
+
 fail_tx:
 	if (tx_pkt)
 		htc_reclaim_txctrl_buf(target, tx_pkt);
@@ -2590,6 +2603,7 @@ static void reset_ep_state(struct htc_target *target)
 		INIT_LIST_HEAD(&endpoint->rx_bufq);
 		INIT_LIST_HEAD(&endpoint->txq);
 		endpoint->target = target;
+		endpoint->tx_credit_flow_enabled = true;
 	}
 
 	/* reset distribution list */
