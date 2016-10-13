@@ -123,7 +123,7 @@ _PIF_WORK	= (_PIF_PER_TRAP)
 	.macro	LAST_BREAK scratch
 	srag	\scratch,%r10,23
 	jz	.+10
-	stg	%r10,__TI_last_break(%r12)
+	stg	%r10,__TASK_TI_last_break(%r12)
 	.endm
 
 	.macro REENABLE_IRQS
@@ -185,14 +185,13 @@ ENTRY(__switch_to)
 	stmg	%r6,%r15,__SF_GPRS(%r15)	# store gprs of prev task
 	lgr	%r1,%r2
 	aghi	%r1,__TASK_thread		# thread_struct of prev task
-	lg	%r5,__TASK_thread_info(%r3)	# get thread_info of next
+	lg	%r5,__TASK_stack(%r3)		# start of kernel stack of next
 	stg	%r15,__THREAD_ksp(%r1)		# store kernel stack of prev
 	lgr	%r1,%r3
 	aghi	%r1,__TASK_thread		# thread_struct of next task
 	lgr	%r15,%r5
 	aghi	%r15,STACK_INIT			# end of kernel stack of next
 	stg	%r3,__LC_CURRENT		# store task struct of next
-	stg	%r5,__LC_THREAD_INFO		# store thread info of next
 	stg	%r15,__LC_KERNEL_STACK		# store end of kernel stack
 	lg	%r15,__THREAD_ksp(%r1)		# load kernel stack of next
 	/* c4 is used in guest detection: arch/s390/kernel/perf_cpum_sf.c */
@@ -271,7 +270,7 @@ ENTRY(system_call)
 .Lsysc_stmg:
 	stmg	%r8,%r15,__LC_SAVE_AREA_SYNC
 	lg	%r10,__LC_LAST_BREAK
-	lg	%r12,__LC_THREAD_INFO
+	lg	%r12,__LC_CURRENT
 	lghi	%r14,_PIF_SYSCALL
 .Lsysc_per:
 	lg	%r15,__LC_KERNEL_STACK
@@ -285,7 +284,7 @@ ENTRY(system_call)
 	mvc	__PT_INT_CODE(4,%r11),__LC_SVC_ILC
 	stg	%r14,__PT_FLAGS(%r11)
 .Lsysc_do_svc:
-	lg	%r10,__TI_sysc_table(%r12)	# address of system call table
+	lg	%r10,__TASK_TI_sysc_table(%r12)	# address of system call table
 	llgh	%r8,__PT_INT_CODE+2(%r11)
 	slag	%r8,%r8,2			# shift and test for svc 0
 	jnz	.Lsysc_nr_ok
@@ -300,7 +299,7 @@ ENTRY(system_call)
 	stg	%r2,__PT_ORIG_GPR2(%r11)
 	stg	%r7,STACK_FRAME_OVERHEAD(%r15)
 	lgf	%r9,0(%r8,%r10)			# get system call add.
-	TSTMSK	__TI_flags(%r12),_TIF_TRACE
+	TSTMSK	__TASK_TI_flags(%r12),_TIF_TRACE
 	jnz	.Lsysc_tracesys
 	basr	%r14,%r9			# call sys_xxxx
 	stg	%r2,__PT_R2(%r11)		# store return value
@@ -310,7 +309,7 @@ ENTRY(system_call)
 .Lsysc_tif:
 	TSTMSK	__PT_FLAGS(%r11),_PIF_WORK
 	jnz	.Lsysc_work
-	TSTMSK	__TI_flags(%r12),_TIF_WORK
+	TSTMSK	__TASK_TI_flags(%r12),_TIF_WORK
 	jnz	.Lsysc_work			# check for work
 	TSTMSK	__LC_CPU_FLAGS,_CIF_WORK
 	jnz	.Lsysc_work
@@ -330,17 +329,17 @@ ENTRY(system_call)
 .Lsysc_work:
 	TSTMSK	__LC_CPU_FLAGS,_CIF_MCCK_PENDING
 	jo	.Lsysc_mcck_pending
-	TSTMSK	__TI_flags(%r12),_TIF_NEED_RESCHED
+	TSTMSK	__TASK_TI_flags(%r12),_TIF_NEED_RESCHED
 	jo	.Lsysc_reschedule
 #ifdef CONFIG_UPROBES
-	TSTMSK	__TI_flags(%r12),_TIF_UPROBE
+	TSTMSK	__TASK_TI_flags(%r12),_TIF_UPROBE
 	jo	.Lsysc_uprobe_notify
 #endif
 	TSTMSK	__PT_FLAGS(%r11),_PIF_PER_TRAP
 	jo	.Lsysc_singlestep
-	TSTMSK	__TI_flags(%r12),_TIF_SIGPENDING
+	TSTMSK	__TASK_TI_flags(%r12),_TIF_SIGPENDING
 	jo	.Lsysc_sigpending
-	TSTMSK	__TI_flags(%r12),_TIF_NOTIFY_RESUME
+	TSTMSK	__TASK_TI_flags(%r12),_TIF_NOTIFY_RESUME
 	jo	.Lsysc_notify_resume
 	TSTMSK	__LC_CPU_FLAGS,_CIF_FPU
 	jo	.Lsysc_vxrs
@@ -386,7 +385,7 @@ ENTRY(system_call)
 	TSTMSK	__PT_FLAGS(%r11),_PIF_SYSCALL
 	jno	.Lsysc_return
 	lmg	%r2,%r7,__PT_R2(%r11)	# load svc arguments
-	lg	%r10,__TI_sysc_table(%r12)	# address of system call table
+	lg	%r10,__TASK_TI_sysc_table(%r12)	# address of system call table
 	lghi	%r8,0			# svc 0 returns -ENOSYS
 	llgh	%r1,__PT_INT_CODE+2(%r11)	# load new svc number
 	cghi	%r1,NR_syscalls
@@ -443,7 +442,7 @@ ENTRY(system_call)
 	basr	%r14,%r9		# call sys_xxx
 	stg	%r2,__PT_R2(%r11)	# store return value
 .Lsysc_tracenogo:
-	TSTMSK	__TI_flags(%r12),_TIF_TRACE
+	TSTMSK	__TASK_TI_flags(%r12),_TIF_TRACE
 	jz	.Lsysc_return
 	lgr	%r2,%r11		# pass pointer to pt_regs
 	larl	%r14,.Lsysc_return
@@ -454,7 +453,7 @@ ENTRY(system_call)
 #
 ENTRY(ret_from_fork)
 	la	%r11,STACK_FRAME_OVERHEAD(%r15)
-	lg	%r12,__LC_THREAD_INFO
+	lg	%r12,__LC_CURRENT
 	brasl	%r14,schedule_tail
 	TRACE_IRQS_ON
 	ssm	__LC_SVC_NEW_PSW	# reenable interrupts
@@ -475,7 +474,7 @@ ENTRY(pgm_check_handler)
 	stpt	__LC_SYNC_ENTER_TIMER
 	stmg	%r8,%r15,__LC_SAVE_AREA_SYNC
 	lg	%r10,__LC_LAST_BREAK
-	lg	%r12,__LC_THREAD_INFO
+	lg	%r12,__LC_CURRENT
 	larl	%r13,cleanup_critical
 	lmg	%r8,%r9,__LC_PGM_OLD_PSW
 	tmhh	%r8,0x0001		# test problem state bit
@@ -498,7 +497,7 @@ ENTRY(pgm_check_handler)
 2:	LAST_BREAK %r14
 	UPDATE_VTIME %r14,%r15,__LC_SYNC_ENTER_TIMER
 	lg	%r15,__LC_KERNEL_STACK
-	lg	%r14,__TI_task(%r12)
+	lgr	%r14,%r12
 	aghi	%r14,__TASK_thread	# pointer to thread_struct
 	lghi	%r13,__LC_PGM_TDB
 	tm	__LC_PGM_ILC+2,0x02	# check for transaction abort
@@ -564,7 +563,7 @@ ENTRY(io_int_handler)
 	stpt	__LC_ASYNC_ENTER_TIMER
 	stmg	%r8,%r15,__LC_SAVE_AREA_ASYNC
 	lg	%r10,__LC_LAST_BREAK
-	lg	%r12,__LC_THREAD_INFO
+	lg	%r12,__LC_CURRENT
 	larl	%r13,cleanup_critical
 	lmg	%r8,%r9,__LC_IO_OLD_PSW
 	SWITCH_ASYNC __LC_SAVE_AREA_ASYNC,__LC_ASYNC_ENTER_TIMER
@@ -595,7 +594,7 @@ ENTRY(io_int_handler)
 	LOCKDEP_SYS_EXIT
 	TRACE_IRQS_ON
 .Lio_tif:
-	TSTMSK	__TI_flags(%r12),_TIF_WORK
+	TSTMSK	__TASK_TI_flags(%r12),_TIF_WORK
 	jnz	.Lio_work		# there is work to do (signals etc.)
 	TSTMSK	__LC_CPU_FLAGS,_CIF_WORK
 	jnz	.Lio_work
@@ -623,9 +622,9 @@ ENTRY(io_int_handler)
 	jo	.Lio_work_user		# yes -> do resched & signal
 #ifdef CONFIG_PREEMPT
 	# check for preemptive scheduling
-	icm	%r0,15,__TI_precount(%r12)
+	icm	%r0,15,__TASK_TI_precount(%r12)
 	jnz	.Lio_restore		# preemption is disabled
-	TSTMSK	__TI_flags(%r12),_TIF_NEED_RESCHED
+	TSTMSK	__TASK_TI_flags(%r12),_TIF_NEED_RESCHED
 	jno	.Lio_restore
 	# switch to kernel stack
 	lg	%r1,__PT_R15(%r11)
@@ -659,11 +658,11 @@ ENTRY(io_int_handler)
 .Lio_work_tif:
 	TSTMSK	__LC_CPU_FLAGS,_CIF_MCCK_PENDING
 	jo	.Lio_mcck_pending
-	TSTMSK	__TI_flags(%r12),_TIF_NEED_RESCHED
+	TSTMSK	__TASK_TI_flags(%r12),_TIF_NEED_RESCHED
 	jo	.Lio_reschedule
-	TSTMSK	__TI_flags(%r12),_TIF_SIGPENDING
+	TSTMSK	__TASK_TI_flags(%r12),_TIF_SIGPENDING
 	jo	.Lio_sigpending
-	TSTMSK	__TI_flags(%r12),_TIF_NOTIFY_RESUME
+	TSTMSK	__TASK_TI_flags(%r12),_TIF_NOTIFY_RESUME
 	jo	.Lio_notify_resume
 	TSTMSK	__LC_CPU_FLAGS,_CIF_FPU
 	jo	.Lio_vxrs
@@ -738,7 +737,7 @@ ENTRY(ext_int_handler)
 	stpt	__LC_ASYNC_ENTER_TIMER
 	stmg	%r8,%r15,__LC_SAVE_AREA_ASYNC
 	lg	%r10,__LC_LAST_BREAK
-	lg	%r12,__LC_THREAD_INFO
+	lg	%r12,__LC_CURRENT
 	larl	%r13,cleanup_critical
 	lmg	%r8,%r9,__LC_EXT_OLD_PSW
 	SWITCH_ASYNC __LC_SAVE_AREA_ASYNC,__LC_ASYNC_ENTER_TIMER
@@ -883,7 +882,7 @@ ENTRY(mcck_int_handler)
 	spt	__LC_CPU_TIMER_SAVE_AREA-4095(%r1)	# revalidate cpu timer
 	lmg	%r0,%r15,__LC_GPREGS_SAVE_AREA-4095(%r1)# revalidate gprs
 	lg	%r10,__LC_LAST_BREAK
-	lg	%r12,__LC_THREAD_INFO
+	lg	%r12,__LC_CURRENT
 	larl	%r13,cleanup_critical
 	lmg	%r8,%r9,__LC_MCK_OLD_PSW
 	TSTMSK	__LC_MCCK_CODE,MCCK_CODE_SYSTEM_DAMAGE
@@ -1100,7 +1099,7 @@ cleanup_critical:
 	lg	%r9,16(%r11)
 	srag	%r9,%r9,23
 	jz	0f
-	mvc	__TI_last_break(8,%r12),16(%r11)
+	mvc	__TASK_TI_last_break(8,%r12),16(%r11)
 0:	# set up saved register r11
 	lg	%r15,__LC_KERNEL_STACK
 	la	%r9,STACK_FRAME_OVERHEAD(%r15)
