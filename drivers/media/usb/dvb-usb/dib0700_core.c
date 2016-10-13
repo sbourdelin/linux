@@ -718,6 +718,7 @@ static void dib0700_rc_urb_completion(struct urb *purb)
 		    poll_reply->nec.data       == 0x00 &&
 		    poll_reply->nec.not_data   == 0xff) {
 			poll_reply->data_state = 2;
+			protocol = RC_TYPE_NECX;
 			break;
 		}
 
