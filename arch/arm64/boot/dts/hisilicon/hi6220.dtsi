@@ -747,6 +747,7 @@
 			g-np-tx-fifo-size = <128>;
 			g-tx-fifo-size = <128 128 128 128 128 128>;
 			interrupts = <0 77 0x4>;
+			hi6220,change_speed_quirk;
 		};
 
 		mailbox: mailbox@f7510000 {

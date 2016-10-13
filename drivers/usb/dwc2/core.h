@@ -816,6 +816,10 @@ struct dwc2_hregs_backup {
  * @frame_list_sz:      Frame list size
  * @desc_gen_cache:     Kmem cache for generic descriptors
  * @desc_hsisoc_cache:  Kmem cache for hs isochronous descriptors
+ * @change_speed_quirk: Change speed configuration to DWC2_SPEED_PARAM_FULL
+ *                      while full&low speed device connect. And change speed
+ *                      back to DWC2_SPEED_PARAM_HIGH while device is gone.
+ * @device_count:       Number of devices connect to root hub
  *
  * These are for peripheral mode:
  *
@@ -942,6 +946,9 @@ struct dwc2_hsotg {
 	u32 frame_list_sz;
 	struct kmem_cache *desc_gen_cache;
 	struct kmem_cache *desc_hsisoc_cache;
+
+	int change_speed_quirk;
+	unsigned int device_count;
 
 #ifdef DEBUG
 	u32 frrem_samples;

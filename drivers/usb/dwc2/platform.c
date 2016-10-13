@@ -529,6 +529,9 @@ static int dwc2_driver_probe(struct platform_device *dev)
 	dev_dbg(&dev->dev, "mapped PA %08lx to VA %p\n",
 		(unsigned long)res->start, hsotg->regs);
 
+	hsotg->change_speed_quirk = device_property_read_bool(&dev->dev,
+				"hi6220,change_speed_quirk");
+
 	retval = dwc2_lowlevel_hw_init(hsotg);
 	if (retval)
 		return retval;
