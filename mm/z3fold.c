@@ -169,7 +169,7 @@ static unsigned long encode_handle(struct z3fold_header *zhdr, enum buddy bud)
 
 	handle = (unsigned long)zhdr;
 	if (bud != HEADLESS)
-		handle += (bud + zhdr->first_num) & BUDDY_MASK;
+		handle += (bud + zhdr->first_num) & PAGE_MASK;
 	return handle;
 }
 
@@ -183,7 +183,7 @@ static struct z3fold_header *handle_to_z3fold_header(unsigned long handle)
 static enum buddy handle_to_buddy(unsigned long handle)
 {
 	struct z3fold_header *zhdr = handle_to_z3fold_header(handle);
-	return (handle - zhdr->first_num) & BUDDY_MASK;
+	return (handle - zhdr->first_num) & PAGE_MASK;
 }
 
 /*
