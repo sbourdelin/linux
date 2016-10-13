@@ -1091,7 +1091,7 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 			batch_free++;
 			if (++migratetype == MIGRATE_PCPTYPES)
 				migratetype = 0;
-			list = &pcp->lists[migratetype];
+			list = &pcp->free_lists[migratetype];
 		} while (list_empty(list));
 
 		/* This is the only non-empty list. Free them all. */
@@ -2258,10 +2258,10 @@ void drain_zone_pages(struct zone *zone, struct per_cpu_pages *pcp)
 
 	local_irq_save(flags);
 	batch = READ_ONCE(pcp->batch);
-	to_drain = min(pcp->count, batch);
+	to_drain = min(pcp->free_count, batch);
 	if (to_drain > 0) {
 		free_pcppages_bulk(zone, to_drain, pcp);
-		pcp->count -= to_drain;
+		pcp->free_count -= to_drain;
 	}
 	local_irq_restore(flags);
 }
@@ -2279,14 +2279,24 @@ static void drain_pages_zone(unsigned int cpu, struct zone *zone)
 	unsigned long flags;
 	struct per_cpu_pageset *pset;
 	struct per_cpu_pages *pcp;
+	int mt;
 
 	local_irq_save(flags);
 	pset = per_cpu_ptr(zone->pageset, cpu);
 
 	pcp = &pset->pcp;
-	if (pcp->count) {
-		free_pcppages_bulk(zone, pcp->count, pcp);
-		pcp->count = 0;
+	if (pcp->alloc_count) {
+		for (mt = 0; mt < MIGRATE_PCPTYPES; mt++) {
+			list_splice_init(&pcp->alloc_lists[mt],
+				&pcp->free_lists[mt]);
+		}
+		pcp->free_count += pcp->alloc_count;
+		pcp->alloc_count = 0;
+	}
+
+	if (pcp->free_count) {
+		free_pcppages_bulk(zone, pcp->free_count, pcp);
+		pcp->free_count = 0;
 	}
 	local_irq_restore(flags);
 }
@@ -2357,12 +2367,13 @@ void drain_all_pages(struct zone *zone)
 
 		if (zone) {
 			pcp = per_cpu_ptr(zone->pageset, cpu);
-			if (pcp->pcp.count)
+			if (pcp->pcp.alloc_count || pcp->pcp.free_count)
 				has_pcps = true;
 		} else {
 			for_each_populated_zone(z) {
 				pcp = per_cpu_ptr(z->pageset, cpu);
-				if (pcp->pcp.count) {
+				if (pcp->pcp.alloc_count ||
+					pcp->pcp.free_count) {
 					has_pcps = true;
 					break;
 				}
@@ -2454,15 +2465,12 @@ void free_hot_cold_page(struct page *page, bool cold)
 	}
 
 	pcp = &this_cpu_ptr(zone->pageset)->pcp;
-	if (!cold)
-		list_add(&page->lru, &pcp->lists[migratetype]);
-	else
-		list_add_tail(&page->lru, &pcp->lists[migratetype]);
-	pcp->count++;
-	if (pcp->count >= pcp->high) {
+	list_add(&page->lru, &pcp->free_lists[migratetype]);
+	pcp->free_count++;
+	if (pcp->free_count >= pcp->batch) {
 		unsigned long batch = READ_ONCE(pcp->batch);
 		free_pcppages_bulk(zone, batch, pcp);
-		pcp->count -= batch;
+		pcp->free_count -= batch;
 	}
 
 out:
@@ -2611,9 +2619,9 @@ struct page *buffered_rmqueue(struct zone *preferred_zone,
 		local_irq_save(flags);
 		do {
 			pcp = &this_cpu_ptr(zone->pageset)->pcp;
-			list = &pcp->lists[migratetype];
+			list = &pcp->alloc_lists[migratetype];
 			if (list_empty(list)) {
-				pcp->count += rmqueue_bulk(zone, 0,
+				pcp->alloc_count += rmqueue_bulk(zone, 0,
 						pcp->batch, list,
 						migratetype, cold);
 				if (unlikely(list_empty(list)))
@@ -2626,7 +2634,7 @@ struct page *buffered_rmqueue(struct zone *preferred_zone,
 				page = list_first_entry(list, struct page, lru);
 
 			list_del(&page->lru);
-			pcp->count--;
+			pcp->alloc_count--;
 
 		} while (check_new_pcp(page));
 	} else {
@@ -4258,13 +4266,17 @@ void show_free_areas(unsigned int filter)
 	int cpu;
 	struct zone *zone;
 	pg_data_t *pgdat;
+	struct per_cpu_pages *pcp;
 
 	for_each_populated_zone(zone) {
 		if (skip_free_areas_node(filter, zone_to_nid(zone)))
 			continue;
 
-		for_each_online_cpu(cpu)
-			free_pcp += per_cpu_ptr(zone->pageset, cpu)->pcp.count;
+		for_each_online_cpu(cpu) {
+			pcp = &per_cpu_ptr(zone->pageset, cpu)->pcp;
+			free_pcp += pcp->alloc_count;
+			free_pcp += pcp->free_count;
+		}
 	}
 
 	printk("active_anon:%lu inactive_anon:%lu isolated_anon:%lu\n"
@@ -4347,8 +4359,11 @@ void show_free_areas(unsigned int filter)
 			continue;
 
 		free_pcp = 0;
-		for_each_online_cpu(cpu)
-			free_pcp += per_cpu_ptr(zone->pageset, cpu)->pcp.count;
+		for_each_online_cpu(cpu) {
+			pcp = &per_cpu_ptr(zone->pageset, cpu)->pcp;
+			free_pcp += pcp->alloc_count;
+			free_pcp += pcp->free_count;
+		}
 
 		show_node(zone);
 		printk("%s"
@@ -4394,7 +4409,8 @@ void show_free_areas(unsigned int filter)
 			K(zone_page_state(zone, NR_PAGETABLE)),
 			K(zone_page_state(zone, NR_BOUNCE)),
 			K(free_pcp),
-			K(this_cpu_read(zone->pageset->pcp.count)),
+			K(this_cpu_read(zone->pageset->pcp.alloc_count) +
+				this_cpu_read(zone->pageset->pcp.free_count)),
 			K(zone_page_state(zone, NR_FREE_CMA_PAGES)));
 		printk("lowmem_reserve[]:");
 		for (i = 0; i < MAX_NR_ZONES; i++)
@@ -5251,9 +5267,12 @@ static void pageset_init(struct per_cpu_pageset *p)
 	memset(p, 0, sizeof(*p));
 
 	pcp = &p->pcp;
-	pcp->count = 0;
-	for (migratetype = 0; migratetype < MIGRATE_PCPTYPES; migratetype++)
-		INIT_LIST_HEAD(&pcp->lists[migratetype]);
+	pcp->alloc_count = 0;
+	pcp->free_count = 0;
+	for (migratetype = 0; migratetype < MIGRATE_PCPTYPES; migratetype++) {
+		INIT_LIST_HEAD(&pcp->alloc_lists[migratetype]);
+		INIT_LIST_HEAD(&pcp->free_lists[migratetype]);
+	}
 }
 
 static void setup_pageset(struct per_cpu_pageset *p, unsigned long batch)

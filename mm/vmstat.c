@@ -676,7 +676,7 @@ static int refresh_cpu_vm_stats(bool do_pagesets)
 			 * if not then there is nothing to expire.
 			 */
 			if (!__this_cpu_read(p->expire) ||
-			       !__this_cpu_read(p->pcp.count))
+			       !__this_cpu_read(p->pcp.free_count))
 				continue;
 
 			/*
@@ -690,7 +690,7 @@ static int refresh_cpu_vm_stats(bool do_pagesets)
 			if (__this_cpu_dec_return(p->expire))
 				continue;
 
-			if (__this_cpu_read(p->pcp.count)) {
+			if (__this_cpu_read(p->pcp.free_count)) {
 				drain_zone_pages(zone, this_cpu_ptr(&p->pcp));
 				changes++;
 			}
@@ -1408,7 +1408,8 @@ static void zoneinfo_show_print(struct seq_file *m, pg_data_t *pgdat,
 			   "\n              high:  %i"
 			   "\n              batch: %i",
 			   i,
-			   pageset->pcp.count,
+			   pageset->pcp.alloc_count +
+			   pageset->pcp.free_count,
 			   pageset->pcp.high,
 			   pageset->pcp.batch);
 #ifdef CONFIG_SMP

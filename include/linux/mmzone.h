@@ -260,12 +260,14 @@ enum zone_watermarks {
 #define high_wmark_pages(z) (z->watermark[WMARK_HIGH])
 
 struct per_cpu_pages {
-	int count;		/* number of pages in the list */
+	int alloc_count;	/* number of pages in the list */
+	int free_count;		/* number of pages in the list */
 	int high;		/* high watermark, emptying needed */
 	int batch;		/* chunk size for buddy add/remove */
 
 	/* Lists of pages, one per migrate type stored on the pcp-lists */
-	struct list_head lists[MIGRATE_PCPTYPES];
+	struct list_head alloc_lists[MIGRATE_PCPTYPES];
+	struct list_head free_lists[MIGRATE_PCPTYPES];
 };
 
 struct per_cpu_pageset {
