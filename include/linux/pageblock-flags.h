@@ -31,12 +31,13 @@ enum pageblock_bits {
 	PB_migrate_end = PB_migrate + 3 - 1,
 			/* 3 bits required for migrate types */
 	PB_migrate_skip,/* If set the block is skipped by compaction */
+	PB_migrate_fixed,
 
 	/*
 	 * Assume the bits will always align on a word. If this assumption
 	 * changes then get/set pageblock needs updating.
 	 */
-	NR_PAGEBLOCK_BITS
+	NR_PAGEBLOCK_BITS = 8,
 };
 
 #ifdef CONFIG_HUGETLB_PAGE
