@@ -3807,11 +3807,6 @@ static int nl80211_start_ap(struct sk_buff *skb, struct genl_info *info)
 	params.dtim_period =
 		nla_get_u32(info->attrs[NL80211_ATTR_DTIM_PERIOD]);
 
-	err = cfg80211_validate_beacon_int(rdev, dev->ieee80211_ptr->iftype,
-					   params.beacon_interval);
-	if (err)
-		return err;
-
 	/*
 	 * In theory, some of these attributes should be required here
 	 * but since they were not used when the command was originally
@@ -3898,6 +3893,13 @@ static int nl80211_start_ap(struct sk_buff *skb, struct genl_info *info)
 	if (!cfg80211_reg_can_beacon_relax(&rdev->wiphy, &params.chandef,
 					   wdev->iftype))
 		return -EINVAL;
+
+	err = cfg80211_validate_beacon_combination(rdev,
+						   dev->ieee80211_ptr->iftype,
+						   &params.chandef,
+						   params.beacon_interval);
+	if (err)
+		return err;
 
 	if (info->attrs[NL80211_ATTR_TX_RATES]) {
 		err = nl80211_parse_tx_bitrate_mask(info, &params.beacon_rate);
@@ -8157,11 +8159,6 @@ static int nl80211_join_ibss(struct sk_buff *skb, struct genl_info *info)
 		ibss.beacon_interval =
 			nla_get_u32(info->attrs[NL80211_ATTR_BEACON_INTERVAL]);
 
-	err = cfg80211_validate_beacon_int(rdev, NL80211_IFTYPE_ADHOC,
-					   ibss.beacon_interval);
-	if (err)
-		return err;
-
 	if (!rdev->ops->join_ibss)
 		return -EOPNOTSUPP;
 
@@ -8185,6 +8182,12 @@ static int nl80211_join_ibss(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	err = nl80211_parse_chandef(rdev, info, &ibss.chandef);
+	if (err)
+		return err;
+
+	err = cfg80211_validate_beacon_combination(rdev, NL80211_IFTYPE_ADHOC,
+						   &ibss.chandef,
+						   ibss.beacon_interval);
 	if (err)
 		return err;
 
@@ -9419,16 +9422,9 @@ static int nl80211_join_mesh(struct sk_buff *skb, struct genl_info *info)
 			    nla_get_u32(info->attrs[NL80211_ATTR_MCAST_RATE])))
 			return -EINVAL;
 
-	if (info->attrs[NL80211_ATTR_BEACON_INTERVAL]) {
+	if (info->attrs[NL80211_ATTR_BEACON_INTERVAL])
 		setup.beacon_interval =
 			nla_get_u32(info->attrs[NL80211_ATTR_BEACON_INTERVAL]);
-
-		err = cfg80211_validate_beacon_int(rdev,
-						   NL80211_IFTYPE_MESH_POINT,
-						   setup.beacon_interval);
-		if (err)
-			return err;
-	}
 
 	if (info->attrs[NL80211_ATTR_DTIM_PERIOD]) {
 		setup.dtim_period =

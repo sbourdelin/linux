@@ -1558,44 +1558,67 @@ bool ieee80211_chandef_to_operating_class(struct cfg80211_chan_def *chandef,
 }
 EXPORT_SYMBOL(ieee80211_chandef_to_operating_class);
 
-int cfg80211_validate_beacon_int(struct cfg80211_registered_device *rdev,
-				 enum nl80211_iftype iftype, u32 beacon_int)
+int
+cfg80211_validate_beacon_combination(struct cfg80211_registered_device *rdev,
+				     enum nl80211_iftype iftype,
+				     struct cfg80211_chan_def *chandef,
+				     u32 beacon_int)
 {
+	int res, i;
 	struct wireless_dev *wdev;
+	struct ieee80211_channel *ch;
+	enum cfg80211_chan_mode chmode;
+	struct ieee80211_channel
+		*used_channels[CFG80211_MAX_NUM_DIFFERENT_CHANNELS];
 	struct iface_combination_params params = {
+		.num_different_channels = 1,
 		.beacon_int_gcd = beacon_int,	/* GCD(n) = n */
 	};
 
 	if (beacon_int < 10 || beacon_int > 10000)
 		return -EINVAL;
 
+	used_channels[0] = chandef->chan;
 	params.iftype_num[iftype] = 1;
+
+	res = cfg80211_chandef_dfs_required(&rdev->wiphy, chandef, iftype);
+	if (res < 0)
+		return res;
+	if (res)
+		params.radar_detect = BIT(chandef->width);
+
 	list_for_each_entry(wdev, &rdev->wiphy.wdev_list, list) {
 		if (!wdev->beacon_interval)
 			continue;
+
+		mutex_lock_nested(&wdev->mtx, 1);
+		__acquire(wdev->mtx);
+		cfg80211_get_chan_state(wdev, &ch, &chmode,
+					&params.radar_detect);
+		wdev_unlock(wdev);
+
+		switch (chmode) {
+		case CHAN_MODE_UNDEFINED:
+			break;
+		case CHAN_MODE_SHARED:
+			for (i = 0; i < CFG80211_MAX_NUM_DIFFERENT_CHANNELS; i++)
+				if (!used_channels[i] || used_channels[i] == ch)
+					break;
+
+			if (i == CFG80211_MAX_NUM_DIFFERENT_CHANNELS)
+				return -EBUSY;
+
+			if (!used_channels[i]) {
+				used_channels[i] = ch;
+				params.num_different_channels++;
+			}
+			break;
+		case CHAN_MODE_EXCLUSIVE:
+			params.num_different_channels++;
+			break;
+		}
 
 		params.iftype_num[wdev->iftype]++;
-	}
-
-	list_for_each_entry(wdev, &rdev->wiphy.wdev_list, list) {
-		u32 bi_prev = wdev->beacon_interval;
-
-		if (!wdev->beacon_interval)
-			continue;
-
-		/* slight optimisation - skip identical BIs */
-		if (wdev->beacon_interval == beacon_int)
-			continue;
-
-		params.beacon_int_different = true;
-
-		/* Get the GCD */
-		while (bi_prev != 0) {
-			u32 tmp_bi = bi_prev;
-
-			bi_prev = params.beacon_int_gcd % bi_prev;
-			params.beacon_int_gcd = tmp_bi;
-		}
 	}
 
 	return cfg80211_check_combinations(&rdev->wiphy, &params);
@@ -1612,6 +1635,35 @@ int cfg80211_iter_combinations(struct wiphy *wiphy,
 	int i, j, iftype;
 	int num_interfaces = 0;
 	u32 used_iftypes = 0;
+	struct wireless_dev *wdev;
+	bool beacon_int_different = false;
+
+	list_for_each_entry(wdev, &wiphy->wdev_list, list) {
+		u32 curr_bi = wdev->beacon_interval;
+
+		if (!curr_bi)
+			continue;
+
+		/* set first beacon_int as GCD if beacon_int_gcd = 0 */
+		if (!params->beacon_int_gcd) {
+			params->beacon_int_gcd = curr_bi;
+			continue;
+		}
+
+		/* slight optimisation - skip identical BIs */
+		if (curr_bi == params->beacon_int_gcd)
+			continue;
+
+		beacon_int_different = true;
+
+		/* Get the GCD */
+		while (curr_bi != 0) {
+			u32 tmp_bi = curr_bi;
+
+			curr_bi = params->beacon_int_gcd % curr_bi;
+			params->beacon_int_gcd = tmp_bi;
+		}
+	}
 
 	if (params->radar_detect) {
 		rcu_read_lock();
@@ -1678,8 +1730,7 @@ int cfg80211_iter_combinations(struct wiphy *wiphy,
 			if (c->beacon_int_min_gcd &&
 			    params->beacon_int_gcd < c->beacon_int_min_gcd)
 				return -EINVAL;
-			if (!c->beacon_int_min_gcd &&
-			    params->beacon_int_different)
+			if (!c->beacon_int_min_gcd && beacon_int_different)
 				goto cont;
 		}
 

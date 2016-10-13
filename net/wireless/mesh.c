@@ -178,6 +178,13 @@ int __cfg80211_join_mesh(struct cfg80211_registered_device *rdev,
 				     NL80211_IFTYPE_MESH_POINT))
 		return -EINVAL;
 
+	err = cfg80211_validate_beacon_combination(rdev,
+						   NL80211_IFTYPE_MESH_POINT,
+						   &setup->chandef,
+						   setup->beacon_interval);
+	if (err)
+		return err;
+
 	err = rdev_join_mesh(rdev, dev, conf, setup);
 	if (!err) {
 		memcpy(wdev->ssid, setup->mesh_id, setup->mesh_id_len);

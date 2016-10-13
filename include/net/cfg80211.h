@@ -788,15 +788,12 @@ struct cfg80211_csa_settings {
  *	the GCD of a single value is considered the value itself, so for
  *	a single interface this should be set to that interface's beacon
  *	interval
- * @beacon_int_different: a flag indicating whether or not all beacon
- *	intervals (of beaconing interfaces) are different or not.
  */
 struct iface_combination_params {
 	int num_different_channels;
 	u8 radar_detect;
 	int iftype_num[NUM_NL80211_IFTYPES];
 	u32 beacon_int_gcd;
-	bool beacon_int_different;
 };
 
 /**
