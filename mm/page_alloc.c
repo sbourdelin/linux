@@ -1406,6 +1406,89 @@ void clear_zone_contiguous(struct zone *zone)
 	zone->contiguous = false;
 }
 
+static unsigned long ratio_unmovable, ratio_reclaimable;
+
+static int __init early_ratio_unmovable(char *buf)
+{
+	if (!buf)
+		return -EINVAL;
+
+	return kstrtoul(buf, 0, &ratio_unmovable);
+}
+early_param("ratio_unmovable", early_ratio_unmovable);
+
+static int __init early_ratio_reclaimable(char *buf)
+{
+	if (!buf)
+		return -EINVAL;
+
+	return kstrtoul(buf, 0, &ratio_reclaimable);
+}
+early_param("ratio_reclaimable", early_ratio_reclaimable);
+
+static void __reserve_zone_fixed_pageblock(struct zone *zone,
+					int migratetype, int nr)
+{
+	unsigned long block_start_pfn = zone->zone_start_pfn;
+	unsigned long block_end_pfn;
+	struct page *page;
+	int count = 0;
+	int pageblocks = MAX_ORDER_NR_PAGES / pageblock_nr_pages;
+	int i;
+
+	block_end_pfn = ALIGN(block_start_pfn + 1, pageblock_nr_pages);
+	for (; block_start_pfn < zone_end_pfn(zone) &&
+			count + pageblocks <= nr;
+			block_start_pfn = block_end_pfn,
+			 block_end_pfn += pageblock_nr_pages) {
+
+		block_end_pfn = min(block_end_pfn, zone_end_pfn(zone));
+
+		if (!__pageblock_pfn_to_page(block_start_pfn,
+					     block_end_pfn, zone))
+			continue;
+
+		page = pfn_to_page(block_start_pfn);
+		if (get_pageblock_migratetype(page) != MIGRATE_MOVABLE)
+			continue;
+
+		if (!PageBuddy(page))
+			continue;
+
+		if (page_order(page) != MAX_ORDER - 1)
+			continue;
+
+		move_freepages_block(zone, page, migratetype);
+		i = pageblocks;
+		do {
+			set_pageblock_migratetype(page, migratetype);
+			set_pageblock_flags_group(page, 1,
+				PB_migrate_fixed, PB_migrate_fixed);
+			count++;
+			page += pageblock_nr_pages;
+		} while (--i);
+	}
+
+	pr_info("Node %d %s %d pageblocks are permanently reserved for migratetype %d\n",
+		zone_to_nid(zone), zone->name, count, migratetype);
+}
+
+static void reserve_zone_fixed_pageblock(struct zone *zone)
+{
+	unsigned long nr_unmovable, nr_reclaimable;
+
+	nr_unmovable = (zone->managed_pages * ratio_unmovable / 100);
+	nr_unmovable /= pageblock_nr_pages;
+
+	nr_reclaimable = (zone->managed_pages * ratio_reclaimable / 100);
+	nr_reclaimable /= pageblock_nr_pages;
+
+	__reserve_zone_fixed_pageblock(zone,
+		MIGRATE_UNMOVABLE, nr_unmovable);
+	__reserve_zone_fixed_pageblock(zone,
+		MIGRATE_RECLAIMABLE, nr_reclaimable);
+}
+
 #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
 static void __init deferred_free_range(struct page *page,
 					unsigned long pfn, int nr_pages)
@@ -1567,6 +1650,7 @@ free_range:
 void __init page_alloc_init_late(void)
 {
 	struct zone *zone;
+	unsigned long flags;
 
 #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
 	int nid;
@@ -1583,6 +1667,12 @@ void __init page_alloc_init_late(void)
 	/* Reinit limits that are based on free pages after the kernel is up */
 	files_maxfiles_init();
 #endif
+
+	for_each_populated_zone(zone) {
+		spin_lock_irqsave(&zone->lock, flags);
+		reserve_zone_fixed_pageblock(zone);
+		spin_unlock_irqrestore(&zone->lock, flags);
+	}
 
 	for_each_populated_zone(zone)
 		set_zone_contiguous(zone);
