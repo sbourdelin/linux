@@ -29,9 +29,6 @@ static void ath6kl_htc_mbox_cleanup(struct htc_target *target);
 static void ath6kl_htc_mbox_stop(struct htc_target *target);
 static int ath6kl_htc_mbox_add_rxbuf_multiple(struct htc_target *target,
 					      struct list_head *pkt_queue);
-static void ath6kl_htc_set_credit_dist(struct htc_target *target,
-				       struct ath6kl_htc_credit_info *cred_info,
-				       u16 svc_pri_order[], int len);
 
 /* threshold to re-enable Tx bundling for an AC*/
 #define TX_RESUME_BUNDLE_THRESHOLD	1500
@@ -146,18 +143,9 @@ static void ath6kl_credit_init(struct ath6kl_htc_credit_info *cred_info,
 static int ath6kl_htc_mbox_credit_setup(struct htc_target *htc_target,
 			       struct ath6kl_htc_credit_info *cred_info)
 {
-	u16 servicepriority[5];
-
 	memset(cred_info, 0, sizeof(struct ath6kl_htc_credit_info));
 
-	servicepriority[0] = WMI_CONTROL_SVC;  /* highest */
-	servicepriority[1] = WMI_DATA_VO_SVC;
-	servicepriority[2] = WMI_DATA_VI_SVC;
-	servicepriority[3] = WMI_DATA_BE_SVC;
-	servicepriority[4] = WMI_DATA_BK_SVC; /* lowest */
-
-	/* set priority list */
-	ath6kl_htc_set_credit_dist(htc_target, cred_info, servicepriority, 5);
+	htc_target->credit_info = cred_info;
 
 	return 0;
 }
@@ -1092,34 +1080,6 @@ static int htc_setup_tx_complete(struct htc_target *target)
 	htc_reclaim_txctrl_buf(target, send_pkt);
 
 	return status;
-}
-
-static void ath6kl_htc_set_credit_dist(struct htc_target *target,
-				struct ath6kl_htc_credit_info *credit_info,
-				u16 srvc_pri_order[], int list_len)
-{
-	struct htc_endpoint *endpoint;
-	int i, ep;
-
-	target->credit_info = credit_info;
-
-	list_add_tail(&target->endpoint[ENDPOINT_0].cred_dist.list,
-		      &target->cred_dist_list);
-
-	for (i = 0; i < list_len; i++) {
-		for (ep = ENDPOINT_1; ep < ENDPOINT_MAX; ep++) {
-			endpoint = &target->endpoint[ep];
-			if (endpoint->svc_id == srvc_pri_order[i]) {
-				list_add_tail(&endpoint->cred_dist.list,
-					      &target->cred_dist_list);
-				break;
-			}
-		}
-		if (ep >= ENDPOINT_MAX) {
-			WARN_ON(1);
-			return;
-		}
-	}
 }
 
 static int ath6kl_htc_mbox_tx(struct htc_target *target,
@@ -2574,6 +2534,14 @@ static int ath6kl_htc_mbox_conn_service(struct htc_target *target,
 			   "SVC: 0x%4.4X ep:%d TX flow control off\n",
 			   endpoint->svc_id, assigned_ep);
 	}
+
+	/* Add the credit distribution list of the current endpoint
+	 * to target->cred_dist_list.
+	 * The order in which this function is called will determine
+	 * the priority of the services.
+	 */
+	list_add_tail(&endpoint->cred_dist.list,
+		      &target->cred_dist_list);
 
 fail_tx:
 	if (tx_pkt)
