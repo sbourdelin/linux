@@ -114,7 +114,8 @@ static int get_key_haup_common(struct IR_i2c *ir, enum rc_type *protocol,
 		vendor = get_unaligned_be16(buf + 1);
 
 		if (vendor == 0x800f) {
-			*ptoggle = (dev & 0x80) != 0;
+			toggle = (dev & 0x80) != 0;
+			*ptoggle = toggle;
 			*protocol = RC_TYPE_RC6_MCE;
 			dev &= 0x7f;
 			dprintk(1, "ir hauppauge (rc6-mce): t%d vendor=%d dev=%d code=%d\n",
