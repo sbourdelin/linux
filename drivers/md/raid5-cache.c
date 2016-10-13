@@ -20,6 +20,7 @@
 #include <linux/random.h>
 #include "md.h"
 #include "raid5.h"
+#include "bitmap.h"
 
 /*
  * metadata/data stored in disk with 4k size unit (a block) regardless
@@ -217,6 +218,44 @@ static void __r5l_set_io_unit_state(struct r5l_io_unit *io,
 	io->state = state;
 }
 
+static void
+r5c_return_dev_pending_writes(struct r5conf *conf, struct r5dev *dev,
+			      struct bio_list *return_bi)
+{
+	struct bio *wbi, *wbi2;
+
+	wbi = dev->written;
+	dev->written = NULL;
+	while (wbi && wbi->bi_iter.bi_sector <
+	       dev->sector + STRIPE_SECTORS) {
+		wbi2 = r5_next_bio(wbi, dev->sector);
+		if (!raid5_dec_bi_active_stripes(wbi)) {
+			md_write_end(conf->mddev);
+			bio_list_add(return_bi, wbi);
+		}
+		wbi = wbi2;
+	}
+}
+
+void r5c_handle_cached_data_endio(struct r5conf *conf,
+	  struct stripe_head *sh, int disks, struct bio_list *return_bi)
+{
+	int i;
+
+	for (i = sh->disks; i--; ) {
+		if (test_bit(R5_InCache, &sh->dev[i].flags) &&
+		    sh->dev[i].written) {
+			set_bit(R5_UPTODATE, &sh->dev[i].flags);
+			r5c_return_dev_pending_writes(conf, &sh->dev[i],
+						      return_bi);
+			bitmap_endwrite(conf->mddev->bitmap, sh->sector,
+					STRIPE_SECTORS,
+					!test_bit(STRIPE_DEGRADED, &sh->state),
+					0);
+		}
+	}
+}
+
 /*
  * Freeze the stripe, thus send the stripe into reclaim path.
  *
@@ -233,6 +272,48 @@ void r5c_freeze_stripe_for_reclaim(struct stripe_head *sh)
 		return;
 	WARN_ON(test_bit(STRIPE_R5C_FROZEN, &sh->state));
 	set_bit(STRIPE_R5C_FROZEN, &sh->state);
+
+	if (log->r5c_state == R5C_STATE_WRITE_THROUGH)
+		return;
+
+	if (!test_and_set_bit(STRIPE_PREREAD_ACTIVE, &sh->state))
+		atomic_inc(&conf->preread_active_stripes);
+
+	if (test_and_clear_bit(STRIPE_R5C_PARTIAL_STRIPE, &sh->state)) {
+		BUG_ON(atomic_read(&conf->r5c_cached_partial_stripes) == 0);
+		atomic_dec(&conf->r5c_cached_partial_stripes);
+	}
+
+	if (test_and_clear_bit(STRIPE_R5C_FULL_STRIPE, &sh->state)) {
+		BUG_ON(atomic_read(&conf->r5c_cached_full_stripes) == 0);
+		atomic_dec(&conf->r5c_cached_full_stripes);
+	}
+}
+
+static void r5c_handle_data_cached(struct stripe_head *sh)
+{
+	int i;
+
+	for (i = sh->disks; i--; )
+		if (test_and_clear_bit(R5_Wantcache, &sh->dev[i].flags)) {
+			set_bit(R5_InCache, &sh->dev[i].flags);
+			clear_bit(R5_LOCKED, &sh->dev[i].flags);
+			atomic_inc(&sh->dev_in_cache);
+		}
+}
+
+/*
+ * this journal write must contain full parity,
+ * it may also contain some data pages
+ */
+static void r5c_handle_parity_cached(struct stripe_head *sh)
+{
+	int i;
+
+	for (i = sh->disks; i--; )
+		if (test_bit(R5_InCache, &sh->dev[i].flags))
+			set_bit(R5_Wantwrite, &sh->dev[i].flags);
+	set_bit(STRIPE_R5C_WRITTEN, &sh->state);
 }
 
 static void r5c_finish_cache_stripe(struct stripe_head *sh)
@@ -242,8 +323,10 @@ static void r5c_finish_cache_stripe(struct stripe_head *sh)
 	if (log->r5c_state == R5C_STATE_WRITE_THROUGH) {
 		BUG_ON(!test_bit(STRIPE_R5C_FROZEN, &sh->state));
 		set_bit(STRIPE_R5C_WRITTEN, &sh->state);
-	} else
-		BUG(); /* write back logic in next patch */
+	} else if (test_bit(STRIPE_R5C_FROZEN, &sh->state))
+		r5c_handle_parity_cached(sh);
+	else
+		r5c_handle_data_cached(sh);
 }
 
 static void r5l_io_run_stripes(struct r5l_io_unit *io)
@@ -483,7 +566,8 @@ static int r5l_log_stripe(struct r5l_log *log, struct stripe_head *sh,
 	io = log->current_io;
 
 	for (i = 0; i < sh->disks; i++) {
-		if (!test_bit(R5_Wantwrite, &sh->dev[i].flags))
+		if (!test_bit(R5_Wantwrite, &sh->dev[i].flags) &&
+		    !test_bit(R5_Wantcache, &sh->dev[i].flags))
 			continue;
 		if (i == sh->pd_idx || i == sh->qd_idx)
 			continue;
@@ -514,7 +598,6 @@ static int r5l_log_stripe(struct r5l_log *log, struct stripe_head *sh,
 	return 0;
 }
 
-static void r5l_wake_reclaim(struct r5l_log *log, sector_t space);
 /*
  * running in raid5d, where reclaim could wait for raid5d too (when it flushes
  * data from log to raid disks), so we shouldn't wait for reclaim here
@@ -544,6 +627,10 @@ int r5l_write_stripe(struct r5l_log *log, struct stripe_head *sh)
 
 		if (!test_bit(R5_Wantwrite, &sh->dev[i].flags))
 			continue;
+
+		if (test_bit(R5_InCache, &sh->dev[i].flags))
+			continue;
+
 		write_disks++;
 		/* checksum is already calculated in last run */
 		if (test_bit(STRIPE_LOG_TRAPPED, &sh->state))
@@ -809,7 +896,6 @@ static void r5l_write_super_and_discard_space(struct r5l_log *log,
 	}
 }
 
-
 static void r5l_do_reclaim(struct r5l_log *log)
 {
 	sector_t reclaim_target = xchg(&log->reclaim_target, 0);
@@ -872,7 +958,7 @@ static void r5l_reclaim_thread(struct md_thread *thread)
 	r5l_do_reclaim(log);
 }
 
-static void r5l_wake_reclaim(struct r5l_log *log, sector_t space)
+void r5l_wake_reclaim(struct r5l_log *log, sector_t space)
 {
 	unsigned long target;
 	unsigned long new = (unsigned long)space; /* overflow in theory */
@@ -1191,6 +1277,8 @@ int r5c_handle_stripe_dirtying(struct r5conf *conf,
 			       int disks)
 {
 	struct r5l_log *log = conf->log;
+	int i;
+	struct r5dev *dev;
 
 	if (!log || test_bit(STRIPE_R5C_FROZEN, &sh->state))
 		return -EAGAIN;
@@ -1201,21 +1289,121 @@ int r5c_handle_stripe_dirtying(struct r5conf *conf,
 		r5c_freeze_stripe_for_reclaim(sh);
 		return -EAGAIN;
 	}
-	BUG();  /* write back logic in next commit */
+
+	s->to_cache = 0;
+
+	for (i = disks; i--; ) {
+		dev = &sh->dev[i];
+		/* if none-overwrite, use the reclaim path (write through) */
+		if (dev->towrite && !test_bit(R5_OVERWRITE, &dev->flags) &&
+		    !test_bit(R5_InCache, &dev->flags)) {
+			r5c_freeze_stripe_for_reclaim(sh);
+			return -EAGAIN;
+		}
+	}
+
+	for (i = disks; i--; ) {
+		dev = &sh->dev[i];
+		if (dev->towrite) {
+			set_bit(R5_Wantcache, &dev->flags);
+			set_bit(R5_Wantdrain, &dev->flags);
+			set_bit(R5_LOCKED, &dev->flags);
+			s->to_cache++;
+		}
+	}
+
+	if (s->to_cache)
+		set_bit(STRIPE_OP_BIODRAIN, &s->ops_request);
+
 	return 0;
 }
 
 /*
  * clean up the stripe (clear STRIPE_R5C_FROZEN etc.) after the stripe is
  * committed to RAID disks
-*/
+ */
 void r5c_handle_stripe_written(struct r5conf *conf,
 			       struct stripe_head *sh)
 {
+	int i;
+	int do_wakeup = 0;
+
 	if (!test_and_clear_bit(STRIPE_R5C_WRITTEN, &sh->state))
 		return;
 	WARN_ON(!test_bit(STRIPE_R5C_FROZEN, &sh->state));
 	clear_bit(STRIPE_R5C_FROZEN, &sh->state);
+
+	if (conf->log->r5c_state == R5C_STATE_WRITE_THROUGH)
+		return;
+
+	for (i = sh->disks; i--; ) {
+		if (test_and_clear_bit(R5_InCache, &sh->dev[i].flags))
+			atomic_dec(&sh->dev_in_cache);
+		if (test_and_clear_bit(R5_Overlap, &sh->dev[i].flags))
+			do_wakeup = 1;
+	}
+
+	if (test_and_clear_bit(STRIPE_FULL_WRITE, &sh->state))
+		if (atomic_dec_and_test(&conf->pending_full_writes))
+			md_wakeup_thread(conf->mddev->thread);
+
+	if (do_wakeup)
+		wake_up(&conf->wait_for_overlap);
+}
+
+int
+r5c_cache_data(struct r5l_log *log, struct stripe_head *sh,
+	       struct stripe_head_state *s)
+{
+	int pages;
+	int reserve;
+	int i;
+	int ret = 0;
+	int page_count = 0;
+
+	BUG_ON(!log);
+
+	for (i = 0; i < sh->disks; i++) {
+		void *addr;
+
+		if (!test_bit(R5_Wantcache, &sh->dev[i].flags))
+			continue;
+		addr = kmap_atomic(sh->dev[i].page);
+		sh->dev[i].log_checksum = crc32c_le(log->uuid_checksum,
+						    addr, PAGE_SIZE);
+		kunmap_atomic(addr);
+		page_count++;
+	}
+	WARN_ON(page_count != s->to_cache);
+	pages = s->to_cache;
+
+	/*
+	 * The stripe must enter state machine again to call endio, so
+	 * don't delay.
+	 */
+	clear_bit(STRIPE_DELAYED, &sh->state);
+	atomic_inc(&sh->count);
+
+	mutex_lock(&log->io_mutex);
+	/* meta + data */
+	reserve = (1 + pages) << (PAGE_SHIFT - 9);
+	if (!r5l_has_free_space(log, reserve)) {
+		spin_lock(&log->no_space_stripes_lock);
+		list_add_tail(&sh->log_list, &log->no_space_stripes);
+		spin_unlock(&log->no_space_stripes_lock);
+
+		r5l_wake_reclaim(log, reserve);
+	} else {
+		ret = r5l_log_stripe(log, sh, pages, 0);
+		if (ret) {
+			spin_lock_irq(&log->io_list_lock);
+			list_add_tail(&sh->log_list, &log->no_mem_stripes);
+			spin_unlock_irq(&log->io_list_lock);
+		}
+	}
+
+	mutex_unlock(&log->io_mutex);
+	return 0;
 }
 
 static int r5l_load_log(struct r5l_log *log)
