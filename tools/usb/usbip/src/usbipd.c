@@ -64,11 +64,13 @@ static const char usbipd_help_string[] =
 	"	-6, --ipv6\n"
 	"		Bind to IPv6. Default is both.\n"
 	"\n"
+#ifndef USBIP_DAEMON_APP
 	"	-e, --device\n"
 	"		Run in device mode.\n"
 	"		Rather than drive an attached device, create\n"
 	"		a virtual UDC to bind gadgets to.\n"
 	"\n"
+#endif
 	"	-D, --daemon\n"
 	"		Run as a daemon process.\n"
 	"\n"
@@ -404,7 +406,9 @@ int main(int argc, char *argv[])
 		{ "ipv6",     no_argument,       NULL, '6' },
 		{ "daemon",   no_argument,       NULL, 'D' },
 		{ "debug",    no_argument,       NULL, 'd' },
+#ifndef USBIP_DAEMON_APP
 		{ "device",   no_argument,       NULL, 'e' },
+#endif
 		{ "pid",      optional_argument, NULL, 'P' },
 		{ "tcp-port", required_argument, NULL, 't' },
 		{ "help",     no_argument,       NULL, 'h' },
@@ -433,7 +437,11 @@ int main(int argc, char *argv[])
 	cmd = cmd_standalone_mode;
 	usbip_init_driver();
 	for (;;) {
-		opt = getopt_long(argc, argv, "46DdeP::t:hv", longopts, NULL);
+		opt = getopt_long(argc, argv, "46Dd"
+#ifndef USBIP_DAEMON_APP
+				  "e"
+#endif
+				  "P::t:hv", longopts, NULL);
 
 		if (opt == -1)
 			break;
@@ -463,9 +471,11 @@ int main(int argc, char *argv[])
 		case 'v':
 			cmd = cmd_version;
 			break;
+#ifndef USBIP_DAEMON_APP
 		case 'e':
 			usbip_update_driver();
 			break;
+#endif
 		case '?':
 			usbipd_help();
 		default:
