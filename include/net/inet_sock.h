@@ -132,6 +132,16 @@ static inline int inet_request_bound_dev_if(const struct sock *sk,
 	return sk->sk_bound_dev_if;
 }
 
+static inline bool inet_exact_dif_match(struct net *net, int dif)
+{
+#ifdef CONFIG_NET_L3_MASTER_DEV
+	if (netif_index_is_l3_master(net, dif) &&
+	    !net->ipv4.sysctl_tcp_l3mdev_accept)
+		return true;
+#endif
+	return false;
+}
+
 struct inet_cork {
 	unsigned int		flags;
 	__be32			addr;
