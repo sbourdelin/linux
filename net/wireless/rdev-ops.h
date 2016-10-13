@@ -490,6 +490,19 @@ static inline int rdev_connect(struct cfg80211_registered_device *rdev,
 	return ret;
 }
 
+static inline int
+rdev_update_connect_params(struct cfg80211_registered_device *rdev,
+			   struct net_device *dev,
+			   struct cfg80211_connect_params *sme,
+			   struct cfg80211_connect_params_valid *cpv)
+{
+	int ret;
+	trace_rdev_update_connect_params(&rdev->wiphy, dev, sme, cpv);
+	ret = rdev->ops->update_connect_params(&rdev->wiphy, dev, sme, cpv);
+	trace_rdev_return_int(&rdev->wiphy, ret);
+	return ret;
+}
+
 static inline int rdev_disconnect(struct cfg80211_registered_device *rdev,
 				  struct net_device *dev, u16 reason_code)
 {

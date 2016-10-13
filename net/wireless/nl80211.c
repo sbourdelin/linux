@@ -8732,6 +8732,31 @@ static int nl80211_connect(struct sk_buff *skb, struct genl_info *info)
 	return err;
 }
 
+static int nl80211_update_connect_params(struct sk_buff *skb,
+					 struct genl_info *info)
+{
+	struct cfg80211_connect_params connect;
+	struct cfg80211_connect_params_valid cpv;
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct net_device *dev = info->user_ptr[1];
+	struct wireless_dev *wdev = dev->ieee80211_ptr;
+
+	memset(&connect, 0, sizeof(connect));
+	memset(&cpv, 0, sizeof(cpv));
+
+	if (!wdev->current_bss)
+		return -ENOLINK;
+
+	if (info->attrs[NL80211_ATTR_IE]) {
+		if (!is_valid_ie_attr(info->attrs[NL80211_ATTR_IE]))
+			return -EINVAL;
+		connect.ie = nla_data(info->attrs[NL80211_ATTR_IE]);
+		connect.ie_len = nla_len(info->attrs[NL80211_ATTR_IE]);
+		cpv.assoc_ies_valid = true;
+	}
+	return cfg80211_update_connect_params(rdev, dev, &connect, &cpv);
+}
+
 static int nl80211_disconnect(struct sk_buff *skb, struct genl_info *info)
 {
 	struct cfg80211_registered_device *rdev = info->user_ptr[0];
@@ -12183,6 +12208,14 @@ static const struct genl_ops nl80211_ops[] = {
 		.doit = nl80211_connect,
 		.policy = nl80211_policy,
 		.flags = GENL_UNS_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
+				  NL80211_FLAG_NEED_RTNL,
+	},
+	{
+		.cmd = NL80211_CMD_UPDATE_CONNECT_PARAMS,
+		.doit = nl80211_update_connect_params,
+		.policy = nl80211_policy,
+		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
 				  NL80211_FLAG_NEED_RTNL,
 	},

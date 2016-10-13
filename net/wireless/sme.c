@@ -1073,6 +1073,16 @@ int cfg80211_connect(struct cfg80211_registered_device *rdev,
 	return 0;
 }
 
+int cfg80211_update_connect_params(struct cfg80211_registered_device *rdev,
+				   struct net_device *dev,
+				   struct cfg80211_connect_params *connect,
+				   struct cfg80211_connect_params_valid *cpv)
+{
+	if (rdev->ops->update_connect_params)
+		return rdev_update_connect_params(rdev, dev, connect, cpv);
+	return 0;
+}
+
 int cfg80211_disconnect(struct cfg80211_registered_device *rdev,
 			struct net_device *dev, u16 reason, bool wextev)
 {
