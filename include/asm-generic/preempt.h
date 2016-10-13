@@ -2,6 +2,7 @@
 #define __ASM_PREEMPT_H
 
 #include <linux/thread_info.h>
+#include <asm/current.h>
 
 #define PREEMPT_ENABLED	(0)
 
