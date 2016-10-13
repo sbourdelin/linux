@@ -361,8 +361,12 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
+#ifdef __aarch64__
+#include <sys/stat.h>
+#else
 #include <time.h>
 #include <signal.h>
+#endif
 #endif
 
 #endif				/* ACPI_USE_STANDARD_HEADERS */
