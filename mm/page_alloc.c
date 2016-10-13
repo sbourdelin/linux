@@ -2121,15 +2121,31 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 	int fallback_mt;
 	bool can_steal;
 
-	/* Find the largest possible block of pages in the other list */
-	for (current_order = MAX_ORDER-1;
-				current_order >= order && current_order <= MAX_ORDER-1;
-				--current_order) {
+	if (start_migratetype == MIGRATE_MOVABLE)
+		current_order = order;
+	else
+		current_order = MAX_ORDER - 1;
+
+	/*
+	 * Find the appropriate block of pages in the other list.
+	 * If start_migratetype is MIGRATE_UNMOVABLE/MIGRATE_RECLAIMABLE,
+	 * it would be better to find largest pageblock since it could cause
+	 * fragmentation. However, in case of MIGRATE_MOVABLE, there is no
+	 * risk about fragmentation so it would be better to use smallest one.
+	 */
+	while (current_order >= order && current_order <= MAX_ORDER - 1) {
+
 		area = &(zone->free_area[current_order]);
 		fallback_mt = find_suitable_fallback(area, current_order,
 				start_migratetype, false, &can_steal);
-		if (fallback_mt == -1)
+		if (fallback_mt == -1) {
+			if (start_migratetype == MIGRATE_MOVABLE)
+				current_order++;
+			else
+				current_order--;
+
 			continue;
+		}
 
 		page = list_first_entry(&area->free_list[fallback_mt],
 						struct page, lru);
