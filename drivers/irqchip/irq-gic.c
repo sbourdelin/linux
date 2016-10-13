@@ -328,18 +328,38 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 	unsigned int cpu, shift = (gic_irq(d) % 4) * 8;
 	u32 val, mask, bit;
 	unsigned long flags;
+	u32 valid_mask;
 
-	if (!force)
-		cpu = cpumask_any_and(mask_val, cpu_online_mask);
-	else
+	if (!force) {
+		valid_mask = cpumask_bits(mask_val)[0];
+		valid_mask &= cpumask_bits(cpu_online_mask)[0];
+
+		cpu = cpumask_any((struct cpumask *)&valid_mask);
+	} else {
 		cpu = cpumask_first(mask_val);
+	}
 
 	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
 		return -EINVAL;
 
 	gic_lock_irqsave(flags);
 	mask = 0xff << shift;
-	bit = gic_cpu_map[cpu] << shift;
+
+	if (!force) {
+		bit = 0;
+
+		for_each_cpu(cpu, (struct cpumask *)&valid_mask) {
+			if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
+				break;
+
+			bit |= gic_cpu_map[cpu];
+		}
+
+		bit = bit << shift;
+	} else {
+		bit = gic_cpu_map[cpu] << shift;
+	}
+
 	val = readl_relaxed(reg) & ~mask;
 	writel_relaxed(val | bit, reg);
 	gic_unlock_irqrestore(flags);
