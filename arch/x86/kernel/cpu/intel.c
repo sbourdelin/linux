@@ -26,6 +26,8 @@
 #include <asm/apic.h>
 #endif
 
+static int phi_r3mwait_disabled;
+
 /*
  * Just in case our CPU detection goes bad, or you have a weird system,
  * allow a way to override the automatic disabling of MPX.
@@ -58,6 +60,34 @@ void check_mpx_erratum(struct cpuinfo_x86 *c)
 	if (cpu_has(c, X86_FEATURE_MPX) && !cpu_has(c, X86_FEATURE_SMEP)) {
 		setup_clear_cpu_cap(X86_FEATURE_MPX);
 		pr_warn("x86/mpx: Disabling MPX since SMEP not present\n");
+	}
+}
+
+static int __init phir3mwait_disable(char *__unused)
+{
+	phi_r3mwait_disabled = 1;
+
+	return 1;
+}
+__setup("phir3mwait=disable", phir3mwait_disable);
+
+static void __init probe_xeon_phi_r3mwait(struct cpuinfo_x86 *c)
+{
+	if (phi_r3mwait_disabled)
+		return;
+
+	/*
+	* Setting ring 3 MONITOR/MWAIT for all threads
+	* when CPU is Xeon Phi Family x200
+	* This can be disabled with phir3mwait=disable cmdline switch.
+	* We preserve the reserved values and set only 2nd bit.
+	*/
+	if (c->x86 == 6 && c->x86_model == INTEL_FAM6_XEON_PHI_KNL) {
+		u64 msr;
+
+		rdmsrl(MSR_PHI_MISC_THD_FEATURE, msr);
+		msr |= MSR_PHI_MISC_THD_FEATURE_R3MWAIT;
+		wrmsrl(MSR_PHI_MISC_THD_FEATURE, msr);
 	}
 }
 
@@ -211,6 +241,7 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 	}
 
 	check_mpx_erratum(c);
+	probe_xeon_phi_r3mwait(c);
 }
 
 #ifdef CONFIG_X86_32
