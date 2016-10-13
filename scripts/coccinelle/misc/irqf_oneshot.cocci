@@ -5,7 +5,7 @@
 /// So pass the IRQF_ONESHOT flag in this case.
 ///
 //
-// Confidence: Good
+// Confidence: Moderate
 // Comments:
 // Options: --no-includes
 
@@ -18,13 +18,12 @@ virtual report
 expression dev;
 expression irq;
 expression thread_fn;
-expression flags;
 position p;
 @@
 (
 request_threaded_irq@p(irq, NULL, thread_fn,
 (
-flags | IRQF_ONESHOT
+IRQF_ONESHOT | ...
 |
 IRQF_ONESHOT
 )
@@ -32,11 +31,30 @@ IRQF_ONESHOT
 |
 devm_request_threaded_irq@p(dev, irq, NULL, thread_fn,
 (
-flags | IRQF_ONESHOT
+IRQF_ONESHOT | ...
 |
 IRQF_ONESHOT
 )
 , ...)
+)
+
+@r2@
+expression dev;
+expression irq;
+expression thread_fn;
+expression flags;
+expression ret;
+position p != r1.p;
+@@
+flags = IRQF_ONESHOT | ...;
+(
+ret = request_threaded_irq@p(irq, NULL, thread_fn, flags, ...);
+|
+ret = devm_request_threaded_irq@p(dev, irq, NULL, thread_fn, flags, ...);
+|
+return request_threaded_irq@p(irq, NULL, thread_fn, flags, ...);
+|
+return devm_request_threaded_irq@p(dev, irq, NULL, thread_fn, flags, ...);
 )
 
 @depends on patch@
@@ -44,8 +62,9 @@ expression dev;
 expression irq;
 expression thread_fn;
 expression flags;
-position p != r1.p;
+position p != {r1.p,r2.p};
 @@
+
 (
 request_threaded_irq@p(irq, NULL, thread_fn,
 (
@@ -69,15 +88,23 @@ devm_request_threaded_irq@p(dev, irq, NULL, thread_fn,
 )
 
 @depends on context@
-position p != r1.p;
+position p != {r1.p,r2.p};
 @@
+(
 *request_threaded_irq@p(...)
+|
+*devm_request_threaded_irq@p(...)
+)
 
 @match depends on report || org@
 expression irq;
-position p != r1.p;
+position p != {r1.p,r2.p};
 @@
+(
 request_threaded_irq@p(irq, NULL, ...)
+|
+devm_request_threaded_irq@p(dev, irq, NULL, ...)
+)
 
 @script:python depends on org@
 p << match.p;
