@@ -164,6 +164,120 @@ static struct mount *propagation_next(struct mount *m,
 	}
 }
 
+/*
+ * get the next mount in the propagation tree (that has not been visited)
+ * @m: the mount seen last
+ * @origin: the original mount from where the tree walk initiated
+ *
+ * Note that peer groups form contiguous segments of slave lists.
+ * We rely on that in get_source() to be able to find out if
+ * vfsmount found while iterating with propagation_next() is
+ * a peer of one we'd found earlier.
+ */
+static struct mount *propagation_visit_next(struct mount *m,
+					    struct mount *origin)
+{
+	/* Has this part of the propgation tree already been visited? */
+	if (IS_MNT_VISITED(m))
+		return NULL;
+
+	SET_MNT_VISITED(m);
+
+	/* are there any slaves of this mount? */
+	if (!list_empty(&m->mnt_slave_list)) {
+		struct mount *slave = first_slave(m);
+		while (1) {
+			if (!IS_MNT_VISITED(slave))
+				return slave;
+			if (slave->mnt_slave.next == &m->mnt_slave_list)
+				break;
+			slave = next_slave(slave);
+		}
+	}
+	while (1) {
+		struct mount *master = m->mnt_master;
+
+		if (master == origin->mnt_master) {
+			struct mount *next = next_peer(m);
+			while (1) {
+				if (next == origin)
+					return NULL;
+				if (!IS_MNT_VISITED(next))
+					return next;
+				next = next_peer(next);
+			}
+		} else {
+			while (1) {
+				if (m->mnt_slave.next == &master->mnt_slave_list)
+					break;
+				m = next_slave(m);
+				if (!IS_MNT_VISITED(m))
+					return m;
+			}
+		}
+
+		/* back at master */
+		m = master;
+	}
+}
+
+/*
+ * get the next mount in the propagation tree (that has not been revisited)
+ * @m: the mount seen last
+ * @origin: the original mount from where the tree walk initiated
+ *
+ * Note that peer groups form contiguous segments of slave lists.
+ * We rely on that in get_source() to be able to find out if
+ * vfsmount found while iterating with propagation_next() is
+ * a peer of one we'd found earlier.
+ */
+static struct mount *propagation_revisit_next(struct mount *m,
+					      struct mount *origin)
+{
+	/* Has this part of the propgation tree already been revisited? */
+	if (!IS_MNT_VISITED(m))
+		return NULL;
+
+	CLEAR_MNT_VISITED(m);
+
+	/* are there any slaves of this mount? */
+	if (!list_empty(&m->mnt_slave_list)) {
+		struct mount *slave = first_slave(m);
+		while (1) {
+			if (IS_MNT_VISITED(slave))
+				return slave;
+			if (slave->mnt_slave.next == &m->mnt_slave_list)
+				break;
+			slave = next_slave(slave);
+		}
+	}
+	while (1) {
+		struct mount *master = m->mnt_master;
+
+		if (master == origin->mnt_master) {
+			struct mount *next = next_peer(m);
+			while (1) {
+				if (next == origin)
+					return NULL;
+				if (IS_MNT_VISITED(next))
+					return next;
+				next = next_peer(next);
+			}
+		} else {
+			while (1) {
+				if (m->mnt_slave.next == &master->mnt_slave_list)
+					break;
+				m = next_slave(m);
+				if (IS_MNT_VISITED(m))
+					return m;
+			}
+		}
+
+		/* back at master */
+		m = master;
+	}
+}
+
 static struct mount *next_group(struct mount *m, struct mount *origin)
 {
 	while (1) {
@@ -399,11 +513,12 @@ static void mark_umount_candidates(struct mount *mnt)
 
 	BUG_ON(parent == mnt);
 
-	for (m = propagation_next(parent, parent); m;
-			m = propagation_next(m, parent)) {
+	for (m = propagation_visit_next(parent, parent); m;
+			m = propagation_visit_next(m, parent)) {
 		struct mount *child = __lookup_mnt_last(&m->mnt,
 						mnt->mnt_mountpoint);
-		if (child && (!IS_MNT_LOCKED(child) || IS_MNT_MARKED(m))) {
+		if (child && (!IS_MNT_LOCKED(child) ||
+			      IS_MNT_MARKED(m))) {
 			SET_MNT_MARK(child);
 		}
 	}
@@ -420,8 +535,8 @@ static void __propagate_umount(struct mount *mnt)
 
 	BUG_ON(parent == mnt);
 
-	for (m = propagation_next(parent, parent); m;
-			m = propagation_next(m, parent)) {
+	for (m = propagation_revisit_next(parent, parent); m;
+			m = propagation_revisit_next(m, parent)) {
 
 		struct mount *child = __lookup_mnt_last(&m->mnt,
 						mnt->mnt_mountpoint);
