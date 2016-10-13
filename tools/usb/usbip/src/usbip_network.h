@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
+ * Copyright (C) 2015 Nobuo Iwata
  */
 
 #ifndef __USBIP_NETWORK_H
@@ -93,7 +94,7 @@ struct op_export_request {
 } __attribute__((packed));
 
 struct op_export_reply {
-	int returncode;
+	uint32_t returncode;
 } __attribute__((packed));
 
 
@@ -115,7 +116,7 @@ struct op_unexport_request {
 } __attribute__((packed));
 
 struct op_unexport_reply {
-	int returncode;
+	uint32_t returncode;
 } __attribute__((packed));
 
 #define PACK_OP_UNEXPORT_REQUEST(pack, request)  do {\
