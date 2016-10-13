@@ -3095,6 +3095,9 @@ search_free:
 
 			goto err_unpin;
 		}
+
+		GEM_BUG_ON(vma->node.start < start);
+		GEM_BUG_ON(vma->node.start + vma->node.size > end);
 	}
 	GEM_BUG_ON(!i915_gem_valid_gtt_space(vma, obj->cache_level));
 
@@ -3793,7 +3796,8 @@ i915_gem_object_ggtt_pin(struct drm_i915_gem_object *obj,
 			 u64 alignment,
 			 u64 flags)
 {
-	struct i915_address_space *vm = &to_i915(obj->base.dev)->ggtt.base;
+	struct drm_i915_private *dev_priv = to_i915(obj->base.dev);
+	struct i915_address_space *vm = &dev_priv->ggtt.base;
 	struct i915_vma *vma;
 	int ret;
 
@@ -3805,6 +3809,19 @@ i915_gem_object_ggtt_pin(struct drm_i915_gem_object *obj,
 		if (flags & PIN_NONBLOCK &&
 		    (i915_vma_is_pinned(vma) || i915_vma_is_active(vma)))
 			return ERR_PTR(-ENOSPC);
+
+		if (flags & PIN_MAPPABLE) {
+			u32 fence_size;
+
+			fence_size = i915_gem_get_ggtt_size(dev_priv, vma->size,
+							    i915_gem_object_get_tiling(obj));
+			if (fence_size > dev_priv->ggtt.mappable_end)
+				return ERR_PTR(-E2BIG);
+
+			if (flags & PIN_NONBLOCK &&
+			    fence_size > dev_priv->ggtt.mappable_end / 2)
+				return ERR_PTR(-ENOSPC);
+		}
 
 		WARN(i915_vma_is_pinned(vma),
 		     "bo is already pinned in ggtt with incorrect alignment:"
