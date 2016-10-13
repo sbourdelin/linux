@@ -1260,6 +1260,26 @@ drm_do_probe_ddc_edid(void *data, u8 *buf, unsigned int block, size_t len)
 	return ret == xfers ? 0 : -1;
 }
 
+static void connector_add_bad_edid(struct drm_connector *connector,
+				   u8 *block, int num)
+{
+	if (connector->bad_edid_counter++ && !(drm_debug & DRM_UT_KMS))
+		return;
+
+	if (drm_edid_is_zero(block, EDID_LENGTH)) {
+		dev_warn(connector->dev->dev,
+			 "%s: EDID block %d is all zeroes.\n",
+			 connector->name, num);
+	} else {
+		dev_warn(connector->dev->dev,
+			 "%s: EDID block %d invalid:\n",
+			 connector->name, num);
+		print_hex_dump(KERN_WARNING,
+			       " \t", DUMP_PREFIX_NONE, 16, 1,
+			       block, EDID_LENGTH, false);
+	}
+}
+
 /**
  * drm_do_get_edid - get EDID data using a custom EDID block read function
  * @connector: connector we're probing
@@ -1282,20 +1302,19 @@ struct edid *drm_do_get_edid(struct drm_connector *connector,
 	void *data)
 {
 	int i, j = 0, valid_extensions = 0;
-	u8 *block, *new;
-	bool print_bad_edid = !connector->bad_edid_counter || (drm_debug & DRM_UT_KMS);
+	u8 *edid, *new;
 
-	if ((block = kmalloc(EDID_LENGTH, GFP_KERNEL)) == NULL)
+	if ((edid = kmalloc(EDID_LENGTH, GFP_KERNEL)) == NULL)
 		return NULL;
 
 	/* base block fetch */
 	for (i = 0; i < 4; i++) {
-		if (get_edid_block(data, block, 0, EDID_LENGTH))
+		if (get_edid_block(data, edid, 0, EDID_LENGTH))
 			goto out;
-		if (drm_edid_block_valid(block, 0, print_bad_edid,
+		if (drm_edid_block_valid(edid, 0, false,
 					 &connector->edid_corrupt))
 			break;
-		if (i == 0 && drm_edid_is_zero(block, EDID_LENGTH)) {
+		if (i == 0 && drm_edid_is_zero(edid, EDID_LENGTH)) {
 			connector->null_edid_counter++;
 			goto carp;
 		}
@@ -1304,58 +1323,45 @@ struct edid *drm_do_get_edid(struct drm_connector *connector,
 		goto carp;
 
 	/* if there's no extensions, we're done */
-	if (block[0x7e] == 0)
-		return (struct edid *)block;
+	if (edid[0x7e] == 0)
+		return (struct edid *)edid;
 
-	new = krealloc(block, (block[0x7e] + 1) * EDID_LENGTH, GFP_KERNEL);
+	new = krealloc(edid, (edid[0x7e] + 1) * EDID_LENGTH, GFP_KERNEL);
 	if (!new)
 		goto out;
-	block = new;
+	edid = new;
 
-	for (j = 1; j <= block[0x7e]; j++) {
+	for (j = 1; j <= edid[0x7e]; j++) {
+		u8 *block = edid + (valid_extensions + 1) * EDID_LENGTH;
+
 		for (i = 0; i < 4; i++) {
-			if (get_edid_block(data,
-				  block + (valid_extensions + 1) * EDID_LENGTH,
-				  j, EDID_LENGTH))
+			if (get_edid_block(data, block, j, EDID_LENGTH))
 				goto out;
-			if (drm_edid_block_valid(block + (valid_extensions + 1)
-						 * EDID_LENGTH, j,
-						 print_bad_edid,
-						 NULL)) {
+			if (drm_edid_block_valid(block, j, false, NULL)) {
 				valid_extensions++;
 				break;
 			}
 		}
 
-		if (i == 4 && print_bad_edid) {
-			dev_warn(connector->dev->dev,
-			 "%s: Ignoring invalid EDID block %d.\n",
-			 connector->name, j);
-
-			connector->bad_edid_counter++;
-		}
+		if (i == 4)
+			connector_add_bad_edid(connector, block, j);
 	}
 
-	if (valid_extensions != block[0x7e]) {
-		block[EDID_LENGTH-1] += block[0x7e] - valid_extensions;
-		block[0x7e] = valid_extensions;
-		new = krealloc(block, (valid_extensions + 1) * EDID_LENGTH, GFP_KERNEL);
+	if (valid_extensions != edid[0x7e]) {
+		edid[EDID_LENGTH-1] += edid[0x7e] - valid_extensions;
+		edid[0x7e] = valid_extensions;
+		new = krealloc(edid, (valid_extensions + 1) * EDID_LENGTH, GFP_KERNEL);
 		if (!new)
 			goto out;
-		block = new;
+		edid = new;
 	}
 
-	return (struct edid *)block;
+	return (struct edid *)edid;
 
 carp:
-	if (print_bad_edid) {
-		dev_warn(connector->dev->dev, "%s: EDID block %d invalid.\n",
-			 connector->name, j);
-	}
-	connector->bad_edid_counter++;
-
+	connector_add_bad_edid(connector, edid, 0);
 out:
-	kfree(block);
+	kfree(edid);
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(drm_do_get_edid);
