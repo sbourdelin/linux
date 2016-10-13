@@ -193,10 +193,7 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
 #endif
 	"b	2b\n"
 	".previous\n"
-	".section __ex_table,\"a\"\n\t"
-		PPC_LONG_ALIGN "\n\t"
-		PPC_LONG "1b,3b\n"
-	".previous"
+	EX_TABLE(1b, 3b)
 	: [tmp] "=&b" (tmp), [offset] "=&r" (offset), [ret] "=&r" (ret)
 	: [addr] "b" (addr), "m" (*(unsigned long *)addr));
 

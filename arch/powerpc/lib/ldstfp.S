@@ -15,24 +15,19 @@
 #include <asm/ppc-opcode.h>
 #include <asm/reg.h>
 #include <asm/asm-offsets.h>
+#include <asm/linkage.h>
 #include <linux/errno.h>
 
 #ifdef CONFIG_PPC_FPU
 
 #define STKFRM	(PPC_MIN_STKFRM + 16)
 
-	.macro	extab	instr,handler
-	.section __ex_table,"a"
-	PPC_LONG \instr,\handler
-	.previous
-	.endm
-
 	.macro	inst32	op
 reg = 0
 	.rept	32
 20:	\op	reg,0,r4
 	b	3f
-	extab	20b,99f
+	EX_TABLE(20b,99f)
 reg = reg + 1
 	.endr
 	.endm
@@ -100,7 +95,7 @@ _GLOBAL(do_lfs)
 	mr	r3,r9
 	addi	r1,r1,STKFRM
 	blr
-	extab	2b,3b
+	EX_TABLE(2b,3b)
 
 /* Load FP reg N from double at *p.  N is in r3, p in r4. */
 _GLOBAL(do_lfd)
@@ -127,7 +122,7 @@ _GLOBAL(do_lfd)
 	mr	r3,r9
 	addi	r1,r1,STKFRM
 	blr
-	extab	2b,3b
+	EX_TABLE(2b,3b)
 
 /* Store FP reg N to float at *p.  N is in r3, p in r4. */
 _GLOBAL(do_stfs)
@@ -154,7 +149,7 @@ _GLOBAL(do_stfs)
 	mr	r3,r9
 	addi	r1,r1,STKFRM
 	blr
-	extab	2b,3b
+	EX_TABLE(2b,3b)
 
 /* Store FP reg N to double at *p.  N is in r3, p in r4. */
 _GLOBAL(do_stfd)
@@ -181,7 +176,7 @@ _GLOBAL(do_stfd)
 	mr	r3,r9
 	addi	r1,r1,STKFRM
 	blr
-	extab	2b,3b
+	EX_TABLE(2b,3b)
 
 #ifdef CONFIG_ALTIVEC
 /* Get the contents of vrN into v0; N is in r3. */
@@ -248,7 +243,7 @@ _GLOBAL(do_lvx)
 	mr	r3,r9
 	addi	r1,r1,STKFRM
 	blr
-	extab	2b,3b
+	EX_TABLE(2b,3b)
 
 /* Store vector reg N to *p.  N is in r3, p in r4. */
 _GLOBAL(do_stvx)
@@ -276,7 +271,7 @@ _GLOBAL(do_stvx)
 	mr	r3,r9
 	addi	r1,r1,STKFRM
 	blr
-	extab	2b,3b
+	EX_TABLE(2b,3b)
 #endif /* CONFIG_ALTIVEC */
 
 #ifdef CONFIG_VSX
@@ -344,7 +339,7 @@ _GLOBAL(do_lxvd2x)
 	mr	r3,r9
 	addi	r1,r1,STKFRM
 	blr
-	extab	2b,3b
+	EX_TABLE(2b,3b)
 
 /* Store VSX reg N to vector doubleword *p.  N is in r3, p in r4. */
 _GLOBAL(do_stxvd2x)
@@ -372,7 +367,7 @@ _GLOBAL(do_stxvd2x)
 	mr	r3,r9
 	addi	r1,r1,STKFRM
 	blr
-	extab	2b,3b
+	EX_TABLE(2b,3b)
 
 #endif /* CONFIG_VSX */
 

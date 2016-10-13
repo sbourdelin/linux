@@ -9,11 +9,10 @@
  * 2 of the License, or (at your option) any later version.
  */
 #include <asm/processor.h>
+#include <asm/linkage.h>
 #include <asm/errno.h>
 #include <asm/ppc_asm.h>
 
-	.section __ex_table,"a"
-	PPC_LONG_ALIGN
 	.text
 	
 /* This clears out any unused part of the destination buffer,
@@ -120,9 +119,7 @@ _GLOBAL(__clear_user)
 92:	mfctr	r3
 	blr
 
-	.section __ex_table,"a"
-	PPC_LONG	11b,90b
-	PPC_LONG	1b,91b
-	PPC_LONG	8b,92b
-	.text
+	EX_TABLE(11b, 90b)
+	EX_TABLE(1b, 91b)
+	EX_TABLE(8b, 92b)
 #endif

@@ -12,4 +12,26 @@
 	     "\t.globl ." #alias "\n\t.set ." #alias ", ." #name)
 #endif
 
+#ifndef __ASSEMBLY__
+/*
+ * Helper macro for exception table entries
+ */
+#define EX_TABLE(_fault, _target)	\
+	".section __ex_table,\"a\"\n"	\
+		PPC_LONG_ALIGN "\n"	\
+		PPC_LONG #_fault "\n"	\
+		PPC_LONG #_target "\n"	\
+	".previous\n"
+
+#else /* __ASSEMBLY__ */
+
+#define EX_TABLE(_fault, _target)	\
+	.section __ex_table,"a"	;	\
+		PPC_LONG_ALIGN ;	\
+		PPC_LONG _fault	;	\
+		PPC_LONG _target ;	\
+	.previous
+
+#endif /* __ASSEMBLY__ */
+
 #endif	/* _ASM_POWERPC_LINKAGE_H */
