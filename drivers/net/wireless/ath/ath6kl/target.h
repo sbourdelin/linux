@@ -331,11 +331,11 @@ struct host_interest {
 
 /* Convert a Target virtual address into a Target physical address */
 #define AR6003_VTOP(vaddr) ((vaddr) & 0x001fffff)
-#define AR6004_VTOP(vaddr) (vaddr)
+#define DEFAULT_VTOP(vaddr) (vaddr)
 
 #define TARG_VTOP(target_type, vaddr) \
 	(((target_type) == TARGET_TYPE_AR6003) ? AR6003_VTOP(vaddr) : \
-	(((target_type) == TARGET_TYPE_AR6004) ? AR6004_VTOP(vaddr) : 0))
+	DEFAULT_VTOP(vaddr))
 
 #define ATH6KL_FWLOG_PAYLOAD_SIZE		1500
 
