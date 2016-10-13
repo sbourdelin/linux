@@ -6605,14 +6605,43 @@ static int valleyview_modeset_calc_cdclk(struct drm_atomic_state *state)
 	return 0;
 }
 
+static bool cdclk_min_for_dp_audio(struct drm_atomic_state *state)
+{
+
+	struct drm_crtc_state *crtc_state;
+	struct drm_crtc *crtc;
+	int i;
+
+	/* BSpec says "Do not use DisplayPort with CDCLK less than 432 MHz,
+	 * audio enabled, port width x4, and link rate HBR2 (5.4 GHz), or else
+	 * there may be audio corruption or screen corruption."
+	 */
+
+	for_each_crtc_in_state(state, crtc, crtc_state, i) {
+		struct intel_crtc_state *pipe_config =
+			to_intel_crtc_state(crtc_state);
+
+		return (intel_crtc_has_dp_encoder(pipe_config) &&
+			pipe_config->has_audio &&
+			pipe_config->port_clock == 540000 &&
+			pipe_config->lane_count == 4);
+	}
+
+	return false;
+}
+
 static int bxt_modeset_calc_cdclk(struct drm_atomic_state *state)
 {
 	int max_pixclk = ilk_max_pixel_rate(state);
+	int cdclk, min_cdclk = 0;
 	struct intel_atomic_state *intel_state =
 		to_intel_atomic_state(state);
 
-	intel_state->cdclk = intel_state->dev_cdclk =
-		bxt_calc_cdclk(max_pixclk);
+	if (cdclk_min_for_dp_audio(state))
+		min_cdclk = bxt_calc_cdclk(432000);
+
+	cdclk = bxt_calc_cdclk(max_pixclk);
+	intel_state->cdclk = intel_state->dev_cdclk = max(min_cdclk, cdclk);
 
 	if (!intel_state->active_crtcs)
 		intel_state->dev_cdclk = bxt_calc_cdclk(0);
@@ -10376,13 +10405,18 @@ static int broadwell_modeset_calc_cdclk(struct drm_atomic_state *state)
 	struct drm_i915_private *dev_priv = to_i915(state->dev);
 	struct intel_atomic_state *intel_state = to_intel_atomic_state(state);
 	int max_pixclk = ilk_max_pixel_rate(state);
-	int cdclk;
+	int cdclk, min_cdclk = 0;
+
+	if (cdclk_min_for_dp_audio(state))
+		min_cdclk = broadwell_calc_cdclk(432000);
 
 	/*
 	 * FIXME should also account for plane ratio
 	 * once 64bpp pixel formats are supported.
 	 */
 	cdclk = broadwell_calc_cdclk(max_pixclk);
+
+	cdclk =	max(min_cdclk, cdclk);
 
 	if (cdclk > dev_priv->max_cdclk_freq) {
 		DRM_DEBUG_KMS("requested cdclk (%d kHz) exceeds max (%d kHz)\n",
@@ -10413,13 +10447,18 @@ static int skl_modeset_calc_cdclk(struct drm_atomic_state *state)
 	struct drm_i915_private *dev_priv = to_i915(state->dev);
 	const int max_pixclk = ilk_max_pixel_rate(state);
 	int vco = intel_state->cdclk_pll_vco;
-	int cdclk;
+	int cdclk, min_cdclk = 0;
+
+	if (cdclk_min_for_dp_audio(state))
+		min_cdclk = skl_calc_cdclk(432000, vco);
 
 	/*
 	 * FIXME should also account for plane ratio
 	 * once 64bpp pixel formats are supported.
 	 */
 	cdclk = skl_calc_cdclk(max_pixclk, vco);
+
+	cdclk = max(min_cdclk, cdclk);
 
 	/*
 	 * FIXME move the cdclk caclulation to
