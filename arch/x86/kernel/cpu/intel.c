@@ -88,6 +88,7 @@ static void __init probe_xeon_phi_r3mwait(struct cpuinfo_x86 *c)
 		rdmsrl(MSR_PHI_MISC_THD_FEATURE, msr);
 		msr |= MSR_PHI_MISC_THD_FEATURE_R3MWAIT;
 		wrmsrl(MSR_PHI_MISC_THD_FEATURE, msr);
+		set_cpu_cap(c, X86_FEATURE_PHIR3MWAIT);
 	}
 }
 

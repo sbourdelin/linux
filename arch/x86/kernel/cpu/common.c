@@ -1109,6 +1109,9 @@ static void identify_cpu(struct cpuinfo_x86 *c)
 #endif
 	/* The boot/hotplug time assigment got cleared, restore it */
 	c->logical_proc_id = topology_phys_to_logical_pkg(c->phys_proc_id);
+
+	if (cpu_has(c, X86_FEATURE_PHIR3MWAIT))
+		elf_hwcap2 |= HWCAP2_PHIR3MWAIT;
 }
 
 /*
