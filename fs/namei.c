@@ -2292,6 +2292,21 @@ static int filename_lookup(int dfd, struct filename *name, unsigned flags,
 {
 	int retval;
 	struct nameidata nd;
+
+	if (flags & LOOKUP_PARENT) {
+		struct qstr last;
+		struct filename *filename;
+		int type;
+
+		filename = filename_parentat(dfd, name, flags ^ LOOKUP_PARENT,
+					    path, &last, &type);
+		if (IS_ERR(filename))
+			return PTR_ERR(filename);
+
+		putname(filename);
+		return 0;
+	}
+
 	if (IS_ERR(name))
 		return PTR_ERR(name);
 	if (unlikely(root)) {
