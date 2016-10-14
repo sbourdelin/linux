@@ -390,20 +390,137 @@ void propagate_mount_unlock(struct mount *mnt)
 }
 
 /*
+ * get the next mount in the propagation tree (that has not been visited)
+ * @m: the mount seen last
+ * @origin: the original mount from where the tree walk initiated
+ *
+ * Note that peer groups form contiguous segments of slave lists.
+ * We rely on that in get_source() to be able to find out if
+ * vfsmount found while iterating with propagation_next() is
+ * a peer of one we'd found earlier.
+ */
+static struct mount *propagation_visit_child(struct mount *last_child,
+					    struct mount *origin_child)
+{
+	struct mount *m = last_child->mnt_parent;
+	struct mount *origin = origin_child->mnt_parent;
+	struct dentry *mountpoint = origin_child->mnt_mountpoint;
+	struct mount *child;
+
+	/* Has this part of the propgation tree already been visited? */
+	if (IS_MNT_VISITED(last_child))
+		return NULL;
+
+	SET_MNT_VISITED(last_child);
+
+	/* are there any slaves of this mount? */
+	if (!list_empty(&m->mnt_slave_list)) {
+		m = first_slave(m);
+		goto check_slave;
+	}
+	while (1) {
+		struct mount *master = m->mnt_master;
+
+		if (master == origin->mnt_master) {
+			struct mount *next = next_peer(m);
+			while (1) {
+				if (next == origin)
+					return NULL;
+				child = __lookup_mnt_last(&next->mnt, mountpoint);
+				if (child && !IS_MNT_VISITED(child))
+					return child;
+				next = next_peer(next);
+			}
+		} else {
+			while (1) {
+				if (m->mnt_slave.next == &master->mnt_slave_list)
+					break;
+				m = next_slave(m);
+			check_slave:
+				child = __lookup_mnt_last(&m->mnt, mountpoint);
+				if (child && !IS_MNT_VISITED(child))
+					return child;
+			}
+		}
+
+		/* back at master */
+		m = master;
+	}
+}
+
+/*
+ * get the next mount in the propagation tree (that has not been revisited)
+ * @m: the mount seen last
+ * @origin: the original mount from where the tree walk initiated
+ *
+ * Note that peer groups form contiguous segments of slave lists.
+ * We rely on that in get_source() to be able to find out if
+ * vfsmount found while iterating with propagation_next() is
+ * a peer of one we'd found earlier.
+ */
+static struct mount *propagation_revisit_child(struct mount *last_child,
+					       struct mount *origin_child)
+{
+	struct mount *m = last_child->mnt_parent;
+	struct mount *origin = origin_child->mnt_parent;
+	struct dentry *mountpoint = origin_child->mnt_mountpoint;
+	struct mount *child;
+
+	/* Has this part of the propgation tree already been revisited? */
+	if (!IS_MNT_VISITED(last_child))
+		return NULL;
+
+	CLEAR_MNT_VISITED(last_child);
+
+	/* are there any slaves of this mount? */
+	if (!list_empty(&m->mnt_slave_list)) {
+		m = first_slave(m);
+		goto check_slave;
+	}
+	while (1) {
+		struct mount *master = m->mnt_master;
+
+		if (master == origin->mnt_master) {
+			struct mount *next = next_peer(m);
+			while (1) {
+				if (next == origin)
+					return NULL;
+				child = __lookup_mnt_last(&next->mnt, mountpoint);
+				if (child && IS_MNT_VISITED(child))
+					return child;
+				next = next_peer(next);
+			}
+		} else {
+			while (1) {
+				if (m->mnt_slave.next == &master->mnt_slave_list)
+					break;
+				m = next_slave(m);
+			check_slave:
+				child = __lookup_mnt_last(&m->mnt, mountpoint);
+				if (child && IS_MNT_VISITED(child))
+					return child;
+			}
+		}
+
+		/* back at master */
+		m = master;
+	}
+}
+
+/*
  * Mark all mounts that the MNT_LOCKED logic will allow to be unmounted.
  */
 static void mark_umount_candidates(struct mount *mnt)
 {
-	struct mount *parent = mnt->mnt_parent;
-	struct mount *m;
+	struct mount *child;
 
-	BUG_ON(parent == mnt);
+	BUG_ON(mnt->mnt_parent == mnt);
 
-	for (m = propagation_next(parent, parent); m;
-			m = propagation_next(m, parent)) {
-		struct mount *child = __lookup_mnt_last(&m->mnt,
-						mnt->mnt_mountpoint);
-		if (child && (!IS_MNT_LOCKED(child) || IS_MNT_MARKED(m))) {
+	for (child = propagation_visit_child(mnt, mnt); child;
+	     child = propagation_visit_child(child, mnt)) {
+		if (child->mnt.mnt_flags & MNT_UMOUNT)
+			continue;
+		if (!IS_MNT_LOCKED(child) || IS_MNT_MARKED(child->mnt_parent)) {
 			SET_MNT_MARK(child);
 		}
 	}
@@ -415,21 +532,17 @@ static void mark_umount_candidates(struct mount *mnt)
  */
 static void __propagate_umount(struct mount *mnt)
 {
-	struct mount *parent = mnt->mnt_parent;
-	struct mount *m;
+	struct mount *child;
 
-	BUG_ON(parent == mnt);
+	BUG_ON(mnt->mnt_parent == mnt);
 
-	for (m = propagation_next(parent, parent); m;
-			m = propagation_next(m, parent)) {
-
-		struct mount *child = __lookup_mnt_last(&m->mnt,
-						mnt->mnt_mountpoint);
+	for (child = propagation_revisit_child(mnt, mnt); child;
+	     child = propagation_revisit_child(child, mnt)) {
 		/*
 		 * umount the child only if the child has no children
 		 * and the child is marked safe to unmount.
 		 */
-		if (!child || !IS_MNT_MARKED(child))
+		if (!IS_MNT_MARKED(child))
 			continue;
 		CLEAR_MNT_MARK(child);
 		if (list_empty(&child->mnt_mounts)) {

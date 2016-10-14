@@ -21,6 +21,10 @@
 #define CLEAR_MNT_MARK(m) ((m)->mnt.mnt_flags &= ~MNT_MARKED)
 #define IS_MNT_LOCKED(m) ((m)->mnt.mnt_flags & MNT_LOCKED)
 
+#define IS_MNT_VISITED(m) ((m)->mnt.mnt_flags & MNT_VISITED)
+#define SET_MNT_VISITED(m) ((m)->mnt.mnt_flags |= MNT_VISITED)
+#define CLEAR_MNT_VISITED(m) ((m)->mnt.mnt_flags &= ~MNT_VISITED)
+
 #define CL_EXPIRE    		0x01
 #define CL_SLAVE     		0x02
 #define CL_COPY_UNBINDABLE	0x04
