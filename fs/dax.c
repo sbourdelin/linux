@@ -142,6 +142,34 @@ static sector_t to_sector(const struct buffer_head *bh,
 	return sector;
 }
 
+static void dax_iostat_start(struct gendisk *disk, struct iov_iter *iter,
+			     unsigned long *start)
+{
+	int rw = iov_iter_rw(iter);
+	int sec = iov_iter_count(iter) >> 9;
+	int cpu = part_stat_lock();
+
+	*start = jiffies;
+	part_round_stats(cpu, &disk->part0);
+	part_stat_inc(cpu, &disk->part0, ios[rw]);
+	part_stat_add(cpu, &disk->part0, sectors[rw], sec);
+	part_inc_in_flight(&disk->part0, rw);
+	part_stat_unlock();
+}
+
+static void dax_iostat_end(struct gendisk *disk, struct iov_iter *iter,
+			   unsigned long start)
+{
+	unsigned long duration = jiffies - start;
+	int rw = iov_iter_rw(iter);
+	int cpu = part_stat_lock();
+
+	part_stat_add(cpu, &disk->part0, ticks[rw], duration);
+	part_round_stats(cpu, &disk->part0);
+	part_dec_in_flight(&disk->part0, rw);
+	part_stat_unlock();
+}
+
 static ssize_t dax_io(struct inode *inode, struct iov_iter *iter,
 		      loff_t start, loff_t end, get_block_t get_block,
 		      struct buffer_head *bh)
@@ -263,9 +291,12 @@ ssize_t dax_do_io(struct kiocb *iocb, struct inode *inode,
 	ssize_t retval = -EINVAL;
 	loff_t pos = iocb->ki_pos;
 	loff_t end = pos + iov_iter_count(iter);
+	struct gendisk *disk;
+	unsigned long start = 0;
 
 	memset(&bh, 0, sizeof(bh));
 	bh.b_bdev = inode->i_sb->s_bdev;
+	disk = bh.b_bdev->bd_disk;
 
 	if ((flags & DIO_LOCKING) && iov_iter_rw(iter) == READ)
 		inode_lock(inode);
@@ -274,7 +305,13 @@ ssize_t dax_do_io(struct kiocb *iocb, struct inode *inode,
 	if (!(flags & DIO_SKIP_DIO_COUNT))
 		inode_dio_begin(inode);
 
+	if (blk_queue_io_stat(disk->queue))
+		dax_iostat_start(disk, iter, &start);
+
 	retval = dax_io(inode, iter, pos, end, get_block, &bh);
+
+	if (start)
+		dax_iostat_end(disk, iter, start);
 
 	if ((flags & DIO_LOCKING) && iov_iter_rw(iter) == READ)
 		inode_unlock(inode);
