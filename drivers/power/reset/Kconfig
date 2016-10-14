@@ -208,5 +208,15 @@ config SYSCON_REBOOT_MODE
 	  register, then the bootloader can read it to take different
 	  action according to the mode.
 
+config QCOM_REBOOT_MODE
+	tristate "Qualcomm reboot mode driver"
+	depends on MFD_SPMI_PMIC
+	select REBOOT_MODE
+	help
+	  Say y here will enable Qualcomm reboot mode driver. This will
+	  get reboot mode arguments and store it in SPMI PMIC register,
+	  then the bootloader can read it to take different action
+	  according to the mode.
+
 endif
 

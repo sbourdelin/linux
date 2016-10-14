@@ -1,0 +1,23 @@
+Qualcomm Reboot Mode Driver
+
+Qualcomm reboot mode driver based on reboot mode framework to update
+SPMI specific bits.
+
+Required Properties:
+-compatible: "qcom,reboot-mode"
+-offset: offset of the SPMI reboot mode register
+
+Optional Properties:
+-mask: mask of reboot mode
+-mode-xxx: magic of reboot mode
+
+Example:
+	qcom,reboot-mode@88f {
+		compatible = "qcom,reboot-mode";
+		offset = <0x88f>;
+		mode-normal = <0x00>;
+		mode-recovery = <0x04>;
+		mode-bootloader = <0x08>;
+		mode-rtc = <0x0C>;
+	};
+
