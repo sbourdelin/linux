@@ -238,7 +238,9 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 					 &dev->scl_falling_time);
 		device_property_read_u32(&pdev->dev, "clock-frequency",
 					 &dev->clk_freq);
-		is_slave = device_property_read_bool(&pdev->dev, "isslave");
+#ifndef CONFIG_ACPI
+		is_slave = device_property_read_bool(&pdev->dev, "is-slave");
+#endif
 	}
 
 	acpi_speed = i2c_acpi_find_bus_speed(&pdev->dev);

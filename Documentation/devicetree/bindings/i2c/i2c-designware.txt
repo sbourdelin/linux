@@ -19,6 +19,8 @@ Optional properties :
 
  - i2c-sda-falling-time-ns : should contain the SDA falling time in nanoseconds.
    This value which is by default 300ns is used to compute the tHIGH period.
+   
+ - is-slave : indicates if the block is a I2C slave device.
 
 Example :
 
@@ -30,7 +32,7 @@ Example :
 		interrupts = <11>;
 		clock-frequency = <400000>;
 	};
-
+	
 	i2c@1120000 {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -42,4 +44,5 @@ Example :
 		i2c-sda-hold-time-ns = <300>;
 		i2c-sda-falling-time-ns = <300>;
 		i2c-scl-falling-time-ns = <300>;
+		is-slave;
 	};
