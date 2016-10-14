@@ -27,6 +27,29 @@
 #include <drm/drm_dp_dual_mode_helper.h>
 #include "intel_drv.h"
 
+/*
+ * This function assumes only one LSPCON port on the device,
+ * and returns the first active LSPCON port.
+ */
+static struct intel_lspcon *find_active_lspcon(struct drm_device *dev)
+{
+	struct intel_lspcon *lspcon = NULL;
+	struct intel_encoder *intel_encoder;
+
+	for_each_intel_encoder(dev, intel_encoder) {
+		struct intel_digital_port *intel_dig_port;
+
+		intel_dig_port = enc_to_dig_port(&intel_encoder->base);
+		lspcon = &intel_dig_port->lspcon;
+		if (lspcon->active) {
+			DRM_DEBUG_KMS("LSPCON active : port %c\n",
+					port_name(intel_dig_port->port));
+			break;
+		}
+	}
+	return lspcon;
+}
+
 enum drm_lspcon_mode lspcon_get_current_mode(struct intel_lspcon *lspcon)
 {
 	enum drm_lspcon_mode current_mode = DRM_LSPCON_MODE_INVALID;
@@ -87,6 +110,21 @@ static bool lspcon_probe(struct intel_lspcon *lspcon)
 	lspcon->mode = lspcon_get_current_mode(lspcon);
 	lspcon->active = true;
 	return true;
+}
+
+void lspcon_resume(struct drm_device *dev)
+{
+	if (IS_GEN9(dev)) {
+		struct intel_lspcon *lspcon = find_active_lspcon(dev);
+
+		if (lspcon) {
+			if (lspcon_change_mode(lspcon, DRM_LSPCON_MODE_PCON,
+						true))
+				DRM_ERROR("LSPCON resume failed\n");
+			else
+				DRM_DEBUG_KMS("LSPCON resume success\n");
+		}
+	}
 }
 
 bool lspcon_init(struct intel_digital_port *intel_dig_port)
