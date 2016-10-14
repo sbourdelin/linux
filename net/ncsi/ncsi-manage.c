@@ -540,21 +540,30 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 		nd->state = ncsi_dev_state_suspend_select;
 		/* Fall through */
 	case ncsi_dev_state_suspend_select:
+		ndp->pending_req_num = 1;
+
+		nca.type = NCSI_PKT_CMD_SP;
+		nca.package = np->id;
+		nca.channel = NCSI_RESERVED_CHANNEL;
+		if (ndp->flags & NCSI_DEV_HWA)
+			nca.bytes[0] = 0;
+		else
+			nca.bytes[0] = 1;
+
+		nd->state = ncsi_dev_state_suspend_dcnt;
+
+		ret = ncsi_xmit_cmd(&nca);
+		if (ret)
+			goto error;
+
+		break;
 	case ncsi_dev_state_suspend_dcnt:
 	case ncsi_dev_state_suspend_dc:
 	case ncsi_dev_state_suspend_deselect:
 		ndp->pending_req_num = 1;
 
 		nca.package = np->id;
-		if (nd->state == ncsi_dev_state_suspend_select) {
-			nca.type = NCSI_PKT_CMD_SP;
-			nca.channel = NCSI_RESERVED_CHANNEL;
-			if (ndp->flags & NCSI_DEV_HWA)
-				nca.bytes[0] = 0;
-			else
-				nca.bytes[0] = 1;
-			nd->state = ncsi_dev_state_suspend_dcnt;
-		} else if (nd->state == ncsi_dev_state_suspend_dcnt) {
+		if (nd->state == ncsi_dev_state_suspend_dcnt) {
 			nca.type = NCSI_PKT_CMD_DCNT;
 			nca.channel = nc->id;
 			nd->state = ncsi_dev_state_suspend_dc;
@@ -570,10 +579,8 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 		}
 
 		ret = ncsi_xmit_cmd(&nca);
-		if (ret) {
-			nd->state = ncsi_dev_state_functional;
-			return;
-		}
+		if (ret)
+			goto error;
 
 		break;
 	case ncsi_dev_state_suspend_done:
@@ -587,6 +594,11 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 		netdev_warn(nd->dev, "Wrong NCSI state 0x%x in suspend\n",
 			    nd->state);
 	}
+
+	return;
+
+error:
+	nd->state = ncsi_dev_state_functional;
 }
 
 static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
