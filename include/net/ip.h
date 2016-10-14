@@ -38,7 +38,7 @@ struct sock;
 struct inet_skb_parm {
 	int			iif;
 	struct ip_options	opt;		/* Compiled IP options		*/
-	unsigned char		flags;
+	__u16			flags;
 
 #define IPSKB_FORWARDED		BIT(0)
 #define IPSKB_XFRM_TUNNEL_SIZE	BIT(1)
@@ -48,6 +48,7 @@ struct inet_skb_parm {
 #define IPSKB_DOREDIRECT	BIT(5)
 #define IPSKB_FRAG_PMTU		BIT(6)
 #define IPSKB_FRAG_SEGS		BIT(7)
+#define IPSKB_L3SLAVE		BIT(8)
 
 	u16			frag_max_size;
 };
@@ -70,6 +71,16 @@ struct ipcm_cookie {
 
 #define IPCB(skb) ((struct inet_skb_parm*)((skb)->cb))
 #define PKTINFO_SKB_CB(skb) ((struct in_pktinfo *)((skb)->cb))
+
+static inline bool inet_exact_dif_match(struct net *net, struct sk_buff *skb)
+{
+#ifdef CONFIG_NET_L3_MASTER_DEV
+	if (!net->ipv4.sysctl_tcp_l3mdev_accept &&
+	    IPCB(skb)->flags & IPSKB_L3SLAVE)
+		return true;
+#endif
+	return false;
+}
 
 struct ip_ra_chain {
 	struct ip_ra_chain __rcu *next;
