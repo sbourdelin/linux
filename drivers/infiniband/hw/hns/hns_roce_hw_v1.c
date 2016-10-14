@@ -2544,7 +2544,7 @@ int hns_roce_v1_query_qp(struct ib_qp *ibqp, struct ib_qp_attr *qp_attr,
 			       QP_CONTEXT_QPC_BYTES_144_QP_STATE_M,
 			       QP_CONTEXT_QPC_BYTES_144_QP_STATE_S);
 	tmp_qp_state = (int)to_ib_qp_state((enum hns_roce_qp_state)state);
-	if (tmp_qp_state == -1) {
+	if (tmp_qp_state == IB_QPS_ERR) {
 		dev_err(dev, "to_ib_qp_state error\n");
 		ret = -EINVAL;
 		goto out;
