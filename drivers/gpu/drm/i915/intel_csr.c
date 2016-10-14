@@ -186,7 +186,9 @@ static const struct stepping_info bxt_stepping_info[] = {
 	{'B', '0'}, {'B', '1'}, {'B', '2'}
 };
 
-static const struct stepping_info no_stepping_info = { '*', '*' };
+static const struct stepping_info no_stepping_info[] = {
+	{ '*', '*' }
+};
 
 static const struct stepping_info *
 intel_get_stepping_info(struct drm_i915_private *dev_priv)
@@ -210,7 +212,7 @@ intel_get_stepping_info(struct drm_i915_private *dev_priv)
 	if (INTEL_REVID(dev_priv) < size)
 		return si + INTEL_REVID(dev_priv);
 
-	return &no_stepping_info;
+	return no_stepping_info;
 }
 
 static void gen9_set_dc_state_debugmask(struct drm_i915_private *dev_priv)
