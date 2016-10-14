@@ -1,0 +1,6 @@
+config HV_UIO
+	tristate "Microsoft Hyper-V UIO driver"
+	depends on HYPERV_NET && UIO
+	help
+	  Userspace interface for Hyper-V VMBus.
+	  Can be used with DPDK to provide access to network device.
