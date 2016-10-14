@@ -800,6 +800,17 @@ static inline int tcp_v6_iif(const struct sk_buff *skb)
 }
 #endif
 
+/* TCP_SKB_CB reference means this can not be used from early demux */
+static inline bool inet_exact_dif_match(struct net *net, struct sk_buff *skb)
+{
+#if IS_ENABLED(CONFIG_NET_L3_MASTER_DEV)
+	if (!net->ipv4.sysctl_tcp_l3mdev_accept &&
+	    skb_l3mdev_slave4(TCP_SKB_CB(skb)->header.h4.flags))
+		return true;
+#endif
+	return false;
+}
+
 /* Due to TSO, an SKB can be composed of multiple actual
  * packets.  To keep these tracked properly, we use this.
  */
