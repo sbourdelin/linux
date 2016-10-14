@@ -388,9 +388,10 @@ ahc_delay(long usec)
 	 * multi-millisecond waits.  Wait at most
 	 * 1024us per call.
 	 */
-	while (usec > 0) {
-		udelay(usec % 1024);
-		usec -= 1024;
+	udelay(usec & 1023);
+	usec >>= 10;
+	while (--usec >= 0) {
+		udelay(1024);
 	}
 }
 
