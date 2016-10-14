@@ -161,6 +161,30 @@ static void i2c_dw_configure_master(struct platform_device *pdev)
 	
 }
 
+static void i2c_dw_configure_slave(struct platform_device *pdev)
+{
+	struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
+	
+	dev->slave_cfg = DW_IC_CON_RX_FIFO_FULL_HLD_CTRL | 
+			  DW_IC_CON_RESTART_EN | DW_IC_CON_STOP_DET_IFADDRESSED | 
+			  DW_IC_CON_SPEED_FAST;
+		  
+	dev->functionality |= I2C_FUNC_SLAVE;
+	dev->functionality &= ~I2C_FUNC_10BIT_ADDR;
+	dev_info(&pdev->dev, "I am registed as a I2C Slave!\n");
+	
+	switch (dev->clk_freq) {
+	case 100000:
+		dev->slave_cfg |= DW_IC_CON_SPEED_STD;
+		
+	case 3400000:
+		dev->slave_cfg |= DW_IC_CON_SPEED_HIGH;
+		break;
+	default:
+		dev->slave_cfg |= DW_IC_CON_SPEED_FAST;
+	}
+}
+
 static int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare)
 {
 	if (IS_ERR(i_dev->clk))
@@ -181,6 +205,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 	struct resource *mem;
 	int irq, r;
 	u32 acpi_speed, ht = 0;
+	bool is_slave = false;
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
@@ -213,6 +238,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 					 &dev->scl_falling_time);
 		device_property_read_u32(&pdev->dev, "clock-frequency",
 					 &dev->clk_freq);
+		is_slave = device_property_read_bool(&pdev->dev, "isslave");
 	}
 
 	acpi_speed = i2c_acpi_find_bus_speed(&pdev->dev);
@@ -244,8 +270,11 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 		I2C_FUNC_SMBUS_BYTE_DATA |
 		I2C_FUNC_SMBUS_WORD_DATA |
 		I2C_FUNC_SMBUS_I2C_BLOCK;
-
-	i2c_dw_configure_master(pdev);
+	
+	if (is_slave)
+		i2c_dw_configure_slave(pdev);
+	else 
+		i2c_dw_configure_master(pdev);
 
 	dev->clk = devm_clk_get(&pdev->dev, NULL);
 	if (!i2c_dw_plat_prepare_clk(dev, true)) {
