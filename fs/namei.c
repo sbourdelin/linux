@@ -1021,6 +1021,10 @@ const char *get_link(struct nameidata *nd)
 		touch_atime(&last->link);
 	}
 
+	error = -EACCES;
+	if (nd->path.mnt->mnt_flags & MNT_NOLINKS)
+		return ERR_PTR(error);
+
 	error = security_inode_follow_link(dentry, inode,
 					   nd->flags & LOOKUP_RCU);
 	if (unlikely(error))
@@ -2919,7 +2923,10 @@ static int may_open(struct path *path, int acc_mode, int flag)
 	case S_IFIFO:
 	case S_IFSOCK:
 		flag &= ~O_TRUNC;
-		break;
+		/*FALLTHRU*/
+	default:
+		if ((path->mnt->mnt_flags & MNT_NOLINKS) && inode->i_nlink > 1)
+			return -EACCES;
 	}
 
 	error = inode_permission(inode, MAY_OPEN | acc_mode);

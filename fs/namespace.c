@@ -2732,6 +2732,8 @@ long do_mount(const char *dev_name, const char __user *dir_name,
 		mnt_flags &= ~(MNT_RELATIME | MNT_NOATIME);
 	if (flags & MS_RDONLY)
 		mnt_flags |= MNT_READONLY;
+	if (flags & MS_NOLINKS)
+		mnt_flags |= MNT_NOLINKS;
 
 	/* The default atime for remount is preservation */
 	if ((flags & MS_REMOUNT) &&
@@ -2741,9 +2743,9 @@ long do_mount(const char *dev_name, const char __user *dir_name,
 		mnt_flags |= path.mnt->mnt_flags & MNT_ATIME_MASK;
 	}
 
-	flags &= ~(MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_ACTIVE | MS_BORN |
-		   MS_NOATIME | MS_NODIRATIME | MS_RELATIME| MS_KERNMOUNT |
-		   MS_STRICTATIME | MS_NOREMOTELOCK);
+	flags &= ~(MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_NOLINKS | MS_ACTIVE |
+		   MS_BORN | MS_NOATIME | MS_NODIRATIME | MS_RELATIME |
+		   MS_KERNMOUNT | MS_STRICTATIME | MS_NOREMOTELOCK);
 
 	if (flags & MS_REMOUNT)
 		retval = do_remount(&path, flags & ~MS_REMOUNT, mnt_flags,
