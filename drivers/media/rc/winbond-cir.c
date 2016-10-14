@@ -655,7 +655,7 @@ wbcir_txmask(struct rc_dev *dev, u32 mask)
 static int
 wbcir_tx(struct rc_dev *dev, unsigned *b, unsigned count)
 {
-	struct wbcir_data *data = dev->priv;
+	struct wbcir_data *data;
 	unsigned *buf;
 	unsigned i;
 	unsigned long flags;
@@ -668,6 +668,7 @@ wbcir_tx(struct rc_dev *dev, unsigned *b, unsigned count)
 	for (i = 0; i < count; i++)
 		buf[i] = DIV_ROUND_CLOSEST(b[i], 10);
 
+	data = dev->priv;
 	/* Not sure if this is possible, but better safe than sorry */
 	spin_lock_irqsave(&data->spinlock, flags);
 	if (data->txstate != WBCIR_TXSTATE_INACTIVE) {
