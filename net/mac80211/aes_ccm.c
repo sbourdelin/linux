@@ -23,13 +23,10 @@ void ieee80211_aes_ccm_encrypt(struct crypto_aead *tfm, u8 *b_0, u8 *aad,
 			       size_t mic_len)
 {
 	struct scatterlist sg[3];
+	struct aead_request *aead_req;
 
-	char aead_req_data[sizeof(struct aead_request) +
-			   crypto_aead_reqsize(tfm)]
-		__aligned(__alignof__(struct aead_request));
-	struct aead_request *aead_req = (void *) aead_req_data;
-
-	memset(aead_req, 0, sizeof(aead_req_data));
+	aead_req = kzalloc(sizeof(struct aead_request) +
+			   crypto_aead_reqsize(tfm), GFP_ATOMIC);
 
 	sg_init_table(sg, 3);
 	sg_set_buf(&sg[0], &aad[2], be16_to_cpup((__be16 *)aad));
@@ -41,6 +38,7 @@ void ieee80211_aes_ccm_encrypt(struct crypto_aead *tfm, u8 *b_0, u8 *aad,
 	aead_request_set_ad(aead_req, sg[0].length);
 
 	crypto_aead_encrypt(aead_req);
+	kfree(aead_req);
 }
 
 int ieee80211_aes_ccm_decrypt(struct crypto_aead *tfm, u8 *b_0, u8 *aad,
@@ -48,15 +46,14 @@ int ieee80211_aes_ccm_decrypt(struct crypto_aead *tfm, u8 *b_0, u8 *aad,
 			      size_t mic_len)
 {
 	struct scatterlist sg[3];
-	char aead_req_data[sizeof(struct aead_request) +
-			   crypto_aead_reqsize(tfm)]
-		__aligned(__alignof__(struct aead_request));
-	struct aead_request *aead_req = (void *) aead_req_data;
+	struct aead_request *aead_req;
+	int err;
 
 	if (data_len == 0)
 		return -EINVAL;
 
-	memset(aead_req, 0, sizeof(aead_req_data));
+	aead_req = kzalloc(sizeof(struct aead_request) +
+			   crypto_aead_reqsize(tfm), GFP_ATOMIC);
 
 	sg_init_table(sg, 3);
 	sg_set_buf(&sg[0], &aad[2], be16_to_cpup((__be16 *)aad));
@@ -67,7 +64,10 @@ int ieee80211_aes_ccm_decrypt(struct crypto_aead *tfm, u8 *b_0, u8 *aad,
 	aead_request_set_crypt(aead_req, sg, sg, data_len + mic_len, b_0);
 	aead_request_set_ad(aead_req, sg[0].length);
 
-	return crypto_aead_decrypt(aead_req);
+	err = crypto_aead_decrypt(aead_req);
+	kfree(aead_req);
+
+	return err;
 }
 
 struct crypto_aead *ieee80211_aes_key_setup_encrypt(const u8 key[],
