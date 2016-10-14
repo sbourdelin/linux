@@ -566,7 +566,7 @@ wbcir_set_carrier_report(struct rc_dev *dev, int enable)
 static int
 wbcir_txcarrier(struct rc_dev *dev, u32 carrier)
 {
-	struct wbcir_data *data = dev->priv;
+	struct wbcir_data *data;
 	unsigned long flags;
 	u8 val;
 	u32 freq;
@@ -592,6 +592,7 @@ wbcir_txcarrier(struct rc_dev *dev, u32 carrier)
 		break;
 	}
 
+	data = dev->priv;
 	spin_lock_irqsave(&data->spinlock, flags);
 	if (data->txstate != WBCIR_TXSTATE_INACTIVE) {
 		spin_unlock_irqrestore(&data->spinlock, flags);
@@ -611,7 +612,7 @@ wbcir_txcarrier(struct rc_dev *dev, u32 carrier)
 static int
 wbcir_txmask(struct rc_dev *dev, u32 mask)
 {
-	struct wbcir_data *data = dev->priv;
+	struct wbcir_data *data;
 	unsigned long flags;
 	u8 val;
 
@@ -637,6 +638,7 @@ wbcir_txmask(struct rc_dev *dev, u32 mask)
 		return -EINVAL;
 	}
 
+	data = dev->priv;
 	spin_lock_irqsave(&data->spinlock, flags);
 	if (data->txstate != WBCIR_TXSTATE_INACTIVE) {
 		spin_unlock_irqrestore(&data->spinlock, flags);
