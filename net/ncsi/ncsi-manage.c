@@ -550,11 +550,29 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 		else
 			nca.bytes[0] = 1;
 
-		nd->state = ncsi_dev_state_suspend_dcnt;
+		if (ndp->flags & NCSI_DEV_RESHUFFLE)
+			nd->state = ncsi_dev_state_suspend_gls;
+		else
+			nd->state = ncsi_dev_state_suspend_dcnt;
 
 		ret = ncsi_xmit_cmd(&nca);
 		if (ret)
 			goto error;
+
+		break;
+	case ncsi_dev_state_suspend_gls:
+		ndp->pending_req_num = np->channel_num;
+
+		nca.type = NCSI_PKT_CMD_GLS;
+		nca.package = np->id;
+		nd->state = ncsi_dev_state_suspend_dcnt;
+
+		NCSI_FOR_EACH_CHANNEL(np, nc) {
+			nca.channel = nc->id;
+			ret = ncsi_xmit_cmd(&nca);
+			if (ret)
+				goto error;
+		}
 
 		break;
 	case ncsi_dev_state_suspend_dcnt:
