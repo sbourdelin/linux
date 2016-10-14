@@ -545,8 +545,6 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 	case ncsi_dev_state_suspend_deselect:
 		ndp->pending_req_num = 1;
 
-		np = ndp->active_package;
-		nc = ndp->active_channel;
 		nca.package = np->id;
 		if (nd->state == ncsi_dev_state_suspend_select) {
 			nca.type = NCSI_PKT_CMD_SP;
