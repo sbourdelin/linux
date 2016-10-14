@@ -175,8 +175,14 @@ static int ipucsi_subdev_set_format(struct v4l2_subdev *sd,
 	} else {
 		struct v4l2_mbus_framefmt *infmt = &ipucsi->format_mbus[0];
 
-		width = infmt->width;
-		height = infmt->height;
+		if (sdformat->format.width < (infmt->width * 3 / 4))
+			width = infmt->width / 2;
+		else
+			width = infmt->width;
+		if (sdformat->format.height < (infmt->height * 3 / 4))
+			height = infmt->height / 2;
+		else
+			height = infmt->height;
 		mbusformat->field = infmt->field;
 		mbusformat->colorspace = infmt->colorspace;
 	}
@@ -237,14 +243,14 @@ static int ipucsi_subdev_s_stream(struct v4l2_subdev *sd, int enable)
 		window.width = fmt[0].width;
 		window.height = fmt[0].height;
 		ipu_csi_set_window(ipucsi->csi, &window);
+		ipu_csi_set_downsize(ipucsi->csi,
+				     fmt[0].width == 2 * fmt[1].width,
+				     fmt[0].height == 2 * fmt[1].height);
 
 		/* Is CSI data source MCT (MIPI)? */
 		mux_mct = (mbus_config.type == V4L2_MBUS_CSI2);
-
 		ipu_set_csi_src_mux(ipucsi->ipu, ipucsi->id, mux_mct);
-		if (mux_mct)
-			ipu_csi_set_mipi_datatype(ipucsi->csi, /*VC*/ 0,
-						  &fmt[0]);
+		ipu_csi_set_mipi_datatype(ipucsi->csi, /*VC*/ 0, &fmt[0]);
 
 		ret = ipu_csi_init_interface(ipucsi->csi, &mbus_config,
 					     &fmt[0]);
