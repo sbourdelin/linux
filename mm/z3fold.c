@@ -258,8 +258,7 @@ static int z3fold_compact_page(struct z3fold_header *zhdr)
 
 
 	if (!test_bit(MIDDLE_CHUNK_MAPPED, &page->private) &&
-	    zhdr->middle_chunks != 0 &&
-	    zhdr->first_chunks == 0 && zhdr->last_chunks == 0) {
+	    zhdr->middle_chunks != 0 && zhdr->first_chunks == 0) {
 		memmove(beg + ZHDR_SIZE_ALIGNED,
 			beg + (zhdr->start_middle << CHUNK_SHIFT),
 			zhdr->middle_chunks << CHUNK_SHIFT);
