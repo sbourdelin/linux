@@ -168,12 +168,6 @@ struct stepping_info {
 	char substepping;
 };
 
-static const struct stepping_info kbl_stepping_info[] = {
-	{'A', '0'}, {'B', '0'}, {'C', '0'},
-	{'D', '0'}, {'E', '0'}, {'F', '0'},
-	{'G', '0'}, {'H', '0'}, {'I', '0'},
-};
-
 static const struct stepping_info skl_stepping_info[] = {
 	{'A', '0'}, {'B', '0'}, {'C', '0'},
 	{'D', '0'}, {'E', '0'}, {'F', '0'},
@@ -197,8 +191,8 @@ intel_get_stepping_info(struct drm_i915_private *dev_priv)
 	unsigned int size;
 
 	if (IS_KABYLAKE(dev_priv)) {
-		size = ARRAY_SIZE(kbl_stepping_info);
-		si = kbl_stepping_info;
+		size = ARRAY_SIZE(no_stepping_info);
+		si = no_stepping_info;
 	} else if (IS_SKYLAKE(dev_priv)) {
 		size = ARRAY_SIZE(skl_stepping_info);
 		si = skl_stepping_info;
