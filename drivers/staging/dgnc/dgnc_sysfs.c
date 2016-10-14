@@ -90,17 +90,21 @@ void dgnc_remove_driver_sysfiles(struct pci_driver *dgnc_driver)
 	driver_remove_file(driverfs, &driver_attr_pollrate);
 }
 
-#define DGNC_VERIFY_BOARD(p, bd)				\
-	do {							\
-		if (!p)						\
-			return 0;				\
-								\
-		bd = dev_get_drvdata(p);			\
-		if (!bd || bd->magic != DGNC_BOARD_MAGIC)	\
-			return 0;				\
-		if (bd->state != BOARD_READY)			\
-			return 0;				\
-	} while (0)
+static struct dgnc_board *dgnc_get_board(struct device *p)
+{
+	struct dgnc_board *bd;
+
+	if (!p)
+		return NULL;
+
+	bd = dev_get_drvdata(p);
+	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+		return NULL;
+	if (bd->state != BOARD_READY)
+		return NULL;
+
+	return bd;
+}
 
 static ssize_t vpd_show(struct device *p, struct device_attribute *attr,
 			char *buf)
@@ -109,7 +113,9 @@ static ssize_t vpd_show(struct device *p, struct device_attribute *attr,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	bd = dgnc_get_board(p);
+	if (!bd)
+		return 0;
 
 	count += sprintf(buf + count,
 		"\n      0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F");
@@ -130,7 +136,9 @@ static ssize_t serial_number_show(struct device *p,
 	struct dgnc_board *bd;
 	int count = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	bd = dgnc_get_board(p);
+	if (!bd)
+		return 0;
 
 	if (bd->serial_num[0] == '\0')
 		count += sprintf(buf + count, "<UNKNOWN>\n");
@@ -148,7 +156,9 @@ static ssize_t ports_state_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	bd = dgnc_get_board(p);
+	if (!bd)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count,
@@ -166,7 +176,9 @@ static ssize_t ports_baud_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	bd = dgnc_get_board(p);
+	if (!bd)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count +=  snprintf(buf + count, PAGE_SIZE - count,
@@ -184,7 +196,9 @@ static ssize_t ports_msignals_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	bd = dgnc_get_board(p);
+	if (!bd)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		struct channel_t *ch = bd->channels[i];
@@ -215,7 +229,9 @@ static ssize_t ports_iflag_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	bd = dgnc_get_board(p);
+	if (!bd)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %x\n",
@@ -233,7 +249,9 @@ static ssize_t ports_cflag_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	bd = dgnc_get_board(p);
+	if (!bd)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %x\n",
@@ -251,7 +269,9 @@ static ssize_t ports_oflag_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	bd = dgnc_get_board(p);
+	if (!bd)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %x\n",
@@ -269,7 +289,9 @@ static ssize_t ports_lflag_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	bd = dgnc_get_board(p);
+	if (!bd)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %x\n",
@@ -287,7 +309,9 @@ static ssize_t ports_digi_flag_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	bd = dgnc_get_board(p);
+	if (!bd)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %x\n",
@@ -305,7 +329,9 @@ static ssize_t ports_rxcount_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	bd = dgnc_get_board(p);
+	if (!bd)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %ld\n",
@@ -323,7 +349,9 @@ static ssize_t ports_txcount_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	bd = dgnc_get_board(p);
+	if (!bd)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %ld\n",
