@@ -81,6 +81,8 @@ static void __iomem **pcc_doorbell_ack_vaddr;
 static int *pcc_doorbell_irq;
 
 static struct mbox_controller pcc_mbox_ctrl = {};
+static DEFINE_MUTEX(pcc_con_mutex);
+
 /**
  * get_pcc_channel - Given a PCC subspace idx, get
  *	the respective mbox_channel.
@@ -243,6 +245,7 @@ struct mbox_chan *pcc_mbox_request_channel(struct mbox_client *cl,
 	struct mbox_chan *chan;
 	unsigned long flags;
 
+	mutex_lock(&pcc_con_mutex);
 	/*
 	 * Each PCC Subspace is a Mailbox Channel.
 	 * The PCC Clients get their PCC Subspace ID
@@ -254,6 +257,7 @@ struct mbox_chan *pcc_mbox_request_channel(struct mbox_client *cl,
 
 	if (IS_ERR(chan) || chan->cl) {
 		dev_err(dev, "Channel not found for idx: %d\n", subspace_id);
+		mutex_unlock(&pcc_con_mutex);
 		return ERR_PTR(-EBUSY);
 	}
 
@@ -267,6 +271,8 @@ struct mbox_chan *pcc_mbox_request_channel(struct mbox_client *cl,
 	if (chan->txdone_method == TXDONE_BY_POLL && cl->knows_txdone)
 		chan->txdone_method |= TXDONE_BY_ACK;
 
+	spin_unlock_irqrestore(&chan->lock, flags);
+
 	if (pcc_doorbell_irq[subspace_id] > 0) {
 		int rc;
 
@@ -279,7 +285,7 @@ struct mbox_chan *pcc_mbox_request_channel(struct mbox_client *cl,
 		}
 	}
 
-	spin_unlock_irqrestore(&chan->lock, flags);
+	mutex_unlock(&pcc_con_mutex);
 
 	return chan;
 }
