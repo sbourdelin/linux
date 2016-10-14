@@ -23,3 +23,70 @@ capture-subsystem {
         compatible = "fsl,imx-capture-subsystem";
         ports = <&ipu1_csi0>, <&ipu1_csi1>, <&ipu2_csi0>, <&ipu2_csi1>;
 };
+
+i.MX MIPI CSI-2 Host Controller
+===============================
+
+The i.MX6 contains an implementation of a Synopsys DesignWare MIPI CSI-2 host
+controller combined with a CSI2IPU gasket that distributes the virtual channels
+to up to four IPUv3 CSIs.
+
+Required properties:
+- compatible: should be "fsl,imx6q-mipi-csi2", "snps,dw-mipi-csi2"
+- reg: should be register base and length as documented in the SoC
+  reference manual
+- clocks: should contain the pclk, cfg, ref, and pixel clocks, in the
+  order determined by the clock-names property.
+- clock-names: should be "pclk", "cfg", "ref", "pixel"
+- address-cells: should be 1
+- size-cells: should be 0
+- port@*: five port nodes using of_graph bindings, one input port and four
+  output ports corresponding to the virtual channels.
+
+Example:
+
+mipi_csi: mipi@021dc000 {
+	compatible = "fsl,imx6q-mipi-csi2", "snps,dw-mipi-csi2";
+	reg = <0x021dc000 0x4000>;
+	clocks = <&clks IMX6QDL_CLK_HSI_TX>, <&clks IMX6QDL_CLK_HSI_TX>,
+		 <&clks IMX6QDL_CLK_HSI_TX>, <&clks IMX6QDL_CLK_EIM_PODF>;
+	clock-names = "pclk", "cfg", "ref", "pixel";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	port@0 {
+		reg = <0>;
+	};
+
+	port@1 {
+		reg = <1>;
+
+		vc0: endpoint {
+			remote-endpoint = <&csi0_in>;
+		};
+	};
+
+	port@2 {
+		reg = <2>;
+
+		vc1: endpoint {
+			remote-endpoint = <&csi1_in>;
+		};
+	};
+
+	port@3 {
+		reg = <3>;
+
+		vc2: endpoint {
+			remote-endpoint = <&csi2_in>;
+		};
+	};
+
+	port@4 {
+		reg = <4>;
+
+		vc3: endpoint {
+			remote-endpoint = <&csi3_in>;
+		};
+	};
+};
