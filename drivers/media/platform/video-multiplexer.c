@@ -138,6 +138,7 @@ static int vidsw_async_init(struct vidsw *vidsw, struct device_node *node)
 		vidsw->pads[i].flags = MEDIA_PAD_FL_SINK;
 	vidsw->pads[numports - 1].flags = MEDIA_PAD_FL_SOURCE;
 
+	vidsw->subdev.entity.function = MEDIA_ENT_F_MUX;
 	ret = media_entity_pads_init(&vidsw->subdev.entity, numports,
 				     vidsw->pads);
 	if (ret < 0)
