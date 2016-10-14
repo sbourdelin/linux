@@ -702,17 +702,17 @@ wbcir_shutdown(struct pnp_dev *device)
 	bool do_wake = true;
 	u8 match[11];
 	u8 mask[11];
-	u8 rc6_csl = 0;
+	u8 rc6_csl;
 	int i;
-
-	memset(match, 0, sizeof(match));
-	memset(mask, 0, sizeof(mask));
 
 	if (wake_sc == INVALID_SCANCODE || !device_may_wakeup(dev)) {
 		do_wake = false;
 		goto finish;
 	}
 
+	rc6_csl = 0;
+	memset(match, 0, sizeof(match));
+	memset(mask, 0, sizeof(mask));
 	switch (protocol) {
 	case IR_PROTOCOL_RC5:
 		if (wake_sc > 0xFFF) {
