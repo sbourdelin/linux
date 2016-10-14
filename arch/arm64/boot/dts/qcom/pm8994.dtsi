@@ -51,6 +51,14 @@
 				     <0 0xa6 0 IRQ_TYPE_NONE>,
 				     <0 0xa7 0 IRQ_TYPE_NONE>;
 		};
+
+		qcom,reboot-mode@88f {
+			compatible = "qcom,reboot-mode";
+			offset = <0x88f>;
+			mode-normal = <0x00>;
+			mode-recovery = <0x04>;
+			mode-bootloader = <0x08>;
+		};
 	};
 
 	pmic@1 {
