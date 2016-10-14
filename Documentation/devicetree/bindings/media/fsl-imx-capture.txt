@@ -1,0 +1,25 @@
+Freescale i.MX IPUv3 capture subsystem
+======================================
+
+The i.MX5/6 IPUv3 capture subsystem consists of one or two IPUs and all
+external subdevices connected to the IPU CSI input ports. On i.MX5 these
+are only external subdevices. On i.MX6, there are additional SoC internal
+multiplexers and a MIPI CSI-2 bridge connected to the CSI input ports via
+of_graph bindings.
+
+On i.MX6 variants with two IPUs, either a single capture subsystem node may be
+defined, containing all CSI ports, or two separate capture subsystem nodes may
+be defined, each containing the CSI ports of a single IPU. In the latter case
+there must be no external of_graph links between the two subsystems.
+
+Required properties:
+- compatible: should be "fsl,imx-capture-subsystem"
+- ports: should contain a list of phandles pointing to the capture interface
+  ports of IPU devices
+
+Example:
+
+capture-subsystem {
+        compatible = "fsl,imx-capture-subsystem";
+        ports = <&ipu1_csi0>, <&ipu1_csi1>, <&ipu2_csi0>, <&ipu2_csi1>;
+};
