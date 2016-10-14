@@ -35,6 +35,7 @@ static inline void indy_sc_wipe(unsigned long first, unsigned long last)
 	".set\tnoreorder\n\t"
 	".set\tmips3\n\t"
 	".set\tnoat\n\t"
+	".set\tgp=64\n\t"
 	"mfc0\t%2, $12\n\t"
 	"li\t$1, 0x80\t\t\t# Go 64 bit\n\t"
 	"mtc0\t$1, $12\n\t"
