@@ -29,6 +29,7 @@ struct lwtunnel_state {
 	int		(*orig_input)(struct sk_buff *);
 	int             len;
 	__u16		headroom;
+	struct		rcu_head rcu;
 	__u8            data[0];
 };
 
@@ -43,13 +44,11 @@ struct lwtunnel_encap_ops {
 	int (*get_encap_size)(struct lwtunnel_state *lwtstate);
 	int (*cmp_encap)(struct lwtunnel_state *a, struct lwtunnel_state *b);
 	int (*xmit)(struct sk_buff *skb);
+	void (*destroy_state)(struct lwtunnel_state *lws);
 };
 
 #ifdef CONFIG_LWTUNNEL
-static inline void lwtstate_free(struct lwtunnel_state *lws)
-{
-	kfree(lws);
-}
+void lwtstate_free(struct lwtunnel_state *lws);
 
 static inline struct lwtunnel_state *
 lwtstate_get(struct lwtunnel_state *lws)
