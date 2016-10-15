@@ -26,6 +26,7 @@
 #include <linux/file.h>
 #include <linux/syscalls.h>
 #include <linux/cgroup.h>
+#include <linux/cn_proc.h>
 
 static struct kmem_cache *nsproxy_cachep;
 
@@ -239,6 +240,7 @@ SYSCALL_DEFINE2(setns, int, fd, int, nstype)
 	struct nsproxy *new_nsproxy;
 	struct file *file;
 	struct ns_common *ns;
+	struct ns_event_prepare ns_event;
 	int err;
 
 	file = proc_ns_fget(fd);
@@ -249,6 +251,8 @@ SYSCALL_DEFINE2(setns, int, fd, int, nstype)
 	ns = get_proc_ns(file_inode(file));
 	if (nstype && (ns->ops->type != nstype))
 		goto out;
+
+	proc_ns_connector_prepare(&ns_event, PROC_NS_REASON_SETNS);
 
 	new_nsproxy = create_new_namespaces(0, tsk, current_user_ns(), tsk->fs);
 	if (IS_ERR(new_nsproxy)) {
@@ -262,6 +266,8 @@ SYSCALL_DEFINE2(setns, int, fd, int, nstype)
 		goto out;
 	}
 	switch_task_namespaces(tsk, new_nsproxy);
+
+	proc_ns_connector_send(&ns_event, current);
 out:
 	fput(file);
 	return err;

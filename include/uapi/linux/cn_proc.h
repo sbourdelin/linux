@@ -55,7 +55,8 @@ struct proc_event {
 		PROC_EVENT_SID  = 0x00000080,
 		PROC_EVENT_PTRACE = 0x00000100,
 		PROC_EVENT_COMM = 0x00000200,
-		/* "next" should be 0x00000400 */
+		PROC_EVENT_NS   = 0x00000400,
+		/* "next" should be 0x00000800 */
 		/* "last" is the last process event: exit,
 		 * while "next to last" is coredumping event */
 		PROC_EVENT_COREDUMP = 0x40000000,
@@ -111,6 +112,26 @@ struct proc_event {
 			__kernel_pid_t process_tgid;
 			char           comm[16];
 		} comm;
+
+		/* There are 7 kind of namespaces */
+		#define MAX_NS_PROC_EVENT_COUNT 7
+		struct ns_proc_event {
+			__kernel_pid_t process_pid;
+			__kernel_pid_t process_tgid;
+			enum reason {
+				PROC_NS_REASON_CLONE   = 0x00000001,
+				PROC_NS_REASON_SETNS   = 0x00000002,
+				PROC_NS_REASON_UNSHARE = 0x00000003,
+				PROC_NS_REASON_LAST    = 0x80000000,
+			} reason;
+			__u32 count;
+			struct {
+				__u32 type;   /* CLONE_NEWNS, CLONE_NEWPID, ... */
+				__u32 flags;  /* unused */
+				__u64 old_inum;
+				__u64 inum;
+			} items[MAX_NS_PROC_EVENT_COUNT];
+		} ns;
 
 		struct coredump_proc_event {
 			__kernel_pid_t process_pid;

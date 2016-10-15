@@ -1905,6 +1905,7 @@ long _do_fork(unsigned long clone_flags,
 	struct task_struct *p;
 	int trace = 0;
 	long nr;
+	struct ns_event_prepare ns_event;
 
 	/*
 	 * Determine whether and which event to report to ptracer.  When
@@ -1924,8 +1925,11 @@ long _do_fork(unsigned long clone_flags,
 			trace = 0;
 	}
 
+	proc_ns_connector_prepare(&ns_event, PROC_NS_REASON_CLONE);
 	p = copy_process(clone_flags, stack_start, stack_size,
 			 child_tidptr, NULL, trace, tls, NUMA_NO_NODE);
+	proc_ns_connector_send(&ns_event, p);
+
 	/*
 	 * Do this prior waking up the new thread - the thread pointer
 	 * might get invalid after that point, if the thread exits quickly.
@@ -2170,6 +2174,7 @@ SYSCALL_DEFINE1(unshare, unsigned long, unshare_flags)
 	struct nsproxy *new_nsproxy = NULL;
 	int do_sysvsem = 0;
 	int err;
+	struct ns_event_prepare ns_event;
 
 	/*
 	 * If unsharing a user namespace must also unshare the thread group
@@ -2196,6 +2201,9 @@ SYSCALL_DEFINE1(unshare, unsigned long, unshare_flags)
 	err = check_unshare_flags(unshare_flags);
 	if (err)
 		goto bad_unshare_out;
+
+	proc_ns_connector_prepare(&ns_event, PROC_NS_REASON_UNSHARE);
+
 	/*
 	 * CLONE_NEWIPC must also detach from the undolist: after switching
 	 * to a new ipc namespace, the semaphore arrays from the old
@@ -2260,6 +2268,8 @@ SYSCALL_DEFINE1(unshare, unsigned long, unshare_flags)
 			new_cred = NULL;
 		}
 	}
+
+	proc_ns_connector_send(&ns_event, current);
 
 bad_unshare_cleanup_cred:
 	if (new_cred)

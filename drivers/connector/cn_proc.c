@@ -30,8 +30,13 @@
 #include <linux/ptrace.h>
 #include <linux/atomic.h>
 #include <linux/pid_namespace.h>
+#include <linux/ipc_namespace.h>
+#include <linux/utsname.h>
+#include <net/net_namespace.h>
+#include <linux/mnt_namespace.h>
 
 #include <linux/cn_proc.h>
+#include <linux/proc_ns.h>
 
 /*
  * Size of a cn_msg followed by a proc_event structure.  Since the
@@ -288,6 +293,139 @@ void proc_exit_connector(struct task_struct *task)
 	ev->event_data.exit.process_tgid = task->tgid;
 	ev->event_data.exit.exit_code = task->exit_code;
 	ev->event_data.exit.exit_signal = task->exit_signal;
+
+	memcpy(&msg->id, &cn_proc_event_id, sizeof(msg->id));
+	msg->ack = 0; /* not used */
+	msg->len = sizeof(*ev);
+	msg->flags = 0; /* not used */
+	send_msg(msg);
+}
+
+void proc_ns_connector_prepare(struct ns_event_prepare *prepare, u16 reason)
+{
+	struct nsproxy *ns = current->nsproxy;
+	struct ns_common *mntns;
+
+	prepare->num_listeners = atomic_read(&proc_event_num_listeners);
+
+	if (prepare->num_listeners < 1)
+		return;
+
+	prepare->reason = reason;
+
+	prepare->user_inum = current->cred->user_ns->ns.inum;
+	prepare->uts_inum = ns->uts_ns->ns.inum;
+	prepare->ipc_inum = ns->ipc_ns->ns.inum;
+
+	mntns = mntns_operations.get(current);
+	if (mntns) {
+		prepare->mnt_inum = mntns->inum;
+		mntns_operations.put(mntns);
+	} else
+		prepare->mnt_inum = 0;
+
+	prepare->pid_inum = ns->pid_ns_for_children->ns.inum;
+	prepare->net_inum = ns->net_ns->ns.inum;
+	prepare->cgroup_inum = ns->cgroup_ns->ns.inum;
+}
+
+void proc_ns_connector_send(struct ns_event_prepare *prepare, struct task_struct *task)
+{
+	struct nsproxy *ns = task->nsproxy;
+	struct ns_common *mntns;
+	struct cn_msg *msg;
+	struct proc_event *ev;
+	__u8 buffer[CN_PROC_MSG_SIZE] __aligned(8);
+	int count;
+
+	if (prepare->num_listeners < 1)
+		return;
+
+	if (atomic_read(&proc_event_num_listeners) < 1)
+		return;
+
+	msg = buffer_to_cn_msg(buffer);
+	ev = (struct proc_event *)msg->data;
+	memset(&ev->event_data, 0, sizeof(ev->event_data));
+	ev->timestamp_ns = ktime_get_ns();
+	ev->what = PROC_EVENT_NS;
+
+	ev->event_data.ns.process_pid  = task->pid;
+	ev->event_data.ns.process_tgid = task->tgid;
+	ev->event_data.ns.reason = prepare->reason;
+	count = 0;
+
+	/* user */
+	if (prepare->user_inum != task->cred->user_ns->ns.inum) {
+		ev->event_data.ns.items[count].type = CLONE_NEWUSER;
+		ev->event_data.ns.items[count].flags = 0;
+		ev->event_data.ns.items[count].old_inum = prepare->user_inum;
+		ev->event_data.ns.items[count].inum = task->cred->user_ns->ns.inum;
+		count++;
+	}
+
+	/* uts */
+	if (prepare->uts_inum != ns->uts_ns->ns.inum) {
+		ev->event_data.ns.items[count].type = CLONE_NEWUTS;
+		ev->event_data.ns.items[count].flags = 0;
+		ev->event_data.ns.items[count].old_inum = prepare->uts_inum;
+		ev->event_data.ns.items[count].inum = ns->uts_ns->ns.inum;
+		count++;
+	}
+
+	/* ipc */
+	if (prepare->ipc_inum != ns->ipc_ns->ns.inum) {
+		ev->event_data.ns.items[count].type = CLONE_NEWIPC;
+		ev->event_data.ns.items[count].flags = 0;
+		ev->event_data.ns.items[count].old_inum = prepare->ipc_inum;
+		ev->event_data.ns.items[count].inum = ns->ipc_ns->ns.inum;
+		count++;
+	}
+
+	/* mnt */
+	mntns = mntns_operations.get(task);
+	if (mntns) {
+		if (mntns && prepare->mnt_inum != mntns->inum) {
+			ev->event_data.ns.items[count].type = CLONE_NEWNS;
+			ev->event_data.ns.items[count].flags = 0;
+			ev->event_data.ns.items[count].old_inum = prepare->mnt_inum;
+			ev->event_data.ns.items[count].inum = mntns->inum;
+			count++;
+		}
+		mntns_operations.put(mntns);
+	}
+
+	/* pid */
+	if (prepare->pid_inum != ns->pid_ns_for_children->ns.inum) {
+		ev->event_data.ns.items[count].type = CLONE_NEWPID;
+		ev->event_data.ns.items[count].flags = 0;
+		ev->event_data.ns.items[count].old_inum = prepare->pid_inum;
+		ev->event_data.ns.items[count].inum = ns->pid_ns_for_children->ns.inum;
+		count++;
+	}
+
+	/* net */
+	if (prepare->net_inum != ns->net_ns->ns.inum) {
+		ev->event_data.ns.items[count].type = CLONE_NEWNET;
+		ev->event_data.ns.items[count].flags = 0;
+		ev->event_data.ns.items[count].old_inum = prepare->net_inum;
+		ev->event_data.ns.items[count].inum = ns->net_ns->ns.inum;
+		count++;
+	}
+
+	/* cgroup */
+	if (prepare->cgroup_inum != ns->cgroup_ns->ns.inum) {
+		ev->event_data.ns.items[count].type = CLONE_NEWNET;
+		ev->event_data.ns.items[count].flags = 0;
+		ev->event_data.ns.items[count].old_inum = prepare->cgroup_inum;
+		ev->event_data.ns.items[count].inum = ns->cgroup_ns->ns.inum;
+		count++;
+	}
+
+	if (count == 0)
+		return;
+
+	ev->event_data.ns.count = count;
 
 	memcpy(&msg->id, &cn_proc_event_id, sizeof(msg->id));
 	msg->ack = 0; /* not used */

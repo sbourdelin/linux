@@ -19,6 +19,20 @@
 
 #include <uapi/linux/cn_proc.h>
 
+struct ns_event_prepare {
+	int num_listeners;
+
+	u16 reason;
+
+	u64 user_inum;
+	u64 uts_inum;
+	u64 ipc_inum;
+	u64 mnt_inum;
+	u64 pid_inum;
+	u64 net_inum;
+	u64 cgroup_inum;
+};
+
 #ifdef CONFIG_PROC_EVENTS
 void proc_fork_connector(struct task_struct *task);
 void proc_exec_connector(struct task_struct *task);
@@ -28,6 +42,9 @@ void proc_ptrace_connector(struct task_struct *task, int which_id);
 void proc_comm_connector(struct task_struct *task);
 void proc_coredump_connector(struct task_struct *task);
 void proc_exit_connector(struct task_struct *task);
+
+void proc_ns_connector_prepare(struct ns_event_prepare *prepare, u16 reason);
+void proc_ns_connector_send(struct ns_event_prepare *prepare, struct task_struct *task);
 #else
 static inline void proc_fork_connector(struct task_struct *task)
 {}
@@ -53,6 +70,14 @@ static inline void proc_coredump_connector(struct task_struct *task)
 {}
 
 static inline void proc_exit_connector(struct task_struct *task)
+{}
+
+static inline void proc_ns_connector_prepare(struct ns_event_prepare *prepare,
+					     u16 reason)
+{}
+
+static inline void proc_ns_connector_send(struct ns_event_prepare *prepare,
+					  struct task_struct *task)
 {}
 #endif	/* CONFIG_PROC_EVENTS */
 #endif	/* CN_PROC_H */
