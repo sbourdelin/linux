@@ -46,10 +46,13 @@ struct crypto_ccm_req_priv_ctx {
 	u8 odata[16];
 	u8 idata[16];
 	u8 auth_tag[16];
+	u8 cmac[16];
 	u32 ilen;
 	u32 flags;
-	struct scatterlist src[3];
-	struct scatterlist dst[3];
+	struct scatterlist *src;
+	struct scatterlist *dst;
+	struct scatterlist srcbuf[2];
+	struct scatterlist dstbuf[2];
 	struct skcipher_request skreq;
 };
 
@@ -280,6 +283,8 @@ static int crypto_ccm_auth(struct aead_request *req, struct scatterlist *plain,
 	if (cryptlen)
 		get_data_to_compute(cipher, pctx, plain, cryptlen);
 
+	crypto_xor(odata, pctx->cmac, 16);
+
 out:
 	return err;
 }
@@ -307,10 +312,12 @@ static inline int crypto_ccm_check_iv(const u8 *iv)
 	return 0;
 }
 
-static int crypto_ccm_init_crypt(struct aead_request *req, u8 *tag)
+static int crypto_ccm_init_crypt(struct aead_request *req)
 {
+	struct crypto_aead *aead = crypto_aead_reqtfm(req);
+	struct crypto_ccm_ctx *ctx = crypto_aead_ctx(aead);
 	struct crypto_ccm_req_priv_ctx *pctx = crypto_ccm_reqctx(req);
-	struct scatterlist *sg;
+	struct crypto_cipher *cipher = ctx->cipher;
 	u8 *iv = req->iv;
 	int err;
 
@@ -325,19 +332,16 @@ static int crypto_ccm_init_crypt(struct aead_request *req, u8 *tag)
 	 */
 	memset(iv + 15 - iv[0], 0, iv[0] + 1);
 
-	sg_init_table(pctx->src, 3);
-	sg_set_buf(pctx->src, tag, 16);
-	sg = scatterwalk_ffwd(pctx->src + 1, req->src, req->assoclen);
-	if (sg != pctx->src + 1)
-		sg_chain(pctx->src, 2, sg);
+	/* prepare the key stream for the auth tag  */
+	crypto_cipher_encrypt_one(cipher, pctx->cmac, iv);
 
-	if (req->src != req->dst) {
-		sg_init_table(pctx->dst, 3);
-		sg_set_buf(pctx->dst, tag, 16);
-		sg = scatterwalk_ffwd(pctx->dst + 1, req->dst, req->assoclen);
-		if (sg != pctx->dst + 1)
-			sg_chain(pctx->dst, 2, sg);
-	}
+	/* increment BE counter in IV[] for the actual payload */
+	iv[15] = 1;
+
+	pctx->src = scatterwalk_ffwd(pctx->srcbuf, req->src, req->assoclen);
+	if (req->src != req->dst)
+		pctx->dst = scatterwalk_ffwd(pctx->dstbuf, req->dst,
+					     req->assoclen);
 
 	return 0;
 }
@@ -354,11 +358,11 @@ static int crypto_ccm_encrypt(struct aead_request *req)
 	u8 *iv = req->iv;
 	int err;
 
-	err = crypto_ccm_init_crypt(req, odata);
+	err = crypto_ccm_init_crypt(req);
 	if (err)
 		return err;
 
-	err = crypto_ccm_auth(req, sg_next(pctx->src), cryptlen);
+	err = crypto_ccm_auth(req, pctx->src, cryptlen);
 	if (err)
 		return err;
 
@@ -369,13 +373,13 @@ static int crypto_ccm_encrypt(struct aead_request *req)
 	skcipher_request_set_tfm(skreq, ctx->ctr);
 	skcipher_request_set_callback(skreq, pctx->flags,
 				      crypto_ccm_encrypt_done, req);
-	skcipher_request_set_crypt(skreq, pctx->src, dst, cryptlen + 16, iv);
+	skcipher_request_set_crypt(skreq, pctx->src, dst, cryptlen, iv);
 	err = crypto_skcipher_encrypt(skreq);
 	if (err)
 		return err;
 
 	/* copy authtag to end of dst */
-	scatterwalk_map_and_copy(odata, sg_next(dst), cryptlen,
+	scatterwalk_map_and_copy(odata, dst, cryptlen,
 				 crypto_aead_authsize(aead), 1);
 	return err;
 }
@@ -392,7 +396,7 @@ static void crypto_ccm_decrypt_done(struct crypto_async_request *areq,
 
 	pctx->flags = 0;
 
-	dst = sg_next(req->src == req->dst ? pctx->src : pctx->dst);
+	dst = req->src == req->dst ? pctx->src : pctx->dst;
 
 	if (!err) {
 		err = crypto_ccm_auth(req, dst, cryptlen);
@@ -418,12 +422,11 @@ static int crypto_ccm_decrypt(struct aead_request *req)
 
 	cryptlen -= authsize;
 
-	err = crypto_ccm_init_crypt(req, authtag);
+	err = crypto_ccm_init_crypt(req);
 	if (err)
 		return err;
 
-	scatterwalk_map_and_copy(authtag, sg_next(pctx->src), cryptlen,
-				 authsize, 0);
+	scatterwalk_map_and_copy(authtag, pctx->src, cryptlen, authsize, 0);
 
 	dst = pctx->src;
 	if (req->src != req->dst)
@@ -432,12 +435,12 @@ static int crypto_ccm_decrypt(struct aead_request *req)
 	skcipher_request_set_tfm(skreq, ctx->ctr);
 	skcipher_request_set_callback(skreq, pctx->flags,
 				      crypto_ccm_decrypt_done, req);
-	skcipher_request_set_crypt(skreq, pctx->src, dst, cryptlen + 16, iv);
+	skcipher_request_set_crypt(skreq, pctx->src, dst, cryptlen, iv);
 	err = crypto_skcipher_decrypt(skreq);
 	if (err)
 		return err;
 
-	err = crypto_ccm_auth(req, sg_next(dst), cryptlen);
+	err = crypto_ccm_auth(req, dst, cryptlen);
 	if (err)
 		return err;
 
