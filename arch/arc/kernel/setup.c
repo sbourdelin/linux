@@ -494,8 +494,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 	free_page((unsigned long)str);
 done:
-	seq_printf(m, "\n");
-
+	seq_putc(m, '\n');
 	return 0;
 }
 
