@@ -87,6 +87,7 @@ struct acpi_pci_link {
 
 static LIST_HEAD(acpi_link_list);
 static DEFINE_MUTEX(acpi_link_lock);
+static int sci_irq = -1, sci_penalty;
 
 /* --------------------------------------------------------------------------
                             PCI Link Device Management
@@ -494,10 +495,15 @@ static int acpi_irq_pci_sharing_penalty(int irq)
 
 static int acpi_irq_get_penalty(int irq)
 {
-	if (irq < ACPI_MAX_ISA_IRQS)
-		return acpi_isa_irq_penalty[irq];
+	int penalty = 0;
 
-	return acpi_irq_pci_sharing_penalty(irq);
+	if (irq == sci_irq)
+		penalty += sci_penalty;
+
+	if (irq < ACPI_MAX_ISA_IRQS)
+		return penalty + acpi_isa_irq_penalty[irq];
+
+	return penalty + acpi_irq_pci_sharing_penalty(irq);
 }
 
 int __init acpi_irq_penalty_init(void)
@@ -870,13 +876,13 @@ bool acpi_isa_irq_available(int irq)
 
 void acpi_penalize_sci_irq(int irq, int trigger, int polarity)
 {
-	if (irq >= 0 && irq < ARRAY_SIZE(acpi_isa_irq_penalty)) {
-		if (trigger != ACPI_MADT_TRIGGER_LEVEL ||
-		    polarity != ACPI_MADT_POLARITY_ACTIVE_LOW)
-			acpi_isa_irq_penalty[irq] += PIRQ_PENALTY_ISA_ALWAYS;
-		else
-			acpi_isa_irq_penalty[irq] += PIRQ_PENALTY_PCI_USING;
-	}
+	sci_irq = irq;
+
+	if (trigger == ACPI_MADT_TRIGGER_LEVEL &&
+	    polarity == ACPI_MADT_POLARITY_ACTIVE_LOW)
+		sci_penalty = PIRQ_PENALTY_PCI_USING;
+	else
+		sci_penalty = PIRQ_PENALTY_ISA_ALWAYS;
 }
 
 /*
