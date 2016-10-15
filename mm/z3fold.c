@@ -580,6 +580,7 @@ next:
 		if ((test_bit(PAGE_HEADLESS, &page->private) && ret == 0) ||
 		    (zhdr->first_chunks == 0 && zhdr->last_chunks == 0 &&
 		     zhdr->middle_chunks == 0)) {
+			spin_unlock(&pool->lock);
 			/*
 			 * All buddies are now free, free the z3fold page and
 			 * return success.
@@ -587,7 +588,6 @@ next:
 			clear_bit(PAGE_HEADLESS, &page->private);
 			free_z3fold_page(zhdr);
 			atomic64_dec(&pool->pages_nr);
-			spin_unlock(&pool->lock);
 			return 0;
 		}  else if (!test_bit(PAGE_HEADLESS, &page->private)) {
 			if (zhdr->first_chunks != 0 &&
@@ -629,7 +629,6 @@ static void *z3fold_map(struct z3fold_pool *pool, unsigned long handle)
 	void *addr;
 	enum buddy buddy;
 
-	spin_lock(&pool->lock);
 	zhdr = handle_to_z3fold_header(handle);
 	addr = zhdr;
 	page = virt_to_page(zhdr);
@@ -656,7 +655,6 @@ static void *z3fold_map(struct z3fold_pool *pool, unsigned long handle)
 		break;
 	}
 out:
-	spin_unlock(&pool->lock);
 	return addr;
 }
 
@@ -671,19 +669,14 @@ static void z3fold_unmap(struct z3fold_pool *pool, unsigned long handle)
 	struct page *page;
 	enum buddy buddy;
 
-	spin_lock(&pool->lock);
 	zhdr = handle_to_z3fold_header(handle);
 	page = virt_to_page(zhdr);
 
-	if (test_bit(PAGE_HEADLESS, &page->private)) {
-		spin_unlock(&pool->lock);
-		return;
+	if (!test_bit(PAGE_HEADLESS, &page->private)) {
+		buddy = handle_to_buddy(handle);
+		if (buddy == MIDDLE)
+			clear_bit(MIDDLE_CHUNK_MAPPED, &page->private);
 	}
-
-	buddy = handle_to_buddy(handle);
-	if (buddy == MIDDLE)
-		clear_bit(MIDDLE_CHUNK_MAPPED, &page->private);
-	spin_unlock(&pool->lock);
 }
 
 /**
