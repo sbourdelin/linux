@@ -2125,7 +2125,7 @@ static struct device **scan_labels(struct nd_region *nd_region)
 
 		devs = kcalloc(2, sizeof(dev), GFP_KERNEL);
 		if (!devs)
-			goto err;
+			goto err_ret;
 		if (is_nd_blk(&nd_region->dev)) {
 			struct nd_namespace_blk *nsblk;
 
@@ -2182,6 +2182,7 @@ static struct device **scan_labels(struct nd_region *nd_region)
 		else
 			namespace_pmem_release(devs[i]);
 	kfree(devs);
+ err_ret:
 	return NULL;
 }
 
