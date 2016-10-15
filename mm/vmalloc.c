@@ -613,82 +613,44 @@ void set_iounmap_nonlazy(void)
 	atomic_set(&vmap_lazy_nr, lazy_max_pages()+1);
 }
 
-/*
- * Purges all lazily-freed vmap areas.
- *
- * If sync is 0 then don't purge if there is already a purge in progress.
- * If force_flush is 1, then flush kernel TLBs between *start and *end even
- * if we found no lazy vmap areas to unmap (callers can use this to optimise
- * their own TLB flushing).
- * Returns with *start = min(*start, lowest purged address)
- *              *end = max(*end, highest purged address)
- */
-static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
-					int sync, int force_flush)
+static bool __purge_vmap_area_lazy(unsigned long start, unsigned long end)
 {
-	static DEFINE_SPINLOCK(purge_lock);
 	struct llist_node *valist;
 	struct vmap_area *va;
 	struct vmap_area *n_va;
 	int nr = 0;
 
-	/*
-	 * If sync is 0 but force_flush is 1, we'll go sync anyway but callers
-	 * should not expect such behaviour. This just simplifies locking for
-	 * the case that isn't actually used at the moment anyway.
-	 */
-	if (!sync && !force_flush) {
-		if (!spin_trylock(&purge_lock))
-			return;
-	} else
-		spin_lock(&purge_lock);
-
-	if (sync)
-		purge_fragmented_blocks_allcpus();
-
 	valist = llist_del_all(&vmap_purge_list);
 	llist_for_each_entry(va, valist, purge_list) {
-		if (va->va_start < *start)
-			*start = va->va_start;
-		if (va->va_end > *end)
-			*end = va->va_end;
+		if (va->va_start < start)
+			start = va->va_start;
+		if (va->va_end > end)
+			end = va->va_end;
 		nr += (va->va_end - va->va_start) >> PAGE_SHIFT;
 	}
 
-	if (nr)
-		atomic_sub(nr, &vmap_lazy_nr);
+	if (!nr)
+		return false;
 
-	if (nr || force_flush)
-		flush_tlb_kernel_range(*start, *end);
+	atomic_sub(nr, &vmap_lazy_nr);
+	flush_tlb_kernel_range(start, end);
 
-	if (nr) {
-		spin_lock(&vmap_area_lock);
-		llist_for_each_entry_safe(va, n_va, valist, purge_list)
-			__free_vmap_area(va);
-		spin_unlock(&vmap_area_lock);
-	}
-	spin_unlock(&purge_lock);
+	spin_lock(&vmap_area_lock);
+	llist_for_each_entry_safe(va, n_va, valist, purge_list)
+		__free_vmap_area(va);
+	spin_unlock(&vmap_area_lock);
+	return true;
 }
 
 /*
- * Kick off a purge of the outstanding lazy areas. Don't bother if somebody
- * is already purging.
- */
-static void try_purge_vmap_area_lazy(void)
-{
-	unsigned long start = ULONG_MAX, end = 0;
-
-	__purge_vmap_area_lazy(&start, &end, 0, 0);
-}
-
-/*
- * Kick off a purge of the outstanding lazy areas.
+ * Kick off a purge of the outstanding lazy areas, including the fragment
+ * blocks on the per-cpu lists.
  */
 static void purge_vmap_area_lazy(void)
 {
-	unsigned long start = ULONG_MAX, end = 0;
+	purge_fragmented_blocks_allcpus();
+	__purge_vmap_area_lazy(ULONG_MAX, 0);
 
-	__purge_vmap_area_lazy(&start, &end, 1, 0);
 }
 
 /*
@@ -706,8 +668,12 @@ static void free_vmap_area_noflush(struct vmap_area *va)
 	/* After this point, we may free va at any time */
 	llist_add(&va->purge_list, &vmap_purge_list);
 
+	/*
+	 * Kick off a purge of the outstanding lazy areas. Don't bother to
+	 * to purge the per-cpu lists of fragmented blocks.
+	 */
 	if (unlikely(nr_lazy > lazy_max_pages()))
-		try_purge_vmap_area_lazy();
+		__purge_vmap_area_lazy(ULONG_MAX, 0);
 }
 
 /*
@@ -1094,7 +1060,9 @@ void vm_unmap_aliases(void)
 		rcu_read_unlock();
 	}
 
-	__purge_vmap_area_lazy(&start, &end, 1, flush);
+	purge_fragmented_blocks_allcpus();
+	if (!__purge_vmap_area_lazy(start, end) && flush)
+		flush_tlb_kernel_range(start, end);
 }
 EXPORT_SYMBOL_GPL(vm_unmap_aliases);
 
