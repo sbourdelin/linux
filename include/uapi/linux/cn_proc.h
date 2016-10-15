@@ -25,9 +25,13 @@
  * for events on the connector.
  */
 enum proc_cn_mcast_op {
+	PROC_CN_GET_FEATURES = 0,
 	PROC_CN_MCAST_LISTEN = 1,
 	PROC_CN_MCAST_IGNORE = 2
 };
+
+#define PROC_CN_FEATURE_BASIC 0x0001
+#define PROC_CN_FEATURE_NS    0x0002
 
 /*
  * From the user's point of view, the process

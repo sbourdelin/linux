@@ -442,14 +442,11 @@ void proc_ns_connector_send(struct ns_event_prepare *prepare, struct task_struct
  * values because it's not being returned via syscall return
  * mechanisms.
  */
-static void cn_proc_ack(int err, int rcvd_seq, int rcvd_ack)
+static void cn_proc_ack(int err, u16 flags, int rcvd_seq, int rcvd_ack)
 {
 	struct cn_msg *msg;
 	struct proc_event *ev;
 	__u8 buffer[CN_PROC_MSG_SIZE] __aligned(8);
-
-	if (atomic_read(&proc_event_num_listeners) < 1)
-		return;
 
 	msg = buffer_to_cn_msg(buffer);
 	ev = (struct proc_event *)msg->data;
@@ -462,7 +459,7 @@ static void cn_proc_ack(int err, int rcvd_seq, int rcvd_ack)
 	memcpy(&msg->id, &cn_proc_event_id, sizeof(msg->id));
 	msg->ack = rcvd_ack + 1;
 	msg->len = sizeof(*ev);
-	msg->flags = 0; /* not used */
+	msg->flags = flags;
 	send_msg(msg);
 }
 
@@ -475,9 +472,12 @@ static void cn_proc_mcast_ctl(struct cn_msg *msg,
 {
 	enum proc_cn_mcast_op *mc_op = NULL;
 	int err = 0;
+	u16 flags = 0;
 
-	if (msg->len != sizeof(*mc_op))
-		return;
+	if (msg->len != sizeof(*mc_op)) {
+		err = EINVAL;
+		goto out;
+	}
 
 	/* 
 	 * Events are reported with respect to the initial pid
@@ -485,8 +485,10 @@ static void cn_proc_mcast_ctl(struct cn_msg *msg,
 	 * other namespaces.
 	 */
 	if ((current_user_ns() != &init_user_ns) ||
-	    (task_active_pid_ns(current) != &init_pid_ns))
-		return;
+	    (task_active_pid_ns(current) != &init_pid_ns)) {
+		err = EPERM;
+		goto out;
+	}
 
 	/* Can only change if privileged. */
 	if (!__netlink_ns_capable(nsp, &init_user_ns, CAP_NET_ADMIN)) {
@@ -496,6 +498,9 @@ static void cn_proc_mcast_ctl(struct cn_msg *msg,
 
 	mc_op = (enum proc_cn_mcast_op *)msg->data;
 	switch (*mc_op) {
+	case PROC_CN_GET_FEATURES:
+		flags = PROC_CN_FEATURE_BASIC | PROC_CN_FEATURE_NS;
+		break;
 	case PROC_CN_MCAST_LISTEN:
 		atomic_inc(&proc_event_num_listeners);
 		break;
@@ -508,7 +513,7 @@ static void cn_proc_mcast_ctl(struct cn_msg *msg,
 	}
 
 out:
-	cn_proc_ack(err, msg->seq, msg->ack);
+	cn_proc_ack(err, flags, msg->seq, msg->ack);
 }
 
 /*
