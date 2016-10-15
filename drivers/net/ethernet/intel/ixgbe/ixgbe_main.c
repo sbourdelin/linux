@@ -7639,6 +7639,7 @@ static void ixgbe_atr(struct ixgbe_ring *ring,
 	struct sk_buff *skb;
 	__be16 vlan_id;
 	int l4_proto;
+	int min_hdr_size = 0;
 
 	/* if ring doesn't have a interrupt vector, cannot perform ATR */
 	if (!q_vector)
@@ -7657,6 +7658,14 @@ static void ixgbe_atr(struct ixgbe_ring *ring,
 
 	/* snag network header to get L4 type and address */
 	skb = first->skb;
+	if (first->protocol == htons(ETH_P_IP))
+		min_hdr_size = sizeof(struct iphdr) +
+			       sizeof(struct tcphdr);
+	else if (first->protocol == htons(ETH_P_IPV6))
+		min_hdr_size = sizeof(struct ipv6hdr) +
+			       sizeof(struct tcphdr);
+	if (min_hdr_size && skb_headlen(skb) < ETH_HLEN + min_hdr_size)
+		return;
 	hdr.network = skb_network_header(skb);
 	if (skb->encapsulation &&
 	    first->protocol == htons(ETH_P_IP) &&
