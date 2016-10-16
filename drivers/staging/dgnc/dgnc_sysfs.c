@@ -90,16 +90,16 @@ void dgnc_remove_driver_sysfiles(struct pci_driver *dgnc_driver)
 	driver_remove_file(driverfs, &driver_attr_pollrate);
 }
 
-#define DGNC_VERIFY_BOARD(p, bd)				\
-	do {							\
-		if (!p)						\
-			return 0;				\
-								\
-		bd = dev_get_drvdata(p);			\
-		if (!bd || bd->magic != DGNC_BOARD_MAGIC)	\
-			return 0;				\
-		if (bd->state != BOARD_READY)			\
-			return 0;				\
+#define DGNC_VERIFY_BOARD(p, bd)
+do {
+	if (!p)
+		return 0;
+
+		bd = dev_get_drvdata(p);
+		if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+			return 0;
+		if (bd->state != BOARD_READY)
+			return 0;
 	} while (0)
 
 static ssize_t vpd_show(struct device *p, struct device_attribute *attr,
