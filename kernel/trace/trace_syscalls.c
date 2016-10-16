@@ -1,5 +1,6 @@
 #include <trace/syscall.h>
 #include <trace/events/syscalls.h>
+#include <linux/extarray.h>
 #include <linux/syscalls.h>
 #include <linux/slab.h>
 #include <linux/kernel.h>
@@ -26,8 +27,7 @@ syscall_get_enter_fields(struct trace_event_call *call)
 	return &entry->enter_fields;
 }
 
-extern struct syscall_metadata *__start_syscalls_metadata[];
-extern struct syscall_metadata *__stop_syscalls_metadata[];
+DECLARE_EXTARRAY(struct syscall_metadata *, syscalls_metadata);
 
 static struct syscall_metadata **syscalls_metadata;
 
@@ -84,8 +84,8 @@ find_syscall_meta(unsigned long syscall)
 	char str[KSYM_SYMBOL_LEN];
 
 
-	start = __start_syscalls_metadata;
-	stop = __stop_syscalls_metadata;
+	start = ext_start(syscalls_metadata);
+	stop = ext_end(syscalls_metadata);
 	kallsyms_lookup(syscall, NULL, NULL, NULL, str);
 
 	if (arch_syscall_match_sym_name(str, "sys_ni_syscall"))
