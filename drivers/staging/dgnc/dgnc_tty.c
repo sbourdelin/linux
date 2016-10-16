@@ -45,7 +45,7 @@
 /*
  * internal variables
  */
-static unsigned char		*dgnc_TmpWriteBuf;
+static unsigned char		*dgnc_tmp_write_buf;
 
 /*
  * Default transparent print information.
@@ -69,7 +69,7 @@ static struct digi_t dgnc_digi_init = {
  * This defines a raw port at 9600 baud, 8 data bits, no parity,
  * 1 stop bit.
  */
-static struct ktermios DgncDefaultTermios = {
+static struct ktermios dgnc_default_termios = {
 	.c_iflag =	(DEFAULT_IFLAGS),	/* iflags */
 	.c_oflag =	(DEFAULT_OFLAGS),	/* oflags */
 	.c_cflag =	(DEFAULT_CFLAGS),	/* cflags */
@@ -160,9 +160,9 @@ int dgnc_tty_preinit(void)
 	 * is only called during module load, (not in interrupt context),
 	 * and with no locks held.
 	 */
-	dgnc_TmpWriteBuf = kmalloc(WRITEBUFLEN, GFP_KERNEL);
+	dgnc_tmp_write_buf = kmalloc(WRITEBUFLEN, GFP_KERNEL);
 
-	if (!dgnc_TmpWriteBuf)
+	if (!dgnc_tmp_write_buf)
 		return -ENOMEM;
 
 	return 0;
@@ -194,7 +194,7 @@ int dgnc_tty_register(struct dgnc_board *brd)
 	brd->serial_driver->minor_start = 0;
 	brd->serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
 	brd->serial_driver->subtype = SERIAL_TYPE_NORMAL;
-	brd->serial_driver->init_termios = DgncDefaultTermios;
+	brd->serial_driver->init_termios = dgnc_default_termios;
 	brd->serial_driver->driver_name = DRVSTR;
 
 	/*
@@ -233,7 +233,7 @@ int dgnc_tty_register(struct dgnc_board *brd)
 	brd->print_driver->minor_start = 0x80;
 	brd->print_driver->type = TTY_DRIVER_TYPE_SERIAL;
 	brd->print_driver->subtype = SERIAL_TYPE_NORMAL;
-	brd->print_driver->init_termios = DgncDefaultTermios;
+	brd->print_driver->init_termios = dgnc_default_termios;
 	brd->print_driver->driver_name = DRVSTR;
 
 	/*
@@ -371,8 +371,8 @@ err_free_channels:
  */
 void dgnc_tty_post_uninit(void)
 {
-	kfree(dgnc_TmpWriteBuf);
-	dgnc_TmpWriteBuf = NULL;
+	kfree(dgnc_tmp_write_buf);
+	dgnc_tmp_write_buf = NULL;
 }
 
 /*
@@ -1543,7 +1543,7 @@ static int dgnc_tty_write_room(struct tty_struct *tty)
 	int ret = 0;
 	unsigned long flags;
 
-	if (!tty || !dgnc_TmpWriteBuf)
+	if (!tty || !dgnc_tmp_write_buf)
 		return 0;
 
 	un = tty->driver_data;
@@ -1623,7 +1623,7 @@ static int dgnc_tty_write(struct tty_struct *tty,
 	ushort tmask;
 	uint remain;
 
-	if (!tty || !dgnc_TmpWriteBuf)
+	if (!tty || !dgnc_tmp_write_buf)
 		return 0;
 
 	un = tty->driver_data;
