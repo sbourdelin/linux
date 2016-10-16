@@ -1422,7 +1422,7 @@ static void raid1_status(struct seq_file *seq, struct mddev *mddev)
 			   rdev && test_bit(In_sync, &rdev->flags) ? "U" : "_");
 	}
 	rcu_read_unlock();
-	seq_printf(seq, "]");
+	seq_putc(seq, ']');
 }
 
 static void raid1_error(struct mddev *mddev, struct md_rdev *rdev)
