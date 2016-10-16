@@ -20,6 +20,7 @@
 #include <linux/spinlock.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/flashchip.h>
+#include <linux/mtd/nand.h>
 #include <linux/mtd/bbm.h>
 
 struct mtd_info;
@@ -689,8 +690,21 @@ nand_get_sdr_timings(const struct nand_data_interface *conf)
 }
 
 /**
+ * struct rawnand_device - raw NAND device structure
+ * @base: NAND device instance (inheritance)
+ *
+ * This structure describes a raw NAND device and should progressively
+ * replace the nand_chip struct.
+ *
+ * Note: do not blindly move nand_chip fields into rawnand_device.
+ */
+struct rawnand_device {
+	struct nand_device base;
+};
+
+/**
  * struct nand_chip - NAND Private Flash Chip Data
- * @mtd:		MTD device registered to the MTD framework
+ * @base:		raw NAND device instance (inheritance)
  * @IO_ADDR_R:		[BOARDSPECIFIC] address to read the 8 I/O lines of the
  *			flash device
  * @IO_ADDR_W:		[BOARDSPECIFIC] address to write the 8 I/O lines of the
@@ -790,7 +804,7 @@ nand_get_sdr_timings(const struct nand_data_interface *conf)
  */
 
 struct nand_chip {
-	struct mtd_info mtd;
+	struct rawnand_device base;
 	void __iomem *IO_ADDR_R;
 	void __iomem *IO_ADDR_W;
 
@@ -880,22 +894,22 @@ extern const struct mtd_ooblayout_ops nand_ooblayout_lp_ops;
 static inline void nand_set_flash_node(struct nand_chip *chip,
 				       struct device_node *np)
 {
-	mtd_set_of_node(&chip->mtd, np);
+	nand_set_of_node(&chip->base.base, np);
 }
 
 static inline struct device_node *nand_get_flash_node(struct nand_chip *chip)
 {
-	return mtd_get_of_node(&chip->mtd);
+	return nand_get_of_node(&chip->base.base);
 }
 
 static inline struct nand_chip *mtd_to_nandc(struct mtd_info *mtd)
 {
-	return container_of(mtd, struct nand_chip, mtd);
+	return container_of(mtd_to_nand(mtd), struct nand_chip, base.base);
 }
 
 static inline struct mtd_info *nandc_to_mtd(struct nand_chip *chip)
 {
-	return &chip->mtd;
+	return nand_to_mtd(&chip->base.base);
 }
 
 static inline void *nand_get_controller_data(struct nand_chip *chip)
