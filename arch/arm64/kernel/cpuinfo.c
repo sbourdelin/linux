@@ -148,14 +148,17 @@ static int c_show(struct seq_file *m, void *v)
 				if (elf_hwcap & (1 << j))
 					seq_printf(m, " %s", hwcap_str[j]);
 		}
-		seq_puts(m, "\n");
-
-		seq_printf(m, "CPU implementer\t: 0x%02x\n",
-			   MIDR_IMPLEMENTOR(midr));
-		seq_printf(m, "CPU architecture: 8\n");
-		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
-		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
-		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
+		seq_printf(m,
+			   "\n"
+			   "CPU implementer\t: 0x%02x\n"
+			   "CPU architecture: 8\n"
+			   "CPU variant\t: 0x%x\n"
+			   "CPU part\t: 0x%03x\n"
+			   "CPU revision\t: %d\n\n",
+			   MIDR_IMPLEMENTOR(midr),
+			   MIDR_VARIANT(midr),
+			   MIDR_PARTNUM(midr),
+			   MIDR_REVISION(midr));
 	}
 
 	return 0;
