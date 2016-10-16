@@ -15,6 +15,12 @@
 #ifndef _WM8580_H
 #define _WM8580_H
 
+struct wm8580_driver_data {
+	char name_playback[24];
+	char name_capture[24];
+	int num_dacs;
+};
+
 #define WM8580_PLLA  1
 #define WM8580_PLLB  2
 
