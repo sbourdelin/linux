@@ -255,10 +255,10 @@ static const char **find_next(void *v, loff_t *pos)
 	int start_index;
 	int last_index;
 
-	start_index = __stop___trace_bprintk_fmt - __start___trace_bprintk_fmt;
+	start_index = ext_size(__trace_bprintk_fmt);
 
 	if (*pos < start_index)
-		return __start___trace_bprintk_fmt + *pos;
+		return ext_start(__trace_bprintk_fmt) + *pos;
 
 	/*
 	 * The __tracepoint_str section is treated the same as the
@@ -273,10 +273,10 @@ static const char **find_next(void *v, loff_t *pos)
 	 * the ASCII text for userspace.
 	 */
 	last_index = start_index;
-	start_index = __stop___tracepoint_str - __start___tracepoint_str;
+	start_index = ext_size(__tracepoint_str);
 
 	if (*pos < last_index + start_index)
-		return __start___tracepoint_str + (*pos - last_index);
+		return ext_start(__tracepoint_str) + (*pos - last_index);
 
 	start_index += last_index;
 	return find_next_mod_format(start_index, v, fmt, pos);

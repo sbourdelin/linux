@@ -2,6 +2,7 @@
 #ifndef _LINUX_KERNEL_TRACE_H
 #define _LINUX_KERNEL_TRACE_H
 
+#include <linux/extarray.h>
 #include <linux/fs.h>
 #include <linux/atomic.h>
 #include <linux/sched.h>
@@ -1600,11 +1601,9 @@ extern int trace_event_enable_disable(struct trace_event_file *file,
 				      int enable, int soft_disable);
 extern int tracing_alloc_snapshot(void);
 
-extern const char *__start___trace_bprintk_fmt[];
-extern const char *__stop___trace_bprintk_fmt[];
+DECLARE_EXTARRAY(const char *, __trace_bprintk_fmt);
 
-extern const char *__start___tracepoint_str[];
-extern const char *__stop___tracepoint_str[];
+DECLARE_EXTARRAY(const char *, __tracepoint_str);
 
 void trace_printk_control(bool enabled);
 void trace_printk_init_buffers(void);
