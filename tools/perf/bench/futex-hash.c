@@ -25,6 +25,9 @@
 
 #include <err.h>
 #include <sys/time.h>
+#ifdef CONFIG_NUMA
+#include <numa.h>
+#endif
 
 static unsigned int nthreads = 0;
 static unsigned int nsecs    = 10;
@@ -32,6 +35,7 @@ static unsigned int nsecs    = 10;
 static unsigned int nfutexes = 1024;
 static bool fshared = false, done = false, silent = false;
 static int futex_flag = 0;
+static int numa_node = -1;
 
 struct timeval start, end, runtime;
 static pthread_mutex_t thread_lock;
@@ -55,8 +59,27 @@ static const struct option options[] = {
 	OPT_UINTEGER('f', "futexes", &nfutexes, "Specify amount of futexes per threads"),
 	OPT_BOOLEAN( 's', "silent",  &silent,   "Silent mode: do not display data/details"),
 	OPT_BOOLEAN( 'S', "shared",  &fshared,  "Use shared futexes instead of private ones"),
+#ifdef CONFIG_NUMA
+	OPT_INTEGER( 'n', "numa",   &numa_node,  "Specify the NUMA node"),
+#endif
 	OPT_END()
 };
+
+#ifndef CONFIG_NUMA
+static int numa_run_on_node(int node __maybe_unused) { return 0; }
+static int numa_node_of_cpu(int node __maybe_unused) { return 0; }
+static void *numa_alloc_local(size_t size) { return malloc(size); }
+static void numa_free(void *p, size_t size __maybe_unused) { return free(p); }
+#endif
+
+static bool cpu_is_local(int cpu)
+{
+	if (numa_node < 0)
+		return true;
+	if (numa_node_of_cpu(cpu) == numa_node)
+		return true;
+	return false;
+}
 
 static const char * const bench_futex_hash_usage[] = {
 	"perf bench futex hash <options>",
@@ -123,6 +146,8 @@ int bench_futex_hash(int argc, const char **argv,
 	unsigned int i, ncpus;
 	pthread_attr_t thread_attr;
 	struct worker *worker = NULL;
+	char *node_str = NULL;
+	unsigned int cpunum;
 
 	argc = parse_options(argc, argv, options, bench_futex_hash_usage, 0);
 	if (argc) {
@@ -136,18 +161,50 @@ int bench_futex_hash(int argc, const char **argv,
 	act.sa_sigaction = toggle_done;
 	sigaction(SIGINT, &act, NULL);
 
-	if (!nthreads) /* default to the number of CPUs */
-		nthreads = ncpus;
+	if (!nthreads) {
+		/* default to the number of CPUs per NUMA node */
+		if (numa_node < 0) {
+			nthreads = ncpus;
+		} else {
+			for (i = 0; i < ncpus; i++) {
+				if (cpu_is_local(i))
+					nthreads++;
+			}
+			if (!nthreads)
+				err(EXIT_FAILURE, "No online CPUs for this node");
+		}
+	} else {
+		int cpu_available = 0;
 
-	worker = calloc(nthreads, sizeof(*worker));
+		for (i = 0; i < ncpus && !cpu_available; i++) {
+			if (cpu_is_local(i))
+				cpu_available = 1;
+		}
+		if (!cpu_available)
+			err(EXIT_FAILURE, "No online CPUs for this node");
+	}
+
+	if (numa_node >= 0) {
+		ret = numa_run_on_node(numa_node);
+		if (ret < 0)
+			err(EXIT_FAILURE, "numa_run_on_node");
+		ret = asprintf(&node_str, " on node %d", numa_node);
+		if (ret < 0)
+			err(EXIT_FAILURE, "numa_node, asprintf");
+	}
+
+	worker = numa_alloc_local(nthreads * sizeof(*worker));
 	if (!worker)
 		goto errmem;
 
 	if (!fshared)
 		futex_flag = FUTEX_PRIVATE_FLAG;
 
-	printf("Run summary [PID %d]: %d threads, each operating on %d [%s] futexes for %d secs.\n\n",
-	       getpid(), nthreads, nfutexes, fshared ? "shared":"private", nsecs);
+	printf("Run summary [PID %d]: %d threads%s, each operating on %d [%s] futexes for %d secs.\n\n",
+	       getpid(), nthreads,
+	       node_str ? : "",
+	       nfutexes, fshared ? "shared":"private",
+	       nsecs);
 
 	init_stats(&throughput_stats);
 	pthread_mutex_init(&thread_lock, NULL);
@@ -157,14 +214,24 @@ int bench_futex_hash(int argc, const char **argv,
 	threads_starting = nthreads;
 	pthread_attr_init(&thread_attr);
 	gettimeofday(&start, NULL);
-	for (i = 0; i < nthreads; i++) {
+	for (cpunum = 0, i = 0; i < nthreads; i++, cpunum++) {
+
+		do {
+			if (cpu_is_local(cpunum))
+				break;
+			cpunum++;
+			if (cpunum > ncpus)
+				cpunum = 0;
+		} while (1);
+
 		worker[i].tid = i;
-		worker[i].futex = calloc(nfutexes, sizeof(*worker[i].futex));
+		worker[i].futex = numa_alloc_local(nfutexes *
+						   sizeof(*worker[i].futex));
 		if (!worker[i].futex)
 			goto errmem;
 
 		CPU_ZERO(&cpu);
-		CPU_SET(i % ncpus, &cpu);
+		CPU_SET(cpunum % ncpus, &cpu);
 
 		ret = pthread_attr_setaffinity_np(&thread_attr, sizeof(cpu_set_t), &cpu);
 		if (ret)
@@ -211,12 +278,12 @@ int bench_futex_hash(int argc, const char **argv,
 				       &worker[i].futex[nfutexes-1], t);
 		}
 
-		free(worker[i].futex);
+		numa_free(worker[i].futex, nfutexes * sizeof(*worker[i].futex));
 	}
 
 	print_summary();
 
-	free(worker);
+	numa_free(worker, nthreads * sizeof(*worker));
 	return ret;
 errmem:
 	err(EXIT_FAILURE, "calloc");
