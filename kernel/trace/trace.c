@@ -11,6 +11,7 @@
  *  Copyright (C) 2004-2006 Ingo Molnar
  *  Copyright (C) 2004 Nadia Yvette Chambers
  */
+#include <linux/extarray.h>
 #include <linux/ring_buffer.h>
 #include <generated/utsrelease.h>
 #include <linux/stacktrace.h>
@@ -7296,15 +7297,12 @@ struct dentry *tracing_init_dentry(void)
 	return NULL;
 }
 
-extern struct trace_enum_map *__start_ftrace_enum_maps[];
-extern struct trace_enum_map *__stop_ftrace_enum_maps[];
+DECLARE_EXTARRAY(struct trace_enum_map *, ftrace_enum_maps);
 
 static void __init trace_enum_init(void)
 {
-	int len;
-
-	len = __stop_ftrace_enum_maps - __start_ftrace_enum_maps;
-	trace_insert_enum_map(NULL, __start_ftrace_enum_maps, len);
+	trace_insert_enum_map(NULL, ext_start(ftrace_enum_maps),
+				    ext_size(ftrace_enum_maps));
 }
 
 #ifdef CONFIG_MODULES
