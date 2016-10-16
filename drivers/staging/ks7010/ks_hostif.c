@@ -97,11 +97,10 @@ int ks_wlan_do_power_save(struct ks_wlan_private *priv)
 {
 	DPRINTK(4, "psstatus.status=%d\n", atomic_read(&priv->psstatus.status));
 
-	if ((priv->connect_status & CONNECT_STATUS_MASK) == CONNECT_STATUS) {
+	if ((priv->connect_status & CONNECT_STATUS_MASK) == CONNECT_STATUS)
 		hostif_sme_enqueue(priv, SME_POW_MNGMT_REQUEST);
-	} else {
+	else
 		priv->dev_state = DEVICE_STATE_READY;
-	}
 	return 0;
 }
 
@@ -705,15 +704,13 @@ void hostif_mib_set_confirm(struct ks_wlan_private *priv)
 		break;
 	case DOT11_GMK1_TSC:
 		DPRINTK(2, "DOT11_GMK1_TSC:mib_status=%d\n", (int)mib_status);
-		if (atomic_read(&priv->psstatus.snooze_guard)) {
+		if (atomic_read(&priv->psstatus.snooze_guard))
 			atomic_set(&priv->psstatus.snooze_guard, 0);
-		}
 		break;
 	case DOT11_GMK2_TSC:
 		DPRINTK(2, "DOT11_GMK2_TSC:mib_status=%d\n", (int)mib_status);
-		if (atomic_read(&priv->psstatus.snooze_guard)) {
+		if (atomic_read(&priv->psstatus.snooze_guard))
 			atomic_set(&priv->psstatus.snooze_guard, 0);
-		}
 		break;
 	case LOCAL_PMK:
 		DPRINTK(2, "LOCAL_PMK:mib_status=%d\n", (int)mib_status);
@@ -2172,8 +2169,9 @@ void hostif_sme_mode_setup(struct ks_wlan_private *priv)
 				else
 					rate_octet[i] =
 					    priv->reg.rate_set.body[i];
-			} else
+			} else {
 				break;
+			}
 		}
 
 	} else {	/* D_11G_ONLY_MODE or D_11BG_COMPATIBLE_MODE */
@@ -2187,8 +2185,9 @@ void hostif_sme_mode_setup(struct ks_wlan_private *priv)
 				else
 					rate_octet[i] =
 					    priv->reg.rate_set.body[i];
-			} else
+			} else {
 				break;
+			}
 		}
 	}
 	rate_size = i;
@@ -2461,9 +2460,8 @@ void hostif_sme_execute(struct ks_wlan_private *priv, int event)
 	DPRINTK(3, "event=%d\n", event);
 	switch (event) {
 	case SME_START:
-		if (priv->dev_state == DEVICE_STATE_BOOT) {
+		if (priv->dev_state == DEVICE_STATE_BOOT)
 			hostif_mib_get_request(priv, DOT11_MAC_ADDRESS);
-		}
 		break;
 	case SME_MULTICAST_REQUEST:
 		hostif_sme_multicast_set(priv);
@@ -2508,14 +2506,12 @@ void hostif_sme_execute(struct ks_wlan_private *priv, int event)
 		}
 		break;
 	case SME_GET_MAC_ADDRESS:
-		if (priv->dev_state == DEVICE_STATE_BOOT) {
+		if (priv->dev_state == DEVICE_STATE_BOOT)
 			hostif_mib_get_request(priv, DOT11_PRODUCT_VERSION);
-		}
 		break;
 	case SME_GET_PRODUCT_VERSION:
-		if (priv->dev_state == DEVICE_STATE_BOOT) {
+		if (priv->dev_state == DEVICE_STATE_BOOT)
 			priv->dev_state = DEVICE_STATE_PREINIT;
-		}
 		break;
 	case SME_STOP_REQUEST:
 		hostif_stop_request(priv);
@@ -2594,9 +2590,9 @@ void hostif_sme_execute(struct ks_wlan_private *priv, int event)
 		/* for power save */
 		atomic_set(&priv->psstatus.snooze_guard, 0);
 		atomic_set(&priv->psstatus.confirm_wait, 0);
-		if (priv->dev_state == DEVICE_STATE_PREINIT) {
+		if (priv->dev_state == DEVICE_STATE_PREINIT)
 			priv->dev_state = DEVICE_STATE_INIT;
-		}
+
 		/* wake_up_interruptible_all(&priv->confirm_wait); */
 		complete(&priv->confirm_wait);
 		break;
