@@ -312,7 +312,7 @@
 	.builtin_fw        : AT(ADDR(.builtin_fw) - LOAD_OFFSET) {	\
 		VMLINUX_SYMBOL(__start_builtin_fw) = .;			\
 		*(.builtin_fw)						\
-		VMLINUX_SYMBOL(__end_builtin_fw) = .;			\
+		VMLINUX_SYMBOL(__stop_builtin_fw) = .;			\
 	}								\
 									\
 	TRACEDATA							\
