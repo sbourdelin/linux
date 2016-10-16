@@ -102,15 +102,15 @@ configuration of fault-injection capabilities.
 - /sys/kernel/debug/fail_page_alloc/ignore-gfp-highmem:
 
 	Format: { 'Y' | 'N' }
-	default is 'N', setting it to 'Y' won't inject failures into
+	default is 'Y', setting it to 'N' will also inject failures into
 	highmem/user allocations.
 
 - /sys/kernel/debug/failslab/ignore-gfp-wait:
 - /sys/kernel/debug/fail_page_alloc/ignore-gfp-wait:
 
 	Format: { 'Y' | 'N' }
-	default is 'N', setting it to 'Y' will inject failures
-	only into non-sleep allocations (GFP_ATOMIC allocations).
+	default is 'Y', setting it to 'N' will also inject failures into
+	allocations that may sleep (non-GFP_ATOMIC allocations).
 
 - /sys/kernel/debug/fail_page_alloc/min-order:
 
@@ -141,7 +141,7 @@ o #include <linux/fault-inject.h>
 
 o define the fault attributes
 
-  DECLARE_FAULT_INJECTION(name);
+  DECLARE_FAULT_ATTR(name);
 
   Please see the definition of struct fault_attr in fault-inject.h
   for details.
