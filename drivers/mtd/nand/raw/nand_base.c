@@ -471,7 +471,7 @@ static int nand_block_markbad_lowlevel(struct mtd_info *mtd, loff_t ofs)
 
 	/* Mark block bad in BBT */
 	if (chip->bbt) {
-		res = nand_markbad_bbt(mtd, ofs);
+		res = nand_markbad_bbt(mtd_to_nand(mtd), ofs);
 		if (!ret)
 			ret = res;
 	}
@@ -511,12 +511,12 @@ static int nand_check_wp(struct mtd_info *mtd)
  */
 static int nand_block_isreserved(struct mtd_info *mtd, loff_t ofs)
 {
-	struct nand_chip *chip = mtd_to_nandc(mtd);
+	struct nand_device *nand = mtd_to_nand(mtd);
 
-	if (!chip->bbt)
+	if (!nand->bbt.bbt)
 		return 0;
 	/* Return info from the table */
-	return nand_isreserved_bbt(mtd, ofs);
+	return nand_isreserved_bbt(nand, ofs);
 }
 
 /**
@@ -530,13 +530,14 @@ static int nand_block_isreserved(struct mtd_info *mtd, loff_t ofs)
  */
 static int nand_block_checkbad(struct mtd_info *mtd, loff_t ofs, int allowbbt)
 {
+	struct nand_device *nand = mtd_to_nand(mtd);
 	struct nand_chip *chip = mtd_to_nandc(mtd);
 
-	if (!chip->bbt)
+	if (!nand->bbt.bbt)
 		return chip->block_bad(mtd, ofs);
 
 	/* Return info from the table */
-	return nand_isbad_bbt(mtd, ofs, allowbbt);
+	return nand_isbad_bbt(nand, ofs, allowbbt);
 }
 
 /**
@@ -3308,6 +3309,71 @@ static void nand_resume(struct mtd_info *mtd)
 static void nand_shutdown(struct mtd_info *mtd)
 {
 	nand_get_device(mtd, FL_PM_SUSPENDED);
+}
+
+/*
+ * Define some generic bad / good block scan pattern which are used
+ * while scanning a device for factory marked good / bad blocks.
+ */
+static uint8_t scan_ff_pattern[] = { 0xff, 0xff };
+
+#define BADBLOCK_SCAN_MASK (~NAND_BBT_NO_OOB)
+
+/**
+ * nand_create_badblock_pattern - [INTERN] Creates a BBT descriptor structure
+ * @this: NAND chip to create descriptor for
+ *
+ * This function allocates and initializes a nand_bbt_descr for BBM detection
+ * based on the properties of @this. The new descriptor is stored in
+ * this->badblock_pattern. Thus, this->badblock_pattern should be NULL when
+ * passed to this function.
+ */
+static int nand_create_badblock_pattern(struct nand_chip *chip)
+{
+	struct nand_device *this = &chip->base.base;
+	struct nand_bbt_descr *bd;
+	if (this->bbt.bbp) {
+		pr_warn("Bad block pattern already allocated; not replacing\n");
+		return -EINVAL;
+	}
+	bd = kzalloc(sizeof(*bd), GFP_KERNEL);
+	if (!bd)
+		return -ENOMEM;
+	bd->options = this->bbt.options & BADBLOCK_SCAN_MASK;
+	bd->offs = chip->badblockpos;
+	bd->len = (chip->options & NAND_BUSWIDTH_16) ? 2 : 1;
+	bd->pattern = scan_ff_pattern;
+	bd->options |= NAND_BBT_DYNAMICSTRUCT;
+	this->bbt.bbp = bd;
+	return 0;
+}
+
+/**
+ * nand_default_bbt - [NAND Interface] Select a default bad block table for the device
+ * @mtd: MTD device structure
+ *
+ * This function selects the default bad block table support for the device and
+ * calls the nand_scan_bbt function.
+ */
+static int nand_default_bbt(struct mtd_info *mtd)
+{
+	struct nand_device *this = mtd_to_nand(mtd);
+	struct nand_chip *chip = mtd_to_nandc(mtd);
+	int ret;
+
+	/* Initialize BBT config from nand_chip info */
+	this->bbt.options = chip->bbt_options;
+	this->bbt.td = chip->bbt_td;
+	this->bbt.md = chip->bbt_md;
+	this->bbt.bbp = chip->badblock_pattern;
+
+	if (!this->bbt.bbp) {
+		ret = nand_create_badblock_pattern(chip);
+		if (ret)
+			return ret;
+	}
+
+	return nand_scan_bbt(this);
 }
 
 /* Set default functions */

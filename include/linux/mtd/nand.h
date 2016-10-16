@@ -477,4 +477,12 @@ static inline struct device_node *nand_get_of_node(struct nand_device *nand)
 {
 	return mtd_get_of_node(&nand->mtd);
 }
+
+/* BBT related functions */
+int nand_scan_bbt(struct nand_device *this);
+int nand_update_bbt(struct nand_device *this, loff_t offs);
+int nand_isreserved_bbt(struct nand_device *this, loff_t offs);
+int nand_isbad_bbt(struct nand_device *this, loff_t offs, int allowbbt);
+int nand_markbad_bbt(struct nand_device *this, loff_t offs);
+
 #endif /* __LINUX_MTD_NAND_H */
