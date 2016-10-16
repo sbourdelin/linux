@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2008 Steven Rostedt <srostedt@redhat.com>
  */
+#include <linux/extarray.h>
 #include <linux/kallsyms.h>
 #include <linux/seq_file.h>
 #include <linux/spinlock.h>
@@ -218,8 +219,7 @@ void ftrace_likely_update(struct ftrace_branch_data *f, int val, int expect)
 }
 EXPORT_SYMBOL(ftrace_likely_update);
 
-extern unsigned long __start_annotated_branch_profile[];
-extern unsigned long __stop_annotated_branch_profile[];
+DECLARE_EXTARRAY(unsigned long, annotated_branch_profile);
 
 static int annotated_branch_stat_headers(struct seq_file *m)
 {
@@ -273,7 +273,7 @@ static int branch_stat_show(struct seq_file *m, void *v)
 
 static void *annotated_branch_stat_start(struct tracer_stat *trace)
 {
-	return __start_annotated_branch_profile;
+	return ext_start(annotated_branch_profile);
 }
 
 static void *
@@ -283,7 +283,7 @@ annotated_branch_stat_next(void *v, int idx)
 
 	++p;
 
-	if ((void *)p >= (void *)__stop_annotated_branch_profile)
+	if ((void *)p >= (void *)ext_end(annotated_branch_profile))
 		return NULL;
 
 	return p;
@@ -347,8 +347,7 @@ fs_initcall(init_annotated_branch_stats);
 
 #ifdef CONFIG_PROFILE_ALL_BRANCHES
 
-extern unsigned long __start_branch_profile[];
-extern unsigned long __stop_branch_profile[];
+DECLARE_EXTARRAY(unsigned long, branch_profile);
 
 static int all_branch_stat_headers(struct seq_file *m)
 {
@@ -363,7 +362,7 @@ static int all_branch_stat_headers(struct seq_file *m)
 
 static void *all_branch_stat_start(struct tracer_stat *trace)
 {
-	return __start_branch_profile;
+	return ext_start(branch_profile);
 }
 
 static void *
@@ -373,7 +372,7 @@ all_branch_stat_next(void *v, int idx)
 
 	++p;
 
-	if ((void *)p >= (void *)__stop_branch_profile)
+	if ((void *)p >= (void *)ext_end(branch_profile))
 		return NULL;
 
 	return p;
