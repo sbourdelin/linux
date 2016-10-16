@@ -1078,6 +1078,17 @@ static void aio_complete(struct kiocb *kiocb, long res, long res2)
 	unsigned tail, pos, head;
 	unsigned long	flags;
 
+	if (kiocb->ki_flags & IOCB_WRITE) {
+		struct file *file = kiocb->ki_filp;
+
+		/*
+		 * Tell lockdep we inherited freeze protection from submission
+		 * thread.
+		 */
+		__sb_writers_acquired(file_inode(file)->i_sb, SB_FREEZE_WRITE);
+		file_end_write(file);
+	}
+
 	/*
 	 * Special case handling for sync iocbs:
 	 *  - events go directly into the iocb for fast handling
@@ -1460,13 +1471,24 @@ rw_common:
 			return ret;
 		}
 
-		if (rw == WRITE)
+		if (rw == WRITE) {
 			file_start_write(file);
+			req->ki_flags |= IOCB_WRITE;
+		}
+
+		if (rw == WRITE) {
+			/*
+			 * We release freeze protection in aio_complete(). Fool
+			 * lockdep by telling it the lock got released so that
+			 * it doesn't complain about held lock when we return
+			 * to userspace.
+			 */
+			__sb_writers_release(file_inode(file)->i_sb,
+					SB_FREEZE_WRITE);
+		}
 
 		ret = iter_op(req, &iter);
 
-		if (rw == WRITE)
-			file_end_write(file);
 		kfree(iovec);
 		break;
 
