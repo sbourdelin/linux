@@ -1699,7 +1699,12 @@ config FAULT_INJECTION_STACKTRACE_FILTER
 	select STACKTRACE
 	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM_UNWIND && !ARC && !SCORE
 	help
-	  Provide stacktrace filter for fault-injection capabilities
+	  Provide stacktrace filter for fault-injection capabilities.
+
+	  This also allows you to enable fault-injection for new callsites,
+	  i.e. a forced fault the first time a given call chain is seen.
+	  This can be useful for triggering fault injection for very rare
+	  or hard-to-hit call chains.
 
 config LATENCYTOP
 	bool "Latency measuring infrastructure"
