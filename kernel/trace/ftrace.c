@@ -13,6 +13,7 @@
  *  Copyright (C) 2004 Nadia Yvette Chambers
  */
 
+#include <linux/extarray.h>
 #include <linux/stop_machine.h>
 #include <linux/clocksource.h>
 #include <linux/kallsyms.h>
@@ -5069,10 +5070,10 @@ void ftrace_module_init(struct module *mod)
 }
 #endif /* CONFIG_MODULES */
 
+DECLARE_EXTARRAY(unsigned long, mcount_loc);
+
 void __init ftrace_init(void)
 {
-	extern unsigned long __start_mcount_loc[];
-	extern unsigned long __stop_mcount_loc[];
 	unsigned long count, flags;
 	int ret;
 
@@ -5082,7 +5083,7 @@ void __init ftrace_init(void)
 	if (ret)
 		goto failed;
 
-	count = __stop_mcount_loc - __start_mcount_loc;
+	count = ext_size(mcount_loc);
 	if (!count) {
 		pr_info("ftrace: No functions to be traced?\n");
 		goto failed;
@@ -5094,8 +5095,8 @@ void __init ftrace_init(void)
 	last_ftrace_enabled = ftrace_enabled = 1;
 
 	ret = ftrace_process_locs(NULL,
-				  __start_mcount_loc,
-				  __stop_mcount_loc);
+				  ext_start(mcount_loc),
+				  ext_end(mcount_loc));
 
 	set_ftrace_early_filters();
 
