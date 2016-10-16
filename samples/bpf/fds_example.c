@@ -88,7 +88,7 @@ static int bpf_do_map(const char *file, uint32_t flags, uint32_t key,
 		       ret, strerror(errno));
 		assert(ret == 0);
 	} else if (flags & BPF_F_KEY) {
-		ret = bpf_lookup_elem(fd, &key, &value);
+		ret = bpf_lookup_elem(fd, &key, &value, sizeof(value));
 		printf("bpf: fd:%d l->(%u):%u ret:(%d,%s)\n", fd, key, value,
 		       ret, strerror(errno));
 		assert(ret == 0);

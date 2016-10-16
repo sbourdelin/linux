@@ -122,7 +122,10 @@ union bpf_attr {
 			__aligned_u64 value;
 			__aligned_u64 next_key;
 		};
-		__u64		flags;
+		union {
+			__u64		flags;
+			__u32		size; /* number of bytes allocated in userspace */
+		};
 	};
 
 	struct { /* anonymous struct used by BPF_PROG_LOAD command */

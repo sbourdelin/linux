@@ -264,13 +264,14 @@ int __weak bpf_stackmap_copy(struct bpf_map *map, void *key, void *value)
 }
 
 /* last field in 'union bpf_attr' used by this command */
-#define BPF_MAP_LOOKUP_ELEM_LAST_FIELD value
+#define BPF_MAP_LOOKUP_ELEM_LAST_FIELD size
 
 static int map_lookup_elem(union bpf_attr *attr)
 {
 	void __user *ukey = u64_to_ptr(attr->key);
 	void __user *uvalue = u64_to_ptr(attr->value);
 	int ufd = attr->map_fd;
+	u32 usize = attr->size;
 	struct bpf_map *map;
 	void *key, *value, *ptr;
 	u32 value_size;
@@ -324,7 +325,7 @@ static int map_lookup_elem(union bpf_attr *attr)
 		goto free_value;
 
 	err = -EFAULT;
-	if (copy_to_user(uvalue, value, value_size) != 0)
+	if (copy_to_user(uvalue, value, min_t(u32, usize, value_size)) != 0)
 		goto free_value;
 
 	err = 0;

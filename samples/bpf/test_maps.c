@@ -47,11 +47,11 @@ static void test_hashmap_sanity(int i, void *data)
 	assert(bpf_update_elem(map_fd, &key, &value, -1) == -1 && errno == EINVAL);
 
 	/* check that key=1 can be found */
-	assert(bpf_lookup_elem(map_fd, &key, &value) == 0 && value == 1234);
+	assert(bpf_lookup_elem(map_fd, &key, &value, sizeof(value)) == 0 && value == 1234);
 
 	key = 2;
 	/* check that key=2 is not found */
-	assert(bpf_lookup_elem(map_fd, &key, &value) == -1 && errno == ENOENT);
+	assert(bpf_lookup_elem(map_fd, &key, &value, sizeof(value)) == -1 && errno == ENOENT);
 
 	/* BPF_EXIST means: update existing element */
 	assert(bpf_update_elem(map_fd, &key, &value, BPF_EXIST) == -1 &&
@@ -139,11 +139,11 @@ static void test_percpu_hashmap_sanity(int task, void *data)
 	 * was run from a different cpu.
 	 */
 	value[0] = 1;
-	assert(bpf_lookup_elem(map_fd, &key, value) == 0 && value[0] == 100);
+	assert(bpf_lookup_elem(map_fd, &key, value, sizeof(value)) == 0 && value[0] == 100);
 
 	key = 2;
 	/* check that key=2 is not found */
-	assert(bpf_lookup_elem(map_fd, &key, value) == -1 && errno == ENOENT);
+	assert(bpf_lookup_elem(map_fd, &key, value, sizeof(value)) == -1 && errno == ENOENT);
 
 	/* BPF_EXIST means: update existing element */
 	assert(bpf_update_elem(map_fd, &key, value, BPF_EXIST) == -1 &&
@@ -170,7 +170,7 @@ static void test_percpu_hashmap_sanity(int task, void *data)
 		assert((expected_key_mask & next_key) == next_key);
 		expected_key_mask &= ~next_key;
 
-		assert(bpf_lookup_elem(map_fd, &next_key, value) == 0);
+		assert(bpf_lookup_elem(map_fd, &next_key, value, sizeof(value)) == 0);
 		for (i = 0; i < nr_cpus; i++)
 			assert(value[i] == i + 100);
 
@@ -218,11 +218,11 @@ static void test_arraymap_sanity(int i, void *data)
 	       errno == EEXIST);
 
 	/* check that key=1 can be found */
-	assert(bpf_lookup_elem(map_fd, &key, &value) == 0 && value == 1234);
+	assert(bpf_lookup_elem(map_fd, &key, &value, sizeof(value)) == 0 && value == 1234);
 
 	key = 0;
 	/* check that key=0 is also found and zero initialized */
-	assert(bpf_lookup_elem(map_fd, &key, &value) == 0 && value == 0);
+	assert(bpf_lookup_elem(map_fd, &key, &value, sizeof(value)) == 0 && value == 0);
 
 
 	/* key=0 and key=1 were inserted, check that key=2 cannot be inserted
@@ -233,7 +233,7 @@ static void test_arraymap_sanity(int i, void *data)
 	       errno == E2BIG);
 
 	/* check that key = 2 doesn't exist */
-	assert(bpf_lookup_elem(map_fd, &key, &value) == -1 && errno == ENOENT);
+	assert(bpf_lookup_elem(map_fd, &key, &value, sizeof(value)) == -1 && errno == ENOENT);
 
 	/* iterate over two elements */
 	assert(bpf_get_next_key(map_fd, &key, &next_key) == 0 &&
@@ -274,7 +274,7 @@ static void test_percpu_arraymap_many_keys(void)
 	for (key = 0; key < nr_keys; key++) {
 		for (i = 0; i < nr_cpus; i++)
 			values[i] = 0;
-		assert(bpf_lookup_elem(map_fd, &key, values) == 0);
+		assert(bpf_lookup_elem(map_fd, &key, values, sizeof(values)) == 0);
 		for (i = 0; i < nr_cpus; i++)
 			assert(values[i] == i + 10);
 	}
@@ -307,11 +307,11 @@ static void test_percpu_arraymap_sanity(int i, void *data)
 	       errno == EEXIST);
 
 	/* check that key=1 can be found */
-	assert(bpf_lookup_elem(map_fd, &key, values) == 0 && values[0] == 100);
+	assert(bpf_lookup_elem(map_fd, &key, values, sizeof(values)) == 0 && values[0] == 100);
 
 	key = 0;
 	/* check that key=0 is also found and zero initialized */
-	assert(bpf_lookup_elem(map_fd, &key, values) == 0 &&
+	assert(bpf_lookup_elem(map_fd, &key, values, sizeof(values)) == 0 &&
 	       values[0] == 0 && values[nr_cpus - 1] == 0);
 
 
@@ -321,7 +321,7 @@ static void test_percpu_arraymap_sanity(int i, void *data)
 	       errno == E2BIG);
 
 	/* check that key = 2 doesn't exist */
-	assert(bpf_lookup_elem(map_fd, &key, values) == -1 && errno == ENOENT);
+	assert(bpf_lookup_elem(map_fd, &key, values, sizeof(values)) == -1 && errno == ENOENT);
 
 	/* iterate over two elements */
 	assert(bpf_get_next_key(map_fd, &key, &next_key) == 0 &&
@@ -371,9 +371,9 @@ static void test_map_large(void)
 	assert(bpf_get_next_key(map_fd, &key, &key) == -1 && errno == ENOENT);
 
 	key.c = 0;
-	assert(bpf_lookup_elem(map_fd, &key, &value) == 0 && value == 0);
+	assert(bpf_lookup_elem(map_fd, &key, &value, sizeof(value)) == 0 && value == 0);
 	key.a = 1;
-	assert(bpf_lookup_elem(map_fd, &key, &value) == -1 && errno == ENOENT);
+	assert(bpf_lookup_elem(map_fd, &key, &value, sizeof(value)) == -1 && errno == ENOENT);
 
 	close(map_fd);
 }
@@ -466,7 +466,7 @@ static void test_map_parallel(void)
 	/* another check for all elements */
 	for (i = 0; i < MAP_SIZE; i++) {
 		key = MAP_SIZE - i - 1;
-		assert(bpf_lookup_elem(map_fd, &key, &value) == 0 &&
+		assert(bpf_lookup_elem(map_fd, &key, &value, sizeof(value)) == 0 &&
 		       value == key);
 	}
 
