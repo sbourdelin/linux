@@ -10,6 +10,7 @@
 
 #define pr_fmt(fmt) fmt
 
+#include <linux/extarray.h>
 #include <linux/workqueue.h>
 #include <linux/spinlock.h>
 #include <linux/kthread.h>
@@ -2808,8 +2809,7 @@ static void __add_event_to_tracers(struct trace_event_call *call)
 		__trace_add_new_event(call, tr);
 }
 
-extern struct trace_event_call *__start_ftrace_events[];
-extern struct trace_event_call *__stop_ftrace_events[];
+DECLARE_EXTARRAY(struct trace_event_call *, ftrace_events)
 
 static char bootup_event_buf[COMMAND_LINE_SIZE] __initdata;
 
@@ -2992,8 +2992,7 @@ static __init int event_trace_enable(void)
 	if (!tr)
 		return -ENODEV;
 
-	for_each_event(iter, __start_ftrace_events, __stop_ftrace_events) {
-
+	ext_for_each(iter, ftrace_events) {
 		call = *iter;
 		ret = event_init(call);
 		if (!ret)
