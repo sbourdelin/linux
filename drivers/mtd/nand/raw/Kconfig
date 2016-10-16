@@ -15,6 +15,7 @@ menuconfig MTD_NAND
 	depends on MTD
 	select MTD_NAND_IDS
 	select MTD_NAND_ECC
+	select MTD_NAND_CORE
 	help
 	  This enables support for accessing all type of NAND flash
 	  devices. For further information see
