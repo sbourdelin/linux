@@ -22,6 +22,7 @@
 
 
 #include <linux/compiler.h>
+#include <linux/extarray.h>
 #include <linux/interrupt.h>
 #include <linux/circ_buf.h>
 #include <linux/spinlock.h>
@@ -349,8 +350,7 @@ struct earlycon_id {
 	int	(*setup)(struct earlycon_device *, const char *options);
 } __aligned(32);
 
-extern const struct earlycon_id __earlycon_table[];
-extern const struct earlycon_id __earlycon_table_end[];
+DECLARE_EXTARRAY(const struct earlycon_id, earlycon_table);
 
 #if defined(CONFIG_SERIAL_EARLYCON) && !defined(MODULE)
 #define EARLYCON_USED_OR_UNUSED	__used

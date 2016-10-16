@@ -154,10 +154,10 @@
 #endif
 
 #ifdef CONFIG_SERIAL_EARLYCON
-#define EARLYCON_TABLE() STRUCT_ALIGN();			\
-			 VMLINUX_SYMBOL(__earlycon_table) = .;	\
-			 *(__earlycon_table)			\
-			 VMLINUX_SYMBOL(__earlycon_table_end) = .;
+#define EARLYCON_TABLE() STRUCT_ALIGN();				\
+			 VMLINUX_SYMBOL(__start_earlycon_table) = .;	\
+			 *(__earlycon_table)				\
+			 VMLINUX_SYMBOL(__stop_earlycon_table) = .;
 #else
 #define EARLYCON_TABLE()
 #endif

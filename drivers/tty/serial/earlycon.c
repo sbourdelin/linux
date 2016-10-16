@@ -180,7 +180,7 @@ int __init setup_earlycon(char *buf)
 	if (early_con.flags & CON_ENABLED)
 		return -EALREADY;
 
-	for (match = __earlycon_table; match < __earlycon_table_end; match++) {
+	ext_for_each(match, earlycon_table) {
 		size_t len = strlen(match->name);
 
 		if (strncmp(buf, match->name, len))

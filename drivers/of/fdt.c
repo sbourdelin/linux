@@ -956,7 +956,7 @@ static int __init early_init_dt_scan_chosen_serial(void)
 		return 0;
 	}
 
-	for (match = __earlycon_table; match < __earlycon_table_end; match++) {
+	ext_for_each(match, earlycon_table) {
 		if (!match->compatible[0])
 			continue;
 
