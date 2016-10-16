@@ -274,8 +274,8 @@ static void __jump_label_update(struct static_key *key,
 
 void __init jump_label_init(void)
 {
-	struct jump_entry *iter_start = __start___jump_table;
-	struct jump_entry *iter_stop = __stop___jump_table;
+	struct jump_entry *iter_start = ext_start(__jump_table);
+	struct jump_entry *iter_stop = ext_end(__jump_table);
 	struct static_key *key = NULL;
 	struct jump_entry *iter;
 
@@ -539,8 +539,8 @@ early_initcall(jump_label_init_module);
  */
 int jump_label_text_reserved(void *start, void *end)
 {
-	int ret = __jump_label_text_reserved(__start___jump_table,
-			__stop___jump_table, start, end);
+	int ret = __jump_label_text_reserved(ext_start(__jump_table),
+			ext_end(__jump_table), start, end);
 
 	if (ret)
 		return ret;
@@ -553,7 +553,7 @@ int jump_label_text_reserved(void *start, void *end)
 
 static void jump_label_update(struct static_key *key)
 {
-	struct jump_entry *stop = __stop___jump_table;
+	struct jump_entry *stop = ext_end(__jump_table);
 	struct jump_entry *entry = static_key_entries(key);
 #ifdef CONFIG_MODULES
 	struct module *mod;
