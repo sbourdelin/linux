@@ -72,6 +72,8 @@
 #define MPI2_SUP_REPLY_POST_HOST_INDEX_OFFSET   (0x0000030C)
 #define MPI2_REPLY_POST_HOST_INDEX_OFFSET	(0x0000006C)
 
+extern bool block_sync_cache;
+
 /*
  * Raid context flags
  */

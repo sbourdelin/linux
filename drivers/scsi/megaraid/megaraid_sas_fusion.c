@@ -747,6 +747,9 @@ megasas_ioc_init_fusion(struct megasas_instance *instance)
 		ret = 1;
 		goto fail_fw_init;
 	}
+	if (!block_sync_cache)
+		instance->fw_sync_cache_support = (scratch_pad_2 &
+			MR_CAN_HANDLE_SYNC_CACHE_OFFSET) ? 1 : 0;
 
 	IOCInitMessage =
 	  dma_alloc_coherent(&instance->pdev->dev,
