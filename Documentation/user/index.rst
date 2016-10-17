@@ -10,6 +10,7 @@ Contents:
    README
    REPORTING-BUGS
    BUG-HUNTING
+   oops-tracing
    initrd
    init
    dynamic-debug-howto
