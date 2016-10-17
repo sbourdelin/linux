@@ -11,6 +11,7 @@ Contents:
    REPORTING-BUGS
    BUG-HUNTING
    initrd
+   init
    dynamic-debug-howto
    SecurityBugs
    kernel-parameters
