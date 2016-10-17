@@ -12,6 +12,7 @@ Contents:
    SecurityBugs
    kernel-parameters
    serial-console
+   braile-console
    binfmt_misc
    bad_memory
    basic_profiling
