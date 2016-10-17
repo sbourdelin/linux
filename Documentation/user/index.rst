@@ -22,5 +22,6 @@ Contents:
    module-signing
    binfmt_misc
    mono
+   java
    bad_memory
    basic_profiling
