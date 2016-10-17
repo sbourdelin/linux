@@ -29,6 +29,10 @@
 /*
  * This macro must be used by the different irqchip drivers to declare
  * the association between their version and their initialization function.
+ * Two syntaxes are supported depending on the table where the irqchip device
+ * is declared:
+ *
+ * - MADT irqchip syntax, which requires the following five arguments:
  *
  * @name: name that must be unique accross all IRQCHIP_ACPI_DECLARE of the
  * same file.
@@ -37,10 +41,17 @@
  *            Can be NULL.
  * @data: data to be checked by the validate function.
  * @fn: initialization function
+ *
+ * - DSDT irqchip syntax, which requires the following three arguments:
+ *
+ * @name: name that must be unique across all IRQCHIP_ACPI_DECLARE of the
+ * same file.
+ * @hid: _HID of the DSDT device
+ * @fn: initialization function
  */
-#define IRQCHIP_ACPI_DECLARE(name, subtable, validate, data, fn)	\
-	ACPI_DECLARE_PROBE_ENTRY(irqchip, name, ACPI_SIG_MADT, 		\
-				 subtable, validate, data, fn)
+
+#define IRQCHIP_ACPI_DECLARE(...)					\
+	__IRQCHIP_ACPI_DECLARE(__VA_ARGS__, MADT, _unused, DSDT)(__VA_ARGS__)
 
 #ifdef CONFIG_IRQCHIP
 void irqchip_init(void);

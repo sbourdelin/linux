@@ -26,6 +26,7 @@
 #include <linux/resource_ext.h>
 #include <linux/device.h>
 #include <linux/property.h>
+#include <linux/irqdomain.h>
 
 #ifndef _LINUX
 #define _LINUX
@@ -308,6 +309,11 @@ int acpi_isa_irq_to_gsi (unsigned isa_irq, u32 *gsi);
 
 void acpi_set_irq_model(enum acpi_irq_model_id model,
 			struct fwnode_handle *fwnode);
+
+int acpi_irq_domain_register_irq(struct acpi_resource_source *source, u32 hwirq,
+				 int trigger, int polarity);
+int acpi_irq_domain_unregister_irq(struct acpi_resource_source *source,
+				   u32 hwirq);
 
 #ifdef CONFIG_X86_IO_APIC
 extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
@@ -1024,6 +1030,43 @@ int __acpi_probe_device_table(struct acpi_probe_entry *start, int nr);
 					  (&ACPI_PROBE_TABLE_END(t) -	\
 					   &ACPI_PROBE_TABLE(t)));	\
 	})
+
+#define ACPI_HID_LEN 9
+
+typedef int (*acpi_dsdt_handler)(struct acpi_device *);
+
+/**
+ * struct acpi_probe_dsdt_entry - boot-time probing entry for DSDT devices
+ * @hid:		_HID of the device
+ * @fn:		Callback to the driver being probed
+ * @driver_data:	Sideband data provided back to the driver
+ */
+struct acpi_dsdt_probe_entry {
+	__u8 _hid[ACPI_HID_LEN];
+	acpi_dsdt_handler probe;
+};
+
+#define ACPI_DECLARE_DSDT_PROBE_ENTRY(name, hid, fn)			\
+	static const struct acpi_dsdt_probe_entry __acpi_probe_##name	\
+		__used __section(__dsdt_acpi_probe_table) =		\
+		{							\
+			._hid = hid,					\
+			.probe = fn,					\
+		}
+
+extern struct acpi_dsdt_probe_entry __dsdt_acpi_probe_table;
+extern struct acpi_dsdt_probe_entry __dsdt_acpi_probe_table_end;
+
+#define MADT_IRQCHIP_ACPI_DECLARE(name, subtable, validate, data, fn)	\
+	ACPI_DECLARE_PROBE_ENTRY(irqchip, name, ACPI_SIG_MADT,		\
+				 subtable, validate, data, fn)
+
+#define DSDT_IRQCHIP_ACPI_DECLARE(name, hid, fn)	\
+	ACPI_DECLARE_DSDT_PROBE_ENTRY(name, hid, fn)
+
+#define __IRQCHIP_ACPI_DECLARE(_a1, _a2, _a3, _a4, _a5, type, ...)	\
+	type##_IRQCHIP_ACPI_DECLARE
+
 #else
 static inline int acpi_dev_get_property(struct acpi_device *adev,
 					const char *name, acpi_object_type type,
@@ -1101,6 +1144,13 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
 		     (void *) data }
 
 #define acpi_probe_device_table(t)	({ int __r = 0; __r;})
+
+#define ACPI_DECLARE_DSDT_PROBE_ENTRY(name, hid, fn)			\
+	static const void *__acpi_probe_##name[]			\
+		__attribute__((unused))				\
+		 = { (void *) hid,					\
+		     (void *) fn }
+
 #endif
 
 #ifdef CONFIG_ACPI_TABLE_UPGRADE
