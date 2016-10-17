@@ -22,6 +22,7 @@ Contents:
    parport
    md
    sysrq
+   unicode
    sysfs-rules
    devices
    module-signing
