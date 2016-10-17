@@ -825,9 +825,9 @@ int ipv6_parse_hopopts(struct sk_buff *skb)
  *	for headers.
  */
 
-static void ipv6_push_rthdr(struct sk_buff *skb, u8 *proto,
-			    struct ipv6_rt_hdr *opt,
-			    struct in6_addr **addr_p, struct in6_addr *saddr)
+static void ipv6_push_rthdr0(struct sk_buff *skb, u8 *proto,
+			     struct ipv6_rt_hdr *opt,
+			     struct in6_addr **addr_p, struct in6_addr *saddr)
 {
 	struct rt0_hdr *phdr, *ihdr;
 	int hops;
@@ -848,6 +848,55 @@ static void ipv6_push_rthdr(struct sk_buff *skb, u8 *proto,
 
 	phdr->rt_hdr.nexthdr = *proto;
 	*proto = NEXTHDR_ROUTING;
+}
+
+#ifdef CONFIG_IPV6_SEG6
+static void ipv6_push_rthdr4(struct sk_buff *skb, u8 *proto,
+			     struct ipv6_rt_hdr *opt,
+			     struct in6_addr **addr_p, struct in6_addr *saddr)
+{
+	struct ipv6_sr_hdr *sr_phdr, *sr_ihdr;
+	struct net *net = NULL;
+	int plen, hops;
+
+	if (skb->dev)
+		net = dev_net(skb->dev);
+	else if (skb->sk)
+		net = sock_net(skb->sk);
+
+	WARN_ON(!net);
+
+	sr_ihdr = (struct ipv6_sr_hdr *)opt;
+	plen = (sr_ihdr->hdrlen + 1) << 3;
+
+	sr_phdr = (struct ipv6_sr_hdr *)skb_push(skb, plen);
+	memcpy(sr_phdr, sr_ihdr, sizeof(struct ipv6_sr_hdr));
+
+	hops = sr_ihdr->first_segment + 1;
+	memcpy(sr_phdr->segments + 1, sr_ihdr->segments + 1,
+	       (hops - 1) * sizeof(struct in6_addr));
+
+	sr_phdr->segments[0] = **addr_p;
+	*addr_p = &sr_ihdr->segments[hops - 1];
+
+	if (net && (sr_get_flags(sr_phdr) & SR6_FLAG_HMAC))
+		seg6_push_hmac(net, saddr, sr_phdr);
+
+	sr_phdr->nexthdr = *proto;
+	*proto = NEXTHDR_ROUTING;
+}
+#endif
+
+static void ipv6_push_rthdr(struct sk_buff *skb, u8 *proto,
+			    struct ipv6_rt_hdr *opt,
+			    struct in6_addr **addr_p, struct in6_addr *saddr)
+{
+#ifdef CONFIG_IPV6_SEG6
+	if (opt->type == IPV6_SRCRT_TYPE_4)
+		ipv6_push_rthdr4(skb, proto, opt, addr_p, saddr);
+#endif
+	if (opt->type == IPV6_SRCRT_TYPE_0)
+		ipv6_push_rthdr0(skb, proto, opt, addr_p, saddr);
 }
 
 static void ipv6_push_exthdr(struct sk_buff *skb, u8 *proto, u8 type, struct ipv6_opt_hdr *opt)
@@ -1091,7 +1140,17 @@ struct in6_addr *fl6_update_dst(struct flowi6 *fl6,
 		return NULL;
 
 	*orig = fl6->daddr;
-	fl6->daddr = *((struct rt0_hdr *)opt->srcrt)->addr;
+
+#ifdef CONFIG_IPV6_SEG6
+	if (opt->srcrt->type == IPV6_SRCRT_TYPE_4) {
+		struct ipv6_sr_hdr *srh = (struct ipv6_sr_hdr *)opt->srcrt;
+
+		fl6->daddr = srh->segments[srh->first_segment];
+	}
+#endif
+	if (opt->srcrt->type == IPV6_SRCRT_TYPE_0)
+		fl6->daddr = *((struct rt0_hdr *)opt->srcrt)->addr;
+
 	return orig;
 }
 EXPORT_SYMBOL_GPL(fl6_update_dst);
