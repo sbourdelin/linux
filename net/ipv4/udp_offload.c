@@ -377,11 +377,50 @@ static int udp4_gro_complete(struct sk_buff *skb, int nhoff)
 	return udp_gro_complete(skb, nhoff, udp4_lib_lookup_skb);
 }
 
+/* Assumes rcu lock is held */
+static int udp4_flow_dissect(const struct sk_buff *skb, void *data, int hlen,
+			     int *nhoff, u8 *ip_proto, __be16 *proto,
+			     struct flow_dissector_key_addrs *key_addrs)
+{
+	u16 _ports[2], *ports;
+	struct net *net;
+	struct sock *sk;
+	int dif = -1;
+
+	/* See if there is a flow dissector in the UDP socket */
+
+	if (skb->dev) {
+		net = dev_net(skb->dev);
+		dif = skb->dev->ifindex;
+	} else if (skb->sk) {
+		net = sock_net(skb->sk);
+	} else {
+		return FLOW_DIS_RET_PASS;
+	}
+
+	ports = __skb_header_pointer(skb, *nhoff, sizeof(_ports),
+				     data, hlen, &_ports);
+	if (!ports)
+		return FLOW_DIS_RET_BAD;
+
+	sk = udp4_lib_lookup_noref(net,
+				   key_addrs->v4addrs.src, ports[0],
+				   key_addrs->v4addrs.dst, ports[1],
+				   dif);
+
+	if (sk && udp_sk(sk)->flow_dissect)
+		return udp_sk(sk)->flow_dissect(sk, skb, data, hlen, nhoff,
+						ip_proto, proto);
+	else
+		return FLOW_DIS_RET_PASS;
+}
+
 static const struct net_offload udpv4_offload = {
 	.callbacks = {
 		.gso_segment = udp4_ufo_fragment,
 		.gro_receive  =	udp4_gro_receive,
 		.gro_complete =	udp4_gro_complete,
+		.flow_dissect = udp4_flow_dissect,
 	},
 };
 
