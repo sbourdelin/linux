@@ -1917,6 +1917,21 @@ int vfio_set_irqs_validate_and_prepare(struct vfio_irq_set *hdr, int num_irqs,
 }
 EXPORT_SYMBOL(vfio_set_irqs_validate_and_prepare);
 
+const char *vfio_device_api_string(u32 flags)
+{
+	if (flags & VFIO_DEVICE_FLAGS_PCI)
+		return "vfio-pci";
+
+	if (flags & VFIO_DEVICE_FLAGS_PLATFORM)
+		return "vfio-platform";
+
+	if (flags & VFIO_DEVICE_FLAGS_AMBA)
+		return "vfio-amba";
+
+	return "";
+}
+EXPORT_SYMBOL(vfio_device_api_string);
+
 /*
  * Pin a set of guest PFNs and return their associated host PFNs for local
  * domain only.
