@@ -2568,6 +2568,10 @@ state_show(struct md_rdev *rdev, char *page)
 		len += sprintf(page+len, "%sreplacement", sep);
 		sep = ",";
 	}
+	if (test_bit(ExternalBbl, &flags)) {
+		len += sprintf(page+len, "%sexternal_bbl", sep);
+		sep = ",";
+	}
 
 	return len+sprintf(page+len, "\n");
 }
@@ -2708,6 +2712,14 @@ state_store(struct md_rdev *rdev, const char *buf, size_t len)
 			}
 		} else
 			err = -EBUSY;
+	} else if (cmd_match(buf, "external_bbl") && (rdev->mddev->external)) {
+		set_bit(ExternalBbl, &rdev->flags);
+		rdev->badblocks.shift = 0;
+		err = 0;
+	} else if (cmd_match(buf, "-external_bbl") && (rdev->mddev->external)) {
+		clear_bit(ExternalBbl, &rdev->flags);
+		rdev->badblocks.shift = -1;
+		err = 0;
 	}
 	if (!err)
 		sysfs_notify_dirent_safe(rdev->sysfs_state);
@@ -8614,6 +8626,9 @@ int rdev_set_badblocks(struct md_rdev *rdev, sector_t s, int sectors,
 	rv = badblocks_set(&rdev->badblocks, s, sectors, 0);
 	if (rv == 0) {
 		/* Make sure they get written out promptly */
+		if (test_bit(ExternalBbl, &rdev->flags))
+			sysfs_notify(&rdev->kobj, NULL,
+				     "unacknowledged_bad_blocks");
 		sysfs_notify_dirent_safe(rdev->sysfs_state);
 		set_mask_bits(&mddev->flags, 0,
 			      BIT(MD_CHANGE_CLEAN) | BIT(MD_CHANGE_PENDING));
@@ -8627,12 +8642,15 @@ EXPORT_SYMBOL_GPL(rdev_set_badblocks);
 int rdev_clear_badblocks(struct md_rdev *rdev, sector_t s, int sectors,
 			 int is_new)
 {
+	int rv;
 	if (is_new)
 		s += rdev->new_data_offset;
 	else
 		s += rdev->data_offset;
-	return badblocks_clear(&rdev->badblocks,
-				  s, sectors);
+	rv = badblocks_clear(&rdev->badblocks, s, sectors);
+	if ((rv == 0) && test_bit(ExternalBbl, &rdev->flags))
+		sysfs_notify(&rdev->kobj, NULL, "bad_blocks");
+	return rv;
 }
 EXPORT_SYMBOL_GPL(rdev_clear_badblocks);
 
