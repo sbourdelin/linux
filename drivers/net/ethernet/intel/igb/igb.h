@@ -139,6 +139,9 @@ struct vf_data_storage {
 /* this is the size past which hardware will drop packets when setting LPE=0 */
 #define MAXIMUM_ETHERNET_VLAN_SIZE 1522
 
+/* In qav mode, the maximum frame size is 1536 */
+#define IGB_MAX_QAV_FRAME_SIZE 1536
+
 /* Supported Rx Buffer Sizes */
 #define IGB_RXBUFFER_256	256
 #define IGB_RXBUFFER_2048	2048
@@ -519,6 +522,8 @@ struct igb_adapter {
 	/* lock for RX network flow classification filter */
 	spinlock_t nfc_lock;
 	bool etype_bitmap[MAX_ETYPE_FILTER];
+
+	bool qav_mode;
 };
 
 /* flags controlling PTP/1588 function */
