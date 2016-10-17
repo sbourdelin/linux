@@ -124,7 +124,7 @@ else
 endif
 
 # Append required CFLAGS
-override CFLAGS += -fPIC
+override CFLAGS += -O2 -fPIC
 override CFLAGS += $(CONFIG_FLAGS) $(INCLUDES) $(PLUGIN_DIR_SQ)
 override CFLAGS += $(udis86-flags) -D_GNU_SOURCE
 
