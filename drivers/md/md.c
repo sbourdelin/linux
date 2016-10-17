@@ -2629,19 +2629,48 @@ state_store(struct md_rdev *rdev, const char *buf, size_t len)
 		set_bit(Blocked, &rdev->flags);
 		err = 0;
 	} else if (cmd_match(buf, "-blocked")) {
-		if (!test_bit(Faulty, &rdev->flags) &&
+		int unblock = 1;
+
+		if ((test_bit(ExternalBbl, &rdev->flags) &&
+			 rdev->badblocks.changed)) {
+			struct badblocks *bb = &rdev->badblocks;
+			int ack = 1;
+
+			write_seqlock_irq(&bb->lock);
+			if (bb->unacked_exist) {
+				u64 *p = bb->page;
+				int i;
+
+				for (i = 0; i < bb->count ; i++) {
+					if (!BB_ACK(p[i])) {
+						ack = 0;
+						break;
+					}
+				}
+				if (ack) {
+					bb->unacked_exist = 0;
+					bb->changed = 0;
+				}
+			}
+			write_sequnlock_irq(&bb->lock);
+		}
+		if ((test_bit(ExternalBbl, &rdev->flags) &&
+			rdev->badblocks.unacked_exist)) {
+			unblock = 0;
+		} else if (!test_bit(Faulty, &rdev->flags) &&
 		    rdev->badblocks.unacked_exist) {
 			/* metadata handler doesn't understand badblocks,
 			 * so we need to fail the device
 			 */
 			md_error(rdev->mddev, rdev);
 		}
-		clear_bit(Blocked, &rdev->flags);
-		clear_bit(BlockedBadBlocks, &rdev->flags);
-		wake_up(&rdev->blocked_wait);
-		set_bit(MD_RECOVERY_NEEDED, &rdev->mddev->recovery);
-		md_wakeup_thread(rdev->mddev->thread);
-
+		if (unblock) {
+			clear_bit(Blocked, &rdev->flags);
+			clear_bit(BlockedBadBlocks, &rdev->flags);
+			wake_up(&rdev->blocked_wait);
+			set_bit(MD_RECOVERY_NEEDED, &rdev->mddev->recovery);
+			md_wakeup_thread(rdev->mddev->thread);
+		}
 		err = 0;
 	} else if (cmd_match(buf, "insync") && rdev->raid_disk == -1) {
 		set_bit(In_sync, &rdev->flags);
