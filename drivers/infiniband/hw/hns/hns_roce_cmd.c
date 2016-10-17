@@ -248,10 +248,14 @@ static int hns_roce_cmd_mbox_wait(struct hns_roce_dev *hr_dev, u64 in_param,
 {
 	int ret = 0;
 
-	down(&hr_dev->cmd.event_sem);
+	wait_event(hr_dev->cmd.event_sem.wq,
+		   atomic_add_unless(&hr_dev->cmd.event_sem.count, -1, 0));
+
 	ret = __hns_roce_cmd_mbox_wait(hr_dev, in_param, out_param,
 				       in_modifier, op_modifier, op, timeout);
-	up(&hr_dev->cmd.event_sem);
+
+	if (atomic_inc_return(&hr_dev->cmd.event_sem.count) == 1)
+		wake_up(&hr_dev->cmd.event_sem.wq);
 
 	return ret;
 }
@@ -313,7 +317,9 @@ int hns_roce_cmd_use_events(struct hns_roce_dev *hr_dev)
 	hr_cmd->context[hr_cmd->max_cmds - 1].next = -1;
 	hr_cmd->free_head = 0;
 
-	sema_init(&hr_cmd->event_sem, hr_cmd->max_cmds);
+	init_waitqueue_head(&hr_cmd->event_sem.wq);
+	atomic_set(&hr_cmd->event_sem.count, hr_cmd->max_cmds);
+
 	spin_lock_init(&hr_cmd->context_lock);
 
 	hr_cmd->token_mask = CMD_TOKEN_MASK;
@@ -332,7 +338,9 @@ void hns_roce_cmd_use_polling(struct hns_roce_dev *hr_dev)
 	hr_cmd->use_events = 0;
 
 	for (i = 0; i < hr_cmd->max_cmds; ++i)
-		down(&hr_cmd->event_sem);
+		wait_event(hr_cmd->event_sem.wq,
+			   atomic_add_unless(
+			   &hr_dev->cmd.event_sem.count, -1, 0));
 
 	kfree(hr_cmd->context);
 	mutex_unlock(&hr_cmd->poll_mutex);

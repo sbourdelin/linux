@@ -291,6 +291,11 @@ struct ib_sa_service_rec {
 #define IB_SA_GUIDINFO_REC_GID6		IB_SA_COMP_MASK(10)
 #define IB_SA_GUIDINFO_REC_GID7		IB_SA_COMP_MASK(11)
 
+struct ib_semaphore {
+	wait_queue_head_t wq;
+	atomic_t count;
+};
+
 struct ib_sa_guidinfo_rec {
 	__be16	lid;
 	u8	block_num;
