@@ -11,6 +11,7 @@ Contents:
    REPORTING-BUGS
    BUG-HUNTING
    oops-tracing
+   ramoops
    initrd
    init
    dynamic-debug-howto
