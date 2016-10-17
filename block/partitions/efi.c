@@ -550,21 +550,6 @@ compare_gpts(gpt_header *pgpt, gpt_header *agpt, u64 lastlba)
 		       le32_to_cpu(agpt->partition_entry_array_crc32));
 		error_found++;
 	}
-	if (le64_to_cpu(pgpt->alternate_lba) != lastlba) {
-		pr_warn("GPT:Primary header thinks Alt. header is not at the end of the disk.\n");
-		pr_warn("GPT:%lld != %lld\n",
-			(unsigned long long)le64_to_cpu(pgpt->alternate_lba),
-			(unsigned long long)lastlba);
-		error_found++;
-	}
-
-	if (le64_to_cpu(agpt->my_lba) != lastlba) {
-		pr_warn("GPT:Alternate GPT header not at the end of the disk.\n");
-		pr_warn("GPT:%lld != %lld\n",
-			(unsigned long long)le64_to_cpu(agpt->my_lba),
-			(unsigned long long)lastlba);
-		error_found++;
-	}
 
 	if (error_found)
 		pr_warn("GPT: Use GNU Parted to correct GPT errors.\n");
