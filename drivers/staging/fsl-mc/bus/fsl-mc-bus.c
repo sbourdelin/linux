@@ -164,8 +164,7 @@ static int fsl_mc_driver_probe(struct device *dev)
 
 	error = mc_drv->probe(mc_dev);
 	if (error < 0) {
-		dev_err(dev, "MC object device probe callback failed: %d\n",
-			error);
+		dev_err(dev, "%s failed: %d\n", __func__, error);
 		return error;
 	}
 
@@ -183,9 +182,7 @@ static int fsl_mc_driver_remove(struct device *dev)
 
 	error = mc_drv->remove(mc_dev);
 	if (error < 0) {
-		dev_err(dev,
-			"MC object device remove callback failed: %d\n",
-			error);
+		dev_err(dev, "%s failed: %d\n", __func__, error);
 		return error;
 	}
 
@@ -227,13 +224,12 @@ int __fsl_mc_driver_register(struct fsl_mc_driver *mc_driver,
 
 	error = driver_register(&mc_driver->driver);
 	if (error < 0) {
-		pr_err("driver_register() failed for %s: %d\n",
+		pr_err("fsl-mc: driver_register() failed for %s: %d\n",
 		       mc_driver->driver.name, error);
 		return error;
 	}
 
-	pr_info("MC object device driver %s registered\n",
-		mc_driver->driver.name);
+	pr_info("fsl-mc: driver %s registered\n", mc_driver->driver.name);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(__fsl_mc_driver_register);
@@ -572,8 +568,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
 	}
 
 	(void)get_device(&mc_dev->dev);
-	dev_dbg(parent_dev, "Added MC object device %s\n",
-		dev_name(&mc_dev->dev));
+	dev_dbg(parent_dev, "added %s\n", dev_name(&mc_dev->dev));
 
 	*new_mc_dev = mc_dev;
 	return 0;
@@ -749,7 +744,7 @@ static int fsl_mc_bus_probe(struct platform_device *pdev)
 	struct mc_version mc_version;
 	struct resource res;
 
-	dev_info(&pdev->dev, "Root MC bus device probed");
+	dev_info(&pdev->dev, "root DPRC probed");
 
 	mc = devm_kzalloc(&pdev->dev, sizeof(*mc), GFP_KERNEL);
 	if (!mc)
@@ -783,8 +778,7 @@ static int fsl_mc_bus_probe(struct platform_device *pdev)
 		goto error_cleanup_mc_io;
 	}
 
-	dev_info(&pdev->dev,
-		 "Freescale Management Complex Firmware version: %u.%u.%u\n",
+	dev_info(&pdev->dev, "MC firmware version: %u.%u.%u\n",
 		 mc_version.major, mc_version.minor, mc_version.revision);
 
 	error = get_mc_addr_translation_ranges(&pdev->dev,
@@ -840,7 +834,7 @@ static int fsl_mc_bus_remove(struct platform_device *pdev)
 	fsl_destroy_mc_io(mc->root_mc_bus_dev->mc_io);
 	mc->root_mc_bus_dev->mc_io = NULL;
 
-	dev_info(&pdev->dev, "Root MC bus device removed");
+	dev_info(&pdev->dev, "root DPRC removed");
 	return 0;
 }
 
@@ -869,21 +863,21 @@ static int __init fsl_mc_bus_driver_init(void)
 					 sizeof(struct fsl_mc_device), 0, 0,
 					 NULL);
 	if (!mc_dev_cache) {
-		pr_err("Could not create fsl_mc_device cache\n");
+		pr_err("fsl-mc: could not create fsl_mc_device cache\n");
 		return -ENOMEM;
 	}
 
 	error = bus_register(&fsl_mc_bus_type);
 	if (error < 0) {
-		pr_err("fsl-mc bus type registration failed: %d\n", error);
+		pr_err("fsl-mc: bus registration failed: %d\n", error);
 		goto error_cleanup_cache;
 	}
 
-	pr_info("fsl-mc bus type registered\n");
+	pr_info("fsl-mc: bus registered\n");
 
 	error = platform_driver_register(&fsl_mc_bus_driver);
 	if (error < 0) {
-		pr_err("platform_driver_register() failed: %d\n", error);
+		pr_err("fsl-mc: driver registration failed: %d\n", error);
 		goto error_cleanup_bus;
 	}
 
