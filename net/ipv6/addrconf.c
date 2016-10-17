@@ -238,6 +238,9 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.use_oif_addrs_only	= 0,
 	.ignore_routes_with_linkdown = 0,
 	.keep_addr_on_down	= 0,
+#ifdef CONFIG_IPV6_SEG6
+	.seg6_enabled		= 0,
+#endif
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
@@ -284,6 +287,9 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.use_oif_addrs_only	= 0,
 	.ignore_routes_with_linkdown = 0,
 	.keep_addr_on_down	= 0,
+#ifdef CONFIG_IPV6_SEG6
+	.seg6_enabled		= 0,
+#endif
 };
 
 /* Check if a valid qdisc is available */
@@ -4945,6 +4951,9 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_DROP_UNICAST_IN_L2_MULTICAST] = cnf->drop_unicast_in_l2_multicast;
 	array[DEVCONF_DROP_UNSOLICITED_NA] = cnf->drop_unsolicited_na;
 	array[DEVCONF_KEEP_ADDR_ON_DOWN] = cnf->keep_addr_on_down;
+#ifdef CONFIG_IPV6_SEG6
+	array[DEVCONF_SEG6_ENABLED] = cnf->seg6_enabled;
+#endif
 }
 
 static inline size_t inet6_ifla6_size(void)
@@ -6036,6 +6045,15 @@ static const struct ctl_table addrconf_sysctl[] = {
 		.proc_handler	= proc_dointvec,
 
 	},
+#ifdef CONFIG_IPV6_SEG6
+	{
+		.procname	= "seg6_enabled",
+		.data		= &ipv6_devconf.seg6_enabled,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+#endif
 	{
 		/* sentinel */
 	}

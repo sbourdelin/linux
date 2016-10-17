@@ -289,4 +289,17 @@ config IPV6_PIMSM_V2
 	  Support for IPv6 PIM multicast routing protocol PIM-SMv2.
 	  If unsure, say N.
 
+config IPV6_SEG6
+	bool "IPv6: Segment Routing support"
+	depends on IPV6
+	select CRYPTO_HMAC
+	select CRYPTO_SHA1
+	select CRYPTO_SHA256
+	---help---
+	  Experimental support for IPv6 Segment Routing dataplane as defined
+	  in IETF draft-ietf-6man-segment-routing-header-02. This option
+	  enables the processing of SR-enabled packets allowing the kernel
+	  to act as a segment endpoint (intermediate or egress). It also
+	  enables an API for the kernel to act as an ingress SR router.
+
 endif # IPV6
