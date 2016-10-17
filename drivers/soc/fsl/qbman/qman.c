@@ -1321,8 +1321,7 @@ static void qman_destroy_portal(struct qman_portal *qm)
 	qm_dqrr_finish(&qm->p);
 	qm_eqcr_finish(&qm->p);
 
-	platform_device_del(qm->pdev);
-	platform_device_put(qm->pdev);
+	platform_device_unregister(qm->pdev);
 
 	qm->config = NULL;
 }
