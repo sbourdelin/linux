@@ -1764,6 +1764,16 @@ static void piix_remove_one(struct pci_dev *pdev)
 {
 	struct ata_host *host = pci_get_drvdata(pdev);
 	struct piix_host_priv *hpriv = host->private_data;
+	int i, timeout = 0;
+
+	/* wait for async probe end */
+	for (i = 0; i < host->n_ports; i++) {
+		while ((host->ports[i]->pflags & ATA_PFLAG_RESETTING) &&
+		       timeout < 100) {
+			msleep(20);
+			timeout++;
+		}
+	}
 
 	pci_write_config_dword(pdev, PIIX_IOCFG, hpriv->saved_iocfg);
 
