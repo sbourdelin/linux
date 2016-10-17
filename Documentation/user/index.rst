@@ -11,3 +11,4 @@ Contents:
    REPORTING-BUGS
    SecurityBugs
    kernel-parameters
+   bad_memory
