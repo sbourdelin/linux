@@ -21,6 +21,7 @@ Contents:
    braile-console
    parport
    md
+   sysrq
    sysfs-rules
    devices
    module-signing
