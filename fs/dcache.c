@@ -438,7 +438,7 @@ static void dentry_lru_add(struct dentry *dentry)
  */
 void __d_drop(struct dentry *dentry)
 {
-	if (!d_unhashed(dentry)) {
+	if (!hlist_bl_unhashed(&dentry->d_hash)) {
 		struct hlist_bl_head *b;
 		/*
 		 * Hashed dentries are normally on the dentry hashtable,
@@ -2342,7 +2342,8 @@ EXPORT_SYMBOL(d_delete);
 static void __d_rehash(struct dentry *entry)
 {
 	struct hlist_bl_head *b = d_hash(entry->d_name.hash);
-	BUG_ON(!d_unhashed(entry));
+
+	BUG_ON(!hlist_bl_unhashed(&entry->d_hash));
 	hlist_bl_lock(b);
 	hlist_bl_add_head_rcu(&entry->d_hash, b);
 	hlist_bl_unlock(b);

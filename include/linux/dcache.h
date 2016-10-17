@@ -330,7 +330,15 @@ extern struct dentry *dget_parent(struct dentry *dentry);
  
 static inline int d_unhashed(const struct dentry *dentry)
 {
-	return hlist_bl_unhashed(&dentry->d_hash);
+	int ret;
+	unsigned int seq;
+
+	do {
+		seq = read_seqcount_begin(&dentry->d_seq);
+		ret = hlist_bl_unhashed(&dentry->d_hash);
+	} while (read_seqcount_retry(&dentry->d_seq, seq));
+
+	return ret;
 }
 
 static inline int d_unlinked(const struct dentry *dentry)
