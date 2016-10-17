@@ -12,3 +12,4 @@ Contents:
    SecurityBugs
    kernel-parameters
    bad_memory
+   basic_profiling
