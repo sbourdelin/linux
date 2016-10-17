@@ -228,7 +228,7 @@ static ssize_t health_show(struct kobject *kobj, struct attribute *attr,
 		return sprintf(buf, "LBUG\n");
 
 	read_lock(&obd_dev_lock);
-	for (i = 0; i < class_devno_max(); i++) {
+	for (i = 0; i < MAX_OBD_DEVICES; i++) {
 		struct obd_device *obd;
 
 		obd = class_num2obd(i);
@@ -326,7 +326,7 @@ static struct attribute *lustre_attrs[] = {
 
 static void *obd_device_list_seq_start(struct seq_file *p, loff_t *pos)
 {
-	if (*pos >= class_devno_max())
+	if (*pos >= MAX_OBD_DEVICES)
 		return NULL;
 
 	return pos;
@@ -339,7 +339,7 @@ static void obd_device_list_seq_stop(struct seq_file *p, void *v)
 static void *obd_device_list_seq_next(struct seq_file *p, void *v, loff_t *pos)
 {
 	++*pos;
-	if (*pos >= class_devno_max())
+	if (*pos >= MAX_OBD_DEVICES)
 		return NULL;
 
 	return pos;

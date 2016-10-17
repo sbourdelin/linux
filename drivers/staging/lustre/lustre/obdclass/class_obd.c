@@ -345,7 +345,7 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
 			goto out;
 		}
 		obd = class_name2obd(data->ioc_inlbuf4);
-	} else if (data->ioc_dev < class_devno_max()) {
+	} else if (data->ioc_dev < MAX_OBD_DEVICES) {
 		obd = class_num2obd(data->ioc_dev);
 	} else {
 		CERROR("OBD ioctl: No device\n");
@@ -499,7 +499,7 @@ static int __init obdclass_init(void)
 	}
 
 	/* This struct is already zeroed for us (static global) */
-	for (i = 0; i < class_devno_max(); i++)
+	for (i = 0; i < MAX_OBD_DEVICES; i++)
 		obd_devs[i] = NULL;
 
 	/* Default the dirty page cache cap to 1/2 of system memory.
@@ -549,7 +549,7 @@ static void obdclass_exit(void)
 	lustre_unregister_fs();
 
 	misc_deregister(&obd_psdev);
-	for (i = 0; i < class_devno_max(); i++) {
+	for (i = 0; i < MAX_OBD_DEVICES; i++) {
 		struct obd_device *obd = class_num2obd(i);
 
 		if (obd && obd->obd_set_up &&

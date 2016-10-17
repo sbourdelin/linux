@@ -290,7 +290,7 @@ struct obd_device *class_newdev(const char *type_name, const char *name)
 	LASSERT(newdev->obd_magic == OBD_DEVICE_MAGIC);
 
 	write_lock(&obd_dev_lock);
-	for (i = 0; i < class_devno_max(); i++) {
+	for (i = 0; i < MAX_OBD_DEVICES; i++) {
 		struct obd_device *obd = class_num2obd(i);
 
 		if (obd && (strcmp(name, obd->obd_name) == 0)) {
@@ -322,9 +322,9 @@ struct obd_device *class_newdev(const char *type_name, const char *name)
 	}
 	write_unlock(&obd_dev_lock);
 
-	if (!result && i >= class_devno_max()) {
+	if (!result && i >= MAX_OBD_DEVICES) {
 		CERROR("all %u OBD devices used, increase MAX_OBD_DEVICES\n",
-		       class_devno_max());
+		       MAX_OBD_DEVICES);
 		result = ERR_PTR(-EOVERFLOW);
 		goto out;
 	}
@@ -372,7 +372,7 @@ int class_name2dev(const char *name)
 		return -1;
 
 	read_lock(&obd_dev_lock);
-	for (i = 0; i < class_devno_max(); i++) {
+	for (i = 0; i < MAX_OBD_DEVICES; i++) {
 		struct obd_device *obd = class_num2obd(i);
 
 		if (obd && strcmp(name, obd->obd_name) == 0) {
@@ -397,7 +397,7 @@ struct obd_device *class_name2obd(const char *name)
 {
 	int dev = class_name2dev(name);
 
-	if (dev < 0 || dev > class_devno_max())
+	if (dev < 0 || dev > MAX_OBD_DEVICES)
 		return NULL;
 	return class_num2obd(dev);
 }
@@ -408,7 +408,7 @@ int class_uuid2dev(struct obd_uuid *uuid)
 	int i;
 
 	read_lock(&obd_dev_lock);
-	for (i = 0; i < class_devno_max(); i++) {
+	for (i = 0; i < MAX_OBD_DEVICES; i++) {
 		struct obd_device *obd = class_num2obd(i);
 
 		if (obd && obd_uuid_equals(uuid, &obd->obd_uuid)) {
@@ -435,7 +435,7 @@ struct obd_device *class_num2obd(int num)
 {
 	struct obd_device *obd = NULL;
 
-	if (num < class_devno_max()) {
+	if (num < MAX_OBD_DEVICES) {
 		obd = obd_devs[num];
 		if (!obd)
 			return NULL;
@@ -463,7 +463,7 @@ struct obd_device *class_find_client_obd(struct obd_uuid *tgt_uuid,
 	int i;
 
 	read_lock(&obd_dev_lock);
-	for (i = 0; i < class_devno_max(); i++) {
+	for (i = 0; i < MAX_OBD_DEVICES; i++) {
 		struct obd_device *obd = class_num2obd(i);
 
 		if (!obd)
@@ -496,13 +496,13 @@ struct obd_device *class_devices_in_group(struct obd_uuid *grp_uuid, int *next)
 
 	if (!next)
 		i = 0;
-	else if (*next >= 0 && *next < class_devno_max())
+	else if (*next >= 0 && *next < MAX_OBD_DEVICES)
 		i = *next;
 	else
 		return NULL;
 
 	read_lock(&obd_dev_lock);
-	for (; i < class_devno_max(); i++) {
+	for (; i < MAX_OBD_DEVICES; i++) {
 		struct obd_device *obd = class_num2obd(i);
 
 		if (!obd)
@@ -533,7 +533,7 @@ int class_notify_sptlrpc_conf(const char *fsname, int namelen)
 	LASSERT(namelen > 0);
 
 	read_lock(&obd_dev_lock);
-	for (i = 0; i < class_devno_max(); i++) {
+	for (i = 0; i < MAX_OBD_DEVICES; i++) {
 		obd = class_num2obd(i);
 
 		if (!obd || obd->obd_set_up == 0 || obd->obd_stopping)
