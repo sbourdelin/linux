@@ -24,5 +24,6 @@ Contents:
    applying-patches
    email-clients
    SubmitChecklist
+   adding-syscalls
 
    development-process
