@@ -23,6 +23,7 @@ Contents:
    md
    sysrq
    unicode
+   VGA-softcursor
    sysfs-rules
    devices
    module-signing
