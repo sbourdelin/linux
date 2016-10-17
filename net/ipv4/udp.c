@@ -1977,6 +1977,9 @@ void udp_destroy_sock(struct sock *sk)
 		if (encap_destroy)
 			encap_destroy(sk);
 	}
+
+	if (up->flow_dissect)
+		udp_flow_dissect_disable();
 }
 
 /*
