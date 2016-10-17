@@ -231,8 +231,7 @@ static int allocate_frame_data(void)
 	}
 	frame_dma = dma_map_single(&pdev->dev, frame_ptr, 4 * HP_NUM_WORDS,
 				   DMA_BIDIRECTIONAL);
-	platform_device_del(pdev);
-	platform_device_put(pdev);
+	platform_device_unregister(pdev);
 	return 0;
 }
 
