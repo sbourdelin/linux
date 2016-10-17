@@ -14,6 +14,7 @@ Contents:
    kernel-parameters
    serial-console
    braile-console
+   devices
    binfmt_misc
    bad_memory
    basic_profiling
