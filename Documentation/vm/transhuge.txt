@@ -238,6 +238,12 @@ values:
   - "force":
     Force the huge option on for all - very useful for testing;
 
+Tehre's limit on minimal file size before kenrel starts allocate huge
+pages for it. By default it's size of huge page.
+
+You can adjust the limit using "huge_min_size=" mount option or
+/sys/kernel/mm/transparent_hugepage/shmem_min_size for in-kernel mount.
+
 == Need of application restart ==
 
 The transparent_hugepage/enabled values and tmpfs mount option only affect

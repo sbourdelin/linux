@@ -369,6 +369,7 @@ static bool shmem_confirm_swap(struct address_space *mapping,
 /* ifdef here to avoid bloating shmem.o when not necessary */
 
 int shmem_huge __read_mostly;
+unsigned long long shmem_huge_min_size = HPAGE_PMD_SIZE __read_mostly;
 
 static int shmem_parse_huge(const char *str)
 {
@@ -1668,6 +1669,8 @@ repeat:
 		swap_free(swap);
 
 	} else {
+		loff_t i_size;
+
 		/* shmem_symlink() */
 		if (mapping->a_ops != &shmem_aops)
 			goto alloc_nohuge;
@@ -1675,14 +1678,17 @@ repeat:
 			goto alloc_nohuge;
 		if (shmem_huge == SHMEM_HUGE_FORCE)
 			goto alloc_huge;
+		i_size = i_size_read(inode);
+		if (i_size < sbinfo->huge_min_size &&
+				index < (sbinfo->huge_min_size >> PAGE_SHIFT))
+			goto alloc_nohuge;
 		switch (sbinfo->huge) {
-			loff_t i_size;
 			pgoff_t off;
 		case SHMEM_HUGE_NEVER:
 			goto alloc_nohuge;
 		case SHMEM_HUGE_WITHIN_SIZE:
 			off = round_up(index, HPAGE_PMD_NR);
-			i_size = round_up(i_size_read(inode), PAGE_SIZE);
+			i_size = round_up(i_size, PAGE_SIZE);
 			if (i_size >= HPAGE_PMD_SIZE &&
 					i_size >> PAGE_SHIFT >= off)
 				goto alloc_huge;
@@ -3349,6 +3355,10 @@ static int shmem_parse_options(char *options, struct shmem_sb_info *sbinfo,
 					huge != SHMEM_HUGE_NEVER)
 				goto bad_val;
 			sbinfo->huge = huge;
+		} else if (!strcmp(this_char, "huge_min_size")) {
+			sbinfo->huge_min_size = memparse(value, &rest);
+			if (*rest)
+				goto bad_val;
 #endif
 #ifdef CONFIG_NUMA
 		} else if (!strcmp(this_char,"mpol")) {
@@ -3382,6 +3392,8 @@ static int shmem_remount_fs(struct super_block *sb, int *flags, char *data)
 	int error = -EINVAL;
 
 	config.mpol = NULL;
+	if (IS_ENABLED(CONFIG_TRANSPARENT_HUGE_PAGECACHE))
+		config.huge_min_size = HPAGE_PMD_SIZE;
 	if (shmem_parse_options(data, &config, true))
 		return error;
 
@@ -3403,6 +3415,7 @@ static int shmem_remount_fs(struct super_block *sb, int *flags, char *data)
 
 	error = 0;
 	sbinfo->huge = config.huge;
+	sbinfo->huge_min_size = config.huge_min_size;
 	sbinfo->max_blocks  = config.max_blocks;
 	sbinfo->max_inodes  = config.max_inodes;
 	sbinfo->free_inodes = config.max_inodes - inodes;
@@ -3438,8 +3451,10 @@ static int shmem_show_options(struct seq_file *seq, struct dentry *root)
 				from_kgid_munged(&init_user_ns, sbinfo->gid));
 #ifdef CONFIG_TRANSPARENT_HUGE_PAGECACHE
 	/* Rightly or wrongly, show huge mount option unmasked by shmem_huge */
-	if (sbinfo->huge)
+	if (sbinfo->huge) {
 		seq_printf(seq, ",huge=%s", shmem_format_huge(sbinfo->huge));
+		seq_printf(seq, ",huge_min_size=%llu", sbinfo->huge_min_size);
+	}
 #endif
 	shmem_show_mpol(seq, sbinfo->mpol);
 	return 0;
@@ -3542,6 +3557,8 @@ int shmem_fill_super(struct super_block *sb, void *data, int silent)
 	sbinfo->mode = S_IRWXUGO | S_ISVTX;
 	sbinfo->uid = current_fsuid();
 	sbinfo->gid = current_fsgid();
+	if (IS_ENABLED(CONFIG_TRANSPARENT_HUGE_PAGECACHE))
+		sbinfo->huge_min_size = HPAGE_PMD_SIZE;
 	sb->s_fs_info = sbinfo;
 
 #ifdef CONFIG_TMPFS
@@ -3780,9 +3797,10 @@ int __init shmem_init(void)
 	}
 
 #ifdef CONFIG_TRANSPARENT_HUGE_PAGECACHE
-	if (has_transparent_hugepage() && shmem_huge < SHMEM_HUGE_DENY)
+	if (has_transparent_hugepage() && shmem_huge < SHMEM_HUGE_DENY) {
 		SHMEM_SB(shm_mnt->mnt_sb)->huge = shmem_huge;
-	else
+		SHMEM_SB(shm_mnt->mnt_sb)->huge_min_size = shmem_huge_min_size;
+	} else
 		shmem_huge = 0; /* just in case it was patched */
 #endif
 	return 0;
@@ -3848,6 +3866,34 @@ static ssize_t shmem_enabled_store(struct kobject *kobj,
 
 struct kobj_attribute shmem_enabled_attr =
 	__ATTR(shmem_enabled, 0644, shmem_enabled_show, shmem_enabled_store);
+
+static ssize_t shmem_min_size_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%llu\n", shmem_huge_min_size);
+}
+
+
+static ssize_t shmem_min_size_store(struct kobject *kobj,
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	unsigned long long size;
+	char *end;
+
+	size = memparse(buf, &end);
+	if (end == buf)
+		return  -EINVAL;
+	if (*end == '\n')
+		end++;
+	if (*end != '\0')
+		return -EINVAL;
+	shmem_huge_min_size = size;
+	SHMEM_SB(shm_mnt->mnt_sb)->huge_min_size = size;
+	return end - buf;
+}
+
+struct kobj_attribute shmem_min_size_attr =
+	__ATTR(shmem_min_size, 0644, shmem_min_size_show, shmem_min_size_store);
 #endif /* CONFIG_TRANSPARENT_HUGE_PAGECACHE && CONFIG_SYSFS */
 
 #ifdef CONFIG_TRANSPARENT_HUGE_PAGECACHE
