@@ -9,6 +9,7 @@ Contents:
 
    README
    REPORTING-BUGS
+   BUG-HUNTING
    SecurityBugs
    kernel-parameters
    serial-console
