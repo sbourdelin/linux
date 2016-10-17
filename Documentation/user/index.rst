@@ -18,6 +18,7 @@ Contents:
    kernel-parameters
    serial-console
    braile-console
+   parport
    md
    devices
    module-signing
