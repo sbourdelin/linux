@@ -3293,3 +3293,40 @@ int kernel_sock_shutdown(struct socket *sock, enum sock_shutdown_cmd how)
 	return sock->ops->shutdown(sock, how);
 }
 EXPORT_SYMBOL(kernel_sock_shutdown);
+
+/*
+ *	This routine returns the IP overhead imposed by a socket i.e.
+ *	the length of the underlying IP header, depending on whether
+ *      this is an IPv4 or IPv6 socket and the length from IP options turned
+ *      on at the socket.
+ */
+u32 kernel_sock_ip_overhead(struct sock *sk)
+{
+	u32 overhead = 0;
+	if (!sk)
+		goto done;
+	if (sk->sk_family == AF_INET) {
+		struct ip_options_rcu *opt = NULL;
+		struct inet_sock *inet = inet_sk(sk);
+		overhead += sizeof(struct iphdr);
+		if (inet)
+			opt = rcu_dereference_protected(inet->inet_opt,
+							sock_owned_by_user(sk));
+		if (opt)
+			overhead += opt->opt.optlen;
+	}
+	else if (sk->sk_family == AF_INET6) {
+		struct ipv6_pinfo *np = inet6_sk(sk);
+		struct ipv6_txoptions *opt = NULL;
+		overhead += sizeof(struct ipv6hdr);
+		if (np)
+			opt = rcu_dereference_protected(np->opt,
+							sock_owned_by_user(sk));
+		if (opt)
+			overhead += (opt->opt_flen + opt->opt_nflen);
+	}
+
+done:
+	return overhead;
+}
+EXPORT_SYMBOL_GPL(kernel_sock_ip_overhead);
