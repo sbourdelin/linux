@@ -49,6 +49,7 @@
 #endif
 #ifdef CONFIG_IPV6_SEG6
 #include <linux/seg6.h>
+#include <net/seg6_hmac.h>
 #endif
 
 #include <linux/uaccess.h>
@@ -309,6 +310,11 @@ static int ipv6_srh_rcv(struct sk_buff *skb)
 		accept_seg6 = idev->cnf.seg6_enabled;
 
 	if (!accept_seg6) {
+		kfree_skb(skb);
+		return -1;
+	}
+
+	if (!seg6_hmac_validate_skb(skb)) {
 		kfree_skb(skb);
 		return -1;
 	}
