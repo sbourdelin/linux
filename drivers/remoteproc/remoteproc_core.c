@@ -916,7 +916,7 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
 	complete_all(&rproc->firmware_loading_complete);
 }
 
-static int rproc_add_virtio_devices(struct rproc *rproc)
+int rproc_add_virtio_devices(struct rproc *rproc)
 {
 	int ret;
 
