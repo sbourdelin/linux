@@ -619,7 +619,7 @@ isert_connected_handler(struct rdma_cm_id *cma_id)
 	mutex_unlock(&isert_np->mutex);
 
 	isert_info("np %p: Allow accept_np to continue\n", isert_np);
-	up(&isert_np->sem);
+	complete(&isert_np->comp);
 }
 
 static void
@@ -2311,7 +2311,7 @@ isert_setup_np(struct iscsi_np *np,
 		isert_err("Unable to allocate struct isert_np\n");
 		return -ENOMEM;
 	}
-	sema_init(&isert_np->sem, 0);
+	init_completion(&isert_np->comp);
 	mutex_init(&isert_np->mutex);
 	INIT_LIST_HEAD(&isert_np->accepted);
 	INIT_LIST_HEAD(&isert_np->pending);
@@ -2427,7 +2427,7 @@ isert_accept_np(struct iscsi_np *np, struct iscsi_conn *conn)
 	int ret;
 
 accept_wait:
-	ret = down_interruptible(&isert_np->sem);
+	ret = wait_for_completion_interruptible(&isert_np->comp);
 	if (ret)
 		return -ENODEV;
 

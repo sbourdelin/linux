@@ -3,6 +3,7 @@
 #include <linux/in6.h>
 #include <rdma/ib_verbs.h>
 #include <rdma/rdma_cm.h>
+#include <linux/completion.h>
 #include <rdma/rw.h>
 #include <scsi/iser.h>
 
@@ -190,7 +191,7 @@ struct isert_device {
 
 struct isert_np {
 	struct iscsi_np         *np;
-	struct semaphore	sem;
+	struct completion	comp;
 	struct rdma_cm_id	*cm_id;
 	struct mutex		mutex;
 	struct list_head	accepted;
