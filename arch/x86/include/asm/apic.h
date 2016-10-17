@@ -174,7 +174,7 @@ static inline void disable_local_APIC(void) { }
 static inline void lapic_update_tsc_freq(void) { }
 #endif /* !CONFIG_X86_LOCAL_APIC */
 
-#ifdef CONFIG_X86_X2APIC
+#if defined CONFIG_X86_X2APIC || defined CONFIG_KVM_GUEST
 /*
  * Make previous memory operations globally visible before
  * sending the IPI through x2apic wrmsr. We need a serializing instruction or
@@ -196,7 +196,7 @@ static inline void native_apic_msr_write(u32 reg, u32 v)
 
 static inline void native_apic_msr_eoi_write(u32 reg, u32 v)
 {
-	wrmsr(APIC_BASE_MSR + (APIC_EOI >> 4), APIC_EOI_ACK, 0);
+	wrmsr_notrace(APIC_BASE_MSR + (APIC_EOI >> 4), APIC_EOI_ACK, 0);
 }
 
 static inline u32 native_apic_msr_read(u32 reg)
