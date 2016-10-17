@@ -166,6 +166,7 @@ enum {
 	ATA_DFLAG_NO_UNLOAD	= (1 << 17), /* device doesn't support unload */
 	ATA_DFLAG_UNLOCK_HPA	= (1 << 18), /* unlock HPA */
 	ATA_DFLAG_NCQ_SEND_RECV = (1 << 19), /* device supports NCQ SEND and RECV */
+	ATA_DFLAG_NCQ_PRIO	= (1 << 20), /* device supports NCQ priority */
 	ATA_DFLAG_INIT_MASK	= (1 << 24) - 1,
 
 	ATA_DFLAG_DETACH	= (1 << 24),
@@ -342,7 +343,9 @@ enum {
 	ATA_SHIFT_PIO		= 0,
 	ATA_SHIFT_MWDMA		= ATA_SHIFT_PIO + ATA_NR_PIO_MODES,
 	ATA_SHIFT_UDMA		= ATA_SHIFT_MWDMA + ATA_NR_MWDMA_MODES,
+	ATA_SHIFT_PRIO		= 6,
 
+	ATA_PRIO_HIGH		= 2,
 	/* size of buffer to pad xfers ending on unaligned boundaries */
 	ATA_DMA_PAD_SZ		= 4,
 
@@ -1608,6 +1611,21 @@ static inline int ata_ncq_enabled(struct ata_device *dev)
 {
 	return (dev->flags & (ATA_DFLAG_PIO | ATA_DFLAG_NCQ_OFF |
 			      ATA_DFLAG_NCQ)) == ATA_DFLAG_NCQ;
+}
+
+/**
+ *	ata_ncq_prio_enabled - Test whether NCQ prio is enabled
+ *	@dev: ATA device to test for
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host lock)
+ *
+ *	RETURNS:
+ *	1 if NCQ prio is enabled for @dev, 0 otherwise.
+ */
+static inline int ata_ncq_prio_enabled(struct ata_device *dev)
+{
+	return (dev->flags & ATA_DFLAG_NCQ_PRIO) == ATA_DFLAG_NCQ_PRIO;
 }
 
 static inline bool ata_fpdma_dsm_supported(struct ata_device *dev)
