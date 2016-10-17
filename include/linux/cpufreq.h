@@ -677,10 +677,10 @@ static inline int cpufreq_table_find_index_dl(struct cpufreq_policy *policy,
 		if (best == table - 1)
 			return pos - table;
 
-		return best - pos;
+		return pos - best;
 	}
 
-	return best - pos;
+	return pos - best;
 }
 
 /* Works only on sorted freq-tables */
