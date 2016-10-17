@@ -10,6 +10,7 @@ Contents:
    README
    REPORTING-BUGS
    BUG-HUNTING
+   initrd
    dynamic-debug-howto
    SecurityBugs
    kernel-parameters
