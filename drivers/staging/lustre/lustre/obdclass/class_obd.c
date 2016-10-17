@@ -374,7 +374,6 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
 	return err;
 } /* class_handle_ioctl */
 
-#define OBD_INIT_CHECK
 static int obd_init_checks(void)
 {
 	__u64 u64val, div64val;
