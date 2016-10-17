@@ -16,6 +16,7 @@
 
 #include <linux/net.h>
 #include <linux/ipv6.h>
+#include <net/lwtunnel.h>
 
 struct seg6_pernet_data {
 	struct mutex lock;
@@ -35,6 +36,12 @@ static inline void seg6_pernet_lock(struct net *net)
 static inline void seg6_pernet_unlock(struct net *net)
 {
 	mutex_unlock(&seg6_pernet(net)->lock);
+}
+
+static inline struct seg6_iptunnel_encap *
+seg6_lwtunnel_encap(struct lwtunnel_state *lwtstate)
+{
+	return (struct seg6_iptunnel_encap *)lwtstate->data;
 }
 
 #endif
