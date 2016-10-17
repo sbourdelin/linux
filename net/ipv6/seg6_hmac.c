@@ -289,7 +289,7 @@ int seg6_push_hmac(struct net *net, struct in6_addr *saddr,
 	int err = -ENOENT;
 	struct sr6_tlv_hmac *tlv;
 
-	tlv = seg6_get_tlv(srh, SR6_TLV_HMAC);
+	tlv = seg6_get_tlv_hmac(srh);
 	if (!tlv)
 		return -EINVAL;
 

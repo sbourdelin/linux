@@ -240,6 +240,7 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.keep_addr_on_down	= 0,
 #ifdef CONFIG_IPV6_SEG6
 	.seg6_enabled		= 0,
+	.seg6_require_hmac	= 0,
 #endif
 };
 
@@ -289,6 +290,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.keep_addr_on_down	= 0,
 #ifdef CONFIG_IPV6_SEG6
 	.seg6_enabled		= 0,
+	.seg6_require_hmac	= 0,
 #endif
 };
 
@@ -4953,6 +4955,7 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_KEEP_ADDR_ON_DOWN] = cnf->keep_addr_on_down;
 #ifdef CONFIG_IPV6_SEG6
 	array[DEVCONF_SEG6_ENABLED] = cnf->seg6_enabled;
+	array[DEVCONF_SEG6_REQUIRE_HMAC] = cnf->seg6_require_hmac;
 #endif
 }
 
@@ -6048,6 +6051,13 @@ static const struct ctl_table addrconf_sysctl[] = {
 #ifdef CONFIG_IPV6_SEG6
 	{
 		.procname	= "seg6_enabled",
+		.data		= &ipv6_devconf.seg6_enabled,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "seg6_require_hmac",
 		.data		= &ipv6_devconf.seg6_enabled,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
