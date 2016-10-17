@@ -11,5 +11,6 @@ Contents:
    REPORTING-BUGS
    SecurityBugs
    kernel-parameters
+   binfmt_misc
    bad_memory
    basic_profiling
