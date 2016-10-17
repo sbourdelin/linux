@@ -2603,6 +2603,7 @@ megaraid_reset_handler(struct scsi_cmnd *scp)
 	list_for_each_entry_safe(scb, tmp, &adapter->pend_list, list) {
 		list_del_init(&scb->list);	// from pending list
 
+		spin_unlock_irqrestore(PENDING_LIST_LOCK(adapter), flags);
 		if (scb->sno >= MBOX_MAX_SCSI_CMDS) {
 			con_log(CL_ANN, (KERN_WARNING
 			"megaraid: IOCTL packet with %d[%d:%d] being reset\n",
@@ -2630,6 +2631,7 @@ megaraid_reset_handler(struct scsi_cmnd *scp)
 
 			megaraid_dealloc_scb(adapter, scb);
 		}
+		spin_lock_irqsave(PENDING_LIST_LOCK(adapter), flags);
 	}
 	spin_unlock_irqrestore(PENDING_LIST_LOCK(adapter), flags);
 
