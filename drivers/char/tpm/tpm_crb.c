@@ -71,7 +71,6 @@ enum crb_status {
 
 enum crb_flags {
 	CRB_FL_ACPI_START	= BIT(0),
-	CRB_FL_CRB_START	= BIT(1),
 };
 
 struct crb_priv {
@@ -158,8 +157,11 @@ static int crb_send(struct tpm_chip *chip, u8 *buf, size_t len)
 	/* Make sure that cmd is populated before issuing start. */
 	wmb();
 
-	if (priv->flags & CRB_FL_CRB_START)
-		iowrite32(CRB_START_INVOKE, &priv->cca->start);
+
+	/* At least some of the 4th Gen Core CPUs that report only needing ACPI
+	 * start require also CRB start so we always set it just in case.
+	 */
+	iowrite32(CRB_START_INVOKE, &priv->cca->start);
 
 	if (priv->flags & CRB_FL_ACPI_START)
 		rc = crb_do_acpi_start(chip);
@@ -329,14 +331,6 @@ static int crb_acpi_add(struct acpi_device *device)
 	priv = devm_kzalloc(dev, sizeof(struct crb_priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
-
-	/* The reason for the extra quirk is that the PTT in 4th Gen Core CPUs
-	 * report only ACPI start but in practice seems to require both
-	 * ACPI start and CRB start.
-	 */
-	if (sm == ACPI_TPM2_COMMAND_BUFFER || sm == ACPI_TPM2_MEMORY_MAPPED ||
-	    !strcmp(acpi_device_hid(device), "MSFT0101"))
-		priv->flags |= CRB_FL_CRB_START;
 
 	if (sm == ACPI_TPM2_START_METHOD ||
 	    sm == ACPI_TPM2_COMMAND_BUFFER_WITH_START_METHOD)
