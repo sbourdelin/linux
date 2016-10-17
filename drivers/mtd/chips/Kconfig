@@ -184,6 +184,23 @@ config MTD_CFI_INTELEXT
 	  provides support for command set 0001, used on Intel StrataFlash
 	  and other parts.
 
+config MTD_CFI_INTELEXT_NO_SUSPEND
+	bool "Disable erase and write suspends for Intel/Sharp flash"
+	depends on MTD_CFI_INTELEXT
+	default n
+	help
+	  Some revisions of the P30, P33, and J3 Flash memory devices can hang
+	  when an ERASE SUSPEND command is issued following an ERASE RESUME
+	  without waiting for the minimum delay time to elapse. The result
+	  is that when the ERASE appears to be complete (no bits are toggling),
+	  the contents of the Flash memory block on which the ERASE was
+	  executing could be inconsstent with the expected values (typically,
+	  the array value is stuck to the 0xC0, 0xC4, 0x80, or 0x84 values).
+	  This cause ERASE operation to fail.
+
+	  Please refer to Micron Technical Note TN-12-06:
+		Adapting the Linux Kernel for P30, P33, and J3 Flash
+
 config MTD_CFI_AMDSTD
 	tristate "Support for CFI command set 0002 (AMD/Fujitsu/Spansion chips)"
 	depends on MTD_GEN_PROBE

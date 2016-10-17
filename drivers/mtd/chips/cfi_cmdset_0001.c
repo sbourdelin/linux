@@ -35,8 +35,10 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/cfi.h>
 
-/* #define CMDSET0001_DISABLE_ERASE_SUSPEND_ON_WRITE */
-/* #define CMDSET0001_DISABLE_WRITE_SUSPEND */
+#ifdef CONFIG_MTD_CFI_INTELEXT_NO_SUSPEND
+#define CMDSET0001_DISABLE_ERASE_SUSPEND_ON_WRITE
+#define CMDSET0001_DISABLE_WRITE_SUSPEND
+#endif
 
 // debugging, turns off buffer write mode if set to 1
 #define FORCE_WORD_WRITE 0
