@@ -529,6 +529,7 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
 						 port);
 	if (!port->leg_domain) {
 		dev_err(dev, "Failed to get a INTx IRQ domain\n");
+		of_node_put(pcie_intc_node);
 		return -ENODEV;
 	}
 
@@ -540,6 +541,7 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
 							 &xilinx_pcie_msi_chip);
 		if (!port->msi_domain) {
 			dev_err(dev, "Failed to get a MSI IRQ domain\n");
+			of_node_put(pcie_intc_node);
 			return -ENODEV;
 		}
 
