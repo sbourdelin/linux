@@ -11,6 +11,7 @@ Contents:
    REPORTING-BUGS
    SecurityBugs
    kernel-parameters
+   serial-console
    binfmt_misc
    bad_memory
    basic_profiling
