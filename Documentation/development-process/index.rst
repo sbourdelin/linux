@@ -26,5 +26,6 @@ Contents:
    SubmitChecklist
    CodeOfConflict
    adding-syscalls
+   magic-number
 
    development-process
