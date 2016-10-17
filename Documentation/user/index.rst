@@ -21,5 +21,6 @@ Contents:
    devices
    module-signing
    binfmt_misc
+   mono
    bad_memory
    basic_profiling
