@@ -19,6 +19,7 @@ Contents:
    braile-console
    md
    devices
+   module-signing
    binfmt_misc
    bad_memory
    basic_profiling
