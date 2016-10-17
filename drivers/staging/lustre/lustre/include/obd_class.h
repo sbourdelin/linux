@@ -406,11 +406,6 @@ do {								 \
 	}							    \
 } while (0)
 
-static inline int class_devno_max(void)
-{
-	return MAX_OBD_DEVICES;
-}
-
 static inline int obd_get_info(const struct lu_env *env,
 			       struct obd_export *exp, __u32 keylen,
 			       void *key, __u32 *vallen, void *val,
