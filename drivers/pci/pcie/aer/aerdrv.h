@@ -80,6 +80,10 @@ struct aer_broadcast_data {
 	enum pci_ers_result result;
 };
 
+struct pci_aer_callbacks {
+	int (*error_source)(struct pci_dev *dev, unsigned int *id);
+};
+
 static inline pci_ers_result_t merge_result(enum pci_ers_result orig,
 		enum pci_ers_result new)
 {
@@ -110,6 +114,7 @@ void aer_isr(struct work_struct *work);
 void aer_print_error(struct pci_dev *dev, struct aer_err_info *info);
 void aer_print_port_info(struct pci_dev *dev, struct aer_err_info *info);
 irqreturn_t aer_irq(int irq, void *context);
+void pci_aer_set_callbacks(struct pci_aer_callbacks *cb);
 
 #ifdef CONFIG_ACPI_APEI
 int pcie_aer_get_firmware_first(struct pci_dev *pci_dev);

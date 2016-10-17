@@ -449,6 +449,15 @@ config X86_EXTENDED_PLATFORM
 endif
 # This is an alphabetically sorted list of 64 bit extended platforms
 # Please maintain the alphabetic order if and when there are additions
+
+config X86_ASR1K
+	bool "Cisco ASR1K"
+	depends on X86_64
+	depends on X86_EXTENDED_PLATFORM
+	---help---
+	  This option is needed in order to support Cisco ASR1K platforms.
+	  If you don't have one of these, you should say N here.
+
 config X86_NUMACHIP
 	bool "Numascale NumaChip"
 	depends on X86_64

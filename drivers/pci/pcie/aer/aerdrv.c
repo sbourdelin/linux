@@ -62,6 +62,8 @@ static struct pcie_port_service_driver aerdriver = {
 	.reset_link	= aer_root_reset,
 };
 
+static struct pci_aer_callbacks callbacks;
+
 static int pcie_aer_disable;
 
 void pci_no_aer(void)
@@ -72,6 +74,11 @@ void pci_no_aer(void)
 bool pci_aer_available(void)
 {
 	return !pcie_aer_disable && pci_msi_enabled();
+}
+
+void pci_aer_set_callbacks(struct pci_aer_callbacks *cb)
+{
+	memcpy(&callbacks, cb, sizeof(*cb));
 }
 
 static int set_device_error_reporting(struct pci_dev *dev, void *data)
@@ -149,6 +156,8 @@ static void aer_enable_rootport(struct aer_rpc *rpc)
 	pci_read_config_dword(pdev, aer_pos + PCI_ERR_ROOT_COMMAND, &reg32);
 	reg32 |= ROOT_PORT_INTR_ON_MESG_MASK;
 	pci_write_config_dword(pdev, aer_pos + PCI_ERR_ROOT_COMMAND, reg32);
+
+	pci_fixup_device(pci_fixup_aer_enable, pdev);
 }
 
 /**
@@ -212,6 +221,10 @@ irqreturn_t aer_irq(int irq, void *context)
 
 	/* Read error source and clear error status */
 	pci_read_config_dword(pdev->port, pos + PCI_ERR_ROOT_ERR_SRC, &id);
+
+	if (callbacks.error_source)
+		callbacks.error_source(pdev->port, &id);
+
 	pci_write_config_dword(pdev->port, pos + PCI_ERR_ROOT_STATUS, status);
 
 	/* Store error source for later DPC handler */

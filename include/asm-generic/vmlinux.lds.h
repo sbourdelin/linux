@@ -311,6 +311,9 @@
 		VMLINUX_SYMBOL(__start_pci_fixups_suspend_late) = .;	\
 		*(.pci_fixup_suspend_late)				\
 		VMLINUX_SYMBOL(__end_pci_fixups_suspend_late) = .;	\
+		VMLINUX_SYMBOL(__start_pci_fixups_aer_enable) = .;      \
+		*(.pci_fixup_aer_enable)                                \
+		VMLINUX_SYMBOL(__end_pci_fixups_aer_enable) = .;	\
 	}								\
 									\
 	/* Built-in firmware blobs */					\
