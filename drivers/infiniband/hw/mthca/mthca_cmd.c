@@ -417,7 +417,8 @@ static int mthca_cmd_wait(struct mthca_dev *dev,
 	int err = 0;
 	struct mthca_cmd_context *context;
 
-	down(&dev->cmd.event_sem);
+	wait_event(dev->cmd.event_sem.wq,
+		   atomic_add_unless(&dev->cmd.event_sem.count, -1, 0));
 
 	spin_lock(&dev->cmd.context_lock);
 	BUG_ON(dev->cmd.free_head < 0);
@@ -459,7 +460,8 @@ out:
 	dev->cmd.free_head = context - dev->cmd.context;
 	spin_unlock(&dev->cmd.context_lock);
 
-	up(&dev->cmd.event_sem);
+	if (atomic_inc_return(&dev->cmd.event_sem.count) == 1)
+		wake_up(&dev->cmd.event_sem.wq);
 	return err;
 }
 
@@ -571,7 +573,8 @@ int mthca_cmd_use_events(struct mthca_dev *dev)
 	dev->cmd.context[dev->cmd.max_cmds - 1].next = -1;
 	dev->cmd.free_head = 0;
 
-	sema_init(&dev->cmd.event_sem, dev->cmd.max_cmds);
+	init_waitqueue_head(&dev->cmd.event_sem.wq);
+	atomic_set(&dev->cmd.event_sem.count, dev->cmd.max_cmds);
 	spin_lock_init(&dev->cmd.context_lock);
 
 	for (dev->cmd.token_mask = 1;
@@ -597,7 +600,8 @@ void mthca_cmd_use_polling(struct mthca_dev *dev)
 	dev->cmd.flags &= ~MTHCA_CMD_USE_EVENTS;
 
 	for (i = 0; i < dev->cmd.max_cmds; ++i)
-		down(&dev->cmd.event_sem);
+		wait_event(dev->cmd.event_sem.wq,
+			   atomic_add_unless(&dev->cmd.event_sem.count, -1, 0));
 
 	kfree(dev->cmd.context);
 
