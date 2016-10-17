@@ -27,5 +27,6 @@ Contents:
    CodeOfConflict
    adding-syscalls
    magic-number
+   volatile-considered-harmful
 
    development-process
