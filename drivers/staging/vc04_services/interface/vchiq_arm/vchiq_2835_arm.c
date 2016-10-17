@@ -121,7 +121,7 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
 		return -ENOMEM;
 	}
 
-	WARN_ON(((int)slot_mem & (PAGE_SIZE - 1)) != 0);
+	WARN_ON(((unsigned long)slot_mem & (PAGE_SIZE - 1)) != 0);
 
 	vchiq_slot_zero = vchiq_init_slots(slot_mem, slot_mem_size);
 	if (!vchiq_slot_zero)
@@ -222,7 +222,7 @@ remote_event_signal(REMOTE_EVENT_T *event)
 int
 vchiq_copy_from_user(void *dst, const void *src, int size)
 {
-	if ((uint32_t)src < TASK_SIZE) {
+	if ((unsigned long)src < TASK_SIZE) {
 		return copy_from_user(dst, src, size);
 	} else {
 		memcpy(dst, src, size);
@@ -375,7 +375,7 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
 	int run, addridx, actual_pages;
         unsigned long *need_release;
 
-	offset = (unsigned int)buf & (PAGE_SIZE - 1);
+	offset = (unsigned long)buf & (PAGE_SIZE - 1);
 	num_pages = (count + offset + PAGE_SIZE - 1) / PAGE_SIZE;
 
 	*ppagelist = NULL;
