@@ -167,6 +167,7 @@ enum {
 	ATA_DFLAG_UNLOCK_HPA	= (1 << 18), /* unlock HPA */
 	ATA_DFLAG_NCQ_SEND_RECV = (1 << 19), /* device supports NCQ SEND and RECV */
 	ATA_DFLAG_NCQ_PRIO	= (1 << 20), /* device supports NCQ priority */
+	ATA_DFLAG_NCQ_PRIO_ON	= (1 << 21), /* Priority cmds sent to dev */
 	ATA_DFLAG_INIT_MASK	= (1 << 24) - 1,
 
 	ATA_DFLAG_DETACH	= (1 << 24),
@@ -545,6 +546,7 @@ typedef void (*ata_postreset_fn_t)(struct ata_link *link, unsigned int *classes)
 
 extern struct device_attribute dev_attr_link_power_management_policy;
 extern struct device_attribute dev_attr_unload_heads;
+extern struct device_attribute dev_attr_ncq_prio_on;
 extern struct device_attribute dev_attr_em_message_type;
 extern struct device_attribute dev_attr_em_message;
 extern struct device_attribute dev_attr_sw_activity;
@@ -1626,6 +1628,11 @@ static inline int ata_ncq_enabled(struct ata_device *dev)
 static inline int ata_ncq_prio_enabled(struct ata_device *dev)
 {
 	return (dev->flags & ATA_DFLAG_NCQ_PRIO) == ATA_DFLAG_NCQ_PRIO;
+}
+
+static inline int ata_ncq_prio_on(struct ata_device *dev)
+{
+	return ((dev->flags & ATA_DFLAG_NCQ_PRIO_ON) == ATA_DFLAG_NCQ_PRIO_ON);
 }
 
 static inline bool ata_fpdma_dsm_supported(struct ata_device *dev)
