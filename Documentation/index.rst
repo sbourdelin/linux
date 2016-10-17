@@ -11,6 +11,7 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+   user/index
    kernel-documentation
    development-process/index
    dev-tools/tools
