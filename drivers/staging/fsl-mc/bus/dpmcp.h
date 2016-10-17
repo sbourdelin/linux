@@ -11,7 +11,6 @@
  * names of any contributors may be used to endorse or promote products
  * derived from this software without specific prior written permission.
  *
- *
  * ALTERNATIVELY, this software may be distributed under the terms of the
  * GNU General Public License ("GPL") as published by the Free Software
  * Foundation, either version 2 of that License or (at your option) any
@@ -59,10 +58,10 @@ struct dpmcp_cfg {
 	int portal_id;
 };
 
-int dpmcp_create(struct fsl_mc_io	*mc_io,
-		 u32		cmd_flags,
-		 const struct dpmcp_cfg	*cfg,
-		u16		*token);
+int dpmcp_create(struct fsl_mc_io *mc_io,
+		 u32 cmd_flags,
+		 const struct dpmcp_cfg *cfg,
+		 u16 *token);
 
 int dpmcp_destroy(struct fsl_mc_io *mc_io,
 		  u32 cmd_flags,
@@ -85,53 +84,53 @@ int dpmcp_reset(struct fsl_mc_io *mc_io,
  * @irq_num: A user defined number associated with this IRQ
  */
 struct dpmcp_irq_cfg {
-	     u64		paddr;
-	     u32		val;
-	     int		irq_num;
+	     u64 paddr;
+	     u32 val;
+	     int irq_num;
 };
 
-int dpmcp_set_irq(struct fsl_mc_io	*mc_io,
-		  u32		cmd_flags,
-		  u16		token,
-		 u8		irq_index,
-		  struct dpmcp_irq_cfg	*irq_cfg);
+int dpmcp_set_irq(struct fsl_mc_io *mc_io,
+		  u32 cmd_flags,
+		  u16 token,
+		  u8 irq_index,
+		  struct dpmcp_irq_cfg *irq_cfg);
 
-int dpmcp_get_irq(struct fsl_mc_io	*mc_io,
-		  u32		cmd_flags,
-		  u16		token,
-		 u8		irq_index,
-		 int			*type,
-		 struct dpmcp_irq_cfg	*irq_cfg);
+int dpmcp_get_irq(struct fsl_mc_io *mc_io,
+		  u32 cmd_flags,
+		  u16 token,
+		  u8 irq_index,
+		  int *type,
+		  struct dpmcp_irq_cfg *irq_cfg);
 
-int dpmcp_set_irq_enable(struct fsl_mc_io	*mc_io,
-			 u32		cmd_flags,
-			 u16		token,
-			u8			irq_index,
-			u8			en);
+int dpmcp_set_irq_enable(struct fsl_mc_io *mc_io,
+			 u32 cmd_flags,
+			 u16 token,
+			 u8 irq_index,
+			 u8 en);
 
-int dpmcp_get_irq_enable(struct fsl_mc_io	*mc_io,
-			 u32		cmd_flags,
-			 u16		token,
-			u8			irq_index,
-			u8			*en);
+int dpmcp_get_irq_enable(struct fsl_mc_io *mc_io,
+			 u32 cmd_flags,
+			 u16 token,
+			 u8 irq_index,
+			 u8 *en);
 
-int dpmcp_set_irq_mask(struct fsl_mc_io	*mc_io,
-		       u32	cmd_flags,
-		       u16		token,
-		      u8		irq_index,
-		      u32		mask);
+int dpmcp_set_irq_mask(struct fsl_mc_io *mc_io,
+		       u32 cmd_flags,
+		       u16 token,
+		       u8 irq_index,
+		       u32 mask);
 
-int dpmcp_get_irq_mask(struct fsl_mc_io	*mc_io,
-		       u32	cmd_flags,
-		       u16		token,
-		      u8		irq_index,
-		      u32		*mask);
+int dpmcp_get_irq_mask(struct fsl_mc_io *mc_io,
+		       u32 cmd_flags,
+		       u16 token,
+		       u8 irq_index,
+		       u32 *mask);
 
-int dpmcp_get_irq_status(struct fsl_mc_io	*mc_io,
-			 u32		cmd_flags,
-			 u16		token,
-			u8			irq_index,
-			u32		*status);
+int dpmcp_get_irq_status(struct fsl_mc_io *mc_io,
+			 u32 cmd_flags,
+			 u16 token,
+			 u8 irq_index,
+			 u32 *status);
 
 /**
  * struct dpmcp_attr - Structure representing DPMCP attributes
@@ -151,9 +150,9 @@ struct dpmcp_attr {
 	} version;
 };
 
-int dpmcp_get_attributes(struct fsl_mc_io	*mc_io,
-			 u32		cmd_flags,
-			 u16		token,
-			struct dpmcp_attr	*attr);
+int dpmcp_get_attributes(struct fsl_mc_io *mc_io,
+			 u32 cmd_flags,
+			 u16 token,
+			 struct dpmcp_attr *attr);
 
 #endif /* __FSL_DPMCP_H */
