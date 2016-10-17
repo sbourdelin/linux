@@ -54,6 +54,7 @@
 #include <net/pkt_cls.h>
 #include <net/tc_act/tc_gact.h>
 #include <net/tc_act/tc_mirred.h>
+#include <net/vxlan.h>
 
 #include "ixgbe.h"
 #include "ixgbe_common.h"
@@ -7658,10 +7659,15 @@ static void ixgbe_atr(struct ixgbe_ring *ring,
 	/* snag network header to get L4 type and address */
 	skb = first->skb;
 	hdr.network = skb_network_header(skb);
+	if (hdr.network <= skb->data || hdr.network >= skb_tail_pointer(skb))
+		return;
 	if (skb->encapsulation &&
 	    first->protocol == htons(ETH_P_IP) &&
 	    hdr.ipv4->protocol == IPPROTO_UDP) {
 		struct ixgbe_adapter *adapter = q_vector->adapter;
+
+		if (skb_tail_pointer(skb) < hdr.network + VXLAN_HEADROOM)
+			return;
 
 		/* verify the port is recognized as VXLAN */
 		if (adapter->vxlan_port &&
@@ -7673,15 +7679,27 @@ static void ixgbe_atr(struct ixgbe_ring *ring,
 			hdr.network = skb_inner_network_header(skb);
 	}
 
+	/* Make sure we have at least [minimum IPv4 header + TCP]
+	 * or [IPv6 header] bytes
+	 */
+	if (skb_tail_pointer(skb) < hdr.network + 40)
+		return;
+
 	/* Currently only IPv4/IPv6 with TCP is supported */
 	switch (hdr.ipv4->version) {
 	case IPVERSION:
 		/* access ihl as u8 to avoid unaligned access on ia64 */
 		hlen = (hdr.network[0] & 0x0F) << 2;
+		if (skb_tail_pointer(skb) < hdr.network + hlen +
+					    sizeof(struct tcphdr))
+			return;
 		l4_proto = hdr.ipv4->protocol;
 		break;
 	case 6:
 		hlen = hdr.network - skb->data;
+		if (skb_tail_pointer(skb) < hdr.network + hlen +
+					    sizeof(struct tcphdr))
+			return;
 		l4_proto = ipv6_find_hdr(skb, &hlen, IPPROTO_TCP, NULL, NULL);
 		hlen -= hdr.network - skb->data;
 		break;
