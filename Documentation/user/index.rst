@@ -21,6 +21,7 @@ Contents:
    braile-console
    parport
    md
+   sysfs-rules
    devices
    module-signing
    binfmt_misc
