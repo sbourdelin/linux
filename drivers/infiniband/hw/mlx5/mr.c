@@ -900,7 +900,9 @@ static struct mlx5_ib_mr *reg_umr(struct ib_pd *pd, struct ib_umem *umem,
 	prep_umr_reg_wqe(pd, &umrwr.wr, &sg, dma, npages, mr->mmkey.key,
 			 page_shift, virt_addr, len, access_flags);
 
-	down(&umrc->sem);
+	wait_event(umrc->sem.wq,
+		   atomic_add_unless(&umrc->sem.count, -1, 0));
+
 	err = ib_post_send(umrc->qp, &umrwr.wr, &bad);
 	if (err) {
 		mlx5_ib_warn(dev, "post send failed, err %d\n", err);
@@ -920,7 +922,8 @@ static struct mlx5_ib_mr *reg_umr(struct ib_pd *pd, struct ib_umem *umem,
 	mr->live = 1;
 
 unmap_dma:
-	up(&umrc->sem);
+	if (atomic_inc_return(&umrc->sem.count) == 1)
+		wake_up(&umrc->sem.wq);
 	dma_unmap_single(ddev, dma, size, DMA_TO_DEVICE);
 
 	kfree(mr_pas);
@@ -1031,7 +1034,8 @@ int mlx5_ib_update_mtt(struct mlx5_ib_mr *mr, u64 start_page_index, int npages,
 		wr.mkey = mr->mmkey.key;
 		wr.target.offset = start_page_index;
 
-		down(&umrc->sem);
+		wait_event(umrc->sem.wq,
+			   atomic_add_unless(&umrc->sem.count, -1, 0));
 		err = ib_post_send(umrc->qp, &wr.wr, &bad);
 		if (err) {
 			mlx5_ib_err(dev, "UMR post send failed, err %d\n", err);
@@ -1043,7 +1047,8 @@ int mlx5_ib_update_mtt(struct mlx5_ib_mr *mr, u64 start_page_index, int npages,
 				err = -EFAULT;
 			}
 		}
-		up(&umrc->sem);
+		if (atomic_inc_return(&umrc->sem.count) == 1)
+			wake_up(&umrc->sem.wq);
 	}
 	dma_unmap_single(ddev, dma, size, DMA_TO_DEVICE);
 
@@ -1224,15 +1229,18 @@ static int unreg_umr(struct mlx5_ib_dev *dev, struct mlx5_ib_mr *mr)
 	umrwr.wr.wr_cqe = &umr_context.cqe;
 	prep_umr_unreg_wqe(dev, &umrwr.wr, mr->mmkey.key);
 
-	down(&umrc->sem);
+	wait_event(umrc->sem.wq,
+		   atomic_add_unless(&umrc->sem.count, -1, 0));
 	err = ib_post_send(umrc->qp, &umrwr.wr, &bad);
 	if (err) {
-		up(&umrc->sem);
+		if (atomic_inc_return(&umrc->sem.count) == 1)
+			wake_up(&umrc->sem.wq);
 		mlx5_ib_dbg(dev, "err %d\n", err);
 		goto error;
 	} else {
 		wait_for_completion(&umr_context.done);
-		up(&umrc->sem);
+		if (atomic_inc_return(&umrc->sem.count) == 1)
+			wake_up(&umrc->sem.wq);
 	}
 	if (umr_context.status != IB_WC_SUCCESS) {
 		mlx5_ib_warn(dev, "unreg umr failed\n");
@@ -1291,7 +1299,8 @@ static int rereg_umr(struct ib_pd *pd, struct mlx5_ib_mr *mr, u64 virt_addr,
 	}
 
 	/* post send request to UMR QP */
-	down(&umrc->sem);
+	wait_event(umrc->sem.wq,
+		   atomic_add_unless(&umrc->sem.count, -1, 0));
 	err = ib_post_send(umrc->qp, &umrwr.wr, &bad);
 
 	if (err) {
@@ -1305,7 +1314,8 @@ static int rereg_umr(struct ib_pd *pd, struct mlx5_ib_mr *mr, u64 virt_addr,
 		}
 	}
 
-	up(&umrc->sem);
+	if (atomic_inc_return(&umrc->sem.count) == 1)
+		wake_up(&umrc->sem.wq);
 	if (flags & IB_MR_REREG_TRANS) {
 		dma_unmap_single(ddev, dma, size, DMA_TO_DEVICE);
 		kfree(mr_pas);

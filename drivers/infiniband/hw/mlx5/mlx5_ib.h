@@ -45,6 +45,7 @@
 #include <linux/mlx5/transobj.h>
 #include <rdma/ib_user_verbs.h>
 #include <rdma/mlx5-abi.h>
+#include <rdma/ib_sa.h>
 
 #define mlx5_ib_dbg(dev, format, arg...)				\
 pr_debug("%s:%s:%d:(pid %d): " format, (dev)->ib_dev.name, __func__,	\
@@ -533,7 +534,7 @@ struct umr_common {
 	struct ib_qp	*qp;
 	/* control access to UMR QP
 	 */
-	struct semaphore	sem;
+	struct ib_semaphore	sem;
 };
 
 enum {

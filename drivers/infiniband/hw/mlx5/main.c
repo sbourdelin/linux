@@ -2520,7 +2520,8 @@ static int create_umr_res(struct mlx5_ib_dev *dev)
 	dev->umrc.cq = cq;
 	dev->umrc.pd = pd;
 
-	sema_init(&dev->umrc.sem, MAX_UMR_WR);
+	init_waitqueue_head(&dev->umrc.sem.wq);
+	atomic_set(&dev->umrc.sem.count, MAX_UMR_WR);
 	ret = mlx5_mr_cache_init(dev);
 	if (ret) {
 		mlx5_ib_warn(dev, "mr cache init failed %d\n", ret);
