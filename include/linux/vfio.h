@@ -112,6 +112,10 @@ extern int vfio_info_add_capability(struct vfio_region_info *info,
 				    struct vfio_info_cap *caps,
 				    int cap_type_id, void *cap_type);
 
+extern int vfio_set_irqs_validate_and_prepare(struct vfio_irq_set *hdr,
+					      int num_irqs, int max_irq_type,
+					      size_t *data_size);
+
 struct pci_dev;
 #ifdef CONFIG_EEH
 extern void vfio_spapr_pci_eeh_open(struct pci_dev *pdev);
