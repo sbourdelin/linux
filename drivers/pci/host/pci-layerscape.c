@@ -245,6 +245,7 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
 	if (!pcie)
 		return -ENOMEM;
 
+	pcie->drvdata = match->data;
 	pp = &pcie->pp;
 	pp->dev = dev;
 	pp->ops = pcie->drvdata->ops;
@@ -256,7 +257,6 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
 		return PTR_ERR(pcie->pp.dbi_base);
 	}
 
-	pcie->drvdata = match->data;
 	pcie->lut = pcie->pp.dbi_base + pcie->drvdata->lut_offset;
 
 	if (!ls_pcie_is_bridge(pcie))
