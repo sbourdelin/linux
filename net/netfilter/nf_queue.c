@@ -187,8 +187,10 @@ void nf_reinject(struct nf_queue_entry *entry, unsigned int verdict)
 	entry->state.thresh = INT_MIN;
 
 	if (verdict == NF_ACCEPT) {
-	next_hook:
-		verdict = nf_iterate(skb, &entry->state, &hook_entry);
+		hook_entry = rcu_dereference(hook_entry->next);
+		if (hook_entry)
+next_hook:
+			verdict = nf_iterate(skb, &entry->state, &hook_entry);
 	}
 
 	switch (verdict & NF_VERDICT_MASK) {
