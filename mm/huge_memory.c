@@ -309,6 +309,7 @@ static struct attribute *hugepage_attr[] = {
 	&use_zero_page_attr.attr,
 #if defined(CONFIG_SHMEM) && defined(CONFIG_TRANSPARENT_HUGE_PAGECACHE)
 	&shmem_enabled_attr.attr,
+	&shmem_min_size_attr.attr,
 #endif
 #ifdef CONFIG_DEBUG_VM
 	&debug_cow_attr.attr,
