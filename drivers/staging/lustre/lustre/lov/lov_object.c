@@ -1532,7 +1532,7 @@ struct lov_stripe_md *lov_lsm_addref(struct lov_object *lov)
 	return lsm;
 }
 
-int lov_read_and_clear_async_rc(struct cl_object *clob)
+static int lov_read_and_clear_async_rc(struct cl_object *clob)
 {
 	struct lu_object *luobj;
 	int rc = 0;
