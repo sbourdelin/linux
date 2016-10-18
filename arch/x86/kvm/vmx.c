@@ -1521,7 +1521,7 @@ static inline void vpid_sync_vcpu_single(int vpid)
 static inline void vpid_sync_vcpu_global(void)
 {
 	if (cpu_has_vmx_invvpid_global())
-		__invvpid(VMX_VPID_EXTENT_ALL_CONTEXT, 0, 0);
+		__invvpid(VMX_VPID_EXTENT_GLOBAL_CONTEXT, 0, 0);
 }
 
 static inline void vpid_sync_context(int vpid)
@@ -7747,7 +7747,7 @@ static int handle_invvpid(struct kvm_vcpu *vcpu)
 		 * Old versions of KVM use the single-context version so we
 		 * have to support it; just treat it the same as all-context.
 		 */
-	case VMX_VPID_EXTENT_ALL_CONTEXT:
+	case VMX_VPID_EXTENT_GLOBAL_CONTEXT:
 		__vmx_flush_tlb(vcpu, to_vmx(vcpu)->nested.vpid02);
 		nested_vmx_succeed(vcpu);
 		break;
