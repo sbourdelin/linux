@@ -1277,12 +1277,12 @@ static int update_cpu_associativity_changes_mask(void)
 static long hcall_vphn(unsigned long cpu, __be32 *associativity)
 {
 	long rc;
-	long retbuf[PLPAR_HCALL9_BUFSIZE] = {0};
+	struct plpar_hcall9_retvals retvals = { 0 };
 	u64 flags = 1;
 	int hwcpu = get_hard_smp_processor_id(cpu);
 
-	rc = plpar_hcall9(H_HOME_NODE_ASSOCIATIVITY, retbuf, flags, hwcpu);
-	vphn_unpack_associativity(retbuf, associativity);
+	rc = plpar_hcall9(H_HOME_NODE_ASSOCIATIVITY, &retvals, flags, hwcpu);
+	vphn_unpack_associativity(&retvals.v[0], associativity);
 
 	return rc;
 }

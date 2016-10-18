@@ -82,7 +82,7 @@ static long ehea_plpar_hcall_norets(unsigned long opcode,
 }
 
 static long ehea_plpar_hcall9(unsigned long opcode,
-			      unsigned long *outs, /* array of 9 outputs */
+			      struct plpar_hcall9_retvals *outs,
 			      unsigned long arg1,
 			      unsigned long arg2,
 			      unsigned long arg3,
@@ -125,8 +125,9 @@ static long ehea_plpar_hcall9(unsigned long opcode,
 			       opcode, ret,
 			       arg1, arg2, arg3, arg4, arg5,
 			       arg6, arg7, arg8, arg9,
-			       outs[0], outs[1], outs[2], outs[3], outs[4],
-			       outs[5], outs[6], outs[7], outs[8]);
+			       outs->v[0], outs->v[1], outs->v[2], outs->v[3],
+			       outs->v[4], outs->v[5], outs->v[6], outs->v[7],
+			       outs->v[8]);
 		return ret;
 	}
 
@@ -214,7 +215,7 @@ u64 ehea_h_alloc_resource_qp(const u64 adapter_handle,
 			     u64 *qp_handle, struct h_epas *h_epas)
 {
 	u64 hret;
-	unsigned long outs[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals outs;
 
 	u64 allocate_controls =
 	    EHEA_BMASK_SET(H_ALL_RES_QP_EQPO, init_attr->low_lat_rq1 ? 1 : 0)
@@ -255,7 +256,7 @@ u64 ehea_h_alloc_resource_qp(const u64 adapter_handle,
 	    | EHEA_BMASK_SET(H_ALL_RES_QP_TH_RQ3, init_attr->rq3_threshold);
 
 	hret = ehea_plpar_hcall9(H_ALLOC_HEA_RESOURCE,
-				 outs,
+				 &outs,
 				 adapter_handle,		/* R4 */
 				 allocate_controls,		/* R5 */
 				 init_attr->send_cq_handle,	/* R6 */
@@ -266,17 +267,17 @@ u64 ehea_h_alloc_resource_qp(const u64 adapter_handle,
 				 r11_in,			/* R11 */
 				 threshold);			/* R12 */
 
-	*qp_handle = outs[0];
-	init_attr->qp_nr = (u32)outs[1];
+	*qp_handle = outs.v[0];
+	init_attr->qp_nr = (u32)outs.v[1];
 
 	init_attr->act_nr_send_wqes =
-	    (u16)EHEA_BMASK_GET(H_ALL_RES_QP_ACT_SWQE, outs[2]);
+	    (u16)EHEA_BMASK_GET(H_ALL_RES_QP_ACT_SWQE, outs.v[2]);
 	init_attr->act_nr_rwqes_rq1 =
-	    (u16)EHEA_BMASK_GET(H_ALL_RES_QP_ACT_R1WQE, outs[2]);
+	    (u16)EHEA_BMASK_GET(H_ALL_RES_QP_ACT_R1WQE, outs.v[2]);
 	init_attr->act_nr_rwqes_rq2 =
-	    (u16)EHEA_BMASK_GET(H_ALL_RES_QP_ACT_R2WQE, outs[2]);
+	    (u16)EHEA_BMASK_GET(H_ALL_RES_QP_ACT_R2WQE, outs.v[2]);
 	init_attr->act_nr_rwqes_rq3 =
-	    (u16)EHEA_BMASK_GET(H_ALL_RES_QP_ACT_R3WQE, outs[2]);
+	    (u16)EHEA_BMASK_GET(H_ALL_RES_QP_ACT_R3WQE, outs.v[2]);
 
 	init_attr->act_wqe_size_enc_sq = init_attr->wqe_size_enc_sq;
 	init_attr->act_wqe_size_enc_rq1 = init_attr->wqe_size_enc_rq1;
@@ -284,25 +285,25 @@ u64 ehea_h_alloc_resource_qp(const u64 adapter_handle,
 	init_attr->act_wqe_size_enc_rq3 = init_attr->wqe_size_enc_rq3;
 
 	init_attr->nr_sq_pages =
-	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_SIZE_SQ, outs[4]);
+	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_SIZE_SQ, outs.v[4]);
 	init_attr->nr_rq1_pages =
-	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_SIZE_RQ1, outs[4]);
+	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_SIZE_RQ1, outs.v[4]);
 	init_attr->nr_rq2_pages =
-	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_SIZE_RQ2, outs[5]);
+	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_SIZE_RQ2, outs.v[5]);
 	init_attr->nr_rq3_pages =
-	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_SIZE_RQ3, outs[5]);
+	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_SIZE_RQ3, outs.v[5]);
 
 	init_attr->liobn_sq =
-	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_LIOBN_SQ, outs[7]);
+	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_LIOBN_SQ, outs.v[7]);
 	init_attr->liobn_rq1 =
-	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_LIOBN_RQ1, outs[7]);
+	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_LIOBN_RQ1, outs.v[7]);
 	init_attr->liobn_rq2 =
-	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_LIOBN_RQ2, outs[8]);
+	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_LIOBN_RQ2, outs.v[8]);
 	init_attr->liobn_rq3 =
-	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_LIOBN_RQ3, outs[8]);
+	    (u32)EHEA_BMASK_GET(H_ALL_RES_QP_LIOBN_RQ3, outs.v[8]);
 
 	if (!hret)
-		hcp_epas_ctor(h_epas, outs[6], outs[6]);
+		hcp_epas_ctor(h_epas, outs.v[6], outs.v[6]);
 
 	return hret;
 }
@@ -312,10 +313,10 @@ u64 ehea_h_alloc_resource_cq(const u64 adapter_handle,
 			     u64 *cq_handle, struct h_epas *epas)
 {
 	u64 hret;
-	unsigned long outs[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals outs;
 
 	hret = ehea_plpar_hcall9(H_ALLOC_HEA_RESOURCE,
-				 outs,
+				 &outs,
 				 adapter_handle,		/* R4 */
 				 H_ALL_RES_TYPE_CQ,		/* R5 */
 				 cq_attr->eq_handle,		/* R6 */
@@ -323,12 +324,12 @@ u64 ehea_h_alloc_resource_cq(const u64 adapter_handle,
 				 cq_attr->max_nr_of_cqes,	/* R8 */
 				 0, 0, 0, 0);			/* R9-R12 */
 
-	*cq_handle = outs[0];
-	cq_attr->act_nr_of_cqes = outs[3];
-	cq_attr->nr_pages = outs[4];
+	*cq_handle = outs.v[0];
+	cq_attr->act_nr_of_cqes = outs.v[3];
+	cq_attr->nr_pages = outs.v[4];
 
 	if (!hret)
-		hcp_epas_ctor(epas, outs[5], outs[6]);
+		hcp_epas_ctor(epas, outs.v[5], outs.v[6]);
 
 	return hret;
 }
@@ -374,7 +375,7 @@ u64 ehea_h_alloc_resource_eq(const u64 adapter_handle,
 			     struct ehea_eq_attr *eq_attr, u64 *eq_handle)
 {
 	u64 hret, allocate_controls;
-	unsigned long outs[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals outs;
 
 	/* resource type */
 	allocate_controls =
@@ -384,19 +385,19 @@ u64 ehea_h_alloc_resource_eq(const u64 adapter_handle,
 	    | EHEA_BMASK_SET(H_ALL_RES_EQ_NON_NEQ_ISN, 1);
 
 	hret = ehea_plpar_hcall9(H_ALLOC_HEA_RESOURCE,
-				 outs,
+				 &outs,
 				 adapter_handle,		/* R4 */
 				 allocate_controls,		/* R5 */
 				 eq_attr->max_nr_of_eqes,	/* R6 */
 				 0, 0, 0, 0, 0, 0);		/* R7-R10 */
 
-	*eq_handle = outs[0];
-	eq_attr->act_nr_of_eqes = outs[3];
-	eq_attr->nr_pages = outs[4];
-	eq_attr->ist1 = outs[5];
-	eq_attr->ist2 = outs[6];
-	eq_attr->ist3 = outs[7];
-	eq_attr->ist4 = outs[8];
+	*eq_handle = outs.v[0];
+	eq_attr->act_nr_of_eqes = outs.v[3];
+	eq_attr->nr_pages = outs.v[4];
+	eq_attr->ist1 = outs.v[5];
+	eq_attr->ist2 = outs.v[6];
+	eq_attr->ist3 = outs.v[7];
+	eq_attr->ist4 = outs.v[8];
 
 	return hret;
 }
@@ -407,10 +408,10 @@ u64 ehea_h_modify_ehea_qp(const u64 adapter_handle, const u8 cat,
 			  u16 *out_swr, u16 *out_rwr)
 {
 	u64 hret;
-	unsigned long outs[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals outs;
 
 	hret = ehea_plpar_hcall9(H_MODIFY_HEA_QP,
-				 outs,
+				 &outs,
 				 adapter_handle,		/* R4 */
 				 (u64) cat,			/* R5 */
 				 qp_handle,			/* R6 */
@@ -418,10 +419,10 @@ u64 ehea_h_modify_ehea_qp(const u64 adapter_handle, const u8 cat,
 				 __pa(cb_addr),			/* R8 */
 				 0, 0, 0, 0);			/* R9-R12 */
 
-	*inv_attr_id = outs[0];
-	*out_swr = outs[3];
-	*out_rwr = outs[4];
-	*proc_mask = outs[5];
+	*inv_attr_id = outs.v[0];
+	*out_swr = outs.v[3];
+	*out_rwr = outs.v[4];
+	*proc_mask = outs.v[5];
 
 	return hret;
 }
@@ -449,10 +450,10 @@ u64 ehea_h_register_smr(const u64 adapter_handle, const u64 orig_mr_handle,
 			struct ehea_mr *mr)
 {
 	u64 hret;
-	unsigned long outs[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals outs;
 
 	hret = ehea_plpar_hcall9(H_REGISTER_SMR,
-				 outs,
+				 &outs,
 				 adapter_handle	      ,		 /* R4 */
 				 orig_mr_handle,		 /* R5 */
 				 vaddr_in,			 /* R6 */
@@ -460,18 +461,18 @@ u64 ehea_h_register_smr(const u64 adapter_handle, const u64 orig_mr_handle,
 				 pd,				 /* R8 */
 				 0, 0, 0, 0);			 /* R9-R12 */
 
-	mr->handle = outs[0];
-	mr->lkey = (u32)outs[2];
+	mr->handle = outs.v[0];
+	mr->lkey = (u32)outs.v[2];
 
 	return hret;
 }
 
 u64 ehea_h_disable_and_get_hea(const u64 adapter_handle, const u64 qp_handle)
 {
-	unsigned long outs[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals outs;
 
 	return ehea_plpar_hcall9(H_DISABLE_AND_GET_HEA,
-				 outs,
+				 &outs,
 				 adapter_handle,		/* R4 */
 				 H_DISABLE_GET_EHEA_WQE_P,	/* R5 */
 				 qp_handle,			/* R6 */
@@ -493,10 +494,10 @@ u64 ehea_h_alloc_resource_mr(const u64 adapter_handle, const u64 vaddr,
 			     const u32 pd, u64 *mr_handle, u32 *lkey)
 {
 	u64 hret;
-	unsigned long outs[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals outs;
 
 	hret = ehea_plpar_hcall9(H_ALLOC_HEA_RESOURCE,
-				 outs,
+				 &outs,
 				 adapter_handle,		   /* R4 */
 				 5,				   /* R5 */
 				 vaddr,				   /* R6 */
@@ -505,8 +506,8 @@ u64 ehea_h_alloc_resource_mr(const u64 adapter_handle, const u64 vaddr,
 				 pd,				   /* R9 */
 				 0, 0, 0);			   /* R10-R12 */
 
-	*mr_handle = outs[0];
-	*lkey = (u32)outs[2];
+	*mr_handle = outs.v[0];
+	*lkey = (u32)outs.v[2];
 	return hret;
 }
 
@@ -564,7 +565,7 @@ u64 ehea_h_modify_ehea_port(const u64 adapter_handle, const u16 port_num,
 			    const u8 cb_cat, const u64 select_mask,
 			    void *cb_addr)
 {
-	unsigned long outs[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals outs;
 	u64 port_info;
 	u64 arr_index = 0;
 	u64 cb_logaddr = __pa(cb_addr);
@@ -575,7 +576,7 @@ u64 ehea_h_modify_ehea_port(const u64 adapter_handle, const u16 port_num,
 	ehea_dump(cb_addr, sizeof(struct hcp_ehea_port_cb0), "Before HCALL");
 #endif
 	return ehea_plpar_hcall9(H_MODIFY_HEA_PORT,
-				 outs,
+				 &outs,
 				 adapter_handle,		/* R4 */
 				 port_info,			/* R5 */
 				 select_mask,			/* R6 */

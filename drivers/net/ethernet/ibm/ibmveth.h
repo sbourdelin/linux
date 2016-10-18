@@ -65,18 +65,18 @@ static inline long h_send_logical_lan(unsigned long unit_address,
 		unsigned long mss, unsigned long large_send_support)
 {
 	long rc;
-	unsigned long retbuf[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals retvals;
 
 	if (large_send_support)
-		rc = plpar_hcall9(H_SEND_LOGICAL_LAN, retbuf, unit_address,
+		rc = plpar_hcall9(H_SEND_LOGICAL_LAN, &retvals, unit_address,
 				  desc1, desc2, desc3, desc4, desc5, desc6,
 				  corellator_in, mss);
 	else
-		rc = plpar_hcall9(H_SEND_LOGICAL_LAN, retbuf, unit_address,
+		rc = plpar_hcall9(H_SEND_LOGICAL_LAN, &retvals, unit_address,
 				  desc1, desc2, desc3, desc4, desc5, desc6,
 				  corellator_in);
 
-	*corellator_out = retbuf[0];
+	*corellator_out = retvals.v[0];
 
 	return rc;
 }

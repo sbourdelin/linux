@@ -115,7 +115,7 @@ err:
 static ssize_t get_best_energy_list(char *page, int activate)
 {
 	int rc, cnt, i, cpu;
-	unsigned long retbuf[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals retvals;
 	unsigned long flags = 0;
 	u32 *buf_page;
 	char *s = page;
@@ -128,14 +128,14 @@ static ssize_t get_best_energy_list(char *page, int activate)
 	if (activate)
 		flags |= FLAGS_ACTIVATE;
 
-	rc = plpar_hcall9(H_BEST_ENERGY, retbuf, flags, 0, __pa(buf_page),
+	rc = plpar_hcall9(H_BEST_ENERGY, &retvals, flags, 0, __pa(buf_page),
 				0, 0, 0, 0, 0, 0);
 	if (rc != H_SUCCESS) {
 		free_page((unsigned long) buf_page);
 		return -EINVAL;
 	}
 
-	cnt = retbuf[0];
+	cnt = retvals.v[0];
 	for (i = 0; i < cnt; i++) {
 		cpu = drc_index_to_cpu(buf_page[2*i+1]);
 		if ((cpu_online(cpu) && !activate) ||
@@ -155,21 +155,21 @@ static ssize_t get_best_energy_data(struct device *dev,
 					char *page, int activate)
 {
 	int rc;
-	unsigned long retbuf[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals retvals;
 	unsigned long flags = 0;
 
 	flags = FLAGS_MODE2;
 	if (activate)
 		flags |= FLAGS_ACTIVATE;
 
-	rc = plpar_hcall9(H_BEST_ENERGY, retbuf, flags,
+	rc = plpar_hcall9(H_BEST_ENERGY, &retvals, flags,
 				cpu_to_drc_index(dev->id),
 				0, 0, 0, 0, 0, 0, 0);
 
 	if (rc != H_SUCCESS)
 		return -EINVAL;
 
-	return sprintf(page, "%lu\n", retbuf[1] >> 32);
+	return sprintf(page, "%lu\n", retvals.v[1] >> 32);
 }
 
 /* Wrapper functions */

@@ -394,6 +394,7 @@ static void __pSeries_lpar_hugepage_invalidate(unsigned long *slot,
 					     int psize, int ssize)
 {
 	unsigned long param[8];
+	struct plpar_hcall9_retvals retvals;
 	int i = 0, pix = 0, rc;
 	unsigned long flags = 0;
 	int lock_tlbie = !mmu_has_feature(MMU_FTR_LOCKLESS_TLBIE);
@@ -411,7 +412,7 @@ static void __pSeries_lpar_hugepage_invalidate(unsigned long *slot,
 			param[pix+1] = hpte_encode_avpn(vpn[i], psize, ssize);
 			pix += 2;
 			if (pix == 8) {
-				rc = plpar_hcall9(H_BULK_REMOVE, param,
+				rc = plpar_hcall9(H_BULK_REMOVE, &retvals,
 						  param[0], param[1], param[2],
 						  param[3], param[4], param[5],
 						  param[6], param[7]);
@@ -422,7 +423,7 @@ static void __pSeries_lpar_hugepage_invalidate(unsigned long *slot,
 	}
 	if (pix) {
 		param[pix] = HBR_END;
-		rc = plpar_hcall9(H_BULK_REMOVE, param, param[0], param[1],
+		rc = plpar_hcall9(H_BULK_REMOVE, &retvals, param[0], param[1],
 				  param[2], param[3], param[4], param[5],
 				  param[6], param[7]);
 		BUG_ON(rc != H_SUCCESS);
@@ -522,6 +523,7 @@ static void pSeries_lpar_flush_hash_range(unsigned long number, int local)
 	unsigned long flags = 0;
 	struct ppc64_tlb_batch *batch = this_cpu_ptr(&ppc64_tlb_batch);
 	int lock_tlbie = !mmu_has_feature(MMU_FTR_LOCKLESS_TLBIE);
+	struct plpar_hcall9_retvals retvals;
 	unsigned long param[9];
 	unsigned long hash, index, shift, hidx, slot;
 	real_pte_t pte;
@@ -555,7 +557,7 @@ static void pSeries_lpar_flush_hash_range(unsigned long number, int local)
 								ssize);
 				pix += 2;
 				if (pix == 8) {
-					rc = plpar_hcall9(H_BULK_REMOVE, param,
+					rc = plpar_hcall9(H_BULK_REMOVE, &retvals,
 						param[0], param[1], param[2],
 						param[3], param[4], param[5],
 						param[6], param[7]);
@@ -567,7 +569,7 @@ static void pSeries_lpar_flush_hash_range(unsigned long number, int local)
 	}
 	if (pix) {
 		param[pix] = HBR_END;
-		rc = plpar_hcall9(H_BULK_REMOVE, param, param[0], param[1],
+		rc = plpar_hcall9(H_BULK_REMOVE, &retvals, param[0], param[1],
 				  param[2], param[3], param[4], param[5],
 				  param[6], param[7]);
 		BUG_ON(rc != H_SUCCESS);
@@ -760,23 +762,23 @@ out:
 int h_get_mpp(struct hvcall_mpp_data *mpp_data)
 {
 	int rc;
-	unsigned long retbuf[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals retvals;
 
-	rc = plpar_hcall9(H_GET_MPP, retbuf);
+	rc = plpar_hcall9(H_GET_MPP, &retvals);
 
-	mpp_data->entitled_mem = retbuf[0];
-	mpp_data->mapped_mem = retbuf[1];
+	mpp_data->entitled_mem = retvals.v[0];
+	mpp_data->mapped_mem = retvals.v[1];
 
-	mpp_data->group_num = (retbuf[2] >> 2 * 8) & 0xffff;
-	mpp_data->pool_num = retbuf[2] & 0xffff;
+	mpp_data->group_num = (retvals.v[2] >> 2 * 8) & 0xffff;
+	mpp_data->pool_num = retvals.v[2] & 0xffff;
 
-	mpp_data->mem_weight = (retbuf[3] >> 7 * 8) & 0xff;
-	mpp_data->unallocated_mem_weight = (retbuf[3] >> 6 * 8) & 0xff;
-	mpp_data->unallocated_entitlement = retbuf[3] & 0xffffffffffffUL;
+	mpp_data->mem_weight = (retvals.v[3] >> 7 * 8) & 0xff;
+	mpp_data->unallocated_mem_weight = (retvals.v[3] >> 6 * 8) & 0xff;
+	mpp_data->unallocated_entitlement = retvals.v[3] & 0xffffffffffffUL;
 
-	mpp_data->pool_size = retbuf[4];
-	mpp_data->loan_request = retbuf[5];
-	mpp_data->backing_mem = retbuf[6];
+	mpp_data->pool_size = retvals.v[4];
+	mpp_data->loan_request = retvals.v[5];
+	mpp_data->backing_mem = retvals.v[6];
 
 	return rc;
 }
@@ -785,14 +787,14 @@ EXPORT_SYMBOL(h_get_mpp);
 int h_get_mpp_x(struct hvcall_mpp_x_data *mpp_x_data)
 {
 	int rc;
-	unsigned long retbuf[PLPAR_HCALL9_BUFSIZE] = { 0 };
+	struct plpar_hcall9_retvals retvals = { 0 };
 
-	rc = plpar_hcall9(H_GET_MPP_X, retbuf);
+	rc = plpar_hcall9(H_GET_MPP_X, &retvals);
 
-	mpp_x_data->coalesced_bytes = retbuf[0];
-	mpp_x_data->pool_coalesced_bytes = retbuf[1];
-	mpp_x_data->pool_purr_cycles = retbuf[2];
-	mpp_x_data->pool_spurr_cycles = retbuf[3];
+	mpp_x_data->coalesced_bytes = retvals.v[0];
+	mpp_x_data->pool_coalesced_bytes = retvals.v[1];
+	mpp_x_data->pool_purr_cycles = retvals.v[2];
+	mpp_x_data->pool_spurr_cycles = retvals.v[3];
 
 	return rc;
 }

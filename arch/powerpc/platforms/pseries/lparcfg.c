@@ -112,25 +112,25 @@ struct hvcall_ppp_data {
 static unsigned int h_get_ppp(struct hvcall_ppp_data *ppp_data)
 {
 	unsigned long rc;
-	unsigned long retbuf[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals retvals;
 
-	rc = plpar_hcall9(H_GET_PPP, retbuf);
+	rc = plpar_hcall9(H_GET_PPP, &retvals);
 
-	ppp_data->entitlement = retbuf[0];
-	ppp_data->unallocated_entitlement = retbuf[1];
+	ppp_data->entitlement = retvals.v[0];
+	ppp_data->unallocated_entitlement = retvals.v[1];
 
-	ppp_data->group_num = (retbuf[2] >> 2 * 8) & 0xffff;
-	ppp_data->pool_num = retbuf[2] & 0xffff;
+	ppp_data->group_num = (retvals.v[2] >> 2 * 8) & 0xffff;
+	ppp_data->pool_num = retvals.v[2] & 0xffff;
 
-	ppp_data->capped = (retbuf[3] >> 6 * 8) & 0x01;
-	ppp_data->weight = (retbuf[3] >> 5 * 8) & 0xff;
-	ppp_data->unallocated_weight = (retbuf[3] >> 4 * 8) & 0xff;
-	ppp_data->active_procs_in_pool = (retbuf[3] >> 2 * 8) & 0xffff;
-	ppp_data->active_system_procs = retbuf[3] & 0xffff;
+	ppp_data->capped = (retvals.v[3] >> 6 * 8) & 0x01;
+	ppp_data->weight = (retvals.v[3] >> 5 * 8) & 0xff;
+	ppp_data->unallocated_weight = (retvals.v[3] >> 4 * 8) & 0xff;
+	ppp_data->active_procs_in_pool = (retvals.v[3] >> 2 * 8) & 0xffff;
+	ppp_data->active_system_procs = retvals.v[3] & 0xffff;
 
-	ppp_data->phys_platform_procs = retbuf[4] >> 6 * 8;
-	ppp_data->max_proc_cap_avail = (retbuf[4] >> 3 * 8) & 0xffffff;
-	ppp_data->entitled_proc_cap_avail = retbuf[4] & 0xffffff;
+	ppp_data->phys_platform_procs = retvals.v[4] >> 6 * 8;
+	ppp_data->max_proc_cap_avail = (retvals.v[4] >> 3 * 8) & 0xffffff;
+	ppp_data->entitled_proc_cap_avail = retvals.v[4] & 0xffffff;
 
 	return rc;
 }

@@ -209,11 +209,11 @@ static inline long plpar_pte_read_4(unsigned long flags, unsigned long ptex,
 
 {
 	long rc;
-	unsigned long retbuf[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals retvals;
 
-	rc = plpar_hcall9(H_READ, retbuf, flags | H_READ_4, ptex);
+	rc = plpar_hcall9(H_READ, &retvals, flags | H_READ_4, ptex);
 
-	memcpy(ptes, retbuf, 8*sizeof(unsigned long));
+	memcpy(ptes, &retvals.v, 8*sizeof(unsigned long));
 
 	return rc;
 }
@@ -227,11 +227,11 @@ static inline long plpar_pte_read_4_raw(unsigned long flags, unsigned long ptex,
 
 {
 	long rc;
-	unsigned long retbuf[PLPAR_HCALL9_BUFSIZE];
+	struct plpar_hcall9_retvals retvals;
 
-	rc = plpar_hcall9_raw(H_READ, retbuf, flags | H_READ_4, ptex);
+	rc = plpar_hcall9_raw(H_READ, &retvals, flags | H_READ_4, ptex);
 
-	memcpy(ptes, retbuf, 8*sizeof(unsigned long));
+	memcpy(ptes, &retvals.v, 8*sizeof(unsigned long));
 
 	return rc;
 }

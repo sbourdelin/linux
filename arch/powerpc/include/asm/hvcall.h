@@ -347,17 +347,20 @@ long plpar_hcall(unsigned long opcode, struct plpar_hcall_retvals *retvals, ...)
  */
 long plpar_hcall_raw(unsigned long opcode, struct plpar_hcall_retvals *retvals, ...);
 
+struct plpar_hcall9_retvals
+{
+	unsigned long v[9];
+};
+
 /**
  * plpar_hcall9: - Make a pseries hypervisor call with up to 9 return arguments
  * @opcode: The hypervisor call to make.
- * @retbuf: Buffer to store up to 9 return arguments in.
+ * @retvals: Buffer to store up to 9 return arguments in.
  *
- * This call supports up to 9 arguments and 9 return arguments. Use
- * PLPAR_HCALL9_BUFSIZE to size the return argument buffer.
+ * This call supports up to 9 arguments and 9 return arguments.
  */
-#define PLPAR_HCALL9_BUFSIZE 9
-long plpar_hcall9(unsigned long opcode, unsigned long *retbuf, ...);
-long plpar_hcall9_raw(unsigned long opcode, unsigned long *retbuf, ...);
+long plpar_hcall9(unsigned long opcode, struct plpar_hcall9_retvals *retvals, ...);
+long plpar_hcall9_raw(unsigned long opcode, struct plpar_hcall9_retvals *retvals, ...);
 
 /* For hcall instrumentation.  One structure per-hcall, per-CPU */
 struct hcall_stats {
