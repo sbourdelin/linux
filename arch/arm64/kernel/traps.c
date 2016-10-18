@@ -447,6 +447,30 @@ void cpu_enable_cache_maint_trap(void *__unused)
 		: "=r" (res)					\
 		: "r" (address), "i" (-EFAULT) )
 
+enum {USER_CACHE_MAINT_DC_CIVAC, USER_CACHE_MAINT_IC_IVAU};
+
+static int do_user_cache_maint(int ins_type, unsigned long address)
+{
+	int ret;
+	unsigned long cl_size = cache_line_size();
+
+	if (!access_ok_tagged(VERIFY_READ,
+			      round_down(address, cl_size),
+			      cl_size))
+		return -EFAULT;
+
+	switch (ins_type) {
+	case USER_CACHE_MAINT_DC_CIVAC:
+		__user_cache_maint("dc civac", address, ret);
+		break;
+	case USER_CACHE_MAINT_IC_IVAU:
+		__user_cache_maint("ic ivau", address, ret);
+		break;
+	}
+
+	return ret;
+}
+
 static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
 {
 	unsigned long address;
@@ -458,16 +482,16 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
 
 	switch (crm) {
 	case ESR_ELx_SYS64_ISS_CRM_DC_CVAU:	/* DC CVAU, gets promoted */
-		__user_cache_maint("dc civac", address, ret);
+		ret = do_user_cache_maint(USER_CACHE_MAINT_DC_CIVAC, address);
 		break;
 	case ESR_ELx_SYS64_ISS_CRM_DC_CVAC:	/* DC CVAC, gets promoted */
-		__user_cache_maint("dc civac", address, ret);
+		ret = do_user_cache_maint(USER_CACHE_MAINT_DC_CIVAC, address);
 		break;
 	case ESR_ELx_SYS64_ISS_CRM_DC_CIVAC:	/* DC CIVAC */
-		__user_cache_maint("dc civac", address, ret);
+		ret = do_user_cache_maint(USER_CACHE_MAINT_DC_CIVAC, address);
 		break;
 	case ESR_ELx_SYS64_ISS_CRM_IC_IVAU:	/* IC IVAU */
-		__user_cache_maint("ic ivau", address, ret);
+		ret = do_user_cache_maint(USER_CACHE_MAINT_IC_IVAU, address);
 		break;
 	default:
 		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);

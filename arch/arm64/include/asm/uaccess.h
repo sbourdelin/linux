@@ -21,6 +21,7 @@
 /*
  * User space memory access functions
  */
+#include <linux/bitops.h>
 #include <linux/kasan-checks.h>
 #include <linux/string.h>
 #include <linux/thread_info.h>
@@ -103,6 +104,9 @@ static inline void set_fs(mm_segment_t fs)
 })
 
 #define access_ok(type, addr, size)	__range_ok(addr, size)
+#define access_ok_tagged(type, addr, size)  access_ok(type,		       \
+						      sign_extend64(addr, 55), \
+						      size)
 #define user_addr_max			get_fs
 
 #define _ASM_EXTABLE(from, to)						\
