@@ -154,8 +154,10 @@ static int dsa_slave_close(struct net_device *dev)
 	struct net_device *master = p->parent->dst->master_netdev;
 	struct dsa_switch *ds = p->parent;
 
-	if (p->phy)
+	if (p->phy) {
 		phy_stop(p->phy);
+		phy_disconnect(p->phy);
+	}
 
 	dev_mc_unsync(master, dev);
 	dev_uc_unsync(master, dev);
