@@ -77,8 +77,37 @@
 			msleep(delay);					\
 		}							\
 	}
+
+#define _CXL_LOOP_HCALL9(call, rc, retbuf, fn, ...)			\
+	{								\
+		unsigned int delay, total_delay = 0;			\
+		u64 token = 0;						\
+									\
+		memset(retbuf, 0, sizeof(retbuf));			\
+		while (1) {						\
+			rc = call(fn, retbuf, __VA_ARGS__, token);	\
+			token = retbuf[0];				\
+			if (rc != H_BUSY && !H_IS_LONG_BUSY(rc))	\
+				break;					\
+									\
+			if (rc == H_BUSY)				\
+				delay = 10;				\
+			else						\
+				delay = get_longbusy_msecs(rc);		\
+									\
+			total_delay += delay;				\
+			if (total_delay > CXL_HCALL_TIMEOUT) {		\
+				WARN(1, "Warning: Giving up waiting for CXL hcall " \
+				     "%#x after %u msec\n", fn, total_delay); \
+				rc = H_BUSY;				\
+				break;					\
+			}						\
+			msleep(delay);					\
+		}							\
+	}
+
 #define CXL_H_WAIT_UNTIL_DONE(...)  _CXL_LOOP_HCALL(plpar_hcall, __VA_ARGS__)
-#define CXL_H9_WAIT_UNTIL_DONE(...) _CXL_LOOP_HCALL(plpar_hcall9, __VA_ARGS__)
+#define CXL_H9_WAIT_UNTIL_DONE(...) _CXL_LOOP_HCALL9(plpar_hcall9, __VA_ARGS__)
 
 #define _PRINT_MSG(rc, format, ...)					\
 	{								\
