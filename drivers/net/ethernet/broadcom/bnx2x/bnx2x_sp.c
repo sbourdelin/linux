@@ -4538,7 +4538,7 @@ static int bnx2x_setup_rss(struct bnx2x *bp,
 	/* RSS keys */
 	if (test_bit(BNX2X_RSS_SET_SRCH, &p->rss_flags)) {
 		u8 *dst = (u8 *)(data->rss_key) + sizeof(data->rss_key);
-		const u8 *src = (const u8 *)p->rss_key;
+		const u8 *src = (const u8 *)o->rss_key;
 		int i;
 
 		/* Apparently, bnx2x reads this array in reverse order

@@ -744,9 +744,6 @@ struct bnx2x_config_rss_params {
 	/* Indirection table */
 	u8		ind_table[T_ETH_INDIRECTION_TABLE_SIZE];
 
-	/* RSS hash values */
-	u32		rss_key[10];
-
 	/* valid only iff BNX2X_RSS_UPDATE_TOE is set */
 	u16		toe_rss_bitmap;
 };
@@ -759,6 +756,8 @@ struct bnx2x_rss_config_obj {
 
 	/* Last configured indirection table */
 	u8			ind_table[T_ETH_INDIRECTION_TABLE_SIZE];
+
+	u32     rss_key[T_ETH_RSS_KEY];
 
 	/* flags for enabling 4-tupple hash on UDP */
 	u8			udp_rss_v4;
