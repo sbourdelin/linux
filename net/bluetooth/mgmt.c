@@ -3103,7 +3103,16 @@ static int set_local_name(struct sock *sk, struct hci_dev *hdev, void *data,
 		goto failed;
 	}
 
-	memcpy(hdev->short_name, cp->short_name, sizeof(hdev->short_name));
+	/* if no short name set and complete name is longer than max
+	 * short name length then shorten complete name
+	 */
+	if (!strlen(cp->short_name) &&
+	    (strlen(cp->name) > HCI_MAX_SHORT_NAME_LENGTH)) {
+		memcpy(hdev->short_name, cp->name, sizeof(hdev->short_name));
+	} else {
+		memcpy(hdev->short_name, cp->short_name,
+		       sizeof(hdev->short_name));
+	}
 
 	if (!hdev_is_powered(hdev)) {
 		memcpy(hdev->dev_name, cp->name, sizeof(hdev->dev_name));
