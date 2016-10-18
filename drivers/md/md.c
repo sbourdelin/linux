@@ -2612,19 +2612,29 @@ state_store(struct md_rdev *rdev, const char *buf, size_t len)
 		set_bit(Blocked, &rdev->flags);
 		err = 0;
 	} else if (cmd_match(buf, "-blocked")) {
-		if (!test_bit(Faulty, &rdev->flags) &&
+		int unblock = 1;
+		int acked = !rdev->badblocks.unacked_exist;
+
+		if ((test_bit(ExternalBbl, &rdev->flags) &&
+		     rdev->badblocks.changed))
+			acked = check_if_badblocks_acked(&rdev->badblocks);
+
+		if (test_bit(ExternalBbl, &rdev->flags) && !acked) {
+			unblock = 0;
+		} else if (!test_bit(Faulty, &rdev->flags) &&
 		    rdev->badblocks.unacked_exist) {
 			/* metadata handler doesn't understand badblocks,
 			 * so we need to fail the device
 			 */
 			md_error(rdev->mddev, rdev);
 		}
-		clear_bit(Blocked, &rdev->flags);
-		clear_bit(BlockedBadBlocks, &rdev->flags);
-		wake_up(&rdev->blocked_wait);
-		set_bit(MD_RECOVERY_NEEDED, &rdev->mddev->recovery);
-		md_wakeup_thread(rdev->mddev->thread);
-
+		if (unblock) {
+			clear_bit(Blocked, &rdev->flags);
+			clear_bit(BlockedBadBlocks, &rdev->flags);
+			wake_up(&rdev->blocked_wait);
+			set_bit(MD_RECOVERY_NEEDED, &rdev->mddev->recovery);
+			md_wakeup_thread(rdev->mddev->thread);
+		}
 		err = 0;
 	} else if (cmd_match(buf, "insync") && rdev->raid_disk == -1) {
 		set_bit(In_sync, &rdev->flags);
