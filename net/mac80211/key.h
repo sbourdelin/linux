@@ -80,7 +80,7 @@ struct ieee80211_key {
 			/* number of mic failures */
 			u32 mic_failures;
 		} tkip;
-		struct {
+		struct ieee80211_ccmp_aead {
 			/*
 			 * Last received packet number. The first
 			 * IEEE80211_NUM_TIDS counters are used with Data

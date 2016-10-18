@@ -10,6 +10,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/percpu.h>
 #include <linux/types.h>
 #include <linux/err.h>
 #include <crypto/aead.h>
@@ -18,13 +19,13 @@
 #include "key.h"
 #include "aes_ccm.h"
 
-int ieee80211_aes_ccm_encrypt(struct crypto_aead *tfm, u8 *b_0, u8 *aad,
-			      u8 *data, size_t data_len, u8 *mic,
+int ieee80211_aes_ccm_encrypt(struct ieee80211_ccmp_aead *ccmp, u8 *b_0,
+			      u8 *aad, u8 *data, size_t data_len, u8 *mic,
 			      size_t mic_len)
 {
 	struct scatterlist sg[3];
 	struct aead_request *aead_req;
-	int reqsize = sizeof(*aead_req) + crypto_aead_reqsize(tfm);
+	int reqsize = sizeof(*aead_req) + crypto_aead_reqsize(ccmp->tfm);
 	u8 *__aad;
 
 	aead_req = kzalloc(reqsize + CCM_AAD_LEN, GFP_ATOMIC);
@@ -39,7 +40,7 @@ int ieee80211_aes_ccm_encrypt(struct crypto_aead *tfm, u8 *b_0, u8 *aad,
 	sg_set_buf(&sg[1], data, data_len);
 	sg_set_buf(&sg[2], mic, mic_len);
 
-	aead_request_set_tfm(aead_req, tfm);
+	aead_request_set_tfm(aead_req, ccmp->tfm);
 	aead_request_set_crypt(aead_req, sg, sg, data_len, b_0);
 	aead_request_set_ad(aead_req, sg[0].length);
 
@@ -49,13 +50,13 @@ int ieee80211_aes_ccm_encrypt(struct crypto_aead *tfm, u8 *b_0, u8 *aad,
 	return 0;
 }
 
-int ieee80211_aes_ccm_decrypt(struct crypto_aead *tfm, u8 *b_0, u8 *aad,
-			      u8 *data, size_t data_len, u8 *mic,
+int ieee80211_aes_ccm_decrypt(struct ieee80211_ccmp_aead *ccmp, u8 *b_0,
+			      u8 *aad, u8 *data, size_t data_len, u8 *mic,
 			      size_t mic_len)
 {
 	struct scatterlist sg[3];
 	struct aead_request *aead_req;
-	int reqsize = sizeof(*aead_req) + crypto_aead_reqsize(tfm);
+	int reqsize = sizeof(*aead_req) + crypto_aead_reqsize(ccmp->tfm);
 	u8 *__aad;
 	int err;
 
@@ -74,7 +75,7 @@ int ieee80211_aes_ccm_decrypt(struct crypto_aead *tfm, u8 *b_0, u8 *aad,
 	sg_set_buf(&sg[1], data, data_len);
 	sg_set_buf(&sg[2], mic, mic_len);
 
-	aead_request_set_tfm(aead_req, tfm);
+	aead_request_set_tfm(aead_req, ccmp->tfm);
 	aead_request_set_crypt(aead_req, sg, sg, data_len + mic_len, b_0);
 	aead_request_set_ad(aead_req, sg[0].length);
 
@@ -84,16 +85,17 @@ int ieee80211_aes_ccm_decrypt(struct crypto_aead *tfm, u8 *b_0, u8 *aad,
 	return err;
 }
 
-struct crypto_aead *ieee80211_aes_key_setup_encrypt(const u8 key[],
-						    size_t key_len,
-						    size_t mic_len)
+int ieee80211_aes_key_setup_encrypt(struct ieee80211_ccmp_aead *ccmp,
+				    const u8 key[],
+				    size_t key_len,
+				    size_t mic_len)
 {
 	struct crypto_aead *tfm;
 	int err;
 
 	tfm = crypto_alloc_aead("ccm(aes)", 0, CRYPTO_ALG_ASYNC);
 	if (IS_ERR(tfm))
-		return tfm;
+		return PTR_ERR(tfm);
 
 	err = crypto_aead_setkey(tfm, key, key_len);
 	if (err)
@@ -102,14 +104,15 @@ struct crypto_aead *ieee80211_aes_key_setup_encrypt(const u8 key[],
 	if (err)
 		goto free_aead;
 
-	return tfm;
+	ccmp->tfm = tfm;
+	return 0;
 
 free_aead:
 	crypto_free_aead(tfm);
-	return ERR_PTR(err);
+	return err;
 }
 
-void ieee80211_aes_key_free(struct crypto_aead *tfm)
+void ieee80211_aes_key_free(struct ieee80211_ccmp_aead *ccmp)
 {
-	crypto_free_aead(tfm);
+	crypto_free_aead(ccmp->tfm);
 }

@@ -431,10 +431,9 @@ ieee80211_key_alloc(u32 cipher, int idx, size_t key_len,
 		 * Initialize AES key state here as an optimization so that
 		 * it does not need to be initialized for every packet.
 		 */
-		key->u.ccmp.tfm = ieee80211_aes_key_setup_encrypt(
-			key_data, key_len, IEEE80211_CCMP_MIC_LEN);
-		if (IS_ERR(key->u.ccmp.tfm)) {
-			err = PTR_ERR(key->u.ccmp.tfm);
+		err = ieee80211_aes_key_setup_encrypt(&key->u.ccmp, key_data,
+					key_len, IEEE80211_CCMP_MIC_LEN);
+		if (err) {
 			kfree(key);
 			return ERR_PTR(err);
 		}
@@ -449,10 +448,9 @@ ieee80211_key_alloc(u32 cipher, int idx, size_t key_len,
 		/* Initialize AES key state here as an optimization so that
 		 * it does not need to be initialized for every packet.
 		 */
-		key->u.ccmp.tfm = ieee80211_aes_key_setup_encrypt(
-			key_data, key_len, IEEE80211_CCMP_256_MIC_LEN);
-		if (IS_ERR(key->u.ccmp.tfm)) {
-			err = PTR_ERR(key->u.ccmp.tfm);
+		err = ieee80211_aes_key_setup_encrypt(&key->u.ccmp, key_data,
+					key_len, IEEE80211_CCMP_256_MIC_LEN);
+		if (err) {
 			kfree(key);
 			return ERR_PTR(err);
 		}
@@ -545,7 +543,7 @@ static void ieee80211_key_free_common(struct ieee80211_key *key)
 	switch (key->conf.cipher) {
 	case WLAN_CIPHER_SUITE_CCMP:
 	case WLAN_CIPHER_SUITE_CCMP_256:
-		ieee80211_aes_key_free(key->u.ccmp.tfm);
+		ieee80211_aes_key_free(&key->u.ccmp);
 		break;
 	case WLAN_CIPHER_SUITE_AES_CMAC:
 	case WLAN_CIPHER_SUITE_BIP_CMAC_256:
