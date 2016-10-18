@@ -15,13 +15,13 @@
 #ifdef CONFIG_COMPAT
 
 int input_event_from_user(const char __user *buffer,
-			  struct input_event *event)
+			  struct raw_input_event *event)
 {
-	if (in_compat_syscall() && !COMPAT_USE_64BIT_TIME) {
-		struct input_event_compat compat_event;
+	if (in_compat_syscall()) {
+		struct raw_input_event_compat compat_event;
 
 		if (copy_from_user(&compat_event, buffer,
-				   sizeof(struct input_event_compat)))
+				   sizeof(struct raw_input_event_compat)))
 			return -EFAULT;
 
 		event->time.tv_sec = compat_event.time.tv_sec;
@@ -31,7 +31,8 @@ int input_event_from_user(const char __user *buffer,
 		event->value = compat_event.value;
 
 	} else {
-		if (copy_from_user(event, buffer, sizeof(struct input_event)))
+		if (copy_from_user(event, buffer,
+				   sizeof(struct raw_input_event)))
 			return -EFAULT;
 	}
 
@@ -39,10 +40,10 @@ int input_event_from_user(const char __user *buffer,
 }
 
 int input_event_to_user(char __user *buffer,
-			const struct input_event *event)
+			const struct raw_input_event *event)
 {
-	if (in_compat_syscall() && !COMPAT_USE_64BIT_TIME) {
-		struct input_event_compat compat_event;
+	if (in_compat_syscall()) {
+		struct raw_input_event_compat compat_event;
 
 		compat_event.time.tv_sec = event->time.tv_sec;
 		compat_event.time.tv_usec = event->time.tv_usec;
@@ -51,11 +52,11 @@ int input_event_to_user(char __user *buffer,
 		compat_event.value = event->value;
 
 		if (copy_to_user(buffer, &compat_event,
-				 sizeof(struct input_event_compat)))
+				 sizeof(struct raw_input_event_compat)))
 			return -EFAULT;
 
 	} else {
-		if (copy_to_user(buffer, event, sizeof(struct input_event)))
+		if (copy_to_user(buffer, event, sizeof(struct raw_input_event)))
 			return -EFAULT;
 	}
 
@@ -100,18 +101,18 @@ int input_ff_effect_from_user(const char __user *buffer, size_t size,
 #else
 
 int input_event_from_user(const char __user *buffer,
-			 struct input_event *event)
+			 struct raw_input_event *event)
 {
-	if (copy_from_user(event, buffer, sizeof(struct input_event)))
+	if (copy_from_user(event, buffer, sizeof(struct raw_input_event)))
 		return -EFAULT;
 
 	return 0;
 }
 
 int input_event_to_user(char __user *buffer,
-			const struct input_event *event)
+			const struct raw_input_event *event)
 {
-	if (copy_to_user(buffer, event, sizeof(struct input_event)))
+	if (copy_to_user(buffer, event, sizeof(struct raw_input_event)))
 		return -EFAULT;
 
 	return 0;
