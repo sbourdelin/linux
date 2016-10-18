@@ -85,9 +85,13 @@ MODULE_PARM_DESC(ramoops_ecc,
 		"bytes ECC)");
 
 struct ramoops_context {
-	struct persistent_ram_zone **przs;
+	/* for dump przs */
+	struct persistent_ram_zone **dprzs;
+	/* for console przs */
 	struct persistent_ram_zone *cprz;
+	/* for ftrace przs */
 	struct persistent_ram_zone *fprz;
+	/* for pmsg przs */
 	struct persistent_ram_zone *mprz;
 	phys_addr_t phys_addr;
 	unsigned long size;
@@ -201,7 +205,7 @@ static ssize_t ramoops_pstore_read(u64 *id, enum pstore_type_id *type,
 
 	/* Find the next valid persistent_ram_zone for DMESG */
 	while (cxt->dump_read_cnt < cxt->max_dump_cnt && !prz) {
-		prz = ramoops_get_next_prz(cxt->przs, &cxt->dump_read_cnt,
+		prz = ramoops_get_next_prz(cxt->dprzs, &cxt->dump_read_cnt,
 					   cxt->max_dump_cnt, id, type,
 					   PSTORE_TYPE_DMESG, 1);
 		if (!prz_ok(prz))
@@ -217,12 +221,15 @@ static ssize_t ramoops_pstore_read(u64 *id, enum pstore_type_id *type,
 	}
 
 	if (!prz_ok(prz))
+		/* get console prz */
 		prz = ramoops_get_next_prz(&cxt->cprz, &cxt->console_read_cnt,
 					   1, id, type, PSTORE_TYPE_CONSOLE, 0);
 	if (!prz_ok(prz))
+		/* get ftrace prz */
 		prz = ramoops_get_next_prz(&cxt->fprz, &cxt->ftrace_read_cnt,
 					   1, id, type, PSTORE_TYPE_FTRACE, 0);
 	if (!prz_ok(prz))
+		/* get pmsg prz */
 		prz = ramoops_get_next_prz(&cxt->mprz, &cxt->pmsg_read_cnt,
 					   1, id, type, PSTORE_TYPE_PMSG, 0);
 	if (!prz_ok(prz))
@@ -316,10 +323,10 @@ static int notrace ramoops_pstore_write_buf(enum pstore_type_id type,
 	if (part != 1)
 		return -ENOSPC;
 
-	if (!cxt->przs)
+	if (!cxt->dprzs)
 		return -ENOSPC;
 
-	prz = cxt->przs[cxt->dump_write_cnt];
+	prz = cxt->dprzs[cxt->dump_write_cnt];
 
 	hlen = ramoops_write_kmsg_hdr(prz, compressed);
 	if (size + hlen > prz->buffer_size)
@@ -359,7 +366,7 @@ static int ramoops_pstore_erase(enum pstore_type_id type, u64 id, int count,
 	case PSTORE_TYPE_DMESG:
 		if (id >= cxt->max_dump_cnt)
 			return -EINVAL;
-		prz = cxt->przs[id];
+		prz = cxt->dprzs[id];
 		break;
 	case PSTORE_TYPE_CONSOLE:
 		prz = cxt->cprz;
@@ -454,28 +461,23 @@ static int ramoops_init_przs(struct device *dev, struct ramoops_context *cxt,
 	if (!cxt->max_dump_cnt)
 		return -ENOMEM;
 
-	cxt->przs = kcalloc(cxt->max_dump_cnt, sizeof(*cxt->przs),
+	cxt->dprzs = kcalloc(cxt->max_dump_cnt, sizeof(*cxt->dprzs),
 			    GFP_KERNEL);
-	if (!cxt->przs) {
+	if (!cxt->dprzs) {
 		dev_err(dev, "failed to initialize a prz array for dumps\n");
 		goto fail_mem;
 	}
 
 	for (i = 0; i < cxt->max_dump_cnt; i++) {
-		err = __ramoops_init_prz(dev, cxt, &cxt->przs[i], paddr,
+		err = __ramoops_init_prz(dev, cxt, &cxt->dprzs[i], paddr,
 					 cxt->record_size, 0, false);
-		if (err) {
-			while (i > 0) {
-				i--;
-				persistent_ram_free(cxt->przs[i]);
-			}
+		if (err)
 			goto fail_prz;
-		}
 	}
 
 	return 0;
 fail_prz:
-	kfree(cxt->przs);
+	ramoops_free_przs(cxt->dprzs, i);
 fail_mem:
 	cxt->max_dump_cnt = 0;
 	return err;
@@ -607,20 +609,24 @@ static int ramoops_probe(struct platform_device *pdev)
 
 	dump_mem_sz = cxt->size - cxt->console_size - cxt->ftrace_size
 			- cxt->pmsg_size;
+	/* init dump przs */
 	err = ramoops_init_przs(dev, cxt, &paddr, dump_mem_sz);
 	if (err)
 		goto fail_out;
 
+	/* init console prz */
 	err = ramoops_init_prz(dev, cxt, &cxt->cprz, &paddr,
 			       cxt->console_size, 0);
 	if (err)
 		goto fail_init_cprz;
 
+	/* init ftrace prz */
 	err = ramoops_init_prz(dev, cxt, &cxt->fprz, &paddr, cxt->ftrace_size,
 			       LINUX_VERSION_CODE);
 	if (err)
 		goto fail_init_fprz;
 
+	/* init pmsg przs */
 	err = ramoops_init_prz(dev, cxt, &cxt->mprz, &paddr, cxt->pmsg_size, 0);
 	if (err)
 		goto fail_init_mprz;
@@ -685,7 +691,7 @@ fail_init_mprz:
 fail_init_fprz:
 	persistent_ram_free(cxt->cprz);
 fail_init_cprz:
-	ramoops_free_przs(cxt->przs, cxt->max_dump_cnt);
+	ramoops_free_przs(cxt->dprzs, cxt->max_dump_cnt);
 	cxt->max_dump_cnt = 0;
 fail_out:
 	return err;
@@ -703,7 +709,7 @@ static int ramoops_remove(struct platform_device *pdev)
 	persistent_ram_free(cxt->mprz);
 	persistent_ram_free(cxt->fprz);
 	persistent_ram_free(cxt->cprz);
-	ramoops_free_przs(cxt->przs, cxt->max_dump_cnt);
+	ramoops_free_przs(cxt->dprzs, cxt->max_dump_cnt);
 	cxt->max_dump_cnt = 0;
 
 	return 0;
