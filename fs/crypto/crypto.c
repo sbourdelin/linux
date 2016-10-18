@@ -194,8 +194,9 @@ static int do_page_crypto(struct inode *inode,
 	skcipher_request_free(req);
 	if (res) {
 		printk_ratelimited(KERN_ERR
-			"%s: crypto_skcipher_encrypt() returned %d\n",
-			__func__, res);
+			"%s: crypto_skcipher_%scrypt() returned %d, flags %#x\n",
+			__func__, rw == FS_DECRYPT ? "de" : "en", res,
+			crypto_skcipher_get_flags(tfm));
 		return res;
 	}
 	return 0;
