@@ -265,7 +265,7 @@ errout:
 EXPORT_SYMBOL(fscrypt_encrypt_page);
 
 /**
- * f2crypt_decrypt_page() - Decrypts a page in-place
+ * fscrypt_decrypt_page() - Decrypts a page in-place
  * @page: The page to decrypt. Must be locked.
  *
  * Decrypts page in-place using the ctx encryption context.
