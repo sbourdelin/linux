@@ -90,7 +90,7 @@
 #define NUMOUTCHANNELS    8
 
 /* size of one value for the D/A converter: channel and value */
-#define SIZEDAOUT          ((sizeof(u8) + sizeof(uint16_t)))
+#define SIZEDAOUT          ((sizeof(u8) + sizeof(u16)))
 
 /*
  * Size of the output-buffer in bytes
