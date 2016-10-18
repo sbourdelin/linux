@@ -22,6 +22,7 @@
 #include <linux/scatterlist.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
+#include <linux/of.h>
 
 #include <linux/leds.h>
 
@@ -3020,6 +3021,32 @@ void __sdhci_read_caps(struct sdhci_host *host, u16 *ver, u32 *caps, u32 *caps1)
 }
 EXPORT_SYMBOL_GPL(__sdhci_read_caps);
 
+void sdhci_get_speed_caps_from_of(struct sdhci_host *host)
+{
+	struct mmc_host *mmc = host->mmc;
+
+	host->caps &= ~SDHCI_CAN_DO_HISPD;
+
+	if (of_property_read_bool(mmc_dev(mmc)->of_node, "cap-sd-highspeed"))
+		host->caps |= SDHCI_CAN_DO_HISPD;
+
+	if (host->version < SDHCI_SPEC_300)
+		return;
+
+	host->caps1 &= ~(SDHCI_SUPPORT_SDR50 | SDHCI_SUPPORT_SDR104 |
+			 SDHCI_SUPPORT_DDR50);
+
+	if (of_property_read_bool(mmc_dev(mmc)->of_node, "sd-uhs-sdr50"))
+		host->caps1 |= SDHCI_SUPPORT_SDR50;
+
+	if (of_property_read_bool(mmc_dev(mmc)->of_node, "sd-uhs-sdr104"))
+		host->caps1 |= SDHCI_SUPPORT_SDR104;
+
+	if (of_property_read_bool(mmc_dev(mmc)->of_node, "sd-uhs-ddr50"))
+		host->caps1 |= SDHCI_SUPPORT_DDR50;
+
+}
+
 int sdhci_setup_host(struct sdhci_host *host)
 {
 	struct mmc_host *mmc;
@@ -3046,6 +3073,10 @@ int sdhci_setup_host(struct sdhci_host *host)
 		return ret;
 
 	sdhci_read_caps(host);
+	if (of_property_read_bool(mmc_dev(mmc)->of_node,
+				  "sdhci-cap-speed-modes-broken"))
+		sdhci_get_speed_caps_from_of(host);
+
 
 	override_timeout_clk = host->timeout_clk;
 
