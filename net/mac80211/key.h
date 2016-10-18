@@ -89,6 +89,7 @@ struct ieee80211_key {
 			 */
 			u8 rx_pn[IEEE80211_NUM_TIDS + 1][IEEE80211_CCMP_PN_LEN];
 			struct crypto_aead *tfm;
+			struct aead_request * __percpu *reqs;
 			u32 replays; /* dot11RSNAStatsCCMPReplays */
 		} ccmp;
 		struct {
