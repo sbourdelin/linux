@@ -40,12 +40,11 @@ void s5p_mfc_init_regs(struct s5p_mfc_dev *dev)
 int s5p_mfc_alloc_priv_buf(struct device *dev, dma_addr_t base,
 					struct s5p_mfc_priv_buf *b)
 {
-	mfc_debug(3, "Allocating priv: %zu\n", b->size);
-
 	b->virt = dma_alloc_coherent(dev, b->size, &b->dma, GFP_KERNEL);
 
 	if (!b->virt) {
-		mfc_err("Allocating private buffer failed\n");
+		mfc_err("Allocating private buffer of size %zu failed\n",
+			b->size);
 		return -ENOMEM;
 	}
 
