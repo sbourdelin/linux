@@ -12,8 +12,6 @@
  * more details.
  *
  ******************************************************************************/
-
-
 #define _OSDEP_SERVICE_C_
 
 #include <osdep_service.h>
@@ -24,9 +22,10 @@
 #include <rtw_ioctl_set.h>
 
 /*
-* Translate the OS dependent @param error_code to OS independent RTW_STATUS_CODE
-* @return: one of RTW_STATUS_CODE
-*/
+ * Translate the OS dependent @param error_code to OS independent
+ * RTW_STATUS_CODE
+ * @return: one of RTW_STATUS_CODE
+ */
 inline int RTW_STATUS_CODE(int error_code)
 {
 	if (error_code >= 0)
@@ -42,23 +41,22 @@ u8 *_rtw_malloc(u32 sz)
 void *rtw_malloc2d(int h, int w, int size)
 {
 	int j;
+	void **a;
 
-	void **a = kzalloc(h*sizeof(void *) + h*w*size, GFP_KERNEL);
-	if (!a) {
-		pr_info("%s: alloc memory fail!\n", __func__);
-		return NULL;
-	}
+	a = kzalloc(h * sizeof(void *) + h * w * size, GFP_KERNEL);
+	if (!a)
+		goto out;
 
 	for (j = 0; j < h; j++)
-		a[j] = ((char *)(a+h)) + j*w*size;
-
+		a[j] = ((char *)(a + h)) + j * w * size;
+out:
 	return a;
 }
 
-void	_rtw_init_queue(struct __queue *pqueue)
+void _rtw_init_queue(struct __queue *pqueue)
 {
-	INIT_LIST_HEAD(&(pqueue->queue));
-	spin_lock_init(&(pqueue->lock));
+	INIT_LIST_HEAD(&pqueue->queue);
+	spin_lock_init(&pqueue->lock);
 }
 
 struct net_device *rtw_alloc_etherdev_with_old_priv(void *old_priv)
@@ -66,7 +64,8 @@ struct net_device *rtw_alloc_etherdev_with_old_priv(void *old_priv)
 	struct net_device *pnetdev;
 	struct rtw_netdev_priv_indicator *pnpi;
 
-	pnetdev = alloc_etherdev_mq(sizeof(struct rtw_netdev_priv_indicator), 4);
+	pnetdev = alloc_etherdev_mq(sizeof(struct rtw_netdev_priv_indicator),
+				    4);
 	if (!pnetdev)
 		goto RETURN;
 
