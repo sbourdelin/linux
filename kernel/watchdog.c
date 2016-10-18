@@ -46,7 +46,7 @@
 
 static DEFINE_MUTEX(watchdog_proc_mutex);
 
-#ifdef CONFIG_HARDLOCKUP_DETECTOR
+#if defined(CONFIG_HARDLOCKUP_DETECTOR) || defined(CONFIG_HAVE_NMI_WATCHDOG)
 static unsigned long __read_mostly watchdog_enabled = SOFT_WATCHDOG_ENABLED|NMI_WATCHDOG_ENABLED;
 #else
 static unsigned long __read_mostly watchdog_enabled = SOFT_WATCHDOG_ENABLED;
@@ -585,14 +585,10 @@ static void watchdog(unsigned int cpu)
  */
 static unsigned long cpu0_err;
 
-static int watchdog_nmi_enable(unsigned int cpu)
+static int arch_watchdog_nmi_enable(unsigned int cpu)
 {
 	struct perf_event_attr *wd_attr;
 	struct perf_event *event = per_cpu(watchdog_ev, cpu);
-
-	/* nothing to do if the hard lockup detector is disabled */
-	if (!(watchdog_enabled & NMI_WATCHDOG_ENABLED))
-		goto out;
 
 	/* is it already setup and enabled? */
 	if (event && event->state > PERF_EVENT_STATE_OFF)
@@ -619,18 +615,6 @@ static int watchdog_nmi_enable(unsigned int cpu)
 		goto out_save;
 	}
 
-	/*
-	 * Disable the hard lockup detector if _any_ CPU fails to set up
-	 * set up the hardware perf event. The watchdog() function checks
-	 * the NMI_WATCHDOG_ENABLED bit periodically.
-	 *
-	 * The barriers are for syncing up watchdog_enabled across all the
-	 * cpus, as clear_bit() does not use barriers.
-	 */
-	smp_mb__before_atomic();
-	clear_bit(NMI_WATCHDOG_ENABLED_BIT, &watchdog_enabled);
-	smp_mb__after_atomic();
-
 	/* skip displaying the same error again */
 	if (cpu > 0 && (PTR_ERR(event) == cpu0_err))
 		return PTR_ERR(event);
@@ -645,8 +629,6 @@ static int watchdog_nmi_enable(unsigned int cpu)
 		pr_err("disabled (cpu%i): unable to create perf event: %ld\n",
 			cpu, PTR_ERR(event));
 
-	pr_info("Shutting down hard lockup detector on all cpus\n");
-
 	return PTR_ERR(event);
 
 	/* success path */
@@ -658,7 +640,7 @@ out:
 	return 0;
 }
 
-static void watchdog_nmi_disable(unsigned int cpu)
+static void arch_watchdog_nmi_disable(unsigned int cpu)
 {
 	struct perf_event *event = per_cpu(watchdog_ev, cpu);
 
@@ -676,8 +658,13 @@ static void watchdog_nmi_disable(unsigned int cpu)
 }
 
 #else
-static int watchdog_nmi_enable(unsigned int cpu) { return 0; }
-static void watchdog_nmi_disable(unsigned int cpu) { return; }
+/*
+ * These two functions are mostly architecture specific
+ * defining them as weak here.
+ */
+int __weak arch_watchdog_nmi_enable(unsigned int cpu) { return 0; }
+void __weak arch_watchdog_nmi_disable(unsigned int cpu) { return; }
+
 #endif /* CONFIG_HARDLOCKUP_DETECTOR */
 
 static struct smp_hotplug_thread watchdog_threads = {
@@ -779,6 +766,42 @@ void lockup_detector_resume(void)
 
 	mutex_unlock(&watchdog_proc_mutex);
 	put_online_cpus();
+}
+
+void watchdog_nmi_disable(unsigned int cpu)
+{
+	arch_watchdog_nmi_disable(cpu);
+}
+
+int watchdog_nmi_enable(unsigned int cpu)
+{
+	int err;
+
+	/* nothing to do if the hard lockup detector is disabled */
+	if (!(watchdog_enabled & NMI_WATCHDOG_ENABLED))
+		return 0;
+
+	err = arch_watchdog_nmi_enable(cpu);
+
+	if (err) {
+		/*
+		 * Disable the hard lockup detector if _any_ CPU fails to set up
+		 * set up the hardware perf event. The watchdog() function checks
+		 * the NMI_WATCHDOG_ENABLED bit periodically.
+		 *
+		 * The barriers are for syncing up watchdog_enabled across all the
+		 * cpus, as clear_bit() does not use barriers.
+		 */
+		smp_mb__before_atomic();
+		clear_bit(NMI_WATCHDOG_ENABLED_BIT, &watchdog_enabled);
+		smp_mb__after_atomic();
+
+		pr_info("Shutting down hard lockup detector on all cpus\n");
+
+		return err;
+	}
+
+	return 0;
 }
 
 static int update_watchdog_all_cpus(void)
