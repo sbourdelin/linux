@@ -1248,7 +1248,7 @@ retry:
 	tmp_prefered_lft = idev->cnf.temp_prefered_lft + age -
 			    idev->desync_factor;
 	/* guard against underflow in case of concurrent updates to cnf */
-	if (unlikely(tmp_prefered_lft < 0))
+	if (unlikely((long)tmp_prefered_lft < 0))
 		tmp_prefered_lft = 0;
 	tmp_prefered_lft = min_t(__u32, ifp->prefered_lft, tmp_prefered_lft);
 	tmp_plen = ifp->prefix_len;
