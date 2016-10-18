@@ -2835,10 +2835,45 @@ EXPORT_SYMBOL(unregister_console);
  * intersects with the init section. Note that code exists elsewhere to get
  * rid of the boot console as soon as the proper console shows up, so there
  * won't be side-effects from postponing the removal.
+ *
+ * Additionally we may be using a device tree which specifies valid
+ * stdout-path referencing a device for which we don't have a driver, or for
+ * which we have a driver that doesn't register itself as preferred console
+ * using of_console_check(). In these cases we attempt here to enable the
+ * first registered console.
  */
 static int __init printk_late_init(void)
 {
-	struct console *con;
+	struct console *con, *enabled;
+
+	if (of_specified_console) {
+		console_lock();
+
+		/* Find the enabled console, if there is one */
+		enabled = NULL;
+		for_each_console(con) {
+			if (!(con->flags & CON_ENABLED))
+				continue;
+
+			enabled = con;
+			break;
+		}
+
+		/* Enable the first console if none were already enabled */
+		con = console_drivers;
+		if (!enabled && con) {
+			if (con->index < 0)
+				con->index = 0;
+			if (con->setup == NULL ||
+			    con->setup(con, NULL) == 0) {
+				con->flags |= CON_ENABLED;
+				if (con->device)
+					con->flags |= CON_CONSDEV;
+			}
+		}
+
+		console_unlock();
+	}
 
 	for_each_console(con) {
 		if (!keep_bootcon && con->flags & CON_BOOT) {
