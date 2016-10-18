@@ -274,14 +274,14 @@ static int hilse_match(hil_mlc *mlc, int unused)
 /* An LCV used to prevent runaway loops, forces 5 second sleep when reset. */
 static int hilse_init_lcv(hil_mlc *mlc, int unused)
 {
-	struct timeval tv;
+	time64_t time;
 
-	do_gettimeofday(&tv);
+	time = ktime_get_seconds();
 
-	if (mlc->lcv && (tv.tv_sec - mlc->lcv_tv.tv_sec) < 5)
+	if (mlc->lcv && (time - mlc->lcv_tv.tv_sec) < 5)
 		return -1;
 
-	mlc->lcv_tv = tv;
+	mlc->lcv_tv.tv_sec = time;
 	mlc->lcv = 0;
 
 	return 0;
@@ -466,7 +466,7 @@ static const struct hilse_node hil_mlc_se[HILSEN_END] = {
 	FUNC(hilse_init_lcv, 0,	HILSEN_NEXT,	HILSEN_SLEEP,	0)
 
 	/* 1  HILSEN_RESTART */
-	FUNC(hilse_inc_lcv, 10,	HILSEN_NEXT,	HILSEN_START,  0)
+	FUNC(hilse_inc_lcv, 10000,	HILSEN_NEXT,	HILSEN_START,  0)
 	OUT(HIL_CTRL_ONLY)			/* Disable APE */
 	CTS
 
@@ -485,7 +485,7 @@ static const struct hilse_node hil_mlc_se[HILSEN_END] = {
 	FUNC(hilse_init_lcv, 0,	HILSEN_NEXT,	HILSEN_SLEEP,	0)
 
 	/* 10 HILSEN_DHR2 */
-	FUNC(hilse_inc_lcv, 10,	HILSEN_NEXT,	HILSEN_START,	0)
+	FUNC(hilse_inc_lcv, 10000,	HILSEN_NEXT,	HILSEN_START,	0)
 	FUNC(hilse_set_ddi, -1,	HILSEN_NEXT,	0,		0)
 	OUT(HIL_PKT_CMD | HIL_CMD_DHR)
 	IN(300000,		HILSEN_DHR2,	HILSEN_DHR2,	HILSEN_NEXT)
@@ -515,7 +515,7 @@ static const struct hilse_node hil_mlc_se[HILSEN_END] = {
 	FUNC(hilse_init_lcv, 0,	HILSEN_NEXT,	HILSEN_DOZE,	0)
 
 	/* 22 HILSEN_ACF2 */
-	FUNC(hilse_inc_lcv, 10,	HILSEN_NEXT,	HILSEN_START,	0)
+	FUNC(hilse_inc_lcv, 10000,	HILSEN_NEXT,	HILSEN_START,	0)
 	OUT(HIL_PKT_CMD | HIL_CMD_ACF | 1)
 	IN(20000,		HILSEN_NEXT,	HILSEN_DSR,	HILSEN_NEXT)
 
@@ -572,7 +572,7 @@ static const struct hilse_node hil_mlc_se[HILSEN_END] = {
 	OUT(HIL_PKT_CMD | HIL_CMD_RPL)
 	EXPECT(HIL_PKT_CMD | HIL_CMD_RPL | HIL_ERR_INT,
 	       20000,		HILSEN_NEXT,	HILSEN_DSR,	HILSEN_NEXT)
-	FUNC(hilse_operate, 1,	HILSEN_OPERATE,	HILSEN_IFC,	HILSEN_PROBE)
+	FUNC(hilse_operate, 1000, HILSEN_OPERATE, HILSEN_IFC,	HILSEN_PROBE)
 
 	/* 58 HILSEN_IFCACF */
 	OUT(HIL_PKT_CMD | HIL_CMD_IFC)
@@ -584,7 +584,6 @@ static const struct hilse_node hil_mlc_se[HILSEN_END] = {
 
 static inline void hilse_setup_input(hil_mlc *mlc, const struct hilse_node *node)
 {
-
 	switch (node->act) {
 	case HILSE_EXPECT_DISC:
 		mlc->imatch = node->object.packet;
@@ -605,7 +604,7 @@ static inline void hilse_setup_input(hil_mlc *mlc, const struct hilse_node *node
 	}
 	mlc->istarted = 1;
 	mlc->intimeout = node->arg;
-	do_gettimeofday(&(mlc->instart));
+	ktime_get_ts64(&(mlc->instart));
 	mlc->icount = 15;
 	memset(mlc->ipacket, 0, 16 * sizeof(hil_packet));
 	BUG_ON(down_trylock(&mlc->isem));
@@ -710,7 +709,7 @@ static int hilse_donode(hil_mlc *mlc)
 			break;
 		}
 		mlc->ostarted = 0;
-		do_gettimeofday(&(mlc->instart));
+		ktime_get_ts64(&(mlc->instart));
 		write_unlock_irqrestore(&mlc->lock, flags);
 		nextidx = HILSEN_NEXT;
 		break;
@@ -731,18 +730,18 @@ static int hilse_donode(hil_mlc *mlc)
 #endif
 
 	while (nextidx & HILSEN_SCHED) {
-		struct timeval tv;
+		struct timespec64 ts;
 
 		if (!sched_long)
 			goto sched;
 
-		do_gettimeofday(&tv);
-		tv.tv_usec += USEC_PER_SEC * (tv.tv_sec - mlc->instart.tv_sec);
-		tv.tv_usec -= mlc->instart.tv_usec;
-		if (tv.tv_usec >= mlc->intimeout) goto sched;
-		tv.tv_usec = (mlc->intimeout - tv.tv_usec) * HZ / USEC_PER_SEC;
-		if (!tv.tv_usec) goto sched;
-		mod_timer(&hil_mlcs_kicker, jiffies + tv.tv_usec);
+		ktime_get_ts64(&ts);
+		ts.tv_nsec += NSEC_PER_SEC * (ts.tv_sec - mlc->instart.tv_sec);
+		ts.tv_nsec -= mlc->instart.tv_nsec;
+		if (ts.tv_nsec >= mlc->intimeout) goto sched;
+		ts.tv_nsec = (mlc->intimeout - ts.tv_nsec) * HZ / NSEC_PER_SEC;
+		if (!ts.tv_nsec) goto sched;
+		mod_timer(&hil_mlcs_kicker, jiffies + ts.tv_nsec);
 		break;
 	sched:
 		tasklet_schedule(&hil_mlcs_tasklet);

@@ -193,7 +193,7 @@ static void hp_sdc_take(int irq, void *dev_id, uint8_t status, uint8_t data)
 	curr->seq[curr->idx++] = status;
 	curr->seq[curr->idx++] = data;
 	hp_sdc.rqty -= 2;
-	do_gettimeofday(&hp_sdc.rtv);
+	ktime_get_ts64(&hp_sdc.rtv);
 
 	if (hp_sdc.rqty <= 0) {
 		/* All data has been gathered. */
@@ -306,13 +306,13 @@ static void hp_sdc_tasklet(unsigned long foo)
 	write_lock_irq(&hp_sdc.rtq_lock);
 
 	if (hp_sdc.rcurr >= 0) {
-		struct timeval tv;
+		struct timespec64 ts;
 
-		do_gettimeofday(&tv);
-		if (tv.tv_sec > hp_sdc.rtv.tv_sec)
-			tv.tv_usec += USEC_PER_SEC;
+		ktime_get_ts64(&ts);
+		if (ts.tv_sec > hp_sdc.rtv.tv_sec)
+			ts.tv_nsec += NSEC_PER_SEC;
 
-		if (tv.tv_usec - hp_sdc.rtv.tv_usec > HP_SDC_MAX_REG_DELAY) {
+		if (ts.tv_nsec - hp_sdc.rtv.tv_nsec > HP_SDC_MAX_REG_DELAY) {
 			hp_sdc_transaction *curr;
 			uint8_t tmp;
 
@@ -322,7 +322,8 @@ static void hp_sdc_tasklet(unsigned long foo)
 			 * it back to the application. and be less verbose.
 			 */
 			printk(KERN_WARNING PREFIX "read timeout (%ius)!\n",
-			       (int)(tv.tv_usec - hp_sdc.rtv.tv_usec));
+			       (int)(ts.tv_nsec - hp_sdc.rtv.tv_nsec) /
+				     (int)NSEC_PER_USEC);
 			curr->idx += hp_sdc.rqty;
 			hp_sdc.rqty = 0;
 			tmp = curr->seq[curr->actidx];
@@ -551,7 +552,7 @@ unsigned long hp_sdc_put(void)
 
 			/* Start a new read */
 			hp_sdc.rqty = curr->seq[curr->idx];
-			do_gettimeofday(&hp_sdc.rtv);
+			ktime_get_ts64(&hp_sdc.rtv);
 			curr->idx++;
 			/* Still need to lock here in case of spurious irq. */
 			write_lock_irq(&hp_sdc.rtq_lock);
