@@ -612,10 +612,7 @@ static void btusb_intr_complete(struct urb *urb)
 	BT_DBG("%s urb %p status %d count %d", hdev->name, urb, urb->status,
 	       urb->actual_length);
 
-	if (!test_bit(HCI_RUNNING, &hdev->flags))
-		return;
-
-	if (urb->status == 0) {
+	if (urb->status == 0 && test_bit(HCI_RUNNING, &hdev->flags)) {
 		hdev->stat.byte_rx += urb->actual_length;
 
 		if (btusb_recv_intr(data, urb->transfer_buffer,
