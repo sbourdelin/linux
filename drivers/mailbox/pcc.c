@@ -267,6 +267,8 @@ struct mbox_chan *pcc_mbox_request_channel(struct mbox_client *cl,
 	if (chan->txdone_method == TXDONE_BY_POLL && cl->knows_txdone)
 		chan->txdone_method |= TXDONE_BY_ACK;
 
+	spin_unlock_irqrestore(&chan->lock, flags);
+
 	if (pcc_doorbell_irq[subspace_id] > 0) {
 		int rc;
 
@@ -278,8 +280,6 @@ struct mbox_chan *pcc_mbox_request_channel(struct mbox_client *cl,
 			chan = ERR_PTR(rc);
 		}
 	}
-
-	spin_unlock_irqrestore(&chan->lock, flags);
 
 	return chan;
 }
@@ -310,10 +310,10 @@ void pcc_mbox_free_channel(struct mbox_chan *chan)
 	if (chan->txdone_method == (TXDONE_BY_POLL | TXDONE_BY_ACK))
 		chan->txdone_method = TXDONE_BY_POLL;
 
+	spin_unlock_irqrestore(&chan->lock, flags);
+
 	if (pcc_doorbell_irq[id] > 0)
 		devm_free_irq(chan->mbox->dev, pcc_doorbell_irq[id], chan);
-
-	spin_unlock_irqrestore(&chan->lock, flags);
 }
 EXPORT_SYMBOL_GPL(pcc_mbox_free_channel);
 
