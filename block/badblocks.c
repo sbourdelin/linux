@@ -439,6 +439,42 @@ void ack_all_badblocks(struct badblocks *bb)
 EXPORT_SYMBOL_GPL(ack_all_badblocks);
 
 /**
+ * check_if_badblocks_acked() - Check if all badblocks in list are acknowledged
+ * @bb:		the badblocks structure that holds all badblock information
+ *
+ * It clears ->changed and ->unacked_exist if successful. It is used by
+ * userspace metadata updates
+ *
+ *  Return:
+ *   True if all badblocks are acknowledged, false otherwise
+ */
+int check_if_badblocks_acked(struct badblocks *bb)
+{
+	int acked = 1;
+
+	write_seqlock_irq(&bb->lock);
+	if (bb->unacked_exist) {
+		u64 *p = bb->page;
+		int i;
+
+		for (i = 0; i < bb->count ; i++) {
+			if (!BB_ACK(p[i])) {
+				acked = 0;
+				break;
+			}
+		}
+		if (acked) {
+			bb->unacked_exist = 0;
+			bb->changed = 0;
+		}
+	}
+	write_sequnlock_irq(&bb->lock);
+
+	return acked;
+}
+EXPORT_SYMBOL_GPL(check_if_badblocks_acked);
+
+/**
  * badblocks_show() - sysfs access to bad-blocks list
  * @bb:		the badblocks structure that holds all badblock information
  * @page:	buffer received from sysfs

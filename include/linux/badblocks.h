@@ -46,6 +46,7 @@ int badblocks_set(struct badblocks *bb, sector_t s, int sectors,
 			int acknowledged);
 int badblocks_clear(struct badblocks *bb, sector_t s, int sectors);
 void ack_all_badblocks(struct badblocks *bb);
+int check_if_badblocks_acked(struct badblocks *bb);
 ssize_t badblocks_show(struct badblocks *bb, char *page, int unack);
 ssize_t badblocks_store(struct badblocks *bb, const char *page, size_t len,
 			int unack);
