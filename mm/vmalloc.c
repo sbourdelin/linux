@@ -661,13 +661,18 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
 	if (nr || force_flush)
 		flush_tlb_kernel_range(*start, *end);
 
+	spin_unlock(&purge_lock);
+
 	if (nr) {
+		unsigned char batch = 0;
 		spin_lock(&vmap_area_lock);
-		llist_for_each_entry_safe(va, n_va, valist, purge_list)
+		llist_for_each_entry_safe(va, n_va, valist, purge_list) {
 			__free_vmap_area(va);
+			if (!batch++)
+				cond_resched_lock(&vmap_area_lock);
+		}
 		spin_unlock(&vmap_area_lock);
 	}
-	spin_unlock(&purge_lock);
 }
 
 /*
