@@ -392,18 +392,16 @@ static struct ramoops_context oops_cxt = {
 	},
 };
 
-static void ramoops_free_przs(struct ramoops_context *cxt)
+static void ramoops_free_przs(struct persistent_ram_zone **przs, int cnt)
 {
 	int i;
 
-	if (!cxt->przs)
+	if (!przs)
 		return;
 
-	for (i = 0; i < cxt->max_dump_cnt; i++)
-		persistent_ram_free(cxt->przs[i]);
-
-	kfree(cxt->przs);
-	cxt->max_dump_cnt = 0;
+	for (i = 0; i < cnt; i++)
+		persistent_ram_free(przs[i]);
+	kfree(przs);
 }
 
 static int ramoops_init_przs(struct device *dev, struct ramoops_context *cxt,
@@ -684,7 +682,8 @@ fail_init_mprz:
 fail_init_fprz:
 	persistent_ram_free(cxt->cprz);
 fail_init_cprz:
-	ramoops_free_przs(cxt);
+	ramoops_free_przs(cxt->przs, cxt->max_dump_cnt);
+	cxt->max_dump_cnt = 0;
 fail_out:
 	return err;
 }
@@ -701,7 +700,8 @@ static int ramoops_remove(struct platform_device *pdev)
 	persistent_ram_free(cxt->mprz);
 	persistent_ram_free(cxt->fprz);
 	persistent_ram_free(cxt->cprz);
-	ramoops_free_przs(cxt);
+	ramoops_free_przs(cxt->przs, cxt->max_dump_cnt);
+	cxt->max_dump_cnt = 0;
 
 	return 0;
 }
