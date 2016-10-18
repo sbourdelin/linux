@@ -909,7 +909,7 @@ static int dm_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
 	 * hctx that it really shouldn't.  The following check guards
 	 * against this rarity (albeit _not_ race-free).
 	 */
-	if (unlikely(test_bit(BLK_MQ_S_STOPPED, &hctx->state)))
+	if (unlikely(blk_mq_hctx_stopped(hctx)))
 		return BLK_MQ_RQ_QUEUE_BUSY;
 
 	if (ti->type->busy && ti->type->busy(ti))
