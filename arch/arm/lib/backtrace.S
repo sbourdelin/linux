@@ -116,7 +116,8 @@ ENDPROC(c_backtrace)
 #define reg   r5
 #define stack r6
 
-.Ldumpstm:	stmfd	sp!, {instr, reg, stack, r7, lr}
+	        /* Must maintain 8 byte stack alignment */
+.Ldumpstm:	stmfd	sp!, {r3, instr, reg, stack, r7, lr}
 		mov	stack, r0
 		mov	instr, r1
 		mov	reg, #10
@@ -140,7 +141,7 @@ ENDPROC(c_backtrace)
 		teq	r7, #0
 		adrne	r0, .Lcr
 		blne	printk
-		ldmfd	sp!, {instr, reg, stack, r7, pc}
+		ldmfd	sp!, {r3, instr, reg, stack, r7, pc}
 
 .Lfp:		.asciz	" r%d:%08x%s"
 .Lcr:		.asciz	"\n"
