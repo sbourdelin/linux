@@ -39,7 +39,11 @@ Optional properties:
 - ftrace-size: size in bytes of log buffer reserved for function tracing and
   profiling (defaults to 0: disabled)
 
-- pmsg-size: size in bytes of log buffer reserved for userspace messages
+- pmsg-size: array of value that are used to size in bytes of log buffer
+  reserved for userspace messages.
+
+	pmsg-size = <0x10000 0x10000>;
+
   (defaults to 0: disabled)
 
 - unbuffered: if present, use unbuffered mappings to map the reserved region
