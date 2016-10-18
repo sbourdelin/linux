@@ -150,12 +150,12 @@ static long h_reg_sub_crq(unsigned long unit_address, unsigned long token,
 			  unsigned long length, unsigned long *number,
 			  unsigned long *irq)
 {
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
+	struct plpar_hcall_retvals retvals;
 	long rc;
 
-	rc = plpar_hcall(H_REG_SUB_CRQ, retbuf, unit_address, token, length);
-	*number = retbuf[0];
-	*irq = retbuf[1];
+	rc = plpar_hcall(H_REG_SUB_CRQ, &retvals, unit_address, token, length);
+	*number = retvals.v[0];
+	*irq = retvals.v[1];
 
 	return rc;
 }

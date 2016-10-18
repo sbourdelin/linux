@@ -131,12 +131,12 @@ static inline long plpar_pte_enter(unsigned long flags,
 		unsigned long hpte_group, unsigned long hpte_v,
 		unsigned long hpte_r, unsigned long *slot)
 {
+	struct plpar_hcall_retvals retvals;
 	long rc;
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
 
-	rc = plpar_hcall(H_ENTER, retbuf, flags, hpte_group, hpte_v, hpte_r);
+	rc = plpar_hcall(H_ENTER, &retvals, flags, hpte_group, hpte_v, hpte_r);
 
-	*slot = retbuf[0];
+	*slot = retvals.v[0];
 
 	return rc;
 }
@@ -145,13 +145,13 @@ static inline long plpar_pte_remove(unsigned long flags, unsigned long ptex,
 		unsigned long avpn, unsigned long *old_pteh_ret,
 		unsigned long *old_ptel_ret)
 {
+	struct plpar_hcall_retvals retvals;
 	long rc;
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
 
-	rc = plpar_hcall(H_REMOVE, retbuf, flags, ptex, avpn);
+	rc = plpar_hcall(H_REMOVE, &retvals, flags, ptex, avpn);
 
-	*old_pteh_ret = retbuf[0];
-	*old_ptel_ret = retbuf[1];
+	*old_pteh_ret = retvals.v[0];
+	*old_ptel_ret = retvals.v[1];
 
 	return rc;
 }
@@ -161,13 +161,13 @@ static inline long plpar_pte_remove_raw(unsigned long flags, unsigned long ptex,
 		unsigned long avpn, unsigned long *old_pteh_ret,
 		unsigned long *old_ptel_ret)
 {
+	struct plpar_hcall_retvals retvals;
 	long rc;
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
 
-	rc = plpar_hcall_raw(H_REMOVE, retbuf, flags, ptex, avpn);
+	rc = plpar_hcall_raw(H_REMOVE, &retvals, flags, ptex, avpn);
 
-	*old_pteh_ret = retbuf[0];
-	*old_ptel_ret = retbuf[1];
+	*old_pteh_ret = retvals.v[0];
+	*old_ptel_ret = retvals.v[1];
 
 	return rc;
 }
@@ -175,13 +175,13 @@ static inline long plpar_pte_remove_raw(unsigned long flags, unsigned long ptex,
 static inline long plpar_pte_read(unsigned long flags, unsigned long ptex,
 		unsigned long *old_pteh_ret, unsigned long *old_ptel_ret)
 {
+	struct plpar_hcall_retvals retvals;
 	long rc;
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
 
-	rc = plpar_hcall(H_READ, retbuf, flags, ptex);
+	rc = plpar_hcall(H_READ, &retvals, flags, ptex);
 
-	*old_pteh_ret = retbuf[0];
-	*old_ptel_ret = retbuf[1];
+	*old_pteh_ret = retvals.v[0];
+	*old_ptel_ret = retvals.v[1];
 
 	return rc;
 }
@@ -190,13 +190,13 @@ static inline long plpar_pte_read(unsigned long flags, unsigned long ptex,
 static inline long plpar_pte_read_raw(unsigned long flags, unsigned long ptex,
 		unsigned long *old_pteh_ret, unsigned long *old_ptel_ret)
 {
+	struct plpar_hcall_retvals retvals;
 	long rc;
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
 
-	rc = plpar_hcall_raw(H_READ, retbuf, flags, ptex);
+	rc = plpar_hcall_raw(H_READ, &retvals, flags, ptex);
 
-	*old_pteh_ret = retbuf[0];
-	*old_ptel_ret = retbuf[1];
+	*old_pteh_ret = retvals.v[0];
+	*old_ptel_ret = retvals.v[1];
 
 	return rc;
 }
@@ -245,12 +245,12 @@ static inline long plpar_pte_protect(unsigned long flags, unsigned long ptex,
 static inline long plpar_tce_get(unsigned long liobn, unsigned long ioba,
 		unsigned long *tce_ret)
 {
+	struct plpar_hcall_retvals retvals;
 	long rc;
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
 
-	rc = plpar_hcall(H_GET_TCE, retbuf, liobn, ioba);
+	rc = plpar_hcall(H_GET_TCE, &retvals, liobn, ioba);
 
-	*tce_ret = retbuf[0];
+	*tce_ret = retvals.v[0];
 
 	return rc;
 }

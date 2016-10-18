@@ -41,15 +41,15 @@
 int hvc_get_chars(uint32_t vtermno, char *buf, int count)
 {
 	long ret;
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
+	struct plpar_hcall_retvals retvals;
 	unsigned long *lbuf = (unsigned long *)buf;
 
-	ret = plpar_hcall(H_GET_TERM_CHAR, retbuf, vtermno);
-	lbuf[0] = be64_to_cpu(retbuf[1]);
-	lbuf[1] = be64_to_cpu(retbuf[2]);
+	ret = plpar_hcall(H_GET_TERM_CHAR, &retvals, vtermno);
+	lbuf[0] = be64_to_cpu(retvals.v[1]);
+	lbuf[1] = be64_to_cpu(retvals.v[2]);
 
 	if (ret == H_SUCCESS)
-		return retbuf[0];
+		return retvals.v[0];
 
 	return 0;
 }

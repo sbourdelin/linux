@@ -18,10 +18,10 @@
 
 static int pseries_get_random_long(unsigned long *v)
 {
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
+	struct plpar_hcall_retvals retvals;
 
-	if (plpar_hcall(H_RANDOM, retbuf) == H_SUCCESS) {
-		*v = retbuf[0];
+	if (plpar_hcall(H_RANDOM, &retvals) == H_SUCCESS) {
+		*v = retvals.v[0];
 		return 1;
 	}
 

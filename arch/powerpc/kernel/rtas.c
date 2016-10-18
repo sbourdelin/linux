@@ -937,7 +937,7 @@ int rtas_ibm_suspend_me(u64 handle)
 {
 	long state;
 	long rc;
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
+	struct plpar_hcall_retvals retvals;
 	struct rtas_suspend_me_data data;
 	DECLARE_COMPLETION_ONSTACK(done);
 	cpumask_var_t offline_mask;
@@ -947,9 +947,9 @@ int rtas_ibm_suspend_me(u64 handle)
 		return -ENOSYS;
 
 	/* Make sure the state is valid */
-	rc = plpar_hcall(H_VASI_STATE, retbuf, handle);
+	rc = plpar_hcall(H_VASI_STATE, &retvals, handle);
 
-	state = retbuf[0];
+	state = retvals.v[0];
 
 	if (rc) {
 		printk(KERN_ERR "rtas_ibm_suspend_me: vasi_state returned %ld\n",rc);

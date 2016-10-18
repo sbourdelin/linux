@@ -139,12 +139,12 @@ static unsigned h_pic(unsigned long *pool_idle_time,
 		      unsigned long *num_procs)
 {
 	unsigned long rc;
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
+	struct plpar_hcall_retvals retvals;
 
-	rc = plpar_hcall(H_PIC, retbuf);
+	rc = plpar_hcall(H_PIC, &retvals);
 
-	*pool_idle_time = retbuf[0];
-	*num_procs = retbuf[1];
+	*pool_idle_time = retvals.v[0];
+	*num_procs = retvals.v[1];
 
 	return rc;
 }
@@ -423,11 +423,11 @@ static void splpar_dispatch_data(struct seq_file *m)
 
 static void parse_em_data(struct seq_file *m)
 {
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
+	struct plpar_hcall_retvals retvals;
 
 	if (firmware_has_feature(FW_FEATURE_LPAR) &&
-	    plpar_hcall(H_GET_EM_PARMS, retbuf) == H_SUCCESS)
-		seq_printf(m, "power_mode_data=%016lx\n", retbuf[0]);
+	    plpar_hcall(H_GET_EM_PARMS, &retvals) == H_SUCCESS)
+		seq_printf(m, "power_mode_data=%016lx\n", retvals.v[0]);
 }
 
 static int pseries_lparcfg_data(struct seq_file *m, void *v)

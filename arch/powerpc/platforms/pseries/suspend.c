@@ -45,12 +45,12 @@ static atomic_t suspending;
 static int pseries_suspend_begin(suspend_state_t state)
 {
 	long vasi_state, rc;
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
+	struct plpar_hcall_retvals retvals;
 
 	/* Make sure the state is valid */
-	rc = plpar_hcall(H_VASI_STATE, retbuf, stream_id);
+	rc = plpar_hcall(H_VASI_STATE, &retvals, stream_id);
 
-	vasi_state = retbuf[0];
+	vasi_state = retvals.v[0];
 
 	if (rc) {
 		pr_err("pseries_suspend_begin: vasi_state returned %ld\n",rc);

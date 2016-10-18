@@ -24,13 +24,13 @@
 
 static inline unsigned int icp_hv_get_xirr(unsigned char cppr)
 {
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
+	struct plpar_hcall_retvals retvals;
 	long rc;
 	unsigned int ret = XICS_IRQ_SPURIOUS;
 
-	rc = plpar_hcall(H_XIRR, retbuf, cppr);
+	rc = plpar_hcall(H_XIRR, &retvals, cppr);
 	if (rc == H_SUCCESS) {
-		ret = (unsigned int)retbuf[0];
+		ret = (unsigned int)retvals.v[0];
 	} else {
 		pr_err("%s: bad return code xirr cppr=0x%x returned %ld\n",
 			__func__, cppr, rc);

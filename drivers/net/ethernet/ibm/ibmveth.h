@@ -86,12 +86,12 @@ static inline long h_illan_attributes(unsigned long unit_address,
 				      unsigned long *ret_attributes)
 {
 	long rc;
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
+	struct plpar_hcall_retvals retvals;
 
-	rc = plpar_hcall(H_ILLAN_ATTRIBUTES, retbuf, unit_address,
+	rc = plpar_hcall(H_ILLAN_ATTRIBUTES, &retvals, unit_address,
 			 reset_mask, set_mask);
 
-	*ret_attributes = retbuf[0];
+	*ret_attributes = retvals.v[0];
 
 	return rc;
 }
