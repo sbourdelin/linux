@@ -61,6 +61,39 @@ void check_mpx_erratum(struct cpuinfo_x86 *c)
 	}
 }
 
+#ifdef CONFIG_X86_64
+static int phi_r3mwait_disabled __read_mostly;
+
+static int __init phir3mwait_disable(char *__unused)
+{
+	phi_r3mwait_disabled = 1;
+	pr_warn("x86/phir3mwait: Disabled ring 3 MWAIT for Xeon Phi");
+	return 1;
+}
+__setup("phir3mwait=disable", phir3mwait_disable);
+
+static void probe_xeon_phi_r3mwait(struct cpuinfo_x86 *c)
+{
+	if (phi_r3mwait_disabled)
+		return;
+
+	/*
+	* Setting ring 3 MONITOR/MWAIT for thread
+	* when CPU is Xeon Phi Family x200.
+	*/
+	if (c->x86 == 6 && c->x86_model == INTEL_FAM6_XEON_PHI_KNL) {
+		u64 msr;
+
+		rdmsrl(MSR_PHI_MISC_THD_FEATURE, msr);
+		msr |= MSR_PHI_MISC_THD_FEATURE_R3MWAIT;
+		wrmsrl(MSR_PHI_MISC_THD_FEATURE, msr);
+	}
+}
+
+#else
+static void probe_xeon_phi_r3mwait(struct cpuinfo_x86 *__unused) {}
+#endif
+
 static void early_init_intel(struct cpuinfo_x86 *c)
 {
 	u64 misc_enable;
@@ -565,6 +598,8 @@ static void init_intel(struct cpuinfo_x86 *c)
 		detect_vmx_virtcap(c);
 
 	init_intel_energy_perf(c);
+
+	probe_xeon_phi_r3mwait(c);
 }
 
 #ifdef CONFIG_X86_32
