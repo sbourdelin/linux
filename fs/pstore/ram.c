@@ -443,7 +443,8 @@ static int __ramoops_init_prz(struct device *dev, struct ramoops_context *cxt,
 	return 0;
 }
 
-static int ramoops_init_przs(struct device *dev, struct ramoops_context *cxt,
+/* init function for dump przs */
+static int ramoops_init_dprzs(struct device *dev, struct ramoops_context *cxt,
 			     phys_addr_t *paddr, size_t dump_mem_sz)
 {
 	int err = -ENOMEM;
@@ -472,17 +473,18 @@ static int ramoops_init_przs(struct device *dev, struct ramoops_context *cxt,
 		err = __ramoops_init_prz(dev, cxt, &cxt->dprzs[i], paddr,
 					 cxt->record_size, 0, false);
 		if (err)
-			goto fail_prz;
+			goto fail_dprz;
 	}
 
 	return 0;
-fail_prz:
+fail_dprz:
 	ramoops_free_przs(cxt->dprzs, i);
 fail_mem:
 	cxt->max_dump_cnt = 0;
 	return err;
 }
 
+/* int function for console, ftrace and pmsg przs */
 static int ramoops_init_prz(struct device *dev, struct ramoops_context *cxt,
 			    struct persistent_ram_zone **prz,
 			    phys_addr_t *paddr, size_t sz, u32 sig)
@@ -610,7 +612,7 @@ static int ramoops_probe(struct platform_device *pdev)
 	dump_mem_sz = cxt->size - cxt->console_size - cxt->ftrace_size
 			- cxt->pmsg_size;
 	/* init dump przs */
-	err = ramoops_init_przs(dev, cxt, &paddr, dump_mem_sz);
+	err = ramoops_init_dprzs(dev, cxt, &paddr, dump_mem_sz);
 	if (err)
 		goto fail_out;
 
