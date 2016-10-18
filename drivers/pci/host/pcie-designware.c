@@ -637,10 +637,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
 		}
 	}
 
-	pp->iatu_unroll_enabled = dw_pcie_iatu_unroll_enabled(pp);
-
 	if (pp->ops->host_init)
 		pp->ops->host_init(pp);
+
+	pp->iatu_unroll_enabled = dw_pcie_iatu_unroll_enabled(pp);
 
 	pp->root_bus_nr = pp->busn->start;
 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
