@@ -681,11 +681,18 @@ int ufs_qcom_phy_power_on(struct phy *generic_phy)
 		goto out_disable_phy;
 	}
 
+	err = ufs_qcom_phy_enable_iface_clk(generic_phy);
+	if (err) {
+		dev_err(dev, "%s enable phy iface clock failed, err=%d\n",
+			__func__, err);
+		goto out_disable_pll;
+	}
+
 	err = ufs_qcom_phy_enable_ref_clk(generic_phy);
 	if (err) {
 		dev_err(dev, "%s enable phy ref clock failed, err=%d\n",
 			__func__, err);
-		goto out_disable_pll;
+		goto out_disable_iface_clk;
 	}
 
 	/* enable device PHY ref_clk pad rail */
@@ -704,6 +711,8 @@ int ufs_qcom_phy_power_on(struct phy *generic_phy)
 
 out_disable_ref_clk:
 	ufs_qcom_phy_disable_ref_clk(generic_phy);
+out_disable_iface_clk:
+	ufs_qcom_phy_disable_iface_clk(generic_phy);
 out_disable_pll:
 	ufs_qcom_phy_disable_vreg(dev, &phy_common->vdda_pll);
 out_disable_phy:
@@ -723,6 +732,7 @@ int ufs_qcom_phy_power_off(struct phy *generic_phy)
 		ufs_qcom_phy_disable_vreg(phy_common->dev,
 					  &phy_common->vddp_ref_clk);
 	ufs_qcom_phy_disable_ref_clk(generic_phy);
+	ufs_qcom_phy_disable_iface_clk(generic_phy);
 
 	ufs_qcom_phy_disable_vreg(phy_common->dev, &phy_common->vdda_pll);
 	ufs_qcom_phy_disable_vreg(phy_common->dev, &phy_common->vdda_phy);
