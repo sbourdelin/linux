@@ -841,6 +841,8 @@ static void dm_old_request_fn(struct request_queue *q)
  */
 int dm_old_init_request_queue(struct mapped_device *md)
 {
+	struct task_struct *task;
+
 	/* Fully initialize the queue */
 	if (!blk_init_allocated_queue(md->queue, dm_old_request_fn, NULL))
 		return -EINVAL;
@@ -854,11 +856,12 @@ int dm_old_init_request_queue(struct mapped_device *md)
 
 	/* Initialize the request-based DM worker thread */
 	init_kthread_worker(&md->kworker);
-	md->kworker_task = kthread_run(kthread_worker_fn, &md->kworker,
-				       "kdmwork-%s", dm_device_name(md));
-	if (IS_ERR(md->kworker_task))
-		return PTR_ERR(md->kworker_task);
+	task = kthread_run(kthread_worker_fn, &md->kworker, "kdmwork-%s",
+			   dm_device_name(md));
+	if (IS_ERR(task))
+		return PTR_ERR(task);
 
+	md->kworker_task = task;
 	elv_register_queue(md->queue);
 
 	return 0;
