@@ -32,7 +32,7 @@ int cmd_list(int argc, const char **argv, const char *prefix __maybe_unused)
 		OPT_END()
 	};
 	const char * const list_usage[] = {
-		"perf list [<options>] [hw|sw|cache|tracepoint|pmu|sdt|event_glob]",
+		"perf list [<options>] [hw|sw|cache|tracepoint|pmu|sdt|vendor|event_glob]",
 		NULL
 	};
 
@@ -57,10 +57,12 @@ int cmd_list(int argc, const char **argv, const char *prefix __maybe_unused)
 		if (strcmp(argv[i], "tracepoint") == 0)
 			print_tracepoint_events(NULL, NULL, raw_dump);
 		else if (strcmp(argv[i], "hw") == 0 ||
-			 strcmp(argv[i], "hardware") == 0)
+			 strcmp(argv[i], "hardware") == 0) {
 			print_symbol_events(NULL, PERF_TYPE_HARDWARE,
 					event_symbols_hw, PERF_COUNT_HW_MAX, raw_dump);
-		else if (strcmp(argv[i], "sw") == 0 ||
+			print_pmu_events(NULL, raw_dump, !desc_flag,
+					long_desc_flag, true);
+		} else if (strcmp(argv[i], "sw") == 0 ||
 			 strcmp(argv[i], "software") == 0)
 			print_symbol_events(NULL, PERF_TYPE_SOFTWARE,
 					event_symbols_sw, PERF_COUNT_SW_MAX, raw_dump);
@@ -69,9 +71,14 @@ int cmd_list(int argc, const char **argv, const char *prefix __maybe_unused)
 			print_hwcache_events(NULL, raw_dump);
 		else if (strcmp(argv[i], "pmu") == 0)
 			print_pmu_events(NULL, raw_dump, !desc_flag,
-						long_desc_flag);
+						long_desc_flag, false);
 		else if (strcmp(argv[i], "sdt") == 0)
 			print_sdt_events(NULL, NULL, raw_dump);
+		else if (strcmp(argv[i], "vendor") == 0 ||
+			 strcmp(argv[i], "model") == 0 ||
+			 strcmp(argv[i], "cpu-model") == 0)
+			print_pmu_events(NULL, raw_dump, !desc_flag,
+					long_desc_flag, true);
 		else if ((sep = strchr(argv[i], ':')) != NULL) {
 			int sep_idx;
 
@@ -100,7 +107,7 @@ int cmd_list(int argc, const char **argv, const char *prefix __maybe_unused)
 					    event_symbols_sw, PERF_COUNT_SW_MAX, raw_dump);
 			print_hwcache_events(s, raw_dump);
 			print_pmu_events(s, raw_dump, !desc_flag,
-						long_desc_flag);
+						long_desc_flag, false);
 			print_tracepoint_events(NULL, s, raw_dump);
 			print_sdt_events(NULL, s, raw_dump);
 			free(s);
