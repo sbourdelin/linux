@@ -61,6 +61,19 @@ void check_mpx_erratum(struct cpuinfo_x86 *c)
 	}
 }
 
+/* noinline to work around problem with gcc 6.2 */
+static noinline void probe_platformid(struct cpuinfo_x86 *c)
+{
+	if ((c->x86_model >= 5) || (c->x86 > 6)) {
+		unsigned val[2];
+
+		/* get processor flags from MSR 0x17 */
+		rdmsr(MSR_IA32_PLATFORM_ID, val[0], val[1]);
+		c->platform_id = (val[1] >> 18) & 7;
+		c->has_platform_id = true;
+	}
+}
+
 static void early_init_intel(struct cpuinfo_x86 *c)
 {
 	u64 misc_enable;
@@ -211,6 +224,8 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 	}
 
 	check_mpx_erratum(c);
+
+	probe_platformid(c);
 }
 
 #ifdef CONFIG_X86_32
