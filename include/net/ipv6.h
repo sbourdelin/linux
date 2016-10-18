@@ -936,8 +936,15 @@ void ipv6_push_nfrag_opts(struct sk_buff *skb, struct ipv6_txoptions *opt,
 void ipv6_push_frag_opts(struct sk_buff *skb, struct ipv6_txoptions *opt,
 			 u8 *proto);
 
+#ifdef CONFIG_INET
 int ipv6_skip_exthdr(const struct sk_buff *, int start, u8 *nexthdrp,
 		     __be16 *frag_offp);
+#else
+static inline int ipv6_skip_exthdr(const struct sk_buff *skb, int start,
+				   u8 *nexthdrp, __be16 *frag_offp) {
+	return -1;
+}
+#endif
 
 bool ipv6_ext_hdr(u8 nexthdr);
 
@@ -948,8 +955,16 @@ enum {
 };
 
 /* find specified header and get offset to it */
+#ifdef CONFIG_INET
 int ipv6_find_hdr(const struct sk_buff *skb, unsigned int *offset, int target,
 		  unsigned short *fragoff, int *fragflg);
+#else
+static inline int ipv6_find_hdr(const struct sk_buff *skb, unsigned int *offset,
+				int target, unsigned short *fragoff,
+				int *fragflg) {
+	return -EPROTONOSUPPORT;
+}
+#endif
 
 int ipv6_find_tlv(const struct sk_buff *skb, int offset, int type);
 
