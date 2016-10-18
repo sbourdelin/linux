@@ -400,12 +400,11 @@ static int tcf_fill_node(struct net *net, struct sk_buff *skb,
 	tcm->tcm__pad2 = 0;
 	tcm->tcm_ifindex = qdisc_dev(tp->q)->ifindex;
 	tcm->tcm_parent = tp->classid;
+	tcm->tcm_handle = 0;
 	tcm->tcm_info = TC_H_MAKE(tp->prio, tp->protocol);
 	if (nla_put_string(skb, TCA_KIND, tp->ops->kind))
 		goto nla_put_failure;
-	tcm->tcm_handle = fh;
 	if (RTM_DELTFILTER != event) {
-		tcm->tcm_handle = 0;
 		if (tp->ops->dump && tp->ops->dump(net, tp, fh, skb, tcm) < 0)
 			goto nla_put_failure;
 	}
