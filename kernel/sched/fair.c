@@ -730,7 +730,7 @@ static void attach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *s
  * Finally, that extrapolated util_avg is clamped to the cap (util_avg_cap)
  * if util_avg > util_avg_cap.
  */
-void post_init_entity_util_avg(struct sched_entity *se)
+void post_init_entity_util_avg(struct sched_entity *se, bool update_tg_load)
 {
 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
 	struct sched_avg *sa = &se->avg;
@@ -770,7 +770,8 @@ void post_init_entity_util_avg(struct sched_entity *se)
 
 	update_cfs_rq_load_avg(now, cfs_rq, false);
 	attach_entity_load_avg(cfs_rq, se);
-	update_tg_load_avg(cfs_rq, false);
+	if (update_tg_load)
+		update_tg_load_avg(cfs_rq, false);
 }
 
 #else /* !CONFIG_SMP */
@@ -8873,15 +8874,17 @@ void online_fair_sched_group(struct task_group *tg)
 	struct sched_entity *se;
 	struct rq *rq;
 	int i;
+	bool update_tg_load = true;
 
 	for_each_possible_cpu(i) {
 		rq = cpu_rq(i);
 		se = tg->se[i];
 
 		raw_spin_lock_irq(&rq->lock);
-		post_init_entity_util_avg(se);
+		post_init_entity_util_avg(se, update_tg_load);
 		sync_throttle(tg, i);
 		raw_spin_unlock_irq(&rq->lock);
+		update_tg_load = false;
 	}
 }
 
