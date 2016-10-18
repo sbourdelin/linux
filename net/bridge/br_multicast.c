@@ -1992,10 +1992,25 @@ static void br_multicast_start_querier(struct net_bridge *br,
 	}
 }
 
+static void br_multicast_start_router(struct net_bridge *br)
+{
+	struct net_bridge_port *port;
+
+	list_for_each_entry(port, &br->port_list, list) {
+		if (port->state == BR_STATE_DISABLED ||
+		    port->state == BR_STATE_BLOCKING)
+			continue;
+
+		if (port->multicast_router == MDB_RTR_TYPE_PERM &&
+		    hlist_unhashed(&port->rlist))
+			br_multicast_add_router(br, port);
+	}
+}
+
 int br_multicast_toggle(struct net_bridge *br, unsigned long val)
 {
-	int err = 0;
 	struct net_bridge_mdb_htable *mdb;
+	int err = 0;
 
 	spin_lock_bh(&br->multicast_lock);
 	if (br->multicast_disabled == !val)
@@ -2027,6 +2042,7 @@ rollback:
 #if IS_ENABLED(CONFIG_IPV6)
 	br_multicast_start_querier(br, &br->ip6_own_query);
 #endif
+	br_multicast_start_router(br);
 
 unlock:
 	spin_unlock_bh(&br->multicast_lock);
