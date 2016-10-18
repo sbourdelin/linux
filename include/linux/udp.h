@@ -79,6 +79,13 @@ struct udp_sock {
 	int			(*gro_complete)(struct sock *sk,
 						struct sk_buff *skb,
 						int nhoff);
+
+	/* Flow dissector function for UDP socket */
+	int			(*flow_dissect)(struct sock *sk,
+						const struct sk_buff *skb,
+						void *data, int hlen,
+						int *nhoff, u8 *ip_proto,
+						__be16 *proto);
 };
 
 static inline struct udp_sock *udp_sk(const struct sock *sk)

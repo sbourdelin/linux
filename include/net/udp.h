@@ -360,4 +360,8 @@ void udp_encap_enable(void);
 #if IS_ENABLED(CONFIG_IPV6)
 void udpv6_encap_enable(void);
 #endif
+
+void udp_flow_dissect_enable(void);
+void udp_flow_dissect_disable(void);
+
 #endif	/* _UDP_H */
