@@ -404,6 +404,38 @@ static void ramoops_free_przs(struct persistent_ram_zone **przs, int cnt)
 	kfree(przs);
 }
 
+static int __ramoops_init_prz(struct device *dev, struct ramoops_context *cxt,
+			      struct persistent_ram_zone **prz,
+			      phys_addr_t *paddr, size_t sz, u32 sig, bool zap)
+{
+	if (!sz)
+		return 0;
+
+	if (*paddr + sz - cxt->phys_addr > cxt->size) {
+		dev_err(dev, "no room for mem region (0x%zx@0x%llx) in (0x%lx@0x%llx)\n",
+			sz, (unsigned long long)*paddr,
+			cxt->size, (unsigned long long)cxt->phys_addr);
+		return -ENOMEM;
+	}
+
+	*prz = persistent_ram_new(*paddr, sz, sig, &cxt->ecc_info,
+				  cxt->memtype);
+	if (IS_ERR(*prz)) {
+		int err = PTR_ERR(*prz);
+
+		dev_err(dev, "failed to request mem region (0x%zx@0x%llx): %d\n",
+			sz, (unsigned long long)*paddr, err);
+		return err;
+	}
+
+	if (zap)
+		persistent_ram_zap(*prz);
+
+	*paddr += sz;
+
+	return 0;
+}
+
 static int ramoops_init_przs(struct device *dev, struct ramoops_context *cxt,
 			     phys_addr_t *paddr, size_t dump_mem_sz)
 {
@@ -430,21 +462,15 @@ static int ramoops_init_przs(struct device *dev, struct ramoops_context *cxt,
 	}
 
 	for (i = 0; i < cxt->max_dump_cnt; i++) {
-		cxt->przs[i] = persistent_ram_new(*paddr, cxt->record_size, 0,
-						  &cxt->ecc_info,
-						  cxt->memtype);
-		if (IS_ERR(cxt->przs[i])) {
-			err = PTR_ERR(cxt->przs[i]);
-			dev_err(dev, "failed to request mem region (0x%zx@0x%llx): %d\n",
-				cxt->record_size, (unsigned long long)*paddr, err);
-
+		err = __ramoops_init_prz(dev, cxt, &cxt->przs[i], paddr,
+					 cxt->record_size, 0, false);
+		if (err) {
 			while (i > 0) {
 				i--;
 				persistent_ram_free(cxt->przs[i]);
 			}
 			goto fail_prz;
 		}
-		*paddr += cxt->record_size;
 	}
 
 	return 0;
@@ -459,30 +485,7 @@ static int ramoops_init_prz(struct device *dev, struct ramoops_context *cxt,
 			    struct persistent_ram_zone **prz,
 			    phys_addr_t *paddr, size_t sz, u32 sig)
 {
-	if (!sz)
-		return 0;
-
-	if (*paddr + sz - cxt->phys_addr > cxt->size) {
-		dev_err(dev, "no room for mem region (0x%zx@0x%llx) in (0x%lx@0x%llx)\n",
-			sz, (unsigned long long)*paddr,
-			cxt->size, (unsigned long long)cxt->phys_addr);
-		return -ENOMEM;
-	}
-
-	*prz = persistent_ram_new(*paddr, sz, sig, &cxt->ecc_info, cxt->memtype);
-	if (IS_ERR(*prz)) {
-		int err = PTR_ERR(*prz);
-
-		dev_err(dev, "failed to request mem region (0x%zx@0x%llx): %d\n",
-			sz, (unsigned long long)*paddr, err);
-		return err;
-	}
-
-	persistent_ram_zap(*prz);
-
-	*paddr += sz;
-
-	return 0;
+	return __ramoops_init_prz(dev, cxt, prz, paddr, sz, sig, true);
 }
 
 static int ramoops_parse_dt_size(struct platform_device *pdev,
