@@ -1855,6 +1855,9 @@ static void mod_sysfs_teardown(struct module *mod)
 }
 
 #ifdef CONFIG_DEBUG_SET_MODULE_RONX
+static bool module_ronx_enabled = true;
+core_param(module_ronx, module_ronx_enabled, bool, 0);
+
 /*
  * LKM RO/NX protection: protect module's text/ro-data
  * from modification and any data from execution.
@@ -1989,6 +1992,8 @@ static void disable_ro_nx(const struct module_layout *layout)
 }
 
 #else
+#define module_ronx_enabled false
+
 static void disable_ro_nx(const struct module_layout *layout) { }
 static void module_enable_nx(const struct module *mod) { }
 static void module_disable_nx(const struct module *mod) { }
@@ -2124,7 +2129,8 @@ static void free_module(struct module *mod)
 	mutex_unlock(&module_mutex);
 
 	/* This may be empty, but that's OK */
-	disable_ro_nx(&mod->init_layout);
+	if (module_ronx_enabled)
+		disable_ro_nx(&mod->init_layout);
 	module_arch_freeing_init(mod);
 	module_memfree(mod->init_layout.base);
 	kfree(mod->args);
@@ -2134,7 +2140,8 @@ static void free_module(struct module *mod)
 	lockdep_free_key_range(mod->core_layout.base, mod->core_layout.size);
 
 	/* Finally, free the core (containing the module structure) */
-	disable_ro_nx(&mod->core_layout);
+	if (module_ronx_enabled)
+		disable_ro_nx(&mod->core_layout);
 	module_memfree(mod->core_layout.base);
 
 #ifdef CONFIG_MPU
@@ -3428,9 +3435,11 @@ static noinline int do_init_module(struct module *mod)
 	/* Switch to core kallsyms now init is done: kallsyms may be walking! */
 	rcu_assign_pointer(mod->kallsyms, &mod->core_kallsyms);
 #endif
-	module_enable_ro(mod, true);
+	if (module_ronx_enabled)
+		module_enable_ro(mod, true);
 	mod_tree_remove_init(mod);
-	disable_ro_nx(&mod->init_layout);
+	if (module_ronx_enabled)
+		disable_ro_nx(&mod->init_layout);
 	module_arch_freeing_init(mod);
 	mod->init_layout.base = NULL;
 	mod->init_layout.size = 0;
@@ -3527,8 +3536,10 @@ static int complete_formation(struct module *mod, struct load_info *info)
 	/* This relies on module_mutex for list integrity. */
 	module_bug_finalize(info->hdr, info->sechdrs, mod);
 
-	module_enable_ro(mod, false);
-	module_enable_nx(mod);
+	if (module_ronx_enabled) {
+		module_enable_ro(mod, false);
+		module_enable_nx(mod);
+	}
 
 	/* Mark state as coming so strong_try_module_get() ignores us,
 	 * but kallsyms etc. can see us. */
@@ -3718,8 +3729,10 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	mutex_unlock(&module_mutex);
 
 	/* we can't deallocate the module until we clear memory protection */
-	module_disable_ro(mod);
-	module_disable_nx(mod);
+	if (module_ronx_enabled) {
+		module_disable_ro(mod);
+		module_disable_nx(mod);
+	}
 
  ddebug_cleanup:
 	dynamic_debug_remove(info->debug);
