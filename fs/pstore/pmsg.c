@@ -34,7 +34,8 @@ static ssize_t write_pmsg(struct file *file, const char __user *buf,
 		return -EFAULT;
 
 	mutex_lock(&pmsg_lock);
-	ret = psinfo->write_buf_user(PSTORE_TYPE_PMSG, 0, &id, 0, buf, 0, count,
+	ret = psinfo->write_buf_user(PSTORE_TYPE_PMSG, 0, &id,
+				     iminor(file->f_inode), buf, 0, count,
 				     psinfo);
 	mutex_unlock(&pmsg_lock);
 	return ret ? ret : count;
@@ -61,7 +62,7 @@ static char *pmsg_devnode(struct device *dev, umode_t *mode)
 
 void pstore_register_pmsg(void)
 {
-	struct device *pmsg_device;
+	int i;
 
 	pmsg_major = register_chrdev(0, PMSG_NAME, &pmsg_fops);
 	if (pmsg_major < 0) {
@@ -76,15 +77,23 @@ void pstore_register_pmsg(void)
 	}
 	pmsg_class->devnode = pmsg_devnode;
 
-	pmsg_device = device_create(pmsg_class, NULL, MKDEV(pmsg_major, 0),
-					NULL, "%s%d", PMSG_NAME, 0);
-	if (IS_ERR(pmsg_device)) {
-		pr_err("failed to create device\n");
-		goto err_device;
+	/* allocate additional /dev/pmsg[ID] */
+	for (i = 0; i < psinfo->num_pmsg; i++) {
+		struct device *pmsg_device;
+
+		pmsg_device = device_create(pmsg_class, NULL,
+					    MKDEV(pmsg_major, i), NULL, "%s%d",
+					    PMSG_NAME, i);
+		if (IS_ERR(pmsg_device)) {
+			pr_err("failed to create device\n");
+			goto err_device;
+		}
 	}
 	return;
 
 err_device:
+	for (i--; i >= 0; i--)
+		device_destroy(pmsg_class, MKDEV(pmsg_major, i));
 	class_destroy(pmsg_class);
 err_class:
 	unregister_chrdev(pmsg_major, PMSG_NAME);
