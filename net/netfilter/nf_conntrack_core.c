@@ -87,6 +87,7 @@ static __read_mostly bool nf_conntrack_locks_all;
 #define GC_MAX_BUCKETS		8192u
 #define GC_INTERVAL		(5 * HZ)
 #define GC_MAX_EVICTS		256u
+static bool gc_full_scan = true;
 
 static struct conntrack_gc_work conntrack_gc_work;
 
@@ -511,6 +512,7 @@ ____nf_conntrack_find(struct net *net, const struct nf_conntrack_zone *zone,
 	unsigned int bucket, hsize;
 
 begin:
+	gc_full_scan = false;
 	nf_conntrack_get_ht(&ct_hash, &hsize);
 	bucket = reciprocal_scale(hash, hsize);
 
@@ -942,7 +944,11 @@ static void gc_worker(struct work_struct *work)
 
 	gc_work = container_of(work, struct conntrack_gc_work, dwork.work);
 
-	goal = min(nf_conntrack_htable_size / GC_MAX_BUCKETS_DIV, GC_MAX_BUCKETS);
+	if (gc_full_scan)
+		goal = nf_conntrack_htable_size;
+	else
+		goal = min(nf_conntrack_htable_size / GC_MAX_BUCKETS_DIV,
+			   GC_MAX_BUCKETS);
 	i = gc_work->last_bucket;
 
 	do {
@@ -977,7 +983,8 @@ static void gc_worker(struct work_struct *work)
 		rcu_read_unlock();
 		cond_resched_rcu_qs();
 	} while (++buckets < goal &&
-		 expired_count < GC_MAX_EVICTS);
+		 (gc_full_scan || expired_count < GC_MAX_EVICTS));
+	gc_full_scan = true;
 
 	if (gc_work->exiting)
 		return;
