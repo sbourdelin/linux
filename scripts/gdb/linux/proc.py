@@ -18,6 +18,7 @@ from linux import tasks
 from linux import lists
 from struct import *
 
+
 class LxCmdLine(gdb.Command):
     """ Report the Linux Commandline used in the current kernel.
         Equivalent to cat /proc/cmdline on a running target"""
@@ -195,6 +196,7 @@ values of that process namespace"""
                         info_opts(MNT_INFO, m_flags)))
 
 LxMounts()
+
 
 class LxFdtDump(gdb.Command):
     """Output Flattened Device Tree header and dump FDT blob to a file
