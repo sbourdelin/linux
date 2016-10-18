@@ -1336,7 +1336,12 @@ static void handle_cmd_completion(struct xhci_hcd *xhci,
 		return;
 	}
 
-	cmd = list_entry(xhci->cmd_list.next, struct xhci_command, cmd_list);
+	if (list_empty(&xhci->cmd_list))
+		cmd = NULL;
+	else {
+		cmd = list_first_entry(&xhci->cmd_list, struct xhci_command,
+				       cmd_list);
+	}
 
 	del_timer(&xhci->cmd_timer);
 
@@ -1350,9 +1355,10 @@ static void handle_cmd_completion(struct xhci_hcd *xhci,
 		return;
 	}
 
-	if (cmd->command_trb != xhci->cmd_ring->dequeue) {
+	if (cmd == NULL || cmd->command_trb != xhci->cmd_ring->dequeue) {
 		xhci_err(xhci,
-			 "Command completion event does not match command\n");
+			 "Command completion event %s\n",
+			 cmd ? "does not match command" : "on empty list");
 		return;
 	}
 
