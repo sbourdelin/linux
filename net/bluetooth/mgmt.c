@@ -6039,9 +6039,9 @@ static u8 tlv_data_max_len(u32 adv_flags, bool is_adv_data)
 		if (adv_flags & MGMT_ADV_FLAG_TX_POWER)
 			max_len -= 3;
 	} else {
-		/* at least 1 byte of name should fit in */
+		/* max 11 bytes of name should fit in */
 		if (adv_flags & MGMT_ADV_FLAG_LOCAL_NAME)
-			max_len -= 3;
+			max_len -= (1 + 1 + 11);
 
 		if (adv_flags & (MGMT_ADV_FLAG_APPEARANCE))
 			max_len -= 4;

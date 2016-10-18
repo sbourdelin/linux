@@ -971,41 +971,23 @@ void __hci_req_enable_advertising(struct hci_request *req)
 
 static u8 append_local_name(struct hci_dev *hdev, u8 *ptr, u8 ad_len)
 {
-	size_t complete_len;
-	size_t short_len;
-	int max_len;
+	size_t len;
 
-	max_len = HCI_MAX_AD_LENGTH - ad_len - 2;
-	complete_len = strlen(hdev->dev_name);
-	short_len = strlen(hdev->short_name);
-
-	/* no space left for name */
-	if (max_len < 1)
+	/* no space left for name (+ NULL + type + len) */
+	if ((HCI_MAX_AD_LENGTH - ad_len) < HCI_MAX_SHORT_NAME_LENGTH + 3)
 		return ad_len;
 
-	/* no name set */
-	if (!complete_len)
-		return ad_len;
-
-	/* complete name fits and is eq to max short name len or smaller */
-	if (complete_len <= max_len &&
-	    complete_len <= HCI_MAX_SHORT_NAME_LENGTH) {
+	/* use complete name if present and fits */
+	len = strlen(hdev->dev_name);
+	if (len && len <= HCI_MAX_SHORT_NAME_LENGTH)
 		return eir_append_data(ptr, ad_len, EIR_NAME_COMPLETE,
-				       hdev->dev_name, complete_len);
-	}
+				       hdev->dev_name, len + 1);
 
-	/* short name set and fits */
-	if (short_len && short_len <= max_len) {
+	/* use short name if present */
+	len = strlen(hdev->short_name);
+	if (len)
 		return eir_append_data(ptr, ad_len, EIR_NAME_SHORT,
-				       hdev->short_name, short_len);
-	}
-
-	/* no short name set so shorten complete name */
-	if (!short_len) {
-		return eir_append_data(ptr, ad_len, EIR_NAME_SHORT,
-				       hdev->dev_name, max_len);
-	}
-
+				       hdev->short_name, len + 1);
 	return ad_len;
 }
 
