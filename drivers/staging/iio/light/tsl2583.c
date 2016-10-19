@@ -657,9 +657,10 @@ static ssize_t illuminance0_calibbias_store(struct device *dev,
 
 	if (kstrtoint(buf, 0, &value))
 		return -EINVAL;
+	else if (!value)
+		return -EINVAL;
 
-	if (value)
-		chip->taos_settings.als_gain_trim = value;
+	chip->taos_settings.als_gain_trim = value;
 
 	return len;
 }
@@ -684,9 +685,10 @@ static ssize_t illuminance0_input_target_store(struct device *dev,
 
 	if (kstrtoint(buf, 0, &value))
 		return -EINVAL;
+	else if (!value)
+		return -EINVAL;
 
-	if (value)
-		chip->taos_settings.als_cal_target = value;
+	chip->taos_settings.als_cal_target = value;
 
 	return len;
 }
@@ -713,9 +715,10 @@ static ssize_t illuminance0_calibrate_store(struct device *dev,
 
 	if (kstrtoint(buf, 0, &value))
 		return -EINVAL;
+	else if (value != 1)
+		return -EINVAL;
 
-	if (value == 1)
-		taos_als_calibrate(indio_dev);
+	taos_als_calibrate(indio_dev);
 
 	return len;
 }
