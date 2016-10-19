@@ -126,7 +126,9 @@ config PINCTRL_MESON
 	select PINCONF
 	select GENERIC_PINCONF
 	select GPIOLIB
+	select IRQ_DOMAIN
 	select OF_GPIO
+	select OF_IRQ
 	select REGMAP_MMIO
 
 config PINCTRL_OXNAS
