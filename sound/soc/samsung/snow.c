@@ -103,7 +103,13 @@ static int snow_probe(struct platform_device *pdev)
 
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret) {
-		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
+		if (ret == -EPROBE_DEFER)
+			dev_err_once(&pdev->dev,
+				     "snd_soc_register_card deferred (%d)\n",
+				     ret);
+		else
+			dev_err(&pdev->dev,
+				"snd_soc_register_card failed (%d)\n", ret);
 		return ret;
 	}
 
