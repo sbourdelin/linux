@@ -23,6 +23,10 @@ Required properties for sub-nodes are:
  - gpio-controller: identifies the node as a gpio controller
  - #gpio-cells: must be 2
 
+Optional property for sub-nodes is:
+ - interrupt-parent: must be a phandle to the meson gpio interrupt controller.
+   if this property is provided, enables gpio ability to generate interrupts
+
 === Other sub-nodes ===
 
 Child nodes without the "gpio-controller" represent some desired
