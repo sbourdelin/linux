@@ -141,6 +141,13 @@
 		#reset-cells = <1>;
 	};
 
+	gpio_interrupt: interrupt-controller@9880 {
+		compatible = "amlogic,meson-gxbb-gpio-intc";
+		reg = <0x0 0x9880 0x0 0x10>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+	};
+
 	uart_B: serial@84dc {
 		compatible = "amlogic,meson-uart";
 		reg = <0x0 0x84dc 0x0 0x14>;
@@ -238,6 +245,7 @@
 			reg-names = "mux", "pull", "gpio";
 			gpio-controller;
 			#gpio-cells = <2>;
+			interrupt-parent = <&gpio_interrupt>;
 		};
 
 		uart_ao_a_pins: uart_ao_a {
@@ -343,6 +351,7 @@
 			reg-names = "mux", "pull", "pull-enable", "gpio";
 			gpio-controller;
 			#gpio-cells = <2>;
+			interrupt-parent = <&gpio_interrupt>;
 		};
 
 		emmc_pins: emmc {
