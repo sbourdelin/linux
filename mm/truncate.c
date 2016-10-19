@@ -50,6 +50,8 @@ static void clear_exceptional_entry(struct address_space *mapping,
 	if (*slot != entry)
 		goto unlock;
 	radix_tree_replace_slot(slot, NULL);
+	__radix_tree_tag_clear(&mapping->page_tree, node, slot,
+			       RADIX_TREE_TAG_SPECIAL);
 	mapping->nrexceptional--;
 	if (!node)
 		goto unlock;

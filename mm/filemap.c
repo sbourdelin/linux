@@ -130,10 +130,12 @@ static int page_cache_tree_insert(struct address_space *mapping,
 
 		mapping->nrexceptional--;
 		if (!dax_mapping(mapping)) {
-			if (shadowp)
-				*shadowp = p;
+			__radix_tree_tag_clear(&mapping->page_tree, node, slot,
+					       RADIX_TREE_TAG_SPECIAL);
 			if (node)
 				workingset_node_shadows_dec(node);
+			if (shadowp)
+				*shadowp = p;
 		} else {
 			/* DAX can replace empty locked entry with a hole */
 			WARN_ON_ONCE(p !=
@@ -184,19 +186,16 @@ static void page_cache_tree_delete(struct address_space *mapping,
 
 		__radix_tree_clear_tags(&mapping->page_tree, node, slot);
 
-		if (!node) {
-			VM_BUG_ON_PAGE(nr != 1, page);
-			/*
-			 * We need a node to properly account shadow
-			 * entries. Don't plant any without. XXX
-			 */
-			shadow = NULL;
-		}
-
 		radix_tree_replace_slot(slot, shadow);
 
-		if (!node)
+		if (shadow)
+			__radix_tree_tag_set(&mapping->page_tree, node, slot,
+					     RADIX_TREE_TAG_SPECIAL);
+
+		if (!node) {
+			VM_BUG_ON_PAGE(nr != 1, page);
 			break;
+		}
 
 		workingset_node_pages_dec(node);
 		if (shadow)
