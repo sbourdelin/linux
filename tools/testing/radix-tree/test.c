@@ -161,7 +161,7 @@ static int verify_node(struct radix_tree_node *slot, unsigned int tag,
 	if (tagged != anyset) {
 		printf("tag: %u, shift %u, tagged: %d, anyset: %d\n",
 			tag, slot->shift, tagged, anyset);
-		for (j = 0; j < RADIX_TREE_MAX_TAGS; j++) {
+		for (j = 0; j < RADIX_TREE_NR_USER_TAGS; j++) {
 			printf("tag %d: ", j);
 			for (i = 0; i < RADIX_TREE_TAG_LONGS; i++)
 				printf("%016lx ", slot->tags[j][i]);
@@ -178,7 +178,7 @@ static int verify_node(struct radix_tree_node *slot, unsigned int tag,
 				if (verify_node(slot->slots[i], tag,
 					    !!test_bit(i, slot->tags[tag]))) {
 					printf("Failure at off %d\n", i);
-					for (j = 0; j < RADIX_TREE_MAX_TAGS; j++) {
+					for (j = 0; j < RADIX_TREE_NR_USER_TAGS; j++) {
 						printf("tag %d: ", j);
 						for (i = 0; i < RADIX_TREE_TAG_LONGS; i++)
 							printf("%016lx ", slot->tags[j][i]);

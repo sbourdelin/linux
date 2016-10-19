@@ -64,7 +64,12 @@ static inline bool radix_tree_is_internal_node(void *ptr)
 
 /*** radix-tree API starts here ***/
 
-#define RADIX_TREE_MAX_TAGS 3
+enum radix_tree_tags {
+	/* Freely allocatable radix tree user tags */
+	RADIX_TREE_NR_USER_TAGS = 3,
+	/* Radix tree internal tags */
+	RADIX_TREE_NR_TAGS = RADIX_TREE_NR_USER_TAGS,
+};
 
 #ifndef RADIX_TREE_MAP_SHIFT
 #define RADIX_TREE_MAP_SHIFT	(CONFIG_BASE_SMALL ? 4 : 6)
@@ -101,7 +106,7 @@ struct radix_tree_node {
 	/* For tree user */
 	struct list_head private_list;
 	void __rcu	*slots[RADIX_TREE_MAP_SIZE];
-	unsigned long	tags[RADIX_TREE_MAX_TAGS][RADIX_TREE_TAG_LONGS];
+	unsigned long	tags[RADIX_TREE_NR_TAGS][RADIX_TREE_TAG_LONGS];
 };
 
 /* root tags are stored in gfp_mask, shifted by __GFP_BITS_SHIFT */

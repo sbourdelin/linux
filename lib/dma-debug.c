@@ -464,7 +464,7 @@ EXPORT_SYMBOL(debug_dma_dump_mappings);
  */
 static RADIX_TREE(dma_active_cacheline, GFP_NOWAIT);
 static DEFINE_SPINLOCK(radix_lock);
-#define ACTIVE_CACHELINE_MAX_OVERLAP ((1 << RADIX_TREE_MAX_TAGS) - 1)
+#define ACTIVE_CACHELINE_MAX_OVERLAP ((1 << RADIX_TREE_NR_USER_TAGS) - 1)
 #define CACHELINE_PER_PAGE_SHIFT (PAGE_SHIFT - L1_CACHE_SHIFT)
 #define CACHELINES_PER_PAGE (1 << CACHELINE_PER_PAGE_SHIFT)
 
@@ -478,7 +478,7 @@ static int active_cacheline_read_overlap(phys_addr_t cln)
 {
 	int overlap = 0, i;
 
-	for (i = RADIX_TREE_MAX_TAGS - 1; i >= 0; i--)
+	for (i = RADIX_TREE_NR_USER_TAGS - 1; i >= 0; i--)
 		if (radix_tree_tag_get(&dma_active_cacheline, cln, i))
 			overlap |= 1 << i;
 	return overlap;
@@ -491,7 +491,7 @@ static int active_cacheline_set_overlap(phys_addr_t cln, int overlap)
 	if (overlap > ACTIVE_CACHELINE_MAX_OVERLAP || overlap < 0)
 		return overlap;
 
-	for (i = RADIX_TREE_MAX_TAGS - 1; i >= 0; i--)
+	for (i = RADIX_TREE_NR_USER_TAGS - 1; i >= 0; i--)
 		if (overlap & 1 << i)
 			radix_tree_tag_set(&dma_active_cacheline, cln, i);
 		else

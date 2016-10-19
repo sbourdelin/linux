@@ -321,7 +321,7 @@ static void radix_tree_node_rcu_free(struct rcu_head *head)
 	 * can leave us with a non-NULL entry in the first slot, so clear
 	 * that here to make sure.
 	 */
-	for (i = 0; i < RADIX_TREE_MAX_TAGS; i++)
+	for (i = 0; i < RADIX_TREE_NR_TAGS; i++)
 		tag_clear(node, i, 0);
 
 	node->slots[0] = NULL;
@@ -512,7 +512,7 @@ static int radix_tree_extend(struct radix_tree_root *root,
 			return -ENOMEM;
 
 		/* Propagate the aggregated tag info into the new root */
-		for (tag = 0; tag < RADIX_TREE_MAX_TAGS; tag++) {
+		for (tag = 0; tag < RADIX_TREE_NR_TAGS; tag++) {
 			if (root_tag_get(root, tag))
 				tag_set(node, tag, 0);
 		}
@@ -803,7 +803,7 @@ void __radix_tree_clear_tags(struct radix_tree_root *root,
 {
 	unsigned int tag;
 
-	for (tag = 0; tag < RADIX_TREE_MAX_TAGS; tag++)
+	for (tag = 0; tag < RADIX_TREE_NR_TAGS; tag++)
 		__radix_tree_tag_clear(root, node, slot, tag);
 }
 
@@ -813,7 +813,7 @@ void __radix_tree_clear_tags(struct radix_tree_root *root,
  *	@index:		index key
  *	@tag:		tag index
  *
- *	Set the search tag (which must be < RADIX_TREE_MAX_TAGS)
+ *	Set the search tag (which must be < RADIX_TREE_NR_TAGS)
  *	corresponding to @index in the radix tree.  From
  *	the root all the way down to the leaf node.
  *
@@ -850,7 +850,7 @@ EXPORT_SYMBOL(radix_tree_tag_set);
  *	@index:		index key
  *	@tag:		tag index
  *
- *	Clear the search tag (which must be < RADIX_TREE_MAX_TAGS)
+ *	Clear the search tag (which must be < RADIX_TREE_NR_TAGS)
  *	corresponding to @index in the radix tree.  If this causes
  *	the leaf node to have no tags set then clear the tag in the
  *	next-to-leaf node, etc.
@@ -887,7 +887,7 @@ EXPORT_SYMBOL(radix_tree_tag_clear);
  * radix_tree_tag_get - get a tag on a radix tree node
  * @root:		radix tree root
  * @index:		index key
- * @tag:		tag index (< RADIX_TREE_MAX_TAGS)
+ * @tag:		tag index (< RADIX_TREE_NR_TAGS)
  *
  * Return values:
  *
@@ -1262,7 +1262,7 @@ EXPORT_SYMBOL(radix_tree_gang_lookup_slot);
  *	@results:	where the results of the lookup are placed
  *	@first_index:	start the lookup from this key
  *	@max_items:	place up to this many items at *results
- *	@tag:		the tag index (< RADIX_TREE_MAX_TAGS)
+ *	@tag:		the tag index (< RADIX_TREE_NR_TAGS)
  *
  *	Performs an index-ascending scan of the tree for present items which
  *	have the tag indexed by @tag set.  Places the items at *@results and
@@ -1303,7 +1303,7 @@ EXPORT_SYMBOL(radix_tree_gang_lookup_tag);
  *	@results:	where the results of the lookup are placed
  *	@first_index:	start the lookup from this key
  *	@max_items:	place up to this many items at *results
- *	@tag:		the tag index (< RADIX_TREE_MAX_TAGS)
+ *	@tag:		the tag index (< RADIX_TREE_NR_TAGS)
  *
  *	Performs an index-ascending scan of the tree for present items which
  *	have the tag indexed by @tag set.  Places the slots at *@results and
@@ -1592,7 +1592,7 @@ void *radix_tree_delete_item(struct radix_tree_root *root,
 	offset = get_slot_offset(node, slot);
 
 	/* Clear all tags associated with the item to be deleted.  */
-	for (tag = 0; tag < RADIX_TREE_MAX_TAGS; tag++)
+	for (tag = 0; tag < RADIX_TREE_NR_TAGS; tag++)
 		node_tag_clear(root, node, tag, offset);
 
 	delete_sibling_entries(node, node_to_entry(slot), offset);
@@ -1687,6 +1687,9 @@ static int radix_tree_callback(struct notifier_block *nfb,
 
 void __init radix_tree_init(void)
 {
+	/* Root tags have to squeeze into radix_tree_root->gfp_mask */
+	BUILD_BUG_ON(RADIX_TREE_NR_TAGS + __GFP_BITS_SHIFT > sizeof(gfp_t) * 8);
+
 	radix_tree_node_cachep = kmem_cache_create("radix_tree_node",
 			sizeof(struct radix_tree_node), 0,
 			SLAB_PANIC | SLAB_RECLAIM_ACCOUNT,
