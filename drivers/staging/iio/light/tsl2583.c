@@ -359,7 +359,7 @@ static int taos_als_calibrate(struct iio_dev *indio_dev)
 			!= (TSL258X_CNTL_ADC_ENBL | TSL258X_CNTL_PWR_ON)) {
 		dev_err(&chip->client->dev,
 			"taos_als_calibrate failed: device not powered on with ADC enabled\n");
-		return -1;
+		return -ENODATA;
 	}
 
 	ret = i2c_smbus_write_byte(chip->client,
@@ -569,7 +569,7 @@ static ssize_t taos_gain_store(struct device *dev,
 		break;
 	default:
 		dev_err(dev, "Invalid Gain Index (must be 1,8,16,111)\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	return len;
