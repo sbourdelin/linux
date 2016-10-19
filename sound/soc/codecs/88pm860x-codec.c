@@ -273,14 +273,21 @@ static int snd_soc_get_volsw_2r_st(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct snd_soc_component *component = &codec->component;
+	unsigned int tmp;
 	unsigned int reg = mc->reg;
 	unsigned int reg2 = mc->rreg;
 	int val[2], val2[2], i;
 
-	val[0] = snd_soc_read(codec, reg) & 0x3f;
-	val[1] = (snd_soc_read(codec, PM860X_SIDETONE_SHIFT) >> 4) & 0xf;
-	val2[0] = snd_soc_read(codec, reg2) & 0x3f;
-	val2[1] = (snd_soc_read(codec, PM860X_SIDETONE_SHIFT)) & 0xf;
+	snd_soc_component_read(component, reg, &tmp);
+	val[0] = tmp & 0x3f;
+
+	snd_soc_component_read(component, reg2, &tmp);
+	val2[0] = tmp & 0x3f;
+
+	snd_soc_component_read(component, PM860X_SIDETONE_SHIFT, &tmp);
+	val[1] = (tmp >> 4) & 0xf;
+	val2[1] = tmp & 0xf;
 
 	for (i = 0; i < ARRAY_SIZE(st_table); i++) {
 		if ((st_table[i].m == val[0]) && (st_table[i].n == val[1]))
@@ -288,6 +295,7 @@ static int snd_soc_get_volsw_2r_st(struct snd_kcontrol *kcontrol,
 		if ((st_table[i].m == val2[0]) && (st_table[i].n == val2[1]))
 			ucontrol->value.integer.value[1] = i;
 	}
+
 	return 0;
 }
 
@@ -330,14 +338,19 @@ static int snd_soc_get_volsw_2r_out(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct snd_soc_component *component = &codec->component;
 	unsigned int reg = mc->reg;
 	unsigned int reg2 = mc->rreg;
 	unsigned int shift = mc->shift;
 	int max = mc->max, val, val2;
 	unsigned int mask = (1 << fls(max)) - 1;
 
-	val = snd_soc_read(codec, reg) >> shift;
-	val2 = snd_soc_read(codec, reg2) >> shift;
+	snd_soc_component_read(component, reg, &val);
+	val >>= shift;
+
+	snd_soc_component_read(component, reg2, &val2);
+	val2 >>= shift;
+
 	ucontrol->value.integer.value[0] = (max - val) & mask;
 	ucontrol->value.integer.value[1] = (max - val2) & mask;
 
@@ -400,8 +413,9 @@ static int pm860x_dac_event(struct snd_soc_dapm_widget *w,
 			    struct snd_kcontrol *kcontrol, int event)
 {
 	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+	struct snd_soc_component *component = &codec->component;
 	unsigned int dac = 0;
-	int data;
+	unsigned int data;
 
 	if (!strcmp(w->name, "Left DAC"))
 		dac = DAC_LEFT;
@@ -429,11 +443,11 @@ static int pm860x_dac_event(struct snd_soc_dapm_widget *w,
 			snd_soc_update_bits(codec, PM860X_EAR_CTRL_2,
 					    RSYNC_CHANGE, RSYNC_CHANGE);
 			/* update dac */
-			data = snd_soc_read(codec, PM860X_DAC_EN_2);
+			snd_soc_component_read(component, PM860X_DAC_EN_2, &data);
 			data &= ~dac;
 			if (!(data & (DAC_LEFT | DAC_RIGHT)))
 				data &= ~MODULATOR;
-			snd_soc_write(codec, PM860X_DAC_EN_2, data);
+			snd_soc_component_write(component, PM860X_DAC_EN_2, data);
 		}
 		break;
 	}
