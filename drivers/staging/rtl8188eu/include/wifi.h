@@ -855,64 +855,6 @@ enum ht_cap_ampdu_factor {
 #define	WPS_CM_SW_DISPLAY_P		0x2008
 #define	WPS_CM_LCD_DISPLAY_P		0x4008
 
-enum P2P_ROLE {
-	P2P_ROLE_DISABLE = 0,
-	P2P_ROLE_DEVICE = 1,
-	P2P_ROLE_CLIENT = 2,
-	P2P_ROLE_GO = 3
-};
-
-enum P2P_STATE {
-	P2P_STATE_NONE = 0,			/* P2P disable */
-	/* P2P had enabled and do nothing */
-	P2P_STATE_IDLE = 1,
-	P2P_STATE_LISTEN = 2,			/* In pure listen state */
-	P2P_STATE_SCAN = 3,			/* In scan phase */
-	/* In the listen state of find phase */
-	P2P_STATE_FIND_PHASE_LISTEN = 4,
-	/* In the search state of find phase */
-	P2P_STATE_FIND_PHASE_SEARCH = 5,
-	/* In P2P provisioning discovery */
-	P2P_STATE_TX_PROVISION_DIS_REQ = 6,
-	P2P_STATE_RX_PROVISION_DIS_RSP = 7,
-	P2P_STATE_RX_PROVISION_DIS_REQ = 8,
-	/* Doing the group owner negotiation handshake */
-	P2P_STATE_GONEGO_ING = 9,
-	/* finish the group negotiation handshake with success */
-	P2P_STATE_GONEGO_OK = 10,
-	/* finish the group negotiation handshake with failure */
-	P2P_STATE_GONEGO_FAIL = 11,
-	/* receiving the P2P Invitation request and match with the profile. */
-	P2P_STATE_RECV_INVITE_REQ_MATCH = 12,
-	/* Doing the P2P WPS */
-	P2P_STATE_PROVISIONING_ING = 13,
-	/* Finish the P2P WPS */
-	P2P_STATE_PROVISIONING_DONE = 14,
-	/* Transmit the P2P Invitation request */
-	P2P_STATE_TX_INVITE_REQ = 15,
-	/* Receiving the P2P Invitation response */
-	P2P_STATE_RX_INVITE_RESP_OK = 16,
-	/* receiving the P2P Invitation request and dismatch with the profile. */
-	P2P_STATE_RECV_INVITE_REQ_DISMATCH = 17,
-	/* receiving the P2P Invitation request and this wifi is GO. */
-	P2P_STATE_RECV_INVITE_REQ_GO = 18,
-	/* receiving the P2P Invitation request to join an existing P2P Group. */
-	P2P_STATE_RECV_INVITE_REQ_JOIN = 19,
-	/* receiving the P2P Invitation response with failure */
-	P2P_STATE_RX_INVITE_RESP_FAIL = 20,
-	/* receiving p2p negotiation response with information is not available */
-	P2P_STATE_RX_INFOR_NOREADY = 21,
-	/* sending p2p negotiation response with information is not available */
-	P2P_STATE_TX_INFOR_NOREADY = 22,
-};
-
-enum P2P_WPSINFO {
-	P2P_NO_WPSINFO				= 0,
-	P2P_GOT_WPSINFO_PEER_DISPLAY_PIN	= 1,
-	P2P_GOT_WPSINFO_SELF_DISPLAY_PIN	= 2,
-	P2P_GOT_WPSINFO_PBC			= 3,
-};
-
 #define	P2P_PRIVATE_IOCTL_SET_LEN		64
 
 enum P2P_PROTO_WK_ID {
@@ -923,21 +865,6 @@ enum P2P_PROTO_WK_ID {
 	P2P_PRE_TX_INVITEREQ_PROCESS_WK = 4,
 	P2P_AP_P2P_CH_SWITCH_PROCESS_WK = 5,
 	P2P_RO_CH_WK = 6,
-};
-
-enum P2P_PS_STATE {
-	P2P_PS_DISABLE = 0,
-	P2P_PS_ENABLE = 1,
-	P2P_PS_SCAN = 2,
-	P2P_PS_SCAN_DONE = 3,
-	P2P_PS_ALLSTASLEEP = 4, /*  for P2P GO */
-};
-
-enum P2P_PS_MODE {
-	P2P_PS_NONE = 0,
-	P2P_PS_CTWINDOW = 1,
-	P2P_PS_NOA	 = 2,
-	P2P_PS_MIX = 3, /*  CTWindow and NoA */
 };
 
 /*	=====================WFD Section===================== */
