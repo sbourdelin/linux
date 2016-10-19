@@ -1303,7 +1303,7 @@ static int wlanhdr_to_ethhdr(struct recv_frame *precvframe)
 	eth_type = ntohs(be_tmp); /* pattrib->ether_type */
 	pattrib->eth_type = eth_type;
 
-	ptr = recvframe_pull(precvframe, (rmv_len-sizeof(struct ethhdr) + (bsnaphdr ? 2 : 0)));
+	ptr = skb_pull(precvframe->pkt, (rmv_len-sizeof(struct ethhdr) + (bsnaphdr ? 2 : 0)));
 
 	memcpy(ptr, pattrib->dst, ETH_ALEN);
 	memcpy(ptr+ETH_ALEN, pattrib->src, ETH_ALEN);
@@ -1372,7 +1372,7 @@ static struct recv_frame *recvframe_defrag(struct adapter *adapter,
 
 		wlanhdr_offset = pnfhdr->attrib.hdrlen + pnfhdr->attrib.iv_len;
 
-		recvframe_pull(pnextrframe, wlanhdr_offset);
+		skb_pull(pnextrframe->pkt, wlanhdr_offset);
 
 		/* append  to first fragment frame's tail (if privacy frame, pull the ICV) */
 		recvframe_pull_tail(prframe, pfhdr->attrib.icv_len);
@@ -1508,10 +1508,10 @@ static int amsdu_to_msdu(struct adapter *padapter, struct recv_frame *prframe)
 
 	pattrib = &prframe->attrib;
 
-	recvframe_pull(prframe, prframe->attrib.hdrlen);
+	skb_pull(prframe->pkt, prframe->attrib.hdrlen);
 
 	if (prframe->attrib.iv_len > 0)
-		recvframe_pull(prframe, prframe->attrib.iv_len);
+		skb_pull(prframe->pkt, prframe->attrib.iv_len);
 
 	a_len = prframe->pkt->len;
 

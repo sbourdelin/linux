@@ -253,23 +253,6 @@ u32 rtw_free_uc_swdec_pending_queue(struct adapter *adapter);
 
 void rtw_reordering_ctrl_timeout_handler(unsigned long data);
 
-static inline u8 *recvframe_pull(struct recv_frame *precvframe, uint sz)
-{
-	/*  rx_data += sz; move rx_data sz bytes  hereafter */
-
-	/* used for extract sz bytes from rx_data, update rx_data and return
-	 * the updated rx_data to the caller */
-
-	u8 *data;
-
-	if (precvframe == NULL)
-		return NULL;
-	data = skb_pull(precvframe->pkt, sz);
-	if (!data)
-		return NULL;
-	return data;
-}
-
 static inline u8 *recvframe_put(struct recv_frame *precvframe, uint sz)
 {
 	/* used for append sz bytes from ptr to rx_tail, update rx_tail
