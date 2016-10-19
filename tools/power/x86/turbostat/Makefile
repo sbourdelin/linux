@@ -9,7 +9,8 @@ endif
 
 turbostat : turbostat.c
 CFLAGS +=	-Wall
-CFLAGS +=	-DMSRHEADER='"../../../../arch/x86/include/asm/msr-index.h"'
+CFLAGS +=	-DMSRHEADER='"../../../../arch/x86/include/asm/msr-index.h"' \
+		-DFAMILYHEADER='"../../../../arch/x86/include/asm/intel-family.h"'
 
 %: %.c
 	@mkdir -p $(BUILD_OUTPUT)
