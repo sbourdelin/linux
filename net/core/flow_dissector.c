@@ -91,6 +91,22 @@ __be32 __skb_flow_get_ports(const struct sk_buff *skb, int thoff, u8 ip_proto,
 }
 EXPORT_SYMBOL(__skb_flow_get_ports);
 
+#define MAX_DISSECT_DEPTH	10
+#define MAX_DISSECT_EXT		10
+
+#define __DISSECT_AGAIN(_target, _depth, _limit) do {	\
+	(_depth)++;					\
+	if ((_depth) > (_limit))				\
+		goto out_good;				\
+	else						\
+		goto _target;				\
+} while (0)
+
+#define DISSECT_AGAIN(target) \
+	__DISSECT_AGAIN(target, depth, MAX_DISSECT_DEPTH)
+#define DISSECT_AGAIN_EXT(target) \
+	__DISSECT_AGAIN(target, ext_cnt, MAX_DISSECT_EXT)
+
 /**
  * __skb_flow_dissect - extract the flow_keys struct and return it
  * @skb: sk_buff to extract the flow from, can be NULL if the rest are specified
@@ -123,6 +139,7 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
 	bool skip_vlan = false;
 	u8 ip_proto = 0;
 	bool ret = false;
+	int depth = 0, ext_cnt = 0;
 
 	if (!data) {
 		data = skb->data;
@@ -262,7 +279,7 @@ ipv6:
 			proto = vlan->h_vlan_encapsulated_proto;
 			nhoff += sizeof(*vlan);
 			if (skip_vlan)
-				goto again;
+				DISSECT_AGAIN(again);
 		}
 
 		skip_vlan = true;
@@ -285,7 +302,7 @@ ipv6:
 			}
 		}
 
-		goto again;
+		DISSECT_AGAIN(again);
 	}
 	case htons(ETH_P_PPP_SES): {
 		struct {
@@ -299,9 +316,9 @@ ipv6:
 		nhoff += PPPOE_SES_HLEN;
 		switch (proto) {
 		case htons(PPP_IP):
-			goto ip;
+			DISSECT_AGAIN(ip);
 		case htons(PPP_IPV6):
-			goto ipv6;
+			DISSECT_AGAIN(ipv6);
 		default:
 			goto out_bad;
 		}
@@ -472,7 +489,7 @@ ip_proto_again:
 		if (flags & FLOW_DISSECTOR_F_STOP_AT_ENCAP)
 			goto out_good;
 
-		goto again;
+		DISSECT_AGAIN(again);
 	}
 	case NEXTHDR_HOP:
 	case NEXTHDR_ROUTING:
@@ -490,7 +507,7 @@ ip_proto_again:
 		ip_proto = opthdr[0];
 		nhoff += (opthdr[1] + 1) << 3;
 
-		goto ip_proto_again;
+		DISSECT_AGAIN_EXT(ip_proto_again);
 	}
 	case NEXTHDR_FRAGMENT: {
 		struct frag_hdr _fh, *fh;
@@ -512,7 +529,7 @@ ip_proto_again:
 		if (!(fh->frag_off & htons(IP6_OFFSET))) {
 			key_control->flags |= FLOW_DIS_FIRST_FRAG;
 			if (flags & FLOW_DISSECTOR_F_PARSE_1ST_FRAG)
-				goto ip_proto_again;
+				DISSECT_AGAIN_EXT(ip_proto_again);
 		}
 		goto out_good;
 	}
@@ -523,7 +540,7 @@ ip_proto_again:
 		if (flags & FLOW_DISSECTOR_F_STOP_AT_ENCAP)
 			goto out_good;
 
-		goto ip;
+		DISSECT_AGAIN(ip);
 	case IPPROTO_IPV6:
 		proto = htons(ETH_P_IPV6);
 
@@ -531,10 +548,10 @@ ip_proto_again:
 		if (flags & FLOW_DISSECTOR_F_STOP_AT_ENCAP)
 			goto out_good;
 
-		goto ipv6;
+		DISSECT_AGAIN(ipv6);
 	case IPPROTO_MPLS:
 		proto = htons(ETH_P_MPLS_UC);
-		goto mpls;
+		DISSECT_AGAIN(mpls);
 	default:
 		break;
 	}
