@@ -279,17 +279,17 @@ static inline u8 *recvframe_put(struct recv_frame *precvframe, uint sz)
 	 * and return the updated rx_tail to the caller */
 	/* after putting, rx_tail must be still larger than rx_end. */
 
+	u8 *tail;
+
 	if (precvframe == NULL)
 		return NULL;
 
-	precvframe->rx_tail += sz;
-
-	if (precvframe->rx_tail > precvframe->pkt->end) {
-		precvframe->rx_tail -= sz;
+	tail = skb_put(precvframe->pkt, sz);
+	if (!tail)
 		return NULL;
-	}
+	precvframe->rx_tail += sz;
 	precvframe->len += sz;
-	return precvframe->rx_tail;
+	return tail;
 }
 
 static inline void recvframe_pull_tail(struct recv_frame *precvframe, uint sz)
@@ -302,11 +302,11 @@ static inline void recvframe_pull_tail(struct recv_frame *precvframe, uint sz)
 
 	if (precvframe == NULL)
 		return;
-	precvframe->rx_tail -= sz;
-	if (precvframe->rx_tail < precvframe->pkt->data) {
-		precvframe->rx_tail += sz;
+
+	if (precvframe->len < sz)
 		return;
-	}
+	precvframe->rx_tail -= sz;
+	skb_trim(precvframe->pkt, precvframe->pkt->len - sz);
 	precvframe->len -= sz;
 }
 
