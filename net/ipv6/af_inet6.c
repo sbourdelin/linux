@@ -414,7 +414,9 @@ int inet6_release(struct socket *sock)
 		return -EINVAL;
 
 	/* Free mc lists */
+	rtnl_lock();
 	ipv6_sock_mc_close(sk);
+	rtnl_unlock();
 
 	/* Free ac lists */
 	ipv6_sock_ac_close(sk);

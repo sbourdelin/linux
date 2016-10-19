@@ -282,10 +282,11 @@ void ipv6_sock_mc_close(struct sock *sk)
 	struct ipv6_mc_socklist *mc_lst;
 	struct net *net = sock_net(sk);
 
+	ASSERT_RTNL();
+
 	if (!rcu_access_pointer(np->ipv6_mc_list))
 		return;
 
-	rtnl_lock();
 	while ((mc_lst = rtnl_dereference(np->ipv6_mc_list)) != NULL) {
 		struct net_device *dev;
 
@@ -305,7 +306,6 @@ void ipv6_sock_mc_close(struct sock *sk)
 		kfree_rcu(mc_lst, rcu);
 
 	}
-	rtnl_unlock();
 }
 
 int ip6_mc_source(int add, int omode, struct sock *sk,
