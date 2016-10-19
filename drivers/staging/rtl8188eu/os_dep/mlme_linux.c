@@ -60,7 +60,7 @@ void rtw_reset_securitypriv(struct adapter *adapter)
 		backup_index = adapter->securitypriv.PMKIDIndex;
 		backup_counter = adapter->securitypriv.btkip_countermeasure;
 		backup_time = adapter->securitypriv.btkip_countermeasure_time;
-		memset((unsigned char *)&adapter->securitypriv, 0, sizeof(struct security_priv));
+		memset(&adapter->securitypriv, 0, sizeof(struct security_priv));
 
 		/*  Restore the PMK information to securitypriv structure for the following connection. */
 		memcpy(&adapter->securitypriv.PMKIDList[0],

@@ -786,7 +786,7 @@ hal_EfusePgCheckAvailableAddr(
 
 static void hal_EfuseConstructPGPkt(u8 offset, u8 word_en, u8 *pData, struct pgpkt *pTargetPkt)
 {
-	memset((void *)pTargetPkt->data, 0xFF, sizeof(u8)*8);
+	memset(pTargetPkt->data, 0xFF, sizeof(u8)*8);
 	pTargetPkt->offset = offset;
 	pTargetPkt->word_en = word_en;
 	efuse_WordEnableDataRead(word_en, pData, pTargetPkt->data);

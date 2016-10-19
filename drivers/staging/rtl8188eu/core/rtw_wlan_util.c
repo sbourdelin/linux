@@ -507,7 +507,7 @@ void flush_all_cam_entry(struct adapter *padapter)
 
 	rtw_hal_set_hwreg(padapter, HW_VAR_CAM_INVALID_ALL, NULL);
 
-	memset((u8 *)(pmlmeinfo->FW_sta_info), 0, sizeof(pmlmeinfo->FW_sta_info));
+	memset(pmlmeinfo->FW_sta_info, 0, sizeof(pmlmeinfo->FW_sta_info));
 }
 
 int WMM_param_handler(struct adapter *padapter, struct ndis_802_11_var_ie *pIE)

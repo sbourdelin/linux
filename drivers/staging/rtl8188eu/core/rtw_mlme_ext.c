@@ -199,7 +199,7 @@ void update_mgntframe_attrib(struct adapter *padapter, struct pkt_attrib *pattri
 {
 	struct mlme_ext_priv	*pmlmeext = &(padapter->mlmeextpriv);
 
-	memset((u8 *)(pattrib), 0, sizeof(struct pkt_attrib));
+	memset(pattrib, 0, sizeof(struct pkt_attrib));
 
 	pattrib->hdrlen = 24;
 	pattrib->nr_frags = 1;
@@ -2847,7 +2847,7 @@ auth_fail:
 		rtw_free_stainfo(padapter, pstat);
 
 	pstat = &stat;
-	memset((char *)pstat, '\0', sizeof(stat));
+	memset(pstat, '\0', sizeof(stat));
 	pstat->auth_seq = 2;
 	memcpy(pstat->hwaddr, sa, 6);
 

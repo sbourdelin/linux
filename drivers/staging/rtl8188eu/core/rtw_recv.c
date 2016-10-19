@@ -44,7 +44,7 @@ static void rtw_signal_stat_timer_hdl(unsigned long data);
 void _rtw_init_sta_recv_priv(struct sta_recv_priv *psta_recvpriv)
 {
 
-	memset((u8 *)psta_recvpriv, 0, sizeof(struct sta_recv_priv));
+	memset(psta_recvpriv, 0, sizeof(struct sta_recv_priv));
 
 	spin_lock_init(&psta_recvpriv->lock);
 

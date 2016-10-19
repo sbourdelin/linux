@@ -892,11 +892,11 @@ static struct sta_info *rtw_joinbss_update_stainfo(struct adapter *padapter, str
 			padapter->securitypriv.bgrpkey_handshake = false;
 			psta->ieee8021x_blocked = true;
 			psta->dot118021XPrivacy = padapter->securitypriv.dot11PrivacyAlgrthm;
-			memset((u8 *)&psta->dot118021x_UncstKey, 0, sizeof(union Keytype));
-			memset((u8 *)&psta->dot11tkiprxmickey, 0, sizeof(union Keytype));
-			memset((u8 *)&psta->dot11tkiptxmickey, 0, sizeof(union Keytype));
-			memset((u8 *)&psta->dot11txpn, 0, sizeof(union pn48));
-			memset((u8 *)&psta->dot11rxpn, 0, sizeof(union pn48));
+			memset(&psta->dot118021x_UncstKey, 0, sizeof(union Keytype));
+			memset(&psta->dot11tkiprxmickey, 0, sizeof(union Keytype));
+			memset(&psta->dot11tkiptxmickey, 0, sizeof(union Keytype));
+			memset(&psta->dot11txpn, 0, sizeof(union pn48));
+			memset(&psta->dot11rxpn, 0, sizeof(union pn48));
 		}
 		/*
 		 * Commented by Albert 2012/07/21
