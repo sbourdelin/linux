@@ -2154,7 +2154,8 @@ static void drm_setup_crtcs(struct drm_fb_helper *fb_helper)
 			fb_crtc->desired_mode = mode;
 			fb_crtc->x = offset->x;
 			fb_crtc->y = offset->y;
-			if (modeset->mode)
+			if (modeset->mode &&
+			    !(fb_helper->connector_info[i]->connector->link_train_retry))
 				drm_mode_destroy(dev, modeset->mode);
 			modeset->mode = drm_mode_duplicate(dev,
 							   fb_crtc->desired_mode);

@@ -516,6 +516,15 @@ drm_atomic_helper_check_modeset(struct drm_device *dev,
 		 */
 		ret = update_connector_routing(state, connector,
 					       connector_state);
+		/* Set crtc->mode_changed and crtc->connectors_changed if
+		 * link_train_retry flag is set in the connector.
+		 */
+		if (connector->link_train_retry) {
+			crtc_state = drm_atomic_get_existing_crtc_state(state,
+									connector->state->crtc);
+			crtc_state->connectors_changed = true;
+			crtc_state->mode_changed = true;
+		}
 		if (ret)
 			return ret;
 	}
