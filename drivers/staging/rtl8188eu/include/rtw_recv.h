@@ -292,7 +292,7 @@ static inline u8 *recvframe_put(struct recv_frame *precvframe, uint sz)
 	return precvframe->rx_tail;
 }
 
-static inline u8 *recvframe_pull_tail(struct recv_frame *precvframe, uint sz)
+static inline void recvframe_pull_tail(struct recv_frame *precvframe, uint sz)
 {
 	/*  rmv data from rx_tail (by yitsen) */
 
@@ -301,14 +301,13 @@ static inline u8 *recvframe_pull_tail(struct recv_frame *precvframe, uint sz)
 	/* after pulling, rx_end must be still larger than rx_data. */
 
 	if (precvframe == NULL)
-		return NULL;
+		return;
 	precvframe->rx_tail -= sz;
 	if (precvframe->rx_tail < precvframe->pkt->data) {
 		precvframe->rx_tail += sz;
-		return NULL;
+		return;
 	}
 	precvframe->len -= sz;
-	return precvframe->rx_tail;
 }
 
 static inline s32 translate_percentage_to_dbm(u32 sig_stren_index)
