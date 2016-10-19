@@ -10,6 +10,9 @@ __archpost:
 include include/config/auto.conf
 include scripts/Kbuild.include
 
+quiet_cmd_head_check = CHKHEAD $@
+      cmd_head_check = $(CONFIG_SHELL) $(srctree)/arch/powerpc/tools/head_check.sh "$(NM)" "$@"
+
 quiet_cmd_relocs_check = CHKREL  $@
 ifeq ($(CONFIG_PPC_BOOK3S_64),y)
       cmd_relocs_check =						\
@@ -24,6 +27,9 @@ endif
 
 vmlinux: FORCE
 	@true
+ifeq ($(CONFIG_PPC64),y)
+	$(call cmd,head_check)
+endif
 ifeq ($(CONFIG_RELOCATABLE),y)
 	$(call if_changed,relocs_check)
 endif
@@ -32,6 +38,7 @@ endif
 	@true
 
 clean:
+	rm -f .tmp_symbols.txt
 	@true
 
 PHONY += FORCE clean
