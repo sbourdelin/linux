@@ -274,6 +274,10 @@ int tipc_msg_build(struct tipc_msg *mhdr, struct msghdr *m,
 		goto error;
 	}
 
+	/* Check that fragment and message header will fit */
+	if (INT_H_SIZE + mhsz > pktmax)
+		return -EMSGSIZE;
+
 	/* Prepare reusable fragment header */
 	tipc_msg_init(msg_prevnode(mhdr), &pkthdr, MSG_FRAGMENTER,
 		      FIRST_FRAGMENT, INT_H_SIZE, msg_destnode(mhdr));
