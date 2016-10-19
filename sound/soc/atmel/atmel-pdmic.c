@@ -289,14 +289,16 @@ static int pdmic_get_mic_volsw(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct snd_soc_component *component = &codec->component;
 	unsigned int dgain_val, scale_val;
+	unsigned int val;
 	int i;
 
-	dgain_val = (snd_soc_read(codec, PDMIC_DSPR1) & PDMIC_DSPR1_DGAIN_MASK)
-		    >> PDMIC_DSPR1_DGAIN_SHIFT;
+	snd_soc_component_read(component, PDMIC_DSPR1, &val);
+	dgain_val = (val & PDMIC_DSPR1_DGAIN_MASK) >> PDMIC_DSPR1_DGAIN_SHIFT;
 
-	scale_val = (snd_soc_read(codec, PDMIC_DSPR0) & PDMIC_DSPR0_SCALE_MASK)
-		    >> PDMIC_DSPR0_SCALE_SHIFT;
+	snd_soc_component_read(component, PDMIC_DSPR0, &val);
+	scale_val = (val & PDMIC_DSPR0_SCALE_MASK) >> PDMIC_DSPR0_SCALE_SHIFT;
 
 	for (i = 0; i < ARRAY_SIZE(mic_gain_table); i++) {
 		if ((mic_gain_table[i].dgain == dgain_val) &&
