@@ -687,41 +687,6 @@ static u8 phy_path_a_rx_iqk(struct adapter *adapt, bool configPathB)
 	return result;
 }
 
-static u8 phy_path_b_iqk(struct adapter *adapt)
-{
-	u32 regeac, regeb4, regebc, regec4, regecc;
-	u8 result = 0x00;
-	struct odm_dm_struct *dm_odm = &adapt->HalData->odmpriv;
-
-	/* One shot, path B LOK & IQK */
-	phy_set_bb_reg(adapt, rIQK_AGC_Cont, bMaskDWord, 0x00000002);
-	phy_set_bb_reg(adapt, rIQK_AGC_Cont, bMaskDWord, 0x00000000);
-
-	mdelay(IQK_DELAY_TIME_88E);
-
-	regeac = phy_query_bb_reg(adapt, rRx_Power_After_IQK_A_2, bMaskDWord);
-	regeb4 = phy_query_bb_reg(adapt, rTx_Power_Before_IQK_B, bMaskDWord);
-	regebc = phy_query_bb_reg(adapt, rTx_Power_After_IQK_B, bMaskDWord);
-	regec4 = phy_query_bb_reg(adapt, rRx_Power_Before_IQK_B_2, bMaskDWord);
-	regecc = phy_query_bb_reg(adapt, rRx_Power_After_IQK_B_2, bMaskDWord);
-
-	if (!(regeac & BIT(31)) &&
-	    (((regeb4 & 0x03FF0000)>>16) != 0x142) &&
-	    (((regebc & 0x03FF0000)>>16) != 0x42))
-		result |= 0x01;
-	else
-		return result;
-
-	if (!(regeac & BIT(30)) &&
-	    (((regec4 & 0x03FF0000)>>16) != 0x132) &&
-	    (((regecc & 0x03FF0000)>>16) != 0x36))
-		result |= 0x02;
-	else
-		ODM_RT_TRACE(dm_odm, ODM_COMP_CALIBRATION,
-			     ODM_DBG_LOUD,  ("Path B Rx IQK fail!!\n"));
-	return result;
-}
-
 static void patha_fill_iqk(struct adapter *adapt, bool iqkok, s32 result[][8],
 			   u8 final_candidate, bool txonly)
 {
@@ -839,14 +804,6 @@ static void mac_setting_calibration(struct adapter *adapt, u32 *mac_reg, u32 *ba
 	usb_write8(adapt, mac_reg[i], (u8)(backup[i]&(~BIT(5))));
 }
 
-static void path_a_standby(struct adapter *adapt)
-{
-
-	phy_set_bb_reg(adapt, rFPGA0_IQK, bMaskDWord, 0x0);
-	phy_set_bb_reg(adapt, 0x840, bMaskDWord, 0x00010000);
-	phy_set_bb_reg(adapt, rFPGA0_IQK, bMaskDWord, 0x80800000);
-}
-
 static void pi_mode_switch(struct adapter *adapt, bool pi_mode)
 {
 	u32 mode;
@@ -930,12 +887,11 @@ static bool simularity_compare(struct adapter *adapt, s32 resulta[][8],
 	}
 }
 
-static void phy_iq_calibrate(struct adapter *adapt, s32 result[][8],
-			     u8 t, bool is2t)
+static void phy_iq_calibrate(struct adapter *adapt, s32 result[][8], u8 t)
 {
 	struct odm_dm_struct *dm_odm = &adapt->HalData->odmpriv;
 	u32 i, retry_count = 2;
-	u8 path_a_ok, path_b_ok;
+	u8 path_a_ok;
 	u32 adda_reg[IQK_ADDA_REG_NUM] = {
 					  rFPGA0_XCD_SwitchControl, rBlue_Tooth,
 					  rRx_Wait_CCA, rTx_CCK_RFON,
@@ -968,7 +924,7 @@ static void phy_iq_calibrate(struct adapter *adapt, s32 result[][8],
 				    dm_odm->RFCalibrateInfo.IQK_BB_backup, IQK_BB_REG_NUM);
 	}
 
-	path_adda_on(adapt, adda_reg, true, is2t);
+	path_adda_on(adapt, adda_reg, true, 0);
 	if (t == 0)
 		dm_odm->RFCalibrateInfo.bRfPiEnable = (u8)phy_query_bb_reg(adapt, rFPGA0_XA_HSSIParameter1,
 									   BIT(8));
@@ -989,13 +945,6 @@ static void phy_iq_calibrate(struct adapter *adapt, s32 result[][8],
 	phy_set_bb_reg(adapt, rFPGA0_XA_RFInterfaceOE, BIT(10), 0x00);
 	phy_set_bb_reg(adapt, rFPGA0_XB_RFInterfaceOE, BIT(10), 0x00);
 
-	if (is2t) {
-		phy_set_bb_reg(adapt, rFPGA0_XA_LSSIParameter, bMaskDWord,
-			       0x00010000);
-		phy_set_bb_reg(adapt, rFPGA0_XB_LSSIParameter, bMaskDWord,
-			       0x00010000);
-	}
-
 	/* MAC settings */
 	mac_setting_calibration(adapt, iqk_mac_reg,
 				dm_odm->RFCalibrateInfo.IQK_MAC_backup);
@@ -1004,16 +953,13 @@ static void phy_iq_calibrate(struct adapter *adapt, s32 result[][8],
 	/* AP or IQK */
 	phy_set_bb_reg(adapt, rConfig_AntA, bMaskDWord, 0x0f600000);
 
-	if (is2t)
-		phy_set_bb_reg(adapt, rConfig_AntB, bMaskDWord, 0x0f600000);
-
 	/*  IQ calibration setting */
 	phy_set_bb_reg(adapt, rFPGA0_IQK, bMaskDWord, 0x80800000);
 	phy_set_bb_reg(adapt, rTx_IQK, bMaskDWord, 0x01007c00);
 	phy_set_bb_reg(adapt, rRx_IQK, bMaskDWord, 0x81004800);
 
 	for (i = 0; i < retry_count; i++) {
-		path_a_ok = phy_path_a_iqk(adapt, is2t);
+		path_a_ok = phy_path_a_iqk(adapt, 0);
 		if (path_a_ok == 0x01) {
 				result[t][0] = (phy_query_bb_reg(adapt, rTx_Power_Before_IQK_A,
 								 bMaskDWord)&0x3FF0000)>>16;
@@ -1024,7 +970,7 @@ static void phy_iq_calibrate(struct adapter *adapt, s32 result[][8],
 	}
 
 	for (i = 0; i < retry_count; i++) {
-		path_a_ok = phy_path_a_rx_iqk(adapt, is2t);
+		path_a_ok = phy_path_a_rx_iqk(adapt, 0);
 		if (path_a_ok == 0x03) {
 				result[t][2] = (phy_query_bb_reg(adapt, rRx_Power_Before_IQK_A_2,
 								 bMaskDWord)&0x3FF0000)>>16;
@@ -1040,38 +986,6 @@ static void phy_iq_calibrate(struct adapter *adapt, s32 result[][8],
 	if (0x00 == path_a_ok) {
 		ODM_RT_TRACE(dm_odm, ODM_COMP_CALIBRATION, ODM_DBG_LOUD,
 			     ("Path A IQK failed!!\n"));
-	}
-
-	if (is2t) {
-		path_a_standby(adapt);
-
-		/*  Turn Path B ADDA on */
-		path_adda_on(adapt, adda_reg, false, is2t);
-
-		for (i = 0; i < retry_count; i++) {
-			path_b_ok = phy_path_b_iqk(adapt);
-			if (path_b_ok == 0x03) {
-				result[t][4] = (phy_query_bb_reg(adapt, rTx_Power_Before_IQK_B,
-								 bMaskDWord)&0x3FF0000)>>16;
-				result[t][5] = (phy_query_bb_reg(adapt, rTx_Power_After_IQK_B,
-								 bMaskDWord)&0x3FF0000)>>16;
-				result[t][6] = (phy_query_bb_reg(adapt, rRx_Power_Before_IQK_B_2,
-								 bMaskDWord)&0x3FF0000)>>16;
-				result[t][7] = (phy_query_bb_reg(adapt, rRx_Power_After_IQK_B_2,
-								 bMaskDWord)&0x3FF0000)>>16;
-				break;
-			} else if (i == (retry_count - 1) && path_b_ok == 0x01) {	/* Tx IQK OK */
-				result[t][4] = (phy_query_bb_reg(adapt, rTx_Power_Before_IQK_B,
-								 bMaskDWord)&0x3FF0000)>>16;
-				result[t][5] = (phy_query_bb_reg(adapt, rTx_Power_After_IQK_B,
-								 bMaskDWord)&0x3FF0000)>>16;
-			}
-		}
-
-		if (0x00 == path_b_ok) {
-			ODM_RT_TRACE(dm_odm, ODM_COMP_CALIBRATION, ODM_DBG_LOUD,
-				     ("Path B IQK failed!!\n"));
-		}
 	}
 
 	/* Back to BB mode, load original value */
@@ -1099,9 +1013,6 @@ static void phy_iq_calibrate(struct adapter *adapt, s32 result[][8],
 		/*  Restore RX initial gain */
 		phy_set_bb_reg(adapt, rFPGA0_XA_LSSIParameter,
 			       bMaskDWord, 0x00032ed3);
-		if (is2t)
-			phy_set_bb_reg(adapt, rFPGA0_XB_LSSIParameter,
-				       bMaskDWord, 0x00032ed3);
 
 		/* load 0xe30 IQC default value */
 		phy_set_bb_reg(adapt, rTx_IQK_Tone_A, bMaskDWord, 0x01008c00);
@@ -1217,7 +1128,7 @@ void rtl88eu_phy_iq_calibrate(struct adapter *adapt, bool recovery)
 	is13simular = false;
 
 	for (i = 0; i < 3; i++) {
-		phy_iq_calibrate(adapt, result, i, 0);
+		phy_iq_calibrate(adapt, result, i);
 
 		if (i == 1) {
 			is12simular = simularity_compare(adapt, result, 0, 1);
