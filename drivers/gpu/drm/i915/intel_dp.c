@@ -313,6 +313,7 @@ intel_dp_mode_valid(struct drm_connector *connector,
 	int target_clock = mode->clock;
 	int max_rate, mode_rate, max_lanes, max_link_clock;
 	int max_dotclk;
+	int common_rates[DP_MAX_SUPPORTED_RATES] = {};
 
 	max_dotclk = intel_dp_downstream_max_dotclock(intel_dp);
 
@@ -326,8 +327,26 @@ intel_dp_mode_valid(struct drm_connector *connector,
 		target_clock = fixed_mode->clock;
 	}
 
-	max_link_clock = intel_dp_max_link_rate(intel_dp);
-	max_lanes = intel_dp_max_lane_count(intel_dp);
+	/* Prune the modes based on the link rate that failed */
+	if (intel_dp->link_train_failed_link_rate) {
+		intel_dp->link_rate_index = intel_dp_link_rate_index(intel_dp,
+								     common_rates,
+								     intel_dp->link_train_failed_link_rate);
+		if (intel_dp->link_rate_index > 0) {
+			max_link_clock = common_rates[intel_dp->link_rate_index - 1];
+			max_lanes = intel_dp_max_lane_count(intel_dp);
+		} else {
+			/* Here we can lower the lane count, but that is DP 1.3 not 1.2 */
+			DRM_ERROR(" No Valid Mode Supported for this Link");
+			connector->link_train_retry = false;
+			intel_dp->link_train_failed_link_rate = 0;
+			intel_dp->link_rate_index = -1;
+		}
+	}
+	else {
+		max_link_clock = intel_dp_max_link_rate(intel_dp);
+		max_lanes = intel_dp_max_lane_count(intel_dp);
+	}
 
 	max_rate = intel_dp_max_data_rate(max_link_clock, max_lanes);
 	mode_rate = intel_dp_link_required(target_clock, 18);
@@ -1609,6 +1628,14 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 
 	if (adjusted_mode->flags & DRM_MODE_FLAG_DBLCLK)
 		return false;
+
+	/* Fall back to lower link rate in case of failure in previous modeset */
+	if (intel_dp->link_train_failed_link_rate) {
+		min_lane_count = max_lane_count;
+		min_clock = max_clock = intel_dp->link_rate_index - 1;
+		intel_dp->link_train_failed_link_rate = 0;
+		intel_dp->link_rate_index = -1;
+	}
 
 	DRM_DEBUG_KMS("DP link computation with max lane count %i "
 		      "max bw %d pixel clock %iKHz\n",
@@ -4394,6 +4421,10 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 	/* Can't disconnect eDP, but you can close the lid... */
 	if (is_edp(intel_dp))
 		status = edp_detect(intel_dp);
+	else if (intel_dp->link_train_failed) {
+		intel_dp->link_train_failed = false;
+		goto out;
+	}
 	else if (intel_digital_port_connected(to_i915(dev),
 					      dp_to_dig_port(intel_dp)))
 		status = intel_dp_detect_dpcd(intel_dp);
