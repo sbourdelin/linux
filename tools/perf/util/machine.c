@@ -1616,7 +1616,9 @@ static int add_callchain_ip(struct thread *thread,
 			    struct symbol **parent,
 			    struct addr_location *root_al,
 			    u8 *cpumode,
-			    u64 ip)
+			    u64 ip,
+			    bool branch,
+			    struct branch_flags *flags)
 {
 	struct addr_location al;
 
@@ -1668,7 +1670,8 @@ static int add_callchain_ip(struct thread *thread,
 
 	if (symbol_conf.hide_unresolved && al.sym == NULL)
 		return 0;
-	return callchain_cursor_append(cursor, al.addr, al.map, al.sym);
+	return callchain_cursor_append(cursor, al.addr, al.map, al.sym,
+				       branch, flags);
 }
 
 struct branch_info *sample__resolve_bstack(struct perf_sample *sample,
@@ -1747,7 +1750,7 @@ static int resolve_lbr_callchain_sample(struct thread *thread,
 	struct ip_callchain *chain = sample->callchain;
 	int chain_nr = min(max_stack, (int)chain->nr);
 	u8 cpumode = PERF_RECORD_MISC_USER;
-	int i, j, err;
+	int i, j, err, k;
 	u64 ip;
 
 	for (i = 0; i < chain_nr; i++) {
@@ -1770,25 +1773,45 @@ static int resolve_lbr_callchain_sample(struct thread *thread,
 		 * in callchain__printf
 		 */
 		int mix_chain_nr = i + 1 + lbr_nr + 1;
+		bool branch;
+		struct branch_flags *flags;
 
 		for (j = 0; j < mix_chain_nr; j++) {
+			branch = false;
+			flags = NULL;
+
 			if (callchain_param.order == ORDER_CALLEE) {
 				if (j < i + 1)
 					ip = chain->ips[j];
-				else if (j > i + 1)
-					ip = lbr_stack->entries[j - i - 2].from;
-				else
+				else if (j > i + 1) {
+					k = j - i - 2;
+					ip = lbr_stack->entries[k].from;
+					branch = true;
+					flags = &lbr_stack->entries[k].flags;
+				} else {
 					ip = lbr_stack->entries[0].to;
+					branch = true;
+					flags = &lbr_stack->entries[0].flags;
+				}
 			} else {
-				if (j < lbr_nr)
-					ip = lbr_stack->entries[lbr_nr - j - 1].from;
+				if (j < lbr_nr) {
+					k = lbr_nr - j - 1;
+					ip = lbr_stack->entries[k].from;
+					branch = true;
+					flags = &lbr_stack->entries[k].flags;
+				}
 				else if (j > lbr_nr)
 					ip = chain->ips[i + 1 - (j - lbr_nr)];
-				else
+				else {
 					ip = lbr_stack->entries[0].to;
+					branch = true;
+					flags = &lbr_stack->entries[0].flags;
+				}
 			}
 
-			err = add_callchain_ip(thread, cursor, parent, root_al, &cpumode, ip);
+			err = add_callchain_ip(thread, cursor, parent,
+					       root_al, &cpumode, ip,
+					       branch, flags);
 			if (err)
 				return (err < 0) ? err : 0;
 		}
@@ -1872,10 +1895,12 @@ static int thread__resolve_callchain_sample(struct thread *thread,
 
 		for (i = 0; i < nr; i++) {
 			err = add_callchain_ip(thread, cursor, parent, root_al,
-					       NULL, be[i].to);
+					       NULL, be[i].to,
+					       true, &be[i].flags);
 			if (!err)
 				err = add_callchain_ip(thread, cursor, parent, root_al,
-						       NULL, be[i].from);
+						       NULL, be[i].from,
+						       true, &be[i].flags);
 			if (err == -EINVAL)
 				break;
 			if (err)
@@ -1903,7 +1928,9 @@ check_calls:
 		if (ip < PERF_CONTEXT_MAX)
                        ++nr_entries;
 
-		err = add_callchain_ip(thread, cursor, parent, root_al, &cpumode, ip);
+		err = add_callchain_ip(thread, cursor, parent,
+				       root_al, &cpumode, ip,
+				       false, NULL);
 
 		if (err)
 			return (err < 0) ? err : 0;
@@ -1919,7 +1946,8 @@ static int unwind_entry(struct unwind_entry *entry, void *arg)
 	if (symbol_conf.hide_unresolved && entry->sym == NULL)
 		return 0;
 	return callchain_cursor_append(cursor, entry->ip,
-				       entry->map, entry->sym);
+				       entry->map, entry->sym,
+				       false, NULL);
 }
 
 static int thread__resolve_callchain_unwind(struct thread *thread,
