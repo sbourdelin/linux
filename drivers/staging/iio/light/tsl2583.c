@@ -515,15 +515,20 @@ static ssize_t power_state_store(struct device *dev,
 				 const char *buf, size_t len)
 {
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct tsl2583_chip *chip = iio_priv(indio_dev);
 	int value, ret;
 
 	if (kstrtoint(buf, 0, &value))
 		return -EINVAL;
 
+	mutex_lock(&chip->als_mutex);
+
 	if (!value)
 		ret = taos_chip_off(indio_dev);
 	else
 		ret = taos_chip_on(indio_dev);
+
+	mutex_unlock(&chip->als_mutex);
 
 	if (ret < 0)
 		return ret;
@@ -568,6 +573,8 @@ static ssize_t illuminance0_calibscale_store(struct device *dev,
 	if (kstrtoint(buf, 0, &value))
 		goto gain_store_done;
 
+	mutex_lock(&chip->als_mutex);
+
 	switch (value) {
 	case 1:
 		chip->taos_settings.als_gain = 0;
@@ -583,10 +590,12 @@ static ssize_t illuminance0_calibscale_store(struct device *dev,
 		break;
 	default:
 		dev_err(dev, "Invalid Gain Index (must be 1,8,16,111)\n");
-		goto gain_store_done;
+		goto gain_store_unlock;
 	}
 	ret = len;
 
+gain_store_unlock:
+	mutex_unlock(&chip->als_mutex);
 gain_store_done:
 	return ret;
 }
@@ -625,7 +634,9 @@ static ssize_t illuminance0_integration_time_store(struct device *dev,
 	if (value % 50)
 		goto als_time_store_done;
 
+	mutex_lock(&chip->als_mutex);
 	chip->taos_settings.als_time = value;
+	mutex_unlock(&chip->als_mutex);
 	ret = len;
 
 als_time_store_done:
@@ -663,7 +674,9 @@ static ssize_t illuminance0_calibbias_store(struct device *dev,
 	else if (!value)
 		return -EINVAL;
 
+	mutex_lock(&chip->als_mutex);
 	chip->taos_settings.als_gain_trim = value;
+	mutex_unlock(&chip->als_mutex);
 
 	return len;
 }
@@ -691,7 +704,9 @@ static ssize_t illuminance0_input_target_store(struct device *dev,
 	else if (!value)
 		return -EINVAL;
 
+	mutex_lock(&chip->als_mutex);
 	chip->taos_settings.als_cal_target = value;
+	mutex_unlock(&chip->als_mutex);
 
 	return len;
 }
@@ -714,6 +729,7 @@ static ssize_t illuminance0_calibrate_store(struct device *dev,
 					    const char *buf, size_t len)
 {
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct tsl2583_chip *chip = iio_priv(indio_dev);
 	int value;
 
 	if (kstrtoint(buf, 0, &value))
@@ -721,7 +737,9 @@ static ssize_t illuminance0_calibrate_store(struct device *dev,
 	else if (value != 1)
 		return -EINVAL;
 
+	mutex_lock(&chip->als_mutex);
 	taos_als_calibrate(indio_dev);
+	mutex_unlock(&chip->als_mutex);
 
 	return len;
 }
@@ -778,6 +796,8 @@ static ssize_t illuminance0_lux_table_store(struct device *dev,
 		goto luxable_store_done;
 	}
 
+	mutex_lock(&chip->als_mutex);
+
 	if (chip->taos_chip_status == TSL258X_CHIP_WORKING) {
 		ret = taos_chip_off(indio_dev);
 		if (ret < 0)
@@ -793,6 +813,8 @@ static ssize_t illuminance0_lux_table_store(struct device *dev,
 		return ret;
 
 	ret = len;
+
+	mutex_unlock(&chip->als_mutex);
 
 luxable_store_done:
 	return ret;
