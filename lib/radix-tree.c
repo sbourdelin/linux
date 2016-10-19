@@ -220,10 +220,10 @@ static void dump_node(struct radix_tree_node *node, unsigned long index)
 {
 	unsigned long i;
 
-	pr_debug("radix node: %p offset %d tags %lx %lx %lx shift %d count %d parent %p\n",
+	pr_debug("radix node: %p offset %d tags %lx %lx %lx shift %d count %d special %d parent %p\n",
 		node, node->offset,
 		node->tags[0][0], node->tags[1][0], node->tags[2][0],
-		node->shift, node->count, node->parent);
+		node->shift, node->count, node->special, node->parent);
 
 	for (i = 0; i < RADIX_TREE_MAP_SIZE; i++) {
 		unsigned long first = index | (i << node->shift);
@@ -522,9 +522,15 @@ static int radix_tree_extend(struct radix_tree_root *root,
 		node->offset = 0;
 		node->count = 1;
 		node->parent = NULL;
-		if (radix_tree_is_internal_node(slot))
-			entry_to_node(slot)->parent = node;
 		node->slots[0] = slot;
+		/* Extending an existing node or root->rnode? */
+		if (radix_tree_is_internal_node(slot)) {
+			entry_to_node(slot)->parent = node;
+		} else {
+			/* Moving a special root->rnode to a node */
+			if (root_tag_get(root, RADIX_TREE_TAG_SPECIAL))
+				node->special = 1;
+		}
 		slot = node_to_entry(node);
 		rcu_assign_pointer(root->rnode, slot);
 		shift += RADIX_TREE_MAP_SHIFT;

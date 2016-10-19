@@ -68,7 +68,8 @@ enum radix_tree_tags {
 	/* Freely allocatable radix tree user tags */
 	RADIX_TREE_NR_USER_TAGS = 3,
 	/* Radix tree internal tags */
-	RADIX_TREE_NR_TAGS = RADIX_TREE_NR_USER_TAGS,
+	RADIX_TREE_TAG_SPECIAL = RADIX_TREE_NR_USER_TAGS,
+	RADIX_TREE_NR_TAGS,
 };
 
 #ifndef RADIX_TREE_MAP_SHIFT
@@ -90,9 +91,10 @@ enum radix_tree_tags {
 #define RADIX_TREE_COUNT_MASK	((1UL << RADIX_TREE_COUNT_SHIFT) - 1)
 
 struct radix_tree_node {
-	unsigned char	shift;	/* Bits remaining in each slot */
-	unsigned char	offset;	/* Slot offset in parent */
-	unsigned int	count;
+	unsigned char	shift;		/* Bits remaining in each slot */
+	unsigned char	offset;		/* Slot offset in parent */
+	unsigned int	count;		/* Total entry count */
+	unsigned char	special;	/* Special entry count */
 	union {
 		struct {
 			/* Used when ascending tree */
