@@ -105,8 +105,9 @@ static inline void sun6i_spi_write(struct sun6i_spi *sspi, u32 reg, u32 value)
 	writel(value, sspi->base_addr + reg);
 }
 
-static inline void sun6i_spi_drain_fifo(struct sun6i_spi *sspi, int len)
+static inline void sun6i_spi_drain_fifo(struct sun6i_spi *sspi)
 {
+	int len = sspi->fifo_depth;
 	u32 reg, cnt;
 	u8 byte;
 
@@ -125,8 +126,9 @@ static inline void sun6i_spi_drain_fifo(struct sun6i_spi *sspi, int len)
 	}
 }
 
-static inline void sun6i_spi_fill_fifo(struct sun6i_spi *sspi, int len)
+static inline void sun6i_spi_fill_fifo(struct sun6i_spi *sspi)
 {
+	int len = sspi->fifo_depth;
 	u8 byte;
 
 	if (len > sspi->len)
@@ -270,7 +272,7 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
 			SUN6I_BURST_CTL_CNT_STC(tx_len));
 
 	/* Fill the TX FIFO */
-	sun6i_spi_fill_fifo(sspi, sspi->fifo_depth);
+	sun6i_spi_fill_fifo(sspi);
 
 	/* Enable the interrupts */
 	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, SUN6I_INT_CTL_TC);
@@ -293,7 +295,7 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
 		goto out;
 	}
 
-	sun6i_spi_drain_fifo(sspi, sspi->fifo_depth);
+	sun6i_spi_drain_fifo(sspi);
 
 out:
 	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, 0);
