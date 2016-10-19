@@ -4503,19 +4503,72 @@ static void hrtick_start_fair(struct rq *rq, struct task_struct *p)
 	}
 }
 
+#ifdef CONFIG_FAIR_GROUP_SCHED
+/*
+ * Find whether slice of 'p' has changed since 'pnew' enqueued or dequeued.
+ */
+static bool task_needs_new_slice(struct task_struct *p,
+				 struct task_struct *pnew)
+{
+	struct cfs_rq *cfs_rq;
+	struct sched_entity *se;
+
+	SCHED_WARN_ON(task_cpu(p) != task_cpu(pnew));
+
+	se = &pnew->se;
+	for_each_sched_entity(se) {
+		cfs_rq = cfs_rq_of(se);
+		/*
+		 * We can stop walking up hierarchy at the ancestor level
+		 * which has more than 1 nr_running because enqueue/dequeue
+		 * of new task won't affect cfs_rq's task_group load_avg from
+		 * that level through the root cfs_rq.
+		 */
+		if (cfs_rq->nr_running > 1)
+			break;
+	}
+
+	/*
+	 * The new task enqueue/dequeue ended up adding or removing of se in
+	 * the root cfs_rq.  All the ses now have new slice.
+	 */
+	if (!se)
+		return true;
+
+	se = &p->se;
+	for_each_sched_entity(se) {
+		/*
+		 * All the ses under 'cfs_rq' now have new slice.  Find if
+		 * 'cfs_rq' is ancestor of 'p'.
+		 */
+		if (cfs_rq == cfs_rq_of(se))
+			return true;
+	}
+
+	return false;
+}
+#else /* !CONFIG_FAIR_GROUP_SCHED */
+static inline bool
+task_needs_new_slice(struct task_struct *p, struct task_struct *pnew)
+{
+	return true;
+}
+#endif
+
 /*
  * called from enqueue/dequeue and updates the hrtick when the
- * current task is from our class and nr_running is low enough
- * to matter.
+ * current task is from our class, nr_running is low enough to matter and
+ * current task's slice can be changed by enqueue or deqeueue of 'p'.
  */
-static void hrtick_update(struct rq *rq)
+static void hrtick_update(struct rq *rq, struct task_struct *p)
 {
 	struct task_struct *curr = rq->curr;
 
 	if (!hrtick_enabled(rq) || curr->sched_class != &fair_sched_class)
 		return;
 
-	if (cfs_rq_of(&curr->se)->nr_running <= sched_nr_latency)
+	if (task_cfs_rq(curr)->nr_running <= sched_nr_latency &&
+	    task_needs_new_slice(curr, p))
 		hrtick_start_fair(rq, curr);
 }
 #else /* !CONFIG_SCHED_HRTICK */
@@ -4524,7 +4577,7 @@ hrtick_start_fair(struct rq *rq, struct task_struct *p)
 {
 }
 
-static inline void hrtick_update(struct rq *rq)
+static inline void hrtick_update(struct rq *rq, struct task_struct *p)
 {
 }
 #endif
@@ -4573,7 +4626,7 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	if (!se)
 		add_nr_running(rq, 1);
 
-	hrtick_update(rq);
+	hrtick_update(rq, p);
 }
 
 static void set_next_buddy(struct sched_entity *se);
@@ -4632,7 +4685,7 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	if (!se)
 		sub_nr_running(rq, 1);
 
-	hrtick_update(rq);
+	hrtick_update(rq, p);
 }
 
 #ifdef CONFIG_SMP
