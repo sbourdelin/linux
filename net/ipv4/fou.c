@@ -27,7 +27,8 @@ struct fou {
 	struct rcu_head rcu;
 };
 
-#define FOU_F_REMCSUM_NOPARTIAL BIT(0)
+#define FOU_F_REMCSUM_NOPARTIAL	BIT(0)
+#define FOU_F_DEEP_HASH		BIT(1)
 
 struct fou_cfg {
 	u16 type;
@@ -281,6 +282,16 @@ out_unlock:
 	return err;
 }
 
+static int fou_flow_dissect(struct sock *sk, const struct sk_buff *skb,
+			    void *data, int hlen, int *nhoff, u8 *ip_proto,
+			    __be16 *proto)
+{
+	*ip_proto = fou_from_sock(sk)->protocol;
+	*nhoff += sizeof(struct udphdr);
+
+	return FLOW_DIS_RET_IPPROTO;
+}
+
 static struct guehdr *gue_gro_remcsum(struct sk_buff *skb, unsigned int off,
 				      struct guehdr *guehdr, void *data,
 				      size_t hdrlen, struct gro_remcsum *grc,
@@ -498,6 +509,48 @@ out_unlock:
 	return err;
 }
 
+static int gue_flow_dissect(struct sock *sk, const struct sk_buff *skb,
+			    void *data, int hlen, int *nhoff, u8 *ip_proto,
+			    __be16 *proto)
+{
+	struct guehdr _hdr, *hdr;
+
+	hdr = __skb_header_pointer(skb, *nhoff + sizeof(struct udphdr),
+				   sizeof(_hdr), data, hlen, &_hdr);
+	if (!hdr)
+		return FLOW_DIS_RET_BAD;
+
+	switch (hdr->version) {
+	case 0: /* Full GUE header present */
+		if (hdr->control)
+			return FLOW_DIS_RET_PASS;
+
+		*nhoff += sizeof(struct udphdr) + sizeof(_hdr) +
+			  (hdr->hlen << 2);
+		*ip_proto = hdr->proto_ctype;
+
+		return FLOW_DIS_RET_IPPROTO;
+	case 1:
+		/* Direct encasulation of IPv4 or IPv6 */
+
+		switch (((struct iphdr *)hdr)->version) {
+		case 4:
+			*nhoff += sizeof(struct udphdr);
+			*ip_proto = IPPROTO_IPIP;
+			return FLOW_DIS_RET_IPPROTO;
+		case 6:
+			*nhoff += sizeof(struct udphdr);
+			*ip_proto = IPPROTO_IPV6;
+			return FLOW_DIS_RET_IPPROTO;
+		default:
+			return FLOW_DIS_RET_PASS;
+		}
+
+	default:
+		return FLOW_DIS_RET_PASS;
+	}
+}
+
 static int fou_add_to_port_list(struct net *net, struct fou *fou)
 {
 	struct fou_net *fn = net_generic(net, fou_net_id);
@@ -568,12 +621,16 @@ static int fou_create(struct net *net, struct fou_cfg *cfg,
 		tunnel_cfg.encap_rcv = fou_udp_recv;
 		tunnel_cfg.gro_receive = fou_gro_receive;
 		tunnel_cfg.gro_complete = fou_gro_complete;
+		if (cfg->flags & FOU_F_DEEP_HASH)
+			tunnel_cfg.flow_dissect = fou_flow_dissect;
 		fou->protocol = cfg->protocol;
 		break;
 	case FOU_ENCAP_GUE:
 		tunnel_cfg.encap_rcv = gue_udp_recv;
 		tunnel_cfg.gro_receive = gue_gro_receive;
 		tunnel_cfg.gro_complete = gue_gro_complete;
+		if (cfg->flags & FOU_F_DEEP_HASH)
+			tunnel_cfg.flow_dissect = gue_flow_dissect;
 		break;
 	default:
 		err = -EINVAL;
@@ -637,6 +694,7 @@ static const struct nla_policy fou_nl_policy[FOU_ATTR_MAX + 1] = {
 	[FOU_ATTR_IPPROTO] = { .type = NLA_U8, },
 	[FOU_ATTR_TYPE] = { .type = NLA_U8, },
 	[FOU_ATTR_REMCSUM_NOPARTIAL] = { .type = NLA_FLAG, },
+	[FOU_ATTR_DEEP_HASH] = { .type = NLA_FLAG },
 };
 
 static int parse_nl_config(struct genl_info *info,
@@ -676,6 +734,9 @@ static int parse_nl_config(struct genl_info *info,
 
 	if (info->attrs[FOU_ATTR_REMCSUM_NOPARTIAL])
 		cfg->flags |= FOU_F_REMCSUM_NOPARTIAL;
+
+	if (info->attrs[FOU_ATTR_DEEP_HASH])
+		cfg->flags |= FOU_F_DEEP_HASH;
 
 	return 0;
 }
@@ -717,6 +778,11 @@ static int fou_fill_info(struct fou *fou, struct sk_buff *msg)
 	if (fou->flags & FOU_F_REMCSUM_NOPARTIAL)
 		if (nla_put_flag(msg, FOU_ATTR_REMCSUM_NOPARTIAL))
 			return -1;
+
+	if (fou->flags & FOU_F_DEEP_HASH)
+		if (nla_put_flag(msg, FOU_ATTR_DEEP_HASH))
+			return -1;
+
 	return 0;
 }
 
