@@ -746,46 +746,22 @@ void *radix_tree_lookup(struct radix_tree_root *root, unsigned long index)
 }
 EXPORT_SYMBOL(radix_tree_lookup);
 
-/**
- *	radix_tree_tag_set - set a tag on a radix tree node
- *	@root:		radix tree root
- *	@index:		index key
- *	@tag:		tag index
- *
- *	Set the search tag (which must be < RADIX_TREE_MAX_TAGS)
- *	corresponding to @index in the radix tree.  From
- *	the root all the way down to the leaf node.
- *
- *	Returns the address of the tagged item.  Setting a tag on a not-present
- *	item is a bug.
- */
-void *radix_tree_tag_set(struct radix_tree_root *root,
-			unsigned long index, unsigned int tag)
+static void node_tag_set(struct radix_tree_root *root,
+			 struct radix_tree_node *node,
+			 unsigned int tag, unsigned int offset)
 {
-	struct radix_tree_node *node, *parent;
-	unsigned long maxindex;
+	while (node) {
+		if (tag_get(node, tag, offset))
+			return;
+		tag_set(node, tag, offset);
 
-	radix_tree_load_root(root, &node, &maxindex);
-	BUG_ON(index > maxindex);
-
-	while (radix_tree_is_internal_node(node)) {
-		unsigned offset;
-
-		parent = entry_to_node(node);
-		offset = radix_tree_descend(parent, &node, index);
-		BUG_ON(!node);
-
-		if (!tag_get(parent, tag, offset))
-			tag_set(parent, tag, offset);
+		offset = node->offset;
+		node = node->parent;
 	}
 
-	/* set the root's tag bit */
 	if (!root_tag_get(root, tag))
 		root_tag_set(root, tag);
-
-	return node;
 }
-EXPORT_SYMBOL(radix_tree_tag_set);
 
 static void node_tag_clear(struct radix_tree_root *root,
 				struct radix_tree_node *node,
@@ -806,6 +782,67 @@ static void node_tag_clear(struct radix_tree_root *root,
 	if (root_tag_get(root, tag))
 		root_tag_clear(root, tag);
 }
+
+void __radix_tree_tag_set(struct radix_tree_root *root,
+			  struct radix_tree_node *node,
+			  void **slot, unsigned int tag)
+{
+	node_tag_set(root, node, tag, node ? get_slot_offset(node, slot) : 0);
+}
+
+void __radix_tree_tag_clear(struct radix_tree_root *root,
+			    struct radix_tree_node *node,
+			    void **slot, unsigned int tag)
+{
+	node_tag_clear(root, node, tag, node ? get_slot_offset(node, slot) : 0);
+}
+
+void __radix_tree_clear_tags(struct radix_tree_root *root,
+			     struct radix_tree_node *node,
+			     void **slot)
+{
+	unsigned int tag;
+
+	for (tag = 0; tag < RADIX_TREE_MAX_TAGS; tag++)
+		__radix_tree_tag_clear(root, node, slot, tag);
+}
+
+/**
+ *	radix_tree_tag_set - set a tag on a radix tree node
+ *	@root:		radix tree root
+ *	@index:		index key
+ *	@tag:		tag index
+ *
+ *	Set the search tag (which must be < RADIX_TREE_MAX_TAGS)
+ *	corresponding to @index in the radix tree.  From
+ *	the root all the way down to the leaf node.
+ *
+ *	Returns the address of the tagged item.  Setting a tag on a not-present
+ *	item is a bug.
+ */
+void *radix_tree_tag_set(struct radix_tree_root *root,
+			unsigned long index, unsigned int tag)
+{
+	struct radix_tree_node *node, *parent;
+	unsigned long maxindex;
+	int uninitialized_var(offset);
+
+	radix_tree_load_root(root, &node, &maxindex);
+	BUG_ON(index > maxindex);
+
+	parent = NULL;
+
+	while (radix_tree_is_internal_node(node)) {
+		parent = entry_to_node(node);
+		offset = radix_tree_descend(parent, &node, index);
+	}
+
+	if (node)
+		node_tag_set(root, parent, tag, offset);
+
+	return node;
+}
+EXPORT_SYMBOL(radix_tree_tag_set);
 
 /**
  *	radix_tree_tag_clear - clear a tag on a radix tree node
@@ -1582,20 +1619,6 @@ void *radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 	return radix_tree_delete_item(root, index, NULL);
 }
 EXPORT_SYMBOL(radix_tree_delete);
-
-void radix_tree_clear_tags(struct radix_tree_root *root,
-			   struct radix_tree_node *node,
-			   void **slot)
-{
-	if (node) {
-		unsigned int tag, offset = get_slot_offset(node, slot);
-		for (tag = 0; tag < RADIX_TREE_MAX_TAGS; tag++)
-			node_tag_clear(root, node, tag, offset);
-	} else {
-		/* Clear root node tags */
-		root->gfp_mask &= __GFP_BITS_MASK;
-	}
-}
 
 /**
  *	radix_tree_tagged - test whether any items in the tree are tagged
