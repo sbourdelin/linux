@@ -73,6 +73,8 @@ SECTIONS
 	} :kernel
 
 	.text : AT(ADDR(.text) - LOAD_OFFSET) {
+		*(.linker_stub_catch);
+		. = . ;
 		/* careful! __ftr_alt_* sections need to be close to .text */
 		ALIGN_FUNCTION();
 		*(.text .fixup __ftr_alt_* .ref.text);
