@@ -41,8 +41,10 @@ int arch_show_interrupts(struct seq_file *p, int prec)
 	seq_printf(p, "%*s: ", prec, "NMI");
 	for_each_online_cpu(j)
 		seq_printf(p, "%10u ", cpu_pda[j].__nmi_count);
-	seq_printf(p, "  CORE  Non Maskable Interrupt\n");
-	seq_printf(p, "%*s: %10u\n", prec, "ERR", atomic_read(&irq_err_count));
+	seq_printf(p,
+		   "  CORE  Non Maskable Interrupt\n"
+		   "%*s: %10u\n",
+		   prec, "ERR", atomic_read(&irq_err_count));
 	return 0;
 }
 #endif
