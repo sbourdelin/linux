@@ -301,6 +301,7 @@ error:
 	return NULL;
 }
 
+#ifdef CONFIG_INET
 /* Some devices are known to send Neigbor Solicitation messages and
  * require Neigbor Advertisement replies.  The IPv6 core will not
  * respond since IFF_NOARP is set, so we must handle them ourselves.
@@ -350,6 +351,7 @@ static void do_neigh_solicit(struct usbnet *dev, u8 *buf, u16 tci)
 out:
 	dev_put(netdev);
 }
+#endif
 
 static bool is_neigh_solicit(u8 *buf, size_t len)
 {
@@ -377,8 +379,10 @@ static struct sk_buff *cdc_mbim_process_dgram(struct usbnet *dev, u8 *buf, size_
 			proto = htons(ETH_P_IP);
 			break;
 		case 0x60:
+#ifdef CONFIG_INET
 			if (is_neigh_solicit(buf, len))
 				do_neigh_solicit(dev, buf, tci);
+#endif
 			proto = htons(ETH_P_IPV6);
 			break;
 		default:

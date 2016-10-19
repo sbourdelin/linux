@@ -352,8 +352,10 @@ static inline void rt_genid_bump_ipv4(struct net *net)
 extern void (*__fib6_flush_trees)(struct net *net);
 static inline void rt_genid_bump_ipv6(struct net *net)
 {
+#ifdef CONFIG_INET
 	if (__fib6_flush_trees)
 		__fib6_flush_trees(net);
+#endif
 }
 
 #if IS_ENABLED(CONFIG_IEEE802154_6LOWPAN)
