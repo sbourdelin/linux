@@ -273,7 +273,7 @@ static inline u8 *recvframe_pull(struct recv_frame *precvframe, uint sz)
 	return data;
 }
 
-static inline u8 *recvframe_put(struct recv_frame *precvframe, int sz)
+static inline u8 *recvframe_put(struct recv_frame *precvframe, uint sz)
 {
 	/* used for append sz bytes from ptr to rx_tail, update rx_tail
 	 * and return the updated rx_tail to the caller */
