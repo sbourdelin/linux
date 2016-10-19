@@ -515,15 +515,18 @@ static ssize_t power_state_store(struct device *dev,
 				 const char *buf, size_t len)
 {
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
-	int value;
+	int value, ret;
 
 	if (kstrtoint(buf, 0, &value))
 		return -EINVAL;
 
 	if (!value)
-		taos_chip_off(indio_dev);
+		ret = taos_chip_off(indio_dev);
 	else
-		taos_chip_on(indio_dev);
+		ret = taos_chip_on(indio_dev);
+
+	if (ret < 0)
+		return ret;
 
 	return len;
 }
@@ -775,14 +778,20 @@ static ssize_t illuminance0_lux_table_store(struct device *dev,
 		goto luxable_store_done;
 	}
 
-	if (chip->taos_chip_status == TSL258X_CHIP_WORKING)
-		taos_chip_off(indio_dev);
+	if (chip->taos_chip_status == TSL258X_CHIP_WORKING) {
+		ret = taos_chip_off(indio_dev);
+		if (ret < 0)
+			return ret;
+	}
 
 	/* Zero out the table */
 	memset(taos_device_lux, 0, sizeof(taos_device_lux));
 	memcpy(taos_device_lux, &value[1], (value[0] * 4));
 
-	taos_chip_on(indio_dev);
+	ret = taos_chip_on(indio_dev);
+	if (ret < 0)
+		return ret;
+
 	ret = len;
 
 luxable_store_done:
@@ -914,7 +923,9 @@ static int taos_probe(struct i2c_client *clientp,
 	taos_defaults(chip);
 
 	/* Make sure the chip is on */
-	taos_chip_on(indio_dev);
+	ret = taos_chip_on(indio_dev);
+	if (ret < 0)
+		return ret;
 
 	dev_info(&clientp->dev, "Light sensor found.\n");
 
