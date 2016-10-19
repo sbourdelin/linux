@@ -206,10 +206,7 @@ static int taos_get_lux(struct iio_dev *indio_dev)
 	u32 ch0lux = 0;
 	u32 ch1lux = 0;
 
-	if (mutex_trylock(&chip->als_mutex) == 0) {
-		dev_info(&chip->client->dev, "taos_get_lux device is busy\n");
-		return chip->als_cur_info.lux; /* busy, so return LAST VALUE */
-	}
+	mutex_lock(&chip->als_mutex);
 
 	if (chip->taos_chip_status != TSL258X_CHIP_WORKING) {
 		/* device is not enabled */
