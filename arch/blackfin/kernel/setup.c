@@ -1313,9 +1313,9 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 	if (bfin_revid() != bfin_compiled_revid()) {
 		if (bfin_compiled_revid() == -1)
-			seq_printf(m, "(Compiled for Rev none)");
+			seq_puts(m, "(Compiled for Rev none)");
 		else if (bfin_compiled_revid() == 0xffff)
-			seq_printf(m, "(Compiled for Rev any)");
+			seq_puts(m, "(Compiled for Rev any)");
 		else
 			seq_printf(m, "(Compiled for Rev %d)", bfin_compiled_revid());
 	}
@@ -1385,7 +1385,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		seq_printf(m, "icache setup\t: %d Sub-banks/%d Ways, %d Lines/Way\n",
 			   BFIN_ISUBBANKS, BFIN_IWAYS, BFIN_ILINES);
 	else
-		seq_printf(m, "icache setup\t: off\n");
+		seq_puts(m, "icache setup\t: off\n");
 
 	seq_printf(m,
 		   "dcache setup\t: %d Super-banks/%d Sub-banks/%d Ways, %d Lines/Way\n",
