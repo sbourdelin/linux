@@ -790,10 +790,10 @@ static const struct file_operations proc_single_file_operations = {
 struct mm_struct *proc_mem_open(struct inode *inode, unsigned int mode)
 {
 	struct task_struct *task = get_proc_task(inode);
-	struct mm_struct *mm = ERR_PTR(-ESRCH);
+	struct mm_struct *ret = ERR_PTR(-ESRCH);
 
 	if (task) {
-		mm = mm_access(task, mode | PTRACE_MODE_FSCREDS);
+		struct mm_struct *mm = mm_access(task, mode | PTRACE_MODE_FSCREDS);
 		put_task_struct(task);
 
 		if (!IS_ERR_OR_NULL(mm)) {
@@ -801,10 +801,11 @@ struct mm_struct *proc_mem_open(struct inode *inode, unsigned int mode)
 			atomic_inc(&mm->mm_count);
 			/* but do not pin its memory */
 			mmput(mm);
+			ret = mm;
 		}
 	}
 
-	return mm;
+	return ret;
 }
 
 static int __mem_open(struct inode *inode, struct file *file, unsigned int mode)
