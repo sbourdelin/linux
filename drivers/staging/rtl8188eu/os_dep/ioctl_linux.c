@@ -966,6 +966,7 @@ static int rtw_wx_set_wap(struct net_device *dev,
 	struct __queue *queue	= &(pmlmepriv->scanned_queue);
 	struct	wlan_network	*pnetwork = NULL;
 	enum ndis_802_11_auth_mode	authmode;
+	struct list_head *scanned;
 
 	if (_FAIL == rtw_pwr_wakeup(padapter)) {
 		ret = -1;
@@ -985,12 +986,12 @@ static int rtw_wx_set_wap(struct net_device *dev,
 	authmode = padapter->securitypriv.ndisauthtype;
 	spin_lock_bh(&queue->lock);
 	phead = get_list_head(queue);
-	pmlmepriv->pscanned = phead->next;
+	scanned = phead->next;
 
-	while (phead != pmlmepriv->pscanned) {
-		pnetwork = container_of(pmlmepriv->pscanned, struct wlan_network, list);
+	while (phead != scanned) {
+		pnetwork = container_of(scanned, struct wlan_network, list);
 
-		pmlmepriv->pscanned = pmlmepriv->pscanned->next;
+		scanned = scanned->next;
 
 		dst_bssid = pnetwork->network.MacAddress;
 
@@ -1313,6 +1314,8 @@ static int rtw_wx_set_essid(struct net_device *dev,
 	authmode = padapter->securitypriv.ndisauthtype;
 	DBG_88E("=>%s\n", __func__);
 	if (wrqu->essid.flags && wrqu->essid.length) {
+		struct list_head *scanned;
+
 		len = min_t(uint, wrqu->essid.length, IW_ESSID_MAX_SIZE);
 
 		if (wrqu->essid.length != 33)
@@ -1326,12 +1329,12 @@ static int rtw_wx_set_essid(struct net_device *dev,
 		RT_TRACE(_module_rtl871x_ioctl_os_c, _drv_info_, ("rtw_wx_set_essid: ssid =[%s]\n", src_ssid));
 		spin_lock_bh(&queue->lock);
 	       phead = get_list_head(queue);
-	      pmlmepriv->pscanned = phead->next;
+		scanned = phead->next;
 
-		while (phead != pmlmepriv->pscanned) {
-			pnetwork = container_of(pmlmepriv->pscanned, struct wlan_network, list);
+		while (phead != scanned) {
+			pnetwork = container_of(scanned, struct wlan_network, list);
 
-			pmlmepriv->pscanned = pmlmepriv->pscanned->next;
+			scanned = scanned->next;
 
 			dst_ssid = pnetwork->network.Ssid.Ssid;
 

@@ -40,8 +40,6 @@ u8 rtw_do_join(struct adapter *padapter)
 
 	set_fwstate(pmlmepriv, _FW_UNDER_LINKING);
 
-	pmlmepriv->pscanned = plist;
-
 	pmlmepriv->to_join = true;
 
 	if (list_empty(&queue->queue)) {
