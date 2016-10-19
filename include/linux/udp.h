@@ -66,6 +66,7 @@ struct udp_sock {
 #define UDPLITE_RECV_CC  0x4		/* set via udplite setsocktopt        */
 	__u8		 pcflag;        /* marks socket as UDP-Lite if > 0    */
 	__u8		 unused[3];
+	spinlock_t	 mem_lock;	/* protects memory accounting         */
 	/*
 	 * For encapsulation sockets.
 	 */
