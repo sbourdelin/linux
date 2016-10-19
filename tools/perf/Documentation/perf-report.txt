@@ -335,6 +335,14 @@ OPTIONS
 --branch-history::
 	Add the addresses of sampled taken branches to the callstack.
 	This allows to examine the path the program took to each sample.
+
+	Also show with some branch flags that can be:
+	- Predicted: display the average percentage of predicated branches.
+		     (predicated number / total number)
+	- Abort: display the average percentage of abort branches.
+		 (abort number /total number)
+	- Cycles: cycles in basic block.
+
 	The data collection must have used -b (or -j) and -g.
 
 --objdump=<path>::
