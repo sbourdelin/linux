@@ -233,7 +233,6 @@ struct recv_frame {
 	struct adapter  *adapter;
 	struct rx_pkt_attrib attrib;
 	uint  len;
-	u8 *rx_head;
 	u8 *rx_data;
 	u8 *rx_tail;
 	u8 *rx_end;
