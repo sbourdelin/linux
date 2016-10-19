@@ -95,7 +95,7 @@ int rtw_recv_indicatepkt(struct adapter *padapter,
 		  precv_frame->pkt->data));
 	RT_TRACE(_module_recv_osdep_c_, _drv_info_,
 		 ("precv_frame->hdr.rx_tail =%p precv_frame->pkt->end =%p precv_frame->hdr.len =%d\n",
-		 precv_frame->rx_tail, precv_frame->pkt->end,
+		 precv_frame->pkt->tail, precv_frame->pkt->end,
 		 precv_frame->len));
 
 	skb_set_tail_pointer(skb, precv_frame->len);
