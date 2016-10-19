@@ -118,6 +118,8 @@ struct k_clock {
 extern struct k_clock clock_posix_cpu;
 extern struct k_clock clock_posix_dynamic;
 
+#ifdef CONFIG_POSIX_TIMERS
+
 void posix_timers_register_clock(const clockid_t clock_id, struct k_clock *new_clock);
 
 /* function to call to trigger timer event */
@@ -131,8 +133,30 @@ void posix_cpu_timers_exit_group(struct task_struct *task);
 void set_process_cpu_timer(struct task_struct *task, unsigned int clock_idx,
 			   cputime_t *newval, cputime_t *oldval);
 
-long clock_nanosleep_restart(struct restart_block *restart_block);
-
 void update_rlimit_cpu(struct task_struct *task, unsigned long rlim_new);
+
+#else
+
+#include <linux/random.h>
+
+static inline void posix_timers_register_clock(const clockid_t clock_id,
+					       struct k_clock *new_clock) {}
+static inline int posix_timer_event(struct k_itimer *timr, int si_private)
+{ return 0; }
+static inline void run_posix_cpu_timers(struct task_struct *task) {}
+static inline void posix_cpu_timers_exit(struct task_struct *task)
+{
+	add_device_randomness((const void*) &task->se.sum_exec_runtime,
+			      sizeof(unsigned long long));
+}
+static inline void posix_cpu_timers_exit_group(struct task_struct *task) {}
+static inline void set_process_cpu_timer(struct task_struct *task,
+		unsigned int clock_idx, cputime_t *newval, cputime_t *oldval) {}
+static inline void update_rlimit_cpu(struct task_struct *task,
+				     unsigned long rlim_new) {}
+
+#endif
+
+long clock_nanosleep_restart(struct restart_block *restart_block);
 
 #endif
