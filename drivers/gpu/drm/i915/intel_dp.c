@@ -1588,6 +1588,7 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 	/* Conveniently, the link BW constants become indices with a shift...*/
 	int min_clock = 0;
 	int max_clock;
+	int link_rate_index;
 	int bpp, mode_rate;
 	int link_avail, link_clock;
 	int common_rates[DP_MAX_SUPPORTED_RATES] = {};
@@ -1636,6 +1637,19 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 		intel_dp->link_train_failed_link_rate = 0;
 		intel_dp->link_rate_index = -1;
 	}
+	/* Use values requested by Compliance Test Request */
+	if (intel_dp->compliance_test_link_rate &&
+	    intel_dp->compliance_test_lane_count) {
+			link_rate_index = intel_dp_link_rate_index(intel_dp,
+								   common_rates,
+								   drm_dp_bw_code_to_link_rate(intel_dp->compliance_test_link_rate));
+			if (link_rate_index >= 0)
+				min_clock = max_clock = link_rate_index;
+			min_lane_count = max_lane_count = intel_dp->compliance_test_lane_count;
+
+			intel_dp->compliance_test_link_rate = 0;
+			intel_dp->compliance_test_lane_count = 0;
+		}
 
 	DRM_DEBUG_KMS("DP link computation with max lane count %i "
 		      "max bw %d pixel clock %iKHz\n",
@@ -1684,6 +1698,7 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 				}
 			}
 		}
+
 	}
 
 	return false;
@@ -3865,6 +3880,29 @@ intel_dp_get_sink_irq_esi(struct intel_dp *intel_dp, u8 *sink_irq_vector)
 static uint8_t intel_dp_autotest_link_training(struct intel_dp *intel_dp)
 {
 	uint8_t test_result = DP_TEST_ACK;
+	int status = 0;
+	/* (DP CTS 1.2)
+	 * 4.3.1.11
+	 */
+	/* Read the TEST_LANE_COUNT and TEST_LINK_RTAE fields (DP CTS 3.1.4) */
+	status = drm_dp_dpcd_readb(&intel_dp->aux, DP_TEST_LANE_COUNT,
+				  &intel_dp->compliance_test_lane_count);
+
+	if (status <= 0) {
+		DRM_DEBUG_KMS("Could not read test lane count from "
+			      "reference sink\n");
+		return 0;
+	}
+	intel_dp->compliance_test_lane_count &= DP_MAX_LANE_COUNT_MASK;
+
+	status = drm_dp_dpcd_readb(&intel_dp->aux, DP_TEST_LINK_RATE,
+				   &intel_dp->compliance_test_link_rate);
+	if (status <= 0) {
+		DRM_DEBUG_KMS("Could not read test link rate from "
+			      "refernce sink\n");
+		return 0;
+	}
+
 	return test_result;
 }
 
@@ -3965,11 +4003,14 @@ static void intel_dp_handle_test_request(struct intel_dp *intel_dp)
 	}
 
 update_status:
-	status = drm_dp_dpcd_write(&intel_dp->aux,
-				   DP_TEST_RESPONSE,
-				   &response, 1);
-	if (status <= 0)
-		DRM_DEBUG_KMS("Could not write test response to sink\n");
+	if (intel_dp->compliance_test_type == DP_TEST_LINK_TRAINING) {
+		status = drm_dp_dpcd_write(&intel_dp->aux,
+					   DP_TEST_RESPONSE,
+					   &response, 1);
+		if (status <= 0)
+			DRM_DEBUG_KMS("Could not write test response "
+				      "to sink\n");
+	}
 }
 
 static int
@@ -4074,9 +4115,7 @@ intel_dp_check_link_status(struct intel_dp *intel_dp)
 	if (!to_intel_crtc(intel_encoder->base.crtc)->active)
 		return;
 
-	/* if link training is requested we should perform it always */
-	if ((intel_dp->compliance_test_type == DP_TEST_LINK_TRAINING) ||
-	    (!drm_dp_channel_eq_ok(link_status, intel_dp->lane_count))) {
+	if ((!drm_dp_channel_eq_ok(link_status, intel_dp->lane_count))) {
 		DRM_DEBUG_KMS("%s: channel EQ not ok, retraining\n",
 			      intel_encoder->base.name);
 
@@ -4101,6 +4140,9 @@ static bool
 intel_dp_short_pulse(struct intel_dp *intel_dp)
 {
 	struct drm_device *dev = intel_dp_to_dev(intel_dp);
+	struct intel_encoder *intel_encoder = &dp_to_dig_port(intel_dp)->base;
+	struct intel_connector *intel_connector = intel_dp->attached_connector;
+	struct drm_connector *connector = &intel_connector->base;
 	u8 sink_irq_vector = 0;
 	u8 old_sink_count = intel_dp->sink_count;
 	bool ret;
@@ -4135,8 +4177,9 @@ intel_dp_short_pulse(struct intel_dp *intel_dp)
 				   DP_DEVICE_SERVICE_IRQ_VECTOR,
 				   sink_irq_vector);
 
-		if (sink_irq_vector & DP_AUTOMATED_TEST_REQUEST)
-			DRM_DEBUG_DRIVER("Test request in short pulse not handled\n");
+		if (sink_irq_vector & DP_AUTOMATED_TEST_REQUEST) {
+			intel_dp_handle_test_request(intel_dp);
+		}
 		if (sink_irq_vector & (DP_CP_IRQ | DP_SINK_SPECIFIC_IRQ))
 			DRM_DEBUG_DRIVER("CP or sink specific irq unhandled\n");
 	}
@@ -4144,6 +4187,11 @@ intel_dp_short_pulse(struct intel_dp *intel_dp)
 	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
 	intel_dp_check_link_status(intel_dp);
 	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+	if ((intel_dp->compliance_test_type == DP_TEST_LINK_TRAINING)) {
+		connector->link_train_retry = true;
+		/* Send a Hotplug Uevent to userspace to start modeset */
+		drm_kms_helper_hotplug_event(intel_encoder->base.dev);
+	}
 
 	return true;
 }
@@ -4421,7 +4469,9 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 	/* Can't disconnect eDP, but you can close the lid... */
 	if (is_edp(intel_dp))
 		status = edp_detect(intel_dp);
-	else if (intel_dp->link_train_failed) {
+	else if (intel_dp->compliance_test_type == DP_TEST_LINK_TRAINING ||
+		 intel_dp->link_train_failed) {
+		intel_dp->compliance_test_type = 0;
 		intel_dp->link_train_failed = false;
 		goto out;
 	}
