@@ -36,7 +36,8 @@ struct cplbinfo_data {
 
 static void cplbinfo_print_header(struct seq_file *m)
 {
-	seq_printf(m, "Index\tAddress\t\tData\tSize\tU/RD\tU/WR\tS/WR\tSwitch\n");
+	seq_puts(m,
+		 "Index\tAddress\t\tData\tSize\tU/RD\tU/WR\tS/WR\tSwitch\n");
 }
 
 static int cplbinfo_nomore(struct cplbinfo_data *cdata)
