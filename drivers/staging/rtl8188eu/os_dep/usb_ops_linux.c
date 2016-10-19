@@ -132,7 +132,7 @@ static int recvbuf2recvframe(struct adapter *adapt, struct sk_buff *pskb)
 			goto _exit_recvbuf2recvframe;
 		}
 
-		recvframe_put(precvframe, skb_len);
+		skb_put(precvframe->pkt, skb_len);
 
 		switch (haldata->UsbRxAggMode) {
 		case USB_RX_AGG_DMA:

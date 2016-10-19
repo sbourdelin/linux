@@ -1380,7 +1380,7 @@ static struct recv_frame *recvframe_defrag(struct adapter *adapter,
 		/* memcpy */
 		memcpy(pfhdr->pkt->tail, pnfhdr->pkt->data, pnfhdr->pkt->len);
 
-		recvframe_put(prframe, pnfhdr->pkt->len);
+		skb_put(prframe->pkt, pnfhdr->pkt->len);
 
 		pfhdr->attrib.icv_len = pnfhdr->attrib.icv_len;
 		plist = plist->next;
