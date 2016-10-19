@@ -184,11 +184,27 @@
 				};
 			};
 
+			usbphy0: usbphy@0 {
+				compatible = "usb-nop-xceiv";
+				clocks = <&clks IMX5_CLK_USB_PHY1_GATE>;
+				clock-names = "main_clk";
+				status = "okay";
+			};
+
+			usbphy1: usbphy@1 {
+				compatible = "usb-nop-xceiv";
+				clocks = <&clks IMX5_CLK_USB_PHY2_GATE>;
+				clock-names = "main_clk";
+				status = "okay";
+			};
+
 			usbotg: usb@53f80000 {
 				compatible = "fsl,imx50-usb", "fsl,imx27-usb";
 				reg = <0x53f80000 0x0200>;
 				interrupts = <18>;
-				clocks = <&clks IMX5_CLK_USB_PHY1_GATE>;
+				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
+				fsl,usbmisc = <&usbmisc 0>;
+				fsl,usbphy = <&usbphy0>;
 				status = "disabled";
 			};
 
@@ -196,7 +212,9 @@
 				compatible = "fsl,imx50-usb", "fsl,imx27-usb";
 				reg = <0x53f80200 0x0200>;
 				interrupts = <14>;
-				clocks = <&clks IMX5_CLK_USB_PHY2_GATE>;
+				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
+				fsl,usbmisc = <&usbmisc 1>;
+				fsl,usbphy = <&usbphy1>;
 				dr_mode = "host";
 				status = "disabled";
 			};
@@ -331,6 +349,13 @@
 				         <&clks IMX5_CLK_UART2_PER_GATE>;
 				clock-names = "ipg", "per";
 				status = "disabled";
+			};
+
+			usbmisc: usbmisc@53fc4800 {
+				#index-cells = <1>;
+				compatible = "fsl,imx53-usbmisc";
+				reg = <0x53fc4800 0x200>;
+				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
 			};
 
 			src: src@53fd0000 {
