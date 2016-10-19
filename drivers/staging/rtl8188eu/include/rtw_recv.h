@@ -266,6 +266,7 @@ static inline u8 *recvframe_pull(struct recv_frame *precvframe, uint sz)
 
 	if (precvframe == NULL)
 		return NULL;
+	skb_pull(precvframe->pkt, sz);
 	precvframe->rx_data += sz;
 	if (precvframe->rx_data > precvframe->rx_tail) {
 		precvframe->rx_data -= sz;
