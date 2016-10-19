@@ -193,26 +193,6 @@ int snd_soc_component_test_bits(struct snd_soc_component *component,
 }
 EXPORT_SYMBOL_GPL(snd_soc_component_test_bits);
 
-unsigned int snd_soc_read(struct snd_soc_codec *codec, unsigned int reg)
-{
-	unsigned int val;
-	int ret;
-
-	ret = snd_soc_component_read(&codec->component, reg, &val);
-	if (ret < 0)
-		return -1;
-
-	return val;
-}
-EXPORT_SYMBOL_GPL(snd_soc_read);
-
-int snd_soc_write(struct snd_soc_codec *codec, unsigned int reg,
-	unsigned int val)
-{
-	return snd_soc_component_write(&codec->component, reg, val);
-}
-EXPORT_SYMBOL_GPL(snd_soc_write);
-
 /**
  * snd_soc_update_bits - update codec register bits
  * @codec: audio codec

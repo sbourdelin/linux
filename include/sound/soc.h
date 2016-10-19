@@ -1425,11 +1425,6 @@ static inline struct snd_soc_codec *snd_soc_dapm_kcontrol_codec(
 	return snd_soc_dapm_to_codec(snd_soc_dapm_kcontrol_dapm(kcontrol));
 }
 
-/* codec IO */
-unsigned int snd_soc_read(struct snd_soc_codec *codec, unsigned int reg);
-int snd_soc_write(struct snd_soc_codec *codec, unsigned int reg,
-	unsigned int val);
-
 /**
  * snd_soc_cache_sync() - Sync the register cache with the hardware
  * @codec: CODEC to sync
