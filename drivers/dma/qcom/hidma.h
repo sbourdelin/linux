@@ -128,6 +128,9 @@ struct hidma_dev {
 	struct dentry			*debugfs;
 	struct dentry			*stats;
 
+	/* sysfs entry for the channel id */
+	struct device_attribute		*chid_attrs;
+
 	/* Task delivering issue_pending */
 	struct tasklet_struct		task;
 };

@@ -567,8 +567,13 @@ static ssize_t hidma_show_values(struct device *dev,
 	return strlen(buf);
 }
 
-static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
-				    int mode)
+static inline void  hidma_sysfs_uninit(struct hidma_dev *dev)
+{
+	device_remove_file(dev->ddev.dev, dev->chid_attrs);
+}
+
+static struct device_attribute*
+hidma_create_sysfs_entry(struct hidma_dev *dev, char *name, int mode)
 {
 	struct device_attribute *attrs;
 	char *name_copy;
@@ -576,18 +581,27 @@ static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
 	attrs = devm_kmalloc(dev->ddev.dev, sizeof(struct device_attribute),
 			     GFP_KERNEL);
 	if (!attrs)
-		return -ENOMEM;
+		return NULL;
 
 	name_copy = devm_kstrdup(dev->ddev.dev, name, GFP_KERNEL);
 	if (!name_copy)
-		return -ENOMEM;
+		return NULL;
 
 	attrs->attr.name = name_copy;
 	attrs->attr.mode = mode;
 	attrs->show = hidma_show_values;
 	sysfs_attr_init(&attrs->attr);
 
-	return device_create_file(dev->ddev.dev, attrs);
+	return attrs;
+}
+
+static int hidma_sysfs_init(struct hidma_dev *dev)
+{
+	dev->chid_attrs = hidma_create_sysfs_entry(dev, "chid", S_IRUGO);
+	if (!dev->chid_attrs)
+		return -ENOMEM;
+
+	return device_create_file(dev->ddev.dev, dev->chid_attrs);
 }
 
 static int hidma_probe(struct platform_device *pdev)
@@ -705,7 +719,7 @@ static int hidma_probe(struct platform_device *pdev)
 	dmadev->irq = chirq;
 	tasklet_init(&dmadev->task, hidma_issue_task, (unsigned long)dmadev);
 	hidma_debug_init(dmadev);
-	hidma_create_sysfs_entry(dmadev, "chid", S_IRUGO);
+	hidma_sysfs_init(dmadev);
 	dev_info(&pdev->dev, "HI-DMA engine driver registration complete\n");
 	platform_set_drvdata(pdev, dmadev);
 	pm_runtime_mark_last_busy(dmadev->ddev.dev);
@@ -732,6 +746,7 @@ static int hidma_remove(struct platform_device *pdev)
 	dma_async_device_unregister(&dmadev->ddev);
 	devm_free_irq(dmadev->ddev.dev, dmadev->irq, dmadev->lldev);
 	tasklet_kill(&dmadev->task);
+	hidma_sysfs_uninit(dmadev);
 	hidma_debug_uninit(dmadev);
 	hidma_ll_uninit(dmadev->lldev);
 	hidma_free(dmadev);
