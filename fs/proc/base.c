@@ -1007,6 +1007,9 @@ static ssize_t auxv_read(struct file *file, char __user *buf,
 {
 	struct mm_struct *mm = file->private_data;
 	unsigned int nwords = 0;
+
+	if (IS_ERR_OR_NULL(mm))
+		return PTR_ERR(mm);
 	do {
 		nwords += 2;
 	} while (mm->saved_auxv[nwords - 2] != 0); /* AT_NULL */
