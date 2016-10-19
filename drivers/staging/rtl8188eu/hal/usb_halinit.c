@@ -411,12 +411,6 @@ static void _InitRDGSetting(struct adapter *Adapter)
 	usb_write8(Adapter, REG_RD_RESP_PKT_TH, 0x05);
 }
 
-static void _InitRxSetting(struct adapter *Adapter)
-{
-	usb_write32(Adapter, REG_MACID, 0x87654321);
-	usb_write32(Adapter, 0x0700, 0x87654321);
-}
-
 static void _InitRetryFunction(struct adapter *Adapter)
 {
 	u8 value8;
@@ -715,20 +709,15 @@ u32 rtl8188eu_hal_init(struct adapter *Adapter)
 	_InitTxBufferBoundary(Adapter, 0);
 
 	HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_DOWNLOAD_FW);
-	if (Adapter->registrypriv.mp_mode == 1) {
-		_InitRxSetting(Adapter);
-		Adapter->bFWReady = false;
-	} else {
-		status = rtl88eu_download_fw(Adapter);
+	status = rtl88eu_download_fw(Adapter);
 
-		if (status) {
-			DBG_88E("%s: Download Firmware failed!!\n", __func__);
-			Adapter->bFWReady = false;
-			return status;
-		}
-		RT_TRACE(_module_hci_hal_init_c_, _drv_info_, ("Initializeadapt8192CSdio(): Download Firmware Success!!\n"));
-		Adapter->bFWReady = true;
+	if (status) {
+		DBG_88E("%s: Download Firmware failed!!\n", __func__);
+		Adapter->bFWReady = false;
+		return status;
 	}
+	RT_TRACE(_module_hci_hal_init_c_, _drv_info_, ("Initializeadapt8192CSdio(): Download Firmware Success!!\n"));
+	Adapter->bFWReady = true;
 	rtl8188e_InitializeFirmwareVars(Adapter);
 
 	rtl88eu_phy_mac_config(Adapter);

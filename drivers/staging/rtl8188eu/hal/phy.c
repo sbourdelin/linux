@@ -981,7 +981,7 @@ static void phy_iq_calibrate(struct adapter *adapt, s32 result[][8],
 			     u8 t, bool is2t)
 {
 	struct odm_dm_struct *dm_odm = &adapt->HalData->odmpriv;
-	u32 i;
+	u32 i, retry_count = 2;
 	u8 path_a_ok, path_b_ok;
 	u32 adda_reg[IQK_ADDA_REG_NUM] = {
 					  rFPGA0_XCD_SwitchControl, rBlue_Tooth,
@@ -1003,12 +1003,6 @@ static void phy_iq_calibrate(struct adapter *adapt, s32 result[][8],
 					      rFPGA0_XCD_RFInterfaceSW, rConfig_AntA, rConfig_AntB,
 					      rFPGA0_XAB_RFInterfaceSW, rFPGA0_XA_RFInterfaceOE,
 					      rFPGA0_XB_RFInterfaceOE, rFPGA0_RFMOD};
-
-	u32 retry_count = 9;
-	if (*(dm_odm->mp_mode) == 1)
-		retry_count = 9;
-	else
-		retry_count = 2;
 
 	if (t == 0) {
 

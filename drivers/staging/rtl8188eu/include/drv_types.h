@@ -64,7 +64,6 @@ struct registry_priv {
 	u8	power_mgnt;
 	u8	ips_mode;
 	u8	smart_ps;
-	u8	mp_mode;
 	u8	software_encrypt;
 	u8	software_decrypt;
 	u8	acm_method;
