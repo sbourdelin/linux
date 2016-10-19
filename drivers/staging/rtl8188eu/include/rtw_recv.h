@@ -292,7 +292,7 @@ static inline u8 *recvframe_put(struct recv_frame *precvframe, uint sz)
 	return precvframe->rx_tail;
 }
 
-static inline u8 *recvframe_pull_tail(struct recv_frame *precvframe, int sz)
+static inline u8 *recvframe_pull_tail(struct recv_frame *precvframe, uint sz)
 {
 	/*  rmv data from rx_tail (by yitsen) */
 
