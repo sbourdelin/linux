@@ -659,8 +659,7 @@ int vb2_queue_init(struct vb2_queue *q)
 	 * queues will always initialize waiting_for_buffers to false.
 	 */
 	q->quirk_poll_must_check_waiting_for_buffers = true;
-	q->dma_dir = V4L2_TYPE_IS_OUTPUT(q->type)
-		   ? DMA_TO_DEVICE : DMA_FROM_DEVICE;
+	q->dma_dir = VB2_DMA_DIR(q);
 
 	return vb2_core_queue_init(q);
 }
