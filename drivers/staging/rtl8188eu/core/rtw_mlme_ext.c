@@ -439,7 +439,6 @@ static void issue_beacon(struct adapter *padapter, int timeout_ms)
 _issue_bcn:
 
 #if defined(CONFIG_88EU_AP_MODE)
-	pmlmepriv->update_bcn = false;
 
 	spin_unlock_bh(&pmlmepriv->bcn_update_lock);
 #endif /* if defined (CONFIG_88EU_AP_MODE) */

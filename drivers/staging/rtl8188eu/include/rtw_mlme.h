@@ -375,7 +375,6 @@ struct mlme_priv {
 	u32 wps_assoc_resp_ie_len;
 
 	spinlock_t bcn_update_lock;
-	u8		update_bcn;
 #endif /* if defined (CONFIG_88EU_AP_MODE) */
 };
 

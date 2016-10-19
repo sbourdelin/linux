@@ -43,11 +43,9 @@ void free_mlme_ap_info(struct adapter *padapter)
 {
 	struct sta_info *psta = NULL;
 	struct sta_priv *pstapriv = &padapter->stapriv;
-	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 
-	pmlmepriv->update_bcn = false;
 	pmlmeext->bstart_bss = false;
 
 	rtw_sta_flush(padapter);
@@ -1360,8 +1358,6 @@ void update_beacon(struct adapter *padapter, u8 ie_id, u8 *oui, u8 tx)
 		break;
 	}
 
-	pmlmepriv->update_bcn = true;
-
 	spin_unlock_bh(&pmlmepriv->bcn_update_lock);
 
 	if (tx)
@@ -1800,8 +1796,6 @@ void start_ap_mode(struct adapter *padapter)
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 	struct wlan_acl_pool *pacl_list = &pstapriv->acl_list;
 
-	pmlmepriv->update_bcn = false;
-
 	pmlmeext->bstart_bss = false;
 
 	pmlmepriv->num_sta_non_erp = 0;
@@ -1848,7 +1842,6 @@ void stop_ap_mode(struct adapter *padapter)
 	struct wlan_acl_pool *pacl_list = &pstapriv->acl_list;
 	struct __queue *pacl_node_q = &pacl_list->acl_node_q;
 
-	pmlmepriv->update_bcn = false;
 	pmlmeext->bstart_bss = false;
 
 	/* reset and init security priv , this can refine with rtw_reset_securitypriv */
