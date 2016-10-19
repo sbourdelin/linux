@@ -1360,26 +1360,29 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	if ((cpudata->imemctl & (IMC | ENICPLB)) != (IMC | ENICPLB))
 		icache_size = 0;
 
-	seq_printf(m, "cache size\t: %d KB(L1 icache) "
-		"%d KB(L1 dcache) %d KB(L2 cache)\n",
-		icache_size, dcache_size, 0);
-	seq_printf(m, "%s\n", cache);
-	seq_printf(m, "external memory\t: "
+	seq_printf(m,
+		   "cache size\t: %d KB(L1 icache) %d KB(L1 dcache) %d KB(L2 cache)\n"
+		   "%s\n"
+		   "external memory\t: "
 #if defined(CONFIG_BFIN_EXTMEM_ICACHEABLE)
 		   "cacheable"
 #else
 		   "uncacheable"
 #endif
-		   " in instruction cache\n");
-	seq_printf(m, "external memory\t: "
+		   " in instruction cache\n"
+		   "external memory\t: "
 #if defined(CONFIG_BFIN_EXTMEM_WRITEBACK)
-		      "cacheable (write-back)"
+		   "cacheable (write-back)"
 #elif defined(CONFIG_BFIN_EXTMEM_WRITETHROUGH)
-		      "cacheable (write-through)"
+		   "cacheable (write-through)"
 #else
-		      "uncacheable"
+		   "uncacheable"
 #endif
-		      " in data cache\n");
+		   " in data cache\n",
+		   icache_size,
+		   dcache_size,
+		   0,
+		   cache);
 
 	if (icache_size)
 		seq_printf(m, "icache setup\t: %d Sub-banks/%d Ways, %d Lines/Way\n",
@@ -1403,31 +1406,36 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		return 0;
 
 	if (L2_LENGTH) {
-		seq_printf(m, "L2 SRAM\t\t: %dKB\n", L2_LENGTH/0x400);
-		seq_printf(m, "L2 SRAM\t\t: "
+		seq_printf(m,
+			   "L2 SRAM\t\t: %dKB\n"
+			   "L2 SRAM\t\t: "
 #if defined(CONFIG_BFIN_L2_ICACHEABLE)
-			      "cacheable"
+			   "cacheable"
 #else
-			      "uncacheable"
+			   "uncacheable"
 #endif
-			      " in instruction cache\n");
-		seq_printf(m, "L2 SRAM\t\t: "
+			   " in instruction cache\n"
+			   "L2 SRAM\t\t: "
 #if defined(CONFIG_BFIN_L2_WRITEBACK)
-			      "cacheable (write-back)"
+			   "cacheable (write-back)"
 #elif defined(CONFIG_BFIN_L2_WRITETHROUGH)
-			      "cacheable (write-through)"
+			   "cacheable (write-through)"
 #else
-			      "uncacheable"
+			   "uncacheable"
 #endif
-			      " in data cache\n");
+			   " in data cache\n",
+			   L2_LENGTH / 0x400);
 	}
-	seq_printf(m, "board name\t: %s\n", bfin_board_name);
-	seq_printf(m, "board memory\t: %ld kB (0x%08lx -> 0x%08lx)\n",
-		physical_mem_end >> 10, 0ul, physical_mem_end);
-	seq_printf(m, "kernel memory\t: %d kB (0x%08lx -> 0x%08lx)\n",
-		((int)memory_end - (int)_rambase) >> 10,
-		_rambase, memory_end);
-
+	seq_printf(m,
+		   "board name\t: %s\n"
+		   "board memory\t: %ld kB (0x%08lx -> 0x%08lx)\n"
+		   "kernel memory\t: %d kB (0x%08lx -> 0x%08lx)\n",
+		   bfin_board_name,
+		   physical_mem_end >> 10,
+		   0ul,
+		   physical_mem_end,
+		   ((int)memory_end - (int)_rambase) >> 10,
+		   _rambase, memory_end);
 	return 0;
 }
 
