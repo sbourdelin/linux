@@ -253,22 +253,6 @@ u32 rtw_free_uc_swdec_pending_queue(struct adapter *adapter);
 
 void rtw_reordering_ctrl_timeout_handler(unsigned long data);
 
-static inline void recvframe_pull_tail(struct recv_frame *precvframe, uint sz)
-{
-	/*  rmv data from rx_tail (by yitsen) */
-
-	/* used for extract sz bytes from rx_end, update rx_end and return
-	 * the updated rx_end to the caller */
-	/* after pulling, rx_end must be still larger than rx_data. */
-
-	if (precvframe == NULL)
-		return;
-
-	if (precvframe->pkt->len < sz)
-		return;
-	skb_trim(precvframe->pkt, precvframe->pkt->len - sz);
-}
-
 static inline s32 translate_percentage_to_dbm(u32 sig_stren_index)
 {
 	s32	power; /*  in dBm. */

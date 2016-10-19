@@ -349,7 +349,7 @@ static int recvframe_chkmic(struct adapter *adapter,
 			RT_TRACE(_module_rtl871x_recv_c_, _drv_err_, ("recvframe_chkmic: rtw_get_stainfo==NULL!!!\n"));
 		}
 
-		recvframe_pull_tail(precvframe, 8);
+		skb_trim(precvframe->pkt, precvframe->pkt->len - 8);
 	}
 
 exit:
@@ -1277,7 +1277,8 @@ static int wlanhdr_to_ethhdr(struct recv_frame *precvframe)
 	struct rx_pkt_attrib *pattrib = &precvframe->attrib;
 
 	if (pattrib->encrypt)
-		recvframe_pull_tail(precvframe, pattrib->icv_len);
+		skb_trim(precvframe->pkt,
+			 precvframe->pkt->len - pattrib->icv_len);
 
 	psnap = (struct ieee80211_snap_hdr *)(ptr+pattrib->hdrlen + pattrib->iv_len);
 	psnap_type = ptr+pattrib->hdrlen + pattrib->iv_len+SNAP_SIZE;
@@ -1375,7 +1376,8 @@ static struct recv_frame *recvframe_defrag(struct adapter *adapter,
 		skb_pull(pnextrframe->pkt, wlanhdr_offset);
 
 		/* append  to first fragment frame's tail (if privacy frame, pull the ICV) */
-		recvframe_pull_tail(prframe, pfhdr->attrib.icv_len);
+		skb_trim(prframe->pkt,
+			 prframe->pkt->len - pfhdr->attrib.icv_len);
 
 		/* memcpy */
 		memcpy(pfhdr->pkt->tail, pnfhdr->pkt->data, pnfhdr->pkt->len);
