@@ -1267,7 +1267,7 @@ exit:
 static int wlanhdr_to_ethhdr(struct recv_frame *precvframe)
 {
 	int	rmv_len;
-	u16	eth_type, len;
+	u16 len;
 	__be16 be_tmp;
 	u8	bsnaphdr;
 	u8	*psnap_type;
@@ -1295,10 +1295,6 @@ static int wlanhdr_to_ethhdr(struct recv_frame *precvframe)
 
 	RT_TRACE(_module_rtl871x_recv_c_, _drv_info_,
 		 ("\n===pattrib->hdrlen: %x===\n\n", pattrib->hdrlen));
-
-	memcpy(&be_tmp, ptr+rmv_len, 2);
-	eth_type = ntohs(be_tmp); /* pattrib->ether_type */
-	pattrib->eth_type = eth_type;
 
 	ptr = skb_pull(precvframe->pkt, (rmv_len-sizeof(struct ethhdr) + (bsnaphdr ? 2 : 0)));
 
@@ -1745,14 +1741,32 @@ static int recv_indicatepkt_reorder(struct adapter *padapter,
 	struct __queue *ppending_recvframe_queue = &preorder_ctrl->pending_recvframe_queue;
 
 	if (!pattrib->amsdu) {
+		u16 eth_type;
+		u8 *ptr = prframe->pkt->data;
+		u8 *psnap_type;
+		int eth_type_offset;
+		struct ieee80211_snap_hdr *psnap;
+
 		/* s1. */
 		strip_iv_icv(prframe->pkt, prframe->attrib.hdrlen,
 			     prframe->attrib.iv_len,
 			     prframe->attrib.encrypt ? prframe->attrib.icv_len : 0);
 
+		psnap = (struct ieee80211_snap_hdr *)(ptr + pattrib->hdrlen);
+		psnap_type = ptr + pattrib->hdrlen + SNAP_SIZE;
+		eth_type_offset = pattrib->hdrlen;
+
+		if ((!memcmp(psnap, rtw_rfc1042_header, SNAP_SIZE) &&
+		     (!memcmp(psnap_type, SNAP_ETH_TYPE_IPX, 2) == false) &&
+		     (!memcmp(psnap_type, SNAP_ETH_TYPE_APPLETALK_AARP, 2) == false)) ||
+		     !memcmp(psnap, rtw_bridge_tunnel_header, SNAP_SIZE))
+			eth_type_offset += SNAP_SIZE;
+
+		eth_type = ntohs(*(__be16 *)(ptr + eth_type_offset));
+
 		wlanhdr_to_ethhdr(prframe);
 
-		if ((pattrib->qos != 1) || (pattrib->eth_type == 0x0806) ||
+		if ((pattrib->qos != 1) || eth_type == 0x0806 ||
 		    (pattrib->ack_policy != 0)) {
 			if ((!padapter->bDriverStopped) &&
 			    (!padapter->bSurpriseRemoved)) {

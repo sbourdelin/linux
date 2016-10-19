@@ -112,8 +112,6 @@ struct rx_pkt_attrib {
 	u8	crc_err;
 	u8	icv_err;
 
-	u16 eth_type;
-
 	u8	dst[ETH_ALEN];
 	u8	src[ETH_ALEN];
 	u8	ta[ETH_ALEN];
