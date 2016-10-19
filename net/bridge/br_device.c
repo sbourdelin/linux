@@ -184,16 +184,14 @@ static struct rtnl_link_stats64 *br_get_stats64(struct net_device *dev,
 
 static int br_change_mtu(struct net_device *dev, int new_mtu)
 {
-	struct net_bridge *br = netdev_priv(dev);
-	if (new_mtu < 68 || new_mtu > br_min_mtu(br))
-		return -EINVAL;
-
-	dev->mtu = new_mtu;
-
 #if IS_ENABLED(CONFIG_BRIDGE_NETFILTER)
+	struct net_bridge *br = netdev_priv(dev);
+
 	/* remember the MTU in the rtable for PMTU */
 	dst_metric_set(&br->fake_rtable.dst, RTAX_MTU, new_mtu);
 #endif
+
+	dev->mtu = new_mtu;
 
 	return 0;
 }
@@ -390,6 +388,7 @@ void br_dev_setup(struct net_device *dev)
 	dev->hw_features = COMMON_FEATURES | NETIF_F_HW_VLAN_CTAG_TX |
 			   NETIF_F_HW_VLAN_STAG_TX;
 	dev->vlan_features = COMMON_FEATURES;
+	dev->max_mtu = br_min_mtu(br);
 
 	br->dev = dev;
 	spin_lock_init(&br->lock);

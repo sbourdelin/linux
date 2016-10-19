@@ -777,7 +777,7 @@ static int macvlan_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct macvlan_dev *vlan = netdev_priv(dev);
 
-	if (new_mtu < 68 || vlan->lowerdev->mtu < new_mtu)
+	if (vlan->lowerdev->mtu < new_mtu)
 		return -EINVAL;
 	dev->mtu = new_mtu;
 	return 0;
@@ -1296,6 +1296,10 @@ int macvlan_common_newlink(struct net *src_net, struct net_device *dev,
 		dev->mtu = lowerdev->mtu;
 	else if (dev->mtu > lowerdev->mtu)
 		return -EINVAL;
+
+	/* MTU range: 68 - lowerdev->max_mtu */
+	dev->min_mtu = ETH_MIN_MTU;
+	dev->max_mtu = lowerdev->max_mtu;
 
 	if (!tb[IFLA_ADDRESS])
 		eth_hw_addr_random(dev);
