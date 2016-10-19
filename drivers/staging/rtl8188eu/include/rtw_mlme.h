@@ -456,25 +456,6 @@ static inline void _clr_fwstate_(struct mlme_priv *pmlmepriv, int state)
 		pmlmepriv->bScanInProcess = false;
 }
 
-/*
- * No Limit on the calling context,
- * therefore set it to be the critical section...
- */
-static inline void clr_fwstate(struct mlme_priv *pmlmepriv, int state)
-{
-	spin_lock_bh(&pmlmepriv->lock);
-	if (check_fwstate(pmlmepriv, state) == true)
-		pmlmepriv->fw_state ^= state;
-	spin_unlock_bh(&pmlmepriv->lock);
-}
-
-static inline void clr_fwstate_ex(struct mlme_priv *pmlmepriv, int state)
-{
-	spin_lock_bh(&pmlmepriv->lock);
-	_clr_fwstate_(pmlmepriv, state);
-	spin_unlock_bh(&pmlmepriv->lock);
-}
-
 u16 rtw_get_capability(struct wlan_bssid_ex *bss);
 void rtw_update_scanned_network(struct adapter *adapter,
 				struct wlan_bssid_ex *target);
