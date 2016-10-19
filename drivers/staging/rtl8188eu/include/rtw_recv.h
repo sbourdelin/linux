@@ -232,7 +232,6 @@ struct recv_frame {
 	struct sk_buff	 *pkt;
 	struct adapter  *adapter;
 	struct rx_pkt_attrib attrib;
-	uint  len;
 	struct sta_info *psta;
 	/* for A-MPDU Rx reordering buffer control */
 	struct recv_reorder_ctrl *preorder_ctrl;
@@ -268,7 +267,6 @@ static inline u8 *recvframe_pull(struct recv_frame *precvframe, uint sz)
 	data = skb_pull(precvframe->pkt, sz);
 	if (!data)
 		return NULL;
-	precvframe->len -= sz;
 	return data;
 }
 
@@ -286,7 +284,6 @@ static inline u8 *recvframe_put(struct recv_frame *precvframe, uint sz)
 	tail = skb_put(precvframe->pkt, sz);
 	if (!tail)
 		return NULL;
-	precvframe->len += sz;
 	return tail;
 }
 
@@ -301,10 +298,9 @@ static inline void recvframe_pull_tail(struct recv_frame *precvframe, uint sz)
 	if (precvframe == NULL)
 		return;
 
-	if (precvframe->len < sz)
+	if (precvframe->pkt->len < sz)
 		return;
 	skb_trim(precvframe->pkt, precvframe->pkt->len - sz);
-	precvframe->len -= sz;
 }
 
 static inline s32 translate_percentage_to_dbm(u32 sig_stren_index)

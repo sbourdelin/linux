@@ -73,7 +73,6 @@ static int recvbuf2recvframe(struct adapter *adapt, struct sk_buff *pskb)
 		}
 
 		INIT_LIST_HEAD(&precvframe->list);
-		precvframe->len = 0;
 
 		update_recvframe_attrib_88e(precvframe, prxstat);
 

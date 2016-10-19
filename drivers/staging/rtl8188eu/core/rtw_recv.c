@@ -80,7 +80,6 @@ int _rtw_init_recv_priv(struct recv_priv *precvpriv, struct adapter *padapter)
 				     &(precvpriv->free_recv_queue.queue));
 
 		precvframe->pkt = NULL;
-		precvframe->len = 0;
 
 		precvframe->adapter = padapter;
 		precvframe++;
@@ -148,8 +147,6 @@ int rtw_free_recvframe(struct recv_frame *precvframe,
 	spin_lock_bh(&pfree_recv_queue->lock);
 
 	list_del_init(&(precvframe->list));
-
-	precvframe->len = 0;
 
 	list_add_tail(&(precvframe->list), get_list_head(pfree_recv_queue));
 
@@ -261,7 +258,7 @@ static int recvframe_chkmic(struct adapter *adapter,
 			}
 
 			/* icv_len included the mic code */
-			datalen = precvframe->len-prxattrib->hdrlen -
+			datalen = precvframe->pkt->len-prxattrib->hdrlen -
 				  prxattrib->iv_len-prxattrib->icv_len-8;
 			pframe = precvframe->pkt->data;
 			payload = pframe+prxattrib->hdrlen+prxattrib->iv_len;
@@ -298,8 +295,8 @@ static int recvframe_chkmic(struct adapter *adapter,
 					uint i;
 					RT_TRACE(_module_rtl871x_recv_c_, _drv_err_,
 						 ("\n ======demp packet (len=%d)======\n",
-						 precvframe->len));
-					for (i = 0; i < precvframe->len; i += 8) {
+						 precvframe->pkt->len));
+					for (i = 0; i < precvframe->pkt->len; i += 8) {
 						RT_TRACE(_module_rtl871x_recv_c_,
 							 _drv_err_,
 							 ("0x%02x:0x%02x:0x%02x:0x%02x:0x%02x:0x%02x:0x%02x:0x%02x",
@@ -315,7 +312,7 @@ static int recvframe_chkmic(struct adapter *adapter,
 					RT_TRACE(_module_rtl871x_recv_c_,
 						 _drv_err_,
 						 ("\n ====== demp packet end [len=%d]======\n",
-						 precvframe->len));
+						 precvframe->pkt->len));
 					RT_TRACE(_module_rtl871x_recv_c_,
 						 _drv_err_,
 						 ("\n hrdlen=%d,\n",
@@ -617,7 +614,7 @@ static void count_rx_stats(struct adapter *padapter,
 	struct rx_pkt_attrib	*pattrib = &prframe->attrib;
 	struct recv_priv	*precvpriv = &padapter->recvpriv;
 
-	sz = prframe->len;
+	sz = prframe->pkt->len;
 	precvpriv->rx_bytes += sz;
 
 	padapter->mlmepriv.LinkDetectInfo.NumRxOkInPeriod++;
@@ -1297,7 +1294,7 @@ static int wlanhdr_to_ethhdr(struct recv_frame *precvframe)
 	}
 
 	rmv_len = pattrib->hdrlen + pattrib->iv_len + (bsnaphdr ? SNAP_SIZE : 0);
-	len = precvframe->len - rmv_len;
+	len = precvframe->pkt->len - rmv_len;
 
 	RT_TRACE(_module_rtl871x_recv_c_, _drv_info_,
 		 ("\n===pattrib->hdrlen: %x,  pattrib->iv_len:%x===\n\n", pattrib->hdrlen,  pattrib->iv_len));
@@ -1381,9 +1378,9 @@ static struct recv_frame *recvframe_defrag(struct adapter *adapter,
 		recvframe_pull_tail(prframe, pfhdr->attrib.icv_len);
 
 		/* memcpy */
-		memcpy(pfhdr->pkt->tail, pnfhdr->pkt->data, pnfhdr->len);
+		memcpy(pfhdr->pkt->tail, pnfhdr->pkt->data, pnfhdr->pkt->len);
 
-		recvframe_put(prframe, pnfhdr->len);
+		recvframe_put(prframe, pnfhdr->pkt->len);
 
 		pfhdr->attrib.icv_len = pnfhdr->attrib.icv_len;
 		plist = plist->next;
@@ -1516,7 +1513,7 @@ static int amsdu_to_msdu(struct adapter *padapter, struct recv_frame *prframe)
 	if (prframe->attrib.iv_len > 0)
 		recvframe_pull(prframe, prframe->attrib.iv_len);
 
-	a_len = prframe->len;
+	a_len = prframe->pkt->len;
 
 	pdata = prframe->pkt->data;
 
@@ -1605,8 +1602,6 @@ static int amsdu_to_msdu(struct adapter *padapter, struct recv_frame *prframe)
 	}
 
 exit:
-
-	prframe->len = 0;
 	rtw_free_recvframe(prframe, pfree_recv_queue);/* free this recv_frame */
 
 	return _SUCCESS;

@@ -2051,7 +2051,7 @@ static u8 collect_bss_info(struct adapter *padapter,
 	u8 *p;
 	u16 val16, subtype;
 	u8 *pframe = precv_frame->pkt->data;
-	u32	packet_len = precv_frame->len;
+	u32	packet_len = precv_frame->pkt->len;
 	u8 ie_offset;
 	struct registry_priv	*pregistrypriv = &padapter->registrypriv;
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
@@ -2558,7 +2558,7 @@ static unsigned int OnProbeReq(struct adapter *padapter,
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	struct wlan_bssid_ex *cur = &(pmlmeinfo->network);
 	u8 *pframe = precv_frame->pkt->data;
-	uint len = precv_frame->len;
+	uint len = precv_frame->pkt->len;
 
 	if (check_fwstate(pmlmepriv, WIFI_STATION_STATE))
 		return _SUCCESS;
@@ -2606,7 +2606,7 @@ static unsigned int OnBeacon(struct adapter *padapter,
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	struct sta_priv	*pstapriv = &padapter->stapriv;
 	u8 *pframe = precv_frame->pkt->data;
-	uint len = precv_frame->len;
+	uint len = precv_frame->pkt->len;
 	struct wlan_bssid_ex *pbss;
 	int ret = _SUCCESS;
 	struct wlan_bssid_ex *pnetwork = &(pmlmeinfo->network);
@@ -2703,7 +2703,7 @@ static unsigned int OnAuth(struct adapter *padapter,
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	u8 *pframe = precv_frame->pkt->data;
-	uint len = precv_frame->len;
+	uint len = precv_frame->pkt->len;
 
 	if ((pmlmeinfo->state&0x03) != WIFI_FW_AP_STATE)
 		return _FAIL;
@@ -2866,7 +2866,7 @@ static unsigned int OnAuthClient(struct adapter *padapter,
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	u8 *pframe = precv_frame->pkt->data;
-	uint pkt_len = precv_frame->len;
+	uint pkt_len = precv_frame->pkt->len;
 
 	DBG_88E("%s\n", __func__);
 
@@ -2954,7 +2954,7 @@ static unsigned int OnAssocReq(struct adapter *padapter,
 	struct wlan_bssid_ex *cur = &(pmlmeinfo->network);
 	struct sta_priv *pstapriv = &padapter->stapriv;
 	u8 *pframe = precv_frame->pkt->data;
-	uint pkt_len = precv_frame->len;
+	uint pkt_len = precv_frame->pkt->len;
 
 	if ((pmlmeinfo->state&0x03) != WIFI_FW_AP_STATE)
 		return _FAIL;
@@ -3386,7 +3386,7 @@ static unsigned int OnAssocRsp(struct adapter *padapter,
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	/* struct wlan_bssid_ex *cur_network = &(pmlmeinfo->network); */
 	u8 *pframe = precv_frame->pkt->data;
-	uint pkt_len = precv_frame->len;
+	uint pkt_len = precv_frame->pkt->len;
 
 	DBG_88E("%s\n", __func__);
 
