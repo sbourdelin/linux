@@ -92,7 +92,7 @@ void rtl88eu_mon_recv_hook(struct net_device *dev, struct recv_frame *frame)
 		return;
 
 	attr = &frame->attrib;
-	data = frame->rx_data;
+	data = frame->pkt->data;
 	data_len = frame->len;
 
 	/* Broadcast and multicast frames don't have attr->{iv,icv}_len set */

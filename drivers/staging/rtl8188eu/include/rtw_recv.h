@@ -233,7 +233,6 @@ struct recv_frame {
 	struct adapter  *adapter;
 	struct rx_pkt_attrib attrib;
 	uint  len;
-	u8 *rx_data;
 	u8 *rx_tail;
 	u8 *rx_end;
 	struct sta_info *psta;
@@ -264,16 +263,15 @@ static inline u8 *recvframe_pull(struct recv_frame *precvframe, uint sz)
 	/* used for extract sz bytes from rx_data, update rx_data and return
 	 * the updated rx_data to the caller */
 
+	u8 *data;
+
 	if (precvframe == NULL)
 		return NULL;
-	skb_pull(precvframe->pkt, sz);
-	precvframe->rx_data += sz;
-	if (precvframe->rx_data > precvframe->rx_tail) {
-		precvframe->rx_data -= sz;
+	data = skb_pull(precvframe->pkt, sz);
+	if (!data)
 		return NULL;
-	}
 	precvframe->len -= sz;
-	return precvframe->rx_data;
+	return data;
 }
 
 static inline u8 *recvframe_put(struct recv_frame *precvframe, int sz)
@@ -306,7 +304,7 @@ static inline u8 *recvframe_pull_tail(struct recv_frame *precvframe, int sz)
 	if (precvframe == NULL)
 		return NULL;
 	precvframe->rx_tail -= sz;
-	if (precvframe->rx_tail < precvframe->rx_data) {
+	if (precvframe->rx_tail < precvframe->pkt->data) {
 		precvframe->rx_tail += sz;
 		return NULL;
 	}

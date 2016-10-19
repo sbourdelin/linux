@@ -204,7 +204,7 @@ void rtw_wep_decrypt(struct adapter  *padapter, u8 *precvframe)
 	struct	security_priv	*psecuritypriv = &padapter->securitypriv;
 
 
-	pframe = (unsigned char *)((struct recv_frame *)precvframe)->rx_data;
+	pframe = (unsigned char *)((struct recv_frame *)precvframe)->pkt->data;
 
 	/* start to decrypt recvframe */
 	if ((prxattrib->encrypt == _WEP40_) || (prxattrib->encrypt == _WEP104_)) {
@@ -652,7 +652,7 @@ u32 rtw_tkip_decrypt(struct adapter *padapter, u8 *precvframe)
 	u32		res = _SUCCESS;
 
 
-	pframe = (unsigned char *)((struct recv_frame *)precvframe)->rx_data;
+	pframe = (unsigned char *)((struct recv_frame *)precvframe)->pkt->data;
 
 	/* 4 start to decrypt recvframe */
 	if (prxattrib->encrypt == _TKIP_) {
@@ -1452,7 +1452,7 @@ u32	rtw_aes_decrypt(struct adapter *padapter, u8 *precvframe)
 	struct	rx_pkt_attrib	 *prxattrib = &((struct recv_frame *)precvframe)->attrib;
 	struct	security_priv	*psecuritypriv = &padapter->securitypriv;
 	u32	res = _SUCCESS;
-	pframe = (unsigned char *)((struct recv_frame *)precvframe)->rx_data;
+	pframe = (unsigned char *)((struct recv_frame *)precvframe)->pkt->data;
 	/* 4 start to encrypt each fragment */
 	if (prxattrib->encrypt == _AES_) {
 		stainfo = rtw_get_stainfo(&padapter->stapriv, &prxattrib->ta[0]);

@@ -129,7 +129,6 @@ static int recvbuf2recvframe(struct adapter *adapt, struct sk_buff *pskb)
 			skb_reserve(pkt_copy, shift_sz);/* force ip_hdr at 8-byte alignment address according to shift_sz. */
 			memcpy(pkt_copy->data, (pbuf + pattrib->drvinfo_sz + RXDESC_SIZE), skb_len);
 			precvframe->rx_tail = pkt_copy->data;
-			precvframe->rx_data = pkt_copy->data;
 		} else {
 			DBG_88E("recvbuf2recvframe: alloc_skb fail , drop frag frame\n");
 			rtw_free_recvframe(precvframe, pfree_recv_queue);
@@ -159,19 +158,19 @@ static int recvbuf2recvframe(struct adapter *adapt, struct sk_buff *pskb)
 			}
 		} else if (pattrib->pkt_rpt_type == TX_REPORT1) {
 			/* CCX-TXRPT ack for xmit mgmt frames. */
-			handle_txrpt_ccx_88e(adapt, precvframe->rx_data);
+			handle_txrpt_ccx_88e(adapt, precvframe->pkt->data);
 			rtw_free_recvframe(precvframe, pfree_recv_queue);
 		} else if (pattrib->pkt_rpt_type == TX_REPORT2) {
 			ODM_RA_TxRPT2Handle_8188E(
 						&haldata->odmpriv,
-						precvframe->rx_data,
+						precvframe->pkt->data,
 						pattrib->pkt_len,
 						pattrib->MacIDValidEntry[0],
 						pattrib->MacIDValidEntry[1]
 						);
 			rtw_free_recvframe(precvframe, pfree_recv_queue);
 		} else if (pattrib->pkt_rpt_type == HIS_REPORT) {
-			interrupt_handler_8188eu(adapt, pattrib->pkt_len, precvframe->rx_data);
+			interrupt_handler_8188eu(adapt, pattrib->pkt_len, precvframe->pkt->data);
 			rtw_free_recvframe(precvframe, pfree_recv_queue);
 		}
 		pkt_cnt--;
