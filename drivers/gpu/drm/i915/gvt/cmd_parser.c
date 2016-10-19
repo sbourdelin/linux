@@ -1640,8 +1640,8 @@ static int perform_bb_shadow(struct parser_exec_state *s)
 
 	entry_obj->obj = i915_gem_object_create(&(s->vgpu->gvt->dev_priv->drm),
 		round_up(bb_size, PAGE_SIZE));
-	if (entry_obj->obj == NULL)
-		return -ENOMEM;
+	if (IS_ERR(entry_obj->obj))
+		return PTR_ERR(entry_obj->obj);
 	entry_obj->len = bb_size;
 	INIT_LIST_HEAD(&entry_obj->list);
 
@@ -2712,8 +2712,8 @@ static int shadow_indirect_ctx(struct intel_shadow_wa_ctx *wa_ctx)
 
 	wa_ctx->indirect_ctx.obj = i915_gem_object_create(dev,
 			round_up(ctx_size + CACHELINE_BYTES, PAGE_SIZE));
-	if (wa_ctx->indirect_ctx.obj == NULL)
-		return -ENOMEM;
+	if (IS_ERR(wa_ctx->indirect_ctx.obj))
+		return PTR_ERR(wa_ctx->indirect_ctx.obj);
 
 	ret = i915_gem_object_get_pages(wa_ctx->indirect_ctx.obj);
 	if (ret)
