@@ -263,9 +263,12 @@ ssize_t dax_do_io(struct kiocb *iocb, struct inode *inode,
 	ssize_t retval = -EINVAL;
 	loff_t pos = iocb->ki_pos;
 	loff_t end = pos + iov_iter_count(iter);
+	struct gendisk *disk;
+	unsigned long start = 0;
 
 	memset(&bh, 0, sizeof(bh));
 	bh.b_bdev = inode->i_sb->s_bdev;
+	disk = bh.b_bdev->bd_disk;
 
 	if ((flags & DIO_LOCKING) && iov_iter_rw(iter) == READ)
 		inode_lock(inode);
@@ -274,7 +277,19 @@ ssize_t dax_do_io(struct kiocb *iocb, struct inode *inode,
 	if (!(flags & DIO_SKIP_DIO_COUNT))
 		inode_dio_begin(inode);
 
+	if (blk_queue_io_stat(disk->queue)) {
+		int sec = iov_iter_count(iter) >> 9;
+
+		start = jiffies;
+		generic_start_io_acct(iov_iter_rw(iter),
+				      (!sec) ? 1 : sec, &disk->part0);
+	}
+
 	retval = dax_io(inode, iter, pos, end, get_block, &bh);
+
+	if (start)
+		generic_end_io_acct(iov_iter_rw(iter),
+				    &disk->part0, start);
 
 	if ((flags & DIO_LOCKING) && iov_iter_rw(iter) == READ)
 		inode_unlock(inode);
