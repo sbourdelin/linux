@@ -433,19 +433,30 @@ void cpu_enable_cache_maint_trap(void *__unused)
 	config_sctlr_el1(SCTLR_EL1_UCI, 0);
 }
 
+/*
+ * Technically the access_ok() check should be done on a cache line size
+ * granularity, but it's tedious the get the right one (dcache vs. icache,
+ * per-core vs. system wide). Since permission checks are based on pages
+ * anyway, just use PAGE_SIZE instead.
+ */
 #define __user_cache_maint(insn, address, res)			\
-	asm volatile (						\
-		"1:	" insn ", %1\n"				\
-		"	mov	%w0, #0\n"			\
-		"2:\n"						\
-		"	.pushsection .fixup,\"ax\"\n"		\
-		"	.align	2\n"				\
-		"3:	mov	%w0, %w2\n"			\
-		"	b	2b\n"				\
-		"	.popsection\n"				\
-		_ASM_EXTABLE(1b, 3b)				\
-		: "=r" (res)					\
-		: "r" (address), "i" (-EFAULT) )
+	if (!access_ok(VERIFY_READ,				\
+		       untagged_addr(address & PAGE_MASK),	\
+	               PAGE_SIZE)) 				\
+		res = -EFAULT;					\
+	else							\
+		asm volatile (					\
+			"1:	" insn ", %1\n"			\
+			"	mov	%w0, #0\n"		\
+			"2:\n"					\
+			"	.pushsection .fixup,\"ax\"\n"	\
+			"	.align	2\n"			\
+			"3:	mov	%w0, %w2\n"		\
+			"	b	2b\n"			\
+			"	.popsection\n"			\
+			_ASM_EXTABLE(1b, 3b)			\
+			: "=r" (res)				\
+			: "r" (address), "i" (-EFAULT) )
 
 static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
 {
