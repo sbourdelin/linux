@@ -1276,12 +1276,8 @@ static int wlanhdr_to_ethhdr(struct recv_frame *precvframe)
 	u8 *ptr = precvframe->pkt->data;
 	struct rx_pkt_attrib *pattrib = &precvframe->attrib;
 
-	if (pattrib->encrypt)
-		skb_trim(precvframe->pkt,
-			 precvframe->pkt->len - pattrib->icv_len);
-
-	psnap = (struct ieee80211_snap_hdr *)(ptr+pattrib->hdrlen + pattrib->iv_len);
-	psnap_type = ptr+pattrib->hdrlen + pattrib->iv_len+SNAP_SIZE;
+	psnap = (struct ieee80211_snap_hdr *)(ptr+pattrib->hdrlen);
+	psnap_type = ptr+pattrib->hdrlen + SNAP_SIZE;
 	/* convert hdr + possible LLC headers into Ethernet header */
 	if ((!memcmp(psnap, rtw_rfc1042_header, SNAP_SIZE) &&
 	     (!memcmp(psnap_type, SNAP_ETH_TYPE_IPX, 2) == false) &&
@@ -1294,11 +1290,11 @@ static int wlanhdr_to_ethhdr(struct recv_frame *precvframe)
 		bsnaphdr = false;
 	}
 
-	rmv_len = pattrib->hdrlen + pattrib->iv_len + (bsnaphdr ? SNAP_SIZE : 0);
+	rmv_len = pattrib->hdrlen + (bsnaphdr ? SNAP_SIZE : 0);
 	len = precvframe->pkt->len - rmv_len;
 
 	RT_TRACE(_module_rtl871x_recv_c_, _drv_info_,
-		 ("\n===pattrib->hdrlen: %x,  pattrib->iv_len:%x===\n\n", pattrib->hdrlen,  pattrib->iv_len));
+		 ("\n===pattrib->hdrlen: %x===\n\n", pattrib->hdrlen));
 
 	memcpy(&be_tmp, ptr+rmv_len, 2);
 	eth_type = ntohs(be_tmp); /* pattrib->ether_type */
@@ -1733,6 +1729,13 @@ static int recv_indicatepkts_in_order(struct adapter *padapter, struct recv_reor
 	return bPktInBuf;
 }
 
+void strip_iv_icv(struct sk_buff *skb, uint header_len,
+		  uint iv_len, uint icv_len) {
+	memmove(skb->data + iv_len, skb->data, header_len);
+	skb_pull(skb, iv_len);
+	skb_trim(skb, skb->len - icv_len);
+}
+
 static int recv_indicatepkt_reorder(struct adapter *padapter,
 				    struct recv_frame *prframe)
 {
@@ -1743,6 +1746,10 @@ static int recv_indicatepkt_reorder(struct adapter *padapter,
 
 	if (!pattrib->amsdu) {
 		/* s1. */
+		strip_iv_icv(prframe->pkt, prframe->attrib.hdrlen,
+			     prframe->attrib.iv_len,
+			     prframe->attrib.encrypt ? prframe->attrib.icv_len : 0);
+
 		wlanhdr_to_ethhdr(prframe);
 
 		if ((pattrib->qos != 1) || (pattrib->eth_type == 0x0806) ||
@@ -1861,6 +1868,10 @@ static int process_recv_indicatepkts(struct adapter *padapter,
 			}
 		}
 	} else { /* B/G mode */
+		strip_iv_icv(prframe->pkt, prframe->attrib.hdrlen,
+			     prframe->attrib.iv_len,
+			     prframe->attrib.encrypt ? prframe->attrib.icv_len : 0);
+
 		retval = wlanhdr_to_ethhdr(prframe);
 		if (retval != _SUCCESS) {
 			RT_TRACE(_module_rtl871x_recv_c_, _drv_err_, ("wlanhdr_to_ethhdr: drop pkt\n"));

@@ -270,5 +270,6 @@ struct sta_info;
 void _rtw_init_sta_recv_priv(struct sta_recv_priv *psta_recvpriv);
 
 void  mgt_dispatcher(struct adapter *padapter, struct recv_frame *precv_frame);
-
+void strip_iv_icv(struct sk_buff *skb, uint header_len,
+		  uint iv_len, uint icv_len);
 #endif

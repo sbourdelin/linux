@@ -40,9 +40,7 @@ static void unprotect_frame(struct sk_buff *skb, int iv_len, int icv_len)
 
 	hdr->frame_control &= ~cpu_to_le16(IEEE80211_FCTL_PROTECTED);
 
-	memmove(skb->data + iv_len, skb->data, hdr_len);
-	skb_pull(skb, iv_len);
-	skb_trim(skb, skb->len - icv_len);
+	strip_iv_icv(skb, hdr_len, iv_len, icv_len);
 }
 
 static void mon_recv_decrypted(struct net_device *dev, const u8 *data,
