@@ -144,6 +144,8 @@ void intel_vgpu_write_fence(struct intel_vgpu *vgpu,
 	struct drm_i915_fence_reg *reg;
 	i915_reg_t fence_reg_lo, fence_reg_hi;
 
+	assert_rpm_wakelock_held(dev_priv);
+
 	if (WARN_ON(fence > vgpu_fence_sz(vgpu)))
 		return;
 
@@ -172,6 +174,8 @@ static void free_vgpu_fence(struct intel_vgpu *vgpu)
 	if (WARN_ON(!vgpu_fence_sz(vgpu)))
 		return;
 
+	intel_runtime_pm_get(dev_priv);
+
 	mutex_lock(&dev_priv->drm.struct_mutex);
 	for (i = 0; i < vgpu_fence_sz(vgpu); i++) {
 		reg = vgpu->fence.regs[i];
@@ -180,6 +184,8 @@ static void free_vgpu_fence(struct intel_vgpu *vgpu)
 			      &dev_priv->mm.fence_list);
 	}
 	mutex_unlock(&dev_priv->drm.struct_mutex);
+
+	intel_runtime_pm_put(dev_priv);
 }
 
 static int alloc_vgpu_fence(struct intel_vgpu *vgpu)
@@ -189,6 +195,8 @@ static int alloc_vgpu_fence(struct intel_vgpu *vgpu)
 	struct drm_i915_fence_reg *reg;
 	int i;
 	struct list_head *pos, *q;
+
+	intel_runtime_pm_get(dev_priv);
 
 	/* Request fences from host */
 	mutex_lock(&dev_priv->drm.struct_mutex);
@@ -207,6 +215,7 @@ static int alloc_vgpu_fence(struct intel_vgpu *vgpu)
 		goto out_free_fence;
 
 	mutex_unlock(&dev_priv->drm.struct_mutex);
+	intel_runtime_pm_put(dev_priv);
 	return 0;
 out_free_fence:
 	/* Return fences to host, if fail */
@@ -218,6 +227,7 @@ out_free_fence:
 			      &dev_priv->mm.fence_list);
 	}
 	mutex_unlock(&dev_priv->drm.struct_mutex);
+	intel_runtime_pm_put(dev_priv);
 	return -ENOSPC;
 }
 
