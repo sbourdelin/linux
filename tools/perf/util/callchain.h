@@ -129,6 +129,8 @@ struct callchain_cursor_node {
 	u64				ip;
 	struct map			*map;
 	struct symbol			*sym;
+	bool				branch;
+	struct branch_flags		branch_flags;
 	struct callchain_cursor_node	*next;
 };
 
@@ -183,7 +185,8 @@ static inline void callchain_cursor_reset(struct callchain_cursor *cursor)
 }
 
 int callchain_cursor_append(struct callchain_cursor *cursor, u64 ip,
-			    struct map *map, struct symbol *sym);
+			    struct map *map, struct symbol *sym,
+			    bool branch, struct branch_flags *flags);
 
 /* Close a cursor writing session. Initialize for the reader */
 static inline void callchain_cursor_commit(struct callchain_cursor *cursor)
