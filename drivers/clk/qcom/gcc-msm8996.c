@@ -1389,6 +1389,7 @@ static struct clk_branch gcc_usb3_phy_aux_clk = {
 
 static struct clk_branch gcc_usb3_phy_pipe_clk = {
 	.halt_check = BRANCH_HALT_DELAY,
+	.udelay = 50,
 	.clkr = {
 		.enable_reg = 0x50004,
 		.enable_mask = BIT(0),
@@ -2443,6 +2444,7 @@ static struct clk_branch gcc_pcie_0_aux_clk = {
 
 static struct clk_branch gcc_pcie_0_pipe_clk = {
 	.halt_check = BRANCH_HALT_DELAY,
+	.udelay = 500,
 	.clkr = {
 		.enable_reg = 0x6b018,
 		.enable_mask = BIT(0),
@@ -2518,6 +2520,7 @@ static struct clk_branch gcc_pcie_1_aux_clk = {
 
 static struct clk_branch gcc_pcie_1_pipe_clk = {
 	.halt_check = BRANCH_HALT_DELAY,
+	.udelay = 500,
 	.clkr = {
 		.enable_reg = 0x6d018,
 		.enable_mask = BIT(0),
@@ -2593,6 +2596,7 @@ static struct clk_branch gcc_pcie_2_aux_clk = {
 
 static struct clk_branch gcc_pcie_2_pipe_clk = {
 	.halt_check = BRANCH_HALT_DELAY,
+	.udelay = 500,
 	.clkr = {
 		.enable_reg = 0x6e018,
 		.enable_mask = BIT(0),
@@ -2722,6 +2726,7 @@ static struct clk_branch gcc_ufs_rx_cfg_clk = {
 
 static struct clk_branch gcc_ufs_tx_symbol_0_clk = {
 	.halt_check = BRANCH_HALT_DELAY,
+	.udelay = 500,
 	.clkr = {
 		.enable_reg = 0x75018,
 		.enable_mask = BIT(0),
@@ -2737,6 +2742,7 @@ static struct clk_branch gcc_ufs_tx_symbol_0_clk = {
 
 static struct clk_branch gcc_ufs_rx_symbol_0_clk = {
 	.halt_check = BRANCH_HALT_DELAY,
+	.udelay = 500,
 	.clkr = {
 		.enable_reg = 0x7501c,
 		.enable_mask = BIT(0),
@@ -2752,6 +2758,7 @@ static struct clk_branch gcc_ufs_rx_symbol_0_clk = {
 
 static struct clk_branch gcc_ufs_rx_symbol_1_clk = {
 	.halt_check = BRANCH_HALT_DELAY,
+	.udelay = 500,
 	.clkr = {
 		.enable_reg = 0x75020,
 		.enable_mask = BIT(0),
@@ -2809,6 +2816,7 @@ static struct clk_branch gcc_ufs_ice_core_clk = {
 
 static struct clk_branch gcc_ufs_sys_clk_core_clk = {
 	.halt_check = BRANCH_HALT_DELAY,
+	.udelay = 500,
 	.clkr = {
 		.enable_reg = 0x76030,
 		.enable_mask = BIT(0),
@@ -2821,6 +2829,7 @@ static struct clk_branch gcc_ufs_sys_clk_core_clk = {
 
 static struct clk_branch gcc_ufs_tx_symbol_clk_core_clk = {
 	.halt_check = BRANCH_HALT_DELAY,
+	.udelay = 500,
 	.clkr = {
 		.enable_reg = 0x76034,
 		.enable_mask = BIT(0),
