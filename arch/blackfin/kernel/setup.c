@@ -1397,8 +1397,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 #ifdef __ARCH_SYNC_CORE_ICACHE
 	seq_printf(m, "icache flushes\t: %lu\n", icache_invld_count[cpu_num]);
 #endif
-
-	seq_printf(m, "\n");
+	seq_putc(m, '\n');
 
 	if (cpu_num != num_possible_cpus() - 1)
 		return 0;
