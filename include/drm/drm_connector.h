@@ -687,6 +687,11 @@ struct drm_connector {
 	 * in case of link train failure during current modeset
 	 */
 	bool link_train_retry;
+
+	/* Work struct to schedule a uevent on link train failure for
+	 * DisplayPort.
+	 */
+	struct work_struct i915_modeset_retry_work;
 };
 
 #define obj_to_connector(x) container_of(x, struct drm_connector, base)
