@@ -23,6 +23,7 @@ fi
 
 reset_tracer
 do_reset
+enable_tracing
 
 echo 'sched:sched_switch' > set_event
 

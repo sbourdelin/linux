@@ -10,6 +10,7 @@ echo _do_fork > set_ftrace_filter
 echo 0 > events/enable
 echo > kprobe_events
 echo 'p:testprobe _do_fork' > kprobe_events
+enable_tracing
 
 # kprobe on / ftrace off
 echo 1 > events/kprobes/testprobe/enable

@@ -36,6 +36,7 @@ fail() { # mesg
 
 echo "Testing function tracer with profiler:"
 echo "enable function tracer"
+enable_tracing
 echo function > current_tracer
 echo "enable profiler"
 echo 1 > function_profile_enabled
