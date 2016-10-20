@@ -482,6 +482,34 @@ static int goodix_get_gpio_config(struct goodix_ts_data *ts)
 	return 0;
 }
 
+static void goodix_tweak_config(struct goodix_ts_data *ts)
+{
+	u8 config[GOODIX_CONFIG_MAX_LENGTH];
+	int error;
+	int raw_cfg_len;
+	u8 check_sum = 0;
+
+	raw_cfg_len = ts->cfg_len - 2;
+
+	error = goodix_i2c_read(ts->client, GOODIX_REG_CONFIG_DATA,
+				config, ts->cfg_len);
+	if (error) {
+		dev_warn(&ts->client->dev,
+			 "Error reading config (%d), avoid tweaking config\n",
+			 error);
+		return;
+	}
+
+	check_sum = goodix_calculate_checksum(ts->cfg_len, config);
+
+	config[raw_cfg_len] = check_sum;
+	config[raw_cfg_len + 1] = 1;
+
+	error = goodix_send_cfg(ts, ts->cfg_len, config);
+	if (error)
+		dev_warn(&ts->client->dev,
+			 "Error writing config (%d)\n", error);
+}
 /**
  * goodix_read_config - Read the embedded configuration of the panel
  *
