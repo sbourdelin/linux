@@ -306,6 +306,7 @@ static int gpio_keys_polled_probe(struct platform_device *pdev)
 
 		if (button->wakeup) {
 			dev_err(dev, DRV_NAME " does not support wakeup\n");
+			fwnode_handle_put(child);
 			return -EINVAL;
 		}
 
