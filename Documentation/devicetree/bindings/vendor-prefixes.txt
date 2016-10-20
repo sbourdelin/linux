@@ -208,7 +208,7 @@ parade	Parade Technologies Inc.
 pericom	Pericom Technology Inc.
 phytec	PHYTEC Messtechnik GmbH
 picochip	Picochip Ltd
-pixcir  PIXCIR MICROELECTRONICS Co., Ltd
+pine64	Pine64
 plathome	Plat'Home Co., Ltd.
 plda	PLDA
 powervr	PowerVR (deprecated, use img)
