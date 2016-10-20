@@ -500,6 +500,10 @@ static void goodix_tweak_config(struct goodix_ts_data *ts)
 		return;
 	}
 
+	/* Setting X and Y Resolution */
+	put_unaligned_le16(ts->abs_x_max, &config[RESOLUTION_LOC]);
+	put_unaligned_le16(ts->abs_y_max, &config[RESOLUTION_LOC + 2]);
+
 	check_sum = goodix_calculate_checksum(ts->cfg_len, config);
 
 	config[raw_cfg_len] = check_sum;
@@ -673,6 +677,8 @@ static int goodix_request_input_dev(struct goodix_ts_data *ts)
 static int goodix_configure_dev(struct goodix_ts_data *ts)
 {
 	int error;
+	bool alter_config = false;
+	u32 max_x, max_y;
 
 	ts->swapped_x_y = device_property_read_bool(&ts->client->dev,
 						    "touchscreen-swapped-x-y");
@@ -680,8 +686,26 @@ static int goodix_configure_dev(struct goodix_ts_data *ts)
 						   "touchscreen-inverted-x");
 	ts->inverted_y = device_property_read_bool(&ts->client->dev,
 						   "touchscreen-inverted-y");
-
 	goodix_read_config(ts);
+
+	if (device_property_present(&ts->client->dev, "touchscreen-size-x") &&
+	    device_property_present(&ts->client->dev, "touchscreen-size-y")) {
+
+		device_property_read_u32(&ts->client->dev, "touchscreen-size-x",
+				&max_x);
+
+		device_property_read_u32(&ts->client->dev, "touchscreen-size-y",
+				&max_y);
+
+		if (max_x > 0 && max_y > 0) {
+			ts->abs_x_max = max_x;
+			ts->abs_y_max = max_y;
+			alter_config = true;
+		}
+	}
+
+	if (alter_config)
+		goodix_tweak_config(ts);
 
 	error = goodix_request_input_dev(ts);
 	if (error)

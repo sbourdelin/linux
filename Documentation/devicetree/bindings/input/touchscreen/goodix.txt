@@ -19,6 +19,8 @@ Optional properties:
 			  interrupt gpio pin as output to reset the device.
  - reset-gpios		: GPIO pin used for reset
 
+ - touchscreen-size-x      : horizontal resolution of touchscreen (in pixels)
+ - touchscreen-size-y      : vertical resolution of touchscreen (in pixels)
  - touchscreen-inverted-x  : X axis is inverted (boolean)
  - touchscreen-inverted-y  : Y axis is inverted (boolean)
  - touchscreen-swapped-x-y : X and Y axis are swapped (boolean)
