@@ -902,8 +902,7 @@ static void __init setup_linux_memory(void)
 #else
 		max_mapnr = physpages = low_top_pfn;
 #endif
-	}
-	else {
+	} else {
 		low_top_pfn = physpages;
 	}
 
@@ -934,8 +933,7 @@ static void __init setup_linux_memory(void)
 					BOOTMEM_DEFAULT);
 			initrd_start = INITRD_START + PAGE_OFFSET;
 			initrd_end = initrd_start + INITRD_SIZE;
-		}
-		else {
+		} else {
 			printk(KERN_ERR
 			       "initrd extends beyond end of memory (0x%08lx > 0x%08lx)\n"
 			       "disabling initrd\n",
