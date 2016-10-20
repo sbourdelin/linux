@@ -25,6 +25,7 @@
 #include <linux/ptp_clock_kernel.h>
 #include <linux/net_tstamp.h>
 #include <linux/timecounter.h>
+#include <linux/mutex.h>
 
 /* compilation time flags */
 
@@ -1698,7 +1699,7 @@ struct bnx2x {
 	int			stats_state;
 
 	/* used for synchronization of concurrent threads statistics handling */
-	struct semaphore	stats_lock;
+	struct mutex		stats_lock;
 
 	/* used by dmae command loader */
 	struct dmae_command	stats_dmae;

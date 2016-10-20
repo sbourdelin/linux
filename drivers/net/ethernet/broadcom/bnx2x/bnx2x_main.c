@@ -12339,7 +12339,7 @@ static int bnx2x_init_bp(struct bnx2x *bp)
 	mutex_init(&bp->port.phy_mutex);
 	mutex_init(&bp->fw_mb_mutex);
 	mutex_init(&bp->drv_info_mutex);
-	sema_init(&bp->stats_lock, 1);
+	mutex_init(&bp->stats_lock);
 	bp->drv_info_mng_owner = false;
 	INIT_LIST_HEAD(&bp->vlan_reg);
 
@@ -14208,9 +14208,9 @@ static int bnx2x_eeh_nic_unload(struct bnx2x *bp)
 	cancel_delayed_work_sync(&bp->sp_task);
 	cancel_delayed_work_sync(&bp->period_task);
 
-	if (!down_timeout(&bp->stats_lock, HZ / 10)) {
+	if (mutex_trylock(&bp->stats_lock)) {
 		bp->stats_state = STATS_STATE_DISABLED;
-		up(&bp->stats_lock);
+		mutex_unlock(&bp->stats_lock);
 	}
 
 	bnx2x_save_statistics(bp);
