@@ -347,6 +347,7 @@ static int __init thunder_uncore_init(void)
 		return ret;
 
 	thunder_uncore_l2c_tad_setup();
+	thunder_uncore_l2c_cbc_setup();
 	return 0;
 }
 late_initcall(thunder_uncore_init);

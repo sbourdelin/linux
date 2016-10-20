@@ -70,3 +70,4 @@ ssize_t thunder_events_sysfs_show(struct device *dev,
 				  struct device_attribute *attr,
 				  char *page);
 int thunder_uncore_l2c_tad_setup(void);
+int thunder_uncore_l2c_cbc_setup(void);
