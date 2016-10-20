@@ -1828,7 +1828,9 @@ hwp_cpu_matched:
 	if (rc)
 		goto out;
 
-	intel_pstate_debug_expose_params();
+	if (pstate_funcs.get_target_pstate != get_target_pstate_use_cpu_load)
+		intel_pstate_debug_expose_params();
+
 	intel_pstate_sysfs_expose_params();
 
 	if (hwp_active)
