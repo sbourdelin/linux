@@ -19,6 +19,30 @@
 
 struct extio_ops *arm64_extio_ops;
 
+/**
+ * indirect_io_ison - check whether indirectIO can work well. This function only call
+ *		before the target I/O address was obtained.
+ *
+ * Returns 1 when indirectIO can work.
+ */
+int indirect_io_ison()
+{
+	return arm64_extio_ops ? 1 : 0;
+}
+
+/**
+ * check_indirect_io - check whether the input taddr is for indirectIO.
+ * @taddr: the io address to be checked.
+ *
+ * Returns 1 when taddr is in the range; otherwise return 0.
+ */
+int chk_indirect_range(u64 taddr)
+{
+	if (arm64_extio_ops->start > taddr || arm64_extio_ops->end < taddr)
+		return 0;
+
+	return 1;
+}
 
 BUILD_EXTIO(b, u8)
 

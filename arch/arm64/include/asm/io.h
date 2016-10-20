@@ -175,6 +175,13 @@ DECLARE_EXTIO(w, u16)
 #define outsl outsl
 
 DECLARE_EXTIO(l, u32)
+
+
+#define indirect_io_ison indirect_io_ison
+extern int indirect_io_ison(void);
+
+#define chk_indirect_range chk_indirect_range
+extern int chk_indirect_range(u64 taddr);
 #endif
 
 
