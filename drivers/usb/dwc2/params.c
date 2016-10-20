@@ -389,6 +389,18 @@ static void dwc2_set_param(struct dwc2_hsotg *hsotg,
 }
 
 /**
+ * dwc2_set_param_u8() - Set a u8 parameter
+ *
+ * See dwc2_set_param().
+ */
+static void dwc2_set_param_u8(struct dwc2_hsotg *hsotg,
+			      u8 *param, char *name, u8 value,
+			      u8 def, u8 min, u8 max)
+{
+	dwc2_set_param(hsotg, param, name, value, def, min, max, 1);
+}
+
+/**
  * dwc2_set_param_u16() - Set a u16 parameter
  *
  * See dwc2_set_param().
@@ -471,73 +483,6 @@ static void dwc2_set_param_otg_cap(struct dwc2_hsotg *hsotg, int val)
 	}
 
 	hsotg->params.otg_cap = val;
-}
-
-static void dwc2_set_param_host_dma(struct dwc2_hsotg *hsotg, int val)
-{
-	int valid = 1;
-
-	if (val > 0 && hsotg->hw_params.arch == GHWCFG2_SLAVE_ONLY_ARCH)
-		valid = 0;
-	if (val < 0)
-		valid = 0;
-
-	if (!valid) {
-		if (val >= 0)
-			dev_err(hsotg->dev,
-				"%d invalid for host_dma parameter. Check HW configuration.\n",
-				val);
-		val = hsotg->hw_params.arch != GHWCFG2_SLAVE_ONLY_ARCH;
-		dev_dbg(hsotg->dev, "Setting host_dma to %d\n", val);
-	}
-
-	hsotg->params.host_dma = val;
-}
-
-static void dwc2_set_param_host_dma_desc(struct dwc2_hsotg *hsotg, int val)
-{
-	int valid = 1;
-
-	if (val > 0 && (hsotg->params.host_dma <= 0 ||
-			!hsotg->hw_params.dma_desc_enable))
-		valid = 0;
-	if (val < 0)
-		valid = 0;
-
-	if (!valid) {
-		if (val >= 0)
-			dev_err(hsotg->dev,
-				"%d invalid for host_dma_desc parameter. Check HW configuration.\n",
-				val);
-		val = (hsotg->params.host_dma > 0 &&
-			hsotg->hw_params.dma_desc_enable);
-		dev_dbg(hsotg->dev, "Setting host_dma_desc to %d\n", val);
-	}
-
-	hsotg->params.host_dma_desc = val;
-}
-
-static void dwc2_set_param_host_dma_desc_fs(struct dwc2_hsotg *hsotg, int val)
-{
-	int valid = 1;
-
-	if (val > 0 && (hsotg->params.host_dma <= 0 ||
-			!hsotg->hw_params.dma_desc_enable))
-		valid = 0;
-	if (val < 0)
-		valid = 0;
-
-	if (!valid) {
-		if (val >= 0)
-			dev_err(hsotg->dev,
-				"%d invalid for host_dma_desc_fs parameter. Check HW configuration.\n",
-				val);
-		val = (hsotg->params.host_dma > 0 &&
-			hsotg->hw_params.dma_desc_enable);
-	}
-
-	hsotg->params.host_dma_desc_fs = val;
-	dev_dbg(hsotg->dev, "Setting host_dma_desc_fs to %d\n", val);
 }
 
 static void
@@ -1115,9 +1060,27 @@ static void dwc2_set_parameters(struct dwc2_hsotg *hsotg,
 	dev_dbg(hsotg->dev, "%s()\n", __func__);
 
 	dwc2_set_param_otg_cap(hsotg, params->otg_cap);
-	dwc2_set_param_host_dma(hsotg, params->host_dma);
-	dwc2_set_param_host_dma_desc(hsotg, params->host_dma_desc);
-	dwc2_set_param_host_dma_desc_fs(hsotg, params->host_dma_desc_fs);
+
+	if ((hsotg->dr_mode == USB_DR_MODE_HOST) ||
+	    (hsotg->dr_mode == USB_DR_MODE_OTG)) {
+		bool slave_only = (hw->arch == GHWCFG2_SLAVE_ONLY_ARCH);
+
+		dev_dbg(hsotg->dev, "Setting HOST parameters\n");
+
+		dwc2_set_param_u8(hsotg, &p->host_dma,
+				  "host-dma", params->host_dma,
+				  slave_only ? 0 : 1,
+				  0, slave_only ? 0 : 1);
+
+		dwc2_set_param_u8(hsotg, &p->host_dma_desc,
+				  "host-dma-desc", params->host_dma_desc,
+				  0, 0, hw->dma_desc_enable ? 0 : 1);
+
+		dwc2_set_param_u8(hsotg, &p->host_dma_desc_fs,
+				  "host-dma-desc-fs", params->host_dma_desc_fs,
+				  0, 0, hw->dma_desc_enable ? 0 : 1);
+	}
+
 	dwc2_set_param_host_support_fs_ls_low_power(hsotg,
 			params->host_support_fs_ls_low_power);
 	dwc2_set_param_enable_dynamic_fifo(hsotg,

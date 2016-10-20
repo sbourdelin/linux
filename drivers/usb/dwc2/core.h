@@ -451,9 +451,6 @@ struct dwc2_core_params {
 #define DWC2_CAP_PARAM_NO_HNP_SRP_CAPABLE	2
 
 	int otg_ver;
-	int host_dma;
-	int host_dma_desc;
-	int host_dma_desc_fs;
 	int speed;
 #define DWC2_SPEED_PARAM_HIGH	0
 #define DWC2_SPEED_PARAM_FULL	1
@@ -491,10 +488,17 @@ struct dwc2_core_params {
 	int external_id_pin_ctl;
 	int hibernation;
 
+	/* Host parameters */
+	u8 host_dma;
+	u8 host_dma_desc;
+	u8 host_dma_desc_fs;
+
 	/*
 	 * The following parameters are *only* set via device
 	 * properties and cannot be set directly in this structure.
 	 */
+
+	/* Gadget parameters */
 	bool g_dma;
 	u16 g_rx_fifo_size;
 	u16 g_np_tx_fifo_size;
