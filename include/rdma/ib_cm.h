@@ -609,4 +609,13 @@ int ib_send_cm_sidr_rep(struct ib_cm_id *cm_id,
  */
 const char *__attribute_const__ ib_reject_msg(int reason);
 
+/**
+ * ib_consumer_reject - return true if the user rejected the connection.
+ * @reason: Value returned in the REJECT event status field.
+ */
+static inline bool ib_consumer_reject(int reason)
+{
+	return reason == IB_CM_REJ_CONSUMER_DEFINED;
+};
+
 #endif /* IB_CM_H */

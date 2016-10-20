@@ -259,4 +259,13 @@ int iw_cm_init_qp_attr(struct iw_cm_id *cm_id, struct ib_qp_attr *qp_attr,
  */
 const char *__attribute_const__ iw_reject_msg(int reason);
 
+/**
+ * iw_consumer_reject - return true if the consumer rejected the connection.
+ * @reason: Value returned in the REJECT event status field.
+ */
+static inline bool iw_consumer_reject(int reason)
+{
+	return reason == -ECONNREFUSED;
+}
+
 #endif /* IW_CM_H */

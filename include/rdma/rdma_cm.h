@@ -395,5 +395,11 @@ __be64 rdma_get_service_id(struct rdma_cm_id *id, struct sockaddr *addr);
  */
 const char *__attribute_const__ rdma_reject_msg(struct rdma_cm_id *id,
 						int reason);
+/**
+ * rdma_consumer_reject - return true if the consumer rejected the connection.
+ * @id: Communication identifier that received the REJECT event
+ * @reason: Value returned in the REJECT event status field.
+ */
+bool rdma_consumer_reject(struct rdma_cm_id *id, int reason);
 
 #endif /* RDMA_CM_H */
