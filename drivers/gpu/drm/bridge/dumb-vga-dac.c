@@ -10,6 +10,7 @@
  * the License, or (at your option) any later version.
  */
 
+#include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/of_graph.h>
 
@@ -23,6 +24,7 @@ struct dumb_vga {
 	struct drm_connector	connector;
 
 	struct i2c_adapter	*ddc;
+	struct gpio_desc	*enable_gpio;
 };
 
 static inline struct dumb_vga *
@@ -124,8 +126,26 @@ static int dumb_vga_attach(struct drm_bridge *bridge)
 	return 0;
 }
 
+static void dumb_vga_enable(struct drm_bridge *bridge)
+{
+	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
+
+	if (vga->enable_gpio)
+		gpiod_set_value_cansleep(vga->enable_gpio, 1);
+}
+
+static void dumb_vga_disable(struct drm_bridge *bridge)
+{
+	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
+
+	if (vga->enable_gpio)
+		gpiod_set_value_cansleep(vga->enable_gpio, 0);
+}
+
 static const struct drm_bridge_funcs dumb_vga_bridge_funcs = {
 	.attach		= dumb_vga_attach,
+	.enable		= dumb_vga_enable,
+	.disable	= dumb_vga_disable,
 };
 
 static struct i2c_adapter *dumb_vga_retrieve_ddc(struct device *dev)
@@ -168,6 +188,14 @@ static int dumb_vga_probe(struct platform_device *pdev)
 	if (!vga)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, vga);
+
+	vga->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+						   GPIOD_OUT_LOW);
+	if (IS_ERR(vga->enable_gpio)) {
+		ret = PTR_ERR(vga->enable_gpio);
+		dev_err(&pdev->dev, "failed to request GPIO: %d\n", ret);
+		return ret;
+	}
 
 	vga->ddc = dumb_vga_retrieve_ddc(&pdev->dev);
 	if (IS_ERR(vga->ddc)) {
