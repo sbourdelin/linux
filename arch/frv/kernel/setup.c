@@ -1053,7 +1053,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	seq_printf(m, "\n");
 
 #ifdef CONFIG_PM
-	seq_printf(m, "PM-Controls:");
+	seq_puts(m, "PM-Controls:");
 	sep = "\t";
 
 	if (clock_bits_settable & CLOCK_BIT_CMODE) {
