@@ -921,7 +921,7 @@ int f2fs_sync_inode_meta(struct f2fs_sb_info *sbi)
 		inode = igrab(&fi->vfs_inode);
 		spin_unlock(&sbi->inode_lock[DIRTY_META]);
 		if (inode) {
-			update_inode_page(inode);
+			sync_inode_metadata(inode, 0);
 			iput(inode);
 		}
 	};
