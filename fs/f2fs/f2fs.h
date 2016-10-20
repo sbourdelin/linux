@@ -1912,6 +1912,11 @@ static inline void *f2fs_kvzalloc(size_t size, gfp_t flags)
 	return ret;
 }
 
+static inline void f2fs_set_page_dirty_nobuffers(struct page *page)
+{
+	__set_page_dirty_nobuffers(page);
+}
+
 #define get_inode_mode(i) \
 	((is_inode_flag_set(i, FI_ACL_MODE)) ? \
 	 (F2FS_I(i)->i_acl_mode) : ((i)->i_mode))
@@ -2152,7 +2157,6 @@ struct page *get_new_data_page(struct inode *, struct page *, pgoff_t, bool);
 int do_write_data_page(struct f2fs_io_info *);
 int f2fs_map_blocks(struct inode *, struct f2fs_map_blocks *, int, int);
 int f2fs_fiemap(struct inode *inode, struct fiemap_extent_info *, u64, u64);
-void f2fs_set_page_dirty_nobuffers(struct page *);
 void f2fs_invalidate_page(struct page *, unsigned int, unsigned int);
 int f2fs_release_page(struct page *, gfp_t);
 #ifdef CONFIG_MIGRATION
