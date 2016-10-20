@@ -398,7 +398,7 @@ static void dwc2_port_intr(struct dwc2_hsotg *hsotg)
 			if (hsotg->params.dma_desc_fs_enable) {
 				u32 hcfg;
 
-				hsotg->params.dma_desc_enable = 0;
+				hsotg->params.host_dma_desc = 0;
 				hsotg->new_connection = false;
 				hcfg = dwc2_readl(hsotg->regs + HCFG);
 				hcfg &= ~HCFG_DESCDMA;
@@ -974,7 +974,7 @@ static void dwc2_hc_xfercomp_intr(struct dwc2_hsotg *hsotg,
 
 	pipe_type = dwc2_hcd_get_pipe_type(&urb->pipe_info);
 
-	if (hsotg->params.dma_desc_enable > 0) {
+	if (hsotg->params.host_dma_desc > 0) {
 		dwc2_hcd_complete_xfer_ddma(hsotg, chan, chnum, halt_status);
 		if (pipe_type == USB_ENDPOINT_XFER_ISOC)
 			/* Do not disable the interrupt, just clear it */
@@ -1097,7 +1097,7 @@ static void dwc2_hc_stall_intr(struct dwc2_hsotg *hsotg,
 	dev_dbg(hsotg->dev, "--Host Channel %d Interrupt: STALL Received--\n",
 		chnum);
 
-	if (hsotg->params.dma_desc_enable > 0) {
+	if (hsotg->params.host_dma_desc > 0) {
 		dwc2_hcd_complete_xfer_ddma(hsotg, chan, chnum,
 					    DWC2_HC_XFER_STALL);
 		goto handle_stall_done;
@@ -1467,7 +1467,7 @@ static void dwc2_hc_babble_intr(struct dwc2_hsotg *hsotg,
 
 	dwc2_hc_handle_tt_clear(hsotg, chan, qtd);
 
-	if (hsotg->params.dma_desc_enable > 0) {
+	if (hsotg->params.host_dma_desc > 0) {
 		dwc2_hcd_complete_xfer_ddma(hsotg, chan, chnum,
 					    DWC2_HC_XFER_BABBLE_ERR);
 		goto disable_int;
@@ -1572,7 +1572,7 @@ static void dwc2_hc_ahberr_intr(struct dwc2_hsotg *hsotg,
 	dev_err(hsotg->dev, "  Interval: %d\n", urb->interval);
 
 	/* Core halts the channel for Descriptor DMA mode */
-	if (hsotg->params.dma_desc_enable > 0) {
+	if (hsotg->params.host_dma_desc > 0) {
 		dwc2_hcd_complete_xfer_ddma(hsotg, chan, chnum,
 					    DWC2_HC_XFER_AHB_ERR);
 		goto handle_ahberr_done;
@@ -1604,7 +1604,7 @@ static void dwc2_hc_xacterr_intr(struct dwc2_hsotg *hsotg,
 
 	dwc2_hc_handle_tt_clear(hsotg, chan, qtd);
 
-	if (hsotg->params.dma_desc_enable > 0) {
+	if (hsotg->params.host_dma_desc > 0) {
 		dwc2_hcd_complete_xfer_ddma(hsotg, chan, chnum,
 					    DWC2_HC_XFER_XACT_ERR);
 		goto handle_xacterr_done;
@@ -1798,8 +1798,8 @@ static void dwc2_hc_chhltd_intr_dma(struct dwc2_hsotg *hsotg,
 
 	if (chan->halt_status == DWC2_HC_XFER_URB_DEQUEUE ||
 	    (chan->halt_status == DWC2_HC_XFER_AHB_ERR &&
-	     hsotg->params.dma_desc_enable <= 0)) {
-		if (hsotg->params.dma_desc_enable > 0)
+	     hsotg->params.host_dma_desc <= 0)) {
+		if (hsotg->params.host_dma_desc > 0)
 			dwc2_hcd_complete_xfer_ddma(hsotg, chan, chnum,
 						    chan->halt_status);
 		else
@@ -1830,7 +1830,7 @@ static void dwc2_hc_chhltd_intr_dma(struct dwc2_hsotg *hsotg,
 	} else if (chan->hcint & HCINTMSK_STALL) {
 		dwc2_hc_stall_intr(hsotg, chan, chnum, qtd);
 	} else if ((chan->hcint & HCINTMSK_XACTERR) &&
-		   hsotg->params.dma_desc_enable <= 0) {
+		   hsotg->params.host_dma_desc <= 0) {
 		if (out_nak_enh) {
 			if (chan->hcint &
 			    (HCINTMSK_NYET | HCINTMSK_NAK | HCINTMSK_ACK)) {
@@ -1850,10 +1850,10 @@ static void dwc2_hc_chhltd_intr_dma(struct dwc2_hsotg *hsotg,
 		 */
 		dwc2_hc_xacterr_intr(hsotg, chan, chnum, qtd);
 	} else if ((chan->hcint & HCINTMSK_XCS_XACT) &&
-		   hsotg->params.dma_desc_enable > 0) {
+		   hsotg->params.host_dma_desc > 0) {
 		dwc2_hc_xacterr_intr(hsotg, chan, chnum, qtd);
 	} else if ((chan->hcint & HCINTMSK_AHBERR) &&
-		   hsotg->params.dma_desc_enable > 0) {
+		   hsotg->params.host_dma_desc > 0) {
 		dwc2_hc_ahberr_intr(hsotg, chan, chnum, qtd);
 	} else if (chan->hcint & HCINTMSK_BBLERR) {
 		dwc2_hc_babble_intr(hsotg, chan, chnum, qtd);
@@ -2023,7 +2023,7 @@ static void dwc2_hc_n_intr(struct dwc2_hsotg *hsotg, int chnum)
 		 * interrupt unmasked
 		 */
 		WARN_ON(hcint != HCINTMSK_CHHLTD);
-		if (hsotg->params.dma_desc_enable > 0)
+		if (hsotg->params.host_dma_desc > 0)
 			dwc2_hcd_complete_xfer_ddma(hsotg, chan, chnum,
 						    chan->halt_status);
 		else

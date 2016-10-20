@@ -1391,7 +1391,7 @@ static int dwc2_schedule_periodic(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 
 	qh->unreserve_pending = 0;
 
-	if (hsotg->params.dma_desc_enable > 0)
+	if (hsotg->params.host_dma_desc > 0)
 		/* Don't rely on SOF and start in ready schedule */
 		list_add_tail(&qh->qh_list_entry, &hsotg->periodic_sched_ready);
 	else
@@ -1599,7 +1599,7 @@ struct dwc2_qh *dwc2_hcd_qh_create(struct dwc2_hsotg *hsotg,
 
 	dwc2_qh_init(hsotg, qh, urb, mem_flags);
 
-	if (hsotg->params.dma_desc_enable > 0 &&
+	if (hsotg->params.host_dma_desc > 0 &&
 	    dwc2_hcd_qh_init_ddma(hsotg, qh, mem_flags) < 0) {
 		dwc2_hcd_qh_free(hsotg, qh);
 		return NULL;
@@ -1711,7 +1711,7 @@ void dwc2_hcd_qh_unlink(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 	dwc2_deschedule_periodic(hsotg, qh);
 	hsotg->periodic_qh_count--;
 	if (!hsotg->periodic_qh_count &&
-	    hsotg->params.dma_desc_enable <= 0) {
+	    hsotg->params.host_dma_desc <= 0) {
 		intr_mask = dwc2_readl(hsotg->regs + GINTMSK);
 		intr_mask &= ~GINTSTS_SOF;
 		dwc2_writel(intr_mask, hsotg->regs + GINTMSK);

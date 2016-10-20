@@ -291,7 +291,7 @@ enum dwc2_ep0_state {
  *                      value for this parameter if none is specified.
  *                       0 - Slave (always available)
  *                       1 - DMA (default, if available)
- * @dma_desc_enable:    When DMA mode is enabled, specifies whether to use
+ * @host_dma_desc:      When DMA mode is enabled, specifies whether to use
  *                      address DMA mode or descriptor DMA mode for accessing
  *                      the data FIFOs. The driver will automatically detect the
  *                      value for this if none is specified.
@@ -452,7 +452,7 @@ struct dwc2_core_params {
 
 	int otg_ver;
 	int host_dma;
-	int dma_desc_enable;
+	int host_dma_desc;
 	int dma_desc_fs_enable;
 	int speed;
 #define DWC2_SPEED_PARAM_HIGH	0

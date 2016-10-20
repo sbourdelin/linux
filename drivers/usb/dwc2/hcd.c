@@ -285,18 +285,18 @@ static int dwc2_gahbcfg_init(struct dwc2_hsotg *hsotg)
 		break;
 	}
 
-	dev_dbg(hsotg->dev, "host_dma:%d dma_desc_enable:%d\n",
+	dev_dbg(hsotg->dev, "host_dma:%d host_dma_desc:%d\n",
 		hsotg->params.host_dma,
-		hsotg->params.dma_desc_enable);
+		hsotg->params.host_dma_desc);
 
 	if (hsotg->params.host_dma > 0) {
-		if (hsotg->params.dma_desc_enable > 0)
+		if (hsotg->params.host_dma_desc > 0)
 			dev_dbg(hsotg->dev, "Using Descriptor DMA mode\n");
 		else
 			dev_dbg(hsotg->dev, "Using Buffer DMA mode\n");
 	} else {
 		dev_dbg(hsotg->dev, "Using Slave mode\n");
-		hsotg->params.dma_desc_enable = 0;
+		hsotg->params.host_dma_desc = 0;
 	}
 
 	if (hsotg->params.host_dma > 0)
@@ -741,7 +741,7 @@ static void dwc2_hc_enable_dma_ints(struct dwc2_hsotg *hsotg,
 	 * For Descriptor DMA mode core halts the channel on AHB error.
 	 * Interrupt is not required.
 	 */
-	if (hsotg->params.dma_desc_enable <= 0) {
+	if (hsotg->params.host_dma_desc <= 0) {
 		if (dbg_hc(chan))
 			dev_vdbg(hsotg->dev, "desc DMA disabled\n");
 		hcintmsk |= HCINTMSK_AHBERR;
@@ -994,7 +994,7 @@ void dwc2_hc_halt(struct dwc2_hsotg *hsotg, struct dwc2_host_chan *chan,
 
 	/* No need to set the bit in DDMA for disabling the channel */
 	/* TODO check it everywhere channel is disabled */
-	if (hsotg->params.dma_desc_enable <= 0) {
+	if (hsotg->params.host_dma_desc <= 0) {
 		if (dbg_hc(chan))
 			dev_vdbg(hsotg->dev, "desc DMA disabled\n");
 		hcchar |= HCCHAR_CHENA;
@@ -2077,7 +2077,7 @@ static int dwc2_hcd_urb_dequeue(struct dwc2_hsotg *hsotg,
 	 * Free the QTD and clean up the associated QH. Leave the QH in the
 	 * schedule if it has any remaining QTDs.
 	 */
-	if (hsotg->params.dma_desc_enable <= 0) {
+	if (hsotg->params.host_dma_desc <= 0) {
 		u8 in_process = urb_qtd->in_process;
 
 		dwc2_hcd_qtd_unlink_and_free(hsotg, urb_qtd, qh);
@@ -2294,7 +2294,7 @@ static void dwc2_core_host_init(struct dwc2_hsotg *hsotg)
 		dwc2_writel(hfir, hsotg->regs + HFIR);
 	}
 
-	if (hsotg->params.dma_desc_enable > 0) {
+	if (hsotg->params.host_dma_desc > 0) {
 		u32 op_mode = hsotg->hw_params.op_mode;
 
 		if (hsotg->hw_params.snpsid < DWC2_CORE_REV_2_90a ||
@@ -2306,7 +2306,7 @@ static void dwc2_core_host_init(struct dwc2_hsotg *hsotg)
 				"Hardware does not support descriptor DMA mode -\n");
 			dev_err(hsotg->dev,
 				"falling back to buffer DMA mode.\n");
-			hsotg->params.dma_desc_enable = 0;
+			hsotg->params.host_dma_desc = 0;
 		} else {
 			hcfg = dwc2_readl(hsotg->regs + HCFG);
 			hcfg |= HCFG_DESCDMA;
@@ -2332,7 +2332,7 @@ static void dwc2_core_host_init(struct dwc2_hsotg *hsotg)
 	otgctl &= ~GOTGCTL_HSTSETHNPEN;
 	dwc2_writel(otgctl, hsotg->regs + GOTGCTL);
 
-	if (hsotg->params.dma_desc_enable <= 0) {
+	if (hsotg->params.host_dma_desc <= 0) {
 		int num_channels, i;
 		u32 hcchar;
 
@@ -2502,7 +2502,7 @@ static void dwc2_hc_init_xfer(struct dwc2_hsotg *hsotg,
 
 	case USB_ENDPOINT_XFER_ISOC:
 		chan->ep_type = USB_ENDPOINT_XFER_ISOC;
-		if (hsotg->params.dma_desc_enable > 0)
+		if (hsotg->params.host_dma_desc > 0)
 			break;
 
 		frame_desc = &urb->iso_descs[qtd->isoc_frame_index];
@@ -2715,7 +2715,7 @@ static int dwc2_assign_and_init_hc(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 		 */
 		chan->multi_count = dwc2_hb_mult(qh->maxp);
 
-	if (hsotg->params.dma_desc_enable > 0) {
+	if (hsotg->params.host_dma_desc > 0) {
 		chan->desc_list_addr = qh->desc_list_dma;
 		chan->desc_list_sz = qh->desc_list_sz;
 	}
@@ -2848,7 +2848,7 @@ static int dwc2_queue_transaction(struct dwc2_hsotg *hsotg,
 			       &hsotg->split_order);
 
 	if (hsotg->params.host_dma > 0) {
-		if (hsotg->params.dma_desc_enable > 0) {
+		if (hsotg->params.host_dma_desc > 0) {
 			if (!chan->xfer_started ||
 			    chan->ep_type == USB_ENDPOINT_XFER_ISOC) {
 				dwc2_hcd_start_xfer_ddma(hsotg, chan->qh);
@@ -3583,7 +3583,7 @@ static int dwc2_hcd_hub_control(struct dwc2_hsotg *hsotg, u16 typereq,
 				u32 hcfg;
 
 				dev_info(hsotg->dev, "Enabling descriptor DMA mode\n");
-				hsotg->params.dma_desc_enable = 1;
+				hsotg->params.host_dma_desc = 1;
 				hcfg = dwc2_readl(hsotg->regs + HCFG);
 				hcfg |= HCFG_DESCDMA;
 				dwc2_writel(hcfg, hsotg->regs + HCFG);
@@ -5004,7 +5004,7 @@ int dwc2_hcd_init(struct dwc2_hsotg *hsotg, int irq)
 		dev_warn(hsotg->dev,
 			 "dma_mask not set, disabling DMA\n");
 		hsotg->params.host_dma = 0;
-		hsotg->params.dma_desc_enable = 0;
+		hsotg->params.host_dma_desc = 0;
 	}
 
 	/* Set device flags indicating whether the HCD supports DMA */
@@ -5107,7 +5107,7 @@ int dwc2_hcd_init(struct dwc2_hsotg *hsotg, int irq)
 	 * DMA mode.
 	 * Alignment must be set to 512 bytes.
 	 */
-	if (hsotg->params.dma_desc_enable ||
+	if (hsotg->params.host_dma_desc ||
 	    hsotg->params.dma_desc_fs_enable) {
 		hsotg->desc_gen_cache = kmem_cache_create("dwc2-gen-desc",
 				sizeof(struct dwc2_hcd_dma_desc) *
@@ -5121,7 +5121,7 @@ int dwc2_hcd_init(struct dwc2_hsotg *hsotg, int irq)
 			 * Disable descriptor dma mode since it will not be
 			 * usable.
 			 */
-			hsotg->params.dma_desc_enable = 0;
+			hsotg->params.host_dma_desc = 0;
 			hsotg->params.dma_desc_fs_enable = 0;
 		}
 
@@ -5138,7 +5138,7 @@ int dwc2_hcd_init(struct dwc2_hsotg *hsotg, int irq)
 			 * Disable descriptor dma mode since it will not be
 			 * usable.
 			 */
-			hsotg->params.dma_desc_enable = 0;
+			hsotg->params.host_dma_desc = 0;
 			hsotg->params.dma_desc_fs_enable = 0;
 		}
 	}
