@@ -474,8 +474,12 @@ static void __init determine_cpu(void)
 		pdm_suspend_mode = HSR0_PDM_PLL_STOP;
 
 		switch (PSR_VERSION(psr)) {
-		case PSR_VERSION_FR501_MB93501:  cpu_silicon = "mb93501";   break;
-		case PSR_VERSION_FR501_MB93501A: cpu_silicon = "mb93501/A"; break;
+		case PSR_VERSION_FR501_MB93501:
+			cpu_silicon = "mb93501";
+			break;
+		case PSR_VERSION_FR501_MB93501A:
+			cpu_silicon = "mb93501/A";
+			break;
 		default:
 			break;
 		}
