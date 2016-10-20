@@ -416,6 +416,7 @@ extern struct kmem_cache *amd_iommu_irq_cache;
 #define APERTURE_PAGE_INDEX(a)	(((a) >> 21) & 0x3fULL)
 
 
+
 /*
  * This struct is used to pass information about
  * incoming PPR faults around.
@@ -433,6 +434,8 @@ struct amd_iommu_fault {
 struct iommu_domain;
 struct irq_domain;
 struct amd_irte_ops;
+
+#define AMD_IOMMU_FLAG_TRANS_PRE_ENABLED      (1 << 0)
 
 /*
  * This structure contains generic data for  IOMMU protection domains
@@ -566,6 +569,7 @@ struct amd_iommu {
 	struct amd_irte_ops *irte_ops;
 #endif
 
+	u32 flags;
 	volatile u64 __aligned(8) cmd_sem;
 };
 
