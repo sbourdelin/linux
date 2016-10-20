@@ -18,6 +18,7 @@
 #include <asm/uaccess.h>
 #include "ext4_jbd2.h"
 #include "ext4.h"
+#include "resize.h"
 
 /**
  * Swap memory between @a and @b for @len bytes.

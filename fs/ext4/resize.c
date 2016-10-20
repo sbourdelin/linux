@@ -5,7 +5,6 @@
  *
  * Copyright (C) 2001, 2002 Andreas Dilger <adilger@clusterfs.com>
  *
- * This could probably be made into a module, because it is not often in use.
  */
 
 
@@ -15,6 +14,7 @@
 #include <linux/slab.h>
 
 #include "ext4_jbd2.h"
+#include "resize.h"
 
 int ext4_resize_begin(struct super_block *sb)
 {
