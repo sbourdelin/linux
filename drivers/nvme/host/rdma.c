@@ -1207,17 +1207,21 @@ out_destroy_queue_ib:
 static int nvme_rdma_conn_rejected(struct nvme_rdma_queue *queue,
 		struct rdma_cm_event *ev)
 {
-	if (ev->param.conn.private_data_len) {
+	struct rdma_cm_id *cm_id = queue->cm_id;
+	int rdma_status = ev->status;
+	short nvme_status = -1;
+
+	if (rdma_consumer_reject(cm_id, rdma_status) &&
+	    ev->param.conn.private_data_len) {
 		struct nvme_rdma_cm_rej *rej =
 			(struct nvme_rdma_cm_rej *)ev->param.conn.private_data;
 
-		dev_err(queue->ctrl->ctrl.device,
-			"Connect rejected, status %d.", le16_to_cpu(rej->sts));
-		/* XXX: Think of something clever to do here... */
-	} else {
-		dev_err(queue->ctrl->ctrl.device,
-			"Connect rejected, no private data.\n");
+		nvme_status = le16_to_cpu(rej->sts);
 	}
+
+	dev_err(queue->ctrl->ctrl.device, "Connect rejected: status %d (%s) "
+		"nvme status %d.\n", rdma_status,
+		rdma_reject_msg(cm_id, rdma_status), nvme_status);
 
 	return -ECONNRESET;
 }
