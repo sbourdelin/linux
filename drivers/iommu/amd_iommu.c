@@ -120,28 +120,6 @@ int amd_iommu_max_glx_val = -1;
 static struct dma_map_ops amd_iommu_dma_ops;
 
 /*
- * This struct contains device specific data for the IOMMU
- */
-struct iommu_dev_data {
-	struct list_head list;		  /* For domain->dev_list */
-	struct list_head dev_data_list;	  /* For global dev_data_list */
-	struct protection_domain *domain; /* Domain the device is bound to */
-	u16 devid;			  /* PCI Device ID */
-	u16 alias;			  /* Alias Device ID */
-	bool iommu_v2;			  /* Device can make use of IOMMUv2 */
-	bool passthrough;		  /* Device is identity mapped */
-	struct {
-		bool enabled;
-		int qdep;
-	} ats;				  /* ATS state */
-	bool pri_tlp;			  /* PASID TLB required for
-					     PPR completions */
-	u32 errata;			  /* Bitmap for errata to apply */
-	bool use_vapic;			  /* Enable device to use vapic mode */
-	bool domain_updated;
-};
-
-/*
  * general struct to manage commands send to an IOMMU
  */
 struct iommu_cmd {
@@ -350,10 +328,11 @@ static struct iommu_dev_data *find_dev_data(u16 devid)
 	return dev_data;
 }
 
-static struct iommu_dev_data *get_dev_data(struct device *dev)
+struct iommu_dev_data *get_dev_data(struct device *dev)
 {
 	return dev->archdata.iommu;
 }
+EXPORT_SYMBOL(get_dev_data);
 
 /*
 * Find or create an IOMMU group for a acpihid device.
@@ -2383,6 +2362,12 @@ static int dir2prot(enum dma_data_direction direction)
 	else
 		return 0;
 }
+
+static void clear_dte_flag_gv(u16 devid)
+{
+	amd_iommu_dev_table[devid].data[0] &= (~DTE_FLAG_GV);
+}
+
 /*
  * This function contains common code for mapping of a physically
  * contiguous memory region into DMA address space. It is used by all
@@ -2417,8 +2402,13 @@ static dma_addr_t __map_single(struct device *dev,
 	if (translation_pre_enabled(iommu) && !dev_data->domain_updated) {
 		dev_data->domain_updated = true;
 		set_dte_entry(dev_data->devid, domain, dev_data->ats.enabled);
-		if (alias != dev_data->devid)
+		if (!(domain->flags & PD_IOMMUV2_MASK))
+			clear_dte_flag_gv(dev_data->devid);
+		if (alias != dev_data->devid) {
 			set_dte_entry(alias, domain, dev_data->ats.enabled);
+			if (!(domain->flags & PD_IOMMUV2_MASK))
+				clear_dte_flag_gv(alias);
+		}
 		device_flush_dte(dev_data);
 	}
 
@@ -2593,8 +2583,13 @@ static int map_sg(struct device *dev, struct scatterlist *sglist,
 	if (translation_pre_enabled(iommu) && !dev_data->domain_updated) {
 		dev_data->domain_updated = true;
 		set_dte_entry(dev_data->devid, domain, dev_data->ats.enabled);
-		if (alias != dev_data->devid)
+		if (!(domain->flags & PD_IOMMUV2_MASK))
+			clear_dte_flag_gv(dev_data->devid);
+		if (alias != dev_data->devid) {
 			set_dte_entry(alias, domain, dev_data->ats.enabled);
+			if (!(domain->flags & PD_IOMMUV2_MASK))
+				clear_dte_flag_gv(alias);
+		}
 		device_flush_dte(dev_data);
 	}
 
