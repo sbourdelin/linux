@@ -313,7 +313,8 @@ u8 r8712_init_drv_sw(struct _adapter *padapter)
 		return _FAIL;
 	if (r8712_init_mlme_priv(padapter) == _FAIL)
 		return _FAIL;
-	_r8712_init_xmit_priv(&padapter->xmitpriv, padapter);
+	if ((_r8712_init_xmit_priv(&padapter->xmitpriv, padapter)) != _SUCCESS)
+		return _FAIL;
 	_r8712_init_recv_priv(&padapter->recvpriv, padapter);
 	memset((unsigned char *)&padapter->securitypriv, 0,
 	       sizeof(struct security_priv));
