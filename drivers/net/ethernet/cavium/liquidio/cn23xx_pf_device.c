@@ -1173,6 +1173,9 @@ static int cn23xx_sriov_config(struct octeon_device *oct)
 		oct->sriov_info.trs, oct->sriov_info.max_vfs,
 		oct->sriov_info.rings_per_vf, oct->sriov_info.pf_srn,
 		oct->sriov_info.num_pf_rings);
+
+	oct->sriov_info.sriov_enabled = 0;
+
 	return 0;
 }
 
