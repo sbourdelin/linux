@@ -1,0 +1,18 @@
+Qualcomm SoC Information (socinfo) Driver binding
+
+This binding describes the Qualcomm SoC Information Driver, which provides
+information such as chip id, chip family, serial number and other such
+details about Qualcomm SoCs.
+
+- compatible:
+	Usage: required
+	Value type: <stringlist>
+	Definition: must be "qcom,socinfo"
+
+= EXAMPLE
+
+The following example represents a socinfo node.
+
+	socinfo {
+		compatible = "qcom,socinfo";
+	};
