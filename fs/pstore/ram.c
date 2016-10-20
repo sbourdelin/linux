@@ -181,6 +181,53 @@ static bool prz_ok(struct persistent_ram_zone *prz)
 			   persistent_ram_ecc_string(prz, NULL, 0));
 }
 
+static void ftrace_old_log_combine(struct persistent_ram_zone *dest,
+				   struct persistent_ram_zone *src)
+{
+	int dest_size, src_size, total, destoff, srcoff, i = 0, j = 0, k = 0;
+	void *mbuf;
+	struct pstore_ftrace_record *drec, *srec, *mrec;
+	int record_size = sizeof(struct pstore_ftrace_record);
+
+	destoff = dest->old_log_size % record_size;
+	dest_size = dest->old_log_size - destoff;
+
+	srcoff = src->old_log_size % record_size;
+	src_size = src->old_log_size - srcoff;
+
+	total = dest_size + src_size;
+	mbuf = kmalloc(total, GFP_KERNEL);
+
+	drec = (struct pstore_ftrace_record *)(dest->old_log + destoff);
+	srec = (struct pstore_ftrace_record *)(src->old_log + srcoff);
+	mrec = (struct pstore_ftrace_record *)(mbuf);
+
+	while (dest_size > 0 && src_size > 0) {
+		if (pstore_ftrace_read_timestamp(&drec[i]) <
+		    pstore_ftrace_read_timestamp(&srec[j])) {
+			mrec[k++] = drec[i++];
+			dest_size -= record_size;
+		} else {
+			mrec[k++] = srec[j++];
+			src_size -= record_size;
+		}
+	}
+
+	while (dest_size > 0) {
+		mrec[k++] = drec[i++];
+		dest_size -= record_size;
+	}
+
+	while (src_size > 0) {
+		mrec[k++] = srec[j++];
+		src_size -= record_size;
+	}
+
+	kfree(dest->old_log);
+	dest->old_log = mbuf;
+	dest->old_log_size = total;
+}
+
 static ssize_t ramoops_pstore_read(u64 *id, enum pstore_type_id *type,
 				   int *count, struct timespec *time,
 				   char **buf, bool *compressed,
@@ -190,7 +237,7 @@ static ssize_t ramoops_pstore_read(u64 *id, enum pstore_type_id *type,
 	ssize_t size;
 	struct ramoops_context *cxt = psi->data;
 	struct persistent_ram_zone *prz = NULL;
-	int header_length = 0;
+	int header_length = 0, free_prz = 0;
 
 	/* Ramoops headers provide time stamps for PSTORE_TYPE_DMESG, but
 	 * PSTORE_TYPE_CONSOLE and PSTORE_TYPE_FTRACE don't currently have
@@ -221,13 +268,39 @@ static ssize_t ramoops_pstore_read(u64 *id, enum pstore_type_id *type,
 		prz = ramoops_get_next_prz(&cxt->cprz, &cxt->console_read_cnt,
 					   1, id, type, PSTORE_TYPE_CONSOLE, 0);
 	if (!prz_ok(prz)) {
-		int max = (cxt->flags & FTRACE_PER_CPU) ? nr_cpu_ids : 1;
-		while (cxt->ftrace_read_cnt < max && !prz) {
+		if (!(cxt->flags & FTRACE_PER_CPU)) {
 			prz = ramoops_get_next_prz(cxt->fprzs,
-					&cxt->ftrace_read_cnt, max, id, type,
+					&cxt->ftrace_read_cnt, 1, id, type,
 					PSTORE_TYPE_FTRACE, 0);
-			if (!prz_ok(prz))
-				continue;
+		} else {
+			/*
+			 * Build a new dummy zone which combines all the
+			 * per-cpu zones and accumulate the zone data and ecc
+			 * info.
+			 */
+			int max;
+			struct persistent_ram_zone *tmp_prz, *prz_next;
+
+			tmp_prz = kzalloc(sizeof(struct persistent_ram_zone),
+					  GFP_KERNEL);
+			max = nr_cpu_ids;
+			while (cxt->ftrace_read_cnt < max) {
+				prz_next = ramoops_get_next_prz(cxt->fprzs,
+						&cxt->ftrace_read_cnt, max, id,
+						type, PSTORE_TYPE_FTRACE, 0);
+
+				if (!prz_ok(prz_next))
+					continue;
+
+				tmp_prz->ecc_info = prz_next->ecc_info;
+				tmp_prz->corrected_bytes +=
+						prz_next->corrected_bytes;
+				tmp_prz->bad_blocks += prz_next->bad_blocks;
+				ftrace_old_log_combine(tmp_prz, prz_next);
+			}
+			*id = 0;
+			prz = tmp_prz;
+			free_prz = 1;
 		}
 	}
 
@@ -247,6 +320,12 @@ static ssize_t ramoops_pstore_read(u64 *id, enum pstore_type_id *type,
 		return -ENOMEM;
 
 	memcpy(*buf, (char *)persistent_ram_old(prz) + header_length, size);
+
+	if (free_prz) {
+		kfree(prz->old_log);
+		kfree(prz);
+	}
+
 	persistent_ram_ecc_string(prz, *buf + size, *ecc_notice_size + 1);
 
 	return size;
