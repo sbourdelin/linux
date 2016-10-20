@@ -1905,10 +1905,13 @@ void wb_workfn(struct work_struct *work)
 {
 	struct bdi_writeback *wb = container_of(to_delayed_work(work),
 						struct bdi_writeback, dwork);
+	struct backing_dev_info *bdi = container_of(to_delayed_work(work),
+						struct backing_dev_info, wb.dwork);
 	long pages_written;
 
 	set_worker_desc("flush-%s", dev_name(wb->bdi->dev));
-	current->flags |= PF_SWAPWRITE;
+	current->flags |= (PF_SWAPWRITE | PF_LESS_THROTTLE);
+	current->bdi = bdi;
 
 	if (likely(!current_is_workqueue_rescuer() ||
 		   !test_bit(WB_registered, &wb->state))) {
@@ -1938,7 +1941,8 @@ void wb_workfn(struct work_struct *work)
 	else if (wb_has_dirty_io(wb) && dirty_writeback_interval)
 		wb_wakeup_delayed(wb);
 
-	current->flags &= ~PF_SWAPWRITE;
+	current->bdi = NULL;
+	current->flags &= ~(PF_SWAPWRITE | PF_LESS_THROTTLE);
 }
 
 /*

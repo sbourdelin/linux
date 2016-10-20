@@ -528,8 +528,11 @@ enum pgdat_flags {
 					 * many dirty file pages at the tail
 					 * of the LRU.
 					 */
-	PGDAT_WRITEBACK,		/* reclaim scanning has recently found
-					 * many pages under writeback
+	PGDAT_ANON_WRITEBACK,		/* reclaim scanning has recently found
+					 * many anonymous pages under writeback
+					 */
+	PGDAT_FILE_WRITEBACK,		/* reclaim scanning has recently found
+					 * many file pages under writeback
 					 */
 	PGDAT_RECLAIM_LOCKED,		/* prevents concurrent reclaim */
 };

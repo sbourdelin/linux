@@ -917,6 +917,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 	unsigned long nr_reclaimed = 0;
 	unsigned long nr_writeback = 0;
 	unsigned long nr_immediate = 0;
+	int file;
 
 	cond_resched();
 
@@ -953,6 +954,8 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 
 		may_enter_fs = (sc->gfp_mask & __GFP_FS) ||
 			(PageSwapCache(page) && (sc->gfp_mask & __GFP_IO));
+
+		file = page_is_file_cache(page)
 
 		/*
 		 * The number of dirty pages determines if a zone is marked
@@ -1016,7 +1019,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			/* Case 1 above */
 			if (current_is_kswapd() &&
 			    PageReclaim(page) &&
-			    test_bit(PGDAT_WRITEBACK, &pgdat->flags)) {
+			    test_bit(PGDAT_ANON_WRITEBACK + file, &pgdat->flags)) {
 				nr_immediate++;
 				goto keep_locked;
 
@@ -1643,13 +1646,14 @@ putback_inactive_pages(struct lruvec *lruvec, struct list_head *page_list)
  * If a kernel thread (such as nfsd for loop-back mounts) services
  * a backing device by writing to the page cache it sets PF_LESS_THROTTLE.
  * In that case we should only throttle if the backing device it is
- * writing to is congested.  In other cases it is safe to throttle.
+ * writing to is congested. The bdi flusher should be throttled only depends
+ * on own bdi and is decoupled with others. In other cases it is safe to throttle.
  */
-static int current_may_throttle(void)
+static int current_may_throttle(int file)
 {
 	return !(current->flags & PF_LESS_THROTTLE) ||
-		current->backing_dev_info == NULL ||
-		bdi_write_congested(current->backing_dev_info);
+		(file && (current->backing_dev_info == NULL ||
+		bdi_write_congested(current->backing_dev_info)));
 }
 
 static bool inactive_reclaimable_pages(struct lruvec *lruvec,
@@ -1774,7 +1778,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	 * are encountered in the nr_immediate check below.
 	 */
 	if (nr_writeback && nr_writeback == nr_taken)
-		set_bit(PGDAT_WRITEBACK, &pgdat->flags);
+		set_bit(PGDAT_ANON_WRITEBACK + file, &pgdat->flags);
 
 	/*
 	 * Legacy memcg will stall in page writeback so avoid forcibly
@@ -1803,7 +1807,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 		 * that pages are cycling through the LRU faster than
 		 * they are written so also forcibly stall.
 		 */
-		if (nr_immediate && current_may_throttle())
+		if (nr_immediate && current_may_throttle(file))
 			congestion_wait(BLK_RW_ASYNC, HZ/10);
 	}
 
@@ -1813,7 +1817,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	 * unqueued dirty pages or cycling through the LRU too quickly.
 	 */
 	if (!sc->hibernation_mode && !current_is_kswapd() &&
-	    current_may_throttle())
+	    current_may_throttle(file))
 		wait_iff_congested(pgdat, BLK_RW_ASYNC, HZ/10);
 
 	trace_mm_vmscan_lru_shrink_inactive(pgdat->node_id,
