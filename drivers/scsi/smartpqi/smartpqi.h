@@ -19,6 +19,8 @@
 #if !defined(_SMARTPQI_H)
 #define _SMARTPQI_H
 
+#include <linux/mutex.h>
+
 #pragma pack(1)
 
 #define PQI_DEVICE_SIGNATURE	"PQI DREG"
@@ -961,7 +963,7 @@ struct pqi_ctrl_info {
 	unsigned int	num_heartbeats_requested;
 	struct timer_list heartbeat_timer;
 
-	struct semaphore sync_request_sem;
+	struct mutex sync_request_mutex;
 	struct semaphore lun_reset_sem;
 };
 

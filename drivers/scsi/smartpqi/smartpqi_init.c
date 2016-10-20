@@ -3444,29 +3444,11 @@ static int pqi_submit_raid_request_synchronous(struct pqi_ctrl_info *ctrl_info,
 	unsigned long msecs_blocked;
 	size_t iu_length;
 
-	/*
-	 * Note that specifying PQI_SYNC_FLAGS_INTERRUPTABLE and a timeout value
-	 * are mutually exclusive.
-	 */
-
-	if (flags & PQI_SYNC_FLAGS_INTERRUPTABLE) {
-		if (down_interruptible(&ctrl_info->sync_request_sem))
+	if (flags & PQI_SYNC_FLAGS_INTERRUPTABLE)
+		if (mutex_lock_interruptible(&ctrl_info->sync_request_mutex))
 			return -ERESTARTSYS;
-	} else {
-		if (timeout_msecs == NO_TIMEOUT) {
-			down(&ctrl_info->sync_request_sem);
-		} else {
-			start_jiffies = jiffies;
-			if (down_timeout(&ctrl_info->sync_request_sem,
-				msecs_to_jiffies(timeout_msecs)))
-				return -ETIMEDOUT;
-			msecs_blocked =
-				jiffies_to_msecs(jiffies - start_jiffies);
-			if (msecs_blocked >= timeout_msecs)
-				return -ETIMEDOUT;
-			timeout_msecs -= msecs_blocked;
-		}
-	}
+	else
+		mutex_lock(&ctrl_info->sync_request_mutex);
 
 	io_request = pqi_alloc_io_request(ctrl_info);
 
@@ -3508,7 +3490,7 @@ static int pqi_submit_raid_request_synchronous(struct pqi_ctrl_info *ctrl_info,
 
 	pqi_free_io_request(io_request);
 
-	up(&ctrl_info->sync_request_sem);
+	mutex_unlock(&ctrl_info->sync_request_mutex);
 
 	return rc;
 }
@@ -5540,8 +5522,7 @@ static struct pqi_ctrl_info *pqi_alloc_ctrl_info(int numa_node)
 	INIT_DELAYED_WORK(&ctrl_info->rescan_work, pqi_rescan_worker);
 	INIT_DELAYED_WORK(&ctrl_info->update_time_work, pqi_update_time_worker);
 
-	sema_init(&ctrl_info->sync_request_sem,
-		PQI_RESERVED_IO_SLOTS_SYNCHRONOUS_REQUESTS);
+	mutex_init(&ctrl_info->sync_request_mutex);
 	sema_init(&ctrl_info->lun_reset_sem, PQI_RESERVED_IO_SLOTS_LUN_RESET);
 
 	ctrl_info->ctrl_id = atomic_inc_return(&pqi_controller_count) - 1;
