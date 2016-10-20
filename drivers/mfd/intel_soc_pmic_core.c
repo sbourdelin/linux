@@ -34,7 +34,7 @@ static struct gpiod_lookup_table panel_gpio_table = {
 	.dev_id = "0000:00:02.0",
 	.table = {
 		/* Panel EN/DISABLE */
-		GPIO_LOOKUP("gpio_crystalcove", 94, "panel", GPIO_ACTIVE_HIGH),
+		GPIO_LOOKUP("crystal_cove_gpio", 94, "panel", GPIO_ACTIVE_HIGH),
 		{ },
 	},
 };
