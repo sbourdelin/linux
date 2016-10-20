@@ -126,7 +126,8 @@ void prepare_namespace(void);
 void __init load_default_modules(void);
 int __init init_rootfs(void);
 
-#ifdef CONFIG_DEBUG_RODATA
+#if defined(CONFIG_DEBUG_RODATA) || defined(CONFIG_DEBUG_SET_MODULE_RONX)
+extern bool rodata_enabled;
 void mark_rodata_ro(void);
 #endif
 

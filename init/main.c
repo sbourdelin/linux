@@ -915,7 +915,7 @@ static int try_to_run_init_process(const char *init_filename)
 static noinline void __init kernel_init_freeable(void);
 
 #ifdef CONFIG_DEBUG_RODATA
-static bool rodata_enabled = true;
+bool rodata_enabled = true;
 static int __init set_debug_rodata(char *str)
 {
 	return strtobool(str, &rodata_enabled);
