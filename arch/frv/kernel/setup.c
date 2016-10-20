@@ -1050,7 +1050,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	if (cpu_board2)
 		seq_printf(m, ", %s", cpu_board2);
 
-	seq_printf(m, "\n");
+	seq_putc(m, '\n');
 
 #ifdef CONFIG_PM
 	seq_puts(m, "PM-Controls:");
