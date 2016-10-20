@@ -230,11 +230,16 @@ int peernet2id_alloc(struct net *net, struct net *peer)
 /* This function returns, if assigned, the id of a peer netns. */
 int peernet2id(struct net *net, struct net *peer)
 {
+	unsigned long flags;
 	int id;
 
-	spin_lock_bh(&net->nsid_lock);
+	/* This is ugly, technically we only need to disable BH, however some
+	 * callers (indirectly) call this with IRQ disabled, which implies
+	 * that we should save the IRQ context here.
+	 */
+	spin_lock_irqsave(&net->nsid_lock, flags);
 	id = __peernet2id(net, peer);
-	spin_unlock_bh(&net->nsid_lock);
+	spin_unlock_irqrestore(&net->nsid_lock, flags);
 	return id;
 }
 EXPORT_SYMBOL(peernet2id);
