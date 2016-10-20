@@ -883,6 +883,14 @@ enum link_m_n_set {
 	M2_N2
 };
 
+struct intel_dp_desc {
+	u8 oui[3];
+	u8 device_id[6];
+	u8 hw_rev;
+	u8 sw_major_rev;
+	u8 sw_minor_rev;
+} __packed;
+
 struct intel_dp {
 	i915_reg_t output_reg;
 	i915_reg_t aux_ch_ctl_reg;
@@ -1459,6 +1467,11 @@ static inline unsigned int intel_dp_unused_lane_mask(int lane_count)
 {
 	return ~((1 << lane_count) - 1) & 0xf;
 }
+
+bool
+intel_dp_read_desc(struct intel_dp *intel_dp, struct intel_dp_desc *desc);
+void
+intel_dp_print_desc(struct intel_dp *intel_dp, struct intel_dp_desc *desc);
 
 /* intel_dp_aux_backlight.c */
 int intel_dp_aux_init_backlight_funcs(struct intel_connector *intel_connector);
