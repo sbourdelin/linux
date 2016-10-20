@@ -964,7 +964,7 @@ struct pqi_ctrl_info {
 	struct timer_list heartbeat_timer;
 
 	struct mutex sync_request_mutex;
-	struct semaphore lun_reset_sem;
+	struct mutex lun_reset_mutex;
 };
 
 enum pqi_ctrl_mode {

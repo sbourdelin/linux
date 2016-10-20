@@ -4601,7 +4601,7 @@ static int pqi_lun_reset(struct pqi_ctrl_info *ctrl_info,
 	DECLARE_COMPLETION_ONSTACK(wait);
 	struct pqi_task_management_request *request;
 
-	down(&ctrl_info->lun_reset_sem);
+	mutex_lock(&ctrl_info->lun_reset_mutex);
 
 	io_request = pqi_alloc_io_request(ctrl_info);
 	io_request->io_complete_callback = pqi_lun_reset_complete;
@@ -4627,7 +4627,7 @@ static int pqi_lun_reset(struct pqi_ctrl_info *ctrl_info,
 		rc = io_request->status;
 
 	pqi_free_io_request(io_request);
-	up(&ctrl_info->lun_reset_sem);
+	mutex_unlock(&ctrl_info->lun_reset_mutex);
 
 	return rc;
 }
@@ -5523,7 +5523,7 @@ static struct pqi_ctrl_info *pqi_alloc_ctrl_info(int numa_node)
 	INIT_DELAYED_WORK(&ctrl_info->update_time_work, pqi_update_time_worker);
 
 	mutex_init(&ctrl_info->sync_request_mutex);
-	sema_init(&ctrl_info->lun_reset_sem, PQI_RESERVED_IO_SLOTS_LUN_RESET);
+	mutex_init(&ctrl_info->lun_reset_mutex);
 
 	ctrl_info->ctrl_id = atomic_inc_return(&pqi_controller_count) - 1;
 	ctrl_info->max_msix_vectors = PQI_MAX_MSIX_VECTORS;
