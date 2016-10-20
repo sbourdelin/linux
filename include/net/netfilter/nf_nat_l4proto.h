@@ -60,6 +60,9 @@ extern const struct nf_nat_l4proto nf_nat_l4proto_dccp;
 #if IS_ENABLED(CONFIG_NF_NAT_PROTO_SCTP)
 extern const struct nf_nat_l4proto nf_nat_l4proto_sctp;
 #endif
+#if IS_ENABLED(CONFIG_NF_NAT_PROTO_UDPLITE)
+extern const struct nf_nat_l4proto nf_nat_l4proto_udplite;
+#endif
 
 bool nf_nat_l4proto_in_range(const struct nf_conntrack_tuple *tuple,
 			     enum nf_nat_manip_type maniptype,
