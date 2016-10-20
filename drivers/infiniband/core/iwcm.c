@@ -59,6 +59,24 @@ MODULE_AUTHOR("Tom Tucker");
 MODULE_DESCRIPTION("iWARP CM");
 MODULE_LICENSE("Dual BSD/GPL");
 
+static const char * const iw_rej_reason_strs[] = {
+	[ECONNRESET]			= "reset by remote host",
+	[ECONNREFUSED]			= "refused by remote application",
+	[ETIMEDOUT]			= "setup timeout",
+};
+
+const char *__attribute_const__ iw_reject_msg(int reason)
+{
+	size_t index = -reason;
+
+	/* iWARP uses negative errnos */
+	index = -index;
+	return (index < ARRAY_SIZE(iw_rej_reason_strs) &&
+		iw_rej_reason_strs[index]) ?
+		iw_rej_reason_strs[index] : "unrecognized reason";
+}
+EXPORT_SYMBOL(iw_reject_msg);
+
 static struct ibnl_client_cbs iwcm_nl_cb_table[] = {
 	[RDMA_NL_IWPM_REG_PID] = {.dump = iwpm_register_pid_cb},
 	[RDMA_NL_IWPM_ADD_MAPPING] = {.dump = iwpm_add_mapping_cb},
