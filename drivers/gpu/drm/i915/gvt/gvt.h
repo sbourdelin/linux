@@ -192,8 +192,6 @@ struct intel_gvt_opregion {
 
 struct intel_gvt {
 	struct mutex lock;
-	bool initialized;
-
 	struct drm_i915_private *dev_priv;
 	struct idr vgpu_idr;	/* vGPU IDR pool */
 
@@ -212,6 +210,8 @@ struct intel_gvt {
 	wait_queue_head_t service_thread_wq;
 	unsigned long service_request;
 };
+
+#define to_gvt(dev_priv) (struct intel_gvt *)((dev_priv)->gvt)
 
 enum {
 	INTEL_GVT_REQUEST_EMULATE_VBLANK = 0,
