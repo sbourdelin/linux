@@ -43,7 +43,7 @@ static const struct dwc2_core_params params_hi6220 = {
 	.otg_ver			= 0,	/* 1.3 */
 	.host_dma			= 1,
 	.host_dma_desc			= 0,
-	.dma_desc_fs_enable		= 0,
+	.host_dma_desc_fs		= 0,
 	.speed				= 0,	/* High Speed */
 	.enable_dynamic_fifo		= 1,
 	.en_multiple_tx_fifo		= 1,
@@ -75,7 +75,7 @@ static const struct dwc2_core_params params_bcm2835 = {
 	.otg_ver			= 0,	/* 1.3 */
 	.host_dma			= 1,
 	.host_dma_desc			= 0,
-	.dma_desc_fs_enable		= 0,
+	.host_dma_desc_fs		= 0,
 	.speed				= 0,	/* High Speed */
 	.enable_dynamic_fifo		= 1,
 	.en_multiple_tx_fifo		= 1,
@@ -106,7 +106,7 @@ static const struct dwc2_core_params params_rk3066 = {
 	.otg_ver			= -1,
 	.host_dma			= -1,
 	.host_dma_desc			= 0,
-	.dma_desc_fs_enable		= 0,
+	.host_dma_desc_fs		= 0,
 	.speed				= -1,
 	.enable_dynamic_fifo		= 1,
 	.en_multiple_tx_fifo		= -1,
@@ -138,7 +138,7 @@ static const struct dwc2_core_params params_ltq = {
 	.otg_ver			= -1,
 	.host_dma			= -1,
 	.host_dma_desc			= -1,
-	.dma_desc_fs_enable		= -1,
+	.host_dma_desc_fs		= 0,
 	.speed				= -1,
 	.enable_dynamic_fifo		= -1,
 	.en_multiple_tx_fifo		= -1,
@@ -170,7 +170,7 @@ static const struct dwc2_core_params params_amlogic = {
 	.otg_ver			= -1,
 	.host_dma			= 1,
 	.host_dma_desc			= 0,
-	.dma_desc_fs_enable		= 0,
+	.host_dma_desc_fs		= 0,
 	.speed				= DWC2_SPEED_PARAM_HIGH,
 	.enable_dynamic_fifo		= 1,
 	.en_multiple_tx_fifo		= -1,
@@ -208,7 +208,7 @@ static const struct dwc2_core_params params_default = {
 	 * Disable it for FS devices as well.
 	 */
 	.host_dma_desc			= 0,
-	.dma_desc_fs_enable		= 0,
+	.host_dma_desc_fs		= 0,
 
 	.speed				= -1,
 	.enable_dynamic_fifo		= -1,
@@ -517,7 +517,7 @@ static void dwc2_set_param_host_dma_desc(struct dwc2_hsotg *hsotg, int val)
 	hsotg->params.host_dma_desc = val;
 }
 
-static void dwc2_set_param_dma_desc_fs_enable(struct dwc2_hsotg *hsotg, int val)
+static void dwc2_set_param_host_dma_desc_fs(struct dwc2_hsotg *hsotg, int val)
 {
 	int valid = 1;
 
@@ -530,14 +530,14 @@ static void dwc2_set_param_dma_desc_fs_enable(struct dwc2_hsotg *hsotg, int val)
 	if (!valid) {
 		if (val >= 0)
 			dev_err(hsotg->dev,
-				"%d invalid for dma_desc_fs_enable parameter. Check HW configuration.\n",
+				"%d invalid for host_dma_desc_fs parameter. Check HW configuration.\n",
 				val);
 		val = (hsotg->params.host_dma > 0 &&
 			hsotg->hw_params.dma_desc_enable);
 	}
 
-	hsotg->params.dma_desc_fs_enable = val;
-	dev_dbg(hsotg->dev, "Setting dma_desc_fs_enable to %d\n", val);
+	hsotg->params.host_dma_desc_fs = val;
+	dev_dbg(hsotg->dev, "Setting host_dma_desc_fs to %d\n", val);
 }
 
 static void
@@ -1117,7 +1117,7 @@ static void dwc2_set_parameters(struct dwc2_hsotg *hsotg,
 	dwc2_set_param_otg_cap(hsotg, params->otg_cap);
 	dwc2_set_param_host_dma(hsotg, params->host_dma);
 	dwc2_set_param_host_dma_desc(hsotg, params->host_dma_desc);
-	dwc2_set_param_dma_desc_fs_enable(hsotg, params->dma_desc_fs_enable);
+	dwc2_set_param_host_dma_desc_fs(hsotg, params->host_dma_desc_fs);
 	dwc2_set_param_host_support_fs_ls_low_power(hsotg,
 			params->host_support_fs_ls_low_power);
 	dwc2_set_param_enable_dynamic_fifo(hsotg,

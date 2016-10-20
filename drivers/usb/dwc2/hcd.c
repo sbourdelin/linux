@@ -3569,7 +3569,7 @@ static int dwc2_hcd_hub_control(struct dwc2_hsotg *hsotg, u16 typereq,
 			port_status |= USB_PORT_STAT_TEST;
 		/* USB_PORT_FEAT_INDICATOR unsupported always 0 */
 
-		if (hsotg->params.dma_desc_fs_enable) {
+		if (hsotg->params.host_dma_desc_fs) {
 			/*
 			 * Enable descriptor DMA only if a full speed
 			 * device is connected.
@@ -5108,7 +5108,7 @@ int dwc2_hcd_init(struct dwc2_hsotg *hsotg, int irq)
 	 * Alignment must be set to 512 bytes.
 	 */
 	if (hsotg->params.host_dma_desc ||
-	    hsotg->params.dma_desc_fs_enable) {
+	    hsotg->params.host_dma_desc_fs) {
 		hsotg->desc_gen_cache = kmem_cache_create("dwc2-gen-desc",
 				sizeof(struct dwc2_hcd_dma_desc) *
 				MAX_DMA_DESC_NUM_GENERIC, 512, SLAB_CACHE_DMA,
@@ -5122,7 +5122,7 @@ int dwc2_hcd_init(struct dwc2_hsotg *hsotg, int irq)
 			 * usable.
 			 */
 			hsotg->params.host_dma_desc = 0;
-			hsotg->params.dma_desc_fs_enable = 0;
+			hsotg->params.host_dma_desc_fs = 0;
 		}
 
 		hsotg->desc_hsisoc_cache = kmem_cache_create("dwc2-hsisoc-desc",
@@ -5139,7 +5139,7 @@ int dwc2_hcd_init(struct dwc2_hsotg *hsotg, int irq)
 			 * usable.
 			 */
 			hsotg->params.host_dma_desc = 0;
-			hsotg->params.dma_desc_fs_enable = 0;
+			hsotg->params.host_dma_desc_fs = 0;
 		}
 	}
 

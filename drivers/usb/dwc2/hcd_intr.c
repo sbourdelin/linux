@@ -395,7 +395,7 @@ static void dwc2_port_intr(struct dwc2_hsotg *hsotg)
 			dwc2_hprt0_enable(hsotg, hprt0, &hprt0_modify);
 		} else {
 			hsotg->flags.b.port_enable_change = 1;
-			if (hsotg->params.dma_desc_fs_enable) {
+			if (hsotg->params.host_dma_desc_fs) {
 				u32 hcfg;
 
 				hsotg->params.host_dma_desc = 0;
