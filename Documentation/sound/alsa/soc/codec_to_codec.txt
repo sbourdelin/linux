@@ -1,0 +1,114 @@
+Creating codec to codec dai link for ALSA dapm
+===================================================
+
+Mostly the flow of audio is always from CPU to codec so your system
+will look as below:
+
+ ----------         ---------
+|         |  dai   |         |
+    CPU    ------->    codec
+|         |        |         |
+ ---------          ---------
+
+In case your system looks as below:
+                     ---------
+                    |         |
+                      codec-2
+                    |         |
+                     ---------
+                         |
+                       dai-2
+                         |
+ ----------          ---------
+|          |  dai-1 |         |
+    CPU     ------->  codec-1
+|          |        |         |
+ ----------          ---------
+                         |
+                       dai-3
+                         |
+                     ---------
+                    |         |
+                      codec-3
+                    |         |
+                     ---------
+
+Suppose codec-2 is a bluetooth chip and codec-3 is connected to
+a speaker and you have a below scenario:
+codec-2 will receive the audio data and the user wants to play that
+audio through codec-3 without involving the CPU.This
+aforementioned case is the ideal case when codec to codec
+connection should be used.
+
+Your dai_link should appear as below in your machine
+file:
+
+static const struct snd_soc_pcm_stream dummy_params = {
+        .formats = SNDRV_PCM_FMTBIT_S24_LE,
+        .rate_min = 48000,
+        .rate_max = 48000,
+        .channels_min = 2,
+        .channels_max = 2,
+};
+
+{
+    .name = "your_name",
+    .stream_name = "your_stream_name",
+    .cpu_dai_name = "snd-soc-dummy-dai",
+    .codec_name = "codec-2,
+    .codec_dai_name = "codec-2-dai_name",
+    .dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF
+                    | SND_SOC_DAIFMT_CBM_CFM,
+    .ignore_suspend = 1,
+    .params = &dummy_params,
+},
+{
+    .name = "your_name",
+    .stream_name = "your_stream_name",
+    .cpu_dai_name = "snd-soc-dummy-dai",
+    .codec_name = "codec-3,
+    .codec_dai_name = "codec-3-dai_name",
+    .dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF
+                    | SND_SOC_DAIFMT_CBM_CFM,
+    .ignore_suspend = 1,
+    .params = &dummy_params,
+},
+
+Note the "params" callback which lets the dapm know that this
+dai_link is a codec to codec connection.
+Also, in above code cpu_dai should be replaced with your actual
+cpu dai but in case you don't have a actual cpu dai then dummy will
+do.
+
+You can browse the speyside.c for an actual example code in mainline.
+
+Note that in current device tree there is no way to mark a dai_link
+as codec to codec. However, it may change in future.
+
+In dapm core a route is created between cpu_dai playback widget
+and codec_dai capture widget for playback path and vice-versa is
+true for capture path. In order for this aforementioned route to get
+triggered, DAPM needs to find a valid endpoint which could be either
+a sink or source widget corresponding to playback and capture path
+respectively.
+
+Below is what you can use it to trigger the widgets provided you have
+stream name ending with "Playback" and "Capture" for cpu and
+codec dai's.
+
+static const struct snd_soc_dapm_widget aif_dapm_widgets[] = {
+        SND_SOC_DAPM_SPK("dummyspk", NULL),
+        SND_SOC_DAPM_MIC("dummymic", NULL),
+};
+
+static const struct snd_soc_dapm_route audio_i2s_map[] = {
+        {"dummyspk", NULL, "Playback"},
+        {"Capture", NULL, "dummymic"},
+};
+
+Above code is good for quick testing but in order to mainline it
+you are expected to create a thin codec driver for the speaker
+amp rather than doing this sort of thing, as that at least
+sets appropriate constraints for the device even if it needs
+no control. For an example of such a driver you can see:
+sound/soc/codecs/wm8727.c
