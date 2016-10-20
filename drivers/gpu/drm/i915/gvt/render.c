@@ -135,10 +135,21 @@ static void handle_tlb_pending_event(struct intel_vgpu *vgpu, int ring_id)
 
 	reg = _MMIO(regs[ring_id]);
 
+	/* WaForceWakeRenderDuringMmioTLBInvalidate:skl
+	 * we need to put a forcewake when invalidating RCS TLB caches,
+	 * otherwise device can go to RC6 state and interrupt invalidation
+	 * process */
+	if (IS_SKYLAKE(dev_priv) && ring_id == RCS)
+		intel_uncore_forcewake_get(dev_priv, FORCEWAKE_RENDER);
+
 	I915_WRITE(reg, 0x1);
 
 	if (wait_for_atomic((I915_READ(reg) == 0), 50))
 		gvt_err("timeout in invalidate ring (%d) tlb\n", ring_id);
+
+	if (IS_SKYLAKE(dev_priv) && ring_id == RCS)
+		intel_uncore_forcewake_put(dev_priv, FORCEWAKE_RENDER);
+
 
 	gvt_dbg_core("invalidate TLB for ring %d\n", ring_id);
 }
