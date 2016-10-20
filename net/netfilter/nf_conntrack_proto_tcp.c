@@ -835,6 +835,13 @@ static int tcp_packet(struct nf_conn *ct,
 	new_state = tcp_conntracks[dir][index][old_state];
 	tuple = &ct->tuplehash[dir].tuple;
 
+	/* if we are liberal in one direction, so be it in the other */
+	if (ct->proto.tcp.seen[IP_CT_DIR_ORIGINAL].flags &
+	    IP_CT_TCP_FLAG_BE_LIBERAL) {
+		ct->proto.tcp.seen[IP_CT_DIR_REPLY].flags |=
+			IP_CT_TCP_FLAG_BE_LIBERAL;
+	}
+
 	switch (new_state) {
 	case TCP_CONNTRACK_SYN_SENT:
 		if (old_state < TCP_CONNTRACK_TIME_WAIT)
