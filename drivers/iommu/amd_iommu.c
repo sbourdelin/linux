@@ -2396,6 +2396,10 @@ static dma_addr_t __map_single(struct device *dev,
 			       enum dma_data_direction direction,
 			       u64 dma_mask)
 {
+	struct iommu_dev_data *dev_data = get_dev_data(dev);
+	struct amd_iommu *iommu = amd_iommu_rlookup_table[dev_data->devid];
+	struct protection_domain *domain = get_domain(dev);
+	u16 alias = amd_iommu_alias_table[dev_data->devid];
 	dma_addr_t offset = paddr & ~PAGE_MASK;
 	dma_addr_t address, start, ret;
 	unsigned int pages;
@@ -2410,6 +2414,13 @@ static dma_addr_t __map_single(struct device *dev,
 		goto out;
 
 	prot = dir2prot(direction);
+	if (translation_pre_enabled(iommu) && !dev_data->domain_updated) {
+		dev_data->domain_updated = true;
+		set_dte_entry(dev_data->devid, domain, dev_data->ats.enabled);
+		if (alias != dev_data->devid)
+			set_dte_entry(alias, domain, dev_data->ats.enabled);
+		device_flush_dte(dev_data);
+	}
 
 	start = address;
 	for (i = 0; i < pages; ++i) {
@@ -2555,6 +2566,9 @@ static int map_sg(struct device *dev, struct scatterlist *sglist,
 		  int nelems, enum dma_data_direction direction,
 		  unsigned long attrs)
 {
+	struct iommu_dev_data *dev_data = get_dev_data(dev);
+	struct amd_iommu *iommu = amd_iommu_rlookup_table[dev_data->devid];
+	u16 alias = amd_iommu_alias_table[dev_data->devid];
 	int mapped_pages = 0, npages = 0, prot = 0, i;
 	struct protection_domain *domain;
 	struct dma_ops_domain *dma_dom;
@@ -2576,6 +2590,13 @@ static int map_sg(struct device *dev, struct scatterlist *sglist,
 		goto out_err;
 
 	prot = dir2prot(direction);
+	if (translation_pre_enabled(iommu) && !dev_data->domain_updated) {
+		dev_data->domain_updated = true;
+		set_dte_entry(dev_data->devid, domain, dev_data->ats.enabled);
+		if (alias != dev_data->devid)
+			set_dte_entry(alias, domain, dev_data->ats.enabled);
+		device_flush_dte(dev_data);
+	}
 
 	/* Map all sg entries */
 	for_each_sg(sglist, s, nelems, i) {
