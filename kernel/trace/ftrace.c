@@ -4239,6 +4239,19 @@ int ftrace_set_filter_ip(struct ftrace_ops *ops, unsigned long ip,
 }
 EXPORT_SYMBOL_GPL(ftrace_set_filter_ip);
 
+/**
+ * ftrace_ops_set_global_filter - setup ops to use global filters
+ * @ops - the ops which will use the global filters
+ *
+ * ftrace users who need global function trace filtering should call this.
+ */
+void ftrace_ops_set_global_filter(struct ftrace_ops *ops)
+{
+	ftrace_ops_init(ops);
+	ops->func_hash = &global_ops.local_hash;
+}
+EXPORT_SYMBOL_GPL(ftrace_ops_set_global_filter);
+
 static int
 ftrace_set_regex(struct ftrace_ops *ops, unsigned char *buf, int len,
 		 int reset, int enable)
