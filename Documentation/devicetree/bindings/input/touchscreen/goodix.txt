@@ -25,6 +25,8 @@ Optional properties:
  - touchscreen-inverted-y  : Y axis is inverted (boolean)
  - touchscreen-swapped-x-y : X and Y axis are swapped (boolean)
                              (swapping is done after inverting the axis)
+ - touchscreen-inter-x-y   : X and Y maximum values programmed in the device
+                             are interchanged internally in hardware. (boolean)
 
 Example:
 

@@ -39,6 +39,7 @@ struct goodix_ts_data {
 	bool swapped_x_y;
 	bool inverted_x;
 	bool inverted_y;
+	bool interchange_x_y;
 	unsigned int max_touch_num;
 	unsigned int int_trigger_type;
 	int cfg_len;
@@ -75,6 +76,9 @@ struct goodix_ts_data {
 #define RESOLUTION_LOC		1
 #define MAX_CONTACTS_LOC	5
 #define TRIGGER_LOC		6
+
+/* Register Bits */
+#define XY_COORD_INTER		3
 
 static const unsigned long goodix_irq_flags[] = {
 	IRQ_TYPE_EDGE_RISING,
@@ -504,6 +508,10 @@ static void goodix_tweak_config(struct goodix_ts_data *ts)
 	put_unaligned_le16(ts->abs_x_max, &config[RESOLUTION_LOC]);
 	put_unaligned_le16(ts->abs_y_max, &config[RESOLUTION_LOC + 2]);
 
+	if (ts->interchange_x_y)
+		config[TRIGGER_LOC] = config[TRIGGER_LOC] |
+				      (1 << XY_COORD_INTER);
+
 	check_sum = goodix_calculate_checksum(ts->cfg_len, config);
 
 	config[raw_cfg_len] = check_sum;
@@ -703,6 +711,11 @@ static int goodix_configure_dev(struct goodix_ts_data *ts)
 			alter_config = true;
 		}
 	}
+
+	ts->interchange_x_y = device_property_read_bool(&ts->client->dev,
+						    "touchscreen-inter-x-y");
+	if (ts->interchange_x_y)
+		alter_config = true;
 
 	if (alter_config)
 		goodix_tweak_config(ts);
