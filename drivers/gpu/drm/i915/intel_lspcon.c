@@ -30,7 +30,7 @@
 static enum drm_lspcon_mode lspcon_get_current_mode(struct intel_lspcon *lspcon)
 {
 	enum drm_lspcon_mode current_mode = DRM_LSPCON_MODE_INVALID;
-	struct i2c_adapter *adapter = &lspcon->aux->ddc;
+	struct i2c_adapter *adapter = &lspcon->intel_dp->aux.ddc;
 
 	if (drm_lspcon_get_mode(adapter, &current_mode))
 		DRM_ERROR("Error reading LSPCON mode\n");
@@ -45,7 +45,7 @@ static int lspcon_change_mode(struct intel_lspcon *lspcon,
 {
 	int err;
 	enum drm_lspcon_mode current_mode;
-	struct i2c_adapter *adapter = &lspcon->aux->ddc;
+	struct i2c_adapter *adapter = &lspcon->intel_dp->aux.ddc;
 
 	err = drm_lspcon_get_mode(adapter, &current_mode);
 	if (err) {
@@ -72,7 +72,7 @@ static int lspcon_change_mode(struct intel_lspcon *lspcon,
 static bool lspcon_probe(struct intel_lspcon *lspcon)
 {
 	enum drm_dp_dual_mode_type adaptor_type;
-	struct i2c_adapter *adapter = &lspcon->aux->ddc;
+	struct i2c_adapter *adapter = &lspcon->intel_dp->aux.ddc;
 
 	/* Lets probe the adaptor and check its type */
 	adaptor_type = drm_dp_dual_mode_detect(adapter);
@@ -89,8 +89,42 @@ static bool lspcon_probe(struct intel_lspcon *lspcon)
 	return true;
 }
 
+static void lspcon_resume_in_pcon_wa(struct intel_lspcon *lspcon)
+{
+	unsigned long start = jiffies;
+
+	if (!lspcon->desc_valid)
+		return;
+
+	while (1) {
+		struct intel_dp_desc desc;
+
+		/*
+		 * The w/a only applies in PCON mode and we don't expect any
+		 * AUX errors.
+		 */
+		if (!intel_dp_read_desc(lspcon->intel_dp, &desc))
+			return;
+
+		if (!memcmp(&lspcon->desc, &desc, sizeof(desc))) {
+			DRM_DEBUG_KMS("LSPCON recovering in PCON mode after %u ms\n",
+				      jiffies_to_msecs(jiffies - start));
+			return;
+		}
+
+		if (time_after(jiffies, start + msecs_to_jiffies(1000)))
+			break;
+
+		msleep(10);
+	}
+
+	DRM_DEBUG_KMS("LSPCON DP descriptor mismatch after resume\n");
+}
+
 void lspcon_resume(struct intel_lspcon *lspcon)
 {
+	lspcon_resume_in_pcon_wa(lspcon);
+
 	if (lspcon_change_mode(lspcon, DRM_LSPCON_MODE_PCON, true))
 		DRM_ERROR("LSPCON resume failed\n");
 	else
@@ -111,7 +145,7 @@ bool lspcon_init(struct intel_digital_port *intel_dig_port)
 
 	lspcon->active = false;
 	lspcon->mode = DRM_LSPCON_MODE_INVALID;
-	lspcon->aux = &dp->aux;
+	lspcon->intel_dp = dp;
 
 	if (!lspcon_probe(lspcon)) {
 		DRM_ERROR("Failed to probe lspcon\n");
@@ -131,12 +165,10 @@ bool lspcon_init(struct intel_digital_port *intel_dig_port)
 		}
 	}
 
-	if (drm_debug & DRM_UT_KMS) {
-		struct intel_dp_desc desc;
-
-		if (intel_dp_read_desc(dp, &desc))
-			intel_dp_print_desc(dp, &desc);
-	}
+	lspcon->desc_valid = intel_dp_read_dpcd(dp) &&
+			     intel_dp_read_desc(dp, &lspcon->desc);
+	if ((drm_debug & DRM_UT_KMS) && lspcon->desc_valid)
+		intel_dp_print_desc(dp, &lspcon->desc);
 
 	DRM_DEBUG_KMS("Success: LSPCON init\n");
 	return true;

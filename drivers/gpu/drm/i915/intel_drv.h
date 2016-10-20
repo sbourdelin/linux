@@ -972,7 +972,9 @@ struct intel_dp {
 struct intel_lspcon {
 	bool active;
 	enum drm_lspcon_mode mode;
-	struct drm_dp_aux *aux;
+	struct intel_dp *intel_dp;
+	bool desc_valid;
+	struct intel_dp_desc desc;
 };
 
 struct intel_digital_port {
@@ -1468,6 +1470,8 @@ static inline unsigned int intel_dp_unused_lane_mask(int lane_count)
 	return ~((1 << lane_count) - 1) & 0xf;
 }
 
+bool
+intel_dp_read_dpcd(struct intel_dp *intel_dp);
 bool
 intel_dp_read_desc(struct intel_dp *intel_dp, struct intel_dp_desc *desc);
 void
