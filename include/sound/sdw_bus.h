@@ -894,5 +894,12 @@ int snd_sdw_disable_and_deprepare(unsigned int stream_tag);
  */
 int snd_sdw_slave_transfer(struct sdw_master *master, struct sdw_msg *msg,
 						unsigned int num);
+
+/* Function to enable tracing */
+void sdw_transfer_trace_reg(void);
+
+/* Function to disable tracing */
+void sdw_transfer_trace_unreg(void);
+
 #endif /*  _LINUX_SDW_BUS_H */
 

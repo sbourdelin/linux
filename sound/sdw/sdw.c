@@ -70,6 +70,8 @@
 
 #include "sdw_priv.h"
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/sdw.h>
 /*
  * Global SoundWire core instance contains list of Masters registered, core
  *	lock and SoundWire stream tags.
@@ -335,6 +337,17 @@ static struct bus_type sdw_bus_type = {
 	.match		= sdw_match,
 	.pm		= &soundwire_pm,
 };
+static struct static_key sdw_trace_msg = STATIC_KEY_INIT_FALSE;
+
+void sdw_transfer_trace_reg(void)
+{
+	static_key_slow_inc(&sdw_trace_msg);
+}
+
+void sdw_transfer_trace_unreg(void)
+{
+	static_key_slow_dec(&sdw_trace_msg);
+}
 
 static int sdw_find_free_dev_num(struct sdw_master *mstr,
 				struct sdw_msg *msg)
@@ -601,6 +614,21 @@ static int sdw_transfer(struct sdw_master *mstr, struct sdw_msg *msg, int num,
 	u8 prev_adr_pg1 = 0;
 	u8 prev_adr_pg2 = 0;
 
+	/*
+	 * sdw_trace_msg gets enabled when trace point sdw_slave_transfer gets
+	 * enabled.  This is an efficient way of keeping the for-loop from
+	 * being executed when not needed.
+	 */
+	if (static_key_false(&sdw_trace_msg)) {
+		int j;
+
+		for (j = 0; j < num; j++)
+			if (msg[j].r_w_flag & SDW_MSG_FLAG_READ)
+				trace_sdw_read(mstr, &msg[j], j);
+			else
+				trace_sdw_write(mstr, &msg[j], j);
+	}
+
 	for (i = 0; i < num; i++) {
 
 		/* Reset timeout for every message */
@@ -663,6 +691,15 @@ static int sdw_transfer(struct sdw_master *mstr, struct sdw_msg *msg, int num,
 			if (time_after(jiffies, orig_jiffies + mstr->timeout))
 				break;
 		}
+	}
+
+	if (static_key_false(&sdw_trace_msg)) {
+		int j;
+
+		for (j = 0; j < msg->len; j++)
+			if (msg[j].r_w_flag & SDW_MSG_FLAG_READ)
+				trace_sdw_reply(mstr, &msg[j], j);
+		trace_sdw_result(mstr, j, ret);
 	}
 
 	if (!ret)
