@@ -474,6 +474,8 @@ int proc_fill_super(struct super_block *s, void *data, int silent)
 	s->s_op = &proc_sops;
 	s->s_time_gran = 1;
 
+	s->s_shrink.seeks = 1;
+	s->s_shrink.batch = 0;
 	/*
 	 * procfs isn't actually a stacking filesystem; however, there is
 	 * too much magic going on inside it to permit stacking things on
