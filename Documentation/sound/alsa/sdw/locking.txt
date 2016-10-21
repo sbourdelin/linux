@@ -1,0 +1,64 @@
+This document explains locking mechanism of the SoundWire bus driver.
+Following types of lock are used in SoundWire bus driver.
+
+1. Core lock
+2. Master lock
+3. Stream lock
+4. Message lock
+
+1. Core lock: Global SoundWire bus driver lock. Core lock is used to
+serialize each of the following operation(s) within SoundWire bus
+driver.
+	- Addition and removal of Master.
+	- Acquire "Master lock" of each Master associated with the
+	  aggregated stream.
+
+
+2. Master lock: SoundWire bus instance lock. Master lock is used to
+serialize each of the following operation(s) within SoundWire bus
+instance.
+	- Addition and removal of Slave(s).
+	- Prepare and enable, disable and de-prepare.
+
+
+3. Stream lock: SoundWire stream lock. Stream lock is used to serialize
+access of stream data structure for a SoundWire stream.
+
+
+4. Message lock: SoundWire message transfer lock. This lock is used to
+serialize the message transfers(read/write) within the SoundWire bus
+instance.
+
+
+Lock Hierarchy
+==============
+
+- Core lock is the parent of Master and Stream lock.
+- Master lock is parent of Message lock.
+- Master and Stream locks are independent of each other.
+
+Example
+=======
+
+Below example shows how locks are acquired during prepare and enable
+operation for aggregated stream. In this example, stream 1 is associated
+with Master 1 and Master 2.
+
+1. Acquire Core lock.
+2. Acquire Master 1 lock.
+3. Acquire Master 2 lock.
+4. Release Core lock.
+
+5. Prepare operation.
+	5.1 Acquire Message lock.
+	5.2 Transfer message on bus (Single message transfer example).
+	5.3 Release Message lock.
+6. Enable operation.
+	6.1 Acquire Message lock.
+	6.2 Transfer message on bus (Single message transfer example).
+	6.3 Release Message lock.
+
+7. Acquire Core lock.
+8. Release Master 1 lock.
+9. Release Master 2 lock.
+10. Release Core lock.
