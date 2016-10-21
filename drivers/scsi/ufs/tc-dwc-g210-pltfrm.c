@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2015-2016 Synopsys, Inc. (www.synopsys.com)
  *
- * Authors: Joao Pinto <jpinto@synopsys.com>
+ * Authors: Joao Pinto <jpmpinto@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -109,5 +109,5 @@ module_platform_driver(tc_dwc_g210_pltfm_driver);
 
 MODULE_ALIAS("platform:tc-dwc-g210-pltfm");
 MODULE_DESCRIPTION("Synopsys Test Chip G210 platform glue driver");
-MODULE_AUTHOR("Joao Pinto <Joao.Pinto@synopsys.com>");
+MODULE_AUTHOR("Joao Pinto <jpmpinto@gmail.com>");
 MODULE_LICENSE("Dual BSD/GPL");

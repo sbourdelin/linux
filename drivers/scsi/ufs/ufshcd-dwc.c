@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2015-2016 Synopsys, Inc. (www.synopsys.com)
  *
- * Authors: Joao Pinto <jpinto@synopsys.com>
+ * Authors: Joao Pinto <jpmpinto@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -149,6 +149,6 @@ out:
 }
 EXPORT_SYMBOL(ufshcd_dwc_link_startup_notify);
 
-MODULE_AUTHOR("Joao Pinto <Joao.Pinto@synopsys.com>");
+MODULE_AUTHOR("Joao Pinto <jpmpinto@gmail.com>");
 MODULE_DESCRIPTION("UFS Host driver for Synopsys Designware Core");
 MODULE_LICENSE("Dual BSD/GPL");

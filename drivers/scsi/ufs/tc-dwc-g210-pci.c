@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2015-2016 Synopsys, Inc. (www.synopsys.com)
  *
- * Authors: Joao Pinto <jpinto@synopsys.com>
+ * Authors: Joao Pinto <jpmpinto@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -176,6 +176,6 @@ static struct pci_driver tc_dwc_g210_pci_driver = {
 
 module_pci_driver(tc_dwc_g210_pci_driver);
 
-MODULE_AUTHOR("Joao Pinto <Joao.Pinto@synopsys.com>");
+MODULE_AUTHOR("Joao Pinto <jpmpinto@gmail.com>");
 MODULE_DESCRIPTION("Synopsys Test Chip G210 PCI glue driver");
 MODULE_LICENSE("Dual BSD/GPL");
