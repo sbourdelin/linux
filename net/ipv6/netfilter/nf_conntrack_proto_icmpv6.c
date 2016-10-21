@@ -223,6 +223,9 @@ icmpv6_error(struct net *net, struct nf_conn *tmpl,
 	if (type >= 0 && type < sizeof(noct_valid_new) &&
 	    noct_valid_new[type]) {
 		skb->nfct = &nf_ct_untracked_get()->ct_general;
+#ifdef CONFIG_NF_CONNTRACK_MARK
+		((struct nf_conn *)skb->nfct)->mark = 0;
+#endif
 		skb->nfctinfo = IP_CT_NEW;
 		nf_conntrack_get(skb->nfct);
 		return NF_ACCEPT;
