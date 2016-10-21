@@ -3777,14 +3777,6 @@ out:
 	return err;
 }
 
-static void unmap_underlying_metadata_blocks(struct block_device *bdev,
-			sector_t block, int count)
-{
-	int i;
-	for (i = 0; i < count; i++)
-                unmap_underlying_metadata(bdev, block + i);
-}
-
 /*
  * Handle EOFBLOCKS_FL flag, clearing it if necessary
  */
@@ -4121,7 +4113,7 @@ out:
 	 * new.
 	 */
 	if (allocated > map->m_len) {
-		unmap_underlying_metadata_blocks(inode->i_sb->s_bdev,
+		unmap_underlying_metadata_ext(inode->i_sb->s_bdev,
 					newblock + map->m_len,
 					allocated - map->m_len);
 		allocated = map->m_len;
