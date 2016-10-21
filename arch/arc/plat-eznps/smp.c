@@ -134,7 +134,7 @@ static void eznps_ipi_send(int cpu)
 
 static void eznps_init_per_cpu(int cpu)
 {
-	smp_ipi_irq_setup(cpu, NPS_IPI_IRQ);
+	smp_ipi_irq_setup(cpu, irq_find_mapping(NULL, NPS_IPI_IRQ));
 
 	eznps_init_core(cpu);
 	mtm_enable_core(cpu);
