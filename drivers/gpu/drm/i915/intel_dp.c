@@ -313,6 +313,7 @@ intel_dp_mode_valid(struct drm_connector *connector,
 	int target_clock = mode->clock;
 	int max_rate, mode_rate, max_lanes, max_link_clock;
 	int max_dotclk;
+	int common_rates[DP_MAX_SUPPORTED_RATES] = {};
 
 	max_dotclk = intel_dp_downstream_max_dotclock(intel_dp);
 
@@ -326,8 +327,27 @@ intel_dp_mode_valid(struct drm_connector *connector,
 		target_clock = fixed_mode->clock;
 	}
 
-	max_link_clock = intel_dp_max_link_rate(intel_dp);
-	max_lanes = intel_dp_max_lane_count(intel_dp);
+	/* Prune the modes based on the link rate that failed */
+	if (intel_dp->link_train_failed_link_rate) {
+		intel_dp->link_rate_index = intel_dp_link_rate_index(intel_dp,
+								     common_rates,
+								     intel_dp->link_train_failed_link_rate);
+		if (intel_dp->link_rate_index > 0) {
+			max_link_clock = common_rates[intel_dp->link_rate_index - 1];
+			max_lanes = intel_dp_max_lane_count(intel_dp);
+		} else {
+			/* Here we can lower the lane count, but that will be
+			 * added for DP Spec 1.3
+			 */
+			DRM_ERROR("No Valid Mode Supported for this Link\n");
+			intel_dp->link_train_failed_link_rate = 0;
+			intel_dp->link_rate_index = -1;
+			intel_dp->link_train_failed = false;
+		}
+	} else {
+		max_link_clock = intel_dp_max_link_rate(intel_dp);
+		max_lanes = intel_dp_max_lane_count(intel_dp);
+	}
 
 	max_rate = intel_dp_max_data_rate(max_link_clock, max_lanes);
 	mode_rate = intel_dp_link_required(target_clock, 18);
@@ -1618,6 +1638,14 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 
 	if (adjusted_mode->flags & DRM_MODE_FLAG_DBLCLK)
 		return false;
+
+	/* Fall back to lower link rate in case of failure in previous modeset */
+	if (intel_dp->link_train_failed_link_rate) {
+		min_lane_count = max_lane_count;
+		min_clock = max_clock = intel_dp->link_rate_index - 1;
+		intel_dp->link_train_failed_link_rate = 0;
+		intel_dp->link_rate_index = -1;
+	}
 
 	DRM_DEBUG_KMS("DP link computation with max lane count %i "
 		      "max bw %d pixel clock %iKHz\n",
@@ -5689,6 +5717,39 @@ out_vdd_off:
 	return false;
 }
 
+static void intel_dp_modeset_retry_work_fn(struct work_struct *work)
+{
+	struct drm_connector *connector;
+	struct intel_dp *intel_dp;
+	struct drm_display_mode *mode;
+	bool verbose_prune = true;
+	bool reprobe = false;
+
+	connector = container_of(work, typeof(*connector),
+				 i915_modeset_retry_work);
+	intel_dp = intel_attached_dp(connector);
+
+	/* Grab the locks before changing connector property*/
+	mutex_lock(&connector->dev->mode_config.mutex);
+	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n", connector->base.id,
+		      connector->name);
+	list_for_each_entry(mode, &connector->modes, head) {
+		mode->status = intel_dp_mode_valid(connector,
+						   mode);
+		if (mode->status != MODE_OK)
+			reprobe = true;
+	}
+	drm_mode_prune_invalid(connector->dev, &connector->modes,
+			       verbose_prune);
+	mutex_unlock(&connector->dev->mode_config.mutex);
+	if (reprobe) {
+		/* Send Hotplug uevent so userspace can reprobe */
+		drm_kms_helper_hotplug_event(connector->dev);
+	}
+	if (intel_dp->link_train_failed)
+		drm_atomic_helper_connector_modeset(connector);
+}
+
 bool
 intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 			struct intel_connector *intel_connector)
@@ -5700,6 +5761,10 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	enum port port = intel_dig_port->port;
 	int type;
+
+	/* Initialize the work for modeset in case of link train failure */
+	INIT_WORK(&connector->i915_modeset_retry_work,
+		  intel_dp_modeset_retry_work_fn);
 
 	if (WARN(intel_dig_port->max_lanes < 1,
 		 "Not enough lanes (%d) for DP on port %c\n",
