@@ -50,6 +50,7 @@
 #define PFX			RNG_MODULE_NAME ": "
 #define RNG_MISCDEV_MINOR	183 /* official */
 
+#define EARLY_RANDOMNESS_SIZE	16
 
 static struct hwrng *current_rng;
 static struct task_struct *hwrng_fill;
@@ -84,14 +85,37 @@ static size_t rng_buffer_size(void)
 
 static void add_early_randomness(struct hwrng *rng)
 {
-	unsigned char bytes[16];
+	unsigned char *bytes;
 	int bytes_read;
 
+	/*
+	 * This code can be reached with rng_mutex held, through the following
+	 * call chain:
+	 *
+	 * hwrng_attr_current_store()
+	 *   set_current_rng()
+	 *     hwrng_init()
+	 *       add_early_randomness()
+	 *
+	 * (that is, when a different RNG is selected through the "rng_current"
+	 * sysfs attribute). For that reason, allocate memory without enabling
+	 * sleep.
+	 *
+	 * If the (immediate) allocation fails, we just pretend to have read
+	 * zero bytes from the RNG, as that is already valid behavior. Also,
+	 * feeding initial randomness from the device to the system entropy
+	 * pool is not important enough to tap into emergency memory pools.
+	 */
+	bytes = kmalloc(EARLY_RANDOMNESS_SIZE, GFP_NOWAIT | __GFP_NOWARN);
+	if (!bytes)
+		return;
+
 	mutex_lock(&reading_mutex);
-	bytes_read = rng_get_data(rng, bytes, sizeof(bytes), 1);
+	bytes_read = rng_get_data(rng, bytes, EARLY_RANDOMNESS_SIZE, 1);
 	mutex_unlock(&reading_mutex);
 	if (bytes_read > 0)
 		add_device_randomness(bytes, bytes_read);
+	kfree(bytes);
 }
 
 static inline void cleanup_rng(struct kref *kref)
