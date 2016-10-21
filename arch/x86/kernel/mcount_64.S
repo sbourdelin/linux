@@ -295,7 +295,7 @@ trace:
 	jmp fgraph_trace
 END(function_hook)
 #endif /* CONFIG_DYNAMIC_FTRACE */
-EXPORT_SYMBOL(function_hook)
+EXPORT_MACRO_SYMBOL(function_hook)
 #endif /* CONFIG_FUNCTION_TRACER */
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER

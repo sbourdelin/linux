@@ -90,5 +90,10 @@ KSYM(__kcrctab_\name):
 	__EXPORT_SYMBOL(name, KSYM(name),)
 #define EXPORT_DATA_SYMBOL_GPL(name)				\
 	__EXPORT_SYMBOL(name, KSYM(name),_gpl)
+/*
+ * If "name" is a macro of a function and not a function itself,
+ * it needs a second pass.
+ */
+#define EXPORT_MACRO_SYMBOL(x) EXPORT_SYMBOL(x)
 
 #endif
