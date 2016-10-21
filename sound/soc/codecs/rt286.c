@@ -305,10 +305,10 @@ static void rt286_jack_detect_work(struct work_struct *work)
 		SND_JACK_MICROPHONE | SND_JACK_HEADPHONE);
 }
 
-int rt286_mic_detect(struct snd_soc_codec *codec, struct snd_soc_jack *jack)
+int rt286_mic_detect(struct snd_soc_component *component, struct snd_soc_jack *jack)
 {
-	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(codec);
-	struct rt286_priv *rt286 = snd_soc_codec_get_drvdata(codec);
+	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(component);
+	struct rt286_priv *rt286 = snd_soc_component_get_drvdata(component);
 
 	rt286->jack = jack;
 

@@ -86,7 +86,7 @@ static int broadwell_rt286_codec_init(struct snd_soc_pcm_runtime *rtd)
 	if (ret)
 		return ret;
 
-	rt286_mic_detect(codec, &broadwell_headset);
+	rt286_mic_detect(&codec->component, &broadwell_headset);
 	return 0;
 }
 
@@ -225,7 +225,7 @@ static int broadwell_suspend(struct snd_soc_card *card){
 	list_for_each_entry(codec, &card->codec_dev_list, card_list) {
 		if (!strcmp(codec->component.name, "i2c-INT343A:00")) {
 			dev_dbg(codec->dev, "disabling jack detect before going to suspend.\n");
-			rt286_mic_detect(codec, NULL);
+			rt286_mic_detect(&codec->component, NULL);
 			break;
 		}
 	}
@@ -238,7 +238,7 @@ static int broadwell_resume(struct snd_soc_card *card){
 	list_for_each_entry(codec, &card->codec_dev_list, card_list) {
 		if (!strcmp(codec->component.name, "i2c-INT343A:00")) {
 			dev_dbg(codec->dev, "enabling jack detect for resume.\n");
-			rt286_mic_detect(codec, &broadwell_headset);
+			rt286_mic_detect(&codec->component, &broadwell_headset);
 			break;
 		}
 	}
