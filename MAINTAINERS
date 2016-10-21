@@ -11334,6 +11334,18 @@ F:	include/sound/dmaengine_pcm.h
 F:	sound/core/pcm_dmaengine.c
 F:	sound/soc/soc-generic-dmaengine-pcm.c
 
+SOUND - SOUNDWIRE
+M:	Hardik Shah <hardik.t.shah@intel.com>
+M:	Sanyog Kale <sanyog.r.kale@intel.com>
+R:	Pierre-Louis Bossart <pierre-louis.bossart@linux.intel.com>
+L:	alsa-devel@alsa-project.org (moderated for non-subscribers)
+S:	Supported
+F:	Documentation/sound/sdw/
+F:	include/sound/sdw_*
+F:	include/sound/sdw/
+F:	sound/sdw/
+F:	drivers/base/regmap-sdw.c
+
 SP2 MEDIA DRIVER
 M:	Olli Salonen <olli.salonen@iki.fi>
 L:	linux-media@vger.kernel.org
