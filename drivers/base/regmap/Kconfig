@@ -29,3 +29,6 @@ config REGMAP_MMIO
 
 config REGMAP_IRQ
 	bool
+
+config REGMAP_SDW
+	depends on SOUND_SDW
