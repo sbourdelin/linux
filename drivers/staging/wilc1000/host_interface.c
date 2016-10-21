@@ -497,10 +497,12 @@ static void handle_cfg_param(struct wilc_vif *vif,
 	if (cfg_param_attr->flag & POWER_MANAGEMENT) {
 		if (cfg_param_attr->power_mgmt_mode < 5) {
 			wid_list[i].id = WID_POWER_MANAGEMENT;
-			wid_list[i].val = (s8 *)&cfg_param_attr->power_mgmt_mode;
+			wid_list[i].val = (s8 *)&cfg_param_attr->
+							       power_mgmt_mode;
 			wid_list[i].type = WID_CHAR;
 			wid_list[i].size = sizeof(char);
-			hif_drv->cfg_values.power_mgmt_mode = (u8)cfg_param_attr->power_mgmt_mode;
+			hif_drv->cfg_values.power_mgmt_mode =
+					   (u8)cfg_param_attr->power_mgmt_mode;
 		} else {
 			netdev_err(vif->ndev, "Invalid power mode\n");
 			goto unlock;
