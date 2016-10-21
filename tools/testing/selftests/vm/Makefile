@@ -13,7 +13,7 @@ TEST_GEN_FILES += transhuge-stress
 TEST_GEN_FILES += userfaultfd
 TEST_GEN_FILES += mlock-random-test
 
-userfaultfd: userfaultfd.c ../../../../usr/include/linux/kernel.h
+$(OUTPUT)userfaultfd: userfaultfd.c ../../../../usr/include/linux/kernel.h
 	$(CC) $(CFLAGS) -O2 -o $@ $< -lpthread
 
 mlock-random-test: mlock-random-test.c

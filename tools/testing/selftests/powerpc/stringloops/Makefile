@@ -5,7 +5,7 @@ CFLAGS += -I$(CURDIR)
 TEST_GEN_PROGS := memcmp
 EXTRA_SOURCES := memcmp_64.S ../harness.c
 
-EXTRA_CLEAN = *.o
+EXTRA_CLEAN = $(OUTPUT)*.o
 
 include ../../lib.mk
 

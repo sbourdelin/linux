@@ -2,7 +2,7 @@ TEST_GEN_PROGS := ipc_unmuxed
 
 CFLAGS += -I../../../../../usr/include
 
-EXTRAN_CLEAN = *.o
+EXTRAN_CLEAN = $(OUTPUT)*.o
 
 include ../../lib.mk
 

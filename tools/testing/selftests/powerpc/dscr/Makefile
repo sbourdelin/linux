@@ -2,11 +2,10 @@ TEST_GEN_PROGS := dscr_default_test dscr_explicit_test dscr_user_test	\
 	      dscr_inherit_test dscr_inherit_exec_test dscr_sysfs_test	\
 	      dscr_sysfs_thread_test
 
-EXTRA_CLEAN := *.o
+EXTRA_CLEAN := $(OUTPUT)*.o
 
 include ../../lib.mk
 
-dscr_default_test: LDLIBS += -lpthread
+$(OUTPUT)dscr_default_test: LDLIBS += -lpthread
 
 $(TEST_GEN_PROGS): ../harness.c
-

@@ -2,7 +2,7 @@ CFLAGS += -I$(CURDIR)
 
 TEST_GEN_PROGS := load_unaligned_zeropad
 
-EXTRA_CLEAN = *.o
+EXTRA_CLEAN = $(OUTPUT)*.o
 
 include ../../lib.mk
 

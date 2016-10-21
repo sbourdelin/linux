@@ -4,10 +4,10 @@ CFLAGS += -O2
 
 $(TEST_GEN_PROGS): ../harness.c
 
-EXTRA_CLEAN = *.o
+EXTRA_CLEAN = $(OUTPUT)*.o
 
 include ../../lib.mk
 
-context_switch: ../utils.c
-context_switch: CFLAGS += -maltivec -mvsx -mabi=altivec
-context_switch: LDLIBS += -lpthread
+$(OUTPUT)context_switch: ../utils.c
+$(OUTPUT)context_switch: CFLAGS += -maltivec -mvsx -mabi=altivec
+$(OUTPUT)context_switch: LDLIBS += -lpthread
