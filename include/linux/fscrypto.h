@@ -273,6 +273,12 @@ extern void fscrypt_pullback_bio_page(struct page **, bool);
 extern void fscrypt_restore_control_page(struct page *);
 extern int fscrypt_zeroout_range(struct inode *, pgoff_t, sector_t,
 						unsigned int);
+int fscrypt_encrypt_buffer(struct inode *inode, const void *plaintext_buf,
+			   const void *ciphertext_buf, unsigned int buflen,
+			   pgoff_t index, gfp_t gfp_flags);
+int fscrypt_decrypt_buffer(struct inode *inode, const void *ciphertext_buf,
+			   const void *plaintext_buf, unsigned int buflen,
+			   pgoff_t index, gfp_t gfp_flags);
 /* policy.c */
 extern int fscrypt_process_policy(struct file *, const struct fscrypt_policy *);
 extern int fscrypt_get_policy(struct inode *, struct fscrypt_policy *);
@@ -416,6 +422,24 @@ static inline int fscrypt_notsupp_fname_alloc_buffer(struct inode *inode,
 static inline void fscrypt_notsupp_fname_free_buffer(struct fscrypt_str *c)
 {
 	return;
+}
+
+static inline int fscrypt_notsupp_encrypt_buffer(const struct inode *inode,
+						 const void *plaintext_buf,
+						 const void *ciphertext_buf,
+						 unsigned int buflen,
+						 pgoff_t index, gfp_t gfp_flags)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int fscrypt_notsupp_decrypt_buffer(const struct inode *inode,
+						 const void *ciphertext_buf,
+						 const void *plaintext_buf,
+						 unsigned int buflen,
+						 pgoff_t index, gfp_t gfp_flags)
+{
+	return -EOPNOTSUPP;
 }
 
 static inline int fscrypt_notsupp_fname_disk_to_usr(struct inode *inode,

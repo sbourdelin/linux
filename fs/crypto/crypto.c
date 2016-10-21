@@ -147,15 +147,14 @@ typedef enum {
 	FS_ENCRYPT,
 } fscrypt_direction_t;
 
-static int do_page_crypto(struct inode *inode,
-			fscrypt_direction_t rw, pgoff_t index,
-			struct page *src_page, struct page *dest_page,
-			gfp_t gfp_flags)
+static int do_crypto(struct inode *inode,
+		     fscrypt_direction_t rw, pgoff_t index,
+		     struct scatterlist *src, struct scatterlist *dst,
+		     unsigned int cryptlen, gfp_t gfp_flags)
 {
 	u8 xts_tweak[FS_XTS_TWEAK_SIZE];
 	struct skcipher_request *req = NULL;
 	DECLARE_FS_COMPLETION_RESULT(ecr);
-	struct scatterlist dst, src;
 	struct fscrypt_info *ci = inode->i_crypt_info;
 	struct crypto_skcipher *tfm = ci->ci_ctfm;
 	int res = 0;
@@ -177,12 +176,8 @@ static int do_page_crypto(struct inode *inode,
 	memset(&xts_tweak[sizeof(index)], 0,
 			FS_XTS_TWEAK_SIZE - sizeof(index));
 
-	sg_init_table(&dst, 1);
-	sg_set_page(&dst, dest_page, PAGE_SIZE, 0);
-	sg_init_table(&src, 1);
-	sg_set_page(&src, src_page, PAGE_SIZE, 0);
-	skcipher_request_set_crypt(req, &src, &dst, PAGE_SIZE,
-					xts_tweak);
+	skcipher_request_set_crypt(req, src, dst, cryptlen,
+				   xts_tweak);
 	if (rw == FS_DECRYPT)
 		res = crypto_skcipher_decrypt(req);
 	else
@@ -200,6 +195,34 @@ static int do_page_crypto(struct inode *inode,
 		return res;
 	}
 	return 0;
+}
+
+static int do_page_crypto(struct inode *inode,
+			  fscrypt_direction_t rw, pgoff_t index,
+			  struct page *src_page, struct page *dst_page,
+			  gfp_t gfp_flags)
+{
+	struct scatterlist src, dst;
+
+	sg_init_table(&src, 1);
+	sg_set_page(&src, src_page, PAGE_SIZE, 0);
+	sg_init_table(&dst, 1);
+	sg_set_page(&dst, dst_page, PAGE_SIZE, 0);
+
+	return do_crypto(inode, rw, index, &src, &dst, PAGE_SIZE, gfp_flags);
+}
+
+static int do_buf_crypto(struct inode *inode,
+			 fscrypt_direction_t rw, pgoff_t index,
+			 const void *src_buf, const void *dst_buf,
+			 unsigned int buflen, gfp_t gfp_flags)
+{
+	struct scatterlist src, dst;
+
+	sg_init_one(&src, src_buf, buflen);
+	sg_init_one(&dst, dst_buf, buflen);
+
+	return do_crypto(inode, rw, index, &src, &dst, buflen, gfp_flags);
 }
 
 static struct page *alloc_bounce_page(struct fscrypt_ctx *ctx, gfp_t gfp_flags)
@@ -263,6 +286,24 @@ errout:
 	return ciphertext_page;
 }
 EXPORT_SYMBOL(fscrypt_encrypt_page);
+
+int fscrypt_encrypt_buffer(struct inode *inode, const void *plaintext_buf,
+			   const void *ciphertext_buf, unsigned int buflen,
+			   pgoff_t index, gfp_t gfp_flags)
+{
+	return do_buf_crypto(inode, FS_ENCRYPT, index, plaintext_buf,
+			     ciphertext_buf, buflen, gfp_flags);
+}
+EXPORT_SYMBOL(fscrypt_encrypt_buffer);
+
+int fscrypt_decrypt_buffer(struct inode *inode, const void *ciphertext_buf,
+			   const void *plaintext_buf, unsigned int buflen,
+			   pgoff_t index, gfp_t gfp_flags)
+{
+	return do_buf_crypto(inode, FS_DECRYPT, index, ciphertext_buf,
+			     plaintext_buf, buflen, gfp_flags);
+}
+EXPORT_SYMBOL(fscrypt_decrypt_buffer);
 
 /**
  * f2crypt_decrypt_page() - Decrypts a page in-place
