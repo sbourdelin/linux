@@ -878,7 +878,7 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 	int max_ports;
 	unsigned long flags;
-	u32 temp, status;
+	u32 temp, status, tmp_status = 0;
 	int retval = 0;
 	__le32 __iomem **port_array;
 	int slot_id;
@@ -1098,6 +1098,32 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			spin_lock_irqsave(&xhci->lock, flags);
 			break;
 		case USB_PORT_FEAT_RESET:
+			/*
+			 * Erratum : A010129
+			 * Synopsys STAR 9000962562.
+			 * USB 2.0 Reset Not Driven While Port in Resume
+			 * While in USB 2.0 resume state (the PORTSC.PLS
+			 * register bit is set to 4'd15), if the xHCI driver
+			 * programs the PORTSC.PR register bit to 1, the
+			 * controller does not drive a USB 2.0 reset
+			 * and it does not generate a PORTSC.PRC=1 interrupt.
+			 * So, The xHCI driver should not program a USB
+			 * 2.0 reset (PORTSC.PR=1) while in resume
+			 * (PORTSC.PLS=4'd15).
+			 */
+			if (xhci->quirks & XHCI_PORT_RST_ON_RESUME) {
+				tmp_status = readl(port_array[wIndex]);
+				spin_unlock_irqrestore(&xhci->lock, flags);
+				if (!DEV_SUPERSPEED(tmp_status)
+					&& (tmp_status & PORT_PLS_MASK)
+					== XDEV_RESUME) {
+					xhci_err(xhci, "skip port reset\n");
+					spin_lock_irqsave(&xhci->lock, flags);
+					break;
+				}
+				spin_lock_irqsave(&xhci->lock, flags);
+			}
+
 			temp = (temp | PORT_RESET);
 			writel(temp, port_array[wIndex]);
 
