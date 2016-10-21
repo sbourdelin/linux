@@ -1,0 +1,454 @@
+/*
+ * Device tree for LEGO MINDSTORMS EV3
+ *
+ * Copyright (C) 2016 David Lechner <david@lechnology.com>
+ *
+ * This program is free software; you can redistribute  it and/or modify it
+ * under  the terms of  the GNU General  Public License as published by the
+ * Free Software Foundation, version 2.
+ */
+
+/dts-v1/;
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/linux-event-codes.h>
+#include <dt-bindings/pwm/pwm.h>
+
+#include "da850.dtsi"
+
+/ {
+	compatible = "lego,ev3", "ti,da850";
+	model = "LEGO MINDSTORMS EV3";
+
+	soc@1c00000 {
+		/*
+		 * (ab)using pinctrl-single to disable all internal pullups/
+		 * pulldowns on I/O.
+		 */
+		pinmux@22c00c {
+			compatible = "pinctrl-single";
+			reg = <0x22c00c 0x4>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			pinctrl-single,bit-per-mux;
+			pinctrl-single,register-width = <32>;
+			pinctrl-single,function-mask = <0xf>;
+			/*
+			 * There is a bug in pinctrl-single that prevents us
+			 * from setting function-mask to 1, so doing things
+			 * in groups of 4. Doesn't really matter since we are
+			 * disabling all at once anyway.
+			 */
+
+			pinctrl-names = "default";
+			pinctrl-0 = <&pupu_disable>;
+
+			pupu_disable: pinmux_all_pins {
+				pinctrl-single,bits = <
+					0x0 0x00000000 0xffffffff
+				>;
+			};
+		};
+	};
+
+	/*
+	 * The buttons on the EV3 are mapped to keyboard keys.
+	 */
+	gpio_keys {
+		compatible = "gpio-keys";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		label = "EV3 buttons";
+		pinctrl-names = "default";
+		pinctrl-0 = <&button_pins>;
+
+		enter {
+			label = "EV3 Button ENTER";
+			linux,code = <KEY_ENTER>;
+			gpios = <&gpio 29 GPIO_ACTIVE_HIGH>;
+		};
+		left {
+			label = "EV3 Button LEFT";
+			linux,code = <KEY_LEFT>;
+			gpios = <&gpio 102 GPIO_ACTIVE_HIGH>;
+		};
+		back {
+			label = "EV3 Button BACK";
+			linux,code = <KEY_BACKSPACE>;
+			gpios = <&gpio 106 GPIO_ACTIVE_HIGH>;
+		};
+		right {
+			label = "EV3 Button RIGHT";
+			linux,code = <KEY_RIGHT>;
+			gpios = <&gpio 124 GPIO_ACTIVE_HIGH>;
+		};
+		down {
+			label = "EV3 Button DOWN";
+			linux,code = <KEY_DOWN>;
+			gpios = <&gpio 126 GPIO_ACTIVE_HIGH>;
+		};
+		up {
+			label = "EV3 Button UP";
+			linux,code = <KEY_UP>;
+			gpios = <&gpio 127 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
+	/*
+	 * The EV3 has two built-in bi-color LEDs behind the buttons.
+	 */
+	leds {
+		compatible = "gpio-leds";
+		pinctrl-names = "default";
+		pinctrl-0 = <&led_pins>;
+
+		left_red {
+			label = "led1:red:brick-status";
+			/* GP6[13] */
+			gpios = <&gpio 103 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "default-on";
+		};
+		left_green {
+			label = "led1:green:brick-status";
+			/* GP6[7] */
+			gpios = <&gpio 108 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "default-on";
+		};
+		right_red {
+			label = "led2:red:brick-status";
+			/* GP6[12] */
+			gpios = <&gpio 109 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "default-on";
+		};
+		right_green {
+			label = "led2:green:brick-status";
+			/* GP6[14] */
+			gpios = <&gpio 110 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "default-on";
+		};
+	};
+
+	/*
+	 * The EV3 is powered down by turning off the main 5V supply.
+	 */
+	gpio-poweroff {
+		compatible = "gpio-poweroff";
+		/* low signal powers off the board */
+		gpios = <&gpio 107 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&system_power_pin>;
+	};
+
+	/*
+	 * The Bluetooth chip requires a clock at 32768Hz. One of the PWMs
+	 * is used to generate this signal.
+	 */
+	bt-slow-clock {
+		status = "disabled";
+		compatible = "pwm-clock";
+		#clock-cells = <0>;
+		clock-frequency = <32768>;
+		clock-output-names = "slow_clk";
+		pwms = <&ecap2 0 30517>;
+	};
+};
+
+&pmx_core {
+	status = "okay";
+
+	spi0_cs3_pin: pinmux_spi0_cs3_pin {
+		pinctrl-single,bits = <
+			/* CS3 */
+			0xc 0x01000000 0x0f000000
+		>;
+	};
+	mmc0_cd_pin: pinmux_mmc0_cd {
+		pinctrl-single,bits = <
+			/* GP5[14] */
+			0x2C 0x00000080 0x000000f0
+		>;
+	};
+	button_pins: pinmux_button_pins {
+		pinctrl-single,bits = <
+			/* GP1[13] */
+			0x8 0x00000800 0x00000f00
+			/* GP6[10] */
+			0x34 0x00800000 0x00f00000
+			/* GP6[6] */
+			0x38 0x00000080 0x000000f0
+			/* GP7[12], GP7[14], GP7[15] */
+			0x40 0x00808800 0x00f0ff00
+		>;
+	};
+	led_pins: pinmux_led_pins {
+		pinctrl-single,bits = <
+			/* GP6[12], GP6[13], GP6[14] */
+			0x34 0x00008880 0x0000fff0
+			/* GP6[7] */
+			0x38 0x00000008 0x0000000f
+		>;
+	};
+	system_power_pin: pinmux_system_power {
+		pinctrl-single,bits = <
+			/* GP6[11] */
+			0x34 0x00080000 0x000f0000
+		>;
+	};
+	in1_pins: pinmux_in1_pins {
+		pinctrl-single,bits = <
+			/* GP0[15] */
+			0x0 0x00000008 0x0000000f
+			/* GP0[2] */
+			0x4 0x00800000 0x00f00000
+			/* GP2[2] */
+			0x18 0x00800000 0x00f00000
+			/* GP8[10], GP8[11] */
+			0x48 0x88000000 0xff000000
+		>;
+	};
+	in2_pins: pinmux_in2_pins {
+		pinctrl-single,bits = <
+			/* GP0[13], GP0[14] */
+			0x0 0x00000880 0x00000ff0
+			/* GP8[12], GP8[14], GP8[15] */
+			0x48 0x00808800 0x00f0ff00
+		>;
+	};
+	in3_pins: pinmux_in3_pins {
+		pinctrl-single,bits = <
+			/* GP0[12] */
+			0x0 0x00008000 0x0000f000
+			/* GP1[14] */
+			0x8 0x00000080 0x000000f0
+			/* GP7[11] */
+			0x40 0x08000000 0x0f000000
+			/* GP7[9] */
+			0x44 0x00000008 0x0000000f
+			/* GP8[9] */
+			0x4c 0x00000008 0x0000000f
+		>;
+	};
+	in4_pins: pinmux_in4_pins {
+		pinctrl-single,bits = <
+			/* GP0[1] */
+			0x4 0x08000000 0x0f000000
+			/* GP1[15] */
+			0x8 0x00000008 0x0000000f
+			/* GP7[10] */
+			0x40 0x80000000 0xf0000000
+			/* GP7[8] */
+			0x44 0x00000080 0x000000f0
+			/* GP6[4] */
+			0x4c 0x00000800 0x00000f00
+		>;
+	};
+	outa_pins: pinmux_outa_pins {
+		pinctrl-single,bits = <
+			/* GP0[4] */
+			0x4 0x00008000 0x0000f000
+			/* GP3[15] */
+			0x1c 0x00000008 0x0000000f
+			/* GP3[6] */
+			0x20 0x00000080 0x000000f0
+			/* GP5[11] */
+			0x2c 0x00080000 0x000f0000
+			/* GP5[4] */
+			0x30 0x00008000 0x0000f000
+		>;
+	};
+	outb_pins: pinmux_outb_pins {
+		pinctrl-single,bits = <
+			/* GP0[3] */
+			0x4 0x00080000 0x000f0000
+			/* GP2[9] */
+			0x14 0x08000000 0x0f000000
+			/* GP2[1], GP2[5] */
+			0x18 0x08000800 0x0f000f00
+			/* GP5[11] */
+			0x2c 0x80000000 0xf0000000
+		>;
+	};
+	outc_pins: pinmux_outc_pins {
+		pinctrl-single,bits = <
+			/* GP3[8], GP3[14] */
+			0x1c 0x80000080 0xf00000f0
+			/* GP5[9], GP5[13] */
+			0x2c 0x08000800 0x0f000f00
+			/* GP6[8] */
+			0x34 0x80000000 0xf0000000
+		>;
+	};
+	outd_pins: pinmux_outd_pins {
+		pinctrl-single,bits = <
+			/* GP2[8] */
+			0x14 0x80000000 0xf0000000
+			/* GP5[10], GP5[15] */
+			0x2c 0x00800008 0x00f0000f
+			/* GP5[3] */
+			0x30 0x00080000 0x000f0000
+			/* GP6[9] */
+			0x34 0x08000000 0x0f000000
+		>;
+	};
+	sound_pins: pinmux_sound_pins {
+		pinctrl-single,bits = <
+			/* GP6[15] */
+			0x34 0x00000008 0x0000000f
+		>;
+	};
+	usb11_pins: pinmux_usb11_pins {
+		pinctrl-single,bits = <
+			/* GP6[5] */
+			0x40 0x00000080 0x000000f0
+			/* GP6[3] */
+			0x4c 0x00008000 0x0000f000
+		>;
+	};
+};
+
+/* Input port 2 */
+&serial0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&serial0_rxtx_pins>;
+};
+
+/* Input port 1 */
+&serial1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&serial1_rxtx_pins>;
+};
+
+/* Bluetooth */
+&serial2 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&serial2_rxtx_pins>, <&serial2_rtscts_pins>;
+};
+
+&rtc0 {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+	clock-frequency = <400000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c0_pins>;
+
+	/*
+	 * EEPROM contains the first stage bootloader, HW ID and Bluetooth MAC.
+	 */
+	eeprom@50 {
+		compatible = "at24,24c128";
+		pagesize = <64>;
+		read-only;
+		reg = <0x50>;
+	};
+};
+
+&wdt {
+	status = "okay";
+};
+
+&mmc0 {
+	status = "okay";
+	max-frequency = <50000000>;
+	bus-width = <4>;
+	cd-gpios = <&gpio 94 GPIO_ACTIVE_LOW>;
+	cap-sd-highspeed;
+	cap-mmc-highspeed;
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc0_pins>, <&mmc0_cd_pin>;
+};
+
+&ehrpwm0 {
+	status = "okay";
+	pinctrl-names = "default";
+	/* SOUND_ARMA */
+	pinctrl-0 = <&ehrpwm0b_pins>;
+};
+
+&ehrpwm1 {
+	status = "disabled";
+	pinctrl-names = "default";
+	/* MBPWM, MAPWM */
+	pinctrl-0 = <&ehrpwm1a_pins>, <&ehrpwm1b_pins>;
+};
+
+&ecap0 {
+	status = "okay";
+	pinctrl-names = "default";
+	/* MCPWM */
+	pinctrl-0 = <&ecap0_pins>;
+};
+
+&ecap1 {
+	status = "disabled";
+	pinctrl-names = "default";
+	/* MDPWM */
+	pinctrl-0 = <&ecap1_pins>;
+};
+
+&ecap2 {
+	status = "disabled";
+	pinctrl-names = "default";
+	/* BTSLOWCLK */
+	pinctrl-0 = <&ecap2_pins>;
+};
+
+&spi0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi0_pins>, <&spi0_cs0_pin>, <&spi0_cs3_pin>;
+	dmas = <&edma0 14 0>, <&edma0 15 0>;
+	dma-names = "rx", "tx";
+
+	spi-flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "n25q128a13", "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+		ti,spi-wdelay = <8>;
+
+		partition@0 {
+			label = "U-Boot";
+			reg = <0 0x40000>;
+		};
+
+		partition@40000 {
+			label = "U-Boot Env";
+			reg = <0x40000 0x10000>;
+		};
+
+		partition@50000 {
+			label = "Kernel";
+			reg = <0x50000 0x200000>;
+		};
+
+		partition@250000 {
+			label = "Filesystem";
+			reg = <0x250000 0xa50000>;
+		};
+
+		partition@cb0000 {
+			label = "Storage";
+			reg = <0xcb0000 0x2f0000>;
+		};
+	};
+
+	/* TODO: ADC goes here */
+};
+
+&spi1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi1_pins>, <&spi1_cs0_pin>;
+
+	/* TODO: LCD Display goes here */
+};
+
+&gpio {
+	status = "okay";
+};
