@@ -766,7 +766,8 @@ static int mcp230xx_probe(struct i2c_client *client,
 	if (match) {
 		pdata = &local_pdata;
 		pdata->base = -1;
-		pdata->chip[0].pullups = 0;
+		of_property_read_u32(client->dev.of_node, "microchip,pullups",
+				     &pdata->chip[0].pullups);
 		pdata->irq_controller =	of_property_read_bool(
 					client->dev.of_node,
 					"interrupt-controller");
