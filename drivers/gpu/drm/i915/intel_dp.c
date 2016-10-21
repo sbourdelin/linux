@@ -288,6 +288,21 @@ static int intel_dp_common_rates(struct intel_dp *intel_dp,
 			       common_rates);
 }
 
+static int intel_dp_link_rate_index(struct intel_dp *intel_dp,
+				    int *common_rates, int link_rate)
+{
+	int common_len;
+	int index;
+
+	common_len = intel_dp_common_rates(intel_dp, common_rates);
+	for (index = 0; index < common_len; index++) {
+		if (link_rate == common_rates[common_len - index - 1])
+			return common_len - index - 1;
+	}
+
+	return -1;
+}
+
 static enum drm_mode_status
 intel_dp_mode_valid(struct drm_connector *connector,
 		    struct drm_display_mode *mode)
