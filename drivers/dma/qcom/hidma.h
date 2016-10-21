@@ -114,6 +114,7 @@ struct hidma_dev {
 	int				irq;
 	int				chidx;
 	u32				nr_descriptors;
+	int				msi_virqbase;
 
 	struct hidma_lldev		*lldev;
 	void				__iomem *dev_trca;
@@ -151,6 +152,7 @@ struct hidma_lldev *hidma_ll_init(struct device *dev, u32 max_channels,
 			u8 chidx);
 int hidma_ll_uninit(struct hidma_lldev *llhndl);
 irqreturn_t hidma_ll_inthandler(int irq, void *arg);
+irqreturn_t hidma_ll_inthandler_msi(int irq, void *arg, int cause);
 void hidma_cleanup_pending_tre(struct hidma_lldev *llhndl, u8 err_info,
 				u8 err_code);
 int hidma_debug_init(struct hidma_dev *dmadev);
