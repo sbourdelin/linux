@@ -1853,7 +1853,8 @@ int genpd_dev_pm_attach(struct device *dev)
 	ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
 					"#power-domain-cells", 0, &pd_args);
 	if (ret < 0) {
-		if (ret != -ENOENT)
+		if (ret != -ENOENT || !IS_ENABLED(CONFIG_ARCH_EXYNOS) ||
+		    IS_ENABLED(CONFIG_64BIT))
 			return ret;
 
 		/*
