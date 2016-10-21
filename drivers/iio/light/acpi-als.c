@@ -56,7 +56,9 @@ static const struct iio_chan_spec acpi_als_channels[] = {
 		},
 		/* _RAW is here for backward ABI compatibility */
 		.info_mask_separate	= BIT(IIO_CHAN_INFO_RAW) |
-					  BIT(IIO_CHAN_INFO_PROCESSED),
+					  BIT(IIO_CHAN_INFO_PROCESSED) |
+					  BIT(IIO_CHAN_INFO_SCALE) |
+					  BIT(IIO_CHAN_INFO_OFFSET),
 	},
 };
 
@@ -76,6 +78,10 @@ struct acpi_als {
 	struct mutex		lock;
 
 	s32			evt_buffer[ACPI_ALS_EVT_BUFFER_SIZE];
+
+	int			scale;
+	int			uscale;
+	int			offset;
 };
 
 /*
@@ -154,25 +160,64 @@ static int acpi_als_read_raw(struct iio_dev *indio_dev,
 	s32 temp_val;
 	int ret;
 
-	if ((mask != IIO_CHAN_INFO_PROCESSED) && (mask != IIO_CHAN_INFO_RAW))
-		return -EINVAL;
-
 	/* we support only illumination (_ALI) so far. */
 	if (chan->type != IIO_LIGHT)
 		return -EINVAL;
 
-	ret = acpi_als_read_value(als, ACPI_ALS_ILLUMINANCE, &temp_val);
-	if (ret < 0)
-		return ret;
+	switch (mask) {
+	case IIO_CHAN_INFO_RAW:
+	case IIO_CHAN_INFO_PROCESSED:
+		ret = acpi_als_read_value(als, ACPI_ALS_ILLUMINANCE, &temp_val);
+		if (ret < 0)
+			return ret;
+		*val = temp_val;
+		return IIO_VAL_INT;
+	case IIO_CHAN_INFO_OFFSET:
+		mutex_lock(&als->lock);
+		*val = als->offset;
+		mutex_unlock(&als->lock);
+		return IIO_VAL_INT;
+	case IIO_CHAN_INFO_SCALE:
+		mutex_lock(&als->lock);
+		*val = als->scale;
+		*val2 = als->uscale;
+		mutex_unlock(&als->lock);
+		return IIO_VAL_INT_PLUS_MICRO;
+	default:
+		return -EINVAL;
+	}
+}
 
-	*val = temp_val;
+static int acpi_als_write_raw(struct iio_dev *indio_dev,
+			      struct iio_chan_spec const *chan, int val,
+			      int val2, long mask)
+{
+	struct acpi_als *als = iio_priv(indio_dev);
 
-	return IIO_VAL_INT;
+	if (chan->type != IIO_LIGHT)
+		return -EINVAL;
+
+	switch (mask) {
+	case IIO_CHAN_INFO_OFFSET:
+		mutex_lock(&als->lock);
+		als->offset = val;
+		mutex_unlock(&als->lock);
+		return 0;
+	case IIO_CHAN_INFO_SCALE:
+		mutex_lock(&als->lock);
+		als->scale = val;
+		als->uscale = val2;
+		mutex_unlock(&als->lock);
+		return 0;
+	default:
+		return -EINVAL;
+	}
 }
 
 static const struct iio_info acpi_als_info = {
 	.driver_module		= THIS_MODULE,
 	.read_raw		= acpi_als_read_raw,
+	.write_raw		= acpi_als_write_raw,
 };
 
 static int acpi_als_add(struct acpi_device *device)
@@ -189,6 +234,9 @@ static int acpi_als_add(struct acpi_device *device)
 
 	device->driver_data = indio_dev;
 	als->device = device;
+	als->scale = 1;
+	als->uscale = 0;
+	als->offset = 0;
 	mutex_init(&als->lock);
 
 	indio_dev->name = ACPI_ALS_DEVICE_NAME;
