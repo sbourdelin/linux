@@ -1,0 +1,253 @@
+SoundWire
+===========
+
+SoundWire is a new interface ratified in 2015 by the MIPI Alliance.
+SoundWire is used for transporting data typically related to audio
+functions. SoundWire interface is optimized to integrate audio devices
+in mobile or mobile inspired systems.
+
+SoundWire is a 2-Pin interface with data and clock line. It facilitates
+development of low cost, efficient, high performance systems. Broad
+level key features of SoundWire interface include:
+
+1. Transporting all of payload data channels, control information, and
+setup commands over a single two-pin interface.
+2. Lower clock frequency, and hence lower power consumption, by use of
+DDR (Dual Data Rate) data transmission.
+3. Clock scaling and optional multiple data lanes to give wide
+flexibility in data rate to match system requirements.
+4. Device status monitoring, including interrupt-style alerts to the
+Master.
+
+The SoundWire protocol supports up to eleven Slave interfaces. All the
+interfaces share the common bus containing data and clock line. Each of
+the Slaves can support up to 14 Data Ports. 13 Data Ports are dedicated
+to audio transport. Data Port0 is dedicated to transport of Bulk control
+information, each of the audio Data Ports (1..14) can support up to 8
+Channels in transmit or receiving mode (typically fixed direction but
+configurable direction is enabled by the specification). Bandwidth
+restrictions to ~19.2..24.576Mbits/s don't however allow for 11*13*8
+channels to be transmitted simultaneously.
+
+Below figure shows the SoundWire Master and Slave devices sample
+connectivity.
+
+|---------------|                       Clock Signal    |---------------|
+|    Master     |-------|-------------------------------|    Slave      |
+|   Interface   |       |               Data Signal     |   Interface   |
+|               |-------|-------|-----------------------|       1       |
+|---------------|       |       |                       |---------------|
+                        |       |
+                        |       |
+                        |       |
+                     |---------------|
+                     |    Slave      |
+                     |   Interface   |
+                     |       2       |
+                     |---------------|
+
+Terminology
+=============
+
+Following is the terminology used in Linux kernel driver. SoundWire
+Master interfaces registers as SoundWire Master device and Slave
+interfaces as SoundWire Slave device.
+
+Bus:
+Similar to I2C/AC97 bus driver, implements Linux bus for SoundWire
+handles the SoundWire protocol and manages bus. Programs all the MIPI
+defined Slave registers.
+
+Master:
+Registers as SoundWire Master device (Linux Device). Similar to
+i2c_adapter. One bus instance is created for every Master interface
+registered to the bus driver.
+
+Slave:
+Registers as SoundWire Slave device (Linux Device). Similar to
+i2c_client.  Multiple Slave interfaces can register to same bus.
+
+Master driver:
+Driver controlling the Master device. Registers a set of ops to abstract
+Master registers away, so that the bus driver can control the bus in a
+hardware-agnostic manner.
+
+Slave driver:
+Driver controlling the Slave device. MIPI-specified registers are
+controlled directly by the bus driver (and transmitted through the
+Master driver/interface). Any implementation-defined Slave register is
+controlled by Slave driver. In practice, it is expected that the Slave
+driver relies on regmap and does not request direct register access.
+
+
+Programming interfaces (SoundWire Master interface Driver)
+==========================================================
+
+SoundWire bus driver supports programming interfaces for the SoundWire
+Master and SoundWire Slave devices. All the code uses the "sdw" prefix
+commonly used by SOC designers and 3rd party vendors.
+
+Each of the SoundWire Master interface needs to be registered to the Bus
+driver.  Master interface capabilities also needs to be registered to
+bus driver since there is no discovery mechanism as a part of SoundWire
+protocol.
+
+The Master interface along with the Master interface capabilities are
+registered based on board file, DT or ACPI.
+
+Following is the API to register the SoundWire Master device.
+
+static int my_sdw_register_master()
+{
+	struct sdw_master master;
+	struct sdw_master_capabilities *m_cap;
+
+	m_cap = &master.mstr_capabilities;
+
+	/*
+	 * Fill the Master device capability, this is required
+	 * by bus driver to handle bus configurations.
+	 */
+	m_cap->highphy_capable = false;
+	m_cap->monitor_handover_supported = false;
+	m_cap->sdw_dp0_supported = 1;
+	m_cap->num_data_ports = INTEL_SDW_MAX_PORTS;
+
+	return snd_sdw_master_add(&master);
+}
+
+Master driver gets registered for controlling the Master device. It
+provides the callback functions to the bus driver to control the bus in
+device specific way. Device and Driver binds according to the standard
+Linux device-driver bind model. Master driver is registered from the
+driver init code. Below code shows the sample Master driver
+registration.
+
+static struct sdw_master_driver intel_sdw_mstr_driver = {
+	.driver_type = SDW_DRIVER_TYPE_MASTER,
+	.driver = {
+		.name   = "intel_sdw_mstr",
+		.pm     = &intel_sdw_pm_ops,
+	},
+
+	.probe          = intel_sdw_probe,
+	.remove         = intel_sdw_remove,
+	.mstr_ops       = &intel_sdw_master_ops,
+	.mstr_port_ops = &intel_sdw_master_port_ops,
+};
+
+static int __init intel_sdw_init(void) {
+	return snd_sdw_master_register_driver(&intel_sdw_mstr_driver);
+}
+
+As shown above Master driver registers itself with  bus using
+"sdw_mstr_driver_register" API, It registers using set of "mstr_ops" and
+"mstr_port_ops" callback functions to the bus driver.
+
+"mstr_ops" is used by bus driver to control the bus in the hardware
+specific way. It includes bus control functions such as sending the
+SoundWire read/write messages on bus. The Bus driver also defines the
+clock frequency and frameshape allocation needed by active stream and
+configuration messages that need to be transmitted over the bus, to
+maximize the bandwidth needed while minimizing the power. The "mstr_ops"
+structure abstracts the hardware details of the Master from the bus
+driver for setting up of the clock frequency and frameshape.
+
+"mstr_port_ops" is used by bus driver to setup the Port parameters of
+the Master interface Port. Master interface Port register map is not
+defined by MIPI specification, so bus driver calls the "mstr_port_ops"
+call back function to do Port operations like "Port Prepare", "Port
+Transport params set", "Port enable and disable". The implementation of
+the Master driver can then perform hardware-specific configurations.
+
+Programming interfaces (SoundWire Slave Driver)
+===============================================
+
+The MIPI specification requires each Slave interface to expose a unique
+48-bit identifier, stored in 6 read only dev_id registers. This dev_id
+identifier contains vendor and part information, as well as a field
+enabling to differentiate between identical components. An additional
+class field is currently unused.  Slave driver is written for the
+specific 48-bit identifier, Bus driver enumerates the Slave device based
+on in 48-bit identifier. Slave device and driver match is done based on
+this 48-bit identifier. Probe of the Slave driver is called by bus on
+successful match between device and driver id. A parent/child
+relationship is enforced between Slave and Master devices (the logical
+representation is aligned with the physical connectivity).
+
+The information on Master/Slave dependencies is stored in platform data,
+board-file, ACPI or DT. The MIPI Software specification defines an
+additional link_id parameters for controllers that have multiple Master
+interfaces. The dev_id registers are only unique in the scope of a link,
+and the link_ID unique in the scope of a controller. Both dev_id and
+link_id are not necessarily unique at the system level but the
+parent/child information is used to avoid ambiguity.
+
+
+static const struct sdw_slave_id intel_id[] = {
+	{"0b:00:f9:84:01:02", 0},
+	{},
+};
+
+MODULE_DEVICE_TABLE(sdw, intel_id);
+
+static struct sdw_slave_driver intel_sdw_driver = {
+	.driver_type = SDW_DRIVER_TYPE_SLAVE,
+	.driver = {
+		.name = "intel",
+	},
+	.probe = intel_sdw_probe,
+	.remove = intel_sdw_remove,
+	.id_table = intel_id,
+};
+
+module_sdw_slave_driver(intel_sdw_driver);
+
+Slave driver needs to register the capabilities (number of ports,
+formats supported, etc) of the Slave device to the bus driver after
+registration.  This is the first call to be called by Slave driver on
+probe. Bus driver needs to know a set of Slave capabilities to program
+Slave registers and to control the bus reconfigurations.
+
+Below code shows the sample for it. Bus drivers programs the MIPI
+defined registers of the Slave.
+
+static int slave_register_sdw_capabilities(struct sdw_slave *sdw,
+                                 const struct sdw_slave_id *sdw_id)
+{
+	struct sdw_slv_capabilities cap;
+	struct sdw_slv_dpn_capabilities *dpn_cap = NULL;
+	struct port_audio_mode_properties *prop = NULL;
+	int i, j;
+
+	cap.wake_up_unavailable = true;
+	cap.test_mode_supported = false;
+	cap.clock_stop1_mode_supported = false;
+	cap.simplified_clock_stop_prepare = false;
+	cap.highphy_capable = true;
+	cap.paging_supported = false;
+	cap.bank_delay_support = false;
+	cap.port_15_read_behavior = 0;
+	cap.sdw_dp0_supported = false;
+	cap.num_of_sdw_ports = 3;
+	[...] additional configuration.
+
+		return snd_sdw_slave_register_caps(sdw, &cap);
+
+}
+
+Future enhancements to be done:
+===============================
+
+1. Currently BRA transfers is not supported.
+2. Bus driver supports only Single Data lane Slaves and Masters
+interfaces.
+
+Links:
+=====
+
+SoundWire MIPI specification 1.1 is available at:
+https://members.mipi.org/wg/All-Members/document/70290
+
+SoundWire MIPI DisCo (Discovery and Configuration) specification is in
+press.
