@@ -7,8 +7,6 @@ This driver is used to unmask them prior to use.
 
 Required properties:
 - compatible	: Should be set to one of:
-			"st,stih415-irq-syscfg"
-			"st,stih416-irq-syscfg"
 			"st,stih407-irq-syscfg"
 			"st,stid127-irq-syscfg"
 - st,syscfg	: Phandle to Cortex-A9 IRQ system config registers
@@ -25,8 +23,8 @@ Optional properties:
 Example:
 
 irq-syscfg {
-	compatible    = "st,stih416-irq-syscfg";
-	st,syscfg     = <&syscfg_cpu>;
+	compatible    = "st,stih407-irq-syscfg";
+	st,syscfg     = <&syscfg_core>;
 	st,irq-device = <ST_IRQ_SYSCFG_PMU_0>,
 			<ST_IRQ_SYSCFG_PMU_1>;
 	st,fiq-device = <ST_IRQ_SYSCFG_DISABLED>,
