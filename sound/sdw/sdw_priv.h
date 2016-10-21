@@ -59,6 +59,27 @@
 #ifndef _LINUX_SDW_PRIV_H
 #define _LINUX_SDW_PRIV_H
 
+#include <linux/kthread.h>
+#include <linux/spinlock.h>
+
+/* Number of message(s) transferred on bus. */
+#define SDW_NUM_OF_MSG1_XFRD	1
+#define SDW_NUM_OF_MSG2_XFRD	2
+#define SDW_NUM_OF_MSG3_XFRD	3
+#define SDW_NUM_OF_MSG4_XFRD	4
+
+/* Maximum number of Data Ports. */
+#define SDW_MAX_DATA_PORTS		15
+
+/**
+ * Max retries to service Slave interrupts, once Slave is in ALERT state.
+ * Bus driver tries to service interrupt till Slave state is changed to
+ * "ATTACHED_OK". In case Slave remains in ALERT state because of error
+ * condition on Slave like, PLL not getting locked or continuous Jack
+ * sensing, bus driver exits after MAX retries.
+ */
+#define SDW_INTR_STAT_READ_MAX_TRIES	10
+
 /**
  * sdw_driver: Structure to typecast both Master and Slave driver to generic
  *	SoundWire driver, to find out the driver type.
@@ -72,16 +93,44 @@ struct sdw_driver {
 };
 #define to_sdw_driver(d)			\
 		container_of(d, struct sdw_driver, driver)
+
+/**
+ * sdw_slv_status: List of Slave status.
+ *
+ * @node: Node for adding status to list of Slave status.
+ * @status: Slave status.
+ */
+struct sdw_slv_status {
+	struct list_head node;
+	enum sdw_slave_status status[SDW_MAX_DEVICES];
+};
+
 /**
  * sdw_bus: Bus structure holding bus related information.
  *
  * @bus_node: Node to add the bus in the sdw_core list.
  * @mstr: Master reference for the bus.
+ * @status_thread: Thread to process the Slave status.
+ * @kworker: Worker for updating the Slave status.
+ * @kwork: Work for worker
+ * @status_list: List where status update from master is added. List is
+ *	executed one by one.
+ *
+ * @spinlock: Lock to protect the list between work thread and interrupt
+ *	context. Bus driver does Slave status processing in the thread
+ *	context, spinlock is used to put the status reported by Master into
+ *	the status list which is processed by bus driver in thread context
+ *	later.
  */
 
 struct sdw_bus {
 	struct list_head bus_node;
 	struct sdw_master *mstr;
+	struct task_struct *status_thread;
+	struct kthread_worker kworker;
+	struct kthread_work kwork;
+	struct list_head status_list;
+	spinlock_t spinlock;
 };
 
 /**
@@ -117,6 +166,23 @@ struct snd_sdw_core {
  */
 void sdw_bank_switch_deferred(struct sdw_master *mstr, struct sdw_msg *msg,
 				struct sdw_deferred_xfer_data *data);
+
+/**
+ * sdw_enable_disable_dpn_intr: Enable or Disable Slave Data Port interrupt.
+ *	This is called by bus driver before prepare and after deprepare of
+ *	the ports.
+ *
+ * @sdw_slv: Slave handle.
+ * @port_num: Port number.
+ * @port_direction: Direction of the port configuration while doing
+ *	prepare/deprepare.
+ *
+ * @enable: Enable (1) or disable (0) the port interrupts.
+ */
+int sdw_enable_disable_dpn_intr(struct sdw_slave *sdw_slv, int port_num,
+					int port_direction, bool enable);
+
+
 /*
  * Helper function for bus driver to write messages. Since bus driver
  * operates on MIPI defined Slave registers, addr_page1 and addr_page2 is
