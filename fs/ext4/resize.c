@@ -15,6 +15,7 @@
 #include <linux/slab.h>
 
 #include "ext4_jbd2.h"
+#include "resize.h"
 
 int ext4_resize_begin(struct super_block *sb)
 {
@@ -45,7 +46,8 @@ int ext4_resize_begin(struct super_block *sb)
 		return -EPERM;
 	}
 
-	if (test_and_set_bit_lock(EXT4_RESIZING, &EXT4_SB(sb)->s_resize_flags))
+	if (test_and_set_bit_lock(EXT4_RESIZING_ACTIVE,
+				  &EXT4_SB(sb)->s_resize_flags))
 		ret = -EBUSY;
 
 	return ret;
@@ -53,7 +55,7 @@ int ext4_resize_begin(struct super_block *sb)
 
 void ext4_resize_end(struct super_block *sb)
 {
-	clear_bit_unlock(EXT4_RESIZING, &EXT4_SB(sb)->s_resize_flags);
+	clear_bit_unlock(EXT4_RESIZING_ACTIVE, &EXT4_SB(sb)->s_resize_flags);
 	smp_mb__after_atomic();
 }
 

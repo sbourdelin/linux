@@ -1403,7 +1403,9 @@ struct ext4_sb_info {
 	struct list_head s_orphan;
 	struct mutex s_orphan_lock;
 	unsigned long s_resize_flags;		/* Flags indicating if there
-						   is a resizer */
+						 *  is a resizer using
+						 * EXT4_RESIZING_* bits
+						 */
 	unsigned long s_commit_interval;
 	u32 s_max_batch_time;
 	u32 s_min_batch_time;
@@ -2555,14 +2557,6 @@ extern int ext4_generic_delete_entry(handle_t *handle,
 				     int csum_size);
 extern bool ext4_empty_dir(struct inode *inode);
 
-/* resize.c */
-extern int ext4_group_add(struct super_block *sb,
-				struct ext4_new_group_data *input);
-extern int ext4_group_extend(struct super_block *sb,
-				struct ext4_super_block *es,
-				ext4_fsblk_t n_blocks_count);
-extern int ext4_resize_fs(struct super_block *sb, ext4_fsblk_t n_blocks_count);
-
 /* super.c */
 extern int ext4_seq_options_show(struct seq_file *seq, void *offset);
 extern int ext4_calculate_overhead(struct super_block *sb);
@@ -3238,10 +3232,6 @@ static inline void ext4_inode_resume_unlocked_dio(struct inode *inode)
 #define ext4_ioend_wq(v)   (&ext4__ioend_wq[((unsigned long)(v)) %\
 					    EXT4_WQ_HASH_SZ])
 extern wait_queue_head_t ext4__ioend_wq[EXT4_WQ_HASH_SZ];
-
-#define EXT4_RESIZING	0
-extern int ext4_resize_begin(struct super_block *sb);
-extern void ext4_resize_end(struct super_block *sb);
 
 static inline void ext4_set_io_unwritten_flag(struct inode *inode,
 					      struct ext4_io_end *io_end)
