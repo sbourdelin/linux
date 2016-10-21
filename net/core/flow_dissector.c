@@ -245,7 +245,7 @@ ipv6:
 	}
 	case htons(ETH_P_8021AD):
 	case htons(ETH_P_8021Q): {
-		const struct vlan_hdr *vlan;
+		const struct vlan_hdr *vlan = NULL;
 
 		if (skb && skb_vlan_tag_present(skb))
 			proto = skb->protocol;
@@ -264,7 +264,7 @@ ipv6:
 		}
 
 		skip_vlan = true;
-		if (dissector_uses_key(flow_dissector,
+		if (vlan && dissector_uses_key(flow_dissector,
 				       FLOW_DISSECTOR_KEY_VLAN)) {
 			key_vlan = skb_flow_dissector_target(flow_dissector,
 							     FLOW_DISSECTOR_KEY_VLAN,
