@@ -52,6 +52,9 @@ Optional properties:
 - no-sdio: controller is limited to send sdio cmd during initialization
 - no-sd: controller is limited to send sd cmd during initialization
 - no-mmc: controller is limited to send mmc cmd during initialization
+- sdhci-cap-speed-modes-broken: One or more of the bits in the sdhci
+  capabilities registers representing speed modes are incorrect. All the bits
+  representing speed modes should be ignored.
 
 *NOTE* on CD and WP polarity. To use common for all SD/MMC host controllers line
 polarity properties, we have to fix the meaning of the "normal" and "inverted"
