@@ -31,6 +31,7 @@
 #include <linux/micrel_phy.h>
 #include <linux/mfd/syscon.h>
 #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+#include <linux/of_net.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/system_misc.h>
@@ -262,6 +263,13 @@ static void __init imx6q_axi_init(void)
 	}
 }
 
+static inline void imx6q_enet_init(void)
+{
+	ocotp_enet_mac_init("fsl,imx6q-fec");
+	imx6q_enet_phy_init();
+	imx6q_1588_init();
+}
+
 static void __init imx6q_init_machine(void)
 {
 	struct device *parent;
@@ -276,14 +284,12 @@ static void __init imx6q_init_machine(void)
 	if (parent == NULL)
 		pr_warn("failed to initialize soc device\n");
 
-	imx6q_enet_phy_init();
-
 	of_platform_default_populate(NULL, NULL, parent);
 
 	imx_ocotp_init("fsl,imx6q-ocotp");
+	imx6q_enet_init();
 	imx_anatop_init();
 	cpu_is_imx6q() ?  imx6q_pm_init() : imx6dl_pm_init();
-	imx6q_1588_init();
 	imx6q_axi_init();
 }
 
