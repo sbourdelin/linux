@@ -741,7 +741,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 	struct vfio_group *group, *g;
 	struct vfio_domain *domain, *d;
 	struct bus_type *bus = NULL;
-	int ret;
+	int attr, ret;
 
 	mutex_lock(&iommu->lock);
 
@@ -775,10 +775,19 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 		goto out_free;
 	}
 
+	/*
+	 * Set iommu nesting domain attribute if nesting translation
+	 * is enabled from iommu vfio, otherwise set iommu only stage
+	 * 2 domain attribute.
+	 */
+	attr = 1;
 	if (iommu->nesting) {
-		int attr = 1;
-
 		ret = iommu_domain_set_attr(domain->domain, DOMAIN_ATTR_NESTING,
+					    &attr);
+		if (ret)
+			goto out_domain;
+	} else {
+		ret = iommu_domain_set_attr(domain->domain, DOMAIN_ATTR_S2,
 					    &attr);
 		if (ret)
 			goto out_domain;
