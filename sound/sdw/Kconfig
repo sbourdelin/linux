@@ -1,0 +1,6 @@
+config SOUND_SDW
+	tristate
+	help
+	  SoundWire interface is typically used for transporting data
+	  related to audio functions. Concerned drivers should "select"
+	  this.
