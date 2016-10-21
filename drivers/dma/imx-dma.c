@@ -813,8 +813,6 @@ static struct dma_async_tx_descriptor *imxdma_prep_slave_sg(
 		unsigned long flags, void *context)
 {
 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
-	struct scatterlist *sg;
-	int i, dma_length = 0;
 	struct imxdma_desc *desc;
 
 	if (list_empty(&imxdmac->ld_free) ||
@@ -822,10 +820,6 @@ static struct dma_async_tx_descriptor *imxdma_prep_slave_sg(
 		return NULL;
 
 	desc = list_first_entry(&imxdmac->ld_free, struct imxdma_desc, node);
-
-	for_each_sg(sgl, sg, sg_len, i) {
-		dma_length += sg_dma_len(sg);
-	}
 
 	switch (imxdmac->word_size) {
 	case DMA_SLAVE_BUSWIDTH_4_BYTES:
@@ -845,7 +839,7 @@ static struct dma_async_tx_descriptor *imxdma_prep_slave_sg(
 	desc->type = IMXDMA_DESC_SLAVE_SG;
 	desc->sg = sgl;
 	desc->sgcount = sg_len;
-	desc->len = dma_length;
+	desc->len = sg_nents_for_dma(sgl, sg_len, SIZE_MAX);
 	desc->direction = direction;
 	if (direction == DMA_DEV_TO_MEM) {
 		desc->src = imxdmac->per_address;
