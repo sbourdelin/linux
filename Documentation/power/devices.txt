@@ -607,7 +607,9 @@ individually.  Instead, a set of devices sharing a power resource can be put
 into a low-power state together at the same time by turning off the shared
 power resource.  Of course, they also need to be put into the full-power state
 together, by turning the shared power resource on.  A set of devices with this
-property is often referred to as a power domain.
+property is often referred to as a power domain. A power domain may also be
+nested inside another power domain. The nested domain is referred to as the
+sub-domain of the parent domain.
 
 Support for power domains is provided through the pm_domain field of struct
 device.  This field is a pointer to an object of type struct dev_pm_domain,
@@ -629,6 +631,13 @@ support for power domains into subsystem-level callbacks, for example by
 modifying the platform bus type.  Other platforms need not implement it or take
 it into account in any way.
 
+Devices and PM domains may be defined as IRQ-safe, if they can be powered
+on/off even when the IRQs are disabled. An IRQ-safe device in a domain will
+disallow power management on the domain, unless the domain is also defined as
+IRQ-safe. In other words, a domain containing all IRQ-safe devices must also
+be defined as IRQ-safe. Another restriction this framework imposes on the
+parent domain of an IRQ-safe domain is that the parent domain must also be
+defined as IRQ-safe.
 
 Device Low Power (suspend) States
 ---------------------------------
