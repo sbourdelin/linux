@@ -78,6 +78,24 @@ static int read_block(struct inode *inode, void *addr, unsigned int block,
 		goto dump;
 
 	dlen = le32_to_cpu(dn->ch.len) - UBIFS_DATA_NODE_SZ;
+
+	if (ubifs_crypt_is_encrypted(inode)) {
+		int clen = le16_to_cpu(dn->compr_size);
+
+		if (clen <= 0 || clen > UBIFS_BLOCK_SIZE || clen > dlen)
+			goto dump;
+
+		ubifs_assert(dlen <= UBIFS_BLOCK_SIZE);
+		err = fscrypt_decrypt_buffer(inode, &dn->data, &dn->data, dlen, block, GFP_NOFS);
+		if (err) {
+			ubifs_err(c, "fscrypt_decrypt_buffer failed: %i", err);
+			return err;
+		}
+
+		ubifs_assert(clen <= dlen);
+		dlen = clen;
+	}
+
 	out_len = UBIFS_BLOCK_SIZE;
 	err = ubifs_decompress(c, &dn->data, dlen, addr, &out_len,
 			       le16_to_cpu(dn->compr_type));
@@ -650,6 +668,24 @@ static int populate_page(struct ubifs_info *c, struct page *page,
 
 			dlen = le32_to_cpu(dn->ch.len) - UBIFS_DATA_NODE_SZ;
 			out_len = UBIFS_BLOCK_SIZE;
+
+			if (ubifs_crypt_is_encrypted(inode)) {
+				int clen = le16_to_cpu(dn->compr_size);
+
+				if (clen <= 0 || clen > UBIFS_BLOCK_SIZE || clen > dlen)
+					goto out_err;
+
+				ubifs_assert(dlen <= UBIFS_BLOCK_SIZE);
+				err = fscrypt_decrypt_buffer(inode, &dn->data, &dn->data, dlen, page_block, GFP_NOFS);
+				if (err) {
+					ubifs_err(c, "fscrypt_decrypt_buffer failed: %i", err);
+					goto out_err;
+				}
+
+				ubifs_assert(clen <= dlen);
+				dlen = clen;
+			}
+
 			err = ubifs_decompress(c, &dn->data, dlen, addr, &out_len,
 					       le16_to_cpu(dn->compr_type));
 			if (err || len != out_len)

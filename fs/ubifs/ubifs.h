@@ -139,6 +139,12 @@
  */
 #define WORST_COMPR_FACTOR 2
 
+#ifdef CONFIG_UBIFS_FS_ENCRYPTION
+#define UBIFS_CIPHER_BLOCK_SIZE FS_CRYPTO_BLOCK_SIZE
+#else
+#define UBIFS_CIPHER_BLOCK_SIZE 0
+#endif
+
 /*
  * How much memory is needed for a buffer where we compress a data node.
  */
