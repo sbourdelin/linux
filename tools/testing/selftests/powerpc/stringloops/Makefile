@@ -2,14 +2,12 @@
 CFLAGS += -m64
 CFLAGS += -I$(CURDIR)
 
-TEST_PROGS := memcmp
+TEST_GEN_PROGS := memcmp
 EXTRA_SOURCES := memcmp_64.S ../harness.c
-
-all: $(TEST_PROGS)
-
-$(TEST_PROGS): $(EXTRA_SOURCES)
 
 include ../../lib.mk
 
+$(TEST_GEN_PROGS): $(EXTRA_SOURCES)
+
 clean:
-	rm -f $(TEST_PROGS) *.o
+	$(RM) $(TEST_GEN_PROGS) *.o
