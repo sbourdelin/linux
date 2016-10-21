@@ -297,7 +297,7 @@ static int cht_suspend_pre(struct snd_soc_card *card)
 	list_for_each_entry(codec, &card->codec_dev_list, card_list) {
 		if (!strcmp(codec->component.name, "i2c-10EC5670:00")) {
 			dev_dbg(codec->dev, "disabling jack detect before going to suspend.\n");
-			rt5670_jack_suspend(codec);
+			rt5670_jack_suspend(&codec->component);
 			break;
 		}
 	}
@@ -311,7 +311,7 @@ static int cht_resume_post(struct snd_soc_card *card)
 	list_for_each_entry(codec, &card->codec_dev_list, card_list) {
 		if (!strcmp(codec->component.name, "i2c-10EC5670:00")) {
 			dev_dbg(codec->dev, "enabling jack detect for resume.\n");
-			rt5670_jack_resume(codec);
+			rt5670_jack_resume(&codec->component);
 			break;
 		}
 	}

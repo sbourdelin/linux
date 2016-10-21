@@ -413,46 +413,47 @@ static bool rt5670_readable_register(struct device *dev, unsigned int reg)
  * Returns detect status.
  */
 
-static int rt5670_headset_detect(struct snd_soc_codec *codec, int jack_insert)
+static int rt5670_headset_detect(struct snd_soc_component *component, int jack_insert)
 {
 	int val;
-	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(codec);
-	struct rt5670_priv *rt5670 = snd_soc_codec_get_drvdata(codec);
+	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(component);
+	struct rt5670_priv *rt5670 = snd_soc_component_get_drvdata(component);
 
 	if (jack_insert) {
 		snd_soc_dapm_force_enable_pin(dapm, "Mic Det Power");
 		snd_soc_dapm_sync(dapm);
-		snd_soc_update_bits(codec, RT5670_GEN_CTRL3, 0x4, 0x0);
-		snd_soc_update_bits(codec, RT5670_CJ_CTRL2,
+		snd_soc_component_update_bits(component, RT5670_GEN_CTRL3, 0x4, 0x0);
+		snd_soc_component_update_bits(component, RT5670_CJ_CTRL2,
 			RT5670_CBJ_DET_MODE | RT5670_CBJ_MN_JD,
 			RT5670_CBJ_MN_JD);
-		snd_soc_write(codec, RT5670_GPIO_CTRL2, 0x0004);
-		snd_soc_update_bits(codec, RT5670_GPIO_CTRL1,
+		snd_soc_component_write(component, RT5670_GPIO_CTRL2, 0x0004);
+		snd_soc_component_update_bits(component, RT5670_GPIO_CTRL1,
 			RT5670_GP1_PIN_MASK, RT5670_GP1_PIN_IRQ);
-		snd_soc_update_bits(codec, RT5670_CJ_CTRL1,
+		snd_soc_component_update_bits(component, RT5670_CJ_CTRL1,
 			RT5670_CBJ_BST1_EN, RT5670_CBJ_BST1_EN);
-		snd_soc_write(codec, RT5670_JD_CTRL3, 0x00f0);
-		snd_soc_update_bits(codec, RT5670_CJ_CTRL2,
+		snd_soc_component_write(component, RT5670_JD_CTRL3, 0x00f0);
+		snd_soc_component_update_bits(component, RT5670_CJ_CTRL2,
 			RT5670_CBJ_MN_JD, RT5670_CBJ_MN_JD);
-		snd_soc_update_bits(codec, RT5670_CJ_CTRL2,
+		snd_soc_component_update_bits(component, RT5670_CJ_CTRL2,
 			RT5670_CBJ_MN_JD, 0);
 		msleep(300);
-		val = snd_soc_read(codec, RT5670_CJ_CTRL3) & 0x7;
+		snd_soc_component_read(component, RT5670_CJ_CTRL3, &val);
+		val &= 0x7;
 		if (val == 0x1 || val == 0x2) {
 			rt5670->jack_type = SND_JACK_HEADSET;
 			/* for push button */
-			snd_soc_update_bits(codec, RT5670_INT_IRQ_ST, 0x8, 0x8);
-			snd_soc_update_bits(codec, RT5670_IL_CMD, 0x40, 0x40);
-			snd_soc_read(codec, RT5670_IL_CMD);
+			snd_soc_component_update_bits(component, RT5670_INT_IRQ_ST, 0x8, 0x8);
+			snd_soc_component_update_bits(component, RT5670_IL_CMD, 0x40, 0x40);
+			snd_soc_component_read(component, RT5670_IL_CMD, &val);
 		} else {
-			snd_soc_update_bits(codec, RT5670_GEN_CTRL3, 0x4, 0x4);
+			snd_soc_component_update_bits(component, RT5670_GEN_CTRL3, 0x4, 0x4);
 			rt5670->jack_type = SND_JACK_HEADPHONE;
 			snd_soc_dapm_disable_pin(dapm, "Mic Det Power");
 			snd_soc_dapm_sync(dapm);
 		}
 	} else {
-		snd_soc_update_bits(codec, RT5670_INT_IRQ_ST, 0x8, 0x0);
-		snd_soc_update_bits(codec, RT5670_GEN_CTRL3, 0x4, 0x4);
+		snd_soc_component_update_bits(component, RT5670_INT_IRQ_ST, 0x8, 0x0);
+		snd_soc_component_update_bits(component, RT5670_GEN_CTRL3, 0x4, 0x4);
 		rt5670->jack_type = 0;
 		snd_soc_dapm_disable_pin(dapm, "Mic Det Power");
 		snd_soc_dapm_sync(dapm);
@@ -461,21 +462,21 @@ static int rt5670_headset_detect(struct snd_soc_codec *codec, int jack_insert)
 	return rt5670->jack_type;
 }
 
-void rt5670_jack_suspend(struct snd_soc_codec *codec)
+void rt5670_jack_suspend(struct snd_soc_component *component)
 {
-	struct rt5670_priv *rt5670 = snd_soc_codec_get_drvdata(codec);
+	struct rt5670_priv *rt5670 = snd_soc_component_get_drvdata(component);
 
 	rt5670->jack_type_saved = rt5670->jack_type;
-	rt5670_headset_detect(codec, 0);
+	rt5670_headset_detect(component, 0);
 }
 EXPORT_SYMBOL_GPL(rt5670_jack_suspend);
 
-void rt5670_jack_resume(struct snd_soc_codec *codec)
+void rt5670_jack_resume(struct snd_soc_component *component)
 {
-	struct rt5670_priv *rt5670 = snd_soc_codec_get_drvdata(codec);
+	struct rt5670_priv *rt5670 = snd_soc_component_get_drvdata(component);
 
 	if (rt5670->jack_type_saved)
-		rt5670_headset_detect(codec, 1);
+		rt5670_headset_detect(component, 1);
 }
 EXPORT_SYMBOL_GPL(rt5670_jack_resume);
 
@@ -512,7 +513,7 @@ static int rt5670_irq_detection(void *data)
 	case 0x30: /* 2 port */
 	case 0x0: /* 1 port or 2 port */
 		if (rt5670->jack_type == 0) {
-			report = rt5670_headset_detect(rt5670->codec, 1);
+			report = rt5670_headset_detect(&rt5670->codec->component, 1);
 			/* for push button and jack out */
 			gpio->debounce_time = 25;
 			break;
@@ -549,7 +550,7 @@ static int rt5670_irq_detection(void *data)
 	case 0x20: /* 1 port */
 		report = 0;
 		snd_soc_update_bits(rt5670->codec, RT5670_INT_IRQ_ST, 0x1, 0x0);
-		rt5670_headset_detect(rt5670->codec, 0);
+		rt5670_headset_detect(&rt5670->codec->component, 0);
 		gpio->debounce_time = 150; /* for jack in */
 		break;
 	default:

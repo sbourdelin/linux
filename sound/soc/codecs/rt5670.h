@@ -2007,8 +2007,8 @@ struct rt5670_priv {
 	int jack_type_saved;
 };
 
-void rt5670_jack_suspend(struct snd_soc_codec *codec);
-void rt5670_jack_resume(struct snd_soc_codec *codec);
+void rt5670_jack_suspend(struct snd_soc_component *component);
+void rt5670_jack_resume(struct snd_soc_component *component);
 int rt5670_set_jack_detect(struct snd_soc_codec *codec,
 	struct snd_soc_jack *jack);
 #endif /* __RT5670_H__ */
