@@ -1349,7 +1349,9 @@ struct hfa384x {
 						  * interface
 						  */
 
-	struct hfa384x_caplevel cap_act_sta_mfi; /* sta f/w to modem interface */
+	struct hfa384x_caplevel cap_act_sta_mfi; /*
+						  * sta f/w to modem interface
+						  */
 
 	struct hfa384x_caplevel cap_act_ap_cfi;	/*
 						 * ap f/w to controller
@@ -1371,7 +1373,9 @@ struct hfa384x {
 
 	struct hfa384x_inf_frame *scanresults;
 
-	struct prism2sta_authlist authlist;	/* Authenticated station list. */
+	struct prism2sta_authlist authlist;	/*
+						 * Authenticated station list
+						 */
 	unsigned int accessmode;		/* Access mode. */
 	struct prism2sta_accesslist allow;	/* Allowed station list. */
 	struct prism2sta_accesslist deny;	/* Denied station list. */
