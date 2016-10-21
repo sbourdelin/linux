@@ -192,8 +192,10 @@ static int prio_tune(struct Qdisc *sch, struct nlattr *opt)
 		qdisc_destroy(child);
 	}
 
-	for (i = oldbands; i < q->bands; i++)
+	for (i = oldbands; i < q->bands; i++) {
 		q->queues[i] = queues[i];
+		qdisc_hash_add(q->queues[i]);
+	}
 
 	sch_tree_unlock(sch);
 	return 0;

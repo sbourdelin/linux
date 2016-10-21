@@ -396,6 +396,7 @@ static int tbf_change(struct Qdisc *sch, struct nlattr *opt)
 					  q->qdisc->qstats.backlog);
 		qdisc_destroy(q->qdisc);
 		q->qdisc = child;
+		qdisc_hash_add(child);
 	}
 	q->limit = qopt->limit;
 	if (tb[TCA_TBF_PBURST])

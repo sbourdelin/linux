@@ -512,6 +512,7 @@ static int sfb_change(struct Qdisc *sch, struct nlattr *opt)
 	if (IS_ERR(child))
 		return PTR_ERR(child);
 
+	qdisc_hash_add(child);
 	sch_tree_lock(sch);
 
 	qdisc_tree_reduce_backlog(q->qdisc, q->qdisc->q.qlen,

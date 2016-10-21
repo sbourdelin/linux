@@ -118,6 +118,8 @@ static int drr_change_class(struct Qdisc *sch, u32 classid, u32 parentid,
 	if (cl->qdisc == NULL)
 		cl->qdisc = &noop_qdisc;
 
+	qdisc_hash_add(cl->qdisc);
+
 	if (tca[TCA_RATE]) {
 		err = gen_replace_estimator(&cl->bstats, NULL, &cl->rate_est,
 					    NULL,

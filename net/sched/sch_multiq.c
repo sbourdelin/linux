@@ -217,6 +217,7 @@ static int multiq_tune(struct Qdisc *sch, struct nlattr *opt)
 				sch_tree_lock(sch);
 				old = q->queues[i];
 				q->queues[i] = child;
+				qdisc_hash_add(child);
 
 				if (old != &noop_qdisc) {
 					qdisc_tree_reduce_backlog(old,
