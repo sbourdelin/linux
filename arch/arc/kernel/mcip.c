@@ -197,6 +197,7 @@ idu_irq_set_affinity(struct irq_data *data, const struct cpumask *cpumask,
 {
 	unsigned long flags;
 	cpumask_t online;
+	unsigned long dest_bits;
 
 	/* errout if no online cpu per @cpumask */
 	if (!cpumask_and(&online, cpumask, cpu_online_mask))
@@ -204,8 +205,14 @@ idu_irq_set_affinity(struct irq_data *data, const struct cpumask *cpumask,
 
 	raw_spin_lock_irqsave(&mcip_lock, flags);
 
-	idu_set_dest(data->hwirq, cpumask_bits(&online)[0]);
-	idu_set_mode(data->hwirq, IDU_M_TRIG_LEVEL, IDU_M_DISTRI_RR);
+	dest_bits = cpumask_bits(&online)[0];
+	idu_set_dest(data->hwirq, dest_bits);
+
+	if (ffs(dest_bits) == fls(dest_bits)) {
+		idu_set_mode(data->hwirq, IDU_M_TRIG_LEVEL, IDU_M_DISTRI_DEST);
+	} else {
+		idu_set_mode(data->hwirq, IDU_M_TRIG_LEVEL, IDU_M_DISTRI_RR);
+	}
 
 	raw_spin_unlock_irqrestore(&mcip_lock, flags);
 
