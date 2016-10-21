@@ -3292,6 +3292,7 @@ static const struct ixgbe_mac_operations mac_ops_X550 = {
 	X550_COMMON_MAC
 	.led_on			= ixgbe_led_on_generic,
 	.led_off		= ixgbe_led_off_generic,
+	.init_led_link_act	= ixgbe_init_led_link_act_generic,
 	.reset_hw		= &ixgbe_reset_hw_X540,
 	.get_media_type		= &ixgbe_get_media_type_X540,
 	.get_san_mac_addr	= &ixgbe_get_san_mac_addr_generic,
@@ -3313,6 +3314,7 @@ static const struct ixgbe_mac_operations mac_ops_X550EM_x = {
 	X550_COMMON_MAC
 	.led_on			= ixgbe_led_on_t_x550em,
 	.led_off		= ixgbe_led_off_t_x550em,
+	.init_led_link_act	= ixgbe_init_led_link_act_generic,
 	.reset_hw		= &ixgbe_reset_hw_X550em,
 	.get_media_type		= &ixgbe_get_media_type_X550em,
 	.get_san_mac_addr	= NULL,
@@ -3334,6 +3336,7 @@ static struct ixgbe_mac_operations mac_ops_x550em_a = {
 	X550_COMMON_MAC
 	.led_on			= ixgbe_led_on_t_x550em,
 	.led_off		= ixgbe_led_off_t_x550em,
+	.init_led_link_act	= ixgbe_init_led_link_act_generic,
 	.reset_hw		= ixgbe_reset_hw_X550em,
 	.get_media_type		= ixgbe_get_media_type_X550em,
 	.get_san_mac_addr	= NULL,
