@@ -74,17 +74,36 @@ static int rsi_process_pkt(struct rsi_common *common)
 	u8 num_blks = 0;
 	u32 rcv_pkt_len = 0;
 	int status = 0;
+	u8 value = 0;
+	u8 protocol = 0, unaggr_pkt = 0;
 
-	status = rsi_sdio_read_register(adapter,
-					SDIO_RX_NUM_BLOCKS_REG,
-					&num_blks);
+#define COEX_PKT 0
+#define WLAN_PKT 3
+#define ZIGB_PKT 1
+#define BT_PKT   2
+	num_blks = ((adapter->interrupt_status & 1) |
+			((adapter->interrupt_status >> 4) << 1));
 
-	if (status) {
-		rsi_dbg(ERR_ZONE,
-			"%s: Failed to read pkt length from the card:\n",
-			__func__);
-		return status;
+	if (!num_blks) {
+		status = rsi_sdio_read_register(adapter,
+						SDIO_RX_NUM_BLOCKS_REG,
+						&value);
+		if (status) {
+			rsi_dbg(ERR_ZONE,
+				"%s: Failed to read pkt length from the card:\n",
+				__func__);
+			return status;
+		}
+
+		protocol = value >> 5;
+		num_blks = value & 0x1f;
+	} else {
+		protocol = WLAN_PKT;
 	}
+
+	if (protocol == BT_PKT || protocol == ZIGB_PKT)  //unaggr_pkt FIXME
+		unaggr_pkt = 1;
+
 	rcv_pkt_len = (num_blks * 256);
 
 	common->rx_data_pkt = kmalloc(rcv_pkt_len, GFP_KERNEL);
@@ -233,6 +252,8 @@ void rsi_interrupt_handler(struct rsi_hw *adapter)
 			mutex_unlock(&common->tx_rxlock);
 			return;
 		}
+		adapter->interrupt_status = isr_status;
+		isr_status &= 0xE;
 
 		rsi_dbg(ISR_ZONE, "%s: Intr_status = %x %d %d\n",
 			__func__, isr_status, (1 << MSDU_PKT_PENDING),

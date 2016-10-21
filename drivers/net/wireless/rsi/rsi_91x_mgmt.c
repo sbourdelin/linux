@@ -18,6 +18,16 @@
 #include "rsi_mgmt.h"
 #include "rsi_common.h"
 
+struct rsi_config_vals dev_config_vals[] = {
+	{
+		.lp_ps_handshake = 0,
+		.ulp_ps_handshake = 0,
+		.sleep_config_params = 0,
+		.ext_pa_or_bt_coex_en = 0,
+	},
+};
+
+/* Bootup Parameters for 20MHz */
 static struct bootup_params boot_params_20 = {
 	.magic_number = cpu_to_le16(0x5aa5),
 	.crystal_good_time = 0x0,
@@ -199,6 +209,39 @@ static struct bootup_params boot_params_40 = {
 	.dcdc_operation_mode = 0x0,
 	.soc_reset_wait_cnt = 0x0
 };
+#define UNUSED_GPIO	1
+#define USED_GPIO	0
+struct rsi_ulp_gpio_vals unused_ulp_gpio_bitmap = {
+	.motion_sensor_gpio_ulp_wakeup = UNUSED_GPIO,
+	.sleep_ind_from_device = UNUSED_GPIO,
+	.ulp_gpio_2 = UNUSED_GPIO,
+	.push_button_ulp_wakeup = UNUSED_GPIO,
+};
+
+struct rsi_soc_gpio_vals unused_soc_gpio_bitmap = {
+	.pspi_csn_0		= USED_GPIO,	//GPIO_0
+	.pspi_csn_1		= USED_GPIO,	//GPIO_1
+	.host_wakeup_intr	= UNUSED_GPIO,	//GPIO_2
+	.pspi_data_0		= USED_GPIO,	//GPIO_3
+	.pspi_data_1		= USED_GPIO,	//GPIO_4
+	.pspi_data_2		= USED_GPIO,	//GPIO_5
+	.pspi_data_3		= USED_GPIO,	//GPIO_6
+	.i2c_scl		= USED_GPIO,	//GPIO_7
+	.i2c_sda		= USED_GPIO,	//GPIO_8
+	.uart1_rx		= UNUSED_GPIO,	//GPIO_9
+	.uart1_tx		= UNUSED_GPIO,	//GPIO_10
+	.uart1_rts_i2s_clk	= UNUSED_GPIO,	//GPIO_11
+	.uart1_cts_i2s_ws	= UNUSED_GPIO,	//GPIO_12
+	.dbg_uart_rx_i2s_din	= UNUSED_GPIO,	//GPIO_13
+	.dbg_uart_tx_i2s_dout	= UNUSED_GPIO,	//GPIO_14
+	.lp_wakeup_boot_bypass	= UNUSED_GPIO,	//GPIO_15
+	.led_0			= USED_GPIO,	//GPIO_16
+	.btcoex_wlan_active_ext_pa_ant_sel_A = UNUSED_GPIO, //GPIO_17
+	.btcoex_bt_priority_ext_pa_ant_sel_B = UNUSED_GPIO, //GPIO_18
+	.btcoex_bt_active_ext_pa_on_off = UNUSED_GPIO, //GPIO_19
+	.rf_reset		= USED_GPIO, //GPIO_20
+	.sleep_ind_from_device	= UNUSED_GPIO,
+};
 
 static u16 mcs[] = {13, 26, 39, 52, 78, 104, 117, 130};
 
@@ -218,6 +261,26 @@ static void rsi_set_default_parameters(struct rsi_common *common)
 	common->fsm_state = FSM_CARD_NOT_READY;
 	common->iface_down = true;
 	common->endpoint = EP_2GHZ_20MHZ;
+	common->driver_mode = 1; /* End-to-End Mode */
+#ifdef CONFIG_RSI_COEX
+	common->coex_mode = 4;
+#else
+	common->coex_mode = 1; /*Default coex mode is WIFI alone */
+#endif
+	common->oper_mode = 1;
+	common->ta_aggr = 0;
+	common->skip_fw_load = 0; /* Default disable skipping fw loading */
+	common->lp_ps_handshake_mode = 0; /* Default No HandShake mode*/
+	common->ulp_ps_handshake_mode = 2; /* Default PKT HandShake mode*/
+	common->rf_power_val = 0; /* Default 1.9V */
+	common->device_gpio_type = TA_GPIO; /* Default TA GPIO */
+	common->country_code = 840; /* Default US */
+	common->wlan_rf_power_mode = 0;
+	common->bt_rf_power_mode = 0;
+	common->obm_ant_sel_val = 2;
+	common->antenna_diversity = 0;
+	common->tx_power = RSI_TXPOWER_MAX;
+
 }
 
 /**
@@ -301,10 +364,11 @@ static int rsi_load_radio_caps(struct rsi_common *common)
 	radio_caps = (struct rsi_radio_caps *)skb->data;
 
 	radio_caps->desc_word[1] = cpu_to_le16(RADIO_CAPABILITIES);
-	radio_caps->desc_word[4] = cpu_to_le16(RSI_RF_TYPE << 8);
+	radio_caps->desc_word[4] = cpu_to_le16(common->channel);
+	radio_caps->desc_word[4] |= cpu_to_le16(RSI_RF_TYPE << 8);
 
+	radio_caps->desc_word[7] |= cpu_to_le16(RSI_LMAC_CLOCK_80MHZ);
 	if (common->channel_width == BW_40MHZ) {
-		radio_caps->desc_word[7] |= cpu_to_le16(RSI_LMAC_CLOCK_80MHZ);
 		radio_caps->desc_word[7] |= cpu_to_le16(RSI_ENABLE_40MHZ);
 
 		if (common->fsm_state == FSM_MAC_INIT_DONE) {
@@ -345,7 +409,7 @@ static int rsi_load_radio_caps(struct rsi_common *common)
 		radio_caps->qos_params[ii].txop_q = 0;
 	}
 
-	for (ii = 0; ii < MAX_HW_QUEUES - 4; ii++) {
+	for (ii = 0; ii < NUM_EDCA_QUEUES; ii++) {
 		radio_caps->qos_params[ii].cont_win_min_q =
 			cpu_to_le16(common->edca_params[ii].cw_min);
 		radio_caps->qos_params[ii].cont_win_max_q =
@@ -355,6 +419,10 @@ static int rsi_load_radio_caps(struct rsi_common *common)
 		radio_caps->qos_params[ii].txop_q =
 			cpu_to_le16(common->edca_params[ii].txop);
 	}
+
+	radio_caps->qos_params[BROADCAST_HW_Q].txop_q = 0xffff;
+	radio_caps->qos_params[MGMT_HW_Q].txop_q = 0;
+	radio_caps->qos_params[BEACON_HW_Q].txop_q = 0xffff;
 
 	memcpy(&common->rate_pwr[0], &gc[0], 40);
 	for (ii = 0; ii < 20; ii++)
@@ -469,7 +537,7 @@ static int rsi_hal_send_sta_notify_frame(struct rsi_common *common,
 	memset(skb->data, 0, sizeof(struct rsi_peer_notify));
 	peer_notify = (struct rsi_peer_notify *)skb->data;
 
-	peer_notify->command = cpu_to_le16(opmode << 1);
+	peer_notify->command = 0;
 
 	switch (notify_event) {
 	case STA_CONNECTED:
@@ -499,7 +567,6 @@ static int rsi_hal_send_sta_notify_frame(struct rsi_common *common,
 
 	if (!status && qos_enable) {
 		rsi_set_contention_vals(common);
-		status = rsi_load_radio_caps(common);
 	}
 	return status;
 }
@@ -595,6 +662,7 @@ static int rsi_program_bb_rf(struct rsi_common *common)
 	mgmt_frame->desc_word[0] = cpu_to_le16(RSI_WIFI_MGMT_Q << 12);
 	mgmt_frame->desc_word[1] = cpu_to_le16(BBP_PROG_IN_TA);
 	mgmt_frame->desc_word[4] = cpu_to_le16(common->endpoint);
+	mgmt_frame->desc_word[3] = cpu_to_le16(common->rf_pwr_mode);
 
 	if (common->rf_reset) {
 		mgmt_frame->desc_word[7] =  cpu_to_le16(RF_RESET_ENABLE);
@@ -751,6 +819,53 @@ int rsi_hal_load_key(struct rsi_common *common,
 
 	return rsi_send_internal_mgmt_frame(common, skb);
 }
+
+/**
+ * rsi_send_common_dev_params() - This function send the common device
+ *				configuration parameters to device.
+ * @common: Pointer to the driver private structure.
+ *
+ * Return: 0 on success, -1 on failure.
+ */
+int rsi_send_common_dev_params(struct rsi_common *common)
+{
+	struct sk_buff *skb = NULL;
+	u32 *soc_gpio, len;
+	u16 *frame, *ulp_gpio, *desc;
+
+	len = 0x20;
+
+	skb = dev_alloc_skb(len + FRAME_DESC_SZ);
+	if (!skb)
+		return -ENOMEM;
+	memset(skb->data, 0, len + FRAME_DESC_SZ);
+
+	desc = (u16 *)&skb->data[0];
+	frame = (u16 *)&skb->data[FRAME_DESC_SZ];
+
+	desc[0] = cpu_to_le16(len | (RSI_COEX_Q << 12));
+	desc[1] = cpu_to_le16(COMMON_DEV_CONFIG);
+
+	frame[0] = (u16)common->lp_ps_handshake_mode;
+	frame[0] |= (u16)common->ulp_ps_handshake_mode << 8;
+
+	ulp_gpio = (u16 *)&unused_ulp_gpio_bitmap;
+	soc_gpio = (u32 *)&unused_soc_gpio_bitmap;
+
+	frame[1] |= (*ulp_gpio) << 8;
+	*(u32 *)&frame[2] = *soc_gpio;
+	frame[4] |= ((u16)common->oper_mode << 8);
+	frame[5] |= ((u16)common->wlan_rf_power_mode);
+	frame[5] |= ((u16)common->bt_rf_power_mode << 8);
+	frame[6] |= ((u16)common->driver_mode << 8);
+	frame[7] = 3; //((u16 )d_assets->region_code);
+	frame[7] |= ((u16)common->obm_ant_sel_val << 8);
+
+	skb_put(skb, len + FRAME_DESC_SZ);
+
+	return rsi_send_internal_mgmt_frame(common, skb);
+}
+
 
 /*
  * rsi_load_bootup_params() - This function send bootup params to the firmware.
@@ -1140,6 +1255,7 @@ void rsi_inform_bss_status(struct rsi_common *common,
 			   u16 aid)
 {
 	if (status) {
+		common->hw_data_qs_blocked = true;
 		rsi_hal_send_sta_notify_frame(common,
 					      RSI_IFTYPE_STATION,
 					      STA_CONNECTED,
@@ -1148,13 +1264,17 @@ void rsi_inform_bss_status(struct rsi_common *common,
 					      aid);
 		if (common->min_rate == 0xffff)
 			rsi_send_auto_rate_request(common);
+		if (!rsi_send_block_unblock_frame(common, false))
+			common->hw_data_qs_blocked = false;
 	} else {
+		common->hw_data_qs_blocked = true;
 		rsi_hal_send_sta_notify_frame(common,
 					      RSI_IFTYPE_STATION,
 					      STA_DISCONNECTED,
 					      bssid,
 					      qos_enable,
 					      aid);
+		rsi_send_block_unblock_frame(common, true);
 	}
 }
 
@@ -1168,6 +1288,7 @@ void rsi_inform_bss_status(struct rsi_common *common,
 static int rsi_eeprom_read(struct rsi_common *common)
 {
 	struct rsi_mac_frame *mgmt_frame;
+	struct rsi_hw *adapter = common->priv;
 	struct sk_buff *skb;
 
 	rsi_dbg(MGMT_TX_ZONE, "%s: Sending EEPROM read req frame\n", __func__);
@@ -1183,15 +1304,16 @@ static int rsi_eeprom_read(struct rsi_common *common)
 	mgmt_frame = (struct rsi_mac_frame *)skb->data;
 
 	/* FrameType */
-	mgmt_frame->desc_word[1] = cpu_to_le16(EEPROM_READ_TYPE);
+	mgmt_frame->desc_word[1] = cpu_to_le16(EEPROM_READ);
 	mgmt_frame->desc_word[0] = cpu_to_le16(RSI_WIFI_MGMT_Q << 12);
 	/* Number of bytes to read */
-	mgmt_frame->desc_word[3] = cpu_to_le16(ETH_ALEN +
-					       WLAN_MAC_MAGIC_WORD_LEN +
-					       WLAN_HOST_MODE_LEN +
-					       WLAN_FW_VERSION_LEN);
+	mgmt_frame->desc_word[3] = cpu_to_le16(adapter->eeprom.length << 4);
+	mgmt_frame->desc_word[2] |= cpu_to_le16(3 << 8);
+
 	/* Address to read */
-	mgmt_frame->desc_word[4] = cpu_to_le16(WLAN_MAC_EEPROM_ADDR);
+	mgmt_frame->desc_word[4] = cpu_to_le16(adapter->eeprom.offset);
+	mgmt_frame->desc_word[5] = cpu_to_le16(adapter->eeprom.offset >> 16);
+	mgmt_frame->desc_word[6] = cpu_to_le16(0); //delay = 0
 
 	skb_put(skb, FRAME_DESC_SZ);
 
@@ -1225,13 +1347,16 @@ int rsi_send_block_unblock_frame(struct rsi_common *common, bool block_event)
 
 	mgmt_frame->desc_word[0] = cpu_to_le16(RSI_WIFI_MGMT_Q << 12);
 	mgmt_frame->desc_word[1] = cpu_to_le16(BLOCK_HW_QUEUE);
+	mgmt_frame->desc_word[3] = cpu_to_le16(0x1);
 
 	if (block_event) {
 		rsi_dbg(INFO_ZONE, "blocking the data qs\n");
 		mgmt_frame->desc_word[4] = cpu_to_le16(0xf);
+		mgmt_frame->desc_word[4] |= cpu_to_le16(0xf << 4);
 	} else {
 		rsi_dbg(INFO_ZONE, "unblocking the data qs\n");
 		mgmt_frame->desc_word[5] = cpu_to_le16(0xf);
+		mgmt_frame->desc_word[5] |= cpu_to_le16(0xf << 4);
 	}
 
 	skb_put(skb, FRAME_DESC_SZ);
@@ -1262,7 +1387,7 @@ int rsi_flash_read(struct rsi_hw *adapter)
 	cmd_frame = (struct rsi_mac_frame *)skb->data;
 
 	/* FrameType */
-	cmd_frame->desc_word[1] = cpu_to_le16(EEPROM_READ_TYPE);
+	cmd_frame->desc_word[1] = cpu_to_le16(EEPROM_READ);
 
 	/* Format of length and offset differs for
 	 * autoflashing and swbl flashing
@@ -1300,13 +1425,36 @@ int rsi_flash_read(struct rsi_hw *adapter)
 static int rsi_handle_ta_confirm_type(struct rsi_common *common,
 				      u8 *msg)
 {
+	struct rsi_hw *adapter = common->priv;
 	u8 sub_type = (msg[15] & 0xff);
 
 	switch (sub_type) {
+	case COMMON_DEV_CONFIG:
+		rsi_dbg(FSM_ZONE,
+			"Common Dev Config params confirm received\n");
+		if (common->fsm_state == FSM_COMMON_DEV_PARAMS_SENT) {
+			if (rsi_load_bootup_params(common)) {
+				common->fsm_state = FSM_CARD_NOT_READY;
+				goto out;
+			} else {
+				common->fsm_state = FSM_BOOT_PARAMS_SENT;
+			}
+		} else {
+			rsi_dbg(INFO_ZONE,
+				"%s: Received common dev config params cfm in %d state\n",
+				 __func__, common->fsm_state);
+			return 0;
+		}
+		break;
+
 	case BOOTUP_PARAMS_REQUEST:
 		rsi_dbg(FSM_ZONE, "%s: Boot up params confirm received\n",
 			__func__);
 		if (common->fsm_state == FSM_BOOT_PARAMS_SENT) {
+			adapter->eeprom.length = (IEEE80211_ADDR_LEN +
+						  WLAN_MAC_MAGIC_WORD_LEN +
+						  WLAN_HOST_MODE_LEN);
+			adapter->eeprom.offset = WLAN_MAC_EEPROM_ADDR;
 			if (rsi_eeprom_read(common)) {
 				common->fsm_state = FSM_CARD_NOT_READY;
 				goto out;
@@ -1321,18 +1469,59 @@ static int rsi_handle_ta_confirm_type(struct rsi_common *common,
 		}
 		break;
 
-	case EEPROM_READ_TYPE:
+	case EEPROM_READ:
+		rsi_dbg(FSM_ZONE, "EEPROM READ confirm received\n");
 		if (common->fsm_state == FSM_EEPROM_READ_MAC_ADDR) {
+			u32 msg_len = ((u16 *)msg)[0] & 0xfff;
+
+			if (msg_len <= 0) {
+				rsi_dbg(FSM_ZONE,
+					"%s: [EEPROM_READ] Invalid len %d\n",
+					__func__, msg_len);
+				goto out;
+			}
 			if (msg[16] == MAGIC_WORD) {
 				u8 offset = (FRAME_DESC_SZ + WLAN_HOST_MODE_LEN
 					     + WLAN_MAC_MAGIC_WORD_LEN);
 				memcpy(common->mac_addr,
 				       &msg[offset],
 				       ETH_ALEN);
-				memcpy(&common->fw_ver,
-				       &msg[offset + ETH_ALEN],
-				       sizeof(struct version_info));
+				adapter->eeprom.length =
+					((WLAN_MAC_MAGIC_WORD_LEN + 3) & (~3));
+				adapter->eeprom.offset =
+					WLAN_EEPROM_RFTYPE_ADDR;
+				if (rsi_eeprom_read(common)) {
+					rsi_dbg(ERR_ZONE,
+						"%s: Failed reading RF band\n",
+						__func__);
+					common->fsm_state = FSM_CARD_NOT_READY;
+				} else {
+					common->fsm_state =
+						FSM_EEPROM_READ_RF_TYPE;
+				}
+			} else {
+				common->fsm_state = FSM_CARD_NOT_READY;
+				break;
+			}
+		} else if (common->fsm_state == FSM_EEPROM_READ_RF_TYPE) {
+			u32 msg_len = ((u16 *)msg)[0] & 0xfff;
 
+			if (msg_len <= 0) {
+				rsi_dbg(FSM_ZONE,
+					"%s:[EEPROM_READ_CFM] Invalid len %d\n",
+					__func__, msg_len);
+				goto out;
+			}
+			if (msg[16] == MAGIC_WORD) {
+				if ((msg[17] & 0x3) == 0x3) {
+					rsi_dbg(INIT_ZONE,
+						"Dual band supported\n");
+					common->band = NL80211_BAND_5GHZ;
+				} else if ((msg[17] & 0x3) == 0x1) {
+					rsi_dbg(INIT_ZONE,
+						"Only 2.4Ghz band supported\n");
+					common->band = NL80211_BAND_2GHZ;
+				}
 			} else {
 				common->fsm_state = FSM_CARD_NOT_READY;
 				break;
@@ -1415,6 +1604,40 @@ out:
 }
 
 /**
+ * rsi_handle_card_ready() - This function handles the card ready
+ *			 indication from firmware.
+ * @common: Pointer to the driver private structure.
+ *
+ * Return: 0 on success, -1 on failure.
+ */
+int rsi_handle_card_ready(struct rsi_common *common)
+{
+	switch (common->fsm_state) {
+	case FSM_CARD_NOT_READY:
+		rsi_set_default_parameters(common);
+		if (rsi_send_common_dev_params(common) < 0)
+			return -EINVAL;
+		common->fsm_state = FSM_COMMON_DEV_PARAMS_SENT;
+		break;
+	case FSM_COMMON_DEV_PARAMS_SENT:
+		rsi_dbg(FSM_ZONE, "Card ready indication from wlan.\n");
+		if (rsi_load_bootup_params(common)) {
+			common->fsm_state = FSM_CARD_NOT_READY;
+			return -EINVAL;
+		}
+		common->fsm_state = FSM_BOOT_PARAMS_SENT;
+		break;
+	default:
+		rsi_dbg(ERR_ZONE,
+			"%s: card ready indication in invalid state %d.\n",
+			__func__, common->fsm_state);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
  * rsi_mgmt_pkt_recv() - This function processes the management packets
  *			 recieved from the hardware.
  * @common: Pointer to the driver private structure.
@@ -1426,34 +1649,26 @@ int rsi_mgmt_pkt_recv(struct rsi_common *common, u8 *msg)
 {
 	s32 msg_len = (le16_to_cpu(*(__le16 *)&msg[0]) & 0x0fff);
 	u16 msg_type = (msg[2]);
-	int ret;
 
 	rsi_dbg(FSM_ZONE, "%s: Msg Len: %d, Msg Type: %4x\n",
 		__func__, msg_len, msg_type);
 
-	if (msg_type == TA_CONFIRM_TYPE) {
+	switch (msg_type) {
+	case TA_CONFIRM_TYPE:
 		return rsi_handle_ta_confirm_type(common, msg);
-	} else if (msg_type == CARD_READY_IND) {
-		rsi_dbg(FSM_ZONE, "%s: Card ready indication received\n",
-			__func__);
-		if (common->fsm_state == FSM_CARD_NOT_READY) {
-			rsi_set_default_parameters(common);
 
-			ret = rsi_load_bootup_params(common);
-			if (ret)
-				return ret;
-			else
-				common->fsm_state = FSM_BOOT_PARAMS_SENT;
-		} else {
-			return -EINVAL;
-		}
-	} else if (msg_type == TX_STATUS_IND) {
+	case CARD_READY_IND:
+		return rsi_handle_card_ready(common);
+
+	case TX_STATUS_IND:
 		if (msg[15] == PROBEREQ_CONFIRM) {
 			common->mgmt_q_block = false;
 			rsi_dbg(FSM_ZONE, "%s: Probe confirm received\n",
 				__func__);
 		}
-	} else {
+		break;
+
+	default:
 		return rsi_mgmt_pkt_to_core(common, msg, msg_len, msg_type);
 	}
 	return 0;

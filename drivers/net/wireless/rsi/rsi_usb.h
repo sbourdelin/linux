@@ -42,6 +42,7 @@ struct rsi_91x_usbdev {
 	struct usb_interface *pfunction;
 	struct urb *rx_usb_urb[MAX_RX_URBS];
 	u8 *tx_buffer;
+	u8 *saved_tx_buffer;
 	__le16 bulkin_size;
 	u8 bulkin_endpoint_addr;
 	__le16 bulkout_size[MAX_BULK_EP];

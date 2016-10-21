@@ -41,19 +41,25 @@ static struct rsi_host_intf_ops usb_host_intf_ops = {
  * Return: status: 0 on success, a negative error code on failure.
  */
 static int rsi_usb_card_write(struct rsi_hw *adapter,
-			      void *buf,
+			      u8 *buf,
 			      u16 len,
-			      u8 endpoint)
+			      u32 endpoint)
 {
 	struct rsi_91x_usbdev *dev = (struct rsi_91x_usbdev *)adapter->rsi_dev;
-	int status;
-	s32 transfer;
+	int status = 0;
+	u8 *seg = dev->tx_buffer;
+	int transfer = 0;
+	int ep = dev->bulkout_endpoint_addr[endpoint - 1];
+
+	memset(seg, 0, len + 128);
+	memcpy(seg + 128, buf, len);
+	len += 128;
+	transfer = len;
 
 	status = usb_bulk_msg(dev->usbdev,
-			      usb_sndbulkpipe(dev->usbdev,
-			      dev->bulkout_endpoint_addr[endpoint - 1]),
-			      buf,
-			      len,
+			      usb_sndbulkpipe(dev->usbdev, ep),
+			      (void *)seg,
+			      (int)len,
 			      &transfer,
 			      HZ * 5);
 
@@ -61,7 +67,11 @@ static int rsi_usb_card_write(struct rsi_hw *adapter,
 		rsi_dbg(ERR_ZONE,
 			"Card write failed with error code :%10d\n", status);
 		dev->write_fail = 1;
+		goto fail;
 	}
+	rsi_dbg(MGMT_TX_ZONE, "%s: Sent Message successfully\n", __func__);
+
+fail:
 	return status;
 }
 
@@ -76,27 +86,23 @@ static int rsi_usb_card_write(struct rsi_hw *adapter,
  * Return: 0 on success, a negative error code on failure.
  */
 static int rsi_write_multiple(struct rsi_hw *adapter,
-			      u8 endpoint,
+			      u32 addr,
 			      u8 *data,
 			      u32 count)
 {
-	struct rsi_91x_usbdev *dev = (struct rsi_91x_usbdev *)adapter->rsi_dev;
-	u8 *seg = dev->tx_buffer;
+	struct rsi_91x_usbdev *dev =
+		(struct rsi_91x_usbdev *)adapter->rsi_dev;
 
-	if (dev->write_fail)
-		return 0;
-
-	if (endpoint == MGMT_EP) {
-		memset(seg, 0, RSI_USB_TX_HEAD_ROOM);
-		memcpy(seg + RSI_USB_TX_HEAD_ROOM, data, count);
-	} else {
-		seg = ((u8 *)data - RSI_USB_TX_HEAD_ROOM);
+	if (!adapter || addr == 0) {
+		rsi_dbg(INFO_ZONE,
+			"%s: Unable to write to card\n", __func__);
+		return -1;
 	}
 
-	return rsi_usb_card_write(adapter,
-				  seg,
-				  count + RSI_USB_TX_HEAD_ROOM,
-				  endpoint);
+	if (dev->write_fail)
+		return -1;
+
+	return rsi_usb_card_write(adapter, data, count, addr);
 }
 
 /**
@@ -259,6 +265,11 @@ static void rsi_rx_done_handler(struct urb *urb)
 	if (urb->status)
 		return;
 
+	if (urb->actual_length <= 0) {
+		rsi_dbg(INFO_ZONE, "%s: Zero length packet\n", __func__);
+		return;
+	}
+
 	rsi_set_event(&dev->rx_thread.event);
 }
 
@@ -386,15 +397,16 @@ int rsi_usb_write_register_multiple(struct rsi_hw *adapter,
 			rsi_dbg(ERR_ZONE,
 				"Reg write failed with error code :%d\n",
 				status);
-		} else {
-			count -= transfer;
-			data += transfer;
-			addr += transfer;
+			kfree(buf);
+			return status;
 		}
+		count -= transfer;
+		data += transfer;
+		addr += transfer;
 	}
 
 	kfree(buf);
-	return 0;
+	return status;
 }
 
 /**
@@ -410,10 +422,12 @@ int rsi_usb_host_intf_write_pkt(struct rsi_hw *adapter,
 				u8 *pkt,
 				u32 len)
 {
-	u32 queueno = ((pkt[1] >> 4) & 0xf);
+	u32 queueno = ((pkt[1] >> 4) & 0x7);
 	u8 endpoint;
 
-	endpoint = ((queueno == RSI_WIFI_MGMT_Q) ? MGMT_EP : DATA_EP);
+	endpoint = ((queueno == RSI_WIFI_MGMT_Q || queueno == RSI_COEX_Q ||
+		     queueno == RSI_WIFI_DATA_Q) ?
+		    MGMT_EP : DATA_EP);
 
 	return rsi_write_multiple(adapter,
 				  endpoint,
@@ -500,7 +514,7 @@ static void rsi_deinit_usb_interface(struct rsi_hw *adapter)
 	rsi_kill_thread(&dev->rx_thread);
 	usb_free_urb(dev->rx_usb_urb[0]);
 	kfree(adapter->priv->rx_data_pkt);
-	kfree(dev->tx_buffer);
+	kfree(dev->saved_tx_buffer);
 }
 
 /**
@@ -516,6 +530,7 @@ static int rsi_init_usb_interface(struct rsi_hw *adapter,
 	struct rsi_91x_usbdev *rsi_dev;
 	struct rsi_common *common = adapter->priv;
 	int status;
+	u8 dword_align_bytes = 0;
 
 	rsi_dev = kzalloc(sizeof(*rsi_dev), GFP_KERNEL);
 	if (!rsi_dev)
@@ -530,18 +545,29 @@ static int rsi_init_usb_interface(struct rsi_hw *adapter,
 	adapter->device = &pfunction->dev;
 	usb_set_intfdata(pfunction, adapter);
 
-	common->rx_data_pkt = kmalloc(2048, GFP_KERNEL);
+	common->rx_data_pkt = kmalloc(2000 * 4, GFP_KERNEL | GFP_DMA);
 	if (!common->rx_data_pkt) {
 		rsi_dbg(ERR_ZONE, "%s: Failed to allocate memory\n",
 			__func__);
 		return -ENOMEM;
 	}
+	common->saved_rx_data_pkt = common->rx_data_pkt;
+	dword_align_bytes = (u32)common->rx_data_pkt & 0x3f;
+	if (dword_align_bytes)
+		common->rx_data_pkt = common->rx_data_pkt +
+				      (64 - dword_align_bytes);
 
 	rsi_dev->tx_buffer = kmalloc(2048, GFP_KERNEL);
 	if (!rsi_dev->tx_buffer) {
 		status = -ENOMEM;
 		goto fail_tx;
 	}
+	rsi_dev->saved_tx_buffer = rsi_dev->tx_buffer;
+	dword_align_bytes = (u32)rsi_dev->tx_buffer & 0x3f;
+	if (dword_align_bytes)
+		rsi_dev->tx_buffer = rsi_dev->tx_buffer +
+				     (64 - dword_align_bytes);
+
 	rsi_dev->rx_usb_urb[0] = usb_alloc_urb(0, GFP_KERNEL);
 	if (!rsi_dev->rx_usb_urb[0]) {
 		status = -ENOMEM;
@@ -549,6 +575,7 @@ static int rsi_init_usb_interface(struct rsi_hw *adapter,
 	}
 	rsi_dev->rx_usb_urb[0]->transfer_buffer = adapter->priv->rx_data_pkt;
 	rsi_dev->tx_blk_size = 252;
+	adapter->tx_blk_size = rsi_dev->tx_blk_size;
 
 	/* Initializing function callbacks */
 	adapter->rx_urb_submit = rsi_rx_urb_submit;
@@ -575,9 +602,9 @@ static int rsi_init_usb_interface(struct rsi_hw *adapter,
 fail_thread:
 	usb_free_urb(rsi_dev->rx_usb_urb[0]);
 fail_rx:
-	kfree(rsi_dev->tx_buffer);
+	kfree(rsi_dev->saved_tx_buffer);
 fail_tx:
-	kfree(common->rx_data_pkt);
+	kfree(common->saved_rx_data_pkt);
 	return status;
 }
 
@@ -595,7 +622,7 @@ static int rsi_probe(struct usb_interface *pfunction,
 {
 	struct rsi_hw *adapter;
 	struct rsi_91x_usbdev *dev;
-	u32 fw_status;
+	u32 fw_status = 0;
 	int status;
 
 	rsi_dbg(INIT_ZONE, "%s: Init function called\n", __func__);

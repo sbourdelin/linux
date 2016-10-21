@@ -32,12 +32,14 @@
 #define ISR_ZONE                        BIT(8)  /* For Interrupt Msgs         */
 
 #define FSM_CARD_NOT_READY              0
-#define FSM_BOOT_PARAMS_SENT            1
-#define FSM_EEPROM_READ_MAC_ADDR        2
-#define FSM_RESET_MAC_SENT              3
-#define FSM_RADIO_CAPS_SENT             4
-#define FSM_BB_RF_PROG_SENT             5
-#define FSM_MAC_INIT_DONE               6
+#define FSM_COMMON_DEV_PARAMS_SENT	1
+#define FSM_BOOT_PARAMS_SENT            2
+#define FSM_EEPROM_READ_MAC_ADDR        3
+#define FSM_EEPROM_READ_RF_TYPE		4
+#define FSM_RESET_MAC_SENT              5
+#define FSM_RADIO_CAPS_SENT             6
+#define FSM_BB_RF_PROG_SENT             7
+#define FSM_MAC_INIT_DONE               8
 
 extern u32 rsi_zone_enabled;
 extern __printf(2, 3) void rsi_dbg(u32 zone, const char *fmt, ...);
@@ -54,12 +56,23 @@ extern __printf(2, 3) void rsi_dbg(u32 zone, const char *fmt, ...);
 #define MAC_80211_HDR_FRAME_CONTROL     0
 #define WME_NUM_AC                      4
 #define NUM_SOFT_QUEUES                 5
-#define MAX_HW_QUEUES                   8
+#define MAX_HW_QUEUES                   12
 #define INVALID_QUEUE                   0xff
 #define MAX_CONTINUOUS_VO_PKTS          8
 #define MAX_CONTINUOUS_VI_PKTS          4
+#define MGMT_HW_Q			10 /* Queue No 10 is used for
+					    * MGMT_QUEUE in Device FW,
+					    *  Hence this is Reserved
+					    */
+#define BROADCAST_HW_Q			9
+#define BEACON_HW_Q			11
+#define MAX_NUM_SCAN_BGCHANS		24
 
 /* Queue information */
+#define RSI_COEX_Q			0x0
+#define RSI_ZIGB_Q			0x1
+#define RSI_BT_Q			0x2
+#define RSI_WLAN_Q			0x3
 #define RSI_WIFI_MGMT_Q                 0x4
 #define RSI_WIFI_DATA_Q                 0x5
 #define IEEE80211_MGMT_FRAME            0x00
@@ -190,6 +203,7 @@ struct rsi_common {
 	/* Generic */
 	u8 channel;
 	u8 *rx_data_pkt;
+	u8 *saved_rx_data_pkt;
 	u8 mac_id;
 	u8 radio_id;
 	u16 rate_pwr[20];
@@ -204,8 +218,27 @@ struct rsi_common {
 	struct cqm_info cqm_info;
 
 	bool hw_data_qs_blocked;
-	
+	u8 driver_mode;
 	u8 coex_mode;
+	u8 oper_mode;
+	u8 ta_aggr;
+	u8 skip_fw_load;
+	u8 lp_ps_handshake_mode;
+	u8 ulp_ps_handshake_mode;
+	u8 uapsd_bitmap;
+	u8 rf_power_val;
+	u8 device_gpio_type;
+	u16 country_code;
+	u8 wlan_rf_power_mode;
+	u8 bt_rf_power_mode;
+	u8 obm_ant_sel_val;
+	u8 antenna_diversity;
+	u16 rf_pwr_mode;
+	char antenna_gain[2];
+	u8 host_wakeup_intr_enable;
+	u8 host_wakeup_intr_active_high;
+	int tx_power;
+	u8 ant_in_use;
 };
 
 enum host_intf {
