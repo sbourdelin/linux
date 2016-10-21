@@ -12,12 +12,15 @@
 #include <linux/irq.h>
 #include <linux/spinlock.h>
 #include <linux/irqdomain.h>
+#include <linux/interrupt.h>
+#include <linux/cpumask.h>
 #include <asm/irqflags-arcv2.h>
 #include <asm/mcip.h>
 #include <asm/setup.h>
 
 static char smp_cpuinfo_buf[128];
 static int idu_detected;
+static unsigned long idu_cirq_to_dest[CONFIG_ARC_NUMBER_OF_INTERRUPTS];
 
 static DEFINE_RAW_SPINLOCK(mcip_lock);
 
@@ -232,8 +235,14 @@ static void idu_cascade_isr(struct irq_desc *desc)
 
 static int idu_irq_map(struct irq_domain *d, unsigned int virq, irq_hw_number_t hwirq)
 {
+	cpumask_t mask;
+
 	irq_set_chip_and_handler(virq, &idu_irq_chip, handle_level_irq);
 	irq_set_status_flags(virq, IRQ_MOVE_PCNTXT);
+
+	cpumask_clear(&mask);
+	cpumask_bits(&mask)[0] |= idu_cirq_to_dest[hwirq];
+	irq_set_affinity(virq, &mask);
 
 	return 0;
 }
@@ -252,8 +261,7 @@ static int idu_irq_xlate(struct irq_domain *d, struct device_node *n,
 	if (distri == 0) {
 		/* 0 - Round Robin to all cpus, otherwise 1 bit per core */
 		raw_spin_lock_irqsave(&mcip_lock, flags);
-		idu_set_dest(hwirq, BIT(num_online_cpus()) - 1);
-		idu_set_mode(hwirq, IDU_M_TRIG_LEVEL, IDU_M_DISTRI_RR);
+		idu_cirq_to_dest[hwirq] = BIT(num_online_cpus()) - 1;
 		raw_spin_unlock_irqrestore(&mcip_lock, flags);
 	} else {
 		/*
@@ -267,8 +275,7 @@ static int idu_irq_xlate(struct irq_domain *d, struct device_node *n,
 				hwirq, cpu);
 
 		raw_spin_lock_irqsave(&mcip_lock, flags);
-		idu_set_dest(hwirq, cpu);
-		idu_set_mode(hwirq, IDU_M_TRIG_LEVEL, IDU_M_DISTRI_DEST);
+		idu_cirq_to_dest[hwirq] = cpu;
 		raw_spin_unlock_irqrestore(&mcip_lock, flags);
 	}
 
