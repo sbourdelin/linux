@@ -210,7 +210,15 @@ static void kvm_on_user_return(struct user_return_notifier *urn)
 	struct kvm_shared_msrs *locals
 		= container_of(urn, struct kvm_shared_msrs, urn);
 	struct kvm_shared_msr_values *values;
+	unsigned long flags;
 
+	/*
+	 * Disabling irqs at this point since the following code could be
+	 * interrupted and executed through kvm_arch_hardware_disable()
+	 */
+	local_irq_save(flags);
+	if (!locals->registered)
+		goto out;
 	for (slot = 0; slot < shared_msrs_global.nr; ++slot) {
 		values = &locals->values[slot];
 		if (values->host != values->curr) {
@@ -220,6 +228,8 @@ static void kvm_on_user_return(struct user_return_notifier *urn)
 	}
 	locals->registered = false;
 	user_return_notifier_unregister(urn);
+out:
+	local_irq_restore(flags);
 }
 
 static void shared_msr_update(unsigned slot, u32 msr)
