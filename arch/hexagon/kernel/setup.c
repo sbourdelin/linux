@@ -132,13 +132,14 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	if (!cpu_online(cpu))
 		return 0;
 #endif
-
-	seq_printf(m, "processor\t: %d\n", cpu);
-	seq_printf(m, "model name\t: Hexagon Virtual Machine\n");
-	seq_printf(m, "BogoMips\t: %lu.%02lu\n",
-		(loops_per_jiffy * HZ) / 500000,
-		((loops_per_jiffy * HZ) / 5000) % 100);
-	seq_printf(m, "\n");
+	seq_printf(m,
+		   "processor\t: %d\n"
+		   "model name\t: Hexagon Virtual Machine\n"
+		   "BogoMips\t: %lu.%02lu\n"
+		   "\n",
+		   cpu,
+		   (loops_per_jiffy * HZ) / 500000,
+		   ((loops_per_jiffy * HZ) / 5000) % 100);
 	return 0;
 }
 
