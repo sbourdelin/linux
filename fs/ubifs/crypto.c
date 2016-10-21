@@ -38,7 +38,7 @@ static int ubifs_key_prefix(struct inode *inode, u8 **key)
 struct fscrypt_operations ubifs_crypt_operations = {
 	.get_context		= ubifs_crypt_get_context,
 	.set_context		= ubifs_crypt_set_context,
-	.is_encrypted		= ubifs_crypt_is_encrypted,
+	.is_encrypted		= __ubifs_crypt_is_encrypted,
 	.empty_dir		= ubifs_crypt_empty_dir,
 	.max_namelen		= ubifs_crypt_max_namelen,
 	.key_prefix		= ubifs_key_prefix,
