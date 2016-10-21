@@ -1854,6 +1854,18 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
 	mutex_lock(&smmu_domain->init_mutex);
 
 	switch (attr) {
+	case DOMAIN_ATTR_S2:
+		if (smmu_domain->smmu) {
+			ret = -EPERM;
+			goto out_unlock;
+		}
+
+		if (*(int *)data)
+			smmu_domain->stage = ARM_SMMU_DOMAIN_S2;
+		else
+			smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
+
+		break;
 	case DOMAIN_ATTR_NESTING:
 		if (smmu_domain->smmu) {
 			ret = -EPERM;
