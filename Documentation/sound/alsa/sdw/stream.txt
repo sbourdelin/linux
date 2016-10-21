@@ -1,0 +1,346 @@
+Audio Stream in SoundWire
+=========================
+An audio stream is a logical or virtual connection created between
+
+1. System memory buffer(s) and Codec(s)
+2. DSP memory buffer(s) and Codec(s)
+3. FIFO(s) and Codec(s)
+4. Codec(s) and Codec(s)
+
+which is typically driven by a DMA(s) channel through the data link. An
+audio stream contains one or more channels of data. All channels within
+stream must have same sample rate and same sample size.
+
+Assume a stream with two channels (Left & Right) is opened using
+SoundWire interface. Below are some of different way a stream can be
+represented in SoundWire.
+
+Stream Sample in memory (System memory, DSP memory or FIFOs):
+-------------------------
+| L | R | L | R | L | R |
+-------------------------
+
+Example 1: Stereo Stream with L and R channels is rendered from Master
+to Slave. Both Master and Slave is using single port.
+
++---------------+                       Clock Signal    +---------------+
+|    Master     +---------------------------------------+     Slave     |
+|   Interface   |                                       |   Interface   |
+|               |                                       |       1       |
+|               |                        Data Signal    |               |
+|    L  +  R    +---------------------------------------+    L  +  R    |
+|     (Data)    |        Data Direction                 |     (Data)    |
++---------------+     +----------------------->         +---------------+
+
+
+Example 2: Stereo Stream with L and R channels is captured from Slave to
+Master. Both Master and Slave is using single port.
+
+
++---------------+                       Clock Signal    +---------------+
+|    Master     +---------------------------------------+     Slave     |
+|   Interface   |                                       |   Interface   |
+|               |                                       |       1       |
+|               |                        Data Signal    |               |
+|    L  +  R    +---------------------------------------+    L  +  R    |
+|     (Data)    |        Data Direction                 |     (Data)    |
++---------------+     <-----------------------+         +---------------+
+
+
+Example 3: Stereo Stream with L and R channels is rendered by Master.
+Each of the L and R channel is received by two different Slaves. Master
+and both Slaves are using single port.
+
+
++---------------+                       Clock Signal    +---------------+
+|    Master     +------------+--------------------------+     Slave     |
+|   Interface   |            |                          |   Interface   |
+|               |            |                          |       1       |
+|               |            |           Data Signal    |               |
+|    L  +  R    +------+--------------------------------+       L       |
+|     (Data)    |      |     |    Data Direction        |     (Data)    |
++---------------+      |     |   +------------->        +---------------+
+                       |     |
+                       |     |
+                       |     |                          +---------------+
+                       |     +------------------------> |     Slave     |
+                       |                                |   Interface   |
+                       |                                |       2       |
+                       |                                |               |
+                       +------------------------------> |       R       |
+                                                        |     (Data)    |
+                                                        +---------------+
+
+
+Example 4: Stereo Stream with L and R channel is rendered by 2 Masters,
+each rendering one channel, and is received by two different Slaves,
+each receiving one channel. Both Masters and both Slaves are using
+single port.
+
+
++---------------+                       Clock Signal    +---------------+
+|    Master     +---------------------------------------+     Slave     |
+|   Interface   |                                       |   Interface   |
+|       1       |                                       |       1       |
+|               |                        Data Signal    |               |
+|       L       +---------------------------------------+       L       |
+|     (Data)    |        Data Direction                 |     (Data)    |
++---------------+     +----------------------->         +---------------+
+
++---------------+                       Clock Signal    +---------------+
+|    Master     +---------------------------------------+     Slave     |
+|   Interface   |                                       |   Interface   |
+|       2       |                                       |       2       |
+|               |                        Data Signal    |               |
+|       R       +---------------------------------------+       R       |
+|     (Data)    |        Data Direction                 |     (Data)    |
++---------------+     +----------------------->         +---------------+
+
+
+Example 5: Stereo Stream with L and R channel is rendered by two
+different Ports of the Master and is received by only single Port of the
+Slave interface.
+
+
++------------------------+
+|                        |
+|         +--------------+                             +-------------------+
+|         |             ||                             |                   |
+|         |  Data Port  ||  L Channel                  |                   |
+|         |      1      |------------+                 |                   |
+|         |  L Channel  ||           |                 +-----+----+        |
+|         |   (Data)    ||           |   L + R Channel ||    Data |        |
+| Master  +--------------+           | +---+---------> ||    Port |        |
+| Interface              |           |                 ||     1   |        |
+|         +--------------+           |                 ||         |        |
+|         |             ||           |                 +----------+        |
+|         |  Data Port  |------------+                 |                   |
+|         |      2      ||  R Channel                  |     Slave         |
+|         |  R Channel  ||                             |   Interface       |
+|         |   (Data)    ||                             |       1           |
+|         +--------------+         Clock Signal        |     L  +  R       |
+|                        +---------------------------> |      (Data)       |
++------------------------+                             |                   |
+                                                       +-------------------+
+
+
+Example 6: Stereo stream with L and R channel is rendered by Slave
+Interface 1 to Slave Interface 2. Master is driving the Clock. Audio
+stream data flow is from Slave interface 1 to Slave Interface 2.
+
+
+                                                        +---------------+
++---------------+                       Clock Signal    |               |
+|    Master     +--+----------------------------------> |     Slave     |
+|   Interface   |  |                    Data Signal     |   Interface   |
+|               +--------+----------------------------+ |       1       |
++---------------+  |     |                              |               |
+                   |     |                              |    L  +  R    |
+                   |     |          +----------------+  |     (Data)    |
+                   |     |          |                   +---------------+
+                   |     |          |
+                   |     |          | Data Direction
+                   |     |          |                   +---------------+
+                   |     |          |                   |               |
+                   |     |          +---------------->  |     Slave     |
+                   |     |                              |   Interface   |
+                   |     |                Clock Signal  |       2       |
+                   |     +------------------------------+               |
+                   |                      Data Signal   |    L  +  R    |
+                   +------------------------------------+     (Data)    |
+                                                        +---------------+
+
+
+SoundWire Stream Management flow
+================================
+
+SoundWire Stream definitions:
+1. Current stream: This is classified as the stream on which operation
+has to be performed like prepare, enable, disable, de-prepare etc.
+
+2. Active stream: This is classified as the stream which is already
+active on bus other than current stream. There can be multiple active
+streams on the bus.
+
+SoundWire bus driver manages stream operations for each stream getting
+rendered/captured on the SoundWire bus.
+
+This section explains what Bus driver operations are done for each of
+the stream getting allocated/released on bus driver. Following are the
+stream states maintained by the Bus driver for each of the audio stream
+getting opened.
+
+
+SoundWire stream states
+=======================
+Below figure shows the SoundWire stream states and possible state
+transition diagram.
+
+|--------------|     |-------------|     |--------------|     |--------------|
+|     ALLOC    |---->|    CONFIG   |---->|   PREPARE    |---->|    ENABLE    |
+|     STATE    |     |    STATE    |     |    STATE     |     |    STATE     |
+|--------------|     |-------------|     |--------------|     |--------------|
+                                                ^                       |
+                                                |                       |
+                                                |                       |
+                                                |                       |
+                                                |                       \/
+    |--------------|                     |--------------|     |--------------|
+    |    RELEASE   |<--------------------|   DEPREPARE  |<----|    DISABLE   |
+    |     STATE    |                     |    STATE     |     |    STATE     |
+    |--------------|                     |--------------|     |--------------|
+
+
+SoundWire Stream State Operations
+==================================
+Below section explains the operations done by the bus driver on
+Master(s) and Slave(s) as part of stream state transitions.
+
+SDW_STATE_STRM_ALLOC: Allocation state for stream. This is the entry
+state of the stream. Operations performed before entering in this
+state:
+1. An unique stream tag is assigned to stream. This stream tag is used
+as a reference for all the operations performed on stream.
+
+2. The resources required for holding stream runtime information are
+allocated and initialized. This holds all stream related information
+such as stream type (PCM/PDM) and parameters, Master and Slave interface
+associated with the stream, reference counting, stream state etc.
+
+After all above operations are successful, stream state is set to
+SDW_STATE_STRM_ALLOC.
+
+
+SDW_STATE_STRM_CONFIG: Configuration state of stream. Operations
+performed before entering in this state:
+1. The resources allocated for stream information in
+SDW_STATE_STRM_ALLOC state are updated. This includes stream parameters,
+Masters and Slaves runtime information associated with the stream.
+
+2. All the Masters and Slaves associated with the stream updates the
+port configuration to bus driver. This includes port numbers allocated
+by Master(s) and Slave(s) for this stream.
+
+After all above operations are successful, stream state is set to
+SDW_STATE_STRM_CONFIG.
+
+
+SDW_STATE_STRM_PREPARE: Prepare state of stream. Operations performed
+before entering in this state:
+1. Bus parameters such as bandwidth, frame shape, clock frequency, SSP
+interval are computed based on current stream as well as already active
+streams on bus. Re-computation is required to accommodate current stream
+on the bus.
+
+2. Transport parameters of all Master and Slave ports are computed for
+the current as well as already active stream based on above calculated
+frame shape and clock frequency.
+
+3. Computed bus and transport parameters are programmed in Master and
+Slave registers. The banked registers programming is done on the
+alternate bank (bank currently unused). Port channels are enabled for
+the already active streams on the alternate bank (bank currently
+unused). This is done in order to not to disrupt already active
+stream(s).
+
+4. Once all the new values are programmed, bus initiates switch to
+alternate  bank. Once switch is successful, the port channels enabled on
+previous bank for already active streams are disabled.
+
+5. Ports of Master and Slave for current stream are prepared.
+
+After all above operations are successful, stream state is set to
+SDW_STATE_STRM_PREPARE.
+
+
+SDW_STATE_STRM_ENABLE: Enable state of stream. Operations performed
+before entering in this state:
+1. All the values computed in SDW_STATE_STRM_PREPARE state are
+programmed in alternate bank (bank currently unused). It includes
+programming of already active streams as well.
+
+2. All the Master and Slave port channels for the current stream are
+enabled on alternate bank (bank currently unused).
+
+3. Once all the new values are programmed, bus initiates switch to
+alternate bank. Once the switch is successful, the port channels enabled
+on previous bank for already active streams are disabled.
+
+After all above operations are successful, stream state is set to
+SDW_STATE_STRM_ENABLE.
+
+
+SDW_STATE_STRM_DISABLE --> Disable state of stream. Operations performed
+before entering in this state:
+1. Disable for Master and Slave ports channels is performed on on
+alternate bank (bank currently unused) registers for current stream.
+
+2. All the current configuration of bus and Master and Slave ports are
+programmed into alternate bank (bank currently unused). It includes
+programming of already active streams port channels on alternate bank
+(bank currently unused).
+
+3. Bus initiates switch to alternate bank. Once the switch is
+successful, the port channels of current stream are disabled.  All the
+port channels enabled on previous bank for active stream are disabled.
+
+After all above operations are successful, stream state is set to
+SDW_STATE_STRM_DISABLE.
+
+
+SDW_STATE_STRM_DEPREPARE: De-prepare state of stream. Operations
+performed before entering in this state:
+1. Check the bandwidth required per Master. If its zero, de-prepare
+current stream and move stream state to SDW_STATE_STRM_DEPREPARE, rest
+of the steps are not required. If bandwidth required per Master is non
+zero that means some more streams are running on Master and continue
+with next step.
+
+2. Bus parameters and transport parameters are computed for the active
+stream(s) on the given Master.
+
+3. All the computed values for active stream(s) are programmed into
+alternate bank (bank currently unused) in Master and Slave registers.
+
+4. Bus initiates switch to alternate bank. Once the switch is
+successful, all the port channels enabled on previous bank for active
+stream are disabled.
+
+5. De-prepare ports of the Master and Slave associated with current
+stream.
+
+After all above operations are successful, stream state is set to
+SDW_STATE_DEPREPARE.
+
+
+SDW_STATE_STRM_RELEASE: Release state of stream. Operations performed
+before entering in this state:
+1. Release port resources for all Master and Slave ports used for
+current stream.
+
+2. Release Master and Slave runtime resources used for current stream.
+
+3. Release stream runtime resources used for current stream.
+
+After all above operations are successful, stream state is set to
+SDW_STATE_STRM_RELEASE.
+
+Future Enhancements
+===================
+1. Slave to Slave communication: Currently stream between Slaves is not
+supported. Master should be always part of the stream(s).
+
+2. Stream Linking for synchronized start: Currently multiple streams
+cannot be synchronously started together with single bank switch. This
+may require ASoC framework changes as well.
+
+Not Supported
+=============
+1. A single port with multiple channels supported cannot be used between
+two streams or across stream. For example a port with 4 channels cannot
+be used to handle 2 independent stereo streams even though it's possible
+in theory in SoundWire.
+
+2. Bandwidth allocation is done in contiguous slots for stream.
+Non-contiguous slots created due to bandwidth fragmentation are not
+taken care in bandwidth calculation.
