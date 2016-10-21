@@ -336,47 +336,44 @@ static struct nf_sockopt_ops so_getorigdst6 = {
 	.owner		= THIS_MODULE,
 };
 
+static struct nf_conntrack_l4proto *nf_conntrack_l4proto6[] = {
+	&nf_conntrack_l4proto_tcp6,
+	&nf_conntrack_l4proto_udp6,
+	&nf_conntrack_l4proto_icmpv6,
+};
+
 static int ipv6_net_init(struct net *net)
 {
-	int ret = 0;
+	int i, ret = 0;
 
-	ret = nf_ct_l4proto_pernet_register(net, &nf_conntrack_l4proto_tcp6);
-	if (ret < 0) {
-		pr_err("nf_conntrack_tcp6: pernet registration failed\n");
-		goto out;
-	}
-	ret = nf_ct_l4proto_pernet_register(net, &nf_conntrack_l4proto_udp6);
-	if (ret < 0) {
-		pr_err("nf_conntrack_udp6: pernet registration failed\n");
-		goto cleanup_tcp6;
-	}
-	ret = nf_ct_l4proto_pernet_register(net, &nf_conntrack_l4proto_icmpv6);
-	if (ret < 0) {
-		pr_err("nf_conntrack_icmp6: pernet registration failed\n");
-		goto cleanup_udp6;
+	for (i = 0; i < ARRAY_SIZE(nf_conntrack_l4proto6); i++) {
+		ret = nf_ct_l4proto_pernet_register(net,
+						    nf_conntrack_l4proto6[i]);
+		if (ret < 0)
+			goto cleanup_l4proto;
 	}
 	ret = nf_ct_l3proto_pernet_register(net, &nf_conntrack_l3proto_ipv6);
 	if (ret < 0) {
 		pr_err("nf_conntrack_ipv6: pernet registration failed.\n");
-		goto cleanup_icmpv6;
+		goto cleanup_l4proto;
 	}
 	return 0;
- cleanup_icmpv6:
-	nf_ct_l4proto_pernet_unregister(net, &nf_conntrack_l4proto_icmpv6);
- cleanup_udp6:
-	nf_ct_l4proto_pernet_unregister(net, &nf_conntrack_l4proto_udp6);
- cleanup_tcp6:
-	nf_ct_l4proto_pernet_unregister(net, &nf_conntrack_l4proto_tcp6);
- out:
+cleanup_l4proto:
+	if (i < ARRAY_SIZE(nf_conntrack_l4proto6))
+		pr_err("nf_conntrack_%s6: pernet registration failed.\n",
+		       nf_conntrack_l4proto6[i]->name);
+	while (--i >= 0)
+		nf_ct_l4proto_pernet_unregister(net, nf_conntrack_l4proto6[i]);
 	return ret;
 }
 
 static void ipv6_net_exit(struct net *net)
 {
+	int i;
+
 	nf_ct_l3proto_pernet_unregister(net, &nf_conntrack_l3proto_ipv6);
-	nf_ct_l4proto_pernet_unregister(net, &nf_conntrack_l4proto_icmpv6);
-	nf_ct_l4proto_pernet_unregister(net, &nf_conntrack_l4proto_udp6);
-	nf_ct_l4proto_pernet_unregister(net, &nf_conntrack_l4proto_tcp6);
+	for (i = ARRAY_SIZE(nf_conntrack_l4proto6) - 1; i >= 0; i--)
+		nf_ct_l4proto_pernet_unregister(net, nf_conntrack_l4proto6[i]);
 }
 
 static struct pernet_operations ipv6_net_ops = {
@@ -386,7 +383,7 @@ static struct pernet_operations ipv6_net_ops = {
 
 static int __init nf_conntrack_l3proto_ipv6_init(void)
 {
-	int ret = 0;
+	int ret = 0, i;
 
 	need_conntrack();
 	nf_defrag_ipv6_enable();
@@ -409,38 +406,25 @@ static int __init nf_conntrack_l3proto_ipv6_init(void)
 		goto cleanup_pernet;
 	}
 
-	ret = nf_ct_l4proto_register(&nf_conntrack_l4proto_tcp6);
-	if (ret < 0) {
-		pr_err("nf_conntrack_ipv6: can't register tcp6 proto.\n");
-		goto cleanup_hooks;
-	}
-
-	ret = nf_ct_l4proto_register(&nf_conntrack_l4proto_udp6);
-	if (ret < 0) {
-		pr_err("nf_conntrack_ipv6: can't register udp6 proto.\n");
-		goto cleanup_tcp6;
-	}
-
-	ret = nf_ct_l4proto_register(&nf_conntrack_l4proto_icmpv6);
-	if (ret < 0) {
-		pr_err("nf_conntrack_ipv6: can't register icmpv6 proto.\n");
-		goto cleanup_udp6;
+	for (i = 0; i < ARRAY_SIZE(nf_conntrack_l4proto6); i++) {
+		ret = nf_ct_l4proto_register(nf_conntrack_l4proto6[i]);
+		if (ret < 0)
+			goto cleanup_l4proto;
 	}
 
 	ret = nf_ct_l3proto_register(&nf_conntrack_l3proto_ipv6);
 	if (ret < 0) {
 		pr_err("nf_conntrack_ipv6: can't register ipv6 proto.\n");
-		goto cleanup_icmpv6;
+		goto cleanup_l4proto;
 	}
 	return ret;
 
- cleanup_icmpv6:
-	nf_ct_l4proto_unregister(&nf_conntrack_l4proto_icmpv6);
- cleanup_udp6:
-	nf_ct_l4proto_unregister(&nf_conntrack_l4proto_udp6);
- cleanup_tcp6:
-	nf_ct_l4proto_unregister(&nf_conntrack_l4proto_tcp6);
- cleanup_hooks:
+cleanup_l4proto:
+	if (i < ARRAY_SIZE(nf_conntrack_l4proto6))
+		pr_err("nf_conntrack_ipv6: can't register %s6 proto.\n",
+		       nf_conntrack_l4proto6[i]->name);
+	while (--i >= 0)
+		nf_ct_l4proto_unregister(nf_conntrack_l4proto6[i]);
 	nf_unregister_hooks(ipv6_conntrack_ops, ARRAY_SIZE(ipv6_conntrack_ops));
  cleanup_pernet:
 	unregister_pernet_subsys(&ipv6_net_ops);
@@ -451,11 +435,12 @@ static int __init nf_conntrack_l3proto_ipv6_init(void)
 
 static void __exit nf_conntrack_l3proto_ipv6_fini(void)
 {
+	int i;
+
 	synchronize_net();
 	nf_ct_l3proto_unregister(&nf_conntrack_l3proto_ipv6);
-	nf_ct_l4proto_unregister(&nf_conntrack_l4proto_tcp6);
-	nf_ct_l4proto_unregister(&nf_conntrack_l4proto_udp6);
-	nf_ct_l4proto_unregister(&nf_conntrack_l4proto_icmpv6);
+	for (i = 0; i < ARRAY_SIZE(nf_conntrack_l4proto6); i++)
+		nf_ct_l4proto_unregister(nf_conntrack_l4proto6[i]);
 	nf_unregister_hooks(ipv6_conntrack_ops, ARRAY_SIZE(ipv6_conntrack_ops));
 	unregister_pernet_subsys(&ipv6_net_ops);
 	nf_unregister_sockopt(&so_getorigdst6);
