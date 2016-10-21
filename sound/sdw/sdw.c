@@ -335,9 +335,191 @@ static struct bus_type sdw_bus_type = {
 };
 
 /**
- * snd_sdw_master_register_driver: SoundWire Master driver registration with
- *	bus. This API will register the Master driver with the SoundWire
- *	bus. It is typically called from the driver's module-init function.
+ * sdw_transfer: Local function where logic is placed to handle NOPM and PM
+ *	variants of the Slave transfer functions.
+ *
+ * @mstr: Handle to SDW Master
+ * @msg: One or more messages to be transferred
+ * @num: Number of messages to be transferred.
+ *
+ * Returns negative error, else the number of messages transferred.
+ *
+ */
+static int sdw_transfer(struct sdw_master *mstr, struct sdw_msg *msg, int num,
+				struct sdw_deferred_xfer_data *data)
+{
+	unsigned long orig_jiffies;
+	int ret, try, i;
+	int program_scp_addr_page = false;
+	u8 prev_adr_pg1 = 0;
+	u8 prev_adr_pg2 = 0;
+
+	for (i = 0; i < num; i++) {
+
+		/* Reset timeout for every message */
+		orig_jiffies = jiffies;
+
+		/* Inform Master driver to program SCP addr or not */
+		if ((prev_adr_pg1 != msg[i].addr_page1) ||
+			(prev_adr_pg2 != msg[i].addr_page2))
+			program_scp_addr_page = true;
+
+		for (ret = 0, try = 0; try <= mstr->retries; try++) {
+
+			/* Call deferred or sync handler based on call */
+			if (!data)
+				ret = mstr->driver->ops->xfer_msg(mstr,
+					&msg[i], program_scp_addr_page);
+
+			else if (mstr->driver->ops->xfer_msg_deferred)
+				mstr->driver->ops->xfer_msg_deferred(
+						mstr, &msg[i],
+						program_scp_addr_page,
+						data);
+			else
+				return -ENOTSUPP;
+			if (ret != -EAGAIN)
+				break;
+
+			if (time_after(jiffies, orig_jiffies + mstr->timeout))
+				break;
+		}
+
+
+		/*
+		 * Set previous address page as current once message is
+		 * transferred.
+		 */
+		prev_adr_pg1 = msg[i].addr_page1;
+		prev_adr_pg2 = msg[i].addr_page2;
+	}
+
+	orig_jiffies = jiffies;
+
+	ret = 0;
+
+	/* Reset page address if its other than 0 */
+	if (msg[i].addr_page1 && msg[i].addr_page2) {
+		for (try = 0; try <= mstr->retries; try++) {
+			/*
+			 * Reset the page address to 0, so that always there
+			 * is fast path access to MIPI defined Slave
+			 * registers.
+			 */
+
+			ret = mstr->driver->ops->reset_page_addr(
+					mstr, msg[0].dev_num);
+
+			if (ret != -EAGAIN)
+				break;
+
+			if (time_after(jiffies, orig_jiffies + mstr->timeout))
+				break;
+		}
+	}
+
+	if (!ret)
+		return i + 1;
+
+	return ret;
+}
+
+/**
+ * sdw_bank_switch_deferred: Initiate the transfer of the message but
+ *	doesn't wait for the message to be completed. Bus driver waits
+ *	outside context of this API for master driver to signal message
+ *	transfer complete. This is not Public API, this is used by Bus
+ *	driver only for Bank switch.
+ *
+ * @mstr: Master which will transfer the message.
+ * @msg: Message to be transferred. Message length of only 1 is supported.
+ * @data: Deferred information for the message to be transferred. This is
+ *	filled by Master on message transfer complete.
+ *
+ * Returns immediately after initiating the transfer, Bus driver needs to
+ * wait on xfer_complete, part of data, which is set by Master driver on
+ * completion of message transfer.
+ *
+ */
+void sdw_bank_switch_deferred(struct sdw_master *mstr, struct sdw_msg *msg,
+				struct sdw_deferred_xfer_data *data)
+{
+
+	pm_runtime_get_sync(&mstr->dev);
+
+	sdw_transfer(mstr, msg, 1, data);
+
+	pm_runtime_mark_last_busy(&mstr->dev);
+	pm_runtime_put_sync_autosuspend(&mstr->dev);
+
+}
+
+/**
+ * snd_sdw_slave_transfer: Transfer message on bus.
+ *
+ * @master: Master which will transfer the message.
+ * @msg: Array of messages to be transferred.
+ * @num: Number of messages to be transferred, messages include read and
+ *	write messages, but not the ping commands. The read and write
+ *	messages are transmitted as a part of read and write SoundWire
+ *	commands with a parameter containing the payload.
+ *
+ * Returns the number of messages successfully transferred else appropriate
+ * error code.
+ */
+int snd_sdw_slave_transfer(struct sdw_master *master, struct sdw_msg *msg,
+							unsigned int num)
+{
+	int ret;
+
+	/*
+	 * Master reports the successfully transmitted messages onto the
+	 * bus. If there are N message to be transmitted onto bus, and if
+	 * Master gets error at (N-2) message it will report number of
+	 * message transferred as N-2 Error is reported if ACK is not
+	 * received for all messages or NACK is received for any of the
+	 * transmitted messages. Currently both ACK not getting received
+	 * and NACK is treated as error. But for upper level like regmap,
+	 * both (Absence of ACK or NACK) errors are same as failure.
+	 */
+
+	/*
+	 * Make sure Master is woken up before message transfer Ideally
+	 * function calling this should have wokenup Master as this will be
+	 * called by Slave driver, and it will do runtime_get for itself,
+	 * which will make sure Master is woken up as Master is parent Linux
+	 * device of Slave. But if Slave is not implementing RTPM, it may
+	 * not do this, so bus driver has to do it always irrespective of
+	 * what Slave does.
+	 */
+	pm_runtime_get_sync(&master->dev);
+
+	if (in_atomic() || irqs_disabled()) {
+		ret = mutex_trylock(&master->msg_lock);
+		if (!ret) {
+			ret = -EAGAIN;
+			goto out;
+		}
+	} else {
+		mutex_lock(&master->msg_lock);
+	}
+
+	ret = sdw_transfer(master, msg, num, NULL);
+
+	mutex_unlock(&master->msg_lock);
+out:
+	/* Put Master to sleep once message is transferred */
+	pm_runtime_mark_last_busy(&master->dev);
+	pm_runtime_put_sync_autosuspend(&master->dev);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_sdw_slave_transfer);
+
+/**
+ * snd_sdw_master_register_driver: This API will register the Master driver
+ *	with the SoundWire bus. It is typically called from the driver's
+ *	module-init function.
  *
  * @driver: Master Driver to be associated with Master interface.
  * @owner: Module owner, generally THIS module.

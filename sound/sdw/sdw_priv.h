@@ -99,4 +99,148 @@ struct snd_sdw_core {
 	struct idr idr;
 };
 
+/**
+ * sdw_bank_switch_deferred: Initiate the transfer of the message but
+ *	doesn't wait for the message to be completed. Bus driver waits
+ *	outside context of this API for master driver to signal message
+ *	transfer complete. This is not Public API, this is used by Bus
+ *	driver only for Bank switch.
+ *
+ * @mstr: Master which will transfer the message.
+ * @msg: Message to be transferred. Message length of only 1 is supported.
+ * @data: Deferred information for the message to be transferred. This is
+ *	filled by Master on message transfer complete.
+ *
+ * Returns immediately after initiating the transfer, Bus driver needs to
+ * wait on xfer_complete, part of data, which is set by Master driver on
+ * completion of message transfer.
+ */
+void sdw_bank_switch_deferred(struct sdw_master *mstr, struct sdw_msg *msg,
+				struct sdw_deferred_xfer_data *data);
+/*
+ * Helper function for bus driver to write messages. Since bus driver
+ * operates on MIPI defined Slave registers, addr_page1 and addr_page2 is
+ * set to 0.
+ */
+static inline int sdw_wr_msg(struct sdw_msg *msg, bool xmit_on_ssp, u16 addr,
+					u16 len, u8 *buf, u8 dev_num,
+					struct sdw_master *mstr,
+					int num_msg)
+{
+	msg->xmit_on_ssp = xmit_on_ssp;
+	msg->r_w_flag = SDW_MSG_FLAG_WRITE;
+	msg->addr = addr;
+	msg->len = len;
+	msg->buf = buf;
+	msg->dev_num = dev_num;
+	msg->addr_page1 = 0x0;
+	msg->addr_page2 = 0x0;
+
+	return snd_sdw_slave_transfer(mstr, msg, num_msg);
+}
+
+/*
+ * Helper function for bus driver to read messages. Since bus driver
+ * operates on MIPI defined Slave registers, addr_page1 and addr_page2 is
+ * set to 0.
+ */
+static inline int sdw_rd_msg(struct sdw_msg *msg, bool xmit_on_ssp, u16 addr,
+					u16 len, u8 *buf, u8 dev_num,
+					struct sdw_master *mstr,
+					int num_msg)
+{
+	msg->xmit_on_ssp = xmit_on_ssp;
+	msg->r_w_flag = SDW_MSG_FLAG_READ;
+	msg->addr = addr;
+	msg->len = len;
+	msg->buf = buf;
+	msg->dev_num = dev_num;
+	msg->addr_page1 = 0x0;
+	msg->addr_page2 = 0x0;
+
+	return snd_sdw_slave_transfer(mstr, msg, num_msg);
+}
+
+/*
+ * Helper function for bus driver to write messages (nopm version). Since
+ * bus driver operates on MIPI defined Slave registers, addr_page1 and
+ * addr_page2 is set to 0.
+ */
+static inline int sdw_wr_msg_nopm(struct sdw_msg *msg, bool xmit_on_ssp,
+					u16 addr, u16 len, u8 *buf,
+					u8 dev_num,
+					struct sdw_master *mstr,
+					int num_msg)
+{
+	msg->xmit_on_ssp = xmit_on_ssp;
+	msg->r_w_flag = SDW_MSG_FLAG_WRITE;
+	msg->addr = addr;
+	msg->len = len;
+	msg->buf = buf;
+	msg->dev_num = dev_num;
+	msg->addr_page1 = 0x0;
+	msg->addr_page2 = 0x0;
+
+	return snd_sdw_slave_transfer(mstr, msg, num_msg);
+}
+
+/*
+ * Helper function for bus driver to read messages (nopm version). Since
+ * bus driver operates on MIPI defined Slave registers, addr_page1 and
+ * addr_page2 is set to 0.
+ */
+static inline int sdw_rd_msg_nopm(struct sdw_msg *msg, bool xmit_on_ssp,
+					u16 addr, u16 len, u8 *buf,
+					u8 dev_num,
+					struct sdw_master *mstr,
+					int num_msg)
+{
+	msg->xmit_on_ssp = xmit_on_ssp;
+	msg->r_w_flag = SDW_MSG_FLAG_READ;
+	msg->addr = addr;
+	msg->len = len;
+	msg->buf = buf;
+	msg->dev_num = dev_num;
+	msg->addr_page1 = 0x0;
+	msg->addr_page2 = 0x0;
+
+	return snd_sdw_slave_transfer(mstr, msg, num_msg);
+}
+
+/*
+ * Helper function for bus driver to create read messages. Since bus driver
+ * operates on MIPI defined Slave registers, addr_page1 and addr_page2 is
+ * set to 0.
+ */
+static inline void sdw_create_rd_msg(struct sdw_msg *msg, bool xmit_on_ssp,
+				u16 addr, u16 len, u8 *buf, u8 dev_num)
+{
+	msg->xmit_on_ssp = xmit_on_ssp;
+	msg->r_w_flag = SDW_MSG_FLAG_READ;
+	msg->addr = addr;
+	msg->len = len;
+	msg->buf = buf;
+	msg->dev_num = dev_num;
+	msg->addr_page1 = 0x0;
+	msg->addr_page2 = 0x0;
+}
+
+/*
+ * Helper function for bus driver to create write messages. Since bus driver
+ * operates on MIPI defined Slave registers, addr_page1 and addr_page2 is
+ * set to 0.
+ */
+static inline void sdw_create_wr_msg(struct sdw_msg *msg, bool xmit_on_ssp,
+				u16 addr, u16 len, u8 *buf, u8 dev_num)
+{
+	msg->xmit_on_ssp = xmit_on_ssp;
+	msg->r_w_flag = SDW_MSG_FLAG_WRITE;
+	msg->addr = addr;
+	msg->len = len;
+	msg->buf = buf;
+	msg->dev_num = dev_num;
+	msg->addr_page1 = 0x0;
+	msg->addr_page2 = 0x0;
+}
+
 #endif /* _LINUX_SDW_PRIV_H */
