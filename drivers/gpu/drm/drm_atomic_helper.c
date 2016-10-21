@@ -2936,6 +2936,64 @@ backoff:
 EXPORT_SYMBOL(drm_atomic_helper_connector_dpms);
 
 /**
+ * drm_atomic_helper_connector_modeset - Force a modeset on a connector
+ * @connector: DRM connector
+ *
+ * Provides a way to redo a modeset with the current mode so that it can
+ * drop the bpp, link rate/lane count and retry the link training.
+ *
+ * Returns:
+ * Returns 0 on success, negative errno numbers on failure.
+ */
+int
+drm_atomic_helper_connector_modeset(struct drm_connector *connector)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_modeset_acquire_ctx ctx;
+	struct drm_atomic_state *state;
+	struct drm_connector_state *connector_state;
+	struct drm_crtc_state *crtc_state;
+	int ret = 0;
+
+	drm_modeset_acquire_init(&ctx, 0);
+	state = drm_atomic_state_alloc(dev);
+	if (!state) {
+		ret = -ENOMEM;
+		goto fail;
+	}
+	state->acquire_ctx = &ctx;
+retry:
+	ret = 0;
+	connector_state = drm_atomic_get_connector_state(state, connector);
+	if (IS_ERR(connector_state)) {
+		ret = PTR_ERR(connector_state);
+		goto fail;
+	}
+	if (!connector_state->crtc)
+		goto fail;
+
+	crtc_state = drm_atomic_get_existing_crtc_state(state,
+							connector_state->crtc);
+	crtc_state->connectors_changed = true;
+	ret = drm_atomic_commit(state);
+fail:
+	if (ret == -EDEADLK) {
+		drm_atomic_state_clear(state);
+		drm_modeset_backoff(&ctx);
+		goto retry;
+	}
+
+	if (state)
+		drm_atomic_state_put(state);
+
+	drm_modeset_drop_locks(&ctx);
+	drm_modeset_acquire_fini(&ctx);
+
+	return ret;
+}
+EXPORT_SYMBOL(drm_atomic_helper_connector_modeset);
+
+/**
  * drm_atomic_helper_best_encoder - Helper for &drm_connector_helper_funcs
  *                                  ->best_encoder callback
  * @connector: Connector control structure

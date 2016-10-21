@@ -126,6 +126,7 @@ int drm_atomic_helper_page_flip(struct drm_crtc *crtc,
 				uint32_t flags);
 int drm_atomic_helper_connector_dpms(struct drm_connector *connector,
 				     int mode);
+int drm_atomic_helper_connector_modeset(struct drm_connector *connector);
 struct drm_encoder *
 drm_atomic_helper_best_encoder(struct drm_connector *connector);
 
