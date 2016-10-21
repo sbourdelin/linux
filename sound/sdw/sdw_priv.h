@@ -603,6 +603,24 @@ void sdw_create_row_col_pair(void);
 void sdw_init_bus_params(struct sdw_bus *sdw_bus);
 
 /**
+ * sdw_prepare_and_enable_ops: This is called by the bus driver for doing
+ *	operations related to stream prepare and enable. sdw_bus_ops are
+ *	performed on bus for preparing and enabling of the streams.
+ *
+ * @stream_tag: Stream tag on which operations needs to be performed.
+ */
+int sdw_prepare_and_enable_ops(struct sdw_stream_tag *stream_tag);
+
+/**
+ * sdw_disable_and_deprepare_ops: This is called by the bus driver for doing
+ *	operations related to stream disable and de-prepare.sdw_bus_ops are
+ *	performed on bus for disabling and de-preparing of the streams.
+ *
+ * @stream_tag: Stream tag on which operations needs to be performed.
+ */
+int sdw_disable_and_deprepare_ops(struct sdw_stream_tag *stream_tag);
+
+/**
  * sdw_get_slv_dpn_caps: Get the data port capabilities based on the port
  *	number and port direction.
  *
@@ -756,6 +774,38 @@ static inline void sdw_create_wr_msg(struct sdw_msg *msg, bool xmit_on_ssp,
 	msg->dev_num = dev_num;
 	msg->addr_page1 = 0x0;
 	msg->addr_page2 = 0x0;
+}
+
+/* Retrieve and return channel count from channel mask */
+static inline int sdw_chn_mask_to_chn(int chn_mask)
+{
+	int c = 0;
+
+	for (c = 0; chn_mask; chn_mask >>= 1)
+		c += chn_mask & 1;
+
+	return c;
+}
+
+/* Fill transport parameter data structure */
+static inline void sdw_fill_xport_params(struct sdw_transport_params *params,
+					int port_num,
+					bool grp_ctrl_valid,
+					int grp_ctrl,
+					int off1, int off2,
+					int hstart, int hstop,
+					int pack_mode, int lane_ctrl)
+{
+
+	params->port_num = port_num;
+	params->blk_grp_ctrl_valid = grp_ctrl_valid;
+	params->blk_grp_ctrl = grp_ctrl;
+	params->offset1 = off1;
+	params->offset2 = off2;
+	params->hstart = hstart;
+	params->hstop = hstop;
+	params->blk_pkg_mode = pack_mode;
+	params->lane_ctrl = lane_ctrl;
 }
 
 #endif /* _LINUX_SDW_PRIV_H */

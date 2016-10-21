@@ -2240,6 +2240,9 @@ int snd_sdw_master_add(struct sdw_master *master)
 	INIT_LIST_HEAD(&sdw_bus->status_list);
 	spin_lock_init(&sdw_bus->spinlock);
 
+	/* Initialize bandwidth calculation data structures */
+	sdw_init_bus_params(sdw_bus);
+
 	/*
 	 * Add bus to the list of buses inside core. This is list of Slave
 	 * devices enumerated on this bus. Adding new devices at end. It can
@@ -2355,6 +2358,75 @@ static enum sdw_clk_stop_mode sdw_slv_get_clk_stp_mode(struct sdw_slave *slave)
 		clock_stop_mode = cap->clk_stp1_mode;
 
 	return clock_stop_mode;
+}
+
+/**
+ * sdw_acquire_mstr_lock: This function acquires Master lock for the
+ *	Master(s) used by the given stream. The advantage of using Master
+ *	lock over core lock is Master lock will lock only those Master(s)
+ *	associated with given stream giving the advantage of simultaneous
+ *	configuration of stream(s) running on different Master(s). On the
+ *	other hand, core lock will not allow multiple stream configuration
+ *	simultaneously.
+ *
+ * @stream_tag: Stream tag on which operations needs to be performed.
+ */
+static void sdw_acquire_mstr_lock(struct sdw_stream_tag *stream_tag)
+{
+	struct sdw_runtime *sdw_rt = stream_tag->sdw_rt;
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	struct sdw_master *sdw_mstr = NULL;
+
+	/* Acquire core lock */
+	mutex_lock(&snd_sdw_core.core_mutex);
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt, &sdw_rt->mstr_rt_list,
+			mstr_strm_node) {
+
+		/* Get Master structure */
+		sdw_mstr = sdw_mstr_rt->mstr;
+
+		/* Acquire Master lock */
+		mutex_lock(&sdw_mstr->lock);
+	}
+
+	/* Release core lock */
+	mutex_unlock(&snd_sdw_core.core_mutex);
+
+}
+
+/**
+ * sdw_release_mstr_lock: This function releases Master lock for the
+ *	Master(s) used by the given stream acquired in sdw_acquire_mstr_lock
+ *	API.
+ *
+ * @stream_tag: Stream tag on which operations needs to be performed.
+ *
+ */
+static void sdw_release_mstr_lock(struct sdw_stream_tag *stream_tag)
+{
+	struct sdw_runtime *sdw_rt = stream_tag->sdw_rt;
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	struct sdw_master *sdw_mstr = NULL;
+
+	/* Acquire core lock */
+	mutex_lock(&snd_sdw_core.core_mutex);
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt, &sdw_rt->mstr_rt_list,
+			mstr_strm_node) {
+
+		/* Get Master structure */
+		sdw_mstr = sdw_mstr_rt->mstr;
+
+		/* Release Master lock */
+		mutex_unlock(&sdw_mstr->lock);
+	}
+
+	/* Release core lock */
+	mutex_unlock(&snd_sdw_core.core_mutex);
+
 }
 
 /**
@@ -3132,6 +3204,174 @@ int snd_sdw_config_ports(struct sdw_master *mstr, struct sdw_slave *slave,
 EXPORT_SYMBOL_GPL(snd_sdw_config_ports);
 
 /**
+ * sdw_find_stream: Retrieves stream tag handle by matching stream tag.
+ *
+ * @stream_tag: Stream tag.
+ */
+static struct sdw_stream_tag *sdw_find_stream(int stream_tag)
+{
+	int i;
+	struct sdw_stream_tag *stream_tags = snd_sdw_core.stream_tags;
+	struct sdw_stream_tag *stream = NULL;
+
+	/* Acquire core lock */
+	mutex_lock(&snd_sdw_core.core_mutex);
+
+	for (i = 0; i < SDW_NUM_STREAM_TAGS; i++) {
+		if (stream_tag == stream_tags[i].stream_tag) {
+			stream = &stream_tags[i];
+			break;
+		}
+	}
+
+	if (stream == NULL) {
+		/* Release core lock */
+		mutex_unlock(&snd_sdw_core.core_mutex);
+		WARN_ON(1);
+		return NULL;
+	}
+
+	/* Release core lock */
+	mutex_unlock(&snd_sdw_core.core_mutex);
+
+	return stream;
+}
+
+/**
+ * snd_sdw_prepare_and_enable: Prepare and enable all the ports of all the
+ *	Master(s) and Slave(s) associated with this stream tag. Following
+ *	will be done as part of prepare operation.
+ *	1. Bus parameters such as bandwidth, frame shape, clock frequency,
+ *	SSP interval are computed based on current stream as well as already
+ *	active streams on bus. Re-computation is required to accommodate
+ *	current stream on the bus.
+ *	2. Transport parameters of all Master and Slave ports are computed
+ *	for the current as well as already active stream based on above
+ *	calculated frame shape and clock frequency.
+ *	3. Computed bus and transport parameters are programmed in Master
+ *	and Slave registers. The banked registers programming is done on the
+ *	alternate bank (bank currently unused). Port channels are enabled
+ *	for the already active streams on the alternate bank (bank currently
+ *	unused). This is done in order to not to disrupt already active
+ *	stream.
+ *	4. Once all the new values are programmed, switch is made to
+ *	alternate bank. Once switch is successful, the port channels enabled
+ *	on previous bank for already active streams are disabled.
+ *	5. Ports of Master and Slave for new stream are prepared.
+ *
+ *	Following will be done as part of enable operation.
+ *	1. All the values computed in SDW_STATE_STRM_PREPARE state are
+ *	programmed in alternate bank (bank currently unused). It includes
+ *	programming of already active streams as well.
+ *	2. All the Master and Slave port channels for the new stream are
+ *	enabled on alternate bank (bank currently unused).
+ *	3. Once all the new values are programmed, switch is made on the
+ *	alternate bank. Once the switch is successful, the port channels
+ *	enabled on previous bank for already active streams are disabled.
+ *
+ *	This shall be called either by Master or Slave, which is responsible
+ *	for doing data transfer between SoundWire link and the system
+ *	memory.
+ *
+ * @stream_tag: Audio stream to be enabled. Each stream has unique
+ *	stream_tag. All the channels of all the ports of Slave(s) and
+ *	Master(s) attached to this stream will be prepared and enabled
+ *	simultaneously with bank switch.
+ */
+int snd_sdw_prepare_and_enable(unsigned int stream_tag)
+{
+
+	int ret;
+
+	struct sdw_stream_tag *stream = NULL;
+
+	stream = sdw_find_stream(stream_tag);
+	if (!stream)
+		return -EINVAL;
+
+	/* Acquire Master lock */
+	sdw_acquire_mstr_lock(stream);
+
+	ret = sdw_prepare_and_enable_ops(stream);
+	if (ret < 0)
+		pr_err("Error: prepare/enable operation failed\n");
+
+	/* Release Master lock */
+	sdw_release_mstr_lock(stream);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_sdw_prepare_and_enable);
+
+/**
+ * snd_sdw_disable_and_deprepare: Disable and de-prepare all the ports of
+ *	all the Master(s) and Slave(s) associated with stream tag. Following
+ *	will be done as part of disable operation.
+ *	1. Disable for Master and Slave ports channels is performed on
+ *	alternate bank (bank currently unused) registers for current stream.
+ *	2. All the current configuration of bus and Master and Slave ports
+ *	are programmed into alternate bank (bank currently unused). It
+ *	includes programming of already active streams port channels on
+ *	alternate bank (bank currently unused).
+ *	3. Switch is made on new bank. Once the switch is successful, the
+ *	port channels of current stream are disabled. All the port channels
+ *	enabled on previous bank for active stream are disabled.
+ *
+ *	Following will be done as part of de-prepare operation.
+ *	1. Check the bandwidth required per Master. If its zero, de-prepare
+ *	current stream and move stream state SDW_STATE_STRM_UNPREPARE, rest
+ *	of the steps are not required. If bandwidth required per Master is
+ *	non zero that means some more streams are running on Master and
+ *	continue with next step.
+ *	2. Bus parameters and transport parameters are computed for the
+ *	streams active on the given Master.
+ *	3. All the computed values for active stream are programmed into
+ *	alternate bank (bank currently unused) in Master and Slave registers
+ *	including already active streams port channels on alternate bank
+ *	(bank currently unused).
+ *	4. Switch is made to alternate bank where all the values for active
+ *	stream were programmed. On successful switch of bank, all the port
+ *	channels enabled on previous bank for active stream are disabled.
+ *	5. De-prepare ports of the Master and Slave associated with current
+ *	stream.
+ *
+ *	This shall be called either by Master or Slave, which is
+ *	responsible for doing data transfer between SoundWire link and the
+ *	system memory.
+ *	Note: Both disable and de-prepare operations are performed in single
+ *	call. De-prepare operation can be deferred for some specific timeout
+ *	value after disable operation, to avoid bus re-configurations
+ *	between short play and pause periods.
+ *
+ * @stream_tag: Audio stream to be disabled. Each stream has unique
+ *	stream_tag. All the channels of all the ports of Slave(s) and
+ *	Master(s) attached to this stream will be disabled and de-prepared
+ *	simultaneously with bank switch.
+ */
+int snd_sdw_disable_and_deprepare(unsigned int stream_tag)
+{
+	int ret;
+	struct sdw_stream_tag *stream = NULL;
+
+	stream = sdw_find_stream(stream_tag);
+	if (!stream)
+		return -EINVAL;
+
+	/* Acquire Master lock */
+	sdw_acquire_mstr_lock(stream);
+
+	ret = sdw_disable_and_deprepare_ops(stream);
+	if (ret < 0)
+		pr_err("Error: disable/de-prepare operations failed\n");
+
+	/* Release Master lock */
+	sdw_release_mstr_lock(stream);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_sdw_disable_and_deprepare);
+
+/**
  * snd_sdw_master_stop_clock: Stop the clock. This function broadcasts the
  *	SCP_CTRL register with clock_stop_now bit set.
  *
@@ -3487,6 +3727,15 @@ static int sdw_init(void)
 
 	if (retval)
 		bus_unregister(&sdw_bus_type);
+
+	/*
+	 * Initialization of bandwidth and runtime stream
+	 * management related operations required for bus driver.
+	 * Currently pre-calculation of row-column combination is performed
+	 * which is required to expedite computation of bus frame shape.
+	 */
+	sdw_create_row_col_pair();
+
 	return retval;
 }
 

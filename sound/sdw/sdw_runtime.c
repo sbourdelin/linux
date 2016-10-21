@@ -1,0 +1,2807 @@
+/*
+ * sdw_runtime.c - SoundWire bus driver stream runtime operations.
+ *
+ * Author: Sanyog Kale <sanyog.r.kale@intel.com>
+ *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * This file is provided under a dual BSD/GPLv2 license.  When using or
+ * redistributing this file, you may do so under either license.
+ *
+ * GPL LICENSE SUMMARY
+ *
+ * Copyright(c) 2016 Intel Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ *
+ * BSD LICENSE
+ *
+ * Copyright(c) 2016 Intel Corporation.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in
+ *     the documentation and/or other materials provided with the
+ *     distribution.
+ *   * Neither the name of Intel Corporation nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ */
+
+#include <linux/slab.h>
+#include <linux/kernel.h>
+#include <linux/delay.h>
+#include <linux/lcm.h>
+#include <sound/sdw_bus.h>
+#include <sound/sdw_master.h>
+#include <sound/sdw_slave.h>
+#include <sound/sdw/sdw_registers.h>
+
+#include "sdw_priv.h"
+
+/* Array of supported rows as per MIPI SoundWire Specification 1.1 */
+static int rows[MAX_NUM_ROWS] = {48, 50, 60, 64, 72, 75, 80, 90,
+		     96, 125, 144, 147, 100, 120, 128, 150,
+		     160, 180, 192, 200, 240, 250, 256};
+
+/* Array of supported columns as per MIPI SoundWire Specification 1.1 */
+static int cols[MAX_NUM_COLS] = {2, 4, 6, 8, 10, 12, 14, 16};
+
+/* Mapping of index to rows */
+static struct sdw_index_to_row sdw_index_row_mapping[MAX_NUM_ROWS] = {
+	{0, 48}, {1, 50}, {2, 60}, {3, 64}, {4, 75}, {5, 80}, {6, 125},
+	{7, 147}, {8, 96}, {9, 100}, {10, 120}, {11, 128}, {12, 150},
+	{13, 160}, {14, 250}, {16, 192}, {17, 200}, {18, 240}, {19, 256},
+	{20, 72}, {21, 144}, {22, 90}, {23, 180},
+};
+
+/* Mapping of index to columns */
+static struct sdw_index_to_col sdw_index_col_mapping[MAX_NUM_COLS] = {
+	{0, 2}, {1, 4}, {2, 6}, {3, 8}, {4, 10}, {5, 12}, {6, 14}, {7, 16},
+};
+
+/**
+ * sdw_create_row_col_pair: Initialization of bandwidth related operations.
+ * This is required to have fast path for the BW calculation when a new stream
+ * is prepared or deprepared. This is called only once as part of SoundWire Bus
+ * driver getting initialized.
+ */
+void sdw_create_row_col_pair(void)
+{
+	int r, c, rowcolcount = 0;
+	int control_bits = SDW_BUS_CONTROL_BITS;
+
+	/* Run loop for all columns */
+	for (c = 0; c < MAX_NUM_COLS; c++) {
+
+		/* Run loop for all rows */
+		for (r = 0; r < MAX_NUM_ROWS; r++) {
+			snd_sdw_core.row_col_pair[rowcolcount].col = cols[c];
+			snd_sdw_core.row_col_pair[rowcolcount].row = rows[r];
+			snd_sdw_core.row_col_pair[rowcolcount].control_bits =
+								control_bits;
+			snd_sdw_core.row_col_pair[rowcolcount].data_bits =
+				(cols[c] * rows[r]) - control_bits;
+			rowcolcount++;
+		}
+	}
+}
+
+/**
+ * sdw_init_bus_params: Sets up bus data structure for BW calculation. This
+ *	is called once per each Master interface registration to the
+ *	SoundWire bus.
+ *
+ * @sdw_bus: Bus handle.
+ */
+void sdw_init_bus_params(struct sdw_bus *sdw_bus)
+{
+	struct sdw_master_caps *sdw_mstr_cap = NULL;
+
+	/* Initialize required parameters in bus structure */
+	sdw_mstr_cap = &sdw_bus->mstr->caps;
+	sdw_bus->max_dr_clk_freq = sdw_mstr_cap->max_clk_freq *
+					SDW_DOUBLE_RATE_FACTOR;
+
+	/*
+	 * Assumption: At power on, bus is running at maximum frequency.
+	 */
+	sdw_bus->curr_dr_clk_freq = sdw_bus->max_dr_clk_freq;
+}
+
+/**
+ * sdw_find_col_index: Performs column to index mapping. The retrieved
+ *	number is used for programming register. This API is called by
+ *	sdw_bank_switch.
+ *
+ * @col: number of columns.
+ *
+ * Returns column index from the mapping else lowest column mapped index.
+ */
+static int sdw_find_col_index(int col)
+{
+	int i;
+
+	for (i = 0; i <= MAX_NUM_COLS; i++) {
+		if (sdw_index_col_mapping[i].col == col)
+			return sdw_index_col_mapping[i].index;
+	}
+
+	return 0; /* Lowest Column number = 2 */
+}
+
+/**
+ * sdw_find_row_index: Performs row to index mapping. The retrieved number
+ *	is used for programming register. This API is called by
+ *	sdw_bank_switch.
+ *
+ * @row: number of rows.
+ *
+ * Returns row index from the mapping else lowest row mapped index.
+ */
+static int sdw_find_row_index(int row)
+{
+	int i;
+
+	for (i = 0; i <= MAX_NUM_ROWS; i++) {
+		if (sdw_index_row_mapping[i].row == row)
+			return sdw_index_row_mapping[i].index;
+	}
+
+	return 0; /* Lowest Row number = 48 */
+}
+
+/**
+ * sdw_program_slv_xport_params: Programs Slave transport registers on
+ *	alternate bank (bank currently unused). This API is called by
+ *	sdw_program_xport_params.
+ *
+ * @sdw_bus: Bus handle.
+ * @slv_rt: Slave runtime handle.
+ * @t_slv_params: Transport parameters to be configured.
+ * @p_slv_params: Port parameters to be configured.
+ */
+static int sdw_program_slv_xport_params(struct sdw_bus *sdw_bus,
+		struct sdw_slv_runtime *slv_rt,
+		struct sdw_transport_params *t_slv_params,
+		struct sdw_port_params *p_slv_params)
+{
+	struct sdw_msg wr_msg, wr_msg1, wr_msg2, wr_msg3, rd_msg;
+	struct sdw_slave_caps *caps = &slv_rt->slv->priv.caps;
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	int ret;
+	int bank_to_use, type;
+	u16 addr, len;
+	u8 wbuf[SDW_BUF_SIZE3] = {0, 0, 0};
+	u8 wbuf1[SDW_BUF_SIZE4] = {0, 0, 0, 0};
+	u8 wbuf2[SDW_BUF_SIZE1] = {0};
+	u8 wbuf3[SDW_BUF_SIZE2] = {0, 0};
+	u8 rbuf[SDW_BUF_SIZE1] = {0};
+	struct sdw_dpn_caps *dpn_cap;
+
+	dpn_cap = sdw_get_slv_dpn_cap(caps, slv_rt->direction,
+				t_slv_params->port_num);
+	if (!dpn_cap)
+		return -EINVAL;
+
+	/* Get port capability info */
+	type = dpn_cap->type;
+
+	/*
+	 * Optimization scope: Reduce number of writes on the bus.
+	 * Mirroring should be considered.
+	 */
+
+	/*
+	 * Fill buffer contents for all messages.
+	 * 1. wr_msg holds values to program blockctrl2, samplectrl1 and
+	 * samplectrl2 registers.
+	 * 2. wr_msg1 holds values to program offset_ctrl1, offset_ctrl2,
+	 * hctrl and blockctrl3 registers.
+	 * 3. wr_msg2 holds values to program lanectrl register.
+	 * 4. wr_msg3 holds values to program portctrl and blockctrl1
+	 * register. If the Slave port(s) doesn't implement block group,
+	 * then blockctrl2 and blockctrl3 registers are not programmed.
+	 * Similarly if the Slave port(s) doesn't support lane control, then
+	 * lanectrl register is not programmed.
+	 */
+
+	/* Fill DPN_BlockCtrl2 value */
+	wbuf[0] = t_slv_params->blk_grp_ctrl;
+
+	/* Fill DPN_SampleCtrl1 value */
+	wbuf[1] = (t_slv_params->sample_interval - 1) &
+			SDW_DPN_SAMPLECTRL1_LOW_MASK;
+
+	 /* Fill DPN_SampleCtrl2 register value */
+	wbuf[2] = ((t_slv_params->sample_interval - 1) &
+			SDW_DPN_SAMPLECTRL2_LOW_MASK) >>
+			SDW_DPN_SAMPLECTRL2_SHIFT;
+
+	/* Fill DPN_OffsetCtrl1 register value */
+	wbuf1[0] = t_slv_params->offset1;
+
+	/* Fill DPN_OffsetCtrl1 register value */
+	wbuf1[1] = t_slv_params->offset2;
+
+	/* Fill DPN_HCtrl register value */
+	wbuf1[2] = (t_slv_params->hstop |
+			(t_slv_params->hstart << SDW_DPN_HCTRL_HSTART_SHIFT));
+
+	/* Fill DPN_BlockCtrl3 register value */
+	wbuf1[3] = t_slv_params->blk_pkg_mode;
+
+	/* Fill DPN_LaneCtrl register value */
+	wbuf2[0] = t_slv_params->lane_ctrl;
+
+	/* Get current bank in use from bus structure */
+	bank_to_use = !sdw_bus->active_bank;
+
+	addr = SDW_DPN_PORTCTRL +
+		(SDW_NUM_DATA_PORT_REGISTERS * t_slv_params->port_num);
+
+	/* Transfer message to read port_ctrl Slave register */
+	ret = sdw_rd_msg(&rd_msg, false, addr, SDW_BUF_SIZE1, rbuf,
+				slv_rt->slv->dev_num, sdw_mstr,
+				SDW_NUM_OF_MSG1_XFRD);
+	if (ret != SDW_NUM_OF_MSG1_XFRD) {
+		ret = -EINVAL;
+		dev_err(&sdw_mstr->dev, "Slave port_ctrl reg read failed\n");
+		goto out;
+	}
+
+	/* Fill DP0_PortCtrl register value */
+	wbuf3[0] = (p_slv_params->flow_mode | (p_slv_params->data_mode <<
+			SDW_DPN_PORTCTRL_PORTDATAMODE_SHIFT) | (rbuf[0]));
+
+	/* Fill DP0_BlockCtrl1 register value */
+	wbuf3[1] = (p_slv_params->bps - 1);
+
+	addr = ((SDW_DPN_BLOCKCTRL2 +
+			(1 * (!t_slv_params->blk_grp_ctrl_valid)) +
+			(SDW_BANK1_REGISTER_OFFSET * bank_to_use)) +
+			(SDW_NUM_DATA_PORT_REGISTERS * t_slv_params->port_num));
+
+	if (type == SDW_DP_TYPE_FULL)
+		len = (SDW_BUF_SIZE2 +
+			(1 * (t_slv_params->blk_grp_ctrl_valid)));
+	else
+		len = (SDW_BUF_SIZE1 +
+			(1 * (t_slv_params->blk_grp_ctrl_valid)));
+
+	ret = sdw_wr_msg(&wr_msg, false, addr, len,
+			&wbuf[0 + (1 * (!t_slv_params->blk_grp_ctrl_valid))],
+			slv_rt->slv->dev_num,
+			sdw_mstr, SDW_NUM_OF_MSG1_XFRD);
+	if (ret != SDW_NUM_OF_MSG1_XFRD) {
+		ret = -EINVAL;
+		dev_err(&sdw_mstr->dev, "Slave block_ctrl2/sample_ctrl1/2 reg write failed\n");
+		goto out;
+	}
+
+	/* Create write message wr_msg1 to program transport Slave register */
+	addr = ((SDW_DPN_OFFSETCTRL1 +
+			(SDW_BANK1_REGISTER_OFFSET * bank_to_use)) +
+			(SDW_NUM_DATA_PORT_REGISTERS * t_slv_params->port_num));
+
+	if (type == SDW_DP_TYPE_FULL)
+		len = SDW_BUF_SIZE4;
+	else
+		len = SDW_BUF_SIZE1;
+	ret = sdw_wr_msg(&wr_msg1, false, addr, len, &wbuf1[0],
+				slv_rt->slv->dev_num, sdw_mstr,
+				SDW_NUM_OF_MSG1_XFRD);
+	if (ret != SDW_NUM_OF_MSG1_XFRD) {
+		ret = -EINVAL;
+		dev_err(&sdw_mstr->dev, "Slave offset_ctrl1/2/h_ctrl/block_ctrl2 reg write failed\n");
+		goto out;
+	}
+
+	if (caps->lane_control_support) {
+		wr_msg2.addr = ((SDW_DPN_HCTRL +
+			(SDW_BANK1_REGISTER_OFFSET * bank_to_use)) +
+			(SDW_NUM_DATA_PORT_REGISTERS * t_slv_params->port_num));
+		ret = sdw_wr_msg(&wr_msg2, false, addr, SDW_BUF_SIZE1,
+					wbuf2, slv_rt->slv->dev_num,
+					sdw_mstr, SDW_NUM_OF_MSG1_XFRD);
+		if (ret != SDW_NUM_OF_MSG1_XFRD) {
+			ret = -EINVAL;
+			dev_err(&sdw_mstr->dev, "Slave lane_ctrl reg write failed\n");
+			goto out;
+		}
+	}
+
+	addr = SDW_DPN_PORTCTRL +
+		(SDW_NUM_DATA_PORT_REGISTERS * t_slv_params->port_num);
+
+	ret = sdw_wr_msg(&wr_msg3, false, addr, SDW_BUF_SIZE2, &wbuf3[0],
+					slv_rt->slv->dev_num, sdw_mstr,
+					SDW_NUM_OF_MSG1_XFRD);
+	if (ret != SDW_NUM_OF_MSG1_XFRD) {
+		ret = -EINVAL;
+		dev_err(&sdw_mstr->dev, "Slave port_ctrl/block_ctrl1 reg write failed\n");
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
+/**
+ * sdw_program_mstr_xport_params: Programs Master transport parameters
+ *	registers on alternate bank (bank currently unused). This API is
+ *	called by sdw_program_xport_params.
+ *
+ * @sdw_bus: Bus handle.
+ * @t_mstr_params: Transport parameters to be configured.
+ * @p_mstr_params: Port parameters to be configured.
+ */
+static int sdw_program_mstr_xport_params(struct sdw_bus *sdw_bus,
+		struct sdw_transport_params *t_mstr_params,
+		struct sdw_port_params *p_mstr_params)
+{
+	struct sdw_master_driver *ops = sdw_bus->mstr->driver;
+	int bank_to_use, ret;
+
+	/* Get current bank in use from bus structure */
+	bank_to_use = !sdw_bus->active_bank;
+
+	/* Perform Master transport parameters API call */
+	ret = ops->port_ops->dpn_set_port_transport_params(sdw_bus->mstr,
+					t_mstr_params, bank_to_use);
+	if (ret < 0)
+		return ret;
+
+	/* Perform Master port parameters API call */
+	ret = ops->port_ops->dpn_set_port_params(sdw_bus->mstr,
+				p_mstr_params, bank_to_use);
+	if (ret < 0)
+		return ret;
+
+	return ret;
+}
+
+/**
+ * sdw_program_xport_params: Programs transport parameters of Master and
+ *	Slave registers. This function calls individual Master and Slave API
+ *	to configure transport and port parameters. This API is called by
+ *	sdw_program_params.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ */
+static int sdw_program_xport_params(struct sdw_bus *sdw_bus,
+	struct sdw_mstr_runtime *sdw_mstr_rt)
+{
+	struct sdw_slv_runtime *slv_rt = NULL;
+	struct sdw_port_runtime *port_rt, *port_slv_rt;
+	struct sdw_transport_params *t_params, *t_slv_params;
+	struct sdw_port_params *p_params, *p_slv_params;
+	int ret = 0;
+
+	/*
+	 * Check stream state before programming transport parameters There
+	 * are two flows in which transport parameters are programmed.
+	 * 1. For new stream enabling, no stream state check required.
+	 * 2. For active streams enabling, stream state check is required.
+	 * For second flow, transport parameters will be only programmed if
+	 * stream is in de-prepare state. It applies for both Master and
+	 * Slave.
+	 */
+
+	if (sdw_mstr_rt->sdw_rt->stream_state == SDW_STATE_STRM_DEPREPARE)
+		return 0;
+
+	/* Iterate for all Slave(s) in Slave list */
+	list_for_each_entry(slv_rt,
+			&sdw_mstr_rt->slv_rt_list, slave_mstr_node) {
+
+		/* Iterate for all Slave port(s) in port list */
+		list_for_each_entry(port_slv_rt, &slv_rt->port_rt_list,
+							port_node) {
+
+			/* Transport and port parameters for Slave */
+			t_slv_params = &port_slv_rt->transport_params;
+			p_slv_params = &port_slv_rt->port_params;
+
+			/* Assign port parameters */
+			p_slv_params->num = port_slv_rt->port_num;
+			p_slv_params->bps = slv_rt->stream_params.bps;
+
+			/*
+			 * TODO: Currently only Isochronous mode supported,
+			 * asynchronous support to be added.
+			 */
+
+			/* Isochronous Mode */
+			port_slv_rt->port_params.flow_mode =
+				SDW_PORT_FLOW_MODE_ISOCH;
+
+			/* Normal Mode */
+			port_slv_rt->port_params.data_mode =
+				SDW_PORT_DATA_MODE_NORMAL;
+
+			/* Program transport & port parameters for Slave */
+			ret = sdw_program_slv_xport_params(sdw_bus, slv_rt,
+					t_slv_params, p_slv_params);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	/* Iterate for all Master port(s) in port list */
+	list_for_each_entry(port_rt,
+			&sdw_mstr_rt->port_rt_list, port_node) {
+
+		/* Transport and port parameters for Master*/
+		t_params = &port_rt->transport_params;
+		p_params = &port_rt->port_params;
+
+		/* Assign port parameters */
+		p_params->num = port_rt->port_num;
+		p_params->bps = sdw_mstr_rt->stream_params.bps;
+
+		/*
+		 * TODO: Currently only Isochronous mode supported,
+		 * asynchronous support to be added.
+		 */
+
+		/* Isochronous Mode */
+		p_params->flow_mode = SDW_PORT_FLOW_MODE_ISOCH;
+
+		/* Normal Mode */
+		p_params->data_mode = 0x0;
+
+		/* Program transport & port parameters for Slave */
+		ret = sdw_program_mstr_xport_params(sdw_bus, t_params,
+							p_params);
+		if (ret < 0)
+			return ret;
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_enable_disable_slv_ports: Enable & disables port(s) channel(s) for
+ *	Slave(s). The Slave(s) port(s) channel(s) are enable or disabled on
+ *	alternate bank (bank currently unused). This API is called by
+ *	sdw_enable_disable_ports.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_slv_rt: Runtime Slave handle.
+ * @port_slv_rt: Runtime port handle.
+ * @chn_en: Enable or disable the channel.
+ */
+static int sdw_enable_disable_slv_ports(struct sdw_bus *sdw_bus,
+			struct sdw_slv_runtime *sdw_slv_rt,
+			struct sdw_port_runtime *port_slv_rt,
+			bool chn_en)
+{
+	struct sdw_msg wr_msg, rd_msg;
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	int ret;
+	int bank_to_use;
+	u16 addr;
+	u8 wbuf[SDW_BUF_SIZE1] = {0};
+	u8 rbuf[SDW_BUF_SIZE1] = {0};
+
+	/* Get current bank in use from bus structure */
+	bank_to_use = !sdw_bus->active_bank;
+
+	/* Get channel enable register address for Slave */
+	addr = ((SDW_DPN_CHANNELEN +
+			(SDW_BANK1_REGISTER_OFFSET * bank_to_use)) +
+			(SDW_NUM_DATA_PORT_REGISTERS *
+			port_slv_rt->port_num));
+
+	/* Transfer message to read channel enable Slave register */
+	ret = sdw_rd_msg(&rd_msg, false, addr, SDW_BUF_SIZE1, rbuf,
+				sdw_slv_rt->slv->dev_num,
+				sdw_bus->mstr,
+				SDW_NUM_OF_MSG1_XFRD);
+
+	if (ret != SDW_NUM_OF_MSG1_XFRD) {
+		dev_err(&sdw_mstr->dev,
+				"Channel enable read failed\n");
+		return -EINVAL;
+	}
+
+	if (chn_en)
+		wbuf[0] = (rbuf[0] | port_slv_rt->channel_mask);
+	else
+		wbuf[0] = (rbuf[0] & ~(port_slv_rt->channel_mask));
+
+	/* Transfer message to write channel enable Slave register */
+	ret = sdw_wr_msg(&wr_msg, false, addr, SDW_BUF_SIZE1, wbuf,
+				sdw_slv_rt->slv->dev_num,
+				sdw_bus->mstr,
+				SDW_NUM_OF_MSG1_XFRD);
+	if (ret != SDW_NUM_OF_MSG1_XFRD) {
+		dev_err(&sdw_mstr->dev,
+				"Channel enable write failed\n");
+		return -EINVAL;
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_enable_disable_mstr_ports: Enable & disables port(s) channel(s) for
+ *	Master. The Master port(s) channel(s) are enable or disabled on
+ *	alternate bank (bank currently unused). This API is called by
+ *	sdw_enable_disable_ports.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @port_slv_rt: Runtime port handle.
+ * @chn_en: Operations to be performed.
+ */
+static int sdw_enable_disable_mstr_ports(struct sdw_bus *sdw_bus,
+		struct sdw_mstr_runtime *sdw_mstr_rt,
+		struct sdw_port_runtime *port_rt,
+		bool chn_en)
+{
+	struct sdw_master_driver *ops = sdw_bus->mstr->driver;
+	struct sdw_enable_ch enable_ch;
+	int bank_to_use, ret = 0;
+
+	/* Fill enable_ch data structure with values */
+	enable_ch.num = port_rt->port_num;
+	enable_ch.ch_mask = port_rt->channel_mask;
+	enable_ch.enable = chn_en; /* Enable/Disable */
+
+
+	/* Get current bank in use from bus structure */
+	bank_to_use = !sdw_bus->active_bank;
+
+	/* Perform Master port(s) channel(s) enable/disable API call */
+	if (ops->port_ops->dpn_port_enable_ch) {
+		ret = ops->port_ops->dpn_port_enable_ch(sdw_bus->mstr,
+					&enable_ch, bank_to_use);
+		if (ret < 0)
+			return ret;
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_enable_disable_ports: Enable/disable port(s) channel(s) for Master
+ *	and Slave. This function calls individual API's of Master and Slave
+ *	respectively to perform enable or disable operation. This API is
+ *	called by sdw_program_params, sdw_update_bus_params_ops and
+ *	sdw_disable_op.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_rt: Runtime stream handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @chn_en: Operations to be performed.
+ */
+static int sdw_enable_disable_ports(struct sdw_bus *sdw_bus,
+			struct sdw_runtime *sdw_rt,
+			struct sdw_mstr_runtime *sdw_mstr_rt,
+			bool chn_en)
+{
+	struct sdw_slv_runtime *slv_rt = NULL;
+	struct sdw_mstr_runtime *mstr_rt = NULL;
+	struct sdw_port_runtime *port_slv, *port_mstr;
+	int ret = 0;
+
+	/*
+	 * There are two flows in which channels are enabled and disabled.
+	 * 1. For new stream enabling/disabling, no stream state check
+	 * required.
+	 * 2. For active streams enabling/disabling, stream state check is
+	 * required.
+	 * Currently goto is used in API to select above operation
+	 * TODO: Avoid usage of goto statement
+	 */
+	if (sdw_mstr_rt == NULL)
+		goto sdw_rt_ops;
+
+	/* Iterate for all Slave(s) in Slave list */
+	list_for_each_entry(slv_rt, &sdw_mstr_rt->slv_rt_list,
+						slave_mstr_node) {
+
+		/*
+		 * Do not perform enable/disable operation if stream is in
+		 * ENABLE state.
+		 */
+		if (slv_rt->sdw_rt->stream_state == SDW_STATE_STRM_ENABLE) {
+
+			/* Iterate for all Slave port(s) in port list */
+			list_for_each_entry(port_slv, &slv_rt->port_rt_list,
+							port_node) {
+
+				/*
+				 * Enable/Disable Slave port(s) channel(s)
+				 */
+				ret = sdw_enable_disable_slv_ports(sdw_bus,
+						slv_rt, port_slv, chn_en);
+				if (ret < 0)
+					return ret;
+			}
+		}
+	}
+
+	/*
+	 * Do not perform enable/disable operation if stream is in ENABLE
+	 * state.
+	 */
+	if (sdw_mstr_rt->sdw_rt->stream_state == SDW_STATE_STRM_ENABLE) {
+
+
+		/* Iterate for all Master port(s) in port list */
+		list_for_each_entry(port_mstr,
+				&sdw_mstr_rt->port_rt_list, port_node) {
+
+			/* Enable/Disable Master port(s) channel(s) */
+			ret = sdw_enable_disable_mstr_ports(sdw_bus,
+				sdw_mstr_rt, port_mstr, chn_en);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+sdw_rt_ops:
+
+	/* Enable/Disable operation based on stream */
+	if (sdw_rt == NULL)
+		return ret;
+
+	/* Iterate for all Slave(s) in Slave list */
+	list_for_each_entry(slv_rt, &sdw_rt->slv_rt_list, slave_strm_node) {
+
+		/* Iterate for all Slave port(s) in port list */
+		list_for_each_entry(port_slv, &slv_rt->port_rt_list,
+						port_node) {
+
+			/* Enable/Disable Slave port(s) channel(s) */
+			ret = sdw_enable_disable_slv_ports(sdw_bus, slv_rt,
+							port_slv, chn_en);
+			if (ret < 0)
+				return ret;
+
+		}
+	}
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(mstr_rt, &sdw_rt->mstr_rt_list, mstr_strm_node) {
+
+		/* Iterate for all Master port(s) in port list */
+		list_for_each_entry(port_mstr, &mstr_rt->port_rt_list,
+							port_node) {
+
+			/* Enable/Disable Master port(s) channel(s) */
+			ret = sdw_enable_disable_mstr_ports(sdw_bus, mstr_rt,
+							port_mstr, chn_en);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_check_slv_clock_cap: Slave capabilities are checked for each clock
+ *	computed. If Slave support given clock, it returns true else false.
+ *	This API is called by sdw_compute_bus_params.
+ *
+ * @mode_prop: Port properties.
+ * @clock_reqd: clock rate.
+ *
+ * Returns true if clock rate is OK else false.
+ */
+static bool sdw_check_slv_clock_cap(struct sdw_port_aud_mode_prop *mode_prop,
+							int clock_reqd)
+{
+
+	int value = 0, j;
+	bool clock_ok = false;
+
+	/*
+	 * Slave(s) can provide supported clock rates or minimum/maximum
+	 * range. First check for clock rates, if not available then check
+	 * with minimum/maximum range.
+	 */
+	if (mode_prop->num_bus_freq_cfgs) {
+		/* Run loop for all clock rates */
+		for (j = 0; j < mode_prop->num_bus_freq_cfgs; j++) {
+			value = mode_prop->clk_freq_buf[j];
+			if (clock_reqd == value) {
+				clock_ok = true;
+				break;
+			}
+			if (j == mode_prop->num_bus_freq_cfgs) {
+				clock_ok = false;
+				break;
+			}
+
+		}
+
+	} else {
+		if ((clock_reqd < mode_prop->min_bus_freq) ||
+				(clock_reqd > mode_prop->max_bus_freq))
+			clock_ok = false;
+		else
+			clock_ok = true;
+	}
+
+	return clock_ok;
+}
+
+/**
+ * sdw_compute_bus_params: Based on the bandwidth computed per bus, clock
+ *	and frame shape required for bus is calculate. Each clock frequency
+ *	selected is checked with all the Slave(s) capabilities in use on
+ *	bus. Based on frame shape, frame interval is also computed. This API
+ *	is called by sdw_compute_params.
+ *
+ * @sdw_bus: Bus handle.
+ * @frame_int: Return frame interval computed.
+ * @sdw_mstr_rt: Runtime Master handle.
+ */
+static int sdw_compute_bus_params(struct sdw_bus *sdw_bus, int *frame_int,
+				struct sdw_mstr_runtime *sdw_mstr_rt)
+{
+	struct sdw_master_caps *sdw_mstr_cap = NULL;
+	struct sdw_dpn_caps *sdw_slv_dpn_cap = NULL;
+	struct sdw_port_aud_mode_prop *mode_prop = NULL;
+	struct sdw_slv_runtime *slv_rt = NULL;
+	struct sdw_port_runtime *port_slv_rt = NULL;
+	unsigned int double_rate_freq, clock_reqd;
+	int i, rc, num_clk_gears, gear;
+	int frame_interval = 0, frame_frequency = 0;
+	int sel_row = 0, sel_col = 0, pn = 0;
+	bool clock_ok = false;
+	struct sdw_slave_caps *caps;
+
+	/* Get Master capabilities handle */
+	sdw_mstr_cap = &sdw_bus->mstr->caps;
+
+	/*
+	 * Note:
+	 * Below loop is executed using number of clock gears supported.
+	 * TODO: Need to add support further if clock to be computed using
+	 * number of clock frequencies.
+	 */
+	num_clk_gears = sdw_mstr_cap->num_clk_gears;
+	if (!num_clk_gears)
+		return -EINVAL;
+
+	/* Double clock rate */
+	double_rate_freq = sdw_mstr_cap->max_clk_freq * SDW_DOUBLE_RATE_FACTOR;
+
+	/*
+	 * Find nearest clock frequency needed by bus for given bandwidth
+	 */
+	for (i = 0; i < num_clk_gears; i++) {
+
+		gear = sdw_mstr_cap->clk_gears[i];
+
+		/* TODO: Explanation for SDW_FREQ_MOD_FACTOR */
+		if (((double_rate_freq / gear) <= sdw_bus->bandwidth) ||
+			(((double_rate_freq / gear) %
+				SDW_FREQ_MOD_FACTOR) != 0))
+			continue;
+
+		/* Selected clock frequency */
+		clock_reqd = sdw_mstr_cap->max_clk_freq / gear;
+
+		/*
+		 * Check all the Slave(s) device capabilities here and find
+		 * whether given clock rate is supported by all Slaves
+		 */
+
+		/* Iterate for all Slave(s) in Slave list */
+		list_for_each_entry(slv_rt, &sdw_mstr_rt->slv_rt_list,
+				slave_mstr_node) {
+
+			/* Iterate for all Slave port(s) in port list */
+			list_for_each_entry(port_slv_rt, &slv_rt->port_rt_list,
+								port_node) {
+
+				/* Get port number */
+				pn = port_slv_rt->port_num;
+				caps = &slv_rt->slv->priv.caps;
+
+				/* Get port capabilities */
+				sdw_slv_dpn_cap = sdw_get_slv_dpn_cap(caps,
+						slv_rt->direction, pn);
+				if (!sdw_slv_dpn_cap)
+					return -EINVAL;
+				mode_prop = sdw_slv_dpn_cap->mode_properties;
+
+				/*
+				 * Perform slave capabilities check API call
+				 * where current selected clock is checked
+				 * against clock rates supported by Slave(s)
+				 */
+				clock_ok = sdw_check_slv_clock_cap(mode_prop,
+								clock_reqd);
+				/*
+				 * Don't check next Slave port capabilities,
+				 * go for next clock frequency
+				 */
+				if (!clock_ok)
+					break;
+			}
+
+			/* Go for next clock frequency */
+			if (!clock_ok)
+				break;
+		}
+
+		/* None of clock rate matches, return error */
+		if (i == num_clk_gears)
+			return -EINVAL;
+
+		/* check for next clock divider */
+		if (!clock_ok)
+			continue;
+
+		/*
+		 * At this point clock rate and clock gear is computed, now
+		 * find frame shape for bus.
+		 */
+		for (rc = 0; rc < MAX_NUM_ROW_COLS; rc++) {
+
+			/* Compute frame interval and frame frequency */
+			frame_interval =
+				snd_sdw_core.row_col_pair[rc].row *
+				snd_sdw_core.row_col_pair[rc].col;
+			frame_frequency =
+				(double_rate_freq/gear)/frame_interval;
+
+			/* Run loop till frame shape is OK */
+			if (((double_rate_freq/gear) -
+						(frame_frequency *
+						 snd_sdw_core.row_col_pair[rc].
+						 control_bits)) <
+						sdw_bus->bandwidth)
+				continue;
+
+			break;
+		}
+
+		/* Valid frame shape not found, check for next clock freq */
+		if (rc == MAX_NUM_ROW_COLS)
+			continue;
+
+		/* Fill all the computed values in data structures */
+		sel_row = snd_sdw_core.row_col_pair[rc].row;
+		sel_col = snd_sdw_core.row_col_pair[rc].col;
+		sdw_bus->frame_freq = frame_frequency;
+		sdw_bus->curr_dr_clk_freq = double_rate_freq/gear;
+		sdw_bus->clk_div = gear;
+		clock_ok = false;
+		*frame_int = frame_interval;
+		sdw_bus->col = sel_col;
+		sdw_bus->row = sel_row;
+
+		break;
+	}
+
+	return 0;
+}
+
+/**
+ * sdw_compute_system_interval: This function computes system interval and
+ *	stream interval per Master based on the current and active streams
+ *	running on bus. This API is called by sdw_compute_params.
+ *
+ * @sdw_bus: Bus handle.
+ * @frame_interval: Computed Frame interval.
+ */
+static int sdw_compute_system_interval(struct sdw_bus *sdw_bus,
+					int frame_interval)
+{
+	struct sdw_transport_params *t_params = NULL, *t_slv_params = NULL;
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	struct sdw_port_runtime *port_rt, *port_slv_rt;
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	struct sdw_slv_runtime *slv_rt = NULL;
+	int lcmnum1 = 0, lcmnum2 = 0, lcmnum3 = 0, div = 0;
+	int sample_interval;
+
+	/*
+	 * once bandwidth and frame shape for bus is found, run a loop for
+	 * current and all the active streams on bus and compute stream
+	 * interval & sample_interval.
+	 */
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt, &sdw_mstr->mstr_rt_list, mstr_node) {
+
+		/*
+		 * Do not compute system and stream interval if stream state
+		 * is in DEPREPARE
+		 */
+		if (sdw_mstr_rt->sdw_rt->stream_state ==
+				SDW_STATE_STRM_DEPREPARE)
+			continue;
+
+		/* Calculate sample interval */
+		sample_interval = (sdw_bus->curr_dr_clk_freq/
+				sdw_mstr_rt->stream_params.rate);
+
+
+		/*
+		 * Iterate for all Master port(s) in port list and assign
+		 * sample interval per port.
+		 */
+		list_for_each_entry(port_rt, &sdw_mstr_rt->port_rt_list,
+							port_node) {
+
+			/* Assign sample interval for each port */
+			t_params = &port_rt->transport_params;
+			t_params->sample_interval = sample_interval;
+		}
+
+		/* Calculate LCM */
+		lcmnum2 = sample_interval;
+
+		if (!lcmnum1)
+			lcmnum1 = lcm(lcmnum2, lcmnum2);
+		else
+			lcmnum1 = lcm(lcmnum1, lcmnum2);
+
+		/* Iterate for all Slave(s) in Slave list */
+		list_for_each_entry(slv_rt, &sdw_mstr_rt->slv_rt_list,
+						slave_mstr_node) {
+
+			/*
+			 * Iterate for all Slave port(s) in port list and
+			 * assign sample interval per port.
+			 */
+			list_for_each_entry(port_slv_rt, &slv_rt->port_rt_list,
+							port_node) {
+
+				/*
+				 * Assign sample interval for each port.
+				 * Assumption is that sample interval per
+				 * port for given Slave will be same.
+				 */
+				t_slv_params = &port_slv_rt->transport_params;
+				t_slv_params->sample_interval = sample_interval;
+			}
+		}
+	}
+
+	/* Assign stream interval */
+	sdw_bus->stream_interval = lcmnum1;
+
+	/*
+	 * If system interval already calculated, return successful, it can
+	 * be case in pause/resume, under-run scenario.
+	 */
+	if (sdw_bus->system_interval)
+		return 0;
+
+	/* Compute system_interval */
+	if (sdw_bus->curr_dr_clk_freq) {
+
+		/* Get divide value */
+		div = (sdw_bus->max_dr_clk_freq / sdw_bus->curr_dr_clk_freq);
+
+		/* Get LCM of stream interval and frame interval */
+		if ((lcmnum1) && (frame_interval))
+
+			lcmnum3 = lcm(lcmnum1, frame_interval);
+		else
+			return -EINVAL;
+
+		/* Fill computed system interval value */
+		sdw_bus->system_interval = ((div * lcmnum3) / frame_interval);
+	}
+
+	/*
+	 * Something went wrong while computing system interval may be lcm
+	 * value may be 0, return error accordingly.
+	 */
+	if (!sdw_bus->system_interval)
+		return -EINVAL;
+
+	return 0;
+}
+
+/**
+ * sdw_compute_slv_xport_params: This function performs transport parameters
+ *	computation of all Slave port(s) for all current and active streams.
+ *	This API is called by sdw_compute_xport_params function.
+ *
+ * @sdw_bus: Bus handle.
+ */
+static int sdw_compute_slv_xport_params(struct sdw_bus *sdw_bus)
+{
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	struct sdw_mstr_runtime *sdw_mstr_rt;
+	struct sdw_slv_runtime *slv_rt = NULL;
+	struct sdw_port_runtime *port_rt;
+	int no_of_chan = 0;
+	int port_bo, bps;
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt,
+			&sdw_mstr->mstr_rt_list, mstr_node) {
+
+		/* Get block offset from Master runtime */
+		port_bo = sdw_mstr_rt->bus_rt.block_offset;
+
+		/* Iterate for all Slave(s) in Slave list */
+		list_for_each_entry(slv_rt, &sdw_mstr_rt->slv_rt_list,
+						slave_mstr_node) {
+
+			/*
+			 * Do not compute any transport parameters if stream
+			 * state is in DEPREPARE
+			 */
+			if (slv_rt->sdw_rt->stream_state ==
+					SDW_STATE_STRM_DEPREPARE)
+				continue;
+
+			/* Get bps value */
+			bps = slv_rt->stream_params.bps;
+
+			/* Iterate for all Slave port(s) in port list */
+			list_for_each_entry(port_rt, &slv_rt->port_rt_list,
+							port_node) {
+
+				/*
+				 * Get no. of channels running on current
+				 * port.
+				 */
+				no_of_chan = sdw_chn_mask_to_chn(
+						port_rt->channel_mask);
+
+				/*
+				 * Fill computed transport parameters for
+				 * current port.
+				 */
+				sdw_fill_xport_params(&port_rt->
+					transport_params,
+					port_rt->port_num,
+					true,
+					SDW_BLK_GRP_CNT_1,
+					port_bo,
+					port_bo >> 8,
+					sdw_mstr_rt->bus_rt.hstart,
+					sdw_mstr_rt->bus_rt.hstop,
+					(SDW_BLK_GRP_CNT_1 * no_of_chan), 0x0);
+
+				/*
+				 * Increment block offset for next
+				 * port/Slave
+				 */
+				port_bo += bps * no_of_chan;
+			}
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * sdw_compute_mstr_xport_params: This function performs transport
+ *	parameters computation of all Master port(s) for all current and
+ *	active streams. This API is called by sdw_compute_xport_params
+ *	function.
+ *
+ * @sdw_bus: Bus handle.
+ * @grp_prms: Group Params.
+ * @group_count: Holds group count.
+ */
+static int sdw_compute_mstr_xport_params(struct sdw_bus *sdw_bus,
+			struct sdw_group_params *grp_prms,
+			int group_count)
+{
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	struct sdw_port_runtime *port_rt;
+	int hstop = 0, hstart = 0;
+	int i, block_offset, port_bo, no_of_chan;
+	int rate, bps, chn;
+
+	/* Compute hstop */
+	hstop = sdw_bus->col - 1;
+
+	/* Run loop for all groups to compute transport parameters */
+	for (i = 0; i < group_count; i++) {
+
+		/* Port block offset */
+		port_bo = block_offset = 1;
+
+		/*
+		 * Iterate for all Master(s) in Master list Find all the
+		 * streams associated with current group.
+		 */
+		list_for_each_entry(sdw_mstr_rt,
+				&sdw_mstr->mstr_rt_list, mstr_node) {
+
+			/*
+			 * Do not compute any transport parameters if stream
+			 * state is in DEPREPARE
+			 */
+			if (sdw_mstr_rt->sdw_rt->stream_state ==
+					SDW_STATE_STRM_DEPREPARE)
+				continue;
+
+			/* Get rate, bps, channel values */
+			rate = sdw_mstr_rt->stream_params.rate;
+			bps = sdw_mstr_rt->stream_params.bps;
+			chn = sdw_mstr_rt->stream_params.channel_count;
+
+			/* Check whether stream belongs to this group */
+			if (rate != grp_prms[i].rate)
+				continue;
+
+			/* Compute hstart and hstop for given Master handle */
+			sdw_mstr_rt->bus_rt.hstart = hstart =
+				hstop - grp_prms[i].hwidth + 1;
+			sdw_mstr_rt->bus_rt.hstop = hstop;
+
+			/*
+			 * Iterate for all Master port(s) in port list
+			 * Compute hstart, hstop, block offset for each
+			 * port(s) of current Master handle.
+			 */
+			list_for_each_entry(port_rt,
+					&sdw_mstr_rt->port_rt_list, port_node) {
+
+				/*
+				 * Get no. of channels running on current
+				 * port.
+				 */
+				no_of_chan = sdw_chn_mask_to_chn(
+						port_rt->channel_mask);
+
+				/*
+				 * Fill computed transport parameters for
+				 * current port.
+				 */
+				sdw_fill_xport_params(
+					&port_rt->transport_params,
+					port_rt->port_num,
+					true,
+					SDW_BLK_GRP_CNT_1,
+					port_bo,
+					port_bo >> 8,
+					hstart,
+					hstop,
+					(SDW_BLK_GRP_CNT_1 * no_of_chan), 0x0);
+
+				/* Fill Master runtime params only once. */
+				if (port_rt == list_first_entry(
+						&sdw_mstr_rt->port_rt_list,
+						struct sdw_port_runtime,
+						port_node)) {
+
+					/*
+					 * While processing first node, make
+					 * a copy of hstart, hstop, block
+					 * offset in Master runtime data
+					 * structure.
+					 */
+					sdw_mstr_rt->bus_rt.hstart = hstart;
+					sdw_mstr_rt->bus_rt.hstop = hstop;
+					sdw_mstr_rt->bus_rt.block_offset
+								= port_bo;
+					sdw_mstr_rt->bus_rt.sub_block_offset
+								= 0;
+				}
+
+				/* Compute block offset for next port */
+				port_bo += bps * chn;
+			}
+
+			/*
+			 * Compute block offset for next stream of same group
+			 */
+			block_offset += bps * chn;
+
+			/*
+			 * Re-assign port_bo for next stream under same
+			 * group
+			 */
+			port_bo = block_offset;
+		}
+
+		/* Compute hstop for next group */
+		hstop = hstop - grp_prms[i].hwidth;
+	}
+
+	return 0;
+}
+
+/**
+ * sdw_compute_group_params: This function performs calculation of full
+ *	bandwidth, payload bandwidth and hwidth per group. This API is
+ *	called by sdw_compute_xport_params function.
+ *
+ * @sdw_bus: Bus handle.
+ * @grp_prms: Group Params
+ * @stream_rate: Stream rate array;
+ * @group_count: Holds group count.
+ */
+static int sdw_compute_group_params(struct sdw_bus *sdw_bus,
+			struct sdw_group_params *grp_prms,
+			int *stream_rates,
+			int group_count)
+{
+
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	int sel_col = sdw_bus->col; /* Computed columns */
+	int column_needed = 0;
+	int i, rate, bps, chn;
+
+	/* Calculate full bandwidth per group */
+	for (i = 0; i < group_count; i++) {
+		grp_prms[i].rate = stream_rates[i];
+		grp_prms[i].full_bw = sdw_bus->curr_dr_clk_freq/
+					grp_prms[i].rate;
+	}
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt, &sdw_mstr->mstr_rt_list, mstr_node) {
+
+		/*
+		 * Do not compute any transport parameters if stream state
+		 * is in DEPREPARE
+		 */
+		if (sdw_mstr_rt->sdw_rt->stream_state ==
+				SDW_STATE_STRM_DEPREPARE)
+			continue;
+
+		/* Get rate, bps, channel values */
+		rate = sdw_mstr_rt->stream_params.rate;
+		bps = sdw_mstr_rt->stream_params.bps;
+		chn = sdw_mstr_rt->stream_params.channel_count;
+
+		/* Calculate payload bandwidth per group */
+		for (i = 0; i < group_count; i++) {
+			if (rate == grp_prms[i].rate)
+				grp_prms[i].payload_bw += bps * chn;
+		}
+	}
+
+	/* Calculate hwidth per group and total column needed per Master */
+	for (i = 0; i < group_count; i++) {
+		grp_prms[i].hwidth =
+			(sel_col * grp_prms[i].payload_bw +
+			grp_prms[i].full_bw - 1)/grp_prms[i].full_bw;
+		column_needed += grp_prms[i].hwidth;
+	}
+
+	/* Check column required should not be greater than selected columns */
+	if (column_needed > sel_col - 1)
+		return -EINVAL;
+
+	return 0;
+}
+
+/**
+ * sdw_add_element_group_count: This function checks grouping already exist
+ *	for given rate. If not, it adds new group in array for given rate.
+ *	This API is called by sdw_get_group_count.
+ *
+ * @grp_cnt: Struture holding stream rate array information.
+ * @rate: Sampling frequency.
+ */
+static int sdw_add_element_group_count(struct sdw_group_count *grp_cnt,
+					unsigned int rate)
+{
+
+	int num = grp_cnt->group_count;
+	int i;
+
+	/* Run loop for number of groups already computed */
+	for (i = 0; i < num; i++) {
+
+		if (rate == grp_cnt->stream_rates[i])
+			break;
+
+		if (i == num) {
+
+			if (grp_cnt->group_count >= grp_cnt->max_size) {
+
+				/* Inc. max size by 1 element */
+				grp_cnt->max_size += 1;
+				grp_cnt->stream_rates = krealloc(
+							grp_cnt->stream_rates,
+							(sizeof(int) *
+							grp_cnt->max_size),
+							GFP_KERNEL);
+				if (!grp_cnt->stream_rates)
+					return -ENOMEM;
+			}
+
+			/* Add new stream rate */
+			grp_cnt->stream_rates[grp_cnt->group_count++] = rate;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * sdw_get_group_count: This function performs grouping of streams having
+ *	stream sample rate and computes group count. This API is called by
+ *	sdw_compute_xport_params.
+ *
+ * @sdw_bus: Bus handle.
+ * @grp_cnt: Struture holding stream rate array information.
+ */
+static int sdw_get_group_count(struct sdw_bus *sdw_bus,
+				struct sdw_group_count *grp_cnt)
+{
+
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	struct sdw_mstr_runtime *sdw_mstr_rt;
+	unsigned int curr_rate = 0;
+	int ret = 0;
+
+	/* Initialize temporary group count data structure */
+	grp_cnt->group_count = 0;
+	grp_cnt->max_size = SDW_STRM_RATE_GROUPING;
+	grp_cnt->stream_rates = kcalloc(grp_cnt->max_size, sizeof(int),
+						GFP_KERNEL);
+	if (!grp_cnt->stream_rates)
+		return -ENOMEM;
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt,
+			&sdw_mstr->mstr_rt_list, mstr_node) {
+
+		/*
+		 * Do not compute any transport parameters if stream state
+		 * is in DEPREPARE
+		 */
+		if (sdw_mstr_rt->sdw_rt->stream_state ==
+						SDW_STATE_STRM_DEPREPARE)
+			continue;
+
+		/* Perform grouping of streams based on stream rate */
+
+		/* check for first entry from Master node list */
+		if (sdw_mstr_rt == list_first_entry(&sdw_mstr->mstr_rt_list,
+					struct sdw_mstr_runtime, mstr_node))
+			/* Add first entry */
+			grp_cnt->stream_rates[grp_cnt->group_count++] =
+					sdw_mstr_rt->stream_params.rate;
+
+		else {
+			curr_rate = sdw_mstr_rt->stream_params.rate;
+
+			ret = sdw_add_element_group_count(grp_cnt, curr_rate);
+			if (ret < 0)
+				return ret;
+
+		}
+	}
+
+	return ret;
+
+}
+
+/** sdw_compute_xport_params: This function computes transport parameters
+ *	for port(s) of all current and active stream(s) on given Master.The
+ *	function also computes transport parameters of all Slave(s) port(s)
+ *	associated with given Master. This API is called from
+ *	sdw_compute_params.
+ *
+ * @sdw_bus: Bus handle.
+ */
+static int sdw_compute_xport_params(struct sdw_bus *sdw_bus)
+{
+	struct sdw_group_params *grp_prms = NULL;
+	struct sdw_group_count grp_cnt;
+	int ret;
+
+	/*
+	 * Perform grouping of streams based on stream sampling rate and get
+	 * number of group count.
+	 */
+	ret = sdw_get_group_count(sdw_bus, &grp_cnt);
+	if (ret < 0)
+		goto out;
+
+	/* Check for number of streams and number of group count */
+	if (grp_cnt.group_count == 0)
+		goto out;
+
+	/* Allocate resources holding temporary variables */
+	grp_prms = kzalloc((sizeof(*grp_prms) *
+				grp_cnt.group_count), GFP_KERNEL);
+	if (!grp_prms) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	/*
+	 * Since the grouping of streams are performed based on stream rate,
+	 * hwidth, full bandwidth and cumulative payload bandwidth is
+	 * computed for each group which is required to compute transport
+	 * parameters.
+	 */
+	ret = sdw_compute_group_params(sdw_bus, grp_prms,
+			&grp_cnt.stream_rates[0], grp_cnt.group_count);
+	if (ret < 0)
+		goto out;
+
+	/*
+	 * Once all the group related computation is performed, transport
+	 * parameters of Master(s) port(s) are computed
+	 */
+	ret = sdw_compute_mstr_xport_params(sdw_bus, grp_prms,
+				grp_cnt.group_count);
+	if (ret < 0)
+		goto out;
+
+	/*
+	 * Once all the Master port(s) transport port(s) are computed,
+	 * transport parameters for Slave port(s) are computed.
+	 */
+	ret = sdw_compute_slv_xport_params(sdw_bus);
+	if (ret < 0)
+		goto out;
+
+out:
+	/* Free up temporary resources */
+	kfree(grp_prms);
+	kfree(grp_cnt.stream_rates);
+
+	return ret;
+}
+
+/**
+ * sdw_bank_switch: This function programs frame control register and
+ *	broadcast message on Slave broadcast address based on bank to be
+ *	used. In normal mode, it checks for bank bank switch completion, in
+ *	aggregation mode, it comes out without checking.
+ *
+ * @sdw_bus: Bus handle.
+ */
+static int sdw_bank_switch(struct sdw_bus *sdw_bus)
+{
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	struct sdw_msg *wr_msg;
+	int bank_to_use, numcol, numrow;
+	int link_mask = sdw_bus->mstr->link_sync_mask;
+	int ret = 0;
+	u16 addr;
+	u8 *wbuf = NULL;
+
+	/* Allocate and assign resources for bank switch message */
+	wr_msg = kzalloc(sizeof(*wr_msg), GFP_KERNEL);
+	if (!wr_msg) {
+		ret = -ENOMEM;
+		goto error;
+	}
+
+	sdw_bus->data.msg = wr_msg;
+
+	wbuf = kzalloc(sizeof(*wbuf), GFP_KERNEL);
+	if (!wbuf) {
+		ret = -ENOMEM;
+		goto error;
+	}
+
+	/* Get row and column index to program register */
+	numcol = sdw_find_col_index(sdw_bus->col);
+	numrow = sdw_find_row_index(sdw_bus->row);
+
+	/* Fill frame_ctrl register values */
+	wbuf[0] = numcol | (numrow << 3);
+
+	/* Get current bank in use from bus structure */
+	bank_to_use = !sdw_bus->active_bank;
+
+	/* Create write message to write frame_ctrl register */
+	if (bank_to_use)
+		addr = (SDW_SCP_FRAMECTRL + SDW_BANK1_REGISTER_OFFSET);
+	else
+		addr = SDW_SCP_FRAMECTRL;
+
+	sdw_create_wr_msg(wr_msg, true, addr, SDW_BUF_SIZE1, wbuf,
+			SDW_SLAVE_BDCAST_ADDR);
+
+	/* Return without waiting from message to get transferred */
+	if (link_mask) {
+
+		/* This lock will be released once transfer is complete */
+		mutex_lock(&sdw_mstr->msg_lock);
+		/* Transfer message to write frame_ctrl register */
+		sdw_bank_switch_deferred(sdw_mstr, wr_msg, &sdw_bus->data);
+	} else {
+
+		/* Transfer message to write frame_ctrl register */
+		ret = snd_sdw_slave_transfer(sdw_mstr, wr_msg,
+					SDW_NUM_OF_MSG1_XFRD);
+		if (ret != SDW_NUM_OF_MSG1_XFRD) {
+			ret = -EINVAL;
+			dev_err(&sdw_mstr->dev, "Slave frame_ctrl reg write failed\n");
+			goto error;
+		}
+	}
+
+	if (!link_mask) {
+
+		/* Free up resources in case of normal bank switch flow */
+		kfree(sdw_bus->data.msg->buf);
+		kfree(sdw_bus->data.msg);
+		sdw_bus->data.msg = NULL;
+
+		/* Update active bank local variable */
+		sdw_bus->active_bank = bank_to_use;
+	}
+
+	return ret;
+
+error:
+	kfree(wr_msg);
+	kfree(wbuf);
+	return ret;
+}
+
+/**
+ * sdw_wait_for_bank_switch: This function waits for reply for bank switch
+ *	operation performed in aggregation mode where bank switch operation
+ *	returns without checking whether switch is successful or not. After
+ *	performing all the post enable operations, this API is called from
+ *	sdw_update_bus_params_ops to wait till band switch operation is
+ *	complete.
+ *
+ * @sdw_bus: Bus handle.
+ */
+static int sdw_wait_for_bank_switch(struct sdw_bus *sdw_bus)
+{
+	struct sdw_master *mstr = sdw_bus->mstr;
+	unsigned long time_left;
+	int bank_to_use;
+
+	/* Check whether to perform wait operation */
+	if (sdw_bus->data.msg != NULL) {
+
+		/* Wait on completion for transfer complete */
+		time_left = wait_for_completion_timeout(
+				&sdw_bus->data.xfer_complete,
+				mstr->caps.bank_switch_timeout);
+
+		if (!time_left) {
+			dev_err(&mstr->dev, "Controller Timed out\n");
+			mutex_unlock(&mstr->msg_lock);
+			return -ETIMEDOUT;
+		}
+
+		/* Update active bank local variable */
+		bank_to_use = sdw_bus->active_bank;
+		sdw_bus->active_bank = !bank_to_use;
+
+		/* Free up resources */
+		kfree(sdw_bus->data.msg->buf);
+		kfree(sdw_bus->data.msg);
+
+		/* Release master lock */
+		mutex_unlock(&mstr->msg_lock);
+	}
+
+	return 0;
+}
+
+
+/**
+ * sdw_update_bus_params_to_slv: This function updates the new bus
+ *	parameters to the Slave driver. New parameters will be in effect on
+ *	next bank switch. This is to inform Slave driver to program any
+ *	implementation defined registers based on new bus params to the
+ *	alternate bank of Slave registers.
+ *
+ * mstr_rt: Master runtime list.
+ * bus_params: Bus params
+ */
+static int sdw_update_bus_params_to_slv(struct sdw_mstr_runtime *mstr_rt,
+				struct sdw_bus_params *bus_params)
+{
+	struct sdw_slave *slave;
+	struct sdw_slv_runtime *slv_rt;
+	int ret = 0;
+
+	/* Iterate for all Slave(s) in Slave list */
+	list_for_each_entry(slv_rt, &mstr_rt->slv_rt_list,
+						slave_mstr_node) {
+		slave = slv_rt->slv;
+		if (slave->priv.driver->pre_bus_config)
+			ret = slave->priv.driver->pre_bus_config(slave,
+					bus_params);
+			if (ret < 0)
+				return ret;
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_program_params: This function performs Master/Slave transport
+ *	parameters register programming and also perform bus parameters SSP,
+ *	clock gear, register programming. This API is called sdw_prepare_op,
+ *	sdw_enable_op, sdw_disable_op and sdw_deprepare_op.
+ *
+ * @sdw_bus: Bus handle.
+ */
+static int sdw_program_params(struct sdw_bus *sdw_bus)
+{
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	bool chn_en;
+	struct sdw_bus_params bus_params;
+	struct sdw_master_driver *ops;
+	int bank_to_use;
+	int ret = 0;
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt, &sdw_mstr->mstr_rt_list, mstr_node) {
+		/*
+		 * Program transport and port parameters for Master and Slave
+		 * ports.
+		 */
+		ret = sdw_program_xport_params(sdw_bus, sdw_mstr_rt);
+		if (ret < 0) {
+			dev_err(&sdw_mstr->dev, "Program transport parameters failed ret = %d\n", ret);
+			return ret;
+		}
+
+		/* Get Master driver operation handle */
+		ops = sdw_bus->mstr->driver;
+
+		/* Get current bank in use from bus structure */
+		bank_to_use = !sdw_bus->active_bank;
+
+		/* Program SSP interval API call */
+		if (ops->ops->set_ssp_interval) {
+			ret = ops->ops->set_ssp_interval(sdw_bus->mstr,
+					sdw_bus->system_interval,
+					bank_to_use);
+			if (ret < 0) {
+				dev_err(&sdw_mstr->dev, "Program SSP interval failed ret = %d\n", ret);
+				return ret;
+			}
+		}
+
+		/* Program clock gear API call */
+		bus_params.clk_freq =
+			(sdw_bus->curr_dr_clk_freq/SDW_DOUBLE_RATE_FACTOR);
+		bus_params.num_rows = sdw_bus->row;
+		bus_params.num_cols = sdw_bus->col;
+		bus_params.bank = bank_to_use;
+		if (ops->ops->set_bus_params)
+			ops->ops->set_bus_params(sdw_bus->mstr, &bus_params);
+
+		/* Update new bus params to all the Slaves */
+		ret = sdw_update_bus_params_to_slv(sdw_mstr_rt, &bus_params);
+		if (ret < 0) {
+			dev_err(&sdw_mstr->dev, "Update of bus params to Slaves failed ret = %d\n", ret);
+			return ret;
+		}
+		/*
+		 * Enable port(s) channel(s) on alternate bank for all active
+		 * streams.
+		 */
+		chn_en = true;
+		ret = sdw_enable_disable_ports(sdw_bus, NULL, sdw_mstr_rt,
+								chn_en);
+		if (ret < 0) {
+			dev_err(&sdw_mstr->dev, "Enable channel failed ret = %d\n", ret);
+			return ret;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_prep_deprep_slv_ports: This function prepares/de-prepares all the
+ *	Slave port(s). It calls all individual APIs to perform:
+ *	- Pre-prepare port(s) operation.
+ *	- Prepare port(s) operation.
+ *	- Post-prepare port(s) operation.
+ *	This API is called from sdw_prep_deprep_ports.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_slv_rt: Runtime Slave handle.
+ * @prt_slv_strm: Runtime port handle.
+ * @prep: prepare or de-prepare operation.
+ */
+static int sdw_prep_deprep_slv_ports(struct sdw_bus *sdw_bus,
+			struct sdw_slv_runtime *sdw_slv_rt,
+			struct sdw_port_runtime *port_slv_rt,
+			bool prep)
+{
+	struct sdw_slave_driver	*slv_ops = sdw_slv_rt->slv->priv.driver;
+	struct sdw_slave_caps *caps = &sdw_slv_rt->slv->priv.caps;
+	struct sdw_dpn_caps *sdw_slv_dpn_cap;
+	struct sdw_msg wr_msg, rd_msg;
+	struct sdw_prepare_ch prep_ch;
+	int ret = 0;
+	int bank_to_use;
+	u16 addr;
+	u8 wbuf[SDW_BUF_SIZE1] = {0};
+	u8 rbuf[SDW_BUF_SIZE1] = {0};
+	unsigned int time_left;
+
+	/* Get current bank in use from bus structure*/
+	bank_to_use = !sdw_bus->active_bank;
+
+	sdw_slv_dpn_cap = sdw_get_slv_dpn_cap(caps, sdw_slv_rt->direction,
+						port_slv_rt->port_num);
+	if (!sdw_slv_dpn_cap)
+		return -EINVAL;
+
+	/*
+	 * Pre-prepare port(s) API call. There can be case that some Slave
+	 * needs to perform some operations before preparing port(s).
+	 */
+	prep_ch.num = port_slv_rt->port_num;
+	prep_ch.ch_mask = port_slv_rt->channel_mask;
+
+	if (prep)
+		prep_ch.prepare = true;
+	else
+		prep_ch.prepare = false;
+
+	prep_ch.bank = bank_to_use;
+	if (slv_ops->port_prep) {
+
+		ret = slv_ops->port_prep(sdw_slv_rt->slv, &prep_ch,
+					SDW_OPS_PORT_PRE_PREP);
+		if (ret < 0) {
+			dev_err(&sdw_bus->mstr->dev, "Slave Port Pre-Prepare failed ret = %d\n", ret);
+			goto out;
+		}
+	}
+
+	/* Prepare Slave port(s) operation */
+	if (sdw_slv_dpn_cap->prepare_ch == SDW_CP_MODE_NORMAL) {
+
+		addr = SDW_DPN_PREPARECTRL +
+			(SDW_NUM_DATA_PORT_REGISTERS * port_slv_rt->port_num);
+		/* Transfer message to read prepare_ctrl Slave register */
+		ret = sdw_rd_msg(&rd_msg, false, addr, SDW_BUF_SIZE1, rbuf,
+						sdw_slv_rt->slv->dev_num,
+						sdw_bus->mstr,
+						SDW_NUM_OF_MSG1_XFRD);
+		if (ret != SDW_NUM_OF_MSG1_XFRD) {
+			ret = -EINVAL;
+			dev_err(&sdw_bus->mstr->dev,
+					"Slave prep_ctrl reg read failed\n");
+			goto out;
+		}
+
+		if (prep)
+			wbuf[0] = (rbuf[0] | port_slv_rt->channel_mask);
+		else
+			wbuf[0] = (rbuf[0] & ~(port_slv_rt->channel_mask));
+
+		/* Transfer message to write prepare_ctrl Slave register */
+		ret = sdw_wr_msg(&wr_msg, false, addr, SDW_BUF_SIZE1, wbuf,
+						sdw_slv_rt->slv->dev_num,
+						sdw_bus->mstr,
+						SDW_NUM_OF_MSG1_XFRD);
+		if (ret != SDW_NUM_OF_MSG1_XFRD) {
+			ret = -EINVAL;
+			dev_err(&sdw_bus->mstr->dev,
+					"Slave prep_ctrl reg write failed\n");
+			goto out;
+		}
+
+		/* Wait for completion on port ready */
+		time_left = wait_for_completion_timeout(
+				&sdw_slv_rt->slv->priv.port_ready
+				[port_slv_rt->port_num],
+				sdw_slv_dpn_cap->ch_prep_timeout);
+
+		if (!time_left) {
+			dev_err(&sdw_bus->mstr->dev, "Timeout:Chn prep failed\n");
+			ret = -ETIMEDOUT;
+			goto out;
+		}
+	}
+
+	/*
+	 * Post-prepare port(s) API call. There can be case that some Slave
+	 * needs to perform some operations after preparing port(s).
+	 */
+	if (slv_ops->port_prep) {
+		ret = slv_ops->port_prep(sdw_slv_rt->slv, &prep_ch,
+					SDW_OPS_PORT_POST_PREP);
+		if (ret < 0)
+			dev_err(&sdw_bus->mstr->dev, "Slave Port Post-Prepare failed ret = %d\n", ret);
+	}
+
+out:
+	return ret;
+}
+
+/**
+ * sdw_prep_deprep_mstr_ports: This function prepares/de-prepares all the
+ *	Master port(s). It calls all individual APIs to perform:
+ *	- Pre-prepare port(s) operation.
+ *	- Prepare port(s) operation.
+ *	- Post-prepare port(s) operation.
+ *	This API is called from sdw_prep_deprep_ports.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @prt_slv_strm: Runtime port handle.
+ * @prep: prepare or de-prepare operation.
+ */
+static int sdw_prep_deprep_mstr_ports(struct sdw_bus *sdw_bus,
+				struct sdw_mstr_runtime *sdw_mstr_rt,
+				struct sdw_port_runtime *port_rt,
+				bool prep)
+{
+	struct sdw_master_driver *ops = sdw_bus->mstr->driver;
+	struct sdw_prepare_ch prep_ch;
+	int ret = 0;
+
+	/*
+	 * Fill prep_ch structure values with port number, channel mask and
+	 * prepare/de-prepare flag value
+	 */
+	prep_ch.num = port_rt->port_num;
+	prep_ch.ch_mask = port_rt->channel_mask;
+	prep_ch.prepare = prep; /* Prepare/De-prepare */
+	prep_ch.bank = !sdw_bus->active_bank;
+
+	/*
+	 * Pre-prepare/Pre-deprepare port(s) API call. There can be case
+	 * that some Master(s) needs to perform some operations before
+	 * preparing/de-preparing port(s).
+	 */
+	if (ops->port_ops->dpn_port_prep) {
+		ret = ops->port_ops->dpn_port_prep(sdw_bus->mstr, &prep_ch,
+						SDW_OPS_PORT_PRE_PREP);
+		if (ret < 0)
+			return ret;
+	}
+
+	/* Prepare/De-prepare API call */
+	if (ops->port_ops->dpn_port_prep) {
+		ret = ops->port_ops->dpn_port_prep(sdw_bus->mstr, &prep_ch,
+						SDW_OPS_PORT_PREP);
+		if (ret < 0)
+			return ret;
+	}
+
+	/*
+	 * Post-prepare/Post-deprepare port(s) API call. There can be case
+	 * that some Master(s) needs to perform some operations after
+	 * preparing/de-preparing port(s).
+	 */
+	if (ops->port_ops->dpn_port_prep) {
+		ret = ops->port_ops->dpn_port_prep(sdw_bus->mstr, &prep_ch,
+						SDW_OPS_PORT_POST_PREP);
+		if (ret < 0)
+			return ret;
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_prep_deprep_ports: This function calls individual APIs for
+ *	prepare/de-prepare for all the Ports of all the Master(s) and
+ *	Slave(s) associated with current stream. This API is called from
+ *	sdw_prepare_op and sdw_deprepare_op.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_rt: Runtime stream handle.
+ */
+static int sdw_prep_deprep_ports(struct sdw_bus *sdw_bus,
+				struct sdw_runtime *sdw_rt,
+				bool is_prep)
+{
+	struct sdw_port_runtime *port_slv_rt, *port_rt;
+	struct sdw_slv_runtime *sdw_slv_rt = NULL;
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	int ret = 0;
+
+	/* Iterate for all Slave(s) in Slave list */
+	list_for_each_entry(sdw_slv_rt,
+			&sdw_rt->slv_rt_list, slave_strm_node) {
+
+		/* Iterate for all Slave port(s) in port list */
+		list_for_each_entry(port_slv_rt,
+				&sdw_slv_rt->port_rt_list, port_node) {
+
+
+			 /* Enable interrupt before Port prepare */
+			if (is_prep) {
+				ret = sdw_enable_disable_dpn_intr(
+						sdw_slv_rt->slv,
+						port_slv_rt->port_num,
+						sdw_slv_rt->direction,
+						is_prep);
+				if (ret < 0)
+					return ret;
+			}
+
+			/*
+			 * Prepare/De-prepare API call for all Slave port(s)
+			 */
+			ret = sdw_prep_deprep_slv_ports(sdw_bus,
+					sdw_slv_rt, port_slv_rt,
+					is_prep);
+			if (ret < 0)
+				return ret;
+
+			 /* Disable interrupt after Port de-prepare */
+			if (!is_prep) {
+				ret = sdw_enable_disable_dpn_intr(
+						sdw_slv_rt->slv,
+						port_slv_rt->port_num,
+						sdw_slv_rt->direction,
+						is_prep);
+				if (ret < 0)
+					return ret;
+			}
+
+		}
+	}
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt,
+			&sdw_rt->mstr_rt_list, mstr_strm_node) {
+
+		/* Iterate for all Master port(s) in port list */
+		list_for_each_entry(port_rt,
+			&sdw_mstr_rt->port_rt_list, port_node) {
+
+			/*
+			 * Prepare/De-prepare API call for all Master
+			 * port(s)
+			 */
+			ret = sdw_prep_deprep_mstr_ports(sdw_bus,
+					sdw_mstr_rt, port_rt,
+					is_prep);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_check_strm_params: Validates all the received stream parameters with
+ *	the Master capabilities on which current stream will be running.
+ *	This API is called from sdw_prepare_op.
+ *
+ * @sdw_mstr_cap: Master capabilities.
+ * @mstr_params: Master PCM parameters.
+ * @stream_params: Stream PCM parameters.
+ *
+ * Returns 0 on success else appropriate error code.
+ */
+static int sdw_check_strm_params(struct sdw_master_caps *sdw_mstr_cap,
+			struct sdw_stream_params *mstr_params,
+			struct sdw_stream_params *stream_params)
+{
+	/*
+	 * Note: Asynchronous mode not supported, return error in case
+	 * stream is not operating in isochronous mode.
+	 */
+	if ((sdw_mstr_cap->max_clk_freq % mstr_params->rate) != 0)
+		return -EINVAL;
+
+	/* Check for sampling frequency */
+	if (stream_params->rate != mstr_params->rate)
+		return -EINVAL;
+
+	return 0;
+}
+
+/**
+ * sdw_compute_params: This function calls individual API's for computing
+ *	clock frequency, frame shape, frame frequency, SSP for bus and all
+ *	transport/port port parameters for Master and Slave port(s). This
+ *	API is called from sdw_prepare_op and sdw_deprepare_op.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ */
+static int sdw_compute_params(struct sdw_bus *sdw_bus,
+		struct sdw_mstr_runtime *sdw_mstr_rt)
+{
+
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	struct sdw_master_caps *sdw_mstr_cap = NULL;
+	int ret, frame_interval = 0;
+
+	/* Retrieve Master capabilities */
+	sdw_mstr_cap = &sdw_mstr->caps;
+
+	/*
+	 * Compute bus parameters API Call. It computes clock frequency
+	 * based on current bandwidth required for bus. It also computes
+	 * frame shape and SoundWire frame frequency.
+	 */
+	ret = sdw_compute_bus_params(sdw_bus, &frame_interval, sdw_mstr_rt);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Compute bus parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Compute system interval API call. It computes system interval and
+	 * stream interval for bus which is required for computing SSP.
+	 */
+	ret = sdw_compute_system_interval(sdw_bus, frame_interval);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Compute system interval failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Compute transport parameters API call. It computes all the
+	 * transport parameters for all Master(s) associated with current
+	 * stream and all Slave(s) associated with Master(s).
+	 */
+	ret = sdw_compute_xport_params(sdw_bus);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Compute transport parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+/**
+ * sdw_update_bus_params_ops: This API performs one of the following
+ *	operation based on bus state. Called from sdw_update_bus_params API.
+ *	- pre-enable port(s) channel(s).
+ *	- bank switch operation.
+ *	- post-enable port channel.
+ *	- bank-switch wait operation.
+ *	- disable port(s) channel(s) operation.
+ *
+ * @sdw_rt: Runtime stream handle.
+ * @bus_state: Operation to be performed.
+ */
+static int sdw_update_bus_params_ops(struct sdw_runtime *sdw_rt,
+				enum sdw_update_bus_ops bus_state)
+{
+	struct sdw_mstr_runtime	*sdw_mstr_rt = NULL;
+	struct sdw_bus *sdw_bus = NULL;
+	struct sdw_master_ops *ops;
+	bool chn_en;
+	int ret = 0;
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt, &sdw_rt->mstr_rt_list,
+					mstr_strm_node) {
+
+		/* Get bus structure for Master */
+		sdw_bus = sdw_master_to_bus(sdw_mstr_rt->mstr);
+		ops = sdw_bus->mstr->driver->ops;
+
+		/*
+		 * Note that currently all the operations of aggregation
+		 * mode are performed sequentially. The switch case is kept
+		 * in order for code to scale where below operations can be
+		 * performed or called in different order.
+		 */
+		switch (bus_state) {
+
+		case SDW_BUS_PORT_PRE:
+
+			/* Pre-enable port(s) channel(s) API call */
+			if (ops->pre_bank_switch) {
+				ret = ops->pre_bank_switch(sdw_bus->mstr);
+				if (ret < 0)
+					return ret;
+			}
+		break;
+
+		case SDW_BUS_BANK_SWITCH:
+
+			/* Bank-switch operation API call */
+			ret = sdw_bank_switch(sdw_bus);
+			if (ret < 0)
+				return ret;
+		break;
+
+		case SDW_BUS_PORT_POST:
+
+			/* Post-enable port(s) channel(s) API call */
+			if (ops->post_bank_switch) {
+				ret = ops->post_bank_switch(sdw_bus->mstr);
+				if (ret < 0)
+					return ret;
+			}
+		break;
+
+		case SDW_BUS_BANK_SWITCH_WAIT:
+
+			/* Bank-switch wait operation API call */
+			ret = sdw_wait_for_bank_switch(sdw_bus);
+			if (ret < 0)
+				return ret;
+		break;
+
+		case SDW_BUS_PORT_DIS_CHN:
+
+			/*
+			 * Disable channel on previous bank for all active
+			 * stream(s)
+			 */
+			chn_en = false;
+			ret = sdw_enable_disable_ports(sdw_bus, NULL,
+				sdw_mstr_rt, chn_en);
+			if (ret < 0)
+				return ret;
+		break;
+		default:
+			return -EINVAL;
+		break;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_update_bus_params: Once all the bus and port parameters are
+ *	programmed, this function performs bank-switch where all the new
+ *	configured parameters gets in effect on alternate.The bank-switch
+ *	operation are different for normal and aggregation mode. In normal
+ *	mode where only one Master is used for stream, bank-switch is
+ *	performed directly followed by disabling channel on previous bank
+ *	for active stream. In aggregation mode below flow is used.
+ *	- pre-enable port(s) channel(s) operation.
+ *	- bank switch operation.
+ *	- post-enable port(s) channel(s) operation.
+ *	- bank-switch wait operation.
+ *	- disable port(s) channel(s) operation.
+ *
+ * @sdw_bus: Bus Handle.
+ * @sdw_rt: Runtime stream handle.
+ * @last_node: Boolean used in case of aggregation mode operation.
+ */
+static int sdw_update_bus_params(struct sdw_bus *sdw_bus,
+			struct sdw_runtime *sdw_rt,
+			bool last_node)
+{
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	int ret = 0;
+
+	/*
+	 * The flow in this API is common for both aggregation and
+	 * non-aggregation mode. Bus driver doesn't differentiate in both of
+	 * the flows, however controller driver should take actions based
+	 * normal or aggregation mode.
+	 */
+
+	/* Check for last node */
+	if (!last_node)
+		return ret;
+
+	/*
+	 * Perform pre-enable ports. There can be case that some of
+	 * controller or Slave port(s) Channel(s) needs to perform some
+	 * operation before enabling port(s) channel(s).
+	 */
+	ret = sdw_update_bus_params_ops(sdw_rt, SDW_BUS_PORT_PRE);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Pre-enable port(s) channel(s) failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Bank-switch operation. Write is broadcast with new rows and
+	 * columns programmed in frame_ctrl register
+	 */
+	ret = sdw_update_bus_params_ops(sdw_rt, SDW_BUS_BANK_SWITCH);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Bank switch operation failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Perform post-enable ports. There can be case that some of
+	 * controller or Slave port(s) Channel(s) needs to perform some
+	 * operation after enabling port(s) channel(s).
+	 */
+	ret = sdw_update_bus_params_ops(sdw_rt, SDW_BUS_PORT_POST);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Post-enable port failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Bank-switch post wait operation. In aggregation mode, bank-switch
+	 * is performed in sync for all Master(s) in post_enable operation.
+	 * This API call check whether bank switch is successful or not.
+	 */
+	ret = sdw_update_bus_params_ops(sdw_rt, SDW_BUS_BANK_SWITCH_WAIT);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Bank switch wait operation failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Disable port(s) channel(s) on previous bank for all active streams.
+	 */
+	ret = sdw_update_bus_params_ops(sdw_rt, SDW_BUS_PORT_DIS_CHN);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Disable port(s) channel(s) failed ret = %d\n", ret);
+		return ret;
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_check_last_node: Check for last node in the given list.
+ *
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @sdw_rt: Runtime stream handle.
+ *
+ * Returns true if given node is last node else false.
+ */
+static bool sdw_check_last_node(struct sdw_mstr_runtime *sdw_mstr_rt,
+					struct sdw_runtime *sdw_rt)
+{
+	struct sdw_mstr_runtime	*last_rt = NULL;
+
+	/* Get last entry from given list */
+	last_rt = list_last_entry(&sdw_rt->mstr_rt_list,
+			struct sdw_mstr_runtime, mstr_strm_node);
+	if (sdw_mstr_rt == last_rt)
+		return true;
+	else
+		return false;
+}
+
+/**
+ * sdw_deprepare_op: perform all operations required to de-prepare port(s).
+ *	Below is the sequence.
+ *	- De-prepare port(s) for current stream.
+ *	- Compute bus parameters.
+ *	- Program bus parameters.
+ *	- Update bus parameters. Switch to alternate bank.
+ *	- Change stream state.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @sdw_rt: Runtime stream handle.
+ */
+static int sdw_deprepare_op(struct sdw_bus *sdw_bus,
+			struct sdw_mstr_runtime *sdw_mstr_rt,
+			struct sdw_runtime *sdw_rt)
+{
+
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	struct sdw_stream_params *mstr_params;
+	bool last_node = false;
+	int ret;
+
+	/*
+	 * Check whether current Master handle is last in the list This is
+	 * needed because some operations in sdw_update_bus_params are only
+	 * performed when all Master(s)/Slave(s) processing is done. Also
+	 * the stream state is changed after all Master(s)/Slave(s)
+	 * processing is done.
+	 */
+	last_node = sdw_check_last_node(sdw_mstr_rt, sdw_rt);
+	mstr_params = &sdw_mstr_rt->stream_params;
+
+	/*
+	 * De-prepare port(s) for Master and Slave associated with current
+	 * stream
+	 */
+	ret = sdw_prep_deprep_ports(sdw_bus, sdw_rt, false);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "De-prepare port(s) failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/* Calculate cumulative bus bandwidth */
+	sdw_mstr_rt->bus_rt.stream_bw = mstr_params->rate *
+		mstr_params->channel_count * mstr_params->bps;
+	sdw_bus->bandwidth -= sdw_mstr_rt->bus_rt.stream_bw;
+
+	/* Perform error check on bus cumulative bandwidth */
+	if (sdw_bus->bandwidth < 0) {
+		dev_err(&sdw_mstr->dev, "Bandwidth calculation failed\n");
+		return -EINVAL;
+	}
+
+	/* Check for any active stream on current bus handle */
+	if (sdw_bus->bandwidth == 0) {
+
+		sdw_bus->system_interval = 0;
+		sdw_bus->stream_interval = 0;
+		sdw_bus->frame_freq = 0;
+
+		/* Change stream state to DEPREPARE */
+		if (last_node)
+			sdw_rt->stream_state = SDW_STATE_STRM_DEPREPARE;
+
+		/*
+		 * No active stream on current bus handle, return
+		 * successfully
+		 */
+		return 0;
+	}
+
+	/*
+	 * Compute bus parameters and transport parameters for current
+	 * Master handle and the Slave(s) associated with it. Bus parameters
+	 * includes computation of clock, frame shape, frame frequency, SSP
+	 * and transport parameters includes computation of hstart, hstop,
+	 * blockoffset, subblockoffset, blockpackingmode, lanecontrol etc.
+	 */
+	ret = sdw_compute_params(sdw_bus, sdw_mstr_rt);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Parameter computation failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Program bus parameters and transport parameters for current
+	 * Master handle and Slave(s) associated with it. Bus parameters
+	 * includes programming clock gear, SSP registers. Transport
+	 * parameters includes programming registers for hstart, hstop,
+	 * blockoffset, subblockoffset, blockpackingmode, lanecontrol,
+	 * SampleInterval, etc.
+	 */
+	ret = sdw_program_params(sdw_bus);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Transport parameters configuration failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Update bus parameters which is basically bank switch operation
+	 * where bus switches from current bank to alternate bank where new
+	 * programmed values take effect. Bank switch operation can be
+	 * performed for individual bus or for multiple bus in sync based on
+	 * stream configuration.
+	 */
+	ret = sdw_update_bus_params(sdw_bus, sdw_rt, last_node);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Update parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/* Change stream state to DEPREPARE */
+	if (last_node)
+		sdw_rt->stream_state = SDW_STATE_STRM_DEPREPARE;
+
+	return ret;
+}
+
+/**
+ * sdw_disable_op: perform all operations required to disable port(s)
+ *	channel(s). Below is sequence.
+ *	- Disable Master/Slave port(s) channel(s) for current stream.
+ *	- Program bus parameters.
+ *	- Update bus parameters. Switch to alternate bank.
+ *	- Change stream state.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @sdw_rt: Runtime stream handle.
+ */
+static int sdw_disable_op(struct sdw_bus *sdw_bus,
+			struct sdw_mstr_runtime *sdw_mstr_rt,
+			struct sdw_runtime *sdw_rt)
+{
+
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	struct sdw_master_caps *sdw_mstr_cap = NULL;
+	struct sdw_stream_params *mstr_params;
+	bool chn_en;
+	bool last_node = false;
+	int ret;
+
+	/*
+	 * Check whether current Master handle is last in the list This is
+	 * needed because some operations in sdw_update_bus_params are only
+	 * performed when all Master(s)/Slave(s) processing is done. Also
+	 * the stream state is changed after all Master(s)/Slave(s)
+	 * processing is done.
+	 */
+	last_node = sdw_check_last_node(sdw_mstr_rt, sdw_rt);
+
+	/* Retrieve Master capabilities and stream parameters */
+	sdw_mstr_cap = &sdw_bus->mstr->caps;
+	mstr_params = &sdw_mstr_rt->stream_params;
+
+	/*
+	 * Disable port(s) channel(s) for Master(s) and Slave(s) associated
+	 * with current stream
+	 */
+	chn_en = false;
+	ret = sdw_enable_disable_ports(sdw_bus, sdw_rt, NULL, chn_en);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Disable port(s) channel(s) failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Program bus parameters and transport parameters for current
+	 * Master handle and Slave(s) associated with it. Bus parameters
+	 * includes programming clock gear, SSP registers. Transport
+	 * parameters includes programming registers for hstart, hstop,
+	 * blockoffset, subblockoffset, blockpackingmode, lanecontrol, etc.
+	 */
+	ret = sdw_program_params(sdw_bus);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Program parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Update bus parameters which is basically bank switch operation
+	 * where bus switches from current bank to alternate bank where new
+	 * programmed values take effect. Bank switch operation can be
+	 * performed for individual bus or for multiple bus in sync based on
+	 * stream configuration.
+	 */
+	ret = sdw_update_bus_params(sdw_bus, sdw_rt, last_node);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Update parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/* Change stream state to DISABLE */
+	if (last_node)
+		sdw_rt->stream_state = SDW_STATE_STRM_DISABLE;
+
+	return ret;
+}
+
+/**
+ * sdw_enable_op: perform all operations required to enable port(s) channel(s).
+ *	Below is sequence.
+ *	- Program bus parameters.
+ *	- Enable Master/Slave port(s) channel(s) for current stream.
+ *	- Update bus parameters. Switch to alternate bank.
+ *	- Change stream state.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @sdw_rt: Runtime stream handle.
+ */
+static int sdw_enable_op(struct sdw_bus *sdw_bus,
+			struct sdw_mstr_runtime *sdw_mstr_rt,
+			struct sdw_runtime *sdw_rt)
+{
+
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	bool chn_en;
+	bool last_node = false;
+	int ret;
+
+	/*
+	 * Check whether current Master handle is last in the list This is
+	 * needed because some operations in sdw_update_bus_params are only
+	 * performed when all Master(s)/Slave(s) processing is done. Also
+	 * the stream state is changed after all Master(s)/Slave(s)
+	 * processing is done.
+	 */
+	last_node = sdw_check_last_node(sdw_mstr_rt, sdw_rt);
+
+	/*
+	 * Program bus parameters and transport parameters for current
+	 * Master handle and Slave(s) associated with it. Bus parameters
+	 * includes programming clock gear, SSP registers. Transport
+	 * parameters includes programming registers for hstart, hstop,
+	 * blockoffset, subblockoffset, blockpackingmode, lanecontrol, etc.
+	 */
+	ret = sdw_program_params(sdw_bus);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Program parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Enable port(s) channel(s) for Master(s) and Slave(s) associated
+	 * with current stream
+	 */
+	chn_en = true;
+	ret = sdw_enable_disable_ports(sdw_bus, sdw_rt, NULL, chn_en);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Enable port(s) channel(s) failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Update bus parameters which is basically bank switch operation
+	 * where bus switches from current bank to alternate bank where new
+	 * programmed values take effect. Bank switch operation can be
+	 * performed for individual bus or for multiple bus in sync based on
+	 * stream configuration.
+	 */
+	ret = sdw_update_bus_params(sdw_bus, sdw_rt, last_node);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Update parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/* Change stream state to ENABLE */
+	if (last_node)
+		sdw_rt->stream_state = SDW_STATE_STRM_ENABLE;
+
+	return ret;
+}
+
+/**
+ * sdw_prepare_op: Perform all operations required to prepare ports. Below is
+ *	sequence.
+ *	- Cross check stream parameters with Master parameters.
+ *	- Compute bus and transport parameters.
+ *	- Program bus and transport parameters.
+ *	- Update bus parameters. Switch to alternate bank.
+ *	- Prepare port(s) for current stream.
+ *	- Change stream state.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @sdw_rt: Runtime stream handle.
+ */
+static int sdw_prepare_op(struct sdw_bus *sdw_bus,
+			struct sdw_mstr_runtime *sdw_mstr_rt,
+			struct sdw_runtime *sdw_rt)
+{
+	struct sdw_stream_params *stream_params = &sdw_rt->stream_params;
+	struct sdw_master *sdw_mstr = sdw_bus->mstr;
+	struct sdw_master_caps *sdw_mstr_cap = NULL;
+	struct sdw_stream_params *mstr_params;
+	bool last_node = false;
+	int ret;
+
+	/*
+	 * Check whether current Master handle is last in the list This is
+	 * needed because some operations in sdw_update_bus_params are only
+	 * performed when all Master(s)/Slave(s) processing is done. Also
+	 * the stream state is changed after all Master(s)/Slave(s)
+	 * processing is done.
+	 */
+	last_node = sdw_check_last_node(sdw_mstr_rt, sdw_rt);
+
+	/* Retrieve Master capabilities and stream parameters */
+	sdw_mstr_cap = &sdw_bus->mstr->caps;
+	mstr_params = &sdw_mstr_rt->stream_params;
+
+	/* Check for isochronous mode, sample rate support etc. */
+	ret = sdw_check_strm_params(sdw_mstr_cap, mstr_params, stream_params);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Check for stream parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/* Calculate stream bandwidth and cumulative bus bandwidth */
+	sdw_mstr_rt->bus_rt.stream_bw = mstr_params->rate *
+		mstr_params->channel_count * mstr_params->bps;
+	sdw_bus->bandwidth += sdw_mstr_rt->bus_rt.stream_bw;
+
+	/*
+	 * Compute bus parameters and transport parameters for current
+	 * Master and the Slave(s) associated with it. Bus parameters
+	 * includes computation of clock, frame shape, frame frequency, SSP
+	 * and transport parameters includes computation of hstart, hstop,
+	 * blockoffset, subblockoffset, blockpackingmode etc for all the
+	 * Ports of this Master and Slave(s) associated with current stream
+	 * and already active streams.
+	 */
+	ret = sdw_compute_params(sdw_bus, sdw_mstr_rt);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Compute parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Program bus parameters and transport parameters for current
+	 * Master and Slave(s) associated with it. Bus parameters includes
+	 * programming clock gear, SSP registers. Transport parameters
+	 * includes programming registers for hstart, hstop, blockoffset,
+	 * subblockoffset, blockpackingmode, lanecontrol, etc.
+	 */
+	ret = sdw_program_params(sdw_bus);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Program parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Update bus parameters which is basically bank switch operation
+	 * where bus switches from current bank to alternate bank where new
+	 * programmed values take effect. Bank switch operation can be
+	 * performed for individual bus or for multiple bus in sync based on
+	 * stream configuration.
+	 */
+	ret = sdw_update_bus_params(sdw_bus, sdw_rt, last_node);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Update parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Prepare port(s) for Master and Slave associated with current
+	 * stream
+	 */
+	ret = sdw_prep_deprep_ports(sdw_bus, sdw_rt, true);
+	if (ret < 0) {
+		dev_err(&sdw_mstr->dev, "Prepare port(s) failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/* Change stream state to PREPARE */
+	if (last_node)
+		sdw_rt->stream_state = SDW_STATE_STRM_PREPARE;
+
+	return ret;
+}
+
+/**
+ * sdw_prepare_and_enable_ops: This is called by the bus driver for doing
+ *	operations related to stream prepare and enable. sdw_bus_ops are
+ *	performed on bus for preparing and enabling of the streams.
+ *
+ * @stream_tag: Stream tag on which operations needs to be performed.
+ */
+int sdw_prepare_and_enable_ops(struct sdw_stream_tag *stream_tag)
+{
+
+	struct sdw_runtime *sdw_rt = stream_tag->sdw_rt;
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	struct sdw_bus *sdw_bus = NULL;
+	struct sdw_master *sdw_mstr = NULL;
+	int ret = 0;
+
+	/*
+	 * Perform prepare and enable operation on all the Masters and
+	 * Slaves associated with stream. Note that the loop is iterated for
+	 * all Master. Stream with only Slave to Slave communication is not
+	 * supported.
+	 */
+
+	/* Check stream state whether to perform prepare & enable operation */
+	if (sdw_rt->stream_state != SDW_STATE_STRM_CONFIG)
+		return ret;
+
+	/* Iterate for all Master(s) in Master list for Prepare operation */
+	list_for_each_entry(sdw_mstr_rt, &sdw_rt->mstr_rt_list,
+					mstr_strm_node) {
+
+		/* Get bus structure for Master */
+		sdw_mstr = sdw_mstr_rt->mstr;
+		sdw_bus = sdw_master_to_bus(sdw_mstr);
+
+		/* Prepare operation of Master/Slave port(s) */
+		ret = sdw_prepare_op(sdw_bus, sdw_mstr_rt,
+				sdw_rt);
+		if (ret < 0) {
+			dev_err(&sdw_mstr->dev, "Prepare Operation failed ret = %d\n", ret);
+			return -EINVAL;
+		}
+	}
+
+	/* Iterate for all Master(s) in Master list for Enable operation */
+	list_for_each_entry(sdw_mstr_rt, &sdw_rt->mstr_rt_list,
+					mstr_strm_node) {
+
+		/* Get bus structure for Master */
+		sdw_bus = sdw_master_to_bus(sdw_mstr_rt->mstr);
+		sdw_mstr = sdw_bus->mstr;
+
+		/* Enable operation of Master/Slave port(s) channel(s) */
+		ret = sdw_enable_op(sdw_bus, sdw_mstr_rt,
+				sdw_rt);
+		if (ret < 0) {
+			dev_err(&sdw_mstr->dev, "Enable Operation failed ret = %d\n", ret);
+			return -EINVAL;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_disable_and_deprepare_ops: This is called by the bus driver for doing
+ *	operations related to stream disable and de-prepare.sdw_bus_ops are
+ *	performed on bus for disabling and de-preparing of the streams.
+ *
+ * @stream_tag: Stream tag on which operations needs to be performed.
+ */
+int sdw_disable_and_deprepare_ops(struct sdw_stream_tag *stream_tag)
+{
+	struct sdw_runtime *sdw_rt = stream_tag->sdw_rt;
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	struct sdw_bus *sdw_bus = NULL;
+	struct sdw_master *sdw_mstr = NULL;
+	int ret = 0;
+
+	/*
+	 * Perform disable and de-prepare operation on all the Masters and
+	 * Slaves associated with stream. Note that the loop is iterated for
+	 * all Master. Stream with only Slave to Slave communication is not
+	 * supported.
+	 */
+
+	/*
+	 * Check stream state whether to perform disable &
+	 * deprepare operation
+	 */
+	if (sdw_rt->stream_state != SDW_STATE_STRM_ENABLE)
+		return ret;
+
+	/* Iterate for all Master(s) in Master list for Disable operation */
+	list_for_each_entry(sdw_mstr_rt,
+			&sdw_rt->mstr_rt_list, mstr_strm_node) {
+
+		/* Get bus structure for Master */
+		sdw_bus = sdw_master_to_bus(sdw_mstr_rt->mstr);
+		sdw_mstr = sdw_bus->mstr;
+
+		/* Disable operation of Master/Slave port(s) channel(s) */
+		ret = sdw_disable_op(sdw_bus, sdw_mstr_rt,
+				sdw_rt);
+		if (ret < 0) {
+			dev_err(&sdw_mstr->dev, "Disable Operation failed ret = %d\n", ret);
+			return -EINVAL;
+		}
+	}
+
+	/* Iterate for all Master(s) in Master list for De-prepare operation */
+	list_for_each_entry(sdw_mstr_rt,
+			&sdw_rt->mstr_rt_list, mstr_strm_node) {
+
+		/* Get bus structure for Master */
+		sdw_bus = sdw_master_to_bus(sdw_mstr_rt->mstr);
+		sdw_mstr = sdw_bus->mstr;
+
+		/* Disable operation of Master/Slave port(s) */
+		ret = sdw_deprepare_op(sdw_bus, sdw_mstr_rt,
+				sdw_rt);
+		if (ret < 0) {
+			dev_err(&sdw_mstr->dev, "De-prepare Operation failed ret = %d\n", ret);
+			return -EINVAL;
+		}
+	}
+
+	return ret;
+}
