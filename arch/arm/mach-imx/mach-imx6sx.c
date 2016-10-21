@@ -74,6 +74,7 @@ static void __init imx6sx_init_machine(void)
 
 	of_platform_default_populate(NULL, NULL, parent);
 
+	imx_ocotp_init("fsl,imx6sx-ocotp");
 	imx6sx_enet_init();
 	imx_anatop_init();
 	imx6sx_pm_init();

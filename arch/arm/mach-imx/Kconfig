@@ -58,6 +58,9 @@ config HAVE_IMX_SRC
 	def_bool y if SMP
 	select ARCH_HAS_RESET_CONTROLLER
 
+config HAVE_IMX_OCOTP
+	bool
+
 config IMX_HAVE_IOMUX_V1
 	bool
 
@@ -492,6 +495,7 @@ config SOC_IMX6
 	select HAVE_IMX_SRC
 	select MFD_SYSCON
 	select PL310_ERRATA_769419 if CACHE_L2X0
+	select HAVE_IMX_OCOTP
 
 config SOC_IMX6Q
 	bool "i.MX6 Quad/DualLite support"
@@ -537,6 +541,7 @@ config SOC_IMX7D
 	select HAVE_IMX_ANATOP
 	select HAVE_IMX_MMDC
 	select HAVE_IMX_SRC
+	select HAVE_IMX_OCOTP
 	help
 		This enables support for Freescale i.MX7 Dual processor.
 

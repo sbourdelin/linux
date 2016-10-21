@@ -280,6 +280,7 @@ static void __init imx6q_init_machine(void)
 
 	of_platform_default_populate(NULL, NULL, parent);
 
+	imx_ocotp_init("fsl,imx6q-ocotp");
 	imx_anatop_init();
 	cpu_is_imx6q() ?  imx6q_pm_init() : imx6dl_pm_init();
 	imx6q_1588_init();
@@ -294,21 +295,7 @@ static void __init imx6q_init_machine(void)
 
 static void __init imx6q_opp_check_speed_grading(struct device *cpu_dev)
 {
-	struct device_node *np;
-	void __iomem *base;
 	u32 val;
-
-	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ocotp");
-	if (!np) {
-		pr_warn("failed to find ocotp node\n");
-		return;
-	}
-
-	base = of_iomap(np, 0);
-	if (!base) {
-		pr_warn("failed to map ocotp\n");
-		goto put_node;
-	}
 
 	/*
 	 * SPEED_GRADING[1:0] defines the max speed of ARM:
@@ -318,7 +305,7 @@ static void __init imx6q_opp_check_speed_grading(struct device *cpu_dev)
 	 * 2b'00: 792000000Hz;
 	 * We need to set the max speed of ARM according to fuse map.
 	 */
-	val = readl_relaxed(base + OCOTP_CFG3);
+	val = imx_ocotp_read(OCOTP_CFG3);
 	val >>= OCOTP_CFG3_SPEED_SHIFT;
 	val &= 0x3;
 
@@ -333,9 +320,6 @@ static void __init imx6q_opp_check_speed_grading(struct device *cpu_dev)
 			if (dev_pm_opp_disable(cpu_dev, 852000000))
 				pr_warn("failed to disable 852 MHz OPP\n");
 	}
-	iounmap(base);
-put_node:
-	of_node_put(np);
 }
 
 static void __init imx6q_opp_init(void)
