@@ -22,6 +22,7 @@
 #include <linux/scatterlist.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
+#include <linux/of.h>
 
 #include <linux/leds.h>
 
@@ -3013,10 +3014,19 @@ void __sdhci_read_caps(struct sdhci_host *host, u16 *ver, u32 *caps, u32 *caps1)
 
 	host->caps = caps ? *caps : sdhci_readl(host, SDHCI_CAPABILITIES);
 
+	if (of_property_read_bool(mmc_dev(host->mmc)->of_node,
+				  "sdhci-cap-speed-modes-broken"))
+		host->caps &= ~SDHCI_CAN_DO_HISPD;
+
 	if (host->version < SDHCI_SPEC_300)
 		return;
 
 	host->caps1 = caps1 ? *caps1 : sdhci_readl(host, SDHCI_CAPABILITIES_1);
+
+	if (of_property_read_bool(mmc_dev(host->mmc)->of_node,
+				  "sdhci-cap-speed-modes-broken"))
+		host->caps1 &= ~(SDHCI_SUPPORT_SDR50 | SDHCI_SUPPORT_SDR104 |
+				 SDHCI_SUPPORT_DDR50 | SDHCI_SUPPORT_HS400);
 }
 EXPORT_SYMBOL_GPL(__sdhci_read_caps);
 
