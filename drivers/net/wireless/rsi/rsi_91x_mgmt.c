@@ -1240,6 +1240,55 @@ int rsi_send_block_unblock_frame(struct rsi_common *common, bool block_event)
 
 }
 
+/**
+ * rsi_flash_read() - This function sends the frash read frame to device
+ * @adapter: Pointer to the hardware structure.
+ *
+ * Return: status: 0 on success, -1 on failure.
+ */
+int rsi_flash_read(struct rsi_hw *adapter)
+{
+	struct rsi_common *common = adapter->priv;
+	struct rsi_mac_frame *cmd_frame = NULL;
+	struct sk_buff *skb;
+
+	rsi_dbg(MGMT_TX_ZONE, "%s: Sending flash read frame\n", __func__);
+
+	skb = dev_alloc_skb(FRAME_DESC_SZ);
+	if (!skb)
+		return -ENOMEM;
+
+	memset(skb->data, 0, FRAME_DESC_SZ);
+	cmd_frame = (struct rsi_mac_frame *)skb->data;
+
+	/* FrameType */
+	cmd_frame->desc_word[1] = cpu_to_le16(EEPROM_READ_TYPE);
+
+	/* Format of length and offset differs for
+	 * autoflashing and swbl flashing
+	 */
+	cmd_frame->desc_word[0] = cpu_to_le16(RSI_WIFI_MGMT_Q << 12);
+
+	/* Number of bytes to read */
+	rsi_dbg(INFO_ZONE, " eeprom length  0x%x, %d\n",
+		adapter->eeprom.length, adapter->eeprom.length);
+	cmd_frame->desc_word[3] = cpu_to_le16(adapter->eeprom.length << 4);
+
+	cmd_frame->desc_word[2] |= cpu_to_le16(3 << 8);
+	if (adapter->eeprom_init) {
+		rsi_dbg(INFO_ZONE, "spi init sent");
+		cmd_frame->desc_word[2] |= cpu_to_le16(BIT(13));
+	}
+
+	/* Address to read */
+	cmd_frame->desc_word[4] = cpu_to_le16(adapter->eeprom.offset);
+	cmd_frame->desc_word[5] = cpu_to_le16(adapter->eeprom.offset >> 16);
+	cmd_frame->desc_word[6] = cpu_to_le16(0); //delay = 0
+
+	skb_put(skb, FRAME_DESC_SZ);
+
+	return rsi_send_internal_mgmt_frame(common, skb);
+}
 
 /**
  * rsi_handle_ta_confirm_type() - This function handles the confirm frames.

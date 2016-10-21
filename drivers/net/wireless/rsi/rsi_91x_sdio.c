@@ -1,6 +1,8 @@
 /**
  * Copyright (c) 2014 Redpine Signals Inc.
  *
+ * Developers:
+ *		Fariya Fathima	2014 <fariya.f@redpinesignals.com>
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
@@ -18,6 +20,7 @@
 #include <linux/module.h>
 #include "rsi_sdio.h"
 #include "rsi_common.h"
+#include "rsi_hal.h"
 
 /**
  * rsi_sdio_set_cmd52_arg() - This function prepares cmd 52 read/write arg.
@@ -386,6 +389,7 @@ static int rsi_setupcard(struct rsi_hw *adapter)
 	rsi_setclock(adapter, 50000);
 
 	dev->tx_blk_size = 256;
+	adapter->tx_blk_size = dev->tx_blk_size;
 	status = rsi_setblocklength(adapter, dev->tx_blk_size);
 	if (status)
 		rsi_dbg(ERR_ZONE,
@@ -473,8 +477,6 @@ void rsi_sdio_ack_intr(struct rsi_hw *adapter, u8 int_bit)
 		rsi_dbg(ERR_ZONE, "%s: unable to send ack\n", __func__);
 }
 
-
-
 /**
  * rsi_sdio_read_register_multiple() - This function read multiple bytes of
  *				       information from the SD card.
@@ -485,10 +487,10 @@ void rsi_sdio_ack_intr(struct rsi_hw *adapter, u8 int_bit)
  *
  * Return: 0 on success, -1 on failure.
  */
-static int rsi_sdio_read_register_multiple(struct rsi_hw *adapter,
-					   u32 addr,
-					   u32 count,
-					   u8 *data)
+int rsi_sdio_read_register_multiple(struct rsi_hw *adapter,
+				    u32 addr,
+				    u8 *data,
+				    u16 count)
 {
 	struct rsi_91x_sdiodev *dev =
 		(struct rsi_91x_sdiodev *)adapter->rsi_dev;
@@ -518,7 +520,7 @@ static int rsi_sdio_read_register_multiple(struct rsi_hw *adapter,
 int rsi_sdio_write_register_multiple(struct rsi_hw *adapter,
 				     u32 addr,
 				     u8 *data,
-				     u32 count)
+				     u16 count)
 {
 	struct rsi_91x_sdiodev *dev =
 		(struct rsi_91x_sdiodev *)adapter->rsi_dev;
@@ -552,6 +554,178 @@ int rsi_sdio_write_register_multiple(struct rsi_hw *adapter,
 	return status;
 }
 
+int rsi_sdio_load_data_master_write(struct rsi_hw *adapter,
+				    u32 base_address,
+				    u32 instructions_sz,
+				    u16 block_size,
+				    u8 *ta_firmware)
+{
+	u32 num_blocks;
+	u16 msb_address;
+	u32 offset, ii;
+	u8 temp_buf[256];
+	u16 lsb_address;
+
+	num_blocks = instructions_sz / block_size;
+	msb_address = base_address >> 16;
+
+	rsi_dbg(INFO_ZONE, "num_blocks: %d\n", num_blocks);
+
+	/* Loading DM ms word in the sdio slave */
+	if (rsi_sdio_master_access_msword(adapter, msb_address)) {
+		rsi_dbg(ERR_ZONE, "%s: Unable to set ms word reg\n", __func__);
+		return -1;
+	}
+
+	for (offset = 0, ii = 0; ii < num_blocks; ii++, offset += block_size) {
+		memset(temp_buf, 0, block_size);
+		memcpy(temp_buf, ta_firmware + offset, block_size);
+		lsb_address = (u16)base_address;
+		if (rsi_sdio_write_register_multiple(adapter,
+					lsb_address | RSI_SD_REQUEST_MASTER,
+					(u8 *)temp_buf, block_size)) {
+			rsi_dbg(ERR_ZONE, "%s: failed to write\n", __func__);
+			return -1;
+		}
+		rsi_dbg(INFO_ZONE, "%s: loading block: %d\n", __func__, ii);
+		base_address += block_size;
+		base_address += block_size;
+
+		if ((base_address >> 16) != msb_address) {
+			msb_address += 1;
+
+			/* Loading DM ms word in the sdio slave */
+			if (rsi_sdio_master_access_msword(adapter,
+							  msb_address)) {
+				rsi_dbg(ERR_ZONE,
+					"%s: Unable to set ms word reg\n",
+					__func__);
+				return -1;
+			}
+		}
+	}
+
+	if (instructions_sz % block_size) {
+		memset(temp_buf, 0, block_size);
+		memcpy(temp_buf,
+		       ta_firmware + offset,
+		       instructions_sz % block_size);
+		lsb_address = (u16)base_address;
+		if (rsi_sdio_write_register_multiple(adapter,
+					lsb_address | RSI_SD_REQUEST_MASTER,
+					(u8 *)(temp_buf),
+					instructions_sz % block_size)) {
+			return -1;
+		}
+		rsi_dbg(INFO_ZONE,
+			"Written Last Block in Address 0x%x Successfully\n",
+			offset | RSI_SD_REQUEST_MASTER);
+	}
+	return 0;
+}
+
+#define align_address(a) ((unsigned long)(a) & ~0x7)
+
+int rsi_sdio_master_reg_read(struct rsi_hw *adapter, u32 addr,
+			     u32 *read_buf, u16 size)
+{
+	u32 *data = NULL;
+	u16 ms_addr = 0;
+	u32 align[2] = {};
+	u32 addr_on_bus;
+
+	data = (u32 *)align_address(&align[1]);
+
+	ms_addr = (addr >> 16);
+	if (rsi_sdio_master_access_msword(adapter, ms_addr)) {
+		rsi_dbg(ERR_ZONE,
+			"%s: Unable to set ms word to common reg\n",
+			__func__);
+		return -1;
+	}
+	addr = addr & 0xFFFF;
+
+	addr_on_bus = (addr & 0xFF000000);
+	if ((addr_on_bus == (FLASH_SIZE_ADDR & 0xFF000000)) ||
+	    (addr_on_bus == 0x0)) {
+		addr_on_bus = (addr & ~(0x3));
+	} else
+		addr_on_bus = addr;
+
+	/* Bringing TA out of reset */
+	if (rsi_sdio_read_register_multiple(adapter,
+					(addr_on_bus | RSI_SD_REQUEST_MASTER),
+					(u8 *)data, 4)) {
+		rsi_dbg(ERR_ZONE, "%s: AHB register read failed\n", __func__);
+		return -1;
+	}
+	if (size == 2) {
+		if ((addr & 0x3) == 0)
+			*read_buf = *data;
+		else
+			*read_buf  = ((*data >> 16));
+		*read_buf = (*read_buf & 0xFFFF);
+	} else if (size == 1) {
+		if ((addr & 0x3) == 0)
+			*read_buf = *data;
+		else if ((addr & 0x3) == 1)
+			*read_buf = (*data >> 8);
+		else if ((addr & 0x3) == 2)
+			*read_buf = (*data >> 16);
+		else
+			*read_buf = (*data >> 24);
+		*read_buf = (*read_buf & 0xFF);
+	} else { /*size is 4 */
+		*read_buf = *data;
+	}
+
+	return 0;
+}
+
+int rsi_sdio_master_reg_write(struct rsi_hw *adapter,
+			      unsigned long addr,
+			      unsigned long data,
+			      u16 size)
+{
+	unsigned long data1[2];
+	unsigned long *data_alligned;
+
+	data_alligned = (unsigned long *)align_address(&data1[1]);
+
+	if (size == 2) {
+		*data_alligned = ((data << 16) | (data & 0xFFFF));
+	} else if (size == 1) {
+		u32 temp_data;
+
+		temp_data = (data & 0xFF);
+		*data_alligned = ((temp_data << 24) |
+				  (temp_data << 16) |
+				  (temp_data << 8) |
+				  (temp_data));
+	} else {
+		*data_alligned = data;
+	}
+	size = 4;
+
+	if (rsi_sdio_master_access_msword(adapter, (addr >> 16))) {
+		rsi_dbg(ERR_ZONE,
+			"%s: Unable to set ms word to common reg\n",
+			__func__);
+		return -1;
+	}
+	addr = addr & 0xFFFF;
+
+	/* Bringing TA out of reset */
+	if (rsi_sdio_write_register_multiple(adapter,
+					     (addr | RSI_SD_REQUEST_MASTER),
+					     (u8 *)data_alligned, size)) {
+		rsi_dbg(ERR_ZONE,
+			"%s: Unable to do AHB reg write\n", __func__);
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * rsi_sdio_host_intf_write_pkt() - This function writes the packet to device.
  * @adapter: Pointer to the adapter structure.
@@ -560,9 +734,9 @@ int rsi_sdio_write_register_multiple(struct rsi_hw *adapter,
  *
  * Return: 0 on success, -1 on failure.
  */
-static int rsi_sdio_host_intf_write_pkt(struct rsi_hw *adapter,
-					u8 *pkt,
-					u32 len)
+int rsi_sdio_host_intf_write_pkt(struct rsi_hw *adapter,
+				 u8 *pkt,
+				 u32 len)
 {
 	struct rsi_91x_sdiodev *dev =
 		(struct rsi_91x_sdiodev *)adapter->rsi_dev;
@@ -585,7 +759,7 @@ static int rsi_sdio_host_intf_write_pkt(struct rsi_hw *adapter,
 						  address,
 						  (u8 *)pkt,
 						  length);
-	if (status)
+	if (status < 0)
 		rsi_dbg(ERR_ZONE, "%s: Unable to write onto the card: %d\n",
 			__func__, status);
 	rsi_dbg(DATA_TX_ZONE, "%s: Successfully written onto card\n", __func__);
@@ -614,8 +788,8 @@ int rsi_sdio_host_intf_read_pkt(struct rsi_hw *adapter,
 
 	status = rsi_sdio_read_register_multiple(adapter,
 						 length,
-						 length, /*num of bytes*/
-						 (u8 *)pkt);
+						 (u8 *)pkt,
+						 length);
 
 	if (status)
 		rsi_dbg(ERR_ZONE, "%s: Failed to read frame: %d\n", __func__,
@@ -676,8 +850,6 @@ static int rsi_init_sdio_interface(struct rsi_hw *adapter,
 	}
 	sdio_release_host(pfunction);
 
-	adapter->host_intf_write_pkt = rsi_sdio_host_intf_write_pkt;
-	adapter->host_intf_read_pkt = rsi_sdio_host_intf_read_pkt;
 	adapter->determine_event_timeout = rsi_sdio_determine_event_timeout;
 	adapter->check_hw_queue_status = rsi_sdio_read_buffer_status_register;
 
@@ -690,6 +862,17 @@ fail:
 	sdio_release_host(pfunction);
 	return status;
 }
+
+static struct rsi_host_intf_ops sdio_host_intf_ops = {
+	.write_pkt		= rsi_sdio_host_intf_write_pkt,
+	.read_pkt		= rsi_sdio_host_intf_read_pkt,
+	.master_access_msword	= rsi_sdio_master_access_msword,
+	.master_reg_read	= rsi_sdio_master_reg_read,
+	.master_reg_write	= rsi_sdio_master_reg_write,
+	.read_reg_multiple	= rsi_sdio_read_register_multiple,
+	.write_reg_multiple	= rsi_sdio_write_register_multiple,
+	.load_data_master_write	= rsi_sdio_load_data_master_write,
+};
 
 /**
  * rsi_probe() - This function is called by kernel when the driver provided
@@ -713,18 +896,12 @@ static int rsi_probe(struct sdio_func *pfunction,
 			__func__);
 		return 1;
 	}
+	adapter->rsi_host_intf = RSI_HOST_INTF_SDIO;
+	adapter->host_intf_ops = &sdio_host_intf_ops;
 
 	if (rsi_init_sdio_interface(adapter, pfunction)) {
 		rsi_dbg(ERR_ZONE, "%s: Failed to init sdio interface\n",
 			__func__);
-		goto fail;
-	}
-
-	if (rsi_sdio_device_init(adapter->priv)) {
-		rsi_dbg(ERR_ZONE, "%s: Failed in device init\n", __func__);
-		sdio_claim_host(pfunction);
-		sdio_disable_func(pfunction);
-		sdio_release_host(pfunction);
 		goto fail;
 	}
 
@@ -737,6 +914,14 @@ static int rsi_probe(struct sdio_func *pfunction,
 
 	sdio_release_host(pfunction);
 	rsi_dbg(INIT_ZONE, "%s: Registered Interrupt handler\n", __func__);
+
+	if (rsi_hal_device_init(adapter)) {
+		rsi_dbg(ERR_ZONE, "%s: Failed in device init\n", __func__);
+		sdio_claim_host(pfunction);
+		sdio_disable_func(pfunction);
+		sdio_release_host(pfunction);
+		goto fail;
+	}
 
 	return 0;
 fail:

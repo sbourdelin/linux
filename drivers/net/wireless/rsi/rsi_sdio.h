@@ -118,11 +118,25 @@ void rsi_interrupt_handler(struct rsi_hw *adapter);
 int rsi_init_sdio_slave_regs(struct rsi_hw *adapter);
 int rsi_sdio_device_init(struct rsi_common *common);
 int rsi_sdio_read_register(struct rsi_hw *adapter, u32 addr, u8 *data);
-int rsi_sdio_host_intf_read_pkt(struct rsi_hw *adapter, u8 *pkt, u32 length);
 int rsi_sdio_write_register(struct rsi_hw *adapter, u8 function,
 			    u32 addr, u8 *data);
+int rsi_sdio_host_intf_read_pkt(struct rsi_hw *adapter, u8 *pkt, u32 length);
+int rsi_sdio_host_intf_write_pkt(struct rsi_hw *adapter, u8 *pkt, u32 len);
+int rsi_sdio_read_register_multiple(struct rsi_hw *adapter, u32 addr,
+				    u8 *data, u16 count);
 int rsi_sdio_write_register_multiple(struct rsi_hw *adapter, u32 addr,
-				     u8 *data, u32 count);
+				     u8 *data, u16 count);
+int rsi_sdio_master_access_msword(struct rsi_hw *adapter,
+				  u16 ms_word);
+int rsi_sdio_load_data_master_write(struct rsi_hw *adapter,
+				    u32 base_address, u32 instructions_sz,
+				    u16 block_size, u8 *ta_firmware);
+int rsi_sdio_master_reg_read(struct rsi_hw *adapter, u32 addr,
+			     u32 *read_buf, u16 size);
+int rsi_sdio_master_reg_write(struct rsi_hw *adapter,
+			      unsigned long addr,
+			      unsigned long data,
+			      u16 size);
 void rsi_sdio_ack_intr(struct rsi_hw *adapter, u8 int_bit);
 int rsi_sdio_determine_event_timeout(struct rsi_hw *adapter);
 int rsi_sdio_read_buffer_status_register(struct rsi_hw *adapter, u8 q_num);
