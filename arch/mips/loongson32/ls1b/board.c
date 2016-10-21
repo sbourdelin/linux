@@ -72,6 +72,7 @@ static struct platform_device *ls1b_platform_devices[] __initdata = {
 	&ls1x_gpio1_pdev,
 	&ls1x_nand_pdev,
 	&ls1x_rtc_pdev,
+	&ls1x_wdt_pdev,
 };
 
 static int __init ls1b_platform_init(void)
