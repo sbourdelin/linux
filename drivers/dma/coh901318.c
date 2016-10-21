@@ -2279,10 +2279,7 @@ coh901318_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
 	struct coh901318_lli *lli;
 	struct coh901318_desc *cohd;
 	const struct coh901318_params *params;
-	struct scatterlist *sg;
-	int len = 0;
-	int size;
-	int i;
+	int len;
 	u32 ctrl_chained = cohc_chan_param(cohc)->ctrl_lli_chained;
 	u32 ctrl = cohc_chan_param(cohc)->ctrl_lli;
 	u32 ctrl_last = cohc_chan_param(cohc)->ctrl_lli_last;
@@ -2338,21 +2335,7 @@ coh901318_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
 	 * MAX_DMA_PACKET_SIZE. Calculate to total number of
 	 * dma elemts required to send the entire sg list
 	 */
-	for_each_sg(sgl, sg, sg_len, i) {
-		unsigned int factor;
-		size = sg_dma_len(sg);
-
-		if (size <= MAX_DMA_PACKET_SIZE) {
-			len++;
-			continue;
-		}
-
-		factor = size >> MAX_DMA_PACKET_SIZE_SHIFT;
-		if ((factor << MAX_DMA_PACKET_SIZE_SHIFT) < size)
-			factor++;
-
-		len += factor;
-	}
+	len = sg_nents_for_dma(sgl, sg_len, MAX_DMA_PACKET_SIZE);
 
 	pr_debug("Allocate %d lli:s for this transfer\n", len);
 	lli = coh901318_lli_alloc(&cohc->base->pool, len);
