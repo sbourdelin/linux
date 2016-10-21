@@ -2205,15 +2205,6 @@ i915_gem_object_put_pages(struct drm_i915_gem_object *obj)
 	return 0;
 }
 
-static unsigned int swiotlb_max_size(void)
-{
-#if IS_ENABLED(CONFIG_SWIOTLB)
-	return swiotlb_nr_tbl() << IO_TLB_SHIFT;
-#else
-	return UINT_MAX;
-#endif
-}
-
 static int
 i915_gem_object_get_pages_gtt(struct drm_i915_gem_object *obj)
 {
@@ -2222,7 +2213,7 @@ i915_gem_object_get_pages_gtt(struct drm_i915_gem_object *obj)
 	struct address_space *mapping;
 	struct sg_table *st;
 	struct page *page, **pages;
-	unsigned int max_segment = swiotlb_max_size();
+	unsigned int max_segment = i915_swiotlb_max_size();
 	int ret;
 	gfp_t gfp;
 
