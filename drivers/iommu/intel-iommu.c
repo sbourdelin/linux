@@ -885,6 +885,7 @@ static struct intel_iommu *device_to_iommu(struct device *dev, u8 *bus, u8 *devf
 	struct intel_iommu *iommu;
 	struct device *tmp;
 	struct pci_dev *ptmp, *pdev = NULL;
+	struct pci_dev *pf_pdev = NULL;
 	u16 segment = 0;
 	int i;
 
@@ -893,6 +894,11 @@ static struct intel_iommu *device_to_iommu(struct device *dev, u8 *bus, u8 *devf
 
 	if (dev_is_pci(dev)) {
 		pdev = to_pci_dev(dev);
+		/*
+		 * Always lookup the PF's IOMMU when handling VF's
+		 */
+		pf_pdev = pci_physfn(pdev);
+		dev = &pf_pdev->dev;
 		segment = pci_domain_nr(pdev->bus);
 	} else if (has_acpi_companion(dev))
 		dev = &ACPI_COMPANION(dev)->dev;
@@ -905,6 +911,9 @@ static struct intel_iommu *device_to_iommu(struct device *dev, u8 *bus, u8 *devf
 		for_each_active_dev_scope(drhd->devices,
 					  drhd->devices_cnt, i, tmp) {
 			if (tmp == dev) {
+				if (pdev->is_virtfn)
+					goto got_pdev;
+
 				*bus = drhd->devices[i].bus;
 				*devfn = drhd->devices[i].devfn;
 				goto out;
