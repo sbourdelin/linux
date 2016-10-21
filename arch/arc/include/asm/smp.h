@@ -37,9 +37,9 @@ extern const char *arc_platform_smp_cpuinfo(void);
  * API expected BY platform smp code (FROM arch smp code)
  *
  * smp_ipi_irq_setup:
- *	Takes @cpu and @irq to which the arch-common ISR is hooked up
+ *	Takes @cpu and @virq to which the arch-common ISR is hooked up
  */
-extern int smp_ipi_irq_setup(int cpu, int irq);
+extern int smp_ipi_irq_setup(int cpu, unsigned int virq);
 
 /*
  * struct plat_smp_ops	- SMP callbacks provided by platform to ARC SMP
