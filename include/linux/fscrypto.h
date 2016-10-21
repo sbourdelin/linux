@@ -273,11 +273,13 @@ extern void fscrypt_pullback_bio_page(struct page **, bool);
 extern void fscrypt_restore_control_page(struct page *);
 extern int fscrypt_zeroout_range(struct inode *, pgoff_t, sector_t,
 						unsigned int);
-int fscrypt_encrypt_buffer(struct inode *inode, const void *plaintext_buf,
+int fscrypt_encrypt_buffer(const struct inode *inode, const void *plaintext_buf,
 			   const void *ciphertext_buf, unsigned int buflen,
 			   pgoff_t index, gfp_t gfp_flags);
-int fscrypt_decrypt_buffer(struct inode *inode, const void *ciphertext_buf,
-			   const void *plaintext_buf, unsigned int buflen,
+int fscrypt_decrypt_buffer(const struct inode *inode,
+			   const void *ciphertext_buf,
+			   const void *plaintext_buf,
+			   unsigned int buflen,
 			   pgoff_t index, gfp_t gfp_flags);
 /* policy.c */
 extern int fscrypt_process_policy(struct file *, const struct fscrypt_policy *);
@@ -291,8 +293,8 @@ extern int fscrypt_get_encryption_info(struct inode *);
 extern void fscrypt_put_encryption_info(struct inode *, struct fscrypt_info *);
 
 /* fname.c */
-extern int fscrypt_setup_filename(struct inode *, const struct qstr *,
-				int lookup, struct fscrypt_name *);
+extern int fscrypt_setup_filename(struct inode *dir, const struct qstr *iname,
+			   int lookup, struct fscrypt_name *fname);
 extern void fscrypt_free_filename(struct fscrypt_name *);
 extern u32 fscrypt_fname_encrypted_size(struct inode *, u32);
 extern int fscrypt_fname_alloc_buffer(struct inode *, u32,

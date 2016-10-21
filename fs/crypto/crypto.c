@@ -147,7 +147,7 @@ typedef enum {
 	FS_ENCRYPT,
 } fscrypt_direction_t;
 
-static int do_crypto(struct inode *inode,
+static int do_crypto(const struct inode *inode,
 		     fscrypt_direction_t rw, pgoff_t index,
 		     struct scatterlist *src, struct scatterlist *dst,
 		     unsigned int cryptlen, gfp_t gfp_flags)
@@ -212,7 +212,7 @@ static int do_page_crypto(struct inode *inode,
 	return do_crypto(inode, rw, index, &src, &dst, PAGE_SIZE, gfp_flags);
 }
 
-static int do_buf_crypto(struct inode *inode,
+static int do_buf_crypto(const struct inode *inode,
 			 fscrypt_direction_t rw, pgoff_t index,
 			 const void *src_buf, const void *dst_buf,
 			 unsigned int buflen, gfp_t gfp_flags)
@@ -287,7 +287,7 @@ errout:
 }
 EXPORT_SYMBOL(fscrypt_encrypt_page);
 
-int fscrypt_encrypt_buffer(struct inode *inode, const void *plaintext_buf,
+int fscrypt_encrypt_buffer(const struct inode *inode, const void *plaintext_buf,
 			   const void *ciphertext_buf, unsigned int buflen,
 			   pgoff_t index, gfp_t gfp_flags)
 {
@@ -296,8 +296,10 @@ int fscrypt_encrypt_buffer(struct inode *inode, const void *plaintext_buf,
 }
 EXPORT_SYMBOL(fscrypt_encrypt_buffer);
 
-int fscrypt_decrypt_buffer(struct inode *inode, const void *ciphertext_buf,
-			   const void *plaintext_buf, unsigned int buflen,
+int fscrypt_decrypt_buffer(const struct inode *inode,
+			   const void *ciphertext_buf,
+			   const void *plaintext_buf,
+			   unsigned int buflen,
 			   pgoff_t index, gfp_t gfp_flags)
 {
 	return do_buf_crypto(inode, FS_DECRYPT, index, ciphertext_buf,
