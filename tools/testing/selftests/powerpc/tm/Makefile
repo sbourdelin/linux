@@ -4,6 +4,8 @@ SIGNAL_CONTEXT_CHK_TESTS := tm-signal-context-chk-gpr tm-signal-context-chk-fpu 
 TEST_GEN_PROGS := tm-resched-dscr tm-syscall tm-signal-msr-resv tm-signal-stack \
 	tm-vmxcopy tm-fork tm-tar tm-tmspr $(SIGNAL_CONTEXT_CHK_TESTS)
 
+EXTRA_CLEAN = *.o
+
 include ../../lib.mk
 
 $(TEST_GEN_PROGS): ../harness.c ../utils.c
@@ -16,6 +18,3 @@ tm-tmspr: CFLAGS += -pthread
 
 $(SIGNAL_CONTEXT_CHK_TESTS): tm-signal.S
 $(SIGNAL_CONTEXT_CHK_TESTS): CFLAGS += -mhtm -m64 -mvsx
-
-clean:
-	$(RM) $(TEST_GEN_PROGS) *.o

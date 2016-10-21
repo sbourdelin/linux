@@ -9,6 +9,7 @@ ASFLAGS = $(CFLAGS)
 
 TEST_GEN_PROGS := copyuser_64 copyuser_power7 memcpy_64 memcpy_power7
 EXTRA_SOURCES := validate.c ../harness.c
+EXTRA_CLEAN := *.o
 
 include ../../lib.mk
 
@@ -19,5 +20,3 @@ memcpy_power7:   CPPFLAGS += -D COPY_LOOP=test_memcpy_power7
 
 $(TEST_GEN_PROGS): $(EXTRA_SOURCES)
 
-clean:
-	$(RM) $(TEST_GEN_PROGS) *.o
