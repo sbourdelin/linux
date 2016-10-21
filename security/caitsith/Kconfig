@@ -1,0 +1,48 @@
+config SECURITY_CAITSITH
+	bool "CaitSith Support"
+	depends on SECURITY
+	select SECURITYFS
+	select SRCU
+	default n
+	help
+	  This selects CaitSith, check list based access control.
+	  Required userspace tools and further information may be
+	  found at <https://caitsith.osdn.jp/>.
+	  If you are unsure how to answer this question, answer N.
+
+config SECURITY_CAITSITH_OMIT_USERSPACE_LOADER
+	bool "Activate without calling userspace policy loader."
+	default n
+	depends on SECURITY_CAITSITH
+	---help---
+	  Say Y here if you want to activate access control as soon as built-in
+	  policy was loaded. This option will be useful for systems where
+	  operations which can lead to the hijacking of the boot sequence are
+	  needed before loading the policy. For example, you can activate
+	  immediately after loading the fixed part of policy which will allow
+	  only operations needed for mounting a partition which contains the
+	  variant part of policy and verifying (e.g. running GPG check) and
+	  loading the variant part of policy. Since you can start using
+	  enforcing mode from the beginning, you can reduce the possibility of
+	  hijacking the boot sequence.
+
+config SECURITY_CAITSITH_POLICY_LOADER
+	string "Location of userspace policy loader"
+	default "/sbin/caitsith-init"
+	depends on SECURITY_CAITSITH
+	depends on !SECURITY_CAITSITH_OMIT_USERSPACE_LOADER
+	---help---
+	  This is the default pathname of policy loader which is called before
+	  activation. You can override this setting via CS_loader= kernel
+	  command line option.
+
+config SECURITY_CAITSITH_ACTIVATION_TRIGGER
+	string "Trigger for calling userspace policy loader"
+	default "/sbin/init"
+	depends on SECURITY_CAITSITH
+	depends on !SECURITY_CAITSITH_OMIT_USERSPACE_LOADER
+	---help---
+	  This is the default pathname of activation trigger. You can override
+	  this setting via CS_trigger= kernel command line option.
+	  For example, if you pass init=/usr/lib/systemd/systemd option, you
+	  may want to also pass CS_trigger=/usr/lib/systemd/systemd option.
