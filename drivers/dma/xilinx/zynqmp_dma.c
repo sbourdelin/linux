@@ -853,12 +853,9 @@ static struct dma_async_tx_descriptor *zynqmp_dma_prep_sg(
 	void *desc = NULL, *prev = NULL;
 	size_t len, dst_avail, src_avail;
 	dma_addr_t dma_dst, dma_src;
-	u32 desc_cnt = 0, i;
-	struct scatterlist *sg;
+	u32 desc_cnt;
 
-	for_each_sg(src_sg, sg, src_sg_len, i)
-		desc_cnt += DIV_ROUND_UP(sg_dma_len(sg),
-					 ZYNQMP_DMA_MAX_TRANS_LEN);
+	desc_cnt = sg_nents_for_dma(src_sg, src_sg_len, ZYNQMP_DMA_MAX_TRANS_LEN);
 
 	spin_lock_bh(&chan->lock);
 	if (desc_cnt > chan->desc_free_cnt) {
