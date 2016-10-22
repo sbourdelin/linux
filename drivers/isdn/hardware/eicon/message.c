@@ -1147,44 +1147,18 @@ static byte test_c_ind_mask_bit(PLCI *plci, word b)
 
 static void dump_c_ind_mask(PLCI *plci)
 {
-	word i, j, k;
-	dword d;
-	char *p;
+	word i, j;
 	char buf[40];
 
 	for (i = 0; i < C_IND_MASK_DWORDS; i += 4)
 	{
-		p = buf + 36;
-		*p = '\0';
-		for (j = 0; j < 4; j++)
-		{
-			if (i + j < C_IND_MASK_DWORDS)
-			{
-				d = plci->c_ind_mask_table[i + j];
-				for (k = 0; k < 8; k++)
-				{
-					*(--p) = hex_asc_lo(d);
-					d >>= 4;
-				}
-			}
-			else if (i != 0)
-			{
-				for (k = 0; k < 8; k++)
-					*(--p) = ' ';
-			}
-			*(--p) = ' ';
-		}
-		dbug(1, dprintf("c_ind_mask =%s", (char *) p));
+		j = min_t(word, C_IND_MASK_DWORDS - i, 4) * 4;
+		hex_dump_to_buffer(plci->c_ind_mask_table[i], j, 16, 4, buf, sizeof(buf), false);
+		dbug(1, dprintf("c_ind_mask =%s", buf));
 	}
 }
 
-
-
-
-
 #define dump_plcis(a)
-
-
 
 /*------------------------------------------------------------------*/
 /* translation function for each message                            */
