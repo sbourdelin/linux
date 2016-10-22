@@ -63,7 +63,7 @@
 		pinctrl-0 = <&pwr_key>;
 
 		power {
-			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+			gpios = <&gpio0 RK_PA2 GPIO_ACTIVE_LOW>;
 			label = "GPIO Power";
 			linux,code = <KEY_POWER>;
 			wakeup-source;
@@ -248,7 +248,7 @@
 		reg = <0x40>;
 		interrupt-parent = <&gpio3>;
 		interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
-		power-gpios = <&gpio3 15 GPIO_ACTIVE_HIGH>;
+		power-gpios = <&gpio3 RK_PB7 GPIO_ACTIVE_HIGH>;
 		touchscreen-size-x = <800>;
 		touchscreen-size-y = <1280>;
 		silead,max-fingers = <5>;
