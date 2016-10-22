@@ -21,8 +21,6 @@
 #include <linux/nvmem-provider.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
-#include <linux/slab.h>
-#include <linux/random.h>
 
 static struct nvmem_config econfig = {
 	.name = "sunxi-sid",
@@ -70,8 +68,6 @@ static int sunxi_sid_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct nvmem_device *nvmem;
 	struct sunxi_sid *sid;
-	int ret, i, size;
-	char *randomness;
 
 	sid = devm_kzalloc(dev, sizeof(*sid), GFP_KERNEL);
 	if (!sid)
@@ -82,7 +78,6 @@ static int sunxi_sid_probe(struct platform_device *pdev)
 	if (IS_ERR(sid->base))
 		return PTR_ERR(sid->base);
 
-	size = resource_size(res) - 1;
 	econfig.size = resource_size(res);
 	econfig.dev = dev;
 	econfig.reg_read = sunxi_sid_read;
@@ -91,25 +86,9 @@ static int sunxi_sid_probe(struct platform_device *pdev)
 	if (IS_ERR(nvmem))
 		return PTR_ERR(nvmem);
 
-	randomness = kzalloc(sizeof(u8) * (size), GFP_KERNEL);
-	if (!randomness) {
-		ret = -EINVAL;
-		goto err_unreg_nvmem;
-	}
-
-	for (i = 0; i < size; i++)
-		randomness[i] = sunxi_sid_read_byte(sid, i);
-
-	add_device_randomness(randomness, size);
-	kfree(randomness);
-
 	platform_set_drvdata(pdev, nvmem);
 
 	return 0;
-
-err_unreg_nvmem:
-	nvmem_unregister(nvmem);
-	return ret;
 }
 
 static int sunxi_sid_remove(struct platform_device *pdev)
