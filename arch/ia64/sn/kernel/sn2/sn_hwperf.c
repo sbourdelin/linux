@@ -400,9 +400,9 @@ static int sn_topology_show(struct seq_file *s, void *d)
 	int nasid_msb;
 
 	if (obj == objs) {
-		seq_printf(s, "# sn_topology version 2\n");
-		seq_printf(s, "# objtype ordinal location partition"
-			" [attribute value [, ...]]\n");
+		seq_puts(s,
+			 "# sn_topology version 2\n"
+			 "# objtype ordinal location partition [attribute value [, ...]]\n");
 
 		if (ia64_sn_get_sn_info(0,
 			&shubtype, &nasid_mask, &nasid_shift, &system_size,
