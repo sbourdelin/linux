@@ -494,12 +494,11 @@ static int sn2_ptc_seq_show(struct seq_file *file, void *data)
 	int cpu;
 
 	cpu = *(loff_t *) data;
-
-	if (!cpu) {
+	if (!cpu)
 		seq_printf(file,
-			   "# cpu ptc_l newrid ptc_flushes nodes_flushed deadlocks lock_nsec shub_nsec shub_nsec_max not_my_mm deadlock2 ipi_fluches ipi_nsec\n");
-		seq_printf(file, "# ptctest %d, flushopt %d\n", sn2_ptctest, sn2_flush_opt);
-	}
+			   "# cpu ptc_l newrid ptc_flushes nodes_flushed deadlocks lock_nsec shub_nsec shub_nsec_max not_my_mm deadlock2 ipi_fluches ipi_nsec\n"
+			   "# ptctest %d, flushopt %d\n",
+			   sn2_ptctest, sn2_flush_opt);
 
 	if (cpu < nr_cpu_ids && cpu_online(cpu)) {
 		stat = &per_cpu(ptcstats, cpu);
