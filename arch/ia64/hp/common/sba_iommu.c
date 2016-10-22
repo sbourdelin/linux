@@ -1906,14 +1906,20 @@ ioc_show(struct seq_file *s, void *v)
 	if (ioc->node != NUMA_NO_NODE)
 		seq_printf(s, "NUMA node       : %d\n", ioc->node);
 #endif
-	seq_printf(s, "IOVA size       : %ld MB\n", ((ioc->pdir_size >> 3) * iovp_size)/(1024*1024));
-	seq_printf(s, "IOVA page size  : %ld kb\n", iovp_size/1024);
+	seq_printf(s,
+		   "IOVA size       : %ld MB\n"
+		   "IOVA page size  : %ld kb\n",
+		   ((ioc->pdir_size >> 3) * iovp_size) / (1024 * 1024)),
+		   iovp_size / 1024);
 
 	for (i = 0; i < (ioc->res_size / sizeof(unsigned long)); ++i, ++res_ptr)
 		used += hweight64(*res_ptr);
 
-	seq_printf(s, "PDIR size       : %d entries\n", ioc->pdir_size >> 3);
-	seq_printf(s, "PDIR used       : %d entries\n", used);
+	seq_printf(s,
+		   "PDIR size       : %d entries\n"
+		   "PDIR used       : %d entries\n",
+		   ioc->pdir_size >> 3,
+		   used);
 
 #ifdef PDIR_SEARCH_TIMING
 	{
