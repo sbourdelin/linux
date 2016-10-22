@@ -700,8 +700,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 			   "thread id  : %u\n",
 			   c->core_id, c->thread_id);
 #endif
-	seq_printf(m,"\n");
-
+	seq_putc(m, '\n');
 	return 0;
 }
 
