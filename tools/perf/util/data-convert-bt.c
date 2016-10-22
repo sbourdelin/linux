@@ -67,7 +67,7 @@ struct ctf_writer {
 			struct bt_ctf_field_type	*u32_hex;
 			struct bt_ctf_field_type	*u64_hex;
 		};
-		struct bt_ctf_field_type *array[6];
+		struct bt_ctf_field_type *array[7];
 	} data;
 	struct bt_ctf_event_class	*comm_class;
 	struct bt_ctf_event_class	*exit_class;
