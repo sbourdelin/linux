@@ -62,7 +62,7 @@
 		autorepeat;
 
 		power {
-			gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
+			gpios = <&gpio0 RK_PA4 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_POWER>;
 			label = "GPIO Key Power";
 			linux,input-type = <1>;
@@ -248,7 +248,7 @@
 		reg = <0x40>;
 		interrupt-parent = <&gpio1>;
 		interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
-		power-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+		power-gpios = <&gpio0 RK_PB6 GPIO_ACTIVE_HIGH>;
 		touchscreen-size-x = <800>;
 		touchscreen-size-y = <1280>;
 		silead,max-fingers = <5>;

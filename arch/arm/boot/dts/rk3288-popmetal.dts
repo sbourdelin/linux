@@ -180,7 +180,7 @@
 	phy-supply = <&vcc_lan>;
 	phy-mode = "rgmii";
 	clock_in_out = "input";
-	snps,reset-gpio = <&gpio4 RK_PB0 0>;
+	snps,reset-gpio = <&gpio4 RK_PB0 GPIO_ACTIVE_HIGH>;
 	snps,reset-active-low;
 	snps,reset-delays-us = <0 10000 1000000>;
 	assigned-clocks = <&cru SCLK_MAC>;
