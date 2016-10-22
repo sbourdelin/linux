@@ -439,7 +439,7 @@ static int rs_proc_show(struct seq_file *m, void *v)
 {
 	int i;
 
-	seq_printf(m, "simserinfo:1.0\n");
+	seq_puts(m, "simserinfo:1.0\n");
 	for (i = 0; i < NR_PORTS; i++)
 		seq_printf(m, "%d: uart:16550 port:3F8 irq:%d\n",
 		       i, rs_table[i].irq);
