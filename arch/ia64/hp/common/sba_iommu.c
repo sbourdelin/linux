@@ -1930,7 +1930,7 @@ ioc_show(struct seq_file *s, void *v)
 	}
 #endif
 #ifndef ALLOW_IOV_BYPASS
-	 seq_printf(s, "IOVA bypass disabled\n");
+	seq_puts(s, "IOVA bypass disabled\n");
 #endif
 	return 0;
 }
