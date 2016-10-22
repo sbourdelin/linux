@@ -33,7 +33,6 @@
 #include "amd_acpi.h"
 #include "atom.h"
 
-extern void amdgpu_pm_acpi_event_handler(struct amdgpu_device *adev);
 /* Call the ATIF method
  */
 /**

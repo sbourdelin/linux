@@ -2145,6 +2145,8 @@ void amdgpu_io_wreg(struct amdgpu_device *adev, u32 reg, u32 v);
 u32 amdgpu_mm_rdoorbell(struct amdgpu_device *adev, u32 index);
 void amdgpu_mm_wdoorbell(struct amdgpu_device *adev, u32 index, u32 v);
 
+void amdgpu_pm_acpi_event_handler(struct amdgpu_device *adev);
+
 /*
  * Registers read & write functions.
  */
