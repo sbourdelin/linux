@@ -190,18 +190,16 @@ void __show_regs(struct pt_regs *regs)
 
 	i = top_reg;
 
-	while (i >= 0) {
-		printk("x%-2d: %016llx ", i, regs->regs[i]);
+	if (i >= 0 && !(i % 2)) {
+		printk("x%-2d: %016llx\n", i, regs->regs[i]);
 		i--;
-
-		if (i % 2 == 0) {
-			pr_cont("x%-2d: %016llx ", i, regs->regs[i]);
-			i--;
-		}
-
-		pr_cont("\n");
 	}
-	printk("\n");
+	while (i > 0) {
+		printk("x%-2d: %016llx x%-2d: %016llx\n",
+		       i, regs->regs[i],
+		       i - 1, regs->regs[i - 1]);
+		i -= 2;
+	}
 }
 
 void show_regs(struct pt_regs * regs)
