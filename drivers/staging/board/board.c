@@ -22,6 +22,7 @@
 
 #include "board.h"
 
+struct device_node *of_find_all_nodes(struct device_node *);
 static struct device_node *irqc_node __initdata;
 static unsigned int irqc_base __initdata;
 
