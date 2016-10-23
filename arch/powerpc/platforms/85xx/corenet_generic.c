@@ -83,56 +83,9 @@ void __init corenet_gen_setup_arch(void)
 	mpc85xx_qe_init();
 }
 
-static const struct of_device_id of_device_ids[] = {
-	{
-		.compatible	= "simple-bus"
-	},
-	{
-		.compatible	= "mdio-mux-gpio"
-	},
-	{
-		.compatible	= "fsl,fpga-ngpixis"
-	},
-	{
-		.compatible	= "fsl,fpga-qixis"
-	},
-	{
-		.compatible	= "fsl,srio",
-	},
-	{
-		.compatible	= "fsl,p4080-pcie",
-	},
-	{
-		.compatible	= "fsl,qoriq-pcie-v2.2",
-	},
-	{
-		.compatible	= "fsl,qoriq-pcie-v2.3",
-	},
-	{
-		.compatible	= "fsl,qoriq-pcie-v2.4",
-	},
-	{
-		.compatible	= "fsl,qoriq-pcie-v3.0",
-	},
-	{
-		.compatible	= "fsl,qe",
-	},
-	{
-		.compatible    = "fsl,fman",
-	},
-	/* The following two are for the Freescale hypervisor */
-	{
-		.name		= "hypervisor",
-	},
-	{
-		.name		= "handles",
-	},
-	{}
-};
-
 int __init corenet_gen_publish_devices(void)
 {
-	return of_platform_bus_probe(NULL, of_device_ids, NULL);
+	return of_platform_default_populate(NULL, NULL, NULL);
 }
 
 static const char * const boards[] __initconst = {
