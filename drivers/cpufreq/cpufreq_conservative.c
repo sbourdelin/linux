@@ -74,6 +74,15 @@ static unsigned int cs_dbs_timer(struct cpufreq_policy *policy)
 	if (cs_tuners->freq_step == 0)
 		goto out;
 
+	if (policy_dbs->deferred_periods < UINT_MAX) {
+		unsigned int freq_target = policy_dbs->deferred_periods *
+				get_freq_target(cs_tuners, policy);
+		if (requested_freq > freq_target)
+			requested_freq -= freq_target;
+		else
+			requested_freq = policy->min;
+		policy_dbs->deferred_periods = UINT_MAX;
+	}
 	/*
 	 * If requested_freq is out of range, it is likely that the limits
 	 * changed in the meantime, so fall back to current frequency in that
