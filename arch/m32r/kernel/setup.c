@@ -351,9 +351,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 	PRINT_CLOCK("CPU", (int)c->cpu_clock);
 	PRINT_CLOCK("Bus", (int)c->bus_clock);
-
-	seq_printf(m, "\n");
-
+	seq_putc(m, '\n');
 	return 0;
 }
 
