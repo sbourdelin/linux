@@ -3899,6 +3899,29 @@ const char *module_address_lookup(unsigned long addr,
 	return ret;
 }
 
+bool module_base_lookup(unsigned long addr,
+			unsigned long *module_size,
+			unsigned long *module_offset,
+			char **modname)
+{
+	struct module *mod;
+
+	preempt_disable();
+
+	mod = __module_address(addr);
+	if (!mod) {
+		preempt_enable();
+		return false;
+	}
+
+	*modname = mod->name;
+	*module_offset = (unsigned long)mod->core_layout.base;
+	*module_size = mod->init_layout.size + mod->core_layout.size;
+
+	preempt_enable();
+	return true;
+}
+
 int lookup_module_symbol_name(unsigned long addr, char *symname)
 {
 	struct module *mod;

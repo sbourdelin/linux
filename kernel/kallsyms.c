@@ -387,8 +387,25 @@ static int __sprint_symbol(char *buffer, unsigned long address,
 
 	address += symbol_offset;
 	name = kallsyms_lookup(address, &size, &offset, &modname, buffer);
-	if (!name)
+	if (!name) {
+		/*
+		 * Fall back to [module_base+offset/size] if the actual
+		 * symbol name is unavailable.
+		 */
+		if (module_base_lookup(address, &size, &offset, &modname)) {
+			if (add_offset) {
+				return snprintf(buffer, KSYM_SYMBOL_LEN,
+						"[%s+%#lx/%#lx]", modname,
+						address - offset -
+							symbol_offset,
+						size);
+			} else {
+				return snprintf(buffer, KSYM_SYMBOL_LEN,
+						"[%s]", modname);
+			}
+		}
 		return sprintf(buffer, "0x%lx", address - symbol_offset);
+	}
 
 	if (name != buffer)
 		strcpy(buffer, name);
