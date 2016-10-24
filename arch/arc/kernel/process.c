@@ -47,7 +47,7 @@ SYSCALL_DEFINE3(arc_usr_cmpxchg, int *, uaddr, int, expected, int, new)
 	int ret;
 
 	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(int)))
-		return ret;
+		return -EFAULT;
 
 	preempt_disable();
 
