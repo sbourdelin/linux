@@ -120,6 +120,7 @@ static bool cs42l52_readable_register(struct device *dev, unsigned int reg)
 static bool cs42l52_volatile_register(struct device *dev, unsigned int reg)
 {
 	switch (reg) {
+	case CS42L52_CHIP:
 	case CS42L52_IFACE_CTL2:
 	case CS42L52_CLK_STATUS:
 	case CS42L52_BATT_LEVEL:
