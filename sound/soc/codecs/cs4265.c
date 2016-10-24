@@ -70,6 +70,7 @@ static bool cs4265_readable_register(struct device *dev, unsigned int reg)
 static bool cs4265_volatile_register(struct device *dev, unsigned int reg)
 {
 	switch (reg) {
+	case CS4265_CHIP_ID:
 	case CS4265_INT_STATUS:
 		return true;
 	default:
