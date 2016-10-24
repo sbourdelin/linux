@@ -89,10 +89,16 @@ static const struct reg_default cs53l30_reg_defaults[] = {
 
 static bool cs53l30_volatile_register(struct device *dev, unsigned int reg)
 {
-	if (reg == CS53L30_IS)
+	switch (reg) {
+	case CS53L30_DEVID_AB:
+	case CS53L30_DEVID_CD:
+	case CS53L30_DEVID_E:
+	case CS53L30_REVID:
+	case CS53L30_IS:
 		return true;
-	else
+	default:
 		return false;
+	}
 }
 
 static bool cs53l30_writeable_register(struct device *dev, unsigned int reg)
