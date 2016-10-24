@@ -156,6 +156,7 @@ struct dw_mci {
 	void __iomem		*regs;
 	void __iomem		*fifo_reg;
 	u32			fifo_addr_override;
+	u32			wm_quirk;
 
 	struct scatterlist	*sg;
 	struct sg_mapping_iter	sg_miter;
