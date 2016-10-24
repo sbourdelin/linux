@@ -275,7 +275,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 	struct mmc_host *host = card->host;
 	u64 limit = BLK_BOUNCE_HIGH;
 	bool bounce = false;
-	int ret;
+	int ret = -ENOMEM;
 
 	if (mmc_dev(host)->dma_mask && *mmc_dev(host)->dma_mask)
 		limit = (u64)dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
@@ -286,6 +286,10 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 		return -ENOMEM;
 
 	mq->qdepth = 2;
+	mq->mqrq = kcalloc(mq->qdepth, sizeof(struct mmc_queue_req),
+			   GFP_KERNEL);
+	if (!mq->mqrq)
+		goto blk_cleanup;
 	mq->mqrq_cur = &mq->mqrq[0];
 	mq->mqrq_prev = &mq->mqrq[1];
 	mq->queue->queuedata = mq;
@@ -350,6 +354,9 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 
  cleanup_queue:
 	mmc_queue_reqs_free_bufs(mq);
+	kfree(mq->mqrq);
+	mq->mqrq = NULL;
+blk_cleanup:
 	blk_cleanup_queue(mq->queue);
 	return ret;
 }
@@ -372,6 +379,8 @@ void mmc_cleanup_queue(struct mmc_queue *mq)
 	spin_unlock_irqrestore(q->queue_lock, flags);
 
 	mmc_queue_reqs_free_bufs(mq);
+	kfree(mq->mqrq);
+	mq->mqrq = NULL;
 
 	mq->card = NULL;
 }
