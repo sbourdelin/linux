@@ -50,10 +50,13 @@ struct fixed_voltage_config {
 	const char *input_supply;
 	int microvolts;
 	int gpio;
+	int oc_gpio;
 	unsigned startup_delay;
 	unsigned gpio_is_open_drain:1;
 	unsigned enable_high:1;
 	unsigned enabled_at_boot:1;
+	unsigned has_oc_gpio:1;
+	unsigned oc_high:1;
 	struct regulator_init_data *init_data;
 };
 
