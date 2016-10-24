@@ -873,8 +873,30 @@ void wq_worker_waking_up(struct task_struct *task, int cpu)
  */
 struct task_struct *wq_worker_sleeping(struct task_struct *task)
 {
-	struct worker *worker = kthread_data(task), *to_wakeup = NULL;
+	struct worker *worker, *to_wakeup = NULL;
 	struct worker_pool *pool;
+
+
+	if (task->state == TASK_DEAD)
+		/* Here we try to catch the following path before
+		 * accessing NULL kthread->vfork_done ptr thru
+		 * kthread_data():
+		 *
+		 *    oops_end()
+		 *    do_exit()
+		 *    schedule()
+		 *
+		 * If panic_on_oops is not set and oops happens on
+		 * a workqueue execution path, thread will be killed.
+		 * That is definitly sad, but not to make the situation
+		 * even worse we have to ignore dead tasks in order not
+		 * to step on zeroed out members (e.g. t->vfork_done is
+		 * already NULL on that path, since we were called by
+		 * do_exit())).
+		 */
+		return NULL;
+
+	worker = kthread_data(task);
 
 	/*
 	 * Rescuers, which may not have all the fields set up like normal
