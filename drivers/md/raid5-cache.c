@@ -1105,6 +1105,8 @@ static int r5l_recovery_log(struct r5l_log *log)
 		log->seq = ctx.seq + 11;
 		log->log_start = r5l_ring_add(log, ctx.pos, BLOCK_SECTORS);
 		r5l_write_super(log, ctx.pos);
+		log->last_checkpoint = ctx.pos;
+		log->next_checkpoint = ctx.pos;
 	} else {
 		log->log_start = ctx.pos;
 		log->seq = ctx.seq;
@@ -1177,6 +1179,7 @@ create:
 	if (log->max_free_space > RECLAIM_MAX_FREE_SPACE)
 		log->max_free_space = RECLAIM_MAX_FREE_SPACE;
 	log->last_checkpoint = cp;
+	log->next_checkpoint = cp;
 
 	__free_page(page);
 
