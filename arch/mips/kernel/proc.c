@@ -142,12 +142,15 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		seq_printf(m, "micromips kernel\t: %s\n",
 		      (read_c0_config3() & MIPS_CONF3_ISA_OE) ?  "yes" : "no");
 	}
-	seq_printf(m, "shadow register sets\t: %d\n",
-		      cpu_data[n].srsets);
-	seq_printf(m, "kscratch registers\t: %d\n",
-		      hweight8(cpu_data[n].kscratch_mask));
-	seq_printf(m, "package\t\t\t: %d\n", cpu_data[n].package);
-	seq_printf(m, "core\t\t\t: %d\n", cpu_data[n].core);
+	seq_printf(m,
+		   "shadow register sets\t: %d\n"
+		   "kscratch registers\t: %d\n"
+		   "package\t\t\t: %d\n"
+		   "core\t\t\t: %d\n",
+		   cpu_data[n].srsets,
+		   hweight8(cpu_data[n].kscratch_mask),
+		   cpu_data[n].package,
+		   cpu_data[n].core);
 
 #if defined(CONFIG_MIPS_MT_SMP) || defined(CONFIG_CPU_MIPSR6)
 	if (cpu_has_mipsmt)
