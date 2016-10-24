@@ -130,6 +130,8 @@
 #define MCI_ST_SDIOIT		(1 << 22)
 #define MCI_ST_CEATAEND		(1 << 23)
 #define MCI_ST_CARDBUSY		(1 << 24)
+/* Extended status bits for the QCOM variants */
+#define MCI_QCOM_PROGDONE	(1 << 23)
 
 #define MMCICLEAR		0x038
 #define MCI_CMDCRCFAILCLR	(1 << 0)
@@ -147,6 +149,8 @@
 #define MCI_ST_SDIOITC		(1 << 22)
 #define MCI_ST_CEATAENDC	(1 << 23)
 #define MCI_ST_BUSYENDC		(1 << 24)
+/* Extended status bits for the QCOM variants */
+#define MCI_QCOM_PROGDONECLR	(1 << 23)
 
 #define MMCIMASK0		0x03c
 #define MCI_CMDCRCFAILMASK	(1 << 0)
@@ -175,6 +179,8 @@
 #define MCI_ST_SDIOITMASK	(1 << 22)
 #define MCI_ST_CEATAENDMASK	(1 << 23)
 #define MCI_ST_BUSYENDMASK	(1 << 24)
+/* Extended status bits for the Qualcomm variants */
+#define MCI_QCOM_PROGDONEMASK	(1 << 23)
 
 #define MMCIMASK1		0x040
 #define MMCIFIFOCNT		0x048
