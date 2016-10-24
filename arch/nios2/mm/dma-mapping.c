@@ -102,7 +102,9 @@ static int nios2_dma_map_sg(struct device *dev, struct scatterlist *sg,
 
 		addr = sg_virt(sg);
 		if (addr) {
-			__dma_sync_for_device(addr, sg->length, direction);
+			if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+				__dma_sync_for_device(addr, sg->length,
+						      direction);
 			sg->dma_address = sg_phys(sg);
 		}
 	}
@@ -117,7 +119,9 @@ static dma_addr_t nios2_dma_map_page(struct device *dev, struct page *page,
 {
 	void *addr = page_address(page) + offset;
 
-	__dma_sync_for_device(addr, size, direction);
+	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+		__dma_sync_for_device(addr, size, direction);
+
 	return page_to_phys(page) + offset;
 }
 
@@ -125,7 +129,8 @@ static void nios2_dma_unmap_page(struct device *dev, dma_addr_t dma_address,
 		size_t size, enum dma_data_direction direction,
 		unsigned long attrs)
 {
-	__dma_sync_for_cpu(phys_to_virt(dma_address), size, direction);
+	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+		__dma_sync_for_cpu(phys_to_virt(dma_address), size, direction);
 }
 
 static void nios2_dma_unmap_sg(struct device *dev, struct scatterlist *sg,
@@ -136,6 +141,9 @@ static void nios2_dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 	int i;
 
 	if (direction == DMA_TO_DEVICE)
+		return;
+
+	if (attrs & DMA_ATTR_SKIP_CPU_SYNC)
 		return;
 
 	for_each_sg(sg, sg, nhwentries, i) {
