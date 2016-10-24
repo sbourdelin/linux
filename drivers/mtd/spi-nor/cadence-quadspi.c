@@ -853,15 +853,14 @@ static int cqspi_set_protocol(struct spi_nor *nor, const int read)
 	f_pdata->data_width = CQSPI_INST_TYPE_SINGLE;
 
 	if (read) {
-		switch (nor->flash_read) {
-		case SPI_NOR_NORMAL:
-		case SPI_NOR_FAST:
+		switch (nor->read_proto) {
+		case SNOR_PROTO_1_1_1:
 			f_pdata->data_width = CQSPI_INST_TYPE_SINGLE;
 			break;
-		case SPI_NOR_DUAL:
+		case SNOR_PROTO_1_1_2:
 			f_pdata->data_width = CQSPI_INST_TYPE_DUAL;
 			break;
-		case SPI_NOR_QUAD:
+		case SNOR_PROTO_1_1_4:
 			f_pdata->data_width = CQSPI_INST_TYPE_QUAD;
 			break;
 		default:
@@ -1074,6 +1073,13 @@ static int cqspi_setup_flash(struct cqspi_st *cqspi, struct device_node *np)
 	struct mtd_info *mtd;
 	unsigned int cs;
 	int i, ret;
+	static const struct spi_nor_modes modes = {
+		.rd_modes = (SNOR_MODE_SLOW |
+			     SNOR_MODE_1_1_1 |
+			     SNOR_MODE_1_1_2 |
+			     SNOR_MODE_1_1_4),
+		.wr_modes = SNOR_MODE_1_1_1,
+	};
 
 	/* Get flash device data */
 	for_each_available_child_of_node(dev->of_node, np) {
@@ -1119,7 +1125,7 @@ static int cqspi_setup_flash(struct cqspi_st *cqspi, struct device_node *np)
 			goto err;
 		}
 
-		ret = spi_nor_scan(nor, NULL, SPI_NOR_QUAD);
+		ret = spi_nor_scan(nor, NULL, &modes);
 		if (ret)
 			goto err;
 
