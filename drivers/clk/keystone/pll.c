@@ -191,7 +191,6 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
 	pll_data->pll_ctl0 = of_iomap(node, i);
 	if (!pll_data->pll_ctl0) {
 		pr_err("%s: ioremap failed\n", __func__);
-		iounmap(pll_data->pllod);
 		goto out;
 	}
 
@@ -206,8 +205,7 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
 		i = of_property_match_string(node, "reg-names", "multiplier");
 		pll_data->pllm = of_iomap(node, i);
 		if (!pll_data->pllm) {
-			iounmap(pll_data->pll_ctl0);
-			iounmap(pll_data->pllod);
+			pr_err("%s: ioremap failed\n", __func__);
 			goto out;
 		}
 	}
@@ -220,6 +218,12 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
 
 out:
 	pr_err("%s: error initializing pll %s\n", __func__, node->name);
+	if (pll_data->pllm)
+		iounmap(pll_data->pllm);
+	if (pll_data->pll_ctl0)
+		iounmap(pll_data->pll_ctl0);
+	if (pll_data->pllod)
+		iounmap(pll_data->pllod);
 	kfree(pll_data);
 }
 
