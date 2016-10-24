@@ -218,9 +218,6 @@ static int au0828_init_isoc(struct au0828_dev *dev, int max_packets,
 	int rc;
 
 	au0828_isocdbg("au0828: called au0828_prepare_isoc\n");
-
-	dev->isoc_ctl.isoc_copy = isoc_copy;
-	dev->isoc_ctl.num_bufs = num_bufs;
 	dev->isoc_ctl.urb = kcalloc(num_bufs,
 				    sizeof(*dev->isoc_ctl.urb),
 				    GFP_KERNEL);
@@ -240,6 +237,7 @@ static int au0828_init_isoc(struct au0828_dev *dev, int max_packets,
 	dev->isoc_ctl.buf = NULL;
 
 	sb_size = max_packets * dev->isoc_ctl.max_pkt_size;
+	dev->isoc_ctl.num_bufs = num_bufs;
 
 	/* allocate urbs and transfer buffers */
 	for (i = 0; i < dev->isoc_ctl.num_bufs; i++) {
@@ -276,6 +274,7 @@ static int au0828_init_isoc(struct au0828_dev *dev, int max_packets,
 			k += dev->isoc_ctl.max_pkt_size;
 		}
 	}
+	dev->isoc_ctl.isoc_copy = isoc_copy;
 
 	/* submit urbs and enables IRQ */
 	for (i = 0; i < dev->isoc_ctl.num_bufs; i++) {
