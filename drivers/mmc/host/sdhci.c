@@ -22,6 +22,7 @@
 #include <linux/scatterlist.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
+#include <linux/of.h>
 
 #include <linux/leds.h>
 
@@ -2991,6 +2992,7 @@ static int sdhci_set_dma_mask(struct sdhci_host *host)
 void __sdhci_read_caps(struct sdhci_host *host, u16 *ver, u32 *caps, u32 *caps1)
 {
 	u16 v;
+	unsigned int speed_cap_broken = false;
 
 	if (host->read_caps)
 		return;
@@ -3005,18 +3007,37 @@ void __sdhci_read_caps(struct sdhci_host *host, u16 *ver, u32 *caps, u32 *caps1)
 
 	sdhci_do_reset(host, SDHCI_RESET_ALL);
 
+	if (of_property_read_bool(mmc_dev(host->mmc)->of_node,
+				  "sdhci-cap-speed-modes-broken"))
+		speed_cap_broken = true;
+
 	v = ver ? *ver : sdhci_readw(host, SDHCI_HOST_VERSION);
 	host->version = (v & SDHCI_SPEC_VER_MASK) >> SDHCI_SPEC_VER_SHIFT;
 
 	if (host->quirks & SDHCI_QUIRK_MISSING_CAPS)
 		return;
 
-	host->caps = caps ? *caps : sdhci_readl(host, SDHCI_CAPABILITIES);
+	if (caps)
+		host->caps = *caps;
+	else {
+		host->caps = sdhci_readl(host, SDHCI_CAPABILITIES);
+		if (speed_cap_broken)
+			host->caps &= ~SDHCI_CAN_DO_HISPD;
+	}
 
 	if (host->version < SDHCI_SPEC_300)
 		return;
 
-	host->caps1 = caps1 ? *caps1 : sdhci_readl(host, SDHCI_CAPABILITIES_1);
+	if (caps1)
+		host->caps1 = *caps1;
+	else {
+		host->caps1 = sdhci_readl(host, SDHCI_CAPABILITIES_1);
+		if (speed_cap_broken)
+			host->caps1 &= ~(SDHCI_SUPPORT_SDR50 |
+					 SDHCI_SUPPORT_SDR104 |
+					 SDHCI_SUPPORT_DDR50 |
+					 SDHCI_SUPPORT_HS400);
+	}
 }
 EXPORT_SYMBOL_GPL(__sdhci_read_caps);
 
