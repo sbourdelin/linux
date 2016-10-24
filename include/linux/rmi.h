@@ -207,6 +207,7 @@ struct rmi_device_platform_data_spi {
  */
 struct rmi_device_platform_data {
 	int reset_delay_ms;
+	u32 pdt_scan_pages;
 
 	struct rmi_device_platform_data_spi spi_data;
 

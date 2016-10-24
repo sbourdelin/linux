@@ -429,6 +429,8 @@ static int rmi_scan_pdt_page(struct rmi_device *rmi_dev,
 					     const struct pdt_entry *entry))
 {
 	struct rmi_driver_data *data = dev_get_drvdata(&rmi_dev->dev);
+	const struct rmi_device_platform_data *pdata =
+		rmi_get_platform_data(rmi_dev);
 	struct pdt_entry pdt_entry;
 	u16 page_start = RMI4_PAGE_SIZE * page;
 	u16 pdt_start = page_start + PDT_START_SCAN_LOCATION;
@@ -450,8 +452,13 @@ static int rmi_scan_pdt_page(struct rmi_device *rmi_dev,
 			return retval;
 	}
 
-	return (data->f01_bootloader_mode || addr == pdt_start) ?
-					RMI_SCAN_DONE : RMI_SCAN_CONTINUE;
+	if (data->f01_bootloader_mode)
+		return RMI_SCAN_DONE;
+
+	if (page >= pdata->pdt_scan_pages && addr == pdt_start)
+		return RMI_SCAN_DONE;
+
+	return RMI_SCAN_CONTINUE;
 }
 
 static int rmi_scan_pdt(struct rmi_device *rmi_dev, void *ctx,
@@ -830,6 +837,11 @@ static int rmi_driver_of_probe(struct device *dev,
 
 	retval = rmi_of_property_read_u32(dev, &pdata->reset_delay_ms,
 					"syna,reset-delay-ms", 1);
+	if (retval)
+		return retval;
+
+	retval = rmi_of_property_read_u32(dev, &pdata->pdt_scan_pages,
+					"syna,pdt-scan-pages", 1);
 	if (retval)
 		return retval;
 
