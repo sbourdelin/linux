@@ -11,11 +11,17 @@
 include ../../scripts/Makefile.include
 
 all: acpidbg acpidump ec
-clean: acpidbg_clean acpidump_clean ec_clean
+clean: acpidbg_clean acpidump_clean include_clean ec_clean
 install: acpidbg_install acpidump_install ec_install
 uninstall: acpidbg_uninstall acpidump_uninstall ec_uninstall
+include/acpi:
+	mkdir -p include
+	ln -s ../../../../include/acpi include/acpi
+include_clean:
+	rm -f include/acpi
+	rm -rf include
 
-acpidbg acpidump ec: FORCE
+acpidbg acpidump ec: include/acpi FORCE
 	$(call descend,tools/$@,all)
 acpidbg_clean acpidump_clean ec_clean:
 	$(call descend,tools/$(@:_clean=),clean)

@@ -19,7 +19,7 @@ vpath %.c \
 CFLAGS += -DACPI_APPLICATION -DACPI_SINGLE_THREAD -DACPI_DEBUGGER\
 	-I.\
 	-I../../../../../drivers/acpi/acpica\
-	-I../../../../../include
+	-I../../include
 LDFLAGS += -lpthread
 TOOL_OBJS = \
 	acpidbg.o
