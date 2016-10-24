@@ -670,11 +670,14 @@ mwifiex_shutdown_drv(struct mwifiex_adapter *adapter)
 
 	adapter->hw_status = MWIFIEX_HW_STATUS_CLOSING;
 	/* wait for mwifiex_process to complete */
+	spin_lock_irqsave(&adapter->main_proc_lock, flags);
 	if (adapter->mwifiex_processing) {
+		spin_unlock_irqrestore(&adapter->main_proc_lock, flags);
 		mwifiex_dbg(adapter, WARN,
 			    "main process is still running\n");
 		return ret;
 	}
+	spin_unlock_irqrestore(&adapter->main_proc_lock, flags);
 
 	/* cancel current command */
 	if (adapter->curr_cmd) {
