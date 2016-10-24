@@ -351,7 +351,7 @@ irqreturn_t do_IPI(int irq, void *dev_id)
  */
 static DEFINE_PER_CPU(int, ipi_dev);
 
-int smp_ipi_irq_setup(int cpu, int irq)
+int smp_ipi_irq_setup(int cpu, unsigned int virq)
 {
 	int *dev = per_cpu_ptr(&ipi_dev, cpu);
 
@@ -359,12 +359,12 @@ int smp_ipi_irq_setup(int cpu, int irq)
 	if (!cpu) {
 		int rc;
 
-		rc = request_percpu_irq(irq, do_IPI, "IPI Interrupt", dev);
+		rc = request_percpu_irq(virq, do_IPI, "IPI Interrupt", dev);
 		if (rc)
-			panic("Percpu IRQ request failed for %d\n", irq);
+			panic("Percpu IRQ request failed for %d\n", virq);
 	}
 
-	enable_percpu_irq(irq, 0);
+	enable_percpu_irq(virq, 0);
 
 	return 0;
 }
