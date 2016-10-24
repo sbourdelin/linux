@@ -271,7 +271,7 @@ static void __init of_pll_div_clk_init(struct device_node *node)
 	}
 
 	if (of_property_read_u32(node, "bit-shift", &shift)) {
-		pr_err("%s: missing 'shift' property\n", __func__);
+		pr_err("%s: missing 'bit-shift' property\n", __func__);
 		return;
 	}
 
@@ -315,7 +315,7 @@ static void __init of_pll_mux_clk_init(struct device_node *node)
 	}
 
 	if (of_property_read_u32(node, "bit-shift", &shift)) {
-		pr_err("%s: missing 'shift' property\n", __func__);
+		pr_err("%s: missing 'bit-shift' property\n", __func__);
 		return;
 	}
 
