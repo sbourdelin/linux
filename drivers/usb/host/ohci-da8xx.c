@@ -39,6 +39,8 @@ static int (*orig_ohci_hub_status_data)(struct usb_hcd *hcd, char *buf);
 
 static struct clk *usb11_clk;
 static struct phy *usb11_phy;
+static struct regulator *vbus_reg;
+struct notifier_block nb;
 
 /* Over-current indicator change flag */
 static int ocic_flag;
@@ -76,22 +78,57 @@ static void ohci_da8xx_disable(void)
 	clk_disable_unprepare(usb11_clk);
 }
 
-/*
- * Handle the port over-current indicator change.
- */
-static void ohci_da8xx_ocic_handler(struct da8xx_ohci_root_hub *hub)
+static int ohci_da8xx_set_power(int on)
 {
-	ocic_flag = 1;
+	int ret = 0;
 
-	/* Once over-current is detected, the port needs to be powered down */
-	if (hub->get_oci() > 0)
-		hub->set_power(0);
+	if (!vbus_reg)
+		return 0;
+
+	if (on) {
+		ret = regulator_enable(vbus_reg);
+		if (ret)
+			pr_err("fail to enable regulator: %d\n", ret);
+	} else {
+		ret = regulator_disable(vbus_reg);
+		if (ret)
+			pr_err("fail to disable regulator: %d\n", ret);
+	}
+
+	return ret;
+}
+
+static int ohci_da8xx_get_power(void)
+{
+	if (!vbus_reg)
+		return 1;
+
+	return regulator_is_enabled(vbus_reg);
+}
+
+static int ohci_da8xx_get_oci(void)
+{
+	if (regulator_get_mode(vbus_reg) == REGULATOR_MODE_OVERCURRENT)
+		return 1;
+
+	return 0;
+}
+
+static int ohci_da8xx_regulator_event(struct notifier_block *nb,
+				unsigned long event, void *data)
+{
+	if (event & REGULATOR_EVENT_OVER_CURRENT) {
+		ocic_flag = 1;
+		if (ohci_da8xx_get_oci())
+			ohci_da8xx_set_power(0);
+	}
+
+	return 0;
 }
 
 static int ohci_da8xx_reset(struct usb_hcd *hcd)
 {
 	struct device *dev		= hcd->self.controller;
-	struct da8xx_ohci_root_hub *hub	= dev_get_platdata(dev);
 	struct ohci_hcd	*ohci		= hcd_to_ohci(hcd);
 	int result;
 	u32 rh_a;
@@ -121,16 +158,14 @@ static int ohci_da8xx_reset(struct usb_hcd *hcd)
 	 * the correct hub descriptor...
 	 */
 	rh_a = ohci_readl(ohci, &ohci->regs->roothub.a);
-	if (hub->set_power) {
+
+	if (vbus_reg) {
 		rh_a &= ~RH_A_NPS;
 		rh_a |=  RH_A_PSM;
-	}
-	if (hub->get_oci) {
 		rh_a &= ~RH_A_NOCP;
 		rh_a |=  RH_A_OCPM;
 	}
-	rh_a &= ~RH_A_POTPGT;
-	rh_a |= hub->potpgt << 24;
+
 	ohci_writel(ohci, rh_a, &ohci->regs->roothub.a);
 
 	return result;
@@ -163,7 +198,6 @@ static int ohci_da8xx_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 				  u16 wIndex, char *buf, u16 wLength)
 {
 	struct device *dev		= hcd->self.controller;
-	struct da8xx_ohci_root_hub *hub	= dev_get_platdata(dev);
 	int temp;
 
 	switch (typeReq) {
@@ -177,11 +211,11 @@ static int ohci_da8xx_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		temp = roothub_portstatus(hcd_to_ohci(hcd), wIndex - 1);
 
 		/* The port power status (PPS) bit defaults to 1 */
-		if (hub->get_power && hub->get_power() == 0)
+		if (ohci_da8xx_get_power() == 0)
 			temp &= ~RH_PS_PPS;
 
 		/* The port over-current indicator (POCI) bit is always 0 */
-		if (hub->get_oci && hub->get_oci() > 0)
+		if (ohci_da8xx_get_oci() > 0)
 			temp |=  RH_PS_POCI;
 
 		/* The over-current indicator change (OCIC) bit is 0 too */
@@ -206,19 +240,13 @@ check_port:
 			dev_dbg(dev, "%sPortFeature(%u): %s\n",
 				temp ? "Set" : "Clear", wIndex, "POWER");
 
-			if (!hub->set_power)
-				return -EPIPE;
-
-			return hub->set_power(temp) ? -EPIPE : 0;
+			return ohci_da8xx_set_power(temp) ? -EPIPE : 0;
 		case USB_PORT_FEAT_C_OVER_CURRENT:
 			dev_dbg(dev, "%sPortFeature(%u): %s\n",
 				temp ? "Set" : "Clear", wIndex,
 				"C_OVER_CURRENT");
 
-			if (temp)
-				ocic_flag = 1;
-			else
-				ocic_flag = 0;
+			ocic_flag = temp;
 			return 0;
 		}
 	}
@@ -231,13 +259,9 @@ check_port:
 
 static int ohci_da8xx_probe(struct platform_device *pdev)
 {
-	struct da8xx_ohci_root_hub *hub	= dev_get_platdata(&pdev->dev);
 	struct usb_hcd	*hcd;
 	struct resource *mem;
 	int error, irq;
-
-	if (hub == NULL)
-		return -ENODEV;
 
 	hcd = usb_create_hcd(&ohci_da8xx_hc_driver, &pdev->dev,
 				dev_name(&pdev->dev));
@@ -258,6 +282,22 @@ static int ohci_da8xx_probe(struct platform_device *pdev)
 		return PTR_ERR(usb11_phy);
 	}
 
+	vbus_reg = devm_regulator_get(&pdev->dev, "vbus");
+	if (IS_ERR(vbus_reg)) {
+		if (PTR_ERR(vbus_reg) != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "Failed to get regulator.\n");
+		return PTR_ERR(vbus_reg);
+	}
+
+	if (vbus_reg) {
+		nb.notifier_call = ohci_da8xx_regulator_event;
+		error = devm_regulator_register_notifier(vbus_reg, &nb);
+		if (error) {
+			dev_err(&pdev->dev,
+				"Could not register regulator notifier\n");
+			return error;
+		}
+	}
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	hcd->regs = devm_ioremap_resource(&pdev->dev, mem);
@@ -281,13 +321,7 @@ static int ohci_da8xx_probe(struct platform_device *pdev)
 
 	device_wakeup_enable(hcd->self.controller);
 
-	if (hub->ocic_notify) {
-		error = hub->ocic_notify(ohci_da8xx_ocic_handler);
-		if (!error)
-			return 0;
-	}
-
-	usb_remove_hcd(hcd);
+	return 0;
 err:
 	usb_put_hcd(hcd);
 	return error;
@@ -295,10 +329,8 @@ err:
 
 static int ohci_da8xx_remove(struct platform_device *pdev)
 {
-	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
-	struct da8xx_ohci_root_hub *hub	= dev_get_platdata(&pdev->dev);
+	struct usb_hcd  *hcd = platform_get_drvdata(pdev);
 
-	hub->ocic_notify(NULL);
 	usb_remove_hcd(hcd);
 	usb_put_hcd(hcd);
 
@@ -313,7 +345,6 @@ static int ohci_da8xx_suspend(struct platform_device *pdev,
 	struct ohci_hcd	*ohci	= hcd_to_ohci(hcd);
 	bool		do_wakeup	= device_may_wakeup(&pdev->dev);
 	int		ret;
-
 
 	if (time_before(jiffies, ohci->next_statechange))
 		msleep(5);
