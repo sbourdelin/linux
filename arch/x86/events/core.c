@@ -228,6 +228,15 @@ static bool check_hw_exists(void)
 	}
 
 	/*
+	 * We still allow the PMU driver to operate:
+	 */
+	if (bios_fail) {
+		pr_cont("Broken BIOS detected, complain to your hardware vendor.\n");
+		pr_err(FW_BUG "the BIOS has corrupted hw-PMU resources (MSR %x is %Lx)\n",
+			      reg_fail, val_fail);
+	}
+
+	/*
 	 * If all the counters are enabled, the below test will always
 	 * fail.  The tools will also become useless in this scenario.
 	 * Just fail and disable the hardware counters.
@@ -251,15 +260,6 @@ static bool check_hw_exists(void)
 	ret |= rdmsrl_safe(reg, &val_new);
 	if (ret || val != val_new)
 		goto msr_fail;
-
-	/*
-	 * We still allow the PMU driver to operate:
-	 */
-	if (bios_fail) {
-		pr_cont("Broken BIOS detected, complain to your hardware vendor.\n");
-		pr_err(FW_BUG "the BIOS has corrupted hw-PMU resources (MSR %x is %Lx)\n",
-			      reg_fail, val_fail);
-	}
 
 	return true;
 
