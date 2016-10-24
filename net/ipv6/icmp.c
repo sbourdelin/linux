@@ -385,6 +385,26 @@ relookup_failed:
 	return ERR_PTR(err);
 }
 
+u32 icmpv6_multipath_hash(const struct ipv6hdr *iph)
+{
+	struct flowi6 fl6;
+
+	/* Calculate the multipath hash from the offending IP datagram that
+	 * triggered the ICMP error. The source and destination addresses are
+	 * swapped as we do our best to route the ICMP message together with the
+	 * flow it belongs to. However, flows in both directions have to have
+	 * the same label (e.g. by using flow label reflection) for it to
+	 * happen.
+	 */
+	memset(&fl6, 0, sizeof(fl6));
+	fl6.daddr = iph->saddr;
+	fl6.saddr = iph->daddr;
+	fl6.flowlabel = ip6_flowinfo(iph);
+	fl6.flowi6_proto = iph->nexthdr;
+
+	return get_hash_from_flowi6(&fl6);
+}
+
 /*
  *	Send an ICMP message in response to a packet in error
  */
@@ -484,6 +504,7 @@ static void icmp6_send(struct sk_buff *skb, u8 type, u8 code, __u32 info,
 	fl6.flowi6_oif = iif;
 	fl6.fl6_icmp_type = type;
 	fl6.fl6_icmp_code = code;
+	fl6.mp_hash = icmpv6_multipath_hash(hdr);
 	security_skb_classify_flow(skb, flowi6_to_flowi(&fl6));
 
 	sk = icmpv6_xmit_lock(net);
