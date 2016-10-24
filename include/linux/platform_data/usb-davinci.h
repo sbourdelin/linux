@@ -13,17 +13,16 @@
 
 struct	da8xx_ohci_root_hub;
 
-typedef void (*da8xx_ocic_handler_t)(struct da8xx_ohci_root_hub *hub,
-				     unsigned port);
+typedef void (*da8xx_ocic_handler_t)(struct da8xx_ohci_root_hub *hub);
 
 /* Passed as the platform data to the OHCI driver */
 struct	da8xx_ohci_root_hub {
 	/* Switch the port power on/off */
-	int	(*set_power)(unsigned port, int on);
+	int	(*set_power)(int on);
 	/* Read the port power status */
-	int	(*get_power)(unsigned port);
+	int	(*get_power)(void);
 	/* Read the port over-current indicator */
-	int	(*get_oci)(unsigned port);
+	int	(*get_oci)(void);
 	/* Over-current indicator change notification (pass NULL to disable) */
 	int	(*ocic_notify)(da8xx_ocic_handler_t handler);
 

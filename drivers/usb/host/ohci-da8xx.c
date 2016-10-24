@@ -25,8 +25,8 @@
 static struct clk *usb11_clk;
 static struct phy *usb11_phy;
 
-/* Over-current indicator change bitmask */
-static volatile u16 ocic_mask;
+/* Over-current indicator change flag */
+static int ocic_flag;
 
 static int ohci_da8xx_enable(void)
 {
@@ -64,14 +64,13 @@ static void ohci_da8xx_disable(void)
 /*
  * Handle the port over-current indicator change.
  */
-static void ohci_da8xx_ocic_handler(struct da8xx_ohci_root_hub *hub,
-				    unsigned port)
+static void ohci_da8xx_ocic_handler(struct da8xx_ohci_root_hub *hub)
 {
-	ocic_mask |= 1 << port;
+	ocic_flag = 1;
 
 	/* Once over-current is detected, the port needs to be powered down */
-	if (hub->get_oci(port) > 0)
-		hub->set_power(port, 0);
+	if (hub->get_oci() > 0)
+		hub->set_power(0);
 }
 
 static int ohci_da8xx_init(struct usb_hcd *hcd)
@@ -147,8 +146,8 @@ static int ohci_da8xx_hub_status_data(struct usb_hcd *hcd, char *buf)
 {
 	int length		= ohci_hub_status_data(hcd, buf);
 
-	/* See if we have OCIC bit set on port 1 */
-	if (ocic_mask & (1 << 1)) {
+	/* See if we have OCIC flag set */
+	if (ocic_flag) {
 		dev_dbg(hcd->self.controller, "over-current indicator change "
 			"on port 1\n");
 
@@ -181,15 +180,15 @@ static int ohci_da8xx_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		temp = roothub_portstatus(hcd_to_ohci(hcd), wIndex - 1);
 
 		/* The port power status (PPS) bit defaults to 1 */
-		if (hub->get_power && hub->get_power(wIndex) == 0)
+		if (hub->get_power && hub->get_power() == 0)
 			temp &= ~RH_PS_PPS;
 
 		/* The port over-current indicator (POCI) bit is always 0 */
-		if (hub->get_oci && hub->get_oci(wIndex) > 0)
+		if (hub->get_oci && hub->get_oci() > 0)
 			temp |=  RH_PS_POCI;
 
 		/* The over-current indicator change (OCIC) bit is 0 too */
-		if (ocic_mask & (1 << wIndex))
+		if (ocic_flag)
 			temp |=  RH_PS_OCIC;
 
 		put_unaligned(cpu_to_le32(temp), (__le32 *)buf);
@@ -213,16 +212,16 @@ check_port:
 			if (!hub->set_power)
 				return -EPIPE;
 
-			return hub->set_power(wIndex, temp) ? -EPIPE : 0;
+			return hub->set_power(temp) ? -EPIPE : 0;
 		case USB_PORT_FEAT_C_OVER_CURRENT:
 			dev_dbg(dev, "%sPortFeature(%u): %s\n",
 				temp ? "Set" : "Clear", wIndex,
 				"C_OVER_CURRENT");
 
 			if (temp)
-				ocic_mask |= 1 << wIndex;
+				ocic_flag = 1;
 			else
-				ocic_mask &= ~(1 << wIndex);
+				ocic_flag = 0;
 			return 0;
 		}
 	}
