@@ -142,6 +142,10 @@ static const struct reg_default cs42l73_reg_defaults[] = {
 static bool cs42l73_volatile_register(struct device *dev, unsigned int reg)
 {
 	switch (reg) {
+	case CS42L73_DEVID_AB:
+	case CS42L73_DEVID_CD:
+	case CS42L73_DEVID_E:
+	case CS42L73_REVID:
 	case CS42L73_IS1:
 	case CS42L73_IS2:
 		return true;
@@ -1337,8 +1341,6 @@ static int cs42l73_i2c_probe(struct i2c_client *i2c_client,
 		gpio_set_value_cansleep(cs42l73->pdata.reset_gpio, 1);
 	}
 
-	regcache_cache_bypass(cs42l73->regmap, true);
-
 	/* initialize codec */
 	ret = regmap_read(cs42l73->regmap, CS42L73_DEVID_AB, &reg);
 	devid = (reg & 0xFF) << 12;
@@ -1365,8 +1367,6 @@ static int cs42l73_i2c_probe(struct i2c_client *i2c_client,
 
 	dev_info(&i2c_client->dev,
 		 "Cirrus Logic CS42L73, Revision: %02X\n", reg & 0xFF);
-
-	regcache_cache_bypass(cs42l73->regmap, false);
 
 	ret =  snd_soc_register_codec(&i2c_client->dev,
 			&soc_codec_dev_cs42l73, cs42l73_dai,
