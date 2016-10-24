@@ -704,6 +704,19 @@ config ZONE_DEVICE
 
 	  If FS_DAX is enabled, then say Y.
 
+config COHERENT_DEVICE
+	bool "Coherent device memory support"
+	depends on MEMORY_HOTPLUG
+	depends on MEMORY_HOTREMOVE
+	depends on PPC64
+	default y
+	help
+	  Coherent device memory node support enables the system to hotplug
+	  a device with coherent memory as a normal system memory node. FPGA,
+	  network, GPU cards etc might contain coherent memory.
+
+	  If not sure, then say N.
+
 config FRAME_VECTOR
 	bool
 
