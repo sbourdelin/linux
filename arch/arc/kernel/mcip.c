@@ -11,6 +11,7 @@
 #include <linux/smp.h>
 #include <linux/irq.h>
 #include <linux/spinlock.h>
+#include <linux/irqdomain.h>
 #include <asm/irqflags-arcv2.h>
 #include <asm/mcip.h>
 #include <asm/setup.h>
@@ -22,8 +23,8 @@ static DEFINE_RAW_SPINLOCK(mcip_lock);
 
 static void mcip_setup_per_cpu(int cpu)
 {
-	smp_ipi_irq_setup(cpu, IPI_IRQ);
-	smp_ipi_irq_setup(cpu, SOFTIRQ_IRQ);
+	smp_ipi_irq_setup(cpu, irq_find_mapping(NULL, IPI_IRQ));
+	smp_ipi_irq_setup(cpu, irq_find_mapping(NULL, SOFTIRQ_IRQ));
 }
 
 static void mcip_ipi_send(int cpu)
