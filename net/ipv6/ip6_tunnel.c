@@ -1205,6 +1205,7 @@ ip4ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 	int err;
 
 	memset(&(IPCB(skb)->opt), 0, sizeof(IPCB(skb)->opt));
+	IP6CB(skb)->frag_max_size = 0;
 
 	tproto = ACCESS_ONCE(t->parms.proto);
 	if (tproto != IPPROTO_IPIP && tproto != 0)
