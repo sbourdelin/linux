@@ -5,7 +5,7 @@
 /// So pass the IRQF_ONESHOT flag in this case.
 ///
 //
-// Confidence: Good
+// Confidence: Moderate
 // Comments:
 // Options: --no-includes
 
@@ -87,16 +87,26 @@ devm_request_threaded_irq@p(dev, irq, NULL, thread_fn,
 )
 
 @depends on context@
+expression dev;
 expression irq;
 position p != {r1.p,r2.p};
 @@
+(
 *request_threaded_irq@p(irq, NULL, ...)
+|
+*devm_request_threaded_irq@p(dev, irq, NULL, ...)
+)
 
 @match depends on report || org@
+expression dev;
 expression irq;
 position p != {r1.p,r2.p};
 @@
+(
 request_threaded_irq@p(irq, NULL, ...)
+|
+devm_request_threaded_irq@p(dev, irq, NULL, ...)
+)
 
 @script:python depends on org@
 p << match.p;
