@@ -2232,9 +2232,10 @@ fpu_emul:
 
 static int mipsr2_stats_show(struct seq_file *s, void *unused)
 {
-
-	seq_printf(s, "Instruction\tTotal\tBDslot\n------------------------------\n");
-	seq_printf(s, "movs\t\t%ld\t%ld\n",
+	seq_puts(s,
+		 "Instruction\tTotal\tBDslot\n------------------------------\n"
+		 "movs\t\t");
+	seq_printf(s, "%ld\t%ld\n",
 		   (unsigned long)__this_cpu_read(mipsr2emustats.movs),
 		   (unsigned long)__this_cpu_read(mipsr2bdemustats.movs));
 	seq_printf(s, "hilo\t\t%ld\t%ld\n",
