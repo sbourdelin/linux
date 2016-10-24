@@ -100,10 +100,6 @@
 
 #include "internal.h"
 
-/* Internal flags */
-#define MPOL_MF_DISCONTIG_OK (MPOL_MF_INTERNAL << 0)	/* Skip checks for continuous vmas */
-#define MPOL_MF_INVERT (MPOL_MF_INTERNAL << 1)		/* Invert check for nodemask */
-
 static struct kmem_cache *policy_cache;
 static struct kmem_cache *sn_cache;
 
@@ -703,7 +699,7 @@ static int queue_pages_test_walk(unsigned long start, unsigned long end,
  * @nodes and @flags,) it's isolated and queued to the pagelist which is
  * passed via @private.)
  */
-static int
+int
 queue_pages_range(struct mm_struct *mm, unsigned long start, unsigned long end,
 		nodemask_t *nodes, unsigned long flags,
 		struct list_head *pagelist)
@@ -724,6 +720,7 @@ queue_pages_range(struct mm_struct *mm, unsigned long start, unsigned long end,
 
 	return walk_page_range(start, end, &queue_pages_walk);
 }
+EXPORT_SYMBOL(queue_pages_range);
 
 /*
  * Apply policy to a single VMA

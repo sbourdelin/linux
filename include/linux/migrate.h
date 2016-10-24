@@ -49,6 +49,9 @@ extern int migrate_page_move_mapping(struct address_space *mapping,
 		struct page *newpage, struct page *page,
 		struct buffer_head *head, enum migrate_mode mode,
 		int extra_count);
+
+extern int migrate_virtual_range(int pid, unsigned long vaddr,
+				unsigned long size, int nid);
 #else
 
 static inline void putback_movable_pages(struct list_head *l) {}

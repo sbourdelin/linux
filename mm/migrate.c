@@ -1367,6 +1367,90 @@ out:
 	return rc;
 }
 
+static struct page *new_node_page(struct page *page,
+		unsigned long node, int **x)
+{
+	return __alloc_pages_node(node, GFP_HIGHUSER_MOVABLE
+					| __GFP_THISNODE, 0);
+}
+
+#ifdef COHERENT_DEVICE
+static void mark_vma_cdm(struct vm_area_struct *vma)
+{
+	vma->vm_flags |= VM_CDM;
+}
+#else
+static void mark_vma_cdm(struct vm_area_struct *vma) {}
+#endif
+
+/*
+ * migrate_virtual_range - migrate all the pages faulted within a virtual
+ *			address range to a specified node.
+ *
+ * @pid:		PID of the task
+ * @start:		Virtual address range beginning
+ * @end:		Virtual address range end
+ * @nid:		Target migration node
+ *
+ * The function first scans the process VMA list to find out the VMA which
+ * contains the given virtual range. Then validates that the virtual range
+ * is within the given VMA's limits.
+ *
+ * Returns the number of pages that were not migrated or an error code.
+ */
+int migrate_virtual_range(int pid, unsigned long start,
+			unsigned long end, int nid)
+{
+	struct mm_struct *mm;
+	struct vm_area_struct *vma;
+	nodemask_t nmask;
+	int ret = -EINVAL;
+
+	LIST_HEAD(mlist);
+
+	nodes_clear(nmask);
+	nodes_setall(nmask);
+
+	if ((!start) || (!end))
+		return -EINVAL;
+
+	rcu_read_lock();
+	mm = find_task_by_vpid(pid)->mm;
+	rcu_read_unlock();
+
+	start &= PAGE_MASK;
+	end &= PAGE_MASK;
+	down_write(&mm->mmap_sem);
+	for (vma = mm->mmap; vma; vma = vma->vm_next) {
+		if  ((start < vma->vm_start) || (end > vma->vm_end))
+			continue;
+
+		ret = queue_pages_range(mm, start, end, &nmask, MPOL_MF_MOVE_ALL
+						| MPOL_MF_DISCONTIG_OK, &mlist);
+		if (ret) {
+			putback_movable_pages(&mlist);
+			break;
+		}
+
+		if (list_empty(&mlist)) {
+			ret = -ENOMEM;
+			break;
+		}
+
+		ret = migrate_pages(&mlist, new_node_page, NULL, nid,
+					MIGRATE_SYNC, MR_COMPACTION);
+		if (ret) {
+			putback_movable_pages(&mlist);
+		} else {
+			if (isolated_cdm_node(nid))
+				mark_vma_cdm(vma);
+		}
+	}
+	up_write(&mm->mmap_sem);
+	return ret;
+}
+EXPORT_SYMBOL(migrate_virtual_range);
+
 #ifdef CONFIG_NUMA
 /*
  * Move a list of individual pages

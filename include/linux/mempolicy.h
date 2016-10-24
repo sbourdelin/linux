@@ -152,6 +152,9 @@ extern bool init_nodemask_of_mempolicy(nodemask_t *mask);
 extern bool mempolicy_nodemask_intersects(struct task_struct *tsk,
 				const nodemask_t *mask);
 extern unsigned int mempolicy_slab_node(void);
+extern int queue_pages_range(struct mm_struct *mm, unsigned long start,
+			unsigned long end, nodemask_t *nodes,
+			unsigned long flags, struct list_head *pagelist);
 
 extern enum zone_type policy_zone;
 
@@ -319,4 +322,8 @@ static inline void mpol_put_task_policy(struct task_struct *task)
 {
 }
 #endif /* CONFIG_NUMA */
+
+#define MPOL_MF_DISCONTIG_OK (MPOL_MF_INTERNAL << 0)	/* Skip checks for continuous vmas */
+#define MPOL_MF_INVERT (MPOL_MF_INTERNAL << 1)		/* Invert check for nodemask */
+
 #endif
