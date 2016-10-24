@@ -43,6 +43,22 @@ static inline int on_dl_rq(struct sched_dl_entity *dl_se)
 	return !RB_EMPTY_NODE(&dl_se->rb_node);
 }
 
+static void add_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	u64 se_bw = dl_se->dl_bw;
+
+	dl_rq->running_bw += se_bw;
+}
+
+static void sub_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	u64 se_bw = dl_se->dl_bw;
+
+	dl_rq->running_bw -= se_bw;
+	if (WARN_ON(dl_rq->running_bw < 0))
+		dl_rq->running_bw = 0;
+}
+
 static inline int is_leftmost(struct task_struct *p, struct dl_rq *dl_rq)
 {
 	struct sched_dl_entity *dl_se = &p->dl;
@@ -498,6 +514,8 @@ static void update_dl_entity(struct sched_dl_entity *dl_se,
 	struct dl_rq *dl_rq = dl_rq_of_se(dl_se);
 	struct rq *rq = rq_of_dl_rq(dl_rq);
 
+	add_running_bw(dl_se, dl_rq);
+
 	if (dl_time_before(dl_se->deadline, rq_clock(rq)) ||
 	    dl_entity_overflow(dl_se, pi_se, rq_clock(rq))) {
 		dl_se->deadline = rq_clock(rq) + pi_se->dl_deadline;
@@ -947,14 +965,19 @@ static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 		return;
 	}
 
+	if (p->on_rq == TASK_ON_RQ_MIGRATING)
+		add_running_bw(&p->dl, &rq->dl);
+
 	/*
 	 * If p is throttled, we do nothing. In fact, if it exhausted
 	 * its budget it needs a replenishment and, since it now is on
 	 * its rq, the bandwidth timer callback (which clearly has not
 	 * run yet) will take care of this.
 	 */
-	if (p->dl.dl_throttled && !(flags & ENQUEUE_REPLENISH))
+	if (p->dl.dl_throttled && !(flags & ENQUEUE_REPLENISH)) {
+		add_running_bw(&p->dl, &rq->dl);
 		return;
+	}
 
 	enqueue_dl_entity(&p->dl, pi_se, flags);
 
@@ -972,6 +995,12 @@ static void dequeue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 {
 	update_curr_dl(rq);
 	__dequeue_task_dl(rq, p, flags);
+
+	if (p->on_rq == TASK_ON_RQ_MIGRATING)
+		sub_running_bw(&p->dl, &rq->dl);
+
+	if (flags & DEQUEUE_SLEEP)
+		sub_running_bw(&p->dl, &rq->dl);
 }
 
 /*
@@ -1501,7 +1530,9 @@ retry:
 	}
 
 	deactivate_task(rq, next_task, 0);
+	sub_running_bw(&next_task->dl, &rq->dl);
 	set_task_cpu(next_task, later_rq->cpu);
+	add_running_bw(&next_task->dl, &later_rq->dl);
 	activate_task(later_rq, next_task, 0);
 	ret = 1;
 
@@ -1589,7 +1620,9 @@ static void pull_dl_task(struct rq *this_rq)
 			resched = true;
 
 			deactivate_task(src_rq, p, 0);
+			sub_running_bw(&p->dl, &src_rq->dl);
 			set_task_cpu(p, this_cpu);
+			add_running_bw(&p->dl, &this_rq->dl);
 			activate_task(this_rq, p, 0);
 			dmin = p->dl.deadline;
 
@@ -1695,6 +1728,9 @@ static void switched_from_dl(struct rq *rq, struct task_struct *p)
 	if (!start_dl_timer(p))
 		__dl_clear_params(p);
 
+	if (task_on_rq_queued(p))
+		sub_running_bw(&p->dl, &rq->dl);
+
 	/*
 	 * Since this might be the only -deadline task on the rq,
 	 * this is the right place to try to pull some other one
@@ -1712,6 +1748,7 @@ static void switched_from_dl(struct rq *rq, struct task_struct *p)
  */
 static void switched_to_dl(struct rq *rq, struct task_struct *p)
 {
+	add_running_bw(&p->dl, &rq->dl);
 
 	/* If p is not queued we will update its parameters at next wakeup. */
 	if (!task_on_rq_queued(p))
