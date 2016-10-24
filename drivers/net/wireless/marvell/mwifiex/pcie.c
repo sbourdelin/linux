@@ -504,6 +504,8 @@ static void mwifiex_pcie_remove(struct pci_dev *pdev)
 	if (!adapter || !adapter->priv_num)
 		return;
 
+	cancel_work_sync(&pcie_work);
+
 	if (user_rmmod && !adapter->mfg_mode) {
 #ifdef CONFIG_PM_SLEEP
 		if (adapter->is_suspended)

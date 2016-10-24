@@ -46,6 +46,15 @@
  */
 static u8 user_rmmod;
 
+/* reset_trigger variable is used to identify if mwifiex_sdio_remove()
+ * is called by sdio_work during reset or the call is from sdio subsystem.
+ * We will cancel sdio_work only if the call is from sdio subsystem.
+ */
+static u8 reset_triggered;
+
+static void mwifiex_sdio_work(struct work_struct *work);
+static DECLARE_WORK(sdio_work, mwifiex_sdio_work);
+
 static struct mwifiex_if_ops sdio_ops;
 static unsigned long iface_work_flags;
 
@@ -288,6 +297,9 @@ mwifiex_sdio_remove(struct sdio_func *func)
 	adapter = card->adapter;
 	if (!adapter || !adapter->priv_num)
 		return;
+
+	if (!reset_triggered)
+		cancel_work_sync(&sdio_work);
 
 	mwifiex_dbg(adapter, INFO, "info: SDIO func num=%d\n", func->num);
 
@@ -2289,7 +2301,9 @@ static void mwifiex_recreate_adapter(struct sdio_mmc_card *card)
 	 * discovered and initializes them from scratch.
 	 */
 
+	reset_triggered = 1;
 	mwifiex_sdio_remove(func);
+	reset_triggered = 0;
 
 	/* power cycle the adapter */
 	sdio_claim_host(func);
@@ -2620,7 +2634,6 @@ static void mwifiex_sdio_work(struct work_struct *work)
 		mwifiex_sdio_card_reset_work(save_adapter);
 }
 
-static DECLARE_WORK(sdio_work, mwifiex_sdio_work);
 /* This function resets the card */
 static void mwifiex_sdio_card_reset(struct mwifiex_adapter *adapter)
 {
