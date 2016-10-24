@@ -58,7 +58,7 @@ struct ctf_writer {
 
 	/* data types */
 	union {
-		struct {
+		struct field_types {
 			struct bt_ctf_field_type	*s64;
 			struct bt_ctf_field_type	*u64;
 			struct bt_ctf_field_type	*s32;
@@ -66,8 +66,9 @@ struct ctf_writer {
 			struct bt_ctf_field_type	*string;
 			struct bt_ctf_field_type	*u32_hex;
 			struct bt_ctf_field_type	*u64_hex;
-		};
-		struct bt_ctf_field_type *array[6];
+		} fts;
+		struct bt_ctf_field_type *array[sizeof(struct field_types) /
+					sizeof(struct bt_ctf_field_type *)];
 	} data;
 	struct bt_ctf_event_class	*comm_class;
 	struct bt_ctf_event_class	*exit_class;
@@ -133,7 +134,7 @@ static __maybe_unused int value_set_##_name(struct ctf_writer *cw,	\
 			     const char *name,				\
 			     _val_type val)				\
 {									\
-	struct bt_ctf_field_type *type = cw->data._name;		\
+	struct bt_ctf_field_type *type = cw->data.fts._name;		\
 	return value_set(type, event, name, (u64) val);			\
 }
 
@@ -150,7 +151,7 @@ static __maybe_unused int
 value_set_string(struct ctf_writer *cw, struct bt_ctf_event *event,
 		 const char *name, const char *string)
 {
-	struct bt_ctf_field_type *type = cw->data.string;
+	struct bt_ctf_field_type *type = cw->data.fts.string;
 	struct bt_ctf_field *field;
 	int ret = 0;
 
@@ -181,25 +182,25 @@ get_tracepoint_field_type(struct ctf_writer *cw, struct format_field *field)
 	unsigned long flags = field->flags;
 
 	if (flags & FIELD_IS_STRING)
-		return cw->data.string;
+		return cw->data.fts.string;
 
 	if (!(flags & FIELD_IS_SIGNED)) {
 		/* unsigned long are mostly pointers */
 		if (flags & FIELD_IS_LONG || flags & FIELD_IS_POINTER)
-			return cw->data.u64_hex;
+			return cw->data.fts.u64_hex;
 	}
 
 	if (flags & FIELD_IS_SIGNED) {
 		if (field->size == 8)
-			return cw->data.s64;
+			return cw->data.fts.s64;
 		else
-			return cw->data.s32;
+			return cw->data.fts.s32;
 	}
 
 	if (field->size == 8)
-		return cw->data.u64;
+		return cw->data.fts.u64;
 	else
-		return cw->data.u32;
+		return cw->data.fts.u32;
 }
 
 static unsigned long long adjust_signedness(unsigned long long value_int, int size)
@@ -969,8 +970,8 @@ static int add_tracepoint_types(struct ctf_writer *cw,
 static int add_bpf_output_types(struct ctf_writer *cw,
 				struct bt_ctf_event_class *class)
 {
-	struct bt_ctf_field_type *len_type = cw->data.u32;
-	struct bt_ctf_field_type *seq_base_type = cw->data.u32_hex;
+	struct bt_ctf_field_type *len_type = cw->data.fts.u32;
+	struct bt_ctf_field_type *seq_base_type = cw->data.fts.u32_hex;
 	struct bt_ctf_field_type *seq_type;
 	int ret;
 
@@ -1013,31 +1014,31 @@ static int add_generic_types(struct ctf_writer *cw, struct perf_evsel *evsel,
 	} while (0)
 
 	if (type & PERF_SAMPLE_IP)
-		ADD_FIELD(event_class, cw->data.u64_hex, "perf_ip");
+		ADD_FIELD(event_class, cw->data.fts.u64_hex, "perf_ip");
 
 	if (type & PERF_SAMPLE_TID) {
-		ADD_FIELD(event_class, cw->data.s32, "perf_tid");
-		ADD_FIELD(event_class, cw->data.s32, "perf_pid");
+		ADD_FIELD(event_class, cw->data.fts.s32, "perf_tid");
+		ADD_FIELD(event_class, cw->data.fts.s32, "perf_pid");
 	}
 
 	if ((type & PERF_SAMPLE_ID) ||
 	    (type & PERF_SAMPLE_IDENTIFIER))
-		ADD_FIELD(event_class, cw->data.u64, "perf_id");
+		ADD_FIELD(event_class, cw->data.fts.u64, "perf_id");
 
 	if (type & PERF_SAMPLE_STREAM_ID)
-		ADD_FIELD(event_class, cw->data.u64, "perf_stream_id");
+		ADD_FIELD(event_class, cw->data.fts.u64, "perf_stream_id");
 
 	if (type & PERF_SAMPLE_PERIOD)
-		ADD_FIELD(event_class, cw->data.u64, "perf_period");
+		ADD_FIELD(event_class, cw->data.fts.u64, "perf_period");
 
 	if (type & PERF_SAMPLE_WEIGHT)
-		ADD_FIELD(event_class, cw->data.u64, "perf_weight");
+		ADD_FIELD(event_class, cw->data.fts.u64, "perf_weight");
 
 	if (type & PERF_SAMPLE_DATA_SRC)
-		ADD_FIELD(event_class, cw->data.u64, "perf_data_src");
+		ADD_FIELD(event_class, cw->data.fts.u64, "perf_data_src");
 
 	if (type & PERF_SAMPLE_TRANSACTION)
-		ADD_FIELD(event_class, cw->data.u64, "perf_transaction");
+		ADD_FIELD(event_class, cw->data.fts.u64, "perf_transaction");
 
 #undef ADD_FIELD
 	return 0;
@@ -1109,7 +1110,7 @@ static int setup_events(struct ctf_writer *cw, struct perf_session *session)
 #define __NON_SAMPLE_ADD_FIELD(t, n)						\
 	do {							\
 		pr2("  field '%s'\n", #n);			\
-		if (bt_ctf_event_class_add_field(event_class, cw->data.t, #n)) {\
+		if (bt_ctf_event_class_add_field(event_class, cw->data.fts.t, #n)) {\
 			pr_err("Failed to add field '%s';\n", #n);\
 			return -1;				\
 		}						\
@@ -1324,15 +1325,15 @@ do {							\
 		goto err;				\
 } while (0)
 
-	CREATE_INT_TYPE(cw->data.s64, 64, true,  false);
-	CREATE_INT_TYPE(cw->data.u64, 64, false, false);
-	CREATE_INT_TYPE(cw->data.s32, 32, true,  false);
-	CREATE_INT_TYPE(cw->data.u32, 32, false, false);
-	CREATE_INT_TYPE(cw->data.u32_hex, 32, false, true);
-	CREATE_INT_TYPE(cw->data.u64_hex, 64, false, true);
+	CREATE_INT_TYPE(cw->data.fts.s64, 64, true,  false);
+	CREATE_INT_TYPE(cw->data.fts.u64, 64, false, false);
+	CREATE_INT_TYPE(cw->data.fts.s32, 32, true,  false);
+	CREATE_INT_TYPE(cw->data.fts.u32, 32, false, false);
+	CREATE_INT_TYPE(cw->data.fts.u32_hex, 32, false, true);
+	CREATE_INT_TYPE(cw->data.fts.u64_hex, 64, false, true);
 
-	cw->data.string  = bt_ctf_field_type_string_create();
-	if (cw->data.string)
+	cw->data.fts.string  = bt_ctf_field_type_string_create();
+	if (cw->data.fts.string)
 		return 0;
 
 err:
@@ -1406,7 +1407,7 @@ static int ctf_writer__init(struct ctf_writer *cw, const char *path)
 	if (!pkt_ctx_type)
 		goto err_cleanup;
 
-	ret = bt_ctf_field_type_structure_add_field(pkt_ctx_type, cw->data.u32, "cpu_id");
+	ret = bt_ctf_field_type_structure_add_field(pkt_ctx_type, cw->data.fts.u32, "cpu_id");
 	bt_ctf_field_type_put(pkt_ctx_type);
 	if (ret)
 		goto err_cleanup;
