@@ -163,6 +163,16 @@ void scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 {
 	__scsi_queue_insert(cmd, reason, 1);
 }
+
+static inline bool scsi_sense_unit_attention(const char *sense)
+{
+	int resp = sense[0] & 0x7f;
+
+	return ((resp & 0x70) &&
+		((resp >= 0x72 && (sense[1] & 0xf) == UNIT_ATTENTION) ||
+		 (resp < 0x72 && (sense[2] & 0xf) == UNIT_ATTENTION)));
+}
+
 /**
  * scsi_execute - insert request and wait for the result
  * @sdev:	scsi device
@@ -187,7 +197,14 @@ int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	struct request *req;
 	int write = (data_direction == DMA_TO_DEVICE);
 	int ret = DRIVER_ERROR << 24;
+	unsigned char sense_buf[SCSI_SENSE_BUFFERSIZE];
 
+	if (!sense) {
+		sense = sense_buf;
+		memset(sense, 0, SCSI_SENSE_BUFFERSIZE);
+	}
+
+ retry:
 	req = blk_get_request(sdev->request_queue, write, __GFP_RECLAIM);
 	if (IS_ERR(req))
 		return ret;
@@ -209,6 +226,13 @@ int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	 * head injection *required* here otherwise quiesce won't work
 	 */
 	blk_execute_rq(req->q, NULL, req, 1);
+
+	if (scsi_sense_unit_attention(sense) && req->retries > 0) {
+		memset(sense, 0, SCSI_SENSE_BUFFERSIZE);
+		retries = req->retries - 1;
+		blk_put_request(req);
+		goto retry;
+	}
 
 	/*
 	 * Some devices (USB mass-storage in particular) may transfer
