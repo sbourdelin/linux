@@ -1243,6 +1243,15 @@ config RTC_DRV_IMXDI
 	   This driver can also be built as a module, if so, the module
 	   will be called "rtc-imxdi".
 
+config RTC_DRV_NXP
+	tristate "NXP flextimer Real Time Alarm "
+	help
+	For the FlexTimer on LS1021A, LS1043A, we can use FTM0 as the wakeup
+	source.
+	Say y here to enable FTM alarm support.  The FTM alarm provides
+	alarm functions for wakeup system from deep sleep.  There is only
+	one FTM can be used in ALARM(FTM 0).
+
 config RTC_DRV_OMAP
 	tristate "TI OMAP Real Time Clock"
 	depends on ARCH_OMAP || ARCH_DAVINCI || COMPILE_TEST
