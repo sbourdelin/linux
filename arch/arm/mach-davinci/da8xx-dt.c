@@ -45,6 +45,8 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
 
 static void __init da850_init_machine(void)
 {
+	da8xx_register_usb20_phy_clk(false);
+	da8xx_register_usb11_phy_clk(false);
 	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
 }
 
