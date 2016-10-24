@@ -140,7 +140,7 @@ static struct clk *clk_register_pll(struct device *dev,
 	init.parent_names = (parent_name ? &parent_name : NULL);
 	init.num_parents = (parent_name ? 1 : 0);
 
-	pll->pll_data	= pll_data;
+	pll->pll_data = pll_data;
 	pll->hw.init = &init;
 
 	clk = clk_register(NULL, &pll->hw);
@@ -150,7 +150,7 @@ static struct clk *clk_register_pll(struct device *dev,
 	return clk;
 out:
 	kfree(pll);
-	return NULL;
+	return clk;
 }
 
 /**
@@ -213,7 +213,7 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
 	}
 
 	clk = clk_register_pll(NULL, node->name, parent_name, pll_data);
-	if (clk) {
+	if (!IS_ERR(clk)) {
 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
 		return;
 	}
