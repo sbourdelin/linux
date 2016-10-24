@@ -1694,6 +1694,26 @@ static struct zonelist *policy_zonelist(gfp_t gfp, struct mempolicy *policy,
 		if (unlikely(gfp & __GFP_THISNODE) &&
 				unlikely(!node_isset(nd, policy->v.nodes)))
 			nd = first_node(policy->v.nodes);
+
+#ifdef CONFIG_COHERENT_DEVICE
+		/*
+		 * Coherent device memory
+		 *
+		 * In case the local node is not part of the nodemask, test if
+		 * the first node in the nodemask is a coherent device memory
+		 * node in which case select it.
+		 *
+		 * FIXME: The check will be restricted to the first node of the
+		 * nodemask or scan through the nodemask to select any present
+		 * coherent device memory node on it or select the first one if
+		 * all of the nodes in the nodemask are coherent device memory.
+		 * These are various approaches possible.
+		 */
+		if (unlikely(!node_isset(nd, policy->v.nodes))) {
+			if (isolated_cdm_node(first_node(policy->v.nodes)))
+				nd = first_node(policy->v.nodes);
+		}
+#endif
 		break;
 	default:
 		BUG();
