@@ -471,7 +471,8 @@ static void stub_disconnect(struct usb_device *udev)
 #ifdef CONFIG_PM
 
 /* These functions need usb_port_suspend and usb_port_resume,
- * which reside in drivers/usb/core/usb.h. Skip for now. */
+ * which reside in drivers/usb/core/usb.h. Skip for now.
+ */
 
 static int stub_suspend(struct usb_device *udev, pm_message_t message)
 {

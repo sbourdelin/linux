@@ -77,9 +77,8 @@ static void event_handler(struct work_struct *work)
 {
 	struct usbip_device *ud;
 
-	if (worker_context == NULL) {
+	if (worker_context == NULL)
 		worker_context = current;
-	}
 
 	while ((ud = get_event()) != NULL) {
 		usbip_dbg_eh("pending event %lx\n", ud->event);

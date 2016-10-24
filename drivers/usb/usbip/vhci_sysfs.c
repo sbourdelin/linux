@@ -224,9 +224,8 @@ static DEVICE_ATTR(detach, S_IWUSR, NULL, store_detach);
 
 static int valid_args(__u32 pdev_nr, __u32 rhport, enum usb_device_speed speed)
 {
-	if (!valid_port(pdev_nr, rhport)) {
+	if (!valid_port(pdev_nr, rhport))
 		return 0;
-	}
 
 	switch (speed) {
 	case USB_SPEED_LOW:
