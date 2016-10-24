@@ -224,17 +224,14 @@ static int au0828_init_isoc(struct au0828_dev *dev, int max_packets,
 	dev->isoc_ctl.urb = kcalloc(num_bufs,
 				    sizeof(*dev->isoc_ctl.urb),
 				    GFP_KERNEL);
-	if (!dev->isoc_ctl.urb) {
-		au0828_isocdbg("cannot alloc memory for usb buffers\n");
+	if (!dev->isoc_ctl.urb)
 		return -ENOMEM;
-	}
 
 	dev->isoc_ctl.transfer_buffer = kcalloc(num_bufs,
 						sizeof(*dev->isoc_ctl
 						       .transfer_buffer),
 						GFP_KERNEL);
 	if (!dev->isoc_ctl.transfer_buffer) {
-		au0828_isocdbg("cannot allocate memory for usb transfer\n");
 		kfree(dev->isoc_ctl.urb);
 		return -ENOMEM;
 	}
@@ -256,10 +253,6 @@ static int au0828_init_isoc(struct au0828_dev *dev, int max_packets,
 		dev->isoc_ctl.transfer_buffer[i] = usb_alloc_coherent(dev->usbdev,
 			sb_size, GFP_KERNEL, &urb->transfer_dma);
 		if (!dev->isoc_ctl.transfer_buffer[i]) {
-			printk("unable to allocate %i bytes for transfer"
-					" buffer %i%s\n",
-					sb_size, i,
-					in_interrupt() ? " while in int" : "");
 			au0828_uninit_isoc(dev);
 			return -ENOMEM;
 		}
