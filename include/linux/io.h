@@ -141,4 +141,17 @@ enum {
 void *memremap(resource_size_t offset, size_t size, unsigned long flags);
 void memunmap(void *addr);
 
+#ifndef arch_io_reserve_memtype_wc
+static inline int arch_io_reserve_memtype_wc(resource_size_t base,
+					     resource_size_t size)
+{
+	return 0;
+}
+
+static inline void arch_io_free_memtype_wc(resource_size_t base,
+					   resource_size_t size)
+{
+}
+#endif
+
 #endif /* _LINUX_IO_H */
