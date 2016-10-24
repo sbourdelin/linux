@@ -2319,7 +2319,7 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 	unsigned char cmd[12];
 	int use_10_for_ms;
 	int header_length;
-	int result, retry_count = retries;
+	int result;
 	struct scsi_sense_hdr my_sshdr;
 
 	memset(data, 0, sizeof(*data));
@@ -2398,11 +2398,6 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 			data->block_descriptor_length = buffer[3];
 		}
 		data->header_length = header_length;
-	} else if ((status_byte(result) == CHECK_CONDITION) &&
-		   scsi_sense_valid(sshdr) &&
-		   sshdr->sense_key == UNIT_ATTENTION && retry_count) {
-		retry_count--;
-		goto retry;
 	}
 
 	return result;
@@ -2436,15 +2431,11 @@ scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries,
 	else
 		sshdr = sshdr_external;
 
-	/* try to eat the UNIT_ATTENTION if there are enough retries */
-	do {
-		result = scsi_execute_req(sdev, cmd, DMA_NONE, NULL, 0, sshdr,
-					  timeout, retries, NULL);
-		if (sdev->removable && scsi_sense_valid(sshdr) &&
-		    sshdr->sense_key == UNIT_ATTENTION)
-			sdev->changed = 1;
-	} while (scsi_sense_valid(sshdr) &&
-		 sshdr->sense_key == UNIT_ATTENTION && --retries);
+	result = scsi_execute_req(sdev, cmd, DMA_NONE, NULL, 0, sshdr,
+				  timeout, retries, NULL);
+	if (sdev->removable && scsi_sense_valid(sshdr) &&
+	    sshdr->sense_key == UNIT_ATTENTION)
+		sdev->changed = 1;
 
 	if (!sshdr_external)
 		kfree(sshdr);
