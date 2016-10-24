@@ -188,9 +188,8 @@ static void dsps_musb_disable(struct musb *musb)
 	musb_writeb(musb->mregs, MUSB_DEVCTL, 0);
 }
 
-static void otg_timer(unsigned long _musb)
+static void dsps_check_status(struct musb *musb)
 {
-	struct musb *musb = (void *)_musb;
 	void __iomem *mregs = musb->mregs;
 	struct device *dev = musb->controller;
 	struct dsps_glue *glue = dev_get_drvdata(dev->parent);
@@ -198,11 +197,6 @@ static void otg_timer(unsigned long _musb)
 	u8 devctl;
 	unsigned long flags;
 	int skip_session = 0;
-	int err;
-
-	err = pm_runtime_get_sync(dev);
-	if (err < 0)
-		dev_err(dev, "Poll could not pm_runtime_get: %i\n", err);
 
 	/*
 	 * We poll because DSPS IP's won't expose several OTG-critical
@@ -246,7 +240,25 @@ static void otg_timer(unsigned long _musb)
 		break;
 	}
 	spin_unlock_irqrestore(&musb->lock, flags);
+}
 
+static void otg_timer(unsigned long _musb)
+{
+	struct musb *musb = (void *)_musb;
+	struct device *dev = musb->controller;
+	int err;
+
+	err = pm_runtime_get(dev);
+	if (err < 0)
+		dev_err(dev, "Poll could not pm_runtime_get: %i\n", err);
+
+	/* If not active, dsps_runtime_resume() will call us again */
+	if (!pm_runtime_active(dev))
+		goto done;
+
+	dsps_check_status(musb);
+
+done:
 	pm_runtime_mark_last_busy(dev);
 	pm_runtime_put_autosuspend(dev);
 }
@@ -847,6 +859,21 @@ static const struct of_device_id musb_dsps_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, musb_dsps_of_match);
 
+static int dsps_runtime_resume(struct device *dev)
+{
+	struct dsps_glue *glue = dev_get_drvdata(dev);
+	struct musb *musb;
+
+	if (!glue->musb)
+		return 0;
+
+	musb = platform_get_drvdata(glue->musb);
+	if (musb)
+		dsps_check_status(musb);
+
+	return 0;
+}
+
 #ifdef CONFIG_PM_SLEEP
 static int dsps_suspend(struct device *dev)
 {
@@ -900,7 +927,10 @@ static int dsps_resume(struct device *dev)
 }
 #endif
 
-static SIMPLE_DEV_PM_OPS(dsps_pm_ops, dsps_suspend, dsps_resume);
+static const struct dev_pm_ops dsps_pm_ops = {
+	SET_RUNTIME_PM_OPS(NULL, dsps_runtime_resume, NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(dsps_suspend, dsps_resume)
+};
 
 static struct platform_driver dsps_usbss_driver = {
 	.probe		= dsps_probe,
