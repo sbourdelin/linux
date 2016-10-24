@@ -5114,7 +5114,11 @@ void gen6_rps_boost(struct drm_i915_private *dev_priv,
 
 void intel_set_rps(struct drm_i915_private *dev_priv, u8 val)
 {
-	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
+	lockdep_assert_held(&dev_priv->rps.hw_lock);
+
+	if (!dev_priv->gt.awake)
+		dev_priv->rps.cur_freq = val;
+	else if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
 		valleyview_set_rps(dev_priv, val);
 	else
 		gen6_set_rps(dev_priv, val);
