@@ -1908,13 +1908,14 @@ retry:
 
 	/*
 	 * Unlike in global OOM situations, memcg is not in a physical
-	 * memory shortage.  Allow dying and OOM-killed tasks to
-	 * bypass the last charges so that they can exit quickly and
-	 * free their memory.
+	 * memory shortage. Allow dying and OOM-killed tasks to bypass
+	 * the last charges so that they can exit quickly and free
+	 * their memory. The same applies for recursing reclaimers.
 	 */
 	if (unlikely(test_thread_flag(TIF_MEMDIE) ||
 		     fatal_signal_pending(current) ||
-		     current->flags & PF_EXITING))
+		     current->flags & PF_EXITING ||
+		     current->flags & PF_MEMALLOC))
 		goto force;
 
 	if (unlikely(task_in_memcg_oom(current)))
