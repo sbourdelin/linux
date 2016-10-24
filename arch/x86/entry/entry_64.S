@@ -475,8 +475,7 @@ END(irq_entries_start)
 	jz	1f
 
 	/*
-	 * IRQ from user mode.  Switch to kernel gsbase and inform context
-	 * tracking that we're in kernel mode.
+	 * IRQ from user mode.  Switch to kernel gsbase.
 	 */
 	SWAPGS
 
@@ -490,6 +489,9 @@ END(irq_entries_start)
 	 */
 	TRACE_IRQS_OFF
 
+	/*
+	 * Inform context tracking that we're in kernel mode.
+	 */
 	CALL_enter_from_user_mode
 
 1:
