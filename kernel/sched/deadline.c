@@ -91,8 +91,14 @@ static void task_go_inactive(struct task_struct *p)
 	 */
 	if (zerolag_time < 0) {
 		sub_running_bw(dl_se, dl_rq);
-		if (!dl_task(p))
+		if (!dl_task(p)) {
+			struct dl_bw *dl_b = dl_bw_of(task_cpu(p));
+
+			raw_spin_lock(&dl_b->lock);
+			__dl_clear(dl_b, p->dl.dl_bw);
 			__dl_clear_params(p);
+			raw_spin_unlock(&dl_b->lock);
+		}
 
 		return;
 	}
@@ -856,8 +862,13 @@ static enum hrtimer_restart inactive_task_timer(struct hrtimer *timer)
 
 	rq = task_rq_lock(p, &rf);
 
-	if (!dl_task(p)) {
+	if (!dl_task(p) || p->state == TASK_DEAD) {
+		struct dl_bw *dl_b = dl_bw_of(task_cpu(p));
+
+		raw_spin_lock(&dl_b->lock);
+		__dl_clear(dl_b, p->dl.dl_bw);
 		__dl_clear_params(p);
+		raw_spin_unlock(&dl_b->lock);
 
 		goto unlock;
 	}
@@ -1330,16 +1341,21 @@ static void task_fork_dl(struct task_struct *p)
 
 static void task_dead_dl(struct task_struct *p)
 {
-	struct dl_bw *dl_b = dl_bw_of(task_cpu(p));
-
 	/*
 	 * Since we are TASK_DEAD we won't slip out of the domain!
 	 */
-	raw_spin_lock_irq(&dl_b->lock);
-	/* XXX we should retain the bw until 0-lag */
-	dl_b->total_bw -= p->dl.dl_bw;
-	raw_spin_unlock_irq(&dl_b->lock);
-	if (hrtimer_active(&p->dl.inactive_timer)) {
+	if (!hrtimer_active(&p->dl.inactive_timer)) {
+		struct dl_bw *dl_b = dl_bw_of(task_cpu(p));
+
+		/*
+		 * If the "inactive timer is not active, the 0-lag time
+		 * is already passed, so we immediately decrease the
+		 * total deadline utilization
+		 */
+		raw_spin_lock_irq(&dl_b->lock);
+		__dl_clear(dl_b, p->dl.dl_bw);
+		raw_spin_unlock_irq(&dl_b->lock);
+	} else {
 		raw_spin_lock_irq(&task_rq(p)->lock);
 		sub_running_bw(&p->dl, dl_rq_of_se(&p->dl));
 		raw_spin_unlock_irq(&task_rq(p)->lock);
