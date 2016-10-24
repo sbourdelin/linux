@@ -114,10 +114,17 @@ void kvm_arch_check_processor_compat(void *rtn)
  */
 int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 {
-	int ret = 0;
+	int ret, cpu;
 
 	if (type)
 		return -EINVAL;
+
+	kvm->arch.last_vcpu_ran = alloc_percpu(typeof(*kvm->arch.last_vcpu_ran));
+	if (!kvm->arch.last_vcpu_ran)
+		return -ENOMEM;
+
+	for_each_possible_cpu(cpu)
+		*per_cpu_ptr(kvm->arch.last_vcpu_ran, cpu) = -1;
 
 	ret = kvm_alloc_stage2_pgd(kvm);
 	if (ret)
@@ -141,6 +148,8 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 out_free_stage2_pgd:
 	kvm_free_stage2_pgd(kvm);
 out_fail_alloc:
+	free_percpu(kvm->arch.last_vcpu_ran);
+	kvm->arch.last_vcpu_ran = NULL;
 	return ret;
 }
 
@@ -167,6 +176,9 @@ int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
 void kvm_arch_destroy_vm(struct kvm *kvm)
 {
 	int i;
+
+	free_percpu(kvm->arch.last_vcpu_ran);
+	kvm->arch.last_vcpu_ran = NULL;
 
 	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
 		if (kvm->vcpus[i]) {
@@ -308,6 +320,27 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 	kvm_arm_reset_debug_ptr(vcpu);
 
 	return 0;
+}
+
+void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu)
+{
+	int *last_ran;
+
+	last_ran = per_cpu_ptr(vcpu->kvm->arch.last_vcpu_ran, cpu);
+
+	/*
+	 * If we're very unlucky and get preempted before having ran
+	 * this vcpu for real, we'll end-up in a situation where any
+	 * vcpu that gets scheduled will perform an invalidation (this
+	 * vcpu explicitely requires it, and all the others will have
+	 * a different vcpu_id).
+	 */
+	if (*last_ran != vcpu->vcpu_id) {
+		if (*last_ran != -1)
+			vcpu->arch.requires_tlbi = true;
+
+		*last_ran = vcpu->vcpu_id;
+	}
 }
 
 void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)

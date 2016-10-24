@@ -131,6 +131,14 @@ static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
 {
 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
 	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+	if (vcpu->arch.requires_tlbi) {
+		/* Force vttbr_el2 to be written */
+		isb();
+		/* Local invalidate only for this VMID */
+		asm volatile("tlbi vmalle1" : : );
+		dsb(nsh);
+		vcpu->arch.requires_tlbi = false;
+	}
 }
 
 static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)

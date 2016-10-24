@@ -62,6 +62,8 @@ struct kvm_arch {
 	/* VTTBR value associated with above pgd and vmid */
 	u64    vttbr;
 
+	int __percpu *last_vcpu_ran;
+
 	/* The maximum number of vCPUs depends on the used GIC model */
 	int max_vcpus;
 
@@ -252,6 +254,9 @@ struct kvm_vcpu_arch {
 	/* vcpu power-off state */
 	bool power_off;
 
+	/* TLBI required */
+	bool requires_tlbi;
+
 	/* Don't run the guest (internal implementation need) */
 	bool pause;
 
@@ -368,7 +373,6 @@ static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
 static inline void kvm_arch_hardware_unsetup(void) {}
 static inline void kvm_arch_sync_events(struct kvm *kvm) {}
 static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
 static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
 
 void kvm_arm_init_debug(void);

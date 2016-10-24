@@ -57,6 +57,8 @@ struct kvm_arch {
 	/* VTTBR value associated with below pgd and vmid */
 	u64    vttbr;
 
+	int __percpu *last_vcpu_ran;
+
 	/* Timer */
 	struct arch_timer_kvm	timer;
 
@@ -173,6 +175,9 @@ struct kvm_vcpu_arch {
 
 	/* vcpu power-off state */
 	bool power_off;
+
+	/* TLBI required */
+	bool requires_tlbi;
 
 	 /* Don't run the guest (internal implementation need) */
 	bool pause;

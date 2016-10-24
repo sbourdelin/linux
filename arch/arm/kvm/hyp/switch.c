@@ -75,6 +75,15 @@ static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
 {
 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
 	write_sysreg(kvm->arch.vttbr, VTTBR);
+	if (vcpu->arch.requires_tlbi) {
+		/* Force vttbr to be written */
+		isb();
+		/* Local invalidate only for this VMID */
+		write_sysreg(0, TLBIALL);
+		dsb(nsh);
+		vcpu->arch.requires_tlbi = false;
+	}
+
 	write_sysreg(vcpu->arch.midr, VPIDR);
 }
 
