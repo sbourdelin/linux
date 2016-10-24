@@ -385,14 +385,13 @@ static int wsm_multi_tx_confirm(struct cw1200_common *priv,
 	if (WARN_ON(count <= 0))
 		return -EINVAL;
 
-	if (count > 1) {
-		/* We already released one buffer, now for the rest */
-		ret = wsm_release_tx_buffer(priv, count - 1);
-		if (ret < 0)
-			return ret;
-		else if (ret > 0)
-			cw1200_bh_wakeup(priv);
-	}
+	/* We already released one buffer, now for the rest */
+	ret = wsm_release_tx_buffer(priv, count - 1);
+	if (ret < 0)
+		return ret;
+
+	if (ret > 0)
+		cw1200_bh_wakeup(priv);
 
 	cw1200_debug_txed_multi(priv, count);
 	for (i = 0; i < count; ++i) {
