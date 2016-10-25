@@ -145,6 +145,10 @@ struct vf_data_storage {
 #define IGB_RX_HDR_LEN		IGB_RXBUFFER_256
 #define IGB_RX_BUFSZ		IGB_RXBUFFER_2048
 
+#define IGB_SKB_PAD		(NET_SKB_PAD + NET_IP_ALIGN)
+#define IGB_MAX_BUILD_SKB_SIZE \
+	(SKB_WITH_OVERHEAD(IGB_RX_BUFSZ) - (IGB_SKB_PAD + IGB_TS_HDR_LEN))
+
 /* How many Rx Buffers do we bundle into one write to the hardware ? */
 #define IGB_RX_BUFFER_WRITE	16 /* Must be power of 2 */
 
@@ -301,11 +305,28 @@ struct igb_q_vector {
 };
 
 enum e1000_ring_flags_t {
-	IGB_RING_FLAG_RX_SCTP_CSUM,
-	IGB_RING_FLAG_RX_LB_VLAN_BSWAP,
-	IGB_RING_FLAG_TX_CTX_IDX,
-	IGB_RING_FLAG_TX_DETECT_HANG
+	IGB_RING_FLAG_RX_SCTP_CSUM = 0,
+#if (NET_IP_ALIGN != 0)
+	IGB_RING_FLAG_RX_BUILD_SKB_ENABLED = 1,
+#endif
+	IGB_RING_FLAG_RX_LB_VLAN_BSWAP = 2,
+	IGB_RING_FLAG_TX_CTX_IDX = 3,
+	IGB_RING_FLAG_TX_DETECT_HANG = 4,
+#if (NET_IP_ALIGN == 0)
+#if (L1_CACHE_SHIFT < 5)
+	IGB_RING_FLAG_RX_BUILD_SKB_ENABLED = 5,
+#else
+	IGB_RING_FLAG_RX_BUILD_SKB_ENABLED = L1_CACHE_SHIFT,
+#endif
+#endif
 };
+
+#define ring_uses_build_skb(ring) \
+	test_bit(IGB_RING_FLAG_RX_BUILD_SKB_ENABLED, &(ring)->flags)
+#define set_ring_build_skb_enabled(ring) \
+	set_bit(IGB_RING_FLAG_RX_BUILD_SKB_ENABLED, &(ring)->flags)
+#define clear_ring_build_skb_enabled(ring) \
+	clear_bit(IGB_RING_FLAG_RX_BUILD_SKB_ENABLED, &(ring)->flags)
 
 #define IGB_TXD_DCMD (E1000_ADVTXD_DCMD_EOP | E1000_ADVTXD_DCMD_RS)
 
