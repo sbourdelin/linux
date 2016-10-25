@@ -555,11 +555,23 @@ static int stm32f4_adc_clk_sel(struct stm32_adc *adc)
 	return 0;
 }
 
+static const struct iio_chan_spec_ext_info stm32f4_adc_ext_info[] = {
+	IIO_ENUM("trigger_pol", IIO_SHARED_BY_ALL, &stm32_adc_trig_pol),
+	{
+		.name = "trigger_pol_available",
+		.shared = IIO_SHARED_BY_ALL,
+		.read = iio_enum_available_read,
+		.private = (uintptr_t)&stm32_adc_trig_pol,
+	},
+	{},
+};
+
 static const struct stm32_adc_ops stm32f4_adc_ops = {
 	.adc_info = stm32f4_adc_info,
 	.ext_triggers = stm32f4_adc_ext_triggers,
 	.jext_triggers = stm32f4_adc_jext_triggers,
 	.adc_reginfo = &stm32f4_adc_reginfo,
+	.ext_info = stm32f4_adc_ext_info,
 	.highres = 12,
 	.max_clock_rate = 36000000,
 	.clk_sel = stm32f4_adc_clk_sel,

@@ -207,7 +207,11 @@ static int stm32_adc_set_trig(struct iio_dev *indio_dev,
 
 		/* trigger source */
 		extsel = trig_info[ret].extsel;
-		exten = STM32_EXTEN_HWTRIG_RISING_EDGE;
+
+		/* default to rising edge if no polarity */
+		if (adc->exten == STM32_EXTEN_SWTRIG)
+			adc->exten = STM32_EXTEN_HWTRIG_RISING_EDGE;
+		exten = adc->exten;
 	}
 
 	spin_lock_irqsave(&adc->lock, flags);
@@ -220,6 +224,40 @@ static int stm32_adc_set_trig(struct iio_dev *indio_dev,
 
 	return 0;
 }
+
+static int stm32_adc_set_trig_pol(struct iio_dev *indio_dev,
+				  const struct iio_chan_spec *chan,
+				  unsigned int type)
+{
+	struct stm32_adc *adc = iio_priv(indio_dev);
+
+	adc->exten = type;
+
+	return 0;
+}
+
+static int stm32_adc_get_trig_pol(struct iio_dev *indio_dev,
+				  const struct iio_chan_spec *chan)
+{
+	struct stm32_adc *adc = iio_priv(indio_dev);
+
+	return adc->exten;
+}
+
+static const char * const stm32_trig_pol_items[] = {
+	[STM32_EXTEN_SWTRIG] = "swtrig",
+	[STM32_EXTEN_HWTRIG_RISING_EDGE] = "rising-edge",
+	[STM32_EXTEN_HWTRIG_FALLING_EDGE] = "falling-edge",
+	[STM32_EXTEN_HWTRIG_BOTH_EDGES] = "both-edges",
+};
+
+const struct iio_enum stm32_adc_trig_pol = {
+	.items = stm32_trig_pol_items,
+	.num_items = ARRAY_SIZE(stm32_trig_pol_items),
+	.get = stm32_adc_get_trig_pol,
+	.set = stm32_adc_set_trig_pol,
+};
+EXPORT_SYMBOL_GPL(stm32_adc_trig_pol);
 
 /**
  * stm32_adc_conv_irq_enable() - Unmask end of conversion irq
@@ -893,6 +931,7 @@ static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
 	chan->scan_type.realbits = adc->common->data->highres;
 	chan->scan_type.storagebits = STM32_STORAGEBITS;
 	chan->scan_type.shift = 0;
+	chan->ext_info = adc->common->data->ext_info;
 }
 
 static int stm32_adc_chan_of_init(struct iio_dev *indio_dev,

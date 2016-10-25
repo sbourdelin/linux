@@ -234,6 +234,7 @@ struct stm32_adc;
  * @ext_triggers:	Reference to trigger info for regular channels
  * @jext_triggers:	Reference to trigger info for injected channels
  * @adc_reginfo:	stm32 ADC registers description
+ * @ext_info:		Extended channel info
  * @highres:		Max resolution
  * @max_clock_rate:	Max input clock rate
  * @clk_sel:		routine to select common clock and prescaler
@@ -251,6 +252,7 @@ struct stm32_adc_ops {
 	const struct stm32_adc_trig_info *ext_triggers;
 	const struct stm32_adc_trig_info *jext_triggers;
 	const struct stm32_adc_reginfo *adc_reginfo;
+	const struct iio_chan_spec_ext_info *ext_info;
 	int highres;
 	unsigned long max_clock_rate;
 	int (*clk_sel)(struct stm32_adc *adc);
@@ -273,6 +275,7 @@ struct stm32_adc_common;
  * @id:			ADC instance number (e.g. adc 1, 2 or 3)
  * @offset:		ADC instance register offset in ADC block
  * @max_channels:	Max channels number for this ADC.
+ * @exten:		External trigger config (enable/polarity)
  * @extrig_list:	External trigger list (for regular channel)
  * @completion:		end of single conversion completion
  * @buffer:		data buffer
@@ -295,6 +298,7 @@ struct stm32_adc {
 	int			id;
 	int			offset;
 	int			max_channels;
+	enum stm32_adc_exten	exten;
 	struct list_head	extrig_list;
 	struct completion	completion;
 	u16			*buffer;
