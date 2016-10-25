@@ -43,6 +43,27 @@ DEFINE_EVENT_FN(x86_exceptions, name,				\
 DEFINE_PAGE_FAULT_EVENT(page_fault_user);
 DEFINE_PAGE_FAULT_EVENT(page_fault_kernel);
 
+TRACE_EVENT_FN(page_fault_exit,
+
+	TP_PROTO(unsigned long address),
+
+	TP_ARGS(address),
+
+	TP_STRUCT__entry(
+		__field(unsigned long, address)
+	),
+
+	TP_fast_assign(
+		__entry->address = address;
+	),
+
+	TP_printk("address=%lx", __entry->address),
+
+	trace_irq_vector_regfunc,
+
+	trace_irq_vector_unregfunc
+);
+
 #undef TRACE_INCLUDE_PATH
 #define TRACE_INCLUDE_PATH .
 #define TRACE_INCLUDE_FILE exceptions

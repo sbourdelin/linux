@@ -1488,6 +1488,7 @@ trace_do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	prev_state = exception_enter();
 	trace_page_fault_entries(address, regs, error_code);
 	__do_page_fault(regs, error_code, address);
+	trace_page_fault_exit(address);
 	exception_exit(prev_state);
 }
 NOKPROBE_SYMBOL(trace_do_page_fault);
