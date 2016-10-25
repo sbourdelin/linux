@@ -30,8 +30,9 @@ Optional properties:
    available in the next section.
 
 - domain-idle-states : A phandle of an idle-state that shall be soaked into a
-                generic domain power state. The idle state definitions are
-                compatible with arm,idle-state specified in [1].
+                generic domain power state. The idle state definitions must be
+                compatible with "domain-idle-state" as well as
+                "arm,idle-state" as defined in [1].
   The domain-idle-state property reflects the idle state of this PM domain and
   not the idle states of the devices or sub-domains in the PM domain. Devices
   and sub-domains have their own idle-states independent of the parent
@@ -85,7 +86,7 @@ Example 3:
 	};
 
 	DOMAIN_RET: state@0 {
-		compatible = "arm,idle-state";
+		compatible = "domain-idle-state", "arm,idle-state";
 		reg = <0x0>;
 		entry-latency-us = <1000>;
 		exit-latency-us = <2000>;
@@ -93,7 +94,7 @@ Example 3:
 	};
 
 	DOMAIN_PWR_DN: state@1 {
-		compatible = "arm,idle-state";
+		compatible = "domain-idle-state", "arm,idle-state";
 		reg = <0x1>;
 		entry-latency-us = <5000>;
 		exit-latency-us = <8000>;
