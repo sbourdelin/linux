@@ -112,9 +112,9 @@ int dwc3_host_init(struct dwc3 *dwc)
 	return 0;
 err2:
 	phy_remove_lookup(dwc->usb2_generic_phy, "usb2-phy",
-			  dev_name(&xhci->dev));
+			  dev_name(dwc->dev));
 	phy_remove_lookup(dwc->usb3_generic_phy, "usb3-phy",
-			  dev_name(&xhci->dev));
+			  dev_name(dwc->dev));
 err1:
 	platform_device_put(xhci);
 	return ret;
@@ -123,8 +123,8 @@ err1:
 void dwc3_host_exit(struct dwc3 *dwc)
 {
 	phy_remove_lookup(dwc->usb2_generic_phy, "usb2-phy",
-			  dev_name(&dwc->xhci->dev));
+			  dev_name(dwc->dev));
 	phy_remove_lookup(dwc->usb3_generic_phy, "usb3-phy",
-			  dev_name(&dwc->xhci->dev));
+			  dev_name(dwc->dev));
 	platform_device_unregister(dwc->xhci);
 }
