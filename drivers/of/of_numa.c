@@ -150,11 +150,26 @@ static int __init of_numa_parse_distance_map(void)
 	return ret;
 }
 
+static bool of_force_no_numa;
+
+void __of_force_no_numa(void)
+{
+	of_force_no_numa = true;
+}
+
 int of_node_to_nid(struct device_node *device)
 {
 	struct device_node *np;
 	u32 nid;
 	int r = -ENODATA;
+
+	/*
+	 * If NUMA forced off, nodes are meaningless.  Return
+	 * NUMA_NO_NODE so that any node specific memory allocations
+	 * can succeed from the default pool.
+	 */
+	if (of_force_no_numa)
+		return NUMA_NO_NODE;
 
 	np = of_node_get(device);
 

@@ -730,11 +730,13 @@ static inline void of_property_clear_flag(struct property *p, unsigned long flag
 
 #if defined(CONFIG_OF) && defined(CONFIG_NUMA)
 extern int of_node_to_nid(struct device_node *np);
+extern void __of_force_no_numa(void);
 #else
 static inline int of_node_to_nid(struct device_node *device)
 {
 	return NUMA_NO_NODE;
 }
+static inline void __of_force_no_numa(void) { /* Empty */ }
 #endif
 
 #ifdef CONFIG_OF_NUMA
