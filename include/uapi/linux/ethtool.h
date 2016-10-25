@@ -1224,6 +1224,51 @@ struct ethtool_per_queue_op {
 	char	data[];
 };
 
+/**
+ * struct ethtool_fecparam - Ethernet forward error correction(fec) parameters
+ * @cmd: Command number = %ETHTOOL_GFECPARAM or %ETHTOOL_SFECPARAM
+ * @autoneg: Flag to enable autonegotiation of fec modes(rs,baser)
+ *          (D44:47 of base link code word)
+ * @fec: Bitmask of supported FEC modes
+ * @rsvd: Reserved for future extensions. i.e FEC bypass feature.
+ *
+ * Drivers should reject a non-zero setting of @autoneg when
+ * autoneogotiation is disabled (or not supported) for the link.
+ *
+ * If @autoneg is non-zero, the MAC is configured to enable one of
+ * the supported FEC modes according to the result of autonegotiation.
+ * Otherwise, it is configured directly based on the @fec parameter
+ */
+struct ethtool_fecparam {
+	__u32   cmd;
+	__u32   autoneg;
+	/* bitmask of FEC modes */
+	__u32   fec;
+	__u32   reserved;
+};
+
+/**
+ * enum ethtool_fec_config_bits - flags definition of ethtool_fec_configuration
+ * @ETHTOOL_FEC_NONE: FEC mode configuration is not supported
+ * @ETHTOOL_FEC_AUTO: Default/Best FEC mode provided by driver
+ * @ETHTOOL_FEC_OFF: No FEC Mode
+ * @ETHTOOL_FEC_RS: Reed-Solomon Forward Error Detection mode
+ * @ETHTOOL_FEC_BASER: Base-R/Reed-Solomon Forward Error Detection mode
+ */
+enum ethtool_fec_config_bits {
+	ETHTOOL_FEC_NONE_BIT,
+	ETHTOOL_FEC_AUTO_BIT,
+	ETHTOOL_FEC_OFF_BIT,
+	ETHTOOL_FEC_RS_BIT,
+	ETHTOOL_FEC_BASER_BIT,
+};
+
+#define ETHTOOL_FEC_NONE		(1 << ETHTOOL_FEC_NONE_BIT)
+#define ETHTOOL_FEC_AUTO		(1 << ETHTOOL_FEC_AUTO_BIT)
+#define ETHTOOL_FEC_OFF			(1 << ETHTOOL_FEC_OFF_BIT)
+#define ETHTOOL_FEC_RS			(1 << ETHTOOL_FEC_RS_BIT)
+#define ETHTOOL_FEC_BASER		(1 << ETHTOOL_FEC_BASER_BIT)
+
 /* CMDs currently supported */
 #define ETHTOOL_GSET		0x00000001 /* DEPRECATED, Get settings.
 					    * Please use ETHTOOL_GLINKSETTINGS
@@ -1315,6 +1360,8 @@ struct ethtool_per_queue_op {
 #define ETHTOOL_GLINKSETTINGS	0x0000004c /* Get ethtool_link_settings */
 #define ETHTOOL_SLINKSETTINGS	0x0000004d /* Set ethtool_link_settings */
 
+#define ETHTOOL_GFECPARAM	0x0000004e /* Get FEC settings */
+#define ETHTOOL_SFECPARAM	0x0000004f /* Set FEC settings */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET
@@ -1369,7 +1416,9 @@ enum ethtool_link_mode_bit_indices {
 	ETHTOOL_LINK_MODE_10000baseLR_Full_BIT	= 44,
 	ETHTOOL_LINK_MODE_10000baseLRM_Full_BIT	= 45,
 	ETHTOOL_LINK_MODE_10000baseER_Full_BIT	= 46,
-
+	ETHTOOL_LINK_MODE_FEC_NONE_BIT		= 47,
+	ETHTOOL_LINK_MODE_FEC_RS_BIT		= 48,
+	ETHTOOL_LINK_MODE_FEC_BASER_BIT		= 49,
 
 	/* Last allowed bit for __ETHTOOL_LINK_MODE_LEGACY_MASK is bit
 	 * 31. Please do NOT define any SUPPORTED_* or ADVERTISED_*
@@ -1378,7 +1427,7 @@ enum ethtool_link_mode_bit_indices {
 	 */
 
 	__ETHTOOL_LINK_MODE_LAST
-	  = ETHTOOL_LINK_MODE_10000baseER_Full_BIT,
+	  = ETHTOOL_LINK_MODE_FEC_BASER_BIT,
 };
 
 #define __ETHTOOL_LINK_MODE_LEGACY_MASK(base_name)	\
