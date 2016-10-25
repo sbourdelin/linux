@@ -502,6 +502,45 @@ static void wait_for_dump_helpers(struct file *file)
 }
 
 /*
+ * umh_ns_setup
+ * set the namesapces to the bask task of a container.
+ * we need to switch back to the original namespaces
+ * so that the thread of workqueue is not influlenced.
+ *
+ * this method runs in workqueue kernel thread.
+ */
+static void umh_ns_setup(struct subprocess_info *info)
+{
+	struct coredump_params *cp = (struct coredump_params *)info->data;
+	struct task_struct *base_task = cp->base_task;
+
+	if (base_task) {
+		cp->current_task_nsproxy = current->nsproxy;
+		//prevent current namespace from being freed
+		get_nsproxy(current->nsproxy);
+		/* Set namespaces to base_task */
+		get_nsproxy(base_task->nsproxy);
+		switch_task_namespaces(current, base_task->nsproxy);
+	}
+}
+
+/*
+ * umh_ns_cleanup
+ * cleanup what we have done in umh_ns_setup.
+ *
+ * this method runs in workqueue kernel thread.
+ */
+static void umh_ns_cleanup(struct subprocess_info *info)
+{
+	struct coredump_params *cp = (struct coredump_params *)info->data;
+	struct nsproxy *current_task_nsproxy = cp->current_task_nsproxy;
+	if (current_task_nsproxy) {
+		/* switch workqueue's original namespace back */
+		switch_task_namespaces(current, current_task_nsproxy);
+	}
+}
+
+/*
  * umh_pipe_setup
  * helper function to customize the process used
  * to collect the core in userspace.  Specifically
@@ -516,6 +555,8 @@ static int umh_pipe_setup(struct subprocess_info *info, struct cred *new)
 {
 	struct file *files[2];
 	struct coredump_params *cp = (struct coredump_params *)info->data;
+	struct task_struct *base_task;
+
 	int err = create_pipe_files(files, 0);
 	if (err)
 		return err;
@@ -524,10 +565,76 @@ static int umh_pipe_setup(struct subprocess_info *info, struct cred *new)
 
 	err = replace_fd(0, files[0], 0);
 	fput(files[0]);
+	if (err)
+		return err;
+
 	/* and disallow core files too */
 	current->signal->rlim[RLIMIT_CORE] = (struct rlimit){1, 1};
 
-	return err;
+	base_task = cp->base_task;
+	if (base_task) {
+		const struct cred *base_cred;
+
+		/* Set fs_root to base_task */
+		spin_lock(&base_task->fs->lock);
+		set_fs_root(current->fs, &base_task->fs->root);
+		set_fs_pwd(current->fs, &base_task->fs->pwd);
+		spin_unlock(&base_task->fs->lock);
+
+		/* Set cgroup to base_task */
+		current->flags &= ~PF_NO_SETAFFINITY;
+		err = cgroup_attach_task_all(base_task, current);
+		if (err < 0)
+			return err;
+
+		/* Set cred to base_task */
+		base_cred = get_task_cred(base_task);
+
+		new->uid   = base_cred->uid;
+		new->gid   = base_cred->gid;
+		new->suid  = base_cred->suid;
+		new->sgid  = base_cred->sgid;
+		new->euid  = base_cred->euid;
+		new->egid  = base_cred->egid;
+		new->fsuid = base_cred->fsuid;
+		new->fsgid = base_cred->fsgid;
+
+		new->securebits = base_cred->securebits;
+
+		new->cap_inheritable = base_cred->cap_inheritable;
+		new->cap_permitted   = base_cred->cap_permitted;
+		new->cap_effective   = base_cred->cap_effective;
+		new->cap_bset        = base_cred->cap_bset;
+		new->cap_ambient     = base_cred->cap_ambient;
+
+		security_cred_free(new);
+#ifdef CONFIG_SECURITY
+		new->security = NULL;
+#endif
+		err = security_prepare_creds(new, base_cred, GFP_KERNEL);
+		if (err < 0) {
+			put_cred(base_cred);
+			return err;
+		}
+
+		free_uid(new->user);
+		new->user = base_cred->user;
+		get_uid(new->user);
+
+		put_user_ns(new->user_ns);
+		new->user_ns = base_cred->user_ns;
+		get_user_ns(new->user_ns);
+
+		put_group_info(new->group_info);
+		new->group_info = base_cred->group_info;
+		get_group_info(new->group_info);
+
+		put_cred(base_cred);
+
+		validate_creds(new);
+	}
+
+	return 0;
 }
 
 void do_coredump(const siginfo_t *siginfo)
@@ -590,6 +697,7 @@ void do_coredump(const siginfo_t *siginfo)
 
 	if (ispipe) {
 		int dump_count;
+                struct task_struct *vinit_task;
 		char **helper_argv;
 		struct subprocess_info *sub_info;
 
@@ -631,6 +739,15 @@ void do_coredump(const siginfo_t *siginfo)
 			goto fail_dropcount;
 		}
 
+		rcu_read_lock();
+		vinit_task = find_task_by_vpid(1);
+		rcu_read_unlock();
+		if (!vinit_task) {
+			printk(KERN_WARNING "failed getting init task info, skipping core dump\n");
+			goto fail_dropcount;
+		}
+
+
 		helper_argv = argv_split(GFP_KERNEL, cn.corename, NULL);
 		if (!helper_argv) {
 			printk(KERN_WARNING "%s failed to allocate memory\n",
@@ -638,15 +755,20 @@ void do_coredump(const siginfo_t *siginfo)
 			goto fail_dropcount;
 		}
 
+		get_task_struct(vinit_task);
+
+		cprm.base_task = vinit_task;
+
 		retval = -ENOMEM;
 		sub_info = call_usermodehelper_setup(helper_argv[0],
 						helper_argv, NULL, GFP_KERNEL,
-						NULL, NULL, umh_pipe_setup,
+						umh_ns_setup, umh_ns_cleanup, umh_pipe_setup,
 						NULL, &cprm);
 		if (sub_info)
 			retval = call_usermodehelper_exec(sub_info,
 							  UMH_WAIT_EXEC);
 
+		put_task_struct(vinit_task);
 		argv_free(helper_argv);
 		if (retval) {
 			printk(KERN_INFO "Core dump to |%s pipe failed\n",

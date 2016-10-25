@@ -59,6 +59,8 @@ struct linux_binprm {
 
 /* Function parameter for binfmt->coredump */
 struct coredump_params {
+        struct task_struct *base_task;
+        struct nsproxy *current_task_nsproxy;
 	const siginfo_t *siginfo;
 	struct pt_regs *regs;
 	struct file *file;
