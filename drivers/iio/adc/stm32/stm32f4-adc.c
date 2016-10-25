@@ -330,6 +330,32 @@ static const struct stm32_adc_info stm32f4_adc_info[] = {
 };
 
 /**
+ * stm32f4_smpr_regs[] - describe sampling time registers & bit fields
+ * Sorted so it can be indexed by channel number.
+ */
+static const struct stm32_adc_regs stm32f4_smpr_regs[] = {
+	{ STM32F4_ADCX_SMPR2, STM32F4_SMP0_MASK, STM32F4_SMP0_SHIFT },
+	{ STM32F4_ADCX_SMPR2, STM32F4_SMP1_MASK, STM32F4_SMP1_SHIFT },
+	{ STM32F4_ADCX_SMPR2, STM32F4_SMP2_MASK, STM32F4_SMP2_SHIFT },
+	{ STM32F4_ADCX_SMPR2, STM32F4_SMP3_MASK, STM32F4_SMP3_SHIFT },
+	{ STM32F4_ADCX_SMPR2, STM32F4_SMP4_MASK, STM32F4_SMP4_SHIFT },
+	{ STM32F4_ADCX_SMPR2, STM32F4_SMP5_MASK, STM32F4_SMP5_SHIFT },
+	{ STM32F4_ADCX_SMPR2, STM32F4_SMP6_MASK, STM32F4_SMP6_SHIFT },
+	{ STM32F4_ADCX_SMPR2, STM32F4_SMP7_MASK, STM32F4_SMP7_SHIFT },
+	{ STM32F4_ADCX_SMPR2, STM32F4_SMP8_MASK, STM32F4_SMP8_SHIFT },
+	{ STM32F4_ADCX_SMPR2, STM32F4_SMP9_MASK, STM32F4_SMP9_SHIFT },
+	{ STM32F4_ADCX_SMPR1, STM32F4_SMP10_MASK, STM32F4_SMP10_SHIFT },
+	{ STM32F4_ADCX_SMPR1, STM32F4_SMP11_MASK, STM32F4_SMP11_SHIFT },
+	{ STM32F4_ADCX_SMPR1, STM32F4_SMP12_MASK, STM32F4_SMP12_SHIFT },
+	{ STM32F4_ADCX_SMPR1, STM32F4_SMP13_MASK, STM32F4_SMP13_SHIFT },
+	{ STM32F4_ADCX_SMPR1, STM32F4_SMP14_MASK, STM32F4_SMP14_SHIFT },
+	{ STM32F4_ADCX_SMPR1, STM32F4_SMP15_MASK, STM32F4_SMP15_SHIFT },
+	{ STM32F4_ADCX_SMPR1, STM32F4_SMP16_MASK, STM32F4_SMP16_SHIFT },
+	{ STM32F4_ADCX_SMPR1, STM32F4_SMP17_MASK, STM32F4_SMP17_SHIFT },
+	{ STM32F4_ADCX_SMPR1, STM32F4_SMP18_MASK, STM32F4_SMP18_SHIFT },
+};
+
+/**
  * stm32f4_sqr_regs - describe regular sequence registers
  * - L: sequence len (register & bit field)
  * - SQ1..SQ16: sequence entries (register & bit field)
@@ -407,6 +433,7 @@ static const struct stm32_adc_reginfo stm32f4_adc_reginfo = {
 	},
 	.sqr_regs = stm32f4_sqr_regs,
 	.jsqr_reg = stm32f4_jsqr_reg,
+	.smpr_regs = stm32f4_smpr_regs,
 	.trig_reginfo = &stm32f4_adc_trig_reginfo,
 	.jtrig_reginfo = &stm32f4_adc_jtrig_reginfo,
 };
@@ -555,7 +582,28 @@ static int stm32f4_adc_clk_sel(struct stm32_adc *adc)
 	return 0;
 }
 
+/* stm32f4_smpr_items : Channel-wise programmable sampling time */
+static const char * const stm32f4_smpr_items[] = {
+	[STM32F4_SMPR_3_CK_CYCLES] = "3_cycles",
+	[STM32F4_SMPR_15_CK_CYCLES] = "15_cycles",
+	[STM32F4_SMPR_28_CK_CYCLES] = "28_cycles",
+	[STM32F4_SMPR_56_CK_CYCLES] = "56_cycles",
+	[STM32F4_SMPR_84_CK_CYCLES] = "84_cycles",
+	[STM32F4_SMPR_112_CK_CYCLES] = "112_cycles",
+	[STM32F4_SMPR_144_CK_CYCLES] = "144_cycles",
+	[STM32F4_SMPR_480_CK_CYCLES] = "480_cycles",
+};
+
+static const struct iio_enum stm32f4_smpr = {
+	.items = stm32f4_smpr_items,
+	.num_items = ARRAY_SIZE(stm32f4_smpr_items),
+	.get = stm32_adc_get_smpr,
+	.set = stm32_adc_set_smpr,
+};
+
 static const struct iio_chan_spec_ext_info stm32f4_adc_ext_info[] = {
+	IIO_ENUM("smpr", IIO_SEPARATE, &stm32f4_smpr),
+	IIO_ENUM_AVAILABLE("smpr", &stm32f4_smpr),
 	IIO_ENUM("trigger_pol", IIO_SHARED_BY_ALL, &stm32_adc_trig_pol),
 	{
 		.name = "trigger_pol_available",

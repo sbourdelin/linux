@@ -143,6 +143,14 @@ struct stm32_adc_chan_spec {
 };
 
 /**
+ * struct stm32_adc_chan - Extended specifications of stm32 adc channels
+ * @smpr: per channel sampling time selection
+ */
+struct stm32_adc_chan {
+	unsigned smpr:3;
+};
+
+/**
  * struct stm32_adc_trig_info - ADC trigger info
  * @extsel:		trigger selection for regular or injected
  * @name:		name of the trigger, corresponding to its source
@@ -206,6 +214,7 @@ struct stm32_adc_trig_reginfo {
  * @jdr:		injected data registers offsets
  * @sqr_regs:		Regular sequence registers description
  * @jsqr_reg:		Injected sequence register description
+ * @smpr_regs:		Sampling time registers description
  * @trig_reginfo:	regular trigger control registers description
  * @jtrig_reginfo:	injected trigger control registers description
  */
@@ -220,6 +229,7 @@ struct stm32_adc_reginfo {
 	u32 jdr[4];
 	const struct stm32_adc_regs *sqr_regs;
 	const struct stm32_adc_regs *jsqr_reg;
+	const struct stm32_adc_regs *smpr_regs;
 	const struct stm32_adc_trig_reginfo *trig_reginfo;
 	const struct stm32_adc_trig_reginfo *jtrig_reginfo;
 };
@@ -328,6 +338,7 @@ struct stm32_adc {
  * @aclk:		common clock for the analog circuitry
  * @vref:		regulator reference
  * @vref_mv:		vref voltage (mv)
+ * @stm32_chans:	stm32 channels extended specification data
  * @gpio_descs:		gpio descriptor used to configure EXTi triggers
  * @lock:		mutex
  */
@@ -341,11 +352,21 @@ struct stm32_adc_common {
 	struct clk			*aclk;
 	struct regulator		*vref;
 	int				vref_mv;
+	struct stm32_adc_chan		*stm32_chans[STM32_ADC_ID_MAX];
 	struct gpio_descs		*gpios;
 	struct mutex			lock;	/* read_raw lock */
 };
 
 /* Helper routines */
+static inline struct stm32_adc_chan *to_stm32_chan(struct stm32_adc *adc,
+						   const struct iio_chan_spec
+						   *chan)
+{
+	struct stm32_adc_chan *stm32_chans = adc->common->stm32_chans[adc->id];
+
+	return &stm32_chans[chan->channel];
+}
+
 static inline int stm32_adc_start_conv(struct stm32_adc *adc)
 {
 	return adc->common->data->start_conv(adc);
@@ -458,6 +479,10 @@ static inline void stm32_adc_clr_bits(struct stm32_adc *adc, u32 reg, u32 bits)
 
 /* STM32 common extended attributes */
 extern const struct iio_enum stm32_adc_trig_pol;
+int stm32_adc_set_smpr(struct iio_dev *indio_dev,
+		       const struct iio_chan_spec *chan, unsigned int smpr);
+int stm32_adc_get_smpr(struct iio_dev *indio_dev,
+		       const struct iio_chan_spec *chan);
 int stm32_adc_probe(struct platform_device *pdev);
 int stm32_adc_remove(struct platform_device *pdev);
 

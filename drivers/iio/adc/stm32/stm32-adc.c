@@ -38,6 +38,61 @@
 #include "stm32-adc.h"
 
 /**
+ * stm32_adc_conf_smp() - Configure sampling time for each channel
+ * @indio_dev: IIO device
+ * @scan_mask: channels to be converted
+ */
+static int stm32_adc_conf_smp(struct iio_dev *indio_dev,
+			      const unsigned long *scan_mask)
+{
+	struct stm32_adc *adc = iio_priv(indio_dev);
+	const struct stm32_adc_regs *smp =
+		adc->common->data->adc_reginfo->smpr_regs;
+	struct stm32_adc_chan *stm32_chan;
+	const struct iio_chan_spec *chan;
+	u32 bit, val;
+	int i;
+
+	for_each_set_bit(bit, scan_mask, indio_dev->masklength) {
+		chan = indio_dev->channels + bit;
+		stm32_chan = to_stm32_chan(adc, chan);
+		i = chan->channel;
+
+		if (i >= adc->max_channels)
+			return -EINVAL;
+
+		val = stm32_adc_readl(adc, smp[i].reg);
+		val &= ~smp[i].mask;
+		val |= (stm32_chan->smpr << smp[i].shift) & smp[i].mask;
+		stm32_adc_writel(adc, smp[i].reg, val);
+	}
+
+	return 0;
+}
+
+int stm32_adc_set_smpr(struct iio_dev *indio_dev,
+		       const struct iio_chan_spec *chan, unsigned int smpr)
+{
+	struct stm32_adc *adc = iio_priv(indio_dev);
+	struct stm32_adc_chan *stm32_chan = to_stm32_chan(adc, chan);
+
+	stm32_chan->smpr = smpr;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(stm32_adc_set_smpr);
+
+int stm32_adc_get_smpr(struct iio_dev *indio_dev,
+		       const struct iio_chan_spec *chan)
+{
+	struct stm32_adc *adc = iio_priv(indio_dev);
+	struct stm32_adc_chan *stm32_chan = to_stm32_chan(adc, chan);
+
+	return stm32_chan->smpr;
+}
+EXPORT_SYMBOL_GPL(stm32_adc_get_smpr);
+
+/**
  * stm32_adc_conf_scan_seq() - Build regular or injected channels scan sequence
  * @indio_dev: IIO device
  * @scan_mask: channels to be converted
@@ -124,6 +179,12 @@ static int stm32_adc_conf_scan(struct iio_dev *indio_dev,
 	if (ret) {
 		dev_err(&indio_dev->dev, "Failed to enable adc\n");
 		return ret;
+	}
+
+	ret = stm32_adc_conf_smp(indio_dev, scan_mask);
+	if (ret) {
+		dev_err(&indio_dev->dev, "Failed to configure samp time\n");
+		goto err_dis;
 	}
 
 	ret = stm32_adc_conf_scan_seq(indio_dev, scan_mask);
@@ -938,12 +999,26 @@ static int stm32_adc_chan_of_init(struct iio_dev *indio_dev,
 				  const struct stm32_adc_info *adc_info)
 {
 	struct stm32_adc *adc = iio_priv(indio_dev);
+	struct stm32_adc_common *common = adc->common;
 	struct device_node *node = indio_dev->dev.of_node;
 	struct property *prop;
 	const __be32 *cur;
 	struct iio_chan_spec *channels;
 	int scan_index = 0, num_channels = 0;
 	u32 val;
+
+	if (!common->stm32_chans[adc->id]) {
+		/* Allocate extended attributes structure for an instance */
+		struct stm32_adc_chan *stm32_chans;
+
+		stm32_chans = devm_kcalloc(&indio_dev->dev,
+					   adc_info->max_channels,
+					   sizeof(*stm32_chans), GFP_KERNEL);
+		if (!stm32_chans)
+			return -ENOMEM;
+
+		common->stm32_chans[adc->id] = stm32_chans;
+	}
 
 	of_property_for_each_u32(node, "st,adc-channels", prop, cur, val)
 		num_channels++;
