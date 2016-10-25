@@ -238,7 +238,8 @@ static void *vb2_dma_sg_get_userptr(struct device *dev, unsigned long vaddr,
 	buf->offset = vaddr & ~PAGE_MASK;
 	buf->size = size;
 	buf->dma_sgt = &buf->sg_table;
-	vec = vb2_create_framevec(vaddr, size, buf->dma_dir == DMA_FROM_DEVICE);
+	vec = vb2_create_framevec(vaddr, size,
+				  VB2_DMA_DIR_CAPTURE(buf->dma_dir));
 	if (IS_ERR(vec))
 		goto userptr_fail_pfnvec;
 	buf->vec = vec;
@@ -291,7 +292,7 @@ static void vb2_dma_sg_put_userptr(void *buf_priv)
 		vm_unmap_ram(buf->vaddr, buf->num_pages);
 	sg_free_table(buf->dma_sgt);
 	while (--i >= 0) {
-		if (buf->dma_dir == DMA_FROM_DEVICE)
+		if (VB2_DMA_DIR_CAPTURE(buf->dma_dir))
 			set_page_dirty_lock(buf->pages[i]);
 	}
 	vb2_destroy_framevec(buf->vec);
