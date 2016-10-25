@@ -449,9 +449,7 @@ static void setup_pci_atmu(struct pci_controller *hose)
 #endif
 		/* adjusting outbound windows could reclaim space in mem map */
 		if (paddr_hi < 0xffffffffull)
-			pr_warning("%s: WARNING: Outbound window cfg leaves "
-				"gaps in memory map. Adjusting the memory map "
-				"could reduce unnecessary bounce buffering.\n",
+			pr_warn("%s: WARNING: Outbound window cfg leaves gaps in memory map. Adjusting the memory map could reduce unnecessary bounce buffering.\n",
 				name);
 
 		pr_info("%s: DMA window size is 0x%llx\n", name,
@@ -532,7 +530,7 @@ int fsl_add_bridge(struct platform_device *pdev, int is_primary)
 	dev = pdev->dev.of_node;
 
 	if (!of_device_is_available(dev)) {
-		pr_warning("%s: disabled\n", dev->full_name);
+		pr_warn("%s: disabled\n", dev->full_name);
 		return -ENODEV;
 	}
 
@@ -809,8 +807,7 @@ int __init mpc83xx_add_bridge(struct device_node *dev)
 	is_mpc83xx_pci = 1;
 
 	if (!of_device_is_available(dev)) {
-		pr_warning("%s: disabled by the firmware.\n",
-			   dev->full_name);
+		pr_warn("%s: disabled by the firmware\n", dev->full_name);
 		return -ENODEV;
 	}
 	pr_debug("Adding PCI host bridge %s\n", dev->full_name);
