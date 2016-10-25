@@ -117,7 +117,9 @@ the thread executes on the designated CPUs. Default is to monitor all CPUs.
 -F=[all|min|maj]::
 --pf=[all|min|maj]::
 	Trace pagefaults. Optionally, you can specify whether you want minor,
-	major or all pagefaults. Default value is maj.
+	major or all pagefaults. Default value is maj. Durations of
+	page-fault handling will be printed if possible (need for some
+	architecture-dependent tracepoints).
 
 --syscalls::
 	Trace system calls. This options is enabled by default.
