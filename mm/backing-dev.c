@@ -853,12 +853,12 @@ static void bdi_remove_from_list(struct backing_dev_info *bdi)
 
 void bdi_unregister(struct backing_dev_info *bdi)
 {
-	/* make sure nobody finds us on the bdi_list anymore */
-	bdi_remove_from_list(bdi);
-	wb_shutdown(&bdi->wb);
-	cgwb_bdi_destroy(bdi);
-
 	if (bdi->dev) {
+		/* make sure nobody finds us on the bdi_list anymore */
+		bdi_remove_from_list(bdi);
+		wb_shutdown(&bdi->wb);
+		cgwb_bdi_destroy(bdi);
+
 		bdi_debug_unregister(bdi);
 		device_unregister(bdi->dev);
 		bdi->dev = NULL;
