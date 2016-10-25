@@ -878,7 +878,7 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 	int max_ports;
 	unsigned long flags;
-	u32 temp, status;
+	u32 temp, status, tmp_status = 0;
 	int retval = 0;
 	__le32 __iomem **port_array;
 	int slot_id;
@@ -1098,6 +1098,21 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			spin_lock_irqsave(&xhci->lock, flags);
 			break;
 		case USB_PORT_FEAT_RESET:
+			/*
+			 * Do not drive a reset signal when the port
+			 * is resuming
+			 */
+			tmp_status = readl(port_array[wIndex]);
+			spin_unlock_irqrestore(&xhci->lock, flags);
+			if (!DEV_SUPERSPEED(tmp_status)	&&
+			    (tmp_status & PORT_PLS_MASK) == XDEV_RESUME) {
+				xhci_err(xhci, "skip port reset\n");
+				spin_lock_irqsave(&xhci->lock, flags);
+				retval = -EPERM;
+				break;
+			}
+			spin_lock_irqsave(&xhci->lock, flags);
+
 			temp = (temp | PORT_RESET);
 			writel(temp, port_array[wIndex]);
 
