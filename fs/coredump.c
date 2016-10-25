@@ -49,15 +49,12 @@
 
 int core_uses_pid;
 unsigned int core_pipe_limit;
-char core_pattern[CORENAME_MAX_SIZE] = "core";
 static int core_name_size = CORENAME_MAX_SIZE;
 
 struct core_name {
 	char *corename;
 	int used, size;
 };
-
-/* The maximal length of core_pattern is also specified in sysctl.c */
 
 static int expand_corename(struct core_name *cn, int size)
 {
@@ -183,10 +180,10 @@ put_exe_file:
  * name into corename, which must have space for at least
  * CORENAME_MAX_SIZE bytes plus one byte for the zero terminator.
  */
-static int format_corename(struct core_name *cn, struct coredump_params *cprm)
+static int format_corename(struct core_name *cn, const char *pat_ptr,
+			   struct coredump_params *cprm)
 {
 	const struct cred *cred = current_cred();
-	const char *pat_ptr = core_pattern;
 	int ispipe = (*pat_ptr == '|');
 	int pid_in_pattern = 0;
 	int err = 0;
@@ -663,6 +660,8 @@ void do_coredump(const siginfo_t *siginfo)
 		 */
 		.mm_flags = mm->flags,
 	};
+	struct pid_namespace *pid_ns;
+	char core_pattern[CORENAME_MAX_SIZE];
 
 	audit_core_dumps(siginfo->si_signo);
 
@@ -671,6 +670,18 @@ void do_coredump(const siginfo_t *siginfo)
 		goto fail;
 	if (!__get_dumpable(cprm.mm_flags))
 		goto fail;
+
+	pid_ns = task_active_pid_ns(current);
+	spin_lock(&pid_ns->core_pattern_lock);
+	while (pid_ns != &init_pid_ns) {
+		if (pid_ns->core_pattern[0])
+			break;
+		spin_unlock(&pid_ns->core_pattern_lock);
+		pid_ns = pid_ns->parent,
+		spin_lock(&pid_ns->core_pattern_lock);
+	}
+	strcpy(core_pattern, pid_ns->core_pattern);
+	spin_unlock(&pid_ns->core_pattern_lock);
 
 	cred = prepare_creds();
 	if (!cred)
@@ -693,7 +704,7 @@ void do_coredump(const siginfo_t *siginfo)
 
 	old_cred = override_creds(cred);
 
-	ispipe = format_corename(&cn, &cprm);
+	ispipe = format_corename(&cn, core_pattern, &cprm);
 
 	if (ispipe) {
 		int dump_count;
@@ -740,7 +751,7 @@ void do_coredump(const siginfo_t *siginfo)
 		}
 
 		rcu_read_lock();
-		vinit_task = find_task_by_vpid(1);
+		vinit_task = find_task_by_pid_ns(1, pid_ns);
 		rcu_read_unlock();
 		if (!vinit_task) {
 			printk(KERN_WARNING "failed getting init task info, skipping core dump\n");

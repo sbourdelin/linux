@@ -484,7 +484,7 @@ static struct ctl_table kern_table[] = {
 	},
 	{
 		.procname	= "core_pattern",
-		.data		= core_pattern,
+		.data		= NULL,
 		.maxlen		= CORENAME_MAX_SIZE,
 		.mode		= 0644,
 		.proc_handler	= proc_dostring_coredump,
@@ -2401,12 +2401,20 @@ int proc_dointvec_minmax(struct ctl_table *table, int write,
 static void validate_coredump_safety(void)
 {
 #ifdef CONFIG_COREDUMP
+	struct pid_namespace *pid_ns = task_active_pid_ns(current);
+	const char *core_pattern;
+
+	spin_lock(&pid_ns->core_pattern_lock);
+	core_pattern = pid_ns->core_pattern;
+
 	if (suid_dumpable == SUID_DUMP_ROOT &&
 	    core_pattern[0] != '/' && core_pattern[0] != '|') {
 		printk(KERN_WARNING "Unsafe core_pattern used with "\
 			"suid_dumpable=2. Pipe handler or fully qualified "\
 			"core dump path required.\n");
 	}
+
+	spin_unlock(&pid_ns->core_pattern_lock);
 #endif
 }
 
@@ -2423,10 +2431,42 @@ static int proc_dointvec_minmax_coredump(struct ctl_table *table, int write,
 static int proc_dostring_coredump(struct ctl_table *table, int write,
 		  void __user *buffer, size_t *lenp, loff_t *ppos)
 {
-	int error = proc_dostring(table, write, buffer, lenp, ppos);
-	if (!error)
-		validate_coredump_safety();
-	return error;
+	int ret;
+	char core_pattern[CORENAME_MAX_SIZE];
+	struct pid_namespace *pid_ns = task_active_pid_ns(current);
+
+	if (write) {
+		if (*ppos && sysctl_writes_strict == SYSCTL_WRITES_WARN)
+			warn_sysctl_write(table);
+
+		ret = _proc_do_string(core_pattern, table->maxlen, write,
+				      (char __user *)buffer, lenp, ppos);
+		if (ret)
+			return ret;
+
+		spin_lock(&pid_ns->core_pattern_lock);
+		strcpy(pid_ns->core_pattern, core_pattern);
+		spin_unlock(&pid_ns->core_pattern_lock);
+	} else {
+		spin_lock(&pid_ns->core_pattern_lock);
+		while (pid_ns != &init_pid_ns) {
+			if (pid_ns->core_pattern[0])
+				break;
+			spin_unlock(&pid_ns->core_pattern_lock);
+			pid_ns = pid_ns->parent,
+			spin_lock(&pid_ns->core_pattern_lock);
+		}
+		strcpy(core_pattern, pid_ns->core_pattern);
+		spin_unlock(&pid_ns->core_pattern_lock);
+
+		ret = _proc_do_string(core_pattern, table->maxlen, write,
+				      (char __user *)buffer, lenp, ppos);
+		if (ret)
+			return ret;
+	}
+
+	validate_coredump_safety();
+	return 0;
 }
 #endif
 
