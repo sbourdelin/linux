@@ -41,8 +41,10 @@ static __init int numa_parse_early_param(char *opt)
 {
 	if (!opt)
 		return -EINVAL;
-	if (!strncmp(opt, "off", 3))
+	if (!strncmp(opt, "off", 3)) {
+		__of_force_no_numa();
 		numa_off = true;
+	}
 
 	return 0;
 }
@@ -432,6 +434,7 @@ static int __init dummy_numa_init(void)
 		return ret;
 	}
 
+	__of_force_no_numa();
 	numa_off = true;
 	return 0;
 }
