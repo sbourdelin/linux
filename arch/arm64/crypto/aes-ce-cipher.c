@@ -253,6 +253,8 @@ static struct crypto_alg aes_alg = {
 
 static int __init aes_mod_init(void)
 {
+	if (!system_supports_fpsimd())
+		return -ENODEV;
 	return crypto_register_alg(&aes_alg);
 }
 

@@ -144,6 +144,8 @@ static struct shash_alg ghash_alg = {
 
 static int __init ghash_ce_mod_init(void)
 {
+	if (!system_supports_fpsimd())
+		return -ENODEV;
 	return crypto_register_shash(&ghash_alg);
 }
 

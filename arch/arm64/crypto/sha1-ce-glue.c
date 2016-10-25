@@ -102,6 +102,8 @@ static struct shash_alg alg = {
 
 static int __init sha1_ce_mod_init(void)
 {
+	if (!system_supports_fpsimd())
+		return -ENODEV;
 	return crypto_register_shash(&alg);
 }
 
