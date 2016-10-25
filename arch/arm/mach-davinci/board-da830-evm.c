@@ -27,6 +27,7 @@
 #include <linux/platform_data/mtd-davinci-aemif.h>
 #include <linux/platform_data/spi-davinci.h>
 #include <linux/platform_data/usb-davinci.h>
+#include <linux/mfd/da8xx-cfgchip.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -133,7 +134,7 @@ static __init void da830_evm_usb_init(void)
 	 * controller won't be able to drive VBUS thinking that it's a B-device.
 	 * Otherwise, we want to use the OTG mode and enable VBUS comparators.
 	 */
-	cfgchip2 &= ~CFGCHIP2_OTGMODE;
+	cfgchip2 &= ~CFGCHIP2_OTGMODE_MASK;
 #ifdef	CONFIG_USB_MUSB_HOST
 	cfgchip2 |=  CFGCHIP2_FORCE_HOST;
 #else
