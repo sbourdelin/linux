@@ -1076,6 +1076,8 @@ static void soc_remove_component(struct snd_soc_component *component)
 	if (component->codec)
 		list_del(&component->codec->card_list);
 
+	list_del(&component->card_list);
+
 	if (component->remove)
 		component->remove(component);
 
@@ -1448,6 +1450,8 @@ static int soc_probe_component(struct snd_soc_card *card,
 	if (component->codec)
 		list_add(&component->codec->card_list, &card->codec_dev_list);
 
+	list_add(&component->card_list, &card->component_dev_list);
+
 	return 0;
 
 err_probe:
@@ -1706,7 +1710,8 @@ static int soc_bind_aux_dev(struct snd_soc_card *card, int num)
 	}
 
 	component->init = aux_dev->init;
-	list_add(&component->list_aux, &card->aux_comp_list);
+	component->has_auxiliary = 1;
+
 	return 0;
 
 err_defer:
@@ -1722,7 +1727,10 @@ static int soc_probe_aux_devices(struct snd_soc_card *card)
 
 	for (order = SND_SOC_COMP_ORDER_FIRST; order <= SND_SOC_COMP_ORDER_LAST;
 		order++) {
-		list_for_each_entry(comp, &card->aux_comp_list, list_aux) {
+		list_for_each_entry(comp, &card->component_dev_list, card_list) {
+			if (!comp->has_auxiliary)
+				continue;
+
 			if (comp->driver->probe_order == order) {
 				ret = soc_probe_component(card,	comp);
 				if (ret < 0) {
@@ -1746,11 +1754,14 @@ static void soc_remove_aux_devices(struct snd_soc_card *card)
 	for (order = SND_SOC_COMP_ORDER_FIRST; order <= SND_SOC_COMP_ORDER_LAST;
 		order++) {
 		list_for_each_entry_safe(comp, _comp,
-			&card->aux_comp_list, list_aux) {
+			&card->component_dev_list, card_list) {
+
+			if (!comp->has_auxiliary)
+				continue;
+
 			if (comp->driver->remove_order == order) {
 				soc_remove_component(comp);
-				/* remove it from the card's aux_comp_list */
-				list_del(&comp->list_aux);
+				comp->has_auxiliary = 0;
 			}
 		}
 	}
