@@ -399,7 +399,35 @@
 				<&edma0 0 1>;
 			dma-names = "tx", "rx";
 		};
+
+		vpif: video@0x00217000 {
+			compatible = "ti,vpif";
+			reg = <0x00217000 0x1000>;
+			status = "disabled";
+		};
+
+		vpif_capture: video-capture@0x00217000 {
+			compatible = "ti,vpif-capture";
+			reg = <0x00217000 0x1000>;
+			interrupts = <92>;
+			status = "disabled";
+
+			/* VPIF capture: input channels */
+			port {
+				vpif_ch0: endpoint@0 {
+					  reg = <0>;
+					  bus-width = <8>;
+				};
+
+				vpif_ch1: endpoint@1 {
+					  reg = <1>;
+					  bus-width = <8>;
+					  data-shift = <8>;
+				};
+			};
+		};
 	};
+
 	aemif: aemif@68000000 {
 		compatible = "ti,da850-aemif";
 		#address-cells = <2>;
