@@ -1708,7 +1708,7 @@ i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
 		else
 			name++;
 
-		if (!strncasecmp(client->name, name, strlen(client->name)))
+		if (!strncasecmp(client->name, name, strlen(name)))
 			return matches;
 	}
 
