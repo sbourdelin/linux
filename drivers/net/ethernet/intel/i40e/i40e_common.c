@@ -4408,7 +4408,7 @@ i40e_status i40e_read_phy_register_clause22(struct i40e_hw *hw,
 					u16 reg, u8 phy_addr, u16 *value)
 {
 	i40e_status status = I40E_ERR_TIMEOUT;
-	u8 port_num = hw->func_caps.mdio_port_num;
+	u8 port_num = (u8)hw->func_caps.mdio_port_num;
 	u32 command = 0;
 	u16 retry = 1000;
 
@@ -4460,9 +4460,9 @@ i40e_status i40e_write_phy_register_clause22(struct i40e_hw *hw,
 					u16 reg, u8 phy_addr, u16 value)
 {
 	i40e_status status = I40E_ERR_TIMEOUT;
+	u8 port_num = (u8)hw->func_caps.mdio_port_num;
 	u32 command  = 0;
 	u16 retry = 1000;
-	u8 port_num = hw->func_caps.mdio_port_num;
 
 	command = value << I40E_GLGEN_MSRWD_MDIWRDATA_SHIFT;
 	wr32(hw, I40E_GLGEN_MSRWD(port_num), command);
