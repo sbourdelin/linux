@@ -482,6 +482,12 @@ static irqreturn_t stm32_adc_common_isr(int irq, void *data)
 	return ret;
 }
 
+static irqreturn_t stm32_adc_exti_handler(int irq, void *data)
+{
+	/* Exti handler should not be invoqued, and is not used */
+	return IRQ_HANDLED;
+}
+
 /**
  * stm32_adc_validate_trigger() - validate trigger for stm32 adc
  * @indio_dev: IIO device
@@ -1051,6 +1057,41 @@ static void stm32_adc_unregister(struct stm32_adc *adc)
 	}
 }
 
+static int stm32_adc_exti_probe(struct stm32_adc_common *common)
+{
+	int i, irq, ret;
+
+	common->gpios = devm_gpiod_get_array_optional(common->dev, NULL,
+						      GPIOD_IN);
+	if (!common->gpios)
+		return 0;
+
+	for (i = 0; i < common->gpios->ndescs; i++) {
+		irq = gpiod_to_irq(common->gpios->desc[i]);
+		if (irq < 0) {
+			dev_err(common->dev, "gpio %d to irq failed\n", i);
+			return irq;
+		}
+
+		ret = devm_request_irq(common->dev, irq, stm32_adc_exti_handler,
+				       0, dev_name(common->dev), common);
+		if (ret) {
+			dev_err(common->dev, "request IRQ %d failed\n", irq);
+			return ret;
+		}
+
+		/*
+		 * gpios are configured as interrupts, so exti trigger path is
+		 * configured in HW. But getting interrupts when starting
+		 * conversions is unused here, so mask it in on exti
+		 * controller by default.
+		 */
+		disable_irq(irq);
+	}
+
+	return 0;
+}
+
 int stm32_adc_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node, *child;
@@ -1130,6 +1171,10 @@ int stm32_adc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to request irq\n");
 		goto err_clk_disable;
 	}
+
+	ret = stm32_adc_exti_probe(common);
+	if (ret)
+		goto err_clk_disable;
 
 	/* Parse adc child nodes to retrieve master/slave instances data */
 	for_each_available_child_of_node(np, child) {

@@ -23,6 +23,7 @@
 #define __STM32_ADC_H
 
 #include <linux/dmaengine.h>
+#include <linux/gpio/consumer.h>
 #include <linux/irq_work.h>
 
 /*
@@ -323,6 +324,7 @@ struct stm32_adc {
  * @aclk:		common clock for the analog circuitry
  * @vref:		regulator reference
  * @vref_mv:		vref voltage (mv)
+ * @gpio_descs:		gpio descriptor used to configure EXTi triggers
  * @lock:		mutex
  */
 struct stm32_adc_common {
@@ -335,6 +337,7 @@ struct stm32_adc_common {
 	struct clk			*aclk;
 	struct regulator		*vref;
 	int				vref_mv;
+	struct gpio_descs		*gpios;
 	struct mutex			lock;	/* read_raw lock */
 };
 
