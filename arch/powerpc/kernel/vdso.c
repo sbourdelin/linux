@@ -51,7 +51,7 @@
 #define VDSO_ALIGNMENT	(1 << 16)
 
 static unsigned int vdso32_pages;
-static struct page **vdso32_pagelist;
+static struct vm_special_mapping vdso32_mapping;
 unsigned long vdso32_sigtramp;
 unsigned long vdso32_rt_sigtramp;
 
@@ -64,7 +64,7 @@ static void *vdso32_kbase;
 extern char vdso64_start, vdso64_end;
 static void *vdso64_kbase = &vdso64_start;
 static unsigned int vdso64_pages;
-static struct page **vdso64_pagelist;
+static struct vm_special_mapping vdso64_mapping;
 unsigned long vdso64_rt_sigtramp;
 #endif /* CONFIG_PPC64 */
 
@@ -143,10 +143,11 @@ struct lib64_elfinfo
 	unsigned long	text;
 };
 
-static int map_vdso(struct page **vdso_pagelist, unsigned long vdso_pages,
+static int map_vdso(struct vm_special_mapping *vsm, unsigned long vdso_pages,
 		unsigned long vdso_base)
 {
 	struct mm_struct *mm = current->mm;
+	struct vm_area_struct *vma;
 	int ret = 0;
 
 	mm->context.vdso_base = 0;
@@ -198,12 +199,14 @@ static int map_vdso(struct page **vdso_pagelist, unsigned long vdso_pages,
 	 * It's fine to use that for setting breakpoints in the vDSO code
 	 * pages though.
 	 */
-	ret = install_special_mapping(mm, vdso_base, vdso_pages << PAGE_SHIFT,
+	vma = _install_special_mapping(mm, vdso_base, vdso_pages << PAGE_SHIFT,
 				     VM_READ|VM_EXEC|
 				     VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
-				     vdso_pagelist);
-	if (ret)
+				     vsm);
+	if (IS_ERR(vma)) {
+		ret = PTR_ERR(vma);
 		current->mm->context.vdso_base = 0;
+	}
 
 out_up_mmap_sem:
 	up_write(&mm->mmap_sem);
@@ -220,7 +223,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 		return 0;
 
 	if (is_32bit_task())
-		return map_vdso(vdso32_pagelist, vdso32_pages, VDSO32_MBASE);
+		return map_vdso(&vdso32_mapping, vdso32_pages, VDSO32_MBASE);
 #ifdef CONFIG_PPC64
 	else
 		/*
@@ -228,7 +231,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 		 * allows get_unmapped_area to find an area near other mmaps
 		 * and most likely share a SLB entry.
 		 */
-		return map_vdso(vdso64_pagelist, vdso64_pages, 0);
+		return map_vdso(&vdso64_mapping, vdso64_pages, 0);
 #endif
 	WARN_ONCE(1, "task is not 32-bit on non PPC64 kernel");
 	return -1;
