@@ -137,6 +137,19 @@ static inline void mfd_acpi_add_device(const struct mfd_cell *cell,
 }
 #endif
 
+static inline int mfd_check_node_callback(struct device *dev, void *data)
+{
+	struct device_node *np = data;
+
+	return dev->of_node == np;
+}
+
+static inline int mfd_is_node_allocated_to_dev(struct device *dev,
+					       struct device_node *node)
+{
+	return device_for_each_child(dev, node, mfd_check_node_callback);
+}
+
 static int mfd_add_device(struct device *parent, int id,
 			  const struct mfd_cell *cell, atomic_t *usage_count,
 			  struct resource *mem_base,
@@ -178,8 +191,10 @@ static int mfd_add_device(struct device *parent, int id,
 	if (parent->of_node && cell->of_compatible) {
 		for_each_child_of_node(parent->of_node, np) {
 			if (of_device_is_compatible(np, cell->of_compatible)) {
-				pdev->dev.of_node = np;
-				break;
+				if (!mfd_is_node_allocated_to_dev(parent, np)) {
+					pdev->dev.of_node = np;
+					break;
+				}
 			}
 		}
 	}
