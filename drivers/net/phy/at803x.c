@@ -52,6 +52,9 @@
 #define AT803X_DEBUG_REG_5			0x05
 #define AT803X_DEBUG_TX_CLK_DLY_EN		BIT(8)
 
+#define	AT803X_DEBUG_REG_B			0x0B
+#define	AT803X_DEBUG_PS_HIB_EN			BIT(15)
+
 #define AT803X_REG_CHIP_CONFIG			0x1f
 #define AT803X_BT_BX_REG_SEL			0x8000
 
@@ -115,6 +118,12 @@ static inline int at803x_enable_tx_delay(struct phy_device *phydev)
 {
 	return at803x_debug_reg_mask(phydev, AT803X_DEBUG_REG_5, 0,
 					AT803X_DEBUG_TX_CLK_DLY_EN);
+}
+
+static inline int at803x_disable_hibernation(struct phy_device *phydev)
+{
+	return at803x_debug_reg_mask(phydev, AT803X_DEBUG_REG_B,
+				     AT803X_DEBUG_PS_HIB_EN, 0);
 }
 
 /* save relevant PHY registers to private copy */
@@ -313,6 +322,9 @@ static int at803x_config_init(struct phy_device *phydev)
 		if (ret < 0)
 			return ret;
 	}
+
+	/* By default disable the Power Hibernation feature */
+	at803x_disable_hibernation(phydev);
 
 	return 0;
 }
