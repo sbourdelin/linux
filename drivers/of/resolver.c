@@ -115,9 +115,8 @@ static int __of_adjust_phandle_ref(struct device_node *node,
 	int err = 0;
 
 	propval = kmalloc(rprop->length, GFP_KERNEL);
-	if (!propval) {
+	if (!propval)
 		return -ENOMEM;
-	}
 	memcpy(propval, rprop->value, rprop->length);
 
 	propend = propval + rprop->length;
@@ -141,14 +140,12 @@ static int __of_adjust_phandle_ref(struct device_node *node,
 
 		*s++ = '\0';
 		err = kstrtoint(s, 10, &offset);
-		if (err != 0) {
+		if (err != 0)
 			goto err_fail;
-		}
 
 		refnode = __of_find_node_by_full_name(node, nodestr);
-		if (!refnode) {
+		if (!refnode)
 			continue;
-		}
 
 		for_each_property_of_node(refnode, sprop) {
 			if (of_prop_cmp(sprop->name, propstr) == 0)
@@ -207,9 +204,8 @@ static int __of_adjust_tree_phandle_references(struct device_node *node,
 		    of_prop_cmp(rprop->name, "linux,phandle") == 0)
 			continue;
 
-		if ((rprop->length % 4) != 0 || rprop->length == 0) {
+		if ((rprop->length % 4) != 0 || rprop->length == 0)
 			return -EINVAL;
-		}
 		count = rprop->length / sizeof(__be32);
 
 		for_each_property_of_node(target, sprop) {
@@ -217,16 +213,13 @@ static int __of_adjust_tree_phandle_references(struct device_node *node,
 				break;
 		}
 
-		if (sprop == NULL) {
+		if (sprop == NULL)
 			return -EINVAL;
-		}
 
 		for (i = 0; i < count; i++) {
 			off = be32_to_cpu(((__be32 *)rprop->value)[i]);
-			if (off >= sprop->length ||
-					(off + 4) > sprop->length) {
+			if (off >= sprop->length || (off + 4) > sprop->length)
 				return -EINVAL;
-			}
 
 			if (phandle_delta) {
 				phandle = be32_to_cpu(*(__be32 *)(sprop->value + off));
@@ -242,9 +235,8 @@ static int __of_adjust_tree_phandle_references(struct device_node *node,
 			if (__of_node_name_cmp(child, childtarget) == 0)
 				break;
 
-		if (!childtarget) {
+		if (!childtarget)
 			return -EINVAL;
-		}
 
 		err = __of_adjust_tree_phandle_references(child, childtarget,
 				phandle_delta);
@@ -342,9 +334,8 @@ int of_resolve_phandles(struct device_node *resolve)
 
 		err = of_property_read_string(root_sym,
 				rprop->name, &refpath);
-		if (err != 0) {
+		if (err != 0)
 			goto out;
-		}
 
 		refnode = of_find_node_by_path(refpath);
 		if (!refnode) {
