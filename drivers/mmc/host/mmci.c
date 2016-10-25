@@ -72,7 +72,10 @@ static unsigned int fmax = 515633;
  * @signal_direction: input/out direction of bus signals can be indicated
  * @pwrreg_clkgate: MMCIPOWER register must be used to gate the clock
  * @busy_detect: true if the variant supports busy detection on DAT0.
- * @busy_dpsm_flag: bitmask enabling busy detection in the DPSM
+ * @busy_cpsm_flag: bitmask enabling busy detection in the CPSM (command
+ *		    path state machine)
+ * @busy_dpsm_flag: bitmask enabling busy detection in the DPSM (data path
+ *		    state machine)
  * @busy_detect_flag: bitmask identifying the bit in the MMCISTATUS register
  * 	 	      indicating that the card is busy
  * @busy_detect_mask: bitmask identifying the bit in the MMCIMASK0 to mask for
@@ -103,6 +106,7 @@ struct variant_data {
 	bool			signal_direction;
 	bool			pwrreg_clkgate;
 	bool			busy_detect;
+	u32			busy_cpsm_flag;
 	u32			busy_dpsm_flag;
 	u32			busy_detect_flag;
 	u32			busy_detect_mask;
@@ -229,6 +233,10 @@ static struct variant_data variant_qcom = {
 	.datalength_bits	= 24,
 	.pwrreg_powerup		= MCI_PWR_UP,
 	.f_max			= 208000000,
+	.busy_detect		= true,
+	.busy_cpsm_flag		= MCI_CPSM_QCOM_PROGENA,
+	.busy_detect_flag	= MCI_QCOM_PROGDONE,
+	.busy_detect_mask	= MCI_QCOM_PROGDONEMASK,
 	.explicit_mclk_control	= true,
 	.qcom_fifo		= true,
 	.qcom_dml		= true,
@@ -903,6 +911,15 @@ mmci_start_command(struct mmci_host *host, struct mmc_command *cmd, u32 c)
 	if (/*interrupt*/0)
 		c |= MCI_CPSM_INTERRUPT;
 
+	/*
+	 * Enable the program end interrupt for specific commands
+	 * used for busy detection.
+	 */
+	if (host->variant->busy_detect &&
+	    (cmd->flags & MMC_RSP_R1B) == MMC_RSP_R1B) {
+		c |= host->variant->busy_cpsm_flag;
+	}
+
 	if (mmc_cmd_type(cmd) == MMC_CMD_ADTC)
 		c |= host->variant->data_cmd_enable;
 
@@ -1005,7 +1022,7 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
 		return;
 
 	/*
-	 * ST Micro variant: handle busy detection.
+	 * ST Micro and Qualcomm variants: handle busy detection.
 	 */
 	if (host->variant->busy_detect) {
 		bool busy_resp = !!(cmd->flags & MMC_RSP_BUSY);
