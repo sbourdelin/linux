@@ -13,6 +13,9 @@
 int __node_distance(int from, int to);
 #define node_distance(a, b) __node_distance(a, b)
 
+extern int __initdata arch_node_distance_ready;
+#define node_distance_ready()	arch_node_distance_ready
+
 extern nodemask_t numa_nodes_parsed __initdata;
 
 /* Mappings between node number and cpus on that node. */

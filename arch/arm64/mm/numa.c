@@ -36,6 +36,7 @@ static int cpu_to_node_map[NR_CPUS] = { [0 ... NR_CPUS-1] = NUMA_NO_NODE };
 static int numa_distance_cnt;
 static u8 *numa_distance;
 static bool numa_off;
+int __initdata arch_node_distance_ready;
 
 static __init int numa_parse_early_param(char *opt)
 {
@@ -395,9 +396,12 @@ static int __init numa_init(int (*init_func)(void))
 		return -EINVAL;
 	}
 
+	arch_node_distance_ready = 1;
 	ret = numa_register_nodes();
-	if (ret < 0)
+	if (ret < 0) {
+		arch_node_distance_ready = 0;
 		return ret;
+	}
 
 	setup_node_to_cpumask_map();
 
