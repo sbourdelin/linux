@@ -409,6 +409,7 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
 {
 	struct clk *clk;
 	int i;
+	int ret;
 
 	imx6q_pu_domain.reg = pu_reg;
 
@@ -431,9 +432,14 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
 		return 0;
 
 	pm_genpd_init(&imx6q_pu_domain.base, NULL, false);
-	return of_genpd_add_provider_onecell(dev->of_node,
-					     &imx_gpc_onecell_data);
+	ret = of_genpd_add_provider_onecell(dev->of_node,
+					    &imx_gpc_onecell_data);
+	if (ret)
+		goto genpd_remove;
+	return 0;
 
+genpd_remove:
+	pm_genpd_remove(&imx6q_pu_domain.base);
 clk_err:
 	while (i--)
 		clk_put(imx6q_pu_domain.clk[i]);
