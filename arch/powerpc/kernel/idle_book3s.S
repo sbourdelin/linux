@@ -99,6 +99,8 @@ core_idle_lock_held:
 	bne	3b
 	HMT_MEDIUM
 	lwarx	r15,0,r14
+	andi.	r9,r15,PNV_CORE_IDLE_LOCK_BIT
+	bne-	core_idle_lock_held
 	blr
 
 /*
