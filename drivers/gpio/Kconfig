@@ -949,6 +949,17 @@ config GPIO_PALMAS
 	  Select this option to enable GPIO driver for the TI PALMAS
 	  series chip family.
 
+config GPIO_PV88080
+	bool "Powerventure Semiconductor PV88080 GPIO"
+	depends on MFD_PV88080
+	help
+	  Support for GPIO pins on PV88080 PMIC.
+
+	  Say yes here to enable the GPIO driver for the PV88080 chip.
+
+	  The Powerventure PMIC chip has 2 GPIO pins that can be
+	  controlled by this driver.
+
 config GPIO_RC5T583
 	bool "RICOH RC5T583 GPIO"
 	depends on MFD_RC5T583

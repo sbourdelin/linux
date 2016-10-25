@@ -576,9 +576,8 @@ config REGULATOR_PV88060
 	  PV88060
 
 config REGULATOR_PV88080
-	tristate "Powerventure Semiconductor PV88080 regulator"
-	depends on I2C
-	select REGMAP_I2C
+	bool "Powerventure Semiconductor PV88080 regulator"
+	depends on MFD_PV88080
 	help
 	  Say y here to support the buck convertors on PV88080
 
