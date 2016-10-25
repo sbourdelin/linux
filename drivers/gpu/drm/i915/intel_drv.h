@@ -1189,6 +1189,8 @@ unsigned int intel_fb_align_height(struct drm_device *dev,
 				   uint64_t fb_format_modifier);
 u32 intel_fb_stride_alignment(const struct drm_i915_private *dev_priv,
 			      uint64_t fb_modifier, uint32_t pixel_format);
+void gen9_enable_dp_audio_stall_fix(struct intel_crtc_state *pipe_config);
+void gen9_disable_dp_audio_stall_fix(struct intel_crtc_state *pipe_config);
 
 /* intel_audio.c */
 void intel_init_audio_hooks(struct drm_i915_private *dev_priv);

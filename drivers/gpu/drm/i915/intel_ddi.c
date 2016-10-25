@@ -1858,6 +1858,38 @@ void intel_ddi_fdi_post_disable(struct intel_encoder *intel_encoder,
 	I915_WRITE(FDI_RX_CTL(PIPE_A), val);
 }
 
+void gen9_enable_dp_audio_stall_fix(struct intel_crtc_state *pipe_config)
+{
+	struct drm_i915_private *dev_priv =
+		to_i915(pipe_config->base.crtc->dev);
+	enum transcoder cpu_transcoder = pipe_config->cpu_transcoder;
+	uint32_t temp;
+
+	if (intel_crtc_has_dp_encoder(pipe_config) &&
+	    pipe_config->port_clock >= 54000) {
+
+		temp = I915_READ(CHICKEN_TRANS(cpu_transcoder));
+		temp |= SPARE_13;
+		I915_WRITE(CHICKEN_TRANS(cpu_transcoder), temp);
+	}
+}
+
+void gen9_disable_dp_audio_stall_fix(struct intel_crtc_state *pipe_config)
+{
+	struct drm_i915_private *dev_priv =
+		to_i915(pipe_config->base.crtc->dev);
+	enum transcoder cpu_transcoder = pipe_config->cpu_transcoder;
+	uint32_t temp;
+
+	if (intel_crtc_has_dp_encoder(pipe_config) &&
+	    pipe_config->port_clock >= 54000) {
+
+		temp = I915_READ(CHICKEN_TRANS(cpu_transcoder));
+		temp &= ~SPARE_13;
+		I915_WRITE(CHICKEN_TRANS(cpu_transcoder), temp);
+	}
+}
+
 static void intel_enable_ddi(struct intel_encoder *intel_encoder,
 			     struct intel_crtc_state *pipe_config,
 			     struct drm_connector_state *conn_state)
@@ -1893,6 +1925,9 @@ static void intel_enable_ddi(struct intel_encoder *intel_encoder,
 	}
 
 	if (intel_crtc->config->has_audio) {
+		if (IS_GEN9(dev_priv))
+			gen9_enable_dp_audio_stall_fix(pipe_config);
+
 		intel_display_power_get(dev_priv, POWER_DOMAIN_AUDIO);
 		intel_audio_codec_enable(intel_encoder);
 	}
@@ -1912,6 +1947,9 @@ static void intel_disable_ddi(struct intel_encoder *intel_encoder,
 	if (intel_crtc->config->has_audio) {
 		intel_audio_codec_disable(intel_encoder);
 		intel_display_power_put(dev_priv, POWER_DOMAIN_AUDIO);
+
+		if (IS_GEN9(dev_priv))
+			gen9_disable_dp_audio_stall_fix(old_crtc_state);
 	}
 
 	if (type == INTEL_OUTPUT_EDP) {
