@@ -1213,9 +1213,71 @@ phys_addr_t __init memblock_alloc(phys_addr_t size, phys_addr_t align)
 	return memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
 }
 
+#ifndef node_distance_ready
+#define node_distance_ready()		0
+#endif
+
+static phys_addr_t __init memblock_alloc_near_nid(phys_addr_t size,
+					phys_addr_t align, phys_addr_t start,
+					phys_addr_t end, int nid, ulong flags,
+					int alloc_func_type)
+{
+	int nnid, round = 0;
+	u64 pa;
+	DECLARE_BITMAP(nodes_map, MAX_NUMNODES);
+
+	bitmap_zero(nodes_map, MAX_NUMNODES);
+
+again:
+	/*
+	 * There are total 4 cases:
+	 * <nid == NUMA_NO_NODE>
+	 *   1)2) node_distance_ready || !node_distance_ready
+	 *	Round 1, nnid = nid = NUMA_NO_NODE;
+	 * <nid != NUMA_NO_NODE>
+	 *   3) !node_distance_ready
+	 *	Round 1, nnid = nid;
+	 *    ::Round 2, currently only applicable for alloc_func_type = <0>
+	 *	Round 2, nnid = NUMA_NO_NODE;
+	 *   4) node_distance_ready
+	 *	Round 1, LOCAL_DISTANCE, nnid = nid;
+	 *	Round ?, nnid = nearest nid;
+	 */
+	if (!node_distance_ready() || (nid == NUMA_NO_NODE)) {
+		nnid = (++round == 1) ? nid : NUMA_NO_NODE;
+	} else {
+		int i, distance = INT_MAX;
+
+		for_each_clear_bit(i, nodes_map, MAX_NUMNODES)
+			if (node_distance(nid, i) < distance) {
+				nnid = i;
+				distance = node_distance(nid, i);
+			}
+	}
+
+	switch (alloc_func_type) {
+	case 0:
+		pa = memblock_find_in_range_node(size, align, start, end, nnid, flags);
+		break;
+
+	case 1:
+	default:
+		pa = memblock_alloc_nid(size, align, nnid);
+		if (!node_distance_ready())
+			return pa;
+	}
+
+	if (!pa && (nnid != NUMA_NO_NODE)) {
+		bitmap_set(nodes_map, nnid, 1);
+		goto again;
+	}
+
+	return pa;
+}
+
 phys_addr_t __init memblock_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid)
 {
-	phys_addr_t res = memblock_alloc_nid(size, align, nid);
+	phys_addr_t res = memblock_alloc_near_nid(size, align, 0, 0, nid, 0, 1);
 
 	if (res)
 		return res;
@@ -1276,18 +1338,10 @@ static void * __init memblock_virt_alloc_internal(
 		max_addr = memblock.current_limit;
 
 again:
-	alloc = memblock_find_in_range_node(size, align, min_addr, max_addr,
-					    nid, flags);
+	alloc = memblock_alloc_near_nid(size, align, min_addr, max_addr,
+					    nid, flags, 0);
 	if (alloc)
 		goto done;
-
-	if (nid != NUMA_NO_NODE) {
-		alloc = memblock_find_in_range_node(size, align, min_addr,
-						    max_addr, NUMA_NO_NODE,
-						    flags);
-		if (alloc)
-			goto done;
-	}
 
 	if (min_addr) {
 		min_addr = 0;
