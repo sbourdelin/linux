@@ -271,6 +271,9 @@ follows:
 		Usage: Required
 		Value type: <stringlist>
 		Definition: Must be "arm,idle-state".
+			    Additionally, nodes that are used to describe a
+			    idle-state of PM domain must also define
+			    "domain-idle-state" as compatible string.
 
 	- local-timer-stop
 		Usage: See definition
