@@ -251,7 +251,8 @@ static inline bool i915_vma_is_ggtt(const struct i915_vma *vma)
 
 static inline bool i915_vma_is_map_and_fenceable(const struct i915_vma *vma)
 {
-	return vma->flags & I915_VMA_CAN_FENCE;
+	return vma->flags & I915_VMA_CAN_FENCE &&
+	       vma->ggtt_view.type != I915_GGTT_VIEW_ROTATED;
 }
 
 static inline bool i915_vma_is_closed(const struct i915_vma *vma)
