@@ -52,6 +52,13 @@ Optional properties:
 - no-sdio: controller is limited to send sdio cmd during initialization
 - no-sd: controller is limited to send sd cmd during initialization
 - no-mmc: controller is limited to send mmc cmd during initialization
+- sdhci-caps-mask: The sdhci capabilities registers are incorrect. This 64bit
+  property corresponds to the bits in the sdhci capabilty registers. If the bit
+  is on in the mask then the bit is incorrect in the registers and should be
+  turned off.
+- sdhci-caps: The sdhci capabilities registers are incorrect. This 64bit
+  property corresponds to the bits in the sdhci capability registers. If the
+  bit is on in the property then the bit should be on in the reigsters.
 
 *NOTE* on CD and WP polarity. To use common for all SD/MMC host controllers line
 polarity properties, we have to fix the meaning of the "normal" and "inverted"
