@@ -1692,6 +1692,16 @@ i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
 	const char *name;
 
 	for (; matches->compatible[0]; matches++) {
+		/*
+		 * Adding devices through the i2c sysfs interface provides us
+		 * a string to match which may be compatible with the device
+		 * tree compatible strings, however with no actual of_node the
+		 * of_match_device() will not match
+		 */
+		if (!strncasecmp(client->name, matches->compatible,
+				strlen(matches->compatible)))
+			return matches;
+
 		name = strchr(matches->compatible, ',');
 		if (!name)
 			name = matches->compatible;
