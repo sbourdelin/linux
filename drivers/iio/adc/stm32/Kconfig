@@ -8,6 +8,7 @@ config STM32_ADC
 	select REGULATOR_FIXED_VOLTAGE
 	select IIO_BUFFER
 	select IIO_TRIGGERED_BUFFER
+	select IRQ_WORK
 	help
 	  Say yes here to build the driver for the STMicroelectronics
 	  STM32 analog-to-digital converter (ADC).
@@ -18,6 +19,7 @@ config STM32_ADC
 config STM32F4_ADC
 	tristate "STMicroelectronics STM32F4 adc"
 	depends on ARCH_STM32 || COMPILE_TEST
+	depends on HAS_DMA
 	depends on OF
 	select STM32_ADC
 	help

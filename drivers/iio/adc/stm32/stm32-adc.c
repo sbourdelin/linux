@@ -21,6 +21,7 @@
 
 #include <linux/clk.h>
 #include <linux/debugfs.h>
+#include <linux/dma-mapping.h>
 #include <linux/iio/iio.h>
 #include <linux/iio/buffer.h>
 #include <linux/iio/events.h>
@@ -371,6 +372,34 @@ static int stm32_adc_read_raw(struct iio_dev *indio_dev,
 	return ret;
 }
 
+static int stm32_adc_residue(struct stm32_adc *adc)
+{
+	struct dma_tx_state state;
+	enum dma_status status;
+
+	if (!adc->rx_buf)
+		return 0;
+
+	status = dmaengine_tx_status(adc->dma_chan,
+				     adc->dma_chan->cookie,
+				     &state);
+	if (status == DMA_IN_PROGRESS) {
+		/* Residue is size in bytes from end of buffer */
+		int i = adc->rx_buf_sz - state.residue;
+		int size;
+
+		/* Return available bytes */
+		if (i >= adc->bufi)
+			size = i - adc->bufi;
+		else
+			size = adc->rx_buf_sz - adc->bufi + i;
+
+		return size;
+	}
+
+	return 0;
+}
+
 /**
  * stm32_adc_isr() - Treat interrupt for one ADC instance within ADC block
  */
@@ -394,8 +423,8 @@ static irqreturn_t stm32_adc_isr(struct stm32_adc *adc)
 	stm32_adc_writel(adc, reginfo->isr, status & ~clr_mask);
 	status &= mask;
 
-	/* Regular data */
-	if (status & reginfo->eoc) {
+	/* Regular data (when dma isn't used) */
+	if ((status & reginfo->eoc) && (!adc->rx_buf)) {
 		adc->buffer[adc->bufi] = stm32_adc_readl(adc, reginfo->dr);
 		if (iio_buffer_enabled(indio_dev)) {
 			adc->bufi++;
@@ -553,6 +582,132 @@ static int stm32_adc_validate_device(struct iio_trigger *trig,
 	return indio != indio_dev ? -EINVAL : 0;
 }
 
+static void stm32_adc_dma_irq_work(struct irq_work *work)
+{
+	struct stm32_adc *adc = container_of(work, struct stm32_adc, work);
+	struct iio_dev *indio_dev = iio_priv_to_dev(adc);
+
+	/**
+	 * iio_trigger_poll calls generic_handle_irq(). So, it requires hard
+	 * irq context, and cannot be called directly from dma callback,
+	 * dma cb has to schedule this work instead.
+	 */
+	iio_trigger_poll(indio_dev->trig);
+}
+
+static void stm32_adc_dma_buffer_done(void *data)
+{
+	struct iio_dev *indio_dev = data;
+	struct stm32_adc *adc = iio_priv(indio_dev);
+
+	/* invoques iio_trigger_poll() from hard irq context */
+	irq_work_queue(&adc->work);
+}
+
+static int stm32_adc_buffer_alloc_dma_start(struct iio_dev *indio_dev)
+{
+	struct stm32_adc *adc = iio_priv(indio_dev);
+	const struct stm32_adc_reginfo *reginfo =
+		adc->common->data->adc_reginfo;
+	struct dma_async_tx_descriptor *desc;
+	struct dma_slave_config config;
+	dma_cookie_t cookie;
+	int ret, size, watermark;
+
+	/* Reset adc buffer index */
+	adc->bufi = 0;
+
+	if (!adc->dma_chan) {
+		/* Allocate adc buffer */
+		adc->buffer = kzalloc(indio_dev->scan_bytes, GFP_KERNEL);
+		if (!adc->buffer)
+			return -ENOMEM;
+
+		return 0;
+	}
+
+	/*
+	 * Allocate at least twice the buffer size for dma cyclic transfers, so
+	 * we can work with at least two dma periods. There should be :
+	 * - always one buffer (period) dma is working on
+	 * - one buffer (period) driver can push with iio_trigger_poll().
+	 */
+	size = indio_dev->buffer->bytes_per_datum * indio_dev->buffer->length;
+	size = max(indio_dev->scan_bytes * 2, size);
+
+	adc->rx_buf = dma_alloc_coherent(adc->common->dev, PAGE_ALIGN(size),
+					 &adc->rx_dma_buf,
+					 GFP_KERNEL);
+	if (!adc->rx_buf)
+		return -ENOMEM;
+	adc->rx_buf_sz = size;
+	watermark = indio_dev->buffer->bytes_per_datum
+		* indio_dev->buffer->watermark;
+	watermark = max(indio_dev->scan_bytes, watermark);
+	watermark = rounddown(watermark, indio_dev->scan_bytes);
+
+	dev_dbg(&indio_dev->dev, "%s size=%d watermark=%d\n", __func__, size,
+		watermark);
+
+	/* Configure DMA channel to read data register */
+	memset(&config, 0, sizeof(config));
+	config.src_addr = (dma_addr_t)adc->common->phys_base;
+	config.src_addr += adc->offset + reginfo->dr;
+	config.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+
+	ret = dmaengine_slave_config(adc->dma_chan, &config);
+	if (ret)
+		goto config_err;
+
+	/* Prepare a DMA cyclic transaction */
+	desc = dmaengine_prep_dma_cyclic(adc->dma_chan,
+					 adc->rx_dma_buf,
+					 size, watermark,
+					 DMA_DEV_TO_MEM,
+					 DMA_PREP_INTERRUPT);
+	if (!desc) {
+		ret = -ENODEV;
+		goto config_err;
+	}
+
+	desc->callback = stm32_adc_dma_buffer_done;
+	desc->callback_param = indio_dev;
+
+	cookie = dmaengine_submit(desc);
+	if (dma_submit_error(cookie)) {
+		ret = dma_submit_error(cookie);
+		goto config_err;
+	}
+
+	/* Issue pending DMA requests */
+	dma_async_issue_pending(adc->dma_chan);
+
+	return 0;
+
+config_err:
+	dma_free_coherent(adc->common->dev, PAGE_ALIGN(size), adc->rx_buf,
+			  adc->rx_dma_buf);
+
+	return ret;
+}
+
+static void stm32_adc_dma_stop_buffer_free(struct iio_dev *indio_dev)
+{
+	struct stm32_adc *adc = iio_priv(indio_dev);
+
+	if (!adc->dma_chan) {
+		kfree(adc->buffer);
+	} else {
+		dmaengine_terminate_all(adc->dma_chan);
+		irq_work_sync(&adc->work);
+		dma_free_coherent(adc->common->dev, PAGE_ALIGN(adc->rx_buf_sz),
+				  adc->rx_buf, adc->rx_dma_buf);
+		adc->rx_buf = NULL;
+	}
+
+	adc->buffer = NULL;
+}
+
 static int stm32_adc_set_trigger_state(struct iio_trigger *trig,
 				       bool state)
 {
@@ -561,13 +716,11 @@ static int stm32_adc_set_trigger_state(struct iio_trigger *trig,
 	int ret;
 
 	if (state) {
-		/* Reset adc buffer index */
-		adc->bufi = 0;
-
-		/* Allocate adc buffer */
-		adc->buffer = kzalloc(indio_dev->scan_bytes, GFP_KERNEL);
-		if (!adc->buffer)
-			return -ENOMEM;
+		ret = stm32_adc_buffer_alloc_dma_start(indio_dev);
+		if (ret) {
+			dev_err(&indio_dev->dev, "alloc failed\n");
+			return ret;
+		}
 
 		ret = stm32_adc_set_trig(indio_dev, trig);
 		if (ret) {
@@ -575,7 +728,8 @@ static int stm32_adc_set_trigger_state(struct iio_trigger *trig,
 			goto err_buffer_free;
 		}
 
-		stm32_adc_conv_irq_enable(adc);
+		if (!adc->dma_chan)
+			stm32_adc_conv_irq_enable(adc);
 
 		ret = stm32_adc_start_conv(adc);
 		if (ret) {
@@ -589,25 +743,25 @@ static int stm32_adc_set_trigger_state(struct iio_trigger *trig,
 			return ret;
 		}
 
-		stm32_adc_conv_irq_disable(adc);
+		if (!adc->dma_chan)
+			stm32_adc_conv_irq_disable(adc);
 
 		ret = stm32_adc_set_trig(indio_dev, NULL);
 		if (ret)
 			dev_warn(&indio_dev->dev, "Can't clear trigger\n");
 
-		kfree(adc->buffer);
-		adc->buffer = NULL;
+		stm32_adc_dma_stop_buffer_free(indio_dev);
 	}
 
 	return 0;
 
 err_irq_trig_disable:
-	stm32_adc_conv_irq_disable(adc);
+	if (!adc->dma_chan)
+		stm32_adc_conv_irq_disable(adc);
 	stm32_adc_set_trig(indio_dev, NULL);
 
 err_buffer_free:
-	kfree(adc->buffer);
-	adc->buffer = NULL;
+	stm32_adc_dma_stop_buffer_free(indio_dev);
 
 	return ret;
 }
@@ -624,17 +778,30 @@ static irqreturn_t stm32_adc_trigger_handler(int irq, void *p)
 	struct iio_dev *indio_dev = pf->indio_dev;
 	struct stm32_adc *adc = iio_priv(indio_dev);
 
-	dev_dbg(&indio_dev->dev, "%s bufi=%d\n", __func__, adc->bufi);
+	if (!adc->dma_chan) {
+		adc->bufi = 0;
+		iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer,
+						   pf->timestamp);
+	} else {
+		int residue = stm32_adc_residue(adc);
 
-	/* reset buffer index */
-	adc->bufi = 0;
-	iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer,
-					   pf->timestamp);
+		while (residue >= indio_dev->scan_bytes) {
+			adc->buffer = (u16 *)&adc->rx_buf[adc->bufi];
+			iio_push_to_buffers_with_timestamp(indio_dev,
+							   adc->buffer,
+							   pf->timestamp);
+			residue -= indio_dev->scan_bytes;
+			adc->bufi += indio_dev->scan_bytes;
+			if (adc->bufi >= adc->rx_buf_sz)
+				adc->bufi = 0;
+		}
+	}
 
 	iio_trigger_notify_done(indio_dev->trig);
 
 	/* re-enable eoc irq */
-	stm32_adc_conv_irq_enable(adc);
+	if (!adc->dma_chan)
+		stm32_adc_conv_irq_enable(adc);
 
 	return IRQ_HANDLED;
 }
@@ -827,6 +994,10 @@ static int stm32_adc_register(struct stm32_adc_common *common,
 	if (ret)
 		goto err_clk_disable;
 
+	adc->dma_chan = dma_request_slave_channel(&indio_dev->dev, "rx");
+	if (adc->dma_chan)
+		init_irq_work(&adc->work, stm32_adc_dma_irq_work);
+
 	ret = iio_triggered_buffer_setup(indio_dev,
 					 &iio_pollfunc_store_time,
 					 &stm32_adc_trigger_handler,
@@ -850,6 +1021,8 @@ err_buffer_cleanup:
 	iio_triggered_buffer_cleanup(indio_dev);
 
 err_trig_unregister:
+	if (adc->dma_chan)
+		dma_release_channel(adc->dma_chan);
 	stm32_adc_trig_unregister(indio_dev);
 
 err_clk_disable:
@@ -870,6 +1043,8 @@ static void stm32_adc_unregister(struct stm32_adc *adc)
 	iio_device_unregister(indio_dev);
 	iio_triggered_buffer_cleanup(indio_dev);
 	stm32_adc_trig_unregister(indio_dev);
+	if (adc->dma_chan)
+		dma_release_channel(adc->dma_chan);
 	if (adc->clk) {
 		clk_disable_unprepare(adc->clk);
 		clk_put(adc->clk);
@@ -900,6 +1075,7 @@ int stm32_adc_probe(struct platform_device *pdev)
 	common->base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(common->base))
 		return PTR_ERR(common->base);
+	common->phys_base = res->start;
 
 	common->data = match->data;
 	common->dev = &pdev->dev;

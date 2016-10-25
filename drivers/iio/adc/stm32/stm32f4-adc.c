@@ -437,15 +437,29 @@ static bool stm32f4_adc_injected_started(struct stm32_adc *adc)
  * @adc: stm32 adc instance
  *
  * Start single conversions for regular or injected channels.
+ * Also take care of normal or DMA mode. DMA is used in circular mode for
+ * regular conversions, in IIO buffer modes. Rely on rx_buf as raw
+ * read doesn't use dma, but direct DR read.
  */
 static int stm32f4_adc_start_conv(struct stm32_adc *adc)
 {
-	u32 trig_msk, start_msk;
+	u32 val, trig_msk, start_msk;
+	unsigned long flags;
 
 	dev_dbg(adc->common->dev, "%s %s\n", __func__,
 		adc->injected ? "injected" : "regular");
 
 	stm32_adc_set_bits(adc, STM32F4_ADCX_CR1, STM32F4_SCAN);
+
+	if (!adc->injected) {
+		spin_lock_irqsave(&adc->lock, flags);
+		val = stm32_adc_readl(adc, STM32F4_ADCX_CR2);
+		val &= ~(STM32F4_DMA | STM32F4_DDS);
+		if (adc->rx_buf)
+			val |= STM32F4_DMA | STM32F4_DDS;
+		stm32_adc_writel(adc, STM32F4_ADCX_CR2, val);
+		spin_unlock_irqrestore(&adc->lock, flags);
+	}
 
 	if (!stm32f4_adc_is_started(adc)) {
 		stm32_adc_set_bits(adc, STM32F4_ADCX_CR2,
@@ -493,6 +507,10 @@ static int stm32f4_adc_stop_conv(struct stm32_adc *adc)
 		stm32_adc_clr_bits(adc, STM32F4_ADCX_CR1, STM32F4_SCAN);
 		stm32_adc_clr_bits(adc, STM32F4_ADCX_CR2, STM32F4_ADON);
 	}
+
+	if (!adc->injected)
+		stm32_adc_clr_bits(adc, STM32F4_ADCX_CR2,
+				   STM32F4_DMA | STM32F4_DDS);
 
 	return 0;
 }

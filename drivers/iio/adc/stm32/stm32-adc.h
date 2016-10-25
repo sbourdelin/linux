@@ -22,6 +22,9 @@
 #ifndef __STM32_ADC_H
 #define __STM32_ADC_H
 
+#include <linux/dmaengine.h>
+#include <linux/irq_work.h>
+
 /*
  * STM32 - ADC global register map
  * ________________________________________________________
@@ -276,6 +279,11 @@ struct stm32_adc_common;
  * @num_conv:		expected number of scan conversions
  * @injected:		use injected channels on this adc
  * @lock:		spinlock
+ * @work:		irq work used to call trigger poll routine
+ * @dma_chan:		dma channel
+ * @rx_buf:		dma rx buffer cpu address
+ * @rx_dma_buf:		dma rx buffer bus address
+ * @rx_buf_sz:		dma rx buffer size
  * @clk:		optional adc clock, for this adc instance
  * @calib:		optional calibration data
  * @en:			emulates enabled state on some stm32 adc
@@ -293,6 +301,11 @@ struct stm32_adc {
 	int			num_conv;
 	bool			injected;
 	spinlock_t		lock;		/* interrupt lock */
+	struct irq_work		work;
+	struct dma_chan		*dma_chan;
+	u8			*rx_buf;
+	dma_addr_t		rx_dma_buf;
+	int			rx_buf_sz;
 	struct clk		*clk;
 	void			*calib;
 	bool			en;
@@ -302,6 +315,7 @@ struct stm32_adc {
  * struct stm32_adc_common - private data of ADC driver, common to all
  * ADC instances (ADC block)
  * @dev:		device for this controller
+ * @phys_base:		control registers base physical addr
  * @base:		control registers base cpu addr
  * @irq:		Common irq line for all adc instances
  * @data:		STM32 dependent data from compatible
@@ -313,6 +327,7 @@ struct stm32_adc {
  */
 struct stm32_adc_common {
 	struct device			*dev;
+	phys_addr_t			phys_base;
 	void __iomem			*base;
 	int				irq;
 	const struct stm32_adc_ops	*data;
