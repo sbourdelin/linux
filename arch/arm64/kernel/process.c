@@ -168,7 +168,7 @@ void machine_restart(char *cmd)
 
 void __show_regs(struct pt_regs *regs)
 {
-	int i, top_reg;
+	unsigned int i, top_reg;
 	u64 lr, sp;
 
 	if (compat_user_mode(regs)) {
@@ -190,24 +190,23 @@ void __show_regs(struct pt_regs *regs)
 
 	i = top_reg;
 
-	while (i >= 0) {
-		printk("x%-2d: %016llx ", i, regs->regs[i]);
+	if (i % 2) {
+		printk("x%-2d: %016llx\n", i, regs->regs[i]);
 		i--;
-
-		if (i % 2 == 0) {
-			pr_cont("x%-2d: %016llx ", i, regs->regs[i]);
-			i--;
-		}
-
-		pr_cont("\n");
 	}
-	printk("\n");
+	while (i > 0) {
+		printk("x%-2d: %016llx x%-2d: %016llx\n",
+		       i, regs->regs[i],
+		       i - 1, regs->regs[i - 1]);
+		i -= 2;
+	}
 }
 
 void show_regs(struct pt_regs * regs)
 {
 	printk("\n");
 	__show_regs(regs);
+	printk("\n");
 }
 
 static void tls_thread_flush(void)
