@@ -17,6 +17,7 @@
 #include <mach/common.h>
 #include "cp_intc.h"
 #include <mach/da8xx.h>
+#include <mach/mux.h>
 
 static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
@@ -38,14 +39,30 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
 		       NULL),
 	OF_DEV_AUXDATA("ti,da830-mcasp-audio", 0x01d00000, "davinci-mcasp.0", NULL),
 	OF_DEV_AUXDATA("ti,da850-aemif", 0x68000000, "ti-aemif", NULL),
+	OF_DEV_AUXDATA("ti,vpif", 0x01e17000, "vpif", NULL),
 	{}
 };
 
 #ifdef CONFIG_ARCH_DAVINCI_DA850
 
+#if IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE)
+static __init void da850_vpif_capture_init(void)
+{
+	int ret;
+	
+	ret = davinci_cfg_reg_list(da850_vpif_capture_pins);
+	if (ret)
+		pr_warn("da850_evm_init: VPIF capture mux setup failed: %d\n",
+			ret);
+}
+#else
+#define da850_vpif_capture_init()
+#endif
+
 static void __init da850_init_machine(void)
 {
 	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
+	da850_vpif_capture_init();
 }
 
 static const char *const da850_boards_compat[] __initconst = {
