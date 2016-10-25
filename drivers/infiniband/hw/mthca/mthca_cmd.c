@@ -405,6 +405,26 @@ void mthca_cmd_event(struct mthca_dev *dev,
 	complete(&context->done);
 }
 
+/* Similar to atomic_cmpxchg but with the complimentary condition. Returns
+ * index to a free node. It also sets cmd->free_head to 'new' so it ensures
+ * atomicity between a call to 'wait_event' and manipulating the free_head.
+ */
+
+static inline int atomic_free_node(struct mthca_cmd *cmd, int new)
+{
+	int orig;
+
+	spin_lock(&cmd->context_lock);
+
+	orig = cmd->free_head;
+	if (likely(cmd->free_head != -1))
+		cmd->free_head = new;
+
+	spin_unlock(&cmd->context_lock);
+
+	return orig;
+}
+
 static int mthca_cmd_wait(struct mthca_dev *dev,
 			  u64 in_param,
 			  u64 *out_param,
@@ -414,14 +434,14 @@ static int mthca_cmd_wait(struct mthca_dev *dev,
 			  u16 op,
 			  unsigned long timeout)
 {
-	int err = 0;
+	int orig_free_head, err = 0;
 	struct mthca_cmd_context *context;
 
-	down(&dev->cmd.event_sem);
+	wait_event(dev->cmd.wq,
+		  (orig_free_head = atomic_free_node(&dev->cmd, -1)) != -1);
 
 	spin_lock(&dev->cmd.context_lock);
-	BUG_ON(dev->cmd.free_head < 0);
-	context = &dev->cmd.context[dev->cmd.free_head];
+	context = &dev->cmd.context[orig_free_head];
 	context->token += dev->cmd.token_mask + 1;
 	dev->cmd.free_head = context->next;
 	spin_unlock(&dev->cmd.context_lock);
@@ -458,8 +478,8 @@ out:
 	context->next = dev->cmd.free_head;
 	dev->cmd.free_head = context - dev->cmd.context;
 	spin_unlock(&dev->cmd.context_lock);
+	wake_up(&dev->cmd.wq);
 
-	up(&dev->cmd.event_sem);
 	return err;
 }
 
@@ -571,7 +591,7 @@ int mthca_cmd_use_events(struct mthca_dev *dev)
 	dev->cmd.context[dev->cmd.max_cmds - 1].next = -1;
 	dev->cmd.free_head = 0;
 
-	sema_init(&dev->cmd.event_sem, dev->cmd.max_cmds);
+	init_waitqueue_head(&dev->cmd.wq);
 	spin_lock_init(&dev->cmd.context_lock);
 
 	for (dev->cmd.token_mask = 1;
@@ -590,12 +610,9 @@ int mthca_cmd_use_events(struct mthca_dev *dev)
  */
 void mthca_cmd_use_polling(struct mthca_dev *dev)
 {
-	int i;
-
 	dev->cmd.flags &= ~MTHCA_CMD_USE_EVENTS;
 
-	for (i = 0; i < dev->cmd.max_cmds; ++i)
-		down(&dev->cmd.event_sem);
+	dev->cmd.free_head = -1;
 
 	kfree(dev->cmd.context);
 }

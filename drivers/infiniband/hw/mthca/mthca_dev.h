@@ -46,6 +46,7 @@
 #include <linux/list.h>
 #include <linux/semaphore.h>
 
+#include <rdma/ib_sa.h>
 #include "mthca_provider.h"
 #include "mthca_doorbell.h"
 
@@ -121,7 +122,7 @@ struct mthca_cmd {
 	struct pci_pool          *pool;
 	struct mutex              hcr_mutex;
 	struct mutex		  poll_mutex;
-	struct semaphore 	  event_sem;
+	wait_queue_head_t	  wq;
 	int              	  max_cmds;
 	spinlock_t                context_lock;
 	int                       free_head;
