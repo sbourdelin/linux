@@ -15,6 +15,9 @@
 #include <linux/device.h>
 #include <linux/types.h>
 #include <linux/delay.h>
+#include <linux/slab.h>
+
+#include <linux/overlay-manager.h>
 
 #include "../w1.h"
 #include "../w1_int.h"
@@ -280,7 +283,43 @@ static const struct attribute_group *w1_f2d_groups[] = {
 	NULL,
 };
 
+#if IS_ENABLED(CONFIG_OF_OVERLAY_MGR_DETECTOR_DS2431)
+static int chip_dip_callback(struct w1_slave *sl)
+{
+	char **candidates = NULL;
+	int i, n, err = 0;
+	u8 *data;
+
+	data = kzalloc(OVERLAY_MGR_DIP_MAX_SZ, GFP_KERNEL);
+	if (!data)
+		return -ENOMEM;
+
+	/* sizeof(struct chip_header) is a mulitple of 8 */
+	for (i = 0; i < OVERLAY_MGR_DIP_MAX_SZ; i += 8) {
+		if (w1_f2d_readblock(sl, i, 8, &data[i])) {
+			err = -EIO;
+			goto end;
+		}
+	}
+
+	overlay_mgr_parse(&sl->dev, data, &candidates, &n);
+	if (!n) {
+		err = -EINVAL;
+		goto end;
+	}
+
+	err = overlay_mgr_apply(&sl->dev, candidates, n);
+
+end:
+	kfree(data);
+	return err;
+}
+#endif
+
 static struct w1_family_ops w1_f2d_fops = {
+#if IS_ENABLED(CONFIG_OF_OVERLAY_MGR_DETECTOR_DS2431)
+	.callback	= chip_dip_callback,
+#endif
 	.groups		= w1_f2d_groups,
 };
 

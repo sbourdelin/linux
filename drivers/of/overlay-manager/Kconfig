@@ -16,4 +16,14 @@ config OF_OVERLAY_MGR_FORMAT_CHIP
 
 endmenu
 
+menu "Overlay Manager detectors"
+
+config OF_OVERLAY_MGR_DETECTOR_DS2431
+	bool "Dip header on a DS2431 EEPROM"
+	depends on W1_SLAVE_DS2431
+	help
+	  Enable dip header DS2431 EEPROM support.
+
+endmenu
+
 endif
