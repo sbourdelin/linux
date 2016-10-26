@@ -93,6 +93,8 @@ struct bus1_peer {
 
 	struct {
 		struct mutex lock;
+		struct rb_root map_handles;
+		u64 handle_ids;
 	} local;
 };
 

@@ -1,4 +1,5 @@
 bus1-y :=			\
+	handle.o		\
 	main.o			\
 	peer.o			\
 	tx.o			\

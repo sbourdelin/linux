@@ -74,6 +74,8 @@ struct bus1_peer *bus1_peer_new(void)
 
 	/* initialize peer-private section */
 	mutex_init(&peer->local.lock);
+	peer->local.map_handles = RB_ROOT;
+	peer->local.handle_ids = 0;
 
 	if (!IS_ERR_OR_NULL(bus1_debugdir)) {
 		char idstr[22];
@@ -129,6 +131,7 @@ struct bus1_peer *bus1_peer_free(struct bus1_peer *peer)
 	bus1_peer_disconnect(peer);
 
 	/* deinitialize peer-private section */
+	WARN_ON(!RB_EMPTY_ROOT(&peer->local.map_handles));
 	mutex_destroy(&peer->local.lock);
 
 	/* deinitialize data section */

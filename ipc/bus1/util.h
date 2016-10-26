@@ -27,6 +27,16 @@
 
 struct dentry;
 
+/**
+ * BUS1_TAIL - tail pointer in singly-linked lists
+ *
+ * Several places of bus1 use singly-linked lists. Usually, the tail pointer is
+ * simply set to NULL. However, sometimes we need to be able to detect whether
+ * a node is linked in O(1). For that we set the tail pointer to BUS1_TAIL
+ * rather than NULL.
+ */
+#define BUS1_TAIL ERR_PTR(-1)
+
 #if defined(CONFIG_DEBUG_FS)
 
 struct dentry *
@@ -47,5 +57,78 @@ bus1_debugfs_create_atomic_x(const char *name,
 }
 
 #endif
+
+/**
+ * bus1_atomic_add_if_ge() - add, if above threshold
+ * @a:		atomic_t to operate on
+ * @add:	value to add
+ * @t:		threshold
+ *
+ * Atomically add @add to @a, if @a is greater than, or equal to, @t.
+ *
+ * If [a + add] triggers an overflow, the operation is undefined. The caller
+ * must verify that this cannot happen.
+ *
+ * Return: The old value of @a is returned.
+ */
+static inline int bus1_atomic_add_if_ge(atomic_t *a, int add, int t)
+{
+	int v, v1;
+
+	for (v = atomic_read(a); v >= t; v = v1) {
+		v1 = atomic_cmpxchg(a, v, v + add);
+		if (likely(v1 == v))
+			return v;
+	}
+
+	return v;
+}
+
+/**
+ * bus1_mutex_lock2() - lock two mutices of the same class
+ * @a:		first mutex, or NULL
+ * @b:		second mutex, or NULL
+ *
+ * This locks both mutices @a and @b. The order in which they are taken is
+ * their memory location, thus allowing to lock 2 mutices of the same class at
+ * the same time.
+ *
+ * It is valid to pass the same mutex as @a and @b, in which case it is only
+ * locked once.
+ *
+ * Use bus1_mutex_unlock2() to exit the critical section.
+ */
+static inline void bus1_mutex_lock2(struct mutex *a, struct mutex *b)
+{
+	if (a < b) {
+		if (a)
+			mutex_lock(a);
+		if (b && b != a)
+			mutex_lock_nested(b, !!a);
+	} else {
+		if (b)
+			mutex_lock(b);
+		if (a && a != b)
+			mutex_lock_nested(a, !!b);
+	}
+}
+
+/**
+ * bus1_mutex_unlock2() - lock two mutices of the same class
+ * @a:		first mutex, or NULL
+ * @b:		second mutex, or NULL
+ *
+ * Unlock both mutices @a and @b. If they point to the same mutex, it is only
+ * unlocked once.
+ *
+ * Usually used in combination with bus1_mutex_lock2().
+ */
+static inline void bus1_mutex_unlock2(struct mutex *a, struct mutex *b)
+{
+	if (a)
+		mutex_unlock(a);
+	if (b && b != a)
+		mutex_unlock(b);
+}
 
 #endif /* __BUS1_UTIL_H */
