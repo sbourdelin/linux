@@ -86,6 +86,14 @@ of_get_fixed_voltage_config(struct device *dev,
 	if ((config->gpio < 0) && (config->gpio != -ENOENT))
 		return ERR_PTR(config->gpio);
 
+	config->oc_gpio = of_get_named_gpio(np, "oc-gpio", 0);
+	if (gpio_is_valid(config->oc_gpio))
+		config->has_oc_gpio = true;
+	else if (config->oc_gpio != -ENOENT)
+		return ERR_PTR(config->oc_gpio);
+
+	config->oc_high = of_property_read_bool(np, "oc-active-high");
+
 	of_property_read_u32(np, "startup-delay-us", &config->startup_delay);
 
 	config->enable_high = of_property_read_bool(np, "enable-active-high");
