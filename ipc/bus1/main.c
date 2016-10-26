@@ -16,6 +16,7 @@
 #include <linux/module.h>
 #include "main.h"
 #include "tests.h"
+#include "user.h"
 
 static int bus1_fop_open(struct inode *inode, struct file *file)
 {
@@ -64,6 +65,7 @@ static int __init bus1_modinit(void)
 
 error:
 	debugfs_remove(bus1_debugdir);
+	bus1_user_modexit();
 	return r;
 }
 
@@ -71,6 +73,7 @@ static void __exit bus1_modexit(void)
 {
 	misc_deregister(&bus1_misc);
 	debugfs_remove(bus1_debugdir);
+	bus1_user_modexit();
 	pr_info("unloaded\n");
 }
 

@@ -1,5 +1,6 @@
 bus1-y :=			\
 	main.o			\
+	user.o			\
 	util/active.o		\
 	util/flist.o		\
 	util/pool.o		\
