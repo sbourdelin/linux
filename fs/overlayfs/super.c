@@ -522,6 +522,22 @@ static unsigned int ovl_split_lowerdirs(char *str)
 	return ctr;
 }
 
+static int
+ovl_set_mode(struct dentry *dentry, umode_t mode)
+{
+	struct iattr iattr;
+	int err;
+
+	if (mode == d_inode(dentry)->i_mode)
+		return 0;
+
+	iattr.ia_valid = ATTR_MODE | ATTR_CTIME;
+	iattr.ia_mode = mode;
+	iattr.ia_ctime = current_time(d_inode(dentry));
+
+	return ovl_setattr(dentry, &iattr);
+}
+
 static int __maybe_unused
 ovl_posix_acl_xattr_get(const struct xattr_handler *handler,
 			struct dentry *dentry, struct inode *inode,
@@ -559,6 +575,18 @@ ovl_posix_acl_xattr_set(const struct xattr_handler *handler,
 	err = -EPERM;
 	if (!inode_owner_or_capable(inode))
 		goto out_acl_release;
+
+	if (handler->flags == ACL_TYPE_ACCESS) {
+		umode_t mode;
+		struct posix_acl *newacl = acl;
+
+		err = posix_acl_update_mode(inode, &mode, &newacl);
+		if (err)
+			goto out_acl_release;
+		err = ovl_set_mode(dentry, mode);
+		if (err)
+			goto out_acl_release;
+	}
 
 	posix_acl_release(acl);
 
