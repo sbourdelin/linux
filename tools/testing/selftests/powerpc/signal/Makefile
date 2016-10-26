@@ -2,7 +2,7 @@ TEST_PROGS := signal signal_tm
 
 all: $(TEST_PROGS)
 
-$(TEST_PROGS): ../harness.c ../utils.c signal.S
+$(TEST_PROGS): ../harness.c ../utility/utils.c signal.S
 
 CFLAGS += -maltivec
 signal_tm: CFLAGS += -mhtm

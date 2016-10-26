@@ -2,7 +2,7 @@ TEST_PROGS := cp_abort
 
 all: $(TEST_PROGS)
 
-$(TEST_PROGS): ../harness.c ../utils.c
+$(TEST_PROGS): ../harness.c ../utility/utils.c
 
 include ../../lib.mk
 
