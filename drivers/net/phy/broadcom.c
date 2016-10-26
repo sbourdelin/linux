@@ -35,6 +35,35 @@ static int bcm54xx_auxctl_write(struct phy_device *phydev, u16 regnum, u16 val)
 	return phy_write(phydev, MII_BCM54XX_AUX_CTL, regnum | val);
 }
 
+static int bcm54810_config(struct phy_device *phydev)
+{
+	int rc;
+
+	/* Disable BroadR-Reach */
+	rc = bcm_phy_write_exp(phydev, BCM54810_EXP_BROADREACH_LRE_MISC_CTL, 0);
+	if (rc < 0)
+		return rc;
+
+	/* SKEW DISABLE */
+	rc = bcm54xx_auxctl_write(phydev, MII_BCM54XX_AUXCTL_SHDWSEL_MISC,
+				  0xF0E0);
+	if (rc < 0)
+		return rc;
+
+	/* DELAY DISABLE */
+	rc = bcm54xx_auxctl_write(phydev, MII_BCM54XX_AUXCTL_SHDWSEL_MISC,
+				  0x7000);
+	if (rc < 0)
+		return rc;
+
+	/* DELAY DISABLE */
+	rc = bcm_phy_write_shadow(phydev, BCM54810_SHD_CLK_CTL, 0);
+	if (rc < 0)
+		return rc;
+
+	return 0;
+}
+
 /* Needs SMDSP clock enabled via bcm54xx_phydsp_config() */
 static int bcm50610_a0_workaround(struct phy_device *phydev)
 {
@@ -207,6 +236,20 @@ static int bcm54xx_config_init(struct phy_device *phydev)
 	    (phydev->dev_flags & PHY_BRCM_AUTO_PWRDWN_ENABLE))
 		bcm54xx_adjust_rxrefclk(phydev);
 
+	if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM54810) {
+		err = bcm54810_config(phydev);
+		if (err)
+			return err;
+
+		reg = phy_read(phydev, MII_BMCR);
+		if (reg < 0)
+			return reg;
+
+		err = phy_write(phydev, MII_BMCR, reg & ~BMCR_PDOWN);
+		if (err)
+			return err;
+	}
+
 	bcm54xx_phydsp_config(phydev);
 
 	return 0;
@@ -332,6 +375,15 @@ static int bcm5481_config_aneg(struct phy_device *phydev)
 		/* Write bits 14:0. */
 		reg |= (1 << 15);
 		phy_write(phydev, 0x18, reg);
+	}
+
+	if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM54810 &&
+	    phydev->dev_flags & PHY_BRCM_EXP_LANE_SWAP) {
+		/* LANE SWAP */
+		ret = bcm_phy_write_exp(phydev, MII_BCM54XX_EXP_SEL_ER + 0x9,
+					0x11B);
+		if (ret < 0)
+			return ret;
 	}
 
 	return ret;
@@ -521,6 +573,18 @@ static struct phy_driver broadcom_drivers[] = {
 	.ack_interrupt	= bcm_phy_ack_intr,
 	.config_intr	= bcm_phy_config_intr,
 }, {
+	.phy_id         = PHY_ID_BCM54810,
+	.phy_id_mask    = 0xfffffff0,
+	.name           = "Broadcom BCM54810",
+	.features       = PHY_GBIT_FEATURES |
+			  SUPPORTED_Pause | SUPPORTED_Asym_Pause,
+	.flags          = PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+	.config_init    = bcm54xx_config_init,
+	.config_aneg    = bcm5481_config_aneg,
+	.read_status    = genphy_read_status,
+	.ack_interrupt  = bcm_phy_ack_intr,
+	.config_intr    = bcm_phy_config_intr,
+}, {
 	.phy_id		= PHY_ID_BCM5482,
 	.phy_id_mask	= 0xfffffff0,
 	.name		= "Broadcom BCM5482",
@@ -603,6 +667,7 @@ static struct mdio_device_id __maybe_unused broadcom_tbl[] = {
 	{ PHY_ID_BCM54616S, 0xfffffff0 },
 	{ PHY_ID_BCM5464, 0xfffffff0 },
 	{ PHY_ID_BCM5481, 0xfffffff0 },
+	{ PHY_ID_BCM54810, 0xfffffff0 },
 	{ PHY_ID_BCM5482, 0xfffffff0 },
 	{ PHY_ID_BCM50610, 0xfffffff0 },
 	{ PHY_ID_BCM50610M, 0xfffffff0 },
