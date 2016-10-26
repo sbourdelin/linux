@@ -374,6 +374,7 @@ struct kvm_memslots {
 struct kvm {
 	spinlock_t mmu_lock;
 	struct mutex slots_lock;
+	struct pid *pid;
 	struct mm_struct *mm; /* userspace tied to this vm */
 	struct kvm_memslots *memslots[KVM_ADDRESS_SPACE_NUM];
 	struct srcu_struct srcu;
