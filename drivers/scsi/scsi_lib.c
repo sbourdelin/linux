@@ -2724,8 +2724,6 @@ EXPORT_SYMBOL_GPL(sdev_evt_send_simple);
 /**
  * scsi_request_fn_active() - number of kernel threads inside scsi_request_fn()
  * @shost: SCSI host for which to count the number of scsi_request_fn() callers.
- *
- * To do: add support for scsi-mq in this function.
  */
 static int scsi_request_fn_active(struct Scsi_Host *shost)
 {
@@ -2744,12 +2742,20 @@ static int scsi_request_fn_active(struct Scsi_Host *shost)
 	return request_fn_active;
 }
 
+static void scsi_mq_wait_for_queuecommand(struct Scsi_Host *shost)
+{
+	struct scsi_device *sdev;
+
+	shost_for_each_device(sdev, shost)
+		blk_mq_quiesce_queue(sdev->request_queue);
+}
+
 /**
  * scsi_wait_for_queuecommand() - wait for ongoing queuecommand() calls
  * @shost: SCSI host pointer.
  *
  * Wait until the ongoing shost->hostt->queuecommand() calls that are
- * invoked from scsi_request_fn() have finished.
+ * invoked from either scsi_request_fn() or scsi_queue_rq() have finished.
  *
  * To do: avoid that scsi_send_eh_cmnd() calls queuecommand() after
  * scsi_internal_device_block() has blocked a SCSI device and remove and also
@@ -2757,8 +2763,12 @@ static int scsi_request_fn_active(struct Scsi_Host *shost)
  */
 void scsi_wait_for_queuecommand(struct Scsi_Host *shost)
 {
-	while (scsi_request_fn_active(shost))
-		msleep(20);
+	if (shost->use_blk_mq) {
+		scsi_mq_wait_for_queuecommand(shost);
+	} else {
+		while (scsi_request_fn_active(shost))
+			msleep(20);
+	}
 }
 EXPORT_SYMBOL(scsi_wait_for_queuecommand);
 
