@@ -120,7 +120,7 @@ enum {
 struct mthca_cmd {
 	struct pci_pool          *pool;
 	struct mutex              hcr_mutex;
-	struct semaphore 	  poll_sem;
+	struct mutex		  poll_mutex;
 	struct semaphore 	  event_sem;
 	int              	  max_cmds;
 	spinlock_t                context_lock;
