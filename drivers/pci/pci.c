@@ -2770,7 +2770,7 @@ void pci_request_acs(void)
  * pci_std_enable_acs - enable ACS on devices using standard ACS capabilites
  * @dev: the PCI device
  */
-static void pci_std_enable_acs(struct pci_dev *dev)
+void pci_std_enable_acs(struct pci_dev *dev)
 {
 	int pos;
 	u16 cap;
