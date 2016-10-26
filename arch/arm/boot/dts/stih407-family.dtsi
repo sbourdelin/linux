@@ -1007,4 +1007,11 @@
 			status = "disabled";
 		};
 	};
+
+	sti_ion {
+		compatible = "st,sti-ion";
+		ion_cma {
+			compatible = "st,cma";
+		};
+	};
 };
