@@ -184,7 +184,7 @@
 #define ACPI_PROBE_TABLE(name)						\
 	. = ALIGN(8);							\
 	VMLINUX_SYMBOL(__##name##_acpi_probe_table) = .;		\
-	*(__##name##_acpi_probe_table)					\
+	KEEP(*(__##name##_acpi_probe_table))				\
 	VMLINUX_SYMBOL(__##name##_acpi_probe_table_end) = .;
 #else
 #define ACPI_PROBE_TABLE(name)
@@ -193,7 +193,7 @@
 #define KERNEL_DTB()							\
 	STRUCT_ALIGN();							\
 	VMLINUX_SYMBOL(__dtb_start) = .;				\
-	*(.dtb.init.rodata)						\
+	KEEP(*(.dtb.init.rodata))					\
 	VMLINUX_SYMBOL(__dtb_end) = .;
 
 /*
@@ -214,11 +214,11 @@
 	/* implement dynamic printk debug */				\
 	. = ALIGN(8);                                                   \
 	VMLINUX_SYMBOL(__start___jump_table) = .;                       \
-	*(__jump_table)                                                 \
+	KEEP(*(__jump_table))                                           \
 	VMLINUX_SYMBOL(__stop___jump_table) = .;                        \
 	. = ALIGN(8);							\
 	VMLINUX_SYMBOL(__start___verbose) = .;                          \
-	*(__verbose)                                                    \
+	KEEP(*(__verbose))                                              \
 	VMLINUX_SYMBOL(__stop___verbose) = .;				\
 	LIKELY_PROFILE()		       				\
 	BRANCH_PROFILE()						\
@@ -271,10 +271,10 @@
 		VMLINUX_SYMBOL(__start_rodata) = .;			\
 		*(.rodata) *(.rodata.*)					\
 		RO_AFTER_INIT_DATA	/* Read only after init */	\
-		*(__vermagic)		/* Kernel version magic */	\
+		KEEP(*(__vermagic))	/* Kernel version magic */	\
 		. = ALIGN(8);						\
 		VMLINUX_SYMBOL(__start___tracepoints_ptrs) = .;		\
-		*(__tracepoints_ptrs)	/* Tracepoints: pointer array */\
+		KEEP(*(__tracepoints_ptrs)) /* Tracepoints: pointer array */ \
 		VMLINUX_SYMBOL(__stop___tracepoints_ptrs) = .;		\
 		*(__tracepoints_strings)/* Tracepoints: strings */	\
 	}								\
@@ -316,7 +316,7 @@
 	/* Built-in firmware blobs */					\
 	.builtin_fw        : AT(ADDR(.builtin_fw) - LOAD_OFFSET) {	\
 		VMLINUX_SYMBOL(__start_builtin_fw) = .;			\
-		*(.builtin_fw)						\
+		KEEP(*(.builtin_fw))					\
 		VMLINUX_SYMBOL(__end_builtin_fw) = .;			\
 	}								\
 									\
@@ -394,7 +394,7 @@
 									\
 	/* Kernel symbol table: strings */				\
         __ksymtab_strings : AT(ADDR(__ksymtab_strings) - LOAD_OFFSET) {	\
-		KEEP(*(__ksymtab_strings))				\
+		*(__ksymtab_strings)					\
 	}								\
 									\
 	/* __*init sections */						\
@@ -407,14 +407,14 @@
 	/* Built-in module parameters. */				\
 	__param : AT(ADDR(__param) - LOAD_OFFSET) {			\
 		VMLINUX_SYMBOL(__start___param) = .;			\
-		*(__param)						\
+		KEEP(*(__param))					\
 		VMLINUX_SYMBOL(__stop___param) = .;			\
 	}								\
 									\
 	/* Built-in module versions. */					\
 	__modver : AT(ADDR(__modver) - LOAD_OFFSET) {			\
 		VMLINUX_SYMBOL(__start___modver) = .;			\
-		*(__modver)						\
+		KEEP(*(__modver))					\
 		VMLINUX_SYMBOL(__stop___modver) = .;			\
 		. = ALIGN((align));					\
 		VMLINUX_SYMBOL(__end_rodata) = .;			\
@@ -517,7 +517,7 @@
 	. = ALIGN(align);						\
 	__ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) {		\
 		VMLINUX_SYMBOL(__start___ex_table) = .;			\
-		*(__ex_table)						\
+		KEEP(*(__ex_table))					\
 		VMLINUX_SYMBOL(__stop___ex_table) = .;			\
 	}
 
@@ -533,9 +533,9 @@
 #ifdef CONFIG_CONSTRUCTORS
 #define KERNEL_CTORS()	. = ALIGN(8);			   \
 			VMLINUX_SYMBOL(__ctors_start) = .; \
-			*(.ctors)			   \
-			*(SORT(.init_array.*))		   \
-			*(.init_array)			   \
+			KEEP(*(.ctors))			   \
+			KEEP(*(SORT(.init_array.*)))	   \
+			KEEP(*(.init_array))		   \
 			VMLINUX_SYMBOL(__ctors_end) = .;
 #else
 #define KERNEL_CTORS()
@@ -659,7 +659,7 @@
 	. = ALIGN(8);							\
 	__bug_table : AT(ADDR(__bug_table) - LOAD_OFFSET) {		\
 		VMLINUX_SYMBOL(__start___bug_table) = .;		\
-		*(__bug_table)						\
+		KEEP(*(__bug_table))					\
 		VMLINUX_SYMBOL(__stop___bug_table) = .;			\
 	}
 #else
@@ -671,7 +671,7 @@
 	. = ALIGN(4);							\
 	.tracedata : AT(ADDR(.tracedata) - LOAD_OFFSET) {		\
 		VMLINUX_SYMBOL(__tracedata_start) = .;			\
-		*(.tracedata)						\
+		KEEP(*(.tracedata))					\
 		VMLINUX_SYMBOL(__tracedata_end) = .;			\
 	}
 #else
