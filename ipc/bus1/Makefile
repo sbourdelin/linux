@@ -2,7 +2,8 @@ bus1-y :=			\
 	main.o			\
 	util/active.o		\
 	util/flist.o		\
-	util/pool.o
+	util/pool.o		\
+	util/queue.o
 
 obj-$(CONFIG_BUS1) += bus1.o
 
