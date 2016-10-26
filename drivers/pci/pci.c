@@ -4771,6 +4771,25 @@ int pcie_set_mps(struct pci_dev *dev, int mps)
 }
 EXPORT_SYMBOL(pcie_set_mps);
 
+int pcie_get_link(struct pci_dev *dev, enum pci_bus_speed *speed,
+		  enum pcie_link_width *width)
+{
+	int ret;
+	u16 lnksta;
+
+	ret = pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &lnksta);
+	if (ret)
+		return ret;
+
+	if (speed)
+		*speed = pcie_link_speed[lnksta & PCI_EXP_LNKSTA_CLS];
+	if (width)
+		*width = (lnksta & PCI_EXP_LNKSTA_NLW) >>
+					PCI_EXP_LNKSTA_NLW_SHIFT;
+
+	return 0;
+}
+
 /**
  * pcie_get_minimum_link - determine minimum link settings of a PCI device
  * @dev: PCI device to query
@@ -4789,17 +4808,12 @@ int pcie_get_minimum_link(struct pci_dev *dev, enum pci_bus_speed *speed,
 	*width = PCIE_LNK_WIDTH_UNKNOWN;
 
 	while (dev) {
-		u16 lnksta;
 		enum pci_bus_speed next_speed;
 		enum pcie_link_width next_width;
 
-		ret = pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &lnksta);
+		ret = pcie_get_link(dev, &next_speed, &next_width);
 		if (ret)
 			return ret;
-
-		next_speed = pcie_link_speed[lnksta & PCI_EXP_LNKSTA_CLS];
-		next_width = (lnksta & PCI_EXP_LNKSTA_NLW) >>
-			PCI_EXP_LNKSTA_NLW_SHIFT;
 
 		if (next_speed < *speed)
 			*speed = next_speed;
