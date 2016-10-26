@@ -844,7 +844,8 @@ enum ib_wc_status {
 	IB_WC_INV_EEC_STATE_ERR,
 	IB_WC_FATAL_ERR,
 	IB_WC_RESP_TIMEOUT_ERR,
-	IB_WC_GENERAL_ERR
+	IB_WC_GENERAL_ERR,
+	IB_WC_STATUS_NONE
 };
 
 const char *__attribute_const__ ib_wc_status_msg(enum ib_wc_status status);

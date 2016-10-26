@@ -846,14 +846,14 @@ static void mlx5_ib_umr_done(struct ib_cq *cq, struct ib_wc *wc)
 		container_of(wc->wr_cqe, struct mlx5_ib_umr_context, cqe);
 
 	context->status = wc->status;
-	complete(&context->done);
+	wake_up(&context->wq);
 }
 
 static inline void mlx5_ib_init_umr_context(struct mlx5_ib_umr_context *context)
 {
 	context->cqe.done = mlx5_ib_umr_done;
 	context->status = -1;
-	init_completion(&context->done);
+	init_waitqueue_head(&context->wq);
 }
 
 static inline int mlx5_ib_post_send_wait(struct mlx5_ib_dev *dev,
@@ -866,13 +866,14 @@ static inline int mlx5_ib_post_send_wait(struct mlx5_ib_dev *dev,
 
 	mlx5_ib_init_umr_context(&umr_context);
 	umrwr->wr.wr_cqe = &umr_context.cqe;
+	umr_context.status = IB_WC_STATUS_NONE;
 
 	down(&umrc->sem);
 	err = ib_post_send(umrc->qp, &umrwr->wr, &bad);
 	if (err) {
 		mlx5_ib_warn(dev, "UMR post send failed, err %d\n", err);
 	} else {
-		wait_for_completion(&umr_context.done);
+		wait_event(umr_context.wq, umr_context.status != IB_WC_STATUS_NONE);
 		if (umr_context.status != IB_WC_SUCCESS) {
 			mlx5_ib_warn(dev, "reg umr failed (%u)\n",
 				     umr_context.status);

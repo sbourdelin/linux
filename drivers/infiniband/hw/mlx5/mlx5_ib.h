@@ -524,7 +524,7 @@ struct mlx5_ib_mw {
 struct mlx5_ib_umr_context {
 	struct ib_cqe		cqe;
 	enum ib_wc_status	status;
-	struct completion	done;
+	wait_queue_head_t	wq;
 };
 
 struct umr_common {
