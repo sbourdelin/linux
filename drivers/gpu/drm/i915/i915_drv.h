@@ -178,7 +178,7 @@ enum plane {
 	PLANE_A = 0,
 	PLANE_B,
 	PLANE_C,
-	PLANE_CURSOR,
+	PLANE_D,
 	I915_MAX_PLANES,
 };
 #define plane_name(p) ((p) + 'A')
@@ -316,9 +316,15 @@ struct i915_hotplug {
 	for ((__p) = 0;							\
 	     (__p) < INTEL_INFO(__dev_priv)->num_sprites[(__pipe)] + 1;	\
 	     (__p)++)
+
+/*
+ * Only iterate over sprites exposed as sprites; omit sprites that
+ * are being repurposed to simulate a cursor.
+ */
 #define for_each_sprite(__dev_priv, __p, __s)				\
 	for ((__s) = 0;							\
-	     (__s) < INTEL_INFO(__dev_priv)->num_sprites[(__p)];	\
+	     (__s) < INTEL_INFO(__dev_priv)->num_sprites[(__p)] -	\
+	             (INTEL_INFO(__dev_priv)->has_real_cursor ? 0 : 1);	\
 	     (__s)++)
 
 #define for_each_port_masked(__port, __ports_mask) \
@@ -687,6 +693,7 @@ struct intel_csr {
 	func(has_psr); \
 	func(has_rc6); \
 	func(has_rc6p); \
+	func(has_real_cursor); \
 	func(has_resource_streamer); \
 	func(has_runtime_pm); \
 	func(has_snoop); \

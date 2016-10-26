@@ -1232,6 +1232,23 @@ void assert_panel_unlocked(struct drm_i915_private *dev_priv, enum pipe pipe)
 	     pipe_name(pipe));
 }
 
+/*
+ * Cursor state for platforms that use a universal plane as a cursor.
+ * Primary is universal #0, others are universal #1-numsprites.  Cursor
+ * will be the final universal plane for the pipe.
+ */
+static bool
+universal_cursor_state(struct drm_i915_private *dev_priv,
+		       enum pipe pipe)
+{
+	unsigned int planenum = INTEL_INFO(dev_priv)->num_sprites[pipe];
+	u32 val;
+
+	val = I915_READ(PLANE_CTL(pipe, planenum));
+
+	return val & PLANE_CTL_ENABLE;
+}
+
 static void assert_cursor(struct drm_i915_private *dev_priv,
 			  enum pipe pipe, bool state)
 {
@@ -1239,6 +1256,8 @@ static void assert_cursor(struct drm_i915_private *dev_priv,
 
 	if (IS_845G(dev_priv) || IS_I865G(dev_priv))
 		cur_state = I915_READ(CURCNTR(PIPE_A)) & CURSOR_ENABLE;
+	else if (!INTEL_INFO(dev_priv)->has_real_cursor)
+		cur_state = universal_cursor_state(dev_priv, pipe);
 	else
 		cur_state = I915_READ(CURCNTR(pipe)) & CURSOR_MODE;
 
@@ -10841,15 +10860,16 @@ static void i9xx_update_cursor(struct drm_crtc *crtc, u32 base,
 	struct drm_device *dev = crtc->dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
-	struct intel_crtc_state *cstate = to_intel_crtc_state(crtc->state);
-	const struct skl_wm_values *wm = &dev_priv->wm.skl_results;
-	const struct skl_plane_wm *p_wm =
-		&cstate->wm.skl.optimal.planes[PLANE_CURSOR];
 	int pipe = intel_crtc->pipe;
 	uint32_t cntl = 0;
 
-	if (INTEL_GEN(dev_priv) >= 9 && wm->dirty_pipes & drm_crtc_mask(crtc))
-		skl_write_cursor_wm(intel_crtc, p_wm, &wm->ddb);
+	/*
+	 * Although gen9 has legacy cursor registers, their use is mutually
+	 * exclusive with the top-most universal plane.  We'll just use the
+	 * universal plane to simulate the legacy cursor interface instead,
+	 * which means we'll never enter here on gen9 platforms.
+	 */
+	WARN_ON(IS_GEN9(dev_priv));
 
 	if (plane_state && plane_state->base.visible) {
 		cntl = MCURSOR_GAMMA_ENABLE;
@@ -13528,56 +13548,6 @@ static void verify_wm_state(struct drm_crtc *crtc,
 				  hw_ddb_entry->start, hw_ddb_entry->end);
 		}
 	}
-
-	/*
-	 * cursor
-	 * If the cursor plane isn't active, we may not have updated it's ddb
-	 * allocation. In that case since the ddb allocation will be updated
-	 * once the plane becomes visible, we can skip this check
-	 */
-	if (intel_crtc->cursor_addr) {
-		hw_plane_wm = &hw_wm.planes[PLANE_CURSOR];
-		sw_plane_wm = &sw_wm->planes[PLANE_CURSOR];
-
-		/* Watermarks */
-		for (level = 0; level <= max_level; level++) {
-			if (skl_wm_level_equals(&hw_plane_wm->wm[level],
-						&sw_plane_wm->wm[level]))
-				continue;
-
-			DRM_ERROR("mismatch in WM pipe %c cursor level %d (expected e=%d b=%u l=%u, got e=%d b=%u l=%u)\n",
-				  pipe_name(pipe), level,
-				  sw_plane_wm->wm[level].plane_en,
-				  sw_plane_wm->wm[level].plane_res_b,
-				  sw_plane_wm->wm[level].plane_res_l,
-				  hw_plane_wm->wm[level].plane_en,
-				  hw_plane_wm->wm[level].plane_res_b,
-				  hw_plane_wm->wm[level].plane_res_l);
-		}
-
-		if (!skl_wm_level_equals(&hw_plane_wm->trans_wm,
-					 &sw_plane_wm->trans_wm)) {
-			DRM_ERROR("mismatch in trans WM pipe %c cursor (expected e=%d b=%u l=%u, got e=%d b=%u l=%u)\n",
-				  pipe_name(pipe),
-				  sw_plane_wm->trans_wm.plane_en,
-				  sw_plane_wm->trans_wm.plane_res_b,
-				  sw_plane_wm->trans_wm.plane_res_l,
-				  hw_plane_wm->trans_wm.plane_en,
-				  hw_plane_wm->trans_wm.plane_res_b,
-				  hw_plane_wm->trans_wm.plane_res_l);
-		}
-
-		/* DDB */
-		hw_ddb_entry = &hw_ddb.plane[pipe][PLANE_CURSOR];
-		sw_ddb_entry = &sw_ddb->plane[pipe][PLANE_CURSOR];
-
-		if (!skl_ddb_entry_equal(hw_ddb_entry, sw_ddb_entry)) {
-			DRM_ERROR("mismatch in DDB state pipe %c cursor (expected (%u,%u), found (%u,%u))\n",
-				  pipe_name(pipe),
-				  sw_ddb_entry->start, sw_ddb_entry->end,
-				  hw_ddb_entry->start, hw_ddb_entry->end);
-		}
-	}
 }
 
 static void
@@ -15215,11 +15185,18 @@ static struct drm_plane *intel_cursor_plane_create(struct drm_device *dev,
 	cursor->can_scale = false;
 	cursor->max_downscale = 1;
 	cursor->pipe = pipe;
-	cursor->plane = pipe;
 	cursor->frontbuffer_bit = INTEL_FRONTBUFFER_CURSOR(pipe);
-	cursor->check_plane = intel_check_cursor_plane;
-	cursor->update_plane = intel_update_cursor_plane;
-	cursor->disable_plane = intel_disable_cursor_plane;
+	if (INTEL_INFO(dev)->has_real_cursor) {
+		cursor->plane = pipe;  /* unused? */
+		cursor->check_plane = intel_check_cursor_plane;
+		cursor->update_plane = intel_update_cursor_plane;
+		cursor->disable_plane = intel_disable_cursor_plane;
+	} else {
+		cursor->plane = INTEL_INFO(dev)->num_sprites[pipe] - 1;
+		cursor->check_plane = intel_check_sprite_plane;
+		cursor->update_plane = skl_update_plane;
+		cursor->disable_plane = skl_disable_plane;
+	}
 
 	ret = drm_universal_plane_init(dev, &cursor->base, 0,
 				       &intel_plane_funcs,
