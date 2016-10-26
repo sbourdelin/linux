@@ -1,0 +1,6 @@
+config OF_OVERLAY_MGR
+	bool "Device Tree Overlay Manager"
+	depends on OF_OVERLAY
+	help
+	  Enable the overlay manager to handle automatic overlay loading when
+	  devices are detected.
