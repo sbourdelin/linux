@@ -57,8 +57,10 @@ EXPORT_SYMBOL(node_to_cpumask_map);
 EXPORT_SYMBOL(node_data);
 
 static int min_common_depth;
-static int n_mem_addr_cells, n_mem_size_cells;
+int n_mem_addr_cells;
+static int n_mem_size_cells;
 static int form1_affinity;
+EXPORT_SYMBOL(n_mem_addr_cells);
 
 #define MAX_DISTANCE_REF_POINTS 4
 static int distance_ref_points_depth;
@@ -405,6 +407,24 @@ static void read_drconf_cell(struct of_drconf_cell *drmem, const __be32 **cellp)
 
 	*cellp = cp + 4;
 }
+ 
+ /*
+ * Retrieve and validate the ibm,dynamic-memory property of the device tree.
+ * Read the next memory block set entry from the ibm,dynamic-memory-v2 property
+ * and return the information in the provided of_drconf_cell_v2 structure.
+ */
+void read_drconf_cell_v2(struct of_drconf_cell_v2 *drmem, const __be32 **cellp)
+{
+	const __be32 *cp = (const __be32 *)*cellp;
+	drmem->num_seq_lmbs = be32_to_cpu(*cp++);
+	drmem->base_addr = read_n_cells(n_mem_addr_cells, &cp);
+	drmem->drc_index = be32_to_cpu(*cp++);
+	drmem->aa_index = be32_to_cpu(*cp++);
+	drmem->flags = be32_to_cpu(*cp++);
+
+	*cellp = cp;
+}
+EXPORT_SYMBOL(read_drconf_cell_v2);
 
 /*
  * Retrieve and validate the ibm,dynamic-memory property of the device tree.

@@ -443,23 +443,34 @@ static int __init early_init_dt_scan_chosen_ppc(unsigned long node,
 
 #ifdef CONFIG_PPC_PSERIES
 /*
- * Interpret the ibm,dynamic-memory property in the
- * /ibm,dynamic-reconfiguration-memory node.
+ * Retrieve and validate the ibm,lmb-size property for drconf memory
+ * from the flattened device tree.
+ */
+static u64 __init get_lmb_size(unsigned long node)
+{
+	const __be32 *ls;
+	int len;
+	ls = of_get_flat_dt_prop(node, "ibm,lmb-size", &len);
+	if (!ls || len < dt_root_size_cells * sizeof(__be32))
+		return 0;
+	return dt_mem_next_cell(dt_root_size_cells, &ls);
+}
+
+/*
+ * Interpret the ibm,dynamic-memory property/ibm,dynamic-memory-v2
+ * in the /ibm,dynamic-reconfiguration-memory node.
  * This contains a list of memory blocks along with NUMA affinity
  * information.
  */
-static int __init early_init_dt_scan_drconf_memory(unsigned long node)
+static int __init early_init_dt_scan_drconf_memory_v1(unsigned long node)
 {
-	const __be32 *dm, *ls, *usm;
+	const __be32 *dm, *usm;
 	int l;
 	unsigned long n, flags;
 	u64 base, size, memblock_size;
 	unsigned int is_kexec_kdump = 0, rngs;
 
-	ls = of_get_flat_dt_prop(node, "ibm,lmb-size", &l);
-	if (ls == NULL || l < dt_root_size_cells * sizeof(__be32))
-		return 0;
-	memblock_size = dt_mem_next_cell(dt_root_size_cells, &ls);
+	memblock_size = get_lmb_size(node);
 
 	dm = of_get_flat_dt_prop(node, "ibm,dynamic-memory", &l);
 	if (dm == NULL || l < sizeof(__be32))
@@ -518,6 +529,76 @@ static int __init early_init_dt_scan_drconf_memory(unsigned long node)
 	memblock_dump_all();
 	return 0;
 }
+
+static int __init early_init_dt_scan_drconf_memory_v2(unsigned long node)
+{
+	const __be32 *dm;
+	int l;
+	unsigned long num_sets;
+	u64 size, base, memblock_size;
+
+	memblock_size = get_lmb_size(node);
+
+	dm = of_get_flat_dt_prop(node, "ibm,dynamic-memory-v2", &l);
+	if (dm == NULL || l < sizeof(__be32))
+		return 0;
+
+	/* Verify expected length of the array of ibm,dynamic-memory-v2
+	 * structs fits in the actual size of the property data.
+	 */
+	num_sets = of_read_number(dm++, 1);
+	if (l < (num_sets * (dt_root_addr_cells + 4) + 1) * sizeof(__be32))
+		return 0;
+
+	if (n_mem_addr_cells == 0)
+		n_mem_addr_cells = dt_root_addr_cells;
+
+	for (; num_sets != 0; --num_sets) {
+		struct of_drconf_cell_v2 drmem;
+		unsigned long nsl;
+
+		read_drconf_cell_v2(&drmem, &dm);
+		base = drmem.base_addr;
+		nsl = drmem.num_seq_lmbs;
+		size = memblock_size;
+
+		/* SKip this block if the reserved bit is set in flags
+		 * or if the block is not assigned to this partition
+		 */
+		if ((drmem.flags & DRCONF_MEM_RESERVED) ||
+		    !(drmem.flags & DRCONF_MEM_ASSIGNED))
+			continue;
+
+		for (; nsl != 0; nsl--) {
+			size = memblock_size;
+
+			if (iommu_is_off) {
+				if (base >= 0x80000000ul)
+					continue;
+				if ((base + size) > 0x80000000ul)
+					size = 0x80000000ul - base;
+			}
+			memblock_add(base, size);
+
+			base += size;
+		}
+	}
+
+	memblock_dump_all();
+	return 0;
+}
+
+static int __init early_init_dt_scan_drconf_memory(unsigned long node)
+{
+	const __be32 *dm;
+	int l;
+	dm = of_get_flat_dt_prop(node, "ibm,dynamic-memory-v2", &l);
+	if (dm == NULL || l < sizeof(__be32))
+		return early_init_dt_scan_drconf_memory_v1(node);
+	else
+		return early_init_dt_scan_drconf_memory_v2(node);
+}
+
 #else
 #define early_init_dt_scan_drconf_memory(node)	0
 #endif /* CONFIG_PPC_PSERIES */
