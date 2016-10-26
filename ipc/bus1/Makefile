@@ -1,6 +1,7 @@
 bus1-y :=			\
 	main.o			\
-	util/active.o
+	util/active.o		\
+	util/flist.o
 
 obj-$(CONFIG_BUS1) += bus1.o
 
