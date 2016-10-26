@@ -1387,6 +1387,24 @@ static void pdev_assign_fixed_resources(struct pci_dev *dev)
 	}
 }
 
+static inline void pdev_restore_resource_sizes(struct pci_dev *dev)
+{
+	struct resource *r;
+	int i;
+
+	for (i = 0; i <= PCI_ROM_RESOURCE; i++) {
+		r = &dev->resource[i];
+		if (r->flags & IORESOURCE_UNSET)
+			continue;
+
+		if (!dev->bars_addsize[i])
+			continue;
+
+		r->end -= dev->bars_addsize[i];
+		dev->bars_addsize[i] = 0;
+	}
+}
+
 void __pci_bus_assign_resources(const struct pci_bus *bus,
 				struct list_head *realloc_head,
 				struct list_head *fail_head)
@@ -1398,6 +1416,7 @@ void __pci_bus_assign_resources(const struct pci_bus *bus,
 
 	list_for_each_entry(dev, &bus->devices, bus_list) {
 		pdev_assign_fixed_resources(dev);
+		pdev_restore_resource_sizes(dev);
 
 		b = dev->subordinate;
 		if (!b)
