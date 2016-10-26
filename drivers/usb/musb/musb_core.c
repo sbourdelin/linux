@@ -2120,12 +2120,6 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	if (musb->ops->ep_select)
 		musb->io.ep_select = musb->ops->ep_select;
 
-	/* At least tusb6010 has its own offsets */
-	if (musb->ops->ep_offset)
-		musb->io.ep_offset = musb->ops->ep_offset;
-	if (musb->ops->ep_select)
-		musb->io.ep_select = musb->ops->ep_select;
-
 	if (musb->ops->fifo_mode)
 		fifo_mode = musb->ops->fifo_mode;
 	else
