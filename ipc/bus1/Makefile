@@ -1,6 +1,7 @@
 bus1-y :=			\
 	handle.o		\
 	main.o			\
+	message.o		\
 	peer.o			\
 	tx.o			\
 	user.o			\

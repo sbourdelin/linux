@@ -26,6 +26,7 @@
 #include <linux/types.h>
 
 struct dentry;
+struct iovec;
 
 /**
  * BUS1_TAIL - tail pointer in singly-linked lists
@@ -36,6 +37,12 @@ struct dentry;
  * rather than NULL.
  */
 #define BUS1_TAIL ERR_PTR(-1)
+
+int bus1_import_vecs(struct iovec *out_vecs,
+		     size_t *out_length,
+		     const void __user *vecs,
+		     size_t n_vecs);
+struct file *bus1_import_fd(int fd);
 
 #if defined(CONFIG_DEBUG_FS)
 

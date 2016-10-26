@@ -54,6 +54,7 @@
 #include <linux/wait.h>
 #include "user.h"
 #include "util/active.h"
+#include "util/pool.h"
 #include "util/queue.h"
 
 struct cred;
@@ -88,6 +89,7 @@ struct bus1_peer {
 
 	struct {
 		struct mutex lock;
+		struct bus1_pool pool;
 		struct bus1_queue queue;
 	} data;
 

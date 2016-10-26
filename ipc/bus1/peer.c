@@ -70,6 +70,7 @@ struct bus1_peer *bus1_peer_new(void)
 
 	/* initialize data section */
 	mutex_init(&peer->data.lock);
+	peer->data.pool = BUS1_POOL_NULL;
 	bus1_queue_init(&peer->data.queue);
 
 	/* initialize peer-private section */
@@ -136,6 +137,7 @@ struct bus1_peer *bus1_peer_free(struct bus1_peer *peer)
 
 	/* deinitialize data section */
 	bus1_queue_deinit(&peer->data.queue);
+	bus1_pool_deinit(&peer->data.pool);
 	mutex_destroy(&peer->data.lock);
 
 	/* deinitialize constant fields */
