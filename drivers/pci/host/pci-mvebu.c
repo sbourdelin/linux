@@ -464,6 +464,8 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
 static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
 {
 	struct mvebu_sw_pci_bridge *bridge = &port->bridge;
+	int rc;
+	phys_addr_t base, size;
 
 	memset(bridge, 0, sizeof(struct mvebu_sw_pci_bridge));
 
@@ -480,6 +482,26 @@ static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
 
 	/* Add capabilities */
 	bridge->status = PCI_STATUS_CAP_LIST;
+
+	/*
+	 * If the firmware has already setup a window for PCIe then assume
+	 * control of it by defaulting the BAR to the window setting.
+	 */
+	rc = mvebu_mbus_get_single_window_by_id(port->mem_target,
+						port->mem_attr, &base, &size);
+	if (rc == -E2BIG)
+		pr_err(FW_BUG "%s: Too many pre-existing mbus mappings\n",
+		       port->dn->name);
+	if (!rc) {
+		if ((base & 0xFFFFF) != 0 || ((size + base) & 0xFFFFF) != 0)
+			pr_err(FW_BUG "%s: Invalid pre-existing mbus mapping\n",
+			       port->dn->name);
+		port->memwin_base = base;
+		port->memwin_size = size;
+		port->bridge.membase = (base >> 16) & 0xFFF0;
+		port->bridge.memlimit = ((size - 1 + base) >> 16) & 0xFFF0;
+		port->bridge.command |= PCI_COMMAND_MEMORY;
+	}
 }
 
 /*

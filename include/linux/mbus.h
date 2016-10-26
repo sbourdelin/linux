@@ -97,5 +97,8 @@ int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
 		    size_t mbus_size, phys_addr_t sdram_phys_base,
 		    size_t sdram_size);
 int mvebu_mbus_dt_init(bool is_coherent);
+int mvebu_mbus_get_single_window_by_id(unsigned int target,
+				       unsigned int attribute,
+				       phys_addr_t *base, phys_addr_t *size);
 
 #endif /* __LINUX_MBUS_H */

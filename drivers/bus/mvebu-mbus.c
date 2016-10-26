@@ -922,6 +922,42 @@ int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
 						 size, MVEBU_MBUS_NO_REMAP);
 }
 
+/**
+ * mvebu_mbus_get_single_window_by_id() - return the location of the window if
+ * the target/attribute has a single enabled mapping.
+ *
+ * RETURNS:
+ *	-ENODEV if no mapping and -E2BIG if there is more than one mapping
+ */
+int mvebu_mbus_get_single_window_by_id(unsigned int target,
+				       unsigned int attribute,
+				       phys_addr_t *base, phys_addr_t *size)
+{
+	unsigned int win;
+	unsigned int count = 0;
+
+	for (win = 0; win < mbus_state.soc->num_wins; win++) {
+		u64 wbase;
+		u32 wsize;
+		u8 wtarget, wattr;
+		int enabled;
+
+		mvebu_mbus_read_window(&mbus_state, win, &enabled, &wbase,
+				       &wsize, &wtarget, &wattr, NULL);
+		if (enabled && wtarget == target && wattr == attribute) {
+			*base = wbase;
+			*size = wsize;
+			count++;
+		}
+	}
+
+	if (count == 1)
+		return 0;
+	if (count == 0)
+		return -ENODEV;
+	return -E2BIG;
+}
+
 int mvebu_mbus_del_window(phys_addr_t base, size_t size)
 {
 	int win;
