@@ -30,10 +30,14 @@
 #include <linux/of_gpio.h>
 #include <linux/regulator/of_regulator.h>
 #include <linux/regulator/machine.h>
+#include <linux/interrupt.h>
 
 struct fixed_voltage_data {
 	struct regulator_desc desc;
 	struct regulator_dev *dev;
+	int oc_gpio;
+	unsigned has_oc_gpio:1;
+	unsigned oc_high:1;
 };
 
 
@@ -93,6 +97,22 @@ of_get_fixed_voltage_config(struct device *dev,
 
 	return config;
 }
+
+static irqreturn_t reg_fixed_overcurrent_irq(int irq, void *data)
+{
+	struct fixed_voltage_data *drvdata = data;
+	unsigned long event = REGULATOR_EVENT_OVER_CURRENT_CHANGE;
+	int oc_value;
+
+	oc_value = gpio_get_value_cansleep(drvdata->oc_gpio);
+	if (oc_value == drvdata->oc_high)
+		event |= REGULATOR_EVENT_OVER_CURRENT;
+
+	regulator_notifier_call_chain(drvdata->dev, event, NULL);
+
+	return IRQ_HANDLED;
+}
+
 
 static struct regulator_ops fixed_voltage_ops = {
 };
@@ -174,6 +194,33 @@ static int reg_fixed_voltage_probe(struct platform_device *pdev)
 	cfg.init_data = config->init_data;
 	cfg.driver_data = drvdata;
 	cfg.of_node = pdev->dev.of_node;
+
+	if (config->has_oc_gpio && gpio_is_valid(config->oc_gpio)) {
+
+		ret = devm_gpio_request_one(&pdev->dev,
+					config->oc_gpio,
+					GPIOF_DIR_IN, "oc_gpio");
+		if (ret) {
+			dev_err(&pdev->dev,
+				"Failed to request gpio: %d\n", ret);
+			return ret;
+		}
+
+		ret = devm_request_threaded_irq(&pdev->dev,
+				gpio_to_irq(config->oc_gpio), NULL,
+				reg_fixed_overcurrent_irq,
+				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING |
+				IRQF_ONESHOT,
+				"over_current", drvdata);
+		if (ret) {
+			dev_err(&pdev->dev,
+				"Failed tp request irq: %d\n", ret);
+			return ret;
+		}
+		drvdata->oc_gpio = config->oc_gpio;
+		drvdata->oc_high = config->oc_high;
+		drvdata->has_oc_gpio = config->has_oc_gpio;
+	}
 
 	drvdata->dev = devm_regulator_register(&pdev->dev, &drvdata->desc,
 					       &cfg);
