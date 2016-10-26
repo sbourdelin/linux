@@ -35,4 +35,17 @@ int overlay_mgr_apply(struct device *dev, char **candidates, unsigned n);
                 -1                                              \
         )
 
+/* Nextthing's C.H.I.P. dip header */
+struct chip_header {
+        u32     magic;                  /* rsvd */
+        u8      version;                /* spec version */
+        u32     vendor_id;
+        u16     product_id;
+        u8      product_version;
+        char    vendor_name[32];
+        char    product_name[32];
+        u8      rsvd[36];               /* rsvd for futre spec versions */
+        u8      data[16];               /* user data, per-cape specific */
+} __packed;
+
 #endif /* __OVERLAY_MGR_H__ */

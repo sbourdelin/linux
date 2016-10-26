@@ -4,3 +4,16 @@ config OF_OVERLAY_MGR
 	help
 	  Enable the overlay manager to handle automatic overlay loading when
 	  devices are detected.
+
+if OF_OVERLAY_MGR
+
+menu "Dips header formats"
+
+config OF_OVERLAY_MGR_FORMAT_CHIP
+	bool "Nextthing's C.H.I.P. dip header format"
+	help
+	  Enable Nextthing's C.H.I.P. dip header format support.
+
+endmenu
+
+endif
