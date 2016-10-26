@@ -1,6 +1,7 @@
 bus1-y :=			\
 	main.o			\
 	peer.o			\
+	tx.o			\
 	user.o			\
 	util.o			\
 	util/active.o		\

@@ -54,6 +54,7 @@
 #include <linux/wait.h>
 #include "user.h"
 #include "util/active.h"
+#include "util/queue.h"
 
 struct cred;
 struct dentry;
@@ -71,6 +72,7 @@ struct pid_namespace;
  * @active:			active references
  * @debugdir:			debugfs root of this peer, or NULL/ERR_PTR
  * @data.lock:			data lock
+ * @data.queue:			message queue
  * @local.lock:			local peer runtime lock
  */
 struct bus1_peer {
@@ -86,6 +88,7 @@ struct bus1_peer {
 
 	struct {
 		struct mutex lock;
+		struct bus1_queue queue;
 	} data;
 
 	struct {
