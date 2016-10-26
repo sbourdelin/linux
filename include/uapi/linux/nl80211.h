@@ -371,7 +371,8 @@
  *	NL80211_CMD_GET_SURVEY and on the "scan" multicast group)
  *
  * @NL80211_CMD_SET_PMKSA: Add a PMKSA cache entry, using %NL80211_ATTR_MAC
- *	(for the BSSID) and %NL80211_ATTR_PMKID.
+ *	(for the BSSID) and %NL80211_ATTR_PMKID. Optionally, %NL80211_ATTR_PMK
+ *	can be used to specify the PMK.
  * @NL80211_CMD_DEL_PMKSA: Delete a PMKSA cache entry, using %NL80211_ATTR_MAC
  *	(for the BSSID) and %NL80211_ATTR_PMKID.
  * @NL80211_CMD_FLUSH_PMKSA: Flush all PMKSA cache entries.
@@ -1937,6 +1938,11 @@ enum nl80211_commands {
  * @NL80211_ATTR_NAN_MATCH: used to report a match. This is a nested attribute.
  *	See &enum nl80211_nan_match_attributes.
  *
+ * @NL80211_ATTR_PMK: PMK for offloaded 4-Way Handshake. Relevant with
+ *	%NL80211_CMD_CONNECT (for WPA/WPA2-PSK networks) when PSK is used, or
+ *	with %NL80211_CMD_SET_PMKSA when 802.1X authentication is used and for
+ *	PMKSA caching.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2335,6 +2341,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_NAN_DUAL,
 	NL80211_ATTR_NAN_FUNC,
 	NL80211_ATTR_NAN_MATCH,
+
+	NL80211_ATTR_PMK,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -4638,6 +4646,9 @@ enum nl80211_feature_flags {
  *	configuration (AP/mesh) with HT rates.
  * @NL80211_EXT_FEATURE_BEACON_RATE_VHT: Driver supports beacon rate
  *	configuration (AP/mesh) with VHT rates.
+ * @NL80211_EXT_FEATURE_4WAY_HANDSHAKE_OFFLOAD_STA: Device supports
+ *	doing 4-way handshake in station mode (PSK is passed as part
+ *	of the connect command).
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
@@ -4652,6 +4663,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_BEACON_RATE_LEGACY,
 	NL80211_EXT_FEATURE_BEACON_RATE_HT,
 	NL80211_EXT_FEATURE_BEACON_RATE_VHT,
+	NL80211_EXT_FEATURE_4WAY_HANDSHAKE_OFFLOAD_STA,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
