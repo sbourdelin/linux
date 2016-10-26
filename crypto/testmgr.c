@@ -2313,6 +2313,10 @@ static const struct alg_test_desc alg_test_descs[] = {
 		.test = alg_test_null,
 		.fips_allowed = 1,
 	}, {
+		.alg = "__intel_sha512-mb",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
 		.alg = "ansi_cprng",
 		.test = alg_test_cprng,
 		.suite = {
@@ -3763,6 +3767,10 @@ static const struct alg_test_desc alg_test_descs[] = {
 		.fips_allowed = 1,
 	}, {
 		.alg = "mcryptd(__intel_sha256-mb)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "mcryptd(__intel_sha512-mb)",
 		.test = alg_test_null,
 		.fips_allowed = 1,
 	}, {
