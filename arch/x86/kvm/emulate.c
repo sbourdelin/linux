@@ -171,6 +171,7 @@
 #define NearBranch  ((u64)1 << 52)  /* Near branches */
 #define No16	    ((u64)1 << 53)  /* No 16 bit operand */
 #define IncSP       ((u64)1 << 54)  /* SP is incremented before ModRM calc */
+#define Aligned16   ((u64)1 << 55)  /* Aligned to 16 byte boundary (e.g. FXSAVE) */
 
 #define DstXacc     (DstAccLo | SrcAccHi | SrcWrite)
 
@@ -632,21 +633,24 @@ static void set_segment_selector(struct x86_emulate_ctxt *ctxt, u16 selector,
  * depending on whether they're AVX encoded or not.
  *
  * Also included is CMPXCHG16B which is not a vector instruction, yet it is
- * subject to the same check.
+ * subject to the same check.  FXSAVE and FXRSTOR are checked here too as their
+ * 512 bytes of data must be aligned to a 16 byte boundary.
  */
-static bool insn_aligned(struct x86_emulate_ctxt *ctxt, unsigned size)
+static unsigned insn_alignment(struct x86_emulate_ctxt *ctxt, unsigned size)
 {
 	if (likely(size < 16))
-		return false;
+		return 1;
 
 	if (ctxt->d & Aligned)
-		return true;
+		return size;
 	else if (ctxt->d & Unaligned)
-		return false;
+		return 1;
 	else if (ctxt->d & Avx)
-		return false;
+		return 1;
+	else if (ctxt->d & Aligned16)
+		return 16;
 	else
-		return true;
+		return size;
 }
 
 static __always_inline int __linearize(struct x86_emulate_ctxt *ctxt,
@@ -704,7 +708,7 @@ static __always_inline int __linearize(struct x86_emulate_ctxt *ctxt,
 		}
 		break;
 	}
-	if (insn_aligned(ctxt, size) && ((la & (size - 1)) != 0))
+	if (la & (insn_alignment(ctxt, size) - 1))
 		return emulate_gp(ctxt, 0);
 	return X86EMUL_CONTINUE;
 bad:
@@ -3856,6 +3860,75 @@ static int em_movsxd(struct x86_emulate_ctxt *ctxt)
 	return X86EMUL_CONTINUE;
 }
 
+static int check_fxsr(struct x86_emulate_ctxt *ctxt)
+{
+	u32 eax = 1, ebx, ecx = 0, edx;
+
+	ctxt->ops->get_cpuid(ctxt, &eax, &ebx, &ecx, &edx);
+	if (!(edx & FFL(FXSR)))
+		return emulate_ud(ctxt);
+
+	if (ctxt->ops->get_cr(ctxt, 0) & (X86_CR0_TS | X86_CR0_EM))
+		return emulate_nm(ctxt);
+
+	return X86EMUL_CONTINUE;
+}
+
+/*
+ * FXSAVE and FXRSTOR have 3 different formats depending on execution mode,
+ *  1) non-64-bit mode
+ *  2) 64-bit mode with REX.W prefix
+ *  3) 64-bit mode without REX.W prefix
+ *
+ * Emulation uses (3) for for (1) mode because only the number of XMM registers
+ * is different.
+ */
+static int em_fxsave(struct x86_emulate_ctxt *ctxt)
+{
+	char fx_state[512] __aligned(16);
+	int rc;
+
+	rc = check_fxsr(ctxt);
+	if (rc != X86EMUL_CONTINUE)
+		return rc;
+
+	ctxt->ops->get_fpu(ctxt);
+#ifdef CONFIG_X86_64
+	if (ctxt->rex_prefix & (1 << 3))
+		asm volatile("fxsave64 %0" : "+m"(fx_state));
+	else
+#endif
+		asm volatile("fxsave %0" : "+m"(fx_state));
+	ctxt->ops->put_fpu(ctxt);
+
+	return segmented_write(ctxt, ctxt->memop.addr.mem, fx_state, 512);
+}
+
+static int em_fxrstor(struct x86_emulate_ctxt *ctxt)
+{
+	char fx_state[512] __aligned(16);
+	int rc;
+
+	rc = check_fxsr(ctxt);
+	if (rc != X86EMUL_CONTINUE)
+		return rc;
+
+	rc = segmented_read(ctxt, ctxt->memop.addr.mem, fx_state, 512);
+	if (rc != X86EMUL_CONTINUE)
+		return rc;
+
+	ctxt->ops->get_fpu(ctxt);
+#ifdef CONFIG_X86_64
+	if (ctxt->rex_prefix & (1 << 3))
+		asm volatile("fxrstor64 %0" : "+m"(fx_state));
+	else
+#endif
+		asm volatile("fxrstor %0" : "+m"(fx_state));
+	ctxt->ops->put_fpu(ctxt);
+
+	return X86EMUL_CONTINUE;
+}
+
 static bool valid_cr(int nr)
 {
 	switch (nr) {
@@ -4208,7 +4281,9 @@ static const struct gprefix pfx_0f_ae_7 = {
 };
 
 static const struct group_dual group15 = { {
-	N, N, N, N, N, N, N, GP(0, &pfx_0f_ae_7),
+	I(ModRM | Aligned16, em_fxsave),
+	I(ModRM | Aligned16, em_fxrstor),
+	N, N, N, N, N, GP(0, &pfx_0f_ae_7),
 }, {
 	N, N, N, N, N, N, N, N,
 } };
