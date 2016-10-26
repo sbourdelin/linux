@@ -273,6 +273,23 @@ config POSIX_MQUEUE_SYSCTL
 	depends on SYSCTL
 	default y
 
+config BUS1
+	tristate "Bus1 Kernel Message Bus"
+	help
+	  The Bus1 Kernel Message Bus defines and implements a distributed
+	  object model. It provides a capability-based IPC system for machine
+	  local communication.
+
+	  The Bus1 IPC system is exposed via /dev/bus1. If debugfs is enabled,
+	  bus1 exposes additional debug information there.
+
+config BUS1_TESTS
+	bool "Bus1 Self-Tests"
+	depends on BUS1
+	help
+	  Enable and run the bus1 self-tests before loading the module. The
+	  overhead is minimal, so there is generally no harm in enabling it.
+
 config CROSS_MEMORY_ATTACH
 	bool "Enable process_vm_readv/writev syscalls"
 	depends on MMU
