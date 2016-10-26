@@ -21,6 +21,7 @@
 #include <linux/ipv6.h>
 #include <linux/route.h>
 #include <net/seg6.h>
+#include <linux/seg6.h>
 #include <linux/seg6_hmac.h>
 
 #define SEG6_HMAC_MAX_DIGESTSIZE	160
