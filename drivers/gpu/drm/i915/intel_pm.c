@@ -4199,6 +4199,17 @@ skl_compute_wm(struct drm_atomic_state *state)
 	return 0;
 }
 
+static void skl_evade_crtc_wm(struct intel_atomic_state *state,
+			      struct intel_crtc_state *cstate)
+{
+	struct intel_crtc *crtc = to_intel_crtc(cstate->base.crtc);
+	struct drm_i915_private *dev_priv = to_i915(state->base.dev);
+	struct skl_pipe_wm *pipe_wm = &cstate->wm.skl.optimal;
+	enum pipe pipe = crtc->pipe;
+
+	I915_WRITE(PIPE_WM_LINETIME(pipe), pipe_wm->linetime);
+}
+
 static void skl_update_wm(struct drm_crtc *crtc)
 {
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
@@ -4292,7 +4303,8 @@ static void ilk_program_watermarks(struct drm_i915_private *dev_priv)
 	ilk_write_wm_values(dev_priv, &results);
 }
 
-static void ilk_initial_watermarks(struct intel_crtc_state *cstate)
+static void ilk_initial_watermarks(struct intel_atomic_state *state,
+				   struct intel_crtc_state *cstate)
 {
 	struct drm_i915_private *dev_priv = to_i915(cstate->base.crtc->dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(cstate->base.crtc);
@@ -4303,7 +4315,8 @@ static void ilk_initial_watermarks(struct intel_crtc_state *cstate)
 	mutex_unlock(&dev_priv->wm.wm_mutex);
 }
 
-static void ilk_optimize_watermarks(struct intel_crtc_state *cstate)
+static void ilk_optimize_watermarks(struct intel_atomic_state *state,
+				    struct intel_crtc_state *cstate)
 {
 	struct drm_i915_private *dev_priv = to_i915(cstate->base.crtc->dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(cstate->base.crtc);
@@ -7741,6 +7754,7 @@ void intel_init_pm(struct drm_device *dev)
 	if (INTEL_INFO(dev)->gen >= 9) {
 		skl_setup_wm_latency(dev);
 		dev_priv->display.update_wm = skl_update_wm;
+		dev_priv->display.atomic_evade_watermarks = skl_evade_crtc_wm;
 		dev_priv->display.compute_global_watermarks = skl_compute_wm;
 	} else if (HAS_PCH_SPLIT(dev_priv)) {
 		ilk_setup_wm_latency(dev);

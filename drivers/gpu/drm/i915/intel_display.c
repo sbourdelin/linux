@@ -5170,7 +5170,7 @@ static void intel_pre_plane_update(struct intel_crtc_state *old_crtc_state)
 	 * us to.
 	 */
 	if (dev_priv->display.initial_watermarks != NULL)
-		dev_priv->display.initial_watermarks(pipe_config);
+		dev_priv->display.initial_watermarks(to_intel_atomic_state(old_state), pipe_config);
 	else if (pipe_config->update_wm_pre)
 		intel_update_watermarks(&crtc->base);
 }
@@ -5384,7 +5384,7 @@ static void ironlake_crtc_enable(struct intel_crtc_state *pipe_config,
 	intel_color_load_luts(&pipe_config->base);
 
 	if (dev_priv->display.initial_watermarks != NULL)
-		dev_priv->display.initial_watermarks(intel_crtc->config);
+		dev_priv->display.initial_watermarks(to_intel_atomic_state(old_state), intel_crtc->config);
 	intel_enable_pipe(intel_crtc);
 
 	if (intel_crtc->config->has_pch_encoder)
@@ -5490,7 +5490,7 @@ static void haswell_crtc_enable(struct intel_crtc_state *pipe_config,
 		intel_ddi_enable_transcoder_func(crtc);
 
 	if (dev_priv->display.initial_watermarks != NULL)
-		dev_priv->display.initial_watermarks(pipe_config);
+		dev_priv->display.initial_watermarks(to_intel_atomic_state(old_state), pipe_config);
 	else
 		intel_update_watermarks(crtc);
 
@@ -14527,7 +14527,7 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 		intel_cstate = to_intel_crtc_state(crtc->state);
 
 		if (dev_priv->display.optimize_watermarks)
-			dev_priv->display.optimize_watermarks(intel_cstate);
+			dev_priv->display.optimize_watermarks(intel_state, intel_cstate);
 	}
 
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
@@ -14935,7 +14935,6 @@ static void intel_begin_crtc_commit(struct drm_crtc *crtc,
 	struct intel_crtc_state *old_intel_state =
 		to_intel_crtc_state(old_crtc_state);
 	bool modeset = needs_modeset(crtc->state);
-	enum pipe pipe = intel_crtc->pipe;
 
 	/* Perform vblank evasion around commit operation */
 	intel_pipe_update_start(intel_crtc);
@@ -14948,14 +14947,13 @@ static void intel_begin_crtc_commit(struct drm_crtc *crtc,
 		intel_color_load_luts(crtc->state);
 	}
 
-	if (intel_cstate->update_pipe) {
+	if (intel_cstate->update_pipe)
 		intel_update_pipe_config(intel_crtc, old_intel_state);
-	} else if (INTEL_GEN(dev_priv) >= 9) {
+	else if (INTEL_GEN(dev_priv) >= 9)
 		skl_detach_scalers(intel_crtc);
 
-		I915_WRITE(PIPE_WM_LINETIME(pipe),
-			   intel_cstate->wm.skl.optimal.linetime);
-	}
+	if (dev_priv->display.atomic_evade_watermarks)
+		dev_priv->display.atomic_evade_watermarks(to_intel_atomic_state(old_crtc_state->state), intel_cstate);
 }
 
 static void intel_finish_crtc_commit(struct drm_crtc *crtc,
@@ -16409,7 +16407,7 @@ retry:
 		struct intel_crtc_state *cs = to_intel_crtc_state(cstate);
 
 		cs->wm.need_postvbl_update = true;
-		dev_priv->display.optimize_watermarks(cs);
+		dev_priv->display.optimize_watermarks(to_intel_atomic_state(state), cs);
 	}
 
 put_state:
