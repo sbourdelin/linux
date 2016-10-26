@@ -69,6 +69,20 @@ static int conf_type;
 module_param(conf_type, int, 0);
 MODULE_PARM_DESC(conf_type, "select octeon configuration 0 default 1 ovs");
 
+/* In non-default case if user wants to have multiple queues then because of
+ * the way Liquidio HW works we need num_queues_per_pf and num_queues_per_vf
+ * module parameters at HW/module init time. This is because in multi-queues per
+ * VF scenario, HW has to carve these queues before FW can start communicating
+ * with PF/VF host drivers.
+ */
+static unsigned int num_queues_per_pf[2] = { 0, 0 };
+module_param_array(num_queues_per_pf, uint, NULL, 0444);
+MODULE_PARM_DESC(num_queues_per_pf, "two comma-separated unsigned integers that specify number of queues per PF0 (left of the comma) and PF1 (right of the comma); for 23xx only. Valid range is 1 to 64.");
+
+static unsigned int num_queues_per_vf[2] = { 0, 0 };
+module_param_array(num_queues_per_vf, uint, NULL, 0444);
+MODULE_PARM_DESC(num_queues_per_vf, "two comma-separated unsigned integers that specify number of queues per PF0 (left of the comma) and PF1 (right of the comma); for 23xx only. Valid values are 1, 2, 4 and 8. ");
+
 static int ptp_enable = 1;
 
 /* Bit mask values for lio->ifstate */
@@ -1730,6 +1744,15 @@ static int octeon_chip_specific_setup(struct octeon_device *oct)
 
 	case OCTEON_CN23XX_PCIID_PF:
 		oct->chip_id = OCTEON_CN23XX_PF_VID;
+		if (num_queues_per_pf[oct->pci_dev->devfn] > 0) {
+			oct->sriov_info.num_pf_rings =
+			    num_queues_per_pf[oct->pci_dev->devfn];
+		}
+		if (num_queues_per_vf[oct->pci_dev->devfn] > 0) {
+			oct->sriov_info.rings_per_vf =
+				num_queues_per_vf[oct->pci_dev->devfn];
+		}
+
 		ret = setup_cn23xx_octeon_pf_device(oct);
 		s = "CN23XX";
 		break;
