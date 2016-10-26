@@ -303,6 +303,34 @@ static int intel_dp_link_rate_index(struct intel_dp *intel_dp,
 	return -1;
 }
 
+void intel_dp_get_link_train_fallback_values(struct intel_dp *intel_dp,
+					     int link_rate, uint8_t lane_count)
+{
+	int common_rates[DP_MAX_SUPPORTED_RATES] = {};
+	int common_len;
+	int link_rate_index = -1;
+
+	if (!intel_dp->link_train_failed)
+		return;
+
+	common_len = intel_dp_common_rates(intel_dp, common_rates);
+	link_rate_index = intel_dp_link_rate_index(intel_dp,
+						   common_rates,
+						   link_rate);
+	if (link_rate_index > 0) {
+		intel_dp->fallback_link_rate_index = link_rate_index - 1;
+		intel_dp->fallback_link_rate = common_rates[intel_dp->fallback_link_rate_index];
+		intel_dp->fallback_lane_count = intel_dp_max_lane_count(intel_dp);
+	} else if (lane_count > 1) {
+		intel_dp->fallback_link_rate_index = common_len -1;
+		intel_dp->fallback_link_rate = common_rates[intel_dp->fallback_link_rate_index];
+		intel_dp->fallback_lane_count = lane_count - 1;
+	} else {
+		DRM_ERROR ("Link Training Unsuccessful\n");
+		intel_dp->link_train_failed = false;
+	}
+}
+
 static enum drm_mode_status
 intel_dp_mode_valid(struct drm_connector *connector,
 		    struct drm_display_mode *mode)
