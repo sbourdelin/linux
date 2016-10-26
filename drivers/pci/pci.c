@@ -4771,6 +4771,35 @@ int pcie_set_mps(struct pci_dev *dev, int mps)
 }
 EXPORT_SYMBOL(pcie_set_mps);
 
+int pcie_retrain_link(struct pci_dev *dev)
+{
+	int ret;
+	u16 lnksta;
+	unsigned long timeout;
+
+	/* Can only retrain from downstream ports */
+	if (!pci_is_pcie(dev) ||
+	    (pci_pcie_type(dev) != PCI_EXP_TYPE_DOWNSTREAM &&
+	     pci_pcie_type(dev) != PCI_EXP_TYPE_ROOT_PORT))
+		return -EINVAL;
+
+	ret = pcie_capability_set_word(dev, PCI_EXP_LNKCTL, PCI_EXP_LNKCTL_RL);
+	if (ret)
+		return ret;
+
+	timeout = jiffies + HZ; /* Retraining timeout */
+	for (;;) {
+		pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &lnksta);
+		if (!(lnksta & PCI_EXP_LNKSTA_LT) ||
+		    time_after(jiffies, timeout))
+			break;
+		msleep(1);
+	}
+
+	return (lnksta & PCI_EXP_LNKSTA_LT) ? -EBUSY : 0;
+}
+EXPORT_SYMBOL(pcie_retrain_link);
+
 int pcie_get_link(struct pci_dev *dev, enum pci_bus_speed *speed,
 		  enum pcie_link_width *width)
 {
