@@ -705,12 +705,20 @@ store_rescan_field (struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR(rescan, S_IWUSR, NULL, store_rescan_field);
 
+static void scsi_remove_device_async(struct scsi_device *sdev)
+{
+	if (scsi_device_get(sdev) < 0)
+		return;
+	if (!schedule_work(&sdev->remove_work))
+		scsi_device_put(sdev);
+}
+
 static ssize_t
 sdev_store_delete(struct device *dev, struct device_attribute *attr,
 		  const char *buf, size_t count)
 {
 	if (device_remove_file_self(dev, attr))
-		scsi_remove_device(to_scsi_device(dev));
+		scsi_remove_device_async(to_scsi_device(dev));
 	return count;
 };
 static DEVICE_ATTR(delete, S_IWUSR, NULL, sdev_store_delete);
@@ -1318,6 +1326,15 @@ void __scsi_remove_device(struct scsi_device *sdev)
 	scsi_target_reap(scsi_target(sdev));
 
 	put_device(dev);
+}
+
+void scsi_remove_device_work(struct work_struct *work)
+{
+	struct scsi_device *sdev = container_of(work, typeof(*sdev),
+						remove_work);
+
+	scsi_remove_device(sdev);
+	scsi_device_put(sdev);
 }
 
 /**

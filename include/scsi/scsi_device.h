@@ -203,6 +203,8 @@ struct scsi_device {
 	struct execute_work	ew; /* used to get process context on put */
 	struct work_struct	requeue_work;
 
+	struct work_struct	remove_work;
+
 	struct scsi_device_handler *handler;
 	void			*handler_data;
 
