@@ -523,6 +523,22 @@ static unsigned int ovl_split_lowerdirs(char *str)
 }
 
 static int __maybe_unused
+ovl_set_mode(struct dentry *dentry, umode_t mode)
+{
+	struct iattr iattr;
+
+	if (mode == d_inode(dentry)->i_mode)
+		return 0;
+
+	iattr.ia_valid = ATTR_MODE | ATTR_CTIME;
+	iattr.ia_mode = mode;
+	iattr.ia_ctime = current_time(d_inode(dentry));
+
+	return ovl_setattr(dentry, &iattr);
+}
+
+#ifdef CONFIG_FS_POSIX_ACL
+static int __maybe_unused
 ovl_posix_acl_xattr_get(const struct xattr_handler *handler,
 			struct dentry *dentry, struct inode *inode,
 			const char *name, void *buffer, size_t size)
@@ -560,6 +576,18 @@ ovl_posix_acl_xattr_set(const struct xattr_handler *handler,
 	if (!inode_owner_or_capable(inode))
 		goto out_acl_release;
 
+	if (handler->flags == ACL_TYPE_ACCESS) {
+		umode_t mode;
+		struct posix_acl *newacl = acl;
+
+		err = posix_acl_update_mode(inode, &mode, &newacl);
+		if (err)
+			goto out_acl_release;
+		err = ovl_set_mode(dentry, mode);
+		if (err)
+			goto out_acl_release;
+	}
+
 	posix_acl_release(acl);
 
 	err = ovl_xattr_set(dentry, handler->name, value, size, flags);
@@ -572,6 +600,7 @@ out_acl_release:
 	posix_acl_release(acl);
 	return err;
 }
+#endif
 
 static int ovl_own_xattr_get(const struct xattr_handler *handler,
 			     struct dentry *dentry, struct inode *inode,
@@ -603,6 +632,7 @@ static int ovl_other_xattr_set(const struct xattr_handler *handler,
 	return ovl_xattr_set(dentry, name, value, size, flags);
 }
 
+#ifdef CONFIG_FS_POSIX_ACL
 static const struct xattr_handler __maybe_unused
 ovl_posix_acl_access_xattr_handler = {
 	.name = XATTR_NAME_POSIX_ACL_ACCESS,
@@ -618,6 +648,7 @@ ovl_posix_acl_default_xattr_handler = {
 	.get = ovl_posix_acl_xattr_get,
 	.set = ovl_posix_acl_xattr_set,
 };
+#endif
 
 static const struct xattr_handler ovl_own_xattr_handler = {
 	.prefix	= OVL_XATTR_PREFIX,
