@@ -3008,6 +3008,23 @@ static bool cursor_position(struct drm_i915_private *dev_priv,
 	return cursor_active(dev_priv, pipe);
 }
 
+static void intel_cursor_info(struct seq_file *m, struct intel_crtc *crtc)
+{
+	struct drm_i915_private *dev_priv = node_to_i915(m->private);
+	bool active;
+	int x, y;
+
+	if (!INTEL_INFO(dev_priv)->has_real_cursor)
+		return;
+
+	active = cursor_position(dev_priv, crtc->pipe, &x, &y);
+	seq_printf(m, "\tcursor visible? %s, position (%d, %d), size %dx%d, addr 0x%08x, active? %s\n",
+		   yesno(crtc->cursor_base),
+		   x, y, crtc->base.cursor->state->crtc_w,
+		   crtc->base.cursor->state->crtc_h,
+		   crtc->cursor_addr, yesno(active));
+}
+
 static const char *plane_type(enum drm_plane_type type)
 {
 	switch (type) {
@@ -3130,9 +3147,7 @@ static int i915_display_info(struct seq_file *m, void *unused)
 	seq_printf(m, "CRTC info\n");
 	seq_printf(m, "---------\n");
 	for_each_intel_crtc(dev, crtc) {
-		bool active;
 		struct intel_crtc_state *pipe_config;
-		int x, y;
 
 		pipe_config = to_intel_crtc_state(crtc->base.state);
 
@@ -3145,12 +3160,7 @@ static int i915_display_info(struct seq_file *m, void *unused)
 		if (pipe_config->base.active) {
 			intel_crtc_info(m, crtc);
 
-			active = cursor_position(dev_priv, crtc->pipe, &x, &y);
-			seq_printf(m, "\tcursor visible? %s, position (%d, %d), size %dx%d, addr 0x%08x, active? %s\n",
-				   yesno(crtc->cursor_base),
-				   x, y, crtc->base.cursor->state->crtc_w,
-				   crtc->base.cursor->state->crtc_h,
-				   crtc->cursor_addr, yesno(active));
+			intel_cursor_info(m, crtc);
 			intel_scaler_info(m, crtc);
 			intel_plane_info(m, crtc);
 		}
