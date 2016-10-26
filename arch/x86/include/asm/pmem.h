@@ -69,15 +69,6 @@ static inline void arch_wb_cache_pmem(void *addr, size_t size)
 		clwb(p);
 }
 
-/*
- * copy_from_iter_nocache() on x86 only uses non-temporal stores for iovec
- * iterators, so for other types (bvec & kvec) we must do a cache write-back.
- */
-static inline bool __iter_needs_pmem_wb(struct iov_iter *i)
-{
-	return iter_is_iovec(i) == false;
-}
-
 /**
  * arch_copy_from_iter_pmem - copy data from an iterator to PMEM
  * @addr:	PMEM destination address
@@ -89,15 +80,7 @@ static inline bool __iter_needs_pmem_wb(struct iov_iter *i)
 static inline size_t arch_copy_from_iter_pmem(void *addr, size_t bytes,
 		struct iov_iter *i)
 {
-	size_t len;
-
-	/* TODO: skip the write-back by always using non-temporal stores */
-	len = copy_from_iter_nocache(addr, bytes, i);
-
-	if (__iter_needs_pmem_wb(i))
-		arch_wb_cache_pmem(addr, bytes);
-
-	return len;
+	return copy_from_iter_nocache(addr, bytes, i);
 }
 
 /**
