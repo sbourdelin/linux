@@ -29,10 +29,10 @@
 void pci_update_resource(struct pci_dev *dev, int resno)
 {
 	struct pci_bus_region region;
-	bool disable;
-	u16 cmd;
+	bool disable = false;
+	u16 cmd, bit;
 	u32 new, check, mask;
-	int reg;
+	int reg, cmd_reg;
 	enum pci_bar_type type;
 	struct resource *res = dev->resource + resno;
 
@@ -81,11 +81,23 @@ void pci_update_resource(struct pci_dev *dev, int resno)
 	 * disable decoding so that a half-updated BAR won't conflict
 	 * with another device.
 	 */
-	disable = (res->flags & IORESOURCE_MEM_64) && !dev->mmio_always_on;
+	if (res->flags & IORESOURCE_MEM_64) {
+		if (resno <= PCI_ROM_RESOURCE) {
+			disable = !dev->mmio_always_on;
+			cmd_reg = PCI_COMMAND;
+			bit = PCI_COMMAND_MEMORY;
+		} else {
+#ifdef CONFIG_PCI_IOV
+			disable = true;
+			cmd_reg = dev->sriov->pos + PCI_SRIOV_CTRL;
+			bit = PCI_SRIOV_CTRL_MSE;
+#endif
+		}
+	}
+
 	if (disable) {
-		pci_read_config_word(dev, PCI_COMMAND, &cmd);
-		pci_write_config_word(dev, PCI_COMMAND,
-				      cmd & ~PCI_COMMAND_MEMORY);
+		pci_read_config_word(dev, cmd_reg, &cmd);
+		pci_write_config_word(dev, cmd_reg, cmd & ~bit);
 	}
 
 	pci_write_config_dword(dev, reg, new);
@@ -107,7 +119,7 @@ void pci_update_resource(struct pci_dev *dev, int resno)
 	}
 
 	if (disable)
-		pci_write_config_word(dev, PCI_COMMAND, cmd);
+		pci_write_config_word(dev, cmd_reg, cmd);
 }
 
 int pci_claim_resource(struct pci_dev *dev, int resource)
