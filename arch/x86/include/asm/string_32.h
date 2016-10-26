@@ -196,6 +196,9 @@ static inline void *__memcpy3d(void *to, const void *from, size_t len)
 
 #endif
 
+#define __HAVE_ARCH_MEMCPY_NOCACHE
+extern void *memcpy_nocache(void *dest, const void *src, size_t count);
+
 #define __HAVE_ARCH_MEMMOVE
 void *memmove(void *dest, const void *src, size_t n);
 

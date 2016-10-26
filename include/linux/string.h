@@ -102,6 +102,21 @@ extern void * memset(void *,int,__kernel_size_t);
 #ifndef __HAVE_ARCH_MEMCPY
 extern void * memcpy(void *,const void *,__kernel_size_t);
 #endif
+
+#ifndef __HAVE_ARCH_MEMCPY_NOCACHE
+/**
+ * memcpy_nocache - Copy one area of memory to another, avoiding the
+ * processor cache if possible
+ * @dest: Where to copy to
+ * @src: Where to copy from
+ * @count: The size of the area.
+ */
+static inline void *memcpy_nocache(void *dest, const void *src, size_t count)
+{
+	return memcpy(dest, src, count);
+}
+#endif
+
 #ifndef __HAVE_ARCH_MEMMOVE
 extern void * memmove(void *,const void *,__kernel_size_t);
 #endif

@@ -1,3 +1,6 @@
+#include <linux/export.h>
+#include <linux/uaccess.h>
+
 /*
  * Count the digits of @val including a possible sign.
  *
@@ -19,3 +22,12 @@ int num_digits(int val)
 	}
 	return d;
 }
+
+#ifdef __HAVE_ARCH_MEMCPY_NOCACHE
+void *memcpy_nocache(void *dest, const void *src, size_t count)
+{
+	__copy_from_user_inatomic_nocache(dest, src, count);
+	return dest;
+}
+EXPORT_SYMBOL(memcpy_nocache);
+#endif

@@ -52,6 +52,9 @@ extern void *__memcpy(void *to, const void *from, size_t len);
 #define memcpy(dst, src, len) __inline_memcpy((dst), (src), (len))
 #endif
 
+#define __HAVE_ARCH_MEMCPY_NOCACHE
+extern void *memcpy_nocache(void *dest, const void *src, size_t count);
+
 #define __HAVE_ARCH_MEMSET
 void *memset(void *s, int c, size_t n);
 void *__memset(void *s, int c, size_t n);
