@@ -2615,6 +2615,7 @@ static void reset_request(struct drm_i915_gem_request *request)
 		head = 0;
 	}
 	memset(vaddr + head, 0, request->postfix - head);
+	i915_set_reset_status(request->ctx, false);
 }
 
 static void i915_gem_reset_engine(struct intel_engine_cs *engine)
