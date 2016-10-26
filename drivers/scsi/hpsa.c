@@ -8450,6 +8450,12 @@ static void controller_lockup_detected(struct ctlr_info *h)
 			"lockup detected after %d but scratchpad register is zero\n",
 			h->heartbeat_sample_interval / HZ);
 		lockup_detected = 0xffffffff;
+	} else if (lockup_detected == 0xffff0000) {
+		/*
+		 * Ring controller NMI doorbell
+		 */
+		dev_warn(&h->pdev->dev, "Telling controller to do an NMI\n");
+		writel(DOORBELL_GENERATE_NMI, h->vaddr + SA5_DOORBELL);
 	}
 	set_lockup_detected_for_all_cpus(h, lockup_detected);
 	spin_unlock_irqrestore(&h->lock, flags);
