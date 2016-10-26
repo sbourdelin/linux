@@ -8455,7 +8455,8 @@ static void controller_lockup_detected(struct ctlr_info *h)
 	spin_unlock_irqrestore(&h->lock, flags);
 	dev_warn(&h->pdev->dev, "Controller lockup detected: 0x%08x after %d\n",
 			lockup_detected, h->heartbeat_sample_interval / HZ);
-	pci_disable_device(h->pdev);
+	if (pci_is_enabled(h->pdev))
+		pci_disable_device(h->pdev);
 	fail_all_outstanding_cmds(h);
 }
 
