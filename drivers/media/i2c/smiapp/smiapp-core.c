@@ -1203,7 +1203,7 @@ out:
  * Power management
  */
 
-static int smiapp_power_on(struct device *dev)
+static int __maybe_unused smiapp_power_on(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct v4l2_subdev *subdev = i2c_get_clientdata(client);
@@ -1349,7 +1349,7 @@ out_xclk_fail:
 	return rval;
 }
 
-static int smiapp_power_off(struct device *dev)
+static int __maybe_unused smiapp_power_off(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct v4l2_subdev *subdev = i2c_get_clientdata(client);
@@ -2741,9 +2741,7 @@ static const struct v4l2_subdev_internal_ops smiapp_internal_ops = {
  * I2C Driver
  */
 
-#ifdef CONFIG_PM
-
-static int smiapp_suspend(struct device *dev)
+static int __maybe_unused smiapp_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct v4l2_subdev *subdev = i2c_get_clientdata(client);
@@ -2768,7 +2766,7 @@ static int smiapp_suspend(struct device *dev)
 	return 0;
 }
 
-static int smiapp_resume(struct device *dev)
+static int __maybe_unused smiapp_resume(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct v4l2_subdev *subdev = i2c_get_clientdata(client);
@@ -2782,13 +2780,6 @@ static int smiapp_resume(struct device *dev)
 
 	return rval;
 }
-
-#else
-
-#define smiapp_suspend	NULL
-#define smiapp_resume	NULL
-
-#endif /* CONFIG_PM */
 
 static struct smiapp_hwconfig *smiapp_get_hwconfig(struct device *dev)
 {
