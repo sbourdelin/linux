@@ -754,6 +754,7 @@ int drm_mode_create_tv_properties(struct drm_device *dev,
 int drm_mode_create_scaling_mode_property(struct drm_device *dev);
 int drm_mode_create_aspect_ratio_property(struct drm_device *dev);
 int drm_mode_create_suggested_offset_properties(struct drm_device *dev);
+int drm_mode_create_link_status_property(struct drm_device *dev);
 
 int drm_mode_connector_set_path_property(struct drm_connector *connector,
 					 const char *path);

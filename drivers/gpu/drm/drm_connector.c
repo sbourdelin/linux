@@ -588,6 +588,11 @@ static const struct drm_prop_enum_list drm_tv_subconnector_enum_list[] = {
 DRM_ENUM_NAME_FN(drm_get_tv_subconnector_name,
 		 drm_tv_subconnector_enum_list)
 
+static const struct drm_prop_enum_list drm_link_status_enum_list[] = {
+	{ DRM_MODE_LINK_STATUS_GOOD, "Good" },
+	{ DRM_MODE_LINK_STATUS_BAD, "Bad" },
+};
+
 int drm_connector_create_standard_properties(struct drm_device *dev)
 {
 	struct drm_property *prop;
@@ -843,6 +848,33 @@ int drm_mode_create_suggested_offset_properties(struct drm_device *dev)
 	return 0;
 }
 EXPORT_SYMBOL(drm_mode_create_suggested_offset_properties);
+
+/**
+ * drm_mode_create_link_status_property - Create link status property
+ * @dev: DRM device
+ *
+ * Called by a driver the first time it's needed, must be attached to desired
+ * connectors.
+ * This property is used to indicate whether link sttaus is Good or Bad as
+ * a result fo link training
+ */
+int drm_mode_create_link_status_property(struct drm_device *dev)
+{
+	struct drm_property *link_status;
+
+	if (dev->mode_config.link_status_property)
+		return 0;
+
+	link_status =
+		drm_property_create_enum(dev, 0, "link-status",
+					 drm_link_status_enum_list,
+					 ARRAY_SIZE(drm_link_status_enum_list));
+
+	dev->mode_config.scaling_mode_property = link_status;
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_mode_create_link_status_property);
 
 /**
  * drm_mode_connector_set_path_property - set tile property on connector

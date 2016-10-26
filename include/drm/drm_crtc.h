@@ -1348,6 +1348,12 @@ struct drm_mode_config {
 	 */
 	struct drm_property *suggested_y_property;
 
+	/**
+	 * @link_status_property: Optional connector property for link status
+	 * of the connector as a result of link training.
+	 */
+	 struct drm_property *link_status_property;
+
 	/* dumb ioctl parameters */
 	uint32_t preferred_depth, prefer_shadow;
 
