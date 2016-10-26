@@ -7,6 +7,7 @@
 #include <linux/platform_data/usb-davinci.h>
 #include <linux/platform_device.h>
 #include <linux/mfd/da8xx-cfgchip.h>
+#include <linux/phy/phy.h>
 #include <linux/usb/musb.h>
 
 #include <mach/clock.h>
@@ -241,6 +242,16 @@ int __init da8xx_register_usb11_phy_clk(bool use_usb_refclkin)
 	clk_put(parent);
 
 	return ret;
+}
+
+static struct platform_device da8xx_usb_phy = {
+	.name		= "da8xx-usb-phy",
+	.id		= -1,
+};
+
+int __init da8xx_register_usb_phy(void)
+{
+	return platform_device_register(&da8xx_usb_phy);
 }
 
 #if IS_ENABLED(CONFIG_USB_MUSB_HDRC)
