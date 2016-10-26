@@ -1082,6 +1082,9 @@ static void bgmac_enable(struct bgmac *bgmac)
 /* http://bcm-v4.sipsolutions.net/mac-gbit/gmac/chipinit */
 static void bgmac_chip_init(struct bgmac *bgmac)
 {
+	/* Clear any erroneously pending interrupts */
+	bgmac_write(bgmac, BGMAC_INT_STATUS, ~0);
+
 	/* 1 interrupt per received frame */
 	bgmac_write(bgmac, BGMAC_INT_RECV_LAZY, 1 << BGMAC_IRL_FC_SHIFT);
 
@@ -1157,8 +1160,6 @@ static int bgmac_open(struct net_device *net_dev)
 {
 	struct bgmac *bgmac = netdev_priv(net_dev);
 	int err = 0;
-
-	bgmac_chip_reset(bgmac);
 
 	err = bgmac_dma_init(bgmac);
 	if (err)
