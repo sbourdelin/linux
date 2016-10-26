@@ -49,6 +49,20 @@
  * ordered, including unicasts, multicasts, and notifications.
  */
 
+/**
+ * Locking
+ *
+ * Most of the bus1 objects form a hierarchy, as such, their locks must be
+ * ordered. Not all orders are explicitly defined (e.g., they might define
+ * orthogonal hierarchies), but this list gives a rough overview:
+ *
+ *   bus1_peer.active
+ *     bus1_peer.local.lock
+ *       bus1_peer.data.lock
+ *         bus1_user.lock
+ *         bus1_user_lock
+ */
+
 struct dentry;
 struct file_operations;
 

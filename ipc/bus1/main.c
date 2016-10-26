@@ -15,17 +15,33 @@
 #include <linux/miscdevice.h>
 #include <linux/module.h>
 #include "main.h"
+#include "peer.h"
 #include "tests.h"
 #include "user.h"
 
 static int bus1_fop_open(struct inode *inode, struct file *file)
 {
+	struct bus1_peer *peer;
+
+	peer = bus1_peer_new();
+	if (IS_ERR(peer))
+		return PTR_ERR(peer);
+
+	file->private_data = peer;
 	return 0;
 }
 
 static int bus1_fop_release(struct inode *inode, struct file *file)
 {
+	bus1_peer_free(file->private_data);
 	return 0;
+}
+
+static void bus1_fop_show_fdinfo(struct seq_file *m, struct file *file)
+{
+	struct bus1_peer *peer = file->private_data;
+
+	seq_printf(m, KBUILD_MODNAME "-peer:\t%16llx\n", peer->id);
 }
 
 const struct file_operations bus1_fops = {
@@ -33,6 +49,7 @@ const struct file_operations bus1_fops = {
 	.open			= bus1_fop_open,
 	.release		= bus1_fop_release,
 	.llseek			= noop_llseek,
+	.show_fdinfo		= bus1_fop_show_fdinfo,
 };
 
 static struct miscdevice bus1_misc = {
