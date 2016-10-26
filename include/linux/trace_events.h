@@ -505,6 +505,9 @@ perf_trace_buf_submit(void *raw_data, int size, int rctx, u16 type,
 {
 	perf_tp_event(type, count, raw_data, size, regs, head, rctx, task);
 }
+
+extern int perf_trace_notifier_register(struct notifier_block *nb);
+extern int perf_trace_notifier_unregister(struct notifier_block *nb);
 #endif
 
 #endif /* _LINUX_TRACE_EVENT_H */
