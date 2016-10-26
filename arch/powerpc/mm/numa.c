@@ -427,30 +427,55 @@ void read_drconf_cell_v2(struct of_drconf_cell_v2 *drmem, const __be32 **cellp)
 EXPORT_SYMBOL(read_drconf_cell_v2);
 
 /*
- * Retrieve and validate the ibm,dynamic-memory property of the device tree.
+ * Retrieve and validate the ibm,dynamic-memory[-v2] property of the
+ * device tree.
  *
- * The layout of the ibm,dynamic-memory property is a number N of memblock
- * list entries followed by N memblock list entries.  Each memblock list entry
- * contains information as laid out in the of_drconf_cell struct above.
+ * The layout of the ibm,dynamic-memory property is a number N of memory
+ * block description list entries followed by N memory block description
+ * list entries.  Each memory block description list entry contains
+ * information as laid out in the of_drconf_cell struct above.
+ *
+ * The layout of the ibm,dynamic-memory-v2 property is a number N of memory
+ * block set description list entries, followed by N memory block set
+ * description set entries.
  */
 static int of_get_drconf_memory(struct device_node *memory, const __be32 **dm)
 {
 	const __be32 *prop;
 	u32 len, entries;
 
-	prop = of_get_property(memory, "ibm,dynamic-memory", &len);
-	if (!prop || len < sizeof(unsigned int))
-		return 0;
+	if (firmware_has_feature(FW_FEATURE_DYN_MEM_V2)) {
 
-	entries = of_read_number(prop++, 1);
+		prop = of_get_property(memory, "ibm,dynamic-memory-v2", &len);
+		if (!prop || len < sizeof(unsigned int))
+			return 0;
 
-	/* Now that we know the number of entries, revalidate the size
-	 * of the property read in to ensure we have everything
-	 */
-	if (len < (entries * (n_mem_addr_cells + 4) + 1) * sizeof(unsigned int))
-		return 0;
+		entries = of_read_number(prop++, 1);
 
-	*dm = prop;
+		/* Now that we know the number of set entries, revalidate the
+		 * size of the property read in to ensure we have everything.
+		 */
+		if (len < dyn_mem_v2_len(entries))
+			return 0;
+
+		*dm = prop;
+	} else {
+		prop = of_get_property(memory, "ibm,dynamic-memory", &len);
+		if (!prop || len < sizeof(unsigned int))
+			return 0;
+
+		entries = of_read_number(prop++, 1);
+
+		/* Now that we know the number of entries, revalidate the size
+		 * of the property read in to ensure we have everything
+		 */
+		if (len < (entries * (n_mem_addr_cells + 4) + 1) *
+			   sizeof(unsigned int))
+			return 0;
+
+		*dm = prop;
+	}
+
 	return entries;
 }
 
@@ -513,7 +538,7 @@ static int of_get_assoc_arrays(struct device_node *memory,
  * This is like of_node_to_nid_single() for memory represented in the
  * ibm,dynamic-reconfiguration-memory node.
  */
-static int of_drconf_to_nid_single(struct of_drconf_cell *drmem,
+static int of_drconf_to_nid_single(u32 drmem_flags, u32 drmem_aa_index,
 				   struct assoc_arrays *aa)
 {
 	int default_nid = 0;
@@ -521,16 +546,16 @@ static int of_drconf_to_nid_single(struct of_drconf_cell *drmem,
 	int index;
 
 	if (min_common_depth > 0 && min_common_depth <= aa->array_sz &&
-	    !(drmem->flags & DRCONF_MEM_AI_INVALID) &&
-	    drmem->aa_index < aa->n_arrays) {
-		index = drmem->aa_index * aa->array_sz + min_common_depth - 1;
+	    !(drmem_flags & DRCONF_MEM_AI_INVALID) &&
+	    drmem_aa_index < aa->n_arrays) {
+		index = drmem_aa_index * aa->array_sz + min_common_depth - 1;
 		nid = of_read_number(&aa->arrays[index], 1);
 
 		if (nid == 0xffff || nid >= MAX_NUMNODES)
 			nid = default_nid;
 
 		if (nid > 0) {
-			index = drmem->aa_index * aa->array_sz;
+			index = drmem_aa_index * aa->array_sz;
 			initialize_distance_lookup_table(nid,
 							&aa->arrays[index]);
 		}
@@ -665,7 +690,7 @@ static inline int __init read_usm_ranges(const __be32 **usm)
  * Extract NUMA information from the ibm,dynamic-reconfiguration-memory
  * node.  This assumes n_mem_{addr,size}_cells have been set.
  */
-static void __init parse_drconf_memory(struct device_node *memory)
+static void __init parse_drconf_memory_v1(struct device_node *memory)
 {
 	const __be32 *uninitialized_var(dm), *usm;
 	unsigned int n, rc, ranges, is_kexec_kdump = 0;
@@ -715,7 +740,8 @@ static void __init parse_drconf_memory(struct device_node *memory)
 				base = read_n_cells(n_mem_addr_cells, &usm);
 				size = read_n_cells(n_mem_size_cells, &usm);
 			}
-			nid = of_drconf_to_nid_single(&drmem, &aa);
+			nid = of_drconf_to_nid_single(drmem.flags,
+							drmem.aa_index, &aa);
 			fake_numa_create_new_node(
 				((base + size) >> PAGE_SHIFT),
 					   &nid);
@@ -726,6 +752,80 @@ static void __init parse_drconf_memory(struct device_node *memory)
 						  &memblock.memory, nid);
 		} while (--ranges);
 	}
+}
+
+static void __init parse_drconf_memory_v2(struct device_node *memory)
+{
+	const __be32 *uninitialized_var(dm);
+	unsigned int num_lmb_sets, rc;
+	unsigned long lmb_size, base;
+	unsigned long size, sz;
+	int nid;
+	struct assoc_arrays aa = { .arrays = NULL };
+	const __be32 *prop;
+	u32	len;
+
+	prop = of_get_property(memory, "ibm,dynamic-memory-v2", &len);
+	if (!prop)
+		return;
+
+	num_lmb_sets = of_get_drconf_memory(memory, &dm);
+	if (!num_lmb_sets)
+		return;
+
+	lmb_size = of_get_lmb_size(memory);
+	if (!lmb_size)
+		return;
+
+	rc = of_get_assoc_arrays(memory, &aa);
+	if (rc)
+		return;
+
+	for (; num_lmb_sets != 0; num_lmb_sets--) {
+		struct of_drconf_cell_v2 drmem;
+		unsigned long nsl;
+
+		/* Get the current LMB set */
+		read_drconf_cell_v2(&drmem, &dm);
+		base = drmem.base_addr;
+		nsl = drmem.num_seq_lmbs;
+
+		/* Skip this block if the reserved bit is set in
+		 * flags (0x80) or if the block is not assigned
+		 * to this partition (0x8)
+		 */
+		if ((drmem.flags & DRCONF_MEM_RESERVED)
+		    || !(drmem.flags & DRCONF_MEM_ASSIGNED))
+			continue;
+
+		for (; nsl != 0; nsl--) {
+			size = lmb_size;
+
+			nid = of_drconf_to_nid_single(drmem.flags,
+						drmem.aa_index, &aa);
+			fake_numa_create_new_node(
+					((base + size) >> PAGE_SHIFT),
+					&nid);
+			node_set_online(nid);
+			sz = numa_enforce_memory_limit(base, size);
+			if (sz)
+				memblock_set_node(base, sz,
+						&memblock.memory, nid);
+
+			base += sz;
+		}
+	}
+}
+
+static void __init parse_drconf_memory(struct device_node *memory)
+{
+	const __be32 *prop;
+	int len;
+	prop = of_get_property(memory, "ibm,dynamic-memory-v2", &len);
+	if (!prop || len < sizeof(unsigned int))
+		parse_drconf_memory_v1(memory);
+	else
+		parse_drconf_memory_v2(memory);
 }
 
 static int __init parse_numa_properties(void)
@@ -1082,8 +1182,8 @@ static int hot_add_drconf_scn_to_nid(struct device_node *memory,
 		if ((scn_addr < drmem.base_addr)
 		    || (scn_addr >= (drmem.base_addr + lmb_size)))
 			continue;
-
-		nid = of_drconf_to_nid_single(&drmem, &aa);
+		nid = of_drconf_to_nid_single(drmem.flags,
+						drmem.aa_index, &aa);
 		break;
 	}
 

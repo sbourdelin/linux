@@ -110,6 +110,18 @@ struct of_drconf_cell_v2 {
 extern void read_drconf_cell_v2(struct of_drconf_cell_v2 *drmem,
 				const __be32 **cellp);
 
+extern void read_one_drc_info(int **info, char **drc_type, char **drc_name,
+			unsigned long int *fdi_p, unsigned long int *nsl_p,
+			unsigned long int *si_p, unsigned long int *ldi_p);
+
+static inline int dyn_mem_v2_len(int entries)
+{
+	int drconf_v2_cells = (n_mem_addr_cells + 4);
+	int drconf_v2_cells_len = (drconf_v2_cells * sizeof(unsigned int));
+	return (((entries) * drconf_v2_cells_len) +
+                (1 * sizeof(unsigned int)));
+}
+
 /*
  * There are two methods for telling firmware what our capabilities are.
  * Newer machines have an "ibm,client-architecture-support" method on the
