@@ -308,7 +308,7 @@ static void kvm_register_steal_time(void)
 
 static DEFINE_PER_CPU(unsigned long, kvm_apic_eoi) = KVM_PV_EOI_DISABLED;
 
-static void kvm_guest_apic_eoi_write(u32 reg, u32 val)
+static void kvm_guest_apic_eoi_write_notrace(u32 reg, u32 val)
 {
 	/**
 	 * This relies on __test_and_clear_bit to modify the memory
@@ -319,7 +319,7 @@ static void kvm_guest_apic_eoi_write(u32 reg, u32 val)
 	 */
 	if (__test_and_clear_bit(KVM_PV_EOI_BIT, this_cpu_ptr(&kvm_apic_eoi)))
 		return;
-	apic_write(APIC_EOI, APIC_EOI_ACK);
+	apic->native_eoi_write(APIC_EOI, APIC_EOI_ACK);
 }
 
 static void kvm_guest_cpu_init(void)
@@ -474,7 +474,7 @@ void __init kvm_guest_init(void)
 	}
 
 	if (kvm_para_has_feature(KVM_FEATURE_PV_EOI))
-		apic_set_eoi_write(kvm_guest_apic_eoi_write);
+		apic_set_eoi_write(kvm_guest_apic_eoi_write_notrace);
 
 	if (kvmclock_vsyscall)
 		kvm_setup_vsyscall_timeinfo();
