@@ -14,9 +14,6 @@
  * AS-IS and WITHOUT ANY WARRANTY; without even the implied warranty
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE, TITLE, or
  * NONINFRINGEMENT.  See the GNU General Public License for more details.
- *
- * This file may also be available under a different license from Cavium.
- * Contact Cavium, Inc. for more information
  ***********************************************************************/
 #ifndef __MAILBOX_H__
 #define __MAILBOX_H__
