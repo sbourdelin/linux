@@ -335,6 +335,18 @@ OPTIONS
 --branch-history::
 	Add the addresses of sampled taken branches to the callstack.
 	This allows to examine the path the program took to each sample.
+
+	Also show with some branch flags that can be:
+	- Predicted: display the average percentage of predicated branches.
+		     (predicated number / total number)
+	- Abort: display the number of tsx aborted branches.
+	- Cycles: cycles in basic block.
+
+	- removed loops: the number of removed loops.
+	It also shows the number of removed loops in callchain list.
+	The branch history code has a loop detection that removes small loops.
+	It would be nice for knowing how many loops were removed.
+
 	The data collection must have used -b (or -j) and -g.
 
 --objdump=<path>::
