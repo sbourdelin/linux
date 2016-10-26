@@ -14,10 +14,17 @@
 #include <linux/init.h>
 #include <linux/miscdevice.h>
 #include <linux/module.h>
+#include <linux/poll.h>
+#include <linux/seq_file.h>
+#include <linux/uio.h>
+#include <uapi/linux/bus1.h>
 #include "main.h"
 #include "peer.h"
 #include "tests.h"
 #include "user.h"
+#include "util/active.h"
+#include "util/pool.h"
+#include "util/queue.h"
 
 static int bus1_fop_open(struct inode *inode, struct file *file)
 {
@@ -37,6 +44,41 @@ static int bus1_fop_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static unsigned int bus1_fop_poll(struct file *file,
+				  struct poll_table_struct *wait)
+{
+	struct bus1_peer *peer = file->private_data;
+	unsigned int mask;
+
+	poll_wait(file, &peer->waitq, wait);
+
+	/* access queue->front unlocked */
+	rcu_read_lock();
+	if (bus1_active_is_deactivated(&peer->active)) {
+		mask = POLLHUP;
+	} else {
+		mask = POLLOUT | POLLWRNORM;
+		if (bus1_queue_is_readable_rcu(&peer->data.queue))
+			mask |= POLLIN | POLLRDNORM;
+	}
+	rcu_read_unlock();
+
+	return mask;
+}
+
+static int bus1_fop_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct bus1_peer *peer = file->private_data;
+	int r;
+
+	if (!bus1_peer_acquire(peer))
+		return -ESHUTDOWN;
+
+	r = bus1_pool_mmap(&peer->data.pool, vma);
+	bus1_peer_release(peer);
+	return r;
+}
+
 static void bus1_fop_show_fdinfo(struct seq_file *m, struct file *file)
 {
 	struct bus1_peer *peer = file->private_data;
@@ -48,7 +90,11 @@ const struct file_operations bus1_fops = {
 	.owner			= THIS_MODULE,
 	.open			= bus1_fop_open,
 	.release		= bus1_fop_release,
+	.poll			= bus1_fop_poll,
 	.llseek			= noop_llseek,
+	.mmap			= bus1_fop_mmap,
+	.unlocked_ioctl		= bus1_peer_ioctl,
+	.compat_ioctl		= bus1_peer_ioctl,
 	.show_fdinfo		= bus1_fop_show_fdinfo,
 };
 

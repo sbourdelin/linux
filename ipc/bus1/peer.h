@@ -52,11 +52,13 @@
 #include <linux/rcupdate.h>
 #include <linux/rbtree.h>
 #include <linux/wait.h>
+#include <uapi/linux/bus1.h>
 #include "user.h"
 #include "util/active.h"
 #include "util/pool.h"
 #include "util/queue.h"
 
+struct bus1_message;
 struct cred;
 struct dentry;
 struct pid_namespace;
@@ -73,8 +75,12 @@ struct pid_namespace;
  * @active:			active references
  * @debugdir:			debugfs root of this peer, or NULL/ERR_PTR
  * @data.lock:			data lock
+ * @data.pool:			data pool
  * @data.queue:			message queue
  * @local.lock:			local peer runtime lock
+ * @local.seed:			pinned seed message
+ * @local.map_handles:		map of owned handles (by handle ID)
+ * @local.handle_ids:		handle ID allocator
  */
 struct bus1_peer {
 	u64 id;
@@ -95,6 +101,7 @@ struct bus1_peer {
 
 	struct {
 		struct mutex lock;
+		struct bus1_message *seed;
 		struct rb_root map_handles;
 		u64 handle_ids;
 	} local;
@@ -102,6 +109,7 @@ struct bus1_peer {
 
 struct bus1_peer *bus1_peer_new(void);
 struct bus1_peer *bus1_peer_free(struct bus1_peer *peer);
+long bus1_peer_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
 /**
  * bus1_peer_acquire() - acquire active reference to peer
