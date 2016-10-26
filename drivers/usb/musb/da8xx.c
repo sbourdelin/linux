@@ -145,6 +145,17 @@ static void otg_timer(unsigned long _musb)
 	unsigned long		flags;
 
 	/*
+	 * We should only execute the OTG workaround when the phy is in OTG
+	 * mode. The workaround require the VBUS sense and the session end
+	 * comparator to be enabled, what is only possible if the phy is in
+	 * OTG mode. As the workaround is only required to detect if the
+	 * controller must act as host or device, we can safely exit OTG is
+	 * not in use.
+	 */
+	if (musb->port_mode != MUSB_PORT_MODE_DUAL_ROLE)
+		return;
+
+	/*
 	 * We poll because DaVinci's won't expose several OTG-critical
 	 * status change events (from the transceiver) otherwise.
 	 */
