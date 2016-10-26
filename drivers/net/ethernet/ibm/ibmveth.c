@@ -1182,6 +1182,8 @@ static int ibmveth_poll(struct napi_struct *napi, int budget)
 	int frames_processed = 0;
 	unsigned long lpar_rc;
 	struct iphdr *iph;
+	bool large_packet = 0;
+	u16 hdr_len = ETH_HLEN + sizeof(struct tcphdr);
 
 restart_poll:
 	while (frames_processed < budget) {
@@ -1236,8 +1238,26 @@ restart_poll:
 						iph->check = 0;
 						iph->check = ip_fast_csum((unsigned char *)iph, iph->ihl);
 						adapter->rx_large_packets++;
+						large_packet = 1;
 					}
 				}
+			}
+
+			if (skb->len > netdev->mtu) {
+				iph = (struct iphdr *)skb->data;
+				if (be16_to_cpu(skb->protocol) == ETH_P_IP &&
+				    iph->protocol == IPPROTO_TCP) {
+					hdr_len += sizeof(struct iphdr);
+					skb_shinfo(skb)->gso_type = SKB_GSO_TCPV4;
+					skb_shinfo(skb)->gso_size = netdev->mtu - hdr_len;
+				} else if (be16_to_cpu(skb->protocol) == ETH_P_IPV6 &&
+					   iph->protocol == IPPROTO_TCP) {
+					hdr_len += sizeof(struct ipv6hdr);
+					skb_shinfo(skb)->gso_type = SKB_GSO_TCPV6;
+					skb_shinfo(skb)->gso_size = netdev->mtu - hdr_len;
+				}
+				if (!large_packet)
+					adapter->rx_large_packets++;
 			}
 
 			napi_gro_receive(napi, skb);	/* send it up */
