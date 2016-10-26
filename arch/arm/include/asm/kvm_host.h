@@ -285,6 +285,14 @@ static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
 int kvm_perf_init(void);
 int kvm_perf_teardown(void);
 
+#if !defined(CONFIG_KVM_PERF_TRACE)
+static inline int kvm_perf_trace_init(void) { return 0; }
+static inline int kvm_perf_trace_teardown(void) { return 0; }
+#else
+int kvm_perf_trace_init(void);
+int kvm_perf_trace_teardown(void);
+#endif
+
 void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
 
 struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);

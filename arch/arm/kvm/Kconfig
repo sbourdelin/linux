@@ -16,6 +16,9 @@ menuconfig VIRTUALIZATION
 
 if VIRTUALIZATION
 
+config KVM_PERF_TRACE
+        bool
+
 config KVM
 	bool "Kernel-based Virtual Machine (KVM) support"
 	depends on MMU && OF
@@ -34,6 +37,7 @@ config KVM
 	select HAVE_KVM_IRQFD
 	select HAVE_KVM_IRQCHIP
 	select HAVE_KVM_IRQ_ROUTING
+	select KVM_PERF_TRACE if EVENT_TRACING && PERF_EVENTS
 	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
 	---help---
 	  Support hosting virtualized guest machines.

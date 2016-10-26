@@ -22,6 +22,7 @@ obj-y += kvm-arm.o init.o interrupts.o
 obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
 obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
 obj-y += $(KVM)/arm/aarch32.o
+obj-$(CONFIG_KVM_PERF_TRACE) += $(KVM)/arm/perf_trace.o
 
 obj-y += $(KVM)/arm/vgic/vgic.o
 obj-y += $(KVM)/arm/vgic/vgic-init.o
