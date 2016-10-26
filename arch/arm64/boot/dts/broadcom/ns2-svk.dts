@@ -56,6 +56,11 @@
 	};
 };
 
+&enet {
+	brcm,enet-phy-lane-swap;
+	status = "ok";
+};
+
 &pci_phy0 {
 	status = "ok";
 };
