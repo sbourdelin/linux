@@ -2027,6 +2027,14 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
 	int err;
 	size_t size = cachep->size;
 
+	/*
+	 * memcg re-creates caches with the flags of the originals. Remove
+	 * the freelist related flags to ensure they are re-defined at this
+	 * stage. Prevent having both flags on edge cases like with pagealloc
+	 * if the original cache was created too early to be OFF_SLAB.
+	 */
+	flags &= ~(CFLGS_OBJFREELIST_SLAB|CFLGS_OFF_SLAB);
+
 #if DEBUG
 #if FORCED_DEBUG
 	/*
