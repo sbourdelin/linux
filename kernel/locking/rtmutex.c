@@ -1513,6 +1513,7 @@ bool __sched rt_mutex_futex_unlock(struct rt_mutex *lock,
 	return rt_mutex_slowunlock(lock, wqh);
 }
 
+#ifdef CONFIG_DEBUG_RT_MUTEXES
 /**
  * rt_mutex_destroy - mark a mutex unusable
  * @lock: the mutex to be destroyed
@@ -1524,12 +1525,10 @@ bool __sched rt_mutex_futex_unlock(struct rt_mutex *lock,
 void rt_mutex_destroy(struct rt_mutex *lock)
 {
 	WARN_ON(rt_mutex_is_locked(lock));
-#ifdef CONFIG_DEBUG_RT_MUTEXES
 	lock->magic = NULL;
-#endif
 }
-
 EXPORT_SYMBOL_GPL(rt_mutex_destroy);
+#endif
 
 /**
  * __rt_mutex_init - initialize the rt lock
