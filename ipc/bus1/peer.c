@@ -114,6 +114,7 @@ struct bus1_peer *bus1_peer_new(void)
 	mutex_init(&peer->data.lock);
 	peer->data.pool = BUS1_POOL_NULL;
 	bus1_queue_init(&peer->data.queue);
+	bus1_user_limits_init(&peer->data.limits, peer->user);
 
 	/* initialize peer-private section */
 	mutex_init(&peer->local.lock);
@@ -201,6 +202,8 @@ static void bus1_peer_flush(struct bus1_peer *peer, u64 flags)
 						     rb_to_peer) {
 			n = atomic_xchg(&h->n_user, 0);
 			bus1_handle_forget_keep(h);
+			bus1_user_discharge(&peer->user->limits.n_handles,
+					    &peer->data.limits.n_handles, n);
 
 			if (bus1_handle_is_anchor(h)) {
 				if (n > 1)
@@ -217,6 +220,9 @@ static void bus1_peer_flush(struct bus1_peer *peer, u64 flags)
 		qlist = bus1_queue_flush(&peer->data.queue, ts);
 		bus1_pool_flush(&peer->data.pool, &n_slices);
 		mutex_unlock(&peer->data.lock);
+
+		bus1_user_discharge(&peer->user->limits.n_slices,
+				    &peer->data.limits.n_slices, n_slices);
 
 		while ((qnode = qlist)) {
 			qlist = qnode->next;
@@ -281,6 +287,7 @@ struct bus1_peer *bus1_peer_free(struct bus1_peer *peer)
 	mutex_destroy(&peer->local.lock);
 
 	/* deinitialize data section */
+	bus1_user_limits_deinit(&peer->data.limits);
 	bus1_queue_deinit(&peer->data.queue);
 	bus1_pool_deinit(&peer->data.pool);
 	mutex_destroy(&peer->data.lock);
@@ -311,10 +318,10 @@ static int bus1_peer_ioctl_peer_query(struct bus1_peer *peer,
 
 	mutex_lock(&peer->local.lock);
 	param.peer_flags = peer->flags & BUS1_PEER_FLAG_WANT_SECCTX;
-	param.max_slices = -1;
-	param.max_handles = -1;
-	param.max_inflight_bytes = -1;
-	param.max_inflight_fds = -1;
+	param.max_slices = peer->data.limits.max_slices;
+	param.max_handles = peer->data.limits.max_handles;
+	param.max_inflight_bytes = peer->data.limits.max_inflight_bytes;
+	param.max_inflight_fds = peer->data.limits.max_inflight_fds;
 	mutex_unlock(&peer->local.lock);
 
 	return copy_to_user(uparam, &param, sizeof(param)) ? -EFAULT : 0;
@@ -336,16 +343,48 @@ static int bus1_peer_ioctl_peer_reset(struct bus1_peer *peer,
 	if (unlikely(param.peer_flags != -1 &&
 		     (param.peer_flags & ~BUS1_PEER_FLAG_WANT_SECCTX)))
 		return -EINVAL;
-	if (unlikely(param.max_slices != -1 ||
-		     param.max_handles != -1 ||
-		     param.max_inflight_bytes != -1 ||
-		     param.max_inflight_fds != -1))
+	if (unlikely((param.max_slices != -1 &&
+		      param.max_slices > INT_MAX) ||
+		     (param.max_handles != -1 &&
+		      param.max_handles > INT_MAX) ||
+		     (param.max_inflight_bytes != -1 &&
+		      param.max_inflight_bytes > INT_MAX) ||
+		     (param.max_inflight_fds != -1 &&
+		      param.max_inflight_fds > INT_MAX)))
 		return -EINVAL;
 
 	mutex_lock(&peer->local.lock);
 
 	if (param.peer_flags != -1)
 		peer->flags = param.peer_flags;
+
+	if (param.max_slices != -1) {
+		atomic_add((int)param.max_slices -
+			   (int)peer->data.limits.max_slices,
+			   &peer->data.limits.n_slices);
+		peer->data.limits.max_slices = param.max_slices;
+	}
+
+	if (param.max_handles != -1) {
+		atomic_add((int)param.max_handles -
+			   (int)peer->data.limits.max_handles,
+			   &peer->data.limits.n_handles);
+		peer->data.limits.max_handles = param.max_handles;
+	}
+
+	if (param.max_inflight_bytes != -1) {
+		atomic_add((int)param.max_inflight_bytes -
+			   (int)peer->data.limits.max_inflight_bytes,
+			   &peer->data.limits.n_inflight_bytes);
+		peer->data.limits.max_inflight_bytes = param.max_inflight_bytes;
+	}
+
+	if (param.max_inflight_fds != -1) {
+		atomic_add((int)param.max_inflight_fds -
+			   (int)peer->data.limits.max_inflight_fds,
+			   &peer->data.limits.n_inflight_fds);
+		peer->data.limits.max_inflight_fds = param.max_inflight_fds;
+	}
 
 	bus1_peer_flush(peer, param.flags);
 
@@ -403,6 +442,8 @@ static int bus1_peer_ioctl_handle_release(struct bus1_peer *peer,
 
 	WARN_ON(atomic_dec_return(&h->n_user) < 0);
 	bus1_handle_forget(h);
+	bus1_user_discharge(&peer->user->limits.n_handles,
+			    &peer->data.limits.n_handles, 1);
 	bus1_handle_release(h, strong);
 
 	r = 0;
@@ -458,7 +499,20 @@ static int bus1_peer_transfer(struct bus1_peer *src,
 		}
 	}
 
+	r = bus1_user_charge(&dst->user->limits.n_handles,
+			     &dst->data.limits.n_handles, 1);
+	if (r < 0)
+		goto exit;
+
 	if (is_new) {
+		r = bus1_user_charge(&src->user->limits.n_handles,
+				     &src->data.limits.n_handles, 1);
+		if (r < 0) {
+			bus1_user_discharge(&dst->user->limits.n_handles,
+					    &dst->data.limits.n_handles, 1);
+			goto exit;
+		}
+
 		WARN_ON(src_h != bus1_handle_acquire(src_h, false));
 		WARN_ON(atomic_inc_return(&src_h->n_user) != 1);
 	}
@@ -543,6 +597,16 @@ static int bus1_peer_ioctl_nodes_destroy(struct bus1_peer *peer,
 	bus1_tx_init(&tx, peer);
 	ptr_nodes = (const u64 __user *)(unsigned long)param.ptr_nodes;
 
+	/*
+	 * We must limit the work that user-space can dispatch in one go. We
+	 * use the maximum number of handles as natural limit. You cannot hit
+	 * it, anyway, except if your call would fail without it as well.
+	 */
+	if (unlikely(param.n_nodes > peer->user->limits.max_handles)) {
+		r = -EINVAL;
+		goto exit;
+	}
+
 	for (i = 0; i < param.n_nodes; ++i) {
 		if (get_user(id, ptr_nodes + i)) {
 			r = -EFAULT;
@@ -578,6 +642,11 @@ static int bus1_peer_ioctl_nodes_destroy(struct bus1_peer *peer,
 			++n_charge;
 	}
 
+	r = bus1_user_charge(&peer->user->limits.n_handles,
+			     &peer->data.limits.n_handles, n_charge);
+	if (r < 0)
+		goto exit;
+
 	/* nothing below this point can fail, anymore */
 
 	mutex_lock(&peer->data.lock);
@@ -611,6 +680,9 @@ static int bus1_peer_ioctl_nodes_destroy(struct bus1_peer *peer,
 		bus1_handle_unref(h);
 	}
 
+	bus1_user_discharge(&peer->user->limits.n_handles,
+			    &peer->data.limits.n_handles, n_discharge);
+
 	r = 0;
 
 exit:
@@ -642,6 +714,8 @@ static int bus1_peer_ioctl_slice_release(struct bus1_peer *peer,
 	mutex_lock(&peer->data.lock);
 	r = bus1_pool_release_user(&peer->data.pool, offset, &n_slices);
 	mutex_unlock(&peer->data.lock);
+	bus1_user_discharge(&peer->user->limits.n_slices,
+			    &peer->data.limits.n_slices, n_slices);
 	return r;
 }
 
@@ -746,6 +820,11 @@ static int bus1_peer_ioctl_send(struct bus1_peer *peer,
 	bus1_tx_init(&tx, peer);
 	ptr_destinations =
 		(const u64 __user *)(unsigned long)param.ptr_destinations;
+
+	if (unlikely(param.n_destinations > peer->user->limits.max_handles)) {
+		r = -EINVAL;
+		goto exit;
+	}
 
 	factory = bus1_factory_new(peer, &param, stack, sizeof(stack));
 	if (IS_ERR(factory)) {

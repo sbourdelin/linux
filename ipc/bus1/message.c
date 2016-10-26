@@ -26,6 +26,7 @@
 #include "handle.h"
 #include "message.h"
 #include "peer.h"
+#include "security.h"
 #include "tx.h"
 #include "user.h"
 #include "util.h"
@@ -242,8 +243,15 @@ int bus1_factory_seal(struct bus1_factory *f)
 	struct bus1_handle *h;
 	struct bus1_flist *e;
 	size_t i;
+	int r;
 
 	lockdep_assert_held(&f->peer->local.lock);
+
+	r = bus1_user_charge(&f->peer->user->limits.n_handles,
+			     &f->peer->data.limits.n_handles,
+			     f->n_handles_charge);
+	if (r < 0)
+		return r;
 
 	for (i = 0, e = f->handles;
 	     i < f->n_handles;
@@ -291,11 +299,29 @@ struct bus1_message *bus1_factory_instantiate(struct bus1_factory *f,
 	transmit_secctx = f->has_secctx &&
 			  (READ_ONCE(peer->flags) & BUS1_PEER_FLAG_WANT_SECCTX);
 
+	r = bus1_user_charge(&peer->user->limits.n_slices,
+			     &peer->data.limits.n_slices, 1);
+	if (r < 0)
+		return ERR_PTR(r);
+
+	r = bus1_user_charge(&peer->user->limits.n_handles,
+			     &peer->data.limits.n_handles, f->n_handles);
+	if (r < 0) {
+		bus1_user_discharge(&peer->user->limits.n_slices,
+				    &peer->data.limits.n_slices, 1);
+		return ERR_PTR(r);
+	}
+
 	size = sizeof(*m) + bus1_flist_inline_size(f->n_handles) +
 	       f->n_files * sizeof(struct file *);
 	m = kmalloc(size, GFP_KERNEL);
-	if (!m)
+	if (!m) {
+		bus1_user_discharge(&peer->user->limits.n_handles,
+				    &peer->data.limits.n_handles, f->n_handles);
+		bus1_user_discharge(&peer->user->limits.n_slices,
+				    &peer->data.limits.n_slices, 1);
 		return ERR_PTR(-ENOMEM);
+	}
 
 	/* set to default first, so the destructor can be called anytime */
 	kref_init(&m->ref);
@@ -329,6 +355,8 @@ struct bus1_message *bus1_factory_instantiate(struct bus1_factory *f,
 	m->slice = bus1_pool_alloc(&peer->data.pool, size);
 	mutex_unlock(&peer->data.lock);
 	if (IS_ERR(m->slice)) {
+		bus1_user_discharge(&peer->user->limits.n_slices,
+				    &peer->data.limits.n_slices, 1);
 		r = PTR_ERR(m->slice);
 		m->slice = NULL;
 		goto error;
@@ -376,6 +404,11 @@ struct bus1_message *bus1_factory_instantiate(struct bus1_factory *f,
 
 	/* import files */
 	while (m->n_files < f->n_files) {
+		r = security_bus1_transfer_file(f->peer, peer,
+						f->files[m->n_files]);
+		if (r < 0)
+			goto error;
+
 		m->files[m->n_files] = get_file(f->files[m->n_files]);
 		++m->n_files;
 	}
@@ -436,10 +469,15 @@ void bus1_message_free(struct kref *k)
 			bus1_handle_unref(e->ptr);
 		}
 	}
+	bus1_user_discharge(&peer->user->limits.n_handles,
+			    &peer->data.limits.n_handles, m->n_handles_charge);
 	bus1_flist_deinit(m->handles, m->n_handles);
 
 	if (m->slice) {
 		mutex_lock(&peer->data.lock);
+		if (!bus1_pool_slice_is_public(m->slice))
+			bus1_user_discharge(&peer->user->limits.n_slices,
+					    &peer->data.limits.n_slices, 1);
 		bus1_pool_release_kernel(&peer->data.pool, m->slice);
 		mutex_unlock(&peer->data.lock);
 	}
@@ -575,7 +613,12 @@ int bus1_message_install(struct bus1_message *m, struct bus1_cmd_recv *param)
 	}
 
 	/* charge resources */
-	if (!peek) {
+	if (peek) {
+		r = bus1_user_charge(&peer->user->limits.n_handles,
+				     &peer->data.limits.n_handles, n_handles);
+		if (r < 0)
+			goto exit;
+	} else {
 		WARN_ON(n_handles < m->n_handles_charge);
 		m->n_handles_charge -= n_handles;
 	}
