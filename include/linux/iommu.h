@@ -131,6 +131,17 @@ struct iommu_dm_region {
 	int			prot;
 };
 
+/*
+ * To consider a PCI device isolated, we require ACS to support Source
+ * Validation, Request Redirection, Completer Redirection, and Upstream
+ * Forwarding.  This effectively means that devices cannot spoof their
+ * requester ID, requests and completions cannot be redirected, and all
+ * transactions are forwarded upstream, even as it passes through a
+ * bridge where the target device is downstream.
+ */
+#define IOMMU_REQ_PCI_ACS_FLAGS   (PCI_ACS_SV | PCI_ACS_RR | \
+				   PCI_ACS_CR | PCI_ACS_UF)
+
 #ifdef CONFIG_IOMMU_API
 
 /**
