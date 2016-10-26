@@ -16,6 +16,7 @@
 
 #include <linux/net.h>
 #include <linux/ipv6.h>
+#include <net/lwtunnel.h>
 
 struct seg6_pernet_data {
 	struct mutex lock;
