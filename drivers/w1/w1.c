@@ -702,7 +702,9 @@ static int __w1_attach_slave_device(struct w1_slave *sl)
 			dev_name(&sl->dev), err);
 		return err;
 	}
-	w1_family_notify(BUS_NOTIFY_ADD_DEVICE, sl);
+	err = w1_family_notify(BUS_NOTIFY_ADD_DEVICE, sl);
+	if (err)
+		return err;
 
 	dev_set_uevent_suppress(&sl->dev, false);
 	kobject_uevent(&sl->dev.kobj, KOBJ_ADD);
