@@ -1,0 +1,14 @@
+STIH4xxSoC ION
+
+Required properties:
+- compatible: "st,sti-ion"
+- list of ION heaps:
+	- compatible: "st,cma"
+
+Example:
+	sti_ion {
+		compatible = "st,sti-ion";
+		ion_cma {
+			compatible = "st,cma";
+		};
+	};
