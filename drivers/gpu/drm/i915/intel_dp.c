@@ -4677,6 +4677,22 @@ done:
 }
 
 static int
+intel_dp_set_link_status_property(struct drm_connector *connector,
+				  uint64_t val)
+{
+	struct drm_device *dev = connector->dev;
+	int ret = 0;
+
+	ret = drm_object_property_set_value(&connector->base,
+					    dev->mode_config.link_status_property,
+					    val);
+	if (ret)
+		return ret;
+
+	return ret;
+}
+
+static int
 intel_dp_connector_register(struct drm_connector *connector)
 {
 	struct intel_dp *intel_dp = intel_attached_dp(connector);
@@ -4943,6 +4959,11 @@ intel_dp_add_properties(struct intel_dp *intel_dp, struct drm_connector *connect
 			connector->dev->mode_config.scaling_mode_property,
 			DRM_MODE_SCALE_ASPECT);
 		intel_connector->panel.fitting_mode = DRM_MODE_SCALE_ASPECT;
+	} else {
+		drm_mode_create_link_status_property(connector->dev);
+		drm_object_attach_property(&connector->base,
+					   connector->dev->mode_config.link_status_property,
+					   DRM_MODE_LINK_STATUS_GOOD);
 	}
 }
 
