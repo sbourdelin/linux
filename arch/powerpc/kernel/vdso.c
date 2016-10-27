@@ -382,8 +382,6 @@ early_initcall(vdso_getcpu_init);
 
 static int __init vdso_init(void)
 {
-	int i;
-
 #ifdef CONFIG_PPC64
 	/*
 	 * Fill up the "systemcfg" stuff for backward compatibility
@@ -454,32 +452,11 @@ static int __init vdso_init(void)
 	}
 
 #ifdef CONFIG_VDSO32
-	/* Make sure pages are in the correct state */
-	vdso32_pagelist = kzalloc(sizeof(struct page *) * (vdso32_pages + 2),
-				  GFP_KERNEL);
-	BUG_ON(vdso32_pagelist == NULL);
-	for (i = 0; i < vdso32_pages; i++) {
-		struct page *pg = virt_to_page(vdso32_kbase + i*PAGE_SIZE);
-		ClearPageReserved(pg);
-		get_page(pg);
-		vdso32_pagelist[i] = pg;
-	}
-	vdso32_pagelist[i++] = virt_to_page(vdso_data);
-	vdso32_pagelist[i] = NULL;
+	init_vdso32_pagelist();
 #endif
 
 #ifdef CONFIG_PPC64
-	vdso64_pagelist = kzalloc(sizeof(struct page *) * (vdso64_pages + 2),
-				  GFP_KERNEL);
-	BUG_ON(vdso64_pagelist == NULL);
-	for (i = 0; i < vdso64_pages; i++) {
-		struct page *pg = virt_to_page(vdso64_kbase + i*PAGE_SIZE);
-		ClearPageReserved(pg);
-		get_page(pg);
-		vdso64_pagelist[i] = pg;
-	}
-	vdso64_pagelist[i++] = virt_to_page(vdso_data);
-	vdso64_pagelist[i] = NULL;
+	init_vdso64_pagelist();
 #endif /* CONFIG_PPC64 */
 
 	get_page(virt_to_page(vdso_data));
