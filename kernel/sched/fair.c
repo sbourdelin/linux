@@ -34,6 +34,7 @@
 #include <trace/events/sched.h>
 
 #include "sched.h"
+#include "tune.h"
 
 /*
  * Targeted preemption latency for CPU-bound tasks:
@@ -5542,6 +5543,42 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 
 	return target;
 }
+
+#ifdef CONFIG_SCHED_TUNE
+
+struct reciprocal_value schedtune_spc_rdiv;
+
+/*
+ * schedtune_margin returns the "margin" to be added on top of
+ * the original value of a "signal".
+ *
+ * The Boost (B) value [%] is used to compute a Margin (M) which
+ * is proportional to the complement of the original Signal (S):
+ *
+ *   M = B * (SCHED_CAPACITY_SCALE - S)
+ *
+ * The obtained value M could be used by the caller to "boost" S.
+ */
+static unsigned long
+schedtune_margin(unsigned long signal, unsigned int boost)
+{
+	unsigned long long margin = 0;
+
+	/* Do not boost saturated signals */
+	if (signal >= SCHED_CAPACITY_SCALE)
+		return 0UL;
+
+	/* Signal Proportional Compensation (SPC) */
+	margin = SCHED_CAPACITY_SCALE - signal;
+	if (boost < 100) {
+		margin *= boost;
+		margin  = reciprocal_divide(margin, schedtune_spc_rdiv);
+	}
+
+	return margin;
+}
+
+#endif /* CONFIG_SCHED_TUNE */
 
 /*
  * cpu_util returns the amount of capacity of a CPU that is used by CFS
