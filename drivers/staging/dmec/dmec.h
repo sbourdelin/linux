@@ -1,6 +1,11 @@
 #ifndef _LINUX_MFD_DMEC_H
 #define _LINUX_MFD_DMEC_H
 
+struct dmec_gpio_platform_data {
+	int gpio_base;
+	int chip_num;
+};
+
 struct dmec_i2c_platform_data {
 	u32 reg_shift; /* register offset shift value */
 	u32 reg_io_width; /* register io read/write width */

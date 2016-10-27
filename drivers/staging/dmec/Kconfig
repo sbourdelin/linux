@@ -17,3 +17,13 @@ config I2C_DMEC
 
 	  To compile this driver as a module, say M here: the module will be
           called i2c-dmec
+
+config GPIO_DMEC
+	tristate "Data Modul GPIO"
+	depends on MFD_DMEC && GPIOLIB
+	help
+	  Say Y here to enable support for a GPIOs on a Data Module embedded
+	  controller.
+
+	  To compile this driver as a module, say M here: the module will be
+          called gpio-dmec
