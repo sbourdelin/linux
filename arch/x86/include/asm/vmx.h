@@ -434,6 +434,45 @@ enum vmcs_field {
 #define VMX_EPT_IPAT_BIT    			(1ull << 6)
 #define VMX_EPT_ACCESS_BIT				(1ull << 8)
 #define VMX_EPT_DIRTY_BIT				(1ull << 9)
+#define VMX_EPT_RWX_MASK                        (VMX_EPT_READABLE_MASK |       \
+						 VMX_EPT_WRITABLE_MASK |       \
+						 VMX_EPT_EXECUTABLE_MASK)
+#define VMX_EPT_MT_MASK				(7ull << VMX_EPT_MT_EPTE_SHIFT)
+
+/* The mask to use to trigger an EPT Misconfiguration in order to track MMIO */
+#define VMX_EPT_MISCONFIG_WX_VALUE		(VMX_EPT_WRITABLE_MASK |       \
+						 VMX_EPT_EXECUTABLE_MASK)
+
+/*
+ * The shift to use for saving the original RWX value when marking the PTE as
+ * not-present for tracking purposes.
+ */
+#define VMX_EPT_RWX_SAVE_SHIFT			52
+
+/*
+ * The shift/mask for determining the type of tracking (if any) being used for a
+ * not-present PTE. Currently, only two bits are used, but more can be added.
+ *
+ * NOTE: Bit 63 is an architecturally ignored bit (and hence can be used for our
+ *       purpose) when the EPT PTE is in a misconfigured state. However, it is
+ *       not necessarily an ignored bit otherwise (even in a not-present state).
+ *       Since the existing MMIO code already uses this bit and since KVM
+ *       doesn't use #VEs currently (where this bit comes into play), so we can
+ *       continue to use it for storing the type. But to be on the safe side,
+ *       we should not set it to 1 in those TRACK_TYPEs where the tracking is
+ *       done via EPT Violations instead of EPT Misconfigurations.
+ */
+#define VMX_EPT_TRACK_TYPE_SHIFT		62
+#define VMX_EPT_TRACK_TYPE_MASK			(3ull <<                       \
+						 VMX_EPT_TRACK_TYPE_SHIFT)
+
+/* Sets only bit 62 as the tracking is done by EPT Violations. See note above */
+#define VMX_EPT_TRACK_ACCESS			(1ull <<                       \
+						 VMX_EPT_TRACK_TYPE_SHIFT)
+/* Sets bits 62 and 63. See note above */
+#define VMX_EPT_TRACK_MMIO			(3ull <<                       \
+						 VMX_EPT_TRACK_TYPE_SHIFT)
+
 
 #define VMX_EPT_IDENTITY_PAGETABLE_ADDR		0xfffbc000ul
 

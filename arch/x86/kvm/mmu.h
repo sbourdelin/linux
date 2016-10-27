@@ -52,6 +52,8 @@ static inline u64 rsvd_bits(int s, int e)
 }
 
 void kvm_mmu_set_mmio_spte_mask(u64 mmio_mask);
+void kvm_mmu_set_access_track_masks(u64 acc_track_mask, u64 acc_track_value,
+				    u64 saved_bits_mask, u64 saved_bits_shift);
 
 void
 reset_shadow_zero_bits_mask(struct kvm_vcpu *vcpu, struct kvm_mmu *context);
