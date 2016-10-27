@@ -143,52 +143,23 @@ struct lib64_elfinfo
 	unsigned long	text;
 };
 
-
-/*
- * This is called from binfmt_elf, we create the special vma for the
- * vDSO and insert it into the mm struct tree
- */
-int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+static int map_vdso(struct page **vdso_pagelist, unsigned long vdso_pages,
+		unsigned long vdso_base)
 {
 	struct mm_struct *mm = current->mm;
-	struct page **vdso_pagelist;
-	unsigned long vdso_pages;
-	unsigned long vdso_base;
 	int ret = 0;
 
-	if (!vdso_ready)
-		return 0;
+	mm->context.vdso_base = 0;
 
-#ifdef CONFIG_PPC64
-	if (is_32bit_task()) {
-		vdso_pagelist = vdso32_pagelist;
-		vdso_pages = vdso32_pages;
-		vdso_base = VDSO32_MBASE;
-	} else {
-		vdso_pagelist = vdso64_pagelist;
-		vdso_pages = vdso64_pages;
-		/*
-		 * On 64bit we don't have a preferred map address. This
-		 * allows get_unmapped_area to find an area near other mmaps
-		 * and most likely share a SLB entry.
-		 */
-		vdso_base = 0;
-	}
-#else
-	vdso_pagelist = vdso32_pagelist;
-	vdso_pages = vdso32_pages;
-	vdso_base = VDSO32_MBASE;
-#endif
-
-	current->mm->context.vdso_base = 0;
-
-	/* vDSO has a problem and was disabled, just don't "enable" it for the
+	/*
+	 * vDSO has a problem and was disabled, just don't "enable" it for the
 	 * process
 	 */
 	if (vdso_pages == 0)
 		return 0;
+
 	/* Add a page to the vdso size for the data page */
-	vdso_pages ++;
+	vdso_pages++;
 
 	/*
 	 * pick a base address for the vDSO in process space. We try to put it
@@ -237,6 +208,30 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 out_up_mmap_sem:
 	up_write(&mm->mmap_sem);
 	return ret;
+}
+
+/*
+ * This is called from binfmt_elf, we create the special vma for the
+ * vDSO and insert it into the mm struct tree
+ */
+int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+{
+	if (!vdso_ready)
+		return 0;
+
+	if (is_32bit_task())
+		return map_vdso(vdso32_pagelist, vdso32_pages, VDSO32_MBASE);
+#ifdef CONFIG_PPC64
+	else
+		/*
+		 * On 64bit we don't have a preferred map address. This
+		 * allows get_unmapped_area to find an area near other mmaps
+		 * and most likely share a SLB entry.
+		 */
+		return map_vdso(vdso64_pagelist, vdso64_pages, 0);
+#endif
+	WARN_ONCE(1, "task is not 32-bit on non PPC64 kernel");
+	return -1;
 }
 
 const char *arch_vma_name(struct vm_area_struct *vma)
