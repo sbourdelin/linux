@@ -120,7 +120,7 @@ static ssize_t show_in_input(struct device *dev, struct device_attribute *attr,
 	return sprintf(buf, "%d\n", in_input);
 }
 
-static DEVICE_ATTR(in0_input, S_IRUGO, show_in_input, NULL);
+static DEVICE_ATTR(in0_input, 0444, show_in_input, NULL);
 
 #ifdef CONFIG_OF
 static int mcp3021_probe_dt(struct i2c_client *client,
