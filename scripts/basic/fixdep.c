@@ -275,13 +275,15 @@ static void do_config_file(const char *filename)
 
 	fd = open(filename, O_RDONLY);
 	if (fd < 0) {
-		fprintf(stderr, "fixdep: error opening config file: ");
-		perror(filename);
+		(void) fprintf(stderr,
+			       "fixdep: error opening config file: %s: %s\n",
+			       filename, strerror(errno));
 		exit(2);
 	}
 	if (fstat(fd, &st) < 0) {
-		fprintf(stderr, "fixdep: error fstat'ing config file: ");
-		perror(filename);
+		(void) fprintf(stderr,
+			       "fixdep: error fstat'ing config file: %s: %s\n",
+			       filename, strerror(errno));
 		exit(2);
 	}
 	if (st.st_size == 0)
