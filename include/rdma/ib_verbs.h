@@ -823,6 +823,7 @@ struct ib_ah_attr {
 };
 
 enum ib_wc_status {
+	IB_WC_STATUS_NONE = -1,
 	IB_WC_SUCCESS,
 	IB_WC_LOC_LEN_ERR,
 	IB_WC_LOC_QP_OP_ERR,
