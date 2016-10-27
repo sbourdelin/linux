@@ -284,27 +284,33 @@ static void do_config_file(const char *filename)
 		perror(filename);
 		exit(2);
 	}
-	if (st.st_size == 0) {
-		close(fd);
-		return;
-	}
+	if (st.st_size == 0)
+		goto close_fd;
 	map = malloc(st.st_size + 1);
 	if (!map) {
 		perror("fixdep: malloc");
-		close(fd);
-		return;
+		goto close_fd;
 	}
 	if (read(fd, map, st.st_size) != st.st_size) {
 		perror("fixdep: read");
-		close(fd);
-		return;
+		goto close_fd;
 	}
 	map[st.st_size] = '\0';
-	close(fd);
-
+	if (close(fd))
+		goto close_failure;
 	parse_config_file(map);
-
 	free(map);
+	return;
+close_fd:
+	if (close(fd)) {
+close_failure:
+		{
+			int code = errno;
+
+			perror("fixdep: close");
+			exit(code);
+		}
+	}
 }
 
 /*
