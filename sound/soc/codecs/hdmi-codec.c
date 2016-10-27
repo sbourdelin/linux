@@ -364,7 +364,7 @@ static int hdmi_of_xlate_dai_name(struct snd_soc_component *component,
 				  struct of_phandle_args *args,
 				  const char **dai_name)
 {
-	int id = args->args[0];
+	int id = args->args_count ? args->args[0] : 0;
 
 	if (id < ARRAY_SIZE(hdmi_dai_name)) {
 		*dai_name = hdmi_dai_name[id];
