@@ -264,24 +264,38 @@ static int kvmppc_set_arch_compat(struct kvm_vcpu *vcpu, u32 arch_compat)
 			 * If an arch bit is set in PCR, all the defined
 			 * higher-order arch bits also have to be set.
 			 */
-			pcr = PCR_ARCH_206 | PCR_ARCH_205;
+			pcr = PCR_ARCH_207 | PCR_ARCH_206 | PCR_ARCH_205;
 			break;
 		case PVR_ARCH_206:
 		case PVR_ARCH_206p:
-			pcr = PCR_ARCH_206;
+			/* Must be at least v2.06 to emulate it */
+			if (!cpu_has_feature(CPU_FTR_ARCH_206))
+				return -EINVAL;
+			pcr = PCR_ARCH_207 | PCR_ARCH_206;
 			break;
 		case PVR_ARCH_207:
+			/* Must be at least v2.07 to emulate it */
+			if (!cpu_has_feature(CPU_FTR_ARCH_207S))
+				return -EINVAL;
+			pcr = PCR_ARCH_207;
 			break;
+		case PVR_ARCH_300:
+			/* Must be at least v3.00 to emulate it */
+			if (!cpu_has_feature(CPU_FTR_ARCH_300))
+				return -EINVAL;
 		default:
 			return -EINVAL;
 		}
 
-		if (!cpu_has_feature(CPU_FTR_ARCH_207S)) {
-			/* POWER7 can't emulate POWER8 */
-			if (!(pcr & PCR_ARCH_206))
-				return -EINVAL;
-			pcr &= ~PCR_ARCH_206;
-		}
+		/*
+		 * Mask the pcr bits which the current processor knows about
+		 * v2.06 and above knows about the v2.05 compat bit
+		 * v2,07 and above knows about the v2.06 compat bit
+		 * v3.00 and above knows about the v2.07 compat bit
+		 */
+		pcr &= (cpu_has_feature(CPU_FTR_ARCH_300) << 3) |
+			(cpu_has_feature(CPU_FTR_ARCH_207S) << 2) |
+			(cpu_has_feature(CPU_FTR_ARCH_206) << 1);
 	}
 
 	spin_lock(&vc->lock);
