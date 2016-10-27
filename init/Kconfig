@@ -1074,6 +1074,48 @@ config RT_GROUP_SCHED
 
 endif #CGROUP_SCHED
 
+config CGROUP_SCHED_TUNE
+	bool "Tasks boosting controller"
+	depends on SCHED_TUNE
+	help
+	  This option allows users to define boost values for groups of
+	  SCHED_OTHER tasks. Once enabled, the utilization of a CPU is boosted
+	  by a factor proportional to the maximum boost value of all the tasks
+	  RUNNABLE on that CPU.
+
+	  This new controller:
+	  1. allows only a two layers hierarchy, where the root defines the
+	     system-wide boost value and its children define a
+	     "boost group" whose tasks will be boosted with the configured
+	     value.
+	  2. supports only a limited number of different boost groups, each
+	     one which could be configured with a different boost value.
+
+	  Say N if unsure.
+
+config SCHED_TUNE_BOOSTGROUPS
+	int "Maximum number of SchedTune's boost groups"
+	range 2 16
+	default 5
+	depends on CGROUP_SCHED_TUNE
+
+	help
+	  When per-task boosting is used we still allow only limited number of
+	  boost groups for two main reasons:
+	  1. on a real system we usually have only few classes of workloads which
+	     make sense to boost with different values,
+	     e.g. background vs foreground tasks, interactive vs low-priority tasks
+	  2. a limited number allows for a simpler and more memory/time efficient
+	     implementation especially for the computation of the per-CPU boost
+	     value
+
+	  NOTE: The first boost group is reserved to defined the global boosting to be
+	  applied to all tasks, thus the minimum number of boost groups is 2.
+	  Indeed, if only global boosting is required than per-task boosting is
+	  not required and this support can be disabled.
+
+	  Use the default value (5) is unsure.
+
 config CGROUP_PIDS
 	bool "PIDs controller"
 	help
