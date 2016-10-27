@@ -208,13 +208,6 @@ static int map_vdso(struct vm_special_mapping *vsm, unsigned long vdso_pages,
 	vdso_base = ALIGN(vdso_base, VDSO_ALIGNMENT);
 
 	/*
-	 * Put vDSO base into mm struct. We need to do this before calling
-	 * install_special_mapping or the perf counter mmap tracking code
-	 * will fail to recognise it as a vDSO (since arch_vma_name fails).
-	 */
-	current->mm->context.vdso_base = vdso_base;
-
-	/*
 	 * our vma flags don't have VM_WRITE so by default, the process isn't
 	 * allowed to write those pages.
 	 * gdb can break that with ptrace interface, and thus trigger COW on
@@ -228,10 +221,10 @@ static int map_vdso(struct vm_special_mapping *vsm, unsigned long vdso_pages,
 				     VM_READ|VM_EXEC|
 				     VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
 				     vsm);
-	if (IS_ERR(vma)) {
+	if (IS_ERR(vma))
 		ret = PTR_ERR(vma);
-		current->mm->context.vdso_base = 0;
-	}
+	else
+		current->mm->context.vdso_base = vdso_base;
 
 out_up_mmap_sem:
 	up_write(&mm->mmap_sem);
@@ -260,13 +253,6 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 #endif
 	WARN_ONCE(1, "task is not 32-bit on non PPC64 kernel");
 	return -1;
-}
-
-const char *arch_vma_name(struct vm_area_struct *vma)
-{
-	if (vma->vm_mm && vma->vm_start == vma->vm_mm->context.vdso_base)
-		return "[vdso]";
-	return NULL;
 }
 
 #ifdef CONFIG_VDSO32
