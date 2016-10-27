@@ -189,15 +189,16 @@ static irqreturn_t mxs_mmc_irq_handler(int irq, void *dev_id)
 	struct mmc_command *cmd = host->cmd;
 	struct mmc_data *data = host->data;
 	struct mxs_ssp *ssp = &host->ssp;
+	unsigned long flags;
 	u32 stat;
 
-	spin_lock(&host->lock);
+	spin_lock_irqsave(&host->lock, flags);
 
 	stat = readl(ssp->base + HW_SSP_CTRL1(ssp));
 	writel(stat & MXS_MMC_IRQ_BITS,
 	       ssp->base + HW_SSP_CTRL1(ssp) + STMP_OFFSET_REG_CLR);
 
-	spin_unlock(&host->lock);
+	spin_unlock_irqrestore(&host->lock, flags);
 
 	if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
 		mmc_signal_sdio_irq(host->mmc);
