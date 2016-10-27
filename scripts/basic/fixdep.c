@@ -366,14 +366,25 @@ static void parse_dep_file(void *map, size_t len)
 					 */
 					if (!saw_any_target) {
 						saw_any_target = 1;
-						printf("source_%s := %s\n\n",
-							target, s);
-						printf("deps_%s := \\\n",
-							target);
+						if (printf("source_%s := %s\n\n"
+							   "deps_%s := \\\n",
+							   target, s, target)
+						   < 24) {
+							int code = errno;
+
+							perror("fixdep: printf");
+							exit(code);
+						}
 					}
 					is_first_dep = 0;
-				} else
-					printf("  %s \\\n", s);
+				} else {
+					if (printf("  %s \\\n", s) < 5) {
+						int code = errno;
+
+						perror("fixdep: printf");
+						exit(code);
+					}
+				}
 				do_config_file(s);
 			}
 		}
@@ -391,8 +402,13 @@ static void parse_dep_file(void *map, size_t len)
 
 	do_extra_deps();
 
-	printf("\n%s: $(deps_%s)\n\n", target, target);
-	printf("$(deps_%s):\n", target);
+	if (printf("\n%s: $(deps_%s)\n\n"
+		   "$(deps_%s):\n", target, target, target) < 27) {
+		int code = errno;
+
+		perror("fixdep: printf");
+		exit(code);
+	}
 }
 
 static void print_deps(void)
