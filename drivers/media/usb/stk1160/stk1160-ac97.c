@@ -90,8 +90,23 @@ void stk1160_ac97_dump_regs(struct stk1160 *dev)
 }
 #endif
 
+int stk1160_has_ac97(struct stk1160 *dev)
+{
+	u8 value;
+
+	stk1160_read_reg(dev, STK1160_POSVA, &value);
+
+	/* Bit 2 high means internal ADC */
+	return !(value & 0x04);
+}
+
 void stk1160_ac97_setup(struct stk1160 *dev)
 {
+	if (!stk1160_has_ac97(dev)) {
+		stk1160_info("Device uses internal 8-bit ADC, skipping AC97 setup.");
+		return;
+	}
+
 	/* Two-step reset AC97 interface and hardware codec */
 	stk1160_write_reg(dev, STK1160_AC97CTL_0, 0x94);
 	stk1160_write_reg(dev, STK1160_AC97CTL_0, 0x8c);
