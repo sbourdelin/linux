@@ -1267,13 +1267,13 @@ int mtk_mdp_register_m2m_device(struct mtk_mdp_dev *mdp)
 err_vdev_register:
 	v4l2_m2m_release(mdp->m2m_dev);
 err_m2m_init:
-	video_device_release(&mdp->vdev);
+	video_device_release(mdp->vdev);
 
 	return ret;
 }
 
 void mtk_mdp_unregister_m2m_device(struct mtk_mdp_dev *mdp)
 {
-	video_device_release(&mdp->vdev);
+	video_device_release(mdp->vdev);
 	v4l2_m2m_release(mdp->m2m_dev);
 }
