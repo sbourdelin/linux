@@ -71,6 +71,8 @@
 #define X86_FEATURE_RECOVERY	( 2*32+ 0) /* CPU in recovery mode */
 #define X86_FEATURE_LONGRUN	( 2*32+ 1) /* Longrun power control */
 #define X86_FEATURE_LRTI	( 2*32+ 3) /* LongRun table interface */
+/* Xeon Phi x200 ring 3 MONITOR/MWAIT enabled */
+#define X86_FEATURE_PHIR3MWAIT	( 2*32+ 4)
 
 /* Other features, Linux-defined mapping, word 3 */
 /* This range is used for feature bits which conflict or are synthesized */

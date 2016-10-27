@@ -14,6 +14,8 @@
 #include <asm/bugs.h>
 #include <asm/cpu.h>
 #include <asm/intel-family.h>
+#include <asm/hwcap2.h>
+#include <asm/elf.h>
 
 #ifdef CONFIG_X86_64
 #include <linux/topology.h>
@@ -84,6 +86,8 @@ static void probe_xeon_phi_r3mwait(struct cpuinfo_x86 *c)
 	} else {
 		msr |= MSR_PHI_MISC_THD_FEATURE_R3MWAIT;
 		wrmsrl(MSR_PHI_MISC_THD_FEATURE, msr);
+		set_cpu_cap(c, X86_FEATURE_PHIR3MWAIT);
+		ELF_HWCAP2 |= HWCAP2_PHIR3MWAIT;
 	}
 }
 
