@@ -25,6 +25,11 @@
 #include "stk1160.h"
 #include "stk1160-reg.h"
 
+static u8 gain = 8;
+
+module_param(gain, byte, 0444);
+MODULE_PARM_DESC(gain, "Set capture gain level if AC97 codec is available (0-15, default: 8)");
+
 static void stk1160_write_ac97(struct stk1160 *dev, u16 reg, u16 value)
 {
 	/* Set codec register address */
@@ -122,7 +127,11 @@ void stk1160_ac97_setup(struct stk1160 *dev)
 	stk1160_write_ac97(dev, 0x16, 0x0808); /* Aux volume */
 	stk1160_write_ac97(dev, 0x1a, 0x0404); /* Record select */
 	stk1160_write_ac97(dev, 0x02, 0x0000); /* Master volume */
-	stk1160_write_ac97(dev, 0x1c, 0x0808); /* Record gain */
+
+	/* Record gain */
+	gain = (gain > 15) ? 15 : gain;
+	stk1160_info("Setting capture gain to %d.", gain);
+	stk1160_write_ac97(dev, 0x1c, (gain<<8) | gain);
 
 #ifdef DEBUG
 	stk1160_ac97_dump_regs(dev);
