@@ -225,6 +225,7 @@ static __init void init_vdso_pagelist(void)
 
 	vdso_mapping.pages = vdso_pagelist;
 	vdso_mapping.name = "[vdso]";
+	vdso_mapping.mremap = vdso_mremap;
 }
 
 #undef find_section

@@ -143,6 +143,31 @@ struct lib64_elfinfo
 	unsigned long	text;
 };
 
+static int vdso_mremap(const struct vm_special_mapping *sm,
+		struct vm_area_struct *new_vma)
+{
+	unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
+	unsigned long vdso_pages;
+
+	if (is_32bit_task())
+		vdso_pages = vdso32_pages;
+#ifdef CONFIG_PPC64
+	else
+		vdso_pages = vdso64_pages;
+#endif
+
+	/* Do not allow partial remap, +1 is for vDSO data page */
+	if (new_size != (vdso_pages + 1) << PAGE_SHIFT)
+		return -EINVAL;
+
+	if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
+		return -EFAULT;
+
+	current->mm->context.vdso_base = new_vma->vm_start;
+
+	return 0;
+}
+
 static int map_vdso(struct vm_special_mapping *vsm, unsigned long vdso_pages,
 		unsigned long vdso_base)
 {
