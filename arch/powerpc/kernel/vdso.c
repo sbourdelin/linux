@@ -154,7 +154,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 	struct page **vdso_pagelist;
 	unsigned long vdso_pages;
 	unsigned long vdso_base;
-	int rc;
+	int ret = 0;
 
 	if (!vdso_ready)
 		return 0;
@@ -203,8 +203,8 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 				      ((VDSO_ALIGNMENT - 1) & PAGE_MASK),
 				      0, 0);
 	if (IS_ERR_VALUE(vdso_base)) {
-		rc = vdso_base;
-		goto fail_mmapsem;
+		ret = vdso_base;
+		goto out_up_mmap_sem;
 	}
 
 	/* Add required alignment. */
@@ -227,21 +227,16 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 	 * It's fine to use that for setting breakpoints in the vDSO code
 	 * pages though.
 	 */
-	rc = install_special_mapping(mm, vdso_base, vdso_pages << PAGE_SHIFT,
+	ret = install_special_mapping(mm, vdso_base, vdso_pages << PAGE_SHIFT,
 				     VM_READ|VM_EXEC|
 				     VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
 				     vdso_pagelist);
-	if (rc) {
+	if (ret)
 		current->mm->context.vdso_base = 0;
-		goto fail_mmapsem;
-	}
 
+out_up_mmap_sem:
 	up_write(&mm->mmap_sem);
-	return 0;
-
- fail_mmapsem:
-	up_write(&mm->mmap_sem);
-	return rc;
+	return ret;
 }
 
 const char *arch_vma_name(struct vm_area_struct *vma)
