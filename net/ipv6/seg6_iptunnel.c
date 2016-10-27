@@ -126,6 +126,14 @@ static int seg6_do_srh_encap(struct sk_buff *skb, struct ipv6_sr_hdr *osrh)
 	hdr->daddr = isrh->segments[isrh->first_segment];
 	set_tun_src(net, skb->dev, &hdr->daddr, &hdr->saddr);
 
+#ifdef CONFIG_IPV6_SEG6_HMAC
+	if (sr_has_hmac(isrh)) {
+		err = seg6_push_hmac(net, &hdr->saddr, isrh);
+		if (unlikely(err))
+			return err;
+	}
+#endif
+
 	skb_postpush_rcsum(skb, hdr, tot_len);
 
 	return 0;
@@ -166,6 +174,16 @@ static int seg6_do_srh_inline(struct sk_buff *skb, struct ipv6_sr_hdr *osrh)
 
 	isrh->segments[0] = hdr->daddr;
 	hdr->daddr = isrh->segments[isrh->first_segment];
+
+#ifdef CONFIG_IPV6_SEG6_HMAC
+	if (sr_has_hmac(isrh)) {
+		struct net *net = dev_net(skb_dst(skb)->dev);
+
+		err = seg6_push_hmac(net, &hdr->saddr, isrh);
+		if (unlikely(err))
+			return err;
+	}
+#endif
 
 	skb_postpush_rcsum(skb, hdr, sizeof(struct ipv6hdr) + hdrlen);
 
