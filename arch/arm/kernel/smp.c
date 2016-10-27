@@ -644,11 +644,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 		break;
 
 	case IPI_CPU_BACKTRACE:
-		printk_nmi_enter();
+		printk_safe_nmi_enter();
 		irq_enter();
 		nmi_cpu_backtrace(regs);
 		irq_exit();
-		printk_nmi_exit();
+		printk_safe_nmi_exit();
 		break;
 
 	default:
