@@ -100,12 +100,17 @@ This permits expressing a boost value as an integer in the range [0..100].
 
 A value of 0 (default) for a CFS task means that schedutil will attempt
 to match compute capacity of the CPU where the task is scheduled to
-match its current utilization with a few spare cycles left. A value of
-100 means that schedutil will select the highest available OPP.
+match its current utilization with a few spare cycles left.
 
-The range between 0 and 100 can be set to satisfy other scenarios suitably.
-For example to satisfy interactive response or depending on other system events
-(battery level, thermal status, etc).
+A value of 100 means that schedutil will select the highest available OPP,
+while a negative value means that schedutils will try to run tasks at lower
+OPPs. Togheter, positive and negative boost value allows to get from scedutil
+behaviors similar to that of the existing "performance" and "powersave"
+governors but with a more fine grained control.
+
+The range between -100 and 100 can be set to satisfy other scenarios suitably.
+For example to satisfy interactive response or other system events (battery
+level, thermal status, etc).
 
 A CGroup based extension is also provided, which permits further user-space
 defined task classification to tune the scheduler for different goals depending
@@ -227,6 +232,27 @@ corresponding to a 50% boost is midway from the original signal and the upper
 bound. Boosting by 100% generates a boosted signal which is always saturated to
 the upper bound.
 
+Negative boosting
+-----------------
+
+While postive boosting uses the SPC strategy to inflate a signal, with negative
+boosting we can reduce artificially the value of a signal. The boosting
+strategy used to reduce a signal is quite simple and extends the concept of
+"margin" already used for positive boosting.
+
+When sched_cfs_boost is defined in [-100%, 0%), the boost value [%] is used to
+compute a margin which is a fraction of the original signal:
+
+	margin := sched_cfs_boost * signal
+
+Such a margin is defined to be a negative quantity which, once added to the
+original signal, it allows to reduce the amount of that signal by a fraction of
+the original value.
+
+With such a definition, for example a 50% utilization task will run at:
+  - 25% capacity OPP when boosted -50%
+  - minimum capacity OPP when boosted -100%
+
 
 4. OPP selection using boosted CPU utilization
 ==============================================
@@ -303,6 +329,14 @@ main characteristics:
      b) It simplifies the implementation considerably, especially for the code
 	which has to compute the per CPU boosting once there are multiple
         RUNNABLE tasks with different boost values.
+
+It's worth to notice that, the boosting of all tasks on a CPU is aggregated to
+figure out what is the max boost value currently required. Thus, for example,
+if we have two tasks:
+  T1 boosted @ -20%
+  T2 boosted @ +30%
+when T2 is active, we boost the CPU +30%, also if T1 is active.
+While the CPU is "slowed-down" 20% when T1 is the only task active on that CPU.
 
 Such a simple design should allow servicing the main utilization scenarios
 identified so far. It provides a simple interface which can be used to manage

@@ -127,6 +127,7 @@ static int __maybe_unused four = 4;
 static unsigned long one_ul = 1;
 static int one_hundred = 100;
 static int one_thousand = 1000;
+static int __maybe_unused one_hundred_neg = -100;
 #ifdef CONFIG_PRINTK
 static int ten_thousand = 10000;
 #endif
@@ -453,7 +454,7 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0644,
 #endif
 		.proc_handler	= &sysctl_sched_cfs_boost_handler,
-		.extra1		= &zero,
+		.extra1		= &one_hundred_neg,
 		.extra2		= &one_hundred,
 	},
 #endif

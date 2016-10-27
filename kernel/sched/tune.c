@@ -13,7 +13,7 @@
 #include "sched.h"
 #include "tune.h"
 
-unsigned int sysctl_sched_cfs_boost __read_mostly;
+int sysctl_sched_cfs_boost __read_mostly;
 
 #ifdef CONFIG_CGROUP_SCHED_TUNE
 
@@ -32,7 +32,7 @@ struct schedtune {
 	int idx;
 
 	/* Boost value for tasks on that SchedTune CGroup */
-	unsigned int boost;
+	int boost;
 
 };
 
@@ -95,10 +95,10 @@ static struct schedtune *allocated_group[boostgroups_max] = {
  */
 struct boost_groups {
 	/* Maximum boost value for all RUNNABLE tasks on a CPU */
-	unsigned int boost_max;
+	int boost_max;
 	struct {
 		/* The boost for tasks on that boost group */
-		unsigned int boost;
+		int boost;
 		/* Count of RUNNABLE tasks on that boost group */
 		unsigned int tasks;
 	} group[boostgroups_max];
@@ -112,15 +112,14 @@ DEFINE_PER_CPU(struct boost_groups, cpu_boost_groups);
 static void
 schedtune_cpu_update(int cpu)
 {
+	bool active_tasks = false;
 	struct boost_groups *bg;
-	unsigned int boost_max;
+	int boost_max = -100;
 	int idx;
 
 	bg = &per_cpu(cpu_boost_groups, cpu);
 
-	/* The root boost group is always active */
-	boost_max = bg->group[0].boost;
-	for (idx = 1; idx < boostgroups_max; ++idx) {
+	for (idx = 0; idx < boostgroups_max; ++idx) {
 		/*
 		 * A boost group affects a CPU only if it has
 		 * RUNNABLE tasks on that CPU
@@ -128,7 +127,12 @@ schedtune_cpu_update(int cpu)
 		if (bg->group[idx].tasks == 0)
 			continue;
 		boost_max = max(boost_max, bg->group[idx].boost);
+		active_tasks = true;
 	}
+
+	/* Reset boosting when there are not tasks in the system */
+	if (!active_tasks)
+		boost_max = 0;
 
 	bg->boost_max = boost_max;
 }
@@ -383,7 +387,7 @@ void schedtune_exit_task(struct task_struct *tsk)
 	task_rq_unlock(rq, tsk, &rq_flags);
 }
 
-static u64
+static s64
 boost_read(struct cgroup_subsys_state *css, struct cftype *cft)
 {
 	struct schedtune *st = css_st(css);
@@ -393,15 +397,18 @@ boost_read(struct cgroup_subsys_state *css, struct cftype *cft)
 
 static int
 boost_write(struct cgroup_subsys_state *css, struct cftype *cft,
-	    u64 boost)
+	    s64 boost)
 {
 	struct schedtune *st = css_st(css);
 
-	if (boost > 100)
+	if (boost < -100 || boost > 100)
 		return -EINVAL;
+
+	/* Update boostgroup and global boosting (if required) */
 	st->boost = boost;
 	if (css == &root_schedtune.css)
 		sysctl_sched_cfs_boost = boost;
+
 	/* Update CPU boost */
 	schedtune_boostgroup_update(st->idx, st->boost);
 
@@ -411,8 +418,8 @@ boost_write(struct cgroup_subsys_state *css, struct cftype *cft,
 static struct cftype files[] = {
 	{
 		.name = "boost",
-		.read_u64 = boost_read,
-		.write_u64 = boost_write,
+		.read_s64 = boost_read,
+		.write_s64 = boost_write,
 	},
 	{ }	/* terminate */
 };

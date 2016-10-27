@@ -5580,17 +5580,34 @@ struct reciprocal_value schedtune_spc_rdiv;
  * schedtune_margin returns the "margin" to be added on top of
  * the original value of a "signal".
  *
- * The Boost (B) value [%] is used to compute a Margin (M) which
- * is proportional to the complement of the original Signal (S):
+ * The Boost (B) value [%] is used to compute a Margin (M) which, in case of
+ * positive boosting, it is proportional to the complement of the original
+ * Signal (S):
  *
- *   M = B * (SCHED_CAPACITY_SCALE - S)
+ *   M = B * (SCHED_CAPACITY_SCALE - S), when B is in (0%, 100%]
+ *
+ * In case of negative boosting, the computed margin is a fraction of the
+ * original S:
+ *
+ *   M = B * S, when B in [-100%, 0%)
  *
  * The obtained value M could be used by the caller to "boost" S.
  */
-static unsigned long
-schedtune_margin(unsigned long signal, unsigned int boost)
+static long
+schedtune_margin(unsigned long signal, int boost)
 {
-	unsigned long long margin = 0;
+	 long long margin = 0;
+
+	/* A -100% boost nullify the orignal signal */
+	if (unlikely(boost == -100))
+		return -signal;
+
+	/* A negative boost produces a proportional (negative) margin */
+	if (unlikely(boost < 0)) {
+		margin = -boost * margin;
+		margin = reciprocal_divide(margin, schedtune_spc_rdiv);
+		return -margin;
+	}
 
 	/* Do not boost saturated signals */
 	if (signal >= SCHED_CAPACITY_SCALE)
@@ -5606,10 +5623,10 @@ schedtune_margin(unsigned long signal, unsigned int boost)
 	return margin;
 }
 
-static inline unsigned long
+static inline long
 schedtune_cpu_margin(unsigned long util, int cpu)
 {
-	unsigned int boost = schedtune_cpu_boost(cpu);
+	int boost = schedtune_cpu_boost(cpu);
 
 	if (boost == 0)
 		return 0UL;
@@ -5619,7 +5636,7 @@ schedtune_cpu_margin(unsigned long util, int cpu)
 
 #else /* CONFIG_SCHED_TUNE */
 
-static inline unsigned long
+static inline long
 schedtune_cpu_margin(unsigned long util, int cpu)
 {
 	return 0;
@@ -5665,9 +5682,10 @@ unsigned long boosted_cpu_util(int cpu)
 {
 	unsigned long util = cpu_rq(cpu)->cfs.avg.util_avg;
 	unsigned long capacity = capacity_orig_of(cpu);
+	int boost = schedtune_cpu_boost(cpu);
 
 	/* Do not boost saturated utilizations */
-	if (util >= capacity)
+	if (boost >= 0 && util >= capacity)
 		return capacity;
 
 	/* Add margin to current CPU's capacity */
