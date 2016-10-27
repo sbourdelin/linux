@@ -32,7 +32,7 @@
  *
  * $ insmod livepatch-sample.ko
  * $ cat /proc/cmdline
- * this has been live patched
+ * <your cmdline> livepatch=1
  *
  * $ echo 0 > /sys/kernel/livepatch/livepatch_sample/enabled
  * $ cat /proc/cmdline
@@ -42,11 +42,18 @@
 #include <linux/seq_file.h>
 static int livepatch_cmdline_proc_show(struct seq_file *m, void *v)
 {
-	seq_printf(m, "%s\n", "this has been live patched");
+	seq_printf(m, "%s livepatch=1\n", saved_command_line);
 	return 0;
 }
 
-static struct klp_func funcs[] = {
+struct KLP_MODULE_RELOC(vmlinux) vmlinux_relocs[] = {
+	{
+		.sym = &saved_command_line,
+		.sympos = 0,
+	},
+};
+
+static struct klp_func vmlinux_funcs[] = {
 	{
 		.old_name = "cmdline_proc_show",
 		.new_func = livepatch_cmdline_proc_show,
@@ -56,7 +63,7 @@ static struct klp_func funcs[] = {
 static struct klp_object objs[] = {
 	{
 		/* name being NULL means vmlinux */
-		.funcs = funcs,
+		.funcs = vmlinux_funcs,
 	}, { }
 };
 
