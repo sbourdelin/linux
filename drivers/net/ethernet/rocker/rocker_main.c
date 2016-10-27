@@ -2542,6 +2542,7 @@ static int rocker_probe_port(struct rocker *rocker, unsigned int port_number)
 	dev = alloc_etherdev(sizeof(struct rocker_port));
 	if (!dev)
 		return -ENOMEM;
+	SET_NETDEV_DEV(dev, &pdev->dev);
 	rocker_port = netdev_priv(dev);
 	rocker_port->dev = dev;
 	rocker_port->rocker = rocker;
