@@ -224,6 +224,38 @@ static irqreturn_t pcc_mbox_irq(int irq, void *p)
 }
 
 /**
+ * pcc_mbox_free_channel - Clients call this to free their Channel.
+ *
+ * @chan: Pointer to the mailbox channel as returned by
+ *		pcc_mbox_request_channel()
+ */
+void pcc_mbox_free_channel(struct mbox_chan *chan)
+{
+	u32 id = chan - pcc_mbox_channels;
+	unsigned long flags;
+
+	if (!chan || !chan->cl)
+		return;
+
+	if (id >= pcc_mbox_ctrl.num_chans) {
+		pr_debug("pcc_mbox_free_channel: Invalid mbox_chan passed\n");
+		return;
+	}
+
+	if (pcc_doorbell_irq[id] > 0)
+		devm_free_irq(chan->mbox->dev, pcc_doorbell_irq[id], chan);
+
+	spin_lock_irqsave(&chan->lock, flags);
+	chan->cl = NULL;
+	chan->active_req = NULL;
+	if (chan->txdone_method == (TXDONE_BY_POLL | TXDONE_BY_ACK))
+		chan->txdone_method = TXDONE_BY_POLL;
+
+	spin_unlock_irqrestore(&chan->lock, flags);
+}
+EXPORT_SYMBOL_GPL(pcc_mbox_free_channel);
+
+/**
  * pcc_mbox_request_channel - PCC clients call this function to
  *		request a pointer to their PCC subspace, from which they
  *		can get the details of communicating with the remote.
@@ -267,6 +299,8 @@ struct mbox_chan *pcc_mbox_request_channel(struct mbox_client *cl,
 	if (chan->txdone_method == TXDONE_BY_POLL && cl->knows_txdone)
 		chan->txdone_method |= TXDONE_BY_ACK;
 
+	spin_unlock_irqrestore(&chan->lock, flags);
+
 	if (pcc_doorbell_irq[subspace_id] > 0) {
 		int rc;
 
@@ -275,48 +309,14 @@ struct mbox_chan *pcc_mbox_request_channel(struct mbox_client *cl,
 		if (unlikely(rc)) {
 			dev_err(dev, "failed to register PCC interrupt %d\n",
 				pcc_doorbell_irq[subspace_id]);
+			pcc_mbox_free_channel(chan);
 			chan = ERR_PTR(rc);
 		}
 	}
 
-	spin_unlock_irqrestore(&chan->lock, flags);
-
 	return chan;
 }
 EXPORT_SYMBOL_GPL(pcc_mbox_request_channel);
-
-/**
- * pcc_mbox_free_channel - Clients call this to free their Channel.
- *
- * @chan: Pointer to the mailbox channel as returned by
- *		pcc_mbox_request_channel()
- */
-void pcc_mbox_free_channel(struct mbox_chan *chan)
-{
-	u32 id = chan - pcc_mbox_channels;
-	unsigned long flags;
-
-	if (!chan || !chan->cl)
-		return;
-
-	if (id >= pcc_mbox_ctrl.num_chans) {
-		pr_debug("pcc_mbox_free_channel: Invalid mbox_chan passed\n");
-		return;
-	}
-
-	spin_lock_irqsave(&chan->lock, flags);
-	chan->cl = NULL;
-	chan->active_req = NULL;
-	if (chan->txdone_method == (TXDONE_BY_POLL | TXDONE_BY_ACK))
-		chan->txdone_method = TXDONE_BY_POLL;
-
-	if (pcc_doorbell_irq[id] > 0)
-		devm_free_irq(chan->mbox->dev, pcc_doorbell_irq[id], chan);
-
-	spin_unlock_irqrestore(&chan->lock, flags);
-}
-EXPORT_SYMBOL_GPL(pcc_mbox_free_channel);
-
 
 /**
  * pcc_send_data - Called from Mailbox Controller code. Used
