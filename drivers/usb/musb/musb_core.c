@@ -122,7 +122,6 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:" MUSB_DRIVER_NAME);
 
-
 /*-------------------------------------------------------------------------*/
 
 static inline struct musb *dev_to_musb(struct device *dev)
@@ -1896,6 +1895,46 @@ static void musb_pm_runtime_check_session(struct musb *musb)
 	musb->session = s;
 }
 
+struct musb_resume_work {
+	void (*callback)(struct musb *musb, void *data);
+	void *data;
+	struct list_head node;
+};
+
+void musb_queue_on_resume(struct musb *musb,
+			  void (*callback)(struct musb *musb, void *data),
+			  void *data)
+{
+	struct musb_resume_work *w;
+	unsigned long flags;
+
+	w = devm_kzalloc(musb->controller, sizeof(*w), GFP_ATOMIC);
+	if (!w)
+		return;
+
+	w->callback = callback;
+	w->data = data;
+	spin_lock_irqsave(&musb->list_lock, flags);
+	list_add_tail(&w->node, &musb->resume_work);
+	spin_unlock_irqrestore(&musb->list_lock, flags);
+}
+EXPORT_SYMBOL_GPL(musb_queue_on_resume);
+
+static void musb_run_pending(struct musb *musb)
+{
+	struct musb_resume_work *w, *_w;
+	unsigned long flags;
+
+	spin_lock_irqsave(&musb->list_lock, flags);
+	list_for_each_entry_safe(w, _w, &musb->resume_work, node) {
+		if (w->callback)
+			w->callback(musb, w->data);
+		list_del(&w->node);
+		devm_kfree(musb->controller, w);
+	}
+	spin_unlock_irqrestore(&musb->list_lock, flags);
+}
+
 /* Only used to provide driver mode change events */
 static void musb_irq_work(struct work_struct *data)
 {
@@ -1969,6 +2008,7 @@ static struct musb *allocate_instance(struct device *dev,
 	INIT_LIST_HEAD(&musb->control);
 	INIT_LIST_HEAD(&musb->in_bulk);
 	INIT_LIST_HEAD(&musb->out_bulk);
+	INIT_LIST_HEAD(&musb->resume_work);
 
 	musb->vbuserr_retry = VBUSERR_RETRY_COUNT;
 	musb->a_wait_bcon = OTG_TIME_A_WAIT_BCON;
@@ -2065,6 +2105,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	}
 
 	spin_lock_init(&musb->lock);
+	spin_lock_init(&musb->list_lock);
 	musb->board_set_power = plat->set_power;
 	musb->min_power = plat->min_power;
 	musb->ops = plat->platform_ops;
@@ -2374,6 +2415,7 @@ static int musb_remove(struct platform_device *pdev)
 	 *  - Peripheral mode: peripheral is deactivated (or never-activated)
 	 *  - OTG mode: both roles are deactivated (or never-activated)
 	 */
+	musb_run_pending(musb);
 	musb_exit_debugfs(musb);
 
 	cancel_work_sync(&musb->irq_work);
@@ -2645,8 +2687,10 @@ static int musb_runtime_resume(struct device *dev)
 	 * Also context restore without save does not make
 	 * any sense
 	 */
-	if (!first)
+	if (!first) {
 		musb_restore_context(musb);
+		musb_run_pending(musb);
+	}
 	first = 0;
 
 	if (musb->need_finish_resume) {
