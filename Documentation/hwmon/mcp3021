@@ -12,6 +12,7 @@ Supported chips:
 Authors:
    Mingkai Hu
    Sven Schuchmann <schuchmann@schleissheimer.de>
+   Clemens Gruber <clemens.gruber@pqgruber.com>
 
 Description
 -----------
@@ -27,3 +28,8 @@ Communication to the MCP3021/MCP3221  is performed using a 2-wire I2C
 compatible interface. Standard (100 kHz) and Fast (400 kHz) I2C modes are
 available. The default I2C device address is 0x4d (contact the Microchip
 factory for additional address options).
+
+The reference voltage used in the conversion can be set through platform data
+in millivolt (for backwards compatibility) or via device tree in microvolt.
+Please refer to Documentation/devicetree/bindings/i2c/mcp3021.txt for details
+about the device tree bindings.
