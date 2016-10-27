@@ -113,6 +113,7 @@
 #include <limits.h>
 #include <ctype.h>
 #include <arpa/inet.h>
+#include <errno.h>
 
 int insert_extra_deps;
 char *target;
@@ -413,21 +414,24 @@ static void print_deps(void)
 	}
 	if (st.st_size == 0) {
 		fprintf(stderr,"fixdep: %s is empty\n",depfile);
-		close(fd);
-		return;
+		goto close_fd;
 	}
 	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	if ((long) map == -1) {
 		perror("fixdep: mmap");
-		close(fd);
-		return;
+		goto close_fd;
 	}
 
 	parse_dep_file(map, st.st_size);
+	if (munmap(map, st.st_size))
+		perror("fixdep: munmap");
+close_fd:
+	if (close(fd)) {
+		int code = errno;
 
-	munmap(map, st.st_size);
-
-	close(fd);
+		perror("fixdep: close");
+		exit(code);
+	}
 }
 
 int main(int argc, char *argv[])
