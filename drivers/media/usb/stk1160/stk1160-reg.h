@@ -26,6 +26,9 @@
 /* Remote Wakup Control */
 #define STK1160_RMCTL			0x00c
 
+/* Power-on Strapping Data */
+#define STK1160_POSVA			0x010
+
 /*
  * Decoder Control Register:
  * This byte controls capture start/stop
