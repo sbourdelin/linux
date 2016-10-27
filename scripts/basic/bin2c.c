@@ -8,29 +8,35 @@
  */
 
 #include <stdio.h>
+#include <errno.h>
 
 int main(int argc, char *argv[])
 {
 	int ch, total = 0;
 
 	if (argc > 1)
-		printf("const char %s[] %s=\n",
-			argv[1], argc > 2 ? argv[2] : "");
+		if (printf("const char %s[] %s=\n",
+			   argv[1], argc > 2 ? argv[2] : "") < 16)
+			return errno;
 
 	do {
-		printf("\t\"");
+		if (fputs("\t\"", stdout) < 0)
+			return errno;
+
 		while ((ch = getchar()) != EOF) {
-			total++;
-			printf("\\x%02x", ch);
-			if (total % 16 == 0)
+			if (printf("\\x%02x", ch) < 4)
+				return errno;
+			if (++total % 16 == 0)
 				break;
 		}
-		printf("\"\n");
+
+		if (puts("\"") < 0)
+			return errno;
 	} while (ch != EOF);
 
 	if (argc > 1)
-		printf("\t;\n\n#include <linux/types.h>\n\nconst size_t %s_size = %d;\n",
-		       argv[1], total);
-
+		if (printf("\t;\n\n#include <linux/types.h>\n\nconst size_t %s_size = %d;\n",
+			   argv[1], total) < 54)
+			return errno;
 	return 0;
 }
