@@ -1,5 +1,5 @@
 /*
- * printk_safe.c - Safe printk in NMI context
+ * printk_safe.c - Safe printk for printk-deadlock-prone contexts
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -32,15 +32,14 @@
  * is later flushed into the main ring buffer via IRQ work.
  *
  * The alternative implementation is chosen transparently
- * via @printk_func per-CPU variable.
+ * by examinig current printk() context mask stored in @printk_safe_context
+ * per-CPU variable.
  *
  * The implementation allows to flush the strings also from another CPU.
  * There are situations when we want to make sure that all buffers
  * were handled or when IRQs are blocked.
  */
-DEFINE_PER_CPU(printk_func_t, printk_func) = vprintk_default;
 static int printk_safe_irq_ready;
-atomic_t nmi_message_lost;
 
 #define SAFE_LOG_BUF_LEN ((1 << CONFIG_PRINTK_SAFE_LOG_BUF_SHIFT) -	\
 			 sizeof(atomic_t) - sizeof(struct irq_work))
@@ -50,27 +49,26 @@ struct printk_safe_seq_buf {
 	struct irq_work		work;	/* IRQ work that flushes the buffer */
 	unsigned char		buffer[SAFE_LOG_BUF_LEN];
 };
-static DEFINE_PER_CPU(struct printk_safe_seq_buf, nmi_print_seq);
 
-/*
- * Safe printk() for NMI context. It uses a per-CPU buffer to
- * store the message. NMIs are not nested, so there is always only
- * one writer running. But the buffer might get flushed from another
- * CPU, so we need to be careful.
- */
-static int vprintk_safe_nmi(const char *fmt, va_list args)
+static DEFINE_PER_CPU(struct printk_safe_seq_buf, safe_print_seq);
+static DEFINE_PER_CPU(int, printk_safe_context);
+
+#ifdef CONFIG_PRINTK_NMI
+static DEFINE_PER_CPU(struct printk_safe_seq_buf, nmi_print_seq);
+atomic_t nmi_message_lost;
+#endif
+
+static int printk_safe_log_store(struct printk_safe_seq_buf *s,
+		const char *fmt, va_list args)
 {
-	struct printk_safe_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
-	int add = 0;
+	int add;
 	size_t len;
 
 again:
 	len = atomic_read(&s->len);
 
-	if (len >= sizeof(s->buffer)) {
-		atomic_inc(&nmi_message_lost);
-		return 0;
-	}
+	if (len >= sizeof(s->buffer))
+		return -E2BIG;
 
 	/*
 	 * Make sure that all old data have been read before the buffer was
@@ -110,7 +108,6 @@ static void printk_safe_flush_line(const char *text, int len)
 		printk_deferred("%.*s", len, text);
 	else
 		printk("%.*s", len, text);
-
 }
 
 /*
@@ -126,7 +123,7 @@ static void printk_safe_flush_seq_line(struct printk_safe_seq_buf *s,
 }
 
 /*
- * Flush data from the associated per_CPU buffer. The function
+ * Flush data from the associated per-CPU buffer. The function
  * can be called either via IRQ work or independently.
  */
 static void __printk_safe_flush(struct irq_work *work)
@@ -209,8 +206,12 @@ void printk_safe_flush(void)
 {
 	int cpu;
 
-	for_each_possible_cpu(cpu)
+	for_each_possible_cpu(cpu) {
+#ifdef CONFIG_PRINTK_NMI
 		__printk_safe_flush(&per_cpu(nmi_print_seq, cpu).work);
+#endif
+		__printk_safe_flush(&per_cpu(safe_print_seq, cpu).work);
+	}
 }
 
 /**
@@ -240,14 +241,95 @@ void printk_safe_flush_on_panic(void)
 	printk_safe_flush();
 }
 
+#ifdef CONFIG_PRINTK_NMI
+/*
+ * Safe printk() for NMI context. It uses a per-CPU buffer to
+ * store the message. NMIs are not nested, so there is always only
+ * one writer running. But the buffer might get flushed from another
+ * CPU, so we need to be careful.
+ */
+static int vprintk_safe_nmi(const char *fmt, va_list args)
+{
+	struct printk_safe_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
+	int add;
+
+	add = printk_safe_log_store(s, fmt, args);
+	if (add == -E2BIG) {
+		atomic_inc(&nmi_message_lost);
+		add = 0;
+	}
+
+	return add;
+}
+
+void printk_safe_nmi_enter(void)
+{
+	this_cpu_or(printk_safe_context, PRINTK_SAFE_NMI_CONTEXT_MASK);
+}
+
+void printk_safe_nmi_exit(void)
+{
+	this_cpu_and(printk_safe_context, ~PRINTK_SAFE_NMI_CONTEXT_MASK);
+}
+
+#else
+
+static int vprintk_safe_nmi(const char *fmt, va_list args)
+{
+	return 0;
+}
+
+#endif /* CONFIG_PRINTK_NMI */
+
+/*
+ * Lockless printk(), to avoid deadlocks should the printk() recurse
+ * into itself. It uses a per-CPU buffer to store the message, just like
+ * NMI.
+ */
+static int vprintk_safe(const char *fmt, va_list args)
+{
+	struct printk_safe_seq_buf *s = this_cpu_ptr(&safe_print_seq);
+
+	return printk_safe_log_store(s, fmt, args);
+}
+
+/* Can be preempted by NMI. */
+void __printk_safe_enter(void)
+{
+	this_cpu_inc(printk_safe_context);
+}
+
+/* Can be preempted by NMI. */
+void __printk_safe_exit(void)
+{
+	this_cpu_dec(printk_safe_context);
+}
+
+__printf(1, 0) int vprintk_func(const char *fmt, va_list args)
+{
+	if (this_cpu_read(printk_safe_context) & PRINTK_SAFE_NMI_CONTEXT_MASK)
+		return vprintk_safe_nmi(fmt, args);
+
+	if (this_cpu_read(printk_safe_context) & PRINTK_SAFE_CONTEXT_MASK)
+		return vprintk_safe(fmt, args);
+
+	return vprintk_default(fmt, args);
+}
+
 void __init printk_safe_init(void)
 {
 	int cpu;
 
 	for_each_possible_cpu(cpu) {
-		struct printk_safe_seq_buf *s = &per_cpu(nmi_print_seq, cpu);
+		struct printk_safe_seq_buf *s;
 
+		s = &per_cpu(safe_print_seq, cpu);
 		init_irq_work(&s->work, __printk_safe_flush);
+
+#ifdef CONFIG_PRINTK_NMI
+		s = &per_cpu(nmi_print_seq, cpu);
+		init_irq_work(&s->work, __printk_safe_flush);
+#endif
 	}
 
 	/* Make sure that IRQ works are initialized before enabling. */
@@ -256,14 +338,4 @@ void __init printk_safe_init(void)
 
 	/* Flush pending messages that did not have scheduled IRQ works. */
 	printk_safe_flush();
-}
-
-void printk_safe_nmi_enter(void)
-{
-	this_cpu_write(printk_func, vprintk_safe_nmi);
-}
-
-void printk_safe_nmi_exit(void)
-{
-	this_cpu_write(printk_func, vprintk_default);
 }
