@@ -1904,6 +1904,41 @@ static inline long ll_lease_type_from_fmode(fmode_t fmode)
 	       ((fmode & FMODE_WRITE) ? LL_LEASE_WRLCK : 0);
 }
 
+static int ll_file_futimes_3(struct file *file, const struct ll_futimes_3 *lfu)
+{
+	struct inode *inode = file_inode(file);
+	struct iattr ia = {
+		.ia_valid = ATTR_ATIME | ATTR_ATIME_SET |
+			    ATTR_MTIME | ATTR_MTIME_SET |
+			    ATTR_CTIME | ATTR_CTIME_SET,
+		.ia_atime = {
+			.tv_sec = lfu->lfu_atime_sec,
+			.tv_nsec = lfu->lfu_atime_nsec,
+		},
+		.ia_mtime = {
+			.tv_sec = lfu->lfu_mtime_sec,
+			.tv_nsec = lfu->lfu_mtime_nsec,
+		},
+		.ia_ctime = {
+			.tv_sec = lfu->lfu_ctime_sec,
+			.tv_nsec = lfu->lfu_ctime_nsec,
+		},
+	};
+	int rc;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (!S_ISREG(inode->i_mode))
+		return -EINVAL;
+
+	inode_lock(inode);
+	rc = ll_setattr_raw(file_dentry(file), &ia, false);
+	inode_unlock(inode);
+
+	return rc;
+}
+
 static long
 ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
@@ -2138,6 +2173,16 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				fmode = 0;
 
 			return ll_lease_type_from_fmode(fmode);
+		case LL_IOC_FUTIMES_3: {
+			const struct ll_futimes_3 __user *lfu_user;
+			struct ll_futimes_3 lfu;
+
+			lfu_user = (const struct ll_futimes_3 __user *)arg;
+			if (copy_from_user(&lfu, lfu_user, sizeof(lfu)))
+				return -EFAULT;
+
+			return ll_file_futimes_3(file, &lfu);
+		}
 		default:
 			return -EINVAL;
 		}
