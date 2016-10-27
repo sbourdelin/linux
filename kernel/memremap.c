@@ -34,6 +34,21 @@ static void *arch_memremap_wb(resource_size_t offset, unsigned long size)
 }
 #endif
 
+#ifndef arch_memremap_exec
+static void *arch_memremap_exec(resource_size_t offset, unsigned long size)
+{
+	return NULL;
+}
+#endif
+
+#ifndef arch_memremap_exec_nocache
+static void *arch_memremap_exec_nocache(resource_size_t offset,
+					unsigned long size)
+{
+	return NULL;
+}
+#endif
+
 static void *try_ram_remap(resource_size_t offset, size_t size)
 {
 	unsigned long pfn = PHYS_PFN(offset);
@@ -48,7 +63,8 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
  * memremap() - remap an iomem_resource as cacheable memory
  * @offset: iomem resource start address
  * @size: size of remap
- * @flags: any of MEMREMAP_WB, MEMREMAP_WT and MEMREMAP_WC
+ * @flags: any of MEMREMAP_WB, MEMREMAP_WT, MEMREMAP_WC, MEMREMAP_EXEC,
+ *	   and MEMREMAP_EXEC_NOCACHE
  *
  * memremap() is "ioremap" for cases where it is known that the resource
  * being mapped does not have i/o side effects and the __iomem
@@ -70,6 +86,16 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
  * MEMREMAP_WC - establish a writecombine mapping, whereby writes may
  * be coalesced together (e.g. in the CPU's write buffers), but is otherwise
  * uncached. Attempts to map System RAM with this mapping type will fail.
+ *
+ * MEMREMAP_EXEC - map memory as cached, as MEMREMAP_WB does, but also
+ * executable to allow for executing code from something like an on-chip
+ * memory. If support for executable mapping is not present on platform
+ * then the mapping will fail.
+ *
+ * MEMREMAP_EXEC_NOCACHE - map memory as non-cached and executable to allow
+ * for executing code from something like an on-chip memory. If support for
+ * executable, non-cached mapping is not present on platform then the
+ * mapping will fail.
  */
 void *memremap(resource_size_t offset, size_t size, unsigned long flags)
 {
@@ -117,6 +143,12 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
 
 	if (!addr && (flags & MEMREMAP_WC))
 		addr = ioremap_wc(offset, size);
+
+	if (!addr && (flags & MEMREMAP_EXEC))
+		addr = arch_memremap_exec(offset, size);
+
+	if (!addr && (flags & MEMREMAP_EXEC_NOCACHE))
+		addr = arch_memremap_exec_nocache(offset, size);
 
 	return addr;
 }
