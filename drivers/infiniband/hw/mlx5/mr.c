@@ -867,7 +867,8 @@ static inline int mlx5_ib_post_send_wait(struct mlx5_ib_dev *dev,
 	mlx5_ib_init_umr_context(&umr_context);
 	umrwr->wr.wr_cqe = &umr_context.cqe;
 
-	down(&umrc->sem);
+	/* limit number of concurrent ib_post_send() on qp */
+	wait_event(umrc->wq, atomic_add_unless(&umrc->users, 1, MAX_UMR_WR));
 	err = ib_post_send(umrc->qp, &umrwr->wr, &bad);
 	if (err) {
 		mlx5_ib_warn(dev, "UMR post send failed, err %d\n", err);
@@ -879,7 +880,8 @@ static inline int mlx5_ib_post_send_wait(struct mlx5_ib_dev *dev,
 			err = -EFAULT;
 		}
 	}
-	up(&umrc->sem);
+	atomic_dec(&umrc->users);
+	wake_up(&umrc->wq);
 	return err;
 }
 

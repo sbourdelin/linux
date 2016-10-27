@@ -2437,10 +2437,6 @@ static void destroy_umrc_res(struct mlx5_ib_dev *dev)
 	ib_dealloc_pd(dev->umrc.pd);
 }
 
-enum {
-	MAX_UMR_WR = 128,
-};
-
 static int create_umr_res(struct mlx5_ib_dev *dev)
 {
 	struct ib_qp_init_attr *init_attr = NULL;
@@ -2520,7 +2516,7 @@ static int create_umr_res(struct mlx5_ib_dev *dev)
 	dev->umrc.cq = cq;
 	dev->umrc.pd = pd;
 
-	sema_init(&dev->umrc.sem, MAX_UMR_WR);
+	init_waitqueue_head(&dev->umrc.wq);
 	ret = mlx5_mr_cache_init(dev);
 	if (ret) {
 		mlx5_ib_warn(dev, "mr cache init failed %d\n", ret);
