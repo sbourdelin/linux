@@ -417,7 +417,7 @@ static void print_deps(void)
 		goto close_fd;
 	}
 	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-	if ((long) map == -1) {
+	if (map == MAP_FAILED) {
 		perror("fixdep: mmap");
 		goto close_fd;
 	}
