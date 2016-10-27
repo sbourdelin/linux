@@ -309,7 +309,6 @@ static unsigned long __init find_function32(struct lib32_elfinfo *lib,
 }
 
 static int __init vdso_do_func_patch32(struct lib32_elfinfo *v32,
-				       struct lib64_elfinfo *v64,
 				       const char *orig, const char *fix)
 {
 	Elf32_Sym *sym32_gen, *sym32_fix;
@@ -344,7 +343,6 @@ static unsigned long __init find_function32(struct lib32_elfinfo *lib,
 }
 
 static int __init vdso_do_func_patch32(struct lib32_elfinfo *v32,
-				       struct lib64_elfinfo *v64,
 				       const char *orig, const char *fix)
 {
 	return 0;
@@ -419,8 +417,7 @@ static unsigned long __init find_function64(struct lib64_elfinfo *lib,
 #endif
 }
 
-static int __init vdso_do_func_patch64(struct lib32_elfinfo *v32,
-				       struct lib64_elfinfo *v64,
+static int __init vdso_do_func_patch64(struct lib64_elfinfo *v64,
 				       const char *orig, const char *fix)
 {
 	Elf64_Sym *sym64_gen, *sym64_fix;
@@ -619,11 +616,9 @@ static __init int vdso_fixup_alt_funcs(struct lib32_elfinfo *v32,
 		 * It would be easy to do, but doesn't seem to be necessary,
 		 * patching the OPD symbol is enough.
 		 */
-		vdso_do_func_patch32(v32, v64, patch->gen_name,
-				     patch->fix_name);
+		vdso_do_func_patch32(v32, patch->gen_name, patch->fix_name);
 #ifdef CONFIG_PPC64
-		vdso_do_func_patch64(v32, v64, patch->gen_name,
-				     patch->fix_name);
+		vdso_do_func_patch64(v64, patch->gen_name, patch->fix_name);
 #endif /* CONFIG_PPC64 */
 	}
 
