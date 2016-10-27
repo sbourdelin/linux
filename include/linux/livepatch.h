@@ -23,6 +23,7 @@
 
 #include <linux/module.h>
 #include <linux/ftrace.h>
+#include <uapi/linux/livepatch.h>
 
 #if IS_ENABLED(CONFIG_LIVEPATCH)
 
