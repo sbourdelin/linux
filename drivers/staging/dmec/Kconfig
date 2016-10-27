@@ -38,3 +38,13 @@ config WDT_DMEC
 
 	  To compile this driver as a module, say M here: the module will be
           called wdt-dmec
+
+config RTM_DMEC
+	tristate "Data Modul RTM"
+	depends on MFD_DMEC
+	help
+	  Say Y to enable support for a running time meter(RTM) on a Data Modul
+	  embedded controllers.
+
+	  To compile this driver as a module, say M here: the module will be
+          called wdt-dmec
