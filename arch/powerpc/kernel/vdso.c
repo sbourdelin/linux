@@ -51,13 +51,13 @@
 #define VDSO_ALIGNMENT	(1 << 16)
 
 static unsigned int vdso32_pages;
-static void *vdso32_kbase;
 static struct page **vdso32_pagelist;
 unsigned long vdso32_sigtramp;
 unsigned long vdso32_rt_sigtramp;
 
 #ifdef CONFIG_VDSO32
 extern char vdso32_start, vdso32_end;
+static void *vdso32_kbase;
 #endif
 
 #ifdef CONFIG_PPC64
@@ -246,249 +246,15 @@ const char *arch_vma_name(struct vm_area_struct *vma)
 	return NULL;
 }
 
-
-
 #ifdef CONFIG_VDSO32
-static void * __init find_section32(Elf32_Ehdr *ehdr, const char *secname,
-				  unsigned long *size)
-{
-	Elf32_Shdr *sechdrs;
-	unsigned int i;
-	char *secnames;
-
-	/* Grab section headers and strings so we can tell who is who */
-	sechdrs = (void *)ehdr + ehdr->e_shoff;
-	secnames = (void *)ehdr + sechdrs[ehdr->e_shstrndx].sh_offset;
-
-	/* Find the section they want */
-	for (i = 1; i < ehdr->e_shnum; i++) {
-		if (strcmp(secnames+sechdrs[i].sh_name, secname) == 0) {
-			if (size)
-				*size = sechdrs[i].sh_size;
-			return (void *)ehdr + sechdrs[i].sh_offset;
-		}
-	}
-	*size = 0;
-	return NULL;
-}
-
-static Elf32_Sym * __init find_symbol32(struct lib32_elfinfo *lib,
-					const char *symname)
-{
-	unsigned int i;
-	char name[MAX_SYMNAME], *c;
-
-	for (i = 0; i < (lib->dynsymsize / sizeof(Elf32_Sym)); i++) {
-		if (lib->dynsym[i].st_name == 0)
-			continue;
-		strlcpy(name, lib->dynstr + lib->dynsym[i].st_name,
-			MAX_SYMNAME);
-		c = strchr(name, '@');
-		if (c)
-			*c = 0;
-		if (strcmp(symname, name) == 0)
-			return &lib->dynsym[i];
-	}
-	return NULL;
-}
-
-/* Note that we assume the section is .text and the symbol is relative to
- * the library base
- */
-static unsigned long __init find_function32(struct lib32_elfinfo *lib,
-					    const char *symname)
-{
-	Elf32_Sym *sym = find_symbol32(lib, symname);
-
-	if (sym == NULL) {
-		printk(KERN_WARNING "vDSO32: function %s not found !\n",
-		       symname);
-		return 0;
-	}
-	return sym->st_value - VDSO32_LBASE;
-}
-
-static int __init vdso_do_func_patch32(struct lib32_elfinfo *v32,
-				       const char *orig, const char *fix)
-{
-	Elf32_Sym *sym32_gen, *sym32_fix;
-
-	sym32_gen = find_symbol32(v32, orig);
-	if (sym32_gen == NULL) {
-		printk(KERN_ERR "vDSO32: Can't find symbol %s !\n", orig);
-		return -1;
-	}
-	if (fix == NULL) {
-		sym32_gen->st_name = 0;
-		return 0;
-	}
-	sym32_fix = find_symbol32(v32, fix);
-	if (sym32_fix == NULL) {
-		printk(KERN_ERR "vDSO32: Can't find symbol %s !\n", fix);
-		return -1;
-	}
-	sym32_gen->st_value = sym32_fix->st_value;
-	sym32_gen->st_size = sym32_fix->st_size;
-	sym32_gen->st_info = sym32_fix->st_info;
-	sym32_gen->st_other = sym32_fix->st_other;
-	sym32_gen->st_shndx = sym32_fix->st_shndx;
-
-	return 0;
-}
-#else /* !CONFIG_VDSO32 */
-static unsigned long __init find_function32(struct lib32_elfinfo *lib,
-					    const char *symname)
-{
-	return 0;
-}
-
-static int __init vdso_do_func_patch32(struct lib32_elfinfo *v32,
-				       const char *orig, const char *fix)
-{
-	return 0;
-}
+#include "vdso_common.c"
 #endif /* CONFIG_VDSO32 */
 
-
 #ifdef CONFIG_PPC64
-
-static void * __init find_section64(Elf64_Ehdr *ehdr, const char *secname,
-				  unsigned long *size)
-{
-	Elf64_Shdr *sechdrs;
-	unsigned int i;
-	char *secnames;
-
-	/* Grab section headers and strings so we can tell who is who */
-	sechdrs = (void *)ehdr + ehdr->e_shoff;
-	secnames = (void *)ehdr + sechdrs[ehdr->e_shstrndx].sh_offset;
-
-	/* Find the section they want */
-	for (i = 1; i < ehdr->e_shnum; i++) {
-		if (strcmp(secnames+sechdrs[i].sh_name, secname) == 0) {
-			if (size)
-				*size = sechdrs[i].sh_size;
-			return (void *)ehdr + sechdrs[i].sh_offset;
-		}
-	}
-	if (size)
-		*size = 0;
-	return NULL;
-}
-
-static Elf64_Sym * __init find_symbol64(struct lib64_elfinfo *lib,
-					const char *symname)
-{
-	unsigned int i;
-	char name[MAX_SYMNAME], *c;
-
-	for (i = 0; i < (lib->dynsymsize / sizeof(Elf64_Sym)); i++) {
-		if (lib->dynsym[i].st_name == 0)
-			continue;
-		strlcpy(name, lib->dynstr + lib->dynsym[i].st_name,
-			MAX_SYMNAME);
-		c = strchr(name, '@');
-		if (c)
-			*c = 0;
-		if (strcmp(symname, name) == 0)
-			return &lib->dynsym[i];
-	}
-	return NULL;
-}
-
-/* Note that we assume the section is .text and the symbol is relative to
- * the library base
- */
-static unsigned long __init find_function64(struct lib64_elfinfo *lib,
-					    const char *symname)
-{
-	Elf64_Sym *sym = find_symbol64(lib, symname);
-
-	if (sym == NULL) {
-		printk(KERN_WARNING "vDSO64: function %s not found !\n",
-		       symname);
-		return 0;
-	}
-#ifdef VDS64_HAS_DESCRIPTORS
-	return *((u64 *)(vdso64_kbase + sym->st_value - VDSO64_LBASE)) -
-		VDSO64_LBASE;
-#else
-	return sym->st_value - VDSO64_LBASE;
-#endif
-}
-
-static int __init vdso_do_func_patch64(struct lib64_elfinfo *v64,
-				       const char *orig, const char *fix)
-{
-	Elf64_Sym *sym64_gen, *sym64_fix;
-
-	sym64_gen = find_symbol64(v64, orig);
-	if (sym64_gen == NULL) {
-		printk(KERN_ERR "vDSO64: Can't find symbol %s !\n", orig);
-		return -1;
-	}
-	if (fix == NULL) {
-		sym64_gen->st_name = 0;
-		return 0;
-	}
-	sym64_fix = find_symbol64(v64, fix);
-	if (sym64_fix == NULL) {
-		printk(KERN_ERR "vDSO64: Can't find symbol %s !\n", fix);
-		return -1;
-	}
-	sym64_gen->st_value = sym64_fix->st_value;
-	sym64_gen->st_size = sym64_fix->st_size;
-	sym64_gen->st_info = sym64_fix->st_info;
-	sym64_gen->st_other = sym64_fix->st_other;
-	sym64_gen->st_shndx = sym64_fix->st_shndx;
-
-	return 0;
-}
-
+#define BITS 64
+#include "vdso_common.c"
 #endif /* CONFIG_PPC64 */
 
-
-static __init int vdso_do_find_sections(struct lib32_elfinfo *v32,
-					struct lib64_elfinfo *v64)
-{
-	void *sect;
-
-	/*
-	 * Locate symbol tables & text section
-	 */
-
-#ifdef CONFIG_VDSO32
-	v32->dynsym = find_section32(v32->hdr, ".dynsym", &v32->dynsymsize);
-	v32->dynstr = find_section32(v32->hdr, ".dynstr", NULL);
-	if (v32->dynsym == NULL || v32->dynstr == NULL) {
-		printk(KERN_ERR "vDSO32: required symbol section not found\n");
-		return -1;
-	}
-	sect = find_section32(v32->hdr, ".text", NULL);
-	if (sect == NULL) {
-		printk(KERN_ERR "vDSO32: the .text section was not found\n");
-		return -1;
-	}
-	v32->text = sect - vdso32_kbase;
-#endif
-
-#ifdef CONFIG_PPC64
-	v64->dynsym = find_section64(v64->hdr, ".dynsym", &v64->dynsymsize);
-	v64->dynstr = find_section64(v64->hdr, ".dynstr", NULL);
-	if (v64->dynsym == NULL || v64->dynstr == NULL) {
-		printk(KERN_ERR "vDSO64: required symbol section not found\n");
-		return -1;
-	}
-	sect = find_section64(v64->hdr, ".text", NULL);
-	if (sect == NULL) {
-		printk(KERN_ERR "vDSO64: the .text section was not found\n");
-		return -1;
-	}
-	v64->text = sect - vdso64_kbase;
-#endif /* CONFIG_PPC64 */
-
-	return 0;
-}
 
 static __init void vdso_setup_trampolines(struct lib32_elfinfo *v32,
 					  struct lib64_elfinfo *v64)
@@ -500,99 +266,10 @@ static __init void vdso_setup_trampolines(struct lib32_elfinfo *v32,
 #ifdef CONFIG_PPC64
 	vdso64_rt_sigtramp = find_function64(v64, "__kernel_sigtramp_rt64");
 #endif
+#ifdef CONFIG_VDSO32
 	vdso32_sigtramp	   = find_function32(v32, "__kernel_sigtramp32");
 	vdso32_rt_sigtramp = find_function32(v32, "__kernel_sigtramp_rt32");
-}
-
-static __init int vdso_fixup_datapage(struct lib32_elfinfo *v32,
-				       struct lib64_elfinfo *v64)
-{
-#ifdef CONFIG_VDSO32
-	Elf32_Sym *sym32;
 #endif
-#ifdef CONFIG_PPC64
-	Elf64_Sym *sym64;
-
-       	sym64 = find_symbol64(v64, "__kernel_datapage_offset");
-	if (sym64 == NULL) {
-		printk(KERN_ERR "vDSO64: Can't find symbol "
-		       "__kernel_datapage_offset !\n");
-		return -1;
-	}
-	*((int *)(vdso64_kbase + sym64->st_value - VDSO64_LBASE)) =
-		(vdso64_pages << PAGE_SHIFT) -
-		(sym64->st_value - VDSO64_LBASE);
-#endif /* CONFIG_PPC64 */
-
-#ifdef CONFIG_VDSO32
-	sym32 = find_symbol32(v32, "__kernel_datapage_offset");
-	if (sym32 == NULL) {
-		printk(KERN_ERR "vDSO32: Can't find symbol "
-		       "__kernel_datapage_offset !\n");
-		return -1;
-	}
-	*((int *)(vdso32_kbase + (sym32->st_value - VDSO32_LBASE))) =
-		(vdso32_pages << PAGE_SHIFT) -
-		(sym32->st_value - VDSO32_LBASE);
-#endif
-
-	return 0;
-}
-
-
-static __init int vdso_fixup_features(struct lib32_elfinfo *v32,
-				      struct lib64_elfinfo *v64)
-{
-	unsigned long size;
-	void *start;
-
-#ifdef CONFIG_PPC64
-	start = find_section64(v64->hdr, "__ftr_fixup", &size);
-	if (start)
-		do_feature_fixups(cur_cpu_spec->cpu_features,
-				  start, start + size);
-
-	start = find_section64(v64->hdr, "__mmu_ftr_fixup", &size);
-	if (start)
-		do_feature_fixups(cur_cpu_spec->mmu_features,
-				  start, start + size);
-
-	start = find_section64(v64->hdr, "__fw_ftr_fixup", &size);
-	if (start)
-		do_feature_fixups(powerpc_firmware_features,
-				  start, start + size);
-
-	start = find_section64(v64->hdr, "__lwsync_fixup", &size);
-	if (start)
-		do_lwsync_fixups(cur_cpu_spec->cpu_features,
-				 start, start + size);
-#endif /* CONFIG_PPC64 */
-
-#ifdef CONFIG_VDSO32
-	start = find_section32(v32->hdr, "__ftr_fixup", &size);
-	if (start)
-		do_feature_fixups(cur_cpu_spec->cpu_features,
-				  start, start + size);
-
-	start = find_section32(v32->hdr, "__mmu_ftr_fixup", &size);
-	if (start)
-		do_feature_fixups(cur_cpu_spec->mmu_features,
-				  start, start + size);
-
-#ifdef CONFIG_PPC64
-	start = find_section32(v32->hdr, "__fw_ftr_fixup", &size);
-	if (start)
-		do_feature_fixups(powerpc_firmware_features,
-				  start, start + size);
-#endif /* CONFIG_PPC64 */
-
-	start = find_section32(v32->hdr, "__lwsync_fixup", &size);
-	if (start)
-		do_lwsync_fixups(cur_cpu_spec->cpu_features,
-				 start, start + size);
-#endif
-
-	return 0;
 }
 
 static __init int vdso_fixup_alt_funcs(struct lib32_elfinfo *v32,
@@ -616,7 +293,9 @@ static __init int vdso_fixup_alt_funcs(struct lib32_elfinfo *v32,
 		 * It would be easy to do, but doesn't seem to be necessary,
 		 * patching the OPD symbol is enough.
 		 */
+#ifdef CONFIG_VDSO32
 		vdso_do_func_patch32(v32, patch->gen_name, patch->fix_name);
+#endif
 #ifdef CONFIG_PPC64
 		vdso_do_func_patch64(v64, patch->gen_name, patch->fix_name);
 #endif /* CONFIG_PPC64 */
@@ -625,24 +304,19 @@ static __init int vdso_fixup_alt_funcs(struct lib32_elfinfo *v32,
 	return 0;
 }
 
-
 static __init int vdso_setup(void)
 {
 	struct lib32_elfinfo	v32;
 	struct lib64_elfinfo	v64;
 
-	v32.hdr = vdso32_kbase;
-#ifdef CONFIG_PPC64
-	v64.hdr = vdso64_kbase;
+#ifdef CONFIG_VDSO32
+	if (vdso_setup32(&v32))
+		return -1;
 #endif
-	if (vdso_do_find_sections(&v32, &v64))
+#ifdef CONFIG_PPC64
+	if (vdso_setup64(&v64))
 		return -1;
-
-	if (vdso_fixup_datapage(&v32, &v64))
-		return -1;
-
-	if (vdso_fixup_features(&v32, &v64))
-		return -1;
+#endif
 
 	if (vdso_fixup_alt_funcs(&v32, &v64))
 		return -1;
