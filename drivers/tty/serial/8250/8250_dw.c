@@ -53,6 +53,8 @@
 /* Helper for fifo size calculation */
 #define DW_UART_CPR_FIFO_SIZE(a)	(((a >> 16) & 0xff) * 16)
 
+/* DesignWare specific register fields */
+#define DW_UART_MCR_SIRE		BIT(6)
 
 struct dw8250_data {
 	u8			usr_reg;
@@ -254,6 +256,20 @@ out:
 	serial8250_do_set_termios(p, termios, old);
 }
 
+static void dw8250_set_ldisc(struct uart_port *p, struct ktermios *termios)
+{
+	unsigned int mcr = p->serial_in(p, UART_MCR);
+
+	if (termios->c_line == N_IRDA)
+		mcr |= DW_UART_MCR_SIRE;
+	else
+		mcr &= ~DW_UART_MCR_SIRE;
+
+	p->serial_out(p, UART_MCR, mcr);
+
+	serial8250_do_set_ldisc(p, termios);
+}
+
 /*
  * dw8250_fallback_dma_filter will prevent the UART from getting just any free
  * channel on platforms that have DMA engines, but don't have any channels
@@ -392,6 +408,7 @@ static int dw8250_probe(struct platform_device *pdev)
 	p->iotype	= UPIO_MEM;
 	p->serial_in	= dw8250_serial_in;
 	p->serial_out	= dw8250_serial_out;
+	p->set_ldisc	= dw8250_set_ldisc;
 
 	p->membase = devm_ioremap(dev, regs->start, resource_size(regs));
 	if (!p->membase)
