@@ -130,4 +130,9 @@
 
 #define LIRC_SET_WIDEBAND_RECEIVER     _IOW('i', 0x00000023, __u32)
 
+/*
+ * Should the lirc driver wait until the IR has been transmitted.
+ */
+#define LIRC_SET_TRANSMITTER_WAIT      _IOW('i', 0x00000024, __u32)
+
 #endif

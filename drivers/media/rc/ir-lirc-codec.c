@@ -161,17 +161,19 @@ static ssize_t ir_lirc_transmit_ir(struct file *file, const char __user *buf,
 
 	ret *= sizeof(unsigned int);
 
-	/*
-	 * The lircd gap calculation expects the write function to
-	 * wait for the actual IR signal to be transmitted before
-	 * returning.
-	 */
-	towait = ktime_us_delta(ktime_add_us(start, duration), ktime_get());
-	if (towait > 0) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(usecs_to_jiffies(towait));
+	if (!lirc->tx_no_wait) {
+		/*
+		 * The lircd gap calculation expects the write function to
+		 * wait for the actual IR signal to be transmitted before
+		 * returning.
+		 */
+		towait = ktime_us_delta(ktime_add_us(start, duration),
+								ktime_get());
+		if (towait > 0) {
+			set_current_state(TASK_INTERRUPTIBLE);
+			schedule_timeout(usecs_to_jiffies(towait));
+		}
 	}
-
 out:
 	kfree(txbuf);
 	return ret;
@@ -233,6 +235,13 @@ static long ir_lirc_ioctl(struct file *filep, unsigned int cmd,
 			return -EINVAL;
 
 		return dev->s_tx_duty_cycle(dev, val);
+
+	case LIRC_SET_TRANSMITTER_WAIT:
+		if (!dev->tx_ir)
+			return -ENOTTY;
+
+		lirc->tx_no_wait = !val;
+		break;
 
 	/* RX settings */
 	case LIRC_SET_REC_CARRIER:
