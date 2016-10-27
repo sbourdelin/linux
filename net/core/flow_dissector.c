@@ -245,7 +245,7 @@ ipv6:
 	}
 	case htons(ETH_P_8021AD):
 	case htons(ETH_P_8021Q): {
-		const struct vlan_hdr *vlan;
+		const struct vlan_hdr *vlan = NULL;
 
 		if (skb_vlan_tag_present(skb))
 			proto = skb->protocol;
@@ -276,7 +276,8 @@ ipv6:
 				key_vlan->vlan_id = skb_vlan_tag_get_id(skb);
 				key_vlan->vlan_priority =
 					(skb_vlan_tag_get_prio(skb) >> VLAN_PRIO_SHIFT);
-			} else {
+			} else if (proto == cpu_to_be16(ETH_P_8021Q) ||
+						proto == cpu_to_be16(ETH_P_8021AD)) {
 				key_vlan->vlan_id = ntohs(vlan->h_vlan_TCI) &
 					VLAN_VID_MASK;
 				key_vlan->vlan_priority =
