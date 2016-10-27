@@ -66,6 +66,48 @@ static void quirk_awe32_resources(struct pnp_dev *dev)
 	}
 }
 
+static void quirk_serial_port(struct pnp_dev *dev)
+{
+	struct pnp_option *option;
+	struct pnp_irq *irq;
+	struct pnp_port *port;
+
+	list_for_each_entry(option, &dev->options, list) {
+		if (!pnp_option_is_dependent(option))
+			continue;
+
+		if (option->type == IORESOURCE_IO) {
+			port = &option->u.port;
+
+			if (port->min != 0x2f8 || port->max != 0x2f8 ||
+				port->size != 8 || port->align != 1)
+				return;
+		} else if (option->type == IORESOURCE_IRQ) {
+			pnp_irq_mask_t map;
+
+			irq = &option->u.irq;
+
+			bitmap_zero(map.bits, PNP_IRQ_NR);
+			__set_bit(3, map.bits);
+			__set_bit(4, map.bits);
+			__set_bit(5, map.bits);
+			__set_bit(6, map.bits);
+			__set_bit(7, map.bits);
+			__set_bit(10, map.bits);
+			__set_bit(11, map.bits);
+			__set_bit(12, map.bits);
+
+			if (!bitmap_equal(map.bits, irq->map.bits, PNP_IRQ_NR))
+				return;
+		}
+	}
+
+	if (irq && port) {
+		bitmap_zero(irq->map.bits, PNP_IRQ_NR);
+		__set_bit(3, irq->map.bits);
+	}
+}
+
 static void quirk_cmi8330_resources(struct pnp_dev *dev)
 {
 	struct pnp_option *option;
@@ -448,6 +490,7 @@ static struct pnp_fixup pnp_fixups[] = {
 #ifdef CONFIG_PCI
 	{"PNP0c02", quirk_intel_mch},
 #endif
+	{"PNP0c02", quirk_serial_port},
 	{""}
 };
 
