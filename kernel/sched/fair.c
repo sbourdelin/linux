@@ -5578,6 +5578,25 @@ schedtune_margin(unsigned long signal, unsigned int boost)
 	return margin;
 }
 
+static inline unsigned long
+schedtune_cpu_margin(unsigned long util, int cpu)
+{
+	unsigned int boost = get_sysctl_sched_cfs_boost();
+
+	if (boost == 0)
+		return 0UL;
+
+	return schedtune_margin(util, boost);
+}
+
+#else /* CONFIG_SCHED_TUNE */
+
+static inline unsigned long
+schedtune_cpu_margin(unsigned long util, int cpu)
+{
+	return 0;
+}
+
 #endif /* CONFIG_SCHED_TUNE */
 
 /*
@@ -5612,6 +5631,23 @@ static int cpu_util(int cpu)
 	unsigned long capacity = capacity_orig_of(cpu);
 
 	return (util >= capacity) ? capacity : util;
+}
+
+unsigned long boosted_cpu_util(int cpu)
+{
+	unsigned long util = cpu_rq(cpu)->cfs.avg.util_avg;
+	unsigned long capacity = capacity_orig_of(cpu);
+
+	/* Do not boost saturated utilizations */
+	if (util >= capacity)
+		return capacity;
+
+	/* Add margin to current CPU's capacity */
+	util += schedtune_cpu_margin(util, cpu);
+	if (util >= capacity)
+		return capacity;
+
+	return util;
 }
 
 static inline int task_util(struct task_struct *p)
