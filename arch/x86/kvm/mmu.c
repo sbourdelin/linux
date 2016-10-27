@@ -473,7 +473,7 @@ retry:
 }
 #endif
 
-static bool spte_is_locklessly_modifiable(u64 spte)
+static bool spte_can_locklessly_be_made_writable(u64 spte)
 {
 	return (spte & (SPTE_HOST_WRITEABLE | SPTE_MMU_WRITEABLE)) ==
 		(SPTE_HOST_WRITEABLE | SPTE_MMU_WRITEABLE);
@@ -487,7 +487,7 @@ static bool spte_has_volatile_bits(u64 spte)
 	 * also, it can help us to get a stable is_writable_pte()
 	 * to ensure tlb flush is not missed.
 	 */
-	if (spte_is_locklessly_modifiable(spte))
+	if (spte_can_locklessly_be_made_writable(spte))
 		return true;
 
 	if (!shadow_accessed_mask)
@@ -556,7 +556,7 @@ static bool mmu_spte_update(u64 *sptep, u64 new_spte)
 	 * we always atomically update it, see the comments in
 	 * spte_has_volatile_bits().
 	 */
-	if (spte_is_locklessly_modifiable(old_spte) &&
+	if (spte_can_locklessly_be_made_writable(old_spte) &&
 	      !is_writable_pte(new_spte))
 		ret = true;
 
@@ -1212,7 +1212,7 @@ static bool spte_write_protect(u64 *sptep, bool pt_protect)
 	u64 spte = *sptep;
 
 	if (!is_writable_pte(spte) &&
-	      !(pt_protect && spte_is_locklessly_modifiable(spte)))
+	      !(pt_protect && spte_can_locklessly_be_made_writable(spte)))
 		return false;
 
 	rmap_printk("rmap_write_protect: spte %p %llx\n", sptep, *sptep);
@@ -2973,7 +2973,7 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gva_t gva, int level,
 	 * Currently, to simplify the code, only the spte write-protected
 	 * by dirty-log can be fast fixed.
 	 */
-	if (!spte_is_locklessly_modifiable(spte))
+	if (!spte_can_locklessly_be_made_writable(spte))
 		goto exit;
 
 	/*
