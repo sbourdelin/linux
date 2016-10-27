@@ -115,7 +115,7 @@ struct reg_sequence {
  */
 #define regmap_read_poll_timeout(map, addr, val, cond, sleep_us, timeout_us) \
 ({ \
-	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
+	ktime_t __timeout = ktime_add_us(ktime_get(), timeout_us); \
 	int ret; \
 	might_sleep_if(sleep_us); \
 	for (;;) { \
@@ -124,7 +124,7 @@ struct reg_sequence {
 			break; \
 		if (cond) \
 			break; \
-		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
+		if (timeout_us && ktime_compare(ktime_get(), __timeout) > 0) { \
 			ret = regmap_read((map), (addr), &(val)); \
 			break; \
 		} \
