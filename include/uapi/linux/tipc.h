@@ -177,6 +177,13 @@ struct tipc_event {
 };
 
 /*
+ *     Definitions for the TIPC protocol sk_state field.
+ */
+enum {
+	TIPC_LISTEN = 1,
+};
+
+/*
  * Socket API
  */
 
