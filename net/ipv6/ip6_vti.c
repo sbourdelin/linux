@@ -610,7 +610,8 @@ static int vti6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	if (type == NDISC_REDIRECT)
 		ip6_redirect(skb, net, skb->dev->ifindex, 0);
 	else
-		ip6_update_pmtu(skb, net, info, 0, 0);
+		ip6_update_pmtu(skb, net, info, 0, 0,
+				sock_net_uid(net, skb->sk));
 	xfrm_state_put(x);
 
 	return 0;
