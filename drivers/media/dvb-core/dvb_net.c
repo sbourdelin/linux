@@ -688,6 +688,9 @@ static void dvb_net_ule( struct net_device *dev, const u8 *buf, size_t buf_len )
 							      ETH_ALEN);
 						skb_pull(priv->ule_skb, ETH_ALEN);
 					}
+				} else {
+					 /* othersie use zero destination address */
+					eth_zero_addr(dest_addr);
 				}
 
 				/* Handle ULE Extension Headers. */
@@ -715,13 +718,8 @@ static void dvb_net_ule( struct net_device *dev, const u8 *buf, size_t buf_len )
 				if (!priv->ule_bridged) {
 					skb_push(priv->ule_skb, ETH_HLEN);
 					ethh = (struct ethhdr *)priv->ule_skb->data;
-					if (!priv->ule_dbit) {
-						 /* dest_addr buffer is only valid if priv->ule_dbit == 0 */
-						memcpy(ethh->h_dest, dest_addr, ETH_ALEN);
-						eth_zero_addr(ethh->h_source);
-					}
-					else /* zeroize source and dest */
-						memset( ethh, 0, ETH_ALEN*2 );
+					memcpy(ethh->h_dest, dest_addr, ETH_ALEN);
+					eth_zero_addr(ethh->h_source);
 
 					ethh->h_proto = htons(priv->ule_sndu_type);
 				}
