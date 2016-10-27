@@ -403,13 +403,15 @@ static void print_deps(void)
 
 	fd = open(depfile, O_RDONLY);
 	if (fd < 0) {
-		fprintf(stderr, "fixdep: error opening depfile: ");
-		perror(depfile);
+		(void) fprintf(stderr,
+			       "fixdep: error opening depfile: %s: %s\n",
+			       depfile, strerror(errno));
 		exit(2);
 	}
 	if (fstat(fd, &st) < 0) {
-		fprintf(stderr, "fixdep: error fstat'ing depfile: ");
-		perror(depfile);
+		(void) fprintf(stderr,
+			       "fixdep: error fstat'ing depfile: %s: %s\n",
+			       depfile, strerror(errno));
 		exit(2);
 	}
 	if (st.st_size == 0) {
