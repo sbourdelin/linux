@@ -27,3 +27,14 @@ config GPIO_DMEC
 
 	  To compile this driver as a module, say M here: the module will be
           called gpio-dmec
+
+config WDT_DMEC
+	tristate "Data Modul Watchdog"
+	depends on MFD_DMEC
+	select WATCHDOG_CORE
+	help
+	  Say Y to enable support for a watchdog on a Data Modul embedded
+	  controllers.
+
+	  To compile this driver as a module, say M here: the module will be
+          called wdt-dmec
