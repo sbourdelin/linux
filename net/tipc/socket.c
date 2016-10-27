@@ -348,6 +348,7 @@ static int tipc_set_sk_state(struct sock *sk, int state)
 
 	switch (state) {
 	case TIPC_OPEN:
+	case TIPC_CLOSING:
 		res = 0;
 		break;
 	case TIPC_LISTEN:
@@ -508,7 +509,7 @@ static int tipc_release(struct socket *sock)
 	 * (which disconnects locally & sends a 'FIN+' to peer)
 	 */
 	dnode = tsk_peer_node(tsk);
-	while (sock->state != SS_DISCONNECTING) {
+	while (sk->sk_state != TIPC_CLOSING) {
 		skb = __skb_dequeue(&sk->sk_receive_queue);
 		if (skb == NULL)
 			break;
@@ -517,7 +518,7 @@ static int tipc_release(struct socket *sock)
 		else {
 			if ((sock->state == SS_CONNECTING) ||
 			    (sock->state == SS_CONNECTED)) {
-				sock->state = SS_DISCONNECTING;
+				tipc_set_sk_state(sk, TIPC_CLOSING);
 				tipc_node_remove_conn(net, dnode, tsk->portid);
 			}
 			tipc_sk_respond(sk, skb, TIPC_ERR_NO_PORT);
@@ -538,7 +539,7 @@ static int tipc_release(struct socket *sock)
 	}
 
 	/* Reject any messages that accumulated in backlog queue */
-	sock->state = SS_DISCONNECTING;
+	tipc_set_sk_state(sk, TIPC_CLOSING);
 	release_sock(sk);
 
 	call_rcu(&tsk->rcu, tipc_sk_callback);
@@ -685,9 +686,6 @@ static unsigned int tipc_poll(struct file *file, struct socket *sock,
 		if (!skb_queue_empty(&sk->sk_receive_queue))
 			mask |= (POLLIN | POLLRDNORM);
 		break;
-	case SS_DISCONNECTING:
-		mask = (POLLIN | POLLRDNORM | POLLHUP);
-		break;
 	default:
 		switch (sk->sk_state) {
 		case TIPC_OPEN:
@@ -697,6 +695,7 @@ static unsigned int tipc_poll(struct file *file, struct socket *sock,
 			    (!skb_queue_empty(&sk->sk_receive_queue)))
 				mask |= (POLLIN | POLLRDNORM);
 			break;
+		case TIPC_CLOSING:
 		case TIPC_DISCONNECTING:
 			mask = (POLLIN | POLLRDNORM | POLLHUP);
 			break;
@@ -881,7 +880,7 @@ static int tipc_wait_for_sndmsg(struct socket *sock, long *timeo_p)
 		int err = sock_error(sk);
 		if (err)
 			return err;
-		if (sock->state == SS_DISCONNECTING)
+		if (sk->sk_state == TIPC_CLOSING)
 			return -EPIPE;
 		if (!*timeo_p)
 			return -EAGAIN;
@@ -1334,7 +1333,7 @@ static int tipc_wait_for_rcvmsg(struct socket *sock, long *timeop)
 	for (;;) {
 		prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 		if (timeo && skb_queue_empty(&sk->sk_receive_queue)) {
-			if (sock->state == SS_DISCONNECTING) {
+			if (sk->sk_state == TIPC_CLOSING) {
 				err = -ENOTCONN;
 				break;
 			}
@@ -1675,13 +1674,11 @@ static bool filter_connect(struct tipc_sock *tsk, struct sk_buff *skb)
 		/* 'ACK-' message is neither accepted nor rejected: */
 		msg_set_dest_droppable(hdr, 1);
 		return false;
-
-	case SS_DISCONNECTING:
-		break;
 	}
 
 	switch (sk->sk_state) {
 	case TIPC_OPEN:
+	case TIPC_CLOSING:
 	case TIPC_DISCONNECTING:
 		break;
 	case TIPC_LISTEN:
