@@ -14,8 +14,8 @@
  */
 
 #include <linux/err.h>
-#include <linux/i2c.h>
 #include <linux/module.h>
+#include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -25,9 +25,8 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/regulator/of_regulator.h>
-#include "pv88080-regulator.h"
 
-#define PV88080_MAX_REGULATORS	4
+#include <linux/mfd/pv88080.h>
 
 /* PV88080 REGULATOR IDs */
 enum {
@@ -36,11 +35,6 @@ enum {
 	PV88080_ID_BUCK2,
 	PV88080_ID_BUCK3,
 	PV88080_ID_HVBUCK,
-};
-
-enum pv88080_types {
-	TYPE_PV88080_AA,
-	TYPE_PV88080_BA,
 };
 
 struct pv88080_regulator {
@@ -53,14 +47,6 @@ struct pv88080_regulator {
 	unsigned int limit_reg;
 	unsigned int conf2;
 	unsigned int conf5;
-};
-
-struct pv88080 {
-	struct device *dev;
-	struct regmap *regmap;
-	struct regulator_dev *rdev[PV88080_MAX_REGULATORS];
-	unsigned long type;
-	const struct pv88080_compatible_regmap *regmap_config;
 };
 
 struct pv88080_buck_voltage {
@@ -93,10 +79,13 @@ struct pv88080_compatible_regmap {
 	int hvbuck_vsel_mask;
 };
 
-static const struct regmap_config pv88080_regmap_config = {
-	.reg_bits = 8,
-	.val_bits = 8,
+struct pv88080_regulators {
+	int	virq;
+	struct pv88080 *pv88080;
+	struct regulator_dev *rdev[PV88080_MAX_REGULATORS];
+	const struct pv88080_compatible_regmap *regmap_config;
 };
+
 
 /* Current limits array (in uA) for BUCK1, BUCK2, BUCK3.
  * Entry indexes corresponds to register values.
@@ -210,16 +199,6 @@ static const struct pv88080_compatible_regmap pv88080_ba_regs = {
 	.hvbuck_enable_mask       = PV88080_HVBUCK_EN,
 	.hvbuck_vsel_mask		  = PV88080_VHVBUCK_MASK,
 };
-
-#ifdef CONFIG_OF
-static const struct of_device_id pv88080_dt_ids[] = {
-	{ .compatible = "pvs,pv88080",    .data = (void *)TYPE_PV88080_AA },
-	{ .compatible = "pvs,pv88080-aa", .data = (void *)TYPE_PV88080_AA },
-	{ .compatible = "pvs,pv88080-ba", .data = (void *)TYPE_PV88080_BA },
-	{},
-};
-MODULE_DEVICE_TABLE(of, pv88080_dt_ids);
-#endif
 
 static unsigned int pv88080_buck_get_mode(struct regulator_dev *rdev)
 {
@@ -374,7 +353,8 @@ static struct pv88080_regulator pv88080_regulator_info[] = {
 
 static irqreturn_t pv88080_irq_handler(int irq, void *data)
 {
-	struct pv88080 *chip = data;
+	struct pv88080_regulators *regulators = data;
+	struct pv88080 *chip = regulators->pv88080;
 	int i, reg_val, err, ret = IRQ_NONE;
 
 	err = regmap_read(chip->regmap, PV88080_REG_EVENT_A, &reg_val);
@@ -383,8 +363,9 @@ static irqreturn_t pv88080_irq_handler(int irq, void *data)
 
 	if (reg_val & PV88080_E_VDD_FLT) {
 		for (i = 0; i < PV88080_MAX_REGULATORS; i++) {
-			if (chip->rdev[i] != NULL) {
-				regulator_notifier_call_chain(chip->rdev[i],
+			if (regulators->rdev[i] != NULL) {
+				regulator_notifier_call_chain(
+					regulators->rdev[i],
 					REGULATOR_EVENT_UNDER_VOLTAGE,
 					NULL);
 			}
@@ -400,8 +381,9 @@ static irqreturn_t pv88080_irq_handler(int irq, void *data)
 
 	if (reg_val & PV88080_E_OVER_TEMP) {
 		for (i = 0; i < PV88080_MAX_REGULATORS; i++) {
-			if (chip->rdev[i] != NULL) {
-				regulator_notifier_call_chain(chip->rdev[i],
+			if (regulators->rdev[i] != NULL) {
+				regulator_notifier_call_chain(
+					regulators->rdev[i],
 					REGULATOR_EVENT_OVER_TEMP,
 					NULL);
 			}
@@ -425,101 +407,67 @@ error_i2c:
 /*
  * I2C driver interface functions
  */
-static int pv88080_i2c_probe(struct i2c_client *i2c,
-		const struct i2c_device_id *id)
+static int pv88080_regulator_probe(struct platform_device *pdev)
 {
-	struct regulator_init_data *init_data = dev_get_platdata(&i2c->dev);
-	struct pv88080 *chip;
+	struct pv88080 *chip = dev_get_drvdata(pdev->dev.parent);
+	struct pv88080_pdata *pdata = dev_get_platdata(chip->dev);
+	struct pv88080_regulators *regulators;
 	const struct pv88080_compatible_regmap *regmap_config;
-	const struct of_device_id *match;
 	struct regulator_config config = { };
-	int i, error, ret;
+	int i, ret, irq;
 	unsigned int conf2, conf5;
 
-	chip = devm_kzalloc(&i2c->dev, sizeof(struct pv88080), GFP_KERNEL);
-	if (!chip)
+	regulators = devm_kzalloc(&pdev->dev,
+			sizeof(struct pv88080_regulators), GFP_KERNEL);
+	if (!regulators)
 		return -ENOMEM;
 
-	chip->dev = &i2c->dev;
-	chip->regmap = devm_regmap_init_i2c(i2c, &pv88080_regmap_config);
-	if (IS_ERR(chip->regmap)) {
-		error = PTR_ERR(chip->regmap);
-		dev_err(chip->dev, "Failed to allocate register map: %d\n",
-			error);
-		return error;
+	platform_set_drvdata(pdev, regulators);
+
+	irq = platform_get_irq_byname(pdev, "regulator-irq");
+	if (irq < 0) {
+		dev_err(&pdev->dev, "Failed to get IRQ.\n");
+		return irq;
 	}
 
-	if (i2c->dev.of_node) {
-		match = of_match_node(pv88080_dt_ids, i2c->dev.of_node);
-		if (!match) {
-			dev_err(chip->dev, "Failed to get of_match_node\n");
-			return -EINVAL;
+	regulators->virq = regmap_irq_get_virq(chip->irq_data, irq);
+	if (regulators->virq >= 0) {
+		ret = devm_request_threaded_irq(&pdev->dev,
+				regulators->virq, NULL,
+				pv88080_irq_handler,
+				IRQF_TRIGGER_LOW|IRQF_ONESHOT,
+				"regulator-irq", regulators);
+		if (ret) {
+			dev_err(chip->dev, "Failed to request IRQ: %d\n", irq);
+			return ret;
 		}
-		chip->type = (unsigned long)match->data;
-	} else {
-		chip->type = id->driver_data;
 	}
 
-	i2c_set_clientdata(i2c, chip);
-
-	if (i2c->irq != 0) {
-		ret = regmap_write(chip->regmap, PV88080_REG_MASK_A, 0xFF);
-		if (ret < 0) {
-			dev_err(chip->dev,
-				"Failed to mask A reg: %d\n", ret);
-			return ret;
-		}
-		ret = regmap_write(chip->regmap, PV88080_REG_MASK_B, 0xFF);
-		if (ret < 0) {
-			dev_err(chip->dev,
-				"Failed to mask B reg: %d\n", ret);
-			return ret;
-		}
-		ret = regmap_write(chip->regmap, PV88080_REG_MASK_C, 0xFF);
-		if (ret < 0) {
-			dev_err(chip->dev,
-				"Failed to mask C reg: %d\n", ret);
-			return ret;
-		}
-
-		ret = devm_request_threaded_irq(&i2c->dev, i2c->irq, NULL,
-					pv88080_irq_handler,
-					IRQF_TRIGGER_LOW|IRQF_ONESHOT,
-					"pv88080", chip);
-		if (ret != 0) {
-			dev_err(chip->dev, "Failed to request IRQ: %d\n",
-				i2c->irq);
-			return ret;
-		}
-
-		ret = regmap_update_bits(chip->regmap, PV88080_REG_MASK_A,
-			PV88080_M_VDD_FLT | PV88080_M_OVER_TEMP, 0);
-		if (ret < 0) {
-			dev_err(chip->dev,
-				"Failed to update mask reg: %d\n", ret);
-			return ret;
-		}
-	} else {
-		dev_warn(chip->dev, "No IRQ configured\n");
+	ret = regmap_update_bits(chip->regmap, PV88080_REG_MASK_A,
+		PV88080_M_VDD_FLT | PV88080_M_OVER_TEMP, 0);
+	if (ret < 0) {
+		dev_err(chip->dev,
+			"Failed to update mask reg: %d\n", ret);
+		return ret;
 	}
 
 	switch (chip->type) {
 	case TYPE_PV88080_AA:
-		chip->regmap_config = &pv88080_aa_regs;
+		regulators->regmap_config = &pv88080_aa_regs;
 		break;
 	case TYPE_PV88080_BA:
-		chip->regmap_config = &pv88080_ba_regs;
+		regulators->regmap_config = &pv88080_ba_regs;
 		break;
 	}
 
-	regmap_config = chip->regmap_config;
+	regmap_config = regulators->regmap_config;
 	config.dev = chip->dev;
 	config.regmap = chip->regmap;
 
 	/* Registeration for BUCK1, 2, 3 */
 	for (i = 0; i < PV88080_MAX_REGULATORS-1; i++) {
-		if (init_data)
-			config.init_data = &init_data[i];
+		if (pdata && pdata->regulators)
+			config.init_data = pdata->regulators[i];
 
 		pv88080_regulator_info[i].limit_reg
 			= regmap_config->buck_regmap[i].buck_limit_reg;
@@ -564,12 +512,12 @@ static int pv88080_i2c_probe(struct i2c_client *i2c,
 			/(pv88080_regulator_info[i].desc.uV_step) + 1;
 
 		config.driver_data = (void *)&pv88080_regulator_info[i];
-		chip->rdev[i] = devm_regulator_register(chip->dev,
+		regulators->rdev[i] = devm_regulator_register(chip->dev,
 			&pv88080_regulator_info[i].desc, &config);
-		if (IS_ERR(chip->rdev[i])) {
+		if (IS_ERR(regulators->rdev[i])) {
 			dev_err(chip->dev,
 				"Failed to register PV88080 regulator\n");
-			return PTR_ERR(chip->rdev[i]);
+			return PTR_ERR(regulators->rdev[i]);
 		}
 	}
 
@@ -583,39 +531,47 @@ static int pv88080_i2c_probe(struct i2c_client *i2c,
 		= regmap_config->hvbuck_vsel_mask;
 
 	/* Registeration for HVBUCK */
-	if (init_data)
-		config.init_data = &init_data[PV88080_ID_HVBUCK];
+	if (pdata && pdata->regulators)
+		config.init_data = pdata->regulators[PV88080_ID_HVBUCK];
 
 	config.driver_data = (void *)&pv88080_regulator_info[PV88080_ID_HVBUCK];
-	chip->rdev[PV88080_ID_HVBUCK] = devm_regulator_register(chip->dev,
+	regulators->rdev[PV88080_ID_HVBUCK] = devm_regulator_register(chip->dev,
 		&pv88080_regulator_info[PV88080_ID_HVBUCK].desc, &config);
-	if (IS_ERR(chip->rdev[PV88080_ID_HVBUCK])) {
+	if (IS_ERR(regulators->rdev[PV88080_ID_HVBUCK])) {
 		dev_err(chip->dev, "Failed to register PV88080 regulator\n");
-		return PTR_ERR(chip->rdev[PV88080_ID_HVBUCK]);
+		return PTR_ERR(regulators->rdev[PV88080_ID_HVBUCK]);
 	}
 
 	return 0;
 }
 
-static const struct i2c_device_id pv88080_i2c_id[] = {
-	{ "pv88080",    TYPE_PV88080_AA },
-	{ "pv88080-aa", TYPE_PV88080_AA },
-	{ "pv88080-ba", TYPE_PV88080_BA },
-	{},
+static const struct platform_device_id pv88080_regulator_id_table[] = {
+	{ "pv88080-regulator", },
+	{ /* sentinel */ }
 };
-MODULE_DEVICE_TABLE(i2c, pv88080_i2c_id);
+MODULE_DEVICE_TABLE(platform, pv88080_regulator_id_table);
 
-static struct i2c_driver pv88080_regulator_driver = {
+static struct platform_driver pv88080_regulator_driver = {
 	.driver = {
-		.name = "pv88080",
-		.of_match_table = of_match_ptr(pv88080_dt_ids),
+		.name = "pv88080-regulator",
 	},
-	.probe = pv88080_i2c_probe,
-	.id_table = pv88080_i2c_id,
+	.probe = pv88080_regulator_probe,
+	.id_table = pv88080_regulator_id_table,
 };
 
-module_i2c_driver(pv88080_regulator_driver);
+static int __init pv88080_regulator_init(void)
+{
+	return platform_driver_register(&pv88080_regulator_driver);
+}
+subsys_initcall(pv88080_regulator_init);
 
-MODULE_AUTHOR("James Ban <James.Ban.opensource@diasemi.com>");
+static void __exit pv88080_regulator_exit(void)
+{
+	platform_driver_unregister(&pv88080_regulator_driver);
+}
+module_exit(pv88080_regulator_exit);
+
+MODULE_AUTHOR("Eric Jeong <eric.jeong.opensource@diasemi.com>");
 MODULE_DESCRIPTION("Regulator device driver for Powerventure PV88080");
 MODULE_LICENSE("GPL");
+
