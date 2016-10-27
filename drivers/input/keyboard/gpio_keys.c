@@ -877,18 +877,7 @@ static struct platform_driver gpio_keys_device_driver = {
 	}
 };
 
-static int __init gpio_keys_init(void)
-{
-	return platform_driver_register(&gpio_keys_device_driver);
-}
-
-static void __exit gpio_keys_exit(void)
-{
-	platform_driver_unregister(&gpio_keys_device_driver);
-}
-
-late_initcall(gpio_keys_init);
-module_exit(gpio_keys_exit);
+module_platform_driver(gpio_keys_device_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Phil Blundell <pb@handhelds.org>");
