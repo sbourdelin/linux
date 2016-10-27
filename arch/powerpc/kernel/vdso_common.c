@@ -14,7 +14,7 @@
 #define VDSO_LBASE	CONCAT3(VDSO, BITS, _LBASE)
 #define vdso_kbase	CONCAT3(vdso, BITS, _kbase)
 #define vdso_pages	CONCAT3(vdso, BITS, _pages)
-#define vdso_pagelist	CONCAT3(vdso, BITS, _pagelist)
+#define vdso_mapping	CONCAT3(vdso, BITS, _mapping)
 
 #undef pr_fmt
 #define pr_fmt(fmt)	"vDSO" __stringify(BITS) ": " fmt
@@ -207,6 +207,7 @@ static __init int vdso_setup(struct lib_elfinfo *v)
 static __init void init_vdso_pagelist(void)
 {
 	int i;
+	struct page **vdso_pagelist;
 
 	/* Make sure pages are in the correct state */
 	vdso_pagelist = kzalloc(sizeof(struct page *) * (vdso_pages + 2),
@@ -221,6 +222,9 @@ static __init void init_vdso_pagelist(void)
 	}
 	vdso_pagelist[i++] = virt_to_page(vdso_data);
 	vdso_pagelist[i] = NULL;
+
+	vdso_mapping.pages = vdso_pagelist;
+	vdso_mapping.name = "[vdso]";
 }
 
 #undef find_section
@@ -236,7 +240,7 @@ static __init void init_vdso_pagelist(void)
 #undef VDSO_LBASE
 #undef vdso_kbase
 #undef vdso_pages
-#undef vdso_pagelist
+#undef vdso_mapping
 #undef lib_elfinfo
 #undef BITS
 #undef _CONCAT3
