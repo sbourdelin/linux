@@ -539,9 +539,9 @@ EXPORT_SYMBOL_GPL(usb_alloc_dev);
  *
  * Each live reference to a device should be refcounted.
  *
- * Drivers for USB interfaces should normally record such references in
- * their probe() methods, when they bind to an interface, and release
- * them by calling usb_put_dev(), in their disconnect() methods.
+ * The device driver core automatically handles this refcounting for USB
+ * interface drivers, but this API can be used for non-parent/child
+ * relationships.
  *
  * Return: A pointer to the device with the incremented reference counter.
  */
