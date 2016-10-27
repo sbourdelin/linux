@@ -1734,6 +1734,8 @@ find_page:
 			if (inode->i_blkbits == PAGE_SHIFT ||
 					!mapping->a_ops->is_partially_uptodate)
 				goto page_not_up_to_date;
+			if (unlikely(iter->type & ITER_PIPE))
+				goto page_not_up_to_date;
 			if (!trylock_page(page))
 				goto page_not_up_to_date;
 			/* Did it get truncated before we got the lock? */
