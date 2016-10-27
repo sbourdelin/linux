@@ -12,6 +12,7 @@
 */
 
 /dts-v1/;
+#include <dt-bindings/pwm/pwm.h>
 #include "exynos4412-odroid-common.dtsi"
 
 / {
@@ -34,7 +35,7 @@
 
 	fan0: pwm-fan {
 		compatible = "pwm-fan";
-		pwms = <&pwm 0 10000 0>;
+		pwms = <&pwm 0 10000 PWM_POLARITY_INVERTED>;
 		cooling-min-state = <0>;
 		cooling-max-state = <3>;
 		#cooling-cells = <2>;
