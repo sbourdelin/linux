@@ -193,10 +193,16 @@ int __init seg6_init(void)
 	if (err)
 		goto out_unregister_genl;
 
+	err = seg6_iptunnel_init();
+	if (err)
+		goto out_unregister_pernet;
+
 	pr_info("Segment Routing with IPv6\n");
 
 out:
 	return err;
+out_unregister_pernet:
+	unregister_pernet_subsys(&ip6_segments_ops);
 out_unregister_genl:
 	genl_unregister_family(&seg6_genl_family);
 	goto out;
@@ -204,6 +210,7 @@ out_unregister_genl:
 
 void seg6_exit(void)
 {
+	seg6_iptunnel_exit();
 	unregister_pernet_subsys(&ip6_segments_ops);
 	genl_unregister_family(&seg6_genl_family);
 }
