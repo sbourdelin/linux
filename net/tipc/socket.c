@@ -342,7 +342,6 @@ static bool tsk_peer_msg(struct tipc_sock *tsk, struct tipc_msg *msg)
  */
 static int tipc_set_sk_state(struct sock *sk, int state)
 {
-	int oldstate = sk->sk_socket->state;
 	int oldsk_state = sk->sk_state;
 	int res = -EINVAL;
 
@@ -352,6 +351,7 @@ static int tipc_set_sk_state(struct sock *sk, int state)
 		res = 0;
 		break;
 	case TIPC_LISTEN:
+	case TIPC_CONNECTING:
 		if (oldsk_state == TIPC_OPEN)
 			res = 0;
 		break;
@@ -366,7 +366,7 @@ static int tipc_set_sk_state(struct sock *sk, int state)
 	case TIPC_DISCONNECTING:
 		if (oldsk_state == TIPC_PROBING ||
 		    oldsk_state == TIPC_ESTABLISHED ||
-		    oldstate == SS_CONNECTING)
+		    oldsk_state == TIPC_CONNECTING)
 			res = 0;
 		break;
 	}
@@ -516,7 +516,7 @@ static int tipc_release(struct socket *sock)
 		if (TIPC_SKB_CB(skb)->bytes_read)
 			kfree_skb(skb);
 		else {
-			if ((sock->state == SS_CONNECTING) ||
+			if ((sk->sk_state == TIPC_CONNECTING) ||
 			    (sock->state == SS_CONNECTED)) {
 				tipc_set_sk_state(sk, TIPC_CLOSING);
 				tipc_node_remove_conn(net, dnode, tsk->portid);
@@ -677,16 +677,12 @@ static unsigned int tipc_poll(struct file *file, struct socket *sock,
 
 	sock_poll_wait(file, sk_sleep(sk), wait);
 
-	switch ((int)sock->state) {
-	case SS_CONNECTED:
+	if ((int)sock->state == SS_CONNECTED) {
 		if (!tsk->link_cong && !tsk_conn_cong(tsk))
 			mask |= POLLOUT;
-		/* fall thru' */
-	case SS_CONNECTING:
 		if (!skb_queue_empty(&sk->sk_receive_queue))
 			mask |= (POLLIN | POLLRDNORM);
-		break;
-	default:
+	} else {
 		switch (sk->sk_state) {
 		case TIPC_OPEN:
 			if (!tsk->link_cong)
@@ -700,6 +696,7 @@ static unsigned int tipc_poll(struct file *file, struct socket *sock,
 			mask = (POLLIN | POLLRDNORM | POLLHUP);
 			break;
 		case TIPC_LISTEN:
+		case TIPC_CONNECTING:
 			if (!skb_queue_empty(&sk->sk_receive_queue))
 				mask |= (POLLIN | POLLRDNORM);
 			break;
@@ -1004,7 +1001,7 @@ new_mtu:
 		rc = tipc_node_xmit(net, &pktchain, dnode, tsk->portid);
 		if (likely(!rc)) {
 			if (!is_connectionless)
-				sock->state = SS_CONNECTING;
+				tipc_set_sk_state(sk, TIPC_CONNECTING);
 			return dsz;
 		}
 		if (rc == -ELINKCONG) {
@@ -1640,9 +1637,10 @@ static bool filter_connect(struct tipc_sock *tsk, struct sk_buff *skb)
 			sk->sk_state_change(sk);
 		}
 		return true;
+	}
 
-	case SS_CONNECTING:
-
+	switch (sk->sk_state) {
+	case TIPC_CONNECTING:
 		/* Accept only ACK or NACK message */
 		if (unlikely(!msg_connected(hdr)))
 			return false;
@@ -1674,9 +1672,7 @@ static bool filter_connect(struct tipc_sock *tsk, struct sk_buff *skb)
 		/* 'ACK-' message is neither accepted nor rejected: */
 		msg_set_dest_droppable(hdr, 1);
 		return false;
-	}
 
-	switch (sk->sk_state) {
 	case TIPC_OPEN:
 	case TIPC_CLOSING:
 	case TIPC_DISCONNECTING:
@@ -1946,7 +1942,8 @@ static int tipc_wait_for_connect(struct socket *sock, long *timeo_p)
 			return sock_intr_errno(*timeo_p);
 
 		prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
-		done = sk_wait_event(sk, timeo_p, sock->state != SS_CONNECTING);
+		done = sk_wait_event(sk, timeo_p,
+				     sk->sk_state != TIPC_CONNECTING);
 		finish_wait(sk_sleep(sk), &wait);
 	} while (!done);
 	return 0;
@@ -1969,7 +1966,7 @@ static int tipc_connect(struct socket *sock, struct sockaddr *dest,
 	struct sockaddr_tipc *dst = (struct sockaddr_tipc *)dest;
 	struct msghdr m = {NULL,};
 	long timeout = (flags & O_NONBLOCK) ? 0 : tsk->conn_timeout;
-	socket_state previous;
+	int previous;
 	int res = 0;
 
 	lock_sock(sk);
@@ -1997,7 +1994,7 @@ static int tipc_connect(struct socket *sock, struct sockaddr *dest,
 		goto exit;
 	}
 
-	previous = sock->state;
+	previous = sk->sk_state;
 
 	switch (sk->sk_state) {
 	case TIPC_OPEN:
@@ -2015,31 +2012,29 @@ static int tipc_connect(struct socket *sock, struct sockaddr *dest,
 		if ((res < 0) && (res != -EWOULDBLOCK))
 			goto exit;
 
-		/* Just entered SS_CONNECTING state; the only
+		/* Just entered TIPC_CONNECTING state; the only
 		 * difference is that return value in non-blocking
 		 * case is EINPROGRESS, rather than EALREADY.
 		 */
 		res = -EINPROGRESS;
-		break;
-	}
-
-	switch (sock->state) {
-	case SS_CONNECTING:
-		if (previous == SS_CONNECTING)
-			res = -EALREADY;
-		if (!timeout)
+		/* fall thru' */
+	case TIPC_CONNECTING:
+		if (!timeout) {
+			if (previous == TIPC_CONNECTING)
+				res = -EALREADY;
 			goto exit;
+		}
 		timeout = msecs_to_jiffies(timeout);
 		/* Wait until an 'ACK' or 'RST' arrives, or a timeout occurs */
 		res = tipc_wait_for_connect(sock, &timeout);
-		break;
-	case SS_CONNECTED:
-		res = -EISCONN;
-		break;
-	default:
-		res = -EINVAL;
-		break;
+		goto exit;
 	}
+
+	if (sock->state == SS_CONNECTED)
+		res = -EISCONN;
+	else
+		res = -EINVAL;
+
 exit:
 	release_sock(sk);
 	return res;
@@ -2201,7 +2196,7 @@ static int tipc_shutdown(struct socket *sock, int how)
 
 	lock_sock(sk);
 
-	if (sock->state == SS_CONNECTING || sock->state == SS_CONNECTED) {
+	if (sock->state == SS_CONNECTED || sk->sk_state == TIPC_CONNECTING) {
 
 restart:
 		dnode = tsk_peer_node(tsk);
