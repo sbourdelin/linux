@@ -759,6 +759,9 @@ void __init early_init_devtree(void *params)
 	 */
 	of_scan_flat_dt(early_init_dt_scan_chosen_ppc, boot_command_line);
 
+	/* Now try to figure out if we are running on LPAR and so on */
+	pseries_probe_fw_features();
+
 	/* Scan memory nodes and rebuild MEMBLOCKs */
 	of_scan_flat_dt(early_init_dt_scan_root, NULL);
 	of_scan_flat_dt(early_init_dt_scan_memory_ppc, NULL);
@@ -825,9 +828,6 @@ void __init early_init_devtree(void *params)
 	of_scan_flat_dt(early_init_dt_scan_recoverable_ranges, NULL);
 #endif
 	epapr_paravirt_early_init();
-
-	/* Now try to figure out if we are running on LPAR and so on */
-	pseries_probe_fw_features();
 
 #ifdef CONFIG_PPC_PS3
 	/* Identify PS3 firmware */
