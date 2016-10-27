@@ -142,16 +142,26 @@ static void print_config(const char *m, int slen)
 {
 	int c, i;
 
-	printf("    $(wildcard include/config/");
+	if (fputs("    $(wildcard include/config/", stdout) < 0)
+		goto put_failure;
 	for (i = 0; i < slen; i++) {
 		c = m[i];
 		if (c == '_')
 			c = '/';
 		else
 			c = tolower(c);
-		putchar(c);
+		if (putchar(c) == EOF)
+			goto put_failure;
 	}
-	printf(".h) \\\n");
+	if (puts(".h) \\") < 0) {
+put_failure:
+		{
+			int code = errno;
+
+			perror("fixdep: print_config");
+			exit(code);
+		}
+	}
 }
 
 static void do_extra_deps(void)
