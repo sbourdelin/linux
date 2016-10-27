@@ -181,6 +181,8 @@ struct tipc_event {
  */
 enum {
 	TIPC_LISTEN = 1,
+	TIPC_PROBING,
+	TIPC_ESTABLISHED,
 };
 
 /*

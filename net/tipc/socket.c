@@ -47,8 +47,6 @@
 #define CONN_TIMEOUT_DEFAULT	8000	/* default connect timeout = 8s */
 #define CONN_PROBING_INTERVAL	msecs_to_jiffies(3600000)  /* [ms] => 1 h */
 #define TIPC_FWD_MSG		1
-#define TIPC_CONN_OK		0
-#define TIPC_CONN_PROBING	1
 #define TIPC_MAX_PORT		0xffffffff
 #define TIPC_MIN_PORT		1
 
@@ -345,11 +343,23 @@ static bool tsk_peer_msg(struct tipc_sock *tsk, struct tipc_msg *msg)
 static int tipc_set_sk_state(struct sock *sk, int state)
 {
 	int oldstate = sk->sk_socket->state;
+	int oldsk_state = sk->sk_state;
 	int res = -EINVAL;
 
 	switch (state) {
 	case TIPC_LISTEN:
 		if (oldstate == SS_UNCONNECTED)
+			res = 0;
+		break;
+	case TIPC_PROBING:
+		if (oldsk_state == TIPC_ESTABLISHED)
+			res = 0;
+		break;
+	case TIPC_ESTABLISHED:
+		if (oldsk_state == TIPC_PROBING ||
+		    oldsk_state == TIPC_ESTABLISHED ||
+		    oldstate == SS_CONNECTING ||
+		    oldstate == SS_UNCONNECTED)
 			res = 0;
 		break;
 	}
@@ -855,7 +865,8 @@ static void tipc_sk_proto_rcv(struct tipc_sock *tsk, struct sk_buff *skb,
 	if (!tsk_peer_msg(tsk, hdr))
 		goto exit;
 
-	tsk->probing_state = TIPC_CONN_OK;
+	if (tipc_set_sk_state(sk, TIPC_ESTABLISHED))
+		goto exit;
 
 	if (mtyp == CONN_PROBE) {
 		msg_set_type(hdr, CONN_PROBE_REPLY);
@@ -1195,8 +1206,8 @@ static void tipc_sk_finish_conn(struct tipc_sock *tsk, u32 peer_port,
 	msg_set_lookup_scope(msg, 0);
 	msg_set_hdr_sz(msg, SHORT_H_SIZE);
 
-	tsk->probing_state = TIPC_CONN_OK;
 	sk_reset_timer(sk, &sk->sk_timer, jiffies + CONN_PROBING_INTERVAL);
+	tipc_set_sk_state(sk, TIPC_ESTABLISHED);
 	tipc_node_add_conn(net, peer_node, tsk->portid, peer_port);
 	tsk->max_pkt = tipc_node_get_mtu(net, peer_node, tsk->portid);
 	tsk->peer_caps = tipc_node_get_capabilities(net, peer_node);
@@ -2260,7 +2271,7 @@ static void tipc_sk_timeout(unsigned long data)
 	peer_port = tsk_peer_port(tsk);
 	peer_node = tsk_peer_node(tsk);
 
-	if (tsk->probing_state == TIPC_CONN_PROBING) {
+	if (sk->sk_state == TIPC_PROBING) {
 		if (!sock_owned_by_user(sk)) {
 			sk->sk_socket->state = SS_DISCONNECTING;
 			tipc_node_remove_conn(sock_net(sk), tsk_peer_node(tsk),
@@ -2278,7 +2289,7 @@ static void tipc_sk_timeout(unsigned long data)
 	skb = tipc_msg_create(CONN_MANAGER, CONN_PROBE,
 			      INT_H_SIZE, 0, peer_node, own_node,
 			      peer_port, tsk->portid, TIPC_OK);
-	tsk->probing_state = TIPC_CONN_PROBING;
+	tipc_set_sk_state(sk, TIPC_PROBING);
 	sk_reset_timer(sk, &sk->sk_timer, jiffies + CONN_PROBING_INTERVAL);
 	bh_unlock_sock(sk);
 	if (skb)
