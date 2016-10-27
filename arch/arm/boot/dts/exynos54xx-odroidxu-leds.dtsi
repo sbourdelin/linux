@@ -12,6 +12,7 @@
 */
 
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/pwm/pwm.h>
 
 / {
 	pwmleds {
@@ -19,7 +20,7 @@
 
 		greenled {
 			label = "green:mmc0";
-			pwms = <&pwm 1 2000000 0>;
+			pwms = <&pwm 1 2000000 PWM_POLARITY_INVERTED>;
 			pwm-names = "pwm1";
 			/*
 			 * Green LED is much brighter than the others
@@ -31,7 +32,7 @@
 
 		blueled {
 			label = "blue:heartbeat";
-			pwms = <&pwm 2 2000000 0>;
+			pwms = <&pwm 2 2000000 PWM_POLARITY_INVERTED>;
 			pwm-names = "pwm2";
 			max_brightness = <255>;
 			linux,default-trigger = "heartbeat";

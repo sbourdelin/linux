@@ -13,6 +13,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/clock/maxim,max77802.h>
+#include <dt-bindings/pwm/pwm.h>
 #include <dt-bindings/regulator/maxim,max77802.h>
 #include "exynos5800.dtsi"
 #include "exynos5420-cpus.dtsi"
@@ -35,7 +36,7 @@
 
 	backlight: backlight {
 		compatible = "pwm-backlight";
-		pwms = <&pwm 0 1000000 0>;
+		pwms = <&pwm 0 1000000 PWM_POLARITY_INVERTED>;
 		brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
 		default-brightness-level = <7>;
 		enable-gpios = <&gpx2 2 GPIO_ACTIVE_HIGH>;
