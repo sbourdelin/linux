@@ -108,6 +108,7 @@ struct dw_mci_dma_slave {
  * @slot: Slots sharing this MMC controller.
  * @fifo_depth: depth of FIFO.
  * @fifo_addr_override: override fifo reg offset with this value.
+ * @wm_quirk: force fifo watermark equal with data length in PIO mode.
  * @data_shift: log2 of FIFO item size.
  * @part_buf_start: Start index in part_buf.
  * @part_buf_count: Bytes of partial data in part_buf.
@@ -156,6 +157,7 @@ struct dw_mci {
 	void __iomem		*regs;
 	void __iomem		*fifo_reg;
 	u32			fifo_addr_override;
+	u32			wm_quirk;
 
 	struct scatterlist	*sg;
 	struct sg_mapping_iter	sg_miter;
