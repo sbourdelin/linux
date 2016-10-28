@@ -17,4 +17,9 @@ static __always_inline __attribute_const__ u8 __arch_bitrev8(u8 x)
 	return __arch_bitrev32((u32)x) >> 24;
 }
 
+static __always_inline __attribute_const__ u32 __arch_bitrev8x4(u32 x)
+{
+	__asm__ ("rbit %0, %1; rev %0, %0" : "=r" (x) : "r" (x));
+}
+
 #endif
