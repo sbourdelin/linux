@@ -2983,7 +2983,8 @@ int qedr_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 
 	if (!wr) {
 		DP_ERR(dev, "Got an empty post send.\n");
-		return -EINVAL;
+		rc = -EINVAL;
+		goto out_unlock;
 	}
 
 	while (wr) {
@@ -3012,6 +3013,7 @@ int qedr_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 	/* Make sure write sticks */
 	mmiowb();
 
+out_unlock:
 	spin_unlock_irqrestore(&qp->q_lock, flags);
 
 	return rc;
