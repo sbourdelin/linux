@@ -218,6 +218,7 @@ enum dw_dmac_flags {
 	DW_DMA_IS_SOFT_LLP = 1,
 	DW_DMA_IS_PAUSED = 2,
 	DW_DMA_IS_INITIALIZED = 3,
+	DW_DMA_IS_LLP_SUPPORTED = 4,
 };
 
 struct dw_dma_chan {
@@ -242,7 +243,6 @@ struct dw_dma_chan {
 
 	/* hardware configuration */
 	unsigned int		block_size;
-	bool			nollp;
 
 	/* custom slave configuration */
 	struct dw_dma_slave	dws;

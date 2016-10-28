@@ -227,7 +227,7 @@ static void dwc_dostart(struct dw_dma_chan *dwc, struct dw_desc *first)
 		return;
 	}
 
-	if (dwc->nollp) {
+	if (!test_bit(DW_DMA_IS_LLP_SUPPORTED, &dwc->flags)) {
 		was_soft_llp = test_and_set_bit(DW_DMA_IS_SOFT_LLP,
 						&dwc->flags);
 		if (was_soft_llp) {
@@ -1265,7 +1265,7 @@ struct dw_cyclic_desc *dw_dma_cyclic_prep(struct dma_chan *chan,
 	unsigned long			flags;
 
 	spin_lock_irqsave(&dwc->lock, flags);
-	if (dwc->nollp) {
+	if (!test_bit(DW_DMA_IS_LLP_SUPPORTED, &dwc->flags)) {
 		spin_unlock_irqrestore(&dwc->lock, flags);
 		dev_dbg(chan2dev(&dwc->chan),
 				"channel doesn't support LLP transfers\n");
@@ -1570,11 +1570,12 @@ int dw_dma_probe(struct dw_dma_chip *chip)
 			 */
 			dwc->block_size =
 				(4 << ((pdata->block_size >> 4 * i) & 0xf)) - 1;
-			dwc->nollp =
-				(dwc_params >> DWC_PARAMS_MBLK_EN & 0x1) == 0;
+			if ((dwc_params >> DWC_PARAMS_MBLK_EN & 0x1) != 0)
+				set_bit(DW_DMA_IS_LLP_SUPPORTED, &dwc->flags);
 		} else {
 			dwc->block_size = pdata->block_size;
-			dwc->nollp = pdata->is_nollp;
+			if (!pdata->is_nollp)
+				set_bit(DW_DMA_IS_LLP_SUPPORTED, &dwc->flags);
 		}
 	}
 
