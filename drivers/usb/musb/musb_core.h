@@ -303,6 +303,7 @@ struct musb_context_registers {
 struct musb {
 	/* device lock */
 	spinlock_t		lock;
+	spinlock_t		list_lock;	/* resume work list lock */
 
 	struct musb_io		io;
 	const struct musb_platform_ops *ops;
@@ -337,6 +338,7 @@ struct musb {
 	struct list_head	control;	/* of musb_qh */
 	struct list_head	in_bulk;	/* of musb_qh */
 	struct list_head	out_bulk;	/* of musb_qh */
+	struct list_head	resume_work;	/* pending work on resume */
 
 	struct timer_list	otg_timer;
 	struct notifier_block	nb;
@@ -539,6 +541,11 @@ extern void musb_load_testpacket(struct musb *);
 extern irqreturn_t musb_interrupt(struct musb *);
 
 extern void musb_hnp_stop(struct musb *musb);
+
+extern void
+musb_queue_on_resume(struct musb *musb,
+		     void (*callback)(struct musb *musb, void *data),
+		     void *data);
 
 static inline void musb_platform_set_vbus(struct musb *musb, int is_on)
 {
