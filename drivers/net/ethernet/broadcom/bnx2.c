@@ -271,22 +271,25 @@ static inline u32 bnx2_tx_avail(struct bnx2 *bp, struct bnx2_tx_ring_info *txr)
 static u32
 bnx2_reg_rd_ind(struct bnx2 *bp, u32 offset)
 {
+	unsigned long flags;
 	u32 val;
 
-	spin_lock_bh(&bp->indirect_lock);
+	spin_lock_irqsave(&bp->indirect_lock, flags);
 	BNX2_WR(bp, BNX2_PCICFG_REG_WINDOW_ADDRESS, offset);
 	val = BNX2_RD(bp, BNX2_PCICFG_REG_WINDOW);
-	spin_unlock_bh(&bp->indirect_lock);
+	spin_unlock_irqrestore(&bp->indirect_lock, flags);
 	return val;
 }
 
 static void
 bnx2_reg_wr_ind(struct bnx2 *bp, u32 offset, u32 val)
 {
-	spin_lock_bh(&bp->indirect_lock);
+	unsigned long flags;
+
+	spin_lock_irqsave(&bp->indirect_lock, flags);
 	BNX2_WR(bp, BNX2_PCICFG_REG_WINDOW_ADDRESS, offset);
 	BNX2_WR(bp, BNX2_PCICFG_REG_WINDOW, val);
-	spin_unlock_bh(&bp->indirect_lock);
+	spin_unlock_irqrestore(&bp->indirect_lock, flags);
 }
 
 static void
@@ -304,8 +307,10 @@ bnx2_shmem_rd(struct bnx2 *bp, u32 offset)
 static void
 bnx2_ctx_wr(struct bnx2 *bp, u32 cid_addr, u32 offset, u32 val)
 {
+	unsigned long flags;
+
 	offset += cid_addr;
-	spin_lock_bh(&bp->indirect_lock);
+	spin_lock_irqsave(&bp->indirect_lock, flags);
 	if (BNX2_CHIP(bp) == BNX2_CHIP_5709) {
 		int i;
 
@@ -322,7 +327,7 @@ bnx2_ctx_wr(struct bnx2 *bp, u32 cid_addr, u32 offset, u32 val)
 		BNX2_WR(bp, BNX2_CTX_DATA_ADR, offset);
 		BNX2_WR(bp, BNX2_CTX_DATA, val);
 	}
-	spin_unlock_bh(&bp->indirect_lock);
+	spin_unlock_irqrestore(&bp->indirect_lock, flags);
 }
 
 #ifdef BCM_CNIC
@@ -2298,7 +2303,7 @@ bnx2_init_5706s_phy(struct bnx2 *bp, int reset_phy)
 	if (BNX2_CHIP(bp) == BNX2_CHIP_5706)
 		BNX2_WR(bp, BNX2_MISC_GP_HW_CTL0, 0x300);
 
-	if (bp->dev->mtu > 1500) {
+	if (bp->dev->mtu > ETH_DATA_LEN) {
 		u32 val;
 
 		/* Set extended packet length bit */
@@ -2352,7 +2357,7 @@ bnx2_init_copper_phy(struct bnx2 *bp, int reset_phy)
 		bnx2_write_phy(bp, MII_BNX2_DSP_RW_PORT, val);
 	}
 
-	if (bp->dev->mtu > 1500) {
+	if (bp->dev->mtu > ETH_DATA_LEN) {
 		/* Set extended packet length bit */
 		bnx2_write_phy(bp, 0x18, 0x7);
 		bnx2_read_phy(bp, 0x18, &val);
@@ -4985,12 +4990,12 @@ bnx2_init_chip(struct bnx2 *bp)
 	/* Program the MTU.  Also include 4 bytes for CRC32. */
 	mtu = bp->dev->mtu;
 	val = mtu + ETH_HLEN + ETH_FCS_LEN;
-	if (val > (MAX_ETHERNET_PACKET_SIZE + 4))
+	if (val > (MAX_ETHERNET_PACKET_SIZE + ETH_HLEN + 4))
 		val |= BNX2_EMAC_RX_MTU_SIZE_JUMBO_ENA;
 	BNX2_WR(bp, BNX2_EMAC_RX_MTU_SIZE, val);
 
-	if (mtu < 1500)
-		mtu = 1500;
+	if (mtu < ETH_DATA_LEN)
+		mtu = ETH_DATA_LEN;
 
 	bnx2_reg_wr_ind(bp, BNX2_RBUF_CONFIG, BNX2_RBUF_CONFIG_VAL(mtu));
 	bnx2_reg_wr_ind(bp, BNX2_RBUF_CONFIG2, BNX2_RBUF_CONFIG2_VAL(mtu));
@@ -7896,10 +7901,6 @@ bnx2_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct bnx2 *bp = netdev_priv(dev);
 
-	if (((new_mtu + ETH_HLEN) > MAX_ETHERNET_JUMBO_PACKET_SIZE) ||
-		((new_mtu + ETH_HLEN) < MIN_ETHERNET_PACKET_SIZE))
-		return -EINVAL;
-
 	dev->mtu = new_mtu;
 	return bnx2_change_ring_size(bp, bp->rx_ring_size, bp->tx_ring_size,
 				     false);
@@ -8589,6 +8590,8 @@ bnx2_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->hw_features |= NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX;
 	dev->features |= dev->hw_features;
 	dev->priv_flags |= IFF_UNICAST_FLT;
+	dev->min_mtu = MIN_ETHERNET_PACKET_SIZE;
+	dev->max_mtu = MAX_ETHERNET_JUMBO_PACKET_SIZE;
 
 	if (!(bp->flags & BNX2_FLAG_CAN_KEEP_VLAN))
 		dev->hw_features &= ~NETIF_F_HW_VLAN_CTAG_RX;

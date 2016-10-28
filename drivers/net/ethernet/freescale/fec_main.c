@@ -1430,13 +1430,13 @@ fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
 		skb_put(skb, pkt_len - 4);
 		data = skb->data;
 
+		if (!is_copybreak && need_swap)
+			swap_buffer(data, pkt_len);
+
 #if !defined(CONFIG_M5272)
 		if (fep->quirks & FEC_QUIRK_HAS_RACC)
 			data = skb_pull_inline(skb, 2);
 #endif
-
-		if (!is_copybreak && need_swap)
-			swap_buffer(data, pkt_len);
 
 		/* Extract the enhanced buffer descriptor */
 		ebdp = NULL;
@@ -1841,11 +1841,11 @@ static int fec_enet_clk_enable(struct net_device *ndev, bool enable)
 		ret = clk_prepare_enable(fep->clk_ahb);
 		if (ret)
 			return ret;
-		if (fep->clk_enet_out) {
-			ret = clk_prepare_enable(fep->clk_enet_out);
-			if (ret)
-				goto failed_clk_enet_out;
-		}
+
+		ret = clk_prepare_enable(fep->clk_enet_out);
+		if (ret)
+			goto failed_clk_enet_out;
+
 		if (fep->clk_ptp) {
 			mutex_lock(&fep->ptp_clk_mutex);
 			ret = clk_prepare_enable(fep->clk_ptp);
@@ -1857,23 +1857,20 @@ static int fec_enet_clk_enable(struct net_device *ndev, bool enable)
 			}
 			mutex_unlock(&fep->ptp_clk_mutex);
 		}
-		if (fep->clk_ref) {
-			ret = clk_prepare_enable(fep->clk_ref);
-			if (ret)
-				goto failed_clk_ref;
-		}
+
+		ret = clk_prepare_enable(fep->clk_ref);
+		if (ret)
+			goto failed_clk_ref;
 	} else {
 		clk_disable_unprepare(fep->clk_ahb);
-		if (fep->clk_enet_out)
-			clk_disable_unprepare(fep->clk_enet_out);
+		clk_disable_unprepare(fep->clk_enet_out);
 		if (fep->clk_ptp) {
 			mutex_lock(&fep->ptp_clk_mutex);
 			clk_disable_unprepare(fep->clk_ptp);
 			fep->ptp_clk_on = false;
 			mutex_unlock(&fep->ptp_clk_mutex);
 		}
-		if (fep->clk_ref)
-			clk_disable_unprepare(fep->clk_ref);
+		clk_disable_unprepare(fep->clk_ref);
 	}
 
 	return 0;
@@ -3055,7 +3052,6 @@ static const struct net_device_ops fec_netdev_ops = {
 	.ndo_stop		= fec_enet_close,
 	.ndo_start_xmit		= fec_enet_start_xmit,
 	.ndo_set_rx_mode	= set_multicast_list,
-	.ndo_change_mtu		= eth_change_mtu,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_tx_timeout		= fec_timeout,
 	.ndo_set_mac_address	= fec_set_mac_address,

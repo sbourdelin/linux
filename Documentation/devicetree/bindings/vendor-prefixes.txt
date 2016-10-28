@@ -135,6 +135,7 @@ infineon Infineon Technologies
 inforce	Inforce Computing
 ingenic	Ingenic Semiconductor
 innolux	Innolux Corporation
+inside-secure	INSIDE Secure
 intel	Intel Corporation
 intercontrol	Inter Control Group
 invensense	InvenSense Inc.
@@ -160,16 +161,19 @@ lltc	Linear Technology Corporation
 lsi	LSI Corp. (LSI Logic)
 marvell	Marvell Technology Group Ltd.
 maxim	Maxim Integrated Products
+mcube	mCube
 meas	Measurement Specialties
 mediatek	MediaTek Inc.
 melexis	Melexis N.V.
 melfas	MELFAS Inc.
+memsic	MEMSIC Inc.
 merrii	Merrii Technology Co., Ltd.
 micrel	Micrel Inc.
 microchip	Microchip Technology Inc.
 microcrystal	Micro Crystal AG
 micron	Micron Technology Inc.
 minix	MINIX Technology Ltd.
+miramems	MiraMEMS Sensing Technology Co., Ltd.
 mitsubishi	Mitsubishi Electric Corporation
 mosaixtech	Mosaix Technologies, Inc.
 moxa	Moxa
@@ -186,6 +190,7 @@ neonode		Neonode Inc.
 netgear	NETGEAR
 netlogic	Broadcom Corporation (formerly NetLogic Microsystems)
 netxeon		Shenzhen Netxeon Technology CO., LTD
+nexbox	Nexbox
 newhaven	Newhaven Display International
 nintendo	Nintendo
 nokia	Nokia
@@ -229,6 +234,7 @@ realtek Realtek Semiconductor Corp.
 renesas	Renesas Electronics Corporation
 richtek	Richtek Technology Corporation
 ricoh	Ricoh Co. Ltd.
+rikomagic	Rikomagic Tech Corp. Ltd
 rockchip	Fuzhou Rockchip Electronics Co., Ltd
 samsung	Samsung Semiconductor
 sandisk	Sandisk Corporation

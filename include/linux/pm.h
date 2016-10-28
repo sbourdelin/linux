@@ -258,7 +258,7 @@ typedef struct pm_message {
  * example, if it detects that a child was unplugged while the system was
  * asleep).
  *
- * Refer to Documentation/power/devices.txt for more information about the role
+ * Refer to Documentation/power/admin-guide/devices.rst for more information about the role
  * of the above callbacks in the system suspend process.
  *
  * There also are callbacks related to runtime power management of devices.
@@ -785,5 +785,12 @@ enum dpm_order {
 	DPM_ORDER_PARENT_BEFORE_DEV,
 	DPM_ORDER_DEV_LAST,
 };
+
+/*
+ * Return this from system suspend/hibernation ->prepare() callback to
+ * request the core to leave the device runtime-suspended during system
+ * suspend if possible.
+ */
+#define DPM_DIRECT_COMPLETE 1
 
 #endif /* _LINUX_PM_H */

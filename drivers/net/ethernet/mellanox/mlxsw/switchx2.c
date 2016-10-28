@@ -410,7 +410,7 @@ static void mlxsw_sx_port_get_drvinfo(struct net_device *dev,
 
 struct mlxsw_sx_port_hw_stats {
 	char str[ETH_GSTRING_LEN];
-	u64 (*getter)(char *payload);
+	u64 (*getter)(const char *payload);
 };
 
 static const struct mlxsw_sx_port_hw_stats mlxsw_sx_port_hw_stats[] = {
@@ -994,6 +994,9 @@ static int mlxsw_sx_port_create(struct mlxsw_sx *mlxsw_sx, u8 local_port)
 	dev->features |= NETIF_F_NETNS_LOCAL | NETIF_F_LLTX | NETIF_F_SG |
 			 NETIF_F_VLAN_CHALLENGED;
 
+	dev->min_mtu = 0;
+	dev->max_mtu = ETH_MAX_MTU;
+
 	/* Each packet needs to have a Tx header (metadata) on top all other
 	 * headers.
 	 */
@@ -1088,6 +1091,7 @@ err_port_stp_state_set:
 err_port_admin_status_set:
 err_port_mtu_set:
 err_port_speed_set:
+	mlxsw_sx_port_swid_set(mlxsw_sx_port, MLXSW_PORT_SWID_DISABLED_PORT);
 err_port_swid_set:
 err_port_system_port_mapping_set:
 port_not_usable:

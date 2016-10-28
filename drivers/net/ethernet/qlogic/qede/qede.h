@@ -320,6 +320,7 @@ struct qede_fastpath {
 #define XMIT_L4_CSUM		BIT(0)
 #define XMIT_LSO		BIT(1)
 #define XMIT_ENC		BIT(2)
+#define XMIT_ENC_GSO_L4_CSUM	BIT(3)
 
 #define QEDE_CSUM_ERROR			BIT(0)
 #define QEDE_CSUM_UNNECESSARY		BIT(1)
@@ -348,12 +349,13 @@ bool qede_has_rx_work(struct qede_rx_queue *rxq);
 int qede_txq_has_work(struct qede_tx_queue *txq);
 void qede_recycle_rx_bd_ring(struct qede_rx_queue *rxq, struct qede_dev *edev,
 			     u8 count);
+void qede_update_rx_prod(struct qede_dev *edev, struct qede_rx_queue *rxq);
 
 #define RX_RING_SIZE_POW	13
 #define RX_RING_SIZE		((u16)BIT(RX_RING_SIZE_POW))
 #define NUM_RX_BDS_MAX		(RX_RING_SIZE - 1)
 #define NUM_RX_BDS_MIN		128
-#define NUM_RX_BDS_DEF		NUM_RX_BDS_MAX
+#define NUM_RX_BDS_DEF		((u16)BIT(10) - 1)
 
 #define TX_RING_SIZE_POW	13
 #define TX_RING_SIZE		((u16)BIT(TX_RING_SIZE_POW))
@@ -361,8 +363,9 @@ void qede_recycle_rx_bd_ring(struct qede_rx_queue *rxq, struct qede_dev *edev,
 #define NUM_TX_BDS_MIN		128
 #define NUM_TX_BDS_DEF		NUM_TX_BDS_MAX
 
-#define QEDE_MIN_PKT_LEN	64
-#define QEDE_RX_HDR_SIZE	256
+#define QEDE_MIN_PKT_LEN		64
+#define QEDE_RX_HDR_SIZE		256
+#define QEDE_MAX_JUMBO_PACKET_SIZE	9600
 #define	for_each_queue(i) for (i = 0; i < edev->num_queues; i++)
 
 #endif /* _QEDE_H_ */

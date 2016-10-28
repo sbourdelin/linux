@@ -157,6 +157,7 @@ ip6_tnl_lookup(struct net *net, const struct in6_addr *remote, const struct in6_
 	hash = HASH(&any, local);
 	for_each_ip6_tunnel_rcu(ip6n->tnls_r_l[hash]) {
 		if (ipv6_addr_equal(local, &t->parms.laddr) &&
+		    ipv6_addr_any(&t->parms.raddr) &&
 		    (t->dev->flags & IFF_UP))
 			return t;
 	}
@@ -164,6 +165,7 @@ ip6_tnl_lookup(struct net *net, const struct in6_addr *remote, const struct in6_
 	hash = HASH(remote, &any);
 	for_each_ip6_tunnel_rcu(ip6n->tnls_r_l[hash]) {
 		if (ipv6_addr_equal(remote, &t->parms.raddr) &&
+		    ipv6_addr_any(&t->parms.laddr) &&
 		    (t->dev->flags & IFF_UP))
 			return t;
 	}
@@ -1634,7 +1636,7 @@ int ip6_tnl_change_mtu(struct net_device *dev, int new_mtu)
 	struct ip6_tnl *tnl = netdev_priv(dev);
 
 	if (tnl->parms.proto == IPPROTO_IPIP) {
-		if (new_mtu < 68)
+		if (new_mtu < ETH_MIN_MTU)
 			return -EINVAL;
 	} else {
 		if (new_mtu < IPV6_MIN_MTU)
@@ -1787,6 +1789,8 @@ ip6_tnl_dev_init_gen(struct net_device *dev)
 	dev->mtu = ETH_DATA_LEN - t_hlen;
 	if (!(t->parms.flags & IP6_TNL_F_IGN_ENCAP_LIMIT))
 		dev->mtu -= 8;
+	dev->min_mtu = ETH_MIN_MTU;
+	dev->max_mtu = 0xFFF8 - dev->hard_header_len;
 
 	return 0;
 

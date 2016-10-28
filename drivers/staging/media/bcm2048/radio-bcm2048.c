@@ -482,6 +482,8 @@ static int bcm2048_set_rds_no_lock(struct bcm2048_device *bdev, u8 rds_on)
 					   flags);
 		memset(&bdev->rds_info, 0, sizeof(bdev->rds_info));
 	}
+	if (err)
+		return err;
 
 	return bcm2048_send_command(bdev, BCM2048_I2C_FM_RDS_SYSTEM,
 				    bdev->cache_fm_rds_system);
@@ -2540,7 +2542,7 @@ static int bcm2048_vidioc_s_hw_freq_seek(struct file *file, void *priv,
 	return err;
 }
 
-static struct v4l2_ioctl_ops bcm2048_ioctl_ops = {
+static const struct v4l2_ioctl_ops bcm2048_ioctl_ops = {
 	.vidioc_querycap	= bcm2048_vidioc_querycap,
 	.vidioc_g_input		= bcm2048_vidioc_g_input,
 	.vidioc_s_input		= bcm2048_vidioc_s_input,

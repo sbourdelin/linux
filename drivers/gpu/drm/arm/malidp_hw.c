@@ -198,9 +198,6 @@ static void malidp500_modeset(struct malidp_hw_device *hwdev, struct videomode *
 
 static int malidp500_rotmem_required(struct malidp_hw_device *hwdev, u16 w, u16 h, u32 fmt)
 {
-	unsigned int depth;
-	int bpp;
-
 	/* RGB888 or BGR888 can't be rotated */
 	if ((fmt == DRM_FORMAT_RGB888) || (fmt == DRM_FORMAT_BGR888))
 		return -EINVAL;
@@ -210,9 +207,7 @@ static int malidp500_rotmem_required(struct malidp_hw_device *hwdev, u16 w, u16 
 	 * worth of pixel data. Required size is then:
 	 *    size = rotated_width * (bpp / 8) * 8;
 	 */
-	drm_fb_get_bpp_depth(fmt, &depth, &bpp);
-
-	return w * bpp;
+	return w * drm_format_plane_cpp(fmt, 0) * 8;
 }
 
 static int malidp550_query_hw(struct malidp_hw_device *hwdev)
@@ -441,6 +436,7 @@ const struct malidp_hw_device malidp_device[MALIDP_MAX_DEVICES] = {
 			},
 			.input_formats = malidp500_de_formats,
 			.n_input_formats = ARRAY_SIZE(malidp500_de_formats),
+			.bus_align_bytes = 8,
 		},
 		.query_hw = malidp500_query_hw,
 		.enter_config_mode = malidp500_enter_config_mode,
@@ -473,6 +469,7 @@ const struct malidp_hw_device malidp_device[MALIDP_MAX_DEVICES] = {
 			},
 			.input_formats = malidp550_de_formats,
 			.n_input_formats = ARRAY_SIZE(malidp550_de_formats),
+			.bus_align_bytes = 8,
 		},
 		.query_hw = malidp550_query_hw,
 		.enter_config_mode = malidp550_enter_config_mode,
@@ -506,6 +503,7 @@ const struct malidp_hw_device malidp_device[MALIDP_MAX_DEVICES] = {
 			},
 			.input_formats = malidp550_de_formats,
 			.n_input_formats = ARRAY_SIZE(malidp550_de_formats),
+			.bus_align_bytes = 16,
 		},
 		.query_hw = malidp650_query_hw,
 		.enter_config_mode = malidp550_enter_config_mode,

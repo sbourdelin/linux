@@ -192,7 +192,7 @@ struct task_struct;
 struct mm_struct;
 struct seq_file;
 
-typedef int (*dump_trace_func_t)(void *data, unsigned long address);
+typedef int (*dump_trace_func_t)(void *data, unsigned long address, int reliable);
 void dump_trace(dump_trace_func_t func, void *data,
 		struct task_struct *task, unsigned long sp);
 
@@ -234,9 +234,9 @@ static inline unsigned short stap(void)
 /*
  * Give up the time slice of the virtual PU.
  */
-void cpu_relax(void);
+void cpu_relax_yield(void);
 
-#define cpu_relax_lowlatency()  barrier()
+#define cpu_relax() barrier()
 
 #define ECAG_CACHE_ATTRIBUTE	0
 #define ECAG_CPU_ATTRIBUTE	1

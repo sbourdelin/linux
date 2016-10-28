@@ -136,6 +136,7 @@ dtb-$(CONFIG_ARCH_EXYNOS4) += \
 	exynos4210-smdkv310.dtb \
 	exynos4210-trats.dtb \
 	exynos4210-universal_c210.dtb \
+	exynos4412-itop-elite.dtb \
 	exynos4412-odroidu3.dtb \
 	exynos4412-odroidx.dtb \
 	exynos4412-odroidx2.dtb \
@@ -330,6 +331,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
 	imx6dl-aristainetos_7.dtb \
 	imx6dl-aristainetos2_4.dtb \
 	imx6dl-aristainetos2_7.dtb \
+	imx6dl-colibri-eval-v3.dtb \
 	imx6dl-cubox-i.dtb \
 	imx6dl-dfi-fs700-m60.dtb \
 	imx6dl-gw51xx.dtb \
@@ -416,10 +418,14 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
 	imx6sx-sabreauto.dtb \
 	imx6sx-sdb-reva.dtb \
 	imx6sx-sdb-sai.dtb \
-	imx6sx-sdb.dtb
+	imx6sx-sdb.dtb \
+	imx6sx-udoo-neo-basic.dtb \
+	imx6sx-udoo-neo-extended.dtb \
+	imx6sx-udoo-neo-full.dtb
 dtb-$(CONFIG_SOC_IMX6UL) += \
 	imx6ul-14x14-evk.dtb \
 	imx6ul-geam-kit.dtb \
+	imx6ul-liteboard.dtb \
 	imx6ul-pico-hobbit.dtb \
 	imx6ul-tx6ul-0010.dtb \
 	imx6ul-tx6ul-0011.dtb \
@@ -620,7 +626,8 @@ dtb-$(CONFIG_ARCH_QCOM) += \
 	qcom-msm8660-surf.dtb \
 	qcom-msm8960-cdp.dtb \
 	qcom-msm8974-lge-nexus5-hammerhead.dtb \
-	qcom-msm8974-sony-xperia-honami.dtb
+	qcom-msm8974-sony-xperia-honami.dtb \
+	swir-wp8548-mangoh-green.dtb
 dtb-$(CONFIG_ARCH_REALVIEW) += \
 	arm-realview-pb1176.dtb \
 	arm-realview-pb11mp.dtb \
@@ -639,7 +646,9 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rk3036-kylin.dtb \
 	rk3066a-bqcurie2.dtb \
 	rk3066a-marsboard.dtb \
+	rk3066a-mk808.dtb \
 	rk3066a-rayeager.dtb \
+	rk3188-px3-evb.dtb \
 	rk3188-radxarock.dtb \
 	rk3228-evb.dtb \
 	rk3229-evb.dtb \
@@ -745,6 +754,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
 	sun4i-a10-pcduino2.dtb \
 	sun4i-a10-pov-protab2-ips9.dtb
 dtb-$(CONFIG_MACH_SUN5I) += \
+	ntc-gr8-chip-pro.dtb \
 	ntc-gr8-evb.dtb \
 	sun5i-a10s-auxtek-t003.dtb \
 	sun5i-a10s-auxtek-t004.dtb \

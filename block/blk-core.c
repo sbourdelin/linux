@@ -1153,6 +1153,7 @@ static struct request *__get_request(struct request_list *rl, int op,
 
 	blk_rq_init(q, rq);
 	blk_rq_set_rl(rq, rl);
+	blk_rq_set_prio(rq, ioc);
 	req_set_op_attrs(rq, op, op_flags | REQ_ALLOCED);
 
 	/* init elvpriv */
@@ -1656,7 +1657,8 @@ void init_request_from_bio(struct request *req, struct bio *bio)
 
 	req->errors = 0;
 	req->__sector = bio->bi_iter.bi_sector;
-	req->ioprio = bio_prio(bio);
+	if (ioprio_valid(bio_prio(bio)))
+		req->ioprio = bio_prio(bio);
 	blk_rq_bio_prep(req->q, req, bio);
 }
 
@@ -1940,6 +1942,10 @@ generic_make_request_checks(struct bio *bio)
 		break;
 	case REQ_OP_WRITE_SAME:
 		if (!bdev_write_same(bio->bi_bdev))
+			goto not_supported;
+	case REQ_OP_ZONE_REPORT:
+	case REQ_OP_ZONE_RESET:
+		if (!bdev_is_zoned(bio->bi_bdev))
 			goto not_supported;
 		break;
 	default:

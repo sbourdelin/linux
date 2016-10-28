@@ -982,11 +982,13 @@ static int dwceqos_mii_probe(struct net_device *ndev)
 	if (netif_msg_probe(lp))
 		phy_attached_info(phydev);
 
-	phydev->supported &= PHY_GBIT_FEATURES;
+	phydev->supported &= PHY_GBIT_FEATURES | SUPPORTED_Pause |
+			     SUPPORTED_Asym_Pause;
 
 	lp->link    = 0;
 	lp->speed   = 0;
 	lp->duplex  = DUPLEX_UNKNOWN;
+	lp->flowcontrol.autoneg = AUTONEG_ENABLE;
 
 	return 0;
 }
@@ -2211,7 +2213,7 @@ static int dwceqos_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 
 tx_error:
 	dwceqos_tx_rollback(lp, &trans);
-	dev_kfree_skb(skb);
+	dev_kfree_skb_any(skb);
 	return 0;
 }
 

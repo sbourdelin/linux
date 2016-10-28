@@ -832,7 +832,7 @@ static const struct tty_operations gb_ops = {
 	.tiocmset =		gb_tty_tiocmset,
 };
 
-static struct tty_port_operations gb_port_ops = {
+static const struct tty_port_operations gb_port_ops = {
 	.dtr_rts =		gb_tty_dtr_rts,
 	.activate =		gb_tty_port_activate,
 	.shutdown =		gb_tty_port_shutdown,
@@ -888,7 +888,7 @@ static int gb_uart_probe(struct gbphy_device *gbphy_dev,
 	minor = alloc_minor(gb_tty);
 	if (minor < 0) {
 		if (minor == -ENOSPC) {
-			dev_err(&connection->bundle->dev,
+			dev_err(&gbphy_dev->dev,
 				"no more free minor numbers\n");
 			retval = -ENODEV;
 		} else {

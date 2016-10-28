@@ -1057,7 +1057,7 @@ static void slic_upr_request_complete(struct adapter *adapter, u32 isr)
 		if (stats->rcv_drops > old->rcv_drops)
 			adapter->rcv_drops += (stats->rcv_drops -
 					       old->rcv_drops);
-		memcpy_fromio(old, stats, sizeof(*stats));
+		memcpy(old, stats, sizeof(*stats));
 		break;
 	}
 	case SLIC_UPR_RLSR:
@@ -2880,7 +2880,6 @@ static const struct net_device_ops slic_netdev_ops = {
 	.ndo_get_stats		= slic_get_stats,
 	.ndo_set_rx_mode	= slic_mcast_set_list,
 	.ndo_validate_addr	= eth_validate_addr,
-	.ndo_change_mtu		= eth_change_mtu,
 };
 
 static u32 slic_card_locate(struct adapter *adapter)

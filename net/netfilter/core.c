@@ -361,16 +361,9 @@ next_hook:
 		if (ret == 0)
 			ret = -EPERM;
 	} else if ((verdict & NF_VERDICT_MASK) == NF_QUEUE) {
-		int err;
-
-		RCU_INIT_POINTER(state->hook_entries, entry);
-		err = nf_queue(skb, state, verdict >> NF_VERDICT_QBITS);
-		if (err < 0) {
-			if (err == -ESRCH &&
-			   (verdict & NF_VERDICT_FLAG_QUEUE_BYPASS))
-				goto next_hook;
-			kfree_skb(skb);
-		}
+		ret = nf_queue(skb, state, &entry, verdict);
+		if (ret == 1 && entry)
+			goto next_hook;
 	}
 	return ret;
 }
@@ -499,7 +492,7 @@ static int __net_init netfilter_net_init(struct net *net)
 						net->proc_net);
 	if (!net->nf.proc_netfilter) {
 		if (!net_eq(net, &init_net))
-			pr_err("cannot create netfilter proc entry");
+			pr_err("cannot create netfilter proc entry\n");
 
 		return -ENOMEM;
 	}
