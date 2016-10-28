@@ -4966,6 +4966,8 @@ bool pci_device_is_present(struct pci_dev *pdev)
 {
 	u32 v;
 
+	if (pdev->is_removed)
+		return false;
 	return pci_bus_read_dev_vendor_id(pdev->bus, pdev->devfn, &v, 0);
 }
 EXPORT_SYMBOL_GPL(pci_device_is_present);
