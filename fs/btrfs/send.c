@@ -3343,14 +3343,17 @@ finish:
 		/*
 		 * The parent inode might have been deleted in the send snapshot
 		 */
+		u64 gen;
 		ret = get_inode_info(sctx->send_root, cur->dir, NULL,
-				     NULL, NULL, NULL, NULL, NULL);
-		if (ret == -ENOENT) {
+				     &gen, NULL, NULL, NULL, NULL);
+
+		if (ret < 0 && ret != -ENOENT)
+			goto out;
+
+		if (ret == -ENOENT || gen != cur->dir_gen) {
 			ret = 0;
 			continue;
 		}
-		if (ret < 0)
-			goto out;
 
 		ret = send_utimes(sctx, cur->dir, cur->dir_gen);
 		if (ret < 0)
