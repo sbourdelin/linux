@@ -1172,26 +1172,61 @@ out:
 	return ret;
 }
 
+/* fully reclaim rmem/fwd memory allocated for skb */
 static void udp_rmem_release(struct sock *sk, int size, int partial)
 {
 	int amt;
 
 	atomic_sub(size, &sk->sk_rmem_alloc);
-
-	spin_lock_bh(&sk->sk_receive_queue.lock);
 	sk->sk_forward_alloc += size;
 	amt = (sk->sk_forward_alloc - partial) & ~(SK_MEM_QUANTUM - 1);
 	sk->sk_forward_alloc -= amt;
-	spin_unlock_bh(&sk->sk_receive_queue.lock);
 
 	if (amt)
 		__sk_mem_reduce_allocated(sk, amt >> SK_MEM_QUANTUM_SHIFT);
 }
 
-static void udp_rmem_free(struct sk_buff *skb)
+/* if we are not peeking the skb, reclaim fwd allocated memory;
+ * rmem and protocol memory updating is delayed outside the lock
+ */
+static void udp_dequeue(struct sock *sk, struct sk_buff *skb, int flags)
 {
-	udp_rmem_release(skb->sk, skb->truesize, 1);
+	int amt;
+
+	if (flags & MSG_PEEK)
+		return;
+
+	sk->sk_forward_alloc += skb->truesize;
+	amt = (sk->sk_forward_alloc - 1) & ~(SK_MEM_QUANTUM - 1);
+	sk->sk_forward_alloc -= amt;
+	UDP_SKB_CB(skb)->fwd_memory_released = amt >> SK_MEM_QUANTUM_SHIFT;
 }
+
+/* complete the memory reclaiming started with udp_dequeue */
+static void __udp_rmem_release(struct sock *sk, struct sk_buff *skb, int flags)
+{
+	int amt = UDP_SKB_CB(skb)->fwd_memory_released;
+
+	if (flags & MSG_PEEK)
+		return;
+
+	atomic_sub(skb->truesize, &sk->sk_rmem_alloc);
+	if (amt)
+		__sk_mem_reduce_allocated(sk, amt);
+}
+
+struct sk_buff *__skb_recv_udp(struct sock *sk, unsigned int flags,
+			       int noblock, int *peeked, int *off, int *err)
+{
+	struct sk_buff *skb;
+
+	skb = __skb_recv_datagram(sk, flags | (noblock ? MSG_DONTWAIT : 0),
+				  udp_dequeue, peeked, off, err);
+	if (skb)
+		__udp_rmem_release(sk, skb, flags);
+	return skb;
+}
+EXPORT_SYMBOL(__skb_recv_udp);
 
 int __udp_enqueue_schedule_skb(struct sock *sk, struct sk_buff *skb)
 {
@@ -1230,7 +1265,6 @@ int __udp_enqueue_schedule_skb(struct sock *sk, struct sk_buff *skb)
 
 	/* the skb owner in now the udp socket */
 	skb->sk = sk;
-	skb->destructor = udp_rmem_free;
 	skb->dev = NULL;
 	sock_skb_set_dropcount(sk, skb);
 
@@ -1254,8 +1288,13 @@ EXPORT_SYMBOL_GPL(__udp_enqueue_schedule_skb);
 static void udp_destruct_sock(struct sock *sk)
 {
 	/* reclaim completely the forward allocated memory */
-	__skb_queue_purge(&sk->sk_receive_queue);
-	udp_rmem_release(sk, 0, 0);
+	struct sk_buff *skb;
+
+	while ((skb = __skb_dequeue(&sk->sk_receive_queue)) != NULL) {
+		udp_rmem_release(sk, skb->truesize, 0);
+		kfree_skb(skb);
+	}
+
 	inet_sock_destruct(sk);
 }
 
@@ -1303,11 +1342,11 @@ static int first_packet_length(struct sock *sk)
 		atomic_inc(&sk->sk_drops);
 		__skb_unlink(skb, rcvq);
 		__skb_queue_tail(&list_kill, skb);
+		udp_rmem_release(sk, skb->truesize, 1);
+		kfree_skb(skb);
 	}
 	res = skb ? skb->len : -1;
 	spin_unlock_bh(&rcvq->lock);
-
-	__skb_queue_purge(&list_kill);
 	return res;
 }
 
@@ -1362,8 +1401,7 @@ int udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int noblock,
 
 try_again:
 	peeking = off = sk_peek_offset(sk, flags);
-	skb = __skb_recv_datagram(sk, flags | (noblock ? MSG_DONTWAIT : 0),
-				  &peeked, &off, &err);
+	skb = __skb_recv_udp(sk, flags, noblock, &peeked, &off, &err);
 	if (!skb)
 		return err;
 
@@ -2582,6 +2620,9 @@ EXPORT_SYMBOL(udp_flow_hashrnd);
 void __init udp_init(void)
 {
 	unsigned long limit;
+
+	BUILD_BUG_ON(sizeof(struct udp_skb_cb) >
+		     FIELD_SIZEOF(struct sk_buff, cb));
 
 	udp_table_init(&udp_table, "UDP");
 	limit = nr_free_buffer_pages() / 8;
