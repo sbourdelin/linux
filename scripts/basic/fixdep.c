@@ -122,8 +122,10 @@ char *cmdline;
 
 static void usage(void)
 {
-	fprintf(stderr, "Usage: fixdep [-e] <depfile> <target> <cmdline>\n");
-	fprintf(stderr, " -e  insert extra dependencies given on stdin\n");
+	if (fputs("Usage: fixdep [-e] <depfile> <target> <cmdline>\n"
+		  " -e  insert extra dependencies given on stdin\n", stderr)
+	   < 0)
+		perror("fixdep: usage");
 	exit(1);
 }
 
