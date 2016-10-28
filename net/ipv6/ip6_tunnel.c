@@ -1174,6 +1174,7 @@ route_lookup:
 
 	skb_push(skb, sizeof(struct ipv6hdr));
 	skb_reset_network_header(skb);
+	memset(skb->cb, 0, sizeof(struct inet6_skb_parm));
 	ipv6h = ipv6_hdr(skb);
 	ip6_flow_hdr(ipv6h, INET_ECN_encapsulate(0, dsfield),
 		     ip6_make_flowlabel(net, skb, fl6->flowlabel, true, fl6));
