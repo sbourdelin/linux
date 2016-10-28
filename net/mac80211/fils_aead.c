@@ -112,7 +112,7 @@ static int aes_siv_encrypt(const u8 *key, size_t key_len,
 	tmp = kmemdup(plain, plain_len, GFP_KERNEL);
 	if (!tmp) {
 		res = -ENOMEM;
-		goto fail;
+		goto fail_ret;
 	}
 
 	/* IV for CTR before encrypted data */
@@ -150,6 +150,7 @@ static int aes_siv_encrypt(const u8 *key, size_t key_len,
 fail:
 	kfree(tmp);
 	crypto_free_skcipher(tfm2);
+fail_ret:
 	return res;
 }
 
