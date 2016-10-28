@@ -750,6 +750,14 @@ struct f2fs_sb_info {
 	u8 key_prefix[F2FS_KEY_DESC_PREFIX_SIZE];
 	u8 key_prefix_size;
 #endif
+
+#ifdef CONFIG_BLK_DEV_ZONED
+	unsigned int nr_blkz;			/* Total number of zones */
+	unsigned int blocks_per_blkz;		/* F2FS blocks per zone */
+	unsigned int log_blocks_per_blkz;	/* log2 F2FS blocks per zone */
+	u8 *blkz_type;				/* Array of zones type */
+#endif
+
 	/* for node-related operations */
 	struct f2fs_nm_info *nm_info;		/* node manager */
 	struct inode *node_inode;		/* cache node blocks */
@@ -2408,6 +2416,14 @@ static inline int f2fs_sb_has_crypto(struct super_block *sb)
 static inline int f2fs_sb_mounted_blkzoned(struct super_block *sb)
 {
 	return F2FS_HAS_FEATURE(sb, F2FS_FEATURE_BLKZONED);
+}
+
+static inline int get_blkz_type(struct f2fs_sb_info *sbi,
+				block_t blkaddr)
+{
+	unsigned int zno = blkaddr >> sbi->log_blocks_per_blkz;
+
+	return sbi->blkz_type[zno];
 }
 
 static inline bool f2fs_discard_en(struct f2fs_sb_info *sbi)
