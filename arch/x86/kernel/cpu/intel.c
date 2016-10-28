@@ -14,6 +14,8 @@
 #include <asm/bugs.h>
 #include <asm/cpu.h>
 #include <asm/intel-family.h>
+#include <asm/hwcap2.h>
+#include <asm/elf.h>
 
 #ifdef CONFIG_X86_64
 #include <linux/topology.h>
@@ -60,6 +62,45 @@ void check_mpx_erratum(struct cpuinfo_x86 *c)
 		pr_warn("x86/mpx: Disabling MPX since SMEP not present\n");
 	}
 }
+
+#ifdef CONFIG_X86_64
+static int phi_r3mwait_disabled __read_mostly;
+
+static int __init phir3mwait_disable(char *__unused)
+{
+	phi_r3mwait_disabled = 1;
+	pr_warn("x86/phir3mwait: Disabled ring 3 MWAIT for Xeon Phi");
+	return 1;
+}
+__setup("phir3mwait=disable", phir3mwait_disable);
+
+static void probe_xeon_phi_r3mwait(struct cpuinfo_x86 *c)
+{
+	u64 msr;
+
+	/*
+	* Setting ring 3 MONITOR/MWAIT for each logical CPU
+	* return when CPU is not Xeon Phi Family x200 (KnightsLanding).
+	*/
+	if (c->x86 != 6 || c->x86_model != INTEL_FAM6_XEON_PHI_KNL)
+		return;
+
+	rdmsrl(MSR_MISC_FEATURE_ENABLES, msr);
+
+	if (phi_r3mwait_disabled) {
+		msr &= ~MSR_MISC_FEATURE_ENABLES_PHIR3MWAIT;
+		wrmsrl(MSR_MISC_FEATURE_ENABLES, msr);
+	} else {
+		msr |= MSR_MISC_FEATURE_ENABLES_PHIR3MWAIT;
+		wrmsrl(MSR_MISC_FEATURE_ENABLES, msr);
+		set_cpu_cap(c, X86_FEATURE_PHIR3MWAIT);
+		ELF_HWCAP2 |= HWCAP2_PHIR3MWAIT;
+	}
+}
+
+#else
+static void probe_xeon_phi_r3mwait(struct cpuinfo_x86 *__unused) {}
+#endif
 
 static void early_init_intel(struct cpuinfo_x86 *c)
 {
@@ -565,6 +606,8 @@ static void init_intel(struct cpuinfo_x86 *c)
 		detect_vmx_virtcap(c);
 
 	init_intel_energy_perf(c);
+
+	probe_xeon_phi_r3mwait(c);
 }
 
 #ifdef CONFIG_X86_32

@@ -3182,6 +3182,11 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 	pg.		[PARIDE]
 			See Documentation/blockdev/paride.txt.
 
+	phir3mwait=	[X86] Disable Intel Xeon Phi x200 ring 3 MONITOR/MWAIT
+			feature for all cpus.
+			Format: { disable }
+			See arch/x86/kernel/cpu/intel.c
+
 	pirq=		[SMP,APIC] Manual mp-table setup
 			See Documentation/x86/i386/IO-APIC.txt.
 
