@@ -322,6 +322,7 @@ struct mtd_info {
 	int (*_block_isreserved) (struct mtd_info *mtd, loff_t ofs);
 	int (*_block_isbad) (struct mtd_info *mtd, loff_t ofs);
 	int (*_block_markbad) (struct mtd_info *mtd, loff_t ofs);
+	int (*_max_bad_blocks) (struct mtd_info *mtd, loff_t ofs, size_t len);
 	int (*_suspend) (struct mtd_info *mtd);
 	void (*_resume) (struct mtd_info *mtd);
 	void (*_reboot) (struct mtd_info *mtd);
@@ -402,6 +403,16 @@ int mtd_wunit_to_pairing_info(struct mtd_info *mtd, int wunit,
 int mtd_pairing_info_to_wunit(struct mtd_info *mtd,
 			      const struct mtd_pairing_info *info);
 int mtd_pairing_groups(struct mtd_info *mtd);
+
+static inline int mtd_max_bad_blocks(struct mtd_info *mtd,
+				     loff_t ofs, size_t len)
+{
+	if (mtd->_max_bad_blocks)
+		return mtd->_max_bad_blocks(mtd, ofs, len);
+
+	return -ENOTSUPP;
+}
+
 int mtd_erase(struct mtd_info *mtd, struct erase_info *instr);
 int mtd_point(struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen,
 	      void **virt, resource_size_t *phys);
