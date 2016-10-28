@@ -132,7 +132,12 @@ static void usage(void)
  */
 static void print_cmdline(void)
 {
-	printf("cmd_%s := %s\n\n", target, cmdline);
+	if (printf("cmd_%s := %s\n\n", target, cmdline) < 10) {
+		int code = errno;
+
+		perror("fixdep: print_cmdline");
+		exit(code);
+	}
 }
 
 /*
