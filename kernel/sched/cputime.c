@@ -51,12 +51,15 @@ void irqtime_account_irq(struct task_struct *curr)
 {
 	s64 delta;
 	int cpu;
+	u64 wallclock;
+	boot account = true;
 
 	if (!sched_clock_irqtime)
 		return;
 
 	cpu = smp_processor_id();
-	delta = sched_clock_cpu(cpu) - __this_cpu_read(irq_start_time);
+	wallclock = sched_clock_cpu(cpu);
+	delta = wallclock - __this_cpu_read(irq_start_time);
 	__this_cpu_add(irq_start_time, delta);
 
 	irq_time_write_begin();
@@ -70,6 +73,11 @@ void irqtime_account_irq(struct task_struct *curr)
 		__this_cpu_add(cpu_hardirq_time, delta);
 	else if (in_serving_softirq() && curr != this_cpu_ksoftirqd())
 		__this_cpu_add(cpu_softirq_time, delta);
+	else
+		account = false;
+
+	if (account && is_idle_task(curr))
+		walt_account_irqtime(cpu, curr, delta, wallclock);
 
 	irq_time_write_end();
 }
