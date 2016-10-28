@@ -1386,13 +1386,18 @@ static blk_qc_t blk_sq_make_request(struct request_queue *q, struct bio *bio)
 	 */
 	plug = current->plug;
 	if (plug) {
+		struct request *first = NULL;
+
 		blk_mq_bio_to_request(rq, bio);
 		if (!request_count)
 			trace_block_plug(q);
+		else
+			first = list_entry_rq(plug->mq_list.next);
 
 		blk_mq_put_ctx(data.ctx);
 
-		if (request_count >= BLK_MAX_REQUEST_COUNT) {
+		if (request_count >= BLK_MAX_REQUEST_COUNT || (first &&
+		    blk_rq_bytes(first) >= BLK_PLUG_FLUSH_SIZE)) {
 			blk_flush_plug_list(plug, false);
 			trace_block_plug(q);
 		}
