@@ -111,23 +111,32 @@ dw_dma_parse_dt(struct platform_device *pdev)
 		return NULL;
 	}
 
-	if (of_property_read_u32(np, "dma-masters", &nr_masters))
-		return NULL;
-	if (nr_masters < 1 || nr_masters > DW_DMA_MAX_NR_MASTERS)
-		return NULL;
-
-	if (of_property_read_u32(np, "dma-channels", &nr_channels))
-		return NULL;
-
 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata)
 		return NULL;
 
-	pdata->nr_masters = nr_masters;
-	pdata->nr_channels = nr_channels;
+	pdata->only_quirks_used = true;
 
 	if (of_property_read_bool(np, "is_private"))
 		pdata->is_private = true;
+
+	if (of_property_read_bool(np, "is-memcpy"))
+		pdata->is_memcpy = true;
+
+	if (of_property_read_u32(np, "dma-masters", &nr_masters))
+		return pdata;
+	if (nr_masters < 1 || nr_masters > DW_DMA_MAX_NR_MASTERS)
+		return pdata;
+
+	pdata->nr_masters = nr_masters;
+
+	if (of_property_read_u32(np, "dma-channels", &nr_channels))
+		return pdata;
+
+	pdata->nr_channels = nr_channels;
+
+	if (of_property_read_bool(np, "is-nollp"))
+		pdata->is_nollp = true;
 
 	if (!of_property_read_u32(np, "chan_allocation_order", &tmp))
 		pdata->chan_allocation_order = (unsigned char)tmp;
@@ -141,10 +150,9 @@ dw_dma_parse_dt(struct platform_device *pdev)
 	if (!of_property_read_u32_array(np, "data-width", arr, nr_masters)) {
 		for (tmp = 0; tmp < nr_masters; tmp++)
 			pdata->data_width[tmp] = arr[tmp];
-	} else if (!of_property_read_u32_array(np, "data_width", arr, nr_masters)) {
-		for (tmp = 0; tmp < nr_masters; tmp++)
-			pdata->data_width[tmp] = BIT(arr[tmp] & 0x07);
 	}
+
+	pdata->only_quirks_used = false;
 
 	return pdata;
 }

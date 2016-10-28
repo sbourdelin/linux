@@ -40,6 +40,11 @@ struct dw_dma_slave {
  * @is_private: The device channels should be marked as private and not for
  *	by the general purpose DMA channel allocator.
  * @is_memcpy: The device channels do support memory-to-memory transfers.
+ * @only_quirks_used: Only read quirks from platform data structure.
+ *	Read other parameters from device tree node (if exists) or from
+ *	hardware autoconfig registers. Only properties "is_private" and
+ *	"is_memcpy" are quirks for now. Note that all listed quirks will
+ *	be copied from platform data.
  * @is_nollp: The device channels does not support multi block transfers.
  * @chan_allocation_order: Allocate channels starting from 0 or 7
  * @chan_priority: Set channel priority increasing from 0 to 7 or 7 to 0.
@@ -52,6 +57,7 @@ struct dw_dma_platform_data {
 	unsigned int	nr_channels;
 	bool		is_private;
 	bool		is_memcpy;
+	bool		only_quirks_used;
 	bool		is_nollp;
 #define CHAN_ALLOCATION_ASCENDING	0	/* zero to seven */
 #define CHAN_ALLOCATION_DESCENDING	1	/* seven to zero */

@@ -1452,9 +1452,22 @@ int dw_dma_probe(struct dw_dma_chip *chip)
 	dw->regs = chip->regs;
 	chip->dw = dw;
 
+	/* Reassign the platform data pointer */
+	pdata = dw->pdata;
+
 	pm_runtime_get_sync(chip->dev);
 
-	if (!chip->pdata) {
+	if (!chip->pdata || chip->pdata->only_quirks_used) {
+		/* Fill quirks with the default values */
+		pdata->is_private = true;
+		pdata->is_memcpy = true;
+
+		/* Apply platform defined quirks */
+		if (chip->pdata && chip->pdata->only_quirks_used) {
+			pdata->is_private = chip->pdata->is_private;
+			pdata->is_memcpy = chip->pdata->is_memcpy;
+		}
+
 		dw_params = dma_readl(dw, DW_PARAMS);
 		dev_dbg(chip->dev, "DW_PARAMS: 0x%08x\n", dw_params);
 
@@ -1463,9 +1476,6 @@ int dw_dma_probe(struct dw_dma_chip *chip)
 			err = -EINVAL;
 			goto err_pdata;
 		}
-
-		/* Reassign the platform data pointer */
-		pdata = dw->pdata;
 
 		/* Get hardware configuration parameters */
 		pdata->nr_channels = (dw_params >> DW_PARAMS_NR_CHAN & 7) + 1;
@@ -1477,8 +1487,6 @@ int dw_dma_probe(struct dw_dma_chip *chip)
 		pdata->block_size = dma_readl(dw, MAX_BLK_SIZE);
 
 		/* Fill platform data with the default values */
-		pdata->is_private = true;
-		pdata->is_memcpy = true;
 		pdata->chan_allocation_order = CHAN_ALLOCATION_ASCENDING;
 		pdata->chan_priority = CHAN_PRIORITY_ASCENDING;
 	} else if (chip->pdata->nr_channels > DW_DMA_MAX_NR_CHANNELS) {
@@ -1486,9 +1494,6 @@ int dw_dma_probe(struct dw_dma_chip *chip)
 		goto err_pdata;
 	} else {
 		memcpy(dw->pdata, chip->pdata, sizeof(*dw->pdata));
-
-		/* Reassign the platform data pointer */
-		pdata = dw->pdata;
 	}
 
 	dw->chan = devm_kcalloc(chip->dev, pdata->nr_channels, sizeof(*dw->chan),
