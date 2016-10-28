@@ -37,8 +37,6 @@
 #include <xen/xen-ops.h>
 #include <xen/balloon.h>
 
-#include "privcmd.h"
-
 MODULE_LICENSE("GPL");
 
 #define PRIV_VMA_LOCKED ((void *)1)
@@ -644,12 +642,11 @@ static int privcmd_vma_range_is_mapped(
 				   is_mapped_fn, NULL) != 0;
 }
 
-const struct file_operations xen_privcmd_fops = {
+const static struct file_operations xen_privcmd_fops = {
 	.owner = THIS_MODULE,
 	.unlocked_ioctl = privcmd_ioctl,
 	.mmap = privcmd_mmap,
 };
-EXPORT_SYMBOL_GPL(xen_privcmd_fops);
 
 static struct miscdevice privcmd_dev = {
 	.minor = MISC_DYNAMIC_MINOR,

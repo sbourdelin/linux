@@ -598,7 +598,7 @@ static unsigned int xenbus_file_poll(struct file *file, poll_table *wait)
 	return 0;
 }
 
-const struct file_operations xen_xenbus_fops = {
+const static struct file_operations xen_xenbus_fops = {
 	.read = xenbus_file_read,
 	.write = xenbus_file_write,
 	.open = xenbus_file_open,
@@ -606,7 +606,6 @@ const struct file_operations xen_xenbus_fops = {
 	.poll = xenbus_file_poll,
 	.llseek = no_llseek,
 };
-EXPORT_SYMBOL_GPL(xen_xenbus_fops);
 
 static struct miscdevice xenbus_dev = {
 	.minor = MISC_DYNAMIC_MINOR,
