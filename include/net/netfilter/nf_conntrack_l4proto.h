@@ -126,13 +126,17 @@ void nf_ct_l4proto_put(struct nf_conntrack_l4proto *p);
 
 /* Protocol pernet registration. */
 int nf_ct_l4proto_pernet_register(struct net *net,
-				  struct nf_conntrack_l4proto *proto);
+				  struct nf_conntrack_l4proto *proto[],
+				  int num_proto);
 void nf_ct_l4proto_pernet_unregister(struct net *net,
-				     struct nf_conntrack_l4proto *proto);
+				     struct nf_conntrack_l4proto *proto[],
+				     int num_proto);
 
 /* Protocol global registration. */
-int nf_ct_l4proto_register(struct nf_conntrack_l4proto *proto);
-void nf_ct_l4proto_unregister(struct nf_conntrack_l4proto *proto);
+int nf_ct_l4proto_register(struct nf_conntrack_l4proto *proto[],
+			   int num_proto);
+void nf_ct_l4proto_unregister(struct nf_conntrack_l4proto *proto[],
+			      int num_proto);
 
 /* Generic netlink helpers */
 int nf_ct_port_tuple_to_nlattr(struct sk_buff *skb,

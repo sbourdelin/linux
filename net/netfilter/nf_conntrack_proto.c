@@ -281,99 +281,136 @@ void nf_ct_l4proto_unregister_sysctl(struct net *net,
 
 /* FIXME: Allow NULL functions and sub in pointers to generic for
    them. --RR */
-int nf_ct_l4proto_register(struct nf_conntrack_l4proto *l4proto)
+int nf_ct_l4proto_register(struct nf_conntrack_l4proto *l4proto[],
+			   int num_proto)
 {
-	int ret = 0;
+	struct nf_conntrack_l4proto *l4;
+	int ret = 0, j;
 
-	if (l4proto->l3proto >= PF_MAX)
-		return -EBUSY;
-
-	if ((l4proto->to_nlattr && !l4proto->nlattr_size)
-		|| (l4proto->tuple_to_nlattr && !l4proto->nlattr_tuple_size))
-		return -EINVAL;
-
-	mutex_lock(&nf_ct_proto_mutex);
-	if (!nf_ct_protos[l4proto->l3proto]) {
-		/* l3proto may be loaded latter. */
-		struct nf_conntrack_l4proto __rcu **proto_array;
-		int i;
-
-		proto_array = kmalloc(MAX_NF_CT_PROTO *
-				      sizeof(struct nf_conntrack_l4proto *),
-				      GFP_KERNEL);
-		if (proto_array == NULL) {
-			ret = -ENOMEM;
-			goto out_unlock;
-		}
-
-		for (i = 0; i < MAX_NF_CT_PROTO; i++)
-			RCU_INIT_POINTER(proto_array[i], &nf_conntrack_l4proto_generic);
-
-		/* Before making proto_array visible to lockless readers,
-		 * we must make sure its content is committed to memory.
-		 */
-		smp_wmb();
-
-		nf_ct_protos[l4proto->l3proto] = proto_array;
-	} else if (rcu_dereference_protected(
-			nf_ct_protos[l4proto->l3proto][l4proto->l4proto],
-			lockdep_is_held(&nf_ct_proto_mutex)
-			) != &nf_conntrack_l4proto_generic) {
-		ret = -EBUSY;
-		goto out_unlock;
+	for (j = 0; j < num_proto; j++) {
+		l4 = l4proto[j];
+		if (l4->l3proto >= PF_MAX)
+			return -EBUSY;
+		if ((l4->to_nlattr && !l4->nlattr_size)
+		    || (l4->tuple_to_nlattr && !l4->nlattr_tuple_size))
+			return -EINVAL;
 	}
 
-	l4proto->nla_size = 0;
-	if (l4proto->nlattr_size)
-		l4proto->nla_size += l4proto->nlattr_size();
-	if (l4proto->nlattr_tuple_size)
-		l4proto->nla_size += 3 * l4proto->nlattr_tuple_size();
+	mutex_lock(&nf_ct_proto_mutex);
+	for (j = 0; j < num_proto; j++) {
+		l4 = l4proto[j];
+		if (!nf_ct_protos[l4->l3proto]) {
+			/* l3proto may be loaded latter. */
+			struct nf_conntrack_l4proto __rcu **proto_array;
+			int i;
 
-	rcu_assign_pointer(nf_ct_protos[l4proto->l3proto][l4proto->l4proto],
-			   l4proto);
-out_unlock:
+			proto_array = kmalloc(MAX_NF_CT_PROTO *
+					      sizeof(l4), GFP_KERNEL);
+			if (proto_array == NULL) {
+				ret = -ENOMEM;
+				break;
+			}
+
+			for (i = 0; i < MAX_NF_CT_PROTO; i++)
+				RCU_INIT_POINTER(proto_array[i],
+						 &nf_conntrack_l4proto_generic);
+
+			/* Before making proto_array visible to lockless readers
+			 * we must make sure its content is committed to memory.
+			 */
+			smp_wmb();
+
+			nf_ct_protos[l4->l3proto] = proto_array;
+		} else if (rcu_dereference_protected(
+				nf_ct_protos[l4->l3proto][l4->l4proto],
+				lockdep_is_held(&nf_ct_proto_mutex)
+				) != &nf_conntrack_l4proto_generic) {
+			ret = -EBUSY;
+			break;
+		}
+
+		l4->nla_size = 0;
+		if (l4->nlattr_size)
+			l4->nla_size += l4->nlattr_size();
+		if (l4->nlattr_tuple_size)
+			l4->nla_size += 3 * l4->nlattr_tuple_size();
+
+		rcu_assign_pointer(nf_ct_protos[l4->l3proto][l4->l4proto], l4);
+	}
+	if (j < num_proto) {
+		int ver = l4->l3proto == PF_INET6 ? 6 : 4;
+
+		pr_err("nf_conntrack_ipv%d: can't register %s%d proto.\n",
+		       ver, l4->name, ver);
+		while (--j >= 0) {
+			l4 = l4proto[j];
+			BUG_ON(rcu_dereference_protected(
+					nf_ct_protos[l4->l3proto][l4->l4proto],
+					lockdep_is_held(&nf_ct_proto_mutex)
+					) != l4);
+			rcu_assign_pointer(
+				nf_ct_protos[l4->l3proto][l4->l4proto],
+				&nf_conntrack_l4proto_generic);
+		}
+	}
 	mutex_unlock(&nf_ct_proto_mutex);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(nf_ct_l4proto_register);
 
 int nf_ct_l4proto_pernet_register(struct net *net,
-				  struct nf_conntrack_l4proto *l4proto)
+				  struct nf_conntrack_l4proto *l4proto[],
+				  int num_proto)
 {
-	int ret = 0;
 	struct nf_proto_net *pn = NULL;
+	int i, ret = 0;
 
-	if (l4proto->init_net) {
-		ret = l4proto->init_net(net, l4proto->l3proto);
+	for (i = 0; i < num_proto; i++) {
+		if (l4proto[i]->init_net) {
+			ret = l4proto[i]->init_net(net, l4proto[i]->l3proto);
+			if (ret < 0)
+				break;
+		}
+
+		pn = nf_ct_l4proto_net(net, l4proto[i]);
+		if (pn == NULL)
+			continue;
+
+		ret = nf_ct_l4proto_register_sysctl(net, pn, l4proto[i]);
 		if (ret < 0)
-			goto out;
+			break;
+
+		pn->users++;
 	}
-
-	pn = nf_ct_l4proto_net(net, l4proto);
-	if (pn == NULL)
-		goto out;
-
-	ret = nf_ct_l4proto_register_sysctl(net, pn, l4proto);
-	if (ret < 0)
-		goto out;
-
-	pn->users++;
-out:
+	if (i < num_proto) {
+		pr_err("nf_conntrack_%s%d: pernet registration failed.\n",
+		       l4proto[i]->name,
+		       l4proto[i]->l3proto == PF_INET6 ? 6 : 4);
+		nf_ct_l4proto_pernet_unregister(net, l4proto, i);
+	}
 	return ret;
 }
 EXPORT_SYMBOL_GPL(nf_ct_l4proto_pernet_register);
 
-void nf_ct_l4proto_unregister(struct nf_conntrack_l4proto *l4proto)
+void nf_ct_l4proto_unregister(struct nf_conntrack_l4proto *l4proto[],
+			      int num_proto)
 {
-	BUG_ON(l4proto->l3proto >= PF_MAX);
+	int i;
+
+	for (i = 0; i < num_proto; i++)
+		BUG_ON(l4proto[i]->l3proto >= PF_MAX);
 
 	mutex_lock(&nf_ct_proto_mutex);
-	BUG_ON(rcu_dereference_protected(
-			nf_ct_protos[l4proto->l3proto][l4proto->l4proto],
-			lockdep_is_held(&nf_ct_proto_mutex)
-			) != l4proto);
-	rcu_assign_pointer(nf_ct_protos[l4proto->l3proto][l4proto->l4proto],
-			   &nf_conntrack_l4proto_generic);
+	while (--num_proto >= 0) {
+		struct nf_conntrack_l4proto *l4 = l4proto[num_proto];
+
+		BUG_ON(rcu_dereference_protected(
+				nf_ct_protos[l4->l3proto][l4->l4proto],
+				lockdep_is_held(&nf_ct_proto_mutex)
+				) != l4);
+		rcu_assign_pointer(nf_ct_protos[l4->l3proto][l4->l4proto],
+				   &nf_conntrack_l4proto_generic);
+	}
 	mutex_unlock(&nf_ct_proto_mutex);
 
 	synchronize_rcu();
@@ -381,19 +418,23 @@ void nf_ct_l4proto_unregister(struct nf_conntrack_l4proto *l4proto)
 EXPORT_SYMBOL_GPL(nf_ct_l4proto_unregister);
 
 void nf_ct_l4proto_pernet_unregister(struct net *net,
-				     struct nf_conntrack_l4proto *l4proto)
+				     struct nf_conntrack_l4proto *l4proto[],
+				     int num_proto)
 {
 	struct nf_proto_net *pn = NULL;
 
-	pn = nf_ct_l4proto_net(net, l4proto);
-	if (pn == NULL)
-		return;
+	while (--num_proto >= 0) {
+		pn = nf_ct_l4proto_net(net, l4proto[num_proto]);
+		if (pn == NULL)
+			continue;
 
-	pn->users--;
-	nf_ct_l4proto_unregister_sysctl(net, pn, l4proto);
+		pn->users--;
+		nf_ct_l4proto_unregister_sysctl(net, pn, l4proto[num_proto]);
 
-	/* Remove all contrack entries for this protocol */
-	nf_ct_iterate_cleanup(net, kill_l4proto, l4proto, 0, 0);
+		/* Remove all contrack entries for this protocol */
+		nf_ct_iterate_cleanup(net, kill_l4proto, l4proto[num_proto],
+				      0, 0);
+	}
 }
 EXPORT_SYMBOL_GPL(nf_ct_l4proto_pernet_unregister);
 
