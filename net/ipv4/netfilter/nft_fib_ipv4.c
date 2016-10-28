@@ -77,7 +77,9 @@ void nft_fib4_eval(const struct nft_expr *expr, struct nft_regs *regs,
 	};
 	const struct net_device *oif;
 	struct net_device *found;
+#ifdef CONFIG_IP_ROUTE_MULTIPATH
 	int i;
+#endif
 
 	/*
 	 * Do not set flowi4_oif, it restricts results (for example, asking
@@ -90,6 +92,8 @@ void nft_fib4_eval(const struct nft_expr *expr, struct nft_regs *regs,
 		oif = pkt->out;
 	else if (priv->flags & NFTA_FIB_F_IIF)
 		oif = pkt->in;
+	else
+		oif = NULL;
 
 	if (pkt->hook == NF_INET_PRE_ROUTING && fib4_is_local(pkt->skb)) {
 		nft_fib_store_result(dest, priv->result, pkt, LOOPBACK_IFINDEX);
@@ -130,6 +134,11 @@ void nft_fib4_eval(const struct nft_expr *expr, struct nft_regs *regs,
 		break;
 	}
 
+       if (!oif) {
+               found = FIB_RES_DEV(res);
+               goto ok;
+       }
+
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 	for (i = 0; i < res.fi->fib_nhs; i++) {
 		struct fib_nh *nh = &res.fi->fib_nh[i];
@@ -139,16 +148,12 @@ void nft_fib4_eval(const struct nft_expr *expr, struct nft_regs *regs,
 			goto ok;
 		}
 	}
-#endif
-	if (priv->flags & NFTA_FIB_F_OIF) {
-		found = FIB_RES_DEV(res);
-		if (found == oif)
-			goto ok;
-		return;
-	}
-
-	*dest = FIB_RES_DEV(res)->ifindex;
 	return;
+#else
+	found = FIB_RES_DEV(res);
+	if (found != oif)
+		return;
+#endif
 ok:
 	switch (priv->result) {
 	case NFT_FIB_RESULT_OIF:
