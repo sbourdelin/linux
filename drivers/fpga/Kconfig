@@ -13,6 +13,13 @@ config FPGA
 
 if FPGA
 
+config FPGA_MGR_CYCLONE_PS_SPI
+	tristate "Altera Cyclone FPGA Passive Serial over SPI"
+	depends on SPI
+	help
+	  FPGA manager driver support for Altera Cyclone using the
+	  passive serial interface over SPI
+
 config FPGA_MGR_SOCFPGA
 	tristate "Altera SOCFPGA FPGA Manager"
 	depends on ARCH_SOCFPGA
