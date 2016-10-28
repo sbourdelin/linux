@@ -321,6 +321,31 @@ extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
  */
 void acpi_unregister_gsi (u32 gsi);
 
+#ifdef CONFIG_IRQ_DOMAIN
+
+int acpi_irq_domain_register_irq(const struct acpi_resource_source *source,
+				 u32 hwirq, int trigger, int polarity);
+int acpi_irq_domain_unregister_irq(const struct acpi_resource_source *source,
+				   u32 hwirq);
+
+#else
+
+static inline int acpi_irq_domain_register_irq(
+	const struct acpi_resource_source *source, u32 hwirq, int trigger,
+	int polarity)
+{
+	return acpi_register_gsi(NULL, hwirq, trigger, polarity);
+}
+
+static inline int acpi_irq_domain_unregister_irq(
+	const struct acpi_resource_source *source,  u32 hwirq)
+{
+	acpi_unregister_gsi(hwirq);
+	return 0;
+}
+
+#endif /* CONFIG_IRQ_DOMAIN */
+
 struct pci_dev;
 
 int acpi_pci_irq_enable (struct pci_dev *dev);
