@@ -97,6 +97,16 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
 	int slot_mem_size, frag_mem_size;
 	int err, irq, i;
 
+	/*
+	 * Setting the DMA mask is necessary in the 64 bit environment.
+	 * It isn't necessary in a 32 bit environment but is considered
+	 * a good practice.
+	 */
+	err = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
+
+	if (err < 0)
+		return err;
+
 	(void)of_property_read_u32(dev->of_node, "cache-line-size",
 				   &g_cache_line_size);
 	g_fragments_size = 2 * g_cache_line_size;
