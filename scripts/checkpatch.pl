@@ -21,6 +21,7 @@ use Getopt::Long qw(:config no_auto_abbrev);
 my $quiet = 0;
 my $tree = 1;
 my $chk_signoff = 1;
+my $chk_review = 0;
 my $chk_patch = 1;
 my $tst_only;
 my $emacs = 0;
@@ -69,6 +70,7 @@ Options:
   -q, --quiet                quiet
   --no-tree                  run without a kernel tree
   --no-signoff               do not check for 'Signed-off-by' line
+  --review                   check for 'Reviewed-by' line
   --patch                    treat FILE as patchfile (default)
   --emacs                    emacs compile window format
   --terse                    one line per report
@@ -183,6 +185,7 @@ GetOptions(
 	'q|quiet+'	=> \$quiet,
 	'tree!'		=> \$tree,
 	'signoff!'	=> \$chk_signoff,
+	'review!'	=> \$chk_review,
 	'patch!'	=> \$chk_patch,
 	'emacs!'	=> \$emacs,
 	'terse!'	=> \$terse,
@@ -217,7 +220,7 @@ help(0) if ($help);
 
 list_types(0) if ($list_types);
 
-$fix = 1 if ($fix_inplace);
+$chk_review = 1 if ($check); # --strict implies checking for Reviewed-by
 $check_orig = $check;
 
 my $exit = 0;
@@ -857,6 +860,7 @@ sub git_commit_info {
 }
 
 $chk_signoff = 0 if ($file);
+$chk_review = 0 if ($file);
 
 my @rawlines = ();
 my @lines = ();
@@ -2130,6 +2134,7 @@ sub process {
 
 	our $clean = 1;
 	my $signoff = 0;
+	my $review = 0;
 	my $is_patch = 0;
 	my $in_header_lines = $file ? 0 : 1;
 	my $in_commit_log = 0;		#Scanning lines before patch
@@ -2397,6 +2402,12 @@ sub process {
 # Check the patch for a signoff:
 		if ($line =~ /^\s*signed-off-by:/i) {
 			$signoff++;
+			$in_commit_log = 0;
+		}
+
+# Check the patch for any review:
+		if ($line =~ /^\s*reviewed-by:/i) {
+			$review++;
 			$in_commit_log = 0;
 		}
 
@@ -6203,6 +6214,10 @@ sub process {
 	if ($is_patch && $has_commit_log && $chk_signoff && $signoff == 0) {
 		ERROR("MISSING_SIGN_OFF",
 		      "Missing Signed-off-by: line(s)\n");
+	}
+	if ($is_patch && $has_commit_log && $chk_review && $review == 0) {
+		ERROR("MISSING_REVIEW",
+		      "Missing Reviewed-by: line(s)\n");
 	}
 
 	print report_dump();
