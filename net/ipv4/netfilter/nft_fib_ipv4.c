@@ -77,7 +77,9 @@ void nft_fib4_eval(const struct nft_expr *expr, struct nft_regs *regs,
 	};
 	const struct net_device *oif;
 	struct net_device *found;
+#ifdef CONFIG_IP_ROUTE_MULTIPATH
 	int i;
+#endif
 
 	/*
 	 * Do not set flowi4_oif, it restricts results (for example, asking
@@ -90,6 +92,8 @@ void nft_fib4_eval(const struct nft_expr *expr, struct nft_regs *regs,
 		oif = pkt->out;
 	else if (priv->flags & NFTA_FIB_F_IIF)
 		oif = pkt->in;
+	else
+		return;
 
 	if (pkt->hook == NF_INET_PRE_ROUTING && fib4_is_local(pkt->skb)) {
 		nft_fib_store_result(dest, priv->result, pkt, LOOPBACK_IFINDEX);
