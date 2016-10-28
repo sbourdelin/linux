@@ -1746,7 +1746,9 @@ get_rq:
 		if (!request_count)
 			trace_block_plug(q);
 		else {
-			if (request_count >= BLK_MAX_REQUEST_COUNT) {
+			struct request *first = list_entry_rq(plug->list.next);
+			if (request_count >= BLK_MAX_REQUEST_COUNT ||
+			    blk_rq_bytes(first) >= BLK_PLUG_FLUSH_SIZE) {
 				blk_flush_plug_list(plug, false);
 				trace_block_plug(q);
 			}
