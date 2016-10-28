@@ -34,6 +34,7 @@
 #include <trace/events/sched.h>
 
 #include "sched.h"
+#include "walt.h"
 
 /*
  * Targeted preemption latency for CPU-bound tasks:
@@ -2878,6 +2879,7 @@ static inline void cfs_rq_util_change(struct cfs_rq *cfs_rq)
 
 	if (cpu == smp_processor_id() && &rq->cfs == cfs_rq) {
 		unsigned long max = rq->cpu_capacity_orig;
+		unsigned long util = cpu_walt_util(rq);
 
 		/*
 		 * There are a few boundary cases this might miss but it should
@@ -2895,8 +2897,8 @@ static inline void cfs_rq_util_change(struct cfs_rq *cfs_rq)
 		 *
 		 * See cpu_util().
 		 */
-		cpufreq_update_util(rq_clock(rq),
-				    min(cfs_rq->avg.util_avg, max), max);
+
+		cpufreq_update_util(rq_clock(rq), min(util, max), max);
 	}
 }
 
@@ -6198,7 +6200,9 @@ static void detach_task(struct task_struct *p, struct lb_env *env)
 
 	p->on_rq = TASK_ON_RQ_MIGRATING;
 	deactivate_task(env->src_rq, p, 0);
+	walt_prepare_migrate(p, env->src_rq, true);
 	set_task_cpu(p, env->dst_cpu);
+	/* update WALT later under the dest rq's lock */
 }
 
 /*
@@ -6330,6 +6334,7 @@ static void attach_task(struct rq *rq, struct task_struct *p)
 	lockdep_assert_held(&rq->lock);
 
 	BUG_ON(task_rq(p) != rq);
+	walt_finish_migrate(p, rq, true);
 	activate_task(rq, p, 0);
 	p->on_rq = TASK_ON_RQ_QUEUED;
 	check_preempt_curr(rq, p, 0);

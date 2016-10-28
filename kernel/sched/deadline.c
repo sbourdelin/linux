@@ -15,6 +15,7 @@
  *                    Fabio Checconi <fchecconi@gmail.com>
  */
 #include "sched.h"
+#include "walt.h"
 
 #include <linux/slab.h>
 
@@ -278,7 +279,9 @@ static struct rq *dl_task_offline_migration(struct rq *rq, struct task_struct *p
 	 * By now the task is replenished and enqueued; migrate it.
 	 */
 	deactivate_task(rq, p, 0);
+	walt_prepare_migrate(p, rq, true);
 	set_task_cpu(p, later_rq->cpu);
+	walt_finish_migrate(p, later_rq, true);
 	activate_task(later_rq, p, 0);
 
 	if (!fallback)
@@ -1512,7 +1515,9 @@ retry:
 	}
 
 	deactivate_task(rq, next_task, 0);
+	walt_prepare_migrate(next_task, rq, true);
 	set_task_cpu(next_task, later_rq->cpu);
+	walt_finish_migrate(next_task, later_rq, true);
 	activate_task(later_rq, next_task, 0);
 	ret = 1;
 
@@ -1600,7 +1605,9 @@ static void pull_dl_task(struct rq *this_rq)
 			resched = true;
 
 			deactivate_task(src_rq, p, 0);
+			walt_prepare_migrate(p, src_rq, true);
 			set_task_cpu(p, this_cpu);
+			walt_finish_migrate(p, this_rq, true);
 			activate_task(this_rq, p, 0);
 			dmin = p->dl.deadline;
 

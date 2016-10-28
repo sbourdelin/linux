@@ -91,6 +91,8 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 
+#include "walt.h"
+
 DEFINE_MUTEX(sched_domains_mutex);
 DEFINE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
 
@@ -991,6 +993,7 @@ static struct rq *move_queued_task(struct rq *rq, struct task_struct *p, int new
 
 	p->on_rq = TASK_ON_RQ_MIGRATING;
 	dequeue_task(rq, p, 0);
+	walt_prepare_migrate(p, rq, true);
 	set_task_cpu(p, new_cpu);
 	raw_spin_unlock(&rq->lock);
 
@@ -998,6 +1001,7 @@ static struct rq *move_queued_task(struct rq *rq, struct task_struct *p, int new
 
 	raw_spin_lock(&rq->lock);
 	BUG_ON(task_cpu(p) != new_cpu);
+	walt_finish_migrate(p, rq, true);
 	enqueue_task(rq, p, 0);
 	p->on_rq = TASK_ON_RQ_QUEUED;
 	check_preempt_curr(rq, p, 0);
@@ -1257,7 +1261,9 @@ static void __migrate_swap_task(struct task_struct *p, int cpu)
 
 		p->on_rq = TASK_ON_RQ_MIGRATING;
 		deactivate_task(src_rq, p, 0);
+		walt_prepare_migrate(p, src_rq, true);
 		set_task_cpu(p, cpu);
+		walt_finish_migrate(p, dst_rq, true);
 		activate_task(dst_rq, p, 0);
 		p->on_rq = TASK_ON_RQ_QUEUED;
 		check_preempt_curr(dst_rq, p, 0);
@@ -2072,13 +2078,19 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	 */
 	smp_cond_load_acquire(&p->on_cpu, !VAL);
 
+	raw_spin_lock(&task_rq(p)->lock);
+	walt_update_task_ravg(p, task_rq(p), TASK_WAKE, walt_ktime_clock(), 0);
+	raw_spin_unlock(&task_rq(p)->lock);
+
 	p->sched_contributes_to_load = !!task_contributes_to_load(p);
 	p->state = TASK_WAKING;
 
 	cpu = select_task_rq(p, p->wake_cpu, SD_BALANCE_WAKE, wake_flags);
 	if (task_cpu(p) != cpu) {
 		wake_flags |= WF_MIGRATED;
+		walt_prepare_migrate(p, task_rq(p), false);
 		set_task_cpu(p, cpu);
+		walt_finish_migrate(p, cpu_rq(cpu), false);
 	}
 #endif /* CONFIG_SMP */
 
@@ -2129,8 +2141,10 @@ static void try_to_wake_up_local(struct task_struct *p, struct pin_cookie cookie
 
 	trace_sched_waking(p);
 
-	if (!task_on_rq_queued(p))
+	if (!task_on_rq_queued(p)) {
+		walt_update_task_ravg(p, rq, TASK_WAKE, walt_ktime_clock(), 0);
 		ttwu_activate(rq, p, ENQUEUE_WAKEUP);
+	}
 
 	ttwu_do_wakeup(rq, p, 0, cookie);
 	if (schedstat_enabled())
@@ -2196,6 +2210,7 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	p->se.nr_migrations		= 0;
 	p->se.vruntime			= 0;
 	INIT_LIST_HEAD(&p->se.group_node);
+	walt_init_new_task_load(p);
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	p->se.cfs_rq			= NULL;
@@ -2569,6 +2584,8 @@ void wake_up_new_task(struct task_struct *p)
 #endif
 	rq = __task_rq_lock(p, &rf);
 	post_init_entity_util_avg(&p->se);
+
+	walt_mark_task_starting(p);
 
 	activate_task(rq, p, 0);
 	p->on_rq = TASK_ON_RQ_QUEUED;
@@ -3071,6 +3088,7 @@ void scheduler_tick(void)
 	update_rq_clock(rq);
 	curr->sched_class->task_tick(rq, curr, 0);
 	cpu_load_update_active(rq);
+	walt_update_task_ravg(rq->curr, rq, TASK_UPDATE, walt_ktime_clock(), 0);
 	calc_global_load_tick(rq);
 	raw_spin_unlock(&rq->lock);
 
@@ -3322,6 +3340,7 @@ static void __sched notrace __schedule(bool preempt)
 	struct pin_cookie cookie;
 	struct rq *rq;
 	int cpu;
+	u64 wallclock;
 
 	cpu = smp_processor_id();
 	rq = cpu_rq(cpu);
@@ -3385,6 +3404,9 @@ static void __sched notrace __schedule(bool preempt)
 		update_rq_clock(rq);
 
 	next = pick_next_task(rq, prev, cookie);
+	wallclock = walt_ktime_clock();
+	walt_update_task_ravg(prev, rq, PUT_PREV_TASK, wallclock, 0);
+	walt_update_task_ravg(next, rq, PICK_NEXT_TASK, wallclock, 0);
 	clear_tsk_need_resched(prev);
 	clear_preempt_need_resched();
 	rq->clock_skip_update = 0;
@@ -7284,6 +7306,8 @@ static void sched_rq_cpu_starting(unsigned int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
 
+	walt_set_window_start(rq);
+
 	rq->calc_load_update = calc_load_update;
 	update_max_interval();
 }
@@ -7304,6 +7328,9 @@ int sched_cpu_dying(unsigned int cpu)
 	/* Handle pending wakeups and then migrate everything off */
 	sched_ttwu_pending();
 	raw_spin_lock_irqsave(&rq->lock, flags);
+
+	walt_migrate_sync_cpu(cpu);
+
 	if (rq->rd) {
 		BUG_ON(!cpumask_test_cpu(cpu, rq->rd->span));
 		set_rq_offline(rq);

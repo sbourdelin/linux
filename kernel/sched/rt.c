@@ -8,6 +8,8 @@
 #include <linux/slab.h>
 #include <linux/irq_work.h>
 
+#include "walt.h"
+
 int sched_rr_timeslice = RR_TIMESLICE;
 
 static int do_sched_rt_period_timer(struct rt_bandwidth *rt_b, int overrun);
@@ -1843,7 +1845,9 @@ retry:
 	}
 
 	deactivate_task(rq, next_task, 0);
+	walt_prepare_migrate(next_task, rq, true);
 	set_task_cpu(next_task, lowest_rq->cpu);
+	walt_finish_migrate(next_task, lowest_rq, true);
 	activate_task(lowest_rq, next_task, 0);
 	ret = 1;
 
@@ -2097,7 +2101,9 @@ static void pull_rt_task(struct rq *this_rq)
 			resched = true;
 
 			deactivate_task(src_rq, p, 0);
+			walt_prepare_migrate(p, src_rq, true);
 			set_task_cpu(p, this_cpu);
+			walt_finish_migrate(p, this_rq, true);
 			activate_task(this_rq, p, 0);
 			/*
 			 * We continue with the search, just in

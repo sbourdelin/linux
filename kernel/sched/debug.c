@@ -607,6 +607,15 @@ do {									\
 	P(nr_switches);
 	P(nr_load_updates);
 	P(nr_uninterruptible);
+#ifdef CONFIG_SMP
+	P(cpu_capacity_orig);
+	P(cpu_capacity);
+#ifdef CONFIG_SCHED_WALT
+	P(window_start);
+	P(curr_runnable_sum);
+	P(prev_runnable_sum);
+#endif
+#endif
 	PN(next_balance);
 	SEQ_printf(m, "  .%-30s: %ld\n", "curr->pid", (long)(task_pid_nr(rq->curr)));
 	PN(clock);
