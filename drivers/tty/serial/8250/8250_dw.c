@@ -53,6 +53,8 @@
 /* Helper for fifo size calculation */
 #define DW_UART_CPR_FIFO_SIZE(a)	(((a >> 16) & 0xff) * 16)
 
+/* DesignWare specific register fields */
+#define DW_UART_MCR_SIRE		BIT(6)
 
 struct dw8250_data {
 	u8			usr_reg;
@@ -66,6 +68,7 @@ struct dw8250_data {
 
 	unsigned int		skip_autocfg:1;
 	unsigned int		uart_16550_compatible:1;
+	unsigned int		sir_mode_supported:1;
 };
 
 static inline int dw8250_modify_msr(struct uart_port *p, int offset, int value)
@@ -254,6 +257,22 @@ out:
 	serial8250_do_set_termios(p, termios, old);
 }
 
+static void dw8250_set_ldisc(struct uart_port *p, struct ktermios *termios)
+{
+	struct dw8250_data *data = p->private_data;
+	unsigned int mcr = p->serial_in(p, UART_MCR);
+
+	if (data->sir_mode_supported) {
+		if (termios->c_line == N_IRDA)
+			mcr |= DW_UART_MCR_SIRE;
+		else
+			mcr &= ~DW_UART_MCR_SIRE;
+
+		p->serial_out(p, UART_MCR, mcr);
+	}
+	serial8250_do_set_ldisc(p, termios);
+}
+
 /*
  * dw8250_fallback_dma_filter will prevent the UART from getting just any free
  * channel on platforms that have DMA engines, but don't have any channels
@@ -324,6 +343,7 @@ static void dw8250_quirks(struct uart_port *p, struct dw8250_data *data)
 static void dw8250_setup_port(struct uart_port *p)
 {
 	struct uart_8250_port *up = up_to_u8250p(p);
+	struct dw8250_data *data = p->private_data;
 	u32 reg;
 
 	/*
@@ -357,6 +377,9 @@ static void dw8250_setup_port(struct uart_port *p)
 
 	if (reg & DW_UART_CPR_AFCE_MODE)
 		up->capabilities |= UART_CAP_AFE;
+
+	if (reg & DW_UART_CPR_SIR_MODE)
+		data->sir_mode_supported = true;
 }
 
 static int dw8250_probe(struct platform_device *pdev)
@@ -392,6 +415,7 @@ static int dw8250_probe(struct platform_device *pdev)
 	p->iotype	= UPIO_MEM;
 	p->serial_in	= dw8250_serial_in;
 	p->serial_out	= dw8250_serial_out;
+	p->set_ldisc	= dw8250_set_ldisc;
 
 	p->membase = devm_ioremap(dev, regs->start, resource_size(regs));
 	if (!p->membase)
