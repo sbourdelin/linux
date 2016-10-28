@@ -315,6 +315,21 @@ extern char ___assert_task_state[1 - 2*!!(
 /* Task command name length */
 #define TASK_COMM_LEN 16
 
+/*
+ * These events may be replaced with a combination of existing scheduler flags
+ * provided that that doesn't make the implementation too fragile.
+ */
+enum task_event {
+	PUT_PREV_TASK   = 0,
+	PICK_NEXT_TASK  = 1,
+	TASK_WAKE       = 2,
+	TASK_MIGRATE    = 3,
+	TASK_UPDATE     = 4,
+	IRQ_UPDATE      = 5,
+};
+
+extern char *task_event_names[];
+
 #include <linux/spinlock.h>
 
 /*
@@ -1320,6 +1335,25 @@ struct sched_statistics {
 };
 #endif
 
+#ifdef CONFIG_SCHED_WALT
+
+/* ravg represents capacity scaled cpu-usage of tasks */
+struct ravg {
+	/*
+	 * 'mark_start' marks the most recent event for a task
+	 *
+	 * 'curr_window' represents task's cpu usage in its most recent
+	 * window
+	 *
+	 * 'prev_window' represents task's cpu usage in the window prior
+	 * to the one represented by 'curr_window'
+	*/
+	u64 mark_start;
+	u32 curr_window, prev_window;
+};
+#endif
+
+
 struct sched_entity {
 	struct load_weight	load;		/* for load-balancing */
 	struct rb_node		run_node;
@@ -1480,6 +1514,11 @@ struct task_struct {
 	const struct sched_class *sched_class;
 	struct sched_entity se;
 	struct sched_rt_entity rt;
+
+#ifdef CONFIG_SCHED_WALT
+	struct ravg ravg;
+#endif
+
 #ifdef CONFIG_CGROUP_SCHED
 	struct task_group *sched_task_group;
 #endif

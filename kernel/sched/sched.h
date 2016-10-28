@@ -65,6 +65,8 @@ static inline void cpu_load_update_active(struct rq *this_rq) { }
 # define scale_load_down(w)	(w)
 #endif
 
+#define cap_scale(v, s) ((v)*(s) >> SCHED_CAPACITY_SHIFT)
+
 /*
  * Task weight (visible to users) and its load (invisible to users) have
  * independent resolution, but they should be well calibrated. We use
@@ -663,6 +665,12 @@ struct rq {
 	/* This is used to determine avg_idle's max value */
 	u64 max_idle_balance_cost;
 #endif
+
+#ifdef CONFIG_SCHED_WALT
+	u64 window_start;
+	u64 curr_runnable_sum;
+	u64 prev_runnable_sum;
+#endif /* CONFIG_SCHED_WALT */
 
 #ifdef CONFIG_IRQ_TIME_ACCOUNTING
 	u64 prev_irq_time;
