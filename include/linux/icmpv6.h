@@ -45,4 +45,6 @@ extern void				icmpv6_flow_init(struct sock *sk,
 							 const struct in6_addr *saddr,
 							 const struct in6_addr *daddr,
 							 int oif);
+struct ipv6hdr;
+u32					icmpv6_multipath_hash(const struct ipv6hdr *iph);
 #endif
