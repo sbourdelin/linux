@@ -19,7 +19,8 @@
 #include <linux/spi/spi.h>
 
 #define FPGA_RESET_TIME		50   /* time in usecs to trigger FPGA config */
-#define FPGA_MIN_DELAY		250  /* min usecs to wait for config status */
+#define FPGA_MIN_DELAY		50   /* min usecs to wait for config status */
+#define FPGA_MAX_DELAY		1000 /* max usecs to wait for config status */
 
 struct cyclonespi_conf {
 	struct gpio_desc *config;
@@ -42,6 +43,7 @@ static int cyclonespi_write_init(struct fpga_manager *mgr, u32 flags,
 				 const char *buf, size_t count)
 {
 	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
+	int i;
 
 	if (flags & FPGA_MGR_PARTIAL_RECONFIG) {
 		dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
@@ -56,13 +58,14 @@ static int cyclonespi_write_init(struct fpga_manager *mgr, u32 flags,
 	}
 
 	gpiod_set_value(conf->config, 1);
-	usleep_range(FPGA_MIN_DELAY, FPGA_MIN_DELAY + 20);
-	if (gpiod_get_value(conf->status) == 0) {
-		dev_err(&mgr->dev, "Status pin not ready.\n");
-		return -EIO;
+	for (i = 0; i < (FPGA_MAX_DELAY / FPGA_MIN_DELAY); i++) {
+		usleep_range(FPGA_MIN_DELAY, FPGA_MIN_DELAY + 20);
+		if (gpiod_get_value(conf->status))
+			return 0;
 	}
 
-	return 0;
+	dev_err(&mgr->dev, "Status pin not ready.\n");
+	return -EIO;
 }
 
 static void rev_buf(void *buf, size_t len)
