@@ -866,6 +866,7 @@ static void alua_rtpg_queue(struct alua_port_group *pg,
 			    struct alua_queue_data *qdata, bool force)
 {
 	int start_queue = 0;
+	int sdev_geted = 0;
 	unsigned long flags;
 	struct workqueue_struct *alua_wq = kaluad_wq;
 
@@ -884,6 +885,7 @@ static void alua_rtpg_queue(struct alua_port_group *pg,
 		kref_get(&pg->kref);
 		pg->rtpg_sdev = sdev;
 		scsi_device_get(sdev);
+		sdev_geted = 1;
 		start_queue = 1;
 	} else if (!(pg->flags & ALUA_PG_RUN_RTPG) && force) {
 		pg->flags |= ALUA_PG_RUN_RTPG;
@@ -901,7 +903,8 @@ static void alua_rtpg_queue(struct alua_port_group *pg,
 	if (start_queue &&
 	    !queue_delayed_work(alua_wq, &pg->rtpg_work,
 				msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS))) {
-		scsi_device_put(sdev);
+		if (sdev_geted)
+			scsi_device_put(sdev);
 		kref_put(&pg->kref, release_port_group);
 	}
 }
