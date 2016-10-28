@@ -3619,6 +3619,11 @@ static int nand_flash_detect_onfi(struct mtd_info *mtd, struct nand_chip *chip,
 	if (p->jedec_id == NAND_MFR_MICRON)
 		nand_onfi_detect_micron(chip, p);
 
+	if (p->bb_per_lun)
+		chip->bb_per_lun = p->bb_per_lun;
+	if (p->blocks_per_lun)
+		chip->blocks_per_lun = p->blocks_per_lun;
+
 	return 1;
 }
 
