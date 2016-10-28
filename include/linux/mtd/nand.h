@@ -771,6 +771,9 @@ nand_get_sdr_timings(const struct nand_data_interface *conf)
  *			supported, 0 otherwise.
  * @jedec_params:	[INTERN] holds the JEDEC parameter page when JEDEC is
  *			supported, 0 otherwise.
+ * @bb_per_lun:	[INTERN] the max number of bad blocks each LUN of a
+ *			this nand device will encounter their life times.
+ * @blocks_per_lun:	[INTERN] The number of PEBs in a LUN
  * @read_retries:	[INTERN] the number of read retry modes supported
  * @onfi_set_features:	[REPLACEABLE] set the features for ONFI nand
  * @onfi_get_features:	[REPLACEABLE] get the features for ONFI nand
@@ -853,6 +856,8 @@ struct nand_chip {
 		struct nand_onfi_params	onfi_params;
 		struct nand_jedec_params jedec_params;
 	};
+	__le16 bb_per_lun;
+	__le32 blocks_per_lun;
 
 	struct nand_data_interface *data_interface;
 
