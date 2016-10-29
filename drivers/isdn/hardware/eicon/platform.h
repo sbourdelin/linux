@@ -124,7 +124,7 @@
 #define DIVAS_CONTAINING_RECORD(address, type, field)			\
 	((type *)((char *)(address) - (char *)(&((type *)0)->field)))
 
-extern int sprintf(char *, const char *, ...);
+extern __printf(2, 3) int sprintf(char *, const char *, ...);
 
 typedef void *LIST_ENTRY;
 
