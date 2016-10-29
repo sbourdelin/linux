@@ -506,6 +506,7 @@ struct request_queue {
 #define QUEUE_FLAG_FLUSH_NQ    25	/* flush not queueuable */
 #define QUEUE_FLAG_DAX         26	/* device supports DAX */
 #define QUEUE_FLAG_NO_MP       27	/* multipage bvecs isn't ready */
+#define QUEUE_FLAG_SPLIT_MP    28	/* split MP bvecs if too bigger */
 
 #define QUEUE_FLAG_DEFAULT	((1 << QUEUE_FLAG_IO_STAT) |		\
 				 (1 << QUEUE_FLAG_STACKABLE)	|	\
@@ -597,6 +598,7 @@ static inline void queue_flag_clear(unsigned int flag, struct request_queue *q)
 	(test_bit(QUEUE_FLAG_SECERASE, &(q)->queue_flags))
 #define blk_queue_dax(q)	test_bit(QUEUE_FLAG_DAX, &(q)->queue_flags)
 #define blk_queue_no_mp(q)	test_bit(QUEUE_FLAG_NO_MP, &(q)->queue_flags)
+#define blk_queue_split_mp(q)	test_bit(QUEUE_FLAG_SPLIT_MP, &(q)->queue_flags)
 
 #define blk_noretry_request(rq) \
 	((rq)->cmd_flags & (REQ_FAILFAST_DEV|REQ_FAILFAST_TRANSPORT| \

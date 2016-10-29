@@ -79,6 +79,10 @@ static inline unsigned get_max_io_size(struct request_queue *q,
 	/* aligned to logical block size */
 	sectors &= ~(mask >> 9);
 
+	/* some queues can't handle bigger bio even it is ready for mp bvecs */
+	if (blk_queue_split_mp(q) && sectors > BIO_SP_MAX_SECTORS)
+		sectors = BIO_SP_MAX_SECTORS;
+
 	return sectors;
 }
 
