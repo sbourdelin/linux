@@ -821,6 +821,12 @@ static int bcache_device_init(struct bcache_device *d, unsigned block_size,
 
 	blk_queue_write_cache(q, true, true);
 
+	/*
+	 * Once bcache is audited that it is ready to deal with big
+	 * incoming bio with multipage bvecs, we can remove the flag.
+	 */
+	set_bit(QUEUE_FLAG_SPLIT_MP,	&d->disk->queue->queue_flags);
+
 	return 0;
 }
 
