@@ -1112,17 +1112,7 @@ static int ufs_qcom_setup_clocks(struct ufs_hba *hba, bool on)
 		return 0;
 
 	if (on) {
-		err = ufs_qcom_phy_enable_iface_clk(host->generic_phy);
-		if (err)
-			goto out;
-
-		err = ufs_qcom_phy_enable_ref_clk(host->generic_phy);
-		if (err) {
-			dev_err(hba->dev, "%s enable phy ref clock failed, err=%d\n",
-				__func__, err);
-			ufs_qcom_phy_disable_iface_clk(host->generic_phy);
-			goto out;
-		}
+		phy_power_on(host->generic_phy);
 		/* enable the device ref clock for HS mode*/
 		if (ufshcd_is_hs_mode(&hba->pwr_info))
 			ufs_qcom_dev_ref_clk_ctrl(host, true);
@@ -1131,9 +1121,8 @@ static int ufs_qcom_setup_clocks(struct ufs_hba *hba, bool on)
 			ufs_qcom_update_bus_bw_vote(host);
 
 	} else {
-
-		/* M-PHY RMMI interface clocks can be turned off */
-		ufs_qcom_phy_disable_iface_clk(host->generic_phy);
+		/* powering off PHY during aggressive clk gating */
+		phy_power_off(host->generic_phy);
 		if (!ufs_qcom_is_link_active(hba))
 			/* disable device ref_clk */
 			ufs_qcom_dev_ref_clk_ctrl(host, false);
@@ -1146,7 +1135,6 @@ static int ufs_qcom_setup_clocks(struct ufs_hba *hba, bool on)
 		dev_err(hba->dev, "%s: set bus vote failed %d\n",
 				__func__, err);
 
-out:
 	return err;
 }
 
