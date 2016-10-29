@@ -418,6 +418,7 @@ struct nfs_openargs {
 	enum open_claim_type4	claim;
 	enum createmode4	createmode;
 	const struct nfs4_label *label;
+	umode_t			umask;
 };
 
 struct nfs_openres {
@@ -937,6 +938,7 @@ struct nfs4_create_arg {
 	const struct nfs_fh *		dir_fh;
 	const u32 *			bitmask;
 	const struct nfs4_label		*label;
+	umode_t				umask;
 };
 
 struct nfs4_create_res {
