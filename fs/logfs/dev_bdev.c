@@ -55,10 +55,11 @@ static void writeseg_end_io(struct bio *bio)
 	int i;
 	struct super_block *sb = bio->bi_private;
 	struct logfs_super *super = logfs_super(sb);
+	struct bvec_iter_all bia;
 
 	BUG_ON(bio->bi_error); /* FIXME: Retry io or write elsewhere */
 
-	bio_for_each_segment_all(bvec, bio, i) {
+	bio_for_each_segment_all_rd(bvec, bio, i, bia) {
 		end_page_writeback(bvec->bv_page);
 		put_page(bvec->bv_page);
 	}
