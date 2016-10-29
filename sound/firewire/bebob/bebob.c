@@ -177,7 +177,7 @@ check_audiophile_booted(struct fw_unit *unit)
 	if (fw_csr_string(unit->directory, CSR_MODEL, name, sizeof(name)) < 0)
 		return false;
 
-	return strncmp(name, "FW Audiophile Bootloader", 15) != 0;
+	return strncmp(name, "FW Audiophile Bootloader", 24) != 0;
 }
 
 static void
