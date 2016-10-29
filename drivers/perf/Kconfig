@@ -19,4 +19,17 @@ config XGENE_PMU
         help
           Say y if you want to use APM X-Gene SoC performance monitors.
 
+config UNCORE_PMU
+	bool
+
+config UNCORE_PMU_CAVIUM
+	depends on PERF_EVENTS && NUMA && ARM64
+	bool "Cavium uncore PMU support"
+	select UNCORE_PMU
+	default y
+	help
+	  Say y if you want to access performance counters of subsystems
+	  on a Cavium SOC like cache controller, memory controller or
+	  processor interconnect.
+
 endmenu
