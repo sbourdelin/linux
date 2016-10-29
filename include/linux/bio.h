@@ -217,7 +217,7 @@ static inline void bio_advance_iter_mp(struct bio *bio, struct bvec_iter *iter,
 
 #define bio_iter_last(bvec, iter) ((iter).bi_size == (bvec).bv_len)
 
-static inline unsigned bio_segments(struct bio *bio)
+static inline unsigned __bio_segments(struct bio *bio, bool mp)
 {
 	unsigned segs = 0;
 	struct bio_vec bv;
@@ -237,10 +237,24 @@ static inline unsigned bio_segments(struct bio *bio)
 	if (bio_op(bio) == REQ_OP_WRITE_SAME)
 		return 1;
 
-	bio_for_each_segment(bv, bio, iter)
-		segs++;
+	if (!mp)
+		bio_for_each_segment(bv, bio, iter)
+			segs++;
+	else
+		bio_for_each_segment_mp(bv, bio, iter)
+			segs++;
 
 	return segs;
+}
+
+static inline unsigned bio_segments(struct bio *bio)
+{
+	return __bio_segments(bio, false);
+}
+
+static inline unsigned bio_segments_mp(struct bio *bio)
+{
+	return __bio_segments(bio, true);
 }
 
 /*
@@ -415,9 +429,23 @@ extern void bio_put(struct bio *);
 
 extern void __bio_clone_fast(struct bio *, struct bio *);
 extern struct bio *bio_clone_fast(struct bio *, gfp_t, struct bio_set *);
-extern struct bio *bio_clone_bioset(struct bio *, gfp_t, struct bio_set *bs);
+extern struct bio *__bio_clone_bioset(struct bio *, gfp_t,
+				      struct bio_set *bs, bool);
 
 extern struct bio_set *fs_bio_set;
+
+/* at default we clone bio with multipage bvecs */
+static inline struct bio *bio_clone_bioset(struct bio *bio, gfp_t gfp,
+					   struct bio_set *bs)
+{
+	return __bio_clone_bioset(bio, gfp, bs, false);
+}
+
+static inline struct bio *bio_clone_bioset_sp(struct bio *bio, gfp_t gfp,
+					      struct bio_set *bs)
+{
+	return __bio_clone_bioset(bio, gfp, bs, true);
+}
 
 static inline struct bio *bio_alloc(gfp_t gfp_mask, unsigned int nr_iovecs)
 {
@@ -427,6 +455,12 @@ static inline struct bio *bio_alloc(gfp_t gfp_mask, unsigned int nr_iovecs)
 static inline struct bio *bio_clone(struct bio *bio, gfp_t gfp_mask)
 {
 	return bio_clone_bioset(bio, gfp_mask, fs_bio_set);
+}
+
+/* Sometimes we have to clone one bio with singlepage bvec */
+static inline struct bio *bio_clone_sp(struct bio *bio, gfp_t gfp_mask)
+{
+	return __bio_clone_bioset(bio, gfp_mask, fs_bio_set, true);
 }
 
 static inline struct bio *bio_kmalloc(gfp_t gfp_mask, unsigned int nr_iovecs)

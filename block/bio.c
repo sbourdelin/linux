@@ -626,16 +626,22 @@ EXPORT_SYMBOL(bio_clone_fast);
  * 	@bio_src: bio to clone
  *	@gfp_mask: allocation priority
  *	@bs: bio_set to allocate from
+ *	@sp_bvecs: if clone to singlepage bvecs.
  *
  *	Clone bio. Caller will own the returned bio, but not the actual data it
  *	points to. Reference count of returned bio will be one.
+ *
+ *	If @sp_bvecs is true, the caller must make sure number of singlepage
+ *	bvecs is less than maximum bvec count.
+ *
  */
-struct bio *bio_clone_bioset(struct bio *bio_src, gfp_t gfp_mask,
-			     struct bio_set *bs)
+struct bio *__bio_clone_bioset(struct bio *bio_src, gfp_t gfp_mask,
+			       struct bio_set *bs, bool sp_bvecs)
 {
 	struct bvec_iter iter;
 	struct bio_vec bv;
 	struct bio *bio;
+	unsigned segs;
 
 	/*
 	 * Pre immutable biovecs, __bio_clone() used to just do a memcpy from
@@ -659,7 +665,12 @@ struct bio *bio_clone_bioset(struct bio *bio_src, gfp_t gfp_mask,
 	 *    __bio_clone_fast() anyways.
 	 */
 
-	bio = bio_alloc_bioset(gfp_mask, bio_segments(bio_src), bs);
+	if (sp_bvecs)
+		segs = bio_segments(bio_src);
+	else
+		segs = bio_segments_mp(bio_src);
+
+	bio = bio_alloc_bioset(gfp_mask, segs, bs);
 	if (!bio)
 		return NULL;
 	bio->bi_bdev		= bio_src->bi_bdev;
@@ -675,8 +686,12 @@ struct bio *bio_clone_bioset(struct bio *bio_src, gfp_t gfp_mask,
 		bio->bi_io_vec[bio->bi_vcnt++] = bio_src->bi_io_vec[0];
 		break;
 	default:
-		bio_for_each_segment(bv, bio_src, iter)
-			bio->bi_io_vec[bio->bi_vcnt++] = bv;
+		if (sp_bvecs)
+			bio_for_each_segment(bv, bio_src, iter)
+				bio->bi_io_vec[bio->bi_vcnt++] = bv;
+		else
+			bio_for_each_segment_mp(bv, bio_src, iter)
+				bio->bi_io_vec[bio->bi_vcnt++] = bv;
 		break;
 	}
 
@@ -694,7 +709,7 @@ struct bio *bio_clone_bioset(struct bio *bio_src, gfp_t gfp_mask,
 
 	return bio;
 }
-EXPORT_SYMBOL(bio_clone_bioset);
+EXPORT_SYMBOL(__bio_clone_bioset);
 
 /**
  *	bio_add_pc_page	-	attempt to add page to bio
