@@ -106,6 +106,7 @@ EXPORT_SYMBOL_GPL(kvm_debugfs_dir);
 static int kvm_debugfs_num_entries;
 static const struct file_operations *stat_fops_per_vm[];
 
+static void kvm_destroy_vm(struct kvm *kvm);
 static long kvm_vcpu_ioctl(struct file *file, unsigned int ioctl,
 			   unsigned long arg);
 #ifdef CONFIG_KVM_COMPAT
@@ -618,6 +619,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	mutex_init(&kvm->irq_lock);
 	mutex_init(&kvm->slots_lock);
 	atomic_set(&kvm->users_count, 1);
+	kvm->destroy = kvm_destroy_vm;
 	INIT_LIST_HEAD(&kvm->devices);
 
 	r = kvm_arch_init_vm(kvm, type);
@@ -737,20 +739,6 @@ static void kvm_destroy_vm(struct kvm *kvm)
 	hardware_disable_all();
 	mmdrop(mm);
 }
-
-void kvm_get_kvm(struct kvm *kvm)
-{
-	atomic_inc(&kvm->users_count);
-}
-EXPORT_SYMBOL_GPL(kvm_get_kvm);
-
-void kvm_put_kvm(struct kvm *kvm)
-{
-	if (atomic_dec_and_test(&kvm->users_count))
-		kvm_destroy_vm(kvm);
-}
-EXPORT_SYMBOL_GPL(kvm_put_kvm);
-
 
 static int kvm_vm_release(struct inode *inode, struct file *filp)
 {

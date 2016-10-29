@@ -404,6 +404,7 @@ struct kvm {
 	struct kvm_vm_stat stat;
 	struct kvm_arch arch;
 	atomic_t users_count;
+	void (*destroy)(struct kvm *kvm);
 #ifdef KVM_COALESCED_MMIO_PAGE_OFFSET
 	struct kvm_coalesced_mmio_ring *coalesced_mmio_ring;
 	spinlock_t ring_lock;
@@ -525,8 +526,16 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 		  struct module *module);
 void kvm_exit(void);
 
-void kvm_get_kvm(struct kvm *kvm);
-void kvm_put_kvm(struct kvm *kvm);
+static inline void kvm_get_kvm(struct kvm *kvm)
+{
+	atomic_inc(&kvm->users_count);
+}
+
+static inline void kvm_put_kvm(struct kvm *kvm)
+{
+	if (atomic_dec_and_test(&kvm->users_count))
+		kvm->destroy(kvm);
+}
 
 static inline struct kvm_memslots *__kvm_memslots(struct kvm *kvm, int as_id)
 {
