@@ -1298,6 +1298,11 @@ try_next_bio:
 static void pkt_start_write(struct pktcdvd_device *pd, struct packet_data *pkt)
 {
 	int f;
+
+	/*
+	 * Need to fix this usage for supporting multipage bvecs,
+	 * because the table can be changed in pkt_make_local_copy().
+	 */
 	struct bio_vec *bvec = pkt->w_bio->bi_io_vec;
 
 	bio_reset(pkt->w_bio);
