@@ -40,6 +40,9 @@
 
 #define BIO_MAX_PAGES		256
 
+/* Max sectors of bio with singlepage bvec */
+#define BIO_SP_MAX_SECTORS     (BIO_MAX_PAGES * (PAGE_SIZE >> 9))
+
 #define bio_prio(bio)			(bio)->bi_ioprio
 #define bio_set_prio(bio, prio)		((bio)->bi_ioprio = prio)
 
