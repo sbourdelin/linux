@@ -1011,6 +1011,9 @@ static int __btrfs_open_devices(struct btrfs_fs_devices *fs_devices,
 		if (blk_queue_discard(q))
 			device->can_discard = 1;
 
+		/* BTRFS isn't ready to support multipage bvecs */
+		set_bit(QUEUE_FLAG_NO_MP, &q->queue_flags);
+
 		device->bdev = bdev;
 		device->in_fs_metadata = 0;
 		device->mode = flags;
