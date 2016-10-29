@@ -1059,7 +1059,7 @@ static void plci_remove(PLCI *plci)
 	}
 	if (plci->Sig.Id == 0xff)
 	{
-		dbug(1, dprintf("D-channel X.25 plci->NL.Id:%0x", plci->NL.Id));
+		dbug(1, dprintf("D-channel X.25 plci->NL.Id:%02x", plci->NL.Id));
 		if (plci->NL.Id && !plci->nl_remove_id)
 		{
 			nl_req_ncci(plci, REMOVE, 0);
@@ -3109,7 +3109,7 @@ static byte data_b3_req(dword Id, word Number, DIVA_CAPI_ADAPTER *a,
 
 	Info = _WRONG_IDENTIFIER;
 	ncci = (word)(Id >> 16);
-	dbug(1, dprintf("ncci=0x%x, plci=0x%x", ncci, plci));
+	dbug(1, dprintf("ncci=0x%x, plci=0x%x", ncci, plci->Id));
 
 	if (plci && ncci)
 	{
@@ -3325,7 +3325,7 @@ static byte select_b_req(dword Id, word Number, DIVA_CAPI_ADAPTER *a,
 	else
 	{
 		dbug(1, dprintf("select_b_req[%d],PLCI=0x%x,Tel=0x%x,NL=0x%x,appl=0x%x,sstate=0x%x",
-				msg->length, plci->Id, plci->tel, plci->NL.Id, plci->appl, plci->SuppState));
+				msg->length, plci->Id, plci->tel, plci->NL.Id, appl->Id, plci->SuppState));
 		dbug(1, dprintf("PlciState=0x%x", plci->State));
 		for (i = 0; i < 7; i++) bp_parms[i].length = 0;
 
@@ -3910,7 +3910,7 @@ void callback(ENTITY *e)
 				if (no_cancel_rc && (a->FlowControlIdTable[ch] == e->Id) && e->Id) {
 					a->FlowControlIdTable[ch] = 0;
 					if ((rc == OK) && a->FlowControlSkipTable[ch]) {
-						dbug(3, dprintf("XDI CAPI: RC cancelled Id:0x02, Ch:%02x", e->Id, ch));
+						dbug(3, dprintf("XDI CAPI: RC cancelled Id:%02x, Ch:%02x", e->Id, ch));
 						return;
 					}
 				}
@@ -9135,7 +9135,7 @@ static word AdvCodecSupport(DIVA_CAPI_ADAPTER *a, PLCI *plci, APPL *appl,
 		{
 			if (a->AdvSignalAppl != appl || a->AdvSignalPLCI)
 			{
-				dbug(1, dprintf("AdvSigPlci=0x%x", a->AdvSignalPLCI));
+				dbug(1, dprintf("AdvSigPlci=0x%x", a->AdvSignalPLCI->Id));
 				return 0x2001; /* codec in use by another application */
 			}
 			if (plci != NULL)
