@@ -31,7 +31,7 @@
 
 
 extern __printf(3, 4)
-void diva_mnt_internal_dprintf(dword drv_id, dword type, char *p, ...);
+void diva_mnt_internal_dprintf(dword drv_id, dword type, const char *p, ...);
 
 #define MODEM_PARSE_ENTRIES  16 /* amount of variables of interest */
 #define FAX_PARSE_ENTRIES    12 /* amount of variables of interest */

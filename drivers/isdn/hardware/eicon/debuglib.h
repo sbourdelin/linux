@@ -230,10 +230,10 @@ extern void DbgSetLevel(unsigned long dbgMask);
  */
 typedef struct _DbgHandle_ *pDbgHandle;
 typedef void (*DbgEnd)(pDbgHandle);
-typedef void (*DbgLog)(unsigned short, int, char *, va_list);
-typedef void (*DbgOld)(unsigned short, char *, va_list);
+typedef void (*DbgLog)(unsigned short, int, const char *, va_list);
+typedef void (*DbgOld)(unsigned short, const char *, va_list);
 typedef void (*DbgEv)(unsigned short, unsigned long, va_list);
-typedef void (*DbgIrq)(unsigned short, int, char *, va_list);
+typedef void (*DbgIrq)(unsigned short, int, const char *, va_list);
 typedef struct _DbgHandle_
 { char    Registered; /* driver successfully registered */
 #define DBG_HANDLE_REG_NEW 0x01  /* this (new) structure    */

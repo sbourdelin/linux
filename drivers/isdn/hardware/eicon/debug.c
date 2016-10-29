@@ -14,9 +14,9 @@
 
 static void DI_register(void *arg);
 static void DI_deregister(pDbgHandle hDbg);
-static void DI_format(int do_lock, word id, int type, char *format, va_list argument_list);
-static void DI_format_locked(word id, int type, char *format, va_list argument_list);
-static void DI_format_old(word id, char *format, va_list ap) { }
+static void DI_format(int do_lock, word id, int type, const char *format, va_list argument_list);
+static void DI_format_locked(word id, int type, const char *format, va_list argument_list);
+static void DI_format_old(word id, const char *format, va_list ap) { }
 static void DiProcessEventLog(unsigned short id, unsigned long msgID, va_list ap) { }
 static void single_p(byte *P, word *PLength, byte Id);
 static void diva_maint_xdi_cb(ENTITY *e);
@@ -25,7 +25,7 @@ static int diva_mnt_cmp_nmbr(const char *nmbr);
 static void diva_free_dma_descriptor(IDI_CALL request, int nr);
 static int diva_get_dma_descriptor(IDI_CALL request, dword *dma_magic);
 __printf(3, 4)
-void diva_mnt_internal_dprintf(dword drv_id, dword type, char *p, ...);
+void diva_mnt_internal_dprintf(dword drv_id, dword type, const char *p, ...);
 
 static dword MaxDumpSize = 256;
 static dword MaxXlogSize = 2 + 128;
@@ -561,7 +561,7 @@ static void DI_deregister(pDbgHandle hDbg) {
 
 static void DI_format_locked(unsigned short id,
 			     int type,
-			     char *format,
+			     const char *format,
 			     va_list argument_list) {
 	DI_format(1, id, type, format, argument_list);
 }
@@ -569,7 +569,7 @@ static void DI_format_locked(unsigned short id,
 static void DI_format(int do_lock,
 		      unsigned short id,
 		      int type,
-		      char *format,
+		      const char *format,
 		      va_list ap) {
 	diva_os_spin_lock_magic_t old_irql;
 	dword sec, usec;
@@ -1904,7 +1904,7 @@ static void diva_change_management_debug_mask(diva_maint_client_t *pC, dword old
 }
 
 
-void diva_mnt_internal_dprintf(dword drv_id, dword type, char *fmt, ...) {
+void diva_mnt_internal_dprintf(dword drv_id, dword type, const char *fmt, ...) {
 	va_list ap;
 
 	va_start(ap, fmt);
