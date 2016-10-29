@@ -35,7 +35,7 @@ MODULE_DEVICE_TABLE(sdio, ks7010_sdio_ids);
 /* macro */
 
 #define inc_txqhead(priv) \
-        (priv->tx_dev.qhead = (priv->tx_dev.qhead + 1) % TX_DEVICE_BUFF_SIZE)
+	(priv->tx_dev.qhead = (priv->tx_dev.qhead + 1) % TX_DEVICE_BUFF_SIZE)
 #define inc_txqtail(priv) \
         (priv->tx_dev.qtail = (priv->tx_dev.qtail + 1) % TX_DEVICE_BUFF_SIZE)
 #define cnt_txqbody(priv) \
