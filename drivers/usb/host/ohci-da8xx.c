@@ -318,7 +318,6 @@ static int usb_hcd_da8xx_probe(const struct hc_driver *driver,
 	hcd->regs = devm_ioremap_resource(&pdev->dev, mem);
 	if (IS_ERR(hcd->regs)) {
 		error = PTR_ERR(hcd->regs);
-		dev_err(&pdev->dev, "failed to map ohci.\n");
 		goto err;
 	}
 	hcd->rsrc_start = mem->start;
