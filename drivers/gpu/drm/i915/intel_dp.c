@@ -354,8 +354,14 @@ intel_dp_mode_valid(struct drm_connector *connector,
 		target_clock = fixed_mode->clock;
 	}
 
-	max_link_clock = intel_dp_max_link_rate(intel_dp);
-	max_lanes = intel_dp_max_lane_count(intel_dp);
+	/* Prune the modes using the fallback link rate/lane count */
+	if (intel_dp->link_train_failed) {
+		max_link_clock = intel_dp->fallback_link_rate;
+		max_lanes = intel_dp->fallback_lane_count;
+	} else {
+		max_link_clock = intel_dp_max_link_rate(intel_dp);
+		max_lanes = intel_dp_max_lane_count(intel_dp);
+	}
 
 	max_rate = intel_dp_max_data_rate(max_link_clock, max_lanes);
 	mode_rate = intel_dp_link_required(target_clock, 18);
@@ -1639,6 +1645,12 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 
 	if (adjusted_mode->flags & DRM_MODE_FLAG_DBLCLK)
 		return false;
+
+	/* Fall back to lower link rate in case of failure in previous modeset */
+	if (intel_dp->link_train_failed) {
+		min_lane_count = max_lane_count = intel_dp->fallback_lane_count;
+		min_clock = max_clock = intel_dp->fallback_link_rate_index;
+	}
 
 	DRM_DEBUG_KMS("DP link computation with max lane count %i "
 		      "max bw %d pixel clock %iKHz\n",
@@ -4423,6 +4435,13 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 		intel_dp->compliance_test_active = 0;
 		intel_dp->compliance_test_type = 0;
 		intel_dp->compliance_test_data = 0;
+		intel_dp->link_train_failed = false;
+		intel_dp->fallback_link_rate_index = -1;
+		intel_dp->fallback_link_rate = 0;
+		intel_dp->fallback_lane_count = 0;
+		connector->link_status = DRM_MODE_LINK_STATUS_GOOD;
+		intel_dp_set_link_status_property(connector,
+						  DRM_MODE_LINK_STATUS_GOOD);
 
 		if (intel_dp->is_mst) {
 			DRM_DEBUG_KMS("MST device may have disappeared %d vs %d\n",
@@ -4514,8 +4533,12 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
 		      connector->base.id, connector->name);
 
+	/* If this is a retry due to link trianing failure */
+	if (status == connector_status_connected && intel_dp->link_train_failed)
+		return status;
+
 	/* If full detect is not performed yet, do a full detect */
-	if (!intel_dp->detect_done)
+	if (!intel_dp->detect_done && !intel_dp->link_train_failed)
 		status = intel_dp_long_pulse(intel_dp->attached_connector);
 
 	intel_dp->detect_done = false;
@@ -5692,6 +5715,47 @@ out_vdd_off:
 	return false;
 }
 
+static void intel_dp_modeset_retry_work_fn(struct work_struct *work)
+{
+	struct intel_connector *intel_connector;
+	struct drm_connector *connector;
+	struct drm_display_mode *mode;
+	bool verbose_prune = true;
+	bool reprobe = false;
+
+	intel_connector = container_of(work, typeof(*intel_connector),
+				       modeset_retry_work);
+	connector = &intel_connector->base;
+
+	/* Grab the locks before changing connector property*/
+	mutex_lock(&connector->dev->mode_config.mutex);
+	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n", connector->base.id,
+		      connector->name);
+	list_for_each_entry(mode, &connector->modes, head) {
+		mode->status = intel_dp_mode_valid(connector,
+						   mode);
+		if (mode->status != MODE_OK)
+			reprobe = true;
+	}
+	drm_mode_prune_invalid(connector->dev, &connector->modes,
+			       verbose_prune);
+
+	/* Set connector link status to BAD only if modeset required
+	 * for the current mode, if mode list changed then just send uevent
+	 * so that it can reprobe the connectors and validate modes and do
+	 * a modeset on a different valid mode.
+	 */
+	if (!reprobe) {
+		connector->link_status = DRM_MODE_LINK_STATUS_BAD;
+		intel_dp_set_link_status_property(connector,
+						  DRM_MODE_LINK_STATUS_BAD);
+	}
+	mutex_unlock(&connector->dev->mode_config.mutex);
+
+	/* Send Hotplug uevent so userspace can reprobe */
+	drm_kms_helper_hotplug_event(connector->dev);
+}
+
 bool
 intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 			struct intel_connector *intel_connector)
@@ -5703,6 +5767,10 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	enum port port = intel_dig_port->port;
 	int type;
+
+	/* Initialize the work for modeset in case of link train failure */
+	INIT_WORK(&intel_connector->modeset_retry_work,
+		  intel_dp_modeset_retry_work_fn);
 
 	if (WARN(intel_dig_port->max_lanes < 1,
 		 "Not enough lanes (%d) for DP on port %c\n",
