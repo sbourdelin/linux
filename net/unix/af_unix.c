@@ -2805,14 +2805,19 @@ static int unix_seq_show(struct seq_file *seq, void *v)
 
 			i = 0;
 			len = u->addr->len - sizeof(short);
-			if (!UNIX_ABSTRACT(s))
+			if (!UNIX_ABSTRACT(s)) {
 				len--;
-			else {
+				for ( ; i < len; i++)
+					seq_putc(seq,
+						 u->addr->name->sun_path[i]);
+			} else {
 				seq_putc(seq, '@');
 				i++;
+				for ( ; i < len; i++)
+					seq_putc(seq,
+						 u->addr->name->sun_path[i] ?:
+						 '@');
 			}
-			for ( ; i < len; i++)
-				seq_putc(seq, u->addr->name->sun_path[i]);
 		}
 		unix_state_unlock(s);
 		seq_putc(seq, '\n');
