@@ -664,6 +664,16 @@ static inline void bio_inc_remaining(struct bio *bio)
 	atomic_inc(&bio->__bi_remaining);
 }
 
+static inline void bio_init_with_vec_table(struct bio *bio,
+					   struct bio_vec *table,
+					   unsigned max_vecs)
+{
+	bio_init(bio);
+	bio->bi_io_vec = table;
+	bio->bi_max_vecs = max_vecs;
+}
+
+
 /*
  * bio_set is used to allow other portions of the IO system to
  * allocate their own private memory pools for bio and iovec structures.
