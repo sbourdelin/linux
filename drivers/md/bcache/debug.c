@@ -110,6 +110,12 @@ void bch_data_verify(struct cached_dev *dc, struct bio *bio)
 	struct bio_vec bv, cbv;
 	struct bvec_iter iter, citer = { 0 };
 
+	/*
+	 * Once multipage bvec is supported, the bio_clone()
+	 * has to make sure page count in this bio can be held
+	 * in the new cloned bio because each single page need
+	 * to assign to each bvec of the new bio.
+	 */
 	check = bio_clone(bio, GFP_NOIO);
 	if (!check)
 		return;
