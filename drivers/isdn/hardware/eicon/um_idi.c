@@ -351,7 +351,7 @@ int diva_um_idi_read(void *entity,
 			  Not enough space to read message
 			*/
 			DBG_ERR(("A: A(%d) E(%08x) read small buffer",
-				 a->adapter_nr, e, ret));
+				 a->adapter_nr, e));
 			diva_os_leave_spin_lock(&adapter_lock, &old_irql,
 						"read");
 			return (-2);
