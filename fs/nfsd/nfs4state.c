@@ -1238,12 +1238,12 @@ static bool unhash_lock_stateid(struct nfs4_ol_stateid *stp)
 
 static void release_lock_stateid(struct nfs4_ol_stateid *stp)
 {
-	struct nfs4_openowner *oo = openowner(stp->st_openstp->st_stateowner);
+	struct nfs4_client *clp = stp->st_stid.sc_client;
 	bool unhashed;
 
-	spin_lock(&oo->oo_owner.so_client->cl_lock);
+	spin_lock(&clp->cl_lock);
 	unhashed = unhash_lock_stateid(stp);
-	spin_unlock(&oo->oo_owner.so_client->cl_lock);
+	spin_unlock(&clp->cl_lock);
 	if (unhashed)
 		nfs4_put_stid(&stp->st_stid);
 }
