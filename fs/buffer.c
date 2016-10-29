@@ -3021,8 +3021,7 @@ void guard_bio_eod(int op, struct bio *bio)
 	unsigned truncated_bytes;
 	/*
 	 * It is safe to truncate the last bvec in the following way
-	 * even though multipage bvec is supported, but we need to
-	 * fix the parameters passed to zero_user().
+	 * even though multipage bvec is supported.
 	 */
 	struct bio_vec *bvec = &bio->bi_io_vec[bio->bi_vcnt - 1];
 
@@ -3045,15 +3044,21 @@ void guard_bio_eod(int op, struct bio *bio)
 	/* Uhhuh. We've got a bio that straddles the device size! */
 	truncated_bytes = bio->bi_iter.bi_size - (maxsector << 9);
 
+	/* ..and clear the end of the buffer for reads */
+	if (op == REQ_OP_READ) {
+		struct bvec_iter start = BVEC_ITER_ALL_INIT;
+		struct bvec_iter iter;
+		struct bio_vec bv;
+
+		start.bi_bvec_done = bvec->bv_len - truncated_bytes;
+
+		__bvec_for_each_sp_bvec(bv, bvec, iter, start)
+			zero_user(bv.bv_page, bv.bv_offset, bv.bv_len);
+	}
+
 	/* Truncate the bio.. */
 	bio->bi_iter.bi_size -= truncated_bytes;
 	bvec->bv_len -= truncated_bytes;
-
-	/* ..and clear the end of the buffer for reads */
-	if (op == REQ_OP_READ) {
-		zero_user(bvec->bv_page, bvec->bv_offset + bvec->bv_len,
-				truncated_bytes);
-	}
 }
 
 static int submit_bh_wbc(int op, int op_flags, struct buffer_head *bh,
