@@ -2518,6 +2518,9 @@ static void pkt_init_queue(struct pktcdvd_device *pd)
 	blk_queue_logical_block_size(q, CD_FRAMESIZE);
 	blk_queue_max_hw_sectors(q, PACKET_MAX_SECTORS);
 	q->queuedata = pd;
+
+	/* not ready for multipage bvec yet */
+	set_bit(QUEUE_FLAG_NO_MP, &q->queue_flags);
 }
 
 static int pkt_seq_show(struct seq_file *m, void *p)
