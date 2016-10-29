@@ -187,22 +187,38 @@ static void bounce_end_io_read_isa(struct bio *bio)
 	__bounce_end_io_read(bio, isa_page_pool);
 }
 
+static inline bool need_split(struct request_queue *q, struct bio *bio)
+{
+	return bio_sectors(bio) > BIO_SP_MAX_SECTORS;
+}
+
+static inline bool need_bounce(struct request_queue *q, struct bio *bio)
+{
+	struct bvec_iter iter;
+	struct bio_vec bv;
+
+	bio_for_each_segment_mp(bv, bio, iter) {
+		unsigned nr = (bv.bv_offset + bv.bv_len - 1) >>
+			PAGE_SHIFT;
+
+		if (page_to_pfn(bv.bv_page) + nr > queue_bounce_pfn(q))
+			return true;
+	}
+	return false;
+}
+
 static void __blk_queue_bounce(struct request_queue *q, struct bio **bio_orig,
 			       mempool_t *pool)
 {
 	struct bio *bio;
 	int rw = bio_data_dir(*bio_orig);
-	struct bio_vec *to, from;
-	struct bvec_iter iter;
+	struct bio_vec *to;
 	unsigned i;
 
-	bio_for_each_segment(from, *bio_orig, iter)
-		if (page_to_pfn(from.bv_page) > queue_bounce_pfn(q))
-			goto bounce;
+	if (!need_bounce(q, *bio_orig))
+		return;
 
-	return;
-bounce:
-	bio = bio_clone_bioset(*bio_orig, GFP_NOIO, fs_bio_set);
+	bio = bio_clone_bioset_sp(*bio_orig, GFP_NOIO, fs_bio_set);
 
 	bio_for_each_segment_all(to, bio, i) {
 		struct page *page = to->bv_page;
@@ -267,9 +283,23 @@ void blk_queue_bounce(struct request_queue *q, struct bio **bio_orig)
 		pool = isa_page_pool;
 	}
 
+	if (!need_bounce(q, *bio_orig))
+		return;
+
 	/*
 	 * slow path
+	 *
+	 * REQ_PC bio won't reach splitting because multipage bvecs
+	 * isn't enabled for REQ_PC.
 	 */
+	if (need_split(q, *bio_orig)) {
+		struct bio *split = bio_split(*bio_orig,
+					      BIO_SP_MAX_SECTORS,
+					      GFP_NOIO, q->bio_split);
+		bio_chain(split, *bio_orig);
+		generic_make_request(*bio_orig);
+		*bio_orig = split;
+	}
 	__blk_queue_bounce(q, bio_orig, pool);
 }
 
