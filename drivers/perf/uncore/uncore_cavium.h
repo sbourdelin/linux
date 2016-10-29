@@ -71,3 +71,4 @@ ssize_t thunder_events_sysfs_show(struct device *dev,
 				  char *page);
 int thunder_uncore_l2c_tad_setup(void);
 int thunder_uncore_l2c_cbc_setup(void);
+int thunder_uncore_lmc_setup(void);
