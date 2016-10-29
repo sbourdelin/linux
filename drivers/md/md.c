@@ -5128,6 +5128,16 @@ static void md_safemode_timeout(unsigned long data)
 
 static int start_dirty_degraded;
 
+/*
+ * MD isn't ready for multipage bvecs yet, and set the flag
+ * so that MD still can see singlepage bvecs bio
+ */
+static inline void md_set_no_mp(struct mddev *mddev)
+{
+	if (mddev->queue)
+		set_bit(QUEUE_FLAG_NO_MP, &mddev->queue->queue_flags);
+}
+
 int md_run(struct mddev *mddev)
 {
 	int err;
@@ -5352,6 +5362,8 @@ int md_run(struct mddev *mddev)
 
 	if (mddev->flags & MD_UPDATE_SB_FLAGS)
 		md_update_sb(mddev, 0);
+
+	md_set_no_mp(mddev);
 
 	md_new_event(mddev);
 	sysfs_notify_dirent_safe(mddev->sysfs_state);
