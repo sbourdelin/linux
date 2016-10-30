@@ -3904,6 +3904,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 		macpower = false;
 	else
 		macpower = true;
+	macpower = false; // Code testing shows macpower must always be set to false to avoid failure
 
 	ret = fops->power_on(priv);
 	if (ret < 0) {
