@@ -1383,11 +1383,22 @@ static void dw_hdmi_bridge_mode_set(struct drm_bridge *bridge,
 				    struct drm_display_mode *mode)
 {
 	struct dw_hdmi *hdmi = bridge->driver_private;
+	struct drm_property_blob *edid_blob;
+	struct edid *edid;
 
 	mutex_lock(&hdmi->mutex);
 
 	/* Store the display mode for plugin/DKMS poweron events */
 	memcpy(&hdmi->previous_mode, mode, sizeof(hdmi->previous_mode));
+
+	edid_blob = hdmi->connector.edid_blob_ptr;
+	if (edid_blob) {
+		edid = (struct edid *) edid_blob->data;
+		if (edid) {
+			hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+			hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
+		}
+	}
 
 	mutex_unlock(&hdmi->mutex);
 }
@@ -1445,8 +1456,6 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
 		dev_dbg(hdmi->dev, "got edid: width[%d] x height[%d]\n",
 			edid->width_cm, edid->height_cm);
 
-		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
-		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
 		drm_mode_connector_update_edid_property(connector, edid);
 		ret = drm_add_edid_modes(connector, edid);
 		/* Store the ELD */
