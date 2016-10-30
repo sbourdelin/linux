@@ -5743,6 +5743,11 @@ static int rtl8xxxu_start(struct ieee80211_hw *hw)
 
 	ret = 0;
 
+	ret = rtl8xxxu_init_device(hw);
+	if (ret)
+		goto error_out;
+
+
 	init_usb_anchor(&priv->rx_anchor);
 	init_usb_anchor(&priv->tx_anchor);
 	init_usb_anchor(&priv->int_anchor);
@@ -6043,10 +6048,6 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 		dev_err(&udev->dev, "Fatal - failed to load firmware\n");
 		goto exit;
 	}
-
-	ret = rtl8xxxu_init_device(hw);
-	if (ret)
-		goto exit;
 
 	hw->wiphy->max_scan_ssids = 1;
 	hw->wiphy->max_scan_ie_len = IEEE80211_MAX_DATA_LEN;
