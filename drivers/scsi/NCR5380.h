@@ -290,7 +290,8 @@ static void NCR5380_print(struct Scsi_Host *instance);
 #define NCR5380_dprint_phase(flg, arg) do {} while (0)
 #endif
 
-static int NCR5380_probe_irq(struct Scsi_Host *instance, int possible);
+static void NCR5380_trigger_irq(struct Scsi_Host *instance);
+static int NCR5380_probe_irq(struct Scsi_Host *instance);
 static int NCR5380_init(struct Scsi_Host *instance, int flags);
 static int NCR5380_maybe_reset_bus(struct Scsi_Host *);
 static void NCR5380_exit(struct Scsi_Host *instance);

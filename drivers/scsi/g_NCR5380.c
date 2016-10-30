@@ -265,7 +265,7 @@ static int generic_NCR5380_init_one(struct scsi_host_template *tpnt,
 	if (irq != IRQ_AUTO)
 		instance->irq = irq;
 	else
-		instance->irq = NCR5380_probe_irq(instance, 0xffff);
+		instance->irq = NCR5380_probe_irq(instance);
 
 	/* Compatibility with documented NCR5380 kernel parameters */
 	if (instance->irq == 255)
