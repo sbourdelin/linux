@@ -67,6 +67,14 @@ MODULE_PARM_DESC(card, "card type (0=NCR5380, 1=NCR53C400, 2=NCR53C400A, 3=DTC31
 MODULE_ALIAS("g_NCR5380_mmio");
 MODULE_LICENSE("GPL");
 
+static bool irq_working;
+
+static irqreturn_t test_irq(int irq, void *dev_id)
+{
+	irq_working = true;
+	return IRQ_HANDLED;
+}
+
 /*
  * Configure I/O address of 53C400A or DTC436 by writing magic numbers
  * to ports 0x779 and 0x379.
@@ -275,10 +283,30 @@ static int generic_NCR5380_init_one(struct scsi_host_template *tpnt,
 		/* set IRQ for HP C2502 */
 		if (board == BOARD_HP_C2502)
 			magic_configure(port_idx, instance->irq, magic);
-		if (request_irq(instance->irq, generic_NCR5380_intr,
-				0, "NCR5380", instance)) {
+		/* test if the IRQ is working */
+		irq_working = false;
+		if (request_irq(instance->irq, test_irq,
+				0, "NCR5380-irqtest", NULL)) {
 			printk(KERN_WARNING "scsi%d : IRQ%d not free, interrupts disabled\n", instance->host_no, instance->irq);
 			instance->irq = NO_IRQ;
+		} else {
+			NCR5380_trigger_irq(instance);
+			NCR5380_read(RESET_PARITY_INTERRUPT_REG);
+			free_irq(instance->irq, NULL);
+			if (irq_working) {
+				if (request_irq(instance->irq,
+						generic_NCR5380_intr, 0,
+						"NCR5380", instance)) {
+					printk(KERN_WARNING "scsi%d : IRQ%d not free, interrupts disabled\n",
+					       instance->host_no,
+					       instance->irq);
+					instance->irq = NO_IRQ;
+				}
+			} else {
+				printk(KERN_WARNING "scsi%d : IRQ%d not working, interrupts disabled\n",
+				       instance->host_no, instance->irq);
+				instance->irq = NO_IRQ;
+			}
 		}
 	}
 
