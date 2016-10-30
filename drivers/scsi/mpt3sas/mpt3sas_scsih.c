@@ -4093,6 +4093,13 @@ scsih_qcmd(struct Scsi_Host *shost, struct scsi_cmnd *scmd)
 	    sas_device_priv_data->block)
 		return SCSI_MLQUEUE_DEVICE_BUSY;
 
+	/*
+	 * Hack: block the device for any ATA_12/ATA_16 command
+	 */
+	if (scmd->cmnd[0] == 0xa1 || scmd->cmnd[0] == 0x85) {
+		sas_device_priv_data = scmd->device->hostdata;
+		_scsih_internal_device_block(scmd->device, sas_device_priv_data);
+	}
 	if (scmd->sc_data_direction == DMA_FROM_DEVICE)
 		mpi_control = MPI2_SCSIIO_CONTROL_READ;
 	else if (scmd->sc_data_direction == DMA_TO_DEVICE)
@@ -4826,6 +4833,10 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 
  out:
 
+	if (scmd->cmnd[0] == 0xa1 || scmd->cmnd[0] == 0x85) {
+		sas_device_priv_data = scmd->device->hostdata;
+		_scsih_internal_device_unblock(scmd->device, sas_device_priv_data);
+	}
 	scsi_dma_unmap(scmd);
 
 	scmd->scsi_done(scmd);
