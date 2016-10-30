@@ -495,6 +495,11 @@ static int NCR5380_init(struct Scsi_Host *instance, int flags)
 
 	NCR5380_write(INITIATOR_COMMAND_REG, ICR_BASE);
 	NCR5380_write(MODE_REG, MR_BASE);
+	/* check if the chip is really there */
+	if (NCR5380_read(MODE_REG) != MR_BASE) {
+		NCR5380_exit(instance);
+		return -ENODEV;
+	}
 	NCR5380_write(TARGET_COMMAND_REG, 0);
 	NCR5380_write(SELECT_ENABLE_REG, 0);
 
