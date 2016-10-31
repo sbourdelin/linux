@@ -16,7 +16,9 @@
 #include <net/sock.h>
 #include <net/inet_sock.h>
 #include <net/netfilter/nf_socket.h>
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
 #include <net/netfilter/nf_conntrack.h>
+#endif
 
 static int
 extract_icmp4_fields(const struct sk_buff *skb, u8 *protocol,

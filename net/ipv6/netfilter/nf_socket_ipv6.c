@@ -18,7 +18,9 @@
 #include <net/inet6_hashtables.h>
 #include <net/netfilter/ipv6/nf_defrag_ipv6.h>
 #include <net/netfilter/nf_socket.h>
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
 #include <net/netfilter/nf_conntrack.h>
+#endif
 
 static int
 extract_icmp6_fields(const struct sk_buff *skb,
