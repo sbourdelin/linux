@@ -111,7 +111,7 @@ struct nfs4_state_owner {
 	unsigned long	     so_flags;
 	struct list_head     so_states;
 	struct nfs_seqid_counter so_seqid;
-	seqcount_t	     so_reclaim_seqcount;
+	struct rw_semaphore  so_reclaim_rw;
 	struct mutex	     so_delegreturn_mutex;
 };
 

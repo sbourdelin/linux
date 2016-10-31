@@ -2682,10 +2682,9 @@ static int _nfs4_open_and_get_state(struct nfs4_opendata *opendata,
 	struct nfs_server *server = sp->so_server;
 	struct dentry *dentry;
 	struct nfs4_state *state;
-	unsigned int seq;
 	int ret;
 
-	seq = raw_seqcount_begin(&sp->so_reclaim_seqcount);
+	down_read(&sp->so_reclaim_rw);
 
 	ret = _nfs4_proc_open(opendata);
 	if (ret != 0)
@@ -2721,12 +2720,10 @@ static int _nfs4_open_and_get_state(struct nfs4_opendata *opendata,
 		goto out;
 
 	ctx->state = state;
-	if (d_inode(dentry) == state->inode) {
+	if (d_inode(dentry) == state->inode)
 		nfs_inode_attach_open_context(ctx);
-		if (read_seqcount_retry(&sp->so_reclaim_seqcount, seq))
-			nfs4_schedule_stateid_recovery(server, state);
-	}
 out:
+	up_read(&sp->so_reclaim_rw);
 	return ret;
 }
 
