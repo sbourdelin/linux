@@ -50,18 +50,14 @@ END_FTR_SECTION(0, 1);						\
 #define OPAL_BRANCH(LABEL)
 #endif
 
-/* TODO:
+/*
+ * DO_OPAL_CALL assumes:
  *
- * - Trace irqs in/off (needs saving/restoring all args, argh...)
- * - Get r11 feed up by Dave so I can have better register usage
+ * r0 = OPAL call token
+ * LR has been saved on the stack
  */
 
-#define OPAL_CALL(name, token)		\
- _GLOBAL_TOC(name);			\
-	mflr	r0;			\
-	std	r0,PPC_LR_STKOFF(r1);	\
-	li	r0,token;		\
-	OPAL_BRANCH(opal_tracepoint_entry) \
+#define DO_OPAL_CALL() 			\
 	mfcr	r12;			\
 	stw	r12,8(r1);		\
 	li	r11,0;			\
@@ -80,6 +76,14 @@ END_FTR_SECTION(0, 1);						\
 	ld	r2,0(r11);		\
 	mtspr	SPRN_HSRR0,r12;		\
 	hrfid
+
+#define OPAL_CALL(name, token)		\
+ _GLOBAL_TOC(name);			\
+	mflr	r0;			\
+	std	r0,PPC_LR_STKOFF(r1);	\
+	li	r0,token;		\
+	OPAL_BRANCH(opal_tracepoint_entry) \
+	DO_OPAL_CALL()
 
 opal_return:
 	/*
@@ -122,26 +126,12 @@ opal_tracepoint_entry:
 	ld	r8,STK_REG(R29)(r1)
 	ld	r9,STK_REG(R30)(r1)
 	ld	r10,STK_REG(R31)(r1)
+
+	/* return from the opal call via tracepoint_return */
 	LOAD_REG_ADDR(r11,opal_tracepoint_return)
-	mfcr	r12
 	std	r11,16(r1)
-	stw	r12,8(r1)
-	li	r11,0
-	mfmsr	r12
-	ori	r11,r11,MSR_EE
-	std	r12,PACASAVEDMSR(r13)
-	andc	r12,r12,r11
-	mtmsrd	r12,1
-	LOAD_REG_ADDR(r11,opal_return)
-	mtlr	r11
-	li	r11,MSR_DR|MSR_IR|MSR_LE
-	andc	r12,r12,r11
-	mtspr	SPRN_HSRR1,r12
-	LOAD_REG_ADDR(r11,opal)
-	ld	r12,8(r11)
-	ld	r2,0(r11)
-	mtspr	SPRN_HSRR0,r12
-	hrfid
+
+	DO_OPAL_CALL()
 
 opal_tracepoint_return:
 	std	r3,STK_REG(R31)(r1)
