@@ -156,11 +156,28 @@ static void magic_configure(int idx, u8 irq, u8 magic[])
 	outb(magic[4], 0x379);
 
 	/* allowed IRQs for HP C2502 */
+	if (irq == 9)
+		irq = 2;
 	if (irq != 2 && irq != 3 && irq != 4 && irq != 5 && irq != 7)
 		irq = 0;
 	if (idx >= 0 && idx <= 7)
 		cfg = 0x80 | idx | (irq << 4);
 	outb(cfg, 0x379);
+}
+
+/* find a free and working IRQ (for HP C2502) */
+static int NCR5380_find_irq(struct Scsi_Host *instance, u8 irqs[],
+			    int port_idx, u8 magic[])
+{
+	int i;
+
+	for (i = 0; irqs[i]; i++) {
+		magic_configure(port_idx, irqs[i], magic);
+		if (NCR5380_test_irq(instance, irqs[i]) == 0)
+			return irqs[i];
+	}
+	magic_configure(port_idx, 0, magic);
+	return NO_IRQ;
 }
 
 static unsigned int ncr_53c400a_ports[] = {
@@ -174,6 +191,9 @@ static u8 ncr_53c400a_magic[] = {	/* 53C400A & DTC436 */
 };
 static u8 hp_c2502_magic[] = {	/* HP C2502 */
 	0x0f, 0x22, 0xf0, 0x20, 0x80
+};
+static u8 hp_c2502_irqs[] = {
+	9, 5, 7, 3, 4, 0
 };
 
 static int generic_NCR5380_init_one(struct scsi_host_template *tpnt,
@@ -345,8 +365,13 @@ static int generic_NCR5380_init_one(struct scsi_host_template *tpnt,
 
 	if (irq != IRQ_AUTO)
 		instance->irq = irq;
-	else
-		instance->irq = NCR5380_probe_irq(instance);
+	else {
+		if (board == BOARD_HP_C2502)
+			instance->irq = NCR5380_find_irq(instance,
+						hp_c2502_irqs, port_idx, magic);
+		else
+			instance->irq = NCR5380_probe_irq(instance);
+	}
 
 	/* Compatibility with documented NCR5380 kernel parameters */
 	if (instance->irq == 255)
