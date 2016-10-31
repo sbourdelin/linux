@@ -73,7 +73,6 @@ struct mqueue_inode_info {
 
 	struct sigevent notify;
 	struct pid *notify_owner;
-	struct user_namespace *notify_user_ns;
 	struct user_struct *user;	/* user who created, for accounting */
 	struct sock *notify_sock;
 	struct sk_buff *notify_cookie;
@@ -240,7 +239,6 @@ static struct inode *mqueue_get_inode(struct super_block *sb,
 		INIT_LIST_HEAD(&info->e_wait_q[0].list);
 		INIT_LIST_HEAD(&info->e_wait_q[1].list);
 		info->notify_owner = NULL;
-		info->notify_user_ns = NULL;
 		info->qsize = 0;
 		info->user = NULL;	/* set when all is ok */
 		info->msg_tree = RB_ROOT;
@@ -643,7 +641,7 @@ static void __do_notify(struct mqueue_inode_info *info)
 			rcu_read_lock();
 			sig_i.si_pid = task_tgid_nr_ns(current,
 						ns_of_pid(info->notify_owner));
-			sig_i.si_uid = from_kuid_munged(info->notify_user_ns, current_uid());
+			sig_i.si_uid = from_kuid(&init_user_ns, current_uid());
 			rcu_read_unlock();
 
 			kill_pid_info(info->notify.sigev_signo,
@@ -656,9 +654,7 @@ static void __do_notify(struct mqueue_inode_info *info)
 		}
 		/* after notification unregisters process */
 		put_pid(info->notify_owner);
-		put_user_ns(info->notify_user_ns);
 		info->notify_owner = NULL;
-		info->notify_user_ns = NULL;
 	}
 	wake_up(&info->wait_q);
 }
@@ -683,9 +679,7 @@ static void remove_notification(struct mqueue_inode_info *info)
 		netlink_sendskb(info->notify_sock, info->notify_cookie);
 	}
 	put_pid(info->notify_owner);
-	put_user_ns(info->notify_user_ns);
 	info->notify_owner = NULL;
-	info->notify_user_ns = NULL;
 }
 
 static int mq_attr_ok(struct ipc_namespace *ipc_ns, struct mq_attr *attr)
@@ -1301,7 +1295,6 @@ retry:
 		}
 
 		info->notify_owner = get_pid(task_tgid(current));
-		info->notify_user_ns = get_user_ns(current_user_ns());
 		inode->i_atime = inode->i_ctime = current_time(inode);
 	}
 	spin_unlock(&info->lock);

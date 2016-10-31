@@ -951,7 +951,7 @@ static inline int legacy_queue(struct sigpending *signals, int sig)
 #ifdef CONFIG_USER_NS
 static inline void userns_fixup_signal_uid(struct siginfo *info, struct task_struct *t)
 {
-	if (current_user_ns() == task_cred_xxx(t, user_ns))
+	if (&init_user_ns == task_cred_xxx(t, user_ns))
 		return;
 
 	if (SI_FROMKERNEL(info))
@@ -959,7 +959,7 @@ static inline void userns_fixup_signal_uid(struct siginfo *info, struct task_str
 
 	rcu_read_lock();
 	info->si_uid = from_kuid_munged(task_cred_xxx(t, user_ns),
-					make_kuid(current_user_ns(), info->si_uid));
+					make_kuid(&init_user_ns, info->si_uid));
 	rcu_read_unlock();
 }
 #else
@@ -1027,7 +1027,8 @@ static int __send_signal(int sig, struct siginfo *info, struct task_struct *t,
 			q->info.si_code = SI_USER;
 			q->info.si_pid = task_tgid_nr_ns(current,
 							task_active_pid_ns(t));
-			q->info.si_uid = from_kuid_munged(current_user_ns(), current_uid());
+			q->info.si_uid = from_kuid(&init_user_ns,
+						   current_uid());
 			break;
 		case (unsigned long) SEND_SIG_PRIV:
 			q->info.si_signo = sig;
@@ -1609,8 +1610,7 @@ bool do_notify_parent(struct task_struct *tsk, int sig)
 	 */
 	rcu_read_lock();
 	info.si_pid = task_pid_nr_ns(tsk, task_active_pid_ns(tsk->parent));
-	info.si_uid = from_kuid_munged(task_cred_xxx(tsk->parent, user_ns),
-				       task_uid(tsk));
+	info.si_uid = from_kuid(&init_user_ns, task_uid(tsk));
 	rcu_read_unlock();
 
 	task_cputime(tsk, &utime, &stime);
@@ -1695,7 +1695,7 @@ static void do_notify_parent_cldstop(struct task_struct *tsk,
 	 */
 	rcu_read_lock();
 	info.si_pid = task_pid_nr_ns(tsk, task_active_pid_ns(parent));
-	info.si_uid = from_kuid_munged(task_cred_xxx(parent, user_ns), task_uid(tsk));
+	info.si_uid = from_kuid(&init_user_ns, task_uid(tsk));
 	rcu_read_unlock();
 
 	task_cputime(tsk, &utime, &stime);
@@ -1904,7 +1904,7 @@ static void ptrace_do_notify(int signr, int exit_code, int why)
 	info.si_signo = signr;
 	info.si_code = exit_code;
 	info.si_pid = task_pid_vnr(current);
-	info.si_uid = from_kuid_munged(current_user_ns(), current_uid());
+	info.si_uid = from_kuid(&init_user_ns, current_uid());
 
 	/* Let the debugger run.  */
 	ptrace_stop(exit_code, why, 1, &info);
@@ -2113,8 +2113,8 @@ static int ptrace_signal(int signr, siginfo_t *info)
 		info->si_code = SI_USER;
 		rcu_read_lock();
 		info->si_pid = task_pid_vnr(current->parent);
-		info->si_uid = from_kuid_munged(current_user_ns(),
-						task_uid(current->parent));
+		info->si_uid = from_kuid(&init_user_ns,
+					 task_uid(current->parent));
 		rcu_read_unlock();
 	}
 
@@ -2852,7 +2852,7 @@ SYSCALL_DEFINE2(kill, pid_t, pid, int, sig)
 	info.si_errno = 0;
 	info.si_code = SI_USER;
 	info.si_pid = task_tgid_vnr(current);
-	info.si_uid = from_kuid_munged(current_user_ns(), current_uid());
+	info.si_uid = from_kuid(&init_user_ns, current_uid());
 
 	return kill_something_info(sig, &info, pid);
 }
@@ -2895,7 +2895,7 @@ static int do_tkill(pid_t tgid, pid_t pid, int sig)
 	info.si_errno = 0;
 	info.si_code = SI_TKILL;
 	info.si_pid = task_tgid_vnr(current);
-	info.si_uid = from_kuid_munged(current_user_ns(), current_uid());
+	info.si_uid = from_kuid(&init_user_ns, current_uid());
 
 	return do_send_specific(tgid, pid, sig, &info);
 }
