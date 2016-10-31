@@ -302,7 +302,10 @@ static struct {
 	u32 hotkey:1;
 	u32 hotkey_mask:1;
 	u32 hotkey_wlsw:1;
-	u32 hotkey_tablet:1;
+	enum {
+		TP_HOTKEY_TABLET_NONE = 0,
+		TP_HOTKEY_TABLET_USES_MHKG = 1,
+	} hotkey_tablet;
 	u32 kbdlight:1;
 	u32 light:1;
 	u32 light_status:1;
@@ -3117,6 +3120,34 @@ static const struct tpacpi_quirk tpacpi_hotkey_qtable[] __initconst = {
 typedef u16 tpacpi_keymap_entry_t;
 typedef tpacpi_keymap_entry_t tpacpi_keymap_t[TPACPI_HOTKEY_MAP_LEN];
 
+static int
+hotkey_init_tablet_mode(void)
+{
+	int res;
+	char *type;
+	bool in_tablet_mode;
+
+	/* For X41t, X60t, X61t Tablets... */
+	if (acpi_evalf(hkey_handle, &res, "MHKG", "qd")) {
+		tp_features.hotkey_tablet = TP_HOTKEY_TABLET_USES_MHKG;
+		in_tablet_mode = !!(res & TP_HOTKEY_TABLET_MASK);
+		type = "MHKG";
+	}
+
+	if (!tp_features.hotkey_tablet)
+		return 0;
+
+	pr_info("Tablet mode switch found (type: %s), currently in %s mode\n",
+		type, in_tablet_mode ? "tablet" : "laptop");
+
+	res = add_to_attr_set(hotkey_dev_attributes,
+			      &dev_attr_hotkey_tablet_mode.attr);
+	if (res)
+		return -1;
+
+	return in_tablet_mode;
+}
+
 static int __init hotkey_init(struct ibm_init_struct *iibm)
 {
 	/* Requirements for changing the default keymaps:
@@ -3464,23 +3495,18 @@ static int __init hotkey_init(struct ibm_init_struct *iibm)
 		res = add_to_attr_set(hotkey_dev_attributes,
 				&dev_attr_hotkey_radio_sw.attr);
 
-	/* For X41t, X60t, X61t Tablets... */
-	if (!res && acpi_evalf(hkey_handle, &status, "MHKG", "qd")) {
-		tp_features.hotkey_tablet = 1;
-		tabletsw_state = !!(status & TP_HOTKEY_TABLET_MASK);
-		pr_info("possible tablet mode switch found; "
-			"ThinkPad in %s mode\n",
-			(tabletsw_state) ? "tablet" : "laptop");
-		res = add_to_attr_set(hotkey_dev_attributes,
-				&dev_attr_hotkey_tablet_mode.attr);
-	}
-
 	if (!res)
 		res = register_attr_set_with_sysfs(
 				hotkey_dev_attributes,
 				&tpacpi_pdev->dev.kobj);
 	if (res)
 		goto err_exit;
+
+	res = hotkey_init_tablet_mode();
+	if (res < 0)
+		goto err_exit;
+
+	tabletsw_state = res;
 
 	/* Set up key map */
 	hotkey_keycode_map = kmalloc(TPACPI_HOTKEY_MAP_SIZE,
