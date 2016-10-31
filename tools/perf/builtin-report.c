@@ -670,6 +670,10 @@ const char report_callchain_help[] = "Display call graph (stack chain/backtrace)
 				     CALLCHAIN_REPORT_HELP
 				     "\n\t\t\t\tDefault: " CALLCHAIN_DEFAULT_OPT;
 
+#define CALLCHAIN_BRANCH_SORT_ORDER	\
+	"srcline,symbol,dso,callchain_branch_predicted," \
+	"callchain_branch_abort,callchain_branch_cycles"
+
 int cmd_report(int argc, const char **argv, const char *prefix __maybe_unused)
 {
 	struct perf_session *session;
@@ -930,7 +934,7 @@ repeat:
 		symbol_conf.use_callchain = true;
 		callchain_register_param(&callchain_param);
 		if (sort_order == NULL)
-			sort_order = "srcline,symbol,dso";
+			sort_order = CALLCHAIN_BRANCH_SORT_ORDER;
 	}
 
 	if (report.mem_mode) {
