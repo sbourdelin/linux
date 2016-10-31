@@ -144,6 +144,9 @@ static inline unsigned long kmem_cache_flags(unsigned long object_size,
 
 #define CACHE_CREATE_MASK (SLAB_CORE_FLAGS | SLAB_DEBUG_FLAGS | SLAB_CACHE_FLAGS)
 
+/* Common allocator flags allowed for cache_create. */
+#define SLAB_FLAGS_PERMITTED (CACHE_CREATE_MASK | SLAB_KASAN)
+
 int __kmem_cache_shutdown(struct kmem_cache *);
 void __kmem_cache_release(struct kmem_cache *);
 int __kmem_cache_shrink(struct kmem_cache *, bool);
