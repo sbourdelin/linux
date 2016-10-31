@@ -81,7 +81,7 @@ static int noinline arc_get_timer_clk(struct device_node *node)
 
 /********** Clock Source Device *********/
 
-#ifdef CONFIG_ARC_HAS_GFRC
+#ifdef CONFIG_ARC_TIMER_GFRC
 
 static cycle_t arc_read_gfrc(struct clocksource *cs)
 {
@@ -135,7 +135,7 @@ CLOCKSOURCE_OF_DECLARE(arc_gfrc, "snps,archs-timer-gfrc", arc_cs_setup_gfrc);
 
 #endif
 
-#ifdef CONFIG_ARC_HAS_RTC
+#ifdef CONFIG_ARC_TIMER_RTC
 
 #define AUX_RTC_CTRL	0x103
 #define AUX_RTC_LOW	0x104
