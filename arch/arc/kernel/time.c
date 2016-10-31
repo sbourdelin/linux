@@ -38,8 +38,8 @@
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <asm/irq.h>
-#include <asm/arcregs.h>
 
+#include <soc/arc/timers.h>
 #include <soc/arc/mcip.h>
 
 /* Timer related Aux registers */
