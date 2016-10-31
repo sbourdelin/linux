@@ -577,6 +577,15 @@ static inline unsigned int cpuid_edx(unsigned int op)
 	return edx;
 }
 
+static inline unsigned int cpuid_count_edx(unsigned op, unsigned count)
+{
+	unsigned int eax, ebx, ecx, edx;
+
+	cpuid_count(op, count, &eax, &ebx, &ecx, &edx);
+
+	return edx;
+}
+
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 static __always_inline void rep_nop(void)
 {
