@@ -18,7 +18,6 @@
  * Greg Kroah-Hartman, published by O'Reilly Media, Inc.
  */
 
-#include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/kernel.h>	/* printk() */
 #include <linux/slab.h>		/* kmalloc() */
@@ -70,8 +69,6 @@ struct srom_dev {
 
 static int srom_major;			/* Dynamic major by default */
 module_param(srom_major, int, 0);
-MODULE_AUTHOR("Tilera Corporation");
-MODULE_LICENSE("GPL");
 
 static int srom_devs;			/* Number of SROM partitions */
 static struct cdev srom_cdev;
@@ -456,19 +453,4 @@ fail_mem:
 	kfree(srom_devices);
 	return result;
 }
-
-/** srom_cleanup() - Clean up the driver's module. */
-static void srom_cleanup(void)
-{
-	int i;
-	for (i = 0; i < srom_devs; i++)
-		device_destroy(srom_class, MKDEV(srom_major, i));
-	class_destroy(srom_class);
-	cdev_del(&srom_cdev);
-	platform_device_unregister(srom_parent);
-	unregister_chrdev_region(MKDEV(srom_major, 0), srom_devs);
-	kfree(srom_devices);
-}
-
-module_init(srom_init);
-module_exit(srom_cleanup);
+device_initcall(srom_init);
