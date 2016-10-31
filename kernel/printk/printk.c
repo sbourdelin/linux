@@ -264,6 +264,13 @@ void console_set_by_of(void)
 # define of_specified_console false
 #endif
 
+/*
+ * The first usable console, which we'll fall back to using if the system
+ * uses a device tree which indicates a stdout-path device for which we
+ * have no driver, or for which our driver doesn't call of_console_check().
+ */
+static struct console *of_fallback_console;
+
 /* Flag: console code may call schedule() */
 static int console_may_schedule;
 
@@ -2598,6 +2605,8 @@ static int __init keep_bootcon_setup(char *str)
 
 early_param("keep_bootcon", keep_bootcon_setup);
 
+static void enable_console(struct console *newcon);
+
 /*
  * The console driver calls this routine during kernel initialization
  * to register the console printing procedure with printk() and to
@@ -2620,7 +2629,6 @@ early_param("keep_bootcon", keep_bootcon_setup);
 void register_console(struct console *newcon)
 {
 	int i;
-	unsigned long flags;
 	struct console *bcon = NULL;
 	struct console_cmdline *c;
 
@@ -2657,7 +2665,9 @@ void register_console(struct console *newcon)
 	 *	didn't select a console we take the first one
 	 *	that registers here.
 	 */
-	if (preferred_console < 0 && !of_specified_console) {
+	if (preferred_console < 0 && of_specified_console) {
+		of_fallback_console = of_fallback_console ?: newcon;
+	} else if (preferred_console < 0) {
 		if (newcon->index < 0)
 			newcon->index = 0;
 		if (newcon->setup == NULL ||
@@ -2705,8 +2715,18 @@ void register_console(struct console *newcon)
 		break;
 	}
 
-	if (!(newcon->flags & CON_ENABLED))
-		return;
+	if (newcon->flags & CON_ENABLED)
+		enable_console(newcon);
+}
+EXPORT_SYMBOL(register_console);
+
+static void enable_console(struct console *newcon)
+{
+	struct console *bcon = NULL;
+	unsigned long flags;
+
+	if (console_drivers && console_drivers->flags & CON_BOOT)
+		bcon = console_drivers;
 
 	/*
 	 * If we have a bootconsole, and are switching to a real console,
@@ -2777,7 +2797,6 @@ void register_console(struct console *newcon)
 				unregister_console(bcon);
 	}
 }
-EXPORT_SYMBOL(register_console);
 
 int unregister_console(struct console *console)
 {
@@ -2839,10 +2858,41 @@ EXPORT_SYMBOL(unregister_console);
  * intersects with the init section. Note that code exists elsewhere to get
  * rid of the boot console as soon as the proper console shows up, so there
  * won't be side-effects from postponing the removal.
+ *
+ * Additionally we may be using a device tree which specifies valid
+ * stdout-path referencing a device for which we don't have a driver, or for
+ * which we have a driver that doesn't register itself as preferred console
+ * using of_console_check(). In these cases we attempt here to enable the
+ * first usable registered console, which we assigned to of_fallback_console.
  */
 static int __init printk_late_init(void)
 {
 	struct console *con;
+	bool any_enabled = false;
+
+	for_each_console(con) {
+		if (!(con->flags & CON_ENABLED))
+			continue;
+
+		any_enabled = true;
+		break;
+	}
+
+	if (!any_enabled && of_fallback_console) {
+		if (of_fallback_console->index < 0)
+			of_fallback_console->index = 0;
+
+		if (!of_fallback_console->setup ||
+		    !of_fallback_console->setup(of_fallback_console, NULL)) {
+			of_fallback_console->flags |= CON_ENABLED;
+			if (of_fallback_console->device) {
+				of_fallback_console->flags |= CON_CONSDEV;
+				preferred_console = 0;
+			}
+		}
+
+		enable_console(of_fallback_console);
+	}
 
 	for_each_console(con) {
 		if (!keep_bootcon && con->flags & CON_BOOT) {
