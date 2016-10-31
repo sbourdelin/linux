@@ -2094,6 +2094,9 @@ static int _nfs4_proc_open_confirm(struct nfs4_opendata *data)
 	};
 	int status;
 
+	if (server->nfs_client->cl_mvops->minor_version != 0)
+		return 0;
+
 	nfs4_init_sequence(&data->c_arg.seq_args, &data->c_res.seq_res, 1);
 	kref_get(&data->kref);
 	data->rpc_done = 0;
