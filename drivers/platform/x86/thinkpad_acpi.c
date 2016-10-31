@@ -3130,12 +3130,15 @@ hotkey_init_tablet_mode(void)
 	/* For X41t, X60t, X61t Tablets... */
 	if (acpi_evalf(hkey_handle, &res, "MHKG", "qd")) {
 		tp_features.hotkey_tablet = TP_HOTKEY_TABLET_USES_MHKG;
-		in_tablet_mode = !!(res & TP_HOTKEY_TABLET_MASK);
 		type = "MHKG";
 	}
 
 	if (!tp_features.hotkey_tablet)
 		return 0;
+
+	res = hotkey_get_tablet_mode(&in_tablet_mode);
+	if (res)
+		return res;
 
 	pr_info("Tablet mode switch found (type: %s), currently in %s mode\n",
 		type, in_tablet_mode ? "tablet" : "laptop");
