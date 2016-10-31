@@ -715,7 +715,7 @@ static int nfit_test0_alloc(struct nfit_test *t)
 				&t->pdev.dev, 0, NULL,
 				nfit_test_dimm_attribute_groups,
 				"test_dimm%d", i);
-		if (!t->dimm_dev[i])
+		if (IS_ERR(t->dimm_dev[i]))
 			return -ENOMEM;
 	}
 
