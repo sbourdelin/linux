@@ -329,6 +329,9 @@ latex_elements = {
 	% To allow adjusting table sizes
 	\\usepackage{adjustbox}
 
+	% Fix reference escape troubles with Sphinx 1.4.x
+	\\renewcommand*{\\DUrole}[2]{ #2 }
+
      '''
 }
 
