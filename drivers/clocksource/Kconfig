@@ -282,6 +282,30 @@ config CLKSRC_MPS2
 	select CLKSRC_MMIO
 	select CLKSRC_OF
 
+config ARC_TIMER
+	bool "Enable timers for ARC Cores"
+	select CLKSRC_OF if OF
+
+if ARC_TIMER
+
+config ARC_TIMER_RTC
+	bool "64-bit cycle counter in HS38 cores"
+	default y if ARC
+	depends on !SMP
+	help
+	  This counter provides 64-bit resolution vs. the 32-bit TIMER1.
+	  It is implemented inside the core thus can't be used in SMP systems
+
+config ARC_TIMER_GFRC
+	bool "64-bit cycle counter in ARConnect block in HS38x cores"
+	default y if ARC
+	depends on SMP
+	help
+	  This counter can be used as clocksource in SMP HS38 SoCs.
+	  It sits outside the core thus can be used in SMP systems
+
+endif
+
 config ARM_ARCH_TIMER
 	bool
 	select CLKSRC_OF if OF
