@@ -5,6 +5,7 @@
 #include <linux/compiler.h>	/* for inline */
 #include <linux/types.h>	/* for size_t */
 #include <linux/stddef.h>	/* for NULL */
+#include <linux/bug.h>
 #include <stdarg.h>
 #include <uapi/linux/string.h>
 
@@ -44,6 +45,12 @@ extern int strcmp(const char *,const char *);
 #ifndef __HAVE_ARCH_STRNCMP
 extern int strncmp(const char *,const char *,__kernel_size_t);
 #endif
+int _strzcmp(const char *, const char *);
+#define strzcmp(s1, s2)							\
+({									\
+	BUILD_BUG_ON(!__same_type(s2, char []));			\
+	_strzcmp(s1, s2);						\
+})
 #ifndef __HAVE_ARCH_STRCASECMP
 extern int strcasecmp(const char *s1, const char *s2);
 #endif

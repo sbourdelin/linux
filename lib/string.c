@@ -360,6 +360,24 @@ int strncmp(const char *cs, const char *ct, size_t count)
 EXPORT_SYMBOL(strncmp);
 #endif
 
+/**
+ * _strzcmp - Compare two strings limited to the length of the 2nd string
+ * @cs: 1st string
+ * @ct: 2nd string
+ */
+int _strzcmp(const char *cs, const char *ct)
+{
+	while (*cs == *ct && *cs != 0) {
+		cs++;
+		ct++;
+	}
+	if (*ct == 0)
+		return 0;
+
+	return *(unsigned char *)cs < *(unsigned char *)ct ? -1: 1;
+}
+EXPORT_SYMBOL(_strzcmp);
+
 #ifndef __HAVE_ARCH_STRCHR
 /**
  * strchr - Find the first occurrence of a character in a string
