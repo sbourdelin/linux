@@ -131,7 +131,13 @@ void __init rcar_gen2_timer_init(void)
 	iounmap(base);
 #endif /* CONFIG_ARM_ARCH_TIMER */
 
-	rcar_gen2_clocks_init(mode);
+	if (IS_ENABLED(CONFIG_ARCH_R8A7790) ||
+	    IS_ENABLED(CONFIG_ARCH_R8A7791) ||
+	    IS_ENABLED(CONFIG_ARCH_R8A7792) ||
+	    IS_ENABLED(CONFIG_ARCH_R8A7793) ||
+	    IS_ENABLED(CONFIG_ARCH_R8A7794))
+		rcar_gen2_clocks_init(mode);
+
 	clocksource_probe();
 }
 
