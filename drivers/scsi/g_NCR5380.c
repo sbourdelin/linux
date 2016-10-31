@@ -52,9 +52,9 @@ module_param(ncr_53c400a, int, 0);
 module_param(dtc_3181e, int, 0);
 module_param(hp_c2502, int, 0);
 
-static int irq[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+static int irq[] = { IRQ_AUTO, IRQ_AUTO, IRQ_AUTO, IRQ_AUTO, IRQ_AUTO, IRQ_AUTO, IRQ_AUTO, IRQ_AUTO };
 module_param_array(irq, int, NULL, 0);
-MODULE_PARM_DESC(irq, "IRQ number(s)");
+MODULE_PARM_DESC(irq, "IRQ number(s) (0=disable, 254=auto [default])");
 
 static int base[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 module_param_array(base, int, NULL, 0);
