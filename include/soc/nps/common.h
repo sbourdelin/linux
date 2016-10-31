@@ -47,6 +47,8 @@
 
 #ifndef __ASSEMBLY__
 
+#include <soc/arc/aux.h>
+
 /* In order to increase compilation test coverage */
 #ifdef CONFIG_ARC
 static inline void nps_ack_gic(void)
@@ -59,8 +61,6 @@ static inline void nps_ack_gic(void)
 }
 #else
 static inline void nps_ack_gic(void) { }
-#define write_aux_reg(r, v)
-#define read_aux_reg(r) 0
 #endif
 
 /* CPU global ID */
