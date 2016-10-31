@@ -14,6 +14,7 @@
 #include <crypto/algapi.h>
 #include <crypto/scatterwalk.h>
 #include <crypto/internal/aead.h>
+#include <linux/cpufeature.h>
 #include <linux/module.h>
 
 #include "aes-ce-setkey.h"
@@ -296,8 +297,6 @@ static struct aead_alg ccm_aes_alg = {
 
 static int __init aes_mod_init(void)
 {
-	if (!(elf_hwcap & HWCAP_AES))
-		return -ENODEV;
 	return crypto_register_aead(&ccm_aes_alg);
 }
 
@@ -306,7 +305,7 @@ static void __exit aes_mod_exit(void)
 	crypto_unregister_aead(&ccm_aes_alg);
 }
 
-module_init(aes_mod_init);
+module_cpu_feature_match(AES, aes_mod_init);
 module_exit(aes_mod_exit);
 
 MODULE_DESCRIPTION("Synchronous AES in CCM mode using ARMv8 Crypto Extensions");
