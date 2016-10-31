@@ -1873,6 +1873,13 @@ void igb_reset(struct igb_adapter *adapter)
 	struct e1000_fc_info *fc = &hw->fc;
 	u32 pba, hwm;
 
+	/* In case of PCI error, adapter might have lost its HW
+	 * address; if we reached this point after an error scenario,
+	 * we should re-assign the hw_addr based on the saved io_addr.
+	 */
+	if (!hw->hw_addr)
+		hw->hw_addr = adapter->io_addr;
+
 	/* Repartition Pba for greater than 9k mtu
 	 * To take effect CTRL.RST is required.
 	 */
