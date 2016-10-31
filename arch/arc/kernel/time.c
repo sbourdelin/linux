@@ -153,14 +153,11 @@ static cycle_t arc_read_rtc(struct clocksource *cs)
 		cycle_t  full;
 	} stamp;
 
-
-	__asm__ __volatile(
-	"1:						\n"
-	"	lr		%0, [AUX_RTC_LOW]	\n"
-	"	lr		%1, [AUX_RTC_HIGH]	\n"
-	"	lr		%2, [AUX_RTC_CTRL]	\n"
-	"	bbit0.nt	%2, 31, 1b		\n"
-	: "=r" (stamp.low), "=r" (stamp.high), "=r" (status));
+	do {
+		stamp.low = read_aux_reg(AUX_RTC_LOW);
+		stamp.high = read_aux_reg(AUX_RTC_HIGH);
+		status = read_aux_reg(AUX_RTC_CTRL);
+	} while (!(status & 0x80000000UL));
 
 	return stamp.full;
 }
