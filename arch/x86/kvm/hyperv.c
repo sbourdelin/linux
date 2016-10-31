@@ -384,10 +384,9 @@ static void synic_init(struct kvm_vcpu_hv_synic *synic)
 	}
 }
 
-static u64 get_time_ref_counter(struct kvm *kvm)
+static u64 get_time_ref_counter(struct kvm_vcpu *vcpu)
 {
-	struct kvm_hv *hv = &kvm->arch.hyperv;
-	struct kvm_vcpu *vcpu;
+	struct kvm_hv *hv = &vcpu->kvm->arch.hyperv;
 	u64 tsc;
 
 	/*
@@ -395,9 +394,8 @@ static u64 get_time_ref_counter(struct kvm *kvm)
 	 * stable, fall back to get_kvmclock_ns.
 	 */
 	if (!hv->tsc_ref.tsc_sequence)
-		return div_u64(get_kvmclock_ns(kvm), 100);
+		return div_u64(get_kvmclock_ns(vcpu), 100);
 
-	vcpu = kvm_get_vcpu(kvm, 0);
 	tsc = kvm_read_l1_tsc(vcpu, rdtsc());
 	return mul_u64_u64_shr(tsc, hv->tsc_ref.tsc_scale, 64)
 		+ hv->tsc_ref.tsc_offset;
@@ -451,7 +449,7 @@ static int stimer_start(struct kvm_vcpu_hv_stimer *stimer)
 	u64 time_now;
 	ktime_t ktime_now;
 
-	time_now = get_time_ref_counter(stimer_to_vcpu(stimer)->kvm);
+	time_now = get_time_ref_counter(stimer_to_vcpu(stimer));
 	ktime_now = ktime_get();
 
 	if (stimer->config & HV_STIMER_PERIODIC) {
@@ -591,7 +589,7 @@ static int stimer_send_msg(struct kvm_vcpu_hv_stimer *stimer)
 			(struct hv_timer_message_payload *)&msg->u.payload;
 
 	payload->expiration_time = stimer->exp_time;
-	payload->delivery_time = get_time_ref_counter(vcpu->kvm);
+	payload->delivery_time = get_time_ref_counter(vcpu);
 	return synic_deliver_msg(vcpu_to_synic(vcpu),
 				 HV_STIMER_SINT(stimer->config), msg);
 }
@@ -626,7 +624,7 @@ void kvm_hv_process_stimers(struct kvm_vcpu *vcpu)
 
 				if (exp_time) {
 					time_now =
-						get_time_ref_counter(vcpu->kvm);
+						get_time_ref_counter(vcpu);
 					if (time_now >= exp_time)
 						stimer_expiration(stimer);
 				}
@@ -1051,7 +1049,7 @@ static int kvm_hv_get_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata)
 		data = hv->hv_hypercall;
 		break;
 	case HV_X64_MSR_TIME_REF_COUNT:
-		data = get_time_ref_counter(kvm);
+		data = get_time_ref_counter(vcpu);
 		break;
 	case HV_X64_MSR_REFERENCE_TSC:
 		data = hv->hv_tsc_page;

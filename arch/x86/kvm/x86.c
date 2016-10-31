@@ -1722,10 +1722,9 @@ static void kvm_gen_update_masterclock(struct kvm *kvm)
 #endif
 }
 
-static u64 __get_kvmclock_ns(struct kvm *kvm)
+static u64 __get_kvmclock_ns(struct kvm_vcpu *vcpu)
 {
-	struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, 0);
-	struct kvm_arch *ka = &kvm->arch;
+	struct kvm_arch *ka = &vcpu->kvm->arch;
 	s64 ns;
 
 	if (vcpu->arch.hv_clock.flags & PVCLOCK_TSC_STABLE_BIT) {
@@ -1738,13 +1737,13 @@ static u64 __get_kvmclock_ns(struct kvm *kvm)
 	return ns;
 }
 
-u64 get_kvmclock_ns(struct kvm *kvm)
+u64 get_kvmclock_ns(struct kvm_vcpu *vcpu)
 {
 	unsigned long flags;
 	s64 ns;
 
 	local_irq_save(flags);
-	ns = __get_kvmclock_ns(kvm);
+	ns = __get_kvmclock_ns(vcpu);
 	local_irq_restore(flags);
 
 	return ns;
@@ -4081,7 +4080,6 @@ long kvm_arch_vm_ioctl(struct file *filp,
 	}
 	case KVM_SET_CLOCK: {
 		struct kvm_clock_data user_ns;
-		u64 now_ns;
 
 		r = -EFAULT;
 		if (copy_from_user(&user_ns, argp, sizeof(user_ns)))
@@ -4092,19 +4090,16 @@ long kvm_arch_vm_ioctl(struct file *filp,
 			goto out;
 
 		r = 0;
-		local_irq_disable();
-		now_ns = __get_kvmclock_ns(kvm);
-		kvm->arch.kvmclock_offset += user_ns.clock - now_ns;
-		local_irq_enable();
+		kvm->arch.kvmclock_offset = user_ns.clock -
+			ktime_get_boot_ns();
 		kvm_gen_update_masterclock(kvm);
 		break;
 	}
 	case KVM_GET_CLOCK: {
 		struct kvm_clock_data user_ns;
-		u64 now_ns;
 
-		now_ns = get_kvmclock_ns(kvm);
-		user_ns.clock = now_ns;
+		user_ns.clock = ktime_get_boot_ns() +
+			kvm->arch.kvmclock_offset;
 		user_ns.flags = 0;
 		memset(&user_ns.pad, 0, sizeof(user_ns.pad));
 
