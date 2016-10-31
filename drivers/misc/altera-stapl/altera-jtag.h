@@ -78,7 +78,7 @@ struct altera_state {
 	struct altera_config	*config;
 	struct altera_jtag	js;
 	char			msg_buff[ALTERA_MESSAGE_LENGTH + 1];
-	long			stack[ALTERA_STACK_SIZE];
+	s32			stack[ALTERA_STACK_SIZE];
 };
 
 int altera_jinit(struct altera_state *astate);

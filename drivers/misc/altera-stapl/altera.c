@@ -224,7 +224,7 @@ static int altera_execute(struct altera_state *astate,
 {
 	struct altera_config *aconf = astate->config;
 	char *msg_buff = astate->msg_buff;
-	long *stack = astate->stack;
+	s32 *stack = astate->stack;
 	int status = 0;
 	u32 first_word = 0L;
 	u32 action_table = 0L;
@@ -237,7 +237,7 @@ static int altera_execute(struct altera_state *astate,
 	u32 action_count = 0L;
 	u32 proc_count = 0L;
 	u32 sym_count = 0L;
-	long *vars = NULL;
+	uintptr_t *vars = NULL;
 	s32 *var_size = NULL;
 	char *attrs = NULL;
 	u8 *proc_attributes = NULL;
@@ -247,11 +247,11 @@ static int altera_execute(struct altera_state *astate,
 	u32 opcode;
 	u32 name_id;
 	u8 charbuf[4];
-	long long_tmp;
+	s32 long_tmp;
 	u32 variable_id;
 	u8 *charptr_tmp;
 	u8 *charptr_tmp2;
-	long *longptr_tmp;
+	s32 *longptr_tmp;
 	int version = 0;
 	int delta = 0;
 	int stack_ptr = 0;
@@ -304,7 +304,7 @@ static int altera_execute(struct altera_state *astate,
 	if (sym_count <= 0)
 		goto exit_done;
 
-	vars = kzalloc(sym_count * sizeof(long), GFP_KERNEL);
+	vars = kzalloc(sym_count * sizeof(uintptr_t), GFP_KERNEL);
 
 	if (vars == NULL)
 		status = -ENOMEM;
@@ -370,7 +370,7 @@ static int altera_execute(struct altera_state *astate,
 			uncomp_size = get_unaligned_le32(&p[data_sect + value]);
 
 			/* allocate a buffer for the uncompressed data */
-			vars[i] = (long)kzalloc(uncomp_size, GFP_KERNEL);
+			vars[i] = (uintptr_t)kzalloc(uncomp_size, GFP_KERNEL);
 			if (vars[i] == 0L)
 				status = -ENOMEM;
 			else {
@@ -391,7 +391,7 @@ static int altera_execute(struct altera_state *astate,
 			}
 		} else if ((attrs[i] & 0x1e) == 0x0c) {
 			/* initialized Boolean array */
-			vars[i] = value + data_sect + (long)p;
+			vars[i] = value + data_sect + (uintptr_t)p;
 		} else if ((attrs[i] & 0x1c) == 0x1c) {
 			/* initialized integer array */
 			vars[i] = value + data_sect;
@@ -411,7 +411,7 @@ static int altera_execute(struct altera_state *astate,
 					/* Boolean array */
 					size = ((var_size[i] + 7L) / 8L);
 
-				vars[i] = (long)kzalloc(size, GFP_KERNEL);
+				vars[i] = (uintptr_t)kzalloc(size, GFP_KERNEL);
 
 				if (vars[i] == 0) {
 					status = -ENOMEM;
@@ -712,7 +712,7 @@ exit_done:
 			if (!altera_check_stack(stack_ptr, 1, &status))
 				break;
 			sprintf(&msg_buff[strlen(msg_buff)],
-					"%ld", stack[--stack_ptr]);
+					"%d", stack[--stack_ptr]);
 			break;
 		case OP_PRNT:
 			/* PRINT finish */
@@ -1136,9 +1136,9 @@ exit_done:
 				/* Allocate a writable buffer for this array */
 				count = var_size[variable_id];
 				long_tmp = vars[variable_id];
-				longptr_tmp = kzalloc(count * sizeof(long),
+				longptr_tmp = kzalloc(count * sizeof(s32),
 								GFP_KERNEL);
-				vars[variable_id] = (long)longptr_tmp;
+				vars[variable_id] = (uintptr_t)longptr_tmp;
 
 				if (vars[variable_id] == 0) {
 					status = -ENOMEM;
@@ -1149,7 +1149,7 @@ exit_done:
 				for (i = 0; i < count; ++i) {
 					longptr_tmp[i] =
 						get_unaligned_be32(&p[long_tmp]);
-					long_tmp += sizeof(long);
+					long_tmp += sizeof(s32);
 				}
 
 				/*
@@ -1168,7 +1168,7 @@ exit_done:
 			if ((attrs[variable_id] & 0x1c) != 0x18)
 				status = -ERANGE;
 			else {
-				longptr_tmp = (long *)vars[variable_id];
+				longptr_tmp = (s32 *)vars[variable_id];
 
 				/* pop the array index */
 				index = stack[--stack_ptr];
@@ -1202,7 +1202,7 @@ exit_done:
 				charptr_tmp2 = (u8 *)vars[variable_id];
 				charptr_tmp =
 					kzalloc(long_tmp, GFP_KERNEL);
-				vars[variable_id] = (long)charptr_tmp;
+				vars[variable_id] = (uintptr_t)charptr_tmp;
 
 				if (vars[variable_id] == 0) {
 					status = -ENOMEM;
@@ -1508,12 +1508,12 @@ exit_done:
 			/* check variable type */
 			if ((attrs[variable_id] & 0x1f) == 0x19) {
 				/* writable integer array */
-				longptr_tmp = (long *)vars[variable_id];
+				longptr_tmp = (s32 *)vars[variable_id];
 				stack[stack_ptr - 1] = longptr_tmp[index];
 			} else if ((attrs[variable_id] & 0x1f) == 0x1c) {
 				/* read-only integer array */
 				long_tmp = vars[variable_id] +
-						(index * sizeof(long));
+						(index * sizeof(s32));
 				stack[stack_ptr - 1] =
 					get_unaligned_be32(&p[long_tmp]);
 			} else
@@ -1583,7 +1583,7 @@ exit_done:
 
 				if (attrs[variable_id] & 0x10)
 					/* allocate integer array */
-					long_tmp *= sizeof(long);
+					long_tmp *= sizeof(s32);
 				else
 					/* allocate Boolean array */
 					long_tmp = (long_tmp + 7) >> 3;
@@ -1601,7 +1601,7 @@ exit_done:
 				 * Allocate a new buffer
 				 * of the requested size
 				 */
-				vars[variable_id] = (long)
+				vars[variable_id] = (uintptr_t)
 					kzalloc(long_tmp, GFP_KERNEL);
 
 				if (vars[variable_id] == 0) {
@@ -1780,7 +1780,7 @@ exit_done:
 				charptr_tmp2 = (u8 *)vars[variable_id];
 				charptr_tmp =
 					kzalloc(long_tmp, GFP_KERNEL);
-				vars[variable_id] = (long)charptr_tmp;
+				vars[variable_id] = (uintptr_t)charptr_tmp;
 
 				if (vars[variable_id] == 0) {
 					status = -ENOMEM;
@@ -1901,7 +1901,7 @@ exit_done:
 				charptr_tmp2 = (u8 *)vars[variable_id];
 				charptr_tmp =
 					kzalloc(long_tmp, GFP_KERNEL);
-				vars[variable_id] = (long)charptr_tmp;
+				vars[variable_id] = (uintptr_t)charptr_tmp;
 
 				if (vars[variable_id] == 0) {
 					status = -ENOMEM;
