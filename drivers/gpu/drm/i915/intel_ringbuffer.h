@@ -496,6 +496,11 @@ static inline u32 intel_engine_get_seqno(struct intel_engine_cs *engine)
 	return intel_read_status_page(engine, I915_GEM_HWS_INDEX);
 }
 
+static inline u32 intel_engine_last_submit(struct intel_engine_cs *engine)
+{
+	return READ_ONCE(engine->timeline->last_submitted_seqno);
+}
+
 int init_workarounds_ring(struct intel_engine_cs *engine);
 
 void intel_engine_get_instdone(struct intel_engine_cs *engine,
