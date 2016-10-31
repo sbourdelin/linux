@@ -3242,11 +3242,16 @@ int ixgbevf_close(struct net_device *netdev)
 {
 	struct ixgbevf_adapter *adapter = netdev_priv(netdev);
 
+	if (test_and_set_bit(__IXGBEVF_CLEAR_IRQS, &adapter->state))
+		return 0;
+
 	ixgbevf_down(adapter);
 	ixgbevf_free_irq(adapter);
 
 	ixgbevf_free_all_tx_resources(adapter);
 	ixgbevf_free_all_rx_resources(adapter);
+
+	clear_bit(__IXGBEVF_CLEAR_IRQS, &adapter->state);
 
 	return 0;
 }
@@ -3792,6 +3797,9 @@ static int ixgbevf_suspend(struct pci_dev *pdev, pm_message_t state)
 	int retval = 0;
 #endif
 
+	while (test_and_set_bit(__IXGBEVF_CLEAR_IRQS, &adapter->state))
+		usleep_range(1000, 2000);
+
 	netif_device_detach(netdev);
 
 	if (netif_running(netdev)) {
@@ -3813,6 +3821,7 @@ static int ixgbevf_suspend(struct pci_dev *pdev, pm_message_t state)
 	if (!test_and_set_bit(__IXGBEVF_DISABLED, &adapter->state))
 		pci_disable_device(pdev);
 
+	clear_bit(__IXGBEVF_CLEAR_IRQS, &adapter->state);
 	return 0;
 }
 

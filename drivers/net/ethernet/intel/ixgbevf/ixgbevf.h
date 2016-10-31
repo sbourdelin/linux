@@ -446,6 +446,7 @@ enum ixbgevf_state_t {
 	__IXGBEVF_SERVICE_INITED,
 	__IXGBEVF_RESET_REQUESTED,
 	__IXGBEVF_QUEUE_RESET_REQUESTED,
+	__IXGBEVF_CLEAR_IRQS,
 };
 
 enum ixgbevf_boards {
