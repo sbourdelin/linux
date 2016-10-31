@@ -118,10 +118,11 @@ static struct clocksource arc_counter_gfrc = {
 
 static int __init arc_cs_setup_gfrc(struct device_node *node)
 {
-	int exists = cpuinfo_arc700[0].extn.gfrc;
+	struct mcip_bcr mp;
 	int ret;
 
-	if (WARN(!exists, "Global-64-bit-Ctr clocksource not detected"))
+	READ_BCR(ARC_REG_MCIP_BCR, mp);
+	if (WARN(!mp.gfrc, "Global-64-bit-Ctr clocksource not detected"))
 		return -ENXIO;
 
 	ret = arc_get_timer_clk(node);
@@ -174,10 +175,11 @@ static struct clocksource arc_counter_rtc = {
 
 static int __init arc_cs_setup_rtc(struct device_node *node)
 {
-	int exists = cpuinfo_arc700[smp_processor_id()].extn.rtc;
+	struct bcr_timer timer;
 	int ret;
 
-	if (WARN(!exists, "Local-64-bit-Ctr clocksource not detected"))
+	READ_BCR(ARC_REG_TIMERS_BCR, timer);
+	if (WARN(!timer.rtc, "Local-64-bit-Ctr clocksource not detected"))
 		return -ENXIO;
 
 	/* Local to CPU hence not usable in SMP */
