@@ -1479,7 +1479,8 @@ dump_phys_mem(void *virt_addr, uint32_t num_bytes)
 		num_pages,                /* len */
 		0,                        /* gup_flags */
 		pages,                    /* pages (array of page pointers) */
-		NULL);                    /* vmas */
+		NULL,                     /* vmas */
+		NULL);                    /* locked */
 	up_read(&current->mm->mmap_sem);
 
 	prev_idx = -1;

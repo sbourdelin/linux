@@ -2723,6 +2723,7 @@ static int cryptocop_ioctl_process(struct inode *inode, struct file *filp, unsig
 			     noinpages,
 			     0,  /* read access only for in data */
 			     inpages,
+			     NULL,
 			     NULL);
 
 	if (err < 0) {
@@ -2737,6 +2738,7 @@ static int cryptocop_ioctl_process(struct inode *inode, struct file *filp, unsig
 				     nooutpages,
 				     FOLL_WRITE, /* write access for out data */
 				     outpages,
+				     NULL,
 				     NULL);
 		up_read(&current->mm->mmap_sem);
 		if (err < 0) {

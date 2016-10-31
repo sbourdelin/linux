@@ -246,7 +246,7 @@ static long ioctl_memcpy(struct fsl_hv_ioctl_memcpy __user *p)
 	down_read(&current->mm->mmap_sem);
 	num_pinned = get_user_pages(param.local_vaddr - lb_offset,
 		num_pages, (param.source == -1) ? 0 : FOLL_WRITE,
-		pages, NULL);
+		pages, NULL, NULL);
 	up_read(&current->mm->mmap_sem);
 
 	if (num_pinned != num_pages) {

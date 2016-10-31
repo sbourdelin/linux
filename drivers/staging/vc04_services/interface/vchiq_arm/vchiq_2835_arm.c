@@ -425,7 +425,8 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
 					  num_pages,
 					  (type == PAGELIST_READ) ? FOLL_WRITE : 0,
 					  pages,
-					  NULL /*vmas */);
+					  NULL /*vmas */,
+					  NULL /* locked */);
 		up_read(&task->mm->mmap_sem);
 
 		if (actual_pages != num_pages) {

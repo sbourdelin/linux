@@ -834,7 +834,7 @@ static __always_inline long __get_user_pages_locked(struct task_struct *tsk,
  *
  *      down_read(&mm->mmap_sem);
  *      do_something()
- *      get_user_pages(tsk, mm, ..., pages, NULL);
+ *      get_user_pages(tsk, mm, ..., pages, NULL, NULL);
  *      up_read(&mm->mmap_sem);
  *
  *  to:
@@ -886,7 +886,7 @@ EXPORT_SYMBOL(__get_user_pages_unlocked);
  * get_user_pages_unlocked() is suitable to replace the form:
  *
  *      down_read(&mm->mmap_sem);
- *      get_user_pages(tsk, mm, ..., pages, NULL);
+ *      get_user_pages(tsk, mm, ..., pages, NULL, NULL);
  *      up_read(&mm->mmap_sem);
  *
  *  with:
@@ -979,10 +979,10 @@ EXPORT_SYMBOL(get_user_pages_remote);
  */
 long get_user_pages(unsigned long start, unsigned long nr_pages,
 		unsigned int gup_flags, struct page **pages,
-		struct vm_area_struct **vmas)
+		struct vm_area_struct **vmas, int *locked)
 {
 	return __get_user_pages_locked(current, current->mm, start, nr_pages,
-				       pages, vmas, NULL, false,
+				       pages, vmas, locked, true,
 				       gup_flags | FOLL_TOUCH);
 }
 EXPORT_SYMBOL(get_user_pages);

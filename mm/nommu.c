@@ -161,7 +161,7 @@ finish_or_fault:
  */
 long get_user_pages(unsigned long start, unsigned long nr_pages,
 		    unsigned int gup_flags, struct page **pages,
-		    struct vm_area_struct **vmas)
+		    struct vm_area_struct **vmas, int *locked)
 {
 	return __get_user_pages(current, current->mm, start, nr_pages,
 				gup_flags, pages, vmas, NULL);
@@ -172,7 +172,7 @@ long get_user_pages_locked(unsigned long start, unsigned long nr_pages,
 			    unsigned int gup_flags, struct page **pages,
 			    int *locked)
 {
-	return get_user_pages(start, nr_pages, gup_flags, pages, NULL);
+	return get_user_pages(start, nr_pages, gup_flags, pages, NULL, NULL);
 }
 EXPORT_SYMBOL(get_user_pages_locked);
 

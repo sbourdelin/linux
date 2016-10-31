@@ -894,7 +894,7 @@ rio_dma_transfer(struct file *filp, u32 transfer_mode,
 				(unsigned long)xfer->loc_addr & PAGE_MASK,
 				nr_pages,
 				dir == DMA_FROM_DEVICE ? FOLL_WRITE : 0,
-				page_list, NULL);
+				page_list, NULL, NULL);
 		up_read(&current->mm->mmap_sem);
 
 		if (pinned != nr_pages) {

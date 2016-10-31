@@ -310,7 +310,7 @@ static ssize_t goldfish_pipe_read_write(struct file *filp, char __user *buffer,
 		 */
 		down_read(&current->mm->mmap_sem);
 		ret = get_user_pages(address, 1, is_write ? 0 : FOLL_WRITE,
-				&page, NULL);
+				&page, NULL, NULL);
 		up_read(&current->mm->mmap_sem);
 		if (ret < 0)
 			break;
