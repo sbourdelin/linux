@@ -668,7 +668,7 @@ struct intel_csr {
 	func(is_skylake); \
 	func(is_broxton); \
 	func(is_kabylake); \
-	func(is_preliminary); \
+	func(is_alpha_support); \
 	/* Keep has_* in alphabetical order */ \
 	func(has_csr); \
 	func(has_ddi); \
@@ -2782,7 +2782,7 @@ struct drm_i915_cmd_table {
 #define IS_SKL_GT4(dev_priv)	(IS_SKYLAKE(dev_priv) && \
 				 (INTEL_DEVID(dev_priv) & 0x00F0) == 0x0030)
 
-#define IS_PRELIMINARY_HW(intel_info) ((intel_info)->is_preliminary)
+#define IS_ALPHA_SUPPORT(intel_info) ((intel_info)->is_alpha_support)
 
 #define SKL_REVID_A0		0x0
 #define SKL_REVID_B0		0x1
