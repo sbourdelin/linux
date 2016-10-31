@@ -72,6 +72,14 @@
 	status = "okay";
 };
 
+&sdhci0 {
+	non-removable;
+	bus-width = <8>;
+	marvell,xenon-emmc;
+	marvell,pad-type = "fixed-1-8v";
+	status = "okay";
+};
+
 /* CON31 */
 &usb3 {
 	status = "okay";
