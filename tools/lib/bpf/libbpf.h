@@ -181,10 +181,13 @@ bool bpf_program__is_kprobe(struct bpf_program *prog);
  * and will be treated as an error due to -Werror.
  */
 struct bpf_map_def {
-	unsigned int type;
-	unsigned int key_size;
-	unsigned int value_size;
-	unsigned int max_entries;
+	uint32_t type;
+	uint32_t key_size;
+	uint32_t value_size;
+	uint32_t max_entries;
+	uint32_t flags;
+	uint32_t id;
+	uint32_t pinning;
 };
 
 /*
