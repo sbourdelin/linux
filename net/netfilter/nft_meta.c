@@ -190,6 +190,12 @@ void nft_meta_get_eval(const struct nft_expr *expr,
 		*dest = prandom_u32_state(state);
 		break;
 	}
+	case NFT_META_HASH:
+		*dest = skb_get_hash(pkt->skb);
+		break;
+	case NFT_META_SYMHASH:
+		*dest = __skb_get_hash_symmetric(skb);
+		break;
 	default:
 		WARN_ON(1);
 		goto err;
@@ -273,6 +279,8 @@ int nft_meta_get_init(const struct nft_ctx *ctx,
 #ifdef CONFIG_CGROUP_NET_CLASSID
 	case NFT_META_CGROUP:
 #endif
+	case NFT_META_HASH:
+	case NFT_META_SYMHASH:
 		len = sizeof(u32);
 		break;
 	case NFT_META_IIFNAME:
