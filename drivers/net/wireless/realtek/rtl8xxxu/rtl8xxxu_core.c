@@ -3900,7 +3900,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	 * Fix 92DU-VC S3 hang with the reason is that secondary mac is not
 	 * initialized. First MAC returns 0xea, second MAC returns 0x00
 	 */
-	if (val8 == 0xea)
+	if (val8 == 0xea || priv->fops == &rtl8723bu_fops)
 		macpower = false;
 	else
 		macpower = true;
@@ -5743,6 +5743,12 @@ static int rtl8xxxu_start(struct ieee80211_hw *hw)
 
 	ret = 0;
 
+	if(priv->fops == &rtl8723bu_fops) {
+		ret = rtl8xxxu_init_device(hw);
+		if (ret)
+			goto error_out;
+	}
+
 	init_usb_anchor(&priv->rx_anchor);
 	init_usb_anchor(&priv->tx_anchor);
 	init_usb_anchor(&priv->int_anchor);
@@ -6044,9 +6050,11 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 		goto exit;
 	}
 
-	ret = rtl8xxxu_init_device(hw);
-	if (ret)
-		goto exit;
+	if(priv->fops != &rtl8723bu_fops) {
+		ret = rtl8xxxu_init_device(hw);
+		if (ret)
+			goto exit;
+	}
 
 	hw->wiphy->max_scan_ssids = 1;
 	hw->wiphy->max_scan_ie_len = IEEE80211_MAX_DATA_LEN;
