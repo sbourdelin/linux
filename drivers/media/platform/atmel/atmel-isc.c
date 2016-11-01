@@ -926,21 +926,21 @@ static int isc_open(struct file *file)
 	if (ret < 0)
 		goto unlock;
 
-	if (!v4l2_fh_is_singular_file(file))
-		goto unlock;
+	ret = !v4l2_fh_is_singular_file(file);
+	if (ret)
+		goto fh_rel;
 
 	ret = v4l2_subdev_call(sd, core, s_power, 1);
-	if (ret < 0 && ret != -ENOIOCTLCMD) {
-		v4l2_fh_release(file);
-		goto unlock;
-	}
+	if (ret < 0 && ret != -ENOIOCTLCMD)
+		goto fh_rel;
 
 	ret = isc_set_fmt(isc, &isc->fmt);
-	if (ret) {
+	if (ret)
 		v4l2_subdev_call(sd, core, s_power, 0);
-		v4l2_fh_release(file);
-	}
 
+fh_rel:
+	if (ret)
+		v4l2_fh_release(file);
 unlock:
 	mutex_unlock(&isc->lock);
 	return ret;
