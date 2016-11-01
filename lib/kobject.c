@@ -639,6 +639,8 @@ static void kobject_cleanup(struct kobject *kobj)
 		kobject_del(kobj);
 	}
 
+	kobj->state_initialized = 0;
+
 	if (t && t->release) {
 		pr_debug("kobject: '%s' (%p): calling ktype release\n",
 			 kobject_name(kobj), kobj);
