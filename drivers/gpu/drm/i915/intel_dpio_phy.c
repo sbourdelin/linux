@@ -365,22 +365,6 @@ static void _bxt_ddi_phy_init(struct drm_i915_private *dev_priv,
 		I915_WRITE(BXT_PORT_CL2CM_DW6(phy), val);
 	}
 
-	val = I915_READ(BXT_PORT_CL1CM_DW30(phy));
-	val &= ~OCL2_LDOFUSE_PWR_DIS;
-	/*
-	 * On PHY1 disable power on the second channel, since no port is
-	 * connected there. On PHY0 both channels have a port, so leave it
-	 * enabled.
-	 * TODO: port C is only connected on BXT-P, so on BXT0/1 we should
-	 * power down the second channel on PHY0 as well.
-	 *
-	 * FIXME: Clarify programming of the following, the register is
-	 * read-only with bit 6 fixed at 0 at least in stepping A.
-	 */
-	if (!phy_info->dual_channel)
-		val |= OCL2_LDOFUSE_PWR_DIS;
-	I915_WRITE(BXT_PORT_CL1CM_DW30(phy), val);
-
 	if (phy_info->rcomp_phy != -1) {
 		uint32_t grc_code;
 		/*
