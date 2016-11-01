@@ -3158,8 +3158,117 @@ DECLARE_PCI_FIXUP_HEADER(0x1814, 0x0601, /* Ralink RT2800 802.11n PCI */
  */
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_REALTEK, 0x8169,
 			 quirk_broken_intx_masking);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX, PCI_ANY_ID,
+
+#define CONNECTX_4_CURR_MAX_MINOR 99
+#define CONNECTX_4_INTX_SUPPORT_MINOR 14
+
+/*
+ * Checking ConnectX-4/LX FW version to see if it supports legacy interrupts.
+ * If so, don't mark it as broken.
+ * FW minor > 99 means older FW version format and no INTx masking support.
+ * FW minor < 14 means new FW version format and no INTx masking support.
+ */
+static void quirk_connectx_4_verify_fw(struct pci_dev *dev)
+{
+	u16 pmcsr;
+	u8 __iomem *fw_ver;
+	u8 fw_minor;
+
+	dev->broken_intx_masking = 1;
+
+	/*
+	 * Check that the device is in the D0 power state. If it's not,
+	 * there is no point to look any further.
+	 */
+	if (dev->pm_cap) {
+		pci_read_config_word(dev, dev->pm_cap + PCI_PM_CTRL, &pmcsr);
+		if ((pmcsr & PCI_PM_CTRL_STATE_MASK) != PCI_D0)
+			return;
+	}
+
+	/* Convert from PCI bus to resource space.  */
+	fw_ver = ioremap(pci_resource_start(dev, 0), 2);
+	if (!fw_ver) {
+		dev_warn(&dev->dev, "Can't map ConnectX-4 initialization segment\n");
+		return;
+	}
+
+	fw_minor = readb(fw_ver + 1);
+	if (fw_minor > CONNECTX_4_CURR_MAX_MINOR ||
+	    fw_minor < CONNECTX_4_INTX_SUPPORT_MINOR)
+		dev_warn(&dev->dev, "ConnectX-4: FW doesn't support INTx masking, disabling. Please upgrade FW for INTx support\n");
+	else
+		dev->broken_intx_masking = 0;
+
+	iounmap(fw_ver);
+}
+
+/*
+ * Mellanox devices that fail under PCI device assignment using DisINTx masking
+ */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX, PCI_DEVICE_ID_MELLANOX_TAVOR,
 			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_TAVOR_BRIDGE,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX, PCI_DEVICE_ID_MELLANOX_ARBEL,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_ARBEL_COMPAT,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX, PCI_DEVICE_ID_MELLANOX_SINAI,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_SINAI_OLD,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_HERMON_SDR,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_HERMON_DDR,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_HERMON_QDR,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_HERMON_DDR_GEN2,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_HERMON_QDR_GEN2,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_HERMON_EN,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_HERMON_EN_GEN2,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_CONNECTX_EN,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_CONNECTX_EN_T_GEN2,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_CONNECTX_EN_GEN2,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_CONNECTX_EN_5_GEN2,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_CONNECTX2,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_CONNECTX3,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_CONNECTX3_PRO,
+			 quirk_broken_intx_masking);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_CONNECTX4,
+			 quirk_connectx_4_verify_fw);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MELLANOX,
+			 PCI_DEVICE_ID_MELLANOX_CONNECTX4_LX,
+			 quirk_connectx_4_verify_fw);
 
 /*
  * Intel i40e (XL710/X710) 10/20/40GbE NICs all have broken INTx masking,
