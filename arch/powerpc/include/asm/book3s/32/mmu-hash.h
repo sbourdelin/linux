@@ -79,7 +79,7 @@ struct hash_pte {
 
 typedef struct {
 	unsigned long id;
-	unsigned long vdso_base;
+	unsigned long vdso;
 } mm_context_t;
 
 #endif /* !__ASSEMBLY__ */

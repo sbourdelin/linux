@@ -167,7 +167,7 @@
 typedef struct {
 	unsigned int id;
 	unsigned int active;
-	unsigned long vdso_base;
+	unsigned long vdso;
 } mm_context_t;
 
 #define PHYS_IMMR_BASE (mfspr(SPRN_IMMR) & 0xfff80000)
