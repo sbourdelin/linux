@@ -861,14 +861,6 @@ static const struct i2c_device_id sx150x_id[] = {
 	{}
 };
 
-static const struct of_device_id sx150x_of_match[] = {
-	{ .compatible = "semtech,sx1508q" },
-	{ .compatible = "semtech,sx1509q" },
-	{ .compatible = "semtech,sx1506q" },
-	{ .compatible = "semtech,sx1502q" },
-	{},
-};
-
 static int sx150x_init_io(struct sx150x_pinctrl *pctl, u8 base, u16 cfg)
 {
 	int err = 0;
@@ -1049,7 +1041,6 @@ static int sx150x_probe(struct i2c_client *client,
 static struct i2c_driver sx150x_driver = {
 	.driver = {
 		.name = "sx150x-pinctrl",
-		.of_match_table = of_match_ptr(sx150x_of_match),
 	},
 	.probe    = sx150x_probe,
 	.id_table = sx150x_id,
