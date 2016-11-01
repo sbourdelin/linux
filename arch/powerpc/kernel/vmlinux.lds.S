@@ -104,6 +104,12 @@ SECTIONS
 		KPROBES_TEXT
 		IRQENTRY_TEXT
 		SOFTIRQENTRY_TEXT
+		/*
+		 * Linker puts .sfpr at the beginning of a group of input
+		 * sections, which can break start-of-text offset if it is
+		 * included with the main text sections.
+		 */
+		*(.sfpr);
 		MEM_KEEP(init.text)
 		MEM_KEEP(exit.text)
 

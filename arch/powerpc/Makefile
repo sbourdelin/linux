@@ -179,7 +179,11 @@ else
 CHECKFLAGS	+= -D__LITTLE_ENDIAN__
 endif
 
+ifeq ($(CONFIG_PPC32),y)
 KBUILD_LDFLAGS_MODULE += arch/powerpc/lib/crtsavres.o
+else
+KBUILD_LDFLAGS_MODULE += --save-restore-funcs
+endif
 
 ifeq ($(CONFIG_476FPE_ERR46),y)
 	KBUILD_LDFLAGS_MODULE += --ppc476-workaround \
