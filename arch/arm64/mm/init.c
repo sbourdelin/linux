@@ -36,6 +36,7 @@
 #include <linux/efi.h>
 #include <linux/swiotlb.h>
 #include <linux/vmalloc.h>
+#include <linux/page-isolation.h>
 
 #include <asm/boot.h>
 #include <asm/fixmap.h>
@@ -301,6 +302,80 @@ void __init arm64_memblock_init(void)
 	memblock_allow_resize();
 }
 
+static struct page *inject_pageblock;
+
+static void __init inject_nomap_create(void)
+{
+	phys_addr_t start, end;
+	unsigned long start_pfn, end_pfn;
+	u64 i;
+	int ret = -ENOMEM;
+
+	pr_info("%s: PAGES_PER_SECTION=%08lx pageblock_nr_pages=%08lx PAGE_SIZE=%08lx\n",
+		__func__, PAGES_PER_SECTION, pageblock_nr_pages, PAGE_SIZE);
+
+	/*
+	 * find a mem range with a complet pageblock in it
+	 */
+	for_each_free_mem_range(i, NUMA_NO_NODE, MEMBLOCK_NONE, &start, &end, NULL) {
+		start_pfn = PFN_DOWN(start);
+		end_pfn = PFN_UP(end);
+		if  (end_pfn - (start_pfn & ~(pageblock_nr_pages-1)) > 2 * pageblock_nr_pages)
+			break;
+	}
+
+	if (i == ULLONG_MAX)
+		goto fail;
+
+	start = PFN_PHYS(start_pfn);
+	end = PFN_PHYS(end_pfn) - 1;
+
+	pr_info("%s: Injecting into range: [%pa-%pa]\n", __func__, &start, &end);
+
+	/* mark the upper 5 pages nomap of a complete pageblock */
+	start_pfn = end_pfn & ~(pageblock_nr_pages-1);
+	start_pfn -= 5;			/* unalign by 5 pages */
+
+	start = PFN_PHYS(start_pfn);
+	end = PFN_PHYS(end_pfn) - 1;
+
+	ret = memblock_mark_nomap(start, end - start + 1);
+	if (ret)
+		goto fail;
+
+	inject_pageblock = pfn_to_page(start_pfn & ~(pageblock_nr_pages-1));
+
+	pr_info("%s: Injected nomap range at: [%pa-%pa] zones: %p %p\n", __func__,
+		&start, &end, page_zone(inject_pageblock),
+		page_zone(inject_pageblock + pageblock_nr_pages - 1));
+
+	return;
+fail:
+	pr_err("%s: Could not inject_unaligned_range: %d\n", __func__, ret);
+}
+
+static void __init inject_nomap_move(void)
+{
+	phys_addr_t start, end;
+	int ret;
+
+	if (!inject_pageblock)
+		return;
+
+	start = PFN_PHYS(page_to_pfn(inject_pageblock));
+	end = PFN_PHYS(page_to_pfn(inject_pageblock) + pageblock_nr_pages) - 1;
+
+	pr_info("%s: Moving [%pa-%pa] zones: %p %p\n", __func__,
+		&start, &end, page_zone(inject_pageblock),
+		page_zone(inject_pageblock + pageblock_nr_pages - 1));
+
+	ret = move_freepages_block(page_zone(inject_pageblock),
+				inject_pageblock,
+				gfpflags_to_migratetype(GFP_KERNEL));
+
+	pr_info("%s: Moved %d pages\n", __func__, ret);
+}
+
 void __init bootmem_init(void)
 {
 	unsigned long min, max;
@@ -320,6 +395,7 @@ void __init bootmem_init(void)
 	arm64_memory_present();
 
 	sparse_init();
+	inject_nomap_create();
 	zone_sizes_init(min, max);
 
 	high_memory = __va((max << PAGE_SHIFT) - 1) + 1;
@@ -479,6 +555,8 @@ void __init mem_init(void)
 		 */
 		sysctl_overcommit_memory = OVERCOMMIT_ALWAYS;
 	}
+
+	inject_nomap_move();
 }
 
 void free_initmem(void)
