@@ -500,6 +500,9 @@ SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len,
 SYSCALL_DEFINE4(pkey_mprotect, unsigned long, start, size_t, len,
 		unsigned long, prot, int, pkey)
 {
+	if (!IS_ENABLED(CONFIG_ARCH_HAS_PKEYS))
+		return -ENOSYS;
+
 	return do_mprotect_pkey(start, len, prot, pkey);
 }
 
@@ -507,6 +510,9 @@ SYSCALL_DEFINE2(pkey_alloc, unsigned long, flags, unsigned long, init_val)
 {
 	int pkey;
 	int ret;
+
+	if (!IS_ENABLED(CONFIG_ARCH_HAS_PKEYS))
+		return -ENOSYS;
 
 	/* No flags supported yet. */
 	if (flags)
@@ -536,6 +542,9 @@ out:
 SYSCALL_DEFINE1(pkey_free, int, pkey)
 {
 	int ret;
+
+	if (!IS_ENABLED(CONFIG_ARCH_HAS_PKEYS))
+		return -ENOSYS;
 
 	down_write(&current->mm->mmap_sem);
 	ret = mm_pkey_free(current->mm, pkey);
