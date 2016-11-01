@@ -676,9 +676,6 @@ struct sched_state {
 	unsigned long used[BITS_TO_LONGS(X86_PMC_IDX_MAX)];
 };
 
-/* Total max is X86_PMC_IDX_MAX, but we are O(n!) limited */
-#define	SCHED_STATES_MAX	2
-
 struct perf_sched {
 	int			max_weight;
 	int			max_events;

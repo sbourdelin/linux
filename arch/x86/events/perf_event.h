@@ -277,8 +277,16 @@ struct cpu_hw_events {
  * dramatically.  The number of such EVENT_CONSTRAINT_OVERLAP() macros
  * and its counter masks must be kept at a minimum.
  */
+
+/* Total max is X86_PMC_IDX_MAX, but we are O(n!) limited */
+#define SCHED_STATES_MAX 3
+
+/* Check we dont overlap beyond the states max. */
+#define OVERLAP_CHECK(n)   (!!sizeof(char[1 - 2*!!(HWEIGHT(n) > SCHED_STATES_MAX)]))
+#define OVERLAP_HWEIGHT(n) (OVERLAP_CHECK(n)*HWEIGHT(n))
+
 #define EVENT_CONSTRAINT_OVERLAP(c, n, m)	\
-	__EVENT_CONSTRAINT(c, n, m, HWEIGHT(n), 1, 0)
+	__EVENT_CONSTRAINT(c, n, m, OVERLAP_HWEIGHT(n), 1, 0)
 
 /*
  * Constraint on the Event code.
