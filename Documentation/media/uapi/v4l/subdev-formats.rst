@@ -1515,12 +1515,10 @@ be named ``MEDIA_BUS_FMT_SRGGB10_2X8_PADHI_LE``.
 .. _bayer-patterns:
 
 .. figure::  subdev-formats_files/bayer.*
-    :alt:    bayer.png
+    :alt:    bayer.pdf / bayer.png
     :align:  center
 
     **Figure 4.8 Bayer Patterns**
-
-
 
 The following table lists existing packed Bayer formats. The data
 organization is given as an example for the first pixel only.
