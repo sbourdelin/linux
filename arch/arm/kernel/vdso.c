@@ -54,8 +54,11 @@ static const struct vm_special_mapping vdso_data_mapping = {
 	.pages = &vdso_data_page,
 };
 
+static int vdso_mremap(const struct vm_special_mapping *sm,
+		struct vm_area_struct *new_vma);
 static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
 	.name = "[vdso]",
+	.mremap = vdso_mremap,
 };
 
 struct elfinfo {
@@ -252,6 +255,24 @@ void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
 
 	if (!IS_ERR(vma))
 		mm->context.vdso = addr;
+}
+
+static int vdso_mremap(const struct vm_special_mapping *sm,
+		struct vm_area_struct *new_vma)
+{
+	unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
+	unsigned long vdso_size = (vdso_total_pages - 1) << PAGE_SHIFT;
+
+	/* Disallow partial vDSO blob remap */
+	if (vdso_size != new_size)
+		return -EINVAL;
+
+	if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
+		return -EFAULT;
+
+	current->mm->context.vdso = new_vma->vm_start;
+
+	return 0;
 }
 
 static void vdso_write_begin(struct vdso_data *vdata)
