@@ -3686,9 +3686,7 @@ static inline void i915_error_state_buf_release(
 {
 	kfree(eb->buf);
 }
-void i915_capture_error_state(struct drm_i915_private *dev_priv,
-			      u32 engine_mask,
-			      const char *error_msg);
+
 void i915_error_state_get(struct drm_device *dev,
 			  struct i915_error_state_file_priv *error_priv);
 void i915_error_state_put(struct i915_error_state_file_priv *error_priv);
