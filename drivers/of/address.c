@@ -479,6 +479,39 @@ static int of_empty_ranges_quirk(struct device_node *np)
 	return false;
 }
 
+
+/*
+ * Check whether the current device being translating use indirectIO.
+ *
+ * return 1 if the check is past, or 0 represents fail checking.
+ */
+static int of_isa_indirect_io(struct device_node *parent,
+				struct of_bus *bus, __be32 *addr,
+				int na, u64 *presult)
+{
+	unsigned int flags;
+	unsigned int rlen;
+
+	/* whether support indirectIO */
+	if (!indirect_io_ison())
+		return 0;
+
+	if (!of_bus_isa_match(parent))
+		return 0;
+
+	flags = bus->get_flags(addr);
+	if (!(flags & IORESOURCE_IO))
+		return 0;
+
+	/* there is ranges property, apply the normal translation directly. */
+	if (of_get_property(parent, "ranges", &rlen))
+		return 0;
+
+	*presult = of_read_number(addr + 1, na - 1);
+
+	return chk_indirect_range(*presult);
+}
+
 static int of_translate_one(struct device_node *parent, struct of_bus *bus,
 			    struct of_bus *pbus, __be32 *addr,
 			    int na, int ns, int pna, const char *rprop)
@@ -532,7 +565,7 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
 	}
 	memcpy(addr, ranges + na, 4 * pna);
 
- finish:
+finish:
 	of_dump_addr("parent translation for:", addr, pna);
 	pr_debug("with offset: %llx\n", (unsigned long long)offset);
 
@@ -593,6 +626,15 @@ static u64 __of_translate_address(struct device_node *dev,
 		if (parent == NULL) {
 			pr_debug("reached root node\n");
 			result = of_read_number(addr, na);
+			break;
+		}
+		/*
+		 * For indirectIO device which has no ranges property, get
+		 * the address from reg directly.
+		 */
+		if (of_isa_indirect_io(dev, bus, addr, na, &result)) {
+			pr_info("isa indirectIO matched(%s)..addr = 0x%llx\n",
+				of_node_full_name(dev), result);
 			break;
 		}
 
@@ -688,8 +730,9 @@ static int __of_address_to_resource(struct device_node *dev,
 	if (taddr == OF_BAD_ADDR)
 		return -EINVAL;
 	memset(r, 0, sizeof(struct resource));
-	if (flags & IORESOURCE_IO) {
+	if (flags & IORESOURCE_IO && taddr >= PCIBIOS_MIN_IO) {
 		unsigned long port;
+
 		port = pci_address_to_pio(taddr);
 		if (port == (unsigned long)-1)
 			return -EINVAL;
