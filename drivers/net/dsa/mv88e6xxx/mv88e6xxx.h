@@ -727,6 +727,14 @@ struct mv88e6xxx_ops {
 			u16 *val);
 	int (*phy_write)(struct mv88e6xxx_chip *chip, int addr, int reg,
 			 u16 val);
+
+#define LINK_UNKNOWN	-1
+
+	/* Port's MAC link state
+	 * LINK_UNKNOWN for normal link detection, 0 to force link down,
+	 * otherwise force link up.
+	 */
+	int (*port_set_link)(struct mv88e6xxx_chip *chip, int port, int link);
 };
 
 enum stat_type {
