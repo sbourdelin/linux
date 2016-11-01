@@ -735,6 +735,13 @@ struct mv88e6xxx_ops {
 	 * otherwise force link up.
 	 */
 	int (*port_set_link)(struct mv88e6xxx_chip *chip, int port, int link);
+
+	/* Port's MAC duplex mode
+	 *
+	 * Use DUPLEX_HALF or DUPLEX_FULL to force half or full duplex, or
+	 * DUPLEX_UNKNOWN for normal duplex detection.
+	 */
+	int (*port_set_duplex)(struct mv88e6xxx_chip *chip, int port, int dup);
 };
 
 enum stat_type {
