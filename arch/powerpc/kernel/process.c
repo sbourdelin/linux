@@ -1282,7 +1282,7 @@ static void print_bits(unsigned long val, struct regbit *bits, const char *sep)
 
 	for (; bits->bit; ++bits)
 		if (val & bits->bit) {
-			printk("%s%s", s, bits->name);
+			pr_cont("%s%s", s, bits->name);
 			s = sep;
 		}
 }
@@ -1305,9 +1305,9 @@ static void print_tm_bits(unsigned long val)
  *   T: Transactional	(bit 34)
  */
 	if (val & (MSR_TM | MSR_TS_S | MSR_TS_T)) {
-		printk(",TM[");
+		pr_cont(",TM[");
 		print_bits(val, msr_tm_bits, "");
-		printk("]");
+		pr_cont("]");
 	}
 }
 #else
@@ -1316,10 +1316,10 @@ static void print_tm_bits(unsigned long val) {}
 
 static void print_msr_bits(unsigned long val)
 {
-	printk("<");
+	pr_cont("<");
 	print_bits(val, msr_bits, ",");
 	print_tm_bits(val);
-	printk(">");
+	pr_cont(">");
 }
 
 #ifdef CONFIG_PPC64
@@ -1347,15 +1347,15 @@ void show_regs(struct pt_regs * regs)
 	printk("  CR: %08lx  XER: %08lx\n", regs->ccr, regs->xer);
 	trap = TRAP(regs);
 	if ((regs->trap != 0xc00) && cpu_has_feature(CPU_FTR_CFAR))
-		printk("CFAR: "REG" ", regs->orig_gpr3);
+		pr_cont("CFAR: "REG" ", regs->orig_gpr3);
 	if (trap == 0x200 || trap == 0x300 || trap == 0x600)
 #if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
-		printk("DEAR: "REG" ESR: "REG" ", regs->dar, regs->dsisr);
+		pr_cont("DEAR: "REG" ESR: "REG" ", regs->dar, regs->dsisr);
 #else
-		printk("DAR: "REG" DSISR: %08lx ", regs->dar, regs->dsisr);
+		pr_cont("DAR: "REG" DSISR: %08lx ", regs->dar, regs->dsisr);
 #endif
 #ifdef CONFIG_PPC64
-	printk("SOFTE: %ld ", regs->softe);
+	pr_cont("SOFTE: %ld ", regs->softe);
 #endif
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	if (MSR_TM_ACTIVE(regs->msr))
@@ -1364,8 +1364,8 @@ void show_regs(struct pt_regs * regs)
 
 	for (i = 0;  i < 32;  i++) {
 		if ((i % REGS_PER_LINE) == 0)
-			printk("\nGPR%02d: ", i);
-		printk(REG " ", regs->gpr[i]);
+			pr_cont("\nGPR%02d: ", i);
+		pr_cont(REG " ", regs->gpr[i]);
 		if (i == LAST_VOLATILE && !FULL_REGS(regs))
 			break;
 	}
@@ -1906,7 +1906,7 @@ void show_stack(struct task_struct *tsk, unsigned long *stack)
 			}
 #endif
 			if (firstframe)
-				printk(" (unreliable)");
+				pr_cont(" (unreliable)");
 			printk("\n");
 		}
 		firstframe = 0;
