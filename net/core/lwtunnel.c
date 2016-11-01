@@ -231,6 +231,10 @@ int lwtunnel_cmp_encap(struct lwtunnel_state *a, struct lwtunnel_state *b)
 }
 EXPORT_SYMBOL(lwtunnel_cmp_encap);
 
+/* Per CPU recursion counter for dst_output() redirections via LWT */
+#define DST_RECURSION_LIMIT 5
+DEFINE_PER_CPU(int, dst_recursion);
+
 int lwtunnel_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	struct dst_entry *dst = skb_dst(skb);
@@ -246,11 +250,19 @@ int lwtunnel_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 	    lwtstate->type > LWTUNNEL_ENCAP_MAX)
 		return 0;
 
+	if (unlikely(__this_cpu_read(dst_recursion) > DST_RECURSION_LIMIT)) {
+		net_crit_ratelimited("lwt: recursion limit reached of redirected dst_output calls\n");
+		return -EFAULT;
+	}
+
 	ret = -EOPNOTSUPP;
 	rcu_read_lock();
 	ops = rcu_dereference(lwtun_encaps[lwtstate->type]);
-	if (likely(ops && ops->output))
+	if (likely(ops && ops->output)) {
+		__this_cpu_inc(dst_recursion);
 		ret = ops->output(net, sk, skb);
+		__this_cpu_dec(dst_recursion);
+	}
 	rcu_read_unlock();
 
 	if (ret == -EOPNOTSUPP)
