@@ -368,8 +368,10 @@ static int stm_char_open(struct inode *inode, struct file *file)
 		return -ENODEV;
 
 	stmf = kzalloc(sizeof(*stmf), GFP_KERNEL);
-	if (!stmf)
-		return -ENOMEM;
+	if (!stmf) {
+		err = -ENOMEM;
+		goto err_put_device;
+	}
 
 	stm_output_init(&stmf->output);
 	stmf->stm = to_stm_device(dev);
@@ -382,9 +384,10 @@ static int stm_char_open(struct inode *inode, struct file *file)
 	return nonseekable_open(inode, file);
 
 err_free:
+	kfree(stmf);
+err_put_device:
 	/* matches class_find_device() above */
 	put_device(dev);
-	kfree(stmf);
 
 	return err;
 }
