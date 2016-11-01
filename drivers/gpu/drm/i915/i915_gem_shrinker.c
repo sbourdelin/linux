@@ -83,8 +83,8 @@ static bool can_release_pages(struct drm_i915_gem_object *obj)
 	if (!obj->mm.pages)
 		return false;
 
-	/* Only shmemfs objects are backed by swap */
-	if (!obj->base.filp)
+	/* shmemfs and userptr objects are backed by swap */
+	if (!obj->base.filp && !obj->userptr.mm)
 		return false;
 
 	/* Only report true if by unbinding the object and putting its pages
