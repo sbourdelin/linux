@@ -213,6 +213,7 @@ struct dentry_operations {
 #define DCACHE_PAR_LOOKUP		0x10000000 /* being looked up (with parent locked shared) */
 #define DCACHE_DENTRY_CURSOR		0x20000000
 
+#define DCACHE_DENTRY_UNHASHED		0x40000000 /* dentry unhashed from tree with unlink */
 extern seqlock_t rename_lock;
 
 /*
@@ -221,7 +222,7 @@ extern seqlock_t rename_lock;
 extern void d_instantiate(struct dentry *, struct inode *);
 extern struct dentry * d_instantiate_unique(struct dentry *, struct inode *);
 extern int d_instantiate_no_diralias(struct dentry *, struct inode *);
-extern void __d_drop(struct dentry *dentry);
+extern void _d_drop(struct dentry *dentry);
 extern void d_drop(struct dentry *dentry);
 extern void d_delete(struct dentry *);
 extern void d_set_d_op(struct dentry *dentry, const struct dentry_operations *op);
@@ -326,11 +327,12 @@ extern struct dentry *dget_parent(struct dentry *dentry);
  *	@dentry: entry to check
  *
  *	Returns true if the dentry passed is not currently hashed.
+ *	hlist_bl_unhashed can't be used as race with d_move().
  */
  
 static inline int d_unhashed(const struct dentry *dentry)
 {
-	return hlist_bl_unhashed(&dentry->d_hash);
+	return dentry->d_flags & DCACHE_DENTRY_UNHASHED;
 }
 
 static inline int d_unlinked(const struct dentry *dentry)

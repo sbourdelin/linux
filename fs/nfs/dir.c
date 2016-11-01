@@ -1891,7 +1891,7 @@ int nfs_unlink(struct inode *dir, struct dentry *dentry)
 		goto out;
 	}
 	if (!d_unhashed(dentry)) {
-		__d_drop(dentry);
+		_d_drop(dentry);
 		need_rehash = 1;
 	}
 	spin_unlock(&dentry->d_lock);
