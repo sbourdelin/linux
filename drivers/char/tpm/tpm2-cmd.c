@@ -258,11 +258,13 @@ static const struct tpm_input_header tpm2_pcrread_header = {
  * tpm2_pcr_read() - read a PCR value
  * @chip:	TPM chip to use.
  * @pcr_idx:	index of the PCR to read.
- * @ref_buf:	buffer to store the resulting hash,
+ * @res_buf:	buffer to store the resulting hash,
  *
- * 0 is returned when the operation is successful. If a negative number is
- * returned it remarks a POSIX error code. If a positive number is returned
- * it remarks a TPM error.
+ *
+ * Return:
+ *     0 when the operation is successful
+ *     A negative number for system errors (errno)
+ *     A positive number for a TPM error.
  */
 int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf)
 {
@@ -304,13 +306,15 @@ static const struct tpm_input_header tpm2_pcrextend_header = {
 
 /**
  * tpm2_pcr_extend() - extend a PCR value
+ *
  * @chip:	TPM chip to use.
  * @pcr_idx:	index of the PCR.
  * @hash:	hash value to use for the extend operation.
  *
- * 0 is returned when the operation is successful. If a negative number is
- * returned it remarks a POSIX error code. If a positive number is returned
- * it remarks a TPM error.
+ * Return:
+ *     0 when the operation is successful
+ *     A negative number for system errors (errno)
+ *     A positive number for a TPM error.
  */
 int tpm2_pcr_extend(struct tpm_chip *chip, int pcr_idx, const u8 *hash)
 {
@@ -348,13 +352,15 @@ static const struct tpm_input_header tpm2_getrandom_header = {
 
 /**
  * tpm2_get_random() - get random bytes from the TPM RNG
+ *
  * @chip: TPM chip to use
  * @out: destination buffer for the random bytes
  * @max: the max number of bytes to write to @out
  *
- * 0 is returned when the operation is successful. If a negative number is
- * returned it remarks a POSIX error code. If a positive number is returned
- * it remarks a TPM error.
+ * Return:
+ *     0 when the operation is successful
+ *     A negative number for system errors (errno)
+ *     A positive number for a TPM error.
  */
 int tpm2_get_random(struct tpm_chip *chip, u8 *out, size_t max)
 {
@@ -404,15 +410,16 @@ static const struct tpm_input_header tpm2_get_tpm_pt_header = {
 };
 
 /**
- * Append TPMS_AUTH_COMMAND to the buffer. The buffer must be allocated with
- * tpm_buf_alloc().
+ * tpm_buf_alloc() - Append TPMS_AUTH_COMMAND to the buffer.
+ *      The buffer must be allocated with
  *
- * @param buf: an allocated tpm_buf instance
- * @param nonce: the session nonce, may be NULL if not used
- * @param nonce_len: the session nonce length, may be 0 if not used
- * @param attributes: the session attributes
- * @param hmac: the session HMAC or password, may be NULL if not used
- * @param hmac_len: the session HMAC or password length, maybe 0 if not used
+ * @buf: an allocated tpm_buf instance
+ * @session_handle: session handle
+ * @nonce: the session nonce, may be NULL if not used
+ * @nonce_len: the session nonce length, may be 0 if not used
+ * @attributes: the session attributes
+ * @hmac: the session HMAC or password, may be NULL if not used
+ * @hmac_len: the session HMAC or password length, maybe 0 if not used
  */
 static void tpm2_buf_append_auth(struct tpm_buf *buf, u32 session_handle,
 				 const u8 *nonce, u16 nonce_len,
@@ -435,7 +442,8 @@ static void tpm2_buf_append_auth(struct tpm_buf *buf, u32 session_handle,
 
 /**
  * tpm2_seal_trusted() - seal the payload of a trusted key
- * @chip_num: TPM chip to use
+ *
+ * @chip: TPM chip to use
  * @payload: the key data in clear and encrypted form
  * @options: authentication values and other options
  *
@@ -540,9 +548,12 @@ out:
 
 /**
  * tpm2_load_cmd() - execute a TPM2_Load command
- * @chip_num: TPM chip to use
+ *
+ * @chip: TPM chip to use
  * @payload: the key data in clear and encrypted form
  * @options: authentication values and other options
+ * @blob_handle: returned blob handle
+ * @flags: tpm transmit flags
  *
  * Return: same as with tpm_transmit_cmd
  */
@@ -600,9 +611,10 @@ out:
 
 /**
  * tpm2_flush_context_cmd() - execute a TPM2_FlushContext command
- * @chip_num: TPM chip to use
- * @payload: the key data in clear and encrypted form
- * @options: authentication values and other options
+ *
+ * @chip: TPM chip to use
+ * @handle: the key data in clear and encrypted form
+ * @flags: tpm transmit flags
  *
  * Return: same as with tpm_transmit_cmd
  */
@@ -632,9 +644,12 @@ static void tpm2_flush_context_cmd(struct tpm_chip *chip, u32 handle,
 
 /**
  * tpm2_unseal_cmd() - execute a TPM2_Unload command
- * @chip_num: TPM chip to use
+ *
+ * @chip: TPM chip to use
  * @payload: the key data in clear and encrypted form
  * @options: authentication values and other options
+ * @blob_handle: blob handle
+ * @flags: tpm_transmit_cmd flags
  *
  * Return: same as with tpm_transmit_cmd
  */
@@ -681,7 +696,7 @@ static int tpm2_unseal_cmd(struct tpm_chip *chip,
 
 /**
  * tpm_unseal_trusted() - unseal the payload of a trusted key
- * @chip_num: TPM chip to use
+ * @chip: TPM chip to use
  * @payload: the key data in clear and encrypted form
  * @options: authentication values and other options
  *
@@ -750,13 +765,15 @@ static const struct tpm_input_header tpm2_startup_header = {
 
 /**
  * tpm2_startup() - send startup command to the TPM chip
+ *
  * @chip:		TPM chip to use.
- * @startup_type	startup type. The value is either
+ * @startup_type:	startup type. The value is either
  *			TPM_SU_CLEAR or TPM_SU_STATE.
  *
- * 0 is returned when the operation is successful. If a negative number is
- * returned it remarks a POSIX error code. If a positive number is returned
- * it remarks a TPM error.
+ * Return:
+ *     0 when the operation is successful
+ *     A negative number for system errors (errno)
+ *     A positive number for a TPM error.
  */
 static int tpm2_startup(struct tpm_chip *chip, u16 startup_type)
 {
@@ -782,7 +799,7 @@ static const struct tpm_input_header tpm2_shutdown_header = {
 /**
  * tpm2_shutdown() - send shutdown command to the TPM chip
  * @chip:		TPM chip to use.
- * @shutdown_type	shutdown type. The value is either
+ * @shutdown_type:	shutdown type. The value is either
  *			TPM_SU_CLEAR or TPM_SU_STATE.
  */
 void tpm2_shutdown(struct tpm_chip *chip, u16 shutdown_type)
@@ -805,12 +822,14 @@ void tpm2_shutdown(struct tpm_chip *chip, u16 shutdown_type)
 
 /*
  * tpm2_calc_ordinal_duration() - maximum duration for a command
+ *
  * @chip:	TPM chip to use.
  * @ordinal:	command code number.
  *
- * 0 is returned when the operation is successful. If a negative number is
- * returned it remarks a POSIX error code. If a positive number is returned
- * it remarks a TPM error.
+ * Return:
+ *     0 when the operation is successful
+ *     A negative number for system errors (errno)
+ *     A positive number for a TPM error.
  */
 unsigned long tpm2_calc_ordinal_duration(struct tpm_chip *chip, u32 ordinal)
 {
@@ -842,13 +861,15 @@ static const struct tpm_input_header tpm2_selftest_header = {
 
 /**
  * tpm2_continue_selftest() - start a self test
+ *
  * @chip: TPM chip to use
  * @full: test all commands instead of testing only those that were not
  *        previously tested.
  *
- * 0 is returned when the operation is successful. If a negative number is
- * returned it remarks a POSIX error code. If a positive number is returned
- * it remarks a TPM error.
+ * Return:
+ *     0 when the operation is successful
+ *     A negative number for system errors (errno)
+ *     A positive number for a TPM error.
  */
 static int tpm2_start_selftest(struct tpm_chip *chip, bool full)
 {
@@ -874,14 +895,16 @@ static int tpm2_start_selftest(struct tpm_chip *chip, bool full)
 
 /**
  * tpm2_do_selftest() - run a full self test
+ *
  * @chip: TPM chip to use
+ *
+ * Return:
+ *     0 when the operation is successful
+ *     A negative number for system errors (errno)
+ *     A positive number for a TPM error.
  *
  * During the self test TPM2 commands return with the error code RC_TESTING.
  * Waiting is done by issuing PCR read until it executes successfully.
- *
- * 0 is returned when the operation is successful. If a negative number is
- * returned it remarks a POSIX error code. If a positive number is returned
- * it remarks a TPM error.
  */
 static int tpm2_do_selftest(struct tpm_chip *chip)
 {
@@ -927,6 +950,8 @@ static int tpm2_do_selftest(struct tpm_chip *chip)
 /**
  * tpm2_probe() - probe TPM 2.0
  * @chip: TPM chip to use
+ *
+ * Return: same as with tpm_transmit_cmd
  *
  * Send idempotent TPM 2.0 command and see whether TPM 2.0 chip replied based on
  * the reply tag.
