@@ -1,0 +1,18 @@
+Device tree bindings for the rfkill-regulator driver
+
+Required properties:
+  - compatible:	should be "rfkill-regulator"
+  - rfkill-name:	the name of this rfkill device
+  - rfkill-type:	the type of this rfkill device;
+			must correspond to a valid rfkill_type from <uapi/linux/rfkill.h>
+  - vrfkill-supply:	phandle to a regulator
+
+Example:
+
+	wlan-rfkill {
+		compatible = "rfkill-regulator";
+		rfkill-name = "WLAN power switch";
+		rfkill-type = <1>;
+
+		vrfkill-supply = <&wlan_power>;
+	};
