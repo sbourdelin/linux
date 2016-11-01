@@ -332,6 +332,10 @@ latex_elements = {
      '''
 }
 
+# Fix reference escape troubles with Sphinx 1.4.x
+if minor > 3:
+    latex_elements['preamble']  += '\\renewcommand*{\\DUrole}[2]{ #2 }'
+
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
