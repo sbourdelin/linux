@@ -3,7 +3,6 @@
  * included in asm-FOO/mmu_context.h for any arch FOO which doesn't need to
  * specially hook these.
  *
- * arch_remap originally from include/linux-mm-arch-hooks.h
  * arch_unmap originally from arch/powerpc/include/asm/mmu_context.h
  * Copyright (C) 2015, IBM Corporation
  * Author: Laurent Dufour <ldufour@linux.vnet.ibm.com>
@@ -32,21 +31,6 @@ static inline void arch_unmap(struct mm_struct *mm,
 #ifdef CONFIG_GENERIC_VDSO
 	if (start <= mm->context.vdso && mm->context.vdso < end)
 		mm->context.vdso = 0;
-#endif /* CONFIG_GENERIC_VDSO */
-}
-
-static inline void arch_remap(struct mm_struct *mm,
-			      unsigned long old_start, unsigned long old_end,
-			      unsigned long new_start, unsigned long new_end)
-{
-#ifdef CONFIG_GENERIC_VDSO
-	/*
-	 * mremap() doesn't allow moving multiple vmas so we can limit the
-	 * check to old_addr == vdso.
-	 */
-	if (old_addr == mm->context.vdso)
-		mm->context.vdso = new_addr;
-
 #endif /* CONFIG_GENERIC_VDSO */
 }
 

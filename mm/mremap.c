@@ -5,6 +5,14 @@
  *
  *	Address space accounting code	<alan@lxorguk.ukuu.org.uk>
  *	(C) Copyright 2002 Red Hat Inc, All Rights Reserved
+ *
+ *	arch_remap originally from include/linux-mm-arch-hooks.h
+ *	Copyright (C) 2015, IBM Corporation
+ *	Author: Laurent Dufour <ldufour@linux.vnet.ibm.com>
+ *
+ *	This program is free software; you can redistribute it and/or modify
+ *	it under the terms of the GNU General Public License version 2 as
+ *	published by the Free Software Foundation.
  */
 
 #include <linux/mm.h>
@@ -21,7 +29,6 @@
 #include <linux/syscalls.h>
 #include <linux/mmu_notifier.h>
 #include <linux/uaccess.h>
-#include <linux/mm-arch-hooks.h>
 
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
@@ -293,8 +300,15 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		old_addr = new_addr;
 		new_addr = err;
 	} else {
-		arch_remap(mm, old_addr, old_addr + old_len,
-			   new_addr, new_addr + new_len);
+#ifdef CONFIG_GENERIC_VDSO
+		/*
+		 * mremap() doesn't allow moving multiple vmas so we can limit
+		 * the check to old_addr == vdso.
+		 */
+		if (old_addr == mm->context.vdso)
+			mm->context.vdso = new_addr;
+
+#endif /* CONFIG_GENERIC_VDSO */
 	}
 
 	/* Conceal VM_ACCOUNT so old reservation is not undone */
