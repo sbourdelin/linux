@@ -845,6 +845,7 @@ config VDSO
 	depends on AEABI && MMU && CPU_V7
 	default y if ARM_ARCH_TIMER
 	select GENERIC_TIME_VSYSCALL
+	select GENERIC_VDSO
 	help
 	  Place in the process address space an ELF shared object
 	  providing fast implementations of gettimeofday and
