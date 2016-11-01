@@ -609,7 +609,7 @@ static void sirfsoc_uart_start_next_rx_dma(struct uart_port *port)
 		sirfport->rx_dma_items.dma_addr, SIRFSOC_RX_DMA_BUF_SIZE,
 		SIRFSOC_RX_DMA_BUF_SIZE / 2,
 		DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);
-	if (IS_ERR_OR_NULL(sirfport->rx_dma_items.desc)) {
+	if (!sirfport->rx_dma_items.desc) {
 		dev_err(port->dev, "DMA slave single fail\n");
 		return;
 	}
