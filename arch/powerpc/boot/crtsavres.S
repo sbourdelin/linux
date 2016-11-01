@@ -38,10 +38,9 @@
  */
 
 	.file	"crtsavres.S"
-	.section ".text"
+	.section ".sfpr","ax",@progbits
 
 /* On PowerPC64 Linux, these functions are provided by the linker.  */
-#ifndef __powerpc64__
 
 #define _GLOBAL(name) \
 	.type name,@function; \
