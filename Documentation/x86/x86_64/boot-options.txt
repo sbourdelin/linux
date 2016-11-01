@@ -281,6 +281,11 @@ Debugging
 
   kstack=N	Print N words from the kernel stack in oops dumps.
 
+  phir3mwait=disable
+  Disables unconditional setting bit 1 of the MSR_MISC_FEATURE_ENABLES
+  for Intel Xeon Phi, this way administrator can switch off ring 3 mwait
+  feature.
+
 Miscellaneous
 
 	nogbpages
