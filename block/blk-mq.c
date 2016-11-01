@@ -2353,13 +2353,57 @@ void blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set, int nr_hw_queues)
 }
 EXPORT_SYMBOL_GPL(blk_mq_update_nr_hw_queues);
 
+static unsigned long blk_mq_poll_nsecs(struct blk_mq_hw_ctx *hctx,
+				       struct request *rq)
+{
+	struct blk_rq_stat stat[2];
+	unsigned long ret = 0;
+
+	/*
+	 * We don't have to do this once per IO, should optimize this
+	 * to just use the current window of stats until it changes
+	 */
+	memset(&stat, 0, sizeof(stat));
+	blk_hctx_stat_get(hctx, stat);
+
+	/*
+	 * As an optimistic guess, use half of the mean service time
+	 * for this type of request
+	 */
+	if (req_op(rq) == REQ_OP_READ && stat[0].nr_samples)
+		ret = (stat[0].mean + 1) / 2;
+	else if (req_op(rq) == REQ_OP_WRITE && stat[1].nr_samples)
+		ret = (stat[1].mean + 1) / 2;
+
+	return ret;
+}
+
 static void blk_mq_poll_hybrid_sleep(struct request_queue *q,
+				     struct blk_mq_hw_ctx *hctx,
 				     struct request *rq)
 {
 	struct hrtimer_sleeper hs;
+	unsigned int nsecs;
 	ktime_t kt;
 
-	if (!q->poll_nsec || test_bit(REQ_ATOM_POLL_SLEPT, &rq->atomic_flags))
+	if (test_bit(REQ_ATOM_POLL_SLEPT, &rq->atomic_flags))
+		return;
+
+	/*
+	 * poll_nsec can be:
+	 *
+	 * -1:	don't ever hybrid sleep
+	 *  0:	use half of prev avg
+	 * >0:	use this specific value
+	 */
+	if (q->poll_nsec == -1)
+		return;
+	else if (q->poll_nsec > 0)
+		nsecs = q->poll_nsec;
+	else
+		nsecs = blk_mq_poll_nsecs(hctx, rq);
+
+	if (!nsecs)
 		return;
 
 	set_bit(REQ_ATOM_POLL_SLEPT, &rq->atomic_flags);
@@ -2368,7 +2412,7 @@ static void blk_mq_poll_hybrid_sleep(struct request_queue *q,
 	 * This will be replaced with the stats tracking code, using
 	 * 'avg_completion_time / 2' as the pre-sleep target.
 	 */
-	kt = ktime_set(0, q->poll_nsec);
+	kt = ktime_set(0, nsecs);
 
 	hrtimer_init_on_stack(&hs.timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	hrtimer_set_expires(&hs.timer, kt);
@@ -2393,7 +2437,7 @@ bool blk_mq_poll(struct blk_mq_hw_ctx *hctx, struct request *rq)
 	struct request_queue *q = hctx->queue;
 	long state;
 
-	blk_mq_poll_hybrid_sleep(q, rq);
+	blk_mq_poll_hybrid_sleep(q, hctx, rq);
 
 	hctx->poll_considered++;
 
