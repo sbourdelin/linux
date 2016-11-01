@@ -396,6 +396,7 @@ source "net/nfc/Kconfig"
 
 config LWTUNNEL
 	bool "Network light weight tunnels"
+	depends on IPV6 || IPV6=n
 	---help---
 	  This feature provides an infrastructure to support light weight
 	  tunnels like mpls. There is no netdevice associated with a light
