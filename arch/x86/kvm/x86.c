@@ -2274,6 +2274,11 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 			return 1;
 		vcpu->arch.osvw.status = data;
 		break;
+	case MSR_MISC_FEATURES_ENABLES:
+		if (data & ~CPUID_FAULT_ENABLE)
+			return 1;
+		vcpu->arch.cpuid_fault = !!(data & CPUID_FAULT_ENABLE);
+		break;
 	default:
 		if (msr && (msr == vcpu->kvm->arch.xen_hvm_config.msr))
 			return xen_hvm_config(vcpu, data);
@@ -2487,6 +2492,15 @@ int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		if (!guest_cpuid_has_osvw(vcpu))
 			return 1;
 		msr_info->data = vcpu->arch.osvw.status;
+		break;
+	case MSR_PLATFORM_INFO:
+		/* cpuid faulting is supported */
+		msr_info->data = PLATINFO_CPUID_FAULT;
+		break;
+	case MSR_MISC_FEATURES_ENABLES:
+		msr_info->data = 0;
+		if (vcpu->arch.cpuid_fault)
+			msr_info->data |= CPUID_FAULT_ENABLE;
 		break;
 	default:
 		if (kvm_pmu_is_valid_msr(vcpu, msr_info->index))
@@ -7497,6 +7511,8 @@ void kvm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 	kvm_update_dr7(vcpu);
 
 	vcpu->arch.cr2 = 0;
+
+	vcpu->arch.cpuid_fault = false;
 
 	kvm_make_request(KVM_REQ_EVENT, vcpu);
 	vcpu->arch.apf.msr_val = 0;
