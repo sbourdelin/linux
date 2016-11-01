@@ -584,6 +584,10 @@ static int get_bad_peb_limit(const struct ubi_device *ubi, int max_beb_per1024)
 	int limit, device_pebs;
 	uint64_t device_size;
 
+	limit = mtd_max_bad_blocks(ubi->mtd, 0, ubi->mtd->size);
+	if (limit > 0)
+		return limit;
+
 	if (!max_beb_per1024)
 		return 0;
 
