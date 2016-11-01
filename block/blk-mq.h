@@ -61,6 +61,8 @@ extern void blk_mq_rq_timed_out(struct request *req, bool reserved);
 
 void blk_mq_release(struct request_queue *q);
 
+extern bool blk_mq_poll(struct blk_mq_hw_ctx *, struct request *);
+
 static inline struct blk_mq_ctx *__blk_mq_get_ctx(struct request_queue *q,
 					   unsigned int cpu)
 {

@@ -2352,6 +2352,39 @@ void blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set, int nr_hw_queues)
 }
 EXPORT_SYMBOL_GPL(blk_mq_update_nr_hw_queues);
 
+bool blk_mq_poll(struct blk_mq_hw_ctx *hctx, struct request *rq)
+{
+	struct request_queue *q = hctx->queue;
+	long state;
+
+	hctx->poll_considered++;
+
+	state = current->state;
+	while (!need_resched()) {
+		int ret;
+
+		hctx->poll_invoked++;
+
+		ret = q->mq_ops->poll(hctx, rq->tag);
+		if (ret > 0) {
+			hctx->poll_success++;
+			set_current_state(TASK_RUNNING);
+			return true;
+		}
+
+		if (signal_pending_state(state, current))
+			set_current_state(TASK_RUNNING);
+
+		if (current->state == TASK_RUNNING)
+			return true;
+		if (ret < 0)
+			break;
+		cpu_relax();
+	}
+
+	return false;
+}
+
 void blk_mq_disable_hotplug(void)
 {
 	mutex_lock(&all_q_mutex);
