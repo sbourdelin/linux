@@ -2686,12 +2686,12 @@ static void i915_gem_cleanup_engine(struct intel_engine_cs *engine)
 	 */
 
 	if (i915.enable_execlists) {
-		spin_lock(&engine->execlist_lock);
+		spin_lock_irq(&engine->timeline->lock);
 		INIT_LIST_HEAD(&engine->execlist_queue);
 		i915_gem_request_put(engine->execlist_port[0].request);
 		i915_gem_request_put(engine->execlist_port[1].request);
 		memset(engine->execlist_port, 0, sizeof(engine->execlist_port));
-		spin_unlock(&engine->execlist_lock);
+		spin_unlock_irq(&engine->timeline->lock);
 	}
 }
 
