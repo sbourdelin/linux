@@ -4748,6 +4748,10 @@ i915_gem_load_init(struct drm_device *dev)
 		goto err_vmas;
 	}
 
+	err = i915_init_sw_fences();
+	if (err)
+		goto err_requests;
+
 	mutex_lock(&dev_priv->drm.struct_mutex);
 	INIT_LIST_HEAD(&dev_priv->gt.timelines);
 	err = i915_gem_timeline_init(dev_priv,
@@ -4755,7 +4759,7 @@ i915_gem_load_init(struct drm_device *dev)
 				     "[execution]");
 	mutex_unlock(&dev_priv->drm.struct_mutex);
 	if (err)
-		goto err_requests;
+		goto err_sw_fences;
 
 	INIT_LIST_HEAD(&dev_priv->context_list);
 	INIT_WORK(&dev_priv->mm.free_work, __i915_gem_free_work);
@@ -4783,6 +4787,8 @@ i915_gem_load_init(struct drm_device *dev)
 
 	return 0;
 
+err_sw_fences:
+	i915_fini_sw_fences();
 err_requests:
 	kmem_cache_destroy(dev_priv->requests);
 err_vmas:
@@ -4798,6 +4804,8 @@ void i915_gem_load_cleanup(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 
 	WARN_ON(!llist_empty(&dev_priv->mm.free_list));
+
+	i915_fini_sw_fences();
 
 	kmem_cache_destroy(dev_priv->requests);
 	kmem_cache_destroy(dev_priv->vmas);

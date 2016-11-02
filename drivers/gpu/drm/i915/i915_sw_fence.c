@@ -17,6 +17,11 @@
 
 static DEFINE_SPINLOCK(i915_sw_fence_lock);
 
+static DEFINE_MUTEX(i915_sw_fence_mutex);
+static unsigned int i915_sw_fence_usecnt;
+static struct kmem_cache *i915_sw_fence_wq_cache;
+static struct kmem_cache *i915_sw_fence_cb_cache;
+
 static int __i915_sw_fence_notify(struct i915_sw_fence *fence,
 				  enum i915_sw_fence_notify state)
 {
@@ -138,7 +143,7 @@ static int i915_sw_fence_wake(wait_queue_t *wq, unsigned mode, int flags, void *
 	__i915_sw_fence_complete(wq->private, key);
 	i915_sw_fence_put(wq->private);
 	if (wq->flags & I915_SW_FENCE_FLAG_ALLOC)
-		kfree(wq);
+		kmem_cache_free(i915_sw_fence_wq_cache, wq);
 	return 0;
 }
 
@@ -212,7 +217,7 @@ static int __i915_sw_fence_await_sw_fence(struct i915_sw_fence *fence,
 
 	pending = 0;
 	if (!wq) {
-		wq = kmalloc(sizeof(*wq), gfp);
+		wq = kmem_cache_alloc(i915_sw_fence_wq_cache, gfp);
 		if (!wq) {
 			if (!gfpflags_allow_blocking(gfp))
 				return -ENOMEM;
@@ -290,7 +295,7 @@ static void dma_i915_sw_fence_wake(struct dma_fence *dma,
 		i915_sw_fence_commit(cb->fence);
 	dma_fence_put(cb->dma);
 
-	kfree(cb);
+	kmem_cache_free(i915_sw_fence_cb_cache, cb);
 }
 
 int i915_sw_fence_await_dma_fence(struct i915_sw_fence *fence,
@@ -304,7 +309,7 @@ int i915_sw_fence_await_dma_fence(struct i915_sw_fence *fence,
 	if (dma_fence_is_signaled(dma))
 		return 0;
 
-	cb = kmalloc(sizeof(*cb), gfp);
+	cb = kmem_cache_alloc(i915_sw_fence_cb_cache, gfp);
 	if (!cb) {
 		if (!gfpflags_allow_blocking(gfp))
 			return -ENOMEM;
@@ -392,4 +397,58 @@ int i915_sw_fence_await_reservation(struct i915_sw_fence *fence,
 	dma_fence_put(excl);
 
 	return ret;
+}
+
+int i915_init_sw_fences(void)
+{
+	struct kmem_cache *wq_cache, *cb_cache;
+
+	mutex_lock(&i915_sw_fence_mutex);
+
+	if (i915_sw_fence_usecnt == 0) {
+		wq_cache = kmem_cache_create("i915_sw_fence_wq",
+					     sizeof(wait_queue_t),
+					     __alignof__(wait_queue_head_t),
+					     0, NULL);
+		if (!wq_cache)
+			goto err;
+
+		cb_cache = kmem_cache_create("i915_sw_fence_cb",
+					     sizeof(struct i915_sw_dma_fence_cb),
+					     __alignof__(struct i915_sw_dma_fence_cb),
+					     0, NULL);
+		if (!cb_cache) {
+			kmem_cache_destroy(wq_cache);
+			goto err;
+		}
+
+		i915_sw_fence_wq_cache = wq_cache;
+		i915_sw_fence_cb_cache = cb_cache;
+
+		i915_sw_fence_usecnt++;
+	}
+
+	mutex_unlock(&i915_sw_fence_mutex);
+
+	return 0;
+
+err:
+	mutex_unlock(&i915_sw_fence_mutex);
+	return -ENOMEM;
+}
+
+void i915_fini_sw_fences(void)
+{
+	mutex_lock(&i915_sw_fence_mutex);
+
+	i915_sw_fence_usecnt--;
+
+	if (i915_sw_fence_usecnt == 0) {
+		kmem_cache_destroy(i915_sw_fence_cb_cache);
+		kmem_cache_destroy(i915_sw_fence_wq_cache);
+
+		i915_sw_fence_cb_cache = i915_sw_fence_wq_cache = NULL;
+	}
+
+	mutex_unlock(&i915_sw_fence_mutex);
 }

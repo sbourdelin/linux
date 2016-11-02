@@ -40,6 +40,9 @@ typedef int (*i915_sw_fence_notify_t)(struct i915_sw_fence *,
 				      enum i915_sw_fence_notify state);
 #define __i915_sw_fence_call __aligned(4)
 
+int i915_init_sw_fences(void);
+void i915_fini_sw_fences(void);
+
 void i915_sw_fence_init(struct i915_sw_fence *fence, i915_sw_fence_notify_t fn);
 void i915_sw_fence_commit(struct i915_sw_fence *fence);
 
