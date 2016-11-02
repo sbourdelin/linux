@@ -640,6 +640,9 @@ static void i915_guc_submit(struct drm_i915_gem_request *rq)
 	struct i915_guc_client *client = guc->execbuf_client;
 	int b_ret;
 
+	rq->previous_context = rq->engine->last_context;
+	rq->engine->last_context = rq->ctx;
+
 	__i915_gem_request_submit(rq);
 
 	spin_lock(&client->wq_lock);
@@ -1522,6 +1525,7 @@ int i915_guc_submission_enable(struct drm_i915_private *dev_priv)
 	/* Take over from manual control of ELSP (execlists) */
 	for_each_engine(engine, dev_priv, id) {
 		engine->submit_request = i915_guc_submit;
+		engine->schedule = NULL;
 
 		/* Replay the current set of previously submitted requests */
 		list_for_each_entry(request,

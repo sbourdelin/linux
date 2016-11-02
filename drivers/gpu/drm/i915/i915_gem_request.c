@@ -141,6 +141,8 @@ i915_priotree_fini(struct i915_priotree *pt)
 {
 	struct i915_dependency *dep, *next;
 
+	GEM_BUG_ON(!RB_EMPTY_NODE(&pt->node));
+
 	/* Everyone we depended upon should retire before us and remove
 	 * themselves from our list. However, retirement is run independently
 	 * on each timeline and so we may be called out-of-order.
@@ -164,6 +166,8 @@ i915_priotree_init(struct i915_priotree *pt)
 {
 	INIT_LIST_HEAD(&pt->pre_list);
 	INIT_LIST_HEAD(&pt->post_list);
+	RB_CLEAR_NODE(&pt->node);
+	pt->priority = INT_MIN;
 }
 
 void i915_gem_retire_noop(struct i915_gem_active *active,

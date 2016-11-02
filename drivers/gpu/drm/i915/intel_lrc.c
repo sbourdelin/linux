@@ -432,9 +432,10 @@ static bool can_merge_ctx(const struct i915_gem_context *prev,
 
 static void execlists_dequeue(struct intel_engine_cs *engine)
 {
-	struct drm_i915_gem_request *cursor, *last;
+	struct drm_i915_gem_request *last;
 	struct execlist_port *port = engine->execlist_port;
 	unsigned long flags;
+	struct rb_node *rb;
 	bool submit = false;
 
 	last = port->request;
@@ -471,7 +472,11 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 	 */
 
 	spin_lock_irqsave(&engine->timeline->lock, flags);
-	list_for_each_entry(cursor, &engine->execlist_queue, execlist_link) {
+	rb = engine->execlist_first;
+	while (rb) {
+		struct drm_i915_gem_request *cursor =
+			rb_entry(rb, typeof(*cursor), priotree.node);
+
 		/* Can we combine this request with the current port? It has to
 		 * be the same context/ringbuffer and not have any exceptions
 		 * (e.g. GVT saying never to combine contexts).
@@ -503,16 +508,27 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 			port++;
 		}
 
+		rb = rb_next(rb);
+		rb_erase(&cursor->priotree.node, &engine->execlist_queue);
+		RB_CLEAR_NODE(&cursor->priotree.node);
+		cursor->priotree.priority = INT_MAX;
+
+		/* We keep the previous context alive until we retire the
+		 * following request. This ensures that any the context object
+		 * is still pinned for any residual writes the HW makes into
+		 * it on the context switch into the next object following the
+		 * breadcrumb. Otherwise, we may retire the context too early.
+		 */
+		cursor->previous_context = engine->last_context;
+		engine->last_context = cursor->ctx;
+
 		__i915_gem_request_submit(cursor);
 		last = cursor;
 		submit = true;
 	}
 	if (submit) {
-		/* Decouple all the requests submitted from the queue */
-		engine->execlist_queue.next = &cursor->execlist_link;
-		cursor->execlist_link.prev = &engine->execlist_queue;
-
 		i915_gem_request_assign(&port->request, last);
+		engine->execlist_first = rb;
 	}
 	spin_unlock_irqrestore(&engine->timeline->lock, flags);
 
@@ -595,24 +611,75 @@ static void intel_lrc_irq_handler(unsigned long data)
 	intel_uncore_forcewake_put(dev_priv, engine->fw_domains);
 }
 
+static bool insert_request(struct i915_priotree *pt, struct rb_root *root)
+{
+	struct rb_node **p, *rb;
+	bool first = true;
+
+	/* most positive priority is scheduled first, equal priorities fifo */
+	rb = NULL;
+	p = &root->rb_node;
+	while (*p) {
+		struct i915_priotree *pos;
+
+		rb = *p;
+		pos = rb_entry(rb, typeof(*pos), node);
+		if (pt->priority > pos->priority) {
+			p = &rb->rb_left;
+		} else {
+			p = &rb->rb_right;
+			first = false;
+		}
+	}
+	rb_link_node(&pt->node, rb, p);
+	rb_insert_color(&pt->node, root);
+
+	return first;
+}
+
 static void execlists_submit_request(struct drm_i915_gem_request *request)
 {
 	struct intel_engine_cs *engine = request->engine;
 
 	assert_spin_locked(&engine->timeline->lock);
 
-	/* We keep the previous context alive until we retire the following
-	 * request. This ensures that any the context object is still pinned
-	 * for any residual writes the HW makes into it on the context switch
-	 * into the next object following the breadcrumb. Otherwise, we may
-	 * retire the context too early.
-	 */
-	request->previous_context = engine->last_context;
-	engine->last_context = request->ctx;
-
-	list_add_tail(&request->execlist_link, &engine->execlist_queue);
+	if (insert_request(&request->priotree, &engine->execlist_queue))
+		engine->execlist_first = &request->priotree.node;
 	if (execlists_elsp_idle(engine))
 		tasklet_hi_schedule(&engine->irq_tasklet);
+}
+
+static void update_priorities(struct i915_priotree *pt, int prio)
+{
+	struct drm_i915_gem_request *request =
+		container_of(pt, struct drm_i915_gem_request, priotree);
+	struct intel_engine_cs *engine = request->engine;
+	struct i915_dependency *dep;
+
+	if (prio <= READ_ONCE(pt->priority))
+		return;
+
+	/* Recursively bump all dependent priorities to match the new request */
+	list_for_each_entry(dep, &pt->pre_list, pre_link)
+		update_priorities(dep->signal, prio);
+
+	/* Fifo and depth-first replacement ensure our deps execute before us */
+	spin_lock_irq(&engine->timeline->lock);
+	pt->priority = prio;
+	if (!RB_EMPTY_NODE(&pt->node)) {
+		rb_erase(&pt->node, &engine->execlist_queue);
+		if (insert_request(pt, &engine->execlist_queue))
+			engine->execlist_first = &pt->node;
+	}
+	spin_unlock_irq(&engine->timeline->lock);
+}
+
+static void execlists_schedule(struct drm_i915_gem_request *request, int prio)
+{
+	/* Make sure that our entire dependency chain shares our prio */
+	update_priorities(&request->priotree, prio);
+
+	/* XXX Do we need to preempt to make room for us and our deps? */
 }
 
 int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request)
@@ -1651,8 +1718,10 @@ void intel_execlists_enable_submission(struct drm_i915_private *dev_priv)
 	struct intel_engine_cs *engine;
 	enum intel_engine_id id;
 
-	for_each_engine(engine, dev_priv, id)
+	for_each_engine(engine, dev_priv, id) {
 		engine->submit_request = execlists_submit_request;
+		engine->schedule = execlists_schedule;
+	}
 }
 
 static void
@@ -1665,6 +1734,7 @@ logical_ring_default_vfuncs(struct intel_engine_cs *engine)
 	engine->emit_breadcrumb = gen8_emit_breadcrumb;
 	engine->emit_breadcrumb_sz = gen8_emit_breadcrumb_sz;
 	engine->submit_request = execlists_submit_request;
+	engine->schedule = execlists_schedule;
 
 	engine->irq_enable = gen8_logical_ring_enable_irq;
 	engine->irq_disable = gen8_logical_ring_disable_irq;

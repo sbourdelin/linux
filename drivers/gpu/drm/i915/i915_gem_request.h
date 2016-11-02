@@ -51,6 +51,9 @@ struct i915_dependency {
 struct i915_priotree {
 	struct list_head pre_list; /* who is before us, we depend upon */
 	struct list_head post_list; /* who is after us, they depend upon us */
+	struct rb_node node;
+	int priority;
+#define I915_PRIORITY_MAX 1024
 };
 
 /**
@@ -168,9 +171,6 @@ struct drm_i915_gem_request {
 	struct drm_i915_file_private *file_priv;
 	/** file_priv list entry for this request */
 	struct list_head client_list;
-
-	/** Link in the execlist submission queue, guarded by execlist_lock. */
-	struct list_head execlist_link;
 };
 
 extern const struct dma_fence_ops i915_fence_ops;
