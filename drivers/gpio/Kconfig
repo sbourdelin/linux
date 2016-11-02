@@ -884,6 +884,16 @@ config HTC_EGPIO
 	    several HTC phones.  It provides basic support for input
 	    pins, output pins, and irqs.
 
+config GPIO_IMANAGER
+	tristate "Advantech iManager GPIO"
+	depends on MFD_IMANAGER
+	help
+	  This enables support for the iManager GPIO interface on some
+	  Advantech SOM, MIO, AIMB, and PCM modules/boards.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called gpio-imanager.
+
 config GPIO_JANZ_TTL
 	tristate "Janz VMOD-TTL Digital IO Module"
 	depends on MFD_JANZ_CMODIO
