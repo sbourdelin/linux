@@ -76,28 +76,31 @@ static int denali_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	denali->flash_reg = ioremap_nocache(csr_base, csr_len);
 	if (!denali->flash_reg) {
 		dev_err(&dev->dev, "Spectra: Unable to remap memory region\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto release_regions;
 	}
 
 	denali->flash_mem = ioremap_nocache(mem_base, mem_len);
 	if (!denali->flash_mem) {
 		dev_err(&dev->dev, "Spectra: ioremap_nocache failed!");
 		ret = -ENOMEM;
-		goto failed_remap_reg;
+		goto unmap_reg;
 	}
 
 	ret = denali_init(denali);
 	if (ret)
-		goto failed_remap_mem;
+		goto unmap_mem;
 
 	pci_set_drvdata(dev, denali);
 
 	return 0;
 
-failed_remap_mem:
+unmap_mem:
 	iounmap(denali->flash_mem);
-failed_remap_reg:
+unmap_reg:
 	iounmap(denali->flash_reg);
+release_regions:
+	pci_release_regions(dev);
 	return ret;
 }
 
@@ -109,6 +112,7 @@ static void denali_pci_remove(struct pci_dev *dev)
 	denali_remove(denali);
 	iounmap(denali->flash_reg);
 	iounmap(denali->flash_mem);
+	pci_release_regions(dev);
 }
 
 static struct pci_driver denali_pci_driver = {
