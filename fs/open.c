@@ -516,7 +516,8 @@ out:
 	return error;
 }
 
-static int chmod_common(const struct path *path, umode_t mode)
+static int chmod_common(const struct path *path, umode_t mode,
+	struct file *filp)
 {
 	struct inode *inode = path->dentry->d_inode;
 	struct inode *delegated_inode = NULL;
@@ -533,6 +534,10 @@ retry_deleg:
 		goto out_unlock;
 	newattrs.ia_mode = (mode & S_IALLUGO) | (inode->i_mode & ~S_IALLUGO);
 	newattrs.ia_valid = ATTR_MODE | ATTR_CTIME;
+	if (filp) {
+		newattrs.ia_file = filp;
+		newattrs.ia_valid |= ATTR_FILE;
+	}
 	error = notify_change(path->dentry, &newattrs, &delegated_inode);
 out_unlock:
 	inode_unlock(inode);
@@ -552,7 +557,7 @@ SYSCALL_DEFINE2(fchmod, unsigned int, fd, umode_t, mode)
 
 	if (f.file) {
 		audit_file(f.file);
-		err = chmod_common(&f.file->f_path, mode);
+		err = chmod_common(&f.file->f_path, mode, f.file);
 		fdput(f);
 	}
 	return err;
@@ -566,7 +571,7 @@ SYSCALL_DEFINE3(fchmodat, int, dfd, const char __user *, filename, umode_t, mode
 retry:
 	error = user_path_at(dfd, filename, lookup_flags, &path);
 	if (!error) {
-		error = chmod_common(&path, mode);
+		error = chmod_common(&path, mode, NULL);
 		path_put(&path);
 		if (retry_estale(error, lookup_flags)) {
 			lookup_flags |= LOOKUP_REVAL;
