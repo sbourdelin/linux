@@ -85,6 +85,12 @@
 /* Max number of processors/hosts in a system */
 #define SMEM_HOST_COUNT		9
 
+/*
+ * Shared memory identifiers, used to acquire handles to respective memory
+ * region.
+ */
+#define SMEM_HW_SW_BUILD_ID		137
+
 /**
   * struct smem_proc_comm - proc_comm communication struct (legacy)
   * @command:	current command to be executed
@@ -695,7 +701,8 @@ static int qcom_smem_probe(struct platform_device *pdev)
 {
 	struct smem_header *header;
 	struct qcom_smem *smem;
-	size_t array_size;
+	void *socinfo;
+	size_t array_size, size;
 	int num_regions;
 	int hwlock_id;
 	u32 version;
@@ -750,6 +757,15 @@ static int qcom_smem_probe(struct platform_device *pdev)
 		return -ENXIO;
 
 	__smem = smem;
+
+	socinfo = qcom_smem_get(QCOM_SMEM_HOST_ANY, SMEM_HW_SW_BUILD_ID,
+			&size);
+	if (IS_ERR(socinfo)) {
+		dev_warn(&pdev->dev,
+			"Can't find SMEM_HW_SW_BUILD_ID; falling back on dummy values.\n");
+		socinfo = setup_dummy_socinfo();
+	}
+	qcom_socinfo_init(socinfo, size);
 
 	return 0;
 }

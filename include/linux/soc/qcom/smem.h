@@ -7,5 +7,6 @@ int qcom_smem_alloc(unsigned host, unsigned item, size_t size);
 void *qcom_smem_get(unsigned host, unsigned item, size_t *size);
 
 int qcom_smem_get_free_space(unsigned host);
-
+int qcom_socinfo_init(void *info, size_t size);
+void *setup_dummy_socinfo(void);
 #endif
