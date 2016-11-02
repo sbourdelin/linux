@@ -288,7 +288,8 @@ static const struct intel_device_info intel_haswell_info = {
 #define BDW_FEATURES \
 	HSW_FEATURES, \
 	BDW_COLORS, \
-	.has_logical_ring_contexts = 1
+	.has_logical_ring_contexts = 1, \
+	.has_64bit_reloc = 1
 
 static const struct intel_device_info intel_broadwell_info = {
 	BDW_FEATURES,
