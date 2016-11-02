@@ -8278,6 +8278,8 @@ enum {
 #define _MIPIA_CTRL			(dev_priv->mipi_mmio_base + 0xb104)
 #define _MIPIC_CTRL			(dev_priv->mipi_mmio_base + 0xb904)
 #define MIPI_CTRL(port)			_MMIO_MIPI(port, _MIPIA_CTRL, _MIPIC_CTRL)
+#define  BXT_PIXEL_OVERLAP_CNT_MASK			(0xf << 10)
+#define  BXT_PIXEL_OVERLAP_CNT_SHIFT			10
 #define  ESCAPE_CLOCK_DIVIDER_SHIFT			5 /* A only */
 #define  ESCAPE_CLOCK_DIVIDER_MASK			(3 << 5)
 #define  ESCAPE_CLOCK_DIVIDER_1				(0 << 5)
