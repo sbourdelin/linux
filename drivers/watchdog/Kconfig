@@ -912,6 +912,17 @@ config WAFER_WDT
 	  To compile this driver as a module, choose M here: the
 	  module will be called wafer5823wdt.
 
+config IMANAGER_WDT
+	tristate "Advantech iManager Watchdog"
+	depends on MFD_IMANAGER
+	select WATCHDOG_CORE
+	help
+	  Support for Advantech iManager watchdog on some Advantech
+	  SOM, MIO, AIMB, and PCM modules/boards.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called imanager_wdt.
+
 config I6300ESB_WDT
 	tristate "Intel 6300ESB Timer/Watchdog"
 	depends on PCI
