@@ -322,7 +322,6 @@ struct reloc_cache {
 	struct drm_mm_node node;
 	unsigned long vaddr;
 	unsigned int page;
-	bool use_64bit_reloc;
 };
 
 static void reloc_cache_init(struct reloc_cache *cache,
@@ -331,7 +330,6 @@ static void reloc_cache_init(struct reloc_cache *cache,
 	cache->page = -1;
 	cache->vaddr = 0;
 	cache->i915 = i915;
-	cache->use_64bit_reloc = INTEL_GEN(cache->i915) >= 8;
 	cache->node.allocated = false;
 }
 
@@ -519,7 +517,7 @@ relocate_entry(struct drm_i915_gem_object *obj,
 	       u64 target_offset)
 {
 	u64 offset = reloc->offset;
-	bool wide = cache->use_64bit_reloc;
+	bool wide = HAS_64BIT_RELOC(cache->i915);
 	void *vaddr;
 
 	target_offset = relocation_target(reloc, target_offset);
@@ -552,6 +550,7 @@ i915_gem_execbuffer_relocate_entry(struct drm_i915_gem_object *obj,
 	struct drm_gem_object *target_obj;
 	struct drm_i915_gem_object *target_i915_obj;
 	struct i915_vma *target_vma;
+	const size_t reloc_w = HAS_64BIT_RELOC(dev_priv) ? 8 : 4;
 	uint64_t target_offset;
 	int ret;
 
@@ -608,8 +607,7 @@ i915_gem_execbuffer_relocate_entry(struct drm_i915_gem_object *obj,
 		return 0;
 
 	/* Check that the relocation address is valid... */
-	if (unlikely(reloc->offset >
-		     obj->base.size - (cache->use_64bit_reloc ? 8 : 4))) {
+	if (unlikely(reloc->offset > obj->base.size - reloc_w)) {
 		DRM_DEBUG("Relocation beyond object bounds: "
 			  "obj %p target %d offset %d size %d.\n",
 			  obj, reloc->target_handle,
