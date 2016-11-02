@@ -198,9 +198,11 @@ struct rc_dev {
 /**
  * rc_allocate_device - Allocates a RC device
  *
+ * @rc_driver_type: specifies the type of the RC output to be allocated
+ *
  * returns a pointer to struct rc_dev.
  */
-struct rc_dev *rc_allocate_device(void);
+struct rc_dev *rc_allocate_device(enum rc_driver_type);
 
 /**
  * rc_free_device - Frees a RC device
