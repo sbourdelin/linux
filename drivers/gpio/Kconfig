@@ -409,6 +409,14 @@ config GPIO_TB10X
 	select GENERIC_IRQ_CHIP
 	select OF_GPIO
 
+config GPIO_TEGRA186
+	bool "NVIDIA Tegra186 GPIO support"
+	default ARCH_TEGRA
+	depends on ARCH_TEGRA || COMPILE_TEST
+	depends on OF_GPIO
+	help
+	 Support for the NVIDIA Tegra186 GPIO controller driver.
+
 config GPIO_TEGRA
 	bool "NVIDIA Tegra GPIO support"
 	default ARCH_TEGRA
