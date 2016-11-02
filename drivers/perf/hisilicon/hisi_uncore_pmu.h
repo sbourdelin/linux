@@ -51,6 +51,22 @@
 	(((event_code & HISI_SCCL_MASK) >>	\
 			   HISI_SCCL_SHIFT) - 1)
 
+#define HISI_PMU_FORMAT_ATTR(_name, _config)		\
+	(&((struct dev_ext_attribute[]) {		\
+		{ .attr = __ATTR(_name, 0444,	\
+			hisi_format_sysfs_show, NULL),	\
+		  .var = (void *) _config,		\
+		}					\
+	})[0].attr.attr)
+
+#define HISI_PMU_EVENT_ATTR_STR(_name, _str)		\
+	(&((struct perf_pmu_events_attr[]) {		\
+		{ .attr = __ATTR(_name, 0444,	\
+			 hisi_event_sysfs_show, NULL),	\
+		  .event_str = _str,			\
+		}					\
+	  })[0].attr.attr)
+
 struct hisi_pmu;
 
 struct hisi_uncore_ops {
@@ -105,4 +121,10 @@ int hisi_djtag_writereg(int module_id, int bank,
 struct hisi_pmu *hisi_pmu_alloc(struct device *dev);
 int hisi_uncore_common_fwprop_read(struct device *dev,
 					struct hisi_pmu *phisi_pmu);
+ssize_t hisi_event_sysfs_show(struct device *dev,
+				  struct device_attribute *attr, char *buf);
+ssize_t hisi_format_sysfs_show(struct device *dev,
+				  struct device_attribute *attr, char *buf);
+ssize_t hisi_cpumask_sysfs_show(struct device *dev,
+				struct device_attribute *attr, char *buf);
 #endif /* __HISI_UNCORE_PMU_H__ */
