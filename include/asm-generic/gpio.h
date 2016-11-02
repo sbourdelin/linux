@@ -89,6 +89,10 @@ static inline void gpio_set_value_cansleep(unsigned gpio, int value)
 	return gpiod_set_raw_value_cansleep(gpio_to_desc(gpio), value);
 }
 
+static inline int gpio_is_enabled(unsigned gpio)
+{
+	return gpiod_is_enabled(gpio_to_desc(gpio));
+}
 
 /* A platform's <asm/gpio.h> code may want to inline the I/O calls when
  * the GPIO is constant and refers to some always-present controller,

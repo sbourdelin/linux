@@ -2356,6 +2356,28 @@ int gpiod_is_active_low(const struct gpio_desc *desc)
 }
 EXPORT_SYMBOL_GPL(gpiod_is_active_low);
 
+/**
+ * gpiod_is_enabled - Finds whether pin is in GPIO mode or in functional mode.
+ * @desc: the gpio descriptor to check.
+ *
+ * Returns 1 if the GPIO mode is enabled of pin, 0 if it is in functional mode
+ * or negative error if any failure.
+ */
+int gpiod_is_enabled(const struct gpio_desc *desc)
+{
+	struct gpio_chip *chip;
+
+	VALIDATE_DESC(desc);
+	chip = desc->gdev->chip;
+	if (!chip->is_enabled) {
+		gpiod_dbg(desc, "%s: missing is_enabled() ops\n", __func__);
+		return -ENOTSUPP;
+	}
+
+	return chip->is_enabled(chip, gpio_chip_hwgpio(desc));
+}
+EXPORT_SYMBOL_GPL(gpiod_is_enabled);
+
 /* I/O calls are only valid after configuration completed; the relevant
  * "is this a valid GPIO" error checks should already have been done.
  *
