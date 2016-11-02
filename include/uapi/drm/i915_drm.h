@@ -391,6 +391,8 @@ typedef struct drm_i915_irq_wait {
 
 /* Query whether DRM_I915_GEM_EXECBUFFER2 supports user defined execution
  * priorities and the driver will attempt to execute batches in priority order.
+ * The initial priority for each batch is supplied by the context and is
+ * controlled via I915_CONTEXT_PARAM_PRIORITY.
  */
 #define I915_PARAM_HAS_SCHEDULER	 41
 
@@ -1224,6 +1226,7 @@ struct drm_i915_gem_context_param {
 #define I915_CONTEXT_PARAM_NO_ZEROMAP	0x2
 #define I915_CONTEXT_PARAM_GTT_SIZE	0x3
 #define I915_CONTEXT_PARAM_NO_ERROR_CAPTURE	0x4
+#define I915_CONTEXT_PARAM_PRIORITY	0x5
 	__u64 value;
 };
 
