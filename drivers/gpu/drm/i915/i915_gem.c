@@ -4716,33 +4716,22 @@ i915_gem_load_init(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	int err;
 
-	dev_priv->objects =
-		kmem_cache_create("i915_gem_object",
-				  sizeof(struct drm_i915_gem_object), 0,
-				  SLAB_HWCACHE_ALIGN,
-				  NULL);
+	dev_priv->objects = KMEM_CACHE(drm_i915_gem_object, SLAB_HWCACHE_ALIGN);
 	if (!dev_priv->objects) {
 		err = -ENOMEM;
 		goto err_out;
 	}
 
-	dev_priv->vmas =
-		kmem_cache_create("i915_gem_vma",
-				  sizeof(struct i915_vma), 0,
-				  SLAB_HWCACHE_ALIGN,
-				  NULL);
+	dev_priv->vmas = KMEM_CACHE(i915_vma, SLAB_HWCACHE_ALIGN);
 	if (!dev_priv->vmas) {
 		err = -ENOMEM;
 		goto err_objects;
 	}
 
-	dev_priv->requests =
-		kmem_cache_create("i915_gem_request",
-				  sizeof(struct drm_i915_gem_request), 0,
-				  SLAB_HWCACHE_ALIGN |
-				  SLAB_RECLAIM_ACCOUNT |
-				  SLAB_DESTROY_BY_RCU,
-				  NULL);
+	dev_priv->requests = KMEM_CACHE(drm_i915_gem_request,
+					SLAB_HWCACHE_ALIGN |
+					SLAB_RECLAIM_ACCOUNT |
+					SLAB_DESTROY_BY_RCU);
 	if (!dev_priv->requests) {
 		err = -ENOMEM;
 		goto err_vmas;
