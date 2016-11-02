@@ -4438,6 +4438,91 @@ unsigned long get_max_pfn(void)
 }
 EXPORT_SYMBOL(get_max_pfn);
 
+static void mark_unused_pages_bitmap(struct zone *zone,
+		unsigned long start_pfn, unsigned long end_pfn,
+		unsigned long *bitmap[], unsigned long bits,
+		unsigned int nr_bmap)
+{
+	unsigned long pfn, flags, nr_pg, pos, *bmap;
+	unsigned int order, i, t, bmap_idx;
+	struct list_head *curr;
+
+	if (zone_is_empty(zone))
+		return;
+
+	end_pfn = min(start_pfn + nr_bmap * bits, end_pfn);
+	spin_lock_irqsave(&zone->lock, flags);
+
+	for_each_migratetype_order(order, t) {
+		list_for_each(curr, &zone->free_area[order].free_list[t]) {
+			pfn = page_to_pfn(list_entry(curr, struct page, lru));
+			if (pfn < start_pfn || pfn >= end_pfn)
+				continue;
+			nr_pg = 1UL << order;
+			if (pfn + nr_pg > end_pfn)
+				nr_pg = end_pfn - pfn;
+			bmap_idx = (pfn - start_pfn) / bits;
+			if (bmap_idx == (pfn + nr_pg - start_pfn) / bits) {
+				bmap = bitmap[bmap_idx];
+				pos = (pfn - start_pfn) % bits;
+				bitmap_set(bmap, pos, nr_pg);
+			} else
+				for (i = 0; i < nr_pg; i++) {
+					pos = pfn - start_pfn + i;
+					bmap_idx = pos / bits;
+					bmap = bitmap[bmap_idx];
+					pos = pos % bits;
+					bitmap_set(bmap, pos, 1);
+				}
+		}
+	}
+
+	spin_unlock_irqrestore(&zone->lock, flags);
+}
+
+/*
+ * During live migration, page is always discardable unless it's
+ * content is needed by the system.
+ * get_unused_pages provides an API to get the unused pages, these
+ * unused pages can be discarded if there is no modification since
+ * the request. Some other mechanism, like the dirty page logging
+ * can be used to track the modification.
+ *
+ * This function scans the free page list to get the unused pages
+ * whose pfn are range from start_pfn to end_pfn, and set the
+ * corresponding bit in the bitmap if an unused page is found.
+ *
+ * Allocating a large bitmap may fail because of fragmentation,
+ * instead of using a single bitmap, we use a scatter/gather bitmap.
+ * The 'bitmap' is the start address of an array which contains
+ * 'nr_bmap' separate small bitmaps, each bitmap contains 'bits' bits.
+ *
+ * return -1 if parameters are invalid
+ * return 0 when end_pfn >= max_pfn
+ * return 1 when end_pfn < max_pfn
+ */
+int get_unused_pages(unsigned long start_pfn, unsigned long end_pfn,
+	unsigned long *bitmap[], unsigned long bits, unsigned int nr_bmap)
+{
+	struct zone *zone;
+	int ret = 0;
+
+	if (bitmap == NULL || *bitmap == NULL || nr_bmap == 0 ||
+		 bits == 0 || start_pfn > end_pfn)
+		return -1;
+	if (end_pfn < max_pfn)
+		ret = 1;
+	if (end_pfn >= max_pfn)
+		ret = 0;
+
+	for_each_populated_zone(zone)
+		mark_unused_pages_bitmap(zone, start_pfn, end_pfn, bitmap,
+					 bits, nr_bmap);
+
+	return ret;
+}
+EXPORT_SYMBOL(get_unused_pages);
+
 static void zoneref_set_zone(struct zone *zone, struct zoneref *zoneref)
 {
 	zoneref->zone = zone;
