@@ -13,7 +13,8 @@
 
 #include "i915_sw_fence.h"
 
-#define I915_SW_FENCE_FLAG_ALLOC BIT(3) /* after WQ_FLAG_* for safety */
+#define I915_SW_FENCE_FLAG_ALLOC	(1)
+#define I915_SW_FENCE_PRIVATE_MASK	~(I915_SW_FENCE_FLAG_ALLOC)
 
 static DEFINE_SPINLOCK(i915_sw_fence_lock);
 
@@ -132,12 +133,17 @@ void i915_sw_fence_commit(struct i915_sw_fence *fence)
 	i915_sw_fence_put(fence);
 }
 
+#define wq_to_i915_sw_fence(wq) (struct i915_sw_fence *) \
+	((unsigned long)(wq)->private & I915_SW_FENCE_PRIVATE_MASK)
+
 static int i915_sw_fence_wake(wait_queue_t *wq, unsigned mode, int flags, void *key)
 {
+	struct i915_sw_fence *fence = wq_to_i915_sw_fence(wq);
+
 	list_del(&wq->task_list);
-	__i915_sw_fence_complete(wq->private, key);
-	i915_sw_fence_put(wq->private);
-	if (wq->flags & I915_SW_FENCE_FLAG_ALLOC)
+	__i915_sw_fence_complete(fence, key);
+	i915_sw_fence_put(fence);
+	if ((unsigned long)wq->private & I915_SW_FENCE_FLAG_ALLOC)
 		kfree(wq);
 	return 0;
 }
@@ -157,7 +163,8 @@ static bool __i915_sw_fence_check_if_after(struct i915_sw_fence *fence,
 		if (wq->func != i915_sw_fence_wake)
 			continue;
 
-		if (__i915_sw_fence_check_if_after(wq->private, signaler))
+		if (__i915_sw_fence_check_if_after(wq_to_i915_sw_fence(wq),
+						   signaler))
 			return true;
 	}
 
@@ -175,7 +182,7 @@ static void __i915_sw_fence_clear_checked_bit(struct i915_sw_fence *fence)
 		if (wq->func != i915_sw_fence_wake)
 			continue;
 
-		__i915_sw_fence_clear_checked_bit(wq->private);
+		__i915_sw_fence_clear_checked_bit(wq_to_i915_sw_fence(wq));
 	}
 }
 
@@ -221,13 +228,14 @@ static int __i915_sw_fence_await_sw_fence(struct i915_sw_fence *fence,
 			return 0;
 		}
 
-		pending |= I915_SW_FENCE_FLAG_ALLOC;
+		pending = I915_SW_FENCE_FLAG_ALLOC;
 	}
 
 	INIT_LIST_HEAD(&wq->task_list);
-	wq->flags = pending;
 	wq->func = i915_sw_fence_wake;
 	wq->private = i915_sw_fence_get(fence);
+	BUG_ON((unsigned long)wq->private & I915_SW_FENCE_FLAG_ALLOC);
+	wq->private = (void *)((unsigned long)wq->private | pending);
 
 	i915_sw_fence_await(fence);
 
