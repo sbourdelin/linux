@@ -113,6 +113,59 @@ i915_gem_request_remove_from_client(struct drm_i915_gem_request *request)
 	spin_unlock(&file_priv->mm.lock);
 }
 
+static int
+i915_priotree_add_dependency(struct i915_priotree *pt,
+			     struct i915_priotree *signal,
+			     struct i915_dependency *dep)
+{
+	unsigned long flags = 0;
+
+	if (!dep) {
+		dep = kmalloc(sizeof(*dep), GFP_KERNEL);
+		if (!dep)
+			return -ENOMEM;
+
+		flags |= I915_DEPENDENCY_ALLOC;
+	}
+
+	dep->signal = signal;
+	dep->flags = flags;
+
+	list_add(&dep->post_link, &signal->post_list);
+	list_add(&dep->pre_link, &pt->pre_list);
+	return 0;
+}
+
+static void
+i915_priotree_fini(struct i915_priotree *pt)
+{
+	struct i915_dependency *dep, *next;
+
+	/* Everyone we depended upon should retire before us and remove
+	 * themselves from our list. However, retirement is run independently
+	 * on each timeline and so we may be called out-of-order.
+	 */
+	list_for_each_entry_safe(dep, next, &pt->pre_list, pre_link) {
+		list_del(&dep->post_link);
+		if (dep->flags & I915_DEPENDENCY_ALLOC)
+			kfree(dep);
+	}
+
+	/* Remove ourselves from everyone who depends upon us */
+	list_for_each_entry_safe(dep, next, &pt->post_list, post_link) {
+		list_del(&dep->pre_link);
+		if (dep->flags & I915_DEPENDENCY_ALLOC)
+			kfree(dep);
+	}
+}
+
+static void
+i915_priotree_init(struct i915_priotree *pt)
+{
+	INIT_LIST_HEAD(&pt->pre_list);
+	INIT_LIST_HEAD(&pt->post_list);
+}
+
 void i915_gem_retire_noop(struct i915_gem_active *active,
 			  struct drm_i915_gem_request *request)
 {
@@ -182,6 +235,8 @@ static void i915_gem_request_retire(struct drm_i915_gem_request *request)
 	i915_gem_context_put(request->ctx);
 
 	dma_fence_signal(&request->fence);
+
+	i915_priotree_fini(&request->priotree);
 	i915_gem_request_put(request);
 }
 
@@ -464,6 +519,8 @@ i915_gem_request_alloc(struct intel_engine_cs *engine,
 	 */
 	i915_sw_fence_await_sw_fence(&req->execute, &req->submit, &req->execq);
 
+	i915_priotree_init(&req->priotree);
+
 	INIT_LIST_HEAD(&req->active_list);
 	req->i915 = dev_priv;
 	req->engine = engine;
@@ -516,6 +573,14 @@ i915_gem_request_await_request(struct drm_i915_gem_request *to,
 	int ret;
 
 	GEM_BUG_ON(to == from);
+
+	if (to->engine->schedule) {
+		ret = i915_priotree_add_dependency(&to->priotree,
+						   &from->priotree,
+						   NULL);
+		if (ret < 0)
+			return ret;
+	}
 
 	if (to->timeline == from->timeline)
 		return 0;
@@ -740,9 +805,14 @@ void __i915_add_request(struct drm_i915_gem_request *request, bool flush_caches)
 
 	prev = i915_gem_active_raw(&timeline->last_request,
 				   &request->i915->drm.struct_mutex);
-	if (prev)
+	if (prev) {
 		i915_sw_fence_await_sw_fence(&request->submit, &prev->submit,
 					     &request->submitq);
+		if (engine->schedule)
+			i915_priotree_add_dependency(&request->priotree,
+						     &prev->priotree,
+						     &request->depq);
+	}
 
 	spin_lock_irq(&timeline->lock);
 	list_add_tail(&request->link, &timeline->requests);

@@ -41,6 +41,18 @@ struct intel_signal_node {
 	struct intel_wait wait;
 };
 
+struct i915_dependency {
+	struct i915_priotree *signal;
+	struct list_head pre_link, post_link;
+	unsigned long flags;
+#define I915_DEPENDENCY_ALLOC BIT(0)
+};
+
+struct i915_priotree {
+	struct list_head pre_list; /* who is before us, we depend upon */
+	struct list_head post_list; /* who is after us, they depend upon us */
+};
+
 /**
  * Request queue structure.
  *
@@ -88,6 +100,17 @@ struct drm_i915_gem_request {
 	struct i915_sw_fence execute;
 	wait_queue_t submitq;
 	wait_queue_t execq;
+
+	/* A list of everyone we wait upon, and everyone who waits upon us.
+	 * Even though we will not be submitted to the hardware before the
+	 * submit fence is signaled (it waits for all external events as well
+	 * as our own requests), the scheduler still needs to know the
+	 * dependency tree for the lifetime of the request (from execbuf
+	 * to retirement), i.e. bidirectional dependency information for the
+	 * request not tied to individual fences.
+	 */
+	struct i915_priotree priotree;
+	struct i915_dependency depq;
 
 	u32 global_seqno;
 
