@@ -1,0 +1,67 @@
+/*
+ * HiSilicon SoC L3C Hardware event counters support
+ *
+ * Copyright (C) 2016 Huawei Technologies Limited
+ * Author: Anurup M <anurup.m@huawei.com>
+ *
+ * This code is based on the uncore PMU's like arm-cci and
+ * arm-ccn.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+#ifndef __HISI_UNCORE_L3C_H__
+#define __HISI_UNCORE_L3C_H__
+
+#include "hisi_uncore_pmu.h"
+
+/*
+ * ARMv8 HiSilicon L3C RAW event types.
+ */
+enum armv8_hisi_l3c_event_types {
+	HISI_HWEVENT_L3C_READ_ALLOCATE		= 0x0,
+	HISI_HWEVENT_L3C_WRITE_ALLOCATE		= 0x01,
+	HISI_HWEVENT_L3C_READ_NOALLOCATE	= 0x02,
+	HISI_HWEVENT_L3C_WRITE_NOALLOCATE	= 0x03,
+	HISI_HWEVENT_L3C_READ_HIT		= 0x04,
+	HISI_HWEVENT_L3C_WRITE_HIT		= 0x05,
+	HISI_HWEVENT_L3C_EVENT_MAX		= 0x15,
+};
+
+/*
+ * ARMv8 HiSilicon Hardware counter Index.
+ */
+enum armv8_hisi_l3c_counters {
+	HISI_IDX_L3C_COUNTER0		= 0x0,
+	HISI_IDX_L3C_COUNTER_MAX	= 0x7,
+};
+
+#define HISI_MAX_CFG_L3C_CNTR	0x08
+
+struct hisi_l3c_hwcfg {
+	u32 evtype_reg0_off;
+	u32 counter_reg0_off;
+	u32 event_ctrl_reg_off;
+	u32 event_enable;
+	u32 module_id[MAX_BANKS];
+	u32 num_banks;
+	u32 bank_cfgen[MAX_BANKS];
+};
+
+struct hisi_l3c_data {
+	struct hisi_djtag_client *client;
+	DECLARE_BITMAP(hisi_l3c_event_used_mask,
+				HISI_MAX_CFG_L3C_CNTR);
+	struct hisi_l3c_hwcfg l3c_hwcfg;
+};
+
+#endif /* __HISI_UNCORE_L3C_H__ */
