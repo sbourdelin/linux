@@ -85,7 +85,9 @@ struct drm_i915_gem_request {
 	struct intel_signal_node signaling;
 
 	struct i915_sw_fence submit;
+	struct i915_sw_fence execute;
 	wait_queue_t submitq;
+	wait_queue_t execq;
 
 	u32 global_seqno;
 
