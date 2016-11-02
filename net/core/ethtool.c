@@ -1516,6 +1516,22 @@ static int ethtool_get_link(struct net_device *dev, char __user *useraddr)
 	return 0;
 }
 
+static int ethtool_get_actual_speed(struct net_device *dev,
+				    char __user *useraddr)
+{
+	struct ethtool_value edata = { .cmd = ETHTOOL_GASPD };
+
+	if (!dev->ethtool_ops->get_actual_speed)
+		return -EOPNOTSUPP;
+
+	edata.data = dev->ethtool_ops->get_actual_speed(dev);
+
+	if (copy_to_user(useraddr, &edata, sizeof(edata)))
+		return -EFAULT;
+
+	return 0;
+}
+
 static int ethtool_get_any_eeprom(struct net_device *dev, void __user *useraddr,
 				  int (*getter)(struct net_device *,
 						struct ethtool_eeprom *, u8 *),
@@ -2450,6 +2466,7 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 	case ETHTOOL_GDRVINFO:
 	case ETHTOOL_GMSGLVL:
 	case ETHTOOL_GLINK:
+	case ETHTOOL_GASPD:
 	case ETHTOOL_GCOALESCE:
 	case ETHTOOL_GRINGPARAM:
 	case ETHTOOL_GPAUSEPARAM:
@@ -2530,6 +2547,9 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 		break;
 	case ETHTOOL_GLINK:
 		rc = ethtool_get_link(dev, useraddr);
+		break;
+	case ETHTOOL_GASPD:
+		rc = ethtool_get_actual_speed(dev, useraddr);
 		break;
 	case ETHTOOL_GEEPROM:
 		rc = ethtool_get_eeprom(dev, useraddr);
