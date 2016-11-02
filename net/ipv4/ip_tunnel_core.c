@@ -73,16 +73,6 @@ void iptunnel_xmit(struct sock *sk, struct rtable *rt, struct sk_buff *skb,
 	skb_dst_set(skb, &rt->dst);
 	memset(IPCB(skb), 0, sizeof(*IPCB(skb)));
 
-	if (skb_iif && !(df & htons(IP_DF))) {
-		/* Arrived from an ingress interface, got encapsulated, with
-		 * fragmentation of encapulating frames allowed.
-		 * If skb is gso, the resulting encapsulated network segments
-		 * may exceed dst mtu.
-		 * Allow IP Fragmentation of segments.
-		 */
-		IPCB(skb)->flags |= IPSKB_FRAG_SEGS;
-	}
-
 	/* Push down and install the IP header. */
 	skb_push(skb, sizeof(struct iphdr));
 	skb_reset_network_header(skb);
