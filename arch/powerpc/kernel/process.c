@@ -1349,17 +1349,19 @@ void show_regs(struct pt_regs * regs)
 #ifdef CONFIG_PPC64
 	printk("SOFTE: %ld ", regs->softe);
 	if ((regs->trap != 0xc00) && cpu_has_feature(CPU_FTR_CFAR))
-		printk("CFAR: "REG" ", regs->orig_gpr3);
+		pr_cont("CFAR: "REG" ", regs->orig_gpr3);
 #endif
 	if (trap == 0x200 || trap == 0x300 || trap == 0x600)
 #if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
-		printk("DEAR: "REG" ESR: "REG" ", regs->dar, regs->dsisr);
+		pr_cont("DEAR: "REG" ESR: "REG" ", regs->dar, regs->dsisr);
 #else
-		printk("DAR: "REG" DSISR: %08lx ", regs->dar, regs->dsisr);
+		pr_cont("DAR: "REG" DSISR: %08lx ", regs->dar, regs->dsisr);
 #endif
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
-	if (MSR_TM_ACTIVE(regs->msr))
-		printk("\nPACATMSCRATCH: %016llx ", get_paca()->tm_scratch);
+	if (MSR_TM_ACTIVE(regs->msr)) {
+		pr_cont("\n");
+		printk("PACATMSCRATCH: %016llx ", get_paca()->tm_scratch);
+	}
 #endif
 
 	for (i = 0;  i < 32;  i++) {
