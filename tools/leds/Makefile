@@ -3,11 +3,11 @@
 CC = $(CROSS_COMPILE)gcc
 CFLAGS = -Wall -Wextra -g -I../../include/uapi
 
-all: uledmon
+all: uledmon led_notify_mon
 %: %.c
 	$(CC) $(CFLAGS) -o $@ $^
 
 clean:
-	$(RM) uledmon
+	$(RM) uledmon led_notify_mon
 
 .PHONY: all clean
