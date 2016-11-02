@@ -305,14 +305,19 @@ static void rt2x00queue_create_tx_descriptor_ht(struct rt2x00_dev *rt2x00dev,
 	struct ieee80211_tx_info *tx_info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_tx_rate *txrate = &tx_info->control.rates[0];
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
-	struct rt2x00_sta *sta_priv = NULL;
+	u8 ba_size = 0;
 
 	if (sta) {
-		txdesc->u.ht.mpdu_density =
-		    sta->ht_cap.ampdu_density;
+		struct rt2x00_sta *sta_priv = sta_to_rt2x00_sta(sta);
 
-		sta_priv = sta_to_rt2x00_sta(sta);
+		txdesc->u.ht.mpdu_density = sta->ht_cap.ampdu_density;
 		txdesc->u.ht.wcid = sta_priv->wcid;
+
+		if (!(tx_info->flags & IEEE80211_TX_CTL_RATE_CTRL_PROBE)) {
+			ba_size = IEEE80211_MIN_AMPDU_BUF;
+			ba_size <<= sta->ht_cap.ampdu_factor;
+			ba_size = min_t(int, 63, ba_size - 1);
+		}
 	}
 
 	/*
@@ -345,7 +350,7 @@ static void rt2x00queue_create_tx_descriptor_ht(struct rt2x00_dev *rt2x00dev,
 		return;
 	}
 
-	txdesc->u.ht.ba_size = 7;	/* FIXME: What value is needed? */
+	txdesc->u.ht.ba_size = ba_size;
 
 	/*
 	 * Only one STBC stream is supported for now.
