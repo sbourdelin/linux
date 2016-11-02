@@ -1346,16 +1346,16 @@ void show_regs(struct pt_regs * regs)
 	print_msr_bits(regs->msr);
 	printk("  CR: %08lx  XER: %08lx\n", regs->ccr, regs->xer);
 	trap = TRAP(regs);
+#ifdef CONFIG_PPC64
+	printk("SOFTE: %ld ", regs->softe);
 	if ((regs->trap != 0xc00) && cpu_has_feature(CPU_FTR_CFAR))
 		printk("CFAR: "REG" ", regs->orig_gpr3);
+#endif
 	if (trap == 0x200 || trap == 0x300 || trap == 0x600)
 #if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
 		printk("DEAR: "REG" ESR: "REG" ", regs->dar, regs->dsisr);
 #else
 		printk("DAR: "REG" DSISR: %08lx ", regs->dar, regs->dsisr);
-#endif
-#ifdef CONFIG_PPC64
-	printk("SOFTE: %ld ", regs->softe);
 #endif
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	if (MSR_TM_ACTIVE(regs->msr))
