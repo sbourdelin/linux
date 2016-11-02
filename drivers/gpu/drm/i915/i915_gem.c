@@ -433,6 +433,56 @@ i915_gem_object_wait_reservation(struct reservation_object *resv,
 	return timeout;
 }
 
+static void fence_set_priority(struct dma_fence *fence, int prio)
+{
+	struct drm_i915_gem_request *rq;
+	struct intel_engine_cs *engine;
+
+	if (!dma_fence_is_i915(fence))
+		return;
+
+	rq = to_request(fence);
+	engine = rq->engine;
+	if (!engine->schedule)
+		return;
+
+	engine->schedule(rq, prio);
+}
+
+int
+i915_gem_object_wait_priority(struct drm_i915_gem_object *obj,
+			      unsigned int flags,
+			      int prio)
+{
+	struct dma_fence *excl;
+
+	if (flags & I915_WAIT_ALL) {
+		struct dma_fence **shared;
+		unsigned int count, i;
+		int ret;
+
+		ret = reservation_object_get_fences_rcu(obj->resv,
+							&excl, &count, &shared);
+		if (ret)
+			return ret;
+
+		for (i = 0; i < count; i++) {
+			fence_set_priority(shared[i], prio);
+			dma_fence_put(shared[i]);
+		}
+
+		kfree(shared);
+	} else {
+		excl = reservation_object_get_excl_rcu(obj->resv);
+	}
+
+	if (excl) {
+		fence_set_priority(excl, prio);
+		dma_fence_put(excl);
+	}
+	return 0;
+}
+
 /**
  * Waits for rendering to the object to be completed
  * @obj: i915 gem object
