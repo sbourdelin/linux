@@ -1363,13 +1363,15 @@ void show_regs(struct pt_regs * regs)
 #endif
 
 	for (i = 0;  i < 32;  i++) {
-		if ((i % REGS_PER_LINE) == 0)
-			printk("\nGPR%02d: ", i);
-		printk(REG " ", regs->gpr[i]);
+		if ((i % REGS_PER_LINE) == 0) {
+			pr_cont("\n");
+			printk("GPR%02d: ", i);
+		}
+		pr_cont(REG " ", regs->gpr[i]);
 		if (i == LAST_VOLATILE && !FULL_REGS(regs))
 			break;
 	}
-	printk("\n");
+	pr_cont("\n");
 #ifdef CONFIG_KALLSYMS
 	/*
 	 * Lookup NIP late so we have the best change of getting the
