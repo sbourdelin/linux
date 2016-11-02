@@ -1869,7 +1869,7 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 		int ret;
 
 		if (inet_get_convert_csum(sk) && uh->check && !IS_UDPLITE(sk))
-			skb_checksum_try_convert(skb, IPPROTO_UDP, uh->check,
+			skb_checksum_try_convert(skb, IPPROTO_UDP,
 						 inet_compute_pseudo);
 
 		ret = udp_queue_rcv_skb(sk, skb);

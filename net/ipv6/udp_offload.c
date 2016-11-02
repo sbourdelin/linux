@@ -135,7 +135,7 @@ static struct sk_buff **udp6_gro_receive(struct sk_buff **head,
 						 ip6_gro_compute_pseudo))
 		goto flush;
 	else if (uh->check)
-		skb_gro_checksum_try_convert(skb, IPPROTO_UDP, uh->check,
+		skb_gro_checksum_try_convert(skb, IPPROTO_UDP,
 					     ip6_gro_compute_pseudo);
 
 skip:

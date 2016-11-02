@@ -91,8 +91,7 @@ int gre_parse_header(struct sk_buff *skb, struct tnl_ptk_info *tpi,
 			return -EINVAL;
 		}
 
-		skb_checksum_try_convert(skb, IPPROTO_GRE, 0,
-					 null_compute_pseudo);
+		skb_checksum_try_convert(skb, IPPROTO_GRE, null_compute_pseudo);
 		options++;
 	}
 

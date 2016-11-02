@@ -190,7 +190,7 @@ static struct sk_buff **gre_gro_receive(struct sk_buff **head,
 		if (skb_gro_checksum_simple_validate(skb))
 			goto out_unlock;
 
-		skb_gro_checksum_try_convert(skb, IPPROTO_GRE, 0,
+		skb_gro_checksum_try_convert(skb, IPPROTO_GRE,
 					     null_compute_pseudo);
 	}
 
