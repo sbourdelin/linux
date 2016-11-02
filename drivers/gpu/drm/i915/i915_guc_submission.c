@@ -640,6 +640,8 @@ static void i915_guc_submit(struct drm_i915_gem_request *rq)
 	struct i915_guc_client *client = guc->execbuf_client;
 	int b_ret;
 
+	__i915_gem_request_submit(rq);
+
 	spin_lock(&client->wq_lock);
 	guc_wq_item_append(client, rq);
 

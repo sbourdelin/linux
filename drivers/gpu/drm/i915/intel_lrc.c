@@ -434,6 +434,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 {
 	struct drm_i915_gem_request *cursor, *last;
 	struct execlist_port *port = engine->execlist_port;
+	unsigned long flags;
 	bool submit = false;
 
 	last = port->request;
@@ -469,6 +470,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 	 * and context switches) submission.
 	 */
 
+	spin_lock_irqsave(&engine->timeline->lock, flags);
 	spin_lock(&engine->execlist_lock);
 	list_for_each_entry(cursor, &engine->execlist_queue, execlist_link) {
 		/* Can we combine this request with the current port? It has to
@@ -501,6 +503,8 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 			i915_gem_request_assign(&port->request, last);
 			port++;
 		}
+
+		__i915_gem_request_submit(cursor);
 		last = cursor;
 		submit = true;
 	}
@@ -512,6 +516,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 		i915_gem_request_assign(&port->request, last);
 	}
 	spin_unlock(&engine->execlist_lock);
+	spin_unlock_irqrestore(&engine->timeline->lock, flags);
 
 	if (submit)
 		execlists_submit_ports(engine);
