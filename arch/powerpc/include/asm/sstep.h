@@ -87,3 +87,11 @@ struct instruction_op {
 
 extern int analyse_instr(struct instruction_op *op, struct pt_regs *regs,
 			 unsigned int instr);
+
+#if defined(CONFIG_KPROBES_SANITY_TEST) && defined(CONFIG_PPC64)
+void test_emulate_step(void);
+#else
+static inline void test_emulate_step(void)
+{
+}
+#endif
