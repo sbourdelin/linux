@@ -1,0 +1,112 @@
+NVIDIA Tegra PMC IO pad controller
+
+NVIDIA Tegra124 and later SoCs support the multi-voltage level and
+low power state of some of its IO pads. The IO pads can work in
+the voltage of the 1.8V and 3.3V of IO power rail sources. When IO
+interface are not used then IO pads can be configure in low power
+state to reduce the power from that IO pads.
+
+On Tegra124, the IO power rail source is auto detected by SoC and hence
+it is only require to configure in low power mode if IO pads are not
+used.
+
+On T210 onwards, the auto-detection is removed from SoC and hence SW
+must configure the PMC register explicitly to set proper voltage in
+IO pads based on IO rail power source voltage.
+
+The voltage configurations and low power state of IO pads should be done
+in boot if it is not going to change other wise dynamically based on IO
+rail voltage on that IO pads and usage of IO pads
+
+The DT property of the io pads must be under the node of pmc i.e.
+pmc@7000e400 for Tegra124 onwards.
+
+Please refer to <pinctrl-bindings.txt> in this directory for details of the
+common pinctrl bindings used by client devices, including the meaning of the
+phrase "pin configuration node".
+
+Tegra's pin configuration nodes act as a container for an arbitrary number of
+subnodes. Each of these subnodes represents some desired configuration for an
+IO pads, or a list of IO pads. This configuration can include the voltage and
+power enable/disable control
+
+The name of each subnode is not important; all subnodes should be enumerated
+and processed purely based on their content. Each subnode only affects those
+parameters that are explicitly listed. Unspecified is represented as an absent
+property,
+
+See the TRM to determine which properties and values apply to each IO pads.
+Macro values for property values are defined in
+<dt-bindings/pinctrl/pinctrl-tegra-io-pad.h>
+
+The voltage supported on the pads are 1.8V and 3.3V. The enums are defined as:
+	For 1.8V, use TEGRA_IO_PAD_POWER_SOURCE_1800000UV
+	For 3.3V, use TEGRA_IO_PAD_POWER_SOURCE_3300000UV
+
+Required subnode-properties:
+==========================
+- pins : An array of strings. Each string contains the name of an IO pads. Valid
+	 values for these names are listed below.
+
+Optional subnode-properties:
+==========================
+-nvidia,power-source-voltage:	Integer. The voltage level of IO pads. The
+				valid values are 1.8V and 3.3V. Macros are
+				defined for these voltage levels in
+				<dt-bindings/pinctrl/pinctrl-tegra-io-pad.h>
+				Use TEGRA_IO_PAD_POWER_SOURCE_1800000UV for 1.8V
+				Use TEGRA_IO_PAD_POWER_SOURCE_3300000UV for 3.3V
+
+				All IO pads do not support the 1.8V/3.3V
+				configurations. Valid values for "pins" are
+				audio-hv, dmic, gpio, sdmmc1, sdmmc3, spi-hv.
+
+Other than above, following properties are supported from generic pin
+configuration explained in <dt-bindings/pinctrl/pinctrl-binding.txt>.
+low-power-enable:		enable low power mode.
+low-power-disable:		disable low power mode.
+
+Valid values for pin for T124 are:
+	audio, bb, cam, comp, csia, csib, csie, dsi, dsib, dsic, dsid, hdmi,
+	hsic, hv, lvds, mipi-bias, nand, pex-bias, pex-clk1, pex-clk2,
+	pex-ctrl, sdmmc1, sdmmc3, sdmmc4, sys-ddc, uart, usb0, usb1, usb2,
+	usb-bias
+
+	All above pins support low power mode.
+
+Valid values for pin for T210 are:
+	audio, audio-hv, cam, csia, csib, csic, csid, csie, csif,
+	dbg, debug-nonao, dmic, dp, dsi, dsib, dsic, dsid, emmc, emmc2,
+	gpio, hdmi, hsic, lvds, mipi-bias, pex-bias, pex-clk1, pex-clk2,
+	pex-ctrl, sdmmc1, sdmmc3, spi, spi-hv, uart, usb-bias, usb0,
+	usb1, usb2, usb3.
+
+	All above pins support low power mode. However, all IO pads do not
+	support the 1.8V/3.3V configurations. Valid values for
+	nvidia,io-pad-voltage are:
+		audio, audio-hv, cam, dbg, dmic, gpio, pex-ctrl, sdmmc1, sdmmc3,
+		spi, spi-hv,uart
+
+Example:
+	#include <dt-bindings/pinctrl/pinctrl-tegra-io-pad.h>
+	pmc@7000e400 {
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&tegra_io_pad_volt_default>;
+		tegra_io_pad_volt_default: common {
+			audio-hv {
+				pins = "audio-hv";
+				nvidia,power-source-voltage = <TEGRA_IO_PAD_POWER_SOURCE_3300000UV>;
+			};
+
+			gpio {
+				pins = "gpio";
+				invidia,power-source-voltage = <TEGRA_IO_PAD_POWER_SOURCE_1800000UV>;
+			};
+
+			audio {
+				pins = "audio", "dmic", "sdmmc1", "sdmmc3";
+				low-power-enable;
+			};
+		};
+	};
