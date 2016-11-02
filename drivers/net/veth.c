@@ -111,15 +111,18 @@ static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct veth_priv *priv = netdev_priv(dev);
 	struct net_device *rcv;
 	int length = skb->len;
+	int ret = NETDEV_TX_OK;
 
 	rcu_read_lock();
 	rcv = rcu_dereference(priv->peer);
 	if (unlikely(!rcv)) {
 		kfree_skb(skb);
+		ret = NET_RX_DROP;
 		goto drop;
 	}
 
-	if (likely(dev_forward_skb(rcv, skb) == NET_RX_SUCCESS)) {
+	ret = dev_forward_skb(rcv, skb);
+	if (likely(ret == NET_RX_SUCCESS)) {
 		struct pcpu_vstats *stats = this_cpu_ptr(dev->vstats);
 
 		u64_stats_update_begin(&stats->syncp);
@@ -131,7 +134,7 @@ drop:
 		atomic64_inc(&priv->dropped);
 	}
 	rcu_read_unlock();
-	return NETDEV_TX_OK;
+	return ret;
 }
 
 /*
