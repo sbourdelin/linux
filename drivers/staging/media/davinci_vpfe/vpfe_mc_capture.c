@@ -579,7 +579,7 @@ static int vpfe_probe(struct platform_device *pdev)
 	struct resource *res1;
 	int ret = -ENOMEM;
 
-	vpfe_dev = kzalloc(sizeof(*vpfe_dev), GFP_KERNEL);
+	vpfe_dev = devm_kzalloc(&pdev->dev, sizeof(*vpfe_dev), GFP_KERNEL);
 	if (!vpfe_dev)
 		return ret;
 
@@ -681,7 +681,6 @@ probe_out_entities_cleanup:
 probe_disable_clock:
 	vpfe_disable_clock(vpfe_dev);
 probe_free_dev_mem:
-	kzfree(vpfe_dev);
 
 	return ret;
 }
@@ -702,7 +701,6 @@ static int vpfe_remove(struct platform_device *pdev)
 	v4l2_device_unregister(&vpfe_dev->v4l2_dev);
 	media_device_unregister(&vpfe_dev->media_dev);
 	vpfe_disable_clock(vpfe_dev);
-	kzfree(vpfe_dev);
 
 	return 0;
 }
