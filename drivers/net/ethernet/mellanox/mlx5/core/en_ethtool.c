@@ -1504,9 +1504,16 @@ static int mlx5e_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
 	return err;
 }
 
+static int mlx5e_get_actual_speed(struct net_device *netdev)
+{
+	/* TODO: FW command to query the actual speed */
+	return SPEED_25000;
+}
+
 const struct ethtool_ops mlx5e_ethtool_ops = {
 	.get_drvinfo       = mlx5e_get_drvinfo,
 	.get_link          = ethtool_op_get_link,
+	.get_actual_speed  = mlx5e_get_actual_speed,
 	.get_strings       = mlx5e_get_strings,
 	.get_sset_count    = mlx5e_get_sset_count,
 	.get_ethtool_stats = mlx5e_get_ethtool_stats,
