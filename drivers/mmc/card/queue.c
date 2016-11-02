@@ -505,8 +505,6 @@ unsigned int mmc_queue_map_sg(struct mmc_queue *mq, struct mmc_queue_req *mqrq)
 			return blk_rq_map_sg(mq->queue, mqrq->req, mqrq->sg);
 	}
 
-	BUG_ON(!mqrq->bounce_sg);
-
 	if (mmc_packed_cmd(cmd_type))
 		sg_len = mmc_queue_packed_map_sg(mq, mqrq->packed,
 						 mqrq->bounce_sg, cmd_type);
