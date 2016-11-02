@@ -682,6 +682,15 @@ static int __init init_rapl_pmus(void)
 {
 	int maxpkg = topology_max_packages();
 	size_t size;
+	unsigned int cpu;
+
+	for_each_possible_cpu(cpu) {
+		if (topology_logical_package_id(cpu) >= maxpkg) {
+			pr_err("rapl pmu error: max package: %u but CPU%d belongs to %u\n",
+			       maxpkg, cpu, topology_logical_package_id(cpu));
+			return -EINVAL;
+		}
+	}
 
 	size = sizeof(*rapl_pmus) + maxpkg * sizeof(struct rapl_pmu *);
 	rapl_pmus = kzalloc(size, GFP_KERNEL);
