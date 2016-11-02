@@ -1804,22 +1804,20 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	/* Some hubs have a subclass of 1, which AFAICT according to the */
 	/*  specs is not defined, but it works */
-	if ((desc->desc.bInterfaceSubClass != 0) &&
-	    (desc->desc.bInterfaceSubClass != 1)) {
-descriptor_error:
+
+	/* Reject in following cases:
+	 * - Interface subclass is not 0 or 1
+	 * - Multiple endpoints
+	 * - Not an interrupt in endpoint
+	 */
+	endpoint = &desc->endpoint[0].desc;
+	if ((desc->desc.bInterfaceSubClass != 0 &&
+	     desc->desc.bInterfaceSubClass != 1) ||
+	    desc->desc.bNumEndpoints != 1 ||
+	    !usb_endpoint_is_int_in(endpoint)) {
 		dev_err(&intf->dev, "bad descriptor, ignoring hub\n");
 		return -EIO;
 	}
-
-	/* Multiple endpoints? What kind of mutant ninja-hub is this? */
-	if (desc->desc.bNumEndpoints != 1)
-		goto descriptor_error;
-
-	endpoint = &desc->endpoint[0].desc;
-
-	/* If it's not an interrupt in endpoint, we'd better punt! */
-	if (!usb_endpoint_is_int_in(endpoint))
-		goto descriptor_error;
 
 	/* We found a hub */
 	dev_info(&intf->dev, "USB hub found\n");
