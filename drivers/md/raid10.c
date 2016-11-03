@@ -777,13 +777,6 @@ static struct md_rdev *read_balance(struct r10conf *conf,
 		if (!do_balance)
 			break;
 
-		/* This optimisation is debatable, and completely destroys
-		 * sequential read speed for 'far copies' arrays.  So only
-		 * keep it for 'near' arrays, and review those later.
-		 */
-		if (geo->near_copies > 1 && !atomic_read(&rdev->nr_pending))
-			break;
-
 		/* for far > 1 always use the lowest address */
 		if (geo->far_copies > 1)
 			new_distance = r10_bio->devs[slot].addr;
