@@ -2480,28 +2480,6 @@ static void mce_disable_cpu(void)
 	vendor_disable_error_reporting();
 }
 
-/* Get notified when a cpu comes on/off. Be hotplug friendly. */
-static int
-mce_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
-{
-	unsigned int cpu = (unsigned long)hcpu;
-
-	switch (action & ~CPU_TASKS_FROZEN) {
-	case CPU_DEAD:
-		if (threshold_cpu_callback_dead)
-			threshold_cpu_callback_dead(cpu);
-		mce_device_remove(cpu);
-		mce_intel_hcpu_update(cpu);
-
-		/* intentionally ignoring frozen here */
-		if (!(action & CPU_TASKS_FROZEN))
-			cmci_rediscover();
-		break;
-	}
-
-	return NOTIFY_OK;
-}
-
 static int mce_cpu_online(unsigned int cpu)
 {
 	int ret;
@@ -2518,6 +2496,19 @@ static int mce_cpu_online(unsigned int cpu)
 	return 0;
 }
 
+static int mce_cpu_dead(unsigned int cpu)
+{
+	if (threshold_cpu_callback_dead)
+		threshold_cpu_callback_dead(cpu);
+	mce_device_remove(cpu);
+	mce_intel_hcpu_update(cpu);
+
+	/* intentionally ignoring frozen here */
+	if (!cpuhp_tasks_frozen)
+		cmci_rediscover();
+	return 0;
+}
+
 static int mce_cpu_down_dying(unsigned int cpu)
 {
 	struct timer_list *t = this_cpu_ptr(&mce_timer);
@@ -2526,10 +2517,6 @@ static int mce_cpu_down_dying(unsigned int cpu)
 	del_timer_sync(t);
 	return 0;
 }
-
-static struct notifier_block mce_cpu_notifier = {
-	.notifier_call = mce_cpu_callback,
-};
 
 static __init void mce_init_banks(void)
 {
@@ -2580,19 +2567,20 @@ static __init int mcheck_init_device(void)
 	if (err)
 		goto err_init_pool;
 
+	err = cpuhp_setup_state(CPUHP_X86_MCE_DEAD, "x86/mce:dead", NULL,
+				mce_cpu_dead);
+	if (err)
+		goto err_init_pool;
+
 	err = cpuhp_setup_state(CPUHP_AP_X86_MCE_STARTING, "x86/mce:starting",
 				mcheck_cpu_starting, mce_cpu_down_dying);
 	if (err)
-		goto err_init_pool;
+		goto err_hp_starting;
 	err = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "x86/mce:online",
 				mce_cpu_online, NULL);
 	if (err < 0)
 		goto err_hp_online;
 	hp_online = err;
-
-	cpu_notifier_register_begin();
-	__register_hotcpu_notifier(&mce_cpu_notifier);
-	cpu_notifier_register_done();
 
 	register_syscore_ops(&mce_syscore_ops);
 
@@ -2609,6 +2597,9 @@ err_register:
 
 err_hp_online:
 	cpuhp_remove_state(CPUHP_AP_X86_MCE_STARTING);
+
+err_hp_starting:
+	cpuhp_remove_state(CPUHP_X86_MCE_DEAD);
 
 err_init_pool:
 	mca_cfg.banks = 0;
