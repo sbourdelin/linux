@@ -461,6 +461,7 @@ static const struct xgbe_version_data xgbe_v2a = {
 	.rx_max_fifo_size		= 229376,
 	.tx_tstamp_workaround		= 1,
 	.ecc_support			= 1,
+	.i2c_support			= 1,
 };
 
 static const struct xgbe_version_data xgbe_v2b = {
@@ -471,6 +472,7 @@ static const struct xgbe_version_data xgbe_v2b = {
 	.rx_max_fifo_size		= 65536,
 	.tx_tstamp_workaround		= 1,
 	.ecc_support			= 1,
+	.i2c_support			= 1,
 };
 
 static const struct pci_device_id xgbe_pci_table[] = {
