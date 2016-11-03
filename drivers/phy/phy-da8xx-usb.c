@@ -22,6 +22,7 @@
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
+#include <linux/usb/of.h>
 
 struct da8xx_usb_phy {
 	struct phy_provider	*phy_provider;
@@ -109,6 +110,7 @@ static int da8xx_usb20_phy_set_mode(struct phy *phy, enum phy_mode mode)
 	case PHY_MODE_USB_DEVICE:	/* Force VBUS valid, ID = 1 */
 		val |= CFGCHIP2_OTGMODE_FORCE_DEVICE;
 		break;
+	case PHY_MODE_INVALID:
 	case PHY_MODE_USB_OTG:	/* Don't override the VBUS/ID comparators */
 		val |= CFGCHIP2_OTGMODE_NO_OVERRIDE |
 			CFGCHIP2_SESENDEN | CFGCHIP2_VBDTCTEN;
@@ -152,6 +154,7 @@ static int da8xx_usb_phy_probe(struct platform_device *pdev)
 	struct device		*dev = &pdev->dev;
 	struct device_node	*node = dev->of_node;
 	struct da8xx_usb_phy	*d_phy;
+	enum usb_dr_mode	dr_mode = PHY_MODE_INVALID;
 
 	d_phy = devm_kzalloc(dev, sizeof(*d_phy), GFP_KERNEL);
 	if (!d_phy)
@@ -202,6 +205,13 @@ static int da8xx_usb_phy_probe(struct platform_device *pdev)
 			dev_err(dev, "Failed to create phy provider\n");
 			return PTR_ERR(d_phy->phy_provider);
 		}
+
+		if (of_find_property(node, "usb20-force-mode", NULL)) {
+			dr_mode = of_usb_get_dr_mode_by_phy(node, 0);
+			if (dr_mode == USB_DR_MODE_UNKNOWN ||
+				dr_mode == USB_DR_MODE_OTG)
+				dev_warn(dev, "dr_mode is not properly set\n");
+		}
 	} else {
 		int ret;
 
@@ -213,6 +223,7 @@ static int da8xx_usb_phy_probe(struct platform_device *pdev)
 		if (ret)
 			dev_warn(dev, "Failed to create usb20 phy lookup\n");
 	}
+	da8xx_usb20_phy_set_mode(d_phy->usb20_phy, dr_mode);
 
 	return 0;
 }
