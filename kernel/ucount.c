@@ -5,6 +5,7 @@
  *  License.
  */
 
+#include <linux/kmemleak.h>
 #include <linux/stat.h>
 #include <linux/sysctl.h>
 #include <linux/slab.h>
@@ -226,6 +227,7 @@ static __init int user_namespace_sysctl_init(void)
 	 */
 	user_header = register_sysctl("user", empty);
 	BUG_ON(!user_header);
+	kmemleak_not_leak(user_header);
 	BUG_ON(!setup_userns_sysctls(&init_user_ns));
 #endif
 	return 0;
