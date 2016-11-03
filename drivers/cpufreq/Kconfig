@@ -45,6 +45,16 @@ config CPU_FREQ_STAT_DETAILS
 
 	  If in doubt, say N.
 
+config CPU_FREQ_STAT_RESET
+	bool "Allow reset of CPU frequency transition statistics"
+	depends on CPU_FREQ_STAT
+	help
+	  If enabled, writing to /sys/[...]/cpufreq/stats/reset will reset the
+	  current CPUfreq statistics. This is primarily meant for testing. It
+	  should not be enabled on a production system.
+
+	  If in doubt, say N.
+
 choice
 	prompt "Default CPUFreq governor"
 	default CPU_FREQ_DEFAULT_GOV_USERSPACE if ARM_SA1100_CPUFREQ || ARM_SA1110_CPUFREQ

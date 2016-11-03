@@ -111,6 +111,35 @@ static ssize_t show_trans_table(struct cpufreq_policy *policy, char *buf)
 cpufreq_freq_attr_ro(trans_table);
 #endif
 
+#ifdef CONFIG_CPU_FREQ_STAT_RESET
+static void cpufreq_stats_clear_table(struct cpufreq_policy *policy)
+{
+	struct cpufreq_stats *stats = policy->stats;
+	unsigned int count = stats->max_state;
+
+	memset(stats->time_in_state, 0, count * sizeof(u64));
+#ifdef CONFIG_CPU_FREQ_STAT_DETAILS
+	memset(stats->trans_table, 0, count * count * sizeof(int));
+#endif
+	stats->last_time = get_jiffies_64();
+	stats->total_trans = 0;
+}
+
+static ssize_t show_reset(struct cpufreq_policy *policy, char *buf)
+{
+	buf[0] = '\0';
+	return 0;
+}
+
+static ssize_t store_reset(struct cpufreq_policy *policy, const char *buf,
+			   size_t count)
+{
+	cpufreq_stats_clear_table(policy);
+	return count;
+}
+cpufreq_freq_attr_rw(reset);
+#endif
+
 cpufreq_freq_attr_ro(total_trans);
 cpufreq_freq_attr_ro(time_in_state);
 
@@ -119,6 +148,9 @@ static struct attribute *default_attrs[] = {
 	&time_in_state.attr,
 #ifdef CONFIG_CPU_FREQ_STAT_DETAILS
 	&trans_table.attr,
+#endif
+#ifdef CONFIG_CPU_FREQ_STAT_RESET
+	&reset.attr,
 #endif
 	NULL
 };
