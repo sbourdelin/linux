@@ -107,7 +107,7 @@ static int process_vm_rw_single_vec(unsigned long addr,
 		 * add FOLL_REMOTE because task/mm might not
 		 * current/current->mm
 		 */
-		pages = __get_user_pages_unlocked(task, mm, pa, pages,
+		pages = __get_user_pages_unlocked(task, mm, NULL, pa, pages,
 						  process_pages, flags);
 		if (pages <= 0)
 			return -EFAULT;
@@ -202,7 +202,7 @@ static ssize_t process_vm_rw_core(pid_t pid, struct iov_iter *iter,
 		goto free_proc_pages;
 	}
 
-	mm = mm_access(task, PTRACE_MODE_ATTACH_REALCREDS);
+	mm = mm_access(task, NULL, PTRACE_MODE_ATTACH_REALCREDS);
 	if (!mm || IS_ERR(mm)) {
 		rc = IS_ERR(mm) ? PTR_ERR(mm) : -ESRCH;
 		/*

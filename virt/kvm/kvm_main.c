@@ -1420,8 +1420,8 @@ static int hva_to_pfn_slow(unsigned long addr, bool *async, bool write_fault,
 		if (write_fault)
 			flags |= FOLL_WRITE;
 
-		npages = __get_user_pages_unlocked(current, current->mm, addr, 1,
-						   page, flags);
+		npages = __get_user_pages_unlocked(current, current->mm, NULL,
+						   addr, 1, page, flags);
 	}
 	if (npages != 1)
 		return npages;

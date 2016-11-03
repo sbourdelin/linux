@@ -3869,6 +3869,7 @@ EXPORT_SYMBOL_GPL(generic_access_phys);
  * given task for page fault accounting.
  */
 static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
+		const struct gup_creds *creds,
 		unsigned long addr, void *buf, int len, unsigned int gup_flags)
 {
 	struct vm_area_struct *vma;
@@ -3882,8 +3883,8 @@ static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		void *maddr;
 		struct page *page = NULL;
 
-		ret = get_user_pages_remote(tsk, mm, addr, 1,
-				gup_flags, &page, &vma);
+		ret = get_user_pages_remote(tsk, mm, creds,
+				addr, 1, gup_flags, &page, &vma);
 		if (ret <= 0) {
 #ifndef CONFIG_HAVE_IOREMAP_PROT
 			break;
@@ -3939,29 +3940,32 @@ static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
  *
  * The caller must hold a reference on @mm.
  */
-int access_remote_vm(struct mm_struct *mm, unsigned long addr,
-		void *buf, int len, unsigned int gup_flags)
+int access_remote_vm(struct mm_struct *mm, const struct gup_creds *creds,
+		unsigned long addr, void *buf, int len, unsigned int gup_flags)
 {
-	return __access_remote_vm(NULL, mm, addr, buf, len, gup_flags);
+	return __access_remote_vm(NULL, mm, creds, addr, buf, len, gup_flags);
 }
 
 /*
  * Access another process' address space.
  * Source/target buffer must be kernel space,
- * Do not walk the page table directly, use get_user_pages
+ * Do not walk the page table directly, use get_user_pages.
+ * @tsk must be ptrace-stopped by current.
  */
 int access_process_vm(struct task_struct *tsk, unsigned long addr,
 		void *buf, int len, unsigned int gup_flags)
 {
 	struct mm_struct *mm;
 	int ret;
+	struct gup_creds creds;
 
 	mm = get_task_mm(tsk);
 	if (!mm)
 		return 0;
-
-	ret = __access_remote_vm(tsk, mm, addr, buf, len, gup_flags);
-
+	creds.subject = current_cred();
+	creds.object = get_task_cred(tsk);
+	ret = __access_remote_vm(tsk, mm, &creds, addr, buf, len, gup_flags);
+	put_cred(creds.object);
 	mmput(mm);
 
 	return ret;

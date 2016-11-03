@@ -23,6 +23,7 @@
 #include <linux/page_ext.h>
 #include <linux/err.h>
 #include <linux/page_ref.h>
+#include <linux/cred.h>
 
 struct mempolicy;
 struct anon_vma;
@@ -1266,12 +1267,25 @@ static inline int fixup_user_fault(struct task_struct *tsk,
 }
 #endif
 
+/*
+ * used to pass security information to LSMs through get_user_pages* for forced
+ * writes (FOLL_WRITE|FOLL_FORCE)
+ */
+struct gup_creds {
+	const struct cred *subject; /* who is trying to write? */
+	const struct cred *object; /* whose memory is written to? */
+};
+/* use when current is writing to its own memory */
+#define GUP_CREDS_CURRENT ((struct gup_creds *)0x1UL)
+
 extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len,
 		unsigned int gup_flags);
-extern int access_remote_vm(struct mm_struct *mm, unsigned long addr,
-		void *buf, int len, unsigned int gup_flags);
+extern int access_remote_vm(struct mm_struct *mm,
+		const struct gup_creds *creds, unsigned long addr, void *buf,
+		int len, unsigned int gup_flags);
 
 long get_user_pages_remote(struct task_struct *tsk, struct mm_struct *mm,
+			    const struct gup_creds *creds,
 			    unsigned long start, unsigned long nr_pages,
 			    unsigned int gup_flags, struct page **pages,
 			    struct vm_area_struct **vmas);
@@ -1281,6 +1295,7 @@ long get_user_pages(unsigned long start, unsigned long nr_pages,
 long get_user_pages_locked(unsigned long start, unsigned long nr_pages,
 		    unsigned int gup_flags, struct page **pages, int *locked);
 long __get_user_pages_unlocked(struct task_struct *tsk, struct mm_struct *mm,
+			       const struct gup_creds *creds,
 			       unsigned long start, unsigned long nr_pages,
 			       struct page **pages, unsigned int gup_flags);
 long get_user_pages_unlocked(unsigned long start, unsigned long nr_pages,
