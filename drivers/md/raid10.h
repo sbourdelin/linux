@@ -53,7 +53,7 @@ struct r10conf {
 	sector_t		offset_diff;
 
 	struct list_head	retry_list;
-	/* A separate list of r1bio which just need raid_end_bio_io called.
+	/* A separate list of r10bio which just need raid_end_bio_io called.
 	 * This mustn't happen for writes which had any errors if the superblock
 	 * needs to be written.
 	 */
