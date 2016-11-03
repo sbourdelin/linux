@@ -270,6 +270,9 @@ static inline int gfpflags_to_migratetype(const gfp_t gfp_flags)
 	BUILD_BUG_ON((1UL << GFP_MOVABLE_SHIFT) != ___GFP_MOVABLE);
 	BUILD_BUG_ON((___GFP_MOVABLE >> GFP_MOVABLE_SHIFT) != MIGRATE_MOVABLE);
 
+	if (IS_ENABLED(CONFIG_CMA) && gfp_flags & __GFP_MOVABLE)
+		return MIGRATE_CMA;
+
 	if (unlikely(page_group_by_mobility_disabled))
 		return MIGRATE_UNMOVABLE;
 

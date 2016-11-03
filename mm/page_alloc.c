@@ -1849,17 +1849,6 @@ static int fallbacks[MIGRATE_TYPES][4] = {
 #endif
 };
 
-#ifdef CONFIG_CMA
-static struct page *__rmqueue_cma_fallback(struct zone *zone,
-					unsigned int order)
-{
-	return __rmqueue_smallest(zone, order, MIGRATE_CMA);
-}
-#else
-static inline struct page *__rmqueue_cma_fallback(struct zone *zone,
-					unsigned int order) { return NULL; }
-#endif
-
 /*
  * Move the free pages in a range to the free lists of the requested type.
  * Note that start_page and end_pages are not aligned on a pageblock
@@ -2218,10 +2207,13 @@ static struct page *__rmqueue(struct zone *zone, unsigned int order,
 	struct page *page;
 
 	page = __rmqueue_smallest(zone, order, migratetype);
-	if (unlikely(!page)) {
-		if (migratetype == MIGRATE_MOVABLE)
-			page = __rmqueue_cma_fallback(zone, order);
+	/* Fallback cma type to movable here */
+	if (!page && migratetype == MIGRATE_CMA) {
+		migratetype = MIGRATE_MOVABLE;
+		page = __rmqueue_smallest(zone, order, migratetype);
+	}
 
+	if (unlikely(!page)) {
 		if (!page)
 			page = __rmqueue_fallback(zone, order, migratetype);
 	}
@@ -2835,7 +2827,7 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 		if (alloc_harder)
 			return true;
 
-		for (mt = 0; mt < MIGRATE_PCPTYPES; mt++) {
+		for (mt = 0; mt < MIGRATE_PCPTYPES - 1; mt++) {
 			if (!list_empty(&area->free_list[mt]))
 				return true;
 		}
@@ -4256,10 +4248,10 @@ static void show_migration_types(unsigned char type)
 		[MIGRATE_UNMOVABLE]	= 'U',
 		[MIGRATE_MOVABLE]	= 'M',
 		[MIGRATE_RECLAIMABLE]	= 'E',
-		[MIGRATE_HIGHATOMIC]	= 'H',
 #ifdef CONFIG_CMA
 		[MIGRATE_CMA]		= 'C',
 #endif
+		[MIGRATE_HIGHATOMIC]	= 'H',
 #ifdef CONFIG_MEMORY_ISOLATION
 		[MIGRATE_ISOLATE]	= 'I',
 #endif
