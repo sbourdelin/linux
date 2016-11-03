@@ -61,10 +61,6 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
 		return 1;
 	}
 	pmd = pmd_offset(pud, addr);
-	if (!pmd_present(*pmd)) {
-		VM_BUG_ON(!pmd_present(*pmd));
-		return 1;
-	}
 	if ((pte_t *)pmd == ptep) {
 		*pgsize = PMD_SIZE;
 		return CONT_PMDS;
