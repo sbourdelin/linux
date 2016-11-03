@@ -70,4 +70,6 @@ struct ima_pmu {
 
 #define UNKNOWN_DOMAIN		-1
 
+int ima_get_domain(struct device_node *pmu_dev);
+
 #endif /* PPC_POWERNV_IMA_PMU_DEF_H */
