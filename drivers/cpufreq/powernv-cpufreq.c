@@ -475,7 +475,7 @@ static inline unsigned int get_nominal_index(void)
 static void powernv_cpufreq_throttle_check(void *data)
 {
 	struct chip *chip;
-	unsigned int cpu = smp_processor_id();
+	int cpu;
 	unsigned long pmsr;
 	int pmsr_pmax;
 	unsigned int pmsr_pmax_idx;
@@ -491,9 +491,11 @@ static void powernv_cpufreq_throttle_check(void *data)
 			goto next;
 		chip->throttled = true;
 		if (pmsr_pmax_idx > powernv_pstate_info.nominal) {
+			cpu = get_cpu();
 			pr_warn_once("CPU %d on Chip %u has Pmax(%d) reduced below nominal frequency(%d)\n",
 				     cpu, chip->id, pmsr_pmax,
 				     idx_to_pstate(powernv_pstate_info.nominal));
+			put_cpu();
 			chip->throttle_sub_turbo++;
 		} else {
 			chip->throttle_turbo++;
