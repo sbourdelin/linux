@@ -410,6 +410,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct zynq_fpga_priv *priv;
 	struct resource *res;
+	fpga_mgr_cap_mask_t caps;
 	int err;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
@@ -461,9 +462,13 @@ static int zynq_fpga_probe(struct platform_device *pdev)
 	zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
 
 	clk_disable(priv->clk);
+	fpga_mgr_cap_zero(&caps);
+	fpga_mgr_cap_set(FPGA_MGR_CAP_FULL_RECONF, caps);
+	fpga_mgr_cap_set(FPGA_MGR_CAP_PARTIAL_RECONF, caps);
+
 
 	err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
-				&zynq_fpga_ops, priv);
+				&zynq_fpga_ops, caps, priv);
 	if (err) {
 		dev_err(dev, "unable to register FPGA manager");
 		clk_unprepare(priv->clk);

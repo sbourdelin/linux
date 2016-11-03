@@ -413,10 +413,6 @@ static int socfpga_fpga_ops_configure_init(struct fpga_manager *mgr, u32 flags,
 	struct socfpga_fpga_priv *priv = mgr->priv;
 	int ret;
 
-	if (flags & FPGA_MGR_PARTIAL_RECONFIG) {
-		dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
-		return -EINVAL;
-	}
 	/* Steps 1 - 5: Reset the FPGA */
 	ret = socfpga_fpga_reset(mgr);
 	if (ret)
@@ -555,6 +551,7 @@ static int socfpga_fpga_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct socfpga_fpga_priv *priv;
 	struct resource *res;
+	fpga_mgr_cap_mask_t caps;
 	int ret;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
@@ -580,8 +577,11 @@ static int socfpga_fpga_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	fpga_mgr_cap_zero(&caps);
+	fpga_mgr_cap_set(FPGA_MGR_CAP_FULL_RECONF, caps);
+
 	return fpga_mgr_register(dev, "Altera SOCFPGA FPGA Manager",
-				 &socfpga_fpga_ops, priv);
+				 &socfpga_fpga_ops, caps, priv);
 }
 
 static int socfpga_fpga_remove(struct platform_device *pdev)
