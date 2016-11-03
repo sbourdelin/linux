@@ -1,3 +1,5 @@
+#ifndef __SELFTESTS_POWERPC_PPC_ASM_H
+#define __SELFTESTS_POWERPC_PPC_ASM_H
 #include <ppc-asm.h>
 
 #define CONFIG_ALTIVEC
@@ -25,24 +27,6 @@
 
 #define PPC_MTOCRF(A, B)	mtocrf A, B
 
-FUNC_START(enter_vmx_usercopy)
-	li	r3,1
-	blr
-
-FUNC_START(exit_vmx_usercopy)
-	li	r3,0
-	blr
-
-FUNC_START(enter_vmx_copy)
-	li	r3,1
-	blr
-
-FUNC_START(exit_vmx_copy)
-	blr
-
-FUNC_START(__copy_tofrom_user_base)
-	blr
-
 #define BEGIN_FTR_SECTION		.if test_feature
 #define FTR_SECTION_ELSE		.else
 #define ALT_FTR_SECTION_END_IFCLR(x)	.endif
@@ -53,3 +37,5 @@ FUNC_START(__copy_tofrom_user_base)
 
 /* Default to taking the first of any alternative feature sections */
 test_feature = 1
+
+#endif /* __SELFTESTS_POWERPC_PPC_ASM_H */
