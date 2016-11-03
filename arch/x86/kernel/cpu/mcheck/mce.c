@@ -2469,35 +2469,15 @@ static void mce_device_remove(unsigned int cpu)
 }
 
 /* Make sure there are no machine checks on offlined CPUs. */
-static void mce_disable_cpu(void *h)
+static void mce_disable_cpu(void)
 {
-	unsigned long action = *(unsigned long *)h;
-
 	if (!mce_available(raw_cpu_ptr(&cpu_info)))
 		return;
 
-	if (!(action & CPU_TASKS_FROZEN))
+	if (!cpuhp_tasks_frozen)
 		cmci_clear();
 
 	vendor_disable_error_reporting();
-}
-
-static void mce_reenable_cpu(void *h)
-{
-	unsigned long action = *(unsigned long *)h;
-	int i;
-
-	if (!mce_available(raw_cpu_ptr(&cpu_info)))
-		return;
-
-	if (!(action & CPU_TASKS_FROZEN))
-		cmci_reenable();
-	for (i = 0; i < mca_cfg.banks; i++) {
-		struct mce_bank *b = &mce_banks[i];
-
-		if (b->init)
-			wrmsrl(msr_ops.ctl(i), b->ctl);
-	}
 }
 
 /* Get notified when a cpu comes on/off. Be hotplug friendly. */
@@ -2505,7 +2485,6 @@ static int
 mce_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
 	unsigned int cpu = (unsigned long)hcpu;
-	struct timer_list *t = &per_cpu(mce_timer, cpu);
 
 	switch (action & ~CPU_TASKS_FROZEN) {
 	case CPU_ONLINE:
@@ -2530,17 +2509,18 @@ mce_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
 		if (!(action & CPU_TASKS_FROZEN))
 			cmci_rediscover();
 		break;
-	case CPU_DOWN_PREPARE:
-		smp_call_function_single(cpu, mce_disable_cpu, &action, 1);
-		del_timer_sync(t);
-		break;
-	case CPU_DOWN_FAILED:
-		smp_call_function_single(cpu, mce_reenable_cpu, &action, 1);
-		mce_start_timer(cpu, t);
-		break;
 	}
 
 	return NOTIFY_OK;
+}
+
+static int mce_cpu_down_dying(unsigned int cpu)
+{
+	struct timer_list *t = this_cpu_ptr(&mce_timer);
+
+	mce_disable_cpu();
+	del_timer_sync(t);
+	return 0;
 }
 
 static struct notifier_block mce_cpu_notifier = {
@@ -2597,7 +2577,7 @@ static __init int mcheck_init_device(void)
 		goto err_init_pool;
 
 	err = cpuhp_setup_state(CPUHP_AP_X86_MCE_STARTING, "x86/mce:starting",
-				mcheck_cpu_starting, NULL);
+				mcheck_cpu_starting, mce_cpu_down_dying);
 	if (err)
 		goto err_init_pool;
 
