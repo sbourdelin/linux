@@ -518,7 +518,7 @@ __i915_gem_userptr_get_pages_worker(struct work_struct *_work)
 			down_read(&mm->mmap_sem);
 			while (pinned < npages) {
 				ret = get_user_pages_remote
-					(work->task, mm,
+					(work->task, mm, NULL,
 					 obj->userptr.ptr + pinned * PAGE_SIZE,
 					 npages - pinned,
 					 flags,

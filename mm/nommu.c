@@ -177,13 +177,14 @@ long get_user_pages_locked(unsigned long start, unsigned long nr_pages,
 EXPORT_SYMBOL(get_user_pages_locked);
 
 long __get_user_pages_unlocked(struct task_struct *tsk, struct mm_struct *mm,
+			       const struct gup_creds *creds,
 			       unsigned long start, unsigned long nr_pages,
 			       struct page **pages, unsigned int gup_flags)
 {
 	long ret;
 	down_read(&mm->mmap_sem);
-	ret = __get_user_pages(tsk, mm, start, nr_pages, gup_flags, pages,
-				NULL, NULL);
+	ret = __get_user_pages(tsk, mm, start, nr_pages, gup_flags, pages, NULL,
+			       NULL);
 	up_read(&mm->mmap_sem);
 	return ret;
 }
@@ -192,8 +193,8 @@ EXPORT_SYMBOL(__get_user_pages_unlocked);
 long get_user_pages_unlocked(unsigned long start, unsigned long nr_pages,
 			     struct page **pages, unsigned int gup_flags)
 {
-	return __get_user_pages_unlocked(current, current->mm, start, nr_pages,
-					 pages, gup_flags);
+	return __get_user_pages_unlocked(current, current->mm, NULL,
+					 start, nr_pages, pages, gup_flags);
 }
 EXPORT_SYMBOL(get_user_pages_unlocked);
 
@@ -1851,8 +1852,8 @@ static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
  *
  * The caller must hold a reference on @mm.
  */
-int access_remote_vm(struct mm_struct *mm, unsigned long addr,
-		void *buf, int len, unsigned int gup_flags)
+int access_remote_vm(struct mm_struct *mm, const struct gup_creds *creds,
+		unsigned long addr, void *buf, int len, unsigned int gup_flags)
 {
 	return __access_remote_vm(NULL, mm, addr, buf, len, gup_flags);
 }
