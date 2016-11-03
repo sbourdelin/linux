@@ -16,6 +16,7 @@
 
 struct perchip_nest_info nest_perchip_info[IMA_MAX_CHIPS];
 struct ima_pmu *per_nest_pmu_arr[IMA_MAX_PMUS];
+static cpumask_t nest_ima_cpumask;
 
 /* Needed for sanity check */
 extern u64 nest_max_offset;
@@ -30,6 +31,164 @@ static struct attribute_group ima_format_group = {
 	.name = "format",
 	.attrs = ima_format_attrs,
 };
+
+/* Get the cpumask printed to a buffer "buf" */
+static ssize_t ima_pmu_cpumask_get_attr(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	cpumask_t *active_mask;
+
+	active_mask = &nest_ima_cpumask;
+	return cpumap_print_to_pagebuf(true, buf, active_mask);
+}
+
+static DEVICE_ATTR(cpumask, S_IRUGO, ima_pmu_cpumask_get_attr, NULL);
+
+static struct attribute *ima_pmu_cpumask_attrs[] = {
+	&dev_attr_cpumask.attr,
+	NULL,
+};
+
+static struct attribute_group ima_pmu_cpumask_attr_group = {
+	.attrs = ima_pmu_cpumask_attrs,
+};
+
+/*
+ * nest_init : Initializes the nest ima engine for the current chip.
+ */
+static void nest_init(int *loc)
+{
+	int rc;
+
+	rc = opal_nest_ima_counters_control(NEST_IMA_PRODUCTION_MODE,
+					    NEST_IMA_ENGINE_START, 0, 0);
+	if (rc)
+		loc[smp_processor_id()] = 1;
+}
+
+static void nest_change_cpu_context(int old_cpu, int new_cpu)
+{
+	int i;
+
+	for (i = 0;
+	     (per_nest_pmu_arr[i] != NULL) && (i < IMA_MAX_PMUS); i++)
+		perf_pmu_migrate_context(&per_nest_pmu_arr[i]->pmu,
+							old_cpu, new_cpu);
+}
+
+static int ppc_nest_ima_cpu_online(unsigned int cpu)
+{
+	int nid, fcpu, ncpu;
+	struct cpumask *l_cpumask, tmp_mask;
+
+	/* Fint the cpumask of this node */
+	nid = cpu_to_node(cpu);
+	l_cpumask = cpumask_of_node(nid);
+
+	/*
+	 * If any of the cpu from this node is already present in the mask,
+	 * just return, if not, then set this cpu in the mask.
+	 */
+	if (!cpumask_and(&tmp_mask, l_cpumask, &nest_ima_cpumask)) {
+		cpumask_set_cpu(cpu, &nest_ima_cpumask);
+		return 0;
+	}
+
+	fcpu = cpumask_first(l_cpumask);
+	ncpu = cpumask_next(cpu, l_cpumask);
+	if (cpu == fcpu) {
+		if (cpumask_test_and_clear_cpu(ncpu, &nest_ima_cpumask)) {
+			cpumask_set_cpu(cpu, &nest_ima_cpumask);
+			nest_change_cpu_context(ncpu, cpu);
+		}
+	}
+
+	return 0;
+}
+
+static int ppc_nest_ima_cpu_offline(unsigned int cpu)
+{
+	int nid, target = -1;
+	struct cpumask *l_cpumask;
+
+	/*
+	 * Check in the designated list for this cpu. Dont bother
+	 * if not one of them.
+	 */
+	if (!cpumask_test_and_clear_cpu(cpu, &nest_ima_cpumask))
+		return 0;
+
+	/*
+	 * Now that this cpu is one of the designated,
+	 * find a next cpu a) which is online and b) in same chip.
+	 */
+	nid = cpu_to_node(cpu);
+	l_cpumask = cpumask_of_node(nid);
+	target = cpumask_next(cpu, l_cpumask);
+
+	/*
+	 * Update the cpumask with the target cpu and
+	 * migrate the context if needed
+	 */
+	if (target >= 0 && target <= nr_cpu_ids) {
+		cpumask_set_cpu(target, &nest_ima_cpumask);
+		nest_change_cpu_context(cpu, target);
+	}
+	return 0;
+}
+
+static int nest_pmu_cpumask_init(void)
+{
+	const struct cpumask *l_cpumask;
+	int cpu, nid;
+	int *cpus_opal_rc;
+
+	if (!cpumask_empty(&nest_ima_cpumask))
+		return 0;
+
+	cpu_notifier_register_begin();
+
+	/*
+	 * Nest PMUs are per-chip counters. So designate a cpu
+	 * from each chip for counter collection.
+	 */
+	for_each_online_node(nid) {
+		l_cpumask = cpumask_of_node(nid);
+
+		/* designate first online cpu in this node */
+		cpu = cpumask_first(l_cpumask);
+		cpumask_set_cpu(cpu, &nest_ima_cpumask);
+	}
+
+	/*
+	 * Memory for OPAL call return value.
+	 */
+	cpus_opal_rc = kzalloc((sizeof(int) * nr_cpu_ids), GFP_KERNEL);
+	if (!cpus_opal_rc)
+		goto fail;
+
+	/* Initialize Nest PMUs in each node using designated cpus */
+	on_each_cpu_mask(&nest_ima_cpumask, (smp_call_func_t)nest_init,
+						(void *)cpus_opal_rc, 1);
+
+	/* Check return value array for any OPAL call failure */
+	for_each_cpu(cpu, &nest_ima_cpumask) {
+		if (cpus_opal_rc[cpu])
+			goto fail;
+	}
+
+	cpuhp_setup_state(CPUHP_AP_PERF_ONLINE,
+			  "POWER_NEST_IMA_ONLINE",
+			  ppc_nest_ima_cpu_online,
+			  ppc_nest_ima_cpu_offline);
+
+	cpu_notifier_register_done();
+	return 0;
+
+fail:
+	cpu_notifier_register_done();
+	return -ENODEV;
+}
 
 static int nest_ima_event_init(struct perf_event *event)
 {
@@ -63,7 +222,7 @@ static int nest_ima_event_init(struct perf_event *event)
 	chip_id = topology_physical_package_id(event->cpu);
 	pcni = &nest_perchip_info[chip_id];
 	event->hw.event_base = pcni->vbase[config/PAGE_SIZE] +
-							(config & ~PAGE_MASK);
+		(config & ~PAGE_MASK);
 
 	return 0;
 }
@@ -123,6 +282,7 @@ static int update_pmu_ops(struct ima_pmu *pmu)
 	pmu->pmu.stop = ima_event_stop;
 	pmu->pmu.read = ima_perf_event_update;
 	pmu->attr_groups[1] = &ima_format_group;
+	pmu->attr_groups[2] = &ima_pmu_cpumask_attr_group;
 	pmu->pmu.attr_groups = pmu->attr_groups;
 
 	return 0;
@@ -189,6 +349,11 @@ int init_ima_pmu(struct ima_events *events, int idx,
 		 struct ima_pmu *pmu_ptr)
 {
 	int ret = -ENODEV;
+
+	/* Add cpumask and register for hotplug notification */
+	ret = nest_pmu_cpumask_init();
+	if (ret)
+		return ret;
 
 	ret = update_events_in_group(events, idx, pmu_ptr);
 	if (ret)
