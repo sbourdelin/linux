@@ -2158,6 +2158,8 @@ void intel_lr_context_resume(struct drm_i915_private *dev_priv)
 			if (WARN_ON(IS_ERR(reg)))
 				continue;
 
+			WARN_ON(!execlists_elsp_idle(engine));
+
 			reg += LRC_STATE_PN * PAGE_SIZE / sizeof(*reg);
 			reg[CTX_RING_HEAD+1] = 0;
 			reg[CTX_RING_TAIL+1] = 0;
