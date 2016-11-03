@@ -409,8 +409,8 @@ stex;	stb	r0,0(r3)
 99:	blr
 
 /*
- * exception handlers for stores: we just need to work
- * out how many bytes weren't copied
+ * exception handlers for stores: we need to work out how many bytes
+ * weren't copied, and we may need to copy some more.
  * Note that the number of bytes of instructions for adjusting r3 needs
  * to equal the amount of the adjustment, due to the trick of using
  * .Lst_exc - r3_offset as the handler address.
@@ -430,10 +430,27 @@ stex;	stb	r0,0(r3)
 	/* adjust by 4 */
 	addi	r3,r3,4
 .Lst_exc:
-	ld	r6,-24(r1)
-	ld	r5,-8(r1)
-	add	r6,r6,r5
-	subf	r3,r3,r6	/* #bytes not copied in r3 */
+	ld	r6,-24(r1)	/* original destination pointer */
+	ld	r4,-16(r1)	/* original source pointer */
+	ld	r5,-8(r1)	/* original number of bytes */
+	add	r7,r6,r5
+	/*
+	 * If the destination pointer isn't 8-byte aligned,
+	 * we may have got the exception as a result of a
+	 * store that overlapped a page boundary, so we may be
+	 * able to copy a few more bytes.
+	 */
+17:	andi.	r0,r3,7
+	beq	19f
+	subf	r8,r6,r3	/* #bytes copied */
+	extable	19f
+	lbzx	r0,r8,r4
+	extable	19f
+	stb	r0,0(r3)
+	addi	r3,r3,1
+	cmpld	r3,r7
+	blt	17b
+19:	subf	r3,r3,r7	/* #bytes not copied in r3 */
 	blr
 
 /*
