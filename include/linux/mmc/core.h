@@ -106,6 +106,12 @@ struct mmc_command {
 	struct mmc_request	*mrq;		/* associated request */
 };
 
+enum mmc_cookie {
+	COOKIE_UNMAPPED,
+	COOKIE_PRE_MAPPED,	/* mapped by pre_req() of controller */
+	COOKIE_MAPPED,		/* mapped by prepare_data() of controller */
+};
+
 struct mmc_data {
 	unsigned int		timeout_ns;	/* data timeout (in ns, max 80ms) */
 	unsigned int		timeout_clks;	/* data timeout (in clocks) */

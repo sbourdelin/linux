@@ -321,12 +321,6 @@ struct sdhci_adma2_64_desc {
 /* Allow for a a command request and a data request at the same time */
 #define SDHCI_MAX_MRQS		2
 
-enum sdhci_cookie {
-	COOKIE_UNMAPPED,
-	COOKIE_PRE_MAPPED,	/* mapped by sdhci_pre_req() */
-	COOKIE_MAPPED,		/* mapped by sdhci_prepare_data() */
-};
-
 struct sdhci_host {
 	/* Data set by hardware interface driver */
 	const char *hw_name;	/* Hardware bus name */
