@@ -39,7 +39,6 @@
 #include <asm/asm.h>
 #include <asm/bugs.h>
 #include <asm/cpu.h>
-#include <asm/mce.h>
 #include <asm/msr.h>
 #include <asm/pat.h>
 #include <asm/microcode.h>
@@ -1094,9 +1093,6 @@ static void identify_cpu(struct cpuinfo_x86 *c)
 		for (i = NCAPINTS; i < NCAPINTS + NBUGINTS; i++)
 			c->x86_capability[i] |= boot_cpu_data.x86_capability[i];
 	}
-
-	/* Init Machine Check Exception if available. */
-	mcheck_cpu_init(c);
 
 	select_idle_routine(c);
 

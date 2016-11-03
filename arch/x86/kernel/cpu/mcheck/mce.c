@@ -1436,11 +1436,24 @@ EXPORT_SYMBOL_GPL(mce_notify_irq);
 static int __mcheck_cpu_mce_banks_init(void)
 {
 	int i;
-	u8 num_banks = mca_cfg.banks;
+	u64 cap;
+	unsigned int num_banks;
+
+	rdmsrl(MSR_IA32_MCG_CAP, cap);
+
+	num_banks = cap & MCG_BANKCNT_MASK;
+	pr_info("CPU supports %d MCE banks\n", num_banks);
+
+	if (num_banks > MAX_NR_BANKS) {
+		pr_warn("Using only %u machine check banks out of %u\n",
+			MAX_NR_BANKS, num_banks);
+		num_banks = MAX_NR_BANKS;
+	}
 
 	mce_banks = kzalloc(num_banks * sizeof(struct mce_bank), GFP_KERNEL);
 	if (!mce_banks)
 		return -ENOMEM;
+	mca_cfg.banks = num_banks;
 
 	for (i = 0; i < num_banks; i++) {
 		struct mce_bank *b = &mce_banks[i];
@@ -1462,25 +1475,11 @@ static int __mcheck_cpu_cap_init(void)
 	rdmsrl(MSR_IA32_MCG_CAP, cap);
 
 	b = cap & MCG_BANKCNT_MASK;
-	if (!mca_cfg.banks)
-		pr_info("CPU supports %d MCE banks\n", b);
-
-	if (b > MAX_NR_BANKS) {
-		pr_warn("Using only %u machine check banks out of %u\n",
-			MAX_NR_BANKS, b);
+	if (b > MAX_NR_BANKS)
 		b = MAX_NR_BANKS;
-	}
 
 	/* Don't support asymmetric configurations today */
-	WARN_ON(mca_cfg.banks != 0 && b != mca_cfg.banks);
-	mca_cfg.banks = b;
-
-	if (!mce_banks) {
-		int err = __mcheck_cpu_mce_banks_init();
-
-		if (err)
-			return err;
-	}
+	WARN_ON(b != mca_cfg.banks);
 
 	/* Use accurate RIP reporting if available. */
 	if ((cap & MCG_EXT_P) && MCG_EXT_CNT(cap) >= 9)
@@ -1769,26 +1768,22 @@ void (*machine_check_vector)(struct pt_regs *, long error_code) =
  * Called for each booted CPU to set up machine checks.
  * Must be called with preempt off:
  */
-void mcheck_cpu_init(struct cpuinfo_x86 *c)
+static int mcheck_cpu_starting(unsigned int cpu)
 {
+	struct cpuinfo_x86 *c = &cpu_data(cpu);
+
 	if (mca_cfg.disabled)
-		return;
+		return 0;
 
 	if (__mcheck_cpu_ancient_init(c))
-		return;
+		return 0;
 
 	if (!mce_available(c))
-		return;
+		return 0;
 
 	if (__mcheck_cpu_cap_init() < 0 || __mcheck_cpu_apply_quirks(c) < 0) {
 		mca_cfg.disabled = true;
-		return;
-	}
-
-	if (mce_gen_pool_init()) {
-		mca_cfg.disabled = true;
-		pr_emerg("Couldn't allocate MCE records pool!\n");
-		return;
+		return 0;
 	}
 
 	machine_check_vector = do_machine_check;
@@ -1797,6 +1792,7 @@ void mcheck_cpu_init(struct cpuinfo_x86 *c)
 	__mcheck_cpu_init_vendor(c);
 	__mcheck_cpu_init_clear_banks();
 	__mcheck_cpu_init_timer();
+	return 0;
 }
 
 /*
@@ -2584,11 +2580,26 @@ static __init int mcheck_init_device(void)
 		goto err_out;
 	}
 
+	err = __mcheck_cpu_mce_banks_init();
+	if (err)
+		goto err_out_mem;
+
 	mce_init_banks();
+
+	err = mce_gen_pool_init();
+	if (err) {
+		pr_emerg("Couldn't allocate MCE records pool!\n");
+		goto err_init_pool;
+	}
 
 	err = subsys_system_register(&mce_subsys, NULL);
 	if (err)
-		goto err_out_mem;
+		goto err_init_pool;
+
+	err = cpuhp_setup_state(CPUHP_AP_X86_MCE_STARTING, "x86/mce:starting",
+				mcheck_cpu_starting, NULL);
+	if (err)
+		goto err_init_pool;
 
 	cpu_notifier_register_begin();
 	for_each_online_cpu(i) {
@@ -2630,12 +2641,18 @@ err_device_create:
 	for_each_possible_cpu(i)
 		mce_device_remove(i);
 
+	cpuhp_remove_state(CPUHP_AP_X86_MCE_STARTING);
+
+err_init_pool:
+	mca_cfg.banks = 0;
+	kfree(mce_banks);
+	mce_banks = NULL;
+
 err_out_mem:
 	free_cpumask_var(mce_device_initialized);
 
 err_out:
 	pr_err("Unable to init device /dev/mcelog (rc: %d)\n", err);
-
 	return err;
 }
 device_initcall_sync(mcheck_init_device);

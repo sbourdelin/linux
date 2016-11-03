@@ -203,12 +203,10 @@ extern int mce_p5_enabled;
 
 #ifdef CONFIG_X86_MCE
 int mcheck_init(void);
-void mcheck_cpu_init(struct cpuinfo_x86 *c);
 void mcheck_cpu_clear(struct cpuinfo_x86 *c);
 void mcheck_vendor_init_severity(void);
 #else
 static inline int mcheck_init(void) { return 0; }
-static inline void mcheck_cpu_init(struct cpuinfo_x86 *c) {}
 static inline void mcheck_cpu_clear(struct cpuinfo_x86 *c) {}
 static inline void mcheck_vendor_init_severity(void) {}
 #endif
