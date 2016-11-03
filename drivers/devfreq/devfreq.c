@@ -364,7 +364,10 @@ void devfreq_monitor_suspend(struct devfreq *devfreq)
 		return;
 	}
 
-	devfreq_update_status(devfreq, devfreq->previous_freq);
+	if (devfreq->suspend_freq)
+		update_devfreq(devfreq, devfreq->suspend_freq);
+	else
+		devfreq_update_status(devfreq, devfreq->previous_freq);
 	devfreq->stop_polling = true;
 	mutex_unlock(&devfreq->lock);
 	cancel_delayed_work_sync(&devfreq->work);
@@ -1250,6 +1253,18 @@ struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
 	return opp;
 }
 EXPORT_SYMBOL(devfreq_recommended_opp);
+
+void devfreq_opp_get_suspend_opp(struct device *dev, struct devfreq *devfreq)
+{
+	struct dev_pm_opp *suspend_opp;
+
+	rcu_read_lock();
+	suspend_opp = dev_pm_opp_get_suspend_opp(dev);
+	if (suspend_opp)
+		devfreq->suspend_freq = dev_pm_opp_get_freq(suspend_opp);
+	rcu_read_unlock();
+}
+EXPORT_SYMBOL(devfreq_opp_get_suspend_opp);
 
 /**
  * devfreq_register_opp_notifier() - Helper function to get devfreq notified
