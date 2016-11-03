@@ -766,6 +766,7 @@ static void delete_glists(struct lio *lio)
 	}
 
 	kfree((void *)lio->glist);
+	kfree((void *)lio->glist_lock);
 }
 
 /**
@@ -1325,6 +1326,7 @@ liquidio_probe(struct pci_dev *pdev,
 		complete(&first_stage);
 
 	if (octeon_device_init(oct_dev)) {
+		complete(&hs->init);
 		liquidio_remove(pdev);
 		return -ENOMEM;
 	}
@@ -1349,7 +1351,15 @@ liquidio_probe(struct pci_dev *pdev,
 			oct_dev->watchdog_task = kthread_create(
 			    liquidio_watchdog, oct_dev,
 			    "liowd/%02hhx:%02hhx.%hhx", bus, device, function);
-			wake_up_process(oct_dev->watchdog_task);
+			if (!IS_ERR(oct_dev->watchdog_task)) {
+				wake_up_process(oct_dev->watchdog_task);
+			} else {
+				oct_dev->watchdog_task = NULL;
+				dev_err(&oct_dev->pci_dev->dev,
+					"failed to create kernel_thread\n");
+				liquidio_remove(pdev);
+				return -1;
+			}
 		}
 	}
 
@@ -1413,6 +1423,8 @@ static void octeon_destroy_resources(struct octeon_device *oct)
 		if (lio_wait_for_oq_pkts(oct))
 			dev_err(&oct->pci_dev->dev, "OQ had pending packets\n");
 
+	/* fallthrough */
+	case OCT_DEV_INTR_SET_DONE:
 		/* Disable interrupts  */
 		oct->fn_list.disable_interrupt(oct, OCTEON_ALL_INTR);
 
@@ -1439,6 +1451,8 @@ static void octeon_destroy_resources(struct octeon_device *oct)
 				pci_disable_msi(oct->pci_dev);
 		}
 
+	/* fallthrough */
+	case OCT_DEV_MSIX_ALLOC_VECTOR_DONE:
 		if (OCTEON_CN23XX_PF(oct))
 			octeon_free_ioq_vector(oct);
 
@@ -1502,10 +1516,13 @@ static void octeon_destroy_resources(struct octeon_device *oct)
 		octeon_unmap_pci_barx(oct, 1);
 
 		/* fallthrough */
-	case OCT_DEV_BEGIN_STATE:
+	case OCT_DEV_PCI_ENABLE_DONE:
+		pci_clear_master(oct->pci_dev);
 		/* Disable the device, releasing the PCI INT */
 		pci_disable_device(oct->pci_dev);
 
+		/* fallthrough */
+	case OCT_DEV_BEGIN_STATE:
 		/* Nothing to be done here either */
 		break;
 	}                       /* end switch (oct->status) */
@@ -1775,6 +1792,7 @@ static int octeon_pci_os_setup(struct octeon_device *oct)
 
 	if (dma_set_mask_and_coherent(&oct->pci_dev->dev, DMA_BIT_MASK(64))) {
 		dev_err(&oct->pci_dev->dev, "Unexpected DMA device capability\n");
+		pci_disable_device(oct->pci_dev);
 		return 1;
 	}
 
@@ -4429,6 +4447,8 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 	if (octeon_pci_os_setup(octeon_dev))
 		return 1;
 
+	atomic_set(&octeon_dev->status, OCT_DEV_PCI_ENABLE_DONE);
+
 	/* Identify the Octeon type and map the BAR address space. */
 	if (octeon_chip_specific_setup(octeon_dev)) {
 		dev_err(&octeon_dev->pci_dev->dev, "Chip specific setup failed\n");
@@ -4500,9 +4520,6 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 	if (octeon_setup_instr_queues(octeon_dev)) {
 		dev_err(&octeon_dev->pci_dev->dev,
 			"instruction queue initialization failed\n");
-		/* On error, release any previously allocated queues */
-		for (j = 0; j < octeon_dev->num_iqs; j++)
-			octeon_delete_instr_queue(octeon_dev, j);
 		return 1;
 	}
 	atomic_set(&octeon_dev->status, OCT_DEV_INSTR_QUEUE_INIT_DONE);
@@ -4518,9 +4535,6 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 
 	if (octeon_setup_output_queues(octeon_dev)) {
 		dev_err(&octeon_dev->pci_dev->dev, "Output queue initialization failed\n");
-		/* Release any previously allocated queues */
-		for (j = 0; j < octeon_dev->num_oqs; j++)
-			octeon_delete_droq(octeon_dev, j);
 		return 1;
 	}
 
@@ -4537,6 +4551,7 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 			dev_err(&octeon_dev->pci_dev->dev, "OCTEON: ioq vector allocation failed\n");
 			return 1;
 		}
+		atomic_set(&octeon_dev->status, OCT_DEV_MSIX_ALLOC_VECTOR_DONE);
 
 	} else {
 		/* The input and output queue registers were setup earlier (the
@@ -4563,6 +4578,8 @@ static int octeon_device_init(struct octeon_device *octeon_dev)
 
 	/* Enable Octeon device interrupts */
 	octeon_dev->fn_list.enable_interrupt(octeon_dev, OCTEON_ALL_INTR);
+
+	atomic_set(&octeon_dev->status, OCT_DEV_INTR_SET_DONE);
 
 	/* Enable the input and output queues for this Octeon device */
 	ret = octeon_dev->fn_list.enable_io_queues(octeon_dev);
