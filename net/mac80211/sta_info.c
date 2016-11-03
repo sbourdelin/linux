@@ -688,7 +688,7 @@ static void __sta_info_recalc_tim(struct sta_info *sta, bool ignore_pending)
 	}
 
 	/* No need to do anything if the driver does all */
-	if (!local->ops->set_tim)
+	if (local->ops->set_tim)
 		return;
 
 	if (sta->dead)
