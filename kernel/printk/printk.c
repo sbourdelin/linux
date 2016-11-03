@@ -260,9 +260,17 @@ void console_set_by_of(void)
 {
 	of_specified_console = true;
 }
+
+static void clear_of_specified_console(void)
+{
+	of_specified_console = false;
+}
 #else
 # define of_specified_console false
+static void clear_of_specified_console(void) { }
 #endif
+
+struct console *of_fallback_console;
 
 /* Flag: console code may call schedule() */
 static int console_may_schedule;
@@ -2657,10 +2665,26 @@ void register_console(struct console *newcon)
 	 *	didn't select a console we take the first one
 	 *	that registers here.
 	 */
-	if (preferred_console < 0 && !of_specified_console) {
+	if (preferred_console < 0) {
 		if (newcon->index < 0)
 			newcon->index = 0;
-		if (newcon->setup == NULL ||
+		if (of_specified_console) {
+			/*
+			 * The device tree stdout-path chosen node property was
+			 * specified so we don't want to enable the first
+			 * registered console just now in order to give the
+			 * device indicated by stdout-path a chance to be
+			 * registered first. Do however keep track of the
+			 * first console we see so that we can fall back to
+			 * using it if we don't see the desired device, either
+			 * because stdout-path isn't valid, or because we have
+			 * no driver for the device or our driver doesn't call
+			 * of_console_check(). See printk_late_init() for this
+			 * fallback.
+			 */
+			if (!of_fallback_console)
+				of_fallback_console = newcon;
+		} else if (newcon->setup == NULL ||
 		    newcon->setup(newcon, NULL) == 0) {
 			newcon->flags |= CON_ENABLED;
 			if (newcon->device) {
@@ -2843,6 +2867,22 @@ EXPORT_SYMBOL(unregister_console);
 static int __init printk_late_init(void)
 {
 	struct console *con;
+
+	if (of_specified_console && of_fallback_console &&
+	    (!console_drivers || !(console_drivers->flags & CON_CONSDEV))) {
+		/*
+		 * The system has a device tree which specified stdout-path,
+		 * but we haven't seen a console associated with the device
+		 * specified by the stdout-path chosen node property.
+		 *
+		 * We do however know which console would have been used
+		 * if stdout-path weren't specified at all, so in an attempt
+		 * to provide some output we'll re-register that console
+		 * pretending that we never saw stdout-path.
+		 */
+		clear_of_specified_console();
+		register_console(of_fallback_console);
+	}
 
 	for_each_console(con) {
 		if (!keep_bootcon && con->flags & CON_BOOT) {
