@@ -152,7 +152,7 @@ static int xgbe_config_msi(struct xgbe_prv_data *pdata)
 	pdata->dev_irq = pdata->pcidev->irq;
 
 	if (msi_count > 1) {
-		pdata->smu_irq = pdata->pcidev->irq + 1;
+		pdata->ecc_irq = pdata->pcidev->irq + 1;
 		pdata->i2c_irq = pdata->pcidev->irq + 2;
 		pdata->an_irq = pdata->pcidev->irq + 3;
 
@@ -165,7 +165,7 @@ static int xgbe_config_msi(struct xgbe_prv_data *pdata)
 		pdata->per_channel_irq = 1;
 		pdata->channel_irq_mode = XGBE_IRQ_MODE_LEVEL;
 	} else {
-		pdata->smu_irq = pdata->pcidev->irq;
+		pdata->ecc_irq = pdata->pcidev->irq;
 		pdata->i2c_irq = pdata->pcidev->irq;
 		pdata->an_irq = pdata->pcidev->irq;
 	}
@@ -207,7 +207,7 @@ static int xgbe_config_msix(struct xgbe_prv_data *pdata)
 	pdata->irq_count = ret;
 
 	pdata->dev_irq = pdata->msix_entries[0].vector;
-	pdata->smu_irq = pdata->msix_entries[1].vector;
+	pdata->ecc_irq = pdata->msix_entries[1].vector;
 	pdata->i2c_irq = pdata->msix_entries[2].vector;
 	pdata->an_irq = pdata->msix_entries[3].vector;
 
@@ -240,7 +240,7 @@ static int xgbe_config_irqs(struct xgbe_prv_data *pdata)
 	pdata->irq_shared = 1;
 
 	pdata->dev_irq = pdata->pcidev->irq;
-	pdata->smu_irq = pdata->pcidev->irq;
+	pdata->ecc_irq = pdata->pcidev->irq;
 	pdata->i2c_irq = pdata->pcidev->irq;
 	pdata->an_irq = pdata->pcidev->irq;
 
@@ -249,7 +249,7 @@ out:
 		unsigned int i;
 
 		dev_dbg(pdata->dev, " dev irq=%d\n", pdata->dev_irq);
-		dev_dbg(pdata->dev, " smu irq=%d\n", pdata->smu_irq);
+		dev_dbg(pdata->dev, " ecc irq=%d\n", pdata->ecc_irq);
 		dev_dbg(pdata->dev, " i2c irq=%d\n", pdata->i2c_irq);
 		dev_dbg(pdata->dev, "  an irq=%d\n", pdata->an_irq);
 		for (i = 0; i < pdata->channel_irq_count; i++)
@@ -460,6 +460,7 @@ static const struct xgbe_version_data xgbe_v2a = {
 	.tx_max_fifo_size		= 229376,
 	.rx_max_fifo_size		= 229376,
 	.tx_tstamp_workaround		= 1,
+	.ecc_support			= 1,
 };
 
 static const struct xgbe_version_data xgbe_v2b = {
@@ -469,6 +470,7 @@ static const struct xgbe_version_data xgbe_v2b = {
 	.tx_max_fifo_size		= 65536,
 	.rx_max_fifo_size		= 65536,
 	.tx_tstamp_workaround		= 1,
+	.ecc_support			= 1,
 };
 
 static const struct pci_device_id xgbe_pci_table[] = {
