@@ -93,24 +93,31 @@ static int da8xx_usb20_phy_power_off(struct phy *phy)
 static int da8xx_usb20_phy_set_mode(struct phy *phy, enum phy_mode mode)
 {
 	struct da8xx_usb_phy *d_phy = phy_get_drvdata(phy);
+	int ret;
 	u32 val;
+
+	ret = regmap_read(d_phy->regmap, CFGCHIP(2), &val);
+	if (ret)
+		return ret;
+
+	val &= ~CFGCHIP2_OTGMODE_MASK;
 
 	switch (mode) {
 	case PHY_MODE_USB_HOST:		/* Force VBUS valid, ID = 0 */
-		val = CFGCHIP2_OTGMODE_FORCE_HOST;
+		val |= CFGCHIP2_OTGMODE_FORCE_HOST;
 		break;
 	case PHY_MODE_USB_DEVICE:	/* Force VBUS valid, ID = 1 */
-		val = CFGCHIP2_OTGMODE_FORCE_DEVICE;
+		val |= CFGCHIP2_OTGMODE_FORCE_DEVICE;
 		break;
 	case PHY_MODE_USB_OTG:	/* Don't override the VBUS/ID comparators */
-		val = CFGCHIP2_OTGMODE_NO_OVERRIDE;
+		val |= CFGCHIP2_OTGMODE_NO_OVERRIDE |
+			CFGCHIP2_SESENDEN | CFGCHIP2_VBDTCTEN;
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	regmap_write_bits(d_phy->regmap, CFGCHIP(2), CFGCHIP2_OTGMODE_MASK,
-			  val);
+	regmap_write(d_phy->regmap, CFGCHIP(2), val);
 
 	return 0;
 }
