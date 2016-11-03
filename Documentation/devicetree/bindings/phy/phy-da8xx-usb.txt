@@ -4,6 +4,11 @@ Required properties:
  - compatible: must be "ti,da830-usb-phy".
  - #phy-cells: must be 1.
 
+Optional properties:
+- usb20-force-mode: Force the phy to operate in same mode than the USB OTG controller.
+		    It should only be defined if the hardware is not capable correctly
+		    detect the role of USB by using VBUS and ID pin.
+
 This device controls the PHY for both the USB 1.1 OHCI and USB 2.0 OTG
 controllers on DA8xx SoCs. Consumers of this device should use index 0 for
 the USB 2.0 phy device and index 1 for the USB 1.1 phy device.
