@@ -19,9 +19,7 @@ vpath %.c \
 	./\
 	../../common\
 	../../os_specific/service_layers
-CFLAGS += -DACPI_DUMP_APP -I.\
-	-I../../../../../drivers/acpi/acpica\
-	-I../../../../../include
+CFLAGS += -DACPI_DUMP_APP -I.
 TOOL_OBJS = \
 	apdump.o\
 	apfiles.o\
