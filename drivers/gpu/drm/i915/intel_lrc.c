@@ -522,6 +522,18 @@ static bool execlists_elsp_idle(struct intel_engine_cs *engine)
 	return !engine->execlist_port[0].request;
 }
 
+void intel_lr_wait_engines_idle(struct drm_i915_private *dev_priv)
+{
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+
+	for_each_engine(engine, dev_priv, id) {
+		if (wait_for(execlists_elsp_idle(engine), 10))
+			DRM_ERROR("Timeout waiting for engine %s to idle\n",
+				  engine->name);
+	}
+}
+
 static bool execlists_elsp_ready(struct intel_engine_cs *engine)
 {
 	int port;

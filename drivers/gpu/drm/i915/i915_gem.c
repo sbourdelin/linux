@@ -2766,6 +2766,9 @@ i915_gem_idle_work_handler(struct work_struct *work)
 	if (dev_priv->gt.active_requests)
 		goto out_unlock;
 
+	if (i915.enable_execlists)
+		intel_lr_wait_engines_idle(dev_priv);
+
 	for_each_engine(engine, dev_priv, id)
 		i915_gem_batch_pool_fini(&engine->batch_pool);
 
