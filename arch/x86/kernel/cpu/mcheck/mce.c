@@ -2255,7 +2255,8 @@ static struct bus_type mce_subsys = {
 
 DEFINE_PER_CPU(struct device *, mce_device);
 
-void (*threshold_cpu_callback)(unsigned long action, unsigned int cpu);
+int (*threshold_cpu_callback_online)(unsigned int cpu);
+int (*threshold_cpu_callback_dead)(unsigned int cpu);
 
 static inline struct mce_bank *attr_to_bank(struct device_attribute *attr)
 {
@@ -2513,12 +2514,19 @@ mce_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
 	switch (action & ~CPU_TASKS_FROZEN) {
 	case CPU_ONLINE:
 		mce_device_create(cpu);
-		if (threshold_cpu_callback)
-			threshold_cpu_callback(action, cpu);
+		if (threshold_cpu_callback_online) {
+			int ret;
+
+			ret = threshold_cpu_callback_online(cpu);
+			if (ret) {
+				mce_device_remove(cpu);
+				return NOTIFY_BAD;
+			}
+		}
 		break;
 	case CPU_DEAD:
-		if (threshold_cpu_callback)
-			threshold_cpu_callback(action, cpu);
+		if (threshold_cpu_callback_dead)
+			threshold_cpu_callback_dead(cpu);
 		mce_device_remove(cpu);
 		mce_intel_hcpu_update(cpu);
 

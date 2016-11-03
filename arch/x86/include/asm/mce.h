@@ -295,7 +295,8 @@ void do_machine_check(struct pt_regs *, long);
  */
 
 extern void (*mce_threshold_vector)(void);
-extern void (*threshold_cpu_callback)(unsigned long action, unsigned int cpu);
+extern int (*threshold_cpu_callback_online)(unsigned int cpu);
+extern int (*threshold_cpu_callback_dead)(unsigned int cpu);
 
 /* Deferred error interrupt handler */
 extern void (*deferred_error_int_vector)(void);
