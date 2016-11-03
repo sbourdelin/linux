@@ -578,8 +578,9 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 						| MUSB_PORT_STAT_RESUME;
 				musb->rh_timer = jiffies
 					+ msecs_to_jiffies(USB_RESUME_TIMEOUT);
-				musb->need_finish_resume = 1;
-
+				musb_queue_resume_work(musb,
+						       musb_host_finish_resume,
+						       NULL);
 				musb->xceiv->otg->state = OTG_STATE_A_HOST;
 				musb->is_active = 1;
 				musb_host_resume_root_hub(musb);
@@ -1969,6 +1970,7 @@ static struct musb *allocate_instance(struct device *dev,
 	INIT_LIST_HEAD(&musb->control);
 	INIT_LIST_HEAD(&musb->in_bulk);
 	INIT_LIST_HEAD(&musb->out_bulk);
+	INIT_LIST_HEAD(&musb->pending_list);
 
 	musb->vbuserr_retry = VBUSERR_RETRY_COUNT;
 	musb->a_wait_bcon = OTG_TIME_A_WAIT_BCON;
@@ -2018,6 +2020,64 @@ static void musb_free(struct musb *musb)
 	musb_host_free(musb);
 }
 
+struct musb_pending_work {
+	void (*callback)(struct musb *musb, void *data);
+	void *data;
+	struct list_head node;
+};
+
+static void musb_pending_work(struct work_struct *work)
+{
+	struct musb *musb;
+	struct musb_pending_work *w;
+	unsigned long flags;
+
+	musb = container_of(work, struct musb, finish_resume_work.work);
+	pm_runtime_get_sync(musb->controller);
+	spin_lock_irqsave(&musb->list_lock, flags);
+	while (!list_empty(&musb->pending_list)) {
+		w = list_first_entry(&musb->pending_list,
+				     struct musb_pending_work,
+				     node);
+		list_del(&w->node);
+		spin_unlock_irqrestore(&musb->list_lock, flags);
+		if (w->callback)
+			w->callback(musb, w->data);
+		devm_kfree(musb->controller, w);
+		spin_lock_irqsave(&musb->list_lock, flags);
+	}
+	spin_unlock_irqrestore(&musb->list_lock, flags);
+	pm_runtime_mark_last_busy(musb->controller);
+	pm_runtime_put_autosuspend(musb->controller);
+}
+
+void musb_queue_resume_work(struct musb *musb,
+			    void (*callback)(struct musb *musb, void *data),
+			    void *data)
+{
+	struct musb_pending_work *w;
+	unsigned long flags;
+
+	if (!callback)
+		return;
+
+	w = devm_kzalloc(musb->controller, sizeof(*w), GFP_ATOMIC);
+	if (!w)
+		return;
+
+	w->callback = callback;
+	w->data = data;
+	spin_lock_irqsave(&musb->list_lock, flags);
+	list_add_tail(&w->node, &musb->pending_list);
+	spin_unlock_irqrestore(&musb->list_lock, flags);
+}
+EXPORT_SYMBOL_GPL(musb_queue_resume_work);
+
+void musb_cancel_resume_work(struct musb *musb)
+{
+	cancel_delayed_work_sync(&musb->finish_resume_work);
+}
+
 static void musb_deassert_reset(struct work_struct *work)
 {
 	struct musb *musb;
@@ -2065,6 +2125,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	}
 
 	spin_lock_init(&musb->lock);
+	spin_lock_init(&musb->list_lock);
 	musb->board_set_power = plat->set_power;
 	musb->min_power = plat->min_power;
 	musb->ops = plat->platform_ops;
@@ -2215,7 +2276,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	/* Init IRQ workqueue before request_irq */
 	INIT_WORK(&musb->irq_work, musb_irq_work);
 	INIT_DELAYED_WORK(&musb->deassert_reset_work, musb_deassert_reset);
-	INIT_DELAYED_WORK(&musb->finish_resume_work, musb_host_finish_resume);
+	INIT_DELAYED_WORK(&musb->finish_resume_work, musb_pending_work);
 
 	/* setup musb parts of the core (especially endpoints) */
 	status = musb_core_init(plat->config->multipoint
@@ -2310,7 +2371,7 @@ fail4:
 
 fail3:
 	cancel_work_sync(&musb->irq_work);
-	cancel_delayed_work_sync(&musb->finish_resume_work);
+	musb_cancel_resume_work(musb);
 	cancel_delayed_work_sync(&musb->deassert_reset_work);
 	if (musb->dma_controller)
 		musb_dma_controller_destroy(musb->dma_controller);
@@ -2377,7 +2438,7 @@ static int musb_remove(struct platform_device *pdev)
 	musb_exit_debugfs(musb);
 
 	cancel_work_sync(&musb->irq_work);
-	cancel_delayed_work_sync(&musb->finish_resume_work);
+	musb_cancel_resume_work(musb);
 	cancel_delayed_work_sync(&musb->deassert_reset_work);
 	pm_runtime_get_sync(musb->controller);
 	musb_host_cleanup(musb);
@@ -2603,11 +2664,9 @@ static int musb_resume(struct device *dev)
 	mask = MUSB_DEVCTL_BDEVICE | MUSB_DEVCTL_FSDEV | MUSB_DEVCTL_LSDEV;
 	if ((devctl & mask) != (musb->context.devctl & mask))
 		musb->port1_status = 0;
-	if (musb->need_finish_resume) {
-		musb->need_finish_resume = 0;
-		schedule_delayed_work(&musb->finish_resume_work,
-				      msecs_to_jiffies(USB_RESUME_TIMEOUT));
-	}
+
+	schedule_delayed_work(&musb->finish_resume_work,
+			      msecs_to_jiffies(USB_RESUME_TIMEOUT));
 
 	/*
 	 * The USB HUB code expects the device to be in RPM_ACTIVE once it came
@@ -2633,8 +2692,8 @@ static int musb_runtime_suspend(struct device *dev)
 
 static int musb_runtime_resume(struct device *dev)
 {
-	struct musb	*musb = dev_to_musb(dev);
-	static int	first = 1;
+	struct musb *musb = dev_to_musb(dev);
+	struct delayed_work *d = &musb->finish_resume_work;
 
 	/*
 	 * When pm_runtime_get_sync called for the first time in driver
@@ -2645,12 +2704,8 @@ static int musb_runtime_resume(struct device *dev)
 	 * Also context restore without save does not make
 	 * any sense
 	 */
-	if (!first)
+	if (d->work.func) {
 		musb_restore_context(musb);
-	first = 0;
-
-	if (musb->need_finish_resume) {
-		musb->need_finish_resume = 0;
 		schedule_delayed_work(&musb->finish_resume_work,
 				msecs_to_jiffies(USB_RESUME_TIMEOUT));
 	}

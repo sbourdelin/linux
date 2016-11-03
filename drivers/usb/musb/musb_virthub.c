@@ -43,13 +43,10 @@
 
 #include "musb_core.h"
 
-void musb_host_finish_resume(struct work_struct *work)
+void musb_host_finish_resume(struct musb *musb, void *unused)
 {
-	struct musb *musb;
 	unsigned long flags;
 	u8 power;
-
-	musb = container_of(work, struct musb, finish_resume_work.work);
 
 	spin_lock_irqsave(&musb->lock, flags);
 
