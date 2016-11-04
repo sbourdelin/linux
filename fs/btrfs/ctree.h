@@ -1097,6 +1097,13 @@ struct btrfs_fs_info {
 
 	/* Used to record internally whether fs has been frozen */
 	int fs_frozen;
+
+	/*
+	 * Inband de-duplication related structures
+	 */
+	unsigned long dedupe_enabled:1;
+	struct btrfs_dedupe_info *dedupe_info;
+	struct mutex dedupe_ioctl_lock;
 };
 
 struct btrfs_subvolume_writers {
