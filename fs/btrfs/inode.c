@@ -1734,20 +1734,23 @@ static int run_delalloc_range(struct inode *inode, struct page *locked_page,
 	int ret;
 	int force_cow = need_force_cow(inode, start, end);
 	struct extent_io_tree *io_tree = &BTRFS_I(inode)->io_tree;
-	int need_compress;
 	struct btrfs_root *root = BTRFS_I(inode)->root;
 	struct btrfs_fs_info *fs_info = root->fs_info;
+	int need_compress, need_dedupe;
 
 	need_compress = test_range_bit(io_tree, start, end,
 				       EXTENT_COMPRESS, 1, NULL);
+	need_dedupe = test_range_bit(io_tree, start, end,
+				     EXTENT_DEDUPE, 1, NULL);
+
 	if (BTRFS_I(inode)->flags & BTRFS_INODE_NODATACOW && !force_cow) {
-		if (need_compress)
+		if (need_compress || need_dedupe)
 			adjust_outstanding_extents(inode, start, end);
 
 		ret = run_delalloc_nocow(inode, locked_page, start, end,
 					 page_started, 1, nr_written);
 	} else if (BTRFS_I(inode)->flags & BTRFS_INODE_PREALLOC && !force_cow) {
-		if (need_compress)
+		if (need_compress || need_dedupe)
 			adjust_outstanding_extents(inode, start, end);
 
 		ret = run_delalloc_nocow(inode, locked_page, start, end,
@@ -1779,6 +1782,8 @@ static void btrfs_split_extent_hook(struct inode *inode,
 
 	if (orig->state & EXTENT_COMPRESS)
 		max_extent_size = SZ_128K;
+	else if (orig->state & EXTENT_DEDUPE)
+		max_extent_size = btrfs_dedupe_blocksize(inode);
 
 	size = orig->end - orig->start + 1;
 	if (size > max_extent_size) {
@@ -1828,6 +1833,8 @@ static void btrfs_merge_extent_hook(struct inode *inode,
 
 	if (other->state & EXTENT_COMPRESS)
 		max_extent_size = SZ_128K;
+	else if (other->state & EXTENT_DEDUPE)
+		max_extent_size = btrfs_dedupe_blocksize(inode);
 
 	if (new->start > other->start)
 		new_size = new->end - other->start + 1;
@@ -1940,6 +1947,9 @@ static void btrfs_set_bit_hook(struct inode *inode,
 
 		if (*bits & EXTENT_COMPRESS)
 			max_extent_size = SZ_128K;
+		else if (*bits & EXTENT_DEDUPE)
+			max_extent_size = btrfs_dedupe_blocksize(inode);
+
 		num_extents = div64_u64(len + max_extent_size - 1,
 					max_extent_size);
 
@@ -1998,6 +2008,9 @@ static void btrfs_clear_bit_hook(struct inode *inode,
 		if (state->state & EXTENT_COMPRESS) {
 			max_extent_size = SZ_128K;
 			reserve_type = BTRFS_RESERVE_COMPRESS;
+		} else if (state->state & EXTENT_DEDUPE) {
+			max_extent_size = btrfs_dedupe_blocksize(inode);
+			reserve_type = BTRFS_RESERVE_DEDUPE;
 		}
 
 		num_extents = div64_u64(len + max_extent_size - 1,
@@ -2216,6 +2229,8 @@ int btrfs_set_extent_delalloc(struct inode *inode, u64 start, u64 end,
 
 	if (flag == 1)
 		max_extent_size = SZ_128K;
+	else if (flag == 2)
+		max_extent_size = btrfs_dedupe_blocksize(inode);
 
 	num_extents = div64_u64(end - start + max_extent_size,
 				    max_extent_size);
@@ -2223,6 +2238,8 @@ int btrfs_set_extent_delalloc(struct inode *inode, u64 start, u64 end,
 	/* compression path */
 	if (flag == 1)
 		bits = EXTENT_DELALLOC | EXTENT_COMPRESS | EXTENT_UPTODATE;
+	else if (flag == 2)
+		bits = EXTENT_DELALLOC | EXTENT_DEDUPE | EXTENT_UPTODATE;
 	else
 		bits = EXTENT_DELALLOC | EXTENT_UPTODATE;
 
@@ -2333,6 +2350,9 @@ again:
 
 	if (inode_need_compress(inode))
 		reserve_type = BTRFS_RESERVE_COMPRESS;
+	else if (inode_need_dedupe(inode))
+		reserve_type = BTRFS_RESERVE_DEDUPE;
+
 	ret = btrfs_delalloc_reserve_space(inode, page_start,
 					   PAGE_SIZE, reserve_type);
 	if (ret) {
@@ -3269,7 +3289,8 @@ static int btrfs_finish_ordered_io(struct btrfs_ordered_extent *ordered_extent)
 	if (test_bit(BTRFS_ORDERED_COMPRESSED, &ordered_extent->flags)) {
 		compress_type = ordered_extent->compress_type;
 		reserve_type = BTRFS_RESERVE_COMPRESS;
-	}
+	} else if (ordered_extent->hash)
+		reserve_type = BTRFS_RESERVE_DEDUPE;
 
 	if (test_bit(BTRFS_ORDERED_PREALLOC, &ordered_extent->flags)) {
 		BUG_ON(compress_type);
@@ -5038,6 +5059,8 @@ int btrfs_truncate_block(struct inode *inode, loff_t from, loff_t len,
 
 	if (inode_need_compress(inode))
 		reserve_type = BTRFS_RESERVE_COMPRESS;
+	else if (inode_need_dedupe(inode))
+		reserve_type = BTRFS_RESERVE_DEDUPE;
 
 	if ((offset & (blocksize - 1)) == 0 &&
 	    (!len || ((len & (blocksize - 1)) == 0)))
@@ -9323,6 +9346,9 @@ int btrfs_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	if (inode_need_compress(inode))
 		reserve_type = BTRFS_RESERVE_COMPRESS;
+	else if (inode_need_dedupe(inode))
+		reserve_type = BTRFS_RESERVE_DEDUPE;
+
 	/*
 	 * Reserving delalloc space after obtaining the page lock can lead to
 	 * deadlock. For example, if a dirty page is locked by this function

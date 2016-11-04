@@ -107,9 +107,11 @@ static const int btrfs_csum_sizes[] = { 4 };
 enum btrfs_metadata_reserve_type {
 	BTRFS_RESERVE_NORMAL,
 	BTRFS_RESERVE_COMPRESS,
+	BTRFS_RESERVE_DEDUPE,
 };
 int inode_need_compress(struct inode *inode);
-u64 btrfs_max_extent_size(enum btrfs_metadata_reserve_type reserve_type);
+u64 btrfs_max_extent_size(struct inode *inode,
+			  enum btrfs_metadata_reserve_type reserve_type);
 
 #define BTRFS_MAX_EXTENT_SIZE SZ_128M
 
