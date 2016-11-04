@@ -2752,6 +2752,10 @@ i915_gem_idle_work_handler(struct work_struct *work)
 	if (!READ_ONCE(dev_priv->gt.awake))
 		return;
 
+	if (i915.enable_execlists)
+	    wait_for(READ_ONCE(dev_priv->gt.active_requests) ||
+		     intel_lr_engines_idle(dev_priv), 10);
+
 	if (READ_ONCE(dev_priv->gt.active_requests))
 		return;
 
@@ -2768,6 +2772,10 @@ i915_gem_idle_work_handler(struct work_struct *work)
 
 	if (dev_priv->gt.active_requests)
 		goto out_unlock;
+
+	if (i915.enable_execlists &&
+	    wait_for(intel_lr_engines_idle(dev_priv), 10))
+		DRM_ERROR("Timeout waiting for engines to idle\n");
 
 	for_each_engine(engine, dev_priv, id)
 		i915_gem_batch_pool_fini(&engine->batch_pool);

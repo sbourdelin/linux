@@ -522,6 +522,25 @@ static bool execlists_elsp_idle(struct intel_engine_cs *engine)
 	return !engine->execlist_port[0].request;
 }
 
+/**
+ * intel_lr_engines_idle() - Determine if all engine submission ports are idle
+ * @dev_priv: i915 device private
+ *
+ * Return true if there are no requests pending on any of the submission ports
+ * of any engines.
+ */
+bool intel_lr_engines_idle(struct drm_i915_private *dev_priv)
+{
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+
+	for_each_engine(engine, dev_priv, id)
+		if (!execlists_elsp_idle(engine))
+			return false;
+
+	return true;
+}
+
 static bool execlists_elsp_ready(struct intel_engine_cs *engine)
 {
 	int port;

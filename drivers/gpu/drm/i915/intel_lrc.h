@@ -87,6 +87,7 @@ void intel_lr_context_unpin(struct i915_gem_context *ctx,
 
 struct drm_i915_private;
 
+bool intel_lr_engines_idle(struct drm_i915_private *dev_priv);
 void intel_lr_context_resume(struct drm_i915_private *dev_priv);
 uint64_t intel_lr_context_descriptor(struct i915_gem_context *ctx,
 				     struct intel_engine_cs *engine);
