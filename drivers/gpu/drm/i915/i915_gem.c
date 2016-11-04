@@ -2164,6 +2164,7 @@ i915_gem_object_put_pages_gtt(struct drm_i915_gem_object *obj,
 		if (obj->mm.madv == I915_MADV_WILLNEED)
 			mark_page_accessed(page);
 
+		set_page_private(page, 0);
 		put_page(page);
 	}
 	obj->mm.dirty = false;
@@ -2310,6 +2311,7 @@ i915_gem_object_get_pages_gtt(struct drm_i915_gem_object *obj)
 			sg->length += PAGE_SIZE;
 		}
 		last_pfn = page_to_pfn(page);
+		set_page_private(page, (unsigned long)obj);
 
 		/* Check that the i965g/gm workaround works. */
 		WARN_ON((gfp & __GFP_DMA32) && (last_pfn >= 0x00100000UL));
@@ -2328,8 +2330,10 @@ i915_gem_object_get_pages_gtt(struct drm_i915_gem_object *obj)
 
 err_pages:
 	sg_mark_end(sg);
-	for_each_sgt_page(page, sgt_iter, st)
+	for_each_sgt_page(page, sgt_iter, st) {
+		set_page_private(page, 0);
 		put_page(page);
+	}
 	sg_free_table(st);
 	kfree(st);
 
@@ -4190,6 +4194,8 @@ i915_gem_object_create(struct drm_device *dev, u64 size)
 		goto fail;
 
 	mask = GFP_HIGHUSER | __GFP_RECLAIMABLE;
+	if (IS_ENABLED(MIGRATION))
+		mask |= __GFP_MOVABLE;
 	if (IS_CRESTLINE(dev_priv) || IS_BROADWATER(dev_priv)) {
 		/* 965gm cannot relocate objects above 4GiB. */
 		mask &= ~__GFP_HIGHMEM;
@@ -4198,6 +4204,7 @@ i915_gem_object_create(struct drm_device *dev, u64 size)
 
 	mapping = obj->base.filp->f_mapping;
 	mapping_set_gfp_mask(mapping, mask);
+	shmem_set_dev_info(mapping, &dev_priv->mm.shmem_info);
 
 	i915_gem_object_init(obj, &i915_gem_object_ops);
 
