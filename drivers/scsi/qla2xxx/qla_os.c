@@ -30,7 +30,7 @@ static int apidev_major;
 /*
  * SRB allocation cache
  */
-static struct kmem_cache *srb_cachep;
+struct kmem_cache *srb_cachep;
 
 /*
  * CT6 CTX allocation cache
@@ -143,19 +143,12 @@ MODULE_PARM_DESC(ql2xiidmaenable,
 		"Enables iIDMA settings "
 		"Default is 1 - perform iIDMA. 0 - no iIDMA.");
 
-int ql2xmaxqueues = 1;
-module_param(ql2xmaxqueues, int, S_IRUGO);
-MODULE_PARM_DESC(ql2xmaxqueues,
-		"Enables MQ settings "
-		"Default is 1 for single queue. Set it to number "
-		"of queues in MQ mode.");
-
-int ql2xmultique_tag;
-module_param(ql2xmultique_tag, int, S_IRUGO);
-MODULE_PARM_DESC(ql2xmultique_tag,
-		"Enables CPU affinity settings for the driver "
-		"Default is 0 for no affinity of request and response IO. "
-		"Set it to 1 to turn on the cpu affinity.");
+int ql2xmqsupport;
+module_param(ql2xmqsupport, int, S_IRUGO);
+MODULE_PARM_DESC(ql2xmqsupport,
+		"Enable on demand multiple queue pairs support "
+		"Default is 0 for no support. "
+		"Set it to 1 to turn on mq qpair support.");
 
 int ql2xfwloadbin;
 module_param(ql2xfwloadbin, int, S_IRUGO|S_IWUSR);
@@ -360,6 +353,25 @@ static int qla2x00_alloc_queues(struct qla_hw_data *ha, struct req_que *req,
 		    "Unable to allocate memory for response queue ptrs.\n");
 		goto fail_rsp_map;
 	}
+
+	if (ql2xmqsupport) {
+		ha->queue_pair_map = kzalloc(sizeof(struct qla_qpair *)
+			* ha->max_qpairs, GFP_KERNEL);
+		if (!ha->queue_pair_map) {
+			ql_log(ql_log_fatal, vha, 0x0180,
+			    "Unable to allocate memory for queue pair ptrs.\n");
+			goto fail_qpair_map;
+		}
+		ha->base_qpair = kzalloc(sizeof(struct qla_qpair), GFP_KERNEL);
+		if (ha->base_qpair == NULL) {
+			ql_log(ql_log_warn, vha, 0x0182,
+			    "Failed to allocate base queue pair memory.\n");
+			goto fail_base_qpair;
+		}
+		ha->base_qpair->req = req;
+		ha->base_qpair->rsp = rsp;
+	}
+
 	/*
 	 * Make sure we record at least the request and response queue zero in
 	 * case we need to free them if part of the probe fails.
@@ -370,6 +382,11 @@ static int qla2x00_alloc_queues(struct qla_hw_data *ha, struct req_que *req,
 	set_bit(0, ha->req_qid_map);
 	return 1;
 
+fail_base_qpair:
+	kfree(ha->queue_pair_map);
+fail_qpair_map:
+	kfree(ha->rsp_q_map);
+	ha->rsp_q_map = NULL;
 fail_rsp_map:
 	kfree(ha->req_q_map);
 	ha->req_q_map = NULL;
@@ -437,62 +454,6 @@ static void qla2x00_free_queues(struct qla_hw_data *ha)
 	}
 	kfree(ha->rsp_q_map);
 	ha->rsp_q_map = NULL;
-}
-
-static int qla25xx_setup_mode(struct scsi_qla_host *vha)
-{
-	uint16_t options = 0;
-	int ques, req, ret;
-	struct qla_hw_data *ha = vha->hw;
-
-	if (!(ha->fw_attributes & BIT_6)) {
-		ql_log(ql_log_warn, vha, 0x00d8,
-		    "Firmware is not multi-queue capable.\n");
-		goto fail;
-	}
-	if (ql2xmultique_tag) {
-		/* create a request queue for IO */
-		options |= BIT_7;
-		req = qla25xx_create_req_que(ha, options, 0, 0, -1,
-			QLA_DEFAULT_QUE_QOS);
-		if (!req) {
-			ql_log(ql_log_warn, vha, 0x00e0,
-			    "Failed to create request queue.\n");
-			goto fail;
-		}
-		ha->wq = alloc_workqueue("qla2xxx_wq", WQ_MEM_RECLAIM, 1);
-		vha->req = ha->req_q_map[req];
-		options |= BIT_1;
-		for (ques = 1; ques < ha->max_rsp_queues; ques++) {
-			ret = qla25xx_create_rsp_que(ha, options, 0, 0, req);
-			if (!ret) {
-				ql_log(ql_log_warn, vha, 0x00e8,
-				    "Failed to create response queue.\n");
-				goto fail2;
-			}
-		}
-		ha->flags.cpu_affinity_enabled = 1;
-		ql_dbg(ql_dbg_multiq, vha, 0xc007,
-		    "CPU affinity mode enabled, "
-		    "no. of response queues:%d no. of request queues:%d.\n",
-		    ha->max_rsp_queues, ha->max_req_queues);
-		ql_dbg(ql_dbg_init, vha, 0x00e9,
-		    "CPU affinity mode enabled, "
-		    "no. of response queues:%d no. of request queues:%d.\n",
-		    ha->max_rsp_queues, ha->max_req_queues);
-	}
-	return 0;
-fail2:
-	qla25xx_delete_queues(vha);
-	destroy_workqueue(ha->wq);
-	ha->wq = NULL;
-	vha->req = ha->req_q_map[0];
-fail:
-	ha->mqenable = 0;
-	kfree(ha->req_q_map);
-	kfree(ha->rsp_q_map);
-	ha->max_req_queues = ha->max_rsp_queues = 1;
-	return 1;
 }
 
 static char *
@@ -669,7 +630,7 @@ qla2x00_sp_free_dma(void *vha, void *ptr)
 	qla2x00_rel_sp(sp->fcport->vha, sp);
 }
 
-static void
+void
 qla2x00_sp_compl(void *data, void *ptr, int res)
 {
 	struct qla_hw_data *ha = (struct qla_hw_data *)data;
@@ -706,6 +667,23 @@ qla2xxx_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	struct scsi_qla_host *base_vha = pci_get_drvdata(ha->pdev);
 	srb_t *sp;
 	int rval;
+	struct qla_percpu_qp_hint *hint;
+	struct qla_qpair *qpair;
+
+	if (vha->flags.qpairs_available) {
+		hint = (struct qla_percpu_qp_hint *)this_cpu_ptr(vha->qps_hint);
+		if (hint->qp) {
+			qpair = hint->qp;
+		} else if (vha->vp_idx && vha->qpair) {
+			/* NPIV port */
+			qpair = vha->qpair;
+		} else {
+			/* TODO: Just grab the first available for now */
+			qpair = list_first_entry(&vha->qp_list,
+			    struct qla_qpair, qp_list_elem);
+		}
+		return qla2xxx_mqueuecommand(host, cmd, qpair);
+	}
 
 	if (ha->flags.eeh_busy) {
 		if (ha->flags.pci_channel_io_perm_failure) {
@@ -1639,9 +1617,7 @@ skip_pio:
 
 	/* Determine queue resources */
 	ha->max_req_queues = ha->max_rsp_queues = 1;
-	if ((ql2xmaxqueues <= 1 && !ql2xmultique_tag) ||
-		(ql2xmaxqueues > 1 && ql2xmultique_tag) ||
-		(!IS_QLA25XX(ha) && !IS_QLA81XX(ha)))
+	if (!ql2xmqsupport || (!IS_QLA25XX(ha) && !IS_QLA81XX(ha)))
 		goto mqiobase_exit;
 
 	ha->mqiobase = ioremap(pci_resource_start(ha->pdev, 3),
@@ -1651,26 +1627,22 @@ skip_pio:
 		    "MQIO Base=%p.\n", ha->mqiobase);
 		/* Read MSIX vector size of the board */
 		pci_read_config_word(ha->pdev, QLA_PCI_MSIX_CONTROL, &msix);
-		ha->msix_count = msix;
-		/* Max queues are bounded by available msix vectors */
-		/* queue 0 uses two msix vectors */
-		if (ql2xmultique_tag) {
-			cpus = num_online_cpus();
-			ha->max_rsp_queues = (ha->msix_count - 1 > cpus) ?
-				(cpus + 1) : (ha->msix_count - 1);
-			ha->max_req_queues = 2;
-		} else if (ql2xmaxqueues > 1) {
-			ha->max_req_queues = ql2xmaxqueues > QLA_MQ_SIZE ?
-			    QLA_MQ_SIZE : ql2xmaxqueues;
-			ql_dbg_pci(ql_dbg_multiq, ha->pdev, 0xc008,
-			    "QoS mode set, max no of request queues:%d.\n",
-			    ha->max_req_queues);
-			ql_dbg_pci(ql_dbg_init, ha->pdev, 0x0019,
-			    "QoS mode set, max no of request queues:%d.\n",
-			    ha->max_req_queues);
-		}
+		ha->msix_count = msix + 1;
+		cpus = num_online_cpus();
+		/* Max queues are bounded by available msix vectors and CPUs */
+		/* MB interrupt uses 1 vector */
+		ha->max_req_queues = (ha->msix_count - 1 > cpus) ?
+			(cpus + 1) : (ha->msix_count - 1);
+		ha->max_rsp_queues = ha->max_req_queues;
+		/* Queue pairs is the max value minus the base queue pair */
+		ha->max_qpairs = ha->max_rsp_queues - 1;
+		ql_dbg_pci(ql_dbg_multiq, ha->pdev, 0xc00e,
+		    "Max no of queues pairs:%d.\n", ha->max_qpairs);
+		ql_dbg_pci(ql_dbg_init, ha->pdev, 0x0188,
+		    "Max no of queues pairs:%d.\n", ha->max_qpairs);
+
 		ql_log_pci(ql_log_info, ha->pdev, 0x001a,
-		    "MSI-X vector count: %d.\n", msix);
+		    "MSI-X vector count: %d.\n", ha->msix_count);
 	} else
 		ql_log_pci(ql_log_info, ha->pdev, 0x001b,
 		    "BAR 3 not enabled.\n");
@@ -1742,26 +1714,25 @@ qla83xx_iospace_config(struct qla_hw_data *ha)
 		/* Read MSIX vector size of the board */
 		pci_read_config_word(ha->pdev,
 		    QLA_83XX_PCI_MSIX_CONTROL, &msix);
-		ha->msix_count = msix;
+		ha->msix_count = msix + 1;
 		/* Max queues are bounded by available msix vectors */
 		/* queue 0 uses two msix vectors */
-		if (ql2xmultique_tag) {
+		if (ql2xmqsupport) {
 			cpus = num_online_cpus();
-			ha->max_rsp_queues = (ha->msix_count - 1 > cpus) ?
+			/* MB interrupt uses 1 vector */
+			ha->max_req_queues = (ha->msix_count - 1 > cpus) ?
 				(cpus + 1) : (ha->msix_count - 1);
-			ha->max_req_queues = 2;
-		} else if (ql2xmaxqueues > 1) {
-			ha->max_req_queues = ql2xmaxqueues > QLA_MQ_SIZE ?
-						QLA_MQ_SIZE : ql2xmaxqueues;
-			ql_dbg_pci(ql_dbg_multiq, ha->pdev, 0xc00c,
-			    "QoS mode set, max no of request queues:%d.\n",
-			    ha->max_req_queues);
-			ql_dbg_pci(ql_dbg_init, ha->pdev, 0x011b,
-			    "QoS mode set, max no of request queues:%d.\n",
-			    ha->max_req_queues);
+			ha->max_rsp_queues = ha->max_req_queues;
+			/* Queue pairs is the max value minus
+			 * the base queue pair */
+			ha->max_qpairs = ha->max_req_queues - 1;
+			ql_dbg_pci(ql_dbg_multiq, ha->pdev, 0xc010,
+			    "Max no of queues pairs:%d.\n", ha->max_qpairs);
+			ql_dbg_pci(ql_dbg_init, ha->pdev, 0x0190,
+			    "Max no of queues pairs:%d.\n", ha->max_qpairs);
 		}
 		ql_log_pci(ql_log_info, ha->pdev, 0x011c,
-		    "MSI-X vector count: %d.\n", msix);
+		    "MSI-X vector count: %d.\n", ha->msix_count);
 	} else
 		ql_log_pci(ql_log_info, ha->pdev, 0x011e,
 		    "BAR 1 not enabled.\n");
@@ -1812,6 +1783,7 @@ static struct isp_operations qla2100_isp_ops = {
 	.write_optrom		= qla2x00_write_optrom_data,
 	.get_flash_version	= qla2x00_get_flash_version,
 	.start_scsi		= qla2x00_start_scsi,
+	.start_scsi_mq          = NULL,
 	.abort_isp		= qla2x00_abort_isp,
 	.iospace_config     	= qla2x00_iospace_config,
 	.initialize_adapter	= qla2x00_initialize_adapter,
@@ -1850,6 +1822,7 @@ static struct isp_operations qla2300_isp_ops = {
 	.write_optrom		= qla2x00_write_optrom_data,
 	.get_flash_version	= qla2x00_get_flash_version,
 	.start_scsi		= qla2x00_start_scsi,
+	.start_scsi_mq          = NULL,
 	.abort_isp		= qla2x00_abort_isp,
 	.iospace_config		= qla2x00_iospace_config,
 	.initialize_adapter	= qla2x00_initialize_adapter,
@@ -1888,6 +1861,7 @@ static struct isp_operations qla24xx_isp_ops = {
 	.write_optrom		= qla24xx_write_optrom_data,
 	.get_flash_version	= qla24xx_get_flash_version,
 	.start_scsi		= qla24xx_start_scsi,
+	.start_scsi_mq          = NULL,
 	.abort_isp		= qla2x00_abort_isp,
 	.iospace_config		= qla2x00_iospace_config,
 	.initialize_adapter	= qla2x00_initialize_adapter,
@@ -1926,6 +1900,7 @@ static struct isp_operations qla25xx_isp_ops = {
 	.write_optrom		= qla24xx_write_optrom_data,
 	.get_flash_version	= qla24xx_get_flash_version,
 	.start_scsi		= qla24xx_dif_start_scsi,
+	.start_scsi_mq          = qla2xxx_dif_start_scsi_mq,
 	.abort_isp		= qla2x00_abort_isp,
 	.iospace_config		= qla2x00_iospace_config,
 	.initialize_adapter	= qla2x00_initialize_adapter,
@@ -1964,6 +1939,7 @@ static struct isp_operations qla81xx_isp_ops = {
 	.write_optrom		= qla24xx_write_optrom_data,
 	.get_flash_version	= qla24xx_get_flash_version,
 	.start_scsi		= qla24xx_dif_start_scsi,
+	.start_scsi_mq          = qla2xxx_dif_start_scsi_mq,
 	.abort_isp		= qla2x00_abort_isp,
 	.iospace_config		= qla2x00_iospace_config,
 	.initialize_adapter	= qla2x00_initialize_adapter,
@@ -2002,6 +1978,7 @@ static struct isp_operations qla82xx_isp_ops = {
 	.write_optrom		= qla82xx_write_optrom_data,
 	.get_flash_version	= qla82xx_get_flash_version,
 	.start_scsi             = qla82xx_start_scsi,
+	.start_scsi_mq          = NULL,
 	.abort_isp		= qla82xx_abort_isp,
 	.iospace_config     	= qla82xx_iospace_config,
 	.initialize_adapter	= qla2x00_initialize_adapter,
@@ -2040,6 +2017,7 @@ static struct isp_operations qla8044_isp_ops = {
 	.write_optrom		= qla8044_write_optrom_data,
 	.get_flash_version	= qla82xx_get_flash_version,
 	.start_scsi             = qla82xx_start_scsi,
+	.start_scsi_mq          = NULL,
 	.abort_isp		= qla8044_abort_isp,
 	.iospace_config		= qla82xx_iospace_config,
 	.initialize_adapter	= qla2x00_initialize_adapter,
@@ -2078,6 +2056,7 @@ static struct isp_operations qla83xx_isp_ops = {
 	.write_optrom		= qla24xx_write_optrom_data,
 	.get_flash_version	= qla24xx_get_flash_version,
 	.start_scsi		= qla24xx_dif_start_scsi,
+	.start_scsi_mq          = qla2xxx_dif_start_scsi_mq,
 	.abort_isp		= qla2x00_abort_isp,
 	.iospace_config		= qla83xx_iospace_config,
 	.initialize_adapter	= qla2x00_initialize_adapter,
@@ -2116,6 +2095,7 @@ static struct isp_operations qlafx00_isp_ops = {
 	.write_optrom		= qla24xx_write_optrom_data,
 	.get_flash_version	= qla24xx_get_flash_version,
 	.start_scsi		= qlafx00_start_scsi,
+	.start_scsi_mq          = NULL,
 	.abort_isp		= qlafx00_abort_isp,
 	.iospace_config		= qlafx00_iospace_config,
 	.initialize_adapter	= qlafx00_initialize_adapter,
@@ -2154,6 +2134,7 @@ static struct isp_operations qla27xx_isp_ops = {
 	.write_optrom		= qla24xx_write_optrom_data,
 	.get_flash_version	= qla24xx_get_flash_version,
 	.start_scsi		= qla24xx_dif_start_scsi,
+	.start_scsi_mq          = qla2xxx_dif_start_scsi_mq,
 	.abort_isp		= qla2x00_abort_isp,
 	.iospace_config		= qla83xx_iospace_config,
 	.initialize_adapter	= qla2x00_initialize_adapter,
@@ -2377,6 +2358,9 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	uint16_t req_length = 0, rsp_length = 0;
 	struct req_que *req = NULL;
 	struct rsp_que *rsp = NULL;
+	int cpu_id;
+	cpumask_t cpu_mask;
+
 	bars = pci_select_bars(pdev, IORESOURCE_MEM | IORESOURCE_IO);
 	sht = &qla2xxx_driver_template;
 	if (pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2422 ||
@@ -2640,6 +2624,7 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	    "Found an ISP%04X irq %d iobase 0x%p.\n",
 	    pdev->device, pdev->irq, ha->iobase);
 	mutex_init(&ha->vport_lock);
+	mutex_init(&ha->mq_lock);
 	init_completion(&ha->mbx_cmd_comp);
 	complete(&ha->mbx_cmd_comp);
 	init_completion(&ha->mbx_intr_comp);
@@ -2719,6 +2704,16 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	host->transportt = qla2xxx_transport_template;
 	sht->vendor_id = (SCSI_NL_VID_TYPE_PCI | PCI_VENDOR_ID_QLOGIC);
 
+	if (ql2xmqsupport && shost_use_blk_mq(host)) {
+		/* number of hardware queues supported by blk/scsi-mq*/
+		host->nr_hw_queues = ha->max_qpairs;
+
+		ql_dbg(ql_dbg_init, base_vha, 0x0192,
+		"blk/scsi-mq enabled,HW Queue = %d.\n", host->nr_hw_queues);
+	} else
+		ql_dbg(ql_dbg_init, base_vha, 0x0193,
+			"blk/scsi-mq disabled.\n");
+
 	ql_dbg(ql_dbg_init, base_vha, 0x0033,
 	    "max_id=%d this_id=%d "
 	    "cmd_per_len=%d unique_id=%d max_cmd_len=%d max_channel=%d "
@@ -2727,7 +2722,6 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	    host->max_cmd_len, host->max_channel, host->max_lun,
 	    host->transportt, sht->vendor_id);
 
-que_init:
 	/* Alloc arrays of request and response ring ptrs */
 	if (!qla2x00_alloc_queues(ha, req, rsp)) {
 		ql_log(ql_log_fatal, base_vha, 0x003d,
@@ -2842,10 +2836,16 @@ que_init:
 	    base_vha->mgmt_svr_loop_id, host->sg_tablesize);
 
 	if (ha->mqenable) {
-		if (qla25xx_setup_mode(base_vha)) {
-			ql_log(ql_log_warn, base_vha, 0x00ec,
-			    "Failed to create queues, falling back to single queue mode.\n");
-			goto que_init;
+		base_vha->qps_hint = alloc_percpu(struct qla_percpu_qp_hint);
+		ha->wq = alloc_workqueue("qla2xxx_wq", WQ_MEM_RECLAIM, 1);
+		/* Create start of day qpairs for Block MQ */
+		if (shost_use_blk_mq(host)) {
+			cpumask_clear(&cpu_mask);
+			for (cpu_id = 0; cpu_id < ha->max_qpairs; cpu_id++) {
+				cpumask_set_cpu(cpu_id, &cpu_mask);
+				qla2xxx_create_qpair(base_vha, &cpu_mask, 5, 0);
+				cpumask_clear_cpu(cpu_id, &cpu_mask);
+			}
 		}
 	}
 
@@ -4035,6 +4035,7 @@ struct scsi_qla_host *qla2x00_create_host(struct scsi_host_template *sht,
 	INIT_LIST_HEAD(&vha->qla_sess_op_cmd_list);
 	INIT_LIST_HEAD(&vha->logo_list);
 	INIT_LIST_HEAD(&vha->plogi_ack_list);
+	INIT_LIST_HEAD(&vha->qp_list);
 
 	spin_lock_init(&vha->work_lock);
 	spin_lock_init(&vha->cmd_list_lock);
@@ -5076,6 +5077,8 @@ qla2x00_do_dpc(void *data)
 {
 	scsi_qla_host_t *base_vha;
 	struct qla_hw_data *ha;
+	uint32_t online;
+	struct qla_qpair *qpair;
 
 	ha = (struct qla_hw_data *)data;
 	base_vha = pci_get_drvdata(ha->pdev);
@@ -5335,6 +5338,22 @@ intr_on_check:
 					&base_vha->dpc_flags)) {
 			if (ha->beacon_blink_led == 1)
 				ha->isp_ops->beacon_blink(base_vha);
+		}
+
+		/* qpair online check */
+		if (test_and_clear_bit(QPAIR_ONLINE_CHECK_NEEDED,
+		    &base_vha->dpc_flags)) {
+			if (ha->flags.eeh_busy ||
+			    ha->flags.pci_channel_io_perm_failure)
+				online = 0;
+			else
+				online = 1;
+
+			mutex_lock(&ha->mq_lock);
+			list_for_each_entry(qpair, &base_vha->qp_list,
+			    qp_list_elem)
+			qpair->online = online;
+			mutex_unlock(&ha->mq_lock);
 		}
 
 		if (!IS_QLAFX00(ha))
@@ -5679,6 +5698,10 @@ qla2xxx_pci_error_detected(struct pci_dev *pdev, pci_channel_state_t state)
 	switch (state) {
 	case pci_channel_io_normal:
 		ha->flags.eeh_busy = 0;
+		if (ql2xmqsupport) {
+			set_bit(QPAIR_ONLINE_CHECK_NEEDED, &vha->dpc_flags);
+			qla2xxx_wake_dpc(vha);
+		}
 		return PCI_ERS_RESULT_CAN_RECOVER;
 	case pci_channel_io_frozen:
 		ha->flags.eeh_busy = 1;
@@ -5692,10 +5715,18 @@ qla2xxx_pci_error_detected(struct pci_dev *pdev, pci_channel_state_t state)
 		pci_disable_device(pdev);
 		/* Return back all IOs */
 		qla2x00_abort_all_cmds(vha, DID_RESET << 16);
+		if (ql2xmqsupport) {
+			set_bit(QPAIR_ONLINE_CHECK_NEEDED, &vha->dpc_flags);
+			qla2xxx_wake_dpc(vha);
+		}
 		return PCI_ERS_RESULT_NEED_RESET;
 	case pci_channel_io_perm_failure:
 		ha->flags.pci_channel_io_perm_failure = 1;
 		qla2x00_abort_all_cmds(vha, DID_NO_CONNECT << 16);
+		if (ql2xmqsupport) {
+			set_bit(QPAIR_ONLINE_CHECK_NEEDED, &vha->dpc_flags);
+			qla2xxx_wake_dpc(vha);
+		}
 		return PCI_ERS_RESULT_DISCONNECT;
 	}
 	return PCI_ERS_RESULT_NEED_RESET;

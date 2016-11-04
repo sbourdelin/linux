@@ -2863,41 +2863,6 @@ out:
 }
 
 static irqreturn_t
-qla25xx_msix_rsp_q(int irq, void *dev_id)
-{
-	struct qla_hw_data *ha;
-	scsi_qla_host_t *vha;
-	struct rsp_que *rsp;
-	struct device_reg_24xx __iomem *reg;
-	unsigned long flags;
-	uint32_t hccr = 0;
-
-	rsp = (struct rsp_que *) dev_id;
-	if (!rsp) {
-		ql_log(ql_log_info, NULL, 0x505b,
-		    "%s: NULL response queue pointer.\n", __func__);
-		return IRQ_NONE;
-	}
-	ha = rsp->hw;
-	vha = pci_get_drvdata(ha->pdev);
-
-	/* Clear the interrupt, if enabled, for this response queue */
-	if (!ha->flags.disable_msix_handshake) {
-		reg = &ha->iobase->isp24;
-		spin_lock_irqsave(&ha->hardware_lock, flags);
-		WRT_REG_DWORD(&reg->hccr, HCCRX_CLR_RISC_INT);
-		hccr = RD_REG_DWORD_RELAXED(&reg->hccr);
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
-	}
-	if (qla2x00_check_reg32_for_disconnect(vha, hccr))
-		goto out;
-	queue_work_on((int) (rsp->id - 1), ha->wq, &rsp->q_work);
-
-out:
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t
 qla24xx_msix_default(int irq, void *dev_id)
 {
 	scsi_qla_host_t	*vha;
@@ -3000,18 +2965,18 @@ struct qla_init_msix_entry {
 	irq_handler_t handler;
 };
 
-static struct qla_init_msix_entry msix_entries[3] = {
+static struct qla_init_msix_entry msix_entries[] = {
 	{ "qla2xxx (default)", qla24xx_msix_default },
 	{ "qla2xxx (rsp_q)", qla24xx_msix_rsp_q },
-	{ "qla2xxx (multiq)", qla25xx_msix_rsp_q },
+	{ "qla2xxx (qpair_multiq)", qla2xxx_msix_rsp_q },
 };
 
-static struct qla_init_msix_entry qla82xx_msix_entries[2] = {
+static struct qla_init_msix_entry qla82xx_msix_entries[] = {
 	{ "qla2xxx (default)", qla82xx_msix_default },
 	{ "qla2xxx (rsp_q)", qla82xx_msix_rsp_q },
 };
 
-static struct qla_init_msix_entry qla83xx_msix_entries[3] = {
+static struct qla_init_msix_entry qla83xx_msix_entries[] = {
 	{ "qla2xxx (default)", qla24xx_msix_default },
 	{ "qla2xxx (rsp_q)", qla24xx_msix_rsp_q },
 	{ "qla2xxx (atio_q)", qla83xx_msix_atio_q },
@@ -3029,7 +2994,7 @@ qla24xx_disable_msix(struct qla_hw_data *ha)
 		if (qentry->have_irq) {
 			/* un-register irq cpu affinity notification */
 			irq_set_affinity_notifier(qentry->vector, NULL);
-			free_irq(qentry->vector, qentry->rsp);
+			free_irq(qentry->vector, qentry->handle);
 		}
 	}
 	pci_disable_msix(ha->pdev);
@@ -3092,7 +3057,8 @@ qla24xx_enable_msix(struct qla_hw_data *ha, struct rsp_que *rsp)
 		qentry->vector = entries[i].vector;
 		qentry->entry = entries[i].entry;
 		qentry->have_irq = 0;
-		qentry->rsp = NULL;
+		qentry->in_use = 0;
+		qentry->handle = NULL;
 		qentry->irq_notify.notify  = qla_irq_affinity_notify;
 		qentry->irq_notify.release = qla_irq_affinity_release;
 		qentry->cpuid = -1;
@@ -3101,8 +3067,10 @@ qla24xx_enable_msix(struct qla_hw_data *ha, struct rsp_que *rsp)
 	/* Enable MSI-X vectors for the base queue */
 	for (i = 0; i < 2; i++) {
 		qentry = &ha->msix_entries[i];
-		qentry->rsp = rsp;
+		qentry->handle = rsp;
 		rsp->msix = qentry;
+		scnprintf(qentry->name, sizeof(qentry->name),
+		    msix_entries[i].name);
 		if (IS_P3P_TYPE(ha))
 			ret = request_irq(qentry->vector,
 				qla82xx_msix_entries[i].handler,
@@ -3134,8 +3102,10 @@ qla24xx_enable_msix(struct qla_hw_data *ha, struct rsp_que *rsp)
 	 */
 	if (QLA_TGT_MODE_ENABLED() && IS_ATIO_MSIX_CAPABLE(ha)) {
 		qentry = &ha->msix_entries[ATIO_VECTOR];
-		qentry->rsp = rsp;
 		rsp->msix = qentry;
+		qentry->handle = rsp;
+		scnprintf(qentry->name, sizeof(qentry->name),
+		    qla83xx_msix_entries[ATIO_VECTOR].name);
 		ret = request_irq(qentry->vector,
 			qla83xx_msix_entries[ATIO_VECTOR].handler,
 			0, qla83xx_msix_entries[ATIO_VECTOR].name, rsp);
@@ -3155,11 +3125,13 @@ msix_register_fail:
 	/* Enable MSI-X vector for response queue update for queue 0 */
 	if (IS_QLA83XX(ha) || IS_QLA27XX(ha)) {
 		if (ha->msixbase && ha->mqiobase &&
-		    (ha->max_rsp_queues > 1 || ha->max_req_queues > 1))
+		    (ha->max_rsp_queues > 1 || ha->max_req_queues > 1 ||
+		     ql2xmqsupport))
 			ha->mqenable = 1;
 	} else
-		if (ha->mqiobase
-		    && (ha->max_rsp_queues > 1 || ha->max_req_queues > 1))
+		if (ha->mqiobase &&
+		    (ha->max_rsp_queues > 1 || ha->max_req_queues > 1 ||
+		     ql2xmqsupport))
 			ha->mqenable = 1;
 	ql_dbg(ql_dbg_multiq, vha, 0xc005,
 	    "mqiobase=%p, max_rsp_queues=%d, max_req_queues=%d.\n",
@@ -3285,16 +3257,16 @@ qla2x00_free_irqs(scsi_qla_host_t *vha)
 		free_irq(ha->pdev->irq, rsp);
 }
 
-
-int qla25xx_request_irq(struct rsp_que *rsp)
+int qla25xx_request_irq(struct qla_hw_data *ha, struct qla_qpair *qpair,
+	struct qla_msix_entry *msix, int vector_type)
 {
-	struct qla_hw_data *ha = rsp->hw;
-	struct qla_init_msix_entry *intr = &msix_entries[2];
-	struct qla_msix_entry *msix = rsp->msix;
+	struct qla_init_msix_entry *intr = &msix_entries[vector_type];
 	scsi_qla_host_t *vha = pci_get_drvdata(ha->pdev);
 	int ret;
 
-	ret = request_irq(msix->vector, intr->handler, 0, intr->name, rsp);
+	scnprintf(msix->name, sizeof(msix->name),
+	    "qla2xxx%lu_qpair%d", vha->host_no, qpair->id);
+	ret = request_irq(msix->vector, intr->handler, 0, msix->name, qpair);
 	if (ret) {
 		ql_log(ql_log_fatal, vha, 0x00e6,
 		    "MSI-X: Unable to register handler -- %x/%d.\n",
@@ -3302,7 +3274,7 @@ int qla25xx_request_irq(struct rsp_que *rsp)
 		return ret;
 	}
 	msix->have_irq = 1;
-	msix->rsp = rsp;
+	msix->handle = qpair;
 	return ret;
 }
 
@@ -3315,11 +3287,14 @@ static void qla_irq_affinity_notify(struct irq_affinity_notify *notify,
 		container_of(notify, struct qla_msix_entry, irq_notify);
 	struct qla_hw_data *ha;
 	struct scsi_qla_host *base_vha;
+	struct rsp_que *rsp;
 
 	/* user is recommended to set mask to just 1 cpu */
 	e->cpuid = cpumask_first(mask);
 
-	ha = e->rsp->hw;
+	rsp = (struct rsp_que *)e->handle;
+	ha = rsp->hw;
+
 	base_vha = pci_get_drvdata(ha->pdev);
 
 	ql_dbg(ql_dbg_init, base_vha, 0xffff,
@@ -3343,9 +3318,10 @@ static void qla_irq_affinity_release(struct kref *ref)
 		container_of(ref, struct irq_affinity_notify, kref);
 	struct qla_msix_entry *e =
 		container_of(notify, struct qla_msix_entry, irq_notify);
-	struct scsi_qla_host *base_vha = pci_get_drvdata(e->rsp->hw->pdev);
+	struct rsp_que *rsp = (struct rsp_que *)e->handle;
+	struct scsi_qla_host *base_vha = pci_get_drvdata(rsp->hw->pdev);
 
 	ql_dbg(ql_dbg_init, base_vha, 0xffff,
-	    "%s: host%ld: vector %d cpu %d \n", __func__,
+		"%s: host%ld: vector %d cpu %d\n", __func__,
 	    base_vha->host_no, e->vector, e->cpuid);
 }
