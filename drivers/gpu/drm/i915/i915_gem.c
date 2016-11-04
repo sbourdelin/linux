@@ -4437,6 +4437,7 @@ int i915_gem_suspend(struct drm_device *dev)
 	 * reset the GPU back to its idle, low power state.
 	 */
 	WARN_ON(dev_priv->gt.awake);
+	WARN_ON(i915.enable_execlists && !intel_lr_engines_idle(dev_priv));
 
 	/*
 	 * Neither the BIOS, ourselves or any other kernel
