@@ -39,9 +39,22 @@ struct shmem_sb_info {
 	unsigned long shrinklist_len; /* Length of shrinklist */
 };
 
+struct shmem_dev_info {
+	void *private_data;
+	int (*migratepage)(struct address_space *mapping,
+			   struct page *newpage, struct page *page,
+			   enum migrate_mode mode, void *dev_priv_data);
+};
+
 static inline struct shmem_inode_info *SHMEM_I(struct inode *inode)
 {
 	return container_of(inode, struct shmem_inode_info, vfs_inode);
+}
+
+static inline void shmem_set_dev_info(struct address_space *mapping,
+				      struct shmem_dev_info *info)
+{
+	mapping->private_data = info;
 }
 
 /*
