@@ -1061,7 +1061,8 @@ static void vlv_invert_wms(struct intel_crtc *crtc)
 
 	for (level = 0; level < wm_state->num_levels; level++) {
 		struct drm_device *dev = crtc->base.dev;
-		const int sr_fifo_size = INTEL_INFO(dev)->num_pipes * 512 - 1;
+		const int sr_fifo_size =
+			INTEL_INFO(to_i915(dev))->num_pipes * 512 - 1;
 		struct intel_plane *plane;
 
 		wm_state->sr[level].plane = sr_fifo_size - wm_state->sr[level].plane;
@@ -1093,7 +1094,7 @@ static void vlv_compute_wm(struct intel_crtc *crtc)
 	struct drm_device *dev = crtc->base.dev;
 	struct vlv_wm_state *wm_state = &crtc->wm_state;
 	struct intel_plane *plane;
-	int sr_fifo_size = INTEL_INFO(dev)->num_pipes * 512 - 1;
+	int sr_fifo_size = INTEL_INFO(to_i915(dev))->num_pipes * 512 - 1;
 	int level;
 
 	memset(wm_state, 0, sizeof(*wm_state));
@@ -1920,7 +1921,7 @@ static unsigned int ilk_plane_wm_max(const struct drm_device *dev,
 
 	/* HSW allows LP1+ watermarks even with multiple pipes */
 	if (level == 0 || config->num_pipes_active > 1) {
-		fifo_size /= INTEL_INFO(dev)->num_pipes;
+		fifo_size /= INTEL_INFO(to_i915(dev))->num_pipes;
 
 		/*
 		 * For some reason the non self refresh
