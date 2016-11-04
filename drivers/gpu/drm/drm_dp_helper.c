@@ -544,7 +544,7 @@ void drm_dp_downstream_debug(struct seq_file *m,
 				 DP_DETAILED_CAP_INFO_AVAILABLE;
 	int clk;
 	int bpc;
-	char id[6];
+	char id[7] = "";
 	int len;
 	uint8_t rev[2];
 	int type = port_cap[0] & DP_DS_PORT_TYPE_MASK;
