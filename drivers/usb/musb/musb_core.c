@@ -2046,6 +2046,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 {
 	int			status;
 	struct musb		*musb;
+	enum musb_mode		mode = MUSB_UNDEFINED;
 	struct musb_hdrc_platform_data *plat = dev_get_platdata(dev);
 
 	/* The driver might handle more features than the board; OK.
@@ -2261,13 +2262,13 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 		status = musb_host_setup(musb, plat->power);
 		if (status < 0)
 			goto fail3;
-		status = musb_platform_set_mode(musb, MUSB_HOST);
+		mode = MUSB_HOST;
 		break;
 	case MUSB_PORT_MODE_GADGET:
 		status = musb_gadget_setup(musb);
 		if (status < 0)
 			goto fail3;
-		status = musb_platform_set_mode(musb, MUSB_PERIPHERAL);
+		mode = MUSB_PERIPHERAL;
 		break;
 	case MUSB_PORT_MODE_DUAL_ROLE:
 		status = musb_host_setup(musb, plat->power);
@@ -2278,15 +2279,19 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 			musb_host_cleanup(musb);
 			goto fail3;
 		}
-		status = musb_platform_set_mode(musb, MUSB_OTG);
+		mode = MUSB_OTG;
 		break;
 	default:
 		dev_err(dev, "unsupported port mode %d\n", musb->port_mode);
 		break;
 	}
 
-	if (status < 0)
-		goto fail3;
+	if (mode != MUSB_UNDEFINED &&
+		!(musb->io.quirks & MUSB_SKIP_SET_MODE)) {
+		status = musb_platform_set_mode(musb, mode);
+		if (status < 0)
+			goto fail3;
+	}
 
 	status = musb_init_debugfs(musb);
 	if (status < 0)
