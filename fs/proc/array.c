@@ -552,8 +552,9 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 		seq_put_decimal_ull(m, " ", mm->arg_end);
 		seq_put_decimal_ull(m, " ", mm->env_start);
 		seq_put_decimal_ull(m, " ", mm->env_end);
-	} else
+	} else {
 		seq_puts(m, " 0 0 0 0 0 0 0");
+	}
 
 	if (permitted)
 		seq_put_decimal_ll(m, " ", task->exit_code);
