@@ -54,6 +54,16 @@ Optional properties:
 --------------------
 - enable-gpios:		GPIO to use to enable/disable the regulator
 
+- pwm-regulator-voltage-ramp-time-us: Integer, voltage ramp time in
+			microseconds. Some PWM regulator has the exponential
+			transition in voltage change as opposite to fixed
+			slew-rate linear transition on other regulators.
+			For such regulator, this property is used to provide
+			the settling time for voltage change which is same
+			for any voltage change.
+			If PWM regulator supports the fixed slew rate then
+			property "regulator-ramp-delay" should be used.
+
 Any property defined as part of the core regulator binding can also be used.
 (See: ../regulator/regulator.txt)
 
