@@ -24,6 +24,7 @@
 
 #include <linux/oom.h>
 #include <linux/shmem_fs.h>
+#include <linux/migrate.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
 #include <linux/pci.h>
@@ -473,6 +474,134 @@ out:
 	return NOTIFY_DONE;
 }
 
+#ifdef CONFIG_MIGRATION
+static bool can_migrate_page(struct drm_i915_gem_object *obj)
+{
+	/* Avoid the migration of page if being actively used by GPU */
+	if (i915_gem_object_is_active(obj))
+		return false;
+
+	/* Skip the migration for purgeable objects otherwise there
+	 * will be a deadlock when shmem will try to lock the page for
+	 * truncation, which is already locked by the caller before
+	 * migration.
+	 */
+	if (obj->mm.madv == I915_MADV_DONTNEED)
+		return false;
+
+	/* Skip the migration for a pinned object */
+	if (atomic_read(&obj->mm.pages_pin_count) > obj->bind_count)
+		return false;
+
+	if (any_vma_pinned(obj))
+		return false;
+
+	return true;
+}
+
+static int do_migrate_page(struct drm_i915_gem_object *obj)
+{
+	struct drm_i915_private *dev_priv = to_i915(obj->base.dev);
+	int ret = 0;
+
+	if (!can_migrate_page(obj))
+		return -EBUSY;
+
+	/* HW access would be required for a GGTT bound object, for which
+	 * device has to be kept awake. But a deadlock scenario can arise if
+	 * the attempt is made to resume the device, when either a suspend
+	 * or a resume operation is already happening concurrently from some
+	 * other path and that only also triggers compaction. So only unbind
+	 * if the device is currently awake.
+	 */
+	if (!intel_runtime_pm_get_if_in_use(dev_priv))
+		return -EBUSY;
+
+	i915_gem_object_get(obj);
+	if (!unsafe_drop_pages(obj))
+		ret = -EBUSY;
+	i915_gem_object_put(obj);
+
+	intel_runtime_pm_put(dev_priv);
+	return ret;
+}
+
+static int i915_gem_shrinker_migratepage(struct address_space *mapping,
+					 struct page *newpage,
+					 struct page *page,
+					 enum migrate_mode mode,
+					 void *dev_priv_data)
+{
+	struct drm_i915_private *dev_priv = dev_priv_data;
+	struct shrinker_lock_uninterruptible slu;
+	int ret;
+
+	/*
+	 * Clear the private field of the new target page as it could have a
+	 * stale value in the private field. Otherwise later on if this page
+	 * itself gets migrated, without getting referred by the Driver
+	 * in between, the stale value would cause the i915_migratepage
+	 * function to go for a toss as object pointer is derived from it.
+	 * This should be safe since at the time of migration, private field
+	 * of the new page (which is actually an independent free 4KB page now)
+	 * should be like a don't care for the kernel.
+	 */
+	set_page_private(newpage, 0);
+
+	if (!page_private(page))
+		goto migrate;
+
+	/*
+	 * Check the page count, if Driver also has a reference then it should
+	 * be more than 2, as shmem will have one reference and one reference
+	 * would have been taken by the migration path itself. So if reference
+	 * is <=2, we can directly invoke the migration function.
+	 */
+	if (page_count(page) <= 2)
+		goto migrate;
+
+	/*
+	 * Use trylock here, with a timeout, for struct_mutex as
+	 * otherwise there is a possibility of deadlock due to lock
+	 * inversion. This path, which tries to migrate a particular
+	 * page after locking that page, can race with a path which
+	 * truncate/purge pages of the corresponding object (after
+	 * acquiring struct_mutex). Since page truncation will also
+	 * try to lock the page, a scenario of deadlock can arise.
+	 */
+	if (!i915_gem_shrinker_lock_uninterruptible(dev_priv, &slu, 10))
+		return -EBUSY;
+
+	ret = 0;
+	if (!PageSwapCache(page) && page_private(page)) {
+		struct drm_i915_gem_object *obj =
+			(struct drm_i915_gem_object *)page_private(page);
+
+		ret = do_migrate_page(obj);
+	}
+
+	i915_gem_shrinker_unlock_uninterruptible(dev_priv, &slu);
+	if (ret)
+		return ret;
+
+	/*
+	 * Ideally here we don't expect the page count to be > 2, as driver
+	 * would have dropped its reference, but occasionally it has been seen
+	 * coming as 3 & 4. This leads to a situation of unexpected page count,
+	 * causing migration failure, with -EGAIN error. This then leads to
+	 * multiple attempts by the kernel to migrate the same set of pages.
+	 * And sometimes the repeated attempts proves detrimental for stability.
+	 * Also since we don't know who is the other owner, and for how long its
+	 * gonna keep the reference, its better to return -EBUSY.
+	 */
+	if (page_count(page) > 2)
+		return -EBUSY;
+
+migrate:
+	return migrate_page(mapping, newpage, page, mode);
+}
+#endif
+
 /**
  * i915_gem_shrinker_init - Initialize i915 shrinker
  * @dev_priv: i915 device
@@ -491,6 +620,11 @@ void i915_gem_shrinker_init(struct drm_i915_private *dev_priv)
 
 	dev_priv->mm.vmap_notifier.notifier_call = i915_gem_shrinker_vmap;
 	WARN_ON(register_vmap_purge_notifier(&dev_priv->mm.vmap_notifier));
+
+	dev_priv->mm.shmem_info.private_data = dev_priv;
+#ifdef CONFIG_MIGRATION
+	dev_priv->mm.shmem_info.migratepage = i915_gem_shrinker_migratepage;
+#endif
 }
 
 /**

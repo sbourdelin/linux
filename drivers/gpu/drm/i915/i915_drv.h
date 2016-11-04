@@ -1357,6 +1357,8 @@ struct intel_l3_parity {
 };
 
 struct i915_gem_mm {
+	struct shmem_dev_info shmem_info;
+
 	/** Memory allocator for GTT stolen memory */
 	struct drm_mm stolen;
 	/** Protects the usage of the GTT stolen memory allocator. This is
