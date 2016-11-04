@@ -1945,6 +1945,33 @@ static void vxlan_encap_bypass(struct sk_buff *skb, struct vxlan_dev *src_vxlan,
 	}
 }
 
+static int check_route_rtf_local(struct sk_buff *skb, struct net_device *dev,
+				 struct vxlan_dev *vxlan, union vxlan_addr *daddr,
+				 __be32 dst_port, __be32 vni, struct dst_entry *dst,
+				 u32 rt_flags)
+{
+	/* Bypass encapsulation if the destination is local */
+	if (rt_flags & RTF_LOCAL &&
+	    !(rt_flags & (RTCF_BROADCAST | RTCF_MULTICAST))) {
+		struct vxlan_dev *dst_vxlan;
+
+		dst_release(dst);
+		dst_vxlan = vxlan_find_vni(vxlan->net, vni,
+					   daddr->sa.sa_family, dst_port,
+					   vxlan->flags);
+		if (!dst_vxlan) {
+			dev->stats.tx_errors++;
+			kfree_skb(skb);
+
+			return -ENOENT;
+		}
+		vxlan_encap_bypass(skb, vxlan, dst_vxlan);
+		return 1;
+	}
+
+	return 0;
+}
+
 static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 			   struct vxlan_rdst *rdst, bool did_rsc)
 {
@@ -2045,26 +2072,16 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		if (IS_ERR(rt))
 			goto tx_error;
 
-		/* Bypass encapsulation if the destination is local */
-		if (!info && rt->rt_flags & RTCF_LOCAL &&
-		    !(rt->rt_flags & (RTCF_BROADCAST | RTCF_MULTICAST))) {
-			struct vxlan_dev *dst_vxlan;
-
-			ip_rt_put(rt);
-			dst_vxlan = vxlan_find_vni(vxlan->net, vni,
-						   dst->sa.sa_family, dst_port,
-						   vxlan->flags);
-			if (!dst_vxlan)
-				goto tx_error;
-			vxlan_encap_bypass(skb, vxlan, dst_vxlan);
-			return;
-		}
-
-		if (!info)
+		if (!info) {
+			err = check_route_rtf_local(skb, dev, vxlan, dst,
+						    dst_port, vni, &rt->dst,
+						    rt->rt_flags);
+			if (err)
+				return;
 			udp_sum = !(flags & VXLAN_F_UDP_ZERO_CSUM_TX);
-		else if (info->key.tun_flags & TUNNEL_DONT_FRAGMENT)
+		} else if (info->key.tun_flags & TUNNEL_DONT_FRAGMENT) {
 			df = htons(IP_DF);
-
+		}
 		tos = ip_tunnel_ecn_encap(tos, old_iph, skb);
 		ttl = ttl ? : ip4_dst_hoplimit(&rt->dst);
 		err = vxlan_build_skb(skb, &rt->dst, sizeof(struct iphdr),
@@ -2079,7 +2096,6 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 	} else {
 		struct vxlan_sock *sock6 = rcu_dereference(vxlan->vn6_sock);
 		struct dst_entry *ndst;
-		u32 rt6i_flags;
 
 		sk = sock6->sock->sk;
 
@@ -2091,24 +2107,16 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		if (IS_ERR(ndst))
 			goto tx_error;
 
-		/* Bypass encapsulation if the destination is local */
-		rt6i_flags = ((struct rt6_info *)ndst)->rt6i_flags;
-		if (!info && rt6i_flags & RTF_LOCAL &&
-		    !(rt6i_flags & (RTCF_BROADCAST | RTCF_MULTICAST))) {
-			struct vxlan_dev *dst_vxlan;
+		if (!info) {
+			u32 rt6i_flags = ((struct rt6_info *)ndst)->rt6i_flags;
 
-			dst_release(ndst);
-			dst_vxlan = vxlan_find_vni(vxlan->net, vni,
-						   dst->sa.sa_family, dst_port,
-						   vxlan->flags);
-			if (!dst_vxlan)
-				goto tx_error;
-			vxlan_encap_bypass(skb, vxlan, dst_vxlan);
-			return;
-		}
-
-		if (!info)
+			err = check_route_rtf_local(skb, dev, vxlan, dst,
+						    dst_port, vni, ndst,
+						    rt6i_flags);
+			if (err)
+				return;
 			udp_sum = !(flags & VXLAN_F_UDP_ZERO_CSUM6_TX);
+		}
 
 		tos = ip_tunnel_ecn_encap(tos, old_iph, skb);
 		ttl = ttl ? : ip6_dst_hoplimit(ndst);
