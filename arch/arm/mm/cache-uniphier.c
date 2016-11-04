@@ -387,21 +387,21 @@ static int __init __uniphier_cache_init(struct device_node *np,
 	if (!data->ctrl_base) {
 		pr_err("L%d: failed to map control register\n", *cache_level);
 		ret = -ENOMEM;
-		goto err;
+		goto free_mem;
 	}
 
 	data->rev_base = of_iomap(np, 1);
 	if (!data->rev_base) {
 		pr_err("L%d: failed to map revision register\n", *cache_level);
 		ret = -ENOMEM;
-		goto err;
+		goto unmap_ctrl;
 	}
 
 	data->op_base = of_iomap(np, 2);
 	if (!data->op_base) {
 		pr_err("L%d: failed to map operation register\n", *cache_level);
 		ret = -ENOMEM;
-		goto err;
+		goto unmap_rev;
 	}
 
 	data->way_ctrl_base = data->ctrl_base + 0xc00;
@@ -451,10 +451,12 @@ static int __init __uniphier_cache_init(struct device_node *np,
 	of_node_put(next_np);
 
 	return ret;
-err:
-	iounmap(data->op_base);
+
+unmap_rev:
 	iounmap(data->rev_base);
+unmap_ctrl:
 	iounmap(data->ctrl_base);
+free_mem:
 	kfree(data);
 
 	return ret;
