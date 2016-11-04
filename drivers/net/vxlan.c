@@ -1789,7 +1789,7 @@ static int vxlan_build_skb(struct sk_buff *skb, struct dst_entry *dst,
 	return 0;
 
 out_free:
-	kfree_skb(skb);
+	dst_release(dst);
 	return err;
 }
 
@@ -1927,7 +1927,6 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 	struct ip_tunnel_info *info;
 	struct vxlan_dev *vxlan = netdev_priv(dev);
 	struct sock *sk;
-	struct rtable *rt = NULL;
 	const struct iphdr *old_iph;
 	union vxlan_addr *dst;
 	union vxlan_addr remote_ip, local_ip;
@@ -2009,6 +2008,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 
 	if (dst->sa.sa_family == AF_INET) {
 		struct vxlan_sock *sock4 = rcu_dereference(vxlan->vn4_sock);
+		struct rtable *rt;
 
 		if (!sock4)
 			goto drop;
@@ -2030,7 +2030,8 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 			netdev_dbg(dev, "circular route to %pI4\n",
 				   &dst->sin.sin_addr.s_addr);
 			dev->stats.collisions++;
-			goto rt_tx_error;
+			ip_rt_put(rt);
+			goto tx_error;
 		}
 
 		/* Bypass encapsulation if the destination is local */
@@ -2058,7 +2059,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		err = vxlan_build_skb(skb, &rt->dst, sizeof(struct iphdr),
 				      vni, md, flags, udp_sum);
 		if (err < 0)
-			goto xmit_tx_error;
+			goto tx_error;
 
 		udp_tunnel_xmit_skb(rt, sk, skb, src->sin.sin_addr.s_addr,
 				    dst->sin.sin_addr.s_addr, tos, ttl, df,
@@ -2117,11 +2118,9 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		skb_scrub_packet(skb, xnet);
 		err = vxlan_build_skb(skb, ndst, sizeof(struct ipv6hdr),
 				      vni, md, flags, udp_sum);
-		if (err < 0) {
-			dst_release(ndst);
-			dev->stats.tx_errors++;
-			return;
-		}
+		if (err < 0)
+			goto tx_error;
+
 		udp_tunnel6_xmit_skb(ndst, sk, skb, dev,
 				     &src->sin6.sin6_addr,
 				     &dst->sin6.sin6_addr, tos, ttl,
@@ -2133,17 +2132,12 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 
 drop:
 	dev->stats.tx_dropped++;
-	goto tx_free;
+	dev_kfree_skb(skb);
+	return;
 
-xmit_tx_error:
-	/* skb is already freed. */
-	skb = NULL;
-rt_tx_error:
-	ip_rt_put(rt);
 tx_error:
 	dev->stats.tx_errors++;
-tx_free:
-	dev_kfree_skb(skb);
+	kfree_skb(skb);
 }
 
 /* Transmit local packets over Vxlan
