@@ -186,6 +186,7 @@ static ssize_t kernfs_file_direct_read(struct kernfs_open_file *of,
 				       loff_t *ppos)
 {
 	ssize_t len = min_t(size_t, count, PAGE_SIZE);
+	struct kernfs_node *kn = of->kn;
 	const struct kernfs_ops *ops;
 	char *buf;
 
@@ -202,20 +203,20 @@ static ssize_t kernfs_file_direct_read(struct kernfs_open_file *of,
 	 * the ops aren't called concurrently for the same open file.
 	 */
 	mutex_lock(&of->mutex);
-	if (!kernfs_get_active(of->kn)) {
+	if (!kernfs_get_active(kn)) {
 		len = -ENODEV;
 		mutex_unlock(&of->mutex);
 		goto out_free;
 	}
 
-	of->event = atomic_read(&of->kn->attr.open->event);
-	ops = kernfs_ops(of->kn);
+	of->event = atomic_read(&kn->attr.open->event);
+	ops = kernfs_ops(kn);
 	if (ops->read)
 		len = ops->read(of, buf, len, *ppos);
 	else
 		len = -EINVAL;
 
-	kernfs_put_active(of->kn);
+	kernfs_put_active(kn);
 	mutex_unlock(&of->mutex);
 
 	if (len < 0)
@@ -274,6 +275,7 @@ static ssize_t kernfs_fop_write(struct file *file, const char __user *user_buf,
 				size_t count, loff_t *ppos)
 {
 	struct kernfs_open_file *of = kernfs_of(file);
+	struct kernfs_node *kn = of->kn;
 	const struct kernfs_ops *ops;
 	size_t len;
 	char *buf;
@@ -305,19 +307,26 @@ static ssize_t kernfs_fop_write(struct file *file, const char __user *user_buf,
 	 * the ops aren't called concurrently for the same open file.
 	 */
 	mutex_lock(&of->mutex);
-	if (!kernfs_get_active(of->kn)) {
+	if (!kernfs_get_active(kn)) {
 		mutex_unlock(&of->mutex);
 		len = -ENODEV;
 		goto out_free;
 	}
 
-	ops = kernfs_ops(of->kn);
+	ops = kernfs_ops(kn);
 	if (ops->write)
 		len = ops->write(of, buf, len, *ppos);
 	else
 		len = -EINVAL;
 
-	kernfs_put_active(of->kn);
+	mutex_lock(&kernfs_mutex);
+	if (kn->flags & KERNFS_BROKE_A_P) {
+		kernfs_unbreak_active_protection(kn);
+		kn->flags &= ~KERNFS_BROKE_A_P;
+	}
+	mutex_unlock(&kernfs_mutex);
+
+	kernfs_put_active(kn);
 	mutex_unlock(&of->mutex);
 
 	if (len > 0)

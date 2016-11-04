@@ -426,6 +426,8 @@ void kernfs_put_active(struct kernfs_node *kn)
 	if (unlikely(!kn))
 		return;
 
+	WARN_ON_ONCE(kn->flags & KERNFS_BROKE_A_P);
+
 	if (kernfs_lockdep(kn))
 		rwsem_release(&kn->dep_map, 1, _RET_IP_);
 	v = atomic_dec_return(&kn->active);
@@ -1314,6 +1316,9 @@ void kernfs_unbreak_active_protection(struct kernfs_node *kn)
  * kernfs_remove_self - remove a kernfs_node from its own method
  * @kn: the self kernfs_node to remove
  *
+ * If kernfs_remove_self() sets KERNFS_BROKE_A_P the caller must invoke
+ * kernfs_unbreak_active_protection().
+ *
  * The caller must be running off of a kernfs operation which is invoked
  * with an active reference - e.g. one of kernfs_ops.  This can be used to
  * implement a file operation which deletes itself.
@@ -1354,6 +1359,7 @@ bool kernfs_remove_self(struct kernfs_node *kn)
 	 */
 	if (!(kn->flags & KERNFS_SUICIDAL)) {
 		kn->flags |= KERNFS_SUICIDAL;
+		kn->flags |= KERNFS_BROKE_A_P;
 		__kernfs_remove(kn);
 		kn->flags |= KERNFS_SUICIDED;
 		ret = true;
@@ -1375,13 +1381,14 @@ bool kernfs_remove_self(struct kernfs_node *kn)
 		finish_wait(waitq, &wait);
 		WARN_ON_ONCE(!RB_EMPTY_NODE(&kn->rb));
 		ret = false;
-	}
 
-	/*
-	 * This must be done while holding kernfs_mutex; otherwise, waiting
-	 * for SUICIDED && deactivated could finish prematurely.
-	 */
-	kernfs_unbreak_active_protection(kn);
+		/*
+		 * This must be done while holding kernfs_mutex; otherwise,
+		 * waiting for SUICIDED && deactivated could finish
+		 * prematurely.
+		 */
+		kernfs_unbreak_active_protection(kn);
+	}
 
 	mutex_unlock(&kernfs_mutex);
 	return ret;

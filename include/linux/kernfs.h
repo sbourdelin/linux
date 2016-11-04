@@ -46,6 +46,7 @@ enum kernfs_node_flag {
 	KERNFS_SUICIDAL		= 0x0400,
 	KERNFS_SUICIDED		= 0x0800,
 	KERNFS_EMPTY_DIR	= 0x1000,
+	KERNFS_BROKE_A_P	= 0x2000,
 };
 
 /* @flags for kernfs_create_root() */
