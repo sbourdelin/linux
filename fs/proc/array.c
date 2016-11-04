@@ -560,6 +560,11 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 	else
 		seq_puts(m, " 0");
 
+	if (mm && permitted)
+		seq_put_decimal_ull(m, " ", mm->task_size);
+	else
+		seq_puts(m, " 0");
+
 	seq_putc(m, '\n');
 	if (mm)
 		mmput(mm);
