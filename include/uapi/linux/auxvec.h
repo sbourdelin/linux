@@ -20,17 +20,16 @@
 #define AT_EUID   12	/* effective uid */
 #define AT_GID    13	/* real gid */
 #define AT_EGID   14	/* effective gid */
-#define AT_PLATFORM 15  /* string identifying CPU for optimizations */
-#define AT_HWCAP  16    /* arch dependent hints at CPU capabilities */
+#define AT_PLATFORM 15	/* string identifying CPU for optimizations */
+#define AT_HWCAP  16	/* arch dependent hints at CPU capabilities */
 #define AT_CLKTCK 17	/* frequency at which times() increments */
 /* AT_* values 18 through 22 are reserved */
-#define AT_SECURE 23   /* secure mode boolean */
+#define AT_SECURE 23	/* secure mode boolean */
 #define AT_BASE_PLATFORM 24	/* string identifying real platform, may
 				 * differ from AT_PLATFORM. */
 #define AT_RANDOM 25	/* address of 16 random bytes */
 #define AT_HWCAP2 26	/* extension of AT_HWCAP */
 
-#define AT_EXECFN  31	/* filename of program */
-
+#define AT_EXECFN 31	/* filename of program */
 
 #endif /* _UAPI_LINUX_AUXVEC_H */
