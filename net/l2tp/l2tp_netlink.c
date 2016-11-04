@@ -880,6 +880,8 @@ static const struct nla_policy l2tp_nl_policy[L2TP_ATTR_MAX + 1] = {
 	[L2TP_ATTR_SESSION_ID]		= { .type = NLA_U32, },
 	[L2TP_ATTR_PEER_SESSION_ID]	= { .type = NLA_U32, },
 	[L2TP_ATTR_UDP_CSUM]		= { .type = NLA_FLAG, },
+	[L2TP_ATTR_UDP_ZERO_CSUM6_TX]	= { .type = NLA_FLAG, },
+	[L2TP_ATTR_UDP_ZERO_CSUM6_RX]	= { .type = NLA_FLAG, },
 	[L2TP_ATTR_VLAN_ID]		= { .type = NLA_U16, },
 	[L2TP_ATTR_DEBUG]		= { .type = NLA_U32, },
 	[L2TP_ATTR_RECV_SEQ]		= { .type = NLA_U8, },
