@@ -2411,12 +2411,17 @@ static struct key_vector *fib_route_get_idx(struct fib_route_iter *iter,
 					    loff_t pos)
 {
 	struct key_vector *l, **tp = &iter->tnode;
+	loff_t saved_pos = 0;
 	t_key key;
 
 	/* use cache location of next-to-find key */
 	if (iter->pos > 0 && pos >= iter->pos) {
 		pos -= iter->pos;
 		key = iter->key;
+		if (pos == 0) {
+			saved_pos = iter->pos;
+			key--;
+		}
 	} else {
 		iter->pos = 0;
 		key = 0;
@@ -2436,10 +2441,13 @@ static struct key_vector *fib_route_get_idx(struct fib_route_iter *iter,
 			break;
 	}
 
-	if (l)
+	if (l) {
 		iter->key = key;	/* remember it */
-	else
+		if (saved_pos)
+			iter->pos = saved_pos;
+	} else {
 		iter->pos = 0;		/* forget it */
+	}
 
 	return l;
 }
