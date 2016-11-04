@@ -1610,8 +1610,10 @@ i40e_status i40e_aq_get_phy_capabilities(struct i40e_hw *hw,
 	if (hw->aq.asq_last_status == I40E_AQ_RC_EIO)
 		status = I40E_ERR_UNKNOWN_PHY;
 
-	if (report_init)
+	if (report_init) {
 		hw->phy.phy_types = le32_to_cpu(abilities->phy_type);
+		hw->phy.phy_types |= ((u64)abilities->phy_type_ext << 32);
+	}
 
 	return status;
 }
