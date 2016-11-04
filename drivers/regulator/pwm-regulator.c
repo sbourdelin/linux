@@ -47,6 +47,9 @@ struct pwm_regulator_data {
 
 	/* Enable GPIO */
 	struct gpio_desc *enb_gpio;
+
+	/* Voltage ramp time */
+	u32 voltage_ramp_time;
 };
 
 struct pwm_voltages {
@@ -233,6 +236,14 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
 	return 0;
 }
 
+static int pwm_regulator_set_voltage_time_sel(struct regulator_dev *rdev,
+					      int old_uV, int new_uV)
+{
+	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+
+	return drvdata->voltage_ramp_time;
+}
+
 static struct regulator_ops pwm_regulator_voltage_table_ops = {
 	.set_voltage_sel = pwm_regulator_set_voltage_sel,
 	.get_voltage_sel = pwm_regulator_get_voltage_sel,
@@ -305,6 +316,13 @@ static int pwm_regulator_init_continuous(struct platform_device *pdev,
 
 	memcpy(&drvdata->ops, &pwm_regulator_voltage_continuous_ops,
 	       sizeof(drvdata->ops));
+
+	if (!of_property_read_u32(pdev->dev.of_node,
+				  "pwm-regulator-voltage-ramp-time-us",
+				  &drvdata->voltage_ramp_time))
+		drvdata->ops.set_voltage_time =
+				pwm_regulator_set_voltage_time_sel;
+
 	drvdata->desc.ops = &drvdata->ops;
 	drvdata->desc.continuous_voltage_range = true;
 
