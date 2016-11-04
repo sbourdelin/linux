@@ -2165,6 +2165,8 @@ err_free_firmware_files:
 
 err_power_down:
 	ath10k_hif_power_down(ar);
+	napi_synchronize(&ar->napi);
+	napi_disable(&ar->napi);
 
 	return ret;
 }
