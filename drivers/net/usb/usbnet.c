@@ -1674,12 +1674,15 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	net->watchdog_timeo = TX_TIMEOUT_JIFFIES;
 	net->ethtool_ops = &usbnet_ethtool_ops;
 
+	if (usb_autopm_get_interface(dev->intf) < 0)
+		goto out1;
+
 	// allow device-specific bind/init procedures
 	// NOTE net->name still not usable ...
 	if (info->bind) {
 		status = info->bind (dev, udev);
 		if (status < 0)
-			goto out1;
+			goto out2;
 
 		// heuristic:  "usb%d" for links we know are two-host,
 		// else "eth%d" when there's reasonable doubt.  userspace
@@ -1772,6 +1775,8 @@ out4:
 out3:
 	if (info->unbind)
 		info->unbind (dev, udev);
+out2:
+	usb_autopm_put_interface(dev->intf);
 out1:
 	/* subdrivers must undo all they did in bind() if they
 	 * fail it, but we may fail later and a deferred kevent
