@@ -36,13 +36,6 @@ static DEFINE_PER_CPU(struct pt, pt_ctx);
 
 static struct pt_pmu pt_pmu;
 
-enum cpuid_regs {
-	CR_EAX = 0,
-	CR_ECX,
-	CR_EDX,
-	CR_EBX
-};
-
 /*
  * Capabilities of Intel PT hardware, such as number of address bits or
  * supported output schemes, are cached and exported to userspace as "caps"
