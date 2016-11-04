@@ -104,7 +104,7 @@ enum {
 	L2TP_ATTR_PEER_CONN_ID,		/* u32 */
 	L2TP_ATTR_SESSION_ID,		/* u32 */
 	L2TP_ATTR_PEER_SESSION_ID,	/* u32 */
-	L2TP_ATTR_UDP_CSUM,		/* u8 */
+	L2TP_ATTR_UDP_CSUM,		/* flag */
 	L2TP_ATTR_VLAN_ID,		/* u16 */
 	L2TP_ATTR_COOKIE,		/* 0, 4 or 8 bytes */
 	L2TP_ATTR_PEER_COOKIE,		/* 0, 4 or 8 bytes */

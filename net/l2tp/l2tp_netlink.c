@@ -379,9 +379,15 @@ static int l2tp_nl_tunnel_send(struct sk_buff *skb, u32 portid, u32 seq, int fla
 
 	switch (tunnel->encap) {
 	case L2TP_ENCAPTYPE_UDP:
+		switch (sk->sk_family) {
+		case AF_INET:
+			if ((!sk->sk_no_check_tx) &&
+			    nla_put_flag(skb, L2TP_ATTR_UDP_CSUM))
+				goto nla_put_failure;
+			break;
+		}
 		if (nla_put_u16(skb, L2TP_ATTR_UDP_SPORT, ntohs(inet->inet_sport)) ||
-		    nla_put_u16(skb, L2TP_ATTR_UDP_DPORT, ntohs(inet->inet_dport)) ||
-		    nla_put_u8(skb, L2TP_ATTR_UDP_CSUM, !sk->sk_no_check_tx))
+		    nla_put_u16(skb, L2TP_ATTR_UDP_DPORT, ntohs(inet->inet_dport)))
 			goto nla_put_failure;
 		/* NOBREAK */
 	case L2TP_ENCAPTYPE_IP:
@@ -873,7 +879,7 @@ static const struct nla_policy l2tp_nl_policy[L2TP_ATTR_MAX + 1] = {
 	[L2TP_ATTR_PEER_CONN_ID]	= { .type = NLA_U32, },
 	[L2TP_ATTR_SESSION_ID]		= { .type = NLA_U32, },
 	[L2TP_ATTR_PEER_SESSION_ID]	= { .type = NLA_U32, },
-	[L2TP_ATTR_UDP_CSUM]		= { .type = NLA_U8, },
+	[L2TP_ATTR_UDP_CSUM]		= { .type = NLA_FLAG, },
 	[L2TP_ATTR_VLAN_ID]		= { .type = NLA_U16, },
 	[L2TP_ATTR_DEBUG]		= { .type = NLA_U32, },
 	[L2TP_ATTR_RECV_SEQ]		= { .type = NLA_U8, },
