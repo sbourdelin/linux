@@ -401,6 +401,12 @@ static int da8xx_musb_init(struct musb *musb)
 		goto err_phy_power_on;
 	}
 
+	ret = phy_set_mode(glue->phy, PHY_MODE_USB_OTG);
+	if (ret) {
+		dev_err(glue->dev, "Failed to set the phy mode.\n");
+		goto err_phy_set_mode;
+	}
+
 	msleep(5);
 
 	/* NOTE: IRQs are in mixed mode, not bypass to pure MUSB */
@@ -410,6 +416,8 @@ static int da8xx_musb_init(struct musb *musb)
 	musb->isr = da8xx_musb_interrupt;
 	return 0;
 
+err_phy_set_mode:
+	phy_power_off(glue->phy);
 err_phy_power_on:
 	phy_exit(glue->phy);
 fail:
@@ -433,7 +441,7 @@ static int da8xx_musb_exit(struct musb *musb)
 }
 
 static const struct musb_platform_ops da8xx_ops = {
-	.quirks		= MUSB_DMA_CPPI | MUSB_INDEXED_EP,
+	.quirks		= MUSB_DMA_CPPI | MUSB_INDEXED_EP | MUSB_SKIP_SET_MODE,
 	.init		= da8xx_musb_init,
 	.exit		= da8xx_musb_exit,
 
