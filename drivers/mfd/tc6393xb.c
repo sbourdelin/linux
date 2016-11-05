@@ -622,7 +622,7 @@ static int tc6393xb_probe(struct platform_device *dev)
 	if (!iomem)
 		return -EINVAL;
 
-	tc6393xb = kzalloc(sizeof *tc6393xb, GFP_KERNEL);
+	tc6393xb = devm_kzalloc(&dev->dev, sizeof(*tc6393xb), GFP_KERNEL);
 	if (!tc6393xb) {
 		ret = -ENOMEM;
 		goto err_kzalloc;
@@ -735,7 +735,6 @@ err_request_scr:
 	clk_put(tc6393xb->clk);
 err_noirq:
 err_clk_get:
-	kfree(tc6393xb);
 err_kzalloc:
 	return ret;
 }
@@ -761,7 +760,6 @@ static int tc6393xb_remove(struct platform_device *dev)
 	iounmap(tc6393xb->scr);
 	release_resource(&tc6393xb->rscr);
 	clk_put(tc6393xb->clk);
-	kfree(tc6393xb);
 
 	return ret;
 }
