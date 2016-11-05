@@ -2460,6 +2460,8 @@ void free_hot_cold_page(struct page *page, bool cold)
 	unsigned long flags;
 	unsigned long pfn = page_to_pfn(page);
 	int migratetype;
+	unsigned long page_idx = pfn & 1UL;
+	struct page *buddy;
 
 	if (!free_pcp_prepare(page))
 		return;
@@ -2482,6 +2484,16 @@ void free_hot_cold_page(struct page *page, bool cold)
 			goto out;
 		}
 		migratetype = MIGRATE_MOVABLE;
+	}
+
+	if (page_idx)
+		buddy = page - 1;
+	else
+		buddy = page + 1;
+	/* merge immediately if buddy is free */	
+	if (PageBuddy(buddy)) {
+		free_one_page(zone, page, pfn, 0, migratetype);
+		goto out;
 	}
 
 	pcp = &this_cpu_ptr(zone->pageset)->pcp;
@@ -2639,8 +2651,12 @@ struct page *buffered_rmqueue(struct zone *preferred_zone,
 	if (likely(order == 0)) {
 		struct per_cpu_pages *pcp;
 		struct list_head *list;
+		unsigned long page_idx;
+		struct page *buddy;
+		int retry = 0;
 
 		local_irq_save(flags);
+retry:
 		do {
 			pcp = &this_cpu_ptr(zone->pageset)->pcp;
 			list = &pcp->lists[migratetype];
@@ -2659,6 +2675,19 @@ struct page *buffered_rmqueue(struct zone *preferred_zone,
 
 			list_del(&page->lru);
 			pcp->count--;
+
+			page_idx = page_to_pfn(page) & 1UL;
+			if (page_idx)
+				buddy = page - 1;
+			else
+				buddy = page + 1;
+			/* merge immediately if buddy is free */
+			if (PageBuddy(buddy) && retry < 3) {
+				free_one_page(page_zone(page), page,
+						page_to_pfn(page), 0, migratetype);
+				retry++;
+				goto retry;
+			}
 
 		} while (check_new_pcp(page));
 	} else {
