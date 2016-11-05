@@ -723,6 +723,29 @@ TRACE_EVENT(kvm_skinit,
 	flags;						\
 	})
 
+/*
+ * Tracepoint for nested #vmexit because of vmwrite
+ */
+TRACE_EVENT(kvm_vmwrite,
+	    TP_PROTO(__u64 vmptr, __u16 field, __u64 value),
+	    TP_ARGS(vmptr, field, value),
+
+	TP_STRUCT__entry(
+		__field(	__u64,	vmptr	)
+		__field(	__u16,	field	)
+		__field(	__u64,	value	)
+	),
+
+	TP_fast_assign(
+		__entry->vmptr		=	vmptr;
+		__entry->field		=	field;
+		__entry->value		=	value;
+	),
+
+	TP_printk("vmcs: 0x%016llx field: 0x%04x value: 0x%llx",
+		  __entry->vmptr, __entry->field, __entry->value)
+);
+
 TRACE_EVENT(kvm_emulate_insn,
 	TP_PROTO(struct kvm_vcpu *vcpu, __u8 failed),
 	TP_ARGS(vcpu, failed),

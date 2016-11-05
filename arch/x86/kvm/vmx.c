@@ -7373,6 +7373,7 @@ static int handle_vmwrite(struct kvm_vcpu *vcpu)
 {
 	unsigned long field;
 	gva_t gva;
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	unsigned long exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
 	u32 vmx_instruction_info = vmcs_read32(VMX_INSTRUCTION_INFO);
 	/* The value to write might be 32 or 64 bits, depending on L1's long
@@ -7411,6 +7412,7 @@ static int handle_vmwrite(struct kvm_vcpu *vcpu)
 		return 1;
 	}
 
+	trace_kvm_vmwrite(vmx->nested.current_vmptr, field, field_value);
 	if (vmcs12_write_any(vcpu, field, field_value) < 0) {
 		nested_vmx_failValid(vcpu, VMXERR_UNSUPPORTED_VMCS_COMPONENT);
 		skip_emulated_instruction(vcpu);
