@@ -317,7 +317,7 @@ static int t7l66xb_probe(struct platform_device *dev)
 	if (!iomem)
 		return -EINVAL;
 
-	t7l66xb = kzalloc(sizeof *t7l66xb, GFP_KERNEL);
+	t7l66xb = devm_kzalloc(&dev->dev, sizeof *t7l66xb, GFP_KERNEL);
 	if (!t7l66xb)
 		return -ENOMEM;
 
@@ -395,7 +395,6 @@ err_clk48m_get:
 	clk_put(t7l66xb->clk32k);
 err_clk32k_get:
 err_noirq:
-	kfree(t7l66xb);
 	return ret;
 }
 
@@ -414,7 +413,6 @@ static int t7l66xb_remove(struct platform_device *dev)
 	iounmap(t7l66xb->scr);
 	release_resource(&t7l66xb->rscr);
 	mfd_remove_devices(&dev->dev);
-	kfree(t7l66xb);
 
 	return ret;
 

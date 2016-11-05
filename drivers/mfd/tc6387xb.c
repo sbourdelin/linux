@@ -150,7 +150,7 @@ static int tc6387xb_probe(struct platform_device *dev)
 	if (!iomem)
 		return -EINVAL;
 
-	tc6387xb = kzalloc(sizeof(*tc6387xb), GFP_KERNEL);
+	tc6387xb = devm_kzalloc(&dev->dev, sizeof(*tc6387xb), GFP_KERNEL);
 	if (!tc6387xb)
 		return -ENOMEM;
 
@@ -203,7 +203,6 @@ err_resource:
 	clk_put(clk32k);
 err_no_clk:
 err_no_irq:
-	kfree(tc6387xb);
 	return ret;
 }
 
@@ -216,7 +215,6 @@ static int tc6387xb_remove(struct platform_device *dev)
 	release_resource(&tc6387xb->rscr);
 	clk_disable_unprepare(tc6387xb->clk32k);
 	clk_put(tc6387xb->clk32k);
-	kfree(tc6387xb);
 
 	return 0;
 }
