@@ -944,7 +944,9 @@ static bool vxlan_group_used(struct vxlan_net *vn, struct vxlan_dev *dev)
 {
 	struct vxlan_dev *vxlan;
 	struct vxlan_sock *sock4;
-	struct vxlan_sock *sock6 = NULL;
+#if IS_ENABLED(CONFIG_IPV6)
+	struct vxlan_sock *sock6;
+#endif
 	unsigned short family = dev->default_dst.remote_ip.sa.sa_family;
 
 	sock4 = rtnl_dereference(dev->vn4_sock);
@@ -1830,6 +1832,7 @@ static struct rtable *vxlan_get_route(struct vxlan_dev *vxlan,
 
 #if IS_ENABLED(CONFIG_IPV6)
 static struct dst_entry *vxlan6_get_route(struct vxlan_dev *vxlan,
+					  struct vxlan_sock *sock6,
 					  struct sk_buff *skb, int oif, u8 tos,
 					  __be32 label,
 					  const struct in6_addr *daddr,
@@ -1837,7 +1840,6 @@ static struct dst_entry *vxlan6_get_route(struct vxlan_dev *vxlan,
 					  struct dst_cache *dst_cache,
 					  const struct ip_tunnel_info *info)
 {
-	struct vxlan_sock *sock6 = rcu_dereference(vxlan->vn6_sock);
 	bool use_cache = ip_tunnel_dst_cache_usable(skb, info);
 	struct dst_entry *ndst;
 	struct flowi6 fl6;
@@ -2070,11 +2072,9 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		struct dst_entry *ndst;
 		u32 rt6i_flags;
 
-		if (!sock6)
-			goto drop;
 		sk = sock6->sock->sk;
 
-		ndst = vxlan6_get_route(vxlan, skb,
+		ndst = vxlan6_get_route(vxlan, sock6, skb,
 					rdst ? rdst->remote_ifindex : 0, tos,
 					label, &dst->sin6.sin6_addr,
 					&src->sin6.sin6_addr,
@@ -2426,9 +2426,10 @@ static int vxlan_fill_metadata_dst(struct net_device *dev, struct sk_buff *skb)
 		ip_rt_put(rt);
 	} else {
 #if IS_ENABLED(CONFIG_IPV6)
+		struct vxlan_sock *sock6 = rcu_dereference(vxlan->vn6_sock);
 		struct dst_entry *ndst;
 
-		ndst = vxlan6_get_route(vxlan, skb, 0, info->key.tos,
+		ndst = vxlan6_get_route(vxlan, sock6, skb, 0, info->key.tos,
 					info->key.label, &info->key.u.ipv6.dst,
 					&info->key.u.ipv6.src, NULL, info);
 		if (IS_ERR(ndst))
