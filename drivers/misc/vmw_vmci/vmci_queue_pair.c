@@ -224,7 +224,6 @@ struct qp_broker_entry {
 	enum qp_broker_state state;
 	bool require_trusted_attach;
 	bool created_by_trusted;
-	bool vmci_page_files;	/* Created by VMX using VMCI page files */
 	struct vmci_queue *produce_q;
 	struct vmci_queue *consume_q;
 	struct vmci_queue_header saved_produce_q;
@@ -1435,7 +1434,6 @@ static int qp_broker_create(struct vmci_handle handle,
 	    !!(context->priv_flags & VMCI_PRIVILEGE_FLAG_RESTRICTED);
 	entry->created_by_trusted =
 	    !!(priv_flags & VMCI_PRIVILEGE_FLAG_TRUSTED);
-	entry->vmci_page_files = false;
 	entry->wakeup_cb = wakeup_cb;
 	entry->client_data = client_data;
 	entry->produce_q = qp_host_alloc_queue(guest_produce_size);
@@ -2111,8 +2109,6 @@ int vmci_qp_broker_set_page_store(struct vmci_handle handle,
 		entry->state = VMCIQPB_CREATED_MEM;
 	else
 		entry->state = VMCIQPB_ATTACHED_MEM;
-
-	entry->vmci_page_files = true;
 
 	if (entry->state == VMCIQPB_ATTACHED_MEM) {
 		result =
