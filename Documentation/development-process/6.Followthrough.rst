@@ -1,7 +1,7 @@
 .. _development_followthrough:
 
-Followthrough
-=============
+Follow through
+==============
 
 At this point, you have followed the guidelines given so far and, with the
 addition of your own engineering skills, have posted a perfect series of
