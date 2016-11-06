@@ -568,7 +568,8 @@ actcapi_data_b3_ind(act2000_card *card, struct sk_buff *skb) {
 	blocknr = msg->msg.data_b3_ind.blocknr;
 	skb_pull(skb, 19);
 	card->interface.rcvcallb_skb(card->myid, chan, skb);
-	if (!(skb = alloc_skb(11, GFP_ATOMIC))) {
+	skb = alloc_skb(11, GFP_ATOMIC;
+	if (!skb) {
 		printk(KERN_WARNING "actcapi: alloc_skb failed\n");
 		return 1;
 	}
