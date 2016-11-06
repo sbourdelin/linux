@@ -3356,12 +3356,12 @@ int i915_gem_object_set_cache_level(struct drm_i915_gem_object *obj,
 				    enum i915_cache_level cache_level)
 {
 	struct i915_vma *vma;
-	int ret = 0;
+	int ret;
 
 	lockdep_assert_held(&obj->base.dev->struct_mutex);
 
 	if (obj->cache_level == cache_level)
-		goto out;
+		return 0;
 
 	/* Inspect the list of currently bound VMA and unbind any that would
 	 * be invalid given the new cache-level. This is principally to
@@ -3459,7 +3459,6 @@ restart:
 		vma->node.color = cache_level;
 	obj->cache_level = cache_level;
 
-out:
 	/* Flush the dirty CPU caches to the backing storage so that the
 	 * object is now coherent at its new cache level (with respect
 	 * to the access domain).
@@ -3608,7 +3607,9 @@ i915_gem_object_pin_to_display_plane(struct drm_i915_gem_object *obj,
 
 	vma->display_alignment = max_t(u64, vma->display_alignment, alignment);
 
-	i915_gem_object_flush_cpu_write_domain(obj);
+	if (obj->cache_dirty || obj->base.write_domain == I915_GEM_DOMAIN_CPU)
+		i915_gem_clflush_object(obj, true);
+	intel_fb_obj_flush(obj, false, ORIGIN_CPU);
 
 	old_write_domain = obj->base.write_domain;
 	old_read_domains = obj->base.read_domains;
