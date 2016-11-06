@@ -184,7 +184,7 @@ config FSL_DMA
 
 config FSL_EDMA
 	tristate "Freescale eDMA engine support"
-	depends on OF
+	depends on OF && FSL_SOC
 	select DMA_ENGINE
 	select DMA_VIRTUAL_CHANNELS
 	help
@@ -230,6 +230,7 @@ config IMX_SDMA
 
 config INTEL_IDMA64
 	tristate "Intel integrated DMA 64-bit support"
+	depends on X86
 	select DMA_ENGINE
 	select DMA_VIRTUAL_CHANNELS
 	help
@@ -339,7 +340,7 @@ config MV_XOR
 
 config MV_XOR_V2
 	bool "Marvell XOR engine version 2 support "
-	depends on ARM64
+	depends on ARM64 && ARCH_MVEBU
 	select DMA_ENGINE
 	select DMA_ENGINE_RAID
 	select ASYNC_TX_ENABLE_CHANNEL_SWITCH
@@ -383,7 +384,7 @@ config MX3_IPU_IRQS
 config NBPFAXI_DMA
 	tristate "Renesas Type-AXI NBPF DMA support"
 	select DMA_ENGINE
-	depends on ARM || COMPILE_TEST
+	depends on (ARM && ARCH_SHMOBILE) || COMPILE_TEST
 	help
 	  Support for "Type-AXI" NBPF DMA IPs from Renesas
 
@@ -493,7 +494,7 @@ config TEGRA210_ADMA
 
 config TIMB_DMA
 	tristate "Timberdale FPGA DMA support"
-	depends on MFD_TIMBERDALE || COMPILE_TEST
+	depends on MFD_TIMBERDALE && (CONFIG_X86_32 || COMPILE_TEST)
 	select DMA_ENGINE
 	help
 	  Enable support for the Timberdale FPGA DMA engine.
@@ -531,7 +532,7 @@ config XGENE_DMA
 
 config XILINX_DMA
 	tristate "Xilinx AXI DMAS Engine"
-	depends on (ARCH_ZYNQ || MICROBLAZE || ARM64)
+	depends on (ARCH_ZYNQ || ARCH_ZYNQMP || MICROBLAZE)
 	select DMA_ENGINE
 	help
 	  Enable support for Xilinx AXI VDMA Soft IP.
@@ -550,7 +551,7 @@ config XILINX_DMA
 
 config XILINX_ZYNQMP_DMA
 	tristate "Xilinx ZynqMP DMA Engine"
-	depends on (ARCH_ZYNQ || MICROBLAZE || ARM64)
+	depends on (ARCH_ZYNQ || ARCH_ZYNQMP || MICROBLAZE)
 	select DMA_ENGINE
 	help
 	  Enable support for Xilinx ZynqMP DMA controller.
