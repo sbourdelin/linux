@@ -424,15 +424,29 @@ static void acm_read_bulk_callback(struct urb *urb)
 		return;
 	}
 
-	if (status) {
-		set_bit(rb->index, &acm->read_urbs_free);
-		if ((status != -ENOENT) || (urb->actual_length == 0))
-			return;
+	switch (status) {
+	case 0:
+		usb_mark_last_busy(acm->dev);
+		acm_process_read_urb(acm, urb);
+		break;
+	case -EPIPE:
+		set_bit(EVENT_RX_STALL, &acm->flags);
+		schedule_work(&acm->work);
+		return;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		dev_dbg(&acm->data->dev,
+			"%s - urb shutting down with status: %d\n",
+			__func__, status);
+		return;
+	default:
+		dev_dbg(&acm->data->dev,
+			"%s - nonzero urb status received: %d\n",
+			__func__, status);
+		break;
 	}
 
-	usb_mark_last_busy(acm->dev);
-
-	acm_process_read_urb(acm, urb);
 	/*
 	 * Unthrottle may run on another CPU which needs to see events
 	 * in the same order. Submission has an implict barrier
@@ -468,6 +482,7 @@ static void acm_write_bulk(struct urb *urb)
 	spin_lock_irqsave(&acm->write_lock, flags);
 	acm_write_done(acm, wb);
 	spin_unlock_irqrestore(&acm->write_lock, flags);
+	set_bit(EVENT_TTY_WAKEUP, &acm->flags);
 	schedule_work(&acm->work);
 }
 
@@ -475,7 +490,30 @@ static void acm_softint(struct work_struct *work)
 {
 	struct acm *acm = container_of(work, struct acm, work);
 
-	tty_port_tty_wakeup(&acm->port);
+	dev_vdbg(&acm->data->dev, "scheduled work\n");
+
+	if (test_bit(EVENT_RX_STALL, &acm->flags)) {
+		int i, status;
+
+		for (i = 0; i < acm->rx_buflimit; i++) {
+			usb_kill_urb(acm->read_urbs[i]);
+			set_bit(i, &acm->read_urbs_free);
+		}
+
+		status = usb_autopm_get_interface(acm->data);
+		if (!status) {
+			status = usb_clear_halt(acm->dev, acm->in);
+			usb_autopm_put_interface(acm->data);
+		}
+		if (!status)
+			acm_submit_read_urbs(acm, GFP_KERNEL);
+		clear_bit(EVENT_RX_STALL, &acm->flags);
+	}
+
+	if (test_bit(EVENT_TTY_WAKEUP, &acm->flags)) {
+		tty_port_tty_wakeup(&acm->port);
+		clear_bit(EVENT_TTY_WAKEUP, &acm->flags);
+	}
 }
 
 /*
