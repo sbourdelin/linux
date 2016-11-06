@@ -89,10 +89,13 @@ int lustre_process_log(struct super_block *sb, char *logname,
 	lustre_cfg_bufs_set(bufs, 2, cfg, sizeof(*cfg));
 	lustre_cfg_bufs_set(bufs, 3, &sb, sizeof(sb));
 	lcfg = lustre_cfg_new(LCFG_LOG_START, bufs);
+	if (IS_ERR(lcfg)) {
+		rc = PTR_ERR(lcfg);
+		goto out_free;
+	}
+
 	rc = obd_process_config(mgc, sizeof(*lcfg), lcfg);
 	lustre_cfg_free(lcfg);
-
-	kfree(bufs);
 
 	if (rc == -EINVAL)
 		LCONSOLE_ERROR_MSG(0x15b, "%s: The configuration from log '%s' failed from the MGS (%d).  Make sure this client and the MGS are running compatible versions of Lustre.\n",
@@ -104,6 +107,9 @@ int lustre_process_log(struct super_block *sb, char *logname,
 				   rc);
 
 	/* class_obd_list(); */
+
+out_free:
+	kfree(bufs);
 	return rc;
 }
 EXPORT_SYMBOL(lustre_process_log);
@@ -127,6 +133,9 @@ int lustre_end_log(struct super_block *sb, char *logname,
 	if (cfg)
 		lustre_cfg_bufs_set(&bufs, 2, cfg, sizeof(*cfg));
 	lcfg = lustre_cfg_new(LCFG_LOG_END, &bufs);
+	if (IS_ERR(lcfg))
+		return PTR_ERR(lcfg);
+
 	rc = obd_process_config(mgc, sizeof(*lcfg), lcfg);
 	lustre_cfg_free(lcfg);
 	return rc;
@@ -159,6 +168,9 @@ static int do_lcfg(char *cfgname, lnet_nid_t nid, int cmd,
 		lustre_cfg_bufs_set_string(&bufs, 4, s4);
 
 	lcfg = lustre_cfg_new(cmd, &bufs);
+	if (IS_ERR(lcfg))
+		return PTR_ERR(lcfg);
+
 	lcfg->lcfg_nid = nid;
 	rc = class_process_config(lcfg);
 	lustre_cfg_free(lcfg);
