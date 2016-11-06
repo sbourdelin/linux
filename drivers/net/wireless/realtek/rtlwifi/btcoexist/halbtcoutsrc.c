@@ -981,7 +981,7 @@ void exhalbtc_set_ant_num(struct rtl_priv *rtlpriv, u8 type, u8 ant_num)
 		if ((gl_bt_coexist.board_info.pg_ant_num == 2) &&
 		    (gl_bt_coexist.board_info.btdm_ant_num == 1))
 			gl_bt_coexist.board_info.btdm_ant_pos =
-						       BTC_ANTENNA_AT_MAIN_PORT;
+						       BTC_ANTENNA_AT_AUX_PORT;
 		else
 			gl_bt_coexist.board_info.btdm_ant_pos =
 						       BTC_ANTENNA_AT_MAIN_PORT;
