@@ -24,11 +24,19 @@ enum cpuid_regs {
 	CR_EBX
 };
 
+struct msr_bit {
+	u16 feature;
+	u16 msr;
+	u8 bit;
+};
+
 void init_scattered_cpuid_features(struct cpuinfo_x86 *c)
 {
+	const struct cpuid_bit *cb;
+	const struct msr_bit *mb;
 	u32 max_level;
 	u32 regs[4];
-	const struct cpuid_bit *cb;
+	u64 msrval;
 
 	static const struct cpuid_bit cpuid_bits[] = {
 		{ X86_FEATURE_INTEL_PT,		CR_EBX,25, 0x00000007, 0 },
@@ -40,6 +48,11 @@ void init_scattered_cpuid_features(struct cpuinfo_x86 *c)
 		{ X86_FEATURE_CPB,		CR_EDX, 9, 0x80000007, 0 },
 		{ X86_FEATURE_PROC_FEEDBACK,	CR_EDX,11, 0x80000007, 0 },
 		{ 0, 0, 0, 0, 0 }
+	};
+
+	static const struct msr_bit msr_bits[] = {
+		{ X86_FEATURE_CPUID_FAULT,	MSR_PLATFORM_INFO, 31 },
+		{ 0, 0, 0 }
 	};
 
 	for (cb = cpuid_bits; cb->feature; cb++) {
@@ -55,5 +68,12 @@ void init_scattered_cpuid_features(struct cpuinfo_x86 *c)
 
 		if (regs[cb->reg] & (1 << cb->bit))
 			set_cpu_cap(c, cb->feature);
+	}
+
+	for (mb = msr_bits; mb->feature; mb++) {
+		if (rdmsrl_safe(mb->msr, &msrval))
+			continue;
+		if (msrval & (1ULL << mb->bit))
+			set_cpu_cap(c, mb->feature);
 	}
 }
