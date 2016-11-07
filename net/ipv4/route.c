@@ -753,7 +753,9 @@ static void __ip_do_redirect(struct rtable *rt, struct sk_buff *skb, struct flow
 			goto reject_redirect;
 	}
 
+	rt->rt_gateway = 0;
 	n = ipv4_neigh_lookup(&rt->dst, NULL, &new_gw);
+	rt->rt_gateway = old_gw;
 	if (!IS_ERR(n)) {
 		if (!(n->nud_state & NUD_VALID)) {
 			neigh_event_send(n, NULL);
