@@ -167,6 +167,11 @@ static const char * const state_str[] = {
 	[FPGA_MGR_STATE_OPERATING] =		"operating",
 };
 
+static const char * const cap_str[] = {
+	[FPGA_MGR_CAP_FULL_RECONF] = "Full reconfiguration",
+	[FPGA_MGR_CAP_PARTIAL_RECONF] = "Partial reconfiguration",
+};
+
 static ssize_t name_show(struct device *dev,
 			 struct device_attribute *attr, char *buf)
 {
@@ -183,10 +188,25 @@ static ssize_t state_show(struct device *dev,
 	return sprintf(buf, "%s\n", state_str[mgr->state]);
 }
 
+static ssize_t capabilities_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	struct fpga_manager *mgr = to_fpga_manager(dev);
+	char *start = buf;
+	enum fpga_mgr_capability cap;
+
+	for_each_fpga_mgr_cap_mask(cap, mgr->caps)
+		buf += sprintf(buf, "%s\n", cap_str[cap]);
+
+	return buf - start;
+}
+
+static DEVICE_ATTR_RO(capabilities);
 static DEVICE_ATTR_RO(name);
 static DEVICE_ATTR_RO(state);
 
 static struct attribute *fpga_mgr_attrs[] = {
+	&dev_attr_capabilities.attr,
 	&dev_attr_name.attr,
 	&dev_attr_state.attr,
 	NULL,

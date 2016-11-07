@@ -35,3 +35,19 @@ Description:	Read fpga manager state as a string.
 		* write complete	= Doing post programming steps
 		* write complete error	= Error while doing post programming
 		* operating		= FPGA is programmed and operating
+
+What: 		/sys/class/fpga_manager/fpga/capabilities
+Date:		November 2016
+KernelVersion:	4.9
+Contact:	Moritz Fischer <moritz.fischer@ettus.com>
+Description:	Read fpga manager capabilities as a string.
+		The intent is to provide userspace with information on what
+		operations the particular instance can execute.
+
+		Each line expresses a capability that is available on the
+		particular instance of an fpga manager.
+		Supported so far:
+
+		* Full reconfiguration
+		* Partial reconfiguration
+		* Decrypt bitstream on the fly

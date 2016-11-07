@@ -108,6 +108,8 @@ static inline void __fpga_mgr_cap_set(enum fpga_mgr_capability cap,
 	set_bit(cap, mask->bits);
 }
 
+#define for_each_fpga_mgr_cap_mask(cap, mask) \
+	for_each_set_bit(cap, mask.bits, FPGA_MGR_CAP_END)
 
 /**
  * struct fpga_manager_ops - ops for low level fpga manager drivers
