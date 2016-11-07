@@ -49,6 +49,18 @@ int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags, const char *buf,
 	struct device *dev = &mgr->dev;
 	int ret;
 
+	if (flags & FPGA_MGR_PARTIAL_RECONFIG &&
+	    !fpga_mgr_has_cap(FPGA_MGR_CAP_PARTIAL_RECONF, mgr->caps)) {
+		dev_err(dev, "Partial reconfiguration not supported\n");
+		return -ENOTSUPP;
+	}
+
+	if (flags & FPGA_MGR_FULL_RECONFIG &&
+	    !fpga_mgr_has_cap(FPGA_MGR_CAP_FULL_RECONF, mgr->caps)) {
+		dev_err(dev, "Full reconfiguration not supported\n");
+		return -ENOTSUPP;
+	}
+
 	/*
 	 * Call the low level driver's write_init function.  This will do the
 	 * device-specific things to get the FPGA into the state where it is
@@ -245,12 +257,14 @@ EXPORT_SYMBOL_GPL(fpga_mgr_put);
  * @dev:	fpga manager device from pdev
  * @name:	fpga manager name
  * @mops:	pointer to structure of fpga manager ops
+ * @caps:	fpga manager capabilities
  * @priv:	fpga manager private data
  *
  * Return: 0 on success, negative error code otherwise.
  */
 int fpga_mgr_register(struct device *dev, const char *name,
 		      const struct fpga_manager_ops *mops,
+		      fpga_mgr_cap_mask_t caps,
 		      void *priv)
 {
 	struct fpga_manager *mgr;
@@ -282,6 +296,7 @@ int fpga_mgr_register(struct device *dev, const char *name,
 	mgr->name = name;
 	mgr->mops = mops;
 	mgr->priv = priv;
+	mgr->caps = caps;
 
 	/*
 	 * Initialize framework state by requesting low level driver read state

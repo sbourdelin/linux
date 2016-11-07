@@ -67,6 +67,47 @@ enum fpga_mgr_states {
  * FPGA_MGR_PARTIAL_RECONFIG: do partial reconfiguration if supported
  */
 #define FPGA_MGR_PARTIAL_RECONFIG	BIT(0)
+#define FPGA_MGR_FULL_RECONFIG		BIT(1)
+
+enum fpga_mgr_capability {
+	FPGA_MGR_CAP_PARTIAL_RECONF,
+	FPGA_MGR_CAP_FULL_RECONF,
+
+/* last capability type for creation of the capabilities mask */
+	FPGA_MGR_CAP_END,
+};
+
+typedef struct { DECLARE_BITMAP(bits, FPGA_MGR_CAP_END); } fpga_mgr_cap_mask_t;
+
+#define fpga_mgr_has_cap(cap, mask) __fpga_mgr_has_cap((cap), &(mask))
+static inline int __fpga_mgr_has_cap(enum fpga_mgr_capability cap,
+				     fpga_mgr_cap_mask_t *mask)
+{
+	return test_bit(cap, mask->bits);
+}
+
+#define fpga_mgr_cap_zero(mask) __fpga_mgr_cap_zero(mask)
+static inline void __fpga_mgr_cap_zero(fpga_mgr_cap_mask_t *mask)
+{
+	bitmap_zero(mask->bits, FPGA_MGR_CAP_END);
+}
+
+#define fpga_mgr_cap_clear(cap, mask) __fpga_mgr_cap_clear((cap), &(mask))
+static inline void __fpga_mgr_cap_clear(enum fpga_mgr_capability cap,
+				       fpga_mgr_cap_mask_t *mask)
+
+{
+	clear_bit(cap, mask->bits);
+}
+
+#define fpga_mgr_cap_set(cap, mask) __fpga_mgr_cap_set((cap), &(mask))
+static inline void __fpga_mgr_cap_set(enum fpga_mgr_capability cap,
+				      fpga_mgr_cap_mask_t *mask)
+
+{
+	set_bit(cap, mask->bits);
+}
+
 
 /**
  * struct fpga_manager_ops - ops for low level fpga manager drivers
@@ -105,6 +146,7 @@ struct fpga_manager {
 	enum fpga_mgr_states state;
 	const struct fpga_manager_ops *mops;
 	void *priv;
+	fpga_mgr_cap_mask_t caps;
 };
 
 #define to_fpga_manager(d) container_of(d, struct fpga_manager, dev)
@@ -120,7 +162,9 @@ struct fpga_manager *of_fpga_mgr_get(struct device_node *node);
 void fpga_mgr_put(struct fpga_manager *mgr);
 
 int fpga_mgr_register(struct device *dev, const char *name,
-		      const struct fpga_manager_ops *mops, void *priv);
+		      const struct fpga_manager_ops *mops,
+		      fpga_mgr_cap_mask_t caps,
+		      void *priv);
 
 void fpga_mgr_unregister(struct device *dev);
 
