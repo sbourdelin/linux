@@ -919,6 +919,7 @@ repeat:
 		BUG();
 		return SIGEMT;
 	}
+	err = 0;
 	pr_debug("Emulating the 0x%08x R2 instruction @ 0x%08lx (pass=%d))\n",
 		 inst, epc, pass);
 
@@ -1096,10 +1097,16 @@ repeat:
 		}
 		break;
 
-	case beql_op:
-	case bnel_op:
 	case blezl_op:
 	case bgtzl_op:
+		/* return MIPS R6 instruction to CPU execution */
+		if (MIPSInst_RT(inst)) {
+			err = SIGILL;
+			break;
+		}
+
+	case beql_op:
+	case bnel_op:
 		if (delay_slot(regs)) {
 			err = SIGILL;
 			break;
