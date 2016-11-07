@@ -212,11 +212,13 @@ static struct iova *__alloc_iova(struct iommu_domain *domain, size_t size,
 
 	if (domain->geometry.force_aperture)
 		dma_limit = min(dma_limit, domain->geometry.aperture_end);
+
+	dma_limit = min(dma_limit >> shift, (dma_addr_t)iovad->dma_32bit_pfn);
 	/*
 	 * Enforce size-alignment to be safe - there could perhaps be an
 	 * attribute to control this per-device, or at least per-domain...
 	 */
-	return alloc_iova(iovad, length, dma_limit >> shift, true);
+	return alloc_iova(iovad, length, dma_limit, true);
 }
 
 /* The IOVA allocator knows what we mapped, so just unmap whatever that was */
