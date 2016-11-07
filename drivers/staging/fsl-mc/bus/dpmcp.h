@@ -85,7 +85,7 @@ int dpmcp_reset(struct fsl_mc_io *mc_io,
  * @irq_num: A user defined number associated with this IRQ
  */
 struct dpmcp_irq_cfg {
-	     uint64_t		paddr;
+	     u64		paddr;
 	     u32		val;
 	     int		irq_num;
 };
