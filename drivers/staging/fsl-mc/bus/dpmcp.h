@@ -39,7 +39,7 @@
 struct fsl_mc_io;
 
 int dpmcp_open(struct fsl_mc_io *mc_io,
-	       uint32_t cmd_flags,
+	       u32 cmd_flags,
 	       int dpmcp_id,
 	       uint16_t *token);
 
@@ -47,7 +47,7 @@ int dpmcp_open(struct fsl_mc_io *mc_io,
 #define DPMCP_GET_PORTAL_ID_FROM_POOL (-1)
 
 int dpmcp_close(struct fsl_mc_io *mc_io,
-		uint32_t cmd_flags,
+		u32 cmd_flags,
 		uint16_t token);
 
 /**
@@ -60,16 +60,16 @@ struct dpmcp_cfg {
 };
 
 int dpmcp_create(struct fsl_mc_io	*mc_io,
-		 uint32_t		cmd_flags,
+		 u32			cmd_flags,
 		 const struct dpmcp_cfg	*cfg,
 		uint16_t		*token);
 
 int dpmcp_destroy(struct fsl_mc_io *mc_io,
-		  uint32_t cmd_flags,
+		  u32 cmd_flags,
 		  uint16_t token);
 
 int dpmcp_reset(struct fsl_mc_io *mc_io,
-		uint32_t cmd_flags,
+		u32 cmd_flags,
 		uint16_t token);
 
 /* IRQ */
@@ -86,52 +86,52 @@ int dpmcp_reset(struct fsl_mc_io *mc_io,
  */
 struct dpmcp_irq_cfg {
 	     uint64_t		paddr;
-	     uint32_t		val;
+	     u32		val;
 	     int		irq_num;
 };
 
 int dpmcp_set_irq(struct fsl_mc_io	*mc_io,
-		  uint32_t		cmd_flags,
+		  u32			cmd_flags,
 		  uint16_t		token,
 		 uint8_t		irq_index,
 		  struct dpmcp_irq_cfg	*irq_cfg);
 
 int dpmcp_get_irq(struct fsl_mc_io	*mc_io,
-		  uint32_t		cmd_flags,
+		  u32			cmd_flags,
 		  uint16_t		token,
 		 uint8_t		irq_index,
 		 int			*type,
 		 struct dpmcp_irq_cfg	*irq_cfg);
 
 int dpmcp_set_irq_enable(struct fsl_mc_io	*mc_io,
-			 uint32_t		cmd_flags,
+			 u32			cmd_flags,
 			 uint16_t		token,
 			uint8_t			irq_index,
 			uint8_t			en);
 
 int dpmcp_get_irq_enable(struct fsl_mc_io	*mc_io,
-			 uint32_t		cmd_flags,
+			 u32			cmd_flags,
 			 uint16_t		token,
 			uint8_t			irq_index,
 			uint8_t			*en);
 
 int dpmcp_set_irq_mask(struct fsl_mc_io	*mc_io,
-		       uint32_t	cmd_flags,
+		       u32	cmd_flags,
 		       uint16_t		token,
 		      uint8_t		irq_index,
-		      uint32_t		mask);
+		      u32		mask);
 
 int dpmcp_get_irq_mask(struct fsl_mc_io	*mc_io,
-		       uint32_t	cmd_flags,
+		       u32	cmd_flags,
 		       uint16_t		token,
 		      uint8_t		irq_index,
-		      uint32_t		*mask);
+		      u32		*mask);
 
 int dpmcp_get_irq_status(struct fsl_mc_io	*mc_io,
-			 uint32_t		cmd_flags,
+			 u32			cmd_flags,
 			 uint16_t		token,
 			uint8_t			irq_index,
-			uint32_t		*status);
+			u32			*status);
 
 /**
  * struct dpmcp_attr - Structure representing DPMCP attributes
@@ -152,7 +152,7 @@ struct dpmcp_attr {
 };
 
 int dpmcp_get_attributes(struct fsl_mc_io	*mc_io,
-			 uint32_t		cmd_flags,
+			 u32			cmd_flags,
 			 uint16_t		token,
 			struct dpmcp_attr	*attr);
 
