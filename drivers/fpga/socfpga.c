@@ -579,6 +579,7 @@ static int socfpga_fpga_probe(struct platform_device *pdev)
 
 	fpga_mgr_cap_zero(&caps);
 	fpga_mgr_cap_set(FPGA_MGR_CAP_FULL_RECONF, caps);
+	fpga_mgr_cap_set(FPGA_MGR_CAP_DECRYPT, caps);
 
 	return fpga_mgr_register(dev, "Altera SOCFPGA FPGA Manager",
 				 &socfpga_fpga_ops, caps, priv);
