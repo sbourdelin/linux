@@ -60,7 +60,7 @@ __u64 eventfd_signal(struct eventfd_ctx *ctx, __u64 n)
 		n = ULLONG_MAX - ctx->count;
 	ctx->count += n;
 	if (waitqueue_active(&ctx->wqh))
-		wake_up_locked_poll(&ctx->wqh, POLLIN);
+		wake_up_locked_poll(&ctx->wqh, POLLIN | POLLRDNORM);
 	spin_unlock_irqrestore(&ctx->wqh.lock, flags);
 
 	return n;
@@ -163,11 +163,11 @@ static unsigned int eventfd_poll(struct file *file, poll_table *wait)
 	count = READ_ONCE(ctx->count);
 
 	if (count > 0)
-		events |= POLLIN;
+		events |= POLLIN | POLLRDNORM;
 	if (count == ULLONG_MAX)
 		events |= POLLERR;
 	if (ULLONG_MAX - 1 > count)
-		events |= POLLOUT;
+		events |= POLLOUT | POLLWRNORM;
 
 	return events;
 }
@@ -200,7 +200,7 @@ int eventfd_ctx_remove_wait_queue(struct eventfd_ctx *ctx, wait_queue_t *wait,
 	eventfd_ctx_do_read(ctx, cnt);
 	__remove_wait_queue(&ctx->wqh, wait);
 	if (*cnt != 0 && waitqueue_active(&ctx->wqh))
-		wake_up_locked_poll(&ctx->wqh, POLLOUT);
+		wake_up_locked_poll(&ctx->wqh, POLLOUT | POLLWRNORM);
 	spin_unlock_irqrestore(&ctx->wqh.lock, flags);
 
 	return *cnt != 0 ? 0 : -EAGAIN;
@@ -253,7 +253,7 @@ ssize_t eventfd_ctx_read(struct eventfd_ctx *ctx, int no_wait, __u64 *cnt)
 	if (likely(res == 0)) {
 		eventfd_ctx_do_read(ctx, cnt);
 		if (waitqueue_active(&ctx->wqh))
-			wake_up_locked_poll(&ctx->wqh, POLLOUT);
+			wake_up_locked_poll(&ctx->wqh, POLLOUT | POLLWRNORM);
 	}
 	spin_unlock_irq(&ctx->wqh.lock);
 
@@ -317,7 +317,7 @@ static ssize_t eventfd_write(struct file *file, const char __user *buf, size_t c
 	if (likely(res > 0)) {
 		ctx->count += ucnt;
 		if (waitqueue_active(&ctx->wqh))
-			wake_up_locked_poll(&ctx->wqh, POLLIN);
+			wake_up_locked_poll(&ctx->wqh, POLLIN | POLLRDNORM);
 	}
 	spin_unlock_irq(&ctx->wqh.lock);
 
