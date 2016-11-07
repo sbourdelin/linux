@@ -68,7 +68,7 @@ static unsigned int signalfd_poll(struct file *file, poll_table *wait)
 	if (next_signal(&current->pending, &ctx->sigmask) ||
 	    next_signal(&current->signal->shared_pending,
 			&ctx->sigmask))
-		events |= POLLIN;
+		events |= POLLIN | POLLRDNORM;
 	spin_unlock_irq(&current->sighand->siglock);
 
 	return events;
