@@ -4145,6 +4145,24 @@ __i915_request_irq_complete(struct drm_i915_gem_request *req)
 	return false;
 }
 
+static inline void
+i915_disable_engine_irqs(struct drm_i915_private *dev_priv)
+{
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+
+	/* Ensure irq handler finishes, and not run again. */
+	disable_irq(dev_priv->drm.irq);
+	for_each_engine(engine, dev_priv, id)
+		tasklet_kill(&engine->irq_tasklet);
+}
+
+static inline void
+i915_enable_engine_irqs(struct drm_i915_private *dev_priv)
+{
+	enable_irq(dev_priv->drm.irq);
+}
+
 void i915_memcpy_init_early(struct drm_i915_private *dev_priv);
 bool i915_memcpy_from_wc(void *dst, const void *src, unsigned long len);
 
