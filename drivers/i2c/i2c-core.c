@@ -1810,7 +1810,7 @@ i2c_of_match_device_sysfs(const struct of_device_id *matches,
 		else
 			name++;
 
-		if (!strncasecmp(client->name, name, strlen(client->name)))
+		if (sysfs_streq(client->name, name))
 			return matches;
 	}
 
