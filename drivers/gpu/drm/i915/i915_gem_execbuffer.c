@@ -1276,6 +1276,7 @@ void i915_vma_move_to_active(struct i915_vma *vma,
 
 		/* update for the implicit flush after a batch */
 		obj->base.write_domain &= ~I915_GEM_GPU_DOMAINS;
+		obj->cache_dirty |= obj->cache_level != I915_CACHE_NONE;
 	}
 
 	if (flags & EXEC_OBJECT_NEEDS_FENCE)
