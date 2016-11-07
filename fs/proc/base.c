@@ -647,7 +647,7 @@ static int proc_pid_syscall(struct seq_file *m, struct pid_namespace *ns,
 	if (res)
 		return res;
 
-	if (task_current_syscall(task, &nr, args, 6, &sp, &pc))
+	if (task_current_syscall(task, &nr, args, &sp, &pc))
 		seq_puts(m, "running\n");
 	else if (nr < 0)
 		seq_printf(m, "%ld 0x%lx 0x%lx\n", nr, sp, pc);

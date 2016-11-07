@@ -4,8 +4,8 @@
 #include <asm/syscall.h>
 
 static int collect_syscall(struct task_struct *target, long *callno,
-			   unsigned long args[6], unsigned int maxargs,
-			   unsigned long *sp, unsigned long *pc)
+			   unsigned long args[6], unsigned long *sp,
+			   unsigned long *pc)
 {
 	struct pt_regs *regs;
 
@@ -25,8 +25,8 @@ static int collect_syscall(struct task_struct *target, long *callno,
 	*pc = instruction_pointer(regs);
 
 	*callno = syscall_get_nr(target, regs);
-	if (*callno != -1L && maxargs > 0)
-		syscall_get_arguments(target, regs, 0, maxargs, args);
+	if (*callno != -1L)
+		syscall_get_arguments(target, regs, 0, 6, args);
 
 	put_task_stack(target);
 	return 0;
@@ -37,7 +37,6 @@ static int collect_syscall(struct task_struct *target, long *callno,
  * @target:		thread to examine
  * @callno:		filled with system call number or -1
  * @args:		filled with @maxargs system call arguments
- * @maxargs:		number of elements in @args to fill
  * @sp:			filled with user stack pointer
  * @pc:			filled with user PC
  *
@@ -55,21 +54,16 @@ static int collect_syscall(struct task_struct *target, long *callno,
  * get() calls as long as we're sure @target won't return to user mode.
  *
  * Returns -%EAGAIN if @target does not remain blocked.
- *
- * Returns -%EINVAL if @maxargs is too large (maximum is six).
  */
 int task_current_syscall(struct task_struct *target, long *callno,
-			 unsigned long args[6], unsigned int maxargs,
-			 unsigned long *sp, unsigned long *pc)
+			 unsigned long args[6], unsigned long *sp,
+			 unsigned long *pc)
 {
 	long state;
 	unsigned long ncsw;
 
-	if (unlikely(maxargs > 6))
-		return -EINVAL;
-
 	if (target == current)
-		return collect_syscall(target, callno, args, maxargs, sp, pc);
+		return collect_syscall(target, callno, args, sp, pc);
 
 	state = target->state;
 	if (unlikely(!state))
@@ -77,7 +71,7 @@ int task_current_syscall(struct task_struct *target, long *callno,
 
 	ncsw = wait_task_inactive(target, state);
 	if (unlikely(!ncsw) ||
-	    unlikely(collect_syscall(target, callno, args, maxargs, sp, pc)) ||
+	    unlikely(collect_syscall(target, callno, args, sp, pc)) ||
 	    unlikely(wait_task_inactive(target, state) != ncsw))
 		return -EAGAIN;
 

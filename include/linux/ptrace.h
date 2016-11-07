@@ -403,7 +403,7 @@ static inline void user_single_step_siginfo(struct task_struct *tsk,
 #endif
 
 extern int task_current_syscall(struct task_struct *target, long *callno,
-				unsigned long args[6], unsigned int maxargs,
-				unsigned long *sp, unsigned long *pc);
+				unsigned long args[6], unsigned long *sp,
+				unsigned long *pc);
 
 #endif
