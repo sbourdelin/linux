@@ -438,6 +438,22 @@ static int svc_tcp_has_wspace(struct svc_xprt *xprt)
 	return !test_bit(SOCK_NOSPACE, &svsk->sk_sock->flags);
 }
 
+static void svc_tcp_notifier_cb(struct svc_xprt *xprt)
+{
+	struct svc_sock *svsk;
+	struct socket *sock;
+	struct linger no_linger = {
+		.l_onoff = 1,
+		.l_linger = 0,
+	};
+
+	svsk = container_of(xprt, struct svc_sock, sk_xprt);
+	sock = svsk->sk_sock;
+	kernel_setsockopt(sock, SOL_SOCKET, SO_LINGER,
+			  (char *)&no_linger, sizeof(no_linger));
+	svc_close_xprt(xprt);
+}
+
 /*
  * See net/ipv6/ip_sockglue.c : ip_cmsg_recv_pktinfo
  */
@@ -1242,6 +1258,7 @@ static struct svc_xprt_ops svc_tcp_ops = {
 	.xpo_has_wspace = svc_tcp_has_wspace,
 	.xpo_accept = svc_tcp_accept,
 	.xpo_secure_port = svc_sock_secure_port,
+	.xpo_notifier_cb = svc_tcp_notifier_cb,
 };
 
 static struct svc_xprt_class svc_tcp_class = {
