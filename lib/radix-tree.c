@@ -753,6 +753,31 @@ void *radix_tree_lookup(struct radix_tree_root *root, unsigned long index)
 }
 EXPORT_SYMBOL(radix_tree_lookup);
 
+static void replace_slot(struct radix_tree_root *root,
+			 struct radix_tree_node *node,
+			 void **slot, void *item,
+			 bool warn_typeswitch)
+{
+	void *old = rcu_dereference_raw(*slot);
+	int count, exceptional;
+
+	WARN_ON_ONCE(radix_tree_is_internal_node(item));
+
+	count = !!item - !!old;
+	exceptional = !!radix_tree_exceptional_entry(item) -
+		      !!radix_tree_exceptional_entry(old);
+
+	WARN_ONCE(warn_typeswitch && (count || exceptional),
+		  "Unaccounted slot replacement: old=%p item=%p count=%d exceptional=%d\n",
+		  old, item, count, exceptional);
+
+	if (node) {
+		node->count += count;
+		node->exceptional += exceptional;
+	}
+	rcu_assign_pointer(*slot, item);
+}
+
 /**
  * __radix_tree_replace		- replace item in a slot
  * @root:	radix tree root
@@ -767,25 +792,34 @@ void __radix_tree_replace(struct radix_tree_root *root,
 			  struct radix_tree_node *node,
 			  void **slot, void *item)
 {
-	void *old = rcu_dereference_raw(*slot);
-	int count, exceptional;
+	/*
+	 * This function supports replacing entries with different types
+	 * (NULL, regular entries, exceptional entries), but that needs
+	 * accounting against the node - unless the slot is root->rnode.
+	 */
+	replace_slot(root, node, slot, item,
+		     !node && slot != (void **)&root->rnode);
+}
 
-	WARN_ON_ONCE(radix_tree_is_internal_node(item));
-
-	count = !!item - !!old;
-	exceptional = !!radix_tree_exceptional_entry(item) -
-		      !!radix_tree_exceptional_entry(old);
-
-	WARN_ONCE(!node && slot != (void **)&root->rnode &&
-		  (count || exceptional),
-		  "Unaccounted slot replacement: old=%p item=%p count=%d exceptional=%d\n",
-		  old, item, count, exceptional);
-
-	if (node) {
-		node->count += count;
-		node->exceptional += exceptional;
-	}
-	rcu_assign_pointer(*slot, item);
+/**
+ * radix_tree_replace_slot	- replace item in a slot
+ * @root:	radix tree root
+ * @slot:	pointer to slot
+ * @item:	new item to store in the slot.
+ *
+ * For use with radix_tree_lookup_slot(), radix_tree_gang_lookup_slot(),
+ * radix_tree_gang_lookup_tag_slot().  Caller must hold tree write locked
+ * across slot lookup and replacement.
+ *
+ * NOTE: This cannot be used to switch between non-entries (empty slots),
+ * regular entries, and exceptional entries, as that requires accounting
+ * inside the radix tree node. When switching from one type of entry to
+ * another, use __radix_tree_lookup() and __radix_tree_replace().
+ */
+void radix_tree_replace_slot(struct radix_tree_root *root,
+			     void **slot, void *item)
+{
+	replace_slot(root, NULL, slot, item, true);
 }
 
 /**
