@@ -4497,3 +4497,18 @@ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_FINTEK, PCI_DEVICE_ID_F81508,
 			quirk_aer_report);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_FINTEK, PCI_DEVICE_ID_F81512,
 			quirk_aer_report);
+
+/*
+ * Fintek F81504/508/512 PCIe-to-UART/GPIO will failed to work on Intel Skylake
+ * platform PEG PCIe port after D0->D3->D0.
+ */
+static void quirk_no_d3(struct pci_dev *pdev)
+{
+	pdev->dev_flags |= PCI_DEV_FLAGS_NO_D3;
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_FINTEK, PCI_DEVICE_ID_F81504,
+			quirk_no_d3);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_FINTEK, PCI_DEVICE_ID_F81508,
+			quirk_no_d3);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_FINTEK, PCI_DEVICE_ID_F81512,
+			quirk_no_d3);
