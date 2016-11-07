@@ -53,7 +53,6 @@ static void clear_exceptional_entry(struct address_space *mapping,
 	mapping->nrexceptional--;
 	if (!node)
 		goto unlock;
-	workingset_node_shadows_dec(node);
 	/*
 	 * Don't track node without shadow entries.
 	 *
@@ -61,8 +60,7 @@ static void clear_exceptional_entry(struct address_space *mapping,
 	 * The list_empty() test is safe as node->private_list is
 	 * protected by mapping->tree_lock.
 	 */
-	if (!workingset_node_shadows(node) &&
-	    !list_empty(&node->private_list))
+	if (!node->exceptional && !list_empty(&node->private_list))
 		list_lru_del(&workingset_shadow_nodes,
 				&node->private_list);
 	__radix_tree_delete_node(&mapping->page_tree, node);

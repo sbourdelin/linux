@@ -132,25 +132,19 @@ static int page_cache_tree_insert(struct address_space *mapping,
 		if (!dax_mapping(mapping)) {
 			if (shadowp)
 				*shadowp = p;
-			if (node)
-				workingset_node_shadows_dec(node);
 		} else {
 			/* DAX can replace empty locked entry with a hole */
 			WARN_ON_ONCE(p !=
 				(void *)(RADIX_TREE_EXCEPTIONAL_ENTRY |
 					 RADIX_DAX_ENTRY_LOCK));
-			/* DAX accounts exceptional entries as normal pages */
-			if (node)
-				workingset_node_pages_dec(node);
 			/* Wakeup waiters for exceptional entry lock */
 			dax_wake_mapping_entry_waiter(mapping, page->index,
 						      false);
 		}
 	}
-	radix_tree_replace_slot(&mapping->page_tree, slot, page);
+	__radix_tree_replace(&mapping->page_tree, node, slot, page);
 	mapping->nrpages++;
 	if (node) {
-		workingset_node_pages_inc(node);
 		/*
 		 * Don't track node that contains actual pages.
 		 *
@@ -193,29 +187,27 @@ static void page_cache_tree_delete(struct address_space *mapping,
 			shadow = NULL;
 		}
 
-		radix_tree_replace_slot(&mapping->page_tree, slot, shadow);
+		__radix_tree_replace(&mapping->page_tree, node, slot, shadow);
 
 		if (!node)
 			break;
 
-		workingset_node_pages_dec(node);
-		if (shadow)
-			workingset_node_shadows_inc(node);
-		else
-			if (__radix_tree_delete_node(&mapping->page_tree, node))
-				continue;
+		if (!shadow &&
+		    __radix_tree_delete_node(&mapping->page_tree, node))
+			continue;
 
 		/*
-		 * Track node that only contains shadow entries. DAX mappings
-		 * contain no shadow entries and may contain other exceptional
-		 * entries so skip those.
+		 * Track node that only contains shadow entries. DAX and SHMEM
+		 * mappings contain no shadow entries and may contain other
+		 * exceptional entries so skip those.
 		 *
 		 * Avoid acquiring the list_lru lock if already tracked.
 		 * The list_empty() test is safe as node->private_list is
 		 * protected by mapping->tree_lock.
 		 */
-		if (!dax_mapping(mapping) && !workingset_node_pages(node) &&
-				list_empty(&node->private_list)) {
+		if (!dax_mapping(mapping) && !shmem_mapping(mapping) &&
+		    node->count == node->exceptional &&
+		    list_empty(&node->private_list)) {
 			node->private_data = mapping;
 			list_lru_add(&workingset_shadow_nodes,
 					&node->private_list);

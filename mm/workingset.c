@@ -418,22 +418,25 @@ static enum lru_status shadow_lru_isolate(struct list_head *item,
 	 * no pages, so we expect to be able to remove them all and
 	 * delete and free the empty node afterwards.
 	 */
-	if (WARN_ON_ONCE(!workingset_node_shadows(node)))
+	if (WARN_ON_ONCE(!node->exceptional))
 		goto out_invalid;
-	if (WARN_ON_ONCE(workingset_node_pages(node)))
+	if (WARN_ON_ONCE(node->count != node->exceptional))
 		goto out_invalid;
 	for (i = 0; i < RADIX_TREE_MAP_SIZE; i++) {
 		if (node->slots[i]) {
 			if (WARN_ON_ONCE(!radix_tree_exceptional_entry(node->slots[i])))
 				goto out_invalid;
+			if (WARN_ON_ONCE(!node->exceptional))
+				goto out_invalid;
 			if (WARN_ON_ONCE(!mapping->nrexceptional))
 				goto out_invalid;
 			node->slots[i] = NULL;
-			workingset_node_shadows_dec(node);
+			node->exceptional--;
+			node->count--;
 			mapping->nrexceptional--;
 		}
 	}
-	if (WARN_ON_ONCE(workingset_node_shadows(node)))
+	if (WARN_ON_ONCE(node->exceptional))
 		goto out_invalid;
 	inc_node_state(page_pgdat(virt_to_page(node)), WORKINGSET_NODERECLAIM);
 	__radix_tree_delete_node(&mapping->page_tree, node);
