@@ -134,6 +134,24 @@
 	 PERF_SAMPLE_BRANCH_KERNEL      |\
 	 PERF_SAMPLE_BRANCH_HV)
 
+/* Contants to support PowerISA v3.0 encoding format */
+#define ISA300_EVENT_COMBINE_SHIFT	10	/* Combine bit */
+#define ISA300_EVENT_COMBINE_MASK	0x3ull
+#define ISA300_SDAR_MODE_SHIFT		50
+#define ISA300_SDAR_MODE_MASK		0x3ull
+
+#define ISA300_EVENT_VALID_MASK		\
+	((ISA300_SDAR_MODE_MASK<< ISA300_SDAR_MODE_SHIFT	|	\
+	(EVENT_THRESH_MASK    << EVENT_THRESH_SHIFT)		|	\
+	(EVENT_SAMPLE_MASK    << EVENT_SAMPLE_SHIFT)		|	\
+	(EVENT_CACHE_SEL_MASK << EVENT_CACHE_SEL_SHIFT)		|	\
+	(EVENT_PMC_MASK       << EVENT_PMC_SHIFT)		|	\
+	(EVENT_UNIT_MASK      << EVENT_UNIT_SHIFT)		|	\
+	(ISA300_EVENT_COMBINE_MASK << ISA300_EVENT_COMBINE_SHIFT) |	\
+	(EVENT_MARKED_MASK    << EVENT_MARKED_SHIFT)		|	\
+	 EVENT_LINUX_MASK					|	\
+	 EVENT_PSEL_MASK))
+
 /*
  * Layout of constraint bits:
  *
@@ -210,14 +228,21 @@
 #define MMCR1_DC_QUAL_SHIFT		47
 #define MMCR1_IC_QUAL_SHIFT		46
 
+/* MMCR1 Combine bits macro for PowerISA v3.0 */
+#define ISA300_MMCR1_COMBINE_SHIFT(pmc)	(38 - ((pmc - 1) * 2))
+
 /* Bits in MMCRA for PowerISA v2.07 */
 #define MMCRA_SAMP_MODE_SHIFT		1
 #define MMCRA_SAMP_ELIG_SHIFT		4
 #define MMCRA_THR_CTL_SHIFT		8
 #define MMCRA_THR_SEL_SHIFT		16
 #define MMCRA_THR_CMP_SHIFT		32
-#define MMCRA_SDAR_MODE_TLB		(1ull << 42)
+#define MMCRA_SDAR_MODE_SHIFT		42
+#define MMCRA_SDAR_MODE_TLB		(1ull << MMCRA_SDAR_MODE_SHIFT)
 #define MMCRA_IFM_SHIFT			30
+
+/* MMCR1 Threshold Compare bit constant for PowerISA v3.0 */
+#define ISA300_MMCRA_THR_CMP_SHIFT	45
 
 /* Bits in MMCR2 for PowerISA v2.07 */
 #define MMCR2_FCS(pmc)			(1ull << (63 - (((pmc) - 1) * 9)))
