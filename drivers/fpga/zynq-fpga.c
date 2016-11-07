@@ -71,6 +71,10 @@
 #define CTRL_PCAP_PR_MASK		BIT(27)
 /* Enable PCAP */
 #define CTRL_PCAP_MODE_MASK		BIT(26)
+/* Needed to reduce clock rate for secure config */
+#define CTRL_PCAP_RATE_EN_MASK		BIT(25)
+/* System booted in secure mode */
+#define CTRL_SEC_EN_MASK		BIT(7)
 
 /* Miscellaneous Control Register bit definitions */
 /* Internal PCAP loopback */
@@ -252,12 +256,20 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
 
 	/* set configuration register with following options:
 	 * - enable PCAP interface
-	 * - set throughput for maximum speed
+	 * - set throughput for maximum speed (if we're not decrypting)
 	 * - set CPU in user mode
 	 */
 	ctrl = zynq_fpga_read(priv, CTRL_OFFSET);
-	zynq_fpga_write(priv, CTRL_OFFSET,
+	if (flags & FPGA_MGR_DECRYPT_BITSTREAM) {
+		zynq_fpga_write(priv, CTRL_OFFSET,
+			(CTRL_PCAP_PR_MASK | CTRL_PCAP_MODE_MASK |
+			 CTRL_PCAP_RATE_EN_MASK | ctrl));
+
+	} else {
+		ctrl &= ~CTRL_PCAP_RATE_EN_MASK;
+		zynq_fpga_write(priv, CTRL_OFFSET,
 			(CTRL_PCAP_PR_MASK | CTRL_PCAP_MODE_MASK | ctrl));
+	}
 
 	/* check that we have room in the command queue */
 	status = zynq_fpga_read(priv, STATUS_OFFSET);
@@ -412,6 +424,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
 	struct resource *res;
 	fpga_mgr_cap_mask_t caps;
 	int err;
+	u32 tmp;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
@@ -466,6 +479,10 @@ static int zynq_fpga_probe(struct platform_device *pdev)
 	fpga_mgr_cap_set(FPGA_MGR_CAP_FULL_RECONF, caps);
 	fpga_mgr_cap_set(FPGA_MGR_CAP_PARTIAL_RECONF, caps);
 
+	/* only works if we booted in secure mode */
+	tmp = zynq_fpga_read(priv, CTRL_OFFSET);
+	if (tmp & CTRL_SEC_EN_MASK)
+		fpga_mgr_cap_set(FPGA_MGR_CAP_DECRYPT, caps);
 
 	err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
 				&zynq_fpga_ops, caps, priv);

@@ -61,6 +61,12 @@ int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags, const char *buf,
 		return -ENOTSUPP;
 	}
 
+	if (flags & FPGA_MGR_DECRYPT_BITSTREAM &&
+	    !fpga_mgr_has_cap(FPGA_MGR_CAP_DECRYPT, mgr->caps)) {
+		dev_err(dev, "Bitstream decryption not supported\n");
+		return -ENOTSUPP;
+	}
+
 	/*
 	 * Call the low level driver's write_init function.  This will do the
 	 * device-specific things to get the FPGA into the state where it is
@@ -170,6 +176,7 @@ static const char * const state_str[] = {
 static const char * const cap_str[] = {
 	[FPGA_MGR_CAP_FULL_RECONF] = "Full reconfiguration",
 	[FPGA_MGR_CAP_PARTIAL_RECONF] = "Partial reconfiguration",
+	[FPGA_MGR_CAP_DECRYPT] = "Decrypt bitstream on the fly",
 };
 
 static ssize_t name_show(struct device *dev,

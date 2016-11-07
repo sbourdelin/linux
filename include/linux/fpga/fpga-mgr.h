@@ -68,10 +68,12 @@ enum fpga_mgr_states {
  */
 #define FPGA_MGR_PARTIAL_RECONFIG	BIT(0)
 #define FPGA_MGR_FULL_RECONFIG		BIT(1)
+#define FPGA_MGR_DECRYPT_BITSTREAM	BIT(2)
 
 enum fpga_mgr_capability {
 	FPGA_MGR_CAP_PARTIAL_RECONF,
 	FPGA_MGR_CAP_FULL_RECONF,
+	FPGA_MGR_CAP_DECRYPT,
 
 /* last capability type for creation of the capabilities mask */
 	FPGA_MGR_CAP_END,
