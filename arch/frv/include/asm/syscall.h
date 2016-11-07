@@ -71,29 +71,15 @@ static inline void syscall_set_return_value(struct task_struct *task,
  */
 static inline void syscall_get_arguments(struct task_struct *task,
 					 struct pt_regs *regs,
-					 unsigned int i, unsigned int n,
 					 unsigned long *args)
 {
-	/*
-	 * Do this simply for now. If we need to start supporting
-	 * fetching arguments from arbitrary indices, this will need some
-	 * extra logic. Presently there are no in-tree users that depend
-	 * on this behaviour.
-	 */
-	BUG_ON(i);
-
 	/* Argument pattern is: GR8, GR9, GR10, GR11, GR12, GR13 */
-	switch (n) {
-	case 6: args[5] = regs->gr13;
-	case 5: args[4] = regs->gr12;
-	case 4: args[3] = regs->gr11;
-	case 3: args[2] = regs->gr10;
-	case 2: args[1] = regs->gr9;
-	case 1:	args[0] = regs->gr8;
-		break;
-	default:
-		BUG();
-	}
+	args[5] = regs->gr13;
+	args[4] = regs->gr12;
+	args[3] = regs->gr11;
+	args[2] = regs->gr10;
+	args[1] = regs->gr9;
+	args[0] = regs->gr8;
 }
 
 /*

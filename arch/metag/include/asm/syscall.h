@@ -66,13 +66,11 @@ static inline void syscall_set_return_value(struct task_struct *task,
 
 static inline void syscall_get_arguments(struct task_struct *task,
 					 struct pt_regs *regs,
-					 unsigned int i, unsigned int n,
 					 unsigned long *args)
 {
 	unsigned int reg, j;
-	BUG_ON(i + n > 6);
 
-	for (j = i, reg = 6 - i; j < (i + n); j++, reg--) {
+	for (j = 0, reg = 6; j < 6; j++, reg--) {
 		if (reg % 2)
 			args[j] = regs->ctx.DX[(reg + 1) / 2].U0;
 		else

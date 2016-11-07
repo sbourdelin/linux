@@ -26,7 +26,7 @@ static int collect_syscall(struct task_struct *target, long *callno,
 
 	*callno = syscall_get_nr(target, regs);
 	if (*callno != -1L)
-		syscall_get_arguments(target, regs, 0, 6, args);
+		syscall_get_arguments(target, regs, args);
 
 	put_task_stack(target);
 	return 0;

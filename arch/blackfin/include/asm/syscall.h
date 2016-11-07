@@ -57,30 +57,36 @@ syscall_set_return_value(struct task_struct *task, struct pt_regs *regs,
  *	syscall_get_arguments()
  *	@task:   unused
  *	@regs:   the register layout to extract syscall arguments from
- *	@i:      first syscall argument to extract
- *	@n:      number of syscall arguments to extract
  *	@args:   array to return the syscall arguments in
  *
- * args[0] gets i'th argument, args[n - 1] gets the i+n-1'th argument
+ * Gets the 6 arguments of the system call
  */
 static inline void
 syscall_get_arguments(struct task_struct *task, struct pt_regs *regs,
-                      unsigned int i, unsigned int n, unsigned long *args)
+                      unsigned long *args)
 {
 	/*
 	 * Assume the ptrace layout doesn't change -- r5 is first in memory,
 	 * then r4, ..., then r0.  So we simply reverse the ptrace register
 	 * array in memory to store into the args array.
 	 */
-	long *aregs = &regs->r0 - i;
-
-	BUG_ON(i > 5 || i + n > 6);
+	long *aregs = &regs->r0;
+	unsigned int n = 6;
 
 	while (n--)
 		*args++ = *aregs--;
 }
 
-/* See syscall_get_arguments() comments */
+/**
+ *	syscall_set_arguments()
+ *	@task:   unused
+ *	@regs:   the register layout to extract syscall arguments from
+ *	@i:      first syscall argument to extract
+ *	@n:      number of syscall arguments to extract
+ *	@args:   array to return the syscall arguments in
+ *
+ * args[0] gets i'th argument, args[n - 1] gets the i+n-1'th argument
+ */
 static inline void
 syscall_set_arguments(struct task_struct *task, struct pt_regs *regs,
                       unsigned int i, unsigned int n, const unsigned long *args)
