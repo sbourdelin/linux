@@ -1520,7 +1520,8 @@ tree_unlocked:
 				if (!nr_none)
 					break;
 				/* Put holes back where they were */
-				radix_tree_replace_slot(slot, NULL);
+				radix_tree_delete(&mapping->page_tree,
+						  iter.index);
 				nr_none--;
 				continue;
 			}
