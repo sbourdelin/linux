@@ -41,14 +41,14 @@ struct fsl_mc_io;
 int dpmcp_open(struct fsl_mc_io *mc_io,
 	       u32 cmd_flags,
 	       int dpmcp_id,
-	       uint16_t *token);
+	       u16 *token);
 
 /* Get portal ID from pool */
 #define DPMCP_GET_PORTAL_ID_FROM_POOL (-1)
 
 int dpmcp_close(struct fsl_mc_io *mc_io,
 		u32 cmd_flags,
-		uint16_t token);
+		u16 token);
 
 /**
  * struct dpmcp_cfg - Structure representing DPMCP configuration
@@ -62,15 +62,15 @@ struct dpmcp_cfg {
 int dpmcp_create(struct fsl_mc_io	*mc_io,
 		 u32			cmd_flags,
 		 const struct dpmcp_cfg	*cfg,
-		uint16_t		*token);
+		u16			*token);
 
 int dpmcp_destroy(struct fsl_mc_io *mc_io,
 		  u32 cmd_flags,
-		  uint16_t token);
+		  u16 token);
 
 int dpmcp_reset(struct fsl_mc_io *mc_io,
 		u32 cmd_flags,
-		uint16_t token);
+		u16 token);
 
 /* IRQ */
 /* IRQ Index */
@@ -92,44 +92,44 @@ struct dpmcp_irq_cfg {
 
 int dpmcp_set_irq(struct fsl_mc_io	*mc_io,
 		  u32			cmd_flags,
-		  uint16_t		token,
+		  u16			token,
 		 uint8_t		irq_index,
 		  struct dpmcp_irq_cfg	*irq_cfg);
 
 int dpmcp_get_irq(struct fsl_mc_io	*mc_io,
 		  u32			cmd_flags,
-		  uint16_t		token,
+		  u16			token,
 		 uint8_t		irq_index,
 		 int			*type,
 		 struct dpmcp_irq_cfg	*irq_cfg);
 
 int dpmcp_set_irq_enable(struct fsl_mc_io	*mc_io,
 			 u32			cmd_flags,
-			 uint16_t		token,
+			 u16			token,
 			uint8_t			irq_index,
 			uint8_t			en);
 
 int dpmcp_get_irq_enable(struct fsl_mc_io	*mc_io,
 			 u32			cmd_flags,
-			 uint16_t		token,
+			 u16			token,
 			uint8_t			irq_index,
 			uint8_t			*en);
 
 int dpmcp_set_irq_mask(struct fsl_mc_io	*mc_io,
 		       u32	cmd_flags,
-		       uint16_t		token,
+		       u16		token,
 		      uint8_t		irq_index,
 		      u32		mask);
 
 int dpmcp_get_irq_mask(struct fsl_mc_io	*mc_io,
 		       u32	cmd_flags,
-		       uint16_t		token,
+		       u16		token,
 		      uint8_t		irq_index,
 		      u32		*mask);
 
 int dpmcp_get_irq_status(struct fsl_mc_io	*mc_io,
 			 u32			cmd_flags,
-			 uint16_t		token,
+			 u16			token,
 			uint8_t			irq_index,
 			u32			*status);
 
@@ -146,14 +146,14 @@ struct dpmcp_attr {
 	 * @minor:	DPMCP minor version
 	 */
 	struct {
-		uint16_t major;
-		uint16_t minor;
+		u16 major;
+		u16 minor;
 	} version;
 };
 
 int dpmcp_get_attributes(struct fsl_mc_io	*mc_io,
 			 u32			cmd_flags,
-			 uint16_t		token,
+			 u16			token,
 			struct dpmcp_attr	*attr);
 
 #endif /* __FSL_DPMCP_H */
