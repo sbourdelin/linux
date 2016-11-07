@@ -247,7 +247,6 @@ struct igb_ring {
 	};
 	void *desc;			/* descriptor ring memory */
 	unsigned long flags;		/* ring specific flags */
-	void __iomem *tail;		/* pointer to ring tail register */
 	dma_addr_t dma;			/* phys address of the ring */
 	unsigned int  size;		/* length of desc. ring in bytes */
 

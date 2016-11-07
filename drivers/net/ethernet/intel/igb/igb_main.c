@@ -3394,9 +3394,8 @@ void igb_configure_tx_ring(struct igb_adapter *adapter,
 	     tdba & 0x00000000ffffffffULL);
 	wr32(E1000_TDBAH(reg_idx), tdba >> 32);
 
-	ring->tail = hw->hw_addr + E1000_TDT(reg_idx);
 	wr32(E1000_TDH(reg_idx), 0);
-	writel(0, ring->tail);
+        wr32(E1000_TDT(reg_idx), 0);
 
 	txdctl |= IGB_TX_PTHRESH;
 	txdctl |= IGB_TX_HTHRESH << 8;
@@ -3733,9 +3732,8 @@ void igb_configure_rx_ring(struct igb_adapter *adapter,
 	     ring->count * sizeof(union e1000_adv_rx_desc));
 
 	/* initialize head and tail */
-	ring->tail = hw->hw_addr + E1000_RDT(reg_idx);
 	wr32(E1000_RDH(reg_idx), 0);
-	writel(0, ring->tail);
+	wr32(E1000_RDT(reg_idx), 0);
 
 	/* set descriptor configuration */
 	srrctl = IGB_RX_HDR_LEN << E1000_SRRCTL_BSIZEHDRSIZE_SHIFT;
@@ -5134,6 +5132,8 @@ static void igb_tx_map(struct igb_ring *tx_ring,
 	u32 tx_flags = first->tx_flags;
 	u32 cmd_type = igb_tx_cmd_type(skb, tx_flags);
 	u16 i = tx_ring->next_to_use;
+        struct igb_adapter *adapter = netdev_priv(tx_ring->netdev);
+        struct e1000_hw *hw = &adapter->hw;
 
 	tx_desc = IGB_TX_DESC(tx_ring, i);
 
@@ -5227,7 +5227,7 @@ static void igb_tx_map(struct igb_ring *tx_ring,
 	igb_maybe_stop_tx(tx_ring, DESC_NEEDED);
 
 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
-		writel(i, tx_ring->tail);
+                wr32(E1000_TDT(tx_ring->reg_idx), i);
 
 		/* we need this if more than one processor can write to our tail
 		 * at a time, it synchronizes IO on IA64/Altix systems
@@ -6749,7 +6749,7 @@ static bool igb_clean_tx_irq(struct igb_q_vector *q_vector, int napi_budget)
 				"  desc.status          <%x>\n",
 				tx_ring->queue_index,
 				rd32(E1000_TDH(tx_ring->reg_idx)),
-				readl(tx_ring->tail),
+				rd32(E1000_TDT(tx_ring->reg_idx)),
 				tx_ring->next_to_use,
 				tx_ring->next_to_clean,
 				tx_buffer->time_stamp,
@@ -7258,6 +7258,8 @@ void igb_alloc_rx_buffers(struct igb_ring *rx_ring, u16 cleaned_count)
 	union e1000_adv_rx_desc *rx_desc;
 	struct igb_rx_buffer *bi;
 	u16 i = rx_ring->next_to_use;
+        struct igb_adapter *adapter = netdev_priv(rx_ring->netdev);
+        struct e1000_hw *hw = &adapter->hw;
 
 	/* nothing to do */
 	if (!cleaned_count)
@@ -7306,7 +7308,7 @@ void igb_alloc_rx_buffers(struct igb_ring *rx_ring, u16 cleaned_count)
 		 * such as IA-64).
 		 */
 		wmb();
-		writel(i, rx_ring->tail);
+                wr32(E1000_RDT(rx_ring->reg_idx), i);
 	}
 }
 
