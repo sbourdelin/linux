@@ -93,44 +93,44 @@ struct dpmcp_irq_cfg {
 int dpmcp_set_irq(struct fsl_mc_io	*mc_io,
 		  u32			cmd_flags,
 		  u16			token,
-		 uint8_t		irq_index,
+		 u8			irq_index,
 		  struct dpmcp_irq_cfg	*irq_cfg);
 
 int dpmcp_get_irq(struct fsl_mc_io	*mc_io,
 		  u32			cmd_flags,
 		  u16			token,
-		 uint8_t		irq_index,
+		 u8			irq_index,
 		 int			*type,
 		 struct dpmcp_irq_cfg	*irq_cfg);
 
 int dpmcp_set_irq_enable(struct fsl_mc_io	*mc_io,
 			 u32			cmd_flags,
 			 u16			token,
-			uint8_t			irq_index,
-			uint8_t			en);
+			u8			irq_index,
+			u8			en);
 
 int dpmcp_get_irq_enable(struct fsl_mc_io	*mc_io,
 			 u32			cmd_flags,
 			 u16			token,
-			uint8_t			irq_index,
-			uint8_t			*en);
+			u8			irq_index,
+			u8			*en);
 
 int dpmcp_set_irq_mask(struct fsl_mc_io	*mc_io,
 		       u32	cmd_flags,
 		       u16		token,
-		      uint8_t		irq_index,
+		      u8		irq_index,
 		      u32		mask);
 
 int dpmcp_get_irq_mask(struct fsl_mc_io	*mc_io,
 		       u32	cmd_flags,
 		       u16		token,
-		      uint8_t		irq_index,
+		      u8		irq_index,
 		      u32		*mask);
 
 int dpmcp_get_irq_status(struct fsl_mc_io	*mc_io,
 			 u32			cmd_flags,
 			 u16			token,
-			uint8_t			irq_index,
+			u8			irq_index,
 			u32			*status);
 
 /**
