@@ -151,6 +151,23 @@ static int do_statfs64(struct kstatfs *st, struct statfs64 __user *p)
 	if (sizeof(buf) == sizeof(*st))
 		memcpy(&buf, st, sizeof(*st));
 	else {
+		if (sizeof buf.f_bsize == 4) {
+			if ((st->f_blocks | st->f_bfree | st->f_bavail |
+			     st->f_bsize | st->f_frsize) &
+			    0xffffffff00000000ULL)
+				return -EOVERFLOW;
+			/*
+			 * f_files and f_ffree may be -1; it's okay to stuff
+			 * that into 32 bits
+			 */
+			if (st->f_files != -1 &&
+			    (st->f_files & 0xffffffff00000000ULL))
+				return -EOVERFLOW;
+			if (st->f_ffree != -1 &&
+			    (st->f_ffree & 0xffffffff00000000ULL))
+				return -EOVERFLOW;
+		}
+
 		buf.f_type = st->f_type;
 		buf.f_bsize = st->f_bsize;
 		buf.f_blocks = st->f_blocks;
