@@ -66,9 +66,9 @@ static void poly1305_setrkey(struct poly1305_desc_ctx *dctx, const u8 *key)
 {
 	/* r &= 0xffffffc0ffffffc0ffffffc0fffffff */
 	dctx->r[0] = (le32_to_cpuvp(key +  0) >> 0) & 0x3ffffff;
-	dctx->r[1] = (le32_to_cpuvp(key +  3) >> 2) & 0x3ffff03;
-	dctx->r[2] = (le32_to_cpuvp(key +  6) >> 4) & 0x3ffc0ff;
-	dctx->r[3] = (le32_to_cpuvp(key +  9) >> 6) & 0x3f03fff;
+	dctx->r[1] = (get_unaligned_le32(key +  3) >> 2) & 0x3ffff03;
+	dctx->r[2] = (get_unaligned_le32(key +  6) >> 4) & 0x3ffc0ff;
+	dctx->r[3] = (get_unaligned_le32(key +  9) >> 6) & 0x3f03fff;
 	dctx->r[4] = (le32_to_cpuvp(key + 12) >> 8) & 0x00fffff;
 }
 
@@ -138,9 +138,9 @@ static unsigned int poly1305_blocks(struct poly1305_desc_ctx *dctx,
 
 		/* h += m[i] */
 		h0 += (le32_to_cpuvp(src +  0) >> 0) & 0x3ffffff;
-		h1 += (le32_to_cpuvp(src +  3) >> 2) & 0x3ffffff;
-		h2 += (le32_to_cpuvp(src +  6) >> 4) & 0x3ffffff;
-		h3 += (le32_to_cpuvp(src +  9) >> 6) & 0x3ffffff;
+		h1 += (get_unaligned_le32(src +  3) >> 2) & 0x3ffffff;
+		h2 += (get_unaligned_le32(src +  6) >> 4) & 0x3ffffff;
+		h3 += (get_unaligned_le32(src +  9) >> 6) & 0x3ffffff;
 		h4 += (le32_to_cpuvp(src + 12) >> 8) | hibit;
 
 		/* h *= r */
