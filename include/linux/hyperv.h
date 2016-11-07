@@ -150,6 +150,7 @@ hv_get_ringbuffer_availbytes(struct hv_ring_buffer_info *rbi,
 
 	*write = write_loc >= read_loc ? dsize - (write_loc - read_loc) :
 		read_loc - write_loc;
+	*write -= 1;
 	*read = dsize - *write;
 }
 
@@ -177,7 +178,8 @@ static inline u32 hv_get_bytes_to_write(struct hv_ring_buffer_info *rbi)
 
 	write = write_loc >= read_loc ? dsize - (write_loc - read_loc) :
 		read_loc - write_loc;
-	return write;
+	/* make sure ring never gets completely full */
+	return write - 1;
 }
 
 /*
