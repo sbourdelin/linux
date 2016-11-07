@@ -47,6 +47,12 @@ static int join_ibss(struct nl80211_state *state,
 		argc--;
 	}
 
+	if (argc && strcmp(argv[0], "__dfs-enable") == 0) {
+		NLA_PUT_FLAG(msg, NL80211_ATTR_HANDLE_DFS);
+		argv++;
+		argc--;
+	}
+
 	if (argc) {
 		if (mac_addr_a2n(abssid, argv[0]) == 0) {
 			NLA_PUT(msg, NL80211_ATTR_MAC, 6, abssid);
