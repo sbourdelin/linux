@@ -628,7 +628,7 @@ static void tusb_musb_set_vbus(struct musb *musb, int is_on)
  * Note that if a mini-A cable is plugged in the ID line will stay down as
  * the weak ID pull-up is not able to pull the ID up.
  */
-static int tusb_musb_set_mode(struct musb *musb, u8 musb_mode)
+static int tusb_musb_set_mode(struct musb *musb, u8 musb_mode, bool init)
 {
 	void __iomem	*tbase = musb->ctrl_base;
 	u32		otg_stat, phy_otg_ctrl, phy_otg_ena, dev_conf;

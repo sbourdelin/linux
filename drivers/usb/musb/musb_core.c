@@ -1730,11 +1730,11 @@ musb_mode_store(struct device *dev, struct device_attribute *attr,
 
 	spin_lock_irqsave(&musb->lock, flags);
 	if (sysfs_streq(buf, "host"))
-		status = musb_platform_set_mode(musb, MUSB_HOST);
+		status = musb_platform_set_mode(musb, MUSB_HOST, false);
 	else if (sysfs_streq(buf, "peripheral"))
-		status = musb_platform_set_mode(musb, MUSB_PERIPHERAL);
+		status = musb_platform_set_mode(musb, MUSB_PERIPHERAL, false);
 	else if (sysfs_streq(buf, "otg"))
-		status = musb_platform_set_mode(musb, MUSB_OTG);
+		status = musb_platform_set_mode(musb, MUSB_OTG, false);
 	else
 		status = -EINVAL;
 	spin_unlock_irqrestore(&musb->lock, flags);
@@ -2261,13 +2261,13 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 		status = musb_host_setup(musb, plat->power);
 		if (status < 0)
 			goto fail3;
-		status = musb_platform_set_mode(musb, MUSB_HOST);
+		status = musb_platform_set_mode(musb, MUSB_HOST, true);
 		break;
 	case MUSB_PORT_MODE_GADGET:
 		status = musb_gadget_setup(musb);
 		if (status < 0)
 			goto fail3;
-		status = musb_platform_set_mode(musb, MUSB_PERIPHERAL);
+		status = musb_platform_set_mode(musb, MUSB_PERIPHERAL, true);
 		break;
 	case MUSB_PORT_MODE_DUAL_ROLE:
 		status = musb_host_setup(musb, plat->power);
@@ -2278,7 +2278,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 			musb_host_cleanup(musb);
 			goto fail3;
 		}
-		status = musb_platform_set_mode(musb, MUSB_OTG);
+		status = musb_platform_set_mode(musb, MUSB_OTG, true);
 		break;
 	default:
 		dev_err(dev, "unsupported port mode %d\n", musb->port_mode);

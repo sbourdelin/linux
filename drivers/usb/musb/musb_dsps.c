@@ -462,7 +462,7 @@ static int dsps_musb_exit(struct musb *musb)
 	return 0;
 }
 
-static int dsps_musb_set_mode(struct musb *musb, u8 mode)
+static int dsps_musb_set_mode(struct musb *musb, u8 mode, bool init)
 {
 	struct device *dev = musb->controller;
 	struct dsps_glue *glue = dev_get_drvdata(dev->parent);

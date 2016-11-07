@@ -356,7 +356,7 @@ static int bfin_musb_vbus_status(struct musb *musb)
 	return 0;
 }
 
-static int bfin_musb_set_mode(struct musb *musb, u8 musb_mode)
+static int bfin_musb_set_mode(struct musb *musb, u8 musb_mode, bool init)
 {
 	return -EIO;
 }

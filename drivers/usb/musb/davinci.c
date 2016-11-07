@@ -369,7 +369,7 @@ static irqreturn_t davinci_musb_interrupt(int irq, void *__hci)
 	return retval;
 }
 
-static int davinci_musb_set_mode(struct musb *musb, u8 mode)
+static int davinci_musb_set_mode(struct musb *musb, u8 mode, bool init)
 {
 	/* EVM can't do this (right?) */
 	return -EIO;

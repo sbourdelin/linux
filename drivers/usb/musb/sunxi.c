@@ -346,7 +346,7 @@ static void sunxi_musb_dma_controller_destroy(struct dma_controller *c)
 {
 }
 
-static int sunxi_musb_set_mode(struct musb *musb, u8 mode)
+static int sunxi_musb_set_mode(struct musb *musb, u8 mode, bool init)
 {
 	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
 	enum phy_mode new_mode;

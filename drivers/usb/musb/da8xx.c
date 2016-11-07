@@ -335,7 +335,7 @@ static irqreturn_t da8xx_musb_interrupt(int irq, void *hci)
 	return ret;
 }
 
-static int da8xx_musb_set_mode(struct musb *musb, u8 musb_mode)
+static int da8xx_musb_set_mode(struct musb *musb, u8 musb_mode, bool init)
 {
 	struct da8xx_glue *glue = dev_get_drvdata(musb->controller->parent);
 	enum phy_mode phy_mode;

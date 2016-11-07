@@ -332,7 +332,7 @@ eoi:
 	return ret;
 }
 
-static int am35x_musb_set_mode(struct musb *musb, u8 musb_mode)
+static int am35x_musb_set_mode(struct musb *musb, u8 musb_mode, bool init)
 {
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *plat = dev_get_platdata(dev);

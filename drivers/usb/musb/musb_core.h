@@ -203,7 +203,7 @@ struct musb_platform_ops {
 	struct dma_controller *
 		(*dma_init) (struct musb *musb, void __iomem *base);
 	void	(*dma_exit)(struct dma_controller *c);
-	int	(*set_mode)(struct musb *musb, u8 mode);
+	int	(*set_mode)(struct musb *musb, u8 mode, bool init);
 	void	(*try_idle)(struct musb *musb, unsigned long timeout);
 	int	(*recover)(struct musb *musb);
 
@@ -558,12 +558,12 @@ static inline void musb_platform_disable(struct musb *musb)
 		musb->ops->disable(musb);
 }
 
-static inline int musb_platform_set_mode(struct musb *musb, u8 mode)
+static inline int musb_platform_set_mode(struct musb *musb, u8 mode, bool init)
 {
 	if (!musb->ops->set_mode)
 		return 0;
 
-	return musb->ops->set_mode(musb, mode);
+	return musb->ops->set_mode(musb, mode, init);
 }
 
 static inline void musb_platform_try_idle(struct musb *musb,
