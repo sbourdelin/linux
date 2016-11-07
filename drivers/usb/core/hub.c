@@ -1744,7 +1744,6 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	struct usb_device *hdev;
 	struct usb_hub *hub;
 
-	desc = intf->cur_altsetting;
 	hdev = interface_to_usbdev(intf);
 
 	/*
@@ -1815,6 +1814,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	}
 #endif
 
+	desc = intf->cur_altsetting;
 	if (!hub_check_descriptor_sanity(desc)) {
 		dev_err(&intf->dev, "bad descriptor, ignoring hub\n");
 		return -EIO;
