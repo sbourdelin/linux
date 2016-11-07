@@ -15,6 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/export.h>
 #include <linux/pci.h>
+#include <linux/aer.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/acpi.h>
@@ -4460,3 +4461,39 @@ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2030, quirk_no_aersid);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2031, quirk_no_aersid);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2032, quirk_no_aersid);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2033, quirk_no_aersid);
+
+/*
+ * Fintek F81504/508/512 PCIe-to-UART/GPIO will generate mass AER
+ * correctable error interrupt message and stop the system boot on Intel
+ * Skylake platform, AER message like the following link:
+ * https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1521173
+ *
+ * Due to the error is correctable error, we'll try to mask the parent AER
+ * interrupt to skip it and preserve generate uncorrectable erro interrupt
+ * normally.
+ */
+static void quirk_aer_report(struct pci_dev *pdev)
+{
+	struct pci_dev *parent;
+	int pos;
+	u32 mask = PCI_ERR_COR_RCVR | PCI_ERR_COR_BAD_TLP |
+			PCI_ERR_COR_BAD_DLLP | PCI_ERR_COR_REP_TIMER;
+
+	parent = pci_upstream_bridge(pdev);
+	if (!parent)
+		return;
+
+	pos = pci_find_ext_capability(parent, PCI_EXT_CAP_ID_ERR);
+	if (!pos) {
+		dev_dbg(&pdev->dev, "%s: bridge not support AER\n", __func__);
+		return;
+	}
+
+	pci_write_config_dword(parent, pos + PCI_ERR_COR_MASK, mask);
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_FINTEK, PCI_DEVICE_ID_F81504,
+			quirk_aer_report);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_FINTEK, PCI_DEVICE_ID_F81508,
+			quirk_aer_report);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_FINTEK, PCI_DEVICE_ID_F81512,
+			quirk_aer_report);
