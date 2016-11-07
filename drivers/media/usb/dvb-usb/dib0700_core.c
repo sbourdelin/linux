@@ -700,7 +700,7 @@ static void dib0700_rc_urb_completion(struct urb *purb)
 {
 	struct dvb_usb_device *d = purb->context;
 	struct dib0700_rc_response *poll_reply;
-	enum rc_type protocol;
+	enum rc_type protocol = RC_TYPE_UNKNOWN;
 	u32 uninitialized_var(keycode);
 	u8 toggle;
 
