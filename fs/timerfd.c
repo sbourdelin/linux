@@ -226,7 +226,7 @@ static unsigned int timerfd_poll(struct file *file, poll_table *wait)
 
 	spin_lock_irqsave(&ctx->wqh.lock, flags);
 	if (ctx->ticks)
-		events |= POLLIN;
+		events |= POLLIN | POLLRDNORM;
 	spin_unlock_irqrestore(&ctx->wqh.lock, flags);
 
 	return events;
