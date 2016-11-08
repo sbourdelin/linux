@@ -11,6 +11,7 @@ voltages and other various functionality to Qualcomm SoCs.
 	Definition: must be one of:
 		    "qcom,pm8058"
 		    "qcom,pm8921"
+		    "qcom,pm8821"
 
 - #address-cells:
 	Usage: required
