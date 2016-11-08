@@ -729,7 +729,7 @@ static void media_device_release(struct media_devnode *devnode)
 	kfree(mdev);
 }
 
-struct media_device *media_device_alloc(struct device *dev)
+struct media_device *media_device_alloc(struct device *dev, void *priv)
 {
 	struct media_device *mdev;
 
@@ -745,6 +745,7 @@ struct media_device *media_device_alloc(struct device *dev)
 
 	mdev->dev = dev;
 	media_device_init(mdev);
+	mdev->priv = priv;
 
 	mdev->devnode.release = media_device_release;
 
