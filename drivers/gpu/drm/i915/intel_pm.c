@@ -2863,28 +2863,6 @@ bool ilk_disable_lp_wm(struct drm_device *dev)
 #define SKL_SAGV_BLOCK_TIME	30 /* µs */
 
 /*
- * Return the index of a plane in the SKL DDB and wm result arrays.  Primary
- * plane is always in slot 0, cursor is always in slot I915_MAX_PLANES-1, and
- * other universal planes are in indices 1..n.  Note that this may leave unused
- * indices between the top "sprite" plane and the cursor.
- */
-static int
-skl_wm_plane_id(const struct intel_plane *plane)
-{
-	switch (plane->base.type) {
-	case DRM_PLANE_TYPE_PRIMARY:
-		return 0;
-	case DRM_PLANE_TYPE_CURSOR:
-		return PLANE_CURSOR;
-	case DRM_PLANE_TYPE_OVERLAY:
-		return plane->plane + 1;
-	default:
-		MISSING_CASE(plane->base.type);
-		return plane->plane;
-	}
-}
-
-/*
  * FIXME: We still don't have the proper code detect if we need to apply the WA,
  * so assume we'll always need it in order to avoid underruns.
  */
@@ -3022,7 +3000,6 @@ bool intel_can_enable_sagv(struct drm_atomic_state *state)
 	struct intel_crtc *crtc;
 	struct intel_plane *plane;
 	struct intel_crtc_state *cstate;
-	struct skl_plane_wm *wm;
 	enum pipe pipe;
 	int level, latency;
 
@@ -3049,7 +3026,8 @@ bool intel_can_enable_sagv(struct drm_atomic_state *state)
 		return false;
 
 	for_each_intel_plane_on_crtc(dev, crtc, plane) {
-		wm = &cstate->wm.skl.optimal.planes[skl_wm_plane_id(plane)];
+		struct skl_plane_wm *wm =
+			&cstate->wm.skl.optimal.planes[plane->id];
 
 		/* Skip this plane if it's not enabled */
 		if (!wm->wm[0].plane_en)
@@ -3148,28 +3126,28 @@ static void skl_ddb_entry_init_from_hw(struct skl_ddb_entry *entry, u32 reg)
 void skl_ddb_get_hw_state(struct drm_i915_private *dev_priv,
 			  struct skl_ddb_allocation *ddb /* out */)
 {
-	enum pipe pipe;
-	int plane;
+	struct intel_crtc *crtc;
 	u32 val;
 
 	memset(ddb, 0, sizeof(*ddb));
 
-	for_each_pipe(dev_priv, pipe) {
+	for_each_intel_crtc(&dev_priv->drm, crtc) {
 		enum intel_display_power_domain power_domain;
+		enum plane_id plane_id;
+		enum pipe pipe = crtc->pipe;
 
 		power_domain = POWER_DOMAIN_PIPE(pipe);
 		if (!intel_display_power_get_if_enabled(dev_priv, power_domain))
 			continue;
 
-		for_each_universal_plane(dev_priv, pipe, plane) {
-			val = I915_READ(PLANE_BUF_CFG(pipe, plane));
-			skl_ddb_entry_init_from_hw(&ddb->plane[pipe][plane],
-						   val);
-		}
+		for_each_plane_id_on_crtc(crtc, plane_id) {
+			if (plane_id != PLANE_CURSOR)
+				val = I915_READ(PLANE_BUF_CFG(pipe, plane_id));
+			else
+				val = I915_READ(CUR_BUF_CFG(pipe));
 
-		val = I915_READ(CUR_BUF_CFG(pipe));
-		skl_ddb_entry_init_from_hw(&ddb->plane[pipe][PLANE_CURSOR],
-					   val);
+			skl_ddb_entry_init_from_hw(&ddb->plane[pipe][plane_id], val);
+		}
 
 		intel_display_power_put(dev_priv, power_domain);
 	}
@@ -3270,30 +3248,30 @@ skl_get_total_relative_data_rate(struct intel_crtc_state *intel_cstate,
 	struct drm_crtc_state *cstate = &intel_cstate->base;
 	struct drm_atomic_state *state = cstate->state;
 	struct drm_plane *plane;
-	const struct intel_plane *intel_plane;
 	const struct drm_plane_state *pstate;
-	unsigned int rate, total_data_rate = 0;
-	int id;
+	unsigned int total_data_rate = 0;
 
 	if (WARN_ON(!state))
 		return 0;
 
 	/* Calculate and cache data rate for each plane */
 	drm_atomic_crtc_state_for_each_plane_state(plane, pstate, cstate) {
-		id = skl_wm_plane_id(to_intel_plane(plane));
-		intel_plane = to_intel_plane(plane);
+		enum plane_id plane_id = to_intel_plane(plane)->id;
+		unsigned int rate;
+
+		/* FIXME cursor shouldn't be here no? */
 
 		/* packed/uv */
 		rate = skl_plane_relative_data_rate(intel_cstate,
 						    pstate, 0);
-		plane_data_rate[id] = rate;
+		plane_data_rate[plane_id] = rate;
 
 		total_data_rate += rate;
 
 		/* y-plane */
 		rate = skl_plane_relative_data_rate(intel_cstate,
 						    pstate, 1);
-		plane_y_data_rate[id] = rate;
+		plane_y_data_rate[plane_id] = rate;
 
 		total_data_rate += rate;
 	}
@@ -3372,17 +3350,16 @@ skl_ddb_calc_min(const struct intel_crtc_state *cstate, int num_active,
 	struct drm_plane *plane;
 
 	drm_atomic_crtc_state_for_each_plane_state(plane, pstate, &cstate->base) {
-		struct intel_plane *intel_plane = to_intel_plane(plane);
-		int id = skl_wm_plane_id(intel_plane);
+		enum plane_id plane_id = to_intel_plane(plane)->id;
 
-		if (id == PLANE_CURSOR)
+		if (plane_id == PLANE_CURSOR)
 			continue;
 
 		if (!pstate->visible)
 			continue;
 
-		minimum[id] = skl_ddb_min_alloc(pstate, 0);
-		y_minimum[id] = skl_ddb_min_alloc(pstate, 1);
+		minimum[plane_id] = skl_ddb_min_alloc(pstate, 0);
+		y_minimum[plane_id] = skl_ddb_min_alloc(pstate, 1);
 	}
 
 	minimum[PLANE_CURSOR] = skl_cursor_allocation(num_active);
@@ -3402,8 +3379,8 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 	uint16_t minimum[I915_MAX_PLANES] = {};
 	uint16_t y_minimum[I915_MAX_PLANES] = {};
 	unsigned int total_data_rate;
+	enum plane_id plane_id;
 	int num_active;
-	int id, i;
 	unsigned plane_data_rate[I915_MAX_PLANES] = {};
 	unsigned plane_y_data_rate[I915_MAX_PLANES] = {};
 
@@ -3434,9 +3411,9 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 	 * proportional to the data rate.
 	 */
 
-	for (i = 0; i < I915_MAX_PLANES; i++) {
-		alloc_size -= minimum[i];
-		alloc_size -= y_minimum[i];
+	for_each_plane_id_on_crtc(intel_crtc, plane_id) {
+		alloc_size -= minimum[plane_id];
+		alloc_size -= y_minimum[plane_id];
 	}
 
 	ddb->plane[pipe][PLANE_CURSOR].start = alloc->end - minimum[PLANE_CURSOR];
@@ -3455,28 +3432,28 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 		return 0;
 
 	start = alloc->start;
-	for (id = 0; id < I915_MAX_PLANES; id++) {
+	for_each_plane_id_on_crtc(intel_crtc, plane_id) {
 		unsigned int data_rate, y_data_rate;
 		uint16_t plane_blocks, y_plane_blocks = 0;
 
-		if (id == PLANE_CURSOR)
+		if (plane_id == PLANE_CURSOR)
 			continue;
 
-		data_rate = plane_data_rate[id];
+		data_rate = plane_data_rate[plane_id];
 
 		/*
 		 * allocation for (packed formats) or (uv-plane part of planar format):
 		 * promote the expression to 64 bits to avoid overflowing, the
 		 * result is < available as data_rate / total_data_rate < 1
 		 */
-		plane_blocks = minimum[id];
+		plane_blocks = minimum[plane_id];
 		plane_blocks += div_u64((uint64_t)alloc_size * data_rate,
 					total_data_rate);
 
 		/* Leave disabled planes at (0,0) */
 		if (data_rate) {
-			ddb->plane[pipe][id].start = start;
-			ddb->plane[pipe][id].end = start + plane_blocks;
+			ddb->plane[pipe][plane_id].start = start;
+			ddb->plane[pipe][plane_id].end = start + plane_blocks;
 		}
 
 		start += plane_blocks;
@@ -3484,15 +3461,15 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 		/*
 		 * allocation for y_plane part of planar format:
 		 */
-		y_data_rate = plane_y_data_rate[id];
+		y_data_rate = plane_y_data_rate[plane_id];
 
-		y_plane_blocks = y_minimum[id];
+		y_plane_blocks = y_minimum[plane_id];
 		y_plane_blocks += div_u64((uint64_t)alloc_size * y_data_rate,
 					total_data_rate);
 
 		if (y_data_rate) {
-			ddb->y_plane[pipe][id].start = start;
-			ddb->y_plane[pipe][id].end = start + y_plane_blocks;
+			ddb->y_plane[pipe][plane_id].start = start;
+			ddb->y_plane[pipe][plane_id].end = start + y_plane_blocks;
 		}
 
 		start += y_plane_blocks;
@@ -3684,11 +3661,8 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 			return 0;
 		} else {
 			DRM_DEBUG_KMS("Requested display configuration exceeds system watermark limitations\n");
-			DRM_DEBUG_KMS("Plane %d.%d: blocks required = %u/%u, lines required = %u/31\n",
-				      to_intel_crtc(cstate->base.crtc)->pipe,
-				      skl_wm_plane_id(to_intel_plane(pstate->plane)),
-				      res_blocks, ddb_allocation, res_lines);
-
+			DRM_DEBUG_KMS("%s: blocks required = %u/%u, lines required = %u/31\n",
+				      pstate->plane->name, res_blocks, ddb_allocation, res_lines);
 			return -EINVAL;
 		}
 	}
@@ -3715,7 +3689,6 @@ skl_compute_wm_level(const struct drm_i915_private *dev_priv,
 	uint16_t ddb_blocks;
 	enum pipe pipe = intel_crtc->pipe;
 	int ret;
-	int i = skl_wm_plane_id(intel_plane);
 
 	if (state)
 		intel_pstate =
@@ -3738,7 +3711,7 @@ skl_compute_wm_level(const struct drm_i915_private *dev_priv,
 
 	WARN_ON(!intel_pstate->base.fb);
 
-	ddb_blocks = skl_ddb_entry_size(&ddb->plane[pipe][i]);
+	ddb_blocks = skl_ddb_entry_size(&ddb->plane[pipe][intel_plane->id]);
 
 	ret = skl_compute_plane_wm(dev_priv,
 				   cstate,
@@ -3801,7 +3774,7 @@ static int skl_build_pipe_wm(struct intel_crtc_state *cstate,
 	for_each_intel_plane_mask(&dev_priv->drm,
 				  intel_plane,
 				  cstate->base.plane_mask) {
-		wm = &pipe_wm->planes[skl_wm_plane_id(intel_plane)];
+		wm = &pipe_wm->planes[intel_plane->id];
 
 		for (level = 0; level <= max_level; level++) {
 			ret = skl_compute_wm_level(dev_priv, ddb, cstate,
@@ -3977,17 +3950,16 @@ skl_ddb_add_affected_planes(struct intel_crtc_state *cstate)
 	struct drm_plane_state *plane_state;
 	struct drm_plane *plane;
 	enum pipe pipe = intel_crtc->pipe;
-	int id;
 
 	WARN_ON(!drm_atomic_get_existing_crtc_state(state, crtc));
 
 	drm_for_each_plane_mask(plane, dev, cstate->base.plane_mask) {
-		id = skl_wm_plane_id(to_intel_plane(plane));
+		enum plane_id plane_id = to_intel_plane(plane)->id;
 
-		if (skl_ddb_entry_equal(&cur_ddb->plane[pipe][id],
-					&new_ddb->plane[pipe][id]) &&
-		    skl_ddb_entry_equal(&cur_ddb->y_plane[pipe][id],
-					&new_ddb->y_plane[pipe][id]))
+		if (skl_ddb_entry_equal(&cur_ddb->plane[pipe][plane_id],
+					&new_ddb->plane[pipe][plane_id]) &&
+		    skl_ddb_entry_equal(&cur_ddb->y_plane[pipe][plane_id],
+					&new_ddb->y_plane[pipe][plane_id]))
 			continue;
 
 		plane_state = drm_atomic_get_plane_state(state, plane);
@@ -4099,7 +4071,6 @@ skl_print_wm_changes(const struct drm_atomic_state *state)
 	const struct intel_plane *intel_plane;
 	const struct skl_ddb_allocation *old_ddb = &dev_priv->wm.skl_hw.ddb;
 	const struct skl_ddb_allocation *new_ddb = &intel_state->wm_results.ddb;
-	int id;
 	int i;
 
 	for_each_crtc_in_state(state, crtc, cstate, i) {
@@ -4107,11 +4078,11 @@ skl_print_wm_changes(const struct drm_atomic_state *state)
 		enum pipe pipe = intel_crtc->pipe;
 
 		for_each_intel_plane_on_crtc(dev, intel_crtc, intel_plane) {
+			enum plane_id plane_id = intel_plane->id;
 			const struct skl_ddb_entry *old, *new;
 
-			id = skl_wm_plane_id(intel_plane);
-			old = &old_ddb->plane[pipe][id];
-			new = &new_ddb->plane[pipe][id];
+			old = &old_ddb->plane[pipe][plane_id];
+			new = &new_ddb->plane[pipe][plane_id];
 
 			if (skl_ddb_entry_equal(old, new))
 				continue;
@@ -4215,14 +4186,16 @@ static void skl_update_wm(struct intel_crtc *intel_crtc)
 	 * their watermarks updated once we update their planes.
 	 */
 	if (intel_crtc->base.state->active_changed) {
-		int plane;
+		enum plane_id plane_id;
 
-		for_each_universal_plane(dev_priv, pipe, plane)
-			skl_write_plane_wm(intel_crtc, &pipe_wm->planes[plane],
-					   &results->ddb, plane);
-
-		skl_write_cursor_wm(intel_crtc, &pipe_wm->planes[PLANE_CURSOR],
-				    &results->ddb);
+		for_each_plane_id_on_crtc(intel_crtc, plane_id) {
+			if (plane_id != PLANE_CURSOR)
+				skl_write_plane_wm(intel_crtc, &pipe_wm->planes[plane_id],
+						   &results->ddb, plane_id);
+			else
+				skl_write_cursor_wm(intel_crtc, &pipe_wm->planes[plane_id],
+						    &results->ddb);
+		}
 	}
 
 	skl_copy_wm_for_pipe(hw_vals, results, pipe);
@@ -4323,7 +4296,6 @@ void skl_pipe_wm_get_hw_state(struct drm_crtc *crtc,
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	struct intel_plane *intel_plane;
-	struct skl_plane_wm *wm;
 	enum pipe pipe = intel_crtc->pipe;
 	int level, id, max_level;
 	uint32_t val;
@@ -4331,20 +4303,20 @@ void skl_pipe_wm_get_hw_state(struct drm_crtc *crtc,
 	max_level = ilk_wm_max_level(dev_priv);
 
 	for_each_intel_plane_on_crtc(dev, intel_crtc, intel_plane) {
-		id = skl_wm_plane_id(intel_plane);
-		wm = &out->planes[id];
+		enum plane_id plane_id = intel_plane->id;
+		struct skl_plane_wm *wm = &out->planes[plane_id];
 
 		for (level = 0; level <= max_level; level++) {
 			if (id != PLANE_CURSOR)
-				val = I915_READ(PLANE_WM(pipe, id, level));
+				val = I915_READ(PLANE_WM(pipe, plane_id, level));
 			else
 				val = I915_READ(CUR_WM(pipe, level));
 
 			skl_wm_level_from_reg_val(val, &wm->wm[level]);
 		}
 
-		if (id != PLANE_CURSOR)
-			val = I915_READ(PLANE_WM_TRANS(pipe, id));
+		if (plane_id != PLANE_CURSOR)
+			val = I915_READ(PLANE_WM_TRANS(pipe, plane_id));
 		else
 			val = I915_READ(CUR_WM_TRANS(pipe));
 
