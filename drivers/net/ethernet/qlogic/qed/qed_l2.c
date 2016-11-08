@@ -2197,6 +2197,5 @@ EXPORT_SYMBOL(qed_get_eth_ops);
 
 void qed_put_eth_ops(void)
 {
-	/* TODO - reference count for module? */
 }
 EXPORT_SYMBOL(qed_put_eth_ops);

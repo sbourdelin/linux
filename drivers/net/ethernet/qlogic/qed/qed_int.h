@@ -218,7 +218,6 @@ struct qed_igu_info {
 	u16			free_blks;
 };
 
-/* TODO Names of function may change... */
 void qed_int_igu_init_pure_rt(struct qed_hwfn *p_hwfn,
 			      struct qed_ptt *p_ptt,
 			      bool b_set,
