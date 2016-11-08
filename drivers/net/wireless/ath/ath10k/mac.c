@@ -7447,6 +7447,63 @@ ath10k_mac_op_switch_vif_chanctx(struct ieee80211_hw *hw,
 	return 0;
 }
 
+static inline void ath10k_mac_update_btcoex_flag(struct ath10k *ar, bool val)
+{
+	if (val)
+		set_bit(ATH10K_FLAG_BTCOEX, &ar->dev_flags);
+	else
+		clear_bit(ATH10K_FLAG_BTCOEX, &ar->dev_flags);
+}
+
+int ath10k_mac_set_btcoex(struct ath10k *ar, bool val)
+{
+	u32 pdev_param;
+	int ret;
+
+	lockdep_assert_held(&ar->conf_mutex);
+
+	if (ar->state != ATH10K_STATE_ON &&
+	    ar->state != ATH10K_STATE_RESTARTED)
+		return -ENETDOWN;
+
+	if (!(test_bit(ATH10K_FLAG_BTCOEX, &ar->dev_flags) ^ val))
+		return 0;
+
+	pdev_param = ar->wmi.pdev_param->enable_btcoex;
+	if (test_bit(ATH10K_FW_FEATURE_BTCOEX_PARAM,
+		     ar->running_fw->fw_file.fw_features)) {
+		ret = ath10k_wmi_pdev_set_param(ar, pdev_param, val);
+
+		if (ret) {
+			ath10k_warn(ar,
+				    "failed to modify btcoex state: %d\n", ret);
+			return ret;
+		}
+		ath10k_mac_update_btcoex_flag(ar, val);
+	} else {
+		ath10k_info(ar, "restarting firmware due to btcoex change");
+		ath10k_mac_update_btcoex_flag(ar, val);
+		queue_work(ar->workqueue, &ar->restart_work);
+	}
+
+	return 0;
+}
+
+static int ath10k_mac_op_set_btcoex(struct ieee80211_hw *hw, bool enabled)
+{
+	int ret;
+	struct ath10k *ar = hw->priv;
+
+	if (!test_bit(WMI_SERVICE_COEX_GPIO, ar->wmi.svc_map))
+		return -EOPNOTSUPP;
+
+	mutex_lock(&ar->conf_mutex);
+	ret = ath10k_mac_set_btcoex(ar, enabled);
+	mutex_unlock(&ar->conf_mutex);
+
+	return ret;
+}
+
 static const struct ieee80211_ops ath10k_ops = {
 	.tx				= ath10k_mac_op_tx,
 	.wake_tx_queue			= ath10k_mac_op_wake_tx_queue,
@@ -7488,6 +7545,7 @@ static const struct ieee80211_ops ath10k_ops = {
 	.assign_vif_chanctx		= ath10k_mac_op_assign_vif_chanctx,
 	.unassign_vif_chanctx		= ath10k_mac_op_unassign_vif_chanctx,
 	.switch_vif_chanctx		= ath10k_mac_op_switch_vif_chanctx,
+	.set_btcoex                     = ath10k_mac_op_set_btcoex,
 
 	CFG80211_TESTMODE_CMD(ath10k_tm_cmd)
 
