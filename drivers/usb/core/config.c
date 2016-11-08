@@ -497,8 +497,10 @@ static int usb_parse_interface(struct device *ddev, int cfgno,
 			break;
 		retval = usb_parse_endpoint(ddev, cfgno, inum, asnum, alt,
 		    num_ep, buffer, size);
-		if (retval < 0)
+		if (retval < 0) {
+			kfree(alt->endpoint);
 			return retval;
+		}
 		++n;
 
 		buffer += retval;
