@@ -1143,7 +1143,7 @@ static int cow_file_range_async(struct inode *inode, struct page *locked_page,
 	struct btrfs_root *root = BTRFS_I(inode)->root;
 	unsigned long nr_pages;
 	u64 cur_end;
-	int limit = 10 * SZ_1M;
+	int limit = SZ_1M;
 
 	clear_extent_bit(&BTRFS_I(inode)->io_tree, start, end, EXTENT_LOCKED,
 			 1, 0, NULL, GFP_NOFS);
