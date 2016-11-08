@@ -27,6 +27,8 @@
 #include <scsi/scsi.h>
 
 #include "qedi.h"
+#include "qedi_gbl.h"
+#include "qedi_iscsi.h"
 
 static uint fw_debug;
 module_param(fw_debug, uint, S_IRUGO | S_IWUSR);
@@ -1416,6 +1418,141 @@ mem_alloc_failure:
 	return status;
 }
 
+int qedi_alloc_sq(struct qedi_ctx *qedi, struct qedi_endpoint *ep)
+{
+	int rval = 0;
+	u32 *pbl;
+	dma_addr_t page;
+	int num_pages;
+
+	if (!ep)
+		return -EIO;
+
+	/* Calculate appropriate queue and PBL sizes */
+	ep->sq_mem_size = QEDI_SQ_SIZE * sizeof(struct iscsi_wqe);
+	ep->sq_mem_size += QEDI_PAGE_SIZE - 1;
+
+	ep->sq_pbl_size = (ep->sq_mem_size / QEDI_PAGE_SIZE) * sizeof(void *);
+	ep->sq_pbl_size = ep->sq_pbl_size + QEDI_PAGE_SIZE;
+
+	ep->sq = dma_alloc_coherent(&qedi->pdev->dev, ep->sq_mem_size,
+				    &ep->sq_dma, GFP_KERNEL);
+	if (!ep->sq) {
+		QEDI_WARN(&qedi->dbg_ctx,
+			  "Could not allocate send queue.\n");
+		rval = -ENOMEM;
+		goto out;
+	}
+	memset(ep->sq, 0, ep->sq_mem_size);
+
+	ep->sq_pbl = dma_alloc_coherent(&qedi->pdev->dev, ep->sq_pbl_size,
+					&ep->sq_pbl_dma, GFP_KERNEL);
+	if (!ep->sq_pbl) {
+		QEDI_WARN(&qedi->dbg_ctx,
+			  "Could not allocate send queue PBL.\n");
+		rval = -ENOMEM;
+		goto out_free_sq;
+	}
+	memset(ep->sq_pbl, 0, ep->sq_pbl_size);
+
+	/* Create PBL */
+	num_pages = ep->sq_mem_size / QEDI_PAGE_SIZE;
+	page = ep->sq_dma;
+	pbl = (u32 *)ep->sq_pbl;
+
+	while (num_pages--) {
+		*pbl = (u32)page;
+		pbl++;
+		*pbl = (u32)((u64)page >> 32);
+		pbl++;
+		page += QEDI_PAGE_SIZE;
+	}
+
+	return rval;
+
+out_free_sq:
+	dma_free_coherent(&qedi->pdev->dev, ep->sq_mem_size, ep->sq,
+			  ep->sq_dma);
+out:
+	return rval;
+}
+
+void qedi_free_sq(struct qedi_ctx *qedi, struct qedi_endpoint *ep)
+{
+	if (ep->sq_pbl)
+		dma_free_coherent(&qedi->pdev->dev, ep->sq_pbl_size, ep->sq_pbl,
+				  ep->sq_pbl_dma);
+	if (ep->sq)
+		dma_free_coherent(&qedi->pdev->dev, ep->sq_mem_size, ep->sq,
+				  ep->sq_dma);
+}
+
+int qedi_get_task_idx(struct qedi_ctx *qedi)
+{
+	s16 tmp_idx;
+
+again:
+	tmp_idx = find_first_zero_bit(qedi->task_idx_map,
+				      MAX_ISCSI_TASK_ENTRIES);
+
+	if (tmp_idx >= MAX_ISCSI_TASK_ENTRIES) {
+		QEDI_ERR(&qedi->dbg_ctx, "FW task context pool is full.\n");
+		tmp_idx = -1;
+		goto err_idx;
+	}
+
+	if (test_and_set_bit(tmp_idx, qedi->task_idx_map))
+		goto again;
+
+err_idx:
+	return tmp_idx;
+}
+
+void qedi_clear_task_idx(struct qedi_ctx *qedi, int idx)
+{
+	if (!test_and_clear_bit(idx, qedi->task_idx_map)) {
+		QEDI_ERR(&qedi->dbg_ctx,
+			 "FW task context, already cleared, tid=0x%x\n", idx);
+		WARN_ON(1);
+	}
+}
+
+void qedi_update_itt_map(struct qedi_ctx *qedi, u32 tid, u32 proto_itt,
+			 struct qedi_cmd *cmd)
+{
+	qedi->itt_map[tid].itt = proto_itt;
+	qedi->itt_map[tid].p_cmd = cmd;
+
+	QEDI_INFO(&qedi->dbg_ctx, QEDI_LOG_CONN,
+		  "update itt map tid=0x%x, with proto itt=0x%x\n", tid,
+		  qedi->itt_map[tid].itt);
+}
+
+void qedi_get_task_tid(struct qedi_ctx *qedi, u32 itt, s16 *tid)
+{
+	u16 i;
+
+	for (i = 0; i < MAX_ISCSI_TASK_ENTRIES; i++) {
+		if (qedi->itt_map[i].itt == itt) {
+			*tid = i;
+			QEDI_INFO(&qedi->dbg_ctx, QEDI_LOG_CONN,
+				  "Ref itt=0x%x, found at tid=0x%x\n",
+				  itt, *tid);
+			return;
+		}
+	}
+
+	WARN_ON(1);
+}
+
+void qedi_get_proto_itt(struct qedi_ctx *qedi, u32 tid, u32 *proto_itt)
+{
+	*proto_itt = qedi->itt_map[tid].itt;
+	QEDI_INFO(&qedi->dbg_ctx, QEDI_LOG_CONN,
+		  "Get itt map tid [0x%x with proto itt[0x%x]",
+		  tid, *proto_itt);
+}
+
 struct qedi_cmd *qedi_get_cmd_from_tid(struct qedi_ctx *qedi, u32 tid)
 {
 	struct qedi_cmd *cmd = NULL;
@@ -1553,6 +1690,26 @@ static int qedi_cpu_callback(struct notifier_block *nfb,
 static struct notifier_block qedi_cpu_notifier = {
 	.notifier_call = qedi_cpu_callback,
 };
+
+void qedi_reset_host_mtu(struct qedi_ctx *qedi, u16 mtu)
+{
+	struct qed_ll2_params params;
+
+	qedi_recover_all_conns(qedi);
+
+	qedi_ops->ll2->stop(qedi->cdev);
+	qedi_ll2_free_skbs(qedi);
+
+	QEDI_INFO(&qedi->dbg_ctx, QEDI_LOG_INFO, "old MTU %u, new MTU %u\n",
+		  qedi->ll2_mtu, mtu);
+	memset(&params, 0, sizeof(params));
+	qedi->ll2_mtu = mtu;
+	params.mtu = qedi->ll2_mtu + IPV6_HDR_LEN + TCP_HDR_LEN;
+	params.drop_ttl0_packets = 0;
+	params.rx_vlan_stripping = 1;
+	ether_addr_copy(params.ll2_mac_address, qedi->dev_info.common.hw_mac);
+	qedi_ops->ll2->start(qedi->cdev, &params);
+}
 
 static void __qedi_remove(struct pci_dev *pdev, int mode)
 {
@@ -1918,6 +2075,13 @@ static int __init qedi_init(void)
 	qedi_dbg_init("qedi");
 #endif
 
+	qedi_scsi_transport = iscsi_register_transport(&qedi_iscsi_transport);
+	if (!qedi_scsi_transport) {
+		QEDI_ERR(NULL, "Could not register qedi transport");
+		rc = -ENOMEM;
+		goto exit_qedi_init_1;
+	}
+
 	register_hotcpu_notifier(&qedi_cpu_notifier);
 
 	ret = pci_register_driver(&qedi_pci_driver);
@@ -1940,6 +2104,7 @@ static int __init qedi_init(void)
 	return rc;
 
 exit_qedi_init_2:
+	iscsi_unregister_transport(&qedi_iscsi_transport);
 exit_qedi_init_1:
 #ifdef CONFIG_DEBUG_FS
 	qedi_dbg_exit();
@@ -1958,6 +2123,7 @@ static void __exit qedi_cleanup(void)
 
 	pci_unregister_driver(&qedi_pci_driver);
 	unregister_hotcpu_notifier(&qedi_cpu_notifier);
+	iscsi_unregister_transport(&qedi_iscsi_transport);
 
 #ifdef CONFIG_DEBUG_FS
 	qedi_dbg_exit();
