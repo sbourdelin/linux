@@ -203,6 +203,10 @@ static inline __must_check int media_entity_enum_init(
  * So drivers need to first initialize the media device, register any entity
  * within the media device, create pad to pad links and then finally register
  * the media device by calling media_device_register() as a final step.
+ *
+ * Note that using this function in drivers is DEPRECATED. New drivers
+ * must use media_device_alloc() and manage references using
+ * media_device_get() and media_device_put() instead.
  */
 void media_device_init(struct media_device *mdev);
 
@@ -251,6 +255,10 @@ struct media_device *media_device_alloc(struct device *dev);
  *
  * This function that will destroy the graph_mutex that is
  * initialized in media_device_init().
+ *
+ * Note that using this function in drivers is DEPRECATED. New drivers
+ * must use media_device_alloc() and manage references using
+ * media_device_get() and media_device_put() instead.
  */
 void media_device_cleanup(struct media_device *mdev);
 
