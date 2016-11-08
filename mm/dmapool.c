@@ -67,8 +67,8 @@ static DEFINE_MUTEX(pools_reg_lock);
 static ssize_t
 show_pools(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	unsigned temp;
-	unsigned size;
+	unsigned int temp;
+	unsigned int size;
 	char *next;
 	struct dma_page *page;
 	struct dma_pool *pool;
@@ -82,8 +82,8 @@ show_pools(struct device *dev, struct device_attribute *attr, char *buf)
 
 	mutex_lock(&pools_lock);
 	list_for_each_entry(pool, &dev->dma_pools, pools) {
-		unsigned pages = 0;
-		unsigned blocks = 0;
+		unsigned int pages = 0;
+		unsigned int blocks = 0;
 
 		spin_lock_irq(&pool->lock);
 		list_for_each_entry(page, &pool->page_list, page_list) {
@@ -105,7 +105,7 @@ show_pools(struct device *dev, struct device_attribute *attr, char *buf)
 	return PAGE_SIZE - size;
 }
 
-static DEVICE_ATTR(pools, S_IRUGO, show_pools, NULL);
+static DEVICE_ATTR(pools, 0444, show_pools, NULL);
 
 /**
  * dma_pool_create - Creates a pool of consistent memory blocks, for dma.
@@ -210,6 +210,7 @@ static void pool_initialise_page(struct dma_pool *pool, struct dma_page *page)
 
 	do {
 		unsigned int next = offset + pool->size;
+
 		if (unlikely((next + pool->size) >= next_boundary)) {
 			next = next_boundary;
 			next_boundary += pool->boundary;
@@ -286,6 +287,7 @@ void dma_pool_destroy(struct dma_pool *pool)
 
 	while (!list_empty(&pool->page_list)) {
 		struct dma_page *page;
+
 		page = list_entry(pool->page_list.next,
 				  struct dma_page, page_list);
 		if (is_page_busy(page)) {
@@ -443,6 +445,7 @@ void dma_pool_free(struct dma_pool *pool, void *vaddr, dma_addr_t dma)
 	}
 	{
 		unsigned int chain = page->offset;
+
 		while (chain < pool->allocation) {
 			if (chain != offset) {
 				chain = *(int *)(page->vaddr + chain);
