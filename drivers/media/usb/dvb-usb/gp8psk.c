@@ -268,6 +268,32 @@ static int gp8psk_usb_probe(struct usb_interface *intf,
 	return ret;
 }
 
+static void gp8psk_usb_disconnect(struct usb_interface *intf)
+{
+	struct dvb_usb_device *d = usb_get_intfdata(intf);
+	struct dvb_usb_adapter *adap;
+	int i, n;
+
+	/*
+	 * As gsp8psk-fe can call back this driver, in order to do URB
+	 * transfers, we need to manually exit the frontend earlier.
+	 */
+	for (n = 0; n < d->num_adapters_initialized; n++) {
+		adap = &d->adapter[n];
+		i = adap->num_frontends_initialized - 1;
+
+		for (; i >= 0; i--) {
+			if (adap->fe_adap[i].fe != NULL) {
+				dvb_unregister_frontend(adap->fe_adap[i].fe);
+				dvb_frontend_detach(adap->fe_adap[i].fe);
+			}
+		}
+		adap->num_frontends_initialized = 0;
+	}
+
+	dvb_usb_device_exit(intf);
+}
+
 static struct usb_device_id gp8psk_usb_table [] = {
 	    { USB_DEVICE(USB_VID_GENPIX, USB_PID_GENPIX_8PSK_REV_1_COLD) },
 	    { USB_DEVICE(USB_VID_GENPIX, USB_PID_GENPIX_8PSK_REV_1_WARM) },
@@ -336,7 +362,7 @@ static struct dvb_usb_device_properties gp8psk_properties = {
 static struct usb_driver gp8psk_usb_driver = {
 	.name		= "dvb_usb_gp8psk",
 	.probe		= gp8psk_usb_probe,
-	.disconnect = dvb_usb_device_exit,
+	.disconnect	= gp8psk_usb_disconnect,
 	.id_table	= gp8psk_usb_table,
 };
 
