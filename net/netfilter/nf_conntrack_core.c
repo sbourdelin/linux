@@ -1337,6 +1337,8 @@ repeat:
 		NF_CT_STAT_INC_ATOMIC(net, invalid);
 		if (ret == -NF_DROP)
 			NF_CT_STAT_INC_ATOMIC(net, drop);
+		if (ret == -NF_REPEAT && tmpl)
+			goto repeat;
 		ret = -ret;
 		goto out;
 	}
@@ -1349,10 +1351,7 @@ out:
 		 * closed/aborted connection. We have to go back and create a
 		 * fresh conntrack.
 		 */
-		if (ret == NF_REPEAT)
-			goto repeat;
-		else
-			nf_ct_put(tmpl);
+		nf_ct_put(tmpl);
 	}
 
 	return ret;
