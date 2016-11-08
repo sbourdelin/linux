@@ -175,7 +175,6 @@ struct ctlr_info {
 #	define DOORBELL_INT	1
 #	define SIMPLE_MODE_INT	2
 #	define MEMQ_MODE_INT	3
-	unsigned int intr[MAX_REPLY_QUEUES];
 	unsigned int msix_vector;
 	unsigned int msi_vector;
 	int intr_mode; /* either PERF_MODE_INT or SIMPLE_MODE_INT */
