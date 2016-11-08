@@ -228,7 +228,7 @@ static int vmw_sou_backing_alloc(struct vmw_private *dev_priv,
 		vmw_sou_backing_free(dev_priv, sou);
 
 	sou->buffer = kzalloc(sizeof(*sou->buffer), GFP_KERNEL);
-	if (unlikely(sou->buffer == NULL))
+	if (unlikely(!sou->buffer))
 		return -ENOMEM;
 
 	/* After we have alloced the backing store might not be able to
