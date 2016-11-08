@@ -23,9 +23,11 @@
 
 #ifdef CONFIG_32BIT
 #ifdef CONFIG_KVM_GUEST
+#ifndef CAC_BASE
 #define CAC_BASE		_AC(0x40000000, UL)
 #else
 #define CAC_BASE		_AC(0x80000000, UL)
+#endif
 #endif
 #ifndef IO_BASE
 #define IO_BASE			_AC(0xa0000000, UL)
