@@ -295,7 +295,7 @@ static int __init irqc_init(void)
 {
 	return platform_driver_register(&irqc_device_driver);
 }
-postcore_initcall(irqc_init);
+device_initcall(irqc_init);
 
 static void __exit irqc_exit(void)
 {
