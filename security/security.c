@@ -1470,6 +1470,12 @@ int security_ib_pkey_access(void *sec, u64 subnet_prefix, u16 pkey)
 }
 EXPORT_SYMBOL(security_ib_pkey_access);
 
+int security_ib_endport_manage_subnet(void *sec, const char *dev_name, u8 port_num)
+{
+	return call_int_hook(ib_endport_manage_subnet, 0, sec, dev_name, port_num);
+}
+EXPORT_SYMBOL(security_ib_endport_manage_subnet);
+
 int security_ib_alloc_security(void **sec)
 {
 	return call_int_hook(ib_alloc_security, 0, sec);
@@ -1943,6 +1949,8 @@ struct security_hook_heads security_hook_heads = {
 
 #ifdef CONFIG_SECURITY_INFINIBAND
 	.ib_pkey_access = LIST_HEAD_INIT(security_hook_heads.ib_pkey_access),
+	.ib_endport_manage_subnet =
+		LIST_HEAD_INIT(security_hook_heads.ib_endport_manage_subnet),
 	.ib_alloc_security =
 		LIST_HEAD_INIT(security_hook_heads.ib_alloc_security),
 	.ib_free_security =
