@@ -712,6 +712,17 @@ void media_device_init(struct media_device *mdev)
 }
 EXPORT_SYMBOL_GPL(media_device_init);
 
+static void media_device_release(struct media_devnode *devnode)
+{
+	struct media_device *mdev = to_media_device(devnode);
+
+	dev_dbg(devnode->parent, "Media device released\n");
+
+	media_device_cleanup(mdev);
+
+	kfree(mdev);
+}
+
 struct media_device *media_device_alloc(struct device *dev)
 {
 	struct media_device *mdev;
@@ -722,6 +733,8 @@ struct media_device *media_device_alloc(struct device *dev)
 
 	mdev->dev = dev;
 	media_device_init(mdev);
+
+	mdev->devnode.release = media_device_release;
 
 	return mdev;
 }

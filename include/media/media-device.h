@@ -212,8 +212,37 @@ void media_device_init(struct media_device *mdev);
  * @dev:	The associated struct device pointer
  *
  * Allocate and initialise a media device. Returns a media device.
+ * The media device is refcounted, and this function returns a media
+ * device the refcount of which is one (1).
+ *
+ * References are taken and given using media_device_get() and
+ * media_device_put().
  */
 struct media_device *media_device_alloc(struct device *dev);
+
+/**
+ * media_device_get() - Get a reference to a media device
+ *
+ * mdev: media device
+ */
+#define media_device_get(mdev)						\
+	do {								\
+		dev_dbg((mdev)->dev, "%s: get media device %s\n",	\
+			__func__, (mdev)->bus_info);			\
+		get_device(&(mdev)->devnode.dev);			\
+	} while (0)
+
+/**
+ * media_device_put() - Put a reference to a media device
+ *
+ * mdev: media device
+ */
+#define media_device_put(mdev)						\
+	do {								\
+		dev_dbg((mdev)->dev, "%s: put media device %s\n",	\
+			__func__, (mdev)->bus_info);			\
+		put_device(&(mdev)->devnode.dev);			\
+	} while (0)
 
 /**
  * media_device_cleanup() - Cleanups a media device element
@@ -464,6 +493,8 @@ static inline struct media_device *media_device_alloc(struct device *dev)
 {
 	return NULL;
 }
+#define media_device_get(mdev) do { } while (0)
+#define media_device_put(mdev) do { } while (0)
 static inline int media_device_register(struct media_device *mdev)
 {
 	return 0;
