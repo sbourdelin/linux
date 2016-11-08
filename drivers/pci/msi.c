@@ -1302,6 +1302,42 @@ const struct cpumask *pci_irq_get_affinity(struct pci_dev *dev, int nr)
 }
 EXPORT_SYMBOL(pci_irq_get_affinity);
 
+/**
+ * pci_irq_get_affinity_vector - return the vector number for a given CPU
+ * @dev:	PCI device to operate on
+ * @cpu:	cpu number
+ *
+ * Returns the vector number for CPU @cpu or a negative error number
+ * if interrupt affinity is not set.
+ */
+int pci_irq_get_affinity_vector(struct pci_dev *dev, int cpu)
+{
+	if (dev->msix_enabled) {
+		struct msi_desc *entry;
+
+		for_each_pci_msi_entry(entry, dev) {
+			if (cpumask_test_cpu(cpu, entry->affinity))
+				return entry->irq;
+		}
+		return -EINVAL;
+	} else if (dev->msi_enabled) {
+		struct msi_desc *entry = first_pci_msi_entry(dev);
+		int nr;
+
+		if (!entry)
+			return -ENOENT;
+
+		for (nr = 0; nr < entry->nvec_used; nr++) {
+			if (cpumask_test_cpu(cpu, &entry->affinity[nr]))
+				return dev->irq + nr;
+		}
+		return -EINVAL;
+	} else {
+		return dev->irq;
+	}
+}
+EXPORT_SYMBOL(pci_irq_get_affinity_vector);
+
 struct pci_dev *msi_desc_to_pci_dev(struct msi_desc *desc)
 {
 	return to_pci_dev(desc->dev);
