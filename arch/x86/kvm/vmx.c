@@ -4993,7 +4993,22 @@ static void ept_set_mmio_spte_mask(void)
 	 * Also, magic bits (0x3ull << 62) is set to quickly identify mmio
 	 * spte.
 	 */
-	kvm_mmu_set_mmio_spte_mask((0x3ull << 62) | 0x6ull);
+	kvm_mmu_set_mmio_spte_mask(VMX_EPT_MISCONFIG_WX_VALUE |
+				   VMX_EPT_TRACK_MMIO);
+}
+
+static void ept_set_acc_track_spte_mask(void)
+{
+	/*
+	 * For access track PTEs we use a non-present PTE to trigger an EPT
+	 * Violation. The original RWX value is saved in some unused bits in
+	 * the PTE and restored when the violation is fixed.
+	 */
+	kvm_mmu_set_access_track_masks(VMX_EPT_RWX_MASK |
+				       VMX_EPT_TRACK_TYPE_MASK,
+				       VMX_EPT_TRACK_ACCESS,
+				       VMX_EPT_RWX_MASK,
+				       VMX_EPT_RWX_SAVE_SHIFT);
 }
 
 #define VMX_XSS_EXIT_BITMAP 0
@@ -6525,6 +6540,9 @@ static __init int hardware_setup(void)
 				      0ull : VMX_EPT_READABLE_MASK);
 		ept_set_mmio_spte_mask();
 		kvm_enable_tdp();
+
+		if (!enable_ept_ad_bits)
+			ept_set_acc_track_spte_mask();
 	} else
 		kvm_disable_tdp();
 
