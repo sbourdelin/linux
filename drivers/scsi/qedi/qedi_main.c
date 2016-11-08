@@ -43,6 +43,10 @@ uint debug = QEDI_LOG_WARN | QEDI_LOG_SCSI_TM;
 module_param(debug, uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, " Default debug level");
 
+uint io_tracing;
+module_param(io_tracing, uint, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(io_tracing,
+		 " Enable logging of SCSI requests/completions into trace buffer. (default off).");
 const struct qed_iscsi_ops *qedi_ops;
 static struct scsi_transport_template *qedi_scsi_transport;
 static struct pci_driver qedi_pci_driver;

@@ -47,6 +47,13 @@ struct scsi_host_template qedi_host_template = {
 	.module = THIS_MODULE,
 	.name = "QLogic QEDI 25/40/100Gb iSCSI Initiator Driver",
 	.proc_name = QEDI_MODULE_NAME,
+	.queuecommand = iscsi_queuecommand,
+	.eh_abort_handler = iscsi_eh_abort,
+	.eh_device_reset_handler = iscsi_eh_device_reset,
+	.eh_target_reset_handler = iscsi_eh_recover_target,
+	.eh_host_reset_handler = qedi_eh_host_reset,
+	.target_alloc = iscsi_target_alloc,
+	.change_queue_depth = scsi_change_queue_depth,
 	.can_queue = QEDI_MAX_ISCSI_TASK,
 	.this_id = -1,
 	.sg_tablesize = QEDI_ISCSI_MAX_BDS_PER_CMD,
@@ -748,6 +755,9 @@ static int qedi_iscsi_send_generic_request(struct iscsi_task *task)
 	case ISCSI_OP_LOGOUT:
 		rc = qedi_send_iscsi_logout(qedi_conn, task);
 		break;
+	case ISCSI_OP_SCSI_TMFUNC:
+		rc = qedi_iscsi_abort_work(qedi_conn, task);
+		break;
 	case ISCSI_OP_TEXT:
 		rc = qedi_send_iscsi_text(qedi_conn, task);
 		break;
@@ -797,6 +807,9 @@ static int qedi_task_xmit(struct iscsi_task *task)
 
 	if (!sc)
 		return qedi_mtask_xmit(conn, task);
+
+	cmd->scsi_cmd = sc;
+	return qedi_iscsi_send_ioreq(task);
 }
 
 static struct iscsi_endpoint *

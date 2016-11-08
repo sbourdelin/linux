@@ -28,11 +28,14 @@ int qedi_send_iscsi_login(struct qedi_conn *qedi_conn,
 			  struct iscsi_task *task);
 int qedi_send_iscsi_logout(struct qedi_conn *qedi_conn,
 			   struct iscsi_task *task);
+int qedi_iscsi_abort_work(struct qedi_conn *qedi_conn,
+			  struct iscsi_task *mtask);
 int qedi_send_iscsi_text(struct qedi_conn *qedi_conn,
 			 struct iscsi_task *task);
 int qedi_send_iscsi_nopout(struct qedi_conn *qedi_conn,
 			   struct iscsi_task *task,
 			   char *datap, int data_len, int unsol);
+int qedi_iscsi_send_ioreq(struct iscsi_task *task);
 int qedi_get_task_idx(struct qedi_ctx *qedi);
 void qedi_clear_task_idx(struct qedi_ctx *qedi, int idx);
 int qedi_iscsi_cleanup_task(struct iscsi_task *task,
@@ -53,6 +56,9 @@ void qedi_mark_device_available(struct iscsi_cls_session *cls_session);
 void qedi_reset_host_mtu(struct qedi_ctx *qedi, u16 mtu);
 int qedi_recover_all_conns(struct qedi_ctx *qedi);
 void qedi_fp_process_cqes(struct qedi_work *work);
+int qedi_cleanup_all_io(struct qedi_ctx *qedi,
+			struct qedi_conn *qedi_conn,
+			struct iscsi_task *task, bool in_recovery);
 void qedi_trace_io(struct qedi_ctx *qedi, struct iscsi_task *task,
 		   u16 tid, int8_t direction);
 int qedi_alloc_id(struct qedi_portid_tbl *id_tbl, u16 id);
