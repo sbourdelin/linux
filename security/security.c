@@ -33,6 +33,8 @@
 /* Maximum number of letters for an LSM name string */
 #define SECURITY_NAME_MAX	10
 
+static ATOMIC_NOTIFIER_HEAD(lsm_notifier_chain);
+
 /* Boot-time LSM user choice */
 static __initdata char chosen_lsm[SECURITY_NAME_MAX + 1] =
 	CONFIG_DEFAULT_SECURITY;
@@ -97,6 +99,24 @@ int __init security_module_enable(const char *module)
 {
 	return !strcmp(module, chosen_lsm);
 }
+
+int call_lsm_notifier(enum lsm_event event, void *data)
+{
+	return atomic_notifier_call_chain(&lsm_notifier_chain, event, data);
+}
+EXPORT_SYMBOL(call_lsm_notifier);
+
+int register_lsm_notifier(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_register(&lsm_notifier_chain, nb);
+}
+EXPORT_SYMBOL(register_lsm_notifier);
+
+int unregister_lsm_notifier(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_unregister(&lsm_notifier_chain, nb);
+}
+EXPORT_SYMBOL(unregister_lsm_notifier);
 
 /*
  * Hook list operation macros.

@@ -69,6 +69,14 @@ struct audit_krule;
 struct user_namespace;
 struct timezone;
 
+enum lsm_event {
+	LSM_POLICY_CHANGE,
+};
+
+int call_lsm_notifier(enum lsm_event event, void *data);
+int register_lsm_notifier(struct notifier_block *nb);
+int unregister_lsm_notifier(struct notifier_block *nb);
+
 /* These functions are in security/commoncap.c */
 extern int cap_capable(const struct cred *cred, struct user_namespace *ns,
 		       int cap, int audit);
