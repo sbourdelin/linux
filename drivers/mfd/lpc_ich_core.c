@@ -1,6 +1,4 @@
 /*
- *  lpc_ich.c - LPC interface for Intel ICH
- *
  *  LPC bridge function of the Intel ICH contains many other
  *  functional units, such as Interrupt controllers, Timers,
  *  Power Management, System Management, GPIO, RTC, and LPC
