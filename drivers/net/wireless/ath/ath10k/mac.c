@@ -7504,6 +7504,69 @@ static int ath10k_mac_op_set_btcoex(struct ieee80211_hw *hw, bool enabled)
 	return ret;
 }
 
+u32
+ath10k_mac_get_btcoex_prio(struct cfg80211_btcoex_priority *btcoex_priority)
+{
+	u32 btcoex_prio = 0;
+
+	if (btcoex_priority->wlan_be_preferred)
+		btcoex_prio |= WIPHY_WLAN_BE_PREFERRED;
+
+	if (btcoex_priority->wlan_bk_preferred)
+		btcoex_prio |= WIPHY_WLAN_BK_PREFERRED;
+
+	if (btcoex_priority->wlan_vi_preferred)
+		btcoex_prio |= WIPHY_WLAN_VI_PREFERRED;
+
+	if (btcoex_priority->wlan_vo_preferred)
+		btcoex_prio |= WIPHY_WLAN_VO_PREFERRED;
+
+	if (btcoex_priority->wlan_beacon_preferred)
+		btcoex_prio |= WIPHY_WLAN_BEACON_PREFERRED;
+
+	if (btcoex_priority->wlan_mgmt_preferred)
+		btcoex_prio |= WIPHY_WLAN_MGMT_PREFERRED;
+
+	return btcoex_prio;
+}
+
+static int ath10k_mac_op_set_btcoex_priority(struct ieee80211_hw *hw,
+			struct cfg80211_btcoex_priority *btcoex_priority)
+{
+	u32 btcoex_prio;
+	struct ath10k *ar = hw->priv;
+	int ret;
+
+	if (!(test_bit(ATH10K_FLAG_BTCOEX, &ar->dev_flags))) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	mutex_lock(&ar->conf_mutex);
+
+	if (ar->state != ATH10K_STATE_ON &&
+	    ar->state != ATH10K_STATE_RESTARTED) {
+		ret = -ENETDOWN;
+		goto exit;
+	}
+
+	btcoex_prio = ath10k_mac_get_btcoex_prio(btcoex_priority);
+
+	if (btcoex_prio > 0x3f)
+		return -E2BIG;
+
+	ret = ath10k_wmi_set_coex_param(ar, btcoex_prio);
+
+	if (ret) {
+		ath10k_warn(ar, "failed to set btcoex priority: %d\n", ret);
+		goto exit;
+	}
+
+exit:
+	mutex_unlock(&ar->conf_mutex);
+	return ret;
+}
+
 static const struct ieee80211_ops ath10k_ops = {
 	.tx				= ath10k_mac_op_tx,
 	.wake_tx_queue			= ath10k_mac_op_wake_tx_queue,
@@ -7546,6 +7609,7 @@ static const struct ieee80211_ops ath10k_ops = {
 	.unassign_vif_chanctx		= ath10k_mac_op_unassign_vif_chanctx,
 	.switch_vif_chanctx		= ath10k_mac_op_switch_vif_chanctx,
 	.set_btcoex                     = ath10k_mac_op_set_btcoex,
+	.set_btcoex_priority		= ath10k_mac_op_set_btcoex_priority,
 
 	CFG80211_TESTMODE_CMD(ath10k_tm_cmd)
 
@@ -8134,6 +8198,18 @@ int ath10k_mac_register(struct ath10k *ar)
 	 * accidentally.
 	 */
 	ar->hw->offchannel_tx_hw_queue = IEEE80211_MAX_QUEUES - 1;
+
+	if (test_bit(WMI_SERVICE_BTCOEX, ar->wmi.svc_map)) {
+		ar->hw->wiphy->btcoex_support_flags =
+			WIPHY_WLAN_BE_PREFERRED |
+			WIPHY_WLAN_BK_PREFERRED |
+			WIPHY_WLAN_VI_PREFERRED |
+			WIPHY_WLAN_VO_PREFERRED |
+			WIPHY_WLAN_BEACON_PREFERRED |
+			WIPHY_WLAN_MGMT_PREFERRED;
+		ath10k_dbg(ar, ATH10K_DBG_BOOT, "btcoex supported mask :%u\n",
+			   ar->hw->wiphy->btcoex_support_flags);
+	}
 
 	switch (ar->running_fw->fw_file.wmi_op_version) {
 	case ATH10K_FW_WMI_OP_VERSION_MAIN:
