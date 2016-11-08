@@ -1376,10 +1376,6 @@ static int cpsw_ndo_open(struct net_device *ndev)
 				  ALE_ALL_PORTS, ALE_ALL_PORTS, 0, 0);
 
 	if (!cpsw_common_res_usage_state(cpsw)) {
-		/* setup tx dma to fixed prio and zero offset */
-		cpdma_control_set(cpsw->dma, CPDMA_TX_PRIO_FIXED, 1);
-		cpdma_control_set(cpsw->dma, CPDMA_RX_BUFFER_OFFSET, 0);
-
 		/* disable priority elevation */
 		__raw_writel(0, &cpsw->regs->ptype);
 
@@ -2710,6 +2706,8 @@ static int cpsw_probe(struct platform_device *pdev)
 	dma_params.desc_align		= 16;
 	dma_params.has_ext_regs		= true;
 	dma_params.desc_hw_addr         = dma_params.desc_mem_phys;
+	dma_params.rxbuf_offset		= 0;
+	dma_params.fixed_prio		= 1;
 
 	cpsw->dma = cpdma_ctlr_create(&dma_params);
 	if (!cpsw->dma) {

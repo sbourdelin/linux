@@ -31,6 +31,8 @@ struct cpdma_params {
 	void __iomem		*rxthresh, *rxfree;
 	int			num_chan;
 	bool			has_soft_reset;
+	bool			fixed_prio;
+	int			rxbuf_offset;
 	int			min_packet_size;
 	u32			desc_mem_phys;
 	u32			desc_hw_addr;
