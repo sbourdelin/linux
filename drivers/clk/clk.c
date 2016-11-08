@@ -2628,7 +2628,15 @@ EXPORT_SYMBOL_GPL(clk_register);
  */
 int clk_hw_register(struct device *dev, struct clk_hw *hw)
 {
-	return PTR_ERR_OR_ZERO(clk_register(dev, hw));
+	struct clk *c;
+
+	c = clk_register(dev, hw);
+	if (IS_ERR(c))
+		return PTR_ERR(c);
+
+	__clk_free_clk(c);
+	hw->clk = NULL;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(clk_hw_register);
 
