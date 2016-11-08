@@ -2660,12 +2660,12 @@ static int __btrfs_qgroup_release_data(struct inode *inode, u64 start, u64 len,
 	if (ret < 0)
 		goto out;
 
-	if (free) {
-		qgroup_free(BTRFS_I(inode)->root, changeset.bytes_changed);
+	if (free)
 		trace_op = QGROUP_FREE;
-	}
 	trace_btrfs_qgroup_release_data(inode, start, len,
 					changeset.bytes_changed, trace_op);
+	if (free)
+		qgroup_free(BTRFS_I(inode)->root, changeset.bytes_changed);
 out:
 	ulist_free(changeset.range_changed);
 	return ret;
