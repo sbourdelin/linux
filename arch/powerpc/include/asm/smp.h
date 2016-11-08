@@ -37,11 +37,15 @@ extern int cpu_to_chip_id(int cpu);
 
 #ifdef CONFIG_SMP
 
+#define SMP_OP_NMI_TYPE_SAFE	1
+#define SMP_OP_NMI_TYPE_HARD	2
+
 struct smp_ops_t {
 	void  (*message_pass)(int cpu, int msg);
 #ifdef CONFIG_PPC_SMP_MUXED_IPI
 	void  (*cause_ipi)(int cpu, unsigned long data);
 #endif
+	int   (*cause_nmi_ipi)(int cpu, int type);
 	void  (*probe)(void);
 	int   (*kick_cpu)(int nr);
 	void  (*setup_cpu)(int nr);
@@ -53,6 +57,7 @@ struct smp_ops_t {
 	int   (*cpu_bootable)(unsigned int nr);
 };
 
+extern int smp_handle_nmi_ipi(struct pt_regs *regs);
 extern void smp_send_debugger_break(void);
 extern void start_secondary_resume(void);
 extern void smp_generic_give_timebase(void);

@@ -425,8 +425,10 @@ out:
 	return ret;
 }
 
-static void do_smp_send_nmi_ipi(int cpu)
+static void do_smp_send_nmi_ipi(int cpu, int type)
 {
+	if (smp_ops->cause_nmi_ipi && smp_ops->cause_nmi_ipi(cpu, type))
+		return;
 	do_message_pass(cpu, PPC_MSG_NMI_IPI_SAFE);
 }
 
@@ -452,9 +454,6 @@ int smp_send_nmi_ipi(int cpu, int function, void *data,
 
 	if (unlikely(!smp_ops))
 		return 0;
-
-	/* Have no real NMI capability yet */
-	safe_udelay += hard_udelay;
 
 	get_online_cpus();
 
@@ -482,7 +481,7 @@ int smp_send_nmi_ipi(int cpu, int function, void *data,
 
 	if (safe_udelay) {
 		for_each_cpu(c, &nmi_ipi_pending_mask)
-			do_smp_send_nmi_ipi(c);
+			do_smp_send_nmi_ipi(c, SMP_OP_NMI_TYPE_SAFE);
 
 		do {
 			safe_udelay--;
@@ -490,6 +489,18 @@ int smp_send_nmi_ipi(int cpu, int function, void *data,
 			if (cpumask_empty(&nmi_ipi_pending_mask))
 				goto done;
 		} while (safe_udelay);
+	}
+
+	if (hard_udelay) {
+		for_each_cpu(c, &nmi_ipi_pending_mask)
+			do_smp_send_nmi_ipi(c, SMP_OP_NMI_TYPE_HARD);
+
+		do {
+			hard_udelay--;
+			udelay(1);
+			if (cpumask_empty(&nmi_ipi_pending_mask))
+				goto done;
+		} while (hard_udelay);
 	}
 
 	ret = 0; /* Could not gather all CPUs */
