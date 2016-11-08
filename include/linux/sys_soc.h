@@ -13,6 +13,9 @@ struct soc_device_attribute {
 	const char *family;
 	const char *revision;
 	const char *soc_id;
+	const char *vendor;
+	const char *serial_num;
+	const char *foundry_id;
 };
 
 /**
