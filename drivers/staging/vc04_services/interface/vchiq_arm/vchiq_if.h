@@ -93,6 +93,13 @@ typedef struct {
 	unsigned int size;
 } VCHIQ_ELEMENT_T;
 
+#if defined(CONFIG_64BIT)
+typedef struct {
+	u32 data;
+	unsigned int size;
+} VCHIQ_ELEMENT32_T;
+#endif
+
 typedef unsigned int VCHIQ_SERVICE_HANDLE_T;
 
 typedef VCHIQ_STATUS_T (*VCHIQ_CALLBACK_T)(VCHIQ_REASON_T, VCHIQ_HEADER_T *,
@@ -104,6 +111,14 @@ typedef struct vchiq_service_base_struct {
 	void *userdata;
 } VCHIQ_SERVICE_BASE_T;
 
+#if defined(CONFIG_64BIT)
+typedef struct vchiq_service_base_struct32 {
+	int fourcc;
+	u32 callback;
+	u32 userdata;
+} VCHIQ_SERVICE_BASE32_T;
+#endif
+
 typedef struct vchiq_service_params_struct {
 	int fourcc;
 	VCHIQ_CALLBACK_T callback;
@@ -111,6 +126,16 @@ typedef struct vchiq_service_params_struct {
 	short version;       /* Increment for non-trivial changes */
 	short version_min;   /* Update for incompatible changes */
 } VCHIQ_SERVICE_PARAMS_T;
+
+#if defined(CONFIG_64BIT)
+typedef struct vchiq_service_params_struct32 {
+	int fourcc;
+	u32 callback;
+	u32 userdata;
+	short version;       /* Increment for non-trivial changes */
+	short version_min;   /* Update for incompatible changes */
+} VCHIQ_SERVICE_PARAMS32_T;
+#endif
 
 typedef struct vchiq_config_struct {
 	unsigned int max_msg_size;

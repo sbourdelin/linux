@@ -573,12 +573,40 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				"vchiq: could not connect: %d", status);
 		break;
 
+#if defined(CONFIG_64BIT)
+	case VCHIQ_IOC_CREATE_SERVICE32:
+#endif
 	case VCHIQ_IOC_CREATE_SERVICE: {
 		VCHIQ_CREATE_SERVICE_T args;
 		USER_SERVICE_T *user_service = NULL;
 		void *userdata;
 		int srvstate;
 
+#if defined(CONFIG_64BIT)
+		if (cmd == VCHIQ_IOC_CREATE_SERVICE32) {
+			VCHIQ_CREATE_SERVICE32_T args32;
+
+			if (copy_from_user
+				(&args32, (const void __user *)arg,
+				sizeof(args32)) != 0) {
+				ret = -EFAULT;
+				break;
+			}
+
+			args.params.fourcc   = args32.params.fourcc;
+			args.params.callback =
+				(VCHIQ_CALLBACK_T)(unsigned long)
+					args32.params.callback;
+			args.params.userdata =
+				(void *)(unsigned long)
+					args32.params.userdata;
+			args.params.version = args32.params.version;
+			args.params.version_min = args32.params.version_min;
+			args.is_open = args32.is_open;
+			args.is_vchi = args32.is_vchi;
+			args.handle  = args32.handle;
+		} else
+#endif
 		if (copy_from_user
 			 (&args, (const void __user *)arg,
 			  sizeof(args)) != 0) {
@@ -641,6 +669,19 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				}
 			}
 
+#if defined(CONFIG_64BIT)
+			if (cmd == VCHIQ_IOC_CREATE_SERVICE32) {
+				if (copy_to_user((void __user *)
+						 &(((VCHIQ_CREATE_SERVICE32_T __user *)
+						 arg)->handle),
+						 (const void *)&service->handle,
+						sizeof(service->handle)) != 0) {
+							ret = -EFAULT;
+							vchiq_remove_service(
+								service->handle);
+				}
+			} else
+#endif
 			if (copy_to_user((void __user *)
 				&(((VCHIQ_CREATE_SERVICE_T __user *)
 					arg)->handle),
@@ -736,6 +777,49 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			ret = -EINVAL;
 	} break;
 
+#if defined(CONFIG_64BIT)
+	case VCHIQ_IOC_QUEUE_MESSAGE32: {
+		VCHIQ_QUEUE_MESSAGE32_T args32;
+
+		if (copy_from_user
+			 (&args32, (const void __user *)arg,
+			  sizeof(args32)) != 0) {
+			ret = -EFAULT;
+			break;
+		}
+
+		service = find_service_for_instance(instance, args32.handle);
+
+		if ((service) && (args32.count <= MAX_ELEMENTS)) {
+			/* Copy elements into kernel space */
+			VCHIQ_ELEMENT_T elements[MAX_ELEMENTS];
+			VCHIQ_ELEMENT32_T elements32[MAX_ELEMENTS];
+
+			if (copy_from_user(elements32,
+					   (void *)(unsigned long)args32.elements,
+					   args32.count * sizeof(VCHIQ_ELEMENT32_T)) == 0) {
+						unsigned int i;
+
+						for (i = 0; i < args32.count; i++) {
+							elements[i].data =
+								(const void *)(unsigned long)
+								elements32[i].data;
+							elements[i].size =
+								elements32[i].size;
+						}
+						status = vchiq_ioc_queue_message
+							(args32.handle,
+							elements, args32.count);
+				}
+			else {
+				ret = -EFAULT;
+			}
+		} else {
+			ret = -EINVAL;
+		}
+	} break;
+#endif
+
 	case VCHIQ_IOC_QUEUE_MESSAGE: {
 		VCHIQ_QUEUE_MESSAGE_T args;
 		if (copy_from_user
@@ -762,6 +846,10 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 	} break;
 
+#if defined(CONFIG_64BIT)
+	case VCHIQ_IOC_QUEUE_BULK_TRANSMIT32:
+	case VCHIQ_IOC_QUEUE_BULK_RECEIVE32:
+#endif
 	case VCHIQ_IOC_QUEUE_BULK_TRANSMIT:
 	case VCHIQ_IOC_QUEUE_BULK_RECEIVE: {
 		VCHIQ_QUEUE_BULK_TRANSFER_T args;
@@ -770,6 +858,28 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			(cmd == VCHIQ_IOC_QUEUE_BULK_TRANSMIT) ?
 			VCHIQ_BULK_TRANSMIT : VCHIQ_BULK_RECEIVE;
 
+#if defined(CONFIG_64BIT)
+		if (cmd == VCHIQ_IOC_QUEUE_BULK_TRANSMIT32 ||
+		    cmd == VCHIQ_IOC_QUEUE_BULK_RECEIVE32) {
+			VCHIQ_QUEUE_BULK_TRANSFER32_T args32;
+
+			if (copy_from_user
+				(&args32, (const void __user *)arg,
+				sizeof(args32)) != 0) {
+				ret = -EFAULT;
+				break;
+			}
+
+			args.handle	= args32.handle;
+			args.data	= (void *)(unsigned long)args32.data;
+			args.size	= args32.size;
+			args.userdata   = (void *)(unsigned long)args32.userdata;
+			args.mode	= args32.mode;
+
+			dir = (cmd == VCHIQ_IOC_QUEUE_BULK_TRANSMIT32) ?
+				VCHIQ_BULK_TRANSMIT : VCHIQ_BULK_RECEIVE;
+		} else
+#endif
 		if (copy_from_user
 			(&args, (const void __user *)arg,
 			sizeof(args)) != 0) {
@@ -847,6 +957,18 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				"saved bulk_waiter %pK for pid %d",
 				waiter, current->pid);
 
+#if defined(CONFIG_64BIT)
+			if (cmd == VCHIQ_IOC_QUEUE_BULK_TRANSMIT32 ||
+			    cmd == VCHIQ_IOC_QUEUE_BULK_RECEIVE32) {
+				if (copy_to_user((void __user *)
+						 &(((VCHIQ_QUEUE_BULK_TRANSFER32_T __user *)
+						 arg)->mode),
+						 (const void *)&mode_waiting,
+						 sizeof(mode_waiting)) != 0)
+							ret = -EFAULT;
+			} else
+#endif
+
 			if (copy_to_user((void __user *)
 				&(((VCHIQ_QUEUE_BULK_TRANSFER_T __user *)
 					arg)->mode),
@@ -856,6 +978,9 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 	} break;
 
+#if defined(CONFIG_64BIT)
+	case VCHIQ_IOC_AWAIT_COMPLETION32:
+#endif
 	case VCHIQ_IOC_AWAIT_COMPLETION: {
 		VCHIQ_AWAIT_COMPLETION_T args;
 
@@ -865,6 +990,25 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
+#if defined(CONFIG_64BIT)
+		if (cmd == VCHIQ_IOC_AWAIT_COMPLETION32) {
+			VCHIQ_AWAIT_COMPLETION32_T args32;
+
+			if (copy_from_user(&args32, (const void __user *)arg,
+					   sizeof(args32)) != 0) {
+						ret = -EFAULT;
+						break;
+			}
+
+			args.count = args32.count;
+			args.buf =
+				(VCHIQ_COMPLETION_DATA_T *)(unsigned long)
+					args32.buf;
+			args.msgbufsize = args32.msgbufsize;
+			args.msgbufcount = args32.msgbufcount;
+			args.msgbufs = (void **)(unsigned long)args32.msgbufs;
+		} else
+#endif
 		if (copy_from_user(&args, (const void __user *)arg,
 			sizeof(args)) != 0) {
 			ret = -EFAULT;
@@ -942,6 +1086,24 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 						break;
 					/* Get the pointer from user space */
 					msgbufcount--;
+#if defined(CONFIG_64BIT)
+					if (cmd == VCHIQ_IOC_AWAIT_COMPLETION32) {
+						u32 msgbuf32;
+
+						if (copy_from_user(&msgbuf32,
+								   (const void __user *)
+								   (void *)(args.msgbufs) +
+								   (sizeof(u32) * msgbufcount),
+								   sizeof(msgbuf32)) != 0) {
+									if (ret == 0)
+										ret = -EFAULT;
+									break;
+						}
+
+						msgbuf = (void *)(unsigned long)
+								msgbuf32;
+					} else
+#endif
 					if (copy_from_user(&msgbuf,
 						(const void __user *)
 						&args.msgbufs[msgbufcount],
@@ -974,6 +1136,33 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 					!instance->use_close_delivered)
 					unlock_service(service);
 
+#if defined(CONFIG_64BIT)
+				if (cmd == VCHIQ_IOC_AWAIT_COMPLETION32) {
+					VCHIQ_COMPLETION_DATA32_T completion32;
+
+					completion32.reason =
+						completion->reason;
+					completion32.header =
+						(u32)(unsigned long)
+							completion->header;
+					completion32.service_userdata =
+						(u32)(unsigned long)
+							completion->service_userdata;
+					completion32.bulk_userdata =
+						(u32)(unsigned long)
+							completion->bulk_userdata;
+
+					if (copy_to_user((void __user *)(
+						(void *)args.buf +
+						ret * sizeof(VCHIQ_COMPLETION_DATA32_T)),
+						&completion32,
+						sizeof(VCHIQ_COMPLETION_DATA32_T)) != 0) {
+						   if (ret == 0)
+							ret = -EFAULT;
+						break;
+					}
+				} else
+#endif
 				if (copy_to_user((void __user *)(
 					(size_t)args.buf +
 					ret * sizeof(VCHIQ_COMPLETION_DATA_T)),
@@ -988,6 +1177,17 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			}
 
 			if (msgbufcount != args.msgbufcount) {
+#if defined(CONFIG_64BIT)
+				if (cmd == VCHIQ_IOC_AWAIT_COMPLETION32) {
+					if (copy_to_user((void __user *)
+							 &((VCHIQ_AWAIT_COMPLETION32_T *)arg)->
+							 msgbufcount,
+							 &msgbufcount,
+							 sizeof(msgbufcount)) != 0) {
+								ret = -EFAULT;
+					}
+				} else
+#endif
 				if (copy_to_user((void __user *)
 					&((VCHIQ_AWAIT_COMPLETION_T *)arg)->
 						msgbufcount,
@@ -1004,12 +1204,32 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		DEBUG_TRACE(AWAIT_COMPLETION_LINE);
 	} break;
 
+#if defined(CONFIG_64BIT)
+	case VCHIQ_IOC_DEQUEUE_MESSAGE32:
+#endif
 	case VCHIQ_IOC_DEQUEUE_MESSAGE: {
 		VCHIQ_DEQUEUE_MESSAGE_T args;
 		USER_SERVICE_T *user_service;
 		VCHIQ_HEADER_T *header;
 
 		DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
+#if defined(CONFIG_64BIT)
+		if (cmd == VCHIQ_IOC_DEQUEUE_MESSAGE32) {
+			VCHIQ_DEQUEUE_MESSAGE32_T args32;
+
+			if (copy_from_user(&args32,
+					   (const void __user *)arg,
+					   sizeof(args32)) != 0) {
+						ret = -EFAULT;
+						break;
+			}
+
+			args.handle	= args32.handle;
+			args.blocking	= args32.blocking;
+			args.bufsize	= args32.bufsize;
+			args.buf	= (void *)(unsigned long)args32.buf;
+		} else
+#endif
 		if (copy_from_user
 			 (&args, (const void __user *)arg,
 			  sizeof(args)) != 0) {
@@ -1093,6 +1313,37 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		ret = vchiq_get_client_id(handle);
 	} break;
 
+#if defined(CONFIG_64BIT)
+	case VCHIQ_IOC_GET_CONFIG32: {
+		VCHIQ_GET_CONFIG32_T args32;
+		VCHIQ_CONFIG_T config;
+
+		if (copy_from_user(&args32,
+				   (const void __user *)arg,
+				   sizeof(args32)) != 0) {
+					ret = -EFAULT;
+					break;
+		}
+		if (args32.config_size > sizeof(config)) {
+			ret = -EINVAL;
+			break;
+		}
+		status = vchiq_get_config(instance,
+					  args32.config_size,
+					  &config);
+		if (status == VCHIQ_SUCCESS) {
+			if (copy_to_user((void __user *)(unsigned long)
+					 args32.pconfig,
+					 &config,
+					 args32.config_size)
+					 != 0) {
+						ret = -EFAULT;
+						break;
+			}
+		}
+	} break;
+#endif
+
 	case VCHIQ_IOC_GET_CONFIG: {
 		VCHIQ_GET_CONFIG_T args;
 		VCHIQ_CONFIG_T config;
@@ -1135,6 +1386,21 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		status = vchiq_set_service_option(
 				args.handle, args.option, args.value);
 	} break;
+
+#if defined(CONFIG_64BIT)
+	case VCHIQ_IOC_DUMP_PHYS_MEM32: {
+		VCHIQ_DUMP_MEM32_T  args32;
+
+		if (copy_from_user(&args32,
+				   (const void __user *)arg,
+				   sizeof(args32)) != 0) {
+					ret = -EFAULT;
+					break;
+		}
+		dump_phys_mem((void *)(unsigned long)args32.virt_addr,
+			      args32.num_bytes);
+	} break;
+#endif
 
 	case VCHIQ_IOC_DUMP_PHYS_MEM: {
 		VCHIQ_DUMP_MEM_T  args;
@@ -1660,6 +1926,9 @@ static const struct file_operations
 vchiq_fops = {
 	.owner = THIS_MODULE,
 	.unlocked_ioctl = vchiq_ioctl,
+#if defined(CONFIG_64BIT)
+	.compat_ioctl = vchiq_ioctl,
+#endif
 	.open = vchiq_open,
 	.release = vchiq_release,
 	.read = vchiq_read
