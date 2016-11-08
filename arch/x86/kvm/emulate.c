@@ -3883,6 +3883,115 @@ static int em_movsxd(struct x86_emulate_ctxt *ctxt)
 	return X86EMUL_CONTINUE;
 }
 
+static int check_fxsr(struct x86_emulate_ctxt *ctxt)
+{
+	u32 eax = 1, ebx, ecx = 0, edx;
+
+	ctxt->ops->get_cpuid(ctxt, &eax, &ebx, &ecx, &edx);
+	if (!(edx & FFL(FXSR)))
+		return emulate_ud(ctxt);
+
+	if (ctxt->ops->get_cr(ctxt, 0) & (X86_CR0_TS | X86_CR0_EM))
+		return emulate_nm(ctxt);
+
+	/*
+	 * Don't emulate a case that should never be hit, instead of working
+	 * around a lack of fxsave64/fxrstor64 on old compilers.
+	 */
+	if (ctxt->mode >= X86EMUL_MODE_PROT64)
+		return X86EMUL_UNHANDLEABLE;
+
+	return X86EMUL_CONTINUE;
+}
+
+/*
+ * FXSAVE and FXRSTOR have 4 different formats depending on execution mode,
+ *  1) 16 bit mode
+ *  2) 32 bit mode
+ *     - like (1), but FIP and FDP (foo) are only 16 bit.  At least Intel CPUs
+ *       preserve whole 32 bit values, though, so (1) and (2) are the same wrt.
+ *       save and restore
+ *  3) 64-bit mode with REX.W prefix
+ *     - like (2), but XMM 8-15 are being saved and restored
+ *  4) 64-bit mode without REX.W prefix
+ *     - like (3), but FIP and FDP are 64 bit
+ *
+ * Emulation uses (3) for (1) and (2) and preserves XMM 8-15 to reach the
+ * desired result.  (4) is not emulated.
+ *
+ * XXX: Guest and host CPUID.(EAX=07H,ECX=0H):EBX[bit 13] (deprecate FPU CS
+ * and FPU DS) should match.
+ */
+static int em_fxsave(struct x86_emulate_ctxt *ctxt)
+{
+	struct fxregs_state fx_state;
+	size_t size = 288; /* up to XMM7 */
+	int rc;
+
+	rc = check_fxsr(ctxt);
+	if (rc != X86EMUL_CONTINUE)
+		return rc;
+
+	ctxt->ops->get_fpu(ctxt);
+
+	rc = asm_safe("fxsave %[fx]", , [fx] "+m"(fx_state));
+
+	ctxt->ops->put_fpu(ctxt);
+
+	if (rc != X86EMUL_CONTINUE)
+		return rc;
+
+	return segmented_write(ctxt, ctxt->memop.addr.mem, &fx_state, size);
+}
+
+static int fx_load_64bit_xmm(struct fxregs_state *new)
+{
+	int rc = X86EMUL_CONTINUE;
+#ifdef CONFIG_X86_64
+	struct fxregs_state old;
+
+	rc = asm_safe("fxsave %[fx]", , [fx] "+m"(old));
+
+	/* XXX: accessing XMM 8-15 is very awkward */
+	memcpy(&new->xmm_space[8*16 / 4], &old.xmm_space[8*16 / 4], 8*16);
+#endif
+	return rc;
+}
+
+static int em_fxrstor(struct x86_emulate_ctxt *ctxt)
+{
+	struct fxregs_state fx_state;
+	int rc;
+
+	rc = check_fxsr(ctxt);
+	if (rc != X86EMUL_CONTINUE)
+		return rc;
+
+	rc = segmented_read(ctxt, ctxt->memop.addr.mem, &fx_state, 512);
+	if (rc != X86EMUL_CONTINUE)
+		return rc;
+
+	if (fx_state.mxcsr >> 16)
+		return emulate_gp(ctxt, 0);
+
+	ctxt->ops->get_fpu(ctxt);
+
+	/*
+	 * 64 bit host will always restore XMM8-15, which is not correct on
+	 * non-64 bit guests.  Load the current values in order to preserve 64
+	 * bit XMMs after fxrstor.
+	 */
+	if (ctxt->mode < X86EMUL_MODE_PROT64)
+		rc = fx_load_64bit_xmm(&fx_state);
+
+	if (rc == X86EMUL_CONTINUE)
+		rc = asm_safe("fxrstor %[fx]", : [fx] "m"(fx_state));
+
+	ctxt->ops->put_fpu(ctxt);
+
+	return rc;
+}
+
 static bool valid_cr(int nr)
 {
 	switch (nr) {
@@ -4235,7 +4344,9 @@ static const struct gprefix pfx_0f_ae_7 = {
 };
 
 static const struct group_dual group15 = { {
-	N, N, N, N, N, N, N, GP(0, &pfx_0f_ae_7),
+	I(ModRM | Aligned16, em_fxsave),
+	I(ModRM | Aligned16, em_fxrstor),
+	N, N, N, N, N, GP(0, &pfx_0f_ae_7),
 }, {
 	N, N, N, N, N, N, N, N,
 } };
