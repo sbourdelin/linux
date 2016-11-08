@@ -724,6 +724,10 @@ static void media_device_release(struct media_devnode *devnode)
 	mdev->entity_internal_idx_max = 0;
 	media_entity_graph_walk_cleanup(&mdev->pm_count_walk);
 	mutex_destroy(&mdev->graph_mutex);
+
+	if (mdev->ops && mdev->ops->release)
+		mdev->ops->release(mdev);
+
 	put_device(mdev->dev);
 
 	kfree(mdev);
