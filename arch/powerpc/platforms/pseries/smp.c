@@ -196,6 +196,16 @@ static void pSeries_cause_ipi_mux(int cpu, unsigned long data)
 		xics_cause_ipi(cpu, data);
 }
 
+static int pseries_cause_nmi_ipi(int cpu, int type)
+{
+	if (type == SMP_OP_NMI_TYPE_HARD) {
+		if (plapr_signal_sys_reset(cpu) == H_SUCCESS)
+			return 1;
+	}
+
+	return 0;
+}
+
 static __init void pSeries_smp_probe(void)
 {
 	xics_smp_probe();
@@ -209,7 +219,7 @@ static __init void pSeries_smp_probe(void)
 static struct smp_ops_t pseries_smp_ops = {
 	.message_pass	= NULL,	/* Use smp_muxed_ipi_message_pass */
 	.cause_ipi	= NULL,	/* Filled at runtime by pSeries_smp_probe() */
-	.cause_nmi_ipi	= NULL,
+	.cause_nmi_ipi	= pseries_cause_nmi_ipi,
 	.probe		= pSeries_smp_probe,
 	.kick_cpu	= smp_pSeries_kick_cpu,
 	.setup_cpu	= smp_setup_cpu,

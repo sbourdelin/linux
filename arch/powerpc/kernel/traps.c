@@ -275,19 +275,22 @@ void _exception(int signr, struct pt_regs *regs, int code, unsigned long addr)
 
 void system_reset_exception(struct pt_regs *regs)
 {
+	nmi_enter();
+
 	/* See if any machine dependent calls */
 	if (ppc_md.system_reset_exception) {
 		if (ppc_md.system_reset_exception(regs))
-			return;
+			goto done;
 	}
 
 	die("System Reset", regs, SIGABRT);
 
+done:
 	/* Must die if the interrupt is not recoverable */
 	if (!(regs->msr & MSR_RI))
 		panic("Unrecoverable System Reset");
 
-	/* What should we do here? We could issue a shutdown or hard reset. */
+	nmi_exit();
 }
 
 #ifdef CONFIG_PPC64
