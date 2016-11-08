@@ -674,7 +674,6 @@ bool machine_check_poll(enum mcp_flags flags, mce_banks_t *b)
 		m.misc = 0;
 		m.addr = 0;
 		m.bank = i;
-		m.tsc = 0;
 
 		barrier();
 		m.status = mce_rdmsrl(msr_ops.status(i));
@@ -1355,7 +1354,7 @@ static void mce_timer_fn(unsigned long data)
 	iv = __this_cpu_read(mce_next_interval);
 
 	if (mce_available(this_cpu_ptr(&cpu_info))) {
-		machine_check_poll(MCP_TIMESTAMP, this_cpu_ptr(&mce_poll_banks));
+		machine_check_poll(0, this_cpu_ptr(&mce_poll_banks));
 
 		if (mce_intel_cmci_poll()) {
 			iv = mce_adjust_timer(iv);
