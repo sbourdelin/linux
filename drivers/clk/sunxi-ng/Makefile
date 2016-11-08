@@ -21,6 +21,7 @@ obj-$(CONFIG_SUNXI_CCU_MP)	+= ccu_mp.o
 obj-$(CONFIG_SUN50I_A64_CCU)	+= ccu-sun50i-a64.o
 obj-$(CONFIG_SUN5I_A10S_CCU)	+= ccu-sun5i-a10s.o
 obj-$(CONFIG_SUN5I_A13_CCU)	+= ccu-sun5i-a13.o
+obj-$(CONFIG_SUN5I_GR8_CCU)	+= ccu-sun5i-gr8.o
 obj-$(CONFIG_SUN6I_A31_CCU)	+= ccu-sun6i-a31.o
 obj-$(CONFIG_SUN8I_A23_CCU)	+= ccu-sun8i-a23.o
 obj-$(CONFIG_SUN8I_A33_CCU)	+= ccu-sun8i-a33.o
