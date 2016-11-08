@@ -6144,14 +6144,20 @@ static int handle_ept_violation(struct kvm_vcpu *vcpu)
 	gpa = vmcs_read64(GUEST_PHYSICAL_ADDRESS);
 	trace_kvm_page_fault(gpa, exit_qualification);
 
-	/* it is a read fault? */
-	error_code = (exit_qualification << 2) & PFERR_USER_MASK;
-	/* it is a write fault? */
-	error_code |= exit_qualification & PFERR_WRITE_MASK;
-	/* It is a fetch fault? */
-	error_code |= (exit_qualification << 2) & PFERR_FETCH_MASK;
-	/* ept page table is present? */
-	error_code |= (exit_qualification & 0x38) != 0;
+	/* Is it a read fault? */
+	error_code = ((exit_qualification >> EPT_VIOLATION_READ_BIT) & 1)
+		     << PFERR_USER_BIT;
+	/* Is it a write fault? */
+	error_code |= ((exit_qualification >> EPT_VIOLATION_WRITE_BIT) & 1)
+		      << PFERR_WRITE_BIT;
+	/* Is it a fetch fault? */
+	error_code |= ((exit_qualification >> EPT_VIOLATION_INSTR_BIT) & 1)
+		      << PFERR_FETCH_BIT;
+	/* ept page table entry is present? */
+	error_code |= (((exit_qualification >> EPT_VIOLATION_READABLE_BIT) |
+			(exit_qualification >> EPT_VIOLATION_WRITABLE_BIT) |
+			(exit_qualification >> EPT_VIOLATION_EXECUTABLE_BIT))
+		       & 1) << PFERR_PRESENT_BIT;
 
 	vcpu->arch.exit_qualification = exit_qualification;
 
