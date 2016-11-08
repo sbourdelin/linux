@@ -724,6 +724,7 @@ static void media_device_release(struct media_devnode *devnode)
 	mdev->entity_internal_idx_max = 0;
 	media_entity_graph_walk_cleanup(&mdev->pm_count_walk);
 	mutex_destroy(&mdev->graph_mutex);
+	put_device(mdev->dev);
 
 	kfree(mdev);
 }
@@ -732,9 +733,15 @@ struct media_device *media_device_alloc(struct device *dev)
 {
 	struct media_device *mdev;
 
-	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
-	if (!mdev)
+	dev = get_device(dev);
+	if (!dev)
 		return NULL;
+
+	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
+	if (!mdev) {
+		put_device(dev);
+		return NULL;
+	}
 
 	mdev->dev = dev;
 	media_device_init(mdev);
