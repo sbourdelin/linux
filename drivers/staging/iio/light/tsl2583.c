@@ -221,7 +221,7 @@ static int tsl2583_get_lux(struct iio_dev *indio_dev)
 		goto return_max;
 
 	if (!ch0) {
-		/* have no data, so return LAST VALUE */
+		/* have no data, so return 0 */
 		ret = 0;
 		chip->als_cur_info.lux = 0;
 		goto done;
