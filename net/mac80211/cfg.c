@@ -3587,6 +3587,14 @@ static int ieee80211_set_btcoex(struct wiphy *wiphy, bool enabled)
 	return drv_set_btcoex(local, enabled);
 }
 
+static int ieee80211_set_btcoex_priority(struct wiphy *wiphy,
+			struct cfg80211_btcoex_priority *btcoex_priority)
+{
+	struct ieee80211_local *local = wiphy_priv(wiphy);
+
+	return drv_set_btcoex_priority(local, btcoex_priority);
+}
+
 const struct cfg80211_ops mac80211_config_ops = {
 	.add_virtual_intf = ieee80211_add_iface,
 	.del_virtual_intf = ieee80211_del_iface,
@@ -3678,4 +3686,5 @@ const struct cfg80211_ops mac80211_config_ops = {
 	.add_nan_func = ieee80211_add_nan_func,
 	.del_nan_func = ieee80211_del_nan_func,
 	.set_btcoex = ieee80211_set_btcoex,
+	.set_btcoex_priority = ieee80211_set_btcoex_priority,
 };

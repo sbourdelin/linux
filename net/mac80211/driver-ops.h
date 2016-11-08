@@ -1262,4 +1262,16 @@ static inline int drv_set_btcoex(struct ieee80211_local *local,
 	return ret;
 }
 
+static inline int drv_set_btcoex_priority(struct ieee80211_local *local,
+			struct cfg80211_btcoex_priority *btcoex_priority)
+{
+	int ret = -EOPNOTSUPP;
+
+	if (local->ops->set_btcoex_priority)
+		ret = local->ops->set_btcoex_priority(&local->hw,
+						      btcoex_priority);
+
+	return ret;
+}
+
 #endif /* __MAC80211_DRIVER_OPS */

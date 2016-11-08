@@ -3454,6 +3454,11 @@ enum ieee80211_reconfig_type {
  *
  * @set_btcoex_: set_btcoex: Called when BTCOEX is enabled/disabled, use
  *	this callback to enable or disable btcoex.
+ * @set_btcoex_priority: Use this callback to set wlan high
+ *	priority frames over bluetooth. Driver supported wlan frames
+ *	for the BTCOEX is exposed by btcoex_support_flags.
+ *	When BTCOEX enabled, the high priority wlan frames will have
+ *	more priority than BT.
  */
 struct ieee80211_ops {
 	void (*tx)(struct ieee80211_hw *hw,
@@ -3707,6 +3712,8 @@ struct ieee80211_ops {
 			    struct ieee80211_vif *vif,
 			    u8 instance_id);
 	int (*set_btcoex)(struct ieee80211_hw *hw, bool enabled);
+	int (*set_btcoex_priority)(struct ieee80211_hw *hw,
+		struct cfg80211_btcoex_priority *btcoex_priority);
 };
 
 /**
