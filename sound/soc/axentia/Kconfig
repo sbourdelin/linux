@@ -1,0 +1,10 @@
+config SND_SOC_AXENTIA_TSE850_PCM5142
+	tristate "ASoC driver for the Axentia TSE-850"
+	depends on ARCH_AT91 && OF
+	select ATMEL_SSC
+	select SND_ATMEL_SOC
+	select SND_ATMEL_SOC_SSC_DMA
+	select SND_SOC_PCM512x_I2C
+	help
+	  Say Y if you want to add support for the ASoC driver for the
+	  Axentia TSE-850 with a PCM5142 codec.
