@@ -1140,4 +1140,17 @@ rdev_set_btcoex(struct cfg80211_registered_device *rdev, bool enabled)
 	trace_rdev_return_int(&rdev->wiphy, ret);
 	return ret;
 }
+
+static inline int
+rdev_set_btcoex_priority(struct cfg80211_registered_device *rdev,
+			 struct net_device *dev,
+			 struct cfg80211_btcoex_priority *btcoex_priority)
+{
+	int ret;
+
+	trace_rdev_set_btcoex_priority(&rdev->wiphy, btcoex_priority);
+	ret = rdev->ops->set_btcoex_priority(&rdev->wiphy, btcoex_priority);
+	trace_rdev_return_int(&rdev->wiphy, ret);
+	return ret;
+}
 #endif /* __CFG80211_RDEV_OPS */

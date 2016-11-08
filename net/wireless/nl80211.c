@@ -415,6 +415,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_NAN_DUAL] = { .type = NLA_U8 },
 	[NL80211_ATTR_NAN_FUNC] = { .type = NLA_NESTED },
 	[NL80211_ATTR_WIPHY_BTCOEX_ENABLE] = { .type = NLA_U8 },
+	[NL80211_ATTR_SET_BTCOEX_PRIORITY] = { .type = NLA_NESTED },
 };
 
 /* policy for the key attributes */
@@ -2010,6 +2011,16 @@ static int nl80211_get_wiphy(struct sk_buff *skb, struct genl_info *info)
 
 	return genlmsg_reply(msg, info);
 }
+
+static const struct nla_policy
+wlan_preferred_policy[NL80211_WLAN_PREFERRED_MAX + 1] = {
+	[NL80211_WLAN_BE_PREFERRED]	= { .type = NLA_FLAG },
+	[NL80211_WLAN_BK_PREFERRED]	= { .type = NLA_FLAG },
+	[NL80211_WLAN_VI_PREFERRED]	= { .type = NLA_FLAG },
+	[NL80211_WLAN_VO_PREFERRED]	= { .type = NLA_FLAG },
+	[NL80211_WLAN_BEACON_PREFERRED]	= { .type = NLA_FLAG },
+	[NL80211_WLAN_MGMT_PREFERRED]	= { .type = NLA_FLAG },
+};
 
 static const struct nla_policy txq_params_policy[NL80211_TXQ_ATTR_MAX + 1] = {
 	[NL80211_TXQ_ATTR_QUEUE]		= { .type = NLA_U8 },
@@ -11744,6 +11755,88 @@ static int nl80211_tdls_cancel_channel_switch(struct sk_buff *skb,
 	return 0;
 }
 
+static int
+parse_btcoex_priority(struct nlattr *tb[], struct wiphy *wiphy,
+		      struct cfg80211_btcoex_priority *btcoex_priority)
+{
+	memset(btcoex_priority, false, sizeof(*btcoex_priority));
+
+	if (tb[NL80211_WLAN_BE_PREFERRED]) {
+		if (!(wiphy->btcoex_support_flags &
+		      WIPHY_WLAN_BE_PREFERRED))
+			return -EINVAL;
+		btcoex_priority->wlan_be_preferred =
+				WIPHY_WLAN_PREFERRED_HIGH;
+	}
+	if (tb[NL80211_WLAN_BK_PREFERRED]) {
+		if (!(wiphy->btcoex_support_flags &
+		      WIPHY_WLAN_BK_PREFERRED))
+			return -EINVAL;
+		btcoex_priority->wlan_bk_preferred =
+				WIPHY_WLAN_PREFERRED_HIGH;
+	}
+	if (tb[NL80211_WLAN_VI_PREFERRED]) {
+		if (!(wiphy->btcoex_support_flags &
+		      WIPHY_WLAN_VI_PREFERRED))
+			return -EINVAL;
+		btcoex_priority->wlan_vi_preferred =
+				WIPHY_WLAN_PREFERRED_HIGH;
+	}
+	if (tb[NL80211_WLAN_VO_PREFERRED]) {
+		if (!(wiphy->btcoex_support_flags &
+		      WIPHY_WLAN_VO_PREFERRED))
+			return -EINVAL;
+		btcoex_priority->wlan_vo_preferred =
+				WIPHY_WLAN_PREFERRED_HIGH;
+	}
+	if (tb[NL80211_WLAN_BEACON_PREFERRED]) {
+		if (!(wiphy->btcoex_support_flags &
+		      WIPHY_WLAN_BEACON_PREFERRED))
+			return -EINVAL;
+		btcoex_priority->wlan_beacon_preferred =
+				WIPHY_WLAN_PREFERRED_HIGH;
+	}
+	if (tb[NL80211_WLAN_MGMT_PREFERRED]) {
+		if (!(wiphy->btcoex_support_flags &
+		      WIPHY_WLAN_MGMT_PREFERRED))
+			return -EINVAL;
+		btcoex_priority->wlan_mgmt_preferred =
+				WIPHY_WLAN_PREFERRED_HIGH;
+	}
+	return 0;
+}
+
+static int nl80211_btcoex_priority(struct sk_buff *skb, struct genl_info *info)
+{
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct net_device *dev = info->user_ptr[1];
+	struct cfg80211_btcoex_priority btcoex_priority = {};
+	struct wiphy wiphy = rdev->wiphy;
+	struct nlattr *tb[NL80211_WLAN_PREFERRED_MAX + 1];
+	int err;
+
+	if (!rdev->ops->set_btcoex_priority)
+		return -EOPNOTSUPP;
+
+	if (!(info->attrs[NL80211_ATTR_SET_BTCOEX_PRIORITY]))
+		return -EINVAL;
+
+	err = nla_parse(tb, NL80211_WLAN_PREFERRED_MAX,
+			nla_data(info->attrs[NL80211_ATTR_SET_BTCOEX_PRIORITY]),
+			nla_len(info->attrs[NL80211_ATTR_SET_BTCOEX_PRIORITY]),
+			wlan_preferred_policy);
+
+	if (err)
+		return err;
+
+	err = parse_btcoex_priority(tb, &wiphy, &btcoex_priority);
+
+	if (err)
+		return -EINVAL;
+
+	return rdev_set_btcoex_priority(rdev, dev, &btcoex_priority);
+}
+
 #define NL80211_FLAG_NEED_WIPHY		0x01
 #define NL80211_FLAG_NEED_NETDEV	0x02
 #define NL80211_FLAG_NEED_RTNL		0x04
@@ -12615,6 +12708,14 @@ static const struct genl_ops nl80211_ops[] = {
 		.policy = nl80211_policy,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
+				  NL80211_FLAG_NEED_RTNL,
+	},
+	{
+		.cmd = NL80211_CMD_SET_BTCOEX_PRIORITY,
+		.doit = nl80211_btcoex_priority,
+		.policy = nl80211_policy,
+		.flags = GENL_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_WIPHY |
 				  NL80211_FLAG_NEED_RTNL,
 	},
 };

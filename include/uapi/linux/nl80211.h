@@ -874,6 +874,10 @@
  *	This will contain a %NL80211_ATTR_NAN_MATCH nested attribute and
  *	%NL80211_ATTR_COOKIE.
  *
+ * @NL80211_CMD_SET_BTCOEX_PRIORITY: Set high priority for driver supported
+ *	wlan frames for BTCOEX over bluetooth. High priority frame type
+ *	identified by %NL80211_ATTR_SET_BTCOEX_PRIORITY parameters.
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -1068,6 +1072,8 @@ enum nl80211_commands {
 	NL80211_CMD_DEL_NAN_FUNCTION,
 	NL80211_CMD_CHANGE_NAN_CONFIG,
 	NL80211_CMD_NAN_MATCH,
+
+	NL80211_CMD_SET_BTCOEX_PRIORITY,
 
 	/* add new commands above here */
 
@@ -1941,6 +1947,11 @@ enum nl80211_commands {
  *	the btcoex feature. When used with %NL80211_CMD_SET_WIPHY it contains
  *	either 0 for disable or 1 for enable btcoex.
  *
+ * @NL80211_ATTR_SET_BTCOEX_PRIORITY: nested attribute for driver supporting
+ *	the BTCOEX. When used with %NL80211_CMD_SET_BTCOEX_PRIORITY it contains
+ *	attributes according &enum nl80211_btcoex_priority to indicate
+ *	which frame has high priority over BT.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2341,6 +2352,7 @@ enum nl80211_attrs {
 	NL80211_ATTR_NAN_MATCH,
 
 	NL80211_ATTR_WIPHY_BTCOEX_ENABLE,
+	NL80211_ATTR_SET_BTCOEX_PRIORITY,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -3548,6 +3560,31 @@ enum nl80211_chan_width {
 	NL80211_CHAN_WIDTH_160,
 	NL80211_CHAN_WIDTH_5,
 	NL80211_CHAN_WIDTH_10,
+};
+
+/**
+ * enum nl80211_btcoex_priority - BTCOEX parameter attributes
+ *	This strcuture has enum values for driver supported wlan
+ *	frame type for BTCOEX.
+ * @NL80211_WLAN_BE_PREFERRED - Best Effort frame
+ * @NL80211_WLAN_BK_PREFERRED - Background frame
+ * @NL80211_WLAN_VI_PREFERRED - Video frame
+ * @NL80211_WLAN_VO_PREFERRED - Voice frame
+ * @NL80211_WLAN_BEACON_PREFERRED - BEACON frame
+ * @NL80211_WLAN_MGMT_PREFERRED - MGMT frame
+ */
+
+enum nl80211_btcoex_priority {
+	__NL80211_WLAN_PREFERRED_INVALID,
+	NL80211_WLAN_BE_PREFERRED,
+	NL80211_WLAN_BK_PREFERRED,
+	NL80211_WLAN_VI_PREFERRED,
+	NL80211_WLAN_VO_PREFERRED,
+	NL80211_WLAN_BEACON_PREFERRED,
+	NL80211_WLAN_MGMT_PREFERRED,
+	__NL80211_WLAN_PREFERRED_LAST,
+	NL80211_WLAN_PREFERRED_MAX =
+			__NL80211_WLAN_PREFERRED_LAST - 1,
 };
 
 /**

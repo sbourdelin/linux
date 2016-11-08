@@ -3031,6 +3031,49 @@ DEFINE_EVENT(wiphy_enabled_evt, rdev_set_btcoex,
 	TP_ARGS(wiphy, enabled)
 );
 
+TRACE_EVENT(rdev_set_btcoex_priority,
+	TP_PROTO(struct wiphy *wiphy,
+		 struct cfg80211_btcoex_priority *btcoex_priority),
+	TP_ARGS(wiphy, btcoex_priority),
+	TP_STRUCT__entry(
+		WIPHY_ENTRY
+		__field(bool, wlan_be_preferred)
+		__field(bool, wlan_bk_preferred)
+		__field(bool, wlan_vi_preferred)
+		__field(bool, wlan_vo_preferred)
+		__field(bool, wlan_beacon_preferred)
+		__field(bool, wlan_mgmt_preferred)
+	),
+	TP_fast_assign(
+		WIPHY_ASSIGN;
+		if (btcoex_priority) {
+			__entry->wlan_be_preferred =
+				btcoex_priority->wlan_be_preferred;
+			__entry->wlan_bk_preferred =
+				btcoex_priority->wlan_bk_preferred;
+			__entry->wlan_vi_preferred =
+				btcoex_priority->wlan_vi_preferred;
+			__entry->wlan_vo_preferred =
+				btcoex_priority->wlan_vo_preferred;
+			__entry->wlan_beacon_preferred =
+				btcoex_priority->wlan_beacon_preferred;
+			__entry->wlan_mgmt_preferred =
+				btcoex_priority->wlan_mgmt_preferred;
+		}
+	),
+	TP_printk(WIPHY_PR_FMT ", wlan_be_preferred: %d, "
+		  "wlan_bk_preferred: %d, "
+		  "wlan_vi_preferred: %d,"
+		  "wlan_vo_preferred: %d, "
+		  "wlan_beacon_preferred: %d "
+		  "wlan_mgmt_preferred: %d.",
+		  WIPHY_PR_ARG, __entry->wlan_be_preferred,
+		  __entry->wlan_bk_preferred,
+		  __entry->wlan_vi_preferred,
+		  __entry->wlan_vo_preferred,
+		  __entry->wlan_beacon_preferred,
+		  __entry->wlan_mgmt_preferred)
+);
 DEFINE_EVENT(wiphy_wdev_evt, rdev_abort_scan,
 	TP_PROTO(struct wiphy *wiphy, struct wireless_dev *wdev),
 	TP_ARGS(wiphy, wdev)

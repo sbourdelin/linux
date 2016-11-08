@@ -2406,6 +2406,27 @@ struct cfg80211_nan_func {
 };
 
 /**
+ * struct cfg80211_btcoex_priority - BTCOEX support frame type
+ *
+ * This structure defines the driver supporting frame types for BTCOEX
+ *
+ * @wlan_be_preferred: best effort frames preferred over bt traffic
+ * @wlan_bk_preferred: background frames preferred over bt traffic
+ * @wlan_vi_preferred: video frames preferred over bt traffic
+ * @wlan_vo_preferred: voice frames preferred over bt traffic
+ * @wlan_beacon_preferred: beacon preferred over bt traffic
+ * @wlan_mgmt_preferred: management frames preferred ovet bt traffic
+ */
+struct cfg80211_btcoex_priority {
+	bool wlan_be_preferred;
+	bool wlan_bk_preferred;
+	bool wlan_vi_preferred;
+	bool wlan_vo_preferred;
+	bool wlan_beacon_preferred;
+	bool wlan_mgmt_preferred;
+};
+
+/**
  * struct cfg80211_ops - backend description for wireless configuration
  *
  * This struct is registered by fullmac card drivers and/or wireless stacks
@@ -2708,6 +2729,11 @@ struct cfg80211_nan_func {
  *	All other parameters must be ignored.
  * @set_btcoex: Use this callback to call driver API when user wants to
  *     enable/disable btcoex.
+ * @set_btcoex_priority: Use this callback to set wlan high
+ *     priority frames over bluetooth. Driver supported wlan frames
+ *     for the BTCOEX is exposed by btcoex_support_flags.
+ *     When BTCOEX enabled, the high priority wlan frames will have
+ *     more priority than BT.
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -2985,6 +3011,8 @@ struct cfg80211_ops {
 				   struct cfg80211_nan_conf *conf,
 				   u32 changes);
 	int     (*set_btcoex)(struct wiphy *wiphy, bool enabled);
+	int     (*set_btcoex_priority)(struct wiphy *wiphy,
+			struct cfg80211_btcoex_priority *btcoex_priority);
 };
 
 /*
@@ -3217,6 +3245,38 @@ struct wiphy_wowlan_support {
 };
 
 /**
+ * wiphy_btcoex_support_flags
+ *	This enum has the driver supported frame types for BTCOEX.
+ * @WIPHY_WLAN_BE_PREFERRED - Supports Best Effort frame for BTCOEX
+ * @WIPHY_WLAN_BK_PREFERRED - supports Background frame for BTCOEX
+ * @WIPHY_WLAN_VI_PREFERRED - supports Video frame for BTCOEX
+ * @WIPHY_WLAN_VO_PREFERRED - supports Voice frame for BTCOEX
+ * @WIPHY_WLAN_BEACON_PREFERRED - supports Beacon frame for BTCOEX
+ * @WIPHY_WLAN_MGMT_PREFERRED - supports Management frames for BTCOEX.
+ */
+
+enum wiphy_btcoex_support_flags {
+	WIPHY_WLAN_BE_PREFERRED		= BIT(0),
+	WIPHY_WLAN_BK_PREFERRED		= BIT(1),
+	WIPHY_WLAN_VI_PREFERRED		= BIT(2),
+	WIPHY_WLAN_VO_PREFERRED		= BIT(3),
+	WIPHY_WLAN_BEACON_PREFERRED	= BIT(4),
+	WIPHY_WLAN_MGMT_PREFERRED	= BIT(5),
+};
+
+/**
+ * enum wiphy_btcoex_priority - BTCOEX priority level
+ *	This enum defines priority level for BTCOEX
+ * WIPHY_WLAN_PREFERRED_LOW - low priority frames over BT traffic
+ * WIPHY_WLAN_PREFERRED_HIGH - high priority frames over BT traffic
+ */
+
+enum wiphy_btcoex_priority {
+	WIPHY_WLAN_PREFERRED_LOW = false,
+	WIPHY_WLAN_PREFERRED_HIGH = true,
+};
+
+/**
  * struct wiphy_coalesce_support - coalesce support data
  * @n_rules: maximum number of coalesce rules
  * @max_delay: maximum supported coalescing delay in msecs
@@ -3394,6 +3454,10 @@ struct wiphy_iftype_ext_capab {
  *	used since access to it is necessarily racy, use the parameter passed
  *	to the suspend() operation instead.
  *
+ * @btcoex_support_flags: This will have the driver supported
+ *	frame types for BTCOEX. This value filled by using
+ *	%enum wiphy_btcoex_support_flags while driver
+ *	initialization.
  * @ap_sme_capa: AP SME capabilities, flags from &enum nl80211_ap_sme_features.
  * @ht_capa_mod_mask:  Specify what ht_cap values can be over-ridden.
  *	If null, then none can be over-ridden.
@@ -3502,6 +3566,7 @@ struct wiphy {
 	struct cfg80211_wowlan *wowlan_config;
 #endif
 
+	u32 btcoex_support_flags;
 	u16 max_remain_on_channel_duration;
 
 	u8 max_num_pmkids;
