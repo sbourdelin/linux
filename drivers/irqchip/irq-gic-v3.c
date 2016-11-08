@@ -355,6 +355,13 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
 			if (static_key_true(&supports_deactivate))
 				gic_write_eoir(irqnr);
 
+			if (irqnr == lpitest->irqnr) {
+				lpitest->end_cycles = pmu_read_cycles();
+				lpitest->done = 0;
+				wake_up_interruptible(&lpitest->wq);
+				continue;
+			}
+
 			err = handle_domain_irq(gic_data.domain, irqnr, regs);
 			if (err) {
 				WARN_ONCE(true, "Unexpected interrupt received!\n");

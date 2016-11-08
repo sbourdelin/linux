@@ -449,6 +449,29 @@ static inline bool gic_enable_sre(void)
 	return !!(val & ICC_SRE_EL1_SRE);
 }
 
+#include <linux/wait.h>
+
+extern void flush_dcache_all(void);
+
+static __always_inline volatile u64 pmu_read_cycles(void)
+{
+        u64 cycles;
+
+        asm volatile("mrs %0, pmccntr_el0\n"
+                     "isb \n\t": [reg] "=r" (cycles));
+        return cycles;
+}
+
+struct lpitest_cntx {
+	u64 total_cycles;
+	u64 end_cycles;
+	u32 irqnr;
+	u32 done;
+	wait_queue_head_t wq;
+};
+
+extern struct lpitest_cntx *lpitest;
+
 #endif
 
 #endif

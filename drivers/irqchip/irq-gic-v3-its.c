@@ -1793,3 +1793,163 @@ int __init its_init(struct device_node *node, struct rdists *rdists,
 
 	return 0;
 }
+#include <linux/debugfs.h>
+
+struct lpitest_cntx lpitest1 = {
+	.wq = __WAIT_QUEUE_HEAD_INITIALIZER(lpitest1.wq),
+};
+struct lpitest_cntx *lpitest = &lpitest1;
+
+static struct its_device *lpi_its_dev;
+
+static struct its_collection *its_build_int_cmd(struct its_cmd_block *cmd,
+						struct its_cmd_desc *desc)
+{
+	struct its_collection *col;
+
+	col = dev_event_to_col(desc->its_inv_cmd.dev,
+			       desc->its_inv_cmd.event_id);
+
+	its_encode_cmd(cmd, 0x03);
+	its_encode_devid(cmd, desc->its_inv_cmd.dev->device_id);
+	its_encode_event_id(cmd, desc->its_inv_cmd.event_id);
+
+	its_fixup_cmd(cmd);
+
+	return col;
+}
+
+static void its_send_int(struct its_device *dev, u32 event_id)
+{
+	struct its_cmd_desc desc;
+
+	desc.its_inv_cmd.dev = dev;
+	desc.its_inv_cmd.event_id = event_id;
+
+	its_send_single_command(dev->its, its_build_int_cmd, &desc);
+}
+
+static ssize_t lpitest_write(struct file *file, const char __user *buffer,
+		size_t count, loff_t *pos)
+{
+	unsigned long val, lcnt;
+	u64 cycles, dcycles, mcycles = ~0;
+	int cpu, ret;
+
+	ret = kstrtoul_from_user(buffer, count, 10, &val);
+	if (ret || val <= 0)
+		return ret;
+
+	preempt_disable();
+
+	flush_dcache_all();
+
+	cpu = smp_processor_id();
+	*pos += count;
+	lpitest->irqnr = lpi_its_dev->event_map.lpi_base + cpu;
+
+	lpitest->total_cycles = 0;
+	lcnt = val;
+	while (val) {
+		cycles = pmu_read_cycles();
+		lpitest->done = 1;
+		its_send_int(lpi_its_dev, cpu);
+		wait_event_interruptible(lpitest->wq, !lpitest->done);
+		dcycles = lpitest->end_cycles - cycles;
+		lpitest->total_cycles += dcycles;
+		if (mcycles > dcycles)
+			mcycles = dcycles;
+		val--;
+	}
+	preempt_enable();
+
+	pr_info("CPU[%d] niter=%ld cycles=0x%lx avg=0x%lx min=0x%lx\n", cpu,
+		(unsigned long)lcnt,
+	        (unsigned long)lpitest->total_cycles,
+		(unsigned long)lpitest->total_cycles/lcnt,
+		(unsigned long)mcycles);
+
+	return ret ? ret : count;
+}
+
+static int lpitest_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, NULL, NULL);
+}
+
+static const struct file_operations lpitest_fops = {
+	.owner = THIS_MODULE,
+	.open = lpitest_proc_open,
+	.read = seq_read,
+	.write = lpitest_write,
+};
+
+static void pmu_enable_cycle_counter(void *discard)
+{
+	u64 tmp;
+
+	asm volatile("mrs %0, pmcr_el0\n"
+		"orr %0, %0, #(1 << 0)\n"
+		"orr %0, %0, #(1 << 2)\n"
+		"bic %0, %0, #(1 << 3)\n"
+		"orr %0, %0, #(1 << 6)\n"
+		"msr pmcr_el0, %0\n"
+		"mov %0, #0b11111\n"
+		"msr pmselr_el0, %0\n"
+		"isb \n"
+		"mrs %0, pmxevtyper_el0\n"
+		"orr %0, %0, #(1 << 27)\n"
+		"bic %0, %0, #(3 << 30)\n"
+		"bic %0, %0, #(3 << 28)\n"
+		"msr pmxevtyper_el0, %0\n"
+		"mrs %0, pmcntenset_el0\n"
+		"orr %0, %0, #(1 << 31)\n"
+		"msr pmcntenset_el0, %0\n"
+		: "=r" (tmp));
+}
+
+static int __init its_lpitest_init(void)
+{
+	struct its_device *its_dev;
+	struct its_node *its;
+	struct dentry *dentry;
+	irq_hw_number_t hwirq;
+	int i, nvec = 64;
+	u8 *cfg;
+
+	if (list_empty(&its_nodes))
+		return 0;
+	its = list_first_entry(&its_nodes, struct its_node, entry);
+
+	dentry = debugfs_create_file("lpitest", 0666, NULL, NULL, &lpitest_fops);
+	if (!dentry) {
+		pr_err("failed to create debugfs for its-lpitest");
+		return -ENOMEM;
+	}
+
+	its_dev = its_create_device(its, 0xFFFF, nvec);
+	if (!its_dev) {
+		pr_err("failed to create its device for lpitest");
+		return -ENOMEM;
+	}
+
+	lpi_its_dev = its_dev;
+	hwirq = its_dev->event_map.lpi_base;
+	cfg = page_address(gic_rdists->prop_page) + hwirq - 8192;
+
+	for (i = 0; i < nvec; i++) {
+		lpi_its_dev->event_map.col_map[i] = i;
+		its_send_mapvi(its_dev, hwirq + i, i);
+		*cfg |= LPI_PROP_ENABLED;
+		dsb(ishst);
+		its_send_inv(its_dev, i);
+		cfg++;
+	}
+
+	on_each_cpu(pmu_enable_cycle_counter, NULL, 1);
+
+	pr_info("lpitest successfully initialized lpi_base=%d\n", (u32)hwirq);
+
+	return 0;
+}
+late_initcall(its_lpitest_init);
