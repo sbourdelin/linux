@@ -1410,7 +1410,7 @@ int kernfs_remove_by_name_ns(struct kernfs_node *parent, const char *name,
 	mutex_lock(&kernfs_mutex);
 
 	kn = kernfs_find_ns(parent, name, ns);
-	if (kn)
+	if (kn && !(kn->flags & KERNFS_SUICIDED))
 		__kernfs_remove(kn);
 
 	mutex_unlock(&kernfs_mutex);
