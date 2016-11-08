@@ -90,9 +90,10 @@ static int tegra_gmi_parse_dt(struct tegra_gmi *gmi)
 {
 	struct device_node *child;
 	u32 property, ranges[4];
+	struct device *dev = gmi->dev;
 	int err;
 
-	child = of_get_next_available_child(gmi->dev->of_node, NULL);
+	child = of_get_next_available_child(dev->of_node, NULL);
 	if (!child) {
 		dev_err(dev, "no child nodes found\n");
 		return -ENODEV;
