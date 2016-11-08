@@ -269,7 +269,7 @@ static int digitv_probe(struct usb_interface *intf,
 {
 	struct dvb_usb_device *d;
 	int ret = dvb_usb_device_init(intf, &digitv_properties, THIS_MODULE, &d,
-				      adapter_nr);
+				      adapter_nr, NULL);
 	if (ret == 0) {
 		u8 b[4] = { 0 };
 

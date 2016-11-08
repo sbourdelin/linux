@@ -562,7 +562,7 @@ static int opera1_probe(struct usb_interface *intf,
 	}
 
 	if (0 != dvb_usb_device_init(intf, &opera1_properties,
-				     THIS_MODULE, NULL, adapter_nr))
+				     THIS_MODULE, NULL, adapter_nr, NULL))
 		return -EINVAL;
 	return 0;
 }

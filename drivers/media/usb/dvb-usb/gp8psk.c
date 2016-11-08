@@ -260,7 +260,7 @@ static int gp8psk_usb_probe(struct usb_interface *intf,
 	int ret;
 	struct usb_device *udev = interface_to_usbdev(intf);
 	ret = dvb_usb_device_init(intf, &gp8psk_properties,
-				  THIS_MODULE, NULL, adapter_nr);
+				  THIS_MODULE, NULL, adapter_nr, NULL);
 	if (ret == 0) {
 		info("found Genpix USB device pID = %x (hex)",
 			le16_to_cpu(udev->descriptor.idProduct));

@@ -78,7 +78,7 @@ static int umt_probe(struct usb_interface *intf,
 		const struct usb_device_id *id)
 {
 	if (0 == dvb_usb_device_init(intf, &umt_properties,
-				     THIS_MODULE, NULL, adapter_nr))
+				     THIS_MODULE, NULL, adapter_nr, NULL))
 		return 0;
 	return -EINVAL;
 }

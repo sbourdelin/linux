@@ -437,7 +437,7 @@ static int friio_probe(struct usb_interface *intf,
 	}
 
 	ret = dvb_usb_device_init(intf, &friio_properties,
-				  THIS_MODULE, &d, adapter_nr);
+				  THIS_MODULE, &d, adapter_nr, NULL);
 	if (ret == 0)
 		friio_streaming_ctrl(&d->adapter[0], 1);
 

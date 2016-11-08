@@ -835,14 +835,14 @@ static int m920x_probe(struct usb_interface *intf,
 		 */
 
 		ret = dvb_usb_device_init(intf, &megasky_properties,
-					  THIS_MODULE, &d, adapter_nr);
+					  THIS_MODULE, &d, adapter_nr, NULL);
 		if (ret == 0) {
 			rc_init_seq = megasky_rc_init;
 			goto found;
 		}
 
 		ret = dvb_usb_device_init(intf, &digivox_mini_ii_properties,
-					  THIS_MODULE, &d, adapter_nr);
+					  THIS_MODULE, &d, adapter_nr, NULL);
 		if (ret == 0) {
 			/* No remote control, so no rc_init_seq */
 			goto found;
@@ -850,28 +850,28 @@ static int m920x_probe(struct usb_interface *intf,
 
 		/* This configures both tuners on the TV Walker Twin */
 		ret = dvb_usb_device_init(intf, &tvwalkertwin_properties,
-					  THIS_MODULE, &d, adapter_nr);
+					  THIS_MODULE, &d, adapter_nr, NULL);
 		if (ret == 0) {
 			rc_init_seq = tvwalkertwin_rc_init;
 			goto found;
 		}
 
 		ret = dvb_usb_device_init(intf, &dposh_properties,
-					  THIS_MODULE, &d, adapter_nr);
+					  THIS_MODULE, &d, adapter_nr, NULL);
 		if (ret == 0) {
 			/* Remote controller not supported yet. */
 			goto found;
 		}
 
 		ret = dvb_usb_device_init(intf, &pinnacle_pctv310e_properties,
-					  THIS_MODULE, &d, adapter_nr);
+					  THIS_MODULE, &d, adapter_nr, NULL);
 		if (ret == 0) {
 			rc_init_seq = pinnacle310e_init;
 			goto found;
 		}
 
 		ret = dvb_usb_device_init(intf, &vp7049_properties,
-					  THIS_MODULE, &d, adapter_nr);
+					  THIS_MODULE, &d, adapter_nr, NULL);
 		if (ret == 0) {
 			rc_init_seq = vp7049_rc_init;
 			goto found;

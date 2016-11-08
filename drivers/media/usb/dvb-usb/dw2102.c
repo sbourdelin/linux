@@ -2285,27 +2285,27 @@ static int dw2102_probe(struct usb_interface *intf,
 	s421->adapter->fe[0].frontend_attach = m88rs2000_frontend_attach;
 
 	if (0 == dvb_usb_device_init(intf, &dw2102_properties,
-			THIS_MODULE, NULL, adapter_nr) ||
+			THIS_MODULE, NULL, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, &dw2104_properties,
-			THIS_MODULE, NULL, adapter_nr) ||
+			THIS_MODULE, NULL, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, &dw3101_properties,
-			THIS_MODULE, NULL, adapter_nr) ||
+			THIS_MODULE, NULL, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, &s6x0_properties,
-			THIS_MODULE, NULL, adapter_nr) ||
+			THIS_MODULE, NULL, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, p1100,
-			THIS_MODULE, NULL, adapter_nr) ||
+			THIS_MODULE, NULL, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, s660,
-			THIS_MODULE, NULL, adapter_nr) ||
+			THIS_MODULE, NULL, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, p7500,
-			THIS_MODULE, NULL, adapter_nr) ||
+			THIS_MODULE, NULL, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, s421,
-			THIS_MODULE, NULL, adapter_nr) ||
+			THIS_MODULE, NULL, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, &su3000_properties,
-			 THIS_MODULE, NULL, adapter_nr) ||
+			 THIS_MODULE, NULL, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, &t220_properties,
-			 THIS_MODULE, NULL, adapter_nr) ||
+			 THIS_MODULE, NULL, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, &tt_s2_4600_properties,
-			 THIS_MODULE, NULL, adapter_nr))
+			 THIS_MODULE, NULL, adapter_nr, NULL))
 		return 0;
 
 	return -ENODEV;

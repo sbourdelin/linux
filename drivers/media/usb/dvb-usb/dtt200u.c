@@ -149,15 +149,15 @@ static int dtt200u_usb_probe(struct usb_interface *intf,
 	struct dtt200u_state *st;
 
 	if (0 == dvb_usb_device_init(intf, &dtt200u_properties,
-				     THIS_MODULE, &d, adapter_nr) ||
+				     THIS_MODULE, &d, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, &wt220u_properties,
-				     THIS_MODULE, &d, adapter_nr) ||
+				     THIS_MODULE, &d, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, &wt220u_fc_properties,
-				     THIS_MODULE, &d, adapter_nr) ||
+				     THIS_MODULE, &d, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, &wt220u_zl0353_properties,
-				     THIS_MODULE, &d, adapter_nr) ||
+				     THIS_MODULE, &d, adapter_nr, NULL) ||
 	    0 == dvb_usb_device_init(intf, &wt220u_miglia_properties,
-				     THIS_MODULE, &d, adapter_nr)) {
+				     THIS_MODULE, &d, adapter_nr, NULL)) {
 		st = d->priv;
 		mutex_init(&st->data_mutex);
 

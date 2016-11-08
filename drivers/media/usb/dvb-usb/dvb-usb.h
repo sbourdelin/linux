@@ -458,7 +458,9 @@ struct dvb_usb_device {
 extern int dvb_usb_device_init(struct usb_interface *,
 			       struct dvb_usb_device_properties *,
 			       struct module *, struct dvb_usb_device **,
-			       short *adapter_nums);
+			       short *adapter_nums,
+			       int (init_device)(struct dvb_usb_device *d));
+
 extern void dvb_usb_device_exit(struct usb_interface *);
 
 /* the generic read/write method for device control */

@@ -1009,7 +1009,7 @@ static int af9005_usb_probe(struct usb_interface *intf,
 	int ret;
 
 	ret = dvb_usb_device_init(intf, &af9005_properties,
-				  THIS_MODULE, &d, adapter_nr);
+				  THIS_MODULE, &d, adapter_nr, NULL);
 
 	if (ret < 0)
 		return ret;

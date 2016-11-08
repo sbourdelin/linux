@@ -165,7 +165,7 @@ static int dtv5100_probe(struct usb_interface *intf,
 	}
 
 	ret = dvb_usb_device_init(intf, &dtv5100_properties,
-				  THIS_MODULE, NULL, adapter_nr);
+				  THIS_MODULE, NULL, adapter_nr, NULL);
 	if (ret)
 		return ret;
 

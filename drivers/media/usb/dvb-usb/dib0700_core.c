@@ -868,7 +868,7 @@ static int dib0700_probe(struct usb_interface *intf,
 
 	for (i = 0; i < dib0700_device_count; i++)
 		if (dvb_usb_device_init(intf, &dib0700_devices[i], THIS_MODULE,
-		    &dev, adapter_nr) == 0) {
+		    &dev, adapter_nr, NULL) == 0) {
 			struct dib0700_state *st = dev->priv;
 			u32 hwversion, romversion, fw_version, fwtype;
 

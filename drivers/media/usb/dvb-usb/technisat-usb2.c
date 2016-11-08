@@ -764,7 +764,7 @@ static int technisat_usb2_probe(struct usb_interface *intf,
 	struct dvb_usb_device *dev;
 
 	if (dvb_usb_device_init(intf, &technisat_usb2_devices, THIS_MODULE,
-				&dev, adapter_nr) != 0)
+				&dev, adapter_nr, NULL) != 0)
 		return -ENODEV;
 
 	if (dev) {

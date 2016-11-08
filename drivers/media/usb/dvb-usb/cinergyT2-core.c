@@ -204,24 +204,21 @@ ret:
 	return ret;
 }
 
-static int cinergyt2_usb_probe(struct usb_interface *intf,
-				const struct usb_device_id *id)
+static int cinergyT2_init_mutex(struct dvb_usb_device *d)
 {
-	struct dvb_usb_device *d;
-	struct cinergyt2_state *st;
-	int ret;
+	struct cinergyt2_state *st = d->priv;
 
-	ret = dvb_usb_device_init(intf, &cinergyt2_properties,
-				  THIS_MODULE, &d, adapter_nr);
-	if (ret < 0)
-		return ret;
-
-	st = d->priv;
 	mutex_init(&st->data_mutex);
-
 	return 0;
 }
 
+static int cinergyt2_usb_probe(struct usb_interface *intf,
+				const struct usb_device_id *id)
+{
+	return dvb_usb_device_init(intf, &cinergyt2_properties,
+				   THIS_MODULE, NULL, adapter_nr,
+				   cinergyT2_init_mutex);
+}
 
 static struct usb_device_id cinergyt2_usb_table[] = {
 	{ USB_DEVICE(USB_VID_TERRATEC, 0x0038) },

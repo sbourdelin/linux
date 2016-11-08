@@ -946,7 +946,7 @@ static int az6027_usb_probe(struct usb_interface *intf,
 				   &az6027_properties,
 				   THIS_MODULE,
 				   NULL,
-				   adapter_nr);
+				   adapter_nr, NULL);
 }
 
 /* I2C */

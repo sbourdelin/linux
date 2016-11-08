@@ -138,22 +138,13 @@ static int dvb_usb_exit(struct dvb_usb_device *d)
 	return 0;
 }
 
-static int dvb_usb_init(struct dvb_usb_device *d, short *adapter_nums)
+static int dvb_usb_init(struct dvb_usb_device *d, short *adapter_nums,
+			int (init_device)(struct dvb_usb_device *d))
 {
 	int ret = 0;
 
 	mutex_init(&d->usb_mutex);
 	mutex_init(&d->i2c_mutex);
-
-	d->state = DVB_USB_STATE_INIT;
-
-	if (d->props.size_of_priv > 0) {
-		d->priv = kzalloc(d->props.size_of_priv, GFP_KERNEL);
-		if (d->priv == NULL) {
-			err("no memory for priv in 'struct dvb_usb_device'");
-			return -ENOMEM;
-		}
-	}
 
 	/* check the capabilities and set appropriate variables */
 	dvb_usb_device_power_ctrl(d, 1);
@@ -233,7 +224,8 @@ int dvb_usb_device_power_ctrl(struct dvb_usb_device *d, int onoff)
 int dvb_usb_device_init(struct usb_interface *intf,
 			struct dvb_usb_device_properties *props,
 			struct module *owner, struct dvb_usb_device **du,
-			short *adapter_nums)
+			short *adapter_nums,
+			int (init_device)(struct dvb_usb_device *d))
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
 	struct dvb_usb_device *d = NULL;
@@ -249,18 +241,41 @@ int dvb_usb_device_init(struct usb_interface *intf,
 		return -ENODEV;
 	}
 
-	if (cold) {
-		info("found a '%s' in cold state, will try to load a firmware", desc->name);
-		ret = dvb_usb_download_firmware(udev, props);
-		if (!props->no_reconnect || ret != 0)
-			return ret;
-	}
-
-	info("found a '%s' in warm state.", desc->name);
 	d = kzalloc(sizeof(struct dvb_usb_device), GFP_KERNEL);
 	if (d == NULL) {
 		err("no memory for 'struct dvb_usb_device'");
 		return -ENOMEM;
+	}
+	d->state = DVB_USB_STATE_INIT;
+
+	if (d->props.size_of_priv > 0) {
+		d->priv = kzalloc(d->props.size_of_priv, GFP_KERNEL);
+		if (d->priv == NULL) {
+			err("no memory for priv in 'struct dvb_usb_device'");
+			ret = -ENOMEM;
+			goto err;
+		}
+	}
+
+	/*
+	 * Some drivers may need to early initialize the device private data,
+	 * for example, when a mutex is serializing URB reads/writes,
+	 * in order for dvb_usb_device_power_ctrl() or firmware load to work.
+	 */
+	if (init_device) {
+		ret = init_device(d);
+		if (ret < 0)
+			goto err;
+	}
+
+	if (cold) {
+		info("found a '%s' in cold state, will try to load a firmware",
+		     desc->name);
+		ret = dvb_usb_download_firmware(udev, props);
+		if (!props->no_reconnect || ret != 0)
+			goto err;
+	} else {
+		info("found a '%s' in warm state.", desc->name);
 	}
 
 	d->udev = udev;
@@ -273,12 +288,17 @@ int dvb_usb_device_init(struct usb_interface *intf,
 	if (du != NULL)
 		*du = d;
 
-	ret = dvb_usb_init(d, adapter_nums);
+	ret = dvb_usb_init(d, adapter_nums, init_device);
 
-	if (ret == 0)
+	if (!ret) {
 		info("%s successfully initialized and connected.", desc->name);
-	else
-		info("%s error while loading driver (%d)", desc->name, ret);
+		return 0;
+	}
+err:
+	info("%s error while loading driver (%d)", desc->name, ret);
+
+	kfree(d->priv);
+	kfree(d);
 	return ret;
 }
 EXPORT_SYMBOL(dvb_usb_device_init);

@@ -107,7 +107,7 @@ static int a800_probe(struct usb_interface *intf,
 		const struct usb_device_id *id)
 {
 	return dvb_usb_device_init(intf, &a800_properties,
-				   THIS_MODULE, NULL, adapter_nr);
+				   THIS_MODULE, NULL, adapter_nr, NULL);
 }
 
 /* do not change the order of the ID table */

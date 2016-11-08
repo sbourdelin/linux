@@ -337,7 +337,7 @@ static int vp702x_usb_probe(struct usb_interface *intf,
 	int ret;
 
 	ret = dvb_usb_device_init(intf, &vp702x_properties,
-				   THIS_MODULE, &d, adapter_nr);
+				   THIS_MODULE, &d, adapter_nr, NULL);
 	if (ret)
 		goto out;
 
