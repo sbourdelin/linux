@@ -172,6 +172,7 @@ struct devfreq {
 	struct delayed_work work;
 
 	unsigned long previous_freq;
+	unsigned long suspend_freq;
 	struct devfreq_dev_status last_status;
 
 	void *data; /* private data for governors */
@@ -179,6 +180,7 @@ struct devfreq {
 	unsigned long min_freq;
 	unsigned long max_freq;
 	bool stop_polling;
+	bool suspend_flag;
 
 	/* information for device frequency transition */
 	unsigned int total_trans;
@@ -214,6 +216,8 @@ extern int devfreq_resume_device(struct devfreq *devfreq);
 /* Helper functions for devfreq user device driver with OPP. */
 extern struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
 					   unsigned long *freq, u32 flags);
+extern void devfreq_opp_get_suspend_opp(struct device *dev,
+					struct devfreq *devfreq);
 extern int devfreq_register_opp_notifier(struct device *dev,
 					 struct devfreq *devfreq);
 extern int devfreq_unregister_opp_notifier(struct device *dev,
@@ -346,6 +350,11 @@ static inline struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
 					   unsigned long *freq, u32 flags)
 {
 	return ERR_PTR(-EINVAL);
+}
+
+static inline void devfreq_opp_get_suspend_opp(struct device *dev,
+					       struct devfreq *devfreq)
+{
 }
 
 static inline int devfreq_register_opp_notifier(struct device *dev,
