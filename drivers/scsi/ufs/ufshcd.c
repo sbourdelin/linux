@@ -1011,7 +1011,10 @@ static inline bool ufshcd_ready_for_uic_cmd(struct ufs_hba *hba)
  */
 static inline u8 ufshcd_get_upmcrs(struct ufs_hba *hba)
 {
-	return (ufshcd_readl(hba, REG_CONTROLLER_STATUS) >> 8) & 0x7;
+	if (hba->quirks & UFSHCD_QUIRK_GET_VS_RESULT)
+		return (u8)ufshcd_vops_get_vs_info(hba, VS_OP_03);
+	else
+		return (ufshcd_readl(hba, REG_CONTROLLER_STATUS) >> 8) & 0x7;
 }
 
 /**
@@ -1038,6 +1041,17 @@ ufshcd_dispatch_uic_cmd(struct ufs_hba *hba, struct uic_command *uic_cmd)
 		      REG_UIC_COMMAND);
 }
 
+static inline enum vs_opcode ufshcd_get_vs_opcode(struct uic_command *uic_cmd)
+{
+	if (uic_cmd->command == UIC_CMD_DME_LINK_STARTUP)
+		return VS_OP_00;
+	else if ((uic_cmd->command == UIC_CMD_DME_HIBER_ENTER))
+		return VS_OP_01;
+	else if ((uic_cmd->command == UIC_CMD_DME_HIBER_EXIT))
+		return VS_OP_02;
+	else
+		return VS_OP_INVALID;
+}
 /**
  * ufshcd_wait_for_uic_cmd - Wait complectioin of UIC command
  * @hba: per adapter instance
@@ -1051,11 +1065,16 @@ ufshcd_wait_for_uic_cmd(struct ufs_hba *hba, struct uic_command *uic_cmd)
 {
 	int ret;
 	unsigned long flags;
+	enum vs_opcode vs_op = ufshcd_get_vs_opcode(uic_cmd);
 
 	if (wait_for_completion_timeout(&uic_cmd->done,
-					msecs_to_jiffies(UIC_CMD_TIMEOUT)))
-		ret = uic_cmd->argument2 & MASK_UIC_COMMAND_RESULT;
-	else
+					msecs_to_jiffies(UIC_CMD_TIMEOUT))) {
+		if (hba->quirks & UFSHCD_QUIRK_GET_VS_RESULT &&
+					vs_op != VS_OP_INVALID)
+			ret = ufshcd_vops_get_vs_info(hba, vs_op);
+		else
+			ret = uic_cmd->argument2 & MASK_UIC_COMMAND_RESULT;
+	} else
 		ret = -ETIMEDOUT;
 
 	spin_lock_irqsave(hba->host->host_lock, flags);

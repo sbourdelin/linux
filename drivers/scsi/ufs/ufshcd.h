@@ -245,6 +245,14 @@ struct ufs_pwr_mode_info {
 	struct ufs_pa_layer_attr info;
 };
 
+enum vs_opcode {
+	VS_OP_00 = 0x00,
+	VS_OP_01,
+	VS_OP_02,
+	VS_OP_03,
+	VS_OP_INVALID = 0xFF,
+};
+
 /**
  * struct ufs_hba_variant_ops - variant specific callbacks
  * @name: variant name
@@ -288,6 +296,7 @@ struct ufs_hba_variant_ops {
 	int     (*resume)(struct ufs_hba *, enum ufs_pm_op);
 	void	(*dbg_register_dump)(struct ufs_hba *hba);
 	int	(*phy_initialization)(struct ufs_hba *);
+	int	(*get_vs_info)(struct ufs_hba *hba, enum vs_opcode);
 };
 
 /* clock gating state  */
@@ -474,6 +483,8 @@ struct ufs_hba {
 	 * ops (get_ufs_hci_version) to get the correct version.
 	 */
 	#define UFSHCD_QUIRK_BROKEN_UFS_HCI_VERSION		UFS_BIT(5)
+
+	#define UFSHCD_QUIRK_GET_VS_RESULT			UFS_BIT(6)
 
 	unsigned int quirks;	/* Deviations from standard UFSHCI spec. */
 
@@ -821,6 +832,15 @@ static inline void ufshcd_vops_dbg_register_dump(struct ufs_hba *hba)
 {
 	if (hba->vops && hba->vops->dbg_register_dump)
 		hba->vops->dbg_register_dump(hba);
+}
+
+static inline int ufshcd_vops_get_vs_info(struct ufs_hba *hba,
+					enum vs_opcode op)
+{
+	if (hba->vops && hba->vops->get_vs_info)
+		return hba->vops->get_vs_info(hba, op);
+
+	return -ENOTSUPP;
 }
 
 #endif /* End of Header */
