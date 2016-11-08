@@ -414,6 +414,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_NAN_MASTER_PREF] = { .type = NLA_U8 },
 	[NL80211_ATTR_NAN_DUAL] = { .type = NLA_U8 },
 	[NL80211_ATTR_NAN_FUNC] = { .type = NLA_NESTED },
+	[NL80211_ATTR_WIPHY_BTCOEX_ENABLE] = { .type = NLA_U8 },
 };
 
 /* policy for the key attributes */
@@ -2346,6 +2347,23 @@ static int nl80211_set_wiphy(struct sk_buff *skb, struct genl_info *info)
 		}
 
 		result = rdev_set_tx_power(rdev, txp_wdev, type, mbm);
+		if (result)
+			return result;
+	}
+
+	if (info->attrs[NL80211_ATTR_WIPHY_BTCOEX_ENABLE]) {
+		u8 val;
+
+		if (!rdev->ops->set_btcoex)
+			return -ENOTSUPP;
+
+		val = nla_get_u8(info->attrs[NL80211_ATTR_WIPHY_BTCOEX_ENABLE]);
+
+		if (val > 1)
+			return -EINVAL;
+
+		result = rdev_set_btcoex(rdev, val);
+
 		if (result)
 			return result;
 	}

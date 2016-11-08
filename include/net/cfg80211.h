@@ -2706,6 +2706,8 @@ struct cfg80211_nan_func {
  * @nan_change_conf: changes NAN configuration. The changed parameters must
  *	be specified in @changes (using &enum cfg80211_nan_conf_changes);
  *	All other parameters must be ignored.
+ * @set_btcoex: Use this callback to call driver API when user wants to
+ *     enable/disable btcoex.
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -2982,6 +2984,7 @@ struct cfg80211_ops {
 				   struct wireless_dev *wdev,
 				   struct cfg80211_nan_conf *conf,
 				   u32 changes);
+	int     (*set_btcoex)(struct wiphy *wiphy, bool enabled);
 };
 
 /*

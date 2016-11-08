@@ -1937,6 +1937,10 @@ enum nl80211_commands {
  * @NL80211_ATTR_NAN_MATCH: used to report a match. This is a nested attribute.
  *	See &enum nl80211_nan_match_attributes.
  *
+ * @NL80211_ATTR_WIPHY_BTCOEX_ENABLE: u8 attribute for driver supporting
+ *	the btcoex feature. When used with %NL80211_CMD_SET_WIPHY it contains
+ *	either 0 for disable or 1 for enable btcoex.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2335,6 +2339,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_NAN_DUAL,
 	NL80211_ATTR_NAN_FUNC,
 	NL80211_ATTR_NAN_MATCH,
+
+	NL80211_ATTR_WIPHY_BTCOEX_ENABLE,
 
 	/* add attributes here, update the policy in nl80211.c */
 

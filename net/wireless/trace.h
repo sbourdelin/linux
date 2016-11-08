@@ -3026,6 +3026,11 @@ TRACE_EVENT(rdev_set_coalesce,
 		  WIPHY_PR_ARG, __entry->n_rules)
 );
 
+DEFINE_EVENT(wiphy_enabled_evt, rdev_set_btcoex,
+	TP_PROTO(struct wiphy *wiphy, bool enabled),
+	TP_ARGS(wiphy, enabled)
+);
+
 DEFINE_EVENT(wiphy_wdev_evt, rdev_abort_scan,
 	TP_PROTO(struct wiphy *wiphy, struct wireless_dev *wdev),
 	TP_ARGS(wiphy, wdev)
