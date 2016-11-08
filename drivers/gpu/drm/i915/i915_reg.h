@@ -5374,18 +5374,21 @@ enum {
 #define _SPBCONSTALPHA		(VLV_DISPLAY_BASE + 0x722a8)
 #define _SPBGAMC		(VLV_DISPLAY_BASE + 0x722f4)
 
-#define SPCNTR(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPACNTR, _SPBCNTR)
-#define SPLINOFF(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPALINOFF, _SPBLINOFF)
-#define SPSTRIDE(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPASTRIDE, _SPBSTRIDE)
-#define SPPOS(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPAPOS, _SPBPOS)
-#define SPSIZE(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPASIZE, _SPBSIZE)
-#define SPKEYMINVAL(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPAKEYMINVAL, _SPBKEYMINVAL)
-#define SPKEYMSK(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPAKEYMSK, _SPBKEYMSK)
-#define SPSURF(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPASURF, _SPBSURF)
-#define SPKEYMAXVAL(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPAKEYMAXVAL, _SPBKEYMAXVAL)
-#define SPTILEOFF(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPATILEOFF, _SPBTILEOFF)
-#define SPCONSTALPHA(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPACONSTALPHA, _SPBCONSTALPHA)
-#define SPGAMC(pipe, plane) _MMIO_PIPE((pipe) * 2 + (plane), _SPAGAMC, _SPBGAMC)
+#define _MMIO_VLV_SPR(pipe, plane, reg_a, reg_b) \
+	_MMIO_PIPE((pipe) * 2 + (plane) - PLANE_SPRITE0, (reg_a), (reg_b))
+
+#define SPCNTR(pipe, plane)		_MMIO_VLV_SPR((pipe), (plane), _SPACNTR, _SPBCNTR)
+#define SPLINOFF(pipe, plane)		_MMIO_VLV_SPR((pipe), (plane), _SPALINOFF, _SPBLINOFF)
+#define SPSTRIDE(pipe, plane)		_MMIO_VLV_SPR((pipe), (plane), _SPASTRIDE, _SPBSTRIDE)
+#define SPPOS(pipe, plane)		_MMIO_VLV_SPR((pipe), (plane), _SPAPOS, _SPBPOS)
+#define SPSIZE(pipe, plane)		_MMIO_VLV_SPR((pipe), (plane), _SPASIZE, _SPBSIZE)
+#define SPKEYMINVAL(pipe, plane)	_MMIO_VLV_SPR((pipe), (plane), _SPAKEYMINVAL, _SPBKEYMINVAL)
+#define SPKEYMSK(pipe, plane)		_MMIO_VLV_SPR((pipe), (plane), _SPAKEYMSK, _SPBKEYMSK)
+#define SPSURF(pipe, plane)		_MMIO_VLV_SPR((pipe), (plane), _SPASURF, _SPBSURF)
+#define SPKEYMAXVAL(pipe, plane)	_MMIO_VLV_SPR((pipe), (plane), _SPAKEYMAXVAL, _SPBKEYMAXVAL)
+#define SPTILEOFF(pipe, plane)		_MMIO_VLV_SPR((pipe), (plane), _SPATILEOFF, _SPBTILEOFF)
+#define SPCONSTALPHA(pipe, plane)	_MMIO_VLV_SPR((pipe), (plane), _SPACONSTALPHA, _SPBCONSTALPHA)
+#define SPGAMC(pipe, plane)		_MMIO_VLV_SPR((pipe), (plane), _SPAGAMC, _SPBGAMC)
 
 /*
  * CHV pipe B sprite CSC
@@ -5394,29 +5397,32 @@ enum {
  * |yg| = |c3 c4 c5| x |yg + yg_ioff| + |yg_ooff|
  * |cb|   |c6 c7 c8|   |cb + cr_ioff|   |cb_ooff|
  */
-#define SPCSCYGOFF(sprite)	_MMIO(VLV_DISPLAY_BASE + 0x6d900 + (sprite) * 0x1000)
-#define SPCSCCBOFF(sprite)	_MMIO(VLV_DISPLAY_BASE + 0x6d904 + (sprite) * 0x1000)
-#define SPCSCCROFF(sprite)	_MMIO(VLV_DISPLAY_BASE + 0x6d908 + (sprite) * 0x1000)
+#define _MMIO_CHV_SPCSC(plane, reg) \
+	_MMIO(VLV_DISPLAY_BASE + ((plane) - PLANE_SPRITE0) * 0x1000 + (reg))
+
+#define SPCSCYGOFF(plane)	_MMIO_CHV_SPCSC(plane, 0x6d900)
+#define SPCSCCBOFF(plane)	_MMIO_CHV_SPCSC(plane, 0x6d904)
+#define SPCSCCROFF(plane)	_MMIO_CHV_SPCSC(plane, 0x6d908)
 #define  SPCSC_OOFF(x)		(((x) & 0x7ff) << 16) /* s11 */
 #define  SPCSC_IOFF(x)		(((x) & 0x7ff) << 0) /* s11 */
 
-#define SPCSCC01(sprite)	_MMIO(VLV_DISPLAY_BASE + 0x6d90c + (sprite) * 0x1000)
-#define SPCSCC23(sprite)	_MMIO(VLV_DISPLAY_BASE + 0x6d910 + (sprite) * 0x1000)
-#define SPCSCC45(sprite)	_MMIO(VLV_DISPLAY_BASE + 0x6d914 + (sprite) * 0x1000)
-#define SPCSCC67(sprite)	_MMIO(VLV_DISPLAY_BASE + 0x6d918 + (sprite) * 0x1000)
-#define SPCSCC8(sprite)		_MMIO(VLV_DISPLAY_BASE + 0x6d91c + (sprite) * 0x1000)
+#define SPCSCC01(plane)		_MMIO_CHV_SPCSC(plane, 0x6d90c)
+#define SPCSCC23(plane)		_MMIO_CHV_SPCSC(plane, 0x6d910)
+#define SPCSCC45(plane)		_MMIO_CHV_SPCSC(plane, 0x6d914)
+#define SPCSCC67(plane)		_MMIO_CHV_SPCSC(plane, 0x6d918)
+#define SPCSCC8(plane)		_MMIO_CHV_SPCSC(plane, 0x6d91c)
 #define  SPCSC_C1(x)		(((x) & 0x7fff) << 16) /* s3.12 */
 #define  SPCSC_C0(x)		(((x) & 0x7fff) << 0) /* s3.12 */
 
-#define SPCSCYGICLAMP(sprite)	_MMIO(VLV_DISPLAY_BASE + 0x6d920 + (sprite) * 0x1000)
-#define SPCSCCBICLAMP(sprite)	_MMIO(VLV_DISPLAY_BASE + 0x6d924 + (sprite) * 0x1000)
-#define SPCSCCRICLAMP(sprite)	_MMIO(VLV_DISPLAY_BASE + 0x6d928 + (sprite) * 0x1000)
+#define SPCSCYGICLAMP(plane)	_MMIO_CHV_SPCSC(plane, 0x6d920)
+#define SPCSCCBICLAMP(plane)	_MMIO_CHV_SPCSC(plane, 0x6d924)
+#define SPCSCCRICLAMP(plane)	_MMIO_CHV_SPCSC(plane, 0x6d928)
 #define  SPCSC_IMAX(x)		(((x) & 0x7ff) << 16) /* s11 */
 #define  SPCSC_IMIN(x)		(((x) & 0x7ff) << 0) /* s11 */
 
-#define SPCSCYGOCLAMP(sprite)	_MMIO(VLV_DISPLAY_BASE + 0x6d92c + (sprite) * 0x1000)
-#define SPCSCCBOCLAMP(sprite)	_MMIO(VLV_DISPLAY_BASE + 0x6d930 + (sprite) * 0x1000)
-#define SPCSCCROCLAMP(sprite)	_MMIO(VLV_DISPLAY_BASE + 0x6d934 + (sprite) * 0x1000)
+#define SPCSCYGOCLAMP(plane)	_MMIO_CHV_SPCSC(plane, 0x6d92c)
+#define SPCSCCBOCLAMP(plane)	_MMIO_CHV_SPCSC(plane, 0x6d930)
+#define SPCSCCROCLAMP(plane)	_MMIO_CHV_SPCSC(plane, 0x6d934)
 #define  SPCSC_OMAX(x)		((x) << 16) /* u10 */
 #define  SPCSC_OMIN(x)		((x) << 0) /* u10 */
 
