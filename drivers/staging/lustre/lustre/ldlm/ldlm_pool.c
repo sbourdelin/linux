@@ -256,7 +256,7 @@ static int ldlm_cli_pool_recalc(struct ldlm_pool *pl)
 	time64_t recalc_interval_sec;
 	int ret;
 
-	recalc_interval_sec = ktime_get_real_seconds() - pl->pl_recalc_time;
+	recalc_interval_sec = ktime_get_seconds() - pl->pl_recalc_time;
 	if (recalc_interval_sec < pl->pl_recalc_period)
 		return 0;
 
@@ -264,7 +264,7 @@ static int ldlm_cli_pool_recalc(struct ldlm_pool *pl)
 	/*
 	 * Check if we need to recalc lists now.
 	 */
-	recalc_interval_sec = ktime_get_real_seconds() - pl->pl_recalc_time;
+	recalc_interval_sec = ktime_get_seconds() - pl->pl_recalc_time;
 	if (recalc_interval_sec < pl->pl_recalc_period) {
 		spin_unlock(&pl->pl_lock);
 		return 0;
@@ -301,7 +301,7 @@ out:
 	 * Time of LRU resizing might be longer than period,
 	 * so update after LRU resizing rather than before it.
 	 */
-	pl->pl_recalc_time = ktime_get_real_seconds();
+	pl->pl_recalc_time = ktime_get_seconds();
 	lprocfs_counter_add(pl->pl_stats, LDLM_POOL_TIMING_STAT,
 			    recalc_interval_sec);
 	spin_unlock(&pl->pl_lock);
