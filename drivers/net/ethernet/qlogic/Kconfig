@@ -113,16 +113,4 @@ config QED_RDMA
 config QED_ISCSI
 	bool
 
-config QEDI
-	tristate "QLogic QED 25/40/100Gb iSCSI driver"
-	depends on QED
-	select QED_LL2
-	select QED_ISCSI
-	default n
-	---help---
-	  This provides a temporary node that allows the compilation
-	  and logical testing of the hardware offload iSCSI support
-	  for QLogic QED. This would be replaced by the 'real' option
-	  once the QEDI driver is added [+relocated].
-
 endif # NET_VENDOR_QLOGIC
