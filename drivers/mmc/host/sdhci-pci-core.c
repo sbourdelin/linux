@@ -27,6 +27,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/mmc/slot-gpio.h>
 #include <linux/mmc/sdhci-pci-data.h>
+#include <linux/acpi.h>
 
 #include "sdhci.h"
 #include "sdhci-pci.h"
@@ -377,6 +378,35 @@ static int byt_emmc_probe_slot(struct sdhci_pci_slot *slot)
 
 static int ni_byt_sdio_probe_slot(struct sdhci_pci_slot *slot)
 {
+#ifdef CONFIG_ACPI
+	/* Get max freq from ACPI for NI hardware */
+	acpi_handle acpi_hdl;
+	acpi_status status;
+	struct acpi_buffer acpi_result = {
+		ACPI_ALLOCATE_BUFFER, NULL };
+	union acpi_object *acpi_buffer;
+	int max_freq;
+
+	status = acpi_get_handle(ACPI_HANDLE(&slot->chip->pdev->dev), "MXFQ",
+				 &acpi_hdl);
+	if (ACPI_FAILURE(status))
+		return  -ENODEV;
+
+	status = acpi_evaluate_object(acpi_hdl, NULL,
+				      NULL, &acpi_result);
+	if (ACPI_FAILURE(status))
+		return -EINVAL;
+
+	acpi_buffer = (union acpi_object *)acpi_result.pointer;
+
+	if (acpi_buffer->type != ACPI_TYPE_INTEGER)
+		return -EINVAL;
+
+	max_freq = acpi_buffer->integer.value;
+
+	slot->host->mmc->f_max = max_freq * 1000000;
+#endif
+
 	slot->host->mmc->caps |= MMC_CAP_POWER_OFF_CARD | MMC_CAP_NONREMOVABLE;
 	return 0;
 }
