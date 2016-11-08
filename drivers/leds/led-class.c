@@ -212,6 +212,7 @@ int led_classdev_register(struct device *parent, struct led_classdev *led_cdev)
 		return -ENODEV;
 	}
 
+	led_cdev->work_flags = 0;
 #ifdef CONFIG_LEDS_TRIGGERS
 	init_rwsem(&led_cdev->trigger_lock);
 #endif
