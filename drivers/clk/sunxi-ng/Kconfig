@@ -74,6 +74,16 @@ config SUN5I_A10S_CCU
 	select SUNXI_CCU_PHASE
 	default MACH_SUN5I
 
+config SUN5I_A13_CCU
+	bool "Support for the Allwinner A13 CCM"
+	select SUNXI_CCU_DIV
+	select SUNXI_CCU_NK
+	select SUNXI_CCU_NKM
+	select SUNXI_CCU_NM
+	select SUNXI_CCU_MP
+	select SUNXI_CCU_PHASE
+	default MACH_SUN5I
+
 config SUN6I_A31_CCU
 	bool "Support for the Allwinner A31/A31s CCU"
 	select SUNXI_CCU_DIV
