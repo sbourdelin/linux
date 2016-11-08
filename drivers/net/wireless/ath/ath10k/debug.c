@@ -2153,6 +2153,9 @@ static ssize_t ath10k_write_btcoex(struct file *file,
 	if (strtobool(buf, &val) != 0)
 		return -EINVAL;
 
+	if (ar->btcoex_support == ATH10K_DT_BTCOEX_NOT_SUPPORTED)
+		return -EOPNOTSUPP;
+
 	mutex_lock(&ar->conf_mutex);
 	ret = ath10k_mac_set_btcoex(ar, val);
 	if (!ret)

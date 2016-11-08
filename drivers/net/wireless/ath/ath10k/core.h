@@ -657,6 +657,12 @@ enum ath10k_tx_pause_reason {
 	ATH10K_TX_PAUSE_MAX,
 };
 
+enum ath10k_dt_btcoex_support_flag {
+	ATH10K_DT_BTCOEX_NOT_FOUND,
+	ATH10K_DT_BTCOEX_SUPPORTED,
+	ATH10K_DT_BTCOEX_NOT_SUPPORTED,
+};
+
 struct ath10k_fw_file {
 	const struct firmware *firmware;
 
@@ -924,6 +930,9 @@ struct ath10k {
 		u32 reg_ack_cts_timeout_conf;
 		u32 reg_ack_cts_timeout_orig;
 	} fw_coverage;
+
+	enum ath10k_dt_btcoex_support_flag btcoex_support;
+	int btcoex_gpio_pin;
 
 	/* must be last */
 	u8 drv_priv[0] __aligned(sizeof(void *));

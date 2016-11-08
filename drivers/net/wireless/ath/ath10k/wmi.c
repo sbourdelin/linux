@@ -7811,6 +7811,7 @@ ath10k_wmi_10_4_ext_resource_config(struct ath10k *ar,
 	cmd = (struct wmi_ext_resource_config_10_4_cmd *)skb->data;
 	cmd->host_platform_config = __cpu_to_le32(type);
 	cmd->fw_feature_bitmap = __cpu_to_le32(fw_feature_bitmap);
+	cmd->btcoex_gpio_pin = __cpu_to_le32(ar->btcoex_gpio_pin);
 
 	ath10k_dbg(ar, ATH10K_DBG_WMI,
 		   "wmi ext resource config host type %d firmware feature bitmap %08x\n",
