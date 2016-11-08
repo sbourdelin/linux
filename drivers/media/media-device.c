@@ -684,6 +684,21 @@ void media_device_init(struct media_device *mdev)
 }
 EXPORT_SYMBOL_GPL(media_device_init);
 
+struct media_device *media_device_alloc(struct device *dev)
+{
+	struct media_device *mdev;
+
+	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
+	if (!mdev)
+		return NULL;
+
+	mdev->dev = dev;
+	media_device_init(mdev);
+
+	return mdev;
+}
+EXPORT_SYMBOL_GPL(media_device_alloc);
+
 void media_device_cleanup(struct media_device *mdev)
 {
 	ida_destroy(&mdev->entity_internal_idx);

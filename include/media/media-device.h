@@ -207,6 +207,15 @@ static inline __must_check int media_entity_enum_init(
 void media_device_init(struct media_device *mdev);
 
 /**
+ * media_device_alloc() - Allocate and initialise a media device
+ *
+ * @dev:	The associated struct device pointer
+ *
+ * Allocate and initialise a media device. Returns a media device.
+ */
+struct media_device *media_device_alloc(struct device *dev);
+
+/**
  * media_device_cleanup() - Cleanups a media device element
  *
  * @mdev:	pointer to struct &media_device
@@ -451,6 +460,10 @@ void __media_device_usb_init(struct media_device *mdev,
 			     const char *driver_name);
 
 #else
+static inline struct media_device *media_device_alloc(struct device *dev)
+{
+	return NULL;
+}
 static inline int media_device_register(struct media_device *mdev)
 {
 	return 0;
