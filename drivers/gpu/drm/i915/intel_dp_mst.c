@@ -492,8 +492,28 @@ static void intel_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 	struct intel_dp *intel_dp = container_of(mgr, struct intel_dp, mst_mgr);
 	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
 	struct drm_device *dev = intel_dig_port->base.base.dev;
+	struct intel_connector *intel_connector;
+	bool changed = false;
+	enum drm_connector_status old_status;
+	struct drm_mode_config *mode_config = &dev->mode_config;
 
-	drm_kms_helper_hotplug_event(dev);
+	mutex_lock(&mode_config->mutex);
+	for_each_intel_connector(dev, intel_connector) {
+		struct drm_connector *connector = &(intel_connector->base);
+
+		if (intel_connector->mst_port != intel_dp)
+			continue;
+
+		old_status = connector->status;
+		connector->status = connector->funcs->detect(connector, false);
+
+		if (old_status != connector->status)
+			changed = true;
+	}
+	mutex_unlock(&mode_config->mutex);
+
+	if (changed)
+		drm_kms_helper_hotplug_event(dev);
 }
 
 static const struct drm_dp_mst_topology_cbs mst_cbs = {
