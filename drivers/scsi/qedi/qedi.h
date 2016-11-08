@@ -21,6 +21,7 @@
 #include <linux/qed/qed_if.h>
 #include "qedi_dbg.h"
 #include <linux/qed/qed_iscsi_if.h>
+#include <linux/qed/qed_ll2_if.h>
 #include "qedi_version.h"
 
 #define QEDI_MODULE_NAME		"qedi"
@@ -54,6 +55,78 @@ struct qedi_endpoint;
 #define QEDI_LOCAL_PORT_MAX     61024
 #define QEDI_LOCAL_PORT_RANGE   (QEDI_LOCAL_PORT_MAX - QEDI_LOCAL_PORT_MIN)
 #define QEDI_LOCAL_PORT_INVALID	0xffff
+#define TX_RX_RING		16
+#define RX_RING			(TX_RX_RING - 1)
+#define LL2_SINGLE_BUF_SIZE	0x400
+#define QEDI_PAGE_SIZE		4096
+#define QEDI_PAGE_ALIGN(addr)	ALIGN(addr, QEDI_PAGE_SIZE)
+#define QEDI_PAGE_MASK		(~((QEDI_PAGE_SIZE) - 1))
+
+#define QEDI_PAGE_SIZE		4096
+#define QEDI_PATH_HANDLE	0xFE0000000UL
+
+struct qedi_uio_ctrl {
+	/* meta data */
+	u32 uio_hsi_version;
+
+	/* user writes */
+	u32 host_tx_prod;
+	u32 host_rx_cons;
+	u32 host_rx_bd_cons;
+	u32 host_tx_pkt_len;
+	u32 host_rx_cons_cnt;
+
+	/* driver writes */
+	u32 hw_tx_cons;
+	u32 hw_rx_prod;
+	u32 hw_rx_bd_prod;
+	u32 hw_rx_prod_cnt;
+
+	/* other */
+	u8 mac_addr[6];
+	u8 reserve[2];
+};
+
+struct qedi_rx_bd {
+	u32 rx_pkt_index;
+	u32 rx_pkt_len;
+	u16 vlan_id;
+};
+
+#define QEDI_RX_DESC_CNT	(QEDI_PAGE_SIZE / sizeof(struct qedi_rx_bd))
+#define QEDI_MAX_RX_DESC_CNT	(QEDI_RX_DESC_CNT - 1)
+#define QEDI_NUM_RX_BD		(QEDI_RX_DESC_CNT * 1)
+#define QEDI_MAX_RX_BD		(QEDI_NUM_RX_BD - 1)
+
+#define QEDI_NEXT_RX_IDX(x)	((((x) & (QEDI_MAX_RX_DESC_CNT)) ==	\
+				  (QEDI_MAX_RX_DESC_CNT - 1)) ?		\
+				 (x) + 2 : (x) + 1)
+
+struct qedi_uio_dev {
+	struct uio_info		qedi_uinfo;
+	u32			uio_dev;
+	struct list_head	list;
+
+	u32			ll2_ring_size;
+	void			*ll2_ring;
+
+	u32			ll2_buf_size;
+	void			*ll2_buf;
+
+	void			*rx_pkt;
+	void			*tx_pkt;
+
+	struct qedi_ctx		*qedi;
+	struct pci_dev		*pdev;
+	void			*uctrl;
+};
+
+/* List to maintain the skb pointers */
+struct skb_work_list {
+	struct list_head list;
+	struct sk_buff *skb;
+	u16 vlan_id;
+};
 
 /* Queue sizes in number of elements */
 #define QEDI_SQ_SIZE		MAX_OUSTANDING_TASKS_PER_CON
