@@ -76,4 +76,9 @@ void init_scattered_cpuid_features(struct cpuinfo_x86 *c)
 		if (msrval & (1ULL << mb->bit))
 			set_cpu_cap(c, mb->feature);
 	}
+
+	if (cpu_has(c, X86_FEATURE_CPUID_FAULT)) {
+		rdmsrl(MSR_MISC_FEATURES_ENABLES, msrval);
+		this_cpu_write(msr_misc_features_enables_shadow, msrval);
+	}
 }
