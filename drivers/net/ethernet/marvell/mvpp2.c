@@ -5651,32 +5651,28 @@ static int mvpp2_set_mac_address(struct net_device *dev, void *p)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
 	const struct sockaddr *addr = p;
-	int err;
+	int err, restart_dev = 0;
 
 	if (!is_valid_ether_addr(addr->sa_data)) {
 		err = -EADDRNOTAVAIL;
 		goto error;
 	}
 
-	if (!netif_running(dev)) {
-		err = mvpp2_prs_update_mac_da(dev, addr->sa_data);
-		if (!err)
-			return 0;
-		/* Reconfigure parser to accept the original MAC address */
+	if (netif_running(dev)) {
+		mvpp2_stop_dev(port);
+		restart_dev = 1;
+	}
+
+	err = mvpp2_prs_update_mac_da(dev, addr->sa_data);
+	if (err) {
+		/* Reconfigure parser accept the original MAC address */
 		mvpp2_prs_update_mac_da(dev, dev->dev_addr);
 		goto error;
 	}
 
-	mvpp2_stop_dev(port);
+	if (!restart_dev)
+		return 0;
 
-	err = mvpp2_prs_update_mac_da(dev, addr->sa_data);
-	if (!err)
-		goto out_start;
-
-	/* Reconfigure parser accept the original MAC address */
-	mvpp2_prs_update_mac_da(dev, dev->dev_addr);
-	goto error;
-out_start:
 	mvpp2_start_dev(port);
 	mvpp2_egress_enable(port);
 	mvpp2_ingress_enable(port);
