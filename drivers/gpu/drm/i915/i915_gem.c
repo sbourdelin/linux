@@ -3199,19 +3199,24 @@ err_unpin:
 void i915_gem_clflush_object(struct drm_i915_gem_object *obj,
 			     bool force)
 {
+	/*
+	 * Stolen memory is always coherent with the GPU as it is explicitly
+	 * marked as wc by the system, or the system is cache-coherent.
+	 * Similarly, we only access struct pages through the CPU cache, so
+	 * anything not backed by physical memory we consider to be always
+	 * coherent and not need clflushing.
+	 */
+	if (!i915_gem_object_has_struct_page(obj))
+		return;
+
 	/* If we don't have a page list set up, then we're not pinned
 	 * to GPU, and we can ignore the cache flush because it'll happen
 	 * again at bind time.
 	 */
-	if (!obj->mm.pages)
+	if (!obj->mm.pages) {
+		obj->cache_dirty = true;
 		return;
-
-	/*
-	 * Stolen memory is always coherent with the GPU as it is explicitly
-	 * marked as wc by the system, or the system is cache-coherent.
-	 */
-	if (obj->stolen || obj->phys_handle)
-		return;
+	}
 
 	/* If the GPU is snooping the contents of the CPU cache,
 	 * we do not need to manually clear the CPU cache lines.  However,
