@@ -3191,6 +3191,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 	pg.		[PARIDE]
 			See Documentation/blockdev/paride.txt.
 
+	phir3mwait=	[X86-64] Disable ring 3 MONITOR/MWAIT on Intel Xeon Phi
+			codenamed Knight Landing cpus.
+			It has no effect on cpus other than Intel Xeon Phi.
+			Format: { disable }
+			See Documentation/x86/x86_64/boot-options.txt
+
 	pirq=		[SMP,APIC] Manual mp-table setup
 			See Documentation/x86/i386/IO-APIC.txt.
 
