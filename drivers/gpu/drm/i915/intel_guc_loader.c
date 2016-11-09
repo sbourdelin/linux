@@ -699,12 +699,9 @@ fail:
 	DRM_DEBUG_DRIVER("GuC fw fetch status FAIL; err %d, fw %p, obj %p\n",
 		err, fw, guc_fw->guc_fw_obj);
 
-	mutex_lock(&dev->struct_mutex);
-	obj = guc_fw->guc_fw_obj;
+	obj = fetch_and_zero(&guc_fw->guc_fw_obj);
 	if (obj)
 		i915_gem_object_put(obj);
-	guc_fw->guc_fw_obj = NULL;
-	mutex_unlock(&dev->struct_mutex);
 
 	release_firmware(fw);		/* OK even if fw is NULL */
 	guc_fw->guc_fw_fetch_status = GUC_FIRMWARE_FAIL;
@@ -781,16 +778,17 @@ void intel_guc_fini(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
+	struct drm_i915_gem_object *obj;
 
 	mutex_lock(&dev->struct_mutex);
 	guc_interrupts_release(dev_priv);
 	i915_guc_submission_disable(dev_priv);
 	i915_guc_submission_fini(dev_priv);
-
-	if (guc_fw->guc_fw_obj)
-		i915_gem_object_put(guc_fw->guc_fw_obj);
-	guc_fw->guc_fw_obj = NULL;
 	mutex_unlock(&dev->struct_mutex);
+
+	obj = fetch_and_zero(&guc_fw->guc_fw_obj);
+	if (obj)
+		i915_gem_object_put(obj);
 
 	guc_fw->guc_fw_fetch_status = GUC_FIRMWARE_NONE;
 }
