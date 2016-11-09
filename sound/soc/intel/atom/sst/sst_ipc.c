@@ -240,6 +240,11 @@ static void process_fw_init(struct intel_sst_drv *sst_drv_ctx,
 			init->fw_version.type, init->fw_version.major,
 			init->fw_version.minor, init->fw_version.build);
 
+	/* Save FW version */
+	sst_drv_ctx->fw_version.type = init->fw_version.type;
+	sst_drv_ctx->fw_version.major = init->fw_version.major;
+	sst_drv_ctx->fw_version.minor = init->fw_version.minor;
+	sst_drv_ctx->fw_version.build = init->fw_version.build;
 ret:
 	sst_wake_up_block(sst_drv_ctx, retval, FW_DWNL_ID, 0 , NULL, 0);
 }
