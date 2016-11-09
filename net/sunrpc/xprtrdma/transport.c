@@ -259,7 +259,7 @@ xprt_rdma_connect_worker(struct work_struct *work)
 
 	dprintk("RPC:       %s: %sconnect\n", __func__,
 			r_xprt->rx_ep.rep_connected != 0 ? "re" : "");
-	rc = rpcrdma_ep_connect(&r_xprt->rx_ep, &r_xprt->rx_ia);
+	rc = rpcrdma_ep_connect(r_xprt);
 	if (rc)
 		xprt_wake_pending_tasks(xprt, rc);
 
