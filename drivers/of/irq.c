@@ -275,7 +275,10 @@ int of_irq_parse_raw(const __be32 *addr, struct of_phandle_args *out_irq)
 	of_node_put(ipar);
 	of_node_put(newpar);
 
-	return -EINVAL;
+	/* Positive non-zero return means no Level-triggered Interrupts
+	 * capability was found.
+	 */
+	return ENOENT;
 }
 EXPORT_SYMBOL_GPL(of_irq_parse_raw);
 

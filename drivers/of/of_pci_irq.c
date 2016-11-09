@@ -89,8 +89,14 @@ int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq
 	laddr[0] = cpu_to_be32((pdev->bus->number << 16) | (pdev->devfn << 8));
 	laddr[1] = laddr[2] = cpu_to_be32(0);
 	rc = of_irq_parse_raw(laddr, out_irq);
-	if (rc)
+
+	if (rc < 0) {
 		goto err;
+	} else if (rc > 0) {
+		dev_warn(&pdev->dev,
+			"of_irq_parse_pci() gave up. The slot of this device has no Level-triggered Interrupts capability.\n");
+		return -rc;
+	}
 	return 0;
 err:
 	dev_err(&pdev->dev, "of_irq_parse_pci() failed with rc=%d\n", rc);
