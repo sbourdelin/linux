@@ -33,7 +33,7 @@ static bool dma_init_coherent_memory(
 		goto out;
 
 	if (flags & DMA_MEMORY_MAP)
-		mem_base = memremap(phys_addr, size, MEMREMAP_WC);
+		mem_base = memremap(phys_addr, size, MEMREMAP_WB);
 	else
 		mem_base = ioremap(phys_addr, size);
 	if (!mem_base)
