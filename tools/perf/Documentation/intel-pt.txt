@@ -550,16 +550,6 @@ Unless /proc/sys/kernel/perf_event_paranoid is set to -1, unprivileged users
 have memory limits imposed upon them.  That affects what buffer sizes they can
 have as outlined above.
 
-Unless /proc/sys/kernel/perf_event_paranoid is set to -1, unprivileged users are
-not permitted to use tracepoints which means there is insufficient side-band
-information to decode Intel PT in per-cpu mode, and potentially workload-only
-mode too if the workload creates new processes.
-
-Note also, that to use tracepoints, read-access to debugfs is required.  So if
-debugfs is not mounted or the user does not have read-access, it will again not
-be possible to decode Intel PT in per-cpu mode.
-
-
 sched_switch tracepoint
 -----------------------
 
