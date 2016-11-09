@@ -2650,7 +2650,7 @@ static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 	 */
 	if (priv->xdp_ring_num == xdp_ring_num) {
 		if (prog) {
-			prog = bpf_prog_add(prog, priv->rx_ring_num - 1);
+			prog = bpf_prog_add(prog, priv->rx_ring_num);
 			if (IS_ERR(prog))
 				return PTR_ERR(prog);
 		}
@@ -2680,7 +2680,7 @@ static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 	}
 
 	if (prog) {
-		prog = bpf_prog_add(prog, priv->rx_ring_num - 1);
+		prog = bpf_prog_add(prog, priv->rx_ring_num);
 		if (IS_ERR(prog))
 			return PTR_ERR(prog);
 	}
