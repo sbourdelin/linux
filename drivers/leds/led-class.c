@@ -29,11 +29,23 @@ static ssize_t brightness_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	int ret;
 
-	/* no lock needed for this */
-	led_update_brightness(led_cdev);
+	mutex_lock(&led_cdev->led_access);
 
-	return sprintf(buf, "%u\n", led_cdev->brightness);
+	if (led_sysfs_is_disabled(led_cdev)) {
+		ret = -EBUSY;
+		goto unlock;
+	}
+
+	ret = led_update_brightness(led_cdev);
+	if (ret < 0)
+		goto unlock;
+
+	ret = sprintf(buf, "%u\n", led_cdev->brightness);
+unlock:
+	mutex_unlock(&led_cdev->led_access);
+	return ret;
 }
 
 static ssize_t brightness_store(struct device *dev,
