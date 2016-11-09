@@ -172,6 +172,7 @@ struct tegra_pmc_soc {
  * @lp0_vec_size: size of the LP0 warm boot code
  * @powergates_available: Bitmap of available power gates
  * @powergates_lock: mutex for power gate register access
+ * @io_pad_lock: Spinlock for IO pad voltage register access
  * @plat_subdevs: Platform device for PMC child devices.
  */
 struct tegra_pmc {
@@ -199,6 +200,7 @@ struct tegra_pmc {
 	DECLARE_BITMAP(powergates_available, TEGRA_POWERGATE_MAX);
 
 	struct mutex powergates_lock;
+	struct spinlock io_pad_lock;
 	struct platform_device **plat_subdevs;
 };
 
@@ -1114,7 +1116,7 @@ int tegra_io_pad_set_voltage(enum tegra_io_pad id,
 	if (pad->voltage == UINT_MAX)
 		return -ENOTSUPP;
 
-	mutex_lock(&pmc->powergates_lock);
+	spin_lock(&pmc->io_pad_lock);
 
 	/* write-enable PMC_PWR_DET_VALUE[pad->voltage] */
 	value = tegra_pmc_readl(PMC_PWR_DET);
@@ -1131,7 +1133,7 @@ int tegra_io_pad_set_voltage(enum tegra_io_pad id,
 
 	tegra_pmc_writel(value, PMC_PWR_DET_VALUE);
 
-	mutex_unlock(&pmc->powergates_lock);
+	spin_unlock(&pmc->io_pad_lock);
 
 	usleep_range(100, 250);
 
@@ -1835,6 +1837,7 @@ static int __init tegra_pmc_early_init(void)
 	u32 value;
 
 	mutex_init(&pmc->powergates_lock);
+	spin_lock_init(&pmc->io_pad_lock);
 
 	np = of_find_matching_node_and_match(NULL, tegra_pmc_match, &match);
 	if (!np) {
