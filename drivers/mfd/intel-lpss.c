@@ -485,6 +485,15 @@ static int resume_lpss_device(struct device *dev, void *data)
 int intel_lpss_prepare(struct device *dev)
 {
 	/*
+	 * This is safe because:
+	 * 1. The runtime suspend and system suspend
+	 * are of the same hook.
+	 * 2. This device is neither runtime wakeup source
+	 * nor system wakeup source.
+	 */
+	if (pm_runtime_status_suspended(dev))
+		return DPM_DIRECT_COMPLETE;
+	/*
 	 * Resume both child devices before entering system sleep. This
 	 * ensures that they are in proper state before they get suspended.
 	 */
@@ -501,9 +510,6 @@ int intel_lpss_suspend(struct device *dev)
 	/* Save device context */
 	for (i = 0; i < LPSS_PRIV_REG_COUNT; i++)
 		lpss->priv_ctx[i] = readl(lpss->priv + i * 4);
-
-	/* Put the device into reset state */
-	writel(0, lpss->priv + LPSS_PRIV_RESETS);
 
 	return 0;
 }
