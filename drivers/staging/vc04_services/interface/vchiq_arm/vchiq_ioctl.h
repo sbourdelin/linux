@@ -47,11 +47,24 @@ typedef struct {
 	unsigned int handle;       /* OUT */
 } VCHIQ_CREATE_SERVICE_T;
 
+struct vchiq_create_service32 {
+	struct vchiq_service_params32 params;
+	int is_open;
+	int is_vchi;
+	unsigned int handle;       /* OUT */
+};
+
 typedef struct {
 	unsigned int handle;
 	unsigned int count;
 	const VCHIQ_ELEMENT_T *elements;
 } VCHIQ_QUEUE_MESSAGE_T;
+
+struct vchiq_queue_message32 {
+	unsigned int handle;
+	unsigned int count;
+	u32 elements;
+};
 
 typedef struct {
 	unsigned int handle;
@@ -61,12 +74,27 @@ typedef struct {
 	VCHIQ_BULK_MODE_T mode;
 } VCHIQ_QUEUE_BULK_TRANSFER_T;
 
+struct vchiq_queue_bulk_transfer32 {
+	unsigned int handle;
+	u32 data;
+	unsigned int size;
+	u32 userdata;
+	VCHIQ_BULK_MODE_T mode;
+};
+
 typedef struct {
 	VCHIQ_REASON_T reason;
 	VCHIQ_HEADER_T *header;
 	void *service_userdata;
 	void *bulk_userdata;
 } VCHIQ_COMPLETION_DATA_T;
+
+struct vchiq_completion_data32 {
+	VCHIQ_REASON_T reason;
+	u32 header;
+	u32 service_userdata;
+	u32 bulk_userdata;
+};
 
 typedef struct {
 	unsigned int count;
@@ -76,6 +104,14 @@ typedef struct {
 	void **msgbufs;
 } VCHIQ_AWAIT_COMPLETION_T;
 
+struct vchiq_await_completion32 {
+	unsigned int count;
+	u32 buf;
+	unsigned int msgbufsize;
+	unsigned int msgbufcount; /* IN/OUT */
+	u32 msgbufs;
+};
+
 typedef struct {
 	unsigned int handle;
 	int blocking;
@@ -83,10 +119,22 @@ typedef struct {
 	void *buf;
 } VCHIQ_DEQUEUE_MESSAGE_T;
 
+struct vchiq_dequeue_message32 {
+	unsigned int handle;
+	int blocking;
+	unsigned int bufsize;
+	u32 buf;
+};
+
 typedef struct {
 	unsigned int config_size;
 	VCHIQ_CONFIG_T *pconfig;
 } VCHIQ_GET_CONFIG_T;
+
+struct vchiq_get_config32 {
+	unsigned int config_size;
+	u32 pconfig;
+};
 
 typedef struct {
 	unsigned int handle;
@@ -99,24 +147,43 @@ typedef struct {
 	size_t    num_bytes;
 } VCHIQ_DUMP_MEM_T;
 
+struct vchiq_dump_mem32 {
+	u32 virt_addr;
+	u32 num_bytes;
+};
+
 #define VCHIQ_IOC_CONNECT              _IO(VCHIQ_IOC_MAGIC,   0)
 #define VCHIQ_IOC_SHUTDOWN             _IO(VCHIQ_IOC_MAGIC,   1)
 #define VCHIQ_IOC_CREATE_SERVICE \
 	_IOWR(VCHIQ_IOC_MAGIC, 2, VCHIQ_CREATE_SERVICE_T)
+#define VCHIQ_IOC_CREATE_SERVICE32 \
+	_IOWR(VCHIQ_IOC_MAGIC, 2, struct vchiq_create_service32)
 #define VCHIQ_IOC_REMOVE_SERVICE       _IO(VCHIQ_IOC_MAGIC,   3)
 #define VCHIQ_IOC_QUEUE_MESSAGE \
 	_IOW(VCHIQ_IOC_MAGIC,  4, VCHIQ_QUEUE_MESSAGE_T)
+#define VCHIQ_IOC_QUEUE_MESSAGE32 \
+	_IOW(VCHIQ_IOC_MAGIC,  4, struct vchiq_queue_message32)
 #define VCHIQ_IOC_QUEUE_BULK_TRANSMIT \
 	_IOWR(VCHIQ_IOC_MAGIC, 5, VCHIQ_QUEUE_BULK_TRANSFER_T)
+#define VCHIQ_IOC_QUEUE_BULK_TRANSMIT32 \
+	_IOWR(VCHIQ_IOC_MAGIC, 5, struct vchiq_queue_bulk_transfer32)
 #define VCHIQ_IOC_QUEUE_BULK_RECEIVE \
 	_IOWR(VCHIQ_IOC_MAGIC, 6, VCHIQ_QUEUE_BULK_TRANSFER_T)
+#define VCHIQ_IOC_QUEUE_BULK_RECEIVE32 \
+	_IOWR(VCHIQ_IOC_MAGIC, 6, struct vchiq_queue_bulk_transfer32)
 #define VCHIQ_IOC_AWAIT_COMPLETION \
 	_IOWR(VCHIQ_IOC_MAGIC, 7, VCHIQ_AWAIT_COMPLETION_T)
+#define VCHIQ_IOC_AWAIT_COMPLETION32 \
+	_IOWR(VCHIQ_IOC_MAGIC, 7, struct vchiq_await_completion32)
 #define VCHIQ_IOC_DEQUEUE_MESSAGE \
 	_IOWR(VCHIQ_IOC_MAGIC, 8, VCHIQ_DEQUEUE_MESSAGE_T)
+#define VCHIQ_IOC_DEQUEUE_MESSAGE32 \
+	_IOWR(VCHIQ_IOC_MAGIC, 8, struct vchiq_dequeue_message32)
 #define VCHIQ_IOC_GET_CLIENT_ID        _IO(VCHIQ_IOC_MAGIC,   9)
 #define VCHIQ_IOC_GET_CONFIG \
 	_IOWR(VCHIQ_IOC_MAGIC, 10, VCHIQ_GET_CONFIG_T)
+#define VCHIQ_IOC_GET_CONFIG32 \
+	_IOWR(VCHIQ_IOC_MAGIC, 10, struct vchiq_get_config32)
 #define VCHIQ_IOC_CLOSE_SERVICE        _IO(VCHIQ_IOC_MAGIC,   11)
 #define VCHIQ_IOC_USE_SERVICE          _IO(VCHIQ_IOC_MAGIC,   12)
 #define VCHIQ_IOC_RELEASE_SERVICE      _IO(VCHIQ_IOC_MAGIC,   13)
@@ -124,6 +191,8 @@ typedef struct {
 	_IOW(VCHIQ_IOC_MAGIC,  14, VCHIQ_SET_SERVICE_OPTION_T)
 #define VCHIQ_IOC_DUMP_PHYS_MEM \
 	_IOW(VCHIQ_IOC_MAGIC,  15, VCHIQ_DUMP_MEM_T)
+#define VCHIQ_IOC_DUMP_PHYS_MEM32 \
+	_IOW(VCHIQ_IOC_MAGIC,  15, struct vchiq_dump_mem32)
 #define VCHIQ_IOC_LIB_VERSION          _IO(VCHIQ_IOC_MAGIC,   16)
 #define VCHIQ_IOC_CLOSE_DELIVERED      _IO(VCHIQ_IOC_MAGIC,   17)
 #define VCHIQ_IOC_MAX                  17
