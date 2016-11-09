@@ -332,6 +332,13 @@ hsw_hdmi_audio_config_update(struct intel_crtc *intel_crtc, enum port port,
 	int n;
 	u32 tmp;
 
+	/* reset CTS value to 0 */
+	tmp = I915_READ(HSW_AUD_M_CTS_ENABLE(pipe));
+	tmp &= ~AUD_CONFIG_M_MASK;
+	tmp &= ~AUD_M_CTS_M_VALUE_INDEX;
+	tmp |= AUD_M_CTS_M_PROG_ENABLE;
+	I915_WRITE(HSW_AUD_M_CTS_ENABLE(pipe), tmp);
+
 	tmp = I915_READ(HSW_AUD_CFG(pipe));
 	tmp &= ~AUD_CONFIG_N_VALUE_INDEX;
 	tmp &= ~AUD_CONFIG_PIXEL_CLOCK_HDMI_MASK;
@@ -351,10 +358,12 @@ hsw_hdmi_audio_config_update(struct intel_crtc *intel_crtc, enum port port,
 
 	I915_WRITE(HSW_AUD_CFG(pipe), tmp);
 
+	/*
+	 * Let's disable "Enable CTS or M Prog bit"
+	 * and let HW calculate the value
+	 */
 	tmp = I915_READ(HSW_AUD_M_CTS_ENABLE(pipe));
-	tmp &= ~AUD_CONFIG_M_MASK;
-	tmp &= ~AUD_M_CTS_M_VALUE_INDEX;
-	tmp |= AUD_M_CTS_M_PROG_ENABLE;
+	tmp &= ~AUD_M_CTS_M_PROG_ENABLE;
 	I915_WRITE(HSW_AUD_M_CTS_ENABLE(pipe), tmp);
 }
 
