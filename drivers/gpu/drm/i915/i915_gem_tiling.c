@@ -206,7 +206,7 @@ i915_gem_set_tiling(struct drm_device *dev, void *data,
 	}
 
 	mutex_lock(&dev->struct_mutex);
-	if (obj->pin_display || obj->framebuffer_references) {
+	if (obj->pin_display || atomic_read(&obj->framebuffer_references)) {
 		err = -EBUSY;
 		goto err;
 	}
