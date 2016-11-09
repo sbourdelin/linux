@@ -85,6 +85,7 @@ static void proc_cpufreq_output(void)
 }
 
 static int no_rounding;
+static int freq_info_truncated;
 static void print_speed(unsigned long speed)
 {
 	unsigned long tmp;
@@ -103,8 +104,10 @@ static void print_speed(unsigned long speed)
 	} else {
 		if (speed > 1000000) {
 			tmp = speed%10000;
-			if (tmp >= 5000)
+			if (tmp >= 5000) {
+				freq_info_truncated = 1;
 				speed += 10000;
+			}
 			printf("%u.%02u GHz", ((unsigned int) speed/1000000),
 				((unsigned int) (speed%1000000)/10000));
 		} else if (speed > 100000) {
@@ -243,6 +246,7 @@ static int get_boost_mode(unsigned int cpu)
 			printf(_("    %.0f MHz max turbo 1 active cores\n"),
 			       ratio * bclk);
 	}
+
 	return 0;
 }
 
@@ -641,5 +645,12 @@ int cmd_freq_info(int argc, char **argv)
 			return ret;
 		printf("\n");
 	}
+
+	if (freq_info_truncated) {
+		printf("  Warning! Frequency values shown are rounded off\n");
+		printf("  To set frequency use frequency values provided\n");
+		printf("  by \"cpupower frequency-info -n \"\n");
+	}
+
 	return ret;
 }
