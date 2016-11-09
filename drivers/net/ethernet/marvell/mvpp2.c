@@ -5663,9 +5663,8 @@ static int mvpp2_set_mac_address(struct net_device *dev, void *p)
 		if (!err)
 			return 0;
 		/* Reconfigure parser to accept the original MAC address */
-		err = mvpp2_prs_update_mac_da(dev, dev->dev_addr);
-		if (err)
-			goto error;
+		mvpp2_prs_update_mac_da(dev, dev->dev_addr);
+		goto error;
 	}
 
 	mvpp2_stop_dev(port);
@@ -5675,9 +5674,8 @@ static int mvpp2_set_mac_address(struct net_device *dev, void *p)
 		goto out_start;
 
 	/* Reconfigure parser accept the original MAC address */
-	err = mvpp2_prs_update_mac_da(dev, dev->dev_addr);
-	if (err)
-		goto error;
+	mvpp2_prs_update_mac_da(dev, dev->dev_addr);
+	goto error;
 out_start:
 	mvpp2_start_dev(port);
 	mvpp2_egress_enable(port);
