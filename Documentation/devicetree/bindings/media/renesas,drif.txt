@@ -1,0 +1,136 @@
+Renesas R-Car Gen3 Digital Radio Interface controller (DRIF)
+------------------------------------------------------------
+
+R-Car Gen3 DRIF is a serial slave device. It interfaces with a master
+device as shown below
+
++---------------------+                +---------------------+
+|                     |-----SCK------->|CLK                  |
+|       Master        |-----SS-------->|SYNC  DRIFn (slave)  |
+|                     |-----SD0------->|D0                   |
+|                     |-----SD1------->|D1                   |
++---------------------+                +---------------------+
+
+Each DRIF channel (drifn) consists of two sub-channels (drifn0 & drifn1).
+The sub-channels are like two individual channels in itself that share the
+common CLK & SYNC. Each sub-channel has it's own dedicated resources like
+irq, dma channels, address space & clock.
+
+The device tree model represents the channel and each of it's sub-channel
+as a separate node. The parent channel ties the sub-channels together with
+their phandles.
+
+Required properties of a sub-channel:
+-------------------------------------
+- compatible: "renesas,r8a7795-drif" if DRIF controller is a part of R8A7795 SoC.
+	      "renesas,rcar-gen3-drif" for a generic R-Car Gen3 compatible device.
+	      When compatible with the generic version, nodes must list the
+	      SoC-specific version corresponding to the platform first
+	      followed by the generic version.
+- reg: offset and length of that sub-channel.
+- interrupts: associated with that sub-channel.
+- clocks: phandle and clock specifier of that sub-channel.
+- clock-names: clock input name string: "fck".
+- dmas: phandles to the DMA channel of that sub-channel.
+- dma-names: names of the DMA channel: "rx".
+
+Optional properties of a sub-channel:
+-------------------------------------
+- power-domains: phandle to the respective power domain.
+
+Required properties of a channel:
+---------------------------------
+- pinctrl-0: pin control group to be used for this channel.
+- pinctrl-names: must be "default".
+- sub-channels : phandles to the two sub-channels.
+
+Optional properties of a channel:
+---------------------------------
+- port: child port node of a channel that defines the local and remote
+        endpoints. The remote endpoint is assumed to be a tuner subdevice
+	endpoint.
+- renesas,syncmd       : sync mode
+			 0 (Frame start sync pulse mode. 1-bit width pulse
+			    indicates start of a frame)
+			 1 (L/R sync or I2S mode) (default)
+- renesas,lsb-first    : empty property indicates lsb bit is received first.
+			 When not defined msb bit is received first (default)
+- renesas,syncac-pol-high  : empty property indicates sync signal polarity.
+			 When defined, active high or high->low sync signal.
+			 When not defined, active low or low->high sync signal
+			 (default)
+- renesas,dtdl         : delay between sync signal and start of reception.
+			 Must contain one of the following values:
+			 0   (no bit delay)
+			 50  (0.5-clock-cycle delay)
+			 100 (1-clock-cycle delay) (default)
+			 150 (1.5-clock-cycle delay)
+			 200 (2-clock-cycle delay)
+- renesas,syncdl       : delay between end of reception and sync signal edge.
+			 Must contain one of the following values:
+			 0   (no bit delay) (default)
+			 50  (0.5-clock-cycle delay)
+			 100 (1-clock-cycle delay)
+			 150 (1.5-clock-cycle delay)
+			 200 (2-clock-cycle delay)
+			 300 (3-clock-cycle delay)
+
+Example
+--------
+
+SoC common dtsi file
+
+		drif00: rif@e6f40000 {
+			compatible = "renesas,r8a7795-drif",
+				     "renesas,rcar-gen3-drif";
+			reg = <0 0xe6f40000 0 0x64>;
+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&cpg CPG_MOD 515>;
+			clock-names = "fck";
+			dmas = <&dmac1 0x20>, <&dmac2 0x20>;
+			dma-names = "rx", "rx";
+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+			status = "disabled";
+		};
+
+		drif01: rif@e6f50000 {
+			compatible = "renesas,r8a7795-drif",
+				     "renesas,rcar-gen3-drif";
+			reg = <0 0xe6f50000 0 0x64>;
+			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&cpg CPG_MOD 514>;
+			clock-names = "fck";
+			dmas = <&dmac1 0x22>, <&dmac2 0x22>;
+			dma-names = "rx", "rx";
+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+			status = "disabled";
+		};
+
+		drif0: rif@0 {
+			compatible = "renesas,r8a7795-drif",
+				     "renesas,rcar-gen3-drif";
+			sub-channels = <&drif00>, <&drif01>;
+			status = "disabled";
+		};
+
+Board specific dts file
+
+&drif00 {
+	status = "okay";
+};
+
+&drif01 {
+	status = "okay";
+};
+
+&drif0 {
+	pinctrl-0 = <&drif0_pins>;
+	pinctrl-names = "default";
+	renesas,syncac-pol-high;
+	status = "okay";
+	port {
+		drif0_ep: endpoint {
+		     remote-endpoint = <&tuner_subdev_ep>;
+		};
+	};
+};
