@@ -749,6 +749,10 @@ config VIDEO_SAA6752HS
 	  To compile this driver as a module, choose M here: the
 	  module will be called saa6752hs.
 
+comment "SDR tuner chips"
+
+source "drivers/media/i2c/max2175/Kconfig"
+
 comment "Miscellaneous helper chips"
 
 config VIDEO_THS7303
