@@ -734,7 +734,8 @@ struct perf_event_context {
 	struct list_head		active_ctx_list;
 	struct list_head		pinned_groups;
 	struct list_head		flexible_groups;
-	struct list_head		event_list;
+	struct list_head		*__percpu event_list;
+
 	int				nr_events;
 	int				nr_active;
 	int				is_active;
