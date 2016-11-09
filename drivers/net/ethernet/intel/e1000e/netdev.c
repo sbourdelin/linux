@@ -4679,11 +4679,12 @@ int e1000e_close(struct net_device *netdev)
 
 	if (!test_bit(__E1000_DOWN, &adapter->state)) {
 		e1000e_down(adapter, true);
-		e1000_free_irq(adapter);
 
 		/* Link status message must follow this format */
 		pr_info("%s NIC Link is Down\n", adapter->netdev->name);
 	}
+
+	e1000_free_irq(adapter);
 
 	napi_disable(&adapter->napi);
 
