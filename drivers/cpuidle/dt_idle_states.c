@@ -79,8 +79,17 @@ static int init_state_node(struct cpuidle_state *idle_state,
 		desc = state_node->name;
 
 	idle_state->flags = 0;
-	if (of_property_read_bool(state_node, "local-timer-stop"))
+	if (of_property_read_bool(state_node, "local-timer-stop")) {
 		idle_state->flags |= CPUIDLE_FLAG_TIMER_STOP;
+		/*
+		 * CPUIDLE_FLAG_TIMER_STOP guarantees that the local tick is
+		 * stopped and since this is not a "coupled" state interrupts
+		 * won't be enabled when it exits allowing the tick to be
+		 * frozen safely. So enter() can be also enter_freeze()
+		 * callback.
+		 */
+		idle_state->enter_freeze = match_id->data;
+	}
 	/*
 	 * TODO:
 	 *	replace with kstrdup and pointer assignment when name
