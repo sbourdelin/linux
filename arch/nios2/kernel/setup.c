@@ -23,6 +23,7 @@
 #include <asm/sections.h>
 #include <asm/setup.h>
 #include <asm/cpuinfo.h>
+#include <linux/screen_info.h>
 
 unsigned long memory_start;
 EXPORT_SYMBOL(memory_start);
@@ -35,6 +36,15 @@ unsigned long memory_size;
 static struct pt_regs fake_regs = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 					0, 0, 0, 0, 0, 0,
 					0};
+
+#if defined(CONFIG_VGA_CONSOLE)
+struct screen_info screen_info = {
+	.orig_video_lines      = 25,
+	.orig_video_cols       = 80,
+	.orig_video_isVGA      = 1,
+	.orig_video_points     = 8
+};
+#endif
 
 /* Copy a short hook instruction sequence to the exception address */
 static inline void copy_exception_handler(unsigned int addr)
