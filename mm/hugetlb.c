@@ -1163,7 +1163,7 @@ static inline void destroy_compound_gigantic_page(struct page *page,
 						unsigned int order) { }
 static inline int alloc_fresh_gigantic_page(struct hstate *h,
 					nodemask_t *nodes_allowed) { return 0; }
-static struct page *alloc_gigantic_page(int nid, unsigned int order)
+static inline struct page *alloc_gigantic_page(int nid, unsigned int order)
 {
 	return NULL;
 }
