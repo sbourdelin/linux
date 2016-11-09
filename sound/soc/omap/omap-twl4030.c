@@ -335,8 +335,10 @@ static int omap_twl4030_probe(struct platform_device *pdev)
 	snd_soc_card_set_drvdata(card, priv);
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret) {
-		dev_err(&pdev->dev, "devm_snd_soc_register_card() failed: %d\n",
-			ret);
+		if (ret != -EPROBE_DEFER)
+			dev_err(&pdev->dev,
+				"devm_snd_soc_register_card() failed: %d\n",
+				ret);
 		return ret;
 	}
 
