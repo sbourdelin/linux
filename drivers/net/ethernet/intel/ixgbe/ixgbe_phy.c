@@ -121,6 +121,8 @@ s32 ixgbe_read_i2c_combined_generic_int(struct ixgbe_hw *hw, u8 addr,
 	u8 reg_high;
 	u8 csum;
 
+	if (hw->mac.type >= ixgbe_mac_X550)
+		max_retry = 3;
 	reg_high = ((reg >> 7) & 0xFE) | 1;     /* Indicate read combined */
 	csum = ixgbe_ones_comp_byte_add(reg_high, reg & 0xFF);
 	csum = ~csum;
@@ -1756,6 +1758,8 @@ static s32 ixgbe_read_i2c_byte_generic_int(struct ixgbe_hw *hw, u8 byte_offset,
 	u32 swfw_mask = hw->phy.phy_semaphore_mask;
 	bool nack = true;
 
+	if (hw->mac.type >= ixgbe_mac_X550)
+		max_retry = 3;
 	if (ixgbe_is_sfp_probe(hw, byte_offset, dev_addr))
 		max_retry = IXGBE_SFP_DETECT_RETRIES;
 
