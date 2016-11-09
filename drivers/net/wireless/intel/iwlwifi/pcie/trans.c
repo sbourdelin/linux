@@ -868,15 +868,12 @@ static int iwl_pcie_load_cpu_sections(struct iwl_trans *trans,
 				      int cpu,
 				      int *first_ucode_section)
 {
-	int shift_param;
 	int i, ret = 0;
 	u32 last_read_idx = 0;
 
 	if (cpu == 1) {
-		shift_param = 0;
 		*first_ucode_section = 0;
 	} else {
-		shift_param = 16;
 		(*first_ucode_section)++;
 	}
 
