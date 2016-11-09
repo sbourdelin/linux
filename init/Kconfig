@@ -1408,6 +1408,18 @@ config MULTIUSER
 
 	  If unsure, say Y here.
 
+config PRCTL
+	bool "prctl syscall" if EXPERT
+	default y
+	help
+	  This option enables the prctl syscall, used for a variety of
+	  operations on the current process.
+
+	  If building an embedded system where no applications or libraries use
+	  prctl, you can disable this option to save space.
+
+	  If unsure, say Y here.
+
 config SGETMASK_SYSCALL
 	bool "sgetmask/ssetmask syscalls support" if EXPERT
 	def_bool PARISC || MN10300 || BLACKFIN || M68K || PPC || MIPS || X86 || SPARC || CRIS || MICROBLAZE || SUPERH
