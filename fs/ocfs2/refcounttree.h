@@ -17,6 +17,8 @@
 #ifndef OCFS2_REFCOUNTTREE_H
 #define OCFS2_REFCOUNTTREE_H
 
+bool ocfs2_is_refcount_inode(struct inode *inode);
+
 struct ocfs2_refcount_tree {
 	struct rb_node rf_node;
 	u64 rf_blkno;
