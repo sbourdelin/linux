@@ -1,0 +1,23 @@
+config QTNFMAC
+	tristate "Quantenna WiFi FullMAC WLAN driver"
+	default n
+	depends on CFG80211
+	---help---
+	  This option adds core support for wireless adapters based on
+	  Quantenna 802.11n/ac chipsets. You still need separate
+	  bus drivers for PCIe to be able to use real devices.
+
+	  If you choose to build it as a module, it will be
+	  called qtnfmac.ko.
+
+config QTNFMAC_PEARL_PCIE
+	tristate "PCIE bus interface support for Quantenna QSR10g FullMAC driver"
+	default n
+	depends on HAS_DMA && PCI
+	depends on QTNFMAC
+	select FW_LOADER
+	select CRC32
+	---help---
+	  This option adds support for wireless adapters based on Quantenna
+	  QSR10g FullMAC chipset running over PCIe. If you choose to build
+	  it as a module, it will be called qtnfmac_pearl_pcie.ko.
