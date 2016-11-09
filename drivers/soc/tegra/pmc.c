@@ -1074,6 +1074,28 @@ unlock:
 }
 EXPORT_SYMBOL(tegra_io_pad_power_disable);
 
+int tegra_io_pad_power_get_status(enum tegra_io_pad id)
+{
+	const struct tegra_io_pad_soc *pad;
+	unsigned long status;
+	u32 value;
+	int bit;
+
+	pad = tegra_io_pad_find(pmc, id);
+	if (!pad)
+		return -ENOENT;
+
+	if (pad->dpd == UINT_MAX)
+		return -ENOTSUPP;
+
+	status = (pad->dpd < 32) ? IO_DPD_STATUS : IO_DPD2_STATUS;
+	bit = pad->dpd % 32;
+	value = tegra_pmc_readl(status);
+
+	return !!(value & BIT(bit));
+}
+EXPORT_SYMBOL(tegra_io_pad_power_get_status);
+
 int tegra_io_pad_set_voltage(enum tegra_io_pad id,
 			     enum tegra_io_pad_voltage voltage)
 {

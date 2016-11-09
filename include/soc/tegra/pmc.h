@@ -156,6 +156,7 @@ int tegra_powergate_sequence_power_up(unsigned int id, struct clk *clk,
 
 int tegra_io_pad_power_enable(enum tegra_io_pad id);
 int tegra_io_pad_power_disable(enum tegra_io_pad id);
+int tegra_io_pad_power_get_status(enum tegra_io_pad id);
 int tegra_io_pad_set_voltage(enum tegra_io_pad id,
 			     enum tegra_io_pad_voltage voltage);
 int tegra_io_pad_get_voltage(enum tegra_io_pad id);
@@ -197,6 +198,11 @@ static inline int tegra_io_pad_power_enable(enum tegra_io_pad id)
 }
 
 static inline int tegra_io_pad_power_disable(enum tegra_io_pad id)
+{
+	return -ENOSYS;
+}
+
+static inline int tegra_io_pad_power_get_status(enum tegra_io_pad id)
 {
 	return -ENOSYS;
 }
