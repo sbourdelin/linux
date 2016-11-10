@@ -1918,7 +1918,8 @@ static int try_to_add_extent_for_io(struct client_obd *cli,
 		}
 
 		if (tmp->oe_srvlock != ext->oe_srvlock ||
-		    !tmp->oe_grants != !ext->oe_grants)
+		    !tmp->oe_grants != !ext->oe_grants ||
+		    tmp->oe_no_merge || ext->oe_no_merge)
 			return 0;
 
 		/* remove break for strict check */
@@ -2649,11 +2650,13 @@ int osc_queue_sync_pages(const struct lu_env *env, struct osc_object *obj,
 	struct osc_async_page *oap, *tmp;
 	int page_count = 0;
 	int mppr = cli->cl_max_pages_per_rpc;
+	bool can_merge = true;
 	pgoff_t start = CL_PAGE_EOF;
 	pgoff_t end = 0;
 
 	list_for_each_entry(oap, list, oap_pending_item) {
-		pgoff_t index = osc_index(oap2osc(oap));
+		struct osc_page *opg = oap2osc_page(oap);
+		pgoff_t index = osc_index(opg);
 
 		if (index > end)
 			end = index;
@@ -2661,6 +2664,9 @@ int osc_queue_sync_pages(const struct lu_env *env, struct osc_object *obj,
 			start = index;
 		++page_count;
 		mppr <<= (page_count > mppr);
+
+		if (unlikely(opg->ops_from > 0 || opg->ops_to < PAGE_SIZE))
+			can_merge = false;
 	}
 
 	ext = osc_extent_alloc(obj);
@@ -2674,6 +2680,7 @@ int osc_queue_sync_pages(const struct lu_env *env, struct osc_object *obj,
 
 	ext->oe_rw = !!(cmd & OBD_BRW_READ);
 	ext->oe_sync = 1;
+	ext->oe_no_merge = !can_merge;
 	ext->oe_urgent = 1;
 	ext->oe_start = start;
 	ext->oe_end = end;
