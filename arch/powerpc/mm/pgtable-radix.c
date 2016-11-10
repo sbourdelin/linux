@@ -222,6 +222,22 @@ static int __init get_idx_from_shift(unsigned int shift)
 	return idx;
 }
 
+int radix_get_mmu_psize(unsigned long page_size)
+{
+	int psize;
+
+	if (page_size == (1UL << mmu_psize_defs[mmu_virtual_psize].shift))
+		psize = mmu_virtual_psize;
+	else if (page_size == (1UL << mmu_psize_defs[MMU_PAGE_2M].shift))
+		psize = MMU_PAGE_2M;
+	else if (page_size == (1UL << mmu_psize_defs[MMU_PAGE_1G].shift))
+		psize = MMU_PAGE_1G;
+	else
+		return -1;
+	return psize;
+}
+
+
 static int __init radix_dt_scan_page_sizes(unsigned long node,
 					   const char *uname, int depth,
 					   void *data)

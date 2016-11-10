@@ -568,10 +568,13 @@ static inline bool check_pte_access(unsigned long access, unsigned long ptev)
  */
 
 static inline void __ptep_set_access_flags(struct mm_struct *mm,
-					   pte_t *ptep, pte_t entry)
+					   pte_t *ptep, pte_t entry,
+					   unsigned long address,
+					   unsigned long pg_sz)
 {
 	if (radix_enabled())
-		return radix__ptep_set_access_flags(mm, ptep, entry);
+		return radix__ptep_set_access_flags(mm, ptep, entry,
+						    address, pg_sz);
 	return hash__ptep_set_access_flags(ptep, entry);
 }
 
