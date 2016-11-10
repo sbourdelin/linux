@@ -96,6 +96,17 @@ startup_64:
 	jnz	bad_address
 
 	/*
+	 * Enable Secure Memory Encryption (if available).  Save the mask
+	 * in %r12 for later use and add the memory encryption mask to %rbp
+	 * to include it in the page table fixups.
+	 */
+	push	%rsi
+	call	sme_enable
+	pop	%rsi
+	movq	%rax, %r12
+	addq	%r12, %rbp
+
+	/*
 	 * Fixup the physical addresses in the page table
 	 */
 	addq	%rbp, early_level4_pgt + (L4_START_KERNEL*8)(%rip)
@@ -118,6 +129,7 @@ startup_64:
 	shrq	$PGDIR_SHIFT, %rax
 
 	leaq	(4096 + _KERNPG_TABLE)(%rbx), %rdx
+	addq	%r12, %rdx
 	movq	%rdx, 0(%rbx,%rax,8)
 	movq	%rdx, 8(%rbx,%rax,8)
 
@@ -134,6 +146,7 @@ startup_64:
 	movq	%rdi, %rax
 	shrq	$PMD_SHIFT, %rdi
 	addq	$(__PAGE_KERNEL_LARGE_EXEC & ~_PAGE_GLOBAL), %rax
+	addq	%r12, %rax
 	leaq	(_end - 1)(%rip), %rcx
 	shrq	$PMD_SHIFT, %rcx
 	subq	%rdi, %rcx
@@ -164,8 +177,20 @@ startup_64:
 	cmp	%r8, %rdi
 	jne	1b
 
-	/* Fixup phys_base */
+	/*
+	 * Fixup phys_base, remove the memory encryption mask from %rbp
+	 * to obtain the true physical address.
+	 */
+	subq	%r12, %rbp
 	addq	%rbp, phys_base(%rip)
+
+	/*
+	 * The page tables have been updated with the memory encryption mask,
+	 * so encrypt the kernel if memory encryption is active
+	 */
+	push	%rsi
+	call	sme_encrypt_kernel
+	pop	%rsi
 
 	movq	$(early_level4_pgt - __START_KERNEL_map), %rax
 	jmp 1f
@@ -187,8 +212,16 @@ ENTRY(secondary_startup_64)
 	/* Sanitize CPU configuration */
 	call verify_cpu
 
+	push	%rsi
+	call	sme_get_me_mask
+	pop	%rsi
+	movq	%rax, %r12
+
 	movq	$(init_level4_pgt - __START_KERNEL_map), %rax
 1:
+
+	/* Add the memory encryption mask to RAX */
+	addq	%r12, %rax
 
 	/* Enable PAE mode and PGE */
 	movl	$(X86_CR4_PAE | X86_CR4_PGE), %ecx
