@@ -888,6 +888,10 @@ struct intel_dp {
 	uint32_t DP;
 	int link_rate;
 	uint8_t lane_count;
+	int fallback_link_rate;
+	uint8_t fallback_lane_count;
+	int fallback_link_rate_index;
+	bool link_train_failed;
 	uint8_t sink_count;
 	bool link_mst;
 	bool has_audio;
@@ -1386,6 +1390,8 @@ int intel_dp_set_link_status_property(struct drm_connector *connector,
 void intel_dp_set_link_params(struct intel_dp *intel_dp,
 			      int link_rate, uint8_t lane_count,
 			      bool link_mst);
+int intel_dp_get_link_train_fallback_values(struct intel_dp *intel_dp,
+					    int link_rate, uint8_t lane_count);
 void intel_dp_start_link_train(struct intel_dp *intel_dp);
 void intel_dp_stop_link_train(struct intel_dp *intel_dp);
 void intel_dp_sink_dpms(struct intel_dp *intel_dp, int mode);
