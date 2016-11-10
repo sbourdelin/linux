@@ -160,6 +160,15 @@ static inline void __set_fixmap(enum fixed_addresses idx,
  */
 #define FIXMAP_PAGE_NOCACHE PAGE_KERNEL_IO_NOCACHE
 
+void __init *early_memremap_enc(resource_size_t phys_addr,
+				unsigned long size);
+void __init *early_memremap_enc_wp(resource_size_t phys_addr,
+				   unsigned long size);
+void __init *early_memremap_dec(resource_size_t phys_addr,
+				unsigned long size);
+void __init *early_memremap_dec_wp(resource_size_t phys_addr,
+				   unsigned long size);
+
 #include <asm-generic/fixmap.h>
 
 #define __late_set_fixmap(idx, phys, flags) __set_fixmap(idx, phys, flags)
