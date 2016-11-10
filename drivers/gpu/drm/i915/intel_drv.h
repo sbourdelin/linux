@@ -1381,6 +1381,8 @@ void intel_csr_ucode_resume(struct drm_i915_private *);
 bool intel_dp_init(struct drm_device *dev, i915_reg_t output_reg, enum port port);
 bool intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 			     struct intel_connector *intel_connector);
+int intel_dp_set_link_status_property(struct drm_connector *connector,
+				      uint64_t val);
 void intel_dp_set_link_params(struct intel_dp *intel_dp,
 			      int link_rate, uint8_t lane_count,
 			      bool link_mst);

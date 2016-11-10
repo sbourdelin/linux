@@ -4640,6 +4640,18 @@ done:
 	return 0;
 }
 
+int
+intel_dp_set_link_status_property(struct drm_connector *connector,
+				  uint64_t val)
+{
+	struct drm_device *dev = connector->dev;
+
+	connector->link_status = val;
+	return drm_object_property_set_value(&connector->base,
+					     dev->mode_config.link_status_property,
+					     val);
+}
+
 static int
 intel_dp_connector_register(struct drm_connector *connector)
 {
