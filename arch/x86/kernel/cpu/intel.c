@@ -452,9 +452,18 @@ static void intel_bsp_resume(struct cpuinfo_x86 *c)
 	init_intel_energy_perf(c);
 }
 
+DEFINE_PER_CPU(u64, msr_misc_features_enables_shadow);
+
 static void init_intel_misc_features_enables(struct cpuinfo_x86 *c)
 {
 	u64 msr;
+
+	if (rdmsrl_safe(MSR_MISC_FEATURES_ENABLES, &msr))
+		return;
+
+	msr = 0;
+	wrmsrl(MSR_MISC_FEATURES_ENABLES, msr);
+	this_cpu_write(msr_misc_features_enables_shadow, msr);
 
 	if (!rdmsrl_safe(MSR_PLATFORM_INFO, &msr)) {
 		if (msr & MSR_PLATFORM_INFO_CPUID_FAULT)
