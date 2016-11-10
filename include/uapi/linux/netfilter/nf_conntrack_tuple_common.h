@@ -2,7 +2,7 @@
 #define _NF_CONNTRACK_TUPLE_COMMON_H
 
 #include <linux/types.h>
-#include <linux/netfilter.h>
+#include <linux/netfilter/nf_conntrack_common.h>
 
 enum ip_conntrack_dir {
 	IP_CT_DIR_ORIGINAL,
