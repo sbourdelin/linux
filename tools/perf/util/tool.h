@@ -40,6 +40,7 @@ struct perf_tool {
 	event_op	mmap,
 			mmap2,
 			comm,
+			namespaces,
 			fork,
 			exit,
 			lost,
