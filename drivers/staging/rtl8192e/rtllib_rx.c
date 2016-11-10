@@ -916,7 +916,7 @@ static size_t rtllib_rx_get_hdrlen(struct rtllib_device *ieee,
 		rx_stats->bContainHTC = true;
 	}
 
-	 if (RTLLIB_QOS_HAS_SEQ(fc))
+	if (RTLLIB_QOS_HAS_SEQ(fc))
 		rx_stats->bIsQosData = true;
 
 	return hdrlen;
@@ -1201,6 +1201,7 @@ static int rtllib_rx_decrypt(struct rtllib_device *ieee, struct sk_buff *skb,
 	if (crypt && !(fc & RTLLIB_FCTL_WEP) &&
 	    rtllib_is_eapol_frame(ieee, skb, hdrlen)) {
 		struct eapol *eap = (struct eapol *)(skb->data + 24);
+
 		netdev_dbg(ieee->dev, "RX: IEEE 802.1X EAPOL frame: %s\n",
 			   eap_get_type(eap->type));
 	}
@@ -1223,7 +1224,6 @@ static void rtllib_rx_check_leave_lps(struct rtllib_device *ieee, u8 unicast,
 				      u8 nr_subframes)
 {
 	if (unicast) {
-
 		if (ieee->state == RTLLIB_LINKED) {
 			if (((ieee->LinkDetectInfo.NumRxUnicastOkInPeriod +
 			    ieee->LinkDetectInfo.NumTxOkInPeriod) > 8) ||
