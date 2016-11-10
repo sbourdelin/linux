@@ -355,8 +355,8 @@ static int sh_mobile_sdhi_probe(struct platform_device *pdev)
 	}
 
 	host = tmio_mmc_host_alloc(pdev);
-	if (!host) {
-		ret = -ENOMEM;
+	if (IS_ERR(host)) {
+		ret = PTR_ERR(host);
 		goto eprobe;
 	}
 

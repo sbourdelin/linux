@@ -1014,7 +1014,7 @@ tmio_mmc_host_alloc(struct platform_device *pdev)
 
 	mmc = mmc_alloc_host(sizeof(struct tmio_mmc_host), &pdev->dev);
 	if (IS_ERR(mmc))
-		return NULL;
+		return ERR_CAST(mmc);
 
 	host = mmc_priv(mmc);
 	host->mmc = mmc;
