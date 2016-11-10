@@ -251,6 +251,8 @@ void __init mem_encrypt_init(void)
 
 	/* Make SWIOTLB use an unencrypted DMA area */
 	swiotlb_clear_encryption();
+
+	pr_info("AMD Secure Memory Encryption active\n");
 }
 
 void swiotlb_set_mem_unenc(void *vaddr, unsigned long size)

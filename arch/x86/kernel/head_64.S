@@ -101,6 +101,7 @@ startup_64:
 	 * to include it in the page table fixups.
 	 */
 	push	%rsi
+	movq	%rsi, %rdi
 	call	sme_enable
 	pop	%rsi
 	movq	%rax, %r12
