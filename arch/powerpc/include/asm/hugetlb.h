@@ -136,7 +136,7 @@ static inline pte_t huge_ptep_get_and_clear(struct vm_area_struct *vma,
 					    unsigned long addr, pte_t *ptep)
 {
 #ifdef CONFIG_PPC64
-	return __pte(pte_update(vma->vm_mm, addr, ptep, ~0UL, 0, 1));
+	return __pte(huge_pte_update(vma, addr, ptep, ~0UL, 0));
 #else
 	return __pte(pte_update(ptep, ~0UL, 0));
 #endif

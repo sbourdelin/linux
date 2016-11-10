@@ -29,13 +29,27 @@ static inline int hstate_get_psize(struct hstate *hstate)
 	}
 }
 
+static inline unsigned long huge_pte_update(struct vm_area_struct *vma, unsigned long addr,
+					    pte_t *ptep, unsigned long clr,
+					    unsigned long set)
+{
+	unsigned long pg_sz;
+
+	VM_WARN_ON(!is_vm_hugetlb_page(vma));
+	pg_sz = huge_page_size(hstate_vma(vma));
+
+	if (radix_enabled())
+		return radix__pte_update(vma->vm_mm, addr, ptep, clr, set, pg_sz);
+	return hash__pte_update(vma->vm_mm, addr, ptep, clr, set, true);
+}
+
 static inline void huge_ptep_set_wrprotect(struct vm_area_struct *vma,
 					   unsigned long addr, pte_t *ptep)
 {
 	if ((pte_raw(*ptep) & cpu_to_be64(_PAGE_WRITE)) == 0)
 		return;
 
-	pte_update(vma->vm_mm, addr, ptep, _PAGE_WRITE, 0, 1);
+	huge_pte_update(vma, addr, ptep, _PAGE_WRITE, 0);
 }
 
 #endif
