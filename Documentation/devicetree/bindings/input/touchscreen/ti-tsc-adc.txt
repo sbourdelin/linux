@@ -30,17 +30,27 @@ Required properties:
 
 Optional properties:
 - child "tsc"
-	ti,charge-delay: Length of touch screen charge delay step in terms of
-			 ADC clock cycles. Charge delay value should be large
-			 in order to avoid false pen-up events. This value
-			 effects the overall sampling speed, hence need to be
-			 kept as low as possible, while avoiding false pen-up
-			 event. Start from a lower value, say 0x400, and
-			 increase value until false pen-up events are avoided.
-			 The pen-up detection happens immediately after the
-			 charge step, so this does in fact function as a
-			 hardware knob for adjusting the amount of "settling
-			 time".
+	ti,charge-delay-ns: Length of touch screen charge delay step in terms of
+			    nano Seconds. Charge delay value should be large
+			    in order to avoid false pen-up events. This value
+			    effects the overall sampling speed, hence need to be
+			    kept as low as possible, while avoiding false pen-up
+			    event. Start from a lower value, say 41000nS, and
+			    increase value until false pen-up events are avoided.
+			    The pen-up detection happens immediately after the
+			    charge step, so this does in fact function as a
+			    hardware knob for adjusting the amount of "settling
+			    time".
+	ti,charge-delay: Deprecated as representing charge delay should be
+			 represented in time as the ADC clock may be different.
+			 Currently this value is calculated based on 3MHz ADC
+			 ref clock, but ADC clock can operate upto 24MHz clock.
+			 ADC clock will be changed to 24MHz to increase the
+			 number of ADC samples. So to keep the backward
+			 compatibility, driver will consider this value is
+			 calculated for 3MHz clock so the value will be
+			 multiplied by 8 to compensate the change in reference
+			 clock.
 
 - child "adc"
 	ti,chan-step-opendelay: List of open delays for each channel of
