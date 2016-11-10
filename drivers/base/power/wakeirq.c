@@ -139,6 +139,8 @@ static irqreturn_t handle_threaded_wake_irq(int irq, void *_wirq)
 	struct wake_irq *wirq = _wirq;
 	int res;
 
+	pm_wakeup_event(wirq->dev, 0);
+
 	/* We don't want RPM_ASYNC or RPM_NOWAIT here */
 	res = pm_runtime_resume(wirq->dev);
 	if (res < 0)
@@ -240,7 +242,7 @@ void dev_pm_disable_wake_irq(struct device *dev)
 	struct wake_irq *wirq = dev->power.wakeirq;
 
 	if (wirq && wirq->dedicated_irq)
-		disable_irq_nosync(wirq->irq);
+		disable_irq(wirq->irq);
 }
 EXPORT_SYMBOL_GPL(dev_pm_disable_wake_irq);
 
