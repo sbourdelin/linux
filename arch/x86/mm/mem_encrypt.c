@@ -16,8 +16,11 @@
 
 #include <asm/tlbflush.h>
 #include <asm/fixmap.h>
+#include <asm/setup.h>
+#include <asm/bootparam.h>
 
 extern pmdval_t early_pmd_flags;
+int __init __early_make_pgtable(unsigned long, pmdval_t);
 
 /*
  * Since sme_me_mask is set early in the boot process it must reside in
@@ -124,6 +127,59 @@ void __init sme_early_mem_dec(resource_size_t paddr, unsigned long size)
 		paddr += len;
 		size -= len;
 	}
+}
+
+static void __init *sme_bootdata_mapping(void *vaddr, unsigned long size)
+{
+	unsigned long paddr = (unsigned long)vaddr - __PAGE_OFFSET;
+	pmdval_t pmd_flags, pmd;
+	void *ret = vaddr;
+
+	/* Use early_pmd_flags but remove the encryption mask */
+	pmd_flags = early_pmd_flags & ~sme_me_mask;
+
+	do {
+		pmd = (paddr & PMD_MASK) + pmd_flags;
+		__early_make_pgtable((unsigned long)vaddr, pmd);
+
+		vaddr += PMD_SIZE;
+		paddr += PMD_SIZE;
+		size = (size < PMD_SIZE) ? 0 : size - PMD_SIZE;
+	} while (size);
+
+	return ret;
+}
+
+void __init sme_map_bootdata(char *real_mode_data)
+{
+	struct boot_params *boot_data;
+	unsigned long cmdline_paddr;
+
+	if (!sme_me_mask)
+		return;
+
+	/*
+	 * The bootdata will not be encrypted, so it needs to be mapped
+	 * as unencrypted data so it can be copied properly.
+	 */
+	boot_data = sme_bootdata_mapping(real_mode_data, sizeof(boot_params));
+
+	/*
+	 * Determine the command line address only after having established
+	 * the unencrypted mapping.
+	 */
+	cmdline_paddr = boot_data->hdr.cmd_line_ptr |
+			((u64)boot_data->ext_cmd_line_ptr << 32);
+	if (cmdline_paddr)
+		sme_bootdata_mapping(__va(cmdline_paddr), COMMAND_LINE_SIZE);
+}
+
+void __init sme_encrypt_ramdisk(resource_size_t paddr, unsigned long size)
+{
+	if (!sme_me_mask)
+		return;
+
+	sme_early_mem_enc(paddr, size);
 }
 
 void __init sme_early_init(void)
