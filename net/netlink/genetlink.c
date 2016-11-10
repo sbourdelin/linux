@@ -360,12 +360,10 @@ int genl_register_family(struct genl_family *family)
 	} else
 		family->attrbuf = NULL;
 
-	family->id = idr_alloc(&genl_fam_idr, family,
+	family->id = err = idr_alloc(&genl_fam_idr, family,
 			       start, end + 1, GFP_KERNEL);
-	if (family->id < 0) {
-		err = family->id;
+	if (err < 0)
 		goto errout_free;
-	}
 
 	err = genl_validate_assign_mc_groups(family);
 	if (err)
