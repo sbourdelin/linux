@@ -15500,7 +15500,7 @@ static void intel_setup_outputs(struct drm_device *dev)
 	if (intel_crt_present(dev))
 		intel_crt_init(dev);
 
-	if (IS_BROXTON(dev_priv)) {
+	if (IS_GEN9_LP(dev_priv)) {
 		/*
 		 * FIXME: Broxton doesn't support port detection via the
 		 * DDI_BUF_CTL_A or SFUSE_STRAP registers, find another way to
