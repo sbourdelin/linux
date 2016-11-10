@@ -67,6 +67,7 @@ struct sdhci_pci_fixes {
 	int			(*resume) (struct sdhci_pci_chip *);
 
 	const struct sdhci_ops	*ops;
+	size_t			priv_size;
 };
 
 struct sdhci_pci_slot {
@@ -87,6 +88,7 @@ struct sdhci_pci_slot {
 				     struct mmc_card *card,
 				     unsigned int max_dtr, int host_drv,
 				     int card_drv, int *drv_type);
+	unsigned long		private[0] ____cacheline_aligned;
 };
 
 struct sdhci_pci_chip {
@@ -100,5 +102,10 @@ struct sdhci_pci_chip {
 	int			num_slots;	/* Slots on controller */
 	struct sdhci_pci_slot	*slots[MAX_SLOTS]; /* Pointers to host slots */
 };
+
+static inline void *sdhci_pci_priv(struct sdhci_pci_slot *slot)
+{
+	return (void *)slot->private;
+}
 
 #endif /* __SDHCI_PCI_H */
