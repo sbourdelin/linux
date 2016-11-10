@@ -519,6 +519,13 @@ drm_atomic_helper_check_modeset(struct drm_device *dev,
 					       connector_state);
 		if (ret)
 			return ret;
+
+		if (connector->state->crtc) {
+			crtc_state = drm_atomic_get_existing_crtc_state(state,
+									connector->state->crtc);
+			if (connector->link_status == DRM_MODE_LINK_STATUS_BAD)
+				crtc_state->connectors_changed = true;
+		}
 	}
 
 	/*
