@@ -692,8 +692,8 @@ static int cb710_mmc_init(struct platform_device *pdev)
 	u32 val;
 
 	mmc = mmc_alloc_host(sizeof(*reader), cb710_slot_dev(slot));
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	platform_set_drvdata(pdev, mmc);
 

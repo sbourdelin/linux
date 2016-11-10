@@ -951,9 +951,9 @@ static int au1xmmc_probe(struct platform_device *pdev)
 	int ret, iflag;
 
 	mmc = mmc_alloc_host(sizeof(struct au1xmmc_host), &pdev->dev);
-	if (!mmc) {
+	if (IS_ERR(mmc)) {
 		dev_err(&pdev->dev, "no memory for mmc_host\n");
-		ret = -ENOMEM;
+		ret = PTR_ERR(mmc);
 		goto out0;
 	}
 

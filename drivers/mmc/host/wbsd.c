@@ -1204,8 +1204,8 @@ static int wbsd_alloc_mmc(struct device *dev)
 	 * Allocate MMC structure.
 	 */
 	mmc = mmc_alloc_host(sizeof(struct wbsd_host), dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	host = mmc_priv(mmc);
 	host->mmc = mmc;

@@ -1509,8 +1509,8 @@ static int mmci_probe(struct amba_device *dev,
 	}
 
 	mmc = mmc_alloc_host(sizeof(struct mmci_host), &dev->dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	ret = mmci_of_parse(np, mmc);
 	if (ret)

@@ -2296,8 +2296,8 @@ static int atmci_init_slot(struct atmel_mci *host,
 	struct atmel_mci_slot		*slot;
 
 	mmc = mmc_alloc_host(sizeof(struct atmel_mci_slot), &host->pdev->dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	slot = mmc_priv(mmc);
 	slot->mmc = mmc;

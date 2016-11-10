@@ -2024,8 +2024,8 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 		return PTR_ERR(base);
 
 	mmc = mmc_alloc_host(sizeof(struct omap_hsmmc_host), &pdev->dev);
-	if (!mmc) {
-		ret = -ENOMEM;
+	if (IS_ERR(mmc)) {
+		ret = PTR_ERR(mmc);
 		goto err;
 	}
 

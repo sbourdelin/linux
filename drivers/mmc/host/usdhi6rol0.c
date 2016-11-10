@@ -1753,8 +1753,8 @@ static int usdhi6_probe(struct platform_device *pdev)
 		return -ENODEV;
 
 	mmc = mmc_alloc_host(sizeof(struct usdhi6_host), dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	ret = mmc_regulator_get_supply(mmc);
 	if (ret == -EPROBE_DEFER)

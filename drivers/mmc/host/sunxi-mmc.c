@@ -1212,9 +1212,9 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
 	int ret;
 
 	mmc = mmc_alloc_host(sizeof(struct sunxi_mmc_host), &pdev->dev);
-	if (!mmc) {
+	if (IS_ERR(mmc)) {
 		dev_err(&pdev->dev, "mmc alloc host failed\n");
-		return -ENOMEM;
+		return PTR_ERR(mmc);
 	}
 
 	host = mmc_priv(mmc);

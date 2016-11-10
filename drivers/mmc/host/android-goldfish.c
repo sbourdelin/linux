@@ -467,8 +467,8 @@ static int goldfish_mmc_probe(struct platform_device *pdev)
 		return -ENXIO;
 
 	mmc = mmc_alloc_host(sizeof(struct goldfish_mmc_host), &pdev->dev);
-	if (mmc == NULL) {
-		ret = -ENOMEM;
+	if (IS_ERR(mmc)) {
+		ret = PTR_ERR(mmc);
 		goto err_alloc_host_failed;
 	}
 

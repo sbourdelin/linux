@@ -711,8 +711,8 @@ static int mvsd_probe(struct platform_device *pdev)
 		return -ENXIO;
 
 	mmc = mmc_alloc_host(sizeof(struct mvsd_host), &pdev->dev);
-	if (!mmc) {
-		ret = -ENOMEM;
+	if (IS_ERR(mmc)) {
+		ret = PTR_ERR(mmc);
 		goto out;
 	}
 

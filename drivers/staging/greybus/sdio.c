@@ -768,8 +768,8 @@ static int gb_sdio_probe(struct gbphy_device *gbphy_dev,
 	int ret = 0;
 
 	mmc = mmc_alloc_host(sizeof(*host), &gbphy_dev->dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	connection = gb_connection_create(gbphy_dev->bundle,
 					  le16_to_cpu(gbphy_dev->cport_desc->id),

@@ -1018,8 +1018,8 @@ static int mxcmci_probe(struct platform_device *pdev)
 		return -EINVAL;
 
 	mmc = mmc_alloc_host(sizeof(*host), &pdev->dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	host = mmc_priv(mmc);
 

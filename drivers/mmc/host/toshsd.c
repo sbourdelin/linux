@@ -617,8 +617,8 @@ static int toshsd_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return ret;
 
 	mmc = mmc_alloc_host(sizeof(struct toshsd_host), &pdev->dev);
-	if (!mmc) {
-		ret = -ENOMEM;
+	if (IS_ERR(mmc)) {
+		ret = PTR_ERR(mmc);
 		goto err;
 	}
 

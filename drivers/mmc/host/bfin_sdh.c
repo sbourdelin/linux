@@ -532,8 +532,8 @@ static int sdh_probe(struct platform_device *pdev)
 	}
 
 	mmc = mmc_alloc_host(sizeof(struct sdh_host), &pdev->dev);
-	if (!mmc) {
-		ret = -ENOMEM;
+	if (IS_ERR(mmc)) {
+		ret = PTR_ERR(mmc);
 		goto out;
 	}
 

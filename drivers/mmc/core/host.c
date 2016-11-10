@@ -349,7 +349,7 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 
 	host = kzalloc(sizeof(struct mmc_host) + extra, GFP_KERNEL);
 	if (!host)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	/* scanning will be enabled when we're ready */
 	host->rescan_disable = 1;
@@ -357,7 +357,7 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 again:
 	if (!ida_pre_get(&mmc_host_ida, GFP_KERNEL)) {
 		kfree(host);
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	spin_lock(&mmc_host_lock);
@@ -368,7 +368,7 @@ again:
 		goto again;
 	} else if (err) {
 		kfree(host);
-		return NULL;
+		return ERR_PTR(err);
 	}
 
 	dev_set_name(&host->class_dev, "mmc%d", host->index);
@@ -379,9 +379,10 @@ again:
 	device_initialize(&host->class_dev);
 	device_enable_async_suspend(&host->class_dev);
 
-	if (mmc_gpio_alloc(host)) {
+	err = mmc_gpio_alloc(host);
+	if (err < 0) {
 		put_device(&host->class_dev);
-		return NULL;
+		return ERR_PTR(err);
 	}
 
 	spin_lock_init(&host->lock);

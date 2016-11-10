@@ -782,9 +782,9 @@ static int wmt_mci_probe(struct platform_device *pdev)
 	}
 
 	mmc = mmc_alloc_host(sizeof(struct wmt_mci_priv), &pdev->dev);
-	if (!mmc) {
+	if (IS_ERR(mmc)) {
 		dev_err(&pdev->dev, "Failed to allocate mmc_host\n");
-		ret = -ENOMEM;
+		ret = PTR_ERR(mmc);
 		goto fail1;
 	}
 

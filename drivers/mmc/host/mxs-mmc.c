@@ -586,8 +586,8 @@ static int mxs_mmc_probe(struct platform_device *pdev)
 		return irq_err;
 
 	mmc = mmc_alloc_host(sizeof(struct mxs_mmc_host), &pdev->dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	host = mmc_priv(mmc);
 	ssp = &host->ssp;

@@ -1333,15 +1333,18 @@ static int mmc_spi_probe(struct spi_device *spi)
 	 * NOTE if many systems use more than one MMC-over-SPI connector
 	 * it'd save some memory to share this.  That's evidently rare.
 	 */
-	status = -ENOMEM;
 	ones = kmalloc(MMC_SPI_BLOCKSIZE, GFP_KERNEL);
-	if (!ones)
+	if (!ones) {
+		status = -ENOMEM;
 		goto nomem;
+	}
 	memset(ones, 0xff, MMC_SPI_BLOCKSIZE);
 
 	mmc = mmc_alloc_host(sizeof(*host), &spi->dev);
-	if (!mmc)
+	if (IS_ERR(mmc)) {
+		status = PTR_ERR(mmc);
 		goto nomem;
+	}
 
 	mmc->ops = &mmc_spi_ops;
 	mmc->max_blk_size = MMC_SPI_BLOCKSIZE;

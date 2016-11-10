@@ -652,8 +652,8 @@ static int pxamci_probe(struct platform_device *pdev)
 		return irq;
 
 	mmc = mmc_alloc_host(sizeof(struct pxamci_host), &pdev->dev);
-	if (!mmc) {
-		ret = -ENOMEM;
+	if (IS_ERR(mmc)) {
+		ret = PTR_ERR(mmc);
 		goto out;
 	}
 

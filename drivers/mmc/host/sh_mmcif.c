@@ -1432,8 +1432,8 @@ static int sh_mmcif_probe(struct platform_device *pdev)
 		return PTR_ERR(reg);
 
 	mmc = mmc_alloc_host(sizeof(struct sh_mmcif_host), dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	ret = mmc_of_parse(mmc);
 	if (ret < 0)

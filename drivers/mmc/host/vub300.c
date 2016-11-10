@@ -2125,8 +2125,8 @@ static int vub300_probe(struct usb_interface *interface,
 	}
 	/* this also allocates memory for our VUB300 mmc host device */
 	mmc = mmc_alloc_host(sizeof(struct vub300_mmc_host), &udev->dev);
-	if (!mmc) {
-		retval = -ENOMEM;
+	if (IS_ERR(mmc)) {
+		retval = PTR_ERR(mmc);
 		dev_err(&udev->dev, "not enough memory for the mmc_host\n");
 		goto error4;
 	}

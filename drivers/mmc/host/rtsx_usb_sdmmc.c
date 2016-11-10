@@ -1363,8 +1363,8 @@ static int rtsx_usb_sdmmc_drv_probe(struct platform_device *pdev)
 	dev_dbg(&(pdev->dev), ": Realtek USB SD/MMC controller found\n");
 
 	mmc = mmc_alloc_host(sizeof(*host), &pdev->dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	host = mmc_priv(mmc);
 	host->ucr = ucr;

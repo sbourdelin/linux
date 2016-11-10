@@ -1108,8 +1108,8 @@ static int via_sd_probe(struct pci_dev *pcidev,
 	pci_write_config_byte(pcidev, VIA_CRDR_PCI_DBG_MODE, 0);
 
 	mmc = mmc_alloc_host(sizeof(struct via_crdr_mmc_host), &pcidev->dev);
-	if (!mmc) {
-		ret = -ENOMEM;
+	if (IS_ERR(mmc)) {
+		ret = PTR_ERR(mmc);
 		goto release;
 	}
 

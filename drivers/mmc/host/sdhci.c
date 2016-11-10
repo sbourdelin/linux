@@ -2943,8 +2943,8 @@ struct sdhci_host *sdhci_alloc_host(struct device *dev,
 	WARN_ON(dev == NULL);
 
 	mmc = mmc_alloc_host(sizeof(struct sdhci_host) + priv_size, dev);
-	if (!mmc)
-		return ERR_PTR(-ENOMEM);
+	if (IS_ERR(mmc))
+		return ERR_CAST(mmc);
 
 	host = mmc_priv(mmc);
 	host->mmc = mmc;

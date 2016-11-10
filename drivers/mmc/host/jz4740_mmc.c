@@ -998,9 +998,9 @@ static int jz4740_mmc_probe(struct platform_device* pdev)
 	pdata = pdev->dev.platform_data;
 
 	mmc = mmc_alloc_host(sizeof(struct jz4740_mmc_host), &pdev->dev);
-	if (!mmc) {
+	if (IS_ERR(mmc)) {
 		dev_err(&pdev->dev, "Failed to alloc mmc host structure\n");
-		return -ENOMEM;
+		return PTR_ERR(mmc);
 	}
 
 	host = mmc_priv(mmc);

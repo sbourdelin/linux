@@ -1494,8 +1494,8 @@ static int msdc_drv_probe(struct platform_device *pdev)
 	}
 	/* Allocate MMC host for this device */
 	mmc = mmc_alloc_host(sizeof(struct msdc_host), &pdev->dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	host = mmc_priv(mmc);
 	ret = mmc_of_parse(mmc);

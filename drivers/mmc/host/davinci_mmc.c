@@ -1229,8 +1229,8 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
 		return -EBUSY;
 
 	mmc = mmc_alloc_host(sizeof(struct mmc_davinci_host), &pdev->dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	host = mmc_priv(mmc);
 	host->mmc = mmc;	/* Important */

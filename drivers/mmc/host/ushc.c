@@ -427,8 +427,8 @@ static int ushc_probe(struct usb_interface *intf, const struct usb_device_id *id
 	int ret;
 
 	mmc = mmc_alloc_host(sizeof(struct ushc_data), &intf->dev);
-	if (mmc == NULL)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 	ushc = mmc_priv(mmc);
 	usb_set_intfdata(intf, ushc);
 

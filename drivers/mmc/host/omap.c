@@ -1227,8 +1227,8 @@ static int mmc_omap_new_slot(struct mmc_omap_host *host, int id)
 	int r;
 
 	mmc = mmc_alloc_host(sizeof(struct mmc_omap_slot), host->dev);
-	if (mmc == NULL)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	slot = mmc_priv(mmc);
 	slot->host = host;

@@ -1013,7 +1013,7 @@ tmio_mmc_host_alloc(struct platform_device *pdev)
 	struct mmc_host *mmc;
 
 	mmc = mmc_alloc_host(sizeof(struct tmio_mmc_host), &pdev->dev);
-	if (!mmc)
+	if (IS_ERR(mmc))
 		return NULL;
 
 	host = mmc_priv(mmc);

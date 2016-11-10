@@ -568,9 +568,9 @@ static int moxart_probe(struct platform_device *pdev)
 	u32 i;
 
 	mmc = mmc_alloc_host(sizeof(struct moxart_host), dev);
-	if (!mmc) {
+	if (IS_ERR(mmc)) {
 		dev_err(dev, "mmc_alloc_host failed\n");
-		ret = -ENOMEM;
+		ret = PTR_ERR(mmc);
 		goto out;
 	}
 

@@ -424,9 +424,9 @@ static int sdricoh_init_mmc(struct pci_dev *pci_dev,
 	/* allocate privdata */
 	mmc = pcmcia_dev->priv =
 	    mmc_alloc_host(sizeof(struct sdricoh_host), &pcmcia_dev->dev);
-	if (!mmc) {
+	if (IS_ERR(mmc)) {
 		dev_err(dev, "mmc_alloc_host failed\n");
-		result = -ENOMEM;
+		result = PTR_ERR(mmc);
 		goto unmap_io;
 	}
 	host = mmc_priv(mmc);

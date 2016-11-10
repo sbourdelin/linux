@@ -1399,8 +1399,8 @@ static int rtsx_pci_sdmmc_drv_probe(struct platform_device *pdev)
 	dev_dbg(&(pdev->dev), ": Realtek PCI-E SDMMC controller found\n");
 
 	mmc = mmc_alloc_host(sizeof(*host), &pdev->dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	host = mmc_priv(mmc);
 	host->pcr = pcr;

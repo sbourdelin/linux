@@ -2598,8 +2598,8 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
 	u32 freq[2];
 
 	mmc = mmc_alloc_host(sizeof(struct dw_mci_slot), host->dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	slot = mmc_priv(mmc);
 	slot->id = id;

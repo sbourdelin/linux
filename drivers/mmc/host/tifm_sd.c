@@ -958,8 +958,8 @@ static int tifm_sd_probe(struct tifm_dev *sock)
 	}
 
 	mmc = mmc_alloc_host(sizeof(struct tifm_sd), &sock->dev);
-	if (!mmc)
-		return -ENOMEM;
+	if (IS_ERR(mmc))
+		return PTR_ERR(mmc);
 
 	host = mmc_priv(mmc);
 	tifm_set_drvdata(sock, mmc);
