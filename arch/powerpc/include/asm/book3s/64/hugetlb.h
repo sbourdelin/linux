@@ -1,5 +1,5 @@
-#ifndef _ASM_POWERPC_BOOK3S_64_HUGETLB_RADIX_H
-#define _ASM_POWERPC_BOOK3S_64_HUGETLB_RADIX_H
+#ifndef _ASM_POWERPC_BOOK3S_64_HUGETLB_H
+#define _ASM_POWERPC_BOOK3S_64_HUGETLB_H
 /*
  * For radix we want generic code to handle hugetlb. But then if we want
  * both hash and radix to be enabled together we need to workaround the
@@ -21,6 +21,8 @@ static inline int hstate_get_psize(struct hstate *hstate)
 		return MMU_PAGE_2M;
 	else if (shift == mmu_psize_defs[MMU_PAGE_1G].shift)
 		return MMU_PAGE_1G;
+	else if (shift == mmu_psize_defs[MMU_PAGE_16M].shift)
+		return MMU_PAGE_16M;
 	else {
 		WARN(1, "Wrong huge page shift\n");
 		return mmu_virtual_psize;
