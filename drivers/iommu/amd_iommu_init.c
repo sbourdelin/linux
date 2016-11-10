@@ -28,6 +28,7 @@
 #include <linux/amd-iommu.h>
 #include <linux/export.h>
 #include <linux/iommu.h>
+#include <linux/mem_encrypt.h>
 #include <asm/pci-direct.h>
 #include <asm/iommu.h>
 #include <asm/gart.h>
@@ -2540,6 +2541,10 @@ int __init amd_iommu_detect(void)
 		return -ENODEV;
 
 	if (amd_iommu_disabled)
+		return -ENODEV;
+
+	/* For now, disable the IOMMU if SME is active */
+	if (sme_me_mask)
 		return -ENODEV;
 
 	ret = iommu_go_to_state(IOMMU_IVRS_DETECTED);
