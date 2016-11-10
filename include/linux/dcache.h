@@ -356,11 +356,33 @@ static inline int cant_delete(const struct dentry *dentry)
 	return (dentry->d_flags & DCACHE_DELETE_LOCK);
 }
 
-static inline void dont_delete(struct dentry *dentry)
+static inline int delete_trylock(struct dentry *dentry)
 {
+	int locked;
+
 	spin_lock(&dentry->d_lock);
+	locked = likely(!cant_delete(dentry));
 	dentry->d_flags |= DCACHE_DELETE_LOCK;
 	spin_unlock(&dentry->d_lock);
+
+	return locked;
+}
+
+static inline void dont_delete(struct dentry *dentry)
+{
+	delete_trylock(dentry);
+}
+
+static inline int delete_unlock(struct dentry *dentry)
+{
+	int unlocked;
+
+	spin_lock(&dentry->d_lock);
+	unlocked = likely(cant_delete(dentry));
+	dentry->d_flags &= ~DCACHE_DELETE_LOCK;
+	spin_unlock(&dentry->d_lock);
+
+	return unlocked;
 }
 
 extern void __d_lookup_done(struct dentry *);
