@@ -142,11 +142,12 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
 }
 
 
-pte_t huge_ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
+pte_t huge_ptep_get_and_clear(struct vm_area_struct *vma, unsigned long addr,
 			      pte_t *ptep)
 {
 	unsigned long flags;
 	pte_t entry;
+	struct mm_struct *mm = vma->vma_mm;
 
 	purge_tlb_start(flags);
 	entry = *ptep;
@@ -157,11 +158,12 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
 }
 
 
-void huge_ptep_set_wrprotect(struct mm_struct *mm,
+void huge_ptep_set_wrprotect(struct vm_area_struct *vma,
 				unsigned long addr, pte_t *ptep)
 {
 	unsigned long flags;
 	pte_t old_pte;
+	struct mm_struct *mm = vma->vm_mm;
 
 	purge_tlb_start(flags);
 	old_pte = *ptep;

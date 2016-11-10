@@ -53,11 +53,12 @@ static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
 	set_pte_at(mm, addr, ptep, pte);
 }
 
-static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+static inline pte_t huge_ptep_get_and_clear(struct vm_area_struct *vma,
 					    unsigned long addr, pte_t *ptep)
 {
 	pte_t clear;
 	pte_t pte = *ptep;
+	struct mm_struct *mm = vma->vm_mm;
 
 	pte_val(clear) = (unsigned long)invalid_pte_table;
 	set_pte_at(mm, addr, ptep, clear);
@@ -81,10 +82,10 @@ static inline pte_t huge_pte_wrprotect(pte_t pte)
 	return pte_wrprotect(pte);
 }
 
-static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
+static inline void huge_ptep_set_wrprotect(struct vm_area_struct *vma,
 					   unsigned long addr, pte_t *ptep)
 {
-	ptep_set_wrprotect(mm, addr, ptep);
+	ptep_set_wrprotect(vma->vm_mm, addr, ptep);
 }
 
 static inline int huge_ptep_set_access_flags(struct vm_area_struct *vma,

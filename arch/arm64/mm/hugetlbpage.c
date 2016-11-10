@@ -197,10 +197,11 @@ pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
 	return entry;
 }
 
-pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+pte_t huge_ptep_get_and_clear(struct vm_area_struct *vma,
 			      unsigned long addr, pte_t *ptep)
 {
 	pte_t pte;
+	struct mm_struct *mm = vma->vm_mm;
 
 	if (pte_cont(*ptep)) {
 		int ncontig, i;
@@ -263,9 +264,11 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
 	}
 }
 
-void huge_ptep_set_wrprotect(struct mm_struct *mm,
+void huge_ptep_set_wrprotect(struct vm_area_struct *vma,
 			     unsigned long addr, pte_t *ptep)
 {
+	struct mm_struct *mm = vma->vm_mm;
+
 	if (pte_cont(*ptep)) {
 		int ncontig, i;
 		pte_t *cpte;

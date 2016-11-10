@@ -132,11 +132,11 @@ static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
 	set_pte_at(mm, addr, ptep, pte);
 }
 
-static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+static inline pte_t huge_ptep_get_and_clear(struct vm_area_struct *vma,
 					    unsigned long addr, pte_t *ptep)
 {
 #ifdef CONFIG_PPC64
-	return __pte(pte_update(mm, addr, ptep, ~0UL, 0, 1));
+	return __pte(pte_update(vma->vm_mm, addr, ptep, ~0UL, 0, 1));
 #else
 	return __pte(pte_update(ptep, ~0UL, 0));
 #endif
@@ -146,7 +146,7 @@ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
 					 unsigned long addr, pte_t *ptep)
 {
 	pte_t pte;
-	pte = huge_ptep_get_and_clear(vma->vm_mm, addr, ptep);
+	pte = huge_ptep_get_and_clear(vma, addr, ptep);
 	flush_hugetlb_page(vma, addr);
 }
 

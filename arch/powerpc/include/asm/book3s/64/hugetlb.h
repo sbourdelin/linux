@@ -28,4 +28,14 @@ static inline int hstate_get_psize(struct hstate *hstate)
 		return mmu_virtual_psize;
 	}
 }
+
+static inline void huge_ptep_set_wrprotect(struct vm_area_struct *vma,
+					   unsigned long addr, pte_t *ptep)
+{
+	if ((pte_raw(*ptep) & cpu_to_be64(_PAGE_WRITE)) == 0)
+		return;
+
+	pte_update(vma->vm_mm, addr, ptep, _PAGE_WRITE, 0, 1);
+}
+
 #endif

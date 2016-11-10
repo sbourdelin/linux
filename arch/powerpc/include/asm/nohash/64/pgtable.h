@@ -257,13 +257,13 @@ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr,
 	pte_update(mm, addr, ptep, _PAGE_RW, 0, 0);
 }
 
-static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
+static inline void huge_ptep_set_wrprotect(struct vm_area_struct *vma,
 					   unsigned long addr, pte_t *ptep)
 {
 	if ((pte_val(*ptep) & _PAGE_RW) == 0)
 		return;
 
-	pte_update(mm, addr, ptep, _PAGE_RW, 0, 1);
+	pte_update(vma->vm_mm, addr, ptep, _PAGE_RW, 0, 1);
 }
 
 /*

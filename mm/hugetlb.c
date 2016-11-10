@@ -3159,7 +3159,7 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 			set_huge_pte_at(dst, addr, dst_pte, entry);
 		} else {
 			if (cow) {
-				huge_ptep_set_wrprotect(src, addr, src_pte);
+				huge_ptep_set_wrprotect(vma, addr, src_pte);
 				mmu_notifier_invalidate_range(src, mmun_start,
 								   mmun_end);
 			}
@@ -3248,7 +3248,7 @@ void __unmap_hugepage_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
 			set_vma_resv_flags(vma, HPAGE_RESV_UNMAPPED);
 		}
 
-		pte = huge_ptep_get_and_clear(mm, address, ptep);
+		pte = huge_ptep_get_and_clear(vma, address, ptep);
 		tlb_remove_tlb_entry(tlb, ptep, address);
 		if (huge_pte_dirty(pte))
 			set_page_dirty(page);
@@ -3997,7 +3997,7 @@ unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
 			continue;
 		}
 		if (!huge_pte_none(pte)) {
-			pte = huge_ptep_get_and_clear(mm, address, ptep);
+			pte = huge_ptep_get_and_clear(vma, address, ptep);
 			pte = pte_mkhuge(huge_pte_modify(pte, newprot));
 			pte = arch_make_huge_pte(pte, vma, NULL, 0);
 			set_huge_pte_at(mm, address, ptep, pte);

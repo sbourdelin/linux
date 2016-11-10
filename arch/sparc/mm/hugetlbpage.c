@@ -174,10 +174,11 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
 	maybe_tlb_batch_add(mm, addr + REAL_HPAGE_SIZE, ptep, orig, 0);
 }
 
-pte_t huge_ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
+pte_t huge_ptep_get_and_clear(struct vm_area_struct *vma, unsigned long addr,
 			      pte_t *ptep)
 {
 	pte_t entry;
+	struct mm_struct *mm = vma->vm_mm;
 
 	entry = *ptep;
 	if (pte_present(entry))

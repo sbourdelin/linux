@@ -136,12 +136,13 @@ pte_t huge_ptep_get(pte_t *ptep)
 	return __rste_to_pte(pte_val(*ptep));
 }
 
-pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+pte_t huge_ptep_get_and_clear(struct vm_area_struct *vma,
 			      unsigned long addr, pte_t *ptep)
 {
 	pte_t pte = huge_ptep_get(ptep);
 	pmd_t *pmdp = (pmd_t *) ptep;
 	pud_t *pudp = (pud_t *) ptep;
+	struct mm_struct *mm = vma->vm_mm;
 
 	if ((pte_val(*ptep) & _REGION_ENTRY_TYPE_MASK) == _REGION_ENTRY_TYPE_R3)
 		pudp_xchg_direct(mm, addr, pudp, __pud(_REGION3_ENTRY_EMPTY));

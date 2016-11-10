@@ -8,7 +8,7 @@
 void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
 		     pte_t *ptep, pte_t pte);
 
-pte_t huge_ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
+pte_t huge_ptep_get_and_clear(struct vm_area_struct *vma, unsigned long addr,
 			      pte_t *ptep);
 
 static inline int is_hugepage_only_range(struct mm_struct *mm,
@@ -54,7 +54,7 @@ static inline pte_t huge_pte_wrprotect(pte_t pte)
 	return pte_wrprotect(pte);
 }
 
-void huge_ptep_set_wrprotect(struct mm_struct *mm,
+void huge_ptep_set_wrprotect(struct vm_area_struct *vma,
 					   unsigned long addr, pte_t *ptep);
 
 int huge_ptep_set_access_flags(struct vm_area_struct *vma,

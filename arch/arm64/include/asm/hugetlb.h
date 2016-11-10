@@ -76,9 +76,9 @@ extern void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
 extern int huge_ptep_set_access_flags(struct vm_area_struct *vma,
 				      unsigned long addr, pte_t *ptep,
 				      pte_t pte, int dirty);
-extern pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+extern pte_t huge_ptep_get_and_clear(struct vm_area_struct *vma,
 				     unsigned long addr, pte_t *ptep);
-extern void huge_ptep_set_wrprotect(struct mm_struct *mm,
+extern void huge_ptep_set_wrprotect(struct vm_area_struct *vma,
 				    unsigned long addr, pte_t *ptep);
 extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
 				  unsigned long addr, pte_t *ptep);
