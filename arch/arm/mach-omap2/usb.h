@@ -60,7 +60,6 @@ struct usbhs_phy_data {
 	bool vcc_polarity;	/* 1 active high, 0 active low */
 };
 
-extern void usb_musb_init(struct omap_musb_board_data *board_data);
 extern void usbhs_init(struct usbhs_omap_platform_data *pdata);
 extern int usbhs_init_phys(struct usbhs_phy_data *phy, int num_phys);
 
