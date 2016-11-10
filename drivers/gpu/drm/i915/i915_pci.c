@@ -372,6 +372,12 @@ static const struct intel_device_info intel_broxton_info = {
 	GEN9_LP_FEATURES,
 };
 
+static const struct intel_device_info intel_geminilake_info = {
+	.is_preliminary = 1,
+	.is_geminilake = 1,
+	GEN9_LP_FEATURES,
+};
+
 static const struct intel_device_info intel_kabylake_info = {
 	BDW_FEATURES,
 	.is_kabylake = 1,

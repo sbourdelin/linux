@@ -667,6 +667,7 @@ struct intel_csr {
 	func(is_broadwell); \
 	func(is_skylake); \
 	func(is_broxton); \
+	func(is_geminilake); \
 	func(is_kabylake); \
 	func(is_preliminary); \
 	/* Keep has_* in alphabetical order */ \
@@ -2756,6 +2757,7 @@ struct drm_i915_cmd_table {
 #define IS_BROADWELL(dev_priv)	((dev_priv)->info.is_broadwell)
 #define IS_SKYLAKE(dev_priv)	((dev_priv)->info.is_skylake)
 #define IS_BROXTON(dev_priv)	((dev_priv)->info.is_broxton)
+#define IS_GEMINILAKE(dev_priv)	((dev_priv)->info.is_geminilake)
 #define IS_KABYLAKE(dev_priv)	((dev_priv)->info.is_kabylake)
 #define IS_MOBILE(dev_priv)	((dev_priv)->info.is_mobile)
 #define IS_HSW_EARLY_SDV(dev_priv) (IS_HASWELL(dev_priv) && \
