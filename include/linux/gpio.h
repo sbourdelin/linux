@@ -77,15 +77,6 @@ static inline int irq_to_gpio(unsigned int irq)
 
 #endif /* ! CONFIG_ARCH_HAVE_CUSTOM_GPIO_H */
 
-/* CONFIG_GPIOLIB: bindings for managed devices that want to request gpios */
-
-struct device;
-
-int devm_gpio_request(struct device *dev, unsigned gpio, const char *label);
-int devm_gpio_request_one(struct device *dev, unsigned gpio,
-			  unsigned long flags, const char *label);
-void devm_gpio_free(struct device *dev, unsigned int gpio);
-
 #else /* ! CONFIG_GPIOLIB */
 
 #include <linux/kernel.h>
@@ -253,6 +244,23 @@ gpiochip_remove_pin_ranges(struct gpio_chip *chip)
 	WARN_ON(1);
 }
 
+#endif /* ! CONFIG_GPIOLIB */
+
+#ifdef CONFIG_GPIO_DEVRES
+
+/* CONFIG_GPIOLIB: bindings for managed devices that want to request gpios */
+
+struct device;
+
+int devm_gpio_request(struct device *dev, unsigned gpio, const char *label);
+int devm_gpio_request_one(struct device *dev, unsigned gpio,
+			  unsigned long flags, const char *label);
+void devm_gpio_free(struct device *dev, unsigned int gpio);
+
+#else
+
+struct device;
+
 static inline int devm_gpio_request(struct device *dev, unsigned gpio,
 				    const char *label)
 {
@@ -272,6 +280,6 @@ static inline void devm_gpio_free(struct device *dev, unsigned int gpio)
 	WARN_ON(1);
 }
 
-#endif /* ! CONFIG_GPIOLIB */
+#endif
 
 #endif /* __LINUX_GPIO_H */

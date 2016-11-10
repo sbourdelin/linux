@@ -70,28 +70,6 @@ struct gpio_descs *__must_check gpiod_get_array_optional(struct device *dev,
 void gpiod_put(struct gpio_desc *desc);
 void gpiod_put_array(struct gpio_descs *descs);
 
-struct gpio_desc *__must_check devm_gpiod_get(struct device *dev,
-					      const char *con_id,
-					      enum gpiod_flags flags);
-struct gpio_desc *__must_check devm_gpiod_get_index(struct device *dev,
-						    const char *con_id,
-						    unsigned int idx,
-						    enum gpiod_flags flags);
-struct gpio_desc *__must_check devm_gpiod_get_optional(struct device *dev,
-						       const char *con_id,
-						       enum gpiod_flags flags);
-struct gpio_desc *__must_check
-devm_gpiod_get_index_optional(struct device *dev, const char *con_id,
-			      unsigned int index, enum gpiod_flags flags);
-struct gpio_descs *__must_check devm_gpiod_get_array(struct device *dev,
-						     const char *con_id,
-						     enum gpiod_flags flags);
-struct gpio_descs *__must_check
-devm_gpiod_get_array_optional(struct device *dev, const char *con_id,
-			      enum gpiod_flags flags);
-void devm_gpiod_put(struct device *dev, struct gpio_desc *desc);
-void devm_gpiod_put_array(struct device *dev, struct gpio_descs *descs);
-
 int gpiod_get_direction(struct gpio_desc *desc);
 int gpiod_direction_input(struct gpio_desc *desc);
 int gpiod_direction_output(struct gpio_desc *desc, int value);
@@ -136,9 +114,7 @@ struct fwnode_handle;
 
 struct gpio_desc *fwnode_get_named_gpiod(struct fwnode_handle *fwnode,
 					 const char *propname);
-struct gpio_desc *devm_get_gpiod_from_child(struct device *dev,
-					    const char *con_id,
-					    struct fwnode_handle *child);
+
 #else /* CONFIG_GPIOLIB */
 
 static inline int gpiod_count(struct device *dev, const char *con_id)
@@ -204,69 +180,6 @@ static inline void gpiod_put_array(struct gpio_descs *descs)
 	/* GPIO can never have been requested */
 	WARN_ON(1);
 }
-
-static inline struct gpio_desc *__must_check
-devm_gpiod_get(struct device *dev,
-		 const char *con_id,
-		 enum gpiod_flags flags)
-{
-	return ERR_PTR(-ENOSYS);
-}
-static inline
-struct gpio_desc *__must_check
-devm_gpiod_get_index(struct device *dev,
-		       const char *con_id,
-		       unsigned int idx,
-		       enum gpiod_flags flags)
-{
-	return ERR_PTR(-ENOSYS);
-}
-
-static inline struct gpio_desc *__must_check
-devm_gpiod_get_optional(struct device *dev, const char *con_id,
-			  enum gpiod_flags flags)
-{
-	return ERR_PTR(-ENOSYS);
-}
-
-static inline struct gpio_desc *__must_check
-devm_gpiod_get_index_optional(struct device *dev, const char *con_id,
-				unsigned int index, enum gpiod_flags flags)
-{
-	return ERR_PTR(-ENOSYS);
-}
-
-static inline struct gpio_descs *__must_check
-devm_gpiod_get_array(struct device *dev, const char *con_id,
-		     enum gpiod_flags flags)
-{
-	return ERR_PTR(-ENOSYS);
-}
-
-static inline struct gpio_descs *__must_check
-devm_gpiod_get_array_optional(struct device *dev, const char *con_id,
-			      enum gpiod_flags flags)
-{
-	return ERR_PTR(-ENOSYS);
-}
-
-static inline void devm_gpiod_put(struct device *dev, struct gpio_desc *desc)
-{
-	might_sleep();
-
-	/* GPIO can never have been requested */
-	WARN_ON(1);
-}
-
-static inline void devm_gpiod_put_array(struct device *dev,
-					struct gpio_descs *descs)
-{
-	might_sleep();
-
-	/* GPIO can never have been requested */
-	WARN_ON(1);
-}
-
 
 static inline int gpiod_get_direction(const struct gpio_desc *desc)
 {
@@ -417,12 +330,6 @@ static inline struct gpio_desc *fwnode_get_named_gpiod(
 	return ERR_PTR(-ENOSYS);
 }
 
-static inline struct gpio_desc *devm_get_gpiod_from_child(
-	struct device *dev, const char *con_id, struct fwnode_handle *child)
-{
-	return ERR_PTR(-ENOSYS);
-}
-
 #endif /* CONFIG_GPIOLIB */
 
 #if IS_ENABLED(CONFIG_GPIOLIB) && IS_ENABLED(CONFIG_GPIO_SYSFS)
@@ -451,5 +358,103 @@ static inline void gpiod_unexport(struct gpio_desc *desc)
 }
 
 #endif /* CONFIG_GPIOLIB && CONFIG_GPIO_SYSFS */
+
+#ifdef CONFIG_GPIO_DEVRES
+	struct gpio_desc *__must_check devm_gpiod_get(struct device *dev,
+						      const char *con_id,
+						      enum gpiod_flags flags);
+	struct gpio_desc *__must_check devm_gpiod_get_index(struct device *dev,
+							    const char *con_id,
+							    unsigned int idx,
+							    enum gpiod_flags flags);
+	struct gpio_desc *__must_check devm_gpiod_get_optional(struct device *dev,
+							       const char *con_id,
+							       enum gpiod_flags flags);
+	struct gpio_desc *__must_check
+	devm_gpiod_get_index_optional(struct device *dev, const char *con_id,
+				      unsigned int index, enum gpiod_flags flags);
+	struct gpio_descs *__must_check devm_gpiod_get_array(struct device *dev,
+							     const char *con_id,
+							     enum gpiod_flags flags);
+	struct gpio_descs *__must_check
+	devm_gpiod_get_array_optional(struct device *dev, const char *con_id,
+				      enum gpiod_flags flags);
+	void devm_gpiod_put(struct device *dev, struct gpio_desc *desc);
+	void devm_gpiod_put_array(struct device *dev, struct gpio_descs *descs);
+
+	struct fwnode_handle;
+	struct gpio_desc *devm_get_gpiod_from_child(struct device *dev,
+						    const char *con_id,
+						    struct fwnode_handle *child);
+#else
+	static inline struct gpio_desc *__must_check
+	devm_gpiod_get(struct device *dev,
+			 const char *con_id,
+			 enum gpiod_flags flags)
+	{
+		return ERR_PTR(-ENOSYS);
+	}
+	static inline
+	struct gpio_desc *__must_check
+	devm_gpiod_get_index(struct device *dev,
+			       const char *con_id,
+			       unsigned int idx,
+			       enum gpiod_flags flags)
+	{
+		return ERR_PTR(-ENOSYS);
+	}
+
+	static inline struct gpio_desc *__must_check
+	devm_gpiod_get_optional(struct device *dev, const char *con_id,
+				  enum gpiod_flags flags)
+	{
+		return ERR_PTR(-ENOSYS);
+	}
+
+	static inline struct gpio_desc *__must_check
+	devm_gpiod_get_index_optional(struct device *dev, const char *con_id,
+					unsigned int index, enum gpiod_flags flags)
+	{
+		return ERR_PTR(-ENOSYS);
+	}
+
+	static inline struct gpio_descs *__must_check
+	devm_gpiod_get_array(struct device *dev, const char *con_id,
+			     enum gpiod_flags flags)
+	{
+		return ERR_PTR(-ENOSYS);
+	}
+
+	static inline struct gpio_descs *__must_check
+	devm_gpiod_get_array_optional(struct device *dev, const char *con_id,
+				      enum gpiod_flags flags)
+	{
+		return ERR_PTR(-ENOSYS);
+	}
+
+	static inline void devm_gpiod_put(struct device *dev, struct gpio_desc *desc)
+	{
+		might_sleep();
+
+		/* GPIO can never have been requested */
+		WARN_ON(1);
+	}
+
+	static inline void devm_gpiod_put_array(struct device *dev,
+						struct gpio_descs *descs)
+	{
+		might_sleep();
+
+		/* GPIO can never have been requested */
+		WARN_ON(1);
+	}
+
+	struct fwnode_handle;
+	static inline struct gpio_desc *devm_get_gpiod_from_child(
+		struct device *dev, const char *con_id, struct fwnode_handle *child)
+	{
+		return ERR_PTR(-ENOSYS);
+	}
+#endif /* CONFIG_GPIO_DEVRES */
 
 #endif
