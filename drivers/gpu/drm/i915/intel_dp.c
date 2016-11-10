@@ -353,8 +353,14 @@ intel_dp_mode_valid(struct drm_connector *connector,
 		target_clock = fixed_mode->clock;
 	}
 
-	max_link_clock = intel_dp_max_link_rate(intel_dp);
-	max_lanes = intel_dp_max_lane_count(intel_dp);
+	/* Prune the modes using the fallback link rate/lane count */
+	if (connector->link_status == DRM_MODE_LINK_STATUS_BAD) {
+		max_link_clock = intel_dp->fallback_link_rate;
+		max_lanes = intel_dp->fallback_lane_count;
+	} else {
+		max_link_clock = intel_dp_max_link_rate(intel_dp);
+		max_lanes = intel_dp_max_lane_count(intel_dp);
+	}
 
 	max_rate = intel_dp_max_data_rate(max_link_clock, max_lanes);
 	mode_rate = intel_dp_link_required(target_clock, 18);
@@ -1591,6 +1597,7 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 	enum port port = dp_to_dig_port(intel_dp)->port;
 	struct intel_crtc *intel_crtc = to_intel_crtc(pipe_config->base.crtc);
 	struct intel_connector *intel_connector = intel_dp->attached_connector;
+	struct drm_connector *connector = &intel_connector->base;
 	int lane_count, clock;
 	int min_lane_count = 1;
 	int max_lane_count = intel_dp_max_lane_count(intel_dp);
@@ -1637,6 +1644,12 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 
 	if (adjusted_mode->flags & DRM_MODE_FLAG_DBLCLK)
 		return false;
+
+	/* Fall back to lower link rate in case of failure in previous modeset */
+	if (connector->link_status == DRM_MODE_LINK_STATUS_BAD) {
+		min_lane_count = max_lane_count = intel_dp->fallback_lane_count;
+		min_clock = max_clock = intel_dp->fallback_link_rate_index;
+	}
 
 	DRM_DEBUG_KMS("DP link computation with max lane count %i "
 		      "max bw %d pixel clock %iKHz\n",
@@ -2784,6 +2797,8 @@ static void intel_enable_dp(struct intel_encoder *encoder,
 	struct drm_device *dev = encoder->base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_crtc *crtc = to_intel_crtc(encoder->base.crtc);
+	struct intel_connector *intel_connector = intel_dp->attached_connector;
+	struct drm_connector *connector = &intel_connector->base;
 	uint32_t dp_reg = I915_READ(intel_dp->output_reg);
 	enum pipe pipe = crtc->pipe;
 
@@ -2814,7 +2829,23 @@ static void intel_enable_dp(struct intel_encoder *encoder,
 	}
 
 	intel_dp_sink_dpms(intel_dp, DRM_MODE_DPMS_ON);
-	intel_dp_start_link_train(intel_dp);
+	if (!intel_dp_start_link_train(intel_dp)) {
+		DRM_DEBUG_KMS("Link Training failed at link rate = %d, lane count = %d",
+			      intel_dp->link_rate, intel_dp->lane_count);
+		if (!intel_dp_get_link_train_fallback_values(intel_dp,
+							     intel_dp->link_rate,
+							     intel_dp->lane_count))
+			/* Schedule a Hotplug Uevent to userspace to start modeset */
+			schedule_work(&intel_connector->modeset_retry_work);
+	} else {
+		DRM_DEBUG_KMS("Link Training Passed at Link Rate = %d, Lane count = %d",
+			      intel_dp->link_rate, intel_dp->lane_count);
+		intel_dp->fallback_link_rate_index = -1;
+		intel_dp->fallback_link_rate = 0;
+		intel_dp->fallback_lane_count = 0;
+		intel_dp_set_link_status_property(connector,
+						  DRM_MODE_LINK_STATUS_GOOD);
+	}
 	intel_dp_stop_link_train(intel_dp);
 
 	if (pipe_config->has_audio) {
@@ -4021,6 +4052,8 @@ intel_dp_retrain_link(struct intel_dp *intel_dp)
 	struct intel_encoder *encoder = &dp_to_dig_port(intel_dp)->base;
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	struct intel_crtc *crtc = to_intel_crtc(encoder->base.crtc);
+	struct intel_connector *intel_connector = intel_dp->attached_connector;
+	struct drm_connector *connector = &intel_connector->base;
 
 	/* Suppress underruns caused by re-training */
 	intel_set_cpu_fifo_underrun_reporting(dev_priv, crtc->pipe, false);
@@ -4028,7 +4061,23 @@ intel_dp_retrain_link(struct intel_dp *intel_dp)
 		intel_set_pch_fifo_underrun_reporting(dev_priv,
 						      intel_crtc_pch_transcoder(crtc), false);
 
-	intel_dp_start_link_train(intel_dp);
+	if (!intel_dp_start_link_train(intel_dp)) {
+		DRM_DEBUG_KMS("Link Training failed at link rate = %d, lane count = %d",
+			      intel_dp->link_rate, intel_dp->lane_count);
+		if (!intel_dp_get_link_train_fallback_values(intel_dp,
+							     intel_dp->link_rate,
+							     intel_dp->lane_count))
+			/* Schedule a Hotplug Uevent to userspace to start modeset */
+			schedule_work(&intel_connector->modeset_retry_work);
+	} else {
+		DRM_DEBUG_KMS("Link Training Passed at Link Rate = %d, Lane count = %d",
+			      intel_dp->link_rate, intel_dp->lane_count);
+		intel_dp->fallback_link_rate_index = -1;
+		intel_dp->fallback_link_rate = 0;
+		intel_dp->fallback_lane_count = 0;
+		intel_dp_set_link_status_property(connector,
+						  DRM_MODE_LINK_STATUS_GOOD);
+	}
 	intel_dp_stop_link_train(intel_dp);
 
 	/* Keep underrun reporting disabled until things are stable */
@@ -4422,6 +4471,11 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 		intel_dp->compliance_test_active = 0;
 		intel_dp->compliance_test_type = 0;
 		intel_dp->compliance_test_data = 0;
+		intel_dp->fallback_link_rate_index = -1;
+		intel_dp->fallback_link_rate = 0;
+		intel_dp->fallback_lane_count = 0;
+		intel_dp_set_link_status_property(connector,
+						  DRM_MODE_LINK_STATUS_GOOD);
 
 		if (intel_dp->is_mst) {
 			DRM_DEBUG_KMS("MST device may have disappeared %d vs %d\n",
@@ -4512,6 +4566,11 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
 		      connector->base.id, connector->name);
+
+	/* If this is a retry due to link trianing failure */
+	if (status == connector_status_connected &&
+	    connector->link_status == DRM_MODE_LINK_STATUS_BAD)
+		return status;
 
 	/* If full detect is not performed yet, do a full detect */
 	if (!intel_dp->detect_done)
@@ -5692,6 +5751,39 @@ out_vdd_off:
 	return false;
 }
 
+static void intel_dp_modeset_retry_work_fn(struct work_struct *work)
+{
+	struct intel_connector *intel_connector;
+	struct drm_connector *connector;
+	struct drm_display_mode *mode;
+	bool verbose_prune = true;
+
+	intel_connector = container_of(work, typeof(*intel_connector),
+				       modeset_retry_work);
+	connector = &intel_connector->base;
+
+	/* Grab the locks before changing connector property*/
+	mutex_lock(&connector->dev->mode_config.mutex);
+	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n", connector->base.id,
+		      connector->name);
+	list_for_each_entry(mode, &connector->modes, head) {
+		mode->status = intel_dp_mode_valid(connector,
+						   mode);
+	}
+	drm_mode_prune_invalid(connector->dev, &connector->modes,
+			       verbose_prune);
+
+	/* Set connector link status to BAD and send a Uevent to notify
+	 * userspace to do a modeset.
+	 */
+	intel_dp_set_link_status_property(connector,
+					  DRM_MODE_LINK_STATUS_BAD);
+	mutex_unlock(&connector->dev->mode_config.mutex);
+
+	/* Send Hotplug uevent so userspace can reprobe */
+	drm_kms_helper_hotplug_event(connector->dev);
+}
+
 bool
 intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 			struct intel_connector *intel_connector)
@@ -5703,6 +5795,10 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	enum port port = intel_dig_port->port;
 	int type;
+
+	/* Initialize the work for modeset in case of link train failure */
+	INIT_WORK(&intel_connector->modeset_retry_work,
+		  intel_dp_modeset_retry_work_fn);
 
 	if (WARN(intel_dig_port->max_lanes < 1,
 		 "Not enough lanes (%d) for DP on port %c\n",

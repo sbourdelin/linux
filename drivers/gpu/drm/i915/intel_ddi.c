@@ -1684,6 +1684,8 @@ static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 	struct intel_dp *intel_dp = enc_to_intel_dp(&encoder->base);
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	enum port port = intel_ddi_get_encoder_port(encoder);
+	struct intel_connector *intel_connector = intel_dp->attached_connector;
+	struct drm_connector *connector = &intel_connector->base;
 
 	intel_dp_set_link_params(intel_dp, link_rate, lane_count,
 				 link_mst);
@@ -1694,7 +1696,24 @@ static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 	intel_prepare_dp_ddi_buffers(encoder);
 	intel_ddi_init_dp_buf_reg(encoder);
 	intel_dp_sink_dpms(intel_dp, DRM_MODE_DPMS_ON);
-	intel_dp_start_link_train(intel_dp);
+	if (!intel_dp_start_link_train(intel_dp)) {
+		DRM_DEBUG_KMS("Link Training failed at link rate = %d, lane count = %d",
+			      link_rate, lane_count);
+		if (!intel_dp_get_link_train_fallback_values(intel_dp,
+							     link_rate,
+							     lane_count))
+			/* Schedule a Hotplug Uevent to userspace to start modeset */
+			schedule_work(&intel_connector->modeset_retry_work);
+	} else {
+		DRM_DEBUG_KMS("Link Training Passed at Link Rate = %d, Lane count = %d",
+			      link_rate, lane_count);
+		intel_dp->fallback_link_rate_index = -1;
+		intel_dp->fallback_link_rate = 0;
+		intel_dp->fallback_lane_count = 0;
+		intel_dp_set_link_status_property(connector,
+						  DRM_MODE_LINK_STATUS_GOOD);
+	}
+
 	if (port != PORT_A || INTEL_GEN(dev_priv) >= 9)
 		intel_dp_stop_link_train(intel_dp);
 }

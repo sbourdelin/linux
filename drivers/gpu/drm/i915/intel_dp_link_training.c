@@ -310,9 +310,15 @@ void intel_dp_stop_link_train(struct intel_dp *intel_dp)
 				DP_TRAINING_PATTERN_DISABLE);
 }
 
-void
+bool
 intel_dp_start_link_train(struct intel_dp *intel_dp)
 {
-	intel_dp_link_training_clock_recovery(intel_dp);
-	intel_dp_link_training_channel_equalization(intel_dp);
+	bool ret;
+
+	if (intel_dp_link_training_clock_recovery(intel_dp)) {
+		ret = intel_dp_link_training_channel_equalization(intel_dp);
+		if (ret)
+			return true;
+	}
+	return false;
 }

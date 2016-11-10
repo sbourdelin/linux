@@ -312,6 +312,9 @@ struct intel_connector {
 	void *port; /* store this opaque as its illegal to dereference it */
 
 	struct intel_dp *mst_port;
+
+	/* Work struct to schedule a uevent on link train failure */
+	struct work_struct modeset_retry_work;
 };
 
 struct dpll {
@@ -891,7 +894,6 @@ struct intel_dp {
 	int fallback_link_rate;
 	uint8_t fallback_lane_count;
 	int fallback_link_rate_index;
-	bool link_train_failed;
 	uint8_t sink_count;
 	bool link_mst;
 	bool has_audio;
@@ -1392,7 +1394,7 @@ void intel_dp_set_link_params(struct intel_dp *intel_dp,
 			      bool link_mst);
 int intel_dp_get_link_train_fallback_values(struct intel_dp *intel_dp,
 					    int link_rate, uint8_t lane_count);
-void intel_dp_start_link_train(struct intel_dp *intel_dp);
+bool intel_dp_start_link_train(struct intel_dp *intel_dp);
 void intel_dp_stop_link_train(struct intel_dp *intel_dp);
 void intel_dp_sink_dpms(struct intel_dp *intel_dp, int mode);
 void intel_dp_encoder_reset(struct drm_encoder *encoder);
