@@ -102,7 +102,7 @@ struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count)
 	return lsm;
 
 err:
-	while (--i >= 0)
+	while (i-- > 0)
 		kmem_cache_free(lov_oinfo_slab, lsm->lsm_oinfo[i]);
 	kvfree(lsm);
 	return NULL;
