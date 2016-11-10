@@ -171,6 +171,12 @@ static int __init init_nvs_nosave(const struct dmi_system_id *d)
 	return 0;
 }
 
+static bool suspend_to_idle_preferred(void)
+{
+	return (acpi_gbl_FADT.flags & ACPI_FADT_LOW_POWER_S0);
+}
+
+
 static struct dmi_system_id acpisleep_dmi_table[] __initdata = {
 	{
 	.callback = init_old_suspend_ordering,
@@ -906,6 +912,11 @@ int __init acpi_sleep_init(void)
 		pm_power_off = acpi_power_off;
 	} else {
 		acpi_no_s5 = true;
+	}
+
+	if (suspend_to_idle_preferred()) {
+		sleep_states[ACPI_STATE_S3] = 0;
+		sleep_states[ACPI_STATE_S1] = 0;
 	}
 
 	supported[0] = 0;
