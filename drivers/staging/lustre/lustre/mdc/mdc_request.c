@@ -327,12 +327,12 @@ static int mdc_xattr_common(struct obd_export *exp,
 
 	/* make rpc */
 	if (opcode == MDS_REINT)
-		mdc_get_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
+		mdc_get_mod_rpc_slot(req, NULL);
 
 	rc = ptlrpc_queue_wait(req);
 
 	if (opcode == MDS_REINT)
-		mdc_put_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
+		mdc_put_mod_rpc_slot(req, NULL);
 
 	if (rc)
 		ptlrpc_req_finished(req);
@@ -775,9 +775,9 @@ static int mdc_close(struct obd_export *exp, struct md_op_data *op_data,
 
 	ptlrpc_request_set_replen(req);
 
-	mdc_get_rpc_lock(obd->u.cli.cl_close_lock, NULL);
+	mdc_get_mod_rpc_slot(req, NULL);
 	rc = ptlrpc_queue_wait(req);
-	mdc_put_rpc_lock(obd->u.cli.cl_close_lock, NULL);
+	mdc_put_mod_rpc_slot(req, NULL);
 
 	if (!req->rq_repmsg) {
 		CDEBUG(D_RPCTRACE, "request failed to send: %p, %d\n", req,
@@ -1490,9 +1490,9 @@ static int mdc_ioc_hsm_progress(struct obd_export *exp,
 
 	ptlrpc_request_set_replen(req);
 
-	mdc_get_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
+	mdc_get_mod_rpc_slot(req, NULL);
 	rc = ptlrpc_queue_wait(req);
-	mdc_put_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
+	mdc_put_mod_rpc_slot(req, NULL);
 out:
 	ptlrpc_req_finished(req);
 	return rc;
@@ -1670,9 +1670,9 @@ static int mdc_ioc_hsm_state_set(struct obd_export *exp,
 
 	ptlrpc_request_set_replen(req);
 
-	mdc_get_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
+	mdc_get_mod_rpc_slot(req, NULL);
 	rc = ptlrpc_queue_wait(req);
-	mdc_put_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
+	mdc_put_mod_rpc_slot(req, NULL);
 out:
 	ptlrpc_req_finished(req);
 	return rc;
@@ -1735,9 +1735,9 @@ static int mdc_ioc_hsm_request(struct obd_export *exp,
 
 	ptlrpc_request_set_replen(req);
 
-	mdc_get_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
+	mdc_get_mod_rpc_slot(req, NULL);
 	rc = ptlrpc_queue_wait(req);
-	mdc_put_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
+	mdc_put_mod_rpc_slot(req, NULL);
 out:
 	ptlrpc_req_finished(req);
 	return rc;
@@ -2582,29 +2582,17 @@ static void mdc_llog_finish(struct obd_device *obd)
 
 static int mdc_setup(struct obd_device *obd, struct lustre_cfg *cfg)
 {
-	struct client_obd *cli = &obd->u.cli;
 	struct lprocfs_static_vars lvars = { NULL };
 	int rc;
 
-	cli->cl_rpc_lock = kzalloc(sizeof(*cli->cl_rpc_lock), GFP_NOFS);
-	if (!cli->cl_rpc_lock)
-		return -ENOMEM;
-	mdc_init_rpc_lock(cli->cl_rpc_lock);
-
 	rc = ptlrpcd_addref();
 	if (rc < 0)
-		goto err_rpc_lock;
-
-	cli->cl_close_lock = kzalloc(sizeof(*cli->cl_close_lock), GFP_NOFS);
-	if (!cli->cl_close_lock) {
-		rc = -ENOMEM;
-		goto err_ptlrpcd_decref;
-	}
-	mdc_init_rpc_lock(cli->cl_close_lock);
+		return rc;
 
 	rc = client_obd_setup(obd, cfg);
 	if (rc)
-		goto err_close_lock;
+		goto err_ptlrpcd_decref;
+
 	lprocfs_mdc_init_vars(&lvars);
 	lprocfs_obd_setup(obd, lvars.obd_vars, lvars.sysfs_vars);
 	sptlrpc_lprocfs_cliobd_attach(obd);
@@ -2621,17 +2609,10 @@ static int mdc_setup(struct obd_device *obd, struct lustre_cfg *cfg)
 		return rc;
 	}
 
-	spin_lock_init(&cli->cl_mod_rpcs_lock);
-	cli->cl_max_mod_rpcs_in_flight = OBD_MAX_RIF_DEFAULT - 1;
-
 	return rc;
 
-err_close_lock:
-	kfree(cli->cl_close_lock);
 err_ptlrpcd_decref:
 	ptlrpcd_decref();
-err_rpc_lock:
-	kfree(cli->cl_rpc_lock);
 	return rc;
 }
 
@@ -2679,11 +2660,6 @@ static int mdc_precleanup(struct obd_device *obd, enum obd_cleanup_stage stage)
 
 static int mdc_cleanup(struct obd_device *obd)
 {
-	struct client_obd *cli = &obd->u.cli;
-
-	kfree(cli->cl_rpc_lock);
-	kfree(cli->cl_close_lock);
-
 	ptlrpcd_decref();
 
 	return client_obd_cleanup(obd);
