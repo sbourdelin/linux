@@ -1429,7 +1429,7 @@ bool intel_ddi_get_hw_state(struct intel_encoder *encoder,
 	DRM_DEBUG_KMS("No pipe for ddi port %c found\n", port_name(port));
 
 out:
-	if (ret && IS_BROXTON(dev_priv)) {
+	if (ret && IS_GEN9_LP(dev_priv)) {
 		tmp = I915_READ(BXT_PHY_CTL(port));
 		if ((tmp & (BXT_PHY_LANE_POWERDOWN_ACK |
 			    BXT_PHY_LANE_ENABLED)) != BXT_PHY_LANE_ENABLED)
@@ -2044,7 +2044,7 @@ void intel_ddi_get_config(struct intel_encoder *encoder,
 
 	intel_ddi_clock_get(encoder, pipe_config);
 
-	if (IS_BROXTON(dev_priv))
+	if (IS_GEN9_LP(dev_priv))
 		pipe_config->lane_lat_optim_mask =
 			bxt_ddi_phy_get_lane_lat_optim_mask(encoder);
 }
@@ -2068,7 +2068,7 @@ static bool intel_ddi_compute_config(struct intel_encoder *encoder,
 	else
 		ret = intel_dp_compute_config(encoder, pipe_config, conn_state);
 
-	if (IS_BROXTON(dev_priv) && ret)
+	if (IS_GEN9_LP(dev_priv) && ret)
 		pipe_config->lane_lat_optim_mask =
 			bxt_ddi_phy_calc_lane_lat_optim_mask(encoder,
 							     pipe_config->lane_count);
@@ -2225,7 +2225,7 @@ void intel_ddi_init(struct drm_device *dev, enum port port)
 
 	intel_encoder->compute_config = intel_ddi_compute_config;
 	intel_encoder->enable = intel_enable_ddi;
-	if (IS_BROXTON(dev_priv))
+	if (IS_GEN9_LP(dev_priv))
 		intel_encoder->pre_pll_enable = bxt_ddi_pre_pll_enable;
 	intel_encoder->pre_enable = intel_ddi_pre_enable;
 	intel_encoder->disable = intel_disable_ddi;
