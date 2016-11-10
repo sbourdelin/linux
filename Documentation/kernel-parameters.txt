@@ -2325,6 +2325,11 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			memory contents and reserves bad memory
 			regions that are detected.
 
+	mem_encrypt=	[X86-64] Enable AMD Secure Memory Encryption (SME)
+			Memory encryption is disabled by default, using this
+			switch, memory encryption can be enabled.
+			on: enable memory encryption
+
 	meye.*=		[HW] Set MotionEye Camera parameters
 			See Documentation/video4linux/meye.txt.
 
