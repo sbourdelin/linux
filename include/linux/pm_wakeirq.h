@@ -14,6 +14,8 @@
 #ifndef _LINUX_PM_WAKEIRQ_H
 #define _LINUX_PM_WAKEIRQ_H
 
+struct device;
+
 #ifdef CONFIG_PM
 
 extern int dev_pm_set_wake_irq(struct device *dev, int irq);
