@@ -785,8 +785,7 @@ free_pending:
  *  7. If we were asked to remove a directory and victim isn't one - ENOTDIR.
  *  8. If we were asked to remove a non-directory and victim isn't one - EISDIR.
  *  9. We can't remove a root or mountpoint.
- * 10. We don't allow removal of NFS sillyrenamed files; it's handled by
- *     nfs_async_unlink().
+ * 10. We don't allow removal of delete locked files.
  */
 
 static int btrfs_may_delete(struct inode *dir, struct dentry *victim, int isdir)
@@ -816,7 +815,7 @@ static int btrfs_may_delete(struct inode *dir, struct dentry *victim, int isdir)
 		return -EISDIR;
 	if (IS_DEADDIR(dir))
 		return -ENOENT;
-	if (victim->d_flags & DCACHE_NFSFS_RENAMED)
+	if (cant_delete(victim))
 		return -EBUSY;
 	return 0;
 }

@@ -180,6 +180,7 @@ struct dentry_operations {
 #define DCACHE_OP_WEAK_REVALIDATE	0x00000800
 
 #define DCACHE_NFSFS_RENAMED		0x00001000
+#define DCACHE_DELETE_LOCK		0x00001000 /* May not delete/rename */
      /* this dentry has been "silly renamed" and has to be deleted on the last
       * dput() */
 #define DCACHE_COOKIE			0x00002000 /* For use by dcookie subsystem */
@@ -347,6 +348,18 @@ static inline void dont_mount(struct dentry *dentry)
 {
 	spin_lock(&dentry->d_lock);
 	dentry->d_flags |= DCACHE_CANT_MOUNT;
+	spin_unlock(&dentry->d_lock);
+}
+
+static inline int cant_delete(const struct dentry *dentry)
+{
+	return (dentry->d_flags & DCACHE_DELETE_LOCK);
+}
+
+static inline void dont_delete(struct dentry *dentry)
+{
+	spin_lock(&dentry->d_lock);
+	dentry->d_flags |= DCACHE_DELETE_LOCK;
 	spin_unlock(&dentry->d_lock);
 }
 

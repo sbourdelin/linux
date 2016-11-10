@@ -678,9 +678,7 @@ out_valid:
 
 	/* the dirent, if it exists, now points to a different vnode */
 not_found:
-	spin_lock(&dentry->d_lock);
-	dentry->d_flags |= DCACHE_NFSFS_RENAMED;
-	spin_unlock(&dentry->d_lock);
+	dont_delete(dentry);
 
 out_bad:
 	_debug("dropping dentry %pd2", dentry);
@@ -701,7 +699,7 @@ static int afs_d_delete(const struct dentry *dentry)
 {
 	_enter("%pd", dentry);
 
-	if (dentry->d_flags & DCACHE_NFSFS_RENAMED)
+	if (cant_delete(dentry))
 		goto zap;
 
 	if (d_really_is_positive(dentry) &&

@@ -2762,8 +2762,7 @@ EXPORT_SYMBOL(__check_sticky);
  *  8. If we were asked to remove a directory and victim isn't one - ENOTDIR.
  *  9. If we were asked to remove a non-directory and victim isn't one - EISDIR.
  * 10. We can't remove a root or mountpoint.
- * 11. We don't allow removal of NFS sillyrenamed files; it's handled by
- *     nfs_async_unlink().
+ * 11. We don't allow removal of delete locked files.
  */
 static int may_delete(struct inode *dir, struct dentry *victim, bool isdir)
 {
@@ -2795,7 +2794,7 @@ static int may_delete(struct inode *dir, struct dentry *victim, bool isdir)
 		return -EISDIR;
 	if (IS_DEADDIR(dir))
 		return -ENOENT;
-	if (victim->d_flags & DCACHE_NFSFS_RENAMED)
+	if (cant_delete(victim))
 		return -EBUSY;
 	return 0;
 }
