@@ -13,6 +13,8 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/dma-mapping.h>
+#include <linux/swiotlb.h>
 
 #include <asm/tlbflush.h>
 #include <asm/fixmap.h>
@@ -239,4 +241,19 @@ void __init sme_early_init(void)
 	/* Update the protection map with memory encryption mask */
 	for (i = 0; i < ARRAY_SIZE(protection_map); i++)
 		protection_map[i] = __pgprot(pgprot_val(protection_map[i]) | sme_me_mask);
+}
+
+/* Architecture __weak replacement functions */
+void __init mem_encrypt_init(void)
+{
+	if (!sme_me_mask)
+		return;
+
+	/* Make SWIOTLB use an unencrypted DMA area */
+	swiotlb_clear_encryption();
+}
+
+void swiotlb_set_mem_unenc(void *vaddr, unsigned long size)
+{
+	sme_set_mem_unenc(vaddr, size);
 }
