@@ -682,6 +682,12 @@ struct drm_connector {
 	uint8_t num_h_tile, num_v_tile;
 	uint8_t tile_h_loc, tile_v_loc;
 	uint16_t tile_h_size, tile_v_size;
+
+	/* Connector Link status
+	 * 0: If the link is Good
+	 * 1: If the link is Bad
+	 */
+	int link_status;
 };
 
 #define obj_to_connector(x) container_of(x, struct drm_connector, base)
@@ -754,7 +760,6 @@ int drm_mode_create_tv_properties(struct drm_device *dev,
 int drm_mode_create_scaling_mode_property(struct drm_device *dev);
 int drm_mode_create_aspect_ratio_property(struct drm_device *dev);
 int drm_mode_create_suggested_offset_properties(struct drm_device *dev);
-
 int drm_mode_connector_set_path_property(struct drm_connector *connector,
 					 const char *path);
 int drm_mode_connector_set_tile_property(struct drm_connector *connector);
