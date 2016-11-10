@@ -34,12 +34,18 @@ static void *arch_memremap_wb(resource_size_t offset, unsigned long size)
 }
 #endif
 
+bool __weak memremap_do_ram_remap(resource_size_t offset, size_t size)
+{
+	return true;
+}
+
 static void *try_ram_remap(resource_size_t offset, size_t size)
 {
 	unsigned long pfn = PHYS_PFN(offset);
 
 	/* In the simple case just return the existing linear address */
-	if (pfn_valid(pfn) && !PageHighMem(pfn_to_page(pfn)))
+	if (pfn_valid(pfn) && !PageHighMem(pfn_to_page(pfn)) &&
+	    memremap_do_ram_remap(offset, size))
 		return __va(offset);
 	return NULL; /* fallback to arch_memremap_wb */
 }

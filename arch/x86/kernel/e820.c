@@ -107,6 +107,22 @@ int __init e820_all_mapped(u64 start, u64 end, unsigned type)
 	return 0;
 }
 
+unsigned int e820_get_entry_type(u64 start, u64 end)
+{
+	int i;
+
+	for (i = 0; i < e820->nr_map; i++) {
+		struct e820entry *ei = &e820->map[i];
+
+		if (ei->addr >= end || ei->addr + ei->size <= start)
+			continue;
+
+		return ei->type;
+	}
+
+	return 0;
+}
+
 /*
  * Add a memory region to the kernel e820 map.
  */

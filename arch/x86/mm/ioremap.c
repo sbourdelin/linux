@@ -20,6 +20,9 @@
 #include <asm/tlbflush.h>
 #include <asm/pgalloc.h>
 #include <asm/pat.h>
+#include <asm/e820.h>
+#include <asm/setup.h>
+#include <linux/efi.h>
 
 #include "physaddr.h"
 
@@ -416,6 +419,92 @@ void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr)
 		return;
 
 	iounmap((void __iomem *)((unsigned long)addr & PAGE_MASK));
+}
+
+static bool memremap_setup_data(resource_size_t phys_addr,
+				unsigned long size)
+{
+	u64 paddr;
+
+	if (phys_addr == boot_params.hdr.setup_data)
+		return true;
+
+	paddr = boot_params.efi_info.efi_memmap_hi;
+	paddr <<= 32;
+	paddr |= boot_params.efi_info.efi_memmap;
+	if (phys_addr == paddr)
+		return true;
+
+	paddr = boot_params.efi_info.efi_systab_hi;
+	paddr <<= 32;
+	paddr |= boot_params.efi_info.efi_systab;
+	if (phys_addr == paddr)
+		return true;
+
+	if (efi_table_address_match(phys_addr))
+		return true;
+
+	return false;
+}
+
+static bool memremap_apply_encryption(resource_size_t phys_addr,
+				      unsigned long size)
+{
+	/* SME is not active, just return true */
+	if (!sme_me_mask)
+		return true;
+
+	/* Check if the address is part of the setup data */
+	if (memremap_setup_data(phys_addr, size))
+		return false;
+
+	/* Check if the address is part of EFI boot/runtime data */
+	switch (efi_mem_type(phys_addr)) {
+	case EFI_BOOT_SERVICES_DATA:
+	case EFI_RUNTIME_SERVICES_DATA:
+		return false;
+	}
+
+	/* Check if the address is outside kernel usable area */
+	switch (e820_get_entry_type(phys_addr, phys_addr + size - 1)) {
+	case E820_RESERVED:
+	case E820_ACPI:
+	case E820_NVS:
+	case E820_UNUSABLE:
+		return false;
+	}
+
+	return true;
+}
+
+/*
+ * Architecure override of __weak function to prevent ram remap and use the
+ * architectural remap function.
+ */
+bool memremap_do_ram_remap(resource_size_t phys_addr, unsigned long size)
+{
+	if (!memremap_apply_encryption(phys_addr, size))
+		return false;
+
+	return true;
+}
+
+/*
+ * Architecure override of __weak function to adjust the protection attributes
+ * used when remapping memory.
+ */
+pgprot_t __init early_memremap_pgprot_adjust(resource_size_t phys_addr,
+					     unsigned long size,
+					     pgprot_t prot)
+{
+	unsigned long prot_val = pgprot_val(prot);
+
+	if (memremap_apply_encryption(phys_addr, size))
+		prot_val |= _PAGE_ENC;
+	else
+		prot_val &= ~_PAGE_ENC;
+
+	return __pgprot(prot_val);
 }
 
 /* Remap memory with encryption */

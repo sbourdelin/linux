@@ -1070,6 +1070,8 @@ efi_capsule_pending(int *reset_type)
 
 extern int efi_status_to_err(efi_status_t status);
 
+extern bool efi_table_address_match(unsigned long phys_addr);
+
 /*
  * Variable Attributes
  */
