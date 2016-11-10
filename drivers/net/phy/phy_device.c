@@ -1598,6 +1598,13 @@ static int phy_probe(struct device *dev)
 	of_set_phy_supported(phydev);
 	phydev->advertising = phydev->supported;
 
+	/* Report that the PHYs can support passing pause frames.  During
+	 * autonegotiation, the PHYs will determine if they should allow
+	 * pause frames to pass.  The MAC driver should then use that result
+	 * to determine whether to enable flow control via pause frames.
+	 */
+	phydev->supported |= SUPPORTED_Pause | SUPPORTED_Asym_Pause;
+
 	/* Set the state to READY by default */
 	phydev->state = PHY_READY;
 
