@@ -15670,14 +15670,14 @@ static void intel_setup_outputs(struct drm_device *dev)
 
 static void intel_user_framebuffer_destroy(struct drm_framebuffer *fb)
 {
-	struct drm_device *dev = fb->dev;
 	struct intel_framebuffer *intel_fb = to_intel_framebuffer(fb);
 
 	drm_framebuffer_cleanup(fb);
-	mutex_lock(&dev->struct_mutex);
-	WARN_ON(!intel_fb->obj->framebuffer_references--);
+
+	WARN_ON(atomic_read(&intel_fb->obj->framebuffer_references) == 0);
+	atomic_dec(&intel_fb->obj->framebuffer_references);
 	i915_gem_object_put(intel_fb->obj);
-	mutex_unlock(&dev->struct_mutex);
+
 	kfree(intel_fb);
 }
 
@@ -15921,7 +15921,7 @@ static int intel_framebuffer_init(struct drm_device *dev,
 		return ret;
 	}
 
-	intel_fb->obj->framebuffer_references++;
+	atomic_inc(&intel_fb->obj->framebuffer_references);
 
 	return 0;
 }
