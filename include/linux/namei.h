@@ -88,6 +88,8 @@ extern int follow_up(struct path *);
 
 extern struct dentry *lock_rename(struct dentry *, struct dentry *);
 extern void unlock_rename(struct dentry *, struct dentry *);
+extern void lock_rename_safe(struct dentry *, struct dentry *);
+extern void unlock_rename_safe(struct dentry *, struct dentry *);
 
 extern void nd_jump_link(struct path *path);
 

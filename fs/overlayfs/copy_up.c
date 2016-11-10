@@ -360,9 +360,8 @@ int ovl_copy_up_one(struct dentry *parent, struct dentry *dentry,
 			return PTR_ERR(link);
 	}
 
-	err = -EIO;
-	if (lock_rename(workdir, upperdir) != NULL) {
-		pr_err("overlayfs: failed to lock workdir+upperdir\n");
+	err = ovl_lock_rename_workdir(workdir, upperdir);
+	if (err) {
 		goto out_unlock;
 	}
 	upperdentry = ovl_dentry_upper(dentry);
@@ -379,7 +378,7 @@ int ovl_copy_up_one(struct dentry *parent, struct dentry *dentry,
 		ovl_set_timestamps(upperdir, &pstat);
 	}
 out_unlock:
-	unlock_rename(workdir, upperdir);
+	ovl_unlock_rename_workdir(workdir, upperdir);
 	do_delayed_call(&done);
 
 	return err;

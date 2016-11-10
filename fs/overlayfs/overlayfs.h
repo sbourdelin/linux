@@ -214,6 +214,8 @@ int ovl_create_real(struct inode *dir, struct dentry *newdentry,
 		    struct kstat *stat, const char *link,
 		    struct dentry *hardlink, bool debug);
 void ovl_cleanup(struct inode *dir, struct dentry *dentry);
+int ovl_lock_rename_workdir(struct dentry *workdir, struct dentry *upperdir);
+void ovl_unlock_rename_workdir(struct dentry *workdir, struct dentry *upperdir);
 
 /* copy_up.c */
 int ovl_copy_up(struct dentry *dentry);

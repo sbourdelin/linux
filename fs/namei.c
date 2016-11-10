@@ -2867,6 +2867,26 @@ void unlock_rename(struct dentry *p1, struct dentry *p2)
 }
 EXPORT_SYMBOL(unlock_rename);
 
+/*
+ * p1 and p2 are delete locked and so are their parents, all the way
+ * to a common ancestor and they are not decendant of each other,
+ * so it is safe to move children between them without holding
+ * s_vfs_rename_mutex and it is safe to lock them in any order.
+ */
+void lock_rename_safe(struct dentry *p1, struct dentry *p2)
+{
+	inode_lock_nested(p1->d_inode, I_MUTEX_PARENT);
+	inode_lock_nested(p2->d_inode, I_MUTEX_PARENT2);
+}
+EXPORT_SYMBOL(lock_rename_safe);
+
+void unlock_rename_safe(struct dentry *p1, struct dentry *p2)
+{
+	inode_unlock(p1->d_inode);
+	inode_unlock(p2->d_inode);
+}
+EXPORT_SYMBOL(unlock_rename_safe);
+
 int vfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 		bool want_excl)
 {

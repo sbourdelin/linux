@@ -213,15 +213,16 @@ out_unlock:
 	return err;
 }
 
-static int ovl_lock_rename_workdir(struct dentry *workdir,
-				   struct dentry *upperdir)
+int ovl_lock_rename_workdir(struct dentry *workdir, struct dentry *upperdir)
 {
 	/* Workdir should not be the same as upperdir */
 	if (workdir == upperdir)
 		goto err;
 
-	/* Workdir should not be subdir of upperdir and vice versa */
-	if (lock_rename(workdir, upperdir) != NULL)
+	/* FIXME: check this once in fill_super */
+	if (upperdir->d_parent == workdir->d_parent->d_parent)
+		lock_rename_safe(workdir, upperdir);
+	else if (lock_rename(workdir, upperdir) != NULL)
 		goto err_unlock;
 
 	return 0;
@@ -231,6 +232,14 @@ err_unlock:
 err:
 	pr_err("overlayfs: failed to lock workdir+upperdir\n");
 	return -EIO;
+}
+
+void ovl_unlock_rename_workdir(struct dentry *workdir, struct dentry *upperdir)
+{
+	if (upperdir->d_parent == workdir->d_parent->d_parent)
+		unlock_rename_safe(workdir, upperdir);
+	else
+		unlock_rename(workdir, upperdir);
 }
 
 static struct dentry *ovl_clear_empty(struct dentry *dentry,
@@ -294,7 +303,7 @@ static struct dentry *ovl_clear_empty(struct dentry *dentry,
 
 	ovl_cleanup_whiteouts(upper, list);
 	ovl_cleanup(wdir, upper);
-	unlock_rename(workdir, upperdir);
+	ovl_unlock_rename_workdir(workdir, upperdir);
 
 	/* dentry's upper doesn't match now, get rid of it */
 	d_drop(dentry);
@@ -306,7 +315,7 @@ out_cleanup:
 out_dput:
 	dput(opaquedir);
 out_unlock:
-	unlock_rename(workdir, upperdir);
+	ovl_unlock_rename_workdir(workdir, upperdir);
 out:
 	return ERR_PTR(err);
 }
@@ -461,7 +470,7 @@ out_dput2:
 out_dput:
 	dput(newdentry);
 out_unlock:
-	unlock_rename(workdir, upperdir);
+	ovl_unlock_rename_workdir(workdir, upperdir);
 out:
 	if (!hardlink) {
 		posix_acl_release(acl);
@@ -668,7 +677,7 @@ out_d_drop:
 out_dput_upper:
 	dput(upper);
 out_unlock:
-	unlock_rename(workdir, upperdir);
+	ovl_unlock_rename_workdir(workdir, upperdir);
 out_dput:
 	dput(opaquedir);
 out:
