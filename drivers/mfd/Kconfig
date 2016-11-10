@@ -1168,6 +1168,20 @@ config MFD_PALMAS
 	  If you say yes here you get support for the Palmas
 	  series of PMIC chips from Texas Instruments.
 
+config MFD_STM32_ADC
+	tristate "STMicroelectronics STM32 adc"
+	depends on ARCH_STM32 || COMPILE_TEST
+	depends on OF
+	select MFD_CORE
+	select REGULATOR
+	select REGULATOR_FIXED_VOLTAGE
+	help
+	  Select this option to enable the core driver for STMicroelectronics
+	  STM32 analog-to-digital converter (ADC).
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called stm32-adc-core.
+
 config TPS6105X
 	tristate "TI TPS61050/61052 Boost Converters"
 	depends on I2C
