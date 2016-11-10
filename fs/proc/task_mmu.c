@@ -445,6 +445,8 @@ struct mem_size_stats {
 	unsigned long swap;
 	unsigned long shared_hugetlb;
 	unsigned long private_hugetlb;
+	unsigned long device;
+	unsigned long device_huge;
 	u64 pss;
 	u64 swap_pss;
 	bool check_shmem_swap;
@@ -458,6 +460,8 @@ static void smaps_account(struct mem_size_stats *mss, struct page *page,
 
 	if (PageAnon(page))
 		mss->anonymous += size;
+	else if (is_zone_device_page(page))
+		mss->device += size;
 
 	mss->resident += size;
 	/* Accumulate the size in pages that have been accessed. */
@@ -575,7 +579,7 @@ static void smaps_pmd_entry(pmd_t *pmd, unsigned long addr,
 	else if (PageSwapBacked(page))
 		mss->shmem_thp += HPAGE_PMD_SIZE;
 	else if (is_zone_device_page(page))
-		/* pass */;
+		mss->device_huge += HPAGE_PMD_SIZE;
 	else
 		VM_BUG_ON_PAGE(1, page);
 	smaps_account(mss, page, true, pmd_young(*pmd), pmd_dirty(*pmd));
@@ -774,6 +778,8 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 		   "ShmemPmdMapped: %8lu kB\n"
 		   "Shared_Hugetlb: %8lu kB\n"
 		   "Private_Hugetlb: %7lu kB\n"
+		   "Device:         %8lu kB\n"
+		   "DeviceHugePages: %7lu kB\n"
 		   "Swap:           %8lu kB\n"
 		   "SwapPss:        %8lu kB\n"
 		   "KernelPageSize: %8lu kB\n"
@@ -792,6 +798,8 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 		   mss.shmem_thp >> 10,
 		   mss.shared_hugetlb >> 10,
 		   mss.private_hugetlb >> 10,
+		   mss.device >> 10,
+		   mss.device_huge >> 10,
 		   mss.swap >> 10,
 		   (unsigned long)(mss.swap_pss >> (10 + PSS_SHIFT)),
 		   vma_kernel_pagesize(vma) >> 10,
