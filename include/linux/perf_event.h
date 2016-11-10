@@ -1110,6 +1110,7 @@ extern int perf_unregister_guest_info_callbacks(struct perf_guest_info_callbacks
 
 extern void perf_event_exec(void);
 extern void perf_event_comm(struct task_struct *tsk, bool exec);
+extern void perf_event_namespaces(struct task_struct *tsk);
 extern void perf_event_fork(struct task_struct *tsk);
 
 /* Callchains */

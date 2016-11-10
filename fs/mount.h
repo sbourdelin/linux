@@ -1,22 +1,7 @@
 #include <linux/mount.h>
 #include <linux/seq_file.h>
-#include <linux/poll.h>
-#include <linux/ns_common.h>
 #include <linux/fs_pin.h>
-
-struct mnt_namespace {
-	atomic_t		count;
-	struct ns_common	ns;
-	struct mount *	root;
-	struct list_head	list;
-	struct user_namespace	*user_ns;
-	struct ucounts		*ucounts;
-	u64			seq;	/* Sequence number to prevent loops */
-	wait_queue_head_t poll;
-	u64 event;
-	unsigned int		mounts; /* # of mounts in the namespace */
-	unsigned int		pending_mounts;
-};
+#include <linux/mnt_namespace.h>
 
 struct mnt_pcp {
 	int mnt_count;

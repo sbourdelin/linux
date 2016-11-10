@@ -46,6 +46,9 @@
 #include <linux/filter.h>
 #include <linux/namei.h>
 #include <linux/parser.h>
+#include <linux/ipc_namespace.h>
+#include <linux/utsname.h>
+#include <linux/mnt_namespace.h>
 
 #include "internal.h"
 
@@ -375,6 +378,7 @@ static DEFINE_PER_CPU(struct pmu_event_list, pmu_sb_events);
 
 static atomic_t nr_mmap_events __read_mostly;
 static atomic_t nr_comm_events __read_mostly;
+static atomic_t nr_namespaces_events __read_mostly;
 static atomic_t nr_task_events __read_mostly;
 static atomic_t nr_freq_events __read_mostly;
 static atomic_t nr_switch_events __read_mostly;
@@ -3868,6 +3872,8 @@ static void unaccount_event(struct perf_event *event)
 		atomic_dec(&nr_mmap_events);
 	if (event->attr.comm)
 		atomic_dec(&nr_comm_events);
+	if (event->attr.namespaces)
+		atomic_dec(&nr_namespaces_events);
 	if (event->attr.task)
 		atomic_dec(&nr_task_events);
 	if (event->attr.freq)
@@ -6470,6 +6476,134 @@ void perf_event_comm(struct task_struct *task, bool exec)
 }
 
 /*
+ * namespaces tracking
+ */
+
+struct perf_namespaces_event {
+	struct task_struct	*task;
+
+	struct {
+		struct perf_event_header	header;
+		u32				pid;
+		u32				tid;
+		u64				time;
+		u32				uts_ns_inum;
+		u32				ipc_ns_inum;
+		u32				mnt_ns_inum;
+		u32				pid_ns_inum;
+		u32				net_ns_inum;
+		u32				cgroup_ns_inum;
+		u32				user_ns_inum;
+	} event_id;
+};
+
+static int perf_event_namespaces_match(struct perf_event *event)
+{
+	return event->attr.namespaces;
+}
+
+static void perf_event_namespaces_output(struct perf_event *event,
+					 void *data)
+{
+	struct perf_namespaces_event *namespaces_event = data;
+	struct perf_output_handle handle;
+	struct perf_sample_data sample;
+	int size = namespaces_event->event_id.header.size;
+	struct nsproxy *nsproxy;
+	int ret;
+
+	if (!perf_event_namespaces_match(event))
+		return;
+
+	perf_event_header__init_id(&namespaces_event->event_id.header,
+				   &sample, event);
+	ret = perf_output_begin(&handle, event,
+				namespaces_event->event_id.header.size);
+
+	if (ret)
+		goto out;
+
+	namespaces_event->event_id.pid = perf_event_pid(event,
+							namespaces_event->task);
+	namespaces_event->event_id.tid = perf_event_tid(event,
+							namespaces_event->task);
+
+	if (namespaces_event->task != current)
+		task_lock(namespaces_event->task);
+
+	nsproxy = namespaces_event->task->nsproxy;
+	if (nsproxy != NULL) {
+		namespaces_event->event_id.uts_ns_inum =
+					nsproxy->uts_ns->ns.inum;
+#ifdef CONFIG_IPC_NS
+		namespaces_event->event_id.ipc_ns_inum =
+					nsproxy->ipc_ns->ns.inum;
+#endif
+		namespaces_event->event_id.mnt_ns_inum =
+					nsproxy->mnt_ns->ns.inum;
+		namespaces_event->event_id.pid_ns_inum =
+					nsproxy->pid_ns_for_children->ns.inum;
+#ifdef CONFIG_NET
+		namespaces_event->event_id.net_ns_inum =
+					nsproxy->net_ns->ns.inum;
+#endif
+#ifdef CONFIG_CGROUPS
+		namespaces_event->event_id.cgroup_ns_inum =
+					nsproxy->cgroup_ns->ns.inum;
+#endif
+	}
+
+	namespaces_event->event_id.user_ns_inum =
+			__task_cred(namespaces_event->task)->user_ns->ns.inum;
+
+	if (namespaces_event->task != current)
+		task_unlock(namespaces_event->task);
+
+	namespaces_event->event_id.time = perf_event_clock(event);
+
+	perf_output_put(&handle, namespaces_event->event_id);
+
+	perf_event__output_id_sample(event, &handle, &sample);
+
+	perf_output_end(&handle);
+out:
+	namespaces_event->event_id.header.size = size;
+}
+
+void perf_event_namespaces(struct task_struct *task)
+{
+	struct perf_namespaces_event namespaces_event;
+
+	if (!atomic_read(&nr_namespaces_events))
+		return;
+
+	namespaces_event = (struct perf_namespaces_event){
+		.task	= task,
+		.event_id  = {
+			.header = {
+				.type = PERF_RECORD_NAMESPACES,
+				.misc = 0,
+				.size = sizeof(namespaces_event.event_id),
+			},
+			/* .pid */
+			/* .tid */
+			/* .time */
+			/* .uts_ns_inum */
+			/* .ipc_ns_inum */
+			/* .mnt_ns_inum */
+			/* .pid_ns_inum */
+			/* .net_ns_inum */
+			/* .cgroup_ns_inum */
+			/* .user_ns_inum */
+		},
+	};
+
+	perf_iterate_sb(perf_event_namespaces_output,
+			&namespaces_event,
+			NULL);
+}
+
+/*
  * mmap tracking
  */
 
@@ -9007,6 +9141,8 @@ static void account_event(struct perf_event *event)
 		atomic_inc(&nr_mmap_events);
 	if (event->attr.comm)
 		atomic_inc(&nr_comm_events);
+	if (event->attr.namespaces)
+		atomic_inc(&nr_namespaces_events);
 	if (event->attr.task)
 		atomic_inc(&nr_task_events);
 	if (event->attr.freq)

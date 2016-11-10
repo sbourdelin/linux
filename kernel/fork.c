@@ -1815,6 +1815,7 @@ static __latent_entropy struct task_struct *copy_process(
 	cgroup_post_fork(p);
 	threadgroup_change_end(current);
 	perf_event_fork(p);
+	perf_event_namespaces(p);
 
 	trace_task_newtask(p, clone_flags);
 	uprobe_copy_process(p, clone_flags);
@@ -2276,6 +2277,9 @@ bad_unshare_cleanup_fs:
 		free_fs_struct(new_fs);
 
 bad_unshare_out:
+	if (!err)
+		perf_event_namespaces(current);
+
 	return err;
 }
 
