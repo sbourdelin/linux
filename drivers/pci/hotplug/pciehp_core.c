@@ -278,6 +278,9 @@ static void pciehp_remove(struct pcie_device *dev)
 {
 	struct controller *ctrl = get_service_data(dev);
 
+	if (!ctrl)
+		return;
+
 	cleanup_slot(ctrl);
 	pciehp_release_ctrl(ctrl);
 }
@@ -295,6 +298,13 @@ static int pciehp_resume(struct pcie_device *dev)
 	u8 status;
 
 	ctrl = get_service_data(dev);
+
+	if (!(pcie_caps_reg(dev->port) & PCI_EXP_FLAGS_SLOT)) {
+		dev_info(&dev->port->dev, "No longer supports hotplug\n");
+		pciehp_remove(dev);
+		set_service_data(dev, NULL);
+		return 0;
+	}
 
 	/* reinitialize the chipset's event detection logic */
 	pcie_enable_notification(ctrl);

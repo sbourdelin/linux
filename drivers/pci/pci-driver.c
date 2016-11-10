@@ -505,7 +505,20 @@ static int pci_restore_standard_config(struct pci_dev *pci_dev)
 
 static void pci_pm_default_resume_early(struct pci_dev *pci_dev)
 {
+	u16 flags;
+
 	pci_power_up(pci_dev);
+
+	if (pci_dev->pcie_cap) {
+		pci_read_config_word(pci_dev, pci_dev->pcie_cap + PCI_EXP_FLAGS,
+				     &flags);
+		if (pci_dev->pcie_flags_reg != flags) {
+			dev_info(&pci_dev->dev, "PCIe Capabilities was %#06x, is %#06x after resume (possible firmware defect)\n",
+				 pci_dev->pcie_flags_reg, flags);
+			pci_dev->pcie_flags_reg = flags;
+		}
+	}
+
 	pci_restore_state(pci_dev);
 	pci_fixup_device(pci_fixup_resume_early, pci_dev);
 }
