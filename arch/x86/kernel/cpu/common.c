@@ -604,6 +604,35 @@ out:
 #endif
 }
 
+/*
+ * AMD Secure Memory Encryption (SME) can reduce the size of the physical
+ * address space if it is enabled, even if memory encryption is not active.
+ * Adjust x86_phys_bits if SME is enabled.
+ */
+static void phys_bits_adjust(struct cpuinfo_x86 *c)
+{
+	u32 eax, ebx, ecx, edx;
+	u64 msr;
+
+	if (c->x86_vendor != X86_VENDOR_AMD)
+		return;
+
+	if (c->extended_cpuid_level < 0x8000001f)
+		return;
+
+	/* Check for SME feature */
+	cpuid(0x8000001f, &eax, &ebx, &ecx, &edx);
+	if (!(eax & 0x01))
+		return;
+
+	/* Check if SME is enabled */
+	rdmsrl(MSR_K8_SYSCFG, msr);
+	if (!(msr & MSR_K8_SYSCFG_MEM_ENCRYPT))
+		return;
+
+	c->x86_phys_bits -= (ebx >> 6) & 0x3f;
+}
+
 static void get_cpu_vendor(struct cpuinfo_x86 *c)
 {
 	char *v = c->x86_vendor_id;
@@ -736,6 +765,7 @@ void get_cpu_cap(struct cpuinfo_x86 *c)
 
 		c->x86_virt_bits = (eax >> 8) & 0xff;
 		c->x86_phys_bits = eax & 0xff;
+		phys_bits_adjust(c);
 		c->x86_capability[CPUID_8000_0008_EBX] = ebx;
 	}
 #ifdef CONFIG_X86_32
