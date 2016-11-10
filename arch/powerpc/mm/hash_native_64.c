@@ -191,6 +191,66 @@ static inline void native_unlock_hpte(struct hash_pte *hptep)
 	clear_bit_unlock(HPTE_LOCK_BIT, word);
 }
 
+/*
+ * This computes the AVPN and B fields of the first dword of a HPTE,
+ * for use when we want to match an existing PTE.  The bottom 7 bits
+ * of the returned value are zero.
+ */
+static inline unsigned long native_hpte_encode_avpn(unsigned long vpn, int psize,
+						    int ssize)
+{
+	unsigned long v;
+	/*
+	 * The AVA field omits the low-order 23 bits of the 78 bits VA.
+	 * These bits are not needed in the PTE, because the
+	 * low-order b of these bits are part of the byte offset
+	 * into the virtual page and, if b < 23, the high-order
+	 * 23-b of these bits are always used in selecting the
+	 * PTEGs to be searched
+	 */
+	v = (vpn >> (23 - VPN_SHIFT)) & ~(mmu_psize_defs[psize].avpnm);
+	v <<= HPTE_V_AVPN_SHIFT;
+	if (!cpu_has_feature(CPU_FTR_ARCH_300))
+		v |= ((unsigned long) ssize) << HPTE_V_SSIZE_SHIFT;
+	return v;
+}
+
+/*
+ * This function sets the AVPN and L fields of the HPTE  appropriately
+ * using the base page size and actual page size.
+ */
+static inline unsigned long native_hpte_encode_v(unsigned long vpn, int base_psize,
+						 int actual_psize, int ssize)
+{
+	unsigned long v;
+	v = native_hpte_encode_avpn(vpn, base_psize, ssize);
+	if (actual_psize != MMU_PAGE_4K)
+		v |= HPTE_V_LARGE;
+	return v;
+}
+
+/*
+ * This function sets the ARPN, and LP fields of the HPTE appropriately
+ * for the page size. We assume the pa is already "clean" that is properly
+ * aligned for the requested page size
+ */
+static inline unsigned long native_hpte_encode_r(unsigned long pa, int base_psize,
+						 int actual_psize, int ssize)
+{
+
+	if (cpu_has_feature(CPU_FTR_ARCH_300))
+		pa |= ((unsigned long) ssize) << HPTE_R_3_0_SSIZE_SHIFT;
+
+	/* A 4K page needs no special encoding */
+	if (actual_psize == MMU_PAGE_4K)
+		return pa & HPTE_R_RPN;
+	else {
+		unsigned int penc = mmu_psize_defs[base_psize].penc[actual_psize];
+		unsigned int shift = mmu_psize_defs[actual_psize].shift;
+		return (pa & ~((1ul << shift) - 1)) | (penc << LP_SHIFT);
+	}
+}
+
 static long native_hpte_insert(unsigned long hpte_group, unsigned long vpn,
 			unsigned long pa, unsigned long rflags,
 			unsigned long vflags, int psize, int apsize, int ssize)
@@ -220,8 +280,8 @@ static long native_hpte_insert(unsigned long hpte_group, unsigned long vpn,
 	if (i == HPTES_PER_GROUP)
 		return -1;
 
-	hpte_v = hpte_encode_v(vpn, psize, apsize, ssize) | vflags | HPTE_V_VALID;
-	hpte_r = hpte_encode_r(pa, psize, apsize, ssize) | rflags;
+	hpte_v = native_hpte_encode_v(vpn, psize, apsize, ssize) | vflags | HPTE_V_VALID;
+	hpte_r = native_hpte_encode_r(pa, psize, apsize, ssize) | rflags;
 
 	if (!(vflags & HPTE_V_BOLTED)) {
 		DBG_LOW(" i=%x hpte_v=%016lx, hpte_r=%016lx\n",
@@ -289,7 +349,7 @@ static long native_hpte_updatepp(unsigned long slot, unsigned long newpp,
 	unsigned long hpte_v, want_v;
 	int ret = 0, local = 0;
 
-	want_v = hpte_encode_avpn(vpn, bpsize, ssize);
+	want_v = native_hpte_encode_avpn(vpn, bpsize, ssize);
 
 	DBG_LOW("    update(vpn=%016lx, avpnv=%016lx, group=%lx, newpp=%lx)",
 		vpn, want_v & HPTE_V_AVPN, slot, newpp);
@@ -343,7 +403,7 @@ static long native_hpte_find(unsigned long vpn, int psize, int ssize)
 	unsigned long want_v, hpte_v;
 
 	hash = hpt_hash(vpn, mmu_psize_defs[psize].shift, ssize);
-	want_v = hpte_encode_avpn(vpn, psize, ssize);
+	want_v = native_hpte_encode_avpn(vpn, psize, ssize);
 
 	/* Bolted mappings are only ever in the primary group */
 	slot = (hash & htab_hash_mask) * HPTES_PER_GROUP;
@@ -406,7 +466,7 @@ static void native_hpte_invalidate(unsigned long slot, unsigned long vpn,
 
 	DBG_LOW("    invalidate(vpn=%016lx, hash: %lx)\n", vpn, slot);
 
-	want_v = hpte_encode_avpn(vpn, bpsize, ssize);
+	want_v = native_hpte_encode_avpn(vpn, bpsize, ssize);
 	native_lock_hpte(hptep);
 	hpte_v = be64_to_cpu(hptep->v);
 
@@ -464,7 +524,7 @@ static void native_hugepage_invalidate(unsigned long vsid,
 		slot += hidx & _PTEIDX_GROUP_IX;
 
 		hptep = htab_address + slot;
-		want_v = hpte_encode_avpn(vpn, psize, ssize);
+		want_v = native_hpte_encode_avpn(vpn, psize, ssize);
 		native_lock_hpte(hptep);
 		hpte_v = be64_to_cpu(hptep->v);
 
@@ -674,7 +734,7 @@ static void native_flush_hash_range(unsigned long number, int local)
 			slot = (hash & htab_hash_mask) * HPTES_PER_GROUP;
 			slot += hidx & _PTEIDX_GROUP_IX;
 			hptep = htab_address + slot;
-			want_v = hpte_encode_avpn(vpn, psize, ssize);
+			want_v = native_hpte_encode_avpn(vpn, psize, ssize);
 			native_lock_hpte(hptep);
 			hpte_v = be64_to_cpu(hptep->v);
 			if (!HPTE_V_COMPARE(hpte_v, want_v) ||

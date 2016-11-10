@@ -43,6 +43,61 @@ enum ps3_lpar_vas_id {
 
 
 static DEFINE_SPINLOCK(ps3_htab_lock);
+/*
+ * This computes the AVPN and B fields of the first dword of a HPTE,
+ * for use when we want to match an existing PTE.  The bottom 7 bits
+ * of the returned value are zero.
+ */
+static inline unsigned long ps3_hpte_encode_avpn(unsigned long vpn, int psize,
+					     int ssize)
+{
+	unsigned long v;
+	/*
+	 * The AVA field omits the low-order 23 bits of the 78 bits VA.
+	 * These bits are not needed in the PTE, because the
+	 * low-order b of these bits are part of the byte offset
+	 * into the virtual page and, if b < 23, the high-order
+	 * 23-b of these bits are always used in selecting the
+	 * PTEGs to be searched
+	 */
+	v = (vpn >> (23 - VPN_SHIFT)) & ~(mmu_psize_defs[psize].avpnm);
+	v <<= HPTE_V_AVPN_SHIFT;
+	v |= ((unsigned long) ssize) << HPTE_V_SSIZE_SHIFT;
+	return v;
+}
+/*
+ * This function sets the AVPN and L fields of the HPTE  appropriately
+ * using the base page size and actual page size.
+ */
+static inline unsigned long ps3_hpte_encode_v(unsigned long vpn, int base_psize,
+					  int actual_psize, int ssize)
+{
+	unsigned long v;
+	v = ps3_hpte_encode_avpn(vpn, base_psize, ssize);
+	if (actual_psize != MMU_PAGE_4K)
+		v |= HPTE_V_LARGE;
+	return v;
+}
+
+/*
+ * This function sets the ARPN, and LP fields of the HPTE appropriately
+ * for the page size. We assume the pa is already "clean" that is properly
+ * aligned for the requested page size
+ */
+static inline unsigned long ps3_hpte_encode_r(unsigned long pa, int base_psize,
+					  int actual_psize, int ssize)
+{
+
+	/* A 4K page needs no special encoding */
+	if (actual_psize == MMU_PAGE_4K)
+		return pa & HPTE_R_RPN;
+	else {
+		unsigned int penc = mmu_psize_defs[base_psize].penc[actual_psize];
+		unsigned int shift = mmu_psize_defs[actual_psize].shift;
+		return (pa & ~((1ul << shift) - 1)) | (penc << LP_SHIFT);
+	}
+}
+
 
 static long ps3_hpte_insert(unsigned long hpte_group, unsigned long vpn,
 	unsigned long pa, unsigned long rflags, unsigned long vflags,
@@ -62,8 +117,8 @@ static long ps3_hpte_insert(unsigned long hpte_group, unsigned long vpn,
 	 */
 	vflags &= ~HPTE_V_SECONDARY;
 
-	hpte_v = hpte_encode_v(vpn, psize, apsize, ssize) | vflags | HPTE_V_VALID;
-	hpte_r = hpte_encode_r(ps3_mm_phys_to_lpar(pa), psize, apsize, ssize) | rflags;
+	hpte_v = ps3_hpte_encode_v(vpn, psize, apsize, ssize) | vflags | HPTE_V_VALID;
+	hpte_r = ps3_hpte_encode_r(ps3_mm_phys_to_lpar(pa), psize, apsize, ssize) | rflags;
 
 	spin_lock_irqsave(&ps3_htab_lock, flags);
 
@@ -118,7 +173,7 @@ static long ps3_hpte_updatepp(unsigned long slot, unsigned long newpp,
 	unsigned long flags;
 	long ret;
 
-	want_v = hpte_encode_avpn(vpn, psize, ssize);
+	want_v = ps3_hpte_encode_avpn(vpn, psize, ssize);
 
 	spin_lock_irqsave(&ps3_htab_lock, flags);
 

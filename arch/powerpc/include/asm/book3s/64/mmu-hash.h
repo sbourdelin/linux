@@ -259,67 +259,6 @@ extern unsigned long tce_alloc_start, tce_alloc_end;
  * If this is the case, mmu_ci_restrictions will be set to 1.
  */
 extern int mmu_ci_restrictions;
-
-/*
- * This computes the AVPN and B fields of the first dword of a HPTE,
- * for use when we want to match an existing PTE.  The bottom 7 bits
- * of the returned value are zero.
- */
-static inline unsigned long hpte_encode_avpn(unsigned long vpn, int psize,
-					     int ssize)
-{
-	unsigned long v;
-	/*
-	 * The AVA field omits the low-order 23 bits of the 78 bits VA.
-	 * These bits are not needed in the PTE, because the
-	 * low-order b of these bits are part of the byte offset
-	 * into the virtual page and, if b < 23, the high-order
-	 * 23-b of these bits are always used in selecting the
-	 * PTEGs to be searched
-	 */
-	v = (vpn >> (23 - VPN_SHIFT)) & ~(mmu_psize_defs[psize].avpnm);
-	v <<= HPTE_V_AVPN_SHIFT;
-	if (!cpu_has_feature(CPU_FTR_ARCH_300))
-		v |= ((unsigned long) ssize) << HPTE_V_SSIZE_SHIFT;
-	return v;
-}
-
-/*
- * This function sets the AVPN and L fields of the HPTE  appropriately
- * using the base page size and actual page size.
- */
-static inline unsigned long hpte_encode_v(unsigned long vpn, int base_psize,
-					  int actual_psize, int ssize)
-{
-	unsigned long v;
-	v = hpte_encode_avpn(vpn, base_psize, ssize);
-	if (actual_psize != MMU_PAGE_4K)
-		v |= HPTE_V_LARGE;
-	return v;
-}
-
-/*
- * This function sets the ARPN, and LP fields of the HPTE appropriately
- * for the page size. We assume the pa is already "clean" that is properly
- * aligned for the requested page size
- */
-static inline unsigned long hpte_encode_r(unsigned long pa, int base_psize,
-					  int actual_psize, int ssize)
-{
-
-	if (cpu_has_feature(CPU_FTR_ARCH_300))
-		pa |= ((unsigned long) ssize) << HPTE_R_3_0_SSIZE_SHIFT;
-
-	/* A 4K page needs no special encoding */
-	if (actual_psize == MMU_PAGE_4K)
-		return pa & HPTE_R_RPN;
-	else {
-		unsigned int penc = mmu_psize_defs[base_psize].penc[actual_psize];
-		unsigned int shift = mmu_psize_defs[actual_psize].shift;
-		return (pa & ~((1ul << shift) - 1)) | (penc << LP_SHIFT);
-	}
-}
-
 /*
  * Build a VPN_SHIFT bit shifted va given VSID, EA and segment size.
  */
