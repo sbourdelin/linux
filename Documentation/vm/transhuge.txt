@@ -208,11 +208,16 @@ You can control hugepage allocation policy in tmpfs with mount option
   - "always":
     Attempt to allocate huge pages every time we need a new page;
 
+    This option can lead to significant overhead if filesystem is used to
+    store small files.
+
   - "never":
     Do not allocate huge pages;
 
   - "within_size":
-    Only allocate huge page if it will be fully within i_size.
+    Only allocate huge page if size of the file more than size of huge
+    page. This helps to avoid overhead for small files.
+
     Also respect fadvise()/madvise() hints;
 
   - "advise:

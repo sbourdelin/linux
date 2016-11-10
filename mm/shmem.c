@@ -1681,10 +1681,8 @@ repeat:
 		case SHMEM_HUGE_NEVER:
 			goto alloc_nohuge;
 		case SHMEM_HUGE_WITHIN_SIZE:
-			off = round_up(index, HPAGE_PMD_NR);
-			i_size = round_up(i_size_read(inode), PAGE_SIZE);
-			if (i_size >= HPAGE_PMD_SIZE &&
-					i_size >> PAGE_SHIFT >= off)
+			i_size = i_size_read(inode);
+			if (index >= HPAGE_PMD_NR || i_size >= HPAGE_PMD_SIZE)
 				goto alloc_huge;
 			/* fallthrough */
 		case SHMEM_HUGE_ADVISE:
