@@ -131,4 +131,9 @@ extern int vas_copy_crb(void *crb, int offset, bool first);
  */
 extern int vas_paste_crb(struct vas_window *win, int off, bool last, bool re);
 
+/*
+ * Print the VAS Fault Isolation Registers (FIR) for the chip @chip.
+ * Used when we encounter an error/exception in VAS.
+ */
+void vas_print_regs(int chip);
 #endif

@@ -15,9 +15,47 @@
 #include <linux/io.h>
 #include <asm/vas.h>
 #include "vas-internal.h"
+#include <asm/opal-api.h>
+#include <asm/opal.h>
 
 int vas_initialized;
 struct vas_instance *vas_instances;
+
+/*
+ * Read the Fault Isolation Registers (FIR) from skiboot into @fir.
+ */
+static void read_fault_regs(int chip, uint64_t *fir)
+{
+	int i;
+	int64_t rc;
+
+	for (i = 0; i < 8; i++)
+		rc = opal_vas_read_fir(chip, i, &fir[i]);
+}
+
+/*
+ * Print the VAS Fault Isolation Registers (FIR) for the chip @chip.
+ * Used when we encounter an error/exception in VAS.
+ *
+ * TODO: Find the chip id where the exception occurred. Hard coding to
+ *	 chip 0 for now.
+ */
+void vas_print_regs(int chip)
+{
+	int i;
+	uint64_t firs[8];
+
+	/* TODO: Only dump FIRs for first chip for now */
+	if (chip == -1)
+		chip = 0;
+
+	read_fault_regs(chip, firs);
+	for (i = 0; i < 8; i += 4) {
+		pr_err("FIR%d: 0x%llx    0x%llx    0x%llx    0x%llx\n", i,
+				firs[i], firs[i+1], firs[i+2], firs[i+3]);
+	}
+}
+
 
 static void init_vas_chip(struct vas_instance *vinst)
 {

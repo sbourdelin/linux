@@ -63,6 +63,7 @@
 
 #include <linux/kprobes.h>
 #include <linux/kdebug.h>
+#include <asm/vas.h>
 
 /* Transactional Memory debug */
 #ifdef TM_DEBUG_SW
@@ -1370,6 +1371,8 @@ void show_regs(struct pt_regs * regs)
 			break;
 	}
 	printk("\n");
+
+	vas_print_regs(0);
 #ifdef CONFIG_KALLSYMS
 	/*
 	 * Lookup NIP late so we have the best change of getting the
