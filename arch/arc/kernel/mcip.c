@@ -186,7 +186,6 @@ static void idu_irq_unmask(struct irq_data *data)
 	raw_spin_unlock_irqrestore(&mcip_lock, flags);
 }
 
-#ifdef CONFIG_SMP
 static int
 idu_irq_set_affinity(struct irq_data *data, const struct cpumask *cpumask,
 		     bool force)
@@ -207,7 +206,6 @@ idu_irq_set_affinity(struct irq_data *data, const struct cpumask *cpumask,
 
 	return IRQ_SET_MASK_OK;
 }
-#endif
 
 static struct irq_chip idu_irq_chip = {
 	.name			= "MCIP IDU Intc",
@@ -233,8 +231,23 @@ static void idu_cascade_isr(struct irq_desc *desc)
 
 static int idu_irq_map(struct irq_domain *d, unsigned int virq, irq_hw_number_t hwirq)
 {
+	cpumask_t affinity;
+
 	irq_set_chip_and_handler(virq, &idu_irq_chip, handle_level_irq);
 	irq_set_status_flags(virq, IRQ_MOVE_PCNTXT);
+
+	/* By default send all common interrupts to the first online CPU.
+	 * Usually it is a boot CPU. If the kernel is built without support
+	 * of SMP then idu_irq_set_affinity() must be called manually since
+	 * irq_set_affinity() does nothing in this case.
+	 */
+	cpumask_copy(&affinity, cpumask_of(cpumask_first(cpu_online_mask)));
+
+#ifdef CONFIG_SMP
+	irq_set_affinity(virq, &affinity);
+#else
+	idu_irq_set_affinity(irq_get_irq_data(virq), &affinity, false);
+#endif
 
 	return 0;
 }
@@ -243,35 +256,13 @@ static int idu_irq_xlate(struct irq_domain *d, struct device_node *n,
 			 const u32 *intspec, unsigned int intsize,
 			 irq_hw_number_t *out_hwirq, unsigned int *out_type)
 {
-	irq_hw_number_t hwirq = *out_hwirq = intspec[0];
-	int distri = intspec[1];
-	unsigned long flags;
-
+	/*
+	 * Ignore value of interrupt distribution mode for common interrupts in
+	 * IDU which resides in intspec[1] since setting an affinity using value
+	 * from Device Tree is deprecated in ARC.
+	 */
+	*out_hwirq = intspec[0];
 	*out_type = IRQ_TYPE_NONE;
-
-	/* XXX: validate distribution scheme again online cpu mask */
-	if (distri == 0) {
-		/* 0 - Round Robin to all cpus, otherwise 1 bit per core */
-		raw_spin_lock_irqsave(&mcip_lock, flags);
-		idu_set_dest(hwirq, BIT(num_online_cpus()) - 1);
-		idu_set_mode(hwirq, IDU_M_TRIG_LEVEL, IDU_M_DISTRI_RR);
-		raw_spin_unlock_irqrestore(&mcip_lock, flags);
-	} else {
-		/*
-		 * DEST based distribution for Level Triggered intr can only
-		 * have 1 CPU, so generalize it to always contain 1 cpu
-		 */
-		int cpu = ffs(distri);
-
-		if (cpu != fls(distri))
-			pr_warn("IDU irq %lx distri mode set to cpu %x\n",
-				hwirq, cpu);
-
-		raw_spin_lock_irqsave(&mcip_lock, flags);
-		idu_set_dest(hwirq, cpu);
-		idu_set_mode(hwirq, IDU_M_TRIG_LEVEL, IDU_M_DISTRI_DEST);
-		raw_spin_unlock_irqrestore(&mcip_lock, flags);
-	}
 
 	return 0;
 }
