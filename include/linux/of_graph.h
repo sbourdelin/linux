@@ -14,6 +14,7 @@
 #ifndef __LINUX_OF_GRAPH_H
 #define __LINUX_OF_GRAPH_H
 
+#include <linux/device.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 
@@ -44,6 +45,7 @@ struct of_endpoint {
 int of_graph_parse_endpoint(const struct device_node *node,
 				struct of_endpoint *endpoint);
 struct device_node *of_graph_get_port_by_id(struct device_node *node, u32 id);
+struct device_node *of_graph_get_top_port(struct device *dev);
 struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
 					struct device_node *previous);
 struct device_node *of_graph_get_endpoint_by_regs(
