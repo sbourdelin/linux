@@ -118,7 +118,9 @@ struct zswap_pool {
 	struct kref kref;
 	struct list_head list;
 	struct work_struct work;
+#ifdef CONFIG_HOTPLUG_CPU
 	struct notifier_block notifier;
+#endif
 	char tfm_name[CRYPTO_MAX_ALG_NAME];
 };
 
@@ -448,6 +450,7 @@ static int __zswap_cpu_comp_notifier(struct zswap_pool *pool,
 	return NOTIFY_OK;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
 static int zswap_cpu_comp_notifier(struct notifier_block *nb,
 				   unsigned long action, void *pcpu)
 {
@@ -456,21 +459,26 @@ static int zswap_cpu_comp_notifier(struct notifier_block *nb,
 
 	return __zswap_cpu_comp_notifier(pool, action, cpu);
 }
+#endif
 
 static int zswap_cpu_comp_init(struct zswap_pool *pool)
 {
 	unsigned long cpu;
 
+#ifdef CONFIG_HOTPLUG_CPU
 	memset(&pool->notifier, 0, sizeof(pool->notifier));
 	pool->notifier.notifier_call = zswap_cpu_comp_notifier;
 
 	cpu_notifier_register_begin();
+#endif
 	for_each_online_cpu(cpu)
 		if (__zswap_cpu_comp_notifier(pool, CPU_UP_PREPARE, cpu) ==
 		    NOTIFY_BAD)
 			goto cleanup;
+#ifdef CONFIG_HOTPLUG_CPU
 	__register_cpu_notifier(&pool->notifier);
 	cpu_notifier_register_done();
+#endif
 	return 0;
 
 cleanup:
@@ -484,11 +492,15 @@ static void zswap_cpu_comp_destroy(struct zswap_pool *pool)
 {
 	unsigned long cpu;
 
+#ifdef CONFIG_HOTPLUG_CPU
 	cpu_notifier_register_begin();
+#endif
 	for_each_online_cpu(cpu)
 		__zswap_cpu_comp_notifier(pool, CPU_UP_CANCELED, cpu);
+#ifdef CONFIG_HOTPLUG_CPU
 	__unregister_cpu_notifier(&pool->notifier);
 	cpu_notifier_register_done();
+#endif
 }
 
 /*********************************
