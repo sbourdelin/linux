@@ -798,6 +798,7 @@ static int vsp1_video_start_streaming(struct vb2_queue *vq, unsigned int count)
 	struct vsp1_video *video = vb2_get_drv_priv(vq);
 	struct vsp1_pipeline *pipe = video->rwpf->pipe;
 	unsigned long flags;
+	bool configured = false;
 	int ret;
 
 	mutex_lock(&pipe->lock);
@@ -807,13 +808,20 @@ static int vsp1_video_start_streaming(struct vb2_queue *vq, unsigned int count)
 			mutex_unlock(&pipe->lock);
 			return ret;
 		}
+
+		/*
+		 * Multiple streams will execute this function in parallel.
+		 * Only the thread which configures the pipeline is allowed to
+		 * execute the vsp1_video_pipeline_run() call below
+		 */
+		configured = true;
 	}
 
 	pipe->stream_count++;
 	mutex_unlock(&pipe->lock);
 
 	spin_lock_irqsave(&pipe->irqlock, flags);
-	if (vsp1_pipeline_ready(pipe))
+	if (vsp1_pipeline_ready(pipe) && configured)
 		vsp1_video_pipeline_run(pipe);
 	spin_unlock_irqrestore(&pipe->irqlock, flags);
 
