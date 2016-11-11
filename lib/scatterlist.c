@@ -370,14 +370,15 @@ int sg_alloc_table(struct sg_table *table, unsigned int nents, gfp_t gfp_mask)
 EXPORT_SYMBOL(sg_alloc_table);
 
 /**
- * sg_alloc_table_from_pages - Allocate and initialize an sg table from
- *			       an array of pages
- * @sgt:	The sg table header to use
- * @pages:	Pointer to an array of page pointers
- * @n_pages:	Number of pages in the pages array
- * @offset:     Offset from start of the first page to the start of a buffer
- * @size:       Number of valid bytes in the buffer (after offset)
- * @gfp_mask:	GFP allocation mask
+ * __sg_alloc_table_from_pages - Allocate and initialize an sg table from
+ *			         an array of pages
+ * @sgt:	 The sg table header to use
+ * @pages:	 Pointer to an array of page pointers
+ * @n_pages:	 Number of pages in the pages array
+ * @offset:      Offset from start of the first page to the start of a buffer
+ * @size:        Number of valid bytes in the buffer (after offset)
+ * @gfp_mask:	 GFP allocation mask
+ * @max_segment: Maximum size of a single scatterlist node in bytes
  *
  *  Description:
  *    Allocate and initialize an sg table from a list of pages. Contiguous
@@ -389,12 +390,11 @@ EXPORT_SYMBOL(sg_alloc_table);
  * Returns:
  *   0 on success, negative error on failure
  */
-int sg_alloc_table_from_pages(struct sg_table *sgt,
-	struct page **pages, unsigned int n_pages,
-	unsigned int offset, unsigned long size,
-	gfp_t gfp_mask)
+int __sg_alloc_table_from_pages(struct sg_table *sgt, struct page **pages,
+				unsigned int n_pages, unsigned int offset,
+				unsigned long size, gfp_t gfp_mask,
+				unsigned int max_segment)
 {
-	const unsigned int max_segment = UINT_MAX;
 	unsigned int seg_len, chunks;
 	unsigned int i;
 	unsigned int cur_page;
@@ -443,6 +443,35 @@ int sg_alloc_table_from_pages(struct sg_table *sgt,
 	}
 
 	return 0;
+}
+EXPORT_SYMBOL(__sg_alloc_table_from_pages);
+
+/**
+ * sg_alloc_table_from_pages - Allocate and initialize an sg table from
+ *			       an array of pages
+ * @sgt:	 The sg table header to use
+ * @pages:	 Pointer to an array of page pointers
+ * @n_pages:	 Number of pages in the pages array
+ * @offset:      Offset from start of the first page to the start of a buffer
+ * @size:        Number of valid bytes in the buffer (after offset)
+ * @gfp_mask:	 GFP allocation mask
+ *
+ *  Description:
+ *    Allocate and initialize an sg table from a list of pages. Contiguous
+ *    ranges of the pages are squashed into a single scatterlist node. A user
+ *    may provide an offset at a start and a size of valid data in a buffer
+ *    specified by the page array. The returned sg table is released by
+ *    sg_free_table.
+ *
+ * Returns:
+ *   0 on success, negative error on failure
+ */
+int sg_alloc_table_from_pages(struct sg_table *sgt, struct page **pages,
+			      unsigned int n_pages, unsigned int offset,
+			      unsigned long size, gfp_t gfp_mask)
+{
+	return __sg_alloc_table_from_pages(sgt, pages, n_pages, offset,
+					   size, gfp_mask, UINT_MAX);
 }
 EXPORT_SYMBOL(sg_alloc_table_from_pages);
 
