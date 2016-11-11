@@ -22,6 +22,10 @@ struct asoc_simple_dai {
 	struct clk *clk;
 };
 
+struct asoc_simple_graph_card_info {
+	int endpoint_num; /* sound endpoint number */
+};
+
 int asoc_simple_card_parse_daifmt(struct device *dev,
 				  struct device_node *node,
 				  struct device_node *codec,
@@ -77,5 +81,9 @@ void asoc_simple_card_canonicalize_cpu(struct snd_soc_dai_link *dai_link,
 				      int is_single_links);
 
 int asoc_simple_card_clean_reference(struct snd_soc_card *card);
+
+void asoc_simple_card_try_to_probe_graph_card(struct device *dev,
+				struct asoc_simple_graph_card_info *info);
+
 
 #endif /* __SIMPLE_CARD_CORE_H */
