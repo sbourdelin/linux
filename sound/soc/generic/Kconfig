@@ -21,3 +21,11 @@ config SND_SIMPLE_GRAPH_CARD
 	select SND_SIMPLE_CARD_UTILS
 	help
 	  This option enables generic simple Graph sound card support
+
+config SND_SIMPLE_GRAPH_SCU_CARD
+	tristate "ASoC Simple Graph SCU sound card support"
+	depends on OF
+	select SND_SIMPLE_CARD_UTILS
+	help
+	  This option enables generic simple Graph SCU sound card support.
+	  It supports DPCM of multi CPU single Codec ststem.
