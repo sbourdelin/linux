@@ -1620,6 +1620,11 @@ static bool kvm_get_time_and_clockread(s64 *kernel_ns, cycle_t *cycle_now)
 
 	return do_monotonic_boot(kernel_ns, cycle_now) == VCLOCK_TSC;
 }
+#else
+static inline bool kvm_get_time_and_clockread(s64 *kernel_ns, cycle_t *cycle_now)
+{
+	return false;
+}
 #endif
 
 /*
@@ -1724,18 +1729,15 @@ static void kvm_gen_update_masterclock(struct kvm *kvm)
 
 static u64 __get_kvmclock_ns(struct kvm *kvm)
 {
-	struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, 0);
 	struct kvm_arch *ka = &kvm->arch;
+	cycle_t cycle_now;
 	s64 ns;
 
-	if (vcpu->arch.hv_clock.flags & PVCLOCK_TSC_STABLE_BIT) {
-		u64 tsc = kvm_read_l1_tsc(vcpu, rdtsc());
-		ns = __pvclock_read_cycles(&vcpu->arch.hv_clock, tsc);
-	} else {
-		ns = ktime_get_boot_ns() + ka->kvmclock_offset;
-	}
+	if (!ka->use_master_clock ||
+	    !kvm_get_time_and_clockread(&ns, &cycle_now))
+		ns = ktime_get_boot_ns();
 
-	return ns;
+	return ns + ka->kvmclock_offset;
 }
 
 u64 get_kvmclock_ns(struct kvm *kvm)
