@@ -1756,6 +1756,43 @@ return_result:
 	return checksum;
 }
 
+static int invalid_rx_desc(struct r8152 *tp, struct rx_desc *rx_desc)
+{
+	u32 opts1 = le32_to_cpu(rx_desc->opts1);
+	u32 opts2 = le32_to_cpu(rx_desc->opts2);
+	unsigned int pkt_len = opts1 & RX_LEN_MASK;
+
+	switch (tp->version) {
+	case RTL_VER_01:
+	case RTL_VER_02:
+		if (pkt_len > RTL8152_RMS)
+			return -EIO;
+		break;
+	default:
+		if (pkt_len > RTL8153_RMS)
+			return -EIO;
+		break;
+	}
+
+	switch (opts2 & (RD_IPV4_CS | RD_IPV6_CS)) {
+	case (RD_IPV4_CS | RD_IPV6_CS):
+		return -EIO;
+	case RD_IPV4_CS:
+	case RD_IPV6_CS:
+		switch (opts2 & (RD_UDP_CS | RD_TCP_CS)) {
+		case (RD_UDP_CS | RD_TCP_CS):
+			return -EIO;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
 static int rx_bottom(struct r8152 *tp, int budget)
 {
 	unsigned long flags;
@@ -1811,6 +1848,18 @@ static int rx_bottom(struct r8152 *tp, int budget)
 			struct net_device_stats *stats = &netdev->stats;
 			unsigned int pkt_len;
 			struct sk_buff *skb;
+
+			if (unlikely(invalid_rx_desc(tp, rx_desc))) {
+				if (net_ratelimit())
+					netif_err(tp, rx_err, netdev,
+						  "Memory unbelievable\n");
+				if (tp->netdev->features & NETIF_F_RXCSUM) {
+					tp->netdev->features &= ~NETIF_F_RXCSUM;
+					netif_err(tp, rx_err, netdev,
+						  "rx checksum off\n");
+				}
+				break;
+			}
 
 			pkt_len = le32_to_cpu(rx_desc->opts1) & RX_LEN_MASK;
 			if (pkt_len < ETH_ZLEN)
