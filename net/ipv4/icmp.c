@@ -773,6 +773,7 @@ static bool icmp_tag_validation(int proto)
 static bool icmp_unreach(struct sk_buff *skb)
 {
 	const struct iphdr *iph;
+	unsigned short old_mtu;
 	struct icmphdr *icmph;
 	struct net *net;
 	u32 info = 0;
@@ -819,6 +820,12 @@ static bool icmp_unreach(struct sk_buff *skb)
 				/* fall through */
 			case 0:
 				info = ntohs(icmph->un.frag.mtu);
+				/* Handle weird case where next hop MTU is
+				 * equal to or exceeding dropped packet size
+				 */
+				old_mtu = ntohs(iph->tot_len);
+				if (info >= old_mtu)
+					info = old_mtu - 2;
 			}
 			break;
 		case ICMP_SR_FAILED:
