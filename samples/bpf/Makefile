@@ -2,6 +2,7 @@
 obj- := dummy.o
 
 # List of programs to build
+hostprogs-y := test_lru_dist
 hostprogs-y += sock_example
 hostprogs-y += fds_example
 hostprogs-y += sockex1
@@ -27,6 +28,7 @@ hostprogs-y += test_current_task_under_cgroup
 hostprogs-y += trace_event
 hostprogs-y += sampleip
 
+test_lru_dist-objs := test_lru_dist.o libbpf.o
 sock_example-objs := sock_example.o libbpf.o
 fds_example-objs := bpf_load.o libbpf.o fds_example.o
 sockex1-objs := bpf_load.o libbpf.o sockex1_user.o
