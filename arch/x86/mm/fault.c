@@ -748,8 +748,30 @@ show_signal_msg(struct pt_regs *regs, unsigned long error_code,
 		(void *)regs->ip, (void *)regs->sp, error_code);
 
 	print_vma_addr(KERN_CONT " in ", regs->ip);
-
 	printk(KERN_CONT "\n");
+
+	if (IS_ENABLED(CONFIG_SEGFAULT_DETAILED_DEBUG)) {
+#define PREAMBLE_LEN	21
+#define OPC_BUF_LEN	64
+		u8 code[OPC_BUF_LEN];
+		int len, i;
+
+		len = __copy_from_user_inatomic(code,
+						(void *)regs->ip - PREAMBLE_LEN,
+						OPC_BUF_LEN);
+
+		__show_regs(regs, 1);
+
+		printk(KERN_DEFAULT "Code: ");
+		for (i = 0; i < OPC_BUF_LEN - len; i++) {
+			if (i == PREAMBLE_LEN)
+				pr_cont("<%02x> ", code[i]);
+			else
+				pr_cont("%02x ", code[i]);
+		}
+
+		printk(KERN_CONT "\n");
+	}
 }
 
 static void

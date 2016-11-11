@@ -383,4 +383,13 @@ config PUNIT_ATOM_DEBUG
 	  The current power state can be read from
 	  /sys/kernel/debug/punit_atom/dev_power_state
 
+config SEGFAULT_DETAILED_DEBUG
+	bool "Dump detailed information for fatal segfaults"
+	---help---
+	  Enable this option if you want to see more debug info in
+	  the kernel log when fatal segfaults get reported. This
+	  option might be useful in constrained environments when
+	  core dumps might not be possible and/or filesystems are
+	  not ready for a core dump writeout.
+
 endmenu
