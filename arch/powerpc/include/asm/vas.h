@@ -37,4 +37,52 @@ enum vas_thresh_ctl {
 	VAS_THRESH_FIFO_GT_EIGHTH_FULL,
 };
 
+/*
+ * Receive window attributes specified by the (in-kernel) owner of window.
+ */
+struct vas_rx_win_attr {
+	void *rx_fifo;
+	int rx_fifo_size;
+	int wcreds_max;
+
+	bool pin_win;
+	bool rej_no_credit;
+	bool tx_wcred_mode;
+	bool rx_wcred_mode;
+	bool tx_win_ord_mode;
+	bool rx_win_ord_mode;
+	bool data_stamp;
+	bool nx_win;
+	bool fault_win;
+	bool notify_disable;
+	bool intr_disable;
+	bool notify_early;
+
+	int lnotify_lpid;
+	int lnotify_pid;
+	int lnotify_tid;
+	int pswid;
+
+	enum vas_thresh_ctl tc_mode;
+};
+
+/*
+ * Open a VAS receive window for the instance of VAS identified by @chipid.
+ * Use @attr to initialize the attributes of the window.
+ *
+ * Each chip can have a MAX_WINDOWS_PER_CHIP. If no free window is available,
+ * return -EAGAIN.
+ *
+ * Return a handle to the window or ERR_PTR() on error.
+ */
+struct vas_window *vas_rx_win_open(int node, int chip, enum vas_cop_type cop,
+			struct vas_rx_win_attr *attr);
+
+/*
+ * Close the send or receive window identified by @win. For receive windows
+ * return -EAGAIN if there are active send windows attached to this receive
+ * window.
+ */
+int vas_win_close(struct vas_window *win);
+
 #endif
