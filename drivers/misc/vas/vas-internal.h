@@ -367,4 +367,59 @@ extern int vas_initialized;
 extern int vas_window_reset(struct vas_instance *vinst, int winid);
 extern struct vas_instance *find_vas_instance(int node, int chip);
 
+/*
+ * VREG(x):
+ * Expand a register's short name (eg: LPID) into two parameters:
+ *	- the register's short name in string form ("LPID"), and
+ *	- the name of the macro (eg: VAS_LPID_OFFSET), defining the
+ *	  register's offset in the window context
+ */
+#define VREG_SFX(n, s)	__stringify(n), VAS_##n##s
+#define VREG(r)		VREG_SFX(r, _OFFSET)
+
+#ifndef vas_debug
+static inline void vas_log_write(struct vas_window *win, char *name,
+			void *regptr, uint64_t val)
+{
+	if (val)
+		pr_err("%swin #%d: %s reg %p, val 0x%llx\n",
+				win->txwin ? "Tx" : "Rx", win->winid, name,
+				regptr, val);
+}
+
+#else	/* vas_debug */
+
+#define vas_log_write(win, name, reg, val)
+
+#endif	/* vas_debug */
+
+
+static inline void write_uwc_reg(struct vas_window *win, char *name,
+			int32_t reg, uint64_t val)
+{
+	void *regptr;
+
+	regptr = win->uwc_map + reg;
+	vas_log_write(win, name, regptr, val);
+
+	out_be64(regptr, val);
+}
+
+static inline void write_hvwc_reg(struct vas_window *win, char *name,
+			int32_t reg, uint64_t val)
+{
+	void *regptr;
+
+	regptr = win->hvwc_map + reg;
+	vas_log_write(win, name, regptr, val);
+
+	out_be64(regptr, val);
+}
+
+static inline uint64_t read_hvwc_reg(struct vas_window *win,
+			char *name __maybe_unused, int32_t reg)
+{
+	return in_be64(win->hvwc_map+reg);
+}
+
 #endif
