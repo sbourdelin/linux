@@ -497,12 +497,8 @@ int ishtp_cl_read_start(struct ishtp_cl *cl)
 out:
 	/* if ishtp_hbm_cl_flow_control_req failed, return rb to free list */
 	if (rets && rb) {
-		spin_lock_irqsave(&dev->read_list_spinlock, dev_flags);
-		list_del(&rb->list);
-		spin_unlock_irqrestore(&dev->read_list_spinlock, dev_flags);
-
 		spin_lock_irqsave(&cl->free_list_spinlock, flags);
-		list_add_tail(&rb->list, &cl->free_rb_list.list);
+		list_move_tail(&rb->list, &cl->free_rb_list.list);
 		spin_unlock_irqrestore(&cl->free_list_spinlock, flags);
 	}
 	return rets;
