@@ -362,4 +362,9 @@ struct vas_winctx {
 	enum vas_notify_after_count notify_after_count;
 };
 
+extern int vas_initialized;
+
+extern int vas_window_reset(struct vas_instance *vinst, int winid);
+extern struct vas_instance *find_vas_instance(int node, int chip);
+
 #endif

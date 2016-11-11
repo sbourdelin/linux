@@ -1,0 +1,19 @@
+#
+# IBM Virtual Accelarator Switchboard (VAS) compatible devices
+#depends on PPC_POWERNV && PCI_MSI && EEH
+#
+
+config VAS
+	tristate "Support for IBM Virtual Accelerator Switchboard (VAS)"
+	default n
+	help
+	  Select this option to enable driver support for IBM Virtual
+	  Accelerator Switchboard (VAS).
+	  VAS allows accelerators in co processors like NX-842 to be
+	  directly available to a user process.  This driver enables
+	  userspace programs to access these accelerators via
+	  /dev/vas/vas-nxM.N devices.
+
+	  VAS adapters are found in POWER9 based systems.
+
+	  If unsure, say N.
