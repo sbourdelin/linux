@@ -66,6 +66,18 @@ static u32 esdhc_readl_fixup(struct sdhci_host *host,
 			return ret;
 		}
 	}
+	/*
+	 * The DAT[3:0] line signal levels and the CMD line signal level is
+	 * not compatible with standard SDHC register. Move the corresponding
+	 * bits around.
+	 */
+	if (spec_reg == SDHCI_PRESENT_STATE) {
+		ret = value & ~0xf8000000;
+		ret |= (value >> 4) & SDHCI_DATA_LVL_MASK;
+		ret |= (value << 1) & 0x01000000;
+		return ret;
+	}
+
 	ret = value;
 	return ret;
 }
