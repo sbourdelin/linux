@@ -67,6 +67,26 @@ struct vas_rx_win_attr {
 };
 
 /*
+ * Window attributes specified by the in-kernel owner of a send window.
+ */
+struct vas_tx_win_attr {
+	enum vas_cop_type cop;
+	int wcreds_max;
+	int lpid;
+	int pid;
+	int pswid;
+	int rsvd_txbuf_count;
+
+	bool user_win;
+	bool pin_win;
+	bool rej_no_credit;
+	bool rsvd_txbuf_enable;
+	bool tx_win_ord_mode;
+	bool rx_win_ord_mode;
+	enum vas_thresh_ctl tc_mode;
+};
+
+/*
  * Open a VAS receive window for the instance of VAS identified by @chipid.
  * Use @attr to initialize the attributes of the window.
  *
@@ -77,6 +97,19 @@ struct vas_rx_win_attr {
  */
 struct vas_window *vas_rx_win_open(int node, int chip, enum vas_cop_type cop,
 			struct vas_rx_win_attr *attr);
+
+/*
+ * Open a VAS send window for the instance of VAS identified by @chipid
+ * and the co-processor type @cop. Use @attr to initialize the attributes
+ * of the window.
+ *
+ * Note: The instance of VAS must already have an open Receive window for
+ * the coprocessor type @cop.
+ *
+ * Return a handle to the send window or ERR_PTR() on error.
+ */
+struct vas_window *vas_tx_win_open(int node, int chip, enum vas_cop_type cop,
+			struct vas_tx_win_attr *attr);
 
 /*
  * Close the send or receive window identified by @win. For receive windows
