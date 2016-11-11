@@ -183,7 +183,6 @@ static void
 actcapi_connect_b3_req(act2000_card *card, act2000_chan *chan)
 {
 	actcapi_msg *m;
-	struct sk_buff *skb;
 
 	ACTCAPI_MKHDR(17, 0x82, 0x00);
 	ACTCAPI_CHKSKB;
@@ -304,7 +303,6 @@ void
 actcapi_select_b2_protocol_req(act2000_card *card, act2000_chan *chan)
 {
 	actcapi_msg *m;
-	struct sk_buff *skb;
 
 	ACTCAPI_MKHDR(10, 0x40, 0x00);
 	ACTCAPI_CHKSKB;
@@ -339,7 +337,6 @@ static void
 actcapi_select_b3_protocol_req(act2000_card *card, act2000_chan *chan)
 {
 	actcapi_msg *m;
-	struct sk_buff *skb;
 
 	ACTCAPI_MKHDR(17, 0x80, 0x00);
 	ACTCAPI_CHKSKB;
@@ -360,7 +357,6 @@ static void
 actcapi_listen_b3_req(act2000_card *card, act2000_chan *chan)
 {
 	actcapi_msg *m;
-	struct sk_buff *skb;
 
 	ACTCAPI_MKHDR(2, 0x81, 0x00);
 	ACTCAPI_CHKSKB;
@@ -372,7 +368,6 @@ static void
 actcapi_disconnect_req(act2000_card *card, act2000_chan *chan)
 {
 	actcapi_msg *m;
-	struct sk_buff *skb;
 
 	ACTCAPI_MKHDR(3, 0x04, 0x00);
 	ACTCAPI_CHKSKB;
@@ -385,7 +380,6 @@ void
 actcapi_disconnect_b3_req(act2000_card *card, act2000_chan *chan)
 {
 	actcapi_msg *m;
-	struct sk_buff *skb;
 
 	ACTCAPI_MKHDR(17, 0x84, 0x00);
 	ACTCAPI_CHKSKB;
@@ -402,7 +396,6 @@ void
 actcapi_connect_resp(act2000_card *card, act2000_chan *chan, __u8 cause)
 {
 	actcapi_msg *m;
-	struct sk_buff *skb;
 
 	ACTCAPI_MKHDR(3, 0x02, 0x03);
 	ACTCAPI_CHKSKB;
@@ -420,7 +413,6 @@ static void
 actcapi_connect_active_resp(act2000_card *card, act2000_chan *chan)
 {
 	actcapi_msg *m;
-	struct sk_buff *skb;
 
 	ACTCAPI_MKHDR(2, 0x03, 0x03);
 	ACTCAPI_CHKSKB;
@@ -434,7 +426,6 @@ static void
 actcapi_connect_b3_resp(act2000_card *card, act2000_chan *chan, __u8 rejectcause)
 {
 	actcapi_msg *m;
-	struct sk_buff *skb;
 
 	ACTCAPI_MKHDR((rejectcause ? 3 : 17), 0x82, 0x03);
 	ACTCAPI_CHKSKB;
@@ -454,7 +445,6 @@ static void
 actcapi_connect_b3_active_resp(act2000_card *card, act2000_chan *chan)
 {
 	actcapi_msg *m;
-	struct sk_buff *skb;
 
 	ACTCAPI_MKHDR(2, 0x83, 0x03);
 	ACTCAPI_CHKSKB;
@@ -467,7 +457,6 @@ static void
 actcapi_info_resp(act2000_card *card, act2000_chan *chan)
 {
 	actcapi_msg *m;
-	struct sk_buff *skb;
 
 	ACTCAPI_MKHDR(2, 0x07, 0x03);
 	ACTCAPI_CHKSKB;
@@ -479,7 +468,6 @@ static void
 actcapi_disconnect_b3_resp(act2000_card *card, act2000_chan *chan)
 {
 	actcapi_msg *m;
-	struct sk_buff *skb;
 
 	ACTCAPI_MKHDR(2, 0x84, 0x03);
 	ACTCAPI_CHKSKB;
@@ -493,7 +481,6 @@ static void
 actcapi_disconnect_resp(act2000_card *card, act2000_chan *chan)
 {
 	actcapi_msg *m;
-	struct sk_buff *skb;
 
 	ACTCAPI_MKHDR(2, 0x04, 0x03);
 	ACTCAPI_CHKSKB;
