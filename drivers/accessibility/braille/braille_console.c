@@ -45,7 +45,7 @@ MODULE_LICENSE("GPL");
 
 /* Emit various sounds */
 static bool sound;
-module_param(sound, bool, 0);
+module_param(sound, bool, 0000);
 MODULE_PARM_DESC(sound, "emit sounds");
 
 static void beep(unsigned int freq)
