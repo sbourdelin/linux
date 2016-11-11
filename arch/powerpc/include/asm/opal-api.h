@@ -168,7 +168,8 @@
 #define OPAL_INT_SET_MFRR			125
 #define OPAL_PCI_TCE_KILL			126
 #define OPAL_VAS_READ_FIR			128
-#define OPAL_LAST				128
+#define OPAL_VAS_GET_TRIGGER_PORT		129
+#define OPAL_LAST				129
 
 /* Device tree flags */
 

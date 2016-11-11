@@ -10,7 +10,11 @@
 #include <linux/types.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
+#include <linux/irqdomain.h>
+#include <linux/interrupt.h>
 #include <linux/io.h>
+#include <asm/opal.h>
+#include <asm/opal-api.h>
 #include <asm/vas.h>
 #include "vas-internal.h"
 #include "copy-paste.h"
@@ -603,6 +607,72 @@ int vas_window_reset(struct vas_instance *vinst, int winid)
 	return 0;
 }
 
+static irqreturn_t vas_irq_handler(int virq, void *data)
+{
+	struct vas_window *win = data;
+
+	pr_devel("VAS: virq %d, window %d\n", virq, win->winid);
+	vas_wakeup_fault_win_thread();
+
+	return IRQ_HANDLED;
+}
+
+static int setup_irq_mapping(struct vas_window *win)
+{
+	int rc;
+	int winid;
+	uint32_t virq;
+	int32_t girq;
+	uint64_t port;
+	char devname[64];
+
+	winid = win->winid;
+	snprintf(devname, sizeof(devname), "vas-window-%d", winid);
+
+	girq = 0;
+	port = 0ULL;
+	rc = opal_vas_get_trigger_port(win->vinst->chip, winid, &girq, &port);
+
+	pr_devel("VAS: %swin #%d: IRQ trigger %d, port 0x%llx, rc %d\n",
+			win->txwin ? "Tx" : "Rx", winid, girq, port, rc);
+	if (rc)
+		return -EINVAL;
+
+	virq = irq_create_mapping(NULL, girq);
+	if (!virq) {
+		pr_devel("VAS: %swin #%d: Unable to map global irq %d\n",
+				win->txwin ? "Tx" : "Rx", winid, girq);
+		return -EINVAL;
+	}
+
+	rc = request_irq(virq, vas_irq_handler, 0, devname, win);
+	if (rc) {
+		pr_devel("VAS: %swin #%d: request_irq() returns %d\n",
+				win->txwin ? "Tx" : "Rx", winid, rc);
+		return rc;
+	}
+
+	win->hwirq = girq;
+	win->irq_port = port;
+
+	return 0;
+}
+
+static void free_irq_mapping(struct vas_window *win)
+{
+	unsigned int irq;
+
+	irq = irq_find_mapping(NULL, win->hwirq);
+	if (!irq) {
+		pr_devel("VAS: Receieved unknown hwirq %d\n", win->hwirq);
+		WARN_ON_ONCE(true);
+		return;
+	}
+
+	free_irq(irq, win);
+}
+
+
 static void put_rx_win(struct vas_window *rxwin)
 {
 	/* Better not be a send window! */
@@ -897,6 +967,15 @@ struct vas_window *vas_tx_win_open(int node, int chip, enum vas_cop_type cop,
 	txwin->rxwin = rxwin;
 	txwin->nx_win = txwin->rxwin->nx_win;
 
+	if (setup_irq_mapping(txwin)) {
+		/*
+		 * TODO: IRQ mapping is essential for user space send windows.
+		 *	 We only support in-kernel initially, so ignore errors
+		 *	 in setting up IRQ mappings for now.
+		 */
+		WARN_ON_ONCE(1);
+	}
+
 	init_winctx_for_txwin(txwin, attr, &winctx);
 
 	init_winctx_regs(txwin, &winctx);
@@ -1013,6 +1092,8 @@ retry:
 	/* if send window, drop reference to matching receive window */
 	if (window->txwin)
 		put_rx_win(window->rxwin);
+
+	free_irq_mapping(window);
 
 	vas_release_window_id(&window->vinst->ida, window->winid);
 
