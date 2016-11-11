@@ -67,6 +67,9 @@ drm_plane_state *malidp_duplicate_plane_state(struct drm_plane *plane)
 		return NULL;
 
 	state = kmalloc(sizeof(*state), GFP_KERNEL);
+	if (!state)
+		return NULL;
+
 	if (state) {
 		m_state = to_malidp_plane_state(plane->state);
 		__drm_atomic_helper_plane_duplicate_state(plane, &state->base);
