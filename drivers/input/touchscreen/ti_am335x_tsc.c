@@ -379,15 +379,30 @@ static int titsc_parse_dt(struct platform_device *pdev,
 		ts_dev->coordinate_readouts = 5;
 	}
 
-	err = of_property_read_u32(node, "ti,charge-delay",
+	err = of_property_read_u32(node, "ti,charge-delay-ns",
 				   &ts_dev->charge_delay);
-	/*
-	 * If ti,charge-delay value is not specified, then use
-	 * CHARGEDLY_OPENDLY as the default value.
-	 */
-	if (err < 0) {
-		ts_dev->charge_delay = CHARGEDLY_OPENDLY;
-		dev_warn(&pdev->dev, "ti,charge-delay not specified\n");
+	if (err >= 0) {
+		u64 charge_delay = ts_dev->charge_delay;
+
+		charge_delay *= ADC_CLK;
+		do_div(charge_delay, 1E9);
+		ts_dev->charge_delay = (u32)charge_delay;
+	} else {
+		err = of_property_read_u32(node, "ti,charge-delay",
+					   &ts_dev->charge_delay);
+		/*
+		 * If ti,charge-delay value is not specified, then use
+		 * CHARGEDLY_OPENDLY as the default value.
+		 */
+		if (err < 0) {
+			ts_dev->charge_delay = CHARGEDLY_OPENDLY;
+			dev_warn(&pdev->dev, "ti,charge-delay not specified\n");
+		}
+		/*
+		 * ti,charge-delay is specified with referrence to 3MHz,
+		 * so convert it to in referrence to current clock
+		 */
+		ts_dev->charge_delay *= ADC_CLK / 3000000;
 	}
 
 	return of_property_read_u32_array(node, "ti,wire-config",
