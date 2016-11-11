@@ -239,7 +239,7 @@ static int asoc_simple_card_parse_of(struct device_node *node,
 		i++;
 	}
 
-	ret = asoc_simple_card_parse_card_name(&priv->snd_card, PREFIX);
+	ret = asoc_simple_card_parse_card_name(&priv->snd_card, NULL, PREFIX);
 	if (ret < 0)
 		return ret;
 
