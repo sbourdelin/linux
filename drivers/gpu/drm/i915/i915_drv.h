@@ -4173,4 +4173,13 @@ int remap_io_mapping(struct vm_area_struct *vma,
 	__T;								\
 })
 
+static inline unsigned int i915_sg_segment_size(void)
+{
+#if IS_ENABLED(CONFIG_SWIOTLB)
+	return swiotlb_nr_tbl() << IO_TLB_SHIFT;
+#else
+	return UINT_MAX;
+#endif
+}
+
 #endif

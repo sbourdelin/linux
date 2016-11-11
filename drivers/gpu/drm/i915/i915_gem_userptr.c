@@ -390,36 +390,20 @@ struct get_pages_work {
 	struct task_struct *task;
 };
 
-#if IS_ENABLED(CONFIG_SWIOTLB)
-#define swiotlb_active() swiotlb_nr_tbl()
-#else
-#define swiotlb_active() 0
-#endif
-
 static int
 st_set_pages(struct sg_table **st, struct page **pvec, int num_pages)
 {
-	struct scatterlist *sg;
-	int ret, n;
+	int ret;
 
 	*st = kmalloc(sizeof(**st), GFP_KERNEL);
 	if (*st == NULL)
 		return -ENOMEM;
 
-	if (swiotlb_active()) {
-		ret = sg_alloc_table(*st, num_pages, GFP_KERNEL);
-		if (ret)
-			goto err;
-
-		for_each_sg((*st)->sgl, sg, num_pages, n)
-			sg_set_page(sg, pvec[n], PAGE_SIZE, 0);
-	} else {
-		ret = sg_alloc_table_from_pages(*st, pvec, num_pages,
-						0, num_pages << PAGE_SHIFT,
-						GFP_KERNEL);
-		if (ret)
-			goto err;
-	}
+	ret = __sg_alloc_table_from_pages(*st, pvec, num_pages, 0,
+					  num_pages << PAGE_SHIFT,
+					  GFP_KERNEL, i915_sg_segment_size());
+	if (ret)
+		goto err;
 
 	return 0;
 
