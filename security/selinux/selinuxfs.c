@@ -1166,7 +1166,7 @@ static ssize_t sel_write_bool(struct file *filep, const char __user *buf,
 
 	length = -EINVAL;
 	if (sscanf(page, "%d", &new_value) != 1)
-		goto out;
+		goto out1;
 
 	if (new_value)
 		new_value = 1;
@@ -1174,9 +1174,10 @@ static ssize_t sel_write_bool(struct file *filep, const char __user *buf,
 	bool_pending_values[index] = new_value;
 	length = count;
 
+out1:
+	kfree(page);
 out:
 	mutex_unlock(&sel_mutex);
-	kfree(page);
 	return length;
 }
 
