@@ -442,7 +442,7 @@ static int intel_ddi_hdmi_level(struct drm_i915_private *dev_priv, enum port por
 
 	hdmi_level = dev_priv->vbt.ddi_port_info[port].hdmi_level_shift;
 
-	if (IS_BROXTON(dev_priv))
+	if (IS_GEN9_LP(dev_priv))
 		return hdmi_level;
 
 	if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv)) {
@@ -1091,7 +1091,7 @@ void intel_ddi_clock_get(struct intel_encoder *encoder,
 		hsw_ddi_clock_get(encoder, pipe_config);
 	else if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))
 		skl_ddi_clock_get(encoder, pipe_config);
-	else if (IS_BROXTON(dev_priv))
+	else if (IS_GEN9_LP(dev_priv))
 		bxt_ddi_clock_get(encoder, pipe_config);
 }
 
@@ -1153,7 +1153,7 @@ bool intel_ddi_pll_select(struct intel_crtc *intel_crtc,
 	if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))
 		return skl_ddi_pll_select(intel_crtc, crtc_state,
 					  intel_encoder);
-	else if (IS_BROXTON(dev_priv))
+	else if (IS_GEN9_LP(dev_priv))
 		return bxt_ddi_pll_select(intel_crtc, crtc_state,
 					  intel_encoder);
 	else
@@ -1643,7 +1643,7 @@ uint32_t ddi_signal_levels(struct intel_dp *intel_dp)
 
 	if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))
 		skl_ddi_set_iboost(encoder, level);
-	else if (IS_BROXTON(dev_priv))
+	else if (IS_GEN9_LP(dev_priv))
 		bxt_ddi_vswing_sequence(dev_priv, level, port, encoder->type);
 
 	return DDI_BUF_TRANS_SELECT(level);
@@ -2246,7 +2246,7 @@ void intel_ddi_init(struct drm_device *dev, enum port port)
 	 * configuration so that we use the proper lane count for our
 	 * calculations.
 	 */
-	if (IS_BROXTON(dev_priv) && port == PORT_A) {
+	if (IS_GEN9_LP(dev_priv) && port == PORT_A) {
 		if (!(intel_dig_port->saved_port_bits & DDI_A_4_LANES)) {
 			DRM_DEBUG_KMS("BXT BIOS forgot to set DDI_A_4_LANES for port A; fixing\n");
 			intel_dig_port->saved_port_bits |= DDI_A_4_LANES;

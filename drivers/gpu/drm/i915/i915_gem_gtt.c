@@ -370,7 +370,7 @@ static void kunmap_page_dma(struct drm_i915_private *dev_priv, void *vaddr)
 	/* There are only few exceptions for gen >=6. chv and bxt.
 	 * And we are not sure about the latter so play safe for now.
 	 */
-	if (IS_CHERRYVIEW(dev_priv) || IS_BROXTON(dev_priv))
+	if (IS_CHERRYVIEW(dev_priv) || IS_GEN9_LP(dev_priv))
 		drm_clflush_virt_range(vaddr, PAGE_SIZE);
 
 	kunmap_atomic(vaddr);
@@ -2939,7 +2939,7 @@ static int ggtt_probe_common(struct i915_ggtt *ggtt, u64 size)
 	 * resort to an uncached mapping. The WC issue is easily caught by the
 	 * readback check when writing GTT PTE entries.
 	 */
-	if (IS_BROXTON(to_i915(ggtt->base.dev)))
+	if (IS_GEN9_LP(to_i915(ggtt->base.dev)))
 		ggtt->gsm = ioremap_nocache(phys_addr, size);
 	else
 		ggtt->gsm = ioremap_wc(phys_addr, size);
@@ -3071,7 +3071,7 @@ static int gen8_gmch_probe(struct i915_ggtt *ggtt)
 
 	ggtt->base.total = (size / sizeof(gen8_pte_t)) << PAGE_SHIFT;
 
-	if (IS_CHERRYVIEW(dev_priv) || IS_BROXTON(dev_priv))
+	if (IS_CHERRYVIEW(dev_priv) || IS_GEN9_LP(dev_priv))
 		chv_setup_private_ppat(dev_priv);
 	else
 		bdw_setup_private_ppat(dev_priv);
@@ -3312,7 +3312,7 @@ void i915_gem_restore_gtt_mappings(struct drm_device *dev)
 	ggtt->base.closed = false;
 
 	if (INTEL_INFO(dev)->gen >= 8) {
-		if (IS_CHERRYVIEW(dev_priv) || IS_BROXTON(dev_priv))
+		if (IS_CHERRYVIEW(dev_priv) || IS_GEN9_LP(dev_priv))
 			chv_setup_private_ppat(dev_priv);
 		else
 			bdw_setup_private_ppat(dev_priv);
