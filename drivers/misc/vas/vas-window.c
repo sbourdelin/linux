@@ -13,6 +13,7 @@
 #include <linux/io.h>
 #include <asm/vas.h>
 #include "vas-internal.h"
+#include "copy-paste.h"
 
 static int fault_winid;
 
@@ -926,6 +927,47 @@ put_rxwin:
 	return ERR_PTR(rc);
 
 }
+
+int vas_copy_crb(void *crb, int offset, bool first)
+{
+	if (!vas_initialized)
+		return -1;
+
+	return vas_copy(crb, offset, first);
+}
+
+int vas_paste_crb(struct vas_window *txwin, int offset, bool last, bool re)
+{
+	int rc;
+	uint64_t val;
+	void *addr;
+
+	if (!vas_initialized)
+		return -1;
+	/*
+	 * Only NX windows are supported for now and hardware assumes
+	 * report-enable flag is set for NX windows. Ensure software
+	 * complies too.
+	 */
+	WARN_ON_ONCE(!re);
+
+	addr = txwin->paste_kaddr;
+	if (re) {
+		/*
+		 * Set the REPORT_ENABLE bit (equivalent to writing
+		 * to 1K offset of the paste address)
+		 */
+		val = SET_FIELD(RMA_LSMP_REPORT_ENABLE, 0ULL, 1);
+		addr += val;
+	}
+
+	rc = vas_paste(addr, offset, last);
+
+	print_fifo_msg_count(txwin);
+
+	return rc;
+}
+
 
 int vas_win_close(struct vas_window *window)
 {
