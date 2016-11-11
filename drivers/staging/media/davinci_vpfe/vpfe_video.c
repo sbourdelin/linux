@@ -423,6 +423,7 @@ static int vpfe_open(struct file *file)
 	/* If decoder is not initialized. initialize it */
 	if (!video->initialized && vpfe_update_pipe_state(video)) {
 		mutex_unlock(&video->lock);
+		kfree(handle);
 		return -ENODEV;
 	}
 	/* Increment device users counter */
