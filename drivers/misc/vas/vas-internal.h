@@ -366,6 +366,7 @@ extern int vas_initialized;
 
 extern int vas_window_reset(struct vas_instance *vinst, int winid);
 extern struct vas_instance *find_vas_instance(int node, int chip);
+extern void vas_wakeup_fault_win_thread(void);
 
 /*
  * VREG(x):
