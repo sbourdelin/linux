@@ -2303,13 +2303,15 @@ complete_cmd_fusion(struct megasas_instance *instance, u32 MSIxIndex)
 			break;
 		case MPI2_FUNCTION_SCSI_IO_REQUEST:  /*Fast Path IO.*/
 			/* Update load balancing info */
-			device_id = MEGASAS_DEV_INDEX(scmd_local);
-			lbinfo = &fusion->load_balance_info[device_id];
-			if (cmd_fusion->scmd->SCp.Status &
-			    MEGASAS_LOAD_BALANCE_FLAG) {
-				atomic_dec(&lbinfo->scsi_pending_cmds[cmd_fusion->pd_r1_lb]);
-				cmd_fusion->scmd->SCp.Status &=
-					~MEGASAS_LOAD_BALANCE_FLAG;
+			if (scmd_local) {
+				device_id = MEGASAS_DEV_INDEX(scmd_local);
+				lbinfo = &fusion->load_balance_info[device_id];
+				if (cmd_fusion->scmd->SCp.Status &
+				    MEGASAS_LOAD_BALANCE_FLAG) {
+					atomic_dec(&lbinfo->scsi_pending_cmds[cmd_fusion->pd_r1_lb]);
+					cmd_fusion->scmd->SCp.Status &=
+						~MEGASAS_LOAD_BALANCE_FLAG;
+				}
 			}
 			if (reply_descript_type ==
 			    MPI2_RPY_DESCRIPT_FLAGS_SCSI_IO_SUCCESS) {
@@ -2320,6 +2322,12 @@ complete_cmd_fusion(struct megasas_instance *instance, u32 MSIxIndex)
 			/* Fall thru and complete IO */
 		case MEGASAS_MPI2_FUNCTION_LD_IO_REQUEST: /* LD-IO Path */
 			/* Map the FW Cmd Status */
+			if (!scmd_local) {
+				dev_err(&instance->pdev->dev,
+					"cmd[%d:%d] already completed\n",
+					MSIxIndex, smid);
+				break;
+			}
 			map_cmd_status(cmd_fusion, status, extStatus);
 			scsi_io_req->RaidContext.status = 0;
 			scsi_io_req->RaidContext.exStatus = 0;
