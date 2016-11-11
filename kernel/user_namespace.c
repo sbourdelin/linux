@@ -672,28 +672,31 @@ static ssize_t map_write(struct file *file, const char __user *buf,
 	 */
 	mutex_lock(&userns_state_mutex);
 
-	ret = -EPERM;
 	/* Only allow one successful write to the map */
-	if (map->nr_extents != 0)
-		goto out;
+	if (map->nr_extents != 0) {
+		mutex_unlock(&userns_state_mutex);
+		return -EPERM;
+	}
 
 	/*
 	 * Adjusting namespace settings requires capabilities on the target.
 	 */
-	if (cap_valid(cap_setid) && !file_ns_capable(file, ns, CAP_SYS_ADMIN))
-		goto out;
+	if (cap_valid(cap_setid) && !file_ns_capable(file, ns, CAP_SYS_ADMIN)) {
+		mutex_unlock(&userns_state_mutex);
+		return -EPERM;
+	}
 
 	/* Only allow < page size writes at the beginning of the file */
-	ret = -EINVAL;
-	if ((*ppos != 0) || (count >= PAGE_SIZE))
-		goto out;
+	if ((*ppos != 0) || (count >= PAGE_SIZE)) {
+		mutex_unlock(&userns_state_mutex);
+		return -EINVAL;
+	}
 
 	/* Slurp in the user data */
 	kbuf = memdup_user_nul(buf, count);
 	if (IS_ERR(kbuf)) {
-		ret = PTR_ERR(kbuf);
-		kbuf = NULL;
-		goto out;
+		mutex_unlock(&userns_state_mutex);
+		return PTR_ERR(kbuf);
 	}
 
 	/* Parse the user data */
