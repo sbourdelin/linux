@@ -2817,18 +2817,16 @@ static irqreturn_t dwc3_process_event_buf(struct dwc3_event_buffer *evt)
 {
 	struct dwc3 *dwc = evt->dwc;
 	irqreturn_t ret = IRQ_NONE;
-	int left;
+	int idx;
 	u32 reg;
-
-	left = evt->count;
 
 	if (!(evt->flags & DWC3_EVENT_PENDING))
 		return IRQ_NONE;
 
-	while (left > 0) {
+	for (idx = 0; idx < evt->count; idx += 4) {
 		union dwc3_event event;
 
-		event.raw = *(u32 *) (evt->buf + evt->lpos);
+		event.raw = *(u32 *)(evt->cache + idx);
 
 		dwc3_process_event_entry(dwc, &event);
 
@@ -2841,10 +2839,6 @@ static irqreturn_t dwc3_process_event_buf(struct dwc3_event_buffer *evt)
 		 * boundary so I worry about that once we try to handle
 		 * that.
 		 */
-		evt->lpos = (evt->lpos + 4) % DWC3_EVENT_BUFFERS_SIZE;
-		left -= 4;
-
-		dwc3_writel(dwc->regs, DWC3_GEVNTCOUNT(0), 4);
 	}
 
 	evt->count = 0;
@@ -2877,6 +2871,7 @@ static irqreturn_t dwc3_check_event_buf(struct dwc3_event_buffer *evt)
 {
 	struct dwc3 *dwc = evt->dwc;
 	u32 count;
+	u32 amount;
 	u32 reg;
 
 	if (pm_runtime_suspended(dwc->dev)) {
@@ -2893,6 +2888,15 @@ static irqreturn_t dwc3_check_event_buf(struct dwc3_event_buffer *evt)
 
 	evt->count = count;
 	evt->flags |= DWC3_EVENT_PENDING;
+
+	amount = min(count, DWC3_EVENT_BUFFERS_SIZE - evt->lpos);
+	memcpy(evt->cache, evt->buf + evt->lpos, amount);
+
+	if (amount < count)
+		memcpy(evt->cache + amount, evt->buf, count - amount);
+
+	evt->lpos = (evt->lpos + count) % DWC3_EVENT_BUFFERS_SIZE;
+	dwc3_writel(dwc->regs, DWC3_GEVNTCOUNT(0), count);
 
 	/* Mask interrupt */
 	reg = dwc3_readl(dwc->regs, DWC3_GEVNTSIZ(0));
