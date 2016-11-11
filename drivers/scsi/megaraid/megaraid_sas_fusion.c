@@ -196,6 +196,7 @@ megasas_fire_cmd_fusion(struct megasas_instance *instance,
 			le32_to_cpu(req_desc->u.low));
 
 	writeq(req_data, &instance->reg_set->inbound_low_queue_port);
+	mmiowb();
 #else
 	unsigned long flags;
 
