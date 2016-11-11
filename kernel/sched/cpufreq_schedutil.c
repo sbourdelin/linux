@@ -371,9 +371,9 @@ static void sugov_policy_free(struct sugov_policy *sg_policy)
 	if (!sg_policy->policy->fast_switch_enabled) {
 		kthread_flush_worker(&sg_policy->worker);
 		kthread_stop(sg_policy->thread);
+		mutex_destroy(&sg_policy->work_lock);
 	}
 
-	mutex_destroy(&sg_policy->work_lock);
 	kfree(sg_policy);
 }
 
@@ -389,8 +389,6 @@ static struct sugov_policy *sugov_policy_alloc(struct cpufreq_policy *policy)
 		return NULL;
 
 	sg_policy->policy = policy;
-	init_irq_work(&sg_policy->irq_work, sugov_irq_work);
-	mutex_init(&sg_policy->work_lock);
 	raw_spin_lock_init(&sg_policy->update_lock);
 
 	/* kthread only required for slow path */
@@ -402,7 +400,6 @@ static struct sugov_policy *sugov_policy_alloc(struct cpufreq_policy *policy)
 	thread = kthread_create(kthread_worker_fn, &sg_policy->worker,
 			"sugov:%d", cpumask_first(policy->related_cpus));
 	if (IS_ERR(thread)) {
-		mutex_destroy(&sg_policy->work_lock);
 		kfree(sg_policy);
 		pr_err("failed to create sugov thread: %ld\n", PTR_ERR(thread));
 		return NULL;
@@ -415,6 +412,9 @@ static struct sugov_policy *sugov_policy_alloc(struct cpufreq_policy *policy)
 		pr_warn("%s: failed to set SCHED_FIFO\n", __func__);
 		return NULL;
 	}
+
+	init_irq_work(&sg_policy->irq_work, sugov_irq_work);
+	mutex_init(&sg_policy->work_lock);
 
 	kthread_bind_mask(thread, policy->related_cpus);
 	wake_up_process(thread);
@@ -578,8 +578,10 @@ static void sugov_stop(struct cpufreq_policy *policy)
 
 	synchronize_sched();
 
-	irq_work_sync(&sg_policy->irq_work);
-	kthread_cancel_work_sync(&sg_policy->work);
+	if (!policy->fast_switch_enabled) {
+		irq_work_sync(&sg_policy->irq_work);
+		kthread_cancel_work_sync(&sg_policy->work);
+	}
 }
 
 static void sugov_limits(struct cpufreq_policy *policy)
