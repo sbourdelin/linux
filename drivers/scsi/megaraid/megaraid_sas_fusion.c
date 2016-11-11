@@ -1708,6 +1708,7 @@ megasas_build_ldio_fusion(struct megasas_instance *instance,
 	struct IO_REQUEST_INFO io_info;
 	struct fusion_context *fusion;
 	struct MR_DRV_RAID_MAP_ALL *local_map_ptr;
+	u16 msix_index;
 	u8 *raidLUN;
 
 	device_id = MEGASAS_DEV_INDEX(scp);
@@ -1797,11 +1798,13 @@ megasas_build_ldio_fusion(struct megasas_instance *instance,
 			fp_possible = io_info.fpOkForIo;
 	}
 
-	/* Use raw_smp_processor_id() for now until cmd->request->cpu is CPU
-	   id by default, not CPU group id, otherwise all MSI-X queues won't
-	   be utilized */
-	cmd->request_desc->SCSIIO.MSIxIndex = instance->msix_vectors ?
-		raw_smp_processor_id() % instance->msix_vectors : 0;
+	if (shost_use_blk_mq(instance->host)) {
+		u32 blk_tag = blk_mq_unique_tag(scp->request);
+		msix_index = blk_mq_unique_tag_to_hwq(blk_tag);
+	} else
+		msix_index = instance->msix_vectors ?
+			raw_smp_processor_id() % instance->msix_vectors : 0;
+	cmd->request_desc->SCSIIO.MSIxIndex = msix_index;
 
 	if (fp_possible) {
 		megasas_set_pd_lba(io_request, scp->cmd_len, &io_info, scp,
@@ -1976,6 +1979,7 @@ megasas_build_syspd_fusion(struct megasas_instance *instance,
 	struct RAID_CONTEXT	*pRAID_Context;
 	struct MR_PD_CFG_SEQ_NUM_SYNC *pd_sync;
 	struct fusion_context *fusion = instance->ctrl_context;
+	u16 msix_index;
 	pd_sync = (void *)fusion->pd_seq_sync[(instance->pd_seq_map_id - 1) & 1];
 
 	device_id = MEGASAS_DEV_INDEX(scmd);
@@ -2020,11 +2024,14 @@ megasas_build_syspd_fusion(struct megasas_instance *instance,
 		io_request->DevHandle = cpu_to_le16(0xFFFF);
 	}
 
+	if (shost_use_blk_mq(instance->host)) {
+		u32 blk_tag = blk_mq_unique_tag(scmd->request);
+		msix_index = blk_mq_unique_tag_to_hwq(blk_tag);
+	} else
+		msix_index = instance->msix_vectors ?
+			(raw_smp_processor_id() % instance->msix_vectors) : 0;
+	cmd->request_desc->SCSIIO.MSIxIndex = msix_index;
 	cmd->request_desc->SCSIIO.DevHandle = io_request->DevHandle;
-	cmd->request_desc->SCSIIO.MSIxIndex =
-		instance->msix_vectors ?
-		(raw_smp_processor_id() % instance->msix_vectors) : 0;
-
 
 	if (!fp_possible) {
 		/* system pd firmware path */
@@ -2193,7 +2200,18 @@ megasas_build_and_issue_cmd_fusion(struct megasas_instance *instance,
 		return SCSI_MLQUEUE_DEVICE_BUSY;
 	}
 
-	cmd = megasas_get_cmd_fusion(instance, scmd->request->tag);
+	if (shost_use_blk_mq(instance->host)) {
+		int msix_vectors, hwq_size;
+		u32 blk_tag = blk_mq_unique_tag(scmd->request);
+		u16 hwq = blk_mq_unique_tag_to_hwq(blk_tag);
+		u16 tag = blk_mq_unique_tag_to_tag(blk_tag);
+
+		msix_vectors = instance->msix_vectors ?
+			instance->msix_vectors : 1;
+		hwq_size = instance->max_scsi_cmds / msix_vectors;
+		cmd = megasas_get_cmd_fusion(instance, (hwq * hwq_size) + tag);
+	} else
+		cmd = megasas_get_cmd_fusion(instance, scmd->request->tag);
 
 	index = cmd->index;
 

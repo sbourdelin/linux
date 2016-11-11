@@ -48,6 +48,7 @@
 #include <linux/blkdev.h>
 #include <linux/mutex.h>
 #include <linux/poll.h>
+#include <linux/blk-mq-pci.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
@@ -103,6 +104,9 @@ MODULE_PARM_DESC(dual_qdepth_disable, "Disable dual queue depth feature. Default
 unsigned int scmd_timeout = MEGASAS_DEFAULT_CMD_TIMEOUT;
 module_param(scmd_timeout, int, S_IRUGO);
 MODULE_PARM_DESC(scmd_timeout, "scsi command timeout (10-90s), default 90s. See megasas_reset_timer.");
+
+bool use_blk_mq = true;
+module_param_named(use_blk_mq, use_blk_mq, bool, 0);
 
 MODULE_LICENSE("GPL");
 MODULE_VERSION(MEGASAS_VERSION);
@@ -1876,6 +1880,17 @@ static void megasas_slave_destroy(struct scsi_device *sdev)
 	sdev->hostdata = NULL;
 }
 
+static int megasas_map_queues(struct Scsi_Host *shost)
+{
+	struct megasas_instance *instance = (struct megasas_instance *)
+		shost->hostdata;
+
+	if (!instance->ctrl_context)
+		return 0;
+
+	return blk_mq_pci_map_queues(&shost->tag_set, instance->pdev, 0);
+}
+
 /*
 * megasas_complete_outstanding_ioctls - Complete outstanding ioctls after a
 *                                       kill adapter
@@ -2980,6 +2995,7 @@ static struct scsi_host_template megasas_template = {
 	.slave_configure = megasas_slave_configure,
 	.slave_alloc = megasas_slave_alloc,
 	.slave_destroy = megasas_slave_destroy,
+	.map_queues = megasas_map_queues,
 	.queuecommand = megasas_queue_command,
 	.eh_target_reset_handler = megasas_reset_target,
 	.eh_abort_handler = megasas_task_abort,
@@ -5604,6 +5620,12 @@ static int megasas_io_attach(struct megasas_instance *instance)
 	host->max_id = MEGASAS_MAX_DEV_PER_CHANNEL;
 	host->max_lun = MEGASAS_MAX_LUN;
 	host->max_cmd_len = 16;
+	host->nr_hw_queues = instance->msix_vectors ?
+		instance->msix_vectors : 1;
+	if (use_blk_mq) {
+		host->can_queue = instance->max_scsi_cmds / host->nr_hw_queues;
+		host->use_blk_mq = 1;
+	}
 
 	/*
 	 * Notify the mid-layer about the new controller
