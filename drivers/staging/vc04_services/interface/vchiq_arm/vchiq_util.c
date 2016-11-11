@@ -52,7 +52,7 @@ int vchiu_queue_init(VCHIU_QUEUE_T *queue, int size)
 	sema_init(&queue->push, 0);
 
 	queue->storage = kzalloc(size * sizeof(VCHIQ_HEADER_T *), GFP_KERNEL);
-	if (queue->storage == NULL) {
+	if (!queue->storage) {
 		vchiu_queue_delete(queue);
 		return 0;
 	}
@@ -61,7 +61,7 @@ int vchiu_queue_init(VCHIU_QUEUE_T *queue, int size)
 
 void vchiu_queue_delete(VCHIU_QUEUE_T *queue)
 {
-	if (queue->storage != NULL)
+	if (queue->storage)
 		kfree(queue->storage);
 }
 

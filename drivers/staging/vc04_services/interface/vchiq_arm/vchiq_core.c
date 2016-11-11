@@ -3273,7 +3273,7 @@ vchiq_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle,
 
 	if (!service ||
 		 (service->srvstate != VCHIQ_SRVSTATE_OPEN) ||
-		 ((memhandle == VCHI_MEM_HANDLE_INVALID) && (offset == NULL)) ||
+		 ((memhandle == VCHI_MEM_HANDLE_INVALID) && (!offset)) ||
 		 (vchiq_check_service(service) != VCHIQ_SUCCESS))
 		goto error_exit;
 
@@ -3910,7 +3910,7 @@ void vchiq_log_dump_mem(const char *label, uint32_t addr, const void *void_mem,
 		}
 		*s++ = '\0';
 
-		if ((label != NULL) && (*label != '\0'))
+		if (label && (*label != '\0'))
 			vchiq_log_trace(VCHIQ_LOG_TRACE,
 				"%s: %08x: %s", label, addr, line_buf);
 		else
