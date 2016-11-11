@@ -2378,7 +2378,8 @@ void megasas_return_mfi_mpt_pthr(struct megasas_instance *instance,
 int megasas_cmd_type(struct scsi_cmnd *cmd);
 void megasas_setup_jbod_map(struct megasas_instance *instance);
 
-void megasas_update_sdev_properties(struct scsi_device *sdev);
+void megasas_update_sdev_properties(struct megasas_instance *instance,
+				    struct scsi_device *sdev);
 int megasas_reset_fusion(struct Scsi_Host *shost, int reason);
 int megasas_task_abort_fusion(struct scsi_cmnd *scmd);
 int megasas_reset_target_fusion(struct scsi_cmnd *scmd);

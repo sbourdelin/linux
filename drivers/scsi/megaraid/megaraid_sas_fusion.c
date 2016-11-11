@@ -3540,7 +3540,7 @@ transition_to_ready:
 			megasas_setup_jbod_map(instance);
 
 			shost_for_each_device(sdev, shost)
-				megasas_update_sdev_properties(sdev);
+				megasas_update_sdev_properties(instance, sdev);
 
 			clear_bit(MEGASAS_FUSION_IN_RESET,
 				  &instance->reset_flags);

@@ -1730,22 +1730,22 @@ static struct megasas_instance *megasas_lookup_instance(u16 host_no)
 /*
 * megasas_update_sdev_properties - Update sdev structure based on controller's FW capabilities
 *
+* @instance: Megasas instance
 * @sdev: OS provided scsi device
 *
 * Returns void
 */
-void megasas_update_sdev_properties(struct scsi_device *sdev)
+void megasas_update_sdev_properties(struct megasas_instance *instance,
+				    struct scsi_device *sdev)
 {
 	u16 pd_index = 0;
 	u32 device_id, ld;
-	struct megasas_instance *instance;
 	struct fusion_context *fusion;
 	struct MR_PRIV_DEVICE *mr_device_priv_data;
 	struct MR_PD_CFG_SEQ_NUM_SYNC *pd_sync;
 	struct MR_LD_RAID *raid;
 	struct MR_DRV_RAID_MAP_ALL *local_map_ptr;
 
-	instance = megasas_lookup_instance(sdev->host->host_no);
 	fusion = instance->ctrl_context;
 	mr_device_priv_data = sdev->hostdata;
 
@@ -1774,13 +1774,11 @@ void megasas_update_sdev_properties(struct scsi_device *sdev)
 	}
 }
 
-static void megasas_set_device_queue_depth(struct scsi_device *sdev)
+static void megasas_set_device_queue_depth(struct megasas_instance *instance,
+					   struct scsi_device *sdev)
 {
 	u16				pd_index = 0;
 	int		ret = DCMD_FAILED;
-	struct megasas_instance *instance;
-
-	instance = megasas_lookup_instance(sdev->host->host_no);
 
 	if (sdev->channel < MEGASAS_MAX_PD_CHANNELS) {
 		pd_index = (sdev->channel * MEGASAS_MAX_DEV_PER_CHANNEL) + sdev->id;
@@ -1816,9 +1814,9 @@ static void megasas_set_device_queue_depth(struct scsi_device *sdev)
 static int megasas_slave_configure(struct scsi_device *sdev)
 {
 	u16 pd_index = 0;
-	struct megasas_instance *instance;
+	struct megasas_instance *instance = (struct megasas_instance *)
+		sdev->host->hostdata;
 
-	instance = megasas_lookup_instance(sdev->host->host_no);
 	if (instance->pd_list_not_supported) {
 		if (sdev->channel < MEGASAS_MAX_PD_CHANNELS &&
 			sdev->type == TYPE_DISK) {
@@ -1829,8 +1827,8 @@ static int megasas_slave_configure(struct scsi_device *sdev)
 				return -ENXIO;
 		}
 	}
-	megasas_set_device_queue_depth(sdev);
-	megasas_update_sdev_properties(sdev);
+	megasas_set_device_queue_depth(instance, sdev);
+	megasas_update_sdev_properties(instance, sdev);
 
 	/*
 	 * The RAID firmware may require extended timeouts.
@@ -1844,10 +1842,10 @@ static int megasas_slave_configure(struct scsi_device *sdev)
 static int megasas_slave_alloc(struct scsi_device *sdev)
 {
 	u16 pd_index = 0;
-	struct megasas_instance *instance ;
+	struct megasas_instance *instance = (struct megasas_instance *)
+		sdev->host->hostdata;
 	struct MR_PRIV_DEVICE *mr_device_priv_data;
 
-	instance = megasas_lookup_instance(sdev->host->host_no);
 	if (sdev->channel < MEGASAS_MAX_PD_CHANNELS) {
 		/*
 		 * Open the OS scan to the SYSTEM PD
