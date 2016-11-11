@@ -28,7 +28,7 @@
 #ifdef CONFIG_DRM_I915_DEBUG_GEM
 #define GEM_BUG_ON(expr) BUG_ON(expr)
 #else
-#define GEM_BUG_ON(expr) do { } while (0)
+#define GEM_BUG_ON(expr) do { if (expr) {} } while(0)
 #endif
 
 #define I915_NUM_ENGINES 5
