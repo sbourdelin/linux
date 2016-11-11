@@ -22,7 +22,7 @@ int main(int argc, char const *argv[])
 {
 	struct uleds_user_dev uleds_dev;
 	int fd, ret;
-	unsigned char brightness;
+	int brightness;
 	struct timespec ts;
 
 	if (argc != 2) {
@@ -31,6 +31,7 @@ int main(int argc, char const *argv[])
 	}
 
 	strncpy(uleds_dev.name, argv[1], LEDS_MAX_NAME_SIZE);
+	uleds_dev.max_brightness = 100;
 
 	fd = open("/dev/uleds", O_RDWR);
 	if (fd == -1) {
@@ -46,7 +47,7 @@ int main(int argc, char const *argv[])
 	}
 
 	while (1) {
-		ret = read(fd, &brightness, 1);
+		ret = read(fd, &brightness, sizeof(brightness));
 		if (ret == -1) {
 			perror("Failed to read from /dev/uleds");
 			close(fd);

@@ -39,7 +39,7 @@ struct uleds_device {
 	struct mutex		mutex;
 	enum uleds_state	state;
 	wait_queue_head_t	waitq;
-	unsigned char		brightness;
+	int			brightness;
 	bool			new_data;
 };
 
@@ -67,7 +67,6 @@ static int uleds_open(struct inode *inode, struct file *file)
 		return -ENOMEM;
 
 	udev->led_cdev.name = udev->user_dev.name;
-	udev->led_cdev.max_brightness = LED_FULL;
 	udev->led_cdev.brightness_set = uleds_brightness_set;
 
 	mutex_init(&udev->mutex);
@@ -117,6 +116,12 @@ static ssize_t uleds_write(struct file *file, const char __user *buffer,
 		goto out;
 	}
 
+	if (udev->user_dev.max_brightness <= 0) {
+		ret = -EINVAL;
+		goto out;
+	}
+	udev->led_cdev.max_brightness = udev->user_dev.max_brightness;
+
 	ret = devm_led_classdev_register(uleds_misc.this_device,
 					 &udev->led_cdev);
 	if (ret < 0)
@@ -138,7 +143,7 @@ static ssize_t uleds_read(struct file *file, char __user *buffer, size_t count,
 	struct uleds_device *udev = file->private_data;
 	ssize_t retval;
 
-	if (count == 0)
+	if (count < sizeof(udev->brightness))
 		return 0;
 
 	do {
@@ -151,9 +156,10 @@ static ssize_t uleds_read(struct file *file, char __user *buffer, size_t count,
 		} else if (!udev->new_data && (file->f_flags & O_NONBLOCK)) {
 			retval = -EAGAIN;
 		} else if (udev->new_data) {
-			retval = copy_to_user(buffer, &udev->brightness, 1);
+			retval = copy_to_user(buffer, &udev->brightness,
+					      sizeof(udev->brightness));
 			udev->new_data = false;
-			retval = 1;
+			retval = sizeof(udev->brightness);
 		}
 
 		mutex_unlock(&udev->mutex);
