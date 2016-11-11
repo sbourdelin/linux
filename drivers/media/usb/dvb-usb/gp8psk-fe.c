@@ -326,6 +326,7 @@ error:
 success:
 	return &s->fe;
 }
+EXPORT_SYMBOL_GPL(gp8psk_fe_attach);
 
 
 static struct dvb_frontend_ops gp8psk_fe_ops = {
