@@ -1055,16 +1055,17 @@ void intel_fbc_choose_crtc(struct drm_i915_private *dev_priv,
 			   struct drm_atomic_state *state)
 {
 	struct intel_fbc *fbc = &dev_priv->fbc;
-	struct drm_plane *plane;
-	struct drm_plane_state *plane_state;
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *crtc_state;
 	bool crtc_chosen = false;
 	int i;
 
 	mutex_lock(&fbc->lock);
 
-	/* Does this atomic commit involve the CRTC currently tied to FBC? */
+	/* Does this atomic commit involve the plane currently tied to FBC? */
 	if (fbc->crtc &&
-	    !drm_atomic_get_existing_crtc_state(state, &fbc->crtc->base))
+	    !drm_atomic_get_existing_plane_state(state,
+						 fbc->crtc->base.primary))
 		goto out;
 
 	if (!intel_fbc_can_enable(dev_priv))
@@ -1074,25 +1075,26 @@ void intel_fbc_choose_crtc(struct drm_i915_private *dev_priv,
 	 * plane. We could go for fancier schemes such as checking the plane
 	 * size, but this would just affect the few platforms that don't tie FBC
 	 * to pipe or plane A. */
-	for_each_plane_in_state(state, plane, plane_state, i) {
-		struct intel_plane_state *intel_plane_state =
-			to_intel_plane_state(plane_state);
-		struct intel_crtc_state *intel_crtc_state;
-		struct intel_crtc *crtc = to_intel_crtc(plane_state->crtc);
+	for_each_crtc_in_state(state, crtc, crtc_state, i) {
+		struct intel_plane_state *plane_state = to_intel_plane_state(
+			drm_atomic_get_existing_plane_state(state,
+							    crtc->primary));
+		struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 
-		if (!intel_plane_state->base.visible)
+		if (!plane_state)
 			continue;
 
-		if (fbc_on_pipe_a_only(dev_priv) && crtc->pipe != PIPE_A)
+		if (!plane_state->base.visible)
 			continue;
 
-		if (fbc_on_plane_a_only(dev_priv) && crtc->plane != PLANE_A)
+		if (fbc_on_pipe_a_only(dev_priv) && intel_crtc->pipe != PIPE_A)
 			continue;
 
-		intel_crtc_state = to_intel_crtc_state(
-			drm_atomic_get_existing_crtc_state(state, &crtc->base));
+		if (fbc_on_plane_a_only(dev_priv) &&
+		    intel_crtc->plane != PLANE_A)
+			continue;
 
-		intel_crtc_state->enable_fbc = true;
+		plane_state->enable_fbc = true;
 		crtc_chosen = true;
 		break;
 	}
@@ -1130,13 +1132,13 @@ void intel_fbc_enable(struct intel_crtc *crtc,
 	if (fbc->enabled) {
 		WARN_ON(fbc->crtc == NULL);
 		if (fbc->crtc == crtc) {
-			WARN_ON(!crtc_state->enable_fbc);
+			WARN_ON(!plane_state->enable_fbc);
 			WARN_ON(fbc->active);
 		}
 		goto out;
 	}
 
-	if (!crtc_state->enable_fbc)
+	if (!plane_state->enable_fbc)
 		goto out;
 
 	WARN_ON(fbc->active);

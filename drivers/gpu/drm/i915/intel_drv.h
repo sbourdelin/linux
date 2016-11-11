@@ -403,6 +403,8 @@ struct intel_plane_state {
 	int scaler_id;
 
 	struct drm_intel_sprite_colorkey ckey;
+
+	bool enable_fbc;
 };
 
 struct intel_initial_plane_config {
@@ -647,8 +649,6 @@ struct intel_crtc_state {
 	struct intel_link_m_n fdi_m_n;
 
 	bool ips_enabled;
-
-	bool enable_fbc;
 
 	bool double_wide;
 
