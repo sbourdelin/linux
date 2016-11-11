@@ -1452,8 +1452,12 @@ void smp_send_stop(void)
 	int cpu;
 
 	if (tlb_type == hypervisor) {
+		int this_cpu = smp_processor_id();
+
+		sunhv_migrate_hvcons_irq(this_cpu);
+
 		for_each_online_cpu(cpu) {
-			if (cpu == smp_processor_id())
+			if (cpu == this_cpu)
 				continue;
 
 			set_cpu_online(cpu, false);

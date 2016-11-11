@@ -61,6 +61,7 @@ extern atomic_t dcpage_flushes_xcall;
 extern int sysctl_tsb_ratio;
 #endif
 
+void sunhv_migrate_hvcons_irq(int cpu);
 void sun_do_break(void);
 extern int stop_a_enabled;
 extern int scons_pwroff;
