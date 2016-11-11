@@ -588,11 +588,8 @@ static int ioctl_file_dedupe_range(struct file *file, void __user *arg)
 	}
 
 	same = memdup_user(argp, size);
-	if (IS_ERR(same)) {
-		ret = PTR_ERR(same);
-		same = NULL;
-		goto out;
-	}
+	if (IS_ERR(same))
+		return PTR_ERR(same);
 
 	same->dest_count = count;
 	ret = vfs_dedupe_file_range(file, same);
