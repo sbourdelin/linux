@@ -1,5 +1,5 @@
 #include "priv.h"
-#if defined(CONFIG_AGP) || (defined(CONFIG_AGP_MODULE) && defined(MODULE))
+#if IS_REACHABLE(CONFIG_AGP)
 #ifndef __NVKM_PCI_AGP_H__
 #define __NVKM_PCI_AGP_H__
 

@@ -37,7 +37,7 @@
 #include <nvkm/subdev/iccsense.h>
 #include <nvkm/subdev/volt.h>
 
-#if defined(CONFIG_HWMON) || (defined(MODULE) && defined(CONFIG_HWMON_MODULE))
+#if IS_REACHABLE(CONFIG_HWMON)
 static ssize_t
 nouveau_hwmon_show_temp(struct device *d, struct device_attribute *a, char *buf)
 {
@@ -662,7 +662,7 @@ static const struct attribute_group hwmon_power_attrgroup = {
 int
 nouveau_hwmon_init(struct drm_device *dev)
 {
-#if defined(CONFIG_HWMON) || (defined(MODULE) && defined(CONFIG_HWMON_MODULE))
+#if IS_REACHABLE(CONFIG_HWMON)
 	struct nouveau_drm *drm = nouveau_drm(dev);
 	struct nvkm_therm *therm = nvxx_therm(&drm->device);
 	struct nvkm_volt *volt = nvxx_volt(&drm->device);
@@ -749,7 +749,7 @@ error:
 void
 nouveau_hwmon_fini(struct drm_device *dev)
 {
-#if defined(CONFIG_HWMON) || (defined(MODULE) && defined(CONFIG_HWMON_MODULE))
+#if IS_REACHABLE(CONFIG_HWMON)
 	struct nouveau_hwmon *hwmon = nouveau_hwmon(dev);
 
 	if (hwmon->hwmon) {
