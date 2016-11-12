@@ -1440,8 +1440,10 @@ static unsigned int sd_check_events(struct gendisk *disk, unsigned int clearing)
 
 	if (scsi_block_when_processing_errors(sdp)) {
 		sshdr  = kzalloc(sizeof(*sshdr), GFP_KERNEL);
-		retval = scsi_test_unit_ready(sdp, SD_TIMEOUT, SD_MAX_RETRIES,
-					      sshdr);
+		retval = scsi_test_unit_ready_flags(sdp, SD_TIMEOUT,
+				SD_MAX_RETRIES, sshdr, REQ_FAIL_IF_NO_PATH);
+		if (retval)
+			pr_info("%s: TUR %#x\n", __func__, retval);
 	}
 
 	/* failed to execute TUR, assume media not present */

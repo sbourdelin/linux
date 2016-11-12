@@ -2403,13 +2403,14 @@ EXPORT_SYMBOL(scsi_mode_sense);
  *	@sshdr_external: Optional pointer to struct scsi_sense_hdr for
  *		returning sense. Make sure that this is cleared before passing
  *		in.
+ *	@flags: or-ed into cmd_flags.
  *
  *	Returns zero if unsuccessful or an error if TUR failed.  For
  *	removable media, UNIT_ATTENTION sets ->changed flag.
  **/
 int
-scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries,
-		     struct scsi_sense_hdr *sshdr_external)
+scsi_test_unit_ready_flags(struct scsi_device *sdev, int timeout, int retries,
+			   struct scsi_sense_hdr *sshdr_external, u64 flags)
 {
 	char cmd[] = {
 		TEST_UNIT_READY, 0, 0, 0, 0, 0,
@@ -2424,8 +2425,8 @@ scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries,
 
 	/* try to eat the UNIT_ATTENTION if there are enough retries */
 	do {
-		result = scsi_execute_req(sdev, cmd, DMA_NONE, NULL, 0, sshdr,
-					  timeout, retries, NULL);
+		result = scsi_execute_req_flags(sdev, cmd, DMA_NONE, NULL, 0,
+					sshdr, timeout, retries, NULL, flags);
 		if (sdev->removable && scsi_sense_valid(sshdr) &&
 		    sshdr->sense_key == UNIT_ATTENTION)
 			sdev->changed = 1;
@@ -2435,6 +2436,14 @@ scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries,
 	if (!sshdr_external)
 		kfree(sshdr);
 	return result;
+}
+EXPORT_SYMBOL(scsi_test_unit_ready_flags);
+
+int scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries,
+			 struct scsi_sense_hdr *sshdr_external)
+{
+	return scsi_test_unit_ready_flags(sdev, timeout, retries,
+					  sshdr_external, 0);
 }
 EXPORT_SYMBOL(scsi_test_unit_ready);
 
