@@ -540,6 +540,7 @@ static int __multipath_map(struct dm_target *ti, struct request *clone,
 	struct multipath *m = ti->private;
 	int r = DM_MAPIO_REQUEUE;
 	size_t nr_bytes = clone ? blk_rq_bytes(clone) : blk_rq_bytes(rq);
+	bool fail_if_no_path = (clone ? : rq)->cmd_flags & REQ_FAIL_IF_NO_PATH;
 	struct pgpath *pgpath;
 	struct block_device *bdev;
 	struct dm_mpath_io *mpio;
@@ -550,7 +551,7 @@ static int __multipath_map(struct dm_target *ti, struct request *clone,
 		pgpath = choose_pgpath(m, nr_bytes);
 
 	if (!pgpath) {
-		if (must_push_back_rq(m))
+		if (!fail_if_no_path && must_push_back_rq(m))
 			return DM_MAPIO_DELAY_REQUEUE;
 		return -EIO;	/* Failed */
 	} else if (test_bit(MPATHF_QUEUE_IO, &m->flags) ||
@@ -1568,6 +1569,7 @@ static int do_end_io(struct multipath *m, struct request *clone,
 	 * clone bios for it and resubmit it later.
 	 */
 	int r = DM_ENDIO_REQUEUE;
+	bool fail_if_no_path = clone->cmd_flags & REQ_FAIL_IF_NO_PATH;
 
 	if (!error && !clone->errors)
 		return 0;	/* I/O complete */
@@ -1580,7 +1582,7 @@ static int do_end_io(struct multipath *m, struct request *clone,
 
 	if (!atomic_read(&m->nr_valid_paths)) {
 		if (!test_bit(MPATHF_QUEUE_IF_NO_PATH, &m->flags)) {
-			if (!must_push_back_rq(m))
+			if (fail_if_no_path || !must_push_back_rq(m))
 				r = -EIO;
 		}
 	}
