@@ -30,6 +30,7 @@
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
 #include <linux/of.h>
+#include <linux/of_irq.h>
 
 #include <linux/i2c/twl.h>
 
@@ -494,7 +495,7 @@ static int twl_rtc_probe(struct platform_device *pdev)
 	struct twl_rtc *twl_rtc;
 	struct device_node *np = pdev->dev.of_node;
 	int ret = -EINVAL;
-	int irq = platform_get_irq(pdev, 0);
+	int irq;
 	u8 rd_reg;
 
 	if (!np) {
@@ -502,6 +503,7 @@ static int twl_rtc_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	irq = irq_of_parse_and_map(np, 0);
 	if (irq <= 0)
 		return ret;
 
