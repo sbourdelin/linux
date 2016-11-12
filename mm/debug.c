@@ -161,4 +161,19 @@ void dump_mm(const struct mm_struct *mm)
 	);
 }
 
+#include <asm/memory.h>
+#include <linux/mm.h>
+
+unsigned long debug_virt_to_phys(volatile void *address)
+{
+	BUG_ON(is_vmalloc_addr((const void *)address));
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64) || defined(CONFIG_UNICORE32) || \
+	defined(CONFIG_MICROBLAZE)
+	return __virt_to_phys(address);
+#else
+	return virt_to_phys(address);
+#endif
+}
+EXPORT_SYMBOL(debug_virt_to_phys);
+
 #endif		/* CONFIG_DEBUG_VM */

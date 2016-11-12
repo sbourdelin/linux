@@ -80,6 +80,10 @@
 #define page_to_pfn __page_to_pfn
 #define pfn_to_page __pfn_to_page
 
+#ifdef CONFIG_DEBUG_VM
+unsigned long debug_virt_to_phys(volatile void *address);
+#endif /* CONFIG_DEBUG_VM */
+
 #endif /* __ASSEMBLY__ */
 
 #endif
