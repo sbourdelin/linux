@@ -117,7 +117,7 @@ unsigned int dbs_update(struct cpufreq_policy *policy)
 	struct policy_dbs_info *policy_dbs = policy->governor_data;
 	struct dbs_data *dbs_data = policy_dbs->dbs_data;
 	unsigned int ignore_nice = dbs_data->ignore_nice_load;
-	unsigned int max_load = 0;
+	unsigned int max_load = 0, idle_periods = UINT_MAX;
 	unsigned int sampling_rate, io_busy, j;
 
 	/*
@@ -163,8 +163,12 @@ unsigned int dbs_update(struct cpufreq_policy *policy)
 			 * calls, so the previous load value can be used then.
 			 */
 			load = j_cdbs->prev_load;
-		} else if (unlikely(time_elapsed > 2 * sampling_rate &&
-				    j_cdbs->prev_load)) {
+		} else if (unlikely(time_elapsed > 2 * sampling_rate)) {
+			unsigned int periods = time_elapsed / sampling_rate;
+
+			if (periods < idle_periods)
+				idle_periods = periods;
+
 			/*
 			 * If the CPU had gone completely idle and a task has
 			 * just woken up on this CPU now, it would be unfair to
@@ -189,8 +193,10 @@ unsigned int dbs_update(struct cpufreq_policy *policy)
 			 * 'time_elapsed' (as compared to the sampling rate)
 			 * indicates this scenario.
 			 */
-			load = j_cdbs->prev_load;
-			j_cdbs->prev_load = 0;
+			if (j_cdbs->prev_load) {
+				load = j_cdbs->prev_load;
+				j_cdbs->prev_load = 0;
+			}
 		} else {
 			if (time_elapsed >= idle_time) {
 				load = 100 * (time_elapsed - idle_time) / time_elapsed;
@@ -218,6 +224,8 @@ unsigned int dbs_update(struct cpufreq_policy *policy)
 		if (load > max_load)
 			max_load = load;
 	}
+	policy_dbs->idle_periods = idle_periods;
+
 	return max_load;
 }
 EXPORT_SYMBOL_GPL(dbs_update);
