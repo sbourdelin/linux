@@ -34,7 +34,7 @@
  *
  *************************************************************************/
 
-/* Driver identification and error statments */
+/* Driver identification and error statements */
 #define	PROCSTR		"dgnc"			/* /proc entries	 */
 #define	DEVSTR		"/dev/dg/dgnc"		/* /dev entries		 */
 #define	DRVSTR		"dgnc"			/* Driver name string	 */
