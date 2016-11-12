@@ -12,6 +12,9 @@
 #include <linux/init.h>
 #include <linux/of.h>
 
+#define SUN8I_CODEC_ANALOG_BASE	0x1c0
+#define SUN8I_CODEC_ANALOG_END	(SUN8I_CODEC_ANALOG_BASE + 0x4 - 1)
+
 struct prcm_data {
 	int nsubdevs;
 	const struct mfd_cell *subdevs;
@@ -54,6 +57,14 @@ static const struct resource sun6i_a31_apb0_rstc_res[] = {
 		.start = 0xb0,
 		.end = 0xb3,
 		.flags = IORESOURCE_MEM,
+	},
+};
+
+static const struct resource sun8i_codec_analog_res[] = {
+	{
+		.start	= SUN8I_CODEC_ANALOG_BASE,
+		.end	= SUN8I_CODEC_ANALOG_END,
+		.flags	= IORESOURCE_MEM,
 	},
 };
 
@@ -108,6 +119,12 @@ static const struct mfd_cell sun8i_a23_prcm_subdevs[] = {
 		.of_compatible = "allwinner,sun6i-a31-clock-reset",
 		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_rstc_res),
 		.resources = sun6i_a31_apb0_rstc_res,
+	},
+	{
+		.name		= "sun8i-codec-analog",
+		.of_compatible	= "allwinner,sun8i-a23-codec-analog",
+		.num_resources	= ARRAY_SIZE(sun8i_codec_analog_res),
+		.resources	= sun8i_codec_analog_res,
 	},
 };
 
