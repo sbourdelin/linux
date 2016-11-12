@@ -656,7 +656,6 @@ static const struct dev_pm_ops twl4030_usb_pm_ops = {
 
 static int twl4030_usb_probe(struct platform_device *pdev)
 {
-	struct twl4030_usb_data *pdata = dev_get_platdata(&pdev->dev);
 	struct twl4030_usb	*twl;
 	struct phy		*phy;
 	int			status, err;
@@ -664,19 +663,17 @@ static int twl4030_usb_probe(struct platform_device *pdev)
 	struct device_node	*np = pdev->dev.of_node;
 	struct phy_provider	*phy_provider;
 
+	if (!np) {
+		dev_err(&pdev->dev, "no DT info\n");
+		return -EINVAL;
+	}
+
 	twl = devm_kzalloc(&pdev->dev, sizeof(*twl), GFP_KERNEL);
 	if (!twl)
 		return -ENOMEM;
 
-	if (np)
-		of_property_read_u32(np, "usb_mode",
-				(enum twl4030_usb_mode *)&twl->usb_mode);
-	else if (pdata) {
-		twl->usb_mode = pdata->usb_mode;
-	} else {
-		dev_err(&pdev->dev, "twl4030 initialized without pdata\n");
-		return -EINVAL;
-	}
+	of_property_read_u32(np, "usb_mode",
+			(enum twl4030_usb_mode *)&twl->usb_mode);
 
 	otg = devm_kzalloc(&pdev->dev, sizeof(*otg), GFP_KERNEL);
 	if (!otg)
@@ -749,11 +746,6 @@ static int twl4030_usb_probe(struct platform_device *pdev)
 			twl->irq, status);
 		return status;
 	}
-
-	if (pdata)
-		err = phy_create_lookup(phy, "usb", "musb-hdrc.0");
-	if (err)
-		return err;
 
 	pm_runtime_mark_last_busy(&pdev->dev);
 	pm_runtime_put_autosuspend(twl->dev);
