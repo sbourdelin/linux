@@ -335,12 +335,17 @@ static int twl4030_kp_program(struct twl4030_keypad *kp)
  */
 static int twl4030_kp_probe(struct platform_device *pdev)
 {
-	struct twl4030_keypad_data *pdata = dev_get_platdata(&pdev->dev);
 	const struct matrix_keymap_data *keymap_data = NULL;
 	struct twl4030_keypad *kp;
 	struct input_dev *input;
+	struct device_node *np = pdev->dev.of_node;
 	u8 reg;
 	int error;
+
+	if (!np) {
+		dev_err(&pdev->dev, "no DT info\n");
+		return -EINVAL;
+	}
 
 	kp = devm_kzalloc(&pdev->dev, sizeof(*kp), GFP_KERNEL);
 	if (!kp)
@@ -363,28 +368,17 @@ static int twl4030_kp_probe(struct platform_device *pdev)
 	input->id.product	= 0x0001;
 	input->id.version	= 0x0003;
 
-	if (pdata) {
-		if (!pdata->rows || !pdata->cols || !pdata->keymap_data) {
-			dev_err(&pdev->dev, "Missing platform_data\n");
-			return -EINVAL;
-		}
+	error = matrix_keypad_parse_of_params(&pdev->dev, &kp->n_rows,
+					      &kp->n_cols);
+	if (error)
+		return error;
 
-		kp->n_rows = pdata->rows;
-		kp->n_cols = pdata->cols;
-		kp->autorepeat = pdata->rep;
-		keymap_data = pdata->keymap_data;
-	} else {
-		error = matrix_keypad_parse_of_params(&pdev->dev, &kp->n_rows,
-						      &kp->n_cols);
-		if (error)
-			return error;
+	kp->autorepeat = true;
 
-		kp->autorepeat = true;
-	}
 
 	if (kp->n_rows > TWL4030_MAX_ROWS || kp->n_cols > TWL4030_MAX_COLS) {
 		dev_err(&pdev->dev,
-			"Invalid rows/cols amount specified in platform/devicetree data\n");
+			"Invalid rows/cols amount specified in DT\n");
 		return -EINVAL;
 	}
 
@@ -445,13 +439,11 @@ static int twl4030_kp_probe(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_OF
 static const struct of_device_id twl4030_keypad_dt_match_table[] = {
 	{ .compatible = "ti,twl4030-keypad" },
 	{},
 };
 MODULE_DEVICE_TABLE(of, twl4030_keypad_dt_match_table);
-#endif
 
 /*
  * NOTE: twl4030 are multi-function devices connected via I2C.
