@@ -421,7 +421,7 @@ EXPORT_SYMBOL(twl_rev);
  *
  * Returns the regmap pointer or NULL in case of failure.
  */
-static struct regmap *twl_get_regmap(u8 mod_no)
+struct regmap *twl_get_regmap(u8 mod_no)
 {
 	int sid;
 	struct twl_client *twl;
@@ -440,6 +440,7 @@ static struct regmap *twl_get_regmap(u8 mod_no)
 
 	return twl->regmap;
 }
+EXPORT_SYMBOL(twl_get_regmap);
 
 /**
  * twl_i2c_write - Writes a n bit register in TWL4030/TWL5030/TWL60X0
