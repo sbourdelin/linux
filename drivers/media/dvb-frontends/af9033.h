@@ -23,8 +23,7 @@
 #define AF9033_H
 
 /*
- * I2C address (TODO: are these in 8-bit format?)
- * 0x38, 0x3a, 0x3c, 0x3e
+ * I2C address: 0x1c, 0x1d, 0x1e, 0x1f
  */
 struct af9033_config {
 	/*
