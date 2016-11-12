@@ -751,6 +751,18 @@ static ssize_t store_no_turbo(struct kobject *a, struct attribute *b,
 	return count;
 }
 
+static void update_cpufreq_policies(void)
+{
+	int cpu;
+
+	get_online_cpus();
+	for_each_online_cpu(cpu) {
+		if (all_cpu_data[cpu])
+			cpufreq_update_policy(cpu);
+	}
+	put_online_cpus();
+}
+
 static ssize_t store_max_perf_pct(struct kobject *a, struct attribute *b,
 				  const char *buf, size_t count)
 {
@@ -776,6 +788,9 @@ static ssize_t store_max_perf_pct(struct kobject *a, struct attribute *b,
 
 	if (hwp_active)
 		intel_pstate_hwp_set_online_cpus();
+
+	update_cpufreq_policies();
+
 	return count;
 }
 
@@ -804,6 +819,9 @@ static ssize_t store_min_perf_pct(struct kobject *a, struct attribute *b,
 
 	if (hwp_active)
 		intel_pstate_hwp_set_online_cpus();
+
+	update_cpufreq_policies();
+
 	return count;
 }
 
@@ -1745,6 +1763,28 @@ static struct cpufreq_driver intel_pstate_driver = {
 	.name		= "intel_pstate",
 };
 
+static int cpufreq_intel_pstate_notifier(struct notifier_block *nb,
+					 unsigned long event, void *data)
+{
+	struct cpufreq_policy *policy = data;
+	int max_freq, min_freq;
+
+	/* When per-CPU limits are used, sysfs limits can't be set */
+	if (per_cpu_limits)
+		return NOTIFY_OK;
+
+	max_freq = policy->cpuinfo.max_freq * limits->max_sysfs_pct / 100;
+	min_freq = policy->cpuinfo.max_freq * limits->min_sysfs_pct / 100;
+
+	cpufreq_verify_within_limits(policy, min_freq, max_freq);
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block intel_pstate_cpufreq_notifier_block = {
+	.notifier_call = cpufreq_intel_pstate_notifier,
+};
+
 static int no_load __initdata;
 static int no_hwp __initdata;
 static int hwp_only __initdata;
@@ -1958,6 +1998,9 @@ hwp_cpu_matched:
 
 	if (hwp_active)
 		pr_info("HWP enabled\n");
+
+	cpufreq_register_notifier(&intel_pstate_cpufreq_notifier_block,
+				  CPUFREQ_POLICY_NOTIFIER);
 
 	return rc;
 out:
