@@ -926,6 +926,10 @@ static int ip6_dst_lookup_tail(struct net *net, const struct sock *sk,
 	int err;
 	int flags = 0;
 
+	if (!ipv6_addr_any(&fl6->saddr) &&
+	    !ipv6_chk_addr(net, &fl6->saddr, NULL, 1))
+		return -EINVAL;
+
 	/* The correct way to handle this would be to do
 	 * ip6_route_get_saddr, and then ip6_route_output; however,
 	 * the route-specific preferred source forces the
