@@ -12,7 +12,7 @@
 
 #include <linux/debugfs.h>
 #include <linux/io.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
@@ -269,7 +269,6 @@ static const struct of_device_id sunxi_sram_dt_match[] = {
 	{ .compatible = "allwinner,sun4i-a10-sram-controller" },
 	{ },
 };
-MODULE_DEVICE_TABLE(of, sunxi_sram_dt_match);
 
 static struct platform_driver sunxi_sram_driver = {
 	.driver = {
@@ -278,8 +277,4 @@ static struct platform_driver sunxi_sram_driver = {
 	},
 	.probe	= sunxi_sram_probe,
 };
-module_platform_driver(sunxi_sram_driver);
-
-MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
-MODULE_DESCRIPTION("Allwinner sunXi SRAM Controller Driver");
-MODULE_LICENSE("GPL");
+builtin_platform_driver(sunxi_sram_driver);
