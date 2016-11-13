@@ -480,6 +480,24 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
 #endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
 
 #else /* CONFIG_IRQ_DOMAIN */
+static inline int irq_find_mapping(struct irq_domain *host,
+				   irq_hw_number_t hwirq)
+{
+	return 0;
+}
+static inline struct irq_domain *irq_domain_add_linear(
+				struct device_node *of_node, unsigned int size,
+				const struct irq_domain_ops *ops,
+				void *host_data)
+{
+	return NULL;
+}
+static inline void irq_domain_remove(struct irq_domain *host) { }
+static inline unsigned int irq_create_mapping(struct irq_domain *host,
+					      irq_hw_number_t hwirq)
+{
+	return 0;
+}
 static inline void irq_dispose_mapping(unsigned int virq) { }
 static inline void irq_domain_activate_irq(struct irq_data *data) { }
 static inline void irq_domain_deactivate_irq(struct irq_data *data) { }
