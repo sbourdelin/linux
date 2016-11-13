@@ -1011,6 +1011,11 @@ static int ip6_dst_lookup_tail(struct net *net, const struct sock *sk,
 		}
 	}
 #endif
+	if (!ipv6_addr_any(&fl6->saddr) &&
+	    !ipv6_chk_addr(net, &fl6->saddr, (*dst)->dev, 1)) {
+		err = -EINVAL;
+		goto out_err_release;
+	}
 
 	return 0;
 
