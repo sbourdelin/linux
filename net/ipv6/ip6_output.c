@@ -916,6 +916,30 @@ out:
 	return dst;
 }
 
+/**
+ * __ip6_dev_find - find the first device with a given source address.
+ * @net: the net namespace
+ * @addr: the source address
+ * @devref: if true, take a reference on the found device
+ *
+ * If a caller uses devref=false, it should be protected by RCU, or RTNL
+ */
+struct net_device *__ip6_dev_find(struct net *net, struct in6_addr *addr, bool devref)
+{
+	struct net_device *result;
+
+	rcu_read_lock();
+	for_each_netdev_rcu(net, result) {
+		if (ipv6_chk_addr(net, addr, result, 1))
+			break;
+	}
+	if (result && devref)
+		dev_hold(result);
+	rcu_read_unlock();
+	return result;
+}
+EXPORT_SYMBOL(__ip6_dev_find);
+
 static int ip6_dst_lookup_tail(struct net *net, const struct sock *sk,
 			       struct dst_entry **dst, struct flowi6 *fl6)
 {
@@ -925,6 +949,10 @@ static int ip6_dst_lookup_tail(struct net *net, const struct sock *sk,
 #endif
 	int err;
 	int flags = 0;
+
+	if (!ipv6_addr_any(&fl6->saddr) &&
+	    !__ip6_dev_find(net, &fl6->saddr, false))
+		return -EINVAL;
 
 	/* The correct way to handle this would be to do
 	 * ip6_route_get_saddr, and then ip6_route_output; however,
