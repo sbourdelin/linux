@@ -862,6 +862,16 @@ static int stmmac_set_tunable(struct net_device *dev,
 	return ret;
 }
 
+static int stmmac_nway_reset(struct net_device *dev)
+{
+	struct stmmac_priv *priv = netdev_priv(dev);
+
+	if (!dev->phydev)
+		return -ENODEV;
+
+	return genphy_restart_aneg(dev->phydev);
+}
+
 static const struct ethtool_ops stmmac_ethtool_ops = {
 	.begin = stmmac_check_if_running,
 	.get_drvinfo = stmmac_ethtool_getdrvinfo,
@@ -886,6 +896,7 @@ static const struct ethtool_ops stmmac_ethtool_ops = {
 	.set_tunable = stmmac_set_tunable,
 	.get_link_ksettings = stmmac_ethtool_get_link_ksettings,
 	.set_link_ksettings = stmmac_ethtool_set_link_ksettings,
+	.nway_reset = stmmac_nway_reset,
 };
 
 void stmmac_set_ethtool_ops(struct net_device *netdev)
