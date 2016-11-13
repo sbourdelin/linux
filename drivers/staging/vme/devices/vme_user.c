@@ -534,7 +534,7 @@ static int vme_user_probe(struct vme_dev *vdev)
 	}
 	vme_user_bridge = vdev;
 
-	/* Initialise descriptors */
+	/* Initialize descriptors */
 	for (i = 0; i < VME_DEVS; i++) {
 		image[i].kern_buf = NULL;
 		image[i].pci_buf = 0;
@@ -661,7 +661,7 @@ err_sysfs:
 	}
 	class_destroy(vme_user_sysfs_class);
 
-	/* Ensure counter set correcty to unalloc all master windows */
+	/* Ensure counter set correctly to unalloc all master windows */
 	i = MASTER_MAX + 1;
 err_master:
 	while (i > MASTER_MINOR) {
@@ -671,7 +671,7 @@ err_master:
 	}
 
 	/*
-	 * Ensure counter set correcty to unalloc all slave windows and buffers
+	 * Ensure counter set correctly to unalloc all slave windows and buffers
 	 */
 	i = SLAVE_MAX + 1;
 err_slave:
@@ -716,7 +716,7 @@ static int vme_user_remove(struct vme_dev *dev)
 	/* Unregister device driver */
 	cdev_del(vme_user_cdev);
 
-	/* Unregiser the major and minor device numbers */
+	/* Unregister the major and minor device numbers */
 	unregister_chrdev_region(MKDEV(VME_MAJOR, 0), VME_DEVS);
 
 	return 0;
