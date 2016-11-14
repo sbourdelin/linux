@@ -25,6 +25,7 @@
 #include <linux/seq_file.h>
 #include <linux/ratelimit.h>
 #include <linux/kthread.h>
+#include <trace/events/block.h>
 #include "md.h"
 #include "raid10.h"
 #include "raid0.h"
@@ -859,6 +860,7 @@ static void flush_pending_writes(struct r10conf *conf)
 		while (bio) { /* submit pending writes */
 			struct bio *next = bio->bi_next;
 			struct md_rdev *rdev = (void*)bio->bi_bdev;
+			struct r10bio *r10_bio = bio->bi_private;
 			bio->bi_next = NULL;
 			bio->bi_bdev = rdev->bdev;
 			if (test_bit(Faulty, &rdev->flags)) {
@@ -868,8 +870,13 @@ static void flush_pending_writes(struct r10conf *conf)
 					    !blk_queue_discard(bdev_get_queue(bio->bi_bdev))))
 				/* Just ignore it */
 				bio_endio(bio);
-			else
+			else {
+				if (conf->mddev->gendisk)
+					trace_block_bio_remap(bdev_get_queue(bio->bi_bdev),
+							      bio, disk_devt(conf->mddev->gendisk),
+							      r10_bio->sector);
 				generic_make_request(bio);
+			}
 			bio = next;
 		}
 	} else
@@ -1042,6 +1049,7 @@ static void raid10_unplug(struct blk_plug_cb *cb, bool from_schedule)
 	while (bio) { /* submit pending writes */
 		struct bio *next = bio->bi_next;
 		struct md_rdev *rdev = (void*)bio->bi_bdev;
+		struct r10bio *r10_bio = bio->bi_private;
 		bio->bi_next = NULL;
 		bio->bi_bdev = rdev->bdev;
 		if (test_bit(Faulty, &rdev->flags)) {
@@ -1051,8 +1059,13 @@ static void raid10_unplug(struct blk_plug_cb *cb, bool from_schedule)
 				    !blk_queue_discard(bdev_get_queue(bio->bi_bdev))))
 			/* Just ignore it */
 			bio_endio(bio);
-		else
+		else {
+			if (conf->mddev->gendisk)
+				trace_block_bio_remap(bdev_get_queue(bio->bi_bdev),
+						      bio, disk_devt(conf->mddev->gendisk),
+						      r10_bio->sector);
 			generic_make_request(bio);
+		}
 		bio = next;
 	}
 	kfree(plug);
@@ -1165,6 +1178,10 @@ read_again:
 		bio_set_op_attrs(read_bio, op, do_sync);
 		read_bio->bi_private = r10_bio;
 
+		if (mddev->gendisk)
+			trace_block_bio_remap(bdev_get_queue(read_bio->bi_bdev),
+					      read_bio, disk_devt(mddev->gendisk),
+					      r10_bio->sector);
 		if (max_sectors < r10_bio->sectors) {
 			/* Could not read all from this device, so we will
 			 * need another r10_bio.
@@ -2496,6 +2513,8 @@ static void handle_read_error(struct mddev *mddev, struct r10bio *r10_bio)
 	char b[BDEVNAME_SIZE];
 	unsigned long do_sync;
 	int max_sectors;
+	dev_t bio_dev;
+	sector_t bio_last_sector;
 
 	/* we got a read error. Maybe the drive is bad.  Maybe just
 	 * the block and we can fix it.
@@ -2507,6 +2526,8 @@ static void handle_read_error(struct mddev *mddev, struct r10bio *r10_bio)
 	 */
 	bio = r10_bio->devs[slot].bio;
 	bdevname(bio->bi_bdev, b);
+	bio_dev = bio->bi_bdev->bd_dev;
+	bio_last_sector = r10_bio->devs[slot].addr + rdev->data_offset + r10_bio->sectors;
 	bio_put(bio);
 	r10_bio->devs[slot].bio = NULL;
 
@@ -2546,6 +2567,10 @@ read_more:
 	bio_set_op_attrs(bio, REQ_OP_READ, do_sync);
 	bio->bi_private = r10_bio;
 	bio->bi_end_io = raid10_end_read_request;
+	trace_block_bio_remap(bdev_get_queue(bio->bi_bdev),
+			      bio, bio_dev,
+			      bio_last_sector - r10_bio->sectors);
+
 	if (max_sectors < r10_bio->sectors) {
 		/* Drat - have to split this up more */
 		struct bio *mbio = r10_bio->master_bio;
