@@ -320,7 +320,7 @@ static void update_hid_for_radix(void)
 		cpu_relax();
 }
 
-void __init radix__early_init_mmu(void)
+void __init radix__early_init_mmu_primary(void)
 {
 	unsigned long lpcr;
 

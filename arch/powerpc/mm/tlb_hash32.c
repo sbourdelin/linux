@@ -168,6 +168,6 @@ void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 }
 EXPORT_SYMBOL(flush_tlb_range);
 
-void __init early_init_mmu(void)
+void __init early_init_mmu_primary(void)
 {
 }

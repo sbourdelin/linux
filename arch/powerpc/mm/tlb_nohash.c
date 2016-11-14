@@ -718,7 +718,7 @@ static void __init early_mmu_set_memory_limit(void)
 }
 
 /* boot cpu only */
-void __init early_init_mmu(void)
+void __init early_init_mmu_primary(void)
 {
 	early_init_mmu_global();
 	early_init_this_mmu();
@@ -770,7 +770,7 @@ void setup_initial_memory_limit(phys_addr_t first_memblock_base,
 	memblock_set_current_limit(first_memblock_base + ppc64_rma_size);
 }
 #else /* ! CONFIG_PPC64 */
-void __init early_init_mmu(void)
+void __init early_init_mmu_primary(void)
 {
 #ifdef CONFIG_PPC_47x
 	early_init_mmu_47x();

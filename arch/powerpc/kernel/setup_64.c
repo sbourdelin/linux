@@ -303,7 +303,7 @@ void __init early_setup(unsigned long dt_ptr)
 	setup_feature_keys();
 
 	/* Initialize the hash table or TLB handling */
-	early_init_mmu();
+	early_init_mmu_primary();
 
 	/*
 	 * At this point, we can let interrupts switch to virtual mode

@@ -104,13 +104,13 @@ void mmu_early_init_devtree(void);
 void hash__early_init_devtree(void);
 void radix__early_init_devtree(void);
 extern void radix_init_native(void);
-extern void hash__early_init_mmu(void);
-extern void radix__early_init_mmu(void);
-static inline void early_init_mmu(void)
+extern void hash__early_init_mmu_primary(void);
+extern void radix__early_init_mmu_primary(void);
+static inline void early_init_mmu_primary(void)
 {
 	if (radix_enabled())
-		return radix__early_init_mmu();
-	return hash__early_init_mmu();
+		return radix__early_init_mmu_primary();
+	return hash__early_init_mmu_primary();
 }
 extern void hash__early_init_mmu_secondary(void);
 extern void radix__early_init_mmu_secondary(void);

@@ -283,7 +283,7 @@ static inline bool early_radix_enabled(void)
 
 #ifndef __ASSEMBLY__
 /* MMU initialization */
-extern void early_init_mmu(void);
+extern void early_init_mmu_primary(void);
 extern void early_init_mmu_secondary(void);
 extern void setup_initial_memory_limit(phys_addr_t first_memblock_base,
 				       phys_addr_t first_memblock_size);

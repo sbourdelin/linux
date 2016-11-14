@@ -909,7 +909,7 @@ void __init hash__early_init_devtree(void)
 	htab_scan_page_sizes();
 }
 
-void __init hash__early_init_mmu(void)
+void __init hash__early_init_mmu_primary(void)
 {
 	htab_init_page_sizes();
 
