@@ -138,6 +138,39 @@ void ath_hw_pll_work(struct work_struct *work)
 				     msecs_to_jiffies(ATH_PLL_WORK_INTERVAL));
 }
 
+static bool ath_hw_hang_deadbeef(struct ath_softc *sc)
+{
+	struct ath_common *common = ath9k_hw_common(sc->sc_ah);
+	u32 reg;
+
+	/* check for stucked MAC */
+	ath9k_ps_wakeup(sc);
+	reg = REG_READ(sc->sc_ah, AR_CFG);
+	ath9k_ps_restore(sc);
+
+	if (reg != 0xdeadbeef)
+		return false;
+
+	ath_dbg(common, RESET,
+		"0xdeadbeef hang is detected. Schedule chip reset\n");
+	ath9k_queue_reset(sc, RESET_TYPE_DEADBEEF);
+
+	return true;
+}
+
+void ath_hw_hang_work(struct work_struct *work)
+{
+	struct ath_softc *sc = container_of(work, struct ath_softc,
+					    hw_hang_work.work);
+
+	if (ath_hw_hang_deadbeef(sc))
+		goto requeue_worker;
+
+requeue_worker:
+	ieee80211_queue_delayed_work(sc->hw, &sc->hw_hang_work,
+				     msecs_to_jiffies(ATH_HANG_WORK_INTERVAL));
+}
+
 /*
  * PA Pre-distortion.
  */
