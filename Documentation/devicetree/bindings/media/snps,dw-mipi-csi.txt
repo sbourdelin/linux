@@ -1,0 +1,27 @@
+Synopsys DesignWare CSI-2 Host controller
+
+Description
+-----------
+
+This HW block is used to receive image coming from an MIPI CSI-2 compatible
+camera.
+
+Required properties:
+- compatible: shall be "snps,dw-mipi-csi"
+- reg		: physical base address and size of the device memory mapped
+		  registers;
+- interrupts	: CSI-2 Host interrupt
+- data-lanes    : Number of lanes to be used
+- output-type   : Core output to be used (IPI-> 0 or IDI->1 or BOTH->2)
+- phys, phy-names: List of one PHY specifier and identifier string (as defined
+  in Documentation/devicetree/bindings/phy/phy-bindings.txt).
+
+Optional properties(if in IPI mode):
+- ipi-mode 	: Mode to be used when in IPI(Camera -> 0 or Automatic -> 1)
+- ipi-color-mode: Color depth to be used in IPI (48 bits -> 0 or 16 bits -> 1)
+- ipi-auto-flush: Data auto-flush (1 -> Yes or 0 -> No)
+- virtual-channel: Virtual channel where data is present when in IPI
+
+The per-board settings:
+ - port sub-node describing a single endpoint connected to the dw-mipi-csi
+   as described in video-interfaces.txt[1].

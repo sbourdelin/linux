@@ -1,0 +1,9 @@
+Synopsys DesignWare CSI-2 Host IPK Media Device
+
+This Media Device at the moment is not totally functional, however it is a base
+for the future.
+
+Required properties:
+
+- compatible: Must be "snps,plat-ipk".
+
