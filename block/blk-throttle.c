@@ -156,6 +156,12 @@ struct throtl_grp {
 	u64 last_finish_time;
 	u64 checked_last_finish_time;
 	u64 avg_ttime;
+
+	unsigned int bio_batch;
+	u64 total_latency;
+	u64 avg_latency;
+	u64 total_size;
+	u64 avg_size;
 };
 
 /* We measure latency for request size from 4k to 4k * ( 1 << 4) */
@@ -1734,12 +1740,30 @@ static unsigned long tg_last_high_overflow_time(struct throtl_grp *tg)
 	return ret;
 }
 
+static u64 throtl_target_latency(struct throtl_data *td,
+	struct throtl_grp *tg)
+{
+	if (td->line_slope == 0 || tg->latency_target == 0)
+		return 0;
+
+	/* latency_target + f(avg_size) - f(4k) */
+	return td->line_slope * ((tg->avg_size >> 10) - 4) +
+		tg->latency_target;
+}
+
 static bool throtl_tg_is_idle(struct throtl_grp *tg)
 {
-	/* cgroup is idle if average think time is more than threshold */
-	return ktime_get_ns() - tg->last_finish_time >
+	/*
+	 * cgroup is idle if:
+	 * 1. average think time is higher than threshold
+	 * 2. average request size is small and average latency is higher
+	 *    than target
+	 */
+	return (ktime_get_ns() - tg->last_finish_time >
 		4 * tg->td->idle_ttime_threshold ||
-	       tg->avg_ttime > tg->td->idle_ttime_threshold;
+		tg->avg_ttime > tg->td->idle_ttime_threshold) ||
+	       (tg->avg_latency && tg->avg_size && tg->avg_size <= 128 * 1024 &&
+		tg->avg_latency < throtl_target_latency(tg->td, tg));
 }
 
 static bool throtl_upgrade_check_one(struct throtl_grp *tg)
@@ -2123,6 +2147,7 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 	bio_associate_current(bio);
 	bio->bi_cg_private = q;
 	bio->bi_cg_size = bio_sectors(bio);
+	bio->bi_cg_enter_time = ktime_get_ns();
 
 	blk_throtl_update_ttime(tg);
 
@@ -2261,6 +2286,33 @@ void blk_throtl_bio_endio(struct bio *bio)
 			latency[index].total_size += bio->bi_cg_size << 9;
 			latency[index].samples++;
 			put_cpu_ptr(td->latency_buckets);
+		}
+	}
+
+	if (bio->bi_cg_enter_time && finish_time > bio->bi_cg_enter_time &&
+	    tg->latency_target) {
+		lat = finish_time - bio->bi_cg_enter_time;
+		tg->total_latency += lat;
+		tg->total_size += bio->bi_cg_size << 9;
+		tg->bio_batch++;
+	}
+
+	if (tg->bio_batch >= 8) {
+		int batch = tg->bio_batch;
+		u64 size = tg->total_size;
+
+		lat = tg->total_latency;
+
+		tg->bio_batch = 0;
+		tg->total_latency = 0;
+		tg->total_size = 0;
+
+		if (batch) {
+			do_div(lat, batch);
+			tg->avg_latency = (tg->avg_latency * 7 +
+				lat) >> 3;
+			do_div(size, batch);
+			tg->avg_size = (tg->avg_size * 7 + size) >> 3;
 		}
 	}
 
