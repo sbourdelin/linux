@@ -257,6 +257,7 @@ static void call_bio_endio(struct r1bio *r1_bio)
 		bio->bi_error = -EIO;
 
 	if (done) {
+		trace_block_bio_complete(bdev_get_queue(bio->bi_bdev), bio, bio->bi_error);
 		bio_endio(bio);
 		/*
 		 * Wake up any possible resync thread that waits for the device

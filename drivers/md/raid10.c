@@ -311,6 +311,7 @@ static void raid_end_bio_io(struct r10bio *r10_bio)
 	if (!test_bit(R10BIO_Uptodate, &r10_bio->state))
 		bio->bi_error = -EIO;
 	if (done) {
+		trace_block_bio_complete(bdev_get_queue(bio->bi_bdev), bio, bio->bi_error);
 		bio_endio(bio);
 		/*
 		 * Wake up any possible resync thread that waits for the device
