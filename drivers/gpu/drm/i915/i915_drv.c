@@ -970,6 +970,15 @@ static void intel_sanitize_options(struct drm_i915_private *dev_priv)
 
 	i915.semaphores = intel_sanitize_semaphores(dev_priv, i915.semaphores);
 	DRM_DEBUG_DRIVER("use GPU sempahores? %s\n", yesno(i915.semaphores));
+
+	/*
+	 * SLPC runs in GuC and hence depends on GuC parameters. For platforms
+	 * with GuC, this option will be sanitized further in intel_guc_init.
+	 * Sanitize here for all platforms so that gt_powersave/sanitize
+	 * routines get to know whether SLPC or RPS is going to be operational.
+	 */
+	if (i915.enable_slpc < 0)
+		i915.enable_slpc = HAS_SLPC(dev_priv);
 }
 
 /**
