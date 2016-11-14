@@ -239,6 +239,9 @@ static void guc_params_init(struct drm_i915_private *dev_priv)
 	} else
 		params[GUC_CTL_DEBUG] = GUC_LOG_DISABLED;
 
+	if (i915.enable_slpc)
+		params[GUC_CTL_FEATURE] |= GUC_CTL_ENABLE_SLPC;
+
 	if (guc->ads_vma) {
 		u32 ads = i915_ggtt_offset(guc->ads_vma) >> PAGE_SHIFT;
 		params[GUC_CTL_DEBUG] |= ads << GUC_ADS_ADDR_SHIFT;
