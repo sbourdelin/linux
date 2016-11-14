@@ -482,7 +482,7 @@ unsigned long radix__pmd_hugepage_update(struct mm_struct *mm, unsigned long add
 	assert_spin_locked(&mm->page_table_lock);
 #endif
 
-	old = radix__pte_update(mm, addr, (pte_t *)pmdp, clr, set, 1);
+	old = radix__pte_update(mm, addr, (pte_t *)pmdp, clr, set, HPAGE_PMD_SIZE);
 	trace_hugepage_update(addr, old, clr, set);
 
 	return old;
