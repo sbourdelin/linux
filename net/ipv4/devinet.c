@@ -1063,10 +1063,7 @@ int devinet_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 			if (!ifa)
 				break;
 			INIT_HLIST_NODE(&ifa->hash);
-			if (colon)
-				memcpy(ifa->ifa_label, ifr.ifr_name, IFNAMSIZ);
-			else
-				memcpy(ifa->ifa_label, dev->name, IFNAMSIZ);
+			memcpy(ifa->ifa_label, ifr.ifr_name, IFNAMSIZ);
 		} else {
 			ret = 0;
 			if (ifa->ifa_local == sin->sin_addr.s_addr)
@@ -1081,8 +1078,7 @@ int devinet_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 		if (!(dev->flags & IFF_POINTOPOINT)) {
 			ifa->ifa_prefixlen = inet_abc_len(ifa->ifa_address);
 			ifa->ifa_mask = inet_make_mask(ifa->ifa_prefixlen);
-			if ((dev->flags & IFF_BROADCAST) &&
-			    ifa->ifa_prefixlen < 31)
+			if (dev->flags & IFF_BROADCAST)
 				ifa->ifa_broadcast = ifa->ifa_address |
 						     ~ifa->ifa_mask;
 		} else {
