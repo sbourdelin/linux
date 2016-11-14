@@ -1679,14 +1679,11 @@ repeat:
 			goto alloc_huge;
 		switch (sbinfo->huge) {
 			loff_t i_size;
-			pgoff_t off;
 		case SHMEM_HUGE_NEVER:
 			goto alloc_nohuge;
 		case SHMEM_HUGE_WITHIN_SIZE:
-			off = round_up(index, HPAGE_PMD_NR);
-			i_size = round_up(i_size_read(inode), PAGE_SIZE);
-			if (i_size >= HPAGE_PMD_SIZE &&
-					i_size >> PAGE_SHIFT >= off)
+			i_size = i_size_read(inode);
+			if (index >= HPAGE_PMD_NR || i_size >= HPAGE_PMD_SIZE)
 				goto alloc_huge;
 			/* fallthrough */
 		case SHMEM_HUGE_ADVISE:
@@ -3858,7 +3855,6 @@ bool shmem_huge_enabled(struct vm_area_struct *vma)
 	struct inode *inode = file_inode(vma->vm_file);
 	struct shmem_sb_info *sbinfo = SHMEM_SB(inode->i_sb);
 	loff_t i_size;
-	pgoff_t off;
 
 	if (shmem_huge == SHMEM_HUGE_FORCE)
 		return true;
@@ -3870,10 +3866,8 @@ bool shmem_huge_enabled(struct vm_area_struct *vma)
 		case SHMEM_HUGE_ALWAYS:
 			return true;
 		case SHMEM_HUGE_WITHIN_SIZE:
-			off = round_up(vma->vm_pgoff, HPAGE_PMD_NR);
 			i_size = round_up(i_size_read(inode), PAGE_SIZE);
-			if (i_size >= HPAGE_PMD_SIZE &&
-					i_size >> PAGE_SHIFT >= off)
+			if (i_size >= HPAGE_PMD_SIZE)
 				return true;
 		case SHMEM_HUGE_ADVISE:
 			/* TODO: implement fadvise() hints */
