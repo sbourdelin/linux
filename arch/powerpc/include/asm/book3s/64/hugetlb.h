@@ -30,4 +30,46 @@ static inline int hstate_get_psize(struct hstate *hstate)
 		return mmu_virtual_psize;
 	}
 }
+
+static inline unsigned long huge_pte_update(struct mm_struct *mm, unsigned long addr,
+					    pte_t *ptep, unsigned long clr,
+					    unsigned long set)
+{
+	if (radix_enabled()) {
+		unsigned long old_pte;
+
+		if (cpu_has_feature(CPU_FTR_POWER9_DD1)) {
+
+			unsigned long new_pte;
+
+			old_pte = __radix_pte_update(ptep, ~0, 0);
+			asm volatile("ptesync" : : : "memory");
+			/*
+			 * new value of pte
+			 */
+			new_pte = (old_pte | set) & ~clr;
+			/*
+			 * For now let's do heavy pid flush
+			 * radix__flush_tlb_page_psize(mm, addr, mmu_virtual_psize);
+			 */
+			radix__flush_tlb_mm(mm);
+
+			__radix_pte_update(ptep, 0, new_pte);
+		} else
+			old_pte = __radix_pte_update(ptep, clr, set);
+		asm volatile("ptesync" : : : "memory");
+		return old_pte;
+	}
+	return hash__pte_update(mm, addr, ptep, clr, set, true);
+}
+
+static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
+					   unsigned long addr, pte_t *ptep)
+{
+	if ((pte_raw(*ptep) & cpu_to_be64(_PAGE_WRITE)) == 0)
+		return;
+
+	huge_pte_update(mm, addr, ptep, _PAGE_WRITE, 0);
+}
+
 #endif
