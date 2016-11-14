@@ -141,6 +141,9 @@
 #define RSI_SUPP_FILTERS	(FIF_ALLMULTI | FIF_PROBE_REQ |\
 				 FIF_BCN_PRBRESP_PROMISC)
 
+#define ANTENNA_SEL_INT			0x02 /* RF_OUT_2 / Integerated */
+#define ANTENNA_SEL_UFL			0x03 /* RF_OUT_1 / U.FL */
+
 /* Rx filter word definitions */
 #define PROMISCOUS_MODE			BIT(0)
 #define ALLOW_DATA_ASSOC_PEER		BIT(1)
@@ -337,4 +340,5 @@ int rsi_send_data_pkt(struct rsi_common *common, struct sk_buff *skb);
 int rsi_band_check(struct rsi_common *common);
 int rsi_send_rx_filter_frame(struct rsi_common *common, u16 rx_filter_word);
 int rsi_send_radio_params_update(struct rsi_common *common);
+int rsi_set_antenna(struct rsi_common *common, u8 antenna);
 #endif
