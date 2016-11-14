@@ -2139,6 +2139,31 @@ ssize_t blk_throtl_slice_store(struct request_queue *q,
 	return count;
 }
 
+ssize_t blk_throtl_idle_threshold_show(struct request_queue *q, char *page)
+{
+	u64 threshold = q->td->idle_ttime_threshold;
+
+	if (!q->td)
+		return -EINVAL;
+	do_div(threshold, 1000);
+	return sprintf(page, "%lluus\n", threshold);
+}
+
+ssize_t blk_throtl_idle_threshold_store(struct request_queue *q,
+	const char *page, size_t count)
+{
+	unsigned long v;
+
+	if (!q->td)
+		return -EINVAL;
+	if (kstrtoul(page, 10, &v))
+		return -EINVAL;
+	if (v == 0)
+		return -EINVAL;
+	q->td->idle_ttime_threshold = v * 1000;
+	return count;
+}
+
 static int __init throtl_init(void)
 {
 	kthrotld_workqueue = alloc_workqueue("kthrotld", WQ_MEM_RECLAIM, 0);

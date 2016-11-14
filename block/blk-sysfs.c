@@ -532,6 +532,12 @@ static struct queue_sysfs_entry throtl_slice_entry = {
 	.show = blk_throtl_slice_show,
 	.store = blk_throtl_slice_store,
 };
+
+static struct queue_sysfs_entry throtl_idle_threshold_entry = {
+	.attr = {.name = "throttling_idle_threshold", .mode = S_IRUGO | S_IWUSR },
+	.show = blk_throtl_idle_threshold_show,
+	.store = blk_throtl_idle_threshold_store,
+};
 #endif
 
 static struct attribute *default_attrs[] = {
@@ -563,6 +569,7 @@ static struct attribute *default_attrs[] = {
 	&queue_dax_entry.attr,
 #ifdef CONFIG_BLK_DEV_THROTTLING
 	&throtl_slice_entry.attr,
+	&throtl_idle_threshold_entry.attr,
 #endif
 	NULL,
 };
