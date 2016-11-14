@@ -169,32 +169,51 @@ enum sta_notify_events {
 
 /* Send Frames Types */
 enum cmd_frame_type {
-	TX_DOT11_MGMT,
-	RESET_MAC_REQ,
-	RADIO_CAPABILITIES,
-	BB_PROG_VALUES_REQUEST,
-	RF_PROG_VALUES_REQUEST,
-	WAKEUP_SLEEP_REQUEST,
-	SCAN_REQUEST,
-	TSF_UPDATE,
-	PEER_NOTIFY,
-	BLOCK_HW_QUEUE,
-	SET_KEY_REQ,
-	AUTO_RATE_IND,
-	BOOTUP_PARAMS_REQUEST,
-	VAP_CAPABILITIES,
-	EEPROM_READ_TYPE ,
-	EEPROM_WRITE,
-	GPIO_PIN_CONFIG ,
-	SET_RX_FILTER,
-	AMPDU_IND,
-	STATS_REQUEST_FRAME,
-	BB_BUF_PROG_VALUES_REQ,
-	BBP_PROG_IN_TA,
-	BG_SCAN_PARAMS,
-	BG_SCAN_PROBE_REQ,
-	CW_MODE_REQ,
-	PER_CMD_PKT
+	TX_DOT11_MGMT = 0,
+	RESET_MAC_REQ, /* 0x1 */
+	RADIO_CAPABILITIES, /* 0x2 */
+	BB_PROG_VALUES_REQUEST, /* 0x3 */
+	RF_PROG_VALUES_REQUEST, /* 0x4 */
+	WAKEUP_SLEEP_REQUEST, /* 0x5 */
+	SCAN_REQUEST, /* 0x6 */
+	TSF_UPDATE, /* 0x7 */
+	PEER_NOTIFY, /* 0x8 */
+	BLOCK_HW_QUEUE, /* 0x9 */
+	SET_KEY_REQ, /* 0xA */
+	AUTO_RATE_IND, /* 0xB */
+	BOOTUP_PARAMS_REQUEST, /* 0xC */
+	VAP_CAPABILITIES, /* 0xD */
+	EEPROM_READ_TYPE, /* 0xE */
+	EEPROM_WRITE, /* 0xF */
+	GPIO_PIN_CONFIG, /* 0x10 */
+	SET_RX_FILTER, /* 0x11 */
+	AMPDU_IND, /* 0x12 */
+	STATS_REQUEST, /* 0x13 */
+	BB_BUF_PROG_VALUES_REQ, /* 0x14 */
+	BBP_PROG_IN_TA, /* 0x15 */
+	BG_SCAN_PARAMS, /* 0x16 */
+	BG_SCAN_PROBE_REQ, /* 0x17 */
+	CW_MODE_REQ, /* 0x18 */
+	PER_CMD_PKT, /* 0x19 */
+	DEV_SLEEP_REQUEST, /* 0x1A */
+	DEV_WAKEUP_CNF,  /* 0x1B */
+	RF_LOOPBACK_REQ, /* 0x1C */
+	RF_LPBK_M3,  /* 0x1D */
+	RF_RESET_FRAME,  /* 0x1E */
+	LMAC_REG_OPS,  /* 0x1F */
+	ANT_SEL_FRAME, /* 0x20 */
+	CONFIRM, /* 0x21 */
+	WLAN_DE_REGISTER, /* 0x22 */
+	DEBUG_FRAME,  /* 0x23 */
+	HW_BMISS_HANDLE, /* 0x24 */
+	MULTICAST_ENABLE, /* 0x25 */
+	TX_MISC_IND, /* 0x26 */
+	VAP_DYNAMIC_UPDATE, /* 0x27 */
+	COMMON_DEV_CONFIG, /* 0x28 */
+	RADIO_PARAMS_UPDATE, /* 0x29 */
+	RADAR_REQUEST, /* 0x2A */
+	WOWLAN_CONFIG_PARAMS, /* 2B */
+	IAP_CONFIG, /* 0x2C */
 };
 
 struct rsi_mac_frame {
@@ -317,4 +336,5 @@ int rsi_send_mgmt_pkt(struct rsi_common *common, struct sk_buff *skb);
 int rsi_send_data_pkt(struct rsi_common *common, struct sk_buff *skb);
 int rsi_band_check(struct rsi_common *common);
 int rsi_send_rx_filter_frame(struct rsi_common *common, u16 rx_filter_word);
+int rsi_send_radio_params_update(struct rsi_common *common);
 #endif
