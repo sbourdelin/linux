@@ -189,5 +189,7 @@ void i915_guc_flush_logs(struct drm_i915_private *dev_priv);
 void i915_guc_register(struct drm_i915_private *dev_priv);
 void i915_guc_unregister(struct drm_i915_private *dev_priv);
 int i915_guc_log_control(struct drm_i915_private *dev_priv, u64 control_val);
+int i915_guc_action(struct intel_guc *guc, u32 *data, u32 len);
+struct i915_vma *guc_allocate_vma(struct intel_guc *guc, u32 size);
 
 #endif
