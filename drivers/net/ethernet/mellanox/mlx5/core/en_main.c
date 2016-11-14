@@ -3125,6 +3125,17 @@ static int mlx5e_xdp_set(struct net_device *netdev, struct bpf_prog *prog)
 		goto unlock;
 	}
 
+	if (prog) {
+		/* num_channels is invariant here, so we can take the
+		 * batched reference right upfront.
+		 */
+		prog = bpf_prog_add(prog, priv->params.num_channels);
+		if (IS_ERR(prog)) {
+			err = PTR_ERR(prog);
+			goto unlock;
+		}
+	}
+
 	was_opened = test_bit(MLX5E_STATE_OPENED, &priv->state);
 	/* no need for full reset when exchanging programs */
 	reset = (!priv->xdp_prog || !prog);
@@ -3132,10 +3143,10 @@ static int mlx5e_xdp_set(struct net_device *netdev, struct bpf_prog *prog)
 	if (was_opened && reset)
 		mlx5e_close_locked(netdev);
 
-	/* exchange programs */
+	/* exchange programs, extra prog reference we got from caller
+	 * as long as we don't fail from this point onwards.
+	 */
 	old_prog = xchg(&priv->xdp_prog, prog);
-	if (prog)
-		bpf_prog_add(prog, 1);
 	if (old_prog)
 		bpf_prog_put(old_prog);
 
@@ -3146,12 +3157,11 @@ static int mlx5e_xdp_set(struct net_device *netdev, struct bpf_prog *prog)
 		mlx5e_open_locked(netdev);
 
 	if (!test_bit(MLX5E_STATE_OPENED, &priv->state) || reset)
-		goto unlock;
+		goto unlock_put;
 
 	/* exchanging programs w/o reset, we update ref counts on behalf
 	 * of the channels RQs here.
 	 */
-	bpf_prog_add(prog, priv->params.num_channels);
 	for (i = 0; i < priv->params.num_channels; i++) {
 		struct mlx5e_channel *c = priv->channel[i];
 
@@ -3173,6 +3183,11 @@ static int mlx5e_xdp_set(struct net_device *netdev, struct bpf_prog *prog)
 unlock:
 	mutex_unlock(&priv->state_lock);
 	return err;
+unlock_put:
+	/* reference on priv->xdp_prog is still held at this point */
+	if (prog)
+		bpf_prog_sub(prog, priv->params.num_channels);
+	goto unlock;
 }
 
 static bool mlx5e_xdp_attached(struct net_device *dev)
