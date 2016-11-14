@@ -178,10 +178,9 @@ int amdgpu_sync_resv(struct amdgpu_device *adev,
 		     struct reservation_object *resv,
 		     void *owner)
 {
-	struct reservation_object_list *flist;
+	struct reservation_shared_iter iter;
 	struct dma_fence *f;
 	void *fence_owner;
-	unsigned i;
 	int r = 0;
 
 	if (resv == NULL)
@@ -190,14 +189,11 @@ int amdgpu_sync_resv(struct amdgpu_device *adev,
 	/* always sync to the exclusive fence */
 	f = reservation_object_get_excl(resv);
 	r = amdgpu_sync_fence(adev, sync, f);
+	if (r)
+		return ret;
 
-	flist = reservation_object_get_list(resv);
-	if (!flist || r)
-		return r;
-
-	for (i = 0; i < flist->shared_count; ++i) {
-		f = rcu_dereference_protected(flist->shared[i],
-					      reservation_object_held(resv));
+	reservation_object_for_each_shared(resv, iter) {
+		f = iter.fence;
 		if (amdgpu_sync_same_dev(adev, f)) {
 			/* VM updates are only interesting
 			 * for other VM updates and moves.

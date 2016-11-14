@@ -49,34 +49,47 @@ extern struct ww_class reservation_ww_class;
 extern struct lock_class_key reservation_seqcount_class;
 extern const char reservation_seqcount_string[];
 
-/**
- * struct reservation_object_list - a list of shared fences
- * @rcu: for internal use
- * @shared_count: table of shared fences
- * @shared_max: for growing shared fence table
- * @shared: shared fence table
- */
-struct reservation_object_list {
-	struct rcu_head rcu;
-	u32 shared_count, shared_max;
-	struct dma_fence __rcu *shared[];
+struct reservation_shared_layer;
+
+#define NSHARED 16
+
+struct reservation_shared_layer {
+	union {
+		u64 prefix;
+		struct rcu_head rcu;
+	};
+	unsigned int height;
+	unsigned int bitmap;
+	void *slot[NSHARED];
+	struct reservation_shared_layer *parent;
 };
+
+struct reservation_shared {
+	struct reservation_shared_layer *hint;
+	struct reservation_shared_layer *top;
+	struct reservation_shared_layer *freed;
+};
+
+static inline void reservation_shared_init(struct reservation_shared *shared)
+{
+	memset(shared, 0, sizeof(*shared));
+}
+
+void reservation_shared_destroy(struct reservation_shared *shared);
 
 /**
  * struct reservation_object - a reservation object manages fences for a buffer
  * @lock: update side lock
  * @seq: sequence count for managing RCU read-side synchronization
- * @fence_excl: the exclusive fence, if there is one currently
- * @fence: list of current shared fences
- * @staged: staged copy of shared fences for RCU updates
+ * @excl: the exclusive fence, if there is one currently
+ * @shared: list of current shared fences
  */
 struct reservation_object {
 	struct ww_mutex lock;
 	seqcount_t seq;
 
-	struct dma_fence __rcu *fence_excl;
-	struct reservation_object_list __rcu *fence;
-	struct reservation_object_list *staged;
+	struct dma_fence __rcu *excl;
+	struct reservation_shared shared;
 };
 
 #define reservation_object_held(obj) lockdep_is_held(&(obj)->lock.base)
@@ -93,9 +106,8 @@ reservation_object_init(struct reservation_object *obj)
 	ww_mutex_init(&obj->lock, &reservation_ww_class);
 
 	__seqcount_init(&obj->seq, reservation_seqcount_string, &reservation_seqcount_class);
-	RCU_INIT_POINTER(obj->fence, NULL);
-	RCU_INIT_POINTER(obj->fence_excl, NULL);
-	obj->staged = NULL;
+	RCU_INIT_POINTER(obj->excl, NULL);
+	reservation_shared_init(&obj->shared);
 }
 
 /**
@@ -105,43 +117,15 @@ reservation_object_init(struct reservation_object *obj)
 static inline void
 reservation_object_fini(struct reservation_object *obj)
 {
-	int i;
-	struct reservation_object_list *fobj;
-	struct dma_fence *excl;
-
 	/*
 	 * This object should be dead and all references must have
 	 * been released to it, so no need to be protected with rcu.
 	 */
-	excl = rcu_dereference_protected(obj->fence_excl, 1);
-	if (excl)
-		dma_fence_put(excl);
+	dma_fence_put(rcu_dereference_protected(obj->excl, 1));
 
-	fobj = rcu_dereference_protected(obj->fence, 1);
-	if (fobj) {
-		for (i = 0; i < fobj->shared_count; ++i)
-			dma_fence_put(rcu_dereference_protected(fobj->shared[i], 1));
-
-		kfree(fobj);
-	}
-	kfree(obj->staged);
+	reservation_shared_destroy(&obj->shared);
 
 	ww_mutex_destroy(&obj->lock);
-}
-
-/**
- * reservation_object_get_list - get the reservation object's
- * shared fence list, with update-side lock held
- * @obj: the reservation object
- *
- * Returns the shared fence list.  Does NOT take references to
- * the fence.  The obj->lock must be held.
- */
-static inline struct reservation_object_list *
-reservation_object_get_list(struct reservation_object *obj)
-{
-	return rcu_dereference_protected(obj->fence,
-					 reservation_object_held(obj));
 }
 
 /**
@@ -158,7 +142,7 @@ reservation_object_get_list(struct reservation_object *obj)
 static inline struct dma_fence *
 reservation_object_get_excl(struct reservation_object *obj)
 {
-	return rcu_dereference_protected(obj->fence_excl,
+	return rcu_dereference_protected(obj->excl,
 					 reservation_object_held(obj));
 }
 
@@ -181,7 +165,7 @@ reservation_object_get_excl_rcu(struct reservation_object *obj)
 retry:
 	seq = read_seqcount_begin(&obj->seq);
 	rcu_read_lock();
-	fence = rcu_dereference(obj->fence_excl);
+	fence = rcu_dereference(obj->excl);
 	if (read_seqcount_retry(&obj->seq, seq)) {
 		rcu_read_unlock();
 		goto retry;
@@ -189,6 +173,12 @@ retry:
 	fence = dma_fence_get(fence);
 	rcu_read_unlock();
 	return fence;
+}
+
+static inline bool
+reservation_object_has_shared(struct reservation_object *obj)
+{
+	return READ_ONCE(obj->shared.top);
 }
 
 int reservation_object_reserve_shared(struct reservation_object *obj);
@@ -205,9 +195,67 @@ int reservation_object_get_fences_rcu(struct reservation_object *obj,
 
 long reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,
-					 unsigned long timeout);
+					 long timeout);
 
 bool reservation_object_test_signaled_rcu(struct reservation_object *obj,
 					  bool test_all);
+
+struct reservation_shared_iter {
+	struct dma_fence *fence;
+	struct reservation_shared_layer *p;
+	u8 stack[16];
+};
+
+static inline void
+__reservation_shared_iter_fill(struct reservation_shared_iter *iter,
+			       struct reservation_shared_layer *p)
+{
+	int h;
+
+	do {
+		int pos = ffs(p->bitmap) - 1;
+
+		h = p->height / ilog2(NSHARED);
+		iter->stack[h] = pos;
+
+		iter->p = p;
+		p = p->slot[pos];
+	} while (h);
+
+	iter->fence = (void *)p;
+}
+
+static inline void
+reservation_shared_iter_init(struct reservation_object *obj,
+			     struct reservation_shared_iter *iter)
+{
+	if (obj->shared.top)
+		__reservation_shared_iter_fill(iter, obj->shared.top);
+	else
+		iter->fence = NULL;
+}
+
+#define fns(x, bit) (ffs((x) & (~(typeof(x))0 << (bit))))
+
+void __reservation_shared_iter_next(struct reservation_shared_iter *iter);
+
+static inline void
+reservation_shared_iter_next(struct reservation_shared_iter *iter)
+{
+	int pos;
+
+	pos = fns(iter->p->bitmap, iter->stack[0] + 1);
+	if (likely(pos)) {
+		iter->stack[0] = --pos;
+		iter->fence = iter->p->slot[pos];
+	} else {
+		__reservation_shared_iter_next(iter);
+	}
+}
+
+#define reservation_object_for_each_shared(obj, __i)			\
+	for (reservation_shared_iter_init(obj, &(__i));			\
+	     __i.fence;							\
+	     reservation_shared_iter_next(&(__i)))
 
 #endif /* _LINUX_RESERVATION_H */

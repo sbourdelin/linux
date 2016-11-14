@@ -4040,7 +4040,7 @@ i915_gem_busy_ioctl(struct drm_device *dev, void *data,
 {
 	struct drm_i915_gem_busy *args = data;
 	struct drm_i915_gem_object *obj;
-	struct reservation_object_list *list;
+	struct reservation_shared_iter iter;
 	unsigned int seq;
 	int err;
 
@@ -4070,20 +4070,11 @@ retry:
 	seq = raw_read_seqcount(&obj->resv->seq);
 
 	/* Translate the exclusive fence to the READ *and* WRITE engine */
-	args->busy = busy_check_writer(rcu_dereference(obj->resv->fence_excl));
+	args->busy = busy_check_writer(rcu_dereference(obj->resv->excl));
 
 	/* Translate shared fences to READ set of engines */
-	list = rcu_dereference(obj->resv->fence);
-	if (list) {
-		unsigned int shared_count = list->shared_count, i;
-
-		for (i = 0; i < shared_count; ++i) {
-			struct dma_fence *fence =
-				rcu_dereference(list->shared[i]);
-
-			args->busy |= busy_check_reader(fence);
-		}
-	}
+	reservation_object_for_each_shared(obj->resv, iter)
+		args->busy |= busy_check_reader(iter.fence);
 
 	if (args->busy && read_seqcount_retry(&obj->resv->seq, seq))
 		goto retry;

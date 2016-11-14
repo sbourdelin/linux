@@ -118,19 +118,22 @@ nouveau_gem_object_unmap(struct nouveau_bo *nvbo, struct nvkm_vma *vma)
 {
 	const bool mapped = nvbo->bo.mem.mem_type != TTM_PL_SYSTEM;
 	struct reservation_object *resv = nvbo->bo.resv;
-	struct reservation_object_list *fobj;
+	struct reservation_shared_iter iter;
 	struct dma_fence *fence = NULL;
-
-	fobj = reservation_object_get_list(resv);
 
 	list_del(&vma->head);
 
-	if (fobj && fobj->shared_count > 1)
-		ttm_bo_wait(&nvbo->bo, false, false);
-	else if (fobj && fobj->shared_count == 1)
-		fence = rcu_dereference_protected(fobj->shared[0],
-						reservation_object_held(resv));
-	else
+	reservation_object_for_each_shared(resv, iter) {
+		if (fence) {
+			ttm_bo_wait(&nvbo->bo, false, false);
+			fence = NULL;
+			break;
+		}
+
+		fence = iter.fence;
+	}
+
+	if (!fence)
 		fence = reservation_object_get_excl(nvbo->bo.resv);
 
 	if (fence && mapped) {

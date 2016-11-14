@@ -30,4 +30,17 @@ config SW_SYNC
 	  WARNING: improper use of this can result in deadlocking kernel
 	  drivers from userspace. Intended for test and debug only.
 
+config RESERVATION_SELFTEST
+	tristate "kselftests for reservation_objects"
+	depends on DEBUG_KERNEL
+	default n
+	---help---
+	  This option provides a kernel module that can be used to test
+	  the struct reservation_object API. This option is not useful
+	  for distributions or general kernels, but only for kernel
+	  developers working on dma-buf, dma-fences and, of course,
+	  reservation_objects.
+
+	  Say N if you are unsure
+
 endmenu

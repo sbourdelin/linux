@@ -91,10 +91,9 @@ int radeon_sync_resv(struct radeon_device *rdev,
 		     struct reservation_object *resv,
 		     bool shared)
 {
-	struct reservation_object_list *flist;
+	struct reservation_shared_iter iter;
 	struct dma_fence *f;
 	struct radeon_fence *fence;
-	unsigned i;
 	int r = 0;
 
 	/* always sync to the exclusive fence */
@@ -105,14 +104,11 @@ int radeon_sync_resv(struct radeon_device *rdev,
 	else if (f)
 		r = dma_fence_wait(f, true);
 
-	flist = reservation_object_get_list(resv);
-	if (shared || !flist || r)
+	if (shared || !reservation_object_has_shared(resv) || r)
 		return r;
 
-	for (i = 0; i < flist->shared_count; ++i) {
-		f = rcu_dereference_protected(flist->shared[i],
-					      reservation_object_held(resv));
-		fence = to_radeon_fence(f);
+	resevation_object_for_each_shared(resv, iter) {
+		fence = to_radeon_fence(iter.fence);
 		if (fence && fence->rdev == rdev)
 			radeon_sync_fence(sync, fence);
 		else

@@ -139,10 +139,9 @@ static unsigned int dma_buf_poll(struct file *file, poll_table *poll)
 {
 	struct dma_buf *dmabuf;
 	struct reservation_object *resv;
-	struct reservation_object_list *fobj;
-	struct dma_fence *fence_excl;
+	struct dma_fence *excl;
 	unsigned long events;
-	unsigned shared_count, seq;
+	unsigned int seq;
 
 	dmabuf = file->private_data;
 	if (!dmabuf || !dmabuf->resv)
@@ -160,22 +159,18 @@ retry:
 	seq = read_seqcount_begin(&resv->seq);
 	rcu_read_lock();
 
-	fobj = rcu_dereference(resv->fence);
-	if (fobj)
-		shared_count = fobj->shared_count;
-	else
-		shared_count = 0;
-	fence_excl = rcu_dereference(resv->fence_excl);
+	excl = rcu_dereference(resv->excl);
 	if (read_seqcount_retry(&resv->seq, seq)) {
 		rcu_read_unlock();
 		goto retry;
 	}
 
-	if (fence_excl && (!(events & POLLOUT) || shared_count == 0)) {
+	if (excl &&
+	    (!(events & POLLOUT) || !reservation_object_has_shared(resv))) {
 		struct dma_buf_poll_cb_t *dcb = &dmabuf->cb_excl;
 		unsigned long pevents = POLLIN;
 
-		if (shared_count == 0)
+		if (!reservation_object_has_shared(resv))
 			pevents |= POLLOUT;
 
 		spin_lock_irq(&dmabuf->poll.lock);
@@ -187,28 +182,28 @@ retry:
 		spin_unlock_irq(&dmabuf->poll.lock);
 
 		if (events & pevents) {
-			if (!dma_fence_get_rcu(fence_excl)) {
+			if (!dma_fence_get_rcu(excl)) {
 				/* force a recheck */
 				events &= ~pevents;
 				dma_buf_poll_cb(NULL, &dcb->cb);
-			} else if (!dma_fence_add_callback(fence_excl, &dcb->cb,
+			} else if (!dma_fence_add_callback(excl, &dcb->cb,
 							   dma_buf_poll_cb)) {
 				events &= ~pevents;
-				dma_fence_put(fence_excl);
+				dma_fence_put(excl);
 			} else {
 				/*
 				 * No callback queued, wake up any additional
 				 * waiters.
 				 */
-				dma_fence_put(fence_excl);
+				dma_fence_put(excl);
 				dma_buf_poll_cb(NULL, &dcb->cb);
 			}
 		}
 	}
 
-	if ((events & POLLOUT) && shared_count > 0) {
+	if ((events & POLLOUT) && reservation_object_has_shared(resv)) {
 		struct dma_buf_poll_cb_t *dcb = &dmabuf->cb_shared;
-		int i;
+		struct reservation_shared_iter iter;
 
 		/* Only queue a new callback if no event has fired yet */
 		spin_lock_irq(&dmabuf->poll.lock);
@@ -221,8 +216,8 @@ retry:
 		if (!(events & POLLOUT))
 			goto out;
 
-		for (i = 0; i < shared_count; ++i) {
-			struct dma_fence *fence = rcu_dereference(fobj->shared[i]);
+		reservation_object_for_each_shared(resv, iter) {
+			struct dma_fence *fence = iter.fence;
 
 			if (!dma_fence_get_rcu(fence)) {
 				/*
@@ -245,7 +240,7 @@ retry:
 		}
 
 		/* No callback queued, wake up any additional waiters. */
-		if (i == shared_count)
+		if (events & POLLOUT)
 			dma_buf_poll_cb(NULL, &dcb->cb);
 	}
 

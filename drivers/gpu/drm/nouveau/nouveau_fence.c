@@ -393,21 +393,19 @@ nouveau_fence_sync(struct nouveau_bo *nvbo, struct nouveau_channel *chan, bool e
 	struct nouveau_fence_chan *fctx = chan->fence;
 	struct dma_fence *fence;
 	struct reservation_object *resv = nvbo->bo.resv;
-	struct reservation_object_list *fobj;
+	struct reservation_shared_iter iter;
 	struct nouveau_fence *f;
-	int ret = 0, i;
+	int ret = 0;
 
 	if (!exclusive) {
 		ret = reservation_object_reserve_shared(resv);
-
 		if (ret)
 			return ret;
 	}
 
-	fobj = reservation_object_get_list(resv);
 	fence = reservation_object_get_excl(resv);
 
-	if (fence && (!exclusive || !fobj || !fobj->shared_count)) {
+	if (fence && (!exclusive || !reservation_object_has_shared(resv))) {
 		struct nouveau_channel *prev = NULL;
 		bool must_wait = true;
 
@@ -426,15 +424,14 @@ nouveau_fence_sync(struct nouveau_bo *nvbo, struct nouveau_channel *chan, bool e
 		return ret;
 	}
 
-	if (!exclusive || !fobj)
+	if (!exclusive)
 		return ret;
 
-	for (i = 0; i < fobj->shared_count && !ret; ++i) {
+	reservation_object_for_each_shared(resv, iter) {
 		struct nouveau_channel *prev = NULL;
 		bool must_wait = true;
 
-		fence = rcu_dereference_protected(fobj->shared[i],
-						reservation_object_held(resv));
+		fence = iter.fence;
 
 		f = nouveau_local_fence(fence, chan->drm);
 		if (f) {

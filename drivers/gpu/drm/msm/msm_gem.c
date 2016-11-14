@@ -520,9 +520,9 @@ int msm_gem_sync_object(struct drm_gem_object *obj,
 		struct msm_fence_context *fctx, bool exclusive)
 {
 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
-	struct reservation_object_list *fobj;
+	struct reservation_shared_iter iter;
 	struct dma_fence *fence;
-	int i, ret;
+	int ret;
 
 	if (!exclusive) {
 		/* NOTE: _reserve_shared() must happen before _add_shared_fence(),
@@ -535,8 +535,7 @@ int msm_gem_sync_object(struct drm_gem_object *obj,
 			return ret;
 	}
 
-	fobj = reservation_object_get_list(msm_obj->resv);
-	if (!fobj || (fobj->shared_count == 0)) {
+	if (!reservation_object_has_shared(msm_obj->resv)) {
 		fence = reservation_object_get_excl(msm_obj->resv);
 		/* don't need to wait on our own fences, since ring is fifo */
 		if (fence && (fence->context != fctx->context)) {
@@ -546,12 +545,11 @@ int msm_gem_sync_object(struct drm_gem_object *obj,
 		}
 	}
 
-	if (!exclusive || !fobj)
+	if (!exclusive)
 		return 0;
 
-	for (i = 0; i < fobj->shared_count; i++) {
-		fence = rcu_dereference_protected(fobj->shared[i],
-						reservation_object_held(msm_obj->resv));
+	reservation_object_for_each_shared(msm_obj->resv, iter) {
+		fence = iter.fence;
 		if (fence->context != fctx->context) {
 			ret = dma_fence_wait(fence, true);
 			if (ret)
@@ -630,7 +628,7 @@ void msm_gem_describe(struct drm_gem_object *obj, struct seq_file *m)
 {
 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
 	struct reservation_object *robj = msm_obj->resv;
-	struct reservation_object_list *fobj;
+	struct reservation_shared_iter iter;
 	struct dma_fence *fence;
 	uint64_t off = drm_vma_node_start(&obj->vma_node);
 	const char *madv;
@@ -656,17 +654,10 @@ void msm_gem_describe(struct drm_gem_object *obj, struct seq_file *m)
 			off, msm_obj->vaddr, obj->size, madv);
 
 	rcu_read_lock();
-	fobj = rcu_dereference(robj->fence);
-	if (fobj) {
-		unsigned int i, shared_count = fobj->shared_count;
+	reservation_object_for_each_shared(fobj, iter)
+		describe_fence(iter.fence, "Shared", m);
 
-		for (i = 0; i < shared_count; i++) {
-			fence = rcu_dereference(fobj->shared[i]);
-			describe_fence(fence, "Shared", m);
-		}
-	}
-
-	fence = rcu_dereference(robj->fence_excl);
+	fence = rcu_dereference(robj->excl);
 	if (fence)
 		describe_fence(fence, "Exclusive", m);
 	rcu_read_unlock();

@@ -1020,9 +1020,9 @@ int etnaviv_gpu_fence_sync_obj(struct etnaviv_gem_object *etnaviv_obj,
 	unsigned int context, bool exclusive)
 {
 	struct reservation_object *robj = etnaviv_obj->resv;
-	struct reservation_object_list *fobj;
+	struct reservation_shared_iter iter;
 	struct dma_fence *fence;
-	int i, ret;
+	int ret;
 
 	if (!exclusive) {
 		ret = reservation_object_reserve_shared(robj);
@@ -1034,8 +1034,7 @@ int etnaviv_gpu_fence_sync_obj(struct etnaviv_gem_object *etnaviv_obj,
 	 * If we have any shared fences, then the exclusive fence
 	 * should be ignored as it will already have been signalled.
 	 */
-	fobj = reservation_object_get_list(robj);
-	if (!fobj || fobj->shared_count == 0) {
+	if (!reservation_object_has_shared(robj)) {
 		/* Wait on any existing exclusive fence which isn't our own */
 		fence = reservation_object_get_excl(robj);
 		if (fence && fence->context != context) {
@@ -1045,12 +1044,11 @@ int etnaviv_gpu_fence_sync_obj(struct etnaviv_gem_object *etnaviv_obj,
 		}
 	}
 
-	if (!exclusive || !fobj)
+	if (!exclusive)
 		return 0;
 
-	for (i = 0; i < fobj->shared_count; i++) {
-		fence = rcu_dereference_protected(fobj->shared[i],
-						reservation_object_held(robj));
+	reservation_object_for_each_shared(resv, iter) {
+		fence = iter.fence;
 		if (fence->context != context) {
 			ret = dma_fence_wait(fence, true);
 			if (ret)

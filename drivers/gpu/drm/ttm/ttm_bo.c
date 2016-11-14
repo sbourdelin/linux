@@ -425,19 +425,15 @@ static void ttm_bo_cleanup_memtype_use(struct ttm_buffer_object *bo)
 
 static void ttm_bo_flush_all_fences(struct ttm_buffer_object *bo)
 {
-	struct reservation_object_list *fobj;
+	struct reservation_shared_iter iter;
 	struct dma_fence *fence;
-	int i;
 
-	fobj = reservation_object_get_list(bo->resv);
 	fence = reservation_object_get_excl(bo->resv);
 	if (fence && !fence->ops->signaled)
 		dma_fence_enable_sw_signaling(fence);
 
-	for (i = 0; fobj && i < fobj->shared_count; ++i) {
-		fence = rcu_dereference_protected(fobj->shared[i],
-					reservation_object_held(bo->resv));
-
+	reservation_object_for_each_shared(bo->resv, iter) {
+		fence = iter.fence;
 		if (!fence->ops->signaled)
 			dma_fence_enable_sw_signaling(fence);
 	}

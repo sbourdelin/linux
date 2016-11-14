@@ -481,7 +481,7 @@ static void etnaviv_gem_describe(struct drm_gem_object *obj, struct seq_file *m)
 {
 	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
 	struct reservation_object *robj = etnaviv_obj->resv;
-	struct reservation_object_list *fobj;
+	struct reservation_shared_iter iter;
 	struct dma_fence *fence;
 	unsigned long off = drm_vma_node_start(&obj->vma_node);
 
@@ -491,17 +491,10 @@ static void etnaviv_gem_describe(struct drm_gem_object *obj, struct seq_file *m)
 			off, etnaviv_obj->vaddr, obj->size);
 
 	rcu_read_lock();
-	fobj = rcu_dereference(robj->fence);
-	if (fobj) {
-		unsigned int i, shared_count = fobj->shared_count;
+	reservation_object_for_each_shared(robj, iter)
+		etnaviv_gem_describe_fence(iter.fence, "Shared", m);
 
-		for (i = 0; i < shared_count; i++) {
-			fence = rcu_dereference(fobj->shared[i]);
-			etnaviv_gem_describe_fence(fence, "Shared", m);
-		}
-	}
-
-	fence = rcu_dereference(robj->fence_excl);
+	fence = rcu_dereference(robj->excl);
 	if (fence)
 		etnaviv_gem_describe_fence(fence, "Exclusive", m);
 	rcu_read_unlock();
