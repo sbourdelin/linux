@@ -2564,12 +2564,15 @@ static void nfs41_check_delegation_stateid(struct nfs4_state *state)
 static int nfs41_check_expired_locks(struct nfs4_state *state)
 {
 	int status, ret = NFS_OK;
-	struct nfs4_lock_state *lsp;
+	struct nfs4_lock_state *lsp, *tmp;
 	struct nfs_server *server = NFS_SERVER(state->inode);
 
 	if (!test_bit(LK_STATE_IN_USE, &state->flags))
 		goto out;
-	list_for_each_entry(lsp, &state->lock_states, ls_locks) {
+	spin_lock(&state->state_lock);
+	list_for_each_entry_safe(lsp, tmp, &state->lock_states, ls_locks) {
+		atomic_inc(&lsp->ls_count);
+		spin_unlock(&state->state_lock);
 		if (test_bit(NFS_LOCK_INITIALIZED, &lsp->ls_flags)) {
 			struct rpc_cred *cred = lsp->ls_state->owner->so_cred;
 
@@ -2588,7 +2591,10 @@ static int nfs41_check_expired_locks(struct nfs4_state *state)
 				break;
 			}
 		}
-	};
+		nfs4_put_lock_state(lsp);
+		spin_lock(&state->state_lock);
+	}
+	spin_unlock(&state->state_lock);
 out:
 	return ret;
 }
