@@ -344,6 +344,9 @@ struct x86_emulate_ctxt {
 	struct read_cache mem_read;
 };
 
+/* String operation identifier (matches the definition in emulate.c) */
+#define CTXT_STRING_OP	(1 << 13)
+
 /* Repeat String Operation Prefix */
 #define REPE_PREFIX	0xf3
 #define REPNE_PREFIX	0xf2

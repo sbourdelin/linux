@@ -275,6 +275,9 @@ static int avic;
 module_param(avic, int, S_IRUGO);
 #endif
 
+/* EXITINFO2 contains valid GPA */
+static bool gpa_avail = true;
+
 /* AVIC VM ID bit masks and lock */
 static DECLARE_BITMAP(avic_vm_id_bitmap, AVIC_VM_ID_NR);
 static DEFINE_SPINLOCK(avic_vm_id_lock);
@@ -1055,8 +1058,10 @@ static __init int svm_hardware_setup(void)
 			goto err;
 	}
 
-	if (!boot_cpu_has(X86_FEATURE_NPT))
+	if (!boot_cpu_has(X86_FEATURE_NPT)) {
 		npt_enabled = false;
+		gpa_avail = false;
+	}
 
 	if (npt_enabled && !npt) {
 		printk(KERN_INFO "kvm: Nested Paging disabled\n");
@@ -4192,6 +4197,8 @@ static int handle_exit(struct kvm_vcpu *vcpu)
 		vcpu->arch.cr0 = svm->vmcb->save.cr0;
 	if (npt_enabled)
 		vcpu->arch.cr3 = svm->vmcb->save.cr3;
+	if (gpa_avail)
+		vcpu->arch.gpa_available = (exit_code == SVM_EXIT_NPF);
 
 	if (unlikely(svm->nested.exit_required)) {
 		nested_svm_vmexit(svm);
