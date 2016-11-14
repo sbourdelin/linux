@@ -147,6 +147,8 @@ struct throtl_grp {
 	unsigned long last_check_time;
 
 	int upgrade_check_batch;
+
+	u64 latency_target;
 	/* When did we start a new slice */
 	unsigned long slice_start[2];
 	unsigned long slice_end[2];
@@ -463,6 +465,7 @@ static struct blkg_policy_data *throtl_pd_alloc(gfp_t gfp, int node)
 			tg->iops[rw][index] = -1;
 		}
 	}
+	/* target latency default 0, eg, always not meet */
 
 	return &tg->pd;
 }
@@ -1572,6 +1575,64 @@ out_finish:
 	return ret ?: nbytes;
 }
 
+static u64 tg_prfill_latency_target(struct seq_file *sf,
+	struct blkg_policy_data *pd, int off)
+{
+	struct throtl_grp *tg = pd_to_tg(pd);
+	const char *dname = blkg_dev_name(pd->blkg);
+
+	if (!dname)
+		return 0;
+	if (tg->latency_target == 0)
+		return 0;
+
+	seq_printf(sf, "%s 4k_lat=%llu\n", dname, tg->latency_target);
+	return 0;
+}
+
+static int tg_print_latency_target(struct seq_file *sf, void *v)
+{
+	blkcg_print_blkgs(sf, css_to_blkcg(seq_css(sf)),
+		tg_prfill_latency_target, &blkcg_policy_throtl,
+		seq_cft(sf)->private, false);
+	return 0;
+}
+
+static ssize_t tg_set_latency_target(struct kernfs_open_file *of,
+				     char *buf, size_t nbytes, loff_t off)
+{
+	struct blkcg *blkcg = css_to_blkcg(of_css(of));
+	struct blkg_conf_ctx ctx;
+	struct throtl_grp *tg;
+	int ret = -EINVAL;
+	char tok[27];
+	char *p;
+	u64 val;
+
+	ret = blkg_conf_prep(blkcg, &blkcg_policy_throtl, buf, &ctx);
+	if (ret)
+		return ret;
+
+	tg = blkg_to_tg(ctx.blkg);
+
+	if (sscanf(ctx.body, "%26s", tok) != 1)
+		goto out_finish;
+
+	p = tok;
+	strsep(&p, "=");
+	if (!p || kstrtou64(p, 10, &val))
+		goto out_finish;
+
+	if (strcmp(tok, "4k_lat"))
+		goto out_finish;
+
+	tg->latency_target = val;
+	ret = 0;
+out_finish:
+	blkg_conf_finish(&ctx);
+	return ret ?: nbytes;
+}
+
 static struct cftype throtl_files[] = {
 	{
 		.name = "high",
@@ -1586,6 +1647,12 @@ static struct cftype throtl_files[] = {
 		.seq_show = tg_print_limit,
 		.write = tg_set_limit,
 		.private = LIMIT_MAX,
+	},
+	{
+		.name = "latency_target",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = tg_print_latency_target,
+		.write = tg_set_latency_target,
 	},
 	{ }	/* terminate */
 };
