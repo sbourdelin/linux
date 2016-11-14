@@ -291,6 +291,29 @@ int fsnotify(struct inode *to_tell, __u32 mask, void *data, int data_is,
 		ret = send_to_group(to_tell, inode_mark, vfsmount_mark, mask,
 				    data, data_is, cookie, file_name);
 
+		/*
+		 * If handle_event() is going to block, we call it again
+		 * witout holding fsnotify_mark_srcu[0], which is protecting
+		 * the low priority mark lists.
+		 * We are still holding fsnotify_mark_srcu[1], which
+		 * is protecting the high priority marks in the first half
+		 * of the mark list, which is where we are at.
+		 */
+		if (group->priority > 0 && ret == -EAGAIN) {
+			srcu_read_unlock(&fsnotify_mark_srcu[0], idx);
+
+			ret = group->ops->handle_event(group, to_tell,
+						       NULL, NULL,
+						       mask, data, data_is,
+						       file_name, cookie);
+
+			/*
+			 * We need to hold fsnotify_mark_srcu[0], because
+			 * next mark may be low priority.
+			 */
+			idx = srcu_read_lock(&fsnotify_mark_srcu[0]);
+		}
+
 		if (ret && (mask & ALL_FSNOTIFY_PERM_EVENTS))
 			goto out;
 

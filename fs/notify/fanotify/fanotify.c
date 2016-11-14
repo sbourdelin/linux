@@ -176,7 +176,7 @@ init: __maybe_unused
 static int fanotify_handle_event(struct fsnotify_group *group,
 				 struct inode *inode,
 				 struct fsnotify_mark *inode_mark,
-				 struct fsnotify_mark *fanotify_mark,
+				 struct fsnotify_mark *vfsmnt_mark,
 				 u32 mask, void *data, int data_type,
 				 const unsigned char *file_name, u32 cookie)
 {
@@ -195,9 +195,16 @@ static int fanotify_handle_event(struct fsnotify_group *group,
 	BUILD_BUG_ON(FAN_ACCESS_PERM != FS_ACCESS_PERM);
 	BUILD_BUG_ON(FAN_ONDIR != FS_ISDIR);
 
-	if (!fanotify_should_send_event(inode_mark, fanotify_mark, mask, data,
-					data_type))
-		return 0;
+	if (inode_mark || vfsmnt_mark) {
+		if (!fanotify_should_send_event(inode_mark, vfsmnt_mark, mask,
+						data, data_type))
+			return 0;
+#ifdef CONFIG_FANOTIFY_ACCESS_PERMISSIONS
+		/* Ask to be called again without a reference to mark */
+		if (mask & FAN_ALL_PERM_EVENTS)
+			return -EAGAIN;
+#endif
+	}
 
 	pr_debug("%s: group=%p inode=%p mask=%x\n", __func__, group, inode,
 		 mask);
