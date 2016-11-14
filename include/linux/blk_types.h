@@ -60,6 +60,8 @@ struct bio {
 	struct io_context	*bi_ioc;
 	struct cgroup_subsys_state *bi_css;
 	void *bi_cg_private;
+	u64 bi_cg_issue_time;
+	sector_t bi_cg_size;
 #endif
 	union {
 #if defined(CONFIG_BLK_DEV_INTEGRITY)
