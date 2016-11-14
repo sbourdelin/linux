@@ -1101,6 +1101,9 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 	case I915_CONTEXT_PARAM_NO_ERROR_CAPTURE:
 		args->value = !!(ctx->flags & CONTEXT_NO_ERROR_CAPTURE);
 		break;
+	case I915_CONTEXT_PARAM_PRIORITY:
+		args->value = ctx->priority;
+		break;
 	default:
 		ret = -EINVAL;
 		break;
@@ -1156,6 +1159,23 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 				ctx->flags &= ~CONTEXT_NO_ERROR_CAPTURE;
 		}
 		break;
+
+	case I915_CONTEXT_PARAM_PRIORITY:
+		{
+			int priority = args->value;
+
+			if (args->size)
+				ret = -EINVAL;
+			else if (priority >= I915_PRIORITY_MAX ||
+				 priority <= -I915_PRIORITY_MAX)
+				ret = -EINVAL;
+			else if (priority > 0 && !capable(CAP_SYS_ADMIN))
+				ret = -EPERM;
+			else
+				ctx->priority = priority;
+		}
+		break;
+
 	default:
 		ret = -EINVAL;
 		break;
