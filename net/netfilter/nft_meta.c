@@ -190,6 +190,18 @@ void nft_meta_get_eval(const struct nft_expr *expr,
 		*dest = prandom_u32_state(state);
 		break;
 	}
+#ifdef CONFIG_SOCK_CGROUP_DATA
+	case NFT_META_CGROUP2: {
+		struct cgroup *cgrp;
+
+		if (!skb->sk || !sk_fullsock(skb->sk))
+			goto err;
+
+		cgrp = sock_cgroup_ptr(&skb->sk->sk_cgrp_data);
+		*dest = cgrp->kn->ino;
+		break;
+	}
+#endif
 	default:
 		WARN_ON(1);
 		goto err;
@@ -272,6 +284,9 @@ int nft_meta_get_init(const struct nft_ctx *ctx,
 	case NFT_META_OIFGROUP:
 #ifdef CONFIG_CGROUP_NET_CLASSID
 	case NFT_META_CGROUP:
+#endif
+#ifdef CONFIG_SOCK_CGROUP_DATA
+	case NFT_META_CGROUP2:
 #endif
 		len = sizeof(u32);
 		break;
