@@ -2328,7 +2328,6 @@ static void nfs4_xdr_enc_open_downgrade(struct rpc_rqst *req,
 	encode_sequence(xdr, &args->seq_args, &hdr);
 	encode_putfh(xdr, args->fh, &hdr);
 	encode_open_downgrade(xdr, args, &hdr);
-	encode_getfattr(xdr, args->bitmask, &hdr);
 	encode_nops(&hdr);
 }
 
@@ -6115,9 +6114,6 @@ static int nfs4_xdr_dec_open_downgrade(struct rpc_rqst *rqstp,
 	if (status)
 		goto out;
 	status = decode_open_downgrade(xdr, res);
-	if (status != 0)
-		goto out;
-	decode_getfattr(xdr, res->fattr, res->server);
 out:
 	return status;
 }
