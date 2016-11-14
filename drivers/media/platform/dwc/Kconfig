@@ -1,0 +1,36 @@
+config VIDEO_DWC
+	bool "Designware Cores CSI-2 IPK (EXPERIMENTAL)"
+	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && OF && HAS_DMA
+	help
+	  Say Y here to enable support for the DesignWare Cores CSI-2 Host IP
+	  Prototyping Kit.
+
+if VIDEO_DWC
+config DWC_PLATFORM
+	tristate "SNPS DWC MIPI CSI2 Host"
+	depends on VIDEO_DWC
+	help
+	  This is the V4L2 plaftorm driver driver for the DWC CSI-2 HOST IPK
+
+	  To compile this driver as a module, choose M here
+
+
+config DWC_MIPI_CSI2_HOST
+	tristate "SNPS DWC MIPI CSI2 Host"
+	select GENERIC_PHY
+	depends on VIDEO_DWC
+	help
+	  This is a V4L2 driver for SNPS DWC MIPI-CSI2
+
+	  To compile this driver as a module, choose M here
+
+config DWC_VIDEO_DEVICE
+	tristate "DWC VIDEO DEVICE"
+	select VIDEOBUF2_VMALLOC
+	select VIDEOBUF2_DMA_CONTIG
+	depends on VIDEO_DWC
+	help
+	  This is a V4L2 driver for SNPS Video device
+	  To compile this driver as a module, choose M here
+
+endif # VIDEO_DWC
