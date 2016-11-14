@@ -121,6 +121,7 @@ struct slpc_shared_data {
 struct intel_slpc {
 	bool active;
 	struct i915_vma *vma;
+	bool i915_load_enable;
 
 	/* i915 cached SLPC frequency limits */
 	u32 min_unslice_freq;

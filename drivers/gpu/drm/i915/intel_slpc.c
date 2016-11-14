@@ -418,6 +418,26 @@ void intel_slpc_enable(struct drm_i915_private *dev_priv)
 			   SLPC_PARAM_GLOBAL_ENABLE_BALANCER_IN_NON_GAMING_MODE,
 			   0);
 
+	if (dev_priv->guc.slpc.i915_load_enable) {
+		/* Ask SLPC to operate within min/max freq softlimits */
+		slpc_mem_set_param(data,
+				   SLPC_PARAM_GLOBAL_MAX_GT_UNSLICE_FREQ_MHZ,
+				   intel_gpu_freq(dev_priv,
+					dev_priv->guc.slpc.max_unslice_freq));
+		slpc_mem_set_param(data,
+				   SLPC_PARAM_GLOBAL_MAX_GT_SLICE_FREQ_MHZ,
+				   intel_gpu_freq(dev_priv,
+					dev_priv->guc.slpc.max_unslice_freq));
+		slpc_mem_set_param(data,
+				   SLPC_PARAM_GLOBAL_MIN_GT_UNSLICE_FREQ_MHZ,
+				   intel_gpu_freq(dev_priv,
+					dev_priv->guc.slpc.min_unslice_freq));
+		slpc_mem_set_param(data,
+				   SLPC_PARAM_GLOBAL_MIN_GT_SLICE_FREQ_MHZ,
+				   intel_gpu_freq(dev_priv,
+					dev_priv->guc.slpc.min_unslice_freq));
+	}
+
 	kunmap_atomic(data);
 
 	host2guc_slpc_reset(dev_priv);
@@ -493,6 +513,13 @@ bool intel_slpc_get_status(struct drm_i915_private *dev_priv)
 	switch (data.global_state) {
 	case SLPC_GLOBAL_STATE_RUNNING:
 		/* Capture required state from SLPC here */
+		dev_priv->guc.slpc.i915_load_enable = true;
+		dev_priv->guc.slpc.max_unslice_freq =
+				data.task_state_data.max_unslice_freq *
+				GEN9_FREQ_SCALER;
+		dev_priv->guc.slpc.min_unslice_freq =
+				data.task_state_data.min_unslice_freq *
+				GEN9_FREQ_SCALER;
 		ret = true;
 		break;
 	case SLPC_GLOBAL_STATE_ERROR:
