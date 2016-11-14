@@ -376,6 +376,50 @@ static void host2guc_slpc_reset(struct drm_i915_private *dev_priv)
 
 void intel_slpc_enable(struct drm_i915_private *dev_priv)
 {
+	struct slpc_shared_data *data;
+	struct page *page;
+	u64 val;
+
+	page = i915_vma_first_page(dev_priv->guc.slpc.vma);
+	data = kmap_atomic(page);
+
+	data->global_state = SLPC_GLOBAL_STATE_NOT_RUNNING;
+
+	/* Enable only GTPERF task, Disable others */
+	val = SLPC_PARAM_TASK_ENABLED;
+	slpc_mem_task_control(data, val,
+			      SLPC_PARAM_TASK_ENABLE_GTPERF,
+			      SLPC_PARAM_TASK_DISABLE_GTPERF);
+
+	val = SLPC_PARAM_TASK_DISABLED;
+	slpc_mem_task_control(data, val,
+			      SLPC_PARAM_TASK_ENABLE_BALANCER,
+			      SLPC_PARAM_TASK_DISABLE_BALANCER);
+
+	slpc_mem_task_control(data, val,
+			      SLPC_PARAM_TASK_ENABLE_DCC,
+			      SLPC_PARAM_TASK_DISABLE_DCC);
+
+	slpc_mem_set_param(data, SLPC_PARAM_GTPERF_THRESHOLD_MAX_FPS, 0);
+
+	slpc_mem_set_param(data, SLPC_PARAM_GTPERF_ENABLE_FRAMERATE_STALLING,
+			   0);
+
+	slpc_mem_set_param(data, SLPC_PARAM_GLOBAL_ENABLE_IA_GT_BALANCING,
+			   0);
+
+	slpc_mem_set_param(data,
+			   SLPC_PARAM_GLOBAL_ENABLE_ADAPTIVE_BURST_TURBO,
+			   0);
+
+	slpc_mem_set_param(data, SLPC_PARAM_GLOBAL_ENABLE_EVAL_MODE, 0);
+
+	slpc_mem_set_param(data,
+			   SLPC_PARAM_GLOBAL_ENABLE_BALANCER_IN_NON_GAMING_MODE,
+			   0);
+
+	kunmap_atomic(data);
+
 	host2guc_slpc_reset(dev_priv);
 	dev_priv->guc.slpc.active = true;
 }
