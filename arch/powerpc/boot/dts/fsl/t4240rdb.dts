@@ -142,6 +142,10 @@
 				reg = <0x68>;
 				interrupts = <0x1 0x1 0 0>;
 			};
+			hwmon@2f {
+				compatible = "winbond,w83793";
+				reg = <0x2f>;
+			};
 		};
 
 		sdhc@114000 {
