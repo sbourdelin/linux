@@ -1,0 +1,36 @@
+Driver for Freescale USB 3.0 PHY
+
+Required properties:
+
+- compatible :	fsl,qoriq-usb3-phy
+- reg :		register mappings for Parameter Configuration Register
+		and Phy base offset.
+- reg-names :	"param_ctrl" and "phy_base"
+- phy_type :	For multi port host USB controllers, should be one of
+		"ulpi", or "serial". For dual role USB controllers,
+		should be one of "ulpi", "utmi", "utmi_wide", or "serial".
+
+Example:
+		usbphy0: usb3-phy@084F0000 {
+                        compatible = "fsl,qoriq-usb3-phy";
+                        reg = <0x0 0x01570070 0x0 0xC>, <0x0 0x084F0000 0x0 0x5000>;
+                        reg-names = "param_ctrl", "phy_base";
+                        #phy-cells = <0>;
+                        phy_type = "utmi";
+                };
+
+                usbphy1: usb3-phy@08500000 {
+                        compatible = "fsl,qoriq-usb3-phy";
+                        reg = <0x0 0x0157007C 0x0 0xC>, <0x0 0x08500000 0x0 0x5000>;
+                        reg-names = "param_ctrl", "phy_base";
+                        #phy-cells = <0>;
+                        phy_type = "utmi";
+                };
+
+                usbphy2: usb3-phy@08510000 {
+                        compatible = "fsl,qoriq-usb3-phy";
+                        reg = <0x0 0x01570088 0x0 0xC>, <0x0 0x08510000 0x0 0x5000>;
+                        reg-names = "param_ctrl", "phy_base";
+                        #phy-cells = <0>;
+                        phy_type = "utmi";
+                };
