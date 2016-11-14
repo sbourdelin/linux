@@ -222,6 +222,11 @@ enum slpc_param_id {
 	SLPC_MAX_PARAM,
 };
 
+#define SLPC_PARAM_TASK_DEFAULT 0
+#define SLPC_PARAM_TASK_ENABLED 1
+#define SLPC_PARAM_TASK_DISABLED 2
+#define SLPC_PARAM_TASK_UNKNOWN 3
+
 /* intel_slpc.c */
 void intel_slpc_init(struct drm_i915_private *dev_priv);
 void intel_slpc_cleanup(struct drm_i915_private *dev_priv);
@@ -238,5 +243,9 @@ void intel_slpc_get_param(struct drm_i915_private *dev_priv, u32 id,
 			  int *overriding, u32 *value);
 int intel_slpc_max_freq_set(struct drm_i915_private *dev_priv, u32 val);
 int intel_slpc_min_freq_set(struct drm_i915_private *dev_priv, u32 val);
+int intel_slpc_task_control(struct drm_i915_private *dev_priv, u64 val,
+			    u32 enable_id, u32 disable_id);
+int intel_slpc_task_status(struct drm_i915_private *dev_priv, u64 *val,
+			   u32 enable_id, u32 disable_id);
 
 #endif

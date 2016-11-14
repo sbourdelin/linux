@@ -216,6 +216,94 @@ void intel_slpc_get_param(struct drm_i915_private *dev_priv,
 	kunmap_atomic(data);
 }
 
+int slpc_mem_task_control(struct slpc_shared_data *data, u64 val,
+			  u32 enable_id, u32 disable_id)
+{
+	int ret = 0;
+
+	if (val == SLPC_PARAM_TASK_DEFAULT) {
+		/* set default */
+		slpc_mem_unset_param(data, enable_id);
+		slpc_mem_unset_param(data, disable_id);
+	} else if (val == SLPC_PARAM_TASK_ENABLED) {
+		/* set enable */
+		slpc_mem_set_param(data, enable_id, 1);
+		slpc_mem_unset_param(data, disable_id);
+	} else if (val == SLPC_PARAM_TASK_DISABLED) {
+		/* set disable */
+		slpc_mem_set_param(data, disable_id, 1);
+		slpc_mem_unset_param(data, enable_id);
+	} else {
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
+int intel_slpc_task_control(struct drm_i915_private *dev_priv, u64 val,
+			    u32 enable_id, u32 disable_id)
+{
+	int ret = 0;
+
+	if (!dev_priv->guc.slpc.active) {
+		ret = -ENODEV;
+	} else if (val == SLPC_PARAM_TASK_DEFAULT) {
+		/* set default */
+		intel_slpc_unset_param(dev_priv, enable_id);
+		intel_slpc_unset_param(dev_priv, disable_id);
+	} else if (val == SLPC_PARAM_TASK_ENABLED) {
+		/* set enable */
+		intel_slpc_set_param(dev_priv, enable_id, 1);
+		intel_slpc_unset_param(dev_priv, disable_id);
+	} else if (val == SLPC_PARAM_TASK_DISABLED) {
+		/* set disable */
+		intel_slpc_set_param(dev_priv, disable_id, 1);
+		intel_slpc_unset_param(dev_priv, enable_id);
+	} else {
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
+int intel_slpc_task_status(struct drm_i915_private *dev_priv, u64 *val,
+			   u32 enable_id, u32 disable_id)
+{
+	int override_enable, override_disable;
+	u32 value_enable, value_disable;
+	int ret = 0;
+
+	if (!dev_priv->guc.slpc.active) {
+		ret = -ENODEV;
+	} else if (val) {
+		intel_slpc_get_param(dev_priv, enable_id, &override_enable,
+				     &value_enable);
+		intel_slpc_get_param(dev_priv, disable_id, &override_disable,
+				     &value_disable);
+
+		/*
+		 * Set the output value:
+		 * 0: default
+		 * 1: enabled
+		 * 2: disabled
+		 * 3: unknown (should not happen)
+		 */
+		if (override_disable && (value_disable == 1))
+			*val = SLPC_PARAM_TASK_DISABLED;
+		else if (override_enable && (value_enable == 1))
+			*val = SLPC_PARAM_TASK_ENABLED;
+		else if (!override_enable && !override_disable)
+			*val = SLPC_PARAM_TASK_DEFAULT;
+		else
+			*val = SLPC_PARAM_TASK_UNKNOWN;
+
+	} else {
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
 void intel_slpc_init(struct drm_i915_private *dev_priv)
 {
 	struct intel_guc *guc = &dev_priv->guc;
