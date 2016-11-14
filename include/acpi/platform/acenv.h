@@ -234,6 +234,21 @@
 #elif defined(_AED_EFI) || defined(_GNU_EFI) || defined(_EDK2_EFI)
 #include "acefi.h"
 
+/*
+ * Up to this point, we've been looking for specific environments.  In
+ * some cases, there is no environment, and we're just working on bare
+ * metal.  However, since we're compiling the Linux kernel, let's just
+ * pretend we're in a Linux environment.
+ */
+#elif defined(__GNUC__) && !defined(__INTEL_COMPILER)
+#if !defined(_LINUX)
+#define _LINUX
+#endif
+#if !defined(__linux__)
+#define __linux__
+#endif
+#include <acpi/platform/aclinux.h>
+
 #else
 
 /* Unknown environment */
