@@ -332,8 +332,10 @@ NCR_700_detect(struct scsi_host_template *tpnt,
 		tpnt->proc_name = "53c700";
 
 	host = scsi_host_alloc(tpnt, 4);
-	if (!host)
+	if (!host) {
+		dma_free_noncoherent(hostdata->dev, TOTAL_MEM_SIZE, memory, pScript);
 		return NULL;
+	}
 	memset(hostdata->slots, 0, sizeof(struct NCR_700_command_slot)
 	       * NCR_700_COMMAND_SLOTS_PER_HOST);
 	for (j = 0; j < NCR_700_COMMAND_SLOTS_PER_HOST; j++) {
@@ -394,6 +396,7 @@ NCR_700_detect(struct scsi_host_template *tpnt,
 
 	if (scsi_add_host(host, dev)) {
 		dev_printk(KERN_ERR, dev, "53c700: scsi_add_host failed\n");
+		dma_free_noncoherent(hostdata->dev, TOTAL_MEM_SIZE, memory, pScript);
 		scsi_host_put(host);
 		return NULL;
 	}
