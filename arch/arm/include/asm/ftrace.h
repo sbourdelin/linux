@@ -54,6 +54,27 @@ static inline void *return_address(unsigned int level)
 
 #define ftrace_return_address(n) return_address(n)
 
+#define ARCH_HAS_SYSCALL_MATCH_SYM_NAME
+
+static inline bool arch_syscall_match_sym_name(const char *sym,
+					       const char *name)
+{
+	/* Skip sys_ */
+	sym += 4;
+	name += 4;
+
+	if (!strcmp(sym, "mmap2"))
+		sym = "mmap_pgoff";
+	else if (!strcmp(sym, "statfs64_wrapper"))
+		sym = "statfs64";
+	else if (!strcmp(sym, "fstatfs64_wrapper"))
+		sym = "fstatfs64";
+	else if (!strcmp(sym, "arm_fadvise64_64"))
+		sym = "fadvise64_64";
+
+	return !strcmp(sym, name);
+}
+
 #endif /* ifndef __ASSEMBLY__ */
 
 #endif /* _ASM_ARM_FTRACE */
