@@ -320,6 +320,25 @@ static void update_hid_for_radix(void)
 		cpu_relax();
 }
 
+/*
+ * In HV mode, we init AMOR so that the hypervisor
+ * and guest can setup IMAR, enable key 0 and set
+ * it to 1
+ * AMOR = 1100....00 (Mask for key 0 is 11)
+ */
+static void __init radix_init_amor(void)
+{
+	unsigned long amor_mask = 0xc000000000000000;
+	unsigned long amor = mfspr(SPRN_AMOR);
+
+	if (cpu_has_feature(CPU_FTR_POWER9_DD1))
+		return;
+
+	amor = amor_mask;
+
+	mtspr(SPRN_AMOR, amor);
+}
+
 void __init radix__early_init_mmu(void)
 {
 	unsigned long lpcr;
@@ -376,6 +395,7 @@ void __init radix__early_init_mmu(void)
 		lpcr = mfspr(SPRN_LPCR);
 		mtspr(SPRN_LPCR, lpcr | LPCR_UPRT | LPCR_HR);
 		radix_init_partition_table();
+		radix_init_amor();
 	}
 
 	radix_init_pgtable();
@@ -393,6 +413,7 @@ void radix__early_init_mmu_secondary(void)
 
 		mtspr(SPRN_PTCR,
 		      __pa(partition_tb) | (PATB_SIZE_SHIFT - 12));
+		radix_init_amor();
 	}
 }
 
