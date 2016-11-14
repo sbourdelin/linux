@@ -549,6 +549,16 @@ int intel_guc_setup(struct drm_device *dev)
 		intel_guc_fw_status_repr(guc_fw->guc_fw_fetch_status),
 		intel_guc_fw_status_repr(guc_fw->guc_fw_load_status));
 
+	/*
+	 * SLPC is enabled by setting up the shared data structure and
+	 * sending reset event to GuC SLPC. Initial data is setup in
+	 * intel_slpc_init. Here we send the reset event. SLPC enabling
+	 * in GuC can happen in parallel in GuC with other initialization
+	 * being done in i915.
+	 */
+	if (i915.enable_slpc)
+		intel_slpc_enable(dev_priv);
+
 	if (i915.enable_guc_submission) {
 		if (i915.guc_log_level >= 0)
 			gen9_enable_guc_interrupts(dev_priv);

@@ -27,6 +27,7 @@
 #include "intel_guc_fwif.h"
 #include "i915_guc_reg.h"
 #include "intel_ringbuffer.h"
+#include "intel_slpc.h"
 
 struct drm_i915_gem_request;
 
@@ -167,6 +168,8 @@ struct intel_guc {
 
 	/* To serialize the Host2GuC actions */
 	struct mutex action_lock;
+
+	struct intel_slpc slpc;
 };
 
 /* intel_guc_loader.c */

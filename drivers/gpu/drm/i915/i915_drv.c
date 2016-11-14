@@ -1697,6 +1697,8 @@ static int i915_drm_resume_early(struct drm_device *dev)
 		hsw_disable_pc8(dev_priv);
 	}
 
+	dev_priv->guc.slpc.active = false;
+
 	intel_uncore_sanitize(dev_priv);
 
 	if (IS_BROXTON(dev_priv) ||

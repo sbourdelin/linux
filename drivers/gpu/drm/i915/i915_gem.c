@@ -2687,6 +2687,14 @@ void i915_gem_reset(struct drm_i915_private *dev_priv)
 
 	i915_gem_restore_fences(&dev_priv->drm);
 
+	/*
+	 * GPU is reset at this point, Hence mark SLPC as inactive to
+	 * not send h2g action to shutdown SLPC as that will fail.
+	 * enable_gt_powersave will setup RC6 and ring frequencies and
+	 * SLPC will be enabled post GuC initialization.
+	 */
+	dev_priv->guc.slpc.active = false;
+
 	if (dev_priv->gt.awake) {
 		intel_sanitize_gt_powersave(dev_priv);
 		intel_enable_gt_powersave(dev_priv);

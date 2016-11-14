@@ -1492,6 +1492,9 @@ int i915_guc_submission_init(struct drm_i915_private *dev_priv)
 	guc_log_create(guc);
 	guc_addon_create(guc);
 
+	if (i915.enable_slpc)
+		intel_slpc_init(dev_priv);
+
 	return 0;
 }
 
