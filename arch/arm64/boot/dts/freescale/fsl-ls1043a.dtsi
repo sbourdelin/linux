@@ -475,11 +475,40 @@
 				 <&clockgen 4 0>;
 		};
 
+		usbphy0: usb3-phy@084f0000 {
+			compatible = "fsl,qoriq-usb3-phy";
+			reg = <0x0 0x01570070 0x0 0xC>,
+			      <0x0 0x084F0000 0x0 0x5000>;
+			reg-names = "param_ctrl", "phy_base";
+			#phy-cells = <0>;
+			phy_type = "utmi";
+		};
+
+		usbphy1: usb3-phy@08500000 {
+			compatible = "fsl,qoriq-usb3-phy";
+			reg = <0x0 0x0157007C 0x0 0xC>,
+			      <0x0 0x08500000 0x0 0x5000>;
+			reg-names = "param_ctrl", "phy_base";
+			#phy-cells = <0>;
+			phy_type = "utmi";
+		};
+
+		usbphy2: usb3-phy@08510000 {
+			compatible = "fsl,qoriq-usb3-phy";
+			reg = <0x0 0x01570088 0x0 0xC>,
+			      <0x0 0x08510000 0x0 0x5000>;
+			reg-names = "param_ctrl", "phy_base";
+			#phy-cells = <0>;
+			phy_type = "utmi";
+		};
+
 		usb0: usb3@2f00000 {
 			compatible = "snps,dwc3";
 			reg = <0x0 0x2f00000 0x0 0x10000>;
 			interrupts = <0 60 0x4>;
 			dr_mode = "host";
+			phys = <&usbphy0>;
+			phy-names = "usb3-phy";
 			snps,quirk-frame-length-adjustment = <0x20>;
 			snps,dis_rxdet_inp3_quirk;
 		};
@@ -489,6 +518,8 @@
 			reg = <0x0 0x3000000 0x0 0x10000>;
 			interrupts = <0 61 0x4>;
 			dr_mode = "host";
+			phys = <&usbphy1>;
+			phy-names = "usb3-phy";
 			snps,quirk-frame-length-adjustment = <0x20>;
 			snps,dis_rxdet_inp3_quirk;
 		};
@@ -498,6 +529,8 @@
 			reg = <0x0 0x3100000 0x0 0x10000>;
 			interrupts = <0 63 0x4>;
 			dr_mode = "host";
+			phys = <&usbphy2>;
+			phy-names = "usb3-phy";
 			snps,quirk-frame-length-adjustment = <0x20>;
 			snps,dis_rxdet_inp3_quirk;
 		};
