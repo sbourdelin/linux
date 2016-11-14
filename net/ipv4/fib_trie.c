@@ -1737,14 +1737,19 @@ struct fib_table *fib_trie_unmerge(struct fib_table *oldtb)
 				goto out;
 
 			memcpy(new_fa, fa, sizeof(*fa));
+			if (fa->fa_info)
+				fa->fa_info->fib_treeref++;
 
 			/* insert clone into table */
 			if (!local_l)
 				local_l = fib_find_node(lt, &local_tp, l->key);
 
 			if (fib_insert_alias(lt, local_tp, local_l, new_fa,
-					     NULL, l->key))
+					     NULL, l->key)) {
+				kmem_cache_free(fn_alias_kmem, new_fa);
+				fib_release_info(fa->fa_info);
 				goto out;
+			}
 		}
 
 		/* stop loop if key wrapped back to 0 */
