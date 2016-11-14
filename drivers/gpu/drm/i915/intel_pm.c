@@ -5109,11 +5109,15 @@ static void gen9_disable_rc6(struct drm_i915_private *dev_priv)
 {
 	I915_WRITE(GEN6_RC_CONTROL, 0);
 	I915_WRITE(GEN9_PG_ENABLE, 0);
+
+	dev_priv->rps.rc6_enabled = false;
 }
 
 static void gen9_disable_rps(struct drm_i915_private *dev_priv)
 {
 	I915_WRITE(GEN6_RP_CONTROL, 0);
+
+	dev_priv->rps.enabled = false;
 }
 
 static void gen6_disable_rps(struct drm_i915_private *dev_priv)
@@ -5121,11 +5125,15 @@ static void gen6_disable_rps(struct drm_i915_private *dev_priv)
 	I915_WRITE(GEN6_RC_CONTROL, 0);
 	I915_WRITE(GEN6_RPNSWREQ, 1 << 31);
 	I915_WRITE(GEN6_RP_CONTROL, 0);
+
+	dev_priv->rps.enabled = false;
 }
 
 static void cherryview_disable_rps(struct drm_i915_private *dev_priv)
 {
 	I915_WRITE(GEN6_RC_CONTROL, 0);
+
+	dev_priv->rps.enabled = false;
 }
 
 static void valleyview_disable_rps(struct drm_i915_private *dev_priv)
@@ -5137,6 +5145,8 @@ static void valleyview_disable_rps(struct drm_i915_private *dev_priv)
 	I915_WRITE(GEN6_RC_CONTROL, 0);
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	dev_priv->rps.enabled = false;
 }
 
 static void intel_print_rc6_info(struct drm_i915_private *dev_priv, u32 mode)
@@ -5354,6 +5364,8 @@ static void gen9_enable_rps(struct drm_i915_private *dev_priv)
 	reset_rps(dev_priv, gen6_set_rps);
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	dev_priv->rps.enabled = true;
 }
 
 static void gen9_enable_rc6(struct drm_i915_private *dev_priv)
@@ -5421,6 +5433,8 @@ static void gen9_enable_rc6(struct drm_i915_private *dev_priv)
 				(GEN9_RENDER_PG_ENABLE | GEN9_MEDIA_PG_ENABLE) : 0);
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	dev_priv->rps.rc6_enabled = true;
 }
 
 static void gen8_enable_rps(struct drm_i915_private *dev_priv)
@@ -5498,6 +5512,8 @@ static void gen8_enable_rps(struct drm_i915_private *dev_priv)
 	reset_rps(dev_priv, gen6_set_rps);
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	dev_priv->rps.enabled = true;
 }
 
 static void gen6_enable_rps(struct drm_i915_private *dev_priv)
@@ -5591,6 +5607,8 @@ static void gen6_enable_rps(struct drm_i915_private *dev_priv)
 	}
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	dev_priv->rps.enabled = true;
 }
 
 static void gen6_update_ring_freq(struct drm_i915_private *dev_priv)
@@ -6066,6 +6084,8 @@ static void cherryview_enable_rps(struct drm_i915_private *dev_priv)
 	reset_rps(dev_priv, valleyview_set_rps);
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	dev_priv->rps.enabled = true;
 }
 
 static void valleyview_enable_rps(struct drm_i915_private *dev_priv)
@@ -6147,6 +6167,8 @@ static void valleyview_enable_rps(struct drm_i915_private *dev_priv)
 	reset_rps(dev_priv, valleyview_set_rps);
 
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+	dev_priv->rps.enabled = true;
 }
 
 static unsigned long intel_pxfreq(u32 vidfreq)
@@ -6711,6 +6733,7 @@ void intel_suspend_gt_powersave(struct drm_i915_private *dev_priv)
 void intel_sanitize_gt_powersave(struct drm_i915_private *dev_priv)
 {
 	dev_priv->rps.enabled = true; /* force disabling */
+	dev_priv->rps.rc6_enabled = true;
 	intel_disable_gt_powersave(dev_priv);
 
 	gen6_reset_rps_interrupts(dev_priv);
@@ -6718,14 +6741,20 @@ void intel_sanitize_gt_powersave(struct drm_i915_private *dev_priv)
 
 void intel_disable_gt_powersave(struct drm_i915_private *dev_priv)
 {
-	if (!READ_ONCE(dev_priv->rps.enabled))
+	if (!READ_ONCE(dev_priv->rps.enabled)) {
+		if (WARN_ON_ONCE(IS_GEN9(dev_priv) &&
+				 READ_ONCE(dev_priv->rps.rc6_enabled)))
+			DRM_ERROR("RC6 not disabled.\n");
 		return;
+	}
 
 	mutex_lock(&dev_priv->rps.hw_lock);
 
 	if (INTEL_GEN(dev_priv) >= 9) {
-		gen9_disable_rc6(dev_priv);
-		gen9_disable_rps(dev_priv);
+		if (READ_ONCE(dev_priv->rps.rc6_enabled))
+			gen9_disable_rc6(dev_priv);
+		if (READ_ONCE(dev_priv->rps.enabled))
+			gen9_disable_rps(dev_priv);
 	} else if (IS_CHERRYVIEW(dev_priv)) {
 		cherryview_disable_rps(dev_priv);
 	} else if (IS_VALLEYVIEW(dev_priv)) {
@@ -6736,7 +6765,6 @@ void intel_disable_gt_powersave(struct drm_i915_private *dev_priv)
 		ironlake_disable_drps(dev_priv);
 	}
 
-	dev_priv->rps.enabled = false;
 	mutex_unlock(&dev_priv->rps.hw_lock);
 }
 
@@ -6745,8 +6773,12 @@ void intel_enable_gt_powersave(struct drm_i915_private *dev_priv)
 	/* We shouldn't be disabling as we submit, so this should be less
 	 * racy than it appears!
 	 */
-	if (READ_ONCE(dev_priv->rps.enabled))
+	if (READ_ONCE(dev_priv->rps.enabled)) {
+		if (WARN_ON_ONCE(IS_GEN9(dev_priv) &&
+				 !READ_ONCE(dev_priv->rps.rc6_enabled)))
+			DRM_ERROR("RC6 and ring frequencies not enabled.\n");
 		return;
+	}
 
 	/* Powersaving is controlled by the host when inside a VM */
 	if (intel_vgpu_active(dev_priv))
@@ -6759,10 +6791,13 @@ void intel_enable_gt_powersave(struct drm_i915_private *dev_priv)
 	} else if (IS_VALLEYVIEW(dev_priv)) {
 		valleyview_enable_rps(dev_priv);
 	} else if (INTEL_GEN(dev_priv) >= 9) {
-		gen9_enable_rc6(dev_priv);
-		gen9_enable_rps(dev_priv);
-		if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))
-			gen6_update_ring_freq(dev_priv);
+		if (!READ_ONCE(dev_priv->rps.rc6_enabled)) {
+			gen9_enable_rc6(dev_priv);
+			if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))
+				gen6_update_ring_freq(dev_priv);
+		}
+		if (!READ_ONCE(dev_priv->rps.enabled))
+			gen9_enable_rps(dev_priv);
 	} else if (IS_BROADWELL(dev_priv)) {
 		gen8_enable_rps(dev_priv);
 		gen6_update_ring_freq(dev_priv);
@@ -6780,7 +6815,6 @@ void intel_enable_gt_powersave(struct drm_i915_private *dev_priv)
 	WARN_ON(dev_priv->rps.efficient_freq < dev_priv->rps.min_freq);
 	WARN_ON(dev_priv->rps.efficient_freq > dev_priv->rps.max_freq);
 
-	dev_priv->rps.enabled = true;
 	mutex_unlock(&dev_priv->rps.hw_lock);
 }
 
