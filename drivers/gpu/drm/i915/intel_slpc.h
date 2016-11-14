@@ -123,6 +123,77 @@ struct intel_slpc {
 	struct i915_vma *vma;
 };
 
+#define SLPC_EVENT_MAX_INPUT_ARGS  7
+#define SLPC_EVENT_MAX_OUTPUT_ARGS 1
+
+union slpc_event_input_header {
+	u32 value;
+	struct {
+		u32 num_args:8;
+		u32 event_id:8;
+	};
+};
+
+struct slpc_event_input {
+	u32 h2g_action_id;
+	union slpc_event_input_header header;
+	u32 args[SLPC_EVENT_MAX_INPUT_ARGS];
+} __packed;
+
+union slpc_event_output_header {
+	u32 value;
+	struct {
+		u32 num_args:8;
+		u32 event_id:8;
+		u32 status:16;
+	};
+};
+
+struct slpc_event_output {
+	u32 reserved;
+	union slpc_event_output_header header;
+	u32 args[SLPC_EVENT_MAX_OUTPUT_ARGS];
+} __packed;
+
+enum slpc_event_id {
+	SLPC_EVENT_RESET = 0,
+	SLPC_EVENT_SHUTDOWN = 1,
+	SLPC_EVENT_PLATFORM_INFO_CHANGE = 2,
+	SLPC_EVENT_DISPLAY_MODE_CHANGE = 3,
+	SLPC_EVENT_FLIP_COMPLETE = 4,
+	SLPC_EVENT_QUERY_TASK_STATE = 5,
+	SLPC_EVENT_PARAMETER_SET = 6,
+	SLPC_EVENT_PARAMETER_UNSET = 7,
+};
+
+#define SLPC_EVENT(id, argc)	((u32) (id) << 8 | (argc))
+
+enum slpc_status {
+	SLPC_STATUS_OK = 0,
+	SLPC_STATUS_ERROR = 1,
+	SLPC_STATUS_ILLEGAL_COMMAND = 2,
+	SLPC_STATUS_INVALID_ARGS = 3,
+	SLPC_STATUS_INVALID_PARAMS = 4,
+	SLPC_STATUS_INVALID_DATA = 5,
+	SLPC_STATUS_OUT_OF_RANGE = 6,
+	SLPC_STATUS_NOT_SUPPORTED = 7,
+	SLPC_STATUS_NOT_IMPLEMENTED = 8,
+	SLPC_STATUS_NO_DATA = 9,
+	SLPC_STATUS_EVENT_NOT_REGISTERED = 10,
+	SLPC_STATUS_REGISTER_LOCKED = 11,
+	SLPC_STATUS_TEMPORARILY_UNAVAILABLE = 12,
+	SLPC_STATUS_VALUE_ALREADY_SET = 13,
+	SLPC_STATUS_VALUE_ALREADY_UNSET = 14,
+	SLPC_STATUS_VALUE_NOT_CHANGED = 15,
+	SLPC_STATUS_MEMIO_ERROR = 16,
+	SLPC_STATUS_EVENT_QUEUED_REQ_DPC = 17,
+	SLPC_STATUS_EVENT_QUEUED_NOREQ_DPC = 18,
+	SLPC_STATUS_NO_EVENT_QUEUED = 19,
+	SLPC_STATUS_OUT_OF_SPACE = 20,
+	SLPC_STATUS_TIMEOUT = 21,
+	SLPC_STATUS_NO_LOCK = 22,
+};
+
 /* intel_slpc.c */
 void intel_slpc_init(struct drm_i915_private *dev_priv);
 void intel_slpc_cleanup(struct drm_i915_private *dev_priv);

@@ -82,6 +82,36 @@ static void slpc_shared_data_init(struct drm_i915_private *dev_priv)
 	kunmap_atomic(data);
 }
 
+static void host2guc_slpc(struct drm_i915_private *dev_priv,
+			  struct slpc_event_input *input, u32 len)
+{
+	union slpc_event_output_header header;
+	u32 *data;
+	int ret = 0;
+
+	/*
+	 * We have only 15 scratch registers for communication.
+	 * the first we will use for the event ID in input and
+	 * output data. Event processing status will be present
+	 * in SOFT_SCRATCH(1) register.
+	 */
+	BUILD_BUG_ON(SLPC_EVENT_MAX_INPUT_ARGS > 14);
+	BUILD_BUG_ON(SLPC_EVENT_MAX_OUTPUT_ARGS < 1);
+	BUILD_BUG_ON(SLPC_EVENT_MAX_OUTPUT_ARGS > 14);
+
+	data = (u32 *) input;
+	data[0] = HOST2GUC_ACTION_SLPC_REQUEST;
+	ret = i915_guc_action(&dev_priv->guc, data, len);
+
+	if (!ret) {
+		header.value = I915_READ(SOFT_SCRATCH(1));
+		ret = header.status;
+	}
+
+	if (ret)
+		DRM_ERROR("event 0x%x status %d\n", (data[1] >> 8), ret);
+}
+
 void intel_slpc_init(struct drm_i915_private *dev_priv)
 {
 	struct intel_guc *guc = &dev_priv->guc;
