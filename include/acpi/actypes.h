@@ -44,6 +44,8 @@
 #ifndef __ACTYPES_H__
 #define __ACTYPES_H__
 
+#include <linux/stddef.h> /* NULL */
+
 /* acpisrc:struct_defs -- for acpisrc conversion */
 
 /*
@@ -437,10 +439,6 @@ typedef u64 acpi_physical_address;
 #endif
 #define TRUE                            (1 == 1)
 
-#ifndef NULL
-#define NULL                            (void *) 0
-#endif
-
 /*
  * Miscellaneous types
  */
@@ -530,9 +528,9 @@ typedef u64 acpi_integer;
 
 /* Pointer/Integer type conversions */
 
-#define ACPI_TO_POINTER(i)              ACPI_ADD_PTR (void, (void *) NULL,(acpi_size) i)
-#define ACPI_TO_INTEGER(p)              ACPI_PTR_DIFF (p, (void *) NULL)
-#define ACPI_OFFSET(d, f)               ACPI_PTR_DIFF (&(((d *) 0)->f), (void *) NULL)
+#define ACPI_TO_POINTER(i)              ACPI_ADD_PTR(void, NULL, (acpi_size) i)
+#define ACPI_TO_INTEGER(p)              ACPI_PTR_DIFF(p, NULL)
+#define ACPI_OFFSET(d, f)               ACPI_PTR_DIFF(&(((d *) 0)->f), NULL)
 #define ACPI_PHYSADDR_TO_PTR(i)         ACPI_TO_POINTER(i)
 #define ACPI_PTR_TO_PHYSADDR(i)         ACPI_TO_INTEGER(i)
 
