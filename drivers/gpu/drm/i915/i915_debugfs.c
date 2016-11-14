@@ -5003,7 +5003,12 @@ i915_max_freq_get(void *data, u64 *val)
 	if (INTEL_GEN(dev_priv) < 6)
 		return -ENODEV;
 
-	*val = intel_gpu_freq(dev_priv, dev_priv->rps.max_freq_softlimit);
+	if (dev_priv->guc.slpc.active)
+		*val = intel_gpu_freq(dev_priv,
+				      dev_priv->guc.slpc.max_unslice_freq);
+	else
+		*val = intel_gpu_freq(dev_priv,
+				      dev_priv->rps.max_freq_softlimit);
 	return 0;
 }
 
@@ -5027,6 +5032,12 @@ i915_max_freq_set(void *data, u64 val)
 	 * Turbo will still be enabled, but won't go above the set value.
 	 */
 	val = intel_freq_opcode(dev_priv, val);
+
+	if (dev_priv->guc.slpc.active) {
+		ret = intel_slpc_max_freq_set(dev_priv, val);
+		mutex_unlock(&dev_priv->rps.hw_lock);
+		return ret;
+	}
 
 	hw_max = dev_priv->rps.max_freq;
 	hw_min = dev_priv->rps.min_freq;
@@ -5057,7 +5068,12 @@ i915_min_freq_get(void *data, u64 *val)
 	if (INTEL_GEN(dev_priv) < 6)
 		return -ENODEV;
 
-	*val = intel_gpu_freq(dev_priv, dev_priv->rps.min_freq_softlimit);
+	if (dev_priv->guc.slpc.active)
+		*val = intel_gpu_freq(dev_priv,
+				      dev_priv->guc.slpc.min_unslice_freq);
+	else
+		*val = intel_gpu_freq(dev_priv,
+				      dev_priv->rps.min_freq_softlimit);
 	return 0;
 }
 
@@ -5081,6 +5097,12 @@ i915_min_freq_set(void *data, u64 val)
 	 * Turbo will still be enabled, but won't go below the set value.
 	 */
 	val = intel_freq_opcode(dev_priv, val);
+
+	if (dev_priv->guc.slpc.active) {
+		ret = intel_slpc_min_freq_set(dev_priv, val);
+		mutex_unlock(&dev_priv->rps.hw_lock);
+		return ret;
+	}
 
 	hw_max = dev_priv->rps.max_freq;
 	hw_min = dev_priv->rps.min_freq;

@@ -121,6 +121,10 @@ struct slpc_shared_data {
 struct intel_slpc {
 	bool active;
 	struct i915_vma *vma;
+
+	/* i915 cached SLPC frequency limits */
+	u32 min_unslice_freq;
+	u32 max_unslice_freq;
 };
 
 #define SLPC_EVENT_MAX_INPUT_ARGS  7
@@ -232,5 +236,7 @@ void intel_slpc_unset_param(struct drm_i915_private *dev_priv, u32 id);
 void intel_slpc_set_param(struct drm_i915_private *dev_priv, u32 id, u32 value);
 void intel_slpc_get_param(struct drm_i915_private *dev_priv, u32 id,
 			  int *overriding, u32 *value);
+int intel_slpc_max_freq_set(struct drm_i915_private *dev_priv, u32 val);
+int intel_slpc_min_freq_set(struct drm_i915_private *dev_priv, u32 val);
 
 #endif
