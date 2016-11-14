@@ -163,6 +163,8 @@ static void guc_interrupts_capture(struct drm_i915_private *dev_priv)
 
 void sanitize_slpc_option(struct drm_i915_private *dev_priv)
 {
+	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
+
 	/* slpc requires hardware support and compatible firmware */
 	if (!HAS_SLPC(dev_priv))
 		i915.enable_slpc = 0;
@@ -173,6 +175,9 @@ void sanitize_slpc_option(struct drm_i915_private *dev_priv)
 
 	/* slpc requires guc submission */
 	if (!i915.enable_guc_submission)
+		i915.enable_slpc = 0;
+
+	if (IS_SKYLAKE(dev_priv) && (guc_fw->guc_fw_major_found != 9))
 		i915.enable_slpc = 0;
 }
 
