@@ -1779,7 +1779,7 @@ static void intel_pstate_use_acpi_profile(void)
 				get_target_pstate_use_cpu_load;
 }
 #else
-static inline void intel_pstate_use_acpi_profile(struct pstate_funcs *funcs)
+static inline void intel_pstate_use_acpi_profile(void)
 {
 }
 #endif
