@@ -471,9 +471,11 @@ static int sd_set_bus_speed_mode(struct mmc_card *card, u8 *status)
 	if (err)
 		return err;
 
-	if ((status[16] & 0xF) != card->sd_bus_speed)
+	if ((status[16] & 0xF) != card->sd_bus_speed) {
+		card->sd_bus_speed = status[16] & 0xF;
 		pr_warn("%s: Problem setting bus speed mode!\n",
 			mmc_hostname(card->host));
+	}
 	else {
 		mmc_set_timing(card->host, timing);
 		mmc_set_clock(card->host, card->sw_caps.uhs_max_dtr);
