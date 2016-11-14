@@ -73,7 +73,7 @@ void fsnotify_destroy_group(struct fsnotify_group *group)
 	 * Wait for fsnotify_mark_srcu period to end and free all marks in
 	 * destroy_list
 	 */
-	fsnotify_mark_destroy_list();
+	fsnotify_mark_destroy_list(group->priority);
 
 	/*
 	 * Since we have waited for fsnotify_mark_srcu in

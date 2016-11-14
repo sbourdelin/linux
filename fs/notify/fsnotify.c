@@ -192,9 +192,10 @@ int fsnotify(struct inode *to_tell, __u32 mask, void *data, int data_is,
 {
 	struct hlist_node *inode_node = NULL, *vfsmount_node = NULL;
 	struct fsnotify_mark *inode_mark = NULL, *vfsmount_mark = NULL;
-	struct fsnotify_group *inode_group, *vfsmount_group;
+	struct fsnotify_group *inode_group, *vfsmount_group, *group;
 	struct mount *mnt;
-	int idx, ret = 0;
+	int perm_idx, idx;
+	int ret = 0;
 	/* global tests shouldn't care about events on child only the specific event */
 	__u32 test_mask = (mask & ~FS_EVENT_ON_CHILD);
 
@@ -223,7 +224,14 @@ int fsnotify(struct inode *to_tell, __u32 mask, void *data, int data_is,
 	    !(mnt && test_mask & mnt->mnt_fsnotify_mask))
 		return 0;
 
-	idx = srcu_read_lock(&fsnotify_mark_srcu);
+	/*
+	 * First mark on the list may be either low or high priority, so
+	 * when traversing to first mark we must hold read side of both srcu.
+	 * When we reach the first low priority mark, we may drop the
+	 * read side of fsnotify_mark_srcu[1]
+	 */
+	idx = srcu_read_lock(&fsnotify_mark_srcu[0]);
+	perm_idx = srcu_read_lock(&fsnotify_mark_srcu[1]);
 
 	if ((mask & FS_MODIFY) ||
 	    (test_mask & to_tell->i_fsnotify_mask))
@@ -252,13 +260,13 @@ int fsnotify(struct inode *to_tell, __u32 mask, void *data, int data_is,
 		if (inode_node) {
 			inode_mark = hlist_entry(srcu_dereference(inode_node, &fsnotify_mark_srcu),
 						 struct fsnotify_mark, obj_list);
-			inode_group = inode_mark->group;
+			group = inode_group = inode_mark->group;
 		}
 
 		if (vfsmount_node) {
 			vfsmount_mark = hlist_entry(srcu_dereference(vfsmount_node, &fsnotify_mark_srcu),
 						    struct fsnotify_mark, obj_list);
-			vfsmount_group = vfsmount_mark->group;
+			group = vfsmount_group = vfsmount_mark->group;
 		}
 
 		if (inode_group && vfsmount_group) {
@@ -270,8 +278,16 @@ int fsnotify(struct inode *to_tell, __u32 mask, void *data, int data_is,
 			} else if (cmp < 0) {
 				vfsmount_group = NULL;
 				vfsmount_mark = NULL;
+				group = inode_group;
 			}
 		}
+
+		if (group->priority == 0 && perm_idx >= 0) {
+			/* We are done iterating the high priority marks */
+			srcu_read_unlock(&fsnotify_mark_srcu[1], perm_idx);
+			perm_idx = -1;
+		}
+
 		ret = send_to_group(to_tell, inode_mark, vfsmount_mark, mask,
 				    data, data_is, cookie, file_name);
 
@@ -287,7 +303,9 @@ int fsnotify(struct inode *to_tell, __u32 mask, void *data, int data_is,
 	}
 	ret = 0;
 out:
-	srcu_read_unlock(&fsnotify_mark_srcu, idx);
+	srcu_read_unlock(&fsnotify_mark_srcu[0], idx);
+	if (perm_idx >= 0)
+		srcu_read_unlock(&fsnotify_mark_srcu[1], perm_idx);
 
 	return ret;
 }
@@ -299,7 +317,9 @@ static __init int fsnotify_init(void)
 
 	BUG_ON(hweight32(ALL_FSNOTIFY_EVENTS) != 23);
 
-	ret = init_srcu_struct(&fsnotify_mark_srcu);
+	ret = init_srcu_struct(&fsnotify_mark_srcu[0]);
+	if (!ret)
+		ret = init_srcu_struct(&fsnotify_mark_srcu[1]);
 	if (ret)
 		panic("initializing fsnotify_mark_srcu");
 

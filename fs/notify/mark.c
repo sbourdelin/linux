@@ -93,12 +93,50 @@
 
 #define FSNOTIFY_REAPER_DELAY	(1)	/* 1 jiffy */
 
-struct srcu_struct fsnotify_mark_srcu;
+/*
+ * fsnotify_mark_srcu[1] protects reads of the first half of inode/vfsmount
+ * mark lists, which consist of the high priority (>0) marks, whose masks
+ * may contain permission events.
+ *
+ * fsnotify_mark_srcu[0] protects reads of the second half of inode/vfsmount
+ * mark lists, which consist of the low priority (0) marks, whose masks
+ * do not contain permission events.
+ *
+ * High priority marks and low priority marks are added to different
+ * destroy lists and freed by different reapers, who synchronize only
+ * the relevant srcu.
+ */
+struct srcu_struct fsnotify_mark_srcu[FS_PRIO_SRCU_NUM];
 static DEFINE_SPINLOCK(destroy_lock);
-static LIST_HEAD(destroy_list);
+static LIST_HEAD(destroy_list_0);
+static LIST_HEAD(destroy_list_1);
+static struct list_head *destroy_lists[FS_PRIO_SRCU_NUM] = {
+	&destroy_list_0,
+	&destroy_list_1
+};
 
 static void fsnotify_mark_destroy_workfn(struct work_struct *work);
-static DECLARE_DELAYED_WORK(reaper_work, fsnotify_mark_destroy_workfn);
+static DECLARE_DELAYED_WORK(reaper_work_0, fsnotify_mark_destroy_workfn);
+static DECLARE_DELAYED_WORK(reaper_work_1, fsnotify_mark_destroy_workfn);
+static struct delayed_work *reapers[FS_PRIO_SRCU_NUM] = {
+	&reaper_work_0,
+	&reaper_work_1
+};
+
+static inline void fsnotify_destroy_list_add(struct fsnotify_mark *mark,
+					     int priority)
+{
+	spin_lock(&destroy_lock);
+	list_add(&mark->g_list, destroy_lists[FS_PRIO_SRCU(priority)]);
+	spin_unlock(&destroy_lock);
+}
+
+static inline void fsnotify_destroy_list_reap(int priority)
+{
+	queue_delayed_work(system_unbound_wq,
+			   reapers[FS_PRIO_SRCU(priority)],
+			   FSNOTIFY_REAPER_DELAY);
+}
 
 void fsnotify_get_mark(struct fsnotify_mark *mark)
 {
@@ -202,9 +240,7 @@ static bool __fsnotify_free_mark(struct fsnotify_mark *mark)
 	if (group->ops->freeing_mark)
 		group->ops->freeing_mark(mark, group);
 
-	spin_lock(&destroy_lock);
-	list_add(&mark->g_list, &destroy_list);
-	spin_unlock(&destroy_lock);
+	fsnotify_destroy_list_add(mark, group->priority);
 
 	return true;
 }
@@ -216,10 +252,8 @@ static bool __fsnotify_free_mark(struct fsnotify_mark *mark)
  */
 void fsnotify_free_mark(struct fsnotify_mark *mark)
 {
-	if (__fsnotify_free_mark(mark)) {
-		queue_delayed_work(system_unbound_wq, &reaper_work,
-				   FSNOTIFY_REAPER_DELAY);
-	}
+	if (__fsnotify_free_mark(mark))
+		fsnotify_destroy_list_reap(mark->group->priority);
 }
 
 void fsnotify_destroy_mark(struct fsnotify_mark *mark,
@@ -407,11 +441,8 @@ err:
 
 	spin_unlock(&mark->lock);
 
-	spin_lock(&destroy_lock);
-	list_add(&mark->g_list, &destroy_list);
-	spin_unlock(&destroy_lock);
-	queue_delayed_work(system_unbound_wq, &reaper_work,
-				FSNOTIFY_REAPER_DELAY);
+	fsnotify_destroy_list_add(mark, group->priority);
+	fsnotify_destroy_list_reap(group->priority);
 
 	return ret;
 }
@@ -537,18 +568,26 @@ void fsnotify_init_mark(struct fsnotify_mark *mark,
 /*
  * Destroy all marks in destroy_list, waits for SRCU period to finish before
  * actually freeing marks.
+ * High priority (>0) marks are on destroy_lists[1] and protected by
+ * fsnotify_mark_srcu[1].
+ * Low priority (0) marks are on destroy_lists[0] and protected by
+ * fsnotify_mark_srcu[0].
  */
-void fsnotify_mark_destroy_list(void)
+void fsnotify_mark_destroy_list(int priority)
 {
 	struct fsnotify_mark *mark, *next;
 	struct list_head private_destroy_list;
+	int id = FS_PRIO_SRCU(priority);
 
 	spin_lock(&destroy_lock);
 	/* exchange the list head */
-	list_replace_init(&destroy_list, &private_destroy_list);
+	list_replace_init(destroy_lists[id], &private_destroy_list);
 	spin_unlock(&destroy_lock);
 
-	synchronize_srcu(&fsnotify_mark_srcu);
+	if (list_empty(&private_destroy_list))
+		return;
+
+	synchronize_srcu(&fsnotify_mark_srcu[id]);
 
 	list_for_each_entry_safe(mark, next, &private_destroy_list, g_list) {
 		list_del_init(&mark->g_list);
@@ -558,5 +597,5 @@ void fsnotify_mark_destroy_list(void)
 
 static void fsnotify_mark_destroy_workfn(struct work_struct *work)
 {
-	fsnotify_mark_destroy_list();
+	fsnotify_mark_destroy_list((void *)work != reapers[0]);
 }

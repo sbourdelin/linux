@@ -11,8 +11,19 @@
 /* destroy all events sitting in this groups notification queue */
 extern void fsnotify_flush_notify(struct fsnotify_group *group);
 
-/* protects reads of inode and vfsmount marks list */
-extern struct srcu_struct fsnotify_mark_srcu;
+/*
+ * fsnotify_mark_srcu[1] protects reads of the first half of inode/vfsmount
+ * mark lists, which consist of the high priority (>0) marks, whose masks
+ * may contain permission events.
+ *
+ * fsnotify_mark_srcu[0] protects reads of the second half of inode/vfsmount
+ * mark lists, which consist of the low priority (0) marks, whose masks
+ * do not contain permission events.
+ */
+#define FS_PRIO_SRCU(prio)	((int)(prio > FS_PRIO_0))
+#define FS_PRIO_SRCU_NUM	2
+
+extern struct srcu_struct fsnotify_mark_srcu[FS_PRIO_SRCU_NUM];
 
 /* Calculate mask of events for a list of marks */
 extern u32 fsnotify_recalc_mask(struct hlist_head *head);
@@ -61,7 +72,7 @@ extern void fsnotify_detach_group_marks(struct fsnotify_group *group);
 /*
  * wait for fsnotify_mark_srcu period to end and free all marks in destroy_list
  */
-extern void fsnotify_mark_destroy_list(void);
+extern void fsnotify_mark_destroy_list(int priority);
 
 /*
  * update the dentry->d_flags of all of inode's children to indicate if inode cares
