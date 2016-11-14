@@ -200,5 +200,9 @@ void intel_slpc_cleanup(struct drm_i915_private *dev_priv);
 void intel_slpc_suspend(struct drm_i915_private *dev_priv);
 void intel_slpc_disable(struct drm_i915_private *dev_priv);
 void intel_slpc_enable(struct drm_i915_private *dev_priv);
+void intel_slpc_read_shared_data(struct drm_i915_private *dev_priv,
+				struct slpc_shared_data *data);
+const char *intel_slpc_get_state_str(enum slpc_global_state state);
+bool intel_slpc_get_status(struct drm_i915_private *dev_priv);
 
 #endif

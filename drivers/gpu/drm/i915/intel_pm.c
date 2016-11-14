@@ -6667,6 +6667,14 @@ void intel_init_gt_powersave(struct drm_i915_private *dev_priv)
 		intel_runtime_pm_get(dev_priv);
 	}
 
+	if (i915.enable_slpc) {
+		dev_priv->guc.slpc.active = intel_slpc_get_status(dev_priv);
+		if (!dev_priv->guc.slpc.active) {
+			i915.enable_slpc = 0;
+			intel_sanitize_gt_powersave(dev_priv);
+		}
+	}
+
 	mutex_lock(&dev_priv->drm.struct_mutex);
 	mutex_lock(&dev_priv->rps.hw_lock);
 
