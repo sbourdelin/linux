@@ -95,6 +95,10 @@ static int ovl_getattr(struct vfsmount *mnt, struct dentry *dentry,
 	old_cred = ovl_override_creds(dentry->d_sb);
 	err = vfs_getattr(&realpath, stat);
 	revert_creds(old_cred);
+
+	stat->dev = dentry->d_sb->s_dev;
+	stat->ino = dentry->d_inode->i_ino;
+
 	return err;
 }
 
