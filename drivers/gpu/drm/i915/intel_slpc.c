@@ -112,6 +112,110 @@ static void host2guc_slpc(struct drm_i915_private *dev_priv,
 		DRM_ERROR("event 0x%x status %d\n", (data[1] >> 8), ret);
 }
 
+static void host2guc_slpc_set_param(struct drm_i915_private *dev_priv,
+				    u32 id, u32 value)
+{
+	struct slpc_event_input data = {0};
+
+	data.header.value = SLPC_EVENT(SLPC_EVENT_PARAMETER_SET, 2);
+	data.args[0] = id;
+	data.args[1] = value;
+
+	host2guc_slpc(dev_priv, &data, 4);
+}
+
+void slpc_mem_set_param(struct slpc_shared_data *data,
+			      u32 id,
+			      u32 value)
+{
+	data->override_parameters_set_bits[id >> 5]
+						|= (1 << (id % 32));
+	data->override_parameters_values[id] = value;
+}
+
+void intel_slpc_set_param(struct drm_i915_private *dev_priv,
+			  u32 id,
+			  u32 value)
+{
+	struct page *page;
+	struct slpc_shared_data *data = NULL;
+
+	WARN_ON(id >= SLPC_MAX_PARAM);
+
+	if (!dev_priv->guc.slpc.vma)
+		return;
+
+	page = i915_vma_first_page(dev_priv->guc.slpc.vma);
+	data = kmap_atomic(page);
+	slpc_mem_set_param(data, id, value);
+	kunmap_atomic(data);
+
+	host2guc_slpc_set_param(dev_priv, id, value);
+}
+
+static void host2guc_slpc_unset_param(struct drm_i915_private *dev_priv,
+				      u32 id)
+{
+	struct slpc_event_input data = {0};
+
+	data.header.value = SLPC_EVENT(SLPC_EVENT_PARAMETER_UNSET, 1);
+	data.args[0] = id;
+
+	host2guc_slpc(dev_priv, &data, 3);
+}
+
+void slpc_mem_unset_param(struct slpc_shared_data *data,
+				u32 id)
+{
+	data->override_parameters_set_bits[id >> 5]
+						&= (~(1 << (id % 32)));
+	data->override_parameters_values[id] = 0;
+}
+
+void intel_slpc_unset_param(struct drm_i915_private *dev_priv,
+			    u32 id)
+{
+	struct page *page;
+	struct slpc_shared_data *data = NULL;
+
+	WARN_ON(id >= SLPC_MAX_PARAM);
+
+	if (!dev_priv->guc.slpc.vma)
+		return;
+
+	page = i915_vma_first_page(dev_priv->guc.slpc.vma);
+	data = kmap_atomic(page);
+	slpc_mem_unset_param(data, id);
+	kunmap_atomic(data);
+
+	host2guc_slpc_unset_param(dev_priv, id);
+}
+
+void intel_slpc_get_param(struct drm_i915_private *dev_priv,
+			  u32 id,
+			  int *overriding, u32 *value)
+{
+	struct page *page;
+	struct slpc_shared_data *data = NULL;
+	u32 bits;
+
+	WARN_ON(id >= SLPC_MAX_PARAM);
+
+	if (!dev_priv->guc.slpc.vma)
+		return;
+
+	page = i915_vma_first_page(dev_priv->guc.slpc.vma);
+	data = kmap_atomic(page);
+	if (overriding) {
+		bits = data->override_parameters_set_bits[id >> 5];
+		*overriding = (0 != (bits & (1 << (id % 32))));
+	}
+	if (value)
+		*value = data->override_parameters_values[id];
+
+	kunmap_atomic(data);
+}
+
 void intel_slpc_init(struct drm_i915_private *dev_priv)
 {
 	struct intel_guc *guc = &dev_priv->guc;
