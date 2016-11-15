@@ -1272,6 +1272,7 @@ static struct spi_driver wm8900_spi_driver = {
 	.probe		= wm8900_spi_probe,
 	.remove		= wm8900_spi_remove,
 };
+module_spi_driver(wm8900_spi_driver);
 #endif /* CONFIG_SPI_MASTER */
 
 #if IS_ENABLED(CONFIG_I2C)
@@ -1318,39 +1319,8 @@ static struct i2c_driver wm8900_i2c_driver = {
 	.remove =   wm8900_i2c_remove,
 	.id_table = wm8900_i2c_id,
 };
+module_i2c_driver(wm8900_i2c_driver);
 #endif
-
-static int __init wm8900_modinit(void)
-{
-	int ret = 0;
-#if IS_ENABLED(CONFIG_I2C)
-	ret = i2c_add_driver(&wm8900_i2c_driver);
-	if (ret != 0) {
-		printk(KERN_ERR "Failed to register wm8900 I2C driver: %d\n",
-		       ret);
-	}
-#endif
-#if defined(CONFIG_SPI_MASTER)
-	ret = spi_register_driver(&wm8900_spi_driver);
-	if (ret != 0) {
-		printk(KERN_ERR "Failed to register wm8900 SPI driver: %d\n",
-		       ret);
-	}
-#endif
-	return ret;
-}
-module_init(wm8900_modinit);
-
-static void __exit wm8900_exit(void)
-{
-#if IS_ENABLED(CONFIG_I2C)
-	i2c_del_driver(&wm8900_i2c_driver);
-#endif
-#if defined(CONFIG_SPI_MASTER)
-	spi_unregister_driver(&wm8900_spi_driver);
-#endif
-}
-module_exit(wm8900_exit);
 
 MODULE_DESCRIPTION("ASoC WM8900 driver");
 MODULE_AUTHOR("Mark Brown <broonie@opensource.wolfonmicro.com>");
