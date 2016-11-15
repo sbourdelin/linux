@@ -1007,4 +1007,12 @@
 			status = "disabled";
 		};
 	};
+
+	ion {
+		compatible = "st,sti-ion", "linux,ion";
+
+		ion-cma-heap {
+			compatible = "st,cma-heap", "linux,ion-heap-dma";
+		};
+	};
 };
