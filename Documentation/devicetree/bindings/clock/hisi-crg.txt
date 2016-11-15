@@ -26,19 +26,20 @@ to specify the clock which they consume.
 
 All these identifier could be found in <dt-bindings/clock/hi3519-clock.h>.
 
-- #reset-cells: should be 2.
+- #reset-cells: should be 3.
 
 A reset signal can be controlled by writing a bit register in the CRG module.
-The reset specifier consists of two cells. The first cell represents the
+The reset specifier consists of three cells. The first cell represents the
 register offset relative to the base address. The second cell represents the
-bit index in the register.
+bit index in the register. The third cell represents the polarity of the reset
+line (0 for normal, 1 for inverted).
 
 Example: CRG nodes
 CRG: clock-reset-controller@12010000 {
 	compatible = "hisilicon,hi3519-crg";
 	reg = <0x12010000 0x10000>;
 	#clock-cells = <1>;
-	#reset-cells = <2>;
+	#reset-cells = <3>;
 };
 
 Example: consumer nodes
@@ -46,5 +47,5 @@ i2c0: i2c@12110000 {
 	compatible = "hisilicon,hi3519-i2c";
 	reg = <0x12110000 0x1000>;
 	clocks = <&CRG HI3519_I2C0_RST>;
-	resets = <&CRG 0xe4 0>;
+	resets = <&CRG 0xe4 0 0>;
 };

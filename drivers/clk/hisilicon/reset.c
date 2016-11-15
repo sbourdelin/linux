@@ -17,6 +17,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <linux/bitops.h>
 #include <linux/io.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
@@ -25,9 +26,11 @@
 #include <linux/spinlock.h>
 #include "reset.h"
 
-#define	HISI_RESET_BIT_MASK	0x1f
-#define	HISI_RESET_OFFSET_SHIFT	8
-#define	HISI_RESET_OFFSET_MASK	0xffff00
+#define HISI_RESET_POLARITY_MASK	BIT(0)
+#define HISI_RESET_BIT_SHIFT	1
+#define HISI_RESET_BIT_MASK	GENMASK(6, 1)
+#define HISI_RESET_OFFSET_SHIFT	8
+#define HISI_RESET_OFFSET_MASK	GENMASK(23, 8)
 
 struct hisi_reset_controller {
 	spinlock_t	lock;
@@ -44,12 +47,15 @@ static int hisi_reset_of_xlate(struct reset_controller_dev *rcdev,
 {
 	u32 offset;
 	u8 bit;
+	bool polarity;
 
 	offset = (reset_spec->args[0] << HISI_RESET_OFFSET_SHIFT)
 		& HISI_RESET_OFFSET_MASK;
-	bit = reset_spec->args[1] & HISI_RESET_BIT_MASK;
+	bit = (reset_spec->args[1] << HISI_RESET_BIT_SHIFT)
+		& HISI_RESET_BIT_MASK;
+	polarity = reset_spec->args[2] & HISI_RESET_POLARITY_MASK;
 
-	return (offset | bit);
+	return (offset | bit | polarity);
 }
 
 static int hisi_reset_assert(struct reset_controller_dev *rcdev,
@@ -59,14 +65,19 @@ static int hisi_reset_assert(struct reset_controller_dev *rcdev,
 	unsigned long flags;
 	u32 offset, reg;
 	u8 bit;
+	bool polarity;
 
 	offset = (id & HISI_RESET_OFFSET_MASK) >> HISI_RESET_OFFSET_SHIFT;
-	bit = id & HISI_RESET_BIT_MASK;
+	bit = (id & HISI_RESET_BIT_MASK) >> HISI_RESET_BIT_SHIFT;
+	polarity = id & HISI_RESET_POLARITY_MASK;
 
 	spin_lock_irqsave(&rstc->lock, flags);
 
 	reg = readl(rstc->membase + offset);
-	writel(reg | BIT(bit), rstc->membase + offset);
+	if (polarity)
+		writel(reg & ~BIT(bit), rstc->membase + offset);
+	else
+		writel(reg | BIT(bit), rstc->membase + offset);
 
 	spin_unlock_irqrestore(&rstc->lock, flags);
 
@@ -80,14 +91,19 @@ static int hisi_reset_deassert(struct reset_controller_dev *rcdev,
 	unsigned long flags;
 	u32 offset, reg;
 	u8 bit;
+	bool polarity;
 
 	offset = (id & HISI_RESET_OFFSET_MASK) >> HISI_RESET_OFFSET_SHIFT;
-	bit = id & HISI_RESET_BIT_MASK;
+	bit = (id & HISI_RESET_BIT_MASK) >> HISI_RESET_BIT_SHIFT;
+	polarity = id & HISI_RESET_POLARITY_MASK;
 
 	spin_lock_irqsave(&rstc->lock, flags);
 
 	reg = readl(rstc->membase + offset);
-	writel(reg & ~BIT(bit), rstc->membase + offset);
+	if (polarity)
+		writel(reg | BIT(bit), rstc->membase + offset);
+	else
+		writel(reg & ~BIT(bit), rstc->membase + offset);
 
 	spin_unlock_irqrestore(&rstc->lock, flags);
 
@@ -118,7 +134,7 @@ struct hisi_reset_controller *hisi_reset_init(struct platform_device *pdev)
 	rstc->rcdev.owner = THIS_MODULE;
 	rstc->rcdev.ops = &hisi_reset_ops;
 	rstc->rcdev.of_node = pdev->dev.of_node;
-	rstc->rcdev.of_reset_n_cells = 2;
+	rstc->rcdev.of_reset_n_cells = 3;
 	rstc->rcdev.of_xlate = hisi_reset_of_xlate;
 	reset_controller_register(&rstc->rcdev);
 
