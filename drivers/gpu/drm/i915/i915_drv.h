@@ -901,6 +901,9 @@ struct i915_ctx_hang_stats {
 
 	/* This context is banned to submit more work */
 	bool banned;
+
+	/* Accumulated score of hangs caused by this context */
+	int ban_score;
 };
 
 /* This must match up with the value previously used for execbuf2.rsvd1. */

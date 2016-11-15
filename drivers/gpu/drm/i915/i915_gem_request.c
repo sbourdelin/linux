@@ -204,6 +204,10 @@ static void i915_gem_request_retire(struct drm_i915_gem_request *request)
 
 	trace_i915_gem_request_retire(request);
 
+	/* Retirement decays the ban score as it is a sign of ctx progress */
+	if (request->ctx->hang_stats.ban_score > 0)
+		request->ctx->hang_stats.ban_score--;
+
 	spin_lock_irq(&request->engine->timeline->lock);
 	list_del_init(&request->link);
 	spin_unlock_irq(&request->engine->timeline->lock);
