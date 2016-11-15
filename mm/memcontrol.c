@@ -497,7 +497,7 @@ static void mem_cgroup_remove_from_trees(struct mem_cgroup *memcg)
 	struct mem_cgroup_per_node *mz;
 	int nid;
 
-	for_each_node(nid) {
+	for_each_online_node(nid) {
 		mz = mem_cgroup_nodeinfo(memcg, nid);
 		mctz = soft_limit_tree_node(nid);
 		mem_cgroup_remove_exceeded(mz, mctz);
@@ -895,7 +895,7 @@ static void invalidate_reclaim_iterators(struct mem_cgroup *dead_memcg)
 	int i;
 
 	while ((memcg = parent_mem_cgroup(memcg))) {
-		for_each_node(nid) {
+		for_each_online_node(nid) {
 			mz = mem_cgroup_nodeinfo(memcg, nid);
 			for (i = 0; i <= DEF_PRIORITY; i++) {
 				iter = &mz->iter[i];
@@ -4146,7 +4146,7 @@ static void mem_cgroup_free(struct mem_cgroup *memcg)
 	int node;
 
 	memcg_wb_domain_exit(memcg);
-	for_each_node(node)
+	for_each_online_node(node)
 		free_mem_cgroup_per_node_info(memcg, node);
 	free_percpu(memcg->stat);
 	kfree(memcg);
@@ -4175,7 +4175,7 @@ static struct mem_cgroup *mem_cgroup_alloc(void)
 	if (!memcg->stat)
 		goto fail;
 
-	for_each_node(node)
+	for_each_online_node(node)
 		if (alloc_mem_cgroup_per_node_info(memcg, node))
 			goto fail;
 
@@ -5774,11 +5774,21 @@ __setup("cgroup.memory=", cgroup_memory);
 static void memcg_node_offline(int node)
 {
 	struct mem_cgroup *memcg;
+	struct mem_cgroup_tree_per_node *rtpn;
+	struct mem_cgroup_tree_per_node *mctz;
+	struct mem_cgroup_per_node *mz;
 
 	if (node < 0)
 		return;
 
+	rtpn = soft_limit_tree.rb_tree_per_node[node];
+	kfree(rtpn);
+
 	for_each_mem_cgroup(memcg) {
+		mz = mem_cgroup_nodeinfo(memcg, node);
+		mctz = soft_limit_tree_node(node);
+		mem_cgroup_remove_exceeded(mz, mctz);
+
 		free_mem_cgroup_per_node_info(memcg, node);
 		mem_cgroup_may_update_nodemask(memcg);
 	}
@@ -5787,9 +5797,17 @@ static void memcg_node_offline(int node)
 static void memcg_node_online(int node)
 {
 	struct mem_cgroup *memcg;
+	struct mem_cgroup_tree_per_node *rtpn;
 
 	if (node < 0)
 		return;
+
+	rtpn = kzalloc_node(sizeof(*rtpn), GFP_KERNEL,
+			    node_online(node) ? node : NUMA_NO_NODE);
+
+	rtpn->rb_root = RB_ROOT;
+	spin_lock_init(&rtpn->lock);
+	soft_limit_tree.rb_tree_per_node[node] = rtpn;
 
 	for_each_mem_cgroup(memcg) {
 		alloc_mem_cgroup_per_node_info(memcg, node);
@@ -5854,7 +5872,7 @@ static int __init mem_cgroup_init(void)
 		INIT_WORK(&per_cpu_ptr(&memcg_stock, cpu)->work,
 			  drain_local_stock);
 
-	for_each_node(node) {
+	for_each_online_node(node) {
 		struct mem_cgroup_tree_per_node *rtpn;
 
 		rtpn = kzalloc_node(sizeof(*rtpn), GFP_KERNEL,
