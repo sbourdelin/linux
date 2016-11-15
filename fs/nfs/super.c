@@ -532,7 +532,8 @@ static void nfs_show_mountd_netid(struct seq_file *m, struct nfs_server *nfss,
 {
 	struct sockaddr *sap = (struct sockaddr *) &nfss->mountd_address;
 
-	seq_printf(m, ",mountproto=");
+	if (nfss->mountd_protocol || showdefaults)
+		seq_printf(m, ",mountproto=");
 	switch (sap->sa_family) {
 	case AF_INET:
 		switch (nfss->mountd_protocol) {
