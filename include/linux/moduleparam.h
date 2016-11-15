@@ -269,6 +269,23 @@ static inline void kernel_param_unlock(struct module *mod)
 	__module_param_call("", name, &param_ops_##type, &var, perm, -1, 0)
 
 /**
+ * core_param_named - define a module compat core kernel parameter.
+ * @name: the name of the cmdline and sysfs parameter (often the same as var)
+ * @var: the variable
+ * @type: the type of the parameter
+ * @perm: visibility in sysfs
+ *
+ * core_param_named is just like module_param_named(), but cannot be modular
+ * and it _does_ add a prefix (such as "printk.").  This is for compatibility
+ * with module_param_named(), and it exists to provide boot arg compatibility
+ * with code that was previously using the modular version with the prefix.
+ */
+#define core_param_named(name, var, type, perm)				\
+	param_check_##type(name, &(var));				\
+	__module_param_call(KBUILD_MODNAME ".", name, &param_ops_##type,\
+			    &var, perm, -1, 0)
+
+/**
  * core_param_unsafe - same as core_param but taints kernel
  */
 #define core_param_unsafe(name, var, type, perm)		\
