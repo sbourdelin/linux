@@ -1,0 +1,20 @@
+Realtek Ethernet PHY
+
+Some boards require special tuning values of the phy.
+
+Optional properties:
+
+realtek,disable-eee-1000t:
+realtek,disable-eee-100tx:
+  If set, respectively disable 1000-BaseT and 100-BaseTx energy efficient
+  ethernet capabilty advertisement
+  default: Leave the phy default settings unchanged (capabilities advertised)
+
+Example:
+
+&mdio0 {
+	ethernetphy0: ethernet-phy@0 {
+		reg = <0>;
+		realtek,disable-eee-1000t;
+	};
+};
