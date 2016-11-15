@@ -4212,7 +4212,6 @@ static void ufshcd_check_errors(struct ufs_hba *hba)
 			/* block commands from scsi mid-layer */
 			scsi_block_requests(hba->host);
 
-			hba->ufshcd_state = UFSHCD_STATE_ERROR;
 			schedule_work(&hba->eh_work);
 		}
 	}
