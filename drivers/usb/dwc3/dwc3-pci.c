@@ -293,8 +293,7 @@ static const struct pci_device_id dwc3_pci_id_table[] = {
 };
 MODULE_DEVICE_TABLE(pci, dwc3_pci_id_table);
 
-#ifdef CONFIG_PM
-static int dwc3_pci_runtime_suspend(struct device *dev)
+static int __maybe_unused dwc3_pci_runtime_suspend(struct device *dev)
 {
 	struct dwc3_pci		*dwc = dev_get_drvdata(dev);
 
@@ -304,7 +303,7 @@ static int dwc3_pci_runtime_suspend(struct device *dev)
 	return -EBUSY;
 }
 
-static int dwc3_pci_runtime_resume(struct device *dev)
+static int __maybe_unused dwc3_pci_runtime_resume(struct device *dev)
 {
 	struct dwc3_pci		*dwc = dev_get_drvdata(dev);
 	struct platform_device	*dwc3 = dwc->dwc3;
@@ -316,23 +315,20 @@ static int dwc3_pci_runtime_resume(struct device *dev)
 
 	return pm_runtime_get(&dwc3->dev);
 }
-#endif /* CONFIG_PM */
 
-#ifdef CONFIG_PM_SLEEP
-static int dwc3_pci_suspend(struct device *dev)
+static int __maybe_unused dwc3_pci_suspend(struct device *dev)
 {
 	struct dwc3_pci		*dwc = dev_get_drvdata(dev);
 
 	return dwc3_pci_dsm(dwc, PCI_INTEL_BXT_STATE_D3);
 }
 
-static int dwc3_pci_resume(struct device *dev)
+static int __maybe_unused dwc3_pci_resume(struct device *dev)
 {
 	struct dwc3_pci		*dwc = dev_get_drvdata(dev);
 
 	return dwc3_pci_dsm(dwc, PCI_INTEL_BXT_STATE_D0);
 }
-#endif /* CONFIG_PM_SLEEP */
 
 static struct dev_pm_ops dwc3_pci_dev_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(dwc3_pci_suspend, dwc3_pci_resume)
