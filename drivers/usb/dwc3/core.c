@@ -556,6 +556,20 @@ static int dwc3_phy_setup(struct dwc3 *dwc)
 	if (dwc->revision > DWC3_REVISION_194A)
 		reg |= DWC3_GUSB2PHYCFG_SUSPHY;
 
+	/*
+	 * When dwc3 controller acts as host role with attaching one slow speed
+	 * device (like mouse or keypad). Then if we plugged out the slow speed
+	 * device, it will timeout to run the deconfiguration endpoint command.
+	 * The reason is it will suspend USB phy to disable phy clock when
+	 * disconnecting slow speed decice, which will affect the xHCI commands
+	 * executing.
+	 *
+	 * Thus we should disable USB 2.0 phy suspend feature when dwc3 acts as
+	 * host role.
+	 */
+	if (dwc->dr_mode == USB_DR_MODE_HOST || dwc->dr_mode == USB_DR_MODE_OTG)
+		reg &= ~DWC3_GUSB2PHYCFG_SUSPHY;
+
 	if (dwc->dis_u2_susphy_quirk)
 		reg &= ~DWC3_GUSB2PHYCFG_SUSPHY;
 
