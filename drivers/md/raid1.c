@@ -2388,16 +2388,17 @@ static void raid1d(struct md_thread *thread)
 		LIST_HEAD(tmp);
 		spin_lock_irqsave(&conf->device_lock, flags);
 		if (!test_bit(MD_CHANGE_PENDING, &mddev->flags)) {
-			while (!list_empty(&conf->bio_end_io_list)) {
-				list_move(conf->bio_end_io_list.prev, &tmp);
-				conf->nr_queued--;
-			}
+			list_add(&tmp, &conf->bio_end_io_list);
+			list_del_init(&conf->bio_end_io_list);
 		}
 		spin_unlock_irqrestore(&conf->device_lock, flags);
 		while (!list_empty(&tmp)) {
 			r1_bio = list_first_entry(&tmp, struct r1bio,
 						  retry_list);
 			list_del(&r1_bio->retry_list);
+			spin_lock_irqsave(&conf->device_lock, flags);
+			conf->nr_queued--;
+			spin_unlock_irqrestore(&conf->device_lock, flags);
 			if (mddev->degraded)
 				set_bit(R1BIO_Degraded, &r1_bio->state);
 			if (test_bit(R1BIO_WriteError, &r1_bio->state))
