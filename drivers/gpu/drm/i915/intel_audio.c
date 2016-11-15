@@ -804,7 +804,8 @@ static int i915_audio_component_sync_audio_rate(struct device *kdev, int port,
 	intel_encoder = get_saved_enc(dev_priv, port, pipe);
 	if (!intel_encoder || !intel_encoder->base.crtc ||
 	    (intel_encoder->type != INTEL_OUTPUT_HDMI &&
-	     intel_encoder->type != INTEL_OUTPUT_DP)) {
+	     intel_encoder->type != INTEL_OUTPUT_DP &&
+		 intel_encoder->type != INTEL_OUTPUT_DP_MST)) {
 		DRM_DEBUG_KMS("Not valid for port %c\n", port_name(port));
 		err = -ENODEV;
 		goto unlock;
