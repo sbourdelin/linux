@@ -74,7 +74,28 @@ enum intel_engine_hangcheck_action {
 	HANGCHECK_HUNG,
 };
 
-#define HANGCHECK_SCORE_RING_HUNG 31
+static inline const char *
+hangcheck_action_to_str(const enum intel_engine_hangcheck_action a)
+{
+	switch (a) {
+	case HANGCHECK_IDLE:
+		return "idle";
+	case HANGCHECK_WAIT:
+		return "wait";
+	case HANGCHECK_ACTIVE_SEQNO:
+		return "active seqno";
+	case HANGCHECK_ACTIVE_HEAD:
+		return "active head";
+	case HANGCHECK_ACTIVE_SUBUNITS:
+		return "active subunits";
+	case HANGCHECK_KICK:
+		return "kick";
+	case HANGCHECK_HUNG:
+		return "hung";
+	}
+
+	return "unknown";
+}
 
 #define I915_MAX_SLICES	3
 #define I915_MAX_SUBSLICES 3
@@ -106,10 +127,11 @@ struct intel_instdone {
 struct intel_engine_hangcheck {
 	u64 acthd;
 	u32 seqno;
-	int score;
 	enum intel_engine_hangcheck_action action;
+	unsigned long action_timestamp;
 	int deadlock;
 	struct intel_instdone instdone;
+	bool guilty;
 };
 
 struct intel_ring {

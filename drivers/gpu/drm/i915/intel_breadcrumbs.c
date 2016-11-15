@@ -57,7 +57,7 @@ static void intel_breadcrumbs_hangcheck(unsigned long data)
 
 static unsigned long wait_timeout(void)
 {
-	return round_jiffies_up(jiffies + DRM_I915_HANGCHECK_JIFFIES);
+	return round_jiffies_up(jiffies + HANGCHECK_PERIOD_JIFFIES);
 }
 
 static void intel_breadcrumbs_fake_irq(unsigned long data)

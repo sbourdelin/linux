@@ -782,7 +782,8 @@ struct drm_i915_error_state {
 		/* Software tracked state */
 		bool waiting;
 		int num_waiters;
-		int hangcheck_score;
+		unsigned long hangcheck_timestamp;
+		bool hangcheck_guilty;
 		enum intel_engine_hangcheck_action hangcheck_action;
 		struct i915_address_space *vm;
 		int num_requests;
@@ -1429,11 +1430,16 @@ struct i915_error_state_file_priv {
 #define I915_FENCE_TIMEOUT (10 * HZ) /* 10s */
 
 struct i915_gpu_error {
-	/* For hangcheck timer */
-#define DRM_I915_HANGCHECK_PERIOD 1500 /* in ms */
-#define DRM_I915_HANGCHECK_JIFFIES msecs_to_jiffies(DRM_I915_HANGCHECK_PERIOD)
-	/* Hang gpu twice in this window and your context gets banned */
-#define DRM_I915_CTX_BAN_PERIOD DIV_ROUND_UP(8*DRM_I915_HANGCHECK_PERIOD, 1000)
+
+#define DRM_I915_STUCK_PERIOD_SEC 24 /* No observed seqno progress */
+#define DRM_I915_HUNG_PERIOD_SEC 4 /* No observed seqno nor head progress */
+
+/* Hang gpu twice in this window and your context gets banned */
+#define DRM_I915_CTX_BAN_PERIOD_SEC 12
+
+#define HANGCHECK_STUCK_JIFFIES (DRM_I915_STUCK_PERIOD_SEC * HZ)
+#define HANGCHECK_HUNG_JIFFIES (DRM_I915_HUNG_PERIOD_SEC * HZ)
+#define HANGCHECK_PERIOD_JIFFIES msecs_to_jiffies(1500)
 
 	struct delayed_work hangcheck_work;
 
@@ -2721,7 +2727,7 @@ static inline void i915_queue_hangcheck(struct drm_i915_private *dev_priv)
 	 * we will ignore a hung ring if a second ring is kept busy.
 	 */
 
-	delay = round_jiffies_up_relative(DRM_I915_HANGCHECK_JIFFIES);
+	delay = round_jiffies_up_relative(HANGCHECK_PERIOD_JIFFIES);
 	queue_delayed_work(system_long_wq,
 			   &dev_priv->gpu_error.hangcheck_work, delay);
 }

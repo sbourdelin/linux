@@ -306,7 +306,6 @@ static void hangcheck_load_sample(struct intel_engine_cs *engine,
 
 	hc->acthd = intel_engine_get_active_head(engine);
 	hc->seqno = intel_engine_get_seqno(engine);
-	hc->score = engine->hangcheck.score;
 }
 
 static void hangcheck_store_sample(struct intel_engine_cs *engine,
@@ -314,7 +313,6 @@ static void hangcheck_store_sample(struct intel_engine_cs *engine,
 {
 	engine->hangcheck.acthd = hc->acthd;
 	engine->hangcheck.seqno = hc->seqno;
-	engine->hangcheck.score = hc->score;
 	engine->hangcheck.action = hc->action;
 }
 
@@ -336,58 +334,109 @@ static void hangcheck_accumulate_sample(struct intel_engine_cs *engine,
 {
 	hc->action = hangcheck_get_action(engine, hc);
 
+	/* We always increment the progress
+	 * if the engine is busy and still processing
+	 * the same request, so that no single request
+	 * can run indefinitely (such as a chain of
+	 * batches). The only time we do not increment
+	 * the hangcheck score on this ring, if this
+	 * engine is in a legitimate wait for another
+	 * engine. In that case the waiting engine is a
+	 * victim and we want to be sure we catch the
+	 * right culprit. Then every time we do kick
+	 * the ring, make it as a progress as the seqno
+	 * advancement might ensure and if not, it
+	 * will catch the hanging engine.
+	 */
+
 	switch (hc->action) {
 	case HANGCHECK_IDLE:
-	case HANGCHECK_WAIT:
-		break;
-
-	case HANGCHECK_ACTIVE_HEAD:
-	case HANGCHECK_ACTIVE_SUBUNITS:
-		/* We always increment the hangcheck score
-		 * if the engine is busy and still processing
-		 * the same request, so that no single request
-		 * can run indefinitely (such as a chain of
-		 * batches). The only time we do not increment
-		 * the hangcheck score on this ring, if this
-		 * engine is in a legitimate wait for another
-		 * engine. In that case the waiting engine is a
-		 * victim and we want to be sure we catch the
-		 * right culprit. Then every time we do kick
-		 * the ring, add a small increment to the
-		 * score so that we can catch a batch that is
-		 * being repeatedly kicked and so responsible
-		 * for stalling the machine.
-		 */
-		hc->score += 1;
-		break;
-
-	case HANGCHECK_KICK:
-		hc->score += 5;
-		break;
-
-	case HANGCHECK_HUNG:
-		hc->score += 20;
-		break;
-
 	case HANGCHECK_ACTIVE_SEQNO:
-		/* Gradually reduce the count so that we catch DoS
-		 * attempts across multiple batches.
-		 */
-		if (hc->score > 0)
-			hc->score -= 15;
-		if (hc->score < 0)
-			hc->score = 0;
-
 		/* Clear head and subunit states on seqno movement */
 		hc->acthd = 0;
 
 		memset(&engine->hangcheck.instdone, 0,
 		       sizeof(engine->hangcheck.instdone));
+
+		engine->hangcheck.action_timestamp = jiffies;
+		break;
+
+	case HANGCHECK_ACTIVE_HEAD:
+	case HANGCHECK_ACTIVE_SUBUNITS:
+	case HANGCHECK_KICK:
+
+	case HANGCHECK_WAIT:
+	case HANGCHECK_HUNG:
 		break;
 
 	default:
 		MISSING_CASE(hc->action);
 	}
+}
+
+static bool
+hangcheck_engine_stall(struct intel_engine_cs *engine,
+		       struct intel_engine_hangcheck *hc)
+{
+	const unsigned long last_action = engine->hangcheck.action_timestamp;
+
+	if (hc->action == HANGCHECK_ACTIVE_SEQNO ||
+	    hc->action == HANGCHECK_IDLE)
+		return false;
+
+	if (time_before(jiffies, last_action + HANGCHECK_HUNG_JIFFIES))
+		return false;
+
+	if (time_before(jiffies, last_action + HANGCHECK_STUCK_JIFFIES))
+		if (hc->action != HANGCHECK_HUNG)
+			return false;
+
+	return true;
+}
+
+static struct intel_engine_cs *find_lra_engine(struct drm_i915_private *i915,
+					       const unsigned int mask)
+{
+	struct intel_engine_cs *engine = NULL, *c;
+	enum intel_engine_id id;
+
+	for_each_engine_masked(c, i915, mask, id) {
+		if (engine == NULL) {
+			engine = c;
+			continue;
+		}
+
+		if (time_before(c->hangcheck.action_timestamp,
+				engine->hangcheck.action_timestamp))
+			engine = c;
+		else if (c->hangcheck.action_timestamp ==
+			 engine->hangcheck.action_timestamp &&
+			 c->hangcheck.seqno < engine->hangcheck.seqno)
+			engine = c;
+
+	}
+
+	return engine;
+}
+
+static struct intel_engine_cs *find_guilty_engine(struct drm_i915_private *i915,
+						  const unsigned int hung_mask,
+						  const unsigned int stuck_mask)
+{
+	struct intel_engine_cs *engine;
+
+	engine = find_lra_engine(i915, hung_mask);
+	if (engine)
+		return engine;
+
+	engine = find_lra_engine(i915, stuck_mask);
+	if (engine)
+		return engine;
+
+	DRM_DEBUG_DRIVER("No engine found for hang (0x%x,0x%x)\n",
+			 hung_mask, stuck_mask);
+	/* Should not get here. But as a safety valve, blame someone */
+	return find_lra_engine(i915, ~0);
 }
 
 static void hangcheck_declare_hang(struct drm_i915_private *i915,
@@ -454,7 +503,7 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 		hangcheck_accumulate_sample(engine, hc);
 		hangcheck_store_sample(engine, hc);
 
-		if (hc->score >= HANGCHECK_SCORE_RING_HUNG) {
+		if (hangcheck_engine_stall(engine, hc)) {
 			hung |= intel_engine_flag(engine);
 			if (hc->action != HANGCHECK_HUNG)
 				stuck |= intel_engine_flag(engine);
@@ -463,8 +512,11 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 		busy_count += busy;
 	}
 
-	if (hung)
+	if (hung) {
+		engine = find_guilty_engine(dev_priv, hung, stuck);
+		engine->hangcheck.guilty = true;
 		hangcheck_declare_hang(dev_priv, hung, stuck);
+	}
 
 	/* Reset timer in case GPU hangs without another request being added */
 	if (busy_count)

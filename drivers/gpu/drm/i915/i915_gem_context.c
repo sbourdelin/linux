@@ -331,7 +331,7 @@ __create_hw_context(struct drm_device *dev,
 	 * is no remap info, it will be a NOP. */
 	ctx->remap_slice = ALL_L3_SLICES(dev_priv);
 
-	ctx->hang_stats.ban_period_seconds = DRM_I915_CTX_BAN_PERIOD;
+	ctx->hang_stats.ban_period_seconds = DRM_I915_CTX_BAN_PERIOD_SEC;
 	ctx->ring_size = 4 * PAGE_SIZE;
 	ctx->desc_template = GEN8_CTX_ADDRESSING_MODE(dev_priv) <<
 			     GEN8_CTX_ADDRESSING_MODE_SHIFT;
