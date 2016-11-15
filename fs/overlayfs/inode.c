@@ -11,6 +11,7 @@
 #include <linux/slab.h>
 #include <linux/xattr.h>
 #include <linux/posix_acl.h>
+#include <linux/fs_stack.h>
 #include "overlayfs.h"
 
 static int ovl_copy_up_truncate(struct dentry *dentry)
@@ -93,7 +94,7 @@ int ovl_setattr(struct dentry *dentry, struct iattr *attr)
 		err = notify_change(upperdentry, attr, NULL);
 		revert_creds(old_cred);
 		if (!err)
-			ovl_copyattr(upperdentry->d_inode, dentry->d_inode);
+			fsstack_copy_attr_all(dentry->d_inode, upperdentry->d_inode);
 		inode_unlock(upperdentry->d_inode);
 
 		if (winode)

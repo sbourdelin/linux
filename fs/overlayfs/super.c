@@ -20,6 +20,7 @@
 #include <linux/statfs.h>
 #include <linux/seq_file.h>
 #include <linux/posix_acl_xattr.h>
+#include <linux/fs_stack.h>
 #include "overlayfs.h"
 
 MODULE_AUTHOR("Miklos Szeredi <miklos@szeredi.hu>");
@@ -581,7 +582,7 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 		}
 		if (!inode)
 			goto out_free_oe;
-		ovl_copyattr(realdentry->d_inode, inode);
+		fsstack_copy_attr_all(inode, realdentry->d_inode);
 	}
 
 	revert_creds(old_cred);
@@ -1054,7 +1055,7 @@ ovl_posix_acl_xattr_set(const struct xattr_handler *handler,
 
 	err = ovl_xattr_set(dentry, handler->name, value, size, flags);
 	if (!err)
-		ovl_copyattr(ovl_inode_real(inode, NULL), inode);
+		fsstack_copy_attr_all(inode, ovl_inode_real(inode, NULL));
 
 	return err;
 
@@ -1345,7 +1346,7 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 
 	realinode = d_inode(ovl_dentry_real(root_dentry));
 	ovl_inode_init(d_inode(root_dentry), realinode, !!upperpath.dentry);
-	ovl_copyattr(realinode, d_inode(root_dentry));
+	fsstack_copy_attr_all(d_inode(root_dentry), realinode);
 
 	sb->s_root = root_dentry;
 

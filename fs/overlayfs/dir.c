@@ -15,6 +15,7 @@
 #include <linux/posix_acl.h>
 #include <linux/posix_acl_xattr.h>
 #include <linux/atomic.h>
+#include <linux/fs_stack.h>
 #include "overlayfs.h"
 
 void ovl_cleanup(struct inode *wdir, struct dentry *wdentry)
@@ -174,7 +175,7 @@ static void ovl_instantiate(struct dentry *dentry, struct inode *inode,
 	ovl_dentry_update(dentry, newdentry);
 	if (!hardlink) {
 		ovl_inode_update(inode, d_inode(newdentry));
-		ovl_copyattr(newdentry->d_inode, inode);
+		fsstack_copy_attr_all(inode, newdentry->d_inode);
 	} else {
 		WARN_ON(ovl_inode_real(inode, NULL) != d_inode(newdentry));
 		inc_nlink(inode);
