@@ -29,8 +29,7 @@ int read_log_of(struct tpm_chip *chip)
 	struct tpm_bios_log *log;
 
 	log = &chip->log;
-	if (chip->dev.parent->of_node)
-		np = chip->dev.parent->of_node;
+	np = chip->dev.parent->of_node;
 	if (!np)
 		return -ENODEV;
 
