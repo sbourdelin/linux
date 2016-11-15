@@ -2978,14 +2978,6 @@ fc_remote_port_delete(struct fc_rport  *rport)
 	unsigned long timeout = rport->dev_loss_tmo;
 	unsigned long flags;
 
-	/*
-	 * No need to flush the fc_host work_q's, as all adds are synchronous.
-	 *
-	 * We do need to reclaim the rport scan work element, so eventually
-	 * (in fc_rport_final_delete()) we'll flush the scsi host work_q if
-	 * there's still a scan pending.
-	 */
-
 	spin_lock_irqsave(shost->host_lock, flags);
 
 	if (rport->port_state != FC_PORTSTATE_ONLINE) {
@@ -3011,6 +3003,14 @@ fc_remote_port_delete(struct fc_rport  *rport)
 	rport->flags |= FC_RPORT_DEVLOSS_PENDING;
 
 	spin_unlock_irqrestore(shost->host_lock, flags);
+
+	/*
+	 * make sure no scan is pending before blocking it, otherwise
+	 * simultaneously scan may cause a permanent QUEUE_FLAG_STOPPED
+	 * flag set of the device's request queue.
+	 */
+	if (rport->flags & FC_RPORT_SCAN_PENDING)
+		scsi_flush_work(shost);
 
 	scsi_target_block(&rport->dev);
 
