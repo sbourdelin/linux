@@ -322,9 +322,10 @@ retry:
 	if (!newval) {
 		do {
 			room = readq_be(&afu->host_map->cmd_room);
-			atomic64_set(&afu->room, room);
-			if (room)
-				goto write_ioarrin;
+			if (room) {
+				atomic64_cmpxchg(&afu->room, 0, room);
+				goto retry;
+			}
 			udelay(1 << nretry);
 		} while (nretry++ < MC_ROOM_RETRY_CNT);
 
@@ -346,7 +347,6 @@ retry:
 		goto no_room;
 	}
 
-write_ioarrin:
 	writeq_be((u64)&cmd->rcb, &afu->host_map->ioarrin);
 out:
 	pr_devel("%s: cmd=%p len=%d ea=%p rc=%d\n", __func__, cmd,
@@ -2409,6 +2409,7 @@ static void cxlflash_worker_thread(struct work_struct *work)
 	struct afu *afu = cfg->afu;
 	struct device *dev = &cfg->dev->dev;
 	int port;
+	u64 room;
 	ulong lock_flags;
 
 	/* Avoid MMIO if the device has failed */
@@ -2437,8 +2438,11 @@ static void cxlflash_worker_thread(struct work_struct *work)
 	}
 
 	if (afu->read_room) {
-		atomic64_set(&afu->room, readq_be(&afu->host_map->cmd_room));
-		afu->read_room = false;
+		room = readq_be(&afu->host_map->cmd_room);
+		if (room) {
+			atomic64_cmpxchg(&afu->room, 0, room);
+			afu->read_room = false;
+		}
 	}
 
 	spin_unlock_irqrestore(cfg->host->host_lock, lock_flags);
