@@ -831,6 +831,66 @@ unclaimed_reg_debug(struct drm_i915_private *dev_priv,
 	__unclaimed_reg_debug(dev_priv, reg, read, before);
 }
 
+static const enum decoupled_power_domain fw2dpd_domain[] = {
+	GEN9_DECOUPLED_PD_RENDER,
+	GEN9_DECOUPLED_PD_BLITTER,
+	GEN9_DECOUPLED_PD_ALL,
+	GEN9_DECOUPLED_PD_MEDIA,
+	GEN9_DECOUPLED_PD_ALL,
+	GEN9_DECOUPLED_PD_ALL,
+	GEN9_DECOUPLED_PD_ALL
+};
+
+/*
+ * Decoupled MMIO access for only 1 DWORD
+ */
+static void __gen9_decoupled_mmio_access(struct drm_i915_private *dev_priv,
+					 u32 reg,
+					 enum forcewake_domains fw_domain,
+					 enum decoupled_ops operation)
+{
+	enum decoupled_power_domain dp_domain;
+	u32 ctrl_reg_data = 0;
+
+	dp_domain = fw2dpd_domain[fw_domain - 1];
+
+	ctrl_reg_data |= reg;
+	ctrl_reg_data |= (operation << GEN9_DECOUPLED_OP_SHIFT);
+	ctrl_reg_data |= (dp_domain << GEN9_DECOUPLED_PD_SHIFT);
+	ctrl_reg_data |= GEN9_DECOUPLED_DW1_GO;
+	__raw_i915_write32(dev_priv, GEN9_DECOUPLED_REG0_DW1, ctrl_reg_data);
+
+	if (wait_for_atomic((__raw_i915_read32(dev_priv,
+			    GEN9_DECOUPLED_REG0_DW1) &
+			    GEN9_DECOUPLED_DW1_GO) == 0,
+			    FORCEWAKE_ACK_TIMEOUT_MS))
+		DRM_ERROR("Decoupled MMIO wait timed out\n");
+}
+
+static inline u32
+__gen9_decoupled_mmio_read32(struct drm_i915_private *dev_priv,
+			     u32 reg,
+			     enum forcewake_domains fw_domain)
+{
+	__gen9_decoupled_mmio_access(dev_priv, reg, fw_domain,
+				     GEN9_DECOUPLED_OP_READ);
+
+	return __raw_i915_read32(dev_priv, GEN9_DECOUPLED_REG0_DW0);
+}
+
+static inline void
+__gen9_decoupled_mmio_write(struct drm_i915_private *dev_priv,
+			    u32 reg, u32 data,
+			    enum forcewake_domains fw_domain)
+{
+
+	__raw_i915_write32(dev_priv, GEN9_DECOUPLED_REG0_DW0, data);
+
+	__gen9_decoupled_mmio_access(dev_priv, reg, fw_domain,
+				     GEN9_DECOUPLED_OP_WRITE);
+}
+
+
 #define GEN2_READ_HEADER(x) \
 	u##x val = 0; \
 	assert_rpm_wakelock_held(dev_priv);
@@ -935,6 +995,28 @@ fwtable_read##x(struct drm_i915_private *dev_priv, i915_reg_t reg, bool trace) {
 	GEN6_READ_FOOTER; \
 }
 
+#define __gen9_decoupled_read(x) \
+static u##x \
+gen9_decoupled_read##x(struct drm_i915_private *dev_priv, \
+		       i915_reg_t reg, bool trace) { \
+	enum forcewake_domains fw_engine; \
+	GEN6_READ_HEADER(x); \
+	fw_engine = __fwtable_reg_read_fw_domains(offset); \
+	if (fw_engine & ~dev_priv->uncore.fw_domains_active) { \
+		unsigned i; \
+		u32 *ptr_data = (u32 *) &val; \
+		for (i = 0; i < x/32; i++, offset += sizeof(u32), ptr_data++) \
+			*ptr_data = __gen9_decoupled_mmio_read32(dev_priv, \
+								 offset, \
+								 fw_engine); \
+	} else { \
+		val = __raw_i915_read##x(dev_priv, reg); \
+	} \
+	GEN6_READ_FOOTER; \
+}
+
+__gen9_decoupled_read(32)
+__gen9_decoupled_read(64)
 __fwtable_read(8)
 __fwtable_read(16)
 __fwtable_read(32)
@@ -1064,6 +1146,25 @@ fwtable_write##x(struct drm_i915_private *dev_priv, i915_reg_t reg, u##x val, bo
 	GEN6_WRITE_FOOTER; \
 }
 
+#define __gen9_decoupled_write(x) \
+static void \
+gen9_decoupled_write##x(struct drm_i915_private *dev_priv, \
+			i915_reg_t reg, u##x val, \
+		bool trace) { \
+	enum forcewake_domains fw_engine; \
+	GEN6_WRITE_HEADER; \
+	fw_engine = __fwtable_reg_write_fw_domains(offset); \
+	if (fw_engine & ~dev_priv->uncore.fw_domains_active) \
+		__gen9_decoupled_mmio_write(dev_priv, \
+					    offset, \
+					    val, \
+					    fw_engine); \
+	else \
+		__raw_i915_write##x(dev_priv, reg, val); \
+	GEN6_WRITE_FOOTER; \
+}
+
+__gen9_decoupled_write(32)
 __fwtable_write(8)
 __fwtable_write(16)
 __fwtable_write(32)
@@ -1287,6 +1388,14 @@ void intel_uncore_init(struct drm_i915_private *dev_priv)
 		ASSIGN_FW_DOMAINS_TABLE(__gen9_fw_ranges);
 		ASSIGN_WRITE_MMIO_VFUNCS(fwtable);
 		ASSIGN_READ_MMIO_VFUNCS(fwtable);
+		if (HAS_DECOUPLED_MMIO(dev_priv)) {
+			dev_priv->uncore.funcs.mmio_readl =
+						gen9_decoupled_read32;
+			dev_priv->uncore.funcs.mmio_readq =
+						gen9_decoupled_read64;
+			dev_priv->uncore.funcs.mmio_writel =
+						gen9_decoupled_write32;
+		}
 		break;
 	case 8:
 		if (IS_CHERRYVIEW(dev_priv)) {
