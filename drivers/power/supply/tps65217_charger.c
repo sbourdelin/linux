@@ -35,7 +35,9 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/tps65217.h>
 
+#define CHARGER_STATUS_PRESENT	(TPS65217_STATUS_ACPWR | TPS65217_STATUS_USBPWR)
 #define POLL_INTERVAL		(HZ * 2)
+#define NUM_CHARGER_IRQS	2
 
 struct tps65217_charger {
 	struct tps65217 *tps;
@@ -142,8 +144,8 @@ static irqreturn_t tps65217_charger_irq(int irq, void *dev)
 
 	dev_dbg(charger->dev, "%s: 0x%x\n", __func__, val);
 
-	/* check for AC status bit */
-	if (val & TPS65217_STATUS_ACPWR) {
+	/* check for charger status bit */
+	if (val & CHARGER_STATUS_PRESENT) {
 		ret = tps65217_enable_charging(charger);
 		if (ret) {
 			dev_err(charger->dev,
@@ -197,37 +199,43 @@ static int tps65217_charger_request_interrupt(struct platform_device *pdev)
 {
 	struct tps65217_charger *charger = platform_get_drvdata(pdev);
 	struct task_struct *poll_task;
-	int irq;
+	int irq[NUM_CHARGER_IRQS];
 	int ret;
+	int i;
 
-	irq = platform_get_irq_byname(pdev, "AC");
-	if (irq < 0)
-		irq = -ENXIO;
+	irq[0] = platform_get_irq_byname(pdev, "AC");
+	irq[1] = platform_get_irq_byname(pdev, "USB");
 
-	if (irq != -ENXIO) {
-		ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
+	/* Create a polling thread if an interrupt is invalid */
+	if (irq[0] < 0 || irq[1] < 0) {
+		poll_task = kthread_run(tps65217_charger_poll_task, charger,
+					"ktps65217charger");
+		if (IS_ERR(poll_task)) {
+			ret = PTR_ERR(poll_task);
+			dev_err(charger->dev, "Unable to run kthread err %d\n", ret);
+			return ret;
+		}
+
+		charger->poll_task = poll_task;
+
+		return 0;
+	}
+
+	/* Create IRQ threads for charger interrupts */
+	for (i = 0; i < NUM_CHARGER_IRQS; i++) {
+		ret = devm_request_threaded_irq(&pdev->dev, irq[i], NULL,
 						tps65217_charger_irq, 0,
 						"tps65217-charger", charger);
 		if (ret) {
 			dev_err(charger->dev,
-				"Unable to register irq %d err %d\n", irq, ret);
+				"Unable to register irq %d err %d\n", irq[i],
+				ret);
 			return ret;
 		}
-
-		/* Check current state */
-		tps65217_charger_irq(irq, charger);
-		return 0;
 	}
 
-	poll_task = kthread_run(tps65217_charger_poll_task, charger,
-				"ktps65217charger");
-	if (IS_ERR(poll_task)) {
-		ret = PTR_ERR(poll_task);
-		dev_err(charger->dev, "Unable to run kthread err %d\n", ret);
-		return ret;
-	}
-
-	charger->poll_task = poll_task;
+	/* Check current state */
+	tps65217_charger_irq(-1, charger);
 
 	return 0;
 }
