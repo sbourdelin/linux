@@ -821,39 +821,41 @@ static int __init arch_timer_common_init(void)
 	return arch_timer_arch_init();
 }
 
+/*
+ * If HYP mode is available, we know that the physical timer
+ * has been configured to be accessible from PL1. Use it, so
+ * that a guest can use the virtual timer instead.
+ *
+ * If no interrupt provided for virtual timer, we'll have to
+ * stick to the physical timer. It'd better be accessible...
+ * On ARM64, we we only use ARCH_TIMER_PHYS_NONSECURE_PPI in Linux.
+ *
+ * On ARMv8.1 with VH extensions, the kernel runs in HYP. VHE
+ * accesses to CNTP_*_EL1 registers are silently redirected to
+ * their CNTHP_*_EL2 counterparts, and use a different PPI
+ * number.
+ */
+static int __init arch_timer_uses_ppi_init(void)
+{
+	if (is_hyp_mode_available() && is_kernel_in_hyp_mode()) {
+		arch_timer_uses_ppi = ARCH_TIMER_HYP_PPI;
+	} else if (!arch_timer_ppi[ARCH_TIMER_VIRT_PPI]) {
+		if (IS_ENABLED(CONFIG_ARM64))
+			arch_timer_uses_ppi = ARCH_TIMER_PHYS_NONSECURE_PPI;
+		else
+			arch_timer_uses_ppi = ARCH_TIMER_PHYS_SECURE_PPI;
+	}
+
+	if (arch_timer_ppi[arch_timer_uses_ppi])
+		return 0;
+
+	pr_warn("No interrupt available, giving up\n");
+	return -EINVAL;
+}
+
 static int __init arch_timer_init(void)
 {
 	int ret;
-	/*
-	 * If HYP mode is available, we know that the physical timer
-	 * has been configured to be accessible from PL1. Use it, so
-	 * that a guest can use the virtual timer instead.
-	 *
-	 * If no interrupt provided for virtual timer, we'll have to
-	 * stick to the physical timer. It'd better be accessible...
-	 *
-	 * On ARMv8.1 with VH extensions, the kernel runs in HYP. VHE
-	 * accesses to CNTP_*_EL1 registers are silently redirected to
-	 * their CNTHP_*_EL2 counterparts, and use a different PPI
-	 * number.
-	 */
-	if (is_hyp_mode_available() || !arch_timer_ppi[ARCH_TIMER_VIRT_PPI]) {
-		bool has_ppi;
-
-		if (is_kernel_in_hyp_mode()) {
-			arch_timer_uses_ppi = ARCH_TIMER_HYP_PPI;
-			has_ppi = !!arch_timer_ppi[ARCH_TIMER_HYP_PPI];
-		} else {
-			arch_timer_uses_ppi = ARCH_TIMER_PHYS_SECURE_PPI;
-			has_ppi = (!!arch_timer_ppi[ARCH_TIMER_PHYS_SECURE_PPI] ||
-				   !!arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]);
-		}
-
-		if (!has_ppi) {
-			pr_warn("No interrupt available, giving up\n");
-			return -EINVAL;
-		}
-	}
 
 	ret = arch_timer_register();
 	if (ret)
@@ -870,7 +872,7 @@ static int __init arch_timer_init(void)
 
 static int __init arch_timer_of_init(struct device_node *np)
 {
-	int i;
+	int i, ret;
 
 	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
 		pr_warn("multiple nodes in dt, skipping\n");
@@ -901,6 +903,10 @@ static int __init arch_timer_of_init(struct device_node *np)
 	if (IS_ENABLED(CONFIG_ARM) &&
 	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
 		arch_timer_uses_ppi = ARCH_TIMER_PHYS_SECURE_PPI;
+
+	ret = arch_timer_uses_ppi_init();
+	if (ret)
+		return ret;
 
 	return arch_timer_init();
 }
@@ -1011,6 +1017,7 @@ static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
 /* Initialize per-processor generic timer */
 static int __init arch_timer_acpi_init(struct acpi_table_header *table)
 {
+	int ret;
 	struct acpi_table_gtdt *gtdt;
 
 	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
@@ -1040,6 +1047,10 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
 
 	/* Get the frequency from CNTFRQ */
 	arch_timer_detect_rate(NULL, NULL);
+
+	ret = arch_timer_uses_ppi_init();
+	if (ret)
+		return ret;
 
 	/* Always-on capability */
 	arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
