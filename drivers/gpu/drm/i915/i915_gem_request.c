@@ -763,6 +763,8 @@ static void i915_gem_mark_busy(const struct intel_engine_cs *engine)
 	if (dev_priv->gt.awake)
 		return;
 
+	GEM_BUG_ON(!dev_priv->gt.active_requests);
+
 	intel_runtime_pm_get_noresume(dev_priv);
 	dev_priv->gt.awake = true;
 
@@ -1143,10 +1145,8 @@ void i915_gem_retire_requests(struct drm_i915_private *dev_priv)
 
 	lockdep_assert_held(&dev_priv->drm.struct_mutex);
 
-	if (!dev_priv->gt.active_requests)
+	if (!dev_priv->gt.awake)
 		return;
-
-	GEM_BUG_ON(!dev_priv->gt.awake);
 
 	for_each_engine(engine, dev_priv, id)
 		engine_retire_requests(engine);
