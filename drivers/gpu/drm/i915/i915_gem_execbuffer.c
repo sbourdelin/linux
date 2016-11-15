@@ -1231,16 +1231,20 @@ static struct i915_gem_context *
 i915_gem_validate_context(struct drm_device *dev, struct drm_file *file,
 			  struct intel_engine_cs *engine, const u32 ctx_id)
 {
+	struct drm_i915_file_private *file_priv = file->driver_priv;
 	struct i915_gem_context *ctx;
 	struct i915_ctx_hang_stats *hs;
 
-	ctx = i915_gem_context_lookup(file->driver_priv, ctx_id);
+	ctx = i915_gem_context_lookup(file_priv, ctx_id);
 	if (IS_ERR(ctx))
 		return ctx;
 
 	hs = &ctx->hang_stats;
 	if (hs->banned) {
-		DRM_DEBUG("Context %u tried to submit while banned\n", ctx_id);
+		DRM_DEBUG("Client %s banned from submitting (%d:%d)\n",
+			  ctx->name,
+			  file_priv->context_bans,
+			  hs->ban_score);
 		return ERR_PTR(-EIO);
 	}
 

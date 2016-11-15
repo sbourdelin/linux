@@ -347,6 +347,14 @@ err_out:
 	return ERR_PTR(ret);
 }
 
+static bool client_is_banned(struct drm_i915_file_private *file_priv)
+{
+	if (file_priv->context_bans <= I915_MAX_CLIENT_CONTEXT_BANS)
+		return false;
+
+	return true;
+}
+
 /**
  * The default context needs to exist per ring that uses contexts. It stores the
  * context state of the GPU for applications that don't utilize HW contexts, as
@@ -359,6 +367,14 @@ i915_gem_create_context(struct drm_device *dev,
 	struct i915_gem_context *ctx;
 
 	lockdep_assert_held(&dev->struct_mutex);
+
+	if (file_priv && client_is_banned(file_priv)) {
+		DRM_DEBUG("client %s[%d] banned from creating ctx\n",
+			  current->comm,
+			  pid_nr(get_task_pid(current, PIDTYPE_PID)));
+
+		return ERR_PTR(-EIO);
+	}
 
 	ctx = __create_hw_context(dev, file_priv);
 	if (IS_ERR(ctx))

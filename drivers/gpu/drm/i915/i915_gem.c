@@ -2636,19 +2636,33 @@ static bool i915_context_is_banned(const struct i915_gem_context *ctx)
 	return false;
 }
 
-static void i915_gem_context_mark_guilty(struct i915_gem_context *ctx)
+static void i915_gem_request_mark_guilty(struct drm_i915_gem_request *request)
 {
-	struct i915_ctx_hang_stats *hs = &ctx->hang_stats;
+	struct i915_ctx_hang_stats *hs = &request->ctx->hang_stats;
 
 	hs->ban_score += 10;
 
-	hs->banned = i915_context_is_banned(ctx);
+	hs->banned = i915_context_is_banned(request->ctx);
 	hs->batch_active++;
+
+	DRM_DEBUG_DRIVER("context %s marked guilty (score %d) banned? %s\n",
+			 request->ctx->name, hs->ban_score, yesno(hs->banned));
+
+	if (!request->file_priv)
+		return;
+
+	if (hs->banned) {
+		request->file_priv->context_bans++;
+
+		DRM_DEBUG_DRIVER("client %s has has %d context banned\n",
+				 request->ctx->name,
+				 request->file_priv->context_bans);
+	}
 }
 
-static void i915_gem_context_mark_innocent(struct i915_gem_context *ctx)
+static void i915_gem_request_mark_innocent(struct drm_i915_gem_request *request)
 {
-	struct i915_ctx_hang_stats *hs = &ctx->hang_stats;
+	struct i915_ctx_hang_stats *hs = &request->ctx->hang_stats;
 
 	hs->batch_pending++;
 }
@@ -2719,9 +2733,9 @@ static void i915_gem_reset_engine(struct intel_engine_cs *engine)
 	}
 
 	if (ring_hung)
-		i915_gem_context_mark_guilty(request->ctx);
+		i915_gem_request_mark_guilty(request);
 	else
-		i915_gem_context_mark_innocent(request->ctx);
+		i915_gem_request_mark_innocent(request);
 
 	if (!ring_hung)
 		return;
