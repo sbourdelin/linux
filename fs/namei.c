@@ -2817,10 +2817,12 @@ static inline int may_create(struct inode *dir, struct dentry *child)
 		return -EEXIST;
 	if (IS_DEADDIR(dir))
 		return -ENOENT;
-	s_user_ns = dir->i_sb->s_user_ns;
-	if (!kuid_has_mapping(s_user_ns, current_fsuid()) ||
-	    !kgid_has_mapping(s_user_ns, current_fsgid()))
-		return -EOVERFLOW;
+	if (!(dir->i_sb->s_type->fs_flags & FS_USERNS_MOUNT)) {
+		s_user_ns = dir->i_sb->s_user_ns;
+		if (!kuid_has_mapping(s_user_ns, current_fsuid()) ||
+		    !kgid_has_mapping(s_user_ns, current_fsgid()))
+			return -EOVERFLOW;
+	}
 	return inode_permission(dir, MAY_WRITE | MAY_EXEC);
 }
 
