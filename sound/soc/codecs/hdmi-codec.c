@@ -12,9 +12,12 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
  * General Public License for more details.
  */
+#include <linux/hdmi-notifier.h>
 #include <linux/module.h>
+#include <linux/notifier.h>
 #include <linux/string.h>
 #include <sound/core.h>
+#include <sound/jack.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
@@ -36,11 +39,17 @@ LIST_HEAD(hdmi_device_list);
 struct hdmi_codec_priv {
 	struct hdmi_codec_pdata hcd;
 	struct snd_soc_dai_driver *daidrv;
+	struct snd_soc_jack *jack;
 	struct hdmi_codec_daifmt daifmt[2];
 	struct mutex current_stream_lock;
 	struct snd_pcm_substream *current_stream;
 	struct snd_pcm_hw_constraint_list ratec;
+	struct mutex eld_lock;
 	uint8_t eld[MAX_ELD_BYTES];
+	struct device *dev;
+	struct hdmi_notifier *notifier;
+	struct notifier_block nb;
+	unsigned int jack_status;
 };
 
 static const struct snd_soc_dapm_widget hdmi_widgets[] = {
@@ -74,7 +83,9 @@ static int hdmi_eld_ctl_get(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct hdmi_codec_priv *hcp = snd_soc_component_get_drvdata(component);
 
+	mutex_lock(&hcp->eld_lock);
 	memcpy(ucontrol->value.bytes.data, hcp->eld, sizeof(hcp->eld));
+	mutex_unlock(&hcp->eld_lock);
 
 	return 0;
 }
@@ -112,7 +123,7 @@ static int hdmi_codec_startup(struct snd_pcm_substream *substream,
 			      struct snd_soc_dai *dai)
 {
 	struct hdmi_codec_priv *hcp = snd_soc_dai_get_drvdata(dai);
-	int ret = 0;
+	int ret;
 
 	dev_dbg(dai->dev, "%s()\n", __func__);
 
@@ -131,17 +142,15 @@ static int hdmi_codec_startup(struct snd_pcm_substream *substream,
 	}
 
 	if (hcp->hcd.ops->get_eld) {
+		mutex_lock(&hcp->eld_lock);
 		ret = hcp->hcd.ops->get_eld(dai->dev->parent, hcp->hcd.data,
 					    hcp->eld, sizeof(hcp->eld));
-
-		if (!ret) {
+		if (!ret)
 			ret = snd_pcm_hw_constraint_eld(substream->runtime,
 							hcp->eld);
-			if (ret)
-				return ret;
-		}
+		mutex_unlock(&hcp->eld_lock);
 	}
-	return 0;
+	return ret;
 }
 
 static void hdmi_codec_shutdown(struct snd_pcm_substream *substream,
@@ -391,6 +400,78 @@ static struct snd_soc_codec_driver hdmi_codec = {
 	},
 };
 
+static void hdmi_codec_jack_report(struct hdmi_codec_priv *hcp,
+				   unsigned int jack_status)
+{
+	if (!hcp->jack)
+		return;
+
+	if (jack_status != hcp->jack_status) {
+		snd_soc_jack_report(hcp->jack, jack_status, SND_JACK_LINEOUT);
+		hcp->jack_status = jack_status;
+	}
+}
+
+static int hdmi_codec_notify(struct notifier_block *nb, unsigned long event,
+			     void *data)
+{
+	struct hdmi_codec_priv *hcp = container_of(nb, struct hdmi_codec_priv,
+						   nb);
+	struct hdmi_notifier *n = data;
+
+	if (!hcp->jack)
+		return NOTIFY_OK;
+
+	switch (event) {
+	case HDMI_NEW_ELD:
+		mutex_lock(&hcp->eld_lock);
+		memcpy(hcp->eld, n->eld, sizeof(hcp->eld));
+		mutex_unlock(&hcp->eld_lock);
+		/* fall through */
+	case HDMI_CONNECTED:
+		hdmi_codec_jack_report(hcp, SND_JACK_LINEOUT);
+		break;
+	case HDMI_DISCONNECTED:
+		hdmi_codec_jack_report(hcp, 0);
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+/**
+ * hdmi_codec_set_jack_detect - register HDMI state notifier callback
+ * @codec: the hdmi-codec instance
+ * @jack: ASoC jack to report (dis)connection events on
+ * @dev: hdmi_notifier device, usually HDMI_TX or CEC device
+ */
+int hdmi_codec_set_jack_detect(struct snd_soc_codec *codec,
+			       struct snd_soc_jack *jack,
+			       struct device *dev)
+{
+	struct hdmi_codec_priv *hcp = snd_soc_codec_get_drvdata(codec);
+	int ret;
+
+	hcp->notifier = hdmi_notifier_get(dev);
+	if (!hcp->notifier)
+		return -ENOMEM;
+
+	hcp->nb.notifier_call = hdmi_codec_notify;
+	ret = hdmi_notifier_register(hcp->notifier, &hcp->nb);
+	if (ret)
+		goto err_notifier_put;
+
+	hcp->jack = jack;
+
+	return 0;
+
+err_notifier_put:
+	hdmi_notifier_put(hcp->notifier);
+	hcp->notifier = NULL;
+	return ret;
+}
+EXPORT_SYMBOL_GPL(hdmi_codec_set_jack_detect);
+
 static int hdmi_codec_probe(struct platform_device *pdev)
 {
 	struct hdmi_codec_pdata *hcd = pdev->dev.platform_data;
@@ -446,6 +527,7 @@ static int hdmi_codec_probe(struct platform_device *pdev)
 
 	hcp->hcd = *hcd;
 	mutex_init(&hcp->current_stream_lock);
+	mutex_init(&hcp->eld_lock);
 
 	hcp->daidrv = devm_kzalloc(dev, dai_count * sizeof(*hcp->daidrv),
 				   GFP_KERNEL);
@@ -465,6 +547,8 @@ static int hdmi_codec_probe(struct platform_device *pdev)
 		hcp->daidrv[i].name = hdmi_dai_name[hd->cnt++];
 	}
 
+	dev_set_drvdata(dev, hcp);
+
 	ret = snd_soc_register_codec(dev, &hdmi_codec, hcp->daidrv,
 				     dai_count);
 	if (ret) {
@@ -473,12 +557,19 @@ static int hdmi_codec_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	dev_set_drvdata(dev, hcp);
+	hcp->dev = dev;
+
 	return 0;
 }
 
 static int hdmi_codec_remove(struct platform_device *pdev)
 {
+	struct hdmi_codec_priv *hcp = platform_get_drvdata(pdev);
+
+	if (hcp->notifier) {
+		hdmi_notifier_unregister(hcp->notifier, &hcp->nb);
+		hdmi_notifier_put(hcp->notifier);
+	}
 	snd_soc_unregister_codec(&pdev->dev);
 	return 0;
 }
