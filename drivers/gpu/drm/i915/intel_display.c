@@ -14140,6 +14140,17 @@ static int intel_atomic_check(struct drm_device *dev,
 	return calc_watermark_data(state);
 }
 
+static bool old_plane_needs_modeset(struct drm_plane *plane,
+				    struct drm_plane_state *new_state)
+{
+	struct drm_crtc_state *crtc_state;
+
+	crtc_state = drm_atomic_get_existing_crtc_state(new_state->state,
+							plane->state->crtc);
+
+	return needs_modeset(crtc_state);
+}
+
 /**
  * intel_prepare_plane_fb - Prepare fb for usage on plane
  * @plane: drm plane to prepare for
@@ -14163,16 +14174,11 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 	struct drm_i915_private *dev_priv = to_i915(plane->dev);
 	struct drm_framebuffer *fb = new_state->fb;
 	struct drm_i915_gem_object *obj = intel_fb_obj(fb);
-	struct drm_i915_gem_object *old_obj = intel_fb_obj(plane->state->fb);
 	int ret;
 
-	if (!obj && !old_obj)
-		return 0;
-
-	if (old_obj) {
-		struct drm_crtc_state *crtc_state =
-			drm_atomic_get_existing_crtc_state(new_state->state,
-							   plane->state->crtc);
+	if (plane->state->fb && old_plane_needs_modeset(plane, new_state)) {
+		struct drm_i915_gem_object *old_obj =
+			intel_fb_obj(plane->state->fb);
 
 		/* Big Hammer, we also need to ensure that any pending
 		 * MI_WAIT_FOR_EVENT inside a user batch buffer on the
@@ -14185,14 +14191,12 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 		 * This should only fail upon a hung GPU, in which case we
 		 * can safely continue.
 		 */
-		if (needs_modeset(crtc_state)) {
-			ret = i915_sw_fence_await_reservation(&intel_state->commit_ready,
-							      old_obj->resv, NULL,
-							      false, 0,
-							      GFP_KERNEL);
-			if (ret < 0)
-				return ret;
-		}
+		ret = i915_sw_fence_await_reservation(&intel_state->commit_ready,
+						      old_obj->resv, NULL,
+						      false, 0,
+						      GFP_KERNEL);
+		if (ret < 0)
+			return ret;
 	}
 
 	if (new_state->fence) { /* explicit fencing */
@@ -14231,7 +14235,7 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 
 		vma = intel_pin_and_fence_fb_obj(fb, new_state->rotation);
 		if (IS_ERR(vma))
-			ret = PTR_ERR(vma);
+			return PTR_ERR(vma);
 
 		to_intel_plane_state(new_state)->vma = vma;
 	}
