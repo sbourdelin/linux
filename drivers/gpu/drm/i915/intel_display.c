@@ -14154,6 +14154,134 @@ static int intel_atomic_check(struct drm_device *dev,
 	return calc_watermark_data(state);
 }
 
+/**
+ * intel_prepare_plane_fb - Prepare fb for usage on plane
+ * @plane: drm plane to prepare for
+ * @fb: framebuffer to prepare for presentation
+ *
+ * Prepares a framebuffer for usage on a display plane.  Generally this
+ * involves pinning the underlying object and updating the frontbuffer tracking
+ * bits.  Some older platforms need special physical address handling for
+ * cursor planes.
+ *
+ * Must be called with struct_mutex held.
+ *
+ * Returns 0 on success, negative error code on failure.
+ */
+int
+intel_prepare_plane_fb(struct drm_plane *plane,
+		       struct drm_plane_state *new_state)
+{
+	struct intel_atomic_state *intel_state =
+		to_intel_atomic_state(new_state->state);
+	struct drm_i915_private *dev_priv = to_i915(plane->dev);
+	struct drm_framebuffer *fb = new_state->fb;
+	struct drm_i915_gem_object *obj = intel_fb_obj(fb);
+	struct drm_i915_gem_object *old_obj = intel_fb_obj(plane->state->fb);
+	int ret;
+
+	if (!obj && !old_obj)
+		return 0;
+
+	if (old_obj) {
+		struct drm_crtc_state *crtc_state =
+			drm_atomic_get_existing_crtc_state(new_state->state,
+							   plane->state->crtc);
+
+		/* Big Hammer, we also need to ensure that any pending
+		 * MI_WAIT_FOR_EVENT inside a user batch buffer on the
+		 * current scanout is retired before unpinning the old
+		 * framebuffer. Note that we rely on userspace rendering
+		 * into the buffer attached to the pipe they are waiting
+		 * on. If not, userspace generates a GPU hang with IPEHR
+		 * point to the MI_WAIT_FOR_EVENT.
+		 *
+		 * This should only fail upon a hung GPU, in which case we
+		 * can safely continue.
+		 */
+		if (needs_modeset(crtc_state)) {
+			ret = i915_sw_fence_await_reservation(&intel_state->commit_ready,
+							      old_obj->resv, NULL,
+							      false, 0,
+							      GFP_KERNEL);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	if (new_state->fence) { /* explicit fencing */
+		ret = i915_sw_fence_await_dma_fence(&intel_state->commit_ready,
+						    new_state->fence,
+						    I915_FENCE_TIMEOUT,
+						    GFP_KERNEL);
+		if (ret < 0)
+			return ret;
+	}
+
+	if (!obj)
+		return 0;
+
+	if (!new_state->fence) { /* implicit fencing */
+		ret = i915_sw_fence_await_reservation(&intel_state->commit_ready,
+						      obj->resv, NULL,
+						      false, I915_FENCE_TIMEOUT,
+						      GFP_KERNEL);
+		if (ret < 0)
+			return ret;
+
+		i915_gem_object_wait_priority(obj, 0, I915_PRIORITY_DISPLAY);
+	}
+
+	if (plane->type == DRM_PLANE_TYPE_CURSOR &&
+	    INTEL_INFO(dev_priv)->cursor_needs_physical) {
+		int align = IS_I830(dev_priv) ? 16 * 1024 : 256;
+		ret = i915_gem_object_attach_phys(obj, align);
+		if (ret) {
+			DRM_DEBUG_KMS("failed to attach phys object\n");
+			return ret;
+		}
+	} else {
+		struct i915_vma *vma;
+
+		vma = intel_pin_and_fence_fb_obj(fb, new_state->rotation);
+		if (IS_ERR(vma)) {
+			DRM_DEBUG_KMS("failed to pin object\n");
+			return PTR_ERR(vma);
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * intel_cleanup_plane_fb - Cleans up an fb after plane use
+ * @plane: drm plane to clean up for
+ * @fb: old framebuffer that was on plane
+ *
+ * Cleans up a framebuffer that has just been removed from a plane.
+ *
+ * Must be called with struct_mutex held.
+ */
+void
+intel_cleanup_plane_fb(struct drm_plane *plane,
+		       struct drm_plane_state *old_state)
+{
+	struct drm_i915_private *dev_priv = to_i915(plane->dev);
+	struct intel_plane_state *old_intel_state;
+	struct drm_i915_gem_object *old_obj = intel_fb_obj(old_state->fb);
+	struct drm_i915_gem_object *obj = intel_fb_obj(plane->state->fb);
+
+	old_intel_state = to_intel_plane_state(old_state);
+
+	if (!obj && !old_obj)
+		return;
+
+	if (old_obj && (plane->type != DRM_PLANE_TYPE_CURSOR ||
+	    !INTEL_INFO(dev_priv)->cursor_needs_physical))
+		intel_unpin_fb_obj(old_state->fb, old_state->rotation);
+}
+
+
 static int intel_atomic_prepare_commit(struct drm_device *dev,
 				       struct drm_atomic_state *state)
 {
@@ -14725,133 +14853,6 @@ static const struct drm_crtc_funcs intel_crtc_funcs = {
 	.atomic_duplicate_state = intel_crtc_duplicate_state,
 	.atomic_destroy_state = intel_crtc_destroy_state,
 };
-
-/**
- * intel_prepare_plane_fb - Prepare fb for usage on plane
- * @plane: drm plane to prepare for
- * @fb: framebuffer to prepare for presentation
- *
- * Prepares a framebuffer for usage on a display plane.  Generally this
- * involves pinning the underlying object and updating the frontbuffer tracking
- * bits.  Some older platforms need special physical address handling for
- * cursor planes.
- *
- * Must be called with struct_mutex held.
- *
- * Returns 0 on success, negative error code on failure.
- */
-int
-intel_prepare_plane_fb(struct drm_plane *plane,
-		       struct drm_plane_state *new_state)
-{
-	struct intel_atomic_state *intel_state =
-		to_intel_atomic_state(new_state->state);
-	struct drm_i915_private *dev_priv = to_i915(plane->dev);
-	struct drm_framebuffer *fb = new_state->fb;
-	struct drm_i915_gem_object *obj = intel_fb_obj(fb);
-	struct drm_i915_gem_object *old_obj = intel_fb_obj(plane->state->fb);
-	int ret;
-
-	if (!obj && !old_obj)
-		return 0;
-
-	if (old_obj) {
-		struct drm_crtc_state *crtc_state =
-			drm_atomic_get_existing_crtc_state(new_state->state,
-							   plane->state->crtc);
-
-		/* Big Hammer, we also need to ensure that any pending
-		 * MI_WAIT_FOR_EVENT inside a user batch buffer on the
-		 * current scanout is retired before unpinning the old
-		 * framebuffer. Note that we rely on userspace rendering
-		 * into the buffer attached to the pipe they are waiting
-		 * on. If not, userspace generates a GPU hang with IPEHR
-		 * point to the MI_WAIT_FOR_EVENT.
-		 *
-		 * This should only fail upon a hung GPU, in which case we
-		 * can safely continue.
-		 */
-		if (needs_modeset(crtc_state)) {
-			ret = i915_sw_fence_await_reservation(&intel_state->commit_ready,
-							      old_obj->resv, NULL,
-							      false, 0,
-							      GFP_KERNEL);
-			if (ret < 0)
-				return ret;
-		}
-	}
-
-	if (new_state->fence) { /* explicit fencing */
-		ret = i915_sw_fence_await_dma_fence(&intel_state->commit_ready,
-						    new_state->fence,
-						    I915_FENCE_TIMEOUT,
-						    GFP_KERNEL);
-		if (ret < 0)
-			return ret;
-	}
-
-	if (!obj)
-		return 0;
-
-	if (!new_state->fence) { /* implicit fencing */
-		ret = i915_sw_fence_await_reservation(&intel_state->commit_ready,
-						      obj->resv, NULL,
-						      false, I915_FENCE_TIMEOUT,
-						      GFP_KERNEL);
-		if (ret < 0)
-			return ret;
-
-		i915_gem_object_wait_priority(obj, 0, I915_PRIORITY_DISPLAY);
-	}
-
-	if (plane->type == DRM_PLANE_TYPE_CURSOR &&
-	    INTEL_INFO(dev_priv)->cursor_needs_physical) {
-		int align = IS_I830(dev_priv) ? 16 * 1024 : 256;
-		ret = i915_gem_object_attach_phys(obj, align);
-		if (ret) {
-			DRM_DEBUG_KMS("failed to attach phys object\n");
-			return ret;
-		}
-	} else {
-		struct i915_vma *vma;
-
-		vma = intel_pin_and_fence_fb_obj(fb, new_state->rotation);
-		if (IS_ERR(vma)) {
-			DRM_DEBUG_KMS("failed to pin object\n");
-			return PTR_ERR(vma);
-		}
-	}
-
-	return 0;
-}
-
-/**
- * intel_cleanup_plane_fb - Cleans up an fb after plane use
- * @plane: drm plane to clean up for
- * @fb: old framebuffer that was on plane
- *
- * Cleans up a framebuffer that has just been removed from a plane.
- *
- * Must be called with struct_mutex held.
- */
-void
-intel_cleanup_plane_fb(struct drm_plane *plane,
-		       struct drm_plane_state *old_state)
-{
-	struct drm_i915_private *dev_priv = to_i915(plane->dev);
-	struct intel_plane_state *old_intel_state;
-	struct drm_i915_gem_object *old_obj = intel_fb_obj(old_state->fb);
-	struct drm_i915_gem_object *obj = intel_fb_obj(plane->state->fb);
-
-	old_intel_state = to_intel_plane_state(old_state);
-
-	if (!obj && !old_obj)
-		return;
-
-	if (old_obj && (plane->type != DRM_PLANE_TYPE_CURSOR ||
-	    !INTEL_INFO(dev_priv)->cursor_needs_physical))
-		intel_unpin_fb_obj(old_state->fb, old_state->rotation);
-}
 
 int
 skl_max_scale(struct intel_crtc *intel_crtc, struct intel_crtc_state *crtc_state)

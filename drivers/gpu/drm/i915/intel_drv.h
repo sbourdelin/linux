@@ -772,6 +772,8 @@ struct intel_plane {
 	int max_downscale;
 	uint32_t frontbuffer_bit;
 
+	struct i915_sw_fence *last_commit;
+
 	/* Since we need to change the watermarks before/after
 	 * enabling/disabling the planes, we need to store the parameters here
 	 * as the other pieces of the struct may not reflect the values we want
