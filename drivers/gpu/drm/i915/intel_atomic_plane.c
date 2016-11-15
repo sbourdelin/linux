@@ -201,8 +201,6 @@ static void intel_plane_atomic_update(struct drm_plane *plane,
 }
 
 const struct drm_plane_helper_funcs intel_plane_helper_funcs = {
-	.prepare_fb = intel_prepare_plane_fb,
-	.cleanup_fb = intel_cleanup_plane_fb,
 	.atomic_check = intel_plane_atomic_check,
 	.atomic_update = intel_plane_atomic_update,
 };

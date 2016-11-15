@@ -14168,7 +14168,7 @@ static int intel_atomic_check(struct drm_device *dev,
  *
  * Returns 0 on success, negative error code on failure.
  */
-int
+static int
 intel_prepare_plane_fb(struct drm_plane *plane,
 		       struct drm_plane_state *new_state)
 {
@@ -14262,7 +14262,7 @@ intel_prepare_plane_fb(struct drm_plane *plane,
  *
  * Must be called with struct_mutex held.
  */
-void
+static void
 intel_cleanup_plane_fb(struct drm_plane *plane,
 		       struct drm_plane_state *old_state)
 {
@@ -14281,6 +14281,49 @@ intel_cleanup_plane_fb(struct drm_plane *plane,
 		intel_unpin_fb_obj(old_state->fb, old_state->rotation);
 }
 
+static int intel_atomic_commit_prepare_planes(struct drm_atomic_state *state)
+{
+	struct drm_plane *plane;
+	struct drm_plane_state *plane_state;
+	int i, j, ret;
+
+	ret = mutex_lock_interruptible(&state->dev->struct_mutex);
+	if (ret)
+		return ret;
+
+	for_each_plane_in_state(state, plane, plane_state, i) {
+		ret = intel_prepare_plane_fb(plane, plane_state);
+		if (ret)
+			break;
+	}
+
+	if (ret) {
+		for_each_plane_in_state(state, plane, plane_state, j) {
+			if (j >= i)
+				break;
+
+			intel_cleanup_plane_fb(plane, plane_state);
+		}
+	}
+
+	mutex_unlock(&state->dev->struct_mutex);
+
+	return ret;
+}
+
+static void intel_atomic_commit_cleanup_planes(struct drm_atomic_state *state)
+{
+	struct drm_plane *plane;
+	struct drm_plane_state *plane_state;
+	int i;
+
+	mutex_lock(&state->dev->struct_mutex);
+
+	for_each_plane_in_state(state, plane, plane_state, i)
+		intel_cleanup_plane_fb(plane, plane_state);
+
+	mutex_unlock(&state->dev->struct_mutex);
+}
 
 static int intel_atomic_prepare_commit(struct drm_device *dev,
 				       struct drm_atomic_state *state)
@@ -14302,14 +14345,7 @@ static int intel_atomic_prepare_commit(struct drm_device *dev,
 			flush_workqueue(dev_priv->wq);
 	}
 
-	ret = mutex_lock_interruptible(&dev->struct_mutex);
-	if (ret)
-		return ret;
-
-	ret = drm_atomic_helper_prepare_planes(dev, state);
-	mutex_unlock(&dev->struct_mutex);
-
-	return ret;
+	return intel_atomic_commit_prepare_planes(state);
 }
 
 u32 intel_crtc_get_vblank_counter(struct intel_crtc *crtc)
@@ -14632,9 +14668,7 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 	if (intel_state->modeset)
 		intel_display_power_put(dev_priv, POWER_DOMAIN_MODESET);
 
-	mutex_lock(&dev->struct_mutex);
-	drm_atomic_helper_cleanup_planes(dev, state);
-	mutex_unlock(&dev->struct_mutex);
+	intel_atomic_commit_cleanup_planes(state);
 
 	drm_atomic_helper_commit_cleanup_done(state);
 
