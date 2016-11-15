@@ -1261,6 +1261,7 @@ static struct i2c_driver da7210_i2c_driver = {
 	.remove		= da7210_i2c_remove,
 	.id_table	= da7210_i2c_id,
 };
+module_i2c_driver(da7210_i2c_driver);
 #endif
 
 #if defined(CONFIG_SPI_MASTER)
@@ -1344,35 +1345,8 @@ static struct spi_driver da7210_spi_driver = {
 	.probe = da7210_spi_probe,
 	.remove = da7210_spi_remove
 };
+module_spi_driver(da7210_spi_driver);
 #endif
-
-static int __init da7210_modinit(void)
-{
-	int ret = 0;
-#if IS_ENABLED(CONFIG_I2C)
-	ret = i2c_add_driver(&da7210_i2c_driver);
-#endif
-#if defined(CONFIG_SPI_MASTER)
-	ret = spi_register_driver(&da7210_spi_driver);
-	if (ret) {
-		printk(KERN_ERR "Failed to register da7210 SPI driver: %d\n",
-		       ret);
-	}
-#endif
-	return ret;
-}
-module_init(da7210_modinit);
-
-static void __exit da7210_exit(void)
-{
-#if IS_ENABLED(CONFIG_I2C)
-	i2c_del_driver(&da7210_i2c_driver);
-#endif
-#if defined(CONFIG_SPI_MASTER)
-	spi_unregister_driver(&da7210_spi_driver);
-#endif
-}
-module_exit(da7210_exit);
 
 MODULE_DESCRIPTION("ASoC DA7210 driver");
 MODULE_AUTHOR("David Chen, Kuninori Morimoto");
