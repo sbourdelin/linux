@@ -100,5 +100,23 @@ unsigned long cpu_khz_from_msr(void)
 #ifdef CONFIG_X86_LOCAL_APIC
 	lapic_timer_frequency = (freq * 1000) / HZ;
 #endif
+
+	/*
+	 * TSC frequency determined by MSR is always considered "known"
+	 * because it is reported by HW.
+	 * Another fact is that on MSR capable platforms, PIT/HPET is
+	 * generally not available so calibration won't work at all.
+	 */
+	setup_force_cpu_cap(X86_FEATURE_TSC_KNOWN_FREQ);
+
+	/*
+	 * Unfortunately there is no a HW way to report TSC is reliable.
+	 * We were told by silicon design team that TSC on Atom SoCs are
+	 * always "reliable". TSC is also the only reliable clocksource
+	 * on these SoCs (HPET is either not present or not functional)
+	 * so marke TSC reliable to avoid watchdog on it.
+	 */
+	setup_force_cpu_cap(X86_FEATURE_TSC_RELIABLE);
+
 	return res;
 }
