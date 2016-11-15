@@ -1233,18 +1233,16 @@ i915_gem_validate_context(struct drm_device *dev, struct drm_file *file,
 {
 	struct drm_i915_file_private *file_priv = file->driver_priv;
 	struct i915_gem_context *ctx;
-	struct i915_ctx_hang_stats *hs;
 
 	ctx = i915_gem_context_lookup(file_priv, ctx_id);
 	if (IS_ERR(ctx))
 		return ctx;
 
-	hs = &ctx->hang_stats;
-	if (hs->banned) {
+	if (ctx->banned) {
 		DRM_DEBUG("Client %s banned from submitting (%d:%d)\n",
 			  ctx->name,
 			  file_priv->context_bans,
-			  hs->ban_score);
+			  ctx->ban_score);
 		return ERR_PTR(-EIO);
 	}
 

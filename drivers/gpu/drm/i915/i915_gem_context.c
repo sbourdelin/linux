@@ -331,7 +331,7 @@ __create_hw_context(struct drm_device *dev,
 	 * is no remap info, it will be a NOP. */
 	ctx->remap_slice = ALL_L3_SLICES(dev_priv);
 
-	ctx->hang_stats.bannable = true;
+	ctx->bannable = true;
 	ctx->ring_size = 4 * PAGE_SIZE;
 	ctx->desc_template = GEN8_CTX_ADDRESSING_MODE(dev_priv) <<
 			     GEN8_CTX_ADDRESSING_MODE_SHIFT;
@@ -1118,7 +1118,7 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 		args->value = !!(ctx->flags & CONTEXT_NO_ERROR_CAPTURE);
 		break;
 	case I915_CONTEXT_PARAM_BANNABLE:
-		args->value = ctx->hang_stats.bannable;
+		args->value = ctx->bannable;
 		break;
 	default:
 		ret = -EINVAL;
@@ -1175,7 +1175,7 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 		else if (!capable(CAP_SYS_ADMIN))
 			ret = -EPERM;
 		else
-			ctx->hang_stats.bannable = args->value;
+			ctx->bannable = args->value;
 		break;
 	default:
 		ret = -EINVAL;
@@ -1191,7 +1191,6 @@ int i915_gem_context_reset_stats_ioctl(struct drm_device *dev,
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_i915_reset_stats *args = data;
-	struct i915_ctx_hang_stats *hs;
 	struct i915_gem_context *ctx;
 	int ret;
 
@@ -1210,15 +1209,14 @@ int i915_gem_context_reset_stats_ioctl(struct drm_device *dev,
 		mutex_unlock(&dev->struct_mutex);
 		return PTR_ERR(ctx);
 	}
-	hs = &ctx->hang_stats;
 
 	if (capable(CAP_SYS_ADMIN))
 		args->reset_count = i915_reset_count(&dev_priv->gpu_error);
 	else
 		args->reset_count = 0;
 
-	args->batch_active = hs->batch_active;
-	args->batch_pending = hs->batch_pending;
+	args->batch_active = ctx->guilty_count;
+	args->batch_pending = ctx->active_count;
 
 	mutex_unlock(&dev->struct_mutex);
 
