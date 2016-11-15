@@ -664,6 +664,7 @@ static struct i2c_driver wm8737_i2c_driver = {
 	.remove =   wm8737_i2c_remove,
 	.id_table = wm8737_i2c_id,
 };
+module_i2c_driver(wm8737_i2c_driver);
 #endif
 
 #if defined(CONFIG_SPI_MASTER)
@@ -714,39 +715,8 @@ static struct spi_driver wm8737_spi_driver = {
 	.probe		= wm8737_spi_probe,
 	.remove		= wm8737_spi_remove,
 };
+module_spi_driver(wm8737_spi_driver);
 #endif /* CONFIG_SPI_MASTER */
-
-static int __init wm8737_modinit(void)
-{
-	int ret;
-#if IS_ENABLED(CONFIG_I2C)
-	ret = i2c_add_driver(&wm8737_i2c_driver);
-	if (ret != 0) {
-		printk(KERN_ERR "Failed to register WM8737 I2C driver: %d\n",
-		       ret);
-	}
-#endif
-#if defined(CONFIG_SPI_MASTER)
-	ret = spi_register_driver(&wm8737_spi_driver);
-	if (ret != 0) {
-		printk(KERN_ERR "Failed to register WM8737 SPI driver: %d\n",
-		       ret);
-	}
-#endif
-	return 0;
-}
-module_init(wm8737_modinit);
-
-static void __exit wm8737_exit(void)
-{
-#if defined(CONFIG_SPI_MASTER)
-	spi_unregister_driver(&wm8737_spi_driver);
-#endif
-#if IS_ENABLED(CONFIG_I2C)
-	i2c_del_driver(&wm8737_i2c_driver);
-#endif
-}
-module_exit(wm8737_exit);
 
 MODULE_DESCRIPTION("ASoC WM8737 driver");
 MODULE_AUTHOR("Mark Brown <broonie@opensource.wolfsonmicro.com>");
