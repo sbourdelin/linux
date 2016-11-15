@@ -1,0 +1,17 @@
+STIH4xxSoC ION
+
+Required properties:
+- compatible: "st,sti-ion", "linux,ion"
+- list of ION heaps:
+	- compatible: "st,cma-heap", "linux,ion-heap-dma"
+
+heap bindings are defined in drivers/staging/android/ion/devicetree.txt
+
+Example:
+	ion {
+		compatible = "st,sti-ion", "linux,ion";
+
+		ion-cma-heap {
+			compatible = "st,cma-heap", "linux,ion-heap-dma";
+		};
+	};
