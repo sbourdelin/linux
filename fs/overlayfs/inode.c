@@ -329,7 +329,7 @@ int ovl_update_time(struct inode *inode, struct timespec *ts, int flags)
 	ovl_path_upper(alias, &upperpath);
 	if (upperpath.dentry) {
 		touch_atime(&upperpath);
-		inode->i_atime = d_inode(upperpath.dentry)->i_atime;
+		fsstack_copy_attr_atime(inode, d_inode(upperpath.dentry));
 	}
 
 	dput(alias);
