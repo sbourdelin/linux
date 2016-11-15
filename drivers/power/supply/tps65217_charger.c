@@ -46,8 +46,6 @@ struct tps65217_charger {
 	int	prev_ac_online;
 
 	struct task_struct	*poll_task;
-
-	int	irq;
 };
 
 static enum power_supply_property tps65217_ac_props[] = {
@@ -198,14 +196,13 @@ static const struct power_supply_desc tps65217_charger_desc = {
 static int tps65217_charger_request_interrupt(struct platform_device *pdev)
 {
 	struct tps65217_charger *charger = platform_get_drvdata(pdev);
+	struct task_struct *poll_task;
 	int irq;
 	int ret;
 
 	irq = platform_get_irq_byname(pdev, "AC");
 	if (irq < 0)
 		irq = -ENXIO;
-
-	charger->irq = irq;
 
 	if (irq != -ENXIO) {
 		ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
@@ -222,12 +219,15 @@ static int tps65217_charger_request_interrupt(struct platform_device *pdev)
 		return 0;
 	}
 
-	charger->poll_task = kthread_run(tps65217_charger_poll_task, charger,
-					 "ktps65217charger");
-	if (IS_ERR(charger->poll_task)) {
-		ret = PTR_ERR(charger->poll_task);
+	poll_task = kthread_run(tps65217_charger_poll_task, charger,
+				"ktps65217charger");
+	if (IS_ERR(poll_task)) {
+		ret = PTR_ERR(poll_task);
 		dev_err(charger->dev, "Unable to run kthread err %d\n", ret);
+		return ret;
 	}
+
+	charger->poll_task = poll_task;
 
 	return 0;
 }
@@ -273,7 +273,7 @@ static int tps65217_charger_remove(struct platform_device *pdev)
 {
 	struct tps65217_charger *charger = platform_get_drvdata(pdev);
 
-	if (charger->irq == -ENXIO)
+	if (charger->poll_task)
 		kthread_stop(charger->poll_task);
 
 	return 0;
