@@ -2245,7 +2245,7 @@ static int ath9k_set_antenna(struct ieee80211_hw *hw, u32 tx_ant, u32 rx_ant)
 		return 0;
 
 	/* AR9100 runs into calibration issues if not all rx chains are enabled */
-	if (AR_SREV_9100(ah))
+	if (AR_SREV_9100(ah) || AR_SREV_9300(ah))
 		ah->rxchainmask = 0x7;
 	else
 		ah->rxchainmask = fill_chainmask(ah->caps.rx_chainmask, rx_ant);
