@@ -2346,7 +2346,7 @@ static bool xgbe_phy_valid_speed(struct xgbe_prv_data *pdata, int speed)
 static int xgbe_phy_link_status(struct xgbe_prv_data *pdata, int *an_restart)
 {
 	struct xgbe_phy_data *phy_data = pdata->phy_data;
-	unsigned int ret, reg;
+	unsigned int reg;
 
 	*an_restart = 0;
 
@@ -2365,7 +2365,8 @@ static int xgbe_phy_link_status(struct xgbe_prv_data *pdata, int *an_restart)
 
 	if (phy_data->phydev) {
 		/* Check external PHY */
-		ret = phy_read_status(phy_data->phydev);
+		int ret = phy_read_status(phy_data->phydev);
+
 		if (ret < 0)
 			return 0;
 
