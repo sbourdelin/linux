@@ -5,3 +5,5 @@ obj-$(CONFIG_KEYSTONE_NAVIGATOR_QMSS)	+= knav_qmss.o
 knav_qmss-y := knav_qmss_queue.o knav_qmss_acc.o
 obj-$(CONFIG_KEYSTONE_NAVIGATOR_DMA)	+= knav_dma.o
 obj-$(CONFIG_WKUP_M3_IPC)		+= wkup_m3_ipc.o
+obj-y             += ti-opp-domain.o
+#obj-$(CONFIG_OPP_DOMAIN_TI)             += ti-opp-domain.o
