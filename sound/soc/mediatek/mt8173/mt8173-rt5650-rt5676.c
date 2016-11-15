@@ -17,7 +17,9 @@
 #include <linux/module.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
+#include <linux/of_platform.h>
 #include <sound/soc.h>
+#include <sound/hdmi-codec.h>
 #include <sound/jack.h>
 #include "../../codecs/rt5645.h"
 #include "../../codecs/rt5677.h"
@@ -131,6 +133,27 @@ static struct snd_soc_dai_link_component mt8173_rt5650_rt5676_codecs[] = {
 	},
 };
 
+static struct snd_soc_jack mt8173_hdmi_card_jack;
+
+static int mt8173_hdmi_init(struct snd_soc_pcm_runtime *runtime)
+{
+	struct snd_soc_card *card = runtime->card;
+	struct snd_soc_codec *codec = runtime->codec;
+	struct device *cec_dev = snd_soc_card_get_drvdata(card);
+	int ret;
+
+	/* Enable jack detection */
+	ret = snd_soc_card_jack_new(card, "HDMI Jack", SND_JACK_LINEOUT,
+				    &mt8173_hdmi_card_jack, NULL, 0);
+	if (ret) {
+		dev_err(card->dev, "HDMI Jack creation failed: %d\n", ret);
+		return ret;
+	}
+
+	return hdmi_codec_set_jack_detect(codec, &mt8173_hdmi_card_jack,
+					  cec_dev);
+}
+
 enum {
 	DAI_LINK_PLAYBACK,
 	DAI_LINK_CAPTURE,
@@ -195,6 +218,7 @@ static struct snd_soc_dai_link mt8173_rt5650_rt5676_dais[] = {
 		.no_pcm = 1,
 		.codec_dai_name = "i2s-hifi",
 		.dpcm_playback = 1,
+		.init = mt8173_hdmi_init,
 	},
 	/* rt5676 <-> rt5650 intercodec link: Sets rt5676 I2S2 as master */
 	[DAI_LINK_INTERCODEC] = {
@@ -235,6 +259,8 @@ static int mt8173_rt5650_rt5676_dev_probe(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = &mt8173_rt5650_rt5676_card;
 	struct device_node *platform_node;
+	struct device_node *cec_np;
+	struct platform_device *cec_pdev;
 	int i, ret;
 
 	platform_node = of_parse_phandle(pdev->dev.of_node,
@@ -281,6 +307,22 @@ static int mt8173_rt5650_rt5676_dev_probe(struct platform_device *pdev)
 	card->dev = &pdev->dev;
 	platform_set_drvdata(pdev, card);
 
+	/* The CEC module handles HDMI hotplug detection */
+	cec_np = of_find_compatible_node(pdev->dev.of_node->parent, NULL,
+					 "mediatek,mt8173-cec");
+	if (!cec_np) {
+		dev_err(&pdev->dev, "Failed to find CEC node\n");
+		return -EINVAL;
+	}
+
+	cec_pdev = of_find_device_by_node(cec_np);
+	if (!cec_pdev) {
+		dev_err(&pdev->dev, "Waiting for CEC device %s\n",
+			cec_np->full_name);
+		return -EPROBE_DEFER;
+	}
+
+	snd_soc_card_set_drvdata(card, &cec_pdev->dev);
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret)
 		dev_err(&pdev->dev, "%s snd_soc_register_card fail %d\n",
