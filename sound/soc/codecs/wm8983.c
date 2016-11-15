@@ -1039,6 +1039,7 @@ static struct spi_driver wm8983_spi_driver = {
 	.probe = wm8983_spi_probe,
 	.remove = wm8983_spi_remove
 };
+module_spi_driver(wm8983_spi_driver);
 #endif
 
 #if IS_ENABLED(CONFIG_I2C)
@@ -1087,40 +1088,8 @@ static struct i2c_driver wm8983_i2c_driver = {
 	.remove = wm8983_i2c_remove,
 	.id_table = wm8983_i2c_id
 };
+module_i2c_driver(wm8983_i2c_driver);
 #endif
-
-static int __init wm8983_modinit(void)
-{
-	int ret = 0;
-
-#if IS_ENABLED(CONFIG_I2C)
-	ret = i2c_add_driver(&wm8983_i2c_driver);
-	if (ret) {
-		printk(KERN_ERR "Failed to register wm8983 I2C driver: %d\n",
-		       ret);
-	}
-#endif
-#if defined(CONFIG_SPI_MASTER)
-	ret = spi_register_driver(&wm8983_spi_driver);
-	if (ret != 0) {
-		printk(KERN_ERR "Failed to register wm8983 SPI driver: %d\n",
-		       ret);
-	}
-#endif
-	return ret;
-}
-module_init(wm8983_modinit);
-
-static void __exit wm8983_exit(void)
-{
-#if IS_ENABLED(CONFIG_I2C)
-	i2c_del_driver(&wm8983_i2c_driver);
-#endif
-#if defined(CONFIG_SPI_MASTER)
-	spi_unregister_driver(&wm8983_spi_driver);
-#endif
-}
-module_exit(wm8983_exit);
 
 MODULE_DESCRIPTION("ASoC WM8983 driver");
 MODULE_AUTHOR("Dimitris Papastamos <dp@opensource.wolfsonmicro.com>");
