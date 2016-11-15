@@ -12483,9 +12483,6 @@ int intel_plane_atomic_calc_changes(struct drm_crtc_state *crtc_state,
 	if (!was_visible && !visible)
 		return 0;
 
-	if (fb != old_plane_state->base.fb)
-		pipe_config->fb_changed = true;
-
 	turn_off = was_visible && (!visible || mode_changed);
 	turn_on = visible && (!was_visible || mode_changed);
 
@@ -14238,6 +14235,13 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 			return PTR_ERR(vma);
 
 		to_intel_plane_state(new_state)->vma = vma;
+		if (to_intel_plane_state(plane->state)->vma != vma) {
+			struct intel_crtc_state *crtc_state;
+
+			crtc_state = intel_atomic_get_crtc_state(new_state->state,
+								 to_intel_crtc(new_state->crtc));
+			crtc_state->fb_changed = true;
+		}
 	}
 
 	return 0;
