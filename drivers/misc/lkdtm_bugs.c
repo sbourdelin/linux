@@ -5,7 +5,10 @@
  * test source files.
  */
 #include "lkdtm.h"
+#include <linux/mman.h>
 #include <linux/sched.h>
+#include <linux/security.h>
+#include <linux/slab.h>
 
 /*
  * Make sure our attempts to over run the kernel stack doesn't trigger
@@ -145,4 +148,45 @@ void lkdtm_ATOMIC_OVERFLOW(void)
 
 	pr_info("attempting bad atomic overflow\n");
 	atomic_inc(&over);
+}
+
+static void test_poison_ptr(void *base, const char *desc)
+{
+	unsigned long *ptr, val, uaddr;
+
+	uaddr = vm_mmap(NULL, mmap_min_addr, PAGE_SIZE, PROT_READ | PROT_WRITE,
+			MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, 0);
+	if (uaddr >= TASK_SIZE) {
+		pr_warn("Failed to allocate user memory, can't perform test.\n");
+		return;
+	}
+
+	/*
+	 * Creating a mapping and adding mmap_min_addr to the value is cheating
+	 * in a way. But it simulates the case where an attacker is able to
+	 * cause an access at a small offset from the base value, leading to a
+	 * user space access. If an arch doesn't define CONFIG_ILLEGAL_POINTER_VALUE
+	 * then it's likely this will work in the absence of other protections.
+	 */
+	ptr = mmap_min_addr + base;
+
+	pr_info("attempting read of %s %p\n", desc, ptr);
+	val = *ptr;
+	pr_info("FAIL: Was able to read %s! Got 0x%lx\n", desc, val);
+
+	pr_info("attempting write of %s %p\n", desc, ptr);
+	*ptr = 0xdeadbeefabcd1234;
+	pr_info("FAIL: Was able to write %s! Now = 0x%lx\n", desc, *ptr);
+
+	vm_munmap(uaddr, PAGE_SIZE);
+}
+
+void lkdtm_ACCESS_LIST_POISON(void)
+{
+	test_poison_ptr(LIST_POISON1, "LIST_POISON");
+}
+
+void lkdtm_ACCESS_ZERO_SIZE_PTR(void)
+{
+	test_poison_ptr(ZERO_SIZE_PTR, "ZERO_SIZE_PTR");
 }
