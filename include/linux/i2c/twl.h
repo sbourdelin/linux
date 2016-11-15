@@ -681,29 +681,6 @@ struct twl4030_power_data {
 extern int twl4030_remove_script(u8 flags);
 extern void twl4030_power_off(void);
 
-struct twl4030_codec_data {
-	unsigned int digimic_delay; /* in ms */
-	unsigned int ramp_delay_value;
-	unsigned int offset_cncl_path;
-	unsigned int hs_extmute:1;
-	int hs_extmute_gpio;
-};
-
-struct twl4030_vibra_data {
-	unsigned int	coexist;
-};
-
-struct twl4030_audio_data {
-	unsigned int	audio_mclk;
-	struct twl4030_codec_data *codec;
-	struct twl4030_vibra_data *vibra;
-
-	/* twl6040 */
-	int audpwron_gpio;	/* audio power-on gpio */
-	int naudint_irq;	/* audio interrupt */
-	unsigned int irq_base;
-};
-
 struct twl4030_platform_data {
 	struct twl4030_clock_init_data		*clock;
 	struct twl4030_bci_platform_data	*bci;

@@ -48,6 +48,14 @@
 
 #define TWL4030_CACHEREGNUM	(TWL4030_REG_MISC_SET_2 + 1)
 
+struct twl4030_codec_data {
+	unsigned int digimic_delay; /* in ms */
+	unsigned int ramp_delay_value;
+	unsigned int offset_cncl_path;
+	unsigned int hs_extmute:1;
+	int hs_extmute_gpio;
+};
+
 /* codec private data */
 struct twl4030_priv {
 	unsigned int codec_powered;
