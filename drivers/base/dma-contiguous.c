@@ -244,6 +244,7 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
 {
 	phys_addr_t align = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
 	phys_addr_t mask = align - 1;
+	phys_addr_t highmem_start;
 	unsigned long node = rmem->fdt_node;
 	struct cma *cma;
 	int err;
@@ -255,6 +256,32 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
 	if ((rmem->base & mask) || (rmem->size & mask)) {
 		pr_err("Reserved memory: incorrect alignment of CMA region\n");
 		return -EINVAL;
+	}
+#ifdef CONFIG_X86
+	/*
+	 * high_memory isn't direct mapped memory so retrieving its physical
+	 * address isn't appropriate.  But it would be useful to check the
+	 * physical address of the highmem boundary so it's justfiable to get
+	 * the physical address from it.  On x86 there is a validation check for
+	 * this case, so the following workaround is needed to avoid it.
+	 */
+	highmem_start = __pa_nodebug(high_memory);
+#else
+	highmem_start = __pa(high_memory);
+#endif
+
+	/*
+	 * All pages in the reserved area must come from the same zone.
+	 * If the reserved region crosses the low/high memory boundary,
+	 * try to fix it up and then fall back to allocate from the low mem
+	 */
+	if (rmem->base < highmem_start &&
+		(rmem->base + rmem->size) > highmem_start) {
+		memblock_free(rmem->base, rmem->size);
+		rmem->base = memblock_alloc_range(rmem->size, align, 0,
+						highmem_start, MEMBLOCK_NONE);
+		if (!rmem->base)
+			return -ENOMEM;
 	}
 
 	err = cma_init_reserved_mem(rmem->base, rmem->size, 0, &cma);
