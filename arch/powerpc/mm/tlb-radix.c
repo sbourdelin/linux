@@ -50,6 +50,9 @@ static inline void _tlbiel_pid(unsigned long pid, unsigned long ric)
 	for (set = 0; set < POWER9_TLB_SETS_RADIX ; set++) {
 		__tlbiel_pid(pid, set, ric);
 	}
+	if (cpu_has_feature(CPU_FTR_POWER9_DD1))
+		asm volatile(PPC_SLBIA(0x7)
+			     : : :"memory");
 	return;
 }
 
@@ -83,6 +86,9 @@ static inline void _tlbiel_va(unsigned long va, unsigned long pid,
 	asm volatile(PPC_TLBIEL(%0, %4, %3, %2, %1)
 		     : : "r"(rb), "i"(r), "i"(prs), "i"(ric), "r"(rs) : "memory");
 	asm volatile("ptesync": : :"memory");
+	if (cpu_has_feature(CPU_FTR_POWER9_DD1))
+		asm volatile(PPC_SLBIA(0x7)
+			     : : :"memory");
 }
 
 static inline void _tlbie_va(unsigned long va, unsigned long pid,
