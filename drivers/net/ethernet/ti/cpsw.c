@@ -2818,7 +2818,12 @@ static int cpsw_probe(struct platform_device *pdev)
 	return 0;
 
 clean_ale_ret:
-	cpsw_ale_destroy(cpsw->ale);
+	if (pm_runtime_get_sync(&pdev->dev) < 0) {
+		pm_runtime_put_noidle(&pdev->dev);
+	} else {
+		cpsw_ale_destroy(cpsw->ale);
+		pm_runtime_put_sync(&pdev->dev);
+	}
 clean_dma_ret:
 	cpdma_ctlr_destroy(cpsw->dma);
 clean_runtime_disable_ret:
