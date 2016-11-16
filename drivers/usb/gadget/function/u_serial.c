@@ -1043,7 +1043,7 @@ static struct tty_driver *gs_tty_driver;
 
 #ifdef CONFIG_U_SERIAL_CONSOLE
 
-static struct gscons_info gscons_info;
+static struct gscons_info gscons_info = {};
 static struct console gserial_cons;
 
 static struct usb_request *gs_request_new(struct usb_ep *ep)
