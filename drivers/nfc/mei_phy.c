@@ -132,7 +132,8 @@ static int mei_nfc_if_version(struct nfc_mei_phy *phy)
 	if (!reply)
 		return -ENOMEM;
 
-	bytes_recv = mei_cldev_recv(phy->cldev, (u8 *)reply, if_version_length);
+	bytes_recv = mei_cldev_recv(phy->cldev, (u8 *)reply,
+				    if_version_length, 0);
 	if (bytes_recv < 0 || bytes_recv < if_version_length) {
 		pr_err("Could not read IF version\n");
 		r = -EIO;
@@ -193,7 +194,7 @@ static int mei_nfc_connect(struct nfc_mei_phy *phy)
 	}
 
 	bytes_recv = mei_cldev_recv(phy->cldev, (u8 *)reply,
-				    connect_resp_length);
+				    connect_resp_length, 0);
 	if (bytes_recv < 0) {
 		r = bytes_recv;
 		pr_err("Could not read connect response %d\n", r);
@@ -279,7 +280,7 @@ static int mei_nfc_recv(struct nfc_mei_phy *phy, u8 *buf, size_t length)
 	struct mei_nfc_hdr *hdr;
 	int received_length;
 
-	received_length = mei_cldev_recv(phy->cldev, buf, length);
+	received_length = mei_cldev_recv(phy->cldev, buf, length, 0);
 	if (received_length < 0)
 		return received_length;
 

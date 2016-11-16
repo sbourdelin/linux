@@ -421,7 +421,7 @@ static void mei_wdt_rx(struct mei_cl_device *cldev)
 	const size_t res_len = sizeof(res);
 	int ret;
 
-	ret = mei_cldev_recv(wdt->cldev, (u8 *)&res, res_len);
+	ret = mei_cldev_recv(wdt->cldev, (u8 *)&res, res_len, 0);
 	if (ret < 0) {
 		dev_err(&cldev->dev, "failure in recv %d\n", ret);
 		return;

@@ -86,7 +86,8 @@ void mei_cldev_driver_unregister(struct mei_cl_driver *cldrv);
 		      mei_cldev_driver_unregister)
 
 ssize_t mei_cldev_send(struct mei_cl_device *cldev, u8 *buf, size_t length);
-ssize_t  mei_cldev_recv(struct mei_cl_device *cldev, u8 *buf, size_t length);
+ssize_t mei_cldev_recv(struct mei_cl_device *cldev, u8 *buf, size_t length,
+		       unsigned int flags);
 
 int mei_cldev_register_rx_cb(struct mei_cl_device *cldev, mei_cldev_cb_t rx_cb);
 int mei_cldev_register_notif_cb(struct mei_cl_device *cldev,
