@@ -11,7 +11,6 @@
 
 #include <linux/io.h>
 #include <linux/slab.h>
-#include <linux/module.h>
 #include <linux/of_fdt.h>
 #include <linux/sys_soc.h>
 #include <linux/of_address.h>
@@ -212,7 +211,6 @@ static const struct of_device_id fsl_guts_of_match[] = {
 	{ .compatible = "fsl,ls2080a-dcfg", },
 	{}
 };
-MODULE_DEVICE_TABLE(of, fsl_guts_of_match);
 
 static struct platform_driver fsl_guts_driver = {
 	.driver = {
@@ -228,9 +226,3 @@ static int __init fsl_guts_init(void)
 	return platform_driver_register(&fsl_guts_driver);
 }
 core_initcall(fsl_guts_init);
-
-static void __exit fsl_guts_exit(void)
-{
-	platform_driver_unregister(&fsl_guts_driver);
-}
-module_exit(fsl_guts_exit);
