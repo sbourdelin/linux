@@ -65,7 +65,17 @@ SCHED_FEAT(RT_PUSH_IPI, true)
 #endif
 
 SCHED_FEAT(FORCE_SD_OVERLAP, false)
-SCHED_FEAT(RT_RUNTIME_SHARE, true)
+
+/*
+ * Enables the sharing of rt_runtime between CPUs, allowing a CPU to
+ * run real-time tasks up to 100% of the time while leaving more
+ * space for non-real-time tasks to run on the CPU that lend rt_runtime.
+ *
+ * WARNING: This may allow the starvation of non-real-time tasks pinned
+ * to the CPU in which spinning rt-tasks run forever.
+ */
+SCHED_FEAT(RT_RUNTIME_SHARE, false)
+
 SCHED_FEAT(LB_MIN, false)
 SCHED_FEAT(ATTACH_AGE_LOAD, true)
 
