@@ -312,7 +312,7 @@ static int zap_process(struct task_struct *start, int exit_code, int flags)
 	int nr = 0;
 
 	/* ignore all signals except SIGKILL, see prepare_signal() */
-	start->signal->flags = SIGNAL_GROUP_COREDUMP | flags;
+	signal_set_flags(start->signal, SIGNAL_GROUP_COREDUMP | flags);
 	start->signal->group_exit_code = exit_code;
 	start->signal->group_stop_count = 0;
 
@@ -451,7 +451,7 @@ static void coredump_finish(struct mm_struct *mm, bool core_dumped)
 	if (core_dumped && !__fatal_signal_pending(current))
 		current->signal->group_exit_code |= 0x80;
 	current->signal->group_exit_task = NULL;
-	current->signal->flags = SIGNAL_GROUP_EXIT;
+	signal_set_flags(current->signal, SIGNAL_GROUP_EXIT);
 	spin_unlock_irq(&current->sighand->siglock);
 
 	next = mm->core_state->dumper.next;

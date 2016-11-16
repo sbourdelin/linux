@@ -696,7 +696,11 @@ struct signal_struct {
 
 	/* thread group stop support, overloads group_exit_code too */
 	int			group_stop_count;
-	unsigned int		flags; /* see SIGNAL_* flags below */
+	/*
+	 * see SIGNAL_* flags below.  Set and clear flags with
+	 * signal_set_flags()/signal_clear_flags().
+	 */
+	unsigned int		flags;
 
 	/*
 	 * PR_SET_CHILD_SUBREAPER marks a process, like a service
@@ -829,6 +833,22 @@ struct signal_struct {
 #define SIGNAL_CLD_MASK		(SIGNAL_CLD_STOPPED|SIGNAL_CLD_CONTINUED)
 
 #define SIGNAL_UNKILLABLE	0x00000040 /* for init: ignore fatal signals */
+/*
+ * Protected flags that should not normally be set/cleared.
+ */
+#define SIGNAL_PROTECTED_MASK	SIGNAL_UNKILLABLE
+
+static inline void signal_set_flags(struct signal_struct *sig,
+				    unsigned int flags)
+{
+	sig->flags = (sig->flags & SIGNAL_PROTECTED_MASK) | flags;
+}
+
+static inline void signal_clear_flags(struct signal_struct *sig,
+				      unsigned int flags)
+{
+	sig->flags &= (~flags | SIGNAL_PROTECTED_MASK);
+}
 
 /* If true, all threads except ->group_exit_task have pending SIGKILL */
 static inline int signal_group_exit(const struct signal_struct *sig)

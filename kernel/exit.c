@@ -922,7 +922,7 @@ do_group_exit(int exit_code)
 			exit_code = sig->group_exit_code;
 		else {
 			sig->group_exit_code = exit_code;
-			sig->flags = SIGNAL_GROUP_EXIT;
+			signal_set_flags(sig, SIGNAL_GROUP_EXIT);
 			zap_other_threads(current);
 		}
 		spin_unlock_irq(&sighand->siglock);
@@ -1315,7 +1315,7 @@ static int wait_task_continued(struct wait_opts *wo, struct task_struct *p)
 		return 0;
 	}
 	if (!unlikely(wo->wo_flags & WNOWAIT))
-		p->signal->flags &= ~SIGNAL_STOP_CONTINUED;
+		signal_clear_flags(p->signal, SIGNAL_STOP_CONTINUED);
 	uid = from_kuid_munged(current_user_ns(), task_uid(p));
 	spin_unlock_irq(&p->sighand->siglock);
 

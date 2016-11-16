@@ -346,7 +346,7 @@ static bool task_participate_group_stop(struct task_struct *task)
 	 * fresh group stop.  Read comment in do_signal_stop() for details.
 	 */
 	if (!sig->group_stop_count && !(sig->flags & SIGNAL_STOP_STOPPED)) {
-		sig->flags = SIGNAL_STOP_STOPPED;
+		signal_set_flags(sig, SIGNAL_STOP_STOPPED);
 		return true;
 	}
 	return false;
@@ -837,7 +837,7 @@ static bool prepare_signal(int sig, struct task_struct *p, bool force)
 			 * will take ->siglock, notice SIGNAL_CLD_MASK, and
 			 * notify its parent. See get_signal_to_deliver().
 			 */
-			signal->flags = why | SIGNAL_STOP_CONTINUED;
+			signal_set_flags(signal, why | SIGNAL_STOP_CONTINUED);
 			signal->group_stop_count = 0;
 			signal->group_exit_code = 0;
 		}
@@ -922,7 +922,7 @@ static void complete_signal(int sig, struct task_struct *p, int group)
 			 * running and doing things after a slower
 			 * thread has the fatal signal pending.
 			 */
-			signal->flags = SIGNAL_GROUP_EXIT;
+			signal_set_flags(signal, SIGNAL_GROUP_EXIT);
 			signal->group_exit_code = sig;
 			signal->group_stop_count = 0;
 			t = p;
@@ -2161,7 +2161,7 @@ relock:
 		else
 			why = CLD_STOPPED;
 
-		signal->flags &= ~SIGNAL_CLD_MASK;
+		signal_clear_flags(signal, SIGNAL_CLD_MASK);
 
 		spin_unlock_irq(&sighand->siglock);
 
