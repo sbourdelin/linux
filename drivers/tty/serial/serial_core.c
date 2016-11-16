@@ -73,7 +73,7 @@ static inline struct uart_port *uart_port_ref(struct uart_state *state)
 
 static inline void uart_port_deref(struct uart_port *uport)
 {
-	if (uport && atomic_dec_and_test(&uport->state->refcount))
+	if (atomic_dec_and_test(&uport->state->refcount))
 		wake_up(&uport->state->remove_wait);
 }
 
@@ -1515,7 +1515,10 @@ static void uart_wait_until_sent(struct tty_struct *tty, int timeout)
 	unsigned long char_time, expire;
 
 	port = uart_port_ref(state);
-	if (!port || port->type == PORT_UNKNOWN || port->fifosize == 0) {
+	if (!port)
+		return;
+
+	if (port->type == PORT_UNKNOWN || port->fifosize == 0) {
 		uart_port_deref(port);
 		return;
 	}
@@ -2365,9 +2368,10 @@ static int uart_poll_get_char(struct tty_driver *driver, int line)
 
 	if (state) {
 		port = uart_port_ref(state);
-		if (port)
+		if (port) {
 			ret = port->ops->poll_get_char(port);
-		uart_port_deref(port);
+			uart_port_deref(port);
+		}
 	}
 	return ret;
 }
