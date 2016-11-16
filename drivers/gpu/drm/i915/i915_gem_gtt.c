@@ -2389,6 +2389,12 @@ static void gen8_set_pte(void __iomem *addr, gen8_pte_t pte)
 	writeq(pte, addr);
 }
 
+static void gen8_ggtt_invalidate(struct drm_i915_private *dev_priv)
+{
+	I915_WRITE(GFX_FLSH_CNTL_GEN6, GFX_FLSH_CNTL_EN);
+	I915_WRITE(GEN8_GTCR, GEN8_GTCR_INVALIDATE);
+}
+
 static void gen8_ggtt_insert_page(struct i915_address_space *vm,
 				  dma_addr_t addr,
 				  uint64_t offset,
@@ -2402,8 +2408,7 @@ static void gen8_ggtt_insert_page(struct i915_address_space *vm,
 
 	gen8_set_pte(pte, gen8_pte_encode(addr, level));
 
-	I915_WRITE(GFX_FLSH_CNTL_GEN6, GFX_FLSH_CNTL_EN);
-	POSTING_READ(GFX_FLSH_CNTL_GEN6);
+	gen8_ggtt_invalidate(dev_priv);
 }
 
 static void gen8_ggtt_insert_entries(struct i915_address_space *vm,
@@ -2440,8 +2445,7 @@ static void gen8_ggtt_insert_entries(struct i915_address_space *vm,
 	 * want to flush the TLBs only after we're certain all the PTE updates
 	 * have finished.
 	 */
-	I915_WRITE(GFX_FLSH_CNTL_GEN6, GFX_FLSH_CNTL_EN);
-	POSTING_READ(GFX_FLSH_CNTL_GEN6);
+	gen8_ggtt_invalidate(dev_priv);
 }
 
 struct insert_entries {

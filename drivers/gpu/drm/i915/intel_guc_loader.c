@@ -366,9 +366,6 @@ static int guc_ucode_xfer(struct drm_i915_private *dev_priv)
 		return PTR_ERR(vma);
 	}
 
-	/* Invalidate GuC TLB to let GuC take the latest updates to GTT. */
-	I915_WRITE(GEN8_GTCR, GEN8_GTCR_INVALIDATE);
-
 	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
 
 	/* init WOPCM */
