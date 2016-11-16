@@ -35,6 +35,7 @@
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/highmem.h>
+#include <linux/mempolicy.h>
 
 #include <xen/xen.h>
 #include <xen/grant_table.h>
@@ -1007,8 +1008,20 @@ static int gntdev_mmap(struct file *flip, struct vm_area_struct *vma)
 
 	vma->vm_ops = &gntdev_vmops;
 
-	vma->vm_flags |= VM_DONTEXPAND | VM_DONTDUMP | VM_IO;
+	vma->vm_flags |= VM_DONTEXPAND | VM_DONTDUMP;
 
+#ifdef CONFIG_NUMA
+	/* Prevent NUMA balancing */
+	if (vma->vm_policy)
+		vma->vm_policy->flags &= ~(MPOL_F_MOF | MPOL_F_MORON);
+	else {
+		struct mempolicy *pol = get_task_policy(current);
+
+		vma->vm_policy = mpol_dup(pol);
+		if (vma->vm_policy)
+			vma->vm_policy->flags &= ~(MPOL_F_MOF | MPOL_F_MORON);
+	}
+#endif
 	if (use_ptemod)
 		vma->vm_flags |= VM_DONTCOPY;
 
