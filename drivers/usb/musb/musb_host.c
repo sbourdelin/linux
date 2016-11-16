@@ -1293,11 +1293,11 @@ void musb_host_tx(struct musb *musb, u8 epnum)
 		status = -EPIPE;
 
 	} else if (tx_csr & MUSB_TXCSR_H_ERROR) {
-		/* (NON-ISO) dma was disabled, fifo flushed */
 		musb_dbg(musb, "TX 3strikes on ep=%d", epnum);
-
-		status = -ETIMEDOUT;
-
+		if (dma)
+			musb_bulk_nak_timeout(musb, hw_ep, 0);
+		else
+			status = -ETIMEDOUT;
 	} else if (tx_csr & MUSB_TXCSR_H_NAKTIMEOUT) {
 		if (USB_ENDPOINT_XFER_BULK == qh->type && qh->mux == 1
 				&& !list_is_singular(&musb->out_bulk)) {
