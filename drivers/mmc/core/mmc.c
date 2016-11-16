@@ -1227,31 +1227,24 @@ static int mmc_select_hs400es(struct mmc_card *card)
 		goto out_err;
 
 	/* Switch card to HS mode */
-	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-			   EXT_CSD_HS_TIMING, EXT_CSD_TIMING_HS,
-			   card->ext_csd.generic_cmd6_time, 0,
-			   true, false, true);
+	err = mmc_select_hs(card);
 	if (err) {
 		pr_err("%s: switch to hs for hs400es failed, err:%d\n",
 			mmc_hostname(host), err);
 		goto out_err;
 	}
 
-	mmc_set_timing(host, MMC_TIMING_MMC_HS);
-	err = mmc_switch_status(card);
-	if (err)
-		goto out_err;
-
 	mmc_set_clock(host, card->ext_csd.hs_max_dtr);
 
-	/* Switch card to DDR with strobe bit */
+	/* Switch card to HS DDR with strobe bit */
 	val = EXT_CSD_DDR_BUS_WIDTH_8 | EXT_CSD_BUS_WIDTH_STROBE;
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-			 EXT_CSD_BUS_WIDTH,
-			 val,
-			 card->ext_csd.generic_cmd6_time);
+	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			   EXT_CSD_BUS_WIDTH, val,
+			   card->ext_csd.generic_cmd6_time,
+			   MMC_TIMING_MMC_DDR52,
+			   true, true, true);
 	if (err) {
-		pr_err("%s: switch to bus width for hs400es failed, err:%d\n",
+		pr_err("%s: switch to hs ddr for hs400es failed, err:%d\n",
 			mmc_hostname(host), err);
 		goto out_err;
 	}
@@ -1261,25 +1254,19 @@ static int mmc_select_hs400es(struct mmc_card *card)
 	      card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			   EXT_CSD_HS_TIMING, val,
-			   card->ext_csd.generic_cmd6_time, 0,
-			   true, false, true);
+			   card->ext_csd.generic_cmd6_time,
+			   MMC_TIMING_MMC_HS400,
+			   true, true, true);
 	if (err) {
 		pr_err("%s: switch to hs400es failed, err:%d\n",
 			mmc_hostname(host), err);
 		goto out_err;
 	}
 
-	/* Set host controller to HS400 timing and frequency */
-	mmc_set_timing(host, MMC_TIMING_MMC_HS400);
-
 	/* Controller enable enhanced strobe function */
 	host->ios.enhanced_strobe = true;
 	if (host->ops->hs400_enhanced_strobe)
 		host->ops->hs400_enhanced_strobe(host, &host->ios);
-
-	err = mmc_switch_status(card);
-	if (err)
-		goto out_err;
 
 	return 0;
 
