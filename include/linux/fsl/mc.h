@@ -14,7 +14,7 @@
 #include <linux/device.h>
 #include <linux/mod_devicetable.h>
 #include <linux/interrupt.h>
-#include "../include/dprc.h"
+#include <linux/fsl/dprc.h>
 
 #define FSL_MC_VENDOR_FREESCALE	0x1957
 

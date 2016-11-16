@@ -10,8 +10,8 @@
 
 #include <linux/module.h>
 #include <linux/msi.h>
-#include "../include/mc-bus.h"
-#include "../include/mc-sys.h"
+#include <linux/fsl/mc-sys.h>
+#include <linux/fsl/mc-cmd.h>
 
 #include "dpbp-cmd.h"
 #include "dpcon-cmd.h"

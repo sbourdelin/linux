@@ -20,9 +20,9 @@
 #include <linux/bitops.h>
 #include <linux/msi.h>
 #include <linux/dma-mapping.h>
-#include "../include/mc-bus.h"
-#include "../include/dpmng.h"
-#include "../include/mc-sys.h"
+#include <linux/fsl/mc-bus.h>
+#include <linux/fsl/dpmng.h>
+#include <linux/fsl/mc-sys.h>
 
 #include "fsl-mc-private.h"
 #include "dprc-cmd.h"
