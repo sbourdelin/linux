@@ -55,8 +55,8 @@ static int mmc_queue_thread(void *d)
 	struct request_queue *q = mq->queue;
 
 	current->flags |= PF_MEMALLOC;
+	set_freezable();
 
-	down(&mq->thread_sem);
 	do {
 		struct request *req = NULL;
 
@@ -95,12 +95,9 @@ static int mmc_queue_thread(void *d)
 				set_current_state(TASK_RUNNING);
 				break;
 			}
-			up(&mq->thread_sem);
-			schedule();
-			down(&mq->thread_sem);
+			try_to_freeze();
 		}
 	} while (1);
-	up(&mq->thread_sem);
 
 	return 0;
 }
@@ -289,8 +286,6 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 			goto cleanup_queue;
 	}
 
-	sema_init(&mq->thread_sem, 1);
-
 	mq->thread = kthread_run(mmc_queue_thread, mq, "mmcqd/%d%s",
 		host->index, subname ? subname : "");
 
@@ -424,8 +419,6 @@ void mmc_queue_suspend(struct mmc_queue *mq)
 		spin_lock_irqsave(q->queue_lock, flags);
 		blk_stop_queue(q);
 		spin_unlock_irqrestore(q->queue_lock, flags);
-
-		down(&mq->thread_sem);
 	}
 }
 
@@ -440,8 +433,6 @@ void mmc_queue_resume(struct mmc_queue *mq)
 
 	if (mq->flags & MMC_QUEUE_SUSPENDED) {
 		mq->flags &= ~MMC_QUEUE_SUSPENDED;
-
-		up(&mq->thread_sem);
 
 		spin_lock_irqsave(q->queue_lock, flags);
 		blk_start_queue(q);
