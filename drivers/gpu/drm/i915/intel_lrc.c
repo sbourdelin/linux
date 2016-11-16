@@ -424,9 +424,6 @@ static bool can_merge_ctx(const struct i915_gem_context *prev,
 	if (prev != next)
 		return false;
 
-	if (ctx_single_port_submission(prev))
-		return false;
-
 	return true;
 }
 
@@ -477,6 +474,13 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 		struct drm_i915_gem_request *cursor =
 			rb_entry(rb, typeof(*cursor), priotree.node);
 
+		/* If last ctx is single_submission, it means we can only
+		 * submit this context in port 0, and cannot submit another
+		 * context in port 1 at the same time. So we will break here
+		 * in this situation.
+		 */
+		if (last && ctx_single_port_submission(last->ctx))
+			break;
 		/* Can we combine this request with the current port? It has to
 		 * be the same context/ringbuffer and not have any exceptions
 		 * (e.g. GVT saying never to combine contexts).
