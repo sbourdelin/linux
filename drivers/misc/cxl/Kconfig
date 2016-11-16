@@ -16,6 +16,7 @@ config CXL
 	depends on PPC_POWERNV && PCI_MSI && EEH
 	select CXL_BASE
 	select CXL_AFU_DRIVER_OPS
+	select ANON_INODES
 	default m
 	help
 	  Select this option to enable driver support for IBM Coherent
