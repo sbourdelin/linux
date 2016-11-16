@@ -319,7 +319,7 @@ static int gpio_keys_polled_probe(struct platform_device *pdev)
 			 * Legacy GPIO number so request the GPIO here and
 			 * convert it to descriptor.
 			 */
-			unsigned flags = GPIOF_IN;
+			unsigned flags = 0;
 
 			if (button->active_low)
 				flags |= GPIOF_ACTIVE_LOW;
@@ -340,6 +340,14 @@ static int gpio_keys_polled_probe(struct platform_device *pdev)
 					button->gpio);
 				return -EINVAL;
 			}
+		}
+
+		/* set the GPIO direction to input */
+		error = gpiod_direction_input(bdata->gpiod);
+		if (error) {
+			dev_err(dev, "Failed to configure GPIO %d as input, error %d\n",
+				desc_to_gpio(bdata->gpiod), error);
+			return error;
 		}
 
 		bdata->last_state = -1;
