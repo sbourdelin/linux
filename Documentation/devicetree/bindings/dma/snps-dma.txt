@@ -20,13 +20,19 @@ Required properties:
 Deprecated properties:
 - data_width: Maximum data width supported by hardware per AHB master
   (0 - 8bits, 1 - 16bits, ..., 5 - 256bits)
+- is_private: The device channels should be marked as private and not for by the
+  general purpose DMA channel allocator. False if not passed.
 
 
 Optional properties:
 - interrupt-parent: Should be the phandle for the interrupt controller
   that services interrupts for this device
-- is_private: The device channels should be marked as private and not for by the
+- is-private: The device channels should be marked as private and not for by the
   general purpose DMA channel allocator. False if not passed.
+- is-memcpu: The device channels do support memory-to-memory transfers. False
+  if not passed.
+- hw-llp: Multi block transfers supported by hardware per AHB master.
+  0 (default): not supported, 1: supported.
 
 Example:
 
@@ -56,7 +62,7 @@ The four cells in order are:
 4. Peripheral master for transfers on allocated channel
 
 Example:
-	
+
 	serial@e0000000 {
 		compatible = "arm,pl011", "arm,primecell";
 		reg = <0xe0000000 0x1000>;
