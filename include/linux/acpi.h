@@ -580,6 +580,7 @@ int acpi_gtdt_init(struct acpi_table_header *table);
 int acpi_gtdt_map_ppi(int type);
 bool acpi_gtdt_c3stop(int type);
 void acpi_gtdt_release(void);
+int gtdt_arch_timer_mem_init(struct arch_timer_mem *data, unsigned int index);
 #endif
 
 #else	/* !CONFIG_ACPI */
