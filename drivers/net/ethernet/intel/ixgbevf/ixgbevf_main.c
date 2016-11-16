@@ -2511,9 +2511,6 @@ err_out:
 	while (q_idx) {
 		q_idx--;
 		q_vector = adapter->q_vector[q_idx];
-#ifdef CONFIG_NET_RX_BUSY_POLL
-		napi_hash_del(&q_vector->napi);
-#endif
 		netif_napi_del(&q_vector->napi);
 		kfree(q_vector);
 		adapter->q_vector[q_idx] = NULL;
@@ -2537,9 +2534,6 @@ static void ixgbevf_free_q_vectors(struct ixgbevf_adapter *adapter)
 		struct ixgbevf_q_vector *q_vector = adapter->q_vector[q_idx];
 
 		adapter->q_vector[q_idx] = NULL;
-#ifdef CONFIG_NET_RX_BUSY_POLL
-		napi_hash_del(&q_vector->napi);
-#endif
 		netif_napi_del(&q_vector->napi);
 		kfree(q_vector);
 	}
