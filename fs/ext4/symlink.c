@@ -24,7 +24,8 @@
 
 static const char *ext4_encrypted_get_link(struct dentry *dentry,
 					   struct inode *inode,
-					   struct delayed_call *done)
+					   struct delayed_call *done,
+					   bool fast)
 {
 	struct page *cpage = NULL;
 	char *caddr, *paddr = NULL;
@@ -40,7 +41,7 @@ static const char *ext4_encrypted_get_link(struct dentry *dentry,
 	if (res)
 		return ERR_PTR(res);
 
-	if (ext4_inode_is_fast_symlink(inode)) {
+	if (fast) {
 		caddr = (char *) EXT4_I(inode)->i_data;
 		max_size = sizeof(EXT4_I(inode)->i_data);
 	} else {
@@ -82,9 +83,30 @@ errout:
 	return ERR_PTR(res);
 }
 
+static const char *ext4_encrypted_get_link_slow(struct dentry *dentry,
+						struct inode *inode,
+						struct delayed_call *done)
+{
+	return ext4_encrypted_get_link(dentry, inode, done, false);
+}
+
+static const char *ext4_encrypted_get_link_fast(struct dentry *dentry,
+						struct inode *inode,
+						struct delayed_call *done)
+{
+	return ext4_encrypted_get_link(dentry, inode, done, true);
+}
+
 const struct inode_operations ext4_encrypted_symlink_inode_operations = {
 	.readlink	= generic_readlink,
-	.get_link	= ext4_encrypted_get_link,
+	.get_link	= ext4_encrypted_get_link_slow,
+	.setattr	= ext4_setattr,
+	.listxattr	= ext4_listxattr,
+};
+
+const struct inode_operations ext4_encrypted_fast_symlink_inode_operations = {
+	.readlink	= generic_readlink,
+	.get_link	= ext4_encrypted_get_link_fast,
 	.setattr	= ext4_setattr,
 	.listxattr	= ext4_listxattr,
 };

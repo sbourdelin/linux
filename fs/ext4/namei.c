@@ -3148,11 +3148,12 @@ static int ext4_symlink(struct inode *dir,
 			goto err_drop_inode;
 		sd->len = cpu_to_le16(ostr.len);
 		disk_link.name = (char *) sd;
-		inode->i_op = &ext4_encrypted_symlink_inode_operations;
 	}
 
 	if ((disk_link.len > EXT4_N_BLOCKS * 4)) {
-		if (!encryption_required)
+		if (encryption_required)
+			inode->i_op = &ext4_encrypted_symlink_inode_operations;
+		else
 			inode->i_op = &ext4_symlink_inode_operations;
 		inode_nohighmem(inode);
 		ext4_set_aops(inode);
@@ -3194,7 +3195,10 @@ static int ext4_symlink(struct inode *dir,
 	} else {
 		/* clear the extent format for fast symlink */
 		ext4_clear_inode_flag(inode, EXT4_INODE_EXTENTS);
-		if (!encryption_required) {
+		if (encryption_required) {
+			inode->i_op =
+				&ext4_encrypted_fast_symlink_inode_operations;
+		} else {
 			inode->i_op = &ext4_fast_symlink_inode_operations;
 			inode->i_link = (char *)&EXT4_I(inode)->i_data;
 		}

@@ -3087,6 +3087,7 @@ extern int ext4_mpage_readpages(struct address_space *mapping,
 
 /* symlink.c */
 extern const struct inode_operations ext4_encrypted_symlink_inode_operations;
+extern const struct inode_operations ext4_encrypted_fast_symlink_inode_operations;
 extern const struct inode_operations ext4_symlink_inode_operations;
 extern const struct inode_operations ext4_fast_symlink_inode_operations;
 
