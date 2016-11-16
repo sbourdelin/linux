@@ -228,6 +228,21 @@ config FB_TILEBLITTING
 comment "Frame buffer hardware drivers"
 	depends on FB
 
+config FB_INTEL_FPGA_VIP
+       	tristate "Intel FPGA VIP framebuffer support"
+	depends on FB
+       	select CMA
+       	select FB_CFB_FILLRECT
+       	select FB_CFB_COPYAREA
+       	select FB_CFB_IMAGEBLIT
+       	select FRAMEBUFFER_CONSOLE
+	select FRAMEBUFFER_CONSOLE_DETECT_PRIMARY if  FRAMEBUFFER_CONSOLE
+	---help---
+	The FB_INTEL_FPGA_VIP driver supports the formerly Altera Video and Image Processing(VIP)
+	Frame Buffer II. Requires CONFIG_CMA and Frame Buffer Console to
+	be enabled as well. The driver currently only supports ARRIA 10 board from the Intel
+	FPGA Reference Design board family.
+
 config FB_GRVGA
 	tristate "Aeroflex Gaisler framebuffer support"
 	depends on FB && SPARC
