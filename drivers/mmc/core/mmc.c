@@ -1094,8 +1094,7 @@ static int mmc_select_hs_ddr(struct mmc_card *card)
 static int mmc_select_hs400(struct mmc_card *card)
 {
 	struct mmc_host *host = card->host;
-	unsigned int max_dtr;
-	int err = 0;
+	int err;
 	u8 val;
 
 	/*
@@ -1105,34 +1104,26 @@ static int mmc_select_hs400(struct mmc_card *card)
 	      host->ios.bus_width == MMC_BUS_WIDTH_8))
 		return 0;
 
-	/* Switch card to HS mode */
-	val = EXT_CSD_TIMING_HS;
-	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-			   EXT_CSD_HS_TIMING, val,
-			   card->ext_csd.generic_cmd6_time, 0,
-			   true, false, true);
+	/*
+	 * Switch card to HS mode.
+	 * First reduce to the HS frequency as CMD13 are sent to poll for busy
+	 * and/or to validate the switch status.
+	 */
+	mmc_set_clock(host, card->ext_csd.hs_max_dtr);
+	err = mmc_select_hs(card);
 	if (err) {
 		pr_err("%s: switch to high-speed from hs200 failed, err:%d\n",
 			mmc_hostname(host), err);
 		return err;
 	}
 
-	/* Set host controller to HS timing */
-	mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
-
-	/* Reduce frequency to HS frequency */
-	max_dtr = card->ext_csd.hs_max_dtr;
-	mmc_set_clock(host, max_dtr);
-
-	err = mmc_switch_status(card);
-	if (err)
-		goto out_err;
-
-	/* Switch card to DDR */
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-			 EXT_CSD_BUS_WIDTH,
-			 EXT_CSD_DDR_BUS_WIDTH_8,
-			 card->ext_csd.generic_cmd6_time);
+	/* Switch card to HS DDR */
+	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			   EXT_CSD_BUS_WIDTH,
+			   EXT_CSD_DDR_BUS_WIDTH_8,
+			   card->ext_csd.generic_cmd6_time,
+			   MMC_TIMING_MMC_DDR52,
+			   true, true, true);
 	if (err) {
 		pr_err("%s: switch to bus width for hs400 failed, err:%d\n",
 			mmc_hostname(host), err);
@@ -1144,28 +1135,17 @@ static int mmc_select_hs400(struct mmc_card *card)
 	      card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			   EXT_CSD_HS_TIMING, val,
-			   card->ext_csd.generic_cmd6_time, 0,
-			   true, false, true);
+			   card->ext_csd.generic_cmd6_time,
+			   MMC_TIMING_MMC_HS400,
+			   true, true, true);
 	if (err) {
 		pr_err("%s: switch to hs400 failed, err:%d\n",
 			 mmc_hostname(host), err);
 		return err;
 	}
 
-	/* Set host controller to HS400 timing and frequency */
-	mmc_set_timing(host, MMC_TIMING_MMC_HS400);
 	mmc_set_bus_speed(card);
-
-	err = mmc_switch_status(card);
-	if (err)
-		goto out_err;
-
 	return 0;
-
-out_err:
-	pr_err("%s: %s failed, error %d\n", mmc_hostname(card->host),
-	       __func__, err);
-	return err;
 }
 
 int mmc_hs200_to_hs400(struct mmc_card *card)
@@ -1187,27 +1167,17 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
 	/* Switch HS400 to HS DDR */
 	val = EXT_CSD_TIMING_HS;
 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
-			   val, card->ext_csd.generic_cmd6_time, 0,
-			   true, false, true);
-	if (err)
-		goto out_err;
-
-	mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
-
-	err = mmc_switch_status(card);
+			   val, card->ext_csd.generic_cmd6_time,
+			   MMC_TIMING_MMC_DDR52,
+			   true, true, true);
 	if (err)
 		goto out_err;
 
 	/* Switch HS DDR to HS */
 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BUS_WIDTH,
 			   EXT_CSD_BUS_WIDTH_8, card->ext_csd.generic_cmd6_time,
-			   0, true, false, true);
-	if (err)
-		goto out_err;
-
-	mmc_set_timing(host, MMC_TIMING_MMC_HS);
-
-	err = mmc_switch_status(card);
+			   MMC_TIMING_MMC_HS,
+			   true, true, true);
 	if (err)
 		goto out_err;
 
@@ -1215,14 +1185,9 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
 	val = EXT_CSD_TIMING_HS200 |
 	      card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
-			   val, card->ext_csd.generic_cmd6_time, 0,
-			   true, false, true);
-	if (err)
-		goto out_err;
-
-	mmc_set_timing(host, MMC_TIMING_MMC_HS200);
-
-	err = mmc_switch_status(card);
+			   val, card->ext_csd.generic_cmd6_time,
+			   MMC_TIMING_MMC_HS200,
+			   true, true, true);
 	if (err)
 		goto out_err;
 
