@@ -212,45 +212,82 @@ found:
 	return ret;
 }
 
-int
-i915_gem_evict_for_vma(struct i915_vma *target)
+int i915_gem_evict_for_vma(struct i915_vma *target, unsigned int flags)
 {
-	struct drm_mm_node *node, *next;
+	struct list_head eviction_list;
+	struct drm_mm_node *node;
+	u64 start = target->node.start;
+	u64 end = start + target->node.size - 1;
+	struct i915_vma *vma, *next;
+	bool check_snoop;
+	int ret = 0;
 
 	lockdep_assert_held(&target->vm->dev->struct_mutex);
+	trace_i915_gem_evict_vma(target, flags);
 
-	list_for_each_entry_safe(node, next,
-			&target->vm->mm.head_node.node_list,
-			node_list) {
-		struct i915_vma *vma;
-		int ret;
-
-		if (node->start + node->size <= target->node.start)
-			continue;
-		if (node->start >= target->node.start + target->node.size)
-			break;
-
-		vma = container_of(node, typeof(*vma), node);
-
-		if (i915_vma_is_pinned(vma)) {
-			if (!vma->exec_entry || i915_vma_pin_count(vma) > 1)
-				/* Object is pinned for some other use */
-				return -EBUSY;
-
-			/* We need to evict a buffer in the same batch */
-			if (vma->exec_entry->flags & EXEC_OBJECT_PINNED)
-				/* Overlapping fixed objects in the same batch */
-				return -EINVAL;
-
-			return -ENOSPC;
-		}
-
-		ret = i915_vma_unbind(vma);
-		if (ret)
-			return ret;
+	check_snoop = target->vm->mm.color_adjust;
+	if (check_snoop) {
+		if (start > target->vm->start)
+			start -= 4096;
+		if (end < target->vm->start + target->vm->total)
+			end += 4096;
 	}
 
-	return 0;
+	node = drm_mm_interval_first(&target->vm->mm, start, end);
+	if (!node)
+		return 0;
+
+	INIT_LIST_HEAD(&eviction_list);
+	vma = container_of(node, typeof(*vma), node);
+	list_for_each_entry_from(vma,
+				 &target->vm->mm.head_node.node_list,
+				 node.node_list) {
+		if (vma->node.start > end)
+			break;
+
+		if (check_snoop) {
+			if (vma->node.start + vma->node.size == target->node.start) {
+				if (vma->node.color == target->node.color)
+					continue;
+			}
+			if (vma->node.start == target->node.start + target->node.size) {
+				if (vma->node.color == target->node.color)
+					continue;
+			}
+		}
+
+		if (vma->node.color == -1) {
+			ret = -ENOSPC;
+			break;
+		}
+
+		if (flags & PIN_NONBLOCK &&
+		    (i915_vma_is_pinned(vma) || i915_vma_is_active(vma))) {
+			ret = -ENOSPC;
+			break;
+		}
+
+		/* Overlap of objects in the same batch? */
+		if (i915_vma_is_pinned(vma)) {
+			ret = -ENOSPC;
+			if (vma->exec_entry &&
+			    vma->exec_entry->flags & EXEC_OBJECT_PINNED)
+				ret = -EINVAL;
+			break;
+		}
+
+		__i915_vma_pin(vma);
+		list_add(&vma->exec_list, &eviction_list);
+	}
+
+	list_for_each_entry_safe(vma, next, &eviction_list, exec_list) {
+		list_del_init(&vma->exec_list);
+		__i915_vma_unpin(vma);
+		if (ret == 0)
+			ret = i915_vma_unbind(vma);
+	}
+
+	return ret;
 }
 
 /**

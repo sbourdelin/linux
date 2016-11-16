@@ -274,6 +274,7 @@ static void eb_destroy(struct eb_vmas *eb)
 				       exec_list);
 		list_del_init(&vma->exec_list);
 		i915_gem_execbuffer_unreserve_vma(vma);
+		vma->exec_entry = NULL;
 		i915_vma_put(vma);
 	}
 	kfree(eb);
@@ -437,7 +438,7 @@ static void *reloc_iomap(struct drm_i915_gem_object *obj,
 			memset(&cache->node, 0, sizeof(cache->node));
 			ret = drm_mm_insert_node_in_range_generic
 				(&ggtt->base.mm, &cache->node,
-				 4096, 0, 0,
+				 4096, 0, -1,
 				 0, ggtt->mappable_end,
 				 DRM_MM_SEARCH_DEFAULT,
 				 DRM_MM_CREATE_DEFAULT);

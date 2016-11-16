@@ -275,6 +275,15 @@ int drm_mm_reserve_node(struct drm_mm *mm, struct drm_mm_node *node)
 	if (hole_start > node->start || hole_end < end)
 		return -ENOSPC;
 
+	if (mm->color_adjust) {
+		u64 adj_start = hole_start, adj_end = hole_end;
+
+		mm->color_adjust(hole, node->color, &adj_start, &adj_end);
+		if (adj_start > node->start ||
+		    adj_end < node->start + node->size)
+			return -ENOSPC;
+	}
+
 	node->mm = mm;
 	node->allocated = 1;
 

@@ -2072,16 +2072,14 @@ static int gen6_ppgtt_allocate_page_directories(struct i915_hw_ppgtt *ppgtt)
 		return ret;
 
 alloc:
-	ret = drm_mm_insert_node_in_range_generic(&ggtt->base.mm,
-						  &ppgtt->node, GEN6_PD_SIZE,
-						  GEN6_PD_ALIGN, 0,
-						  0, ggtt->base.total,
+	ret = drm_mm_insert_node_in_range_generic(&ggtt->base.mm, &ppgtt->node,
+						  GEN6_PD_SIZE, GEN6_PD_ALIGN,
+						  -1, 0, ggtt->base.total,
 						  DRM_MM_TOPDOWN);
 	if (ret == -ENOSPC && !retried) {
 		ret = i915_gem_evict_something(&ggtt->base,
 					       GEN6_PD_SIZE, GEN6_PD_ALIGN,
-					       I915_CACHE_NONE,
-					       0, ggtt->base.total,
+					       -1, 0, ggtt->base.total,
 					       0);
 		if (ret)
 			goto err_out;

@@ -325,12 +325,6 @@ bool i915_gem_valid_gtt_space(struct i915_vma *vma,
 	if (vma->vm->mm.color_adjust == NULL)
 		return true;
 
-	if (!drm_mm_node_allocated(gtt_space))
-		return true;
-
-	if (list_empty(&gtt_space->node_list))
-		return true;
-
 	other = list_entry(gtt_space->node_list.prev, struct drm_mm_node, node_list);
 	if (other->allocated && !other->hole_follows && other->color != cache_level)
 		return false;
@@ -413,7 +407,7 @@ i915_vma_insert(struct i915_vma *vma, u64 size, u64 alignment, u64 flags)
 		vma->node.color = obj->cache_level;
 		ret = drm_mm_reserve_node(&vma->vm->mm, &vma->node);
 		if (ret) {
-			ret = i915_gem_evict_for_vma(vma);
+			ret = i915_gem_evict_for_vma(vma, flags);
 			if (ret == 0)
 				ret = drm_mm_reserve_node(&vma->vm->mm, &vma->node);
 			if (ret)
