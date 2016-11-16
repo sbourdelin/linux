@@ -753,8 +753,24 @@ static void intel_setup_cadls(struct drm_i915_private *dev_priv)
 	 * not always correct as display outputs may exist, but not active. This
 	 * initialization is necessary for some Clevo laptops that check this
 	 * field before processing the brightness and display switching hotkeys.
+	 * Put internal panels in front of the list to ensure they're not left
+	 * out.
 	 */
 	for_each_intel_connector(&dev_priv->drm, connector) {
+		if ((connector->acpi_device_id & ACPI_DISPLAY_TYPE_MASK) !=
+		    ACPI_DISPLAY_TYPE_INTERNAL_DIGITAL)
+			continue;
+
+		if (i >= ARRAY_SIZE(opregion->acpi->cadl))
+			break;
+		opregion->acpi->cadl[i++] = connector->acpi_device_id;
+	}
+
+	for_each_intel_connector(&dev_priv->drm, connector) {
+		if ((connector->acpi_device_id & ACPI_DISPLAY_TYPE_MASK) ==
+		    ACPI_DISPLAY_TYPE_INTERNAL_DIGITAL)
+			continue;
+
 		if (i >= ARRAY_SIZE(opregion->acpi->cadl))
 			break;
 		opregion->acpi->cadl[i++] = connector->acpi_device_id;
