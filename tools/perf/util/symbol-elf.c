@@ -1822,7 +1822,7 @@ void kcore_extract__delete(struct kcore_extract *kce)
 static int populate_sdt_note(Elf **elf, const char *data, size_t len,
 			     struct list_head *sdt_notes)
 {
-	const char *provider, *name;
+	const char *provider, *name, *args;
 	struct sdt_note *tmp = NULL;
 	GElf_Ehdr ehdr;
 	GElf_Addr base_off = 0;
@@ -1880,6 +1880,20 @@ static int populate_sdt_note(Elf **elf, const char *data, size_t len,
 		ret = -ENOMEM;
 		goto out_free_prov;
 	}
+
+	args = (const char *)memchr(name, '\0', data + len - name);
+
+	/*
+	 * There is no argument if:
+	 * - We reached the end of the note;
+	 * - There is not enough room to hold a potential string;
+	 * - The argument string is empty or just contains ':'.
+	 */
+	if (args == NULL || data + len - args < 2 ||
+		args[1] == ':' || args[1] == '\0')
+		tmp->args = NULL;
+	else
+		tmp->args = strdup(++args);
 
 	if (gelf_getclass(*elf) == ELFCLASS32) {
 		memcpy(&tmp->addr, &buf, 3 * sizeof(Elf32_Addr));
