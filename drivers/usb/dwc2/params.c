@@ -93,6 +93,13 @@ static const struct dwc2_core_params params_bcm2835 = {
 	.host_ls_low_power_phy_clk	= 0,	/* 48 MHz */
 	.ts_dline			= 0,
 	.reload_ctl			= 0,
+
+	/*
+	 * Although this value would normally be invalid, for BCM2835,
+	 * the GAHBCFG.HBSTLEN field has a different meaning from that
+	 * defined by Synopsys. See the BCM2835 databook section 15.2
+	 * for details.
+	 */
 	.ahbcfg				= 0x10,
 	.uframe_sched			= 0,
 	.external_id_pin_ctl		= -1,
