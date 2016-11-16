@@ -1067,7 +1067,28 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
 		       arch_timer_mem_of_init);
 
 #ifdef CONFIG_ACPI_GTDT
-/* Initialize per-processor generic timer */
+static int __init arch_timer_mem_acpi_init(void)
+{
+	struct arch_timer_mem *timer_mem;
+	int ret = 0;
+	int i = 0;
+
+	timer_mem = kzalloc(sizeof(*timer_mem), GFP_KERNEL);
+	if (!timer_mem)
+		return -ENOMEM;
+
+	while (!gtdt_arch_timer_mem_init(timer_mem, i)) {
+		ret = arch_timer_mem_init(timer_mem);
+		if (ret)
+			break;
+		i++;
+	}
+
+	kfree(timer_mem);
+	return ret;
+}
+
+/* Initialize per-processor generic timer and memory-mapped timer(if present) */
 static int __init arch_timer_acpi_init(struct acpi_table_header *table)
 {
 	int ret;
@@ -1103,6 +1124,9 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
 
 	/* Get the frequency from CNTFRQ */
 	arch_timer_detect_rate(NULL);
+
+	if (arch_timer_mem_acpi_init())
+		pr_err("Failed to initialize memory-mapped timer.\n");
 
 	ret = arch_timer_init();
 
