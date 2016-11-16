@@ -65,6 +65,7 @@
 #include <sys/ioctl.h>
 #include <pthread.h>
 #include <linux/userfaultfd.h>
+#include <inttypes.h>
 
 #ifdef __NR_userfaultfd
 
@@ -232,10 +233,10 @@ static int copy_page(unsigned long offset)
 	if (ioctl(uffd, UFFDIO_COPY, &uffdio_copy)) {
 		/* real retval in ufdio_copy.copy */
 		if (uffdio_copy.copy != -EEXIST)
-			fprintf(stderr, "UFFDIO_COPY error %Ld\n",
+			fprintf(stderr, "UFFDIO_COPY error %"PRId64"\n",
 				uffdio_copy.copy), exit(1);
 	} else if (uffdio_copy.copy != page_size) {
-		fprintf(stderr, "UFFDIO_COPY unexpected copy %Ld\n",
+		fprintf(stderr, "UFFDIO_COPY unexpected copy %"PRId64"\n",
 			uffdio_copy.copy), exit(1);
 	} else
 		return 1;
@@ -451,7 +452,7 @@ static int userfaultfd_stress(void)
 		return 1;
 	}
 	if (uffdio_api.api != UFFD_API) {
-		fprintf(stderr, "UFFDIO_API error %Lu\n", uffdio_api.api);
+		fprintf(stderr, "UFFDIO_API error %"PRIu64"\n", uffdio_api.api);
 		return 1;
 	}
 
