@@ -243,8 +243,11 @@ static int sun4i_drv_add_endpoints(struct device *dev,
 		DRM_DEBUG_DRIVER("Adding component %s\n",
 				 of_node_full_name(node));
 		component_match_add(dev, match, compare_of, node);
-		count++;
 	}
+
+	/* Only count the tcon as an output */
+	if (sun4i_drv_node_is_tcon(node))
+		count++;
 
 	/* Inputs are listed first, then outputs */
 	port = of_graph_get_port_by_id(node, 1);
