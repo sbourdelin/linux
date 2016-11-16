@@ -1351,7 +1351,7 @@ static void mmc_select_driver_type(struct mmc_card *card)
 static int mmc_select_hs200(struct mmc_card *card)
 {
 	struct mmc_host *host = card->host;
-	unsigned int old_timing, old_signal_voltage;
+	unsigned int old_signal_voltage;
 	int err = -EINVAL;
 	u8 val;
 
@@ -1378,22 +1378,11 @@ static int mmc_select_hs200(struct mmc_card *card)
 		      card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
 		err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 				   EXT_CSD_HS_TIMING, val,
-				   card->ext_csd.generic_cmd6_time, 0,
-				   true, false, true);
-		if (err)
-			goto err;
-		old_timing = host->ios.timing;
-		mmc_set_timing(host, MMC_TIMING_MMC_HS200);
-
-		err = mmc_switch_status(card);
-		/*
-		 * mmc_select_timing() assumes timing has not changed if
-		 * it is a switch error.
-		 */
-		if (err == -EBADMSG)
-			mmc_set_timing(host, old_timing);
+				   card->ext_csd.generic_cmd6_time,
+				   MMC_TIMING_MMC_HS200,
+				   true, true, true);
 	}
-err:
+
 	if (err) {
 		/* fall back to the old signal voltage, if fails report error */
 		if (__mmc_set_signal_voltage(host, old_signal_voltage))
