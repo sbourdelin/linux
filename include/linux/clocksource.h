@@ -175,7 +175,7 @@ static inline u32 clocksource_hz2mult(u32 hz, u32 shift_constant)
  */
 static inline s64 clocksource_cyc2ns(cycle_t cycles, u32 mult, u32 shift)
 {
-	return ((u64) cycles * mult) >> shift;
+	return mult_frac(cycles, mult, 1ULL << shift);
 }
 
 
