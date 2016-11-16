@@ -192,13 +192,14 @@ static void __bpf_lru_list_rotate_inactive(struct bpf_lru *lru,
 		next = cur->prev;
 		if (bpf_lru_node_is_ref(node))
 			__bpf_lru_node_move(l, node, BPF_LRU_LIST_T_ACTIVE);
-		if (cur == last)
+		if (cur == last) {
+			l->next_inactive_rotation = next;
 			break;
+		}
 		cur = next;
 		i++;
 	}
 
-	l->next_inactive_rotation = next;
 }
 
 /* Shrink the inactive list.  It starts from the tail of the
