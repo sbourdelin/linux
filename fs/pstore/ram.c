@@ -787,9 +787,7 @@ static int ramoops_probe(struct platform_device *pdev)
 				: 1;
 	err = ramoops_init_przs("ftrace", dev, cxt, &cxt->fprzs, &paddr,
 				cxt->ftrace_size, -1,
-				&cxt->max_ftrace_cnt, LINUX_VERSION_CODE,
-				(cxt->flags & RAMOOPS_FLAG_FTRACE_PER_CPU)
-					? PRZ_FLAG_NO_LOCK : 0);
+				&cxt->max_ftrace_cnt, LINUX_VERSION_CODE, 0);
 	if (err)
 		goto fail_init_fprz;
 

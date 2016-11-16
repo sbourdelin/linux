@@ -51,21 +51,17 @@ static inline size_t buffer_start(struct persistent_ram_zone *prz)
 /* increase and wrap the start pointer, returning the old value */
 static size_t buffer_start_add(struct persistent_ram_zone *prz, size_t a)
 {
-	int old;
-	int new;
-	unsigned long flags;
-
-	if (!(prz->flags & PRZ_FLAG_NO_LOCK))
-		raw_spin_lock_irqsave(&prz->buffer_lock, flags);
+	int old, new, before;
 
 	old = atomic_read(&prz->buffer->start);
-	new = old + a;
-	while (unlikely(new >= prz->buffer_size))
-		new -= prz->buffer_size;
-	atomic_set(&prz->buffer->start, new);
+	do {
+		new = old + a;
+		while (unlikely(new >= prz->buffer_size))
+			new -= prz->buffer_size;
 
-	if (!(prz->flags & PRZ_FLAG_NO_LOCK))
-		raw_spin_unlock_irqrestore(&prz->buffer_lock, flags);
+		before = old;
+		old = atomic_cmpxchg(&prz->buffer->start, before, new);
+	} while (old != before);
 
 	return old;
 }
@@ -73,25 +69,20 @@ static size_t buffer_start_add(struct persistent_ram_zone *prz, size_t a)
 /* increase the size counter until it hits the max size */
 static void buffer_size_add(struct persistent_ram_zone *prz, size_t a)
 {
-	size_t old;
-	size_t new;
-	unsigned long flags;
-
-	if (!(prz->flags & PRZ_FLAG_NO_LOCK))
-		raw_spin_lock_irqsave(&prz->buffer_lock, flags);
+	size_t old, new, before;
 
 	old = atomic_read(&prz->buffer->size);
-	if (old == prz->buffer_size)
-		goto exit;
+	do {
+		if (old == prz->buffer_size)
+			break;
 
-	new = old + a;
-	if (new > prz->buffer_size)
-		new = prz->buffer_size;
-	atomic_set(&prz->buffer->size, new);
+		new = old + a;
+		if (new > prz->buffer_size)
+			new = prz->buffer_size;
 
-exit:
-	if (!(prz->flags & PRZ_FLAG_NO_LOCK))
-		raw_spin_unlock_irqrestore(&prz->buffer_lock, flags);
+		before = old;
+		old = atomic_cmpxchg(&prz->buffer->size, before, new);
+	} while (old != before);
 }
 
 static void notrace persistent_ram_encode_rs8(struct persistent_ram_zone *prz,
@@ -496,7 +487,6 @@ static int persistent_ram_post_init(struct persistent_ram_zone *prz, u32 sig,
 
 	prz->buffer->sig = sig;
 	persistent_ram_zap(prz);
-	prz->buffer_lock = __RAW_SPIN_LOCK_UNLOCKED(buffer_lock);
 	prz->flags = flags;
 
 	return 0;
