@@ -2703,9 +2703,16 @@ static void i915_gem_reset_engine(struct intel_engine_cs *engine)
 	if (!request)
 		return;
 
-	ring_hung = engine->hangcheck.score >= HANGCHECK_SCORE_RING_HUNG;
-	if (engine->hangcheck.seqno != intel_engine_get_seqno(engine))
+	ring_hung = engine->hangcheck.stall;
+	if (engine->hangcheck.seqno != intel_engine_get_seqno(engine)) {
+		if (ring_hung)
+			DRM_ERROR("%s pardoned due to progress after hangcheck %x vs %x\n",
+				  engine->name,
+				  engine->hangcheck.seqno,
+				  intel_engine_get_seqno(engine));
+
 		ring_hung = false;
+	}
 
 	i915_set_reset_status(request->ctx, ring_hung);
 	if (!ring_hung)

@@ -34,6 +34,7 @@ struct i915_gem_timeline;
 struct intel_timeline {
 	u64 fence_context;
 	u32 last_submitted_seqno;
+	unsigned long last_retire_timestamp;
 
 	spinlock_t lock;
 

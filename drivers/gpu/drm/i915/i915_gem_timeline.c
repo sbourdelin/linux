@@ -24,6 +24,15 @@
 
 #include "i915_drv.h"
 
+static void i915_gem_timeline_retire(struct i915_gem_active *active,
+				     struct drm_i915_gem_request *request)
+{
+	struct intel_timeline *tl =
+		container_of(active, typeof(*tl), last_request);
+
+	tl->last_retire_timestamp = jiffies;
+}
+
 static int __i915_gem_timeline_init(struct drm_i915_private *i915,
 				    struct i915_gem_timeline *timeline,
 				    const char *name,
@@ -54,7 +63,8 @@ static int __i915_gem_timeline_init(struct drm_i915_private *i915,
 #else
 		spin_lock_init(&tl->lock);
 #endif
-		init_request_active(&tl->last_request, NULL);
+		init_request_active(&tl->last_request,
+				    i915_gem_timeline_retire);
 		INIT_LIST_HEAD(&tl->requests);
 	}
 

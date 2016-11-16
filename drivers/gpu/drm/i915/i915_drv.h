@@ -795,7 +795,8 @@ struct drm_i915_error_state {
 		/* Software tracked state */
 		bool waiting;
 		int num_waiters;
-		int hangcheck_score;
+		unsigned long hangcheck_timestamp;
+		bool hangcheck_stall;
 		enum intel_engine_hangcheck_action hangcheck_action;
 		struct i915_address_space *vm;
 		int num_requests;
@@ -1440,6 +1441,9 @@ struct i915_error_state_file_priv {
 
 #define I915_RESET_TIMEOUT (10 * HZ) /* 10s */
 #define I915_FENCE_TIMEOUT (10 * HZ) /* 10s */
+
+#define I915_ENGINE_DEAD_TIMEOUT  (4 * HZ)  /* No observed seqno/head/subunit progress */
+#define I915_SEQNO_DEAD_TIMEOUT   (12 * HZ) /* Engine progress without head progress */
 
 struct i915_gpu_error {
 	/* For hangcheck timer */
