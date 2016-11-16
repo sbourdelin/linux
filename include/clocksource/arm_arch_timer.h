@@ -20,18 +20,18 @@
 #include <linux/timecounter.h>
 #include <linux/types.h>
 
-#define ARCH_CP15_TIMER			BIT(0)
-#define ARCH_MEM_TIMER			BIT(1)
+#define ARCH_TIMER_TYPE_CP15		BIT(0)
+#define ARCH_TIMER_TYPE_MEM		BIT(1)
 
-#define ARCH_TIMER_CTRL_ENABLE		(1 << 0)
-#define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
-#define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
+#define ARCH_TIMER_CTRL_ENABLE		BIT(0)
+#define ARCH_TIMER_CTRL_IT_MASK		BIT(1)
+#define ARCH_TIMER_CTRL_IT_STAT		BIT(2)
 
-#define CNTHCTL_EL1PCTEN		(1 << 0)
-#define CNTHCTL_EL1PCEN			(1 << 1)
-#define CNTHCTL_EVNTEN			(1 << 2)
-#define CNTHCTL_EVNTDIR			(1 << 3)
-#define CNTHCTL_EVNTI			(0xF << 4)
+#define ARCH_TIMER_CNTHCTL_EL1PCTEN	BIT(0)
+#define ARCH_TIMER_CNTHCTL_EL1PCEN	BIT(1)
+#define ARCH_TIMER_CNTHCTL_EVNTEN	BIT(2)
+#define ARCH_TIMER_CNTHCTL_EVNTDIR	BIT(3)
+#define ARCH_TIMER_CNTHCTL_EVNTI	(0xF << 4)
 
 enum arch_timer_reg {
 	ARCH_TIMER_REG_CTRL,
@@ -39,11 +39,11 @@ enum arch_timer_reg {
 };
 
 enum arch_timer_ppi_nr {
-	PHYS_SECURE_PPI,
-	PHYS_NONSECURE_PPI,
-	VIRT_PPI,
-	HYP_PPI,
-	MAX_TIMER_PPI
+	ARCH_TIMER_PHYS_SECURE_PPI,
+	ARCH_TIMER_PHYS_NONSECURE_PPI,
+	ARCH_TIMER_VIRT_PPI,
+	ARCH_TIMER_HYP_PPI,
+	ARCH_TIMER_MAX_TIMER_PPI
 };
 
 enum arch_timer_spi_nr {
@@ -57,13 +57,13 @@ enum arch_timer_spi_nr {
 #define ARCH_TIMER_MEM_PHYS_ACCESS	2
 #define ARCH_TIMER_MEM_VIRT_ACCESS	3
 
-#define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter */
-#define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
-#define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
+#define ARCH_TIMER_USR_PCT_ACCESS_EN	BIT(0) /* physical counter */
+#define ARCH_TIMER_USR_VCT_ACCESS_EN	BIT(1) /* virtual counter */
+#define ARCH_TIMER_VIRT_EVT_EN		BIT(2)
 #define ARCH_TIMER_EVT_TRIGGER_SHIFT	(4)
 #define ARCH_TIMER_EVT_TRIGGER_MASK	(0xF << ARCH_TIMER_EVT_TRIGGER_SHIFT)
-#define ARCH_TIMER_USR_VT_ACCESS_EN	(1 << 8) /* virtual timer registers */
-#define ARCH_TIMER_USR_PT_ACCESS_EN	(1 << 9) /* physical timer registers */
+#define ARCH_TIMER_USR_VT_ACCESS_EN	BIT(8) /* virtual timer registers */
+#define ARCH_TIMER_USR_PT_ACCESS_EN	BIT(9) /* physical timer registers */
 
 #define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
 
