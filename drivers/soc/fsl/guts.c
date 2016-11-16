@@ -31,6 +31,7 @@ struct fsl_soc_die_attr {
 static struct guts *guts;
 static struct soc_device_attribute soc_dev_attr;
 static struct soc_device *soc_dev;
+static const char *machine;
 
 
 /* SoC die attribute definition for QorIQ platform */
@@ -135,7 +136,6 @@ static int fsl_guts_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct resource *res;
 	const struct fsl_soc_die_attr *soc_die;
-	const char *machine;
 	u32 svr;
 
 	/* Initialize guts */
@@ -151,7 +151,6 @@ static int fsl_guts_probe(struct platform_device *pdev)
 		return PTR_ERR(guts->regs);
 
 	/* Register soc device */
-	machine = of_flat_dt_get_machine_name();
 	if (machine)
 		soc_dev_attr.machine = devm_kstrdup(dev, machine, GFP_KERNEL);
 
@@ -223,6 +222,7 @@ static struct platform_driver fsl_guts_driver = {
 
 static int __init fsl_guts_init(void)
 {
+	machine = of_flat_dt_get_machine_name();
 	return platform_driver_register(&fsl_guts_driver);
 }
 core_initcall(fsl_guts_init);
