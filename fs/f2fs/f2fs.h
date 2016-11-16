@@ -160,6 +160,7 @@ enum {
 	ORPHAN_INO,		/* for orphan ino list */
 	APPEND_INO,		/* for append ino list */
 	UPDATE_INO,		/* for update ino list */
+	FDATASYNC_INO,		/* need to flush nodes during fdatasync */
 	MAX_INO_ENTRY,		/* max. list */
 };
 
@@ -1667,6 +1668,7 @@ static inline void f2fs_i_links_write(struct inode *inode, bool inc)
 	f2fs_mark_inode_dirty_sync(inode, true);
 }
 
+void add_ino_entry(struct f2fs_sb_info *, nid_t, int);
 static inline void f2fs_i_blocks_write(struct inode *inode,
 					blkcnt_t diff, bool add)
 {
@@ -1678,6 +1680,8 @@ static inline void f2fs_i_blocks_write(struct inode *inode,
 	f2fs_mark_inode_dirty_sync(inode, true);
 	if (clean || recover)
 		set_inode_flag(inode, FI_AUTO_RECOVER);
+
+	add_ino_entry(F2FS_I_SB(inode), inode->i_ino, FDATASYNC_INO);
 }
 
 static inline void f2fs_i_size_write(struct inode *inode, loff_t i_size)
@@ -1692,6 +1696,8 @@ static inline void f2fs_i_size_write(struct inode *inode, loff_t i_size)
 	f2fs_mark_inode_dirty_sync(inode, true);
 	if (clean || recover)
 		set_inode_flag(inode, FI_AUTO_RECOVER);
+
+	add_ino_entry(F2FS_I_SB(inode), inode->i_ino, FDATASYNC_INO);
 }
 
 static inline bool f2fs_skip_inode_update(struct inode *inode)
@@ -2115,6 +2121,7 @@ void add_ino_entry(struct f2fs_sb_info *, nid_t, int type);
 void remove_ino_entry(struct f2fs_sb_info *, nid_t, int type);
 void release_ino_entry(struct f2fs_sb_info *, bool);
 bool exist_written_data(struct f2fs_sb_info *, nid_t, int);
+bool need_flush_nodes(struct f2fs_sb_info *, nid_t);
 int f2fs_sync_inode_meta(struct f2fs_sb_info *);
 int acquire_orphan_inode(struct f2fs_sb_info *);
 void release_orphan_inode(struct f2fs_sb_info *);

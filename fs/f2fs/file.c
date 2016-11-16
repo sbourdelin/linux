@@ -209,8 +209,13 @@ static int f2fs_do_sync_file(struct file *file, loff_t start, loff_t end,
 		return ret;
 	}
 
-	/* if the inode is dirty, let's recover all the time */
-	if (!datasync && !f2fs_skip_inode_update(inode)) {
+	if (datasync) {
+		if (need_flush_nodes(sbi, ino)) {
+			f2fs_write_inode(inode, NULL);
+			goto go_write;
+		}
+	} else if (!f2fs_skip_inode_update(inode)) {
+		/* if the inode is dirty, let's recover all the time */
 		f2fs_write_inode(inode, NULL);
 		goto go_write;
 	}
@@ -276,6 +281,8 @@ sync_nodes:
 	/* once recovery info is written, don't need to tack this */
 	remove_ino_entry(sbi, ino, APPEND_INO);
 	clear_inode_flag(inode, FI_APPEND_WRITE);
+
+	remove_ino_entry(sbi, ino, FDATASYNC_INO);
 flush_out:
 	remove_ino_entry(sbi, ino, UPDATE_INO);
 	clear_inode_flag(inode, FI_UPDATE_WRITE);
