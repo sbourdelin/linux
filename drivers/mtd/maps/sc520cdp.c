@@ -243,6 +243,10 @@ static int __init init_sc520cdp(void)
 
 		if (!sc520cdp_map[i].virt) {
 			printk("Failed to ioremap_nocache\n");
+			if (i) {
+				while (--i)
+					iounmap(sc520cdp_map[i].virt);
+			}
 			return -EIO;
 		}
 
