@@ -128,6 +128,35 @@ static const struct ethtool_ops slic_ethtool_ops;
 
 MODULE_DEVICE_TABLE(pci, slic_pci_tbl);
 
+#ifndef ioread64
+#ifdef readq
+#define ioread64 readq
+#else
+#define ioread64 _ioread64
+static inline u64 _ioread64(void __iomem *mmio)
+{
+	u64 low, high;
+
+	low = ioread32(mmio);
+	high = ioread32(mmio + sizeof(u32));
+	return low | (high << 32);
+}
+#endif
+#endif
+
+#ifndef iowrite64
+#ifdef writeq
+#define iowrite64 writeq
+#else
+#define iowrite64 _iowrite64
+static inline void _iowrite64(u64 val, void __iomem *mmio)
+{
+	iowrite32(val, mmio);
+	iowrite32(val >> 32, mmio + sizeof(u32));
+}
+#endif
+#endif
+
 static void slic_mcast_set_bit(struct adapter *adapter, char *address)
 {
 	unsigned char crcpoly;
@@ -923,8 +952,8 @@ err_unlock_irq:
 static void slic_link_upr_complete(struct adapter *adapter, u32 isr)
 {
 	struct slic_shmemory *sm = &adapter->shmem;
-	struct slic_shmem_data *sm_data = sm->shmem_data;
-	u32 lst = sm_data->lnkstatus;
+	struct slic_shmem_data __iomem *sm_data = sm->shmem_data;
+	u32 lst = ioread32(&sm_data->lnkstatus);
 	uint linkup;
 	unsigned char linkspeed;
 	unsigned char linkduplex;
@@ -1003,8 +1032,8 @@ static void slic_upr_request_complete(struct adapter *adapter, u32 isr)
 	switch (upr->upr_request) {
 	case SLIC_UPR_STATS: {
 		struct slic_shmemory *sm = &adapter->shmem;
-		struct slic_shmem_data *sm_data = sm->shmem_data;
-		struct slic_stats *stats = &sm_data->stats;
+		struct slic_shmem_data __iomem *sm_data = sm->shmem_data;
+		struct slic_stats __iomem *stats = &sm_data->stats;
 		struct slic_stats *old = &adapter->inicstats_prev;
 		struct slicnet_stats *stst = &adapter->slic_stats;
 
@@ -1014,50 +1043,62 @@ static void slic_upr_request_complete(struct adapter *adapter, u32 isr)
 			break;
 		}
 
-		UPDATE_STATS_GB(stst->tcp.xmit_tcp_segs, stats->xmit_tcp_segs,
+		UPDATE_STATS_GB(stst->tcp.xmit_tcp_segs,
+				ioread64(&stats->xmit_tcp_segs),
 				old->xmit_tcp_segs);
 
-		UPDATE_STATS_GB(stst->tcp.xmit_tcp_bytes, stats->xmit_tcp_bytes,
+		UPDATE_STATS_GB(stst->tcp.xmit_tcp_bytes,
+				ioread64(&stats->xmit_tcp_bytes),
 				old->xmit_tcp_bytes);
 
-		UPDATE_STATS_GB(stst->tcp.rcv_tcp_segs, stats->rcv_tcp_segs,
+		UPDATE_STATS_GB(stst->tcp.rcv_tcp_segs,
+				ioread64(&stats->rcv_tcp_segs),
 				old->rcv_tcp_segs);
 
-		UPDATE_STATS_GB(stst->tcp.rcv_tcp_bytes, stats->rcv_tcp_bytes,
+		UPDATE_STATS_GB(stst->tcp.rcv_tcp_bytes,
+				ioread64(&stats->rcv_tcp_bytes),
 				old->rcv_tcp_bytes);
 
-		UPDATE_STATS_GB(stst->iface.xmt_bytes, stats->xmit_bytes,
+		UPDATE_STATS_GB(stst->iface.xmt_bytes,
+				ioread64(&stats->xmit_bytes),
 				old->xmit_bytes);
 
-		UPDATE_STATS_GB(stst->iface.xmt_ucast, stats->xmit_unicasts,
+		UPDATE_STATS_GB(stst->iface.xmt_ucast,
+				ioread64(&stats->xmit_unicasts),
 				old->xmit_unicasts);
 
-		UPDATE_STATS_GB(stst->iface.rcv_bytes, stats->rcv_bytes,
+		UPDATE_STATS_GB(stst->iface.rcv_bytes,
+				ioread64(&stats->rcv_bytes),
 				old->rcv_bytes);
 
-		UPDATE_STATS_GB(stst->iface.rcv_ucast, stats->rcv_unicasts,
+		UPDATE_STATS_GB(stst->iface.rcv_ucast,
+				ioread64(&stats->rcv_unicasts),
 				old->rcv_unicasts);
 
-		UPDATE_STATS_GB(stst->iface.xmt_errors, stats->xmit_collisions,
+		UPDATE_STATS_GB(stst->iface.xmt_errors,
+				ioread64(&stats->xmit_collisions),
 				old->xmit_collisions);
 
 		UPDATE_STATS_GB(stst->iface.xmt_errors,
-				stats->xmit_excess_collisions,
+				ioread64(&stats->xmit_excess_collisions),
 				old->xmit_excess_collisions);
 
-		UPDATE_STATS_GB(stst->iface.xmt_errors, stats->xmit_other_error,
+		UPDATE_STATS_GB(stst->iface.xmt_errors,
+				ioread64(&stats->xmit_other_error),
 				old->xmit_other_error);
 
-		UPDATE_STATS_GB(stst->iface.rcv_errors, stats->rcv_other_error,
+		UPDATE_STATS_GB(stst->iface.rcv_errors,
+				ioread64(&stats->rcv_other_error),
 				old->rcv_other_error);
 
-		UPDATE_STATS_GB(stst->iface.rcv_discards, stats->rcv_drops,
+		UPDATE_STATS_GB(stst->iface.rcv_discards,
+				ioread64(&stats->rcv_drops),
 				old->rcv_drops);
 
-		if (stats->rcv_drops > old->rcv_drops)
-			adapter->rcv_drops += (stats->rcv_drops -
+		if (ioread64(&stats->rcv_drops) > old->rcv_drops)
+			adapter->rcv_drops += (ioread64(&stats->rcv_drops) -
 					       old->rcv_drops);
-		memcpy(old, stats, sizeof(*stats));
+		memcpy_fromio(old, stats, sizeof(*stats));
 		break;
 	}
 	case SLIC_UPR_RLSR:
@@ -1679,10 +1720,10 @@ static void slic_init_cleanup(struct adapter *adapter)
 
 	if (adapter->shmem.shmem_data) {
 		struct slic_shmemory *sm = &adapter->shmem;
-		struct slic_shmem_data *sm_data = sm->shmem_data;
+		struct slic_shmem_data __iomem *sm_data = sm->shmem_data;
 
-		pci_free_consistent(adapter->pcidev, sizeof(*sm_data), sm_data,
-				    sm->isr_phaddr);
+		pci_free_consistent(adapter->pcidev, sizeof(*sm_data),
+				    (void __force *)sm_data, sm->isr_phaddr);
 	}
 
 	if (adapter->pingtimerset) {
@@ -2068,15 +2109,15 @@ static irqreturn_t slic_interrupt(int irq, void *dev_id)
 	struct net_device *dev = dev_id;
 	struct adapter *adapter = netdev_priv(dev);
 	struct slic_shmemory *sm = &adapter->shmem;
-	struct slic_shmem_data *sm_data = sm->shmem_data;
+	struct slic_shmem_data __iomem *sm_data = sm->shmem_data;
 	u32 isr;
 
-	if (sm_data->isr) {
+	if (ioread32(&sm_data->isr)) {
 		slic_write32(adapter, SLIC_REG_ICR, ICR_INT_MASK);
 		slic_flush_write(adapter);
 
-		isr = sm_data->isr;
-		sm_data->isr = 0;
+		isr = ioread32(&sm_data->isr);
+		iowrite32(0, &sm_data->isr);
 		adapter->num_isrs++;
 		switch (adapter->card->state) {
 		case CARD_UP:
@@ -2211,7 +2252,7 @@ static int slic_if_init(struct adapter *adapter, unsigned long *flags)
 	struct sliccard *card = adapter->card;
 	struct net_device *dev = adapter->netdev;
 	struct slic_shmemory *sm = &adapter->shmem;
-	struct slic_shmem_data *sm_data = sm->shmem_data;
+	struct slic_shmem_data __iomem *sm_data = sm->shmem_data;
 	int rc;
 
 	/* adapter should be down at this point */
@@ -2295,7 +2336,7 @@ static int slic_if_init(struct adapter *adapter, unsigned long *flags)
 	/*
 	 *    clear any pending events, then enable interrupts
 	 */
-	sm_data->isr = 0;
+	iowrite32(0, &sm_data->isr);
 	slic_write32(adapter, SLIC_REG_ISR, 0);
 	slic_write32(adapter, SLIC_REG_ICR, ICR_INT_ON);
 
@@ -2584,7 +2625,7 @@ static void slic_config_pci(struct pci_dev *pcidev)
 static int slic_card_init(struct sliccard *card, struct adapter *adapter)
 {
 	struct slic_shmemory *sm = &adapter->shmem;
-	struct slic_shmem_data *sm_data = sm->shmem_data;
+	struct slic_shmem_data __iomem  *sm_data = sm->shmem_data;
 	struct slic_eeprom *peeprom;
 	struct oslic_eeprom *pOeeprom;
 	dma_addr_t phys_config;
@@ -2647,9 +2688,9 @@ static int slic_card_init(struct sliccard *card, struct adapter *adapter)
 		}
 
 		for (;;) {
-			if (sm_data->isr) {
-				if (sm_data->isr & ISR_UPC) {
-					sm_data->isr = 0;
+			if (ioread32(&sm_data->isr)) {
+				if (ioread32(&sm_data->isr) & ISR_UPC) {
+					iowrite32(0, &sm_data->isr);
 					slic_write64(adapter, SLIC_REG_ISP, 0,
 						     0);
 					slic_write32(adapter, SLIC_REG_ISR, 0);
@@ -2659,7 +2700,7 @@ static int slic_card_init(struct sliccard *card, struct adapter *adapter)
 					break;
 				}
 
-				sm_data->isr = 0;
+				iowrite32(0, &sm_data->isr);
 				slic_write32(adapter, SLIC_REG_ISR, 0);
 				slic_flush_write(adapter);
 			} else {
@@ -2862,7 +2903,7 @@ static int slic_init_adapter(struct net_device *netdev,
 	if (!sm_data)
 		return -ENOMEM;
 
-	sm->shmem_data = sm_data;
+	sm->shmem_data = (struct slic_shmem_data __force __iomem *)sm_data;
 	sm->isr_phaddr = phaddr;
 	sm->lnkstatus_phaddr = phaddr + offsetof(struct slic_shmem_data,
 						 lnkstatus);
