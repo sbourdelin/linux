@@ -652,7 +652,11 @@ static __initconst const struct x86_pmu amd_pmu = {
 	.amd_nb_constraints	= 1,
 };
 
-static int __init amd_core_pmu_init(void)
+/*
+ * This function initializes core PMU to enable support
+ * for AMD Core PMC Extension.
+ */
+static int __init amd_core_pmc_ext_init(void)
 {
 	if (!boot_cpu_has(X86_FEATURE_PERFCTR_CORE))
 		return 0;
@@ -662,7 +666,12 @@ static int __init amd_core_pmu_init(void)
 		pr_cont("Fam15h ");
 		x86_pmu.get_event_constraints = amd_get_event_constraints_f15h;
 		break;
-
+	case 0x17:
+		pr_cont("Fam17h ");
+		/* In family 17h, there are no event constraints in the PMC hardware.
+		 * We fallback to using default amd_get_event_constraints.
+		 */
+		break;
 	default:
 		pr_err("core perfctr but no constraints; unknown hardware!\n");
 		return -ENODEV;
@@ -696,7 +705,7 @@ __init int amd_pmu_init(void)
 
 	x86_pmu = amd_pmu;
 
-	ret = amd_core_pmu_init();
+	ret = amd_core_pmc_ext_init();
 	if (ret)
 		return ret;
 
