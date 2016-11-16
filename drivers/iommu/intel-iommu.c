@@ -2067,9 +2067,16 @@ static int domain_context_mapping_one(struct dmar_domain *domain,
 	 * It's a non-present to present mapping. If hardware doesn't cache
 	 * non-present entry we only need to flush the write-buffer. If the
 	 * _does_ cache non-present entries, then it does so in the special
-	 * domain #0, which we have to flush:
+	 * domain #0, which we have to flush.
+	 *
+	 * For kdump cases, present entries may be cached due to the in-flight
+	 * DMA and copied old pgtable, but there is no unmapping behaviour for
+	 * them, so we need an explicit iotlb flush for the newly-mapped device.
+	 * For kdump, at this point, the device is supposed to finish reset at
+	 * the driver probe stage, no in-flight DMA will exist, thus we do not
+	 * need to worry about that anymore hereafter.
 	 */
-	if (cap_caching_mode(iommu->cap)) {
+	if (is_kdump_kernel() || cap_caching_mode(iommu->cap)) {
 		iommu->flush.flush_context(iommu, 0,
 					   (((u16)bus) << 8) | devfn,
 					   DMA_CCMD_MASK_NOBIT,
