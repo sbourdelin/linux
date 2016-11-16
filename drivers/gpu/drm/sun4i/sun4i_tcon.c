@@ -512,16 +512,16 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
 		return ret;
 	}
 
-	ret = sun4i_tcon_init_regmap(dev, tcon);
-	if (ret) {
-		dev_err(dev, "Couldn't init our TCON regmap\n");
-		goto err_assert_reset;
-	}
-
 	ret = sun4i_tcon_init_clocks(dev, tcon);
 	if (ret) {
 		dev_err(dev, "Couldn't init our TCON clocks\n");
 		goto err_assert_reset;
+	}
+
+	ret = sun4i_tcon_init_regmap(dev, tcon);
+	if (ret) {
+		dev_err(dev, "Couldn't init our TCON regmap\n");
+		goto err_free_clocks;
 	}
 
 	ret = sun4i_tcon_init_irq(dev, tcon);
