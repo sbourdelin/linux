@@ -17,3 +17,6 @@ mc-bus-driver-objs := fsl-mc-bus.o \
 		      fsl-mc-msi.o \
 		      dpmcp.o \
 		      dpbp.o
+
+# MC DPIO driver
+obj-$(CONFIG_FSL_MC_DPIO) += dpio/
