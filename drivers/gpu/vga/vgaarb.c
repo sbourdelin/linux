@@ -29,7 +29,8 @@
  *
  */
 
-#define pr_fmt(fmt) "vgaarb: " fmt
+#define DRV "vgaarb: "
+#define pr_fmt(fmt) DRV fmt
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -663,7 +664,7 @@ static bool vga_arbiter_add_pci_device(struct pci_dev *pdev)
 	 */
 	if (vga_default == NULL &&
 	    ((vgadev->owns & VGA_RSRC_LEGACY_MASK) == VGA_RSRC_LEGACY_MASK)) {
-		pr_info("setting as boot device: PCI:%s\n", pci_name(pdev));
+		dev_info(&pdev->dev, DRV "setting as boot device\n");
 		vga_set_default_device(pdev);
 	}
 
@@ -672,8 +673,7 @@ static bool vga_arbiter_add_pci_device(struct pci_dev *pdev)
 	/* Add to the list */
 	list_add(&vgadev->list, &vga_list);
 	vga_count++;
-	pr_info("device added: PCI:%s,decodes=%s,owns=%s,locks=%s\n",
-		pci_name(pdev),
+	dev_info(&pdev->dev, DRV "device added: decodes=%s,owns=%s,locks=%s\n",
 		vga_iostate_to_str(vgadev->decodes),
 		vga_iostate_to_str(vgadev->owns),
 		vga_iostate_to_str(vgadev->locks));
@@ -732,8 +732,7 @@ static inline void vga_update_device_decodes(struct vga_device *vgadev,
 	decodes_unlocked = vgadev->locks & decodes_removed;
 	vgadev->decodes = new_decodes;
 
-	pr_info("device changed decodes: PCI:%s,olddecodes=%s,decodes=%s:owns=%s\n",
-		pci_name(vgadev->pdev),
+	dev_info(&vgadev->pdev->dev, DRV "device changed decodes: olddecodes=%s,decodes=%s:owns=%s\n",
 		vga_iostate_to_str(old_decodes),
 		vga_iostate_to_str(vgadev->decodes),
 		vga_iostate_to_str(vgadev->owns));
@@ -1201,7 +1200,7 @@ static ssize_t vga_arb_write(struct file *file, const char __user *buf,
 		pr_debug("vgadev %p\n", vgadev);
 		if (vgadev == NULL) {
 			if (pdev) {
-				pr_err("this pci device is not a vga device\n");
+				dev_err(&pdev->dev, DRV "this device is not a vga device\n");
 				pci_dev_put(pdev);
 			}
 
@@ -1401,6 +1400,7 @@ static int __init vga_arb_device_init(void)
 	int rc;
 	struct pci_dev *pdev;
 	struct vga_device *vgadev;
+	struct device *dev;
 
 	rc = misc_register(&vga_arb_device);
 	if (rc < 0)
@@ -1433,6 +1433,7 @@ static int __init vga_arb_device_init(void)
 		int i;
 
 		limit = screen_info.lfb_base + screen_info.lfb_size;
+		dev = &vgadev->pdev->dev;
 
 		/* Does firmware framebuffer belong to us? */
 		for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
@@ -1451,20 +1452,16 @@ static int __init vga_arb_device_init(void)
 				continue;
 
 			if (!vga_default_device())
-				pr_info("setting as boot device: PCI:%s\n",
-					pci_name(vgadev->pdev));
+				dev_info(dev, DRV "setting as boot device\n");
 			else if (vgadev->pdev != vga_default_device())
-				pr_info("overriding boot device: PCI:%s\n",
-					pci_name(vgadev->pdev));
+				dev_info(dev, DRV "overriding boot device\n");
 			vga_set_default_device(vgadev->pdev);
 		}
 #endif
 		if (vgadev->bridge_has_one_vga)
-			pr_info("bridge control possible %s\n",
-				pci_name(vgadev->pdev));
+			dev_info(dev, DRV "bridge control possible\n");
 		else
-			pr_info("no bridge control possible %s\n",
-				pci_name(vgadev->pdev));
+			dev_info(dev, DRV "no bridge control possible\n");
 	}
 	return rc;
 }
