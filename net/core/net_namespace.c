@@ -159,6 +159,9 @@ static int alloc_netid(struct net *net, struct net *peer, int reqid)
 		max = reqid + 1;
 	}
 
+	if (!atomic_read(&net->count) || !&atomic_read(peer->count))
+		return -EINVAL;
+
 	return idr_alloc(&net->netns_ids, peer, min, max, GFP_ATOMIC);
 }
 
