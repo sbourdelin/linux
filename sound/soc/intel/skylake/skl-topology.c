@@ -1326,7 +1326,8 @@ skl_tplg_fe_get_cpr_module(struct snd_soc_dai *dai, int stream)
 }
 
 static struct skl_module_cfg *skl_get_mconfig_pb_cpr(
-		struct snd_soc_dai *dai, struct snd_soc_dapm_widget *w)
+		struct snd_soc_dai *dai, struct snd_soc_dapm_widget *w,
+		bool check_power)
 {
 	struct snd_soc_dapm_path *p;
 	struct skl_module_cfg *mconfig = NULL;
@@ -1336,10 +1337,14 @@ static struct skl_module_cfg *skl_get_mconfig_pb_cpr(
 			if (p->connect &&
 				    (p->sink->id == snd_soc_dapm_aif_out) &&
 				    p->source->priv) {
-				mconfig = p->source->priv;
-				return mconfig;
+				if ((check_power && p->sink->power) ||
+				    !check_power) {
+					mconfig = p->source->priv;
+					return mconfig;
+				}
 			}
-			mconfig = skl_get_mconfig_pb_cpr(dai, p->source);
+			mconfig = skl_get_mconfig_pb_cpr(dai, p->source,
+							 check_power);
 			if (mconfig)
 				return mconfig;
 		}
@@ -1348,7 +1353,8 @@ static struct skl_module_cfg *skl_get_mconfig_pb_cpr(
 }
 
 static struct skl_module_cfg *skl_get_mconfig_cap_cpr(
-		struct snd_soc_dai *dai, struct snd_soc_dapm_widget *w)
+		struct snd_soc_dai *dai, struct snd_soc_dapm_widget *w,
+		bool check_power)
 {
 	struct snd_soc_dapm_path *p;
 	struct skl_module_cfg *mconfig = NULL;
@@ -1358,10 +1364,14 @@ static struct skl_module_cfg *skl_get_mconfig_cap_cpr(
 			if (p->connect &&
 				    (p->source->id == snd_soc_dapm_aif_in) &&
 				    p->sink->priv) {
-				mconfig = p->sink->priv;
-				return mconfig;
+				if ((check_power && p->sink->power) ||
+				    !check_power) {
+					mconfig = p->sink->priv;
+					return mconfig;
+				}
 			}
-			mconfig = skl_get_mconfig_cap_cpr(dai, p->sink);
+			mconfig = skl_get_mconfig_cap_cpr(dai, p->sink,
+							  check_power);
 			if (mconfig)
 				return mconfig;
 		}
@@ -1370,17 +1380,17 @@ static struct skl_module_cfg *skl_get_mconfig_cap_cpr(
 }
 
 struct skl_module_cfg *
-skl_tplg_be_get_cpr_module(struct snd_soc_dai *dai, int stream)
+skl_tplg_be_get_cpr_module(struct snd_soc_dai *dai, int stream, bool check_power)
 {
 	struct snd_soc_dapm_widget *w;
 	struct skl_module_cfg *mconfig;
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		w = dai->playback_widget;
-		mconfig = skl_get_mconfig_pb_cpr(dai, w);
+		mconfig = skl_get_mconfig_pb_cpr(dai, w, check_power);
 	} else {
 		w = dai->capture_widget;
-		mconfig = skl_get_mconfig_cap_cpr(dai, w);
+		mconfig = skl_get_mconfig_cap_cpr(dai, w, check_power);
 	}
 	return mconfig;
 }

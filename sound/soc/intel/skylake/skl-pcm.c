@@ -230,7 +230,7 @@ static int skl_be_prepare(struct snd_pcm_substream *substream,
 	if (dai->playback_widget->power || dai->capture_widget->power)
 		return 0;
 
-	mconfig = skl_tplg_be_get_cpr_module(dai, substream->stream);
+	mconfig = skl_tplg_be_get_cpr_module(dai, substream->stream, false);
 	if (mconfig == NULL)
 		return -EINVAL;
 
@@ -485,7 +485,7 @@ static struct skl_module_cfg *get_mconfig_for_be_dai(
 	}
 
 	/* Get Back End Copier Config */
-	return skl_tplg_be_get_cpr_module(cpu_dai_be, substream->stream);
+	return skl_tplg_be_get_cpr_module(cpu_dai_be, substream->stream, true);
 }
 
 struct timestamp_context {
@@ -928,7 +928,7 @@ static int skl_link_pcm_prepare(struct snd_pcm_substream *substream,
 	snd_hdac_ext_link_stream_reset(link_dev);
 
 	/* In case of XRUN recovery, reset the FW pipe to clean state */
-	mconfig = skl_tplg_be_get_cpr_module(dai, substream->stream);
+	mconfig = skl_tplg_be_get_cpr_module(dai, substream->stream, false);
 	if (mconfig && (substream->runtime->status->state ==
 					SNDRV_PCM_STATE_XRUN))
 		skl_reset_pipe(skl->skl_sst, mconfig->pipe);
