@@ -302,10 +302,12 @@ void drm_mm_takedown(struct drm_mm *mm);
 bool drm_mm_clean(struct drm_mm *mm);
 
 struct drm_mm_node *
-drm_mm_interval_first(struct drm_mm *mm, u64 start, u64 last);
+__drm_mm_interval_first(struct drm_mm *mm, u64 start, u64 last);
 
-struct drm_mm_node *
-drm_mm_interval_next(struct drm_mm_node *node, u64 start, u64 last);
+#define drm_mm_for_each_node_in_range(node, mm, start, end)		\
+	for (node = __drm_mm_interval_first((mm), (start), (end)-1);	\
+	     node && node->start < (end);				\
+	     node = list_next_entry(node, node_list))			\
 
 void drm_mm_init_scan(struct drm_mm *mm,
 		      u64 size,
