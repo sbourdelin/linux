@@ -11,9 +11,9 @@
 #include <asm/prctl.h> /* XXX This should get the constants from libc */
 #include <os.h>
 
-long arch_prctl(struct task_struct *task, int code, unsigned long __user *addr)
+long arch_prctl(struct task_struct *task, int code, unsigned long __user *arg2)
 {
-	unsigned long *ptr = addr, tmp;
+	unsigned long *ptr = arg2, tmp;
 	long ret;
 	int pid = task->mm->context.id.u.pid;
 
@@ -63,19 +63,19 @@ long arch_prctl(struct task_struct *task, int code, unsigned long __user *addr)
 		ret = save_registers(pid, &current->thread.regs.regs);
 		break;
 	case ARCH_GET_FS:
-		ret = put_user(tmp, addr);
+		ret = put_user(tmp, arg2);
 		break;
 	case ARCH_GET_GS:
-		ret = put_user(tmp, addr);
+		ret = put_user(tmp, arg2);
 		break;
 	}
 
 	return ret;
 }
 
-SYSCALL_DEFINE2(arch_prctl, int, code, unsigned long, addr)
+SYSCALL_DEFINE2(arch_prctl, int, code, unsigned long, arg2)
 {
-	return arch_prctl(current, code, (unsigned long __user *) addr);
+	return arch_prctl(current, code, (unsigned long __user *) arg2);
 }
 
 void arch_switch_to(struct task_struct *to)
