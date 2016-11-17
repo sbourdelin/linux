@@ -1141,7 +1141,7 @@ int skl_get_timestamp_info(struct skl_sst *ctx,
 
 	/* Fill in message data structure */
 	msg.module_id = m_cfg->id.module_id;
-	msg.instance_id = m_cfg->id.instance_id;
+	msg.instance_id = m_cfg->id.pvt_id;
 	msg.param_data_size = 4; /* Timestamp Init Length = 4 Bytes */
 	msg.large_param_id = 1;
 
