@@ -271,6 +271,7 @@ struct skl_pipe_params {
 	u32 s_freq;
 	u32 s_fmt;
 	u8 linktype;
+	u64 t0_wallclk;
 	int stream;
 };
 

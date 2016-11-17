@@ -21,6 +21,9 @@
 
 #include <linux/pci.h>
 #include <linux/pm_runtime.h>
+#include <linux/delay.h>
+#include <linux/clocksource.h>
+#include <linux/timekeeping.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include "skl.h"
@@ -31,6 +34,7 @@
 #define HDA_MONO 1
 #define HDA_STEREO 2
 #define HDA_QUAD 4
+#define SKL_ADSP_FWREG_PPLBASE     (0x8000 + 0x40)
 
 static struct snd_pcm_hardware azx_pcm_hw = {
 	.info =			(SNDRV_PCM_INFO_MMAP |
@@ -365,6 +369,351 @@ static int skl_be_hw_params(struct snd_pcm_substream *substream,
 	return skl_tplg_be_update_params(dai, &p_params);
 }
 
+static struct snd_soc_dai *skl_get_be_dai(struct snd_soc_pcm_runtime *fe,
+		int stream)
+{
+	struct snd_soc_dpcm *dpcm;
+	struct snd_soc_pcm_runtime *be;
+
+	dpcm = list_first_entry(&fe->dpcm[stream].be_clients,
+			struct snd_soc_dpcm, list_be);
+	if (!dpcm)
+		return NULL;
+	be = dpcm->be;
+
+	return be->cpu_dai;
+}
+
+/*
+ * skl_azx_scale64: Scale base by mult/div while not overflowing sanely
+ *
+ * copied from sound/pci/hda/hda_controller.c
+ *
+ * The tmestamps for a 48Khz stream can overflow after (2^64/10^9)/48K which
+ * is about 384307 ie ~4.5 days.
+ *
+ * This scales the calculation so that overflow will happen but after 2^64 /
+ * 48000 secs, which is pretty large!
+ *
+ * In caln below:
+ *	base may overflow, but since there isn’t any additional division
+ *	performed on base it’s OK
+ *	rem can’t overflow because both are 32-bit values
+ */
+
+static u64 skl_azx_scale64(u64 base, u32 num, u32 den)
+{
+	u64 rem;
+
+	rem = do_div(base, den);
+
+	base *= num;
+	rem *= num;
+
+	do_div(rem, den);
+
+	return base + rem;
+}
+
+/*
+ * Reads start stream offset for the gateway from the fw register. FW
+ * registers store both start stream offset and end stream offset in 4
+ * dwords. First 2 dwords for start stream and 2nd 2 dwords for end stream
+ * offset.
+ */
+static int skl_get_startstreamoffset(struct skl *skl, struct skl_module_cfg *mconfig,
+			struct snd_pcm_substream *ss, u64 *ss_offset_ns)
+{
+	void __iomem *offset_addr, *mmio_base;
+	struct skl_pipe_params *params = mconfig->pipe->p_params;
+	u64 soffset;
+	u32 ssesoffset[4];
+	u8 gtw_id;
+
+	switch (mconfig->dev_type) {
+	case SKL_DEVICE_I2S:
+		gtw_id = mconfig->vbus_id;
+		break;
+	case SKL_DEVICE_DMIC:
+		gtw_id = mconfig->vbus_id;
+		break;
+	case SKL_DEVICE_HDALINK:
+		gtw_id = params->link_dma_id;
+	case SKL_DEVICE_HDAHOST:
+		gtw_id = params->host_dma_id;
+		break;
+	default:
+		return -EINVAL;
+
+	}
+
+	mmio_base = pci_ioremap_bar(skl->pci, 4);
+
+	/* 16 bytes is stored for each gateway */
+	offset_addr = mmio_base + SKL_ADSP_FWREG_PPLBASE + (gtw_id * 16);
+	memcpy_fromio(&ssesoffset, offset_addr, 16);
+
+	/* Only 1st 2 dwords for start stream offset */
+	soffset = (u64) ssesoffset[1] << 32 | ssesoffset[0];
+
+	/*
+	 * Convert into samples with link is transmitting in 32 bit
+	 * container and 2 channel per pipeline.
+	 */
+	soffset = soffset/8;
+
+	skl_azx_scale64(soffset, NSEC_PER_SEC, ss->runtime->rate);
+
+	return 0;
+}
+
+static struct skl_module_cfg *get_mconfig_for_be_dai(
+		struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = snd_pcm_substream_chip(substream);
+	struct snd_soc_dai *cpu_dai_be;
+	
+	cpu_dai_be = skl_get_be_dai(rtd, substream->stream);
+	if (!cpu_dai_be) {
+		dev_err(rtd->cpu_dai->dev, "Back End DAI not found\n");
+		return NULL;
+	}
+
+	/* Get Back End Copier Config */
+	return skl_tplg_be_get_cpr_module(cpu_dai_be, substream->stream);
+}
+
+struct timestamp_context {
+	struct skl *skl;
+	struct snd_pcm_substream *substream;
+	struct skl_module_cfg *m_cfg;
+	struct system_counterval_t sys;
+	ktime_t device_time;
+	struct system_time_snapshot snapshot;
+	u64 wallclk;
+};
+
+static int skl_get_dsp_timestamp(ktime_t *device,
+		struct system_counterval_t *system, void *ctx)
+{
+	u32 array[9];
+	int ret;
+	u64 t_local_sample, t_wallclk, t_tscc;
+	struct timestamp_context *context = ctx;
+	struct snd_pcm_runtime *runtime = context->substream->runtime;
+
+	ret  = skl_get_timestamp_info(context->skl->skl_sst,
+				context->m_cfg, (u32 *)&array);
+	if (ret < 0)
+		return ret;
+
+	t_local_sample = (u64) array[4] << 32 | array[3];
+	t_wallclk = (u64) array[6] << 32 | array[5];
+	t_tscc = (u64) array[8] << 32 | array[7];
+
+	*device = ns_to_ktime(skl_azx_scale64(t_local_sample, NSEC_PER_SEC,
+						runtime->rate));
+	*system = convert_art_to_tsc(t_tscc);
+
+	context->wallclk= skl_azx_scale64(t_wallclk, NSEC_PER_SEC, 24000000);
+
+	return 0;
+}
+
+int skl_get_sync_time( ktime_t *device_time, struct system_counterval_t *sys,
+								void *ctx )
+{
+	struct timestamp_context *ddev = ctx;
+
+	*device_time = ddev->device_time;
+	*sys = ddev->sys;
+
+	return 0;
+}
+
+static int skl_get_crossstamp(struct system_device_crosststamp *xstamp,
+						struct timestamp_context *ctx)
+{
+	int ret;
+
+	ktime_get_snapshot(&ctx->snapshot );
+	ret = skl_get_dsp_timestamp(&ctx->device_time, &ctx->sys, ctx);
+	if (ret < 0)
+		return ret;
+
+	return get_device_system_crosststamp(skl_get_sync_time, ctx,
+						&ctx->snapshot, xstamp);
+}
+
+/*
+ * Read timestamp from firmware and return values in ns for wallclk and
+ * sample counter. For tscc it return correlated system time.
+ */
+static int skl_read_timestamp_info(struct skl_module_cfg *m_cfg,
+			struct snd_pcm_substream *substream,
+			struct system_device_crosststamp *xstamp,
+			struct skl *skl, u64 *wallclk_ns)
+{
+
+
+	int ret;
+	struct timestamp_context context;
+
+	context.skl = skl;
+	context.substream = substream;
+	context.m_cfg = m_cfg;
+
+	ret = skl_get_crossstamp(xstamp, &context);
+	if (ret < 0)
+		return ret;
+
+	*wallclk_ns = context.wallclk;
+
+	return 0;
+}
+
+/* Return tscc in ns and timespec reference */
+static int skl_convert_tscc(struct snd_pcm_substream *substream,
+		struct system_device_crosststamp *xstamp,
+		struct timespec *system_ts, u64 *system_ns)
+{
+	switch (substream->runtime->tstamp_type) {
+	case SNDRV_PCM_TSTAMP_TYPE_MONOTONIC:
+		return -EINVAL;
+
+	case SNDRV_PCM_TSTAMP_TYPE_MONOTONIC_RAW:
+		if (system_ns)
+			*system_ns = ktime_to_ns(xstamp->sys_monoraw);
+		if (system_ts)
+			*system_ts = ktime_to_timespec(xstamp->sys_monoraw);
+		break;
+
+	default:
+		if (system_ns)
+			*system_ns = ktime_to_ns(xstamp->sys_realtime);
+		if (system_ts)
+			*system_ts = ktime_to_timespec(xstamp->sys_realtime);
+		break;
+	}
+
+	return 0;
+}
+
+/*
+ * Reading the timestamp value from the DSP immediately after the DMA start
+ * may not reflect the correct trigger timestamp. So two different
+ * timestamps (T1 and T2) are read with 10ms delay, a ratio is identified to
+ * compute trigger tstamp(T0).
+ */
+static int skl_pcm_trigger_calc_ttime(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = snd_pcm_substream_chip(substream);
+	struct hdac_ext_bus *ebus = get_bus_ctx(substream);
+	struct skl *skl = ebus_to_skl(ebus);
+	struct skl_module_cfg *m_cfg_fe, *m_cfg_be;
+	struct system_device_crosststamp xstamp;
+	u64 t1sample_ns, t1wallclk_ns, t1tscc_ns;
+	u64 t2sample_ns, t2wallclk_ns;
+	u64 t0wallclk_ns;
+	u64 startstreamoffset_ns;
+	u64 ratio, operator1;
+	s64 trigger_value;
+	int ret;
+
+	dev_dbg(rtd->cpu_dai->dev, "In %s: CPU Dai: %s\n", __func__,
+			rtd->cpu_dai->name);
+
+	m_cfg_fe = skl_tplg_fe_get_cpr_module(rtd->cpu_dai, substream->stream);
+	if (!m_cfg_fe) {
+		dev_err(rtd->cpu_dai->dev, "Front End Copier Gateway not found\n");
+		return -EINVAL;
+	}
+
+	/*
+	 * The link may be enabled before the stream start. A snapshot of
+	 * the link counter is taken when dma starts and stored in a stream
+	 * start offset register. This will be used as a reference to
+	 * calculate trigger timestamp.
+	 */
+	ret = skl_get_startstreamoffset(skl, m_cfg_fe, substream, &startstreamoffset_ns);
+	if (ret < 0) {
+		dev_err(rtd->cpu_dai->dev,
+			"Error in getting stream offset for device type=%d\n",
+			m_cfg_fe->dev_type);
+		return -EINVAL;
+	}
+
+	/* Get Back End Copier Config */
+	m_cfg_be = get_mconfig_for_be_dai(substream);
+	if (!m_cfg_be) {
+		dev_err(rtd->cpu_dai->dev, "Back End Copier not found\n");
+		return -EINVAL;
+	}
+
+	/*
+	 * If the fw timestamp values are read immediately after the dma is
+	 * started, there is a possibility that num samples will be less
+	 * than stream start offset and may result in a negative
+	 * calculation. So wait a while before reading the first (T1)
+	 * timestamp values.
+	 */
+	msleep(5);
+
+	/* Read T1 from FW */
+	ret = skl_read_timestamp_info(m_cfg_be, substream, &xstamp,
+					skl, &t1wallclk_ns);
+	if (ret < 0)
+		return ret;
+
+	t1sample_ns = ktime_to_ns(xstamp.device);
+	ret = skl_convert_tscc(substream, &xstamp, NULL, &t1tscc_ns);
+	if (ret < 0)
+		return ret;
+
+	/* Read T2 after 10 ms */
+	msleep(10);
+	ret = skl_read_timestamp_info(m_cfg_be, substream, &xstamp,
+					skl, &t2wallclk_ns);
+	if (ret < 0)
+		return ret;
+	t2sample_ns = ktime_to_ns(xstamp.device);
+
+	/*
+	 * Multiply with 1000000 to include fractional part. Dropped later
+	 * before calculating final value
+	 */
+	ratio = ((t2wallclk_ns - t1wallclk_ns) * 1000000) /
+			(t2sample_ns - t1sample_ns);
+	dev_dbg(rtd->cpu_dai->dev, "ratio: %lld\n", ratio);
+
+	/*
+	 * T0_WallClock = T1_WallClock -
+	 * 	(Ratio * (T1_LLPU_LLPL - StreamStartOffset))
+	 */
+	operator1 =  (ratio * (t1sample_ns - startstreamoffset_ns));
+	operator1 = operator1/1000000;
+
+	t0wallclk_ns = t1wallclk_ns - operator1;
+	dev_dbg(rtd->cpu_dai->dev, "T0 wallclock Value: %lld\n", t0wallclk_ns);
+
+	ret = skl_convert_tscc(substream, &xstamp, NULL, &t1tscc_ns);
+	if (ret < 0)
+		return ret;
+
+	/* Trigger Time = T1_System - (T1_WallClock - T0_WallClock) */
+	trigger_value = t1tscc_ns - (t1wallclk_ns - t0wallclk_ns);
+	substream->runtime->trigger_tstamp = ns_to_timespec64(trigger_value);
+	dev_dbg(rtd->cpu_dai->dev, "Trigger Value: %lld\n", trigger_value);
+
+	/*
+	 * Store t0 wallclock as reference to compute audio timestamp in
+	 * get_time_info callback
+	 */
+	m_cfg_be->pipe->p_params->t0_wallclk = t0wallclk_ns;
+
+	return 0;
+}
+
 static int skl_decoupled_trigger(struct snd_pcm_substream *substream,
 		int cmd)
 {
@@ -422,6 +771,7 @@ static int skl_pcm_trigger(struct snd_pcm_substream *substream, int cmd,
 	struct hdac_ext_stream *stream = get_hdac_ext_stream(substream);
 	struct snd_soc_dapm_widget *w;
 	int ret;
+	int start, ttime;
 
 	mconfig = skl_tplg_fe_get_cpr_module(dai, substream->stream);
 	if (!mconfig)
@@ -447,25 +797,19 @@ static int skl_pcm_trigger(struct snd_pcm_substream *substream, int cmd,
 							stream->dpib);
 			snd_hdac_ext_stream_set_lpib(stream, stream->lpib);
 		}
-
-	case SNDRV_PCM_TRIGGER_START:
-	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		/*
-		 * Start HOST DMA and Start FE Pipe.This is to make sure that
-		 * there are no underrun/overrun in the case when the FE
-		 * pipeline is started but there is a delay in starting the
-		 * DMA channel on the host.
-		 */
-		snd_hdac_ext_stream_decouple(ebus, stream, true);
-		ret = skl_decoupled_trigger(substream, cmd);
-		if (ret < 0)
-			return ret;
-		return skl_run_pipe(ctx, mconfig->pipe);
+		start = 1, ttime = 0;
 		break;
-
+	case SNDRV_PCM_TRIGGER_START:
+		start = ttime = 1;
+		break;
+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+		start = 1;
+		ttime = 0;
+		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_STOP:
+		start = ttime = 0;
 		/*
 		 * Stop FE Pipe first and stop DMA. This is to make sure that
 		 * there are no underrun/overrun in the case if there is a delay
@@ -491,6 +835,29 @@ static int skl_pcm_trigger(struct snd_pcm_substream *substream, int cmd,
 
 	default:
 		return -EINVAL;
+	}
+
+	if (start) {
+		/*
+		 * Start HOST DMA and Start FE Pipe.This is to make sure that
+		 * there are no underrun/overrun in the case when the FE
+		 * pipeline is started but there is a delay in starting the
+		 * DMA channel on the host.
+		 */
+		snd_hdac_ext_stream_decouple(ebus, stream, true);
+		ret = skl_decoupled_trigger(substream, cmd);
+		if (ret < 0)
+			return ret;
+		ret = skl_run_pipe(ctx, mconfig->pipe);
+		if (ret < 0)
+			return ret;
+	}
+
+	if ((ttime) && ((ebus_to_hbus(ebus))->gtscap)) {
+
+		ret = skl_pcm_trigger_calc_ttime(substream);
+		if (ret < 0)
+			return ret;
 	}
 
 	return 0;
