@@ -1551,3 +1551,5 @@ _GLOBAL(return_to_handler)
 	blr
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 #endif /* CONFIG_FUNCTION_TRACER */
+
+_GLOBAL_SYM(__entry_text_end)

@@ -36,11 +36,21 @@
 #include <asm/cacheflush.h>
 #include <asm/sstep.h>
 #include <asm/uaccess.h>
+#include <asm/sections.h>
 
 DEFINE_PER_CPU(struct kprobe *, current_kprobe) = NULL;
 DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
 
 struct kretprobe_blackpoint kretprobe_blacklist[] = {{NULL, NULL}};
+
+bool arch_within_kprobe_blacklist(unsigned long addr)
+{
+	/* The __kprobes marked functions and entry code must not be probed */
+	return (addr >= (unsigned long)__kprobes_text_start &&
+	        addr < (unsigned long)__kprobes_text_end) ||
+	       (addr >= (unsigned long)_stext &&
+		addr < (unsigned long)__entry_text_end);
+}
 
 int __kprobes arch_prepare_kprobe(struct kprobe *p)
 {
