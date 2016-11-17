@@ -26,6 +26,7 @@
 #include "debug.h"
 #include "hif.h"
 #include "wmi-ops.h"
+#include "mac.h"
 
 /* ms */
 #define ATH10K_DEBUG_HTT_STATS_INTERVAL 1000
@@ -2142,7 +2143,6 @@ static ssize_t ath10k_write_btcoex(struct file *file,
 	size_t buf_size;
 	int ret;
 	bool val;
-	u32 pdev_param;
 
 	buf_size = min(count, (sizeof(buf) - 1));
 	if (copy_from_user(buf, ubuf, buf_size))
@@ -2154,40 +2154,9 @@ static ssize_t ath10k_write_btcoex(struct file *file,
 		return -EINVAL;
 
 	mutex_lock(&ar->conf_mutex);
-
-	if (ar->state != ATH10K_STATE_ON &&
-	    ar->state != ATH10K_STATE_RESTARTED) {
-		ret = -ENETDOWN;
-		goto exit;
-	}
-
-	if (!(test_bit(ATH10K_FLAG_BTCOEX, &ar->dev_flags) ^ val)) {
+	ret = ath10k_mac_set_btcoex(ar, val);
+	if (!ret)
 		ret = count;
-		goto exit;
-	}
-
-	pdev_param = ar->wmi.pdev_param->enable_btcoex;
-	if (test_bit(ATH10K_FW_FEATURE_BTCOEX_PARAM,
-		     ar->running_fw->fw_file.fw_features)) {
-		ret = ath10k_wmi_pdev_set_param(ar, pdev_param, val);
-		if (ret) {
-			ath10k_warn(ar, "failed to enable btcoex: %d\n", ret);
-			ret = count;
-			goto exit;
-		}
-	} else {
-		ath10k_info(ar, "restarting firmware due to btcoex change");
-		queue_work(ar->workqueue, &ar->restart_work);
-	}
-
-	if (val)
-		set_bit(ATH10K_FLAG_BTCOEX, &ar->dev_flags);
-	else
-		clear_bit(ATH10K_FLAG_BTCOEX, &ar->dev_flags);
-
-	ret = count;
-
-exit:
 	mutex_unlock(&ar->conf_mutex);
 
 	return ret;
