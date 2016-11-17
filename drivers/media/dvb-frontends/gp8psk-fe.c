@@ -395,3 +395,5 @@ static struct dvb_frontend_ops gp8psk_fe_ops = {
 	.dishnetwork_send_legacy_command = gp8psk_fe_send_legacy_dish_cmd,
 	.enable_high_lnb_voltage = gp8psk_fe_enable_high_lnb_voltage
 };
+
+MODULE_LICENSE("GPL v2");
