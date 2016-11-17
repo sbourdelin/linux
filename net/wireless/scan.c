@@ -327,7 +327,7 @@ int __cfg80211_stop_sched_scan(struct cfg80211_registered_device *rdev,
 			return err;
 	}
 
-	nl80211_send_sched_scan(rdev, dev, NL80211_CMD_SCHED_SCAN_STOPPED);
+	nl80211_send_scan_event(rdev, dev, NL80211_CMD_SCHED_SCAN_STOPPED);
 
 	RCU_INIT_POINTER(rdev->sched_scan_req, NULL);
 	kfree_rcu(sched_scan_req, rcu_head);
@@ -1108,7 +1108,7 @@ cfg80211_inform_bss_frame_data(struct wiphy *wiphy,
 	else
 		rcu_assign_pointer(tmp.pub.beacon_ies, ies);
 	rcu_assign_pointer(tmp.pub.ies, ies);
-	
+
 	memcpy(tmp.pub.bssid, mgmt->bssid, ETH_ALEN);
 	tmp.pub.channel = channel;
 	tmp.pub.scan_width = data->scan_width;

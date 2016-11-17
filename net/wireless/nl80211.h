@@ -16,7 +16,7 @@ struct sk_buff *nl80211_build_scan_msg(struct cfg80211_registered_device *rdev,
 				       struct wireless_dev *wdev, bool aborted);
 void nl80211_send_scan_result(struct cfg80211_registered_device *rdev,
 			      struct sk_buff *msg);
-void nl80211_send_sched_scan(struct cfg80211_registered_device *rdev,
+void nl80211_send_scan_event(struct cfg80211_registered_device *rdev,
 			     struct net_device *netdev, u32 cmd);
 void nl80211_send_sched_scan_results(struct cfg80211_registered_device *rdev,
 				     struct net_device *netdev);
