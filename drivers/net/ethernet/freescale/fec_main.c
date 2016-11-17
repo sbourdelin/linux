@@ -1604,6 +1604,34 @@ fec_enet_interrupt(int irq, void *dev_id)
 	return ret;
 }
 
+static inline bool
+fec_enet_recover_rxq(struct fec_enet_private *fep, u16 queue_id)
+{
+	int work_bit = (queue_id == 0) ? 2 : ((queue_id == 1) ? 0 : 1);
+
+	if (readl(fep->rx_queue[queue_id]->bd.reg_desc_active))
+		return false;
+
+	dev_notice_once(&fep->pdev->dev, "Recovered rx queue\n");
+
+	fep->work_rx |= 1 << work_bit;
+
+	return true;
+}
+
+static inline bool fec_enet_recover_rxqs(struct fec_enet_private *fep)
+{
+	unsigned int q;
+	bool ret = false;
+
+	for (q = 0; q < fep->num_rx_queues; q++) {
+		if (fec_enet_recover_rxq(fep, q))
+			ret = true;
+	}
+
+	return ret;
+}
+
 static int fec_enet_rx_napi(struct napi_struct *napi, int budget)
 {
 	struct net_device *ndev = napi->dev;
@@ -1617,6 +1645,9 @@ static int fec_enet_rx_napi(struct napi_struct *napi, int budget)
 	if (pkts < budget) {
 		napi_complete(napi);
 		writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
+
+		if (fec_enet_recover_rxqs(fep) && napi_reschedule(napi))
+			writel(FEC_NAPI_IMASK, fep->hwp + FEC_IMASK);
 	}
 	return pkts;
 }
