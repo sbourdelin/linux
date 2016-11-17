@@ -266,7 +266,10 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
 
 	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
 					dma->tx_dma_phys,
-					DSPI_DMA_BUFSIZE, DMA_MEM_TO_DEV,
+					dma->curr_xfer_len *
+					DMA_SLAVE_BUSWIDTH_4_BYTES /
+					(tx_word ? 2 : 1),
+					DMA_MEM_TO_DEV,
 					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
 	if (!dma->tx_desc) {
 		dev_err(dev, "Not able to get desc for DMA xfer\n");
@@ -282,7 +285,10 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
 
 	dma->rx_desc = dmaengine_prep_slave_single(dma->chan_rx,
 					dma->rx_dma_phys,
-					DSPI_DMA_BUFSIZE, DMA_DEV_TO_MEM,
+					dma->curr_xfer_len *
+					DMA_SLAVE_BUSWIDTH_4_BYTES /
+					(tx_word ? 2 : 1),
+					DMA_DEV_TO_MEM,
 					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
 	if (!dma->rx_desc) {
 		dev_err(dev, "Not able to get desc for DMA xfer\n");
