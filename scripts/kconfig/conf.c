@@ -447,6 +447,46 @@ static void check_conf(struct menu *menu)
 		check_conf(child);
 }
 
+static void check_selects(struct menu *menu)
+{
+	struct symbol *sym, *sel;
+	struct property *prop;
+
+	while (menu) {
+		sym = menu->sym;
+
+		if (sym && !sym_is_choice(sym) &&
+		    sym->type != S_UNKNOWN &&
+		    sym_get_tristate_value(sym) != no &&
+		    sym->flags & SYMBOL_WRITE) {
+			for_all_properties(sym, prop, P_SELECT) {
+				sel = prop->expr->left.sym;
+				if (sel->type == S_UNKNOWN &&
+				    expr_calc_value(prop->visible.expr) != no) {
+					fprintf(stderr, "%s:%d:warning: ",
+						prop->file->name,
+						prop->lineno);
+					fprintf(stderr,
+						"'%s' selects unknown symbol '%s'\n",
+						sym->name,
+						sel->name);
+				}
+			}
+		}
+
+		if (menu->list) {
+			menu = menu->list;
+		} else if (menu->next) {
+			menu = menu->next;
+		} else while ((menu = menu->parent)) {
+			if (menu->next) {
+				menu = menu->next;
+				break;
+			}
+		}
+	}
+}
+
 static struct option long_opts[] = {
 	{"oldaskconfig",    no_argument,       NULL, oldaskconfig},
 	{"oldconfig",       no_argument,       NULL, oldconfig},
@@ -685,6 +725,8 @@ int main(int ac, char **av)
 			  input_mode != olddefconfig));
 		break;
 	}
+
+	check_selects(rootmenu.list);
 
 	if (sync_kconfig) {
 		/* silentoldconfig is used during the build so we shall update autoconf.
