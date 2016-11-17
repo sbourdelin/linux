@@ -3651,6 +3651,10 @@ enum nl80211_bss_scan_width {
  *	@NL80211_BSS_PARENT_BSSID. (u64).
  * @NL80211_BSS_PARENT_BSSID: the BSS according to which @NL80211_BSS_PARENT_TSF
  *	is set.
+ * @NL80211_BSS_DISTANCE: distance to AP with @NL80211_BSS_PARENT_BSSID in
+ *	centimeters (u32).
+ * @NL80211_BSS_VARIANCE_DISTANCE: variance of @NL80211_BSS_DISTANCE value (u32).
+ *
  * @__NL80211_BSS_AFTER_LAST: internal
  * @NL80211_BSS_MAX: highest BSS attribute
  */
@@ -3674,6 +3678,8 @@ enum nl80211_bss {
 	NL80211_BSS_PAD,
 	NL80211_BSS_PARENT_TSF,
 	NL80211_BSS_PARENT_BSSID,
+	NL80211_BSS_DISTANCE,
+	NL80211_BSS_VARIANCE_DISTANCE,
 
 	/* keep last */
 	__NL80211_BSS_AFTER_LAST,

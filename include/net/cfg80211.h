@@ -1675,6 +1675,9 @@ enum cfg80211_signal_type {
  * @scan_width: scan width that was used
  * @signal: signal strength value, according to the wiphy's
  *	signal type
+ * @distance: distance to AP with %parent_bssid in centimeters. Zero
+ *	value indicates this is undetermined.
+ * @var_distance: variance of %distance indicating accurracy.
  * @boottime_ns: timestamp (CLOCK_BOOTTIME) when the information was
  *	received; should match the time when the frame was actually
  *	received by the device (not just by the host, in case it was
@@ -1691,6 +1694,8 @@ struct cfg80211_inform_bss {
 	struct ieee80211_channel *chan;
 	enum nl80211_bss_scan_width scan_width;
 	s32 signal;
+	u32 distance;
+	u32 var_distance;
 	u64 boottime_ns;
 	u64 parent_tsf;
 	u8 parent_bssid[ETH_ALEN] __aligned(2);
@@ -1737,6 +1742,9 @@ struct cfg80211_bss_ies {
  *	that holds the beacon data. @beacon_ies is still valid, of course, and
  *	points to the same data as hidden_beacon_bss->beacon_ies in that case.
  * @signal: signal strength value (type depends on the wiphy's signal_type)
+ * @distance: distance to AP with %parent_bssid in centimeters. Zero
+ *	value indicates this is undetermined.
+ * @var_distance: variance of %distance indicating accurracy.
  * @priv: private area for driver use, has at least wiphy->bss_priv_size bytes
  */
 struct cfg80211_bss {
@@ -1755,6 +1763,9 @@ struct cfg80211_bss {
 	u16 capability;
 
 	u8 bssid[ETH_ALEN];
+
+	u32 distance;
+	u32 var_distance;
 
 	u8 priv[0] __aligned(sizeof(void *));
 };
