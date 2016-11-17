@@ -271,4 +271,10 @@ int iio_read_channel_scale(struct iio_channel *chan, int *val,
 int iio_convert_raw_to_processed(struct iio_channel *chan, int raw,
 	int *processed, unsigned int scale);
 
+int iio_get_channel_ext_info_count(struct iio_channel *chan);
+ssize_t iio_read_channel_ext_info(struct iio_channel *chan,
+				  const char *attr, char *buf);
+ssize_t iio_write_channel_ext_info(struct iio_channel *chan, const char *attr,
+				   const char *buf, size_t len);
+
 #endif
