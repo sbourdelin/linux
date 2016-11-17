@@ -13297,6 +13297,25 @@ void nl80211_send_sched_scan_results(struct cfg80211_registered_device *rdev,
 				NL80211_MCGRP_SCAN, GFP_KERNEL);
 }
 
+void nl80211_send_gscan_results(struct cfg80211_registered_device *rdev,
+				struct net_device *netdev)
+{
+	struct sk_buff *msg;
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg)
+		return;
+
+	if (nl80211_send_scan_event_msg(msg, rdev, netdev, 0, 0, 0,
+					NL80211_CMD_GSCAN_RESULTS) < 0) {
+		nlmsg_free(msg);
+		return;
+	}
+
+	genlmsg_multicast_netns(&nl80211_fam, wiphy_net(&rdev->wiphy), msg, 0,
+				NL80211_MCGRP_SCAN, GFP_KERNEL);
+}
+
 void nl80211_send_scan_event(struct cfg80211_registered_device *rdev,
 			     struct net_device *netdev, u32 cmd)
 {

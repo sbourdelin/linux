@@ -78,6 +78,7 @@ struct cfg80211_registered_device {
 	unsigned long suspend_at;
 	struct work_struct scan_done_wk;
 	struct work_struct sched_scan_results_wk;
+	struct work_struct gscan_results_wk;
 
 	struct genl_info *cur_cmd_info;
 
@@ -423,6 +424,7 @@ void ___cfg80211_scan_done(struct cfg80211_registered_device *rdev,
 void __cfg80211_sched_scan_results(struct work_struct *wk);
 int __cfg80211_stop_sched_scan(struct cfg80211_registered_device *rdev,
 			       bool driver_initiated);
+void __cfg80211_gscan_results(struct work_struct *wk);
 int __cfg80211_stop_gscan(struct cfg80211_registered_device *rdev,
 			  bool driver_initiated);
 void cfg80211_upload_connect_keys(struct wireless_dev *wdev);

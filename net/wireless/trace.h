@@ -2799,6 +2799,16 @@ DEFINE_EVENT(wiphy_only_evt, cfg80211_sched_scan_stopped,
 	TP_ARGS(wiphy)
 );
 
+DEFINE_EVENT(wiphy_only_evt, cfg80211_gscan_results,
+	TP_PROTO(struct wiphy *wiphy),
+	TP_ARGS(wiphy)
+);
+
+DEFINE_EVENT(wiphy_only_evt, cfg80211_gscan_stopped,
+	TP_PROTO(struct wiphy *wiphy),
+	TP_ARGS(wiphy)
+);
+
 TRACE_EVENT(cfg80211_get_bss,
 	TP_PROTO(struct wiphy *wiphy, struct ieee80211_channel *channel,
 		 const u8 *bssid, const u8 *ssid, size_t ssid_len,

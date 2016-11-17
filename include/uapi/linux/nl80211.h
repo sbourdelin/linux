@@ -896,6 +896,7 @@
  *
  * @NL80211_CMD_START_GSCAN: start GScan.
  * @NL80211_CMD_STOP_GSCAN: request to stop current GScan.
+ * @NL80211_CMD_GSCAN_RESULTS: indicates that there GScan results available.
  * @NL80211_CMD_GSCAN_STOPPED: indicates that the currently running GScan
  *	has stopped. This event is generated upon @NL80211_CMD_STOP_GSCAN and
  *	the driver may issue this event at any time when a GScan is running.
@@ -1101,6 +1102,7 @@ enum nl80211_commands {
 
 	NL80211_CMD_START_GSCAN,
 	NL80211_CMD_STOP_GSCAN,
+	NL80211_CMD_GSCAN_RESULTS,
 	NL80211_CMD_GSCAN_STOPPED,
 
 	/* add new commands above here */
