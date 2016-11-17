@@ -1,0 +1,28 @@
+* Device tree bindings for the Aspeed LPC Controller
+
+The Aspeed LPC controller contains registers for a variety of functions. Not
+all registers for a function are contiguous, and some registers are referenced
+by functions outside the LPC controller.
+
+Note that this is separate from the H8S/2168 compatible register set occupying
+the start of the LPC controller address space.
+
+Some significant functions in the LPC controller:
+
+* LPC Host Controller
+* Host Interface Controller
+* iBT Controller
+* SuperIO Scratch registers
+
+Required properties:
+- compatible:		"aspeed,ast2500-lpc", "syscon"
+- reg:			contains offset/length value of the Aspeed-specific LPC
+			memory region.
+
+Example:
+
+lpc: lpc@1e7890a0 {
+	compatible = "aspeed,ast2500-lpc", "syscon";
+	reg = <0x1e789080 0x1e0>;
+};
+
