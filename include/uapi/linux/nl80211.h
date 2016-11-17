@@ -1977,6 +1977,9 @@ enum nl80211_commands {
  * @NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED: Indicates whether or not multicast
  *	packets should be send out as unicast to all stations (flag attribute).
  *
+ * @NL80211_ATTR_GSCAN_CAPS: indicating capabilities of GScan functionality
+ *	of the device. This is a nested attribute.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2380,6 +2383,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_FILS_NONCES,
 
 	NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED,
+
+	NL80211_ATTR_GSCAN_CAPS,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -5186,6 +5191,59 @@ enum nl80211_nan_match_attributes {
 	/* keep last */
 	NUM_NL80211_NAN_MATCH_ATTR,
 	NL80211_NAN_MATCH_ATTR_MAX = NUM_NL80211_NAN_MATCH_ATTR - 1
+};
+
+/**
+ * enum nl80211_gscan_caps_attr - GScan capabilities attributes.
+ *
+ * @__NL80211_GSCAN_CAPS_ATTR_INVALID: reserved.
+ * @NL80211_GSCAN_CAPS_ATTR_MAX_SCAN_CACHE_SIZE: total space allocated for
+ *	scan results (in bytes).
+ * @NL80211_GSCAN_CAPS_ATTR_MAX_SCAN_BUCKETS: maximum number of channel buckets.
+ * @NL80211_GSCAN_CAPS_ATTR_MAX_AP_CACHE_PER_SCAN: maximum number of APs that
+ *	can be stored per scan.
+ * @NL80211_GSCAN_CAPS_ATTR_MAX_RSSI_SAMPLE_SIZE:  number of RSSI samples used
+ *	for averaging RSSI.
+ * @NL80211_GSCAN_CAPS_ATTR_MAX_SCAN_REPORTING_THRESHOLD: max possible report
+ *	threshold. in percentage.
+ * @NL80211_GSCAN_CAPS_ATTR_MAX_HOTLIST_BSSID: maximum number of entries for
+ *	hotlist BSSIDs.
+ * @NL80211_GSCAN_CAPS_ATTR_MAX_HOTLIST_SSID: maximum number of entries for
+ *	hotlist SSIDs.
+ * @NL80211_GSCAN_CAPS_ATTR_MAX_SIGNIFICANT_WIFI_CHANGE_APS: maximum number of
+ *	entries for significant change APs.
+ * @NL80211_GSCAN_CAPS_ATTR_MAX_BSSID_HISTORY: number of BSSID/RSSI entries that
+ *	device can hold.
+ * @NL80211_GSCAN_CAPS_ATTR_MAX_EPNO_HASHED_NETWORKS: max number of hashed epno
+ *	entries.
+ * @NL80211_GSCAN_CAPS_ATTR_MAX_EPNO_EXACT_NETWORKS: max number of epno entries
+ *	for which an exact match of SSID is required or which are hidded SSIDs.
+ * @NL80211_GSCAN_CAPS_ATTR_MAX_WHITE_LIST_SSID: max number of white listed
+ *	SSIDs.
+ * @NL80211_GSCAN_CAPS_ATTR_MAX: highest GScan capability attribute.
+ *
+ * @__NL80211_GSCAN_CAPS_ATTR_AFTER_LAST: internal use.
+ *
+ * All attributes are u32 type.
+ */
+enum nl80211_gscan_caps_attr {
+	__NL80211_GSCAN_CAPS_ATTR_INVALID,
+	NL80211_GSCAN_CAPS_ATTR_MAX_SCAN_CACHE_SIZE,
+	NL80211_GSCAN_CAPS_ATTR_MAX_SCAN_BUCKETS,
+	NL80211_GSCAN_CAPS_ATTR_MAX_AP_CACHE_PER_SCAN,
+	NL80211_GSCAN_CAPS_ATTR_MAX_RSSI_SAMPLE_SIZE,
+	NL80211_GSCAN_CAPS_ATTR_MAX_SCAN_REPORTING_THRESHOLD,
+	NL80211_GSCAN_CAPS_ATTR_MAX_HOTLIST_BSSID,
+	NL80211_GSCAN_CAPS_ATTR_MAX_HOTLIST_SSID,
+	NL80211_GSCAN_CAPS_ATTR_MAX_SIGNIFICANT_WIFI_CHANGE_APS,
+	NL80211_GSCAN_CAPS_ATTR_MAX_BSSID_HISTORY,
+	NL80211_GSCAN_CAPS_ATTR_MAX_EPNO_HASHED_NETWORKS,
+	NL80211_GSCAN_CAPS_ATTR_MAX_EPNO_EXACT_NETWORKS,
+	NL80211_GSCAN_CAPS_ATTR_MAX_WHITE_LIST_SSID,
+
+	/* keep last */
+	__NL80211_GSCAN_CAPS_ATTR_AFTER_LAST,
+	NL80211_GSCAN_CAPS_ATTR_MAX = __NL80211_GSCAN_CAPS_ATTR_AFTER_LAST - 1
 };
 
 #endif /* __LINUX_NL80211_H */

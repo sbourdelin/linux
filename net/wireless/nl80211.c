@@ -1423,9 +1423,10 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 	void *hdr;
 	struct nlattr *nl_bands, *nl_band;
 	struct nlattr *nl_freqs, *nl_freq;
-	struct nlattr *nl_cmds;
+	struct nlattr *nl_cmds, *nl_gscan;
 	enum nl80211_band band;
 	struct ieee80211_channel *chan;
+	const struct wiphy_gscan_caps *gscan;
 	int i;
 	const struct ieee80211_txrx_stypes *mgmt_stypes =
 				rdev->wiphy.mgmt_stypes;
@@ -1879,6 +1880,48 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 				break;
 			}
 		}
+
+		state->split_start++;
+		break;
+	case 14:
+		if (!rdev->wiphy.gscan) {
+			/* done */
+			state->split_start = 0;
+			break;
+		}
+		gscan = rdev->wiphy.gscan;
+		nl_gscan = nla_nest_start(msg, NL80211_ATTR_GSCAN_CAPS);
+		if (!nl_gscan ||
+		    nla_put_u32(msg, NL80211_GSCAN_CAPS_ATTR_MAX_SCAN_CACHE_SIZE,
+				gscan->max_scan_cache_size) ||
+		    nla_put_u32(msg, NL80211_GSCAN_CAPS_ATTR_MAX_SCAN_BUCKETS,
+				gscan->max_scan_buckets) ||
+		    nla_put_u32(msg, NL80211_GSCAN_CAPS_ATTR_MAX_AP_CACHE_PER_SCAN,
+				gscan->max_ap_cache_per_scan) ||
+		    nla_put_u32(msg, NL80211_GSCAN_CAPS_ATTR_MAX_RSSI_SAMPLE_SIZE,
+				gscan->max_rssi_sample_size) ||
+		    nla_put_u32(msg,
+				NL80211_GSCAN_CAPS_ATTR_MAX_SCAN_REPORTING_THRESHOLD,
+				gscan->max_scan_reporting_threshold) ||
+		    nla_put_u32(msg, NL80211_GSCAN_CAPS_ATTR_MAX_HOTLIST_BSSID,
+				gscan->max_hotlist_bssids) ||
+		    nla_put_u32(msg, NL80211_GSCAN_CAPS_ATTR_MAX_HOTLIST_SSID,
+				gscan->max_hotlist_ssids) ||
+		    nla_put_u32(msg,
+				NL80211_GSCAN_CAPS_ATTR_MAX_SIGNIFICANT_WIFI_CHANGE_APS,
+				gscan->max_significant_wifi_change_aps) ||
+		    nla_put_u32(msg, NL80211_GSCAN_CAPS_ATTR_MAX_BSSID_HISTORY,
+				gscan->max_bssid_history_entries) ||
+		    nla_put_u32(msg,
+				NL80211_GSCAN_CAPS_ATTR_MAX_EPNO_HASHED_NETWORKS,
+				gscan->max_epno_hashed_networks) ||
+		    nla_put_u32(msg,
+				NL80211_GSCAN_CAPS_ATTR_MAX_EPNO_EXACT_NETWORKS,
+				gscan->max_epno_exact_networks) ||
+		    nla_put_u32(msg, NL80211_GSCAN_CAPS_ATTR_MAX_WHITE_LIST_SSID,
+				gscan->max_white_list_ssid))
+			goto nla_put_failure;
+		nla_nest_end(msg, nl_gscan);
 
 		/* done */
 		state->split_start = 0;

@@ -3372,6 +3372,40 @@ struct wiphy_iftype_ext_capab {
 };
 
 /**
+ * struct wiphy_gscan_caps -  gscan capabilities of the device.
+ *
+ * @max_scan_cache_size: total space allocated for scan results (in bytes).
+ * @max_scan_buckets: maximum number of channel buckets.
+ * @max_ap_cache_per_scan: maximum number of APs that can be stored per scan.
+ * @max_rssi_sample_size: number of RSSI samples used for averaging RSSI.
+ * @max_scan_reporting_threshold: max possible report threshold. in percentage.
+ * @max_hotlist_bssids: maximum number of entries for hotlist BSSIDs.
+ * @max_hotlist_ssids: maximum number of entries for hotlist SSIDs.
+ * @max_significant_wifi_change_aps: maximum number of entries for significant
+ *	change APs.
+ * @max_bssid_history_entries: number of BSSID/RSSI entries that device can
+ *	hold.
+ * @max_epno_networks: max number of hashed epno entries.
+ * @max_epno_networks_by_ssid: max number of epno entries for which an
+ *	exact match of SSID is required or which are hidded SSIDs.
+ * @max_white_list_ssid: max number of white listed SSIDs.
+ */
+struct wiphy_gscan_caps {
+	u32 max_scan_cache_size;
+	u32 max_scan_buckets;
+	u32 max_ap_cache_per_scan;
+	u32 max_rssi_sample_size;
+	u32 max_scan_reporting_threshold;
+	u32 max_hotlist_bssids;
+	u32 max_hotlist_ssids;
+	u32 max_significant_wifi_change_aps;
+	u32 max_bssid_history_entries;
+	u32 max_epno_hashed_networks;
+	u32 max_epno_exact_networks;
+	u32 max_white_list_ssid;
+};
+
+/**
  * struct wiphy - wireless hardware description
  * @reg_notifier: the driver's regulatory notification callback,
  *	note that if your driver uses wiphy_apply_custom_regulatory()
@@ -3524,6 +3558,7 @@ struct wiphy_iftype_ext_capab {
  * @bss_select_support: bitmask indicating the BSS selection criteria supported
  *	by the driver in the .connect() callback. The bit position maps to the
  *	attribute indices defined in &enum nl80211_bss_select_attr.
+ * @gscan: structure holding the hardware capabilities for gscan.
  *
  * @cookie_counter: unique generic cookie counter, used to identify objects.
  */
@@ -3654,6 +3689,7 @@ struct wiphy {
 	u8 max_adj_channel_rssi_comp;
 
 	u32 bss_select_support;
+	const struct wiphy_gscan_caps *gscan;
 
 	u64 cookie_counter;
 
