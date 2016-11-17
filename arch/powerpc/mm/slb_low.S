@@ -30,7 +30,7 @@
  *	r9, r10, r11 are clobbered by this function
  * No other registers are examined or changed.
  */
-_GLOBAL(slb_allocate_realmode)
+_GLOBAL_NOKPROBE(slb_allocate_realmode)
 	/*
 	 * check for bad kernel/user address
 	 * (ea & ~REGION_MASK) >= PGTABLE_RANGE
@@ -59,7 +59,7 @@ _GLOBAL(slb_allocate_realmode)
 	/* Linear mapping encoding bits, the "li" instruction below will
 	 * be patched by the kernel at boot
 	 */
-_GLOBAL_SYM(slb_miss_kernel_load_linear)
+_GLOBAL_SYM_NOKPROBE(slb_miss_kernel_load_linear)
 	li	r11,0
 	/*
 	 * context = (MAX_USER_CONTEXT) + ((ea >> 60) - 0xc) + 1
@@ -79,7 +79,7 @@ END_MMU_FTR_SECTION_IFCLR(MMU_FTR_1T_SEGMENT)
 	/* Check virtual memmap region. To be patches at kernel boot */
 	cmpldi	cr0,r9,0xf
 	bne	1f
-_GLOBAL_SYM(slb_miss_kernel_load_vmemmap)
+_GLOBAL_SYM_NOKPROBE(slb_miss_kernel_load_vmemmap)
 	li	r11,0
 	b	6f
 1:
@@ -95,7 +95,7 @@ _GLOBAL_SYM(slb_miss_kernel_load_vmemmap)
 	b	6f
 5:
 	/* IO mapping */
-_GLOBAL_SYM(slb_miss_kernel_load_io)
+_GLOBAL_SYM_NOKPROBE(slb_miss_kernel_load_io)
 	li	r11,0
 6:
 	/*
@@ -203,7 +203,7 @@ END_MMU_FTR_SECTION_IFSET(MMU_FTR_1T_SEGMENT)
 7:	ld	r10,PACASTABRR(r13)
 	addi	r10,r10,1
 	/* This gets soft patched on boot. */
-_GLOBAL_SYM(slb_compare_rr_to_size)
+_GLOBAL_SYM_NOKPROBE(slb_compare_rr_to_size)
 	cmpldi	r10,0
 
 	blt+	4f
