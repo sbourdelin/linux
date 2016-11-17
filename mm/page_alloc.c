@@ -822,7 +822,8 @@ continue_merging:
 			clear_page_guard(zone, buddy, order, migratetype);
 		} else {
 			list_del(&buddy->lru);
-			zone->free_area[order].nr_free--;
+			zone->free_area[order].nr_free[migratetype]--;
+			zone->free_area[order].total_free--;
 			rmv_page_order(buddy);
 		}
 		combined_idx = buddy_idx & page_idx;
@@ -881,7 +882,8 @@ done_merging:
 
 	list_add(&page->lru, &zone->free_area[order].free_list[migratetype]);
 out:
-	zone->free_area[order].nr_free++;
+	zone->free_area[order].nr_free[migratetype]++;
+	zone->free_area[order].total_free++;
 }
 
 /*
@@ -1669,7 +1671,8 @@ static inline void expand(struct zone *zone, struct page *page,
 			continue;
 
 		list_add(&page[size].lru, &area->free_list[migratetype]);
-		area->nr_free++;
+		area->nr_free[migratetype]++;
+		area->total_free++;
 		set_page_order(&page[size], high);
 	}
 }
@@ -1823,7 +1826,8 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 			continue;
 		list_del(&page->lru);
 		rmv_page_order(page);
-		area->nr_free--;
+		area->nr_free[migratetype]--;
+		area->total_free--;
 		expand(zone, page, order, current_order, area, migratetype);
 		set_pcppage_migratetype(page, migratetype);
 		return page;
@@ -2012,7 +2016,7 @@ int find_suitable_fallback(struct free_area *area, unsigned int order,
 	int i;
 	int fallback_mt;
 
-	if (area->nr_free == 0)
+	if (!area->total_free)
 		return -1;
 
 	*can_steal = false;
@@ -2021,7 +2025,7 @@ int find_suitable_fallback(struct free_area *area, unsigned int order,
 		if (fallback_mt == MIGRATE_TYPES)
 			break;
 
-		if (list_empty(&area->free_list[fallback_mt]))
+		if (!area->nr_free[fallback_mt])
 			continue;
 
 		if (can_steal_fallback(order, migratetype))
@@ -2184,7 +2188,8 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 			steal_suitable_fallback(zone, page, start_migratetype);
 
 		/* Remove the page from the freelists */
-		area->nr_free--;
+		area->nr_free[fallback_mt]--;
+		area->total_free--;
 		list_del(&page->lru);
 		rmv_page_order(page);
 
@@ -2570,7 +2575,8 @@ int __isolate_free_page(struct page *page, unsigned int order)
 
 	/* Remove page from free list */
 	list_del(&page->lru);
-	zone->free_area[order].nr_free--;
+	zone->free_area[order].nr_free[mt]--;
+	zone->free_area[order].total_free--;
 	rmv_page_order(page);
 
 	/*
@@ -2829,22 +2835,19 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 		struct free_area *area = &z->free_area[o];
 		int mt;
 
-		if (!area->nr_free)
+		if (!area->total_free)
 			continue;
 
 		if (alloc_harder)
 			return true;
 
-		for (mt = 0; mt < MIGRATE_PCPTYPES; mt++) {
-			if (!list_empty(&area->free_list[mt]))
+		for (mt = 0; mt < MIGRATE_PCPTYPES; mt++)
+			if (area->nr_free[mt])
 				return true;
-		}
 
 #ifdef CONFIG_CMA
-		if ((alloc_flags & ALLOC_CMA) &&
-		    !list_empty(&area->free_list[MIGRATE_CMA])) {
+		if ((alloc_flags & ALLOC_CMA) && area->nr_free[MIGRATE_CMA])
 			return true;
-		}
 #endif
 	}
 	return false;
@@ -4452,12 +4455,12 @@ void show_free_areas(unsigned int filter)
 			struct free_area *area = &zone->free_area[order];
 			int type;
 
-			nr[order] = area->nr_free;
+			nr[order] = area->total_free;
 			total += nr[order] << order;
 
 			types[order] = 0;
 			for (type = 0; type < MIGRATE_TYPES; type++) {
-				if (!list_empty(&area->free_list[type]))
+				if (area->nr_free[type])
 					types[order] |= 1 << type;
 			}
 		}
@@ -5121,8 +5124,10 @@ static void __meminit zone_init_free_lists(struct zone *zone)
 	unsigned int order, t;
 	for_each_migratetype_order(order, t) {
 		INIT_LIST_HEAD(&zone->free_area[order].free_list[t]);
-		zone->free_area[order].nr_free = 0;
+		zone->free_area[order].nr_free[t] = 0;
 	}
+	for (order = 0; order < MAX_ORDER; order++)
+		zone->free_area[order].total_free = 0;
 }
 
 #ifndef __HAVE_ARCH_MEMMAP_INIT
@@ -7441,6 +7446,8 @@ __offline_isolated_pages(unsigned long start_pfn, unsigned long end_pfn)
 	spin_lock_irqsave(&zone->lock, flags);
 	pfn = start_pfn;
 	while (pfn < end_pfn) {
+		int migratetype;
+
 		if (!pfn_valid(pfn)) {
 			pfn++;
 			continue;
@@ -7463,9 +7470,11 @@ __offline_isolated_pages(unsigned long start_pfn, unsigned long end_pfn)
 		pr_info("remove from free list %lx %d %lx\n",
 			pfn, 1 << order, end_pfn);
 #endif
+		migratetype = get_pageblock_migratetype(page);
 		list_del(&page->lru);
 		rmv_page_order(page);
-		zone->free_area[order].nr_free--;
+		zone->free_area[order].nr_free[migratetype]--;
+		zone->free_area[order].total_free--;
 		for (i = 0; i < (1 << order); i++)
 			SetPageReserved((page+i));
 		pfn += (1 << order);
