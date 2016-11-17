@@ -259,9 +259,16 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
 	}
 
 	val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
-	dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
-					SPI_PUSHR_PCS(dspi->cs) |
-					SPI_PUSHR_CTAS(0);
+	if (dspi->cs_change) {
+		dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
+						SPI_PUSHR_PCS(dspi->cs) |
+						SPI_PUSHR_CTAS(0);
+	} else {
+		dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
+						SPI_PUSHR_PCS(dspi->cs) |
+						SPI_PUSHR_CTAS(0) |
+						SPI_PUSHR_CONT;
+	}
 	dspi->tx += tx_word + 1;
 
 	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
