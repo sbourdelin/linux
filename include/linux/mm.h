@@ -446,6 +446,15 @@ static inline int put_page_testzero(struct page *page)
 	return page_ref_dec_and_test(page);
 }
 
+static inline nodemask_t system_ram(void)
+{
+	nodemask_t ram_nodes;
+
+	nodes_clear(ram_nodes);
+	nodes_andnot(ram_nodes, node_states[N_MEMORY], node_states[N_COHERENT_DEVICE]);
+	return ram_nodes;
+}
+
 /*
  * Try to grab a ref unless the page has a refcount of zero, return false if
  * that is the case.
