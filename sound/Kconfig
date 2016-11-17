@@ -60,6 +60,7 @@ if !M68K && !UML
 
 menuconfig SND
 	tristate "Advanced Linux Sound Architecture"
+	depends on HAS_DMA
 	help
 	  Say 'Y' or 'M' to enable ALSA (Advanced Linux Sound Architecture),
 	  the new base sound system.
