@@ -2734,6 +2734,8 @@ struct wmi_ext_resource_config_10_4_cmd {
 	__le32 host_platform_config;
 	/* see enum wmi_10_4_feature_mask */
 	__le32 fw_feature_bitmap;
+	/* Contains btcoex gpio pin number */
+	__le32 btcoex_gpio_pin;
 };
 
 struct wmi_set_coex_param_10_4_cmd {
