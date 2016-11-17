@@ -7236,7 +7236,7 @@ static int nl80211_start_sched_scan(struct sk_buff *skb,
 
 	rcu_assign_pointer(rdev->sched_scan_req, sched_scan_req);
 
-	nl80211_send_sched_scan(rdev, dev,
+	nl80211_send_scan_event(rdev, dev,
 				NL80211_CMD_START_SCHED_SCAN);
 	return 0;
 
@@ -12878,7 +12878,7 @@ static int nl80211_send_scan_msg(struct sk_buff *msg,
 }
 
 static int
-nl80211_send_sched_scan_msg(struct sk_buff *msg,
+nl80211_send_scan_event_msg(struct sk_buff *msg,
 			    struct cfg80211_registered_device *rdev,
 			    struct net_device *netdev,
 			    u32 portid, u32 seq, int flags, u32 cmd)
@@ -12958,7 +12958,7 @@ void nl80211_send_sched_scan_results(struct cfg80211_registered_device *rdev,
 	if (!msg)
 		return;
 
-	if (nl80211_send_sched_scan_msg(msg, rdev, netdev, 0, 0, 0,
+	if (nl80211_send_scan_event_msg(msg, rdev, netdev, 0, 0, 0,
 					NL80211_CMD_SCHED_SCAN_RESULTS) < 0) {
 		nlmsg_free(msg);
 		return;
@@ -12968,7 +12968,7 @@ void nl80211_send_sched_scan_results(struct cfg80211_registered_device *rdev,
 				NL80211_MCGRP_SCAN, GFP_KERNEL);
 }
 
-void nl80211_send_sched_scan(struct cfg80211_registered_device *rdev,
+void nl80211_send_scan_event(struct cfg80211_registered_device *rdev,
 			     struct net_device *netdev, u32 cmd)
 {
 	struct sk_buff *msg;
@@ -12977,7 +12977,7 @@ void nl80211_send_sched_scan(struct cfg80211_registered_device *rdev,
 	if (!msg)
 		return;
 
-	if (nl80211_send_sched_scan_msg(msg, rdev, netdev, 0, 0, 0, cmd) < 0) {
+	if (nl80211_send_scan_event_msg(msg, rdev, netdev, 0, 0, 0, cmd) < 0) {
 		nlmsg_free(msg);
 		return;
 	}
