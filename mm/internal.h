@@ -451,6 +451,7 @@ extern unsigned long  __must_check vm_mmap_pgoff(struct file *, unsigned long,
 
 extern void set_pageblock_order(void);
 unsigned long reclaim_clean_pages_from_list(struct zone *zone,
+					    enum migrate_mode mode,
 					    struct list_head *page_list);
 /* The ALLOC_WMARK bits are used as an index to zone->watermark */
 #define ALLOC_WMARK_MIN		WMARK_MIN
