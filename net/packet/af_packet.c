@@ -1970,8 +1970,6 @@ static unsigned int run_filter(struct sk_buff *skb,
 static int __packet_rcv_vnet(const struct sk_buff *skb,
 			     struct virtio_net_hdr *vnet_hdr)
 {
-	*vnet_hdr = (const struct virtio_net_hdr) { 0 };
-
 	if (virtio_net_hdr_from_skb(skb, vnet_hdr, vio_le()))
 		BUG();
 
@@ -2390,8 +2388,6 @@ static void tpacket_set_protocol(const struct net_device *dev,
 
 static int __packet_snd_vnet_parse(struct virtio_net_hdr *vnet_hdr, size_t len)
 {
-	unsigned short gso_type = 0;
-
 	if ((vnet_hdr->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) &&
 	    (__virtio16_to_cpu(vio_le(), vnet_hdr->csum_start) +
 	     __virtio16_to_cpu(vio_le(), vnet_hdr->csum_offset) + 2 >
@@ -2403,29 +2399,6 @@ static int __packet_snd_vnet_parse(struct virtio_net_hdr *vnet_hdr, size_t len)
 	if (__virtio16_to_cpu(vio_le(), vnet_hdr->hdr_len) > len)
 		return -EINVAL;
 
-	if (vnet_hdr->gso_type != VIRTIO_NET_HDR_GSO_NONE) {
-		switch (vnet_hdr->gso_type & ~VIRTIO_NET_HDR_GSO_ECN) {
-		case VIRTIO_NET_HDR_GSO_TCPV4:
-			gso_type = SKB_GSO_TCPV4;
-			break;
-		case VIRTIO_NET_HDR_GSO_TCPV6:
-			gso_type = SKB_GSO_TCPV6;
-			break;
-		case VIRTIO_NET_HDR_GSO_UDP:
-			gso_type = SKB_GSO_UDP;
-			break;
-		default:
-			return -EINVAL;
-		}
-
-		if (vnet_hdr->gso_type & VIRTIO_NET_HDR_GSO_ECN)
-			gso_type |= SKB_GSO_TCP_ECN;
-
-		if (vnet_hdr->gso_size == 0)
-			return -EINVAL;
-	}
-
-	vnet_hdr->gso_type = gso_type;	/* changes type, temporary storage */
 	return 0;
 }
 
@@ -2448,22 +2421,7 @@ static int packet_snd_vnet_parse(struct msghdr *msg, size_t *len,
 static int packet_snd_vnet_gso(struct sk_buff *skb,
 			       struct virtio_net_hdr *vnet_hdr)
 {
-	if (vnet_hdr->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
-		u16 s = __virtio16_to_cpu(vio_le(), vnet_hdr->csum_start);
-		u16 o = __virtio16_to_cpu(vio_le(), vnet_hdr->csum_offset);
-
-		if (!skb_partial_csum_set(skb, s, o))
-			return -EINVAL;
-	}
-
-	skb_shinfo(skb)->gso_size =
-		__virtio16_to_cpu(vio_le(), vnet_hdr->gso_size);
-	skb_shinfo(skb)->gso_type = vnet_hdr->gso_type;
-
-	/* Header must be checked, and gso_segs computed. */
-	skb_shinfo(skb)->gso_type |= SKB_GSO_DODGY;
-	skb_shinfo(skb)->gso_segs = 0;
-	return 0;
+	return virtio_net_hdr_to_skb(skb, vnet_hdr, vio_le());
 }
 
 static int tpacket_fill_skb(struct packet_sock *po, struct sk_buff *skb,
