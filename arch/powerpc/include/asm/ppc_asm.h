@@ -254,13 +254,19 @@ n:
 
 #endif
 
+#define _GLOBAL_SYM(name)	\
+	.globl name;		\
+name:
+
 /*
  * __kprobes (the C annotation) puts the symbol into the .kprobes.text
  * section, which gets emitted at the end of regular text.
  *
  * _ASM_NOKPROBE_SYMBOL and NOKPROBE_SYMBOL just adds the symbol to
- * a blacklist. The former is for core kprobe functions/data, the
- * latter is for those that incdentially must be excluded from probing
+ * a blacklist.
+ *
+ * The former (__kprobes) is for core kprobe functions/data, the
+ * latter is for those that incidentally must be excluded from probing
  * and allows them to be linked at more optimal location within text.
  */
 #ifdef CONFIG_KPROBES
@@ -271,6 +277,15 @@ n:
 #else
 #define _ASM_NOKPROBE_SYMBOL(entry)
 #endif
+
+#define _GLOBAL_NOKPROBE(name)				\
+	_GLOBAL(name);					\
+	_ASM_NOKPROBE_SYMBOL(name)
+
+#define _GLOBAL_SYM_NOKPROBE(name)			\
+	_GLOBAL_SYM(name);				\
+	_ASM_NOKPROBE_SYMBOL(name)
+
 
 #define FUNC_START(name)	_GLOBAL(name)
 #define FUNC_END(name)
