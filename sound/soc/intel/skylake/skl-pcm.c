@@ -46,6 +46,7 @@ static struct snd_pcm_hardware azx_pcm_hw = {
 				 SNDRV_PCM_INFO_SYNC_START |
 				 SNDRV_PCM_INFO_HAS_WALL_CLOCK | /* legacy */
 				 SNDRV_PCM_INFO_HAS_LINK_ATIME |
+				 SNDRV_PCM_INFO_HAS_LINK_SYNCHRONIZED_ATIME |
 				 SNDRV_PCM_INFO_NO_PERIOD_WAKEUP),
 	.formats =		SNDRV_PCM_FMTBIT_S16_LE |
 				SNDRV_PCM_FMTBIT_S32_LE |
@@ -168,6 +169,10 @@ static int skl_pcm_open(struct snd_pcm_substream *substream,
 		runtime->hw.info &= ~SNDRV_PCM_INFO_HAS_WALL_CLOCK; /* legacy */
 		runtime->hw.info &= ~SNDRV_PCM_INFO_HAS_LINK_ATIME;
 	}
+
+	/* Disable synchronized timestamp cap based on gtscap flag */
+	if (!(ebus_to_hbus(ebus))->gtscap)
+		runtime->hw.info &= ~SNDRV_PCM_INFO_HAS_LINK_SYNCHRONIZED_ATIME;
 
 	runtime->private_data = stream;
 
