@@ -710,6 +710,7 @@ static struct wmi_cmd_map wmi_10_4_cmd_map = {
 	.pdev_bss_chan_info_request_cmdid =
 			WMI_10_4_PDEV_BSS_CHAN_INFO_REQUEST_CMDID,
 	.ext_resource_cfg_cmdid = WMI_10_4_EXT_RESOURCE_CFG_CMDID,
+	.set_coex_param_cmdid = WMI_10_4_BTCOEX_CFG_CMDID,
 };
 
 /* MAIN WMI VDEV param map */
@@ -7859,6 +7860,23 @@ ath10k_wmi_barrier(struct ath10k *ar)
 	return 0;
 }
 
+static struct sk_buff *
+ath10k_wmi_10_4_op_gen_set_coex_param(struct ath10k *ar,
+				      u32 btcoex_prio)
+{
+	struct wmi_set_coex_param_10_4_cmd *cmd;
+	struct sk_buff *skb;
+
+	skb = ath10k_wmi_alloc_skb(ar, sizeof(*cmd));
+	if (!skb)
+		return ERR_PTR(-ENOMEM);
+
+	cmd = (struct wmi_set_coex_param_10_4_cmd *)skb->data;
+	cmd->btcoex_prio = __cpu_to_le32(btcoex_prio);
+
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "BTCOEX priority :%u\n", btcoex_prio);
+	return skb;
+}
 static const struct wmi_ops wmi_ops = {
 	.rx = ath10k_wmi_op_rx,
 	.map_svc = wmi_main_svc_map,
@@ -8205,6 +8223,7 @@ static const struct wmi_ops wmi_10_4_ops = {
 	.gen_pdev_bss_chan_info_req = ath10k_wmi_10_2_op_gen_pdev_bss_chan_info,
 	.gen_echo = ath10k_wmi_op_gen_echo,
 	.gen_pdev_get_tpc_config = ath10k_wmi_10_2_4_op_gen_pdev_get_tpc_config,
+	.gen_set_coex_param = ath10k_wmi_10_4_op_gen_set_coex_param,
 };
 
 int ath10k_wmi_attach(struct ath10k *ar)

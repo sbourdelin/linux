@@ -197,6 +197,8 @@ struct wmi_ops {
 					(struct ath10k *ar,
 					 enum wmi_bss_survey_req_type type);
 	struct sk_buff *(*gen_echo)(struct ath10k *ar, u32 value);
+	struct sk_buff *(*gen_set_coex_param)(struct ath10k *ar,
+					      u32 btcoex_prio);
 };
 
 int ath10k_wmi_cmd_send(struct ath10k *ar, struct sk_buff *skb, u32 cmd_id);
@@ -1409,6 +1411,23 @@ ath10k_wmi_echo(struct ath10k *ar, u32 value)
 		return PTR_ERR(skb);
 
 	return ath10k_wmi_cmd_send(ar, skb, wmi->cmd->echo_cmdid);
+}
+
+static inline int
+ath10k_wmi_set_coex_param(struct ath10k *ar, u32 btcoex_prio)
+{
+	struct sk_buff *skb;
+
+	if (!ar->wmi.ops->gen_set_coex_param)
+		return -EOPNOTSUPP;
+
+	skb = ar->wmi.ops->gen_set_coex_param(ar, btcoex_prio);
+
+	if (IS_ERR(skb))
+		return PTR_ERR(skb);
+
+	return ath10k_wmi_cmd_send(ar, skb,
+				   ar->wmi.cmd->set_coex_param_cmdid);
 }
 
 #endif
