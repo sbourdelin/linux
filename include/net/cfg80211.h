@@ -2464,6 +2464,90 @@ struct cfg80211_nan_func {
 };
 
 /**
+ * struct cfg80211_gscan_channel - GScan channel parameters.
+ *
+
+ * @ch: specific channel.
+ * @dwell_time: hint for dwell time in milliseconds.
+ * @passive: indicates passive scan is requested.
+ */
+struct cfg80211_gscan_channel {
+    struct ieee80211_channel *ch;
+    int dwell_time;
+    bool passive;
+};
+
+/**
+ * struct cfg80211_gscan_bucket - GScan bucket parameters.
+ *
+ * @idx: unique bucket index.
+ * @band: bit flags for band(s) to use, see %enum nl80211_bucket_band.
+ * @period: period in which the bucket is scheduled to be scanned. If the
+ *	period is too small for driver it should not fail but report results
+ *	as fast as it can. For exponential backoff bucket this is the minimum
+ *	period.
+ * @report_events: This is a bit field according %enum nl80211_bucket_report_event.
+ * @max_period: used only for the exponential backoff bucket whose scan period will
+ *	grow exponentially to a maximum period of max_period.
+ * @exponent: used only for the exponential backoff bucket.
+ * @step_count: used only for the exponential backoff bucket.
+ * @n_channels: number of channels in @channels array.
+ * @channels: channels to scan which may include DFS channels.
+ */
+struct cfg80211_gscan_bucket {
+	int idx;
+	u32 band;
+	int period;
+	u8 report_events;
+	int max_period;
+	int exponent;
+	int step_count;
+	int n_channels;
+	struct cfg80211_gscan_channel *channels;
+};
+
+/**
+ * struct cfg80211_gscan_request - GScan request parameters.
+ *
+ * @flags: scan request flags according %enum nl80211_scan_flags.
+ * @base_period: base timer period in milliseconds.
+ * @max_ap_per_scan: number of APs to store in each scan entry in the BSSID/RSSI
+ *	history buffer (keep APS with highest RSSI).
+ * @report_threshold_percent: wake up system when scan buffer is filled to this
+ *	percentage.
+ * @report_threshold_num_scans: wake up system when this many scans are stored
+ *	in scan buffer.
+ * @mac: MAC address used for randomisation.
+ * @mac_mask: MAC address mask. bits that are 0 in the mask should be
+ *	randomised, bits that are 1 should be taken as is from @mac.
+ * @n_buckets: number of entries in @buckets array.
+ * @buckets: array of GScan buckets.
+ *
+ * @dev: net device for which GScan is requested.
+ * @rcu_head: RCU callback used to free the struct.
+ * @owner_nlportid: netlink port which initiated this request.
+ */
+struct cfg80211_gscan_request {
+	u32 flags;
+	int base_period;
+	int max_ap_per_scan;
+	u8 report_threshold_percent;
+	int report_threshold_num_scans;
+	u8 mac[ETH_ALEN];
+	u8 mac_mask[ETH_ALEN];
+
+	int n_buckets;
+
+	/* internal */
+	struct net_device *dev;
+	struct rcu_head rcu_head;
+	u32 owner_nlportid;
+
+	/* keep last */
+	struct cfg80211_gscan_bucket buckets[0];
+};
+
+/**
  * struct cfg80211_ops - backend description for wireless configuration
  *
  * This struct is registered by fullmac card drivers and/or wireless stacks
@@ -2773,8 +2857,9 @@ struct cfg80211_nan_func {
  * @nan_change_conf: changes NAN configuration. The changed parameters must
  *	be specified in @changes (using &enum cfg80211_nan_conf_changes);
  *	All other parameters must be ignored.
- *
  * @set_multicast_to_unicast: configure multicast to unicast conversion for BSS
+ * @start_gscan: start the GSCAN scanning offload.
+ * @stop_gscan: stop the GSCAN scanning offload.
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -3055,10 +3140,12 @@ struct cfg80211_ops {
 				   struct wireless_dev *wdev,
 				   struct cfg80211_nan_conf *conf,
 				   u32 changes);
-
 	int	(*set_multicast_to_unicast)(struct wiphy *wiphy,
 					    struct net_device *dev,
 					    const bool enabled);
+	int	(*start_gscan)(struct wiphy *wiphy, struct net_device *dev,
+			       struct cfg80211_gscan_request *gscan_req);
+	int	(*stop_gscan)(struct wiphy *wiphy, struct net_device *dev);
 };
 
 /*

@@ -1153,4 +1153,29 @@ rdev_set_coalesce(struct cfg80211_registered_device *rdev,
 	trace_rdev_return_int(&rdev->wiphy, ret);
 	return ret;
 }
+
+static inline int
+rdev_start_gscan(struct cfg80211_registered_device *rdev,
+		 struct net_device *dev,
+		 struct cfg80211_gscan_request *request)
+{
+	int ret;
+
+	trace_rdev_start_gscan(&rdev->wiphy, dev);
+	ret = rdev->ops->start_gscan(&rdev->wiphy, dev, request);
+	trace_rdev_return_int(&rdev->wiphy, ret);
+	return ret;
+}
+
+static inline int
+rdev_stop_gscan(struct cfg80211_registered_device *rdev,
+		struct net_device *dev)
+{
+	int ret;
+
+	trace_rdev_stop_gscan(&rdev->wiphy, dev);
+	ret = rdev->ops->stop_gscan(&rdev->wiphy, dev);
+	trace_rdev_return_int(&rdev->wiphy, ret);
+	return ret;
+}
 #endif /* __CFG80211_RDEV_OPS */

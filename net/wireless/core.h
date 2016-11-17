@@ -74,6 +74,7 @@ struct cfg80211_registered_device {
 	struct cfg80211_scan_request *scan_req; /* protected by RTNL */
 	struct sk_buff *scan_msg;
 	struct cfg80211_sched_scan_request __rcu *sched_scan_req;
+	struct cfg80211_gscan_request __rcu *gscan_req;
 	unsigned long suspend_at;
 	struct work_struct scan_done_wk;
 	struct work_struct sched_scan_results_wk;
@@ -95,6 +96,7 @@ struct cfg80211_registered_device {
 	struct work_struct destroy_work;
 
 	struct work_struct sched_scan_stop_wk;
+	struct work_struct gscan_stop_wk;
 
 	/* must be last because of the way we do wiphy_priv(),
 	 * and it should at least be aligned to NETDEV_ALIGN */
@@ -421,6 +423,8 @@ void ___cfg80211_scan_done(struct cfg80211_registered_device *rdev,
 void __cfg80211_sched_scan_results(struct work_struct *wk);
 int __cfg80211_stop_sched_scan(struct cfg80211_registered_device *rdev,
 			       bool driver_initiated);
+int __cfg80211_stop_gscan(struct cfg80211_registered_device *rdev,
+			  bool driver_initiated);
 void cfg80211_upload_connect_keys(struct wireless_dev *wdev);
 int cfg80211_change_iface(struct cfg80211_registered_device *rdev,
 			  struct net_device *dev, enum nl80211_iftype ntype,
