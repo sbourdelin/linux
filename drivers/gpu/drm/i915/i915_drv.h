@@ -895,6 +895,7 @@ enum i915_cache_level {
 			      the CPU, but L3 is only visible to the GPU. */
 	I915_CACHE_WT, /* hsw:gt3e WriteThrough for scanouts */
 };
+#define UNCOLORED (-1)
 
 struct i915_ctx_hang_stats {
 	/* This context had batch pending when hang was declared */
