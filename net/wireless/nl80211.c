@@ -404,6 +404,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 				    .len = FILS_MAX_KEK_LEN },
 	[NL80211_ATTR_FILS_NONCES] = { .len = 2 * FILS_NONCE_LEN },
 	[NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED] = { .type = NLA_FLAG, },
+	[NL80211_ATTR_GSCAN_PARAMS] = { .type = NLA_NESTED },
 };
 
 /* policy for the key attributes */
@@ -11860,6 +11861,318 @@ static int nl80211_set_multicast_to_unicast(struct sk_buff *skb,
 	return rdev_set_multicast_to_unicast(rdev, dev, enabled);
 }
 
+static const
+struct nla_policy nl80211_gscan_policy[NL80211_GSCAN_ATTR_MAX + 1] = {
+	[NL80211_GSCAN_ATTR_BASE_PERIOD] = { .type = NLA_U32 },
+	[NL80211_GSCAN_ATTR_MAX_AP_PER_SCAN] = { .type = NLA_U32 },
+	[NL80211_GSCAN_ATTR_REPORT_PERC] = { .type = NLA_U8 },
+	[NL80211_GSCAN_ATTR_REPORT_SCANS] = { .type = NLA_U32 },
+	[NL80211_GSCAN_ATTR_BUCKETS] = { .type = NLA_NESTED },
+};
+
+static const struct nla_policy
+nl80211_gscan_bucket_policy[NL80211_GSCAN_BUCKET_ATTR_MAX + 1] = {
+	[NL80211_GSCAN_BUCKET_ATTR_ID] = { .type = NLA_U32 },
+	[NL80211_GSCAN_BUCKET_ATTR_BAND] = { .type = NLA_U32 },
+	[NL80211_GSCAN_BUCKET_ATTR_PERIOD] = { .type = NLA_U32 },
+	[NL80211_GSCAN_BUCKET_ATTR_REPORT] = { .type = NLA_U32 },
+	[NL80211_GSCAN_BUCKET_ATTR_MAX_PERIOD] = { .type = NLA_U32 },
+	[NL80211_GSCAN_BUCKET_ATTR_EXPONENT] = { .type = NLA_U32 },
+	[NL80211_GSCAN_BUCKET_ATTR_STEPS] = { .type = NLA_U32 },
+	[NL80211_GSCAN_BUCKET_ATTR_CHANNELS] = { .type = NLA_NESTED },
+};
+
+static const struct nla_policy
+nl80211_gscan_channel_policy[NL80211_GSCAN_CHAN_ATTR_MAX + 1] = {
+        [NL80211_GSCAN_CHAN_ATTR_FREQ] = { .type = NLA_U32 },
+        [NL80211_GSCAN_CHAN_ATTR_DWELL_TIME] = { .type = NLA_U32 },
+        [NL80211_GSCAN_CHAN_ATTR_NO_IR] = { .type = NLA_FLAG },
+};
+
+static int nl80211_parse_gscan_channel(struct cfg80211_registered_device *rdev,
+				       struct nlattr *nattr,
+				       struct cfg80211_gscan_channel *chan)
+{
+	struct nlattr *tb[NL80211_GSCAN_CHAN_ATTR_MAX + 1];
+	struct ieee80211_channel *ch;
+	int err;
+
+	err = nla_parse(tb, NL80211_GSCAN_CHAN_ATTR_MAX, nla_data(nattr),
+			nla_len(nattr), nl80211_gscan_channel_policy);
+	if (err)
+		return err;
+
+	if (!tb[NL80211_GSCAN_CHAN_ATTR_FREQ])
+		return -EINVAL;
+
+	ch = ieee80211_get_channel(&rdev->wiphy,
+				   nla_get_u32(tb[NL80211_GSCAN_CHAN_ATTR_FREQ]));
+	if (!ch || (ch->flags & IEEE80211_CHAN_DISABLED))
+		return -EINVAL;
+
+	chan->ch = ch;
+
+	if (tb[NL80211_GSCAN_CHAN_ATTR_DWELL_TIME])
+		chan->dwell_time = nla_get_u32(tb[NL80211_GSCAN_CHAN_ATTR_DWELL_TIME]);
+	if (tb[NL80211_GSCAN_CHAN_ATTR_NO_IR])
+		chan->passive = true;
+	return 0;
+}
+
+static int nl80211_parse_gscan_bucket(struct cfg80211_registered_device *rdev,
+				      struct nlattr *nattr,
+				      struct cfg80211_gscan_bucket *bucket,
+				      struct cfg80211_gscan_channel *channels)
+{
+	struct nlattr *tb[NL80211_GSCAN_BUCKET_ATTR_MAX + 1];
+	struct nlattr *chan;
+	struct cfg80211_gscan_channel *ch;
+	int err, rem;
+	int num_chans = 0;
+	u32 band_select = 0;
+	u32 dfs_invalid_mask;
+
+	err = nla_parse(tb, NL80211_GSCAN_BUCKET_ATTR_MAX, nla_data(nattr),
+			nla_len(nattr), nl80211_gscan_bucket_policy);
+	if (err)
+		return err;
+
+	if (!tb[NL80211_GSCAN_BUCKET_ATTR_ID] ||
+	    !tb[NL80211_GSCAN_BUCKET_ATTR_PERIOD])
+		return -EINVAL;
+
+	bucket->idx = nla_get_u32(tb[NL80211_GSCAN_BUCKET_ATTR_ID]);
+	if (tb[NL80211_GSCAN_BUCKET_ATTR_BAND]) {
+		band_select = nla_get_u32(tb[NL80211_GSCAN_BUCKET_ATTR_BAND]);
+
+		/* only makes sense if a band is selected */
+		if (!(band_select & (NL80211_BUCKET_BAND_2GHZ | NL80211_BUCKET_BAND_5GHZ)))
+			return -EINVAL;
+	}
+
+	dfs_invalid_mask = NL80211_BUCKET_BAND_5GHZ | NL80211_BUCKET_BAND_NODFS |
+			   NL80211_BUCKET_BAND_DFS_ONLY;
+	if ((band_select & dfs_invalid_mask) == dfs_invalid_mask)
+		return -EINVAL;
+
+	bucket->band = band_select;
+	bucket->period = nla_get_u32(tb[NL80211_GSCAN_BUCKET_ATTR_PERIOD]);
+
+	if (tb[NL80211_GSCAN_BUCKET_ATTR_MAX_PERIOD])
+		bucket->max_period = nla_get_u32(tb[NL80211_GSCAN_BUCKET_ATTR_MAX_PERIOD]);
+
+	if (bucket->max_period) {
+		if (bucket->max_period < bucket->period)
+			return -EINVAL;
+		/* additional attributes required for backoff bucket */
+		if (bucket->max_period > bucket->period) {
+			if (!tb[NL80211_GSCAN_BUCKET_ATTR_EXPONENT] ||
+			    !tb[NL80211_GSCAN_BUCKET_ATTR_STEPS])
+				return -EINVAL;
+
+			bucket->exponent = nla_get_u32(tb[NL80211_GSCAN_BUCKET_ATTR_EXPONENT]);
+			bucket->step_count = nla_get_u32(tb[NL80211_GSCAN_BUCKET_ATTR_STEPS]);
+		}
+	}
+
+	/* ignore channels if band is specified */
+	if (band_select)
+		return 0;
+
+        nla_for_each_nested(chan, tb[NL80211_GSCAN_BUCKET_ATTR_CHANNELS], rem) {
+                num_chans++;
+        }
+	if (num_chans > 16)
+		return -EINVAL;
+
+	bucket->n_channels = num_chans;
+	if (!num_chans)
+		return 0;
+
+	bucket->channels = channels;
+	ch = &bucket->channels[0];
+        nla_for_each_nested(chan, tb[NL80211_GSCAN_BUCKET_ATTR_CHANNELS], rem) {
+		err = nl80211_parse_gscan_channel(rdev, chan, ch);
+		if (err) {
+			return err;
+		}
+		ch++;
+        }
+
+	return 0;
+}
+
+static struct cfg80211_gscan_request *
+nl80211_alloc_gscan_request(struct cfg80211_registered_device *rdev,
+			    struct nlattr *buckets_attr)
+{
+	struct cfg80211_gscan_request *req;
+	struct cfg80211_gscan_bucket *b;
+	struct cfg80211_gscan_channel *ch;
+	int n_buckets, n_channels;
+	struct nlattr *attr, *bucket, *channel;
+	int rem, rem_b, rem_c;
+	size_t reqsize;
+
+	if (!buckets_attr)
+		return ERR_PTR(-EINVAL);
+
+	n_buckets = 0;
+	n_channels = 0;
+	nla_for_each_nested(bucket, buckets_attr, rem) {
+		n_buckets++;
+		if (n_buckets > rdev->wiphy.gscan->max_scan_buckets)
+			return ERR_PTR(-EINVAL);
+
+		nla_for_each_nested(attr, bucket, rem_b) {
+			if (nla_type(attr) == NL80211_GSCAN_BUCKET_ATTR_CHANNELS) {
+				nla_for_each_nested(channel, attr, rem_c)
+					n_channels++;
+			}
+		}
+	}
+
+	reqsize = sizeof(*req) +
+		  sizeof(*b) * n_buckets +
+		  sizeof(*ch) * n_channels;
+
+	req = kzalloc(reqsize, GFP_KERNEL);
+	if (!req)
+		return ERR_PTR(-ENOMEM);
+
+	req->n_buckets = n_buckets;
+	return req;
+}
+
+static int nl80211_parse_gscan_params(struct cfg80211_registered_device *rdev,
+				      struct nlattr *attrs[],
+				      struct cfg80211_gscan_request **request)
+{
+	struct cfg80211_gscan_request *req;
+	struct nlattr *tb[NL80211_GSCAN_ATTR_MAX + 1];
+	struct nlattr *bucket;
+	struct cfg80211_gscan_bucket *b;
+	struct cfg80211_gscan_channel *ch;
+	int err, rem, i;
+	u32 bucket_map;
+
+	if (!attrs[NL80211_ATTR_GSCAN_PARAMS])
+		return -EINVAL;
+
+	err = nla_parse(tb, NL80211_GSCAN_ATTR_MAX,
+			nla_data(attrs[NL80211_ATTR_GSCAN_PARAMS]),
+			nla_len(attrs[NL80211_ATTR_GSCAN_PARAMS]),
+			nl80211_gscan_policy);
+	if (err)
+		return err;
+
+	req = nl80211_alloc_gscan_request(rdev, tb[NL80211_GSCAN_ATTR_BUCKETS]);
+	if (IS_ERR(req))
+		return PTR_ERR(req);
+
+	if (!tb[NL80211_GSCAN_ATTR_BASE_PERIOD])
+		return -EINVAL;
+
+	req->base_period = nla_get_u32(tb[NL80211_GSCAN_ATTR_BASE_PERIOD]);
+
+	if (tb[NL80211_GSCAN_ATTR_MAX_AP_PER_SCAN])
+		req->max_ap_per_scan = nla_get_u32(tb[NL80211_GSCAN_ATTR_MAX_AP_PER_SCAN]);
+	if (tb[NL80211_GSCAN_ATTR_REPORT_PERC])
+		req->report_threshold_percent = nla_get_u8(tb[NL80211_GSCAN_ATTR_REPORT_PERC]);
+	if (tb[NL80211_GSCAN_ATTR_REPORT_SCANS])
+		req->report_threshold_num_scans = nla_get_u32(tb[NL80211_GSCAN_ATTR_REPORT_SCANS]);
+	if (attrs[NL80211_ATTR_MAC])
+		memcpy(req->mac, nla_data(attrs[NL80211_ATTR_MAC]), ETH_ALEN);
+	if (attrs[NL80211_ATTR_MAC_MASK])
+		memcpy(req->mac_mask, nla_data(attrs[NL80211_ATTR_MAC_MASK]),
+		       ETH_ALEN);
+	if (attrs[NL80211_ATTR_SCAN_FLAGS])
+		req->flags = nla_get_u32(attrs[NL80211_ATTR_SCAN_FLAGS]);
+
+	b = &req->buckets[0];
+	ch = (struct cfg80211_gscan_channel *)(&req->buckets[req->n_buckets]);
+	nla_for_each_nested(bucket, tb[NL80211_GSCAN_ATTR_BUCKETS], rem) {
+		err = nl80211_parse_gscan_bucket(rdev, bucket, b, ch);
+		if (err)
+			goto free_req;
+		ch += b->n_channels;
+		b++;
+	}
+	bucket_map = 0;
+	for (i = 0; i < req->n_buckets; i++) {
+		if (BIT(req->buckets[i].idx) & bucket_map) {
+			err = -EINVAL;
+			goto free_req;
+		}
+		bucket_map |= BIT(req->buckets[i].idx);
+
+		if (req->buckets[i].period % req->base_period) {
+			err = -EINVAL;
+			goto free_req;
+		}
+		if (req->buckets[i].max_period &&
+		    (req->buckets[i].max_period % req->base_period)) {
+			err = -EINVAL;
+			goto free_req;
+		}
+	}
+	*request = req;
+	return 0;
+
+free_req:
+	kfree(req);
+	return err;
+}
+
+static int nl80211_start_gscan(struct sk_buff *skb, struct genl_info *info)
+{
+	struct cfg80211_gscan_request *request;
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct net_device *dev = info->user_ptr[1];
+	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	int err;
+
+	if (!rdev->wiphy.gscan ||
+	    !rdev->ops->start_gscan)
+		return -EOPNOTSUPP;
+
+	if (rdev->gscan_req)
+		return -EINPROGRESS;
+
+	err = nl80211_parse_gscan_params(rdev, info->attrs, &request);
+	if (err)
+		return err;
+
+	wdev_lock(wdev);
+	err = rdev_start_gscan(rdev, dev, request);
+	wdev_unlock(wdev);
+	if (err) {
+		kfree(request);
+		return err;
+	}
+
+	request->dev = dev;
+	if (info->attrs[NL80211_ATTR_SOCKET_OWNER])
+		request->owner_nlportid = info->snd_portid;
+
+	rcu_assign_pointer(rdev->gscan_req, request);
+
+	nl80211_send_scan_event(rdev, dev,
+				NL80211_CMD_START_GSCAN);
+	return 0;
+}
+
+static int nl80211_stop_gscan(struct sk_buff *skb, struct genl_info *info)
+{
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+
+	if (!rdev->wiphy.gscan ||
+	    !rdev->ops->stop_gscan)
+		return -EOPNOTSUPP;
+
+	return __cfg80211_stop_gscan(rdev, false);
+}
+
 #define NL80211_FLAG_NEED_WIPHY		0x01
 #define NL80211_FLAG_NEED_NETDEV	0x02
 #define NL80211_FLAG_NEED_RTNL		0x04
@@ -12733,6 +13046,22 @@ static const struct genl_ops nl80211_ops[] = {
 		.policy = nl80211_policy,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
+				  NL80211_FLAG_NEED_RTNL,
+	},
+	{
+		.cmd = NL80211_CMD_START_GSCAN,
+		.doit = nl80211_start_gscan,
+		.policy = nl80211_policy,
+		.flags = GENL_UNS_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
+				  NL80211_FLAG_NEED_RTNL,
+	},
+	{
+		.cmd = NL80211_CMD_STOP_GSCAN,
+		.doit = nl80211_stop_gscan,
+		.policy = nl80211_policy,
+		.flags = GENL_UNS_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
 				  NL80211_FLAG_NEED_RTNL,
 	},
 };
@@ -14540,12 +14869,18 @@ static int nl80211_netlink_notify(struct notifier_block * nb,
 	list_for_each_entry_rcu(rdev, &cfg80211_rdev_list, list) {
 		bool schedule_destroy_work = false;
 		bool schedule_scan_stop = false;
+		bool schedule_gscan_stop = false;
 		struct cfg80211_sched_scan_request *sched_scan_req =
 			rcu_dereference(rdev->sched_scan_req);
+		struct cfg80211_gscan_request *gscan_req =
+			rcu_dereference(rdev->gscan_req);
 
 		if (sched_scan_req && notify->portid &&
 		    sched_scan_req->owner_nlportid == notify->portid)
 			schedule_scan_stop = true;
+		if (gscan_req && notify->portid &&
+		    gscan_req->owner_nlportid == notify->portid)
+			schedule_gscan_stop = true;
 
 		list_for_each_entry_rcu(wdev, &rdev->wiphy.wdev_list, list) {
 			cfg80211_mlme_unregister_socket(wdev, notify->portid);
@@ -14576,12 +14911,18 @@ static int nl80211_netlink_notify(struct notifier_block * nb,
 				spin_unlock(&rdev->destroy_list_lock);
 				schedule_work(&rdev->destroy_work);
 			}
-		} else if (schedule_scan_stop) {
-			sched_scan_req->owner_nlportid = 0;
+		} else {
+			if (schedule_scan_stop) {
+				sched_scan_req->owner_nlportid = 0;
 
-			if (rdev->ops->sched_scan_stop &&
-			    rdev->wiphy.flags & WIPHY_FLAG_SUPPORTS_SCHED_SCAN)
-				schedule_work(&rdev->sched_scan_stop_wk);
+				if (rdev->ops->sched_scan_stop &&
+				    rdev->wiphy.flags & WIPHY_FLAG_SUPPORTS_SCHED_SCAN)
+					schedule_work(&rdev->sched_scan_stop_wk);
+			}
+			if (schedule_gscan_stop) {
+				gscan_req->owner_nlportid = 0;
+				schedule_work(&rdev->gscan_stop_wk);
+			}
 		}
 	}
 

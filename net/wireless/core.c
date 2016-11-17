@@ -357,6 +357,20 @@ static void cfg80211_sched_scan_stop_wk(struct work_struct *work)
 	rtnl_unlock();
 }
 
+static void cfg80211_gscan_stop_wk(struct work_struct *work)
+{
+	struct cfg80211_registered_device *rdev;
+
+	rdev = container_of(work, struct cfg80211_registered_device,
+			    gscan_stop_wk);
+
+	rtnl_lock();
+
+	__cfg80211_stop_gscan(rdev, false);
+
+	rtnl_unlock();
+}
+
 /* exported functions */
 
 struct wiphy *wiphy_new_nm(const struct cfg80211_ops *ops, int sizeof_priv,
@@ -383,6 +397,7 @@ struct wiphy *wiphy_new_nm(const struct cfg80211_ops *ops, int sizeof_priv,
 	WARN_ON(ops->remain_on_channel && !ops->cancel_remain_on_channel);
 	WARN_ON(ops->tdls_channel_switch && !ops->tdls_cancel_channel_switch);
 	WARN_ON(ops->add_tx_ts && !ops->del_tx_ts);
+	WARN_ON(ops->start_gscan && !ops->stop_gscan);
 
 	alloc_size = sizeof(*rdev) + sizeof_priv;
 
@@ -456,6 +471,7 @@ use_default_name:
 	spin_lock_init(&rdev->destroy_list_lock);
 	INIT_WORK(&rdev->destroy_work, cfg80211_destroy_iface_wk);
 	INIT_WORK(&rdev->sched_scan_stop_wk, cfg80211_sched_scan_stop_wk);
+	INIT_WORK(&rdev->gscan_stop_wk, cfg80211_gscan_stop_wk);
 
 #ifdef CONFIG_CFG80211_DEFAULT_PS
 	rdev->wiphy.flags |= WIPHY_FLAG_PS_ON_BY_DEFAULT;
@@ -688,6 +704,12 @@ int wiphy_register(struct wiphy *wiphy)
 	 */
 	if (WARN_ON(wiphy->bss_select_support &&
 		    (wiphy->bss_select_support & ~(BIT(__NL80211_BSS_SELECT_ATTR_AFTER_LAST) - 2))))
+		return -EINVAL;
+
+	/* buckets must have unique index and in nl80211 parsing
+	 * a u32 is used to verify that hence this limit.
+	 */
+	if (WARN_ON(wiphy->gscan && wiphy->gscan->max_scan_buckets > 32))
 		return -EINVAL;
 
 	if (wiphy->addresses)
@@ -1001,6 +1023,7 @@ void __cfg80211_leave(struct cfg80211_registered_device *rdev,
 {
 	struct net_device *dev = wdev->netdev;
 	struct cfg80211_sched_scan_request *sched_scan_req;
+	struct cfg80211_gscan_request *gscan_req;
 
 	ASSERT_RTNL();
 	ASSERT_WDEV_LOCK(wdev);
@@ -1014,6 +1037,9 @@ void __cfg80211_leave(struct cfg80211_registered_device *rdev,
 		sched_scan_req = rtnl_dereference(rdev->sched_scan_req);
 		if (sched_scan_req && dev == sched_scan_req->dev)
 			__cfg80211_stop_sched_scan(rdev, false);
+		gscan_req = rtnl_dereference(rdev->gscan_req);
+		if (gscan_req && dev == gscan_req->dev)
+			__cfg80211_stop_gscan(rdev, false);
 
 #ifdef CONFIG_CFG80211_WEXT
 		kfree(wdev->wext.ie);
@@ -1089,6 +1115,7 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
 	struct cfg80211_registered_device *rdev;
 	struct cfg80211_sched_scan_request *sched_scan_req;
+	struct cfg80211_gscan_request *gscan_req;
 
 	if (!wdev)
 		return NOTIFY_DONE;
@@ -1159,6 +1186,10 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 		if (WARN_ON(sched_scan_req &&
 			    sched_scan_req->dev == wdev->netdev)) {
 			__cfg80211_stop_sched_scan(rdev, false);
+		}
+		gscan_req = rtnl_dereference(rdev->gscan_req);
+		if (WARN_ON(gscan_req && gscan_req->dev == wdev->netdev)) {
+			__cfg80211_stop_gscan(rdev, false);
 		}
 
 		rdev->opencount--;

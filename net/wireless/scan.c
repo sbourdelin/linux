@@ -335,6 +335,34 @@ int __cfg80211_stop_sched_scan(struct cfg80211_registered_device *rdev,
 	return 0;
 }
 
+int __cfg80211_stop_gscan(struct cfg80211_registered_device *rdev,
+			  bool driver_initiated)
+{
+	struct cfg80211_gscan_request *gscan_req;
+	struct net_device *dev;
+
+	ASSERT_RTNL();
+
+	if (!rdev->gscan_req)
+		return -ENOENT;
+
+	gscan_req = rtnl_dereference(rdev->gscan_req);
+	dev = gscan_req->dev;
+
+	if (!driver_initiated) {
+		int err = rdev_stop_gscan(rdev, dev);
+		if (err)
+			return err;
+	}
+
+	nl80211_send_scan_event(rdev, dev, NL80211_CMD_GSCAN_STOPPED);
+
+	RCU_INIT_POINTER(rdev->gscan_req, NULL);
+	kfree_rcu(gscan_req, rcu_head);
+
+	return 0;
+}
+
 void cfg80211_bss_age(struct cfg80211_registered_device *rdev,
                       unsigned long age_secs)
 {

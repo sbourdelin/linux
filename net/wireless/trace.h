@@ -3067,6 +3067,15 @@ TRACE_EVENT(rdev_set_multicast_to_unicast,
 		  WIPHY_PR_ARG, NETDEV_PR_ARG,
 		  BOOL_TO_STR(__entry->enabled))
 );
+
+DEFINE_EVENT(wiphy_netdev_evt, rdev_start_gscan,
+	TP_PROTO(struct wiphy *wiphy, struct net_device *netdev),
+	TP_ARGS(wiphy, netdev)
+);
+DEFINE_EVENT(wiphy_netdev_evt, rdev_stop_gscan,
+	TP_PROTO(struct wiphy *wiphy, struct net_device *netdev),
+	TP_ARGS(wiphy, netdev)
+);
 #endif /* !__RDEV_OPS_TRACE || TRACE_HEADER_MULTI_READ */
 
 #undef TRACE_INCLUDE_PATH

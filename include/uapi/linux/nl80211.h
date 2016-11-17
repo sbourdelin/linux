@@ -894,6 +894,12 @@
  *	does not result in a change for the current association. Currently,
  *	only the %NL80211_ATTR_IE data is used and updated with this command.
  *
+ * @NL80211_CMD_START_GSCAN: start GScan.
+ * @NL80211_CMD_STOP_GSCAN: request to stop current GScan.
+ * @NL80211_CMD_GSCAN_STOPPED: indicates that the currently running GScan
+ *	has stopped. This event is generated upon @NL80211_CMD_STOP_GSCAN and
+ *	the driver may issue this event at any time when a GScan is running.
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -1092,6 +1098,10 @@ enum nl80211_commands {
 	NL80211_CMD_SET_MULTICAST_TO_UNICAST,
 
 	NL80211_CMD_UPDATE_CONNECT_PARAMS,
+
+	NL80211_CMD_START_GSCAN,
+	NL80211_CMD_STOP_GSCAN,
+	NL80211_CMD_GSCAN_STOPPED,
 
 	/* add new commands above here */
 
@@ -2385,6 +2395,7 @@ enum nl80211_attrs {
 	NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED,
 
 	NL80211_ATTR_GSCAN_CAPS,
+	NL80211_ATTR_GSCAN_PARAMS,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -4779,12 +4790,15 @@ enum nl80211_connect_failed_reason {
  *	locally administered 1, multicast 0) is assumed.
  *	This flag must not be requested when the feature isn't supported, check
  *	the nl80211 feature flags for the device.
+ * @NL80211_SCAN_FLAGS_IE_DATA: request the device to supply IE data in the
+ *	request.
  */
 enum nl80211_scan_flags {
 	NL80211_SCAN_FLAG_LOW_PRIORITY			= 1<<0,
 	NL80211_SCAN_FLAG_FLUSH				= 1<<1,
 	NL80211_SCAN_FLAG_AP				= 1<<2,
 	NL80211_SCAN_FLAG_RANDOM_ADDR			= 1<<3,
+	NL80211_SCAN_FLAG_IE_DATA			= 1<<4,
 };
 
 /**
@@ -5244,6 +5258,138 @@ enum nl80211_gscan_caps_attr {
 	/* keep last */
 	__NL80211_GSCAN_CAPS_ATTR_AFTER_LAST,
 	NL80211_GSCAN_CAPS_ATTR_MAX = __NL80211_GSCAN_CAPS_ATTR_AFTER_LAST - 1
+};
+
+/**
+ * enum nl80211_gscan_attr - common GScan parameters.
+ *
+ * @__NL80211_GSCAN_ATTR_INVALID: reserved.
+ * @NL80211_GSCAN_ATTR_BASE_PERIOD: base timer period in milliseconds.
+ * @NL80211_GSCAN_ATTR_MAX_AP_PER_SCAN: number of APs that are kept per
+ *	scan. The kept APs are the ones with strongest RSSI level.
+ * @NL80211_GSCAN_ATTR_REPORT_PERC: threshold specifying percentage of
+ *	scan cache filled that should trigger event for scan results.
+ * @NL80211_GSCAN_ATTR_REPORT_SCANS: threshold specifying number of scans
+ *	after which an event is expected for scan results.
+ * @NL80211_GSCAN_ATTR_BUCKETS: nested attribute specifying
+ *	per-bucket parameters for GScan. See %enum nl80211_gscan_bucket_attr
+ *	for description.
+ * @NL80211_GSCAN_ATTR_MAX: highest GScan attribute.
+ * @__NL80211_GSCAN_ATTR_AFTER_LAST: internal use.
+ */
+enum nl80211_gscan_attr {
+	__NL80211_GSCAN_ATTR_INVALID,
+	NL80211_GSCAN_ATTR_BASE_PERIOD,
+	NL80211_GSCAN_ATTR_MAX_AP_PER_SCAN,
+	NL80211_GSCAN_ATTR_REPORT_PERC,
+	NL80211_GSCAN_ATTR_REPORT_SCANS,
+	NL80211_GSCAN_ATTR_BUCKETS,
+
+	/* keep last */
+	__NL80211_GSCAN_ATTR_AFTER_LAST,
+	NL80211_GSCAN_ATTR_MAX = __NL80211_GSCAN_ATTR_AFTER_LAST - 1
+};
+
+/**
+ * enum nl80211_gscan_bucket_attr - per-bucket GScan parameters.
+ *
+ * @__NL80211_GSCAN_BUCKET_ATTR_INVALID,
+ * @NL80211_GSCAN_BUCKET_ATTR_ID: unique bucket id.
+ * @NL80211_GSCAN_BUCKET_ATTR_BAND: specifies the band to be scanned
+ *	according %enum nl80211_bucket_band. If specified
+ *	@NL80211_GSCAN_BUCKET_ATTR_CHANNELS is ignored.
+ * @NL80211_GSCAN_BUCKET_ATTR_PERIOD: specifies the period between
+ *	consecutive scans of this bucket. For backoff bucket this
+ *	is period(0).
+ * @NL80211_GSCAN_BUCKET_ATTR_REPORT: specifies reporting flags according
+ *	%enum nl80211_bucket_report_event.
+ * @NL80211_GSCAN_BUCKET_ATTR_MAX_PERIOD: maximum period between
+ *	consecutive scans. If specified this is a backoff bucket in
+ *	which the period increases according formula:
+ *	period(N) = period(0) * (base ^ (N/step_count))
+ * @NL80211_GSCAN_BUCKET_ATTR_EXPONENT: exponential base value as used
+ *	in given formula. This attribute is required when
+ *	@NL80211_GSCAN_BUCKET_ATTR_MAX_PERIOD is specified.
+ * @NL80211_GSCAN_BUCKET_ATTR_STEPS: step count as used in given formula.
+ *	This attribute is required when @NL80211_GSCAN_BUCKET_ATTR_MAX_PERIOD
+ *	is specified.
+ * @NL80211_GSCAN_BUCKET_ATTR_CHANNELS: nested attribute specifying the
+ *	channels that are to be scanned for this bucket.
+ * @NL80211_GSCAN_BUCKET_ATTR_MAX: highest GScan bucket attribute.
+ * @__NL80211_GSCAN_BUCKET_ATTR_AFTER_LAST: internal use.
+ */
+enum nl80211_gscan_bucket_attr {
+	__NL80211_GSCAN_BUCKET_ATTR_INVALID,
+	NL80211_GSCAN_BUCKET_ATTR_ID,
+	NL80211_GSCAN_BUCKET_ATTR_BAND,
+	NL80211_GSCAN_BUCKET_ATTR_PERIOD,
+	NL80211_GSCAN_BUCKET_ATTR_REPORT,
+	NL80211_GSCAN_BUCKET_ATTR_MAX_PERIOD,
+	NL80211_GSCAN_BUCKET_ATTR_EXPONENT,
+	NL80211_GSCAN_BUCKET_ATTR_STEPS,
+	NL80211_GSCAN_BUCKET_ATTR_CHANNELS,
+
+	/* keep last */
+	__NL80211_GSCAN_BUCKET_ATTR_AFTER_LAST,
+	NL80211_GSCAN_BUCKET_ATTR_MAX = __NL80211_GSCAN_BUCKET_ATTR_AFTER_LAST - 1
+};
+
+/**
+ * enum nl80211_gscan_chan_attr - GScan bucket channel parameters.
+ *
+ * @__NL80211_GSCAN_CHAN_ATTR_INVALID: reserved.
+ * @NL80211_GSCAN_CHAN_ATTR_FREQ: frequency of channel.
+ * @NL80211_GSCAN_CHAN_ATTR_DWELL_TIME: dwell time to be used for scanning
+ *	this channel.
+ * @NL80211_GSCAN_CHAN_ATTR_NO_IR: scanning should be done passive.
+ * @NL80211_GSCAN_CHAN_ATTR_MAX: highest GScan channel attribute.
+ * @__NL80211_GSCAN_CHAN_ATTR_AFTER_LAST: internal use.
+ */
+enum nl80211_gscan_chan_attr {
+	__NL80211_GSCAN_CHAN_ATTR_INVALID,
+	NL80211_GSCAN_CHAN_ATTR_FREQ,
+	NL80211_GSCAN_CHAN_ATTR_DWELL_TIME,
+	NL80211_GSCAN_CHAN_ATTR_NO_IR,
+
+	/* keep last */
+	__NL80211_GSCAN_CHAN_ATTR_AFTER_LAST,
+	NL80211_GSCAN_CHAN_ATTR_MAX = __NL80211_GSCAN_CHAN_ATTR_AFTER_LAST - 1
+};
+
+/**
+ * enum nl80211_bucket_band - GScan bucket band selection.
+ *
+ * @NL80211_BUCKET_BAND_2GHZ: consider all device supported channels
+ *	in 2G band.
+ * @NL80211_BUCKET_BAND_5GHZ: consider all device supported channels
+ *	in 5G band, ie. both DFS and non-DFS when @NL80211_BUCKET_BAND_NODFS
+ *	and @NL80211_BUCKET_BAND_DFS_ONLY are not set.
+ * @NL80211_BUCKET_BAND_NODFS: only consider non-DFS channels. Only
+ *	applicable when 5G band is selected, otherwise ignored.
+ * @NL80211_BUCKET_BAND_DFS_ONLY: only consider DFS channels. Only
+ *	applicable when 5G band is selected, otherwise ignored.
+ *
+ * Setting both @NL80211_BUCKET_BAND_NODFS and @NL80211_BUCKET_BAND_DFS_ONLY
+ * is considerd invalid.
+ */
+enum nl80211_bucket_band {
+	NL80211_BUCKET_BAND_2GHZ	= (1 << 0),
+	NL80211_BUCKET_BAND_5GHZ	= (1 << 1),
+	NL80211_BUCKET_BAND_NODFS	= (1 << 2),
+	NL80211_BUCKET_BAND_DFS_ONLY	= (1 << 3),
+};
+
+/**
+ * enum nl80211_bucket_report_event - GScan bucket report flags.
+ *
+ * @NL80211_BUCKET_REPORT_EACH_SCAN: trigger event after each scan.
+ * @NL80211_BUCKET_REPORT_FULL_RESULTS: report full scan results.
+ * @NL80211_BUCKET_REPORT_NO_BATCH: no batching required.
+ */
+enum nl80211_bucket_report_event {
+	NL80211_BUCKET_REPORT_EACH_SCAN		= (1 << 0),
+	NL80211_BUCKET_REPORT_FULL_RESULTS	= (1 << 1),
+	NL80211_BUCKET_REPORT_NO_BATCH		= (1 << 2),
 };
 
 #endif /* __LINUX_NL80211_H */
