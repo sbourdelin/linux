@@ -3700,9 +3700,10 @@ retry:
 
 	/*
 	 * Do not retry costly high order allocations unless they are
-	 * __GFP_REPEAT
+	 * __GFP_REPEAT or __GFP_NOFAIL
 	 */
-	if (order > PAGE_ALLOC_COSTLY_ORDER && !(gfp_mask & __GFP_REPEAT))
+	if (order > PAGE_ALLOC_COSTLY_ORDER &&
+	    !(gfp_mask & (__GFP_REPEAT | __GFP_NOFAIL)))
 		goto nopage;
 
 	/* Make sure we know about allocations which stall for too long */
