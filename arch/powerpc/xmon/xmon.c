@@ -120,7 +120,7 @@ static void byterev(unsigned char *, int);
 static void memex(void);
 static int bsesc(void);
 static void dump(void);
-static void prdump(unsigned long, long);
+static void prdump(unsigned long, long, int);
 static int ppc_inst_dump(unsigned long, long, int);
 static void dump_log_buf(void);
 
@@ -144,6 +144,7 @@ int skipbl(void);
 int scanhex(unsigned long *valp);
 static void scannl(void);
 static int hexdigit(int);
+static int digithex(int);
 void getstring(char *, int);
 static void flush_input(void);
 static int inchar(void);
@@ -220,6 +221,7 @@ Commands:\n\
 #endif
 #ifdef CONFIG_PPC64
   "\
+  dR	dump bytes in reverse (double words) \n\
   dp[#]	dump paca for current cpu, or cpu #\n\
   dpa	dump paca for all possible cpus\n"
 #endif
@@ -2371,43 +2373,76 @@ dump(void)
 		xmon_rawdump(adrs, ndump);
 		adrs += ndump;
 		last_cmd = "dr\n";
+#ifdef CONFIG_PPC64
+	} else if (c == 'R') {
+		scanhex(&ndump);
+		if (ndump == 0)
+			ndump = 64;
+		else if (ndump > MAX_DUMP)
+			ndump = MAX_DUMP;
+		prdump(adrs, ndump, 1);
+		adrs += ndump;
+		last_cmd = "dR\n";
+#endif
 	} else {
 		scanhex(&ndump);
 		if (ndump == 0)
 			ndump = 64;
 		else if (ndump > MAX_DUMP)
 			ndump = MAX_DUMP;
-		prdump(adrs, ndump);
+		prdump(adrs, ndump, 0);
 		adrs += ndump;
 		last_cmd = "d\n";
 	}
 }
 
 static void
-prdump(unsigned long adrs, long ndump)
+prdump(unsigned long adrs, long ndump, int reverse)
 {
 	long n, m, c, r, nr;
 	unsigned char temp[16];
+	unsigned char buf[17];
+	int idx;
 
 	for (n = ndump; n > 0;) {
 		printf(REG, adrs);
 		putchar(' ');
 		r = n < 16? n: 16;
 		nr = mread(adrs, temp, r);
+
+		if (reverse) {
+			idx = 14;
+			buf[16] = '\0';
+		}
 		adrs += nr;
 		for (m = 0; m < r; ++m) {
-			if ((m & (sizeof(long) - 1)) == 0 && m > 0)
+			if ((m & (sizeof(long) - 1)) == 0 && m > 0) {
+				if (reverse) {
+					printf("%s", buf);
+					idx = 14;
+				}
 				putchar(' ');
-			if (m < nr)
-				printf("%.2x", temp[m]);
-			else
+			}
+
+			if (m < nr) {
+				if (reverse) {
+					buf[idx + 1] = digithex(temp[m] % 16);
+					buf[idx] = digithex(temp[m] / 16);
+					idx -= 2;
+				} else
+					printf("%.2x", temp[m]);
+			} else
 				printf("%s", fault_chars[fault_type]);
 		}
+
+		if (reverse)
+			printf("%s", buf);
 		for (; m < 16; ++m) {
 			if ((m & (sizeof(long) - 1)) == 0)
 				putchar(' ');
 			printf("  ");
 		}
+
 		printf("  |");
 		for (m = 0; m < r; ++m) {
 			if (m < nr) {
@@ -2890,6 +2925,15 @@ static int hexdigit(int c)
 		return c - ('A' - 10);
 	if( 'a' <= c && c <= 'f' )
 		return c - ('a' - 10);
+	return EOF;
+}
+
+static int digithex(int c)
+{
+	if (c >= 0 && c <= 9)
+		return c + '0';
+	if (c >= 0xa && c <= 0xf)
+		return c + ('a' - 10);
 	return EOF;
 }
 
