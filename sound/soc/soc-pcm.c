@@ -2746,6 +2746,7 @@ int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 		rtd->ops.silence	= platform->driver->ops->silence;
 		rtd->ops.page		= platform->driver->ops->page;
 		rtd->ops.mmap		= platform->driver->ops->mmap;
+		rtd->ops.get_time_info  = platform->driver->ops->get_time_info;
 	}
 
 	if (playback)
