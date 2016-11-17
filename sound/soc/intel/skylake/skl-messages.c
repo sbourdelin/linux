@@ -66,6 +66,7 @@ static void skl_dsp_enable_notification(struct skl_sst *ctx, bool enable)
 	mask.notify = NOTIFICATION_MASK;
 	mask.enable = enable;
 
+	/* Notification param_id is 3 */
 	msg.large_param_id = NOTIFICATION_PARAM_ID;
 	msg.param_data_size = sizeof(mask);
 
@@ -1117,6 +1118,51 @@ int skl_delete_pipe(struct skl_sst *ctx, struct skl_pipe *pipe)
 	pipe->state = SKL_PIPE_INVALID;
 
 	return ret;
+}
+
+/**
+ * skl_get_timestamp_info - Queries FW for timestamp info
+ * @arg1:       skl_sst context
+ * @arg2:	copier module configuration
+ * @arg3:	skl_timestamp_ntf_data data structure to be filled
+ *
+ * Return:  0 - for successful reply from firmware.
+ *          Error - for no reply from firmware.
+ */
+int skl_get_timestamp_info(struct skl_sst *ctx,
+		struct skl_module_cfg *m_cfg, u32 *ntf)
+{
+	struct notification_message *n_msg = &ctx->notification_msg;
+	struct skl_ipc_large_config_msg msg;
+	u32 param = 0x80; /* Hammock Harbor ID: (tsctrl_reg) */
+	int ret;
+
+	dev_dbg(ctx->dev, "In %s: pipe = %d\n", __func__, m_cfg->pipe->ppl_id);
+
+	/* Fill in message data structure */
+	msg.module_id = m_cfg->id.module_id;
+	msg.instance_id = m_cfg->id.instance_id;
+	msg.param_data_size = 4; /* Timestamp Init Length = 4 Bytes */
+	msg.large_param_id = 1;
+
+	/* Send IPC to Firmware */
+	ret = skl_ipc_set_large_config(&ctx->ipc, &msg, &param);
+	if (ret < 0)
+		return -EINVAL;
+
+	/* Wait for notification from Firmware for HH request */
+	init_waitqueue_head(&n_msg->notification_wait);
+	n_msg->complete = false;
+
+	ret = wait_event_timeout(n_msg->notification_wait,
+			n_msg->complete, msecs_to_jiffies(IPC_TIMEOUT_MSECS));
+	if (!ret)
+		return -EINVAL;
+
+	/* Copying 9 DWORD recieved from FW 9*4=36 */
+	memcpy(ntf, &ctx->notification_msg.ntf_data, 36);
+
+	return 0;
 }
 
 /*

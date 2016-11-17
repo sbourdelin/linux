@@ -34,7 +34,6 @@
 #define IPC_GLB_REPLY_STATUS_MASK	((0x1 << IPC_GLB_REPLY_STATUS_SHIFT) - 1)
 #define IPC_GLB_REPLY_STATUS(x)		((x) << IPC_GLB_REPLY_STATUS_SHIFT)
 
-#define IPC_TIMEOUT_MSECS		3000
 
 #define IPC_EMPTY_LIST_SIZE		8
 
@@ -377,6 +376,14 @@ static int skl_ipc_process_notification(struct sst_generic_ipc *ipc,
 			skl->miscbdcg_disabled = true;
 			break;
 
+		case IPC_GLB_NOTIFY_TIMESTAMP_CAPTURED:
+			/* copy rx data from the mailbox */
+			sst_dsp_inbox_read(ipc->dsp,
+				&skl->notification_msg.ntf_data,
+				sizeof(skl->notification_msg.ntf_data));
+			skl->notification_msg.complete = true;
+			wake_up(&skl->notification_msg.notification_wait);
+			break;
 		default:
 			dev_err(ipc->dev, "ipc: Unhandled error msg=%x\n",
 						header.primary);

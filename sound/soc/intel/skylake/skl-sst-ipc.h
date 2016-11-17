@@ -20,6 +20,8 @@
 #include <linux/irqreturn.h>
 #include "../common/sst-ipc.h"
 
+#define IPC_TIMEOUT_MSECS               3000
+
 struct sst_dsp;
 struct skl_sst;
 struct sst_generic_ipc;
@@ -70,6 +72,23 @@ struct skl_d0i3_data {
 	struct delayed_work work;
 };
 
+struct skl_timestamp_ntf_data {
+	/* Module + Instance ID recieved from FW */
+	u32 module_instance_id;
+
+	/* Gateway ID recieved from FW */
+	u32 node_id;
+
+	/* RAW Timestamp Info recieved from FW */
+	u32 timestamp_data[7];
+};
+
+struct notification_message {
+	bool complete;
+	wait_queue_head_t notification_wait;
+	struct skl_timestamp_ntf_data ntf_data;
+};
+
 struct skl_sst {
 	struct device *dev;
 	struct sst_dsp *dsp;
@@ -105,6 +124,9 @@ struct skl_sst {
 	void (*update_d0i3c)(struct device *dev, bool enable);
 
 	struct skl_d0i3_data d0i3;
+
+	/* Timestamp notification */
+	struct notification_message notification_msg;
 };
 
 struct skl_ipc_init_instance_msg {
@@ -166,8 +188,8 @@ int skl_ipc_init_instance(struct sst_generic_ipc *sst_ipc,
 int skl_ipc_bind_unbind(struct sst_generic_ipc *sst_ipc,
 		struct skl_ipc_bind_unbind_msg *msg);
 
-int skl_ipc_load_modules(struct sst_generic_ipc *ipc,
-				u8 module_cnt, void *data);
+int skl_ipc_load_modules(struct sst_generic_ipc *ipc, u8 module_cnt,
+							void *data);
 
 int skl_ipc_unload_modules(struct sst_generic_ipc *ipc,
 				u8 module_cnt, void *data);

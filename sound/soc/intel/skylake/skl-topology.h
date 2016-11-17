@@ -374,6 +374,9 @@ void skl_tplg_d0i3_put(struct skl *skl, enum d0i3_capability caps);
 
 int skl_create_pipeline(struct skl_sst *ctx, struct skl_pipe *pipe);
 
+int skl_get_timestamp_info(struct skl_sst *ctx,
+	struct skl_module_cfg *m_cfg, u32 *ntf);
+
 int skl_run_pipe(struct skl_sst *ctx, struct skl_pipe *pipe);
 
 int skl_pause_pipe(struct skl_sst *ctx, struct skl_pipe *pipe);
