@@ -2115,6 +2115,11 @@ static inline unsigned char *skb_inner_mac_header(const struct sk_buff *skb)
 	return skb->head + skb->inner_mac_header;
 }
 
+static inline int skb_inner_mac_offset(const struct sk_buff *skb)
+{
+	return skb_inner_mac_header(skb) - skb->data;
+}
+
 static inline void skb_reset_inner_mac_header(struct sk_buff *skb)
 {
 	skb->inner_mac_header = skb->data - skb->head;

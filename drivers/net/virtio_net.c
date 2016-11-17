@@ -1789,7 +1789,10 @@ static int virtnet_probe(struct virtio_device *vdev)
 
 		if (virtio_has_feature(vdev, VIRTIO_NET_F_GSO)) {
 			dev->hw_features |= NETIF_F_TSO | NETIF_F_UFO
-				| NETIF_F_TSO_ECN | NETIF_F_TSO6;
+				| NETIF_F_TSO_ECN | NETIF_F_TSO6
+				| NETIF_F_GSO_UDP_TUNNEL
+				| NETIF_F_GSO_UDP_TUNNEL_CSUM
+				| NETIF_F_GSO_TUNNEL_REMCSUM;
 		}
 		/* Individual feature bits: what can host handle? */
 		if (virtio_has_feature(vdev, VIRTIO_NET_F_HOST_TSO4))
@@ -1798,13 +1801,18 @@ static int virtnet_probe(struct virtio_device *vdev)
 			dev->hw_features |= NETIF_F_TSO6;
 		if (virtio_has_feature(vdev, VIRTIO_NET_F_HOST_ECN))
 			dev->hw_features |= NETIF_F_TSO_ECN;
-		if (virtio_has_feature(vdev, VIRTIO_NET_F_HOST_UFO))
+		if (virtio_has_feature(vdev, VIRTIO_NET_F_HOST_UFO)) {
 			dev->hw_features |= NETIF_F_UFO;
-
+#if 1
+			dev->hw_features |= NETIF_F_GSO_UDP_TUNNEL;
+			dev->hw_features |= NETIF_F_GSO_UDP_TUNNEL_CSUM;
+			dev->hw_features |= NETIF_F_GSO_TUNNEL_REMCSUM;
+#endif
+		}
 		dev->features |= NETIF_F_GSO_ROBUST;
 
 		if (gso)
-			dev->features |= dev->hw_features & (NETIF_F_ALL_TSO|NETIF_F_UFO);
+			dev->features |= dev->hw_features & (NETIF_F_ALL_TSO|NETIF_F_UFO|NETIF_F_GSO_UDP_TUNNEL|NETIF_F_GSO_UDP_TUNNEL_CSUM|NETIF_F_GSO_TUNNEL_REMCSUM);
 		/* (!csum && gso) case will be fixed by register_netdev() */
 	}
 	if (virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_CSUM))

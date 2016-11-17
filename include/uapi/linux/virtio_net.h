@@ -93,7 +93,14 @@ struct virtio_net_hdr_v1 {
 #define VIRTIO_NET_HDR_GSO_TCPV4	1	/* GSO frame, IPv4 TCP (TSO) */
 #define VIRTIO_NET_HDR_GSO_UDP		3	/* GSO frame, IPv4 UDP (UFO) */
 #define VIRTIO_NET_HDR_GSO_TCPV6	4	/* GSO frame, IPv6 TCP */
+#define VIRTIO_NET_HDR_GSO_UDP_TUNNEL	0x10	/* GSO frame, UDP tunnel */
+#define VIRTIO_NET_HDR_GSO_UDP_TUNNEL_CSUM 0x20	/* GSO frame, UDP tnl w CSUM */
+#define VIRTIO_NET_HDR_GSO_TUNNEL_REMCSUM 0x40	/* TUNNEL with TSO & REMCSUM */
 #define VIRTIO_NET_HDR_GSO_ECN		0x80	/* TCP has ECN set */
+#define VIRTIO_NET_HDR_GSO_FLAGS (VIRTIO_NET_HDR_GSO_UDP_TUNNEL | \
+				  VIRTIO_NET_HDR_GSO_UDP_TUNNEL_CSUM | \
+				  VIRTIO_NET_HDR_GSO_TUNNEL_REMCSUM | \
+				  VIRTIO_NET_HDR_GSO_ECN)
 	__u8 gso_type;
 	__virtio16 hdr_len;	/* Ethernet + IP + tcp/udp hdrs */
 	__virtio16 gso_size;	/* Bytes to append to hdr_len per frame */

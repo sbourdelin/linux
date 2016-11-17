@@ -198,7 +198,9 @@ struct tun_struct {
 	struct net_device	*dev;
 	netdev_features_t	set_features;
 #define TUN_USER_FEATURES (NETIF_F_HW_CSUM|NETIF_F_TSO_ECN|NETIF_F_TSO| \
-			  NETIF_F_TSO6|NETIF_F_UFO)
+			   NETIF_F_TSO6|NETIF_F_UFO|NETIF_F_GSO_UDP_TUNNEL| \
+			   NETIF_F_GSO_UDP_TUNNEL_CSUM| \
+			   NETIF_F_GSO_TUNNEL_REMCSUM)
 
 	int			align;
 	int			vnet_hdr_sz;
@@ -1877,6 +1879,9 @@ static int set_offload(struct tun_struct *tun, unsigned long arg)
 
 		if (arg & TUN_F_UFO) {
 			features |= NETIF_F_UFO;
+#if 1
+			features |= NETIF_F_GSO_UDP_TUNNEL|NETIF_F_GSO_UDP_TUNNEL_CSUM|NETIF_F_GSO_TUNNEL_REMCSUM;
+#endif
 			arg &= ~TUN_F_UFO;
 		}
 	}
