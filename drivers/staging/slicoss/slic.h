@@ -540,6 +540,15 @@ static inline void slic_flush_write(struct adapter *adapter)
 	ioread32(adapter->regs + SLIC_REG_HOSTID);
 }
 
+static inline u64 slic_ioread64(void __iomem *mmio)
+{
+	u64 low, high;
+
+	low = ioread32(mmio);
+	high = ioread32(mmio + sizeof(u32));
+	return low | (high << 32);
+}
+
 #define UPDATE_STATS(largestat, newstat, oldstat)                        \
 {                                                                        \
 	if ((newstat) < (oldstat))                                       \
