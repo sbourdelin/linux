@@ -904,6 +904,8 @@ static int __init parse_memmap_one(char *p)
 	} else if (*p == '!') {
 		start_at = memparse(p+1, &p);
 		e820_add_region(start_at, mem_size, E820_PRAM);
+		if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+			pr_warn("e820: CONFIG_RANDOMIZE_BASE enabled, kernel image may collide/overwrite the pmem range on subsequent boots!\n");
 	} else
 		e820_remove_range(mem_size, ULLONG_MAX - mem_size, E820_RAM, 1);
 
