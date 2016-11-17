@@ -287,6 +287,47 @@ void cfg80211_sched_scan_results(struct wiphy *wiphy)
 }
 EXPORT_SYMBOL(cfg80211_sched_scan_results);
 
+void __cfg80211_gscan_results(struct work_struct *wk)
+{
+	struct cfg80211_registered_device *rdev;
+	struct cfg80211_gscan_request *request;
+
+	rdev = container_of(wk, struct cfg80211_registered_device,
+			    gscan_results_wk);
+
+	rtnl_lock();
+
+	request = rtnl_dereference(rdev->gscan_req);
+
+	/* we don't have sched_scan_req anymore if the scan is stopping */
+	if (request) {
+#if 0
+		/* TODO: how to deal with flush */
+		if (request->flags & NL80211_SCAN_FLAG_FLUSH) {
+			/* flush entries from previous scans */
+			spin_lock_bh(&rdev->bss_lock);
+			__cfg80211_bss_expire(rdev, request->scan_start);
+			spin_unlock_bh(&rdev->bss_lock);
+			request->scan_start = jiffies;
+		}
+#endif
+		nl80211_send_gscan_results(rdev, request->dev);
+	}
+
+	rtnl_unlock();
+}
+
+void cfg80211_gscan_results(struct wiphy *wiphy)
+{
+	trace_cfg80211_gscan_results(wiphy);
+	/* ignore if we're not scanning */
+
+	if (rcu_access_pointer(wiphy_to_rdev(wiphy)->gscan_req))
+		queue_work(cfg80211_wq,
+			   &wiphy_to_rdev(wiphy)->gscan_results_wk);
+}
+EXPORT_SYMBOL(cfg80211_gscan_results);
+
 void cfg80211_sched_scan_stopped_rtnl(struct wiphy *wiphy)
 {
 	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wiphy);
@@ -306,6 +347,26 @@ void cfg80211_sched_scan_stopped(struct wiphy *wiphy)
 	rtnl_unlock();
 }
 EXPORT_SYMBOL(cfg80211_sched_scan_stopped);
+
+void cfg80211_gscan_stopped_rtnl(struct wiphy *wiphy)
+{
+	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wiphy);
+
+	ASSERT_RTNL();
+
+	trace_cfg80211_gscan_stopped(wiphy);
+
+	__cfg80211_stop_gscan(rdev, true);
+}
+EXPORT_SYMBOL(cfg80211_gscan_stopped_rtnl);
+
+void cfg80211_gscan_stopped(struct wiphy *wiphy)
+{
+	rtnl_lock();
+	cfg80211_gscan_stopped_rtnl(wiphy);
+	rtnl_unlock();
+}
+EXPORT_SYMBOL(cfg80211_gscan_stopped);
 
 int __cfg80211_stop_sched_scan(struct cfg80211_registered_device *rdev,
 			       bool driver_initiated)

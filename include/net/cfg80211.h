@@ -4570,6 +4570,34 @@ void cfg80211_sched_scan_stopped(struct wiphy *wiphy);
 void cfg80211_sched_scan_stopped_rtnl(struct wiphy *wiphy);
 
 /**
+ * cfg80211_gscan_results - notify that new scan results are available
+ *
+ * @wiphy: the wiphy which got GScan results
+ */
+void cfg80211_gscan_results(struct wiphy *wiphy);
+
+/**
+ * cfg80211_gscan_stopped - notify that the GScan has stopped
+ *
+ * @wiphy: the wiphy on which the GScan stopped.
+ *
+ * The driver can call this function to inform cfg80211 that the
+ * GScan had to be stopped, for whatever reason.
+ */
+void cfg80211_gscan_stopped(struct wiphy *wiphy);
+
+/**
+ * cfg80211_gscan_stopped_rtnl - notify that the GScan has stopped
+ *
+ * @wiphy: the wiphy on which the GScan stopped.
+ *
+ * The driver can call this function to inform cfg80211 that the
+ * GScan had to be stopped, for whatever reason.
+ * This function should be called with rtnl locked.
+ */
+void cfg80211_gscan_stopped_rtnl(struct wiphy *wiphy);
+
+/**
  * cfg80211_inform_bss_frame_data - inform cfg80211 of a received BSS frame
  * @wiphy: the wiphy reporting the BSS
  * @data: the BSS metadata
