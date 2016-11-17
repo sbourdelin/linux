@@ -59,8 +59,7 @@ _GLOBAL(slb_allocate_realmode)
 	/* Linear mapping encoding bits, the "li" instruction below will
 	 * be patched by the kernel at boot
 	 */
-.globl slb_miss_kernel_load_linear
-slb_miss_kernel_load_linear:
+_GLOBAL_SYM(slb_miss_kernel_load_linear)
 	li	r11,0
 	/*
 	 * context = (MAX_USER_CONTEXT) + ((ea >> 60) - 0xc) + 1
@@ -71,17 +70,16 @@ slb_miss_kernel_load_linear:
 
 
 BEGIN_FTR_SECTION
-	b	slb_finish_load
+	b	.Lslb_finish_load
 END_MMU_FTR_SECTION_IFCLR(MMU_FTR_1T_SEGMENT)
-	b	slb_finish_load_1T
+	b	.Lslb_finish_load_1T
 
 1:
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
 	/* Check virtual memmap region. To be patches at kernel boot */
 	cmpldi	cr0,r9,0xf
 	bne	1f
-.globl slb_miss_kernel_load_vmemmap
-slb_miss_kernel_load_vmemmap:
+_GLOBAL_SYM(slb_miss_kernel_load_vmemmap)
 	li	r11,0
 	b	6f
 1:
@@ -97,8 +95,7 @@ slb_miss_kernel_load_vmemmap:
 	b	6f
 5:
 	/* IO mapping */
-.globl slb_miss_kernel_load_io
-slb_miss_kernel_load_io:
+_GLOBAL_SYM(slb_miss_kernel_load_io)
 	li	r11,0
 6:
 	/*
@@ -109,9 +106,9 @@ slb_miss_kernel_load_io:
 	addi	r9,r9,(MAX_USER_CONTEXT - 0xc + 1)@l
 
 BEGIN_FTR_SECTION
-	b	slb_finish_load
+	b	.Lslb_finish_load
 END_MMU_FTR_SECTION_IFCLR(MMU_FTR_1T_SEGMENT)
-	b	slb_finish_load_1T
+	b	.Lslb_finish_load_1T
 
 0:	/*
 	 * For userspace addresses, make sure this is region 0.
@@ -174,9 +171,9 @@ END_MMU_FTR_SECTION_IFCLR(MMU_FTR_1T_SEGMENT)
 	ld	r9,PACACONTEXTID(r13)
 BEGIN_FTR_SECTION
 	cmpldi	r10,0x1000
-	bge	slb_finish_load_1T
+	bge	.Lslb_finish_load_1T
 END_MMU_FTR_SECTION_IFSET(MMU_FTR_1T_SEGMENT)
-	b	slb_finish_load
+	b	.Lslb_finish_load
 
 8:	/* invalid EA - return an error indication */
 	crset	4*cr0+eq		/* indicate failure */
@@ -187,7 +184,7 @@ END_MMU_FTR_SECTION_IFSET(MMU_FTR_1T_SEGMENT)
  *
  * r3 = EA, r9 = context, r10 = ESID, r11 = flags, clobbers r9, cr7 = <> PAGE_OFFSET
  */
-slb_finish_load:
+.Lslb_finish_load:
 	rldimi  r10,r9,ESID_BITS,0
 	ASM_VSID_SCRAMBLE(r10,r9,256M)
 	/*
@@ -206,8 +203,7 @@ slb_finish_load:
 7:	ld	r10,PACASTABRR(r13)
 	addi	r10,r10,1
 	/* This gets soft patched on boot. */
-.globl slb_compare_rr_to_size
-slb_compare_rr_to_size:
+_GLOBAL_SYM(slb_compare_rr_to_size)
 	cmpldi	r10,0
 
 	blt+	4f
@@ -256,7 +252,7 @@ slb_compare_rr_to_size:
  *
  * r3 = EA, r9 = context, r10 = ESID(256MB), r11 = flags, clobbers r9
  */
-slb_finish_load_1T:
+.Lslb_finish_load_1T:
 	srdi	r10,r10,(SID_SHIFT_1T - SID_SHIFT)	/* get 1T ESID */
 	rldimi  r10,r9,ESID_BITS_1T,0
 	ASM_VSID_SCRAMBLE(r10,r9,1T)
