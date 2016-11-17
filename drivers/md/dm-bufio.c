@@ -89,6 +89,7 @@ struct dm_bufio_client {
 
 	struct list_head lru[LIST_SIZE];
 	unsigned long n_buffers[LIST_SIZE];
+	unsigned long n_all_buffers;
 
 	struct block_device *bdev;
 	unsigned block_size;
@@ -485,6 +486,7 @@ static void __link_buffer(struct dm_buffer *b, sector_t block, int dirty)
 	struct dm_bufio_client *c = b->c;
 
 	c->n_buffers[dirty]++;
+	c->n_all_buffers++;
 	b->block = block;
 	b->list_mode = dirty;
 	list_add(&b->lru_list, &c->lru[dirty]);
@@ -502,6 +504,7 @@ static void __unlink_buffer(struct dm_buffer *b)
 	BUG_ON(!c->n_buffers[b->list_mode]);
 
 	c->n_buffers[b->list_mode]--;
+	c->n_all_buffers--;
 	__remove(b->c, b);
 	list_del(&b->lru_list);
 }
@@ -515,6 +518,7 @@ static void __relink_lru(struct dm_buffer *b, int dirty)
 
 	BUG_ON(!c->n_buffers[b->list_mode]);
 
+	/* NOTE: don't update n_all_buffers: -1 + 1 = 0 */
 	c->n_buffers[b->list_mode]--;
 	c->n_buffers[dirty]++;
 	b->list_mode = dirty;
@@ -1588,17 +1592,10 @@ static unsigned long
 dm_bufio_shrink_count(struct shrinker *shrink, struct shrink_control *sc)
 {
 	struct dm_bufio_client *c;
-	unsigned long count;
 
 	c = container_of(shrink, struct dm_bufio_client, shrinker);
-	if (sc->gfp_mask & __GFP_FS)
-		dm_bufio_lock(c);
-	else if (!dm_bufio_trylock(c))
-		return 0;
 
-	count = c->n_buffers[LIST_CLEAN] + c->n_buffers[LIST_DIRTY];
-	dm_bufio_unlock(c);
-	return count;
+	return c->n_all_buffers;
 }
 
 /*
