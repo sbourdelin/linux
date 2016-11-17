@@ -35,6 +35,7 @@
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/highmem.h>
+#include <linux/mempolicy.h>
 
 #include <xen/xen.h>
 #include <xen/grant_table.h>
@@ -433,10 +434,28 @@ static struct page *gntdev_vma_find_special_page(struct vm_area_struct *vma,
 	return map->pages[(addr - map->pages_vm_start) >> PAGE_SHIFT];
 }
 
+#ifdef CONFIG_NUMA
+/*
+ * We have this op to make sure callers (such as vma_policy_mof()) don't
+ * check current task's policy which may include migrate flags (MPOL_F_MOF
+ * or MPOL_F_MORON)
+ */
+static struct mempolicy *gntdev_vma_get_policy(struct vm_area_struct *vma,
+					       unsigned long addr)
+{
+	if (mpol_needs_cond_ref(vma->vm_policy))
+		mpol_get(vma->vm_policy);
+	return vma->vm_policy;
+}
+#endif
+
 static const struct vm_operations_struct gntdev_vmops = {
 	.open = gntdev_vma_open,
 	.close = gntdev_vma_close,
 	.find_special_page = gntdev_vma_find_special_page,
+#ifdef CONFIG_NUMA
+	.get_policy = gntdev_vma_get_policy,
+#endif
 };
 
 /* ------------------------------------------------------------------ */
@@ -1007,7 +1026,13 @@ static int gntdev_mmap(struct file *flip, struct vm_area_struct *vma)
 
 	vma->vm_ops = &gntdev_vmops;
 
-	vma->vm_flags |= VM_DONTEXPAND | VM_DONTDUMP | VM_IO;
+	vma->vm_flags |= VM_DONTEXPAND | VM_DONTDUMP;
+
+#ifdef CONFIG_NUMA
+	/* Prevent NUMA balancing */
+	if (vma->vm_policy)
+		vma->vm_policy->flags &= ~(MPOL_F_MOF | MPOL_F_MORON);
+#endif
 
 	if (use_ptemod)
 		vma->vm_flags |= VM_DONTCOPY;
