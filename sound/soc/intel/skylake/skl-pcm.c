@@ -1459,7 +1459,17 @@ static int skl_get_time_info(struct snd_pcm_substream *substream,
 {
 	struct hdac_ext_stream *sstream = get_hdac_ext_stream(substream);
 	struct hdac_stream *hstr = hdac_stream(sstream);
+	struct snd_soc_pcm_runtime *rtd = snd_pcm_substream_chip(substream);
+	struct hdac_ext_bus *ebus = get_bus_ctx(substream);
+	struct skl *skl = ebus_to_skl(ebus);
+	struct system_device_crosststamp xstamp;
+	struct skl_module_cfg *m_cfg_be;
+	u64 wallclk_ns;
 	u64 nsec;
+	int ret;
+
+	dev_dbg(rtd->cpu_dai->dev, "In %s: CPU Dai: %s\n", __func__,
+					rtd->cpu_dai->name);
 
 	if ((substream->runtime->hw.info & SNDRV_PCM_INFO_HAS_LINK_ATIME) &&
 		(audio_tstamp_config->type_requested == SNDRV_PCM_AUDIO_TSTAMP_TYPE_LINK)) {
@@ -1476,7 +1486,37 @@ static int skl_get_time_info(struct snd_pcm_substream *substream,
 		audio_tstamp_report->actual_type = SNDRV_PCM_AUDIO_TSTAMP_TYPE_LINK;
 		audio_tstamp_report->accuracy_report = 1; /* rest of struct is valid */
 		audio_tstamp_report->accuracy = 42; /* 24MHzWallClk == 42ns resolution */
+	} else if ((substream->runtime->hw.info &
+			SNDRV_PCM_INFO_HAS_LINK_SYNCHRONIZED_ATIME)
+			&& (audio_tstamp_config->type_requested ==
+			SNDRV_PCM_AUDIO_TSTAMP_TYPE_LINK_SYNCHRONIZED)) {
 
+		if ((ebus_to_hbus(ebus))->gtscap) {
+			m_cfg_be = get_mconfig_for_be_dai(substream);
+			if (!m_cfg_be) {
+				dev_err(rtd->cpu_dai->dev, "Back End Copier not found\n");
+				return -EINVAL;
+			}
+
+			ret = skl_read_timestamp_info(m_cfg_be, substream, &xstamp,
+								skl, &wallclk_ns);
+			if (ret < 0)
+				return ret;
+
+			ret = skl_convert_tscc(substream, &xstamp, system_ts, NULL);
+			if (ret < 0)
+				return ret;
+
+			*audio_ts = ns_to_timespec(wallclk_ns -
+					m_cfg_be->pipe->p_params->t0_wallclk);
+			audio_tstamp_report->accuracy_report = 1;
+
+			/* 24 MHz WallClock == 42ns resolution */
+			audio_tstamp_report->accuracy = 42;
+
+			audio_tstamp_report->actual_type =
+				SNDRV_PCM_AUDIO_TSTAMP_TYPE_LINK_SYNCHRONIZED;
+		}
 	} else {
 		audio_tstamp_report->actual_type = SNDRV_PCM_AUDIO_TSTAMP_TYPE_DEFAULT;
 	}
