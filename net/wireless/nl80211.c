@@ -7515,6 +7515,14 @@ static int nl80211_send_bss(struct sk_buff *msg, struct netlink_callback *cb,
 			      intbss->ts_boottime, NL80211_BSS_PAD))
 		goto nla_put_failure;
 
+	if (res->distance && nla_put_u32(msg, NL80211_BSS_DISTANCE,
+					 res->distance))
+		goto nla_put_failure;
+
+	if (res->var_distance && nla_put_u32(msg, NL80211_BSS_VARIANCE_DISTANCE,
+					     res->var_distance))
+		goto nla_put_failure;
+
 	switch (rdev->wiphy.signal_type) {
 	case CFG80211_SIGNAL_TYPE_MBM:
 		if (nla_put_u32(msg, NL80211_BSS_SIGNAL_MBM, res->signal))

@@ -973,6 +973,8 @@ cfg80211_inform_bss_data(struct wiphy *wiphy,
 	tmp.pub.signal = data->signal;
 	tmp.pub.beacon_interval = beacon_interval;
 	tmp.pub.capability = capability;
+	tmp.pub.distance = data->distance;
+	tmp.pub.var_distance = data->var_distance;
 	tmp.ts_boottime = data->boottime_ns;
 
 	/*
