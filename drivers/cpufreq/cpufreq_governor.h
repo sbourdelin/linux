@@ -114,12 +114,7 @@ struct cpu_dbs_info {
 	u64 prev_cpu_idle;
 	u64 prev_update_time;
 	u64 prev_cpu_nice;
-	/*
-	 * Used to keep track of load in the previous interval. However, when
-	 * explicitly set to zero, it is used as a flag to ensure that we copy
-	 * the previous load to the current interval only once, upon the first
-	 * wake-up from idle.
-	 */
+	/* Used to keep track of load in the previous interval. */
 	unsigned int prev_load;
 	struct update_util_data update_util;
 	struct policy_dbs_info *policy_dbs;

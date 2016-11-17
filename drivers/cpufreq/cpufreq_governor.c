@@ -163,25 +163,17 @@ unsigned int dbs_update(struct cpufreq_policy *policy)
 			 * calls, so the previous load value can be used then.
 			 */
 			load = j_cdbs->prev_load;
-		} else if (unlikely(time_elapsed > 2 * sampling_rate &&
-				    j_cdbs->prev_load)) {
+		} else if (time_elapsed > 2 * sampling_rate) {
+			unsigned int busy, periods;
+
 			/*
 			 * If the CPU had gone completely idle and a task has
 			 * just woken up on this CPU now, it would be unfair to
 			 * calculate 'load' the usual way for this elapsed
 			 * time-window, because it would show near-zero load,
 			 * irrespective of how CPU intensive that task actually
-			 * was. This is undesirable for latency-sensitive bursty
-			 * workloads.
-			 *
-			 * To avoid this, reuse the 'load' from the previous
-			 * time-window and give this task a chance to start with
-			 * a reasonably high CPU frequency. However, that
-			 * shouldn't be over-done, lest we get stuck at a high
-			 * load (high frequency) for too long, even when the
-			 * current system load has actually dropped down, so
-			 * clear prev_load to guarantee that the load will be
-			 * computed again next time.
+			 * was. This is undesirable, so we can safely consider
+			 * that the CPU is busy only in the last sampling period
 			 *
 			 * Detecting this situation is easy: the governor's
 			 * utilization update handler would not have run during
@@ -189,8 +181,16 @@ unsigned int dbs_update(struct cpufreq_policy *policy)
 			 * 'time_elapsed' (as compared to the sampling rate)
 			 * indicates this scenario.
 			 */
-			load = j_cdbs->prev_load;
-			j_cdbs->prev_load = 0;
+			busy = time_elapsed - idle_time;
+			if (busy > sampling_rate)
+				load = 100;
+			else
+				load = 100 * busy / sampling_rate;
+			j_cdbs->prev_load = load;
+
+			periods = time_elapsed / sampling_rate;
+			if (periods < idle_periods)
+				idle_periods = periods;
 		} else {
 			if (time_elapsed >= idle_time) {
 				load = 100 * (time_elapsed - idle_time) / time_elapsed;
@@ -213,13 +213,6 @@ unsigned int dbs_update(struct cpufreq_policy *policy)
 				load = (int)idle_time < 0 ? 100 : 0;
 			}
 			j_cdbs->prev_load = load;
-		}
-
-		if (time_elapsed > 2 * sampling_rate) {
-			unsigned int periods = time_elapsed / sampling_rate;
-
-			if (periods < idle_periods)
-				idle_periods = periods;
 		}
 
 		if (load > max_load)
