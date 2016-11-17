@@ -651,7 +651,7 @@ static void i915_guc_submit(struct drm_i915_gem_request *rq)
 
 	/* WA to flush out the pending GMADR writes to ring buffer. */
 	if (i915_vma_is_map_and_fenceable(rq->ring->vma))
-		POSTING_READ_FW(GUC_STATUS);
+		POSTING_READ(GUC_STATUS);
 
 	b_ret = guc_ring_doorbell(client);
 
