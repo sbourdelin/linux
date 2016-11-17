@@ -512,6 +512,8 @@ struct md_personality
 	/* congested implements bdi.congested_fn().
 	 * Will not be called while array is 'suspended' */
 	int (*congested)(struct mddev *mddev, int bits);
+	/* stop touching raid disks */
+	void (*stop_writes)(struct mddev *mddev);
 };
 
 struct md_sysfs_entry {

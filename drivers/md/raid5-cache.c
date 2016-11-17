@@ -738,11 +738,13 @@ static void r5l_write_super_and_discard_space(struct r5l_log *log,
 
 static void r5l_do_reclaim(struct r5l_log *log)
 {
+	static DEFINE_MUTEX(lock);
 	sector_t reclaim_target = xchg(&log->reclaim_target, 0);
 	sector_t reclaimable;
 	sector_t next_checkpoint;
 	u64 next_cp_seq;
 
+	mutex_lock(&lock);
 	spin_lock_irq(&log->io_list_lock);
 	/*
 	 * move proper io_unit to reclaim list. We should not change the order.
@@ -769,8 +771,10 @@ static void r5l_do_reclaim(struct r5l_log *log)
 	spin_unlock_irq(&log->io_list_lock);
 
 	BUG_ON(reclaimable < 0);
-	if (reclaimable == 0)
+	if (reclaimable == 0) {
+		mutex_unlock(&lock);
 		return;
+	}
 
 	/*
 	 * write_super will flush cache of each raid disk. We must write super
@@ -783,6 +787,8 @@ static void r5l_do_reclaim(struct r5l_log *log)
 	log->last_checkpoint = next_checkpoint;
 	log->last_cp_seq = next_cp_seq;
 	mutex_unlock(&log->io_mutex);
+
+	mutex_unlock(&lock);
 
 	r5l_run_no_space_stripes(log);
 }
@@ -834,6 +840,17 @@ void r5l_quiesce(struct r5l_log *log, int state)
 		md_unregister_thread(&log->reclaim_thread);
 		r5l_do_reclaim(log);
 	}
+}
+
+void r5l_stop_writes(struct mddev *mddev)
+{
+	struct r5conf *conf = mddev->private;
+	struct r5l_log *log = conf->log;
+
+	if (!log)
+		return;
+	r5l_wake_reclaim(log, -1L);
+	r5l_do_reclaim(log);
 }
 
 bool r5l_log_disk_error(struct r5conf *conf)

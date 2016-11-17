@@ -7866,6 +7866,7 @@ static struct md_personality raid6_personality =
 	.quiesce	= raid5_quiesce,
 	.takeover	= raid6_takeover,
 	.congested	= raid5_congested,
+	.stop_writes	= r5l_stop_writes,
 };
 static struct md_personality raid5_personality =
 {
@@ -7889,6 +7890,7 @@ static struct md_personality raid5_personality =
 	.quiesce	= raid5_quiesce,
 	.takeover	= raid5_takeover,
 	.congested	= raid5_congested,
+	.stop_writes	= r5l_stop_writes,
 };
 
 static struct md_personality raid4_personality =
@@ -7913,6 +7915,7 @@ static struct md_personality raid4_personality =
 	.quiesce	= raid5_quiesce,
 	.takeover	= raid4_takeover,
 	.congested	= raid5_congested,
+	.stop_writes	= r5l_stop_writes,
 };
 
 static int __init raid5_init(void)
