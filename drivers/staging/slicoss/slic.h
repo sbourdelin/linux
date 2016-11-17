@@ -540,6 +540,7 @@ static inline void slic_flush_write(struct adapter *adapter)
 	ioread32(adapter->regs + SLIC_REG_HOSTID);
 }
 
+#if BITS_PER_LONG == 32
 static inline u64 slic_ioread64(void __iomem *mmio)
 {
 	u64 low, high;
@@ -548,6 +549,14 @@ static inline u64 slic_ioread64(void __iomem *mmio)
 	high = ioread32(mmio + sizeof(u32));
 	return low | (high << 32);
 }
+#elif BITS_PER_LONG == 64
+static inline u64 slic_ioread64(void __iomem *mmio)
+{
+	return readq(mmio);
+}
+#else
+#error BITS_PER_LONG must be 32 or 64
+#endif
 
 #define UPDATE_STATS(largestat, newstat, oldstat)                        \
 {                                                                        \
