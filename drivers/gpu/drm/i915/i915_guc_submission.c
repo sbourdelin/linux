@@ -247,16 +247,9 @@ static int guc_update_doorbell_id(struct intel_guc *guc,
 
 	/* Activate the new doorbell */
 	__set_bit(new_id, doorbell_bitmap);
-	doorbell->cookie = 0;
 	doorbell->db_status = GUC_DOORBELL_ENABLED;
+	doorbell->cookie = client->doorbell_cookie;
 	return host2guc_allocate_doorbell(guc, client);
-}
-
-static int guc_init_doorbell(struct intel_guc *guc,
-			      struct i915_guc_client *client,
-			      uint16_t db_id)
-{
-	return guc_update_doorbell_id(guc, client, db_id);
 }
 
 static void guc_disable_doorbell(struct intel_guc *guc,
@@ -567,11 +560,11 @@ static int guc_ring_doorbell(struct i915_guc_client *gc)
 
 	/* current cookie */
 	db_cmp.db_status = GUC_DOORBELL_ENABLED;
-	db_cmp.cookie = gc->cookie;
+	db_cmp.cookie = gc->doorbell_cookie;
 
 	/* cookie to be updated */
 	db_exc.db_status = GUC_DOORBELL_ENABLED;
-	db_exc.cookie = gc->cookie + 1;
+	db_exc.cookie = gc->doorbell_cookie + 1;
 	if (db_exc.cookie == 0)
 		db_exc.cookie = 1;
 
@@ -586,7 +579,7 @@ static int guc_ring_doorbell(struct i915_guc_client *gc)
 		/* if the exchange was successfully executed */
 		if (db_ret.value_qw == db_cmp.value_qw) {
 			/* db was successfully rung */
-			gc->cookie = db_exc.cookie;
+			gc->doorbell_cookie = db_exc.cookie;
 			ret = 0;
 			break;
 		}
@@ -779,8 +772,7 @@ static void guc_init_doorbell_hw(struct intel_guc *guc)
 	uint16_t db_id;
 	int i, err;
 
-	/* Save client's original doorbell selection */
-	db_id = client->doorbell_id;
+	guc_disable_doorbell(guc, client);
 
 	for (i = 0; i < GUC_MAX_DOORBELLS; ++i) {
 		/* Skip if doorbell is OK */
@@ -793,7 +785,9 @@ static void guc_init_doorbell_hw(struct intel_guc *guc)
 					i, err);
 	}
 
-	/* Restore to original value */
+	db_id = select_doorbell_register(guc, client->priority);
+	WARN_ON(db_id == GUC_INVALID_DOORBELL_ID);
+
 	err = guc_update_doorbell_id(guc, client, db_id);
 	if (err)
 		DRM_WARN("Failed to restore doorbell to %d, err %d\n",
@@ -883,8 +877,13 @@ guc_client_alloc(struct drm_i915_private *dev_priv,
 
 	guc_proc_desc_init(guc, client);
 	guc_ctx_desc_init(guc, client);
-	if (guc_init_doorbell(guc, client, db_id))
-		goto err;
+
+	/* For runtime client allocation we need to enable the doorbell. Not
+	 * required yet for the static execbuf_client as this special kernel
+	 * client is enabled from i915_guc_submission_enable().
+	 *
+	 * guc_update_doorbell_id(guc, client, db_id);
+	 */
 
 	DRM_DEBUG_DRIVER("new priority %u client %p for engine(s) 0x%x: ctx_index %u\n",
 		priority, client, client->engines, client->ctx_index);
@@ -1504,42 +1503,43 @@ int i915_guc_submission_init(struct drm_i915_private *dev_priv)
 	guc_log_create(guc);
 	guc_addon_create(guc);
 
+	guc->execbuf_client = guc_client_alloc(dev_priv,
+					       INTEL_INFO(dev_priv)->ring_mask,
+					       GUC_CTX_PRIORITY_KMD_NORMAL,
+					       dev_priv->kernel_context);
+	if (!guc->execbuf_client) {
+		DRM_ERROR("Failed to create GuC client for execbuf!\n");
+		goto err;
+	}
+
 	return 0;
+
+err:
+	i915_guc_submission_fini(dev_priv);
+	return -ENOMEM;
 }
 
 int i915_guc_submission_enable(struct drm_i915_private *dev_priv)
 {
 	struct intel_guc *guc = &dev_priv->guc;
-	struct drm_i915_gem_request *request;
-	struct i915_guc_client *client;
+	struct i915_guc_client *client = guc->execbuf_client;
 	struct intel_engine_cs *engine;
 	enum intel_engine_id id;
 
-	/* client for execbuf submission */
-	client = guc_client_alloc(dev_priv,
-				  INTEL_INFO(dev_priv)->ring_mask,
-				  GUC_CTX_PRIORITY_KMD_NORMAL,
-				  dev_priv->kernel_context);
-	if (!client) {
-		DRM_ERROR("Failed to create normal GuC client!\n");
-		return -ENOMEM;
-	}
-
-	guc->execbuf_client = client;
 	host2guc_sample_forcewake(guc, client);
 	guc_init_doorbell_hw(guc);
 
 	/* Take over from manual control of ELSP (execlists) */
 	for_each_engine(engine, dev_priv, id) {
+		struct drm_i915_gem_request *rq;
+
 		engine->submit_request = i915_guc_submit;
 		engine->schedule = NULL;
 
 		/* Replay the current set of previously submitted requests */
-		list_for_each_entry(request,
-				    &engine->timeline->requests, link) {
+		list_for_each_entry(rq, &engine->timeline->requests, link) {
 			client->wq_rsvd += sizeof(struct guc_wq_item);
-			if (i915_sw_fence_done(&request->submit))
-				i915_guc_submit(request);
+			i915_guc_submit(rq);
 		}
 	}
 
@@ -1548,21 +1548,18 @@ int i915_guc_submission_enable(struct drm_i915_private *dev_priv)
 
 void i915_guc_submission_disable(struct drm_i915_private *dev_priv)
 {
-	struct intel_guc *guc = &dev_priv->guc;
-
-	if (!guc->execbuf_client)
-		return;
-
 	/* Revert back to manual ELSP submission */
 	intel_execlists_enable_submission(dev_priv);
-
-	guc_client_free(dev_priv, guc->execbuf_client);
-	guc->execbuf_client = NULL;
 }
 
 void i915_guc_submission_fini(struct drm_i915_private *dev_priv)
 {
 	struct intel_guc *guc = &dev_priv->guc;
+	struct i915_guc_client *gc;
+
+	gc = fetch_and_zero(&guc->execbuf_client);
+	if (gc)
+		guc_client_free(dev_priv, gc);
 
 	i915_vma_unpin_and_release(&guc->ads_vma);
 	i915_vma_unpin_and_release(&guc->log.vma);
