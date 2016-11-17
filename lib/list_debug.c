@@ -55,11 +55,11 @@ void __list_del_entry(struct list_head *entry)
 		"list_del corruption, %p->prev is LIST_POISON2 (%p)\n",
 		entry, LIST_POISON2) ||
 	    WARN(prev->next != entry,
-		"list_del corruption. prev->next should be %p, "
-		"but was %p\n", entry, prev->next) ||
+		"list_del corruption. prev->next should be %p, but was %p (prev=%p)\n",
+		entry, prev->next, prev) ||
 	    WARN(next->prev != entry,
-		"list_del corruption. next->prev should be %p, "
-		"but was %p\n", entry, next->prev))
+		"list_del corruption. next->prev should be %p, but was %p (next=%p)\n",
+		entry, next->prev, next))
 		return;
 
 	__list_del(prev, next);
