@@ -12,6 +12,7 @@
 #define	_LINUX_SLAB_H
 
 #include <linux/gfp.h>
+#include <linux/poison.h>
 #include <linux/types.h>
 #include <linux/workqueue.h>
 
@@ -109,10 +110,13 @@
  * ZERO_SIZE_PTR can be passed to kfree though in the same way that NULL can.
  * Both make kfree a no-op.
  */
-#define ZERO_SIZE_PTR ((void *)16)
+#define ZERO_SIZE_PTR ((void *)(16 + POISON_POINTER_DELTA))
 
-#define ZERO_OR_NULL_PTR(x) ((unsigned long)(x) <= \
-				(unsigned long)ZERO_SIZE_PTR)
+#define ZERO_OR_NULL_PTR(x)				\
+	({						\
+		void *p = (void *)(x);			\
+		(p == NULL || p == ZERO_SIZE_PTR);	\
+	})
 
 #include <linux/kmemleak.h>
 #include <linux/kasan.h>
