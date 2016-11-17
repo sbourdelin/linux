@@ -53,11 +53,6 @@
  * busyness. There is no direct way to detect idleness. Instead an idle timer
  * work delayed work should be started from the flush and flip functions and
  * cancelled as soon as busyness is detected.
- *
- * Note that there's also an older frontbuffer activity tracking scheme which
- * just tracks general activity. This is done by the various mark_busy and
- * mark_idle functions. For display power management features using these
- * functions is deprecated and should be avoided.
  */
 
 #include <drm/drmP.h>
