@@ -228,9 +228,7 @@ static int __init renesas_soc_init(void)
 	if (!soc_dev_attr)
 		return -ENOMEM;
 
-	np = of_find_node_by_path("/");
-	of_property_read_string(np, "model", &soc_dev_attr->machine);
-	of_node_put(np);
+	of_machine_get_model_name(&soc_dev_attr->machine);
 
 	soc_dev_attr->family = kstrdup_const(family->name, GFP_KERNEL);
 	soc_dev_attr->soc_id = kstrdup_const(strchr(match->compatible, ',') + 1,

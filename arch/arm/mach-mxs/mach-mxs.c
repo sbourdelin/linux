@@ -391,8 +391,7 @@ static void __init mxs_machine_init(void)
 	if (!soc_dev_attr)
 		return;
 
-	root = of_find_node_by_path("/");
-	ret = of_property_read_string(root, "model", &soc_dev_attr->machine);
+	ret = of_machine_get_model_name(&soc_dev_attr->machine);
 	if (ret)
 		return;
 

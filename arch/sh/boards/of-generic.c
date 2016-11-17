@@ -135,11 +135,7 @@ static void __init sh_of_setup(char **cmdline_p)
 	board_time_init = sh_of_time_init;
 
 	sh_mv.mv_name = "Unknown SH model";
-	root = of_find_node_by_path("/");
-	if (root) {
-		of_property_read_string(root, "model", &sh_mv.mv_name);
-		of_node_put(root);
-	}
+	of_machine_get_model_name(&sh_mv.mv_name);
 
 	sh_of_smp_probe();
 }

@@ -152,8 +152,7 @@ static int fsl_guts_probe(struct platform_device *pdev)
 		return PTR_ERR(guts->regs);
 
 	/* Register soc device */
-	machine = of_flat_dt_get_machine_name();
-	if (machine)
+	if (!of_machine_get_model_name(&machine))
 		soc_dev_attr.machine = devm_kstrdup(dev, machine, GFP_KERNEL);
 
 	svr = fsl_guts_get_svr();

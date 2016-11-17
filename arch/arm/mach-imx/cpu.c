@@ -85,9 +85,7 @@ struct device * __init imx_soc_device_init(void)
 
 	soc_dev_attr->family = "Freescale i.MX";
 
-	root = of_find_node_by_path("/");
-	ret = of_property_read_string(root, "model", &soc_dev_attr->machine);
-	of_node_put(root);
+	ret = of_machine_get_model_name(&soc_dev_attr->machine);
 	if (ret)
 		goto free_soc;
 

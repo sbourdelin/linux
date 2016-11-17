@@ -546,6 +546,40 @@ int of_machine_is_compatible(const char *compat)
 EXPORT_SYMBOL(of_machine_is_compatible);
 
 /**
+ * of_machine_get_model_name - Find and read the model name or the compatible
+ *		value for the machine.
+ * @model:	pointer to null terminated return string, modified only if
+ *		return value is 0.
+ *
+ * Returns a string containing either the model name or the compatible value
+ * of the machine if found, else return error.
+ *
+ * Search for a machine model name or the compatible if model name is missing
+ * in a device tree node and retrieve a null terminated string value (pointer
+ * to data, not a copy). Returns 0 on success, -EINVAL if root of the device
+ * tree is not found and other error returned by of_property_read_string on
+ * failure.
+ */
+int of_machine_get_model_name(const char **model)
+{
+	int error;
+	struct device_node *root;
+
+	root = of_find_node_by_path("/");
+	if (!root)
+		return -EINVAL;
+
+	error = of_property_read_string(root, "model", model);
+	if (error)
+		error = of_property_read_string_index(root, "compatible",
+						      0, model);
+	of_node_put(root);
+
+	return error;
+}
+EXPORT_SYMBOL(of_machine_get_model_name);
+
+/**
  *  __of_device_is_available - check if a device is available for use
  *
  *  @device: Node to check for availability, with locks already held

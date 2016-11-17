@@ -10,20 +10,11 @@
 
 #include <linux/of.h>
 
-#include <asm/bootinfo.h>
-
 const char *get_system_type(void)
 {
 	const char *str;
-	int err;
 
-	err = of_property_read_string(of_root, "model", &str);
-	if (!err)
-		return str;
-
-	err = of_property_read_string_index(of_root, "compatible", 0, &str);
-	if (!err)
-		return str;
-
-	return "Unknown";
+	if (of_machine_get_model_name(&str))
+		return "Unknown";
+	return str;
 }
