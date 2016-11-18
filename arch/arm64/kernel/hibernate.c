@@ -50,9 +50,6 @@
  */
 extern int in_suspend;
 
-/* Find a symbols alias in the linear map */
-#define LMADDR(x)	phys_to_virt(virt_to_phys(x))
-
 /* Do we need to reset el2? */
 #define el2_reset_needed() (is_hyp_mode_available() && !is_kernel_in_hyp_mode())
 
@@ -125,12 +122,12 @@ int arch_hibernation_header_save(void *addr, unsigned int max_size)
 		return -EOVERFLOW;
 
 	arch_hdr_invariants(&hdr->invariants);
-	hdr->ttbr1_el1		= virt_to_phys(swapper_pg_dir);
+	hdr->ttbr1_el1		= __pa_symbol(swapper_pg_dir);
 	hdr->reenter_kernel	= _cpu_resume;
 
 	/* We can't use __hyp_get_vectors() because kvm may still be loaded */
 	if (el2_reset_needed())
-		hdr->__hyp_stub_vectors = virt_to_phys(__hyp_stub_vectors);
+		hdr->__hyp_stub_vectors = __pa_symbol(__hyp_stub_vectors);
 	else
 		hdr->__hyp_stub_vectors = 0;
 
@@ -484,7 +481,7 @@ int swsusp_arch_resume(void)
 	 * Since we only copied the linear map, we need to find restore_pblist's
 	 * linear map address.
 	 */
-	lm_restore_pblist = LMADDR(restore_pblist);
+	lm_restore_pblist = __lm_sym_addr(restore_pblist);
 
 	/*
 	 * We need a zero page that is zero before & after resume in order to
