@@ -516,6 +516,7 @@ static int rpm_suspend(struct device *dev, int rpmflags)
 
 	callback = RPM_GET_CALLBACK(dev, runtime_suspend);
 
+	dev_pm_check_wake_irq(dev);
 	dev_pm_enable_wake_irq(dev);
 	retval = rpm_callback(callback, dev);
 	if (retval)

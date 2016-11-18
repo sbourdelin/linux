@@ -24,8 +24,23 @@ extern void pm_runtime_remove(struct device *dev);
 struct wake_irq {
 	struct device *dev;
 	int irq;
+	bool active:1;
 	bool dedicated_irq:1;
 };
+
+/* Caller must hold &dev->power.lock to change wirq->active */
+static inline void dev_pm_check_wake_irq(struct device *dev)
+{
+	struct wake_irq *wirq = dev->power.wakeirq;
+
+	if (!wirq)
+		return;
+
+	if (unlikely(!wirq->active)) {
+		wirq->active = true;
+		wmb();	/* ensure dev_pm_enable_wake_irq() sees active */
+	}
+}
 
 extern void dev_pm_arm_wake_irq(struct wake_irq *wirq);
 extern void dev_pm_disarm_wake_irq(struct wake_irq *wirq);
@@ -95,6 +110,10 @@ static inline int wakeup_sysfs_add(struct device *dev) { return 0; }
 static inline void wakeup_sysfs_remove(struct device *dev) {}
 static inline int pm_qos_sysfs_add(struct device *dev) { return 0; }
 static inline void pm_qos_sysfs_remove(struct device *dev) {}
+
+static inline void dev_pm_check_wake_irq(struct device *dev)
+{
+}
 
 static inline void dev_pm_arm_wake_irq(struct wake_irq *wirq)
 {

@@ -210,8 +210,7 @@ EXPORT_SYMBOL_GPL(dev_pm_set_dedicated_wake_irq);
  * dev_pm_enable_wake_irq - Enable device wake-up interrupt
  * @dev: Device
  *
- * Called from the bus code or the device driver for
- * runtime_suspend() to enable the wake-up interrupt while
+ * Called from rpm_suspend() to enable the wake-up interrupt while
  * the device is running.
  *
  * Note that for runtime_suspend()) the wake-up interrupts
@@ -222,7 +221,7 @@ void dev_pm_enable_wake_irq(struct device *dev)
 {
 	struct wake_irq *wirq = dev->power.wakeirq;
 
-	if (wirq && wirq->dedicated_irq)
+	if (wirq && wirq->dedicated_irq && wirq->active)
 		enable_irq(wirq->irq);
 }
 EXPORT_SYMBOL_GPL(dev_pm_enable_wake_irq);
@@ -231,15 +230,14 @@ EXPORT_SYMBOL_GPL(dev_pm_enable_wake_irq);
  * dev_pm_disable_wake_irq - Disable device wake-up interrupt
  * @dev: Device
  *
- * Called from the bus code or the device driver for
- * runtime_resume() to disable the wake-up interrupt while
+ * Called from rpm_resume() to disable the wake-up interrupt while
  * the device is running.
  */
 void dev_pm_disable_wake_irq(struct device *dev)
 {
 	struct wake_irq *wirq = dev->power.wakeirq;
 
-	if (wirq && wirq->dedicated_irq)
+	if (wirq && wirq->dedicated_irq && wirq->active)
 		disable_irq_nosync(wirq->irq);
 }
 EXPORT_SYMBOL_GPL(dev_pm_disable_wake_irq);
