@@ -2741,8 +2741,6 @@ static const struct v4l2_subdev_internal_ops smiapp_internal_ops = {
  * I2C Driver
  */
 
-#ifdef CONFIG_PM
-
 static int smiapp_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -2782,13 +2780,6 @@ static int smiapp_resume(struct device *dev)
 
 	return rval;
 }
-
-#else
-
-#define smiapp_suspend	NULL
-#define smiapp_resume	NULL
-
-#endif /* CONFIG_PM */
 
 static struct smiapp_hwconfig *smiapp_get_hwconfig(struct device *dev)
 {
@@ -2915,7 +2906,11 @@ static int smiapp_probe(struct i2c_client *client,
 
 	pm_runtime_enable(&client->dev);
 
+#ifdef CONFIG_PM
 	rval = pm_runtime_get_sync(&client->dev);
+#else
+	rval = smiapp_power_on(&client->dev);
+#endif
 	if (rval < 0) {
 		rval = -ENODEV;
 		goto out_power_off;
@@ -3113,7 +3108,11 @@ out_cleanup:
 	smiapp_cleanup(sensor);
 
 out_power_off:
+#ifdef CONFIG_PM
 	pm_runtime_put(&client->dev);
+#else
+	smiapp_power_off(&client->dev);
+#endif
 	pm_runtime_disable(&client->dev);
 
 	return rval;
@@ -3127,7 +3126,11 @@ static int smiapp_remove(struct i2c_client *client)
 
 	v4l2_async_unregister_subdev(subdev);
 
+#ifdef CONFIG_PM
 	pm_runtime_suspend(&client->dev);
+#else
+	smiapp_power_off(&client->dev);
+#endif
 	pm_runtime_disable(&client->dev);
 
 	for (i = 0; i < sensor->ssds_used; i++) {
