@@ -1455,3 +1455,19 @@ static __init int pt_init(void)
 	return ret;
 }
 arch_initcall(pt_init);
+
+/*
+ * Disable the PT trace for debugging purposes.
+ */
+void pt_disable(void)
+{
+	u64 val;
+
+	if (!boot_cpu_has(X86_FEATURE_INTEL_PT))
+		return;
+
+	rdmsrl_safe(MSR_IA32_RTIT_CTL, &val);
+	val &= ~RTIT_CTL_TRACEEN;
+	wrmsrl_safe(MSR_IA32_RTIT_CTL, val);
+}
+EXPORT_SYMBOL(pt_disable);

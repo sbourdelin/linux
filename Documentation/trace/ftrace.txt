@@ -2549,6 +2549,11 @@ The following commands are supported:
   command, it only prints out the contents of the ring buffer for the
   CPU that executed the function that triggered the dump.
 
+- ptoff
+  When the function is hit disable Intel PT trace. The Intel PT
+  trace has to be set up earlier with perf record -a -e intel_pt// ...
+  This disables the trace on the current CPU only.
+
 trace_pipe
 ----------
 

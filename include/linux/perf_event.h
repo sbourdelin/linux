@@ -1386,4 +1386,6 @@ int perf_event_exit_cpu(unsigned int cpu);
 #define perf_event_exit_cpu	NULL
 #endif
 
+void pt_disable(void);
+
 #endif /* _LINUX_PERF_EVENT_H */

@@ -22,6 +22,7 @@
 #include <linux/ctype.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
+#include <linux/perf_event.h>
 
 #include "trace.h"
 
@@ -1036,6 +1037,83 @@ static struct event_command trigger_traceoff_cmd = {
 	.set_filter		= set_trigger_filter,
 };
 
+#if defined(CONFIG_PERF_EVENTS) && defined(CONFIG_CPU_SUP_INTEL)
+
+static void
+ptoff_trigger(struct event_trigger_data *data, void *rec)
+{
+	pt_disable();
+}
+
+static void
+ptoff_count_trigger(struct event_trigger_data *data, void *rec)
+{
+	if (!data->count)
+		return;
+
+	if (data->count != -1)
+		(data->count)--;
+
+	ptoff_trigger(data, rec);
+}
+
+static int
+ptoff_trigger_print(struct seq_file *m, struct event_trigger_ops *ops,
+		       struct event_trigger_data *data)
+{
+	return event_trigger_print("ptoff", m, (void *)data->count,
+				   data->filter_str);
+}
+
+static struct event_trigger_ops ptoff_trigger_ops = {
+	.func			= ptoff_trigger,
+	.print			= ptoff_trigger_print,
+	.init			= event_trigger_init,
+	.free			= event_trigger_free,
+};
+
+static struct event_trigger_ops ptoff_count_trigger_ops = {
+	.func			= ptoff_count_trigger,
+	.print			= ptoff_trigger_print,
+	.init			= event_trigger_init,
+	.free			= event_trigger_free,
+};
+
+static struct event_trigger_ops *
+ptoff_get_trigger_ops(char *cmd, char *param)
+{
+	return param ? &ptoff_count_trigger_ops : &ptoff_trigger_ops;
+}
+
+static struct event_command trigger_ptoff_cmd = {
+	.name			= "ptoff",
+	.trigger_type		= ETT_PTOFF,
+	.func			= event_trigger_callback,
+	.reg			= register_trigger,
+	.unreg			= unregister_trigger,
+	.get_trigger_ops	= ptoff_get_trigger_ops,
+	.set_filter		= set_trigger_filter,
+};
+
+static __init int register_trigger_ptoff_cmd(void)
+{
+	int ret;
+
+	if (!boot_cpu_has(X86_FEATURE_INTEL_PT))
+		return 0;
+
+	ret = register_event_command(&trigger_ptoff_cmd);
+	WARN_ON(ret < 0);
+
+	return ret;
+}
+
+#else
+
+static inline int register_trigger_ptoff_cmd(void) { return 0; }
+
+#endif
+
 #ifdef CONFIG_TRACER_SNAPSHOT
 static void
 snapshot_trigger(struct event_trigger_data *data, void *rec)
@@ -1601,6 +1679,7 @@ __init int register_trigger_cmds(void)
 	register_trigger_enable_disable_cmds();
 	register_trigger_hist_enable_disable_cmds();
 	register_trigger_hist_cmd();
+	register_trigger_ptoff_cmd();
 
 	return 0;
 }

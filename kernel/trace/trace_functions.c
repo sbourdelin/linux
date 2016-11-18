@@ -15,6 +15,7 @@
 #include <linux/ftrace.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
+#include <linux/perf_event.h>
 
 #include "trace.h"
 
@@ -643,6 +644,57 @@ static struct ftrace_func_command ftrace_cpudump_cmd = {
 	.func			= ftrace_cpudump_callback,
 };
 
+#if defined(CONFIG_PERF_EVENTS) && defined(CONFIG_CPU_SUP_INTEL)
+static void
+ftrace_ptoff_probe(unsigned long ip, unsigned long parent_ip, void **data)
+{
+	if (update_count(data))
+		pt_disable();
+}
+
+static int
+ftrace_ptoff_print(struct seq_file *m, unsigned long ip,
+			struct ftrace_probe_ops *ops, void *data)
+{
+	return ftrace_probe_print("ptoff", m, ip, data);
+}
+
+static struct ftrace_probe_ops ptoff_probe_ops = {
+	.func			= ftrace_ptoff_probe,
+	.print			= ftrace_ptoff_print,
+};
+
+static int
+ftrace_ptoff_callback(struct ftrace_hash *hash,
+			   char *glob, char *cmd, char *param, int enable)
+{
+	struct ftrace_probe_ops *ops;
+
+	ops = &ptoff_probe_ops;
+
+	/* Only dump once. */
+	return ftrace_trace_probe_callback(ops, hash, glob, cmd,
+					   "1", enable);
+}
+
+static struct ftrace_func_command ftrace_ptoff_cmd = {
+	.name			= "ptoff",
+	.func			= ftrace_ptoff_callback,
+};
+
+static int register_ptoff_command(void)
+{
+	if (!boot_cpu_has(X86_FEATURE_INTEL_PT))
+		return 0;
+	return register_ftrace_command(&ftrace_ptoff_cmd);
+}
+
+#else
+
+static inline int register_ptoff_command(void) { return 0; }
+
+#endif
+
 static int __init init_func_cmd_traceon(void)
 {
 	int ret;
@@ -667,8 +719,14 @@ static int __init init_func_cmd_traceon(void)
 	if (ret)
 		goto out_free_dump;
 
+	ret = register_ptoff_command();
+	if (ret)
+	    goto out_free_cpudump;
+
 	return 0;
 
+ out_free_cpudump:
+	unregister_ftrace_command(&ftrace_cpudump_cmd);
  out_free_dump:
 	unregister_ftrace_command(&ftrace_dump_cmd);
  out_free_stacktrace:

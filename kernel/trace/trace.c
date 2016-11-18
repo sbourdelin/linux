@@ -4082,6 +4082,9 @@ static const char readme_msg[] =
 #endif
 	"\t\t      dump\n"
 	"\t\t      cpudump\n"
+#if defined(CONFIG_PERF_EVENTS) && defined(CONFIG_CPU_SUP_INTEL)
+	"\t\t      ptoff\n"
+#endif
 	"\t     example: echo do_fault:traceoff > set_ftrace_filter\n"
 	"\t              echo do_trap:traceoff:3 > set_ftrace_filter\n"
 	"\t     The first one will disable tracing every time do_fault is hit\n"
@@ -4174,6 +4177,9 @@ static const char readme_msg[] =
 #endif
 #ifdef CONFIG_HIST_TRIGGERS
 	"\t\t    hist (see below)\n"
+#endif
+#if defined(CONFIG_PERF_EVENTS) && defined(CONFIG_CPU_SUP_INTEL)
+	"\t\t	ptoff\t\t- Disable PT trace on current CPU\n"
 #endif
 	"\t   example: echo traceoff > events/block/block_unplug/trigger\n"
 	"\t            echo traceoff:3 > events/block/block_unplug/trigger\n"
