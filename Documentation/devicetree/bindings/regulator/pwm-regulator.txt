@@ -54,6 +54,18 @@ Optional properties:
 --------------------
 - enable-gpios:		GPIO to use to enable/disable the regulator
 
+- voltage-ramp-exponential: Boolean, Some of PWM regulator has the exponential
+			transition in voltage ramp as opposite to fixed
+			slew-rate linear transition on other regulators.
+			For such PWM regulator, presence of this property will
+			tell that value of the regulator ramp delay provided by
+			DT property "regulator-ramp-delay" is exponential and
+			fixed delay for any voltage level change.
+			If PWM regulator supports the fixed linear slew rate
+			then this property should be absent from DT node and
+			property "regulator-ramp-delay" is used as linear slew
+			rate.
+
 Any property defined as part of the core regulator binding can also be used.
 (See: ../regulator/regulator.txt)
 
