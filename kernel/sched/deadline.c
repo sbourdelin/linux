@@ -318,7 +318,7 @@ static inline void queue_pull_task(struct rq *rq)
 #endif /* CONFIG_SMP */
 
 static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags);
-static void __dequeue_task_dl(struct rq *rq, struct task_struct *p, int flags);
+static void __dequeue_task_dl(struct rq *rq, struct task_struct *p);
 static void check_preempt_curr_dl(struct rq *rq, struct task_struct *p,
 				  int flags);
 
@@ -744,7 +744,7 @@ static void update_curr_dl(struct rq *rq)
 throttle:
 	if (dl_runtime_exceeded(dl_se) || dl_se->dl_yielded) {
 		dl_se->dl_throttled = 1;
-		__dequeue_task_dl(rq, curr, 0);
+		__dequeue_task_dl(rq, curr);
 		if (unlikely(dl_se->dl_boosted || !start_dl_timer(curr)))
 			enqueue_task_dl(rq, curr, ENQUEUE_REPLENISH);
 
@@ -962,7 +962,7 @@ static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 		enqueue_pushable_dl_task(rq, p);
 }
 
-static void __dequeue_task_dl(struct rq *rq, struct task_struct *p, int flags)
+static void __dequeue_task_dl(struct rq *rq, struct task_struct *p)
 {
 	dequeue_dl_entity(&p->dl);
 	dequeue_pushable_dl_task(rq, p);
@@ -971,7 +971,7 @@ static void __dequeue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 static void dequeue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 {
 	update_curr_dl(rq);
-	__dequeue_task_dl(rq, p, flags);
+	__dequeue_task_dl(rq, p);
 }
 
 /*
