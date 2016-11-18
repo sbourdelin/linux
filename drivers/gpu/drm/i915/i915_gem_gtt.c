@@ -3277,6 +3277,16 @@ int i915_ggtt_enable_hw(struct drm_i915_private *dev_priv)
 	return 0;
 }
 
+static bool restore_vma(struct i915_vma *vma)
+{
+	if (i915_vma_is_pinned(vma)) {
+		WARN_ON(i915_vma_bind(vma, vma->obj->cache_level, PIN_UPDATE));
+		return true;
+	} else {
+		WARN_ON(i915_vma_unbind(vma));
+		return false;
+	}
+}
 void i915_gem_restore_gtt_mappings(struct drm_i915_private *dev_priv)
 {
 	struct i915_ggtt *ggtt = &dev_priv->ggtt;
@@ -3299,12 +3309,7 @@ void i915_gem_restore_gtt_mappings(struct drm_i915_private *dev_priv)
 			if (vma->vm != &ggtt->base)
 				continue;
 
-			if (!i915_vma_unbind(vma))
-				continue;
-
-			WARN_ON(i915_vma_bind(vma, obj->cache_level,
-					      PIN_UPDATE));
-			ggtt_bound = true;
+			ggtt_bound |= restore_vma(vma);
 		}
 
 		if (ggtt_bound)
