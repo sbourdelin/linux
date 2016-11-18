@@ -1046,23 +1046,19 @@ int bnx2fc_process_new_cqes(struct bnx2fc_rport *tgt)
 			struct bnx2fc_percpu_s *fps = NULL;
 			unsigned int cpu = wqe % num_possible_cpus();
 
-			fps = &per_cpu(bnx2fc_percpu, cpu);
-			spin_lock_bh(&fps->fp_work_lock);
-			if (unlikely(!fps->iothread))
-				goto unlock;
-
 			work = bnx2fc_alloc_work(tgt, wqe);
-			if (work)
+			if (work) {
+				fps = &per_cpu(bnx2fc_percpu, cpu);
+
+				spin_lock_bh(&fps->fp_work_lock);
 				list_add_tail(&work->list,
 					      &fps->work_list);
-unlock:
-			spin_unlock_bh(&fps->fp_work_lock);
-
-			/* Pending work request completion */
-			if (fps->iothread && work)
-				wake_up_process(fps->iothread);
-			else
+				spin_unlock_bh(&fps->fp_work_lock);
+				schedule_work_on(cpu, &fps->work);
+			} else {
 				bnx2fc_process_cq_compl(tgt, wqe);
+			}
+
 			num_free_sqes++;
 		}
 		cqe++;
