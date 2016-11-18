@@ -276,7 +276,7 @@ static struct platform_driver broadwell_audio = {
 	},
 };
 
-module_platform_driver(broadwell_audio)
+module_platform_driver(broadwell_audio);
 
 /* Module information */
 MODULE_AUTHOR("Liam Girdwood, Xingchao Wang");
