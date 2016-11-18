@@ -317,6 +317,12 @@ config VIDEO_STI_DELTA
 
 if VIDEO_STI_DELTA
 
+config VIDEO_STI_DELTA_MJPEG
+	bool "STMicroelectronics DELTA MJPEG support"
+	default y
+	help
+		Enables DELTA MJPEG hardware support.
+
 endif # VIDEO_STI_DELTA
 
 config VIDEO_SH_VEU
