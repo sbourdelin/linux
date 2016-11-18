@@ -1,0 +1,22 @@
+#
+# Cavium crypto device configuration
+#
+
+config CRYPTO_DEV_CPT
+	tristate
+	select HW_RANDOM_OCTEON
+	select CRYPTO_AES
+	select CRYPTO_DES
+	select CRYPTO_BLKCIPHER
+	select FW_LOADER
+
+config OCTEONTX_CPT_PF
+	tristate "Octeon-tx CPT Physical function driver"
+	depends on ARCH_THUNDER
+	select CRYPTO_DEV_CPT
+	help
+	  Support for Cavium CPT block found in octeon-tx series of
+	  processors.
+
+	  To compile this as a module, choose M here: the module will be
+	  called cptpf.
