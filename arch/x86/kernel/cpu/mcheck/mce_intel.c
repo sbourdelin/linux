@@ -11,6 +11,8 @@
 #include <linux/sched.h>
 #include <linux/cpumask.h>
 #include <asm/apic.h>
+#include <asm/cpufeature.h>
+#include <asm/intel-family.h>
 #include <asm/processor.h>
 #include <asm/msr.h>
 #include <asm/mce.h>
@@ -464,11 +466,38 @@ static void intel_clear_lmce(void)
 	wrmsrl(MSR_IA32_MCG_EXT_CTL, val);
 }
 
+static void intel_ppin_init(struct cpuinfo_x86 *c)
+{
+	unsigned long long msr_ppin_ctl;
+
+	switch (c->x86_model) {
+	case INTEL_FAM6_IVYBRIDGE_X:
+	case INTEL_FAM6_HASWELL_X:
+	case INTEL_FAM6_BROADWELL_XEON_D:
+	case INTEL_FAM6_BROADWELL_X:
+	case INTEL_FAM6_SKYLAKE_X:
+		if (rdmsrl_safe(MSR_PPIN_CTL, &msr_ppin_ctl))
+			return;
+		if ((msr_ppin_ctl & 3ul) == 1ul) {
+			/* PPIN available but disabled */
+			return;
+		}
+		/* if PPIN is disabled, but not locked, try to enable */
+		if (msr_ppin_ctl == 0) {
+			wrmsrl_safe(MSR_PPIN_CTL, 2ul);
+			rdmsrl_safe(MSR_PPIN_CTL, &msr_ppin_ctl);
+		}
+		if ((msr_ppin_ctl & 3ul) == 2ul)
+			set_cpu_cap(c, X86_FEATURE_INTEL_PPIN);
+	}
+}
+
 void mce_intel_feature_init(struct cpuinfo_x86 *c)
 {
 	intel_init_thermal(c);
 	intel_init_cmci();
 	intel_init_lmce();
+	intel_ppin_init(c);
 }
 
 void mce_intel_feature_clear(struct cpuinfo_x86 *c)
