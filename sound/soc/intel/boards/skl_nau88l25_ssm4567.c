@@ -723,7 +723,7 @@ static struct platform_driver skylake_audio = {
 	.id_table = skl_board_ids,
 };
 
-module_platform_driver(skylake_audio)
+module_platform_driver(skylake_audio);
 
 /* Module information */
 MODULE_AUTHOR("Conrad Cooke  <conrad.cooke@intel.com>");
