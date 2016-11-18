@@ -2172,8 +2172,7 @@ static int rcu_nocb_kthread(void *arg)
 			if (__rcu_reclaim(rdp->rsp->name, list))
 				cl++;
 			c++;
-			local_bh_enable();
-			cond_resched_rcu_qs();
+			_local_bh_enable();
 			list = next;
 		}
 		trace_rcu_batch_end(rdp->rsp->name, c, !!list, 0, 0, 1);
