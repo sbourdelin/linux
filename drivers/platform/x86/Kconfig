@@ -1027,4 +1027,8 @@ config INTEL_TELEMETRY
 	  used to get various SoC events and parameters
 	  directly via debugfs files. Various tools may use
 	  this interface for SoC state monitoring.
+
+config P2SB
+	tristate
+	depends on PCI
 endif # X86_PLATFORM_DEVICES
