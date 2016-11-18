@@ -597,6 +597,10 @@ static int uncore_validate_group(struct intel_uncore_pmu *pmu,
 	struct intel_uncore_box *fake_box;
 	int ret = -EINVAL, n;
 
+	/* All events in group must be from the same uncore box. */
+	if (leader->pmu->type != pmu->pmu.type)
+		return -EINVAL;
+
 	fake_box = uncore_alloc_box(pmu->type, NUMA_NO_NODE);
 	if (!fake_box)
 		return -ENOMEM;
