@@ -2,7 +2,9 @@
 
 Required properties :
 
- - compatible : should be "snps,designware-i2c"
+ - compatible : should be:
+   - "snps,designware-i2c" to setup the hardware block as I2C master.
+   - "snps,designware-i2c-slave" to setup the hardware block as I2C slave.
  - reg : Offset and length of the register set for the device
  - interrupts : <IRQ> where IRQ is the interrupt number.
 
