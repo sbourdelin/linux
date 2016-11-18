@@ -160,6 +160,30 @@ static void i2c_dw_configure_master(struct platform_device *pdev)
 	}
 }
 
+static void i2c_dw_configure_slave(struct platform_device *pdev)
+{
+	struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
+
+	dev->slave_cfg = DW_IC_CON_RX_FIFO_FULL_HLD_CTRL |
+			 DW_IC_CON_RESTART_EN | DW_IC_CON_STOP_DET_IFADDRESSED |
+			 DW_IC_CON_SPEED_FAST;
+
+	dev->functionality |= I2C_FUNC_SLAVE;
+	dev->functionality &= ~I2C_FUNC_10BIT_ADDR;
+	dev_info(&pdev->dev, "I am registed as a I2C Slave!\n");
+
+	switch (dev->clk_freq) {
+	case 100000:
+		dev->slave_cfg |= DW_IC_CON_SPEED_STD;
+		break;
+	case 3400000:
+		dev->slave_cfg |= DW_IC_CON_SPEED_HIGH;
+		break;
+	default:
+		dev->slave_cfg |= DW_IC_CON_SPEED_FAST;
+	}
+}
+
 static int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare)
 {
 	if (IS_ERR(i_dev->clk))
@@ -244,7 +268,11 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 		I2C_FUNC_SMBUS_WORD_DATA |
 		I2C_FUNC_SMBUS_I2C_BLOCK;
 
-	i2c_dw_configure_master(pdev);
+	if (of_device_is_compatible(pdev->dev.of_node,
+		 "snps,designware-i2c-slave"))
+		i2c_dw_configure_slave(pdev);
+	else
+		i2c_dw_configure_master(pdev);
 
 	dev->clk = devm_clk_get(&pdev->dev, NULL);
 	if (!i2c_dw_plat_prepare_clk(dev, true)) {
@@ -257,7 +285,13 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 	}
 
 	if (!dev->tx_fifo_depth) {
-		u32 param1 = i2c_dw_read_comp_param(dev);
+		u32 param1;
+
+		if (of_device_is_compatible(pdev->dev.of_node,
+			 "snps,designware-i2c-slave"))
+			param1 = i2c_dw_read_comp_param_slave(dev);
+		else
+			param1 = i2c_dw_read_comp_param(dev);
 
 		dev->tx_fifo_depth = ((param1 >> 16) & 0xff) + 1;
 		dev->rx_fifo_depth = ((param1 >> 8)  & 0xff) + 1;
@@ -278,8 +312,12 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 		pm_runtime_set_active(&pdev->dev);
 		pm_runtime_enable(&pdev->dev);
 	}
+	if (of_device_is_compatible(pdev->dev.of_node,
+		 "snps,designware-i2c-slave"))
+		r = i2c_dw_probe_slave(dev);
+	else
+		r = i2c_dw_probe(dev);
 
-	r = i2c_dw_probe(dev);
 	if (r && !dev->pm_runtime_disabled)
 		pm_runtime_disable(&pdev->dev);
 
@@ -291,10 +329,13 @@ static int dw_i2c_plat_remove(struct platform_device *pdev)
 	struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
 
 	pm_runtime_get_sync(&pdev->dev);
-
 	i2c_del_adapter(&dev->adapter);
 
-	i2c_dw_disable(dev);
+	if (of_device_is_compatible(pdev->dev.of_node,
+		 "snps,designware-i2c-slave"))
+		i2c_dw_disable_slave(dev);
+	else
+		i2c_dw_disable(dev);
 
 	pm_runtime_dont_use_autosuspend(&pdev->dev);
 	pm_runtime_put_sync(&pdev->dev);
@@ -307,6 +348,9 @@ static int dw_i2c_plat_remove(struct platform_device *pdev)
 #ifdef CONFIG_OF
 static const struct of_device_id dw_i2c_of_match[] = {
 	{ .compatible = "snps,designware-i2c", },
+#ifndef CONFIG_ACPI
+	{ .compatible = "snps,designware-i2c-slave", },
+#endif
 	{},
 };
 MODULE_DEVICE_TABLE(of, dw_i2c_of_match);
@@ -334,7 +378,11 @@ static int dw_i2c_plat_suspend(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
 
-	i2c_dw_disable(i_dev);
+	if (of_device_is_compatible(pdev->dev.of_node,
+		 "snps,designware-i2c-slave"))
+		i2c_dw_disable_slave(i_dev);
+	else
+		i2c_dw_disable(i_dev);
 	i2c_dw_plat_prepare_clk(i_dev, false);
 
 	return 0;
@@ -347,8 +395,13 @@ static int dw_i2c_plat_resume(struct device *dev)
 
 	i2c_dw_plat_prepare_clk(i_dev, true);
 
-	if (!i_dev->pm_runtime_disabled)
-		i2c_dw_init(i_dev);
+	if (!i_dev->pm_runtime_disabled) {
+		if (of_device_is_compatible(pdev->dev.of_node,
+			 "snps,designware-i2c-slave"))
+			i2c_dw_init_slave(i_dev);
+		else
+			i2c_dw_init(i_dev);
+	}
 
 	return 0;
 }
