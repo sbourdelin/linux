@@ -580,6 +580,8 @@ static int i915_load_modeset_init(struct drm_device *dev)
 
 	intel_register_dsm_handler();
 
+	intel_acpi_find_i2c(dev_priv);
+
 	ret = vga_switcheroo_register_client(pdev, &i915_switcheroo_ops, false);
 	if (ret)
 		goto cleanup_vga_client;

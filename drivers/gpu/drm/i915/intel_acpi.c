@@ -110,6 +110,65 @@ static void intel_dsm_platform_mux_info(void)
 	ACPI_FREE(pkg);
 }
 
+static int i2c_acpi_get_name(struct acpi_resource *ares, void *data)
+{
+	struct drm_i915_private *dev_priv = data;
+	struct acpi_resource_i2c_serialbus *sb;
+	unsigned int val;
+	char *resource;
+	int error;
+
+
+	if (ares->type == ACPI_RESOURCE_TYPE_SERIAL_BUS) {
+		sb = &ares->data.i2c_serial_bus;
+
+		if (sb->type == ACPI_RESOURCE_SERIAL_TYPE_I2C) {
+			struct acpi_i2c_data_node *i2c_entry = NULL;
+
+			resource = sb->resource_source.string_ptr;
+			resource = strstr(resource, "I2C");
+			error = kstrtouint(resource+3, 0, &val);
+			if (error)
+				return error;
+
+			i2c_entry = kzalloc(sizeof(struct acpi_i2c_data_node),
+					GFP_NOWAIT);
+			i2c_entry->i2c_bus_number = val;
+			i2c_entry->i2c_slave_address = sb->slave_address;
+
+			list_add_tail(&i2c_entry->head,
+					&dev_priv->acpi_i2c_list);
+		}
+	}
+
+	return 1;
+}
+
+acpi_status intel_acpi_find_i2c(struct drm_i915_private *dev_priv)
+{
+	struct pci_dev *pdev = dev_priv->drm.pdev;
+	struct list_head resource_list;
+	struct acpi_device *adev;
+	acpi_handle dhandle;
+
+	dhandle = ACPI_HANDLE(&pdev->dev);
+	if (!dhandle)
+		return false;
+
+	if (acpi_bus_get_device(dhandle, &adev))
+		return AE_OK;
+	if (acpi_bus_get_status(adev) || !adev->status.present)
+		return AE_OK;
+
+	INIT_LIST_HEAD(&resource_list);
+	INIT_LIST_HEAD(&dev_priv->acpi_i2c_list);
+	acpi_dev_get_resources(adev, &resource_list,
+			i2c_acpi_get_name, dev_priv);
+	acpi_dev_free_resource_list(&resource_list);
+
+	return AE_OK;
+}
+
 static bool intel_dsm_pci_probe(struct pci_dev *pdev)
 {
 	acpi_handle dhandle;

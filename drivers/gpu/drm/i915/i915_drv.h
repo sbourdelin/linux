@@ -33,6 +33,7 @@
 #include <uapi/drm/i915_drm.h>
 #include <uapi/drm/drm_fourcc.h>
 
+#include <linux/acpi.h>
 #include <linux/io-mapping.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
@@ -1796,6 +1797,12 @@ struct intel_wm_config {
 	bool sprites_scaled;
 };
 
+struct acpi_i2c_data_node {
+	struct list_head head;
+	int i2c_bus_number;
+	int i2c_slave_address;
+};
+
 struct drm_i915_private {
 	struct drm_device drm;
 
@@ -1887,6 +1894,8 @@ struct drm_i915_private {
 
 	/* backlight registers and fields in struct intel_panel */
 	struct mutex backlight_lock;
+
+	struct list_head acpi_i2c_list;
 
 	/* LVDS info */
 	bool no_aux_handshake;
@@ -3459,6 +3468,7 @@ static inline int intel_opregion_get_panel_type(struct drm_i915_private *dev)
 #ifdef CONFIG_ACPI
 extern void intel_register_dsm_handler(void);
 extern void intel_unregister_dsm_handler(void);
+extern acpi_status intel_acpi_find_i2c(struct drm_i915_private *dev_priv);
 #else
 static inline void intel_register_dsm_handler(void) { return; }
 static inline void intel_unregister_dsm_handler(void) { return; }
