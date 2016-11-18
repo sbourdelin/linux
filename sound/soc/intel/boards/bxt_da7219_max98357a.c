@@ -511,7 +511,7 @@ static struct platform_driver broxton_audio = {
 		.pm = &snd_soc_pm_ops,
 	},
 };
-module_platform_driver(broxton_audio)
+module_platform_driver(broxton_audio);
 
 /* Module information */
 MODULE_DESCRIPTION("Audio Machine driver-DA7219 & MAX98357A in I2S mode");
