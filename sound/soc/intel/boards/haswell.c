@@ -200,7 +200,7 @@ static struct platform_driver haswell_audio = {
 	},
 };
 
-module_platform_driver(haswell_audio)
+module_platform_driver(haswell_audio);
 
 /* Module information */
 MODULE_AUTHOR("Liam Girdwood, Xingchao Wang");
