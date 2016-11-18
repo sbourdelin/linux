@@ -2043,7 +2043,9 @@ int drm_dp_mst_topology_mgr_set_mst(struct drm_dp_mst_topology_mgr *mgr, bool ms
 		}
 		mgr->total_pbn = 64 * mgr->pbn_div;
 		mgr->total_slots = 64;
-		mgr->avail_slots = mgr->total_slots;
+
+		/* 1 slot out of the 64 time slots is used for MTP header */
+		mgr->avail_slots = mgr->total_slots - 1;
 
 		/* add initial branch device at LCT 1 */
 		mstb = drm_dp_add_mst_branch_device(1, NULL);
@@ -2468,34 +2470,52 @@ EXPORT_SYMBOL(drm_dp_mst_get_edid);
  * @pbn: payload bandwidth to convert into slots.
  */
 int drm_dp_find_vcpi_slots(struct drm_dp_mst_topology_mgr *mgr,
-			   int pbn)
+			   struct drm_dp_mst_port *port, int pbn)
 {
-	int num_slots;
+	int req_slots, curr_slots, new_slots, ret;
 
-	num_slots = DIV_ROUND_UP(pbn, mgr->pbn_div);
+	req_slots = DIV_ROUND_UP(pbn, mgr->pbn_div);
+	curr_slots = drm_dp_mst_get_vcpi_slots(mgr, port);
 
-	if (num_slots > mgr->avail_slots)
-		return -ENOSPC;
-	return num_slots;
+	if (req_slots <= curr_slots)
+		return req_slots;
+
+	new_slots = req_slots - curr_slots;
+	mutex_lock(&mgr->lock);
+	if (new_slots <= mgr->avail_slots) {
+		ret = req_slots;
+	} else {
+		DRM_DEBUG_KMS("not enough vcpi slots, req=%d avail=%d\n", req_slots, mgr->avail_slots);
+		ret =  -ENOSPC;
+	}
+	mutex_unlock(&mgr->lock);
+
+	return ret;
 }
 EXPORT_SYMBOL(drm_dp_find_vcpi_slots);
 
 static int drm_dp_init_vcpi(struct drm_dp_mst_topology_mgr *mgr,
 			    struct drm_dp_vcpi *vcpi, int pbn)
 {
-	int num_slots;
+	int req_slots;
 	int ret;
 
-	num_slots = DIV_ROUND_UP(pbn, mgr->pbn_div);
+	req_slots = DIV_ROUND_UP(pbn, mgr->pbn_div);
 
-	if (num_slots > mgr->avail_slots)
-		return -ENOSPC;
+	mutex_lock(&mgr->lock);
+	if (req_slots > mgr->avail_slots) {
+		ret = -ENOSPC;
+		goto out;
+	}
 
 	vcpi->pbn = pbn;
-	vcpi->aligned_pbn = num_slots * mgr->pbn_div;
-	vcpi->num_slots = num_slots;
+	vcpi->aligned_pbn = req_slots * mgr->pbn_div;
+	vcpi->num_slots = req_slots;
 
 	ret = drm_dp_mst_assign_payload_id(mgr, vcpi);
+
+out:
+	mutex_unlock(&mgr->lock);
 	if (ret < 0)
 		return ret;
 	return 0;
@@ -2533,6 +2553,10 @@ bool drm_dp_mst_allocate_vcpi(struct drm_dp_mst_topology_mgr *mgr, struct drm_dp
 	DRM_DEBUG_KMS("initing vcpi for %d %d\n", pbn, port->vcpi.num_slots);
 	*slots = port->vcpi.num_slots;
 
+	mutex_lock(&mgr->lock);
+	mgr->avail_slots -= port->vcpi.num_slots;
+	mutex_unlock(&mgr->lock);
+
 	drm_dp_put_port(port);
 	return true;
 out:
@@ -2565,6 +2589,11 @@ void drm_dp_mst_reset_vcpi_slots(struct drm_dp_mst_topology_mgr *mgr, struct drm
 	port = drm_dp_get_validated_port_ref(mgr, port);
 	if (!port)
 		return;
+
+	mutex_lock(&mgr->lock);
+	mgr->avail_slots += port->vcpi.num_slots;
+	mutex_unlock(&mgr->lock);
+
 	port->vcpi.num_slots = 0;
 	drm_dp_put_port(port);
 }

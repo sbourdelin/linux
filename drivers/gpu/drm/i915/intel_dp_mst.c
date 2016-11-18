@@ -42,6 +42,8 @@ static bool intel_dp_mst_compute_config(struct intel_encoder *encoder,
 	int lane_count, slots;
 	const struct drm_display_mode *adjusted_mode = &pipe_config->base.adjusted_mode;
 	int mst_pbn;
+	struct intel_connector *connector =
+		to_intel_connector(conn_state->connector);
 
 	pipe_config->dp_encoder_is_mst = true;
 	pipe_config->has_pch_encoder = false;
@@ -62,7 +64,8 @@ static bool intel_dp_mst_compute_config(struct intel_encoder *encoder,
 	mst_pbn = drm_dp_calc_pbn_mode(adjusted_mode->crtc_clock, bpp);
 
 	pipe_config->pbn = mst_pbn;
-	slots = drm_dp_find_vcpi_slots(&intel_dp->mst_mgr, mst_pbn);
+	slots = drm_dp_find_vcpi_slots(&intel_dp->mst_mgr, connector->port,
+				       mst_pbn);
 	if (slots < 0) {
 		DRM_ERROR("not enough available time slots for pbn=%d", mst_pbn);
 		return false;

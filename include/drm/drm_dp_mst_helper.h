@@ -590,7 +590,7 @@ void drm_dp_mst_deallocate_vcpi(struct drm_dp_mst_topology_mgr *mgr,
 
 
 int drm_dp_find_vcpi_slots(struct drm_dp_mst_topology_mgr *mgr,
-			   int pbn);
+			   struct drm_dp_mst_port *port, int pbn);
 
 
 int drm_dp_update_payload_part1(struct drm_dp_mst_topology_mgr *mgr);
