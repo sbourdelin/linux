@@ -1004,9 +1004,83 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 
 static const u8 *mipi_exec_i2c(struct intel_dsi *intel_dsi, const u8 *data)
 {
-	DRM_DEBUG_KMS("Skipping I2C element execution\n");
+	struct drm_i915_private *dev_priv = intel_dsi->base.base.dev->dev_private;
+	struct i2c_adapter *adapter;
+	int ret, i;
+	u8 reg_offset, payload_size;
+	struct i2c_msg msg;
+	struct acpi_i2c_data_node *i2c_entry = NULL;
+	u8 *transmit_buffer;
+	u8 flag, resource_id, bus_number;
+	u16 slave_add;
+	u8 count = 0;
 
-	return data + *(data + 6) + 7;
+	flag = *data++;
+	resource_id = *data++;
+	bus_number = *data++;
+	slave_add = *(u16 *)(data);
+	data += 2;
+	reg_offset = *data++;
+	payload_size = *data++;
+
+	if (resource_id == 0xff || bus_number == 0xff) {
+		DRM_DEBUG_KMS("ignoring gmbus (resource id %02x, bus %02x)\n",
+			      resource_id, bus_number);
+		goto out;
+	}
+
+	/* Parse the list and get the required i2c bus number */
+	list_for_each_entry(i2c_entry, &dev_priv->acpi_i2c_list,
+				head) {
+		if (count == resource_id) {
+			/* override the busnumber */
+			bus_number = i2c_entry->i2c_bus_number;
+			break;
+		}
+		count++;
+	}
+
+	/*
+	 * Since the i2c bus number indexing in BIOS starts from 1
+	 * decrementing the bus number which we are reading.
+	 */
+	bus_number--;
+
+	adapter = i2c_get_adapter(bus_number);
+	if (!adapter) {
+		DRM_ERROR("i2c_get_adapter(%u)\n", bus_number);
+		goto out;
+	}
+
+	transmit_buffer = kmalloc(1 + payload_size, GFP_TEMPORARY);
+	if (!transmit_buffer)
+		goto out_put;
+
+	transmit_buffer[0] = reg_offset;
+	memcpy(&transmit_buffer[1], data, payload_size);
+
+	msg.addr = slave_add;
+	msg.flags = 0;
+	msg.len = payload_size + 1;
+	msg.buf = &transmit_buffer[0];
+
+	for (i = 0; i < 6; i++) {
+		ret = i2c_transfer(adapter, &msg, 1);
+		if (ret == 1)
+			goto out_free;
+		else if (ret == -EAGAIN)
+			usleep_range(1000, 2500);
+		else
+			break;
+	}
+
+	DRM_ERROR("i2c transfer failed: %d\n", ret);
+out_free:
+	kfree(transmit_buffer);
+out_put:
+	i2c_put_adapter(adapter);
+out:
+	return data + payload_size;
 }
 
 static const u8 *mipi_exec_spi(struct intel_dsi *intel_dsi, const u8 *data)
