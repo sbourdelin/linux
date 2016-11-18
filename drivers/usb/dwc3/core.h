@@ -1248,4 +1248,19 @@ static inline void dwc3_ulpi_exit(struct dwc3 *dwc)
 { }
 #endif
 
+#if IS_ENABLED(CONFIG_USB_DWC3_HOST_SUSPEND)
+int dwc3_host_suspend(struct dwc3 *dwc);
+int dwc3_host_resume(struct dwc3 *dwc);
+#else
+static inline int dwc3_host_suspend(struct dwc3 *dwc)
+{
+	return 0;
+}
+
+static inline int dwc3_host_resume(struct dwc3 *dwc)
+{
+	return 0;
+}
+#endif
+
 #endif /* __DRIVERS_USB_DWC3_CORE_H */
