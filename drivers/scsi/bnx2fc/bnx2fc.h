@@ -172,6 +172,7 @@ struct bnx2fc_percpu_s {
 	struct list_head work_list;
 	spinlock_t fp_work_lock;
 };
+DECLARE_PER_CPU(struct bnx2fc_percpu_s, bnx2fc_percpu);
 
 struct bnx2fc_fw_stats {
 	u64	fc_crc_cnt;
@@ -513,7 +514,6 @@ void bnx2fc_cmd_mgr_free(struct bnx2fc_cmd_mgr *cmgr);
 void bnx2fc_get_link_state(struct bnx2fc_hba *hba);
 char *bnx2fc_get_next_rqe(struct bnx2fc_rport *tgt, u8 num_items);
 void bnx2fc_return_rqe(struct bnx2fc_rport *tgt, u8 num_items);
-int bnx2fc_get_paged_crc_eof(struct sk_buff *skb, int tlen);
 int bnx2fc_send_rrq(struct bnx2fc_cmd *aborted_io_req);
 int bnx2fc_send_adisc(struct bnx2fc_rport *tgt, struct fc_frame *fp);
 int bnx2fc_send_logo(struct bnx2fc_rport *tgt, struct fc_frame *fp);
@@ -537,7 +537,6 @@ void bnx2fc_init_task(struct bnx2fc_cmd *io_req,
 void bnx2fc_add_2_sq(struct bnx2fc_rport *tgt, u16 xid);
 void bnx2fc_ring_doorbell(struct bnx2fc_rport *tgt);
 int bnx2fc_eh_abort(struct scsi_cmnd *sc_cmd);
-int bnx2fc_eh_host_reset(struct scsi_cmnd *sc_cmd);
 int bnx2fc_eh_target_reset(struct scsi_cmnd *sc_cmd);
 int bnx2fc_eh_device_reset(struct scsi_cmnd *sc_cmd);
 void bnx2fc_rport_event_handler(struct fc_lport *lport,
@@ -570,8 +569,6 @@ struct fc_seq *bnx2fc_elsct_send(struct fc_lport *lport, u32 did,
 						   struct fc_frame *,
 						   void *),
 				      void *arg, u32 timeout);
-void bnx2fc_arm_cq(struct bnx2fc_rport *tgt);
-int bnx2fc_process_new_cqes(struct bnx2fc_rport *tgt);
 void bnx2fc_process_cq_compl(struct bnx2fc_rport *tgt, u16 wqe);
 struct bnx2fc_rport *bnx2fc_tgt_lookup(struct fcoe_port *port,
 					     u32 port_id);
