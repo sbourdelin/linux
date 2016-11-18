@@ -86,6 +86,8 @@ struct vfio_group {
 	struct mutex			unbound_lock;
 	atomic_t			opened;
 	bool				noiommu;
+	struct kvm			*kvm;
+	struct blocking_notifier_head	notifier;
 };
 
 struct vfio_device {
@@ -339,6 +341,7 @@ static struct vfio_group *vfio_create_group(struct iommu_group *iommu_group)
 #ifdef CONFIG_VFIO_NOIOMMU
 	group->noiommu = (iommu_group_get_iommudata(iommu_group) == &noiommu);
 #endif
+	BLOCKING_INIT_NOTIFIER_HEAD(&group->notifier);
 
 	group->nb.notifier_call = vfio_iommu_group_notifier;
 
@@ -1015,6 +1018,63 @@ static long vfio_ioctl_check_extension(struct vfio_container *container,
 	return ret;
 }
 
+void vfio_group_set_kvm(struct vfio_group *group, struct kvm *kvm)
+{
+	group->kvm = kvm;
+	blocking_notifier_call_chain(&group->notifier,
+				VFIO_GROUP_NOTIFY_SET_KVM, kvm);
+}
+EXPORT_SYMBOL_GPL(vfio_group_set_kvm);
+
+static int vfio_register_group_notifier(struct vfio_group *group,
+					unsigned long *events,
+					struct notifier_block *nb)
+{
+	int ret;
+	bool set_kvm = false;
+
+	if (*events & VFIO_GROUP_NOTIFY_SET_KVM)
+		set_kvm = true;
+
+	/* clear known events */
+	*events &= ~VFIO_GROUP_NOTIFY_SET_KVM;
+
+	/* refuse to continue if still events remaining */
+	if (*events)
+		return -EINVAL;
+
+	if (!atomic_inc_not_zero(&group->opened))
+		return -EINVAL;
+
+	ret = blocking_notifier_chain_register(&group->notifier, nb);
+
+	/*
+	 * The attaching of kvm and vfio_group might already happen, so
+	 * here we replay once upon registration.
+	 */
+	if (!ret && set_kvm && group->kvm)
+		blocking_notifier_call_chain(&group->notifier,
+					VFIO_GROUP_NOTIFY_SET_KVM, group->kvm);
+
+	atomic_dec(&group->opened);
+
+	return ret;
+}
+
+static int vfio_unregister_group_notifier(struct vfio_group *group,
+					 struct notifier_block *nb)
+{
+	int ret;
+
+	if (!atomic_inc_not_zero(&group->opened))
+		return -EINVAL;
+
+	ret = blocking_notifier_chain_unregister(&group->notifier, nb);
+
+	atomic_dec(&group->opened);
+	return ret;
+}
+
 /* hold write lock on container->group_lock */
 static int __vfio_container_attach_groups(struct vfio_container *container,
 					  struct vfio_iommu_driver *driver,
@@ -1581,6 +1641,9 @@ static int vfio_group_fops_release(struct inode *inode, struct file *filep)
 
 	filep->private_data = NULL;
 
+	/* Any user didn't unregister? */
+	WARN_ON(group->notifier.head);
+
 	vfio_group_try_dissolve_container(group);
 
 	atomic_dec(&group->opened);
@@ -2088,6 +2151,9 @@ int vfio_register_notifier(struct device *dev, vfio_notify_type_t type,
 	case VFIO_IOMMU_NOTIFY:
 		ret = vfio_register_iommu_notifier(group, events, nb);
 		break;
+	case VFIO_GROUP_NOTIFY:
+		ret = vfio_register_group_notifier(group, events, nb);
+		break;
 	default:
 		ret = EINVAL;
 	}
@@ -2113,6 +2179,9 @@ int vfio_unregister_notifier(struct device *dev, vfio_notify_type_t type,
 	switch (type) {
 	case VFIO_IOMMU_NOTIFY:
 		ret = vfio_unregister_iommu_notifier(group, nb);
+		break;
+	case VFIO_GROUP_NOTIFY:
+		ret = vfio_unregister_group_notifier(group, nb);
 		break;
 	default:
 		ret = -EINVAL;
