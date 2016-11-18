@@ -338,7 +338,7 @@ static struct platform_driver bdw_rt5677_audio = {
 	},
 };
 
-module_platform_driver(bdw_rt5677_audio)
+module_platform_driver(bdw_rt5677_audio);
 
 /* Module information */
 MODULE_AUTHOR("Ben Zhang");
