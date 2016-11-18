@@ -8,6 +8,44 @@
 #include <linux/sched.h>
 #include <linux/errno.h>
 
+#define per_cpu_sum(var)						\
+({									\
+	typeof(var) __sum = 0;						\
+	int cpu;							\
+	compiletime_assert_atomic_type(__sum);				\
+	for_each_possible_cpu(cpu)					\
+		__sum += per_cpu(var, cpu);				\
+	__sum;								\
+})
+
+/*
+ * Return true if the modular sum of the sem->read_count per-CPU variable is
+ * zero.  If this sum is zero, then it is stable due to the fact that if any
+ * newly arriving readers increment a given counter, they will immediately
+ * decrement that same counter.
+ */
+static bool readers_active_check(struct percpu_rw_semaphore *sem)
+{
+	if (per_cpu_sum(*sem->read_count) != 0)
+		return false;
+
+	/*
+	 * If we observed the decrement; ensure we see the entire critical
+	 * section. In the case of __readers_active_check we avoid the
+	 * critical section sync, as the writer wakee will fully re-check
+	 * to continue.
+	 */
+
+	smp_mb(); /* C matches B */
+
+	return true;
+}
+
+static bool __readers_active_check(struct percpu_rw_semaphore *sem)
+{
+	return !(per_cpu_sum(*sem->read_count) !=0);
+}
+
 int __percpu_init_rwsem(struct percpu_rw_semaphore *sem,
 			const char *name, struct lock_class_key *rwsem_key)
 {
@@ -103,40 +141,10 @@ void __percpu_up_read(struct percpu_rw_semaphore *sem)
 	__this_cpu_dec(*sem->read_count);
 
 	/* Prod writer to recheck readers_active */
-	swake_up(&sem->writer);
+	if (__readers_active_check(sem))
+		swake_up(&sem->writer);
 }
 EXPORT_SYMBOL_GPL(__percpu_up_read);
-
-#define per_cpu_sum(var)						\
-({									\
-	typeof(var) __sum = 0;						\
-	int cpu;							\
-	compiletime_assert_atomic_type(__sum);				\
-	for_each_possible_cpu(cpu)					\
-		__sum += per_cpu(var, cpu);				\
-	__sum;								\
-})
-
-/*
- * Return true if the modular sum of the sem->read_count per-CPU variable is
- * zero.  If this sum is zero, then it is stable due to the fact that if any
- * newly arriving readers increment a given counter, they will immediately
- * decrement that same counter.
- */
-static bool readers_active_check(struct percpu_rw_semaphore *sem)
-{
-	if (per_cpu_sum(*sem->read_count) != 0)
-		return false;
-
-	/*
-	 * If we observed the decrement; ensure we see the entire critical
-	 * section.
-	 */
-
-	smp_mb(); /* C matches B */
-
-	return true;
-}
 
 void percpu_down_write(struct percpu_rw_semaphore *sem)
 {
