@@ -861,6 +861,8 @@ struct thread_trace {
 	} paths;
 
 	struct intlist *syscall_stats;
+	u64	       pgfault_entry_time;
+	char           *pgfault_entry_str;
 };
 
 static struct thread_trace *thread_trace__new(void)
@@ -1797,21 +1799,56 @@ out:
 	return 0;
 }
 
-static void print_location(FILE *f, struct perf_sample *sample,
-			   struct addr_location *al,
-			   bool print_dso, bool print_sym)
+static int trace__pgfault_enter(struct trace *trace,
+				struct perf_evsel *evsel __maybe_unused,
+				union perf_event *event __maybe_unused,
+				struct perf_sample *sample)
 {
+	struct thread *thread;
+	struct thread_trace *ttrace;
+	int err = -1;
+
+	thread = machine__findnew_thread(trace->host, sample->pid, sample->tid);
+	if (!thread)
+		goto out;
+
+	ttrace = thread__trace(thread, trace->output);
+	if (ttrace == NULL)
+		goto out_put;
+
+	ttrace->pgfault_entry_time = sample->time;
+
+out:
+	err = 0;
+out_put:
+	thread__put(thread);
+	return err;
+}
+
+static size_t scnprintf_location(char *bf, size_t size,
+				struct perf_sample *sample,
+				struct addr_location *al,
+				bool print_dso, bool print_sym)
+{
+	size_t printed = 0;
 
 	if ((verbose || print_dso) && al->map)
-		fprintf(f, "%s@", al->map->dso->long_name);
+		printed += scnprintf(bf + printed,
+				size - printed, "%s@", al->map->dso->long_name);
 
 	if ((verbose || print_sym) && al->sym)
-		fprintf(f, "%s+0x%" PRIx64, al->sym->name,
-			al->addr - al->sym->start);
+		printed += scnprintf(bf + printed,
+				size - printed,
+				"%s+0x%" PRIx64, al->sym->name,
+				al->addr - al->sym->start);
 	else if (al->map)
-		fprintf(f, "0x%" PRIx64, al->addr);
+		printed += scnprintf(bf + printed,
+				size - printed, "0x%" PRIx64, al->addr);
 	else
-		fprintf(f, "0x%" PRIx64, sample->addr);
+		printed += scnprintf(bf + printed,
+				size - printed, "0x%" PRIx64, sample->addr);
+
+	return printed;
 }
 
 static int trace__pgfault(struct trace *trace,
@@ -1823,23 +1860,28 @@ static int trace__pgfault(struct trace *trace,
 	struct addr_location al;
 	char map_type = 'd';
 	struct thread_trace *ttrace;
+	size_t printed = 0;
 	int err = -1;
 	int callchain_ret = 0;
 
 	thread = machine__findnew_thread(trace->host, sample->pid, sample->tid);
+	if (!thread)
+		goto out;
 
-	if (sample->callchain) {
-		callchain_ret = trace__resolve_callchain(trace, evsel, sample, &callchain_cursor);
+	ttrace = thread__trace(thread, trace->output);
+	if (ttrace == NULL)
+		goto out_put;
+
+	if (!ttrace->pgfault_entry_time && sample->callchain) {
+		callchain_ret =
+			trace__resolve_callchain(trace, evsel,
+						sample, &callchain_cursor);
 		if (callchain_ret == 0) {
 			if (callchain_cursor.nr < trace->min_stack)
 				goto out_put;
 			callchain_ret = 1;
 		}
 	}
-
-	ttrace = thread__trace(thread, trace->output);
-	if (ttrace == NULL)
-		goto out_put;
 
 	if (evsel->attr.config == PERF_COUNT_SW_PAGE_FAULTS_MAJ)
 		ttrace->pfmaj++;
@@ -1849,18 +1891,27 @@ static int trace__pgfault(struct trace *trace,
 	if (trace->summary_only)
 		goto out;
 
+	if (ttrace->pgfault_entry_str == NULL) {
+		ttrace->pgfault_entry_str = malloc(trace__entry_str_size);
+		if (!ttrace->pgfault_entry_str)
+			goto out_put;
+		ttrace->pgfault_entry_str[0] = '\0';
+	}
+
 	thread__find_addr_location(thread, sample->cpumode, MAP__FUNCTION,
 			      sample->ip, &al);
 
-	trace__fprintf_entry_head(trace, thread, 0, sample->time, trace->output);
+	printed += scnprintf(ttrace->pgfault_entry_str + printed,
+			trace__entry_str_size - printed, "%sfault [",
+			evsel->attr.config == PERF_COUNT_SW_PAGE_FAULTS_MAJ ?
+			"maj" : "min");
 
-	fprintf(trace->output, "%sfault [",
-		evsel->attr.config == PERF_COUNT_SW_PAGE_FAULTS_MAJ ?
-		"maj" : "min");
+	printed += scnprintf_location(ttrace->pgfault_entry_str + printed,
+				trace__entry_str_size - printed,
+				sample, &al, false, true);
 
-	print_location(trace->output, sample, &al, false, true);
-
-	fprintf(trace->output, "] => ");
+	printed += scnprintf(ttrace->pgfault_entry_str + printed,
+			trace__entry_str_size - printed, "] => ");
 
 	thread__find_addr_location(thread, sample->cpumode, MAP__VARIABLE,
 				   sample->addr, &al);
@@ -1875,14 +1926,97 @@ static int trace__pgfault(struct trace *trace,
 			map_type = '?';
 	}
 
-	print_location(trace->output, sample, &al, true, false);
+	printed += scnprintf_location(ttrace->pgfault_entry_str + printed,
+				trace__entry_str_size - printed,
+				sample, &al, true, false);
 
-	fprintf(trace->output, " (%c%c)\n", map_type, al.level);
+	printed += scnprintf(ttrace->pgfault_entry_str + printed,
+			trace__entry_str_size - printed,
+			" (%c%c)", map_type, al.level);
+
+	if (!ttrace->pgfault_entry_time) {
+		trace__fprintf_entry_head(trace, thread,
+					0, sample->time, trace->output);
+		fprintf(trace->output, "%-70s\n", ttrace->pgfault_entry_str);
+
+		if (callchain_ret > 0)
+			trace__fprintf_callchain(trace, sample);
+		else if (callchain_ret < 0)
+			pr_err("Problem processing %s callchain, skipping...\n",
+				perf_evsel__name(evsel));
+	}
+
+out:
+	err = 0;
+out_put:
+	thread__put(thread);
+	return err;
+}
+
+static int trace__pgfault_exit(struct trace *trace, struct perf_evsel *evsel,
+			      union perf_event *event __maybe_unused,
+			      struct perf_sample *sample)
+{
+	struct thread *thread;
+	struct thread_trace *ttrace;
+	u64 duration = 0;
+	int err = -1, callchain_ret = 0;
+
+	thread = machine__findnew_thread(trace->host, sample->pid, sample->tid);
+
+	ttrace = thread__priv(thread);
+	if (!ttrace)
+		goto out_put;
+
+	if (!ttrace->pgfault_entry_time)
+		goto out;
+
+	/*
+	 * The check below is necessary for a specific case: it is
+	 * possible to enable only major (or minor) page faults
+	 * software events but it is impossible to filter page-fault
+	 * related tracepoints according to the major / minor
+	 * characteristic.
+	 */
+
+	if (!ttrace->pgfault_entry_str ||
+		strlen(ttrace->pgfault_entry_str) == 0)
+		goto out;
+
+	if (sample->callchain) {
+		callchain_ret =
+			trace__resolve_callchain(trace, evsel,
+						sample, &callchain_cursor);
+		if (callchain_ret == 0) {
+			if (callchain_cursor.nr < trace->min_stack)
+				goto out;
+			callchain_ret = 1;
+		}
+	}
+
+	if (ttrace->pgfault_entry_time) {
+		duration = sample->time - ttrace->pgfault_entry_time;
+		if (trace__filter_duration(trace, duration))
+			goto out;
+	}
+
+	trace__fprintf_entry_head(trace, thread,
+				duration, sample->time, trace->output);
+
+	fprintf(trace->output, "%-70s\n", ttrace->pgfault_entry_str);
+
+	/*
+	 * Once the string is printed; clear it just in case the next
+	 * software events is filtered (because of major / minor.
+	 */
+	ttrace->pgfault_entry_str[0] = '\0';
 
 	if (callchain_ret > 0)
 		trace__fprintf_callchain(trace, sample);
 	else if (callchain_ret < 0)
-		pr_err("Problem processing %s callchain, skipping...\n", perf_evsel__name(evsel));
+		pr_err("Problem processing %s callchain, skipping...\n",
+			perf_evsel__name(evsel));
+
 out:
 	err = 0;
 out_put:
@@ -2062,6 +2196,43 @@ static struct perf_evsel *perf_evsel__new_pgfault(u64 config)
 	return evsel;
 }
 
+static int trace__add_pgfault_newtp(struct trace *trace)
+{
+	int err = -1;
+	struct perf_evlist *evlist = trace->evlist;
+
+	/*
+	 * The tracepoints exceptions::page_fault_* are not available
+	 * on all architecture.; so, we consider it is not an error if
+	 * the 1st one's initialization is KO...
+	 */
+	err = perf_evlist__add_newtp(evlist, "exceptions",
+				"page_fault_kernel_exit", trace__pgfault_exit);
+	if (err < 0)
+		return 0;
+
+	/*
+	 * ...however, if the 2nd, 3rd or 4th init is KO; there is
+	 * definitely something wrong not related with the absence of
+	 * tracepoints
+	 */
+	err = perf_evlist__add_newtp(evlist, "exceptions",
+				"page_fault_user_exit", trace__pgfault_exit);
+	if (err < 0)
+		return -1;
+
+	err = perf_evlist__add_newtp(evlist, "exceptions",
+				"page_fault_kernel_entry",
+				trace__pgfault_enter);
+	if (err < 0)
+		return -1;
+
+	err = perf_evlist__add_newtp(evlist, "exceptions",
+				"page_fault_user_entry", trace__pgfault_enter);
+
+	return err;
+}
+
 static void trace__handle_event(struct trace *trace, union perf_event *event, struct perf_sample *sample)
 {
 	const u32 type = event->header.type;
@@ -2193,9 +2364,12 @@ static int trace__run(struct trace *trace, int argc, const char **argv)
 		perf_evlist__add(evlist, pgfault_min);
 	}
 
+	if (trace->trace_pgfaults && trace__add_pgfault_newtp(trace))
+		goto out_error_pgfault_tp;
+
 	if (trace->sched &&
-	    perf_evlist__add_newtp(evlist, "sched", "sched_stat_runtime",
-				   trace__sched_stat_runtime))
+		perf_evlist__add_newtp(evlist, "sched", "sched_stat_runtime",
+				trace__sched_stat_runtime))
 		goto out_error_sched_stat_runtime;
 
 	err = perf_evlist__create_maps(evlist, &trace->opts.target);
@@ -2397,6 +2571,11 @@ out_error_sched_stat_runtime:
 
 out_error_raw_syscalls:
 	tracing_path__strerror_open_tp(errno, errbuf, sizeof(errbuf), "raw_syscalls", "sys_(enter|exit)");
+	goto out_error;
+
+out_error_pgfault_tp:
+	tracing_path__strerror_open_tp(errno, errbuf, sizeof(errbuf),
+				"exceptions", "page_fault_(kernel|user)");
 	goto out_error;
 
 out_error_mmap:
