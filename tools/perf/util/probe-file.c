@@ -27,6 +27,7 @@
 #include "probe-event.h"
 #include "probe-file.h"
 #include "session.h"
+#include "perf_regs.h"
 
 #define MAX_CMDLEN 256
 
@@ -687,6 +688,137 @@ static unsigned long long sdt_note__get_addr(struct sdt_note *note)
 		 : (unsigned long long)note->addr.a64[0];
 }
 
+static const char * const type_to_suffix[] = {
+	":s64", "", "", "", ":s32", "", ":s16", ":s8",
+	"", ":u8", ":u16", "", ":u32", "", "", "", ":u64"
+};
+
+static int synthesize_sdt_probe_arg(struct strbuf *buf, int i, const char *arg)
+{
+	const struct sdt_name_reg *rnames;
+	char *tmp, *desc = strdup(arg);
+	const char *suffix = "";
+	int ret = -1;
+
+	if (desc == NULL) {
+		pr_debug4("Allocation error\n");
+		return ret;
+	}
+
+	/*
+	 * The uprobe tracer format does not support all the
+	 * addressing modes (notably: in x86 the scaled mode); so, we
+	 * detect ',' characters, if there is just one, there is no
+	 * use converting the sdt arg into a uprobe one.
+	 */
+	if (strchr(desc, ',')) {
+		pr_debug4("SDT argument format not supported\n");
+		goto out;
+	}
+
+	tmp = strchr(desc, '@');
+	if (tmp) {
+		long type_idx;
+		/*
+		 * Isolate the string number and convert it into a
+		 * binary value; this will be an index to get suffix
+		 * of the uprobe name (defining the type)
+		 */
+		tmp[0] = '\0';
+		type_idx = strtol(desc, NULL, 10);
+		if (type_idx == LONG_MIN ||
+			type_idx == LONG_MAX) {
+			pr_debug4("Failed to get sdt type\n");
+			goto error;
+		}
+		suffix = type_to_suffix[type_idx + 8];
+		/* Get rid of the sdt prefix which is now useless */
+		tmp++;
+		memmove(desc, tmp, strlen(tmp) + 1);
+	}
+
+	/*
+	 * The uprobe parser does not support all gas register names;
+	 * so, we have to replace them (ex. for x86_64: %rax -> %ax);
+	 * the loop below performs all the needed renamings if needed.
+	 */
+
+	for (rnames = sdt_reg_renamings; rnames->sdt_name != NULL; rnames++) {
+		char *new_desc, *sdt_name;
+		size_t prefix_len, uprobe_len, mid_ofs, desc_len;
+
+		sdt_name = strstr(desc, rnames->sdt_name);
+		if (sdt_name == NULL)
+			continue;
+
+		new_desc = zalloc(strlen(desc) + 1 +
+				strlen(rnames->uprobe_name) -
+				strlen(rnames->sdt_name));
+		if (new_desc == NULL)
+			goto error;
+
+		prefix_len = sdt_name - desc;
+		if (prefix_len != 0)
+			memcpy(new_desc, desc, prefix_len);
+
+		uprobe_len = strlen(rnames->uprobe_name);
+		memcpy(new_desc + prefix_len, rnames->uprobe_name, uprobe_len);
+
+		mid_ofs = prefix_len + strlen(rnames->sdt_name);
+		desc_len = strlen(desc);
+		if (mid_ofs < desc_len)
+			memcpy(new_desc + prefix_len + uprobe_len,
+				desc + mid_ofs, desc_len - mid_ofs);
+
+		free(desc);
+		desc = new_desc;
+	}
+
+	if (strbuf_addf(buf, " arg%d=%s%s", i, desc, suffix) < 0)
+		goto error;
+
+out:
+	ret = 0;
+error:
+	free(desc);
+	return ret;
+}
+
+static char *synthesize_sdt_probe_command(struct sdt_note *note,
+					const char *pathname,
+					const char *sdtgrp)
+{
+	struct strbuf buf;
+	char *ret = NULL, **args;
+	int i, args_count;
+
+	if (strbuf_init(&buf, 32) < 0)
+		return NULL;
+
+	if (strbuf_addf(&buf, "p:%s/%s %s:0x%llx",
+				sdtgrp, note->name, pathname,
+				sdt_note__get_addr(note)) < 0)
+		goto error;
+
+	if (!note->args)
+		goto out;
+
+	if (note->args) {
+		args = argv_split(note->args, &args_count);
+
+		for (i = 0; i < args_count; ++i) {
+			if (synthesize_sdt_probe_arg(&buf, i, args[i]) < 0)
+				goto error;
+		}
+	}
+
+out:
+	ret = strbuf_detach(&buf, NULL);
+error:
+	strbuf_release(&buf);
+	return ret;
+}
+
 int probe_cache__scan_sdt(struct probe_cache *pcache, const char *pathname)
 {
 	struct probe_cache_entry *entry = NULL;
@@ -723,11 +855,12 @@ int probe_cache__scan_sdt(struct probe_cache *pcache, const char *pathname)
 			entry->pev.group = strdup(sdtgrp);
 			list_add_tail(&entry->node, &pcache->entries);
 		}
-		ret = asprintf(&buf, "p:%s/%s %s:0x%llx",
-				sdtgrp, note->name, pathname,
-				sdt_note__get_addr(note));
-		if (ret < 0)
+		buf = synthesize_sdt_probe_command(note, pathname, sdtgrp);
+		if (!buf) {
+			ret = -ENOMEM;
 			break;
+		}
+
 		strlist__add(entry->tevlist, buf);
 		free(buf);
 		entry = NULL;

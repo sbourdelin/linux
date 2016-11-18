@@ -26,3 +26,21 @@ const struct sample_reg sample_reg_masks[] = {
 #endif
 	SMPL_REG_END
 };
+
+const struct sdt_name_reg sdt_reg_renamings[] = {
+	SDT_NAME_REG(eax, ax),
+	SDT_NAME_REG(rax, ax),
+	SDT_NAME_REG(ebx, bx),
+	SDT_NAME_REG(rbx, bx),
+	SDT_NAME_REG(ecx, cx),
+	SDT_NAME_REG(rcx, cx),
+	SDT_NAME_REG(edx, dx),
+	SDT_NAME_REG(rdx, dx),
+	SDT_NAME_REG(esi, si),
+	SDT_NAME_REG(rsi, si),
+	SDT_NAME_REG(edi, di),
+	SDT_NAME_REG(rdi, di),
+	SDT_NAME_REG(ebp, bp),
+	SDT_NAME_REG(rbp, bp),
+	SDT_NAME_REG_END,
+};
