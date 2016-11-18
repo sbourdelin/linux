@@ -145,6 +145,14 @@ Optional properties:
 
 - status: Marks the node enabled/disabled.
 
+- domain-performance-state: A positive integer value representing the minimum
+  performance level (of the parent domain) required by the consumer for the
+  working of respective OPP. The integer value '1' represents the lowest
+  performance level and the highest value represents the highest performance
+  level. The consumer device node (which contains phandle to the OPP table in
+  its "operating-points-v2" property) should have its "power-domains" property
+  set as well.
+
 Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
 
 / {
@@ -514,6 +522,55 @@ Example 6: opp-microvolt-<name>, opp-microamp-<name>:
 			opp-microvolt-fast = <970000 975000 985000>, /* Supply vcc0 */
 					     <960000 965000 975000>; /* Supply vcc1 */
 			opp-microamp =  <70000>; /* Will be used for both slow/fast */
+		};
+	};
+};
+
+Example 7: domain-Performance-state:
+(example: For 1GHz require domain state 1 and for 1.1 & 1.2 GHz require state 2)
+
+/ {
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			compatible = "arm,cortex-a9";
+			reg = <0>;
+			next-level-cache = <&L2>;
+			clocks = <&clk_controller 0>;
+			clock-names = "cpu";
+			cpu-supply = <&cpu_supply0>;
+			operating-points-v2 = <&cpu0_opp_table>;
+			power-domains = <&foo_pd>;
+		};
+	};
+
+	cpu0_opp_table: opp_table0 {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp@1000000000 {
+			opp-hz = /bits/ 64 <1000000000>;
+			opp-microvolt = <970000 975000 985000>;
+			opp-microamp = <70000>;
+			clock-latency-ns = <300000>;
+			opp-suspend;
+			domain-performance-state = <1>;
+		};
+		opp@1100000000 {
+			opp-hz = /bits/ 64 <1100000000>;
+			opp-microvolt = <980000 1000000 1010000>;
+			opp-microamp = <80000>;
+			clock-latency-ns = <310000>;
+			domain-performance-state = <2>;
+		};
+		opp@1200000000 {
+			opp-hz = /bits/ 64 <1200000000>;
+			opp-microvolt = <1025000>;
+			clock-latency-ns = <290000>;
+			turbo-mode;
+			domain-performance-state = <2>;
 		};
 	};
 };
