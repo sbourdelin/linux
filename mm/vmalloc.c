@@ -1530,6 +1530,7 @@ void vfree_atomic(const void *addr)
 void vfree(const void *addr)
 {
 	BUG_ON(in_nmi());
+	WARN_ON_ONCE(in_atomic());
 
 	kmemleak_free(addr);
 
