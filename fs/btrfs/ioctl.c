@@ -3121,20 +3121,24 @@ static int extent_same_check_offsets(struct inode *inode, u64 off, u64 *plen,
 static int btrfs_extent_same(struct inode *src, u64 loff, u64 olen,
 			     struct inode *dst, u64 dst_loff)
 {
-	int ret;
-	u64 len = olen;
+	int ret = 0;
+	u64 len;
 	struct cmp_pages cmp;
 	bool same_inode = (src == dst);
 	u64 same_lock_start = 0;
 	u64 same_lock_len = 0;
 
-	if (len == 0)
-		return 0;
-
 	if (same_inode)
 		inode_lock(src);
 	else
 		btrfs_double_inode_lock(src, dst);
+
+	if (olen == 0) {
+		olen = i_size_read(src) - loff;
+		if (olen == 0)
+			goto out_unlock;
+	}
+	len = olen;
 
 	ret = extent_same_check_offsets(src, loff, &len, olen);
 	if (ret)
