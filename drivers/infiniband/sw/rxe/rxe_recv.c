@@ -391,7 +391,7 @@ int rxe_rcv(struct sk_buff *skb)
 			     payload_size(pkt));
 	calc_icrc = cpu_to_be32(~calc_icrc);
 	if (unlikely(calc_icrc != pack_icrc)) {
-		char saddr[sizeof(struct in6_addr)];
+		char saddr[64];
 
 		if (skb->protocol == htons(ETH_P_IPV6))
 			sprintf(saddr, "%pI6", &ipv6_hdr(skb)->saddr);
