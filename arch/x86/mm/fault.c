@@ -1465,12 +1465,22 @@ NOKPROBE_SYMBOL(do_page_fault);
 #ifdef CONFIG_TRACING
 static nokprobe_inline void
 trace_page_fault_entries(unsigned long address, struct pt_regs *regs,
-			 unsigned long error_code)
+			unsigned long error_code)
 {
 	if (user_mode(regs))
-		trace_page_fault_user(address, regs, error_code);
+		trace_page_fault_user_entry(address, regs, error_code);
 	else
-		trace_page_fault_kernel(address, regs, error_code);
+		trace_page_fault_kernel_entry(address, regs, error_code);
+}
+
+static nokprobe_inline void
+trace_page_fault_exits(unsigned long address, struct pt_regs *regs,
+		unsigned long error_code)
+{
+	if (user_mode(regs))
+		trace_page_fault_user_exit(address, regs, error_code);
+	else
+		trace_page_fault_kernel_exit(address, regs, error_code);
 }
 
 dotraplinkage void notrace
@@ -1488,6 +1498,7 @@ trace_do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	prev_state = exception_enter();
 	trace_page_fault_entries(address, regs, error_code);
 	__do_page_fault(regs, error_code, address);
+	trace_page_fault_exits(address, regs, error_code);
 	exception_exit(prev_state);
 }
 NOKPROBE_SYMBOL(trace_do_page_fault);

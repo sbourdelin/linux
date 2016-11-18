@@ -33,14 +33,29 @@ DECLARE_EVENT_CLASS(x86_exceptions,
 		  __entry->error_code) );
 
 #define DEFINE_PAGE_FAULT_EVENT(name)				\
-DEFINE_EVENT_FN(x86_exceptions, name,				\
+DEFINE_EVENT_FN(x86_exceptions, name##_entry,			\
+	TP_PROTO(unsigned long address,	struct pt_regs *regs,	\
+		 unsigned long error_code),			\
+	TP_ARGS(address, regs, error_code),			\
+	trace_irq_vector_regfunc,				\
+	trace_irq_vector_unregfunc);				\
+DEFINE_EVENT_FN(x86_exceptions, name##_exit,			\
 	TP_PROTO(unsigned long address,	struct pt_regs *regs,	\
 		 unsigned long error_code),			\
 	TP_ARGS(address, regs, error_code),			\
 	trace_irq_vector_regfunc,				\
 	trace_irq_vector_unregfunc);
 
+/*
+ * page_fault_user - called when entering/exiting a page fault in
+ * user-space
+ */
 DEFINE_PAGE_FAULT_EVENT(page_fault_user);
+
+/*
+ * page_fault_kernel - called when entering/exiting a page fault in
+ * kernel-space
+ */
 DEFINE_PAGE_FAULT_EVENT(page_fault_kernel);
 
 #undef TRACE_INCLUDE_PATH
