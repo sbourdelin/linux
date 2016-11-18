@@ -4240,6 +4240,7 @@ void i915_gem_resume(struct drm_device *dev)
 
 	WARN_ON(dev_priv->gt.awake);
 
+	intel_runtime_pm_get(dev_priv);
 	mutex_lock(&dev->struct_mutex);
 	i915_gem_restore_gtt_mappings(dev_priv);
 
@@ -4250,6 +4251,7 @@ void i915_gem_resume(struct drm_device *dev)
 	dev_priv->gt.resume(dev_priv);
 
 	mutex_unlock(&dev->struct_mutex);
+	intel_runtime_pm_put(dev_priv);
 }
 
 void i915_gem_init_swizzling(struct drm_i915_private *dev_priv)
