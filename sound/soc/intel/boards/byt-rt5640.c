@@ -222,7 +222,7 @@ static struct platform_driver byt_rt5640_audio = {
 		.pm = &snd_soc_pm_ops,
 	},
 };
-module_platform_driver(byt_rt5640_audio)
+module_platform_driver(byt_rt5640_audio);
 
 MODULE_DESCRIPTION("ASoC Intel(R) Baytrail Machine driver");
 MODULE_AUTHOR("Omair Md Abdullah, Jarkko Nikula");
