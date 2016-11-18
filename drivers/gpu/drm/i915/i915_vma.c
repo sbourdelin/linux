@@ -648,3 +648,13 @@ destroy:
 	return 0;
 }
 
+bool i915_vma_rebind(struct i915_vma *vma)
+{
+	if (i915_vma_is_pinned(vma)) {
+		WARN_ON(i915_vma_bind(vma, vma->obj->cache_level, PIN_UPDATE));
+		return true;
+	} else {
+		WARN_ON(i915_vma_unbind(vma));
+		return false;
+	}
+}

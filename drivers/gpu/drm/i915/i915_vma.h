@@ -200,8 +200,11 @@ i915_vma_compare(struct i915_vma *vma,
 		      sizeof(view->params));
 }
 
-int i915_vma_bind(struct i915_vma *vma, enum i915_cache_level cache_level,
+int i915_vma_bind(struct i915_vma *vma,
+		  enum i915_cache_level cache_level,
 		  u32 flags);
+bool i915_vma_rebind(struct i915_vma *vma);
+
 bool i915_gem_valid_gtt_space(struct i915_vma *vma, unsigned long cache_level);
 bool
 i915_vma_misplaced(struct i915_vma *vma, u64 size, u64 alignment, u64 flags);
@@ -339,4 +342,3 @@ i915_vma_unpin_fence(struct i915_vma *vma)
 }
 
 #endif
-

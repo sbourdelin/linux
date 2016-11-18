@@ -3293,12 +3293,7 @@ void i915_gem_restore_gtt_mappings(struct drm_i915_private *dev_priv)
 			if (vma->vm != &ggtt->base)
 				continue;
 
-			if (!i915_vma_unbind(vma))
-				continue;
-
-			WARN_ON(i915_vma_bind(vma, obj->cache_level,
-					      PIN_UPDATE));
-			ggtt_bound = true;
+			ggtt_bound |= i915_vma_rebind(vma);
 		}
 
 		if (ggtt_bound)
