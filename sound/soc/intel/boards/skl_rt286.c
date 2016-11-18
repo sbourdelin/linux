@@ -521,7 +521,7 @@ static struct platform_driver skylake_audio = {
 
 };
 
-module_platform_driver(skylake_audio)
+module_platform_driver(skylake_audio);
 
 /* Module information */
 MODULE_AUTHOR("Omair Mohammed Abdullah <omair.m.abdullah@intel.com>");
