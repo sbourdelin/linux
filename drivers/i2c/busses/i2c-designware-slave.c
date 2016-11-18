@@ -38,7 +38,7 @@ static void i2c_dw_configure_fifo_slave(struct dw_i2c_dev *dev)
 	dw_writel(dev, 0, DW_IC_TX_TL);
 	dw_writel(dev, 0, DW_IC_RX_TL);
 
-	/* configure the i2c slave */
+	/* configure the I2C slave */
 	dw_writel(dev, dev->slave_cfg, DW_IC_CON);
 	dw_writel(dev, DW_IC_INTR_SLAVE_MASK, DW_IC_INTR_MASK);
 }
@@ -182,7 +182,7 @@ int i2c_dw_reg_slave(struct i2c_client *slave)
 	if (slave->flags & I2C_CLIENT_TEN)
 		return -EAFNOSUPPORT;
 		/* set slave address in the IC_SAR register,
-		* the address to which the DW_apb_i2c responds */
+		 * the address to which the DW_apb_i2c responds */
 
 	__i2c_dw_enable(dev, false);
 	dw_writel(dev, slave->addr, DW_IC_SAR);
@@ -266,7 +266,7 @@ static u32 i2c_dw_read_clear_intrbits_slave(struct dw_i2c_dev *dev)
 }
 
 /*
- * Interrupt service routine. This gets called whenever an I2C interrupt
+ * Interrupt service routine. This gets called whenever an I2C slave interrupt
  * occurs.
  */
 
@@ -300,7 +300,7 @@ static bool i2c_dw_irq_handler_slave(struct dw_i2c_dev *dev)
 				val = dw_readl(dev, DW_IC_DATA_CMD);
 				if (!i2c_slave_event(dev->slave,
 				 I2C_SLAVE_WRITE_RECEIVED, &val)) {
-					dev_dbg(dev->dev, "Byte %X acked! ",
+					dev_dbg(dev->dev, "Byte %X acked!",
 					 val);
 				}
 				dw_readl(dev, DW_IC_CLR_RD_REQ);
@@ -330,7 +330,7 @@ static bool i2c_dw_irq_handler_slave(struct dw_i2c_dev *dev)
 		val = dw_readl(dev, DW_IC_DATA_CMD);
 		if (!i2c_slave_event(dev->slave, I2C_SLAVE_WRITE_RECEIVED,
 		 &val))
-			dev_dbg(dev->dev, "Byte %X acked! ", val);
+			dev_dbg(dev->dev, "Byte %X acked!", val);
 	} else {
 		i2c_slave_event(dev->slave, I2C_SLAVE_STOP, &val);
 		stat = i2c_dw_read_clear_intrbits_slave(dev);
