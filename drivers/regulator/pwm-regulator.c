@@ -233,6 +233,24 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
 	return 0;
 }
 
+/**
+ * Some of PWM regulators have exponential voltage ramp. On such PWM
+ * regulators, voltage settling time is same regardless of voltage
+ * level change.
+ */
+static int pwm_regulator_set_voltage_time(struct regulator_dev *rdev,
+					  int old_uV, int new_uV)
+{
+	return rdev->constraints->ramp_delay;
+}
+
+static int pwm_regulator_set_voltage_time_sel(struct regulator_dev *rdev,
+					      unsigned int old_selector,
+					      unsigned int new_selector)
+{
+	return rdev->constraints->ramp_delay;
+}
+
 static struct regulator_ops pwm_regulator_voltage_table_ops = {
 	.set_voltage_sel = pwm_regulator_set_voltage_sel,
 	.get_voltage_sel = pwm_regulator_get_voltage_sel,
@@ -294,17 +312,25 @@ static int pwm_regulator_init_table(struct platform_device *pdev,
 	drvdata->desc.ops = &drvdata->ops;
 	drvdata->desc.n_voltages	= length / sizeof(*duty_cycle_table);
 
+	if (of_property_read_bool(np, "voltage-ramp-exponential"))
+		drvdata->ops.set_voltage_time_sel =
+					pwm_regulator_set_voltage_time_sel;
 	return 0;
 }
 
 static int pwm_regulator_init_continuous(struct platform_device *pdev,
 					 struct pwm_regulator_data *drvdata)
 {
+	struct device_node *np = pdev->dev.of_node;
 	u32 dutycycle_range[2] = { 0, 100 };
 	u32 dutycycle_unit = 100;
 
 	memcpy(&drvdata->ops, &pwm_regulator_voltage_continuous_ops,
 	       sizeof(drvdata->ops));
+
+	if (of_property_read_bool(np, "voltage-ramp-exponential"))
+		drvdata->ops.set_voltage_time = pwm_regulator_set_voltage_time;
+
 	drvdata->desc.ops = &drvdata->ops;
 	drvdata->desc.continuous_voltage_range = true;
 
