@@ -152,6 +152,11 @@ dw_dma_parse_dt(struct platform_device *pdev)
 			pdata->data_width[tmp] = BIT(arr[tmp] & 0x07);
 	}
 
+	if (!of_property_read_u32_array(np, "multi-block", arr, nr_masters)) {
+		for (tmp = 0; tmp < nr_masters; tmp++)
+			pdata->multi_block[tmp] = arr[tmp];
+	}
+
 	return pdata;
 }
 #else
