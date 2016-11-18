@@ -239,10 +239,8 @@ static int mwifiex_sdio_resume(struct device *dev)
 	struct sdio_func *func = dev_to_sdio_func(dev);
 	struct sdio_mmc_card *card;
 	struct mwifiex_adapter *adapter;
-	mmc_pm_flag_t pm_flag = 0;
 
 	if (func) {
-		pm_flag = sdio_get_host_pm_caps(func);
 		card = sdio_get_drvdata(func);
 		if (!card || !card->adapter) {
 			pr_err("resume: invalid card or adapter\n");
