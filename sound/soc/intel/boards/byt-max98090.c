@@ -180,7 +180,7 @@ static struct platform_driver byt_max98090_driver = {
 		.pm = &snd_soc_pm_ops,
 	},
 };
-module_platform_driver(byt_max98090_driver)
+module_platform_driver(byt_max98090_driver);
 
 MODULE_DESCRIPTION("ASoC Intel(R) Baytrail Machine driver");
 MODULE_AUTHOR("Omair Md Abdullah, Jarkko Nikula");
