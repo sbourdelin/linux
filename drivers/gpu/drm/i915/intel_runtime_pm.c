@@ -2632,6 +2632,9 @@ void intel_runtime_pm_get(struct drm_i915_private *dev_priv)
 	struct pci_dev *pdev = dev_priv->drm.pdev;
 	struct device *kdev = &pdev->dev;
 
+	if (atomic_inc_not_zero(&dev_priv->pm.wakeref_count))
+		return;
+
 	pm_runtime_get_sync(kdev);
 
 	atomic_inc(&dev_priv->pm.wakeref_count);
@@ -2652,6 +2655,9 @@ bool intel_runtime_pm_get_if_in_use(struct drm_i915_private *dev_priv)
 {
 	struct pci_dev *pdev = dev_priv->drm.pdev;
 	struct device *kdev = &pdev->dev;
+
+	if (atomic_inc_not_zero(&dev_priv->pm.wakeref_count))
+		return;
 
 	if (IS_ENABLED(CONFIG_PM)) {
 		int ret = pm_runtime_get_if_in_use(kdev);
@@ -2695,6 +2701,9 @@ void intel_runtime_pm_get_noresume(struct drm_i915_private *dev_priv)
 	struct pci_dev *pdev = dev_priv->drm.pdev;
 	struct device *kdev = &pdev->dev;
 
+	if (atomic_inc_not_zero(&dev_priv->pm.wakeref_count))
+		return;
+
 	assert_rpm_wakelock_held(dev_priv);
 	pm_runtime_get_noresume(kdev);
 
@@ -2713,6 +2722,9 @@ void intel_runtime_pm_put(struct drm_i915_private *dev_priv)
 {
 	struct pci_dev *pdev = dev_priv->drm.pdev;
 	struct device *kdev = &pdev->dev;
+
+	if (!atomic_dec_and_test(&dev_priv->pm.wakeref_count))
+		return;
 
 	assert_rpm_wakelock_held(dev_priv);
 	atomic_dec(&dev_priv->pm.wakeref_count);
