@@ -409,7 +409,7 @@ static struct platform_driver snd_cht_mc_driver = {
 	.probe = snd_cht_mc_probe,
 };
 
-module_platform_driver(snd_cht_mc_driver)
+module_platform_driver(snd_cht_mc_driver);
 
 MODULE_DESCRIPTION("ASoC Intel(R) Braswell Machine driver");
 MODULE_AUTHOR("Fang, Yang A,N,Harshapriya");
