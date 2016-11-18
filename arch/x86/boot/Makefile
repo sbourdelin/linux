@@ -160,6 +160,8 @@ isoimage: $(obj)/bzImage
 	-rm -rf $(obj)/isoimage
 	mkdir $(obj)/isoimage
 	for i in lib lib64 share end ; do \
+		[ -r /usr/$$i/syslinux/ldlinux.c32 ] && \
+			cp /usr/$$i/syslinux/ldlinux.c32 $(obj)/isoimage ; \
 		if [ -f /usr/$$i/syslinux/isolinux.bin ] ; then \
 			cp /usr/$$i/syslinux/isolinux.bin $(obj)/isoimage ; \
 			if [ -f /usr/$$i/syslinux/ldlinux.c32 ]; then \
