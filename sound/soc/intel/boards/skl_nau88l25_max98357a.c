@@ -671,7 +671,7 @@ static struct platform_driver skylake_audio = {
 	.id_table = skl_board_ids,
 };
 
-module_platform_driver(skylake_audio)
+module_platform_driver(skylake_audio);
 
 /* Module information */
 MODULE_DESCRIPTION("Audio Machine driver-NAU88L25 & MAX98357A in I2S mode");
