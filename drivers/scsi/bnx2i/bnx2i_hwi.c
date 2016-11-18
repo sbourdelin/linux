@@ -19,8 +19,6 @@
 #include <scsi/libiscsi.h>
 #include "bnx2i.h"
 
-DECLARE_PER_CPU(struct bnx2i_percpu_s, bnx2i_percpu);
-
 /**
  * bnx2i_get_cid_num - get cid from ep
  * @ep: 	endpoint pointer
@@ -1350,9 +1348,9 @@ int bnx2i_send_fw_iscsi_init_msg(struct bnx2i_hba *hba)
  *
  * process SCSI CMD Response CQE & complete the request to SCSI-ML
  */
-int bnx2i_process_scsi_cmd_resp(struct iscsi_session *session,
-				struct bnx2i_conn *bnx2i_conn,
-				struct cqe *cqe)
+static int bnx2i_process_scsi_cmd_resp(struct iscsi_session *session,
+				       struct bnx2i_conn *bnx2i_conn,
+				       struct cqe *cqe)
 {
 	struct iscsi_conn *conn = bnx2i_conn->cls_conn->dd_data;
 	struct bnx2i_hba *hba = bnx2i_conn->hba;
@@ -1862,44 +1860,36 @@ static void bnx2i_process_cmd_cleanup_resp(struct iscsi_session *session,
 
 
 /**
- * bnx2i_percpu_io_thread - thread per cpu for ios
+ * bnx2i_percpu_io_work - thread per cpu for ios
  *
- * @arg:	ptr to bnx2i_percpu_info structure
+ * @work_s:	The work struct
  */
-int bnx2i_percpu_io_thread(void *arg)
+void bnx2i_percpu_io_work(struct work_struct *work_s)
 {
-	struct bnx2i_percpu_s *p = arg;
+	struct bnx2i_percpu_s *p;
 	struct bnx2i_work *work, *tmp;
 	LIST_HEAD(work_list);
 
-	set_user_nice(current, MIN_NICE);
+	p = container_of(work_s, struct bnx2i_percpu_s, work);
 
-	while (!kthread_should_stop()) {
-		spin_lock_bh(&p->p_work_lock);
-		while (!list_empty(&p->work_list)) {
-			list_splice_init(&p->work_list, &work_list);
-			spin_unlock_bh(&p->p_work_lock);
-
-			list_for_each_entry_safe(work, tmp, &work_list, list) {
-				list_del_init(&work->list);
-				/* work allocated in the bh, freed here */
-				bnx2i_process_scsi_cmd_resp(work->session,
-							    work->bnx2i_conn,
-							    &work->cqe);
-				atomic_dec(&work->bnx2i_conn->work_cnt);
-				kfree(work);
-			}
-			spin_lock_bh(&p->p_work_lock);
-		}
-		set_current_state(TASK_INTERRUPTIBLE);
+	spin_lock_bh(&p->p_work_lock);
+	while (!list_empty(&p->work_list)) {
+		list_splice_init(&p->work_list, &work_list);
 		spin_unlock_bh(&p->p_work_lock);
-		schedule();
+
+		list_for_each_entry_safe(work, tmp, &work_list, list) {
+			list_del_init(&work->list);
+			/* work allocated in the bh, freed here */
+			bnx2i_process_scsi_cmd_resp(work->session,
+						    work->bnx2i_conn,
+						    &work->cqe);
+			atomic_dec(&work->bnx2i_conn->work_cnt);
+			kfree(work);
+		}
+		spin_lock_bh(&p->p_work_lock);
 	}
-	__set_current_state(TASK_RUNNING);
-
-	return 0;
+	spin_unlock_bh(&p->p_work_lock);
 }
-
 
 /**
  * bnx2i_queue_scsi_cmd_resp - queue cmd completion to the percpu thread
@@ -1920,7 +1910,6 @@ static int bnx2i_queue_scsi_cmd_resp(struct iscsi_session *session,
 	struct bnx2i_percpu_s *p = NULL;
 	struct iscsi_task *task;
 	struct scsi_cmnd *sc;
-	int rc = 0;
 	int cpu;
 
 	spin_lock(&session->back_lock);
@@ -1939,33 +1928,29 @@ static int bnx2i_queue_scsi_cmd_resp(struct iscsi_session *session,
 
 	spin_unlock(&session->back_lock);
 
-	p = &per_cpu(bnx2i_percpu, cpu);
-	spin_lock(&p->p_work_lock);
-	if (unlikely(!p->iothread)) {
-		rc = -EINVAL;
-		goto err;
-	}
 	/* Alloc and copy to the cqe */
 	bnx2i_work = kzalloc(sizeof(struct bnx2i_work), GFP_ATOMIC);
-	if (bnx2i_work) {
-		INIT_LIST_HEAD(&bnx2i_work->list);
-		bnx2i_work->session = session;
-		bnx2i_work->bnx2i_conn = bnx2i_conn;
-		memcpy(&bnx2i_work->cqe, cqe, sizeof(struct cqe));
-		list_add_tail(&bnx2i_work->list, &p->work_list);
-		atomic_inc(&bnx2i_conn->work_cnt);
-		wake_up_process(p->iothread);
-		spin_unlock(&p->p_work_lock);
-		goto done;
-	} else
-		rc = -ENOMEM;
-err:
-	spin_unlock(&p->p_work_lock);
-	bnx2i_process_scsi_cmd_resp(session, bnx2i_conn, (struct cqe *)cqe);
-done:
-	return rc;
-}
+	if (!bnx2i_work) {
+		bnx2i_process_scsi_cmd_resp(session, bnx2i_conn,
+					    (struct cqe *)cqe);
+		return -ENOMEM;
+	}
 
+	p = per_cpu_ptr(&bnx2i_percpu, cpu);
+
+	INIT_LIST_HEAD(&bnx2i_work->list);
+	bnx2i_work->session = session;
+	bnx2i_work->bnx2i_conn = bnx2i_conn;
+	memcpy(&bnx2i_work->cqe, cqe, sizeof(struct cqe));
+
+	spin_lock(&p->p_work_lock);
+	list_add_tail(&bnx2i_work->list, &p->work_list);
+	atomic_inc(&bnx2i_conn->work_cnt);
+	spin_unlock(&p->p_work_lock);
+
+	schedule_work_on(cpu, &p->work);
+	return 0;
+}
 
 /**
  * bnx2i_process_new_cqes - process newly DMA'ed CQE's
