@@ -461,7 +461,7 @@ static struct platform_driver broxton_audio = {
 		.pm = &snd_soc_pm_ops,
 	},
 };
-module_platform_driver(broxton_audio)
+module_platform_driver(broxton_audio);
 
 /* Module information */
 MODULE_AUTHOR("Ramesh Babu <Ramesh.Babu@intel.com>");
