@@ -332,7 +332,6 @@ struct fcoe_transport {
  *		    memory for a new trailer
  */
 struct fcoe_percpu_s {
-	struct task_struct *kthread;
 	struct work_struct work;
 	struct sk_buff_head fcoe_rx_list;
 	struct page *crc_eof_page;
