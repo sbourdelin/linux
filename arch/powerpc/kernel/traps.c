@@ -824,6 +824,11 @@ void single_step_exception(struct pt_regs *regs)
 
 	clear_single_step(regs);
 
+#ifdef CONFIG_KPROBES
+	if (kprobe_post_handler(regs))
+		return;
+#endif
+
 	if (notify_die(DIE_SSTEP, "single_step", regs, 5,
 					5, SIGTRAP) == NOTIFY_STOP)
 		goto bail;
@@ -1176,6 +1181,11 @@ void program_check_exception(struct pt_regs *regs)
 		 * rcu_lock, notify_die, or atomic_notifier_call_chain */
 		if (debugger_bpt(regs))
 			goto bail;
+
+#ifdef CONFIG_KPROBES
+		if (kprobe_handler(regs))
+			goto bail;
+#endif
 
 		/* trap exception */
 		if (notify_die(DIE_BPT, "breakpoint", regs, 5, 5, SIGTRAP)
@@ -1745,6 +1755,11 @@ void DebugException(struct pt_regs *regs, unsigned long debug_status)
 			return;
 		}
 
+#ifdef CONFIG_KPROBES
+		if (kprobe_post_handler(regs))
+			return;
+#endif
+
 		if (notify_die(DIE_SSTEP, "block_step", regs, 5,
 			       5, SIGTRAP) == NOTIFY_STOP) {
 			return;
@@ -1758,6 +1773,11 @@ void DebugException(struct pt_regs *regs, unsigned long debug_status)
 		mtspr(SPRN_DBCR0, mfspr(SPRN_DBCR0) & ~DBCR0_IC);
 		/* Clear the instruction completion event */
 		mtspr(SPRN_DBSR, DBSR_IC);
+
+#ifdef CONFIG_KPROBES
+		if (kprobe_post_handler(regs))
+			return;
+#endif
 
 		if (notify_die(DIE_SSTEP, "single_step", regs, 5,
 			       5, SIGTRAP) == NOTIFY_STOP) {
