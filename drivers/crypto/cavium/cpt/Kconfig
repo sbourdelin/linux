@@ -20,3 +20,13 @@ config OCTEONTX_CPT_PF
 
 	  To compile this as a module, choose M here: the module will be
 	  called cptpf.
+config OCTEONTX_CPT_VF
+	tristate "Octeon-tx CPT Virtual function driver"
+	depends on ARCH_THUNDER
+	select CRYPTO_DEV_CPT
+	help
+	  Support for Cavium CPT Virtual function found in octeon-tx
+	  series of processors.
+
+	  To compile this as a module, choose M here: the module will be
+	  called cptvf.
