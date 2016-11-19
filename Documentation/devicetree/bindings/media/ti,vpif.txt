@@ -1,0 +1,8 @@
+Texas Instruments VPIF
+----------------------
+
+The Video Port InterFace (VPIF) is the core component for video output
+and capture on TI Davinci family SoCs.
+
+- compatible: must be "ti,vpif"
+- reg: physical base address and length of the registers set for the device;
