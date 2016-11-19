@@ -271,7 +271,7 @@ print_tickdevice(struct seq_file *m, struct tick_device *td, int cpu)
 	SEQ_printf(m, " event_handler:  ");
 	print_name_offset(m, dev->event_handler);
 	SEQ_printf(m, "\n");
-	SEQ_printf(m, " retries:        %lu\n", dev->retries);
+	SEQ_printf(m, " retries:        %u\n", dev->retries);
 	SEQ_printf(m, "\n");
 }
 

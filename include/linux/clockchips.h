@@ -115,7 +115,7 @@ struct clock_event_device {
 	u32			shift;
 	enum clock_event_state	state_use_accessors:8;
 	unsigned int		features:24;
-	unsigned long		retries;
+	unsigned int		retries;
 
 	int			(*set_state_periodic)(struct clock_event_device *);
 	int			(*set_state_oneshot)(struct clock_event_device *);
