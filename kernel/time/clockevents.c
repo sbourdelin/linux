@@ -225,6 +225,9 @@ static int clockevents_increase_min_delta(struct clock_event_device *dev)
 	if (dev->min_delta_ns > MIN_DELTA_LIMIT)
 		dev->min_delta_ns = MIN_DELTA_LIMIT;
 
+	dev->min_delta_ticks_adjusted = (unsigned long)((dev->min_delta_ns *
+						dev->mult) >> dev->shift);
+
 	printk_deferred(KERN_WARNING
 			"CE: %s increased min_delta_ns to %llu nsec\n",
 			dev->name ? dev->name : "?",
@@ -333,9 +336,11 @@ int clockevents_program_event(struct clock_event_device *dev, ktime_t expires,
 		return force ? clockevents_program_min_delta(dev) : -ETIME;
 
 	delta = min(delta, (int64_t) dev->max_delta_ns);
-	delta = max(delta, (int64_t) dev->min_delta_ns);
 
 	clc = ((unsigned long long) delta * dev->mult) >> dev->shift;
+
+	clc = max_t(unsigned long, clc, dev->min_delta_ticks_adjusted);
+
 	rc = dev->set_next_event((unsigned long) clc, dev);
 
 	return (rc && force) ? clockevents_program_min_delta(dev) : rc;
@@ -454,6 +459,8 @@ static void __clockevents_update_bounds(struct clock_event_device *dev)
 	 */
 	dev->min_delta_ns = cev_delta2ns(dev->min_delta_ticks, dev, false);
 	dev->max_delta_ns = cev_delta2ns(dev->max_delta_ticks, dev, true);
+	dev->min_delta_ticks_adjusted = (unsigned long)((dev->min_delta_ns *
+						dev->mult) >> dev->shift);
 }
 
 /**
