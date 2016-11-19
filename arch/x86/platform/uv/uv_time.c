@@ -388,12 +388,8 @@ static __init int uv_rtc_setup_clock(void)
 	clock_event_device_uv.mult = div_sc(sn_rtc_cycles_per_second,
 				NSEC_PER_SEC, clock_event_device_uv.shift);
 
-	clock_event_device_uv.min_delta_ns = NSEC_PER_SEC /
-						sn_rtc_cycles_per_second;
 	clock_event_device_uv.min_delta_ticks = 1;
 
-	clock_event_device_uv.max_delta_ns = clocksource_uv.mask *
-				(NSEC_PER_SEC / sn_rtc_cycles_per_second);
 	clock_event_device_uv.max_delta_ticks = clocksource_uv.mask;
 
 	rc = schedule_on_each_cpu(uv_rtc_register_clockevents);

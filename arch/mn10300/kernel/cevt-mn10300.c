@@ -97,9 +97,7 @@ int __init init_clockevents(void)
 	clockevents_calc_mult_shift(cd, MN10300_JCCLK, 1);
 
 	/* Calculate the min / max delta */
-	cd->max_delta_ns	= clockevent_delta2ns(TMJCBR_MAX, cd);
 	cd->max_delta_ticks	= TMJCBR_MAX;
-	cd->min_delta_ns	= clockevent_delta2ns(100, cd);
 	cd->min_delta_ticks	= 100;
 
 	cd->rating		= 200;

@@ -153,7 +153,6 @@ static int tile_timer_shutdown(struct clock_event_device *evt)
 static DEFINE_PER_CPU(struct clock_event_device, tile_timer) = {
 	.name = "tile timer",
 	.features = CLOCK_EVT_FEAT_ONESHOT,
-	.min_delta_ns = 1000,
 	.min_delta_ticks = 1,
 	.rating = 100,
 	.irq = -1,
@@ -169,7 +168,6 @@ void setup_tile_timer(void)
 
 	/* Fill in fields that are speed-specific. */
 	clockevents_calc_mult_shift(evt, cycles_per_sec, TILE_MINSEC);
-	evt->max_delta_ns = clockevent_delta2ns(MAX_TICK, evt);
 	evt->max_delta_ticks = MAX_TICK;
 
 	/* Mark as being for this cpu only. */
