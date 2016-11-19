@@ -168,6 +168,7 @@ struct spk_synth {
 	int *default_vol;
 	int (*probe)(struct spk_synth *synth);
 	void (*release)(void);
+	int (*serial_out)(const char ch);
 	const char *(*synth_immediate)(struct spk_synth *synth,
 					const char *buff);
 	void (*catch_up)(struct spk_synth *synth);
