@@ -92,9 +92,9 @@ enum clock_event_state {
  * @set_state_shutdown:	switch state to shutdown
  * @tick_resume:	resume clkevt device
  * @broadcast:		function to broadcast events
- * @min_delta_ticks:	minimum delta value in ticks stored for reconfiguration
  * @max_delta_ticks:	maximum delta value in ticks stored for reconfiguration
  * @name:		ptr to clock event name
+ * @min_delta_ticks:	minimum delta value in ticks stored for reconfiguration
  * @rating:		variable to rate clock event devices
  * @irq:		IRQ number (only for non CPU local devices)
  * @bound_on:		Bound on CPU
@@ -108,7 +108,7 @@ struct clock_event_device {
 	int			(*set_next_ktime)(ktime_t expires, struct clock_event_device *);
 	ktime_t			next_event;
 	u64			max_delta_ns;
-	unsigned long		min_delta_ticks_adjusted;
+	unsigned int		min_delta_ticks_adjusted;
 	u32			mult;
 	u32			shift;
 	enum clock_event_state	state_use_accessors;
@@ -124,10 +124,10 @@ struct clock_event_device {
 	void			(*broadcast)(const struct cpumask *mask);
 	void			(*suspend)(struct clock_event_device *);
 	void			(*resume)(struct clock_event_device *);
-	unsigned long		min_delta_ticks;
 	unsigned long		max_delta_ticks;
 
 	const char		*name;
+	unsigned int		min_delta_ticks;
 	int			rating;
 	int			irq;
 	int			bound_on;
@@ -189,7 +189,7 @@ extern void clockevents_register_device(struct clock_event_device *dev);
 extern int clockevents_unbind_device(struct clock_event_device *ced, int cpu);
 
 extern void clockevents_config_and_register(struct clock_event_device *dev,
-					    u32 freq, unsigned long min_delta,
+					    u32 freq, unsigned int min_delta,
 					    unsigned long max_delta);
 
 extern int clockevents_update_freq(struct clock_event_device *ce, u32 freq);

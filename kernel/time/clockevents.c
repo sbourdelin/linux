@@ -228,7 +228,7 @@ static int clockevents_increase_min_delta(struct clock_event_device *dev)
 	if (min_delta_ns > MIN_DELTA_LIMIT)
 		min_delta_ns = MIN_DELTA_LIMIT;
 
-	dev->min_delta_ticks_adjusted = (unsigned long)((min_delta_ns *
+	dev->min_delta_ticks_adjusted = (unsigned int)((min_delta_ns *
 						dev->mult) >> dev->shift);
 
 	printk_deferred(KERN_WARNING
@@ -451,7 +451,7 @@ static void __clockevents_update_bounds(struct clock_event_device *dev)
 	 */
 	dev->min_delta_ticks_adjusted =
 		max(dev->min_delta_ticks,
-			(unsigned long)((1000ULL * dev->mult) >> dev->shift));
+			(unsigned int)((1000ULL * dev->mult) >> dev->shift));
 }
 
 /**
@@ -514,7 +514,7 @@ static void clockevents_config(struct clock_event_device *dev, u32 freq)
  * min/max_delta can be 0 for devices which do not support oneshot mode.
  */
 void clockevents_config_and_register(struct clock_event_device *dev,
-				     u32 freq, unsigned long min_delta,
+				     u32 freq, unsigned int min_delta,
 				     unsigned long max_delta)
 {
 	dev->min_delta_ticks = min_delta;
