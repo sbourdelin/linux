@@ -74,10 +74,6 @@ enum clock_event_state {
 
 /**
  * struct clock_event_device - clock event device descriptor
- * @event_handler:	Assigned by the framework to be called by the low
- *			level handler of the event source
- * @set_next_event:	set next event function using a clocksource delta
- * @set_next_ktime:	set next event function using a direct ktime value
  * @next_event:		local storage for the next event in oneshot mode
  * @max_delta_ns:	maximum delta value in ns
  * @max_delta_ticks:	maximum delta value in ticks
@@ -86,6 +82,12 @@ enum clock_event_state {
  * @shift:		nanoseconds to cycles divisor (power of two)
  * @state_use_accessors:current state of the device, assigned by the core code
  * @features:		features
+ * @event_handler:	Assigned by the framework to be called by the low
+ *			level handler of the event source
+ * @set_next_event:	set next event function using a clocksource delta
+ * @set_next_ktime:	set next event function using a direct ktime value
+ * @list:		list head for the management code
+ * @mult:		ns to cycles multiplier stored for reconfiguration
  * @retries:		number of forced programming retries
  * @set_state_periodic:	switch state to periodic
  * @set_state_oneshot:	switch state to oneshot
@@ -95,18 +97,13 @@ enum clock_event_state {
  * @broadcast:		function to broadcast events
  * @name:		ptr to clock event name
  * @min_delta_ticks:	minimum delta value in ticks stored for reconfiguration
- * @mult:		ns to cycles multiplier stored for reconfiguration
  * @rating:		variable to rate clock event devices
  * @irq:		IRQ number (only for non CPU local devices)
  * @bound_on:		Bound on CPU
  * @cpumask:		cpumask to indicate for which CPUs this device works
- * @list:		list head for the management code
  * @owner:		module reference
  */
 struct clock_event_device {
-	void			(*event_handler)(struct clock_event_device *);
-	int			(*set_next_event)(unsigned long evt, struct clock_event_device *);
-	int			(*set_next_ktime)(ktime_t expires, struct clock_event_device *);
 	ktime_t			next_event;
 	u64			max_delta_ns;
 	unsigned long		max_delta_ticks;
@@ -115,6 +112,11 @@ struct clock_event_device {
 	u32			shift;
 	enum clock_event_state	state_use_accessors:8;
 	unsigned int		features:24;
+	void			(*event_handler)(struct clock_event_device *);
+	int			(*set_next_event)(unsigned long evt, struct clock_event_device *);
+	int			(*set_next_ktime)(ktime_t expires, struct clock_event_device *);
+	struct list_head	list;
+	u32			mult;
 	unsigned int		retries;
 
 	int			(*set_state_periodic)(struct clock_event_device *);
@@ -129,12 +131,10 @@ struct clock_event_device {
 
 	const char		*name;
 	unsigned int		min_delta_ticks;
-	u32			mult;
 	int			rating;
 	int			irq;
 	int			bound_on;
 	const struct cpumask	*cpumask;
-	struct list_head	list;
 	struct module		*owner;
 } ____cacheline_aligned;
 
