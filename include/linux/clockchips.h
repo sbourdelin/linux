@@ -111,8 +111,8 @@ struct clock_event_device {
 	unsigned int		min_delta_ticks_adjusted;
 	u32			mult;
 	u32			shift;
-	enum clock_event_state	state_use_accessors;
-	unsigned int		features;
+	enum clock_event_state	state_use_accessors:8;
+	unsigned int		features:24;
 	unsigned long		retries;
 
 	int			(*set_state_periodic)(struct clock_event_device *);
