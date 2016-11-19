@@ -434,29 +434,37 @@ static cycle_t dummy_clock_read(struct clocksource *cs)
 }
 
 /**
- * halt_fast_timekeeper - Prevent fast timekeeper from accessing clocksource.
- * @tk: Timekeeper to snapshot.
+ * halt_timekeepers - Prevent timekeepers from accessing clocksource.
  *
  * It generally is unsafe to access the clocksource after timekeeping has been
  * suspended, so take a snapshot of the readout base of @tk and use it as the
  * fast timekeeper's readout base while suspended.  It will return the same
  * number of cycles every time until timekeeping is resumed at which time the
- * proper readout base for the fast timekeeper will be restored automatically.
+ * proper readout base for the timekeeper will be restored automatically.
  */
-static void halt_fast_timekeeper(struct timekeeper *tk)
+
+static struct tk_read_base tkr_dummy_mono;
+static struct tk_read_base tkr_dummy_raw;
+
+static void halt_timekeepers(void)
 {
-	static struct tk_read_base tkr_dummy;
-	struct tk_read_base *tkr = &tk->tkr_mono;
+	struct timekeeper *tk = &tk_core.timekeeper;
 
-	memcpy(&tkr_dummy, tkr, sizeof(tkr_dummy));
-	cycles_at_suspend = tkr->read(tkr->clock);
-	tkr_dummy.read = dummy_clock_read;
-	update_fast_timekeeper(&tkr_dummy, &tk_fast_mono);
+	/*
+	 * Save the last readouts of mono and raw and replace their
+	 * read functions to return the last cycles at suspend.
+	 */
+	cycles_at_suspend = tk->tkr_mono.cycle_last;
+	memcpy(&tkr_dummy_mono, &tk->tkr_mono, sizeof(tkr_dummy_mono));
+	memcpy(&tkr_dummy_raw, &tk->tkr_raw, sizeof(tkr_dummy_mono));
+	tkr_dummy_mono.read = dummy_clock_read;
+	tkr_dummy_raw.read = dummy_clock_read;
 
-	tkr = &tk->tkr_raw;
-	memcpy(&tkr_dummy, tkr, sizeof(tkr_dummy));
-	tkr_dummy.read = dummy_clock_read;
-	update_fast_timekeeper(&tkr_dummy, &tk_fast_raw);
+	/*
+	 * Halt the fast and slow timekeepers and use the cached readouts
+	 */
+	update_fast_timekeeper(&tkr_dummy_mono, &tk_fast_mono);
+	update_fast_timekeeper(&tkr_dummy_raw, &tk_fast_raw);
 }
 
 #ifdef CONFIG_GENERIC_TIME_VSYSCALL_OLD
@@ -689,17 +697,18 @@ EXPORT_SYMBOL(getnstimeofday64);
 
 ktime_t ktime_get(void)
 {
-	struct timekeeper *tk = &tk_core.timekeeper;
+	struct tk_read_base *tkr;
 	unsigned int seq;
 	ktime_t base;
 	s64 nsecs;
 
-	WARN_ON(timekeeping_suspended);
+	tkr = timekeeping_suspended ?
+		&tkr_dummy_mono :  &tk_core.timekeeper.tkr_mono;
 
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
-		base = tk->tkr_mono.base;
-		nsecs = timekeeping_get_ns(&tk->tkr_mono);
+		base = tkr->base;
+		nsecs = timekeeping_get_ns(tkr);
 
 	} while (read_seqcount_retry(&tk_core.seq, seq));
 
@@ -709,15 +718,16 @@ EXPORT_SYMBOL_GPL(ktime_get);
 
 u32 ktime_get_resolution_ns(void)
 {
-	struct timekeeper *tk = &tk_core.timekeeper;
+	struct tk_read_base *tkr;
 	unsigned int seq;
 	u32 nsecs;
 
-	WARN_ON(timekeeping_suspended);
+	tkr = timekeeping_suspended ?
+		&tkr_dummy_mono :  &tk_core.timekeeper.tkr_mono;
 
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
-		nsecs = tk->tkr_mono.mult >> tk->tkr_mono.shift;
+		nsecs = tkr->mult >> tkr->shift;
 	} while (read_seqcount_retry(&tk_core.seq, seq));
 
 	return nsecs;
@@ -732,17 +742,18 @@ static ktime_t *offsets[TK_OFFS_MAX] = {
 
 ktime_t ktime_get_with_offset(enum tk_offsets offs)
 {
-	struct timekeeper *tk = &tk_core.timekeeper;
+	struct tk_read_base *tkr;
 	unsigned int seq;
 	ktime_t base, *offset = offsets[offs];
 	s64 nsecs;
 
-	WARN_ON(timekeeping_suspended);
+	tkr = timekeeping_suspended ?
+		&tkr_dummy_mono :  &tk_core.timekeeper.tkr_mono;
 
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
-		base = ktime_add(tk->tkr_mono.base, *offset);
-		nsecs = timekeeping_get_ns(&tk->tkr_mono);
+		base = ktime_add(tkr->base, *offset);
+		nsecs = timekeeping_get_ns(tkr);
 
 	} while (read_seqcount_retry(&tk_core.seq, seq));
 
@@ -776,15 +787,18 @@ EXPORT_SYMBOL_GPL(ktime_mono_to_any);
  */
 ktime_t ktime_get_raw(void)
 {
-	struct timekeeper *tk = &tk_core.timekeeper;
+	struct tk_read_base *tkr;
 	unsigned int seq;
 	ktime_t base;
 	s64 nsecs;
 
+	tkr = timekeeping_suspended ?
+		&tkr_dummy_raw :  &tk_core.timekeeper.tkr_raw;
+
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
-		base = tk->tkr_raw.base;
-		nsecs = timekeeping_get_ns(&tk->tkr_raw);
+		base = tkr->base;
+		nsecs = timekeeping_get_ns(tkr);
 
 	} while (read_seqcount_retry(&tk_core.seq, seq));
 
@@ -1734,7 +1748,7 @@ int timekeeping_suspend(void)
 	}
 
 	timekeeping_update(tk, TK_MIRROR);
-	halt_fast_timekeeper(tk);
+	halt_timekeepers();
 	write_seqcount_end(&tk_core.seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
 
