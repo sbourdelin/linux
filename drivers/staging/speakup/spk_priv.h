@@ -46,6 +46,7 @@ int spk_wait_for_xmitr(void);
 unsigned char spk_serial_in(void);
 unsigned char spk_serial_in_nowait(void);
 int spk_serial_out(const char ch);
+int spk_serial_out_tty(const char ch);
 void spk_serial_release(void);
 
 char synth_buffer_getc(void);

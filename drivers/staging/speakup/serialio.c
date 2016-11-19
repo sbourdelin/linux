@@ -217,6 +217,12 @@ int spk_serial_out(const char ch)
 }
 EXPORT_SYMBOL_GPL(spk_serial_out);
 
+int spk_serial_out_tty(const char ch)
+{
+	return spk_serial_out(ch);
+}
+EXPORT_SYMBOL_GPL(spk_serial_out_tty);
+
 void spk_serial_release(void)
 {
 	if (speakup_info.port_tts == 0)
