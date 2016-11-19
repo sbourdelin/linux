@@ -66,6 +66,12 @@ enum clock_event_state {
  */
 # define CLOCK_EVT_FEAT_HRTIMER		0x000080
 
+/*
+ * Clockevent device's mult/shift pair shall not get adjusted in order
+ * to compensate for NTP corrections made in the timekeeping core.
+ */
+# define CLOCK_EVT_FEAT_NO_ADJUST		0x000100
+
 /**
  * struct clock_event_device - clock event device descriptor
  * @event_handler:	Assigned by the framework to be called by the low
