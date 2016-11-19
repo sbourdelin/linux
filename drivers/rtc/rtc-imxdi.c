@@ -109,6 +109,7 @@
  * @rtc: pointer to rtc struct
  * @ioaddr: IO registers pointer
  * @irq: dryice normal interrupt
+ * @sec_irq: dryice security violation interrupt
  * @clk: input reference clock
  * @dsr: copy of the DSR register
  * @irq_lock: interrupt enable register (DIER) lock
@@ -121,6 +122,7 @@ struct imxdi_dev {
 	struct rtc_device *rtc;
 	void __iomem *ioaddr;
 	int irq;
+	int sec_irq;
 	struct clk *clk;
 	u32 dsr;
 	spinlock_t irq_lock;
@@ -688,24 +690,6 @@ static irqreturn_t dryice_norm_irq(int irq, void *dev_id)
 	dier = readl(imxdi->ioaddr + DIER);
 	dsr = readl(imxdi->ioaddr + DSR);
 
-	/* handle the security violation event */
-	if (dier & DIER_SVIE) {
-		if (dsr & DSR_SVF) {
-			/*
-			 * Disable the interrupt when this kind of event has
-			 * happened.
-			 * There cannot be more than one event of this type,
-			 * because it needs a complex state change
-			 * including a main power cycle to get again out of
-			 * this state.
-			 */
-			di_int_disable(imxdi, DIER_SVIE);
-			/* report the violation */
-			di_report_tamper_info(imxdi, dsr);
-			rc = IRQ_HANDLED;
-		}
-	}
-
 	/* handle write complete and write error cases */
 	if (dier & DIER_WCIE) {
 		/*If the write wait queue is empty then there is no pending
@@ -741,6 +725,40 @@ static irqreturn_t dryice_norm_irq(int irq, void *dev_id)
 	}
 	return rc;
 }
+
+/*
+ * dryice security violation interrupt handler
+ */
+static irqreturn_t dryice_sec_irq(int irq, void *dev_id)
+{
+	struct imxdi_dev *imxdi = dev_id;
+	u32 dsr, dier;
+	irqreturn_t rc = IRQ_NONE;
+
+	dier = readl(imxdi->ioaddr + DIER);
+	dsr = readl(imxdi->ioaddr + DSR);
+
+	/* handle the security violation event */
+	if (dier & DIER_SVIE) {
+		if (dsr & DSR_SVF) {
+			/*
+			 * Disable the interrupt when this kind of event has
+			 * happened.
+			 * There cannot be more than one event of this type,
+			 * because it needs a complex state change
+			 * including a main power cycle to get again out of
+			 * this state.
+			 */
+			di_int_disable(imxdi, DIER_SVIE);
+			/* report the violation */
+			di_report_tamper_info(imxdi, dsr);
+			rc = IRQ_HANDLED;
+		}
+	}
+
+	return rc;
+}
+
 
 /*
  * post the alarm event from user context so it can sleep
@@ -783,6 +801,9 @@ static int __init dryice_rtc_probe(struct platform_device *pdev)
 	imxdi->irq = platform_get_irq(pdev, 0);
 	if (imxdi->irq < 0)
 		return imxdi->irq;
+	imxdi->sec_irq = platform_get_irq(pdev, 1);
+	if (imxdi->sec_irq < 0)
+		return imxdi->sec_irq;
 
 	init_waitqueue_head(&imxdi->write_wait);
 
@@ -812,6 +833,13 @@ static int __init dryice_rtc_probe(struct platform_device *pdev)
 			IRQF_SHARED, pdev->name, imxdi);
 	if (rc) {
 		dev_warn(&pdev->dev, "interrupt not available.\n");
+		goto err;
+	}
+
+	rc = devm_request_irq(&pdev->dev, imxdi->sec_irq, dryice_sec_irq,
+			IRQF_SHARED, pdev->name, imxdi);
+	if (rc) {
+		dev_warn(&pdev->dev, "security violation interrupt not available.\n");
 		goto err;
 	}
 
