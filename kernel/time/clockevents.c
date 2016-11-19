@@ -341,6 +341,22 @@ int clockevents_program_event(struct clock_event_device *dev, ktime_t expires,
 	return (rc && force) ? clockevents_program_min_delta(dev) : rc;
 }
 
+static void ced_list_add(struct clock_event_device *dev)
+{
+	/*
+	 * Insert all devices which aren't candidates for NTP
+	 * frequency adjustments at the end of the list such that
+	 * clockevents_adjust_all_freqs() can skip the tail once
+	 * encountering the first of them.
+	 */
+	if (!(dev->features & CLOCK_EVT_FEAT_ONESHOT) ||
+	    (dev->features & CLOCK_EVT_FEAT_DUMMY) ||
+	    (dev->features & CLOCK_EVT_FEAT_NO_ADJUST))
+		list_add_tail(&dev->list, &clockevent_devices);
+	else
+		list_add(&dev->list, &clockevent_devices);
+}
+
 /*
  * Called after a notify add to make devices available which were
  * released from the notifier call.
@@ -353,7 +369,7 @@ static void clockevents_notify_released(void)
 		dev = list_entry(clockevents_released.next,
 				 struct clock_event_device, list);
 		list_del(&dev->list);
-		list_add(&dev->list, &clockevent_devices);
+		ced_list_add(dev);
 		tick_check_new_device(dev);
 	}
 }
@@ -524,7 +540,7 @@ void clockevents_register_device(struct clock_event_device *dev)
 
 	raw_spin_lock_irqsave(&clockevents_lock, flags);
 
-	list_add(&dev->list, &clockevent_devices);
+	ced_list_add(dev);
 	tick_check_new_device(dev);
 	clockevents_notify_released();
 
@@ -638,7 +654,7 @@ void clockevents_adjust_all_freqs(u32 mult_cs_mono, u32 mult_cs_raw)
 		if (!(dev->features & CLOCK_EVT_FEAT_ONESHOT) ||
 		    (dev->features & CLOCK_EVT_FEAT_DUMMY) ||
 		    (dev->features & CLOCK_EVT_FEAT_NO_ADJUST))
-			continue;
+			break;
 
 		/*
 		 * The cached last_mult_adjusted is only valid if
