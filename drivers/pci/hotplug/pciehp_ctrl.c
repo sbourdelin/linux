@@ -182,6 +182,7 @@ static void pciehp_power_thread(struct work_struct *work)
 	switch (info->req) {
 	case DISABLE_REQ:
 		mutex_lock(&p_slot->hotplug_lock);
+		p_slot->state = POWEROFF_STATE;
 		pciehp_disable_slot(p_slot);
 		mutex_unlock(&p_slot->hotplug_lock);
 		mutex_lock(&p_slot->lock);
@@ -190,6 +191,7 @@ static void pciehp_power_thread(struct work_struct *work)
 		break;
 	case ENABLE_REQ:
 		mutex_lock(&p_slot->hotplug_lock);
+		p_slot->state = POWERON_STATE;
 		ret = pciehp_enable_slot(p_slot);
 		mutex_unlock(&p_slot->hotplug_lock);
 		if (ret)
@@ -208,8 +210,6 @@ static void pciehp_power_thread(struct work_struct *work)
 static void pciehp_queue_power_work(struct slot *p_slot, int req)
 {
 	struct power_work_info *info;
-
-	p_slot->state = (req == ENABLE_REQ) ? POWERON_STATE : POWEROFF_STATE;
 
 	info = kmalloc(sizeof(*info), GFP_KERNEL);
 	if (!info) {
