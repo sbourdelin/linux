@@ -42,6 +42,7 @@ struct proxy_dev {
 	long state;                  /* internal state */
 #define STATE_OPENED_FLAG        BIT(0)
 #define STATE_WAIT_RESPONSE_FLAG BIT(1)  /* waiting for emulator response */
+#define STATE_REGISTERED_FLAG	 BIT(2)
 
 	size_t req_len;              /* length of queued TPM request */
 	size_t resp_len;             /* length of queued TPM response */
@@ -372,6 +373,7 @@ static void vtpm_proxy_work(struct work_struct *work)
 	if (rc)
 		goto err;
 
+	proxy_dev->state |= STATE_REGISTERED_FLAG;
 	return;
 
 err:
@@ -516,7 +518,8 @@ static void vtpm_proxy_delete_device(struct proxy_dev *proxy_dev)
 	 */
 	vtpm_proxy_fops_undo_open(proxy_dev);
 
-	tpm_chip_unregister(proxy_dev->chip);
+	if (proxy_dev->state & STATE_REGISTERED_FLAG)
+		tpm_chip_unregister(proxy_dev->chip);
 
 	vtpm_proxy_delete_proxy_dev(proxy_dev);
 }
