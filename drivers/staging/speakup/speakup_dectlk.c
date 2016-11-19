@@ -132,6 +132,7 @@ static struct spk_synth synth_dectlk = {
 	.default_vol = g5_defaults,
 	.probe = spk_serial_synth_probe,
 	.release = spk_serial_release,
+	.serial_out = spk_serial_out,
 	.synth_immediate = spk_synth_immediate,
 	.catch_up = do_catch_up,
 	.flush = synth_flush,
