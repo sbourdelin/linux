@@ -130,6 +130,7 @@ static struct spk_synth synth_dtlk = {
 	.vars = vars,
 	.probe = synth_probe,
 	.release = dtlk_release,
+	.serial_out = spk_serial_out,
 	.synth_immediate = synth_immediate,
 	.catch_up = do_catch_up,
 	.flush = synth_flush,

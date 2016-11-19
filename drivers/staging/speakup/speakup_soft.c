@@ -133,6 +133,7 @@ static struct spk_synth synth_soft = {
 	.vars = vars,
 	.probe = softsynth_probe,
 	.release = softsynth_release,
+	.serial_out = NULL,
 	.synth_immediate = NULL,
 	.catch_up = NULL,
 	.flush = NULL,
