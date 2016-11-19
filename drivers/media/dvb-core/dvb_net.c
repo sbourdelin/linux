@@ -660,11 +660,12 @@ static int dvb_net_ule_should_drop(struct dvb_net_ule_handle *h)
 	return 0;
 }
 
-
 static void dvb_net_ule_check_crc(struct dvb_net_ule_handle *h,
 				  u32 ule_crc, u32 expected_crc)
 {
 	u8 dest_addr[ETH_ALEN];
+
+	eth_zero_addr(dest_addr);
 
 	if (ule_crc != expected_crc) {
 		pr_warn("%lu: CRC32 check FAILED: %08x / %08x, SNDU len %d type %#x, ts_remain %d, next 2: %x.\n",
@@ -750,15 +751,8 @@ static void dvb_net_ule_check_crc(struct dvb_net_ule_handle *h,
 	if (!h->priv->ule_bridged) {
 		skb_push(h->priv->ule_skb, ETH_HLEN);
 		h->ethh = (struct ethhdr *)h->priv->ule_skb->data;
-		if (!h->priv->ule_dbit) {
-			/*
-			 * dest_addr buffer is only valid if
-			 * h->priv->ule_dbit == 0
-			 */
-			memcpy(h->ethh->h_dest, dest_addr, ETH_ALEN);
-			eth_zero_addr(h->ethh->h_source);
-		} else /* zeroize source and dest */
-			memset(h->ethh, 0, ETH_ALEN * 2);
+		memcpy(h->ethh->h_dest, dest_addr, ETH_ALEN);
+		eth_zero_addr(h->ethh->h_source);
 
 		h->ethh->h_proto = htons(h->priv->ule_sndu_type);
 	}
