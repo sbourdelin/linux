@@ -358,14 +358,14 @@ int of_resolve_phandles(struct device_node *overlay)
 
 		err = update_usages_of_a_phandle_reference(overlay, prop, phandle);
 		if (err)
-			break;
+			goto err_out;
 	}
+out:
+	of_node_put(tree_symbols);
+	return err;
 
 err_out:
 	pr_err("overlay phandle fixup failed: %d\n", err);
-out:
-	of_node_put(tree_symbols);
-
-	return err;
+	goto out;
 }
 EXPORT_SYMBOL_GPL(of_resolve_phandles);
