@@ -1,0 +1,36 @@
+CPCAP PMIC device tree binding
+
+Required properties:
+- compatible		: Motorola device "motorola,cpcap", others "st,6556002"
+- reg			: Chip select and size
+- interrupt-parent	: The parent interrupt controller
+- interrupts		: The interrupt line the device is connected to
+- interrupt-controller	: Marks the device node as an interrupt controller
+- #interrupt-cells	: The number of cells to describe an IRQ, should be 2
+- #address-cells	: Child device offset number of cells, typically 1
+- #size-cells		: Child device size number of cells, typically 1
+- ranges		: Child device register range
+- spi-max-frequency	: Typically set to 3000000
+- spi-cs_high		: SPI chip select direction
+
+Example:
+
+&mcspi1 {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	ranges;
+	cpcap: pmic@0 {
+		compatible = "motorola,cpcap", "st,6556002";
+		reg = <0 0>;	/* cs0, size 0 */
+		interrupt-parent = <&gpio1>;
+		interrupts = <7 IRQ_TYPE_EDGE_RISING>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0 0 0x8000>;
+		spi-max-frequency = <3000000>;
+		spi-cs-high;
+	};
+};
+
