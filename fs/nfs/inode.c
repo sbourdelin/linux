@@ -639,7 +639,7 @@ static void nfs_request_parent_use_readdirplus(struct dentry *dentry)
 	struct dentry *parent;
 
 	parent = dget_parent(dentry);
-	nfs_force_use_readdirplus(d_inode(parent));
+	nfs_advise_use_readdirplus(d_inode(parent));
 	dput(parent);
 }
 

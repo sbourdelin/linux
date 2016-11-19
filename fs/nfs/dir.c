@@ -462,7 +462,6 @@ bool nfs_use_readdirplus(struct inode *dir, struct dir_context *ctx)
  * and calling nfs_advise_use_readdirplus, then forcing a
  * cache flush.
  */
-static
 void nfs_advise_use_readdirplus(struct inode *dir)
 {
 	struct nfs_inode *nfsi = NFS_I(dir);
@@ -472,19 +471,6 @@ void nfs_advise_use_readdirplus(struct inode *dir)
 		set_bit(NFS_INO_ADVISE_RDPLUS, &nfsi->flags);
 		invalidate_mapping_pages(dir->i_mapping, 0, -1);
 	}
-}
-
-/*
- * This function is mainly for use by nfs_getattr().
- *
- * If this is an 'ls -l', we want to force use of readdirplus.
- * Do this by checking if there is an active file descriptor
- * and calling nfs_advise_use_readdirplus, then forcing a
- * cache flush.
- */
-void nfs_force_use_readdirplus(struct inode *dir)
-{
-	nfs_advise_use_readdirplus(dir);
 }
 
 static
