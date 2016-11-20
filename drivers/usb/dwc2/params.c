@@ -320,7 +320,7 @@ static void dwc2_set_core_param(void *param, u8 size, u64 value)
  * @size: The size of the core parameter in bytes, or 0 for bool.
  *
  * This function looks up @property and sets the @param to that value.
- * If the property doesn't exist it uses the passed-in @value. It will
+ * If the property doesn't exist it uses the passed-in @legacy value. It will
  * verify that the value falls between @min and @max. If it doesn't,
  * it will output an error and set the parameter to either @def or,
  * failing that, to @min.
