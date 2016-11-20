@@ -375,9 +375,6 @@ static void macvlan_forward_source_one(struct sk_buff *skb,
 	int ret;
 
 	dev = vlan->dev;
-	if (unlikely(!(dev->flags & IFF_UP)))
-		return;
-
 	nskb = skb_clone(skb, GFP_ATOMIC);
 	if (!nskb)
 		return;
