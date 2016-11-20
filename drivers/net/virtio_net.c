@@ -1419,6 +1419,41 @@ static const struct ethtool_ops virtnet_ethtool_ops = {
 	.set_settings = virtnet_set_settings,
 };
 
+static int virtnet_set_features(struct net_device *netdev,
+				netdev_features_t features)
+{
+	struct virtnet_info *vi = netdev_priv(netdev);
+	struct virtio_device *vdev = vi->vdev;
+	struct scatterlist sg;
+	u64 offloads = 0;
+
+	if (features & NETIF_F_LRO)
+		offloads |= (1 << VIRTIO_NET_F_GUEST_TSO4) |
+			    (1 << VIRTIO_NET_F_GUEST_TSO6);
+
+	if (features & NETIF_F_RXCSUM)
+		offloads |= (1 << VIRTIO_NET_F_GUEST_CSUM);
+
+	if (virtio_has_feature(vdev, VIRTIO_NET_F_CTRL_GUEST_OFFLOADS)) {
+		sg_init_one(&sg, &offloads, sizeof(uint64_t));
+		if (!virtnet_send_command(vi,
+					  VIRTIO_NET_CTRL_GUEST_OFFLOADS,
+					  VIRTIO_NET_CTRL_GUEST_OFFLOADS_SET,
+					  &sg)) {
+			dev_warn(&netdev->dev,
+				 "Failed to set guest offloads by virtnet command.\n");
+			return -EINVAL;
+		}
+	} else if (virtio_has_feature(vdev, VIRTIO_NET_F_CTRL_GUEST_OFFLOADS) &&
+		   !virtio_has_feature(vdev, VIRTIO_F_VERSION_1)) {
+		dev_warn(&netdev->dev,
+			 "No support for setting offloads pre version_1.\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static const struct net_device_ops virtnet_netdev = {
 	.ndo_open            = virtnet_open,
 	.ndo_stop   	     = virtnet_close,
@@ -1435,6 +1470,7 @@ static const struct net_device_ops virtnet_netdev = {
 #ifdef CONFIG_NET_RX_BUSY_POLL
 	.ndo_busy_poll		= virtnet_busy_poll,
 #endif
+	.ndo_set_features	= virtnet_set_features,
 };
 
 static void virtnet_config_changed_work(struct work_struct *work)
@@ -1810,6 +1846,12 @@ static int virtnet_probe(struct virtio_device *vdev)
 	if (virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_CSUM))
 		dev->features |= NETIF_F_RXCSUM;
 
+	if (virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_TSO4) &&
+	    virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_TSO6)) {
+		dev->features |= NETIF_F_LRO;
+		dev->hw_features |= NETIF_F_LRO;
+	}
+
 	dev->vlan_features = dev->features;
 
 	/* MTU range: 68 - 65535 */
@@ -2047,7 +2089,8 @@ static struct virtio_device_id id_table[] = {
 	VIRTIO_NET_F_CTRL_RX, VIRTIO_NET_F_CTRL_VLAN, \
 	VIRTIO_NET_F_GUEST_ANNOUNCE, VIRTIO_NET_F_MQ, \
 	VIRTIO_NET_F_CTRL_MAC_ADDR, \
-	VIRTIO_NET_F_MTU
+	VIRTIO_NET_F_MTU, \
+	VIRTIO_NET_F_CTRL_GUEST_OFFLOADS
 
 static unsigned int features[] = {
 	VIRTNET_FEATURES,
