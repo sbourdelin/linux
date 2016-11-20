@@ -1331,8 +1331,6 @@ static int ena_request_mgmnt_irq(struct ena_adapter *adapter)
 		  "set affinity hint of mgmnt irq.to 0x%lx (irq vector: %d)\n",
 		  irq->affinity_hint_mask.bits[0], irq->vector);
 
-	irq_set_affinity_hint(irq->vector, &irq->affinity_hint_mask);
-
 	return rc;
 }
 
@@ -1362,8 +1360,6 @@ static int ena_request_io_irq(struct ena_adapter *adapter)
 		netif_dbg(adapter, ifup, adapter->netdev,
 			  "set affinity hint of irq. index %d to 0x%lx (irq vector: %d)\n",
 			  i, irq->affinity_hint_mask.bits[0], irq->vector);
-
-		irq_set_affinity_hint(irq->vector, &irq->affinity_hint_mask);
 	}
 
 	return rc;
