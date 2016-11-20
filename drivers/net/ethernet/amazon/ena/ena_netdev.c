@@ -3179,6 +3179,7 @@ err_device_destroy:
 err_free_region:
 	ena_release_bars(ena_dev, pdev);
 err_free_ena_dev:
+	pci_set_drvdata(pdev, NULL);
 	vfree(ena_dev);
 err_disable_device:
 	pci_disable_device(pdev);
