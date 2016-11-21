@@ -12729,12 +12729,7 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 				   struct intel_crtc_state *pipe_config,
 				   const char *context)
 {
-	struct drm_device *dev = crtc->base.dev;
-	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct drm_plane *plane;
-	struct intel_plane *intel_plane;
-	struct intel_plane_state *state;
-	struct drm_framebuffer *fb;
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 
 	DRM_DEBUG_KMS("[CRTC:%d:%s]%s\n",
 		      crtc->base.base.id, crtc->base.name, context);
@@ -12821,37 +12816,6 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 			      pipe_config->dpll_hw_state.dpll_md,
 			      pipe_config->dpll_hw_state.fp0,
 			      pipe_config->dpll_hw_state.fp1);
-	}
-
-	DRM_DEBUG_KMS("planes on this crtc\n");
-	list_for_each_entry(plane, &dev->mode_config.plane_list, head) {
-		struct drm_format_name_buf format_name;
-		intel_plane = to_intel_plane(plane);
-		if (intel_plane->pipe != crtc->pipe)
-			continue;
-
-		state = to_intel_plane_state(plane->state);
-		fb = state->base.fb;
-		if (!fb) {
-			DRM_DEBUG_KMS("[PLANE:%d:%s] disabled, scaler_id = %d\n",
-				      plane->base.id, plane->name, state->scaler_id);
-			continue;
-		}
-
-		DRM_DEBUG_KMS("[PLANE:%d:%s] FB:%d, fb = %ux%u format = %s\n",
-			      plane->base.id, plane->name,
-			      fb->base.id, fb->width, fb->height,
-			      drm_get_format_name(fb->pixel_format, &format_name));
-		if (INTEL_GEN(dev_priv) >= 9)
-			DRM_DEBUG_KMS("\tscaler:%d src %dx%d+%d+%d dst %dx%d+%d+%d\n",
-				      state->scaler_id,
-				      state->base.src.x1 >> 16,
-				      state->base.src.y1 >> 16,
-				      drm_rect_width(&state->base.src) >> 16,
-				      drm_rect_height(&state->base.src) >> 16,
-				      state->base.dst.x1, state->base.dst.y1,
-				      drm_rect_width(&state->base.dst),
-				      drm_rect_height(&state->base.dst));
 	}
 }
 
