@@ -1,0 +1,76 @@
+Common multiplexer controller bindings
+
+A mux controller will have one, or several, child devices that uses (or
+consumes) a mux controller. A mux controller can possibly control several
+parallel multiplexers. The node for a mux controller will have one child
+node for each multiplexer controller consumer.
+
+A mux controller provides a number of states to its consumers, and the
+state space is a simple zero-based enumeration. I.e. 0-1 for a 2-way
+multiplexer, 0-7 for an 8-way multiplexer, etc.
+
+Example:
+
+	/*
+	 * Two consumers (one for an ADC line and one for an i2c bus) of
+	 * parallel 4-way multiplexers controlled by the same two GPIO-lines.
+	 */
+	mux {
+		compatible = "mux-gpio";
+
+		mux-gpios = <&pioA 0 GPIO_ACTIVE_HIGH>,
+			    <&pioA 1 GPIO_ACTIVE_HIGH>;
+
+		adc {
+			compatible = "iio-mux";
+			io-channels = <&adc 0>;
+			io-channel-names = "parent";
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			sync-1@0 {
+				reg = <0>;
+			};
+
+			in@1 {
+				reg = <1>;
+			};
+
+			out@2 {
+				reg = <2>;
+			};
+
+			sync-2@3 {
+				reg = <3>;
+			};
+		};
+
+		i2c-mux {
+			compatible = "i2c-mux-simple,mux-locked";
+			i2c-parent = <&i2c1>;
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			i2c@0 {
+				reg = <0>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				ssd1307: oled@3c {
+					/* ... */
+				};
+			};
+
+			i2c@3 {
+				reg = <3>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				pca9555: pca9555@20 {
+					/* ... */
+				};
+			};
+		};
+	};
