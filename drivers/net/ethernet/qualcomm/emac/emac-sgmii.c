@@ -166,6 +166,10 @@ static int emac_sgmii_acpi_match(struct device *dev, void *data)
 			.id = "QCOM8071",
 			.driver_data = (kernel_ulong_t)emac_sgmii_init_qdf2432,
 		},
+		{
+			.id = "QCOM8072",
+			.driver_data = (kernel_ulong_t)emac_sgmii_init_qdf2400,
+		},
 		{}
 	};
 	const struct acpi_device_id *id = acpi_match_device(match_table, dev);
