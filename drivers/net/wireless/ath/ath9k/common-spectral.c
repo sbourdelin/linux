@@ -802,16 +802,27 @@ static ssize_t write_file_spec_scan_ctl(struct file *file,
 					size_t count, loff_t *ppos)
 {
 	struct ath_spec_scan_priv *spec_priv = file->private_data;
+	struct ath_hw *ah = spec_priv->ah;
+	struct ath_softc *sc = ah->hw->priv;
 	struct ath_common *common = ath9k_hw_common(spec_priv->ah);
 	char buf[32];
 	ssize_t len;
+	ssize_t result = count;
 
 	if (IS_ENABLED(CONFIG_ATH9K_TX99))
 		return -EOPNOTSUPP;
 
+	mutex_lock(&sc->mutex);
+	if (ah->hw->conf.radar_enabled) {
+		result = -EINVAL;
+		goto unlock;
+	}
+
 	len = min(count, sizeof(buf) - 1);
-	if (copy_from_user(buf, user_buf, len))
-		return -EFAULT;
+	if (copy_from_user(buf, user_buf, len)) {
+		result = -EFAULT;
+		goto unlock;
+	}
 
 	buf[len] = '\0';
 
@@ -830,10 +841,14 @@ static ssize_t write_file_spec_scan_ctl(struct file *file,
 		ath9k_cmn_spectral_scan_config(common, spec_priv, SPECTRAL_DISABLED);
 		ath_dbg(common, CONFIG, "spectral scan: disabled\n");
 	} else {
-		return -EINVAL;
+		result = -EINVAL;
+		goto unlock;
 	}
 
-	return count;
+unlock:
+	mutex_unlock(&sc->mutex);
+
+	return result;
 }
 
 static const struct file_operations fops_spec_scan_ctl = {

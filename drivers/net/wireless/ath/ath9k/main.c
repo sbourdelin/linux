@@ -1459,6 +1459,12 @@ static int ath9k_config(struct ieee80211_hw *hw, u32 changed)
 	if (!ath9k_is_chanctx_enabled() && (changed & IEEE80211_CONF_CHANGE_CHANNEL)) {
 		ctx->offchannel = !!(conf->flags & IEEE80211_CONF_OFFCHANNEL);
 		ath_chanctx_set_channel(sc, ctx, &hw->conf.chandef);
+
+		/* We need to ensure that spectral scan is disabled. */
+		if (conf->radar_enabled &&
+		    sc->spec_priv.spectral_mode != SPECTRAL_DISABLED)
+			ath9k_cmn_spectral_scan_config(common, &sc->spec_priv,
+						       SPECTRAL_DISABLED);
 	}
 
 	mutex_unlock(&sc->mutex);
