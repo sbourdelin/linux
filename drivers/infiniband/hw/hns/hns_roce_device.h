@@ -364,7 +364,7 @@ struct hns_roce_cmdq {
 	* Event mode: cmd register mutex protection,
 	* ensure to not exceed max_cmds and user use limit region
 	*/
-	struct semaphore	event_sem;
+	wait_queue_head_t       wq;
 	int			max_cmds;
 	spinlock_t		context_lock;
 	int			free_head;
