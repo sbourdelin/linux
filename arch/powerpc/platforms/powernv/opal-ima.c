@@ -34,6 +34,8 @@
 extern struct perchip_nest_info nest_perchip_info[IMA_MAX_CHIPS];
 extern struct ima_pmu *per_nest_pmu_arr[IMA_MAX_PMUS];
 
+u64 nest_max_offset;
+
 extern int init_ima_pmu(struct ima_events *events,
 			int idx, struct ima_pmu *pmu_ptr);
 
@@ -68,8 +70,25 @@ static int ima_event_info_str(struct property *pp, char *name,
 	return 0;
 }
 
+/*
+ * Updates the maximum offset for an event in the pmu with domain
+ * "pmu_domain". Right now, only nest domain is supported.
+ */
+static void update_max_value(u32 value, int pmu_domain)
+{
+	switch (pmu_domain) {
+	case IMA_DOMAIN_NEST:
+		if (nest_max_offset < value)
+			nest_max_offset = value;
+		break;
+	default:
+		/* Unknown domain, return */
+		return;
+	}
+}
+
 static int ima_event_info_val(char *name, u32 val,
-			       struct ima_events *events)
+			      struct ima_events *events, int pmu_domain)
 {
 	int ret;
 
@@ -77,6 +96,7 @@ static int ima_event_info_val(char *name, u32 val,
 	if (ret)
 		return ret;
 	sprintf(events->ev_value, "event=0x%x", val);
+	update_max_value(val, pmu_domain);
 
 	return 0;
 }
@@ -111,7 +131,8 @@ static int set_event_property(struct property *pp, char *event_prop,
 static int ima_events_node_parser(struct device_node *dev,
 				  struct ima_events *events,
 				  struct property *event_scale,
-				  struct property *event_unit)
+				  struct property *event_unit,
+				  int pmu_domain)
 {
 	struct property *name, *pp;
 	char *ev_name;
@@ -153,7 +174,8 @@ static int ima_events_node_parser(struct device_node *dev,
 		 */
 		if (strncmp(pp->name, "reg", 3) == 0) {
 			of_property_read_u32(dev, pp->name, &val);
-			ret = ima_event_info_val(ev_name, val, &events[idx]);
+			ret = ima_event_info_val(ev_name, val, &events[idx],
+				pmu_domain);
 			if (ret) {
 				kfree(events[idx].ev_name);
 				kfree(events[idx].ev_value);
@@ -243,9 +265,10 @@ static void ima_free_events(struct ima_events *events, int nr_entries)
 /*
  * ima_pmu_create : Takes the parent device which is the pmu unit and a
  *                  pmu_index as the inputs.
- * Allocates memory for the pmu, sets up its domain (NEST or CORE), and
- * allocates memory for the events supported by this pmu. Assigns a name for
- * the pmu. Calls ima_events_node_parser() to setup the individual events.
+ * Allocates memory for the pmu, sets up its domain (right now, only NEST),
+ * and allocates memory for the events supported by this pmu. Assigns a name
+ * for the pmu. Calls ima_events_node_parser() to setup the individual
+ * events.
  * If everything goes fine, it calls, init_ima_pmu() to setup the pmu device
  * and register it.
  */
@@ -322,7 +345,7 @@ static int ima_pmu_create(struct device_node *parent, int pmu_index)
 	/* Loop through event nodes */
 	for_each_child_of_node(parent, ev_node) {
 		ret = ima_events_node_parser(ev_node, &events[idx], scale_pp,
-					     unit_pp);
+					     unit_pp, pmu_ptr->domain);
 		if (ret < 0) {
 			/* Unable to parse this event */
 			if (ret == -ENOMEM)
