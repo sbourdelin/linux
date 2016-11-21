@@ -23,6 +23,9 @@ static struct kmem_cache *gb_message_cache;
 /* Workqueue to handle Greybus operation completions. */
 static struct workqueue_struct *gb_operation_completion_wq;
 
+/* Workqueue to handle Greybus asynchronous operation timeouts. */
+static struct workqueue_struct *gb_operation_async_timeout_wq;
+
 /* Wait queue for synchronous cancellations. */
 static DECLARE_WAIT_QUEUE_HEAD(gb_operation_cancellation_queue);
 
@@ -285,6 +288,10 @@ static void gb_operation_work(struct work_struct *work)
 	gb_operation_put(operation);
 }
 
+static void gb_operation_async_worker(struct work_struct *work)
+{
+}
+
 static void gb_operation_message_init(struct gb_host_device *hd,
 				struct gb_message *message, u16 operation_id,
 				size_t payload_size, u8 type)
@@ -524,6 +531,7 @@ gb_operation_create_common(struct gb_connection *connection, u8 type,
 	operation->type = type;
 	operation->errno = -EBADR;  /* Initial value--means "never set" */
 
+	INIT_DELAYED_WORK(&operation->delayed_work, gb_operation_async_worker);
 	INIT_WORK(&operation->work, gb_operation_work);
 	init_completion(&operation->completion);
 	kref_init(&operation->kref);
@@ -1216,8 +1224,14 @@ int __init gb_operation_init(void)
 	if (!gb_operation_completion_wq)
 		goto err_destroy_operation_cache;
 
+	gb_operation_async_timeout_wq = alloc_workqueue("greybus_async_timeout",
+							0, 0);
+	if (!gb_operation_async_timeout_wq)
+		goto err_destroy_workqueue;
 	return 0;
 
+err_destroy_workqueue:
+	destroy_workqueue(gb_operation_completion_wq);
 err_destroy_operation_cache:
 	kmem_cache_destroy(gb_operation_cache);
 	gb_operation_cache = NULL;
@@ -1230,6 +1244,7 @@ err_destroy_message_cache:
 
 void gb_operation_exit(void)
 {
+	destroy_workqueue(gb_operation_async_timeout_wq);
 	destroy_workqueue(gb_operation_completion_wq);
 	gb_operation_completion_wq = NULL;
 	kmem_cache_destroy(gb_operation_cache);

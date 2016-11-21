@@ -98,6 +98,7 @@ struct gb_operation {
 	struct work_struct	work;
 	gb_operation_callback	callback;
 	struct completion	completion;
+	struct delayed_work	delayed_work;
 
 	struct kref		kref;
 	atomic_t		waiters;
