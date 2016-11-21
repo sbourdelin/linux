@@ -336,6 +336,8 @@
 #define   LPCR_VRMA_L		ASM_CONST(0x0008000000000000)
 #define   LPCR_VRMA_LP0		ASM_CONST(0x0001000000000000)
 #define   LPCR_VRMA_LP1		ASM_CONST(0x0000800000000000)
+#define   LPCR_PECEu		ASM_CONST(0x0000700000000000)   /* P9 PECE "upper" */
+#define   LPCR_PECEu0		ASM_CONST(0x0000400000000000)   /* P9 Wakeup on HV interrupts" */
 #define   LPCR_RMLS		0x1C000000	/* Implementation dependent RMO limit sel */
 #define   LPCR_RMLS_SH		26
 #define   LPCR_ILE		ASM_CONST(0x0000000002000000)   /* !HV irqs set MSR:LE */
