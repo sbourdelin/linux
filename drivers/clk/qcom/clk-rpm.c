@@ -127,8 +127,7 @@ struct clk_rpm {
 
 struct rpm_cc {
 	struct qcom_rpm *rpm;
-	struct clk_hw_onecell_data data;
-	struct clk_hw *hws[];
+	struct clk_hw_onecell_data *data;
 };
 
 struct rpm_clk_desc {
@@ -393,9 +392,7 @@ MODULE_DEVICE_TABLE(of, rpm_clk_match_table);
 
 static int rpm_clk_probe(struct platform_device *pdev)
 {
-	struct clk_hw **hws;
 	struct rpm_cc *rcc;
-	struct clk_hw_onecell_data *data;
 	int ret;
 	size_t num_clks, i;
 	struct qcom_rpm *rpm;
@@ -415,14 +412,13 @@ static int rpm_clk_probe(struct platform_device *pdev)
 	rpm_clks = desc->clks;
 	num_clks = desc->num_clks;
 
-	rcc = devm_kzalloc(&pdev->dev, sizeof(*rcc) + sizeof(*hws) * num_clks,
-			   GFP_KERNEL);
+	rcc = devm_kzalloc(&pdev->dev, sizeof(*rcc), GFP_KERNEL);
 	if (!rcc)
 		return -ENOMEM;
 
-	hws = rcc->hws;
-	data = &rcc->data;
-	data->num = num_clks;
+	rcc->data = devm_kzalloc(&pdev->dev, sizeof(*rcc->data) + num_clks *
+				 sizeof(*rcc->data->hws), GFP_KERNEL);
+	rcc->data->num = num_clks;
 
 	for (i = 0; i < num_clks; i++) {
 		if (!rpm_clks[i])
@@ -437,17 +433,19 @@ static int rpm_clk_probe(struct platform_device *pdev)
 
 	for (i = 0; i < num_clks; i++) {
 		if (!rpm_clks[i]) {
-			data->hws[i] = ERR_PTR(-ENOENT);
+			rcc->data->hws[i] = ERR_PTR(-ENOENT);
 			continue;
 		}
 
 		ret = devm_clk_hw_register(&pdev->dev, &rpm_clks[i]->hw);
 		if (ret)
 			goto err;
+
+		rcc->data->hws[i] = &rpm_clks[i]->hw;
 	}
 
 	ret = of_clk_add_hw_provider(pdev->dev.of_node, of_clk_hw_onecell_get,
-				     data);
+				     rcc->data);
 	if (ret)
 		goto err;
 
