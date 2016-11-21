@@ -989,7 +989,7 @@ enum cpu_idle_type {
  * already in a wake queue, the wakeup will happen soon and the second
  * waker can just skip it.
  *
- * The WAKE_Q macro declares and initializes the list head.
+ * The DEFINE_WAKE_Q macro declares and initializes the list head.
  * wake_up_q() does NOT reinitialize the list; it's expected to be
  * called near the end of a function, where the fact that the queue is
  * not used again will be easy to see by inspection.
@@ -1009,7 +1009,7 @@ struct wake_q_head {
 
 #define WAKE_Q_TAIL ((struct wake_q_node *) 0x01)
 
-#define WAKE_Q(name)					\
+#define DEFINE_WAKE_Q(name)				\
 	struct wake_q_head name = { WAKE_Q_TAIL, &name.first }
 
 extern void wake_q_add(struct wake_q_head *head,
@@ -2443,6 +2443,10 @@ void calc_load_exit_idle(void);
 static inline void calc_load_enter_idle(void) { }
 static inline void calc_load_exit_idle(void) { }
 #endif /* CONFIG_NO_HZ_COMMON */
+
+#ifndef cpu_relax_yield
+#define cpu_relax_yield() cpu_relax()
+#endif
 
 /*
  * Do not use outside of architecture code which knows its limitations.
