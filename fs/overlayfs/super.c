@@ -28,6 +28,15 @@ struct ovl_dir_cache;
 
 #define OVL_MAX_STACK 500
 
+static bool ovl_redirect_dir_default =
+#ifdef CONFIG_OVERLAY_FS_REDIRECT_DIR
+	true;
+#else
+	false;
+#endif
+module_param_named(redirect_dir, ovl_redirect_dir_default, bool, 0644);
+MODULE_PARM_DESC(ovl_redirect_dir_default,
+		 "Default to on or off for the redirect_dir feature");
 
 static void ovl_dentry_release(struct dentry *dentry)
 {
@@ -702,6 +711,7 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 	if (!ufs)
 		goto out;
 
+	ufs->config.redirect_dir = ovl_redirect_dir_default;
 	err = ovl_parse_opt((char *) data, &ufs->config);
 	if (err)
 		goto out_free_config;
