@@ -19,8 +19,8 @@
 #ifndef __DT_BINDINGS_TPS65217_H__
 #define __DT_BINDINGS_TPS65217_H__
 
-#define TPS65217_IRQ_USB	0
-#define TPS65217_IRQ_AC		1
-#define TPS65217_IRQ_PB		2
+#define TPS65217_IRQ_USB_POWER		0	/* USB power state change */
+#define TPS65217_IRQ_AC_POWER		1	/* AC power state change */
+#define TPS65217_IRQ_PUSHBUTTON		2	/* Push button state change */
 
 #endif

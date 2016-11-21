@@ -319,13 +319,13 @@
 	ti,pmic-shutdown-controller;
 
 	charger {
-		interrupts = <TPS65217_IRQ_AC>, <TPS65217_IRQ_USB>;
+		interrupts = <TPS65217_IRQ_AC_POWER>, <TPS65217_IRQ_USB_POWER>;
 		interrupts-names = "AC", "USB";
 		status = "okay";
 	};
 
 	pwrbutton {
-		interrupts = <TPS65217_IRQ_PB>;
+		interrupts = <TPS65217_IRQ_PUSHBUTTON>;
 		status = "okay";
 	};
 
