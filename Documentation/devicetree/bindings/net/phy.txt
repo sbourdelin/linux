@@ -35,6 +35,11 @@ Optional Properties:
 - broken-turn-around: If set, indicates the PHY device does not correctly
   release the turn around line low at the end of a MDIO transaction.
 
+- eee-advert-disable: Bits to clear in the MDIO_AN_EEE_ADV register to
+  disable EEE modes. Example
+    * 0x4: disable EEE for 1000T,
+    * 0x6: disable EEE for 100TX and 1000T
+
 Example:
 
 ethernet-phy@0 {
