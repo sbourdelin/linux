@@ -9,8 +9,8 @@ if [[ $# < 2 ]]; then
 fi
 
 vmlinux=$1
-basepath=$2
-modpath=$3
+basepath=$(readlink -ev "$2")
+modpath=$(readlink -ev "$3")
 declare -A cache
 declare -A modcache
 
@@ -77,7 +77,7 @@ parse_symbol() {
 	fi
 
 	# Strip out the base of the path
-	code=${code//$basepath/""}
+	code=${code//$basepath\//""}
 
 	# In the case of inlines, move everything to same line
 	code=${code//$'\n'/' '}
