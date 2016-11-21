@@ -1143,12 +1143,12 @@ SMB2_tcon(const unsigned int xid, struct cifs_ses *ses, const char *tree,
 		goto tcon_exit;
 	}
 
-	if (rsp->ShareType & SMB2_SHARE_TYPE_DISK)
+	if (rsp->ShareType == SMB2_SHARE_TYPE_DISK) {
 		cifs_dbg(FYI, "connection to disk share\n");
-	else if (rsp->ShareType & SMB2_SHARE_TYPE_PIPE) {
+	} else if (rsp->ShareType == SMB2_SHARE_TYPE_PIPE) {
 		tcon->ipc = true;
 		cifs_dbg(FYI, "connection to pipe share\n");
-	} else if (rsp->ShareType & SMB2_SHARE_TYPE_PRINT) {
+	} else if (rsp->ShareType == SMB2_SHARE_TYPE_PRINT) {
 		tcon->print = true;
 		cifs_dbg(FYI, "connection to printer\n");
 	} else {
