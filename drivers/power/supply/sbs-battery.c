@@ -740,6 +740,7 @@ static void sbs_delayed_work(struct work_struct *work)
 }
 
 static const struct power_supply_desc sbs_default_desc = {
+	.name = "sbs-battery",
 	.type = POWER_SUPPLY_TYPE_BATTERY,
 	.properties = sbs_properties,
 	.num_properties = ARRAY_SIZE(sbs_properties),
@@ -760,11 +761,6 @@ static int sbs_probe(struct i2c_client *client,
 	sbs_desc = devm_kmemdup(&client->dev, &sbs_default_desc,
 			sizeof(*sbs_desc), GFP_KERNEL);
 	if (!sbs_desc)
-		return -ENOMEM;
-
-	sbs_desc->name = devm_kasprintf(&client->dev, GFP_KERNEL, "sbs-%s",
-			dev_name(&client->dev));
-	if (!sbs_desc->name)
 		return -ENOMEM;
 
 	chip = devm_kzalloc(&client->dev, sizeof(struct sbs_info), GFP_KERNEL);
