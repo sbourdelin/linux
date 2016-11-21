@@ -223,35 +223,30 @@ out:
 	return 0;
 }
 
-static int dsa_slave_port_vlan_add(struct net_device *dev,
+static int dsa_slave_port_vlan_add(struct dsa_switch *ds, int port,
 				   const struct switchdev_obj_port_vlan *vlan,
 				   struct switchdev_trans *trans)
 {
-	struct dsa_slave_priv *p = netdev_priv(dev);
-	struct dsa_switch *ds = p->parent;
 
 	if (switchdev_trans_ph_prepare(trans)) {
 		if (!ds->ops->port_vlan_prepare || !ds->ops->port_vlan_add)
 			return -EOPNOTSUPP;
 
-		return ds->ops->port_vlan_prepare(ds, p->port, vlan, trans);
+		return ds->ops->port_vlan_prepare(ds, port, vlan, trans);
 	}
 
-	ds->ops->port_vlan_add(ds, p->port, vlan, trans);
+	ds->ops->port_vlan_add(ds, port, vlan, trans);
 
 	return 0;
 }
 
-static int dsa_slave_port_vlan_del(struct net_device *dev,
+static int dsa_slave_port_vlan_del(struct dsa_switch *ds, int port,
 				   const struct switchdev_obj_port_vlan *vlan)
 {
-	struct dsa_slave_priv *p = netdev_priv(dev);
-	struct dsa_switch *ds = p->parent;
-
 	if (!ds->ops->port_vlan_del)
 		return -EOPNOTSUPP;
 
-	return ds->ops->port_vlan_del(ds, p->port, vlan);
+	return ds->ops->port_vlan_del(ds, port, vlan);
 }
 
 static int dsa_slave_port_vlan_dump(struct net_device *dev,
@@ -465,7 +460,20 @@ static int dsa_slave_port_obj_add(struct net_device *dev,
 				  const struct switchdev_obj *obj,
 				  struct switchdev_trans *trans)
 {
+	struct dsa_slave_priv *p = netdev_priv(dev);
+	struct dsa_switch *ds = p->parent;
+	int port = p->port;
 	int err;
+
+	/* Here we may be called with an orig_dev which is different from dev,
+	 * on purpose, to receive request coming from e.g the bridge master
+	 * device. Although there are no network device associated with CPU/DSA
+	 * ports, we may still have programming operation for these ports.
+	 */
+	if (obj->orig_dev == p->bridge_dev) {
+		ds = ds->dst->ds[0];
+		port = ds->dst->cpu_port;
+	}
 
 	/* For the prepare phase, ensure the full set of changes is feasable in
 	 * one go in order to signal a failure properly. If an operation is not
@@ -483,7 +491,7 @@ static int dsa_slave_port_obj_add(struct net_device *dev,
 					     trans);
 		break;
 	case SWITCHDEV_OBJ_ID_PORT_VLAN:
-		err = dsa_slave_port_vlan_add(dev,
+		err = dsa_slave_port_vlan_add(ds, port,
 					      SWITCHDEV_OBJ_PORT_VLAN(obj),
 					      trans);
 		break;
@@ -498,7 +506,20 @@ static int dsa_slave_port_obj_add(struct net_device *dev,
 static int dsa_slave_port_obj_del(struct net_device *dev,
 				  const struct switchdev_obj *obj)
 {
+	struct dsa_slave_priv *p = netdev_priv(dev);
+	struct dsa_switch *ds = p->parent;
+	int port = p->port;
 	int err;
+
+	/* Here we may be called with an orig_dev which is different from dev,
+	 * on purpose, to receive request coming from e.g the bridge master
+	 * device. Although there are no network device associated with CPU/DSA
+	 * ports, we may still have programming operation for these ports.
+	 */
+	if (obj->orig_dev == p->bridge_dev) {
+		ds = ds->dst->ds[0];
+		port = ds->dst->cpu_port;
+	}
 
 	switch (obj->id) {
 	case SWITCHDEV_OBJ_ID_PORT_FDB:
@@ -509,7 +530,7 @@ static int dsa_slave_port_obj_del(struct net_device *dev,
 		err = dsa_slave_port_mdb_del(dev, SWITCHDEV_OBJ_PORT_MDB(obj));
 		break;
 	case SWITCHDEV_OBJ_ID_PORT_VLAN:
-		err = dsa_slave_port_vlan_del(dev,
+		err = dsa_slave_port_vlan_del(ds, port,
 					      SWITCHDEV_OBJ_PORT_VLAN(obj));
 		break;
 	default:
