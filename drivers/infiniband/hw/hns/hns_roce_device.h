@@ -34,6 +34,7 @@
 #define _HNS_ROCE_DEVICE_H
 
 #include <rdma/ib_verbs.h>
+#include <linux/mutex.h>
 
 #define DRV_NAME "hns_roce"
 
@@ -358,7 +359,7 @@ struct hns_roce_cmdq {
 	struct dma_pool		*pool;
 	u8 __iomem		*hcr;
 	struct mutex		hcr_mutex;
-	struct semaphore	poll_sem;
+	struct mutex		poll_mutex;
 	/*
 	* Event mode: cmd register mutex protection,
 	* ensure to not exceed max_cmds and user use limit region

@@ -119,7 +119,7 @@ static int hns_roce_cmd_mbox_post_hw(struct hns_roce_dev *hr_dev, u64 in_param,
 	return ret;
 }
 
-/* this should be called with "poll_sem" */
+/* this should be called with "poll_mutex" */
 static int __hns_roce_cmd_mbox_poll(struct hns_roce_dev *hr_dev, u64 in_param,
 				    u64 out_param, unsigned long in_modifier,
 				    u8 op_modifier, u16 op,
@@ -167,10 +167,10 @@ static int hns_roce_cmd_mbox_poll(struct hns_roce_dev *hr_dev, u64 in_param,
 {
 	int ret;
 
-	down(&hr_dev->cmd.poll_sem);
+	mutex_lock(&hr_dev->cmd.poll_mutex);
 	ret = __hns_roce_cmd_mbox_poll(hr_dev, in_param, out_param, in_modifier,
 				       op_modifier, op, timeout);
-	up(&hr_dev->cmd.poll_sem);
+	mutex_unlock(&hr_dev->cmd.poll_mutex);
 
 	return ret;
 }
@@ -275,7 +275,7 @@ int hns_roce_cmd_init(struct hns_roce_dev *hr_dev)
 	struct device *dev = &hr_dev->pdev->dev;
 
 	mutex_init(&hr_dev->cmd.hcr_mutex);
-	sema_init(&hr_dev->cmd.poll_sem, 1);
+	mutex_init(&hr_dev->cmd.poll_mutex);
 	hr_dev->cmd.use_events = 0;
 	hr_dev->cmd.toggle = 1;
 	hr_dev->cmd.max_cmds = CMD_MAX_NUM;
@@ -319,8 +319,6 @@ int hns_roce_cmd_use_events(struct hns_roce_dev *hr_dev)
 	hr_cmd->token_mask = CMD_TOKEN_MASK;
 	hr_cmd->use_events = 1;
 
-	down(&hr_cmd->poll_sem);
-
 	return 0;
 }
 
@@ -335,7 +333,6 @@ void hns_roce_cmd_use_polling(struct hns_roce_dev *hr_dev)
 		down(&hr_cmd->event_sem);
 
 	kfree(hr_cmd->context);
-	up(&hr_cmd->poll_sem);
 }
 
 struct hns_roce_cmd_mailbox
