@@ -615,7 +615,7 @@ static int watchdog_nmi_enable(unsigned int cpu)
 	if (!IS_ERR(event)) {
 		/* only print for cpu0 or different than cpu0 */
 		if (cpu == 0 || cpu0_err)
-			pr_info("enabled on all CPUs, permanently consumes one hw-PMU counter.\n");
+			pr_info_once("enabled on all CPUs, permanently consumes one hw-PMU counter.\n");
 		goto out_save;
 	}
 
