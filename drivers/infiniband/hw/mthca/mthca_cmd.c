@@ -347,7 +347,7 @@ static int mthca_cmd_poll(struct mthca_dev *dev,
 	unsigned long end;
 	u8 status;
 
-	down(&dev->cmd.poll_sem);
+	mutex_lock(&dev->cmd.poll_mutex);
 
 	err = mthca_cmd_post(dev, in_param,
 			     out_param ? *out_param : 0,
@@ -382,7 +382,7 @@ static int mthca_cmd_poll(struct mthca_dev *dev,
 	}
 
 out:
-	up(&dev->cmd.poll_sem);
+	mutex_unlock(&dev->cmd.poll_mutex);
 	return err;
 }
 
@@ -520,7 +520,7 @@ static int mthca_cmd_imm(struct mthca_dev *dev,
 int mthca_cmd_init(struct mthca_dev *dev)
 {
 	mutex_init(&dev->cmd.hcr_mutex);
-	sema_init(&dev->cmd.poll_sem, 1);
+	mutex_init(&dev->cmd.poll_mutex);
 	dev->cmd.flags = 0;
 
 	dev->hcr = ioremap(pci_resource_start(dev->pdev, 0) + MTHCA_HCR_BASE,
@@ -582,8 +582,6 @@ int mthca_cmd_use_events(struct mthca_dev *dev)
 
 	dev->cmd.flags |= MTHCA_CMD_USE_EVENTS;
 
-	down(&dev->cmd.poll_sem);
-
 	return 0;
 }
 
@@ -600,8 +598,6 @@ void mthca_cmd_use_polling(struct mthca_dev *dev)
 		down(&dev->cmd.event_sem);
 
 	kfree(dev->cmd.context);
-
-	up(&dev->cmd.poll_sem);
 }
 
 struct mthca_mailbox *mthca_alloc_mailbox(struct mthca_dev *dev,
