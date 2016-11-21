@@ -405,6 +405,34 @@ void mthca_cmd_event(struct mthca_dev *dev,
 	complete(&context->done);
 }
 
+static inline struct mthca_cmd_context *
+mthca_try_get_context(struct mthca_cmd *cmd)
+{
+	struct mthca_cmd_context *context = NULL;
+
+	spin_lock(&cmd->context_lock);
+
+	if (cmd->free_head < 0)
+		goto out;
+
+	context = &cmd->context[cmd->free_head];
+	context->token += cmd->token_mask + 1;
+	cmd->free_head = context->next;
+out:
+	spin_unlock(&cmd->context_lock);
+	return context;
+}
+
+/* wait for and acquire a free context */
+static inline struct mthca_cmd_context *
+mthca_get_free_context(struct mthca_cmd *cmd)
+{
+	struct mthca_cmd_context *context;
+
+	wait_event(cmd->wq, (context = mthca_try_get_context(cmd)));
+	return context;
+}
+
 static int mthca_cmd_wait(struct mthca_dev *dev,
 			  u64 in_param,
 			  u64 *out_param,
@@ -417,15 +445,7 @@ static int mthca_cmd_wait(struct mthca_dev *dev,
 	int err = 0;
 	struct mthca_cmd_context *context;
 
-	down(&dev->cmd.event_sem);
-
-	spin_lock(&dev->cmd.context_lock);
-	BUG_ON(dev->cmd.free_head < 0);
-	context = &dev->cmd.context[dev->cmd.free_head];
-	context->token += dev->cmd.token_mask + 1;
-	dev->cmd.free_head = context->next;
-	spin_unlock(&dev->cmd.context_lock);
-
+	context = mthca_get_free_context(&dev->cmd);
 	init_completion(&context->done);
 
 	err = mthca_cmd_post(dev, in_param,
@@ -458,8 +478,8 @@ out:
 	context->next = dev->cmd.free_head;
 	dev->cmd.free_head = context - dev->cmd.context;
 	spin_unlock(&dev->cmd.context_lock);
+	wake_up(&dev->cmd.wq);
 
-	up(&dev->cmd.event_sem);
 	return err;
 }
 
@@ -571,7 +591,7 @@ int mthca_cmd_use_events(struct mthca_dev *dev)
 	dev->cmd.context[dev->cmd.max_cmds - 1].next = -1;
 	dev->cmd.free_head = 0;
 
-	sema_init(&dev->cmd.event_sem, dev->cmd.max_cmds);
+	init_waitqueue_head(&dev->cmd.wq);
 	spin_lock_init(&dev->cmd.context_lock);
 
 	for (dev->cmd.token_mask = 1;
@@ -590,12 +610,9 @@ int mthca_cmd_use_events(struct mthca_dev *dev)
  */
 void mthca_cmd_use_polling(struct mthca_dev *dev)
 {
-	int i;
-
 	dev->cmd.flags &= ~MTHCA_CMD_USE_EVENTS;
 
-	for (i = 0; i < dev->cmd.max_cmds; ++i)
-		down(&dev->cmd.event_sem);
+	dev->cmd.free_head = -1;
 
 	kfree(dev->cmd.context);
 }
