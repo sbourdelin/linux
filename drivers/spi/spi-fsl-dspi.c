@@ -227,8 +227,10 @@ static void dspi_rx_dma_callback(void *arg)
 	if (!(dspi->dataflags & TRAN_STATE_RX_VOID)) {
 		for (i = 0; i < dma->curr_xfer_len; i++) {
 			d = dspi->dma->rx_dma_buf[i];
-			rx_word ? (*(u16 *)dspi->rx = d) :
-						(*(u8 *)dspi->rx = d);
+			if (rx_word)
+				*(u16 *)dspi->rx = d;
+			else
+				*(u8 *)dspi->rx = d;
 			dspi->rx += rx_word + 1;
 		}
 	}
@@ -248,14 +250,20 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
 	tx_word = is_double_byte_mode(dspi);
 
 	for (i = 0; i < dma->curr_xfer_len - 1; i++) {
-		val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
+		if (tx_word)
+			val = *(u16 *) dspi->tx;
+		else
+			val = *(u8 *) dspi->tx;
 		dspi->dma->tx_dma_buf[i] =
 			SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
 			SPI_PUSHR_CTAS(0) | SPI_PUSHR_CONT;
 		dspi->tx += tx_word + 1;
 	}
 
-	val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
+	if (tx_word)
+		val = *(u16 *) dspi->tx;
+	else
+		val = *(u8 *) dspi->tx;
 	dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
 					SPI_PUSHR_PCS(dspi->cs) |
 					SPI_PUSHR_CTAS(0);
@@ -431,9 +439,11 @@ static int dspi_request_dma(struct fsl_dspi *dspi, phys_addr_t phy_addr)
 	return 0;
 
 err_slave_config:
-	devm_kfree(dev, dma->rx_dma_buf);
+	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
+			dma->rx_dma_buf, dma->rx_dma_phys);
 err_rx_dma_buf:
-	devm_kfree(dev, dma->tx_dma_buf);
+	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
+			dma->tx_dma_buf, dma->tx_dma_phys);
 err_tx_dma_buf:
 	dma_release_channel(dma->chan_tx);
 err_tx_channel:
