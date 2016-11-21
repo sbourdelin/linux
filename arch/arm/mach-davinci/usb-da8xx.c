@@ -119,9 +119,8 @@ static struct platform_device da8xx_usb11_device = {
 	.resource	= da8xx_usb11_resources,
 };
 
-int __init da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata)
+int __init da8xx_register_usb11(void)
 {
-	da8xx_usb11_device.dev.platform_data = pdata;
 	return platform_device_register(&da8xx_usb11_device);
 }
 

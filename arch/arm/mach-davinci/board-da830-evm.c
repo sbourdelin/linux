@@ -129,7 +129,7 @@ static __init void da830_evm_usb_init(void)
 	if (ret)
 		pr_warn("fail to add ohci regulator\n");
 
-	ret = da8xx_register_usb11(NULL);
+	ret = da8xx_register_usb11();
 	if (ret)
 		pr_warn("%s: USB 1.1 registration failed: %d\n", __func__, ret);
 }
