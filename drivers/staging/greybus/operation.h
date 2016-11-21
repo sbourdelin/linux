@@ -175,6 +175,10 @@ gb_operation_request_send_sync(struct gb_operation *operation)
 			GB_OPERATION_TIMEOUT_DEFAULT);
 }
 
+int gb_operation_request_send_async_timeout(struct gb_operation *operation,
+					    unsigned int timeout,
+					    gb_operation_callback callback,
+					    gfp_t gfp);
 void gb_operation_cancel(struct gb_operation *operation, int errno);
 void gb_operation_cancel_incoming(struct gb_operation *operation, int errno);
 

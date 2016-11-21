@@ -288,8 +288,24 @@ static void gb_operation_work(struct work_struct *work)
 	gb_operation_put(operation);
 }
 
+/*
+ * This function runs once an asynchronous operation's timeout has expired.
+ * If the timeout is the first thing to run then it cancels the operation
+ * setting the result to -ETIMEDOUT and results in the running of the
+ * completion work-queue and associated completion callback with -ETIMEDOUT
+ * as the result code. Alternatively if the operation has already had it's
+ * status code set to something other than -EINPROGRESS then no further
+ * action is taken. In both cases the operation reference count taken in
+ * gb_operation_request_send_async_timeout() is decremented.
+ */
 static void gb_operation_async_worker(struct work_struct *work)
 {
+	struct delayed_work *delayed_work = to_delayed_work(work);
+	struct gb_operation *operation =
+		container_of(delayed_work, struct gb_operation, delayed_work);
+
+	gb_operation_cancel(operation, -ETIMEDOUT);
+	gb_operation_put(operation);
 }
 
 static void gb_operation_message_init(struct gb_host_device *hd,
@@ -760,6 +776,40 @@ err_put:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(gb_operation_request_send);
+
+/*
+ * Send an asynchronous operation. This function will not block, it returns
+ * immediately. The delayed worker gb_operation_async_worker() will run
+ * unconditionally dropping the extra reference we take below.
+ */
+int gb_operation_request_send_async_timeout(struct gb_operation *operation,
+					    unsigned int timeout,
+					    gb_operation_callback callback,
+					    gfp_t gfp)
+{
+	int ret;
+	unsigned long timeout_jiffies;
+
+	/* Take a reference dropped later in gb_operation_async_worker() */
+	gb_operation_get(operation);
+
+	ret = gb_operation_request_send(operation, callback, gfp);
+	if (ret) {
+		gb_operation_put(operation);
+		return ret;
+	}
+
+	if (timeout)
+		timeout_jiffies = msecs_to_jiffies(timeout);
+	else
+		timeout_jiffies = MAX_SCHEDULE_TIMEOUT;
+
+	queue_delayed_work(gb_operation_async_timeout_wq,
+			   &operation->delayed_work,
+			   timeout_jiffies);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(gb_operation_request_send_async_timeout);
 
 /*
  * Send a synchronous operation.  This function is expected to
