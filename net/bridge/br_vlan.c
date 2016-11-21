@@ -228,7 +228,9 @@ static int __vlan_add(struct net_bridge_vlan *v, u16 flags)
 		err = __vlan_vid_add(dev, br, v->vid, flags);
 		if (err)
 			goto out;
+	}
 
+	if (p) {
 		/* need to work on the master vlan too */
 		if (flags & BRIDGE_VLAN_INFO_MASTER) {
 			err = br_vlan_add(br, v->vid, flags |
@@ -242,6 +244,14 @@ static int __vlan_add(struct net_bridge_vlan *v, u16 flags)
 			goto out_filt;
 		v->brvlan = masterv;
 		v->stats = masterv->stats;
+
+		/* Propagate the VLAN flags changes down to the underlying
+		 * hardware, which may have to reconfigure the physical port
+		 * associated with the bridge (e.g: CPU/management port)
+		 */
+		err = __vlan_vid_add(br->dev, br, v->vid, flags);
+		if (err)
+			goto out_filt;
 	}
 
 	/* Add the dev mac and count the vlan only if it's usable */
@@ -287,19 +297,25 @@ static int __vlan_del(struct net_bridge_vlan *v)
 	struct net_bridge_vlan *masterv = v;
 	struct net_bridge_vlan_group *vg;
 	struct net_bridge_port *p = NULL;
+	struct net_device *dev;
+	struct net_bridge *br;
 	int err = 0;
 
 	if (br_vlan_is_master(v)) {
-		vg = br_vlan_group(v->br);
+		br = v->br;
+		vg = br_vlan_group(br);
+		dev = v->br->dev;
 	} else {
 		p = v->port;
+		br = p->br;
+		dev = p->dev;
 		vg = nbp_vlan_group(v->port);
 		masterv = v->brvlan;
 	}
 
 	__vlan_delete_pvid(vg, v->vid);
-	if (p) {
-		err = __vlan_vid_del(p->dev, p->br, v->vid);
+	if (p || br_vlan_is_master(v)) {
+		err = __vlan_vid_del(dev, br, v->vid);
 		if (err)
 			goto out;
 	}
@@ -568,6 +584,12 @@ int br_vlan_add(struct net_bridge *br, u16 vid, u16 flags)
 			vg->num_vlans++;
 		}
 		__vlan_add_flags(vlan, flags);
+
+		/* Propagate the VLAN flags changes down to the underlying
+		 * hardware, which may have to reconfigure the physical port
+		 * associated with the bridge (e.g: CPU/management port)
+		 */
+		__vlan_vid_add(br->dev, br, vlan->vid, flags);
 		return 0;
 	}
 
