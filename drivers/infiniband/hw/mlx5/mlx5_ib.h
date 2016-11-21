@@ -533,7 +533,12 @@ struct umr_common {
 	struct ib_qp	*qp;
 	/* control access to UMR QP
 	 */
-	struct semaphore	sem;
+	wait_queue_head_t	wq;
+	atomic_t		users;
+};
+
+enum {
+	MAX_UMR_WR = 128,
 };
 
 enum {
