@@ -86,6 +86,7 @@ static const struct ixgbe_info *ixgbe_info_tbl[] = {
 	[board_X550]		= &ixgbe_X550_info,
 	[board_X550EM_x]	= &ixgbe_X550EM_x_info,
 	[board_x550em_a]	= &ixgbe_x550em_a_info,
+	[board_x550em_a_fw]	= &ixgbe_x550em_a_fw_info,
 };
 
 /* ixgbe_pci_tbl - PCI Device ID Table
@@ -140,6 +141,8 @@ static const struct pci_device_id ixgbe_pci_tbl[] = {
 	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_X550EM_A_SGMII_L), board_x550em_a },
 	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_X550EM_A_10G_T), board_x550em_a},
 	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_X550EM_A_SFP), board_x550em_a },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_X550EM_A_1G_T), board_x550em_a_fw },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_X550EM_A_1G_T_L), board_x550em_a_fw },
 	/* required last entry */
 	{0, }
 };
@@ -180,6 +183,7 @@ MODULE_VERSION(DRV_VERSION);
 static struct workqueue_struct *ixgbe_wq;
 
 static bool ixgbe_check_cfg_remove(struct ixgbe_hw *hw, struct pci_dev *pdev);
+static void ixgbe_watchdog_link_is_down(struct ixgbe_adapter *);
 
 static int ixgbe_read_pci_cfg_word_parent(struct ixgbe_adapter *adapter,
 					  u32 reg, u16 *value)
@@ -5294,6 +5298,8 @@ void ixgbe_reinit_locked(struct ixgbe_adapter *adapter)
 
 	while (test_and_set_bit(__IXGBE_RESETTING, &adapter->state))
 		usleep_range(1000, 2000);
+	if (adapter->hw.phy.type == ixgbe_phy_fw)
+		ixgbe_watchdog_link_is_down(adapter);
 	ixgbe_down(adapter);
 	/*
 	 * If SR-IOV enabled then wait a bit before bringing the adapter
@@ -5554,6 +5560,31 @@ void ixgbe_down(struct ixgbe_adapter *adapter)
 }
 
 /**
+ * ixgbe_eee_capable - helper function to determine EEE support on X550
+ * @adapter: board private structure
+ */
+static void ixgbe_set_eee_capable(struct ixgbe_adapter *adapter)
+{
+	struct ixgbe_hw *hw = &adapter->hw;
+
+	switch (hw->device_id) {
+	case IXGBE_DEV_ID_X550EM_A_1G_T:
+	case IXGBE_DEV_ID_X550EM_A_1G_T_L:
+		if (!hw->phy.eee_speeds_supported)
+			break;
+		adapter->flags2 |= IXGBE_FLAG2_EEE_CAPABLE;
+		if (!hw->phy.eee_speeds_advertised)
+			break;
+		adapter->flags2 |= IXGBE_FLAG2_EEE_ENABLED;
+		break;
+	default:
+		adapter->flags2 &= ~IXGBE_FLAG2_EEE_CAPABLE;
+		adapter->flags2 &= ~IXGBE_FLAG2_EEE_ENABLED;
+		break;
+	}
+}
+
+/**
  * ixgbe_tx_timeout - Respond to a Tx Hang
  * @netdev: network interface device structure
  **/
@@ -5717,6 +5748,14 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter,
 		break;
 	case ixgbe_mac_x550em_a:
 		adapter->flags |= IXGBE_FLAG_GENEVE_OFFLOAD_CAPABLE;
+		switch (hw->device_id) {
+		case IXGBE_DEV_ID_X550EM_A_1G_T:
+		case IXGBE_DEV_ID_X550EM_A_1G_T_L:
+			adapter->flags2 |= IXGBE_FLAG2_TEMP_SENSOR_CAPABLE;
+			break;
+		default:
+			break;
+		}
 	/* fall through */
 	case ixgbe_mac_X550EM_x:
 #ifdef CONFIG_IXGBE_DCB
@@ -5730,6 +5769,8 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter,
 #endif /* IXGBE_FCOE */
 	/* Fall Through */
 	case ixgbe_mac_X550:
+		if (hw->mac.type == ixgbe_mac_X550)
+			adapter->flags2 |= IXGBE_FLAG2_TEMP_SENSOR_CAPABLE;
 #ifdef CONFIG_IXGBE_DCA
 		adapter->flags &= ~IXGBE_FLAG_DCA_CAPABLE;
 #endif
@@ -9591,6 +9632,7 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	hw->phy.reset_if_overtemp = true;
 	err = hw->mac.ops.reset_hw(hw);
 	hw->phy.reset_if_overtemp = false;
+	ixgbe_set_eee_capable(adapter);
 	if (err == IXGBE_ERR_SFP_NOT_PRESENT) {
 		err = 0;
 	} else if (err == IXGBE_ERR_SFP_NOT_SUPPORTED) {
