@@ -56,6 +56,12 @@ static struct timekeeper shadow_timekeeper;
 struct tk_fast {
 	seqcount_t		seq;
 	struct tk_read_base	base[2];
+
+	/*
+	 * first dimension is based on lower seq bit,
+	 * second dimension is for offset type (real, boot, tai)
+	 */
+	ktime_t			offsets[2][3];
 };
 
 static struct tk_fast tk_fast_mono ____cacheline_aligned;
@@ -350,14 +356,20 @@ static void update_fast_timekeeper(struct tk_read_base *tkr, struct tk_fast *tkf
 	/* Force readers off to base[1] */
 	raw_write_seqcount_latch(&tkf->seq);
 
-	/* Update base[0] */
+	/* Update base[0] and offsets*/
 	memcpy(base, tkr, sizeof(*base));
+	tkf->offsets[0][TK_OFFS_REAL] = tk_core.timekeeper.offs_real;
+	tkf->offsets[0][TK_OFFS_BOOT] = tk_core.timekeeper.offs_boot;
+	tkf->offsets[0][TK_OFFS_TAI] = tk_core.timekeeper.offs_tai;
 
 	/* Force readers back to base[0] */
 	raw_write_seqcount_latch(&tkf->seq);
 
-	/* Update base[1] */
+	/* Update base[1] and offsets*/
 	memcpy(base + 1, base, sizeof(*base));
+	tkf->offsets[1][TK_OFFS_REAL] = tk_core.timekeeper.offs_real;
+	tkf->offsets[1][TK_OFFS_BOOT] = tk_core.timekeeper.offs_boot;
+	tkf->offsets[1][TK_OFFS_TAI] = tk_core.timekeeper.offs_tai;
 }
 
 /**
@@ -392,16 +404,23 @@ static void update_fast_timekeeper(struct tk_read_base *tkr, struct tk_fast *tkf
  * of the following timestamps. Callers need to be aware of that and
  * deal with it.
  */
-static __always_inline u64 __ktime_get_fast_ns(struct tk_fast *tkf)
+static __always_inline u64 __ktime_get_fast_ns(struct tk_fast *tkf, int offset)
 {
 	struct tk_read_base *tkr;
 	unsigned int seq;
 	u64 now;
+	ktime_t *off;
 
 	do {
 		seq = raw_read_seqcount_latch(&tkf->seq);
 		tkr = tkf->base + (seq & 0x01);
-		now = ktime_to_ns(tkr->base);
+
+		if (unlikely((offset >= 0))) {
+			off = tkf->offsets[seq & 0x01];
+			now = ktime_to_ns(ktime_add(tkr->base, off[offset]));
+		} else {
+			now = ktime_to_ns(tkr->base);
+		}
 
 		now += timekeeping_delta_to_ns(tkr,
 				clocksource_delta(
@@ -415,15 +434,20 @@ static __always_inline u64 __ktime_get_fast_ns(struct tk_fast *tkf)
 
 u64 ktime_get_mono_fast_ns(void)
 {
-	return __ktime_get_fast_ns(&tk_fast_mono);
+	return __ktime_get_fast_ns(&tk_fast_mono, -1);
 }
 EXPORT_SYMBOL_GPL(ktime_get_mono_fast_ns);
 
 u64 ktime_get_raw_fast_ns(void)
 {
-	return __ktime_get_fast_ns(&tk_fast_raw);
+	return __ktime_get_fast_ns(&tk_fast_raw, -1);
 }
 EXPORT_SYMBOL_GPL(ktime_get_raw_fast_ns);
+
+u64 ktime_get_boot_fast_ns(void)
+{
+	return __ktime_get_fast_ns(&tk_fast_mono, TK_OFFS_BOOT);
+}
 
 /* Suspend-time cycles value for halted fast timekeeper. */
 static cycle_t cycles_at_suspend;
