@@ -16,8 +16,12 @@
  */
 
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 
 #include "core.h"
+
+#define DWC3_HOST_SUSPEND_COUNT		100
+#define DWC3_HOST_SUSPEND_TIMEOUT	100
 
 static int dwc3_host_get_irq(struct dwc3 *dwc)
 {
@@ -140,3 +144,53 @@ void dwc3_host_exit(struct dwc3 *dwc)
 			  dev_name(&dwc->xhci->dev));
 	platform_device_unregister(dwc->xhci);
 }
+
+#ifdef CONFIG_USB_DWC3_HOST_SUSPEND
+int dwc3_host_suspend(struct dwc3 *dwc)
+{
+	struct device *xhci = &dwc->xhci->dev;
+	int ret, cnt = DWC3_HOST_SUSPEND_COUNT;
+
+	/*
+	 * We need make sure the children of the xHCI device had been into
+	 * suspend state, or we will suspend xHCI device failed.
+	 */
+	while (!pm_children_suspended(xhci) && --cnt > 0)
+		msleep(DWC3_HOST_SUSPEND_TIMEOUT);
+
+	if (cnt <= 0) {
+		dev_err(xhci, "failed to suspend xHCI children device\n");
+		return -EBUSY;
+	}
+
+	/*
+	 * If the xHCI device had been into suspend state, thus just return.
+	 */
+	if (pm_runtime_suspended(xhci))
+		return 0;
+
+	/* Suspend the xHCI device synchronously. */
+	ret = pm_runtime_put_sync(xhci);
+	if (ret) {
+		dev_err(xhci, "failed to suspend xHCI device\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+int dwc3_host_resume(struct dwc3 *dwc)
+{
+	struct device *xhci = &dwc->xhci->dev;
+	int ret;
+
+	/* Resume the xHCI device synchronously. */
+	ret = pm_runtime_get_sync(xhci);
+	if (ret) {
+		dev_err(xhci, "failed to resume xHCI device\n");
+		return ret;
+	}
+
+	return 0;
+}
+#endif
