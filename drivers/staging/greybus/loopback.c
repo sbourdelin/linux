@@ -524,7 +524,6 @@ static int gb_loopback_async_operation(struct gb_loopback *gb, int type,
 
 	atomic_inc(&gb->outstanding_operations);
 
-	mutex_lock(&gb->mutex);
 	timeout = gb->msec_timeout;
 	ret = gb_operation_request_send_async_timeout(operation, timeout,
 						      gb_loopback_async_operation_callback,
@@ -538,7 +537,6 @@ error:
 	gb_operation_put(operation);
 	kfree(op_async);
 done:
-	mutex_unlock(&gb->mutex);
 	return ret;
 }
 
@@ -918,7 +916,6 @@ static int gb_loopback_fn(void *data)
 		type = gb->type;
 		if (gb->ts.tv_usec == 0 && gb->ts.tv_sec == 0)
 			do_gettimeofday(&gb->ts);
-		mutex_unlock(&gb->mutex);
 
 		/* Else operations to perform */
 		if (gb->async) {
@@ -949,6 +946,7 @@ static int gb_loopback_fn(void *data)
 			gb_loopback_calculate_stats(gb, !!error);
 		}
 		gb->send_count++;
+		mutex_unlock(&gb->mutex);
 		if (us_wait)
 			udelay(us_wait);
 	}
