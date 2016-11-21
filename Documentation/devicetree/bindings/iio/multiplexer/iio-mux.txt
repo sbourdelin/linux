@@ -1,0 +1,47 @@
+IIO multiplexer bindings
+
+If a multiplexer is used to select which hardware signal is fed to
+e.g. an ADC channel, these bindings describe that situation.
+
+Required properties:
+- compatible : "iio-mux"
+- io-channels : Channel node of the parent channel that has multiplexed
+		input.
+- io-channel-names : Should be "parent".
+- #address-cells = <1>;
+- #size-cells = <0>;
+
+Required properties for iio-mux child nodes:
+- reg : The multiplexer state as described in ../misc/mux-controller.txt
+
+For each iio-mux child, an iio channel will be created whose number will
+match the mux controller state.
+
+Example:
+	mux {
+		compatible = "mux-gpio";
+
+		mux-gpios = <&pioA 0 GPIO_ACTIVE_HIGH>,
+			    <&pioA 1 GPIO_ACTIVE_HIGH>;
+
+		adc {
+			compatible = "iio-mux";
+			io-channels = <&adc 0>;
+			io-channel-names = "parent";
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			sync@0 {
+				reg = <0>;
+			};
+
+			in@1 {
+				reg = <1>;
+			};
+
+			system-regulator@2 {
+				reg = <2>;
+			};
+		};
+	};
