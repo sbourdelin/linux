@@ -288,6 +288,21 @@ int pci_set_vpd_size(struct pci_dev *dev, size_t len)
 }
 EXPORT_SYMBOL(pci_set_vpd_size);
 
+/**
+ * pci_set_vpd_timeout - Set wait timeout for Vital Product Data accesses
+ * @dev:	pci device struct
+ * @timeout:	jiffies to wait for completion
+ */
+int pci_set_vpd_timeout(struct pci_dev *dev, unsigned long timeout)
+{
+	if (!dev->vpd || !dev->vpd->ops)
+		return -ENODEV;
+	return dev->vpd->ops->set_timeout(dev, timeout);
+}
+EXPORT_SYMBOL(pci_set_vpd_timeout);
+
+#define PCI_VPD_DEF_TIMEOUT msecs_to_jiffies(50)
+#define PCI_VPD_MAX_TIMEOUT msecs_to_jiffies(250)
 #define PCI_VPD_MAX_SIZE (PCI_VPD_ADDR_MASK + 1)
 
 /**
@@ -355,7 +370,7 @@ static size_t pci_vpd_size(struct pci_dev *dev, size_t old_size)
 static int pci_vpd_wait(struct pci_dev *dev)
 {
 	struct pci_vpd *vpd = dev->vpd;
-	unsigned long timeout = jiffies + msecs_to_jiffies(50);
+	unsigned long timeout = jiffies + vpd->timeout;
 	unsigned long max_sleep = 16;
 	u16 status;
 	int ret;
@@ -524,10 +539,22 @@ static int pci_vpd_set_size(struct pci_dev *dev, size_t len)
 	return 0;
 }
 
+static int pci_vpd_set_timeout(struct pci_dev *dev, unsigned long timeout)
+{
+	struct pci_vpd *vpd = dev->vpd;
+
+	if (timeout < PCI_VPD_DEF_TIMEOUT || timeout > PCI_VPD_MAX_TIMEOUT)
+		return -EINVAL;
+
+	vpd->timeout = timeout;
+	return 0;
+}
+
 static const struct pci_vpd_ops pci_vpd_ops = {
 	.read = pci_vpd_read,
 	.write = pci_vpd_write,
 	.set_size = pci_vpd_set_size,
+	.set_timeout = pci_vpd_set_timeout,
 };
 
 static ssize_t pci_vpd_f0_read(struct pci_dev *dev, loff_t pos, size_t count,
@@ -574,10 +601,25 @@ static int pci_vpd_f0_set_size(struct pci_dev *dev, size_t len)
 	return ret;
 }
 
+static int pci_vpd_f0_set_timeout(struct pci_dev *dev, unsigned long timeout)
+{
+	struct pci_dev *tdev = pci_get_slot(dev->bus,
+					    PCI_DEVFN(PCI_SLOT(dev->devfn), 0));
+	int ret;
+
+	if (!tdev)
+		return -ENODEV;
+
+	ret = pci_set_vpd_timeout(tdev, timeout);
+	pci_dev_put(tdev);
+	return ret;
+}
+
 static const struct pci_vpd_ops pci_vpd_f0_ops = {
 	.read = pci_vpd_f0_read,
 	.write = pci_vpd_f0_write,
 	.set_size = pci_vpd_f0_set_size,
+	.set_timeout = pci_vpd_f0_set_timeout,
 };
 
 int pci_vpd_init(struct pci_dev *dev)
@@ -594,6 +636,7 @@ int pci_vpd_init(struct pci_dev *dev)
 		return -ENOMEM;
 
 	vpd->len = PCI_VPD_MAX_SIZE;
+	vpd->timeout = PCI_VPD_DEF_TIMEOUT;
 	if (dev->dev_flags & PCI_DEV_FLAGS_VPD_REF_F0)
 		vpd->ops = &pci_vpd_f0_ops;
 	else
