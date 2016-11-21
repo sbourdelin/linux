@@ -1673,6 +1673,10 @@ bool cxl_slot_is_supported(struct pci_dev *dev, int flags)
 }
 EXPORT_SYMBOL_GPL(cxl_slot_is_supported);
 
+static bool cxl_pci_is_slow_vpd_device(struct pci_dev *dev)
+{
+	return dev->device == 0x0601;
+}
 
 static int cxl_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
@@ -1689,6 +1693,9 @@ static int cxl_probe(struct pci_dev *dev, const struct pci_device_id *id)
 		dev_info(&dev->dev, "Ignoring card on incompatible PCI slot\n");
 		return -ENODEV;
 	}
+
+	if (cxl_pci_is_slow_vpd_device(dev))
+		pci_set_vpd_timeout(dev, msecs_to_jiffies(125));
 
 	if (cxl_verbose)
 		dump_cxl_config_space(dev);
