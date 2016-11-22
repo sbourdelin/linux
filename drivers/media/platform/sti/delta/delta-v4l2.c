@@ -17,6 +17,7 @@
 #include <media/videobuf2-dma-contig.h>
 
 #include "delta.h"
+#include "delta-ipc.h"
 
 #define DELTA_NAME	"st-delta"
 
@@ -1687,6 +1688,14 @@ static int delta_probe(struct platform_device *pdev)
 	pm_runtime_set_suspended(dev);
 	pm_runtime_enable(dev);
 
+	/* init firmware ipc channel */
+	ret = delta_ipc_init(delta);
+	if (ret) {
+		dev_err(delta->dev, "%s failed to initialize firmware ipc channel\n",
+			DELTA_PREFIX);
+		goto err;
+	}
+
 	/* register all available decoders */
 	register_decoders(delta);
 
@@ -1730,6 +1739,8 @@ err:
 static int delta_remove(struct platform_device *pdev)
 {
 	struct delta_dev *delta = platform_get_drvdata(pdev);
+
+	delta_ipc_exit(delta);
 
 	delta_unregister_device(delta);
 
