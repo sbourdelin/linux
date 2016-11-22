@@ -1,20 +1,26 @@
 PRELIMINARY DRAFT, MAY CONTAIN MISTAKES!
 28 Jun 2011
+MODIFIED FOR CONNECT AND DISCONNECT OPERARION.
+07 March 2016
 
-The USB/IP protocol follows a server/client architecture. The server exports the
-USB devices and the clients imports them. The device driver for the exported
-USB device runs on the client machine.
+The USB/IP protocol follows a server/client architecture between two computers
+one has USB devices and the other runs application using the devices. There are
+two ways for initiation.
 
-The client may ask for the list of the exported USB devices. To get the list the
-client opens a TCP/IP connection towards the server, and sends an OP_REQ_DEVLIST
-packet on top of the TCP/IP connection (so the actual OP_REQ_DEVLIST may be sent
-in one or more pieces at the low level transport layer). The server sends back
-the OP_REP_DEVLIST packet which lists the exported USB devices. Finally the
-TCP/IP connection is closed.
+The first way is to import devices from application-side. In this way, the
+server runs in device-side and the client runs in application-side. In device
+side user makes devices importable with 'bind' operation.
 
+The client may ask for the list of the importable USB devices. To get the list
+the client opens a TCP/IP connection towards the server, and sends an
+OP_REQ_DEVLIST packet on top of the TCP/IP connection (so the actual
+OP_REQ_DEVLIST may be sent in one or more pieces at the low level transport
+layer). The server sends back the OP_REP_DEVLIST packet which lists the
+importable USB devices. Finally the TCP/IP connection is closed.
+
+   application-side                                    device-side
  virtual host controller                                 usb host
-      "client"                                           "server"
-  (imports USB devices)                             (exports USB devices)
+      "client"         (lists importable devices)        "server"
           |                                                 |
           |                  OP_REQ_DEVLIST                 |
           | ----------------------------------------------> |
@@ -23,18 +29,13 @@ TCP/IP connection is closed.
           | <---------------------------------------------- |
           |                                                 |
 
-Once the client knows the list of exported USB devices it may decide to use one
-of them. First the client opens a TCP/IP connection towards the server and
-sends an OP_REQ_IMPORT packet. The server replies with OP_REP_IMPORT. If the
-import was successful the TCP/IP connection remains open and will be used
-to transfer the URB traffic between the client and the server. The client may
-send two types of packets: the USBIP_CMD_SUBMIT to submit an URB, and
-USBIP_CMD_UNLINK to unlink a previously submitted URB. The answers of the
-server may be USBIP_RET_SUBMIT and USBIP_RET_UNLINK respectively.
+Once the client knows the list of importable USB devices it may decide to use
+one of them. First the client opens a TCP/IP connection towards the server and
+sends an OP_REQ_IMPORT packet. The server replies with OP_REP_IMPORT.
 
+   application-side                                    device-side
  virtual host controller                                 usb host
-      "client"                                           "server"
-  (imports USB devices)                             (exports USB devices)
+      "client"           (imports a USB device)          "server"
           |                                                 |
           |                  OP_REQ_IMPORT                  |
           | ----------------------------------------------> |
@@ -42,6 +43,32 @@ server may be USBIP_RET_SUBMIT and USBIP_RET_UNLINK respectively.
           |                  OP_REP_IMPORT                  |
           | <---------------------------------------------- |
           |                                                 |
+
+The second way is to export devices from device-side. In this way, the server
+runs in application-side and the client runs in device-side. The client binds a
+device to export, opens a TCP/IP connection towards the server and sends an
+OP_REQ_EXPORT packet. The server replies with OP_REP_EXPORT.
+
+   application-side                                    device-side
+ virtual host controller                                 usb host
+       "server"          (exports a USB device)          "client"
+          |                                                 |
+          |                  OP_REQ_EXPORT                  |
+          | <---------------------------------------------- |
+          |                                                 |
+          |                  OP_REP_EXPORT                  |
+          | ----------------------------------------------> |
+          |                                                 |
+
+If the import or export was successful the TCP/IP connection remains open and
+will be used to transfer the URB traffic between the client and the server. The
+client may send two types of packets: the USBIP_CMD_SUBMIT to submit an URB, and
+USBIP_CMD_UNLINK to unlink a previously submitted URB. The answers of the server
+may be USBIP_RET_SUBMIT and USBIP_RET_UNLINK respectively.
+
+   application-side                                    device-side
+ virtual host controller                                 usb host
+   "client/server"                                   "server/client"
           |                                                 |
           |            USBIP_CMD_SUBMIT(seqnum = n)         |
           | ----------------------------------------------> |
@@ -84,11 +111,27 @@ server may be USBIP_RET_SUBMIT and USBIP_RET_UNLINK respectively.
           | <---------------------------------------------- |
           |                                                 |
 
+For the second way, it is able to unexport devices from device-side. First the
+client opens a TCP/IP connection towards the server and sends an OP_REQ_UNEXPORT
+packet. Then the server detaches exported device then the connection will be
+closed. The server replies the result with OP_REP_UNEXPORT.
+
+   application-side                                    device-side
+ virtual host controller                                 usb host
+       "server"         (un-exports a USB device)        "client"
+          |                                                 |
+          |                  OP_REQ_UNEXPORT                |
+          | <---------------------------------------------- |
+          |                                                 |
+          |                  OP_REP_UNEXPORT                |
+          | ----------------------------------------------> |
+          |                                                 |
+
 The fields are in network (big endian) byte order meaning that the most significant
 byte (MSB) is stored at the lowest address.
 
 
-OP_REQ_DEVLIST: Retrieve the list of exported USB devices.
+OP_REQ_DEVLIST: Retrieve the list of importable USB devices.
 
  Offset    | Length | Value      | Description
 -----------+--------+------------+---------------------------------------------------
@@ -182,7 +225,6 @@ OP_REQ_IMPORT: Request to import (attach) a remote USB device.
            |        |            |   from the message field OP_REP_DEVLIST.busid.
            |        |            |   A string closed with zero, the unused bytes
            |        |            |   shall be filled with zeros.
------------+--------+------------+---------------------------------------------------
 
 OP_REP_IMPORT: Reply to import (attach) a remote USB device.
 
@@ -232,6 +274,122 @@ OP_REP_IMPORT: Reply to import (attach) a remote USB device.
  0x13D     | 1      |            | bNumConfigurations
 -----------+--------+------------+---------------------------------------------------
  0x13E     | 1      |            | bNumInterfaces
+
+OP_REQ_EXPORT: Request to export (connect) a local USB device to remote.
+
+ Offset    | Length | Value      | Description
+-----------+--------+------------+---------------------------------------------------
+ 0         | 2      | 0x0100     | Binary-coded decimal USBIP version number: v1.0.0
+-----------+--------+------------+---------------------------------------------------
+ 2         | 2      | 0x8006     | Command code: export a remote USB device.
+-----------+--------+------------+---------------------------------------------------
+ 4         | 4      | 0x00000000 | Status: unused, shall be set to 0
+-----------+--------+------------+---------------------------------------------------
+ 8         |        |            | From now on comes the details of the exporting
+           |        |            |   device.
+-----------+--------+------------+---------------------------------------------------
+           | 256    |            | path: Path of the device on the host exporting the
+           |        |            |   USB device, string closed with zero byte, e.g.
+           |        |            |   "/sys/devices/pci0000:00/0000:00:1d.1/usb3/3-2"
+           |        |            |   The unused bytes shall be filled with zero
+           |        |            |   bytes.
+-----------+--------+------------+---------------------------------------------------
+ 0x108     | 32     |            | busid: Bus ID of the exported device, string
+           |        |            |   closed with zero byte, e.g. "3-2". The unused
+           |        |            |   bytes shall be filled with zero bytes.
+-----------+--------+------------+---------------------------------------------------
+ 0x128     | 4      |            | busnum
+-----------+--------+------------+---------------------------------------------------
+ 0x12C     | 4      |            | devnum
+-----------+--------+------------+---------------------------------------------------
+ 0x130     | 4      |            | speed
+-----------+--------+------------+---------------------------------------------------
+ 0x134     | 2      |            | idVendor
+-----------+--------+------------+---------------------------------------------------
+ 0x136     | 2      |            | idProduct
+-----------+--------+------------+---------------------------------------------------
+ 0x138     | 2      |            | bcdDevice
+-----------+--------+------------+---------------------------------------------------
+ 0x139     | 1      |            | bDeviceClass
+-----------+--------+------------+---------------------------------------------------
+ 0x13A     | 1      |            | bDeviceSubClass
+-----------+--------+------------+---------------------------------------------------
+ 0x13B     | 1      |            | bDeviceProtocol
+-----------+--------+------------+---------------------------------------------------
+ 0x13C     | 1      |            | bConfigurationValue
+-----------+--------+------------+---------------------------------------------------
+ 0x13D     | 1      |            | bNumConfigurations
+-----------+--------+------------+---------------------------------------------------
+ 0x13E     | 1      |            | bNumInterfaces
+
+OP_REP_EXPORT: Reply to export (connect) a local USB device to remote.
+
+ Offset    | Length | Value      | Description
+-----------+--------+------------+---------------------------------------------------
+ 0         | 2      | 0x0100     | Binary-coded decimal USBIP version number: v1.0.0
+-----------+--------+------------+---------------------------------------------------
+ 2         | 2      | 0x0006     | Reply code: Reply to import.
+-----------+--------+------------+---------------------------------------------------
+ 4         | 4      | 0x00000000 | Status: 0 for OK
+           |        |            |         1 for error
+
+OP_REQ_UNEXPORT: Request to un-export (disconnect) a local USB device from remote.
+
+ Offset    | Length | Value      | Description
+-----------+--------+------------+---------------------------------------------------
+ 0         | 2      | 0x0100     | Binary-coded decimal USBIP version number: v1.0.0
+-----------+--------+------------+---------------------------------------------------
+ 2         | 2      | 0x8007     | Command code: export a remote USB device.
+-----------+--------+------------+---------------------------------------------------
+ 4         | 4      | 0x00000000 | Status: unused, shall be set to 0
+-----------+--------+------------+---------------------------------------------------
+ 8         |        |            | From now on comes the details of the un-exporting
+           |        |            |   device.
+-----------+--------+------------+---------------------------------------------------
+           | 256    |            | path: Path of the device on the host exporting the
+           |        |            |   USB device, string closed with zero byte, e.g.
+           |        |            |   "/sys/devices/pci0000:00/0000:00:1d.1/usb3/3-2"
+           |        |            |   The unused bytes shall be filled with zero
+           |        |            |   bytes.
+-----------+--------+------------+---------------------------------------------------
+ 0x108     | 32     |            | busid: Bus ID of the exported device, string
+           |        |            |   closed with zero byte, e.g. "3-2". The unused
+           |        |            |   bytes shall be filled with zero bytes.
+-----------+--------+------------+---------------------------------------------------
+ 0x128     | 4      |            | busnum
+-----------+--------+------------+---------------------------------------------------
+ 0x12C     | 4      |            | devnum
+-----------+--------+------------+---------------------------------------------------
+ 0x130     | 4      |            | speed
+-----------+--------+------------+---------------------------------------------------
+ 0x134     | 2      |            | idVendor
+-----------+--------+------------+---------------------------------------------------
+ 0x136     | 2      |            | idProduct
+-----------+--------+------------+---------------------------------------------------
+ 0x138     | 2      |            | bcdDevice
+-----------+--------+------------+---------------------------------------------------
+ 0x139     | 1      |            | bDeviceClass
+-----------+--------+------------+---------------------------------------------------
+ 0x13A     | 1      |            | bDeviceSubClass
+-----------+--------+------------+---------------------------------------------------
+ 0x13B     | 1      |            | bDeviceProtocol
+-----------+--------+------------+---------------------------------------------------
+ 0x13C     | 1      |            | bConfigurationValue
+-----------+--------+------------+---------------------------------------------------
+ 0x13D     | 1      |            | bNumConfigurations
+-----------+--------+------------+---------------------------------------------------
+ 0x13E     | 1      |            | bNumInterfaces
+
+OP_REP_UNEXPORT: Reply to un-export (disconnect) a local USB device from remote.
+
+ Offset    | Length | Value      | Description
+-----------+--------+------------+---------------------------------------------------
+ 0         | 2      | 0x0100     | Binary-coded decimal USBIP version number: v1.0.0
+-----------+--------+------------+---------------------------------------------------
+ 2         | 2      | 0x0007     | Reply code: Reply to import.
+-----------+--------+------------+---------------------------------------------------
+ 4         | 4      | 0x00000000 | Status: 0 for OK
+           |        |            |         1 for error
 
 USBIP_CMD_SUBMIT: Submit an URB
 
