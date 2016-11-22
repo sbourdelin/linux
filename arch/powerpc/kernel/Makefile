@@ -112,6 +112,8 @@ obj64-$(CONFIG_AUDIT)		+= compat_audit.o
 
 obj-$(CONFIG_PPC_IO_WORKAROUNDS)	+= io-workarounds.o
 
+obj32-$(CONFIG_FUNCTION_TRACER)	+= ftrace_32.o
+obj64-$(CONFIG_FUNCTION_TRACER)	+= ftrace_64.o
 obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o
 obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o
 obj-$(CONFIG_FTRACE_SYSCALLS)	+= ftrace.o
