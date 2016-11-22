@@ -39,7 +39,7 @@ void usbip_unbind_usage(void)
 	printf("usage: %s", usbip_unbind_usage_string);
 }
 
-static int unbind_device(char *busid)
+int usbip_unbind_device(char *busid)
 {
 	char bus_type[] = "usb";
 	int rc, ret = -1;
@@ -127,7 +127,7 @@ int usbip_unbind(int argc, char *argv[])
 
 		switch (opt) {
 		case 'b':
-			ret = unbind_device(optarg);
+			ret = usbip_unbind_device(optarg);
 			goto out;
 		default:
 			goto err_out;

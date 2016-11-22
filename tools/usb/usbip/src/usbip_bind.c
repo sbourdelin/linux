@@ -139,7 +139,7 @@ out:
 	return status;
 }
 
-static int bind_device(char *busid)
+int usbip_bind_device(char *busid)
 {
 	int rc;
 	struct udev *udev;
@@ -200,7 +200,7 @@ int usbip_bind(int argc, char *argv[])
 
 		switch (opt) {
 		case 'b':
-			ret = bind_device(optarg);
+			ret = usbip_bind_device(optarg);
 			goto out;
 		default:
 			goto err_out;

@@ -256,17 +256,15 @@ int usbip_export_device(struct usbip_exported_device *edev, int sockfd)
 }
 
 struct usbip_exported_device *usbip_generic_get_device(
-		struct usbip_host_driver *hdriver, int num)
+		struct usbip_host_driver *hdriver, char *busid)
 {
 	struct list_head *i;
 	struct usbip_exported_device *edev;
-	int cnt = 0;
 
 	list_for_each(i, &hdriver->edev_list) {
 		edev = list_entry(i, struct usbip_exported_device, node);
-		if (num == cnt)
+		if (!strncmp(busid, edev->udev.busid, SYSFS_BUS_ID_SIZE))
 			return edev;
-		cnt++;
 	}
 
 	return NULL;
