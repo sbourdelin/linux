@@ -865,7 +865,7 @@ static int iproc_pcie_ib_write(struct iproc_pcie *pcie, int region_idx,
 	 * Now program the IMAP registers.  Each IARR region may have one or
 	 * more IMAP windows.
 	 */
-	size /= nr_windows;
+	size >>= ilog2(nr_windows);
 	for (window_idx = 0; window_idx < nr_windows; window_idx++) {
 		val = readl(pcie->base + imap_offset);
 		val |= lower_32_bits(axi_addr) | IMAP_VALID;
