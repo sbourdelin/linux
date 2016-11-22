@@ -48,8 +48,8 @@
 #define LSCR1_GRAY1(x)            (((x) & 0xf))
 
 #define DMACR_BURST	(1 << 31)
-#define DMACR_HM(x)	(((x) & 0xf) << 16)
-#define DMACR_TM(x)	((x) & 0xf)
+#define DMACR_HM(x)	(((x) & 0x7f) << 16)
+#define DMACR_TM(x)	((x) & 0x7f)
 
 struct imx_fb_videomode {
 	struct fb_videomode mode;
