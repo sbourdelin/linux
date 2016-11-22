@@ -82,3 +82,10 @@ void _memset_io(volatile void __iomem *dst, int c, size_t count)
 	}
 }
 EXPORT_SYMBOL(_memset_io);
+
+/* can't export them from memcpy.S/memset.S because of hidden declaration */
+void mmioset(void __iomem *addr, unsigned int c, size_t n);
+EXPORT_SYMBOL(mmioset);
+
+void mmiocpy(void *dest, const void __iomem *src, size_t n);
+EXPORT_SYMBOL(mmiocpy);
