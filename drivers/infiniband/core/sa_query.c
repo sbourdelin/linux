@@ -958,7 +958,7 @@ static void update_sm_ah(struct work_struct *work)
 		pr_err("Couldn't find index for default PKey\n");
 
 	memset(&ah_attr, 0, sizeof ah_attr);
-	ah_attr.dlid     = port_attr.sm_lid;
+	ah_attr.dlid     = (u16)port_attr.sm_lid;
 	ah_attr.sl       = port_attr.sm_sl;
 	ah_attr.port_num = port->port_num;
 	if (port_attr.grh_required) {
