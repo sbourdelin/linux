@@ -360,7 +360,7 @@ struct ipoib_dev_priv {
 	u32		  qkey;
 
 	union ib_gid local_gid;
-	u16	     local_lid;
+	u32	     local_lid;
 
 	unsigned int admin_mtu;
 	unsigned int mcast_mtu;
@@ -429,6 +429,8 @@ struct ipoib_path {
 	struct rb_node	      rb_node;
 	struct list_head      list;
 	int  		      valid;
+	u32		      dlid;
+	u32		      slid;
 };
 
 struct ipoib_neigh {

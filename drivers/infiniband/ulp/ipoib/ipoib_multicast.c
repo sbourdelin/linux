@@ -581,7 +581,7 @@ void ipoib_mcast_join_task(struct work_struct *work)
 			  port_attr.state);
 		return;
 	}
-	priv->local_lid = (u16)port_attr.lid;
+	priv->local_lid = port_attr.lid;
 	netif_addr_lock_bh(dev);
 
 	if (!test_bit(IPOIB_FLAG_DEV_ADDR_SET, &priv->flags)) {

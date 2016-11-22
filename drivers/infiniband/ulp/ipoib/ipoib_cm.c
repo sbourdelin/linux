@@ -38,6 +38,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/moduleparam.h>
+#include <rdma/opa_addr.h>
 
 #include "ipoib.h"
 
@@ -1356,6 +1357,16 @@ static void ipoib_cm_tx_start(struct work_struct *work)
 			goto free_neigh;
 		}
 		memcpy(&pathrec, &p->path->pathrec, sizeof pathrec);
+
+		if (rdma_cap_opa_ah(priv->ca, priv->port)) {
+			if (p->path->dlid >= be16_to_cpu(IB_MULTICAST_LID_BASE))
+				pathrec.dgid.global.interface_id =
+					OPA_MAKE_ID(p->path->dlid);
+
+			if (p->path->slid >= be16_to_cpu(IB_MULTICAST_LID_BASE))
+				pathrec.sgid.global.interface_id =
+					OPA_MAKE_ID(p->path->slid);
+		}
 
 		spin_unlock_irqrestore(&priv->lock, flags);
 		netif_tx_unlock_bh(dev);

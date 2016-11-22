@@ -52,6 +52,7 @@
 #include <linux/inetdevice.h>
 #include <rdma/ib_cache.h>
 #include <linux/pci.h>
+#include <rdma/opa_addr.h>
 
 #define DRV_VERSION "1.0.0"
 
@@ -766,6 +767,31 @@ static void path_rec_completion(int status,
 	spin_lock_irqsave(&priv->lock, flags);
 
 	if (!IS_ERR_OR_NULL(ah)) {
+		/*
+		 * Extended LIDs might get programmed into GIDs in the
+		 * case of OPA devices. Since we have created the ah
+		 * above which would have made use of the lids, now is
+		 * a good time to change them back to regular GIDs after
+		 * saving the extended LIDs.
+		 */
+		if (rdma_cap_opa_ah(priv->ca, priv->port) &&
+		    ib_is_opa_gid(&pathrec->sgid)) {
+			path->slid = opa_get_lid_from_gid(&pathrec->sgid);
+			pathrec->sgid = path->pathrec.sgid;
+		} else {
+			path->slid = be16_to_cpu(pathrec->slid);
+		}
+
+		if (rdma_cap_opa_ah(priv->ca, priv->port) &&
+		    ib_is_opa_gid(&pathrec->dgid)) {
+			path->dlid = opa_get_lid_from_gid(&pathrec->dgid);
+			pathrec->dgid = path->pathrec.dgid;
+		} else {
+			path->dlid = be16_to_cpu(pathrec->dlid);
+		}
+		ipoib_dbg(priv, "PathRec SGID %pI6 DGID %pI6\n",
+			  pathrec->sgid.raw, pathrec->dgid.raw);
+
 		path->pathrec = *pathrec;
 
 		old_ah   = path->ah;
