@@ -63,7 +63,7 @@ static struct mlx5e_ethtool_table *get_flow_table(struct mlx5e_priv *priv,
 	int table_size;
 	int prio;
 
-	switch (fs->flow_type & ~(FLOW_EXT | FLOW_MAC_EXT)) {
+	switch (ethtool_get_flow_spec_type(fs->flow_type)) {
 	case TCP_V4_FLOW:
 	case UDP_V4_FLOW:
 		max_tuples = ETHTOOL_NUM_L3_L4_FTS;
@@ -147,7 +147,7 @@ static int set_flow_attrs(u32 *match_c, u32 *match_v,
 					     outer_headers);
 	void *outer_headers_v = MLX5_ADDR_OF(fte_match_param, match_v,
 					     outer_headers);
-	u32 flow_type = fs->flow_type & ~(FLOW_EXT | FLOW_MAC_EXT);
+	u32 flow_type = ethtool_get_flow_spec_type(fs->flow_type);
 	struct ethtool_tcpip4_spec *l4_mask;
 	struct ethtool_tcpip4_spec *l4_val;
 	struct ethtool_usrip4_spec *l3_mask;
@@ -393,7 +393,7 @@ static int validate_flow(struct mlx5e_priv *priv,
 	    fs->ring_cookie != RX_CLS_FLOW_DISC)
 		return -EINVAL;
 
-	switch (fs->flow_type & ~(FLOW_EXT | FLOW_MAC_EXT)) {
+	switch (ethtool_get_flow_spec_type(fs->flow_type)) {
 	case ETHER_FLOW:
 		eth_mask = &fs->m_u.ether_spec;
 		if (!is_zero_ether_addr(eth_mask->h_dest))

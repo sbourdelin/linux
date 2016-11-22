@@ -1270,7 +1270,7 @@ static int mlx4_en_validate_flow(struct net_device *dev,
 			return -EINVAL;
 	}
 
-	switch (cmd->fs.flow_type & ~(FLOW_EXT | FLOW_MAC_EXT)) {
+	switch (ethtool_get_flow_spec_type(cmd->fs.flow_type)) {
 	case TCP_V4_FLOW:
 	case UDP_V4_FLOW:
 		if (cmd->fs.m_u.tcp_ip4_spec.tos)
@@ -1493,7 +1493,7 @@ static int mlx4_en_ethtool_to_net_trans_rule(struct net_device *dev,
 	if (err)
 		return err;
 
-	switch (cmd->fs.flow_type & ~(FLOW_EXT | FLOW_MAC_EXT)) {
+	switch (ethtool_get_flow_spec_type(cmd->fs.flow_type)) {
 	case ETHER_FLOW:
 		spec_l2 = kzalloc(sizeof(*spec_l2), GFP_KERNEL);
 		if (!spec_l2)
