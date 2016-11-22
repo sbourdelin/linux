@@ -353,6 +353,22 @@ ALT_FTR_SECTION_END_NESTED_IFSET(CPU_FTR_ARCH_207S, 66);		\
 	ld	r3,ORIG_GPR3(r1);	/* Restore original r3 */	\
 20:	nop;
 
+#define CHECK_SRESET_INTERRUPT                                          \
+BEGIN_FTR_SECTION_NESTED(67);						\
+	mfspr	r0,SPRN_SRR1;						\
+	rlwinm	r0,r0,45-31,0xf; /* Extract wake reason field (P8,9) */ \
+	cmpwi	r0,0x4;		  /* System Reset ? 	*/		\
+	bne	21f;							\
+	ld	r1,PACAR1(r13);						\
+	ld	r9,_CCR(r1);						\
+	ld	r11,_NIP(r1);						\
+	mfspr	r12, SPRN_SRR1;						\
+	b	system_reset_common ;					\
+	b	.; 		/* We shouldn't return here */		\
+FTR_SECTION_ELSE_NESTED(67);						\
+	nop		   ;						\
+ALT_FTR_SECTION_END_NESTED_IFSET(CPU_FTR_ARCH_207S, 67); \
+21:	nop;
 
 /*
  * r3 - requested stop state
@@ -644,6 +660,7 @@ _GLOBAL(pnv_wakeup_loss)
 	ld	r1,PACAR1(r13)
 BEGIN_FTR_SECTION
 	CHECK_HMI_INTERRUPT
+	CHECK_SRESET_INTERRUPT
 END_FTR_SECTION_IFSET(CPU_FTR_HVMODE)
 	REST_NVGPRS(r1)
 	REST_GPR(2, r1)
@@ -666,6 +683,7 @@ _GLOBAL(pnv_wakeup_noloss)
 	bne	pnv_wakeup_loss
 BEGIN_FTR_SECTION
 	CHECK_HMI_INTERRUPT
+	CHECK_SRESET_INTERRUPT
 END_FTR_SECTION_IFSET(CPU_FTR_HVMODE)
 	ld	r1,PACAR1(r13)
 	ld	r6,_CCR(r1)
