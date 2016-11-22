@@ -2381,6 +2381,8 @@ enum nl80211_attrs {
 
 	NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED,
 
+	NL80211_ATTR_MIN_SCAN_PLAN_INTERVAL,
+
 	/* add attributes here, update the policy in nl80211.c */
 
 	__NL80211_ATTR_AFTER_LAST,

@@ -1474,6 +1474,8 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 				rdev->wiphy.max_sched_scan_plans) ||
 		    nla_put_u32(msg, NL80211_ATTR_MAX_SCAN_PLAN_INTERVAL,
 				rdev->wiphy.max_sched_scan_plan_interval) ||
+		    nla_put_u32(msg, NL80211_ATTR_MIN_SCAN_PLAN_INTERVAL,
+				rdev->wiphy.min_sched_scan_plan_interval) ||
 		    nla_put_u32(msg, NL80211_ATTR_MAX_SCAN_PLAN_ITERATIONS,
 				rdev->wiphy.max_sched_scan_plan_iterations))
 			goto nla_put_failure;
@@ -6774,6 +6776,12 @@ nl80211_parse_sched_scan_plans(struct wiphy *wiphy, int n_plans,
 		if (!request->scan_plans[0].interval)
 			return -EINVAL;
 
+		if (wiphy->min_sched_scan_plan_interval &&
+		    request->scan_plans[0].interval <
+		    wiphy->min_sched_scan_plan_interval)
+			request->scan_plans[0].interval =
+				wiphy->min_sched_scan_plan_interval;
+
 		if (request->scan_plans[0].interval >
 		    wiphy->max_sched_scan_plan_interval)
 			request->scan_plans[0].interval =
@@ -6801,6 +6809,10 @@ nl80211_parse_sched_scan_plans(struct wiphy *wiphy, int n_plans,
 		if (!request->scan_plans[i].interval ||
 		    request->scan_plans[i].interval >
 		    wiphy->max_sched_scan_plan_interval)
+			return -EINVAL;
+		if (wiphy->min_sched_scan_plan_interval &&
+		    request->scan_plans[i].interval <
+		    wiphy->min_sched_scan_plan_interval)
 			return -EINVAL;
 
 		if (plan[NL80211_SCHED_SCAN_PLAN_ITERATIONS]) {

@@ -3427,6 +3427,8 @@ struct wiphy_iftype_ext_capab {
  *	scans
  * @max_sched_scan_plans: maximum number of scan plans (scan interval and number
  *	of iterations) for scheduled scan supported by the device.
+ * @min_sched_scan_plan_interval: minimum interval (in seconds) for a
+ *	single scan plan supported by the device.
  * @max_sched_scan_plan_interval: maximum interval (in seconds) for a
  *	single scan plan supported by the device.
  * @max_sched_scan_plan_iterations: maximum number of iterations for a single
@@ -3552,6 +3554,7 @@ struct wiphy {
 	u16 max_scan_ie_len;
 	u16 max_sched_scan_ie_len;
 	u32 max_sched_scan_plans;
+	u32 min_sched_scan_plan_interval;
 	u32 max_sched_scan_plan_interval;
 	u32 max_sched_scan_plan_iterations;
 
