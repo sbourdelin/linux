@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
+ * Copyright (C) 2015 Nobuo Iwata
+ *               2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
  * Copyright (C) 2015-2016 Samsung Electronics
  *               Igor Kotrasinski <i.kotrasinsk@samsung.com>
@@ -43,25 +44,19 @@
 #include <signal.h>
 #include <poll.h>
 
-#include "usbip_host_driver.h"
-#include "usbip_host_common.h"
-#include "usbip_device_driver.h"
 #include "usbip_common.h"
 #include "usbip_network.h"
+#include "usbipd.h"
 #include "list.h"
 
-#undef  PROGNAME
-#define PROGNAME "usbipd"
 #define MAXSOCKFD 20
 
 #define MAIN_LOOP_TIMEOUT 10
 
-#define DEFAULT_PID_FILE "/var/run/" PROGNAME ".pid"
-
 static const char usbip_version_string[] = PACKAGE_STRING;
 
 static const char usbipd_help_string[] =
-	"usage: usbipd [options]\n"
+	"usage: %s [options]\n"
 	"\n"
 	"	-4, --ipv4\n"
 	"		Bind to IPv4. Default is both.\n"
@@ -82,7 +77,7 @@ static const char usbipd_help_string[] =
 	"\n"
 	"	-PFILE, --pid FILE\n"
 	"		Write process id to FILE.\n"
-	"		If no FILE specified, use " DEFAULT_PID_FILE "\n"
+	"		If no FILE specified, use %s.\n"
 	"\n"
 	"	-tPORT, --tcp-port PORT\n"
 	"		Listen on TCP/IP port PORT.\n"
@@ -93,198 +88,9 @@ static const char usbipd_help_string[] =
 	"	-v, --version\n"
 	"		Show version.\n";
 
-static struct usbip_host_driver *driver;
-
 static void usbipd_help(void)
 {
-	printf("%s\n", usbipd_help_string);
-}
-
-static int recv_request_import(int sockfd)
-{
-	struct op_import_request req;
-	struct usbip_exported_device *edev;
-	struct usbip_usb_device pdu_udev;
-	struct list_head *i;
-	int found = 0;
-	int error = 0;
-	int rc;
-
-	memset(&req, 0, sizeof(req));
-
-	rc = usbip_net_recv(sockfd, &req, sizeof(req));
-	if (rc < 0) {
-		dbg("usbip_net_recv failed: import request");
-		return -1;
-	}
-	PACK_OP_IMPORT_REQUEST(0, &req);
-
-	list_for_each(i, &driver->edev_list) {
-		edev = list_entry(i, struct usbip_exported_device, node);
-		if (!strncmp(req.busid, edev->udev.busid, SYSFS_BUS_ID_SIZE)) {
-			info("found requested device: %s", req.busid);
-			found = 1;
-			break;
-		}
-	}
-
-	if (found) {
-		/* should set TCP_NODELAY for usbip */
-		usbip_net_set_nodelay(sockfd);
-
-		/* export device needs a TCP/IP socket descriptor */
-		rc = usbip_export_device(edev, sockfd);
-		if (rc < 0)
-			error = 1;
-	} else {
-		info("requested device not found: %s", req.busid);
-		error = 1;
-	}
-
-	rc = usbip_net_send_op_common(sockfd, OP_REP_IMPORT,
-				      (!error ? ST_OK : ST_NA));
-	if (rc < 0) {
-		dbg("usbip_net_send_op_common failed: %#0x", OP_REP_IMPORT);
-		return -1;
-	}
-
-	if (error) {
-		dbg("import request busid %s: failed", req.busid);
-		return -1;
-	}
-
-	memcpy(&pdu_udev, &edev->udev, sizeof(pdu_udev));
-	usbip_net_pack_usb_device(1, &pdu_udev);
-
-	rc = usbip_net_send(sockfd, &pdu_udev, sizeof(pdu_udev));
-	if (rc < 0) {
-		dbg("usbip_net_send failed: devinfo");
-		return -1;
-	}
-
-	dbg("import request busid %s: complete", req.busid);
-
-	return 0;
-}
-
-static int send_reply_devlist(int connfd)
-{
-	struct usbip_exported_device *edev;
-	struct usbip_usb_device pdu_udev;
-	struct usbip_usb_interface pdu_uinf;
-	struct op_devlist_reply reply;
-	struct list_head *j;
-	int rc, i;
-
-	reply.ndev = 0;
-	/* number of exported devices */
-	list_for_each(j, &driver->edev_list) {
-		reply.ndev += 1;
-	}
-	info("exportable devices: %d", reply.ndev);
-
-	rc = usbip_net_send_op_common(connfd, OP_REP_DEVLIST, ST_OK);
-	if (rc < 0) {
-		dbg("usbip_net_send_op_common failed: %#0x", OP_REP_DEVLIST);
-		return -1;
-	}
-	PACK_OP_DEVLIST_REPLY(1, &reply);
-
-	rc = usbip_net_send(connfd, &reply, sizeof(reply));
-	if (rc < 0) {
-		dbg("usbip_net_send failed: %#0x", OP_REP_DEVLIST);
-		return -1;
-	}
-
-	list_for_each(j, &driver->edev_list) {
-		edev = list_entry(j, struct usbip_exported_device, node);
-		dump_usb_device(&edev->udev);
-		memcpy(&pdu_udev, &edev->udev, sizeof(pdu_udev));
-		usbip_net_pack_usb_device(1, &pdu_udev);
-
-		rc = usbip_net_send(connfd, &pdu_udev, sizeof(pdu_udev));
-		if (rc < 0) {
-			dbg("usbip_net_send failed: pdu_udev");
-			return -1;
-		}
-
-		for (i = 0; i < edev->udev.bNumInterfaces; i++) {
-			dump_usb_interface(&edev->uinf[i]);
-			memcpy(&pdu_uinf, &edev->uinf[i], sizeof(pdu_uinf));
-			usbip_net_pack_usb_interface(1, &pdu_uinf);
-
-			rc = usbip_net_send(connfd, &pdu_uinf,
-					sizeof(pdu_uinf));
-			if (rc < 0) {
-				err("usbip_net_send failed: pdu_uinf");
-				return -1;
-			}
-		}
-	}
-
-	return 0;
-}
-
-static int recv_request_devlist(int connfd)
-{
-	struct op_devlist_request req;
-	int rc;
-
-	memset(&req, 0, sizeof(req));
-
-	rc = usbip_net_recv(connfd, &req, sizeof(req));
-	if (rc < 0) {
-		dbg("usbip_net_recv failed: devlist request");
-		return -1;
-	}
-
-	rc = send_reply_devlist(connfd);
-	if (rc < 0) {
-		dbg("send_reply_devlist failed");
-		return -1;
-	}
-
-	return 0;
-}
-
-static int recv_pdu(int connfd)
-{
-	uint16_t code = OP_UNSPEC;
-	int ret;
-
-	ret = usbip_net_recv_op_common(connfd, &code);
-	if (ret < 0) {
-		dbg("could not receive opcode: %#0x", code);
-		return -1;
-	}
-
-	ret = usbip_refresh_device_list(driver);
-	if (ret < 0) {
-		dbg("could not refresh device list: %d", ret);
-		return -1;
-	}
-
-	info("received request: %#0x(%d)", code, connfd);
-	switch (code) {
-	case OP_REQ_DEVLIST:
-		ret = recv_request_devlist(connfd);
-		break;
-	case OP_REQ_IMPORT:
-		ret = recv_request_import(connfd);
-		break;
-	case OP_REQ_DEVINFO:
-	case OP_REQ_CRYPKEY:
-	default:
-		err("received an unknown opcode: %#0x", code);
-		ret = -1;
-	}
-
-	if (ret == 0)
-		info("request %#0x(%d): complete", code, connfd);
-	else
-		info("request %#0x(%d): failed", code, connfd);
-
-	return ret;
+	printf(usbipd_help_string, usbip_progname, usbip_default_pid_file);
 }
 
 #ifdef HAVE_LIBWRAP
@@ -293,7 +99,7 @@ static int tcpd_auth(int connfd)
 	struct request_info request;
 	int rc;
 
-	request_init(&request, RQ_DAEMON, PROGNAME, RQ_FILE, connfd, 0);
+	request_init(&request, RQ_DAEMON, usbip_progname, RQ_FILE, connfd, 0);
 	fromhost(&request);
 	rc = hosts_access(&request);
 	if (rc == 0)
@@ -303,12 +109,11 @@ static int tcpd_auth(int connfd)
 }
 #endif
 
-static int do_accept(int listenfd)
+static int do_accept(int listenfd, char *host, char *port)
 {
 	int connfd;
 	struct sockaddr_storage ss;
 	socklen_t len = sizeof(ss);
-	char host[NI_MAXHOST], port[NI_MAXSERV];
 	int rc;
 
 	memset(&ss, 0, sizeof(ss));
@@ -319,8 +124,8 @@ static int do_accept(int listenfd)
 		return -1;
 	}
 
-	rc = getnameinfo((struct sockaddr *)&ss, len, host, sizeof(host),
-			 port, sizeof(port), NI_NUMERICHOST | NI_NUMERICSERV);
+	rc = getnameinfo((struct sockaddr *)&ss, len, host, NI_MAXHOST,
+			 port, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV);
 	if (rc)
 		err("getnameinfo: %s", gai_strerror(rc));
 
@@ -334,6 +139,9 @@ static int do_accept(int listenfd)
 #endif
 	info("connection from %s:%s", host, port);
 
+	/* should set TCP_NODELAY for usbip */
+	usbip_net_set_nodelay(connfd);
+
 	return connfd;
 }
 
@@ -341,14 +149,15 @@ int process_request(int listenfd)
 {
 	pid_t childpid;
 	int connfd;
+	char host[NI_MAXHOST], port[NI_MAXSERV];
 
-	connfd = do_accept(listenfd);
+	connfd = do_accept(listenfd, host, port);
 	if (connfd < 0)
 		return -1;
 	childpid = fork();
 	if (childpid == 0) {
 		close(listenfd);
-		recv_pdu(connfd);
+		usbip_recv_pdu(connfd, host, port);
 		exit(0);
 	}
 	close(connfd);
@@ -503,13 +312,13 @@ static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 	struct timespec timeout;
 	sigset_t sigmask;
 
-	if (usbip_driver_open(driver))
+	if (usbip_open_driver())
 		return -1;
 
 	if (daemonize) {
 		if (daemon(0, 0) < 0) {
 			err("daemonizing failed: %s", strerror(errno));
-			usbip_driver_close(driver);
+			usbip_close_driver();
 			return -1;
 		}
 		umask(0);
@@ -518,7 +327,7 @@ static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 	set_signal();
 	write_pid_file();
 
-	info("starting " PROGNAME " (%s)", usbip_version_string);
+	info("starting %s (%s)", usbip_progname, usbip_version_string);
 
 	/*
 	 * To suppress warnings on systems with bindv6only disabled
@@ -534,7 +343,7 @@ static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 
 	ai_head = do_getaddrinfo(NULL, family);
 	if (!ai_head) {
-		usbip_driver_close(driver);
+		usbip_close_driver();
 		return -1;
 	}
 	nsockfd = listen_all_addrinfo(ai_head, sockfdlist,
@@ -542,7 +351,7 @@ static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 	freeaddrinfo(ai_head);
 	if (nsockfd <= 0) {
 		err("failed to open a listening socket");
-		usbip_driver_close(driver);
+		usbip_close_driver();
 		return -1;
 	}
 
@@ -581,9 +390,9 @@ static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 		}
 	}
 
-	info("shutting down " PROGNAME);
+	info("shutting down %s", usbip_progname);
 	free(fds);
-	usbip_driver_close(driver);
+	usbip_close_driver();
 
 	return 0;
 }
@@ -593,7 +402,6 @@ int main(int argc, char *argv[])
 	static const struct option longopts[] = {
 		{ "ipv4",     no_argument,       NULL, '4' },
 		{ "ipv6",     no_argument,       NULL, '6' },
-		{ "daemon",   no_argument,       NULL, 'D' },
 		{ "daemon",   no_argument,       NULL, 'D' },
 		{ "debug",    no_argument,       NULL, 'd' },
 		{ "device",   no_argument,       NULL, 'e' },
@@ -623,7 +431,7 @@ int main(int argc, char *argv[])
 		err("not running as root?");
 
 	cmd = cmd_standalone_mode;
-	driver = &host_driver;
+	usbip_init_driver();
 	for (;;) {
 		opt = getopt_long(argc, argv, "46DdeP::t:hv", longopts, NULL);
 
@@ -647,7 +455,7 @@ int main(int argc, char *argv[])
 			cmd = cmd_help;
 			break;
 		case 'P':
-			pid_file = optarg ? optarg : DEFAULT_PID_FILE;
+			pid_file = optarg ? optarg : usbip_default_pid_file;
 			break;
 		case 't':
 			usbip_setup_port_number(optarg);
@@ -656,7 +464,7 @@ int main(int argc, char *argv[])
 			cmd = cmd_version;
 			break;
 		case 'e':
-			driver = &device_driver;
+			usbip_update_driver();
 			break;
 		case '?':
 			usbipd_help();
@@ -674,7 +482,7 @@ int main(int argc, char *argv[])
 		remove_pid_file();
 		break;
 	case cmd_version:
-		printf(PROGNAME " (%s)\n", usbip_version_string);
+		printf("%s (%s)\n", usbip_progname, usbip_version_string);
 		rc = 0;
 		break;
 	case cmd_help:
