@@ -54,6 +54,14 @@ static HLIST_HEAD(binder_procs);
 static HLIST_HEAD(binder_deferred_list);
 static HLIST_HEAD(binder_dead_nodes);
 
+static struct kmem_cache *binder_proc_cachep;
+static struct kmem_cache *binder_thread_cachep;
+static struct kmem_cache *binder_node_cachep;
+static struct kmem_cache *binder_ref_cachep;
+static struct kmem_cache *binder_transaction_cachep;
+static struct kmem_cache *binder_work_cachep;
+static struct kmem_cache *binder_ref_death_cachep;
+
 static struct dentry *binder_debugfs_dir_entry_root;
 static struct dentry *binder_debugfs_dir_entry_proc;
 static struct binder_node *binder_context_mgr_node;
@@ -902,7 +910,7 @@ static struct binder_node *binder_new_node(struct binder_proc *proc,
 			return NULL;
 	}
 
-	node = kzalloc(sizeof(*node), GFP_KERNEL);
+	node = kmem_cache_zalloc(binder_node_cachep, GFP_KERNEL);
 	if (node == NULL)
 		return NULL;
 	binder_stats_created(BINDER_STAT_NODE);
@@ -992,7 +1000,7 @@ static int binder_dec_node(struct binder_node *node, int strong, int internal)
 					     "dead node %d deleted\n",
 					     node->debug_id);
 			}
-			kfree(node);
+			kmem_cache_free(binder_node_cachep, node);
 			binder_stats_deleted(BINDER_STAT_NODE);
 		}
 	}
@@ -1043,7 +1051,7 @@ static struct binder_ref *binder_get_ref_for_node(struct binder_proc *proc,
 		else
 			return ref;
 	}
-	new_ref = kzalloc(sizeof(*ref), GFP_KERNEL);
+	new_ref = kmem_cache_zalloc(binder_ref_cachep, GFP_KERNEL);
 	if (new_ref == NULL)
 		return NULL;
 	binder_stats_created(BINDER_STAT_REF);
@@ -1108,10 +1116,10 @@ static void binder_delete_ref(struct binder_ref *ref)
 			     "%d delete ref %d desc %d has death notification\n",
 			      ref->proc->pid, ref->debug_id, ref->desc);
 		list_del(&ref->death->work.entry);
-		kfree(ref->death);
+		kmem_cache_free(binder_ref_death_cachep, ref->death);
 		binder_stats_deleted(BINDER_STAT_DEATH);
 	}
-	kfree(ref);
+	kmem_cache_free(binder_ref_cachep, ref);
 	binder_stats_deleted(BINDER_STAT_REF);
 }
 
@@ -1183,7 +1191,7 @@ static void binder_pop_transaction(struct binder_thread *target_thread,
 	t->need_reply = 0;
 	if (t->buffer)
 		t->buffer->transaction = NULL;
-	kfree(t);
+	kmem_cache_free(binder_transaction_cachep, t);
 	binder_stats_deleted(BINDER_STAT_TRANSACTION);
 }
 
@@ -1444,14 +1452,14 @@ static void binder_transaction(struct binder_proc *proc,
 	e->to_proc = target_proc->pid;
 
 	/* TODO: reuse incoming transaction for reply */
-	t = kzalloc(sizeof(*t), GFP_KERNEL);
+	t = kmem_cache_zalloc(binder_transaction_cachep, GFP_KERNEL);
 	if (t == NULL) {
 		return_error = BR_FAILED_REPLY;
 		goto err_alloc_t_failed;
 	}
 	binder_stats_created(BINDER_STAT_TRANSACTION);
 
-	tcomplete = kzalloc(sizeof(*tcomplete), GFP_KERNEL);
+	tcomplete = kmem_cache_zalloc(binder_work_cachep, GFP_KERNEL);
 	if (tcomplete == NULL) {
 		return_error = BR_FAILED_REPLY;
 		goto err_alloc_tcomplete_failed;
@@ -1742,10 +1750,10 @@ err_copy_data_failed:
 	t->buffer->transaction = NULL;
 	binder_free_buf(target_proc, t->buffer);
 err_binder_alloc_buf_failed:
-	kfree(tcomplete);
+	kmem_cache_free(binder_work_cachep, tcomplete);
 	binder_stats_deleted(BINDER_STAT_TRANSACTION_COMPLETE);
 err_alloc_tcomplete_failed:
-	kfree(t);
+	kmem_cache_free(binder_transaction_cachep, t);
 	binder_stats_deleted(BINDER_STAT_TRANSACTION);
 err_alloc_t_failed:
 err_bad_call_stack:
@@ -2039,7 +2047,7 @@ static int binder_thread_write(struct binder_proc *proc,
 						proc->pid, thread->pid);
 					break;
 				}
-				death = kzalloc(sizeof(*death), GFP_KERNEL);
+				death = kmem_cache_zalloc(binder_ref_death_cachep, GFP_KERNEL);
 				if (death == NULL) {
 					thread->return_error = BR_ERROR;
 					binder_debug(BINDER_DEBUG_FAILED_TRANSACTION,
@@ -2282,7 +2290,7 @@ retry:
 				     proc->pid, thread->pid);
 
 			list_del(&w->entry);
-			kfree(w);
+			kmem_cache_free(binder_work_cachep, w);
 			binder_stats_deleted(BINDER_STAT_TRANSACTION_COMPLETE);
 		} break;
 		case BINDER_WORK_NODE: {
@@ -2342,7 +2350,7 @@ retry:
 						     (u64)node->ptr,
 						     (u64)node->cookie);
 					rb_erase(&node->rb_node, &proc->nodes);
-					kfree(node);
+					kmem_cache_free(binder_node_cachep, node);
 					binder_stats_deleted(BINDER_STAT_NODE);
 				} else {
 					binder_debug(BINDER_DEBUG_INTERNAL_REFS,
@@ -2383,7 +2391,7 @@ retry:
 
 			if (w->type == BINDER_WORK_CLEAR_DEATH_NOTIFICATION) {
 				list_del(&w->entry);
-				kfree(death);
+				kmem_cache_free(binder_ref_death_cachep, death);
 				binder_stats_deleted(BINDER_STAT_DEATH);
 			} else
 				list_move(&w->entry, &proc->delivered_death);
@@ -2463,7 +2471,7 @@ retry:
 			thread->transaction_stack = t;
 		} else {
 			t->buffer->transaction = NULL;
-			kfree(t);
+			kmem_cache_free(binder_transaction_cachep, t);
 			binder_stats_deleted(BINDER_STAT_TRANSACTION);
 		}
 		break;
@@ -2508,14 +2516,14 @@ static void binder_release_work(struct list_head *list)
 					"undelivered transaction %d\n",
 					t->debug_id);
 				t->buffer->transaction = NULL;
-				kfree(t);
+				kmem_cache_free(binder_transaction_cachep, t);
 				binder_stats_deleted(BINDER_STAT_TRANSACTION);
 			}
 		} break;
 		case BINDER_WORK_TRANSACTION_COMPLETE: {
 			binder_debug(BINDER_DEBUG_DEAD_TRANSACTION,
 				"undelivered TRANSACTION_COMPLETE\n");
-			kfree(w);
+			kmem_cache_free(binder_work_cachep, w);
 			binder_stats_deleted(BINDER_STAT_TRANSACTION_COMPLETE);
 		} break;
 		case BINDER_WORK_DEAD_BINDER_AND_CLEAR:
@@ -2526,7 +2534,7 @@ static void binder_release_work(struct list_head *list)
 			binder_debug(BINDER_DEBUG_DEAD_TRANSACTION,
 				"undelivered death notification, %016llx\n",
 				(u64)death->cookie);
-			kfree(death);
+			kmem_cache_free(binder_ref_death_cachep, death);
 			binder_stats_deleted(BINDER_STAT_DEATH);
 		} break;
 		default:
@@ -2556,7 +2564,7 @@ static struct binder_thread *binder_get_thread(struct binder_proc *proc)
 			break;
 	}
 	if (*p == NULL) {
-		thread = kzalloc(sizeof(*thread), GFP_KERNEL);
+		thread = kmem_cache_zalloc(binder_thread_cachep, GFP_KERNEL);
 		if (thread == NULL)
 			return NULL;
 		binder_stats_created(BINDER_STAT_THREAD);
@@ -2609,7 +2617,7 @@ static int binder_free_thread(struct binder_proc *proc,
 	if (send_reply)
 		binder_send_failed_reply(send_reply, BR_DEAD_REPLY);
 	binder_release_work(&thread->todo);
-	kfree(thread);
+	kmem_cache_free(binder_thread_cachep, thread);
 	binder_stats_deleted(BINDER_STAT_THREAD);
 	return active_transactions;
 }
@@ -2973,7 +2981,7 @@ static int binder_open(struct inode *nodp, struct file *filp)
 	binder_debug(BINDER_DEBUG_OPEN_CLOSE, "binder_open: %d:%d\n",
 		     current->group_leader->pid, current->pid);
 
-	proc = kzalloc(sizeof(*proc), GFP_KERNEL);
+	proc = kmem_cache_zalloc(binder_proc_cachep, GFP_KERNEL);
 	if (proc == NULL)
 		return -ENOMEM;
 	get_task_struct(current);
@@ -3053,7 +3061,7 @@ static int binder_node_release(struct binder_node *node, int refs)
 	binder_release_work(&node->async_todo);
 
 	if (hlist_empty(&node->refs)) {
-		kfree(node);
+		kmem_cache_free(binder_node_cachep, node);
 		binder_stats_deleted(BINDER_STAT_NODE);
 
 		return refs;
@@ -3190,7 +3198,7 @@ static void binder_deferred_release(struct binder_proc *proc)
 		     __func__, proc->pid, threads, nodes, incoming_refs,
 		     outgoing_refs, active_transactions, buffers, page_count);
 
-	kfree(proc);
+	kmem_cache_free(binder_proc_cachep, proc);
 }
 
 static void binder_deferred_func(struct work_struct *work)
@@ -3691,9 +3699,82 @@ BINDER_DEBUG_ENTRY(stats);
 BINDER_DEBUG_ENTRY(transactions);
 BINDER_DEBUG_ENTRY(transaction_log);
 
+static void binder_destroy_cache(void)
+{
+	if (binder_proc_cachep)
+		kmem_cache_destroy(binder_proc_cachep);
+
+	if (binder_thread_cachep)
+		kmem_cache_destroy(binder_thread_cachep);
+
+	if (binder_node_cachep)
+		kmem_cache_destroy(binder_node_cachep);
+
+	if (binder_ref_cachep)
+		kmem_cache_destroy(binder_ref_cachep);
+
+	if (binder_transaction_cachep)
+		kmem_cache_destroy(binder_transaction_cachep);
+
+	if (binder_work_cachep)
+		kmem_cache_destroy(binder_work_cachep);
+
+	if (binder_ref_death_cachep)
+		kmem_cache_destroy(binder_ref_death_cachep);
+}
+
+static int __init binder_create_cache(void)
+{
+	binder_proc_cachep = kmem_cache_create("binder_proc",
+					sizeof(struct binder_proc), 0, 0, NULL);
+	if (!binder_proc_cachep)
+		goto fail;
+
+	binder_thread_cachep = kmem_cache_create("binder_thread",
+					sizeof(struct binder_thread), 0, 0, NULL);
+	if (!binder_thread_cachep)
+		goto fail;
+
+	binder_node_cachep = kmem_cache_create("binder_node",
+					sizeof(struct binder_node), 0, 0, NULL);
+	if (!binder_node_cachep)
+		goto fail;
+
+	binder_ref_cachep = kmem_cache_create("binder_ref",
+					sizeof(struct binder_ref), 0, 0, NULL);
+	if (!binder_ref_cachep)
+		goto fail;
+
+	binder_transaction_cachep = kmem_cache_create("binder_transaction",
+					sizeof(struct binder_transaction), 0, 0, NULL);
+	if (!binder_transaction_cachep)
+		goto fail;
+
+	binder_work_cachep = kmem_cache_create("binder_work",
+					sizeof(struct binder_work), 0, 0, NULL);
+	if (!binder_work_cachep)
+		goto fail;
+
+	binder_ref_death_cachep = kmem_cache_create("binder_ref_death",
+					sizeof(struct binder_ref_death), 0, 0, NULL);
+	if (!binder_ref_death_cachep)
+		goto fail;
+
+	return 0;
+
+fail:
+	binder_destroy_cache();
+	return -ENOMEM;
+}
+
 static int __init binder_init(void)
 {
 	int ret;
+
+	if (binder_create_cache()) {
+		pr_err("binder cache creation failed\n");
+		return -ENOMEM;
+	}
 
 	binder_debugfs_dir_entry_root = debugfs_create_dir("binder", NULL);
 	if (binder_debugfs_dir_entry_root)
