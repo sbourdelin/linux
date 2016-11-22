@@ -3,8 +3,11 @@
  * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
  */
 
-/* No __ro_after_init data in the .rodata section - which will always be ro */
-#define RO_AFTER_INIT_DATA
+/* empty __ro_after_init data in the .rodata section - it will always be ro */
+#define RO_AFTER_INIT_DATA						\
+	__start_data_ro_after_init = .;                                 \
+	__end_data_ro_after_init = .;
+
 
 #include <asm-generic/vmlinux.lds.h>
 #include <asm/cache.h>
