@@ -15188,7 +15188,6 @@ intel_cursor_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 	cursor->can_scale = false;
 	cursor->max_downscale = 1;
 	cursor->pipe = pipe;
-	cursor->plane = pipe;
 	cursor->id = PLANE_CURSOR;
 	cursor->frontbuffer_bit = INTEL_FRONTBUFFER_CURSOR(pipe);
 	cursor->check_plane = intel_check_cursor_plane;
