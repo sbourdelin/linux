@@ -2018,7 +2018,7 @@ send_last:
 			wc.opcode = IB_WC_RECV;
 		wc.qp = &qp->ibqp;
 		wc.src_qp = qp->remote_qpn;
-		wc.slid = (u16)qp->remote_ah_attr.dlid;
+		wc.slid = qp->remote_ah_attr.dlid;
 		wc.sl = qp->remote_ah_attr.sl;
 		/* zero fields that are N/A */
 		wc.vendor_err = 0;

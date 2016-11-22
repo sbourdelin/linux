@@ -591,7 +591,7 @@ do_write:
 	wc.byte_len = wqe->length;
 	wc.qp = &qp->ibqp;
 	wc.src_qp = qp->remote_qpn;
-	wc.slid = (u16)qp->remote_ah_attr.dlid;
+	wc.slid = qp->remote_ah_attr.dlid;
 	wc.sl = qp->remote_ah_attr.sl;
 	wc.port_num = 1;
 	/* Signal completion event if the solicited bit is set. */

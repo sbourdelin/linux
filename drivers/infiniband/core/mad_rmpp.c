@@ -316,7 +316,7 @@ create_rmpp_recv(struct ib_mad_agent_private *agent,
 	mad_hdr = &mad_recv_wc->recv_buf.mad->mad_hdr;
 	rmpp_recv->tid = mad_hdr->tid;
 	rmpp_recv->src_qp = mad_recv_wc->wc->src_qp;
-	rmpp_recv->slid = mad_recv_wc->wc->slid;
+	rmpp_recv->slid = (u16)mad_recv_wc->wc->slid;
 	rmpp_recv->mgmt_class = mad_hdr->mgmt_class;
 	rmpp_recv->class_version = mad_hdr->class_version;
 	rmpp_recv->method  = mad_hdr->method;
@@ -337,7 +337,7 @@ find_rmpp_recv(struct ib_mad_agent_private *agent,
 	list_for_each_entry(rmpp_recv, &agent->rmpp_list, list) {
 		if (rmpp_recv->tid == mad_hdr->tid &&
 		    rmpp_recv->src_qp == mad_recv_wc->wc->src_qp &&
-		    rmpp_recv->slid == mad_recv_wc->wc->slid &&
+		    rmpp_recv->slid == (u16)mad_recv_wc->wc->slid &&
 		    rmpp_recv->mgmt_class == mad_hdr->mgmt_class &&
 		    rmpp_recv->class_version == mad_hdr->class_version &&
 		    rmpp_recv->method == mad_hdr->method)
