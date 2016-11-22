@@ -87,4 +87,16 @@ extern int arch_check_node_cdm(int nid);
 static inline int arch_check_node_cdm(int nid) {return 0;}
 #endif
 
+static inline nodemask_t ram_nodemask(void)
+{
+#ifdef CONFIG_COHERENT_DEVICE
+	nodemask_t ram_nodes;
+
+	nodes_clear(ram_nodes);
+	nodes_andnot(ram_nodes, node_states[N_MEMORY], node_states[N_COHERENT_DEVICE]);
+	return ram_nodes;
+#else
+	return node_states[N_MEMORY];
+#endif
+}
 #endif /* _LINUX_NODE_H_ */
