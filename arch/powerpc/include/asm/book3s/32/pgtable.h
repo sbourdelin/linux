@@ -222,6 +222,11 @@ static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
 	ptep_set_wrprotect(mm, addr, ptep);
 }
 
+static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+					    unsigned long addr, pte_t *ptep)
+{
+	return __pte(pte_update(ptep, ~0UL, 0));
+}
 
 static inline void __ptep_set_access_flags(struct mm_struct *mm,
 					   pte_t *ptep, pte_t entry,
