@@ -414,4 +414,49 @@ static inline void virtio_cwrite64(struct virtio_device *vdev,
 		_r;							\
 	})
 
+static inline __le16 virtio_cread16_le(struct virtio_device *vdev,
+				 unsigned int offset)
+{
+	__le16 ret;
+
+	vdev->config->get(vdev, offset, &ret, sizeof(ret));
+	return ret;
+}
+
+static inline void virtio_cwrite16_le(struct virtio_device *vdev,
+				   unsigned int offset, __le16 val)
+{
+	vdev->config->set(vdev, offset, &val, sizeof(val));
+}
+
+static inline __le32 virtio_cread32_le(struct virtio_device *vdev,
+				 unsigned int offset)
+{
+	__le32 ret;
+
+	vdev->config->get(vdev, offset, &ret, sizeof(ret));
+	return ret;
+}
+
+static inline void virtio_cwrite32_le(struct virtio_device *vdev,
+				   unsigned int offset, __le32 val)
+{
+	vdev->config->set(vdev, offset, &val, sizeof(val));
+}
+
+static inline __le64 virtio_cread64_le(struct virtio_device *vdev,
+				 unsigned int offset)
+{
+	__le64 ret;
+
+	__virtio_cread_many(vdev, offset, &ret, 1, sizeof(ret));
+	return ret;
+}
+
+static inline void virtio_cwrite64_le(struct virtio_device *vdev,
+				   unsigned int offset, __le64 val)
+{
+	vdev->config->set(vdev, offset, &val, sizeof(val));
+}
+
 #endif /* _LINUX_VIRTIO_CONFIG_H */
