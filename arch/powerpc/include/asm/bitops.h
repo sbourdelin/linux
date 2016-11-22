@@ -223,11 +223,15 @@ static __inline__ unsigned long __ffs(unsigned long x)
  * the libc and compiler builtin ffs routines, therefore
  * differs in spirit from the above ffz (man ffs).
  */
+#ifdef CONFIG_PPC64
 static __inline__ int ffs(int x)
 {
 	unsigned long i = (unsigned long)x;
 	return __ilog2(i & -i) + 1;
 }
+#else
+#include <asm-generic/bitops/builtin-ffs.h>
+#endif
 
 /*
  * fls: find last (most-significant) bit set.
