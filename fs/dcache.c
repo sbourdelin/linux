@@ -316,6 +316,16 @@ static void dentry_free(struct dentry *dentry)
 		call_rcu(&dentry->d_u.d_rcu, __d_free);
 }
 
+static void dentry_iput(struct dentry *dentry, struct inode *inode)
+{
+	if (!inode->i_nlink)
+		fsnotify_inoderemove(inode);
+	if (dentry->d_op && dentry->d_op->d_iput)
+		dentry->d_op->d_iput(dentry, inode);
+	else
+		iput(inode);
+}
+
 /*
  * Release the dentry's inode, using the filesystem
  * d_iput() operation if defined.
@@ -335,12 +345,7 @@ static void dentry_unlink_inode(struct dentry * dentry)
 		raw_write_seqcount_end(&dentry->d_seq);
 	spin_unlock(&dentry->d_lock);
 	spin_unlock(&inode->i_lock);
-	if (!inode->i_nlink)
-		fsnotify_inoderemove(inode);
-	if (dentry->d_op && dentry->d_op->d_iput)
-		dentry->d_op->d_iput(dentry, inode);
-	else
-		iput(inode);
+	dentry_iput(dentry, inode);
 }
 
 /*
@@ -1816,6 +1821,24 @@ void d_instantiate(struct dentry *entry, struct inode * inode)
 }
 EXPORT_SYMBOL(d_instantiate);
 
+static void lock_two_inodes(struct inode *inode1, struct inode *inode2)
+{
+	if (inode1 > inode2)
+		swap(inode1, inode2);
+	if (inode1)
+		spin_lock(&inode1->i_lock);
+	if (inode2)
+		spin_lock(&inode2->i_lock);
+}
+
+static void unlock_two_inodes(struct inode *inode1, struct inode *inode2)
+{
+	if (inode1)
+		spin_unlock(&inode1->i_lock);
+	if (inode2)
+		spin_unlock(&inode2->i_lock);
+}
+
 /**
  * d_instantiate_no_diralias - instantiate a non-aliased dentry
  * @entry: dentry to complete
@@ -2338,6 +2361,39 @@ again:
 	fsnotify_nameremove(dentry, isdir);
 }
 EXPORT_SYMBOL(d_delete);
+
+/**
+ * d_replace - change the inode a dentry is associated with
+ * @dentry: dentry to modify
+ * @inode: inode to attach to this dentry
+ *
+ * Fill in new inode information in a dentry that may have previously been
+ * instantiated. This handles both negative and positive dentries.
+ */
+void d_replace(struct dentry *dentry, struct inode *inode)
+{
+	struct inode *old_inode = dentry->d_inode;
+	unsigned int add_flags;
+
+	lock_two_inodes(old_inode, inode);
+	spin_lock(&dentry->d_lock);
+	add_flags = d_flags_for_inode(inode);
+
+	if (old_inode)
+		hlist_del(&dentry->d_u.d_alias);
+	hlist_add_head(&dentry->d_u.d_alias, &inode->i_dentry);
+
+	raw_write_seqcount_begin(&dentry->d_seq);
+	__d_set_inode_and_type(dentry, inode, add_flags);
+	raw_write_seqcount_end(&dentry->d_seq);
+	fsnotify_update_flags(dentry);
+
+	spin_unlock(&dentry->d_lock);
+	unlock_two_inodes(old_inode, inode);
+	if (old_inode)
+		dentry_iput(dentry, old_inode);
+}
+EXPORT_SYMBOL(d_replace);
 
 static void __d_rehash(struct dentry *entry)
 {
