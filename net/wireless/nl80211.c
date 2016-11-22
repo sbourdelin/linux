@@ -6774,7 +6774,8 @@ nl80211_parse_sched_scan_plans(struct wiphy *wiphy, int n_plans,
 		if (!request->scan_plans[0].interval)
 			return -EINVAL;
 
-		if (request->scan_plans[0].interval >
+		if (wiphy->max_sched_scan_plan_interval &&
+		    request->scan_plans[0].interval >
 		    wiphy->max_sched_scan_plan_interval)
 			request->scan_plans[0].interval =
 				wiphy->max_sched_scan_plan_interval;
@@ -6798,7 +6799,10 @@ nl80211_parse_sched_scan_plans(struct wiphy *wiphy, int n_plans,
 
 		request->scan_plans[i].interval =
 			nla_get_u32(plan[NL80211_SCHED_SCAN_PLAN_INTERVAL]);
-		if (!request->scan_plans[i].interval ||
+		if (!request->scan_plans[i].interval)
+			return -EINVAL;
+
+		if (wiphy->max_sched_scan_plan_interval &&
 		    request->scan_plans[i].interval >
 		    wiphy->max_sched_scan_plan_interval)
 			return -EINVAL;
