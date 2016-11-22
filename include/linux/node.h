@@ -81,4 +81,10 @@ static inline void register_hugetlbfs_with_node(node_registration_func_t reg,
 
 #define to_node(device) container_of(device, struct node, dev)
 
+#ifdef CONFIG_COHERENT_DEVICE
+extern int arch_check_node_cdm(int nid);
+#else
+static inline int arch_check_node_cdm(int nid) {return 0;}
+#endif
+
 #endif /* _LINUX_NODE_H_ */
