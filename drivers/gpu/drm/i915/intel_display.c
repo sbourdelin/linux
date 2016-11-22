@@ -15261,14 +15261,8 @@ static int intel_crtc_init(struct drm_i915_private *dev_priv, enum pipe pipe)
 	crtc_state->base.crtc = &intel_crtc->base;
 
 	/* initialize shared scalers */
-	if (INTEL_GEN(dev_priv) >= 9) {
-		if (pipe == PIPE_C)
-			intel_crtc->num_scalers = 1;
-		else
-			intel_crtc->num_scalers = SKL_NUM_SCALERS;
-
-		skl_init_scalers(dev_priv, intel_crtc, crtc_state);
-	}
+	intel_crtc->num_scalers =  dev_priv->info.num_scalers[pipe];
+	skl_init_scalers(dev_priv, intel_crtc, crtc_state);
 
 	primary = intel_primary_plane_create(dev_priv, pipe);
 	if (IS_ERR(primary)) {
