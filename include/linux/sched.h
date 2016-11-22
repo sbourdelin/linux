@@ -1057,6 +1057,10 @@ static inline int cpu_numa_flags(void)
 }
 #endif
 
+int arch_asym_cpu_priority(int cpu);
+int arch_asym_max_cpu_and(const struct cpumask *mask1,
+			  const struct cpumask *mask2);
+
 struct sched_domain_attr {
 	int relax_domain_level;
 };
