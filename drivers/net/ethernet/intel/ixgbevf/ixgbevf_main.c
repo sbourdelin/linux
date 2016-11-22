@@ -3840,6 +3840,7 @@ static int ixgbevf_resume(struct pci_dev *pdev)
 	struct ixgbevf_adapter *adapter = netdev_priv(netdev);
 	u32 err;
 
+	adapter->hw.hw_addr = adapter->io_addr;
 	pci_restore_state(pdev);
 	/* pci_restore_state clears dev->state_saved so call
 	 * pci_save_state to restore it.
@@ -4283,6 +4284,7 @@ static pci_ers_result_t ixgbevf_io_slot_reset(struct pci_dev *pdev)
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct ixgbevf_adapter *adapter = netdev_priv(netdev);
 
+	adapter->hw.hw_addr = adapter->io_addr;
 	if (pci_enable_device_mem(pdev)) {
 		dev_err(&pdev->dev,
 			"Cannot re-enable PCI device after reset.\n");
