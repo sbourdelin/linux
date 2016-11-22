@@ -328,6 +328,40 @@ out:
 	return result;
 }
 
+/* retuns true if the incoming gid is assigned to the IPoIB
+ * netdev interface
+ *
+ * OPA devices may have the incoming GID in the OPA GID
+ * format which might not necessarily be assigned to the
+ * netdev interface. This necessitates searching the GID
+ * table to match this OPA GID.
+ */
+static bool ipoib_check_gid(struct ipoib_dev_priv *priv,
+			    const union ib_gid *gid)
+{
+	bool is_local_gid;
+	struct ib_port_attr attr;
+	union ib_gid port_gid;
+	int i;
+
+	if (!gid)
+		return true;
+
+	is_local_gid = !memcmp(gid, &priv->local_gid, sizeof(*gid));
+
+	if (!rdma_cap_opa_ah(priv->ca, priv->port) || is_local_gid)
+		return is_local_gid;
+
+	if (ib_query_port(priv->ca, priv->port, &attr))
+		return false;
+	for (i = 1; i < attr.gid_tbl_len; i++) {
+		if (ib_query_gid(priv->ca, priv->port, i, &port_gid, NULL))
+			return false;
+		if (!memcmp(gid, &port_gid, sizeof(*gid)))
+			return true;
+	}
+	return false;
+}
 /* returns the number of IPoIB netdevs on top a given ipoib device matching a
  * pkey_index and address, if one exists.
  *
@@ -344,8 +378,7 @@ static int ipoib_match_gid_pkey_addr(struct ipoib_dev_priv *priv,
 	struct net_device *net_dev = NULL;
 	int matches = 0;
 
-	if (priv->pkey_index == pkey_index &&
-	    (!gid || !memcmp(gid, &priv->local_gid, sizeof(*gid)))) {
+	if (priv->pkey_index == pkey_index && ipoib_check_gid(priv, gid)) {
 		if (!addr) {
 			net_dev = ipoib_get_master_net_dev(priv->dev);
 		} else {
