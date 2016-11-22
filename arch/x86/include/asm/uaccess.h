@@ -88,8 +88,11 @@ static inline bool __chk_range_not_ok(unsigned long addr, unsigned long size, un
  * checks that the pointer is in the user space range - after calling
  * this function, memory access functions may still return -EFAULT.
  */
-#define access_ok(type, addr, size) \
-	likely(!__range_not_ok(addr, size, user_addr_max()))
+#define access_ok(type, addr, size)					\
+({									\
+	WARN_ON_ONCE(!in_task());					\
+	likely(!__range_not_ok(addr, size, user_addr_max()));		\
+})
 
 /*
  * These are the main single-value transfer routines.  They automatically
