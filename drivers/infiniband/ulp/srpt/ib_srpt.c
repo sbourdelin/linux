@@ -514,8 +514,8 @@ static int srpt_refresh_port(struct srpt_port *sport)
 	if (ret)
 		goto err_query_port;
 
-	sport->sm_lid = (u16)port_attr.sm_lid;
-	sport->lid = (u16)port_attr.lid;
+	sport->sm_lid = port_attr.sm_lid;
+	sport->lid = port_attr.lid;
 
 	ret = ib_query_gid(sport->sdev->device, sport->port, 0, &sport->gid,
 			   NULL);
