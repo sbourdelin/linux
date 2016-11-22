@@ -200,6 +200,7 @@ struct rockchip_thermal_data {
 #define TSADCV3_AUTO_Q_SEL_EN			BIT(1)
 
 #define TSADCV2_INT_SRC_EN(chn)			BIT(chn)
+#define TSADCV2_INT_SRC_SHIFT(chn)		chn
 #define TSADCV2_SHUT_2GPIO_SRC_EN(chn)		BIT(4 + (chn))
 #define TSADCV2_SHUT_2CRU_SRC_EN(chn)		BIT(8 + (chn))
 
@@ -908,9 +909,21 @@ static int rockchip_thermal_set_trips(void *_sensor, int low, int high)
 	struct rockchip_thermal_sensor *sensor = _sensor;
 	struct rockchip_thermal_data *thermal = sensor->thermal;
 	const struct rockchip_tsadc_chip *tsadc = thermal->chip;
+	u32 int_clr;
 
 	dev_dbg(&thermal->pdev->dev, "%s: sensor %d: low: %d, high %d\n",
 		__func__, sensor->id, low, high);
+
+	/*
+	 * In some cases, some sensors didn't need the trip points, the
+	 * set_trips will return {-INT_MAX, INT_MAX} to trigger thermal alarm.
+	 */
+	if (high == INT_MAX) {
+		int_clr = readl_relaxed(thermal->regs + TSADCV2_INT_EN);
+		int_clr |= 0 << TSADCV2_INT_SRC_SHIFT(sensor->id);
+		writel_relaxed(int_clr, thermal->regs + TSADCV2_INT_EN);
+		return 0;
+	}
 
 	tsadc->set_alarm_temp(&tsadc->table,
 			      sensor->id, thermal->regs, high);
