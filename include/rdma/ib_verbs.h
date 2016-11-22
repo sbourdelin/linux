@@ -479,6 +479,7 @@ static inline struct rdma_hw_stats *rdma_alloc_hw_stats_struct(
 /* Address format                       0x000FF000 */
 #define RDMA_CORE_CAP_AF_IB             0x00001000
 #define RDMA_CORE_CAP_ETH_AH            0x00002000
+#define RDMA_CORE_CAP_OPA_AH            0x00004000
 
 /* Protocol                             0xFFF00000 */
 #define RDMA_CORE_CAP_PROT_IB           0x00100000
@@ -2469,6 +2470,26 @@ static inline bool rdma_cap_af_ib(const struct ib_device *device, u8 port_num)
 static inline bool rdma_cap_eth_ah(const struct ib_device *device, u8 port_num)
 {
 	return device->port_immutable[port_num].core_cap_flags & RDMA_CORE_CAP_ETH_AH;
+}
+
+/**
+ * rdma_cap_opa_ah - Check if the port of device has the capability
+ * OPA Address handle
+ * @device: Device to check
+ * @port_num: Port number to check
+ *
+ * OPA Address handles enable use of 32 bit LIDs by using a specially
+ * formatted GID field to carry the LID. This check enables kernel
+ * components to identify such a scheme so that they can then try
+ * to make use of the LID in the GID field.
+ *
+ * Return: true if we are running as a OPA device which enables
+ * 32 bit LIDs to be used in the fabric.
+ */
+static inline bool rdma_cap_opa_ah(struct ib_device *device, u8 port_num)
+{
+	return (device->port_immutable[port_num].core_cap_flags &
+		RDMA_CORE_CAP_OPA_AH) == RDMA_CORE_CAP_OPA_AH;
 }
 
 /**
