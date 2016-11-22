@@ -299,12 +299,16 @@ extern unsigned long pci_io_base;
 
 static inline unsigned long pte_update(struct mm_struct *mm, unsigned long addr,
 				       pte_t *ptep, unsigned long clr,
-				       unsigned long set, int huge)
+				       unsigned long set,
+				       unsigned long pg_sz)
 {
+	bool huge = (pg_sz != PAGE_SIZE);
+
 	if (radix_enabled())
-		return radix__pte_update(mm, addr, ptep, clr, set, huge);
+		return radix__pte_update(mm, addr, ptep, clr, set, pg_sz);
 	return hash__pte_update(mm, addr, ptep, clr, set, huge);
 }
+
 /*
  * For hash even if we have _PAGE_ACCESSED = 0, we do a pte_update.
  * We currently remove entries from the hashtable regardless of whether
@@ -322,7 +326,7 @@ static inline int __ptep_test_and_clear_young(struct mm_struct *mm,
 
 	if ((pte_raw(*ptep) & cpu_to_be64(_PAGE_ACCESSED | H_PAGE_HASHPTE)) == 0)
 		return 0;
-	old = pte_update(mm, addr, ptep, _PAGE_ACCESSED, 0, 0);
+	old = pte_update(mm, addr, ptep, _PAGE_ACCESSED, 0, PAGE_SIZE);
 	return (old & _PAGE_ACCESSED) != 0;
 }
 
@@ -341,21 +345,21 @@ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr,
 	if ((pte_raw(*ptep) & cpu_to_be64(_PAGE_WRITE)) == 0)
 		return;
 
-	pte_update(mm, addr, ptep, _PAGE_WRITE, 0, 0);
+	pte_update(mm, addr, ptep, _PAGE_WRITE, 0, PAGE_SIZE);
 }
 
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
 static inline pte_t ptep_get_and_clear(struct mm_struct *mm,
 				       unsigned long addr, pte_t *ptep)
 {
-	unsigned long old = pte_update(mm, addr, ptep, ~0UL, 0, 0);
+	unsigned long old = pte_update(mm, addr, ptep, ~0UL, 0, PAGE_SIZE);
 	return __pte(old);
 }
 
 static inline void pte_clear(struct mm_struct *mm, unsigned long addr,
 			     pte_t * ptep)
 {
-	pte_update(mm, addr, ptep, ~0UL, 0, 0);
+	pte_update(mm, addr, ptep, ~0UL, 0, PAGE_SIZE);
 }
 
 static inline int pte_write(pte_t pte)
