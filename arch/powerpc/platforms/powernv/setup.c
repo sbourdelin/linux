@@ -28,6 +28,7 @@
 #include <linux/bug.h>
 #include <linux/pci.h>
 #include <linux/cpufreq.h>
+#include <linux/sysfs.h>
 
 #include <asm/machdep.h>
 #include <asm/firmware.h>
@@ -118,6 +119,53 @@ static void pnv_prepare_going_down(void)
 	opal_flash_term_callback();
 }
 
+static bool force_full_ipl_reboot = false;
+
+static ssize_t force_full_ipl_reboot_show(struct kobject *k,
+					  struct kobj_attribute *attr,
+					  char *buf)
+{
+	return sprintf(buf, "%d\n", (int) force_full_ipl_reboot);
+}
+
+static ssize_t force_full_ipl_reboot_store(struct kobject *k,
+					   struct kobj_attribute *attr,
+					   const char *buf,
+					   size_t count)
+{
+	if (count != 2)  /* including trailing NUL */
+		return -EINVAL;
+
+	switch (buf[0]) {
+	case '0':
+		force_full_ipl_reboot = false;
+		return count;
+	case '1':
+		force_full_ipl_reboot = true;
+		return count;
+	default:
+		return -EINVAL;
+	}
+}
+
+static struct kobj_attribute opal_force_full_ipl_reboot_attr =
+	__ATTR(force_full_ipl_reboot, 0644, force_full_ipl_reboot_show,
+	       force_full_ipl_reboot_store);
+
+void opal_reboot_sysfs_init(void) {
+	int rc = 0;
+
+	if (!opal_kobj) {
+		pr_warn("setup: opal kobject is not available");
+		return;
+	}
+
+	rc = sysfs_create_file(opal_kobj, &opal_force_full_ipl_reboot_attr.attr);
+	if (rc)
+		pr_err("setup: unable to create sysfs file "
+		       "force_full_ipl_reboot (%d)", rc);
+}
+
 static void  __noreturn pnv_restart(char *cmd)
 {
 	long rc = OPAL_BUSY;
@@ -125,7 +173,20 @@ static void  __noreturn pnv_restart(char *cmd)
 	pnv_prepare_going_down();
 
 	while (rc == OPAL_BUSY || rc == OPAL_BUSY_EVENT) {
-		rc = opal_cec_reboot();
+		if (force_full_ipl_reboot && opal_check_token(OPAL_CEC_REBOOT2)) {
+			rc = opal_cec_reboot2(OPAL_REBOOT_FULL_IPL,
+					      "Full IPL reboot requested");
+
+			if (rc == OPAL_UNSUPPORTED) {
+				pr_err("Firmware doesn't support forcing full "
+				       "IPL reboot");
+				force_full_ipl_reboot = false;
+				rc = opal_cec_reboot();
+			}
+		} else {
+			rc = opal_cec_reboot();
+		}
+
 		if (rc == OPAL_BUSY_EVENT)
 			opal_poll_events(NULL);
 		else
