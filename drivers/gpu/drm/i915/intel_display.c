@@ -3001,10 +3001,9 @@ static void i9xx_update_primary_plane(struct drm_plane *primary,
 	struct drm_i915_private *dev_priv = to_i915(primary->dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc_state->base.crtc);
 	struct drm_framebuffer *fb = plane_state->base.fb;
-	int plane = intel_crtc->plane;
+	enum plane plane_id = to_intel_plane(primary)->plane;
 	u32 linear_offset;
 	u32 dspcntr;
-	i915_reg_t reg = DSPCNTR(plane);
 	unsigned int rotation = plane_state->base.rotation;
 	int x = plane_state->base.src.x1 >> 16;
 	int y = plane_state->base.src.y1 >> 16;
@@ -3020,16 +3019,16 @@ static void i9xx_update_primary_plane(struct drm_plane *primary,
 		/* pipesrc and dspsize control the size that is scaled from,
 		 * which should always be the user's requested size.
 		 */
-		I915_WRITE(DSPSIZE(plane),
+		I915_WRITE(DSPSIZE(plane_id),
 			   ((crtc_state->pipe_src_h - 1) << 16) |
 			   (crtc_state->pipe_src_w - 1));
-		I915_WRITE(DSPPOS(plane), 0);
-	} else if (IS_CHERRYVIEW(dev_priv) && plane == PLANE_B) {
-		I915_WRITE(PRIMSIZE(plane),
+		I915_WRITE(DSPPOS(plane_id), 0);
+	} else if (IS_CHERRYVIEW(dev_priv) && plane_id == PLANE_B) {
+		I915_WRITE(PRIMSIZE(plane_id),
 			   ((crtc_state->pipe_src_h - 1) << 16) |
 			   (crtc_state->pipe_src_w - 1));
-		I915_WRITE(PRIMPOS(plane), 0);
-		I915_WRITE(PRIMCNSTALPHA(plane), 0);
+		I915_WRITE(PRIMPOS(plane_id), 0);
+		I915_WRITE(PRIMCNSTALPHA(plane_id), 0);
 	}
 
 	switch (fb->pixel_format) {
@@ -3092,21 +3091,21 @@ static void i9xx_update_primary_plane(struct drm_plane *primary,
 	intel_crtc->adjusted_x = x;
 	intel_crtc->adjusted_y = y;
 
-	I915_WRITE(reg, dspcntr);
+	I915_WRITE(DSPCNTR(plane_id), dspcntr);
 
-	I915_WRITE(DSPSTRIDE(plane), fb->pitches[0]);
+	I915_WRITE(DSPSTRIDE(plane_id), fb->pitches[0]);
 	if (INTEL_GEN(dev_priv) >= 4) {
-		I915_WRITE(DSPSURF(plane),
+		I915_WRITE(DSPSURF(plane_id),
 			   intel_fb_gtt_offset(fb, rotation) +
 			   intel_crtc->dspaddr_offset);
-		I915_WRITE(DSPTILEOFF(plane), (y << 16) | x);
-		I915_WRITE(DSPLINOFF(plane), linear_offset);
+		I915_WRITE(DSPTILEOFF(plane_id), (y << 16) | x);
+		I915_WRITE(DSPLINOFF(plane_id), linear_offset);
 	} else {
-		I915_WRITE(DSPADDR(plane),
+		I915_WRITE(DSPADDR(plane_id),
 			   intel_fb_gtt_offset(fb, rotation) +
 			   intel_crtc->dspaddr_offset);
 	}
-	POSTING_READ(reg);
+	POSTING_READ(DSPCNTR(plane_id));
 }
 
 static void i9xx_disable_primary_plane(struct drm_plane *primary,
@@ -3114,15 +3113,14 @@ static void i9xx_disable_primary_plane(struct drm_plane *primary,
 {
 	struct drm_device *dev = crtc->dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
-	int plane = intel_crtc->plane;
+	enum plane plane_id = to_intel_plane(primary)->plane;
 
-	I915_WRITE(DSPCNTR(plane), 0);
+	I915_WRITE(DSPCNTR(plane_id), 0);
 	if (INTEL_INFO(dev_priv)->gen >= 4)
-		I915_WRITE(DSPSURF(plane), 0);
+		I915_WRITE(DSPSURF(plane_id), 0);
 	else
-		I915_WRITE(DSPADDR(plane), 0);
-	POSTING_READ(DSPCNTR(plane));
+		I915_WRITE(DSPADDR(plane_id), 0);
+	POSTING_READ(DSPCNTR(plane_id));
 }
 
 static void ironlake_update_primary_plane(struct drm_plane *primary,
@@ -3133,10 +3131,9 @@ static void ironlake_update_primary_plane(struct drm_plane *primary,
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc_state->base.crtc);
 	struct drm_framebuffer *fb = plane_state->base.fb;
-	int plane = intel_crtc->plane;
+	enum plane plane_id = to_intel_plane(primary)->plane;
 	u32 linear_offset;
 	u32 dspcntr;
-	i915_reg_t reg = DSPCNTR(plane);
 	unsigned int rotation = plane_state->base.rotation;
 	int x = plane_state->base.src.x1 >> 16;
 	int y = plane_state->base.src.y1 >> 16;
@@ -3196,19 +3193,19 @@ static void ironlake_update_primary_plane(struct drm_plane *primary,
 	intel_crtc->adjusted_x = x;
 	intel_crtc->adjusted_y = y;
 
-	I915_WRITE(reg, dspcntr);
+	I915_WRITE(DSPCNTR(plane_id), dspcntr);
 
-	I915_WRITE(DSPSTRIDE(plane), fb->pitches[0]);
-	I915_WRITE(DSPSURF(plane),
+	I915_WRITE(DSPSTRIDE(plane_id), fb->pitches[0]);
+	I915_WRITE(DSPSURF(plane_id),
 		   intel_fb_gtt_offset(fb, rotation) +
 		   intel_crtc->dspaddr_offset);
 	if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) {
-		I915_WRITE(DSPOFFSET(plane), (y << 16) | x);
+		I915_WRITE(DSPOFFSET(plane_id), (y << 16) | x);
 	} else {
-		I915_WRITE(DSPTILEOFF(plane), (y << 16) | x);
-		I915_WRITE(DSPLINOFF(plane), linear_offset);
+		I915_WRITE(DSPTILEOFF(plane_id), (y << 16) | x);
+		I915_WRITE(DSPLINOFF(plane_id), linear_offset);
 	}
-	POSTING_READ(reg);
+	POSTING_READ(DSPCNTR(plane_id));
 }
 
 u32 intel_fb_stride_alignment(const struct drm_i915_private *dev_priv,
