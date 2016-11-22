@@ -339,6 +339,8 @@ static struct snd_soc_dai_driver hdmi_i2s_dai = {
 		.sig_bits = 24,
 	},
 	.ops = &hdmi_dai_ops,
+	.pcm_controls = hdmi_controls,
+	.num_pcm_controls = ARRAY_SIZE(hdmi_controls),
 };
 
 static const struct snd_soc_dai_driver hdmi_spdif_dai = {
@@ -381,8 +383,6 @@ static int hdmi_of_xlate_dai_name(struct snd_soc_component *component,
 
 static struct snd_soc_codec_driver hdmi_codec = {
 	.component_driver = {
-		.controls		= hdmi_controls,
-		.num_controls		= ARRAY_SIZE(hdmi_controls),
 		.dapm_widgets		= hdmi_widgets,
 		.num_dapm_widgets	= ARRAY_SIZE(hdmi_widgets),
 		.dapm_routes		= hdmi_routes,
