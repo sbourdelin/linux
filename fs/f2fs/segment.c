@@ -685,6 +685,7 @@ static int __f2fs_issue_discard_zone(struct f2fs_sb_info *sbi,
 {
 	sector_t nr_sects = SECTOR_FROM_BLOCK(blklen);
 	sector_t sector;
+	u32 rem;
 	int devi = 0;
 
 	if (sbi->s_ndevs) {
@@ -693,7 +694,8 @@ static int __f2fs_issue_discard_zone(struct f2fs_sb_info *sbi,
 	}
 	sector = SECTOR_FROM_BLOCK(blkstart);
 
-	if (sector % bdev_zone_size(bdev) || nr_sects != bdev_zone_size(bdev)) {
+	div_u64_rem(sector, bdev_zone_size(bdev), &rem);
+	if (rem || nr_sects != bdev_zone_size(bdev)) {
 		f2fs_msg(sbi->sb, KERN_INFO,
 			"(%d) %s: Unaligned discard attempted (block %x + %x)",
 			devi, sbi->s_ndevs ? FDEV(devi).path: "",
