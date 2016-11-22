@@ -33,6 +33,23 @@
 #if !defined(OPA_ADDR_H)
 #define OPA_ADDR_H
 
+#include <rdma/ib_verbs.h>
+
 #define OPA_TO_IB_UCAST_LID(x)	(((x) >= be16_to_cpu(IB_MULTICAST_LID_BASE)) \
 				 ? 0 : x)
+#define	OPA_SPECIAL_OUI		(0x00066AULL)
+
+/**
+ * ib_is_opa_gid: Returns true if the top 24 bits of the gid
+ * contains the OPA_STL_OUI identifier. This identifies that
+ * the provided gid is a special purpose GID meant to carry
+ * extended LID information.
+ *
+ * @gid: The Global identifier
+ */
+static inline bool ib_is_opa_gid(union ib_gid *gid)
+{
+	return ((be64_to_cpu(gid->global.interface_id) >> 40) ==
+		OPA_SPECIAL_OUI);
+}
 #endif /* OPA_ADDR_H */
