@@ -1,0 +1,187 @@
+ACPI _OSI and _REV methods
+--------------------------
+
+The ACPI _OSI method, "Operating System Interfaces",
+informs the ACPI BIOS about 'interfaces' supported by the Operating System.
+
+The ACPI _REV method returns the "Revision of the ACPI specification
+that OSPM supports"
+
+This document explains how and why the BIOS and Linux should use these methods.
+It also explains how and why they are widely mis-used.
+
+How to use _OSI
+---------------
+
+Linux runs on two groups of machines -- those that are tested by the OEM
+to be compatible with Linux, and those that were never tested with Linux,
+but where Linux was installed to replace the original OS (Windows or OSX).
+
+The larger group is the systems tested to run only Windows.
+Many of those systems were not only tested with just Windows, they were
+tested with just one specific version of Windows.  Even though the BIOS
+uses _OSI to query what version of Windows is running, only a single
+path through the BIOS has every been tested.
+For that reason, Linux must continue to claim compatibility with
+all versions of Windows.  To do otherwise exposes BIOS bugs on this
+large group of machines.
+
+But Linux isn't actually compatible with Windows, and the Linux community
+has also been hurt with regressions when Linux adds the latest version of
+Windows to its list of _OSI strings.  So it is possible that additional strings
+will be more thoroughly vetted before shipping upstream in the future.
+But it is likely that they will all eventually be added.
+
+Then there are systems designed and tested to run Linux.
+Often an OEM's ACPI BIOS team wants to support a unique feature
+in Linux, to do this, the BIOS should ask exactly what it wants to know:
+
+_OSI("Linux-OEM-my_interface_name")
+where 'OEM' is needed if this is an OEM-specific hook,
+and 'my_interface_name' describes the hook, which could be a
+quirk, a bug, or a bug-fix.
+
+For this to work, a patch must be sent to upstream Linux
+via the linux-acpi@vger.kernel.org mailing list.  When that patch
+is checked into Linux, the OS will answer "YES" when the BIOS
+on the OEM's system uses _OSI to ask if the interface is supported
+by the OS.  Linux distributors can back-port that patch for Linux
+pre-installs, and it will be included by all distributions that
+re-base to upstream.  If the distribution can not update the kernel binary,
+they can also add an acpi_osi= cmdline parameter to the boot loader, as needed.
+
+If the string refers to a feature where the upstream kernel
+eventually grows support, a patch should be sent to remove
+the string when that support is added to the kernel.
+
+That was easy.  Read on, to find out how to do it wrong.
+
+Before _OSI, there was _OS
+--------------------------
+
+ACPI 1.0 specified "_OS" as an
+"object that evaluates to a string that identifies the operating system."
+
+The ACPI BIOS flow would include an evaluation of _OS, and the AML
+interpreter in the kernel would return to it a string identifying
+the OS.  _OS returned "Microsoft Windows" on Windows 98 and SE.
+It returned "Microsoft WindowsME:Millenium Edition" for Win-ME,
+and for Windows NT it returned "Microsoft Windows NT".  After that,
+_OS was abandoned, though modern BIOS continue to contain
+an ancient idiom looking for "Microsoft Windows NT" -- just
+in case time travel becomes possible?
+
+On a platform tasked with running multiple versions of Windows,
+the BIOS could use _OS to enable/disable devices that and OS
+might support, or enable/disable quirks or bug work-arounds
+necessary to make the platform compatible with a pre-existing OS.
+
+If a BIOS invokes _OS today, Linux will return
+"Microsoft Windows NT".  That is the *only* possible choice,
+as doing otherwise can steer the BIOS down an un-tested path.
+
+_OS had fundamental problems.  First, the BIOS needed to know the name
+of every version of the OS that would run on it, and needed to know
+all the quirks of those OS's.  Certainly it would make more sense
+for the BIOS to ask *specific* things of the OS, such
+"do you support a specific interface", and thus in ACPI 3.0,
+_OSI was born to replace _OS.
+
+_OSI is born, and immediately mis-used
+--------------------------------------
+
+With _OSI, the *BIOS* provides the string describing an interface,
+and asks the OS: "YES/NO, are you compatible with this interface?"
+
+eg. _OSI("3.0 Thermal Model") would return TRUE if the OS knows how
+to deal with the thermal extensions made to the ACPI 3.0 specification.
+An old OS that doesn't know about those extensions would answer FALSE,
+and a new OS may be able to return TRUE.
+
+For an OS-specific interface, the BIOS and the OS
+were to agree on a string of the form such as "Windows-interface_name".
+
+But two bad things happened.  First, the Windows ecosystem used _OSI
+not as designed, but as a direct replacement for _OS -- identifying
+the OS version, rather than an OS supported interface.  Indeed, right
+from the start, the ACPI 3.0 spec itself codified this mis-use
+in example code using _OSI("Windows 2001").
+
+The Windows BIOS/OS ecosystem continues to mis-use this method today.
+
+Linux had no choice but to also return TRUE to _OSI("Windows 2001")
+and its successors.  To do otherwise would virtually guarantee breaking
+a BIOS that has been tested only with that _OSI returning TRUE.
+
+This strategy is problematic, as Linux is never completely compatible with
+the latest version of Windows, and sometimes it takes more than a year
+to iron out incompatibilities.
+
+The Linux community made things worse by returning TRUE
+to _OSI("Linux").  Doing so is even worse than the Windows mis-use
+of _OSI, as "Linux" contains no version information.
+_OSI("Linux") led to some BIOS' malfunctioning due to BIOS writer's
+using it in un-tested BIOS flows.  But some OEM's used _OSI("Linux")
+in tested flows to support real Linux features.  In 2009, Linux
+removed _OSI("Linux"), and added a cmdline parameter to restore it
+for legacy systems that needed it, and added a BIOS_BUG warning
+for all BIOS's that invoke it.  No BIOS ever should use _OSI("Linux").
+
+The result is a strategy for Linux to maximize compatibility with
+ACPI BIOS that are tested on Windows machines.  There is a real risk
+of over-stating that compatibility; but the alternative has often been
+catastrophic failure resulting from the BIOS taking paths that
+were never validated under *any* OS.
+
+BIOS for Linux and Windows
+--------------------------
+
+For some platforms, a BIOS that wants to properly run Windows
+and Linux needs to know which is running.  This is a valid requirement,
+and it may be, for example, due to specific hardware that is supported by one
+OS is incompatible with the same hardware support in the other OS.
+Examples may be sound or storage devices with different hardware modes.
+The BIOS can handle such quirks, only if it can reliably identify
+what software is running.
+
+Do not use _REV
+---------------
+
+Some BIOS writers decided to use _REV to tell the difference
+between Linux and Windows.  _REV was defined in ACPI 1.0 to return
+the version of ACPI supported by the OS and the OS AML interpreter.
+
+Modern Windows returns _REV = 2.  Linux used ACPI_CA_SUPPORT_LEVEL,
+which would increment, based on the version of the spec supported.
+
+Unfortunately, _REV was also mis-used.  eg. some BIOS would check
+for _REV = 3, and do something for Linux, but when Linux returned
+_REV = 4, that support broke.
+
+In response to this problem, Linux returns _REV = 2 always,
+from mid-2015 onward.  The ACPI specification will also be updated
+to reflect that _REV is deprecated, and always returns 2.
+
+_OSI("Darwin")
+--------------
+
+No description of _OSI would be complete without mentioning _OSI("Darwin").
+This string is mis-used by Apple on Mac platforms, just as Linux
+mis-used _OSI("Linux").
+
+Linux did not originally return TRUE to _OSI("Darwin"),
+on the assumption that on Apple hardware, Linux was
+probably best pretending to be Windows,
+rather than pretending to be OSX.
+
+But _OSI("Darwin") was required to make Thunderbolt work,
+and so Linux changed to enable it by default.  Making matters worse,
+that change did not include the ability to disable _OSI("Darwin")
+on the cmdline with acpi_OSI=!Darwin, and so the resulting
+regressions had no workaround.
+
+The cmdline has since been fixed to enable !Darwin.
+Today "Darwin" enables Thunderbolt, but significantly
+hurts battery life, and so the default for _OSI("Darwin")
+is still under debate.
+
