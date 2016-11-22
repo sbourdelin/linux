@@ -241,6 +241,8 @@ struct perf_limits {
  *			when per cpu controls are enforced
  * @acpi_perf_data:	Stores ACPI perf information read from _PSS
  * @valid_pss_table:	Set to true for valid ACPI _PSS entries found
+ * @epp_saved:		Last saved HWP energy performance preference
+ *			or energy performance bias
  *
  * This structure stores per CPU instance data for all CPUs.
  */
@@ -268,6 +270,7 @@ struct cpudata {
 	bool valid_pss_table;
 #endif
 	unsigned int iowait_boost;
+	int epp_saved;
 };
 
 static struct cpudata **all_cpu_data;
@@ -566,6 +569,48 @@ static inline void update_turbo_state(void)
 		 cpu->pstate.max_pstate == cpu->pstate.turbo_pstate);
 }
 
+static int intel_pstate_get_epb(struct cpudata *cpu_data)
+{
+	u64 epb;
+	int ret;
+
+	if (!static_cpu_has(X86_FEATURE_EPB))
+		return -ENXIO;
+
+	ret = rdmsrl_on_cpu(cpu_data->cpu, MSR_IA32_ENERGY_PERF_BIAS, &epb);
+	if (ret)
+		return ret;
+
+	return (int)(epb & 0x0f);
+}
+
+static int intel_pstate_get_epp(struct cpudata *cpu_data, u64 hwp_req_data)
+{
+	int epp;
+
+	if (static_cpu_has(X86_FEATURE_HWP_EPP))
+		epp = (hwp_req_data >> 24) & 0xff;
+	else
+		/* When there is no EPP present, HWP uses EPB settings */
+		epp = intel_pstate_get_epb(cpu_data);
+
+	return epp;
+}
+
+static void intel_pstate_set_epb(int cpu, int pref)
+{
+	u64 epb;
+
+	if (!static_cpu_has(X86_FEATURE_EPB))
+		return;
+
+	if (rdmsrl_on_cpu(cpu, MSR_IA32_ENERGY_PERF_BIAS, &epb))
+		return;
+
+	epb = (epb & ~0x0f) | pref;
+	wrmsrl_on_cpu(cpu, MSR_IA32_ENERGY_PERF_BIAS, epb);
+}
+
 static void intel_pstate_hwp_set(const struct cpumask *cpumask)
 {
 	int min, hw_min, max, hw_max, cpu, range, adj_range;
@@ -574,6 +619,8 @@ static void intel_pstate_hwp_set(const struct cpumask *cpumask)
 
 	for_each_cpu(cpu, cpumask) {
 		int max_perf_pct, min_perf_pct;
+		struct cpudata *cpu_data = all_cpu_data[cpu];
+		int epp;
 
 		if (per_cpu_limits)
 			perf_limits = all_cpu_data[cpu]->perf_limits;
@@ -602,6 +649,41 @@ static void intel_pstate_hwp_set(const struct cpumask *cpumask)
 
 		value &= ~HWP_MAX_PERF(~0L);
 		value |= HWP_MAX_PERF(max);
+		if (cpu_data->policy == CPUFREQ_POLICY_PERFORMANCE) {
+			epp = intel_pstate_get_epp(cpu_data, value);
+			if (epp)
+				cpu_data->epp_saved = epp;
+
+			/* If EPP read was failed, then don't try to write */
+			if (epp < 0)
+				goto skip_epp;
+
+			epp = 0;
+		} else {
+			/* skip setting EPP, when saved value is invalid */
+			if (cpu_data->epp_saved < 0)
+				goto skip_epp;
+
+			/*
+			 * No need to restore EPP when it is not zero. This
+			 * means:
+			 *  - Policy is not changed
+			 *  - user has manually changed
+			 *  - Error reading EPB
+			 */
+			epp = intel_pstate_get_epp(cpu_data, value);
+			if (epp)
+				goto skip_epp;
+			else
+				epp = cpu_data->epp_saved;
+		}
+		if (static_cpu_has(X86_FEATURE_HWP_EPP)) {
+			value &= ~GENMASK_ULL(31, 24);
+			value |= (u64)epp << 24;
+		} else {
+			intel_pstate_set_epb(cpu, epp);
+		}
+skip_epp:
 		wrmsrl_on_cpu(cpu, MSR_HWP_REQUEST, value);
 	}
 }
