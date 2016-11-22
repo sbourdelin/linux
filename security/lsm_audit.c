@@ -423,6 +423,11 @@ static void dump_common_audit_data(struct audit_buffer *ab,
 				 a->u.pkey->pkey, &sbn_pfx);
 		break;
 	}
+	case LSM_AUDIT_DATA_IB_ENDPORT:
+		audit_log_format(ab, " device=%s port_num=%u",
+				 a->u.ib_endport->dev_name,
+				 a->u.ib_endport->port_num);
+		break;
 	} /* switch (a->type) */
 }
 
