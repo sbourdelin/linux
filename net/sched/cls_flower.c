@@ -135,7 +135,7 @@ static int fl_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 	struct fl_flow_key skb_mkey;
 	struct ip_tunnel_info *info;
 
-	if (!atomic_read(&head->ht.nelems))
+	if (!head || !atomic_read(&head->ht.nelems))
 		return -1;
 
 	fl_clear_masked_range(&skb_key, &head->mask);
