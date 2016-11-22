@@ -936,6 +936,7 @@ static int iproc_pcie_setup_ib(struct iproc_pcie *pcie,
 
 		}
 	}
+	ret = -EINVAL;
 err_ib:
 	dev_err(dev, "unable to configure inbound mapping\n");
 	dev_err(dev, "axi %pap, pci %pap, res size %pap\n",
