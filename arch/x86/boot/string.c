@@ -122,6 +122,31 @@ unsigned long long simple_strtoull(const char *cp, char **endp, unsigned int bas
 }
 
 /**
+ * simple_strtoul - convert a string to an unsigned long
+ * @cp: The start of the string
+ * @endp: A pointer to the end of the parsed string will be placed here
+ * @base: The number base to use
+ */
+unsigned long simple_strtoul(const char *cp, char **endp, unsigned int base)
+{
+	return simple_strtoull(cp, endp, base);
+}
+
+/**
+ * simple_strtol - convert a string to a signed long
+ * @cp: The start of the string
+ * @endp: A pointer to the end of the parsed string will be placed here
+ * @base: The number base to use
+ */
+long simple_strtol(const char *cp, char **endp, unsigned int base)
+{
+	if (*cp == '-')
+		return -simple_strtoul(cp + 1, endp, base);
+
+	return simple_strtoul(cp, endp, base);
+}
+
+/**
  * strlen - Find the length of a string
  * @s: The string to be sized
  */

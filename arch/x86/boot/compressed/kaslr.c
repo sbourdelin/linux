@@ -11,6 +11,7 @@
  */
 #include "misc.h"
 #include "error.h"
+#include "../boot.h"
 
 #include <generated/compile.h>
 #include <linux/module.h>
@@ -61,6 +62,7 @@ enum mem_avoid_index {
 	MEM_AVOID_INITRD,
 	MEM_AVOID_CMDLINE,
 	MEM_AVOID_BOOTPARAMS,
+	MEM_AVOID_MEMMAP,
 	MEM_AVOID_MAX,
 };
 
@@ -75,6 +77,37 @@ static bool mem_overlaps(struct mem_vector *one, struct mem_vector *two)
 	if (one->start >= two->start + two->size)
 		return false;
 	return true;
+}
+
+#include "../../../../lib/cmdline.c"
+
+static int
+parse_memmap(char *p, unsigned long long *start, unsigned long long *size)
+{
+	char *oldp;
+
+	if (!p)
+		return -EINVAL;
+
+	/* we don't care about this option here */
+	if (!strncmp(p, "exactmap", 8))
+		return -EINVAL;
+
+	oldp = p;
+	*size = memparse(p, &p);
+	if (p == oldp)
+		return -EINVAL;
+
+	switch (*p) {
+	case '@':
+	case '#':
+	case '$':
+	case '!':
+		*start = memparse(p+1, &p);
+		return 0;
+	}
+
+	return -EINVAL;
 }
 
 /*
@@ -158,6 +191,8 @@ static void mem_avoid_init(unsigned long input, unsigned long input_size,
 	u64 initrd_start, initrd_size;
 	u64 cmd_line, cmd_line_size;
 	char *ptr;
+	char arg[38];
+	unsigned long long memmap_start, memmap_size;
 
 	/*
 	 * Avoid the region that is unsafe to overlap during
@@ -194,6 +229,16 @@ static void mem_avoid_init(unsigned long input, unsigned long input_size,
 	mem_avoid[MEM_AVOID_BOOTPARAMS].size = sizeof(*boot_params);
 	add_identity_map(mem_avoid[MEM_AVOID_BOOTPARAMS].start,
 			 mem_avoid[MEM_AVOID_BOOTPARAMS].size);
+
+	/* see if we have any memmap areas */
+	if (cmdline_find_option("memmap", arg, sizeof(arg)) > 0) {
+		int rc = parse_memmap(arg, &memmap_start, &memmap_size);
+
+		if (!rc) {
+			mem_avoid[MEM_AVOID_MEMMAP].start = memmap_start;
+			mem_avoid[MEM_AVOID_MEMMAP].size = memmap_size;
+		}
+	}
 
 	/* We don't need to set a mapping for setup_data. */
 
