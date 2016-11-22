@@ -814,7 +814,7 @@ __attribute_const__ enum ib_rate mult_to_ib_rate(int mult);
 
 struct ib_ah_attr {
 	struct ib_global_route	grh;
-	u16			dlid;
+	u32			dlid;
 	u8			sl;
 	u8			src_path_bits;
 	u8			static_rate;

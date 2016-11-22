@@ -2281,7 +2281,10 @@ ssize_t ib_uverbs_query_qp(struct ib_uverbs_file *file,
 	resp.dest.sgid_index        = attr->ah_attr.grh.sgid_index;
 	resp.dest.hop_limit         = attr->ah_attr.grh.hop_limit;
 	resp.dest.traffic_class     = attr->ah_attr.grh.traffic_class;
-	resp.dest.dlid              = attr->ah_attr.dlid;
+	if (rdma_cap_opa_ah(ib_dev, attr->ah_attr.port_num))
+		resp.dest.dlid	    = OPA_TO_IB_UCAST_LID(attr->ah_attr.dlid);
+	else
+		resp.dest.dlid	    = (u16)attr->ah_attr.dlid;
 	resp.dest.sl                = attr->ah_attr.sl;
 	resp.dest.src_path_bits     = attr->ah_attr.src_path_bits;
 	resp.dest.static_rate       = attr->ah_attr.static_rate;
@@ -2293,7 +2296,11 @@ ssize_t ib_uverbs_query_qp(struct ib_uverbs_file *file,
 	resp.alt_dest.sgid_index    = attr->alt_ah_attr.grh.sgid_index;
 	resp.alt_dest.hop_limit     = attr->alt_ah_attr.grh.hop_limit;
 	resp.alt_dest.traffic_class = attr->alt_ah_attr.grh.traffic_class;
-	resp.alt_dest.dlid          = attr->alt_ah_attr.dlid;
+	if (rdma_cap_opa_ah(ib_dev, attr->alt_ah_attr.port_num))
+		resp.alt_dest.dlid  =
+			OPA_TO_IB_UCAST_LID(attr->alt_ah_attr.dlid);
+	else
+		resp.alt_dest.dlid  = (u16)attr->alt_ah_attr.dlid;
 	resp.alt_dest.sl            = attr->alt_ah_attr.sl;
 	resp.alt_dest.src_path_bits = attr->alt_ah_attr.src_path_bits;
 	resp.alt_dest.static_rate   = attr->alt_ah_attr.static_rate;

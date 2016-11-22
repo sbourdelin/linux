@@ -1781,12 +1781,12 @@ void hfi1_cnp_rcv(struct hfi1_packet *packet)
 
 	switch (packet->qp->ibqp.qp_type) {
 	case IB_QPT_UC:
-		rlid = qp->remote_ah_attr.dlid;
+		rlid = (u16)qp->remote_ah_attr.dlid;
 		rqpn = qp->remote_qpn;
 		svc_type = IB_CC_SVCTYPE_UC;
 		break;
 	case IB_QPT_RC:
-		rlid = qp->remote_ah_attr.dlid;
+		rlid = (u16)qp->remote_ah_attr.dlid;
 		rqpn = qp->remote_qpn;
 		svc_type = IB_CC_SVCTYPE_RC;
 		break;

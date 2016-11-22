@@ -58,7 +58,7 @@ static struct ib_ah *create_ib_ah(struct ib_pd *pd, struct ib_ah_attr *ah_attr,
 		memcpy(ah->av.ib.dgid, ah_attr->grh.dgid.raw, 16);
 	}
 
-	ah->av.ib.dlid    = cpu_to_be16(ah_attr->dlid);
+	ah->av.ib.dlid    = cpu_to_be16((u16)ah_attr->dlid);
 	if (ah_attr->static_rate) {
 		ah->av.ib.stat_rate = ah_attr->static_rate + MLX4_STAT_RATE_OFFSET;
 		while (ah->av.ib.stat_rate > IB_RATE_2_5_GBPS + MLX4_STAT_RATE_OFFSET &&

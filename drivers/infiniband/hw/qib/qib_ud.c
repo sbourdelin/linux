@@ -98,7 +98,7 @@ static void qib_ud_loopback(struct rvt_qp *sqp, struct rvt_swqe *swqe)
 				      ah_attr->sl,
 				      sqp->ibqp.qp_num, qp->ibqp.qp_num,
 				      cpu_to_be16(lid),
-				      cpu_to_be16(ah_attr->dlid));
+				      cpu_to_be16((u16)ah_attr->dlid));
 			goto drop;
 		}
 	}
@@ -122,7 +122,7 @@ static void qib_ud_loopback(struct rvt_qp *sqp, struct rvt_swqe *swqe)
 				      ah_attr->sl,
 				      sqp->ibqp.qp_num, qp->ibqp.qp_num,
 				      cpu_to_be16(lid),
-				      cpu_to_be16(ah_attr->dlid));
+				      cpu_to_be16((u16)ah_attr->dlid));
 			goto drop;
 		}
 	}
@@ -296,7 +296,7 @@ int qib_make_ud_req(struct rvt_qp *qp, unsigned long *flags)
 			this_cpu_inc(ibp->pmastats->n_unicast_xmit);
 	} else {
 		this_cpu_inc(ibp->pmastats->n_unicast_xmit);
-		lid = ah_attr->dlid & ~((1 << ppd->lmc) - 1);
+		lid = ((u16)ah_attr->dlid) & ~((1 << ppd->lmc) - 1);
 		if (unlikely(lid == ppd->lid)) {
 			unsigned long tflags = *flags;
 			/*
@@ -363,7 +363,7 @@ int qib_make_ud_req(struct rvt_qp *qp, unsigned long *flags)
 	else
 		lrh0 |= ibp->sl_to_vl[ah_attr->sl] << 12;
 	priv->s_hdr->lrh[0] = cpu_to_be16(lrh0);
-	priv->s_hdr->lrh[1] = cpu_to_be16(ah_attr->dlid);  /* DEST LID */
+	priv->s_hdr->lrh[1] = cpu_to_be16((u16)ah_attr->dlid);  /* DEST LID */
 	priv->s_hdr->lrh[2] =
 			cpu_to_be16(qp->s_hdrwords + nwords + SIZE_OF_CRC);
 	lid = ppd->lid;

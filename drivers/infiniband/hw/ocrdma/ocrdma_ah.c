@@ -215,7 +215,7 @@ struct ib_ah *ocrdma_create_ah(struct ib_pd *ibpd, struct ib_ah_attr *attr)
 
 	/* if pd is for the user process, pass the ah_id to user space */
 	if ((pd->uctx) && (pd->uctx->ah_tbl.va)) {
-		ahid_addr = pd->uctx->ah_tbl.va + attr->dlid;
+		ahid_addr = pd->uctx->ah_tbl.va + (u16)attr->dlid;
 		*ahid_addr = 0;
 		*ahid_addr |= ah->id & OCRDMA_AH_ID_MASK;
 		if (ocrdma_is_udp_encap_supported(dev)) {

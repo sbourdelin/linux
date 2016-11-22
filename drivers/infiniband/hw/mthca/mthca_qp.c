@@ -516,7 +516,7 @@ static int mthca_path_set(struct mthca_dev *dev, const struct ib_ah_attr *ah,
 			  struct mthca_qp_path *path, u8 port)
 {
 	path->g_mylmc     = ah->src_path_bits & 0x7f;
-	path->rlid        = cpu_to_be16(ah->dlid);
+	path->rlid        = cpu_to_be16((u16)ah->dlid);
 	path->static_rate = mthca_get_rate(dev, ah->static_rate, port);
 
 	if (ah->ah_flags & IB_AH_GRH) {

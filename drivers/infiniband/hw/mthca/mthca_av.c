@@ -200,7 +200,7 @@ on_hca_fail:
 
 	av->port_pd = cpu_to_be32(pd->pd_num | (ah_attr->port_num << 24));
 	av->g_slid  = ah_attr->src_path_bits;
-	av->dlid    = cpu_to_be16(ah_attr->dlid);
+	av->dlid    = cpu_to_be16((u16)ah_attr->dlid);
 	av->msg_sr  = (3 << 4) | /* 2K message */
 		mthca_get_rate(dev, ah_attr->static_rate, ah_attr->port_num);
 	av->sl_tclass_flowlabel = cpu_to_be32(ah_attr->sl << 28);

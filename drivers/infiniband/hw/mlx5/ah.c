@@ -56,7 +56,7 @@ static struct ib_ah *create_ib_ah(struct mlx5_ib_dev *dev,
 						ah_attr->grh.sgid_index);
 		ah->av.stat_rate_sl |= (ah_attr->sl & 0x7) << 1;
 	} else {
-		ah->av.rlid = cpu_to_be16(ah_attr->dlid);
+		ah->av.rlid = cpu_to_be16((u16)ah_attr->dlid);
 		ah->av.fl_mlid = ah_attr->src_path_bits & 0x7f;
 		ah->av.stat_rate_sl |= (ah_attr->sl & 0xf);
 	}

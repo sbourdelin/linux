@@ -297,7 +297,7 @@ int hfi1_ruc_check_hdr(struct hfi1_ibport *ibp, struct ib_header *hdr,
 			goto err;
 		}
 		/* Validate the SLID. See Ch. 9.6.1.5 and 17.2.8 */
-		if (be16_to_cpu(hdr->lrh[3]) != qp->alt_ah_attr.dlid ||
+		if (be16_to_cpu(hdr->lrh[3]) != (u16)qp->alt_ah_attr.dlid ||
 		    ppd_from_ibp(ibp)->port != qp->alt_ah_attr.port_num)
 			goto err;
 		spin_lock_irqsave(&qp->s_lock, flags);
@@ -332,7 +332,7 @@ int hfi1_ruc_check_hdr(struct hfi1_ibport *ibp, struct ib_header *hdr,
 			goto err;
 		}
 		/* Validate the SLID. See Ch. 9.6.1.5 */
-		if (be16_to_cpu(hdr->lrh[3]) != qp->remote_ah_attr.dlid ||
+		if (be16_to_cpu(hdr->lrh[3]) != (u16)qp->remote_ah_attr.dlid ||
 		    ppd_from_ibp(ibp)->port != qp->port_num)
 			goto err;
 		if (qp->s_mig_state == IB_MIG_REARM &&
@@ -591,7 +591,7 @@ do_write:
 	wc.byte_len = wqe->length;
 	wc.qp = &qp->ibqp;
 	wc.src_qp = qp->remote_qpn;
-	wc.slid = qp->remote_ah_attr.dlid;
+	wc.slid = (u16)qp->remote_ah_attr.dlid;
 	wc.sl = qp->remote_ah_attr.sl;
 	wc.port_num = 1;
 	/* Signal completion event if the solicited bit is set. */
@@ -812,7 +812,8 @@ void hfi1_make_ruc_header(struct rvt_qp *qp, struct ib_other_headers *ohdr,
 	else
 		qp->s_flags &= ~RVT_S_AHG_VALID;
 	ps->s_txreq->phdr.hdr.lrh[0] = cpu_to_be16(lrh0);
-	ps->s_txreq->phdr.hdr.lrh[1] = cpu_to_be16(qp->remote_ah_attr.dlid);
+	ps->s_txreq->phdr.hdr.lrh[1] =
+		cpu_to_be16((u16)qp->remote_ah_attr.dlid);
 	ps->s_txreq->phdr.hdr.lrh[2] =
 		cpu_to_be16(qp->s_hdrwords + nwords + SIZE_OF_CRC);
 	ps->s_txreq->phdr.hdr.lrh[3] = cpu_to_be16(ppd_from_ibp(ibp)->lid |
@@ -864,9 +865,9 @@ void hfi1_do_send(struct rvt_qp *qp)
 
 	switch (qp->ibqp.qp_type) {
 	case IB_QPT_RC:
-		if (!loopback && ((qp->remote_ah_attr.dlid & ~((1 << ps.ppd->lmc
-								) - 1)) ==
-				 ps.ppd->lid)) {
+		if (!loopback && (((u16)qp->remote_ah_attr.dlid &
+				   ~((1 << ps.ppd->lmc) - 1)) ==
+				  ps.ppd->lid)) {
 			ruc_loopback(qp);
 			return;
 		}
@@ -874,9 +875,9 @@ void hfi1_do_send(struct rvt_qp *qp)
 		timeout_int = (qp->timeout_jiffies);
 		break;
 	case IB_QPT_UC:
-		if (!loopback && ((qp->remote_ah_attr.dlid & ~((1 << ps.ppd->lmc
-								) - 1)) ==
-				 ps.ppd->lid)) {
+		if (!loopback && (((u16)qp->remote_ah_attr.dlid &
+				   ~((1 << ps.ppd->lmc) - 1)) ==
+				  ps.ppd->lid)) {
 			ruc_loopback(qp);
 			return;
 		}

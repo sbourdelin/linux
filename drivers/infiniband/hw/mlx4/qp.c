@@ -1396,7 +1396,7 @@ static int _mlx4_set_path(struct mlx4_ib_dev *dev, const struct ib_ah_attr *ah,
 
 
 	path->grh_mylmc     = ah->src_path_bits & 0x7f;
-	path->rlid	    = cpu_to_be16(ah->dlid);
+	path->rlid	    = cpu_to_be16((u16)ah->dlid);
 	if (ah->static_rate) {
 		path->static_rate = ah->static_rate + MLX4_STAT_RATE_OFFSET;
 		while (path->static_rate > IB_RATE_2_5_GBPS + MLX4_STAT_RATE_OFFSET &&

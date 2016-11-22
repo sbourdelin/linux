@@ -42,7 +42,7 @@ void ib_copy_ah_attr_to_user(struct ib_uverbs_ah_attr *dst,
 	dst->grh.hop_limit         = src->grh.hop_limit;
 	dst->grh.traffic_class     = src->grh.traffic_class;
 	memset(&dst->grh.reserved, 0, sizeof(dst->grh.reserved));
-	dst->dlid 	    	   = src->dlid;
+	dst->dlid		   = (u16)src->dlid;
 	dst->sl   	    	   = src->sl;
 	dst->src_path_bits 	   = src->src_path_bits;
 	dst->static_rate   	   = src->static_rate;

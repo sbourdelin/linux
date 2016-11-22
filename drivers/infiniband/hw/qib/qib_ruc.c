@@ -297,7 +297,7 @@ int qib_ruc_check_hdr(struct qib_ibport *ibp, struct ib_header *hdr,
 			goto err;
 		}
 		/* Validate the SLID. See Ch. 9.6.1.5 and 17.2.8 */
-		if (be16_to_cpu(hdr->lrh[3]) != qp->alt_ah_attr.dlid ||
+		if (be16_to_cpu(hdr->lrh[3]) != (u16)qp->alt_ah_attr.dlid ||
 		    ppd_from_ibp(ibp)->port != qp->alt_ah_attr.port_num)
 			goto err;
 		spin_lock_irqsave(&qp->s_lock, flags);
@@ -330,7 +330,7 @@ int qib_ruc_check_hdr(struct qib_ibport *ibp, struct ib_header *hdr,
 			goto err;
 		}
 		/* Validate the SLID. See Ch. 9.6.1.5 */
-		if (be16_to_cpu(hdr->lrh[3]) != qp->remote_ah_attr.dlid ||
+		if (be16_to_cpu(hdr->lrh[3]) != (u16)qp->remote_ah_attr.dlid ||
 		    ppd_from_ibp(ibp)->port != qp->port_num)
 			goto err;
 		if (qp->s_mig_state == IB_MIG_REARM &&
@@ -566,7 +566,7 @@ again:
 	wc.byte_len = wqe->length;
 	wc.qp = &qp->ibqp;
 	wc.src_qp = qp->remote_qpn;
-	wc.slid = qp->remote_ah_attr.dlid;
+	wc.slid = (u16)qp->remote_ah_attr.dlid;
 	wc.sl = qp->remote_ah_attr.sl;
 	wc.port_num = 1;
 	/* Signal completion event if the solicited bit is set. */
@@ -702,7 +702,7 @@ void qib_make_ruc_header(struct rvt_qp *qp, struct ib_other_headers *ohdr,
 	lrh0 |= ibp->sl_to_vl[qp->remote_ah_attr.sl] << 12 |
 		qp->remote_ah_attr.sl << 4;
 	priv->s_hdr->lrh[0] = cpu_to_be16(lrh0);
-	priv->s_hdr->lrh[1] = cpu_to_be16(qp->remote_ah_attr.dlid);
+	priv->s_hdr->lrh[1] = cpu_to_be16((u16)qp->remote_ah_attr.dlid);
 	priv->s_hdr->lrh[2] =
 			cpu_to_be16(qp->s_hdrwords + nwords + SIZE_OF_CRC);
 	priv->s_hdr->lrh[3] = cpu_to_be16(ppd_from_ibp(ibp)->lid |
@@ -744,7 +744,8 @@ void qib_do_send(struct rvt_qp *qp)
 
 	if ((qp->ibqp.qp_type == IB_QPT_RC ||
 	     qp->ibqp.qp_type == IB_QPT_UC) &&
-	    (qp->remote_ah_attr.dlid & ~((1 << ppd->lmc) - 1)) == ppd->lid) {
+	    (((u16)qp->remote_ah_attr.dlid) & ~((1 << ppd->lmc) - 1))
+	    == ppd->lid) {
 		qib_ruc_loopback(qp);
 		return;
 	}
