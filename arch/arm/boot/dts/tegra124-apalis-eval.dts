@@ -232,7 +232,6 @@
 
 	backlight: backlight {
 		compatible = "pwm-backlight";
-
 		/* BKL1_PWM */
 		pwms = <&pwm 3 5000000>;
 		brightness-levels = <255 231 223 207 191 159 127 0>;
