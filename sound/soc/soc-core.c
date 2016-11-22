@@ -1598,6 +1598,25 @@ static int soc_probe_dai(struct snd_soc_dai *dai, int order)
 	return 0;
 }
 
+static int soc_link_dai_pcm_controls(struct snd_soc_card *card,
+				     struct snd_soc_dai *dai,
+				     struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_kcontrol_new kctl;
+	struct snd_soc_dai_driver *drv = dai->driver;
+	int i, err;
+
+	for (i = 0; i < drv->num_pcm_controls; i++) {
+		kctl = drv->pcm_controls[i];
+		if (!rtd->dai_link->no_pcm)
+			kctl.device = rtd->pcm->device;
+		if (snd_soc_add_dai_controls(dai, &kctl, 1))
+			return err;
+	}
+
+	return 0;
+}
+
 static int soc_link_dai_widgets(struct snd_soc_card *card,
 				struct snd_soc_dai_link *dai_link,
 				struct snd_soc_pcm_runtime *rtd)
@@ -1708,6 +1727,24 @@ static int soc_probe_link_dais(struct snd_soc_card *card,
 				dev_err(card->dev, "ASoC: can't create pcm %s :%d\n",
 				       dai_link->stream_name, ret);
 				return ret;
+			}
+
+			/* Bind DAIs pcm controls to the PCM device */
+			if (cpu_dai->driver->pcm_controls) {
+				ret = soc_link_dai_pcm_controls(card, cpu_dai,
+								rtd);
+				if (ret < 0)
+					return ret;
+			}
+			for (i = 0; i < rtd->num_codecs; i++) {
+				struct snd_soc_dai *dai = rtd->codec_dais[i];
+
+				if (dai->driver->pcm_controls)
+					ret = soc_link_dai_pcm_controls(card,
+									dai,
+									rtd);
+				if (ret < 0)
+					return ret;
 			}
 		} else {
 			INIT_DELAYED_WORK(&rtd->delayed_work,

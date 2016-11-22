@@ -273,6 +273,10 @@ struct snd_soc_dai_driver {
 	/* probe ordering - for components with runtime dependencies */
 	int probe_order;
 	int remove_order;
+
+	/* Optional PCM controls to bind to PCM device on DAIs link*/
+	const struct snd_kcontrol_new *pcm_controls;
+	int num_pcm_controls;
 };
 
 /*
