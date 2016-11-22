@@ -98,6 +98,7 @@ struct line6_properties {
 
 	int altsetting;
 
+	unsigned ctrl_if;
 	unsigned ep_ctrl_r;
 	unsigned ep_ctrl_w;
 	unsigned ep_audio_r;
