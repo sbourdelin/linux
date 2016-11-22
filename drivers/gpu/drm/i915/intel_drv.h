@@ -430,8 +430,8 @@ struct intel_scaler {
 };
 
 struct intel_crtc_scaler_state {
-#define SKL_NUM_SCALERS 2
-	struct intel_scaler scalers[SKL_NUM_SCALERS];
+#define MAX_NUM_SCALERS 2
+	struct intel_scaler scalers[MAX_NUM_SCALERS];
 
 	/*
 	 * scaler_users: keeps track of users requesting scalers on this crtc.
