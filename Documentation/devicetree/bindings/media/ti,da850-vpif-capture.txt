@@ -1,0 +1,65 @@
+Texas Instruments VPIF Capture
+------------------------------
+
+The TI Video Port InterFace (VPIF) capture component is the primary
+component for video capture on the DA850 family of TI DaVinci SoCs.
+
+TI Document number reference: SPRUH82C
+
+Required properties:
+- compatible: must be "ti,da850-vpif-capture"
+- reg: physical base address and length of the registers set for the device;
+- interrupts: should contain IRQ line for the VPIF
+
+VPIF capture has a 16-bit parallel bus input, supporting 2 8-bit
+channels or a single 16-bit channel.  It should contain at least one
+port child node with child 'endpoint' node. Please refer to the
+bindings defined in
+Documentation/devicetree/bindings/media/video-interfaces.txt.
+
+Example using 2 8-bit input channels, one of which is connected to an
+I2C-connected TVP5147 decoder:
+
+	vpif_capture: video-capture@0x00217000 {
+		compatible = "ti,da850-vpif-capture";
+		reg = <0x00217000 0x1000>;
+		interrupts = <92>;
+
+		port {
+			vpif_ch0: endpoint@0 {
+				  reg = <0>;
+				  bus-width = <8>;
+				  remote-endpoint = <&composite>;
+			};
+
+			vpif_ch1: endpoint@1 {
+				  reg = <1>;
+				  bus-width = <8>;
+				  data-shift = <8>;
+			};
+		};
+	};
+
+[ ... ]
+
+&i2c0 {
+
+	tvp5147@5d {
+		compatible = "ti,tvp5147";
+		reg = <0x5d>;
+		status = "okay";
+
+		port {
+			composite: endpoint {
+				hsync-active = <1>;
+				vsync-active = <1>;
+				pclk-sample = <0>;
+
+				/* VPIF channel 0 (lower 8-bits) */
+				remote-endpoint = <&vpif_ch0>;
+				bus-width = <8>;
+			};
+		};
+	};
+
+};
