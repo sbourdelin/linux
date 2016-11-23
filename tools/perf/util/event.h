@@ -265,6 +265,8 @@ enum auxtrace_error_type {
  *
  * The total_nmi_overhead tells exactly the NMI handler overhead on each CPU.
  * The total NMI# is stored in [0], while the accumulated time is in [1].
+ * The total_mux_overhead tells exactly the Multiplexing overhead on each CPU.
+ * The total rotate# is stored in [0], while the accumulated time is in [1].
  */
 struct events_stats {
 	u64 total_period;
@@ -274,6 +276,7 @@ struct events_stats {
 	u64 total_aux_lost;
 	u64 total_invalid_chains;
 	u64 total_nmi_overhead[MAX_NR_CPUS][2];
+	u64 total_mux_overhead[MAX_NR_CPUS][2];
 	u32 nr_events[PERF_RECORD_HEADER_MAX];
 	u32 nr_non_filtered_samples;
 	u32 nr_lost_warned;

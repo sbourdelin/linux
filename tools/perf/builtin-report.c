@@ -377,9 +377,13 @@ static int perf_evlist__tty_browse_hists(struct perf_evlist *evlist,
 				continue;
 			if (rep->cpu_list && !test_bit(cpu, rep->cpu_bitmap))
 				continue;
-			fprintf(stdout, "#\tCPU %d: NMI#: %" PRIu64 " time: %" PRIu64 " ns\n",
-				cpu, evlist->stats.total_nmi_overhead[cpu][0],
+			fprintf(stdout, "#\tCPU %d\n", cpu);
+			fprintf(stdout, "#\t\tNMI#: %" PRIu64 " time: %" PRIu64 " ns\n",
+				evlist->stats.total_nmi_overhead[cpu][0],
 				evlist->stats.total_nmi_overhead[cpu][1]);
+			fprintf(stdout, "#\t\tMultiplexing#: %" PRIu64 " time: %" PRIu64 " ns\n",
+				evlist->stats.total_mux_overhead[cpu][0],
+				evlist->stats.total_mux_overhead[cpu][1]);
 		}
 		fprintf(stdout, "#\n");
 	}
