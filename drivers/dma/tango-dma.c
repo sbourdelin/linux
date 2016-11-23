@@ -414,18 +414,14 @@ static void tangox_dma_desc_free(struct virt_dma_desc *vd)
 
 static void tangox_dma_reset(struct tangox_dma_device *dev)
 {
-	int i;
+	writel(0xffffffff, dev->sbox_base + SBOX_RESET);
+	writel(0xffffffff, dev->sbox_base + SBOX_RESET2);
 
-	for (i = 0; i < 2; i++) {
-		writel(0xffffffff, dev->sbox_base);
-		writel(0xff00ff00, dev->sbox_base);
-		writel(0xffffffff, dev->sbox_base + 4);
-		writel(0xff00ff00, dev->sbox_base + 4);
-		udelay(2);
-	}
+	writel(0xff00ff00, dev->sbox_base + SBOX_RESET);
+	writel(0xff00ff00, dev->sbox_base + SBOX_RESET2);
 
-	writel(0xffffffff, dev->sbox_base + 8);
-	writel(0xffffffff, dev->sbox_base + 12);
+	writel(0xffffffff, dev->sbox_base + SBOX_ROUTE);
+	writel(0xffffffff, dev->sbox_base + SBOX_ROUTE2);
 }
 
 static struct dma_chan *tangox_dma_xlate(struct of_phandle_args *dma_spec,
