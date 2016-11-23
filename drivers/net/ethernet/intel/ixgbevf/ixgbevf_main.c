@@ -3840,6 +3840,7 @@ static int ixgbevf_resume(struct pci_dev *pdev)
 	struct ixgbevf_adapter *adapter = netdev_priv(netdev);
 	u32 err;
 
+	adapter->hw.hw_addr = adapter->io_addr;
 	pci_restore_state(pdev);
 	/* pci_restore_state clears dev->state_saved so call
 	 * pci_save_state to restore it.
@@ -4289,6 +4290,7 @@ static pci_ers_result_t ixgbevf_io_slot_reset(struct pci_dev *pdev)
 		return PCI_ERS_RESULT_DISCONNECT;
 	}
 
+	adapter->hw.hw_addr = adapter->io_addr;
 	smp_mb__before_atomic();
 	clear_bit(__IXGBEVF_DISABLED, &adapter->state);
 	pci_set_master(pdev);
