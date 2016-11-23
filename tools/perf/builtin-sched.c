@@ -194,7 +194,7 @@ struct perf_sched {
 	struct perf_sched_map map;
 };
 
-static u64 get_nsecs(void)
+u64 get_nsecs(void)
 {
 	struct timespec ts;
 
