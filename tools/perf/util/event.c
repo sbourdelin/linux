@@ -1190,6 +1190,39 @@ size_t perf_event__fprintf_switch(union perf_event *event, FILE *fp)
 		       event->context_switch.next_prev_tid);
 }
 
+size_t perf_event__fprintf_overhead(union perf_event *event, FILE *fp)
+{
+	size_t ret;
+
+	if (event->overhead.type == PERF_NMI_OVERHEAD) {
+		ret = fprintf(fp, " [NMI] nr: %llu  time: %llu cpu %u\n",
+			      event->overhead.entry.nr,
+			      event->overhead.entry.time,
+			      event->overhead.entry.cpu);
+	} else if (event->overhead.type == PERF_MUX_OVERHEAD) {
+		ret = fprintf(fp, " [MUX] nr: %llu  time: %llu cpu %u\n",
+			      event->overhead.entry.nr,
+			      event->overhead.entry.time,
+			      event->overhead.entry.cpu);
+	} else if (event->overhead.type == PERF_SB_OVERHEAD) {
+		ret = fprintf(fp, " [SB] nr: %llu  time: %llu cpu %u\n",
+			      event->overhead.entry.nr,
+			      event->overhead.entry.time,
+			      event->overhead.entry.cpu);
+	} else if (event->overhead.type == PERF_USER_WRITE_OVERHEAD) {
+		ret = fprintf(fp, " [USER WRITE] nr: %llu  time: %llu cpu %u\n",
+			      event->overhead.entry.nr,
+			      event->overhead.entry.time,
+			      event->overhead.entry.cpu);
+	} else if (event->overhead.type == PERF_USER_ELAPSED_TIME) {
+		ret = fprintf(fp, " [ELAPSED TIME] time: %llu\n",
+			      event->overhead.entry.time);
+	} else {
+		ret = fprintf(fp, " unhandled!\n");
+	}
+	return ret;
+}
+
 size_t perf_event__fprintf(union perf_event *event, FILE *fp)
 {
 	size_t ret = fprintf(fp, "PERF_RECORD_%s",
@@ -1218,6 +1251,10 @@ size_t perf_event__fprintf(union perf_event *event, FILE *fp)
 	case PERF_RECORD_SWITCH:
 	case PERF_RECORD_SWITCH_CPU_WIDE:
 		ret += perf_event__fprintf_switch(event, fp);
+		break;
+	case PERF_RECORD_OVERHEAD:
+	case PERF_RECORD_USER_OVERHEAD:
+		ret += perf_event__fprintf_overhead(event, fp);
 		break;
 	default:
 		ret += fprintf(fp, "\n");

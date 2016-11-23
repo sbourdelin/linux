@@ -829,6 +829,7 @@ struct perf_script {
 	bool			show_task_events;
 	bool			show_mmap_events;
 	bool			show_switch_events;
+	bool			show_overhead;
 	bool			allocated;
 	struct cpu_map		*cpus;
 	struct thread_map	*threads;
@@ -1264,6 +1265,37 @@ static int process_switch_event(struct perf_tool *tool,
 	return 0;
 }
 
+static int process_overhead_event(struct perf_tool *tool,
+				  union perf_event *event,
+				  struct perf_sample *sample,
+				  struct machine *machine)
+{
+	struct thread *thread;
+	struct perf_script *script = container_of(tool, struct perf_script, tool);
+	struct perf_session *session = script->session;
+	struct perf_evsel *evsel;
+
+	if (perf_event__process_switch(tool, event, sample, machine) < 0)
+		return -1;
+	if (sample) {
+		evsel = perf_evlist__id2evsel(session->evlist, sample->id);
+		thread = machine__findnew_thread(machine, sample->pid, sample->tid);
+		if (thread == NULL) {
+			pr_debug("problem processing OVERHEAD event, skipping it.\n");
+			return -1;
+		}
+
+		print_sample_start(sample, thread, evsel);
+		perf_event__fprintf(event, stdout);
+		thread__put(thread);
+	} else {
+		/* USER OVERHEAD event */
+		perf_event__fprintf(event, stdout);
+	}
+
+	return 0;
+}
+
 static void sig_handler(int sig __maybe_unused)
 {
 	session_done = 1;
@@ -1287,6 +1319,8 @@ static int __cmd_script(struct perf_script *script)
 	}
 	if (script->show_switch_events)
 		script->tool.context_switch = process_switch_event;
+	if (script->show_overhead)
+		script->tool.overhead  = process_overhead_event;
 
 	ret = perf_session__process_events(script->session);
 
@@ -2172,6 +2206,8 @@ int cmd_script(int argc, const char **argv, const char *prefix __maybe_unused)
 		    "Show the mmap events"),
 	OPT_BOOLEAN('\0', "show-switch-events", &script.show_switch_events,
 		    "Show context switch events (if recorded)"),
+	OPT_BOOLEAN('\0', "show-overhead", &script.show_overhead,
+		    "Show overhead events"),
 	OPT_BOOLEAN('f', "force", &file.force, "don't complain, do it"),
 	OPT_BOOLEAN(0, "ns", &nanosecs,
 		    "Use 9 decimal places when displaying time"),
