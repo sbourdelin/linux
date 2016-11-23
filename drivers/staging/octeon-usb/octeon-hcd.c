@@ -2636,12 +2636,12 @@ static int cvmx_usb_poll_channel(struct octeon_hcd *usb, int channel)
 				hcintmsk.u32 = 0;
 				hcintmsk.s.chhltdmsk = 1;
 				cvmx_usb_write_csr32(usb,
-						     CVMX_USBCX_HCINTMSKX(channel, usb->index),
-						     hcintmsk.u32);
+				     CVMX_USBCX_HCINTMSKX(channel, usb->index),
+				     hcintmsk.u32);
 				usbc_hcchar.s.chdis = 1;
 				cvmx_usb_write_csr32(usb,
-						     CVMX_USBCX_HCCHARX(channel, usb->index),
-						     usbc_hcchar.u32);
+				     CVMX_USBCX_HCCHARX(channel, usb->index),
+				     usbc_hcchar.u32);
 				return 0;
 			} else if (usbc_hcint.s.xfercompl) {
 				/*
