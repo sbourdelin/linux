@@ -764,6 +764,8 @@ struct perf_event_context {
 #endif
 	void				*task_ctx_data; /* pmu specific data */
 	struct rcu_head			rcu_head;
+
+	struct perf_overhead_entry	sb_overhead;
 };
 
 /*

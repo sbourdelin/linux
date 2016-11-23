@@ -994,6 +994,7 @@ struct perf_branch_entry {
 enum perf_record_overhead_type {
 	PERF_NMI_OVERHEAD	= 0,
 	PERF_MUX_OVERHEAD,
+	PERF_SB_OVERHEAD,
 
 	PERF_OVERHEAD_MAX,
 };

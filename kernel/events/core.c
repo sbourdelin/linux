@@ -1818,9 +1818,15 @@ event_sched_out(struct perf_event *event,
 	if (event->attr.exclusive || !cpuctx->active_oncpu)
 		cpuctx->exclusive = 0;
 
-	if (log_overhead && cpuctx->mux_overhead.nr) {
-		cpuctx->mux_overhead.cpu = smp_processor_id();
-		perf_log_overhead(event, PERF_MUX_OVERHEAD, &cpuctx->mux_overhead);
+	if (log_overhead) {
+		if (cpuctx->mux_overhead.nr) {
+			cpuctx->mux_overhead.cpu = smp_processor_id();
+			perf_log_overhead(event, PERF_MUX_OVERHEAD, &cpuctx->mux_overhead);
+		}
+		if (ctx->sb_overhead.nr) {
+			ctx->sb_overhead.cpu = smp_processor_id();
+			perf_log_overhead(event, PERF_SB_OVERHEAD, &ctx->sb_overhead);
+		}
 	}
 
 	perf_pmu_enable(event->pmu);
@@ -6116,6 +6122,14 @@ static void perf_iterate_sb_cpu(perf_iterate_f output, void *data)
 	}
 }
 
+static void
+perf_caculate_sb_overhead(struct perf_event_context *ctx,
+			  u64 time)
+{
+	ctx->sb_overhead.nr++;
+	ctx->sb_overhead.time += time;
+}
+
 /*
  * Iterate all events that need to receive side-band events.
  *
@@ -6126,9 +6140,12 @@ static void
 perf_iterate_sb(perf_iterate_f output, void *data,
 	       struct perf_event_context *task_ctx)
 {
+	struct perf_event_context *overhead_ctx = task_ctx;
 	struct perf_event_context *ctx;
+	u64 start_clock, end_clock;
 	int ctxn;
 
+	start_clock = perf_clock();
 	rcu_read_lock();
 	preempt_disable();
 
@@ -6146,12 +6163,19 @@ perf_iterate_sb(perf_iterate_f output, void *data,
 
 	for_each_task_context_nr(ctxn) {
 		ctx = rcu_dereference(current->perf_event_ctxp[ctxn]);
-		if (ctx)
+		if (ctx) {
 			perf_iterate_ctx(ctx, output, data, false);
+			if (!overhead_ctx)
+				overhead_ctx = ctx;
+		}
 	}
 done:
 	preempt_enable();
 	rcu_read_unlock();
+
+	end_clock = perf_clock();
+	if (overhead_ctx)
+		perf_caculate_sb_overhead(overhead_ctx, end_clock - start_clock);
 }
 
 /*
