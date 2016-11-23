@@ -497,11 +497,13 @@ static void mem_cgroup_remove_from_trees(struct mem_cgroup *memcg)
 	struct mem_cgroup_per_node *mz;
 	int nid;
 
-	for_each_node(nid) {
+	get_online_mems();
+	for_each_online_node(nid) {
 		mz = mem_cgroup_nodeinfo(memcg, nid);
 		mctz = soft_limit_tree_node(nid);
 		mem_cgroup_remove_exceeded(mz, mctz);
 	}
+	put_online_mems();
 }
 
 static struct mem_cgroup_per_node *
@@ -895,7 +897,8 @@ static void invalidate_reclaim_iterators(struct mem_cgroup *dead_memcg)
 	int i;
 
 	while ((memcg = parent_mem_cgroup(memcg))) {
-		for_each_node(nid) {
+		get_online_mems();
+		for_each_online_node(nid) {
 			mz = mem_cgroup_nodeinfo(memcg, nid);
 			for (i = 0; i <= DEF_PRIORITY; i++) {
 				iter = &mz->iter[i];
@@ -903,6 +906,7 @@ static void invalidate_reclaim_iterators(struct mem_cgroup *dead_memcg)
 					dead_memcg, NULL);
 			}
 		}
+		put_online_mems();
 	}
 }
 
@@ -1342,6 +1346,10 @@ int mem_cgroup_select_victim_node(struct mem_cgroup *memcg)
 int mem_cgroup_select_victim_node(struct mem_cgroup *memcg)
 {
 	return 0;
+}
+
+static void mem_cgroup_may_update_nodemask(struct mem_cgroup *memcg)
+{
 }
 #endif
 
@@ -4133,8 +4141,10 @@ static void mem_cgroup_free(struct mem_cgroup *memcg)
 	int node;
 
 	memcg_wb_domain_exit(memcg);
-	for_each_node(node)
+	get_online_mems();
+	for_each_online_node(node)
 		free_mem_cgroup_per_node_info(memcg, node);
+	put_online_mems();
 	free_percpu(memcg->stat);
 	kfree(memcg);
 }
@@ -4162,9 +4172,11 @@ static struct mem_cgroup *mem_cgroup_alloc(void)
 	if (!memcg->stat)
 		goto fail;
 
-	for_each_node(node)
+	get_online_mems();
+	for_each_online_node(node)
 		if (alloc_mem_cgroup_per_node_info(memcg, node))
 			goto fail;
+	put_online_mems();
 
 	if (memcg_wb_domain_init(memcg, GFP_KERNEL))
 		goto fail;
@@ -4187,6 +4199,7 @@ static struct mem_cgroup *mem_cgroup_alloc(void)
 	idr_replace(&mem_cgroup_idr, memcg, memcg->id.id);
 	return memcg;
 fail:
+	put_online_mems();
 	if (memcg->id.id > 0)
 		idr_remove(&mem_cgroup_idr, memcg->id.id);
 	mem_cgroup_free(memcg);
@@ -5760,10 +5773,61 @@ __setup("cgroup.memory=", cgroup_memory);
 
 static void memcg_node_offline(int node)
 {
+	struct mem_cgroup *memcg;
+	struct mem_cgroup_tree_per_node *rtpn;
+	struct mem_cgroup_per_node *mz;
+
+	if (node < 0)
+		return;
+
+	rtpn = soft_limit_tree_node(node);
+
+	for_each_mem_cgroup(memcg) {
+		mz = mem_cgroup_nodeinfo(memcg, node);
+		/* mz can be NULL if node_online failed */
+		if (mz)
+			mem_cgroup_remove_exceeded(mz, rtpn);
+
+		free_mem_cgroup_per_node_info(memcg, node);
+		mem_cgroup_may_update_nodemask(memcg);
+	}
+
+	kfree(rtpn);
+
 }
 
-static void memcg_node_online(int node)
+static int memcg_node_online(int node)
 {
+	struct mem_cgroup *memcg;
+	struct mem_cgroup_tree_per_node *rtpn;
+	struct mem_cgroup_per_node *mz;
+
+	if (node < 0)
+		return 0;
+
+	rtpn = kzalloc_node(sizeof(*rtpn), GFP_KERNEL, node);
+
+	rtpn->rb_root = RB_ROOT;
+	spin_lock_init(&rtpn->lock);
+	soft_limit_tree.rb_tree_per_node[node] = rtpn;
+
+	for_each_mem_cgroup(memcg) {
+		if (alloc_mem_cgroup_per_node_info(memcg, node))
+			goto fail;
+		mem_cgroup_may_update_nodemask(memcg);
+	}
+	return 0;
+fail:
+	/*
+	 * We don't want mz in node_offline to trip when
+	 * allocation fails and CANCEL_ONLINE gets called
+	 */
+	for_each_mem_cgroup(memcg) {
+		mz = mem_cgroup_nodeinfo(memcg, node);
+		free_mem_cgroup_per_node_info(memcg, node);
+		mz = NULL;
+	}
+	return -ENOMEM;
 }
 
 static int memcg_memory_hotplug_callback(struct notifier_block *self,
@@ -5773,12 +5837,13 @@ static int memcg_memory_hotplug_callback(struct notifier_block *self,
 	int node = marg->status_change_nid;
 
 	switch (action) {
-	case MEM_GOING_OFFLINE:
 	case MEM_CANCEL_OFFLINE:
+	case MEM_GOING_OFFLINE:
 	case MEM_ONLINE:
 		break;
 	case MEM_GOING_ONLINE:
-		memcg_node_online(node);
+		if (memcg_node_online(node))
+			return NOTIFY_BAD;
 		break;
 	case MEM_CANCEL_ONLINE:
 	case MEM_OFFLINE:
@@ -5824,7 +5889,8 @@ static int __init mem_cgroup_init(void)
 		INIT_WORK(&per_cpu_ptr(&memcg_stock, cpu)->work,
 			  drain_local_stock);
 
-	for_each_node(node) {
+	get_online_mems();
+	for_each_online_node(node) {
 		struct mem_cgroup_tree_per_node *rtpn;
 
 		rtpn = kzalloc_node(sizeof(*rtpn), GFP_KERNEL,
@@ -5834,6 +5900,7 @@ static int __init mem_cgroup_init(void)
 		spin_lock_init(&rtpn->lock);
 		soft_limit_tree.rb_tree_per_node[node] = rtpn;
 	}
+	put_online_mems();
 
 	return 0;
 }
