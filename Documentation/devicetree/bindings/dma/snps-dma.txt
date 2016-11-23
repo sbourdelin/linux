@@ -27,6 +27,9 @@ Optional properties:
   that services interrupts for this device
 - is_private: The device channels should be marked as private and not for by the
   general purpose DMA channel allocator. False if not passed.
+- multi-block: Multi block transfers supported by hardware per AHB master.
+  Array property with one cell per master. 0 (default): not supported,
+  1: supported.
 
 Example:
 
