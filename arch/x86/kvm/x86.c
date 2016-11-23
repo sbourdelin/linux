@@ -4420,7 +4420,19 @@ static int vcpu_mmio_gva_to_gpa(struct kvm_vcpu *vcpu, unsigned long gva,
 		return 1;
 	}
 
-	*gpa = vcpu->arch.walk_mmu->gva_to_gpa(vcpu, gva, access, exception);
+	/*
+	 * If the exit was due to a NPF we may already have a GPA.
+	 * If the GPA is present, use it to avoid the GVA to GPA table
+	 * walk. Note, this cannot be used on string operations since
+	 * string operation using rep will only have the initial GPA
+	 * from when the NPF occurred.
+	 */
+	if (vcpu->arch.gpa_available &&
+	    !(vcpu->arch.emulate_ctxt.d & CTXT_STRING_OP))
+		*gpa = exception->address;
+	else
+		*gpa = vcpu->arch.walk_mmu->gva_to_gpa(vcpu, gva, access,
+						       exception);
 
 	if (*gpa == UNMAPPED_GVA)
 		return -1;
@@ -5542,6 +5554,9 @@ int x86_emulate_instruction(struct kvm_vcpu *vcpu,
 	}
 
 restart:
+	/* Save the faulting GPA (cr2) in the address field */
+	ctxt->exception.address = cr2;
+
 	r = x86_emulate_insn(ctxt);
 
 	if (r == EMULATION_INTERCEPTED)

@@ -4246,6 +4246,8 @@ static int handle_exit(struct kvm_vcpu *vcpu)
 		return 1;
 	}
 
+	vcpu->arch.gpa_available = (exit_code == SVM_EXIT_NPF);
+
 	return svm_exit_handlers[exit_code](svm);
 }
 
