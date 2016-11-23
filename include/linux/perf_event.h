@@ -313,6 +313,7 @@ struct pmu {
 #define PERF_EF_START	0x01		/* start the counter when adding    */
 #define PERF_EF_RELOAD	0x02		/* reload the counter when starting */
 #define PERF_EF_UPDATE	0x04		/* update the counter when stopping */
+#define PERF_EF_LOG	0x08
 
 	/*
 	 * Adds/Removes a counter to/from the PMU, can be done inside a

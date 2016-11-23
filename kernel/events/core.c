@@ -1774,7 +1774,8 @@ event_filter_match(struct perf_event *event)
 static void
 event_sched_out(struct perf_event *event,
 		  struct perf_cpu_context *cpuctx,
-		  struct perf_event_context *ctx)
+		  struct perf_event_context *ctx,
+		  bool log_overhead)
 {
 	u64 tstamp = perf_event_time(event);
 	u64 delta;
@@ -1799,9 +1800,8 @@ event_sched_out(struct perf_event *event,
 		return;
 
 	perf_pmu_disable(event->pmu);
-
 	event->tstamp_stopped = tstamp;
-	event->pmu->del(event, 0);
+	event->pmu->del(event, log_overhead ? PERF_EF_LOG : 0);
 	event->oncpu = -1;
 	event->state = PERF_EVENT_STATE_INACTIVE;
 	if (event->pending_disable) {
@@ -1824,20 +1824,21 @@ event_sched_out(struct perf_event *event,
 static void
 group_sched_out(struct perf_event *group_event,
 		struct perf_cpu_context *cpuctx,
-		struct perf_event_context *ctx)
+		struct perf_event_context *ctx,
+		bool log_overhead)
 {
 	struct perf_event *event;
 	int state = group_event->state;
 
 	perf_pmu_disable(ctx->pmu);
 
-	event_sched_out(group_event, cpuctx, ctx);
+	event_sched_out(group_event, cpuctx, ctx, log_overhead);
 
 	/*
 	 * Schedule out siblings (if any):
 	 */
 	list_for_each_entry(event, &group_event->sibling_list, group_entry)
-		event_sched_out(event, cpuctx, ctx);
+		event_sched_out(event, cpuctx, ctx, log_overhead);
 
 	perf_pmu_enable(ctx->pmu);
 
@@ -1861,7 +1862,7 @@ __perf_remove_from_context(struct perf_event *event,
 {
 	unsigned long flags = (unsigned long)info;
 
-	event_sched_out(event, cpuctx, ctx);
+	event_sched_out(event, cpuctx, ctx, false);
 	if (flags & DETACH_GROUP)
 		perf_group_detach(event);
 	list_del_event(event, ctx);
@@ -1907,9 +1908,9 @@ static void __perf_event_disable(struct perf_event *event,
 	update_cgrp_time_from_event(event);
 	update_group_times(event);
 	if (event == event->group_leader)
-		group_sched_out(event, cpuctx, ctx);
+		group_sched_out(event, cpuctx, ctx, true);
 	else
-		event_sched_out(event, cpuctx, ctx);
+		event_sched_out(event, cpuctx, ctx, true);
 	event->state = PERF_EVENT_STATE_OFF;
 }
 
@@ -2124,10 +2125,10 @@ group_error:
 			event->tstamp_running += now - event->tstamp_stopped;
 			event->tstamp_stopped = now;
 		} else {
-			event_sched_out(event, cpuctx, ctx);
+			event_sched_out(event, cpuctx, ctx, false);
 		}
 	}
-	event_sched_out(group_event, cpuctx, ctx);
+	event_sched_out(group_event, cpuctx, ctx, false);
 
 	pmu->cancel_txn(pmu);
 
@@ -2181,7 +2182,8 @@ static void add_event_to_ctx(struct perf_event *event,
 
 static void ctx_sched_out(struct perf_event_context *ctx,
 			  struct perf_cpu_context *cpuctx,
-			  enum event_type_t event_type);
+			  enum event_type_t event_type,
+			  bool log_overhead);
 static void
 ctx_sched_in(struct perf_event_context *ctx,
 	     struct perf_cpu_context *cpuctx,
@@ -2189,7 +2191,8 @@ ctx_sched_in(struct perf_event_context *ctx,
 	     struct task_struct *task);
 
 static void task_ctx_sched_out(struct perf_cpu_context *cpuctx,
-			       struct perf_event_context *ctx)
+			       struct perf_event_context *ctx,
+			       bool log_overhead)
 {
 	if (!cpuctx->task_ctx)
 		return;
@@ -2197,7 +2200,7 @@ static void task_ctx_sched_out(struct perf_cpu_context *cpuctx,
 	if (WARN_ON_ONCE(ctx != cpuctx->task_ctx))
 		return;
 
-	ctx_sched_out(ctx, cpuctx, EVENT_ALL);
+	ctx_sched_out(ctx, cpuctx, EVENT_ALL, log_overhead);
 }
 
 static void perf_event_sched_in(struct perf_cpu_context *cpuctx,
@@ -2217,7 +2220,7 @@ static void ctx_resched(struct perf_cpu_context *cpuctx,
 {
 	perf_pmu_disable(cpuctx->ctx.pmu);
 	if (task_ctx)
-		task_ctx_sched_out(cpuctx, task_ctx);
+		task_ctx_sched_out(cpuctx, task_ctx, false);
 	cpu_ctx_sched_out(cpuctx, EVENT_ALL);
 	perf_event_sched_in(cpuctx, task_ctx, current);
 	perf_pmu_enable(cpuctx->ctx.pmu);
@@ -2264,7 +2267,7 @@ static int  __perf_install_in_context(void *info)
 	}
 
 	if (activate) {
-		ctx_sched_out(ctx, cpuctx, EVENT_TIME);
+		ctx_sched_out(ctx, cpuctx, EVENT_TIME, false);
 		add_event_to_ctx(event, ctx);
 		ctx_resched(cpuctx, task_ctx);
 	} else {
@@ -2379,7 +2382,7 @@ static void __perf_event_enable(struct perf_event *event,
 		return;
 
 	if (ctx->is_active)
-		ctx_sched_out(ctx, cpuctx, EVENT_TIME);
+		ctx_sched_out(ctx, cpuctx, EVENT_TIME, false);
 
 	__perf_event_mark_enabled(event);
 
@@ -2594,7 +2597,8 @@ EXPORT_SYMBOL_GPL(perf_event_refresh);
 
 static void ctx_sched_out(struct perf_event_context *ctx,
 			  struct perf_cpu_context *cpuctx,
-			  enum event_type_t event_type)
+			  enum event_type_t event_type,
+			  bool log_overhead)
 {
 	int is_active = ctx->is_active;
 	struct perf_event *event;
@@ -2645,12 +2649,12 @@ static void ctx_sched_out(struct perf_event_context *ctx,
 	perf_pmu_disable(ctx->pmu);
 	if (is_active & EVENT_PINNED) {
 		list_for_each_entry(event, &ctx->pinned_groups, group_entry)
-			group_sched_out(event, cpuctx, ctx);
+			group_sched_out(event, cpuctx, ctx, log_overhead);
 	}
 
 	if (is_active & EVENT_FLEXIBLE) {
 		list_for_each_entry(event, &ctx->flexible_groups, group_entry)
-			group_sched_out(event, cpuctx, ctx);
+			group_sched_out(event, cpuctx, ctx, log_overhead);
 	}
 	perf_pmu_enable(ctx->pmu);
 }
@@ -2833,7 +2837,7 @@ unlock:
 
 	if (do_switch) {
 		raw_spin_lock(&ctx->lock);
-		task_ctx_sched_out(cpuctx, ctx);
+		task_ctx_sched_out(cpuctx, ctx, false);
 		raw_spin_unlock(&ctx->lock);
 	}
 }
@@ -2941,7 +2945,7 @@ void __perf_event_task_sched_out(struct task_struct *task,
 static void cpu_ctx_sched_out(struct perf_cpu_context *cpuctx,
 			      enum event_type_t event_type)
 {
-	ctx_sched_out(&cpuctx->ctx, cpuctx, event_type);
+	ctx_sched_out(&cpuctx->ctx, cpuctx, event_type, false);
 }
 
 static void
@@ -3333,7 +3337,7 @@ static int perf_rotate_context(struct perf_cpu_context *cpuctx)
 
 	cpu_ctx_sched_out(cpuctx, EVENT_FLEXIBLE);
 	if (ctx)
-		ctx_sched_out(ctx, cpuctx, EVENT_FLEXIBLE);
+		ctx_sched_out(ctx, cpuctx, EVENT_FLEXIBLE, false);
 
 	rotate_ctx(&cpuctx->ctx);
 	if (ctx)
@@ -3398,7 +3402,7 @@ static void perf_event_enable_on_exec(int ctxn)
 
 	cpuctx = __get_cpu_context(ctx);
 	perf_ctx_lock(cpuctx, ctx);
-	ctx_sched_out(ctx, cpuctx, EVENT_TIME);
+	ctx_sched_out(ctx, cpuctx, EVENT_TIME, false);
 	list_for_each_entry(event, &ctx->event_list, event_entry)
 		enabled |= event_enable_on_exec(event, ctx);
 
@@ -10168,7 +10172,7 @@ static void perf_event_exit_task_context(struct task_struct *child, int ctxn)
 	 * in.
 	 */
 	raw_spin_lock_irq(&child_ctx->lock);
-	task_ctx_sched_out(__get_cpu_context(child_ctx), child_ctx);
+	task_ctx_sched_out(__get_cpu_context(child_ctx), child_ctx, true);
 
 	/*
 	 * Now that the context is inactive, destroy the task <-> ctx relation

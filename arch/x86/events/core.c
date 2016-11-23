@@ -1397,6 +1397,11 @@ static void x86_pmu_del(struct perf_event *event, int flags)
 
 	perf_event_update_userpage(event);
 
+	if ((flags & PERF_EF_LOG) && cpuc->nmi_overhead.nr) {
+		cpuc->nmi_overhead.cpu = smp_processor_id();
+		perf_log_overhead(event, PERF_NMI_OVERHEAD, &cpuc->nmi_overhead);
+	}
+
 do_del:
 	if (x86_pmu.del) {
 		/*
@@ -1475,11 +1480,21 @@ void perf_events_lapic_init(void)
 	apic_write(APIC_LVTPC, APIC_DM_NMI);
 }
 
+static void
+perf_caculate_nmi_overhead(u64 time)
+{
+	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
+
+	cpuc->nmi_overhead.nr++;
+	cpuc->nmi_overhead.time += time;
+}
+
 static int
 perf_event_nmi_handler(unsigned int cmd, struct pt_regs *regs)
 {
 	u64 start_clock;
 	u64 finish_clock;
+	u64 clock;
 	int ret;
 
 	/*
@@ -1492,8 +1507,10 @@ perf_event_nmi_handler(unsigned int cmd, struct pt_regs *regs)
 	start_clock = sched_clock();
 	ret = x86_pmu.handle_irq(regs);
 	finish_clock = sched_clock();
+	clock = finish_clock - start_clock;
 
-	perf_sample_event_took(finish_clock - start_clock);
+	perf_caculate_nmi_overhead(clock);
+	perf_sample_event_took(clock);
 
 	return ret;
 }
