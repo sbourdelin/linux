@@ -255,6 +255,8 @@ static void cpm_uart_int_rx(struct uart_port *port)
 
 	pr_debug("CPM uart[%d]:RX INT\n", port->line);
 
+	uart_led_trigger_rx(port);
+
 	/* Just loop through the closed BDs and copy the characters into
 	 * the buffer.
 	 */
@@ -720,6 +722,8 @@ static int cpm_uart_tx_pump(struct uart_port *port)
 
 	/* Pick next descriptor and fill from buffer */
 	bdp = pinfo->tx_cur;
+
+	uart_led_trigger_tx(port);
 
 	while (!(in_be16(&bdp->cbd_sc) & BD_SC_READY) &&
 	       xmit->tail != xmit->head) {
@@ -1426,13 +1430,27 @@ static int cpm_uart_probe(struct platform_device *ofdev)
 	if (ret)
 		return ret;
 
-	return uart_add_one_port(&cpm_reg, &pinfo->port);
+	ret = uart_add_one_port(&cpm_reg, &pinfo->port);
+	if (ret)
+		return ret;
+
+	uart_add_led_triggers(&cpm_reg, &pinfo->port);
+
+	return 0;
 }
 
 static int cpm_uart_remove(struct platform_device *ofdev)
 {
 	struct uart_cpm_port *pinfo = platform_get_drvdata(ofdev);
-	return uart_remove_one_port(&cpm_reg, &pinfo->port);
+	int ret;
+
+	ret = uart_remove_one_port(&cpm_reg, &pinfo->port);
+	if (ret)
+		return ret;
+
+	uart_remove_led_triggers(&pinfo->port);
+
+	return 0;
 }
 
 static const struct of_device_id cpm_uart_match[] = {
