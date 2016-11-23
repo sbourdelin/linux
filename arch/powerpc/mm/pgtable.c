@@ -219,12 +219,18 @@ int ptep_set_access_flags(struct vm_area_struct *vma, unsigned long address,
 			  pte_t *ptep, pte_t entry, int dirty)
 {
 	int changed;
+	unsigned long page_size;
+
 	entry = set_access_flags_filter(entry, vma, dirty);
 	changed = !pte_same(*(ptep), entry);
 	if (changed) {
-		if (!is_vm_hugetlb_page(vma))
+		if (!is_vm_hugetlb_page(vma)) {
+			page_size = PAGE_SIZE;
 			assert_pte_locked(vma->vm_mm, address);
-		__ptep_set_access_flags(vma->vm_mm, ptep, entry);
+		} else
+			page_size = huge_page_size(hstate_vma(vma));
+		__ptep_set_access_flags(vma->vm_mm, ptep, entry,
+					address, page_size);
 		flush_tlb_page(vma, address);
 	}
 	return changed;
