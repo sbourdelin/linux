@@ -5,6 +5,9 @@
 #define TCG_EVENT_NAME_LEN_MAX	255
 #define MAX_TEXT_EVENT		1000	/* Max event string length */
 #define ACPI_TCPA_SIG		"TCPA"	/* 0x41504354 /'TCPA' */
+#define HASH_COUNT		3
+#define MAX_TPM_LOG_MSG		128
+#define MAX_DIGEST_SIZE		64
 
 #ifdef CONFIG_PPC64
 #define do_endian_conversion(x) be32_to_cpu(x)
@@ -73,8 +76,74 @@ enum tcpa_pc_event_ids {
 	HOST_TABLE_OF_DEVICES,
 };
 
+/*
+ * All the structures related to TPM 2.0 Event Log are taken from TCG EFIi
+ * Protocol * Specification, Family "2.0". Document is available on link
+ * http://www.trustedcomputinggroup.org/tcg-efi-protocol-specification/
+ * Information is also available on TCG PC Client Platform Firmware Profile
+ * Specification, Family "2.0"
+ * Detailed digest structures for TPM 2.0 are defined in document
+ * Trusted Platform Module Library Part 2: Structures, Family "2.0".
+ */
+
+/* TPM 2.0 Event log header algorithm spec. */
+struct tcg_efi_specid_event_algs {
+	u16     alg_id;
+	u16     digest_size;
+} __packed;
+
+/* TPM 2.0 Event log header data. */
+struct tcg_efi_specid_event {
+	u8      signature[16];
+	u32     platform_class;
+	u8      spec_version_minor;
+	u8      spec_version_major;
+	u8      spec_errata;
+	u8      uintnsize;
+	u32     num_algs;
+	struct tcg_efi_specid_event_algs   digest_sizes[HASH_COUNT];
+	u8      vendor_info_size;
+	u8      vendor_info[0];
+} __packed;
+
+/* TPM 2.0 Event Log Header. */
+struct tcg_pcr_event {
+	u32     pcr_idx;
+	u32     event_type;
+	u8      digest[20];
+	u32     event_size;
+	u8      event[MAX_TPM_LOG_MSG];
+} __packed;
+
+/* TPM 2.0 Crypto agile algorithm and respective digest. */
+struct tpmt_ha {
+	u16     alg_id;
+	u8      digest[MAX_DIGEST_SIZE];
+} __packed;
+
+/* TPM 2.0 Crypto agile digests list. */
+struct tpml_digest_values {
+	u32     count;
+	struct tpmt_ha  digests[HASH_COUNT];
+} __packed;
+
+/* TPM 2.0 Event field structure. */
+struct tcg_event_field {
+	u32     event_size;
+	u8      event[MAX_TPM_LOG_MSG];
+} __packed;
+
+/* TPM 2.0 Crypto agile log entry format. */
+struct tcg_pcr_event2 {
+	u32     pcr_idx;
+	u32     event_type;
+	struct tpml_digest_values digests;
+	struct tcg_event_field  event;
+} __packed;
+
 extern const struct seq_operations tpm_ascii_b_measurements_seqops;
 extern const struct seq_operations tpm_binary_b_measurements_seqops;
+extern const struct seq_operations tpm2_binary_b_measurements_seqops;
 
 #if defined(CONFIG_ACPI)
 int tpm_read_log_acpi(struct tpm_chip *chip);
