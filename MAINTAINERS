@@ -6916,6 +6916,7 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kvms390/linux.git
 S:	Supported
 F:	Documentation/s390/kvm.txt
 F:	arch/s390/include/asm/kvm*
+F:	arch/s390/tools/kvm_facilities.c
 F:	arch/s390/kvm/
 
 KERNEL VIRTUAL MACHINE (KVM) FOR ARM
