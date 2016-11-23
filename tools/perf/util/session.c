@@ -1207,6 +1207,23 @@ static int
 					    &sample->read.one, machine);
 }
 
+static void
+overhead_stats_update(struct perf_tool *tool,
+		      struct perf_evlist *evlist,
+		      union perf_event *event)
+{
+	if (tool->overhead == perf_event__process_overhead) {
+		switch (event->overhead.type) {
+		case PERF_NMI_OVERHEAD:
+			evlist->stats.total_nmi_overhead[event->overhead.entry.cpu][0] += event->overhead.entry.nr;
+			evlist->stats.total_nmi_overhead[event->overhead.entry.cpu][1] += event->overhead.entry.time;
+			break;
+		default:
+			break;
+		}
+	}
+}
+
 static int machines__deliver_event(struct machines *machines,
 				   struct perf_evlist *evlist,
 				   union perf_event *event,
@@ -1271,6 +1288,7 @@ static int machines__deliver_event(struct machines *machines,
 	case PERF_RECORD_SWITCH_CPU_WIDE:
 		return tool->context_switch(tool, event, sample, machine);
 	case PERF_RECORD_OVERHEAD:
+		overhead_stats_update(tool, evlist, event);
 		return tool->overhead(tool, event, sample, machine);
 	default:
 		++evlist->stats.nr_unknown_events;

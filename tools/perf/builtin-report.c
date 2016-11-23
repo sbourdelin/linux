@@ -365,11 +365,22 @@ static int perf_evlist__tty_browse_hists(struct perf_evlist *evlist,
 					 struct report *rep,
 					 const char *help)
 {
+	struct perf_session *session = rep->session;
 	struct perf_evsel *pos;
+	int cpu;
 
 	fprintf(stdout, "#\n# Total Lost Samples: %" PRIu64 "\n#\n", evlist->stats.total_lost_samples);
 	if (symbol_conf.show_overhead) {
 		fprintf(stdout, "# Overhead:\n");
+		for (cpu = 0; cpu < session->header.env.nr_cpus_online; cpu++) {
+			if (!evlist->stats.total_nmi_overhead[cpu][0])
+				continue;
+			if (rep->cpu_list && !test_bit(cpu, rep->cpu_bitmap))
+				continue;
+			fprintf(stdout, "#\tCPU %d: NMI#: %" PRIu64 " time: %" PRIu64 " ns\n",
+				cpu, evlist->stats.total_nmi_overhead[cpu][0],
+				evlist->stats.total_nmi_overhead[cpu][1]);
+		}
 		fprintf(stdout, "#\n");
 	}
 	evlist__for_each_entry(evlist, pos) {

@@ -558,6 +558,15 @@ int machine__process_switch_event(struct machine *machine __maybe_unused,
 int machine__process_overhead_event(struct machine *machine __maybe_unused,
 				    union perf_event *event __maybe_unused)
 {
+	if (event->overhead.type == PERF_NMI_OVERHEAD) {
+		dump_printf(" NMI nr: %llu  time: %llu cpu %u\n",
+			    event->overhead.entry.nr,
+			    event->overhead.entry.time,
+			    event->overhead.entry.cpu);
+	} else {
+		dump_printf("\tUNSUPPORT OVERHEAD TYPE 0x%x!\n", event->overhead.type);
+	}
+
 	return 0;
 }
 
