@@ -114,6 +114,9 @@ int create_user_ns(struct cred *new)
 	ns->ns.ops = &userns_operations;
 
 	atomic_set(&ns->count, 1);
+#ifdef CONFIG_SECURITY_PTAGS_WITH_USER_NS
+	atomic_set(&ns->weak_count, 0);
+#endif
 	/* Leave the new->user_ns reference with the new user namespace. */
 	ns->parent = parent_ns;
 	ns->level = parent_ns->level + 1;

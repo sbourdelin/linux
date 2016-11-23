@@ -1,0 +1,428 @@
+The PTAGS security module
+=========================
+
+
+Overview
+--------
+
+The PTAGS module allows to attach tags to processes. Tags are accessed
+through the files /proc/<PID>/attr/ptags and /proc/<PID>/tasks/<TID>/attr/ptags
+(named below "ptags file").
+
+The module PTAGS is part of the security of linux for 2 reasons:
+
+ 1. it is built on top of the Linux Security Module (LSM) infrastructure
+    as it exists since v4.1
+
+ 2. it is a foundation for building permissions, privileges and cookies based
+    security in user land.
+
+The tags are public by nature. Accesses to the ptags file are not restricted
+except by standards DAC and MAC for files: any process having read access to
+/proc/<PID>/attr/ptags or to /proc/<PID>/tasks/<TID>/attr/ptags can read the
+tags of the task (and their value if any).
+
+Writing on tags files is also possible and subject to DAC and MAC rules.
+
+Writing a ptags file allows (under conditions) to change the tags of a
+process. When writting the file, it acts like a protocol accepting
+one or more lines. This protocol allows to add new tags, to remove existing
+tags, to attach values to tags, to tell wether the tag is kept or not on
+execution of the system call "execve".
+
+The accepted lines are:
+
+ - empty line: "\n"
+
+    Only a new-line
+
+ - comment: "#...anything...\n"
+
+     A sharp followed by anything and a new-line
+
+ - action:
+
+     Action lines begins with one of the following characters:
+
+      o + (plus) adds a tag and/or set keep flags
+      o - (minus) removes tags and/or keep flags
+      o ! (bang) assign a value to a tag
+      o ? (question mark) query existence of tags and/or keep flags
+
+
+Example of using ptags
+----------------------
+
+Usages of ptags are multiple. One of the main use is setting privileges,
+permissions or cookies to processes in the user land.
+
+For this example, a server S will be queried to give permissions to a process.
+The permissions given are handled by a simple tag: one permission, one tag.
+Because the server S doesn't want to interfere with other permission managers,
+it prefixes its permissions with the prefix "S:".
+
+To be able to add and remove permissions aof prefix "S:" to other processes,
+the server process S must have the 3 special tags below:
+
+ - ptags:S:add
+ - ptags:S:others
+ - ptags:S:sub
+
+This means that the process can add and sub tags prefixed by S: for itself and
+for other processes.
+
+Having this tags, the server can now add tags prefixed by S: to other
+processes by writing the ptags file /proc/<PID>/attr/ptags as if the following
+command was issued:
+
+ $ echo "+S:PERMISSION-NAME" > /proc/<PID>/attr/ptags
+
+This will add the tags S:PERMISSION-NAME to the process of <PID>.
+In that case, the "keep flag" is not set.
+
+The fact that this means that the permission S:PERMISSION-NAME is given
+to the process is only a convention between processes of the user land.
+In the user land, checking if a process has or not the tag S:PERMISSION-NAME
+is done by reading the ptags file /proc/<PID>/attr/ptags as if the following
+command was issued:
+
+ $ grep -q '^S:PERMISSION-NAME$' /proc/<PID>/attr/ptags
+
+The following command use ptags protocol and has the same behaviour:
+
+ $ echo "?S:PERMISSION-NAME" > /proc/<PID>/attr/ptags
+
+The role of the ptags module is to ensure that the given tags are attached
+to the process and will die with it.
+
+The module ptags also allows the tags to be automatically copied to cloned
+processes (forks and threads) and manages how tags are kept or not when
+the system call "execve" is invoked.
+
+In the above example, the tag S:PERMISSION-NAME is removed when execve is
+called because the keep flag is not set.
+
+To set the keep flag, an @ (at sign) must prefix the tag name in the + (add)
+command, as if the following command was issued:
+
+ $ echo "+@S:PERMISSION-NAME" > /proc/<PID>/attr/ptags
+
+It is possible to attach a value to a tag. Thos achieve it, the process must
+have the special tag "ptags:S:set". This is done by writing the ptags file
+as with the command:
+
+ $ echo "!S:PERMISSION-NAME=VALUE" > /proc/<PID>/attr/ptags
+
+
+Structure of tags
+-----------------
+
+Tags are structured in fields separated by : (colon). For example, the tag
+"scope:subscope:item" is made of 3 fields: "scope", "subscope" and "item".
+
+Tags whose first field is "ptags" are specials: they are used to give
+permissions to modify tags.
+
+Note that fields can be empty: the tag ":x::a" is a valid tag.
+
+The structure of the tags allows to define prefix and pattern, the pattern
+"scope:subscope:*" matches any tag that has the prefix "scope:subscope:".
+Matching ":*" is allowed and matches any tag beginning with :.
+
+
+Tag Validity (TV) Rules
+-----------------------
+
+The following rules detail what are valid tags:
+
+(TV.1)
+
+   Tags are valid utf-8 strings with a maximum length of 4000 bytes (the count
+   of char is lower or equal to 4000 because utf8 encoding).
+
+(TV.2)
+
+   Tags must contain neither control characters (code lower than 32),
+   nor '=' (equal), nor '*' (star), nor DEL (ASCII code 127). (note that tags
+   can contain spaces but can't contain tab)
+
+(TV.3)
+
+   Tags must neither begin with @ (at sign) nor end with : (colon).
+
+(TV.4)
+
+   Tags starting with the string "ptags:" (6 characters) must end with
+   one of the following strings: ":add", ":sub", ":set", ":others". For
+   example, "ptags:add" (9 characters) and "ptags:myself:sub" (16 characters)
+   are valid tags but "ptags:myadd" (11 characters) is not valid.
+
+
+Value Validity (VV) rules
+-------------------------
+
+(VV.1)
+
+   Values are valid utf-8 strings with a maximum length of 32700 bytes (the
+   count of char is lower or equal to 32700 because utf8 encoding).
+
+(VV.2)
+
+   Values must contain neither control characters (code lower than 32),
+   nor DEL (ASCII code 127). (note that values can contain spaces but can't
+   contain tab)
+
+
+Pattern Validity (PV) rules
+---------------------------
+
+(PV.1)
+
+   Any valid tag (see TV) is a valid pattern matching only that tag.
+   This is an exact pattern.
+
+(PV.2)
+
+   Any valid tag (see TV) followed by :* (the two characters colon then star)
+   is a valid pattern matching any tag prefixed by the string before * (star).
+   This is a global pattern.
+
+Example: the pattern "S:*" will match "S:A:B.c" and "S:X" but will not match
+neither "S" nor "X".
+
+For actions matching global patterns, the action is performed where allowed and
+silentely not performed where not allowed.
+
+Action of reading the ptags file
+--------------------------------
+
+Any process allowed to read the ptags file of an other process (depending on
+DAC and MAC) has access to the tag set.
+
+Reading the ptags file returns valid utf8 lines, one tag per line. Each LINE
+has the following format:
+
+ LINE = KEEP-FLAG? TAG-NAME VALUE? LF
+ KEEP-FLAG = '@'
+ TAG-NAME = see TV rules
+ VALUE = '=' see VV rules
+
+The tags are listed in lexicographic order as below:
+
+a-tag
+@b-tag
+c-tag=value-of-c-tag
+
+The keep flag (@ at sign at start of the line) is ignored when sorting tags.
+On the above example, the b-tag is kept across "execve" while other tags are
+dropped. The value of c-tag is available for any reader after the equal sign.
+
+
+Action of adding for one tag
+----------------------------
+
+The action of adding one tag of name TAGNAME is done by writing either
+"+TAGNAME\n" or "+@TAGNAME\n" to the ptags file.
+
+The table below shows the effect of writing either +TAGNAME or +@TAGNAME
+when adding is allowed.
+
+      BEFORE   : +TAGNAME  : +@TAGNAME
+     ----------+-----------+---------------
+               : TAGNAME   : @TAGNAME
+      TAGNAME  : TAGNAME   : @TAGNAME
+      @TAGNAME : @TAGNAME  : @TAGNAME
+
+The table below shows the effect of writing either +TAGNAME or +@TAGNAME
+when adding is NOT allowed.
+
+      BEFORE   : +TAGNAME  : +@TAGNAME
+     ----------+-----------+---------------
+               :           :
+      TAGNAME  : TAGNAME   :
+      @TAGNAME : @TAGNAME  : @TAGNAME
+
+
+Action of adding the keep flag for global patterns
+--------------------------------------------------
+
+The action of adding the keep flag to tags matching the global pattern GLOB:*
+is done by writing "+@GLOB:*\n" to the ptags file.
+
+See the third columns of the tables above for effect of the command on tags
+matching the pattern.
+
+
+Action of removing for one tag
+------------------------------
+
+The action of removing the tag of name TAGNAME is done by writing
+"-TAGNAME\n" to the ptags file.
+
+The action of removing the keep flag tag of name TAGNAME is done by writing
+"-@TAGNAME\n" to the ptags file.
+
+The table below shows the effect of writing either -TAGNAME or -@TAGNAME
+when removing is allowed.
+
+      BEFORE   : -TAGNAME  : -@TAGNAME
+     ----------+-----------+---------------
+               :           :
+      TAGNAME  :           : TAGNAME
+      @TAGNAME :           : TAGNAME
+
+The table below shows the effect of writing either -TAGNAME or -@TAGNAME
+when removing is NOT allowed.
+
+      BEFORE   : -TAGNAME  : -@TAGNAME
+     ----------+-----------+---------------
+               :           :
+      TAGNAME  : TAGNAME   : TAGNAME
+      @TAGNAME : @TAGNAME  : @TAGNAME
+
+
+Action of removing for global patterns
+--------------------------------------
+
+The action of removing tags matching the global pattern GLOB:* is done by
+writing "-GLOB:*\n" to the ptags file.
+
+The action of removing the keep flag of tags matching the global pattern
+GLOB:* is done by writing "-@GLOB:*\n" to the ptags file.
+
+See the tables above for effect of the command on tags matching the pattern.
+
+Action of removing all
+----------------------
+
+The action of removing all tags is done by writing "-\n" to the ptags file.
+
+The action of removing the keep flag of all tags is done by writing "-@\n" to
+the ptags file.
+
+See the tables above for effect of the command on tags matching the pattern.
+
+
+Action of setting the value of one tag
+--------------------------------------
+
+The action of attaching VALUE to the tag of name TAGNAME is done by writing
+"!TAGNAME=VALUE\n" to the ptags file.
+
+The value can be removed (or set to nothing)  by writing "!TAGNAME=\n" or
+"!TAGNAMEn" to the ptags file.
+
+
+Querying existence of tags or keep flags of tags
+------------------------------------------------
+
+Writing "?PATTERN\n" returns an error if no tags matching pattern exist.
+
+Writing "?@PATTERN\n" returns an error if no tags matching pattern exist or if
+no tags matching pattern has the keep flag.
+
+
+Allowed actions
+---------------
+
+Any process can query any other processes (? command).
+
+Normally a process can not remove tags or keep flags from itself. A process can
+remove a tag or a keep flag from itself only if one or more of the following
+conditions is true:
+
+ - the process has not the tag or the keep flag (it is not an error)
+
+ - the process has the tag "ptags:sub" and the tag to remove
+   or whose keep flag is to remove is not a special tag
+
+ - the process has a tag "ptags:PREFIX:sub" where PREFIX is any valid prefix
+   and the tag to remove or whose keep flag is to remove has the prefix
+   "PREFIX:" (in particular, the tag "ptags:ptags:sub" allows to remove any
+   special tag)
+
+ - the process is a kernel's thread
+
+ - the process has the capability CAP_MAC_ADMIN according to user namespaces
+
+Normally a process can not add tags or keep flags to itself. A process can add
+a tag or keep flags to itself only if one or more of the following conditions
+is true:
+
+ - the process already has the tag or the keep flag (it is not an error)
+
+ - the process has the tag "ptags:add" and the tag to add or whose keep flags
+   is to set is not a special tag
+
+ - the process has a tag "ptags:PREFIX:add" where PREFIX is any valid prefix
+   and the tag to add or whose keep flag is to set has the prefix "PREFIX:"
+   (in particular, the tag "ptags:ptags:add" allows to add any special tag)
+
+ - the process is a kernel's thread
+
+ - the process has the capability CAP_MAC_ADMIN according to user namespaces
+
+Normally a process can not set values to its tags. A process can set values
+to its tags only if one or more of the following conditions is true:
+
+ - the process has the tag "ptags:set" and the tag to set is not a special tag
+
+ - the process has a tag "ptags:PREFIX:set"  where PREFIX is any valid prefix
+   and the tag to set to set has the prefix "PREFIX:"
+
+ - the process is a kernel's thread
+
+ - the process has the capability CAP_MAC_ADMIN according to user namespaces
+
+Normally a process can not modify tags of other processes. A process can modify
+the tag set of an other process only if one or more of the following conditions
+is true:
+
+ - the process is a kernel's thread
+
+ - the process has the capability CAP_MAC_ADMIN according to user namespaces
+
+ - the following two conditions are both true:
+
+   o the process could modify the tags if it was for itself
+
+   o one of the following condition is true:
+
+     # the process has the tag "ptags:others" and tags to modify are not
+       special tags
+
+     # the process has the tag "ptags:PREFIX:others"  where PREFIX is any valid
+       prefix and tags to modify have the prefix "PREFIX:" (in particular, the
+       tag "ptags:ptags:others" allows to modify special tags of other
+       processes)
+
+
+Writing to ptags files
+----------------------
+
+When writing lines to ptags file, using "write" call, the result is the count
+of bytes written without error. If the first line raise an error, an error is
+returned through errno. The returned errors are:
+
+   error       action    reason
+   --------------------------------------------------------------
+   EINVAL      +-!?      invalid value
+   EPERM       +-!       not allowed
+   ENOMEM      +!        out of memory
+   ENOENT      -?        no tag found
+   ECANCELED   +         maximum count of tags reached
+
+
+Watching ptags files
+--------------------
+
+Because tags are modified only through accesses to the ptags file, it is
+possible to monitor the inotify(7) interface to track possible changes.
+
+
+User land library
+-----------------
+
+A library for accessing and managing process tags is available for
+download at https://gitlab.com/jobol/ptags
+

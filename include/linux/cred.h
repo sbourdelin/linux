@@ -139,6 +139,9 @@ struct cred {
 #endif
 #ifdef CONFIG_SECURITY
 	void		*security;	/* subjective LSM security */
+#ifdef CONFIG_SECURITY_PTAGS
+	void		*ptags;		/* secured process tagging */
+#endif
 #endif
 	struct user_struct *user;	/* real user ID subscription */
 	struct user_namespace *user_ns; /* user_ns the caps and keyrings are relative to. */

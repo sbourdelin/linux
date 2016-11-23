@@ -5784,6 +5784,10 @@ static int selinux_getprocattr(struct task_struct *p,
 	int error;
 	unsigned len;
 
+#ifdef CONFIG_SECURITY_PTAGS
+	if (strcmp(name, "ptags") == 0)
+		return 0;
+#endif
 	if (current != p) {
 		error = current_has_perm(p, PROCESS__GETATTR);
 		if (error)
@@ -5831,6 +5835,10 @@ static int selinux_setprocattr(struct task_struct *p,
 	int error;
 	char *str = value;
 
+#ifdef CONFIG_SECURITY_PTAGS
+	if (strcmp(name, "ptags") == 0)
+		return 0;
+#endif
 	if (current != p) {
 		/* SELinux only allows a process to change its own
 		   security attributes. */

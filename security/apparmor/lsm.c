@@ -473,10 +473,16 @@ static int apparmor_getprocattr(struct task_struct *task, char *name,
 {
 	int error = -ENOENT;
 	/* released below */
-	const struct cred *cred = get_task_cred(task);
-	struct aa_task_cxt *cxt = cred_cxt(cred);
+	const struct cred *cred;
+	struct aa_task_cxt *cxt;
 	struct aa_profile *profile = NULL;
 
+#ifdef CONFIG_SECURITY_PTAGS
+	if (strcmp(name, "ptags") == 0)
+		return 0;
+#endif
+	cred = get_task_cred(task);
+	cxt = cred_cxt(cred);
 	if (strcmp(name, "current") == 0)
 		profile = aa_get_newest_profile(cxt->profile);
 	else if (strcmp(name, "prev") == 0  && cxt->previous)
@@ -504,6 +510,10 @@ static int apparmor_setprocattr(struct task_struct *task, char *name,
 	size_t arg_size;
 	int error;
 
+#ifdef CONFIG_SECURITY_PTAGS
+	if (strcmp(name, "ptags") == 0)
+		return 0;
+#endif
 	if (size == 0)
 		return -EINVAL;
 	/* task can only write its own attributes */

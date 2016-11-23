@@ -273,6 +273,9 @@ struct cred *prepare_creds(void)
 #ifdef CONFIG_SECURITY
 	new->security = NULL;
 #endif
+#ifdef CONFIG_SECURITY_PTAGS
+	new->ptags = NULL;
+#endif
 
 	if (security_prepare_creds(new, old, GFP_KERNEL) < 0)
 		goto error;
@@ -626,6 +629,9 @@ struct cred *prepare_kernel_cred(struct task_struct *daemon)
 
 #ifdef CONFIG_SECURITY
 	new->security = NULL;
+#endif
+#ifdef CONFIG_SECURITY_PTAGS
+	new->ptags = NULL;
 #endif
 	if (security_prepare_creds(new, old, GFP_KERNEL) < 0)
 		goto error;

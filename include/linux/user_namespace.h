@@ -40,6 +40,9 @@ struct user_namespace {
 	struct uid_gid_map	gid_map;
 	struct uid_gid_map	projid_map;
 	atomic_t		count;
+#ifdef CONFIG_SECURITY_PTAGS_WITH_USER_NS
+	atomic_t		weak_count;
+#endif
 	struct user_namespace	*parent;
 	int			level;
 	kuid_t			owner;
@@ -94,6 +97,26 @@ static inline void put_user_ns(struct user_namespace *ns)
 	if (ns && atomic_dec_and_test(&ns->count))
 		__put_user_ns(ns);
 }
+
+#ifdef CONFIG_SECURITY_PTAGS_WITH_USER_NS
+static inline struct user_namespace *get_weak_user_ns(struct user_namespace *ns)
+{
+	if (ns && atomic_inc_return(&ns->weak_count) == 1)
+		get_user_ns(ns);
+	return ns;
+}
+
+static inline void put_weak_user_ns(struct user_namespace *ns)
+{
+	if (ns && atomic_dec_and_test(&ns->weak_count))
+		put_user_ns(ns);
+}
+
+static inline int is_weak_user_ns_still_alive(struct user_namespace *ns)
+{
+	return ns && atomic_read(&ns->count) > 1;
+}
+#endif
 
 struct seq_operations;
 extern const struct seq_operations proc_uid_seq_operations;

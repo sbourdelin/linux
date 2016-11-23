@@ -1,0 +1,16 @@
+config SECURITY_PTAGS
+	bool "Secure process tagging support (PTAGS)"
+	depends on SECURITY
+	default n
+	help
+	  PTags module allows to tag the processes through
+	  the special files /proc/<pid>/attr/ptags.
+
+config SECURITY_PTAGS_WITH_USER_NS
+	bool "PTAGS with user namespace support (EXPERIMENTAL)"
+	depends on SECURITY_PTAGS && USER_NS
+	default n
+	help
+	  Activating this option allows PTAGS module to
+	  manage tags by user namespaces.
+

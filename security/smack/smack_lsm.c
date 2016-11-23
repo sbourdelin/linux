@@ -3602,13 +3602,18 @@ unlockandout:
  */
 static int smack_getprocattr(struct task_struct *p, char *name, char **value)
 {
-	struct smack_known *skp = smk_of_task_struct(p);
+	struct smack_known *skp;
 	char *cp;
 	int slen;
 
+#ifdef CONFIG_SECURITY_PTAGS
+	if (strcmp(name, "ptags") == 0)
+		return 0;
+#endif
 	if (strcmp(name, "current") != 0)
 		return -EINVAL;
 
+	skp = smk_of_task_struct(p);
 	cp = kstrdup(skp->smk_known, GFP_KERNEL);
 	if (cp == NULL)
 		return -ENOMEM;
@@ -3633,12 +3638,16 @@ static int smack_getprocattr(struct task_struct *p, char *name, char **value)
 static int smack_setprocattr(struct task_struct *p, char *name,
 			     void *value, size_t size)
 {
-	struct task_smack *tsp = current_security();
+	struct task_smack *tsp;
 	struct cred *new;
 	struct smack_known *skp;
 	struct smack_known_list_elem *sklep;
 	int rc;
 
+#ifdef CONFIG_SECURITY_PTAGS
+	if (strcmp(name, "ptags") == 0)
+		return 0;
+#endif
 	/*
 	 * Changing another process' Smack value is too dangerous
 	 * and supports no sane use case.
@@ -3646,6 +3655,7 @@ static int smack_setprocattr(struct task_struct *p, char *name,
 	if (p != current)
 		return -EPERM;
 
+	tsp = current_security();
 	if (!smack_privileged(CAP_MAC_ADMIN) && list_empty(&tsp->smk_relabel))
 		return -EPERM;
 
