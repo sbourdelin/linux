@@ -3298,6 +3298,17 @@ int dw_mci_runtime_resume(struct device *dev)
 	if (ret)
 		return ret;
 
+	if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS)) {
+		clk_disable_unprepare(host->ciu_clk);
+
+		if (host->cur_slot &&
+		    (mmc_can_gpio_cd(host->cur_slot->mmc) ||
+		     !mmc_card_is_removable(host->cur_slot->mmc)))
+			clk_disable_unprepare(host->biu_clk);
+
+		return -ENODEV;
+	}
+
 	if (host->use_dma && host->dma_ops->init)
 		host->dma_ops->init(host);
 
