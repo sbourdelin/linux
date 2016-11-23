@@ -444,6 +444,8 @@ static inline void imx_transmit_buffer(struct imx_port *sport)
 		return;
 	}
 
+	uart_led_trigger_tx(&sport->port);
+
 	if (sport->dma_is_enabled) {
 		/*
 		 * We've just sent a X-char Ensure the TX DMA is enabled
@@ -569,6 +571,7 @@ static void imx_dma_tx(struct imx_port *sport)
 	/* fire it */
 	sport->dma_is_txing = 1;
 	dmaengine_submit(desc);
+	uart_led_trigger_tx(&sport->port);
 	dma_async_issue_pending(chan);
 	return;
 }
@@ -655,6 +658,8 @@ static irqreturn_t imx_rxint(int irq, void *dev_id)
 	struct tty_port *port = &sport->port.state->port;
 	unsigned long flags, temp;
 
+	uart_led_trigger_rx(&sport->port);
+
 	spin_lock_irqsave(&sport->port.lock, flags);
 
 	while (readl(sport->port.membase + USR2) & USR2_RDR) {
@@ -728,6 +733,8 @@ static void imx_dma_rxint(struct imx_port *sport)
 {
 	unsigned long temp;
 	unsigned long flags;
+
+	uart_led_trigger_rx(&sport->port);
 
 	spin_lock_irqsave(&sport->port.lock, flags);
 
@@ -2184,14 +2191,27 @@ static int serial_imx_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, sport);
 
-	return uart_add_one_port(&imx_reg, &sport->port);
+	ret = uart_add_one_port(&imx_reg, &sport->port);
+	if (ret)
+		return ret;
+
+	uart_add_led_triggers(&imx_reg, &sport->port);
+
+	return 0;
 }
 
 static int serial_imx_remove(struct platform_device *pdev)
 {
 	struct imx_port *sport = platform_get_drvdata(pdev);
+	int ret;
 
-	return uart_remove_one_port(&imx_reg, &sport->port);
+	ret = uart_remove_one_port(&imx_reg, &sport->port);
+	if (ret)
+		return ret;
+
+	uart_remove_led_triggers(&sport->port);
+
+	return 0;
 }
 
 static void serial_imx_restore_context(struct imx_port *sport)
