@@ -15,12 +15,20 @@ static struct intel_dsm_priv {
 	acpi_handle dhandle;
 } intel_dsm_priv;
 
-static const u8 intel_dsm_guid[] = {
+static u8 intel_dsm_guid[] = {
 	0xd3, 0x73, 0xd8, 0x7e,
 	0xd0, 0xc2,
 	0x4f, 0x4e,
 	0xa8, 0x54,
 	0x0f, 0x13, 0x17, 0xb0, 0x1c, 0x2c
+};
+
+static u8 intel_dsm_guid_bxt[] = {
+	0xc6, 0x41, 0x5b, 0x3e,
+	0x1d, 0xeb,
+	0x60, 0x42,
+	0x9d, 0x15,
+	0xc7, 0x1f, 0xba, 0xda, 0xe4, 0x14
 };
 
 static char *intel_dsm_port_name(u8 id)
@@ -113,12 +121,20 @@ static void intel_dsm_platform_mux_info(void)
 static bool intel_dsm_pci_probe(struct pci_dev *pdev)
 {
 	acpi_handle dhandle;
+	struct drm_device *dev = pci_get_drvdata(pdev);
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	u8 *guid;
 
 	dhandle = ACPI_HANDLE(&pdev->dev);
 	if (!dhandle)
 		return false;
 
-	if (!acpi_check_dsm(dhandle, intel_dsm_guid, INTEL_DSM_REVISION_ID,
+	if (IS_BROXTON(dev_priv))
+		guid = intel_dsm_guid_bxt;
+	else
+		guid = intel_dsm_guid;
+
+	if (!acpi_check_dsm(dhandle, guid, INTEL_DSM_REVISION_ID,
 			    1 << INTEL_DSM_FN_PLATFORM_MUX_INFO)) {
 		DRM_DEBUG_KMS("no _DSM method for intel device\n");
 		return false;
