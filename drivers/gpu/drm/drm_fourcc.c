@@ -85,6 +85,8 @@ EXPORT_SYMBOL(drm_mode_legacy_fb_format);
  */
 const char *drm_get_format_name(uint32_t format, struct drm_format_name_buf *buf)
 {
+	BUG_ON(!buf);
+
 	snprintf(buf->str, sizeof(buf->str),
 		 "%c%c%c%c %s-endian (0x%08x)",
 		 printable_char(format & 0xff),
