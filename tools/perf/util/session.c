@@ -1559,6 +1559,30 @@ perf_session__warn_order(const struct perf_session *session)
 		ui__warning("%u out of order events recorded.\n", oe->nr_unordered_events);
 }
 
+static void
+perf_session__warn_overhead(const struct perf_session *session)
+{
+	const struct events_stats *stats = &session->evlist->stats;
+	double overhead_rate;
+	u64 overhead;
+	int i;
+
+	for (i = 0; i < session->header.env.nr_cpus_online; i++) {
+		overhead = stats->total_nmi_overhead[i][1];
+		overhead += stats->total_mux_overhead[i][1];
+		overhead += stats->total_sb_overhead[i][1];
+		overhead += stats->total_user_write_overhead[i][1];
+
+		overhead_rate = (double)overhead / (double)stats->elapsed_time;
+
+		if (overhead_rate > 0.1) {
+			ui__warning("Perf overhead is high! The overhead rate is %3.2f%% on CPU %d\n\n"
+				    "Please consider reducing the number of events, or increasing the period, or decrease the frequency.\n\n",
+				    overhead_rate * 100.0, i);
+		}
+	}
+}
+
 static void perf_session__warn_about_errors(const struct perf_session *session)
 {
 	const struct events_stats *stats = &session->evlist->stats;
@@ -1632,6 +1656,8 @@ static void perf_session__warn_about_errors(const struct perf_session *session)
 			    "Increase it by --proc-map-timeout\n",
 			    stats->nr_proc_map_timeout);
 	}
+
+	perf_session__warn_overhead(session);
 }
 
 static int perf_session__flush_thread_stack(struct thread *thread,
