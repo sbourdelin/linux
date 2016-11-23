@@ -1193,17 +1193,12 @@ static struct platform_driver ab8500_btemp_driver = {
 	},
 };
 
-static int __init ab8500_btemp_init(void)
-{
-	return platform_driver_register(&ab8500_btemp_driver);
-}
-
 static void __exit ab8500_btemp_exit(void)
 {
 	platform_driver_unregister(&ab8500_btemp_driver);
 }
 
-device_initcall(ab8500_btemp_init);
+builtin_platform_driver(ab8500_btemp_driver);
 module_exit(ab8500_btemp_exit);
 
 MODULE_LICENSE("GPL v2");
