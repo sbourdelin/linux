@@ -153,11 +153,9 @@ static void tangox_dma_pchan_detach(struct tangox_dma_pchan *pchan)
 static int tangox_dma_issue_single(struct tangox_dma_pchan *pchan,
 				   struct tangox_dma_sg *sg, int flags)
 {
-	writel(sg->addr, pchan->base + DMA_ADDR);
-	writel(sg->len, pchan->base + DMA_COUNT);
-	wmb();
-	writel(DMA_MODE_SINGLE << 1 | flags, pchan->base + DMA_CMD);
-	wmb();
+	writel_relaxed(sg->addr, pchan->base + DMA_ADDR);
+	writel_relaxed(sg->len, pchan->base + DMA_COUNT);
+	writel_relaxed(DMA_MODE_SINGLE << 1 | flags, pchan->base + DMA_CMD);
 
 	return sg->len;
 }
