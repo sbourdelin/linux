@@ -36,7 +36,6 @@
 #include <linux/ctype.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/delay.h>
 #include <asm/pgtable.h>
 
 #include "genwqe_driver.h"
