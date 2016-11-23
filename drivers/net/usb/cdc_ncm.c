@@ -498,6 +498,22 @@ static int cdc_ncm_init(struct usbnet *dev)
 		return err; /* GET_NTB_PARAMETERS is required */
 	}
 
+	/* Some modems (e.g. Telit LE922A6) need to reset the MBIM function
+	 * or they will fail to work properly.
+	 * For details on RESET_FUNCTION request see document
+	 * "USB Communication Class Subclass Specification for MBIM"
+	 * RESET_FUNCTION should be harmless for all the other MBIM modems
+	 */
+	if (cdc_ncm_comm_intf_is_mbim(ctx->control->cur_altsetting)) {
+		err = usbnet_write_cmd(dev, USB_CDC_RESET_FUNCTION,
+				       USB_TYPE_CLASS | USB_DIR_OUT
+				       | USB_RECIP_INTERFACE,
+				       0, iface_no, NULL, 0);
+		if (err < 0) {
+			dev_err(&dev->intf->dev, "failed RESET_FUNCTION\n");
+		}
+	}
+
 	/* set CRC Mode */
 	if (cdc_ncm_flags(dev) & USB_CDC_NCM_NCAP_CRC_MODE) {
 		dev_dbg(&dev->intf->dev, "Setting CRC mode off\n");
@@ -838,24 +854,23 @@ int cdc_ncm_bind_common(struct usbnet *dev, struct usb_interface *intf, u8 data_
 	/* Reset data interface. Some devices will not reset properly
 	 * unless they are configured first.  Toggle the altsetting to
 	 * force a reset
+	 * This is applied only to ncm devices, since it has been verified
+	 * to cause issues with some MBIM modems (e.g. Telit LE922A6).
+	 * MBIM devices reset is achieved using MBIM request RESET_FUNCTION
+	 * in cdc_ncm_init
 	 */
-	usb_set_interface(dev->udev, iface_no, data_altsetting);
-	temp = usb_set_interface(dev->udev, iface_no, 0);
-	if (temp) {
-		dev_dbg(&intf->dev, "set interface failed\n");
-		goto error2;
+	if (!cdc_ncm_comm_intf_is_mbim(intf->cur_altsetting)) {
+		usb_set_interface(dev->udev, iface_no, data_altsetting);
+		temp = usb_set_interface(dev->udev, iface_no, 0);
+		if (temp) {
+			dev_dbg(&intf->dev, "set interface failed\n");
+			goto error2;
+		}
 	}
 
 	/* initialize basic device settings */
 	if (cdc_ncm_init(dev))
 		goto error2;
-
-	/* Some firmwares need a pause here or they will silently fail
-	 * to set up the interface properly.  This value was decided
-	 * empirically on a Sierra Wireless MC7455 running 02.08.02.00
-	 * firmware.
-	 */
-	usleep_range(10000, 20000);
 
 	/* configure data interface */
 	temp = usb_set_interface(dev->udev, iface_no, data_altsetting);
