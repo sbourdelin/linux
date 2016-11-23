@@ -9,6 +9,7 @@ Required properties:
 - clocks : must contain an entry for each entry in clock-names
 - clock-names : must include the following entries:
   "timer", "pclk"
+- rockchip,clocksource: setup the timer as clocksource
 
 Example:
 	timer: timer@ff810000 {
