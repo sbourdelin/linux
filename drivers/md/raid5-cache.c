@@ -371,6 +371,7 @@ static inline void r5c_update_log_state(struct r5l_log *log)
 	struct r5conf *conf = log->rdev->mddev->private;
 	sector_t free_space;
 	sector_t reclaim_space;
+	bool wake_reclaim = false;
 
 	if (!r5c_is_writeback(log))
 		return;
@@ -380,12 +381,18 @@ static inline void r5c_update_log_state(struct r5l_log *log)
 	reclaim_space = r5c_log_required_to_flush_cache(conf);
 	if (free_space < 2 * reclaim_space)
 		set_bit(R5C_LOG_CRITICAL, &conf->cache_state);
-	else
+	else {
+		if (test_bit(R5C_LOG_CRITICAL, &conf->cache_state))
+			wake_reclaim = true;
 		clear_bit(R5C_LOG_CRITICAL, &conf->cache_state);
+	}
 	if (free_space < 3 * reclaim_space)
 		set_bit(R5C_LOG_TIGHT, &conf->cache_state);
 	else
 		clear_bit(R5C_LOG_TIGHT, &conf->cache_state);
+
+	if (wake_reclaim)
+		r5l_wake_reclaim(log, 0);
 }
 
 /*
@@ -1349,6 +1356,10 @@ static void r5c_do_reclaim(struct r5conf *conf)
 		spin_unlock(&conf->device_lock);
 		spin_unlock_irqrestore(&log->stripe_in_journal_lock, flags);
 	}
+
+	if (!test_bit(R5C_LOG_CRITICAL, &conf->cache_state))
+		r5l_run_no_space_stripes(log);
+
 	md_wakeup_thread(conf->mddev->thread);
 }
 
