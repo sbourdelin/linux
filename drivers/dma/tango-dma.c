@@ -38,6 +38,11 @@
 #define DMA_MODE_DOUBLE	2
 #define DMA_MODE_RECT	3
 
+#define SBOX_RESET	0
+#define SBOX_RESET2	4
+#define SBOX_ROUTE	8
+#define SBOX_ROUTE2	12
+
 struct tangox_dma_sg {
 	dma_addr_t addr;
 	unsigned int len;
