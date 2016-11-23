@@ -10,6 +10,8 @@
 
 #define INTEL_DSM_REVISION_ID 1 /* For Calpella anyway... */
 #define INTEL_DSM_FN_PLATFORM_MUX_INFO 1 /* No args */
+#define INTEL_DSM_SET_HPD_WAKEUP 17
+#define HPD_WAKEUP_EN_VAL 0xFCF0
 
 static struct intel_dsm_priv {
 	acpi_handle dhandle;
@@ -118,6 +120,25 @@ static void intel_dsm_platform_mux_info(void)
 	ACPI_FREE(pkg);
 }
 
+static void intel_dsm_set_hpd_wakeup(u8 *guid)
+{
+	union acpi_object *obj;
+	union acpi_object argv4 = {
+		.integer.type = ACPI_TYPE_INTEGER,
+		.integer.value = HPD_WAKEUP_EN_VAL,
+	};
+
+	obj = acpi_evaluate_dsm_typed(intel_dsm_priv.dhandle, guid,
+			INTEL_DSM_REVISION_ID, INTEL_DSM_SET_HPD_WAKEUP,
+			&argv4, ACPI_TYPE_INTEGER);
+
+	if (!obj)
+		DRM_DEBUG_DRIVER("failed to evaluate _DSM\n");
+
+	ACPI_FREE(obj);
+}
+
+
 static bool intel_dsm_pci_probe(struct pci_dev *pdev)
 {
 	acpi_handle dhandle;
@@ -134,14 +155,23 @@ static bool intel_dsm_pci_probe(struct pci_dev *pdev)
 	else
 		guid = intel_dsm_guid;
 
-	if (!acpi_check_dsm(dhandle, guid, INTEL_DSM_REVISION_ID,
-			    1 << INTEL_DSM_FN_PLATFORM_MUX_INFO)) {
-		DRM_DEBUG_KMS("no _DSM method for intel device\n");
-		return false;
-	}
-
 	intel_dsm_priv.dhandle = dhandle;
-	intel_dsm_platform_mux_info();
+
+	if (acpi_check_dsm(dhandle, guid, INTEL_DSM_REVISION_ID,
+				1 << INTEL_DSM_FN_PLATFORM_MUX_INFO))
+		intel_dsm_platform_mux_info();
+	else
+		DRM_DEBUG_KMS("no _DSM method for mux-info\n");
+
+	/* Need to ensure vbt parsing is completed. */
+	if (dev_priv->vbt.hpd_wakeup_enabled &&
+		acpi_check_dsm(dhandle, guid, INTEL_DSM_REVISION_ID,
+				1 << INTEL_DSM_SET_HPD_WAKEUP))
+		intel_dsm_set_hpd_wakeup(guid);
+	else {
+		dev_priv->vbt.hpd_wakeup_enabled = false;
+		DRM_DEBUG_KMS("no _DSM method for hpd-enabling\n");
+	}
 
 	return true;
 }
