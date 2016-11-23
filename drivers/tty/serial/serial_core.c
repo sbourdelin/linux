@@ -34,6 +34,7 @@
 #include <linux/serial_core.h>
 #include <linux/delay.h>
 #include <linux/mutex.h>
+#include <linux/leds.h>
 
 #include <asm/irq.h>
 #include <asm/uaccess.h>
@@ -2707,6 +2708,77 @@ static const struct attribute_group tty_dev_attr_group = {
 	.attrs = tty_dev_attrs,
 	};
 
+void uart_led_trigger_tx(struct uart_port *uport)
+{
+	unsigned long delay = 50;
+
+	led_trigger_blink_oneshot(uport->led_trigger_tx, &delay, &delay, 0);
+}
+
+void uart_led_trigger_rx(struct uart_port *uport)
+{
+	unsigned long delay = 50;
+
+	led_trigger_blink_oneshot(uport->led_trigger_rx, &delay, &delay, 0);
+}
+
+/**
+ *	uart_add_led_triggers - register LED triggers for a UART
+ *	@drv: pointer to the uart low level driver structure for this port
+ *	@uport: uart port structure to use for this port.
+ *
+ *	Called by the driver to register LED triggers for a UART. It's the
+ *	drivers responsibility to call uart_led_trigger_rx/tx on received
+ *	and transmitted chars then.
+ */
+int uart_add_led_triggers(struct uart_driver *drv, struct uart_port *uport)
+{
+	int ret;
+
+	if (!IS_ENABLED(CONFIG_LEDS_TRIGGERS))
+		return 0;
+
+	uport->led_trigger_tx_name = kasprintf(GFP_KERNEL, "%s%d-tx",
+					       drv->dev_name, uport->line);
+	uport->led_trigger_rx_name = kasprintf(GFP_KERNEL, "%s%d-rx",
+					       drv->dev_name, uport->line);
+	if (!uport->led_trigger_tx_name || !uport->led_trigger_rx_name) {
+		ret = -ENOMEM;
+		goto err_alloc;
+	}
+
+	led_trigger_register_simple(uport->led_trigger_tx_name,
+				    &uport->led_trigger_tx);
+	led_trigger_register_simple(uport->led_trigger_rx_name,
+				    &uport->led_trigger_rx);
+
+	return 0;
+
+err_alloc:
+	kfree(uport->led_trigger_tx_name);
+	kfree(uport->led_trigger_rx_name);
+
+	return ret;
+}
+
+/**
+ *	uart_remove_led_triggers - remove LED triggers
+ *	@drv: pointer to the uart low level driver structure for this port
+ *	@uport: uart port structure to use for this port.
+ *
+ *	Remove LED triggers previously registered with uart_add_led_triggers
+ */
+void uart_remove_led_triggers(struct uart_port *uport)
+{
+	if (uport->led_trigger_rx)
+		led_trigger_unregister_simple(uport->led_trigger_rx);
+	kfree(uport->led_trigger_rx_name);
+
+	if (uport->led_trigger_tx)
+		led_trigger_unregister_simple(uport->led_trigger_tx);
+	kfree(uport->led_trigger_tx_name);
+}
+
 /**
  *	uart_add_one_port - attach a driver-defined port structure
  *	@drv: pointer to the uart low level driver structure for this port
@@ -2876,6 +2948,7 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *uport)
 	WARN_ON(atomic_dec_return(&state->refcount) < 0);
 	wait_event(state->remove_wait, !atomic_read(&state->refcount));
 	state->uart_port = NULL;
+
 	mutex_unlock(&port->mutex);
 out:
 	mutex_unlock(&port_mutex);

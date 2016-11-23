@@ -29,6 +29,7 @@
 #include <linux/tty.h>
 #include <linux/mutex.h>
 #include <linux/sysrq.h>
+#include <linux/leds.h>
 #include <uapi/linux/serial_core.h>
 
 #ifdef CONFIG_SERIAL_CORE_CONSOLE
@@ -251,6 +252,10 @@ struct uart_port {
 	const struct attribute_group **tty_groups;	/* all attributes (serial core use only) */
 	struct serial_rs485     rs485;
 	void			*private_data;		/* generic platform data pointer */
+	struct led_trigger	*led_trigger_rx;
+	char			*led_trigger_rx_name;
+	struct led_trigger	*led_trigger_tx;
+	char			*led_trigger_tx_name;
 };
 
 static inline int serial_port_in(struct uart_port *up, int offset)
@@ -393,6 +398,11 @@ struct tty_driver *uart_console_device(struct console *co, int *index);
 void uart_console_write(struct uart_port *port, const char *s,
 			unsigned int count,
 			void (*putchar)(struct uart_port *, int));
+
+int uart_add_led_triggers(struct uart_driver *drv, struct uart_port *uport);
+void uart_remove_led_triggers(struct uart_port *uport);
+void uart_led_trigger_tx(struct uart_port *port);
+void uart_led_trigger_rx(struct uart_port *port);
 
 /*
  * Port/driver registration/removal
