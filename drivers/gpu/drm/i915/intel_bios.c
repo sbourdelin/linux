@@ -557,6 +557,12 @@ parse_driver_features(struct drm_i915_private *dev_priv,
 	if (driver->lvds_config == BDB_DRIVER_FEATURE_EDP)
 		dev_priv->vbt.edp.support = 1;
 
+	if (driver->hpd_wakeup_source) {
+		dev_priv->vbt.hpd_wakeup_enabled = true;
+		DRM_DEBUG_KMS("HPD as wakeup feature is enabled\n");
+	} else
+		DRM_DEBUG_KMS("HPD wakeup source feature is disabled in VBT\n");
+
 	DRM_DEBUG_KMS("DRRS State Enabled:%d\n", driver->drrs_enabled);
 	/*
 	 * If DRRS is not supported, drrs_type has to be set to 0.
