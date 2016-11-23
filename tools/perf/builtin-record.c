@@ -45,6 +45,11 @@
 #include <asm/bug.h>
 #include <linux/time64.h>
 
+struct write_overhead{
+	u64	nr;
+	u64	time;
+};
+
 struct record {
 	struct perf_tool	tool;
 	struct record_opts	opts;
@@ -63,17 +68,40 @@ struct record {
 	bool			timestamp_filename;
 	bool			switch_output;
 	unsigned long long	samples;
+	struct write_overhead	overhead[MAX_NR_CPUS];
 };
+
+static u64 get_vnsecs(void)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+
+	return ts.tv_sec * NSEC_PER_SEC + ts.tv_nsec;
+}
 
 static int record__write(struct record *rec, void *bf, size_t size)
 {
+	int cpu = sched_getcpu();
+	u64 start, end;
+	int ret = 0;
+
+	start = get_vnsecs();
 	if (perf_data_file__write(rec->session->file, bf, size) < 0) {
 		pr_err("failed to write perf data, error: %m\n");
-		return -1;
+		ret = -1;
+		goto done;
 	}
 
 	rec->bytes_written += size;
-	return 0;
+done:
+	end = get_vnsecs();
+	if (cpu >= 0) {
+		rec->overhead[cpu].nr++;
+		rec->overhead[cpu].time += (end - start);
+	}
+
+	return ret;
 }
 
 static int process_synthesized_event(struct perf_tool *tool,
@@ -813,6 +841,33 @@ out:
 	return err;
 }
 
+static void perf_event__synth_overhead(struct record *rec, perf_event__handler_t process)
+{
+	int cpu;
+
+	union perf_event event = {
+		.overhead = {
+			.header = {
+				.type = PERF_RECORD_USER_OVERHEAD,
+				.size = sizeof(struct perf_overhead),
+			},
+		},
+	};
+
+	event.overhead.type = PERF_USER_WRITE_OVERHEAD;
+
+	for (cpu = 0; cpu < MAX_NR_CPUS; cpu++) {
+		if (!rec->overhead[cpu].nr)
+			continue;
+
+		event.overhead.entry.cpu = cpu;
+		event.overhead.entry.nr = rec->overhead[cpu].nr;
+		event.overhead.entry.time = rec->overhead[cpu].time;
+
+		(void)process(&rec->tool, &event, NULL, NULL);
+	}
+}
+
 static int __cmd_record(struct record *rec, int argc, const char **argv)
 {
 	int err;
@@ -1073,6 +1128,8 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 		err = -1;
 		goto out_child;
 	}
+
+	perf_event__synth_overhead(rec, process_synthesized_event);
 
 	if (!quiet)
 		fprintf(stderr, "[ perf record: Woken up %ld times to write data ]\n", waking);
