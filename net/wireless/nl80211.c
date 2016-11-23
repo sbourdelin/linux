@@ -405,6 +405,8 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_FILS_NONCES] = { .len = 2 * FILS_NONCE_LEN },
 	[NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED] = { .type = NLA_FLAG, },
 	[NL80211_ATTR_BSSID] = { .len = ETH_ALEN },
+	[NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI] = { .type = NLA_U32 },
+	[NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI_5G_PREF] = { .type = NLA_U32 },
 };
 
 /* policy for the key attributes */
@@ -6856,6 +6858,7 @@ nl80211_parse_sched_scan(struct wiphy *wiphy, struct wireless_dev *wdev,
 	size_t ie_len;
 	struct nlattr *tb[NL80211_SCHED_SCAN_MATCH_ATTR_MAX + 1];
 	s32 default_match_rssi = NL80211_SCAN_RSSI_THOLD_OFF;
+	int bbr;
 
 	if (!is_valid_ie_attr(attrs[NL80211_ATTR_IE]))
 		return ERR_PTR(-EINVAL);
@@ -6948,6 +6951,13 @@ nl80211_parse_sched_scan(struct wiphy *wiphy, struct wireless_dev *wdev,
 	}
 
 	if (!n_plans || n_plans > wiphy->max_sched_scan_plans)
+		return ERR_PTR(-EINVAL);
+
+	bbr = wiphy_ext_feature_isset(
+		wiphy, NL80211_EXT_FEATURE_SCHED_SCAN_BETTER_BSS);
+	if (!bbr &&
+	    (attrs[NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI] ||
+	     attrs[NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI_5G_PREF]))
 		return ERR_PTR(-EINVAL);
 
 	request = kzalloc(sizeof(*request)
@@ -7155,6 +7165,14 @@ nl80211_parse_sched_scan(struct wiphy *wiphy, struct wireless_dev *wdev,
 	if (attrs[NL80211_ATTR_SCHED_SCAN_DELAY])
 		request->delay =
 			nla_get_u32(attrs[NL80211_ATTR_SCHED_SCAN_DELAY]);
+
+	if (attrs[NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI])
+		request->relative_rssi = nla_get_s32(
+			attrs[NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI]);
+
+	if (attrs[NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI_5G_PREF])
+		request->relative_rssi_5g_pref = nla_get_s32(
+			attrs[NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI_5G_PREF]);
 
 	err = nl80211_parse_sched_scan_plans(wiphy, n_plans, request, attrs);
 	if (err)
@@ -9649,7 +9667,8 @@ static int nl80211_send_wowlan_tcp(struct sk_buff *msg,
 	return 0;
 }
 
-static int nl80211_send_wowlan_nd(struct sk_buff *msg,
+static int nl80211_send_wowlan_nd(struct wiphy *wiphy,
+				  struct sk_buff *msg,
 				  struct cfg80211_sched_scan_request *req)
 {
 	struct nlattr *nd, *freqs, *matches, *match, *scan_plans, *scan_plan;
@@ -9668,6 +9687,15 @@ static int nl80211_send_wowlan_nd(struct sk_buff *msg,
 		return -ENOBUFS;
 
 	if (nla_put_u32(msg, NL80211_ATTR_SCHED_SCAN_DELAY, req->delay))
+		return -ENOBUFS;
+
+	if (wiphy_ext_feature_isset(
+		    wiphy, NL80211_EXT_FEATURE_SCHED_SCAN_BETTER_BSS) &&
+	    (nla_put_u32(msg, NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI,
+			 req->relative_rssi) ||
+	     nla_put_u32(msg,
+			 NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI_5G_PREF,
+			 req->relative_rssi_5g_pref)))
 		return -ENOBUFS;
 
 	freqs = nla_nest_start(msg, NL80211_ATTR_SCAN_FREQUENCIES);
@@ -9783,7 +9811,7 @@ static int nl80211_get_wowlan(struct sk_buff *skb, struct genl_info *info)
 			goto nla_put_failure;
 
 		if (nl80211_send_wowlan_nd(
-			    msg,
+			    &rdev->wiphy, msg,
 			    rdev->wiphy.wowlan_config->nd_config))
 			goto nla_put_failure;
 

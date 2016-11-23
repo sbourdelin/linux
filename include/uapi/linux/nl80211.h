@@ -1981,6 +1981,16 @@ enum nl80211_commands {
  *	%NL80211_ATTR_MAC has also been used in various commands/events for
  *	specifying the BSSID.
  *
+ * @NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI: Relative RSSI threshold by which
+ *	other BSSs has to be better than the current connected BSS so that they
+ *	get reported to user space. This will give an opportunity to userspace
+ *	to consider connecting to other matching BSSs which have better RSSI
+ *	than the current connected BSS.
+ *
+ * @NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI_5G_PREF: The amount of RSSI preference
+ *	to be given to 5 GHz APs over 2.4 GHz APs while searching for better
+ *	BSSs than the current connected BSS.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2386,6 +2396,9 @@ enum nl80211_attrs {
 	NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED,
 
 	NL80211_ATTR_BSSID,
+
+	NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI,
+	NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI_5G_PREF,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -4698,6 +4711,9 @@ enum nl80211_feature_flags {
  *	configuration (AP/mesh) with VHT rates.
  * @NL80211_EXT_FEATURE_FILS_STA: This driver supports Fast Initial Link Setup
  *	with user space SME (NL80211_CMD_AUTHENTICATE) in station mode.
+ * @NL80211_EXT_FEATURE_SCHED_SCAN_BETTER_BSS: The driver supports sched_scan
+ *	for reporting BSSs with better RSSI than the current connected BSS
+ *	(%NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI).
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
@@ -4713,6 +4729,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_BEACON_RATE_HT,
 	NL80211_EXT_FEATURE_BEACON_RATE_VHT,
 	NL80211_EXT_FEATURE_FILS_STA,
+	NL80211_EXT_FEATURE_SCHED_SCAN_BETTER_BSS,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,

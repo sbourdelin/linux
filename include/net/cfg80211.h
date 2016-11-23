@@ -1626,6 +1626,20 @@ struct cfg80211_sched_scan_plan {
  *	cycle.  The driver may ignore this parameter and start
  *	immediately (or at any other time), if this feature is not
  *	supported.
+ * @relative_rssi: Relative RSSI threshold to restrict scan result reporting in
+ *	connected state to cases where a matching BSS is determined to have a
+ *	significantly better RSSI than the current connected BSS.
+ * @relative_rssi_5g_pref: The amount of RSSI preference that is given to a
+ *	5 GHz BSS over 2.4 GHz BSS while looking for better BSSs in connected
+ *	state.
+ *	If the current connected BSS is in the 2.4 GHz band, other BSSs in the
+ *	2.4 GHz band to be reported should have better RSSI by @relative_rssi
+ *	and other BSSs in the 5 GHz band to be reported should have better RSSI
+ *	by (@relative_rssi - @relative_rssi_5g_pref).
+ *	If the current connected BSS is in the 5 GHz band, other BSSs in the
+ *	2.4 GHz band to be reported should have better RSSI by
+ *	(@relative_rssi + @relative_rssi_5g_pref) and other BSSs in the 5 GHz
+ *	band to be reported should have better RSSI by by @relative_rssi.
  */
 struct cfg80211_sched_scan_request {
 	struct cfg80211_ssid *ssids;
@@ -1644,6 +1658,9 @@ struct cfg80211_sched_scan_request {
 
 	u8 mac_addr[ETH_ALEN] __aligned(2);
 	u8 mac_addr_mask[ETH_ALEN] __aligned(2);
+
+	int relative_rssi;
+	int relative_rssi_5g_pref;
 
 	/* internal */
 	struct wiphy *wiphy;
