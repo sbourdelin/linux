@@ -536,11 +536,7 @@ static struct platform_driver davinci_mdio_driver = {
 	.remove = davinci_mdio_remove,
 };
 
-static int __init davinci_mdio_init(void)
-{
-	return platform_driver_register(&davinci_mdio_driver);
-}
-device_initcall(davinci_mdio_init);
+builtin_platform_driver(davinci_mdio_driver);
 
 static void __exit davinci_mdio_exit(void)
 {
