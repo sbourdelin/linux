@@ -412,6 +412,9 @@ include::itrace.txt[]
 --hierarchy::
 	Enable hierarchical output.
 
+--show-overhead::
+	Show extra overhead which perf brings during monitoring
+
 include::callchain-overhead-calculation.txt[]
 
 SEE ALSO

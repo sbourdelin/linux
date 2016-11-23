@@ -368,6 +368,10 @@ static int perf_evlist__tty_browse_hists(struct perf_evlist *evlist,
 	struct perf_evsel *pos;
 
 	fprintf(stdout, "#\n# Total Lost Samples: %" PRIu64 "\n#\n", evlist->stats.total_lost_samples);
+	if (symbol_conf.show_overhead) {
+		fprintf(stdout, "# Overhead:\n");
+		fprintf(stdout, "#\n");
+	}
 	evlist__for_each_entry(evlist, pos) {
 		struct hists *hists = evsel__hists(pos);
 		const char *evname = perf_evsel__name(pos);
@@ -830,6 +834,8 @@ int cmd_report(int argc, const char **argv, const char *prefix __maybe_unused)
 	OPT_CALLBACK_DEFAULT(0, "stdio-color", NULL, "mode",
 			     "'always' (default), 'never' or 'auto' only applicable to --stdio mode",
 			     stdio__config_color, "always"),
+	OPT_BOOLEAN(0, "show-overhead", &symbol_conf.show_overhead,
+		    "Show perf overhead"),
 	OPT_END()
 	};
 	struct perf_data_file file = {

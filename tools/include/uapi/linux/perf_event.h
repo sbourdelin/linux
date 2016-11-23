@@ -862,6 +862,17 @@ enum perf_event_type {
 	 */
 	PERF_RECORD_SWITCH_CPU_WIDE		= 15,
 
+	/*
+	 * Records perf overhead
+	 * struct {
+	 * 	struct perf_event_header 	header;
+	 * 	u32				type;
+	 * 	struct perf_overhead_entry	entry;
+	 * 	struct sample_id		sample_id;
+	 * };
+	 */
+	PERF_RECORD_OVERHEAD			= 16,
+
 	PERF_RECORD_MAX,			/* non-ABI */
 };
 
@@ -978,6 +989,28 @@ struct perf_branch_entry {
 		abort:1,    /* transaction abort */
 		cycles:16,  /* cycle count to last branch */
 		reserved:44;
+};
+
+enum perf_record_overhead_type {
+	PERF_NMI_OVERHEAD	= 0,
+	PERF_MUX_OVERHEAD,
+	PERF_SB_OVERHEAD,
+
+	PERF_OVERHEAD_MAX,
+};
+
+/*
+ * single overhead record layout:
+ *
+ * 	 cpu: The cpu which overhead occues
+ * 	  nr: Times of overhead happens.
+ * 	      E.g. for NMI, nr == times of NMI handler are called.
+ * 	time: Total overhead cost(ns)
+ */
+struct perf_overhead_entry {
+	__u32	cpu;
+	__u64	nr;
+	__u64	time;
 };
 
 #endif /* _UAPI_LINUX_PERF_EVENT_H */

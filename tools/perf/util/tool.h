@@ -47,6 +47,7 @@ struct perf_tool {
 			aux,
 			itrace_start,
 			context_switch,
+			overhead,
 			throttle,
 			unthrottle;
 	event_attr_op	attr;

@@ -480,6 +480,12 @@ struct time_conv_event {
 	u64 time_zero;
 };
 
+struct perf_overhead {
+	struct perf_event_header	header;
+	u32				type;
+	struct perf_overhead_entry	entry;
+};
+
 union perf_event {
 	struct perf_event_header	header;
 	struct mmap_event		mmap;
@@ -509,6 +515,7 @@ union perf_event {
 	struct stat_event		stat;
 	struct stat_round_event		stat_round;
 	struct time_conv_event		time_conv;
+	struct perf_overhead		overhead;
 };
 
 void perf_event__print_totals(void);
@@ -587,6 +594,10 @@ int perf_event__process_switch(struct perf_tool *tool,
 			       union perf_event *event,
 			       struct perf_sample *sample,
 			       struct machine *machine);
+int perf_event__process_overhead(struct perf_tool *tool,
+				 union perf_event *event,
+				 struct perf_sample *sample,
+				 struct machine *machine);
 int perf_event__process_mmap(struct perf_tool *tool,
 			     union perf_event *event,
 			     struct perf_sample *sample,

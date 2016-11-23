@@ -31,6 +31,7 @@ static const char *perf_event__names[] = {
 	[PERF_RECORD_LOST_SAMPLES]		= "LOST_SAMPLES",
 	[PERF_RECORD_SWITCH]			= "SWITCH",
 	[PERF_RECORD_SWITCH_CPU_WIDE]		= "SWITCH_CPU_WIDE",
+	[PERF_RECORD_OVERHEAD]			= "OVERHEAD",
 	[PERF_RECORD_HEADER_ATTR]		= "ATTR",
 	[PERF_RECORD_HEADER_EVENT_TYPE]		= "EVENT_TYPE",
 	[PERF_RECORD_HEADER_TRACING_DATA]	= "TRACING_DATA",
@@ -1054,6 +1055,14 @@ int perf_event__process_switch(struct perf_tool *tool __maybe_unused,
 			       struct machine *machine)
 {
 	return machine__process_switch_event(machine, event);
+}
+
+int perf_event__process_overhead(struct perf_tool *tool __maybe_unused,
+				 union perf_event *event,
+				 struct perf_sample *sample __maybe_unused,
+				 struct machine *machine)
+{
+	return machine__process_overhead_event(machine, event);
 }
 
 size_t perf_event__fprintf_mmap(union perf_event *event, FILE *fp)

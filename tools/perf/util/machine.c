@@ -555,6 +555,12 @@ int machine__process_switch_event(struct machine *machine __maybe_unused,
 	return 0;
 }
 
+int machine__process_overhead_event(struct machine *machine __maybe_unused,
+				    union perf_event *event __maybe_unused)
+{
+	return 0;
+}
+
 static void dso__adjust_kmod_long_name(struct dso *dso, const char *filename)
 {
 	const char *dup_filename;
@@ -1536,6 +1542,8 @@ int machine__process_event(struct machine *machine, union perf_event *event,
 	case PERF_RECORD_SWITCH:
 	case PERF_RECORD_SWITCH_CPU_WIDE:
 		ret = machine__process_switch_event(machine, event); break;
+	case PERF_RECORD_OVERHEAD:
+		ret = machine__process_overhead_event(machine, event); break;
 	default:
 		ret = -1;
 		break;
