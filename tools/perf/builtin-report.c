@@ -371,6 +371,7 @@ static int perf_evlist__tty_browse_hists(struct perf_evlist *evlist,
 
 	fprintf(stdout, "#\n# Total Lost Samples: %" PRIu64 "\n#\n", evlist->stats.total_lost_samples);
 	if (symbol_conf.show_overhead) {
+		fprintf(stdout, "# Elapsed time: %" PRIu64 " ns\n",  evlist->stats.elapsed_time);
 		fprintf(stdout, "# Overhead:\n");
 		for (cpu = 0; cpu < session->header.env.nr_cpus_online; cpu++) {
 			if (!evlist->stats.total_nmi_overhead[cpu][0])

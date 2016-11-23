@@ -578,6 +578,9 @@ int machine__process_overhead_event(struct machine *machine __maybe_unused,
 			    event->overhead.entry.nr,
 			    event->overhead.entry.time,
 			    event->overhead.entry.cpu);
+	} else if (event->overhead.type == PERF_USER_ELAPSED_TIME) {
+		dump_printf(" Elapsed time: %llu\n",
+			    event->overhead.entry.time);
 	} else {
 		dump_printf("\tUNSUPPORT OVERHEAD TYPE 0x%x!\n", event->overhead.type);
 	}

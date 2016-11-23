@@ -1231,6 +1231,9 @@ overhead_stats_update(struct perf_tool *tool,
 			evlist->stats.total_user_write_overhead[event->overhead.entry.cpu][0] += event->overhead.entry.nr;
 			evlist->stats.total_user_write_overhead[event->overhead.entry.cpu][1] += event->overhead.entry.time;
 			break;
+		case PERF_USER_ELAPSED_TIME:
+			evlist->stats.elapsed_time = event->overhead.entry.time;
+			break;
 		default:
 			break;
 		}

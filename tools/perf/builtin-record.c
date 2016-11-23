@@ -69,6 +69,7 @@ struct record {
 	bool			switch_output;
 	unsigned long long	samples;
 	struct write_overhead	overhead[MAX_NR_CPUS];
+	u64			elapsed_time;
 };
 
 static u64 get_vnsecs(void)
@@ -866,6 +867,12 @@ static void perf_event__synth_overhead(struct record *rec, perf_event__handler_t
 
 		(void)process(&rec->tool, &event, NULL, NULL);
 	}
+
+	event.overhead.type = PERF_USER_ELAPSED_TIME;
+	event.overhead.entry.cpu = -1;
+	event.overhead.entry.nr = 1;
+	event.overhead.entry.time = rec->elapsed_time;
+	(void)process(&rec->tool, &event, NULL, NULL);
 }
 
 static int __cmd_record(struct record *rec, int argc, const char **argv)
@@ -1129,6 +1136,7 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 		goto out_child;
 	}
 
+	rec->elapsed_time = get_nsecs() - rec->elapsed_time;
 	perf_event__synth_overhead(rec, process_synthesized_event);
 
 	if (!quiet)
@@ -1600,6 +1608,8 @@ int cmd_record(int argc, const char **argv, const char *prefix __maybe_unused)
 # undef set_nobuild
 # undef REASON
 #endif
+
+	rec->elapsed_time = get_nsecs();
 
 	rec->evlist = perf_evlist__new();
 	if (rec->evlist == NULL)

@@ -275,6 +275,7 @@ enum auxtrace_error_type {
  * The total_user_write_overhead tells exactly the overhead to write data in
  * perf record.
  * The total write# is stored in [0], while the accumulated time is in [1].
+ * The elapsed_time tells the elapsed time of perf record
  */
 struct events_stats {
 	u64 total_period;
@@ -287,6 +288,7 @@ struct events_stats {
 	u64 total_mux_overhead[MAX_NR_CPUS][2];
 	u64 total_sb_overhead[MAX_NR_CPUS][2];
 	u64 total_user_write_overhead[MAX_NR_CPUS][2];
+	u64 elapsed_time;
 	u32 nr_events[PERF_RECORD_HEADER_MAX];
 	u32 nr_non_filtered_samples;
 	u32 nr_lost_warned;
@@ -497,6 +499,7 @@ struct time_conv_event {
 	u64 time_zero;
 };
 
+#define PERF_USER_ELAPSED_TIME	200 /* above any possible overhead type */
 enum perf_user_overhead_event_type { /* above any possible kernel type */
 	PERF_USER_OVERHEAD_TYPE_START	= 100,
 	PERF_USER_WRITE_OVERHEAD	= 100,
