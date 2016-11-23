@@ -998,6 +998,10 @@ perf_event__output_id_sample(struct perf_event *event,
 extern void
 perf_log_lost_samples(struct perf_event *event, u64 lost);
 
+extern void
+perf_log_overhead(struct perf_event *event, u32 type,
+		  struct perf_overhead_entry *entry);
+
 static inline bool is_sampling_event(struct perf_event *event)
 {
 	return event->attr.sample_period != 0;
