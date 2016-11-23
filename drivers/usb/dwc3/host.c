@@ -16,6 +16,7 @@
  */
 
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 
 #include "core.h"
 
@@ -128,3 +129,39 @@ void dwc3_host_exit(struct dwc3 *dwc)
 			  dev_name(&dwc->xhci->dev));
 	platform_device_unregister(dwc->xhci);
 }
+
+#ifdef CONFIG_USB_DWC3_HOST_SUSPEND
+int dwc3_host_suspend(struct dwc3 *dwc)
+{
+	struct device *xhci = &dwc->xhci->dev;
+	int ret;
+
+	/*
+	 * Note: if we get the -EBUSY, which means the xHCI children devices are
+	 * not in suspend state yet, the glue layer need to wait for a while and
+	 * try to suspend xHCI device again.
+	 */
+	ret = pm_runtime_put_sync(xhci);
+	if (ret) {
+		dev_err(xhci, "failed to suspend xHCI device\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+int dwc3_host_resume(struct dwc3 *dwc)
+{
+	struct device *xhci = &dwc->xhci->dev;
+	int ret;
+
+	/* Resume the xHCI device synchronously. */
+	ret = pm_runtime_get_sync(xhci);
+	if (ret) {
+		dev_err(xhci, "failed to resume xHCI device\n");
+		return ret;
+	}
+
+	return 0;
+}
+#endif

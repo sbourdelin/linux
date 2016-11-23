@@ -47,6 +47,13 @@ config USB_DWC3_DUAL_ROLE
 
 endchoice
 
+config USB_DWC3_HOST_SUSPEND
+	bool "Choose if the DWC3 host (xhci) can be suspend/resume"
+	depends on USB_DWC3_HOST=y || USB_DWC3_DUAL_ROLE=y
+	help
+	  We can suspend the host when the slave is detached for power saving,
+	  and resume the host when one slave is attached.
+
 comment "Platform Glue Driver Support"
 
 config USB_DWC3_OMAP
