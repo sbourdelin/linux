@@ -4161,6 +4161,45 @@ static void ept_save_pdptrs(struct kvm_vcpu *vcpu)
 		  (unsigned long *)&vcpu->arch.regs_dirty);
 }
 
+static bool fixed_bits_valid(u64 val, u64 fixed0, u64 fixed1)
+{
+	return ((val & fixed0) == fixed0) && ((~val & ~fixed1) == ~fixed1);
+}
+
+static bool nested_guest_cr0_valid(struct kvm_vcpu *vcpu, unsigned long val)
+{
+	u64 fixed0 = to_vmx(vcpu)->nested.nested_vmx_cr0_fixed0;
+	u64 fixed1 = to_vmx(vcpu)->nested.nested_vmx_cr0_fixed1;
+	struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
+
+	if (to_vmx(vcpu)->nested.nested_vmx_secondary_ctls_high &
+		SECONDARY_EXEC_UNRESTRICTED_GUEST &&
+	    nested_cpu_has2(vmcs12, SECONDARY_EXEC_UNRESTRICTED_GUEST))
+		fixed0 &= ~(X86_CR0_PE | X86_CR0_PG);
+
+	return fixed_bits_valid(val, fixed0, fixed1);
+}
+
+static bool nested_host_cr0_valid(struct kvm_vcpu *vcpu, unsigned long val)
+{
+	u64 fixed0 = to_vmx(vcpu)->nested.nested_vmx_cr0_fixed0;
+	u64 fixed1 = to_vmx(vcpu)->nested.nested_vmx_cr0_fixed1;
+
+	return fixed_bits_valid(val, fixed0, fixed1);
+}
+
+static bool nested_cr4_valid(struct kvm_vcpu *vcpu, unsigned long val)
+{
+	u64 fixed0 = to_vmx(vcpu)->nested.nested_vmx_cr4_fixed0;
+	u64 fixed1 = to_vmx(vcpu)->nested.nested_vmx_cr4_fixed1;
+
+	return fixed_bits_valid(val, fixed0, fixed1);
+}
+
+/* No difference in the restrictions on guest and host CR4 in VMX operation. */
+#define nested_guest_cr4_valid	nested_cr4_valid
+#define nested_host_cr4_valid	nested_cr4_valid
+
 static int vmx_set_cr4(struct kvm_vcpu *vcpu, unsigned long cr4);
 
 static void ept_update_paging_mode_cr0(unsigned long *hw_cr0,
@@ -4289,8 +4328,8 @@ static int vmx_set_cr4(struct kvm_vcpu *vcpu, unsigned long cr4)
 		if (!nested_vmx_allowed(vcpu))
 			return 1;
 	}
-	if (to_vmx(vcpu)->nested.vmxon &&
-	    ((cr4 & VMXON_CR4_ALWAYSON) != VMXON_CR4_ALWAYSON))
+
+	if (to_vmx(vcpu)->nested.vmxon && !nested_cr4_valid(vcpu, cr4))
 		return 1;
 
 	vcpu->arch.cr4 = cr4;
@@ -5850,18 +5889,6 @@ vmx_patch_hypercall(struct kvm_vcpu *vcpu, unsigned char *hypercall)
 	hypercall[2] = 0xc1;
 }
 
-static bool nested_cr0_valid(struct kvm_vcpu *vcpu, unsigned long val)
-{
-	unsigned long always_on = VMXON_CR0_ALWAYSON;
-	struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
-
-	if (to_vmx(vcpu)->nested.nested_vmx_secondary_ctls_high &
-		SECONDARY_EXEC_UNRESTRICTED_GUEST &&
-	    nested_cpu_has2(vmcs12, SECONDARY_EXEC_UNRESTRICTED_GUEST))
-		always_on &= ~(X86_CR0_PE | X86_CR0_PG);
-	return (val & always_on) == always_on;
-}
-
 /* called to set cr0 as appropriate for a mov-to-cr0 exit. */
 static int handle_set_cr0(struct kvm_vcpu *vcpu, unsigned long val)
 {
@@ -5880,7 +5907,7 @@ static int handle_set_cr0(struct kvm_vcpu *vcpu, unsigned long val)
 		val = (val & ~vmcs12->cr0_guest_host_mask) |
 			(vmcs12->guest_cr0 & vmcs12->cr0_guest_host_mask);
 
-		if (!nested_cr0_valid(vcpu, val))
+		if (!nested_guest_cr0_valid(vcpu, val))
 			return 1;
 
 		if (kvm_set_cr0(vcpu, val))
@@ -5889,8 +5916,9 @@ static int handle_set_cr0(struct kvm_vcpu *vcpu, unsigned long val)
 		return 0;
 	} else {
 		if (to_vmx(vcpu)->nested.vmxon &&
-		    ((val & VMXON_CR0_ALWAYSON) != VMXON_CR0_ALWAYSON))
+		    !nested_host_cr0_valid(vcpu, val))
 			return 1;
+
 		return kvm_set_cr0(vcpu, val);
 	}
 }
@@ -10377,15 +10405,15 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 		return 1;
 	}
 
-	if (((vmcs12->host_cr0 & VMXON_CR0_ALWAYSON) != VMXON_CR0_ALWAYSON) ||
-	    ((vmcs12->host_cr4 & VMXON_CR4_ALWAYSON) != VMXON_CR4_ALWAYSON)) {
+	if (!nested_host_cr0_valid(vcpu, vmcs12->host_cr0) ||
+	    !nested_host_cr4_valid(vcpu, vmcs12->host_cr4)) {
 		nested_vmx_failValid(vcpu,
 			VMXERR_ENTRY_INVALID_HOST_STATE_FIELD);
 		return 1;
 	}
 
-	if (!nested_cr0_valid(vcpu, vmcs12->guest_cr0) ||
-	    ((vmcs12->guest_cr4 & VMXON_CR4_ALWAYSON) != VMXON_CR4_ALWAYSON)) {
+	if (!nested_guest_cr0_valid(vcpu, vmcs12->guest_cr0) ||
+	    !nested_guest_cr4_valid(vcpu, vmcs12->guest_cr4)) {
 		nested_vmx_entry_failure(vcpu, vmcs12,
 			EXIT_REASON_INVALID_STATE, ENTRY_FAIL_DEFAULT);
 		return 1;
