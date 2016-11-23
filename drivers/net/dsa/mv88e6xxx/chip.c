@@ -2487,6 +2487,10 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_chip *chip, int port)
 				PORT_CONTROL_FORWARD_UNKNOWN_MC;
 		else
 			reg |= PORT_CONTROL_DSA_TAG;
+
+		if (mv88e6xxx_6097_family(chip))
+			reg |= PORT_CONTROL_FORWARD_UNKNOWN_MC;
+
 		reg |= PORT_CONTROL_EGRESS_ADD_TAG |
 			PORT_CONTROL_FORWARD_UNKNOWN;
 	}
