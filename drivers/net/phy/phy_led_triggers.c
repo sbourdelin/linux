@@ -128,6 +128,9 @@ void phy_led_triggers_unregister(struct phy_device *phy)
 {
 	int i;
 
+	if (!phy->phy_num_led_triggers)
+		return;
+
 	for (i = 0; i < phy->phy_num_led_triggers; i++)
 		phy_led_trigger_unregister(&phy->phy_led_triggers[i]);
 
