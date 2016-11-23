@@ -106,6 +106,51 @@
 		};
 	};
 
+	timer0: timer@20038000 {
+		compatible = "rockchip,rk3288-timer";
+		reg = <0x20038000 0x20>;
+		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cru SCLK_TIMER0>, <&cru PCLK_TIMER0>;
+		clock-names = "timer", "pclk";
+		status = "disabled";
+	};
+
+	timer1: timer@20038020 {
+		compatible = "rockchip,rk3288-timer";
+		reg = <0x20038020 0x20>;
+		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cru SCLK_TIMER1>, <&cru PCLK_TIMER0>;
+		clock-names = "timer", "pclk";
+		status = "disabled";
+	};
+
+	timer4: timer@20038060 {
+		compatible = "rockchip,rk3288-timer";
+		reg = <0x20038060 0x20>;
+		interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cru SCLK_TIMER4>, <&cru PCLK_TIMER0>;
+		clock-names = "timer", "pclk";
+		status = "disabled";
+	};
+
+	timer5: timer@20038080 {
+		compatible = "rockchip,rk3288-timer";
+		reg = <0x20038080 0x20>;
+		interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cru SCLK_TIMER5>, <&cru PCLK_TIMER0>;
+		clock-names = "timer", "pclk";
+		status = "disabled";
+	};
+
+	timer6: timer@200380A0 {
+		compatible = "rockchip,rk3288-timer";
+		reg = <0x200380A0 0x20>;
+		interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cru SCLK_TIMER6>, <&cru PCLK_TIMER0>;
+		clock-names = "timer", "pclk";
+		status = "disabled";
+	};
+
 	i2s0: i2s@1011a000 {
 		compatible = "rockchip,rk3188-i2s", "rockchip,rk3066-i2s";
 		reg = <0x1011a000 0x2000>;
