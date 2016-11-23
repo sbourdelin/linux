@@ -1818,6 +1818,11 @@ event_sched_out(struct perf_event *event,
 	if (event->attr.exclusive || !cpuctx->active_oncpu)
 		cpuctx->exclusive = 0;
 
+	if (log_overhead && cpuctx->mux_overhead.nr) {
+		cpuctx->mux_overhead.cpu = smp_processor_id();
+		perf_log_overhead(event, PERF_MUX_OVERHEAD, &cpuctx->mux_overhead);
+	}
+
 	perf_pmu_enable(event->pmu);
 }
 
@@ -3313,9 +3318,17 @@ static void rotate_ctx(struct perf_event_context *ctx)
 		list_rotate_left(&ctx->flexible_groups);
 }
 
+static void
+perf_caculate_mux_overhead(struct perf_cpu_context *cpuctx, u64 time)
+{
+	cpuctx->mux_overhead.nr++;
+	cpuctx->mux_overhead.time += time;
+}
+
 static int perf_rotate_context(struct perf_cpu_context *cpuctx)
 {
 	struct perf_event_context *ctx = NULL;
+	u64 start_clock, end_clock;
 	int rotate = 0;
 
 	if (cpuctx->ctx.nr_events) {
@@ -3332,6 +3345,7 @@ static int perf_rotate_context(struct perf_cpu_context *cpuctx)
 	if (!rotate)
 		goto done;
 
+	start_clock = perf_clock();
 	perf_ctx_lock(cpuctx, cpuctx->task_ctx);
 	perf_pmu_disable(cpuctx->ctx.pmu);
 
@@ -3347,6 +3361,8 @@ static int perf_rotate_context(struct perf_cpu_context *cpuctx)
 
 	perf_pmu_enable(cpuctx->ctx.pmu);
 	perf_ctx_unlock(cpuctx, cpuctx->task_ctx);
+	end_clock = perf_clock();
+	perf_caculate_mux_overhead(cpuctx, end_clock - start_clock);
 done:
 
 	return rotate;
