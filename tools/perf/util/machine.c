@@ -568,6 +568,11 @@ int machine__process_overhead_event(struct machine *machine __maybe_unused,
 			    event->overhead.entry.nr,
 			    event->overhead.entry.time,
 			    event->overhead.entry.cpu);
+	} else if (event->overhead.type == PERF_SB_OVERHEAD) {
+		dump_printf(" SB nr: %llu  time: %llu cpu %u\n",
+			    event->overhead.entry.nr,
+			    event->overhead.entry.time,
+			    event->overhead.entry.cpu);
 	} else {
 		dump_printf("\tUNSUPPORT OVERHEAD TYPE 0x%x!\n", event->overhead.type);
 	}

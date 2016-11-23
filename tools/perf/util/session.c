@@ -1222,6 +1222,10 @@ overhead_stats_update(struct perf_tool *tool,
 			evlist->stats.total_mux_overhead[event->overhead.entry.cpu][0] += event->overhead.entry.nr;
 			evlist->stats.total_mux_overhead[event->overhead.entry.cpu][1] += event->overhead.entry.time;
 			break;
+		case PERF_SB_OVERHEAD:
+			evlist->stats.total_sb_overhead[event->overhead.entry.cpu][0] += event->overhead.entry.nr;
+			evlist->stats.total_sb_overhead[event->overhead.entry.cpu][1] += event->overhead.entry.time;
+			break;
 		default:
 			break;
 		}

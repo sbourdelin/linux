@@ -384,6 +384,9 @@ static int perf_evlist__tty_browse_hists(struct perf_evlist *evlist,
 			fprintf(stdout, "#\t\tMultiplexing#: %" PRIu64 " time: %" PRIu64 " ns\n",
 				evlist->stats.total_mux_overhead[cpu][0],
 				evlist->stats.total_mux_overhead[cpu][1]);
+			fprintf(stdout, "#\t\tSB#: %" PRIu64 " time: %" PRIu64 " ns\n",
+				evlist->stats.total_sb_overhead[cpu][0],
+				evlist->stats.total_sb_overhead[cpu][1]);
 		}
 		fprintf(stdout, "#\n");
 	}

@@ -267,6 +267,10 @@ enum auxtrace_error_type {
  * The total NMI# is stored in [0], while the accumulated time is in [1].
  * The total_mux_overhead tells exactly the Multiplexing overhead on each CPU.
  * The total rotate# is stored in [0], while the accumulated time is in [1].
+ * The total_sb_overhead tells exactly the overhead to output side-band
+ * events on each CPU.
+ * The total number of accessing side-band events handler function is stored
+ * in [0], while the accumulated processing time is in [1].
  */
 struct events_stats {
 	u64 total_period;
@@ -277,6 +281,7 @@ struct events_stats {
 	u64 total_invalid_chains;
 	u64 total_nmi_overhead[MAX_NR_CPUS][2];
 	u64 total_mux_overhead[MAX_NR_CPUS][2];
+	u64 total_sb_overhead[MAX_NR_CPUS][2];
 	u32 nr_events[PERF_RECORD_HEADER_MAX];
 	u32 nr_non_filtered_samples;
 	u32 nr_lost_warned;
