@@ -171,6 +171,9 @@ struct devfreq {
 	struct notifier_block nb;
 	struct delayed_work work;
 
+	unsigned long suspend_freq; /* freq during devfreq suspend */
+	unsigned long resume_freq; /* freq restored after suspend cycle */
+
 	unsigned long previous_freq;
 	struct devfreq_dev_status last_status;
 
@@ -210,6 +213,10 @@ extern void devm_devfreq_remove_device(struct device *dev,
 /* Supposed to be called by PM callbacks */
 extern int devfreq_suspend_device(struct devfreq *devfreq);
 extern int devfreq_resume_device(struct devfreq *devfreq);
+
+/* Suspend/resume the entire Devfreq subsystem. */
+void devfreq_suspend(void);
+void devfreq_resume(void);
 
 /* Helper functions for devfreq user device driver with OPP. */
 extern struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
@@ -410,6 +417,9 @@ static inline int devfreq_update_stats(struct devfreq *df)
 {
 	return -EINVAL;
 }
+
+static inline void devfreq_suspend(void) {}
+static inline void devfreq_resume(void) {}
 #endif /* CONFIG_PM_DEVFREQ */
 
 #endif /* __LINUX_DEVFREQ_H__ */

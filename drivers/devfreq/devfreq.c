@@ -785,6 +785,81 @@ int devfreq_resume_device(struct devfreq *devfreq)
 EXPORT_SYMBOL(devfreq_resume_device);
 
 /**
+ * devfreq_suspend() - Suspend DevFreq governors
+ *
+ * Called during system wide Suspend/Hibernate cycles for suspending governors
+ * in the same fashion as cpufreq_suspend().
+ */
+void devfreq_suspend(void)
+{
+	struct devfreq *devfreq;
+	unsigned long freq;
+	int ret;
+
+	mutex_lock(&devfreq_list_lock);
+
+	list_for_each_entry(devfreq, &devfreq_list, node) {
+		if (!devfreq->suspend_freq)
+			continue;
+
+		ret = devfreq_suspend_device(devfreq);
+		if (ret < 0) {
+			dev_warn(&devfreq->dev, "%s: governor suspend failed\n", __func__);
+			continue;
+		}
+
+		devfreq->resume_freq = 0;
+		if (devfreq->profile->get_cur_freq) {
+			ret = devfreq->profile->get_cur_freq(devfreq->dev.parent, &freq);
+			if (ret >= 0)
+				devfreq->resume_freq = freq;
+		}
+
+		freq = devfreq->suspend_freq;
+		ret = devfreq->profile->target(devfreq->dev.parent, &freq, 0);
+
+		if (ret < 0)
+			dev_warn(&devfreq->dev, "%s: setting suspend frequency failed\n", __func__);
+	}
+
+	mutex_unlock(&devfreq_list_lock);
+}
+
+/**
+ * devfreq_resume() - Resume DevFreq governors
+ *
+ * Called during system wide Suspend/Hibernate cycle for resuming governors that
+ * are suspended with devfreq_suspend().
+ */
+void devfreq_resume(void)
+{
+	struct devfreq *devfreq;
+	unsigned long freq;
+	int ret;
+
+	mutex_lock(&devfreq_list_lock);
+
+	list_for_each_entry(devfreq, &devfreq_list, node) {
+		if (!devfreq->suspend_freq)
+			continue;
+
+		freq = devfreq->resume_freq;
+		ret = devfreq->profile->target(devfreq->dev.parent, &freq, 0);
+
+		if (ret < 0) {
+			dev_warn(&devfreq->dev, "%s: setting resume frequency failed\n", __func__);
+			continue;
+		}
+
+		ret = devfreq_resume_device(devfreq);
+		if (ret < 0)
+			dev_warn(&devfreq->dev, "%s: governor resume failed\n", __func__);
+	}
+
+	mutex_unlock(&devfreq_list_lock);
+}
+
+/**
  * devfreq_add_governor() - Add devfreq governor
  * @governor:	the devfreq governor to be added
  */
