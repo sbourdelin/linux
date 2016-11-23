@@ -581,6 +581,7 @@ serial8250_register_ports(struct uart_driver *drv, struct device *dev)
 			up->port.flags |= UPF_NO_TXEN_TEST;
 
 		uart_add_one_port(drv, &up->port);
+		uart_add_led_triggers(drv, &up->port);
 	}
 }
 
@@ -975,8 +976,10 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
 
 	uart = serial8250_find_match_or_unused(&up->port);
 	if (uart && uart->port.type != PORT_8250_CIR) {
-		if (uart->port.dev)
+		if (uart->port.dev) {
 			uart_remove_one_port(&serial8250_reg, &uart->port);
+			uart_remove_led_triggers(&uart->port);
+		}
 
 		uart->port.iobase       = up->port.iobase;
 		uart->port.membase      = up->port.membase;
@@ -1050,8 +1053,11 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
 
 			ret = uart_add_one_port(&serial8250_reg,
 						&uart->port);
-			if (ret == 0)
+			if (ret == 0) {
+				uart_add_led_triggers(&serial8250_reg,
+						&uart->port);
 				ret = uart->port.line;
+			}
 		} else {
 			dev_info(uart->port.dev,
 				"skipping CIR port at 0x%lx / 0x%llx, IRQ %d\n",
@@ -1090,6 +1096,7 @@ void serial8250_unregister_port(int line)
 	}
 
 	uart_remove_one_port(&serial8250_reg, &uart->port);
+	uart_remove_led_triggers(&uart->port);
 	if (serial8250_isa_devs) {
 		uart->port.flags &= ~UPF_BOOT_AUTOCONF;
 		if (skip_txen_test)
@@ -1098,6 +1105,7 @@ void serial8250_unregister_port(int line)
 		uart->port.dev = &serial8250_isa_devs->dev;
 		uart->capabilities = 0;
 		uart_add_one_port(&serial8250_reg, &uart->port);
+		uart_add_led_triggers(&serial8250_reg, &uart->port);
 	} else {
 		uart->port.dev = NULL;
 	}

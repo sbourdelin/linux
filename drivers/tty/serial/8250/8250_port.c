@@ -1705,6 +1705,8 @@ unsigned char serial8250_rx_chars(struct uart_8250_port *up, unsigned char lsr)
 	struct uart_port *port = &up->port;
 	int max_count = 256;
 
+	uart_led_trigger_rx(port);
+
 	do {
 		serial8250_read_char(up, lsr);
 		if (--max_count == 0)
@@ -1737,6 +1739,8 @@ void serial8250_tx_chars(struct uart_8250_port *up)
 		__stop_tx(up);
 		return;
 	}
+
+	uart_led_trigger_tx(port);
 
 	count = up->tx_loadsz;
 	do {
