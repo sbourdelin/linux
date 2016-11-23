@@ -156,7 +156,7 @@ static int tangox_dma_issue_single(struct tangox_dma_pchan *pchan,
 	writel(sg->addr, pchan->base + DMA_ADDR);
 	writel(sg->len, pchan->base + DMA_COUNT);
 	wmb();
-	writel(flags << 2 | DMA_MODE_SINGLE, pchan->base + DMA_CMD);
+	writel(DMA_MODE_SINGLE << 1 | flags, pchan->base + DMA_CMD);
 	wmb();
 
 	return sg->len;
@@ -569,7 +569,7 @@ static int tangox_dma_remove(struct platform_device *pdev)
 }
 
 static struct of_device_id tangox_dma_dt_ids[] = {
-	{ .compatible = "sigma,smp8640-dma" },
+	{ .compatible = "sigma,smp8758-dma" },
 	{ }
 };
 
