@@ -315,6 +315,8 @@ static inline void qlogicpti_set_hostdev_defaults(struct qlogicpti *qpti)
 static int qlogicpti_reset_hardware(struct Scsi_Host *host)
 {
 	struct qlogicpti *qpti = (struct qlogicpti *) host->hostdata;
+	__u32 qres_dvma = (__u32)qpti->res_dvma;
+	__u32 qreq_dvma = (__u32)qpti->req_dvma;
 	u_short param[6];
 	unsigned short risc_code_addr;
 	int loop_count, i;
@@ -391,8 +393,8 @@ static int qlogicpti_reset_hardware(struct Scsi_Host *host)
 
 	param[0] = MBOX_INIT_RES_QUEUE;
 	param[1] = RES_QUEUE_LEN + 1;
-	param[2] = (u_short) (qpti->res_dvma >> 16);
-	param[3] = (u_short) (qpti->res_dvma & 0xffff);
+	param[2] = (u_short)(qres_dvma >> 16);
+	param[3] = (u_short)(qres_dvma & 0xffff);
 	param[4] = param[5] = 0;
 	if (qlogicpti_mbox_command(qpti, param, 1)) {
 		printk(KERN_EMERG "qlogicpti%d: Cannot init response queue.\n",
@@ -403,8 +405,8 @@ static int qlogicpti_reset_hardware(struct Scsi_Host *host)
 
 	param[0] = MBOX_INIT_REQ_QUEUE;
 	param[1] = QLOGICPTI_REQ_QUEUE_LEN + 1;
-	param[2] = (u_short) (qpti->req_dvma >> 16);
-	param[3] = (u_short) (qpti->req_dvma & 0xffff);
+	param[2] = (u_short)(qreq_dvma >> 16);
+	param[3] = (u_short)(qreq_dvma & 0xffff);
 	param[4] = param[5] = 0;
 	if (qlogicpti_mbox_command(qpti, param, 1)) {
 		printk(KERN_EMERG "qlogicpti%d: Cannot init request queue.\n",
