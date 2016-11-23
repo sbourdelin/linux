@@ -27,6 +27,7 @@ int tpm_read_log_of(struct tpm_chip *chip)
 	const u32 *sizep;
 	const u64 *basep;
 	struct tpm_bios_log *log;
+	u32 log_size;
 
 	log = &chip->log;
 	if (chip->dev.parent && chip->dev.parent->of_node)
@@ -34,25 +35,43 @@ int tpm_read_log_of(struct tpm_chip *chip)
 	else
 		return -ENODEV;
 
+	/*
+	 * For both vtpm/tpm, firmware has log addr and log size in big
+	 * endian format. But in case of vtpm, there is a method called
+	 * sml-handover which is run during kernel init even before
+	 * device tree is setup. This sml-handover function takes care
+	 * of endianness and writes to sml-base and sml-size in little
+	 * endian format. For this reason, vtpm doesn't need conversion
+	 * but physical tpm needs the conversion.
+	 */
 	sizep = of_get_property(np, "linux,sml-size", NULL);
+	if (of_property_match_string(np, "compatible", "IBM,vtpm") < 0)
+		log_size = be32_to_cpup(sizep);
+	else
+		log_size = *sizep;
+
 	basep = of_get_property(np, "linux,sml-base", NULL);
 	if (sizep == NULL && basep == NULL)
 		return -ENODEV;
 	if (sizep == NULL || basep == NULL)
 		return -EIO;
 
-	if (*sizep == 0) {
+	if (log_size == 0) {
 		dev_warn(&chip->dev, "%s: Event log area empty\n", __func__);
 		return -EIO;
 	}
 
-	log->bios_event_log = kmalloc(*sizep, GFP_KERNEL);
+	log->bios_event_log = kmalloc(log_size, GFP_KERNEL);
 	if (!log->bios_event_log)
 		return -ENOMEM;
 
-	log->bios_event_log_end = log->bios_event_log + *sizep;
+	log->bios_event_log_end = log->bios_event_log + log_size;
 
-	memcpy(log->bios_event_log, __va(*basep), *sizep);
+	if (of_property_match_string(np, "compatible", "IBM,vtpm") < 0)
+		memcpy(chip->log.bios_event_log, __va(be64_to_cpup(basep)),
+		       log_size);
+	else
+		memcpy(chip->log.bios_event_log, __va(*basep), log_size);
 
 	return 0;
 }
