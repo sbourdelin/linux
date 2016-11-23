@@ -1563,6 +1563,7 @@ int of_phandle_iterator_init(struct of_phandle_iterator *it,
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(of_phandle_iterator_init);
 
 int of_phandle_iterator_next(struct of_phandle_iterator *it)
 {
@@ -1632,6 +1633,7 @@ err:
 
 	return -EINVAL;
 }
+EXPORT_SYMBOL_GPL(of_phandle_iterator_next);
 
 int of_phandle_iterator_args(struct of_phandle_iterator *it,
 			     uint32_t *args,
@@ -1649,6 +1651,7 @@ int of_phandle_iterator_args(struct of_phandle_iterator *it,
 
 	return count;
 }
+EXPORT_SYMBOL_GPL(of_phandle_iterator_args);
 
 static int __of_parse_phandle_with_args(const struct device_node *np,
 					const char *list_name,
