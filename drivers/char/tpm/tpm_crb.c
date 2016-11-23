@@ -100,7 +100,7 @@ static u8 crb_status(struct tpm_chip *chip)
 static int crb_recv(struct tpm_chip *chip, u8 *buf, size_t count)
 {
 	struct crb_priv *priv = dev_get_drvdata(&chip->dev);
-	unsigned int expected;
+	u32 expected;
 
 	/* sanity check */
 	if (count < 6)
@@ -110,7 +110,7 @@ static int crb_recv(struct tpm_chip *chip, u8 *buf, size_t count)
 		return -EIO;
 
 	memcpy_fromio(buf, priv->rsp, 6);
-	expected = be32_to_cpup((__be32 *) &buf[2]);
+	expected = get_unaligned_be32(buf + 2);
 
 	if (expected > count)
 		return -EIO;

@@ -23,6 +23,7 @@
 #ifndef __TPM_H__
 #define __TPM_H__
 
+#include <asm/unaligned.h>
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/fs.h>

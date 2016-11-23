@@ -343,8 +343,8 @@ ssize_t tpm_transmit(struct tpm_chip *chip, const u8 *buf, size_t bufsiz,
 	if (bufsiz > TPM_BUFSIZE)
 		bufsiz = TPM_BUFSIZE;
 
-	count = be32_to_cpu(*((__be32 *) (buf + 2)));
-	ordinal = be32_to_cpu(*((__be32 *) (buf + 6)));
+	count = get_unaligned_be32(buf + 2);
+	ordinal = get_unaligned_be32(buf + 6);
 	if (count == 0)
 		return -ENODATA;
 	if (count > bufsiz) {

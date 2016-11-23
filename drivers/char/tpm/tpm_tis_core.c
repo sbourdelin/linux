@@ -215,7 +215,7 @@ static int tpm_tis_recv(struct tpm_chip *chip, u8 *buf, size_t count)
 		goto out;
 	}
 
-	expected = be32_to_cpu(*(__be32 *) (buf + 2));
+	expected = get_unaligned_be32(buf + 2);
 	if (expected > count) {
 		size = -EIO;
 		goto out;
@@ -349,7 +349,7 @@ static int tpm_tis_send_main(struct tpm_chip *chip, u8 *buf, size_t len)
 		goto out_err;
 
 	if (chip->flags & TPM_CHIP_FLAG_IRQ) {
-		ordinal = be32_to_cpu(*((__be32 *) (buf + 6)));
+		ordinal = get_unaligned_be32(buf + 6);
 
 		if (chip->flags & TPM_CHIP_FLAG_TPM2)
 			dur = tpm2_calc_ordinal_duration(chip, ordinal);

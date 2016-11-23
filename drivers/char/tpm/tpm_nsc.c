@@ -131,7 +131,6 @@ static int tpm_nsc_recv(struct tpm_chip *chip, u8 * buf, size_t count)
 	u8 *buffer = buf;
 	u8 data, *p;
 	u32 size;
-	__be32 *native_size;
 
 	if (count < 6)
 		return -EIO;
@@ -174,8 +173,7 @@ static int tpm_nsc_recv(struct tpm_chip *chip, u8 * buf, size_t count)
 		return -EIO;
 	}
 
-	native_size = (__force __be32 *) (buf + 2);
-	size = be32_to_cpu(*native_size);
+	size = get_unaligned_be32(buf + 2);
 
 	if (count < size)
 		return -EIO;

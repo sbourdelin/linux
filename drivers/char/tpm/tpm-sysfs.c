@@ -71,7 +71,7 @@ static ssize_t pubek_show(struct device *dev, struct device_attribute *attr,
 		    data[12], data[13], data[14], data[15],
 		    data[16], data[17], data[18], data[19],
 		    data[20], data[21], data[22], data[23],
-		    be32_to_cpu(*((__be32 *) (data + 24))));
+		    be32_to_cpup((__be32 *)(data + 24)));
 
 	for (i = 0; i < 256; i++) {
 		str += sprintf(str, "%02X ", data[i + 28]);

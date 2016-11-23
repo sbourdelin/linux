@@ -437,7 +437,8 @@ static int recv_data(struct tpm_chip *chip, u8 *buf, size_t count)
 static int tpm_tis_i2c_recv(struct tpm_chip *chip, u8 *buf, size_t count)
 {
 	int size = 0;
-	int expected, status;
+	u32 expected;
+	int status;
 
 	if (count < TPM_HEADER_SIZE) {
 		size = -EIO;
@@ -451,7 +452,7 @@ static int tpm_tis_i2c_recv(struct tpm_chip *chip, u8 *buf, size_t count)
 		goto out;
 	}
 
-	expected = be32_to_cpu(*(__be32 *)(buf + 2));
+	expected = get_unaligned_be32(buf + 2);
 	if ((size_t) expected > count) {
 		size = -EIO;
 		goto out;
