@@ -108,11 +108,11 @@ static struct tangox_dma_desc *tangox_dma_alloc_desc(unsigned int num_sgs)
 
 static void tangox_dma_sbox_map(struct tangox_dma_device *dev, int src, int dst)
 {
-	void __iomem *addr = dev->sbox_base + 8;
+	void __iomem *addr = dev->sbox_base + SBOX_ROUTE;
 	int shift = (dst - 1) * 4;
 
-	if (shift > 31) {
-		addr += 4;
+	if (dst > 8) {
+		addr = dev->sbox_base + SBOX_ROUTE2;
 		shift -= 32;
 	}
 
