@@ -73,11 +73,7 @@ static struct platform_driver dbx500_cpufreq_plat_driver = {
 	.probe = dbx500_cpufreq_probe,
 };
 
-static int __init dbx500_cpufreq_register(void)
-{
-	return platform_driver_register(&dbx500_cpufreq_plat_driver);
-}
-device_initcall(dbx500_cpufreq_register);
+builtin_platform_driver(dbx500_cpufreq_plat_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("cpufreq driver for DBX500");
