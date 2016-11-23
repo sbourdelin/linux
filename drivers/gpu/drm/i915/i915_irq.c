@@ -110,9 +110,9 @@ static const u32 hpd_status_i915[HPD_NUM_PINS] = {
 
 /* BXT hpd list */
 static const u32 hpd_bxt[HPD_NUM_PINS] = {
-	[HPD_PORT_A] = BXT_DE_PORT_HP_DDIA,
-	[HPD_PORT_B] = BXT_DE_PORT_HP_DDIB,
-	[HPD_PORT_C] = BXT_DE_PORT_HP_DDIC
+	[HPD_PORT_A] = (BXT_DE_PORT_HP_DDIA | BXT_PCU_DC9_HP_DDIA),
+	[HPD_PORT_B] = (BXT_DE_PORT_HP_DDIB | BXT_PCU_DC9_HP_DDIB),
+	[HPD_PORT_C] = (BXT_DE_PORT_HP_DDIC | BXT_PCU_DC9_HP_DDIC)
 };
 
 /* IIR can theoretically queue up two events. Be paranoid. */
@@ -2463,6 +2463,24 @@ gen8_de_irq_handler(struct drm_i915_private *dev_priv, u32 master_ctl)
 			DRM_ERROR("The master control interrupt lied (DE PORT)!\n");
 	}
 
+	if (master_ctl & GEN8_PCU_IRQ) {
+		iir = I915_READ(GEN8_PCU_IIR);
+		if (iir) {
+			u32 tmp_mask;
+
+			I915_WRITE(GEN8_PCU_IIR, iir);
+			ret = IRQ_HANDLED;
+			if (IS_BROXTON(dev_priv)) {
+				tmp_mask = iir & BXT_PCU_DC9_HOTPLUG_MASK;
+				if (tmp_mask)
+					bxt_hpd_irq_handler(dev_priv, tmp_mask,
+							hpd_bxt);
+			} else
+				DRM_ERROR("Unexpected PCU interrupt\n");
+		} else
+			DRM_ERROR("The master control interrupt lied (PCU)!\n");
+	}
+
 	for_each_pipe(dev_priv, pipe) {
 		u32 flip_done, fault_errors;
 
@@ -4290,6 +4308,19 @@ void intel_irq_uninstall(struct drm_i915_private *dev_priv)
 	dev_priv->pm.irqs_enabled = false;
 }
 
+static void bxt_enable_pcu_interrupt(struct drm_i915_private *dev_priv)
+{
+	u32 de_pcu_hpd_enable_mask, de_pcu_imr, de_pcu_ier;
+
+	de_pcu_hpd_enable_mask = GEN9_DE_PCU_PORTA_HOTPLUG |
+				GEN9_DE_PCU_PORTB_HOTPLUG |
+				GEN9_DE_PCU_PORTC_HOTPLUG;
+
+	de_pcu_imr = (I915_READ(GEN8_PCU_IMR) & 0x0);
+	de_pcu_ier = (I915_READ(GEN8_PCU_IER) | de_pcu_hpd_enable_mask);
+	GEN5_IRQ_INIT(GEN8_PCU_, de_pcu_imr, de_pcu_ier);
+}
+
 /**
  * intel_runtime_pm_disable_interrupts - runtime interrupt disabling
  * @dev_priv: i915 device instance
@@ -4299,8 +4330,27 @@ void intel_irq_uninstall(struct drm_i915_private *dev_priv)
  */
 void intel_runtime_pm_disable_interrupts(struct drm_i915_private *dev_priv)
 {
+	unsigned long flags = 0;
+
 	dev_priv->drm.driver->irq_uninstall(&dev_priv->drm);
 	dev_priv->pm.irqs_enabled = false;
+
+	if (IS_BROXTON(dev_priv) && dev_priv->vbt.hpd_wakeup_enabled) {
+
+		/* Enable HPD related interrupts during DC9 for HPD wakeup */
+
+		I915_WRITE(GEN8_MASTER_IRQ, GEN8_MASTER_IRQ_CONTROL);
+		POSTING_READ(GEN8_MASTER_IRQ);
+
+		spin_lock_irqsave(&dev_priv->irq_lock, flags);
+		if (dev_priv->display.hpd_irq_setup)
+			dev_priv->display.hpd_irq_setup(dev_priv);
+		spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
+
+		bxt_enable_pcu_interrupt(dev_priv);
+
+		dev_priv->pm.irqs_enabled = true;
+	}
 	synchronize_irq(dev_priv->drm.irq);
 }
 
