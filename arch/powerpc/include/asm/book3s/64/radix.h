@@ -129,15 +129,16 @@ static inline unsigned long __radix_pte_update(pte_t *ptep, unsigned long clr,
 
 
 static inline unsigned long radix__pte_update(struct mm_struct *mm,
-					unsigned long addr,
-					pte_t *ptep, unsigned long clr,
-					unsigned long set,
-					int huge)
+					      unsigned long addr,
+					      pte_t *ptep, unsigned long clr,
+					      unsigned long set,
+					      unsigned long page_size)
 {
 	unsigned long old_pte;
 
 	if (cpu_has_feature(CPU_FTR_POWER9_DD1)) {
 
+		int psize;
 		unsigned long new_pte;
 
 		old_pte = __radix_pte_update(ptep, ~0, 0);
@@ -146,18 +147,14 @@ static inline unsigned long radix__pte_update(struct mm_struct *mm,
 		 * new value of pte
 		 */
 		new_pte = (old_pte | set) & ~clr;
-
-		/*
-		 * For now let's do heavy pid flush
-		 * radix__flush_tlb_page_psize(mm, addr, mmu_virtual_psize);
-		 */
-		radix__flush_tlb_mm(mm);
+		psize = radix_get_mmu_psize(page_size);
+		radix__flush_tlb_page_psize(mm, addr, psize);
 
 		__radix_pte_update(ptep, 0, new_pte);
 	} else
 		old_pte = __radix_pte_update(ptep, clr, set);
 	asm volatile("ptesync" : : : "memory");
-	if (!huge)
+	if (page_size == PAGE_SIZE)
 		assert_pte_locked(mm, addr);
 
 	return old_pte;
