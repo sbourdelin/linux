@@ -2875,16 +2875,18 @@ static void nested_vmx_setup_ctls_msrs(struct vcpu_vmx *vmx)
 		vmx->nested.nested_vmx_basic |= VMX_BASIC_INOUT;
 
 	/*
-	 * These MSRs specify bits which the guest must keep fixed (on or off)
+	 * These MSRs specify bits which the guest must keep fixed on
 	 * while L1 is in VMXON mode (in L1's root mode, or running an L2).
 	 * We picked the standard core2 setting.
 	 */
 #define VMXON_CR0_ALWAYSON     (X86_CR0_PE | X86_CR0_PG | X86_CR0_NE)
 #define VMXON_CR4_ALWAYSON     X86_CR4_VMXE
 	vmx->nested.nested_vmx_cr0_fixed0 = VMXON_CR0_ALWAYSON;
-	vmx->nested.nested_vmx_cr0_fixed1 = -1ULL;
 	vmx->nested.nested_vmx_cr4_fixed0 = VMXON_CR4_ALWAYSON;
-	vmx->nested.nested_vmx_cr4_fixed1 = -1ULL;
+
+	/* These MSRs specify bits which the guest must keep fixed off. */
+	rdmsrl(MSR_IA32_VMX_CR0_FIXED1, vmx->nested.nested_vmx_cr0_fixed1);
+	rdmsrl(MSR_IA32_VMX_CR4_FIXED1, vmx->nested.nested_vmx_cr4_fixed1);
 
 	/* highest index: VMX_PREEMPTION_TIMER_VALUE */
 	vmx->nested.nested_vmx_vmcs_enum = 0x2e;
@@ -9476,6 +9478,49 @@ static void vmcs_set_secondary_exec_control(u32 new_ctl)
 		     (new_ctl & ~mask) | (cur_ctl & mask));
 }
 
+/*
+ * Generate MSR_IA32_VMX_CR4_FIXED1 according to CPUID. Only set bits
+ * (indicating "allowed-1") if they are supported in the guest's CPUID.
+ */
+static void nested_vmx_cr4_fixed1_update(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	struct kvm_cpuid_entry2 *entry;
+
+#define update(_cr4_mask, _reg, _cpuid_mask) do {			\
+	if (entry && (entry->_reg & (_cpuid_mask)))			\
+		vmx->nested.nested_vmx_cr4_fixed1 |= (_cr4_mask);	\
+} while (0)
+
+	vmx->nested.nested_vmx_cr4_fixed1 = X86_CR4_PCE;
+
+	entry = kvm_find_cpuid_entry(vcpu, 0x1, 0);
+	update(X86_CR4_VME,        edx, bit(X86_FEATURE_VME));
+	update(X86_CR4_PVI,        edx, bit(X86_FEATURE_VME));
+	update(X86_CR4_TSD,        edx, bit(X86_FEATURE_TSC));
+	update(X86_CR4_DE,         edx, bit(X86_FEATURE_DE));
+	update(X86_CR4_PSE,        edx, bit(X86_FEATURE_PSE));
+	update(X86_CR4_PAE,        edx, bit(X86_FEATURE_PAE));
+	update(X86_CR4_MCE,        edx, bit(X86_FEATURE_MCE));
+	update(X86_CR4_PGE,        edx, bit(X86_FEATURE_PGE));
+	update(X86_CR4_OSFXSR,     edx, bit(X86_FEATURE_FXSR));
+	update(X86_CR4_OSXMMEXCPT, edx, bit(X86_FEATURE_XMM));
+	update(X86_CR4_VMXE,       ecx, bit(X86_FEATURE_VMX));
+	update(X86_CR4_SMXE,       ecx, bit(X86_FEATURE_SMX));
+	update(X86_CR4_PCIDE,      ecx, bit(X86_FEATURE_PCID));
+	update(X86_CR4_OSXSAVE,    ecx, bit(X86_FEATURE_XSAVE));
+
+	entry = kvm_find_cpuid_entry(vcpu, 0x7, 0);
+	update(X86_CR4_FSGSBASE,   ebx, bit(X86_FEATURE_FSGSBASE));
+	update(X86_CR4_SMEP,       ebx, bit(X86_FEATURE_SMEP));
+	update(X86_CR4_SMAP,       ebx, bit(X86_FEATURE_SMAP));
+	update(X86_CR4_PKE,        ecx, bit(X86_FEATURE_PKU));
+	/* TODO: Use X86_CR4_UMIP and X86_FEATURE_UMIP macros */
+	update(bit(11),            ecx, bit(2));
+
+#undef update
+}
+
 static void vmx_cpuid_update(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpuid_entry2 *best;
@@ -9517,6 +9562,9 @@ static void vmx_cpuid_update(struct kvm_vcpu *vcpu)
 	else
 		to_vmx(vcpu)->msr_ia32_feature_control_valid_bits &=
 			~FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX;
+
+	if (nested_vmx_allowed(vcpu))
+		nested_vmx_cr4_fixed1_update(vcpu);
 }
 
 static void vmx_set_supported_cpuid(u32 func, struct kvm_cpuid_entry2 *entry)
