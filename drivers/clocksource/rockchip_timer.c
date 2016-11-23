@@ -60,8 +60,7 @@ static inline void rk_timer_disable(struct rk_timer *timer)
 
 static inline void rk_timer_enable(struct rk_timer *timer, u32 flags)
 {
-	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
-		       timer->ctrl);
+	writel_relaxed(TIMER_ENABLE | flags, timer->ctrl);
 }
 
 static void rk_timer_update_counter(unsigned long cycles,
@@ -82,7 +81,7 @@ static inline int rk_timer_set_next_event(unsigned long cycles,
 	struct rk_timer *timer = rk_timer(ce);
 	rk_timer_disable(timer);
 	rk_timer_update_counter(cycles, timer);
-	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT);
+	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT | TIMER_INT_UNMASK);
 	return 0;
 }
 
@@ -98,7 +97,7 @@ static int rk_timer_set_periodic(struct clock_event_device *ce)
 	struct rk_timer *timer = rk_timer(ce);
 	rk_timer_disable(timer);
 	rk_timer_update_counter(timer->freq / HZ - 1, timer);
-	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING);
+	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING | TIMER_INT_UNMASK);
 	return 0;
 }
 
