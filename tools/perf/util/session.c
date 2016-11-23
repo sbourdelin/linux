@@ -804,6 +804,7 @@ static perf_event__swap_op perf_event__swap_ops[] = {
 	[PERF_RECORD_STAT_ROUND]	  = perf_event__stat_round_swap,
 	[PERF_RECORD_EVENT_UPDATE]	  = perf_event__event_update_swap,
 	[PERF_RECORD_TIME_CONV]		  = perf_event__all64_swap,
+	[PERF_RECORD_USER_OVERHEAD]	  = perf_event__all64_swap,
 	[PERF_RECORD_HEADER_MAX]	  = NULL,
 };
 
@@ -1382,6 +1383,9 @@ static s64 perf_session__process_user_event(struct perf_session *session,
 	case PERF_RECORD_TIME_CONV:
 		session->time_conv = event->time_conv;
 		return tool->time_conv(tool, event, session);
+	case PERF_RECORD_USER_OVERHEAD:
+		overhead_stats_update(tool, session->evlist, event);
+		return tool->overhead(tool, event, NULL, NULL);
 	default:
 		return -EINVAL;
 	}
