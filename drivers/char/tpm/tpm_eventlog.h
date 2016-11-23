@@ -73,6 +73,9 @@ enum tcpa_pc_event_ids {
 	HOST_TABLE_OF_DEVICES,
 };
 
+extern const struct seq_operations tpm_ascii_b_measurements_seqops;
+extern const struct seq_operations tpm_binary_b_measurements_seqops;
+
 #if defined(CONFIG_ACPI)
 int tpm_read_log_acpi(struct tpm_chip *chip);
 #else
