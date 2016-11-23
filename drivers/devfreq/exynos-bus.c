@@ -335,6 +335,7 @@ static int exynos_bus_parse_of(struct device_node *np,
 			      struct exynos_bus *bus)
 {
 	struct device *dev = bus->dev;
+	struct dev_pm_opp *suspend_opp;
 	unsigned long rate;
 	int ret;
 
@@ -368,6 +369,13 @@ static int exynos_bus_parse_of(struct device_node *np,
 		ret = PTR_ERR(bus->curr_opp);
 		goto err_opp;
 	}
+
+	suspend_opp = dev_pm_opp_get_suspend_opp(dev);
+	if (suspend_opp) {
+		bus->devfreq->suspend_freq = dev_pm_opp_get_freq(suspend_opp);
+		printk("DEBUG: suspend opp found!\n");
+	}
+
 	rcu_read_unlock();
 
 	return 0;
