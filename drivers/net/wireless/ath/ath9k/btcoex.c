@@ -290,6 +290,7 @@ static void ath9k_hw_btcoex_enable_3wire(struct ath_hw *ah)
 	struct ath_btcoex_hw *btcoex = &ah->btcoex_hw;
 	u32  val;
 	int i;
+	int coex_mode = MS(btcoex->bt_coex_mode, AR_BT_MODE);
 
 	/*
 	 * Program coex mode and weight registers to
@@ -319,7 +320,11 @@ static void ath9k_hw_btcoex_enable_3wire(struct ath_hw *ah)
 		REG_WRITE(ah, 0x50040, val);
 	}
 
-	REG_RMW_FIELD(ah, AR_QUIET1, AR_QUIET1_QUIET_ACK_CTS_ENABLE, 1);
+	if (AR_SREV_SOC(ah) && (coex_mode == ATH_BT_COEX_MODE_SLOTTED))
+		REG_RMW_FIELD(ah, AR_QUIET1, AR_QUIET1_QUIET_ACK_CTS_ENABLE, 0);
+	else
+		REG_RMW_FIELD(ah, AR_QUIET1, AR_QUIET1_QUIET_ACK_CTS_ENABLE, 1);
+
 	REG_RMW_FIELD(ah, AR_PCU_MISC, AR_PCU_BT_ANT_PREVENT_RX, 0);
 
 	ath9k_hw_gpio_request_out(ah, btcoex->wlanactive_gpio,
