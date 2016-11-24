@@ -484,6 +484,7 @@ int intel_guc_setup(struct drm_device *dev)
 		goto fail;
 	}
 
+	mutex_init(&dev_priv->guc.action_lock);
 	guc_interrupts_release(dev_priv);
 	gen9_reset_guc_interrupts(dev_priv);
 

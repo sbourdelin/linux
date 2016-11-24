@@ -1362,7 +1362,6 @@ int i915_guc_submission_init(struct drm_i915_private *dev_priv)
 
 	guc->ctx_pool_vma = vma;
 	ida_init(&guc->ctx_ids);
-	mutex_init(&guc->action_lock);
 	guc_log_create(guc);
 	guc_addon_create(guc);
 
