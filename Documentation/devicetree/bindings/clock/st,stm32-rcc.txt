@@ -74,6 +74,8 @@ The secondary index is bound with the following magic numbers:
 				 crystal or ceramic resonator)
 	4	CLK_HSE_RTC	(HSE division factor for RTC clock)
 	5	CLK_RTC		(real-time clock)
+	6	PLL_VCO_I2S	(vco frequency of I2S pll)
+	7	PLL_VCO_SAI	(vco frequency of SAI pll)
 
 Example:
 
