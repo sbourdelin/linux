@@ -176,7 +176,6 @@ static void inc_deq(struct xhci_hcd *xhci, struct xhci_ring *ring)
 		ring->deq_seg = ring->deq_seg->next;
 		ring->dequeue = ring->deq_seg->trbs;
 	}
-	return;
 }
 
 /*
@@ -1163,7 +1162,6 @@ static void xhci_handle_cmd_config_ep(struct xhci_hcd *xhci, int slot_id,
 		ring_doorbell_for_active_rings(xhci, slot_id, ep_index);
 		return;
 	}
-	return;
 }
 
 static void xhci_handle_cmd_reset_dev(struct xhci_hcd *xhci, int slot_id,
@@ -1254,7 +1252,6 @@ static void xhci_handle_stopped_cmd_ring(struct xhci_hcd *xhci,
 		mod_timer(&xhci->cmd_timer, jiffies + XHCI_CMD_DEFAULT_TIMEOUT);
 		xhci_ring_cmd_db(xhci);
 	}
-	return;
 }
 
 
@@ -1303,7 +1300,6 @@ void xhci_handle_command_timeout(unsigned long data)
 	xhci_dbg(xhci, "Command timeout on stopped ring\n");
 	xhci_handle_stopped_cmd_ring(xhci, xhci->current_cmd);
 	spin_unlock_irqrestore(&xhci->lock, flags);
-	return;
 }
 
 static void handle_cmd_completion(struct xhci_hcd *xhci,

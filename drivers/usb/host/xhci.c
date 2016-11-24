@@ -275,8 +275,6 @@ static void xhci_free_irq(struct xhci_hcd *xhci)
 		return;
 	if (pdev->irq > 0)
 		free_irq(pdev->irq, xhci_to_hcd(xhci));
-
-	return;
 }
 
 /*
@@ -357,7 +355,6 @@ static void xhci_cleanup_msix(struct xhci_hcd *xhci)
 	}
 
 	hcd->msix_enabled = 0;
-	return;
 }
 
 static void __maybe_unused xhci_msix_sync_irqs(struct xhci_hcd *xhci)
