@@ -542,6 +542,18 @@ static void __mnt_unmake_readonly(struct mount *mnt)
 	unlock_mount_hash();
 }
 
+bool sb_file_times_updatable(struct super_block *sb)
+{
+
+	if (!timestamp_check.check_on)
+		return true;
+
+	if (sb->s_time_max > timestamp_check.timestamp_supported)
+		return true;
+
+	return false;
+}
+
 int sb_prepare_remount_readonly(struct super_block *sb)
 {
 	struct mount *mnt;

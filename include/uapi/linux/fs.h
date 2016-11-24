@@ -91,6 +91,11 @@ struct files_stat_struct {
 	unsigned long max_files;		/* tunable */
 };
 
+struct vfs_max_timestamp_check {
+	time64_t timestamp_supported;
+	int check_on;
+};
+
 struct inodes_stat_t {
 	long nr_inodes;
 	long nr_unused;
@@ -99,7 +104,6 @@ struct inodes_stat_t {
 
 
 #define NR_FILE  8192	/* this can well be larger on a larger system */
-
 
 /*
  * These are the fs-independent mount-flags: up to 32 flags are supported

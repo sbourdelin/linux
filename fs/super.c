@@ -1199,6 +1199,13 @@ mount_fs(struct file_system_type *type, int flags, const char *name, void *data)
 	WARN((sb->s_maxbytes < 0), "%s set sb->s_maxbytes to "
 		"negative value (%lld)\n", type->name, sb->s_maxbytes);
 
+	if (!(sb->s_flags & MS_RDONLY) && !sb_file_times_updatable(sb)) {
+		WARN(1, "File times cannot be updated on the filesystem.\n");
+		WARN(1, "Retry mounting the filesystem readonly.\n");
+		error = -EROFS;
+		goto out_sb;
+	}
+
 	up_write(&sb->s_umount);
 	free_secdata(secdata);
 	return root;
