@@ -175,8 +175,12 @@ void nft_fib6_eval(const struct nft_expr *expr, struct nft_regs *regs,
 	if (rt->dst.error)
 		goto put_rt_err;
 
-	/* Should not see RTF_LOCAL here */
-	if (rt->rt6i_flags & (RTF_REJECT | RTF_ANYCAST | RTF_LOCAL))
+	if (rt->rt6i_flags & RTF_LOCAL) {
+		nft_fib_store_result(dest, priv->result, pkt, LOOPBACK_IFINDEX);
+		goto put_rt_err;
+	}
+
+	if (rt->rt6i_flags & (RTF_REJECT | RTF_ANYCAST))
 		goto put_rt_err;
 
 	if (oif && oif != rt->rt6i_idev->dev) {

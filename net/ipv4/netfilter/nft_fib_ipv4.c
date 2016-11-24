@@ -128,7 +128,8 @@ void nft_fib4_eval(const struct nft_expr *expr, struct nft_regs *regs,
 	switch (res.type) {
 	case RTN_UNICAST:
 		break;
-	case RTN_LOCAL:	/* should not appear here, see fib4_is_local() above */
+	case RTN_LOCAL:
+		nft_fib_store_result(dest, priv->result, pkt, LOOPBACK_IFINDEX);
 		return;
 	default:
 		break;
