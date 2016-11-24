@@ -119,8 +119,8 @@ static bool r5l_has_free_space(struct r5l_log *log, sector_t size)
 	return log->device_size > used_size + size;
 }
 
-static void __r5l_set_io_unit_state(struct r5l_io_unit *io,
-				    enum r5l_io_unit_state state)
+void __r5l_set_io_unit_state(struct r5l_io_unit *io,
+			     enum r5l_io_unit_state state)
 {
 	if (WARN_ON(io->state >= state))
 		return;
@@ -340,7 +340,7 @@ static void r5c_finish_cache_stripe(struct stripe_head *sh)
 	}
 }
 
-static void r5l_io_run_stripes(struct r5l_io_unit *io)
+void r5l_io_run_stripes(struct r5l_io_unit *io)
 {
 	struct stripe_head *sh, *next;
 
@@ -935,7 +935,7 @@ static sector_t r5l_reclaimable_space(struct r5l_log *log)
 				 r5c_calculate_new_cp(conf));
 }
 
-static void r5l_run_no_mem_stripe(struct r5l_log *log)
+void r5l_run_no_mem_stripe(struct r5l_log *log)
 {
 	struct stripe_head *sh;
 
@@ -1040,7 +1040,7 @@ static void r5l_log_flush_endio(struct bio *bio)
  * only write stripes of an io_unit to raid disks till the io_unit is the first
  * one whose data/parity is in log.
  */
-static void __r5l_flush_stripe_to_raid(struct r5l_log *log)
+void __r5l_flush_stripe_to_raid(struct r5l_log *log)
 {
 	bool do_flush;
 
@@ -1362,7 +1362,7 @@ bool r5l_log_disk_error(struct r5conf *conf)
 	if (!log)
 		ret = test_bit(MD_HAS_JOURNAL, &conf->mddev->flags);
 	else
-		ret = test_bit(Faulty, &log->rdev->flags);
+		ret = log->rdev && test_bit(Faulty, &log->rdev->flags);
 	rcu_read_unlock();
 	return ret;
 }

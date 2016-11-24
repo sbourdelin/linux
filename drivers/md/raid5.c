@@ -464,6 +464,11 @@ static void shrink_buffers(struct stripe_head *sh)
 		sh->dev[i].page = NULL;
 		put_page(p);
 	}
+
+	if (sh->ppl_page) {
+		put_page(sh->ppl_page);
+		sh->ppl_page = NULL;
+	}
 }
 
 static int grow_buffers(struct stripe_head *sh, gfp_t gfp)
@@ -480,6 +485,13 @@ static int grow_buffers(struct stripe_head *sh, gfp_t gfp)
 		sh->dev[i].page = page;
 		sh->dev[i].orig_page = page;
 	}
+
+	if (test_bit(MD_HAS_PPL, &sh->raid_conf->mddev->flags)) {
+		sh->ppl_page = alloc_page(gfp);
+		if (!sh->ppl_page)
+			return 1;
+	}
+
 	return 0;
 }
 
@@ -875,7 +887,8 @@ static void ops_run_io(struct stripe_head *sh, struct stripe_head_state *s)
 
 	might_sleep();
 
-	if (!test_bit(STRIPE_R5C_CACHING, &sh->state)) {
+	if (!test_bit(STRIPE_R5C_CACHING, &sh->state) ||
+	    test_bit(MD_HAS_PPL, &conf->mddev->flags)) {
 		/* writing out phase */
 		if (r5l_write_stripe(conf->log, sh) == 0)
 			return;

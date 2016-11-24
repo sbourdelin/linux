@@ -159,4 +159,10 @@ extern int r5l_handle_flush_request(struct r5l_log *log, struct bio *bio);
 extern void r5l_quiesce(struct r5l_log *log, int state);
 extern bool r5l_log_disk_error(struct r5conf *conf);
 
+extern void __r5l_set_io_unit_state(struct r5l_io_unit *io,
+				    enum r5l_io_unit_state state);
+extern void r5l_io_run_stripes(struct r5l_io_unit *io);
+extern void r5l_run_no_mem_stripe(struct r5l_log *log);
+extern void __r5l_flush_stripe_to_raid(struct r5l_log *log);
+
 #endif /* _RAID5_CACHE_H */
