@@ -118,8 +118,11 @@ void ath_chanctx_init(struct ath_softc *sc)
 		INIT_LIST_HEAD(&ctx->vifs);
 		ctx->txpower = ATH_TXPOWER_MAX;
 		ctx->flush_timeout = HZ / 5; /* 200ms */
-		for (j = 0; j < ARRAY_SIZE(ctx->acq); j++)
-			INIT_LIST_HEAD(&ctx->acq[j]);
+		for (j = 0; j < ARRAY_SIZE(ctx->acq); j++) {
+			INIT_LIST_HEAD(&ctx->acq[j].acq_new);
+			INIT_LIST_HEAD(&ctx->acq[j].acq_old);
+			spin_lock_init(&ctx->acq[j].lock);
+		}
 	}
 }
 
@@ -142,6 +145,18 @@ void ath_chanctx_set_channel(struct ath_softc *sc, struct ath_chanctx *ctx,
 	}
 
 	ath_set_channel(sc);
+}
+
+void ath_acq_lock(struct ath_softc *sc, struct ath_acq *acq)
+	__acquires(&acq->lock)
+{
+	spin_lock_bh(&acq->lock);
+}
+
+void ath_acq_unlock(struct ath_softc *sc, struct ath_acq *acq)
+	__releases(&acq->lock)
+{
+	spin_unlock_bh(&acq->lock);
 }
 
 #ifdef CONFIG_ATH9K_CHANNEL_CONTEXT
@@ -1345,8 +1360,11 @@ void ath9k_offchannel_init(struct ath_softc *sc)
 	ctx->txpower = ATH_TXPOWER_MAX;
 	cfg80211_chandef_create(&ctx->chandef, chan, NL80211_CHAN_HT20);
 
-	for (i = 0; i < ARRAY_SIZE(ctx->acq); i++)
-		INIT_LIST_HEAD(&ctx->acq[i]);
+	for (i = 0; i < ARRAY_SIZE(ctx->acq); i++) {
+		INIT_LIST_HEAD(&ctx->acq[i].acq_new);
+		INIT_LIST_HEAD(&ctx->acq[i].acq_old);
+		spin_lock_init(&ctx->acq[i].lock);
+	}
 
 	sc->offchannel.chan.offchannel = true;
 }
