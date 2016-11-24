@@ -1,5 +1,6 @@
 # Platform specific code goes here
 obj-y	+= atom/
+obj-$(X86_ASR1K)	+= asr1k/
 obj-y	+= ce4100/
 obj-y	+= efi/
 obj-y	+= geode/

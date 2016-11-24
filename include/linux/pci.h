@@ -1689,6 +1689,7 @@ enum pci_fixup_pass {
 	pci_fixup_suspend,	/* pci_device_suspend() */
 	pci_fixup_resume_early, /* pci_device_resume_early() */
 	pci_fixup_suspend_late,	/* pci_device_suspend_late() */
+	pci_fixup_aer_enable,   /* pci_device_aer_enable() */
 };
 
 /* Anonymous variables would be nice... */
@@ -1762,6 +1763,10 @@ enum pci_fixup_pass {
 #define DECLARE_PCI_FIXUP_SUSPEND_LATE(vendor, device, hook)		\
 	DECLARE_PCI_FIXUP_SECTION(.pci_fixup_suspend_late,		\
 		suspend_late##hook, vendor, device,	\
+		PCI_ANY_ID, 0, hook)
+#define DECLARE_PCI_FIXUP_AER_ENABLE(vendor, device, hook)		\
+	DECLARE_PCI_FIXUP_SECTION(.pci_fixup_aer_enable,		\
+		aer_enable##vendor##device##hook, vendor, device,	\
 		PCI_ANY_ID, 0, hook)
 
 #ifdef CONFIG_PCI_QUIRKS
