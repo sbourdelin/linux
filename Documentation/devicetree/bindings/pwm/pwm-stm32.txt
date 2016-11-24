@@ -1,0 +1,37 @@
+STMicroelectronics PWM driver bindings for STM32
+
+Must be a sub-node of STM32 general purpose timer driver
+
+Required parameters:
+- compatible:		Must be "st,stm32-pwm"
+- pinctrl-names: 	Set to "default".
+- pinctrl-0: 		List of phandles pointing to pin configuration nodes
+			for PWM module.
+			For Pinctrl properties, please refer to [1].
+
+Optional parameters:
+- st,breakinput:	Set if the hardware have break input capabilities
+- st,breakinput-polarity: Set break input polarity. Default is 0
+			 The value define the active polarity:
+			  - 0 (active LOW)
+			  - 1 (active HIGH)
+- st,pwm-num-chan:	Number of available PWM channels.  Default is 0.
+- st,32bits-counter:	Set if the hardware have a 32 bits counter
+- st,complementary:	Set if the hardware have complementary output channels
+
+[1] Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+
+Example:
+	gptimer1: gptimer1@40010000 {
+		compatible = "st,stm32-gptimer";
+		reg = <0x40010000 0x400>;
+		clocks = <&rcc 0 160>;
+		clock-names = "clk_int";
+
+		pwm1@0 {
+			compatible = "st,stm32-pwm";
+			st,pwm-num-chan = <4>;
+			st,breakinput;
+			st,complementary;
+		};
+	};
