@@ -79,6 +79,8 @@ The secondary index is bound with the following magic numbers:
 	7	PLL_VCO_SAI	(vco frequency of SAI pll)
 	8	CLK_LCD		(LCD-TFT)
 	9	CLK_I2S		(I2S clocks)
+	10	CLK_SAI1	(audio clocks)
+	11	CLK_SAI2
 
 Example:
 
