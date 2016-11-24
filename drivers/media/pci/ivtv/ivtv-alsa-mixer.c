@@ -20,20 +20,15 @@
  *  02111-1307  USA
  */
 
-#include <linux/init.h>
-#include <linux/kernel.h>
-#include <linux/device.h>
-#include <linux/spinlock.h>
-#include <linux/videodev2.h>
+#include "ivtv-alsa.h"
+#include "ivtv-alsa-mixer.h"
+#include "ivtv-driver.h"
 
-#include <media/v4l2-device.h>
+#include <linux/videodev2.h>
 
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/tlv.h>
-
-#include "ivtv-alsa.h"
-#include "ivtv-driver.h"
 
 /*
  * Note the cx25840-core volume scale is funny, due to the alignment of the
