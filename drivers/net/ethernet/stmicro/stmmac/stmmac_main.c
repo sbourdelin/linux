@@ -2003,7 +2003,7 @@ static netdev_tx_t stmmac_tso_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Compute header lengths */
 	proto_hdr_len = skb_transport_offset(skb) + tcp_hdrlen(skb);
 
-	/* Desc availability based on threshold should be enough safe */
+	/* Desc availability based on threshold should be safe enough */
 	if (unlikely(stmmac_tx_avail(priv) <
 		(((skb->len - proto_hdr_len) / TSO_MAX_BUFF_SIZE + 1)))) {
 		if (!netif_queue_stopped(dev)) {
@@ -2216,8 +2216,7 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (enh_desc)
 		is_jumbo = priv->hw->mode->is_jumbo_frm(skb->len, enh_desc);
 
-	if (unlikely(is_jumbo) && likely(priv->synopsys_id <
-					 DWMAC_CORE_4_00)) {
+	if (unlikely(is_jumbo) && priv->synopsys_id < DWMAC_CORE_4_00) {
 		entry = priv->hw->mode->jumbo_frm(priv, skb, csum_insertion);
 		if (unlikely(entry < 0))
 			goto dma_map_err;
@@ -2242,7 +2241,7 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 
 		priv->tx_skbuff[entry] = NULL;
 
-		if (unlikely(priv->synopsys_id >= DWMAC_CORE_4_00)) {
+		if (priv->synopsys_id >= DWMAC_CORE_4_00) {
 			desc->des0 = des;
 			priv->tx_skbuff_dma[entry].buf = desc->des0;
 		} else {
@@ -2319,7 +2318,7 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 		if (dma_mapping_error(priv->device, des))
 			goto dma_map_err;
 
-		if (unlikely(priv->synopsys_id >= DWMAC_CORE_4_00)) {
+		if (priv->synopsys_id >= DWMAC_CORE_4_00) {
 			first->des0 = des;
 			priv->tx_skbuff_dma[first_entry].buf = first->des0;
 		} else {
@@ -2438,7 +2437,7 @@ static inline void stmmac_rx_refill(struct stmmac_priv *priv)
 				break;
 			}
 
-			if (unlikely(priv->synopsys_id >= DWMAC_CORE_4_00)) {
+			if (priv->synopsys_id >= DWMAC_CORE_4_00) {
 				p->des0 = priv->rx_skbuff_dma[entry];
 				p->des1 = 0;
 			} else {
@@ -2455,7 +2454,7 @@ static inline void stmmac_rx_refill(struct stmmac_priv *priv)
 		}
 		wmb();
 
-		if (unlikely(priv->synopsys_id >= DWMAC_CORE_4_00))
+		if (priv->synopsys_id >= DWMAC_CORE_4_00)
 			priv->hw->desc->init_rx_desc(p, priv->use_riwt, 0, 0);
 		else
 			priv->hw->desc->set_rx_owner(p);
@@ -2545,7 +2544,7 @@ static int stmmac_rx(struct stmmac_priv *priv, int limit)
 			int frame_len;
 			unsigned int des;
 
-			if (unlikely(priv->synopsys_id >= DWMAC_CORE_4_00))
+			if (priv->synopsys_id >= DWMAC_CORE_4_00)
 				des = p->des0;
 			else
 				des = p->des2;
