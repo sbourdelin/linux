@@ -53,6 +53,7 @@ static int utimes_common(struct path *path, struct timespec *times)
 	int error;
 	struct iattr newattrs;
 	struct inode *inode = path->dentry->d_inode;
+	struct super_block *sb = inode->i_sb;
 	struct inode *delegated_inode = NULL;
 
 	error = mnt_want_write(path->mnt);
@@ -68,16 +69,24 @@ static int utimes_common(struct path *path, struct timespec *times)
 		if (times[0].tv_nsec == UTIME_OMIT)
 			newattrs.ia_valid &= ~ATTR_ATIME;
 		else if (times[0].tv_nsec != UTIME_NOW) {
-			newattrs.ia_atime.tv_sec = times[0].tv_sec;
-			newattrs.ia_atime.tv_nsec = times[0].tv_nsec;
+			newattrs.ia_atime.tv_sec =
+				clamp_t(time64_t, times[0].tv_sec, sb->s_time_min, sb->s_time_max);
+			if (times[0].tv_sec >= sb->s_time_max)
+				newattrs.ia_atime.tv_nsec = 0;
+			else
+				newattrs.ia_atime.tv_nsec = times[0].tv_nsec;
 			newattrs.ia_valid |= ATTR_ATIME_SET;
 		}
 
 		if (times[1].tv_nsec == UTIME_OMIT)
 			newattrs.ia_valid &= ~ATTR_MTIME;
 		else if (times[1].tv_nsec != UTIME_NOW) {
-			newattrs.ia_mtime.tv_sec = times[1].tv_sec;
-			newattrs.ia_mtime.tv_nsec = times[1].tv_nsec;
+			newattrs.ia_mtime.tv_sec =
+				clamp_t(time64_t, times[1].tv_sec, sb->s_time_min, sb->s_time_max);
+			if (times[1].tv_sec >= sb->s_time_max)
+				newattrs.ia_mtime.tv_nsec = 0;
+			else
+				newattrs.ia_mtime.tv_nsec = times[1].tv_nsec;
 			newattrs.ia_valid |= ATTR_MTIME_SET;
 		}
 		/*
