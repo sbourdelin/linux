@@ -90,6 +90,17 @@ enum subpixel_order {
 };
 
 /**
+ * enum drm_link_status - connector's link_status property value
+ *
+ * This enum is used as the connector's link status property value.
+ * It is set to the values defined in uapi.
+ */
+enum drm_link_status {
+	DRM_LINK_STATUS_GOOD = DRM_MODE_LINK_STATUS_GOOD,
+	DRM_LINK_STATUS_BAD = DRM_MODE_LINK_STATUS_BAD,
+};
+
+/**
  * struct drm_display_info - runtime data about the connected sink
  *
  * Describes a given display (e.g. CRT or flat panel) and its limitations. For
@@ -212,6 +223,9 @@ struct drm_connector_state {
 	struct drm_crtc *crtc;
 
 	struct drm_encoder *best_encoder;
+
+	/* Connector Link status */
+	enum drm_link_status link_status;
 
 	struct drm_atomic_state *state;
 };
@@ -695,6 +709,7 @@ struct drm_connector {
 	uint8_t num_h_tile, num_v_tile;
 	uint8_t tile_h_loc, tile_v_loc;
 	uint16_t tile_h_size, tile_v_size;
+
 };
 
 #define obj_to_connector(x) container_of(x, struct drm_connector, base)
@@ -767,12 +782,13 @@ int drm_mode_create_tv_properties(struct drm_device *dev,
 int drm_mode_create_scaling_mode_property(struct drm_device *dev);
 int drm_mode_create_aspect_ratio_property(struct drm_device *dev);
 int drm_mode_create_suggested_offset_properties(struct drm_device *dev);
-
 int drm_mode_connector_set_path_property(struct drm_connector *connector,
 					 const char *path);
 int drm_mode_connector_set_tile_property(struct drm_connector *connector);
 int drm_mode_connector_update_edid_property(struct drm_connector *connector,
 					    const struct edid *edid);
+void drm_mode_connector_set_link_status_property(struct drm_connector *connector,
+						 uint64_t link_status);
 
 /**
  * struct drm_tile_group - Tile group metadata

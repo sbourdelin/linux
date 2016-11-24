@@ -1087,6 +1087,14 @@ int drm_atomic_connector_set_property(struct drm_connector *connector,
 		 * now?) atomic writes to DPMS property:
 		 */
 		return -EINVAL;
+	} else if (property == config->link_status_property) {
+		/* Never downgrade from GOOD to BAD on userspace's request here,
+		 * only hw issues can do that.
+		 */
+		if (state->link_status == GOOD)
+			return 0;
+		state->link_status = val;
+		return 0;
 	} else if (connector->funcs->atomic_set_property) {
 		return connector->funcs->atomic_set_property(connector,
 				state, property, val);
@@ -1135,6 +1143,8 @@ drm_atomic_connector_get_property(struct drm_connector *connector,
 		*val = (state->crtc) ? state->crtc->base.id : 0;
 	} else if (property == config->dpms_property) {
 		*val = connector->dpms;
+	} else if (property == config->link_status_property) {
+		*val = state->link_status;
 	} else if (connector->funcs->atomic_get_property) {
 		return connector->funcs->atomic_get_property(connector,
 				state, property, val);
