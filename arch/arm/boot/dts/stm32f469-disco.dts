@@ -73,3 +73,31 @@
 &usart3 {
 	status = "okay";
 };
+
+&gptimer1 {
+	status = "okay";
+
+	pwm1@0 {
+		pinctrl-0	= <&pwm1_pins>;
+		pinctrl-names	= "default";
+		status = "okay";
+	};
+
+	iiotimer1@0 {
+		status = "okay";
+	};
+};
+
+&gptimer3 {
+	status = "okay";
+
+	pwm3@0 {
+		pinctrl-0	= <&pwm3_pins>;
+		pinctrl-names	= "default";
+		status = "okay";
+	};
+
+	iiotimer3@0 {
+		status = "okay";
+	};
+};
