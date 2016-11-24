@@ -6260,7 +6260,7 @@ static bool skl_cdclk_pcu_ready(struct drm_i915_private *dev_priv)
 
 static bool skl_cdclk_wait_for_pcu_ready(struct drm_i915_private *dev_priv)
 {
-	return _wait_for(skl_cdclk_pcu_ready(dev_priv), 3000, 10) == 0;
+	return _wait_for(skl_cdclk_pcu_ready(dev_priv), 10000, 10) == 0;
 }
 
 static void skl_set_cdclk(struct drm_i915_private *dev_priv, int cdclk, int vco)
