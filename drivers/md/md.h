@@ -711,4 +711,7 @@ static inline int mddev_is_clustered(struct mddev *mddev)
 {
 	return mddev->cluster_info && mddev->bitmap_info.nodes > 1;
 }
+
+extern struct mddev *mddev_find_container(struct mddev *subarray);
+
 #endif /* _MD_MD_H */
