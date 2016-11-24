@@ -26,20 +26,6 @@ enum ath_bt_mode {
 	ATH_BT_COEX_MODE_DISABLED,      /* coexistence disabled */
 };
 
-struct ath_btcoex_config {
-	u8 bt_time_extend;
-	bool bt_txstate_extend;
-	bool bt_txframe_extend;
-	enum ath_bt_mode bt_mode; /* coexistence mode */
-	bool bt_quiet_collision;
-	bool bt_rxclear_polarity; /* invert rx_clear as WLAN_ACTIVE*/
-	u8 bt_priority_time;
-	u8 bt_first_slot_time;
-	bool bt_hold_rx_clear;
-	u8 wl_active_time;
-	u8 wl_qc_time;
-};
-
 static const u32 ar9003_wlan_weights[ATH_BTCOEX_STOMP_MAX]
 				    [AR9300_NUM_WLAN_WEIGHTS] = {
 	{ 0xfffffff0, 0xfffffff0, 0xfffffff0, 0xfffffff0 }, /* STOMP_ALL */
@@ -59,33 +45,16 @@ static const u32 mci_wlan_weights[ATH_BTCOEX_STOMP_MAX]
 void ath9k_hw_init_btcoex_hw(struct ath_hw *ah, int qnum)
 {
 	struct ath_btcoex_hw *btcoex_hw = &ah->btcoex_hw;
-	const struct ath_btcoex_config ath_bt_config = {
-		.bt_time_extend = 0,
-		.bt_txstate_extend = true,
-		.bt_txframe_extend = true,
-		.bt_mode = ATH_BT_COEX_MODE_SLOTTED,
-		.bt_quiet_collision = true,
-		.bt_rxclear_polarity = true,
-		.bt_priority_time = 2,
-		.bt_first_slot_time = 5,
-		.bt_hold_rx_clear = true,
-		.wl_active_time = 0x20,
-		.wl_qc_time = 0x20,
-	};
-	bool rxclear_polarity = ath_bt_config.bt_rxclear_polarity;
-	u8 time_extend = ath_bt_config.bt_time_extend;
-	u8 first_slot_time = ath_bt_config.bt_first_slot_time;
+	struct ath_btcoex_config *config = &btcoex_hw->config;
+	bool rxclear_polarity = true;
 
 	if (AR_SREV_9300_20_OR_LATER(ah))
-		rxclear_polarity = !ath_bt_config.bt_rxclear_polarity;
+		rxclear_polarity = false;
 
 	if (AR_SREV_SOC(ah)) {
-		first_slot_time = 0x1d;
-		time_extend = 0xa;
-
 		btcoex_hw->bt_coex_mode3 =
-			SM(ath_bt_config.wl_active_time, AR_BT_WL_ACTIVE_TIME) |
-			SM(ath_bt_config.wl_qc_time, AR_BT_WL_QC_TIME);
+			SM(config->wl_active_time, AR_BT_WL_ACTIVE_TIME) |
+			SM(config->wl_qc_time, AR_BT_WL_QC_TIME);
 
 		btcoex_hw->bt_coex_mode2 =
 			AR_BT_PROTECT_BT_AFTER_WAKEUP |
@@ -93,21 +62,20 @@ void ath9k_hw_init_btcoex_hw(struct ath_hw *ah, int qnum)
 	}
 
 	btcoex_hw->bt_coex_mode =
-		(btcoex_hw->bt_coex_mode & AR_BT_QCU_THRESH) |
-		SM(time_extend, AR_BT_TIME_EXTEND) |
-		SM(ath_bt_config.bt_txstate_extend, AR_BT_TXSTATE_EXTEND) |
-		SM(ath_bt_config.bt_txframe_extend, AR_BT_TX_FRAME_EXTEND) |
-		SM(ath_bt_config.bt_mode, AR_BT_MODE) |
-		SM(ath_bt_config.bt_quiet_collision, AR_BT_QUIET) |
+		AR_BT_TXSTATE_EXTEND |
+		AR_BT_TX_FRAME_EXTEND |
+		AR_BT_QUIET |
+		SM(ATH_BT_COEX_MODE_SLOTTED, AR_BT_MODE) |
 		SM(rxclear_polarity, AR_BT_RX_CLEAR_POLARITY) |
-		SM(ath_bt_config.bt_priority_time, AR_BT_PRIORITY_TIME) |
-		SM(first_slot_time, AR_BT_FIRST_SLOT_TIME) |
+		SM(config->bt_time_extend, AR_BT_TIME_EXTEND) |
+		SM(config->bt_priority_time, AR_BT_PRIORITY_TIME) |
+		SM(config->bt_first_slot_time, AR_BT_FIRST_SLOT_TIME) |
 		SM(qnum, AR_BT_QCU_THRESH);
 
 	btcoex_hw->bt_coex_mode2 |=
-		SM(ath_bt_config.bt_hold_rx_clear, AR_BT_HOLD_RX_CLEAR) |
-		SM(ATH_BTCOEX_BMISS_THRESH, AR_BT_BCN_MISS_THRESH) |
-		AR_BT_DISABLE_BT_ANT;
+		AR_BT_HOLD_RX_CLEAR |
+		AR_BT_DISABLE_BT_ANT |
+		SM(ATH_BTCOEX_BMISS_THRESH, AR_BT_BCN_MISS_THRESH);
 }
 EXPORT_SYMBOL(ath9k_hw_init_btcoex_hw);
 

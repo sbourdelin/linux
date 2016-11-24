@@ -79,6 +79,26 @@ MODULE_PARM_DESC(use_chanctx, "Enable channel context for concurrency");
 static int ath9k_btcoex_duty_cycle = ATH_BTCOEX_DEF_DUTY_CYCLE;
 module_param_named(btcoex_duty_cycle, ath9k_btcoex_duty_cycle, int, 0444);
 MODULE_PARM_DESC(btcoex_duty_cycle, "BT coexistence duty cycle");
+
+static int ath9k_btcoex_time_extend;
+module_param_named(btcoex_time_extend, ath9k_btcoex_time_extend, int, 0444);
+MODULE_PARM_DESC(btcoex_time_extend, "BT coexistence time extend");
+
+static int ath9k_btcoex_priority_time = 2;
+module_param_named(btcoex_priority_time, ath9k_btcoex_priority_time, int, 0444);
+MODULE_PARM_DESC(btcoex_priority_time, "BT coexistence priority time");
+
+static int ath9k_btcoex_first_slot_time = 5;
+module_param_named(btcoex_first_slot_time, ath9k_btcoex_first_slot_time, int, 0444);
+MODULE_PARM_DESC(btcoex_first_slot_time, "BT coexistence first slot time");
+
+static int ath9k_btcoex_wl_active_time;
+module_param_named(btcoex_wl_active_time, ath9k_btcoex_wl_active_time, int, 0444);
+MODULE_PARM_DESC(btcoex_wl_active_time, "BT coexistence wlan active time");
+
+static int ath9k_btcoex_wl_qc_time;
+module_param_named(btcoex_wl_qc_time, ath9k_btcoex_wl_qc_time, int, 0444);
+MODULE_PARM_DESC(btcoex_wl_qc_time, "BT coexistence wlan quiet collision time");
 #endif
 
 bool is_ath9k_unloaded;
@@ -648,7 +668,13 @@ static int ath9k_init_softc(u16 devid, struct ath_softc *sc,
 
 #ifdef CONFIG_ATH9K_BTCOEX_SUPPORT
 	sc->btcoex.duty_cycle = ath9k_btcoex_duty_cycle;
+	ah->btcoex_hw.config.bt_time_extend = ath9k_btcoex_time_extend;
+	ah->btcoex_hw.config.bt_priority_time = ath9k_btcoex_priority_time;
+	ah->btcoex_hw.config.bt_first_slot_time = ath9k_btcoex_first_slot_time;
+	ah->btcoex_hw.config.wl_active_time = ath9k_btcoex_wl_active_time;
+	ah->btcoex_hw.config.wl_qc_time = ath9k_btcoex_wl_qc_time;
 #endif
+
 	/*
 	 * Platform quirks.
 	 */

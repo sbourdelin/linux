@@ -104,6 +104,14 @@ struct ath9k_hw_aic {
 	u32 aic_cal_start_time;
 };
 
+struct ath_btcoex_config {
+	u8 bt_time_extend;
+	u8 bt_priority_time;
+	u8 bt_first_slot_time;
+	u8 wl_active_time;
+	u8 wl_qc_time;
+};
+
 struct ath_btcoex_hw {
 	enum ath_btcoex_scheme scheme;
 	struct ath9k_hw_mci mci;
@@ -119,6 +127,7 @@ struct ath_btcoex_hw {
 	u32 bt_weight[AR9300_NUM_BT_WEIGHTS];
 	u32 wlan_weight[AR9300_NUM_WLAN_WEIGHTS];
 	u8 tx_prio[ATH_BTCOEX_STOMP_MAX];
+	struct ath_btcoex_config config;
 };
 
 void ath9k_hw_btcoex_init_scheme(struct ath_hw *ah);
