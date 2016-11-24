@@ -118,9 +118,36 @@ void dev_pm_opp_free_cpufreq_table(struct device *dev,
 EXPORT_SYMBOL_GPL(dev_pm_opp_free_cpufreq_table);
 #endif	/* CONFIG_CPU_FREQ */
 
+static bool dev_pm_opp_is_removed_last(struct device *dev)
+{
+	struct opp_device *opp_dev;
+	struct opp_table *opp_table;
+	bool ret = false;
+
+	mutex_lock(&opp_table_lock);
+
+	opp_table = _find_opp_table(dev);
+	if (IS_ERR(opp_table))
+		goto unlock;
+
+	if (list_is_singular(&opp_table->dev_list))
+		goto unlock;
+
+	opp_dev = list_last_entry(&opp_table->dev_list, struct opp_device,
+				  node);
+	if (opp_dev->dev == dev)
+		ret = true;
+
+unlock:
+	mutex_unlock(&opp_table_lock);
+
+	return ret;
+}
+
 void _dev_pm_opp_cpumask_remove_table(const struct cpumask *cpumask, bool of)
 {
 	struct device *cpu_dev;
+	struct device *last = NULL;
 	int cpu;
 
 	WARN_ON(cpumask_empty(cpumask));
@@ -133,10 +160,22 @@ void _dev_pm_opp_cpumask_remove_table(const struct cpumask *cpumask, bool of)
 			continue;
 		}
 
+		if (!last && dev_pm_opp_is_removed_last(cpu_dev)) {
+			last = cpu_dev;
+			continue;
+		}
+
 		if (of)
 			dev_pm_opp_of_remove_table(cpu_dev);
 		else
 			dev_pm_opp_remove_table(cpu_dev);
+	}
+
+	if (last) {
+		if (of)
+			dev_pm_opp_of_remove_table(last);
+		else
+			dev_pm_opp_remove_table(last);
 	}
 }
 
