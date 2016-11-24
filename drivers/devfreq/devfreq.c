@@ -216,16 +216,7 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
 	return 0;
 }
 
-/* Load monitoring helper functions for governors use */
-
-/**
- * update_devfreq() - Reevaluate the device and configure frequency.
- * @devfreq:	the devfreq instance.
- *
- * Note: Lock devfreq->lock before calling update_devfreq
- *	 This function is exported for governors.
- */
-int update_devfreq(struct devfreq *devfreq)
+static int _update_devfreq(struct devfreq *devfreq, bool is_suspending)
 {
 	struct devfreq_freqs freqs;
 	unsigned long freq, cur_freq;
@@ -241,9 +232,13 @@ int update_devfreq(struct devfreq *devfreq)
 		return -EINVAL;
 
 	/* Reevaluate the proper frequency */
-	err = devfreq->governor->get_target_freq(devfreq, &freq);
-	if (err)
-		return err;
+	if (is_suspending && devfreq->suspend_freq) {
+		freq = devfreq->suspend_freq;
+	} else {
+		err = devfreq->governor->get_target_freq(devfreq, &freq);
+		if (err)
+			return err;
+	}
 
 	/*
 	 * Adjust the frequency with user freq and QoS.
@@ -288,6 +283,21 @@ int update_devfreq(struct devfreq *devfreq)
 
 	devfreq->previous_freq = freq;
 	return err;
+}
+
+/* Load monitoring helper functions for governors use */
+
+/**
+ * update_devfreq() - Reevaluate the device and configure frequency.
+ * @devfreq:	the devfreq instance.
+ *
+ * Note: Lock devfreq->lock before calling update_devfreq
+ *	 This function is exported for governors.
+ */
+
+int update_devfreq(struct devfreq *devfreq)
+{
+	return _update_devfreq(devfreq, false);
 }
 EXPORT_SYMBOL(update_devfreq);
 
@@ -528,6 +538,7 @@ struct devfreq *devfreq_add_device(struct device *dev,
 	struct devfreq *devfreq;
 	struct devfreq_governor *governor;
 	int err = 0;
+	struct dev_pm_opp *suspend_opp;
 
 	if (!dev || !profile || !governor_name) {
 		dev_err(dev, "%s: Invalid parameters.\n", __func__);
@@ -562,6 +573,12 @@ struct devfreq *devfreq_add_device(struct device *dev,
 	devfreq->last_status.current_frequency = profile->initial_freq;
 	devfreq->data = data;
 	devfreq->nb.notifier_call = devfreq_notifier_call;
+
+	rcu_read_lock();
+	suspend_opp = dev_pm_opp_get_suspend_opp(dev);
+	if (suspend_opp)
+		devfreq->suspend_freq = dev_pm_opp_get_freq(suspend_opp);
+	rcu_read_unlock();
 
 	if (!devfreq->profile->max_state && !devfreq->profile->freq_table) {
 		mutex_unlock(&devfreq->lock);
@@ -757,6 +774,10 @@ int devfreq_suspend_device(struct devfreq *devfreq)
 
 	if (!devfreq->governor)
 		return 0;
+
+	mutex_lock(&devfreq->lock);
+	_update_devfreq(devfreq, true);
+	mutex_unlock(&devfreq->lock);
 
 	return devfreq->governor->event_handler(devfreq,
 				DEVFREQ_GOV_SUSPEND, NULL);
