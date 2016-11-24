@@ -1198,6 +1198,13 @@ enum intel_sbi_destination {
 	SBI_MPHY,
 };
 
+/* SKL+ Watermark arbitrated display bandwidth Workarounds */
+enum watermark_memory_wa {
+	WATERMARK_WA_NONE,
+	WATERMARK_WA_X_TILED,
+	WATERMARK_WA_Y_TILED,
+};
+
 #define QUIRK_PIPEA_FORCE (1<<0)
 #define QUIRK_LVDS_SSC_DISABLE (1<<1)
 #define QUIRK_INVERT_BRIGHTNESS (1<<2)
@@ -1769,6 +1776,8 @@ struct skl_ddb_allocation {
 
 struct skl_wm_values {
 	unsigned dirty_pipes;
+	/* any WaterMark memory workaround Required */
+	enum watermark_memory_wa mem_wa;
 	struct skl_ddb_allocation ddb;
 };
 

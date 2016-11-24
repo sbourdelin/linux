@@ -2888,11 +2888,7 @@ skl_wm_plane_id(const struct intel_plane *plane)
 	}
 }
 
-/*
- * FIXME: We still don't have the proper code detect if we need to apply the WA,
- * so assume we'll always need it in order to avoid underruns.
- */
-static bool skl_needs_memory_bw_wa(struct intel_atomic_state *state)
+static bool intel_needs_memory_bw_wa(struct intel_atomic_state *state)
 {
 	struct drm_i915_private *dev_priv = to_i915(state->base.dev);
 
@@ -3066,7 +3062,7 @@ bool intel_can_enable_sagv(struct drm_atomic_state *state)
 
 		latency = dev_priv->wm.skl_latency[level];
 
-		if (skl_needs_memory_bw_wa(intel_state) &&
+		if (intel_needs_memory_bw_wa(intel_state) &&
 		    plane->base.state->fb->modifier ==
 		    I915_FORMAT_MOD_X_TILED)
 			latency += 15;
@@ -3596,7 +3592,7 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 	uint32_t y_min_scanlines;
 	struct intel_atomic_state *state =
 		to_intel_atomic_state(cstate->base.state);
-	bool apply_memory_bw_wa = skl_needs_memory_bw_wa(state);
+	enum watermark_memory_wa mem_wa;
 	bool y_tiled, x_tiled;
 
 	if (latency == 0 || !cstate->base.active || !intel_pstate->base.visible) {
@@ -3612,7 +3608,8 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 	if (IS_KABYLAKE(dev_priv) && dev_priv->ipc_enabled)
 		latency += 4;
 
-	if (apply_memory_bw_wa && x_tiled)
+	mem_wa = state->wm_results.mem_wa;
+	if (mem_wa != WATERMARK_WA_NONE && x_tiled)
 		latency += 15;
 
 	width = drm_rect_width(&intel_pstate->base.src) >> 16;
@@ -3647,7 +3644,7 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 		y_min_scanlines = 4;
 	}
 
-	if (apply_memory_bw_wa)
+	if (mem_wa == WATERMARK_WA_Y_TILED)
 		y_min_scanlines *= 2;
 
 	plane_bytes_per_line = width * cpp;
@@ -4076,6 +4073,15 @@ skl_compute_ddb(struct drm_atomic_state *state)
 	}
 
 	/*
+	 * If Watermark workaround is changed we need to recalculate
+	 * watermark values for all active pipes
+	 */
+	if (intel_state->wm_results.mem_wa != dev_priv->wm.skl_hw.mem_wa) {
+		realloc_pipes = ~0;
+		intel_state->wm_results.dirty_pipes = ~0;
+	}
+
+	/*
 	 * We're not recomputing for the pipes not included in the commit, so
 	 * make sure we start with the current state.
 	 */
@@ -4099,6 +4105,129 @@ skl_compute_ddb(struct drm_atomic_state *state)
 
 	return 0;
 }
+
+static void
+skl_compute_memory_bandwidth_wm_wa(struct drm_atomic_state *state)
+{
+	struct drm_device *dev = state->dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct intel_crtc *intel_crtc;
+	struct intel_plane_state *intel_pstate;
+	struct intel_atomic_state *intel_state = to_intel_atomic_state(state);
+	struct memdev_info *memdev_info = &dev_priv->memdev_info;
+	int num_active_pipes;
+	uint32_t max_pipe_bw_kbps, total_pipe_bw_kbps;
+	int display_bw_percentage;
+	bool y_tile_enabled = false;
+
+	if (!intel_needs_memory_bw_wa(intel_state)) {
+		intel_state->wm_results.mem_wa = WATERMARK_WA_NONE;
+		return;
+	}
+
+	if (!memdev_info->valid)
+		goto exit;
+
+	max_pipe_bw_kbps = 0;
+	num_active_pipes = 0;
+	for_each_intel_crtc(dev, intel_crtc) {
+		struct intel_crtc_state *cstate;
+		struct intel_plane *plane;
+		int num_active_planes;
+		uint32_t  max_plane_bw_kbps, pipe_bw_kbps;
+
+		/*
+		 * If CRTC is part of current atomic commit, get crtc state from
+		 * existing CRTC state. else take the cached CRTC state
+		 */
+		cstate = NULL;
+		if (state)
+			cstate = intel_atomic_get_existing_crtc_state(state,
+					intel_crtc);
+		if (!cstate)
+			cstate = to_intel_crtc_state(intel_crtc->base.state);
+
+		if (!cstate->base.active)
+			continue;
+
+		num_active_planes = 0;
+		max_plane_bw_kbps = 0;
+		for_each_intel_plane_mask(dev, plane, cstate->base.plane_mask) {
+			struct drm_framebuffer *fb;
+			uint32_t plane_bw_kbps;
+			uint32_t id = skl_wm_plane_id(plane);
+
+			intel_pstate = NULL;
+			intel_pstate =
+				intel_atomic_get_existing_plane_state(state,
+									plane);
+			if (!intel_pstate)
+				intel_pstate =
+					to_intel_plane_state(plane->base.state);
+
+			if (!intel_pstate->base.visible)
+				continue;
+
+			if (WARN_ON(!intel_pstate->base.fb))
+				continue;
+
+			if (id == PLANE_CURSOR)
+				continue;
+
+			fb = intel_pstate->base.fb;
+			if ((fb->modifier == I915_FORMAT_MOD_Y_TILED ||
+				fb->modifier == I915_FORMAT_MOD_Yf_TILED))
+				y_tile_enabled = true;
+
+			plane_bw_kbps = skl_adjusted_plane_pixel_rate(cstate,
+								intel_pstate);
+			max_plane_bw_kbps = max(plane_bw_kbps,
+							max_plane_bw_kbps);
+			num_active_planes++;
+		}
+		pipe_bw_kbps = max_plane_bw_kbps * num_active_planes;
+		max_pipe_bw_kbps = max(pipe_bw_kbps, max_pipe_bw_kbps);
+		num_active_pipes++;
+	}
+
+	total_pipe_bw_kbps = max_pipe_bw_kbps * num_active_pipes;
+
+	display_bw_percentage = DIV_ROUND_UP_ULL(total_pipe_bw_kbps * 100,
+						memdev_info->bandwidth_kbps);
+
+	/*
+	 * If there is any Ytile plane enabled and arbitrated display
+	 * bandwidth > 20% of raw system memory bandwidth
+	 * Enale Y-tile related WA
+	 *
+	 * If memory is dual channel single rank, Xtile limit = 35%, else Xtile
+	 * limit = 60%
+	 * If there is no Ytile plane enabled and
+	 * arbitrated display bandwidth > Xtile limit
+	 * Enable X-tile realated WA
+	 */
+	if (y_tile_enabled && (display_bw_percentage > 20))
+		intel_state->wm_results.mem_wa = WATERMARK_WA_Y_TILED;
+	else {
+		int x_tile_percentage = 60;
+		enum rank rank = DRAM_RANK_SINGLE;
+
+		if (memdev_info->rank != DRAM_RANK_INVALID)
+			rank = memdev_info->rank;
+
+		if ((rank == DRAM_RANK_SINGLE) &&
+					(memdev_info->num_channels == 2))
+			x_tile_percentage = 35;
+
+		if (display_bw_percentage > x_tile_percentage)
+			intel_state->wm_results.mem_wa = WATERMARK_WA_X_TILED;
+	}
+	return;
+
+exit:
+	intel_state->wm_results.mem_wa = WATERMARK_WA_Y_TILED;
+}
+
 
 static void
 skl_copy_wm_for_pipe(struct skl_wm_values *dst,
@@ -4175,6 +4304,8 @@ skl_compute_wm(struct drm_atomic_state *state)
 
 	/* Clear all dirty flags */
 	results->dirty_pipes = 0;
+
+	skl_compute_memory_bandwidth_wm_wa(state);
 
 	ret = skl_compute_ddb(state);
 	if (ret)
