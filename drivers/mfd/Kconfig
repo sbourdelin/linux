@@ -1607,6 +1607,15 @@ config MFD_STW481X
 	  in various ST Microelectronics and ST-Ericsson embedded
 	  Nomadik series.
 
+config MFD_STM32_GP_TIMER
+	tristate "Support for STM32 General Purpose Timer"
+	select MFD_CORE
+	select REGMAP
+	depends on ARCH_STM32
+	depends on OF
+	help
+	  Select this option to enable stm32 general purpose timer
+
 menu "Multimedia Capabilities Port drivers"
 	depends on ARCH_SA1100
 
@@ -1644,4 +1653,5 @@ config MFD_VEXPRESS_SYSREG
 	  on the ARM Ltd. Versatile Express board.
 
 endmenu
+
 endif
