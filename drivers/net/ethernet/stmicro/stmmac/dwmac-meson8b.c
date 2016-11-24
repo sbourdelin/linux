@@ -23,6 +23,8 @@
 #include <linux/platform_device.h>
 #include <linux/stmmac.h>
 
+#include <dt-bindings/net/dwmac-meson8b.h>
+
 #include "stmmac_platform.h"
 
 #define PRG_ETH0			0x0
@@ -35,10 +37,6 @@
 
 #define PRG_ETH0_TXDLY_SHIFT		5
 #define PRG_ETH0_TXDLY_MASK		GENMASK(6, 5)
-#define PRG_ETH0_TXDLY_OFF		(0x0 << PRG_ETH0_TXDLY_SHIFT)
-#define PRG_ETH0_TXDLY_QUARTER		(0x1 << PRG_ETH0_TXDLY_SHIFT)
-#define PRG_ETH0_TXDLY_HALF		(0x2 << PRG_ETH0_TXDLY_SHIFT)
-#define PRG_ETH0_TXDLY_THREE_QUARTERS	(0x3 << PRG_ETH0_TXDLY_SHIFT)
 
 /* divider for the result of m250_sel */
 #define PRG_ETH0_CLK_M250_DIV_SHIFT	7
@@ -69,6 +67,8 @@ struct meson8b_dwmac {
 
 	struct clk_divider	m25_div;
 	struct clk		*m25_div_clk;
+
+	u32			tx_dly;
 };
 
 static void meson8b_dwmac_mask_bits(struct meson8b_dwmac *dwmac, u32 reg,
@@ -198,7 +198,7 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
 
 		/* TX clock delay - all known boards use a 1/4 cycle delay */
 		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0, PRG_ETH0_TXDLY_MASK,
-					PRG_ETH0_TXDLY_QUARTER);
+					dwmac->tx_dly << PRG_ETH0_TXDLY_SHIFT);
 		break;
 
 	case PHY_INTERFACE_MODE_RMII:
@@ -278,6 +278,12 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "missing phy-mode property\n");
 		return -EINVAL;
 	}
+
+	ret = of_property_read_u32(pdev->dev.of_node, "amlogic,tx-delay",
+				   &dwmac->tx_dly);
+	if (ret)
+		/* default to 1/4 cycle (= 2ns for RGMII) */
+		dwmac->tx_dly = DWMAC_MESON8B_TXDLY_QUARTER_CYCLE;
 
 	ret = meson8b_init_clk(dwmac);
 	if (ret)
