@@ -108,9 +108,11 @@ static bool __evdev_is_filtered(struct evdev_client *client,
 }
 
 /* flush queued events of type @type, caller must hold client->buffer_lock */
-static void __evdev_flush_queue(struct evdev_client *client, unsigned int type)
+static unsigned int __evdev_flush_queue(struct evdev_client *client,
+					unsigned int type)
 {
 	unsigned int i, head, num;
+	unsigned int drop_count = 0;
 	unsigned int mask = client->bufsize - 1;
 	bool is_report;
 	struct input_event *ev;
@@ -129,9 +131,11 @@ static void __evdev_flush_queue(struct evdev_client *client, unsigned int type)
 
 		if (ev->type == type) {
 			/* drop matched entry */
+			drop_count++;
 			continue;
 		} else if (is_report && !num) {
 			/* drop empty SYN_REPORT groups */
+			drop_count++;
 			continue;
 		} else if (head != i) {
 			/* move entry to fill the gap */
@@ -151,6 +155,7 @@ static void __evdev_flush_queue(struct evdev_client *client, unsigned int type)
 	}
 
 	client->head = head;
+	return drop_count;
 }
 
 static void __evdev_queue_syn_dropped(struct evdev_client *client)
@@ -920,6 +925,7 @@ static int evdev_handle_get_val(struct evdev_client *client,
 	int ret;
 	unsigned long *mem;
 	size_t len;
+	unsigned int drop_count = 0;
 
 	len = BITS_TO_LONGS(maxbit) * sizeof(unsigned long);
 	mem = kmalloc(len, GFP_KERNEL);
@@ -933,12 +939,12 @@ static int evdev_handle_get_val(struct evdev_client *client,
 
 	spin_unlock(&dev->event_lock);
 
-	__evdev_flush_queue(client, type);
+	drop_count = __evdev_flush_queue(client, type);
 
 	spin_unlock_irq(&client->buffer_lock);
 
 	ret = bits_to_user(mem, maxbit, maxlen, p, compat);
-	if (ret < 0)
+	if (ret < 0 && drop_count > 0)
 		evdev_queue_syn_dropped(client);
 
 	kfree(mem);
