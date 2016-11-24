@@ -108,6 +108,7 @@ static struct r5l_io_unit *ppl_new_iounit(struct r5l_log *log,
 	io->log = log;
 	INIT_LIST_HEAD(&io->log_sibling);
 	INIT_LIST_HEAD(&io->stripe_list);
+	INIT_LIST_HEAD(&io->stripe_finished_list);
 	io->state = IO_UNIT_RUNNING;
 
 	io->meta_page = mempool_alloc(log->meta_pool, GFP_NOIO);
@@ -960,6 +961,93 @@ err:
 	return ret;
 }
 
+static void ppl_log_stop(struct r5l_log *log)
+{
+	struct r5l_io_unit *io, *next;
+	unsigned long flags;
+	bool wait;
+
+	/* wait for in flight ios to complete */
+	do {
+		wait = false;
+		spin_lock_irqsave(&log->io_list_lock, flags);
+		list_for_each_entry(io, &log->running_ios, log_sibling) {
+			if (io->state == IO_UNIT_IO_START) {
+				wait = true;
+				break;
+			}
+		}
+		if (!wait)
+			wait = !list_empty(&log->flushing_ios);
+		spin_unlock_irqrestore(&log->io_list_lock, flags);
+	} while (wait);
+
+	/* clean up iounits */
+	spin_lock_irqsave(&log->io_list_lock, flags);
+
+	list_for_each_entry_safe(io, next, &log->running_ios, log_sibling) {
+		list_move_tail(&io->log_sibling, &log->finished_ios);
+		bio_put(io->current_bio);
+		mempool_free(io->meta_page, log->meta_pool);
+	}
+	list_splice_tail_init(&log->io_end_ios, &log->finished_ios);
+
+	list_for_each_entry_safe(io, next, &log->finished_ios, log_sibling) {
+		struct stripe_head *sh;
+		list_for_each_entry(sh, &io->stripe_list, log_list) {
+			clear_bit(STRIPE_LOG_TRAPPED, &sh->state);
+			sh->log_io = NULL;
+		}
+		r5l_io_run_stripes(io);
+		list_for_each_entry(sh, &io->stripe_finished_list, log_list) {
+			sh->log_io = NULL;
+		}
+		list_del(&io->log_sibling);
+		mempool_free(io, log->io_pool);
+	}
+	r5l_run_no_mem_stripe(log);
+
+	spin_unlock_irqrestore(&log->io_list_lock, flags);
+}
+
+static int __ppl_modify_log(struct r5l_log *log, struct md_rdev *rdev, int op)
+{
+	struct r5l_log *log_child;
+	struct ppl_conf *ppl_conf = log->private;
+
+	if (!rdev)
+		return -EINVAL;
+
+	dbg("rdev->raid_disk: %d op: %d\n", rdev->raid_disk, op);
+
+	if (rdev->raid_disk < 0)
+		return 0;
+
+	if (rdev->raid_disk >= ppl_conf->count)
+		return -ENODEV;
+
+	if (op == 0) {
+		log_child = ppl_conf->child_logs[rdev->raid_disk];
+		if (!log_child)
+			return 0;
+		ppl_conf->child_logs[rdev->raid_disk] = NULL;
+		ppl_log_stop(log_child);
+		ppl_exit_log_child(log_child);
+	} else if (op == 1) {
+		int ret = ppl_init_log_child(log, rdev, &log_child);
+		if (ret)
+			return ret;
+		ret = ppl_write_empty_header(log_child);
+		if (ret)
+			return ret;
+		ppl_conf->child_logs[rdev->raid_disk] = log_child;
+	} else {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int __ppl_write_stripe(struct r5l_log *log, struct stripe_head *sh)
 {
 	struct ppl_conf *ppl_conf = log->private;
@@ -997,6 +1085,7 @@ static void __ppl_flush_stripe_to_raid(struct r5l_log *log)
 struct r5l_policy r5l_ppl = {
 	.init_log = __ppl_init_log,
 	.exit_log = __ppl_exit_log,
+	.modify_log = __ppl_modify_log,
 	.write_stripe = __ppl_write_stripe,
 	.write_stripe_run = __ppl_write_stripe_run,
 	.flush_stripe_to_raid = __ppl_flush_stripe_to_raid,

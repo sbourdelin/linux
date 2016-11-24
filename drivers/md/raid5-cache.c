@@ -345,7 +345,7 @@ void r5l_io_run_stripes(struct r5l_io_unit *io)
 	struct stripe_head *sh, *next;
 
 	list_for_each_entry_safe(sh, next, &io->stripe_list, log_list) {
-		list_del_init(&sh->log_list);
+		list_move_tail(&sh->log_list, &io->stripe_finished_list);
 
 		r5c_finish_cache_stripe(sh);
 
@@ -553,6 +553,7 @@ static struct r5l_io_unit *r5l_new_meta(struct r5l_log *log)
 	io->log = log;
 	INIT_LIST_HEAD(&io->log_sibling);
 	INIT_LIST_HEAD(&io->stripe_list);
+	INIT_LIST_HEAD(&io->stripe_finished_list);
 	bio_list_init(&io->flush_barriers);
 	io->state = IO_UNIT_RUNNING;
 
@@ -2527,6 +2528,16 @@ void r5l_exit_log(struct r5l_log *log)
 		log->policy->exit_log(log);
 
 	kfree(log);
+}
+
+/*
+ * operation: 0 - remove rdev from log, 1 - add rdev to log
+ */
+int r5l_modify_log(struct r5l_log *log, struct md_rdev *rdev, int operation)
+{
+	if (log && log->policy->modify_log)
+		return log->policy->modify_log(log, rdev, operation);
+	return 0;
 }
 
 struct r5l_policy r5l_journal = {

@@ -7398,6 +7398,19 @@ static int raid5_remove_disk(struct mddev *mddev, struct md_rdev *rdev)
 			*rdevp = rdev;
 		}
 	}
+	if (test_bit(JournalPpl, &rdev->flags) && conf->log) {
+		int ret;
+		if (conf->log->rwh_policy != RWH_POLICY_PPL)
+			return -EINVAL;
+		ret = r5l_modify_log(conf->log, rdev, 0);
+		if (ret)
+			return ret;
+		if (p->replacement) {
+			ret = r5l_modify_log(conf->log, p->replacement, 1);
+			if (ret)
+				return ret;
+		}
+	}
 	if (p->replacement) {
 		/* We must have just cleared 'rdev' */
 		p->rdev = p->replacement;
@@ -7490,6 +7503,13 @@ static int raid5_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 		}
 	}
 out:
+	if (conf->log && !test_bit(Replacement, &rdev->flags) &&
+	    conf->log->rwh_policy == RWH_POLICY_PPL) {
+		int ret = r5l_modify_log(conf->log, rdev, 1);
+		if (ret)
+			return ret;
+	}
+
 	print_raid5_conf(conf);
 	return err;
 }

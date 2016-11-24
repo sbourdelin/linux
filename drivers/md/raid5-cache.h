@@ -111,6 +111,7 @@ struct r5l_io_unit {
 	sector_t log_end;	/* where the io_unit ends */
 	struct list_head log_sibling; /* log->running_ios */
 	struct list_head stripe_list; /* stripes added to the io_unit */
+	struct list_head stripe_finished_list; /* stripes written to log */
 
 	int state;
 	bool need_split_bio;
@@ -141,6 +142,7 @@ enum r5l_io_unit_state {
 struct r5l_policy {
 	int (*init_log)(struct r5l_log *log, struct r5conf *conf);
 	void (*exit_log)(struct r5l_log *log);
+	int (*modify_log)(struct r5l_log *log, struct md_rdev *rdev, int op);
 	int (*write_stripe)(struct r5l_log *log, struct stripe_head *sh);
 	void (*write_stripe_run)(struct r5l_log *log);
 	void (*flush_stripe_to_raid)(struct r5l_log *log);
@@ -151,6 +153,7 @@ struct r5l_policy {
 
 extern int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev, int policy_type);
 extern void r5l_exit_log(struct r5l_log *log);
+extern int r5l_modify_log(struct r5l_log *log, struct md_rdev *rdev, int operation);
 extern int r5l_write_stripe(struct r5l_log *log, struct stripe_head *sh);
 extern void r5l_write_stripe_run(struct r5l_log *log);
 extern void r5l_flush_stripe_to_raid(struct r5l_log *log);
