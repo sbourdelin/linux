@@ -26,10 +26,21 @@
 / { __local_fixups__ {
 	testcase-data {
 		phandle-tests {
+			provider4 {
+				phandle-map = <0x00000008 0x00000018
+					       0x00000024 0x0000003c
+					       0x00000050 0x0000005c>;
+			};
 			consumer-a {
 				phandle-list = <0x00000000 0x00000008
 						0x00000018 0x00000028
 						0x00000034 0x00000038>;
+				phandle-list-bad-args = <0x00000000 0x0000000c>;
+			};
+			consumer-b {
+				phandle-list = <0x00000000 0x00000008
+						0x00000018 0x00000024
+						0x00000030 0x00000034>;
 				phandle-list-bad-args = <0x00000000 0x0000000c>;
 			};
 		};
