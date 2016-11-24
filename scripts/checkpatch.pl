@@ -4737,6 +4737,18 @@ sub process {
 			}
 		}
 
+# warn if <foo.h> is already #included
+		if ($tree && $rawline =~ m{^.\s*\#\s*include\s*\<(.*)\.h\>}) {
+			my $file = "$1.h";
+			if (-f "$root/$realfile") {
+				my $asminclude = `grep -Ec "#include\\s+<$file>" $root/$realfile`;
+				if ($asminclude > 1) {
+					WARN("INCLUDE_LINUX",
+					     "Do not use #include <$file>, this header is already included\n" . $herecurr);
+				}
+			}
+		}
+
 # multi-statement macros should be enclosed in a do while loop, grab the
 # first statement and ensure its the whole macro if its not enclosed
 # in a known good container
