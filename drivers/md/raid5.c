@@ -1939,6 +1939,49 @@ static void ops_run_check_pq(struct stripe_head *sh, struct raid5_percpu *percpu
 			   &sh->ops.zero_sum_result, percpu->spare_page, &submit);
 }
 
+static struct dma_async_tx_descriptor *
+ops_run_partial_parity(struct stripe_head *sh, struct raid5_percpu *percpu,
+		       struct dma_async_tx_descriptor *tx)
+{
+	int disks = sh->disks;
+	struct page **xor_srcs = flex_array_get(percpu->scribble, 0);
+	int count = 0, pd_idx = sh->pd_idx, i;
+	struct async_submit_ctl submit;
+
+	if (test_bit(STRIPE_FULL_WRITE, &sh->state))
+		return tx;
+
+	if (sh->reconstruct_state == reconstruct_state_prexor_drain_run) {
+		for (i = disks; i--;) {
+			struct r5dev *dev = &sh->dev[i];
+			if (test_bit(R5_Wantdrain, &dev->flags)
+					|| i == pd_idx)
+				xor_srcs[count++] = dev->page;
+		}
+	} else if (sh->reconstruct_state == reconstruct_state_drain_run) {
+		for (i = disks; i--;) {
+			struct r5dev *dev = &sh->dev[i];
+			if (test_bit(R5_UPTODATE, &dev->flags))
+				xor_srcs[count++] = dev->page;
+		}
+	} else {
+		return tx;
+	}
+
+	init_async_submit(&submit, ASYNC_TX_XOR_ZERO_DST, tx,
+			NULL, sh, flex_array_get(percpu->scribble, 0)
+				+ sizeof(struct page *) * (sh->disks + 2));
+
+	if (count == 1)
+		tx = async_memcpy(sh->ppl_page, xor_srcs[0], 0, 0, PAGE_SIZE,
+				&submit);
+	else
+		tx = async_xor(sh->ppl_page, xor_srcs, 0, count, PAGE_SIZE,
+				&submit);
+
+	return tx;
+}
+
 static void raid_run_ops(struct stripe_head *sh, unsigned long ops_request)
 {
 	int overlap_clear = 0, i, disks = sh->disks;
@@ -1968,6 +2011,11 @@ static void raid_run_ops(struct stripe_head *sh, unsigned long ops_request)
 		if (tx && !test_bit(STRIPE_OP_RECONSTRUCT, &ops_request))
 			async_tx_ack(tx);
 	}
+
+	if (test_bit(STRIPE_OP_BIODRAIN, &ops_request) &&
+			test_bit(MD_HAS_PPL, &conf->mddev->flags) &&
+			conf->disks[sh->pd_idx].rdev)
+		tx = ops_run_partial_parity(sh, percpu, tx);
 
 	if (test_bit(STRIPE_OP_PREXOR, &ops_request)) {
 		if (level < 6)
@@ -3019,6 +3067,33 @@ static int add_stripe_bio(struct stripe_head *sh, struct bio *bi, int dd_idx,
 	}
 	if (*bip && (*bip)->bi_iter.bi_sector < bio_end_sector(bi))
 		goto overlap;
+
+	/*
+	 * PPL does not allow writes to different disks in the same stripe when
+	 * they are not next to each other. Not really an overlap, but
+	 * wait_for_overlap can be used to handle this.
+	 */
+	if (forwrite && test_bit(MD_HAS_PPL, &conf->mddev->flags)) {
+		int i;
+		int di = 0;
+		int first = -1, last = -1;
+		int count = 0;
+		for (i = 0; i < sh->disks; i++) {
+			if (i == sh->pd_idx)
+				continue;
+
+			if (sh->dev[i].towrite || i == dd_idx) {
+				count++;
+				if (first < 0)
+					first = di;
+				last = di;
+			}
+			di++;
+		}
+
+		if (last > first && (last - first > count - 1))
+			goto overlap;
+	}
 
 	if (!forwrite || previous)
 		clear_bit(STRIPE_BATCH_READY, &sh->state);
