@@ -99,14 +99,11 @@ static void mall_destroy_hw_filter(struct tcf_proto *tp,
 					     &offload);
 }
 
-static bool mall_destroy(struct tcf_proto *tp, bool force)
+static void mall_destroy(struct tcf_proto *tp)
 {
 	struct cls_mall_head *head = rtnl_dereference(tp->root);
 	struct net_device *dev = tp->q->dev_queue->dev;
 	struct cls_mall_filter *f = head->filter;
-
-	if (!force && f)
-		return false;
 
 	if (f) {
 		if (tc_should_offload(dev, tp, f->flags))
@@ -114,9 +111,7 @@ static bool mall_destroy(struct tcf_proto *tp, bool force)
 
 		call_rcu(&f->rcu, mall_destroy_filter);
 	}
-	RCU_INIT_POINTER(tp->root, NULL);
 	kfree_rcu(head, rcu);
-	return true;
 }
 
 static unsigned long mall_get(struct tcf_proto *tp, u32 handle)
@@ -225,7 +220,7 @@ errout:
 	return err;
 }
 
-static int mall_delete(struct tcf_proto *tp, unsigned long arg)
+static int mall_delete(struct tcf_proto *tp, unsigned long arg, bool *last)
 {
 	struct cls_mall_head *head = rtnl_dereference(tp->root);
 	struct cls_mall_filter *f = (struct cls_mall_filter *) arg;
@@ -237,6 +232,7 @@ static int mall_delete(struct tcf_proto *tp, unsigned long arg)
 	RCU_INIT_POINTER(head->filter, NULL);
 	tcf_unbind_filter(tp, &f->res);
 	call_rcu(&f->rcu, mall_destroy_filter);
+	*last = true;
 	return 0;
 }
 

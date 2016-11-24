@@ -1899,15 +1899,11 @@ reset:
 }
 EXPORT_SYMBOL(tc_classify);
 
-bool tcf_destroy(struct tcf_proto *tp, bool force)
+void tcf_destroy(struct tcf_proto *tp)
 {
-	if (tp->ops->destroy(tp, force)) {
-		module_put(tp->ops->owner);
-		kfree_rcu(tp, rcu);
-		return true;
-	}
-
-	return false;
+	tp->ops->destroy(tp);
+	module_put(tp->ops->owner);
+	kfree_rcu(tp, rcu);
 }
 
 void tcf_destroy_chain(struct tcf_proto __rcu **fl)
@@ -1916,7 +1912,7 @@ void tcf_destroy_chain(struct tcf_proto __rcu **fl)
 
 	while ((tp = rtnl_dereference(*fl)) != NULL) {
 		RCU_INIT_POINTER(*fl, tp->next);
-		tcf_destroy(tp, true);
+		tcf_destroy(tp);
 	}
 }
 EXPORT_SYMBOL(tcf_destroy_chain);

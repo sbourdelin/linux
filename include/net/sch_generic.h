@@ -203,14 +203,14 @@ struct tcf_proto_ops {
 					    const struct tcf_proto *,
 					    struct tcf_result *);
 	int			(*init)(struct tcf_proto*);
-	bool			(*destroy)(struct tcf_proto*, bool);
+	void			(*destroy)(struct tcf_proto*);
 
 	unsigned long		(*get)(struct tcf_proto*, u32 handle);
 	int			(*change)(struct net *net, struct sk_buff *,
 					struct tcf_proto*, unsigned long,
 					u32 handle, struct nlattr **,
 					unsigned long *, bool);
-	int			(*delete)(struct tcf_proto*, unsigned long);
+	int			(*delete)(struct tcf_proto*, unsigned long, bool*);
 	void			(*walk)(struct tcf_proto*, struct tcf_walker *arg);
 
 	/* rtnetlink specific */
@@ -405,7 +405,7 @@ struct Qdisc *qdisc_create_dflt(struct netdev_queue *dev_queue,
 				const struct Qdisc_ops *ops, u32 parentid);
 void __qdisc_calculate_pkt_len(struct sk_buff *skb,
 			       const struct qdisc_size_table *stab);
-bool tcf_destroy(struct tcf_proto *tp, bool force);
+void tcf_destroy(struct tcf_proto *tp);
 void tcf_destroy_chain(struct tcf_proto __rcu **fl);
 int skb_do_redirect(struct sk_buff *);
 
