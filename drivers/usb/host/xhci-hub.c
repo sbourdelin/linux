@@ -356,7 +356,7 @@ int xhci_find_slot_id_by_port(struct usb_hcd *hcd, struct xhci_hcd *xhci,
 	enum usb_device_speed speed;
 
 	slot_id = 0;
-	for (i = 0; i < MAX_HC_SLOTS; i++) {
+	for (i = 0; i < HCS_MAX_SLOTS(xhci->hcs_params1); i++) {
 		if (!xhci->devs[i])
 			continue;
 		speed = xhci->devs[i]->udev->speed;

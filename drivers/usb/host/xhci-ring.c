@@ -895,7 +895,7 @@ void xhci_stop_endpoint_command_watchdog(unsigned long arg)
 		 * doesn't touch the memory.
 		 */
 	}
-	for (i = 0; i < MAX_HC_SLOTS; i++) {
+	for (i = 0; i < HCS_MAX_SLOTS(xhci->hcs_params1); i++) {
 		if (!xhci->devs[i])
 			continue;
 		for (j = 0; j < 31; j++)

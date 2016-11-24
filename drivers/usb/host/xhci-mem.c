@@ -1828,7 +1828,7 @@ void xhci_mem_cleanup(struct xhci_hcd *xhci)
 		}
 	}
 
-	for (i = 1; i < MAX_HC_SLOTS; ++i)
+	for (i = 1; i < HCS_MAX_SLOTS(xhci->hcs_params1); ++i)
 		xhci_free_virt_device(xhci, i);
 
 	dma_pool_destroy(xhci->segment_pool);
@@ -2535,7 +2535,7 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 	 * something other than the default (~1ms minimum between interrupts).
 	 * See section 5.5.1.2.
 	 */
-	for (i = 0; i < MAX_HC_SLOTS; ++i)
+	for (i = 0; i < HCS_MAX_SLOTS(xhci->hcs_params1); ++i)
 		xhci->devs[i] = NULL;
 	for (i = 0; i < USB_MAXCHILDREN; ++i) {
 		xhci->bus_state[0].resume_done[i] = 0;

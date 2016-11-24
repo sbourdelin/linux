@@ -766,6 +766,8 @@ void xhci_shutdown(struct usb_hcd *hcd)
 	/* Yet another workaround for spurious wakeups at shutdown with HSW */
 	if (xhci->quirks & XHCI_SPURIOUS_WAKEUP)
 		pci_set_power_state(to_pci_dev(hcd->self.controller), PCI_D3hot);
+
+	kfree(xhci->devs);
 }
 
 #ifdef CONFIG_PM
@@ -4896,6 +4898,11 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 
 	xhci->quirks |= quirks;
 
+	xhci->devs = kcalloc(HCS_MAX_SLOTS(xhci->hcs_params1),
+			sizeof(struct xhci_virt_device *), GFP_KERNEL);
+	if (!xhci->devs)
+		return -ENOMEM;
+
 	get_quirks(dev, xhci);
 
 	/* In xhci controllers which follow xhci 1.0 spec gives a spurious
@@ -4908,13 +4915,13 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 	/* Make sure the HC is halted. */
 	retval = xhci_halt(xhci);
 	if (retval)
-		return retval;
+		goto err;
 
 	xhci_dbg(xhci, "Resetting HCD\n");
 	/* Reset the internal HC memory state and registers. */
 	retval = xhci_reset(xhci);
 	if (retval)
-		return retval;
+		goto err;
 	xhci_dbg(xhci, "Reset complete\n");
 
 	/*
@@ -4940,7 +4947,7 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 		 */
 		retval = dma_set_mask(dev, DMA_BIT_MASK(32));
 		if (retval)
-			return retval;
+			goto err;
 		xhci_dbg(xhci, "Enabling 32-bit DMA addresses.\n");
 		dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
 	}
@@ -4949,13 +4956,17 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 	/* Initialize HCD and host controller data structures. */
 	retval = xhci_init(hcd);
 	if (retval)
-		return retval;
+		goto err;
 	xhci_dbg(xhci, "Called HCD init\n");
 
 	xhci_info(xhci, "hcc params 0x%08x hci version 0x%x quirks 0x%08x\n",
 		  xhci->hcc_params, xhci->hci_version, xhci->quirks);
 
 	return 0;
+
+err:
+	kfree(xhci->devs);
+	return retval;
 }
 EXPORT_SYMBOL_GPL(xhci_gen_setup);
 
