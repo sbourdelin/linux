@@ -6790,6 +6790,10 @@ static int raid5_run(struct mddev *mddev)
 	rdev_for_each(rdev, mddev) {
 		long long diff;
 
+		if (test_bit(MD_HAS_PPL, &mddev->flags) &&
+		    test_bit(In_sync, &rdev->flags))
+			set_bit(JournalPpl, &rdev->flags);
+
 		if (test_bit(JournalPpl, &rdev->flags) &&
 		    test_bit(In_sync, &rdev->flags))
 			ppl_disks++;
@@ -6811,6 +6815,9 @@ static int raid5_run(struct mddev *mddev)
 			 diff > min_offset_diff)
 			min_offset_diff = diff;
 	}
+
+	if (ppl_disks)
+		set_bit(MD_HAS_PPL, &mddev->flags);
 
 	if (mddev->reshape_position != MaxSector) {
 		/* Check that we can continue the reshape.
