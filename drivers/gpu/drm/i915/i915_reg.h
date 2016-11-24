@@ -7672,6 +7672,43 @@ enum {
 #define  DC_STATE_DEBUG_MASK_CORES	(1<<0)
 #define  DC_STATE_DEBUG_MASK_MEMORY_UP	(1<<1)
 
+#define BXT_P_CR_MC_BIOS_REQ_0_0_0	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x7114)
+#define BXT_REQ_DATA_MASK			0x3F
+#define BXT_DRAM_ACTIVE_CHANNEL_SHIFT		12
+#define BXT_DRAM_ACTIVE_CHANNEL_MASK		0xF
+/*
+ * BIOS programs this field of REQ_DATA [5:0] in integer
+ * multiple of 133333 KHz (133.33MHz)
+ */
+#define	BXT_MEMORY_FREQ_MULTIPLIER_KHZ		133333
+#define BXT_D_CR_DRP0_DUNIT8			0x1000
+#define BXT_D_CR_DRP0_DUNIT9			0x1200
+#define BXT_D_CR_DRP0_DUNIT_MAX			4
+#define _MMIO_MCHBAR_DUNIT(x, a, b) _MMIO(MCHBAR_MIRROR_BASE_SNB + (a) + (x)*((b)-(a)))
+#define BXT_D_CR_DRP0_DUNIT(x)	_MMIO_MCHBAR_DUNIT(x, BXT_D_CR_DRP0_DUNIT8, BXT_D_CR_DRP0_DUNIT9)
+#define BXT_DRAM_CHANNEL_ACTIVE_SHIFT		12
+#define BXT_DRAM_CHANNEL_ACTIVE_MASK		0xF
+#define BXT_DRAM_RANK_MASK			0x3
+#define BXT_DRAM_RANK_SINGLE			0x1
+#define BXT_DRAM_RANK_DUAL			0x3
+
+/*
+ * SKL memory frequeny multiplier is 266667 KHz (266.67 MHz)
+ */
+#define	SKL_MEMORY_FREQ_MULTIPLIER_KHZ		266667
+#define SKL_MC_BIOS_DATA_0_0_0_MCHBAR_PCU	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5E04)
+#define SKL_REQ_DATA_MASK			(0xF << 0)
+#define SKL_MAD_DIMM_CH0_0_0_0_MCHBAR_MCMAIN	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x500C)
+#define SKL_MAD_DIMM_CH1_0_0_0_MCHBAR_MCMAIN	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5010)
+#define SKL_DRAM_SIZE_MASK			0x1F
+#define SKL_DRAM_SIZE_L_SHIFT			0
+#define SKL_DRAM_SIZE_S_SHIFT			16
+#define SKL_DRAM_RANK_MASK			0x1
+#define SKL_DRAM_RANK_L_SHIFT			10
+#define SKL_DRAM_RANK_S_SHIFT			26
+#define SKL_DRAM_RANK_SINGLE			0x0
+#define SKL_DRAM_RANK_DUAL			0x1
+
 /* Please see hsw_read_dcomp() and hsw_write_dcomp() before using this register,
  * since on HSW we can't write to it using I915_WRITE. */
 #define D_COMP_HSW			_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5F0C)

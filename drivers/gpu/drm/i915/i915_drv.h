@@ -2173,6 +2173,18 @@ struct drm_i915_private {
 		bool distrust_bios_wm;
 	} wm;
 
+	struct memdev_info {
+		bool valid;
+		uint32_t bandwidth_kbps;
+		uint8_t num_channels;
+		enum rank {
+			DRAM_RANK_INVALID = 0,
+			DRAM_RANK_SINGLE,
+			DRAM_RANK_DUAL
+		} rank;
+	} memdev_info;
+
+
 	struct i915_runtime_pm pm;
 
 	/* Abstract the submission mechanism (legacy ringbuffer or execlists) away */

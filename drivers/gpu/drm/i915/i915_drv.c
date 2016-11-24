@@ -976,6 +976,173 @@ static void intel_sanitize_options(struct drm_i915_private *dev_priv)
 	DRM_DEBUG_DRIVER("use GPU sempahores? %s\n", yesno(i915.semaphores));
 }
 
+static inline enum rank skl_memdev_get_channel_rank(uint32_t val)
+{
+	uint8_t l_rank, s_rank;
+	uint8_t l_size, s_size;
+	enum rank ch_rank = DRAM_RANK_SINGLE;
+
+	l_size = (val >> SKL_DRAM_SIZE_L_SHIFT) & SKL_DRAM_SIZE_MASK;
+	s_size = (val >> SKL_DRAM_SIZE_S_SHIFT) & SKL_DRAM_SIZE_MASK;
+	l_rank = (val >> SKL_DRAM_RANK_L_SHIFT) & SKL_DRAM_RANK_MASK;
+	s_rank = (val >> SKL_DRAM_RANK_S_SHIFT) & SKL_DRAM_RANK_MASK;
+
+	/*
+	 * If any of the slot has dual rank memory consider
+	 * dual rank memory channel
+	 */
+	if (l_rank == SKL_DRAM_RANK_DUAL || s_rank == SKL_DRAM_RANK_DUAL)
+		ch_rank = DRAM_RANK_DUAL;
+
+	/*
+	 * If both the slot has single rank memory then configuration
+	 * is dual rank memory
+	 */
+	if ((l_size && l_rank == SKL_DRAM_RANK_SINGLE) &&
+		(s_size && s_rank == SKL_DRAM_RANK_SINGLE))
+		ch_rank = DRAM_RANK_DUAL;
+	return ch_rank;
+}
+
+static int
+skl_get_memdev_info(struct drm_i915_private *dev_priv)
+{
+	struct memdev_info *memdev_info = &dev_priv->memdev_info;
+	uint32_t mem_freq_khz;
+	uint32_t val;
+	enum rank ch0_rank, ch1_rank;
+
+	val = I915_READ(SKL_MC_BIOS_DATA_0_0_0_MCHBAR_PCU);
+	mem_freq_khz = (val & SKL_REQ_DATA_MASK) *
+				SKL_MEMORY_FREQ_MULTIPLIER_KHZ;
+
+	val = I915_READ(SKL_MAD_DIMM_CH0_0_0_0_MCHBAR_MCMAIN);
+	if (val != 0x0) {
+		memdev_info->num_channels++;
+		ch0_rank = skl_memdev_get_channel_rank(val);
+	}
+
+	val = I915_READ(SKL_MAD_DIMM_CH1_0_0_0_MCHBAR_MCMAIN);
+	if (val != 0x0) {
+		memdev_info->num_channels++;
+		ch1_rank = skl_memdev_get_channel_rank(val);
+	}
+
+	if (memdev_info->num_channels == 0) {
+		DRM_ERROR("Number of mem channels are zero\n");
+		return -EINVAL;
+	}
+
+	memdev_info->bandwidth_kbps = (memdev_info->num_channels *
+							mem_freq_khz * 8);
+
+	if (memdev_info->bandwidth_kbps == 0) {
+		DRM_ERROR("Couldn't get system memory bandwidth\n");
+		return -EINVAL;
+	}
+	memdev_info->valid = true;
+
+	/*
+	 * If any of channel is single rank channel,
+	 * consider single rank memory
+	 */
+	if (ch0_rank == DRAM_RANK_SINGLE || ch1_rank == DRAM_RANK_SINGLE)
+		memdev_info->rank = DRAM_RANK_SINGLE;
+	else
+		memdev_info->rank = max(ch0_rank, ch1_rank);
+
+	return 0;
+}
+
+static int
+bxt_get_memdev_info(struct drm_i915_private *dev_priv)
+{
+	struct memdev_info *memdev_info = &dev_priv->memdev_info;
+	uint32_t dram_channels;
+	uint32_t mem_freq_khz, val;
+	uint8_t num_active_channels;
+	int i;
+
+	val = I915_READ(BXT_P_CR_MC_BIOS_REQ_0_0_0);
+	mem_freq_khz = ((val & BXT_REQ_DATA_MASK) *
+				BXT_MEMORY_FREQ_MULTIPLIER_KHZ);
+
+	dram_channels = (val >> BXT_DRAM_CHANNEL_ACTIVE_SHIFT) &
+					BXT_DRAM_CHANNEL_ACTIVE_MASK;
+	num_active_channels = hweight32(dram_channels);
+
+	memdev_info->bandwidth_kbps = (mem_freq_khz * num_active_channels * 4);
+
+	if (memdev_info->bandwidth_kbps == 0) {
+		DRM_ERROR("Couldn't get system memory bandwidth\n");
+		return -EINVAL;
+	}
+	memdev_info->valid = true;
+
+	/*
+	 * Now read each DUNIT8/9/10/11 to check the rank of each dimms.
+	 */
+	for (i = 0; i < BXT_D_CR_DRP0_DUNIT_MAX; i++) {
+		val = I915_READ(BXT_D_CR_DRP0_DUNIT(i));
+		if (val != 0xFFFFFFFF) {
+			uint8_t rank;
+			enum rank ch_rank;
+
+			memdev_info->num_channels++;
+			rank = val & BXT_DRAM_RANK_MASK;
+			if (rank == BXT_DRAM_RANK_SINGLE)
+				ch_rank = DRAM_RANK_SINGLE;
+			else if (rank == BXT_DRAM_RANK_DUAL)
+				ch_rank = DRAM_RANK_DUAL;
+			else
+				ch_rank = DRAM_RANK_INVALID;
+
+			/*
+			 * If any of channel is having single rank memory
+			 * consider memory as single rank
+			 */
+			if (memdev_info->rank == DRAM_RANK_INVALID)
+				memdev_info->rank = ch_rank;
+			else if (ch_rank == DRAM_RANK_SINGLE)
+				memdev_info->rank = DRAM_RANK_SINGLE;
+		}
+	}
+	return 0;
+}
+
+static void
+intel_get_memdev_info(struct drm_i915_private *dev_priv)
+{
+	struct memdev_info *memdev_info = &dev_priv->memdev_info;
+	int ret;
+
+	memdev_info->valid = false;
+	memdev_info->rank = DRAM_RANK_INVALID;
+	memdev_info->num_channels = 0;
+
+	if (!IS_GEN9(dev_priv))
+		return;
+
+	if (IS_BROXTON(dev_priv))
+		ret = bxt_get_memdev_info(dev_priv);
+	else
+		ret = skl_get_memdev_info(dev_priv);
+	if (ret)
+		return;
+
+	DRM_DEBUG_DRIVER("DRAM bandwidth: %u KBps total-channels: %u\n",
+				memdev_info->bandwidth_kbps,
+				memdev_info->num_channels);
+	if (memdev_info->rank == DRAM_RANK_INVALID)
+		DRM_INFO("Counld not get memory rank info\n");
+	else {
+		DRM_DEBUG_DRIVER("DRAM rank: %s rank\n",
+				(memdev_info->rank == DRAM_RANK_DUAL) ?
+						"dual" : "single");
+	}
+}
+
+
 /**
  * i915_driver_init_hw - setup state requiring device access
  * @dev_priv: device private
@@ -1077,6 +1244,12 @@ static int i915_driver_init_hw(struct drm_i915_private *dev_priv)
 		if (pci_enable_msi(pdev) < 0)
 			DRM_DEBUG_DRIVER("can't enable MSI");
 	}
+
+	/*
+	 * Fill the memdev structure to get the system raw bandwidth
+	 * This will be used by WM algorithm, to implement GEN9 based WA
+	 */
+	intel_get_memdev_info(dev_priv);
 
 	return 0;
 
