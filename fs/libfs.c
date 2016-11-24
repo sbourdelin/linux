@@ -256,6 +256,8 @@ struct dentry *mount_pseudo_xattr(struct file_system_type *fs_type, char *name,
 	s->s_op = ops ? ops : &simple_super_operations;
 	s->s_xattr = xattr;
 	s->s_time_gran = 1;
+	s->s_time_min = TIME64_MIN;
+	s->s_time_max = TIME64_MAX;
 	root = new_inode(s);
 	if (!root)
 		goto Enomem;
@@ -515,6 +517,8 @@ int simple_fill_super(struct super_block *s, unsigned long magic,
 	s->s_magic = magic;
 	s->s_op = &simple_super_operations;
 	s->s_time_gran = 1;
+	s->s_time_min = TIME64_MIN;
+	s->s_time_max = TIME64_MAX;
 
 	inode = new_inode(s);
 	if (!inode)

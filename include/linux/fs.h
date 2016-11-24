@@ -1381,6 +1381,9 @@ struct super_block {
 	/* Granularity of c/m/atime in ns.
 	   Cannot be worse than a second */
 	u32		   s_time_gran;
+	/* Time limits for c/m/atime in seconds. */
+	time64_t           s_time_min;
+	time64_t           s_time_max;
 
 	/*
 	 * The next field is for VFS *only*. No filesystems have any business
