@@ -1195,6 +1195,15 @@ static struct fscrypt_operations ext4_cryptops = {
 };
 #endif
 
+static int ext4_compat_flag_check(struct inode *inode, int openflag)
+{
+	if (openflag & O_DIRECT &&
+		test_opt(inode->i_sb, DATA_FLAGS) == EXT4_MOUNT_JOURNAL_DATA)
+		return -EPERM;
+
+	return 0;
+}
+
 #ifdef CONFIG_QUOTA
 static char *quotatypes[] = INITQFNAMES;
 #define QTYPE2NAME(t) (quotatypes[t])
@@ -1267,6 +1276,7 @@ static const struct super_operations ext4_sops = {
 	.get_dquots	= ext4_get_dquots,
 #endif
 	.bdev_try_to_free_page = bdev_try_to_free_page,
+	.compat_flag_check = ext4_compat_flag_check,
 };
 
 static const struct export_operations ext4_export_ops = {

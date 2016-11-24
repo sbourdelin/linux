@@ -3493,6 +3493,18 @@ static struct file *path_openat(struct nameidata *nd,
 		put_filp(file);
 		return ERR_CAST(s);
 	}
+
+	if (unlikely(file->f_flags & O_DIRECT)) {
+		struct super_block *sb = nd->inode->i_sb;
+
+		if (unlikely(sb->s_op->compat_flag_check)) {
+			error = sb->s_op->compat_flag_check(nd->inode,
+							    op->open_flag);
+			if (error)
+				goto out2;
+		}
+	}
+
 	while (!(error = link_path_walk(s, nd)) &&
 		(error = do_last(nd, file, op, &opened)) > 0) {
 		nd->flags &= ~(LOOKUP_OPEN|LOOKUP_CREATE|LOOKUP_EXCL);
