@@ -16,6 +16,7 @@
 #include <linux/blkdev.h>
 #include <linux/slab.h>
 #include <linux/crc32c.h>
+#include <linux/async_tx.h>
 #include <linux/module.h>
 #include <linux/raid/md_p.h>
 #include "md.h"
@@ -373,6 +374,346 @@ static void __ppl_stripe_write_finished(struct r5l_io_unit *io)
 	spin_unlock_irqrestore(&log->io_list_lock, flags);
 }
 
+static void ppl_xor(int size, struct page *page1, struct page *page2,
+		    struct page *page_result)
+{
+	struct async_submit_ctl submit;
+	struct dma_async_tx_descriptor *tx;
+	struct page *xor_srcs[] = { page1, page2 };
+
+	init_async_submit(&submit, ASYNC_TX_ACK|ASYNC_TX_XOR_DROP_DST,
+			  NULL, NULL, NULL, NULL);
+	tx = async_xor(page_result, xor_srcs, 0, 2, size, &submit);
+
+	async_tx_quiesce(&tx);
+}
+
+static int ppl_recover_entry(struct r5l_log *log, struct ppl_header_entry *e,
+			     sector_t ppl_sector)
+{
+	struct mddev *mddev = log->rdev->mddev;
+	struct r5conf *conf = mddev->private;
+
+	int block_size = queue_logical_block_size(mddev->queue);
+	struct page *pages;
+	struct page *page1;
+	struct page *page2;
+	sector_t r_sector_first = e->data_sector * (block_size >> 9);
+	sector_t r_sector_last = r_sector_first + (e->data_size >> 9) - 1;
+	int strip_sectors = conf->chunk_sectors;
+	int i;
+	int ret = 0;
+
+	if (e->pp_size > 0 && (e->pp_size >> 9) < strip_sectors) {
+		if (e->data_size > e->pp_size)
+			r_sector_last = r_sector_first +
+				(e->data_size / e->pp_size) * strip_sectors - 1;
+		strip_sectors = e->pp_size >> 9;
+	}
+
+	pages = alloc_pages(GFP_KERNEL, 1);
+	if (!pages)
+		return -ENOMEM;
+	page1 = pages;
+	page2 = pages + 1;
+
+	dbg("array sector first %llu, last %llu\n",
+	    (unsigned long long)r_sector_first,
+	    (unsigned long long)r_sector_last);
+
+	/* if start and end is 4k aligned, use a 4k block */
+	if (block_size == 512 &&
+			r_sector_first % (PAGE_SIZE >> 9) == 0 &&
+			(r_sector_last + 1) % (PAGE_SIZE >> 9) == 0)
+		block_size = PAGE_SIZE;
+
+	/* iterate through blocks in strip */
+	for (i = 0; i < strip_sectors; i += (block_size >> 9)) {
+		bool update_parity = false;
+		sector_t parity_sector;
+		struct md_rdev *parity_rdev;
+		struct stripe_head sh;
+		int disk;
+
+		dbg("  iter %d start\n", i);
+		memset(page_address(page1), 0, PAGE_SIZE);
+
+		/* iterate through data member disks */
+		for (disk = 0; disk < (conf->raid_disks - conf->max_degraded);
+				disk++) {
+			int dd_idx;
+			struct md_rdev *rdev;
+			sector_t sector;
+			sector_t r_sector = r_sector_first + i +
+					    (disk * conf->chunk_sectors);
+
+			dbg("    data member disk %d start\n", disk);
+			if (r_sector > r_sector_last) {
+				dbg("    array sector %llu doesn't need parity update\n",
+				    (unsigned long long)r_sector);
+				continue;
+			}
+
+			update_parity = true;
+
+			/* map raid sector to member disk */
+			sector = raid5_compute_sector(conf, r_sector, 0, &dd_idx, NULL);
+			dbg("    processing array sector %llu => data mem disk %d, sector %llu\n",
+			    (unsigned long long)r_sector, dd_idx,
+			    (unsigned long long)sector);
+
+			rdev = conf->disks[dd_idx].rdev;
+			if (!rdev) {
+				dbg("    data member disk %d missing\n", dd_idx);
+				update_parity = false;
+				break;
+			}
+
+			dbg("    reading data member disk %s sector %llu\n",
+			    rdev->bdev->bd_disk->disk_name,
+			    (unsigned long long)sector);
+			if (!sync_page_io(rdev, sector, block_size, page2,
+					REQ_OP_READ, 0, false)) {
+				md_error(mddev, rdev);
+				dbg("    read failed!\n");
+				ret = -EIO;
+				goto out;
+			}
+
+			ppl_xor(block_size, page1, page2, page1);
+		}
+
+		if (!update_parity)
+			continue;
+
+		if (e->pp_size > 0) {
+			dbg("  reading pp disk sector %llu\n",
+			    (unsigned long long)(ppl_sector + i));
+			if (!sync_page_io(log->rdev,
+					ppl_sector - log->rdev->data_offset + i,
+					block_size, page2, REQ_OP_READ, 0,
+					false)) {
+				dbg("  read failed!\n");
+				md_error(mddev, log->rdev);
+				ret = -EIO;
+				goto out;
+			}
+
+			ppl_xor(block_size, page1, page2, page1);
+		}
+
+		/* map raid sector to parity disk */
+		parity_sector = raid5_compute_sector(conf, r_sector_first + i,
+				0, &disk, &sh);
+		BUG_ON(sh.pd_idx != e->parity_disk);
+		parity_rdev = conf->disks[sh.pd_idx].rdev;
+
+		BUG_ON(parity_rdev->bdev->bd_dev != log->rdev->bdev->bd_dev);
+		dbg("  write parity at sector %llu, parity disk %s\n",
+		    (unsigned long long)parity_sector,
+		    parity_rdev->bdev->bd_disk->disk_name);
+		if (!sync_page_io(parity_rdev, parity_sector, block_size,
+				page1, REQ_OP_WRITE, 0, false)) {
+			dbg("  parity write error!\n");
+			md_error(mddev, parity_rdev);
+			ret = -EIO;
+			goto out;
+		}
+	}
+
+out:
+	__free_pages(pages, 1);
+	return ret;
+}
+
+static int ppl_recover(struct r5l_log *log, struct ppl_header *pplhdr)
+{
+	struct mddev *mddev = log->rdev->mddev;
+	sector_t ppl_sector = log->rdev->ppl.sector + (PPL_HEADER_SIZE >> 9);
+	struct page *page;
+	int i;
+	int ret = 0;
+
+	page = alloc_page(GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+
+	/* iterate through all PPL entries saved */
+	for (i = 0; i < pplhdr->entries_count; i++) {
+		struct ppl_header_entry *e = &pplhdr->entries[i];
+		u32 size = le32_to_cpu(e->pp_size);
+		sector_t sector = ppl_sector;
+		int ppl_entry_sectors = size >> 9;
+		u32 crc, crc_stored;
+
+		dbg("disk: %d, entry: %d, ppl_sector: %llu ppl_size: %u\n",
+		    log->rdev->raid_disk, i, (unsigned long long)ppl_sector,
+		    size);
+
+		crc = ~0;
+		crc_stored = le32_to_cpu(e->checksum);
+
+		while (size) {
+			int s = size > PAGE_SIZE ? PAGE_SIZE : size;
+
+			if (!sync_page_io(log->rdev,
+					sector - log->rdev->data_offset,
+					s, page, REQ_OP_READ, 0, false)) {
+				md_error(mddev, log->rdev);
+				ret = -EIO;
+				goto out;
+			}
+
+			crc = crc32c_le(crc, page_address(page), s);
+
+			size -= s;
+			sector += s >> 9;
+		}
+
+		crc = ~crc;
+
+		if (crc != crc_stored) {
+			dbg("ppl entry crc does not match: stored: 0x%x calculated: 0x%x\n",
+			    crc_stored, crc);
+			ret++;
+		} else {
+			int ret2;
+			e->data_sector = le64_to_cpu(e->data_sector);
+			e->pp_size = le32_to_cpu(e->pp_size);
+			e->data_size = le32_to_cpu(e->data_size);
+
+			ret2 = ppl_recover_entry(log, e, ppl_sector);
+			if (ret2) {
+				ret = ret2;
+				goto out;
+			}
+		}
+
+		ppl_sector += ppl_entry_sectors;
+	}
+out:
+	__free_page(page);
+	return ret;
+}
+
+static int ppl_write_empty_header(struct r5l_log *log)
+{
+	struct page *page;
+	struct ppl_header *pplhdr;
+	int ret = 0;
+
+	dbg("disk: %d ppl_sector: %llu\n",
+	    log->rdev->raid_disk, (unsigned long long)log->rdev->ppl.sector);
+
+	page = alloc_page(GFP_KERNEL | __GFP_ZERO);
+	if (!page)
+		return -ENOMEM;
+
+	pplhdr = page_address(page);
+	memset(pplhdr->reserved, 0xff, PPL_HDR_RESERVED);
+	pplhdr->signature = cpu_to_le32(log->uuid_checksum);
+	pplhdr->checksum = cpu_to_le32(~crc32c_le(~0, pplhdr, PAGE_SIZE));
+
+	if (!sync_page_io(log->rdev, log->rdev->ppl.sector -
+			  log->rdev->data_offset, PPL_HEADER_SIZE, page,
+			  REQ_OP_WRITE, 0, false)) {
+		md_error(log->rdev->mddev, log->rdev);
+		ret = -EIO;
+	}
+
+	__free_page(page);
+	return ret;
+}
+
+static int ppl_load_distributed(struct r5l_log *log)
+{
+	struct mddev *mddev = log->rdev->mddev;
+	struct page *page;
+	struct ppl_header *pplhdr;
+	u32 crc, crc_stored;
+	int ret = 0;
+
+	dbg("disk: %d\n", log->rdev->raid_disk);
+
+	/* read PPL header */
+	page = alloc_page(GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+
+	if (!sync_page_io(log->rdev,
+			  log->rdev->ppl.sector - log->rdev->data_offset,
+			  PAGE_SIZE, page, REQ_OP_READ, 0, false)) {
+		md_error(mddev, log->rdev);
+		ret = -EIO;
+		goto out;
+	}
+	pplhdr = page_address(page);
+
+	/* check header validity */
+	crc_stored = le32_to_cpu(pplhdr->checksum);
+	pplhdr->checksum = 0;
+	crc = ~crc32c_le(~0, pplhdr, PAGE_SIZE);
+
+	if (crc_stored != crc) {
+		dbg("ppl header crc does not match: stored: 0x%x calculated: 0x%x\n",
+		    crc_stored, crc);
+		ret = 1;
+		goto out;
+	}
+
+	pplhdr->signature = le32_to_cpu(pplhdr->signature);
+	pplhdr->generation = le64_to_cpu(pplhdr->generation);
+	pplhdr->entries_count = le32_to_cpu(pplhdr->entries_count);
+
+	if (pplhdr->signature != log->uuid_checksum) {
+		dbg("ppl header signature does not match: stored: 0x%x configured: 0x%x\n",
+		    pplhdr->signature, log->uuid_checksum);
+		ret = 1;
+		goto out;
+	}
+
+	if (mddev->recovery_cp != MaxSector)
+		ret = ppl_recover(log, pplhdr);
+out:
+	__free_page(page);
+
+	if (ret >= 0) {
+		int ret2 = ppl_write_empty_header(log);
+		if (ret2)
+			ret = ret2;
+	}
+
+	dbg("return: %d\n", ret);
+	return ret;
+}
+
+static int ppl_load(struct r5l_log *log)
+{
+	struct ppl_conf *ppl_conf = log->private;
+	int ret = 0;
+	int i;
+
+	for (i = 0; i < ppl_conf->count; i++) {
+		struct r5l_log *log_child = ppl_conf->child_logs[i];
+		int ret2;
+
+		/* Missing drive */
+		if (!log_child)
+			continue;
+
+		ret2 = ppl_load_distributed(log_child);
+		if (ret2 < 0) {
+			ret = ret2;
+			break;
+		}
+
+		ret += ret2;
+	}
+
+	dbg("return: %d\n", ret);
+	return ret;
+}
+
 #define IMSM_MPB_SIG "Intel Raid ISM Cfg Sig. "
 #define IMSM_MPB_ORIG_FAMILY_NUM_OFFSET 64
 
@@ -603,6 +944,12 @@ static int __ppl_init_log(struct r5l_log *log, struct r5conf *conf)
 
 		ppl_conf->child_logs[i] = log_child;
 	}
+
+	ret = ppl_load(log);
+	if (!ret && mddev->recovery_cp == 0 && !mddev->degraded)
+		mddev->recovery_cp = MaxSector;
+	else if (ret < 0)
+		goto err;
 
 	rcu_assign_pointer(conf->log, log);
 	set_bit(MD_HAS_PPL, &mddev->flags);

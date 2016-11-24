@@ -7101,7 +7101,10 @@ static int raid5_run(struct mddev *mddev)
 
 	if (mddev->degraded > dirty_parity_disks &&
 	    mddev->recovery_cp != MaxSector) {
-		if (mddev->ok_start_degraded)
+		if (rwh_policy)
+			pr_warn("md/raid:%s: starting dirty degraded array with journal.\n",
+				mdname(mddev));
+		else if (mddev->ok_start_degraded)
 			pr_crit("md/raid:%s: starting dirty degraded array - data corruption possible.\n",
 				mdname(mddev));
 		else {
