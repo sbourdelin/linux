@@ -1747,11 +1747,11 @@ static int stmmac_hw_setup(struct net_device *dev, bool init_ptp)
 	if (priv->hw->pcs && priv->hw->mac->pcs_ctrl_ane)
 		priv->hw->mac->pcs_ctrl_ane(priv->hw, 1, priv->hw->ps, 0);
 
-	/*  set TX ring length */
+	/* Set TX ring length */
 	if (priv->hw->dma->set_tx_ring_len)
 		priv->hw->dma->set_tx_ring_len(priv->ioaddr,
 					       (DMA_TX_SIZE - 1));
-	/*  set RX ring length */
+	/* Set RX ring length */
 	if (priv->hw->dma->set_rx_ring_len)
 		priv->hw->dma->set_rx_ring_len(priv->ioaddr,
 					       (DMA_RX_SIZE - 1));
@@ -2212,7 +2212,7 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 	priv->tx_skbuff[first_entry] = skb;
 
 	enh_desc = priv->plat->enh_desc;
-	/* To program the descriptors according to the size of the frame */
+	/* Program the descriptors according to the size of the frame */
 	if (enh_desc)
 		is_jumbo = priv->hw->mode->is_jumbo_frm(skb->len, enh_desc);
 
@@ -2665,7 +2665,7 @@ static int stmmac_rx(struct stmmac_priv *priv, int limit)
  *  @budget : maximum number of packets that the current CPU can receive from
  *	      all interfaces.
  *  Description :
- *  To look at the incoming frames and clear the tx resources.
+ *  Look at the incoming frames and clear the tx resources.
  */
 static int stmmac_poll(struct napi_struct *napi, int budget)
 {
@@ -2828,7 +2828,7 @@ static irqreturn_t stmmac_interrupt(int irq, void *dev_id)
 		return IRQ_NONE;
 	}
 
-	/* To handle GMAC own interrupts */
+	/* Handle GMAC own interrupts */
 	if ((priv->plat->has_gmac) || (priv->plat->has_gmac4)) {
 		int status = priv->hw->mac->host_irq_status(priv->hw,
 							    &priv->xstats);
@@ -2853,7 +2853,7 @@ static irqreturn_t stmmac_interrupt(int irq, void *dev_id)
 		}
 	}
 
-	/* To handle DMA interrupts */
+	/* Handle DMA interrupts */
 	stmmac_dma_interrupt(priv);
 
 	return IRQ_HANDLED;
@@ -3145,7 +3145,7 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
 
 	priv->hw = mac;
 
-	/* To use the chained or ring mode */
+	/* Use the chained or ring mode */
 	if (priv->synopsys_id >= DWMAC_CORE_4_00) {
 		priv->hw->mode = &dwmac4_ring_mode_ops;
 	} else {
@@ -3191,7 +3191,7 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
 	} else
 		pr_info(" No HW DMA feature register supported");
 
-	/* To use alternate (extended), normal or GMAC4 descriptor structures */
+	/* Use alternate (extended), normal or GMAC4 descriptor structures */
 	if (priv->synopsys_id >= DWMAC_CORE_4_00)
 		priv->hw->desc = &dwmac4_desc_ops;
 	else
