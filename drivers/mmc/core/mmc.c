@@ -1242,7 +1242,12 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
 	mmc_set_timing(host, MMC_TIMING_MMC_HS200);
 
 	err = mmc_switch_status(card);
-	if (err)
+	/*
+	 * For HS200, CRC errors are not a reliable way to know the switch
+	 * failed. If there really is a problem, we would expect tuning will
+	 * fail and the result ends up the same.
+	 */
+	if (err && err != -EILSEQ)
 		goto out_err;
 
 	mmc_set_bus_speed(card);
@@ -1398,6 +1403,14 @@ static int mmc_select_hs200(struct mmc_card *card)
 		mmc_set_timing(host, MMC_TIMING_MMC_HS200);
 
 		err = mmc_switch_status(card);
+		/*
+		 * For HS200, CRC errors are not a reliable way to know the
+		 * switch failed. If there really is a problem, we would expect
+		 * tuning will fail and the result ends up the same.
+		 */
+		if (err == -EILSEQ)
+			err = 0;
+
 		/*
 		 * mmc_select_timing() assumes timing has not changed if
 		 * it is a switch error.
