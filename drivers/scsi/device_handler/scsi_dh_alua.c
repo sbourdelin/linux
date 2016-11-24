@@ -113,7 +113,7 @@ struct alua_queue_data {
 #define ALUA_POLICY_SWITCH_ALL		1
 
 static void alua_rtpg_work(struct work_struct *work);
-static void alua_rtpg_queue(struct alua_port_group *pg,
+static int alua_rtpg_queue(struct alua_port_group *pg,
 			    struct scsi_device *sdev,
 			    struct alua_queue_data *qdata, bool force);
 static void alua_check(struct scsi_device *sdev, bool force);
@@ -862,7 +862,7 @@ static void alua_rtpg_work(struct work_struct *work)
 	kref_put(&pg->kref, release_port_group);
 }
 
-static void alua_rtpg_queue(struct alua_port_group *pg,
+static int alua_rtpg_queue(struct alua_port_group *pg,
 			    struct scsi_device *sdev,
 			    struct alua_queue_data *qdata, bool force)
 {
@@ -871,7 +871,7 @@ static void alua_rtpg_queue(struct alua_port_group *pg,
 	struct workqueue_struct *alua_wq = kaluad_wq;
 
 	if (!pg)
-		return;
+		return SCSI_DH_IO;
 
 	spin_lock_irqsave(&pg->lock, flags);
 	if (qdata) {
@@ -906,7 +906,10 @@ static void alua_rtpg_queue(struct alua_port_group *pg,
 		if (sdev)
 			scsi_device_put(sdev);
 		kref_put(&pg->kref, release_port_group);
+		return SCSI_DH_IO;
 	}
+
+	return SCSI_DH_OK;
 }
 
 /*
@@ -1007,11 +1010,12 @@ static int alua_activate(struct scsi_device *sdev,
 		mutex_unlock(&h->init_mutex);
 		goto out;
 	}
-	fn = NULL;
 	rcu_read_unlock();
 	mutex_unlock(&h->init_mutex);
 
-	alua_rtpg_queue(pg, sdev, qdata, true);
+	err = alua_rtpg_queue(pg, sdev, qdata, true);
+	if (!err)
+		fn = NULL;
 	kref_put(&pg->kref, release_port_group);
 out:
 	if (fn)
