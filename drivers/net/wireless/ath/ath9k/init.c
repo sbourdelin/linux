@@ -75,6 +75,12 @@ MODULE_PARM_DESC(use_chanctx, "Enable channel context for concurrency");
 
 #endif /* CONFIG_ATH9K_CHANNEL_CONTEXT */
 
+#ifdef CONFIG_ATH9K_BTCOEX_SUPPORT
+static int ath9k_btcoex_duty_cycle = ATH_BTCOEX_DEF_DUTY_CYCLE;
+module_param_named(btcoex_duty_cycle, ath9k_btcoex_duty_cycle, int, 0444);
+MODULE_PARM_DESC(btcoex_duty_cycle, "BT coexistence duty cycle");
+#endif
+
 bool is_ath9k_unloaded;
 
 #ifdef CONFIG_MAC80211_LEDS
@@ -624,6 +630,7 @@ static int ath9k_init_softc(u16 devid, struct ath_softc *sc,
 	sc->sc_ah = ah;
 	sc->dfs_detector = dfs_pattern_detector_init(common, NL80211_DFS_UNSET);
 	sc->tx99_power = MAX_RATE_POWER + 1;
+
 	init_waitqueue_head(&sc->tx_wait);
 	sc->cur_chan = &sc->chanctx[0];
 	if (!ath9k_is_chanctx_enabled())
@@ -639,6 +646,9 @@ static int ath9k_init_softc(u16 devid, struct ath_softc *sc,
 	common->btcoex_enabled = ath9k_btcoex_enable == 1;
 	common->disable_ani = false;
 
+#ifdef CONFIG_ATH9K_BTCOEX_SUPPORT
+	sc->btcoex.duty_cycle = ath9k_btcoex_duty_cycle;
+#endif
 	/*
 	 * Platform quirks.
 	 */
