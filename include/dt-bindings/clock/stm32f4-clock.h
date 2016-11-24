@@ -28,7 +28,8 @@
 #define PLL_VCO_I2S		6
 #define PLL_VCO_SAI		7
 #define CLK_LCD			8
+#define CLK_I2S			9
 
-#define END_PRIMARY_CLK		9
+#define END_PRIMARY_CLK		10
 
 #endif

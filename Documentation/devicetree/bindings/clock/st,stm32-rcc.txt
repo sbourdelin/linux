@@ -19,6 +19,7 @@ Required properties:
   use.
 - clocks: External oscillator clock phandle
   - high speed external clock signal (HSE)
+  - external I2S clock (I2S_CKIN)
 
 Example:
 
@@ -27,7 +28,7 @@ Example:
 		#clock-cells = <2>
 		compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
 		reg = <0x40023800 0x400>;
-		clocks = <&clk_hse>;
+		clocks = <&clk_hse>, <&clk_i2s_ckin>;
 	};
 
 Specifying gated clocks
@@ -77,6 +78,7 @@ The secondary index is bound with the following magic numbers:
 	6	PLL_VCO_I2S	(vco frequency of I2S pll)
 	7	PLL_VCO_SAI	(vco frequency of SAI pll)
 	8	CLK_LCD		(LCD-TFT)
+	9	CLK_I2S		(I2S clocks)
 
 Example:
 
