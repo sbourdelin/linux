@@ -1,0 +1,15 @@
+#
+# Timers drivers
+
+menu "Timers"
+
+config IIO_STM32_TIMER
+	tristate "stm32 iio timer"
+	depends on ARCH_STM32
+	depends on OF
+	select IIO_TRIGGERED_EVENT
+	select MFD_STM32_GP_TIMER
+	help
+	  Select this option to enable stm32 timers hardware IPs
+
+endmenu
