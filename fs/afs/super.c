@@ -321,6 +321,8 @@ static int afs_fill_super(struct super_block *sb,
 	sb->s_op		= &afs_super_ops;
 	sb->s_bdi		= &as->volume->bdi;
 	strlcpy(sb->s_id, as->volume->vlocation->vldb.name, sizeof(sb->s_id));
+	sb->s_time_max = Y2106_EXPIRY_TIMESTAMP;
+	sb->s_time_min = 0;
 
 	/* allocate the root inode and dentry */
 	fid.vid		= as->volume->vid;
