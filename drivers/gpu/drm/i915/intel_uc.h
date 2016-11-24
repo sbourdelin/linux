@@ -169,6 +169,19 @@ struct intel_guc {
 	struct mutex action_lock;
 };
 
+/* intel_uc.c */
+bool host2guc_action_response(struct drm_i915_private *dev_priv, u32 *status);
+int host2guc_action(struct intel_guc *guc, u32 *data, u32 len);
+int host2guc_allocate_doorbell(struct intel_guc *guc,
+			       struct i915_guc_client *client);
+int host2guc_release_doorbell(struct intel_guc *guc,
+			      struct i915_guc_client *client);
+int host2guc_sample_forcewake(struct intel_guc *guc,
+			      struct i915_guc_client *client);
+int host2guc_logbuffer_flush_complete(struct intel_guc *guc);
+int host2guc_force_logbuffer_flush(struct intel_guc *guc);
+int host2guc_logging_control(struct intel_guc *guc, u32 control_val);
+
 /* intel_guc_loader.c */
 extern void intel_guc_init(struct drm_device *dev);
 extern int intel_guc_setup(struct drm_device *dev);
