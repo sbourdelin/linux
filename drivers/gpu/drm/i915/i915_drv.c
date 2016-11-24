@@ -603,6 +603,7 @@ static int i915_load_modeset_init(struct drm_device *dev)
 	if (ret)
 		goto cleanup_irq;
 
+	intel_uc_init(dev_priv);
 	intel_guc_init(dev);
 
 	ret = i915_gem_init(dev);

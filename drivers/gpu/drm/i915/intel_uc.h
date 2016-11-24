@@ -170,6 +170,7 @@ struct intel_guc {
 };
 
 /* intel_uc.c */
+void intel_uc_init(struct drm_i915_private *dev_priv);
 bool intel_guc_recv(struct drm_i915_private *dev_priv, u32 *status);
 int intel_guc_send(struct intel_guc *guc, u32 *data, u32 len);
 int intel_guc_sample_forcewake(struct intel_guc *guc,
