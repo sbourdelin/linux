@@ -1960,6 +1960,38 @@ static void stmmac_tso_allocator(struct stmmac_priv *priv, unsigned int des,
 	}
 }
 
+static void stmmac_xmit_common(struct sk_buff *skb, struct net_device *dev, int nfrags, struct dma_desc *desc)
+{
+	struct stmmac_priv *priv = netdev_priv(dev);
+
+	if (unlikely(stmmac_tx_avail(priv) <= (MAX_SKB_FRAGS + 1))) {
+		if (netif_msg_hw(priv))
+			pr_debug("%s: stop transmitted packets\n", __func__);
+		netif_stop_queue(dev);
+	}
+
+	dev->stats.tx_bytes += skb->len;
+
+	/* According to the coalesce parameter the IC bit for the latest
+	 * segment is reset and the timer re-started to clean the tx status.
+	 * This approach takes care about the fragments: desc is the first
+	 * element in case of no SG.
+	 */
+	priv->tx_count_frames += nfrags + 1;
+	if (likely(priv->tx_coal_frames > priv->tx_count_frames)) {
+		mod_timer(&priv->txtimer,
+			  STMMAC_COAL_TIMER(priv->tx_coal_timer));
+	} else {
+		priv->tx_count_frames = 0;
+		priv->hw->desc->set_tx_ic(desc);
+		priv->xstats.tx_set_ic_bit++;
+	}
+
+	if (!priv->hwts_tx_en)
+		skb_tx_timestamp(skb);
+}
+
+
 /**
  *  stmmac_tso_xmit - Tx entry point of the driver for oversized frames (TSO)
  *  @skb : the socket buffer
@@ -2081,29 +2113,10 @@ static netdev_tx_t stmmac_tso_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	priv->cur_tx = STMMAC_GET_ENTRY(priv->cur_tx, DMA_TX_SIZE);
 
-	if (unlikely(stmmac_tx_avail(priv) <= (MAX_SKB_FRAGS + 1))) {
-		if (netif_msg_hw(priv))
-			pr_debug("%s: stop transmitted packets\n", __func__);
-		netif_stop_queue(dev);
-	}
-
-	dev->stats.tx_bytes += skb->len;
+	stmmac_xmit_common(skb, dev, nfrags, desc);
+	
 	priv->xstats.tx_tso_frames++;
 	priv->xstats.tx_tso_nfrags += nfrags;
-
-	/* Manage tx mitigation */
-	priv->tx_count_frames += nfrags + 1;
-	if (likely(priv->tx_coal_frames > priv->tx_count_frames)) {
-		mod_timer(&priv->txtimer,
-			  STMMAC_COAL_TIMER(priv->tx_coal_timer));
-	} else {
-		priv->tx_count_frames = 0;
-		priv->hw->desc->set_tx_ic(desc);
-		priv->xstats.tx_set_ic_bit++;
-	}
-
-	if (!priv->hwts_tx_en)
-		skb_tx_timestamp(skb);
 
 	if (unlikely((skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) &&
 		     priv->hwts_tx_en)) {
@@ -2281,31 +2294,7 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 		print_pkt(skb->data, skb->len);
 	}
 
-	if (unlikely(stmmac_tx_avail(priv) <= (MAX_SKB_FRAGS + 1))) {
-		if (netif_msg_hw(priv))
-			pr_debug("%s: stop transmitted packets\n", __func__);
-		netif_stop_queue(dev);
-	}
-
-	dev->stats.tx_bytes += skb->len;
-
-	/* According to the coalesce parameter the IC bit for the latest
-	 * segment is reset and the timer re-started to clean the tx status.
-	 * This approach takes care about the fragments: desc is the first
-	 * element in case of no SG.
-	 */
-	priv->tx_count_frames += nfrags + 1;
-	if (likely(priv->tx_coal_frames > priv->tx_count_frames)) {
-		mod_timer(&priv->txtimer,
-			  STMMAC_COAL_TIMER(priv->tx_coal_timer));
-	} else {
-		priv->tx_count_frames = 0;
-		priv->hw->desc->set_tx_ic(desc);
-		priv->xstats.tx_set_ic_bit++;
-	}
-
-	if (!priv->hwts_tx_en)
-		skb_tx_timestamp(skb);
+	stmmac_xmit_common(skb, dev, nfrags, desc);
 
 	/* Ready to fill the first descriptor and set the OWN bit w/o any
 	 * problems because all the descriptors are actually ready to be
