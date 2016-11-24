@@ -10213,6 +10213,7 @@ static int ipr_probe_ioa(struct pci_dev *pdev,
 			}
 
 			ioa_cfg->intr_flag = IPR_USE_LSI;
+			ioa_cfg->clear_isr = 1;
 			ioa_cfg->nvectors = 1;
 		}
 		else if (rc)
