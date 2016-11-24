@@ -28,6 +28,13 @@
 #include <linux/regmap.h>
 #include <linux/mfd/syscon.h>
 
+/*
+ * Include list of clocks wich are not derived from system clock (SYSCLOCK)
+ * The index of these clocks is the secondary index of DT bindings
+ *
+ */
+#include <dt-bindings/clock/stm32f4-clock.h>
+
 #define STM32F4_RCC_PLLCFGR		0x04
 #define STM32F4_RCC_CFGR		0x08
 #define STM32F4_RCC_AHB1ENR		0x30
@@ -207,8 +214,6 @@ static const struct stm32f4_gate_data stm32f469_gates[] __initconst = {
 	{ STM32F4_RCC_APB2ENR, 22,	"sai1",		"apb2_div" },
 	{ STM32F4_RCC_APB2ENR, 26,	"ltdc",		"apb2_div" },
 };
-
-enum { SYSTICK, FCLK, CLK_LSI, CLK_LSE, CLK_HSE_RTC, CLK_RTC, END_PRIMARY_CLK };
 
 /*
  * This bitmask tells us which bit offsets (0..192) on STM32F4[23]xxx
