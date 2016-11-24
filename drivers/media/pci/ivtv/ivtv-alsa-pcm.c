@@ -23,21 +23,18 @@
  *  02111-1307  USA
  */
 
-#include <linux/init.h>
-#include <linux/kernel.h>
-#include <linux/vmalloc.h>
-
-#include <media/v4l2-device.h>
-
-#include <sound/core.h>
-#include <sound/pcm.h>
-
 #include "ivtv-driver.h"
 #include "ivtv-queue.h"
 #include "ivtv-streams.h"
 #include "ivtv-fileops.h"
 #include "ivtv-alsa.h"
 #include "ivtv-alsa-pcm.h"
+
+#include <linux/vmalloc.h>
+
+#include <sound/core.h>
+#include <sound/pcm.h>
+
 
 static unsigned int pcm_debug;
 module_param(pcm_debug, int, 0644);
