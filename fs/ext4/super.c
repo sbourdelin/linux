@@ -3641,8 +3641,13 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 			       sbi->s_inode_size);
 			goto failed_mount;
 		}
-		if (sbi->s_inode_size > EXT4_GOOD_OLD_INODE_SIZE)
+		if (sbi->s_inode_size > EXT4_GOOD_OLD_INODE_SIZE) {
 			sb->s_time_gran = 1 << (EXT4_EPOCH_BITS - 2);
+			sb->s_time_max = EXT4_EXTRA_TIMESTAMP_MAX;
+		} else
+			sb->s_time_max = EXT4_NON_EXTRA_TIMESTAMP_MAX;
+
+		sb->s_time_min = EXT4_TIMESTAMP_MIN;
 	}
 
 	sbi->s_desc_size = le16_to_cpu(es->s_desc_size);
