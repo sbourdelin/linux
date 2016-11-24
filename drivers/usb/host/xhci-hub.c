@@ -444,8 +444,6 @@ void xhci_ring_device(struct xhci_hcd *xhci, int slot_id)
 			xhci_ring_ep_doorbell(xhci, slot_id, i, 0);
 		}
 	}
-
-	return;
 }
 
 static void xhci_disable_port(struct usb_hcd *hcd, struct xhci_hcd *xhci,
