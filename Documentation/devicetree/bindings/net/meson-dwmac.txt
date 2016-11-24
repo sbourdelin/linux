@@ -25,6 +25,17 @@ Required properties on Meson8b and newer:
 		- "clkin0" - first parent clock of the internal mux
 		- "clkin1" - second parent clock of the internal mux
 
+Optional properties on Meson8b and newer:
+- amlogic,tx-delay:	The internal RGMII TX clock delay configuration.
+			Defaults to DWMAC_MESON8B_TXDLY_QUARTER_CYCLE
+			when not given. All possible values are defined
+			as preprocessor macro in
+			<dt-bindings/net/dwmac-meson8b.h>.
+			The delay is specified as divider for the
+			internal clock (RGMII typically uses a 125MHz
+			clock clock (= 8ns per cycle), so setting
+			DWMAC_MESON8B_TXDLY_QUARTER_CYCLE
+			results in a TX delay of 8ns/4 = 2ns.
 
 Example for Meson6:
 
