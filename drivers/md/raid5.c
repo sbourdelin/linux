@@ -61,6 +61,7 @@
 #include "raid5.h"
 #include "raid0.h"
 #include "bitmap.h"
+#include "raid5-cache.h"
 
 #define cpu_to_group(cpu) cpu_to_node(cpu)
 #define ANY_GROUP NUMA_NO_NODE
