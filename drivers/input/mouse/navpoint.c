@@ -166,7 +166,7 @@ static void navpoint_up(struct navpoint *navpoint)
 	for (timeout = 100; timeout != 0; --timeout) {
 		if (!(pxa_ssp_read_reg(ssp, SSSR) & SSSR_CSS))
 			break;
-		msleep(1);
+		usleep_range(1000, 1100);
 	}
 
 	if (timeout == 0)

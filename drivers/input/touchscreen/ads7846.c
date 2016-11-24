@@ -58,7 +58,7 @@
  * files.
  */
 
-#define TS_POLL_DELAY	1	/* ms delay before the first sample */
+#define TS_POLL_DELAY	1000	/* us delay before the first sample */
 #define TS_POLL_PERIOD	5	/* ms delay between samples */
 
 /* this driver doesn't aim at the peak continuous sample rate */
@@ -857,7 +857,7 @@ static irqreturn_t ads7846_irq(int irq, void *handle)
 	struct ads7846 *ts = handle;
 
 	/* Start with a small delay before checking pendown state */
-	msleep(TS_POLL_DELAY);
+	usleep_range(TS_POLL_DELAY, TS_POLL_DELAY + 100);
 
 	while (!ts->stopped && get_pendown_state(ts)) {
 

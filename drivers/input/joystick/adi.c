@@ -48,7 +48,7 @@ MODULE_LICENSE("GPL");
 #define ADI_MAX_START		200	/* Trigger to packet timeout [200us] */
 #define ADI_MAX_STROBE		40	/* Single bit timeout [40us] */
 #define ADI_INIT_DELAY		10	/* Delay after init packet [10ms] */
-#define ADI_DATA_DELAY		4	/* Delay after data packet [4ms] */
+#define ADI_DATA_DELAY		4000	/* Delay after data packet [4000us] */
 
 #define ADI_MAX_LENGTH		256
 #define ADI_MIN_LENGTH		8
@@ -514,7 +514,7 @@ static int adi_connect(struct gameport *gameport, struct gameport_driver *drv)
 
 	msleep(ADI_INIT_DELAY);
 	if (adi_read(port)) {
-		msleep(ADI_DATA_DELAY);
+		usleep_range(ADI_DATA_DELAY, ADI_DATA_DELAY + 100);
 		adi_read(port);
 	}
 

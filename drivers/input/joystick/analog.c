@@ -88,7 +88,7 @@ MODULE_PARM_DESC(map, "Describes analog joysticks type/capabilities");
 #define ANALOG_EXTENSIONS	0x7ff00
 #define ANALOG_GAMEPAD		0x80000
 
-#define ANALOG_MAX_TIME		3	/* 3 ms */
+#define ANALOG_MAX_TIME		3000	/* 3000 us */
 #define ANALOG_LOOP_TIME	2000	/* 2 * loop */
 #define ANALOG_SAITEK_DELAY	200	/* 200 us */
 #define ANALOG_SAITEK_TIME	2000	/* 2000 us */
@@ -257,7 +257,7 @@ static int analog_cooked_read(struct analog_port *port)
 	int i, j;
 
 	loopout = (ANALOG_LOOP_TIME * port->loop) / 1000;
-	timeout = ANALOG_MAX_TIME * port->speed;
+	timeout = (ANALOG_MAX_TIME / 1000) * port->speed;
 
 	local_irq_save(flags);
 	gameport_trigger(gameport);
@@ -625,20 +625,20 @@ static int analog_init_port(struct gameport *gameport, struct gameport_driver *d
 
 		gameport_trigger(gameport);
 		t = gameport_read(gameport);
-		msleep(ANALOG_MAX_TIME);
+		usleep_range(ANALOG_MAX_TIME, ANALOG_MAX_TIME + 100);
 		port->mask = (gameport_read(gameport) ^ t) & t & 0xf;
 		port->fuzz = (port->speed * ANALOG_FUZZ_MAGIC) / port->loop / 1000 + ANALOG_FUZZ_BITS;
 
 		for (i = 0; i < ANALOG_INIT_RETRIES; i++) {
 			if (!analog_cooked_read(port))
 				break;
-			msleep(ANALOG_MAX_TIME);
+			usleep_range(ANALOG_MAX_TIME, ANALOG_MAX_TIME + 100);
 		}
 
 		u = v = 0;
 
-		msleep(ANALOG_MAX_TIME);
-		t = gameport_time(gameport, ANALOG_MAX_TIME * 1000);
+		usleep_range(ANALOG_MAX_TIME, ANALOG_MAX_TIME + 100);
+		t = gameport_time(gameport, ANALOG_MAX_TIME);
 		gameport_trigger(gameport);
 		while ((gameport_read(port->gameport) & port->mask) && (u < t))
 			u++;

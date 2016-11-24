@@ -42,7 +42,7 @@ MODULE_LICENSE("GPL");
 
 #define GF2K_START		400	/* The time we wait for the first bit [400 us] */
 #define GF2K_STROBE		40	/* The time we wait for the first bit [40 us] */
-#define GF2K_TIMEOUT		4	/* Wait for everything to settle [4 ms] */
+#define GF2K_TIMEOUT		4000	/* Wait for everything to settle [4000 us] */
 #define GF2K_LENGTH		80	/* Max number of triplets in a packet */
 
 /*
@@ -138,7 +138,7 @@ static void gf2k_trigger_seq(struct gameport *gameport, short *seq)
 	i = 0;
         do {
 		gameport_trigger(gameport);
-		t = gameport_time(gameport, GF2K_TIMEOUT * 1000);
+		t = gameport_time(gameport, GF2K_TIMEOUT);
 		while ((gameport_read(gameport) & 1) && t) t--;
                 udelay(seq[i]);
         } while (seq[++i]);
@@ -259,11 +259,11 @@ static int gf2k_connect(struct gameport *gameport, struct gameport_driver *drv)
 
 	gf2k_trigger_seq(gameport, gf2k_seq_reset);
 
-	msleep(GF2K_TIMEOUT);
+	usleep_range(GF2K_TIMEOUT, GF2K_TIMEOUT + 100);
 
 	gf2k_trigger_seq(gameport, gf2k_seq_digital);
 
-	msleep(GF2K_TIMEOUT);
+	usleep_range(GF2K_TIMEOUT, GF2K_TIMEOUT + 100);
 
 	if (gf2k_read_packet(gameport, GF2K_LENGTH, data) < 12) {
 		err = -ENODEV;

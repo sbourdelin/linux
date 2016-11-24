@@ -689,7 +689,7 @@ static int lm8323_probe(struct i2c_client *client,
 			break;
 		}
 
-		msleep(1);
+		usleep_range(1000, 1100);
 	}
 
 	lm8323_configure(lm);

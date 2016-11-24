@@ -98,7 +98,7 @@ static int ns558_isa_probe(int io)
 		release_region(io, 1);
 		return -ENODEV;
 	}
-	msleep(3);
+	usleep_range(3000, 3100);
 /*
  * After some time (4ms) the axes shouldn't change anymore.
  */
@@ -124,7 +124,7 @@ static int ns558_isa_probe(int io)
 		outb(0xff, io & (-1 << i));
 		for (j = b = 0; j < 1000; j++)
 			if (inb(io & (-1 << i)) != inb((io & (-1 << i)) + (1 << i) - 1)) b++;
-		msleep(3);
+		usleep_range(3000, 3100);
 
 		if (b > 300) {				/* We allow 30% difference */
 			release_region(io & (-1 << i), (1 << i));
