@@ -6774,8 +6774,10 @@ static int raid5_run(struct mddev *mddev)
 	struct r5conf *conf;
 	int working_disks = 0;
 	int dirty_parity_disks = 0;
+	int ppl_disks = 0;
 	struct md_rdev *rdev;
 	struct md_rdev *journal_dev = NULL;
+	int rwh_policy = RWH_POLICY_OFF;
 	sector_t reshape_offset = 0;
 	int i;
 	long long min_offset_diff = 0;
@@ -6787,6 +6789,10 @@ static int raid5_run(struct mddev *mddev)
 
 	rdev_for_each(rdev, mddev) {
 		long long diff;
+
+		if (test_bit(JournalPpl, &rdev->flags) &&
+		    test_bit(In_sync, &rdev->flags))
+			ppl_disks++;
 
 		if (test_bit(Journal, &rdev->flags)) {
 			journal_dev = rdev;
@@ -6978,6 +6984,22 @@ static int raid5_run(struct mddev *mddev)
 		goto abort;
 	}
 
+	if (ppl_disks) {
+		if (ppl_disks != working_disks) {
+			pr_err("md/raid:%s: distributed PPL must be enabled on all member devices - aborting\n",
+			       mdname(mddev));
+			goto abort;
+		}
+		rwh_policy = RWH_POLICY_PPL;
+	}
+
+	if (journal_dev) {
+		if (ppl_disks)
+			pr_warn("md/raid:%s: using journal device and PPL not allowed - ignoring PPL\n",
+				mdname(mddev));
+		rwh_policy = RWH_POLICY_JOURNAL;
+	}
+
 	/* device size must be a multiple of chunk size */
 	mddev->dev_sectors &= ~(mddev->chunk_sectors - 1);
 	mddev->resync_max_sectors = mddev->dev_sectors;
@@ -7103,12 +7125,17 @@ static int raid5_run(struct mddev *mddev)
 		blk_queue_max_hw_sectors(mddev->queue, UINT_MAX);
 	}
 
-	if (journal_dev) {
-		char b[BDEVNAME_SIZE];
+	if (rwh_policy) {
+		if (journal_dev) {
+			char b[BDEVNAME_SIZE];
 
-		pr_debug("md/raid:%s: using device %s as journal\n",
-			 mdname(mddev), bdevname(journal_dev->bdev, b));
-		if (r5l_init_log(conf, journal_dev))
+			pr_debug("md/raid:%s: using device %s as journal\n",
+				 mdname(mddev), bdevname(journal_dev->bdev, b));
+		} else if (rwh_policy == RWH_POLICY_PPL) {
+			pr_debug("md/raid:%s: enabling distributed PPL journal\n",
+				 mdname(mddev));
+		}
+		if (r5l_init_log(conf, journal_dev, rwh_policy))
 			goto abort;
 	}
 
@@ -7304,6 +7331,7 @@ static int raid5_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 
 	if (test_bit(Journal, &rdev->flags)) {
 		char b[BDEVNAME_SIZE];
+		int ret;
 		if (conf->log)
 			return -EBUSY;
 
@@ -7312,7 +7340,9 @@ static int raid5_add_disk(struct mddev *mddev, struct md_rdev *rdev)
 		 * The array is in readonly mode if journal is missing, so no
 		 * write requests running. We should be safe
 		 */
-		r5l_init_log(conf, rdev);
+		ret = r5l_init_log(conf, rdev, RWH_POLICY_JOURNAL);
+		if (ret)
+			return ret;
 		pr_debug("md/raid:%s: using device %s as journal\n",
 			 mdname(mddev), bdevname(rdev->bdev, b));
 		return 0;

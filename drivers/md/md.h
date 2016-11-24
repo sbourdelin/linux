@@ -172,6 +172,9 @@ enum flag_bits {
 				 * Usually, this device should be faster
 				 * than other devices in the array
 				 */
+	JournalPpl,		/* This device is used for raid5
+				 * Partial Parity Log.
+				 */
 	ClusterRemove,
 	RemoveSynchronized,	/* synchronize_rcu() was called after
 				 * this device was known to be faulty,

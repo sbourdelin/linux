@@ -2575,6 +2575,8 @@ state_show(struct md_rdev *rdev, char *page)
 		len += sprintf(page+len, "journal%s", sep);
 	if (test_bit(WriteMostly, &flags))
 		len += sprintf(page+len, "write_mostly%s", sep);
+	if (test_bit(JournalPpl, &flags))
+		len += sprintf(page+len, "journal_ppl%s", sep);
 	if (test_bit(Blocked, &flags) ||
 	    (rdev->badblocks.unacked_exist
 	     && !test_bit(Faulty, &flags)))
@@ -2752,6 +2754,9 @@ state_store(struct md_rdev *rdev, const char *buf, size_t len)
 		err = 0;
 	} else if (cmd_match(buf, "-external_bbl") && (rdev->mddev->external)) {
 		clear_bit(ExternalBbl, &rdev->flags);
+		err = 0;
+	} else if (cmd_match(buf, "journal_ppl")) {
+		set_bit(JournalPpl, &rdev->flags);
 		err = 0;
 	}
 	if (!err)

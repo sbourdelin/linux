@@ -81,6 +81,13 @@ struct r5l_log {
 	struct work_struct deferred_io_work;
 
 	struct r5l_policy *policy;
+	enum {
+		RWH_POLICY_OFF,
+		RWH_POLICY_JOURNAL,
+		RWH_POLICY_PPL,
+	} rwh_policy;
+
+	void *private;
 };
 
 /*
@@ -142,7 +149,7 @@ struct r5l_policy {
 	void (*quiesce)(struct r5l_log *log, int state);
 };
 
-extern int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev);
+extern int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev, int policy_type);
 extern void r5l_exit_log(struct r5l_log *log);
 extern int r5l_write_stripe(struct r5l_log *log, struct stripe_head *sh);
 extern void r5l_write_stripe_run(struct r5l_log *log);

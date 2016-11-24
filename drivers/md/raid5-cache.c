@@ -2539,16 +2539,29 @@ struct r5l_policy r5l_journal = {
 	.handle_flush_request = __r5l_handle_flush_request,
 	.quiesce = __r5l_quiesce,
 };
+extern struct r5l_policy r5l_ppl;
 
-int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev)
+int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev, int policy_type)
 {
 	int ret;
 	struct r5l_log *log = kzalloc(sizeof(*log), GFP_KERNEL);
 	if (!log)
 		return -ENOMEM;
 
+	switch (policy_type) {
+	case RWH_POLICY_JOURNAL:
+		log->policy = &r5l_journal;
+		break;
+	case RWH_POLICY_PPL:
+		log->policy = &r5l_ppl;
+		break;
+	default:
+		kfree(log);
+		return -EINVAL;
+	}
+
 	log->rdev = rdev;
-	log->policy = &r5l_journal;
+	log->rwh_policy = policy_type;
 
 	ret = log->policy->init_log(log, conf);
 	if (ret)
