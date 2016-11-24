@@ -715,6 +715,27 @@ static int ppl_load(struct r5l_log *log)
 	return ret;
 }
 
+static int ppl_invalidate(struct r5l_log *log)
+{
+	struct ppl_conf *ppl_conf = log->private;
+	int i;
+
+	for (i = 0; i < ppl_conf->count; i++) {
+		struct r5l_log *log_child = ppl_conf->child_logs[i];
+		int ret;
+
+		/* Missing drive */
+		if (!log_child)
+			continue;
+
+		ret = ppl_write_empty_header(log_child);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 #define IMSM_MPB_SIG "Intel Raid ISM Cfg Sig. "
 #define IMSM_MPB_ORIG_FAMILY_NUM_OFFSET 64
 
@@ -946,11 +967,18 @@ static int __ppl_init_log(struct r5l_log *log, struct r5conf *conf)
 		ppl_conf->child_logs[i] = log_child;
 	}
 
-	ret = ppl_load(log);
-	if (!ret && mddev->recovery_cp == 0 && !mddev->degraded)
-		mddev->recovery_cp = MaxSector;
-	else if (ret < 0)
-		goto err;
+	if (mddev->pers) {
+		dbg("Array running - invalidate PPL\n");
+		ret = ppl_invalidate(log);
+		if (ret)
+			goto err;
+	} else {
+		ret = ppl_load(log);
+		if (!ret && mddev->recovery_cp == 0 && !mddev->degraded)
+			mddev->recovery_cp = MaxSector;
+		else if (ret < 0)
+			goto err;
+	}
 
 	rcu_assign_pointer(conf->log, log);
 	set_bit(MD_HAS_PPL, &mddev->flags);

@@ -6408,6 +6408,114 @@ raid5_group_thread_cnt = __ATTR(group_thread_cnt, S_IRUGO | S_IWUSR,
 				raid5_show_group_thread_cnt,
 				raid5_store_group_thread_cnt);
 
+static ssize_t
+raid5_show_rwh_policy(struct mddev *mddev, char *page)
+{
+	struct r5conf *conf;
+	int ret = 0;
+	spin_lock(&mddev->lock);
+	conf = mddev->private;
+	if (conf) {
+		const char *policy = NULL;
+		if (!conf->log)
+			policy = "off";
+		else if (conf->log->rwh_policy == RWH_POLICY_JOURNAL)
+			policy = "journal";
+		else if (conf->log->rwh_policy == RWH_POLICY_PPL)
+			policy = "ppl";
+		if (policy)
+			ret = sprintf(page, "%s\n", policy);
+	}
+	spin_unlock(&mddev->lock);
+	return ret;
+}
+
+static void raid5_reset_cache(struct mddev *mddev)
+{
+	struct r5conf *conf = mddev->private;
+
+	mutex_lock(&conf->cache_size_mutex);
+	while (conf->max_nr_stripes &&
+		       drop_one_stripe(conf))
+			;
+
+	while (conf->min_nr_stripes > conf->max_nr_stripes)
+		if (!grow_one_stripe(conf, GFP_KERNEL))
+			break;
+	mutex_unlock(&conf->cache_size_mutex);
+}
+
+static ssize_t
+raid5_store_rwh_policy(struct mddev *mddev, const char *page, size_t len)
+{
+	struct r5conf *conf;
+	int err;
+	int new_policy, current_policy;
+
+	if (len >= PAGE_SIZE)
+		return -EINVAL;
+
+	err = mddev_lock(mddev);
+	if (err)
+		return err;
+	conf = mddev->private;
+	if (!conf) {
+		err = -ENODEV;
+		goto out;
+	}
+
+	if (conf->log)
+		current_policy = conf->log->rwh_policy;
+	else
+		current_policy = RWH_POLICY_OFF;
+
+	if (strncmp(page, "off", 3) == 0) {
+		new_policy = RWH_POLICY_OFF;
+	} else if (strncmp(page, "journal", 7) == 0) {
+		new_policy = RWH_POLICY_JOURNAL;
+	} else if (strncmp(page, "ppl", 3) == 0) {
+		new_policy = RWH_POLICY_PPL;
+	} else {
+		err = -EINVAL;
+		goto out;
+	}
+
+	if (new_policy == current_policy)
+		goto out;
+
+	if (current_policy == RWH_POLICY_PPL && new_policy == RWH_POLICY_OFF) {
+		struct r5l_log *log;
+		mddev_suspend(mddev);
+		log = conf->log;
+		conf->log = NULL;
+		synchronize_rcu();
+		r5l_exit_log(log);
+		raid5_reset_cache(mddev);
+		mddev_resume(mddev);
+	} else if (current_policy == RWH_POLICY_OFF &&
+		   new_policy == RWH_POLICY_PPL) {
+		mddev_suspend(mddev);
+		err = r5l_init_log(conf, NULL, new_policy);
+		if (!err)
+			raid5_reset_cache(mddev);
+		mddev_resume(mddev);
+	} else {
+		err = -EINVAL;
+		goto out;
+	}
+
+	md_update_sb(mddev, 1);
+out:
+	mddev_unlock(mddev);
+
+	return err ?: len;
+}
+
+static struct md_sysfs_entry
+raid5_rwh_policy = __ATTR(rwh_policy, S_IRUGO | S_IWUSR,
+				raid5_show_rwh_policy,
+				raid5_store_rwh_policy);
+
 static struct attribute *raid5_attrs[] =  {
 	&raid5_stripecache_size.attr,
 	&raid5_stripecache_active.attr,
@@ -6416,6 +6524,7 @@ static struct attribute *raid5_attrs[] =  {
 	&raid5_skip_copy.attr,
 	&raid5_rmw_level.attr,
 	&r5c_journal_mode.attr,
+	&raid5_rwh_policy.attr,
 	NULL,
 };
 static struct attribute_group raid5_attrs_group = {
