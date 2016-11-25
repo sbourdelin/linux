@@ -778,6 +778,35 @@ int hns_ae_get_regs_len(struct hnae_handle *handle)
 	return total_num;
 }
 
+static bool hns_ae_is_l3l4_csum_err(struct hnae_handle *handle)
+{
+	struct hns_ppe_cb *ppe_cb = hns_get_ppe_cb(handle);
+	u32 regval;
+	bool retval = false;
+
+	/* read PPE_HIS_PRO_ERR register and check for the checksum errors */
+	regval = dsaf_read_dev(ppe_cb, PPE_HIS_PRO_ERR_REG);
+
+	if (dsaf_get_bit(regval, PPE_L4_TCP_CSUM_ERR_B)) {
+		dsaf_set_bit(regval, PPE_L4_TCP_CSUM_ERR_B, 0);
+		retval = true;
+	} else if (dsaf_get_bit(regval, PPE_L4_IPV6_UDP_CSUM_ERR_B)) {
+		dsaf_set_bit(regval, PPE_L4_IPV6_UDP_CSUM_ERR_B, 0);
+		retval = true;
+	} else if (dsaf_get_bit(regval, PPE_L4_IPV4_UDP_CSUM_ERR_B)) {
+		dsaf_set_bit(regval, PPE_L4_IPV4_UDP_CSUM_ERR_B, 0);
+		retval = true;
+	} else if (dsaf_get_bit(regval, PPE_L3_IPV4_CSUM_ERR_B)) {
+		dsaf_set_bit(regval, PPE_L3_IPV4_CSUM_ERR_B, 0);
+		retval = true;
+	} else if (dsaf_get_bit(regval, PPE_L4_SCTP_CSUM_ERR_B)) {
+		dsaf_set_bit(regval, PPE_L4_SCTP_CSUM_ERR_B, 0);
+		retval = true;
+	}
+
+	return retval;
+}
+
 static u32 hns_ae_get_rss_key_size(struct hnae_handle *handle)
 {
 	return HNS_PPEV2_RSS_KEY_SIZE;
@@ -866,6 +895,7 @@ static struct hnae_ae_ops hns_dsaf_ops = {
 	.set_led_id = hns_ae_cpld_set_led_id,
 	.get_regs = hns_ae_get_regs,
 	.get_regs_len = hns_ae_get_regs_len,
+	.is_l3l4csum_err = hns_ae_is_l3l4_csum_err,
 	.get_rss_key_size = hns_ae_get_rss_key_size,
 	.get_rss_indir_size = hns_ae_get_rss_indir_size,
 	.get_rss = hns_ae_get_rss,

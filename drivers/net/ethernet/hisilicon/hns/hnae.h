@@ -99,6 +99,8 @@ enum hnae_led_state {
 #define HNS_RX_FLAG_L3ID_IPV6 0x1
 #define HNS_RX_FLAG_L4ID_UDP 0x0
 #define HNS_RX_FLAG_L4ID_TCP 0x1
+#define HNS_RX_FLAG_L4ID_SCTP 0x3
+
 
 #define HNS_TXD_ASID_S 0
 #define HNS_TXD_ASID_M (0xff << HNS_TXD_ASID_S)
@@ -513,6 +515,7 @@ struct hnae_ae_ops {
 			  enum hnae_led_state status);
 	void (*get_regs)(struct hnae_handle *handle, void *data);
 	int (*get_regs_len)(struct hnae_handle *handle);
+	bool (*is_l3l4csum_err)(struct hnae_handle *handle);
 	u32	(*get_rss_key_size)(struct hnae_handle *handle);
 	u32	(*get_rss_indir_size)(struct hnae_handle *handle);
 	int	(*get_rss)(struct hnae_handle *handle, u32 *indir, u8 *key,
