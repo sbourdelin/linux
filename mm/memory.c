@@ -2670,7 +2670,7 @@ int do_swap_page(struct vm_fault *vmf)
 	}
 
 	swap_free(entry);
-	if (mem_cgroup_swap_full(page) ||
+	if (swap_not_keep_cache(page) ||
 	    (vma->vm_flags & VM_LOCKED) || PageMlocked(page))
 		try_to_free_swap(page);
 	unlock_page(page);

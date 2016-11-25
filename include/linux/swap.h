@@ -554,5 +554,13 @@ static inline bool mem_cgroup_swap_full(struct page *page)
 }
 #endif
 
+#ifdef CONFIG_SWAP_CACHE_RULE
+extern bool swap_not_keep_cache(struct page *page);
+extern void swap_cache_rule_update(void);
+#else
+#define swap_not_keep_cache(p)		mem_cgroup_swap_full(p)
+#define swap_cache_rule_update()
+#endif
+
 #endif /* __KERNEL__*/
 #endif /* _LINUX_SWAP_H */

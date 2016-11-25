@@ -1033,7 +1033,7 @@ int free_swap_and_cache(swp_entry_t entry)
 		 * Also recheck PageSwapCache now page is locked (above).
 		 */
 		if (PageSwapCache(page) && !PageWriteback(page) &&
-		    (!page_mapped(page) || mem_cgroup_swap_full(page))) {
+		    (!page_mapped(page) || swap_not_keep_cache(page))) {
 			delete_from_swap_cache(page);
 			SetPageDirty(page);
 		}
@@ -2006,6 +2006,8 @@ out_dput:
 	filp_close(victim, NULL);
 out:
 	putname(pathname);
+	if (!err)
+		swap_cache_rule_update();
 	return err;
 }
 
@@ -2594,6 +2596,8 @@ out:
 		putname(name);
 	if (inode && S_ISREG(inode->i_mode))
 		inode_unlock(inode);
+	if (!error)
+		swap_cache_rule_update();
 	return error;
 }
 
@@ -2972,3 +2976,71 @@ static void free_swap_count_continuations(struct swap_info_struct *si)
 		}
 	}
 }
+
+#ifdef CONFIG_SWAP_CACHE_RULE
+enum swap_cache_rule_type {
+	SWAP_CACHE_UNKNOWN = 0,
+	SWAP_CACHE_SPECIAL_RULE,
+	SWAP_CACHE_NOT_KEEP,
+	SWAP_CACHE_NEED_CHECK,
+};
+
+static enum swap_cache_rule_type swap_cache_rule __read_mostly;
+
+bool swap_not_keep_cache(struct page *page)
+{
+	enum swap_cache_rule_type rule = READ_ONCE(swap_cache_rule);
+
+	if (rule == SWAP_CACHE_NOT_KEEP)
+		return true;
+
+	if (unlikely(rule == SWAP_CACHE_SPECIAL_RULE)) {
+		struct swap_info_struct *sis;
+
+		BUG_ON(!PageSwapCache(page));
+
+		sis = page_swap_info(page);
+		if (sis->flags & SWP_BLKDEV) {
+			struct gendisk *disk = sis->bdev->bd_disk;
+
+			if (READ_ONCE(disk->swap_cache_not_keep))
+				return true;
+		}
+	}
+
+	return mem_cgroup_swap_full(page);
+}
+
+void swap_cache_rule_update(void)
+{
+	enum swap_cache_rule_type rule = SWAP_CACHE_UNKNOWN;
+	int type;
+
+	spin_lock(&swap_lock);
+	for (type = 0; type < nr_swapfiles; type++) {
+		struct swap_info_struct *sis = swap_info[type];
+		enum swap_cache_rule_type current_rule = SWAP_CACHE_NEED_CHECK;
+
+		if (!(sis->flags & SWP_USED))
+			continue;
+
+		if (sis->flags & SWP_BLKDEV) {
+			struct gendisk *disk = sis->bdev->bd_disk;
+
+			if (READ_ONCE(disk->swap_cache_not_keep))
+				current_rule = SWAP_CACHE_NOT_KEEP;
+		}
+
+		if (rule == SWAP_CACHE_UNKNOWN)
+			rule = current_rule;
+		else if (rule != current_rule) {
+			rule = SWAP_CACHE_SPECIAL_RULE;
+			break;
+		}
+	}
+	spin_unlock(&swap_lock);
+
+	WRITE_ONCE(swap_cache_rule, rule);
+}
+EXPORT_SYMBOL(swap_cache_rule_update);
+#endif

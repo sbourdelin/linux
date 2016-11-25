@@ -215,6 +215,9 @@ struct gendisk {
 #endif	/* CONFIG_BLK_DEV_INTEGRITY */
 	int node_id;
 	struct badblocks *bb;
+#ifdef CONFIG_SWAP_CACHE_RULE
+	bool swap_cache_not_keep;
+#endif
 };
 
 static inline struct gendisk *part_to_disk(struct hd_struct *part)
