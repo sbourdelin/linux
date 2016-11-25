@@ -155,6 +155,74 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
 	return 0;
 }
 
+static int axp20x_usb_power_set_property(struct power_supply *psy,
+					 enum power_supply_property psp,
+					 const union power_supply_propval *val)
+{
+	struct axp20x_usb_power *power = power_supply_get_drvdata(psy);
+	int ret, val1;
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
+		switch (val->intval) {
+		case 4000000:
+		case 4100000:
+		case 4200000:
+		case 4300000:
+		case 4400000:
+		case 4500000:
+		case 4600000:
+		case 4700000:
+			val1 = (val->intval - 4000000) / 100000;
+			ret = regmap_update_bits(power->regmap,
+						 AXP20X_VBUS_IPSOUT_MGMT,
+						 AXP20X_VBUS_VHOLD_MASK,
+						 val1 << 3);
+			if (ret)
+				return ret;
+
+			return 0;
+		default:
+			return -EINVAL;
+		}
+
+		return 0;
+
+	case POWER_SUPPLY_PROP_CURRENT_MAX:
+		switch (val->intval) {
+		case 100000:
+			if (power->axp20x_id == AXP221_ID)
+				return -EINVAL;
+		case 500000:
+		case 900000:
+			val1 = (900000 - val->intval) / 400000;
+			ret = regmap_update_bits(power->regmap,
+						 AXP20X_VBUS_IPSOUT_MGMT,
+						 AXP20X_VBUS_CLIMIT_MASK, val1);
+			if (ret)
+				return ret;
+
+			return 0;
+		default:
+			return -EINVAL;
+		}
+
+		return 0;
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int axp20x_usb_power_prop_writeable(struct power_supply *psy,
+					   enum power_supply_property psp)
+{
+	return psp == POWER_SUPPLY_PROP_VOLTAGE_MIN ||
+	       psp == POWER_SUPPLY_PROP_CURRENT_MAX;
+}
+
 static enum power_supply_property axp20x_usb_power_properties[] = {
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_PRESENT,
@@ -178,7 +246,9 @@ static const struct power_supply_desc axp20x_usb_power_desc = {
 	.type = POWER_SUPPLY_TYPE_USB,
 	.properties = axp20x_usb_power_properties,
 	.num_properties = ARRAY_SIZE(axp20x_usb_power_properties),
+	.property_is_writeable = axp20x_usb_power_prop_writeable,
 	.get_property = axp20x_usb_power_get_property,
+	.set_property = axp20x_usb_power_set_property,
 };
 
 static const struct power_supply_desc axp22x_usb_power_desc = {
@@ -186,7 +256,9 @@ static const struct power_supply_desc axp22x_usb_power_desc = {
 	.type = POWER_SUPPLY_TYPE_USB,
 	.properties = axp22x_usb_power_properties,
 	.num_properties = ARRAY_SIZE(axp22x_usb_power_properties),
+	.property_is_writeable = axp20x_usb_power_prop_writeable,
 	.get_property = axp20x_usb_power_get_property,
+	.set_property = axp20x_usb_power_set_property,
 };
 
 static const struct of_device_id axp20x_usb_power_match[] = {
