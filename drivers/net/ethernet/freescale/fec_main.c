@@ -2314,10 +2314,19 @@ static void fec_enet_get_ethtool_stats(struct net_device *dev,
 	struct ethtool_stats *stats, u64 *data)
 {
 	struct fec_enet_private *fep = netdev_priv(dev);
-	int i;
+	int i, ret;
+
+	ret = pm_runtime_get_sync(&fep->pdev->dev);
+	if (IS_ERR_VALUE(ret)) {
+		memset(data, 0, sizeof(*data) * ARRAY_SIZE(fec_stats));
+		return;
+	}
 
 	for (i = 0; i < ARRAY_SIZE(fec_stats); i++)
 		data[i] = readl(fep->hwp + fec_stats[i].offset);
+
+	pm_runtime_mark_last_busy(&fep->pdev->dev);
+	pm_runtime_put_autosuspend(&fep->pdev->dev);
 }
 
 static void fec_enet_get_strings(struct net_device *netdev,
