@@ -48,6 +48,8 @@ void __dump_page(struct page *page, const char *reason)
 	 * encode own info.
 	 */
 	int mapcount = PageSlab(page) ? 0 : page_mapcount(page);
+	int i;
+	const int words_per_line = (sizeof(unsigned long) == 8) ? 4 : 8;
 
 	pr_emerg("page:%p count:%d mapcount:%d mapping:%p index:%#lx",
 		  page, page_ref_count(page), mapcount,
@@ -58,6 +60,21 @@ void __dump_page(struct page *page, const char *reason)
 	BUILD_BUG_ON(ARRAY_SIZE(pageflag_names) != __NR_PAGEFLAGS + 1);
 
 	pr_emerg("flags: %#lx(%pGp)\n", page->flags, &page->flags);
+
+	pr_alert("raw struct page data:");
+	for (i = 0; i < sizeof(struct page) / sizeof(unsigned long); i++) {
+		unsigned long *word_ptr;
+
+		word_ptr = ((unsigned long *) page) + i;
+
+		if ((i % words_per_line) == 0) {
+			pr_cont("\n");
+			pr_alert(" %016lx", *word_ptr);
+		} else {
+			pr_cont(" %016lx", *word_ptr);
+		}
+	}
+	pr_cont("\n");
 
 	if (reason)
 		pr_alert("page dumped because: %s\n", reason);
