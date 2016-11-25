@@ -22,6 +22,7 @@
 #include <linux/reset-controller.h>
 #include <linux/math64.h>
 #include <linux/delay.h>
+#include <linux/clk.h>
 
 #include <dt-bindings/clock/qcom,gcc-ipq4019.h>
 
@@ -1735,13 +1736,55 @@ static const struct of_device_id gcc_ipq4019_match_table[] = {
 };
 MODULE_DEVICE_TABLE(of, gcc_ipq4019_match_table);
 
+/* Contains index for safe clock during APSS freq change */
+static int gcc_ipq4019_cpu_safe_parent;
+static int
+gcc_ipq4019_cpu_clk_notifier_fn(struct notifier_block *nb,
+				unsigned long action, void *data)
+{
+	int err = 0;
+
+	if (action == PRE_RATE_CHANGE)
+		err = clk_rcg2_ops.set_parent(&apps_clk_src.clkr.hw,
+					      gcc_ipq4019_cpu_safe_parent);
+
+	return notifier_from_errno(err);
+}
+
+static struct notifier_block gcc_ipq4019_cpu_clk_notifier = {
+	.notifier_call = gcc_ipq4019_cpu_clk_notifier_fn,
+};
+
 static int gcc_ipq4019_probe(struct platform_device *pdev)
 {
-	return qcom_cc_probe(pdev, &gcc_ipq4019_desc);
+	int err;
+
+	err = qcom_cc_probe(pdev, &gcc_ipq4019_desc);
+	if (err)
+		return err;
+
+	gcc_ipq4019_cpu_safe_parent = qcom_find_src_index(&apps_clk_src.clkr.hw,
+						apps_clk_src.parent_map,
+						P_FEPLL500);
+	if (gcc_ipq4019_cpu_safe_parent < 0)
+		err = gcc_ipq4019_cpu_safe_parent;
+
+	if (!err)
+		err = clk_notifier_register(apps_clk_src.clkr.hw.clk,
+				      &gcc_ipq4019_cpu_clk_notifier);
+
+	return err;
+}
+
+static int gcc_ipq4019_remove(struct platform_device *pdev)
+{
+	return clk_notifier_unregister(apps_clk_src.clkr.hw.clk,
+					&gcc_ipq4019_cpu_clk_notifier);
 }
 
 static struct platform_driver gcc_ipq4019_driver = {
 	.probe		= gcc_ipq4019_probe,
+	.remove		= gcc_ipq4019_remove,
 	.driver		= {
 		.name	= "qcom,gcc-ipq4019",
 		.of_match_table = gcc_ipq4019_match_table,
