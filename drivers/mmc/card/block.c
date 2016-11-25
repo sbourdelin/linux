@@ -1480,6 +1480,9 @@ static int mmc_packed_init(struct mmc_queue *mq, struct mmc_card *card)
 	if (mq->qdepth != 2)
 		return -EINVAL;
 
+	if (mqrq_cur->packed)
+		goto out;
+
 	mqrq_cur->packed = kzalloc(sizeof(struct mmc_packed), GFP_KERNEL);
 	if (!mqrq_cur->packed) {
 		pr_warn("%s: unable to allocate packed cmd for mqrq_cur\n",
@@ -1509,6 +1512,9 @@ static void mmc_packed_clean(struct mmc_queue *mq)
 {
 	struct mmc_queue_req *mqrq_cur = &mq->mqrq[0];
 	struct mmc_queue_req *mqrq_prev = &mq->mqrq[1];
+
+	if (mq->card->mqrq_ref_cnt > 1)
+		return;
 
 	kfree(mqrq_cur->packed);
 	mqrq_cur->packed = NULL;

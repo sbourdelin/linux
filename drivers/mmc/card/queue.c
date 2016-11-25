@@ -200,10 +200,17 @@ static struct mmc_queue_req *mmc_queue_alloc_mqrqs(struct mmc_queue *mq,
 	struct mmc_queue_req *mqrq;
 	int i;
 
+	if (mq->card->mqrq) {
+		mq->card->mqrq_ref_cnt += 1;
+		return mq->card->mqrq;
+	}
+
 	mqrq = kcalloc(qdepth, sizeof(*mqrq), GFP_KERNEL);
 	if (mqrq) {
 		for (i = 0; i < mq->qdepth; i++)
 			mqrq[i].task_id = i;
+		mq->card->mqrq = mqrq;
+		mq->card->mqrq_ref_cnt = 1;
 	}
 
 	return mqrq;
@@ -213,6 +220,9 @@ static bool mmc_queue_alloc_bounce_bufs(struct mmc_queue *mq,
 					unsigned int bouncesz)
 {
 	int i;
+
+	if (mq->card->mqrq_ref_cnt > 1)
+		return !!mq->mqrq[0].bounce_buf;
 
 	for (i = 0; i < mq->qdepth; i++) {
 		mq->mqrq[i].bounce_buf = kmalloc(bouncesz, GFP_KERNEL);
@@ -237,6 +247,9 @@ static int mmc_queue_alloc_bounce_sgs(struct mmc_queue *mq,
 {
 	int i, ret;
 
+	if (mq->card->mqrq_ref_cnt > 1)
+		return 0;
+
 	for (i = 0; i < mq->qdepth; i++) {
 		mq->mqrq[i].sg = mmc_alloc_sg(1, &ret);
 		if (ret)
@@ -253,6 +266,9 @@ static int mmc_queue_alloc_bounce_sgs(struct mmc_queue *mq,
 static int mmc_queue_alloc_sgs(struct mmc_queue *mq, int max_segs)
 {
 	int i, ret;
+
+	if (mq->card->mqrq_ref_cnt > 1)
+		return 0;
 
 	for (i = 0; i < mq->qdepth; i++) {
 		mq->mqrq[i].sg = mmc_alloc_sg(max_segs, &ret);
@@ -281,6 +297,19 @@ static void mmc_queue_reqs_free_bufs(struct mmc_queue *mq)
 
 	for (i = 0; i < mq->qdepth; i++)
 		mmc_queue_req_free_bufs(&mq->mqrq[i]);
+}
+
+static void mmc_queue_free_mqrqs(struct mmc_queue *mq)
+{
+	if (!mq->mqrq)
+		return;
+
+	if (!--mq->card->mqrq_ref_cnt) {
+		mmc_queue_reqs_free_bufs(mq);
+		kfree(mq->card->mqrq);
+		mq->card->mqrq = NULL;
+	}
+	mq->mqrq = NULL;
 }
 
 /**
@@ -373,9 +402,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 	return 0;
 
  cleanup_queue:
-	mmc_queue_reqs_free_bufs(mq);
-	kfree(mq->mqrq);
-	mq->mqrq = NULL;
+	mmc_queue_free_mqrqs(mq);
 blk_cleanup:
 	blk_cleanup_queue(mq->queue);
 	return ret;
@@ -398,9 +425,7 @@ void mmc_cleanup_queue(struct mmc_queue *mq)
 	blk_start_queue(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 
-	mmc_queue_reqs_free_bufs(mq);
-	kfree(mq->mqrq);
-	mq->mqrq = NULL;
+	mmc_queue_free_mqrqs(mq);
 
 	mq->card = NULL;
 }
