@@ -64,6 +64,7 @@ struct mmc_queue_req *mmc_queue_req_find(struct mmc_queue *mq,
 	mqrq->req = req;
 	mq->qcnt += 1;
 	__set_bit(mqrq->task_id, &mq->qslots);
+	mqrq->retry_cnt = 0;
 
 	return mqrq;
 }
@@ -353,7 +354,10 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 	if (!mq->queue)
 		return -ENOMEM;
 
-	mq->qdepth = 2;
+	if (card->ext_csd.cmdq_en)
+		mq->qdepth = card->ext_csd.cmdq_depth;
+	else
+		mq->qdepth = 2;
 	mq->mqrq = mmc_queue_alloc_mqrqs(mq, mq->qdepth);
 	if (!mq->mqrq)
 		goto blk_cleanup;
