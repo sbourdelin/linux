@@ -308,6 +308,13 @@ struct sock *__udp6_lib_lookup(struct net *net,
 struct sock *udp6_lib_lookup_skb(struct sk_buff *skb,
 				 __be16 sport, __be16 dport);
 
+int __udp_recvmmsg(struct sock *sk, struct mmsghdr __user *ummsg,
+		   unsigned int *vlen, unsigned int flags,
+		   struct timespec *timeout, const struct timespec64 *end_time,
+		   int (*udp_process_msg)(struct sock *sk, struct sk_buff *skb,
+					  struct msghdr *msg,
+					  unsigned int flags));
+
 /*
  * 	SNMP statistics for UDP and UDP-Lite
  */

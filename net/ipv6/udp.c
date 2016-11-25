@@ -479,6 +479,21 @@ try_again:
 
 }
 
+static int udp6_process_msg(struct sock *sk, struct sk_buff *skb,
+			    struct msghdr *msg, unsigned int flags)
+{
+	return udp6_process_skb(sk, skb, msg, msg_data_left(msg), flags,
+				&msg->msg_namelen, 0, 0, skb->peeked);
+}
+
+int udpv6_recvmmsg(struct sock *sk, struct mmsghdr __user *ummsg,
+		   unsigned int *nr, unsigned int flags,
+		   struct timespec *timeout, const struct timespec64 *end_time)
+{
+	return __udp_recvmmsg(sk, ummsg, nr, flags, timeout, end_time,
+			      udp6_process_msg);
+}
+
 void __udp6_lib_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 		    u8 type, u8 code, int offset, __be32 info,
 		    struct udp_table *udptable)
@@ -1443,6 +1458,7 @@ struct proto udpv6_prot = {
 	.getsockopt	   = udpv6_getsockopt,
 	.sendmsg	   = udpv6_sendmsg,
 	.recvmsg	   = udpv6_recvmsg,
+	.recvmmsg	   = udpv6_recvmmsg,
 	.release_cb	   = ip6_datagram_release_cb,
 	.hash		   = udp_lib_hash,
 	.unhash		   = udp_lib_unhash,

@@ -23,6 +23,9 @@ int compat_udp_getsockopt(struct sock *sk, int level, int optname,
 #endif
 int udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int noblock,
 		int flags, int *addr_len);
+int udp_recvmmsg(struct sock *sk, struct mmsghdr __user *ummsg,
+		 unsigned int *nr, unsigned int flags, struct timespec *timeout,
+		 const struct timespec64 *end_time);
 int udp_sendpage(struct sock *sk, struct page *page, int offset, size_t size,
 		 int flags);
 int udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb);
