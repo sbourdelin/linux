@@ -1350,34 +1350,18 @@ int udp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 }
 EXPORT_SYMBOL(udp_ioctl);
 
-/*
- * 	This should be easy, if there is something there we
- * 	return it, otherwise we block.
- */
-
-int udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int noblock,
-		int flags, int *addr_len)
+static int udp_process_skb(struct sock *sk, struct sk_buff *skb,
+			   struct msghdr *msg, size_t len, int flags,
+			   int *addr_len, int off, int peeking, int peeked)
 {
-	struct inet_sock *inet = inet_sk(sk);
 	DECLARE_SOCKADDR(struct sockaddr_in *, sin, msg->msg_name);
-	struct sk_buff *skb;
-	unsigned int ulen, copied;
-	int peeked, peeking, off;
-	int err;
+	struct inet_sock *inet = inet_sk(sk);
 	int is_udplite = IS_UDPLITE(sk);
 	bool checksum_valid = false;
+	int ulen = skb->len;
+	int copied = len;
+	int err;
 
-	if (flags & MSG_ERRQUEUE)
-		return ip_recv_error(sk, msg, len, addr_len);
-
-try_again:
-	peeking = off = sk_peek_offset(sk, flags);
-	skb = __skb_recv_udp(sk, flags, noblock, &peeked, &off, &err);
-	if (!skb)
-		return err;
-
-	ulen = skb->len;
-	copied = len;
 	if (copied > ulen - off)
 		copied = ulen - off;
 	else if (copied < ulen)
@@ -1446,10 +1430,41 @@ csum_copy_err:
 	}
 	kfree_skb(skb);
 
-	/* starting over for a new packet, but check if we need to yield */
-	cond_resched();
 	msg->msg_flags &= ~MSG_TRUNC;
-	goto try_again;
+	return -EINVAL;
+}
+
+/*
+ *	This should be easy, if there is something there we
+ *	return it, otherwise we block.
+ */
+int udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int noblock,
+		int flags, int *addr_len)
+{
+	struct sk_buff *skb;
+	int peeked, peeking, off;
+	int err;
+
+	if (flags & MSG_ERRQUEUE)
+		return ip_recv_error(sk, msg, len, addr_len);
+
+try_again:
+	peeking = off = sk_peek_offset(sk, flags);
+	skb = __skb_recv_udp(sk, flags, noblock, &peeked, &off, &err);
+	if (!skb)
+		return err;
+
+	err = udp_process_skb(sk, skb, msg, len, flags, addr_len, off, peeking,
+			      peeked);
+	if (err < 0) {
+		if (err != -EINVAL)
+			return err;
+
+		/* restarting for a new packet, but check if we need to yield */
+		cond_resched();
+		goto try_again;
+	}
+	return err;
 }
 
 int __udp_disconnect(struct sock *sk, int flags)
