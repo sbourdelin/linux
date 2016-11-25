@@ -169,9 +169,8 @@ static void efx_ethtool_get_drvinfo(struct net_device *net_dev,
 
 	strlcpy(info->driver, KBUILD_MODNAME, sizeof(info->driver));
 	strlcpy(info->version, EFX_DRIVER_VERSION, sizeof(info->version));
-	if (efx_nic_rev(efx) >= EFX_REV_SIENA_A0)
-		efx_mcdi_print_fwver(efx, info->fw_version,
-				     sizeof(info->fw_version));
+	efx_mcdi_print_fwver(efx, info->fw_version,
+			     sizeof(info->fw_version));
 	strlcpy(info->bus_info, pci_name(efx->pci_dev), sizeof(info->bus_info));
 }
 
@@ -966,8 +965,6 @@ efx_ethtool_get_rxnfc(struct net_device *net_dev,
 		return 0;
 
 	case ETHTOOL_GRXFH: {
-		unsigned min_revision = 0;
-
 		info->data = 0;
 		switch (info->flow_type) {
 		case UDP_V4_FLOW:
@@ -980,7 +977,6 @@ efx_ethtool_get_rxnfc(struct net_device *net_dev,
 		case AH_ESP_V4_FLOW:
 		case IPV4_FLOW:
 			info->data |= RXH_IP_SRC | RXH_IP_DST;
-			min_revision = EFX_REV_FALCON_B0;
 			break;
 		case UDP_V6_FLOW:
 			if (efx->rx_hash_udp_4tuple)
@@ -992,13 +988,10 @@ efx_ethtool_get_rxnfc(struct net_device *net_dev,
 		case AH_ESP_V6_FLOW:
 		case IPV6_FLOW:
 			info->data |= RXH_IP_SRC | RXH_IP_DST;
-			min_revision = EFX_REV_SIENA_A0;
 			break;
 		default:
 			break;
 		}
-		if (efx_nic_rev(efx) < min_revision)
-			info->data = 0;
 		return 0;
 	}
 
@@ -1271,9 +1264,7 @@ static u32 efx_ethtool_get_rxfh_indir_size(struct net_device *net_dev)
 {
 	struct efx_nic *efx = netdev_priv(net_dev);
 
-	return ((efx_nic_rev(efx) < EFX_REV_FALCON_B0 ||
-		 efx->n_rx_channels == 1) ?
-		0 : ARRAY_SIZE(efx->rx_indir_table));
+	return (efx->n_rx_channels == 1) ? 0 : ARRAY_SIZE(efx->rx_indir_table);
 }
 
 static int efx_ethtool_get_rxfh(struct net_device *net_dev, u32 *indir, u8 *key,

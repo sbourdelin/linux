@@ -733,16 +733,7 @@ static void efx_stop_datapath(struct efx_nic *efx)
 	}
 
 	rc = efx->type->fini_dmaq(efx);
-	if (rc && EFX_WORKAROUND_7803(efx)) {
-		/* Schedule a reset to recover from the flush failure. The
-		 * descriptor caches reference memory we're about to free,
-		 * but falcon_reconfigure_mac_wrapper() won't reconnect
-		 * the MACs because of the pending reset.
-		 */
-		netif_err(efx, drv, efx->net_dev,
-			  "Resetting to recover from flush failure\n");
-		efx_schedule_reset(efx, RESET_TYPE_ALL);
-	} else if (rc) {
+	if (rc) {
 		netif_err(efx, drv, efx->net_dev, "failed to flush queues\n");
 	} else {
 		netif_dbg(efx, drv, efx->net_dev,
@@ -1892,15 +1883,13 @@ static void efx_start_all(struct efx_nic *efx)
 		queue_delayed_work(efx->workqueue, &efx->monitor_work,
 				   efx_monitor_interval);
 
-	/* If link state detection is normally event-driven, we have
+	/* Link state detection is normally event-driven; we have
 	 * to poll now because we could have missed a change
 	 */
-	if (efx_nic_rev(efx) >= EFX_REV_SIENA_A0) {
-		mutex_lock(&efx->mac_lock);
-		if (efx->phy_op->poll(efx))
-			efx_link_status_changed(efx);
-		mutex_unlock(&efx->mac_lock);
-	}
+	mutex_lock(&efx->mac_lock);
+	if (efx->phy_op->poll(efx))
+		efx_link_status_changed(efx);
+	mutex_unlock(&efx->mac_lock);
 
 	efx->type->start_stats(efx);
 	efx->type->pull_stats(efx);

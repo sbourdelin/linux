@@ -197,7 +197,6 @@ struct efx_tx_buffer {
  *	Size of the region is efx_piobuf_size.
  * @piobuf_offset: Buffer offset to be specified in PIO descriptors
  * @initialised: Has hardware queue been initialised?
- * @tx_min_size: Minimum transmit size for this queue. Depends on HW.
  * @handle_tso: TSO xmit preparation handler.  Sets up the TSO metadata and
  *	may also map tx data, depending on the nature of the TSO implementation.
  * @read_count: Current read pointer.
@@ -248,7 +247,6 @@ struct efx_tx_queue {
 	void __iomem *piobuf;
 	unsigned int piobuf_offset;
 	bool initialised;
-	unsigned int tx_min_size;
 
 	/* Function pointers used in the fast path. */
 	int (*handle_tso)(struct efx_tx_queue*, struct sk_buff*, bool *);
