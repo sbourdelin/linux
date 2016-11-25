@@ -2220,6 +2220,66 @@ SYSCALL_DEFINE3(recvmsg, int, fd, struct user_msghdr __user *, msg,
  *     Linux recvmmsg interface
  */
 
+int recvmmsg_ctx_from_user(struct sock *sk, struct mmsghdr __user *mmsg,
+			   unsigned int flags, int nosec,
+			   struct recvmmsg_ctx *ctx)
+{
+	struct user_msghdr __user *msg = (struct user_msghdr __user *)mmsg;
+	struct compat_msghdr __user *msg_compat;
+	ssize_t err;
+
+	ctx->iov = ctx->iovstack;
+	msg_compat = (struct compat_msghdr __user *)mmsg;
+	err = copy_msghdr_from_user_gen(&ctx->msg_sys, flags, msg_compat, msg,
+					&ctx->uaddr, &ctx->iov, &ctx->addr);
+	if (err < 0) {
+		ctx->iov = NULL;
+		return err;
+	}
+
+	ctx->cmsg_ptr = (unsigned long)ctx->msg_sys.msg_control;
+	ctx->msg_sys.msg_flags = flags & MSG_CMSG_MASK;
+
+	/* We assume all kernel code knows the size of sockaddr_storage */
+	ctx->msg_sys.msg_namelen = 0;
+
+	if (nosec)
+		return 0;
+
+	return security_socket_recvmsg(sk->sk_socket, &ctx->msg_sys,
+				      msg_data_left(&ctx->msg_sys), flags);
+}
+
+int recvmmsg_ctx_to_user(struct mmsghdr __user **mmsg_ptr, int len,
+			 unsigned int flags, struct recvmmsg_ctx *ctx)
+{
+	struct compat_mmsghdr __user *mmsg_compat;
+	struct mmsghdr __user *mmsg = *mmsg_ptr;
+	int err;
+
+	mmsg_compat = (struct compat_mmsghdr __user *)mmsg;
+	err = copy_msghdr_to_user_gen(&ctx->msg_sys, flags,
+				      &mmsg_compat->msg_hdr, &mmsg->msg_hdr,
+				      ctx->uaddr, &ctx->addr, ctx->cmsg_ptr);
+	if (err)
+		return err;
+
+	if (MSG_CMSG_COMPAT & flags) {
+		err = __put_user(len, &mmsg_compat->msg_len);
+		if (err < 0)
+			return err;
+
+		*mmsg_ptr = (struct mmsghdr __user *)(mmsg_compat + 1);
+	} else {
+		err = put_user(len, &mmsg->msg_len);
+		if (err < 0)
+			return err;
+
+		*mmsg_ptr = mmsg + 1;
+	}
+	return err;
+}
+
 static int __proto_recvmmsg(struct socket *sock, struct mmsghdr __user *ummsg,
 			    unsigned int *vlen, unsigned int flags,
 			    struct timespec *timeout,

@@ -301,6 +301,71 @@ struct sk_buff *skb_recv_datagram(struct sock *sk, unsigned int flags,
 }
 EXPORT_SYMBOL(skb_recv_datagram);
 
+/**
+ *	__skb_try_recv_datagram_batch - Receive a batch of datagram skbuff
+ *	@sk: socket
+ *	@flags: MSG_ flags
+ *	@batch: maximum batch length
+ *	@bulk_destructor: invoked under the receive lock on successful dequeue
+ *	@err: error code returned
+ *	@last: set to last peeked message to inform the wait function
+ *	       what to look for when peeking
+ *
+ * like __skb_try_recv_datagram, but dequeue a full batch up to the specified
+ * max length. Returned skbs are linked and the list is NULL terminated.
+ * Peeking is not supported.
+ */
+struct sk_buff *__skb_try_recv_datagram_batch(struct sock *sk,
+					      unsigned int flags,
+					      unsigned int batch,
+					      void (*bulk_destructor)(
+						     struct sock *sk, int size),
+					      int *err)
+{
+	unsigned int datagrams = 0, totalsize = 0;
+	struct sk_buff *skb, *last, *first;
+	struct sk_buff_head *queue;
+
+	*err = sock_error(sk);
+	if (*err)
+		return NULL;
+
+	queue = &sk->sk_receive_queue;
+	spin_lock_bh(&queue->lock);
+	for (;;) {
+		if (!skb_queue_empty(queue))
+			break;
+
+		spin_unlock_bh(&queue->lock);
+
+		if (!sk_can_busy_loop(sk) ||
+		    !sk_busy_loop(sk, flags & MSG_DONTWAIT))
+			goto no_packets;
+
+		spin_lock_bh(&queue->lock);
+	}
+
+	last = (struct sk_buff *)queue;
+	first = (struct sk_buff *)queue->next;
+	skb_queue_walk(queue, skb) {
+		last = skb;
+		totalsize += skb->truesize;
+		if (++datagrams == batch)
+			break;
+	}
+	__skb_queue_unsplice(first, last, datagrams, queue);
+
+	if (bulk_destructor)
+		bulk_destructor(sk, totalsize);
+	spin_unlock_bh(&queue->lock);
+	return first;
+
+no_packets:
+	*err = -EAGAIN;
+	return NULL;
+}
+EXPORT_SYMBOL(__skb_try_recv_datagram_batch);
+
 void skb_free_datagram(struct sock *sk, struct sk_buff *skb)
 {
 	consume_skb(skb);

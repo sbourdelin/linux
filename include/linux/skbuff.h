@@ -1598,6 +1598,20 @@ static inline void __skb_insert(struct sk_buff *newsk,
 	list->qlen++;
 }
 
+static inline void __skb_queue_unsplice(struct sk_buff *first,
+					struct sk_buff *last,
+					unsigned int n,
+					struct sk_buff_head *queue)
+{
+	struct sk_buff *next = last->next, *prev = first->prev;
+
+	queue->qlen -= n;
+	last->next = NULL;
+	first->prev = NULL;
+	next->prev = prev;
+	prev->next = next;
+}
+
 static inline void __skb_queue_splice(const struct sk_buff_head *list,
 				      struct sk_buff *prev,
 				      struct sk_buff *next)
@@ -3032,6 +3046,12 @@ static inline void skb_frag_list_init(struct sk_buff *skb)
 
 int __skb_wait_for_more_packets(struct sock *sk, int *err, long *timeo_p,
 				const struct sk_buff *skb);
+struct sk_buff *__skb_try_recv_datagram_batch(struct sock *sk,
+					      unsigned int flags,
+					      unsigned int batch,
+					      void (*bulk_destructor)(
+						     struct sock *sk, int size),
+					      int *err);
 struct sk_buff *__skb_try_recv_datagram(struct sock *sk, unsigned flags,
 					void (*destructor)(struct sock *sk,
 							   struct sk_buff *skb),

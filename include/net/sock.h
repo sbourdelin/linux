@@ -1534,6 +1534,25 @@ int __sock_cmsg_send(struct sock *sk, struct msghdr *msg, struct cmsghdr *cmsg,
 int sock_cmsg_send(struct sock *sk, struct msghdr *msg,
 		   struct sockcm_cookie *sockc);
 
+struct recvmmsg_ctx {
+	struct iovec		iovstack[UIO_FASTIOV];
+	struct msghdr		msg_sys;
+	struct sockaddr __user	*uaddr;
+	struct sockaddr_storage	addr;
+	unsigned long		cmsg_ptr;
+	struct iovec		*iov;
+};
+
+int recvmmsg_ctx_from_user(struct sock *sk, struct mmsghdr __user *mmsg,
+			   unsigned int flags, int nosec,
+			   struct recvmmsg_ctx *ctx);
+int recvmmsg_ctx_to_user(struct mmsghdr __user **mmsg, int len,
+			 unsigned int flags, struct recvmmsg_ctx *ctx);
+static inline void recvmmsg_ctx_free(struct recvmmsg_ctx *ctx)
+{
+	kfree(ctx->iov);
+}
+
 static inline bool sock_recvmmsg_timeout(struct timespec *timeout,
 					 struct timespec64 end_time)
 {
