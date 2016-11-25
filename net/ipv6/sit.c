@@ -972,6 +972,7 @@ static netdev_tx_t ipip6_tunnel_xmit(struct sk_buff *skb,
 	}
 
 	skb_set_inner_ipproto(skb, IPPROTO_IPV6);
+	skb->protocol = htons(ETH_P_IP);
 
 	iptunnel_xmit(NULL, rt, skb, fl4.saddr, fl4.daddr, protocol, tos, ttl,
 		      df, !net_eq(tunnel->net, dev_net(dev)));
