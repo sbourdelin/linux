@@ -9,6 +9,7 @@ Kernel and driver related documentation.
 
    assoc_array
    atomic_ops
+   local_ops
    workqueue
 
 .. only::  subproject
