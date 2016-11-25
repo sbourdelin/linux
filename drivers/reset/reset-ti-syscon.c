@@ -154,8 +154,8 @@ static int ti_syscon_reset_status(struct reset_controller_dev *rcdev,
 	if (ret)
 		return ret;
 
-	return (reset_state & BIT(control->status_bit)) &&
-			(control->flags & STATUS_SET);
+	ret = (reset_state & BIT(control->status_bit)) ? 1 : 0;
+	return (control->flags & STATUS_SET) ? ret : (!ret);
 }
 
 static struct reset_control_ops ti_syscon_reset_ops = {
