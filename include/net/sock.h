@@ -1528,6 +1528,24 @@ int __sock_cmsg_send(struct sock *sk, struct msghdr *msg, struct cmsghdr *cmsg,
 int sock_cmsg_send(struct sock *sk, struct msghdr *msg,
 		   struct sockcm_cookie *sockc);
 
+static inline bool sock_recvmmsg_timeout(struct timespec *timeout,
+					 struct timespec64 end_time)
+{
+	struct timespec64 timeout64;
+
+	if (!timeout)
+		return false;
+
+	ktime_get_ts64(&timeout64);
+	*timeout = timespec64_to_timespec(timespec64_sub(end_time, timeout64));
+	if (timeout->tv_sec < 0) {
+		timeout->tv_sec = timeout->tv_nsec = 0;
+		return true;
+	}
+
+	return timeout->tv_nsec == 0 && timeout->tv_sec == 0;
+}
+
 /*
  * Functions to fill in entries in struct proto_ops when a protocol
  * does not implement a particular function.
