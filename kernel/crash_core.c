@@ -291,8 +291,8 @@ int __init parse_crashkernel_low(char *cmdline,
 				"crashkernel=", suffix_tbl[SUFFIX_LOW]);
 }
 
-static u32 *append_elf_note(u32 *buf, char *name, unsigned int type,
-			    void *data, size_t data_len)
+u32 *append_elf_note(u32 *buf, char *name, unsigned int type,
+		     void *data, size_t data_len)
 {
 	struct elf_note note;
 
@@ -309,7 +309,7 @@ static u32 *append_elf_note(u32 *buf, char *name, unsigned int type,
 	return buf;
 }
 
-static void final_note(u32 *buf)
+void final_note(u32 *buf)
 {
 	struct elf_note note;
 
