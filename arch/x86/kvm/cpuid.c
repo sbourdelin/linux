@@ -126,7 +126,13 @@ int kvm_update_cpuid(struct kvm_vcpu *vcpu)
 		((best->eax & 0xff00) >> 8) != 0)
 		return -EINVAL;
 
-	/* Update physical-address width */
+
+	/*
+	 * Update physical-address width.
+	 * Make sure that it does not exceed hardware capabilities.
+	 */
+	if (cpuid_query_maxphyaddr(vcpu) > boot_cpu_data.x86_phys_bits)
+		return -EINVAL;
 	vcpu->arch.maxphyaddr = cpuid_query_maxphyaddr(vcpu);
 
 	kvm_pmu_refresh(vcpu);
