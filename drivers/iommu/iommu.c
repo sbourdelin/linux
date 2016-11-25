@@ -1625,6 +1625,7 @@ int iommu_request_dm_for_dev(struct device *dev)
 	if (group->default_domain)
 		iommu_domain_free(group->default_domain);
 	group->default_domain = dm_domain;
+	group->domain = dm_domain;
 
 	pr_info("Using direct mapping for device %s\n", dev_name(dev));
 
