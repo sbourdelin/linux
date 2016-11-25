@@ -71,15 +71,21 @@ static struct dentry *ovl_d_real(struct dentry *dentry,
 	}
 
 	real = ovl_dentry_upper(dentry);
-	if (real && (!inode || inode == d_inode(real)))
-		return real;
+	if (real && inode && inode == d_inode(real))
+	    return real;
+
+	if (real && !inode && d_inode(real))
+		return d_real(real, d_inode(real), open_flags);
 
 	real = ovl_dentry_lower(dentry);
 	if (!real)
 		goto bug;
 
-	if (!inode || inode == d_inode(real))
+	if (inode && inode == d_inode(real))
 		return real;
+
+	if (!inode && d_inode(real))
+		return d_real(real, d_inode(real), open_flags);
 
 	/* Handle recursion */
 	return d_real(real, inode, open_flags);
