@@ -674,7 +674,7 @@ static void vmbus_wait_for_unload(void)
 		if (completion_done(&vmbus_connection.unload_event))
 			break;
 
-		for_each_online_cpu(cpu) {
+		for_each_present_cpu(cpu) {
 			page_addr = hv_context.synic_message_page[cpu];
 			msg = (struct hv_message *)page_addr +
 				VMBUS_MESSAGE_SINT;
@@ -700,7 +700,7 @@ static void vmbus_wait_for_unload(void)
 	 * maybe-pending messages on all CPUs to be able to receive new
 	 * messages after we reconnect.
 	 */
-	for_each_online_cpu(cpu) {
+	for_each_present_cpu(cpu) {
 		page_addr = hv_context.synic_message_page[cpu];
 		msg = (struct hv_message *)page_addr + VMBUS_MESSAGE_SINT;
 		msg->header.message_type = HVMSG_NONE;
