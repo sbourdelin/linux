@@ -1010,6 +1010,12 @@ struct proto {
 	int			(*recvmsg)(struct sock *sk, struct msghdr *msg,
 					   size_t len, int noblock, int flags,
 					   int *addr_len);
+	int			(*recvmmsg)(struct sock *sk,
+					    struct mmsghdr __user *user_mmsg,
+					    unsigned int *nr,
+					    unsigned int flags,
+					    struct timespec *timeout,
+					    const struct timespec64 *end_time);
 	int			(*sendpage)(struct sock *sk, struct page *page,
 					int offset, size_t size, int flags);
 	int			(*bind)(struct sock *sk,

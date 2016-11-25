@@ -770,6 +770,21 @@ int inet_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 }
 EXPORT_SYMBOL(inet_recvmsg);
 
+int inet_recvmmsg(struct socket *sock, struct mmsghdr __user *ummsg,
+		  unsigned int *vlen, unsigned int flags,
+		  struct timespec *timeout, const struct timespec64 *end_time)
+{
+	struct sock *sk = sock->sk;
+
+	if (!sk->sk_prot->recvmmsg)
+		return -EOPNOTSUPP;
+
+	sock_rps_record_flow(sk);
+
+	return sk->sk_prot->recvmmsg(sk, ummsg, vlen, flags, timeout, end_time);
+}
+EXPORT_SYMBOL(inet_recvmmsg);
+
 int inet_shutdown(struct socket *sock, int how)
 {
 	struct sock *sk = sock->sk;
@@ -942,6 +957,7 @@ const struct proto_ops inet_dgram_ops = {
 	.getsockopt	   = sock_common_getsockopt,
 	.sendmsg	   = inet_sendmsg,
 	.recvmsg	   = inet_recvmsg,
+	.recvmmsg	   = inet_recvmmsg,
 	.mmap		   = sock_no_mmap,
 	.sendpage	   = inet_sendpage,
 	.set_peek_off	   = sk_set_peek_off,

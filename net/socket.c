@@ -2140,6 +2140,8 @@ static int copy_msghdr_to_user_gen(struct msghdr *msg_sys, int flags,
 				  &msg->msg_controllen);
 }
 
+#define MSG_CMSG_MASK (MSG_CMSG_CLOEXEC | MSG_CMSG_COMPAT)
+
 static int ___sys_recvmsg(struct socket *sock, struct user_msghdr __user *msg,
 			 struct msghdr *msg_sys, unsigned int flags, int nosec)
 {
@@ -2163,7 +2165,7 @@ static int ___sys_recvmsg(struct socket *sock, struct user_msghdr __user *msg,
 		return err;
 
 	cmsg_ptr = (unsigned long)msg_sys->msg_control;
-	msg_sys->msg_flags = flags & (MSG_CMSG_CLOEXEC|MSG_CMSG_COMPAT);
+	msg_sys->msg_flags = flags & MSG_CMSG_MASK;
 
 	/* We assume all kernel code knows the size of sockaddr_storage */
 	msg_sys->msg_namelen = 0;
@@ -2218,6 +2220,21 @@ SYSCALL_DEFINE3(recvmsg, int, fd, struct user_msghdr __user *, msg,
  *     Linux recvmmsg interface
  */
 
+static int __proto_recvmmsg(struct socket *sock, struct mmsghdr __user *ummsg,
+			    unsigned int *vlen, unsigned int flags,
+			    struct timespec *timeout,
+			    const struct timespec64 *end_time)
+{
+	if (!sock->ops->recvmmsg)
+		return -EOPNOTSUPP;
+
+	if (sock->file->f_flags & O_NONBLOCK)
+		flags |= MSG_DONTWAIT;
+
+	/* defer LSM check and mmsg parsing to the proto operation */
+	return sock->ops->recvmmsg(sock, ummsg, vlen, flags, timeout, end_time);
+}
+
 int __sys_recvmmsg(int fd, struct mmsghdr __user *mmsg, unsigned int vlen,
 		   unsigned int flags, struct timespec *timeout)
 {
@@ -2242,6 +2259,12 @@ int __sys_recvmmsg(int fd, struct mmsghdr __user *mmsg, unsigned int vlen,
 	err = sock_error(sock->sk);
 	if (err)
 		goto out_put;
+
+	err = __proto_recvmmsg(sock, mmsg, &vlen, flags, timeout, &end_time);
+	if (err != -EOPNOTSUPP) {
+		datagrams = vlen;
+		goto chk_error;
+	}
 
 	entry = mmsg;
 	compat_entry = (struct compat_mmsghdr __user *)mmsg;
@@ -2287,6 +2310,7 @@ int __sys_recvmmsg(int fd, struct mmsghdr __user *mmsg, unsigned int vlen,
 		cond_resched();
 	}
 
+chk_error:
 	if (err == 0)
 		goto out_put;
 

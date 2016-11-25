@@ -182,6 +182,11 @@ struct proto_ops {
 	 */
 	int		(*recvmsg)   (struct socket *sock, struct msghdr *m,
 				      size_t total_len, int flags);
+	int		(*recvmmsg)  (struct socket *sock,
+				      struct mmsghdr __user *user_mmsg,
+				      unsigned int *vlen, unsigned int flags,
+				      struct timespec *timeout,
+				      const struct timespec64 *end_time);
 	int		(*mmap)	     (struct file *file, struct socket *sock,
 				      struct vm_area_struct * vma);
 	ssize_t		(*sendpage)  (struct socket *sock, struct page *page,
