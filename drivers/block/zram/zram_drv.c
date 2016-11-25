@@ -30,6 +30,8 @@
 #include <linux/err.h>
 #include <linux/idr.h>
 #include <linux/sysfs.h>
+#include <linux/swap.h>
+#include <asm/barrier.h>
 
 #include "zram_drv.h"
 
@@ -1158,6 +1160,32 @@ static ssize_t reset_store(struct device *dev,
 	return len;
 }
 
+#ifdef CONFIG_SWAP_CACHE_RULE
+static ssize_t swap_cache_not_keep_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct zram *zram = dev_to_zram(dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n",
+			 zram->disk->swap_cache_not_keep);
+}
+
+static ssize_t swap_cache_not_keep_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t len)
+{
+	struct zram *zram = dev_to_zram(dev);
+	bool rule;
+
+	if (strtobool(buf, &rule) < 0)
+		return -EINVAL;
+	WRITE_ONCE(zram->disk->swap_cache_not_keep, rule);
+
+	swap_cache_rule_update();
+
+	return len;
+}
+#endif
+
 static int zram_open(struct block_device *bdev, fmode_t mode)
 {
 	int ret = 0;
@@ -1190,6 +1218,9 @@ static DEVICE_ATTR_RW(mem_limit);
 static DEVICE_ATTR_RW(mem_used_max);
 static DEVICE_ATTR_RW(max_comp_streams);
 static DEVICE_ATTR_RW(comp_algorithm);
+#ifdef CONFIG_SWAP_CACHE_RULE
+static DEVICE_ATTR_RW(swap_cache_not_keep);
+#endif
 
 static struct attribute *zram_disk_attrs[] = {
 	&dev_attr_disksize.attr,
@@ -1213,6 +1244,9 @@ static struct attribute *zram_disk_attrs[] = {
 	&dev_attr_io_stat.attr,
 	&dev_attr_mm_stat.attr,
 	&dev_attr_debug_stat.attr,
+#ifdef CONFIG_SWAP_CACHE_RULE
+	&dev_attr_swap_cache_not_keep.attr,
+#endif
 	NULL,
 };
 
