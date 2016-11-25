@@ -41,29 +41,39 @@ ports_match_v1(const struct xt_multiport_v1 *minfo,
 			/* range port matching */
 			e = minfo->ports[++i];
 			pr_debug("src or dst matches with %d-%d?\n", s, e);
-
 			switch (minfo->flags) {
 			case XT_MULTIPORT_SOURCE:
-				return (src >= s && src <= e) ^ minfo->invert;
+				if (src >= s && src <= e)
+					return true ^ minfo->invert;
+				break;
 			case XT_MULTIPORT_DESTINATION:
-				return (dst >= s && dst <= e) ^ minfo->invert;
+				if (dst >= s && dst <= e)
+					return true ^ minfo->invert;
+				break;
 			case XT_MULTIPORT_EITHER:
-				return ((dst >= s && dst <= e) ||
-					(src >= s && src <= e)) ^ minfo->invert;
+				if ((dst >= s && dst <= e) ||
+				    (src >= s && src <= e))
+					return true ^ minfo->invert;
+				break;
 			default:
 				break;
 			}
 		} else {
 			/* exact port matching */
 			pr_debug("src or dst matches with %d?\n", s);
-
 			switch (minfo->flags) {
 			case XT_MULTIPORT_SOURCE:
-				return (src == s) ^ minfo->invert;
+				if (src == s)
+					return true ^ minfo->invert;
+				break;
 			case XT_MULTIPORT_DESTINATION:
-				return (dst == s) ^ minfo->invert;
+				if (dst == s)
+					return true ^ minfo->invert;
+				break;
 			case XT_MULTIPORT_EITHER:
-				return (src == s || dst == s) ^ minfo->invert;
+				if (src == s || dst == s)
+					return true ^ minfo->invert;
+				break;
 			default:
 				break;
 			}
