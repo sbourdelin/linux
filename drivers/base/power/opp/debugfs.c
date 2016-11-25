@@ -158,7 +158,7 @@ static void opp_migrate_dentry(struct opp_device *opp_dev,
 
 	/* Look for next opp-dev */
 	list_for_each_entry(new_dev, &opp_table->dev_list, node)
-		if (new_dev != opp_dev)
+		if (new_dev != opp_dev && !new_dev->inactive)
 			break;
 
 	/* new_dev is guaranteed to be valid here */
@@ -191,7 +191,7 @@ void opp_debug_unregister(struct opp_device *opp_dev,
 {
 	if (opp_dev->dentry == opp_table->dentry) {
 		/* Move the real dentry object under another device */
-		if (!list_is_singular(&opp_table->dev_list)) {
+		if (opp_table->active_dev_count) {
 			opp_migrate_dentry(opp_dev, opp_table);
 			goto out;
 		}

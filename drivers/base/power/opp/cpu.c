@@ -186,7 +186,7 @@ int dev_pm_opp_set_sharing_cpus(struct device *cpu_dev,
 
 	mutex_lock(&opp_table_lock);
 
-	opp_table = _find_opp_table(cpu_dev);
+	opp_table = _find_opp_table(cpu_dev, true);
 	if (IS_ERR(opp_table)) {
 		ret = PTR_ERR(opp_table);
 		goto unlock;
@@ -244,7 +244,7 @@ int dev_pm_opp_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask)
 
 	mutex_lock(&opp_table_lock);
 
-	opp_table = _find_opp_table(cpu_dev);
+	opp_table = _find_opp_table(cpu_dev, true);
 	if (IS_ERR(opp_table)) {
 		ret = PTR_ERR(opp_table);
 		goto unlock;

@@ -358,7 +358,7 @@ static int _of_add_opp_table_v2(struct device *dev, struct device_node *opp_np)
 
 	mutex_lock(&opp_table_lock);
 
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, true);
 	if (WARN_ON(IS_ERR(opp_table))) {
 		ret = PTR_ERR(opp_table);
 		mutex_unlock(&opp_table_lock);

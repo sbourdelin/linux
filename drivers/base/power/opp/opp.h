@@ -104,6 +104,7 @@ struct dev_pm_opp {
  * @node:	list node
  * @dev:	device to which the struct object belongs
  * @rcu_head:	RCU callback head used for deferred freeing
+ * @inactive:	'fase' if the device is still using the opp table, else 'true'.
  * @dentry:	debugfs dentry pointer (per device)
  *
  * This is an internal data structure maintaining the devices that are managed
@@ -113,6 +114,7 @@ struct opp_device {
 	struct list_head node;
 	const struct device *dev;
 	struct rcu_head rcu_head;
+	bool inactive;
 
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *dentry;
@@ -136,6 +138,7 @@ enum opp_table_access {
  * @rcu_head:	RCU callback head used for deferred freeing
  * @dev_list:	list of devices that share these OPPs
  * @opp_list:	table of opps
+ * @active_dev_count: Count of active devices using this table.
  * @np:		struct device_node pointer for opp's DT node.
  * @clock_latency_ns_max: Max clock latency in nanoseconds.
  * @shared_opp: OPP is shared between multiple devices.
@@ -165,6 +168,7 @@ struct opp_table {
 	struct rcu_head rcu_head;
 	struct list_head dev_list;
 	struct list_head opp_list;
+	unsigned int active_dev_count;
 
 	struct device_node *np;
 	unsigned long clock_latency_ns_max;
@@ -188,7 +192,7 @@ struct opp_table {
 };
 
 /* Routines internal to opp core */
-struct opp_table *_find_opp_table(struct device *dev);
+struct opp_table *_find_opp_table(struct device *dev, bool active_only);
 struct opp_device *_add_opp_dev(const struct device *dev, struct opp_table *opp_table);
 void _dev_pm_opp_remove_table(struct device *dev, bool remove_all);
 struct dev_pm_opp *_allocate_opp(struct device *dev, struct opp_table **opp_table);

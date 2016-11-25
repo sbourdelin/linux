@@ -40,14 +40,30 @@ do {									\
 			 "opp_table_lock protection");			\
 } while (0)
 
+/**
+ * _find_opp_dev - Returns existing opp_dev for opp table
+ *
+ * @dev: Device for which opp_dev needs to be found
+ * @opp_table: OPP table.
+ * @active_only: If true: find only for active entries. If false, find for both
+ * active and inactive entries.
+ */
 static struct opp_device *_find_opp_dev(const struct device *dev,
-					struct opp_table *opp_table)
+					struct opp_table *opp_table,
+					bool active_only)
 {
 	struct opp_device *opp_dev;
 
-	list_for_each_entry(opp_dev, &opp_table->dev_list, node)
-		if (opp_dev->dev == dev)
-			return opp_dev;
+	list_for_each_entry(opp_dev, &opp_table->dev_list, node) {
+		if (opp_dev->dev != dev)
+			continue;
+
+		/* Only return active entries ? */
+		if (active_only && opp_dev->inactive)
+			return NULL;
+
+		return opp_dev;
+	}
 
 	return NULL;
 }
@@ -55,6 +71,8 @@ static struct opp_device *_find_opp_dev(const struct device *dev,
 /**
  * _find_opp_table() - find opp_table struct using device pointer
  * @dev:	device pointer used to lookup OPP table
+ * @active_only: If true: find only for active entries. If false, find for both
+ * active and inactive entries.
  *
  * Search OPP table for one containing matching device. Does a RCU reader
  * operation to grab the pointer needed.
@@ -68,7 +86,7 @@ static struct opp_device *_find_opp_dev(const struct device *dev,
  *
  * For Writers, this function must be called with opp_table_lock held.
  */
-struct opp_table *_find_opp_table(struct device *dev)
+struct opp_table *_find_opp_table(struct device *dev, bool active_only)
 {
 	struct opp_table *opp_table;
 
@@ -80,7 +98,7 @@ struct opp_table *_find_opp_table(struct device *dev)
 	}
 
 	list_for_each_entry_rcu(opp_table, &opp_tables, node)
-		if (_find_opp_dev(dev, opp_table))
+		if (_find_opp_dev(dev, opp_table, active_only))
 			return opp_table;
 
 	return ERR_PTR(-ENODEV);
@@ -199,7 +217,7 @@ unsigned long dev_pm_opp_get_max_clock_latency(struct device *dev)
 
 	rcu_read_lock();
 
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, true);
 	if (IS_ERR(opp_table))
 		clock_latency_ns = 0;
 	else
@@ -229,7 +247,7 @@ unsigned long dev_pm_opp_get_max_volt_latency(struct device *dev)
 
 	rcu_read_lock();
 
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, true);
 	if (IS_ERR(opp_table)) {
 		rcu_read_unlock();
 		return 0;
@@ -302,7 +320,7 @@ struct dev_pm_opp *dev_pm_opp_get_suspend_opp(struct device *dev)
 
 	opp_rcu_lockdep_assert();
 
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, true);
 	if (IS_ERR(opp_table) || !opp_table->suspend_opp ||
 	    !opp_table->suspend_opp->available)
 		return NULL;
@@ -328,7 +346,7 @@ int dev_pm_opp_get_opp_count(struct device *dev)
 
 	rcu_read_lock();
 
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, true);
 	if (IS_ERR(opp_table)) {
 		count = PTR_ERR(opp_table);
 		dev_err(dev, "%s: OPP table not found (%d)\n",
@@ -382,7 +400,7 @@ struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
 
 	opp_rcu_lockdep_assert();
 
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, true);
 	if (IS_ERR(opp_table)) {
 		int r = PTR_ERR(opp_table);
 
@@ -451,7 +469,7 @@ struct dev_pm_opp *dev_pm_opp_find_freq_ceil(struct device *dev,
 		return ERR_PTR(-EINVAL);
 	}
 
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, true);
 	if (IS_ERR(opp_table))
 		return ERR_CAST(opp_table);
 
@@ -493,7 +511,7 @@ struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
 		return ERR_PTR(-EINVAL);
 	}
 
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, true);
 	if (IS_ERR(opp_table))
 		return ERR_CAST(opp_table);
 
@@ -524,7 +542,7 @@ static struct clk *_get_opp_clk(struct device *dev)
 
 	rcu_read_lock();
 
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, true);
 	if (IS_ERR(opp_table)) {
 		dev_err(dev, "%s: device opp doesn't exist\n", __func__);
 		clk = ERR_CAST(opp_table);
@@ -611,7 +629,7 @@ int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
 
 	rcu_read_lock();
 
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, true);
 	if (IS_ERR(opp_table)) {
 		dev_err(dev, "%s: device opp doesn't exist\n", __func__);
 		rcu_read_unlock();
@@ -694,21 +712,57 @@ static void _kfree_opp_dev_rcu(struct rcu_head *head)
 	kfree_rcu(opp_dev, rcu_head);
 }
 
-static void _remove_opp_dev(struct opp_device *opp_dev,
-			    struct opp_table *opp_table)
+static void _remove_opp_devices(struct opp_table *opp_table)
 {
+	struct opp_device *opp_dev, *tmp;
+
+	list_for_each_entry_safe(opp_dev, tmp, &opp_table->dev_list, node) {
+		list_del(&opp_dev->node);
+		call_srcu(&opp_table->srcu_head.srcu, &opp_dev->rcu_head,
+			  _kfree_opp_dev_rcu);
+	}
+}
+
+static void _deactivate_opp_dev(struct opp_device *opp_dev,
+				struct opp_table *opp_table)
+{
+	opp_table->active_dev_count--;
+	opp_dev->inactive = true;
 	opp_debug_unregister(opp_dev, opp_table);
-	list_del(&opp_dev->node);
-	call_srcu(&opp_table->srcu_head.srcu, &opp_dev->rcu_head,
-		  _kfree_opp_dev_rcu);
+}
+
+static void _activate_opp_dev(struct opp_device *opp_dev,
+			      struct opp_table *opp_table)
+{
+	int ret;
+
+	/* Create debugfs entries for the opp_table */
+	ret = opp_debug_register(opp_dev, opp_table);
+	if (ret)
+		dev_err(opp_dev->dev, "%s: Failed to register opp debugfs (%d)\n",
+			__func__, ret);
+
+	opp_dev->inactive = false;
+	opp_table->active_dev_count++;
 }
 
 struct opp_device *_add_opp_dev(const struct device *dev,
 				struct opp_table *opp_table)
 {
 	struct opp_device *opp_dev;
-	int ret;
 
+	/* Try to find an inactive entry first */
+	opp_dev = _find_opp_dev(dev, opp_table, false);
+	if (opp_dev) {
+		if (opp_dev->inactive)
+			goto activate;
+
+		/* Already active */
+		dev_err(opp_dev->dev, "%s: Entry already active\n", __func__);
+		return NULL;
+	}
+
+	/* Allocate new opp-dev */
 	opp_dev = kzalloc(sizeof(*opp_dev), GFP_KERNEL);
 	if (!opp_dev)
 		return NULL;
@@ -717,12 +771,8 @@ struct opp_device *_add_opp_dev(const struct device *dev,
 	opp_dev->dev = dev;
 	list_add_rcu(&opp_dev->node, &opp_table->dev_list);
 
-	/* Create debugfs entries for the opp_table */
-	ret = opp_debug_register(opp_dev, opp_table);
-	if (ret)
-		dev_err(dev, "%s: Failed to register opp debugfs (%d)\n",
-			__func__, ret);
-
+activate:
+	_activate_opp_dev(opp_dev, opp_table);
 	return opp_dev;
 }
 
@@ -742,7 +792,7 @@ static struct opp_table *_add_opp_table(struct device *dev)
 	int ret;
 
 	/* Check for existing table for 'dev' first */
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, false);
 	if (!IS_ERR(opp_table))
 		return opp_table;
 
@@ -804,8 +854,6 @@ static void _kfree_device_rcu(struct rcu_head *head)
  */
 static void _remove_opp_table(struct opp_table *opp_table)
 {
-	struct opp_device *opp_dev;
-
 	if (!list_empty(&opp_table->opp_list))
 		return;
 
@@ -822,10 +870,7 @@ static void _remove_opp_table(struct opp_table *opp_table)
 	if (!IS_ERR(opp_table->clk))
 		clk_put(opp_table->clk);
 
-	opp_dev = list_first_entry(&opp_table->dev_list, struct opp_device,
-				   node);
-
-	_remove_opp_dev(opp_dev, opp_table);
+	_remove_opp_devices(opp_table);
 
 	/* dev_list must be empty now */
 	WARN_ON(!list_empty(&opp_table->dev_list));
@@ -897,7 +942,7 @@ void dev_pm_opp_remove(struct device *dev, unsigned long freq)
 	/* Hold our table modification lock here */
 	mutex_lock(&opp_table_lock);
 
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, true);
 	if (IS_ERR(opp_table))
 		goto unlock;
 
@@ -1165,7 +1210,7 @@ void dev_pm_opp_put_supported_hw(struct device *dev)
 	mutex_lock(&opp_table_lock);
 
 	/* Check for existing table for 'dev' first */
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, false);
 	if (IS_ERR(opp_table)) {
 		dev_err(dev, "Failed to find opp_table: %ld\n",
 			PTR_ERR(opp_table));
@@ -1274,7 +1319,7 @@ void dev_pm_opp_put_prop_name(struct device *dev)
 	mutex_lock(&opp_table_lock);
 
 	/* Check for existing table for 'dev' first */
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, false);
 	if (IS_ERR(opp_table)) {
 		dev_err(dev, "Failed to find opp_table: %ld\n",
 			PTR_ERR(opp_table));
@@ -1382,7 +1427,7 @@ void dev_pm_opp_put_regulator(struct device *dev)
 	mutex_lock(&opp_table_lock);
 
 	/* Check for existing table for 'dev' first */
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, false);
 	if (IS_ERR(opp_table)) {
 		dev_err(dev, "Failed to find opp_table: %ld\n",
 			PTR_ERR(opp_table));
@@ -1471,7 +1516,7 @@ static int _opp_set_availability(struct device *dev, unsigned long freq,
 	mutex_lock(&opp_table_lock);
 
 	/* Find the opp_table */
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, true);
 	if (IS_ERR(opp_table)) {
 		r = PTR_ERR(opp_table);
 		dev_warn(dev, "%s: Device OPP not found (%d)\n", __func__, r);
@@ -1586,7 +1631,7 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_disable);
  */
 struct srcu_notifier_head *dev_pm_opp_get_notifier(struct device *dev)
 {
-	struct opp_table *opp_table = _find_opp_table(dev);
+	struct opp_table *opp_table = _find_opp_table(dev, true);
 
 	if (IS_ERR(opp_table))
 		return ERR_CAST(opp_table); /* matching type */
@@ -1603,12 +1648,13 @@ void _dev_pm_opp_remove_table(struct device *dev, bool remove_all)
 {
 	struct opp_table *opp_table;
 	struct dev_pm_opp *opp, *tmp;
+	struct opp_device *opp_dev;
 
 	/* Hold our table modification lock here */
 	mutex_lock(&opp_table_lock);
 
 	/* Check for existing table for 'dev' */
-	opp_table = _find_opp_table(dev);
+	opp_table = _find_opp_table(dev, true);
 	if (IS_ERR(opp_table)) {
 		int error = PTR_ERR(opp_table);
 
@@ -1620,16 +1666,26 @@ void _dev_pm_opp_remove_table(struct device *dev, bool remove_all)
 		goto unlock;
 	}
 
-	/* Find if opp_table manages a single device */
-	if (list_is_singular(&opp_table->dev_list)) {
-		/* Free static OPPs */
-		list_for_each_entry_safe(opp, tmp, &opp_table->opp_list, node) {
-			if (remove_all || !opp->dynamic)
-				_opp_remove(opp_table, opp, true);
-		}
-	} else {
-		_remove_opp_dev(_find_opp_dev(dev, opp_table), opp_table);
+	opp_dev = _find_opp_dev(dev, opp_table, true);
+
+	/* Already inactive */
+	if (opp_dev->inactive) {
+		dev_err(opp_dev->dev, "%s: entry already inactive\n", __func__);
+		goto unlock;
 	}
+
+	/* Remove the OPPs only if the table has no active devices */
+	if (opp_table->active_dev_count > 1)
+		goto deactivate;
+
+	/* Free static OPPs */
+	list_for_each_entry_safe(opp, tmp, &opp_table->opp_list, node) {
+		if (remove_all || !opp->dynamic)
+			_opp_remove(opp_table, opp, true);
+	}
+
+deactivate:
+	_deactivate_opp_dev(opp_dev, opp_table);
 
 unlock:
 	mutex_unlock(&opp_table_lock);
