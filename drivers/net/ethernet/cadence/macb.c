@@ -991,6 +991,7 @@ static inline void macb_init_rx_ring(struct macb *bp)
 		addr += bp->rx_buffer_size;
 	}
 	bp->rx_ring[bp->rx_ring_size - 1].addr |= MACB_BIT(RX_WRAP);
+	bp->rx_tail = 0;
 }
 
 static int macb_rx(struct macb *bp, int budget)
@@ -1736,8 +1737,6 @@ static void macb_init_rings(struct macb *bp)
 	bp->queues[0].tx_head = 0;
 	bp->queues[0].tx_tail = 0;
 	bp->queues[0].tx_ring[bp->tx_ring_size - 1].ctrl |= MACB_BIT(TX_WRAP);
-
-	bp->rx_tail = 0;
 }
 
 static void macb_reset_hw(struct macb *bp)
