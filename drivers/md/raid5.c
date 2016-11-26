@@ -677,12 +677,23 @@ raid5_get_active_stripe(struct r5conf *conf, sector_t sector,
 					atomic_inc(&conf->active_stripes);
 				BUG_ON(list_empty(&sh->lru) &&
 				       !test_bit(STRIPE_EXPANDING, &sh->state));
+
 				inc_empty_inactive_list_flag = 0;
 				if (!list_empty(conf->inactive_list + hash))
 					inc_empty_inactive_list_flag = 1;
 				list_del_init(&sh->lru);
 				if (list_empty(conf->inactive_list + hash) && inc_empty_inactive_list_flag)
 					atomic_inc(&conf->empty_inactive_list_nr);
+
+				if (test_and_clear_bit(STRIPE_R5C_PARTIAL_STRIPE, &sh->state)) {
+					WARN_ON(atomic_read(&conf->r5c_cached_partial_stripes) == 0);
+					atomic_dec(&conf->r5c_cached_partial_stripes);
+				}
+				if (test_and_clear_bit(STRIPE_R5C_FULL_STRIPE, &sh->state)) {
+					WARN_ON(atomic_read(&conf->r5c_cached_full_stripes) == 0);
+					atomic_dec(&conf->r5c_cached_full_stripes);
+				}
+
 				if (sh->group) {
 					sh->group->stripes_cnt--;
 					sh->group = NULL;
