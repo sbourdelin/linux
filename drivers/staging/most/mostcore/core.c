@@ -342,15 +342,15 @@ static ssize_t show_channel_starving(struct most_c_obj *c,
 }
 
 #define create_show_channel_attribute(val) \
-	static MOST_CHNL_ATTR(val, S_IRUGO, show_##val, NULL)
+	MOST_CHNL_ATTR(val, 0444, show_##val, NULL)
 
-create_show_channel_attribute(available_directions);
-create_show_channel_attribute(available_datatypes);
-create_show_channel_attribute(number_of_packet_buffers);
-create_show_channel_attribute(number_of_stream_buffers);
-create_show_channel_attribute(size_of_stream_buffer);
-create_show_channel_attribute(size_of_packet_buffer);
-create_show_channel_attribute(channel_starving);
+static create_show_channel_attribute(available_directions);
+static create_show_channel_attribute(available_datatypes);
+static create_show_channel_attribute(number_of_packet_buffers);
+static create_show_channel_attribute(number_of_stream_buffers);
+static create_show_channel_attribute(size_of_stream_buffer);
+static create_show_channel_attribute(size_of_packet_buffer);
+static create_show_channel_attribute(channel_starving);
 
 static ssize_t show_set_number_of_buffers(struct most_c_obj *c,
 					  struct most_c_attr *attr,
@@ -494,16 +494,16 @@ static ssize_t store_set_packets_per_xact(struct most_c_obj *c,
 }
 
 #define create_channel_attribute(value) \
-	static MOST_CHNL_ATTR(value, S_IRUGO | S_IWUSR, \
+	MOST_CHNL_ATTR(value, 0644, \
 			      show_##value, \
 			      store_##value)
 
-create_channel_attribute(set_buffer_size);
-create_channel_attribute(set_number_of_buffers);
-create_channel_attribute(set_direction);
-create_channel_attribute(set_datatype);
-create_channel_attribute(set_subbuffer_size);
-create_channel_attribute(set_packets_per_xact);
+static create_channel_attribute(set_buffer_size);
+static create_channel_attribute(set_number_of_buffers);
+static create_channel_attribute(set_direction);
+static create_channel_attribute(set_datatype);
+static create_channel_attribute(set_subbuffer_size);
+static create_channel_attribute(set_packets_per_xact);
 
 /**
  * most_channel_def_attrs - array of default attributes of channel object
@@ -690,10 +690,10 @@ static ssize_t show_interface(struct most_inst_obj *instance_obj,
 }
 
 #define create_inst_attribute(value) \
-	static MOST_INST_ATTR(value, S_IRUGO, show_##value, NULL)
+	MOST_INST_ATTR(value, 0444, show_##value, NULL)
 
-create_inst_attribute(description);
-create_inst_attribute(interface);
+static create_inst_attribute(description);
+static create_inst_attribute(interface);
 
 static struct attribute *most_inst_def_attrs[] = {
 	&most_inst_attr_description.attr,
@@ -1016,7 +1016,7 @@ static ssize_t store_add_link(struct most_aim_obj *aim_obj,
 }
 
 static struct most_aim_attribute most_aim_attr_add_link =
-	__ATTR(add_link, S_IRUGO | S_IWUSR, show_add_link, store_add_link);
+	__ATTR(add_link, 0644, show_add_link, store_add_link);
 
 /**
  * store_remove_link - store function for remove_link attribute
@@ -1059,7 +1059,7 @@ static ssize_t store_remove_link(struct most_aim_obj *aim_obj,
 }
 
 static struct most_aim_attribute most_aim_attr_remove_link =
-	__ATTR(remove_link, S_IWUSR, NULL, store_remove_link);
+	__ATTR(remove_link, 0200, NULL, store_remove_link);
 
 static struct attribute *most_aim_def_attrs[] = {
 	&most_aim_attr_add_link.attr,
