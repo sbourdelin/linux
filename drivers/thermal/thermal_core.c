@@ -643,7 +643,7 @@ static void thermal_zone_device_check(struct work_struct *work)
 	container_of(_dev, struct thermal_zone_device, device)
 
 static ssize_t
-type_show(struct device *dev, struct device_attribute *attr, char *buf)
+thermal_type_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct thermal_zone_device *tz = to_thermal_zone(dev);
 
@@ -1159,7 +1159,7 @@ int power_actor_set_power(struct thermal_cooling_device *cdev,
 	return 0;
 }
 
-static DEVICE_ATTR(type, 0444, type_show, NULL);
+static DEVICE_ATTR(type, 0444, thermal_type_show, NULL);
 static DEVICE_ATTR(temp, 0444, temp_show, NULL);
 static DEVICE_ATTR(mode, 0644, mode_show, mode_store);
 static DEVICE_ATTR(passive, S_IRUGO | S_IWUSR, passive_show, passive_store);
