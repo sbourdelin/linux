@@ -52,8 +52,6 @@
 /* Register descriptions for audio */
 #include <linux/mfd/twl4030-audio.h>
 
-#include "twl-core.h"
-
 /*
  * The TWL4030 "Triton 2" is one of a family of a multi-function "Power
  * Management and System Companion Device" chips originally designed for
@@ -149,6 +147,12 @@
 #define CK32K_LOWPWR_EN			(1 << 7)
 
 /*----------------------------------------------------------------------*/
+
+int twl6030_init_irq(struct device *dev, int irq_num);
+int twl6030_exit_irq(void);
+int twl4030_init_irq(struct device *dev, int irq_num);
+int twl4030_exit_irq(void);
+int twl4030_init_chip_irq(const char *chip);
 
 /* Structure for each TWL4030/TWL6030 Slave */
 struct twl_client {
