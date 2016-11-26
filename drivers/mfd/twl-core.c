@@ -48,6 +48,7 @@
 
 #include <linux/i2c.h>
 #include <linux/i2c/twl.h>
+#include <linux/mfd/twl-core.h>
 
 /* Register descriptions for audio */
 #include <linux/mfd/twl4030-audio.h>
@@ -154,28 +155,7 @@ int twl4030_init_irq(struct device *dev, int irq_num);
 int twl4030_exit_irq(void);
 int twl4030_init_chip_irq(const char *chip);
 
-/* Structure for each TWL4030/TWL6030 Slave */
-struct twl_client {
-	struct i2c_client *client;
-	struct regmap *regmap;
-};
-
-/* mapping the module id to slave id and base address */
-struct twl_mapping {
-	unsigned char sid;	/* Slave ID */
-	unsigned char base;	/* base address */
-};
-
-struct twl_private {
-	bool ready; /* The core driver is ready to be used */
-	u32 twl_idcode; /* TWL IDCODE Register value */
-	unsigned int twl_id;
-
-	struct twl_mapping *twl_map;
-	struct twl_client *twl_modules;
-};
-
-static struct twl_private *twl_priv;
+static struct twlcore *twl_priv;
 
 static struct twl_mapping twl4030_map[] = {
 	/*
@@ -745,7 +725,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto free;
 	}
 
-	twl_priv = devm_kzalloc(&client->dev, sizeof(struct twl_private),
+	twl_priv = devm_kzalloc(&client->dev, sizeof(struct twlcore),
 				GFP_KERNEL);
 	if (!twl_priv) {
 		status = -ENOMEM;
@@ -803,6 +783,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 
 	twl_priv->ready = true;
+	dev_set_drvdata(&client->dev, twl_priv);
 
 	/* setup clock framework */
 	clocks_init(&pdev->dev);
