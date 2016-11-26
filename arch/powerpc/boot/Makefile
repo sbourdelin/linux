@@ -171,9 +171,12 @@ $(addprefix $(obj)/,$(libfdt) $(libfdtheader)): $(obj)/%: $(srctree)/scripts/dtc
 $(obj)/empty.c:
 	$(Q)touch $@
 
-$(obj)/zImage.lds: $(obj)/%: $(srctree)/$(src)/%.S
-	$(CROSS32CC) $(cpp_flags) -E -Wp,-MD,$(depfile) -P -Upowerpc \
-		-D__ASSEMBLY__ -DLINKER_SCRIPT -o $@ $<
+quiet_cmd_cpp_lds_S = LDS     $@
+	cmd_cpp_lds_S = $(CROSS32CC) $(cpp_flags) -E -Wp,-MD,$(depfile) -P \
+			-Upowerpc -D__ASSEMBLY__ -DLINKER_SCRIPT -o $@ $<
+
+$(obj)/zImage.lds: $(obj)/%: $(srctree)/$(src)/%.S FORCE
+	$(call if_changed_dep,cpp_lds_S)
 
 $(obj)/zImage.coff.lds $(obj)/zImage.ps3.lds : $(obj)/%: $(srctree)/$(src)/%.S
 	$(Q)cp $< $@
