@@ -340,15 +340,21 @@ ad7192_show_scale_available(struct device *dev,
 	return len;
 }
 
+static ssize_t
+in_voltage_scale_available_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	return ad7192_show_scale_available(dev, attr, buf);
+}
+
 static IIO_DEVICE_ATTR_NAMED(in_v_m_v_scale_available,
 			     in_voltage-voltage_scale_available,
-			     S_IRUGO, ad7192_show_scale_available, NULL, 0);
+			     0444, ad7192_show_scale_available, NULL, 0);
 
-static IIO_DEVICE_ATTR(in_voltage_scale_available, S_IRUGO,
-		       ad7192_show_scale_available, NULL, 0);
+static IIO_DEVICE_ATTR_RO(in_voltage_scale_available, 0);
 
-static ssize_t ad7192_show_ac_excitation(struct device *dev,
-					 struct device_attribute *attr,
+static ssize_t ac_excitation_en_show(struct device *dev,
+				     struct device_attribute *attr,
 					 char *buf)
 {
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
@@ -357,8 +363,8 @@ static ssize_t ad7192_show_ac_excitation(struct device *dev,
 	return sprintf(buf, "%d\n", !!(st->mode & AD7192_MODE_ACX));
 }
 
-static ssize_t ad7192_show_bridge_switch(struct device *dev,
-					 struct device_attribute *attr,
+static ssize_t bridge_switch_en_show(struct device *dev,
+				     struct device_attribute *attr,
 					 char *buf)
 {
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
@@ -367,8 +373,8 @@ static ssize_t ad7192_show_bridge_switch(struct device *dev,
 	return sprintf(buf, "%d\n", !!(st->gpocon & AD7192_GPOCON_BPDSW));
 }
 
-static ssize_t ad7192_set(struct device *dev,
-			  struct device_attribute *attr,
+static ssize_t bridge_switch_en_store(struct device *dev,
+				      struct device_attribute *attr,
 			  const char *buf,
 			  size_t len)
 {
@@ -412,13 +418,16 @@ static ssize_t ad7192_set(struct device *dev,
 	return ret ? ret : len;
 }
 
-static IIO_DEVICE_ATTR(bridge_switch_en, S_IRUGO | S_IWUSR,
-		       ad7192_show_bridge_switch, ad7192_set,
-		       AD7192_REG_GPOCON);
+static ssize_t ac_excitation_en_store(struct device *dev,
+				      struct device_attribute *attr,
+					 const char *buf, size_t len)
+{
+	return bridge_switch_en_store(dev, attr, buf, len);
+}
 
-static IIO_DEVICE_ATTR(ac_excitation_en, S_IRUGO | S_IWUSR,
-		       ad7192_show_ac_excitation, ad7192_set,
-		       AD7192_REG_MODE);
+static IIO_DEVICE_ATTR_RW(bridge_switch_en, AD7192_REG_GPOCON);
+
+static IIO_DEVICE_ATTR_RW(ac_excitation_en, AD7192_REG_MODE);
 
 static struct attribute *ad7192_attributes[] = {
 	&iio_dev_attr_in_v_m_v_scale_available.dev_attr.attr,
