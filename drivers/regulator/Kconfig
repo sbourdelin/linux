@@ -843,6 +843,13 @@ config REGULATOR_TWL4030
 	  This driver supports the voltage regulators provided by
 	  this family of companion chips.
 
+config REGULATOR_TWL6032
+	tristate "TI TWL6032 PMIC"
+	depends on TWL4030_CORE
+	depends on OF || COMPILE_TEST
+	help
+	  This driver supports the Texas Instruments TWL6032 voltage regulator.
+
 config REGULATOR_VEXPRESS
 	tristate "Versatile Express regulators"
 	depends on VEXPRESS_CONFIG

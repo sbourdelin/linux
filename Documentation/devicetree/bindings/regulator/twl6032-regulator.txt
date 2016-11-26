@@ -1,0 +1,109 @@
+TWL6032 PMIC Voltage Regulator Bindings
+
+The parent node must be MFD TWL Core, ti,twl6032.
+
+Required properties:
+- compatible: "ti,twl6032"
+
+Optional properties:
+- regulators node containing regulator childs.
+
+The child regulators  must be named after their hardware
+counterparts: LDO[1-6], LDOLN, LDOUSB and VANA.
+
+Each regulator is defined using the standard binding
+for regulators as described in ./regulator.txt
+
+Example:
+twl {
+	compatible = "ti,twl6032";
+
+	[...]
+
+	pmic {
+		compatible = "ti,twl6032-regulator";
+
+		regulators {
+			ldo1: LDO1 {
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <2500000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+				};
+			};
+
+			ldo2: LDO2 {
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <3000000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+				};
+			};
+
+			ldo3: LDO3 {
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <1800000>;
+				regulator-boot-on;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+				};
+			};
+
+			ldo4: LDO4 {
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <1800000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+				};
+			};
+
+			ldo5: LDO5 {
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <3000000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+				};
+			};
+
+			ldo6: LDO6 {
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <1800000>;
+				regulator-always-on;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+				};
+			};
+
+			ldo7: LDO7 {
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <1800000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			ldoln: LDOLN {
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <3000000>;
+			};
+
+			ldousb: LDOUSB {
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <3000000>;
+			};
+
+			vana: VANA {
+				regulator-min-microvolt = <2100000>;
+				regulator-max-microvolt = <2100000>;
+				regulator-always-on;
+			};
+		};
+	};
+
+	[...]
+};
