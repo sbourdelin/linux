@@ -43,6 +43,7 @@
 #include <linux/of_platform.h>
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
+#include <linux/mfd/core.h>
 
 #include <linux/regulator/machine.h>
 
@@ -155,7 +156,15 @@ int twl4030_init_irq(struct device *dev, int irq_num);
 int twl4030_exit_irq(void);
 int twl4030_init_chip_irq(const char *chip);
 
+
 static struct twlcore *twl_priv;
+
+static struct mfd_cell twl6032_devs[] = {
+	{
+		.name = "twl6032-regulator",
+		.of_compatible = "ti,twl6032-regulator",
+	},
+};
 
 static struct twl_mapping twl4030_map[] = {
 	/*
@@ -665,6 +674,8 @@ static int twl_remove(struct i2c_client *client)
 	unsigned i, num_slaves;
 	int status;
 
+	mfd_remove_devices(&client->dev);
+
 	if (twl_class_is_4030())
 		status = twl4030_exit_irq();
 	else
@@ -832,6 +843,17 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		temp |= SMARTREFLEX_ENABLE;
 		twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, temp,
 				 TWL4030_DCDC_GLOBAL_CFG);
+	}
+
+	if (id->driver_data & TWL6032_SUBCLASS) {
+		status = mfd_add_devices(&client->dev, PLATFORM_DEVID_NONE,
+					 twl6032_devs, ARRAY_SIZE(twl6032_devs),
+					 NULL, 0, NULL);
+		if (status != 0) {
+			dev_err(&client->dev, "failed to add mfd devices: %d\n",
+				status);
+			goto fail;
+		}
 	}
 
 fail:
