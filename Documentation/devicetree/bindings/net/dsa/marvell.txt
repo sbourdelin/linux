@@ -15,6 +15,7 @@ Additional required and optional properties can be found in dsa.txt.
 
 Required properties:
 - compatible	       : Should be one of "marvell,mv88e6085" or
+			 "marvell,mv88e6176" or
 			 "marvell,mv88e6190"
 - reg                  : Address on the MII bus for the switch.
 
