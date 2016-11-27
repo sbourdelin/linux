@@ -4280,6 +4280,10 @@ static const struct of_device_id mv88e6xxx_of_match[] = {
 		.data = &mv88e6xxx_table[MV88E6085],
 	},
 	{
+		.compatible = "marvell,mv88e6176",
+		.data = &mv88e6xxx_table[MV88E6176],
+	},
+	{
 		.compatible = "marvell,mv88e6190",
 		.data = &mv88e6xxx_table[MV88E6190],
 	},
