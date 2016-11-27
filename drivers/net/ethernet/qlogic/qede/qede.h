@@ -263,6 +263,7 @@ struct qede_rx_queue {
 	u64 rcv_pkts;
 
 	u16 num_rx_buffers; /* Slowpath */
+	u8 data_direction;
 	u8 rxq_id;
 
 	struct sw_rx_data *sw_rx_ring;
@@ -295,6 +296,7 @@ struct sw_tx_bd {
 };
 
 struct qede_tx_queue {
+	u8 is_xdp;
 	bool is_legacy;
 	u16 sw_tx_cons;
 	u16 sw_tx_prod;
@@ -311,8 +313,18 @@ struct qede_tx_queue {
 	void __iomem *doorbell_addr;
 	union db_prod tx_db;
 	int index; /* Slowpath only */
+#define QEDE_TXQ_XDP_TO_IDX(edev, txq)	((txq)->index - \
+					 QEDE_MAX_TSS_CNT(edev))
+#define QEDE_TXQ_IDX_TO_XDP(edev, idx)	((idx) + QEDE_MAX_TSS_CNT(edev))
 
-	struct sw_tx_bd *sw_tx_ring;
+	/* Regular Tx requires skb + metadata for release purpose,
+	 * while XDP requires only the pages themselves.
+	 */
+	union {
+		struct sw_tx_bd *skbs;
+		struct page **pages;
+	} sw_tx_ring;
+
 	struct qed_chain tx_pbl;
 
 	/* Slowpath; Should be kept in end [unless missing padding] */
@@ -337,10 +349,12 @@ struct qede_fastpath {
 #define QEDE_FASTPATH_COMBINED	(QEDE_FASTPATH_TX | QEDE_FASTPATH_RX)
 	u8			type;
 	u8			id;
+	u8			xdp_xmit;
 	struct napi_struct	napi;
 	struct qed_sb_info	*sb_info;
 	struct qede_rx_queue	*rxq;
 	struct qede_tx_queue	*txq;
+	struct qede_tx_queue	*xdp_tx;
 
 #define VEC_NAME_SIZE	(sizeof(((struct net_device *)0)->name) + 8)
 	char	name[VEC_NAME_SIZE];
