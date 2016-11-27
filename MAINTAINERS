@@ -8438,6 +8438,7 @@ S:	Maintained
 F:	net/dsa/
 F:	include/net/dsa.h
 F:	drivers/net/dsa/
+F:	Documentation/devicetree/bindings/net/dsa/
 
 NETWORKING [GENERAL]
 M:	"David S. Miller" <davem@davemloft.net>
