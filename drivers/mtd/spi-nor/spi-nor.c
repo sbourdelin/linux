@@ -22,6 +22,7 @@
 #include <linux/of_platform.h>
 #include <linux/spi/flash.h>
 #include <linux/mtd/spi-nor.h>
+#include <linux/spi/spi.h>
 
 /* Define max times to check status register before we give up. */
 
@@ -89,15 +90,24 @@ static const struct flash_info *spi_nor_match_id(const char *name);
 static int read_sr(struct spi_nor *nor)
 {
 	int ret;
-	u8 val;
+	u8 val[2];
 
-	ret = nor->read_reg(nor, SPINOR_OP_RDSR, &val, 1);
-	if (ret < 0) {
-		pr_err("error %d reading SR\n", (int) ret);
-		return ret;
+	if (nor->stripe) {
+		ret = nor->read_reg(nor, SPINOR_OP_RDSR, &val[0], 2);
+		if (ret < 0) {
+			pr_err("error %d reading SR\n", (int) ret);
+			return ret;
+		}
+		val[0] |= val[1];
+	} else {
+		ret = nor->read_reg(nor, SPINOR_OP_RDSR, &val[0], 1);
+		if (ret < 0) {
+			pr_err("error %d reading SR\n", (int) ret);
+			return ret;
+		}
 	}
 
-	return val;
+	return val[0];
 }
 
 /*
@@ -108,15 +118,24 @@ static int read_sr(struct spi_nor *nor)
 static int read_fsr(struct spi_nor *nor)
 {
 	int ret;
-	u8 val;
+	u8 val[2];
 
-	ret = nor->read_reg(nor, SPINOR_OP_RDFSR, &val, 1);
-	if (ret < 0) {
-		pr_err("error %d reading FSR\n", ret);
-		return ret;
+	if (nor->stripe) {
+		ret = nor->read_reg(nor, SPINOR_OP_RDFSR, &val[0], 2);
+		if (ret < 0) {
+			pr_err("error %d reading FSR\n", ret);
+			return ret;
+		}
+		val[0] &= val[1];
+	} else {
+		ret = nor->read_reg(nor, SPINOR_OP_RDFSR, &val[0], 1);
+		if (ret < 0) {
+			pr_err("error %d reading FSR\n", ret);
+			return ret;
+		}
 	}
 
-	return val;
+	return val[0];
 }
 
 /*
@@ -290,9 +309,16 @@ static int spi_nor_wait_till_ready(struct spi_nor *nor)
  */
 static int erase_chip(struct spi_nor *nor)
 {
+	u32 ret;
+
 	dev_dbg(nor->dev, " %lldKiB\n", (long long)(nor->mtd.size >> 10));
 
-	return nor->write_reg(nor, SPINOR_OP_CHIP_ERASE, NULL, 0);
+	ret = nor->write_reg(nor, SPINOR_OP_CHIP_ERASE, NULL, 0);
+	if (ret)
+		return ret;
+
+	return ret;
+
 }
 
 static int spi_nor_lock_and_prep(struct spi_nor *nor, enum spi_nor_ops ops)
@@ -349,7 +375,7 @@ static int spi_nor_erase_sector(struct spi_nor *nor, u32 addr)
 static int spi_nor_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
 	struct spi_nor *nor = mtd_to_spi_nor(mtd);
-	u32 addr, len;
+	u32 addr, len, offset;
 	uint32_t rem;
 	int ret;
 
@@ -399,9 +425,13 @@ static int spi_nor_erase(struct mtd_info *mtd, struct erase_info *instr)
 	/* "sector"-at-a-time erase */
 	} else {
 		while (len) {
-			write_enable(nor);
 
-			ret = spi_nor_erase_sector(nor, addr);
+			write_enable(nor);
+			offset = addr;
+			if (nor->stripe)
+				offset /= 2;
+
+			ret = spi_nor_erase_sector(nor, offset);
 			if (ret)
 				goto erase_err;
 
@@ -525,6 +555,8 @@ static int stm_lock(struct spi_nor *nor, loff_t ofs, uint64_t len)
 	bool use_top;
 	int ret;
 
+	ofs = ofs >> nor->shift;
+
 	status_old = read_sr(nor);
 	if (status_old < 0)
 		return status_old;
@@ -609,6 +641,8 @@ static int stm_unlock(struct spi_nor *nor, loff_t ofs, uint64_t len)
 	bool can_be_top = true, can_be_bottom = nor->flags & SNOR_F_HAS_SR_TB;
 	bool use_top;
 	int ret;
+
+	ofs = ofs >> nor->shift;
 
 	status_old = read_sr(nor);
 	if (status_old < 0)
@@ -709,6 +743,8 @@ static int spi_nor_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
 	if (ret)
 		return ret;
 
+	ofs = ofs >> nor->shift;
+
 	ret = nor->flash_lock(nor, ofs, len);
 
 	spi_nor_unlock_and_unprep(nor, SPI_NOR_OPS_UNLOCK);
@@ -723,6 +759,8 @@ static int spi_nor_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
 	ret = spi_nor_lock_and_prep(nor, SPI_NOR_OPS_UNLOCK);
 	if (ret)
 		return ret;
+
+	ofs = ofs >> nor->shift;
 
 	ret = nor->flash_unlock(nor, ofs, len);
 
@@ -1018,6 +1056,9 @@ static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
 	u8			id[SPI_NOR_MAX_ID_LEN];
 	const struct flash_info	*info;
 
+	nor->spi->master->flags &= ~(SPI_MASTER_BOTH_CS |
+					SPI_MASTER_DATA_STRIPE);
+
 	tmp = nor->read_reg(nor, SPINOR_OP_RDID, id, SPI_NOR_MAX_ID_LEN);
 	if (tmp < 0) {
 		dev_dbg(nor->dev, "error %d reading JEDEC ID\n", tmp);
@@ -1041,6 +1082,7 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
 {
 	struct spi_nor *nor = mtd_to_spi_nor(mtd);
 	int ret;
+	u32 offset = from;
 
 	dev_dbg(nor->dev, "from 0x%08x, len %zd\n", (u32)from, len);
 
@@ -1049,7 +1091,13 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
 		return ret;
 
 	while (len) {
-		ret = nor->read(nor, from, len, buf);
+
+		offset = from;
+
+		if (nor->stripe)
+			offset /= 2;
+
+		ret = nor->read(nor, offset, len, buf);
 		if (ret == 0) {
 			/* We shouldn't see 0-length reads */
 			ret = -EIO;
@@ -1161,6 +1209,7 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
 	struct spi_nor *nor = mtd_to_spi_nor(mtd);
 	size_t page_offset, page_remain, i;
 	ssize_t ret;
+	u32 offset;
 
 	dev_dbg(nor->dev, "to 0x%08x, len %zd\n", (u32)to, len);
 
@@ -1178,9 +1227,13 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
 		/* the size of data remaining on the first page */
 		page_remain = min_t(size_t,
 				    nor->page_size - page_offset, len - i);
+		offset = (to + i);
+
+		if (nor->stripe)
+			offset /= 2;
 
 		write_enable(nor);
-		ret = nor->write(nor, to + i, page_remain, buf + i);
+		ret = nor->write(nor, (offset), page_remain, buf + i);
 		if (ret < 0)
 			goto write_err;
 		written = ret;
@@ -1302,22 +1355,22 @@ static int spi_nor_check(struct spi_nor *nor)
 
 int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 {
-	const struct flash_info *info = NULL;
+	struct flash_info *info = NULL;
 	struct device *dev = nor->dev;
 	struct mtd_info *mtd = &nor->mtd;
 	struct device_node *np = spi_nor_get_flash_node(nor);
-	int ret;
-	int i;
+	struct device_node *np_spi;
+	int ret, i, xlnx_qspi_mode;
 
 	ret = spi_nor_check(nor);
 	if (ret)
 		return ret;
 
 	if (name)
-		info = spi_nor_match_id(name);
+		info = (struct flash_info *)spi_nor_match_id(name);
 	/* Try to auto-detect if chip name wasn't specified or not found */
 	if (!info)
-		info = spi_nor_read_id(nor);
+		info = (struct flash_info *)spi_nor_read_id(nor);
 	if (IS_ERR_OR_NULL(info))
 		return -ENOENT;
 
@@ -1341,7 +1394,7 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 			 */
 			dev_warn(dev, "found %s, expected %s\n",
 				 jinfo->name, info->name);
-			info = jinfo;
+			info = (struct flash_info *)jinfo;
 		}
 	}
 
@@ -1370,6 +1423,27 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 	mtd->size = info->sector_size * info->n_sectors;
 	mtd->_erase = spi_nor_erase;
 	mtd->_read = spi_nor_read;
+#ifdef CONFIG_OF
+	np_spi = of_get_next_parent(np);
+
+	if (of_property_read_u32(np_spi, "xlnx,qspi-mode",
+				&xlnx_qspi_mode) < 0) {
+		nor->shift = 0;
+		nor->stripe = 0;
+	} else if (xlnx_qspi_mode == 2) {
+		nor->shift = 1;
+		info->sector_size <<= nor->shift;
+		info->page_size <<= nor->shift;
+		mtd->size <<= nor->shift;
+		nor->stripe = 1;
+		nor->spi->master->flags |= (SPI_MASTER_BOTH_CS |
+						SPI_MASTER_DATA_STRIPE);
+	}
+#else
+	/* Default to single */
+	nor->shift = 0;
+	nor->stripe = 0;
+#endif
 
 	/* NOR protection support for STmicro/Micron chips and similar */
 	if (JEDEC_MFR(info) == SNOR_MFR_MICRON ||
@@ -1400,10 +1474,10 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 	/* prefer "small sector" erase if possible */
 	if (info->flags & SECT_4K) {
 		nor->erase_opcode = SPINOR_OP_BE_4K;
-		mtd->erasesize = 4096;
+		mtd->erasesize = 4096 << nor->shift;
 	} else if (info->flags & SECT_4K_PMC) {
 		nor->erase_opcode = SPINOR_OP_BE_4K_PMC;
-		mtd->erasesize = 4096;
+		mtd->erasesize = 4096 << nor->shift;
 	} else
 #endif
 	{
@@ -1508,16 +1582,14 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 	dev_info(dev, "%s (%lld Kbytes)\n", info->name,
 			(long long)mtd->size >> 10);
 
-	dev_dbg(dev,
-		"mtd .name = %s, .size = 0x%llx (%lldMiB), "
+	dev_dbg(dev, "mtd .name = %s, .size = 0x%llx (%lldMiB), "
 		".erasesize = 0x%.8x (%uKiB) .numeraseregions = %d\n",
 		mtd->name, (long long)mtd->size, (long long)(mtd->size >> 20),
 		mtd->erasesize, mtd->erasesize / 1024, mtd->numeraseregions);
 
 	if (mtd->numeraseregions)
 		for (i = 0; i < mtd->numeraseregions; i++)
-			dev_dbg(dev,
-				"mtd.eraseregions[%d] = { .offset = 0x%llx, "
+			dev_dbg(dev, "mtd.eraseregions[%d] = { .offset = 0x%llx, "
 				".erasesize = 0x%.8x (%uKiB), "
 				".numblocks = %d }\n",
 				i, (long long)mtd->eraseregions[i].offset,
