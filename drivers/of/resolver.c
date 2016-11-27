@@ -311,7 +311,8 @@ int of_resolve_phandles(struct device_node *overlay)
 		if (!of_node_cmp(local_fixups->name, "__local_fixups__"))
 			break;
 
-	err = adjust_local_phandle_references(local_fixups, overlay, phandle_delta);
+	err = adjust_local_phandle_references(local_fixups, overlay,
+					      phandle_delta);
 	if (err) {
 		pr_err("overlay phandle fixup failed: %d\n", err);
 		return err;
@@ -356,7 +357,8 @@ int of_resolve_phandles(struct device_node *overlay)
 		phandle = refnode->phandle;
 		of_node_put(refnode);
 
-		err = update_usages_of_a_phandle_reference(overlay, prop, phandle);
+		err = update_usages_of_a_phandle_reference(overlay, prop,
+							   phandle);
 		if (err)
 			break;
 	}
