@@ -154,8 +154,11 @@ static int tcf_pedit(struct sk_buff *skb, const struct tc_action *a,
 			}
 
 			ptr = skb_header_pointer(skb, off + offset, 4, &_data);
-			if (!ptr)
+			if ((unsigned char *)ptr < skb->head) {
+				pr_info("tc filter pedit offset out of bounds\n");
 				goto bad;
+			}
+
 			/* just do it, baby */
 			*ptr = ((*ptr & tkey->mask) ^ tkey->val);
 			if (ptr == &_data)
