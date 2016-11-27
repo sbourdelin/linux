@@ -296,14 +296,12 @@ int of_resolve_phandles(struct device_node *overlay)
 	tree_symbols = NULL;
 
 	if (!overlay) {
-		pr_err("null overlay\n");
-		err = -EINVAL;
-		goto err_out;
+		pr_err("overlay phandle fixup failed: null overlay\n");
+		return -EINVAL;
 	}
 	if (!of_node_check_flag(overlay, OF_DETACHED)) {
-		pr_err("overlay not detached\n");
-		err = -EINVAL;
-		goto err_out;
+		pr_err("overlay phandle fixup failed: overlay not detached\n");
+		return -EINVAL;
 	}
 
 	phandle_delta = live_tree_max_phandle() + 1;
@@ -314,8 +312,10 @@ int of_resolve_phandles(struct device_node *overlay)
 			break;
 
 	err = adjust_local_phandle_references(local_fixups, overlay, phandle_delta);
-	if (err)
-		goto err_out;
+	if (err) {
+		pr_err("overlay phandle fixup failed: %d\n", err);
+		return err;
+	}
 
 	overlay_fixups = NULL;
 
@@ -324,16 +324,13 @@ int of_resolve_phandles(struct device_node *overlay)
 			overlay_fixups = child;
 	}
 
-	if (!overlay_fixups) {
-		err = 0;
-		goto out;
-	}
+	if (!overlay_fixups)
+		return 0;
 
 	tree_symbols = of_find_node_by_path("/__symbols__");
 	if (!tree_symbols) {
-		pr_err("no symbols in root of device tree.\n");
-		err = -EINVAL;
-		goto err_out;
+		pr_err("overlay phandle fixup failed: no symbols in root\n");
+		return -EINVAL;
 	}
 
 	for_each_property_of_node(overlay_fixups, prop) {
@@ -344,13 +341,16 @@ int of_resolve_phandles(struct device_node *overlay)
 
 		err = of_property_read_string(tree_symbols,
 				prop->name, &refpath);
-		if (err)
-			goto err_out;
+		if (err) {
+			pr_err("overlay phandle fixup failed: %d\n", err);
+			goto out;
+		}
 
 		refnode = of_find_node_by_path(refpath);
 		if (!refnode) {
 			err = -ENOENT;
-			goto err_out;
+			pr_err("overlay phandle fixup failed: !refnode\n");
+			goto out;
 		}
 
 		phandle = refnode->phandle;
@@ -361,8 +361,6 @@ int of_resolve_phandles(struct device_node *overlay)
 			break;
 	}
 
-err_out:
-	pr_err("overlay phandle fixup failed: %d\n", err);
 out:
 	of_node_put(tree_symbols);
 
