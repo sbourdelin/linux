@@ -83,8 +83,6 @@
 
 struct tmp108 {
 	struct regmap *regmap;
-	struct device *hwmon_dev;
-	struct thermal_zone_device *tz;
 	u16 config;
 	unsigned long ready_time;
 };
@@ -245,6 +243,7 @@ static int tmp108_probe(struct i2c_client *client,
 {
 	struct device *dev = &client->dev;
 	struct device *hwmon_dev;
+	struct thermal_zone_device *tz;
 	struct tmp108 *tmp108;
 	unsigned int regval;
 	int err;
@@ -353,34 +352,24 @@ static int tmp108_probe(struct i2c_client *client,
 	if (err)
 		return err;
 
-	hwmon_dev = hwmon_device_register_with_groups(dev, client->name,
-						      tmp108, tmp108_groups);
+	hwmon_dev = devm_hwmon_device_register_with_groups(dev, client->name,
+							   tmp108,
+							   tmp108_groups);
 	if (IS_ERR(hwmon_dev)) {
 		dev_dbg(dev, "unable to register hwmon device\n");
 		return PTR_ERR(hwmon_dev);
 	}
 
-	tmp108->hwmon_dev = hwmon_dev;
-	tmp108->tz = thermal_zone_of_sensor_register(hwmon_dev, 0, hwmon_dev,
-						     &tmp108_of_thermal_ops);
-	if (IS_ERR(tmp108->tz))
-		return PTR_ERR(tmp108->tz);
+	tz = devm_thermal_zone_of_sensor_register(hwmon_dev, 0, hwmon_dev,
+						  &tmp108_of_thermal_ops);
+	if (IS_ERR(tz))
+		return PTR_ERR(tz);
 
 	dev_info(dev, "%s, alert: active %s, hyst: %uC, conv: %ucHz\n",
 		 (tmp108->config & TMP108_CONF_TM) != 0 ?
 			"interrupt" : "comparator",
 		 (tmp108->config & TMP108_CONF_POL) != 0 ? "high" : "low",
 		 hysteresis, convrate);
-	return 0;
-}
-
-static int tmp108_remove(struct i2c_client *client)
-{
-	struct tmp108 *tmp108 = i2c_get_clientdata(client);
-
-	thermal_zone_of_sensor_unregister(tmp108->hwmon_dev, tmp108->tz);
-	hwmon_device_unregister(tmp108->hwmon_dev);
-
 	return 0;
 }
 
@@ -418,7 +407,6 @@ static struct i2c_driver tmp108_driver = {
 	.driver.name	= DRIVER_NAME,
 	.driver.pm	= &tmp108_dev_pm_ops,
 	.probe		= tmp108_probe,
-	.remove		= tmp108_remove,
 	.id_table	= tmp108_id,
 };
 
