@@ -1,0 +1,27 @@
+TMP108 temperature sensor
+-------------------------
+
+This device supports I2C only.
+
+Requires node properties:
+- compatible : "ti,tmp108"
+- reg : the I2C address of the device. This is 0x48, 0x49, 0x4a, or 0x4b.
+
+Optional node properties:
+- ti,thermostat-mode-comparitor : (boolean) select the comparitor mode for the
+      thermostat rather than the default interrupt-mode.
+- ti,alert-active-high : (boolean) make the alert pin active-high instead of
+      the default active-low.
+- ti,conversion-rate-cHz : (integer, cHz) select the conversion frequency for
+      continuous mode, in centi-Hz: 25, 100 (default), 400, or 1600.
+- ti,hysteresis : (integer, C) select the hysteresis value: 0, 1, 2, or 4
+      (celcius).
+
+Example:
+	tmp108@48 {
+		compatible = "ti,tmp108";
+		reg = <0x48>;
+		ti,alert-active-high;
+		ti,hysteresis = <2>;
+		ti,conversion-rate-cHz = <25>;
+	};
