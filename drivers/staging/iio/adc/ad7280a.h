@@ -35,4 +35,10 @@ struct ad7280_platform_data {
 	bool			thermistor_term_en;
 };
 
+enum event_code_type {
+	AD7280A_IIO_EVENT_CODE,
+	AD7280A_IIO_MOD_EVENT_CODE,
+	AD7280A_IIO_UNMOD_EVENT_CODE,
+};
+
 #endif /* IIO_ADC_AD7280_H_ */
