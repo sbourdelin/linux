@@ -14346,8 +14346,6 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 		WARN_ON(ret);
 	}
 
-	drm_atomic_helper_wait_for_dependencies(state);
-
 	if (intel_state->modeset) {
 		memcpy(dev_priv->min_pixclk, intel_state->min_pixclk,
 		       sizeof(intel_state->min_pixclk));
@@ -14470,16 +14468,12 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 	if (intel_state->modeset && intel_can_enable_sagv(state))
 		intel_enable_sagv(dev_priv);
 
-	drm_atomic_helper_commit_hw_done(state);
-
 	if (intel_state->modeset)
 		intel_display_power_put(dev_priv, POWER_DOMAIN_MODESET);
 
 	mutex_lock(&dev->struct_mutex);
 	drm_atomic_helper_cleanup_planes(dev, state);
 	mutex_unlock(&dev->struct_mutex);
-
-	drm_atomic_helper_commit_cleanup_done(state);
 
 	drm_atomic_state_free(state);
 
@@ -14545,10 +14539,6 @@ static int intel_atomic_commit(struct drm_device *dev,
 		DRM_DEBUG_KMS("nonblocking commit for modeset not yet implemented.\n");
 		return -EINVAL;
 	}
-
-	ret = drm_atomic_helper_setup_commit(state, nonblock);
-	if (ret)
-		return ret;
 
 	INIT_WORK(&state->commit_work, intel_atomic_commit_work);
 
