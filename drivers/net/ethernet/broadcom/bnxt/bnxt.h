@@ -1010,6 +1010,7 @@ struct bnxt {
 	u32			rss_hash_cfg;
 
 	u8			max_tc;
+	u8			max_lltc;	/* lossless TCs */
 	struct bnxt_queue_info	q_info[BNXT_MAX_QUEUE];
 
 	unsigned int		current_interval;
