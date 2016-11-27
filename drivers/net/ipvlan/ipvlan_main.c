@@ -7,6 +7,7 @@
  *
  */
 
+#include "linux/netfilter_ipv4.h"
 #include "ipvlan.h"
 
 static u32 ipvl_nf_hook_refcnt = 0;
@@ -16,13 +17,13 @@ static struct nf_hook_ops ipvl_nfops[] __read_mostly = {
 		.hook     = ipvlan_nf_input,
 		.pf       = NFPROTO_IPV4,
 		.hooknum  = NF_INET_LOCAL_IN,
-		.priority = INT_MAX,
+		.priority = NF_IP_PRI_LAST,
 	},
 	{
 		.hook     = ipvlan_nf_input,
 		.pf       = NFPROTO_IPV6,
 		.hooknum  = NF_INET_LOCAL_IN,
-		.priority = INT_MAX,
+		.priority = NF_IP_PRI_LAST,
 	},
 };
 
