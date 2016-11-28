@@ -2475,6 +2475,27 @@ static void skip_emulated_instruction_no_trap(struct kvm_vcpu *vcpu)
 static int skip_emulated_instruction(struct kvm_vcpu *vcpu)
 {
 	skip_emulated_instruction_no_trap(vcpu);
+
+	if (unlikely(vmx_get_rflags(vcpu) & X86_EFLAGS_TF)) {
+		if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
+			vcpu->run->debug.arch.dr6 = DR6_BS | DR6_FIXED_1 |
+						    DR6_RTM;
+			vcpu->run->debug.arch.pc = vcpu->arch.singlestep_rip;
+			vcpu->run->debug.arch.exception = DB_VECTOR;
+			vcpu->run->exit_reason = KVM_EXIT_DEBUG;
+			return 0;
+		}
+
+		/*
+		 * "Certain debug exceptions may clear bit 0-3.  The
+		 * remaining contents of the DR6 register are never
+		 * cleared by the processor".
+		 */
+		vcpu->arch.dr6 &= ~15;
+		vcpu->arch.dr6 |= DR6_BS | DR6_RTM;
+		kvm_queue_exception(vcpu, DB_VECTOR);
+	}
+
 	return 1;
 }
 
