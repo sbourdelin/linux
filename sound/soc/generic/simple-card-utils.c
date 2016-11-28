@@ -8,6 +8,7 @@
  * published by the Free Software Foundation.
  */
 #include <linux/clk.h>
+#include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_graph.h>
@@ -291,6 +292,47 @@ int asoc_simple_card_clean_reference(struct snd_soc_card *card)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(asoc_simple_card_clean_reference);
+
+void asoc_simple_card_try_to_probe_graph_card(struct device *dev)
+{
+	struct platform_device_info pdevinfo;
+	struct device_node *node;
+	const char *compatible;
+	int ret;
+
+	node = of_graph_get_top_port(dev);
+	if (!node)
+		/*
+		 * It doesn't have graph base sound DT.
+		 * Do nothing here, It assumes that system has
+		 * normal sound card.
+		 */
+		return;
+
+	ret = of_property_read_string(node, "compatible", &compatible);
+	if (ret < 0)
+		goto probe_err;
+
+	/*
+	 * FIXME
+	 *
+	 * It should use of_platform_xxx() instead of
+	 * platform_device_register_full() ? but there is no solution.
+	 * see also
+	 * linux/sound/soc/generic/simple-graph-card.c :: asoc_simple_card_probe
+	 */
+
+	memset(&pdevinfo, 0, sizeof(pdevinfo));
+	pdevinfo.parent		= dev;
+	pdevinfo.id		= PLATFORM_DEVID_AUTO;
+	pdevinfo.name		= compatible;
+	pdevinfo.dma_mask	= DMA_BIT_MASK(32);
+	platform_device_register_full(&pdevinfo);
+
+probe_err:
+	of_node_put(node);
+}
+EXPORT_SYMBOL_GPL(asoc_simple_card_try_to_probe_graph_card);
 
 /* Module information */
 MODULE_AUTHOR("Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>");

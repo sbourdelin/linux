@@ -79,4 +79,6 @@ void asoc_simple_card_canonicalize_cpu(struct snd_soc_dai_link *dai_link,
 
 int asoc_simple_card_clean_reference(struct snd_soc_card *card);
 
+void asoc_simple_card_try_to_probe_graph_card(struct device *dev);
+
 #endif /* __SIMPLE_CARD_CORE_H */
