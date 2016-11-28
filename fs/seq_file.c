@@ -190,6 +190,9 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 	 */
 	m->version = file->f_version;
 
+	if (*ppos == 0)
+		m->index = 0;
+
 	/* Don't assume *ppos is where we left it */
 	if (unlikely(*ppos != m->read_pos)) {
 		while ((err = traverse(m, *ppos)) == -EAGAIN)
