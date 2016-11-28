@@ -77,7 +77,16 @@ Specific guidelines for the kernel documentation
 
 Here are some specific guidelines for the kernel documentation:
 
-* Please don't go overboard with reStructuredText markup. Keep it simple.
+* Please don't go overboard with reStructuredText markup. Keep it simple. A lot
+  of core kernel developers prefer plain text, with a big emphasis on plain. And
+  in the end if we have pretty generated docs which the subject experts don't
+  like to edit and keep up-to-date everyone loses.
+
+  Be especially considerate when converting existing .txt documentation. There's
+  a wide scale from annotating every little bit with in-line styles to only
+  touching up the bare minimum needed to integrate an existing file into the
+  larger documentation. Please align with the wishes of the maintainer to make
+  sure that documentations stays useful for everyone.
 
 * Please stick to this order of heading adornments:
 
