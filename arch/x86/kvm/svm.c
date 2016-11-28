@@ -608,7 +608,7 @@ static void svm_set_interrupt_shadow(struct kvm_vcpu *vcpu, int mask)
 
 }
 
-static void skip_emulated_instruction(struct kvm_vcpu *vcpu)
+static int skip_emulated_instruction(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
 
@@ -621,7 +621,7 @@ static void skip_emulated_instruction(struct kvm_vcpu *vcpu)
 		if (emulate_instruction(vcpu, EMULTYPE_SKIP) !=
 				EMULATE_DONE)
 			printk(KERN_DEBUG "%s: NOP\n", __func__);
-		return;
+		return 1;
 	}
 	if (svm->next_rip - kvm_rip_read(vcpu) > MAX_INST_SIZE)
 		printk(KERN_ERR "%s: ip 0x%lx next 0x%llx\n",
@@ -629,6 +629,7 @@ static void skip_emulated_instruction(struct kvm_vcpu *vcpu)
 
 	kvm_rip_write(vcpu, svm->next_rip);
 	svm_set_interrupt_shadow(vcpu, 0);
+	return 1;
 }
 
 static void svm_queue_exception(struct kvm_vcpu *vcpu, unsigned nr,
@@ -3151,8 +3152,7 @@ static int skinit_interception(struct vcpu_svm *svm)
 
 static int wbinvd_interception(struct vcpu_svm *svm)
 {
-	kvm_emulate_wbinvd(&svm->vcpu);
-	return 1;
+	return kvm_emulate_wbinvd(&svm->vcpu);
 }
 
 static int xsetbv_interception(struct vcpu_svm *svm)
@@ -3275,9 +3275,7 @@ static int rdpmc_interception(struct vcpu_svm *svm)
 		return emulate_on_interception(svm);
 
 	err = kvm_rdpmc(&svm->vcpu);
-	kvm_complete_insn_gp(&svm->vcpu, err);
-
-	return 1;
+	return kvm_complete_insn_gp(&svm->vcpu, err);
 }
 
 static bool check_selective_cr0_intercepted(struct vcpu_svm *svm,
@@ -3374,9 +3372,7 @@ static int cr_interception(struct vcpu_svm *svm)
 		}
 		kvm_register_write(&svm->vcpu, reg, val);
 	}
-	kvm_complete_insn_gp(&svm->vcpu, err);
-
-	return 1;
+	return kvm_complete_insn_gp(&svm->vcpu, err);
 }
 
 static int dr_interception(struct vcpu_svm *svm)
