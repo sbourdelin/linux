@@ -7891,6 +7891,49 @@ int sandybridge_pcode_write(struct drm_i915_private *dev_priv,
 	return 0;
 }
 
+static bool skl_pcode_try_request(struct drm_i915_private *dev_priv, u32 mbox,
+				  u32 request, u32 *status)
+{
+	u32 val = request;
+
+	*status = sandybridge_pcode_read(dev_priv, mbox, &val);
+
+	return *status || (val & GEN9_PCODE_REQUEST_DONE);
+}
+
+/**
+ * skl_pcode_request - send PCODE request until acknowledgment
+ * @dev_priv: device private
+ * @mbox: PCODE mailbox ID the request is targeted for
+ * @request: request ID
+ *
+ * Keep resending the @request to @mbox until PCODE acknowledges it, or a 10ms
+ * timeout expires.
+ *
+ * Returns 0 on success, %-ETIMEDOUT in case of a timeout, <0 in case of some
+ * other error as reported by PCODE.
+ */
+int skl_pcode_request(struct drm_i915_private *dev_priv, u32 mbox, u32 request)
+{
+	u32 status;
+	int ret;
+
+	WARN_ON(!mutex_is_locked(&dev_priv->rps.hw_lock));
+
+	/*
+	 * The spec says to keep retrying the request for at most 3ms until
+	 * acknowledgement, so disable pre-emption to maximize the number of
+	 * attempts within this duration. Use a 10ms overall timeout to
+	 * account for interrupts that could reduce the number of attempts.
+	 */
+	preempt_disable();
+	ret = wait_for_atomic(skl_pcode_try_request(dev_priv, mbox, request,
+						    &status), 10);
+	preempt_enable();
+
+	return ret ? ret : status;
+}
+
 static int byt_gpu_freq(struct drm_i915_private *dev_priv, int val)
 {
 	/*
