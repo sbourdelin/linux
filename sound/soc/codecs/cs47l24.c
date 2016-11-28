@@ -1138,7 +1138,7 @@ static int cs47l24_codec_probe(struct snd_soc_codec *codec)
 	if (ret)
 		goto err_adsp2_codec_probe;
 
-	snd_soc_dapm_disable_pin(dapm, "HAPTICS");
+	snd_soc_component_disable_pin(&codec->component, "HAPTICS");
 
 	return 0;
 
