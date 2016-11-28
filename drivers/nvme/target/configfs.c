@@ -466,7 +466,7 @@ out_free_link:
 	return ret;
 }
 
-static int nvmet_port_subsys_drop_link(struct config_item *parent,
+static void nvmet_port_subsys_drop_link(struct config_item *parent,
 		struct config_item *target)
 {
 	struct nvmet_port *port = to_nvmet_port(parent->ci_parent);
@@ -474,21 +474,16 @@ static int nvmet_port_subsys_drop_link(struct config_item *parent,
 	struct nvmet_subsys_link *p;
 
 	down_write(&nvmet_config_sem);
-	list_for_each_entry(p, &port->subsystems, entry) {
-		if (p->subsys == subsys)
-			goto found;
-	}
+	list_for_each_entry(p, &port->subsystems, entry)
+		if (p->subsys == subsys) {
+			list_del(&p->entry);
+			nvmet_genctr++;
+			if (list_empty(&port->subsystems))
+				nvmet_disable_port(port);
+			kfree(p);
+			break;
+		}
 	up_write(&nvmet_config_sem);
-	return -EINVAL;
-
-found:
-	list_del(&p->entry);
-	nvmet_genctr++;
-	if (list_empty(&port->subsystems))
-		nvmet_disable_port(port);
-	up_write(&nvmet_config_sem);
-	kfree(p);
-	return 0;
 }
 
 static struct configfs_item_operations nvmet_port_subsys_item_ops = {
@@ -542,7 +537,7 @@ out_free_link:
 	return ret;
 }
 
-static int nvmet_allowed_hosts_drop_link(struct config_item *parent,
+static void nvmet_allowed_hosts_drop_link(struct config_item *parent,
 		struct config_item *target)
 {
 	struct nvmet_subsys *subsys = to_subsys(parent->ci_parent);
@@ -550,19 +545,14 @@ static int nvmet_allowed_hosts_drop_link(struct config_item *parent,
 	struct nvmet_host_link *p;
 
 	down_write(&nvmet_config_sem);
-	list_for_each_entry(p, &subsys->hosts, entry) {
-		if (!strcmp(nvmet_host_name(p->host), nvmet_host_name(host)))
-			goto found;
-	}
+	list_for_each_entry(p, &subsys->hosts, entry)
+		if (!strcmp(nvmet_host_name(p->host), nvmet_host_name(host))) {
+			list_del(&p->entry);
+			nvmet_genctr++;
+			kfree(p);
+			break;
+		}
 	up_write(&nvmet_config_sem);
-	return -EINVAL;
-
-found:
-	list_del(&p->entry);
-	nvmet_genctr++;
-	up_write(&nvmet_config_sem);
-	kfree(p);
-	return 0;
 }
 
 static struct configfs_item_operations nvmet_allowed_hosts_item_ops = {
