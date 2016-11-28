@@ -2386,6 +2386,70 @@ struct device_node *of_graph_get_top_port(struct device *dev)
 EXPORT_SYMBOL(of_graph_get_top_port);
 
 /**
+ * of_graph_get_next_port() - get next port node
+ * @parent: pointer to the parent device node
+ * @prev: previous endpoint node, or NULL to get first
+ *
+ * Return: An 'endpoint' node pointer with refcount incremented. Refcount
+ * of the passed @prev node is decremented.
+ */
+struct device_node *of_graph_get_next_port(const struct device_node *parent,
+					   struct device_node *prev)
+{
+	struct device_node *port;
+	struct device_node *node;
+
+	if (!parent)
+		return NULL;
+
+	node = of_get_child_by_name(parent, "ports");
+	if (node)
+		parent = node;
+
+	/*
+	 * Start by locating the port node. If no previous endpoint is specified
+	 * search for the first port node, otherwise get the previous endpoint
+	 * parent port node.
+	 */
+	if (!prev) {
+		port = of_get_child_by_name(parent, "port");
+		if (!port)
+			pr_err("%s(): no port node found in %s\n",
+			       __func__, parent->full_name);
+	} else {
+		do {
+			port = of_get_next_child(parent, prev);
+			if (!port)
+				break;
+		} while (of_node_cmp(port->name, "port"));
+	}
+
+	of_node_put(node);
+
+	return port;
+}
+EXPORT_SYMBOL(of_graph_get_next_port);
+
+/**
+ * of_graph_get_next_endpoint_in_port() - get next endpoint node in port
+ * @parent: pointer to the parent device node
+ * @prev: previous endpoint node, or NULL to get first
+ *
+ * Return: An 'endpoint' node pointer with refcount incremented. Refcount
+ * of the passed @prev node is decremented.
+ */
+struct device_node *of_graph_get_next_endpoint_in_port(
+			const struct device_node *port,
+			struct device_node *prev)
+{
+	if (!port)
+		return NULL;
+
+	return of_get_next_child(port, prev);
+}
+EXPORT_SYMBOL(of_graph_get_next_endpoint_in_port);
+
+/**
  * of_graph_get_next_endpoint() - get next endpoint node
  * @parent: pointer to the parent device node
  * @prev: previous endpoint node, or NULL to get first
