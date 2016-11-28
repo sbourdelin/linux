@@ -2362,6 +2362,30 @@ struct device_node *of_graph_get_port_by_id(struct device_node *parent, u32 id)
 EXPORT_SYMBOL(of_graph_get_port_by_id);
 
 /**
+ * of_graph_get_top_port() - get the top port node
+ * @dev: pointer to the device
+ *
+ * Return: A 'port' node pointer with refcount incremented. The caller
+ * has to use of_node_put() on it when done.
+ */
+struct device_node *of_graph_get_top_port(struct device *dev)
+{
+	struct device_node *np = dev->of_node;
+	struct device_node *node;
+
+	node = of_get_child_by_name(np, "ports");
+	if (node)
+		return node;
+
+	node = of_get_child_by_name(np, "port");
+	if (node)
+		return node;
+
+	return NULL;
+}
+EXPORT_SYMBOL(of_graph_get_top_port);
+
+/**
  * of_graph_get_next_endpoint() - get next endpoint node
  * @parent: pointer to the parent device node
  * @prev: previous endpoint node, or NULL to get first
