@@ -117,6 +117,19 @@ void __cgroup_bpf_update(struct cgroup *cgrp,
 	}
 }
 
+static int __cgroup_bpf_run_filter_skb(struct sk_buff *skb,
+				       struct bpf_prog *prog)
+{
+	unsigned int offset = skb->data - skb_network_header(skb);
+	int ret;
+
+	__skb_push(skb, offset);
+	ret = bpf_prog_run_save_cb(prog, skb) == 1 ? 0 : -EPERM;
+	__skb_pull(skb, offset);
+
+	return ret;
+}
+
 /**
  * __cgroup_bpf_run_filter() - Run a program for packet filtering
  * @sk: The socken sending or receiving traffic
@@ -153,11 +166,15 @@ int __cgroup_bpf_run_filter(struct sock *sk,
 
 	prog = rcu_dereference(cgrp->bpf.effective[type]);
 	if (prog) {
-		unsigned int offset = skb->data - skb_network_header(skb);
-
-		__skb_push(skb, offset);
-		ret = bpf_prog_run_save_cb(prog, skb) == 1 ? 0 : -EPERM;
-		__skb_pull(skb, offset);
+		switch (type) {
+		case BPF_CGROUP_INET_INGRESS:
+		case BPF_CGROUP_INET_EGRESS:
+			ret = __cgroup_bpf_run_filter_skb(skb, prog);
+			break;
+		/* make gcc happy else complains about missing enum value */
+		default:
+			return 0;
+		}
 	}
 
 	rcu_read_unlock();
