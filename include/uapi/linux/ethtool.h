@@ -254,11 +254,19 @@ struct ethtool_tunable {
 enum phy_tunable_id {
 	ETHTOOL_PHY_ID_UNSPEC,
 	ETHTOOL_PHY_DOWNSHIFT,
+	ETHTOOL_PHY_LOOPBACK,
 	/*
 	 * Add your fresh new phy tunable attribute above and remember to update
 	 * phy_tunable_strings[] in net/core/ethtool.c
 	 */
 	__ETHTOOL_PHY_TUNABLE_COUNT,
+};
+
+enum phy_loopback_type {
+	ETHTOOL_PHY_LOOPBACK_DISABLE,
+	ETHTOOL_PHY_LOOPBACK_NEAR,
+	ETHTOOL_PHY_LOOPBACK_FAR,
+	ETHTOOL_PHY_LOOPBACK_EXTN
 };
 
 /**
