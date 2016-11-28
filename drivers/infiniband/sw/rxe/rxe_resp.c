@@ -1198,6 +1198,8 @@ int rxe_responder(void *arg)
 	struct rxe_pkt_info *pkt = NULL;
 	int ret = 0;
 
+	rxe_add_ref(qp);
+
 	qp->resp.aeth_syndrome = AETH_ACK_UNLIMITED;
 
 	if (!qp->valid) {
@@ -1386,5 +1388,6 @@ int rxe_responder(void *arg)
 exit:
 	ret = -EAGAIN;
 done:
+	rxe_drop_ref(qp);
 	return ret;
 }

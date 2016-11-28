@@ -596,6 +596,8 @@ int rxe_requester(void *arg)
 	struct rxe_qp rollback_qp;
 	struct rxe_send_wqe rollback_wqe;
 
+	rxe_add_ref(qp);
+
 next_wqe:
 	if (unlikely(!qp->valid || qp->req.state == QP_STATE_ERROR))
 		goto exit;
@@ -756,8 +758,10 @@ err:
 	 */
 	wqe->wr.send_flags |= IB_SEND_SIGNALED;
 	__rxe_do_task(&qp->comp.task);
+	rxe_drop_ref(qp);
 	return -EAGAIN;
 
 exit:
+	rxe_drop_ref(qp);
 	return -EAGAIN;
 }
