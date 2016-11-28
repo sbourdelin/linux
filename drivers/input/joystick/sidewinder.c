@@ -50,7 +50,7 @@ MODULE_LICENSE("GPL");
 
 #define SW_START	600	/* The time we wait for the first bit [600 us] */
 #define SW_STROBE	60	/* Max time per bit [60 us] */
-#define SW_TIMEOUT	6	/* Wait for everything to settle [6 ms] */
+#define SW_TIMEOUT	6000	/* Wait for everything to settle [6000 us] */
 #define SW_KICK		45	/* Wait after A0 fall till kick [45 us] */
 #define SW_END		8	/* Number of bits before end of packet to kick */
 #define SW_FAIL		16	/* Number of packet read errors to fail and reinitialize */
@@ -139,7 +139,7 @@ static int sw_read_packet(struct gameport *gameport, unsigned char *buf, int len
 	unsigned char pending, u, v;
 
 	i = -id;						/* Don't care about data, only want ID */
-	timeout = id ? gameport_time(gameport, SW_TIMEOUT * 1000) : 0; /* Set up global timeout for ID packet */
+	timeout = id ? gameport_time(gameport, SW_TIMEOUT) : 0; /* Set up global timeout for ID packet */
 	kick = id ? gameport_time(gameport, SW_KICK) : 0;	/* Set up kick timeout for ID packet */
 	start = gameport_time(gameport, SW_START);
 	strobe = gameport_time(gameport, SW_STROBE);
@@ -248,7 +248,7 @@ static void sw_init_digital(struct gameport *gameport)
 	i = 0;
         do {
                 gameport_trigger(gameport);			/* Trigger */
-		t = gameport_time(gameport, SW_TIMEOUT * 1000);
+		t = gameport_time(gameport, SW_TIMEOUT);
 		while ((gameport_read(gameport) & 1) && t) t--;	/* Wait for axis to fall back to 0 */
                 udelay(seq[i]);					/* Delay magic time */
         } while (seq[++i]);
@@ -483,13 +483,13 @@ static int sw_read(struct sw *sw)
 		" - reinitializing joystick.\n", sw->gameport->phys);
 
 	if (!i && sw->type == SW_ID_3DP) {					/* 3D Pro can be in analog mode */
-		mdelay(3 * SW_TIMEOUT);
+		mdelay(3 * (SW_TIMEOUT / 1000));
 		sw_init_digital(sw->gameport);
 	}
 
-	mdelay(SW_TIMEOUT);
+	mdelay(SW_TIMEOUT / 1000);
 	i = sw_read_packet(sw->gameport, buf, SW_LENGTH, 0);			/* Read normal data packet */
-	mdelay(SW_TIMEOUT);
+	mdelay(SW_TIMEOUT / 1000);
 	sw_read_packet(sw->gameport, buf, SW_LENGTH, i);			/* Read ID packet, this initializes the stick */
 
 	sw->fail = SW_FAIL;
@@ -616,14 +616,14 @@ static int sw_connect(struct gameport *gameport, struct gameport_driver *drv)
 		gameport->phys, gameport->io, gameport->speed);
 
 	i = sw_read_packet(gameport, buf, SW_LENGTH, 0);		/* Read normal packet */
-	msleep(SW_TIMEOUT);
+	usleep_range(SW_TIMEOUT, SW_TIMEOUT + 100);
 	dbg("Init 1: Mode %d. Length %d.", m , i);
 
 	if (!i) {							/* No data. 3d Pro analog mode? */
 		sw_init_digital(gameport);				/* Switch to digital */
-		msleep(SW_TIMEOUT);
+		usleep_range(SW_TIMEOUT, SW_TIMEOUT + 100);
 		i = sw_read_packet(gameport, buf, SW_LENGTH, 0);	/* Retry reading packet */
-		msleep(SW_TIMEOUT);
+		usleep_range(SW_TIMEOUT, SW_TIMEOUT + 100);
 		dbg("Init 1b: Length %d.", i);
 		if (!i) {						/* No data -> FAIL */
 			err = -ENODEV;
@@ -636,7 +636,7 @@ static int sw_connect(struct gameport *gameport, struct gameport_driver *drv)
 	dbg("Init 2: Mode %d. ID Length %d.", m, j);
 
 	if (j <= 0) {							/* Read ID failed. Happens in 1-bit mode on PP */
-		msleep(SW_TIMEOUT);
+		usleep_range(SW_TIMEOUT, SW_TIMEOUT + 100);
 		i = sw_read_packet(gameport, buf, SW_LENGTH, 0);	/* Retry reading packet */
 		m |= sw_guess_mode(buf, i);
 		dbg("Init 2b: Mode %d. Length %d.", m, i);
@@ -644,7 +644,7 @@ static int sw_connect(struct gameport *gameport, struct gameport_driver *drv)
 			err = -ENODEV;
 			goto fail2;
 		}
-		msleep(SW_TIMEOUT);
+		usleep_range(SW_TIMEOUT, SW_TIMEOUT + 100);
 		j = sw_read_packet(gameport, idbuf, SW_LENGTH, i);	/* Retry reading ID */
 		dbg("Init 2c: ID Length %d.", j);
 	}
@@ -655,7 +655,7 @@ static int sw_connect(struct gameport *gameport, struct gameport_driver *drv)
 
 	do {
 		k--;
-		msleep(SW_TIMEOUT);
+		usleep_range(SW_TIMEOUT, SW_TIMEOUT + 100);
 		i = sw_read_packet(gameport, buf, SW_LENGTH, 0);	/* Read data packet */
 		dbg("Init 3: Mode %d. Length %d. Last %d. Tries %d.", m, i, l, k);
 
