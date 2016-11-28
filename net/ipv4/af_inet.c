@@ -1198,6 +1198,7 @@ struct sk_buff *inet_gso_segment(struct sk_buff *skb,
 	struct iphdr *iph;
 	int proto, tot_len;
 	int nhoff;
+	u16 frag_off;
 	int ihl;
 	int id;
 
@@ -1213,6 +1214,7 @@ struct sk_buff *inet_gso_segment(struct sk_buff *skb,
 
 	id = ntohs(iph->id);
 	proto = iph->protocol;
+	frag_off = iph->frag_off;
 
 	/* Warning: after this point, iph might be no longer valid */
 	if (unlikely(!pskb_may_pull(skb, ihl)))
@@ -1233,7 +1235,7 @@ struct sk_buff *inet_gso_segment(struct sk_buff *skb,
 		fixedid = !!(skb_shinfo(skb)->gso_type & SKB_GSO_TCP_FIXEDID);
 
 		/* fixed ID is invalid if DF bit is not set */
-		if (fixedid && !(iph->frag_off & htons(IP_DF)))
+		if (fixedid && !(frag_off & htons(IP_DF)))
 			goto out;
 	}
 
