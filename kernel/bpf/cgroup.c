@@ -117,6 +117,12 @@ void __cgroup_bpf_update(struct cgroup *cgrp,
 	}
 }
 
+static int __cgroup_bpf_run_filter_sock(struct sock *sk,
+					struct bpf_prog *prog)
+{
+	return prog->bpf_func(sk, prog->insnsi) == 1 ? 0 : -EPERM;
+}
+
 static int __cgroup_bpf_run_filter_skb(struct sk_buff *skb,
 				       struct bpf_prog *prog)
 {
@@ -170,6 +176,9 @@ int __cgroup_bpf_run_filter(struct sock *sk,
 		case BPF_CGROUP_INET_INGRESS:
 		case BPF_CGROUP_INET_EGRESS:
 			ret = __cgroup_bpf_run_filter_skb(skb, prog);
+			break;
+		case BPF_CGROUP_INET_SOCK:
+			ret = __cgroup_bpf_run_filter_sock(sk, prog);
 			break;
 		/* make gcc happy else complains about missing enum value */
 		default:
