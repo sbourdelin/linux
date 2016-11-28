@@ -81,7 +81,7 @@ static void wm97xx_acc_pen_up(struct wm97xx *wm)
 {
 	int i;
 
-	msleep(1);
+	usleep_range(1000, 1100);
 
 	for (i = 0; i < 16; i++)
 		MODR;
@@ -98,7 +98,7 @@ static int wm97xx_acc_pen_down(struct wm97xx *wm)
 	 * for samples.  The controller can't have a suitably low
 	 * threshold set to use the notifications it gives.
 	 */
-	msleep(1);
+	usleep_range(1000, 1100);
 
 	if (tries > 5) {
 		tries = 0;
