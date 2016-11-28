@@ -15,11 +15,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <clocksource/arm_arch_timer.h>
 #include <linux/compiler.h>
 #include <linux/kvm_host.h>
 
 #include <asm/kvm_hyp.h>
+#include <asm/kvm_timer.h>
 
 /* vcpu is already in the HYP VA space */
 void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
@@ -37,7 +37,7 @@ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
 
 	/* Allow physical timer/counter access for the host */
 	val = read_sysreg(cnthctl_el2);
-	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
+	val |= get_el1pcten() | get_el1pcen();
 	write_sysreg(val, cnthctl_el2);
 
 	/* Clear cntvoff for the host */
@@ -55,8 +55,8 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
 	 * Physical counter access is allowed
 	 */
 	val = read_sysreg(cnthctl_el2);
-	val &= ~CNTHCTL_EL1PCEN;
-	val |= CNTHCTL_EL1PCTEN;
+	val &= ~get_el1pcen();
+	val |= get_el1pcten();
 	write_sysreg(val, cnthctl_el2);
 
 	if (timer->enabled) {
