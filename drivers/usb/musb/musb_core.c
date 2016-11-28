@@ -1040,14 +1040,15 @@ static void musb_enable_interrupts(struct musb *musb)
 
 }
 
-static void musb_generic_disable(struct musb *musb)
+static void musb_generic_disable(struct musb *musb, bool suspend)
 {
 	void __iomem	*mbase = musb->mregs;
 
 	musb_disable_interrupts(musb);
 
 	/* off */
-	musb_writeb(mbase, MUSB_DEVCTL, 0);
+	if (!suspend || !(musb->io.quirks & MUSB_PRESERVE_DEVCTL))
+		musb_writeb(mbase, MUSB_DEVCTL, 0);
 }
 
 /*
@@ -1106,7 +1107,7 @@ void musb_stop(struct musb *musb)
 {
 	/* stop IRQs, timers, ... */
 	musb_platform_disable(musb);
-	musb_generic_disable(musb);
+	musb_generic_disable(musb, false);
 	musb_dbg(musb, "HDRC disabled");
 
 	/* FIXME
@@ -2310,7 +2311,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 
 	/* be sure interrupts are disabled before connecting ISR */
 	musb_platform_disable(musb);
-	musb_generic_disable(musb);
+	musb_generic_disable(musb, false);
 
 	/* Init IRQ workqueue before request_irq */
 	INIT_DELAYED_WORK(&musb->irq_work, musb_irq_work);
@@ -2486,7 +2487,7 @@ static int musb_remove(struct platform_device *pdev)
 	musb_gadget_cleanup(musb);
 	spin_lock_irqsave(&musb->lock, flags);
 	musb_platform_disable(musb);
-	musb_generic_disable(musb);
+	musb_generic_disable(musb, false);
 	spin_unlock_irqrestore(&musb->lock, flags);
 	musb_writeb(musb->mregs, MUSB_DEVCTL, 0);
 	pm_runtime_dont_use_autosuspend(musb->controller);
@@ -2663,7 +2664,7 @@ static int musb_suspend(struct device *dev)
 	unsigned long	flags;
 
 	musb_platform_disable(musb);
-	musb_generic_disable(musb);
+	musb_generic_disable(musb, true);
 	WARN_ON(!list_empty(&musb->pending_list));
 
 	spin_lock_irqsave(&musb->lock, flags);
