@@ -114,6 +114,7 @@ static const struct nft_expr_ops nft_exthdr_ops = {
 
 static struct nft_expr_type nft_exthdr_type __read_mostly = {
 	.name		= "exthdr",
+	.type		= NFT_EXPR_EXTHDR,
 	.ops		= &nft_exthdr_ops,
 	.policy		= nft_exthdr_policy,
 	.maxattr	= NFTA_EXTHDR_MAX,
@@ -135,4 +136,4 @@ module_exit(nft_exthdr_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Patrick McHardy <kaber@trash.net>");
-MODULE_ALIAS_NFT_EXPR("exthdr");
+MODULE_ALIAS_NFT_EXPR("exthdr", NFT_EXPR_EXTHDR);

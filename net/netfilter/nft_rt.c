@@ -129,6 +129,7 @@ static const struct nft_expr_ops nft_rt_get_ops = {
 
 static struct nft_expr_type nft_rt_type __read_mostly = {
 	.name		= "rt",
+	.type		= NFT_EXPR_RT,
 	.ops		= &nft_rt_get_ops,
 	.policy		= nft_rt_policy,
 	.maxattr	= NFTA_RT_MAX,
@@ -150,4 +151,4 @@ module_exit(nft_rt_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Anders K. Pedersen <akp@cohaesio.com>");
-MODULE_ALIAS_NFT_EXPR("rt");
+MODULE_ALIAS_NFT_EXPR("rt", NFT_EXPR_RT);

@@ -1555,6 +1555,9 @@ static int nf_tables_delchain(struct net *net, struct sock *nlsk,
  */
 int nft_register_expr(struct nft_expr_type *type)
 {
+	if (type->type == NFT_EXPR_UNSPEC)
+		return -EINVAL;
+
 	nfnl_lock(NFNL_SUBSYS_NFTABLES);
 	if (type->family == NFPROTO_UNSPEC)
 		list_add_tail_rcu(&type->list, &nf_tables_expressions);
@@ -1580,45 +1583,62 @@ void nft_unregister_expr(struct nft_expr_type *type)
 EXPORT_SYMBOL_GPL(nft_unregister_expr);
 
 static const struct nft_expr_type *__nft_expr_type_get(u8 family,
-						       struct nlattr *nla)
+						       struct nlattr *nla,
+						       u16 attr)
 {
 	const struct nft_expr_type *type;
 
 	list_for_each_entry(type, &nf_tables_expressions, list) {
-		if (!nla_strcmp(nla, type->name) &&
-		    (!type->family || type->family == family))
+		if (attr == NFTA_EXPR_NAME &&
+		    !nla_strcmp(nla, type->name))
+			return type;
+		else if (attr == NFTA_EXPR_TYPE &&
+			 ntohl(nla_get_be32(nla)) == type->type)
 			return type;
 	}
 	return NULL;
 }
 
 static const struct nft_expr_type *nft_expr_type_get(u8 family,
-						     struct nlattr *nla)
+						     struct nlattr *nla,
+						     u16 attr)
 {
 	const struct nft_expr_type *type;
 
-	if (nla == NULL)
-		return ERR_PTR(-EINVAL);
-
-	type = __nft_expr_type_get(family, nla);
+	type = __nft_expr_type_get(family, nla, attr);
 	if (type != NULL && try_module_get(type->owner))
 		return type;
 
 #ifdef CONFIG_MODULES
 	if (type == NULL) {
 		nfnl_unlock(NFNL_SUBSYS_NFTABLES);
-		request_module("nft-expr-%u-%.*s", family,
-			       nla_len(nla), (char *)nla_data(nla));
-		nfnl_lock(NFNL_SUBSYS_NFTABLES);
-		if (__nft_expr_type_get(family, nla))
-			return ERR_PTR(-EAGAIN);
+		if (attr == NFTA_EXPR_NAME) {
+			request_module("nft-expr-%u-%.*s", family,
+				       nla_len(nla), (char *)nla_data(nla));
+			nfnl_lock(NFNL_SUBSYS_NFTABLES);
+			if (__nft_expr_type_get(family, nla, attr))
+				return ERR_PTR(-EAGAIN);
 
-		nfnl_unlock(NFNL_SUBSYS_NFTABLES);
-		request_module("nft-expr-%.*s",
-			       nla_len(nla), (char *)nla_data(nla));
-		nfnl_lock(NFNL_SUBSYS_NFTABLES);
-		if (__nft_expr_type_get(family, nla))
-			return ERR_PTR(-EAGAIN);
+			nfnl_unlock(NFNL_SUBSYS_NFTABLES);
+			request_module("nft-expr-%.*s",
+				       nla_len(nla), (char *)nla_data(nla));
+			nfnl_lock(NFNL_SUBSYS_NFTABLES);
+			if (__nft_expr_type_get(family, nla, attr))
+				return ERR_PTR(-EAGAIN);
+		} else if (attr == NFTA_EXPR_TYPE) {
+			u32 expr_type = ntohl(nla_get_be32(nla));
+
+			request_module("nft-expr-%u-%u", family, expr_type);
+			nfnl_lock(NFNL_SUBSYS_NFTABLES);
+			if (__nft_expr_type_get(family, nla, attr))
+				return ERR_PTR(-EAGAIN);
+
+			nfnl_unlock(NFNL_SUBSYS_NFTABLES);
+			request_module("nft-expr-%u", expr_type);
+			nfnl_lock(NFNL_SUBSYS_NFTABLES);
+			if (__nft_expr_type_get(family, nla, attr))
+				return ERR_PTR(-EAGAIN);
+		}
 	}
 #endif
 	return ERR_PTR(-ENOENT);
@@ -1627,12 +1647,15 @@ static const struct nft_expr_type *nft_expr_type_get(u8 family,
 static const struct nla_policy nft_expr_policy[NFTA_EXPR_MAX + 1] = {
 	[NFTA_EXPR_NAME]	= { .type = NLA_STRING },
 	[NFTA_EXPR_DATA]	= { .type = NLA_NESTED },
+	[NFTA_EXPR_TYPE]	= { .type = NLA_U32 },
 };
 
 static int nf_tables_fill_expr_info(struct sk_buff *skb,
 				    const struct nft_expr *expr)
 {
 	if (nla_put_string(skb, NFTA_EXPR_NAME, expr->ops->type->name))
+		goto nla_put_failure;
+	if (nla_put_be32(skb, NFTA_EXPR_TYPE, htonl(expr->ops->type->type)))
 		goto nla_put_failure;
 
 	if (expr->ops->dump) {
@@ -1685,7 +1708,12 @@ static int nf_tables_expr_parse(const struct nft_ctx *ctx,
 	if (err < 0)
 		return err;
 
-	type = nft_expr_type_get(ctx->afi->family, tb[NFTA_EXPR_NAME]);
+	if (tb[NFTA_EXPR_TYPE])
+		type = nft_expr_type_get(ctx->afi->family, tb[NFTA_EXPR_TYPE],
+					 NFTA_EXPR_TYPE);
+	else
+		type = nft_expr_type_get(ctx->afi->family, tb[NFTA_EXPR_NAME],
+					 NFTA_EXPR_NAME);
 	if (IS_ERR(type))
 		return PTR_ERR(type);
 

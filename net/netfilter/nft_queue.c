@@ -197,6 +197,7 @@ nft_queue_select_ops(const struct nft_ctx *ctx,
 
 static struct nft_expr_type nft_queue_type __read_mostly = {
 	.name		= "queue",
+	.type		= NFT_EXPR_QUEUE,
 	.select_ops	= &nft_queue_select_ops,
 	.policy		= nft_queue_policy,
 	.maxattr	= NFTA_QUEUE_MAX,
@@ -218,4 +219,4 @@ module_exit(nft_queue_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Eric Leblond <eric@regit.org>");
-MODULE_ALIAS_NFT_EXPR("queue");
+MODULE_ALIAS_NFT_EXPR("queue", NFT_EXPR_QUEUE);

@@ -179,6 +179,7 @@ static const struct nft_expr_ops nft_byteorder_ops = {
 
 struct nft_expr_type nft_byteorder_type __read_mostly = {
 	.name		= "byteorder",
+	.type		= NFT_EXPR_BYTEORDER,
 	.ops		= &nft_byteorder_ops,
 	.policy		= nft_byteorder_policy,
 	.maxattr	= NFTA_BYTEORDER_MAX,

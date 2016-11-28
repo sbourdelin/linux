@@ -165,6 +165,7 @@ static const struct nft_expr_ops nft_counter_ops = {
 
 static struct nft_expr_type nft_counter_type __read_mostly = {
 	.name		= "counter",
+	.type		= NFT_EXPR_COUNTER,
 	.ops		= &nft_counter_ops,
 	.policy		= nft_counter_policy,
 	.maxattr	= NFTA_COUNTER_MAX,
@@ -187,4 +188,4 @@ module_exit(nft_counter_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Patrick McHardy <kaber@trash.net>");
-MODULE_ALIAS_NFT_EXPR("counter");
+MODULE_ALIAS_NFT_EXPR("counter", NFT_EXPR_COUNTER);

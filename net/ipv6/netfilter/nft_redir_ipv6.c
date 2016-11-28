@@ -51,6 +51,7 @@ static const struct nft_expr_ops nft_redir_ipv6_ops = {
 
 static struct nft_expr_type nft_redir_ipv6_type __read_mostly = {
 	.family		= NFPROTO_IPV6,
+	.type		= NFT_EXPR_REDIR,
 	.name		= "redir",
 	.ops		= &nft_redir_ipv6_ops,
 	.policy		= nft_redir_policy,
@@ -73,4 +74,4 @@ module_exit(nft_redir_ipv6_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>");
-MODULE_ALIAS_NFT_AF_EXPR(AF_INET6, "redir");
+MODULE_ALIAS_NFT_AF_EXPR(AF_INET6, "redir", NFT_EXPR_REDIR);

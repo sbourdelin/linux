@@ -49,6 +49,7 @@ static const struct nft_expr_ops nft_masq_ipv6_ops = {
 static struct nft_expr_type nft_masq_ipv6_type __read_mostly = {
 	.family		= NFPROTO_IPV6,
 	.name		= "masq",
+	.type		= NFT_EXPR_MASQ,
 	.ops		= &nft_masq_ipv6_ops,
 	.policy		= nft_masq_policy,
 	.maxattr	= NFTA_MASQ_MAX,
@@ -79,4 +80,4 @@ module_exit(nft_masq_ipv6_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>");
-MODULE_ALIAS_NFT_AF_EXPR(AF_INET6, "masq");
+MODULE_ALIAS_NFT_AF_EXPR(AF_INET6, "masq", NFT_EXPR_MASQ);

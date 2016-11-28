@@ -188,6 +188,7 @@ nft_ng_select_ops(const struct nft_ctx *ctx, const struct nlattr * const tb[])
 
 static struct nft_expr_type nft_ng_type __read_mostly = {
 	.name		= "numgen",
+	.type		= NFT_EXPR_NUMGEN,
 	.select_ops	= &nft_ng_select_ops,
 	.policy		= nft_ng_policy,
 	.maxattr	= NFTA_NG_MAX,
@@ -209,4 +210,4 @@ module_exit(nft_ng_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Laura Garcia <nevola@gmail.com>");
-MODULE_ALIAS_NFT_EXPR("numgen");
+MODULE_ALIAS_NFT_EXPR("numgen", NFT_EXPR_NUMGEN);

@@ -251,6 +251,7 @@ nft_fib6_select_ops(const struct nft_ctx *ctx,
 
 static struct nft_expr_type nft_fib6_type __read_mostly = {
 	.name		= "fib",
+	.type		= NFT_EXPR_FIB,
 	.select_ops	= &nft_fib6_select_ops,
 	.policy		= nft_fib_policy,
 	.maxattr	= NFTA_FIB_MAX,
@@ -272,4 +273,4 @@ module_exit(nft_fib6_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Florian Westphal <fw@strlen.de>");
-MODULE_ALIAS_NFT_AF_EXPR(10, "fib");
+MODULE_ALIAS_NFT_AF_EXPR(10, "fib", NFT_EXPR_FIB);

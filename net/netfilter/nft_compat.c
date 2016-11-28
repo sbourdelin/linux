@@ -705,6 +705,7 @@ err:
 
 static struct nft_expr_type nft_match_type __read_mostly = {
 	.name		= "match",
+	.type		= NFT_EXPR_COMPAT_MATCH,
 	.select_ops	= nft_match_select_ops,
 	.policy		= nft_match_policy,
 	.maxattr	= NFTA_MATCH_MAX,
@@ -794,6 +795,7 @@ err:
 
 static struct nft_expr_type nft_target_type __read_mostly = {
 	.name		= "target",
+	.type		= NFT_EXPR_COMPAT_TARGET,
 	.select_ops	= nft_target_select_ops,
 	.policy		= nft_target_policy,
 	.maxattr	= NFTA_TARGET_MAX,
@@ -843,5 +845,5 @@ module_exit(nft_compat_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Pablo Neira Ayuso <pablo@netfilter.org>");
-MODULE_ALIAS_NFT_EXPR("match");
-MODULE_ALIAS_NFT_EXPR("target");
+MODULE_ALIAS_NFT_EXPR("match", NFT_EXPR_MATCH);
+MODULE_ALIAS_NFT_EXPR("target", NFT_EXPR_TARGET);

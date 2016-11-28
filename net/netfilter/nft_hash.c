@@ -124,6 +124,7 @@ static const struct nft_expr_ops nft_hash_ops = {
 
 static struct nft_expr_type nft_hash_type __read_mostly = {
 	.name		= "hash",
+	.type		= NFT_EXPR_HASH,
 	.ops		= &nft_hash_ops,
 	.policy		= nft_hash_policy,
 	.maxattr	= NFTA_HASH_MAX,
@@ -145,4 +146,4 @@ module_exit(nft_hash_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Laura Garcia <nevola@gmail.com>");
-MODULE_ALIAS_NFT_EXPR("hash");
+MODULE_ALIAS_NFT_EXPR("hash", NFT_EXPR_HASH);

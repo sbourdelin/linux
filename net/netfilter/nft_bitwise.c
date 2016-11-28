@@ -131,6 +131,7 @@ static const struct nft_expr_ops nft_bitwise_ops = {
 
 struct nft_expr_type nft_bitwise_type __read_mostly = {
 	.name		= "bitwise",
+	.type		= NFT_EXPR_BITWISE,
 	.ops		= &nft_bitwise_ops,
 	.policy		= nft_bitwise_policy,
 	.maxattr	= NFTA_BITWISE_MAX,

@@ -649,6 +649,7 @@ struct nft_expr_type {
 	unsigned int			maxattr;
 	u8				family;
 	u8				flags;
+	u8				type;
 };
 
 #define NFT_EXPR_STATEFUL		0x1
@@ -979,11 +980,13 @@ void nft_trace_notify(struct nft_traceinfo *info);
 #define MODULE_ALIAS_NFT_CHAIN(family, name) \
 	MODULE_ALIAS("nft-chain-" __stringify(family) "-" name)
 
-#define MODULE_ALIAS_NFT_AF_EXPR(family, name) \
-	MODULE_ALIAS("nft-expr-" __stringify(family) "-" name)
+#define MODULE_ALIAS_NFT_AF_EXPR(family, name, type) \
+	MODULE_ALIAS("nft-expr-" __stringify(family) "-" name); \
+	MODULE_ALIAS("nft-expr-" __stringify(family) "-" __stringify(type)); \
 
-#define MODULE_ALIAS_NFT_EXPR(name) \
-	MODULE_ALIAS("nft-expr-" name)
+#define MODULE_ALIAS_NFT_EXPR(name, type) \
+	MODULE_ALIAS("nft-expr-" name);	\
+	MODULE_ALIAS("nft-expr-" __stringify(type))
 
 #define MODULE_ALIAS_NFT_SET() \
 	MODULE_ALIAS("nft-set")

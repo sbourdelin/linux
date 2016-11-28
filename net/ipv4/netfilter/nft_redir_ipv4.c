@@ -51,6 +51,7 @@ static const struct nft_expr_ops nft_redir_ipv4_ops = {
 static struct nft_expr_type nft_redir_ipv4_type __read_mostly = {
 	.family		= NFPROTO_IPV4,
 	.name		= "redir",
+	.type		= NFT_EXPR_REDIR,
 	.ops		= &nft_redir_ipv4_ops,
 	.policy		= nft_redir_policy,
 	.maxattr	= NFTA_REDIR_MAX,
@@ -72,4 +73,4 @@ module_exit(nft_redir_ipv4_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>");
-MODULE_ALIAS_NFT_AF_EXPR(AF_INET, "redir");
+MODULE_ALIAS_NFT_AF_EXPR(AF_INET, "redir", NFT_EXPR_REDIR);

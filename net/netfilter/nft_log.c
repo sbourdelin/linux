@@ -188,6 +188,7 @@ static const struct nft_expr_ops nft_log_ops = {
 
 static struct nft_expr_type nft_log_type __read_mostly = {
 	.name		= "log",
+	.type		= NFT_EXPR_LOG,
 	.ops		= &nft_log_ops,
 	.policy		= nft_log_policy,
 	.maxattr	= NFTA_LOG_MAX,
@@ -209,4 +210,4 @@ module_exit(nft_log_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Patrick McHardy <kaber@trash.net>");
-MODULE_ALIAS_NFT_EXPR("log");
+MODULE_ALIAS_NFT_EXPR("log", NFT_EXPR_LOG);

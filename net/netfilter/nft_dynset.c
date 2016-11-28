@@ -272,6 +272,7 @@ static const struct nft_expr_ops nft_dynset_ops = {
 
 struct nft_expr_type nft_dynset_type __read_mostly = {
 	.name		= "dynset",
+	.type		= NFT_EXPR_DYNSET,
 	.ops		= &nft_dynset_ops,
 	.policy		= nft_dynset_policy,
 	.maxattr	= NFTA_DYNSET_MAX,

@@ -219,6 +219,7 @@ nft_limit_select_ops(const struct nft_ctx *ctx,
 
 static struct nft_expr_type nft_limit_type __read_mostly = {
 	.name		= "limit",
+	.type		= NFT_EXPR_LIMIT,
 	.select_ops	= nft_limit_select_ops,
 	.policy		= nft_limit_policy,
 	.maxattr	= NFTA_LIMIT_MAX,
@@ -241,4 +242,4 @@ module_exit(nft_limit_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Patrick McHardy <kaber@trash.net>");
-MODULE_ALIAS_NFT_EXPR("limit");
+MODULE_ALIAS_NFT_EXPR("limit", NFT_EXPR_LIMIT);

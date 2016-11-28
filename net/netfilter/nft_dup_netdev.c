@@ -72,6 +72,7 @@ static const struct nft_expr_ops nft_dup_netdev_ops = {
 
 static struct nft_expr_type nft_dup_netdev_type __read_mostly = {
 	.family		= NFPROTO_NETDEV,
+	.type		= NFT_EXPR_DUP,
 	.name		= "dup",
 	.ops		= &nft_dup_netdev_ops,
 	.policy		= nft_dup_netdev_policy,
@@ -94,4 +95,4 @@ module_exit(nft_dup_netdev_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Pablo Neira Ayuso <pablo@netfilter.org>");
-MODULE_ALIAS_NFT_AF_EXPR(5, "dup");
+MODULE_ALIAS_NFT_AF_EXPR(5, "dup", NFT_EXPR_DUP);

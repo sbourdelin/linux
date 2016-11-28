@@ -96,6 +96,7 @@ static const struct nft_expr_ops nft_quota_ops = {
 
 static struct nft_expr_type nft_quota_type __read_mostly = {
 	.name		= "quota",
+	.type		= NFT_EXPR_QUOTA,
 	.ops		= &nft_quota_ops,
 	.policy		= nft_quota_policy,
 	.maxattr	= NFTA_QUOTA_MAX,
@@ -118,4 +119,4 @@ module_exit(nft_quota_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Pablo Neira Ayuso <pablo@netfilter.org>");
-MODULE_ALIAS_NFT_EXPR("quota");
+MODULE_ALIAS_NFT_EXPR("quota", NFT_EXPR_QUOTA);

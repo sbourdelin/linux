@@ -269,6 +269,7 @@ static const struct nft_expr_ops nft_nat_ops = {
 
 static struct nft_expr_type nft_nat_type __read_mostly = {
 	.name           = "nat",
+	.type		= NFT_EXPR_NAT,
 	.ops            = &nft_nat_ops,
 	.policy         = nft_nat_policy,
 	.maxattr        = NFTA_NAT_MAX,
@@ -290,4 +291,4 @@ module_exit(nft_nat_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Tomasz Bursztyka <tomasz.bursztyka@linux.intel.com>");
-MODULE_ALIAS_NFT_EXPR("nat");
+MODULE_ALIAS_NFT_EXPR("nat", NFT_EXPR_NAT);

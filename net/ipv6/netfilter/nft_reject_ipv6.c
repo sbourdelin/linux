@@ -53,6 +53,7 @@ static const struct nft_expr_ops nft_reject_ipv6_ops = {
 static struct nft_expr_type nft_reject_ipv6_type __read_mostly = {
 	.family		= NFPROTO_IPV6,
 	.name		= "reject",
+	.type		= NFT_EXPR_REJECT,
 	.ops		= &nft_reject_ipv6_ops,
 	.policy		= nft_reject_policy,
 	.maxattr	= NFTA_REJECT_MAX,
@@ -74,4 +75,4 @@ module_exit(nft_reject_ipv6_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Patrick McHardy <kaber@trash.net>");
-MODULE_ALIAS_NFT_AF_EXPR(AF_INET6, "reject");
+MODULE_ALIAS_NFT_AF_EXPR(AF_INET6, "reject", NFT_EXPR_REJECT);

@@ -58,6 +58,7 @@ static const struct nft_expr_ops nft_fib_inet_ops = {
 static struct nft_expr_type nft_fib_inet_type __read_mostly = {
 	.family		= NFPROTO_INET,
 	.name		= "fib",
+	.type		= NFT_EXPR_FIB,
 	.ops		= &nft_fib_inet_ops,
 	.policy		= nft_fib_policy,
 	.maxattr	= NFTA_FIB_MAX,
@@ -79,4 +80,4 @@ module_exit(nft_fib_inet_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Florian Westphal <fw@strlen.de>");
-MODULE_ALIAS_NFT_AF_EXPR(1, "fib");
+MODULE_ALIAS_NFT_AF_EXPR(1, "fib", NFT_EXPR_FIB);

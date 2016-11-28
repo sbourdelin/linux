@@ -132,6 +132,7 @@ static const struct nft_expr_ops nft_range_ops = {
 
 struct nft_expr_type nft_range_type __read_mostly = {
 	.name		= "range",
+	.type		= NFT_EXPR_RANGE,
 	.ops		= &nft_range_ops,
 	.policy		= nft_range_policy,
 	.maxattr	= NFTA_RANGE_MAX,

@@ -84,6 +84,7 @@ static const struct nla_policy nft_dup_ipv6_policy[NFTA_DUP_MAX + 1] = {
 static struct nft_expr_type nft_dup_ipv6_type __read_mostly = {
 	.family		= NFPROTO_IPV6,
 	.name		= "dup",
+	.type		= NFT_EXPR_DUP,
 	.ops		= &nft_dup_ipv6_ops,
 	.policy		= nft_dup_ipv6_policy,
 	.maxattr	= NFTA_DUP_MAX,
@@ -105,4 +106,4 @@ module_exit(nft_dup_ipv6_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Pablo Neira Ayuso <pablo@netfilter.org>");
-MODULE_ALIAS_NFT_AF_EXPR(AF_INET6, "dup");
+MODULE_ALIAS_NFT_AF_EXPR(AF_INET6, "dup", NFT_EXPR_DUP);

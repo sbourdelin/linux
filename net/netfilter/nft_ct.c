@@ -513,6 +513,7 @@ nft_ct_select_ops(const struct nft_ctx *ctx,
 
 static struct nft_expr_type nft_ct_type __read_mostly = {
 	.name		= "ct",
+	.type		= NFT_EXPR_CT,
 	.select_ops	= &nft_ct_select_ops,
 	.policy		= nft_ct_policy,
 	.maxattr	= NFTA_CT_MAX,
@@ -547,6 +548,7 @@ static const struct nft_expr_ops nft_notrack_ops = {
 
 static struct nft_expr_type nft_notrack_type __read_mostly = {
 	.name		= "notrack",
+	.type		= NFT_EXPR_NOTRACK,
 	.ops		= &nft_notrack_ops,
 	.owner		= THIS_MODULE,
 };
@@ -582,5 +584,5 @@ module_exit(nft_ct_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Patrick McHardy <kaber@trash.net>");
-MODULE_ALIAS_NFT_EXPR("ct");
-MODULE_ALIAS_NFT_EXPR("notrack");
+MODULE_ALIAS_NFT_EXPR("ct", NFT_EXPR_CT);
+MODULE_ALIAS_NFT_EXPR("notrack", NFT_EXPR_NOTRACK);

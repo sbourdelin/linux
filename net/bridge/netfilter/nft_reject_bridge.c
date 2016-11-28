@@ -443,6 +443,7 @@ static const struct nft_expr_ops nft_reject_bridge_ops = {
 static struct nft_expr_type nft_reject_bridge_type __read_mostly = {
 	.family		= NFPROTO_BRIDGE,
 	.name		= "reject",
+	.type		= NFT_EXPR_REJECT,
 	.ops		= &nft_reject_bridge_ops,
 	.policy		= nft_reject_policy,
 	.maxattr	= NFTA_REJECT_MAX,
@@ -464,4 +465,4 @@ module_exit(nft_reject_bridge_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Pablo Neira Ayuso <pablo@netfilter.org>");
-MODULE_ALIAS_NFT_AF_EXPR(AF_BRIDGE, "reject");
+MODULE_ALIAS_NFT_AF_EXPR(AF_BRIDGE, "reject", NFT_EXPR_REJECT);

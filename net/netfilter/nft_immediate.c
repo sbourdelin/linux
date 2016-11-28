@@ -114,6 +114,7 @@ static const struct nft_expr_ops nft_imm_ops = {
 
 struct nft_expr_type nft_imm_type __read_mostly = {
 	.name		= "immediate",
+	.type		= NFT_EXPR_IMMEDIATE,
 	.ops		= &nft_imm_ops,
 	.policy		= nft_immediate_policy,
 	.maxattr	= NFTA_IMMEDIATE_MAX,

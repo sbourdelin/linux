@@ -209,6 +209,7 @@ nft_cmp_select_ops(const struct nft_ctx *ctx, const struct nlattr * const tb[])
 
 struct nft_expr_type nft_cmp_type __read_mostly = {
 	.name		= "cmp",
+	.type		= NFT_EXPR_CMP,
 	.select_ops	= nft_cmp_select_ops,
 	.policy		= nft_cmp_policy,
 	.maxattr	= NFTA_CMP_MAX,

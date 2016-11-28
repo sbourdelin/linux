@@ -165,6 +165,7 @@ static const struct nft_expr_ops nft_lookup_ops = {
 
 struct nft_expr_type nft_lookup_type __read_mostly = {
 	.name		= "lookup",
+	.type		= NFT_EXPR_LOOKUP,
 	.ops		= &nft_lookup_ops,
 	.policy		= nft_lookup_policy,
 	.maxattr	= NFTA_LOOKUP_MAX,

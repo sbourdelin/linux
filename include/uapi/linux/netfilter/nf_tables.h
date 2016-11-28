@@ -420,16 +420,51 @@ enum nft_verdict_attributes {
 };
 #define NFTA_VERDICT_MAX	(__NFTA_VERDICT_MAX - 1)
 
+/* Expression types. */
+#define NFT_EXPR_UNSPEC		0
+#define NFT_EXPR_BITWISE	1
+#define NFT_EXPR_BYTEORDER	2
+#define NFT_EXPR_CMP		3
+#define NFT_EXPR_COMPAT_MATCH	4
+#define NFT_EXPR_COMPAT_TARGET	5
+#define NFT_EXPR_COUNTER	6
+#define NFT_EXPR_CT		7
+#define NFT_EXPR_DUP		8
+#define NFT_EXPR_DYNSET		9
+#define NFT_EXPR_EXTHDR		10
+#define NFT_EXPR_FIB		11
+#define NFT_EXPR_FWD		12
+#define NFT_EXPR_HASH		13
+#define NFT_EXPR_IMMEDIATE	14
+#define NFT_EXPR_LIMIT		15
+#define NFT_EXPR_LOG		16
+#define NFT_EXPR_LOOKUP		17
+#define NFT_EXPR_MASQ		18
+#define NFT_EXPR_META		19
+#define NFT_EXPR_NAT		20
+#define NFT_EXPR_NOTRACK	21
+#define NFT_EXPR_NUMGEN		22
+#define NFT_EXPR_PAYLOAD	23
+#define NFT_EXPR_QUEUE		24
+#define NFT_EXPR_QUOTA		25
+#define NFT_EXPR_RANGE		26
+#define NFT_EXPR_REDIR		27
+#define NFT_EXPR_REJECT		28
+#define NFT_EXPR_RT		29
+#define NFT_EXPR_MAX		30
+
 /**
  * enum nft_expr_attributes - nf_tables expression netlink attributes
  *
  * @NFTA_EXPR_NAME: name of the expression type (NLA_STRING)
  * @NFTA_EXPR_DATA: type specific data (NLA_NESTED)
+ * @NFTA_EXPR_TYPE: expression type (NLA_U32)
  */
 enum nft_expr_attributes {
 	NFTA_EXPR_UNSPEC,
 	NFTA_EXPR_NAME,
 	NFTA_EXPR_DATA,
+	NFTA_EXPR_TYPE,
 	__NFTA_EXPR_MAX
 };
 #define NFTA_EXPR_MAX		(__NFTA_EXPR_MAX - 1)

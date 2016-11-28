@@ -74,6 +74,7 @@ static const struct nft_expr_ops nft_fwd_netdev_ops = {
 static struct nft_expr_type nft_fwd_netdev_type __read_mostly = {
 	.family		= NFPROTO_NETDEV,
 	.name		= "fwd",
+	.type		= NFT_EXPR_FWD,
 	.ops		= &nft_fwd_netdev_ops,
 	.policy		= nft_fwd_netdev_policy,
 	.maxattr	= NFTA_FWD_MAX,
@@ -95,4 +96,4 @@ module_exit(nft_fwd_netdev_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Pablo Neira Ayuso <pablo@netfilter.org>");
-MODULE_ALIAS_NFT_AF_EXPR(5, "fwd");
+MODULE_ALIAS_NFT_AF_EXPR(5, "fwd", NFT_EXPR_FWD);

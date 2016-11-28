@@ -321,6 +321,7 @@ nft_payload_select_ops(const struct nft_ctx *ctx,
 
 struct nft_expr_type nft_payload_type __read_mostly = {
 	.name		= "payload",
+	.type		= NFT_EXPR_PAYLOAD,
 	.select_ops	= nft_payload_select_ops,
 	.policy		= nft_payload_policy,
 	.maxattr	= NFTA_PAYLOAD_MAX,

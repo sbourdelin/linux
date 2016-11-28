@@ -111,6 +111,7 @@ nft_meta_bridge_select_ops(const struct nft_ctx *ctx,
 static struct nft_expr_type nft_meta_bridge_type __read_mostly = {
 	.family         = NFPROTO_BRIDGE,
 	.name           = "meta",
+	.type		= NFT_EXPR_META,
 	.select_ops     = &nft_meta_bridge_select_ops,
 	.policy         = nft_meta_policy,
 	.maxattr        = NFTA_META_MAX,
@@ -132,4 +133,4 @@ module_exit(nft_meta_bridge_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Tomasz Bursztyka <tomasz.bursztyka@linux.intel.com>");
-MODULE_ALIAS_NFT_AF_EXPR(AF_BRIDGE, "meta");
+MODULE_ALIAS_NFT_AF_EXPR(AF_BRIDGE, "meta", NFT_EXPR_META);
