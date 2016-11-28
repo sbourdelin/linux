@@ -79,6 +79,7 @@ int asoc_simple_card_set_dailink_name(struct device *dev,
 EXPORT_SYMBOL_GPL(asoc_simple_card_set_dailink_name);
 
 int asoc_simple_card_parse_card_name(struct snd_soc_card *card,
+				     struct device_node *node,
 				     char *prefix)
 {
 	char prop[128];
@@ -87,7 +88,7 @@ int asoc_simple_card_parse_card_name(struct snd_soc_card *card,
 	snprintf(prop, sizeof(prop), "%sname", prefix);
 
 	/* Parse the card name from DT */
-	ret = snd_soc_of_parse_card_name(card, prop);
+	ret = snd_soc_of_parse_card_name_from_node(card, node, prop);
 	if (ret < 0)
 		return ret;
 

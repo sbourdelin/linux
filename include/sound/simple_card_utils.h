@@ -32,6 +32,7 @@ int asoc_simple_card_set_dailink_name(struct device *dev,
 				      struct snd_soc_dai_link *dai_link,
 				      const char *fmt, ...);
 int asoc_simple_card_parse_card_name(struct snd_soc_card *card,
+				     struct device_node *node,
 				     char *prefix);
 
 #define asoc_simple_card_parse_clk_cpu(node, dai_link, simple_dai)		\
