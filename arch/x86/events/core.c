@@ -63,7 +63,7 @@ u64 __read_mostly hw_cache_extra_regs
  * Can only be executed on the CPU where the event is active.
  * Returns the delta events processed.
  */
-u64 x86_perf_event_update(struct perf_event *event)
+u64 x86_perf_event_update(struct perf_event *event, bool pmi)
 {
 	struct hw_perf_event *hwc = &event->hw;
 	int shift = 64 - x86_pmu.cntval_bits;
@@ -99,6 +99,21 @@ again:
 	 */
 	delta = (new_raw_count << shift) - (prev_raw_count << shift);
 	delta >>= shift;
+
+	/*
+	 * Correct delta for special cases caused by the late PMI handle.
+	 * Case1: PMU counter may be start from a big value.
+	 *	  In PMI, new < prev. delta is negative.
+	 * Case2: new is big enough which impact the sign flag.
+	 *	  The delta will be negative after arithmetic right shift.
+	 * Case3: In PMI, new > prev.
+	 *	  The new - prev lose the max count value.
+	 *
+	 * There may be event update in PMI and overflow gap,
+	 * but it rarely happen. The rare case doesn't handle here.
+	 */
+	if (((delta > 0) && pmi) || (delta < 0))
+		delta += x86_pmu.cntval_mask + 1;
 
 	local64_add(delta, &event->count);
 	local64_sub(delta, &hwc->period_left);
@@ -1342,7 +1357,7 @@ void x86_pmu_stop(struct perf_event *event, int flags)
 		 * Drain the remaining delta count out of a event
 		 * that we are disabling:
 		 */
-		x86_perf_event_update(event);
+		x86_perf_event_update(event, (flags == 0));
 		hwc->state |= PERF_HES_UPTODATE;
 	}
 }
@@ -1441,7 +1456,7 @@ int x86_pmu_handle_irq(struct pt_regs *regs)
 
 		event = cpuc->events[idx];
 
-		val = x86_perf_event_update(event);
+		val = x86_perf_event_update(event, true);
 		if (val & (1ULL << (x86_pmu.cntval_bits - 1)))
 			continue;
 
@@ -1850,7 +1865,7 @@ early_initcall(init_hw_perf_events);
 
 static inline void x86_pmu_read(struct perf_event *event)
 {
-	x86_perf_event_update(event);
+	x86_perf_event_update(event, false);
 }
 
 /*
