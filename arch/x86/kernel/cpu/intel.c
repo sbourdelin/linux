@@ -456,6 +456,13 @@ static void init_intel_misc_features(struct cpuinfo_x86 *c)
 {
 	u64 msr;
 
+	if (rdmsrl_safe(MSR_MISC_FEATURES_ENABLES, &msr))
+		return;
+
+	msr = 0;
+	wrmsrl(MSR_MISC_FEATURES_ENABLES, msr);
+	this_cpu_write(msr_misc_features_shadow, msr);
+
 	if (!rdmsrl_safe(MSR_PLATFORM_INFO, &msr)) {
 		if (msr & MSR_PLATFORM_INFO_CPUID_FAULT)
 			set_cpu_cap(c, X86_FEATURE_CPUID_FAULT);

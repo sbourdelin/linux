@@ -33,6 +33,7 @@
 #include <asm/mce.h>
 #include <asm/vm86.h>
 #include <asm/switch_to.h>
+#include <asm/prctl.h>
 
 /*
  * per-CPU TSS segments. Threads are completely 'soft' on Linux,
@@ -192,6 +193,75 @@ int set_tsc_mode(unsigned int val)
 	return 0;
 }
 
+DEFINE_PER_CPU(u64, msr_misc_features_shadow);
+
+static void set_cpuid_faulting(bool on)
+{
+	u64 msrval;
+
+	DEBUG_LOCKS_WARN_ON(!irqs_disabled());
+
+	msrval = this_cpu_read(msr_misc_features_shadow);
+	msrval &= ~MSR_MISC_FEATURES_ENABLES_CPUID_FAULT;
+	msrval |= (on << MSR_MISC_FEATURES_ENABLES_CPUID_FAULT_BIT);
+	this_cpu_write(msr_misc_features_shadow, msrval);
+	wrmsrl(MSR_MISC_FEATURES_ENABLES, msrval);
+}
+
+static void disable_cpuid(void)
+{
+	preempt_disable();
+	if (!test_and_set_thread_flag(TIF_NOCPUID)) {
+		/*
+		 * Must flip the CPU state synchronously with
+		 * TIF_NOCPUID in the current running context.
+		 */
+		set_cpuid_faulting(true);
+	}
+	preempt_enable();
+}
+
+static void enable_cpuid(void)
+{
+	preempt_disable();
+	if (test_and_clear_thread_flag(TIF_NOCPUID)) {
+		/*
+		 * Must flip the CPU state synchronously with
+		 * TIF_NOCPUID in the current running context.
+		 */
+		set_cpuid_faulting(false);
+	}
+	preempt_enable();
+}
+
+static int get_cpuid_mode(void)
+{
+	return !test_thread_flag(TIF_NOCPUID);
+}
+
+static int set_cpuid_mode(struct task_struct *task, unsigned long cpuid_enabled)
+{
+	if (!static_cpu_has(X86_FEATURE_CPUID_FAULT))
+		return -ENODEV;
+
+	if (cpuid_enabled)
+		enable_cpuid();
+	else
+		disable_cpuid();
+
+	return 0;
+}
+
+/*
+ * Called immediately after a successful exec.
+ */
+void arch_setup_new_exec(void)
+{
+	/* If cpuid was previously disabled for this task, re-enable it. */
+	if (test_thread_flag(TIF_NOCPUID))
+		enable_cpuid();
+}
+
 void __switch_to_xtra(struct task_struct *prev_p, struct task_struct *next_p,
 		      struct tss_struct *tss)
 {
@@ -209,6 +279,11 @@ void __switch_to_xtra(struct task_struct *prev_p, struct task_struct *next_p,
 			debugctl |= DEBUGCTLMSR_BTF;
 
 		update_debugctlmsr(debugctl);
+	}
+
+	if (test_tsk_thread_flag(prev_p, TIF_NOCPUID) ^
+	    test_tsk_thread_flag(next_p, TIF_NOCPUID)) {
+		set_cpuid_faulting(test_tsk_thread_flag(next_p, TIF_NOCPUID));
 	}
 
 	if (test_tsk_thread_flag(prev_p, TIF_NOTSC) ^
@@ -588,5 +663,12 @@ out:
 long do_arch_prctl_common(struct task_struct *task, int code,
 			  unsigned long cpuid_enabled)
 {
+	switch (code) {
+	case ARCH_GET_CPUID:
+		return get_cpuid_mode();
+	case ARCH_SET_CPUID:
+		return set_cpuid_mode(task, cpuid_enabled);
+	}
+
 	return -EINVAL;
 }
