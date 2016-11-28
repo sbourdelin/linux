@@ -31,6 +31,7 @@ liquidio_vf-$(CONFIG_LIQUIDIO_VF) += lio_ethtool.o \
 			cn66xx_device.o    \
 			cn68xx_device.o    \
 			cn23xx_pf_device.o \
+			cn23xx_vf_device.o \
 			octeon_mailbox.o   \
 			octeon_mem_ops.o   \
 			octeon_droq.o      \
