@@ -2514,3 +2514,17 @@ struct device_node *of_graph_get_remote_port(const struct device_node *node)
 	return of_get_next_parent(np);
 }
 EXPORT_SYMBOL(of_graph_get_remote_port);
+
+bool of_graph_port_type_is(struct device_node *port, char *type)
+{
+	const char *prop = NULL;
+
+	of_property_read_string(port, "type", &prop);
+
+	if (prop &&
+	    strcmp(prop, type) == 0)
+		return true;
+
+	return false;
+}
+EXPORT_SYMBOL(of_graph_port_type_is);
