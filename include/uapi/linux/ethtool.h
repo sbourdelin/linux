@@ -1583,6 +1583,11 @@ static inline int ethtool_validate_duplex(__u8 duplex)
 #define	FLOW_EXT	0x80000000
 #define	FLOW_MAC_EXT	0x40000000
 
+static inline __u32 ethtool_get_flow_spec_type(__u32 flow_type)
+{
+	return flow_type & (FLOW_EXT | FLOW_MAC_EXT);
+}
+
 /* L3-L4 network traffic flow hash options */
 #define	RXH_L2DA	(1 << 1)
 #define	RXH_VLAN	(1 << 2)
