@@ -1019,6 +1019,33 @@ out:
 	__sdhci_msm_set_clock(host, clock);
 }
 
+void sdhci_msm_reset(struct sdhci_host *host, u8 mask)
+{
+	unsigned long timeout = 100;
+
+	sdhci_writeb(host, mask, SDHCI_SOFTWARE_RESET);
+
+	if (mask & SDHCI_RESET_ALL) {
+		host->clock = 0;
+
+		/*
+		 * SDHCI_RESET_ALL triggers the PWR IRQ and we need
+		 * to handle it here.
+		 */
+		sdhci_msm_voltage_switch(host);
+	}
+
+	while (sdhci_readb(host, SDHCI_SOFTWARE_RESET) & mask) {
+		if (timeout == 0) {
+			pr_err("%s: Reset 0x%x never completed.\n",
+			       mmc_hostname(host->mmc), (int)mask);
+			return;
+		}
+		timeout--;
+		mdelay(1);
+	}
+}
+
 static const struct of_device_id sdhci_msm_dt_match[] = {
 	{ .compatible = "qcom,sdhci-msm-v4" },
 	{},
@@ -1028,7 +1055,7 @@ MODULE_DEVICE_TABLE(of, sdhci_msm_dt_match);
 
 static const struct sdhci_ops sdhci_msm_ops = {
 	.platform_execute_tuning = sdhci_msm_execute_tuning,
-	.reset = sdhci_reset,
+	.reset = sdhci_msm_reset,
 	.set_clock = sdhci_msm_set_clock,
 	.get_min_clock = sdhci_msm_get_min_clock,
 	.get_max_clock = sdhci_msm_get_max_clock,
