@@ -1175,18 +1175,14 @@ static int cow_file_range_async(struct inode *inode, struct page *locked_page,
 	clear_extent_bit(&BTRFS_I(inode)->io_tree, start, end, EXTENT_LOCKED,
 			 1, 0, NULL, GFP_NOFS);
 	while (start < end) {
+		ASSERT(reserve_type == BTRFS_RESERVE_COMPRESS);
 		async_cow = kmalloc(sizeof(*async_cow), GFP_NOFS);
 		BUG_ON(!async_cow); /* -ENOMEM */
 		async_cow->inode = igrab(inode);
 		async_cow->root = root;
 		async_cow->locked_page = locked_page;
 		async_cow->start = start;
-
-		if (reserve_type == BTRFS_RESERVE_COMPRESS)
-			cur_end = min(end, start + SZ_512K - 1);
-		else
-			ASSERT(0);
-
+		cur_end = min(end, start + SZ_512K - 1);
 		async_cow->end = cur_end;
 		INIT_LIST_HEAD(&async_cow->extents);
 
