@@ -65,6 +65,9 @@ static int ipvlan_set_port_mode(struct ipvl_port *port, u16 nval)
 	struct net_device *mdev = port->dev;
 	int err = 0;
 
+	if (nval >= IPVLAN_MODE_MAX)
+		return -EINVAL;
+
 	ASSERT_RTNL();
 	if (port->mode != nval) {
 		if (nval == IPVLAN_MODE_L3S) {
