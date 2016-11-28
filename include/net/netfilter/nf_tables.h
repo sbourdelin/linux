@@ -14,6 +14,7 @@
 
 struct nft_pktinfo {
 	struct sk_buff			*skb;
+	const struct nft_chain		*chain;
 	bool				tprot_set;
 	u8				tprot;
 	/* for x_tables compatibility */
@@ -45,11 +46,18 @@ static inline const struct net_device *nft_out(const struct nft_pktinfo *pkt)
 	return pkt->xt.state->out;
 }
 
+static inline const struct nft_chain *nft_chain(const struct nft_pktinfo *pkt)
+{
+	return pkt->chain;
+}
+
 static inline void nft_set_pktinfo(struct nft_pktinfo *pkt,
 				   struct sk_buff *skb,
-				   const struct nf_hook_state *state)
+				   const struct nf_hook_state *state,
+				   const struct nft_chain *chain)
 {
 	pkt->skb = skb;
+	pkt->chain = chain;
 	pkt->xt.state = state;
 }
 
@@ -64,9 +72,10 @@ static inline void nft_set_pktinfo_proto_unspec(struct nft_pktinfo *pkt,
 
 static inline void nft_set_pktinfo_unspec(struct nft_pktinfo *pkt,
 					  struct sk_buff *skb,
-					  const struct nf_hook_state *state)
+					  const struct nf_hook_state *state,
+					  const struct nft_chain *chain)
 {
-	nft_set_pktinfo(pkt, skb, state);
+	nft_set_pktinfo(pkt, skb, state, chain);
 	nft_set_pktinfo_proto_unspec(pkt, skb);
 }
 
@@ -865,7 +874,7 @@ static inline struct nft_base_chain *nft_base_chain(const struct nft_chain *chai
 
 int __nft_release_basechain(struct nft_ctx *ctx);
 
-unsigned int nft_do_chain(struct nft_pktinfo *pkt, void *priv);
+unsigned int nft_do_chain(struct nft_pktinfo *pkt);
 
 /**
  *	struct nft_table - nf_tables table

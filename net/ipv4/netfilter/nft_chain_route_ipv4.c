@@ -38,7 +38,7 @@ static unsigned int nf_route_table_hook(void *priv,
 	    ip_hdrlen(skb) < sizeof(struct iphdr))
 		return NF_ACCEPT;
 
-	nft_set_pktinfo_ipv4(&pkt, skb, state);
+	nft_set_pktinfo_ipv4(&pkt, skb, state, priv);
 
 	mark = skb->mark;
 	iph = ip_hdr(skb);
@@ -46,7 +46,7 @@ static unsigned int nf_route_table_hook(void *priv,
 	daddr = iph->daddr;
 	tos = iph->tos;
 
-	ret = nft_do_chain(&pkt, priv);
+	ret = nft_do_chain(&pkt);
 	if (ret != NF_DROP && ret != NF_STOLEN) {
 		iph = ip_hdr(skb);
 

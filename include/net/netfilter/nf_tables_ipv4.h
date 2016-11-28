@@ -7,11 +7,12 @@
 static inline void
 nft_set_pktinfo_ipv4(struct nft_pktinfo *pkt,
 		     struct sk_buff *skb,
-		     const struct nf_hook_state *state)
+		     const struct nf_hook_state *state,
+		     const struct nft_chain *chain)
 {
 	struct iphdr *ip;
 
-	nft_set_pktinfo(pkt, skb, state);
+	nft_set_pktinfo(pkt, skb, state, chain);
 
 	ip = ip_hdr(pkt->skb);
 	pkt->tprot_set = true;
@@ -54,9 +55,10 @@ __nft_set_pktinfo_ipv4_validate(struct nft_pktinfo *pkt,
 static inline void
 nft_set_pktinfo_ipv4_validate(struct nft_pktinfo *pkt,
 			      struct sk_buff *skb,
-			      const struct nf_hook_state *state)
+			      const struct nf_hook_state *state,
+			      const struct nft_chain *chain)
 {
-	nft_set_pktinfo(pkt, skb, state);
+	nft_set_pktinfo(pkt, skb, state, chain);
 	if (__nft_set_pktinfo_ipv4_validate(pkt, skb, state) < 0)
 		nft_set_pktinfo_proto_unspec(pkt, skb);
 }

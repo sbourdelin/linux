@@ -120,10 +120,9 @@ struct nft_jumpstack {
 	int			rulenum;
 };
 
-unsigned int
-nft_do_chain(struct nft_pktinfo *pkt, void *priv)
+unsigned int nft_do_chain(struct nft_pktinfo *pkt)
 {
-	const struct nft_chain *chain = priv, *basechain = chain;
+	const struct nft_chain *chain = pkt->chain, *basechain = chain;
 	const struct net *net = nft_net(pkt);
 	const struct nft_rule *rule;
 	const struct nft_expr *expr, *last;

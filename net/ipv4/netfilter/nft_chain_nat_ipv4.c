@@ -33,9 +33,9 @@ static unsigned int nft_nat_do_chain(void *priv,
 {
 	struct nft_pktinfo pkt;
 
-	nft_set_pktinfo_ipv4(&pkt, skb, state);
+	nft_set_pktinfo_ipv4(&pkt, skb, state, priv);
 
-	return nft_do_chain(&pkt, priv);
+	return nft_do_chain(&pkt);
 }
 
 static unsigned int nft_nat_ipv4_fn(void *priv,

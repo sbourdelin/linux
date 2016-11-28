@@ -7,12 +7,13 @@
 static inline void
 nft_set_pktinfo_ipv6(struct nft_pktinfo *pkt,
 		     struct sk_buff *skb,
-		     const struct nf_hook_state *state)
+		     const struct nf_hook_state *state,
+		     const struct nft_chain *chain)
 {
 	int protohdr, thoff = 0;
 	unsigned short frag_off;
 
-	nft_set_pktinfo(pkt, skb, state);
+	nft_set_pktinfo(pkt, skb, state, chain);
 
 	protohdr = ipv6_find_hdr(pkt->skb, &thoff, -1, &frag_off, NULL);
 	if (protohdr < 0) {
@@ -68,9 +69,10 @@ __nft_set_pktinfo_ipv6_validate(struct nft_pktinfo *pkt,
 static inline void
 nft_set_pktinfo_ipv6_validate(struct nft_pktinfo *pkt,
 			      struct sk_buff *skb,
-			      const struct nf_hook_state *state)
+			      const struct nf_hook_state *state,
+			      const struct nft_chain *chain)
 {
-	nft_set_pktinfo(pkt, skb, state);
+	nft_set_pktinfo(pkt, skb, state, chain);
 	if (__nft_set_pktinfo_ipv6_validate(pkt, skb, state) < 0)
 		nft_set_pktinfo_proto_unspec(pkt, skb);
 }

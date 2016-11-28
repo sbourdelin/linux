@@ -23,17 +23,17 @@ nft_do_chain_netdev(void *priv, struct sk_buff *skb,
 
 	switch (skb->protocol) {
 	case htons(ETH_P_IP):
-		nft_set_pktinfo_ipv4_validate(&pkt, skb, state);
+		nft_set_pktinfo_ipv4_validate(&pkt, skb, state, priv);
 		break;
 	case htons(ETH_P_IPV6):
-		nft_set_pktinfo_ipv6_validate(&pkt, skb, state);
+		nft_set_pktinfo_ipv6_validate(&pkt, skb, state, priv);
 		break;
 	default:
-		nft_set_pktinfo_unspec(&pkt, skb, state);
+		nft_set_pktinfo_unspec(&pkt, skb, state, priv);
 		break;
 	}
 
-	return nft_do_chain(&pkt, priv);
+	return nft_do_chain(&pkt);
 }
 
 static struct nft_af_info nft_af_netdev __read_mostly = {

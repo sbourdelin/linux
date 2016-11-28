@@ -27,17 +27,17 @@ nft_do_chain_bridge(void *priv,
 
 	switch (eth_hdr(skb)->h_proto) {
 	case htons(ETH_P_IP):
-		nft_set_pktinfo_ipv4_validate(&pkt, skb, state);
+		nft_set_pktinfo_ipv4_validate(&pkt, skb, state, priv);
 		break;
 	case htons(ETH_P_IPV6):
-		nft_set_pktinfo_ipv6_validate(&pkt, skb, state);
+		nft_set_pktinfo_ipv6_validate(&pkt, skb, state, priv);
 		break;
 	default:
-		nft_set_pktinfo_unspec(&pkt, skb, state);
+		nft_set_pktinfo_unspec(&pkt, skb, state, priv);
 		break;
 	}
 
-	return nft_do_chain(&pkt, priv);
+	return nft_do_chain(&pkt);
 }
 
 static struct nft_af_info nft_af_bridge __read_mostly = {

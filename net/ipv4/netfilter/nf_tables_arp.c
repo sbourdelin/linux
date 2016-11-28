@@ -21,9 +21,9 @@ nft_do_chain_arp(void *priv,
 {
 	struct nft_pktinfo pkt;
 
-	nft_set_pktinfo_unspec(&pkt, skb, state);
+	nft_set_pktinfo_unspec(&pkt, skb, state, priv);
 
-	return nft_do_chain(&pkt, priv);
+	return nft_do_chain(&pkt);
 }
 
 static struct nft_af_info nft_af_arp __read_mostly = {

@@ -33,7 +33,7 @@ static unsigned int nf_route_table_hook(void *priv,
 	u32 mark, flowlabel;
 	int err;
 
-	nft_set_pktinfo_ipv6(&pkt, skb, state);
+	nft_set_pktinfo_ipv6(&pkt, skb, state, priv);
 
 	/* save source/dest address, mark, hoplimit, flowlabel, priority */
 	memcpy(&saddr, &ipv6_hdr(skb)->saddr, sizeof(saddr));
@@ -44,7 +44,7 @@ static unsigned int nf_route_table_hook(void *priv,
 	/* flowlabel and prio (includes version, which shouldn't change either */
 	flowlabel = *((u32 *)ipv6_hdr(skb));
 
-	ret = nft_do_chain(&pkt, priv);
+	ret = nft_do_chain(&pkt);
 	if (ret != NF_DROP && ret != NF_STOLEN &&
 	    (memcmp(&ipv6_hdr(skb)->saddr, &saddr, sizeof(saddr)) ||
 	     memcmp(&ipv6_hdr(skb)->daddr, &daddr, sizeof(daddr)) ||
