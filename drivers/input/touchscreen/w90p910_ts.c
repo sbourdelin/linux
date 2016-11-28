@@ -171,9 +171,9 @@ static int w90p910_open(struct input_dev *dev)
 	clk_enable(w90p910_ts->clk);
 
 	__raw_writel(ADC_RST1, w90p910_ts->ts_reg);
-	msleep(1);
+	usleep_range(1000, 1100);
 	__raw_writel(ADC_RST0, w90p910_ts->ts_reg);
-	msleep(1);
+	usleep_range(1000, 1100);
 
 	/* set delay and screen type */
 	val = __raw_readl(w90p910_ts->ts_reg + 0x04);
