@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <sched.h>
 #include <sys/wait.h>
+#include <sys/resource.h>
 #include <stdlib.h>
 #include <time.h>
 #include "bpf_sys.h"
