@@ -1,0 +1,67 @@
+Simple-Graph-Card:
+
+Simple-Graph-Card specifies audio DAI connections of SoC <-> codec.
+It is based on common bindings for device graphs.
+see ${LINUX}/Documentation/devicetree/bindings/graph.txt
+
+Basically, Simple-Graph-Card property is same as Simple-Card.
+see ${LINUX}/Documentation/devicetree/bindings/sound/simple-card.txt
+
+Below are same as Simple-Card.
+
+- simple-audio-card,name
+- simple-audio-card,widgets
+- simple-audio-card,routing
+- simple-audio-card,mclk-fs
+- simple-audio-card,hp-det-gpio
+- simple-audio-card,mic-det-gpio
+- simple-audio-card,format
+- simple-audio-card,frame-master
+- simple-audio-card,bitclock-master
+- simple-audio-card,bitclock-inversion
+- simple-audio-card,frame-inversion
+- simple-audio-card,mclk-fs
+- simple-audio-card,dai-tdm-slot-num
+- simple-audio-card,dai-tdm-slot-width
+- clocks / system-clock-frequency
+
+In Simple-Graph-Card, above properties need in CPU side port on DT.
+And it needs to have "compatible" property too.
+In addition, CPU side driver needs to call asoc_simple_card_try_to_probe_graph_card().
+It will probe specified Card driver if it could find "compatible" property on port.
+Otherwise, it will do nothing.
+
+Required properties:
+
+- compatible				: "asoc-simple-graph-card";
+- type					: "sound";
+
+Example
+
+ak4643: codec@12 {
+	compatible = "asahi-kasei,ak4643";
+	...
+	port {
+		type = "sound";
+		ak4643_port: endpoint {
+			remote-endpoint = <&rcar_ak4643_port>;
+			...
+		};
+	};
+};
+
+rcar_sound {
+	...
+	port {
+		compatible = "asoc-simple-graph-card";
+
+		simple-audio-card,format = "left_j";
+		simple-audio-card,bitclock-master = <&ak4643_port>;
+		simple-audio-card,frame-master = <&ak4643_port>;
+		type = "sound";
+		rcar_ak4643_port: endpoint {
+			remote-endpoint = <&ak4643_port>;
+			...
+		};
+	};
+};
