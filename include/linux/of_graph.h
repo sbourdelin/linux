@@ -52,11 +52,13 @@ struct of_endpoint {
 	     child = of_graph_get_next_endpoint(parent, child))
 
 #define of_graph_port_type_is_sound(n)		of_graph_port_type_is(n, "sound")
+#define of_graph_get_sound_endpoint_count(n)	of_graph_get_endpoint_count(n, "sound")
 
 #ifdef CONFIG_OF
 int of_graph_parse_endpoint(const struct device_node *node,
 				struct of_endpoint *endpoint);
 bool of_graph_port_type_is(struct device_node *port, char *type);
+int of_graph_get_endpoint_count(const struct device_node *np, char *type);
 struct device_node *of_graph_get_port_by_id(struct device_node *node, u32 id);
 struct device_node *of_graph_get_top_port(struct device *dev);
 struct device_node *of_graph_get_next_port(const struct device_node *parent,
@@ -85,6 +87,12 @@ static inline int of_graph_parse_endpoint(const struct device_node *node,
 static bool of_graph_port_type_is(struct device_node *port, char *type)
 {
 	return false;
+}
+
+static inline int of_graph_get_endpoint_count(const struct device_node *np,
+					      char *type)
+{
+	return 0;
 }
 
 static inline struct device_node *of_graph_get_port_by_id(

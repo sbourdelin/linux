@@ -2630,3 +2630,19 @@ bool of_graph_port_type_is(struct device_node *port, char *type)
 	return false;
 }
 EXPORT_SYMBOL(of_graph_port_type_is);
+
+int of_graph_get_endpoint_count(const struct device_node *np, char *type)
+{
+	struct device_node *port, *endpoint;
+	int num = 0;
+
+	for_each_of_endpoint(np, port, endpoint) {
+		if (!type)
+			num++;
+		else
+			num += of_graph_port_type_is(port, type);
+	}
+
+	return num;
+}
+EXPORT_SYMBOL(of_graph_get_endpoint_count);
