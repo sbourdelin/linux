@@ -1,0 +1,69 @@
+Simple-Graph-SCU-Card:
+
+Simple-Graph-SCU-Card specifies audio DAI connections of SoC <-> codec.
+It is based on common bindings for device graphs.
+see ${LINUX}/Documentation/devicetree/bindings/graph.txt
+
+Basically, Simple-Graph-SCU-Card property is same as Simple-Card / Simple-Graph-Card.
+see ${LINUX}/Documentation/devicetree/bindings/sound/simple-card.txt
+    ${LINUX}/Documentation/devicetree/bindings/sound/simple-graph-card.txt
+
+Main difference between Simple-Graph-Card and Simple-Graph-SCU-Card is that
+Simple-Graph-SCU-Card can use multi CPU.
+
+Required properties:
+
+- compatible				: "asoc-simple-graph-scu-card";
+- type					: "sound";
+- simple-audio-card,routing		: see simple-card.txt
+
+Example
+
+ak4643: codec@12 {
+	compatible = "asahi-kasei,ak4643";
+	...
+	port {
+		type = "sound";
+		ak4643_fe: endpoint@0 {
+			remote-endpoint = <&rsnd_fe>;
+			...
+		};
+		ak4643_be: endpoint@1 {
+			remote-endpoint = <&rsnd_be>;
+			...
+		};
+	};
+};
+
+rcar_sound {
+	...
+	ports {
+		compatible = "asoc-simple-graph-scu-card";
+
+		simple-audio-card,name = "graph-sound";
+		simple-audio-card,format = "left_j";
+		simple-audio-card,bitclock-master = <&rsnd_fe>;
+		simple-audio-card,frame-master = <&rsnd_fe>;
+		simple-audio-card,convert-rate = <48000>;
+		simple-audio-card,convert-channels = <2>;
+		simple-audio-card,prefix = "ak4642";
+		simple-audio-card,routing =
+				"ak4642 Playback", "DAI0 Playback",
+				"ak4642 Playback", "DAI1 Playback";
+
+		port@0 {
+			type = "sound";
+			rsnd_fe: endpoint@0 {
+				remote-endpoint = <&ak4643_fe>;
+				...
+			};
+		};
+		port@1 {
+			type = "sound";
+			rsnd_be: endpoint@1 {
+				remote-endpoint = <&ak4643_be>;
+				...
+			};
+		};
+	};
+};
