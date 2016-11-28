@@ -401,6 +401,8 @@ static u32 rk_tsadcv2_temp_to_code(const struct chip_tsadc_table *table,
 				   int temp)
 {
 	int high, low, mid;
+	unsigned long num;
+	unsigned int denom;
 	u32 error = table->data_mask;
 
 	low = 0;
@@ -419,6 +421,27 @@ static u32 rk_tsadcv2_temp_to_code(const struct chip_tsadc_table *table,
 		else
 			low = mid + 1;
 		mid = (low + high) / 2;
+	}
+
+	/*
+	 * The conversion code granularity provided by the table. Let's
+	 * assume that the relationship between temperature and
+	 * analog value between 2 table entries is linear and interpolate
+	 * to produce less granular result.
+	 */
+	num = abs(table->id[mid].code - table->id[mid + 1].code);
+	num *= temp - table->id[mid].temp;
+	denom = table->id[mid + 1].temp - table->id[mid].temp;
+
+	switch (table->mode) {
+	case ADC_DECREMENT:
+		return table->id[mid].code - (num / denom);
+	case ADC_INCREMENT:
+		return table->id[mid].code + (num / denom);
+	default:
+		pr_err("%s: invalid conversion table, mode=%d\n",
+		       __func__, table->mode);
+		return error;
 	}
 
 exit:
