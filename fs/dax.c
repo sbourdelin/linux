@@ -309,7 +309,7 @@ static void put_unlocked_mapping_entry(struct address_space *mapping,
  * persistent memory the benefit is doubtful. We can add that later if we can
  * show it helps.
  */
-static void *grab_mapping_entry(struct address_space *mapping, pgoff_t index,
+static __maybe_unused void * grab_mapping_entry(struct address_space *mapping, pgoff_t index,
 		unsigned long size_flag)
 {
 	bool pmd_downgrade = false; /* splitting 2MiB entry into 4k entries? */
@@ -489,7 +489,7 @@ int dax_delete_mapping_entry(struct address_space *mapping, pgoff_t index)
  * otherwise it will simply fall out of the page cache under memory
  * pressure without ever having been dirtied.
  */
-static int dax_load_hole(struct address_space *mapping, void *entry,
+static int __maybe_unused dax_load_hole(struct address_space *mapping, void *entry,
 			 struct vm_fault *vmf)
 {
 	struct page *page;
@@ -509,7 +509,7 @@ static int dax_load_hole(struct address_space *mapping, void *entry,
 	return VM_FAULT_LOCKED;
 }
 
-static int copy_user_dax(struct block_device *bdev, sector_t sector, size_t size,
+static int __maybe_unused copy_user_dax(struct block_device *bdev, sector_t sector, size_t size,
 		struct page *to, unsigned long vaddr)
 {
 	struct blk_dax_ctl dax = {
@@ -815,7 +815,7 @@ int dax_writeback_mapping_range(struct address_space *mapping,
 }
 EXPORT_SYMBOL_GPL(dax_writeback_mapping_range);
 
-static int dax_insert_mapping(struct address_space *mapping,
+static int __maybe_unused dax_insert_mapping(struct address_space *mapping,
 		struct block_device *bdev, sector_t sector, size_t size,
 		void **entryp, struct vm_area_struct *vma, struct vm_fault *vmf)
 {
