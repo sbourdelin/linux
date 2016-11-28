@@ -452,6 +452,16 @@ static void intel_bsp_resume(struct cpuinfo_x86 *c)
 	init_intel_energy_perf(c);
 }
 
+static void init_intel_misc_features(struct cpuinfo_x86 *c)
+{
+	u64 msr;
+
+	if (!rdmsrl_safe(MSR_PLATFORM_INFO, &msr)) {
+		if (msr & MSR_PLATFORM_INFO_CPUID_FAULT)
+			set_cpu_cap(c, X86_FEATURE_CPUID_FAULT);
+	}
+}
+
 static void init_intel(struct cpuinfo_x86 *c)
 {
 	unsigned int l2 = 0;
@@ -565,6 +575,8 @@ static void init_intel(struct cpuinfo_x86 *c)
 		detect_vmx_virtcap(c);
 
 	init_intel_energy_perf(c);
+
+	init_intel_misc_features(c);
 }
 
 #ifdef CONFIG_X86_32
