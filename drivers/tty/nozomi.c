@@ -69,13 +69,8 @@
 #define NOZOMI_DEBUG_LEVEL 0x00
 
 #define P_BUF_SIZE 128
-#define NFO(_err_flag_, args...)				\
-do {								\
-	char tmp[P_BUF_SIZE];					\
-	snprintf(tmp, sizeof(tmp), ##args);			\
-	printk(_err_flag_ "[%d] %s(): %s\n", __LINE__,		\
-		__func__, tmp);				\
-} while (0)
+#define NFO(_err_flag_, fmt, args...)					\
+	pr_debug("[%d] %s(): " fmt "\n", __LINE__, __func__,  ##args);
 
 #define DBG1(args...) D_(0x01, ##args)
 #define DBG2(args...) D_(0x02, ##args)
