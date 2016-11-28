@@ -584,3 +584,9 @@ out:
 	put_task_stack(p);
 	return ret;
 }
+
+long do_arch_prctl_common(struct task_struct *task, int code,
+			  unsigned long cpuid_enabled)
+{
+	return -EINVAL;
+}
