@@ -70,9 +70,9 @@ void cgroup_bpf_inherit(struct cgroup *cgrp, struct cgroup *parent)
  * releases the one that is currently attached, if any. @prog is then made
  * the effective program of type @type in that cgroup.
  *
- * If @prog is %NULL, the currently attached program of type @type is released,
- * and the effective program of the parent cgroup (if any) is inherited to
- * @cgrp.
+ * If @prog is not %NULL, the currently attached program of type @type is
+ * released, and the effective program of the parent cgroup (if any) is
+ * inherited to @cgrp.
  *
  * Then, the descendants of @cgrp are walked and the effective program for
  * each of them is set to the effective program of @cgrp unless the
