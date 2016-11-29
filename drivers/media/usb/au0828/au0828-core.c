@@ -280,6 +280,7 @@ create_link:
 	}
 }
 
+/* Callers should hold graph_mutex */
 static int au0828_enable_source(struct media_entity *entity,
 				struct media_pipeline *pipe)
 {
@@ -292,8 +293,6 @@ static int au0828_enable_source(struct media_entity *entity,
 
 	if (!mdev)
 		return -ENODEV;
-
-	mutex_lock(&mdev->graph_mutex);
 
 	dev = mdev->source_priv;
 
@@ -421,12 +420,12 @@ static int au0828_enable_source(struct media_entity *entity,
 		 dev->active_source->name, dev->active_sink->name,
 		 dev->active_link_owner->name, ret);
 end:
-	mutex_unlock(&mdev->graph_mutex);
 	pr_debug("au0828_enable_source() end %s %d %d\n",
 		 entity->name, entity->function, ret);
 	return ret;
 }
 
+/* Callers should hold graph_mutex */
 static void au0828_disable_source(struct media_entity *entity)
 {
 	int ret = 0;
@@ -436,13 +435,10 @@ static void au0828_disable_source(struct media_entity *entity)
 	if (!mdev)
 		return;
 
-	mutex_lock(&mdev->graph_mutex);
 	dev = mdev->source_priv;
 
-	if (!dev->active_link) {
-		ret = -ENODEV;
-		goto end;
-	}
+	if (!dev->active_link)
+		return;
 
 	/* link is active - stop pipeline from source (tuner) */
 	if (dev->active_link->sink->entity == dev->active_sink &&
@@ -452,7 +448,7 @@ static void au0828_disable_source(struct media_entity *entity)
 		 * has active pipeline
 		*/
 		if (dev->active_link_owner != entity)
-			goto end;
+			return;
 		__media_entity_pipeline_stop(entity);
 		ret = __media_entity_setup_link(dev->active_link, 0);
 		if (ret)
@@ -467,9 +463,6 @@ static void au0828_disable_source(struct media_entity *entity)
 		dev->active_source = NULL;
 		dev->active_sink = NULL;
 	}
-
-end:
-	mutex_unlock(&mdev->graph_mutex);
 }
 #endif
 
