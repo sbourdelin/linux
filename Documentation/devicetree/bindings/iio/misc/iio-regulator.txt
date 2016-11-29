@@ -1,0 +1,18 @@
+Industrial IO regulator device driver
+-------------------------------------
+
+This document describes the bindings for the iio-regulator - a dummy device
+driver representing a physical regulator within the iio framework.
+
+Required properties:
+
+- compatible: must be "iio-regulator"
+- vcc-supply: phandle of the regulator this device represents
+
+Example
+-------
+
+iio_regulator {
+	compatible = "iio-regulator";
+	vcc-supply = <&vcc0>;
+};

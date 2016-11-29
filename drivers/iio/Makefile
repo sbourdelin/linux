@@ -26,6 +26,7 @@ obj-y += frequency/
 obj-y += health/
 obj-y += humidity/
 obj-y += imu/
+obj-y += misc/
 obj-y += light/
 obj-y += magnetometer/
 obj-y += orientation/

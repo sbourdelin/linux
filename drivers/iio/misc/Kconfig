@@ -1,0 +1,17 @@
+#
+# Miscellaneous iio drivers
+#
+# When adding new entries keep the list in alphabetical order
+
+menu "Miscellaneous iio drivers"
+
+config IIO_REGULATOR
+	tristate "IIO regulator driver"
+	depends on REGULATOR
+	help
+	  Say yes here to build support for regulators powering iio devices.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called iio-regulator.
+
+endmenu
