@@ -15,10 +15,10 @@ config 104_QUAD_8
 	  Performing a write to a counter's IIO_CHAN_INFO_RAW sets the counter and
 	  also clears the counter's respective error flag. Although the counters
 	  have a 25-bit range, only the lower 24 bits may be set, either directly
-	  or via a counter's preset attribute. Interrupts are not supported by
-	  this driver.
+	  or via a counter's preset attribute.
 
 	  The base port addresses for the devices may be configured via the base
-	  array module parameter.
+	  array module parameter. The interrupt line numbers for the devices may
+	  be configured via the irq array module parameter.
 
 endmenu

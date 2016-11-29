@@ -16,10 +16,12 @@
 #include <linux/bitops.h>
 #include <linux/device.h>
 #include <linux/errno.h>
+#include <linux/iio/events.h>
 #include <linux/iio/iio.h>
 #include <linux/iio/types.h>
 #include <linux/io.h>
 #include <linux/ioport.h>
+#include <linux/interrupt.h>
 #include <linux/isa.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -33,6 +35,10 @@ static unsigned int num_quad8;
 module_param_array(base, uint, &num_quad8, 0);
 MODULE_PARM_DESC(base, "ACCES 104-QUAD-8 base addresses");
 
+static unsigned int irq[max_num_isa_dev(QUAD8_EXTENT)];
+module_param_array(irq, uint, NULL, 0000);
+MODULE_PARM_DESC(base, "ACCES 104-QUAD-8 interrupt line numbers");
+
 #define QUAD8_NUM_COUNTERS 8
 
 /**
@@ -43,6 +49,7 @@ MODULE_PARM_DESC(base, "ACCES 104-QUAD-8 base addresses");
  * @quadrature_scale:	array of quadrature mode scale configurations
  * @ab_enable:		array of A and B inputs enable configurations
  * @preset_enable:	array of set_to_preset_on_index attribute configurations
+ * @irq_trig_func:	array of IRQ trigger function attribute configurations
  * @synchronous_mode:	array of index function synchronous mode configurations
  * @index_polarity:	array of index function polarity configurations
  * @base:		base port address of the IIO device
@@ -54,6 +61,7 @@ struct quad8_iio {
 	unsigned int quadrature_scale[QUAD8_NUM_COUNTERS];
 	unsigned int ab_enable[QUAD8_NUM_COUNTERS];
 	unsigned int preset_enable[QUAD8_NUM_COUNTERS];
+	unsigned int irq_trig_func[QUAD8_NUM_COUNTERS];
 	unsigned int synchronous_mode[QUAD8_NUM_COUNTERS];
 	unsigned int index_polarity[QUAD8_NUM_COUNTERS];
 	unsigned int base;
@@ -150,7 +158,8 @@ static int quad8_write_raw(struct iio_dev *indio_dev,
 
 		priv->ab_enable[chan->channel] = val;
 
-		ior_cfg = val | priv->preset_enable[chan->channel] << 1;
+		ior_cfg = val | priv->preset_enable[chan->channel] << 1 |
+			priv->irq_trig_func[chan->channel] << 3;
 
 		/* Load I/O control configuration */
 		outb(0x40 | ior_cfg, base_offset);
@@ -184,10 +193,39 @@ static int quad8_write_raw(struct iio_dev *indio_dev,
 	return -EINVAL;
 }
 
+static int quad8_read_event_config(struct iio_dev *indio_dev,
+	const struct iio_chan_spec *chan, enum iio_event_type type,
+	enum iio_event_direction dir)
+{
+	const struct quad8_iio *const priv = iio_priv(indio_dev);
+	const unsigned int irq_enabled = inb(priv->base + 0x12);
+
+	return !!(irq_enabled & BIT(chan->channel));
+}
+
+static int quad8_write_event_config(struct iio_dev *indio_dev,
+	const struct iio_chan_spec *chan, enum iio_event_type type,
+	enum iio_event_direction dir, int state)
+{
+	const struct quad8_iio *const priv = iio_priv(indio_dev);
+	unsigned int irq_enabled = inb(priv->base + 0x12);
+
+	if (state)
+		irq_enabled |= BIT(chan->channel);
+	else
+		irq_enabled &= ~BIT(chan->channel);
+
+	outb(irq_enabled, priv->base + 0x12);
+
+	return 0;
+}
+
 static const struct iio_info quad8_info = {
 	.driver_module = THIS_MODULE,
 	.read_raw = quad8_read_raw,
-	.write_raw = quad8_write_raw
+	.write_raw = quad8_write_raw,
+	.read_event_config = quad8_read_event_config,
+	.write_event_config = quad8_write_event_config
 };
 
 static ssize_t quad8_read_preset(struct iio_dev *indio_dev, uintptr_t private,
@@ -253,13 +291,52 @@ static ssize_t quad8_write_set_to_preset_on_index(struct iio_dev *indio_dev,
 	priv->preset_enable[chan->channel] = preset_enable;
 
 	ior_cfg = priv->ab_enable[chan->channel] |
-		(unsigned int)preset_enable << 1;
+		(unsigned int)preset_enable << 1 |
+		priv->irq_trig_func[chan->channel] << 3;
 
 	/* Load I/O control configuration to Input / Output Control Register */
 	outb(0x40 | ior_cfg, base_offset);
 
 	return len;
 }
+
+static const char *const quad8_irq_trig_func_modes[] = {
+	"/Carry",
+	"/Compare",
+	"/Carry/Borrow",
+	"Index"
+};
+
+static int quad8_set_irq_trig_func(struct iio_dev *indio_dev,
+	const struct iio_chan_spec *chan, unsigned int irq_trig_func)
+{
+	struct quad8_iio *const priv = iio_priv(indio_dev);
+	const unsigned int ior_cfg = priv->ab_enable[chan->channel] |
+		priv->preset_enable[chan->channel] << 1 | irq_trig_func << 3;
+	const int base_offset = priv->base + 2 * chan->channel + 1;
+
+	priv->irq_trig_func[chan->channel] = irq_trig_func;
+
+	/* Load I/O control configuration to Input/Output Control Register */
+	outb(0x40 | ior_cfg, base_offset);
+
+	return 0;
+}
+
+static int quad8_get_irq_trig_func(struct iio_dev *indio_dev,
+	const struct iio_chan_spec *chan)
+{
+	const struct quad8_iio *const priv = iio_priv(indio_dev);
+
+	return priv->irq_trig_func[chan->channel];
+}
+
+static const struct iio_enum quad8_irq_trig_func_enum = {
+	.items = quad8_irq_trig_func_modes,
+	.num_items = ARRAY_SIZE(quad8_irq_trig_func_modes),
+	.set = quad8_set_irq_trig_func,
+	.get = quad8_get_irq_trig_func
+};
 
 static const char *const quad8_noise_error_states[] = {
 	"No excessive noise is present at the count inputs",
@@ -477,6 +554,8 @@ static const struct iio_chan_spec_ext_info quad8_count_ext_info[] = {
 		.read = quad8_read_set_to_preset_on_index,
 		.write = quad8_write_set_to_preset_on_index
 	},
+	IIO_ENUM("irq_trig_func", IIO_SEPARATE, &quad8_irq_trig_func_enum),
+	IIO_ENUM_AVAILABLE("irq_trig_func", &quad8_irq_trig_func_enum),
 	IIO_ENUM("noise_error", IIO_SEPARATE, &quad8_noise_error_enum),
 	IIO_ENUM_AVAILABLE("noise_error", &quad8_noise_error_enum),
 	IIO_ENUM("count_direction", IIO_SEPARATE, &quad8_count_direction_enum),
@@ -497,12 +576,22 @@ static const struct iio_chan_spec_ext_info quad8_index_ext_info[] = {
 	{}
 };
 
+static const struct iio_event_spec quad8_event[] = {
+	{
+		.type = IIO_EV_TYPE_MAG,
+		.dir = IIO_EV_DIR_NONE,
+		.mask_separate = BIT(IIO_EV_INFO_ENABLE)
+	}
+};
+
 #define QUAD8_COUNT_CHAN(_chan) {					\
 	.type = IIO_COUNT,						\
 	.channel = (_chan),						\
 	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |			\
 		BIT(IIO_CHAN_INFO_ENABLE) | BIT(IIO_CHAN_INFO_SCALE),	\
 	.ext_info = quad8_count_ext_info,				\
+	.event_spec = quad8_event,					\
+	.num_event_specs = ARRAY_SIZE(quad8_event),			\
 	.indexed = 1							\
 }
 
@@ -525,12 +614,35 @@ static const struct iio_chan_spec quad8_channels[] = {
 	QUAD8_COUNT_CHAN(7), QUAD8_INDEX_CHAN(7)
 };
 
+static irqreturn_t quad8_irq_handler(int irq, void *indio_dev)
+{
+	const struct quad8_iio *const priv = iio_priv(indio_dev);
+	unsigned long irq_status;
+	unsigned long channel;
+
+	irq_status = inb(priv->base + 0x10);
+	if (!irq_status)
+		return IRQ_NONE;
+
+	for_each_set_bit(channel, &irq_status, QUAD8_NUM_COUNTERS)
+		iio_push_event(indio_dev,
+			IIO_UNMOD_EVENT_CODE(IIO_COUNT, channel,
+				IIO_EV_TYPE_MAG, IIO_EV_DIR_NONE),
+			iio_get_time_ns(indio_dev));
+
+	/* Clear pending interrupts on device */
+	outb(0x10, priv->base + 0x11);
+
+	return IRQ_HANDLED;
+}
+
 static int quad8_probe(struct device *dev, unsigned int id)
 {
 	struct iio_dev *indio_dev;
 	struct quad8_iio *priv;
 	int i, j;
 	unsigned int base_offset;
+	int err;
 
 	indio_dev = devm_iio_device_alloc(dev, sizeof(*priv));
 	if (!indio_dev)
@@ -552,6 +664,8 @@ static int quad8_probe(struct device *dev, unsigned int id)
 	priv = iio_priv(indio_dev);
 	priv->base = base[id];
 
+	/* Reset Index/Interrupt Register */
+	outb(0x00, base[id] + 0x12);
 	/* Reset all counters and disable interrupt function */
 	outb(0x01, base[id] + 0x11);
 	/* Set initial configuration for all counters */
@@ -573,8 +687,13 @@ static int quad8_probe(struct device *dev, unsigned int id)
 		/* Disable index function; negative index polarity */
 		outb(0x60, base_offset + 1);
 	}
-	/* Enable all counters */
-	outb(0x00, base[id] + 0x11);
+	/* Enable all counters and enable interrupt function */
+	outb(0x10, base[id] + 0x11);
+
+	err = devm_request_irq(dev, irq[id], quad8_irq_handler, IRQF_SHARED,
+		dev_name(dev), indio_dev);
+	if (err)
+		return err;
 
 	return devm_iio_device_register(dev, indio_dev);
 }

@@ -51,6 +51,31 @@ Description:
 			not freeze at the bundary points, but counts
 			continuously throughout.
 
+What:		/sys/bus/iio/devices/iio:deviceX/in_countY_irq_trig_func
+KernelVersion:	4.9
+Contact:	linux-iio@vger.kernel.org
+Description:
+		IRQ trigger function for channel Y. Four IRQ trigger functions
+		are available: /Carry, /Compare, /Carry/Borrow, and Index.
+
+		/Carry:
+			Interrupt generated on active low Carry signal. Carry
+			signal toggles every time channel Y counter overflows.
+
+		/Compare:
+			Interrupt generated on active low Compare signal.
+			Compare signal toggles every time channel Y preset
+			register is equal to channel Y counter.
+
+		/Carry/Borrow:
+			Interrupt generated on active low Carry signal and
+			active low Borrow signal. Carry signal toggles every
+			time channel Y counter overflows. Borrow signal toggles
+			every time channel Y counter underflows.
+
+		Index:
+			Interrupt generated on active high Index signal.
+
 What:		/sys/bus/iio/devices/iio:deviceX/in_countY_noise_error
 KernelVersion:	4.9
 Contact:	linux-iio@vger.kernel.org
@@ -93,7 +118,8 @@ Contact:	linux-iio@vger.kernel.org
 Description:
 		Whether to set channel Y counter with channel Y preset value
 		when channel Y index input is active, or continuously count.
-		Valid attribute values are boolean.
+		Valid attribute values are boolean. This attribute is ignored
+		when channel Y IRQs are disabled.
 
 What:		/sys/bus/iio/devices/iio:deviceX/in_indexY_index_polarity
 KernelVersion:	4.9
@@ -123,3 +149,12 @@ Description:
 			set_to_preset_on_index) is performed synchronously with
 			the quadrature clock on the active level of the index
 			input.
+
+What:		/sys/bus/iio/devices/iio:deviceX/events/in_countY_mag_en
+KernelVersion:	4.9
+Contact:	linux-iio@vger.kernel.org
+Description:
+		Event generated when a channel Y IRQ occurs. Channel Y IRQs are
+		triggered as configured by the channel Y irq_trig_func
+		attribute. Channel Y IRQs are disabled when this attribute is
+		set to 0.
