@@ -5643,3 +5643,11 @@ void emulator_writeback_register_cache(struct x86_emulate_ctxt *ctxt)
 {
 	writeback_registers(ctxt);
 }
+
+bool emulator_is_string_op(struct x86_emulate_ctxt *ctxt)
+{
+	if (ctxt->d & String)
+		return true;
+
+	return false;
+}
