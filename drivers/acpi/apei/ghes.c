@@ -858,17 +858,18 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
 		if (sev >= GHES_SEV_PANIC)
 			__ghes_panic(ghes);
 
+		ret = NMI_HANDLED;
+
 		if (!(ghes->flags & GHES_TO_CLEAR))
 			continue;
 
 		__process_error(ghes);
 		ghes_clear_estatus(ghes);
-
-		ret = NMI_HANDLED;
 	}
 
 #ifdef CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG
-	irq_work_queue(&ghes_proc_irq_work);
+	if (ret == NMI_HANDLED)
+		irq_work_queue(&ghes_proc_irq_work);
 #endif
 	atomic_dec(&ghes_in_nmi);
 	return ret;
