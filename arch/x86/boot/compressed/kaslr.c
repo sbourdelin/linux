@@ -11,6 +11,7 @@
  */
 #include "misc.h"
 #include "error.h"
+#include "../boot.h"
 
 #include <generated/compile.h>
 #include <linux/module.h>
@@ -61,8 +62,15 @@ enum mem_avoid_index {
 	MEM_AVOID_INITRD,
 	MEM_AVOID_CMDLINE,
 	MEM_AVOID_BOOTPARAMS,
+	MEM_AVOID_MEMMAP1,
+	MEM_AVOID_MEMMAP2,
+	MEM_AVOID_MEMMAP3,
+	MEM_AVOID_MEMMAP4,
 	MEM_AVOID_MAX,
 };
+
+/* only supporting at most 4 memmap regions with kaslr */
+#define MAX_MEMMAP_REGIONS	4
 
 static struct mem_vector mem_avoid[MEM_AVOID_MAX];
 
@@ -75,6 +83,72 @@ static bool mem_overlaps(struct mem_vector *one, struct mem_vector *two)
 	if (one->start >= two->start + two->size)
 		return false;
 	return true;
+}
+
+#include "../../../../lib/cmdline.c"
+
+static int
+parse_memmap(char *p, unsigned long long *start, unsigned long long *size)
+{
+	char *oldp;
+
+	if (!p)
+		return -EINVAL;
+
+	/* we don't care about this option here */
+	if (!strncmp(p, "exactmap", 8))
+		return -EINVAL;
+
+	oldp = p;
+	*size = memparse(p, &p);
+	if (p == oldp)
+		return -EINVAL;
+
+	switch (*p) {
+	case '@':
+	case '#':
+	case '$':
+	case '!':
+		*start = memparse(p + 1, &p);
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+static int mem_avoid_memmap(void)
+{
+	char arg[128];
+	int rc = 0;
+
+	/* see if we have any memmap areas */
+	if (cmdline_find_option("memmap", arg, sizeof(arg)) > 0) {
+		int i = 0;
+		char *str = arg;
+
+		while (str && (i < MAX_MEMMAP_REGIONS)) {
+			unsigned long long start, size;
+			char *k = strchr(str, ',');
+
+			if (k)
+				*k++ = 0;
+
+			rc = parse_memmap(str, &start, &size);
+			if (rc < 0)
+				break;
+			str = k;
+
+			mem_avoid[MEM_AVOID_MEMMAP1 + i].start = start;
+			mem_avoid[MEM_AVOID_MEMMAP1 + i].size = size;
+			i++;
+		}
+
+		/* more than 4 memmaps, fail kaslr */
+		if ((i >= MAX_MEMMAP_REGIONS) && str)
+			rc = -EINVAL;
+	}
+
+	return rc;
 }
 
 /*
@@ -429,12 +503,20 @@ void choose_random_location(unsigned long input,
 			    unsigned long *virt_addr)
 {
 	unsigned long random_addr, min_addr;
+	int rc;
 
 	/* By default, keep output position unchanged. */
 	*virt_addr = *output;
 
 	if (cmdline_find_option_bool("nokaslr")) {
 		warn("KASLR disabled: 'nokaslr' on cmdline.");
+		return;
+	}
+
+	/* Mark the memmap regions we need to avoid */
+	rc = mem_avoid_memmap();
+	if (rc < 0) {
+		warn("KASLR disabled: memmap exceeds limit of 4, giving up.");
 		return;
 	}
 
