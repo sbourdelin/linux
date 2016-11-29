@@ -13345,6 +13345,13 @@ L:	zd1211-devs@lists.sourceforge.net (subscribers-only)
 S:	Maintained
 F:	drivers/net/wireless/zydas/zd1211rw/
 
+ZONED BLOCK DEVICE DEVICE-MAPPER (dm-zoned)
+M:      Damien Le Moal <damien.lemoal@wdc.com>
+L:	dm-devel@redhat.com
+S:      Maintained
+F:      drivers/md/dm-zoned*
+F:      Documentation/device-mapper/dm-zoned.txt
+
 ZPOOL COMPRESSED PAGE STORAGE API
 M:	Dan Streetman <ddstreet@ieee.org>
 L:	linux-mm@kvack.org

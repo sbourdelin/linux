@@ -508,4 +508,20 @@ config DM_LOG_WRITES
 
 	  If unsure, say N.
 
+config DM_ZONED
+	tristate "Zoned block device target support"
+	depends on BLK_DEV_DM
+	depends on BLK_DEV_ZONED
+	---help---
+	  This device-mapper target takes a zoned block device and expose it as
+	  a regular disk without any write constraint.
+	  This is mainly intended for use with file systems that do not
+	  natively support zoned block devices. Other uses by applications using
+	  raw block devices (for example object stores) is also possible.
+
+	  To compile this code as a module, choose M here: the module will
+	  be called dm-zoned.
+
+	  If unsure, say N.
+
 endif # MD
