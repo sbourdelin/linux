@@ -2705,6 +2705,9 @@ static int i40e_add_fdir_ethtool(struct i40e_vsi *vsi,
 	if (pf->auto_disable_flags & I40E_FLAG_FD_SB_ENABLED)
 		return -ENOSPC;
 
+	if (!(pf->flags & I40E_FLAG_FD_SB_ENABLED))
+		return -EOPNOTSUPP;
+
 	if (test_bit(__I40E_RESET_RECOVERY_PENDING, &pf->state) ||
 	    test_bit(__I40E_RESET_INTR_RECEIVED, &pf->state))
 		return -EBUSY;
