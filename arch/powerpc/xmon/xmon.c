@@ -1216,10 +1216,13 @@ bpt_cmds(void)
 {
 	int cmd;
 	unsigned long a;
-	int mode, i;
+	int i;
 	struct bpt *bp;
+#ifndef CONFIG_8xx
+	int mode;
 	const char badaddr[] = "Only kernel addresses are permitted "
 		"for breakpoints\n";
+#endif
 
 	cmd = inchar();
 	switch (cmd) {
