@@ -295,6 +295,16 @@
 #define NTB_BAR_MASK_64			~(0xfull)
 #define NTB_BAR_MASK_32			~(0xfu)
 
+/* port related constants */
+#define NTB_PEER_CNT			(1)
+#define NTB_PIDX_MAX			(0)
+
+enum intel_ntb_port {
+	NTB_PORT_NONE = -1,
+	NTB_PORT_PRI,
+	NTB_PORT_SEC
+};
+
 struct intel_ntb_dev;
 
 struct intel_ntb_reg {

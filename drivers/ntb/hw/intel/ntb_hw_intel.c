@@ -229,7 +229,7 @@ static inline void ndev_reset_unsafe_flags(struct intel_ntb_dev *ndev)
 
 	/* Only B2B has a workaround to avoid SDOORBELL */
 	if (ndev->hwerr_flags & NTB_HWERR_SDOORBELL_LOCKUP)
-		if (!ntb_topo_is_b2b(ndev->ntb.topo))
+		if (ndev->ntb.topo != NTB_TOPO_B2B)
 			ndev->unsafe_flags |= NTB_UNSAFE_DB;
 
 	/* No low level workaround to avoid SB01BASE */
@@ -759,8 +759,8 @@ static ssize_t ndev_ntb_debugfs_read(struct file *filp, char __user *ubuf,
 			 "NTB Device Information:\n");
 
 	off += scnprintf(buf + off, buf_size - off,
-			 "Connection Topology -\t%s\n",
-			 ntb_topo_string(ndev->ntb.topo));
+			 "Connection Topology -\t%s:%d\n",
+			 ntb_topo_string(ndev->ntb.topo), ndev->ntb.port);
 
 	if (ndev->b2b_idx != UINT_MAX) {
 		off += scnprintf(buf + off, buf_size - off,
@@ -892,7 +892,7 @@ static ssize_t ndev_ntb_debugfs_read(struct file *filp, char __user *ubuf,
 	}
 
 	if (pdev_is_xeon(pdev)) {
-		if (ntb_topo_is_b2b(ndev->ntb.topo)) {
+		if (ndev->ntb.topo == NTB_TOPO_B2B) {
 			off += scnprintf(buf + off, buf_size - off,
 					 "\nNTB Outgoing B2B XLAT:\n");
 
@@ -1035,7 +1035,34 @@ static void ndev_deinit_debugfs(struct intel_ntb_dev *ndev)
 	debugfs_remove_recursive(ndev->debugfs_dir);
 }
 
-static int intel_ntb_link_is_up(struct ntb_dev *ntb,
+static int intel_ntb_port_number(struct ntb_dev *ntb)
+{
+	return ntb->port;
+}
+
+static int intel_ntb_peer_port_count(struct ntb_dev *ntb)
+{
+	return NTB_PEER_CNT;
+}
+
+static int intel_ntb_peer_port_number(struct ntb_dev *ntb, int pidx)
+{
+	if (pidx > NTB_PIDX_MAX)
+		return -EINVAL;
+
+	return (ntb->port == NTB_PORT_PRI ? NTB_PORT_SEC : NTB_PORT_PRI);
+}
+
+static int intel_ntb_peer_port_idx(struct ntb_dev *ntb, int port)
+{
+	if ((ntb->port == NTB_PORT_PRI && port != NTB_PORT_SEC) ||
+	    (ntb->port == NTB_PORT_SEC && port != NTB_PORT_PRI))
+		return -EINVAL;
+
+	return 0;
+}
+
+static u64 intel_ntb_link_is_up(struct ntb_dev *ntb,
 				enum ntb_speed *speed,
 				enum ntb_width *width)
 {
@@ -1067,7 +1094,7 @@ static int intel_ntb_link_enable(struct ntb_dev *ntb,
 
 	ndev = container_of(ntb, struct intel_ntb_dev, ntb);
 
-	if (ndev->ntb.topo == NTB_TOPO_SEC)
+	if (ndev->ntb.topo == NTB_TOPO_P2P && ndev->ntb.port == NTB_PORT_SEC)
 		return -EINVAL;
 
 	dev_dbg(ndev_dev(ndev),
@@ -1096,7 +1123,7 @@ static int intel_ntb_link_disable(struct ntb_dev *ntb)
 
 	ndev = container_of(ntb, struct intel_ntb_dev, ntb);
 
-	if (ndev->ntb.topo == NTB_TOPO_SEC)
+	if (ndev->ntb.topo == NTB_TOPO_P2P && ndev->ntb.port == NTB_PORT_SEC)
 		return -EINVAL;
 
 	dev_dbg(ndev_dev(ndev), "Disabling link\n");
@@ -1440,27 +1467,32 @@ static int atom_link_is_err(struct intel_ntb_dev *ndev)
 	return 0;
 }
 
-static inline enum ntb_topo atom_ppd_topo(struct intel_ntb_dev *ndev, u32 ppd)
+static inline int atom_ppd_init_topo(struct intel_ntb_dev *ndev, u32 ppd)
 {
 	switch (ppd & ATOM_PPD_TOPO_MASK) {
 	case ATOM_PPD_TOPO_B2B_USD:
 		dev_dbg(ndev_dev(ndev), "PPD %d B2B USD\n", ppd);
-		return NTB_TOPO_B2B_USD;
-
+		ndev->ntb.topo = NTB_TOPO_B2B;
+		ndev->ntb.port = NTB_PORT_PRI;
+		return 0;
 	case ATOM_PPD_TOPO_B2B_DSD:
 		dev_dbg(ndev_dev(ndev), "PPD %d B2B DSD\n", ppd);
-		return NTB_TOPO_B2B_DSD;
+		ndev->ntb.topo = NTB_TOPO_B2B;
+		ndev->ntb.port = NTB_PORT_SEC;
+		return 0;
 
 	case ATOM_PPD_TOPO_PRI_USD:
 	case ATOM_PPD_TOPO_PRI_DSD: /* accept bogus PRI_DSD */
 	case ATOM_PPD_TOPO_SEC_USD:
 	case ATOM_PPD_TOPO_SEC_DSD: /* accept bogus SEC_DSD */
-		dev_dbg(ndev_dev(ndev), "PPD %d non B2B disabled\n", ppd);
-		return NTB_TOPO_NONE;
+		dev_err(ndev_dev(ndev), "PPD %d non B2B disabled\n", ppd);
+		ndev->ntb.topo = NTB_TOPO_NONE;
+		ndev->ntb.port = NTB_PORT_NONE;
+		return -EINVAL;
 	}
 
-	dev_dbg(ndev_dev(ndev), "PPD %d invalid\n", ppd);
-	return NTB_TOPO_NONE;
+	dev_err(ndev_dev(ndev), "PPD %d invalid\n", ppd);
+	return -EINVAL;
 }
 
 static void atom_link_hb(struct work_struct *work)
@@ -1568,9 +1600,7 @@ static int atom_init_ntb(struct intel_ntb_dev *ndev)
 	ndev->spad_count = ATOM_SPAD_COUNT;
 	ndev->db_count = ATOM_DB_COUNT;
 
-	switch (ndev->ntb.topo) {
-	case NTB_TOPO_B2B_USD:
-	case NTB_TOPO_B2B_DSD:
+	if (ndev->ntb.topo == NTB_TOPO_B2B) {
 		ndev->self_reg = &atom_pri_reg;
 		ndev->peer_reg = &atom_b2b_reg;
 		ndev->xlat_reg = &atom_sec_xlat;
@@ -1578,12 +1608,8 @@ static int atom_init_ntb(struct intel_ntb_dev *ndev)
 		/* Enable Bus Master and Memory Space on the secondary side */
 		iowrite16(PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER,
 			  ndev->self_mmio + ATOM_SPCICMD_OFFSET);
-
-		break;
-
-	default:
+	} else
 		return -EINVAL;
-	}
 
 	ndev->db_valid_mask = BIT_ULL(ndev->db_count) - 1;
 
@@ -1599,9 +1625,9 @@ static int atom_init_dev(struct intel_ntb_dev *ndev)
 	if (rc)
 		return -EIO;
 
-	ndev->ntb.topo = atom_ppd_topo(ndev, ppd);
-	if (ndev->ntb.topo == NTB_TOPO_NONE)
-		return -EINVAL;
+	rc = atom_ppd_init_topo(ndev, ppd);
+	if (rc)
+		return rc;
 
 	rc = atom_init_ntb(ndev);
 	if (rc)
@@ -1611,7 +1637,7 @@ static int atom_init_dev(struct intel_ntb_dev *ndev)
 	if (rc)
 		return rc;
 
-	if (ndev->ntb.topo != NTB_TOPO_SEC) {
+	if (ndev->ntb.port != NTB_PORT_SEC) {
 		/* Initiate PCI-E link training */
 		rc = pci_write_config_dword(ndev->ntb.pdev, ATOM_PPD_OFFSET,
 					    ppd | ATOM_PPD_INIT_LINK);
@@ -2040,31 +2066,37 @@ static int xeon_poll_link(struct intel_ntb_dev *ndev)
 
 static int xeon_link_is_up(struct intel_ntb_dev *ndev)
 {
-	if (ndev->ntb.topo == NTB_TOPO_SEC)
+	if (ndev->ntb.port == NTB_PORT_SEC)
 		return 1;
 
 	return NTB_LNK_STA_ACTIVE(ndev->lnk_sta);
 }
 
-static inline enum ntb_topo xeon_ppd_topo(struct intel_ntb_dev *ndev, u8 ppd)
+static inline int xeon_ppd_init_topo(struct intel_ntb_dev *ndev, u8 ppd)
 {
 	switch (ppd & XEON_PPD_TOPO_MASK) {
 	case XEON_PPD_TOPO_B2B_USD:
-		return NTB_TOPO_B2B_USD;
-
+		ndev->ntb.topo = NTB_TOPO_B2B;
+		ndev->ntb.port = NTB_PORT_PRI;
+		return 0;
 	case XEON_PPD_TOPO_B2B_DSD:
-		return NTB_TOPO_B2B_DSD;
-
+		ndev->ntb.topo = NTB_TOPO_B2B;
+		ndev->ntb.port = NTB_PORT_SEC;
+		return 0;
 	case XEON_PPD_TOPO_PRI_USD:
 	case XEON_PPD_TOPO_PRI_DSD: /* accept bogus PRI_DSD */
-		return NTB_TOPO_PRI;
-
+		ndev->ntb.topo = NTB_TOPO_P2P;
+		ndev->ntb.port = NTB_PORT_PRI;
+		return 0;
 	case XEON_PPD_TOPO_SEC_USD:
 	case XEON_PPD_TOPO_SEC_DSD: /* accept bogus SEC_DSD */
-		return NTB_TOPO_SEC;
+		ndev->ntb.topo = NTB_TOPO_P2P;
+		ndev->ntb.port = NTB_PORT_SEC;
+		return 0;
 	}
 
-	return NTB_TOPO_NONE;
+	dev_err(ndev_dev(ndev), "PPD %d invalid\n", ppd);
+	return -EINVAL;
 }
 
 static inline int xeon_ppd_bar4_split(struct intel_ntb_dev *ndev, u8 ppd)
@@ -2352,39 +2384,39 @@ static int xeon_init_ntb(struct intel_ntb_dev *ndev)
 	ndev->db_count = XEON_DB_COUNT;
 	ndev->db_link_mask = XEON_DB_LINK_BIT;
 
-	switch (ndev->ntb.topo) {
-	case NTB_TOPO_PRI:
-		if (ndev->hwerr_flags & NTB_HWERR_SDOORBELL_LOCKUP) {
-			dev_err(ndev_dev(ndev), "NTB Primary config disabled\n");
-			return -EINVAL;
+	if (ndev->ntb.topo == NTB_TOPO_P2P) {
+		if (ndev->ntb.port == NTB_PORT_PRI) {
+			if (ndev->hwerr_flags & NTB_HWERR_SDOORBELL_LOCKUP) {
+				dev_err(ndev_dev(ndev),
+					"NTB Primary config disabled\n");
+				return -EINVAL;
+			}
+
+			/* enable link to allow secondary side dev to appear */
+			ntb_ctl = ioread32(ndev->self_mmio +
+					   ndev->reg->ntb_ctl);
+			ntb_ctl &= ~NTB_CTL_DISABLE;
+			iowrite32(ntb_ctl, ndev->self_mmio +
+				  ndev->reg->ntb_ctl);
+
+			/* use half the spads for the peer */
+			ndev->spad_count >>= 1;
+			ndev->self_reg = &xeon_pri_reg;
+			ndev->peer_reg = &xeon_sec_reg;
+			ndev->xlat_reg = &xeon_sec_xlat;
+		} else {
+			if (ndev->hwerr_flags & NTB_HWERR_SDOORBELL_LOCKUP) {
+				dev_err(ndev_dev(ndev),
+					"NTB Secondary config disabled\n");
+				return -EINVAL;
+			}
+			/* use half the spads for the peer */
+			ndev->spad_count >>= 1;
+			ndev->self_reg = &xeon_sec_reg;
+			ndev->peer_reg = &xeon_pri_reg;
+			ndev->xlat_reg = &xeon_pri_xlat;
 		}
-
-		/* enable link to allow secondary side device to appear */
-		ntb_ctl = ioread32(ndev->self_mmio + ndev->reg->ntb_ctl);
-		ntb_ctl &= ~NTB_CTL_DISABLE;
-		iowrite32(ntb_ctl, ndev->self_mmio + ndev->reg->ntb_ctl);
-
-		/* use half the spads for the peer */
-		ndev->spad_count >>= 1;
-		ndev->self_reg = &xeon_pri_reg;
-		ndev->peer_reg = &xeon_sec_reg;
-		ndev->xlat_reg = &xeon_sec_xlat;
-		break;
-
-	case NTB_TOPO_SEC:
-		if (ndev->hwerr_flags & NTB_HWERR_SDOORBELL_LOCKUP) {
-			dev_err(ndev_dev(ndev), "NTB Secondary config disabled\n");
-			return -EINVAL;
-		}
-		/* use half the spads for the peer */
-		ndev->spad_count >>= 1;
-		ndev->self_reg = &xeon_sec_reg;
-		ndev->peer_reg = &xeon_pri_reg;
-		ndev->xlat_reg = &xeon_pri_xlat;
-		break;
-
-	case NTB_TOPO_B2B_USD:
-	case NTB_TOPO_B2B_DSD:
+	} else {
 		ndev->self_reg = &xeon_pri_reg;
 		ndev->peer_reg = &xeon_b2b_reg;
 		ndev->xlat_reg = &xeon_sec_xlat;
@@ -2409,11 +2441,12 @@ static int xeon_init_ntb(struct intel_ntb_dev *ndev)
 				b2b_mw_idx, ndev->b2b_idx);
 
 		} else if (ndev->hwerr_flags & NTB_HWERR_B2BDOORBELL_BIT14) {
-			dev_warn(ndev_dev(ndev), "Reduce doorbell count by 1\n");
+			dev_warn(ndev_dev(ndev),
+				"Reduce doorbell count by 1\n");
 			ndev->db_count -= 1;
 		}
 
-		if (ndev->ntb.topo == NTB_TOPO_B2B_USD) {
+		if (ndev->ntb.port == NTB_PORT_PRI) {
 			rc = xeon_setup_b2b_mw(ndev,
 					       &xeon_b2b_dsd_addr,
 					       &xeon_b2b_usd_addr);
@@ -2428,11 +2461,6 @@ static int xeon_init_ntb(struct intel_ntb_dev *ndev)
 		/* Enable Bus Master and Memory Space on the secondary side */
 		iowrite16(PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER,
 			  ndev->self_mmio + XEON_SPCICMD_OFFSET);
-
-		break;
-
-	default:
-		return -EINVAL;
 	}
 
 	ndev->db_valid_mask = BIT_ULL(ndev->db_count) - 1;
@@ -2525,13 +2553,13 @@ static int xeon_init_dev(struct intel_ntb_dev *ndev)
 	if (rc)
 		return -EIO;
 
-	ndev->ntb.topo = xeon_ppd_topo(ndev, ppd);
-	dev_dbg(ndev_dev(ndev), "ppd %#x topo %s\n", ppd,
-		ntb_topo_string(ndev->ntb.topo));
-	if (ndev->ntb.topo == NTB_TOPO_NONE)
-		return -EINVAL;
+	rc = xeon_ppd_init_topo(ndev, ppd);
+	dev_dbg(ndev_dev(ndev), "ppd %#x topo %s:%d\n", ppd,
+		ntb_topo_string(ndev->ntb.topo), ndev->ntb.port);
+	if (rc)
+		return rc;
 
-	if (ndev->ntb.topo != NTB_TOPO_SEC) {
+	if (ndev->ntb.topo != NTB_TOPO_P2P && ndev->ntb.port != NTB_PORT_SEC) {
 		ndev->bar4_split = xeon_ppd_bar4_split(ndev, ppd);
 		dev_dbg(ndev_dev(ndev), "ppd %#x bar4_split %d\n",
 			ppd, ndev->bar4_split);
@@ -2631,6 +2659,7 @@ static inline void ndev_init_struct(struct intel_ntb_dev *ndev,
 {
 	ndev->ntb.pdev = pdev;
 	ndev->ntb.topo = NTB_TOPO_NONE;
+	ndev->ntb.port = NTB_PORT_NONE;
 	ndev->ntb.ops = &intel_ntb_ops;
 
 	ndev->b2b_off = 0;
@@ -2883,6 +2912,10 @@ static const struct intel_ntb_xlat_reg skx_sec_xlat = {
 
 /* operations for primary side of local ntb */
 static const struct ntb_dev_ops intel_ntb_ops = {
+	.port_number		= intel_ntb_port_number,
+	.peer_port_count	= intel_ntb_peer_port_count,
+	.peer_port_number	= intel_ntb_peer_port_number,
+	.peer_port_idx		= intel_ntb_peer_port_idx,
 	.link_is_up		= intel_ntb_link_is_up,
 	.link_enable		= intel_ntb_link_enable,
 	.link_disable		= intel_ntb_link_disable,
