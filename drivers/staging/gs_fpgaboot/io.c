@@ -55,7 +55,7 @@ int xl_supported_prog_bus_width(enum wbus bus_bytes)
 		break;
 	default:
 		pr_err("unsupported program bus width %d\n",
-				bus_bytes);
+		       bus_bytes);
 		return 0;
 	}
 
