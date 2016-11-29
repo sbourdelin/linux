@@ -184,8 +184,6 @@ static struct vscsiif_request *scsifront_pre_req(struct vscsifrnt_info *info)
 
 	ring_req = RING_GET_REQUEST(&(info->ring), ring->req_prod_pvt);
 
-	ring->req_prod_pvt++;
-
 	ring_req->rqid = (uint16_t)id;
 
 	return ring_req;
@@ -195,6 +193,8 @@ static void scsifront_do_request(struct vscsifrnt_info *info)
 {
 	struct vscsiif_front_ring *ring = &(info->ring);
 	int notify;
+
+	ring->req_prod_pvt++;
 
 	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(ring, notify);
 	if (notify)
@@ -626,6 +626,7 @@ static int scsifront_action_handler(struct scsi_cmnd *sc, uint8_t act)
 	}
 
 	if (scsifront_enter(info)) {
+		scsifront_put_rqid(info, shadow->rqid);
 		spin_unlock_irq(host->host_lock);
 		kfree(shadow);
 		return FAILED;
