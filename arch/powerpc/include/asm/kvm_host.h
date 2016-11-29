@@ -708,6 +708,24 @@ struct kvm_vcpu_arch {
 
 #define __KVM_HAVE_ARCH_WQP
 #define __KVM_HAVE_CREATE_DEVICE
+#ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
+#define __KVM_HAVE_ARCH_VZALLOC_OVERRIDE
+#endif
+
+/*
+ * KVM uses some of these data structures -- the ones
+ * from kvzalloc() in real mode. If the data structure
+ * happens to come from a vmalloc'd range then its access
+ * in real mode will lead to problems due to the aliasing
+ * issue - (top 4 bits are ignore).
+ * A 0xd000+offset will point to a 0xc000+offset in realmode
+ * Hence we want our data structures from come from kmalloc'd
+ * regions, so that we don't have these aliasing issues
+ */
+static inline void *kvm_arch_vzalloc(unsigned long size)
+{
+	return kzalloc(size, GFP_KERNEL);
+}
 
 static inline void kvm_arch_hardware_disable(void) {}
 static inline void kvm_arch_hardware_unsetup(void) {}
