@@ -88,3 +88,7 @@
 &uart2 {
 	status = "okay";
 };
+
+&timer {
+	compatible = "rockchip,rk3229-timer", "rockchip,rk3288-timer";
+};
