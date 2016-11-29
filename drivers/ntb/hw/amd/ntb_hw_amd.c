@@ -5,6 +5,7 @@
  *   GPL LICENSE SUMMARY
  *
  *   Copyright (C) 2016 Advanced Micro Devices, Inc. All Rights Reserved.
+ *   Copyright (C) 2016 T-Platforms. All Rights Reserved.
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of version 2 of the GNU General Public License as
@@ -13,6 +14,7 @@
  *   BSD LICENSE
  *
  *   Copyright (C) 2016 Advanced Micro Devices, Inc. All Rights Reserved.
+ *   Copyright (C) 2016 T-Platforms. All Rights Reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
  *   modification, are permitted provided that the following conditions
