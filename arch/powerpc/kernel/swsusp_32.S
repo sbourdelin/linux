@@ -302,7 +302,7 @@ END_MMU_FTR_SECTION_IFSET(MMU_FTR_USE_HIGH_BATS)
 	/* Flush all TLBs */
 	lis	r4,0x1000
 1:	addic.	r4,r4,-0x1000
-	tlbie	r4
+	tlbie	r4,0
 	bgt	1b
 	sync
 

@@ -1110,7 +1110,7 @@ END_MMU_FTR_SECTION_IFSET(MMU_FTR_USE_HIGH_BATS)
 flush_tlbs:
 	lis	r10, 0x40
 1:	addic.	r10, r10, -0x1000
-	tlbie	r10
+	tlbie	r10,0
 	bgt	1b
 	sync
 	blr

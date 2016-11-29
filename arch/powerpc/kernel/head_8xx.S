@@ -314,9 +314,9 @@ SystemCall:
 #ifdef CONFIG_8xx_CPU15
 #define INVALIDATE_ADJACENT_PAGES_CPU15(tmp, addr)	\
 	addi	tmp, addr, PAGE_SIZE;	\
-	tlbie	tmp;			\
+	tlbie	tmp,0;			\
 	addi	tmp, addr, -PAGE_SIZE;	\
-	tlbie	tmp
+	tlbie	tmp,0
 #else
 #define INVALIDATE_ADJACENT_PAGES_CPU15(tmp, addr)
 #endif
@@ -477,7 +477,7 @@ InstructionTLBError:
 	mr	r5,r9
 	andis.	r10,r5,0x4000
 	beq+	1f
-	tlbie	r4
+	tlbie	r4,0
 	/* 0x400 is InstructionAccess exception, needed by bad_page_fault() */
 1:	EXC_XFER_LITE(0x400, handle_page_fault)
 
@@ -501,7 +501,7 @@ DARFixed:/* Return from dcbx instruction bug workaround */
 	mfspr	r4,SPRN_DAR
 	andis.	r10,r5,0x4000
 	beq+	1f
-	tlbie	r4
+	tlbie	r4,0
 1:	li	r10,RPN_PATTERN
 	mtspr	SPRN_DAR,r10	/* Tag DAR, to be used in DTLB Error */
 	/* 0x300 is DataAccess exception, needed by bad_page_fault() */

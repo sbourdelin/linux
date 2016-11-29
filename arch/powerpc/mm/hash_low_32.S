@@ -352,7 +352,7 @@ _GLOBAL(hash_page_patch_A)
 	 */
 	andi.	r6,r6,_PAGE_HASHPTE
 	beq+	10f			/* no PTE: go look for an empty slot */
-	tlbie	r4
+	tlbie	r4,0
 
 	addis	r4,r7,htab_hash_searches@ha
 	lwz	r6,htab_hash_searches@l(r4)
@@ -612,7 +612,7 @@ _GLOBAL(flush_hash_patch_B)
 3:	li	r0,0
 	STPTE	r0,0(r12)		/* invalidate entry */
 4:	sync
-	tlbie	r4			/* in hw tlb too */
+	tlbie	r4,0			/* in hw tlb too */
 	sync
 
 8:	ble	cr1,9f			/* if all ptes checked */
@@ -661,7 +661,7 @@ _GLOBAL(_tlbie)
 	stwcx.	r8,0,r9
 	bne-	10b
 	eieio
-	tlbie	r3
+	tlbie	r3,0
 	sync
 	TLBSYNC
 	li	r0,0
@@ -670,7 +670,7 @@ _GLOBAL(_tlbie)
 	SYNC_601
 	isync
 #else /* CONFIG_SMP */
-	tlbie	r3
+	tlbie	r3,0
 	sync
 #endif /* CONFIG_SMP */
 	blr
