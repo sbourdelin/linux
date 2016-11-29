@@ -76,7 +76,7 @@
 #include <asm/unaligned.h>
 #include <linux/errqueue.h>
 
-int sysctl_tcp_timestamps __read_mostly = 1;
+int sysctl_tcp_timestamps __read_mostly = 2;
 int sysctl_tcp_window_scaling __read_mostly = 1;
 int sysctl_tcp_sack __read_mostly = 1;
 int sysctl_tcp_fack __read_mostly = 1;
@@ -6323,10 +6323,12 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 	if (security_inet_conn_request(sk, skb, req))
 		goto drop_and_free;
 
-	if (isn && tmp_opt.tstamp_ok)
+	if (isn && tmp_opt.tstamp_ok && sysctl_tcp_timestamps == 2)
 		af_ops->init_seq(skb, &tcp_rsk(req)->ts_off);
 
 	if (!want_cookie && !isn) {
+		u32 ts_off;
+
 		/* VJ's idea. We save last timestamp seen
 		 * from the destination in peer table, when entering
 		 * state TIME-WAIT, and check against it before
@@ -6366,7 +6368,9 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 			goto drop_and_release;
 		}
 
-		isn = af_ops->init_seq(skb, &tcp_rsk(req)->ts_off);
+		isn = af_ops->init_seq(skb, &ts_off);
+		if (sysctl_tcp_timestamps == 2)
+			tcp_rsk(req)->ts_off = ts_off;
 	}
 	if (!dst) {
 		dst = af_ops->route_req(sk, &fl, req, NULL);
