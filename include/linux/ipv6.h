@@ -299,7 +299,7 @@ bool ipv6_mod_enabled(void);
 
 static inline struct ipv6_pinfo *inet6_sk(const struct sock *__sk)
 {
-	return sk_fullsock(__sk) ? inet_sk(__sk)->pinet6 : NULL;
+	return inet_sk(__sk)->pinet6;
 }
 
 static inline struct raw6_sock *raw6_sk(const struct sock *sk)
