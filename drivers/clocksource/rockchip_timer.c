@@ -53,16 +53,6 @@ static inline struct rk_timer *rk_timer(struct clock_event_device *ce)
 	return &rk_clock_event_device(ce)->timer;
 }
 
-static inline void __iomem *rk_base(struct clock_event_device *ce)
-{
-	return rk_timer(ce)->base;
-}
-
-static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
-{
-	return rk_timer(ce)->ctrl;
-}
-
 static inline void rk_timer_disable(struct rk_timer *timer)
 {
 	writel_relaxed(TIMER_DISABLE, timer->ctrl);
