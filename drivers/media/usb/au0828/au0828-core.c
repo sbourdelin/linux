@@ -153,9 +153,11 @@ static void au0828_unregister_media_device(struct au0828_dev *dev)
 	}
 
 	/* clear enable_source, disable_source */
+	mutex_lock(&mdev->graph_mutex);
 	dev->media_dev->source_priv = NULL;
 	dev->media_dev->enable_source = NULL;
 	dev->media_dev->disable_source = NULL;
+	mutex_unlock(&mdev->graph_mutex);
 
 	media_device_unregister(dev->media_dev);
 	media_device_cleanup(dev->media_dev);
@@ -549,9 +551,11 @@ static int au0828_media_device_register(struct au0828_dev *dev,
 		return ret;
 	}
 	/* set enable_source */
+	mutex_lock(&dev->media_dev->graph_mutex);
 	dev->media_dev->source_priv = (void *) dev;
 	dev->media_dev->enable_source = au0828_enable_source;
 	dev->media_dev->disable_source = au0828_disable_source;
+	mutex_unlock(&dev->media_dev->graph_mutex);
 #endif
 	return 0;
 }
