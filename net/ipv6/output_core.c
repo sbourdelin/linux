@@ -166,8 +166,10 @@ int ip6_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
 	int err;
 
 	err = __ip6_local_out(net, sk, skb);
-	if (likely(err == 1))
+	if (likely(err == 1)) {
+		skb->protocol = htons(ETH_P_IPV6);
 		err = dst_output(net, sk, skb);
+	}
 
 	return err;
 }
