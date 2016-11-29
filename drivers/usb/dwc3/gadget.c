@@ -1720,7 +1720,7 @@ static int __dwc3_gadget_start(struct dwc3 *dwc)
 			reg |= DWC3_DCFG_LOWSPEED;
 			break;
 		case USB_SPEED_FULL:
-			reg |= DWC3_DCFG_FULLSPEED1;
+			reg |= DWC3_DCFG_FULLSPEED2;
 			break;
 		case USB_SPEED_HIGH:
 			reg |= DWC3_DCFG_HIGHSPEED;
