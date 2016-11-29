@@ -93,6 +93,30 @@ struct rt6key {
 
 struct fib6_table;
 
+/* Multipath nexthop.
+ * @nh is the actual nexthop
+ * @nslices is the number of slices assigned to this nexthop
+ */
+struct rt6_multi_nh {
+	struct rt6_info *nh;
+	unsigned int	nslices;
+};
+
+/* Multipath routes map.
+ * @nhs is an array of available nexthops
+ * @size is the number of elements in @nhs
+ * @nslices is the number of slices and the number of elements in @index
+ *	    and is always in the form 2^x to prevent using a division for
+ *	    the computation of the modulo.
+ * @index is an array mapping a slice index to a nexthop index in @nhs
+ */
+struct rt6_multi_map {
+	struct rt6_multi_nh	*nhs;
+	unsigned int		size;
+	unsigned int		nslices;
+	__u8			*index;
+};
+
 struct rt6_info {
 	struct dst_entry		dst;
 
@@ -113,6 +137,7 @@ struct rt6_info {
 	 */
 	struct list_head		rt6i_siblings;
 	unsigned int			rt6i_nsiblings;
+	struct rt6_multi_map		*rt6i_nh_map;
 
 	atomic_t			rt6i_ref;
 

@@ -427,39 +427,27 @@ static bool rt6_check_expired(const struct rt6_info *rt)
 	return false;
 }
 
-/* Multipath route selection:
- *   Hash based function using packet header and flowlabel.
- * Adapted from fib_info_hashfn()
- */
-static int rt6_info_hash_nhsfn(unsigned int candidate_count,
-			       const struct flowi6 *fl6)
-{
-	return get_hash_from_flowi6(fl6) % candidate_count;
-}
-
 static struct rt6_info *rt6_multipath_select(struct rt6_info *match,
 					     struct flowi6 *fl6, int oif,
 					     int strict)
 {
-	struct rt6_info *sibling, *next_sibling;
-	int route_choosen;
+	struct rt6_multi_map *nh_map = match->rt6i_nh_map;
+	__u32 hash = get_hash_from_flowi6(fl6);
+	unsigned int slice, idx;
+	struct rt6_info *res;
 
-	route_choosen = rt6_info_hash_nhsfn(match->rt6i_nsiblings + 1, fl6);
-	/* Don't change the route, if route_choosen == 0
-	 * (siblings does not include ourself)
-	 */
-	if (route_choosen)
-		list_for_each_entry_safe(sibling, next_sibling,
-				&match->rt6i_siblings, rt6i_siblings) {
-			route_choosen--;
-			if (route_choosen == 0) {
-				if (rt6_score_route(sibling, oif, strict) < 0)
-					break;
-				match = sibling;
-				break;
-			}
-		}
-	return match;
+	WARN_ON(!nh_map);
+	if (!nh_map)
+		return match;
+
+	slice = hash & (nh_map->nslices - 1);
+	idx = nh_map->index[slice];
+	res = nh_map->nhs[idx].nh;
+
+	if (rt6_score_route(res, oif, strict) < 0)
+		res = match;
+
+	return res;
 }
 
 /*
@@ -3550,6 +3538,9 @@ int ipv6_sysctl_rtcache_flush(struct ctl_table *ctl, int write,
 	return 0;
 }
 
+static int one = 1;
+static int thirtyone = 31;
+
 struct ctl_table ipv6_route_table_template[] = {
 	{
 		.procname	=	"flush",
@@ -3621,6 +3612,15 @@ struct ctl_table ipv6_route_table_template[] = {
 		.mode		=	0644,
 		.proc_handler	=	proc_dointvec_ms_jiffies,
 	},
+	{
+		.procname	=	"ecmp_slices",
+		.data		=	&init_net.ipv6.sysctl.ip6_rt_ecmp_slices,
+		.maxlen		=	sizeof(int),
+		.mode		=	0644,
+		.proc_handler	=	proc_dointvec_minmax,
+		.extra1		=	&one,
+		.extra2		=	&thirtyone,
+	},
 	{ }
 };
 
@@ -3644,6 +3644,7 @@ struct ctl_table * __net_init ipv6_route_sysctl_init(struct net *net)
 		table[7].data = &net->ipv6.sysctl.ip6_rt_mtu_expires;
 		table[8].data = &net->ipv6.sysctl.ip6_rt_min_advmss;
 		table[9].data = &net->ipv6.sysctl.ip6_rt_gc_min_interval;
+		table[10].data = &net->ipv6.sysctl.ip6_rt_ecmp_slices;
 
 		/* Don't export sysctls to unprivileged users */
 		if (net->user_ns != &init_user_ns)
@@ -3707,6 +3708,7 @@ static int __net_init ip6_route_net_init(struct net *net)
 	net->ipv6.sysctl.ip6_rt_gc_elasticity = 9;
 	net->ipv6.sysctl.ip6_rt_mtu_expires = 10*60*HZ;
 	net->ipv6.sysctl.ip6_rt_min_advmss = IPV6_MIN_MTU - 20 - 40;
+	net->ipv6.sysctl.ip6_rt_ecmp_slices = 5;
 
 	net->ipv6.ip6_rt_gc_expire = 30*HZ;
 

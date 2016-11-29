@@ -727,6 +727,166 @@ static void fib6_purge_rt(struct rt6_info *rt, struct fib6_node *fn,
 	}
 }
 
+static void fib6_mp_free(struct rt6_info *rt)
+{
+	struct rt6_multi_map *nh_map = rt->rt6i_nh_map;
+	struct rt6_info *sibling;
+
+	if (nh_map) {
+		list_for_each_entry(sibling, &rt->rt6i_siblings,
+				    rt6i_siblings) {
+			sibling->rt6i_nh_map = NULL;
+		}
+
+		rt->rt6i_nh_map = NULL;
+
+		kfree(nh_map->nhs);
+		kfree(nh_map->index);
+		kfree(nh_map);
+	}
+}
+
+static int fib6_mp_extend(struct net *net, struct rt6_info *sref,
+			  struct rt6_info *rt)
+{
+	struct rt6_multi_map *nh_map = sref->rt6i_nh_map;
+	struct rt6_multi_nh *tmp_nhs, *old_nhs;
+	unsigned int kslices;
+	unsigned int i, j;
+
+	if (!nh_map) {
+		__u8 *index;
+
+		nh_map = kmalloc(sizeof(*nh_map), GFP_ATOMIC);
+		if (!nh_map)
+			return -ENOMEM;
+
+		nh_map->size = 1;
+		nh_map->nslices = (1 << net->ipv6.sysctl.ip6_rt_ecmp_slices);
+
+		tmp_nhs = kmalloc(sizeof(*tmp_nhs), GFP_ATOMIC);
+		if (!tmp_nhs) {
+			kfree(nh_map);
+			return -ENOMEM;
+		}
+
+		tmp_nhs[0].nh = sref;
+		tmp_nhs[0].nslices = nh_map->nslices;
+		nh_map->nhs = tmp_nhs;
+
+		index = kmalloc_array(nh_map->nslices, sizeof(*index),
+				      GFP_ATOMIC);
+		if (!index) {
+			kfree(nh_map->nhs);
+			kfree(nh_map);
+			return -ENOMEM;
+		}
+
+		for (i = 0; i < nh_map->nslices; i++)
+			index[i] = 0;
+
+		nh_map->index = index;
+		sref->rt6i_nh_map = nh_map;
+	}
+
+	if (nh_map->size == nh_map->nslices)
+		return -ENOBUFS;
+
+	nh_map->size++;
+
+	tmp_nhs = kmalloc_array(nh_map->size, sizeof(*tmp_nhs), GFP_ATOMIC);
+	if (!tmp_nhs)
+		return -ENOMEM;
+
+	for (i = 0; i < nh_map->size - 1; i++)
+		tmp_nhs[i] = nh_map->nhs[i];
+
+	tmp_nhs[nh_map->size - 1].nh = rt;
+	tmp_nhs[nh_map->size - 1].nslices = 0;
+
+	kslices = nh_map->nslices / nh_map->size;
+
+	/* Loop over nexthops and steal a random slice until we have kslices for
+	 * the new nexthop. This algorithm ensures that flows are taken as
+	 * equally as possible from current nexthops.
+	 *
+	 * At each iteration, @j is the index in tmp_nhs of the nexthop
+	 * to steal from and @idx is the index of the slice to steal
+	 * among @j's slices.
+	 */
+	for (i = 0, j = 0; i < kslices; i++) {
+		unsigned int idx, k = 0;
+
+		if (tmp_nhs[j].nslices == 1)
+			continue;
+
+		idx = (prandom_u32() % tmp_nhs[j].nslices) + 1;
+		do {
+			if (nh_map->index[k++] == j)
+				idx--;
+		} while (idx);
+
+		nh_map->index[k - 1] = nh_map->size - 1;
+		tmp_nhs[nh_map->size - 1].nslices++;
+		tmp_nhs[j].nslices--;
+
+		j = (j + 1) % (nh_map->size - 1);
+	}
+
+	WARN_ON(tmp_nhs[nh_map->size - 1].nslices != kslices);
+
+	old_nhs = nh_map->nhs;
+	nh_map->nhs = tmp_nhs;
+	kfree(old_nhs);
+
+	rt->rt6i_nh_map = nh_map;
+
+	return 0;
+}
+
+static int fib6_mp_shrink(struct rt6_info *sref, struct rt6_info *rt)
+{
+	struct rt6_multi_map *nh_map = sref->rt6i_nh_map;
+	struct rt6_multi_nh *tmp_nhs, *old_nhs;
+	unsigned int i, j, idx = 0;
+
+	tmp_nhs = kmalloc_array(nh_map->size - 1, sizeof(*tmp_nhs), GFP_ATOMIC);
+	if (!tmp_nhs)
+		return -ENOMEM;
+
+	for (i = 0, j = 0; i < nh_map->size; i++) {
+		if (nh_map->nhs[i].nh != rt)
+			tmp_nhs[j++] = nh_map->nhs[i];
+		else
+			idx = i;
+	}
+
+	nh_map->size--;
+	old_nhs = nh_map->nhs;
+	nh_map->nhs = tmp_nhs;
+	kfree(old_nhs);
+
+	rt->rt6i_nh_map = NULL;
+
+	/* Update the slices index. For each slice mapping to the removed
+	 * nexthop, assign another random nexthop. For each slice mapping
+	 * to a nexthop that was after the removed nexthop, decrement the
+	 * nexthop index to reflect the shift. Nexthops that were before
+	 * the removed nexthop are unaffected.
+	 */
+	for (i = 0; i < nh_map->nslices; i++) {
+		if (nh_map->index[i] == idx) {
+			j = prandom_u32() % nh_map->size;
+			nh_map->index[i] = j;
+			nh_map->nhs[j].nslices++;
+		} else if (nh_map->index[i] > idx) {
+			nh_map->index[i]--;
+		}
+	}
+
+	return 0;
+}
+
 /*
  *	Insert routing information in a node.
  */
@@ -837,6 +997,9 @@ next_iter:
 			}
 			sibling = sibling->dst.rt6_next;
 		}
+		err = fib6_mp_extend(info->nl_net, sibling, rt);
+		if (err < 0)
+			return err;
 		/* For each sibling in the list, increment the counter of
 		 * siblings. BUG() if counters does not match, list of siblings
 		 * is broken!
@@ -900,6 +1063,8 @@ add:
 			fn->fn_flags |= RTN_RTINFO;
 		}
 		nsiblings = iter->rt6i_nsiblings;
+		if (nsiblings)
+			fib6_mp_free(iter);
 		fib6_purge_rt(iter, fn, info->nl_net);
 		rt6_release(iter);
 
@@ -1407,13 +1572,20 @@ static void fib6_del_route(struct fib6_node *fn, struct rt6_info **rtp,
 
 	/* Remove this entry from other siblings */
 	if (rt->rt6i_nsiblings) {
-		struct rt6_info *sibling, *next_sibling;
+		struct rt6_info *sibling, *next_sibling, *sref;
+
+		sref = list_first_entry(&rt->rt6i_siblings, struct rt6_info,
+					rt6i_siblings);
 
 		list_for_each_entry_safe(sibling, next_sibling,
 					 &rt->rt6i_siblings, rt6i_siblings)
 			sibling->rt6i_nsiblings--;
 		rt->rt6i_nsiblings = 0;
 		list_del_init(&rt->rt6i_siblings);
+		if (!sref->rt6i_nsiblings)
+			fib6_mp_free(sref);
+		else
+			fib6_mp_shrink(sref, rt);
 	}
 
 	/* Adjust walkers */
