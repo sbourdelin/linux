@@ -63,11 +63,13 @@ static inline void rk_timer_enable(struct rk_timer *timer, u32 flags)
 	writel_relaxed(TIMER_ENABLE | flags, timer->ctrl);
 }
 
-static void rk_timer_update_counter(unsigned long cycles,
-				    struct rk_timer *timer)
+static void rk_timer_update_counter(u64 cycles, struct rk_timer *timer)
 {
-	writel_relaxed(cycles, timer->base + TIMER_LOAD_COUNT0);
-	writel_relaxed(0, timer->base + TIMER_LOAD_COUNT1);
+	u32 lower = cycles & 0xFFFFFFFF;
+	u32 upper = (cycles >> 32) & 0xFFFFFFFF;
+
+	writel_relaxed(lower, timer->base + TIMER_LOAD_COUNT0);
+	writel_relaxed(upper, timer->base + TIMER_LOAD_COUNT1);
 }
 
 static void rk_timer_interrupt_clear(struct rk_timer *timer)
