@@ -197,40 +197,42 @@ static int ndev_mw_to_bar(struct amd_ntb_dev *ndev, int idx)
 	return 1 << idx;
 }
 
-static int amd_ntb_mw_count(struct ntb_dev *ntb)
+static int amd_ntb_mw_count(struct ntb_dev *ntb, int pidx)
 {
+	if (pidx > NTB_PIDX_MAX)
+		return -EINVAL;
+
 	return ntb_ndev(ntb)->mw_count;
 }
 
-static int amd_ntb_mw_get_range(struct ntb_dev *ntb, int idx,
-				phys_addr_t *base,
-				resource_size_t *size,
-				resource_size_t *align,
-				resource_size_t *align_size)
+static int amd_ntb_mw_get_align(struct ntb_dev *ntb, int pidx, int idx,
+				resource_size_t *addr_align,
+				resource_size_t *size_align,
+				resource_size_t *size_max)
 {
 	struct amd_ntb_dev *ndev = ntb_ndev(ntb);
 	int bar;
+
+	if (pidx > NTB_PIDX_MAX)
+		return -EINVAL;
 
 	bar = ndev_mw_to_bar(ndev, idx);
 	if (bar < 0)
 		return bar;
 
-	if (base)
-		*base = pci_resource_start(ndev->ntb.pdev, bar);
+	if (addr_align)
+		*addr_align = SZ_4K;
 
-	if (size)
-		*size = pci_resource_len(ndev->ntb.pdev, bar);
+	if (size_align)
+		*size_align = 1;
 
-	if (align)
-		*align = SZ_4K;
-
-	if (align_size)
-		*align_size = 1;
+	if (size_max)
+		*size_max = pci_resource_len(ndev->ntb.pdev, bar);
 
 	return 0;
 }
 
-static int amd_ntb_mw_set_trans(struct ntb_dev *ntb, int idx,
+static int amd_ntb_mw_set_trans(struct ntb_dev *ntb, int pidx, int idx,
 				dma_addr_t addr, resource_size_t size)
 {
 	struct amd_ntb_dev *ndev = ntb_ndev(ntb);
@@ -239,6 +241,9 @@ static int amd_ntb_mw_set_trans(struct ntb_dev *ntb, int idx,
 	void __iomem *mmio, *peer_mmio;
 	u64 base_addr, limit, reg_val;
 	int bar;
+
+	if (pidx > NTB_PIDX_MAX)
+		return -EINVAL;
 
 	bar = ndev_mw_to_bar(ndev, idx);
 	if (bar < 0)
@@ -308,6 +313,31 @@ static int amd_ntb_mw_set_trans(struct ntb_dev *ntb, int idx,
 			return -EIO;
 		}
 	}
+
+	return 0;
+}
+
+static int amd_ntb_peer_mw_count(struct ntb_dev *ntb)
+{
+	/* The same as for inbound MWs */
+	return ntb_ndev(ntb)->mw_count;
+}
+
+static int amd_ntb_peer_mw_get_addr(struct ntb_dev *ntb, int idx,
+				    phys_addr_t *base, resource_size_t *size)
+{
+	struct amd_ntb_dev *ndev = ntb_ndev(ntb);
+	int bar;
+
+	bar = ndev_mw_to_bar(ndev, idx);
+	if (bar < 0)
+		return bar;
+
+	if (base)
+		*base = pci_resource_start(ndev->ntb.pdev, bar);
+
+	if (size)
+		*size = pci_resource_len(ndev->ntb.pdev, bar);
 
 	return 0;
 }
@@ -466,8 +496,10 @@ static const struct ntb_dev_ops amd_ntb_ops = {
 	.link_enable		= amd_ntb_link_enable,
 	.link_disable		= amd_ntb_link_disable,
 	.mw_count		= amd_ntb_mw_count,
-	.mw_get_range		= amd_ntb_mw_get_range,
+	.mw_get_align		= amd_ntb_mw_get_align,
 	.mw_set_trans		= amd_ntb_mw_set_trans,
+	.peer_mw_count		= amd_ntb_peer_mw_count,
+	.peer_mw_get_addr	= amd_ntb_peer_mw_get_addr,
 	.db_valid_mask		= amd_ntb_db_valid_mask,
 	.db_vector_count	= amd_ntb_db_vector_count,
 	.db_vector_mask		= amd_ntb_db_vector_mask,
