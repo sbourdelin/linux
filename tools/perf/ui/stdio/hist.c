@@ -400,6 +400,53 @@ static size_t hist_entry_callchain__fprintf(struct hist_entry *he,
 	return 0;
 }
 
+static size_t hist_entry_inline__fprintf(struct hist_entry *he,
+					 int left_margin,
+					 FILE *fp)
+{
+	struct dso *dso;
+	struct inline_node *node;
+	struct inline_list *ilist;
+	int ret = 0, i = 0;
+
+	if (he->ms.map == NULL)
+		return 0;
+
+	dso = he->ms.map->dso;
+	if (dso == NULL)
+		return 0;
+
+	if (dso->kernel != DSO_TYPE_USER)
+		return 0;
+
+	node = get_inline_node(dso, map__rip_2objdump(he->ms.map, he->ip));
+	if (node == NULL)
+		return 0;
+
+	ret += callchain__fprintf_left_margin(fp, left_margin);
+	ret += fprintf(fp, "|\n");
+	ret += callchain__fprintf_left_margin(fp, left_margin);
+	ret += fprintf(fp, "---");
+	left_margin += 3;
+
+	list_for_each_entry(ilist, &node->val, list) {
+		if (ilist->filename != NULL) {
+			if (i++ > 0)
+				ret = callchain__fprintf_left_margin(fp,
+								left_margin);
+			ret += fprintf(fp, "%s:%d (inline)",
+				       ilist->filename, ilist->line_nr);
+			ret += fprintf(fp, "\n");
+		}
+	}
+
+	if (i > 0)
+		ret += fprintf(fp, "\n");
+
+	free_inline_node(node);
+	return ret;
+}
+
 int __hist_entry__snprintf(struct hist_entry *he, struct perf_hpp *hpp,
 			   struct perf_hpp_list *hpp_list)
 {
@@ -529,6 +576,7 @@ static int hist_entry__fprintf(struct hist_entry *he, size_t size,
 			       bool use_callchain)
 {
 	int ret;
+	int callchain_ret = 0;
 	struct perf_hpp hpp = {
 		.buf		= bf,
 		.size		= size,
@@ -547,7 +595,13 @@ static int hist_entry__fprintf(struct hist_entry *he, size_t size,
 	ret = fprintf(fp, "%s\n", bf);
 
 	if (use_callchain)
-		ret += hist_entry_callchain__fprintf(he, total_period, 0, fp);
+		callchain_ret = hist_entry_callchain__fprintf(he, total_period,
+							      0, fp);
+
+	if ((callchain_ret == 0) && symbol_conf.show_inline)
+		ret += hist_entry_inline__fprintf(he, 0, fp);
+	else
+		ret += callchain_ret;
 
 	return ret;
 }
