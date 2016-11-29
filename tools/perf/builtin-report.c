@@ -830,6 +830,8 @@ int cmd_report(int argc, const char **argv, const char *prefix __maybe_unused)
 	OPT_CALLBACK_DEFAULT(0, "stdio-color", NULL, "mode",
 			     "'always' (default), 'never' or 'auto' only applicable to --stdio mode",
 			     stdio__config_color, "always"),
+	OPT_BOOLEAN(0, "inline", &symbol_conf.show_inline,
+		    "Show inline functions"),
 	OPT_END()
 	};
 	struct perf_data_file file = {
