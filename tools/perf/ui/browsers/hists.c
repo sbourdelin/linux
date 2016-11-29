@@ -362,6 +362,46 @@ static void hist_entry__init_have_children(struct hist_entry *he)
 	he->init_have_children = true;
 }
 
+static void hist_entry_init_inline_node(struct hist_entry *he)
+{
+	struct dso *dso;
+
+	if (he->inline_node)
+		return;
+
+	if (he->ms.map == NULL)
+		return;
+
+	dso = he->ms.map->dso;
+	if (dso == NULL)
+		return;
+
+	if (dso->kernel != DSO_TYPE_USER)
+		return;
+
+	he->inline_node = get_inline_node(dso,
+		map__rip_2objdump(he->ms.map, he->ip));
+
+	if (he->inline_node == NULL)
+		return;
+
+	he->has_children = true;
+}
+
+static int inline__count_rows(struct hist_entry *he)
+{
+	struct inline_node *node = he->inline_node;
+	struct inline_list *ilist;
+	int i = 0;
+
+	list_for_each_entry(ilist, &node->val, list) {
+		if (ilist->filename != NULL)
+			i++;
+	}
+
+	return i;
+}
+
 static bool hist_browser__toggle_fold(struct hist_browser *browser)
 {
 	struct hist_entry *he = browser->he_selection;
@@ -393,7 +433,11 @@ static bool hist_browser__toggle_fold(struct hist_browser *browser)
 
 		if (he->unfolded) {
 			if (he->leaf)
-				he->nr_rows = callchain__count_rows(&he->sorted_chain);
+				if (he->inline_node)
+					he->nr_rows = inline__count_rows(he);
+				else
+					he->nr_rows = callchain__count_rows(
+						&he->sorted_chain);
 			else
 				he->nr_rows = hierarchy_count_rows(browser, he, false);
 
@@ -1091,6 +1135,40 @@ static int hist_browser__show_callchain(struct hist_browser *browser,
 	return printed;
 }
 
+static int hist_browser__show_inline(struct hist_browser *browser,
+				     struct hist_entry *entry,
+				     unsigned short row)
+{
+	struct inline_node *node;
+	struct inline_list *ilist;
+	char buf[1024];
+	int color, width, first_row;
+
+	first_row = row;
+	node = entry->inline_node;
+	width = browser->b.width - (LEVEL_OFFSET_STEP + 2);
+
+	list_for_each_entry(ilist, &node->val, list) {
+		if (ilist->filename != NULL) {
+			color = HE_COLORSET_NORMAL;
+			if (ui_browser__is_current_entry(&browser->b, row))
+				color = HE_COLORSET_SELECTED;
+
+			scnprintf(buf, sizeof(buf), "%s:%d (inline)",
+				ilist->filename, ilist->line_nr);
+
+			ui_browser__set_color(&browser->b, color);
+			hist_browser__gotorc(browser, row, 0);
+			ui_browser__write_nstring(&browser->b, " ",
+				LEVEL_OFFSET_STEP + 2);
+			ui_browser__write_nstring(&browser->b, buf, width);
+			row++;
+		}
+	}
+
+	return row - first_row;
+}
+
 struct hpp_arg {
 	struct ui_browser *b;
 	char folded_sign;
@@ -1204,6 +1282,11 @@ static int hist_browser__show_entry(struct hist_browser *browser,
 		folded_sign = hist_entry__folded(entry);
 	}
 
+	if (symbol_conf.show_inline && (!entry->has_children)) {
+		hist_entry_init_inline_node(entry);
+		folded_sign = hist_entry__folded(entry);
+	}
+
 	if (row_offset == 0) {
 		struct hpp_arg arg = {
 			.b		= &browser->b,
@@ -1235,7 +1318,8 @@ static int hist_browser__show_entry(struct hist_browser *browser,
 			}
 
 			if (first) {
-				if (symbol_conf.use_callchain) {
+				if (symbol_conf.use_callchain ||
+					symbol_conf.show_inline) {
 					ui_browser__printf(&browser->b, "%c ", folded_sign);
 					width -= 2;
 				}
@@ -1277,8 +1361,14 @@ static int hist_browser__show_entry(struct hist_browser *browser,
 			.is_current_entry = current_entry,
 		};
 
-		printed += hist_browser__show_callchain(browser, entry, 1, row,
-					hist_browser__show_callchain_entry, &arg,
+		if (entry->inline_node)
+			printed += hist_browser__show_inline(browser,
+					entry, row);
+		else
+			printed += hist_browser__show_callchain(browser,
+					entry, 1, row,
+					hist_browser__show_callchain_entry,
+					&arg,
 					hist_browser__check_output_full);
 	}
 
