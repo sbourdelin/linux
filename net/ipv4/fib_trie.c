@@ -421,8 +421,22 @@ static inline int tnode_full(struct key_vector *tn, struct key_vector *n)
 	return n && ((n->pos + n->bits) == tn->pos) && IS_TNODE(n);
 }
 
+static void node_push_suffix(struct key_vector *tn, struct key_vector *l)
+{
+	while (tn->slen < l->slen) {
+		tn->slen = l->slen;
+		tn = node_parent(tn);
+		if (!tn)
+			break;
+	}
+}
+
 /* Add a child at position i overwriting the old value.
  * Update the value of full_children and empty_children.
+ *
+ * The suffix length of the parent node and the rest of the tree is
+ * updated (if required) when adding/replacing a node, but is caller's
+ * responsibility on removal.
  */
 static void put_child(struct key_vector *tn, unsigned long i,
 		      struct key_vector *n)
@@ -447,8 +461,8 @@ static void put_child(struct key_vector *tn, unsigned long i,
 	else if (!wasfull && isfull)
 		tn_info(tn)->full_children++;
 
-	if (n && (tn->slen < n->slen))
-		tn->slen = n->slen;
+	if (n)
+		node_push_suffix(tn, n);
 
 	rcu_assign_pointer(tn->tnode[i], n);
 }
@@ -919,15 +933,27 @@ static struct key_vector *resize(struct trie *t, struct key_vector *tn)
 	if (max_work != MAX_WORK)
 		return tp;
 
-	/* push the suffix length to the parent node */
-	if (tn->slen > tn->pos) {
-		unsigned char slen = update_suffix(tn);
-
-		if (slen > tp->slen)
-			tp->slen = slen;
-	}
-
 	return tp;
+}
+
+static void node_set_suffix(struct key_vector *tp, unsigned char slen)
+{
+	if (slen > tp->slen)
+		tp->slen = slen;
+}
+
+static void node_pull_suffix(struct key_vector *tn)
+{
+	struct key_vector *tp;
+	unsigned char slen;
+
+	slen = update_suffix(tn);
+	tp = node_parent(tn);
+	while ((tp->slen > tp->pos) && (tp->slen > slen)) {
+		if (update_suffix(tp) > slen)
+			break;
+		tp = node_parent(tp);
+	}
 }
 
 static void leaf_pull_suffix(struct key_vector *tp, struct key_vector *l)
@@ -936,17 +962,6 @@ static void leaf_pull_suffix(struct key_vector *tp, struct key_vector *l)
 		if (update_suffix(tp) > l->slen)
 			break;
 		tp = node_parent(tp);
-	}
-}
-
-static void leaf_push_suffix(struct key_vector *tn, struct key_vector *l)
-{
-	/* if this is a new leaf then tn will be NULL and we can sort
-	 * out parent suffix lengths as a part of trie_rebalance
-	 */
-	while (tn->slen < l->slen) {
-		tn->slen = l->slen;
-		tn = node_parent(tn);
 	}
 }
 
@@ -1107,7 +1122,7 @@ static int fib_insert_alias(struct trie *t, struct key_vector *tp,
 	/* if we added to the tail node then we need to update slen */
 	if (l->slen < new->fa_slen) {
 		l->slen = new->fa_slen;
-		leaf_push_suffix(tp, l);
+		node_push_suffix(tp, l);
 	}
 
 	return 0;
@@ -1495,12 +1510,15 @@ static void fib_remove_alias(struct trie *t, struct key_vector *tp,
 	/* remove the fib_alias from the list */
 	hlist_del_rcu(&old->fa_list);
 
-	/* if we emptied the list this leaf will be freed and we can sort
-	 * out parent suffix lengths as a part of trie_rebalance
-	 */
+	/* if we emptied the list this leaf will be freed */
 	if (hlist_empty(&l->leaf)) {
 		put_child_root(tp, l->key, NULL);
 		node_free(l);
+		/* only need to update suffixes if this alias was
+		 * possibly the one with the largest suffix in the parent
+		 */
+		if (tp->slen == old->fa_slen)
+			node_pull_suffix(tp);
 		trie_rebalance(t, tp);
 		return;
 	}
@@ -1783,6 +1801,16 @@ void fib_table_flush_external(struct fib_table *tb)
 			if (IS_TRIE(pn))
 				break;
 
+			/* push the suffix length to the parent node,
+			 * since a previous leaf removal may have
+			 * caused it to change
+			 */
+			if (pn->slen > pn->pos) {
+				unsigned char slen = update_suffix(pn);
+
+				node_set_suffix(node_parent(pn), slen);
+			}
+
 			/* resize completed node */
 			pn = resize(t, pn);
 			cindex = get_index(pkey, pn);
@@ -1848,6 +1876,16 @@ int fib_table_flush(struct net *net, struct fib_table *tb)
 			/* cannot resize the trie vector */
 			if (IS_TRIE(pn))
 				break;
+
+			/* push the suffix length to the parent node,
+			 * since a previous leaf removal may have
+			 * caused it to change
+			 */
+			if (pn->slen > pn->pos) {
+				unsigned char slen = update_suffix(pn);
+
+				node_set_suffix(node_parent(pn), slen);
+			}
 
 			/* resize completed node */
 			pn = resize(t, pn);
