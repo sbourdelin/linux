@@ -78,6 +78,7 @@
 #include <termios.h>
 #include <linux/bitops.h>
 #include <termios.h>
+#include <linux/list.h>
 #include "strlist.h"
 
 extern const char *graph_line;
@@ -364,5 +365,19 @@ extern int sched_getcpu(void);
 int is_printable_array(char *p, unsigned int len);
 
 int timestamp__scnprintf_usec(u64 timestamp, char *buf, size_t sz);
+
+struct inline_list {
+	char			*filename;
+	unsigned int		line_nr;
+	struct list_head	list;
+};
+
+struct inline_node {
+	u64			addr;
+	struct list_head	val;
+};
+
+struct inline_node *get_inline_node(struct dso *dso, u64 addr);
+void free_inline_node(struct inline_node *node);
 
 #endif /* GIT_COMPAT_UTIL_H */
