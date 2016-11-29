@@ -19,6 +19,8 @@
 
 #define TIMER_LOAD_COUNT0	0x00
 #define TIMER_LOAD_COUNT1	0x04
+#define TIMER_CURRENT_VALUE0	0x08
+#define TIMER_CURRENT_VALUE1	0x0C
 #define TIMER_CONTROL_REG3288	0x10
 #define TIMER_CONTROL_REG3399	0x1c
 #define TIMER_INT_STATUS	0x18
@@ -70,6 +72,25 @@ static void rk_timer_update_counter(u64 cycles, struct rk_timer *timer)
 
 	writel_relaxed(lower, timer->base + TIMER_LOAD_COUNT0);
 	writel_relaxed(upper, timer->base + TIMER_LOAD_COUNT1);
+}
+
+static u64 rk_timer_counter_read(struct rk_timer *timer)
+{
+	u64 counter;
+	u32 lower;
+	u32 upper, old_upper;
+
+	upper = readl_relaxed(timer->base + TIMER_CURRENT_VALUE1);
+	do {
+		old_upper = upper;
+		lower = readl_relaxed(timer->base + TIMER_CURRENT_VALUE0);
+		upper = readl_relaxed(timer->base + TIMER_CURRENT_VALUE1);
+	} while (upper != old_upper);
+
+	counter = upper;
+	counter <<= 32;
+	counter |= lower;
+	return counter;
 }
 
 static void rk_timer_interrupt_clear(struct rk_timer *timer)
