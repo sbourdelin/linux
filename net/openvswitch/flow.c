@@ -477,12 +477,17 @@ invalid:
 }
 
 /**
- * key_extract - extracts a flow key from an Ethernet frame.
+ * key_extract - extracts a flow key from a packet with or without an
+ * Ethernet header.
  * @skb: sk_buff that contains the frame, with skb->data pointing to the
- * Ethernet header
+ * beginning of the packet.
  * @key: output flow key
  *
- * The caller must ensure that skb->len >= ETH_HLEN.
+ * 'key->mac_proto' must be initialized to indicate the frame type.
+ * For an L3 frame 'key->mac_proto' must equal 'MAC_PROTO_NONE', and the
+ * caller must ensure that 'skb->protocol' is set to the ethertype of the L3
+ * header.  Otherwise the presence of an Ethernet header is assumed and
+ * the caller must ensure that skb->len >= ETH_HLEN.
  *
  * Returns 0 if successful, otherwise a negative errno value.
  *
@@ -498,8 +503,9 @@ invalid:
  *      of a correct length, otherwise the same as skb->network_header.
  *      For other key->eth.type values it is left untouched.
  *
- *    - skb->protocol: the type of the data starting at skb->network_header.
- *      Equals to key->eth.type.
+ *    - skb->protocol: For non-accelerated VLAN, one of the VLAN ether types,
+ *      otherwise the same as key->eth.type, the ether type of the payload
+ *      starting at skb->network_header.
  */
 static int key_extract(struct sk_buff *skb, struct sw_flow_key *key)
 {
@@ -518,6 +524,7 @@ static int key_extract(struct sk_buff *skb, struct sw_flow_key *key)
 			return -EINVAL;
 
 		skb_reset_network_header(skb);
+		key->eth.type = skb->protocol;
 	} else {
 		eth = eth_hdr(skb);
 		ether_addr_copy(key->eth.src, eth->h_source);
@@ -531,15 +538,22 @@ static int key_extract(struct sk_buff *skb, struct sw_flow_key *key)
 		if (unlikely(parse_vlan(skb, key)))
 			return -ENOMEM;
 
-		skb->protocol = parse_ethertype(skb);
-		if (unlikely(skb->protocol == htons(0)))
+		key->eth.type = parse_ethertype(skb);
+		if (unlikely(key->eth.type == htons(0)))
 			return -ENOMEM;
+
+		if (skb->protocol == htons(ETH_P_TEB)) {
+			if (key->eth.vlan.tci & htons(VLAN_TAG_PRESENT)
+			    && !skb_vlan_tag_present(skb))
+				skb->protocol = key->eth.vlan.tpid;
+			else
+				skb->protocol = key->eth.type;
+		}
 
 		skb_reset_network_header(skb);
 		__skb_push(skb, skb->data - skb_mac_header(skb));
 	}
 	skb_reset_mac_len(skb);
-	key->eth.type = skb->protocol;
 
 	/* Network layer. */
 	if (key->eth.type == htons(ETH_P_IP)) {
