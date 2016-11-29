@@ -191,6 +191,19 @@ void ntb_db_event(struct ntb_dev *ntb, int vector)
 }
 EXPORT_SYMBOL(ntb_db_event);
 
+void ntb_msg_event(struct ntb_dev *ntb)
+{
+	unsigned long irqflags;
+
+	spin_lock_irqsave(&ntb->ctx_lock, irqflags);
+	{
+		if (ntb->ctx_ops && ntb->ctx_ops->msg_event)
+			ntb->ctx_ops->msg_event(ntb->ctx);
+	}
+	spin_unlock_irqrestore(&ntb->ctx_lock, irqflags);
+}
+EXPORT_SYMBOL(ntb_msg_event);
+
 static int ntb_probe(struct device *dev)
 {
 	struct ntb_dev *ntb;
