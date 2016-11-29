@@ -876,8 +876,8 @@ struct ethtool_rx_flow_spec {
  * space for this at this time. If a future patch consumes the next
  * byte it should be aware of this possiblity.
  */
-#define ETHTOOL_RX_FLOW_SPEC_RING	0x00000000FFFFFFFFLL
-#define ETHTOOL_RX_FLOW_SPEC_RING_VF	0x000000FF00000000LL
+#define ETHTOOL_RX_FLOW_SPEC_RING	0x00000000FFFFFFFFULL
+#define ETHTOOL_RX_FLOW_SPEC_RING_VF	0x000000FF00000000ULL
 #define ETHTOOL_RX_FLOW_SPEC_RING_VF_OFF 32
 static inline __u64 ethtool_get_flow_spec_ring(__u64 ring_cookie)
 {
