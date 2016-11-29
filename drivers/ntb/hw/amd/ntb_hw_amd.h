@@ -62,6 +62,10 @@
 #define NTB_LNK_STA_SPEED(x)	(((x) & NTB_LNK_STA_SPEED_MASK) >> 16)
 #define NTB_LNK_STA_WIDTH(x)	(((x) & NTB_LNK_STA_WIDTH_MASK) >> 20)
 
+/* port related constants */
+#define NTB_PEER_CNT			(1)
+#define NTB_PIDX_MAX			(0)
+
 #ifndef read64
 #ifdef readq
 #define read64 readq
@@ -165,6 +169,12 @@ enum {
 	AMD_SMU_SPADOFFSET	= 0x4B4,
 
 	AMD_PEER_OFFSET		= 0x400,
+};
+
+enum amd_ntb_port {
+	NTB_PORT_NONE = -1,
+	NTB_PORT_PRI,
+	NTB_PORT_SEC
 };
 
 struct amd_ntb_dev;
