@@ -94,6 +94,9 @@ MODULE_PARM_DESC(use_dma, "Use DMA engine to perform large data copy");
 
 static struct dentry *nt_debugfs_dir;
 
+/* Only two-ports NTB devices are supported */
+#define PIDX		0
+
 struct ntb_queue_entry {
 	/* ntb_queue list reference */
 	struct list_head entry;
@@ -682,7 +685,7 @@ static void ntb_free_mw(struct ntb_transport_ctx *nt, int num_mw)
 	if (!mw->virt_addr)
 		return;
 
-	ntb_mw_clear_trans(nt->ndev, num_mw);
+	ntb_mw_clear_trans(nt->ndev, PIDX, num_mw);
 	dma_free_coherent(&pdev->dev, mw->buff_size,
 			  mw->virt_addr, mw->dma_addr);
 	mw->xlat_size = 0;
@@ -739,7 +742,8 @@ static int ntb_set_mw(struct ntb_transport_ctx *nt, int num_mw,
 	}
 
 	/* Notify HW the memory location of the receive buffer */
-	rc = ntb_mw_set_trans(nt->ndev, num_mw, mw->dma_addr, mw->xlat_size);
+	rc = ntb_mw_set_trans(nt->ndev, PIDX, num_mw, mw->dma_addr,
+			      mw->xlat_size);
 	if (rc) {
 		dev_err(&pdev->dev, "Unable to set mw%d translation", num_mw);
 		ntb_free_mw(nt, num_mw);
@@ -871,17 +875,17 @@ static void ntb_transport_link_work(struct work_struct *work)
 			size = max_mw_size;
 
 		spad = MW0_SZ_HIGH + (i * 2);
-		ntb_peer_spad_write(ndev, spad, upper_32_bits(size));
+		ntb_peer_spad_write(ndev, PIDX, spad, upper_32_bits(size));
 
 		spad = MW0_SZ_LOW + (i * 2);
-		ntb_peer_spad_write(ndev, spad, lower_32_bits(size));
+		ntb_peer_spad_write(ndev, PIDX, spad, lower_32_bits(size));
 	}
 
-	ntb_peer_spad_write(ndev, NUM_MWS, nt->mw_count);
+	ntb_peer_spad_write(ndev, PIDX, NUM_MWS, nt->mw_count);
 
-	ntb_peer_spad_write(ndev, NUM_QPS, nt->qp_count);
+	ntb_peer_spad_write(ndev, PIDX, NUM_QPS, nt->qp_count);
 
-	ntb_peer_spad_write(ndev, VERSION, NTB_TRANSPORT_VERSION);
+	ntb_peer_spad_write(ndev, PIDX, VERSION, NTB_TRANSPORT_VERSION);
 
 	/* Query the remote side for its info */
 	val = ntb_spad_read(ndev, VERSION);
@@ -957,10 +961,10 @@ static void ntb_qp_link_work(struct work_struct *work)
 
 	val = ntb_spad_read(nt->ndev, QP_LINKS);
 
-	ntb_peer_spad_write(nt->ndev, QP_LINKS, val | BIT(qp->qp_num));
+	ntb_peer_spad_write(nt->ndev, PIDX, QP_LINKS, val | BIT(qp->qp_num));
 
 	/* query remote spad for qp ready bits */
-	ntb_peer_spad_read(nt->ndev, QP_LINKS);
+	ntb_peer_spad_read(nt->ndev, PIDX, QP_LINKS);
 	dev_dbg_ratelimited(&pdev->dev, "Remote QP link status = %x\n", val);
 
 	/* See if the remote side is up */
@@ -1069,12 +1073,20 @@ static int ntb_transport_probe(struct ntb_client *self, struct ntb_dev *ndev)
 	int node;
 	int rc, i;
 
-	mw_count = ntb_mw_count(ndev);
+	mw_count = ntb_mw_count(ndev, PIDX);
 	if (ntb_spad_count(ndev) < (NUM_MWS + 1 + mw_count * 2)) {
 		dev_err(&ndev->dev, "Not enough scratch pad registers for %s",
 			NTB_TRANSPORT_NAME);
 		return -EIO;
 	}
+
+	if (!ndev->ops->mw_set_trans) {
+		dev_err(&ndev->dev, "Inbound MW based NTB API is required\n");
+		return -EINVAL;
+	}
+
+	if (ntb_peer_port_count(ndev) != 1)
+		dev_warn(&ndev->dev, "Multi-port NTB devices unsupported\n");
 
 	if (ntb_db_is_unsafe(ndev))
 		dev_dbg(&ndev->dev,
@@ -1103,8 +1115,13 @@ static int ntb_transport_probe(struct ntb_client *self, struct ntb_dev *ndev)
 	for (i = 0; i < mw_count; i++) {
 		mw = &nt->mw_vec[i];
 
-		rc = ntb_mw_get_range(ndev, i, &mw->phys_addr, &mw->phys_size,
-				      &mw->xlat_align, &mw->xlat_align_size);
+		rc = ntb_mw_get_align(ndev, PIDX, i, &mw->xlat_align,
+				      &mw->xlat_align_size, NULL);
+		if (rc)
+			goto err1;
+
+		rc = ntb_peer_mw_get_addr(ndev, i, &mw->phys_addr,
+					  &mw->phys_size);
 		if (rc)
 			goto err1;
 
@@ -2124,7 +2141,7 @@ void ntb_transport_link_down(struct ntb_transport_qp *qp)
 
 	val = ntb_spad_read(qp->ndev, QP_LINKS);
 
-	ntb_peer_spad_write(qp->ndev, QP_LINKS,
+	ntb_peer_spad_write(qp->ndev, PIDX, QP_LINKS,
 			    val & ~BIT(qp->qp_num));
 
 	if (qp->link_is_up)
