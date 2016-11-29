@@ -118,26 +118,46 @@ void dev_pm_opp_free_cpufreq_table(struct device *dev,
 EXPORT_SYMBOL_GPL(dev_pm_opp_free_cpufreq_table);
 #endif	/* CONFIG_CPU_FREQ */
 
+void _cpu_remove_table(unsigned int cpu, bool of)
+{
+	struct device *cpu_dev = get_cpu_device(cpu);
+
+	if (!cpu_dev) {
+		pr_err("%s: failed to get cpu%d device\n", __func__, cpu);
+		return;
+	}
+
+	if (of)
+		dev_pm_opp_of_remove_table(cpu_dev);
+	else
+		dev_pm_opp_remove_table(cpu_dev);
+}
+
 void _dev_pm_opp_cpumask_remove_table(const struct cpumask *cpumask, bool of)
 {
-	struct device *cpu_dev;
-	int cpu;
+	struct cpumask tmpmask;
+	int cpu, first_cpu;
 
 	WARN_ON(cpumask_empty(cpumask));
 
-	for_each_cpu(cpu, cpumask) {
-		cpu_dev = get_cpu_device(cpu);
-		if (!cpu_dev) {
-			pr_err("%s: failed to get cpu%d device\n", __func__,
-			       cpu);
-			continue;
-		}
+	/*
+	 * The first cpu in the cpumask is important as that is used to create
+	 * the opp-table initially and routines like dev_pm_opp_put_regulator()
+	 * will expect the list-dev for the first CPU to be present while such
+	 * routines are called, otherwise we will fail to find the opp-table for
+	 * such devices.
+	 *
+	 * FIXME: Cleanup this mess and implement cookie based solutions instead
+	 * of working on the device pointer.
+	 */
+	first_cpu = cpumask_first(cpumask);
+	cpumask_copy(&tmpmask, cpumask);
+	cpumask_clear_cpu(first_cpu, &tmpmask);
 
-		if (of)
-			dev_pm_opp_of_remove_table(cpu_dev);
-		else
-			dev_pm_opp_remove_table(cpu_dev);
-	}
+	for_each_cpu(cpu, &tmpmask)
+		_cpu_remove_table(cpu, of);
+
+	_cpu_remove_table(first_cpu, of);
 }
 
 /**
