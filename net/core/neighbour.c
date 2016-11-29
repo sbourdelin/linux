@@ -2256,6 +2256,16 @@ static bool neigh_ifindex_filtered(struct net_device *dev, int filter_idx)
 	return false;
 }
 
+static bool neigh_dump_filtered(struct net_device *dev, int filter_idx,
+		int filter_master_idx)
+{
+	if (neigh_ifindex_filtered(dev, filter_idx) ||
+	    neigh_master_filtered(dev, filter_master_idx))
+		return true;
+
+	return false;
+}
+
 static int neigh_dump_table(struct neigh_table *tbl, struct sk_buff *skb,
 			    struct netlink_callback *cb)
 {
@@ -2285,20 +2295,15 @@ static int neigh_dump_table(struct neigh_table *tbl, struct sk_buff *skb,
 	rcu_read_lock_bh();
 	nht = rcu_dereference_bh(tbl->nht);
 
-	for (h = s_h; h < (1 << nht->hash_shift); h++) {
-		if (h > s_h)
-			s_idx = 0;
+	for (h = s_h; h < (1 << nht->hash_shift); h++, s_idx = 0) {
 		for (n = rcu_dereference_bh(nht->hash_buckets[h]), idx = 0;
 		     n != NULL;
-		     n = rcu_dereference_bh(n->next)) {
-			if (!net_eq(dev_net(n->dev), net))
+		     n = rcu_dereference_bh(n->next), idx++) {
+			if (idx < s_idx || !net_eq(dev_net(n->dev), net))
 				continue;
-			if (neigh_ifindex_filtered(n->dev, filter_idx))
+			if (neigh_dump_filtered(n->dev, filter_idx,
+						filter_master_idx))
 				continue;
-			if (neigh_master_filtered(n->dev, filter_master_idx))
-				continue;
-			if (idx < s_idx)
-				goto next;
 			if (neigh_fill_info(skb, n, NETLINK_CB(cb->skb).portid,
 					    cb->nlh->nlmsg_seq,
 					    RTM_NEWNEIGH,
@@ -2306,8 +2311,6 @@ static int neigh_dump_table(struct neigh_table *tbl, struct sk_buff *skb,
 				rc = -1;
 				goto out;
 			}
-next:
-			idx++;
 		}
 	}
 	rc = skb->len;
@@ -2328,14 +2331,10 @@ static int pneigh_dump_table(struct neigh_table *tbl, struct sk_buff *skb,
 
 	read_lock_bh(&tbl->lock);
 
-	for (h = s_h; h <= PNEIGH_HASHMASK; h++) {
-		if (h > s_h)
-			s_idx = 0;
-		for (n = tbl->phash_buckets[h], idx = 0; n; n = n->next) {
-			if (pneigh_net(n) != net)
+	for (h = s_h; h <= PNEIGH_HASHMASK; h++, s_idx = 0) {
+		for (n = tbl->phash_buckets[h], idx = 0; n; n = n->next, idx++) {
+			if (idx < s_idx || pneigh_net(n) != net)
 				continue;
-			if (idx < s_idx)
-				goto next;
 			if (pneigh_fill_info(skb, n, NETLINK_CB(cb->skb).portid,
 					    cb->nlh->nlmsg_seq,
 					    RTM_NEWNEIGH,
@@ -2344,8 +2343,6 @@ static int pneigh_dump_table(struct neigh_table *tbl, struct sk_buff *skb,
 				rc = -1;
 				goto out;
 			}
-		next:
-			idx++;
 		}
 	}
 
