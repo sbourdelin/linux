@@ -323,6 +323,7 @@ acpi_get_irq_source_fwhandle(const struct acpi_resource_source *source);
 int acpi_register_irq(struct fwnode_handle *source, u32 hwirq, int trigger,
 		      int polarity);
 void acpi_unregister_irq(struct fwnode_handle *source, u32 hwirq);
+int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res);
 #else
 #define acpi_get_irq_source_fwhandle(source) (NULL)
 static inline int acpi_register_irq(struct fwnode_handle *source, u32 hwirq,
@@ -780,6 +781,14 @@ static inline int acpi_reconfig_notifier_unregister(struct notifier_block *nb)
 }
 
 #endif	/* !CONFIG_ACPI */
+
+#ifndef CONFIG_ACPI_GENERIC_GSI
+static inline int acpi_irq_get(acpi_handle handle, unsigned int index,
+			       struct resource *res)
+{
+	return -EINVAL;
+}
+#endif /* CONFIG_ACPI_GENERIC_GSI */
 
 #ifdef CONFIG_ACPI_HOTPLUG_IOAPIC
 int acpi_ioapic_add(acpi_handle root);
