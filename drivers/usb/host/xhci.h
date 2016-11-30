@@ -924,9 +924,6 @@ struct xhci_virt_ep {
 	struct list_head	cancelled_td_list;
 	struct xhci_td		*stopped_td;
 	unsigned int		stopped_stream;
-	/* Watchdog timer for stop endpoint command to cancel URBs */
-	struct timer_list	stop_cmd_timer;
-	int			stop_cmds_pending;
 	struct xhci_hcd		*xhci;
 	/* Dequeue pointer and dequeue segment for a submitted Set TR Dequeue
 	 * command.  We'll need to update the ring's dequeue segment and dequeue
@@ -1461,8 +1458,6 @@ struct urb_priv {
 #define	ERST_ENTRIES	1
 /* Poll every 60 seconds */
 #define	POLL_TIMEOUT	60
-/* Stop endpoint command timeout (secs) for URB cancellation watchdog timer */
-#define XHCI_STOP_EP_CMD_TIMEOUT	5
 /* XXX: Make these module parameters */
 
 struct s3_save {

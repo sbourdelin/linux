@@ -1578,10 +1578,6 @@ int xhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 			goto done;
 		}
 		ep->ep_state |= EP_HALT_PENDING;
-		ep->stop_cmds_pending++;
-		ep->stop_cmd_timer.expires = jiffies +
-			XHCI_STOP_EP_CMD_TIMEOUT * HZ;
-		add_timer(&ep->stop_cmd_timer);
 		xhci_queue_stop_endpoint(xhci, command, urb->dev->slot_id,
 					 ep_index, 0);
 		xhci_ring_cmd_db(xhci);
@@ -3618,10 +3614,8 @@ void xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev)
 	virt_dev = xhci->devs[udev->slot_id];
 
 	/* Stop any wayward timer functions (which may grab the lock) */
-	for (i = 0; i < 31; ++i) {
+	for (i = 0; i < 31; ++i)
 		virt_dev->eps[i].ep_state &= ~EP_HALT_PENDING;
-		del_timer_sync(&virt_dev->eps[i].stop_cmd_timer);
-	}
 
 	spin_lock_irqsave(&xhci->lock, flags);
 	/* Don't disable the slot if the host controller is dead. */

@@ -562,18 +562,6 @@ static void td_to_noop(struct xhci_hcd *xhci, struct xhci_ring *ep_ring,
 	}
 }
 
-static void xhci_stop_watchdog_timer_in_irq(struct xhci_hcd *xhci,
-		struct xhci_virt_ep *ep)
-{
-	ep->ep_state &= ~EP_HALT_PENDING;
-	/* Can't del_timer_sync in interrupt, so we attempt to cancel.  If the
-	 * timer is running on another CPU, we don't decrement stop_cmds_pending
-	 * (since we didn't successfully stop the watchdog timer).
-	 */
-	if (del_timer(&ep->stop_cmd_timer))
-		ep->stop_cmds_pending--;
-}
-
 /* Must be called with xhci->lock held in interrupt context */
 static void xhci_giveback_urb_in_irq(struct xhci_hcd *xhci,
 		struct xhci_td *cur_td, int status)
@@ -665,7 +653,7 @@ static void xhci_handle_cmd_stop_ep(struct xhci_hcd *xhci, int slot_id,
 	ep = &xhci->devs[slot_id]->eps[ep_index];
 
 	if (list_empty(&ep->cancelled_td_list)) {
-		xhci_stop_watchdog_timer_in_irq(xhci, ep);
+		ep->ep_state &= ~EP_HALT_PENDING;
 		ep->stopped_td = NULL;
 		ring_doorbell_for_active_rings(xhci, slot_id, ep_index);
 		return;
@@ -720,7 +708,7 @@ remove_finished_td:
 		list_del_init(&cur_td->td_list);
 	}
 	last_unlinked_td = cur_td;
-	xhci_stop_watchdog_timer_in_irq(xhci, ep);
+	ep->ep_state &= ~EP_HALT_PENDING;
 
 	/* If necessary, queue a Set Transfer Ring Dequeue Pointer command */
 	if (deq_state.new_deq_ptr && deq_state.new_deq_seg) {
@@ -818,38 +806,19 @@ static void xhci_kill_endpoint_urbs(struct xhci_hcd *xhci,
 	}
 }
 
-/* Watchdog timer function for when a stop endpoint command fails to complete.
+/* This timeout function for when a stop endpoint command fails to complete.
  * In this case, we assume the host controller is broken or dying or dead.  The
  * host may still be completing some other events, so we have to be careful to
  * let the event ring handler and the URB dequeueing/enqueueing functions know
  * through xhci->state.
- *
- * The timer may also fire if the host takes a very long time to respond to the
- * command, and the stop endpoint command completion handler cannot delete the
- * timer before the timer function is called.  Another endpoint cancellation may
- * sneak in before the timer function can grab the lock, and that may queue
- * another stop endpoint command and add the timer back.  So we cannot use a
- * simple flag to say whether there is a pending stop endpoint command for a
- * particular endpoint.
- *
- * Instead we use a combination of that flag and a counter for the number of
- * pending stop endpoint commands.  If the timer is the tail end of the last
- * stop endpoint command, and the endpoint's command is still pending, we assume
- * the host is dying.
  */
-void xhci_stop_endpoint_command_watchdog(unsigned long arg)
+void xhci_stop_endpoint_command_timeout(struct xhci_hcd *xhci)
 {
-	struct xhci_hcd *xhci;
-	struct xhci_virt_ep *ep;
 	int ret, i, j;
 	unsigned long flags;
 
-	ep = (struct xhci_virt_ep *) arg;
-	xhci = ep->xhci;
-
 	spin_lock_irqsave(&xhci->lock, flags);
 
-	ep->stop_cmds_pending--;
 	if (xhci->xhc_state & XHCI_STATE_REMOVING) {
 		spin_unlock_irqrestore(&xhci->lock, flags);
 		return;
@@ -858,13 +827,6 @@ void xhci_stop_endpoint_command_watchdog(unsigned long arg)
 		xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
 				"Stop EP timer ran, but another timer marked "
 				"xHCI as DYING, exiting.");
-		spin_unlock_irqrestore(&xhci->lock, flags);
-		return;
-	}
-	if (!(ep->stop_cmds_pending == 0 && (ep->ep_state & EP_HALT_PENDING))) {
-		xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
-				"Stop EP timer ran, but no command pending, "
-				"exiting.");
 		spin_unlock_irqrestore(&xhci->lock, flags);
 		return;
 	}
@@ -905,6 +867,7 @@ void xhci_stop_endpoint_command_watchdog(unsigned long arg)
 			xhci_kill_endpoint_urbs(xhci, i, j);
 	}
 	spin_unlock_irqrestore(&xhci->lock, flags);
+	xhci_cleanup_command_queue(xhci);
 	xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
 			"Calling usb_hc_died()");
 	usb_hc_died(xhci_to_hcd(xhci));
@@ -1269,7 +1232,21 @@ void xhci_handle_command_timeout(unsigned long data)
 	unsigned long flags;
 	u64 hw_ring_state;
 	bool second_timeout = false;
+	union xhci_trb *cmd_trb;
+	u32 cmd_type = 0;
+
 	xhci = (struct xhci_hcd *) data;
+	spin_lock_irqsave(&xhci->lock, flags);
+	if (xhci->current_cmd) {
+		cmd_trb = xhci->current_cmd->command_trb;
+		cmd_type = TRB_FIELD_TO_TYPE(le32_to_cpu(cmd_trb->generic.field[3]));
+	}
+	spin_unlock_irqrestore(&xhci->lock, flags);
+
+	if (cmd_type == TRB_STOP_RING) {
+		xhci_stop_endpoint_command_timeout(xhci);
+		return;
+	}
 
 	/* mark this command to be cancelled */
 	spin_lock_irqsave(&xhci->lock, flags);
