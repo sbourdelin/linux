@@ -765,6 +765,9 @@ struct mv88e6xxx_ops {
 	int (*phy_write)(struct mv88e6xxx_chip *chip, int addr, int reg,
 			 u16 val);
 
+	/* Switch Software Reset */
+	int (*reset)(struct mv88e6xxx_chip *chip);
+
 	/* RGMII Receive/Transmit Timing Control
 	 * Add delay on PHY_INTERFACE_MODE_RGMII_*ID, no delay otherwise.
 	 */

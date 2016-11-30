@@ -33,6 +33,41 @@ int mv88e6xxx_g1_wait(struct mv88e6xxx_chip *chip, int reg, u16 mask)
 	return mv88e6xxx_wait(chip, chip->info->global1_addr, reg, mask);
 }
 
+/* Offset 0x04: Switch Global Control Register */
+
+int mv88e6185_g1_reset(struct mv88e6xxx_chip *chip)
+{
+	u16 val;
+	int err;
+
+	/* Set the SWReset bit 15 along with the PPUEn bit 14, to also restart
+	 * the PPU, including re-doing PHY detection and initialization
+	 */
+	err = mv88e6xxx_g1_read(chip, GLOBAL_CONTROL, &val);
+	if (err)
+		return err;
+
+	val |= GLOBAL_CONTROL_SW_RESET;
+	val |= GLOBAL_CONTROL_PPU_ENABLE;
+
+	return mv88e6xxx_g1_write(chip, GLOBAL_CONTROL, val);
+}
+
+int mv88e6352_g1_reset(struct mv88e6xxx_chip *chip)
+{
+	u16 val;
+	int err;
+
+	/* Set the SWReset bit 15 */
+	err = mv88e6xxx_g1_read(chip, GLOBAL_CONTROL, &val);
+	if (err)
+		return err;
+
+	val |= GLOBAL_CONTROL_SW_RESET;
+
+	return mv88e6xxx_g1_write(chip, GLOBAL_CONTROL, val);
+}
+
 /* Offset 0x1c: Global Control 2 */
 
 int mv88e6390_g1_stats_set_histogram(struct mv88e6xxx_chip *chip)
