@@ -66,6 +66,21 @@ int mv88e6352_g1_ppu_polling(struct mv88e6xxx_chip *chip, bool *polling)
 	return 0;
 }
 
+int mv88e6xxx_g1_init_ready(struct mv88e6xxx_chip *chip, bool *ready)
+{
+	u16 val;
+	int err;
+
+	/* Check the value of the InitReady bit 11 */
+	err = mv88e6xxx_g1_read(chip, GLOBAL_STATUS, &val);
+	if (err)
+		return err;
+
+	*ready = !!(val & GLOBAL_STATUS_INIT_READY);
+
+	return 0;
+}
+
 /* Offset 0x04: Switch Global Control Register */
 
 int mv88e6185_g1_reset(struct mv88e6xxx_chip *chip)

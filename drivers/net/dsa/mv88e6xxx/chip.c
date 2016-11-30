@@ -2363,6 +2363,36 @@ static void mv88e6xxx_port_bridge_leave(struct dsa_switch *ds, int port)
 	mutex_unlock(&chip->reg_lock);
 }
 
+static int mv88e6xxx_wait_switch_ready(struct mv88e6xxx_chip *chip)
+{
+	const unsigned long timeout = jiffies + 1 * HZ;
+	bool ready;
+	int err;
+
+	/* Wait up to 1 second for switch to be ready.
+	 * The switch is ready when all units inside the device (ATU, VTU, etc.)
+	 * have finished their initialization and are ready to accept frames.
+	 */
+	while (time_before(jiffies, timeout)) {
+		err = mv88e6xxx_g1_init_ready(chip, &ready);
+		if (err)
+			return err;
+
+		if (ready)
+			break;
+
+		usleep_range(1000, 2000);
+	}
+
+	if (time_after(jiffies, timeout))
+		return -ETIMEDOUT;
+
+	/* If there is a PPU, the PortStatus registers must not be written to by
+	 * software until the PPU is active polling, so wait until then.
+	 */
+	return mv88e6xxx_ppu_wait(chip, true);
+}
+
 static int mv88e6xxx_software_reset(struct mv88e6xxx_chip *chip)
 {
 	if (chip->info->ops->reset)
@@ -2406,10 +2436,6 @@ static int mv88e6xxx_disable_ports(struct mv88e6xxx_chip *chip)
 
 static int mv88e6xxx_switch_reset(struct mv88e6xxx_chip *chip)
 {
-	bool ppu_active = mv88e6xxx_has(chip, MV88E6XXX_FLAG_PPU_ACTIVE);
-	u16 is_reset = (ppu_active ? 0x8800 : 0xc800);
-	unsigned long timeout;
-	u16 reg;
 	int err;
 
 	err = mv88e6xxx_disable_ports(chip);
@@ -2422,23 +2448,7 @@ static int mv88e6xxx_switch_reset(struct mv88e6xxx_chip *chip)
 	if (err)
 		return err;
 
-	/* Wait up to one second for reset to complete. */
-	timeout = jiffies + 1 * HZ;
-	while (time_before(jiffies, timeout)) {
-		err = mv88e6xxx_g1_read(chip, 0x00, &reg);
-		if (err)
-			return err;
-
-		if ((reg & is_reset) == is_reset)
-			break;
-		usleep_range(1000, 2000);
-	}
-	if (time_after(jiffies, timeout))
-		err = -ETIMEDOUT;
-	else
-		err = 0;
-
-	return err;
+	return mv88e6xxx_wait_switch_ready(chip);
 }
 
 static int mv88e6xxx_serdes_power_on(struct mv88e6xxx_chip *chip)
