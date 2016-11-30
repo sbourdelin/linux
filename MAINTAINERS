@@ -2353,6 +2353,7 @@ L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 S:	Maintained
 F:	Documentation/devicetree/bindings/arm/axentia.txt
 F:	arch/arm/boot/dts/axentia-*
+F:	arch/arm/configs/tse850_defconfig
 
 AZ6007 DVB DRIVER
 M:	Mauro Carvalho Chehab <mchehab@s-opensource.com>
