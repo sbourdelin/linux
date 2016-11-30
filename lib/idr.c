@@ -14,7 +14,7 @@
  * by the id to obtain the pointer.  The bitmap makes allocating
  * a new id quick.
  *
- * You call it to allocate an id (an int) an associate with that id a
+ * You call it to allocate an id (an int) and associate with that id a
  * pointer or what ever, we treat it as a (void *).  You can pass this
  * id to a user for him to pass back at a later time.  You then pass
  * that id to this code and it returns your pointer.
