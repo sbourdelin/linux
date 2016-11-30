@@ -186,6 +186,7 @@ static void mmc_queue_setup_discard(struct request_queue *q,
 		queue_flag_set_unlocked(QUEUE_FLAG_SECERASE, q);
 }
 
+#ifdef CONFIG_MMC_BLOCK_BOUNCE
 static bool mmc_queue_alloc_bounce_bufs(struct mmc_queue *mq,
 					unsigned int bouncesz)
 {
@@ -226,6 +227,7 @@ static int mmc_queue_alloc_bounce_sgs(struct mmc_queue *mq,
 
 	return 0;
 }
+#endif
 
 static int mmc_queue_alloc_sgs(struct mmc_queue *mq, int max_segs)
 {
