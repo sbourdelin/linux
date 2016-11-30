@@ -717,6 +717,9 @@ static void handle_rx(struct vhost_net *net)
 			pr_debug("Discarded rx packet: "
 				 " len %d, expected %zd\n", err, sock_len);
 			vhost_discard_vq_desc(vq, headcount);
+			/* Don't continue to do, when meet errors. */
+			if (err < 0)
+				goto out;
 			continue;
 		}
 		/* Supply virtio_net_hdr if VHOST_NET_F_VIRTIO_NET_HDR */
