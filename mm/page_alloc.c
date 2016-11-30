@@ -3220,7 +3220,8 @@ should_compact_retry(struct alloc_context *ac, int order, int alloc_flags,
 	 * compaction.
 	 */
 	if (compaction_withdrawn(compact_result))
-		return compaction_zonelist_suitable(ac, order, alloc_flags);
+		return compaction_zonelist_suitable(ac, order, alloc_flags,
+						    *compact_priority);
 
 	/*
 	 * !costly requests are much more important than __GFP_REPEAT
@@ -3290,7 +3291,7 @@ should_compact_retry(struct alloc_context *ac, unsigned int order, int alloc_fla
 /* Perform direct synchronous page reclaim */
 static int
 __perform_reclaim(gfp_t gfp_mask, unsigned int order,
-					const struct alloc_context *ac)
+		  const struct alloc_context *ac, enum compact_priority prio)
 {
 	struct reclaim_state reclaim_state;
 	int progress;
@@ -3304,7 +3305,7 @@ __perform_reclaim(gfp_t gfp_mask, unsigned int order,
 	reclaim_state.reclaimed_slab = 0;
 	current->reclaim_state = &reclaim_state;
 
-	progress = try_to_free_pages(ac->zonelist, order, gfp_mask,
+	progress = try_to_free_pages(ac->zonelist, order, gfp_mask, prio,
 								ac->nodemask);
 
 	current->reclaim_state = NULL;
@@ -3320,12 +3321,12 @@ __perform_reclaim(gfp_t gfp_mask, unsigned int order,
 static inline struct page *
 __alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
 		unsigned int alloc_flags, const struct alloc_context *ac,
-		unsigned long *did_some_progress)
+		enum compact_priority prio, unsigned long *did_some_progress)
 {
 	struct page *page = NULL;
 	bool drained = false;
 
-	*did_some_progress = __perform_reclaim(gfp_mask, order, ac);
+	*did_some_progress = __perform_reclaim(gfp_mask, order, ac, prio);
 	if (unlikely(!(*did_some_progress)))
 		return NULL;
 
@@ -3669,7 +3670,7 @@ retry:
 
 	/* Try direct reclaim and then allocating */
 	page = __alloc_pages_direct_reclaim(gfp_mask, order, alloc_flags, ac,
-							&did_some_progress);
+					compact_priority, &did_some_progress);
 	if (page)
 		goto got_pg;
 
@@ -7211,7 +7212,7 @@ static int __alloc_contig_migrate_range(struct compact_control *cc,
 			break;
 		}
 
-		nr_reclaimed = reclaim_clean_pages_from_list(cc->zone,
+		nr_reclaimed = reclaim_clean_pages_from_list(cc->zone, cc->mode,
 							&cc->migratepages);
 		cc->nr_migratepages -= nr_reclaimed;
 

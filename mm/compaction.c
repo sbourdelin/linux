@@ -1365,7 +1365,7 @@ static enum compact_result compact_finished(struct zone *zone,
 static enum compact_result __compaction_suitable(struct zone *zone, int order,
 					unsigned int alloc_flags,
 					int classzone_idx,
-					unsigned long wmark_target)
+					unsigned long wmark_target, bool sync)
 {
 	unsigned long watermark;
 
@@ -1402,18 +1402,34 @@ static enum compact_result __compaction_suitable(struct zone *zone, int order,
 						ALLOC_CMA, wmark_target))
 		return COMPACT_SKIPPED;
 
+	if (!sync) {
+		unsigned long free;
+
+		free = zone_page_state(zone, NR_FREE_CMA_PAGES) +
+		       zone_page_state(zone, NR_FREE_MOVABLE_PAGES);
+		/*
+		 * Page migration can only migrate pages to MIGRATE_MOVABLE or
+		 * MIGRATE_CMA pageblocks for async compaction.  If there is
+		 * insufficient free target memory, do not attempt compaction
+		 * since free scanning will become unnecessarily expensive.
+		 */
+		if (!__zone_watermark_ok(zone, 0, watermark, classzone_idx,
+					 ALLOC_CMA, free))
+			return COMPACT_SKIPPED;
+	}
+
 	return COMPACT_CONTINUE;
 }
 
 enum compact_result compaction_suitable(struct zone *zone, int order,
 					unsigned int alloc_flags,
-					int classzone_idx)
+					int classzone_idx, bool sync)
 {
 	enum compact_result ret;
 	int fragindex;
 
 	ret = __compaction_suitable(zone, order, alloc_flags, classzone_idx,
-				    zone_page_state(zone, NR_FREE_PAGES));
+				    zone_page_state(zone, NR_FREE_PAGES), sync);
 	/*
 	 * fragmentation index determines if allocation failures are due to
 	 * low memory or external fragmentation
@@ -1444,7 +1460,7 @@ enum compact_result compaction_suitable(struct zone *zone, int order,
 }
 
 bool compaction_zonelist_suitable(struct alloc_context *ac, int order,
-		int alloc_flags)
+				  int alloc_flags, enum compact_priority prio)
 {
 	struct zone *zone;
 	struct zoneref *z;
@@ -1467,7 +1483,7 @@ bool compaction_zonelist_suitable(struct alloc_context *ac, int order,
 		available = zone_reclaimable_pages(zone) / order;
 		available += zone_page_state_snapshot(zone, NR_FREE_PAGES);
 		compact_result = __compaction_suitable(zone, order, alloc_flags,
-				ac_classzone_idx(ac), available);
+				ac_classzone_idx(ac), available, prio);
 		if (compact_result != COMPACT_SKIPPED)
 			return true;
 	}
@@ -1484,7 +1500,7 @@ static enum compact_result compact_zone(struct zone *zone, struct compact_contro
 	const bool sync = cc->mode != MIGRATE_ASYNC;
 
 	ret = compaction_suitable(zone, cc->order, cc->alloc_flags,
-							cc->classzone_idx);
+				  cc->classzone_idx, sync);
 	/* Compaction is likely to fail */
 	if (ret == COMPACT_SUCCESS || ret == COMPACT_SKIPPED)
 		return ret;
@@ -1860,13 +1876,16 @@ static bool kcompactd_node_suitable(pg_data_t *pgdat)
 	enum zone_type classzone_idx = pgdat->kcompactd_classzone_idx;
 
 	for (zoneid = 0; zoneid <= classzone_idx; zoneid++) {
+		enum compact_result result;
+
 		zone = &pgdat->node_zones[zoneid];
 
 		if (!populated_zone(zone))
 			continue;
 
-		if (compaction_suitable(zone, pgdat->kcompactd_max_order, 0,
-					classzone_idx) == COMPACT_CONTINUE)
+		result = compaction_suitable(zone, pgdat->kcompactd_max_order,
+					     0, classzone_idx, true);
+		if (result == COMPACT_CONTINUE)
 			return true;
 	}
 
@@ -1903,7 +1922,7 @@ static void kcompactd_do_work(pg_data_t *pgdat)
 		if (compaction_deferred(zone, cc.order))
 			continue;
 
-		if (compaction_suitable(zone, cc.order, 0, zoneid) !=
+		if (compaction_suitable(zone, cc.order, 0, zoneid, true) !=
 							COMPACT_CONTINUE)
 			continue;
 

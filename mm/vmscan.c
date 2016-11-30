@@ -84,6 +84,8 @@ struct scan_control {
 	/* Scan (total_size >> priority) pages at once */
 	int priority;
 
+	enum compact_priority compact_priority;
+
 	/* The highest zone to isolate pages for reclaim from */
 	enum zone_type reclaim_idx;
 
@@ -1275,11 +1277,15 @@ keep:
 }
 
 unsigned long reclaim_clean_pages_from_list(struct zone *zone,
+					    enum migrate_mode mode,
 					    struct list_head *page_list)
 {
 	struct scan_control sc = {
 		.gfp_mask = GFP_KERNEL,
 		.priority = DEF_PRIORITY,
+		.compact_priority = mode == MIGRATE_ASYNC ?
+				    COMPACT_PRIO_ASYNC :
+				    COMPACT_PRIO_SYNC_LIGHT,
 		.may_unmap = 1,
 	};
 	unsigned long ret, dummy1, dummy2, dummy3, dummy4, dummy5;
@@ -2500,7 +2506,8 @@ static inline bool should_continue_reclaim(struct pglist_data *pgdat,
 		if (!managed_zone(zone))
 			continue;
 
-		switch (compaction_suitable(zone, sc->order, 0, sc->reclaim_idx)) {
+		switch (compaction_suitable(zone, sc->order, 0, sc->reclaim_idx,
+					    sc->compact_priority)) {
 		case COMPACT_SUCCESS:
 		case COMPACT_CONTINUE:
 			return false;
@@ -2617,7 +2624,8 @@ static inline bool compaction_ready(struct zone *zone, struct scan_control *sc)
 	unsigned long watermark;
 	enum compact_result suitable;
 
-	suitable = compaction_suitable(zone, sc->order, 0, sc->reclaim_idx);
+	suitable = compaction_suitable(zone, sc->order, 0, sc->reclaim_idx,
+				       sc->compact_priority);
 	if (suitable == COMPACT_SUCCESS)
 		/* Allocation should succeed already. Don't reclaim. */
 		return true;
@@ -2946,7 +2954,8 @@ out:
 }
 
 unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
-				gfp_t gfp_mask, nodemask_t *nodemask)
+				gfp_t gfp_mask, enum compact_priority prio,
+				nodemask_t *nodemask)
 {
 	unsigned long nr_reclaimed;
 	struct scan_control sc = {
@@ -2956,6 +2965,7 @@ unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
 		.order = order,
 		.nodemask = nodemask,
 		.priority = DEF_PRIORITY,
+		.compact_priority = prio,
 		.may_writepage = !laptop_mode,
 		.may_unmap = 1,
 		.may_swap = 1,
@@ -3036,6 +3046,7 @@ unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *memcg,
 		.reclaim_idx = MAX_NR_ZONES - 1,
 		.target_mem_cgroup = memcg,
 		.priority = DEF_PRIORITY,
+		.compact_priority = DEF_COMPACT_PRIORITY,
 		.may_writepage = !laptop_mode,
 		.may_unmap = 1,
 		.may_swap = may_swap,
@@ -3207,6 +3218,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 		.gfp_mask = GFP_KERNEL,
 		.order = order,
 		.priority = DEF_PRIORITY,
+		.compact_priority = DEF_COMPACT_PRIORITY,
 		.may_writepage = !laptop_mode,
 		.may_unmap = 1,
 		.may_swap = 1,
@@ -3540,6 +3552,7 @@ unsigned long shrink_all_memory(unsigned long nr_to_reclaim)
 		.gfp_mask = GFP_HIGHUSER_MOVABLE,
 		.reclaim_idx = MAX_NR_ZONES - 1,
 		.priority = DEF_PRIORITY,
+		.compact_priority = DEF_COMPACT_PRIORITY,
 		.may_writepage = 1,
 		.may_unmap = 1,
 		.may_swap = 1,
@@ -3728,6 +3741,7 @@ static int __node_reclaim(struct pglist_data *pgdat, gfp_t gfp_mask, unsigned in
 		.gfp_mask = (gfp_mask = memalloc_noio_flags(gfp_mask)),
 		.order = order,
 		.priority = NODE_RECLAIM_PRIORITY,
+		.compact_priority = DEF_COMPACT_PRIORITY,
 		.may_writepage = !!(node_reclaim_mode & RECLAIM_WRITE),
 		.may_unmap = !!(node_reclaim_mode & RECLAIM_UNMAP),
 		.may_swap = 1,
