@@ -3037,7 +3037,7 @@ static void hfa384x_usbin_callback(struct urb *urb)
 {
 	struct wlandevice *wlandev = urb->context;
 	struct hfa384x *hw;
-	union hfa384x_usbin *usbin = (union hfa384x_usbin *)urb->transfer_buffer;
+	union hfa384x_usbin *usbin = NULL;
 	struct sk_buff *skb = NULL;
 	int result;
 	int urb_status;
@@ -3049,6 +3049,7 @@ static void hfa384x_usbin_callback(struct urb *urb)
 		ABORT
 	} action;
 
+	usbin = (union hfa384x_usbin *)urb->transfer_buffer;
 	if (!wlandev || !wlandev->netdev || wlandev->hwremoved)
 		goto exit;
 
