@@ -1519,9 +1519,13 @@ void facility_unavailable_exception(struct pt_regs *regs)
 		return;
 	}
 
-	if ((status < ARRAY_SIZE(facility_strings)) &&
-	    facility_strings[status])
-		facility = facility_strings[status];
+	if ((hv || status >= 2) &&
+		(status < ARRAY_SIZE(facility_strings)) &&
+		facility_strings[status])
+			facility = facility_strings[status];
+	else
+		pr_warn_ratelimited("Unexpected facility unavailable exception "
+			"interruption cause %d\n", status);
 
 	/* We restore the interrupt state now */
 	if (!arch_irq_disabled_regs(regs))
