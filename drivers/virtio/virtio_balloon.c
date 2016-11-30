@@ -56,7 +56,7 @@ static struct vfsmount *balloon_mnt;
 
 struct virtio_balloon {
 	struct virtio_device *vdev;
-	struct virtqueue *inflate_vq, *deflate_vq, *stats_vq;
+	struct virtqueue *inflate_vq, *deflate_vq, *stats_vq, *req_vq;
 
 	/* The balloon servicing is delegated to a freezable workqueue. */
 	struct work_struct update_balloon_stats_work;
@@ -75,6 +75,8 @@ struct virtio_balloon {
 	void *resp_hdr;
 	/* Pointer to the start address of response data. */
 	unsigned long *resp_data;
+	/* Size of response data buffer. */
+	unsigned long resp_buf_size;
 	/* Pointer offset of the response data. */
 	unsigned long resp_pos;
 	/* Bitmap and bitmap count used to tell the host the pages */
@@ -83,6 +85,8 @@ struct virtio_balloon {
 	unsigned int nr_page_bmap;
 	/* Used to record the processed pfn range */
 	unsigned long min_pfn, max_pfn, start_pfn, end_pfn;
+	/* Request header */
+	struct virtio_balloon_req_hdr req_hdr;
 	/*
 	 * The pages we've told the Host we're not using are enqueued
 	 * at vb_dev_info->pages list.
@@ -551,6 +555,58 @@ static void update_balloon_stats(struct virtio_balloon *vb)
 				pages_to_bytes(available));
 }
 
+static void send_unused_pages_info(struct virtio_balloon *vb,
+				unsigned long req_id)
+{
+	struct scatterlist sg_in;
+	unsigned long pos = 0;
+	struct virtqueue *vq = vb->req_vq;
+	struct virtio_balloon_resp_hdr *hdr = vb->resp_hdr;
+	int ret, order;
+
+	mutex_lock(&vb->balloon_lock);
+
+	for (order = MAX_ORDER - 1; order >= 0; order--) {
+		pos = 0;
+		ret = get_unused_pages(vb->resp_data,
+			 vb->resp_buf_size / sizeof(unsigned long),
+			 order, &pos);
+		if (ret == -ENOSPC) {
+			void *new_resp_data;
+
+			new_resp_data = kmalloc(2 * vb->resp_buf_size,
+						GFP_KERNEL);
+			if (new_resp_data) {
+				kfree(vb->resp_data);
+				vb->resp_data = new_resp_data;
+				vb->resp_buf_size *= 2;
+				order++;
+				continue;
+			} else
+				dev_warn(&vb->vdev->dev,
+					 "%s: omit some %d order pages\n",
+					 __func__, order);
+		}
+
+		if (pos > 0) {
+			vb->resp_pos = pos;
+			hdr->cmd = BALLOON_GET_UNUSED_PAGES;
+			hdr->id = req_id;
+			if (order > 0)
+				hdr->flag = BALLOON_FLAG_CONT;
+			else
+				hdr->flag = BALLOON_FLAG_DONE;
+
+			send_resp_data(vb, vq, true);
+		}
+	}
+
+	mutex_unlock(&vb->balloon_lock);
+	sg_init_one(&sg_in, &vb->req_hdr, sizeof(vb->req_hdr));
+	virtqueue_add_inbuf(vq, &sg_in, 1, &vb->req_hdr, GFP_KERNEL);
+	virtqueue_kick(vq);
+}
+
 /*
  * While most virtqueues communicate guest-initiated requests to the hypervisor,
  * the stats queue operates in reverse.  The driver initializes the virtqueue
@@ -685,18 +741,56 @@ static void update_balloon_size_func(struct work_struct *work)
 		queue_work(system_freezable_wq, work);
 }
 
+static void misc_handle_rq(struct virtio_balloon *vb)
+{
+	struct virtio_balloon_req_hdr *ptr_hdr;
+	unsigned int len;
+
+	ptr_hdr = virtqueue_get_buf(vb->req_vq, &len);
+	if (!ptr_hdr || len != sizeof(vb->req_hdr))
+		return;
+
+	switch (ptr_hdr->cmd) {
+	case BALLOON_GET_UNUSED_PAGES:
+		send_unused_pages_info(vb, ptr_hdr->param);
+		break;
+	default:
+		break;
+	}
+}
+
+static void misc_request(struct virtqueue *vq)
+{
+	struct virtio_balloon *vb = vq->vdev->priv;
+
+	misc_handle_rq(vb);
+}
+
 static int init_vqs(struct virtio_balloon *vb)
 {
-	struct virtqueue *vqs[3];
-	vq_callback_t *callbacks[] = { balloon_ack, balloon_ack, stats_request };
-	static const char * const names[] = { "inflate", "deflate", "stats" };
+	struct virtqueue *vqs[4];
+	vq_callback_t *callbacks[] = { balloon_ack, balloon_ack,
+					 stats_request, misc_request };
+	static const char * const names[] = { "inflate", "deflate", "stats",
+						 "misc" };
 	int err, nvqs;
 
 	/*
 	 * We expect two virtqueues: inflate and deflate, and
 	 * optionally stat.
 	 */
-	nvqs = virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_STATS_VQ) ? 3 : 2;
+	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_HOST_REQ_VQ))
+		nvqs = 4;
+	else if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_STATS_VQ))
+		nvqs = 3;
+	else
+		nvqs = 2;
+
+	if (!virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_STATS_VQ)) {
+		__virtio_clear_bit(vb->vdev, VIRTIO_BALLOON_F_PAGE_BITMAP);
+		__virtio_clear_bit(vb->vdev, VIRTIO_BALLOON_F_HOST_REQ_VQ);
+	}
+
 	err = vb->vdev->config->find_vqs(vb->vdev, nvqs, vqs, callbacks, names);
 	if (err)
 		return err;
@@ -716,6 +810,18 @@ static int init_vqs(struct virtio_balloon *vb)
 		    < 0)
 			BUG();
 		virtqueue_kick(vb->stats_vq);
+	}
+	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_HOST_REQ_VQ)) {
+		struct scatterlist sg_in;
+
+		vb->req_vq = vqs[3];
+		sg_init_one(&sg_in, &vb->req_hdr, sizeof(vb->req_hdr));
+		if (virtqueue_add_inbuf(vb->req_vq, &sg_in, 1,
+		    &vb->req_hdr, GFP_KERNEL) < 0)
+			__virtio_clear_bit(vb->vdev,
+					VIRTIO_BALLOON_F_HOST_REQ_VQ);
+		else
+			virtqueue_kick(vb->req_vq);
 	}
 	return 0;
 }
@@ -850,11 +956,13 @@ static int virtballoon_probe(struct virtio_device *vdev)
 	vb->resp_hdr = kzalloc(sizeof(struct virtio_balloon_resp_hdr),
 				 GFP_KERNEL);
 	/* Clear the feature bit if memory allocation fails */
-	if (!vb->resp_hdr)
+	if (!vb->resp_hdr) {
 		__virtio_clear_bit(vdev, VIRTIO_BALLOON_F_PAGE_BITMAP);
-	else {
+		__virtio_clear_bit(vdev, VIRTIO_BALLOON_F_HOST_REQ_VQ);
+	} else {
 		vb->page_bitmap[0] = kmalloc(BALLOON_BMAP_SIZE, GFP_KERNEL);
 		if (!vb->page_bitmap[0]) {
+			__virtio_clear_bit(vdev, VIRTIO_BALLOON_F_HOST_REQ_VQ);
 			__virtio_clear_bit(vdev, VIRTIO_BALLOON_F_PAGE_BITMAP);
 			kfree(vb->resp_hdr);
 		} else {
@@ -863,12 +971,15 @@ static int virtballoon_probe(struct virtio_device *vdev)
 			if (!vb->resp_data) {
 				__virtio_clear_bit(vdev,
 						VIRTIO_BALLOON_F_PAGE_BITMAP);
+				__virtio_clear_bit(vdev,
+						VIRTIO_BALLOON_F_HOST_REQ_VQ);
 				kfree(vb->page_bitmap[0]);
 				kfree(vb->resp_hdr);
 			}
 		}
 	}
 	vb->resp_pos = 0;
+	vb->resp_buf_size = BALLOON_BMAP_SIZE;
 	mutex_init(&vb->balloon_lock);
 	init_waitqueue_head(&vb->acked);
 	vb->vdev = vdev;
@@ -988,6 +1099,7 @@ static unsigned int features[] = {
 	VIRTIO_BALLOON_F_STATS_VQ,
 	VIRTIO_BALLOON_F_DEFLATE_ON_OOM,
 	VIRTIO_BALLOON_F_PAGE_BITMAP,
+	VIRTIO_BALLOON_F_HOST_REQ_VQ,
 };
 
 static struct virtio_driver virtio_balloon_driver = {

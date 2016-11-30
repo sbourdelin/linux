@@ -4428,6 +4428,78 @@ void show_free_areas(unsigned int filter)
 	show_swap_cache_info();
 }
 
+struct page_info_item {
+	__le64 start_pfn : 52; /* start pfn for the bitmap */
+	__le64 page_shift : 6; /* page shift width, in bytes */
+	__le64 bmap_len : 6;  /* bitmap length, in bytes */
+};
+
+static int  mark_unused_pages(struct zone *zone,
+		unsigned long *unused_pages, unsigned long size,
+		int order, unsigned long *pos)
+{
+	unsigned long pfn, flags;
+	unsigned int t;
+	struct list_head *curr;
+	struct page_info_item *info;
+
+	if (zone_is_empty(zone))
+		return 0;
+
+	spin_lock_irqsave(&zone->lock, flags);
+
+	if (*pos + zone->free_area[order].nr_free > size)
+		return -ENOSPC;
+	for (t = 0; t < MIGRATE_TYPES; t++) {
+		list_for_each(curr, &zone->free_area[order].free_list[t]) {
+			pfn = page_to_pfn(list_entry(curr, struct page, lru));
+			info = (struct page_info_item *)(unused_pages + *pos);
+			info->start_pfn = pfn;
+			info->page_shift = order + PAGE_SHIFT;
+			*pos += 1;
+		}
+	}
+
+	spin_unlock_irqrestore(&zone->lock, flags);
+
+	return 0;
+}
+
+/*
+ * During live migration, page is always discardable unless it's
+ * content is needed by the system.
+ * get_unused_pages provides an API to get the unused pages, these
+ * unused pages can be discarded if there is no modification since
+ * the request. Some other mechanism, like the dirty page logging
+ * can be used to track the modification.
+ *
+ * This function scans the free page list to get the unused pages
+ * with the specified order, and set the corresponding element in
+ * the bitmap if an unused page is found.
+ *
+ * return -EINVAL if parameters are invalid
+ * return -ENOSPC when bitmap can't contain the pages
+ * return 0 when sccess
+ */
+int get_unused_pages(unsigned long *unused_pages, unsigned long size,
+		int order, unsigned long *pos)
+{
+	struct zone *zone;
+	int ret = 0;
+
+	if (unused_pages == NULL || pos == NULL || *pos < 0)
+		return -EINVAL;
+
+	for_each_populated_zone(zone) {
+		ret = mark_unused_pages(zone, unused_pages, size, order, pos);
+		if (ret < 0)
+			break;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(get_unused_pages);
+
 static void zoneref_set_zone(struct zone *zone, struct zoneref *zoneref)
 {
 	zoneref->zone = zone;
