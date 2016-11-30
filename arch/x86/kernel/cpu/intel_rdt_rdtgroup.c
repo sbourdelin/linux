@@ -1034,9 +1034,19 @@ out:
 	return ret;
 }
 
+static int rdtgroup_show_options(struct seq_file *seq,
+	struct kernfs_root *kf_root)
+{
+	struct rdt_resource *r_l3data = &rdt_resources_all[RDT_RESOURCE_L3DATA];
+	if (r_l3data->enabled)
+		seq_puts(seq, ",cdp");
+	return 0;
+}
+
 static struct kernfs_syscall_ops rdtgroup_kf_syscall_ops = {
 	.mkdir	= rdtgroup_mkdir,
 	.rmdir	= rdtgroup_rmdir,
+	.show_options = rdtgroup_show_options,
 };
 
 static int __init rdtgroup_setup_root(void)
