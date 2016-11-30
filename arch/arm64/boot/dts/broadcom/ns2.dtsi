@@ -191,6 +191,18 @@
 
 		#include "ns2-clock.dtsi"
 
+		spu-crypto@612d0000 {
+			compatible = "brcm,spum-crypto";
+			reg = <0x612d0000 0x900>,    /* SPU 0 control regs */
+				<0x612f0000 0x900>,  /* SPU 1 control regs */
+				<0x61310000 0x900>,  /* SPU 2 control regs */
+				<0x61330000 0x900>;  /* SPU 3 control regs */
+			mboxes = <&pdc0 0>,
+				<&pdc1 0>,
+				<&pdc2 0>,
+				<&pdc3 0>;
+		};
+
 		dma0: dma@61360000 {
 			compatible = "arm,pl330", "arm,primecell";
 			reg = <0x61360000 0x1000>;
