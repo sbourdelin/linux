@@ -2773,12 +2773,8 @@ static netdev_features_t stmmac_fix_features(struct net_device *dev,
 		features &= ~NETIF_F_CSUM_MASK;
 
 	/* Disable tso if asked by ethtool */
-	if ((priv->plat->tso_en) && (priv->dma_cap.tsoen)) {
-		if (features & NETIF_F_TSO)
-			priv->tso = true;
-		else
-			priv->tso = false;
-	}
+	if ((priv->plat->tso_en) && (priv->dma_cap.tsoen))
+		priv->tso = !!(features & NETIF_F_TSO);
 
 	return features;
 }
