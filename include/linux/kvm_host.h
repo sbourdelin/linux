@@ -19,6 +19,7 @@
 #include <linux/preempt.h>
 #include <linux/msi.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
 #include <linux/rcupdate.h>
 #include <linux/ratelimit.h>
 #include <linux/err.h>
@@ -799,6 +800,16 @@ static inline bool kvm_arch_has_noncoherent_dma(struct kvm *kvm)
 	return false;
 }
 #endif
+
+#ifdef __KVM_HAVE_ARCH_VZALLOC_OVERRIDE
+static void *kvm_arch_vzalloc(unsigned long size);
+#else
+static inline void *kvm_arch_vzalloc(unsigned long size)
+{
+	return vzalloc(size);
+}
+#endif
+
 #ifdef __KVM_HAVE_ARCH_ASSIGNED_DEVICE
 void kvm_arch_start_assignment(struct kvm *kvm);
 void kvm_arch_end_assignment(struct kvm *kvm);
