@@ -2485,10 +2485,14 @@ static int __do_proc_doulongvec_minmax(void *data, struct ctl_table *table, int 
 					     sizeof(proc_wspace_sep), NULL);
 			if (err)
 				break;
-			if (neg)
-				continue;
-			if ((min && val < *min) || (max && val > *max))
-				continue;
+			if (neg) {
+				err = -EINVAL;
+				break;
+			}
+			if ((min && val < *min) || (max && val > *max)) {
+				err = -EINVAL;
+				break;
+			}
 			*i = val;
 		} else {
 			val = convdiv * (*i) / convmul;
