@@ -26,6 +26,8 @@ int mv88e6xxx_g1_init_ready(struct mv88e6xxx_chip *chip, bool *ready);
 
 int mv88e6185_g1_reset(struct mv88e6xxx_chip *chip);
 int mv88e6352_g1_reset(struct mv88e6xxx_chip *chip);
+int mv88e6xxx_g1_ppu_enable(struct mv88e6xxx_chip *chip);
+int mv88e6xxx_g1_ppu_disable(struct mv88e6xxx_chip *chip);
 
 int mv88e6xxx_g1_stats_wait(struct mv88e6xxx_chip *chip);
 int mv88e6xxx_g1_stats_snapshot(struct mv88e6xxx_chip *chip, int port);

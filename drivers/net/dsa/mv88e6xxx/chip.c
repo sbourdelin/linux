@@ -549,15 +549,12 @@ static int mv88e6xxx_ppu_wait(struct mv88e6xxx_chip *chip, bool state)
 
 static int mv88e6xxx_ppu_disable(struct mv88e6xxx_chip *chip)
 {
-	u16 val;
 	int err;
 
-	err = mv88e6xxx_g1_read(chip, GLOBAL_CONTROL, &val);
-	if (err)
-		return err;
+	if (!chip->info->ops->ppu_disable)
+		return 0;
 
-	err = mv88e6xxx_g1_write(chip, GLOBAL_CONTROL,
-				 val & ~GLOBAL_CONTROL_PPU_ENABLE);
+	err = chip->info->ops->ppu_disable(chip);
 	if (err)
 		return err;
 
@@ -566,15 +563,12 @@ static int mv88e6xxx_ppu_disable(struct mv88e6xxx_chip *chip)
 
 static int mv88e6xxx_ppu_enable(struct mv88e6xxx_chip *chip)
 {
-	u16 val;
 	int err;
 
-	err = mv88e6xxx_g1_read(chip, GLOBAL_CONTROL, &val);
-	if (err)
-		return err;
+	if (!chip->info->ops->ppu_enable)
+		return 0;
 
-	err = mv88e6xxx_g1_write(chip, GLOBAL_CONTROL,
-				 val | GLOBAL_CONTROL_PPU_ENABLE);
+	err = chip->info->ops->ppu_enable(chip);
 	if (err)
 		return err;
 
@@ -2775,18 +2769,11 @@ static int mv88e6xxx_g1_setup(struct mv88e6xxx_chip *chip)
 	/* Enable the PHY Polling Unit if present, don't discard any packets,
 	 * and mask all interrupt sources.
 	 */
-	err = mv88e6xxx_g1_read(chip, GLOBAL_CONTROL, &reg);
-	if (err < 0)
-		return err;
-
-	reg &= ~GLOBAL_CONTROL_PPU_ENABLE;
-	if (mv88e6xxx_has(chip, MV88E6XXX_FLAG_PPU) ||
-	    mv88e6xxx_has(chip, MV88E6XXX_FLAG_PPU_ACTIVE))
-		reg |= GLOBAL_CONTROL_PPU_ENABLE;
-
-	err = mv88e6xxx_g1_write(chip, GLOBAL_CONTROL, reg);
-	if (err)
-		return err;
+	if (chip->info->ops->ppu_enable) {
+		err = chip->info->ops->ppu_enable(chip);
+		if (err)
+			return err;
+	}
 
 	/* Configure the upstream port, and configure it as the port to which
 	 * ingress and egress and ARP monitor frames are to be sent.
@@ -3225,6 +3212,8 @@ static const struct mv88e6xxx_ops mv88e6085_ops = {
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
 	.ppu_polling = mv88e6185_g1_ppu_polling,
+	.ppu_enable = mv88e6xxx_g1_ppu_enable,
+	.ppu_disable = mv88e6xxx_g1_ppu_disable,
 	.reset = mv88e6185_g1_reset,
 };
 
@@ -3241,6 +3230,8 @@ static const struct mv88e6xxx_ops mv88e6095_ops = {
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
 	.ppu_polling = mv88e6185_g1_ppu_polling,
+	.ppu_enable = mv88e6xxx_g1_ppu_enable,
+	.ppu_disable = mv88e6xxx_g1_ppu_disable,
 	.reset = mv88e6185_g1_reset,
 };
 
@@ -3257,6 +3248,8 @@ static const struct mv88e6xxx_ops mv88e6097_ops = {
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
 	.ppu_polling = mv88e6185_g1_ppu_polling,
+	.ppu_enable = mv88e6xxx_g1_ppu_enable,
+	.ppu_disable = mv88e6xxx_g1_ppu_disable,
 	.reset = mv88e6185_g1_reset,
 };
 
@@ -3288,6 +3281,8 @@ static const struct mv88e6xxx_ops mv88e6131_ops = {
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
 	.ppu_polling = mv88e6185_g1_ppu_polling,
+	.ppu_enable = mv88e6xxx_g1_ppu_enable,
+	.ppu_disable = mv88e6xxx_g1_ppu_disable,
 	.reset = mv88e6185_g1_reset,
 };
 
@@ -3406,6 +3401,8 @@ static const struct mv88e6xxx_ops mv88e6185_ops = {
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
 	.ppu_polling = mv88e6185_g1_ppu_polling,
+	.ppu_enable = mv88e6xxx_g1_ppu_enable,
+	.ppu_disable = mv88e6xxx_g1_ppu_disable,
 	.reset = mv88e6185_g1_reset,
 };
 
@@ -4037,13 +4034,13 @@ static struct mv88e6xxx_chip *mv88e6xxx_alloc_chip(struct device *dev)
 
 static void mv88e6xxx_phy_init(struct mv88e6xxx_chip *chip)
 {
-	if (mv88e6xxx_has(chip, MV88E6XXX_FLAG_PPU))
+	if (chip->info->ops->ppu_enable && chip->info->ops->ppu_disable)
 		mv88e6xxx_ppu_state_init(chip);
 }
 
 static void mv88e6xxx_phy_destroy(struct mv88e6xxx_chip *chip)
 {
-	if (mv88e6xxx_has(chip, MV88E6XXX_FLAG_PPU))
+	if (chip->info->ops->ppu_enable && chip->info->ops->ppu_disable)
 		mv88e6xxx_ppu_state_destroy(chip);
 }
 

@@ -116,6 +116,34 @@ int mv88e6352_g1_reset(struct mv88e6xxx_chip *chip)
 	return mv88e6xxx_g1_write(chip, GLOBAL_CONTROL, val);
 }
 
+int mv88e6xxx_g1_ppu_enable(struct mv88e6xxx_chip *chip)
+{
+	u16 val;
+	int err;
+
+	err = mv88e6xxx_g1_read(chip, GLOBAL_CONTROL, &val);
+	if (err)
+		return err;
+
+	val |= GLOBAL_CONTROL_PPU_ENABLE;
+
+	return mv88e6xxx_g1_write(chip, GLOBAL_CONTROL, val);
+}
+
+int mv88e6xxx_g1_ppu_disable(struct mv88e6xxx_chip *chip)
+{
+	u16 val;
+	int err;
+
+	err = mv88e6xxx_g1_read(chip, GLOBAL_CONTROL, &val);
+	if (err)
+		return err;
+
+	val &= ~GLOBAL_CONTROL_PPU_ENABLE;
+
+	return mv88e6xxx_g1_write(chip, GLOBAL_CONTROL, val);
+}
+
 /* Offset 0x1c: Global Control 2 */
 
 int mv88e6390_g1_stats_set_histogram(struct mv88e6xxx_chip *chip)
