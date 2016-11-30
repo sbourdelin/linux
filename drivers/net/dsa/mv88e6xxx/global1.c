@@ -33,6 +33,39 @@ int mv88e6xxx_g1_wait(struct mv88e6xxx_chip *chip, int reg, u16 mask)
 	return mv88e6xxx_wait(chip, chip->info->global1_addr, reg, mask);
 }
 
+/* Offset 0x00: Switch Global Status Register */
+
+int mv88e6185_g1_ppu_polling(struct mv88e6xxx_chip *chip, bool *polling)
+{
+	u16 state;
+	int err;
+
+	/* Check the value of the PPUState bits 15:14 */
+	err = mv88e6xxx_g1_read(chip, GLOBAL_STATUS, &state);
+	if (err)
+		return err;
+
+	state &= GLOBAL_STATUS_PPU_STATE_MASK;
+	*polling = state == GLOBAL_STATUS_PPU_STATE_POLLING;
+
+	return 0;
+}
+
+int mv88e6352_g1_ppu_polling(struct mv88e6xxx_chip *chip, bool *polling)
+{
+	u16 state;
+	int err;
+
+	/* Check the value of the PPUState (or InitState) bit 15 */
+	err = mv88e6xxx_g1_read(chip, GLOBAL_STATUS, &state);
+	if (err)
+		return err;
+
+	*polling = !!(state & GLOBAL_STATUS_PPU_STATE);
+
+	return 0;
+}
+
 /* Offset 0x04: Switch Global Control Register */
 
 int mv88e6185_g1_reset(struct mv88e6xxx_chip *chip)

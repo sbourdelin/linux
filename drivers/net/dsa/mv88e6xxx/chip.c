@@ -525,10 +525,32 @@ int mv88e6xxx_update(struct mv88e6xxx_chip *chip, int addr, int reg, u16 update)
 	return mv88e6xxx_write(chip, addr, reg, val);
 }
 
+static int mv88e6xxx_ppu_wait(struct mv88e6xxx_chip *chip, bool state)
+{
+	bool polling;
+	int i, err;
+
+	if (!chip->info->ops->ppu_polling)
+		return 0;
+
+	for (i = 0; i < 16; i++) {
+		err = chip->info->ops->ppu_polling(chip, &polling);
+		if (err)
+			return err;
+
+		usleep_range(1000, 2000);
+
+		if (polling == state)
+			return 0;
+	}
+
+	return -ETIMEDOUT;
+}
+
 static int mv88e6xxx_ppu_disable(struct mv88e6xxx_chip *chip)
 {
 	u16 val;
-	int i, err;
+	int err;
 
 	err = mv88e6xxx_g1_read(chip, GLOBAL_CONTROL, &val);
 	if (err)
@@ -539,23 +561,13 @@ static int mv88e6xxx_ppu_disable(struct mv88e6xxx_chip *chip)
 	if (err)
 		return err;
 
-	for (i = 0; i < 16; i++) {
-		err = mv88e6xxx_g1_read(chip, GLOBAL_STATUS, &val);
-		if (err)
-			return err;
-
-		usleep_range(1000, 2000);
-		if ((val & GLOBAL_STATUS_PPU_MASK) != GLOBAL_STATUS_PPU_POLLING)
-			return 0;
-	}
-
-	return -ETIMEDOUT;
+	return mv88e6xxx_ppu_wait(chip, false);
 }
 
 static int mv88e6xxx_ppu_enable(struct mv88e6xxx_chip *chip)
 {
 	u16 val;
-	int i, err;
+	int err;
 
 	err = mv88e6xxx_g1_read(chip, GLOBAL_CONTROL, &val);
 	if (err)
@@ -566,17 +578,7 @@ static int mv88e6xxx_ppu_enable(struct mv88e6xxx_chip *chip)
 	if (err)
 		return err;
 
-	for (i = 0; i < 16; i++) {
-		err = mv88e6xxx_g1_read(chip, GLOBAL_STATUS, &val);
-		if (err)
-			return err;
-
-		usleep_range(1000, 2000);
-		if ((val & GLOBAL_STATUS_PPU_MASK) == GLOBAL_STATUS_PPU_POLLING)
-			return 0;
-	}
-
-	return -ETIMEDOUT;
+	return mv88e6xxx_ppu_wait(chip, true);
 }
 
 static void mv88e6xxx_ppu_reenable_work(struct work_struct *ugly)
@@ -3212,6 +3214,7 @@ static const struct mv88e6xxx_ops mv88e6085_ops = {
 	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
+	.ppu_polling = mv88e6185_g1_ppu_polling,
 	.reset = mv88e6185_g1_reset,
 };
 
@@ -3227,6 +3230,7 @@ static const struct mv88e6xxx_ops mv88e6095_ops = {
 	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
+	.ppu_polling = mv88e6185_g1_ppu_polling,
 	.reset = mv88e6185_g1_reset,
 };
 
@@ -3242,6 +3246,7 @@ static const struct mv88e6xxx_ops mv88e6097_ops = {
 	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
+	.ppu_polling = mv88e6185_g1_ppu_polling,
 	.reset = mv88e6185_g1_reset,
 };
 
@@ -3272,6 +3277,7 @@ static const struct mv88e6xxx_ops mv88e6131_ops = {
 	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
+	.ppu_polling = mv88e6185_g1_ppu_polling,
 	.reset = mv88e6185_g1_reset,
 };
 
@@ -3318,6 +3324,7 @@ static const struct mv88e6xxx_ops mv88e6171_ops = {
 	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3336,6 +3343,7 @@ static const struct mv88e6xxx_ops mv88e6172_ops = {
 	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3352,6 +3360,7 @@ static const struct mv88e6xxx_ops mv88e6175_ops = {
 	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3370,6 +3379,7 @@ static const struct mv88e6xxx_ops mv88e6176_ops = {
 	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3385,6 +3395,7 @@ static const struct mv88e6xxx_ops mv88e6185_ops = {
 	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
+	.ppu_polling = mv88e6185_g1_ppu_polling,
 	.reset = mv88e6185_g1_reset,
 };
 
@@ -3402,6 +3413,7 @@ static const struct mv88e6xxx_ops mv88e6190_ops = {
 	.stats_get_sset_count = mv88e6320_stats_get_sset_count,
 	.stats_get_strings = mv88e6320_stats_get_strings,
 	.stats_get_stats = mv88e6390_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3419,6 +3431,7 @@ static const struct mv88e6xxx_ops mv88e6190x_ops = {
 	.stats_get_sset_count = mv88e6320_stats_get_sset_count,
 	.stats_get_strings = mv88e6320_stats_get_strings,
 	.stats_get_stats = mv88e6390_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3436,6 +3449,7 @@ static const struct mv88e6xxx_ops mv88e6191_ops = {
 	.stats_get_sset_count = mv88e6320_stats_get_sset_count,
 	.stats_get_strings = mv88e6320_stats_get_strings,
 	.stats_get_stats = mv88e6390_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3454,6 +3468,7 @@ static const struct mv88e6xxx_ops mv88e6240_ops = {
 	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3471,6 +3486,7 @@ static const struct mv88e6xxx_ops mv88e6290_ops = {
 	.stats_get_sset_count = mv88e6320_stats_get_sset_count,
 	.stats_get_strings = mv88e6320_stats_get_strings,
 	.stats_get_stats = mv88e6390_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3521,6 +3537,7 @@ static const struct mv88e6xxx_ops mv88e6350_ops = {
 	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3537,6 +3554,7 @@ static const struct mv88e6xxx_ops mv88e6351_ops = {
 	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3555,6 +3573,7 @@ static const struct mv88e6xxx_ops mv88e6352_ops = {
 	.stats_get_sset_count = mv88e6095_stats_get_sset_count,
 	.stats_get_strings = mv88e6095_stats_get_strings,
 	.stats_get_stats = mv88e6095_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3572,6 +3591,7 @@ static const struct mv88e6xxx_ops mv88e6390_ops = {
 	.stats_get_sset_count = mv88e6320_stats_get_sset_count,
 	.stats_get_strings = mv88e6320_stats_get_strings,
 	.stats_get_stats = mv88e6390_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3589,6 +3609,7 @@ static const struct mv88e6xxx_ops mv88e6390x_ops = {
 	.stats_get_sset_count = mv88e6320_stats_get_sset_count,
 	.stats_get_strings = mv88e6320_stats_get_strings,
 	.stats_get_stats = mv88e6390_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 
@@ -3606,6 +3627,7 @@ static const struct mv88e6xxx_ops mv88e6391_ops = {
 	.stats_get_sset_count = mv88e6320_stats_get_sset_count,
 	.stats_get_strings = mv88e6320_stats_get_strings,
 	.stats_get_stats = mv88e6390_stats_get_stats,
+	.ppu_polling = mv88e6352_g1_ppu_polling,
 	.reset = mv88e6352_g1_reset,
 };
 

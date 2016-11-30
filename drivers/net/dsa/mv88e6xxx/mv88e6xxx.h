@@ -175,12 +175,11 @@
 
 #define GLOBAL_STATUS		0x00
 #define GLOBAL_STATUS_PPU_STATE BIT(15) /* 6351 and 6171 */
-/* Two bits for 6165, 6185 etc */
-#define GLOBAL_STATUS_PPU_MASK		(0x3 << 14)
-#define GLOBAL_STATUS_PPU_DISABLED_RST	(0x0 << 14)
-#define GLOBAL_STATUS_PPU_INITIALIZING	(0x1 << 14)
-#define GLOBAL_STATUS_PPU_DISABLED	(0x2 << 14)
-#define GLOBAL_STATUS_PPU_POLLING	(0x3 << 14)
+#define GLOBAL_STATUS_PPU_STATE_MASK		(0x3 << 14) /* 6165 6185 */
+#define GLOBAL_STATUS_PPU_STATE_DISABLED_RST	(0x0 << 14)
+#define GLOBAL_STATUS_PPU_STATE_INITIALIZING	(0x1 << 14)
+#define GLOBAL_STATUS_PPU_STATE_DISABLED	(0x2 << 14)
+#define GLOBAL_STATUS_PPU_STATE_POLLING		(0x3 << 14)
 #define GLOBAL_STATUS_IRQ_AVB		8
 #define GLOBAL_STATUS_IRQ_DEVICE	7
 #define GLOBAL_STATUS_IRQ_STATS		6
@@ -765,6 +764,8 @@ struct mv88e6xxx_ops {
 	int (*phy_write)(struct mv88e6xxx_chip *chip, int addr, int reg,
 			 u16 val);
 
+	/* PHY Polling Unit (PPU) operations */
+	int (*ppu_polling)(struct mv88e6xxx_chip *chip, bool *polling);
 	/* Switch Software Reset */
 	int (*reset)(struct mv88e6xxx_chip *chip);
 
