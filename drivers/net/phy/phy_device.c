@@ -866,6 +866,11 @@ int phy_attach_direct(struct net_device *dev, struct phy_device *phydev,
 		return -EIO;
 	}
 
+	if (!try_module_get(d->driver->owner)) {
+		dev_err(&dev->dev, "failed to get the device driver module\n");
+		return -EIO;
+	}
+
 	get_device(d);
 
 	/* Assume that if there is no driver, that it doesn't
@@ -921,6 +926,7 @@ int phy_attach_direct(struct net_device *dev, struct phy_device *phydev,
 
 error:
 	put_device(d);
+	module_put(d->driver->owner);
 	module_put(bus->owner);
 	return err;
 }
@@ -998,6 +1004,7 @@ void phy_detach(struct phy_device *phydev)
 	bus = phydev->mdio.bus;
 
 	put_device(&phydev->mdio.dev);
+	module_put(phydev->mdio.dev.driver->owner);
 	module_put(bus->owner);
 }
 EXPORT_SYMBOL(phy_detach);
