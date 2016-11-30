@@ -181,6 +181,25 @@ static void power9_config_bhrb(u64 pmu_bhrb_filter)
 	mtspr(SPRN_MMCRA, (mfspr(SPRN_MMCRA) | pmu_bhrb_filter));
 }
 
+static int power9_llevent_get_constraint(u64 event[], int n_ev)
+{
+	int i;
+	unsigned int pmc, unit, mask = 0;
+
+	for (i = 0; i < n_ev; ++i) {
+		pmc	= (event[i] >> EVENT_PMC_SHIFT) & EVENT_PMC_MASK;
+		unit	= (event[i] >> EVENT_UNIT_SHIFT) & EVENT_UNIT_MASK;
+		if (unit >= 6 && unit <= 9)
+			mask |= 1 << (pmc - 1);
+
+	}
+
+	if ((mask) && ((mask & 0xf) < 0x8))
+		return -1;
+
+	return 0;
+}
+
 #define C(x)	PERF_COUNT_HW_CACHE_##x
 
 /*
@@ -307,6 +326,7 @@ static struct power_pmu power9_pmu = {
 	.cache_events		= &power9_cache_events,
 	.attr_groups		= power9_pmu_attr_groups,
 	.bhrb_nr		= 32,
+	.get_llevent_constraint	= power9_llevent_get_constraint,
 };
 
 static int __init init_power9_pmu(void)

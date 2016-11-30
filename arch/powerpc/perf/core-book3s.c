@@ -1267,6 +1267,10 @@ static void power_pmu_enable(struct pmu *pmu)
 		goto out;
 	}
 
+	if ( (ppmu->get_llevent_constraint) &&
+	     ppmu->get_llevent_constraint(cpuhw->events, cpuhw->n_events))
+		goto out;
+
 	if (!(ppmu->flags & PPMU_ARCH_207S)) {
 		/*
 		 * Add in MMCR0 freeze bits corresponding to the attr.exclude_*
