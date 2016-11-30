@@ -91,6 +91,7 @@ config CRYPTO_AES_ARM_BS
 	select CRYPTO_ALGAPI
 	select CRYPTO_AES_ARM
 	select CRYPTO_ABLK_HELPER
+	select CRYPTO_SIMD
 	help
 	  Use a faster and more secure NEON based implementation of AES in CBC,
 	  CTR and XTS modes
