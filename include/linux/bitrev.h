@@ -9,6 +9,7 @@
 #define __bitrev32 __arch_bitrev32
 #define __bitrev16 __arch_bitrev16
 #define __bitrev8 __arch_bitrev8
+#define __bitrev8x4 __arch_bitrev8x4
 
 #else
 extern u8 const byte_rev_table[256];
@@ -25,6 +26,14 @@ static inline u16 __bitrev16(u16 x)
 static inline u32 __bitrev32(u32 x)
 {
 	return (__bitrev16(x & 0xffff) << 16) | __bitrev16(x >> 16);
+}
+
+static inline u32 __bitrev8x4(u32 x)
+{
+	return(__bitrev8(x & 0xff) |
+	       (__bitrev8((x >> 8)  & 0xff) << 8) |
+	       (__bitrev8((x >> 16)  & 0xff) << 16) |
+	       (__bitrev8((x >> 24)  & 0xff) << 24));
 }
 
 #endif /* CONFIG_HAVE_ARCH_BITREVERSE */
@@ -47,6 +56,15 @@ static inline u32 __bitrev32(u32 x)
 	__x = ((__x & (u16)0xF0F0U) >> 4) | ((__x & (u16)0x0F0FU) << 4);	\
 	__x = ((__x & (u16)0xCCCCU) >> 2) | ((__x & (u16)0x3333U) << 2);	\
 	__x = ((__x & (u16)0xAAAAU) >> 1) | ((__x & (u16)0x5555U) << 1);	\
+	__x;								\
+})
+
+#define __constant_bitrev8x4(x) \
+({			\
+	u32 __x = x;	\
+	__x = ((__x & (u32)0xF0F0F0F0UL) >> 4) | ((__x & (u32)0x0F0F0F0FUL) << 4);	\
+	__x = ((__x & (u32)0xCCCCCCCCUL) >> 2) | ((__x & (u32)0x33333333UL) << 2);	\
+	__x = ((__x & (u32)0xAAAAAAAAUL) >> 1) | ((__x & (u32)0x55555555UL) << 1);	\
 	__x;								\
 })
 
@@ -74,6 +92,14 @@ static inline u32 __bitrev32(u32 x)
 	__constant_bitrev16(__x) :			\
 	__bitrev16(__x);				\
  })
+
+#define bitrev8x4(x) \
+({			\
+	u32 __x = x;	\
+	__builtin_constant_p(__x) ?	\
+	__constant_bitrev8x4(__x) :			\
+	__bitrev8x4(__x);				\
+})
 
 #define bitrev8(x) \
 ({			\
