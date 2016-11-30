@@ -1,13 +1,15 @@
 #ifndef _ASM_X86_E820_H
 #define _ASM_X86_E820_H
 
-#ifdef CONFIG_EFI
+/*
+ * We need to make sure that E820_X_MAX is defined
+ * before we include uapi/asm/e820.h
+ */
 #include <linux/numa.h>
 #define E820_X_MAX (E820MAX + 3 * MAX_NUMNODES)
-#else	/* ! CONFIG_EFI */
-#define E820_X_MAX E820MAX
-#endif
+
 #include <uapi/asm/e820.h>
+
 #ifndef __ASSEMBLY__
 /* see comment in arch/x86/kernel/e820.c */
 extern struct e820map *e820;
