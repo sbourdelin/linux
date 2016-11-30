@@ -2370,6 +2370,17 @@ qla2xxx_scan_finished(struct Scsi_Host *shost, unsigned long time)
 	return atomic_read(&vha->loop_state) == LOOP_READY;
 }
 
+static void qla2x00_destroy_mbx_wq(struct qla_hw_data *ha)
+{
+	struct workqueue_struct *wq = ha->mbx_wq;
+
+	if (wq) {
+		ha->mbx_wq = NULL;
+		flush_workqueue(wq);
+		destroy_workqueue(wq);
+	}
+}
+
 /*
  * PCI driver interface
  */
@@ -2805,6 +2816,15 @@ que_init:
 	ql_dbg(ql_dbg_init, base_vha, 0x003f,
 	    "req->req_q_in=%p req->req_q_out=%p rsp->rsp_q_in=%p rsp->rsp_q_out=%p.\n",
 	    req->req_q_in, req->req_q_out, rsp->rsp_q_in, rsp->rsp_q_out);
+
+	sprintf(wq_name, "qla2xxx_%lu_mbx", base_vha->host_no);
+	ha->mbx_wq = create_singlethread_workqueue(wq_name);
+	if (!ha->mbx_wq) {
+		ql_log(ql_log_fatal, base_vha, 0x00f0,
+			"Unable to start mail box thread!\n");
+		ret = -ENODEV;
+		goto probe_failed;
+	}
 
 	if (ha->isp_ops->initialize_adapter(base_vha)) {
 		ql_log(ql_log_fatal, base_vha, 0x00d6,
@@ -3277,6 +3297,8 @@ qla2x00_remove_one(struct pci_dev *pdev)
 	scsi_host_put(base_vha->host);
 
 	qla2x00_unmap_iobases(ha);
+
+	qla2x00_destroy_mbx_wq(ha);
 
 	pci_release_selected_regions(ha->pdev, ha->bars);
 	kfree(ha);
@@ -5045,6 +5067,8 @@ qla2x00_disable_board_on_pci_error(struct work_struct *work)
 	qla2x00_free_queues(ha);
 
 	qla2x00_unmap_iobases(ha);
+
+	qla2x00_destroy_mbx_wq(ha);
 
 	pci_release_selected_regions(ha->pdev, ha->bars);
 	pci_disable_pcie_error_reporting(pdev);

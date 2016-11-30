@@ -3553,6 +3553,9 @@ struct qla_hw_data {
 	uint32_t	idc_audit_ts;
 	uint32_t	idc_extend_tmo;
 
+	/* mail box work queue */
+	struct workqueue_struct *mbx_wq;
+
 	/* DPC low-priority workqueue */
 	struct workqueue_struct *dpc_lp_wq;
 	struct work_struct idc_aen;

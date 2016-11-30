@@ -10,6 +10,14 @@
 #include <linux/delay.h>
 #include <linux/gfp.h>
 
+struct mbx_cmd_info_t {
+	mbx_cmd_t		*mcp;
+	scsi_qla_host_t		*vha;
+	struct work_struct	work;
+	struct completion	comp;
+	int			status;
+};
+
 struct rom_cmd {
 	uint16_t cmd;
 } rom_cmds[] = {
@@ -68,7 +76,7 @@ static int is_rom_cmd(uint16_t cmd)
  *	Kernel context.
  */
 static int
-qla2x00_mailbox_command(scsi_qla_host_t *vha, mbx_cmd_t *mcp)
+__qla2x00_mailbox_command(scsi_qla_host_t *vha, mbx_cmd_t *mcp)
 {
 	int		rval, i;
 	unsigned long    flags = 0;
@@ -140,19 +148,6 @@ qla2x00_mailbox_command(scsi_qla_host_t *vha, mbx_cmd_t *mcp)
 		return QLA_FUNCTION_TIMEOUT;
 	}
 
-	/*
-	 * Wait for active mailbox commands to finish by waiting at most tov
-	 * seconds. This is to serialize actual issuing of mailbox cmds during
-	 * non ISP abort time.
-	 */
-	if (!wait_for_completion_timeout(&ha->mbx_cmd_comp, mcp->tov * HZ)) {
-		/* Timeout occurred. Return error. */
-		ql_log(ql_log_warn, vha, 0x1005,
-		    "Cmd access timeout, cmd=0x%x, Exiting.\n",
-		    mcp->mb[0]);
-		return QLA_FUNCTION_TIMEOUT;
-	}
-
 	ha->flags.mbox_busy = 1;
 	/* Save mailbox command for debug */
 	ha->mcp = mcp;
@@ -217,7 +212,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *vha, mbx_cmd_t *mcp)
 				ql_dbg(ql_dbg_mbx, vha, 0x1010,
 				    "Pending mailbox timeout, exiting.\n");
 				rval = QLA_FUNCTION_TIMEOUT;
-				goto premature_exit;
+				goto mbx_done;
 			}
 			WRT_REG_DWORD(&reg->isp82.hint, HINT_MBX_INT_PENDING);
 		} else if (IS_FWI2_CAPABLE(ha))
@@ -251,7 +246,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *vha, mbx_cmd_t *mcp)
 				ql_dbg(ql_dbg_mbx, vha, 0x1012,
 				    "Pending mailbox timeout, exiting.\n");
 				rval = QLA_FUNCTION_TIMEOUT;
-				goto premature_exit;
+				goto mbx_done;
 			}
 			WRT_REG_DWORD(&reg->isp82.hint, HINT_MBX_INT_PENDING);
 		} else if (IS_FWI2_CAPABLE(ha))
@@ -297,7 +292,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *vha, mbx_cmd_t *mcp)
 			rval = QLA_FUNCTION_FAILED;
 			ql_log(ql_log_warn, vha, 0x1015,
 			    "FW hung = %d.\n", ha->flags.isp82xx_fw_hung);
-			goto premature_exit;
+			goto mbx_done;
 		}
 
 		if (ha->mailbox_out[0] != MBS_COMMAND_COMPLETE)
@@ -353,7 +348,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *vha, mbx_cmd_t *mcp)
 					set_bit(PCI_ERR, &base_vha->dpc_flags);
 				ha->flags.mbox_busy = 0;
 				rval = QLA_FUNCTION_TIMEOUT;
-				goto premature_exit;
+				goto mbx_done;
 			}
 
 			/* Attempt to capture firmware dump for further
@@ -431,8 +426,6 @@ qla2x00_mailbox_command(scsi_qla_host_t *vha, mbx_cmd_t *mcp)
 				    command, mcp->mb[0]);
 				set_bit(ABORT_ISP_ACTIVE, &vha->dpc_flags);
 				clear_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
-				/* Allow next mbx cmd to come in. */
-				complete(&ha->mbx_cmd_comp);
 				if (ha->isp_ops->abort_isp(vha)) {
 					/* Failed. retry later. */
 					set_bit(ISP_ABORT_NEEDED,
@@ -445,10 +438,6 @@ qla2x00_mailbox_command(scsi_qla_host_t *vha, mbx_cmd_t *mcp)
 			}
 		}
 	}
-
-premature_exit:
-	/* Allow next mbx cmd to come in. */
-	complete(&ha->mbx_cmd_comp);
 
 mbx_done:
 	if (rval) {
@@ -472,6 +461,57 @@ mbx_done:
 	}
 
 	return rval;
+}
+
+static void
+qla2x00_mailbox_work(struct work_struct *work)
+{
+	struct mbx_cmd_info_t *cmd_info =
+	    container_of(work, struct mbx_cmd_info_t, work);
+
+	cmd_info->status =
+	    __qla2x00_mailbox_command(cmd_info->vha, cmd_info->mcp);
+
+	complete(&cmd_info->comp);
+}
+
+static int
+qla2x00_mailbox_command(scsi_qla_host_t *vha, mbx_cmd_t *mcp)
+{
+	struct mbx_cmd_info_t cmd_info;
+	struct qla_hw_data *ha = vha->hw;
+	int rval;
+	uint16_t command = mcp->mb[0];
+
+	if (!ha->mbx_wq) {
+		ql_log(ql_log_warn, vha, 0x1005,
+			"mbx work queue doesn't exist: cmd=0x%x.\n", command);
+		return QLA_FUNCTION_FAILED;
+	}
+
+	ql_dbg(ql_dbg_mbx, vha, 0x1021, "Enter %s/%d: %p 0x%x.\n",
+		current->comm, task_pid_nr(current), mcp, command);
+
+	cmd_info.vha = vha;
+	cmd_info.mcp = mcp;
+	init_completion(&cmd_info.comp);
+	INIT_WORK(&cmd_info.work, qla2x00_mailbox_work);
+	queue_work(ha->mbx_wq, &cmd_info.work);
+
+	rval = wait_for_completion_timeout(&cmd_info.comp, mcp->tov * HZ);
+
+	if (rval <= 0) {
+		ql_log(ql_log_warn, vha, 0x1005,
+			"cmd failed: %s, cmd=0x%x, rval=%d Exiting.\n",
+			rval ? "signal" : "timeout", command, rval);
+		cancel_work_sync(&cmd_info.work);
+		return QLA_FUNCTION_TIMEOUT;
+	}
+
+	ql_dbg(ql_dbg_mbx, vha, 0x1021, "Done %s/%d: %p 0x%x.\n",
+		current->comm, task_pid_nr(current), mcp, command);
+
+	return cmd_info.status;
 }
 
 int
