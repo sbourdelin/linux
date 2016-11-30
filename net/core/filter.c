@@ -2960,6 +2960,33 @@ static u32 sk_filter_convert_ctx_access(enum bpf_access_type type, int dst_reg,
 	return insn - insn_buf;
 }
 
+#define SOCKF_AD_TYPE     1
+#define SOCKF_AD_PROTOCOL 2
+
+static u32 convert_sock_access(int sock_field, int dst_reg, int src_reg,
+			       struct bpf_insn *insn_buf)
+{
+	struct bpf_insn *insn = insn_buf;
+
+	switch (sock_field) {
+	case SOCKF_AD_TYPE:
+		*insn++ = BPF_LDX_MEM(BPF_W, dst_reg, src_reg,
+				      offsetof(struct sock, __sk_flags_offset));
+		*insn++ = BPF_ALU32_IMM(BPF_AND, dst_reg, SK_FL_TYPE_MASK);
+		*insn++ = BPF_ALU32_IMM(BPF_RSH, dst_reg, SK_FL_TYPE_SHIFT);
+		break;
+
+	case SOCKF_AD_PROTOCOL:
+		*insn++ = BPF_LDX_MEM(BPF_W, dst_reg, src_reg,
+				      offsetof(struct sock, __sk_flags_offset));
+		*insn++ = BPF_ALU32_IMM(BPF_AND, dst_reg, SK_FL_PROTO_MASK);
+		*insn++ = BPF_ALU32_IMM(BPF_RSH, dst_reg, SK_FL_PROTO_SHIFT);
+		break;
+	}
+
+	return insn - insn_buf;
+}
+
 static u32 sock_filter_convert_ctx_access(enum bpf_access_type type,
 					  int dst_reg, int src_reg,
 					  int ctx_off,
@@ -2979,6 +3006,21 @@ static u32 sock_filter_convert_ctx_access(enum bpf_access_type type,
 			*insn++ = BPF_LDX_MEM(BPF_W, dst_reg, src_reg,
 				      offsetof(struct sock, sk_bound_dev_if));
 		break;
+
+	case offsetof(struct bpf_sock, family):
+		BUILD_BUG_ON(FIELD_SIZEOF(struct sock, sk_family) != 2);
+
+		*insn++ = BPF_LDX_MEM(BPF_H, dst_reg, src_reg,
+				      offsetof(struct sock, sk_family));
+		break;
+
+	case offsetof(struct bpf_sock, type):
+		return convert_sock_access(SOCKF_AD_TYPE, dst_reg, src_reg,
+					   insn_buf);
+
+	case offsetof(struct bpf_sock, protocol):
+		return convert_sock_access(SOCKF_AD_PROTOCOL, dst_reg, src_reg,
+					   insn_buf);
 	}
 
 	return insn - insn_buf;
