@@ -34,6 +34,7 @@
 #define VIRTIO_BALLOON_F_MUST_TELL_HOST	0 /* Tell before reclaiming pages */
 #define VIRTIO_BALLOON_F_STATS_VQ	1 /* Memory Stats virtqueue */
 #define VIRTIO_BALLOON_F_DEFLATE_ON_OOM	2 /* Deflate balloon on OOM */
+#define VIRTIO_BALLOON_F_PAGE_BITMAP	3 /* Send page info with bitmap */
 
 /* Size of a PFN in the balloon interface. */
 #define VIRTIO_BALLOON_PFN_SHIFT 12
@@ -81,5 +82,23 @@ struct virtio_balloon_stat {
 	__virtio16 tag;
 	__virtio64 val;
 } __attribute__((packed));
+
+/* Response header structure */
+struct virtio_balloon_resp_hdr {
+	__le64 cmd : 8; /* Distinguish different requests type */
+	__le64 flag: 8; /* Mark status for a specific request type */
+	__le64 id : 16; /* Distinguish requests of a specific type */
+	__le64 data_len: 32; /* Length of the following data, in bytes */
+};
+
+/* Page bitmap header structure */
+struct virtio_balloon_bmap_hdr {
+	struct {
+		__le64 start_pfn : 52; /* start pfn for the bitmap */
+		__le64 page_shift : 6; /* page shift width, in bytes */
+		__le64 bmap_len : 6;  /* bitmap length, in bytes */
+	} head;
+	__le64 bmap[0];
+};
 
 #endif /* _LINUX_VIRTIO_BALLOON_H */
