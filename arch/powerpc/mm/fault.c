@@ -392,8 +392,15 @@ good_area:
 	if (is_exec) {
 		/*
 		 * An execution fault + no execute ?
+		 * We need to check for CPU_FTR_COHERENT_ICACHE, since
+		 * on some variants, an NX fault is taken and
+		 * hash_page_do_lazy_icache() does the fixup. Without the
+		 * check for CPU_FTR_COHERENT_ICACHE we could have a false
+		 * positive if we have !CPU_FTR_COHERENT_ICACHE and
+		 * CPU_FTR_NOEXECUTE
 		 */
-		if (regs->msr & SRR1_ISI_N_OR_G)
+		if (cpu_has_feature(CPU_FTR_COHERENT_ICACHE) &&
+			(regs->msr & SRR1_ISI_N_OR_G))
 			goto bad_area;
 
 		/*
