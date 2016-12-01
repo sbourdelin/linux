@@ -380,7 +380,7 @@ struct octeon_hcd {
 #define CVMX_WAIT_FOR_FIELD32(address, _union, cond, timeout_usec)	    \
 	({int result;							    \
 	do {								    \
-		u64 done = cvmx_get_cycle() + (u64)timeout_usec *	    \
+		u64 done = cvmx_get_cycle() + (u64)(timeout_usec) *	    \
 			   octeon_get_clock_rate() / 1000000;		    \
 		union _union c;						    \
 									    \

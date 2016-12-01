@@ -51,10 +51,10 @@
 
 #define CVMX_USBCXBASE 0x00016F0010000000ull
 #define CVMX_USBCXREG1(reg, bid) \
-	(CVMX_ADD_IO_SEG(CVMX_USBCXBASE | reg) + \
+	(CVMX_ADD_IO_SEG(CVMX_USBCXBASE | (reg)) + \
 	 ((bid) & 1) * 0x100000000000ull)
 #define CVMX_USBCXREG2(reg, bid, off) \
-	(CVMX_ADD_IO_SEG(CVMX_USBCXBASE | reg) + \
+	(CVMX_ADD_IO_SEG(CVMX_USBCXBASE | (reg)) + \
 	 (((off) & 7) + ((bid) & 1) * 0x8000000000ull) * 32)
 
 #define CVMX_USBCX_GAHBCFG(bid)		CVMX_USBCXREG1(0x008, bid)
@@ -86,9 +86,9 @@
 #define CVMX_USBNXBID2(bid) (((bid) & 1) * 0x100000000000ull)
 
 #define CVMX_USBNXREG1(reg, bid) \
-	(CVMX_ADD_IO_SEG(0x0001180068000000ull | reg) + CVMX_USBNXBID1(bid))
+	(CVMX_ADD_IO_SEG(0x0001180068000000ull | (reg)) + CVMX_USBNXBID1(bid))
 #define CVMX_USBNXREG2(reg, bid) \
-	(CVMX_ADD_IO_SEG(0x00016F0000000000ull | reg) + CVMX_USBNXBID2(bid))
+	(CVMX_ADD_IO_SEG(0x00016F0000000000ull | (reg)) + CVMX_USBNXBID2(bid))
 
 #define CVMX_USBNX_CLK_CTL(bid)		CVMX_USBNXREG1(0x10, bid)
 #define CVMX_USBNX_DMA0_INB_CHN0(bid)	CVMX_USBNXREG2(0x818, bid)
