@@ -177,9 +177,14 @@ kvmppc_interrupt_pr:
 	 * R13             = PACA
 	 * HSTATE.SCRATCH0 = guest R12
 	 * HSTATE.SCRATCH1 = guest R9
+	 * HSTATE.SCRATCH2 = guest CTR if RELOCATABLE
 	 */
 #ifdef CONFIG_PPC64
 	/* Match 32-bit entry */
+#ifdef CONFIG_RELOCATABLE
+	ld	r9,HSTATE_SCRATCH2(r13)
+	mtctr	r9
+#endif
 	ld	r9,HSTATE_SCRATCH1(r13)
 	stw	r12,HSTATE_SCRATCH1(r13) /* CR is in the low half of r12 */
 	srdi	r12, r12, 32		 /* trap is in the high half of r12 */

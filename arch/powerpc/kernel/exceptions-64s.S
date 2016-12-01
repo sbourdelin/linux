@@ -137,7 +137,7 @@ EXC_COMMON_BEGIN(system_reset_idle_common)
 	lbz	r0,HSTATE_HWTHREAD_REQ(r13)
 	cmpwi	r0,0
 	beq	1f
-	b	kvm_start_guest
+	BRANCH_TO_KVM(r10, kvm_start_guest)
 1:
 #endif
 
@@ -972,7 +972,7 @@ TRAMP_REAL_BEGIN(hmi_exception_early)
 	EXCEPTION_PROLOG_COMMON_2(PACA_EXGEN)
 	EXCEPTION_PROLOG_COMMON_3(0xe60)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-	bl	hmi_exception_realmode
+	BRANCH_LINK_TO_KVM(r4, hmi_exception_realmode)
 	/* Windup the stack. */
 	/* Move original HSRR0 and HSRR1 into the respective regs */
 	ld	r9,_MSR(r1)

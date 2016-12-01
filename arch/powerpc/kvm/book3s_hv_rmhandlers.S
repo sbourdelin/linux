@@ -1047,8 +1047,14 @@ kvmppc_interrupt_hv:
 	 * R13		= PACA
 	 * R9		= unused
 	 * guest R12, R9 saved in shadow VCPU SCRATCH0/1 respectively
+	 * guest CTR saved in shadow VCPU SCRATCH2 if RELOCATABLE
 	 * guest R13 saved in SPRN_SCRATCH0
 	 */
+#ifdef CONFIG_RELOCATABLE
+	ld	r9, HSTATE_SCRATCH2(r13)
+	mtctr	r9
+#endif
+
 	lbz	r9, HSTATE_IN_GUEST(r13)
 	cmpwi	r9, KVM_GUEST_MODE_HOST_HV
 	beq	kvmppc_bad_host_intr
