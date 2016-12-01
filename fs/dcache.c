@@ -1327,12 +1327,8 @@ int d_set_mounted(struct dentry *dentry)
 	write_seqlock(&rename_lock);
 	for (p = dentry->d_parent; !IS_ROOT(p); p = p->d_parent) {
 		/* Need exclusion wrt. d_invalidate() */
-		spin_lock(&p->d_lock);
-		if (unlikely(d_unhashed(p))) {
-			spin_unlock(&p->d_lock);
+		if (unlikely(d_unhashed(p)))
 			goto out;
-		}
-		spin_unlock(&p->d_lock);
 	}
 	spin_lock(&dentry->d_lock);
 	if (!d_unlinked(dentry)) {
@@ -1510,12 +1506,8 @@ void d_invalidate(struct dentry *dentry)
 	/*
 	 * If it's already been dropped, return OK.
 	 */
-	spin_lock(&dentry->d_lock);
-	if (d_unhashed(dentry)) {
-		spin_unlock(&dentry->d_lock);
+	if (d_unhashed(dentry))
 		return;
-	}
-	spin_unlock(&dentry->d_lock);
 
 	/* Negative dentries can be dropped without further checks */
 	if (!dentry->d_inode) {
