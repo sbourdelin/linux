@@ -37,7 +37,9 @@
 #include <linux/mutex.h>
 #include <linux/acpi.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/gpio/consumer.h>
+#include <linux/regulator/consumer.h>
 
 #include <linux/i2c/i2c-hid.h>
 
@@ -918,10 +920,25 @@ static inline int i2c_hid_acpi_pdata(struct i2c_client *client,
 #endif
 
 #ifdef CONFIG_OF
+
+/* of_device_id match data */
+struct i2c_hid_of_data {
+	/* Name of supply regulator. */
+	const char *supply_name;
+	/* Delay required after powering on device before it is usable. */
+	int init_delay_ms;
+};
+
+static const struct i2c_hid_of_data wacom_w9013_data = {
+	.supply_name		= "vdd",
+	.init_delay_ms		= 100,
+};
+
 static int i2c_hid_of_probe(struct i2c_client *client,
 		struct i2c_hid_platform_data *pdata)
 {
 	struct device *dev = &client->dev;
+	const struct i2c_hid_of_data *data = of_device_get_match_data(dev);
 	u32 val;
 	int ret;
 
@@ -937,10 +954,33 @@ static int i2c_hid_of_probe(struct i2c_client *client,
 	}
 	pdata->hid_descriptor_address = val;
 
+	if (data) {
+		pdata->init_delay_ms = data->init_delay_ms;
+		if (data->supply_name) {
+			pdata->supply = devm_regulator_get_optional(&client->dev,
+								    data->supply_name);
+			if (IS_ERR(pdata->supply)) {
+				ret = PTR_ERR(pdata->supply);
+				pdata->supply = NULL;
+				if (ret == -EPROBE_DEFER)
+					return ret;
+				if (ret == -ENODEV)
+					return 0;
+				dev_err(dev, "Failed to get %s regulator: %d\n",
+					data->supply_name, ret);
+				return ret;
+			}
+		}
+	}
+
 	return 0;
 }
 
 static const struct of_device_id i2c_hid_of_match[] = {
+	{
+		.compatible = "wacom,w9013",
+		.data = &wacom_w9013_data,
+	},
 	{ .compatible = "hid-over-i2c" },
 	{},
 };
@@ -981,6 +1021,17 @@ static int i2c_hid_probe(struct i2c_client *client,
 		}
 	} else {
 		ihid->pdata = *platform_data;
+	}
+
+	if (ihid->pdata.supply) {
+		ret = regulator_enable(ihid->pdata.supply);
+		if (ret < 0) {
+			dev_err(&client->dev, "Failed to enable regulator: %d\n",
+				ret);
+			return ret;
+		}
+		if (ihid->pdata.init_delay_ms)
+			msleep(ihid->pdata.init_delay_ms);
 	}
 
 	if (client->irq > 0) {
@@ -1100,6 +1151,9 @@ static int i2c_hid_remove(struct i2c_client *client)
 	if (ihid->desc)
 		gpiod_put(ihid->desc);
 
+	if (ihid->pdata.supply)
+		regulator_disable(ihid->pdata.supply);
+
 	kfree(ihid);
 
 	acpi_dev_remove_driver_gpios(ACPI_COMPANION(&client->dev));
@@ -1152,6 +1206,11 @@ static int i2c_hid_suspend(struct device *dev)
 		else
 			hid_warn(hid, "Failed to enable irq wake: %d\n",
 				wake_status);
+	} else if (ihid->pdata.supply) {
+		ret = regulator_disable(ihid->pdata.supply);
+		if (ret < 0)
+			hid_warn(hid, "Failed to disable supply: %d\n",
+				 ret);
 	}
 
 	return 0;
@@ -1165,7 +1224,16 @@ static int i2c_hid_resume(struct device *dev)
 	struct hid_device *hid = ihid->hid;
 	int wake_status;
 
-	if (device_may_wakeup(&client->dev) && ihid->irq_wake_enabled) {
+	if (!device_may_wakeup(&client->dev)) {
+		if (ihid->pdata.supply) {
+			ret = regulator_enable(ihid->pdata.supply);
+			if (ret < 0)
+				hid_warn(hid, "Failed to enable supply: %d\n",
+					 ret);
+			if (ihid->pdata.init_delay_ms)
+				msleep(ihid->pdata.init_delay_ms);
+		}
+	} else if (ihid->irq_wake_enabled) {
 		wake_status = disable_irq_wake(ihid->irq);
 		if (!wake_status)
 			ihid->irq_wake_enabled = false;
