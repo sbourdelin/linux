@@ -1286,6 +1286,7 @@ static void teardown_hyp_mode(void)
 
 static int init_vhe_mode(void)
 {
+	on_each_cpu(kvm_timer_init_vhe, NULL, 1);
 	kvm_info("VHE mode initialized successfully\n");
 	return 0;
 }
