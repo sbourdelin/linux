@@ -24,6 +24,7 @@
 #include <linux/firmware.h>
 #include <linux/circ_buf.h>
 #include <linux/debugfs.h>
+#include <linux/drmfs.h>
 #include <linux/relay.h>
 #include "i915_drv.h"
 #include "intel_guc.h"
@@ -923,7 +924,7 @@ static int subbuf_start_callback(struct rchan_buf *buf,
 }
 
 /*
- * file_create() callback. Creates relay file in debugfs.
+ * file_create() callback. Creates relay file.
  */
 static struct dentry *create_buf_file_callback(const char *filename,
 					       struct dentry *parent,
@@ -949,17 +950,26 @@ static struct dentry *create_buf_file_callback(const char *filename,
 	 * dentry of the file associated with the channel buffer and that file's
 	 * name need not be same as the filename passed as an argument.
 	 */
+#if defined(CONFIG_DRMFS)
+	buf_file = drmfs_create_file("guc_log", mode,
+				       parent, buf, &relay_file_operations);
+#else
 	buf_file = debugfs_create_file("guc_log", mode,
 				       parent, buf, &relay_file_operations);
+#endif
 	return buf_file;
 }
 
 /*
- * file_remove() default callback. Removes relay file in debugfs.
+ * file_remove() default callback. Removes relay file.
  */
 static int remove_buf_file_callback(struct dentry *dentry)
 {
+#if defined(CONFIG_DRMFS)
+	drmfs_remove(dentry);
+#else
 	debugfs_remove(dentry);
+#endif
 	return 0;
 }
 
@@ -1009,6 +1019,10 @@ static int guc_log_create_relay_file(struct intel_guc *guc)
 	struct dentry *log_dir;
 	int ret;
 
+#if defined(CONFIG_DRMFS)
+	/* Create the log file in drmfs dir: /sys/kernel/drm/i915/ */
+	log_dir = dev_priv->drm.driver->drmfs_root;
+#else
 	/* For now create the log file in /sys/kernel/debug/dri/0 dir */
 	log_dir = dev_priv->drm.primary->debugfs_root;
 
@@ -1021,10 +1035,12 @@ static int guc_log_create_relay_file(struct intel_guc *guc)
 	 *      relay channel.
 	 * ii)  Should be able to use 'relay_file_operations' fops for the file.
 	 * iii) Set the 'i_private' field of file's inode to the pointer of
-	 *	relay channel buffer.
+	 *      relay channel buffer.
 	 */
+#endif
+
 	if (!log_dir) {
-		DRM_ERROR("Debugfs dir not available yet for GuC log file\n");
+		DRM_ERROR("Root dir not available yet for GuC log file\n");
 		return -ENODEV;
 	}
 
@@ -1265,7 +1281,7 @@ static int guc_log_create_extras(struct intel_guc *guc)
 	if (!guc->log.relay_chan) {
 		/* Create a relay channel, so that we have buffers for storing
 		 * the GuC firmware logs, the channel will be linked with a file
-		 * later on when debugfs is registered.
+		 * later on when debugfs/drmfs is registered.
 		 */
 		ret = guc_log_create_relay_channel(guc);
 		if (ret)
