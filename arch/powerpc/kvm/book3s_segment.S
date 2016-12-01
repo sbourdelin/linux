@@ -167,20 +167,33 @@ kvmppc_handler_trampoline_enter_end:
  *                                                                            *
  *****************************************************************************/
 
-.global kvmppc_handler_trampoline_exit
-kvmppc_handler_trampoline_exit:
-
 .global kvmppc_interrupt_pr
 kvmppc_interrupt_pr:
+	/* 64-bit entry. Register usage at this point:
+	 *
+	 * SPRG_SCRATCH0   = guest R13
+	 * R9              = unused
+	 * R12             = (exit handler id << 32) | guest CR
+	 * R13             = PACA
+	 * HSTATE.SCRATCH0 = guest R12
+	 * HSTATE.SCRATCH1 = guest R9
+	 */
+#ifdef CONFIG_PPC64
+	/* Match 32-bit entry */
+	ld	r9,HSTATE_SCRATCH1(r13)
+	stw	r12,HSTATE_SCRATCH1(r13) /* CR is in the low half of r12 */
+	srdi	r12, r12, 32		 /* trap is in the high half of r12 */
+#endif
 
+.global kvmppc_handler_trampoline_exit
+kvmppc_handler_trampoline_exit:
 	/* Register usage at this point:
 	 *
-	 * SPRG_SCRATCH0  = guest R13
-	 * R12            = exit handler id
-	 * R13            = shadow vcpu (32-bit) or PACA (64-bit)
+	 * SPRG_SCRATCH0   = guest R13
+	 * R12             = exit handler id
+	 * R13             = shadow vcpu (32-bit) or PACA (64-bit)
 	 * HSTATE.SCRATCH0 = guest R12
 	 * HSTATE.SCRATCH1 = guest CR
-	 *
 	 */
 
 	/* Save registers */
