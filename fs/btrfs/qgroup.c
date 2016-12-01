@@ -2635,6 +2635,7 @@ static int __btrfs_qgroup_release_data(struct inode *inode, u64 start, u64 len,
 	}
 	trace_btrfs_qgroup_release_data(inode, start, len,
 					changeset.bytes_changed, trace_op);
+	ret = changeset.bytes_changed;
 out:
 	ulist_free(changeset.range_changed);
 	return ret;
