@@ -298,6 +298,9 @@ int hv_ringbuffer_write(struct vmbus_channel *channel,
 	unsigned long flags = 0;
 	struct hv_ring_buffer_info *outring_info = &channel->outbound;
 
+	if (channel->rescind)
+		return -ENODEV;
+
 	for (i = 0; i < kv_count; i++)
 		totalbytes_towrite += kv_list[i].iov_len;
 
