@@ -312,9 +312,11 @@ static irqreturn_t arche_platform_wd_irq(int irq, void *devid)
 		if (arche_pdata->wake_detect_state == WD_STATE_IDLE) {
 			arche_pdata->wake_detect_start = jiffies;
 			/*
-			 * In the begining, when wake/detect goes low (first time), we assume
-			 * it is meant for coldboot and set the flag. If wake/detect line stays low
-			 * beyond 30msec, then it is coldboot else fallback to standby boot.
+			 * In the beginning, when wake/detect goes low (first
+			 * time), we assume it is meant for coldboot and set
+			 * the flag. If wake/detect line stays low beyond
+			 * 30msec, then it is coldboot else fallback to 
+			 * standby boot.
 			 */
 			arche_platform_set_wake_detect_state(arche_pdata,
 							     WD_STATE_BOOT_INIT);
@@ -561,7 +563,8 @@ static int arche_platform_probe(struct platform_device *pdev)
 	struct device_node *np = dev->of_node;
 	int ret;
 
-	arche_pdata = devm_kzalloc(&pdev->dev, sizeof(*arche_pdata), GFP_KERNEL);
+	arche_pdata = devm_kzalloc(&pdev->dev, sizeof(*arche_pdata),
+				  GFP_KERNEL);
 	if (!arche_pdata)
 		return -ENOMEM;
 
@@ -780,12 +783,18 @@ static SIMPLE_DEV_PM_OPS(arche_platform_pm_ops,
 			arche_platform_resume);
 
 static const struct of_device_id arche_platform_of_match[] = {
-	{ .compatible = "google,arche-platform", }, /* Use PID/VID of SVC device */
+	{
+		 /* Use PID/VID of SVC device */
+		.compatible = "google,arche-platform",
+	},
 	{ },
 };
 
 static const struct of_device_id arche_combined_id[] = {
-	{ .compatible = "google,arche-platform", }, /* Use PID/VID of SVC device */
+	{
+		/* Use PID/VID of SVC device */
+		.compatible = "google,arche-platform",
+	},
 	{ .compatible = "usbffff,2", },
 	{ },
 };
