@@ -29,6 +29,9 @@
 #include <linux/mmzone.h>
 #include <linux/writeback.h>
 #include <linux/page-flags.h>
+#include <linux/vmalloc.h>
+#include <linux/slab.h>
+#include <linux/mm.h>
 
 struct mem_cgroup;
 struct page;
@@ -877,5 +880,18 @@ static inline void memcg_kmem_update_page_stat(struct page *page,
 {
 }
 #endif /* CONFIG_MEMCG && !CONFIG_SLOB */
+
+static inline void memcg_free(const void *ptr)
+{
+	is_vmalloc_addr(ptr) ? vfree(ptr) : kfree(ptr);
+}
+
+static inline void *memcg_alloc(size_t size)
+{
+	if (likely(size <= (PAGE_SIZE << PAGE_ALLOC_COSTLY_ORDER)))
+		return kzalloc(size, GFP_KERNEL|__GFP_NORETRY);
+
+	return vzalloc(size);
+}
 
 #endif /* _LINUX_MEMCONTROL_H */

@@ -157,9 +157,8 @@ static int init_memcg_params(struct kmem_cache *s,
 	if (!memcg_nr_cache_ids)
 		return 0;
 
-	arr = kzalloc(sizeof(struct memcg_cache_array) +
-		      memcg_nr_cache_ids * sizeof(void *),
-		      GFP_KERNEL);
+	arr = memcg_alloc(sizeof(struct memcg_cache_array) +
+			memcg_nr_cache_ids * sizeof(void *));
 	if (!arr)
 		return -ENOMEM;
 
@@ -170,7 +169,15 @@ static int init_memcg_params(struct kmem_cache *s,
 static void destroy_memcg_params(struct kmem_cache *s)
 {
 	if (is_root_cache(s))
-		kfree(rcu_access_pointer(s->memcg_params.memcg_caches));
+		memcg_free(rcu_access_pointer(s->memcg_params.memcg_caches));
+}
+
+static void memcg_rcu_free(struct rcu_head *rcu)
+{
+	struct memcg_cache_array *arr;
+
+	arr = container_of(rcu, struct memcg_cache_array, rcu);
+	memcg_free(arr);
 }
 
 static int update_memcg_params(struct kmem_cache *s, int new_array_size)
@@ -180,8 +187,8 @@ static int update_memcg_params(struct kmem_cache *s, int new_array_size)
 	if (!is_root_cache(s))
 		return 0;
 
-	new = kzalloc(sizeof(struct memcg_cache_array) +
-		      new_array_size * sizeof(void *), GFP_KERNEL);
+	new = memcg_alloc(sizeof(struct memcg_cache_array) +
+				new_array_size * sizeof(void *));
 	if (!new)
 		return -ENOMEM;
 
@@ -193,7 +200,7 @@ static int update_memcg_params(struct kmem_cache *s, int new_array_size)
 
 	rcu_assign_pointer(s->memcg_params.memcg_caches, new);
 	if (old)
-		kfree_rcu(old, rcu);
+		call_rcu(&old->rcu, memcg_rcu_free);
 	return 0;
 }
 

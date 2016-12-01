@@ -327,12 +327,12 @@ static int memcg_init_list_lru_node(struct list_lru_node *nlru)
 {
 	int size = memcg_nr_cache_ids;
 
-	nlru->memcg_lrus = kmalloc(size * sizeof(void *), GFP_KERNEL);
-	if (!nlru->memcg_lrus)
+	nlru->memcg_lrus = memcg_alloc(size * sizeof(void *));
+	if (nlru->memcg_lrus == NULL)
 		return -ENOMEM;
 
 	if (__memcg_init_list_lru_node(nlru->memcg_lrus, 0, size)) {
-		kfree(nlru->memcg_lrus);
+		memcg_free(nlru->memcg_lrus);
 		return -ENOMEM;
 	}
 
@@ -342,7 +342,7 @@ static int memcg_init_list_lru_node(struct list_lru_node *nlru)
 static void memcg_destroy_list_lru_node(struct list_lru_node *nlru)
 {
 	__memcg_destroy_list_lru_node(nlru->memcg_lrus, 0, memcg_nr_cache_ids);
-	kfree(nlru->memcg_lrus);
+	memcg_free(nlru->memcg_lrus);
 }
 
 static int memcg_update_list_lru_node(struct list_lru_node *nlru,
@@ -353,12 +353,12 @@ static int memcg_update_list_lru_node(struct list_lru_node *nlru,
 	BUG_ON(old_size > new_size);
 
 	old = nlru->memcg_lrus;
-	new = kmalloc(new_size * sizeof(void *), GFP_KERNEL);
+	new = memcg_alloc(new_size * sizeof(void *));
 	if (!new)
 		return -ENOMEM;
 
 	if (__memcg_init_list_lru_node(new, old_size, new_size)) {
-		kfree(new);
+		memcg_free(new);
 		return -ENOMEM;
 	}
 
@@ -375,7 +375,7 @@ static int memcg_update_list_lru_node(struct list_lru_node *nlru,
 	nlru->memcg_lrus = new;
 	spin_unlock_irq(&nlru->lock);
 
-	kfree(old);
+	memcg_free(old);
 	return 0;
 }
 
