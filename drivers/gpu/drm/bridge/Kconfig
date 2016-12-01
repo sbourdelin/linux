@@ -39,6 +39,15 @@ config DRM_DW_HDMI_AHB_AUDIO
 	  Designware HDMI block.  This is used in conjunction with
 	  the i.MX6 HDMI driver.
 
+config DRM_DW_HDMI_I2S_AUDIO
+	tristate "Synopsis Designware I2S Audio interface"
+	depends on SND_SOC
+	depends on DRM_DW_HDMI
+	select SND_SOC_HDMI_CODEC
+	help
+	  Support the I2S Audio interface which is part of the Synopsis
+	  Designware HDMI block.
+
 config DRM_NXP_PTN3460
 	tristate "NXP PTN3460 DP/LVDS bridge"
 	depends on OF
@@ -56,6 +65,13 @@ config DRM_PARADE_PS8622
 	select BACKLIGHT_CLASS_DEVICE
 	---help---
 	  Parade eDP-LVDS bridge chip driver.
+
+config DRM_SIL_SII8620
+	tristate "Silicon Image SII8620 HDMI/MHL bridge"
+	depends on OF
+	select DRM_KMS_HELPER
+	help
+	  Silicon Image SII8620 HDMI/MHL bridge chip driver.
 
 config DRM_SII902X
 	tristate "Silicon Image sii902x RGB/HDMI bridge"
