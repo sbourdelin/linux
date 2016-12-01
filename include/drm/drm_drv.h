@@ -405,6 +405,9 @@ struct drm_driver {
 
 	/* List of devices hanging off this driver with stealth attach. */
 	struct list_head legacy_dev_list;
+
+	/* drmfs parent directory dentry for this driver */
+	struct dentry *drmfs_root;
 };
 
 extern __printf(6, 7)

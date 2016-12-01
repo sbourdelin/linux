@@ -672,6 +672,14 @@ int drm_dev_register(struct drm_device *dev, unsigned long flags)
 {
 	int ret;
 
+#ifdef CONFIG_DRMFS
+	dev->driver->drmfs_root = drmfs_create_dir(dev->driver->name, NULL);
+	if (IS_ERR(dev->driver->drmfs_root)) {
+		DRM_ERROR("Failed to get drmfs root dentry\n");
+		return PTR_ERR(dev->driver->drmfs_root);
+	}
+#endif
+
 	mutex_lock(&drm_global_mutex);
 
 	ret = drm_minor_register(dev, DRM_MINOR_CONTROL);
@@ -742,6 +750,9 @@ void drm_dev_unregister(struct drm_device *dev)
 	drm_minor_unregister(dev, DRM_MINOR_PRIMARY);
 	drm_minor_unregister(dev, DRM_MINOR_RENDER);
 	drm_minor_unregister(dev, DRM_MINOR_CONTROL);
+#ifdef CONFIG_DRMFS
+	drmfs_remove(dev->driver->drmfs_root);
+#endif
 }
 EXPORT_SYMBOL(drm_dev_unregister);
 
@@ -829,6 +840,9 @@ static void drm_core_exit(void)
 {
 	unregister_chrdev(DRM_MAJOR, "drm");
 	debugfs_remove(drm_debugfs_root);
+#ifdef CONFIG_DRMFS
+	drmfs_fini();
+#endif
 	drm_sysfs_destroy();
 	idr_destroy(&drm_minors_idr);
 	drm_connector_ida_destroy();
@@ -848,6 +862,14 @@ static int __init drm_core_init(void)
 		DRM_ERROR("Cannot create DRM class: %d\n", ret);
 		goto error;
 	}
+
+#ifdef CONFIG_DRMFS
+	ret = drmfs_init();
+	if (ret < 0) {
+		DRM_ERROR("Cannot create DRM FS: %d\n", ret);
+		goto error;
+	}
+#endif
 
 	drm_debugfs_root = debugfs_create_dir("dri", NULL);
 	if (!drm_debugfs_root) {
