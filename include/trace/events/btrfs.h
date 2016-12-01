@@ -259,6 +259,7 @@ DECLARE_EVENT_CLASS(btrfs__ordered_extent,
 		__field(	int,  compress_type	)
 		__field(	int,  refs		)
 		__field(	u64,  root_objectid	)
+		__field(	u64,  truncated_len	)
 	),
 
 	TP_fast_assign_btrfs(btrfs_sb(inode->i_sb),
@@ -273,10 +274,12 @@ DECLARE_EVENT_CLASS(btrfs__ordered_extent,
 		__entry->refs		= atomic_read(&ordered->refs);
 		__entry->root_objectid	=
 				BTRFS_I(inode)->root->root_key.objectid;
+		__entry->truncated_len	= ordered->truncated_len;
 	),
 
 	TP_printk_btrfs("root = %llu(%s), ino = %llu, file_offset = %llu, "
 		  "start = %llu, len = %llu, disk_len = %llu, "
+		  "truncated_len = %llu, "
 		  "bytes_left = %llu, flags = %s, compress_type = %d, "
 		  "refs = %d",
 		  show_root_type(__entry->root_objectid),
@@ -285,6 +288,7 @@ DECLARE_EVENT_CLASS(btrfs__ordered_extent,
 		  (unsigned long long)__entry->start,
 		  (unsigned long long)__entry->len,
 		  (unsigned long long)__entry->disk_len,
+		  (unsigned long long)__entry->truncated_len,
 		  (unsigned long long)__entry->bytes_left,
 		  show_ordered_flags(__entry->flags),
 		  __entry->compress_type, __entry->refs)
