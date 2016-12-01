@@ -15,6 +15,5 @@ mc-bus-driver-objs := fsl-mc-bus.o \
 		      dprc-driver.o \
 		      fsl-mc-allocator.o \
 		      fsl-mc-msi.o \
-		      irq-gic-v3-its-fsl-mc-msi.o \
 		      dpmcp.o \
 		      dpbp.o

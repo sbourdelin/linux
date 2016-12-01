@@ -10,8 +10,8 @@
 #ifndef _FSL_MC_PRIVATE_H_
 #define _FSL_MC_PRIVATE_H_
 
-#include "../include/mc.h"
-#include "../include/mc-bus.h"
+#include <linux/fsl/mc.h>
+#include <linux/fsl/mc-bus.h>
 
 int __must_check fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
 				   struct fsl_mc_io *mc_io,

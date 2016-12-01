@@ -16,7 +16,7 @@
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
 #include <linux/msi.h>
-#include "../include/mc-bus.h"
+#include <linux/fsl/mc-bus.h>
 
 /*
  * Generate a unique ID identifying the interrupt (only used within the MSI
