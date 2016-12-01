@@ -1,0 +1,561 @@
+/*
+ * Copyright © 2014 Intel Corporation
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *
+ * Authors:
+ *	Swati Dhingra <swati.dhingra@intel.com>
+ *	Sourab Gupta <sourab.gupta@intel.com>
+ *	Akash Goel <akash.goel@intel.com>
+ */
+
+/*
+ * drmfs is the filesystem used for output of drm subsystem data
+ */
+
+#include <linux/module.h>
+#include <linux/fs.h>
+#include <linux/mount.h>
+#include <linux/kobject.h>
+#include <linux/namei.h>
+#include <linux/drmfs.h>
+#include <linux/fsnotify.h>
+#include <linux/seq_file.h>
+#include <linux/parser.h>
+#include <linux/magic.h>
+#include <linux/slab.h>
+
+#define DRMFS_DEFAULT_MODE	0700
+
+static struct vfsmount *drmfs_mount;
+static int drmfs_mount_count;
+static bool drmfs_registered;
+
+static ssize_t default_read_file(struct file *file, char __user *buf,
+				size_t count, loff_t *ppos)
+{
+	return 0;
+}
+
+static ssize_t default_write_file(struct file *file, const char __user *buf,
+				size_t count, loff_t *ppos)
+{
+	return count;
+}
+
+static const struct file_operations drmfs_default_file_operations = {
+	.read =		default_read_file,
+	.write =	default_write_file,
+	.open =		simple_open,
+	.llseek =	noop_llseek,
+};
+
+static struct inode *drmfs_get_inode(struct super_block *sb)
+{
+	struct inode *inode = new_inode(sb);
+
+	if (inode) {
+		inode->i_ino = get_next_ino();
+		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+	}
+	return inode;
+}
+
+struct drmfs_mount_opts {
+	kuid_t uid;
+	kgid_t gid;
+	umode_t mode;
+};
+
+enum {
+	Opt_uid,
+	Opt_gid,
+	Opt_mode,
+	Opt_err
+};
+
+static const match_table_t tokens = {
+	{Opt_uid, "uid=%u"},
+	{Opt_gid, "gid=%u"},
+	{Opt_mode, "mode=%o"},
+	{Opt_err, NULL}
+};
+
+struct drmfs_fs_info {
+	struct drmfs_mount_opts mount_opts;
+};
+
+static int drmfs_parse_options(char *data, struct drmfs_mount_opts *opts)
+{
+	substring_t args[MAX_OPT_ARGS];
+	int option;
+	int token;
+	kuid_t uid;
+	kgid_t gid;
+	char *p;
+
+	opts->mode = DRMFS_DEFAULT_MODE;
+
+	while ((p = strsep(&data, ",")) != NULL) {
+		if (!*p)
+			continue;
+
+		token = match_token(p, tokens, args);
+		switch (token) {
+		case Opt_uid:
+			if (match_int(&args[0], &option))
+				return -EINVAL;
+			uid = make_kuid(current_user_ns(), option);
+			if (!uid_valid(uid))
+				return -EINVAL;
+			opts->uid = uid;
+			break;
+		case Opt_gid:
+			if (match_int(&args[0], &option))
+				return -EINVAL;
+			gid = make_kgid(current_user_ns(), option);
+			if (!gid_valid(gid))
+				return -EINVAL;
+			opts->gid = gid;
+			break;
+		case Opt_mode:
+			if (match_octal(&args[0], &option))
+				return -EINVAL;
+			opts->mode = option & S_IALLUGO;
+			break;
+		/*
+		 * We might like to report bad mount options here
+		 */
+		}
+	}
+
+	return 0;
+}
+
+static int drmfs_apply_options(struct super_block *sb)
+{
+	struct drmfs_fs_info *fsi = sb->s_fs_info;
+	struct inode *inode = sb->s_root->d_inode;
+	struct drmfs_mount_opts *opts = &fsi->mount_opts;
+
+	inode->i_mode &= ~S_IALLUGO;
+	inode->i_mode |= opts->mode;
+
+	inode->i_uid = opts->uid;
+	inode->i_gid = opts->gid;
+
+	return 0;
+}
+
+static int drmfs_remount(struct super_block *sb, int *flags, char *data)
+{
+	int err;
+	struct drmfs_fs_info *fsi = sb->s_fs_info;
+
+	sync_filesystem(sb);
+	err = drmfs_parse_options(data, &fsi->mount_opts);
+	if (err)
+		goto fail;
+
+	drmfs_apply_options(sb);
+
+fail:
+	return err;
+}
+
+static int drmfs_show_options(struct seq_file *m, struct dentry *root)
+{
+	struct drmfs_fs_info *fsi = root->d_sb->s_fs_info;
+	struct drmfs_mount_opts *opts = &fsi->mount_opts;
+
+	if (!uid_eq(opts->uid, GLOBAL_ROOT_UID))
+		seq_printf(m, ",uid=%u",
+			   from_kuid_munged(&init_user_ns, opts->uid));
+	if (!gid_eq(opts->gid, GLOBAL_ROOT_GID))
+		seq_printf(m, ",gid=%u",
+			   from_kgid_munged(&init_user_ns, opts->gid));
+	if (opts->mode != DRMFS_DEFAULT_MODE)
+		seq_printf(m, ",mode=%o", opts->mode);
+
+	return 0;
+}
+
+static const struct super_operations drmfs_super_operations = {
+	.statfs		= simple_statfs,
+	.remount_fs	= drmfs_remount,
+	.show_options	= drmfs_show_options,
+};
+
+static int drm_fill_super(struct super_block *sb, void *data, int silent)
+{
+	static struct tree_descr drm_files[] = { {""} };
+	struct drmfs_fs_info *fsi;
+	int err;
+
+	save_mount_options(sb, data);
+
+	fsi = kzalloc(sizeof(struct drmfs_fs_info), GFP_KERNEL);
+	sb->s_fs_info = fsi;
+	if (!fsi) {
+		err = -ENOMEM;
+		goto fail;
+	}
+
+	err = drmfs_parse_options(data, &fsi->mount_opts);
+	if (err)
+		goto fail;
+
+	err  =  simple_fill_super(sb, DRMFS_MAGIC, drm_files);
+	if (err)
+		goto fail;
+
+	sb->s_op = &drmfs_super_operations;
+
+	drmfs_apply_options(sb);
+
+	return 0;
+
+fail:
+	kfree(fsi);
+	sb->s_fs_info = NULL;
+	return err;
+}
+
+static struct dentry *drm_mount(struct file_system_type *fs_type,
+			int flags, const char *dev_name,
+			void *data)
+{
+	return mount_single(fs_type, flags, data, drm_fill_super);
+}
+
+static struct file_system_type drm_fs_type = {
+	.owner =	THIS_MODULE,
+	.name =		"drmfs",
+	.mount =	drm_mount,
+	.kill_sb =	kill_litter_super,
+};
+MODULE_ALIAS_FS("drmfs");
+
+static struct dentry *start_creating(const char *name, struct dentry *parent)
+{
+	struct dentry *dentry;
+	int error;
+
+	pr_debug("drmfs: creating file '%s'\n", name);
+
+	error = simple_pin_fs(&drm_fs_type, &drmfs_mount,
+			      &drmfs_mount_count);
+	if (error)
+		return ERR_PTR(error);
+
+	/* If the parent is not specified, we create it in the root.
+	 * We need the root dentry to do this, which is in the super
+	 * block. A pointer to that is in the struct vfsmount that we
+	 * have around.
+	 */
+	if (!parent)
+		parent = drmfs_mount->mnt_root;
+
+	inode_lock(parent->d_inode);
+	dentry = lookup_one_len(name, parent, strlen(name));
+	if (!IS_ERR(dentry) && dentry->d_inode) {
+		dput(dentry);
+		dentry = ERR_PTR(-EEXIST);
+	}
+
+	if (IS_ERR(dentry)) {
+		inode_unlock(parent->d_inode);
+		simple_release_fs(&drmfs_mount, &drmfs_mount_count);
+	}
+
+	return dentry;
+}
+
+static struct dentry *failed_creating(struct dentry *dentry)
+{
+	inode_unlock(dentry->d_parent->d_inode);
+	dput(dentry);
+	simple_release_fs(&drmfs_mount, &drmfs_mount_count);
+	return NULL;
+}
+
+static struct dentry *end_creating(struct dentry *dentry)
+{
+	inode_unlock(dentry->d_parent->d_inode);
+	return dentry;
+}
+
+/**
+ * drmfs_create_file - create a file in the drmfs filesystem
+ * @name: a pointer to a string containing the name of the file to create.
+ * @mode: the permission that the file should have.
+ * @parent: a pointer to the parent dentry for this file.  This should be a
+ *          directory dentry if set.  If this parameter is NULL, then the
+ *          file will be created in the root of the drmfs filesystem.
+ * @data: a pointer to something that the caller will want to get to later
+ *        on.  The inode.i_private pointer will point to this value on
+ *        the open() call.
+ * @fops: a pointer to a struct file_operations that should be used for
+ *        this file.
+ *
+ * This is the basic "create a file" function for drmfs.  It allows for a
+ * wide range of flexibility in creating a file, or a directory (if you want
+ * to create a directory, the drmfs_create_dir() function is
+ * recommended to be used instead.)
+ *
+ * This function will return a pointer to a dentry if it succeeds.  This
+ * pointer must be passed to the drmfs_remove() function when the file is
+ * to be removed (no automatic cleanup happens if your module is unloaded,
+ * you are responsible here.)  If an error occurs, %NULL will be returned.
+ *
+ */
+struct dentry *drmfs_create_file(const char *name, umode_t mode,
+				   struct dentry *parent, void *data,
+				   const struct file_operations *fops)
+{
+	struct dentry *dentry;
+	struct inode *inode;
+
+	if (!(mode & S_IFMT))
+		mode |= S_IFREG;
+
+	if (WARN_ON(!S_ISREG(mode)))
+		return NULL;
+
+	dentry = start_creating(name, parent);
+
+	if (IS_ERR(dentry))
+		return NULL;
+
+	inode = drmfs_get_inode(dentry->d_sb);
+	if (unlikely(!inode))
+		return failed_creating(dentry);
+
+	inode->i_mode = mode;
+	inode->i_fop = fops ? fops : &drmfs_default_file_operations;
+	inode->i_private = data;
+	d_instantiate(dentry, inode);
+	fsnotify_create(dentry->d_parent->d_inode, dentry);
+	return end_creating(dentry);
+}
+EXPORT_SYMBOL(drmfs_create_file);
+
+static struct dentry *__create_dir(const char *name, struct dentry *parent,
+				   const struct inode_operations *ops)
+{
+	struct dentry *dentry = start_creating(name, parent);
+	struct inode *inode;
+
+	if (IS_ERR(dentry))
+		return NULL;
+
+	inode = drmfs_get_inode(dentry->d_sb);
+	if (unlikely(!inode))
+		return failed_creating(dentry);
+
+	inode->i_mode = S_IFDIR | S_IRWXU | S_IRUGO | S_IXUGO;
+	inode->i_op = ops;
+	inode->i_fop = &simple_dir_operations;
+
+	/* directory inodes start off with i_nlink == 2 (for "." entry) */
+	inc_nlink(inode);
+	d_instantiate(dentry, inode);
+	inc_nlink(dentry->d_parent->d_inode);
+	fsnotify_mkdir(dentry->d_parent->d_inode, dentry);
+	return end_creating(dentry);
+}
+
+/**
+ * drmfs_create_dir - create a directory in the drmfs filesystem
+ * @name: a pointer to a string containing the name of the directory to
+ *        create.
+ * @parent: a pointer to the parent dentry for this file.  This should be a
+ *          directory dentry if set.  If this parameter is NULL, then the
+ *          directory will be created in the root of the drmfs filesystem.
+ *
+ * This function creates a directory in drmfs with the given name.
+ *
+ * This function will return a pointer to a dentry if it succeeds.  This
+ * pointer must be passed to the drmfs_remove() function when the file is
+ * to be removed. If an error occurs, %NULL will be returned.
+ *
+ */
+struct dentry *drmfs_create_dir(const char *name, struct dentry *parent)
+{
+	return __create_dir(name, parent, &simple_dir_inode_operations);
+}
+EXPORT_SYMBOL(drmfs_create_dir);
+
+static int __drmfs_remove(struct dentry *dentry, struct dentry *parent)
+{
+	int ret = 0;
+
+	if (simple_positive(dentry)) {
+		if (dentry->d_inode) {
+			dget(dentry);
+			switch (dentry->d_inode->i_mode & S_IFMT) {
+			case S_IFDIR:
+				ret = simple_rmdir(parent->d_inode, dentry);
+				break;
+			default:
+				simple_unlink(parent->d_inode, dentry);
+				break;
+			}
+			if (!ret)
+				d_delete(dentry);
+			dput(dentry);
+		}
+	}
+	return ret;
+}
+
+
+/**
+ * drmfs_remove - removes a file or directory from the drmfs filesystem
+ * @dentry: a pointer to a the dentry of the file or directory to be
+ *          removed.
+ *
+ * This function removes a file or directory in drmfs that was previously
+ * created with a call to another drmfs function (like
+ * drmfs_create_file() or variants thereof.)
+ */
+void drmfs_remove(struct dentry *dentry)
+{
+	struct dentry *parent;
+	int ret;
+
+	if (IS_ERR_OR_NULL(dentry))
+		return;
+
+	parent = dentry->d_parent;
+	inode_lock(parent->d_inode);
+	ret = __drmfs_remove(dentry, parent);
+	inode_unlock(parent->d_inode);
+	if (!ret)
+		simple_release_fs(&drmfs_mount, &drmfs_mount_count);
+}
+EXPORT_SYMBOL(drmfs_remove);
+
+/**
+ * drmfs_remove_recursive - recursively removes a directory
+ * @dentry: a pointer to a the dentry of the directory to be removed.
+ *
+ * This function recursively removes a directory tree in drmfs that
+ * was previously created with a call to another drmfs function
+ * (like drmfs_create_file() or variants thereof.)
+ */
+void drmfs_remove_recursive(struct dentry *dentry)
+{
+	struct dentry *child, *parent;
+
+	if (IS_ERR_OR_NULL(dentry))
+		return;
+
+	parent = dentry;
+ down:
+	inode_lock(parent->d_inode);
+ loop:
+	/*
+	 * The parent->d_subdirs is protected by the d_lock. Outside that
+	 * lock, the child can be unlinked and set to be freed which can
+	 * use the d_u.d_child as the rcu head and corrupt this list.
+	 */
+	spin_lock(&parent->d_lock);
+	list_for_each_entry(child, &parent->d_subdirs, d_child) {
+		if (!simple_positive(child))
+			continue;
+
+		/* perhaps simple_empty(child) makes more sense */
+		if (!list_empty(&child->d_subdirs)) {
+			spin_unlock(&parent->d_lock);
+			inode_unlock(parent->d_inode);
+			parent = child;
+			goto down;
+		}
+
+		spin_unlock(&parent->d_lock);
+
+		if (!__drmfs_remove(child, parent))
+			simple_release_fs(&drmfs_mount, &drmfs_mount_count);
+
+		/*
+		 * The parent->d_lock protects against child from unlinking
+		 * from d_subdirs. When releasing the parent->d_lock we can
+		 * no longer trust that the next pointer is valid.
+		 * Restart the loop. We'll skip this one with the
+		 * simple_positive() check.
+		 */
+		goto loop;
+	}
+	spin_unlock(&parent->d_lock);
+
+	inode_unlock(parent->d_inode);
+	child = parent;
+	parent = parent->d_parent;
+	inode_lock(parent->d_inode);
+
+	if (child != dentry)
+		/* go up */
+		goto loop;
+
+	if (!__drmfs_remove(child, parent))
+		simple_release_fs(&drmfs_mount, &drmfs_mount_count);
+	inode_unlock(parent->d_inode);
+}
+EXPORT_SYMBOL(drmfs_remove_recursive);
+
+/**
+ * drmfs_initialized - Tells whether drmfs has been registered
+ */
+bool drmfs_initialized(void)
+{
+	return drmfs_registered;
+}
+EXPORT_SYMBOL(drmfs_initialized);
+
+int drmfs_init(void)
+{
+	int retval;
+
+	retval = sysfs_create_mount_point(kernel_kobj, "drm");
+	if (retval)
+		return -EINVAL;
+
+	retval = register_filesystem(&drm_fs_type);
+	if (!retval)
+		drmfs_registered = true;
+
+	return retval;
+}
+EXPORT_SYMBOL(drmfs_init);
+
+int drmfs_fini(void)
+{
+	int retval;
+
+	retval = unregister_filesystem(&drm_fs_type);
+	if (retval)
+		return retval;
+
+	drmfs_registered = false;
+
+	sysfs_remove_mount_point(kernel_kobj, "drm");
+}
+EXPORT_SYMBOL(drmfs_fini);

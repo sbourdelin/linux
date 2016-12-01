@@ -200,6 +200,15 @@ config HUGETLBFS
 config HUGETLB_PAGE
 	def_bool HUGETLBFS
 
+config DRMFS
+	bool "Drmfs file system support"
+	depends on DRM
+	help
+	  Drmfs is a pseudo file system for drm subsystem output data.
+
+	  drmfs is a filesystem to hold miscellaneous output data from drm
+	  subsystems.
+
 config ARCH_HAS_GIGANTIC_PAGE
 	bool
 
