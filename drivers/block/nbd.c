@@ -930,8 +930,10 @@ static int __init nbd_init(void)
 
 	for (i = 0; i < nbds_max; i++) {
 		struct gendisk *disk = alloc_disk(1 << part_shift);
-		if (!disk)
+		if (!disk) {
+			err = -ENOMEM;
 			goto out;
+		}
 		nbd_dev[i].disk = disk;
 
 		nbd_dev[i].tag_set.ops = &nbd_mq_ops;
@@ -955,7 +957,8 @@ static int __init nbd_init(void)
 		 * These structs are big so we dynamically allocate them.
 		 */
 		disk->queue = blk_mq_init_queue(&nbd_dev[i].tag_set);
-		if (!disk->queue) {
+		if (IS_ERR(disk->queue)) {
+			err = PTR_ERR(disk->queue);
 			blk_mq_free_tag_set(&nbd_dev[i].tag_set);
 			put_disk(disk);
 			goto out;
