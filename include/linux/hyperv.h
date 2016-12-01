@@ -800,7 +800,8 @@ struct vmbus_channel {
 	 * Channel rescind callback. Some channels (the hvsock ones), need to
 	 * register a callback which is invoked in vmbus_onoffer_rescind().
 	 */
-	void (*chn_rescind_callback)(struct vmbus_channel *channel);
+	void (*chn_rescind_callback)(struct vmbus_channel *channel, void *arg);
+	void *rescind_arg;
 
 	/*
 	 * The spinlock to protect the structure. It is being used to protect
@@ -959,8 +960,8 @@ int vmbus_request_offers(void);
 void vmbus_set_sc_create_callback(struct vmbus_channel *primary_channel,
 			void (*sc_cr_cb)(struct vmbus_channel *new_sc));
 
-void vmbus_set_chn_rescind_callback(struct vmbus_channel *channel,
-		void (*chn_rescind_cb)(struct vmbus_channel *));
+void vmbus_set_chn_rescind_callback(struct vmbus_channel *channel, void *arg,
+		void (*chn_rescind_cb)(struct vmbus_channel *, void *));
 
 /*
  * Retrieve the (sub) channel on which to send an outgoing request.

@@ -825,8 +825,10 @@ static void vmbus_onoffer_rescind(struct vmbus_channel_message_header *hdr)
 
 	if (channel->device_obj) {
 		if (channel->chn_rescind_callback) {
-			channel->chn_rescind_callback(channel);
-			goto out;
+			channel->chn_rescind_callback(channel,
+						      channel->rescind_arg);
+			if (is_hvsock_channel(channel))
+				goto out;
 		}
 		/*
 		 * We will have to unregister this device from the
@@ -1215,9 +1217,10 @@ bool vmbus_are_subchannels_present(struct vmbus_channel *primary)
 }
 EXPORT_SYMBOL_GPL(vmbus_are_subchannels_present);
 
-void vmbus_set_chn_rescind_callback(struct vmbus_channel *channel,
-		void (*chn_rescind_cb)(struct vmbus_channel *))
+void vmbus_set_chn_rescind_callback(struct vmbus_channel *channel, void *arg,
+		void (*chn_rescind_cb)(struct vmbus_channel *, void *))
 {
 	channel->chn_rescind_callback = chn_rescind_cb;
+	channel->rescind_arg = arg;
 }
 EXPORT_SYMBOL_GPL(vmbus_set_chn_rescind_callback);
