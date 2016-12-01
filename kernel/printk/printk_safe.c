@@ -52,10 +52,11 @@ struct printk_safe_seq_buf {
 
 static DEFINE_PER_CPU(struct printk_safe_seq_buf, safe_print_seq);
 static DEFINE_PER_CPU(int, printk_context);
+static atomic_t safe_message_lost;
 
 #ifdef CONFIG_PRINTK_NMI
 static DEFINE_PER_CPU(struct printk_safe_seq_buf, nmi_print_seq);
-atomic_t nmi_message_lost;
+static atomic_t nmi_message_lost;
 #endif
 
 static int printk_safe_log_store(struct printk_safe_seq_buf *s,
@@ -155,6 +156,36 @@ static int printk_safe_flush_buffer(const char *start, size_t len)
 	return len;
 }
 
+static void report_message_lost(atomic_t *num_lost, const char *context)
+{
+	int lost = atomic_xchg(num_lost, 0);
+
+	if (lost)
+		printk_deferred("Lost %d message(s) from %s context!\n",
+				lost,
+				context);
+}
+
+#ifdef CONFIG_PRINTK_NMI
+
+static void report_nmi_message_lost(void)
+{
+	report_message_lost(&nmi_message_lost, "NMI");
+}
+
+#else
+
+static void report_nmi_message_lost(void)
+{
+}
+
+#endif /* CONFIG_PRINTK_NMI */
+
+static void report_safe_message_lost(void)
+{
+	report_message_lost(&safe_message_lost, "printk-safe");
+}
+
 /*
  * Flush data from the associated per-CPU buffer. The function
  * can be called either via IRQ work or independently.
@@ -210,6 +241,9 @@ more:
 	 */
 	if (atomic_cmpxchg(&s->len, len, 0) != len)
 		goto more;
+
+	report_nmi_message_lost();
+	report_safe_message_lost();
 
 out:
 	raw_spin_unlock_irqrestore(&read_lock, flags);
@@ -309,8 +343,15 @@ static int vprintk_safe_nmi(const char *fmt, va_list args)
 static int vprintk_safe(const char *fmt, va_list args)
 {
 	struct printk_safe_seq_buf *s = this_cpu_ptr(&safe_print_seq);
+	int add;
 
-	return printk_safe_log_store(s, fmt, args);
+	add = printk_safe_log_store(s, fmt, args);
+	if (add == -ENOSPC) {
+		atomic_inc(&safe_message_lost);
+		add = 0;
+	}
+
+	return add;
 }
 
 /* Can be preempted by NMI. */
