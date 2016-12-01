@@ -87,7 +87,6 @@ int cpdma_chan_process(struct cpdma_chan *chan, int quota);
 
 int cpdma_ctlr_int_ctrl(struct cpdma_ctlr *ctlr, bool enable);
 void cpdma_ctlr_eoi(struct cpdma_ctlr *ctlr, u32 value);
-int cpdma_chan_int_ctrl(struct cpdma_chan *chan, bool enable);
 u32 cpdma_ctrl_rxchs_state(struct cpdma_ctlr *ctlr);
 u32 cpdma_ctrl_txchs_state(struct cpdma_ctlr *ctlr);
 bool cpdma_check_free_tx_desc(struct cpdma_chan *chan);
@@ -110,8 +109,5 @@ enum cpdma_control {
 	CPDMA_STAT_RX_ERR_CODE,		/* read-only */
 	CPDMA_RX_BUFFER_OFFSET,		/* read-write */
 };
-
-int cpdma_control_get(struct cpdma_ctlr *ctlr, int control);
-int cpdma_control_set(struct cpdma_ctlr *ctlr, int control, int value);
 
 #endif

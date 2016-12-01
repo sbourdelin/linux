@@ -628,6 +628,23 @@ int cpdma_ctlr_destroy(struct cpdma_ctlr *ctlr)
 }
 EXPORT_SYMBOL_GPL(cpdma_ctlr_destroy);
 
+static int cpdma_chan_int_ctrl(struct cpdma_chan *chan, bool enable)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&chan->lock, flags);
+	if (chan->state != CPDMA_STATE_ACTIVE) {
+		spin_unlock_irqrestore(&chan->lock, flags);
+		return -EINVAL;
+	}
+
+	dma_reg_write(chan->ctlr, enable ? chan->int_set : chan->int_clear,
+		      chan->mask);
+	spin_unlock_irqrestore(&chan->lock, flags);
+
+	return 0;
+}
+
 int cpdma_ctlr_int_ctrl(struct cpdma_ctlr *ctlr, bool enable)
 {
 	unsigned long flags;
@@ -796,6 +813,7 @@ int cpdma_chan_set_weight(struct cpdma_chan *ch, int weight)
 	spin_unlock_irqrestore(&ctlr->lock, flags);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(cpdma_chan_set_weight);
 
 /* cpdma_chan_get_min_rate - get minimum allowed rate for channel
  * Should be called before cpdma_chan_set_rate.
@@ -810,6 +828,7 @@ u32 cpdma_chan_get_min_rate(struct cpdma_ctlr *ctlr)
 
 	return DIV_ROUND_UP(divident, divisor);
 }
+EXPORT_SYMBOL_GPL(cpdma_chan_get_min_rate);
 
 /* cpdma_chan_set_rate - limits bandwidth for transmit channel.
  * The bandwidth * limited channels have to be in order beginning from lowest.
@@ -853,6 +872,7 @@ err:
 	spin_unlock_irqrestore(&ctlr->lock, flags);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(cpdma_chan_set_rate);
 
 u32 cpdma_chan_get_rate(struct cpdma_chan *ch)
 {
@@ -865,6 +885,7 @@ u32 cpdma_chan_get_rate(struct cpdma_chan *ch)
 
 	return rate;
 }
+EXPORT_SYMBOL_GPL(cpdma_chan_get_rate);
 
 struct cpdma_chan *cpdma_chan_create(struct cpdma_ctlr *ctlr, int chan_num,
 				     cpdma_handler_fn handler, int rx_type)
@@ -1269,47 +1290,5 @@ int cpdma_chan_stop(struct cpdma_chan *chan)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(cpdma_chan_stop);
-
-int cpdma_chan_int_ctrl(struct cpdma_chan *chan, bool enable)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&chan->lock, flags);
-	if (chan->state != CPDMA_STATE_ACTIVE) {
-		spin_unlock_irqrestore(&chan->lock, flags);
-		return -EINVAL;
-	}
-
-	dma_reg_write(chan->ctlr, enable ? chan->int_set : chan->int_clear,
-		      chan->mask);
-	spin_unlock_irqrestore(&chan->lock, flags);
-
-	return 0;
-}
-
-int cpdma_control_get(struct cpdma_ctlr *ctlr, int control)
-{
-	unsigned long flags;
-	int ret;
-
-	spin_lock_irqsave(&ctlr->lock, flags);
-	ret = _cpdma_control_get(ctlr, control);
-	spin_unlock_irqrestore(&ctlr->lock, flags);
-
-	return ret;
-}
-
-int cpdma_control_set(struct cpdma_ctlr *ctlr, int control, int value)
-{
-	unsigned long flags;
-	int ret;
-
-	spin_lock_irqsave(&ctlr->lock, flags);
-	ret = _cpdma_control_set(ctlr, control, value);
-	spin_unlock_irqrestore(&ctlr->lock, flags);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(cpdma_control_set);
 
 MODULE_LICENSE("GPL");
