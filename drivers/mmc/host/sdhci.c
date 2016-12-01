@@ -2004,7 +2004,9 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	if (host->ops->platform_execute_tuning) {
 		spin_unlock_irqrestore(&host->lock, flags);
 		err = host->ops->platform_execute_tuning(host, opcode);
-		return err;
+		if (err != -ENOTSUPP)
+			return err;
+		spin_lock_irqsave(&host->lock, flags);
 	}
 
 	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
