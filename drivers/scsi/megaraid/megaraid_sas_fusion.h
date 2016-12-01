@@ -972,7 +972,7 @@ struct MR_FW_RAID_MAP_DYNAMIC {
     u32                 descTableSize;  /* Total Size of desc table */
 	/* Total Number of elements in the desc table */
     u32                 descTableNumElements;
-    u64			reserved1;
+    u64			PCIThresholdBandwidth;
     u32			reserved2[3];	/*future use */
 	/* timeout value used by driver in FP IOs */
     u8                  fpPdIoTimeoutSec;
@@ -1121,7 +1121,7 @@ struct MR_DRV_RAID_MAP {
 	__le16                 reserve3;
 
 	struct MR_DEV_HANDLE_INFO  devHndlInfo[MAX_RAIDMAP_PHYSICAL_DEVICES_DYN];
-	u16                 ldTgtIdToLd[MAX_LOGICAL_DRIVES_DYN];
+	u16                  ldTgtIdToLd[MAX_LOGICAL_DRIVES_DYN];
 	struct MR_ARRAY_INFO       arMapInfo[MAX_API_ARRAYS_DYN];
 	struct MR_LD_SPAN_MAP      ldSpanMap[1];
 
@@ -1265,6 +1265,7 @@ struct fusion_context {
 	u32 old_map_sz;
 	u32 new_map_sz;
 	u32 drv_map_sz;
+
 	u32 drv_map_pages;
 	struct MR_PD_CFG_SEQ_NUM_SYNC	*pd_seq_sync[JBOD_MAPS_COUNT];
 	dma_addr_t pd_seq_phys[JBOD_MAPS_COUNT];
