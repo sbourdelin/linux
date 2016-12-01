@@ -81,6 +81,7 @@ struct vfio_iommu_driver_ops {
 	int		(*unpin_pages)(void *iommu_data,
 				       unsigned long *user_pfn, int npage);
 	int		(*register_notifier)(void *iommu_data,
+					     unsigned long *events,
 					     struct notifier_block *nb);
 	int		(*unregister_notifier)(void *iommu_data,
 					       struct notifier_block *nb);
@@ -107,13 +108,23 @@ extern int vfio_pin_pages(struct device *dev, unsigned long *user_pfn,
 extern int vfio_unpin_pages(struct device *dev, unsigned long *user_pfn,
 			    int npage);
 
-#define VFIO_IOMMU_NOTIFY_DMA_UNMAP	(1)
-
+typedef unsigned short vfio_notify_type_t;
 extern int vfio_register_notifier(struct device *dev,
+				  vfio_notify_type_t type,
+				  unsigned long *required_events,
 				  struct notifier_block *nb);
-
 extern int vfio_unregister_notifier(struct device *dev,
+				    vfio_notify_type_t type,
 				    struct notifier_block *nb);
+
+/* each type has independent events */
+enum vfio_notify_type {
+	VFIO_IOMMU_NOTIFY = (__force vfio_notify_type_t)0,
+};
+
+/* events for VFIO_IOMMU_NOTIFY */
+#define VFIO_IOMMU_NOTIFY_DMA_UNMAP	BIT(0)
+
 
 /*
  * Sub-module helpers
