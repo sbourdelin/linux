@@ -739,6 +739,9 @@ static int uncore_pmu_register(struct intel_uncore_pmu *pmu)
 		pmu->pmu.attr_groups = pmu->type->attr_groups;
 	}
 
+	if (pmu->type->single_fixed && pmu->pmu_idx)
+		pmu->pmu.attr_groups = pmu->type->no_fixed_attr_groups;
+
 	if (pmu->type->num_boxes == 1) {
 		if (strlen(pmu->type->name) > 0)
 			sprintf(pmu->name, "uncore_%s", pmu->type->name);
@@ -811,6 +814,8 @@ static void uncore_type_exit(struct intel_uncore_type *type)
 	}
 	kfree(type->events_group);
 	type->events_group = NULL;
+	kfree(type->no_fixed_attr_groups[2]);
+	type->no_fixed_attr_groups[2] = NULL;
 }
 
 static void uncore_types_exit(struct intel_uncore_type **types)
@@ -819,13 +824,45 @@ static void uncore_types_exit(struct intel_uncore_type **types)
 		uncore_type_exit(*types);
 }
 
+static struct attribute_group *
+uncore_alloc_event_group(struct intel_uncore_type *type,
+			 bool single_fixed)
+{
+	struct attribute_group *attr_group;
+	struct attribute **attrs;
+	char fixed_event_name[11];
+	int i, j, index = 0;
+
+	if (single_fixed)
+		snprintf(fixed_event_name, 11, "event=0x%x", UNCORE_FIXED_EVENT);
+
+	for (i = 0; type->event_descs[i].attr.attr.name; i++)
+		;
+
+	attr_group = kzalloc(sizeof(struct attribute *) * (i + 1) +
+				sizeof(*attr_group), GFP_KERNEL);
+	if (!attr_group)
+		return NULL;
+
+	attrs = (struct attribute **)(attr_group + 1);
+	attr_group->name = "events";
+	attr_group->attrs = attrs;
+
+	for (j = 0; j < i; j++) {
+		if (single_fixed && !strncmp(type->event_descs[j].config, fixed_event_name, 10))
+			continue;
+
+		attrs[index++] = &type->event_descs[j].attr.attr;
+	}
+
+	return attr_group;
+}
+
 static int __init uncore_type_init(struct intel_uncore_type *type, bool setid)
 {
 	struct intel_uncore_pmu *pmus;
-	struct attribute_group *attr_group;
-	struct attribute **attrs;
 	size_t size;
-	int i, j;
+	int i;
 
 	pmus = kzalloc(sizeof(*pmus) * type->num_boxes, GFP_KERNEL);
 	if (!pmus)
@@ -848,24 +885,25 @@ static int __init uncore_type_init(struct intel_uncore_type *type, bool setid)
 				0, type->num_counters, 0, 0);
 
 	if (type->event_descs) {
-		for (i = 0; type->event_descs[i].attr.attr.name; i++);
-
-		attr_group = kzalloc(sizeof(struct attribute *) * (i + 1) +
-					sizeof(*attr_group), GFP_KERNEL);
-		if (!attr_group)
+		type->events_group = uncore_alloc_event_group(type, false);
+		if (!type->events_group)
 			return -ENOMEM;
-
-		attrs = (struct attribute **)(attr_group + 1);
-		attr_group->name = "events";
-		attr_group->attrs = attrs;
-
-		for (j = 0; j < i; j++)
-			attrs[j] = &type->event_descs[j].attr.attr;
-
-		type->events_group = attr_group;
+		if (type->single_fixed) {
+			type->no_fixed_attr_groups[2] = uncore_alloc_event_group(type, true);
+			if (!type->no_fixed_attr_groups[2]) {
+				kfree(type->events_group);
+				return -ENOMEM;
+			}
+		}
 	}
 
 	type->pmu_group = &uncore_pmu_attr_group;
+
+	if (type->single_fixed) {
+		type->no_fixed_attr_groups[0] = type->pmu_group;
+		type->no_fixed_attr_groups[1] = type->format_group;
+	}
+
 	return 0;
 }
 
