@@ -1353,7 +1353,7 @@ static inline void d_lustre_invalidate(struct dentry *dentry, int nested)
 	 * it and busy inodes would be reported.
 	 */
 	if (d_count(dentry) == 0 && !(dentry->d_flags & DCACHE_DISCONNECTED))
-		__d_drop(dentry);
+		_d_drop(dentry);
 	spin_unlock(&dentry->d_lock);
 }
 

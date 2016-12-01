@@ -248,7 +248,7 @@ void configfs_drop_dentry(struct configfs_dirent * sd, struct dentry * parent)
 		spin_lock(&dentry->d_lock);
 		if (simple_positive(dentry)) {
 			dget_dlock(dentry);
-			__d_drop(dentry);
+			_d_drop(dentry);
 			spin_unlock(&dentry->d_lock);
 			simple_unlink(d_inode(parent), dentry);
 		} else

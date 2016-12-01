@@ -168,7 +168,7 @@ static void spufs_prune_dir(struct dentry *dir)
 		spin_lock(&dentry->d_lock);
 		if (simple_positive(dentry)) {
 			dget_dlock(dentry);
-			__d_drop(dentry);
+			_d_drop(dentry);
 			spin_unlock(&dentry->d_lock);
 			simple_unlink(d_inode(dir), dentry);
 			/* XXX: what was dcache_lock protecting here? Other

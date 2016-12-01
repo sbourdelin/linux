@@ -438,7 +438,7 @@ static void dentry_lru_add(struct dentry *dentry)
  */
 void __d_drop(struct dentry *dentry)
 {
-	if (!d_unhashed(dentry)) {
+	if (!hlist_bl_unhashed(&dentry->d_hash)) {
 		struct hlist_bl_head *b;
 		/*
 		 * Hashed dentries are normally on the dentry hashtable,
@@ -458,12 +458,18 @@ void __d_drop(struct dentry *dentry)
 		write_seqcount_invalidate(&dentry->d_seq);
 	}
 }
-EXPORT_SYMBOL(__d_drop);
+
+void _d_drop(struct dentry *dentry)
+{
+	dentry->d_flags |= DCACHE_DENTRY_UNHASHED;
+	__d_drop(dentry);
+}
+EXPORT_SYMBOL(_d_drop);
 
 void d_drop(struct dentry *dentry)
 {
 	spin_lock(&dentry->d_lock);
-	__d_drop(dentry);
+	_d_drop(dentry);
 	spin_unlock(&dentry->d_lock);
 }
 EXPORT_SYMBOL(d_drop);
@@ -530,7 +536,7 @@ static void __dentry_kill(struct dentry *dentry)
 			d_lru_del(dentry);
 	}
 	/* if it was on the hash then remove it */
-	__d_drop(dentry);
+	_d_drop(dentry);
 	dentry_unlist(dentry, parent);
 	if (parent)
 		spin_unlock(&parent->d_lock);
@@ -1486,7 +1492,7 @@ static void check_and_drop(void *_data)
 	struct detach_data *data = _data;
 
 	if (!data->mountpoint && !data->select.found)
-		__d_drop(data->select.start);
+		_d_drop(data->select.start);
 }
 
 /**
@@ -1601,7 +1607,7 @@ struct dentry *__d_alloc(struct super_block *sb, const struct qstr *name)
 	dentry->d_name.name = dname;
 
 	dentry->d_lockref.count = 1;
-	dentry->d_flags = 0;
+	dentry->d_flags = DCACHE_DENTRY_UNHASHED;
 	spin_lock_init(&dentry->d_lock);
 	seqcount_init(&dentry->d_seq);
 	dentry->d_inode = NULL;
@@ -1926,6 +1932,7 @@ static struct dentry *__d_obtain_alias(struct inode *inode, int disconnected)
 	spin_lock(&tmp->d_lock);
 	__d_set_inode_and_type(tmp, inode, add_flags);
 	hlist_add_head(&tmp->d_u.d_alias, &inode->i_dentry);
+	tmp->d_flags &= ~DCACHE_DENTRY_UNHASHED;
 	hlist_bl_lock(&tmp->d_sb->s_anon);
 	hlist_bl_add_head(&tmp->d_hash, &tmp->d_sb->s_anon);
 	hlist_bl_unlock(&tmp->d_sb->s_anon);
@@ -2331,7 +2338,7 @@ again:
 	}
 
 	if (!d_unhashed(dentry))
-		__d_drop(dentry);
+		_d_drop(dentry);
 
 	spin_unlock(&dentry->d_lock);
 
@@ -2342,7 +2349,8 @@ EXPORT_SYMBOL(d_delete);
 static void __d_rehash(struct dentry *entry)
 {
 	struct hlist_bl_head *b = d_hash(entry->d_name.hash);
-	BUG_ON(!d_unhashed(entry));
+	BUG_ON(!hlist_bl_unhashed(&entry->d_hash));
+	entry->d_flags &= ~DCACHE_DENTRY_UNHASHED;
 	hlist_bl_lock(b);
 	hlist_bl_add_head_rcu(&entry->d_hash, b);
 	hlist_bl_unlock(b);
