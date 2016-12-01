@@ -212,3 +212,33 @@ Finally we move core 4-7 over to the new group and make sure that the
 kernel and the tasks running there get 50% of the cache.
 
 # echo C0 > p0/cpus
+
+4) Locking between applications
+
+Certain operations on the resctrl filesystem, composed of
+read / writes to multiple files, must be atomic.
+
+As an example, the allocation of an exclusive reservation
+of L3 cache involves:
+
+        1. read list of cbmmasks for each directory
+        2. find a contiguous set of bits in the global CBM bitmask
+           that is clear in any of the directory cbmmasks
+        3. create a new directory
+        4. set the bits found in step 2 to the new directory "schemata"
+           file
+
+If two applications attempting to allocate space race with each other
+(if two processes execute the steps above in a interlocked fashion),
+they can end up using the same bits of CBMMASK, which renders the
+reservations non-exclusive but shared.
+
+To coordinate atomic operations on resctrl and avoid the problem
+above, the following locking procedure is recommended:
+
+A) open /var/lock/resctrl/fs.lock with O_CREAT|O_EXCL.
+B) if success, write pid of program accessing the directory
+   structure to this file.
+C) read/write the directory structure.
+D) remove file.
+
