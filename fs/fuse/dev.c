@@ -23,6 +23,23 @@
 MODULE_ALIAS_MISCDEV(FUSE_MINOR);
 MODULE_ALIAS("devname:fuse");
 
+#define wait_fatal_freezable(wq, condition, exclusive)			\
+({									\
+	int __ret = 0;							\
+	do {								\
+		if (exclusive)						\
+			ret = wait_event_interruptible_exclusive(wq,	\
+							condition);	\
+		else							\
+			ret = wait_event_interruptible(wq, condition);	\
+		if (!__ret || fatal_signal_pending(current))		\
+			break;						\
+		if (!freezing(current))					\
+			continue;					\
+	} while (try_to_freeze());					\
+	__ret;								\
+})
+
 static struct kmem_cache *fuse_req_cachep;
 
 static struct fuse_dev *fuse_get_dev(struct file *file)
@@ -99,6 +116,19 @@ void fuse_request_free(struct fuse_req *req)
 	kmem_cache_free(fuse_req_cachep, req);
 }
 
+static void block_sigs(sigset_t *oldset)
+{
+	sigset_t mask;
+
+	siginitsetinv(&mask, sigmask(SIGKILL));
+	sigprocmask(SIG_BLOCK, &mask, oldset);
+}
+
+static void restore_sigs(sigset_t *oldset)
+{
+	sigprocmask(SIG_SETMASK, oldset, NULL);
+}
+
 void __fuse_get_request(struct fuse_req *req)
 {
 	atomic_inc(&req->count);
@@ -134,13 +164,18 @@ static struct fuse_req *__fuse_get_req(struct fuse_conn *fc, unsigned npages,
 				       bool for_background)
 {
 	struct fuse_req *req;
+	sigset_t oldset;
+	int intr;
 	int err;
 	atomic_inc(&fc->num_waiting);
 
 	if (fuse_block_alloc(fc, for_background)) {
 		err = -EINTR;
-		if (wait_event_killable_exclusive(fc->blocked_waitq,
-				!fuse_block_alloc(fc, for_background)))
+		block_sigs(&oldset);
+		intr = wait_fatal_freezable(fc->blocked_waitq,
+				!fuse_block_alloc(fc, for_background), true);
+		restore_sigs(&oldset);
+		if (intr)
 			goto out;
 	}
 	/* Matches smp_wmb() in fuse_set_initialized() */
@@ -427,9 +462,12 @@ static void request_wait_answer(struct fuse_conn *fc, struct fuse_req *req)
 	}
 
 	if (!test_bit(FR_FORCE, &req->flags)) {
+		sigset_t oldset;
 		/* Only fatal signals may interrupt this */
-		err = wait_event_killable(req->waitq,
-					test_bit(FR_FINISHED, &req->flags));
+		block_sigs(&oldset);
+		err = wait_fatal_freezable(req->waitq,
+				test_bit(FR_FINISHED, &req->flags), false);
+		restore_sigs(&oldset);
 		if (!err)
 			return;
 
