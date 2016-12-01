@@ -11,11 +11,15 @@ If this binding is used, the kernel module i2c-hid will handle the communication
 with the device and the generic hid core layer will handle the protocol.
 
 Required properties:
-- compatible: must be "hid-over-i2c"
+- compatible: must be "hid-over-i2c", or a device-specific string like:
+    * "wacom,w9013"
 - reg: i2c slave address
 - hid-descr-addr: HID descriptor address
 - interrupt-parent: the phandle for the interrupt controller
 - interrupts: interrupt line
+
+Optional properties:
+- vdd-supply: phandle of the regulator that provides the supply voltage.
 
 Example:
 
