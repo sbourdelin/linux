@@ -23,7 +23,7 @@
  */
 #include <linux/firmware.h>
 #include <linux/circ_buf.h>
-#include <linux/debugfs.h>
+#include <linux/drmfs.h>
 #include <linux/relay.h>
 #include "i915_drv.h"
 #include "intel_guc.h"
@@ -923,7 +923,7 @@ static int subbuf_start_callback(struct rchan_buf *buf,
 }
 
 /*
- * file_create() callback. Creates relay file in debugfs.
+ * file_create() callback. Creates relay file in drmfs.
  */
 static struct dentry *create_buf_file_callback(const char *filename,
 					       struct dentry *parent,
@@ -949,17 +949,17 @@ static struct dentry *create_buf_file_callback(const char *filename,
 	 * dentry of the file associated with the channel buffer and that file's
 	 * name need not be same as the filename passed as an argument.
 	 */
-	buf_file = debugfs_create_file("guc_log", mode,
+	buf_file = drmfs_create_file("guc_log", mode,
 				       parent, buf, &relay_file_operations);
 	return buf_file;
 }
 
 /*
- * file_remove() default callback. Removes relay file in debugfs.
+ * file_remove() default callback. Removes relay file in drmfs.
  */
 static int remove_buf_file_callback(struct dentry *dentry)
 {
-	debugfs_remove(dentry);
+	drmfs_remove(dentry);
 	return 0;
 }
 
@@ -1009,22 +1009,11 @@ static int guc_log_create_relay_file(struct intel_guc *guc)
 	struct dentry *log_dir;
 	int ret;
 
-	/* For now create the log file in /sys/kernel/debug/dri/0 dir */
-	log_dir = dev_priv->drm.primary->debugfs_root;
+	/* Create the log file in drmfs dir: /sys/kernel/drm/i915/ */
+	log_dir = dev_priv->drm.driver->drmfs_root;
 
-	/* If /sys/kernel/debug/dri/0 location do not exist, then debugfs is
-	 * not mounted and so can't create the relay file.
-	 * The relay API seems to fit well with debugfs only, for availing relay
-	 * there are 3 requirements which can be met for debugfs file only in a
-	 * straightforward/clean manner :-
-	 * i)   Need the associated dentry pointer of the file, while opening the
-	 *      relay channel.
-	 * ii)  Should be able to use 'relay_file_operations' fops for the file.
-	 * iii) Set the 'i_private' field of file's inode to the pointer of
-	 *	relay channel buffer.
-	 */
 	if (!log_dir) {
-		DRM_ERROR("Debugfs dir not available yet for GuC log file\n");
+		DRM_ERROR("Drmfs dir not available yet for GuC log file\n");
 		return -ENODEV;
 	}
 
@@ -1265,7 +1254,7 @@ static int guc_log_create_extras(struct intel_guc *guc)
 	if (!guc->log.relay_chan) {
 		/* Create a relay channel, so that we have buffers for storing
 		 * the GuC firmware logs, the channel will be linked with a file
-		 * later on when debugfs is registered.
+		 * later on when drmfs is registered.
 		 */
 		ret = guc_log_create_relay_channel(guc);
 		if (ret)
