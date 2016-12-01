@@ -20,9 +20,12 @@
 #include "block-range.h"
 #include "arch/common.h"
 #include <regex.h>
+#include <unistd.h>
 #include <pthread.h>
 #include <linux/bitops.h>
 #include <sys/utsname.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 const char 	*disassembler_style;
 const char	*objdump_path;
@@ -1278,6 +1281,21 @@ int symbol__strerror_disassemble(struct symbol *sym __maybe_unused, struct map *
 			  "  --vmlinux vmlinux\n", build_id_msg ?: "");
 	}
 		break;
+
+	case SYMBOL_ANNOTATE_ERRNO__NO_OBJDUMP:
+		scnprintf(buf, buflen, "No objdump tool available in $PATH\n");
+		break;
+
+	case SYMBOL_ANNOTATE_ERRNO__NO_EXEC_OBJDUMP:
+		scnprintf(buf, buflen,
+			"The objdump tool found in $PATH cannot be executed\n");
+		break;
+
+	case SYMBOL_ANNOTATE_ERRNO__NO_OUTPUT:
+		scnprintf(buf, buflen,
+			"The objdump tool returned no disassembled code\n");
+		break;
+
 	default:
 		scnprintf(buf, buflen, "Internal error: Invalid %d error code\n", errnum);
 		break;
@@ -1321,6 +1339,61 @@ fallback:
 	return 0;
 }
 
+static int annotate__check_objdump(void)
+{
+	char command[PATH_MAX * 2];
+	int wstatus, err;
+	pid_t pid;
+
+	snprintf(command, sizeof(command),
+		"%s -v > /dev/null 2>&1",
+		objdump_path ? objdump_path : "objdump");
+
+	pid = fork();
+	if (pid < 0) {
+		pr_err("Failure forking to run %s\n", command);
+		return -1;
+	}
+
+	if (pid == 0) {
+		execl("/bin/sh", "sh", "-c", command, NULL);
+		exit(-1);
+	}
+
+	err = waitpid(pid, &wstatus, 0);
+	if (err < 0) {
+		pr_err("Failure calling waitpid: %s: (%s)\n",
+			strerror(errno), command);
+		return -1;
+	}
+
+	pr_err("%s: %d %d\n", command, pid, WEXITSTATUS(wstatus));
+
+	switch (WEXITSTATUS(wstatus)) {
+	case 0:
+		/* Success */
+		err = 0;
+		break;
+	case 127:
+		/* The shell did not find objdump in the path */
+		err = SYMBOL_ANNOTATE_ERRNO__NO_OBJDUMP;
+		break;
+	default:
+		/*
+		 * In the default case, we consider that objdump
+		 * cannot be executed; so it gathers many fault
+		 * scenarii:
+		 * - objdump is not an executable (126);
+		 * - objdump has some dependency issue;
+		 * - ...
+		 */
+		err = SYMBOL_ANNOTATE_ERRNO__NO_EXEC_OBJDUMP;
+		break;
+	}
+
+	return err;
+}
+
 static const char *annotate__norm_arch(const char *arch_name)
 {
 	struct utsname uts;
@@ -1348,6 +1421,10 @@ int symbol__disassemble(struct symbol *sym, struct map *map, const char *arch_na
 	pid_t pid;
 	int err = dso__disassemble_filename(dso, symfs_filename, sizeof(symfs_filename));
 
+	if (err)
+		return err;
+
+	err = annotate__check_objdump();
 	if (err)
 		return err;
 
@@ -1482,7 +1559,7 @@ int symbol__disassemble(struct symbol *sym, struct map *map, const char *arch_na
 		delete_last_nop(sym);
 
 	fclose(file);
-	err = 0;
+	err = nline == 0 ? SYMBOL_ANNOTATE_ERRNO__NO_OUTPUT : 0;
 out_remove_tmp:
 	close(stdout_fd[0]);
 
