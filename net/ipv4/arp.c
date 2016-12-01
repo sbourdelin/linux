@@ -330,6 +330,7 @@ static void arp_solicit(struct neighbour *neigh, struct sk_buff *skb)
 {
 	__be32 saddr = 0;
 	u8 dst_ha[MAX_ADDR_LEN], *dst_hw = NULL;
+	u8 null_dev_hw_addr[MAX_ADDR_LEN];
 	struct net_device *dev = neigh->dev;
 	__be32 target = *(__be32 *)neigh->primary_key;
 	int probes = atomic_read(&neigh->probes);
@@ -371,10 +372,12 @@ static void arp_solicit(struct neighbour *neigh, struct sk_buff *skb)
 
 	probes -= NEIGH_VAR(neigh->parms, UCAST_PROBES);
 	if (probes < 0) {
+		memset(&null_dev_hw_addr, 0, dev->addr_len);
 		if (!(neigh->nud_state & NUD_VALID))
 			pr_debug("trying to ucast probe in NUD_INVALID\n");
 		neigh_ha_snapshot(dst_ha, neigh, dev);
-		dst_hw = dst_ha;
+		if (memcmp(&dst_ha, &null_dev_hw_addr, dev->addr_len) != 0)
+			dst_hw = dst_ha;
 	} else {
 		probes -= NEIGH_VAR(neigh->parms, APP_PROBES);
 		if (probes < 0) {
