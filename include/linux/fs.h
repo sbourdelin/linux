@@ -2045,9 +2045,19 @@ struct file_system_type {
 	struct lock_class_key s_vfs_rename_key;
 	struct lock_class_key s_writers_key[SB_FREEZE_LEVELS];
 
+	/*
+	 * Most file systems are not stackable. The ones that are stackable
+	 * (i.e. overlayfs) cannot be at stack level 0. It is possible to
+	 * stack FILESYSTEM_MAX_STACK_DEPTH fs of the same type on top of
+	 * each other with the lower being read-only. We need to annonate
+	 * stackable i_mutex locks according to stack level of the super
+	 * block instance.
+	 */
+#define FS_STACK_NESTING(sb) \
+	((sb)->s_stack_depth ? (sb)->s_stack_depth - 1 : 0)
 	struct lock_class_key i_lock_key;
-	struct lock_class_key i_mutex_key;
-	struct lock_class_key i_mutex_dir_key;
+	struct lock_class_key i_mutex_key[FILESYSTEM_MAX_STACK_DEPTH];
+	struct lock_class_key i_mutex_dir_key[FILESYSTEM_MAX_STACK_DEPTH];
 };
 
 #define MODULE_ALIAS_FS(NAME) MODULE_ALIAS("fs-" NAME)
