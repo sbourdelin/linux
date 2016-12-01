@@ -946,6 +946,8 @@ static inline void clear_low_latency_mode(struct vmbus_channel *c)
 	c->low_latency = false;
 }
 
+bool device_is_hyperv(struct device *dev);
+
 void vmbus_onmessage(void *context);
 
 int vmbus_request_offers(void);

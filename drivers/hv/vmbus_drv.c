@@ -692,6 +692,12 @@ struct onmessage_work_context {
 	struct hv_message msg;
 };
 
+bool device_is_hyperv(struct device *dev)
+{
+	return dev->release == vmbus_device_release;
+}
+EXPORT_SYMBOL_GPL(device_is_hyperv);
+
 static void vmbus_onmessage_work(struct work_struct *work)
 {
 	struct onmessage_work_context *ctx;
