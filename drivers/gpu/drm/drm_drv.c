@@ -27,6 +27,7 @@
  */
 
 #include <linux/debugfs.h>
+#include <linux/drmfs.h>
 #include <linux/fs.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>

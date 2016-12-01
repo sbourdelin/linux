@@ -61,6 +61,9 @@
 #define STACK_END_MAGIC		0x57AC6E9D
 
 #define TRACEFS_MAGIC          0x74726163
+#define DRMFS_MAGIC	       0x84724143      /* some random number.
+						* Is there a better way?
+						*/
 
 #define V9FS_MAGIC		0x01021997
 
