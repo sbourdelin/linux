@@ -28,6 +28,7 @@ problems and bugs in particular.
    bug-hunting
    bug-bisect
    tainted-kernels
+   maintainers
    ramoops
    dynamic-debug-howto
    init
