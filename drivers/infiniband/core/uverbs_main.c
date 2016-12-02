@@ -51,6 +51,7 @@
 #include <rdma/ib.h>
 
 #include "uverbs.h"
+#include "core_priv.h"
 
 MODULE_AUTHOR("Roland Dreier");
 MODULE_DESCRIPTION("InfiniBand userspace verbs access");
@@ -236,6 +237,8 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 
 		idr_remove_uobj(&ib_uverbs_ah_idr, uobj);
 		ib_destroy_ah(ah);
+		ib_rdmacg_uncharge(&uobj->cg_obj, context->device,
+				   RDMACG_RESOURCE_HCA_OBJECT);
 		kfree(uobj);
 	}
 
@@ -245,6 +248,8 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 
 		idr_remove_uobj(&ib_uverbs_mw_idr, uobj);
 		uverbs_dealloc_mw(mw);
+		ib_rdmacg_uncharge(&uobj->cg_obj, context->device,
+				   RDMACG_RESOURCE_HCA_OBJECT);
 		kfree(uobj);
 	}
 
@@ -253,6 +258,8 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 
 		idr_remove_uobj(&ib_uverbs_rule_idr, uobj);
 		ib_destroy_flow(flow_id);
+		ib_rdmacg_uncharge(&uobj->cg_obj, context->device,
+				   RDMACG_RESOURCE_HCA_OBJECT);
 		kfree(uobj);
 	}
 
@@ -267,6 +274,8 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 		} else {
 			ib_uverbs_detach_umcast(qp, uqp);
 			ib_destroy_qp(qp);
+			ib_rdmacg_uncharge(&uobj->cg_obj, context->device,
+					   RDMACG_RESOURCE_HCA_OBJECT);
 		}
 		ib_uverbs_release_uevent(file, &uqp->uevent);
 		kfree(uqp);
@@ -300,6 +309,8 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 
 		idr_remove_uobj(&ib_uverbs_srq_idr, uobj);
 		ib_destroy_srq(srq);
+		ib_rdmacg_uncharge(&uobj->cg_obj, context->device,
+				   RDMACG_RESOURCE_HCA_OBJECT);
 		ib_uverbs_release_uevent(file, uevent);
 		kfree(uevent);
 	}
@@ -312,6 +323,8 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 
 		idr_remove_uobj(&ib_uverbs_cq_idr, uobj);
 		ib_destroy_cq(cq);
+		ib_rdmacg_uncharge(&uobj->cg_obj, context->device,
+				   RDMACG_RESOURCE_HCA_OBJECT);
 		ib_uverbs_release_ucq(file, ev_file, ucq);
 		kfree(ucq);
 	}
@@ -321,6 +334,8 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 
 		idr_remove_uobj(&ib_uverbs_mr_idr, uobj);
 		ib_dereg_mr(mr);
+		ib_rdmacg_uncharge(&uobj->cg_obj, context->device,
+				   RDMACG_RESOURCE_HCA_OBJECT);
 		kfree(uobj);
 	}
 
@@ -341,10 +356,15 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 
 		idr_remove_uobj(&ib_uverbs_pd_idr, uobj);
 		ib_dealloc_pd(pd);
+		ib_rdmacg_uncharge(&uobj->cg_obj, context->device,
+				   RDMACG_RESOURCE_HCA_OBJECT);
 		kfree(uobj);
 	}
 
 	put_pid(context->tgid);
+
+	ib_rdmacg_uncharge(&context->cg_obj, context->device,
+			   RDMACG_RESOURCE_HCA_HANDLE);
 
 	return context->device->dealloc_ucontext(context);
 }
