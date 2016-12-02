@@ -782,14 +782,9 @@ static void sxgbe_tx_queue_clean(struct sxgbe_tx_queue *tqueue)
 	/* wake up queue */
 	if (unlikely(netif_tx_queue_stopped(dev_txq) &&
 		     sxgbe_tx_avail(tqueue, tx_rsize) > SXGBE_TX_THRESH(priv))) {
-		netif_tx_lock(priv->dev);
-		if (netif_tx_queue_stopped(dev_txq) &&
-		    sxgbe_tx_avail(tqueue, tx_rsize) > SXGBE_TX_THRESH(priv)) {
-			if (netif_msg_tx_done(priv))
-				pr_debug("%s: restart transmit\n", __func__);
-			netif_tx_wake_queue(dev_txq);
-		}
-		netif_tx_unlock(priv->dev);
+		if (netif_msg_tx_done(priv))
+			pr_debug("%s: restart transmit\n", __func__);
+		netif_tx_wake_queue(dev_txq);
 	}
 
 	spin_unlock(&tqueue->tx_lock);
