@@ -862,6 +862,9 @@ megasas_ioc_init_fusion(struct megasas_instance *instance)
 		drv_ops->mfi_capabilities.support_ext_queue_depth = 1;
 
 	drv_ops->mfi_capabilities.support_qd_throttling = 1;
+
+	drv_ops->mfi_capabilities.supportPdMapTargetId = 1;
+
 	/* Convert capability to LE32 */
 	cpu_to_le32s((u32 *)&init_frame->driver_operations.mfi_capabilities);
 
@@ -2232,8 +2235,12 @@ megasas_build_syspd_fusion(struct megasas_instance *instance,
 	if (instance->use_seqnum_jbod_fp &&
 		instance->pd_list[pd_index].driveType == TYPE_DISK) {
 		/* TgtId must be incremented by 255 as jbod seq number is index
-		 * below raid map
-		 */
+		* below raid map
+		*/
+		/* More than 256 PD/JBOD support for Ventura */
+		if (instance->support_morethan256jbod)
+			pRAID_Context->VirtualDiskTgtId = pd_sync->seq[pd_index].pdTargetId;
+		else
 		pRAID_Context->VirtualDiskTgtId =
 			cpu_to_le16(device_id + (MAX_PHYSICAL_DEVICES - 1));
 		pRAID_Context->configSeqNum = pd_sync->seq[pd_index].seqNum;
