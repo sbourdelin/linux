@@ -355,6 +355,14 @@ static const struct nla_policy fl_policy[TCA_FLOWER_MAX + 1] = {
 	[TCA_FLOWER_KEY_ENC_UDP_SRC_PORT_MASK]	= { .type = NLA_U16 },
 	[TCA_FLOWER_KEY_ENC_UDP_DST_PORT]	= { .type = NLA_U16 },
 	[TCA_FLOWER_KEY_ENC_UDP_DST_PORT_MASK]	= { .type = NLA_U16 },
+	[TCA_FLOWER_KEY_ICMPV4_TYPE]	= { .type = NLA_U8 },
+	[TCA_FLOWER_KEY_ICMPV4_TYPE_MASK] = { .type = NLA_U8 },
+	[TCA_FLOWER_KEY_ICMPV4_CODE]	= { .type = NLA_U8 },
+	[TCA_FLOWER_KEY_ICMPV4_CODE_MASK] = { .type = NLA_U8 },
+	[TCA_FLOWER_KEY_ICMPV6_TYPE]	= { .type = NLA_U8 },
+	[TCA_FLOWER_KEY_ICMPV6_TYPE_MASK] = { .type = NLA_U8 },
+	[TCA_FLOWER_KEY_ICMPV6_CODE]	= { .type = NLA_U8 },
+	[TCA_FLOWER_KEY_ICMPV6_CODE_MASK] = { .type = NLA_U8 },
 };
 
 static void fl_set_key_val(struct nlattr **tb,
@@ -471,6 +479,20 @@ static int fl_set_key(struct net *net, struct nlattr **tb,
 		fl_set_key_val(tb, &key->tp.dst, TCA_FLOWER_KEY_SCTP_DST,
 			       &mask->tp.dst, TCA_FLOWER_KEY_SCTP_DST_MASK,
 			       sizeof(key->tp.dst));
+	} else if (flow_basic_key_is_icmpv4(&key->basic)) {
+		fl_set_key_val(tb, &key->tp.type, TCA_FLOWER_KEY_ICMPV4_TYPE,
+			       &mask->tp.type, TCA_FLOWER_KEY_ICMPV4_TYPE_MASK,
+			       sizeof(key->tp.type));
+		fl_set_key_val(tb, &key->tp.code, TCA_FLOWER_KEY_ICMPV4_CODE,
+			       &mask->tp.code, TCA_FLOWER_KEY_ICMPV4_CODE_MASK,
+			       sizeof(key->tp.code));
+	} else if (flow_basic_key_is_icmpv6(&key->basic)) {
+		fl_set_key_val(tb, &key->tp.type, TCA_FLOWER_KEY_ICMPV6_TYPE,
+			       &mask->tp.type, TCA_FLOWER_KEY_ICMPV6_TYPE_MASK,
+			       sizeof(key->tp.type));
+		fl_set_key_val(tb, &key->tp.code, TCA_FLOWER_KEY_ICMPV4_CODE,
+			       &mask->tp.code, TCA_FLOWER_KEY_ICMPV4_CODE_MASK,
+			       sizeof(key->tp.code));
 	}
 
 	if (tb[TCA_FLOWER_KEY_ENC_IPV4_SRC] ||
@@ -942,6 +964,26 @@ static int fl_dump(struct net *net, struct tcf_proto *tp, unsigned long fh,
 		  fl_dump_key_val(skb, &key->tp.dst, TCA_FLOWER_KEY_SCTP_DST,
 				  &mask->tp.dst, TCA_FLOWER_KEY_SCTP_DST_MASK,
 				  sizeof(key->tp.dst))))
+		goto nla_put_failure;
+	else if (flow_basic_key_is_icmpv4(&key->basic) &&
+		 (fl_dump_key_val(skb, &key->tp.type,
+				  TCA_FLOWER_KEY_ICMPV4_TYPE, &mask->tp.type,
+				  TCA_FLOWER_KEY_ICMPV4_TYPE_MASK,
+				  sizeof(key->tp.type)) ||
+		  fl_dump_key_val(skb, &key->tp.code,
+				  TCA_FLOWER_KEY_ICMPV4_CODE, &mask->tp.code,
+				  TCA_FLOWER_KEY_ICMPV4_CODE_MASK,
+				  sizeof(key->tp.code))))
+		goto nla_put_failure;
+	else if (flow_basic_key_is_icmpv6(&key->basic) &&
+		 (fl_dump_key_val(skb, &key->tp.type,
+				  TCA_FLOWER_KEY_ICMPV6_TYPE, &mask->tp.type,
+				  TCA_FLOWER_KEY_ICMPV6_TYPE_MASK,
+				  sizeof(key->tp.type)) ||
+		  fl_dump_key_val(skb, &key->tp.code,
+				  TCA_FLOWER_KEY_ICMPV6_CODE, &mask->tp.code,
+				  TCA_FLOWER_KEY_ICMPV6_CODE_MASK,
+				  sizeof(key->tp.code))))
 		goto nla_put_failure;
 
 	if (key->enc_control.addr_type == FLOW_DISSECTOR_KEY_IPV4_ADDRS &&
