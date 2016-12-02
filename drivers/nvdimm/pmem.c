@@ -267,7 +267,7 @@ static int pmem_attach_disk(struct device *dev,
 	pmem->phys_addr = res->start;
 	pmem->size = resource_size(res);
 	if (nvdimm_has_flush(nd_region) < 0)
-		dev_warn(dev, "unable to guarantee persistence of writes\n");
+		dev_warn(dev, "unable to guarantee persistence of writes due to unknown flushing capability of the memory region\n");
 
 	if (!devm_request_mem_region(dev, res->start, resource_size(res),
 				dev_name(dev))) {
