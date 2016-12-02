@@ -357,6 +357,26 @@ static void cfg80211_sched_scan_stop_wk(struct work_struct *work)
 	rtnl_unlock();
 }
 
+static void cfg80211_disconnect_wk(struct work_struct *work)
+{
+	struct cfg80211_registered_device *rdev;
+	struct wireless_dev *wdev;
+
+	wdev = container_of(work, struct wireless_dev, disconnect_wk);
+	rdev = wiphy_to_rdev(wdev->wiphy);
+
+	if (!wdev->netdev)
+		return;
+
+	wdev_lock(wdev);
+
+	if (wdev->conn_owner_nlportid)
+		cfg80211_disconnect(rdev, wdev->netdev,
+					WLAN_REASON_DEAUTH_LEAVING, true);
+
+	wdev_unlock(wdev);
+}
+
 /* exported functions */
 
 struct wiphy *wiphy_new_nm(const struct cfg80211_ops *ops, int sizeof_priv,
@@ -1117,6 +1137,8 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 		     wdev->iftype == NL80211_IFTYPE_ADHOC) && !wdev->use_4addr)
 			dev->priv_flags |= IFF_DONT_BRIDGE;
 
+		INIT_WORK(&wdev->disconnect_wk, cfg80211_disconnect_wk);
+
 		nl80211_notify_iface(rdev, wdev, NL80211_CMD_NEW_INTERFACE);
 		break;
 	case NETDEV_GOING_DOWN:
@@ -1205,6 +1227,7 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 #ifdef CONFIG_CFG80211_WEXT
 			kzfree(wdev->wext.keys);
 #endif
+			flush_work(&wdev->disconnect_wk);
 		}
 		/*
 		 * synchronise (so that we won't find this netdev

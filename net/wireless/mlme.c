@@ -130,6 +130,8 @@ void cfg80211_auth_timeout(struct net_device *dev, const u8 *addr)
 
 	nl80211_send_auth_timeout(rdev, dev, addr, GFP_KERNEL);
 	cfg80211_sme_auth_timeout(wdev);
+
+	wdev->conn_owner_nlportid = 0;
 }
 EXPORT_SYMBOL(cfg80211_auth_timeout);
 
@@ -146,6 +148,8 @@ void cfg80211_assoc_timeout(struct net_device *dev, struct cfg80211_bss *bss)
 
 	cfg80211_unhold_bss(bss_from_pub(bss));
 	cfg80211_put_bss(wiphy, bss);
+
+	wdev->conn_owner_nlportid = 0;
 }
 EXPORT_SYMBOL(cfg80211_assoc_timeout);
 
