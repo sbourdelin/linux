@@ -1825,7 +1825,7 @@ megasas_build_ldio_fusion(struct megasas_instance *instance,
 			  struct megasas_cmd_fusion *cmd)
 {
 	u8 fp_possible;
-	u32 start_lba_lo, start_lba_hi, device_id, datalength = 0;
+	u32 start_lba_lo, start_lba_hi, device_id, datalength = 0, ld;
 	struct MPI2_RAID_SCSI_IO_REQUEST *io_request;
 	union MEGASAS_REQUEST_DESCRIPTOR_UNION *req_desc;
 	struct IO_REQUEST_INFO io_info;
@@ -1833,6 +1833,8 @@ megasas_build_ldio_fusion(struct megasas_instance *instance,
 	struct MR_DRV_RAID_MAP_ALL *local_map_ptr;
 	u8 *raidLUN;
 	unsigned long spinlock_flags;
+	RAID_CONTEXT_UNION *pRAID_Context;
+	struct MR_LD_RAID *raid;
 
 	device_id = MEGASAS_DEV_INDEX(scp);
 
@@ -1911,6 +1913,8 @@ megasas_build_ldio_fusion(struct megasas_instance *instance,
 		io_info.isRead = 1;
 
 	local_map_ptr = fusion->ld_drv_map[(instance->map_id & 1)];
+	ld = MR_TargetIdToLdGet(device_id, local_map_ptr);
+	raid = MR_LdRaidGet(ld, local_map_ptr);
 
 	if ((MR_TargetIdToLdGet(device_id, local_map_ptr) >=
 		instance->fw_supported_vd_count) || (!fusion->fast_path_io)) {
@@ -1941,6 +1945,8 @@ megasas_build_ldio_fusion(struct megasas_instance *instance,
 			fp_possible = false;
 	}
 
+	pRAID_Context = &io_request->RaidContext;
+
 	if (fp_possible) {
 		megasas_set_pd_lba(io_request, scp->cmd_len, &io_info, scp,
 				   local_map_ptr, start_lba_lo);
@@ -1960,6 +1966,12 @@ megasas_build_ldio_fusion(struct megasas_instance *instance,
 			io_request->RaidContext.raid_context.regLockFlags |=
 			  (MR_RL_FLAGS_GRANT_DESTINATION_CUDA |
 			   MR_RL_FLAGS_SEQ_NUM_ENABLE);
+		} else if (instance->is_ventura) {
+			io_request->RaidContext.raid_context_g35.Type = MPI2_TYPE_CUDA;
+			io_request->RaidContext.raid_context_g35.nseg = 0x1;
+			io_request->RaidContext.raid_context_g35.routingFlags.bits.sqn = 1;
+			io_request->IoFlags |=
+				cpu_to_le16(MPI25_SAS_DEVICE0_FLAGS_ENABLED_FAST_PATH);
 		}
 		if ((fusion->load_balance_info[device_id].loadBalanceFlag) &&
 		    (io_info.isRead)) {
@@ -1969,6 +1981,13 @@ megasas_build_ldio_fusion(struct megasas_instance *instance,
 					&io_info);
 			scp->SCp.Status |= MEGASAS_LOAD_BALANCE_FLAG;
 			cmd->pd_r1_lb = io_info.pd_after_lb;
+			if (instance->is_ventura)
+				io_request->RaidContext.raid_context_g35.spanArm =
+					io_info.span_arm;
+			else
+				io_request->RaidContext.raid_context.spanArm =
+					io_info.span_arm;
+
 		} else
 			scp->SCp.Status &= ~MEGASAS_LOAD_BALANCE_FLAG;
 
@@ -1987,6 +2006,36 @@ megasas_build_ldio_fusion(struct megasas_instance *instance,
 		io_request->DevHandle = io_info.devHandle;
 		/* populate the LUN field */
 		memcpy(io_request->LUN, raidLUN, 8);
+		if (instance->is_ventura) {
+			if (io_info.isRead) {
+				if ((raid->cpuAffinity.pdRead.cpu0) &&
+							(raid->cpuAffinity.pdRead.cpu1))
+					pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+										MR_RAID_CTX_CPUSEL_FCFS;
+				else if (raid->cpuAffinity.pdRead.cpu1)
+					pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+										MR_RAID_CTX_CPUSEL_1;
+				else
+					pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+										MR_RAID_CTX_CPUSEL_0;
+			} else {
+				if ((raid->cpuAffinity.pdWrite.cpu0) &&
+							(raid->cpuAffinity.pdWrite.cpu1))
+					pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+										MR_RAID_CTX_CPUSEL_FCFS;
+				else if (raid->cpuAffinity.pdWrite.cpu1)
+					pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+										MR_RAID_CTX_CPUSEL_1;
+				else
+					pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+										MR_RAID_CTX_CPUSEL_0;
+				if (pRAID_Context->raid_context_g35.routingFlags.bits.sld) {
+					pRAID_Context->raid_context_g35.RAIDFlags =
+						(MR_RAID_FLAGS_IO_SUB_TYPE_CACHE_BYPASS
+						<< MR_RAID_CTX_RAID_FLAGS_IO_SUB_TYPE_SHIFT);
+				}
+			}
+		}
 	} else {
 		io_request->RaidContext.raid_context.timeoutValue =
 			cpu_to_le16(local_map_ptr->raidMap.fpPdIoTimeoutSec);
@@ -1996,7 +2045,7 @@ megasas_build_ldio_fusion(struct megasas_instance *instance,
 		if (fusion->adapter_type == INVADER_SERIES) {
 			if (io_info.do_fp_rlbypass ||
 				(io_request->RaidContext.raid_context.regLockFlags ==
-													REGION_TYPE_UNUSED))
+					REGION_TYPE_UNUSED))
 				cmd->request_desc->SCSIIO.RequestFlags =
 					(MEGASAS_REQ_DESCRIPT_FLAGS_NO_LOCK <<
 					MEGASAS_REQ_DESCRIPT_FLAGS_TYPE_SHIFT);
@@ -2005,9 +2054,48 @@ megasas_build_ldio_fusion(struct megasas_instance *instance,
 				(MR_RL_FLAGS_GRANT_DESTINATION_CPU0 |
 				 MR_RL_FLAGS_SEQ_NUM_ENABLE);
 			io_request->RaidContext.raid_context.nseg = 0x1;
+		} else if (instance->is_ventura) {
+			io_request->RaidContext.raid_context_g35.Type = MPI2_TYPE_CUDA;
+			io_request->RaidContext.raid_context_g35.routingFlags.bits.sqn = 1;
+			io_request->RaidContext.raid_context_g35.nseg = 0x1;
 		}
 		io_request->Function = MEGASAS_MPI2_FUNCTION_LD_IO_REQUEST;
 		io_request->DevHandle = cpu_to_le16(device_id);
+
+		if (instance->is_ventura) {
+			if (io_info.isRead) {
+				if ((raid->cpuAffinity.ldRead.cpu0) &&
+						(raid->cpuAffinity.ldRead.cpu1))
+					pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+										MR_RAID_CTX_CPUSEL_FCFS;
+				else if (raid->cpuAffinity.ldRead.cpu1)
+					pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+										MR_RAID_CTX_CPUSEL_1;
+				else
+					pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+										MR_RAID_CTX_CPUSEL_0;
+			} else {
+				if ((raid->cpuAffinity.ldWrite.cpu0) &&
+							(raid->cpuAffinity.ldWrite.cpu1))
+					pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+										MR_RAID_CTX_CPUSEL_FCFS;
+				else if (raid->cpuAffinity.ldWrite.cpu1)
+					pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+										MR_RAID_CTX_CPUSEL_1;
+				else
+					pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+										MR_RAID_CTX_CPUSEL_0;
+
+				if (io_request->RaidContext.raid_context_g35.streamDetected &&
+					(raid->level == 5) &&
+								(raid->writeMode == MR_RL_WRITE_THROUGH_MODE)) {
+					if (pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel ==
+								MR_RAID_CTX_CPUSEL_FCFS)
+						pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+						MR_RAID_CTX_CPUSEL_0;
+				}
+			}
+		}
 	} /* Not FP */
 }
 
@@ -2072,7 +2160,8 @@ static void megasas_build_ld_nonrw_fusion(struct megasas_instance *instance,
 
 		/* set RAID context values */
 		pRAID_Context->configSeqNum = raid->seqNum;
-		pRAID_Context->regLockFlags = REGION_TYPE_SHARED_READ;
+		if (!instance->is_ventura)
+			pRAID_Context->regLockFlags = REGION_TYPE_SHARED_READ;
 		pRAID_Context->timeoutValue = cpu_to_le16(raid->fpIoTimeoutForLd);
 
 		/* get the DevHandle for the PD (since this is
@@ -2146,8 +2235,11 @@ megasas_build_syspd_fusion(struct megasas_instance *instance,
 			cpu_to_le16(device_id + (MAX_PHYSICAL_DEVICES - 1));
 		pRAID_Context->configSeqNum = pd_sync->seq[pd_index].seqNum;
 		io_request->DevHandle = pd_sync->seq[pd_index].devHandle;
-		pRAID_Context->regLockFlags |=
-			(MR_RL_FLAGS_SEQ_NUM_ENABLE|MR_RL_FLAGS_GRANT_DESTINATION_CUDA);
+		if (instance->is_ventura)
+			io_request->RaidContext.raid_context_g35.routingFlags.bits.sqn = 1;
+		else
+			pRAID_Context->regLockFlags |=
+				(MR_RL_FLAGS_SEQ_NUM_ENABLE|MR_RL_FLAGS_GRANT_DESTINATION_CUDA);
 		pRAID_Context->Type = MPI2_TYPE_CUDA;
 		pRAID_Context->nseg = 0x1;
 	} else if (fusion->fast_path_io) {
@@ -2267,11 +2359,15 @@ megasas_build_io_fusion(struct megasas_instance *instance,
 		return 1;
 	}
 
-	/* numSGE store lower 8 bit of sge_count.
-	 * numSGEExt store higher 8 bit of sge_count
-	 */
-	io_request->RaidContext.raid_context.numSGE = sge_count;
-	io_request->RaidContext.raid_context.numSGEExt = (u8)(sge_count >> 8);
+	if (instance->is_ventura)
+		io_request->RaidContext.raid_context_g35.numSGE = sge_count;
+	else {
+		/* numSGE store lower 8 bit of sge_count.
+		 * numSGEExt store higher 8 bit of sge_count
+		 */
+		io_request->RaidContext.raid_context.numSGE = sge_count;
+		io_request->RaidContext.raid_context.numSGEExt = (u8)(sge_count >> 8);
+	}
 
 	io_request->SGLFlags = cpu_to_le16(MPI2_SGE_FLAGS_64_BIT_ADDRESSING);
 
@@ -2320,6 +2416,10 @@ void megasas_fpio_to_ldio(struct megasas_instance *instance,
 	struct megasas_cmd_fusion *cmd, struct scsi_cmnd *scmd)
 {
 	struct fusion_context *fusion;
+	RAID_CONTEXT_UNION *pRAID_Context;
+	struct MR_LD_RAID *raid;
+	struct MR_DRV_RAID_MAP_ALL *local_map_ptr;
+	u32 device_id, ld;
 	fusion = instance->ctrl_context;
 	
 	cmd->request_desc->SCSIIO.RequestFlags =
@@ -2343,6 +2443,34 @@ void megasas_fpio_to_ldio(struct megasas_instance *instance,
 	cmd->io_request->Control = 0;
 	cmd->io_request->EEDPBlockSize = 0;
 	cmd->isRaid_1_fp_write = 0;
+
+	device_id = MEGASAS_DEV_INDEX(cmd->scmd);
+	local_map_ptr = fusion->ld_drv_map[(instance->map_id & 1)];
+	ld = MR_TargetIdToLdGet(device_id, local_map_ptr);
+	raid = MR_LdRaidGet(ld, local_map_ptr);
+	pRAID_Context = &cmd->io_request->RaidContext;
+	if (cmd->scmd->sc_data_direction == PCI_DMA_FROMDEVICE) {
+		if ((raid->cpuAffinity.ldRead.cpu0) && (raid->cpuAffinity.ldRead.cpu1))
+			pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+								MR_RAID_CTX_CPUSEL_FCFS;
+		else if (raid->cpuAffinity.ldRead.cpu1)
+			pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+								MR_RAID_CTX_CPUSEL_1;
+		else
+			pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+								MR_RAID_CTX_CPUSEL_0;
+	} else {
+		if ((raid->cpuAffinity.ldWrite.cpu0) &&
+						(raid->cpuAffinity.ldWrite.cpu1))
+			pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+								MR_RAID_CTX_CPUSEL_FCFS;
+		else if (raid->cpuAffinity.ldWrite.cpu1)
+			pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+								MR_RAID_CTX_CPUSEL_1;
+		else
+			pRAID_Context->raid_context_g35.routingFlags.bits.cpuSel =
+								MR_RAID_CTX_CPUSEL_0;
+	}
 }
 /*megasas_prepate_secondRaid1_IO
  * It prepares the raid 1 second IO
