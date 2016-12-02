@@ -22,6 +22,8 @@ Optional properties:
 	the reset-gpios (if any) are asserted
 - post-power-on-delay-ms : Delay in ms after powering the card and
 	de-asserting the reset-gpios (if any)
+- invert-off-state: Invert the power down state for the reset-gpios (if any)
+	and pwrdn-gpios (if any)
 
 Example:
 

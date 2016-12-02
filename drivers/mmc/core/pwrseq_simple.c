@@ -26,6 +26,7 @@
 struct mmc_pwrseq_simple {
 	struct mmc_pwrseq pwrseq;
 	bool clk_enabled;
+	bool invert_off_state;
 	u32 pre_power_on_delay_ms;
 	u32 post_power_on_delay_ms;
 	struct clk *ext_clk;
@@ -80,9 +81,10 @@ static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
 static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
 {
 	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
+	unsigned int off_state = !(pwrseq->invert_off_state);
 
-	mmc_pwrseq_simple_set_gpios_value(pwrseq, pwrseq->reset_gpios, 1);
-	mmc_pwrseq_simple_set_gpios_value(pwrseq, pwrseq->pwrdn_gpios, 1);
+	mmc_pwrseq_simple_set_gpios_value(pwrseq, pwrseq->reset_gpios, off_state);
+	mmc_pwrseq_simple_set_gpios_value(pwrseq, pwrseq->pwrdn_gpios, off_state);
 
 	if (!IS_ERR(pwrseq->ext_clk) && pwrseq->clk_enabled) {
 		clk_disable_unprepare(pwrseq->ext_clk);
@@ -107,6 +109,7 @@ static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
 {
 	struct mmc_pwrseq_simple *pwrseq;
 	struct device *dev = &pdev->dev;
+	bool invert_off_state = false;
 
 	pwrseq = devm_kzalloc(dev, sizeof(*pwrseq), GFP_KERNEL);
 	if (!pwrseq)
@@ -116,8 +119,11 @@ static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
 	if (IS_ERR(pwrseq->ext_clk) && PTR_ERR(pwrseq->ext_clk) != -ENOENT)
 		return PTR_ERR(pwrseq->ext_clk);
 
+	if (device_property_read_bool(dev, "invert-off-state"))
+		invert_off_state = true;
+
 	pwrseq->reset_gpios = devm_gpiod_get_array(dev, "reset",
-							GPIOD_OUT_HIGH);
+			invert_off_state ? GPIOD_OUT_LOW : GPIOD_OUT_HIGH);
 	if (IS_ERR(pwrseq->reset_gpios) &&
 	    PTR_ERR(pwrseq->reset_gpios) != -ENOENT &&
 	    PTR_ERR(pwrseq->reset_gpios) != -ENOSYS) {
@@ -125,7 +131,7 @@ static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
 	}
 
 	pwrseq->pwrdn_gpios = devm_gpiod_get_array(dev, "pwrdn",
-							GPIOD_OUT_HIGH);
+			invert_off_state ? GPIOD_OUT_LOW : GPIOD_OUT_HIGH);
 
 	device_property_read_u32(dev, "pre-power-on-delay-ms",
 				 &pwrseq->pre_power_on_delay_ms);
@@ -136,6 +142,7 @@ static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
 	pwrseq->pwrseq.dev = dev;
 	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
 	pwrseq->pwrseq.owner = THIS_MODULE;
+	pwrseq->invert_off_state = invert_off_state;
 	platform_set_drvdata(pdev, pwrseq);
 
 	return mmc_pwrseq_register(&pwrseq->pwrseq);
