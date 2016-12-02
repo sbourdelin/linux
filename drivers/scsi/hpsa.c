@@ -90,6 +90,10 @@ static int hpsa_simple_mode;
 module_param(hpsa_simple_mode, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(hpsa_simple_mode,
 	"Use 'simple mode' rather than 'performant mode'");
+static int hpsa_expose_enclosure;
+module_param(hpsa_expose_enclosure, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(hpsa_expose_enclosure,
+	     "Expose enclosure devices to the OS");
 
 /* define the PCI info for the cards we can control */
 static const struct pci_device_id hpsa_pci_device_id[] = {
@@ -4386,7 +4390,11 @@ static void hpsa_update_scsi_devices(struct ctlr_info *h)
 		 * Expose all devices except for physical devices that
 		 * are masked.
 		 */
-		if (MASKED_DEVICE(lunaddrbytes) && this_device->physical_device)
+		if (hpsa_expose_enclosure &&
+		    this_device->devtype == TYPE_ENCLOSURE)
+			this_device->expose_device = 1;
+		else if (MASKED_DEVICE(lunaddrbytes) &&
+			 this_device->physical_device)
 			this_device->expose_device = 0;
 		else
 			this_device->expose_device = 1;
