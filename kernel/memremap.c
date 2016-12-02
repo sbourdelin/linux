@@ -296,8 +296,8 @@ void *devm_memremap_pages(struct device *dev, struct resource *res,
 		IORESOURCE_SYSTEM_RAM, IORES_DESC_NONE);
 
 	if (is_ram == REGION_MIXED) {
-		WARN_ONCE(1, "%s attempted on mixed region %pr\n",
-				__func__, res);
+		WARN_ONCE(1, "%s attempted on mixed region %pr or arguments not aligned to section size: %#lx\n",
+				__func__, res, SECTION_SIZE);
 		return ERR_PTR(-ENXIO);
 	}
 
