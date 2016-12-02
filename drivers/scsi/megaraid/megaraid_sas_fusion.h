@@ -133,11 +133,99 @@ struct RAID_CONTEXT {
 	u8      resvd2;
 };
 
+/*
+* Raid Context structure which describes ventura MegaRAID specific
+* IO Paramenters ,This resides at offset 0x60 where the SGL normally
+* starts in MPT IO Frames
+*/
+typedef struct _RAID_CONTEXT_G35 {
+#if   defined(__BIG_ENDIAN_BITFIELD)
+	u16	resvd0:8;
+	u16	nseg:4;
+	u16	Type:4;
+#else
+	u16	Type:4;		    /* 0x00 */
+	u16	nseg:4;		    /* 0x00 */
+	u16     resvd0:8;
+#endif
+	u16     timeoutValue; /* 0x02 -0x03 */
+	union {
+		struct {
+#if	defined(__BIG_ENDIAN_BITFIELD)
+		u16	setDivert:4;
+		u16	cpuSel:4;
+		u16	log:1;
+		u16	rw:1;
+		u16	sbs:1;
+		u16	sqn:1;
+		u16	fwn:1;
+		u16	c2f:1;
+		u16	sld:1;
+		u16	reserved:1;
+#else
+		u16	reserved:1;
+		u16	sld:1;
+		u16	c2f:1;
+		u16	fwn:1;
+		u16	sqn:1;
+		u16	sbs:1;
+		u16	rw:1;
+		u16	log:1;
+		u16	cpuSel:4;
+		u16	setDivert:4;
+#endif
+			} bits;
+		u16 s;
+	} routingFlags;	/* 0x04 -0x05 routing flags */
+
+	u16     VirtualDiskTgtId;   /* 0x06 -0x07 */
+
+	u64     regLockRowLBA;      /* 0x08 - 0x0F */
+
+	u32     regLockLength;      /* 0x10 - 0x13 */
+
+	union {
+		u16     nextLMId;           /* 0x14 - 0x15 */
+		u16	peerSMID;	/* used for the raid 1/10 fp writes */
+	} smid;
+	u8      exStatus;       /* 0x16 : OUT */
+	u8      status;             /* 0x17 status */
+
+	u8      RAIDFlags;          /* 0x18 resvd[7:6], ioSubType[5:4],
+								* resvd[3:1], preferredCpu[0] 
+								*/
+	u8      spanArm;            /* 0x1C span[7:5], arm[4:0] */
+	u16	configSeqNum;           /* 0x1A -0x1B */
+#if   defined(__BIG_ENDIAN_BITFIELD)              /* 0x1C Â– 0x1D */
+	u16     streamDetected:1;
+	u16     reserved:3;
+	u16     numSGE:12;
+#else
+	u16     numSGE:12;
+	u16     reserved:3;
+	u16     streamDetected:1;
+#endif
+	u8      resvd2[2];          /* 0x1E-0x1F */
+} RAID_CONTEXT_G35;
+
+typedef union _RAID_CONTEXT_UNION {
+	struct RAID_CONTEXT raid_context;
+	RAID_CONTEXT_G35 raid_context_g35;
+} RAID_CONTEXT_UNION, *PRAID_CONTEXT_UNION;
+
 #define RAID_CTX_SPANARM_ARM_SHIFT	(0)
 #define RAID_CTX_SPANARM_ARM_MASK	(0x1f)
 
 #define RAID_CTX_SPANARM_SPAN_SHIFT	(5)
 #define RAID_CTX_SPANARM_SPAN_MASK	(0xE0)
+
+/* number of bits per index in U32 TrackStream */
+#define BITS_PER_INDEX_STREAM		4
+#define INVALID_STREAM_NUM              16
+#define MR_STREAM_BITMAP		0x76543210
+#define STREAM_MASK			((1 << BITS_PER_INDEX_STREAM) - 1)
+#define ZERO_LAST_STREAM		0x0fffffff
+#define MAX_STREAMS_TRACKED 		8
 
 /*
  * define region lock types
@@ -409,7 +497,7 @@ struct MPI2_RAID_SCSI_IO_REQUEST {
 	u8                      LUN[8];                         /* 0x34 */
 	__le32			Control;                        /* 0x3C */
 	union MPI2_SCSI_IO_CDB_UNION  CDB;			/* 0x40 */
-	struct RAID_CONTEXT	RaidContext;                    /* 0x60 */
+	RAID_CONTEXT_UNION            RaidContext;  /* 0x60 */
 	union MPI2_SGE_IO_UNION       SGL;			/* 0x80 */
 };
 
@@ -656,11 +744,13 @@ struct MR_LD_RAID {
 		u32     encryptionType:8;
 		u32     pdPiMode:4;
 		u32     ldPiMode:4;
-		u32     reserved5:3;
+		u32     reserved5:2;
+		u32     raCapable:1;
 		u32     fpCapable:1;
 #else
 		u32     fpCapable:1;
-		u32     reserved5:3;
+		u32     raCapable:1;
+		u32     reserved5:2;
 		u32     ldPiMode:4;
 		u32     pdPiMode:4;
 		u32     encryptionType:8;
@@ -745,6 +835,7 @@ struct IO_REQUEST_INFO {
 	u64 start_row;
 	u8  span_arm;	/* span[7:5], arm[4:0] */
 	u8  pd_after_lb;
+	bool raCapable;
 };
 
 struct MR_LD_TARGET_SYNC {
@@ -930,6 +1021,31 @@ struct MR_PD_CFG_SEQ_NUM_SYNC {
 	struct MR_PD_CFG_SEQ seq[1];
 } __packed;
 
+/* stream detection */
+typedef struct _STREAM_DETECT {
+	u64 nextSeqLBA; /* next LBA to match sequential access */
+	struct megasas_cmd_fusion *first_cmd_fusion; /* first cmd in group */
+	struct megasas_cmd_fusion *last_cmd_fusion; /* last cmd in group */
+	u32 countCmdsInStream; /* count of host commands in this stream */
+	u16 numSGEsInGroup; /* total number of SGEs in grouped IOs */
+	u8 isRead; /* SCSI OpCode for this stream */
+	u8 groupDepth; /* total number of host commands in group */
+	bool groupFlush; /* TRUE if cannot add any more commands to this group */
+	u8 reserved[7]; /* pad to 64-bit alignment */
+} STREAM_DETECT, *PTR_STREAM_DETECT;
+
+typedef struct _LD_STREAM_DETECT {
+	bool writeBack; /* TRUE if WB, FALSE if WT */
+	bool FPWriteEnabled;
+	bool membersSSDs;
+	bool fpCacheBypassCapable;
+	u32 mruBitMap; /* bitmap used to track MRU and LRU stream indicies */
+	volatile long iosToFware; /* current count of RW IOs sent to Fware */
+	volatile long writeBytesOutstanding; /* not used in first implementation */
+	/* this is the array of stream detect structures (one per stream) */
+	STREAM_DETECT streamTrack[MAX_STREAMS_TRACKED];
+} LD_STREAM_DETECT, *PTR_LD_STREAM_DETECT;
+
 struct MPI2_IOC_INIT_RDPQ_ARRAY_ENTRY {
 	u64 RDPQBaseAddress;
 	u32 Reserved1;
@@ -983,6 +1099,7 @@ struct fusion_context {
 	struct LD_LOAD_BALANCE_INFO load_balance_info[MAX_LOGICAL_DRIVES_EXT];
 	LD_SPAN_INFO log_to_span[MAX_LOGICAL_DRIVES_EXT];
 	u8 adapter_type;
+	PTR_LD_STREAM_DETECT  *streamDetectByLD;
 };
 
 union desc_value {
