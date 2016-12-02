@@ -1586,6 +1586,9 @@ static int stmmac_init_dma_engine(struct stmmac_priv *priv)
 		return -EINVAL;
 	}
 
+	if (!priv->plat->dma_cfg->pbl)
+		priv->plat->dma_cfg->pbl = DEFAULT_DMA_PBL;
+
 	if (priv->extend_desc && (priv->mode == STMMAC_RING_MODE))
 		atds = 1;
 
