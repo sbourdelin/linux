@@ -274,8 +274,7 @@ static int intersect_rates(const int *source_rates, int source_len,
 	return k;
 }
 
-static int intel_dp_common_rates(struct intel_dp *intel_dp,
-				 int *common_rates)
+static int intel_dp_common_rates(struct intel_dp *intel_dp)
 {
 	const int *source_rates, *sink_rates;
 	int source_len, sink_len;
@@ -285,7 +284,7 @@ static int intel_dp_common_rates(struct intel_dp *intel_dp,
 
 	return intersect_rates(source_rates, source_len,
 			       sink_rates, sink_len,
-			       common_rates);
+			       intel_dp->common_rates);
 }
 
 static enum drm_mode_status
@@ -312,7 +311,7 @@ intel_dp_mode_valid(struct drm_connector *connector,
 	}
 
 	max_link_clock = intel_dp_max_link_rate(intel_dp);
-	max_lanes = intel_dp_max_lane_count(intel_dp);
+	max_lanes = intel_dp->max_lane_count;
 
 	max_rate = intel_dp_max_data_rate(max_link_clock, max_lanes);
 	mode_rate = intel_dp_link_required(target_clock, 18);
@@ -1430,8 +1429,7 @@ static void snprintf_int_array(char *str, size_t len,
 static void intel_dp_print_rates(struct intel_dp *intel_dp)
 {
 	const int *source_rates, *sink_rates;
-	int source_len, sink_len, common_len;
-	int common_rates[DP_MAX_SUPPORTED_RATES];
+	int source_len, sink_len;
 	char str[128]; /* FIXME: too big for stack? */
 
 	if ((drm_debug & DRM_UT_KMS) == 0)
@@ -1445,8 +1443,8 @@ static void intel_dp_print_rates(struct intel_dp *intel_dp)
 	snprintf_int_array(str, sizeof(str), sink_rates, sink_len);
 	DRM_DEBUG_KMS("sink rates: %s\n", str);
 
-	common_len = intel_dp_common_rates(intel_dp, common_rates);
-	snprintf_int_array(str, sizeof(str), common_rates, common_len);
+	snprintf_int_array(str, sizeof(str), intel_dp->common_rates,
+			   intel_dp->common_len);
 	DRM_DEBUG_KMS("common rates: %s\n", str);
 }
 
@@ -1495,14 +1493,12 @@ static int rate_to_index(int find, const int *rates)
 int
 intel_dp_max_link_rate(struct intel_dp *intel_dp)
 {
-	int rates[DP_MAX_SUPPORTED_RATES] = {};
-	int len;
+	int len = intel_dp->common_len;
 
-	len = intel_dp_common_rates(intel_dp, rates);
 	if (WARN_ON(len <= 0))
 		return 162000;
 
-	return rates[len - 1];
+	return intel_dp->common_rates[len - 1];
 }
 
 int intel_dp_rate_select(struct intel_dp *intel_dp, int rate)
@@ -1550,22 +1546,18 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 	struct intel_connector *intel_connector = intel_dp->attached_connector;
 	int lane_count, clock;
 	int min_lane_count = 1;
-	int max_lane_count = intel_dp_max_lane_count(intel_dp);
+	int max_lane_count = intel_dp->max_lane_count;
 	/* Conveniently, the link BW constants become indices with a shift...*/
 	int min_clock = 0;
 	int max_clock;
 	int bpp, mode_rate;
 	int link_avail, link_clock;
-	int common_rates[DP_MAX_SUPPORTED_RATES] = {};
-	int common_len;
 	uint8_t link_bw, rate_select;
 
-	common_len = intel_dp_common_rates(intel_dp, common_rates);
-
 	/* No common link rates between source and sink */
-	WARN_ON(common_len <= 0);
+	WARN_ON(intel_dp->common_len <= 0);
 
-	max_clock = common_len - 1;
+	max_clock = intel_dp->common_len - 1;
 
 	if (HAS_PCH_SPLIT(dev_priv) && !HAS_DDI(dev_priv) && port != PORT_A)
 		pipe_config->has_pch_encoder = true;
@@ -1597,7 +1589,7 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 
 	DRM_DEBUG_KMS("DP link computation with max lane count %i "
 		      "max bw %d pixel clock %iKHz\n",
-		      max_lane_count, common_rates[max_clock],
+		      max_lane_count, intel_dp->common_rates[max_clock],
 		      adjusted_mode->crtc_clock);
 
 	/* Walk through all bpp values. Luckily they're all nicely spaced with 2
@@ -1633,7 +1625,7 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 				lane_count <= max_lane_count;
 				lane_count <<= 1) {
 
-				link_clock = common_rates[clock];
+				link_clock = intel_dp->common_rates[clock];
 				link_avail = intel_dp_max_data_rate(link_clock,
 								    lane_count);
 
@@ -1663,7 +1655,7 @@ found:
 	pipe_config->lane_count = lane_count;
 
 	pipe_config->pipe_bpp = bpp;
-	pipe_config->port_clock = common_rates[clock];
+	pipe_config->port_clock = intel_dp->common_rates[clock];
 
 	intel_dp_compute_rate(intel_dp, pipe_config->port_clock,
 			      &link_bw, &rate_select);
@@ -4395,7 +4387,9 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 		      yesno(intel_dp_source_supports_hbr2(intel_dp)),
 		      yesno(drm_dp_tps3_supported(intel_dp->dpcd)));
 
+	intel_dp->common_len = intel_dp_common_rates(intel_dp);
 	intel_dp_print_rates(intel_dp);
+	intel_dp->max_lane_count = intel_dp_max_lane_count(intel_dp);
 
 	intel_dp_read_desc(intel_dp);
 
