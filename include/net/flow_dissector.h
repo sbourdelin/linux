@@ -199,10 +199,30 @@ struct flow_keys_digest {
 void make_flow_keys_digest(struct flow_keys_digest *digest,
 			   const struct flow_keys *flow);
 
+static inline bool flow_protos_are_icmpv4(__be16 n_proto, u8 ip_proto)
+{
+	return n_proto == htons(ETH_P_IP) && ip_proto == IPPROTO_ICMP;
+}
+
+static inline bool flow_protos_are_icmpv6(__be16 n_proto, u8 ip_proto)
+{
+	return n_proto == htons(ETH_P_IPV6) && ip_proto == IPPROTO_ICMPV6;
+}
+
 static inline bool flow_protos_are_icmp_any(__be16 n_proto, u8 ip_proto)
 {
-	return (n_proto == htons(ETH_P_IP) && ip_proto == IPPROTO_ICMP) ||
-		(n_proto == htons(ETH_P_IPV6) && ip_proto == IPPROTO_ICMPV6);
+	return flow_protos_are_icmpv4(n_proto, ip_proto) ||
+		flow_protos_are_icmpv6(n_proto, ip_proto);
+}
+
+static inline bool flow_basic_key_is_icmpv4(const struct flow_dissector_key_basic *basic)
+{
+	return flow_protos_are_icmpv4(basic->n_proto, basic->ip_proto);
+}
+
+static inline bool flow_basic_key_is_icmpv6(const struct flow_dissector_key_basic *basic)
+{
+	return flow_protos_are_icmpv6(basic->n_proto, basic->ip_proto);
 }
 
 static inline bool flow_keys_are_icmp_any(const struct flow_keys *keys)
