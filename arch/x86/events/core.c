@@ -365,7 +365,7 @@ int x86_add_exclusive(unsigned int what)
 {
 	int i;
 
-	if (x86_pmu.lbr_pt_coexist)
+	if (what == x86_lbr_exclusive_pt && x86_pmu.lbr_pt_coexist)
 		return 0;
 
 	if (!atomic_inc_not_zero(&x86_pmu.lbr_exclusive[what])) {
@@ -388,7 +388,7 @@ fail_unlock:
 
 void x86_del_exclusive(unsigned int what)
 {
-	if (x86_pmu.lbr_pt_coexist)
+	if (what == x86_lbr_exclusive_pt && x86_pmu.lbr_pt_coexist)
 		return;
 
 	atomic_dec(&x86_pmu.lbr_exclusive[what]);
