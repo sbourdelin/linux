@@ -112,7 +112,7 @@ int analogix_dp_enable_psr(struct device *dev)
 	struct edp_vsc_psr psr_vsc;
 
 	if (!dp->psr_support)
-		return -EINVAL;
+		return 0;
 
 	/* Prepare VSC packet as per EDP 1.4 spec, Table 6.9 */
 	memset(&psr_vsc, 0, sizeof(psr_vsc));
@@ -135,7 +135,7 @@ int analogix_dp_disable_psr(struct device *dev)
 	struct edp_vsc_psr psr_vsc;
 
 	if (!dp->psr_support)
-		return -EINVAL;
+		return 0;
 
 	/* Prepare VSC packet as per EDP 1.4 spec, Table 6.9 */
 	memset(&psr_vsc, 0, sizeof(psr_vsc));
@@ -878,6 +878,8 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
 	dp->psr_support = analogix_dp_detect_sink_psr(dp);
 	if (dp->psr_support)
 		analogix_dp_enable_sink_psr(dp);
+	else
+		dev_warn(dp->dev, "Sink not support PSR\n");
 }
 
 /*
