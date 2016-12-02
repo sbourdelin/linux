@@ -199,10 +199,15 @@ static void recalculate_apic_map(struct kvm *kvm)
 		xapic_id = kvm_xapic_id(apic);
 		x2apic_id = kvm_x2apic_id(apic);
 
-		if (apic_x2apic_mode(apic) &&
+		/* Hotplug hack: see kvm_apic_match_physical_addr(), ... */
+		if ((apic_x2apic_mode(apic) || x2apic_id > 0xff) &&
 				x2apic_id <= new->max_apic_id)
 			new->phys_map[x2apic_id] = apic;
-		else if (!apic_x2apic_mode(apic))
+		/*
+		 * ... xAPIC ID of VCPUs with APIC ID > 0xff will wrap-around,
+		 * prevent them from masking VCPUs with APIC ID <= 0xff.
+		 */
+		if (!apic_x2apic_mode(apic) && !new->phys_map[xapic_id])
 			new->phys_map[xapic_id] = apic;
 
 		ldr = kvm_lapic_get_reg(apic, APIC_LDR);
@@ -611,6 +616,10 @@ static bool kvm_apic_match_physical_addr(struct kvm_lapic *apic, u32 mda)
 
 	if (apic_x2apic_mode(apic))
 		return mda == kvm_x2apic_id(apic);
+
+	/* Hotplug hack: LAPIC in xAPIC mode also accepts x2APIC. */
+	if (kvm_x2apic_id(apic) > 0xff && mda == kvm_x2apic_id(apic))
+		return true;
 
 	return mda == kvm_xapic_id(apic);
 }
