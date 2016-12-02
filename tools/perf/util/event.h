@@ -237,6 +237,7 @@ enum perf_user_event_type { /* above any possible kernel type */
 	PERF_RECORD_STAT_ROUND			= 77,
 	PERF_RECORD_EVENT_UPDATE		= 78,
 	PERF_RECORD_TIME_CONV			= 79,
+	PERF_RECORD_USER_OVERHEAD		= 80,
 	PERF_RECORD_HEADER_MAX
 };
 
@@ -488,6 +489,10 @@ struct time_conv_event {
 	u64 time_shift;
 	u64 time_mult;
 	u64 time_zero;
+};
+
+enum perf_user_overhead_event_type { /* above any possible kernel type */
+	PERF_USER_OVERHEAD_TYPE_START	= 100,
 };
 
 struct perf_overhead {
