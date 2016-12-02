@@ -339,6 +339,7 @@ MODULE_LICENSE("GPL");
 static struct nf_conntrack_l4proto *builtin_l4proto4[] = {
 	&nf_conntrack_l4proto_tcp4,
 	&nf_conntrack_l4proto_udp4,
+	&nf_conntrack_l4proto_udplite4,
 	&nf_conntrack_l4proto_icmp,
 };
 
