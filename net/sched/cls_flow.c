@@ -96,7 +96,7 @@ static u32 flow_get_proto(const struct sk_buff *skb,
 static u32 flow_get_proto_src(const struct sk_buff *skb,
 			      const struct flow_keys *flow)
 {
-	if (flow->ports.ports)
+	if (!flow_keys_are_icmp_any(flow) && flow->ports.ports)
 		return ntohs(flow->ports.src);
 
 	return addr_fold(skb->sk);
@@ -105,7 +105,7 @@ static u32 flow_get_proto_src(const struct sk_buff *skb,
 static u32 flow_get_proto_dst(const struct sk_buff *skb,
 			      const struct flow_keys *flow)
 {
-	if (flow->ports.ports)
+	if (!flow_keys_are_icmp_any(flow) && flow->ports.ports)
 		return ntohs(flow->ports.dst);
 
 	return addr_fold(skb_dst(skb)) ^ (__force u16) tc_skb_protocol(skb);

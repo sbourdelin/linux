@@ -1094,6 +1094,11 @@ u32 __skb_get_poff(const struct sk_buff *skb, void *data,
 __be32 __skb_flow_get_ports(const struct sk_buff *skb, int thoff, u8 ip_proto,
 			    void *data, int hlen_proto);
 
+static inline bool skb_flow_is_icmp_any(const struct sk_buff *skb, u8 ip_proto)
+{
+	return flow_protos_are_icmp_any(skb->protocol, ip_proto);
+}
+
 static inline __be32 skb_flow_get_ports(const struct sk_buff *skb,
 					int thoff, u8 ip_proto)
 {

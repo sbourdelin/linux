@@ -3181,7 +3181,8 @@ static bool bond_flow_dissect(struct bonding *bond, struct sk_buff *skb,
 	} else {
 		return false;
 	}
-	if (bond->params.xmit_policy == BOND_XMIT_POLICY_LAYER34 && proto >= 0)
+	if (bond->params.xmit_policy == BOND_XMIT_POLICY_LAYER34 &&
+	    proto >= 0 && !skb_flow_is_icmp_any(skb, proto))
 		fk->ports.ports = skb_flow_get_ports(skb, noff, proto);
 
 	return true;
@@ -3209,7 +3210,8 @@ u32 bond_xmit_hash(struct bonding *bond, struct sk_buff *skb)
 		return bond_eth_hash(skb);
 
 	if (bond->params.xmit_policy == BOND_XMIT_POLICY_LAYER23 ||
-	    bond->params.xmit_policy == BOND_XMIT_POLICY_ENCAP23)
+	    bond->params.xmit_policy == BOND_XMIT_POLICY_ENCAP23 ||
+	    flow_keys_are_icmp_any(&flow))
 		hash = bond_eth_hash(skb);
 	else
 		hash = (__force u32)flow.ports.ports;
