@@ -414,6 +414,13 @@ include::itrace.txt[]
 
 --show-profiling-cost:
 	Show extra time cost during perf profiling
+	Sort the extra time cost by CPU
+	If CPU information is not available in perf_sample, using -1 instead.
+	The time cost include:
+	- SAM: sample overhead. For x86, it's the time cost in perf NMI handler.
+	- MUX: multiplexing overhead. The time cost spends on rotate context.
+	- SB: side-band events overhead. The time cost spends on iterating all
+	      events that need to receive side-band events.
 
 include::callchain-overhead-calculation.txt[]
 

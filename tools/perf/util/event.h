@@ -245,6 +245,12 @@ enum auxtrace_error_type {
 	PERF_AUXTRACE_ERROR_MAX
 };
 
+struct total_overhead {
+	struct perf_overhead_entry	total_sample[MAX_NR_CPUS + 1];
+	struct perf_overhead_entry	total_mux[MAX_NR_CPUS + 1];
+	struct perf_overhead_entry	total_sb[MAX_NR_CPUS + 1];
+};
+
 /*
  * The kernel collects the number of events it couldn't send in a stretch and
  * when possible sends this number in a PERF_RECORD_LOST event. The number of
@@ -262,6 +268,9 @@ enum auxtrace_error_type {
  * multipling nr_events[PERF_EVENT_SAMPLE] by a frequency isn't possible to get
  * the total number of low level events, it is necessary to to sum all struct
  * sample_event.period and stash the result in total_period.
+ *
+ * The overhead tells the perf profiling time cost on each CPU. The cost can be
+ * divided into sampling cost, multiplexing cost and side-band events cost.
  */
 struct events_stats {
 	u64 total_period;
@@ -270,6 +279,7 @@ struct events_stats {
 	u64 total_lost_samples;
 	u64 total_aux_lost;
 	u64 total_invalid_chains;
+	struct total_overhead overhead;
 	u32 nr_events[PERF_RECORD_HEADER_MAX];
 	u32 nr_non_filtered_samples;
 	u32 nr_lost_warned;

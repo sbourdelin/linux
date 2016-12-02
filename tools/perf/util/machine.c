@@ -557,9 +557,31 @@ int machine__process_switch_event(struct machine *machine __maybe_unused,
 
 int machine__process_overhead_event(struct machine *machine __maybe_unused,
 				    union perf_event *event,
-				    struct perf_sample *sample __maybe_unused)
+				    struct perf_sample *sample)
 {
-	dump_printf("\tUNSUPPORT TYPE 0x%lx!\n", event->overhead.type);
+	switch (event->overhead.type) {
+	case PERF_PMU_SAMPLE_OVERHEAD:
+		dump_printf(" SAMPLE nr: %llu  time: %llu cpu %d\n",
+			    event->overhead.entry.nr,
+			    event->overhead.entry.time,
+			    sample->cpu);
+		break;
+	case PERF_CORE_MUX_OVERHEAD:
+		dump_printf(" MULTIPLEXING nr: %llu  time: %llu cpu %d\n",
+			    event->overhead.entry.nr,
+			    event->overhead.entry.time,
+			    sample->cpu);
+		break;
+	case PERF_CORE_SB_OVERHEAD:
+		dump_printf(" SIDE-BAND nr: %llu  time: %llu cpu %d\n",
+			    event->overhead.entry.nr,
+			    event->overhead.entry.time,
+			    sample->cpu);
+		break;
+	default:
+		dump_printf("\tUNSUPPORT TYPE 0x%lx!\n", event->overhead.type);
+		return 0;
+	}
 	return 0;
 }
 

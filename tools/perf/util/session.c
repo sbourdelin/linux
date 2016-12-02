@@ -1207,6 +1207,36 @@ static int
 					    &sample->read.one, machine);
 }
 
+static void
+overhead_stats_update(struct perf_tool *tool,
+		      struct perf_evlist *evlist,
+		      union perf_event *event,
+		      int cpu)
+{
+	if (tool->overhead != perf_event__process_overhead)
+		return;
+
+	if (cpu < 0)
+		cpu = MAX_NR_CPUS;
+
+	switch (event->overhead.type) {
+	case PERF_PMU_SAMPLE_OVERHEAD:
+		evlist->stats.overhead.total_sample[cpu].nr += event->overhead.entry.nr;
+		evlist->stats.overhead.total_sample[cpu].time += event->overhead.entry.time;
+		break;
+	case PERF_CORE_MUX_OVERHEAD:
+		evlist->stats.overhead.total_mux[cpu].nr += event->overhead.entry.nr;
+		evlist->stats.overhead.total_mux[cpu].time += event->overhead.entry.time;
+		break;
+	case PERF_CORE_SB_OVERHEAD:
+		evlist->stats.overhead.total_sb[cpu].nr += event->overhead.entry.nr;
+		evlist->stats.overhead.total_sb[cpu].time += event->overhead.entry.time;
+		break;
+	default:
+		break;
+	}
+}
+
 static int machines__deliver_event(struct machines *machines,
 				   struct perf_evlist *evlist,
 				   union perf_event *event,
@@ -1271,6 +1301,7 @@ static int machines__deliver_event(struct machines *machines,
 	case PERF_RECORD_SWITCH_CPU_WIDE:
 		return tool->context_switch(tool, event, sample, machine);
 	case PERF_RECORD_OVERHEAD:
+		overhead_stats_update(tool, evlist, event, sample->cpu);
 		return tool->overhead(tool, event, sample, machine);
 	default:
 		++evlist->stats.nr_unknown_events;
@@ -2038,20 +2069,60 @@ void perf_session__fprintf_info(struct perf_session *session, FILE *fp,
 	fprintf(fp, "# ========\n#\n");
 }
 
-void perf_session__fprintf_overhead_info(struct perf_session *session, FILE *fp,
-					 const char *cpu_list __maybe_unused,
-					 unsigned long *cpu_bitmap __maybe_unused)
+static void
+perf_session__fprintf_overhead_body(struct perf_evlist *evlist,
+				    FILE *fp, int cpu)
 {
-	if (session == NULL || fp == NULL)
+	if (!evlist->stats.overhead.total_sample[cpu].nr &&
+	    !evlist->stats.overhead.total_mux[cpu].nr &&
+	    !evlist->stats.overhead.total_sb[cpu].nr)
 		return;
 
-	if (!perf_evlist__overhead(session->evlist)) {
-		fprintf(fp, "#\n# No profiling time cost information available.\n#\n");
+	fprintf(stdout, "# %3d ", (cpu == MAX_NR_CPUS) ? -1 : cpu);
+
+	fprintf(stdout, "%10llu %14llu ",
+		evlist->stats.overhead.total_sample[cpu].nr,
+		evlist->stats.overhead.total_sample[cpu].time);
+	fprintf(stdout, "%10llu %14llu ",
+		evlist->stats.overhead.total_mux[cpu].nr,
+		evlist->stats.overhead.total_mux[cpu].time);
+	fprintf(stdout, "%10llu %14llu ",
+		evlist->stats.overhead.total_sb[cpu].nr,
+		evlist->stats.overhead.total_sb[cpu].time);
+	fprintf(fp, "\n");
+}
+
+void perf_session__fprintf_overhead_info(struct perf_session *session,
+					 FILE *fp,
+					 const char *cpu_list,
+					 unsigned long *cpu_bitmap)
+{
+	struct perf_evlist *evlist;
+	int cpu;
+
+	if (session == NULL || fp == NULL)
 		return;
+	evlist = session->evlist;
+	if (!perf_evlist__overhead(evlist)) {
+		fprintf(fp, "#\n# No profiling time cost information available.\n#\n");
 	}
 
 	fprintf(fp, "# ========\n");
+	fprintf(fp, "# CPU");
+	fprintf(fp, "       SAM    SAM cost(ns)");
+	fprintf(fp, "       MUX    MUX cost(ns)");
+	fprintf(fp, "        SB     SB cost(ns)");
+	fprintf(fp, "\n");
 
+	perf_session__fprintf_overhead_body(evlist, fp, MAX_NR_CPUS);
+
+	if (perf_evlist__sample_id_all(evlist)) {
+		for (cpu = 0; cpu < session->header.env.nr_cpus_online; cpu++) {
+			if (cpu_list && !test_bit(cpu, cpu_bitmap))
+				continue;
+			perf_session__fprintf_overhead_body(evlist, fp, cpu);
+		}
+	}
 	fprintf(fp, "# ========\n#\n");
 }
 
