@@ -55,6 +55,7 @@ struct record_opts {
 	bool	     all_user;
 	bool	     tail_synthesize;
 	bool	     overwrite;
+	bool	     no_profile_cost;
 	unsigned int freq;
 	unsigned int mmap_pages;
 	unsigned int auxtrace_mmap_pages;

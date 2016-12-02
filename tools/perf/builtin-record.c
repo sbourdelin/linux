@@ -1512,6 +1512,8 @@ struct option __record_options[] = {
 		    "Switch output when receive SIGUSR2"),
 	OPT_BOOLEAN(0, "dry-run", &dry_run,
 		    "Parse options then exit"),
+	OPT_BOOLEAN(0, "no-profile-cost-info", &record.opts.no_profile_cost,
+		    "Do not collect perf profiling time cost information"),
 	OPT_END()
 };
 

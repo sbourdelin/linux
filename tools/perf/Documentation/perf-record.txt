@@ -460,6 +460,12 @@ config terms. For example: 'cycles/overwrite/' and 'instructions/no-overwrite/'.
 
 Implies --tail-synthesize.
 
+--no-profile-cost-info::
+Perf collects profiling time cost by default.
+The time cost includes sampling overhead, multiplexing overhead, side-band
+events overhead and so on.
+This option disable the profiling time cost information collection.
+
 SEE ALSO
 --------
 linkperf:perf-stat[1], linkperf:perf-list[1]
