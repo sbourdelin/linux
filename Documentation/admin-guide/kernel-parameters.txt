@@ -843,6 +843,11 @@
 			The filter can be disabled or changed to another
 			driver later using sysfs.
 
+	dmi_entry_point=	[DMI,EFI,KEXEC]
+			Pass the DMI entry point to the kernel, mostly used
+			on machines running EFI runtime service to boot the
+			second kernel for kdump.
+
 	drm_kms_helper.edid_firmware=[<connector>:]<file>[,[<connector>:]<file>]
 			Broken monitors, graphic adapters, KVMs and EDIDless
 			panels may send no or incorrect EDID data sets.

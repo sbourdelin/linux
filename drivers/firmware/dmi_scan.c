@@ -595,8 +595,22 @@ static int __init dmi_smbios3_present(const u8 *buf)
 	return 1;
 }
 
+#ifdef CONFIG_KEXEC
+static unsigned long dmi_entry_point;
+static int __init setup_dmi_entry_point(char *arg)
+{
+	return kstrtoul(arg, 16, &dmi_entry_point);
+}
+early_param("dmi_entry_point", setup_dmi_entry_point);
+#endif
+
 static resource_size_t __init dmi_get_entry_point(void)
 {
+#ifdef CONFIG_KEXEC
+	if (dmi_entry_point)
+		return dmi_entry_point;
+#endif
+
 	if (efi_enabled(EFI_CONFIG_TABLES)) {
 		/*
 		 * According to the DMTF SMBIOS reference spec v3.0.0, it is
