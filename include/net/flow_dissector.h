@@ -2,6 +2,7 @@
 #define _NET_FLOW_DISSECTOR_H
 
 #include <linux/types.h>
+#include <linux/in.h>
 #include <linux/in6.h>
 #include <uapi/linux/if_ether.h>
 
@@ -89,10 +90,15 @@ struct flow_dissector_key_addrs {
 };
 
 /**
- * flow_dissector_key_tp_ports:
- *	@ports: port numbers of Transport header
+ * flow_dissector_key_ports:
+ *	@ports: port numbers of Transport header or
+ *		type and code of ICMP header
+ *		ports: source (high) and destination (low) port numbers
  *		src: source port number
  *		dst: destination port number
+ *		icmp: ICMP type (high) and code (low)
+ *		type: ICMP type
+ *		type: ICMP code
  */
 struct flow_dissector_key_ports {
 	union {
@@ -100,6 +106,11 @@ struct flow_dissector_key_ports {
 		struct {
 			__be16 src;
 			__be16 dst;
+		};
+		__be16 icmp;
+		struct {
+			u8 type;
+			u8 code;
 		};
 	};
 };
@@ -188,9 +199,22 @@ struct flow_keys_digest {
 void make_flow_keys_digest(struct flow_keys_digest *digest,
 			   const struct flow_keys *flow);
 
+static inline bool flow_protos_are_icmp_any(__be16 n_proto, u8 ip_proto)
+{
+	return (n_proto == htons(ETH_P_IP) && ip_proto == IPPROTO_ICMP) ||
+		(n_proto == htons(ETH_P_IPV6) && ip_proto == IPPROTO_ICMPV6);
+}
+
+static inline bool flow_keys_are_icmp_any(const struct flow_keys *keys)
+{
+	return flow_protos_are_icmp_any(keys->basic.n_proto,
+					keys->basic.ip_proto);
+}
+
 static inline bool flow_keys_have_l4(const struct flow_keys *keys)
 {
-	return (keys->ports.ports || keys->tags.flow_label);
+	return (!flow_keys_are_icmp_any(keys) && keys->ports.ports) ||
+		keys->tags.flow_label;
 }
 
 u32 flow_hash_from_keys(struct flow_keys *keys);

@@ -58,6 +58,28 @@ void skb_flow_dissector_init(struct flow_dissector *flow_dissector,
 EXPORT_SYMBOL(skb_flow_dissector_init);
 
 /**
+ * skb_flow_get_be16 - extract be16 entity
+ * @skb: sk_buff to extract from
+ * @poff: offset to extract at
+ * @data: raw buffer pointer to the packet
+ * @hlen: packet header length
+ *
+ * The function will try to retrieve a be32 entity at
+ * offset poff
+ */
+__be16 skb_flow_get_be16(const struct sk_buff *skb, int poff, void *data,
+			 int hlen)
+{
+	__be16 *u, _u;
+
+	u = __skb_header_pointer(skb, poff, sizeof(_u), data, hlen, &_u);
+	if (u)
+		return *u;
+
+	return 0;
+}
+
+/**
  * __skb_flow_get_ports - extract the upper layer ports and return them
  * @skb: sk_buff to extract the ports from
  * @thoff: transport header offset
@@ -542,8 +564,13 @@ ip_proto_again:
 		key_ports = skb_flow_dissector_target(flow_dissector,
 						      FLOW_DISSECTOR_KEY_PORTS,
 						      target_container);
-		key_ports->ports = __skb_flow_get_ports(skb, nhoff, ip_proto,
-							data, hlen);
+		if (flow_protos_are_icmp_any(proto, ip_proto))
+			key_ports->icmp = skb_flow_get_be16(skb, nhoff, data,
+							    hlen);
+		else
+			key_ports->ports = __skb_flow_get_ports(skb, nhoff,
+								ip_proto, data,
+								hlen);
 	}
 
 out_good:
@@ -718,7 +745,8 @@ void make_flow_keys_digest(struct flow_keys_digest *digest,
 
 	data->n_proto = flow->basic.n_proto;
 	data->ip_proto = flow->basic.ip_proto;
-	data->ports = flow->ports.ports;
+	if (flow_keys_have_l4(flow))
+		data->ports = flow->ports.ports;
 	data->src = flow->addrs.v4addrs.src;
 	data->dst = flow->addrs.v4addrs.dst;
 }
