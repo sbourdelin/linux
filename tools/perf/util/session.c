@@ -1563,6 +1563,52 @@ perf_session__warn_order(const struct perf_session *session)
 		ui__warning("%u out of order events recorded.\n", oe->nr_unordered_events);
 }
 
+static void
+perf_session__warn_overhead(const struct perf_session *session)
+{
+	const struct events_stats *stats = &session->evlist->stats;
+	double overhead_rate;
+	u64 overhead, max;
+	int cpu;
+	int i;
+
+	overhead = stats->overhead.total_sample[MAX_NR_CPUS].time;
+	overhead += stats->overhead.total_mux[MAX_NR_CPUS].time;
+	overhead += stats->overhead.total_sb[MAX_NR_CPUS].time;
+	max = overhead;
+	cpu = -1;
+
+	for (i = 0; i < session->header.env.nr_cpus_online; i++) {
+		overhead = stats->overhead.total_sample[i].time;
+		overhead += stats->overhead.total_mux[i].time;
+		overhead += stats->overhead.total_sb[i].time;
+		if (overhead > max) {
+			max = overhead;
+			cpu = i;
+		}
+	}
+	overhead_rate = (double)max / (double)stats->elapsed_time;
+
+	if (overhead_rate > 0.1) {
+		if (cpu > 0) {
+			ui__warning("Perf kernel profiling cost is high! The cost rate is %3.2f%% on CPU %d\n\n"
+				    "Please consider reducing the number of events, or increasing the period, or decrease the frequency.\n\n",
+				    overhead_rate * 100.0, cpu);
+		} else {
+			ui__warning("Perf kernel profiling cost is high! The cost rate is %3.2f%%\n\n"
+				    "Please consider reducing the number of events, or increasing the period, or decrease the frequency.\n\n",
+				    overhead_rate * 100.0);
+		}
+	}
+
+	overhead_rate = (double)stats->cpu_time / (double)stats->elapsed_time;
+	if (overhead_rate > 0.5) {
+		ui__warning("Perf record profiling cost is high! The cost rate is %3.2f%%\n\n"
+			    "Please consider reducing the number of events, or increasing the period, or decrease the frequency.\n\n",
+			    overhead_rate * 100.0);
+	}
+}
+
 static void perf_session__warn_about_errors(const struct perf_session *session)
 {
 	const struct events_stats *stats = &session->evlist->stats;
@@ -1636,6 +1682,8 @@ static void perf_session__warn_about_errors(const struct perf_session *session)
 			    "Increase it by --proc-map-timeout\n",
 			    stats->nr_proc_map_timeout);
 	}
+
+	perf_session__warn_overhead(session);
 }
 
 static int perf_session__flush_thread_stack(struct thread *thread,
