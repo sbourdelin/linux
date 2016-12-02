@@ -595,11 +595,8 @@ static int __init dmi_smbios3_present(const u8 *buf)
 	return 1;
 }
 
-void __init dmi_scan_machine(void)
+static resource_size_t __init dmi_get_entry_point(void)
 {
-	char __iomem *p, *q;
-	char buf[32];
-
 	if (efi_enabled(EFI_CONFIG_TABLES)) {
 		/*
 		 * According to the DMTF SMBIOS reference spec v3.0.0, it is
@@ -614,32 +611,32 @@ void __init dmi_scan_machine(void)
 		 * have the 64-bit entry point, but fail to decode it, fall
 		 * back to the legacy one (if available)
 		 */
-		if (efi.smbios3 != EFI_INVALID_TABLE_ADDR) {
-			p = dmi_early_remap(efi.smbios3, 32);
-			if (p == NULL)
-				goto error;
-			memcpy_fromio(buf, p, 32);
-			dmi_early_unmap(p, 32);
+		if (efi.smbios3 != EFI_INVALID_TABLE_ADDR)
+			return efi.smbios3;
+		if (efi.smbios != EFI_INVALID_TABLE_ADDR)
+			return efi.smbios;
+	}
+	return 0;
+}
 
-			if (!dmi_smbios3_present(buf)) {
-				dmi_available = 1;
-				goto out;
-			}
-		}
-		if (efi.smbios == EFI_INVALID_TABLE_ADDR)
-			goto error;
+void __init dmi_scan_machine(void)
+{
+	resource_size_t ep = dmi_get_entry_point();
+	char __iomem *p, *q;
+	char buf[32];
 
+	if (ep) {
 		/* This is called as a core_initcall() because it isn't
 		 * needed during early boot.  This also means we can
 		 * iounmap the space when we're done with it.
 		 */
-		p = dmi_early_remap(efi.smbios, 32);
+		p = dmi_early_remap(ep, 32);
 		if (p == NULL)
 			goto error;
 		memcpy_fromio(buf, p, 32);
 		dmi_early_unmap(p, 32);
 
-		if (!dmi_present(buf)) {
+		if (!dmi_smbios3_present(buf) || !dmi_present(buf)) {
 			dmi_available = 1;
 			goto out;
 		}
