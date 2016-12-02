@@ -238,6 +238,7 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.use_oif_addrs_only	= 0,
 	.ignore_routes_with_linkdown = 0,
 	.keep_addr_on_down	= 0,
+	.addrgenmode = IN6_ADDR_GEN_MODE_EUI64,
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
@@ -284,6 +285,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.use_oif_addrs_only	= 0,
 	.ignore_routes_with_linkdown = 0,
 	.keep_addr_on_down	= 0,
+	.addrgenmode = IN6_ADDR_GEN_MODE_EUI64,
 };
 
 /* Check if a valid qdisc is available */
@@ -378,7 +380,7 @@ static struct inet6_dev *ipv6_add_dev(struct net_device *dev)
 	if (ndev->cnf.stable_secret.initialized)
 		ndev->addr_gen_mode = IN6_ADDR_GEN_MODE_STABLE_PRIVACY;
 	else
-		ndev->addr_gen_mode = IN6_ADDR_GEN_MODE_EUI64;
+		ndev->addr_gen_mode = ipv6_devconf_dflt.addrgenmode;
 
 	ndev->cnf.mtu6 = dev->mtu;
 	ndev->nd_parms = neigh_parms_alloc(dev, &nd_tbl);
@@ -4950,6 +4952,7 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_DROP_UNICAST_IN_L2_MULTICAST] = cnf->drop_unicast_in_l2_multicast;
 	array[DEVCONF_DROP_UNSOLICITED_NA] = cnf->drop_unsolicited_na;
 	array[DEVCONF_KEEP_ADDR_ON_DOWN] = cnf->keep_addr_on_down;
+	array[DEVCONF_ADDRGENMODE] = cnf->addrgenmode;
 }
 
 static inline size_t inet6_ifla6_size(void)
@@ -5496,6 +5499,71 @@ int addrconf_sysctl_mtu(struct ctl_table *ctl, int write,
 	return proc_dointvec_minmax(&lctl, write, buffer, lenp, ppos);
 }
 
+static void addrconf_addrgenmode_change(struct net *net)
+{
+	struct net_device *dev;
+	struct inet6_dev *idev;
+
+	read_lock(&dev_base_lock);
+	for_each_netdev(net, dev) {
+		rcu_read_lock();
+		idev = __in6_dev_get(dev);
+		if (idev) {
+			idev->cnf.addrgenmode = ipv6_devconf_dflt.addrgenmode;
+			idev->addr_gen_mode = ipv6_devconf_dflt.addrgenmode;
+			rtnl_lock();
+			addrconf_dev_config(idev->dev);
+			rtnl_unlock();
+		}
+		rcu_read_unlock();
+	}
+	read_unlock(&dev_base_lock);
+}
+
+static int addrconf_sysctl_addrgenmode(struct ctl_table *ctl, int write,
+								void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	int ret;
+	int new_val;
+	struct inet6_dev *idev = (struct inet6_dev *)ctl->extra1;
+	struct net *net = (struct net *)ctl->extra2;
+
+	if (write) { /* sysctl write request */
+		ret = proc_dointvec(ctl, write, buffer, lenp, ppos);
+		new_val = *((int *)ctl->data);
+
+		/* request for the all */
+		if (&net->ipv6.devconf_all->addrgenmode == ctl->data) {
+			ipv6_devconf_dflt.addrgenmode = new_val;
+			addrconf_addrgenmode_change(net);
+
+		/* request for default */
+		} else if (&net->ipv6.devconf_dflt->addrgenmode == ctl->data) {
+			ipv6_devconf_dflt.addrgenmode = new_val;
+
+		/* request for individual inet device */
+		} else {
+			if (!idev) {
+				return ret;
+			}
+			if (idev->addr_gen_mode != new_val) {
+				idev->addr_gen_mode = new_val;
+				rtnl_lock();
+				addrconf_dev_config(idev->dev);
+				rtnl_unlock();
+			}
+		}
+
+	} else { /* sysctl read request */
+		if (idev) {
+			memcpy(ctl->data, &idev->addr_gen_mode, sizeof(idev->addr_gen_mode));
+		}
+		ret = proc_dointvec(ctl, 0, buffer, lenp, ppos);
+	}
+
+	return ret;
+}
+
 static void dev_disable_change(struct inet6_dev *idev)
 {
 	struct netdev_notifier_info info;
@@ -6040,6 +6108,13 @@ static const struct ctl_table addrconf_sysctl[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 
+	},
+	{
+		.procname	= "addrgenmode",
+		.data		= &ipv6_devconf.addrgenmode,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= addrconf_sysctl_addrgenmode,
 	},
 	{
 		/* sentinel */
