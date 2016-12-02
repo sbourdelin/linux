@@ -289,6 +289,9 @@ include::itrace.txt[]
 --force::
 	Don't do ownership validation.
 
+--show-profiling-cost-events::
+	Display perf profiling time cost related event (PERF_RECORD_OVERHEAD)
+
 SEE ALSO
 --------
 linkperf:perf-record[1], linkperf:perf-script-perl[1],

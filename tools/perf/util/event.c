@@ -1189,6 +1189,32 @@ size_t perf_event__fprintf_switch(union perf_event *event, FILE *fp)
 		       event->context_switch.next_prev_tid);
 }
 
+size_t perf_event__fprintf_overhead(union perf_event *event, FILE *fp)
+{
+	size_t ret;
+
+	switch (event->overhead.type) {
+	case PERF_PMU_SAMPLE_OVERHEAD:
+		ret = fprintf(fp, " [SAMPLE] nr: %llu  time: %llu\n",
+			      event->overhead.entry.nr,
+			      event->overhead.entry.time);
+		break;
+	case PERF_CORE_MUX_OVERHEAD:
+		ret = fprintf(fp, " [MUX] nr: %llu  time: %llu\n",
+			      event->overhead.entry.nr,
+			      event->overhead.entry.time);
+		break;
+	case PERF_CORE_SB_OVERHEAD:
+		ret = fprintf(fp, " [SB] nr: %llu  time: %llu\n",
+			      event->overhead.entry.nr,
+			      event->overhead.entry.time);
+		break;
+	default:
+		ret = fprintf(fp, " unhandled!\n");
+	}
+	return ret;
+}
+
 size_t perf_event__fprintf(union perf_event *event, FILE *fp)
 {
 	size_t ret = fprintf(fp, "PERF_RECORD_%s",
@@ -1217,6 +1243,9 @@ size_t perf_event__fprintf(union perf_event *event, FILE *fp)
 	case PERF_RECORD_SWITCH:
 	case PERF_RECORD_SWITCH_CPU_WIDE:
 		ret += perf_event__fprintf_switch(event, fp);
+		break;
+	case PERF_RECORD_OVERHEAD:
+		ret += perf_event__fprintf_overhead(event, fp);
 		break;
 	default:
 		ret += fprintf(fp, "\n");
