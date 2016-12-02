@@ -1787,6 +1787,7 @@ event_sched_out(struct perf_event *event,
 		  struct perf_cpu_context *cpuctx,
 		  struct perf_event_context *ctx)
 {
+	bool log_overhead = needs_log_overhead(event) & ctx->log_overhead;
 	u64 tstamp = perf_event_time(event);
 	u64 delta;
 
@@ -1812,7 +1813,7 @@ event_sched_out(struct perf_event *event,
 	perf_pmu_disable(event->pmu);
 
 	event->tstamp_stopped = tstamp;
-	event->pmu->del(event, 0);
+	event->pmu->del(event, log_overhead ? PERF_EF_LOG : 0);
 	event->oncpu = -1;
 	event->state = PERF_EVENT_STATE_INACTIVE;
 	if (event->pending_disable) {
@@ -1913,6 +1914,9 @@ static void __perf_event_disable(struct perf_event *event,
 {
 	if (event->state < PERF_EVENT_STATE_INACTIVE)
 		return;
+
+	/* log overhead when disable event */
+	ctx->log_overhead = true;
 
 	update_context_time(ctx);
 	update_cgrp_time_from_event(event);
@@ -10176,6 +10180,9 @@ static void perf_event_exit_task_context(struct task_struct *child, int ctxn)
 	child_ctx = perf_pin_task_context(child, ctxn);
 	if (!child_ctx)
 		return;
+
+	/* log overhead when exit task context */
+	child_ctx->log_overhead = true;
 
 	/*
 	 * In order to reduce the amount of tricky in ctx tear-down, we hold
