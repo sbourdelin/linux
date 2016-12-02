@@ -716,12 +716,10 @@ struct _event_ack_list {
 struct adapter_reply_queue {
 	struct MPT3SAS_ADAPTER	*ioc;
 	u8			msix_index;
-	unsigned int		vector;
 	u32			reply_post_host_index;
 	Mpi2ReplyDescriptorsUnion_t *reply_post_free;
 	char			name[MPT_NAME_LENGTH];
 	atomic_t		busy;
-	cpumask_var_t		affinity_hint;
 	struct list_head	list;
 };
 
@@ -835,8 +833,6 @@ typedef void (*MPT3SAS_FLUSH_RUNNING_CMDS)(struct MPT3SAS_ADAPTER *ioc);
  * @start_scan_failed: means port enable failed, return's the ioc_status
  * @msix_enable: flag indicating msix is enabled
  * @msix_vector_count: number msix vectors
- * @cpu_msix_table: table for mapping cpus to msix index
- * @cpu_msix_table_sz: table size
  * @schedule_dead_ioc_flush_running_cmds: callback to flush pending commands
  * @scsi_io_cb_idx: shost generated commands
  * @tm_cb_idx: task management commands
@@ -1002,8 +998,6 @@ struct MPT3SAS_ADAPTER {
 
 	u8		msix_enable;
 	u16		msix_vector_count;
-	u8		*cpu_msix_table;
-	u16		cpu_msix_table_sz;
 	resource_size_t __iomem **reply_post_host_index;
 	u32		ioc_reset_count;
 	MPT3SAS_FLUSH_RUNNING_CMDS schedule_dead_ioc_flush_running_cmds;
