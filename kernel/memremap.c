@@ -198,7 +198,7 @@ static void pgmap_radix_release(struct resource *res)
 {
 	resource_size_t key, align_start, align_size, align_end;
 
-	align_start = res->start & ~(SECTION_SIZE - 1);
+	align_start = res->start & SECTION_MASK;
 	align_size = ALIGN(resource_size(res), SECTION_SIZE);
 	align_end = align_start + align_size - 1;
 
@@ -244,7 +244,7 @@ static void devm_memremap_pages_release(struct device *dev, void *data)
 	}
 
 	/* pages are dead and unused, undo the arch mapping */
-	align_start = res->start & ~(SECTION_SIZE - 1);
+	align_start = res->start & SECTION_MASK;
 	align_size = ALIGN(resource_size(res), SECTION_SIZE);
 	arch_remove_memory(align_start, align_size);
 	untrack_pfn(NULL, PHYS_PFN(align_start), align_size);
@@ -289,7 +289,7 @@ void *devm_memremap_pages(struct device *dev, struct resource *res,
 	int error, nid, is_ram;
 	unsigned long pfn;
 
-	align_start = res->start & ~(SECTION_SIZE - 1);
+	align_start = res->start & SECTION_MASK;
 	align_size = ALIGN(res->start + resource_size(res), SECTION_SIZE)
 		- align_start;
 	is_ram = region_intersects(align_start, align_size,
