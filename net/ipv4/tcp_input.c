@@ -144,7 +144,21 @@ static void tcp_measure_rcv_mss(struct sock *sk, const struct sk_buff *skb)
 	 */
 	len = skb_shinfo(skb)->gso_size ? : skb->len;
 	if (len >= icsk->icsk_ack.rcv_mss) {
-		icsk->icsk_ack.rcv_mss = len;
+		static bool __once __read_mostly;
+
+		icsk->icsk_ack.rcv_mss = min_t(unsigned int, len,
+					       tcp_sk(sk)->advmss);
+		if (icsk->icsk_ack.rcv_mss != len && !__once) {
+			struct net_device *dev;
+
+			__once = true;
+
+			rcu_read_lock();
+			dev = dev_get_by_index_rcu(sock_net(sk), skb->skb_iif);
+			pr_warn_once("%s: Driver has suspect GRO implementation, TCP performance may be compromised.\n",
+				     dev ? dev->name : "Unknown driver");
+			rcu_read_unlock();
+		}
 	} else {
 		/* Otherwise, we make more careful check taking into account,
 		 * that SACKs block is variable.
