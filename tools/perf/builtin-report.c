@@ -565,6 +565,10 @@ static int __cmd_report(struct report *rep)
 	evlist__for_each_entry(session->evlist, pos)
 		rep->nr_entries += evsel__hists(pos)->nr_entries;
 
+	if (symbol_conf.show_profiling_cost) {
+		perf_session__fprintf_overhead_info(session, stdout, rep->cpu_list, rep->cpu_bitmap);
+	}
+
 	if (use_browser == 0) {
 		if (verbose > 3)
 			perf_session__fprintf(session, stdout);
@@ -830,6 +834,8 @@ int cmd_report(int argc, const char **argv, const char *prefix __maybe_unused)
 	OPT_CALLBACK_DEFAULT(0, "stdio-color", NULL, "mode",
 			     "'always' (default), 'never' or 'auto' only applicable to --stdio mode",
 			     stdio__config_color, "always"),
+	OPT_BOOLEAN(0, "show-profiling-cost", &symbol_conf.show_profiling_cost,
+		    "Show extra time cost during perf profiling"),
 	OPT_END()
 	};
 	struct perf_data_file file = {
@@ -957,7 +963,8 @@ repeat:
 	}
 
 	/* Force tty output for header output and per-thread stat. */
-	if (report.header || report.header_only || report.show_threads)
+	if (report.header || report.header_only ||
+	    report.show_threads || symbol_conf.show_profiling_cost)
 		use_browser = 0;
 
 	if (strcmp(input_name, "-") != 0)
@@ -983,6 +990,13 @@ repeat:
 		}
 	} else if (use_browser == 0) {
 		fputs("# To display the perf.data header info, please use --header/--header-only options.\n#\n",
+		      stdout);
+	}
+
+	if (!symbol_conf.show_profiling_cost &&
+	    perf_evlist__overhead(session->evlist) &&
+	    (use_browser == 0)) {
+		fputs("# To display the profiling time cost info, please use --show-profiling-cost options.\n#\n",
 		      stdout);
 	}
 

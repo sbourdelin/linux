@@ -102,6 +102,9 @@ int perf_session__cpu_bitmap(struct perf_session *session,
 
 void perf_session__fprintf_info(struct perf_session *s, FILE *fp, bool full);
 
+void perf_session__fprintf_overhead_info(struct perf_session *s, FILE *fp,
+					 const char *cpu_list, unsigned long *cpu_bitmap);
+
 struct perf_evsel_str_handler;
 
 int __perf_session__set_tracepoints_handlers(struct perf_session *session,

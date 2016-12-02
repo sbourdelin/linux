@@ -1594,6 +1594,12 @@ bool perf_evlist__sample_id_all(struct perf_evlist *evlist)
 	return first->attr.sample_id_all;
 }
 
+bool perf_evlist__overhead(struct perf_evlist *evlist)
+{
+	struct perf_evsel *first = perf_evlist__first(evlist);
+	return first->attr.overhead;
+}
+
 void perf_evlist__set_selected(struct perf_evlist *evlist,
 			       struct perf_evsel *evsel)
 {
