@@ -229,7 +229,7 @@ static struct thread **idle_threads;
 static int idle_max_cpu;
 static char idle_comm[] = "<idle>";
 
-static u64 get_nsecs(void)
+u64 get_nsecs(void)
 {
 	struct timespec ts;
 

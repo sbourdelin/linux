@@ -12,6 +12,8 @@ const char *help_unknown_cmd(const char *cmd);
 void prune_packed_objects(int);
 int read_line_with_nul(char *buf, int size, FILE *file);
 int check_pager_config(const char *cmd);
+u64 get_nsecs(void);
+u64 get_vnsecs(void);
 
 int cmd_annotate(int argc, const char **argv, const char *prefix);
 int cmd_bench(int argc, const char **argv, const char *prefix);

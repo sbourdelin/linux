@@ -65,6 +65,15 @@ struct record {
 	unsigned long long	samples;
 };
 
+u64 get_vnsecs(void)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+
+	return ts.tv_sec * NSEC_PER_SEC + ts.tv_nsec;
+}
+
 static int record__write(struct record *rec, void *bf, size_t size)
 {
 	if (perf_data_file__write(rec->session->file, bf, size) < 0) {
