@@ -694,7 +694,7 @@ static int nand_davinci_probe(struct platform_device *pdev)
 
 	ret = -EINVAL;
 
-	info->clk = devm_clk_get(&pdev->dev, "aemif");
+	info->clk = devm_clk_get(&pdev->dev, "nand");
 	if (IS_ERR(info->clk)) {
 		ret = PTR_ERR(info->clk);
 		dev_dbg(&pdev->dev, "unable to get AEMIF clock, err %d\n", ret);
