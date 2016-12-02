@@ -49,6 +49,8 @@ struct record {
 	struct perf_tool	tool;
 	struct record_opts	opts;
 	u64			bytes_written;
+	u64			record_cpu_time;
+	u64			elapsed_time;
 	struct perf_data_file	file;
 	struct auxtrace_record	*itr;
 	struct perf_evlist	*evlist;
@@ -746,6 +748,47 @@ static const struct perf_event_mmap_page *record__pick_pc(struct record *rec)
 	return NULL;
 }
 
+static int perf_event__synth_overhead(struct record *rec, u64 type, u64 time,
+				      perf_event__handler_t process)
+{
+	union perf_event event = {
+		.overhead = {
+			.header = {
+				.type = PERF_RECORD_USER_OVERHEAD,
+				.size = sizeof(struct perf_overhead),
+			},
+			.type = type,
+			.entry = {
+				.nr = 1,
+				.time = time,
+			},
+		},
+	};
+
+	return process(&rec->tool, &event, NULL, NULL);
+}
+
+static int perf_event__synth_overheads(struct record *rec)
+{
+	int err;
+
+	err = perf_event__synth_overhead(rec, PERF_USER_CPU_TIME,
+					 (get_vnsecs() - rec->record_cpu_time),
+					 process_synthesized_event);
+	if (err < 0)
+		return err;
+	rec->record_cpu_time = get_vnsecs();
+
+	err = perf_event__synth_overhead(rec, PERF_USER_ELAPSED_TIME,
+					 (get_nsecs() - rec->elapsed_time),
+					 process_synthesized_event);
+	if (err < 0)
+		return err;
+	rec->elapsed_time = get_nsecs();
+
+	return 0;
+}
+
 static int record__synthesize(struct record *rec, bool tail)
 {
 	struct perf_session *session = rec->session;
@@ -757,7 +800,7 @@ static int record__synthesize(struct record *rec, bool tail)
 	int err = 0;
 
 	if (rec->opts.tail_synthesize != tail)
-		return 0;
+		goto out;
 
 	if (file->is_pipe) {
 		err = perf_event__synthesize_attrs(tool, session,
@@ -819,6 +862,10 @@ static int record__synthesize(struct record *rec, bool tail)
 					    process_synthesized_event, opts->sample_address,
 					    opts->proc_map_timeout);
 out:
+	if (tail && perf_evlist__overhead(session->evlist) &&
+	    (perf_event__synth_overheads(rec) < 0))
+		pr_err("Couldn't synthesize user overhead information.\n");
+
 	return err;
 }
 
@@ -1554,6 +1601,9 @@ int cmd_record(int argc, const char **argv, const char *prefix __maybe_unused)
 # undef set_nobuild
 # undef REASON
 #endif
+
+	rec->record_cpu_time = get_vnsecs();
+	rec->elapsed_time = get_nsecs();
 
 	rec->evlist = perf_evlist__new();
 	if (rec->evlist == NULL)

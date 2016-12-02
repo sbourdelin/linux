@@ -280,6 +280,8 @@ struct events_stats {
 	u64 total_lost_samples;
 	u64 total_aux_lost;
 	u64 total_invalid_chains;
+	u64 cpu_time;
+	u64 elapsed_time;
 	struct total_overhead overhead;
 	u32 nr_events[PERF_RECORD_HEADER_MAX];
 	u32 nr_non_filtered_samples;
@@ -493,6 +495,8 @@ struct time_conv_event {
 
 enum perf_user_overhead_event_type { /* above any possible kernel type */
 	PERF_USER_OVERHEAD_TYPE_START	= 100,
+	PERF_USER_CPU_TIME		= 100,
+	PERF_USER_ELAPSED_TIME,
 };
 
 struct perf_overhead {

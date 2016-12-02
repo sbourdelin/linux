@@ -1233,6 +1233,12 @@ overhead_stats_update(struct perf_tool *tool,
 		evlist->stats.overhead.total_sb[cpu].nr += event->overhead.entry.nr;
 		evlist->stats.overhead.total_sb[cpu].time += event->overhead.entry.time;
 		break;
+	case PERF_USER_CPU_TIME:
+		evlist->stats.cpu_time += event->overhead.entry.time;
+		break;
+	case PERF_USER_ELAPSED_TIME:
+		evlist->stats.elapsed_time += event->overhead.entry.time;
+		break;
 	default:
 		break;
 	}
@@ -2112,6 +2118,8 @@ void perf_session__fprintf_overhead_info(struct perf_session *session,
 	}
 
 	fprintf(fp, "# ========\n");
+	fprintf(fp, "# Elapsed time: %lu(ns)\n", evlist->stats.elapsed_time);
+	fprintf(fp, "# Perf record cpu time: %lu(ns)\n#\n", evlist->stats.cpu_time);
 	fprintf(fp, "# CPU");
 	fprintf(fp, "       SAM    SAM cost(ns)");
 	fprintf(fp, "       MUX    MUX cost(ns)");

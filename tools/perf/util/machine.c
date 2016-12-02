@@ -578,6 +578,11 @@ int machine__process_overhead_event(struct machine *machine __maybe_unused,
 			    event->overhead.entry.time,
 			    sample->cpu);
 		break;
+	case PERF_USER_CPU_TIME:
+		dump_printf(" CPU time: %llu\n", event->overhead.entry.time);
+		break;
+	case PERF_USER_ELAPSED_TIME:
+		dump_printf(" elapsed time: %llu\n", event->overhead.entry.time);
 	default:
 		dump_printf("\tUNSUPPORT TYPE 0x%lx!\n", event->overhead.type);
 		return 0;
