@@ -378,11 +378,6 @@ config NF_NAT_PROTO_DCCP
 	depends on NF_NAT && NF_CT_PROTO_DCCP
 	default NF_NAT && NF_CT_PROTO_DCCP
 
-config NF_NAT_PROTO_UDPLITE
-	tristate
-	depends on NF_NAT && NF_CT_PROTO_UDPLITE
-	default NF_NAT && NF_CT_PROTO_UDPLITE
-
 config NF_NAT_PROTO_SCTP
 	tristate
 	default NF_NAT && NF_CT_PROTO_SCTP
