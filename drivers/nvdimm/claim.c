@@ -238,11 +238,10 @@ static int nsio_rw_bytes(struct nd_namespace_common *ndns,
 		if (unlikely(is_bad_pmem(&nsio->bb, offset / 512, sz_align)))
 			return -EIO;
 		return memcpy_from_pmem(buf, nsio->addr + offset, size);
-	} else {
-		memcpy_to_pmem(nsio->addr + offset, buf, size);
-		nvdimm_flush(to_nd_region(ndns->dev.parent));
 	}
 
+	memcpy_to_pmem(nsio->addr + offset, buf, size);
+	nvdimm_flush(to_nd_region(ndns->dev.parent));
 	return 0;
 }
 
