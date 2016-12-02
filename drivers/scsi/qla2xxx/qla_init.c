@@ -1769,8 +1769,7 @@ qla2x00_alloc_outstanding_cmds(struct qla_hw_data *ha, struct req_que *req)
 	if (req->outstanding_cmds)
 		return QLA_SUCCESS;
 
-	if (!IS_FWI2_CAPABLE(ha) || (ha->mqiobase &&
-	    (ql2xmultique_tag || ql2xmaxqueues > 1)))
+	if (!IS_FWI2_CAPABLE(ha))
 		req->num_outstanding_cmds = DEFAULT_OUTSTANDING_COMMANDS;
 	else {
 		if (ha->cur_fw_xcb_count <= ha->cur_fw_iocb_count)
@@ -4248,10 +4247,7 @@ qla2x00_loop_resync(scsi_qla_host_t *vha)
 	struct req_que *req;
 	struct rsp_que *rsp;
 
-	if (vha->hw->flags.cpu_affinity_enabled)
-		req = vha->hw->req_q_map[0];
-	else
-		req = vha->req;
+	req = vha->req;
 	rsp = req->rsp;
 
 	clear_bit(ISP_ABORT_RETRY, &vha->dpc_flags);
@@ -6040,10 +6036,10 @@ qla24xx_configure_vhba(scsi_qla_host_t *vha)
 		return -EINVAL;
 
 	rval = qla2x00_fw_ready(base_vha);
-	if (ha->flags.cpu_affinity_enabled)
-		req = ha->req_q_map[0];
+	if (vha->qpair)
+		req = vha->qpair->req;
 	else
-		req = vha->req;
+		req = ha->req_q_map[0];
 	rsp = req->rsp;
 
 	if (rval == QLA_SUCCESS) {
