@@ -1380,14 +1380,9 @@ static void stmmac_tx_clean(struct stmmac_priv *priv)
 
 	if (unlikely(netif_queue_stopped(priv->dev) &&
 		     stmmac_tx_avail(priv) > STMMAC_TX_THRESH)) {
-		netif_tx_lock(priv->dev);
-		if (netif_queue_stopped(priv->dev) &&
-		    stmmac_tx_avail(priv) > STMMAC_TX_THRESH) {
-			netif_dbg(priv, tx_done, priv->dev,
-				  "%s: restart transmit\n", __func__);
-			netif_wake_queue(priv->dev);
-		}
-		netif_tx_unlock(priv->dev);
+		netif_dbg(priv, tx_done, priv->dev,
+			  "%s: restart transmit\n", __func__);
+		netif_wake_queue(priv->dev);
 	}
 
 	if ((priv->eee_enabled) && (!priv->tx_path_in_lpi_mode)) {
