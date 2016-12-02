@@ -1532,8 +1532,8 @@ struct nd_namespace_common *nvdimm_namespace_common_probe(struct device *dev)
 
 	size = nvdimm_namespace_capacity(ndns);
 	if (size < ND_MIN_NAMESPACE_SIZE) {
-		dev_dbg(&ndns->dev, "%pa, too small must be at least %#x\n",
-				&size, ND_MIN_NAMESPACE_SIZE);
+		dev_warn(&ndns->dev, "%pa, too small must be at least %#x\n",
+			 &size, ND_MIN_NAMESPACE_SIZE);
 		return ERR_PTR(-ENODEV);
 	}
 
