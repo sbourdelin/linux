@@ -104,8 +104,11 @@ static void async_pf_execute(struct work_struct *work)
 	 * This memory barrier pairs with prepare_to_wait's set_current_state()
 	 */
 	smp_mb();
-	if (swait_active(&vcpu->wq))
-		swake_up(&vcpu->wq);
+#ifdef CONFIG_KVM_ASYNC_PF_SYNC
+	kvm_vcpu_wake_up(vcpu);
+#else
+	kvm_vcpu_kick(vcpu);
+#endif
 
 	mmput(mm);
 	kvm_put_kvm(vcpu->kvm);
