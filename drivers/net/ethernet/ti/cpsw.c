@@ -1513,7 +1513,7 @@ fail:
 	return NETDEV_TX_BUSY;
 }
 
-#ifdef CONFIG_TI_CPTS
+#if IS_ENABLED(CONFIG_TI_CPTS)
 
 static void cpsw_hwtstamp_v1(struct cpsw_common *cpsw)
 {
@@ -1661,7 +1661,16 @@ static int cpsw_hwtstamp_get(struct net_device *dev, struct ifreq *ifr)
 
 	return copy_to_user(ifr->ifr_data, &cfg, sizeof(cfg)) ? -EFAULT : 0;
 }
+#else
+static int cpsw_hwtstamp_get(struct net_device *dev, struct ifreq *ifr)
+{
+	return -EOPNOTSUPP;
+}
 
+static int cpsw_hwtstamp_set(struct net_device *dev, struct ifreq *ifr)
+{
+	return -EOPNOTSUPP;
+}
 #endif /*CONFIG_TI_CPTS*/
 
 static int cpsw_ndo_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
@@ -1674,12 +1683,10 @@ static int cpsw_ndo_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
 		return -EINVAL;
 
 	switch (cmd) {
-#ifdef CONFIG_TI_CPTS
 	case SIOCSHWTSTAMP:
 		return cpsw_hwtstamp_set(dev, req);
 	case SIOCGHWTSTAMP:
 		return cpsw_hwtstamp_get(dev, req);
-#endif
 	}
 
 	if (!cpsw->slaves[slave_no].phy)
@@ -1935,10 +1942,10 @@ static void cpsw_set_msglevel(struct net_device *ndev, u32 value)
 	priv->msg_enable = value;
 }
 
+#if IS_ENABLED(CONFIG_TI_CPTS)
 static int cpsw_get_ts_info(struct net_device *ndev,
 			    struct ethtool_ts_info *info)
 {
-#ifdef CONFIG_TI_CPTS
 	struct cpsw_common *cpsw = ndev_to_cpsw(ndev);
 
 	info->so_timestamping =
@@ -1955,7 +1962,12 @@ static int cpsw_get_ts_info(struct net_device *ndev,
 	info->rx_filters =
 		(1 << HWTSTAMP_FILTER_NONE) |
 		(1 << HWTSTAMP_FILTER_PTP_V2_EVENT);
+	return 0;
+}
 #else
+static int cpsw_get_ts_info(struct net_device *ndev,
+			    struct ethtool_ts_info *info)
+{
 	info->so_timestamping =
 		SOF_TIMESTAMPING_TX_SOFTWARE |
 		SOF_TIMESTAMPING_RX_SOFTWARE |
@@ -1963,9 +1975,9 @@ static int cpsw_get_ts_info(struct net_device *ndev,
 	info->phc_index = -1;
 	info->tx_types = 0;
 	info->rx_filters = 0;
-#endif
 	return 0;
 }
+#endif
 
 static int cpsw_get_settings(struct net_device *ndev,
 			     struct ethtool_cmd *ecmd)
