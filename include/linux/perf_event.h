@@ -998,6 +998,10 @@ perf_event__output_id_sample(struct perf_event *event,
 extern void
 perf_log_lost_samples(struct perf_event *event, u64 lost);
 
+extern void
+perf_log_overhead(struct perf_event *event, u64 type,
+		  struct perf_overhead_entry *entry);
+
 static inline bool is_sampling_event(struct perf_event *event)
 {
 	return event->attr.sample_period != 0;
@@ -1219,6 +1223,11 @@ static inline bool is_write_backward(struct perf_event *event)
 static inline bool has_addr_filter(struct perf_event *event)
 {
 	return event->pmu->nr_addr_filters;
+}
+
+static inline bool needs_log_overhead(struct perf_event *event)
+{
+	return !!event->attr.overhead;
 }
 
 /*
