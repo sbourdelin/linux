@@ -230,6 +230,8 @@ struct cpu_hw_events {
 	struct intel_excl_cntrs		*excl_cntrs;
 	int excl_thread_id; /* 0 or 1 */
 
+	struct perf_overhead_entry     nmi_overhead;
+
 	/*
 	 * AMD specific bits
 	 */

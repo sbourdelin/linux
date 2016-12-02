@@ -1001,6 +1001,7 @@ enum perf_record_overhead_type {
 	PERF_CORE_OVERHEAD	 = 0,
 
 	PERF_PMU_OVERHEAD	 = 20,
+	PERF_PMU_SAMPLE_OVERHEAD = 20,
 
 	PERF_OVERHEAD_MAX,
 };
