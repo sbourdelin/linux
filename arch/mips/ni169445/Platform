@@ -1,0 +1,6 @@
+#
+# National Instruments 169445 FPGA board
+#
+platform-$(CONFIG_NI_169445)	+= ni169445/
+load-$(CONFIG_NI_169445)	+= 0xffffffff80002000
+all-$(CONFIG_NI_169445)		:= $(COMPRESSION_FNAME).srec

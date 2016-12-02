@@ -20,6 +20,7 @@ platforms += loongson32
 platforms += loongson64
 platforms += mti-malta
 platforms += netlogic
+platforms += ni169445
 platforms += paravirt
 platforms += pic32
 platforms += pistachio
