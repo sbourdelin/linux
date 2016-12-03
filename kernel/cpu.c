@@ -228,7 +228,8 @@ static struct {
 	.wq = __WAIT_QUEUE_HEAD_INITIALIZER(cpu_hotplug.wq),
 	.lock = __MUTEX_INITIALIZER(cpu_hotplug.lock),
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
-	.dep_map = STATIC_LOCKDEP_MAP_INIT("cpu_hotplug.dep_map", &cpu_hotplug.dep_map),
+	.dep_map = STATIC_LOCKDEP_MAP_INIT("cpu_hotplug.dep_map",
+			&cpu_hotplug.dep_map),
 #endif
 };
 
@@ -304,7 +305,7 @@ void cpu_hotplug_begin(void)
 		mutex_lock(&cpu_hotplug.lock);
 		prepare_to_wait(&cpu_hotplug.wq, &wait, TASK_UNINTERRUPTIBLE);
 		if (likely(!atomic_read(&cpu_hotplug.refcount)))
-				break;
+			break;
 		mutex_unlock(&cpu_hotplug.lock);
 		schedule();
 	}
@@ -353,6 +354,7 @@ EXPORT_SYMBOL_GPL(cpu_hotplug_enable);
 int register_cpu_notifier(struct notifier_block *nb)
 {
 	int ret;
+
 	cpu_maps_update_begin();
 	ret = raw_notifier_chain_register(&cpu_chain, nb);
 	cpu_maps_update_done();
@@ -363,6 +365,7 @@ int __register_cpu_notifier(struct notifier_block *nb)
 {
 	return raw_notifier_chain_register(&cpu_chain, nb);
 }
+EXPORT_SYMBOL(__register_cpu_notifier);
 
 static int __cpu_notify(unsigned long val, unsigned int cpu, int nr_to_call,
 			int *nr_calls)
@@ -661,7 +664,6 @@ void __init cpuhp_threads_init(void)
 
 #ifdef CONFIG_HOTPLUG_CPU
 EXPORT_SYMBOL(register_cpu_notifier);
-EXPORT_SYMBOL(__register_cpu_notifier);
 void unregister_cpu_notifier(struct notifier_block *nb)
 {
 	cpu_maps_update_begin();
@@ -1250,7 +1252,7 @@ static struct cpuhp_step cpuhp_bp_states[] = {
 		.teardown.single	= NULL,
 	},
 #ifdef CONFIG_SMP
-	[CPUHP_CREATE_THREADS]= {
+	[CPUHP_CREATE_THREADS] = {
 		.name			= "threads:prepare",
 		.startup.single		= smpboot_create_threads,
 		.teardown.single	= NULL,
@@ -1366,7 +1368,8 @@ static struct cpuhp_step cpuhp_ap_states[] = {
 		.teardown.single	= rcutree_dying_cpu,
 	},
 	/* Entry state on starting. Interrupts enabled from here on. Transient
-	 * state for synchronsization */
+	 * state for synchronsization
+	 */
 	[CPUHP_AP_ONLINE] = {
 		.name			= "ap:online",
 	},
