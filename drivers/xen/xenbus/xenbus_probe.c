@@ -708,8 +708,10 @@ static int __init xenstored_local_init(void)
 
 	/* Allocate Xenstore page */
 	page = get_zeroed_page(GFP_KERNEL);
-	if (!page)
+	if (!page) {
+		err = -ENOMEM;
 		goto out_err;
+	}
 
 	xen_store_gfn = xen_start_info->store_mfn = virt_to_gfn((void *)page);
 
