@@ -1314,7 +1314,7 @@ static int orinoco_ioctl_commit(struct net_device *dev,
 		return 0;
 
 	if (orinoco_lock(priv, &flags) != 0)
-		return err;
+		return -EBUSY;
 
 	err = orinoco_commit(priv);
 
