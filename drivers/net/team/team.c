@@ -1140,6 +1140,7 @@ static int team_port_add(struct team *team, struct net_device *port_dev)
 	struct net_device *dev = team->dev;
 	struct team_port *port;
 	char *portname = port_dev->name;
+	bool linkup;
 	int err;
 
 	if (port_dev->flags & IFF_LOOPBACK) {
@@ -1249,9 +1250,12 @@ static int team_port_add(struct team *team, struct net_device *port_dev)
 
 	port->index = -1;
 	list_add_tail_rcu(&port->list, &team->port_list);
-	team_port_enable(team, port);
+	linkup = !!netif_carrier_ok(port_dev);
+	if (linkup)
+		team_port_enable(team, port);
+
 	__team_compute_features(team);
-	__team_port_change_port_added(port, !!netif_carrier_ok(port_dev));
+	__team_port_change_port_added(port, linkup);
 	__team_options_change_check(team);
 
 	netdev_info(dev, "Port device %s added\n", portname);
