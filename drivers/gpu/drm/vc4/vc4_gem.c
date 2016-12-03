@@ -544,6 +544,7 @@ vc4_cl_lookup_bos(struct drm_device *dev,
 
 	handles = drm_malloc_ab(exec->bo_count, sizeof(uint32_t));
 	if (!handles) {
+		ret = -ENOMEM;
 		DRM_ERROR("Failed to allocate incoming GEM handles\n");
 		goto fail;
 	}
