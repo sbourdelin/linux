@@ -88,14 +88,24 @@ static int sram_probe(struct platform_device *pdev)
 	info->sram_phys   = (phys_addr_t)res->start;
 	info->sram_size   = resource_size(res);
 	info->sram_virt   = ioremap(info->sram_phys, info->sram_size);
+	if (!info->sram_virt) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
 	info->pool_name	  = kstrdup(pdata->pool_name, GFP_KERNEL);
+	if (!info->pool_name) {
+		ret = -ENOMEM;
+		goto unmap_io;
+	}
+
 	info->granularity = pdata->granularity;
 
 	info->gpool = gen_pool_create(ilog2(info->granularity), -1);
 	if (!info->gpool) {
 		dev_err(&pdev->dev, "create pool failed\n");
 		ret = -ENOMEM;
-		goto create_pool_err;
+		goto free_name;
 	}
 
 	ret = gen_pool_add_virt(info->gpool, (unsigned long)info->sram_virt,
@@ -117,9 +127,10 @@ static int sram_probe(struct platform_device *pdev)
 
 add_chunk_err:
 	gen_pool_destroy(info->gpool);
-create_pool_err:
-	iounmap(info->sram_virt);
+free_name:
 	kfree(info->pool_name);
+unmap_io:
+	iounmap(info->sram_virt);
 out:
 	kfree(info);
 	return ret;
