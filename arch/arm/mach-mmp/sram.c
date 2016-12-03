@@ -66,7 +66,7 @@ static int sram_probe(struct platform_device *pdev)
 	struct sram_platdata *pdata = pdev->dev.platform_data;
 	struct sram_bank_info *info;
 	struct resource *res;
-	int ret = 0;
+	int ret;
 
 	if (!pdata || !pdata->pool_name)
 		return -ENODEV;
