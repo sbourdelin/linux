@@ -1132,7 +1132,7 @@ static int __cpdma_chan_process(struct cpdma_chan *chan)
 	}
 	desc_dma = desc_phys(pool, desc);
 
-	status	= __raw_readl(&desc->hw_mode);
+	status = desc_read(desc, hw_mode);
 	outlen	= status & 0x7ff;
 	if (status & CPDMA_DESC_OWNER) {
 		chan->stats.busy_dequeue++;
