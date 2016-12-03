@@ -4222,7 +4222,7 @@ out:
 	else
 		set_bit(BTRFS_FS_UPDATE_UUID_TREE_GEN, &fs_info->flags);
 	up(&fs_info->uuid_tree_rescan_sem);
-	return 0;
+	return ret;
 }
 
 /*
