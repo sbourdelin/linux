@@ -99,6 +99,17 @@ EXPORT_SYMBOL_GPL(ehci_cf_port_reset_rwsem);
 #define HUB_DEBOUNCE_STEP	  25
 #define HUB_DEBOUNCE_STABLE	 100
 
+static bool padding = true;
+module_param(padding, bool, 0444);
+MODULE_PARM_DESC(padding, "USB timing value padding");
+
+struct _usb_timing_config usb_timing = {
+	.tdrsmdn = USB_TIMING_TDRSMDN_DEF,
+	.trsmrcy = USB_TIMING_TRSMRCY_DEF,
+	.trstrcy = USB_TIMING_TRSTRCY_DEF
+};
+EXPORT_SYMBOL_GPL(usb_timing);
+
 static void hub_release(struct kref *kref);
 static int usb_reset_and_verify_device(struct usb_device *udev);
 
@@ -2884,7 +2895,7 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 done:
 	if (status == 0) {
 		/* TRSTRCY = 10 ms; plus some extra */
-		msleep(10 + 40);
+		msleep(usb_timing.trstrcy);
 		if (udev) {
 			struct usb_hcd *hcd = bus_to_hcd(udev->bus);
 
@@ -3476,10 +3487,10 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 	if (status) {
 		dev_dbg(&port_dev->dev, "can't resume, status %d\n", status);
 	} else {
-		/* drive resume for USB_RESUME_TIMEOUT msec */
+		/* drive resume for TDRSMDN msec */
 		dev_dbg(&udev->dev, "usb %sresume\n",
 				(PMSG_IS_AUTO(msg) ? "auto-" : ""));
-		msleep(USB_RESUME_TIMEOUT);
+		msleep(usb_timing.tdrsmdn);
 
 		/* Virtual root hubs can trigger on GET_PORT_STATUS to
 		 * stop resume signaling.  Then finish the resume
@@ -3488,7 +3499,7 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 		status = hub_port_status(hub, port1, &portstatus, &portchange);
 
 		/* TRSMRCY = 10 msec */
-		msleep(10);
+		msleep(usb_timing.trsmrcy);
 	}
 
  SuspendCleared:
@@ -3574,7 +3585,7 @@ static int hub_handle_remote_wakeup(struct usb_hub *hub, unsigned int port,
 
 	if (udev) {
 		/* TRSMRCY = 10 msec */
-		msleep(10);
+		msleep(usb_timing.trsmrcy);
 
 		usb_unlock_port(port_dev);
 		ret = usb_remote_wakeup(udev);
@@ -5260,6 +5271,12 @@ int usb_hub_init(void)
 		printk(KERN_ERR "%s: can't register hub driver\n",
 			usbcore_name);
 		return -1;
+	}
+
+	if (!padding) {
+		usb_timing.tdrsmdn = USB_TIMING_TDRSMDN_MIN;
+		usb_timing.trsmrcy = USB_TIMING_TRSMRCY_MIN;
+		usb_timing.trstrcy = USB_TIMING_TRSTRCY_MIN;
 	}
 
 	/*

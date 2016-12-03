@@ -4237,6 +4237,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 	usbcore.blinkenlights=
 			[USB] Set to cycle leds on hubs (default 0 = off).
 
+	usbcore.padding=
+			[USB] Pad the USB 2.0 spec timing values (default 1 = on).
+
 	usbcore.old_scheme_first=
 			[USB] Start with the old device initialization
 			scheme (default 0 = off).
