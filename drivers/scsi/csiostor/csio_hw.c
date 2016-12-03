@@ -1372,8 +1372,8 @@ csio_config_device_caps(struct csio_hw *hw)
 	}
 
 	/* Validate device capabilities */
-	rv = csio_hw_validate_caps(hw, mbp);
-	if (rv != 0)
+	retval = csio_hw_validate_caps(hw, mbp);
+	if (retval != 0)
 		goto out;
 
 	/* Don't config device capabilities if already configured */
