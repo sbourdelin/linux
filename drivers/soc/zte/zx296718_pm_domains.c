@@ -1,0 +1,162 @@
+/*
+ * Copyright (C) 2015 ZTE Ltd.
+ *
+ * Author: Baoyou Xie <baoyou.xie@linaro.org>
+ * License terms: GNU General Public License (GPL) version 2
+ */
+#include "pm_domains.h"
+
+enum {
+	PCU_DM_VOU = 0,
+	PCU_DM_SAPPU,
+	PCU_DM_VDE,
+	PCU_DM_VCE,
+	PCU_DM_HDE,
+	PCU_DM_VIU,
+	PCU_DM_USB20,
+	PCU_DM_USB21,
+	PCU_DM_USB30,
+	PCU_DM_HSIC,
+	PCU_DM_GMAC,
+	PCU_DM_TS,
+};
+
+static struct zx_pm_domain vou_domain = {
+	.dm = {
+		.name		= "vou_domain",
+		.power_off	= zx_normal_power_off,
+		.power_on	= zx_normal_power_on,
+	},
+	.bit = PCU_DM_VOU,
+};
+static struct zx_pm_domain sappu_domain = {
+	.dm = {
+		.name		= "sappu_domain",
+		.power_off	= zx_normal_power_off,
+		.power_on	= zx_normal_power_on,
+	},
+	.bit = PCU_DM_SAPPU,
+};
+static struct zx_pm_domain vde_domain = {
+	.dm = {
+		.name		= "vde_domain",
+		.power_off	= zx_normal_power_off,
+		.power_on	= zx_normal_power_on,
+	},
+	.bit = PCU_DM_VDE,
+};
+static struct zx_pm_domain vce_domain = {
+	.dm = {
+		.name		= "vce_domain",
+		.power_off	= zx_normal_power_off,
+		.power_on	= zx_normal_power_on,
+	},
+	.bit = PCU_DM_VCE,
+};
+static struct zx_pm_domain hde_domain = {
+	.dm = {
+		.name		= "hde_domain",
+		.power_off	= zx_normal_power_off,
+		.power_on	= zx_normal_power_on,
+	},
+	.bit = PCU_DM_HDE,
+};
+
+static struct zx_pm_domain viu_domain = {
+	.dm = {
+		.name		= "viu_domain",
+		.power_off	= zx_normal_power_off,
+		.power_on	= zx_normal_power_on,
+	},
+	.bit = PCU_DM_VIU,
+};
+static struct zx_pm_domain usb20_domain = {
+	.dm = {
+		.name		= "usb20_domain",
+		.power_off	= zx_normal_power_off,
+		.power_on	= zx_normal_power_on,
+	},
+	.bit = PCU_DM_USB20,
+};
+static struct zx_pm_domain usb21_domain = {
+	.dm = {
+		.name		= "usb21_domain",
+		.power_off	= zx_normal_power_off,
+		.power_on	= zx_normal_power_on,
+	},
+	.bit = PCU_DM_USB21,
+};
+static struct zx_pm_domain usb30_domain = {
+	.dm = {
+		.name		= "usb30_domain",
+		.power_off	= zx_normal_power_off,
+		.power_on	= zx_normal_power_on,
+	},
+	.bit = PCU_DM_USB30,
+};
+static struct zx_pm_domain hsic_domain = {
+	.dm = {
+		.name		= "hsic_domain",
+		.power_off	= zx_normal_power_off,
+		.power_on	= zx_normal_power_on,
+	},
+	.bit = PCU_DM_HSIC,
+};
+static struct zx_pm_domain gmac_domain = {
+	.dm = {
+		.name		= "gmac_domain",
+		.power_off	= zx_normal_power_off,
+		.power_on	= zx_normal_power_on,
+	},
+	.bit = PCU_DM_GMAC,
+};
+static struct zx_pm_domain ts_domain = {
+	.dm = {
+		.name		= "ts_domain",
+		.power_off	= zx_normal_power_off,
+		.power_on	= zx_normal_power_on,
+	},
+	.bit = PCU_DM_TS,
+};
+struct generic_pm_domain *zx296718_pm_domains[] = {
+	//&vou_domain.dm,
+	&sappu_domain.dm,
+	&vde_domain.dm,
+	&vce_domain.dm,
+	&hde_domain.dm,
+	&viu_domain.dm,
+	&usb20_domain.dm,
+	&usb21_domain.dm,
+	&usb30_domain.dm,
+	&hsic_domain.dm,
+	&gmac_domain.dm,
+	&ts_domain.dm,
+	&vou_domain.dm,
+};
+
+static int zx296718_pd_probe(struct platform_device *pdev)
+{
+	return zx_pd_probe(pdev,
+			  zx296718_pm_domains,
+			  ARRAY_SIZE(zx296718_pm_domains));
+}
+
+static const struct of_device_id zx296718_pm_domain_matches[] = {
+	{ .compatible = "zte,zx296718-pcu", },
+	{ },
+};
+
+static struct platform_driver zx296718_pd_driver = {
+	.driver = {
+		.name = "zx-powerdomain",
+		.owner = THIS_MODULE,
+		.of_match_table = zx296718_pm_domain_matches,
+	},
+	.probe = zx296718_pd_probe,
+};
+
+static int __init zx296718_pd_init(void)
+{
+	return platform_driver_register(&zx296718_pd_driver);
+}
+subsys_initcall(zx296718_pd_init);
