@@ -123,8 +123,10 @@ int public_key_verify_signature(const struct public_key *pkey,
 
 	outlen = crypto_akcipher_maxsize(tfm);
 	output = kmalloc(outlen, GFP_KERNEL);
-	if (!output)
+	if (!output) {
+		ret = -ENOMEM;
 		goto error_free_req;
+	}
 
 	sg_init_one(&sig_sg, sig->s, sig->s_size);
 	sg_init_one(&digest_sg, output, outlen);
