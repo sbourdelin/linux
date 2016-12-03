@@ -613,7 +613,7 @@ out:
 		csio_err(hw, "erase of flash sector %d failed, error %d\n",
 			 start, ret);
 	csio_wr_reg32(hw, 0, SF_OP_A);    /* unlock SF */
-	return 0;
+	return ret;
 }
 
 static void
