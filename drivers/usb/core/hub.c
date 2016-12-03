@@ -5265,8 +5265,98 @@ static struct usb_driver hub_driver = {
 	.supports_autosuspend =	1,
 };
 
+static ssize_t tdrsmdn_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", usb_timing.tdrsmdn);
+}
+
+static ssize_t tdrsmdn_store(struct kobject *kobj,
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret, val;
+
+	ret = kstrtoint(buf, 10, &val);
+	if (ret < 0)
+		return ret;
+
+	if (val < 20)
+		usb_timing.tdrsmdn = 20;
+	else
+		usb_timing.tdrsmdn = val;
+
+	return count;
+}
+
+static ssize_t trsmrcy_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", usb_timing.trsmrcy);
+}
+
+static ssize_t trsmrcy_store(struct kobject *kobj,
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret, val;
+
+	ret = kstrtoint(buf, 10, &val);
+	if (ret < 0)
+		return ret;
+
+	if (val < 10)
+		usb_timing.trsmrcy = 10;
+	else
+		usb_timing.trsmrcy = val;
+
+	return count;
+}
+
+static ssize_t trstrcy_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", usb_timing.trstrcy);
+}
+
+static ssize_t trstrcy_store(struct kobject *kobj,
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int ret, val;
+
+	ret = kstrtoint(buf, 10, &val);
+	if (ret < 0)
+		return ret;
+
+	if (val < 0)
+		usb_timing.trstrcy = 0;
+	else
+		usb_timing.trstrcy = val;
+
+	return count;
+}
+
+static struct kobj_attribute tdrsmdn_attr =
+	__ATTR(tdrsmdn, 0664, tdrsmdn_show, tdrsmdn_store);
+static struct kobj_attribute trsmrcy_attr =
+	__ATTR(trsmrcy, 0664, trsmrcy_show, trsmrcy_store);
+static struct kobj_attribute trstrcy_attr =
+	__ATTR(trstrcy, 0664, trstrcy_show, trstrcy_store);
+
+static struct attribute *attrs[] = {
+	&tdrsmdn_attr.attr,
+	&trsmrcy_attr.attr,
+	&trstrcy_attr.attr,
+	NULL
+};
+
+static struct attribute_group attr_group = {
+	.attrs = attrs,
+};
+
 int usb_hub_init(void)
 {
+	int retval;
+	struct kobject *usb_kobj;
+
 	if (usb_register(&hub_driver) < 0) {
 		printk(KERN_ERR "%s: can't register hub driver\n",
 			usbcore_name);
@@ -5277,6 +5367,16 @@ int usb_hub_init(void)
 		usb_timing.tdrsmdn = USB_TIMING_TDRSMDN_MIN;
 		usb_timing.trsmrcy = USB_TIMING_TRSMRCY_MIN;
 		usb_timing.trstrcy = USB_TIMING_TRSTRCY_MIN;
+	}
+
+	usb_kobj = kobject_create_and_add("usb", kernel_kobj);
+	if (!usb_kobj)
+		return -ENOMEM;
+
+	retval = sysfs_create_group(usb_kobj, &attr_group);
+	if (retval) {
+		kobject_put(usb_kobj);
+		return retval;
 	}
 
 	/*
