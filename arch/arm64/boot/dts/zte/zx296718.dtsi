@@ -312,5 +312,12 @@
 			reg = <0x01480000 0x1000>;
 			#clock-cells = <1>;
 		};
+
+		pcu_domain: pcu@0x00117000 {
+			compatible = "zte,zx296718-pcu";
+			reg = <0x00117000 0x1000>;
+			#power-domain-cells = <1>;
+			status = "ok";
+		};
 	};
 };

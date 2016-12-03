@@ -27,6 +27,9 @@ System management required properties:
       - compatible = "zte,zx296718-aon-sysctrl"
       - compatible = "zte,zx296718-sysctrl"
 
+Low power management required properties:
+      - compatible = "zte,zx296718-pcu"
+
 Example:
 aon_sysctrl: aon-sysctrl@116000 {
 	compatible = "zte,zx296718-aon-sysctrl", "syscon";
@@ -37,3 +40,11 @@ sysctrl: sysctrl@1463000 {
 	compatible = "zte,zx296718-sysctrl", "syscon";
 	reg = <0x1463000 0x1000>;
 };
+
+pcu_domain: pcu@0x00117000 {
+        compatible = "zte,zx296718-pcu";
+        reg = <0x00117000 0x1000>;
+        #power-domain-cells = <1>;
+        status = "ok";
+};
+
