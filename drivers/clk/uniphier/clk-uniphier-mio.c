@@ -30,7 +30,7 @@
 		.name = "sd" #ch "-sel",				\
 		.type = UNIPHIER_CLK_TYPE_MUX,				\
 		.idx = -1,						\
-		.mux = {						\
+		{ .mux = {						\
 			.parent_names = {				\
 				"sd-44m",				\
 				"sd-33m",				\
@@ -63,7 +63,7 @@
 				0x00001200,				\
 				0x00001300,				\
 			},						\
-		},							\
+		} },							\
 	},								\
 	UNIPHIER_CLK_GATE("sd" #ch, (_idx), "sd" #ch "-sel", 0x20 + 0x200 * (ch), 8)
 
