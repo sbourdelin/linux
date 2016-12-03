@@ -14,7 +14,7 @@
 #include <linux/slab.h>
 #include <linux/uio_driver.h>
 
-#include <asm/io.h>
+#include <linux/io.h>
 
 #define PLX9030_INTCSR		0x4C
 #define INTSCR_INT1_ENABLE	0x01
@@ -67,16 +67,20 @@ static int hilscher_pci_probe(struct pci_dev *dev,
 	info->mem[1].addr = pci_resource_start(dev, 2);
 	info->mem[1].size = pci_resource_len(dev, 2);
 	info->mem[1].memtype = UIO_MEM_PHYS;
+
 	switch (id->subdevice) {
-		case CIF_SUBDEVICE_PROFIBUS:
-			info->name = "CIF_Profibus";
-			break;
-		case CIF_SUBDEVICE_DEVICENET:
-			info->name = "CIF_Devicenet";
-			break;
-		default:
-			info->name = "CIF_???";
+	case CIF_SUBDEVICE_PROFIBUS:
+		info->name = "CIF_Profibus";
+		break;
+
+	case CIF_SUBDEVICE_DEVICENET:
+		info->name = "CIF_Devicenet";
+		break;
+
+	default:
+		info->name = "CIF_???";
 	}
+
 	info->version = "0.0.1";
 	info->irq = dev->irq;
 	info->irq_flags = IRQF_SHARED;
@@ -95,7 +99,7 @@ out_release:
 out_disable:
 	pci_disable_device(dev);
 out_free:
-	kfree (info);
+	kfree(info);
 	return -ENODEV;
 }
 
@@ -108,7 +112,7 @@ static void hilscher_pci_remove(struct pci_dev *dev)
 	pci_disable_device(dev);
 	iounmap(info->mem[0].internal_addr);
 
-	kfree (info);
+	kfree(info);
 }
 
 static struct pci_device_id hilscher_pci_ids[] = {
