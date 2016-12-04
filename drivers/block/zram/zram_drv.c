@@ -1414,8 +1414,8 @@ static ssize_t hot_remove_store(struct class *class,
 }
 
 static struct class_attribute zram_control_class_attrs[] = {
-	__ATTR_RO(hot_add),
-	__ATTR_WO(hot_remove),
+	__ATTR(hot_add, 0400, hot_add_show, NULL),
+	__ATTR(hot_remove, 0200, NULL, hot_remove_store),
 	__ATTR_NULL,
 };
 
