@@ -2081,6 +2081,14 @@ static bool tcp_small_queue_check(struct sock *sk, const struct sk_buff *skb,
 	limit <<= factor;
 
 	if (atomic_read(&sk->sk_wmem_alloc) > limit) {
+		/* Special case where TX completion is delayed too much :
+		 * If the skb we try to send is the first skb in write queue,
+		 * then send it !
+		 * No need to wait for TX completion to call us back.
+		 */
+		if (skb == sk->sk_write_queue.next)
+			return false;
+
 		set_bit(TSQ_THROTTLED, &tcp_sk(sk)->tsq_flags);
 		/* It is possible TX completion already happened
 		 * before we set TSQ_THROTTLED, so we must
