@@ -811,7 +811,8 @@ int bnx2x_vfpf_config_rss(struct bnx2x *bp,
 		      sizeof(struct channel_list_end_tlv));
 
 	memcpy(req->ind_table, params->ind_table, T_ETH_INDIRECTION_TABLE_SIZE);
-	memcpy(req->rss_key, params->rss_key, sizeof(params->rss_key));
+	memcpy(req->rss_key, params->rss_obj->rss_key,
+	       sizeof(params->rss_obj->rss_key));
 	req->ind_table_size = T_ETH_INDIRECTION_TABLE_SIZE;
 	req->rss_key_size = T_ETH_RSS_KEY;
 	req->rss_result_mask = params->rss_result_mask;
@@ -1985,7 +1986,7 @@ static void bnx2x_vf_mbx_update_rss(struct bnx2x *bp, struct bnx2x_virtf *vf,
 	/* set vfop params according to rss tlv */
 	memcpy(rss.ind_table, rss_tlv->ind_table,
 	       T_ETH_INDIRECTION_TABLE_SIZE);
-	memcpy(rss.rss_key, rss_tlv->rss_key, sizeof(rss_tlv->rss_key));
+	memcpy(&vf->rss_conf_obj.rss_key, rss_tlv->rss_key, sizeof(rss_tlv->rss_key));
 	rss.rss_obj = &vf->rss_conf_obj;
 	rss.rss_result_mask = rss_tlv->rss_result_mask;
 

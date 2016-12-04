@@ -2106,7 +2106,7 @@ int bnx2x_rss(struct bnx2x *bp, struct bnx2x_rss_config_obj *rss_obj,
 
 	if (config_hash) {
 		/* RSS keys */
-		netdev_rss_key_fill(params.rss_key, T_ETH_RSS_KEY * 4);
+		netdev_rss_key_fill(&rss_obj->rss_key, T_ETH_RSS_KEY * 4);
 		__set_bit(BNX2X_RSS_SET_SRCH, &params.rss_flags);
 	}
 
