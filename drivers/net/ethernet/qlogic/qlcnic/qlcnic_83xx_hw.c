@@ -3189,7 +3189,7 @@ int qlcnic_83xx_test_link(struct qlcnic_adapter *adapter)
 
 	err = qlcnic_alloc_mbx_args(&cmd, adapter, QLCNIC_CMD_GET_LINK_STATUS);
 	if (err)
-		return err;
+		return config;
 
 	err = qlcnic_issue_cmd(adapter, &cmd);
 	if (err) {
