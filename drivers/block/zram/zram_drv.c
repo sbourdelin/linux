@@ -1413,9 +1413,16 @@ static ssize_t hot_remove_store(struct class *class,
 	return ret ? ret : count;
 }
 
+/*
+ * NOTE: hot_add attribute is not the usual read-only sysfs
+ * attribute. In a sence that reading from this file does alter
+ * the state of your system -- it creates a new un-initialized
+ * zram device and returns back this device's device_id (or an
+ * error code if it fails to create a new device).
+ */
 static struct class_attribute zram_control_class_attrs[] = {
-	__ATTR_RO(hot_add),
-	__ATTR_WO(hot_remove),
+	__ATTR(hot_add, 0400, hot_add_show, NULL),
+	__ATTR(hot_remove, 0200, NULL, hot_remove_store),
 	__ATTR_NULL,
 };
 
