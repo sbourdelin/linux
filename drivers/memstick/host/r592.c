@@ -761,6 +761,7 @@ static int r592_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (error)
 		goto error3;
 
+	error = -ENOMEM;
 	dev->mmio = pci_ioremap_bar(pdev, 0);
 	if (!dev->mmio)
 		goto error4;
