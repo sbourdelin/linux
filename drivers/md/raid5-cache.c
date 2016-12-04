@@ -2602,13 +2602,17 @@ int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev)
 
 	INIT_WORK(&log->deferred_io_work, r5l_submit_io_async);
 
-	log->r5c_journal_mode = R5C_JOURNAL_MODE_WRITE_THROUGH;
 	INIT_LIST_HEAD(&log->stripe_in_journal_list);
 	spin_lock_init(&log->stripe_in_journal_lock);
 	atomic_set(&log->stripe_in_journal_count, 0);
 
 	if (r5l_load_log(log))
 		goto error;
+
+	if (log->last_checkpoint == log->next_checkpoint)
+		log->r5c_journal_mode = R5C_JOURNAL_MODE_WRITE_THROUGH;
+	else
+		log->r5c_journal_mode = R5C_JOURNAL_MODE_WRITE_BACK;
 
 	rcu_assign_pointer(conf->log, log);
 	set_bit(MD_HAS_JOURNAL, &conf->mddev->flags);
