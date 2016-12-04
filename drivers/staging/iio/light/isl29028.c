@@ -115,7 +115,7 @@ static int isl29028_set_als_scale(struct isl29028_chip *chip, int lux_scale)
 					ISL29028_CONF_ALS_RANGE_LOW_LUX;
 
 	return regmap_update_bits(chip->regmap, ISL29028_REG_CONFIGURE,
-		ISL29028_CONF_ALS_RANGE_MASK, val);
+				  ISL29028_CONF_ALS_RANGE_MASK, val);
 }
 
 static int isl29028_set_als_ir_mode(struct isl29028_chip *chip,
@@ -147,7 +147,8 @@ static int isl29028_set_als_ir_mode(struct isl29028_chip *chip,
 
 	case ISL29028_MODE_NONE:
 		return regmap_update_bits(chip->regmap, ISL29028_REG_CONFIGURE,
-			ISL29028_CONF_ALS_EN_MASK, ISL29028_CONF_ALS_DIS);
+					  ISL29028_CONF_ALS_EN_MASK,
+					  ISL29028_CONF_ALS_DIS);
 	}
 
 	if (ret < 0)
