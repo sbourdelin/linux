@@ -1413,7 +1413,7 @@ int ubi_self_check_all_ff(struct ubi_device *ubi, int pnum, int offset, int len)
 	buf = __vmalloc(len, GFP_NOFS, PAGE_KERNEL);
 	if (!buf) {
 		ubi_err(ubi, "cannot allocate memory to check for 0xFFs");
-		return 0;
+		return -ENOMEM;
 	}
 
 	err = mtd_read(ubi->mtd, addr, len, &read, buf);
