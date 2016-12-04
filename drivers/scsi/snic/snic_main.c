@@ -586,6 +586,7 @@ snic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	for (i = 0; i < SNIC_IO_LOCKS; i++)
 		spin_lock_init(&snic->io_req_lock[i]);
 
+	ret = -ENOMEM;
 	pool = mempool_create_slab_pool(2,
 				snic_glob->req_cache[SNIC_REQ_CACHE_DFLT_SGL]);
 	if (!pool) {
