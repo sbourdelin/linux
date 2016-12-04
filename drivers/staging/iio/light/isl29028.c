@@ -419,14 +419,16 @@ static const struct iio_chan_spec isl29028_channels[] = {
 	{
 		.type = IIO_LIGHT,
 		.info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED) |
-		BIT(IIO_CHAN_INFO_SCALE),
-	}, {
+				      BIT(IIO_CHAN_INFO_SCALE),
+	},
+	{
 		.type = IIO_INTENSITY,
 		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
-	}, {
+	},
+	{
 		.type = IIO_PROXIMITY,
 		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-		BIT(IIO_CHAN_INFO_SAMP_FREQ),
+				      BIT(IIO_CHAN_INFO_SAMP_FREQ),
 	}
 };
 
