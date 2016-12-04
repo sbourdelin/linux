@@ -4189,7 +4189,10 @@ int xhci_set_usb2_hardware_lpm(struct usb_hcd *hcd,
 		}
 
 		pm_val &= ~PORT_HIRD_MASK;
-		pm_val |= PORT_HIRD(hird) | PORT_RWE | PORT_L1DS(udev->slot_id);
+		if ((xhci->quirks & XHCI_RWE_DISABLE) && (xhci->hci_version <= 0x100))
+			pm_val |= PORT_HIRD(hird) | PORT_L1DS(udev->slot_id);
+		else
+			pm_val |= PORT_HIRD(hird) | PORT_RWE | PORT_L1DS(udev->slot_id);
 		writel(pm_val, pm_addr);
 		pm_val = readl(pm_addr);
 		pm_val |= PORT_HLE;
