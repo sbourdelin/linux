@@ -2884,7 +2884,9 @@ fec_enet_close(struct net_device *ndev)
 	if (fep->quirks & FEC_QUIRK_ERR006687)
 		imx6q_cpuidle_fec_irqs_unused();
 
+#if !defined(CONFIG_M5272)
 	fec_enet_update_ethtool_stats(ndev);
+#endif
 
 	fec_enet_clk_enable(ndev, false);
 	pinctrl_pm_select_sleep_state(&fep->pdev->dev);
@@ -3192,7 +3194,9 @@ static int fec_enet_init(struct net_device *ndev)
 
 	fec_restart(ndev);
 
+#if !defined(CONFIG_M5272)
 	fec_enet_update_ethtool_stats(ndev);
+#endif
 
 	return 0;
 }
@@ -3292,9 +3296,11 @@ fec_probe(struct platform_device *pdev)
 	fec_enet_get_queue_num(pdev, &num_tx_qs, &num_rx_qs);
 
 	/* Init network device */
-	ndev = alloc_etherdev_mqs(sizeof(struct fec_enet_private) +
-				  ARRAY_SIZE(fec_stats) * sizeof(u64),
-				  num_tx_qs, num_rx_qs);
+	ndev = alloc_etherdev_mqs(sizeof(struct fec_enet_private)
+#if !defined(CONFIG_M5272)
+				  + ARRAY_SIZE(fec_stats) * sizeof(u64)
+#endif
+				  , num_tx_qs, num_rx_qs);
 	if (!ndev)
 		return -ENOMEM;
 
