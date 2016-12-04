@@ -80,7 +80,7 @@ static int isl29028_set_proxim_sampling(struct isl29028_chip *chip,
 					unsigned int sampling)
 {
 	static unsigned int prox_period[] = {800, 400, 200, 100, 75, 50, 12, 0};
-	int sel;
+	unsigned int sel;
 	unsigned int period = DIV_ROUND_UP(1000, sampling);
 
 	for (sel = 0; sel < ARRAY_SIZE(prox_period); ++sel) {
