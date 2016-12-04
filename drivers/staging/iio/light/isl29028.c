@@ -121,11 +121,21 @@ static int isl29028_enable_proximity(struct isl29028_chip *chip)
 
 static int isl29028_set_als_scale(struct isl29028_chip *chip, int lux_scale)
 {
+	struct device *dev = regmap_get_device(chip->regmap);
 	int val = (lux_scale == 2000) ? ISL29028_CONF_ALS_RANGE_HIGH_LUX :
 					ISL29028_CONF_ALS_RANGE_LOW_LUX;
+	int ret;
 
-	return regmap_update_bits(chip->regmap, ISL29028_REG_CONFIGURE,
-				  ISL29028_CONF_ALS_RANGE_MASK, val);
+	ret = regmap_update_bits(chip->regmap, ISL29028_REG_CONFIGURE,
+				 ISL29028_CONF_ALS_RANGE_MASK, val);
+	if (ret < 0)
+		dev_err(dev,
+			"%s(): Error %d setting the ALS scale\n", __func__,
+			ret);
+	else
+		chip->lux_scale = lux_scale;
+
+	return ret;
 }
 
 static int isl29028_set_als_ir_mode(struct isl29028_chip *chip,
@@ -322,13 +332,6 @@ static int isl29028_write_raw(struct iio_dev *indio_dev,
 		}
 
 		ret = isl29028_set_als_scale(chip, val);
-		if (ret < 0) {
-			dev_err(dev,
-				"Setting lux scale fail with error %d\n", ret);
-			break;
-		}
-
-		chip->lux_scale = val;
 		break;
 	default:
 		dev_err(dev, "Unsupported channel type\n");
@@ -459,7 +462,7 @@ static int isl29028_chip_init_and_power_on(struct isl29028_chip *chip)
 
 	ret = isl29028_set_als_scale(chip, chip->lux_scale);
 	if (ret < 0)
-		dev_err(dev, "setting als scale failed, err = %d\n", ret);
+		return ret;
 
 	chip->suspended = false;
 
