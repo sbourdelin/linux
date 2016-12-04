@@ -51,7 +51,8 @@
 #include "mlx4_en.h"
 #include "en_port.h"
 
-#define MLX4_EN_MAX_XDP_MTU ((int)(PAGE_SIZE - ETH_HLEN - (2 * VLAN_HLEN)))
+#define MLX4_EN_MAX_XDP_MTU ((int)(PAGE_SIZE - ETH_HLEN - (2 * VLAN_HLEN) - \
+				   XDP_PACKET_HEADROOM))
 
 int mlx4_en_setup_tc(struct net_device *dev, u8 up)
 {
@@ -1551,6 +1552,7 @@ int mlx4_en_start_port(struct net_device *dev)
 	struct mlx4_en_tx_ring *tx_ring;
 	int rx_index = 0;
 	int err = 0;
+	int mtu;
 	int i, t;
 	int j;
 	u8 mc_list[16] = {0};
@@ -1684,8 +1686,12 @@ int mlx4_en_start_port(struct net_device *dev)
 	}
 
 	/* Configure port */
+	mtu = priv->rx_skb_size + ETH_FCS_LEN;
+	if (priv->tx_ring_num[TX_XDP])
+		mtu += XDP_PACKET_HEADROOM;
+
 	err = mlx4_SET_PORT_general(mdev->dev, priv->port,
-				    priv->rx_skb_size + ETH_FCS_LEN,
+				    mtu,
 				    priv->prof->tx_pause,
 				    priv->prof->tx_ppp,
 				    priv->prof->rx_pause,
@@ -2254,6 +2260,13 @@ void mlx4_en_destroy_netdev(struct net_device *dev)
 static bool mlx4_en_check_xdp_mtu(struct net_device *dev, int mtu)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
+
+	if (mtu + XDP_PACKET_HEADROOM > priv->max_mtu) {
+		en_err(priv,
+		       "Device max mtu:%d does not allow %d bytes reserved headroom for XDP prog\n",
+		       priv->max_mtu, XDP_PACKET_HEADROOM);
+		return false;
+	}
 
 	if (mtu > MLX4_EN_MAX_XDP_MTU) {
 		en_err(priv, "mtu:%d > max:%d when XDP prog is attached\n",
