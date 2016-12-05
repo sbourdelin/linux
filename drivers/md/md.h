@@ -122,6 +122,13 @@ struct md_rdev {
 					   * sysfs entry */
 
 	struct badblocks badblocks;
+
+	struct {
+		unsigned int offset; /* Offset from superblock to start of PPL.
+				      * Not used by external metadata. */
+		unsigned int size;   /* Size in sectors of the PPL space */
+		sector_t sector;     /* First sector of the PPL space */
+	} ppl;
 };
 enum flag_bits {
 	Faulty,			/* device is known to have a fault */
@@ -235,6 +242,7 @@ enum mddev_flags {
 				 * never cause the array to become failed.
 				 */
 	MD_NEED_REWRITE,	/* metadata write needs to be repeated */
+	MD_HAS_PPL,		/* The raid array has PPL feature set */
 };
 #define MD_UPDATE_SB_FLAGS (BIT(MD_CHANGE_DEVS) | \
 			    BIT(MD_CHANGE_CLEAN) | \
