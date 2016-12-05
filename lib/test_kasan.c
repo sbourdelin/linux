@@ -352,6 +352,19 @@ static noinline void __init kasan_stack_oob(void)
 	*(volatile char *)p;
 }
 
+static noinline void __init kasan_stack_use_after_scope(void)
+{
+	char *ptr = NULL;
+	{
+		char a;
+
+		ptr = &a;
+	}
+
+	pr_info("use-after-scope on stack\n");
+	*(volatile char *)ptr;
+}
+
 static noinline void __init ksize_unpoisons_memory(void)
 {
 	char *ptr;
@@ -461,6 +474,7 @@ static int __init kmalloc_tests_init(void)
 	kmalloc_uaf2();
 	kmem_cache_oob();
 	kasan_stack_oob();
+	kasan_stack_use_after_scope();
 	kasan_global_oob();
 	ksize_unpoisons_memory();
 	copy_user_test();
