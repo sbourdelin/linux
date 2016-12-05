@@ -1548,8 +1548,12 @@ static void unhandled_cp_access(struct kvm_vcpu *vcpu,
 		WARN_ON(1);
 	}
 
-	kvm_err("Unsupported guest CP%d access at: %08lx\n",
-		cp, *vcpu_pc(vcpu));
+	if (params->is_32bit)
+		kvm_err("Unsupported guest CP%d access at: %08lx\n",
+			cp, *vcpu_pc(vcpu));
+	else
+		kvm_err("Unsupported guest CP%d access at: %016lx\n",
+			cp, *vcpu_pc(vcpu));
 	print_sys_reg_instr(params);
 	kvm_inject_undefined(vcpu);
 }

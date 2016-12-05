@@ -77,7 +77,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 
 	pr_alert("pgd = %p\n", mm->pgd);
 	pgd = pgd_offset(mm, addr);
-	pr_alert("[%08lx] *pgd=%016llx", addr, pgd_val(*pgd));
+	pr_alert("[%016lx] *pgd=%016llx", addr, pgd_val(*pgd));
 
 	do {
 		pud_t *pud;
@@ -177,7 +177,7 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
 	 * No handler, we'll have to terminate things with extreme prejudice.
 	 */
 	bust_spinlocks(1);
-	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
+	pr_alert("Unable to handle kernel %s at virtual address %016lx\n",
 		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
 		 "paging request", addr);
 
@@ -198,9 +198,14 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
 	struct siginfo si;
 
 	if (unhandled_signal(tsk, sig) && show_unhandled_signals_ratelimited()) {
-		pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
-			tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
-			addr, esr);
+		if (compat_user_mode(regs))
+			pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
+				tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
+				addr, esr);
+		else
+			pr_info("%s[%d]: unhandled %s (%d) at 0x%016lx, esr 0x%03x\n",
+				tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
+				addr, esr);
 		show_pte(tsk->mm, addr);
 		show_regs(regs);
 	}

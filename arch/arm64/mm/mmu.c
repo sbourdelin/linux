@@ -683,9 +683,9 @@ void __init early_fixmap_init(void)
 		pr_warn("pmd %p != %p, %p\n",
 			pmd, fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)),
 			fixmap_pmd(fix_to_virt(FIX_BTMAP_END)));
-		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
+		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %016lx\n",
 			fix_to_virt(FIX_BTMAP_BEGIN));
-		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
+		pr_warn("fix_to_virt(FIX_BTMAP_END):   %016lx\n",
 			fix_to_virt(FIX_BTMAP_END));
 
 		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
