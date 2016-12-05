@@ -1417,6 +1417,18 @@ enum motionsense_command {
 	 */
 	MOTIONSENSE_CMD_SENSOR_OFFSET = 11,
 
+	/*
+	 * List available activities for a MOTION sensor.
+	 * Indicates if they are enabled or disabled.
+	 */
+	MOTIONSENSE_CMD_LIST_ACTIVITIES = 12,
+
+	/*
+	 * Activity management
+	 * Enable/Disable activity recognition.
+	 */
+	MOTIONSENSE_CMD_SET_ACTIVITY = 13,
+
 	/* Number of motionsense sub-commands. */
 	MOTIONSENSE_NUM_CMDS
 };
@@ -1494,6 +1506,21 @@ struct ec_response_motion_sensor_data {
 	};
 } __packed;
 
+/* List supported activity recognition */
+enum motionsensor_activity {
+	MOTIONSENSE_ACTIVITY_RESERVED = 0,
+	MOTIONSENSE_ACTIVITY_SIG_MOTION = 1,
+	MOTIONSENSE_ACTIVITY_DOUBLE_TAP = 2,
+};
+
+struct ec_motion_sense_activity {
+	uint8_t sensor_num;
+	uint8_t activity;       /* one of enum motionsensor_activity */
+	uint8_t enable;         /* 1: enable, 0: disable */
+	uint8_t reserved;
+	uint16_t parameters[3]; /* activity dependent parameters */
+};
+
 struct ec_params_motion_sense {
 	uint8_t cmd;
 	union {
@@ -1561,6 +1588,8 @@ struct ec_params_motion_sense {
 			/* Data to set or EC_MOTION_SENSE_NO_VALUE to read. */
 			int32_t data;
 		} sensor_odr, sensor_range;
+
+		struct ec_motion_sense_activity set_activity;
 	};
 } __packed;
 
@@ -1611,6 +1640,12 @@ struct ec_response_motion_sense {
 			int16_t temp;
 			int16_t offset[3];
 		} sensor_offset, perform_calib;
+
+		struct {
+			uint16_t reserved;
+			uint32_t enabled;
+			uint32_t disabled;
+		} __packed list_activities;
 	};
 } __packed;
 
