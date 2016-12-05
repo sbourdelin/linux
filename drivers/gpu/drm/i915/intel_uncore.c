@@ -1289,14 +1289,20 @@ static void intel_uncore_fw_domains_init(struct drm_i915_private *dev_priv)
 	if (IS_GEN9(dev_priv)) {
 		dev_priv->uncore.funcs.force_wake_get = fw_domains_get;
 		dev_priv->uncore.funcs.force_wake_put = fw_domains_put;
-		fw_domain_init(dev_priv, FW_DOMAIN_ID_RENDER,
-			       FORCEWAKE_RENDER_GEN9,
-			       FORCEWAKE_ACK_RENDER_GEN9);
-		fw_domain_init(dev_priv, FW_DOMAIN_ID_BLITTER,
-			       FORCEWAKE_BLITTER_GEN9,
-			       FORCEWAKE_ACK_BLITTER_GEN9);
-		fw_domain_init(dev_priv, FW_DOMAIN_ID_MEDIA,
-			       FORCEWAKE_MEDIA_GEN9, FORCEWAKE_ACK_MEDIA_GEN9);
+		if (HAS_ENGINE(dev_priv, RCS))
+			fw_domain_init(dev_priv, FW_DOMAIN_ID_RENDER,
+				       FORCEWAKE_RENDER_GEN9,
+				       FORCEWAKE_ACK_RENDER_GEN9);
+
+		if (HAS_ENGINE(dev_priv, BCS))
+			fw_domain_init(dev_priv, FW_DOMAIN_ID_BLITTER,
+				       FORCEWAKE_BLITTER_GEN9,
+				       FORCEWAKE_ACK_BLITTER_GEN9);
+
+		if (HAS_ENGINE(dev_priv, VCS))
+			fw_domain_init(dev_priv, FW_DOMAIN_ID_MEDIA,
+				       FORCEWAKE_MEDIA_GEN9,
+				       FORCEWAKE_ACK_MEDIA_GEN9);
 	} else if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
 		dev_priv->uncore.funcs.force_wake_get = fw_domains_get;
 		if (!IS_CHERRYVIEW(dev_priv))
