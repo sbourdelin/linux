@@ -23,6 +23,14 @@ config PPC_PSERIES
 	select PPC_DOORBELL
 	default y
 
+config ARCH_USE_QUEUED_SPINLOCKS
+	default y
+	bool "Enable qspinlock"
+	help
+	  Enabling this option will let kernel use qspinlock which is a kind of
+	  fairlock.  It has shown a good performance improvement on x86 and also ppc
+	  especially in high contention cases.
+
 config PPC_SPLPAR
 	depends on PPC_PSERIES
 	bool "Support for shared-processor logical partitions"
