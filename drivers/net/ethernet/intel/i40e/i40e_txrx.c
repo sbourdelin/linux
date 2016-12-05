@@ -551,15 +551,17 @@ static void i40e_unmap_and_free_tx_resource(struct i40e_ring *ring,
 		else
 			dev_kfree_skb_any(tx_buffer->skb);
 		if (dma_unmap_len(tx_buffer, len))
-			dma_unmap_single(ring->dev,
-					 dma_unmap_addr(tx_buffer, dma),
-					 dma_unmap_len(tx_buffer, len),
-					 DMA_TO_DEVICE);
+			dma_unmap_single_attrs(ring->dev,
+					       dma_unmap_addr(tx_buffer, dma),
+					       dma_unmap_len(tx_buffer, len),
+					       DMA_TO_DEVICE,
+					       ring->dma_attrs);
 	} else if (dma_unmap_len(tx_buffer, len)) {
-		dma_unmap_page(ring->dev,
-			       dma_unmap_addr(tx_buffer, dma),
-			       dma_unmap_len(tx_buffer, len),
-			       DMA_TO_DEVICE);
+		dma_unmap_single_attrs(ring->dev,
+				       dma_unmap_addr(tx_buffer, dma),
+				       dma_unmap_len(tx_buffer, len),
+				       DMA_TO_DEVICE,
+				       ring->dma_attrs);
 	}
 
 	tx_buffer->next_to_watch = NULL;
@@ -662,6 +664,8 @@ static bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
 	struct i40e_tx_buffer *tx_buf;
 	struct i40e_tx_desc *tx_head;
 	struct i40e_tx_desc *tx_desc;
+	dma_addr_t addr;
+	size_t size;
 	unsigned int total_bytes = 0, total_packets = 0;
 	unsigned int budget = vsi->work_limit;
 
@@ -696,10 +700,11 @@ static bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
 		napi_consume_skb(tx_buf->skb, napi_budget);
 
 		/* unmap skb header data */
-		dma_unmap_single(tx_ring->dev,
-				 dma_unmap_addr(tx_buf, dma),
-				 dma_unmap_len(tx_buf, len),
-				 DMA_TO_DEVICE);
+		dma_unmap_single_attrs(tx_ring->dev,
+				       dma_unmap_addr(tx_buf, dma),
+				       dma_unmap_len(tx_buf, len),
+				       DMA_TO_DEVICE,
+				       tx_ring->dma_attrs);
 
 		/* clear tx_buffer data */
 		tx_buf->skb = NULL;
@@ -717,12 +722,15 @@ static bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
 				tx_desc = I40E_TX_DESC(tx_ring, 0);
 			}
 
+			addr = dma_unmap_addr(tx_buf, dma);
+			size = dma_unmap_len(tx_buf, len);
 			/* unmap any remaining paged data */
 			if (dma_unmap_len(tx_buf, len)) {
-				dma_unmap_page(tx_ring->dev,
-					       dma_unmap_addr(tx_buf, dma),
-					       dma_unmap_len(tx_buf, len),
-					       DMA_TO_DEVICE);
+				dma_unmap_single_attrs(tx_ring->dev,
+						       addr,
+						       size,
+						       DMA_TO_DEVICE,
+						       tx_ring->dma_attrs);
 				dma_unmap_len_set(tx_buf, len, 0);
 			}
 		}
@@ -1010,6 +1018,11 @@ int i40e_setup_tx_descriptors(struct i40e_ring *tx_ring)
 	 */
 	tx_ring->size += sizeof(u32);
 	tx_ring->size = ALIGN(tx_ring->size, 4096);
+#ifdef CONFIG_SPARC
+	tx_ring->dma_attrs = DMA_ATTR_WEAK_ORDERING;
+#else
+	tx_ring->dma_attrs = 0;
+#endif
 	tx_ring->desc = dma_alloc_coherent(dev, tx_ring->size,
 					   &tx_ring->dma, GFP_KERNEL);
 	if (!tx_ring->desc) {
@@ -1053,7 +1066,11 @@ void i40e_clean_rx_ring(struct i40e_ring *rx_ring)
 		if (!rx_bi->page)
 			continue;
 
-		dma_unmap_page(dev, rx_bi->dma, PAGE_SIZE, DMA_FROM_DEVICE);
+		dma_unmap_single_attrs(dev,
+				       rx_bi->dma,
+				       PAGE_SIZE,
+				       DMA_FROM_DEVICE,
+				       rx_ring->dma_attrs);
 		__free_pages(rx_bi->page, 0);
 
 		rx_bi->page = NULL;
@@ -1113,6 +1130,11 @@ int i40e_setup_rx_descriptors(struct i40e_ring *rx_ring)
 	/* Round up to nearest 4K */
 	rx_ring->size = rx_ring->count * sizeof(union i40e_32byte_rx_desc);
 	rx_ring->size = ALIGN(rx_ring->size, 4096);
+#ifdef CONFIG_SPARC
+	rx_ring->dma_attrs = DMA_ATTR_WEAK_ORDERING;
+#else
+	rx_ring->dma_attrs = 0;
+#endif
 	rx_ring->desc = dma_alloc_coherent(dev, rx_ring->size,
 					   &rx_ring->dma, GFP_KERNEL);
 
@@ -1182,7 +1204,8 @@ static bool i40e_alloc_mapped_page(struct i40e_ring *rx_ring,
 	}
 
 	/* map page for use */
-	dma = dma_map_page(rx_ring->dev, page, 0, PAGE_SIZE, DMA_FROM_DEVICE);
+	dma = dma_map_single_attrs(rx_ring->dev, page_address(page), PAGE_SIZE,
+				   DMA_FROM_DEVICE, rx_ring->dma_attrs);
 
 	/* if mapping failed free memory back to system since
 	 * there isn't much point in holding memory we can't use
@@ -1695,8 +1718,11 @@ struct sk_buff *i40e_fetch_rx_buffer(struct i40e_ring *rx_ring,
 		rx_ring->rx_stats.page_reuse_count++;
 	} else {
 		/* we are not reusing the buffer so unmap it */
-		dma_unmap_page(rx_ring->dev, rx_buffer->dma, PAGE_SIZE,
-			       DMA_FROM_DEVICE);
+		dma_unmap_single_attrs(rx_ring->dev,
+				       rx_buffer->dma,
+				       PAGE_SIZE,
+				       DMA_FROM_DEVICE,
+				       rx_ring->dma_attrs);
 	}
 
 	/* clear contents of buffer_info */
@@ -2737,7 +2763,8 @@ static inline void i40e_tx_map(struct i40e_ring *tx_ring, struct sk_buff *skb,
 	first->skb = skb;
 	first->tx_flags = tx_flags;
 
-	dma = dma_map_single(tx_ring->dev, skb->data, size, DMA_TO_DEVICE);
+	dma = dma_map_single_attrs(tx_ring->dev, skb->data, size,
+				   DMA_TO_DEVICE, tx_ring->dma_attrs);
 
 	tx_desc = I40E_TX_DESC(tx_ring, i);
 	tx_bi = first;

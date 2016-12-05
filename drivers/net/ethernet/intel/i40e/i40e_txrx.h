@@ -327,6 +327,7 @@ struct i40e_ring {
 
 	unsigned int size;		/* length of descriptor ring in bytes */
 	dma_addr_t dma;			/* physical address of ring */
+	unsigned long dma_attrs;	/* DMA attributes */
 
 	struct i40e_vsi *vsi;		/* Backreference to associated VSI */
 	struct i40e_q_vector *q_vector;	/* Backreference to associated vector */
