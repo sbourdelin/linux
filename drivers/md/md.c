@@ -8334,7 +8334,8 @@ static int remove_and_add_spares(struct mddev *mddev,
 		    !test_bit(Blocked, &rdev->flags) &&
 		    ((test_bit(RemoveSynchronized, &rdev->flags) ||
 		     (!test_bit(In_sync, &rdev->flags) &&
-		      !test_bit(Journal, &rdev->flags))) &&
+		      !test_bit(Journal, &rdev->flags) &&
+		      !test_bit(JournalPpl, &rdev->flags))) &&
 		    atomic_read(&rdev->nr_pending)==0)) {
 			if (mddev->pers->hot_remove_disk(
 				    mddev, rdev) == 0) {
