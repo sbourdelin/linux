@@ -2,6 +2,7 @@
  * QNAP Turbo NAS Board power off. Can also be used on Synology devices.
  *
  * Copyright (C) 2012 Andrew Lunn <andrew@lunn.ch>
+ * Copyright (C) 2016 Roger Shimizu <rogershimizu@gmail.com>
  *
  * Based on the code from:
  *
@@ -25,18 +26,29 @@
 
 #define UART1_REG(x)	(base + ((UART_##x) << 2))
 
+/* 4-byte magic hello command to UART1-attached microcontroller */
+static const unsigned char qnap_micon_magic[] = {
+	0x03,
+	0x00,
+	0x00,
+	0x00
+};
+
 struct power_off_cfg {
 	u32 baud;
+	const unsigned char *magic;
 	char cmd;
 };
 
 static const struct power_off_cfg qnap_power_off_cfg = {
 	.baud = 19200,
+	.magic = qnap_micon_magic,
 	.cmd = 'A',
 };
 
 static const struct power_off_cfg synology_power_off_cfg = {
 	.baud = 9600,
+	.magic = qnap_micon_magic,
 	.cmd = '1',
 };
 
@@ -65,10 +77,10 @@ static void qnap_power_off(void)
 	writel(0x83, UART1_REG(LCR));
 	writel(divisor & 0xff, UART1_REG(DLL));
 	writel((divisor >> 8) & 0xff, UART1_REG(DLM));
-	writel(0x03, UART1_REG(LCR));
-	writel(0x00, UART1_REG(IER));
-	writel(0x00, UART1_REG(FCR));
-	writel(0x00, UART1_REG(MCR));
+	writel(cfg->magic[0], UART1_REG(LCR));
+	writel(cfg->magic[1], UART1_REG(IER));
+	writel(cfg->magic[2], UART1_REG(FCR));
+	writel(cfg->magic[3], UART1_REG(MCR));
 
 	/* send the power-off command to PIC */
 	writel(cfg->cmd, UART1_REG(TX));
