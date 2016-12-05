@@ -1411,10 +1411,8 @@ int ubi_self_check_all_ff(struct ubi_device *ubi, int pnum, int offset, int len)
 		return 0;
 
 	buf = __vmalloc(len, GFP_NOFS, PAGE_KERNEL);
-	if (!buf) {
-		ubi_err(ubi, "cannot allocate memory to check for 0xFFs");
-		return 0;
-	}
+	if (!buf)
+		return -ENOMEM;
 
 	err = mtd_read(ubi->mtd, addr, len, &read, buf);
 	if (err && !mtd_is_bitflip(err)) {
