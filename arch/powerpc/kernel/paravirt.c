@@ -140,6 +140,9 @@ struct pv_lock_ops pv_lock_op = {
 };
 EXPORT_SYMBOL(pv_lock_op);
 
+struct static_key_true sharedprocessor_key = STATIC_KEY_TRUE_INIT;
+EXPORT_SYMBOL(sharedprocessor_key);
+
 void __init pv_lock_init(void)
 {
 	if (SHARED_PROCESSOR) {
@@ -149,5 +152,6 @@ void __init pv_lock_init(void)
 		pv_lock_op.unlock = __pv_queued_spin_unlock;
 		pv_lock_op.wait = __pv_wait;
 		pv_lock_op.kick = __pv_kick;
+		static_branch_disable(&sharedprocessor_key);
 	}
 }
