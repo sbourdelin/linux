@@ -21,25 +21,34 @@
 #include <linux/spi/spi.h>
 #include <linux/rtc.h>
 #include <linux/of.h>
+#include <linux/delay.h>
 
 /* MCP795 Instructions, see datasheet table 3-1 */
-#define MCP795_EEREAD	0x03
-#define MCP795_EEWRITE	0x02
-#define MCP795_EEWRDI	0x04
-#define MCP795_EEWREN	0x06
-#define MCP795_SRREAD	0x05
-#define MCP795_SRWRITE	0x01
-#define MCP795_READ	0x13
-#define MCP795_WRITE	0x12
-#define MCP795_UNLOCK	0x14
-#define MCP795_IDWRITE	0x32
-#define MCP795_IDREAD	0x33
-#define MCP795_CLRWDT	0x44
-#define MCP795_CLRRAM	0x54
+#define MCP795_EEREAD		0x03
+#define MCP795_EEWRITE		0x02
+#define MCP795_EEWRDI		0x04
+#define MCP795_EEWREN		0x06
+#define MCP795_SRREAD		0x05
+#define MCP795_SRWRITE		0x01
+#define MCP795_READ		0x13
+#define MCP795_WRITE		0x12
+#define MCP795_UNLOCK		0x14
+#define MCP795_IDWRITE		0x32
+#define MCP795_IDREAD		0x33
+#define MCP795_CLRWDT		0x44
+#define MCP795_CLRRAM		0x54
 
-#define MCP795_ST_BIT	0x80
-#define MCP795_24_BIT	0x40
-#define MCP795_LP_BIT	0x20
+/* MCP795 RTCC registers, see datasheet table 4-1 */
+#define MCP795_REG_SECONDS	0x01
+#define MCP795_REG_DAY		0x04
+#define MCP795_REG_MONTH	0x06
+#define MCP795_REG_CONTROL	0x08
+
+#define MCP795_ST_BIT		0x80
+#define MCP795_24_BIT		0x40
+#define MCP795_LP_BIT		0x20
+#define MCP795_EXTOSC_BIT	0x08
+#define MCP795_OSCON_BIT	0x20
 
 static int mcp795_rtcc_read(struct device *dev, u8 addr, u8 *buf, u8 count)
 {
@@ -94,14 +103,51 @@ static int mcp795_rtcc_set_bits(struct device *dev, u8 addr, u8 mask, u8 state)
 	return ret;
 }
 
+static int mcp795_stop_oscillator(struct device *dev)
+{
+	int retries = 5;
+	int ret;
+	u8 data;
+
+	ret = mcp795_rtcc_set_bits(dev, MCP795_REG_SECONDS, MCP795_ST_BIT, 0);
+	if (ret)
+		return ret;
+	ret = mcp795_rtcc_set_bits(dev, MCP795_REG_CONTROL, MCP795_EXTOSC_BIT, 0);
+	if (ret)
+		return ret;
+	do {
+		usleep_range(700, 800);
+		ret = mcp795_rtcc_read(dev, MCP795_REG_DAY,
+					&data, sizeof(data));
+		if (ret)
+			break;
+		if (!(data & MCP795_OSCON_BIT))
+			break;
+
+	} while (--retries);
+
+	return !retries ? -EIO : ret;
+}
+
+static int mcp795_start_oscillator(struct device *dev)
+{
+	return mcp795_rtcc_set_bits(dev, MCP795_REG_SECONDS,
+					MCP795_ST_BIT, MCP795_ST_BIT);
+}
+
 static int mcp795_set_time(struct device *dev, struct rtc_time *tim)
 {
 	int month;
 	int ret;
 	u8 data[7];
 
+	/* Stop RTC while updating the registers */
+	ret = mcp795_stop_oscillator(dev);
+	if (ret)
+		return ret;
+
 	/* Read first, so we can leave config bits untouched */
-	ret = mcp795_rtcc_read(dev, 0x01, data, sizeof(data));
+	ret = mcp795_rtcc_read(dev, MCP795_REG_SECONDS, data, sizeof(data));
 
 	if (ret)
 		return ret;
@@ -110,6 +156,16 @@ static int mcp795_set_time(struct device *dev, struct rtc_time *tim)
 	data[1] = (data[1] & 0x80) | ((tim->tm_min / 10) << 4) | (tim->tm_min % 10);
 	data[2] = ((tim->tm_hour / 10) << 4) | (tim->tm_hour % 10);
 	data[4] = ((tim->tm_mday / 10) << 4) | ((tim->tm_mday) % 10);
+
+	/* Always write the date and month using a separate Write command.
+	 * This is a workaround for a know silicon issue that some combinations
+	 * of date and month values may result in the date being reset to 1.
+	 */
+	ret = mcp795_rtcc_write(dev, MCP795_REG_SECONDS, data, 5);
+
+	if (ret)
+		return ret;
+
 	month = tim->tm_mon + 1;
 	data[5] = (data[5] & MCP795_LP_BIT) |
 			((month / 10) << 4) | (month % 10);
@@ -119,8 +175,13 @@ static int mcp795_set_time(struct device *dev, struct rtc_time *tim)
 
 	data[6] = ((tim->tm_year / 10) << 4) | (tim->tm_year % 10);
 
-	ret = mcp795_rtcc_write(dev, 0x01, data, sizeof(data));
+	ret = mcp795_rtcc_write(dev, MCP795_REG_MONTH, &data[5], 2);
 
+	if (ret)
+		return ret;
+
+	/* Start back RTC */
+	ret = mcp795_start_oscillator(dev);
 	if (ret)
 		return ret;
 
@@ -136,7 +197,7 @@ static int mcp795_read_time(struct device *dev, struct rtc_time *tim)
 	int ret;
 	u8 data[7];
 
-	ret = mcp795_rtcc_read(dev, 0x01, data, sizeof(data));
+	ret = mcp795_rtcc_read(dev, MCP795_REG_SECONDS, data, sizeof(data));
 
 	if (ret)
 		return ret;
@@ -174,7 +235,7 @@ static int mcp795_probe(struct spi_device *spi)
 	}
 
 	/* Start the oscillator */
-	mcp795_rtcc_set_bits(&spi->dev, 0x01, MCP795_ST_BIT, MCP795_ST_BIT);
+	mcp795_start_oscillator(&spi->dev);
 	/* Clear the 12 hour mode flag*/
 	mcp795_rtcc_set_bits(&spi->dev, 0x03, MCP795_24_BIT, 0);
 
