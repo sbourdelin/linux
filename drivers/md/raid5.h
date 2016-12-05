@@ -228,6 +228,7 @@ struct stripe_head {
 	struct list_head	log_list;
 	sector_t		log_start; /* first meta block on the journal */
 	struct list_head	r5c; /* for r5c_cache->stripe_in_journal */
+	struct page		*ppl_page;
 	/**
 	 * struct stripe_operations
 	 * @target - STRIPE_OP_COMPUTE_BLK target
