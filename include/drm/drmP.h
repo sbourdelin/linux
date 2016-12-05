@@ -58,6 +58,7 @@
 #include <linux/vmalloc.h>
 #include <linux/workqueue.h>
 #include <linux/dma-fence.h>
+#include <linux/dynamic_debug.h>
 
 #include <asm/mman.h>
 #include <asm/pgalloc.h>
@@ -129,7 +130,6 @@ struct dma_buf_attachment;
  * run-time by echoing the debug value in its sysfs node:
  *   # echo 0xf > /sys/module/drm/parameters/debug
  */
-#define DRM_UT_NONE		0x00
 #define DRM_UT_CORE 		0x01
 #define DRM_UT_DRIVER		0x02
 #define DRM_UT_KMS		0x04
@@ -146,25 +146,22 @@ struct dma_buf_attachment;
 /** \name Macros to make printk easier */
 /*@{*/
 
-#define _DRM_PRINTK(once, level, fmt, ...)				\
-	do {								\
-		printk##once(KERN_##level "[" DRM_NAME "] " fmt,	\
-			     ##__VA_ARGS__);				\
-	} while (0)
+#define _DRM_FMT_PREFIX "[" DRM_NAME "] "
+#define _DRM_FMT_FUNC_PREFIX "[" DRM_NAME ":%s] "
 
 #define DRM_INFO(fmt, ...)						\
-	_DRM_PRINTK(, INFO, fmt, ##__VA_ARGS__)
+	pr_info(_DRM_FMT_PREFIX fmt, ##__VA_ARGS__)
 #define DRM_NOTE(fmt, ...)						\
-	_DRM_PRINTK(, NOTICE, fmt, ##__VA_ARGS__)
+	pr_notice(_DRM_FMT_PREFIX fmt, ##__VA_ARGS__)
 #define DRM_WARN(fmt, ...)						\
-	_DRM_PRINTK(, WARNING, fmt, ##__VA_ARGS__)
+	pr_warn(_DRM_FMT_PREFIX fmt, ##__VA_ARGS__)
 
 #define DRM_INFO_ONCE(fmt, ...)						\
-	_DRM_PRINTK(_once, INFO, fmt, ##__VA_ARGS__)
+	pr_info_once(_DRM_FMT_PREFIX fmt, ##__VA_ARGS__)
 #define DRM_NOTE_ONCE(fmt, ...)						\
-	_DRM_PRINTK(_once, NOTICE, fmt, ##__VA_ARGS__)
+	pr_notice_once(_DRM_FMT_PREFIX fmt, ##__VA_ARGS__)
 #define DRM_WARN_ONCE(fmt, ...)						\
-	_DRM_PRINTK(_once, WARNING, fmt, ##__VA_ARGS__)
+	pr_warn_once(_DRM_FMT_PREFIX fmt, ##__VA_ARGS__)
 
 /**
  * Error output.
@@ -173,10 +170,11 @@ struct dma_buf_attachment;
  * \param arg arguments
  */
 #define DRM_DEV_ERROR(dev, fmt, ...)					\
-	drm_dev_printk(dev, KERN_ERR, DRM_UT_NONE, __func__, " *ERROR*",\
-		       fmt, ##__VA_ARGS__)
+	dev_err(dev, _DRM_FMT_FUNC_PREFIX "*ERROR*" fmt, __func__,	\
+		##__VA_ARGS__)
 #define DRM_ERROR(fmt, ...)						\
-	drm_printk(KERN_ERR, DRM_UT_NONE, fmt,	##__VA_ARGS__)
+	pr_err(_DRM_FMT_FUNC_PREFIX "*ERROR*" fmt, __func__,	        \
+	       ##__VA_ARGS__)
 
 /**
  * Rate limited error output.  Like DRM_ERROR() but won't flood the log.
@@ -193,21 +191,14 @@ struct dma_buf_attachment;
 	if (__ratelimit(&_rs))						\
 		DRM_DEV_ERROR(dev, fmt, ##__VA_ARGS__);			\
 })
-#define DRM_ERROR_RATELIMITED(fmt, ...)					\
-	DRM_DEV_ERROR_RATELIMITED(NULL, fmt, ##__VA_ARGS__)
+#define DRM_ERROR_RATELIMITED(fmt, args...)				\
+	DRM_DEV_ERROR_RATELIMITED(NULL, fmt, ##args)
 
-#define DRM_DEV_INFO(dev, fmt, ...)					\
-	drm_dev_printk(dev, KERN_INFO, DRM_UT_NONE, __func__, "", fmt,	\
-		       ##__VA_ARGS__)
+#define DRM_DEV_INFO(dev, fmt, args...)					\
+	dev_info(dev, _DRM_FMT_FUNC_PREFIX fmt, __func__, ##args)
 
-#define DRM_DEV_INFO_ONCE(dev, fmt, ...)				\
-({									\
-	static bool __print_once __read_mostly;				\
-	if (!__print_once) {						\
-		__print_once = true;					\
-		DRM_DEV_INFO(dev, fmt, ##__VA_ARGS__);			\
-	}								\
-})
+#define DRM_DEV_INFO_ONCE(dev, fmt, args...)				\
+	dev_info_once(dev, _DRM_FMT_FUNC_PREFIX fmt, __func__, ##args)
 
 /**
  * Debug output.
@@ -215,50 +206,104 @@ struct dma_buf_attachment;
  * \param fmt printf() like format string.
  * \param arg arguments
  */
+
+#if defined(CONFIG_DYNAMIC_DEBUG)
+/* We don't use pr_debug and dev_dbg directly since we want to
+ * maintain format compatibility with non-dynamic drm debug messages
+ */
+#define _DRM_DYNAMIC_DEV_DEBUG(dev, fmt, args...)			\
+({									\
+	DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, fmt);			\
+	if (DYNAMIC_DEBUG_BRANCH(descriptor))				\
+		dev_printk(KERN_DEBUG, dev, fmt, ##args);		\
+})
+#define _DRM_DYNAMIC_DEBUG(fmt, args...)				\
+({									\
+	DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, fmt);			\
+	if (DYNAMIC_DEBUG_BRANCH(descriptor))				\
+		printk(KERN_DEBUG fmt, ##args);				\
+})
+#else
+#define _DRM_DYNAMIC_DEV_DEBUG(dev, fmt, args...)			\
+	no_printk(fmt, ##args)
+#define _DRM_DYNAMIC_DEBUG(fmt, args...)				\
+	no_printk(fmt, ##args)
+#endif
+
+/* The conditional use of pr_debug/dev_dbg here allows us to take
+ * advantage of the kernel's dynamic debug feature by default (ref
+ * Documentation/dynamic-debug-howto.txt) while maintaining
+ * compatibility with using drm.drm_debug to turn on sets of messages
+ *
+ * Note: pr_debug and dev_dbg can't be called by a wrapper function
+ * otherwise they can't track the __FILE__, __func__ and __LINE__
+ * where they are called.
+ */
+#define _DRM_DEV_DEBUG(dev, category, fmt, args...)			\
+({									\
+	if (unlikely(drm_debug & category)) {				\
+	    dev_printk(KERN_DEBUG, dev, _DRM_FMT_FUNC_PREFIX fmt,	\
+		       __func__, ##args);				\
+	} else {							\
+	    _DRM_DYNAMIC_DEV_DEBUG(dev, _DRM_FMT_FUNC_PREFIX fmt,	\
+				   __func__, ##args);			\
+	}								\
+})
+#define _DRM_DEBUG(category, fmt, args...)				\
+({									\
+	if (unlikely(drm_debug & category)) {				\
+	    printk(KERN_DEBUG _DRM_FMT_FUNC_PREFIX fmt,			\
+		   __func__, ##args);					\
+	} else								\
+	    _DRM_DYNAMIC_DEBUG(_DRM_FMT_FUNC_PREFIX fmt,		\
+			       __func__, ##args);			\
+})
+
 #define DRM_DEV_DEBUG(dev, fmt, args...)				\
-	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_CORE, __func__, "", fmt,	\
-		       ##args)
-#define DRM_DEBUG(fmt, ...)						\
-	drm_printk(KERN_DEBUG, DRM_UT_CORE, fmt, ##__VA_ARGS__)
+	_DRM_DEV_DEBUG(dev, DRM_UT_CORE, fmt, ##args)
+#define DRM_DEBUG(fmt, args...)						\
+	_DRM_DEBUG(DRM_UT_CORE, fmt, ##args)
 
 #define DRM_DEV_DEBUG_DRIVER(dev, fmt, args...)				\
-	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_DRIVER, __func__, "",	\
-		       fmt, ##args)
-#define DRM_DEBUG_DRIVER(fmt, ...)					\
-	drm_printk(KERN_DEBUG, DRM_UT_DRIVER, fmt, ##__VA_ARGS__)
+	_DRM_DEV_DEBUG(dev, DRM_UT_DRIVER, fmt, ##args)
+#define DRM_DEBUG_DRIVER(fmt, args...)					\
+	_DRM_DEBUG(DRM_UT_DRIVER, fmt, ##args)
 
 #define DRM_DEV_DEBUG_KMS(dev, fmt, args...)				\
-	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_KMS, __func__, "", fmt,	\
-		       ##args)
-#define DRM_DEBUG_KMS(fmt, ...)					\
-	drm_printk(KERN_DEBUG, DRM_UT_KMS, fmt, ##__VA_ARGS__)
+	_DRM_DEV_DEBUG(dev, DRM_UT_KMS, fmt, ##args)
+#define DRM_DEBUG_KMS(fmt, args...)					\
+	_DRM_DEBUG(DRM_UT_KMS, fmt, ##args)
 
 #define DRM_DEV_DEBUG_PRIME(dev, fmt, args...)				\
-	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_PRIME, __func__, "",	\
-		       fmt, ##args)
-#define DRM_DEBUG_PRIME(fmt, ...)					\
-	drm_printk(KERN_DEBUG, DRM_UT_PRIME, fmt, ##__VA_ARGS__)
+	_DRM_DEV_DEBUG(dev, DRM_UT_PRIME, fmt, ##args)
+#define DRM_DEBUG_PRIME(fmt, args...)					\
+	_DRM_DEBUG(DRM_UT_PRIME, fmt, ##args)
 
 #define DRM_DEV_DEBUG_ATOMIC(dev, fmt, args...)				\
-	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_ATOMIC, __func__, "",	\
-		       fmt, ##args)
-#define DRM_DEBUG_ATOMIC(fmt, ...)					\
-	drm_printk(KERN_DEBUG, DRM_UT_ATOMIC, fmt, ##__VA_ARGS__)
+	_DRM_DEV_DEBUG(dev, DRM_UT_ATOMIC, fmt, ##args)
+#define DRM_DEBUG_ATOMIC(fmt, args...)					\
+	_DRM_DEBUG(DRM_UT_ATOMIC, fmt, ##args)
 
 #define DRM_DEV_DEBUG_VBL(dev, fmt, args...)				\
-	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_VBL, __func__, "", fmt,	\
-		       ##args)
-#define DRM_DEBUG_VBL(fmt, ...)					\
-	drm_printk(KERN_DEBUG, DRM_UT_VBL, fmt, ##__VA_ARGS__)
+	_DRM_DEV_DEBUG(dev, DRM_UT_VBL, fmt, ##args)
+#define DRM_DEBUG_VBL(fmt, args...)					\
+	_DRM_DEBUG(DRM_UT_VBL, fmt, ##args)
 
-#define _DRM_DEV_DEFINE_DEBUG_RATELIMITED(dev, level, fmt, args...)	\
+#define _DRM_DEV_DEFINE_DEBUG_RATELIMITED(dev, category, fmt, args...)	\
 ({									\
 	static DEFINE_RATELIMIT_STATE(_rs,				\
 				      DEFAULT_RATELIMIT_INTERVAL,	\
 				      DEFAULT_RATELIMIT_BURST);		\
 	if (__ratelimit(&_rs))						\
-		drm_dev_printk(dev, KERN_DEBUG, DRM_UT_ ## level,	\
-			       __func__, "", fmt, ##args);		\
+		_DRM_DEV_DEBUG(dev, DRM_UT_ ## category, fmt, ##args);	\
+})
+#define _DRM_DEFINE_DEBUG_RATELIMITED(category, fmt, args...)	\
+({									\
+	static DEFINE_RATELIMIT_STATE(_rs,				\
+				      DEFAULT_RATELIMIT_INTERVAL,	\
+				      DEFAULT_RATELIMIT_BURST);		\
+	if (__ratelimit(&_rs))						\
+		_DRM_DEBUG(DRM_UT_ ## category, fmt, ##args);		\
 })
 
 /**
@@ -268,21 +313,24 @@ struct dma_buf_attachment;
  * \param arg arguments
  */
 #define DRM_DEV_DEBUG_RATELIMITED(dev, fmt, args...)			\
-	DEV__DRM_DEFINE_DEBUG_RATELIMITED(dev, CORE, fmt, ##args)
+	_DRM_DEFINE_DEBUG_RATELIMITED(dev, CORE, fmt, ##args)
 #define DRM_DEBUG_RATELIMITED(fmt, args...)				\
-	DRM_DEV_DEBUG_RATELIMITED(NULL, fmt, ##args)
+	_DRM_DEFINE_DEBUG_RATELIMITED(CORE, fmt, ##args)
+
 #define DRM_DEV_DEBUG_DRIVER_RATELIMITED(dev, fmt, args...)		\
 	_DRM_DEV_DEFINE_DEBUG_RATELIMITED(dev, DRIVER, fmt, ##args)
 #define DRM_DEBUG_DRIVER_RATELIMITED(fmt, args...)			\
-	DRM_DEV_DEBUG_DRIVER_RATELIMITED(NULL, fmt, ##args)
+	_DRM_DEV_DEFINE_DEBUG_RATELIMITED(DRIVER, fmt, ##args)
+
 #define DRM_DEV_DEBUG_KMS_RATELIMITED(dev, fmt, args...)		\
 	_DRM_DEV_DEFINE_DEBUG_RATELIMITED(dev, KMS, fmt, ##args)
 #define DRM_DEBUG_KMS_RATELIMITED(fmt, args...)				\
-	DRM_DEV_DEBUG_KMS_RATELIMITED(NULL, fmt, ##args)
+	_DRM_DEFINE_DEBUG_RATELIMITED(KMS, fmt, ##args)
+
 #define DRM_DEV_DEBUG_PRIME_RATELIMITED(dev, fmt, args...)		\
 	_DRM_DEV_DEFINE_DEBUG_RATELIMITED(dev, PRIME, fmt, ##args)
 #define DRM_DEBUG_PRIME_RATELIMITED(fmt, args...)			\
-	DRM_DEV_DEBUG_PRIME_RATELIMITED(NULL, fmt, ##args)
+	_DRM_DEFINE_DEBUG_RATELIMITED(PRIME, fmt, ##args)
 
 /* Format strings and argument splitters to simplify printing
  * various "complex" objects
