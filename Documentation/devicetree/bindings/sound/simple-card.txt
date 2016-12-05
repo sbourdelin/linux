@@ -86,6 +86,7 @@ Optional CPU/CODEC subnodes properties:
 					  in dai startup() and disabled with
 					  clk_disable_unprepare() in dai
 					  shutdown().
+					  see Clock Example.
 
 Example 1 - single DAI link:
 
@@ -197,5 +198,36 @@ sound {
 	simple-audio-card,codec {
 		sound-dai = <&codec>;
 		clocks = ...
+	};
+};
+
+
+Clock Example 1 - clock settings on each subnode
+
+sound {
+	...
+	simple-audio-card,cpu {
+		sound-dai = <&xxx>;
+		clocks = <&cpu_clock>;
+	};
+	simple-audio-card,codec {
+		sound-dai = <&xxx>;
+		clocks = <&codec_clock>;
+	};
+};
+
+Clock Example 2 - clock settings by clocks
+
+sound {
+	...
+	clocks = <&cpu_clock>, <&codec_clock>;
+	clock-names = "cpu", "codec";
+	clock-ranges;
+	...
+	simple-audio-card,cpu {
+		sound-dai = <&xxx>;
+	};
+	simple-audio-card,codec {
+		sound-dai = <&xxx>;
 	};
 };
