@@ -197,14 +197,19 @@ void MR_PopulateDrvRaidMap(struct megasas_instance *instance)
 
 	if (instance->max_raid_mapsize) {
 		fw_map_dyn = fusion->ld_map[(instance->map_id & 1)];
+		if (fw_map_dyn->pci_threshold_bandwidth)
+			instance->pci_threshold_bandwidth =
+			le64_to_cpu(fw_map_dyn->pci_threshold_bandwidth);
 #if VD_EXT_DEBUG
 		dev_dbg(&instance->pdev->dev,
 		" raidMapSize 0x%x fw_map_dyn->descTableOffset 0x%x, "
-		" descTableSize 0x%x descTableNumElements 0x%x\n",
+		" descTableSize 0x%x descTableNumElements 0x%x, "
+		" PCIThreasholdBandwidth %llu\n",
 		le32_to_cpu(fw_map_dyn->raid_map_size),
 		le32_to_cpu(fw_map_dyn->desc_table_offset),
 		le32_to_cpu(fw_map_dyn->desc_table_size),
-		le32_to_cpu(fw_map_dyn->desc_table_num_elements));
+		le32_to_cpu(fw_map_dyn->desc_table_num_elements),
+		instance->pci_threshold_bandwidth);
 		dev_dbg(&instance->pdev->dev,
 		"drv map %p ldCount %d\n", drv_map, fw_map_dyn->ld_count);
 #endif
@@ -434,6 +439,8 @@ void MR_PopulateDrvRaidMap(struct megasas_instance *instance)
 			sizeof(struct MR_DEV_HANDLE_INFO) *
 			MAX_RAIDMAP_PHYSICAL_DEVICES);
 	}
+	if (instance->is_ventura && !instance->pci_threshold_bandwidth)
+		instance->pci_threshold_bandwidth = ULLONG_MAX;
 }
 
 /*
