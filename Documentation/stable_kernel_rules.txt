@@ -54,11 +54,13 @@ To have the patch automatically included in the stable tree, add the tag
 
 .. code-block:: none
 
-     Cc: stable@vger.kernel.org
+     stable-request: $version[s]
 
 in the sign-off area. Once the patch is merged it will be applied to
-the stable tree without anything else needing to be done by the author
-or subsystem maintainer.
+the stable tree[s] without anything else needing to be done by the author
+or subsystem maintainer. In exceptional cases when the $version is not
+known to the patch submitter "any" can be used and the final version will
+get resolved at the time of backporting.
 
 .. _option_2:
 
@@ -104,10 +106,10 @@ format in the sign-off area:
 
 .. code-block:: none
 
-     Cc: <stable@vger.kernel.org> # 3.3.x: a1f84a3: sched: Check for idle
-     Cc: <stable@vger.kernel.org> # 3.3.x: 1b9508f: sched: Rate-limit newidle
-     Cc: <stable@vger.kernel.org> # 3.3.x: fd21073: sched: Fix affinity logic
-     Cc: <stable@vger.kernel.org> # 3.3.x
+     stable-request: depends on a1f84a3: sched: Check for idle
+     stable-request: depends on 1b9508f: sched: Rate-limit newidle
+     stable-request: depends on fd21073: sched: Fix affinity logic
+     stable-request: 3.3.x
      Signed-off-by: Ingo Molnar <mingo@elte.hu>
 
 The tag sequence has the meaning of:
@@ -118,13 +120,6 @@ The tag sequence has the meaning of:
      git cherry-pick 1b9508f
      git cherry-pick fd21073
      git cherry-pick <this commit>
-
-Also, some patches may have kernel version prerequisites.  This can be
-specified in the following format in the sign-off area:
-
-.. code-block:: none
-
-     Cc: <stable@vger.kernel.org> # 3.3.x-
 
 The tag has the meaning of:
 
