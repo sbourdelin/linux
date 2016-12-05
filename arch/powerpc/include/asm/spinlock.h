@@ -64,9 +64,13 @@ static inline bool vcpu_is_preempted(int cpu)
 /* We only yield to the hypervisor if we are in shared processor mode */
 #define SHARED_PROCESSOR (lppaca_shared_proc(local_paca->lppaca_ptr))
 extern void __spin_yield(arch_spinlock_t *lock);
+extern void __spin_yield_cpu(int cpu, int confer);
+extern void __spin_wake_cpu(int cpu);
 extern void __rw_yield(arch_rwlock_t *lock);
 #else /* SPLPAR */
 #define __spin_yield(x)        barrier()
+#define __spin_yield_cpu(x, y) barrier()
+#define __spin_wake_cpu(x) barrier()
 #define __rw_yield(x)  barrier()
 #define SHARED_PROCESSOR       0
 #endif
