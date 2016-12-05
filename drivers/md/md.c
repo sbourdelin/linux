@@ -595,6 +595,43 @@ static struct mddev *mddev_find(dev_t unit)
 	goto retry;
 }
 
+struct mddev *mddev_find_container(struct mddev *subarray)
+{
+	struct mddev *mddev, *ret = NULL;
+	char *container_name;
+	int len = 0;
+	int i;
+
+	if (!subarray->external)
+		return NULL;
+
+	container_name = subarray->metadata_type + 1;
+	i = 0;
+	while (container_name[i]) {
+		if (container_name[i] == '/') {
+			len = i;
+			break;
+		}
+		i++;
+	}
+	if (len == 0)
+		return NULL;
+
+	spin_lock(&all_mddevs_lock);
+	list_for_each_entry(mddev, &all_mddevs, all_mddevs) {
+		char *name = mdname(mddev);
+		if (strlen(name) == len &&
+				strncmp(name, container_name, len) == 0) {
+			ret = mddev;
+			break;
+		}
+	}
+	spin_unlock(&all_mddevs_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(mddev_find_container);
+
 static struct attribute_group md_redundancy_group;
 
 void mddev_unlock(struct mddev *mddev)
