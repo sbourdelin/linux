@@ -14522,6 +14522,12 @@ intel_atomic_commit_ready(struct i915_sw_fence *fence,
 		break;
 
 	case FENCE_FREE:
+		/* Ideally we would hook into the state->destroy callback to
+		 * mark the fence object free at the right time. Since we
+		 * don't currently have that callback, mark it as free
+		 * right away.
+		 */
+		i915_sw_fence_fini(fence);
 		drm_atomic_state_put(&state->base);
 		break;
 	}
