@@ -56,6 +56,14 @@
 #define PCI_DEVICE_ID_LSI_INTRUDER_24		0x00cf
 #define PCI_DEVICE_ID_LSI_CUTLASS_52		0x0052
 #define PCI_DEVICE_ID_LSI_CUTLASS_53		0x0053
+#define PCI_DEVICE_ID_LSI_MECTOR		    0x00D4
+#define PCI_DEVICE_ID_LSI_VENTURA		    0x0014
+#define PCI_DEVICE_ID_LSI_CRUSADER		    0x0015
+#define PCI_DEVICE_ID_LSI_HARPOON		    0x0016
+#define PCI_DEVICE_ID_LSI_TOMCAT		    0x0017
+#define PCI_DEVICE_ID_LSI_VENTURA_4PORT		0x001B
+#define PCI_DEVICE_ID_LSI_CRUSADER_4PORT	0x001C
+#define PCI_DEVICE_ID_LSI_MARLIN		    0x00D3
 
 /*
  * Intel HBA SSDIDs
@@ -1478,7 +1486,7 @@ struct megasas_register_set {
 
 	u32 	inbound_high_queue_port ;	/*00C4h*/
 
-	u32 	reserved_5;			/*00C8h*/
+	u32 inbound_single_queue_port;	/*00C8h*/
 	u32	res_6[11];			/*CCh*/
 	u32	host_diag;
 	u32	seq_offset;
@@ -2143,6 +2151,7 @@ struct megasas_instance {
 	u8 is_rdpq;
 	bool dev_handle;
 	bool fw_sync_cache_support;
+	bool is_ventura;
 };
 struct MR_LD_VF_MAP {
 	u32 size;
