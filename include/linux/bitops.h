@@ -24,6 +24,20 @@
 #define GENMASK_ULL(h, l) \
 	(((~0ULL) << (l)) & (~0ULL >> (BITS_PER_LONG_LONG - 1 - (h))))
 
+#ifdef	__KERNEL__
+/*
+ * Equivalent of BIT(x) but for contiguous bitfields
+ * GENVALUE(1, 0,0xff) = 0x00000003
+ * GENVALUE(3, 0,0xff) = 0x0000000f
+ * GENVALUE(15,8,0xff) = 0x0000ff00
+ * GENVALUE(6, 6,   1) = 0x00000040 == BIT(6)
+ */
+#define GENVALUE(msb, lsb, val)     \
+	(((val) << (lsb)) & (GENMASK((msb), (lsb))))
+#define GENVALUE_ULL(msb, lsb, val) \
+	(((val) << (lsb)) & (GENMASK_ULL((msb), (lsb))))
+#endif
+
 extern unsigned int __sw_hweight8(unsigned int w);
 extern unsigned int __sw_hweight16(unsigned int w);
 extern unsigned int __sw_hweight32(unsigned int w);
