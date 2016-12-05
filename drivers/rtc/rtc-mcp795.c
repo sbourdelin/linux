@@ -96,6 +96,7 @@ static int mcp795_rtcc_set_bits(struct device *dev, u8 addr, u8 mask, u8 state)
 
 static int mcp795_set_time(struct device *dev, struct rtc_time *tim)
 {
+	int month;
 	int ret;
 	u8 data[7];
 
@@ -109,8 +110,9 @@ static int mcp795_set_time(struct device *dev, struct rtc_time *tim)
 	data[1] = (data[1] & 0x80) | ((tim->tm_min / 10) << 4) | (tim->tm_min % 10);
 	data[2] = ((tim->tm_hour / 10) << 4) | (tim->tm_hour % 10);
 	data[4] = ((tim->tm_mday / 10) << 4) | ((tim->tm_mday) % 10);
+	month = tim->tm_mon + 1;
 	data[5] = (data[5] & MCP795_LP_BIT) |
-			((tim->tm_mon / 10) << 4) | (tim->tm_mon % 10);
+			((month / 10) << 4) | (month % 10);
 
 	if (tim->tm_year > 100)
 		tim->tm_year -= 100;
@@ -143,7 +145,7 @@ static int mcp795_read_time(struct device *dev, struct rtc_time *tim)
 	tim->tm_min	= ((data[1] & 0x70) >> 4) * 10 + (data[1] & 0x0f);
 	tim->tm_hour	= ((data[2] & 0x30) >> 4) * 10 + (data[2] & 0x0f);
 	tim->tm_mday	= ((data[4] & 0x30) >> 4) * 10 + (data[4] & 0x0f);
-	tim->tm_mon	= ((data[5] & 0x10) >> 4) * 10 + (data[5] & 0x0f);
+	tim->tm_mon	= ((data[5] & 0x10) >> 4) * 10 + (data[5] & 0x0f) - 1;
 	tim->tm_year	= ((data[6] & 0xf0) >> 4) * 10 + (data[6] & 0x0f) + 100; /* Assume we are in 20xx */
 
 	dev_dbg(dev, "Read from mcp795: %04d-%02d-%02d %02d:%02d:%02d\n",
