@@ -1347,10 +1347,8 @@ static int self_check_write(struct ubi_device *ubi, const void *buf, int pnum,
 		return 0;
 
 	buf1 = __vmalloc(len, GFP_NOFS, PAGE_KERNEL);
-	if (!buf1) {
-		ubi_err(ubi, "cannot allocate memory to check writes");
-		return 0;
-	}
+	if (!buf1)
+		return -ENOMEM;
 
 	err = mtd_read(ubi->mtd, addr, len, &read, buf1);
 	if (err && !mtd_is_bitflip(err))
