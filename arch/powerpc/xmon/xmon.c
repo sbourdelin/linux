@@ -121,7 +121,6 @@ static void memex(void);
 static int bsesc(void);
 static void dump(void);
 static void prdump(unsigned long, long);
-static int ppc_inst_dump(unsigned long, long, int);
 static void dump_log_buf(void);
 
 #ifdef CONFIG_PPC_POWERNV
@@ -2465,7 +2464,7 @@ generic_inst_dump(unsigned long adr, long count, int praddr,
 	return adr - first_adr;
 }
 
-static int
+int
 ppc_inst_dump(unsigned long adr, long count, int praddr)
 {
 	return generic_inst_dump(adr, count, praddr, print_insn_powerpc);

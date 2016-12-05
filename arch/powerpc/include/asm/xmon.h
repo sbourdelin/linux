@@ -20,6 +20,7 @@ extern void xmon_register_spus(struct list_head *list);
 struct pt_regs;
 extern int xmon(struct pt_regs *excp);
 extern irqreturn_t xmon_irq(int, void *);
+extern int ppc_inst_dump(unsigned long addr, long count, int praddr);
 #else
 static inline void xmon_setup(void) { };
 static inline void xmon_register_spus(struct list_head *list) { };

@@ -52,6 +52,7 @@
 #include <asm/switch_to.h>
 #include <asm/tm.h>
 #include <asm/debug.h>
+#include <asm/xmon.h>
 #ifdef CONFIG_PPC64
 #include <asm/firmware.h>
 #endif
@@ -1229,10 +1230,20 @@ static void show_instructions(struct pt_regs *regs)
 		     probe_kernel_address((unsigned int __user *)pc, instr)) {
 			pr_cont("XXXXXXXX ");
 		} else {
+#ifndef CONFIG_XMON
 			if (regs->nip == pc)
 				pr_cont("<%08x> ", instr);
 			else
 				pr_cont("%08x ", instr);
+#else
+			/* Does not work for SPU's */
+			ppc_inst_dump(pc, 1, 1);
+			if (regs->nip == pc)
+				/*
+				 * 26 = 16 (addr) + 2 (spaces) + 8 (instr)
+				 */
+				printk("%*s\n", 26, "^^^^^^^^");
+#endif
 		}
 
 		pc += sizeof(int);
