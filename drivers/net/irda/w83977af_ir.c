@@ -517,15 +517,15 @@ static netdev_tx_t w83977af_hard_xmit(struct sk_buff *skb,
 
 		mtt = irda_get_mtt(skb);
 		pr_debug("%s: %ld, mtt=%d\n", __func__, jiffies, mtt);
-			if (mtt > 1000)
-				mdelay(mtt / 1000);
-			else if (mtt)
-				udelay(mtt);
+		if (mtt > 1000)
+			mdelay(mtt / 1000);
+		else if (mtt)
+			udelay(mtt);
 
-			/* Enable DMA interrupt */
-			switch_bank(iobase, SET0);
-			outb(ICR_EDMAI, iobase + ICR);
-			w83977af_dma_write(self, iobase);
+		/* Enable DMA interrupt */
+		switch_bank(iobase, SET0);
+		outb(ICR_EDMAI, iobase + ICR);
+		w83977af_dma_write(self, iobase);
 	} else {
 		self->tx_buff.data = self->tx_buff.head;
 		self->tx_buff.len = async_wrap_skb(skb, self->tx_buff.data,
