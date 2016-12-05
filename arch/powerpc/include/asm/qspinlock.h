@@ -15,7 +15,7 @@ static inline u8 *__qspinlock_lock_byte(struct qspinlock *lock)
 	return (u8 *)lock + 3 * IS_BUILTIN(CONFIG_CPU_BIG_ENDIAN);
 }
 
-static inline void queued_spin_unlock(struct qspinlock *lock)
+static inline void native_queued_spin_unlock(struct qspinlock *lock)
 {
 	/* release semantics is required */
 	smp_store_release(__qspinlock_lock_byte(lock), 0);
@@ -26,6 +26,33 @@ static inline int queued_spin_is_locked(struct qspinlock *lock)
 	smp_mb();
 	return atomic_read(&lock->val);
 }
+
+#ifdef CONFIG_PARAVIRT_SPINLOCKS
+#include <asm/qspinlock_paravirt.h>
+/*
+ * try to know who is the lock holder, however it is not always true
+ * Return:
+ * -1, we did not know the lock holder.
+ * other value, likely is the lock holder.
+ */
+extern int spin_lock_holder(void *lock);
+
+static inline void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+{
+	pv_queued_spin_lock(lock, val);
+}
+
+static inline void queued_spin_unlock(struct qspinlock *lock)
+{
+	pv_queued_spin_unlock(lock);
+}
+#else
+#define spin_lock_holder(l) (-1)
+static inline void queued_spin_unlock(struct qspinlock *lock)
+{
+	native_queued_spin_unlock(lock);
+}
+#endif
 
 #include <asm-generic/qspinlock.h>
 
