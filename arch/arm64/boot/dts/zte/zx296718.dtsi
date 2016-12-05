@@ -263,6 +263,11 @@
 			reg = <0x116000 0x1000>;
 		};
 
+		pcu_domain: pcu@117000 {
+			compatible = "zte,zx296718-pcu";
+			reg = <0x00117000 0x1000>;
+		};
+
 		uart0: uart@11f000 {
 			compatible = "arm,pl011", "arm,primecell";
 			arm,primecell-periphid = <0x001feffe>;
