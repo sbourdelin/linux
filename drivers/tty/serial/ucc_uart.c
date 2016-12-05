@@ -827,7 +827,7 @@ static void qe_uart_shutdown(struct uart_port *port)
 			break;
 		}
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(2);
+		schedule_timeout(msecs_to_jiffies(2));
 	}
 
 	if (qe_port->wait_closing) {
