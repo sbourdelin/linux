@@ -31,6 +31,14 @@ config ARCH_USE_QUEUED_SPINLOCKS
 	  fairlock.  It has shown a good performance improvement on x86 and also ppc
 	  especially in high contention cases.
 
+config PARAVIRT_SPINLOCKS
+       bool "Paravirtialization support for qspinlock"
+       depends on PPC_SPLPAR && QUEUED_SPINLOCKS
+       default y
+       help
+         If kernel need run as a guest then enable this option.
+         Generally it can let kernel have a better performace.
+
 config PPC_SPLPAR
 	depends on PPC_PSERIES
 	bool "Support for shared-processor logical partitions"
