@@ -1352,7 +1352,7 @@ static void neo_flush_uart_write(struct channel_t *ch)
 		 */
 		tmp = readb(&ch->ch_neo_uart->isr_fcr);
 		if (tmp & 4)
-			udelay(10);
+			usleep_range(10, 20);
 		else
 			break;
 	}
@@ -1384,7 +1384,7 @@ static void neo_flush_uart_read(struct channel_t *ch)
 		 */
 		tmp = readb(&ch->ch_neo_uart->isr_fcr);
 		if (tmp & 2)
-			udelay(10);
+			usleep_range(10, 20);
 		else
 			break;
 	}
@@ -1616,7 +1616,7 @@ static void neo_assert_modem_signals(struct channel_t *ch)
 	neo_pci_posting_flush(ch->ch_bd);
 
 	/* Give time for the UART to actually raise/drop the signals */
-	udelay(10);
+	usleep_range(10, 20);
 }
 
 static void neo_send_start_character(struct channel_t *ch)
@@ -1628,7 +1628,7 @@ static void neo_send_start_character(struct channel_t *ch)
 		ch->ch_xon_sends++;
 		writeb(ch->ch_startc, &ch->ch_neo_uart->txrx);
 		neo_pci_posting_flush(ch->ch_bd);
-		udelay(10);
+		usleep_range(10, 20);
 	}
 }
 
@@ -1641,7 +1641,7 @@ static void neo_send_stop_character(struct channel_t *ch)
 		ch->ch_xoff_sends++;
 		writeb(ch->ch_stopc, &ch->ch_neo_uart->txrx);
 		neo_pci_posting_flush(ch->ch_bd);
-		udelay(10);
+		usleep_range(10, 20);
 	}
 }
 
