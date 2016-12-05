@@ -88,9 +88,16 @@ static int cxl_pcie_config_info(struct pci_bus *bus, unsigned int devfn,
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
 	afu = (struct cxl_afu *)phb->private_data;
-	record = cxl_pcie_cfg_record(bus->number, devfn);
-	if (record > afu->crs_num)
+
+	/* Grab a reader lock on afu. We rely on the caller to release this! */
+	if (!down_read_trylock(&afu->configured_rwsem))
 		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	record = cxl_pcie_cfg_record(bus->number, devfn);
+	if (record > afu->crs_num) {
+		up_read(&afu->configured_rwsem);
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	}
 
 	*_afu = afu;
 	*_record = record;
@@ -127,6 +134,7 @@ static int cxl_pcie_read_config(struct pci_bus *bus, unsigned int devfn,
 		WARN_ON(1);
 	}
 
+	up_read(&afu->configured_rwsem); /* locked in cxl_pcie_config_info() */
 	if (rc)
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
@@ -157,6 +165,7 @@ static int cxl_pcie_write_config(struct pci_bus *bus, unsigned int devfn,
 		WARN_ON(1);
 	}
 
+	up_read(&afu->configured_rwsem); /* locked in cxl_pcie_config_info() */
 	if (rc)
 		return PCIBIOS_SET_FAILED;
 
