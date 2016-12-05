@@ -1,5 +1,10 @@
 /*
- * QNAP Turbo NAS Board power off. Can also be used on Synology devices.
+ * QNAP Turbo NAS Board power off.
+ * It can also be used on following devices:
+ * - Synology devices
+ * - KuroBox Pro
+ * - Buffalo Linkstation Pro (LS-GL)
+ * - Buffalo Terastation Pro II/Live
  *
  * Copyright (C) 2012 Andrew Lunn <andrew@lunn.ch>
  * Copyright (C) 2016 Roger Shimizu <rogershimizu@gmail.com>
@@ -8,6 +13,8 @@
  *
  * Copyright (C) 2009  Martin Michlmayr <tbm@cyrius.com>
  * Copyright (C) 2008  Byron Bradley <byron.bbradley@gmail.com>
+ * Copyright (C) 2008  Sylver Bruneau <sylver.bruneau@googlemail.com>
+ * Copyright (C) 2007  Herbert Valerio Riedel <hvr@gnu.org>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,6 +30,7 @@
 #include <linux/of.h>
 #include <linux/io.h>
 #include <linux/clk.h>
+#include <linux/delay.h>
 
 #define UART1_REG(x)	(base + ((UART_##x) << 2))
 #define MICON_CMD_SIZE	4
@@ -35,6 +43,13 @@ static const unsigned char qnap_micon_magic[] = {
 	0x00
 };
 
+static const unsigned char kuroboxpro_micon_magic[] = {
+	0x1b,
+	0x00,
+	0x07,
+	0x00
+};
+
 // for each row, first byte is the size of command
 static const unsigned char qnap_power_off_cmd[][MICON_CMD_SIZE] = {
 	{ 1, 'A'},
@@ -43,6 +58,13 @@ static const unsigned char qnap_power_off_cmd[][MICON_CMD_SIZE] = {
 
 static const unsigned char synology_power_off_cmd[][MICON_CMD_SIZE] = {
 	{ 1, '1'},
+	{}
+};
+
+static const unsigned char kuroboxpro_power_off_cmd[][MICON_CMD_SIZE] = {
+	{ 3, 0x01, 0x35, 0x00},
+	{ 2, 0x00, 0x0c},
+	{ 2, 0x00, 0x06},
 	{}
 };
 
@@ -64,12 +86,21 @@ static const struct power_off_cfg synology_power_off_cfg = {
 	.cmd = synology_power_off_cmd,
 };
 
+static const struct power_off_cfg kuroboxpro_power_off_cfg = {
+	.baud = 38400,
+	.magic = kuroboxpro_micon_magic,
+	.cmd = kuroboxpro_power_off_cmd,
+};
+
 static const struct of_device_id qnap_power_off_of_match_table[] = {
 	{ .compatible = "qnap,power-off",
 	  .data = &qnap_power_off_cfg,
 	},
 	{ .compatible = "synology,power-off",
 	  .data = &synology_power_off_cfg,
+	},
+	{ .compatible = "kuroboxpro,power-off",
+	  .data = &kuroboxpro_power_off_cfg,
 	},
 	{}
 };
@@ -78,6 +109,109 @@ MODULE_DEVICE_TABLE(of, qnap_power_off_of_match_table);
 static void __iomem *base;
 static unsigned long tclk;
 static const struct power_off_cfg *cfg;
+
+static int uart1_miconread(unsigned char *buf, int count)
+{
+	int i;
+	int timeout;
+
+	for (i = 0; i < count; i++) {
+		timeout = 10;
+
+		while (!(readl(UART1_REG(LSR)) & UART_LSR_DR)) {
+			if (--timeout == 0)
+				break;
+			udelay(1000);
+		}
+
+		if (timeout == 0)
+			break;
+		buf[i] = readl(UART1_REG(RX));
+	}
+
+	/* return read bytes */
+	return i;
+}
+
+static int uart1_miconwrite(const unsigned char *buf, int count)
+{
+	int i = 0;
+
+	while (count--) {
+		while (!(readl(UART1_REG(LSR)) & UART_LSR_THRE))
+			barrier();
+		writel(buf[i++], UART1_REG(TX));
+	}
+
+	return 0;
+}
+
+static int uart1_miconsend(const unsigned char *data, int count)
+{
+	int i;
+	unsigned char checksum = 0;
+	unsigned char recv_buf[40];
+	unsigned char send_buf[40];
+	unsigned char correct_ack[3];
+	int retry = 2;
+
+	/* Generate checksum */
+	for (i = 0; i < count; i++)
+		checksum -=  data[i];
+
+	do {
+		/* Send data */
+		uart1_miconwrite(data, count);
+
+		/* send checksum */
+		uart1_miconwrite(&checksum, 1);
+
+		if (uart1_miconread(recv_buf, sizeof(recv_buf)) <= 3) {
+			printk(KERN_ERR ">%s: receive failed.\n", __func__);
+
+			/* send preamble to clear the receive buffer */
+			memset(&send_buf, 0xff, sizeof(send_buf));
+			uart1_miconwrite(send_buf, sizeof(send_buf));
+
+			/* make dummy reads */
+			mdelay(100);
+			uart1_miconread(recv_buf, sizeof(recv_buf));
+		} else {
+			/* Generate expected ack */
+			correct_ack[0] = 0x01;
+			correct_ack[1] = data[1];
+			correct_ack[2] = 0x00;
+
+			/* checksum Check */
+			if ((recv_buf[0] + recv_buf[1] + recv_buf[2] +
+			     recv_buf[3]) & 0xFF) {
+				printk(KERN_ERR ">%s: Checksum Error : "
+					"Received data[%02x, %02x, %02x, %02x]"
+					"\n", __func__, recv_buf[0],
+					recv_buf[1], recv_buf[2], recv_buf[3]);
+			} else {
+				/* Check Received Data */
+				if (correct_ack[0] == recv_buf[0] &&
+				    correct_ack[1] == recv_buf[1] &&
+				    correct_ack[2] == recv_buf[2]) {
+					/* Interval for next command */
+					mdelay(10);
+
+					/* Receive ACK */
+					return 0;
+				}
+			}
+			/* Received NAK or illegal Data */
+			printk(KERN_ERR ">%s: Error : NAK or Illegal Data "
+					"Received\n", __func__);
+		}
+	} while (retry--);
+
+	/* Interval for next command */
+	mdelay(10);
+
+	return -1;
+}
 
 static void qnap_power_off(void)
 {
@@ -98,6 +232,13 @@ static void qnap_power_off(void)
 	if(cfg->cmd[0][0] == 1 && cfg->cmd[1][0] == 0) {
 		/* for qnap and synology, it's simply one-byte command */
 		writel(cfg->cmd[0][1], UART1_REG(TX));
+	}
+	else {
+		int i;
+		for(i = 0; cfg->cmd[i][0] > 0; i ++) {
+			/* [0] is size of the command; command starts from [1] */
+			uart1_miconsend(&(cfg->cmd[i][1]), cfg->cmd[i][0]);
+		}
 	}
 }
 
