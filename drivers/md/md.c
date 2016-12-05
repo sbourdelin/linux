@@ -3204,6 +3204,27 @@ static ssize_t ubb_store(struct md_rdev *rdev, const char *page, size_t len)
 static struct rdev_sysfs_entry rdev_unack_bad_blocks =
 __ATTR(unacknowledged_bad_blocks, S_IRUGO|S_IWUSR, ubb_show, ubb_store);
 
+static ssize_t
+sb_start_show(struct md_rdev *rdev, char *page)
+{
+	return sprintf(page, "%llu\n", (unsigned long long)rdev->sb_start);
+}
+
+static ssize_t
+sb_start_store(struct md_rdev *rdev, const char *buf, size_t len)
+{
+	unsigned long long sb_start;
+	if (kstrtoull(buf, 10, &sb_start) < 0)
+		return -EINVAL;
+	if (!rdev->mddev->external)
+		return -EBUSY;
+	rdev->sb_start = sb_start;
+	return len;
+}
+
+static struct rdev_sysfs_entry rdev_sb_start =
+__ATTR(sb_start, S_IRUGO|S_IWUSR, sb_start_show, sb_start_store);
+
 static struct attribute *rdev_default_attrs[] = {
 	&rdev_state.attr,
 	&rdev_errors.attr,
@@ -3214,6 +3235,7 @@ static struct attribute *rdev_default_attrs[] = {
 	&rdev_recovery_start.attr,
 	&rdev_bad_blocks.attr,
 	&rdev_unack_bad_blocks.attr,
+	&rdev_sb_start.attr,
 	NULL,
 };
 static ssize_t
