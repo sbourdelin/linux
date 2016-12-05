@@ -800,18 +800,21 @@ static void sd_config_write_same(struct scsi_disk *sdkp)
 		goto out;
 	}
 
-	/* Some devices can not handle block counts above 0xffff despite
-	 * supporting WRITE SAME(16). Consequently we default to 64k
-	 * blocks per I/O unless the device explicitly advertises a
-	 * bigger limit.
-	 */
-	if (sdkp->max_ws_blocks > SD_MAX_WS10_BLOCKS)
-		sdkp->max_ws_blocks = min_not_zero(sdkp->max_ws_blocks,
-						   (u32)SD_MAX_WS16_BLOCKS);
-	else if (sdkp->ws16 || sdkp->ws10 || sdkp->device->no_report_opcodes)
-		sdkp->max_ws_blocks = min_not_zero(sdkp->max_ws_blocks,
-						   (u32)SD_MAX_WS10_BLOCKS);
-	else {
+	if (sdkp->ws16 || sdkp->ws10 || sdkp->device->no_report_opcodes) {
+		/*
+		 * Some devices can not handle block counts above 0xffff despite
+		 * supporting WRITE SAME(16). Consequently we default to 64k
+		 * blocks per I/O unless the device explicitly advertises a
+		 * bigger limit.
+		 */
+		if (sdkp->max_ws_blocks > SD_MAX_WS10_BLOCKS) {
+			sdkp->max_ws_blocks = min_not_zero(sdkp->max_ws_blocks,
+						(u32)SD_MAX_WS16_BLOCKS);
+		} else {
+			sdkp->max_ws_blocks = min_not_zero(sdkp->max_ws_blocks,
+						(u32)SD_MAX_WS10_BLOCKS);
+		}
+	} else {
 		sdkp->device->no_write_same = 1;
 		sdkp->max_ws_blocks = 0;
 	}
