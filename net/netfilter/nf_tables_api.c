@@ -2920,6 +2920,8 @@ static int nf_tables_newset(struct net *net, struct sock *nlsk,
 			return -EINVAL;
 	} else if (flags & NFT_SET_OBJECT)
 		return -EINVAL;
+	else
+		objtype = NFT_OBJECT_UNSPEC;
 
 	timeout = 0;
 	if (nla[NFTA_SET_TIMEOUT] != NULL) {
