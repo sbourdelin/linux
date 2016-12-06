@@ -37,7 +37,7 @@ int __init parse_spcr(bool earlycon)
 	acpi_status status;
 	char *uart;
 	char *iotype;
-	int baud_rate;
+	char *baud_rate_string;
 	int err;
 
 	if (acpi_disabled)
@@ -82,25 +82,33 @@ int __init parse_spcr(bool earlycon)
 	}
 
 	switch (table->baud_rate) {
+	case 0:
+		/*
+		 * This value is not standaritzed by ACPI SPCR for now.
+		 * It means that hardware should not be re-initialized with
+		 * new speed.
+		 */
+		baud_rate_string = "";
+		break;
 	case 3:
-		baud_rate = 9600;
+		baud_rate_string = ",9600";
 		break;
 	case 4:
-		baud_rate = 19200;
+		baud_rate_string = ",19200";
 		break;
 	case 6:
-		baud_rate = 57600;
+		baud_rate_string = ",57600";
 		break;
 	case 7:
-		baud_rate = 115200;
+		baud_rate_string = ",115200";
 		break;
 	default:
 		err = -ENOENT;
 		goto done;
 	}
 
-	snprintf(opts, sizeof(opts), "%s,%s,0x%llx,%d", uart, iotype,
-		 table->serial_port.address, baud_rate);
+	snprintf(opts, sizeof(opts), "%s,%s,0x%llx%s", uart, iotype,
+		 table->serial_port.address, baud_rate_string);
 
 	pr_info("console: %s\n", opts);
 
