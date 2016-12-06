@@ -388,6 +388,17 @@ config PWM_STI
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-sti.
 
+config PWM_STM32
+	bool "STMicroelectronics STM32 PWM"
+	depends on ARCH_STM32 || COMPILE_TEST
+	depends on OF
+	depends on MFD_STM32_GP_TIMER
+	help
+	  Generic PWM framework driver for STM32 SoCs.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-stm32.
+
 config PWM_STMPE
 	bool "STMPE expander PWM export"
 	depends on MFD_STMPE
