@@ -14,7 +14,6 @@ struct xt_rateest {
 	struct hlist_node		list;
 	char				name[IFNAMSIZ];
 	struct gnet_estimator		params;
-	struct rcu_head			rcu;
 
 	/* keep this field far away to speedup xt_rateest_mt() */
 	struct net_rate_estimator __rcu *rate_est;
