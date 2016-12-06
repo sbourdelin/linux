@@ -68,6 +68,9 @@ int __init parse_spcr(bool earlycon)
 	case ACPI_DBG2_BCM2835:
 		uart = "pl011";
 		break;
+	case ACPI_DBG2_16550_32BIT:
+		iotype = "mmio32";
+		/* fall through */
 	case ACPI_DBG2_16550_COMPATIBLE:
 	case ACPI_DBG2_16550_SUBSET:
 		if (table->serial_port.space_id ==
