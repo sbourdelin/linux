@@ -137,6 +137,8 @@ static struct pid_namespace *create_pid_namespace(struct user_namespace *user_ns
 	for (i = 1; i < PIDMAP_ENTRIES; i++)
 		atomic_set(&ns->pidmap[i].nr_free, BITS_PER_PAGE);
 
+	spin_lock_init(&ns->core_pattern_lock);
+
 	return ns;
 
 out_free_map:
