@@ -27,6 +27,7 @@ static LIST_HEAD(ir_raw_client_list);
 static DEFINE_MUTEX(ir_raw_handler_lock);
 static LIST_HEAD(ir_raw_handler_list);
 static atomic64_t available_protocols = ATOMIC64_INIT(0);
+static atomic64_t encode_protocols = ATOMIC64_INIT(0);
 
 static int ir_raw_event_thread(void *data)
 {
@@ -234,6 +235,13 @@ u64
 ir_raw_get_allowed_protocols(void)
 {
 	return atomic64_read(&available_protocols);
+}
+
+/* used internally by the sysfs interface */
+u64
+ir_raw_get_encode_protocols(void)
+{
+	return atomic64_read(&encode_protocols);
 }
 
 static int change_protocol(struct rc_dev *dev, u64 *rc_type)
@@ -504,6 +512,8 @@ int ir_raw_handler_register(struct ir_raw_handler *ir_raw_handler)
 		list_for_each_entry(raw, &ir_raw_client_list, list)
 			ir_raw_handler->raw_register(raw->dev);
 	atomic64_or(ir_raw_handler->protocols, &available_protocols);
+	if (ir_raw_handler->encode)
+		atomic64_or(ir_raw_handler->protocols, &encode_protocols);
 	mutex_unlock(&ir_raw_handler_lock);
 
 	return 0;
@@ -523,6 +533,8 @@ void ir_raw_handler_unregister(struct ir_raw_handler *ir_raw_handler)
 			ir_raw_handler->raw_unregister(raw->dev);
 	}
 	atomic64_andnot(protocols, &available_protocols);
+	if (ir_raw_handler->encode)
+		atomic64_andnot(protocols, &encode_protocols);
 	mutex_unlock(&ir_raw_handler_lock);
 }
 EXPORT_SYMBOL(ir_raw_handler_unregister);

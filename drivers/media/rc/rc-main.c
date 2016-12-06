@@ -1750,11 +1750,13 @@ int rc_register_device(struct rc_dev *dev)
 		dev->input_name ?: "Unspecified device", path ?: "N/A");
 	kfree(path);
 
-	if (dev->driver_type == RC_DRIVER_IR_RAW) {
+	if (dev->driver_type == RC_DRIVER_IR_RAW || dev->encode_wakeup) {
+		/* Load raw decoders, if they aren't already */
 		if (!raw_init) {
 			request_module_nowait("ir-lirc-codec");
 			raw_init = true;
 		}
+
 		rc = ir_raw_event_register(dev);
 		if (rc < 0)
 			goto out_input;
