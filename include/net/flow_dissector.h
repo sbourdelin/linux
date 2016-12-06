@@ -154,8 +154,8 @@ struct flow_dissector {
 };
 
 struct flow_keys {
+#define FLOW_KEYS_HASH_START_FIELD control
 	struct flow_dissector_key_control control;
-#define FLOW_KEYS_HASH_START_FIELD basic
 	struct flow_dissector_key_basic basic;
 	struct flow_dissector_key_tags tags;
 	struct flow_dissector_key_vlan vlan;
