@@ -10,6 +10,13 @@ const char clang_builtin_bpf_helper_str[] =
 "	unsigned int max_entries;\n"
 "};\n"
 "#define SEC(NAME) __attribute__((section(NAME), used))\n"
+"extern int printf(const char *, ...);\n"
+"extern int puts(const char *);\n"
+"extern int perf_map_update_elem(void *, void *, void *, void *, unsigned long);\n"
+"extern int perf_map_lookup_elem(void *, void *, void *, void *);\n"
+"extern int perf_map_get_next_key(void *, void *, void *, void *);\n"
+"extern int perf_map_pin(void *, void *, const char *);\n"
+"extern int perf_map_get(const char *);\n"
 "#endif\n"
 "#endif"
 ;
