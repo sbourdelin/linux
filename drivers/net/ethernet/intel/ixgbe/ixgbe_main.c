@@ -2179,8 +2179,7 @@ static int ixgbe_clean_rx_irq(struct ixgbe_q_vector *q_vector,
 				total_rx_bytes += ddp_bytes;
 				total_rx_packets += DIV_ROUND_UP(ddp_bytes,
 								 mss);
-			}
-			if (!ddp_bytes) {
+			} else {
 				dev_kfree_skb_any(skb);
 				continue;
 			}
