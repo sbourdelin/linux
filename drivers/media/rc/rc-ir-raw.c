@@ -249,6 +249,43 @@ static void ir_raw_disable_protocols(struct rc_dev *dev, u64 protocols)
 	mutex_unlock(&dev->lock);
 }
 
+/**
+ * ir_raw_encode_scancode() - Encode a scancode as raw events
+ *
+ * @protocol:		protocol
+ * @scancode:		scancode filter describing a single scancode
+ * @events:		array of raw events to write into
+ * @max:		max number of raw events
+ *
+ * Attempts to encode the scancode as raw events.
+ *
+ * Returns:	The number of events written.
+ *		-ENOBUFS if there isn't enough space in the array to fit the
+ *		encoding. In this case all @max events will have been written.
+ *		-EINVAL if the scancode is ambiguous or invalid, or if no
+ *		compatible encoder was found.
+ */
+int ir_raw_encode_scancode(enum rc_type protocol,
+			   const struct rc_scancode_filter *scancode,
+			   struct ir_raw_event *events, unsigned int max)
+{
+	struct ir_raw_handler *handler;
+	int ret = -EINVAL;
+
+	mutex_lock(&ir_raw_handler_lock);
+	list_for_each_entry(handler, &ir_raw_handler_list, list) {
+		if (handler->protocols & (1 << protocol) && handler->encode) {
+			ret = handler->encode(protocol, scancode, events, max);
+			if (ret >= 0 || ret == -ENOBUFS)
+				break;
+		}
+	}
+	mutex_unlock(&ir_raw_handler_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(ir_raw_encode_scancode);
+
 /*
  * Used to (un)register raw event clients
  */
