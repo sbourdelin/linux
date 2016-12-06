@@ -1,0 +1,15 @@
+#
+# Timers drivers
+
+menu "Timers"
+
+config IIO_STM32_TIMER_TRIGGER
+	tristate "STM32 Timer Trigger"
+	depends on ARCH_STM32 || COMPILE_TEST
+	depends on OF
+	depends on MFD_STM32_GP_TIMER
+	select IIO_TRIGGERED_EVENT
+	help
+	  Select this option to enable STM32 Timer Trigger
+
+endmenu
