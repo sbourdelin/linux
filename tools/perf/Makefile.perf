@@ -329,9 +329,25 @@ endif
 LIBS = -Wl,--whole-archive $(PERFLIBS) -Wl,--no-whole-archive -Wl,--start-group $(EXTLIBS) -Wl,--end-group
 
 ifeq ($(USE_CLANG), 1)
+  # Only partial of the required clang libraries are listed.
+  #
+  # In case of dynamical linking, if clang is built and installed
+  # correctly, ld can infer the full list automatically. However,
+  # I observed a potential bug in 3.9.0 that four libraries
+  # (ASTMatchers, Format Rewrite and ToolingCore) are lost.
+  #
+  # In case of statical linking, providing the full list causes
+  # linking time dramatically increases because of --{start,end}-group.
+  #
+  # If linking error, replace CLANGLIBS_LIST with the full list
+  # and try again.
+  #
+  # The full list should be:
+  #
+  # Basic CodeGen Frontend Tooling AST Lex Driver Edit Parse Sema
+  # Serialization ASTMatchers Format Rewrite ToolingCore Analysis
   CLANGLIBS_LIST = AST Basic CodeGen Driver Frontend Lex Tooling Edit Sema Analysis Parse Serialization
-  LIBCLANG = $(foreach l,$(CLANGLIBS_LIST),$(wildcard $(shell $(LLVM_CONFIG) --libdir)/libclang$(l).a))
-  LIBS += -Wl,--start-group $(LIBCLANG) -Wl,--end-group
+  LIBS += -L$(shell $(LLVM_CONFIG) --libdir) -Wl,--start-group $(foreach l,$(CLANGLIBS_LIST),-lclang$(l)) -Wl,--end-group
 endif
 
 ifeq ($(USE_LLVM), 1)
