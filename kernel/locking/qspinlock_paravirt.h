@@ -72,7 +72,7 @@ static inline bool pv_queued_spin_steal_lock(struct qspinlock *lock)
 	struct __qspinlock *l = (void *)lock;
 
 	if (!(atomic_read(&lock->val) & _Q_LOCKED_PENDING_MASK) &&
-	    (cmpxchg(&l->locked, 0, _Q_LOCKED_VAL) == 0)) {
+	    (cmpxchg_acquire(&l->locked, 0, _Q_LOCKED_VAL) == 0)) {
 		qstat_inc(qstat_pv_lock_stealing, true);
 		return true;
 	}
@@ -101,16 +101,16 @@ static __always_inline void clear_pending(struct qspinlock *lock)
 
 /*
  * The pending bit check in pv_queued_spin_steal_lock() isn't a memory
- * barrier. Therefore, an atomic cmpxchg() is used to acquire the lock
- * just to be sure that it will get it.
+ * barrier. Therefore, an atomic cmpxchg_acquire() is used to acquire the
+ * lock to provide the proper memory barrier.
  */
 static __always_inline int trylock_clear_pending(struct qspinlock *lock)
 {
 	struct __qspinlock *l = (void *)lock;
 
 	return !READ_ONCE(l->locked) &&
-	       (cmpxchg(&l->locked_pending, _Q_PENDING_VAL, _Q_LOCKED_VAL)
-			== _Q_PENDING_VAL);
+	       (cmpxchg_acquire(&l->locked_pending, _Q_PENDING_VAL,
+				_Q_LOCKED_VAL) == _Q_PENDING_VAL);
 }
 #else /* _Q_PENDING_BITS == 8 */
 static __always_inline void set_pending(struct qspinlock *lock)
@@ -138,7 +138,7 @@ static __always_inline int trylock_clear_pending(struct qspinlock *lock)
 		 */
 		old = val;
 		new = (val & ~_Q_PENDING_MASK) | _Q_LOCKED_VAL;
-		val = atomic_cmpxchg(&lock->val, old, new);
+		val = atomic_cmpxchg_acquire(&lock->val, old, new);
 
 		if (val == old)
 			return 1;
@@ -211,7 +211,7 @@ static struct qspinlock **pv_hash(struct qspinlock *lock, struct pv_node *node)
 
 	for_each_hash_entry(he, offset, hash) {
 		hopcnt++;
-		if (!cmpxchg(&he->lock, NULL, lock)) {
+		if (!cmpxchg_relaxed(&he->lock, NULL, lock)) {
 			WRITE_ONCE(he->node, node);
 			qstat_hop(hopcnt);
 			return &he->lock;
@@ -309,7 +309,7 @@ static void pv_wait_node(struct mcs_spinlock *node, struct mcs_spinlock *prev)
 		 *     MB			      MB
 		 * [L] pn->locked		[RmW] pn->state = vcpu_hashed
 		 *
-		 * Matches the cmpxchg() from pv_kick_node().
+		 * Matches the cmpxchg_release() from pv_kick_node().
 		 */
 		smp_store_mb(pn->state, vcpu_halted);
 
@@ -324,7 +324,7 @@ static void pv_wait_node(struct mcs_spinlock *node, struct mcs_spinlock *prev)
 		 * value so that pv_wait_head_or_lock() knows to not also try
 		 * to hash this lock.
 		 */
-		cmpxchg(&pn->state, vcpu_halted, vcpu_running);
+		cmpxchg_relaxed(&pn->state, vcpu_halted, vcpu_running);
 
 		/*
 		 * If the locked flag is still not set after wakeup, it is a
@@ -360,9 +360,10 @@ static void pv_kick_node(struct qspinlock *lock, struct mcs_spinlock *node)
 	 * pv_wait_node(). If OTOH this fails, the vCPU was running and will
 	 * observe its next->locked value and advance itself.
 	 *
-	 * Matches with smp_store_mb() and cmpxchg() in pv_wait_node()
+	 * Matches with smp_store_mb() and cmpxchg_relaxed() in pv_wait_node().
 	 */
-	if (cmpxchg(&pn->state, vcpu_halted, vcpu_hashed) != vcpu_halted)
+	if (cmpxchg_release(&pn->state, vcpu_halted, vcpu_hashed)
+			!= vcpu_halted)
 		return;
 
 	/*
@@ -461,8 +462,8 @@ pv_wait_head_or_lock(struct qspinlock *lock, struct mcs_spinlock *node)
 	}
 
 	/*
-	 * The cmpxchg() or xchg() call before coming here provides the
-	 * acquire semantics for locking. The dummy ORing of _Q_LOCKED_VAL
+	 * The cmpxchg_acquire() or xchg() call before coming here provides
+	 * the acquire semantics for locking. The dummy ORing of _Q_LOCKED_VAL
 	 * here is to indicate to the compiler that the value will always
 	 * be nozero to enable better code optimization.
 	 */
@@ -488,11 +489,12 @@ __pv_queued_spin_unlock_slowpath(struct qspinlock *lock, u8 locked)
 	}
 
 	/*
-	 * A failed cmpxchg doesn't provide any memory-ordering guarantees,
-	 * so we need a barrier to order the read of the node data in
-	 * pv_unhash *after* we've read the lock being _Q_SLOW_VAL.
+	 * A failed cmpxchg_release doesn't provide any memory-ordering
+	 * guarantees, so we need a barrier to order the read of the node
+	 * data in pv_unhash *after* we've read the lock being _Q_SLOW_VAL.
 	 *
-	 * Matches the cmpxchg() in pv_wait_head_or_lock() setting _Q_SLOW_VAL.
+	 * Matches the cmpxchg_acquire() in pv_wait_head_or_lock() setting
+	 * _Q_SLOW_VAL.
 	 */
 	smp_rmb();
 
