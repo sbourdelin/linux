@@ -207,6 +207,7 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
 	void *vaddr;
 	struct sk_buff *skb;
 	struct rtnl_link_stats64 *percpu_stats;
+	struct dpaa2_eth_drv_stats *percpu_extras;
 	struct device *dev = priv->net_dev->dev.parent;
 	struct dpaa2_fas *fas;
 	u32 status = 0;
@@ -218,6 +219,7 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
 	prefetch(vaddr + dpaa2_fd_get_offset(fd));
 
 	percpu_stats = this_cpu_ptr(priv->percpu_stats);
+	percpu_extras = this_cpu_ptr(priv->percpu_extras);
 
 	if (fd_format == dpaa2_fd_single) {
 		skb = build_linear_skb(priv, ch, fd, vaddr);
@@ -226,6 +228,8 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
 				vaddr + dpaa2_fd_get_offset(fd);
 		skb = build_frag_skb(priv, ch, sgt);
 		skb_free_frag(vaddr);
+		percpu_extras->rx_sg_frames++;
+		percpu_extras->rx_sg_bytes += dpaa2_fd_get_len(fd);
 	} else {
 		/* We don't support any other format */
 		goto err_frame_format;
@@ -290,6 +294,7 @@ static int consume_frames(struct dpaa2_eth_channel *ch)
 
 		fd = dpaa2_dq_fd(dq);
 		fq = (struct dpaa2_eth_fq *)dpaa2_dq_fqd_ctx(dq);
+		fq->stats.frames++;
 
 		fq->consume(priv, ch, fd, &ch->napi);
 		cleaned++;
@@ -531,11 +536,13 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
 	struct dpaa2_fd fd;
 	struct rtnl_link_stats64 *percpu_stats;
+	struct dpaa2_eth_drv_stats *percpu_extras;
 	struct dpaa2_eth_fq *fq;
 	u16 queue_mapping;
 	int err, i;
 
 	percpu_stats = this_cpu_ptr(priv->percpu_stats);
+	percpu_extras = this_cpu_ptr(priv->percpu_extras);
 
 	if (unlikely(skb_headroom(skb) < DPAA2_ETH_NEEDED_HEADROOM(priv))) {
 		struct sk_buff *ns;
@@ -564,10 +571,14 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
 	/* Setup the FD fields */
 	memset(&fd, 0, sizeof(fd));
 
-	if (skb_is_nonlinear(skb))
+	if (skb_is_nonlinear(skb)) {
 		err = build_sg_fd(priv, skb, &fd);
-	else
+		percpu_extras->tx_sg_frames++;
+		percpu_extras->tx_sg_bytes += skb->len;
+	} else {
 		err = build_single_fd(priv, skb, &fd);
+	}
+
 	if (unlikely(err)) {
 		percpu_stats->tx_dropped++;
 		goto err_build_fd;
@@ -584,6 +595,7 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
 		if (err != -EBUSY)
 			break;
 	}
+	percpu_extras->tx_portal_busy += i;
 	if (unlikely(err < 0)) {
 		percpu_stats->tx_errors++;
 		/* Clean up everything, including freeing the skb */
@@ -609,7 +621,12 @@ static void dpaa2_eth_tx_conf(struct dpaa2_eth_priv *priv,
 			      struct napi_struct *napi __always_unused)
 {
 	struct rtnl_link_stats64 *percpu_stats;
+	struct dpaa2_eth_drv_stats *percpu_extras;
 	u32 status = 0;
+
+	percpu_extras = this_cpu_ptr(priv->percpu_extras);
+	percpu_extras->tx_conf_frames++;
+	percpu_extras->tx_conf_bytes += dpaa2_fd_get_len(fd);
 
 	free_tx_fd(priv, fd, &status);
 
@@ -815,12 +832,18 @@ static int refill_pool(struct dpaa2_eth_priv *priv,
 static int pull_channel(struct dpaa2_eth_channel *ch)
 {
 	int err;
+	int dequeues = -1;
 
 	/* Retry while portal is busy */
 	do {
 		err = dpaa2_io_service_pull_channel(NULL, ch->ch_id, ch->store);
+		dequeues++;
 		cpu_relax();
 	} while (err == -EBUSY);
+
+	ch->stats.dequeue_portal_busy += dequeues;
+	if (unlikely(err))
+		ch->stats.pull_err++;
 
 	return err;
 }
@@ -868,6 +891,8 @@ static int dpaa2_eth_poll(struct napi_struct *napi, int budget)
 			cpu_relax();
 		} while (err == -EBUSY);
 	}
+
+	ch->stats.frames += cleaned;
 
 	return cleaned;
 }
@@ -1330,6 +1355,10 @@ static void cdan_cb(struct dpaa2_io_notification_ctx *ctx)
 	struct dpaa2_eth_channel *ch;
 
 	ch = container_of(ctx, struct dpaa2_eth_channel, nctx);
+
+	/* Update NAPI statistics */
+	ch->stats.cdan++;
+
 	napi_schedule_irqoff(&ch->napi);
 }
 
@@ -2351,6 +2380,12 @@ static int dpaa2_eth_probe(struct fsl_mc_device *dpni_dev)
 		err = -ENOMEM;
 		goto err_alloc_percpu_stats;
 	}
+	priv->percpu_extras = alloc_percpu(*priv->percpu_extras);
+	if (!priv->percpu_extras) {
+		dev_err(dev, "alloc_percpu(percpu_extras) failed\n");
+		err = -ENOMEM;
+		goto err_alloc_percpu_extras;
+	}
 
 	err = netdev_init(net_dev);
 	if (err)
@@ -2392,6 +2427,8 @@ err_alloc_rings:
 err_csum:
 	unregister_netdev(net_dev);
 err_netdev_init:
+	free_percpu(priv->percpu_extras);
+err_alloc_percpu_extras:
 	free_percpu(priv->percpu_stats);
 err_alloc_percpu_stats:
 	del_ch_napi(priv);
@@ -2430,6 +2467,7 @@ static int dpaa2_eth_remove(struct fsl_mc_device *ls_dev)
 
 	free_rings(priv);
 	free_percpu(priv->percpu_stats);
+	free_percpu(priv->percpu_extras);
 
 	del_ch_napi(priv);
 	free_dpbp(priv);
