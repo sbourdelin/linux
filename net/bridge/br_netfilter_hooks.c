@@ -1009,7 +1009,7 @@ int br_nf_hook_thresh(unsigned int hook, struct net *net,
 	int ret;
 
 	for (elem = rcu_dereference(net->nf.hooks[NFPROTO_BRIDGE][hook]);
-	     nf_hook_entry_priority(elem) <= NF_BR_PRI_BRNF;
+	     elem && nf_hook_entry_priority(elem) <= NF_BR_PRI_BRNF;
 	     elem = rcu_dereference(elem->next))
 		;
 
