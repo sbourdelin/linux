@@ -86,7 +86,8 @@ enum rc_filter_type {
  * @allowed_protocols: bitmask with the supported RC_BIT_* protocols
  * @enabled_protocols: bitmask with the enabled RC_BIT_* protocols
  * @allowed_wakeup_protocols: bitmask with the supported RC_BIT_* wakeup protocols
- * @enabled_wakeup_protocols: bitmask with the enabled RC_BIT_* wakeup protocols
+ * @wakeup_protocol: the enabled RC_TYPE_* wakeup protocol or
+ *	RC_TYPE_UNKNOWN if disabled.
  * @scancode_filter: scancode filter
  * @scancode_wakeup_filter: scancode wakeup filters
  * @scancode_mask: some hardware decoders are not capable of providing the full
@@ -149,7 +150,7 @@ struct rc_dev {
 	u64				allowed_protocols;
 	u64				enabled_protocols;
 	u64				allowed_wakeup_protocols;
-	u64				enabled_wakeup_protocols;
+	enum rc_type			wakeup_protocol;
 	struct rc_scancode_filter	scancode_filter;
 	struct rc_scancode_filter	scancode_wakeup_filter;
 	u32				scancode_mask;
@@ -169,7 +170,7 @@ struct rc_dev {
 	u32				rx_resolution;
 	u32				tx_resolution;
 	int				(*change_protocol)(struct rc_dev *dev, u64 *rc_type);
-	int				(*change_wakeup_protocol)(struct rc_dev *dev, u64 *rc_type);
+	int				(*change_wakeup_protocol)(struct rc_dev *dev, enum rc_type protocol);
 	int				(*open)(struct rc_dev *dev);
 	void				(*close)(struct rc_dev *dev);
 	int				(*s_tx_mask)(struct rc_dev *dev, u32 mask);

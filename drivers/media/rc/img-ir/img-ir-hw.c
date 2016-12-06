@@ -685,7 +685,6 @@ success:
 	if (!hw->decoder || !hw->decoder->filter)
 		wakeup_protocols = 0;
 	rdev->allowed_wakeup_protocols = wakeup_protocols;
-	rdev->enabled_wakeup_protocols = wakeup_protocols;
 	return 0;
 }
 
@@ -701,7 +700,6 @@ static void img_ir_set_protocol(struct img_ir_priv *priv, u64 proto)
 	mutex_lock(&rdev->lock);
 	rdev->enabled_protocols = proto;
 	rdev->allowed_wakeup_protocols = proto;
-	rdev->enabled_wakeup_protocols = proto;
 	mutex_unlock(&rdev->lock);
 }
 
