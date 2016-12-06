@@ -716,8 +716,7 @@ static ssize_t usbtmc_read(struct file *filp, char __user *buf,
 				/* Remove padding if it exists */
 				if (actual > remaining)
 					actual = remaining;
-			}
-			else {
+			} else {
 				if (this_part > n_characters)
 					this_part = n_characters;
 				/* Remove padding if it exists */
@@ -733,7 +732,7 @@ static ssize_t usbtmc_read(struct file *filp, char __user *buf,
 			if ((buffer[8] & 0x01) && (actual >= n_characters))
 				remaining = 0;
 
-			dev_dbg(dev, "Bulk-IN header: remaining(%zu), buf(%p), buffer(%p) done(%zu)\n", remaining,buf,buffer,done);
+			dev_dbg(dev, "Bulk-IN header: remaining(%zu), buf(%p), buffer(%p) done(%zu)\n", remaining, buf, buffer, done);
 
 
 			/* Copy buffer to user space */
@@ -743,14 +742,13 @@ static ssize_t usbtmc_read(struct file *filp, char __user *buf,
 				goto exit;
 			}
 			done += actual;
-		}
-		else  {
+		} else  {
 			if (actual > remaining)
 				actual = remaining;
 
 			remaining -= actual;
 
-			dev_dbg(dev, "Bulk-IN header cont: actual(%u), done(%zu), remaining(%zu), buf(%p), buffer(%p)\n", actual, done, remaining,buf,buffer);
+			dev_dbg(dev, "Bulk-IN header cont: actual(%u), done(%zu), remaining(%zu), buf(%p), buffer(%p)\n", actual, done, remaining, buf, buffer);
 
 			/* Copy buffer to user space */
 			if (copy_to_user(buf + done, buffer, actual)) {
@@ -1401,7 +1399,7 @@ static int usbtmc_probe(struct usb_interface *intf,
 	dev_dbg(&intf->dev, "Trying to find if device Vendor 0x%04X Product 0x%04X has the RIGOL quirk\n",
 		le16_to_cpu(data->usb_dev->descriptor.idVendor),
 		le16_to_cpu(data->usb_dev->descriptor.idProduct));
-	for(n = 0; usbtmc_id_quirk[n].idVendor > 0; n++) {
+	for (n = 0; usbtmc_id_quirk[n].idVendor > 0; n++) {
 		if ((usbtmc_id_quirk[n].idVendor == le16_to_cpu(data->usb_dev->descriptor.idVendor)) &&
 		    (usbtmc_id_quirk[n].idProduct == le16_to_cpu(data->usb_dev->descriptor.idProduct))) {
 			dev_dbg(&intf->dev, "Setting this device as having the RIGOL quirk\n");
