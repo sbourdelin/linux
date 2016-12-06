@@ -1082,7 +1082,7 @@ wbcir_probe(struct pnp_dev *device, const struct pnp_device_id *dev_id)
 	data->dev->dev.parent = &device->dev;
 	data->dev->timeout = MS_TO_NS(100);
 	data->dev->rx_resolution = US_TO_NS(2);
-	data->dev->allowed_protocols = RC_BIT_ALL;
+	data->dev->allowed_protocols = RC_BIT_ALL_IR_DECODER;
 	data->dev->allowed_wakeup_protocols = RC_BIT_NEC | RC_BIT_NECX |
 			RC_BIT_RC5 | RC_BIT_RC6_0 | RC_BIT_RC6_6A_24 |
 			RC_BIT_RC6_6A_32 | RC_BIT_RC6_MCE;
