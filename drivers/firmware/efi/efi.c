@@ -531,6 +531,17 @@ int __init efi_config_parse_tables(void *config_tables, int count, int sz,
 
 	efi_memattr_init();
 
+	/*
+	 * Since EFI_MEMORY_ATTRIBUTES_TABLE is intended to replace
+	 * EFI_PROPERTIES_TABLE, let's skip parsing of EFI_PROPERTIES_TABLE
+	 * if we find EFI_MEMORY_ATTRIBUTES_TABLE.
+	 * Note: We might need to *re-enable* parsing of EFI_PROPERTIES_TABLE
+	 * if it defines some bits that are not defined in
+	 * EFI_MEMORY_ATTRIBUTES_TABLE.
+	 */
+	if (efi_enabled(EFI_MEM_ATTR))
+		return 0;
+
 	/* Parse the EFI Properties table if it exists */
 	if (efi.properties_table != EFI_INVALID_TABLE_ADDR) {
 		efi_properties_table_t *tbl;
