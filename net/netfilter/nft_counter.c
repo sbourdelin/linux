@@ -101,7 +101,7 @@ static void nft_counter_obj_destroy(struct nft_object *obj)
 }
 
 static void nft_counter_fetch(struct nft_counter_percpu __percpu *counter,
-			      struct nft_counter *total, bool reset)
+			      struct nft_counter *total)
 {
 	struct nft_counter_percpu *cpu_stats;
 	u64 bytes, packets;
@@ -110,19 +110,35 @@ static void nft_counter_fetch(struct nft_counter_percpu __percpu *counter,
 
 	memset(total, 0, sizeof(*total));
 	for_each_possible_cpu(cpu) {
-		if (reset)
-			bytes = packets = 0;
+		cpu_stats = per_cpu_ptr(counter, cpu);
+		do {
+			seq	= u64_stats_fetch_begin_irq(&cpu_stats->syncp);
+			bytes	= cpu_stats->counter.bytes;
+			packets	= cpu_stats->counter.packets;
+		} while (u64_stats_fetch_retry_irq(&cpu_stats->syncp, seq));
+
+		total->packets += packets;
+		total->bytes += bytes;
+	}
+}
+
+static void nft_counter_reset(struct nft_counter_percpu __percpu *counter,
+			      struct nft_counter *total)
+{
+	struct nft_counter_percpu *cpu_stats;
+	u64 bytes, packets;
+	unsigned int seq;
+	int cpu;
+
+	memset(total, 0, sizeof(*total));
+	for_each_possible_cpu(cpu) {
+		bytes = packets = 0;
 
 		cpu_stats = per_cpu_ptr(counter, cpu);
 		do {
 			seq	= u64_stats_fetch_begin_irq(&cpu_stats->syncp);
-			if (reset) {
-				packets += xchg(&cpu_stats->counter.packets, 0);
-				bytes	+= xchg(&cpu_stats->counter.bytes, 0);
-			} else {
-				bytes	= cpu_stats->counter.bytes;
-				packets	= cpu_stats->counter.packets;
-			}
+			packets += xchg(&cpu_stats->counter.packets, 0);
+			bytes	+= xchg(&cpu_stats->counter.bytes, 0);
 		} while (u64_stats_fetch_retry_irq(&cpu_stats->syncp, seq));
 
 		total->packets += packets;
@@ -136,7 +152,10 @@ static int nft_counter_do_dump(struct sk_buff *skb,
 {
 	struct nft_counter total;
 
-	nft_counter_fetch(priv->counter, &total, reset);
+	if (reset)
+		nft_counter_reset(priv->counter, &total);
+	else
+		nft_counter_fetch(priv->counter, &total);
 
 	if (nla_put_be64(skb, NFTA_COUNTER_BYTES, cpu_to_be64(total.bytes),
 			 NFTA_COUNTER_PAD) ||
@@ -215,7 +234,7 @@ static int nft_counter_clone(struct nft_expr *dst, const struct nft_expr *src)
 	struct nft_counter_percpu *this_cpu;
 	struct nft_counter total;
 
-	nft_counter_fetch(priv->counter, &total, false);
+	nft_counter_fetch(priv->counter, &total);
 
 	cpu_stats = __netdev_alloc_pcpu_stats(struct nft_counter_percpu,
 					      GFP_ATOMIC);
