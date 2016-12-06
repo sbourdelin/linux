@@ -1,0 +1,13 @@
+#
+# zx SoC drivers
+#
+menuconfig SOC_ZX
+        bool "zx SoC driver support"
+
+if SOC_ZX
+
+config ZX_PM_DOMAINS
+        bool "zx PM domains"
+        depends on PM_GENERIC_DOMAINS
+
+endif
