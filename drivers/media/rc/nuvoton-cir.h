@@ -60,6 +60,7 @@ static int debug;
  */
 #define TX_BUF_LEN 256
 #define RX_BUF_LEN 32
+#define WAKE_FIFO_LEN 67
 
 #define SIO_ID_MASK 0xfff0
 
