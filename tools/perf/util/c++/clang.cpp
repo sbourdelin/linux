@@ -112,15 +112,53 @@ getModuleFromSource(llvm::opt::ArgStringList CFlags, StringRef Path)
 
 PerfModule::PerfModule(std::unique_ptr<llvm::Module>&& M) : Module(std::move(M))
 {
+	for (llvm::Function& F : *Module) {
+		if (F.getLinkage() != llvm::GlobalValue::ExternalLinkage)
+			continue;
+
+		if (StringRef(F.getSection()).startswith("perfhook:"))
+			JITFunctions.insert(&F);
+		else
+			BPFFunctions.insert(&F);
+	}
+
+	for (auto V = Module->global_begin(); V != Module->global_end(); V++) {
+		llvm::GlobalVariable *GV = &*V;
+		if (StringRef(GV->getSection()) == llvm::StringRef("maps"))
+			Maps.insert(GV);
+	}
+}
+
+void PerfModule::prepareBPF(void)
+{
+	/*
+	 * setLinkage(AvailableExternallyLinkage) causes LLVM
+	 * blindly skip the function. They still exist in Module
+	 * so we can bring them back by resetting linkage to
+	 * ExternalLinkage.
+	 */
+	for (llvm::Function *F : JITFunctions)
+		F->setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
+	for (llvm::Function *F : BPFFunctions)
+		F->setLinkage(llvm::GlobalValue::ExternalLinkage);
 
 }
 
+void PerfModule::prepareJIT(void)
+{
+	for (llvm::Function *F : BPFFunctions)
+		F->setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
+	for (llvm::Function *F : JITFunctions)
+		F->setLinkage(llvm::GlobalValue::ExternalLinkage);
+
+}
 
 std::unique_ptr<llvm::SmallVectorImpl<char>>
 PerfModule::toBPFObject(void)
 {
 	using namespace llvm;
 
+	prepareBPF();
 	std::string TargetTriple("bpf-pc-linux");
 	std::string Error;
 	const Target* Target = TargetRegistry::lookupTarget(TargetTriple, Error);
