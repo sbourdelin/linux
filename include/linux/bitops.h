@@ -24,6 +24,72 @@
 #define GENMASK_ULL(h, l) \
 	(((~0ULL) << (l)) & (~0ULL >> (BITS_PER_LONG_LONG - 1 - (h))))
 
+#ifdef	__KERNEL__
+/*
+ * Equivalent of BIT(x) but for contiguous bitfields
+ *
+ * NOTE: 'val' is truncated to the size of the bitfield [msb:lsb]
+ *
+ * GENVALUE(1, 0,0xffff) = 0x00000003
+ * GENVALUE(3, 0,0xffff) = 0x0000000f
+ * GENVALUE(15,8,0xffff) = 0x0000ff00
+ * GENVALUE(6, 6,     1) = 0x00000040 == BIT(6)
+ */
+#define GENVALUE(msb, lsb, val)						\
+	(								\
+		/* BUILD_BUG_ON_ZERO() evaluates to 0 */		\
+		BUILD_BUG_ON_ZERO(!__builtin_constant_p(msb)) |		\
+		BUILD_BUG_ON_ZERO(!__builtin_constant_p(lsb)) |		\
+		(((val) << (lsb)) & (GENMASK((msb), (lsb))))		\
+	)
+
+#define GENVALUE_ULL(msb, lsb, val)					\
+	(								\
+		/* BUILD_BUG_ON_ZERO() evaluates to 0 */		\
+		BUILD_BUG_ON_ZERO(!__builtin_constant_p(msb)) |		\
+		BUILD_BUG_ON_ZERO(!__builtin_constant_p(lsb)) |		\
+		(((val) << (lsb)) & (GENMASK_ULL((msb), (lsb))))	\
+	)
+
+/*
+ * Takes 'val' and inserts it as bitfield [msb:lsb] into 'target'
+ *
+ * NOTE: 'val' is truncated to the size of the bitfield [msb:lsb]
+ *
+ *    a = 0x111a5000;
+ *    BITFIELD_INSERT(a, 19, 12, 0xff5a);
+ * => 'a = 0x1115a000'
+ */
+#define BITFIELD_INSERT(target, msb, lsb, val)				\
+	(target = ((target & ~GENMASK(msb, lsb)) |			\
+		   GENVALUE(msb, lsb, val)))
+
+#define BITFIELD_INSERT_ULL(target, msb, lsb, val)			\
+	(target = ((target & ~GENMASK_ULL(msb, lsb)) |			\
+		   GENVALUE_ULL(msb, lsb, val)))
+
+/*
+ * Extracts bitfield [msb:lsb] from 'source'
+ *
+ *    a = 0x111a5000;
+ *    b = BITFIELD_EXTRACT(a, 19, 12);
+ * => 'b = 0xa5'
+ */
+#define BITFIELD_EXTRACT(source, msb, lsb)				\
+	(								\
+		BUILD_BUG_ON_ZERO(!__builtin_constant_p(msb)) |		\
+		BUILD_BUG_ON_ZERO(!__builtin_constant_p(lsb)) |		\
+		(((source) & GENMASK(msb, lsb)) >> (lsb))		\
+	)
+
+#define BITFIELD_EXTRACT_ULL(source, msb, lsb)				\
+	(								\
+		BUILD_BUG_ON_ZERO(!__builtin_constant_p(msb)) |		\
+		BUILD_BUG_ON_ZERO(!__builtin_constant_p(lsb)) |		\
+		(((source) & GENMASK_ULL(msb, lsb)) >> (lsb))		\
+	)
+#endif
+
 extern unsigned int __sw_hweight8(unsigned int w);
 extern unsigned int __sw_hweight16(unsigned int w);
 extern unsigned int __sw_hweight32(unsigned int w);
