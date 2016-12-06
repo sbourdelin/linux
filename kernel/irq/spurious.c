@@ -180,6 +180,14 @@ static inline int bad_action_ret(irqreturn_t action_ret)
 	return 1;
 }
 
+void __weak arch_irq_debug(unsigned int irq)
+{
+	/*
+	 * This weak function provides a method to dump arch-specific
+	 * data to further debug unhandled IRQs or IRQ storms.
+	 */
+}
+
 /*
  * If 99,900 of the previous 100,000 interrupts have not been handled
  * then assume that the IRQ is stuck in some manner. Drop a diagnostic
@@ -218,6 +226,7 @@ static void __report_bad_irq(struct irq_desc *desc, irqreturn_t action_ret)
 					action->thread_fn, action->thread_fn);
 		printk(KERN_CONT "\n");
 	}
+	arch_irq_debug(irq);
 	raw_spin_unlock_irqrestore(&desc->lock, flags);
 }
 

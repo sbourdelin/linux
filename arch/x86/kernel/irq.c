@@ -10,6 +10,7 @@
 #include <linux/ftrace.h>
 #include <linux/delay.h>
 #include <linux/export.h>
+#include <linux/pci.h>
 
 #include <asm/apic.h>
 #include <asm/io_apic.h>
@@ -547,3 +548,74 @@ void fixup_irqs(void)
 	}
 }
 #endif
+
+/* Unhandled Interrupt Debug */
+
+static struct work_struct x86_unhandled_irq_work;
+static void x86_unhandled_irq_work_fn(struct work_struct *work)
+{
+#ifdef CONFIG_PCI
+	struct pci_dev *dev = NULL;
+	u32 reg;
+	int irq_pending;
+
+	pr_emerg("PCI devices with INTERRUPT STATUS set (bit 3 of PCI_STATUS register):\n");
+	for_each_pci_dev(dev) {
+		if (!dev || !dev->pin)
+			continue;
+
+		pci_read_config_dword(dev, PCI_COMMAND, &reg);
+		irq_pending = !!((reg >> 16) & PCI_STATUS_INTERRUPT);
+		if (irq_pending)
+			pr_emerg("possible unhandled irq source %s: pin = %d\n",
+				 pci_name(dev), dev->pin);
+	}
+#endif
+}
+
+static void lapic_dump_irr(void)
+{
+#ifdef CONFIG_X86_LOCAL_APIC
+	int irr, bit;
+	u32 reg;
+
+	pr_emerg("This CPU APIC ID is %d, and cpu id is %d.\n",
+		 hard_smp_processor_id(), smp_processor_id());
+	pr_emerg("CPU %d LAPIC IRR dump:\n", smp_processor_id());
+	/*
+	 * Since this CPU is handling the interrupt, dump its LAPIC IRR to see
+	 * which line is asserted.
+	 */
+	for (irr = APIC_ISR_NR - 1; irr >= 0; irr--) {
+		reg = apic_read(APIC_IRR + irr*0x10);
+		pr_emerg("APIC IRR %d (IRQs %d to %d) = 0x%0x ", irr,
+			 (irr + 1) * 32 - 1, irr * 32, reg);
+		if (reg) {
+			pr_cont(" [ ");
+			for (bit = 0; bit < 32; bit++) {
+				if ((reg >> bit) & 0x01)
+					pr_cont("%d ", bit + (irr * 32));
+			}
+			pr_cont("]");
+		}
+		pr_cont("\n");
+	}
+#endif
+}
+
+void arch_irq_debug(unsigned int irq)
+{
+	pr_emerg("Additional x86 information on IRQ #%d ...\n", irq);
+
+	/* PCI information cannot be dumped in interrupt context */
+	INIT_WORK(&x86_unhandled_irq_work, x86_unhandled_irq_work_fn);
+	schedule_work_on(smp_processor_id(), &x86_unhandled_irq_work);
+
+#ifdef CONFIG_X86_IO_APIC
+	/* Dump the IOAPIC irq mapping */
+	print_IRQ_to_pin_mapping(irq);
+#endif
+
+	/* Dump this CPU's IRR to determine which bits are set */
+	lapic_dump_irr();
+}

@@ -195,6 +195,7 @@ extern void disable_IO_APIC(void);
 extern void setup_ioapic_dest(void);
 extern int IO_APIC_get_PCI_irq_vector(int bus, int devfn, int pin);
 extern void print_IO_APICs(void);
+extern void print_IRQ_to_pin_mapping(unsigned int irq);
 #else  /* !CONFIG_X86_IO_APIC */
 
 #define IO_APIC_IRQ(x)		0
@@ -203,6 +204,7 @@ extern void print_IO_APICs(void);
 static inline void ioapic_insert_resources(void) { }
 static inline int arch_early_ioapic_init(void) { return 0; }
 static inline void print_IO_APICs(void) {}
+static inline void print_IRQ_to_pin_mapping(unsigned int irq) {}
 #define gsi_top (NR_IRQS_LEGACY)
 static inline int mp_find_ioapic(u32 gsi) { return 0; }
 static inline int mp_map_gsi_to_irq(u32 gsi, unsigned int flags,
