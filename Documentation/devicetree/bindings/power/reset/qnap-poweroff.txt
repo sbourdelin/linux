@@ -9,8 +9,14 @@ pm_power_off which is called to turn the power off.
 Synology NAS devices use a similar scheme, but a different baud rate,
 9600, and a different character, '1'.
 
+KuroBox Pro, Buffalo Linkstation LS-GL (also known as
+Buffalo Linkstation Pro/Live) and Buffalo Terastation Pro II/Live
+are similar, however it has even higher baud rate and need more
+commands to feed the UART1 before power off.
+
 Required Properties:
-- compatible: Should be "qnap,power-off" or "synology,power-off"
+- compatible: Should be "qnap,power-off", "synology,power-off"
+  or "kuroboxpro,power-off"
 
 - reg: Address and length of the register set for UART1
 - clocks: tclk clock

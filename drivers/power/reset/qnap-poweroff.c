@@ -1,5 +1,10 @@
 /*
- * QNAP Turbo NAS Board power off. Can also be used on Synology devices.
+ * QNAP Turbo NAS Board power off.
+ * It can also be used on following devices:
+ * - Synology devices
+ * - KuroBox Pro
+ * - Buffalo Linkstation Pro (LS-GL)
+ * - Buffalo Terastation Pro II/Live
  *
  * Copyright (C) 2012 Andrew Lunn <andrew@lunn.ch>
  * Copyright (C) 2016 Roger Shimizu <rogershimizu@gmail.com>
@@ -23,8 +28,8 @@
 #include <linux/of.h>
 #include <linux/io.h>
 #include <linux/clk.h>
+#include "kuroboxpro-common.h"
 
-#define UART1_REG(x)	(base + ((UART_##x) << 2))
 #define MICON_CMD_SIZE	4
 
 /* 4-byte magic hello command to UART1-attached microcontroller */
@@ -32,6 +37,13 @@ static const unsigned char qnap_micon_magic[] = {
 	0x03,
 	0x00,
 	0x00,
+	0x00
+};
+
+static const unsigned char kuroboxpro_micon_magic[] = {
+	0x1b,
+	0x00,
+	0x07,
 	0x00
 };
 
@@ -43,6 +55,13 @@ static const unsigned char qnap_power_off_cmd[][MICON_CMD_SIZE] = {
 
 static const unsigned char synology_power_off_cmd[][MICON_CMD_SIZE] = {
 	{ 1, '1'},
+	{}
+};
+
+static const unsigned char kuroboxpro_power_off_cmd[][MICON_CMD_SIZE] = {
+	{ 3, 0x01, 0x35, 0x00},
+	{ 2, 0x00, 0x0c},
+	{ 2, 0x00, 0x06},
 	{}
 };
 
@@ -64,12 +83,21 @@ static const struct power_off_cfg synology_power_off_cfg = {
 	.cmd = synology_power_off_cmd,
 };
 
+static const struct power_off_cfg kuroboxpro_power_off_cfg = {
+	.baud = 38400,
+	.magic = kuroboxpro_micon_magic,
+	.cmd = kuroboxpro_power_off_cmd,
+};
+
 static const struct of_device_id qnap_power_off_of_match_table[] = {
 	{ .compatible = "qnap,power-off",
 	  .data = &qnap_power_off_cfg,
 	},
 	{ .compatible = "synology,power-off",
 	  .data = &synology_power_off_cfg,
+	},
+	{ .compatible = "kuroboxpro,power-off",
+	  .data = &kuroboxpro_power_off_cfg,
 	},
 	{}
 };
@@ -98,6 +126,13 @@ static void qnap_power_off(void)
 	if(cfg->cmd[0][0] == 1 && cfg->cmd[1][0] == 0) {
 		/* for qnap and synology, it's simply one-byte command */
 		writel(cfg->cmd[0][1], UART1_REG(TX));
+	}
+	else {
+		int i;
+		for(i = 0; cfg->cmd[i][0] > 0; i ++) {
+			/* [0] is size of the command; command starts from [1] */
+			uart1_micon_send(base, &(cfg->cmd[i][1]), cfg->cmd[i][0]);
+		}
 	}
 }
 
