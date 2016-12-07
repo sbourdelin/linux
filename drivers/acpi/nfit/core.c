@@ -1631,7 +1631,7 @@ static int acpi_nfit_init_interleave_set(struct acpi_nfit_desc *acpi_desc,
 	if (!nd_set)
 		return -ENOMEM;
 
-	info = devm_kzalloc(dev, sizeof_nfit_set_info(nr), GFP_KERNEL);
+	info = kzalloc(sizeof_nfit_set_info(nr), GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
 	for (i = 0; i < nr; i++) {
@@ -1644,6 +1644,7 @@ static int acpi_nfit_init_interleave_set(struct acpi_nfit_desc *acpi_desc,
 
 		if (!memdev || !nfit_mem->dcr) {
 			dev_err(dev, "%s: failed to find DCR\n", __func__);
+			kfree(info);
 			return -ENODEV;
 		}
 
@@ -1655,7 +1656,7 @@ static int acpi_nfit_init_interleave_set(struct acpi_nfit_desc *acpi_desc,
 			cmp_map, NULL);
 	nd_set->cookie = nd_fletcher64(info, sizeof_nfit_set_info(nr), 0);
 	ndr_desc->nd_set = nd_set;
-	devm_kfree(dev, info);
+	kfree(info);
 
 	return 0;
 }
