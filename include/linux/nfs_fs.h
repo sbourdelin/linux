@@ -89,6 +89,7 @@ struct nfs_open_dir_context {
 	__u64 dir_cookie;
 	__u64 dup_cookie;
 	signed char duped;
+	int use_readdir_plus;
 };
 
 /*

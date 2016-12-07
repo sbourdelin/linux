@@ -78,6 +78,7 @@ static struct nfs_open_dir_context *alloc_nfs_open_dir_context(struct inode *dir
 		ctx->dir_cookie = 0;
 		ctx->dup_cookie = 0;
 		ctx->cred = get_rpccred(cred);
+		ctx->use_readdir_plus = 0;
 		spin_lock(&dir->i_lock);
 		list_add(&ctx->list, &nfsi->open_files);
 		spin_unlock(&dir->i_lock);
@@ -443,15 +444,33 @@ int nfs_same_file(struct dentry *dentry, struct nfs_entry *entry)
 }
 
 static
-bool nfs_use_readdirplus(struct inode *dir, struct dir_context *ctx)
+bool nfs_use_readdirplus(struct inode *dir, struct dir_context *ctx,
+			struct nfs_open_dir_context *dir_ctx)
 {
 	if (!nfs_server_capable(dir, NFS_CAP_READDIRPLUS))
 		return false;
-	if (test_and_clear_bit(NFS_INO_ADVISE_RDPLUS, &NFS_I(dir)->flags))
+	if (xchg(&dir_ctx->use_readdir_plus, 0))
 		return true;
 	if (ctx->pos == 0)
 		return true;
 	return false;
+}
+
+static
+void nfs_set_readdirplus(struct inode *dir, int force)
+{
+	struct nfs_inode *nfsi = NFS_I(dir);
+	struct nfs_open_dir_context *ctx;
+
+	if (nfs_server_capable(dir, NFS_CAP_READDIRPLUS) &&
+	    !list_empty(&nfsi->open_files)) {
+		spin_lock(&dir->i_lock);
+		list_for_each_entry(ctx, &nfsi->open_files, list)
+			ctx->use_readdir_plus = 1;
+		spin_unlock(&dir->i_lock);
+		if (force)
+			invalidate_mapping_pages(dir->i_mapping, 0, -1);
+	}
 }
 
 /*
@@ -461,11 +480,7 @@ bool nfs_use_readdirplus(struct inode *dir, struct dir_context *ctx)
  */
 void nfs_advise_use_readdirplus(struct inode *dir)
 {
-	struct nfs_inode *nfsi = NFS_I(dir);
-
-	if (nfs_server_capable(dir, NFS_CAP_READDIRPLUS) &&
-	    !list_empty(&nfsi->open_files))
-		set_bit(NFS_INO_ADVISE_RDPLUS, &nfsi->flags);
+	nfs_set_readdirplus(dir, 0);
 }
 
 /*
@@ -478,13 +493,7 @@ void nfs_advise_use_readdirplus(struct inode *dir)
  */
 void nfs_force_use_readdirplus(struct inode *dir)
 {
-	struct nfs_inode *nfsi = NFS_I(dir);
-
-	if (nfs_server_capable(dir, NFS_CAP_READDIRPLUS) &&
-	    !list_empty(&nfsi->open_files)) {
-		set_bit(NFS_INO_ADVISE_RDPLUS, &nfsi->flags);
-		invalidate_mapping_pages(dir->i_mapping, 0, -1);
-	}
+	nfs_set_readdirplus(dir, 1);
 }
 
 static
@@ -921,7 +930,7 @@ static int nfs_readdir(struct file *file, struct dir_context *ctx)
 	desc->ctx = ctx;
 	desc->dir_cookie = &dir_ctx->dir_cookie;
 	desc->decode = NFS_PROTO(inode)->decode_dirent;
-	desc->plus = nfs_use_readdirplus(inode, ctx) ? 1 : 0;
+	desc->plus = nfs_use_readdirplus(inode, ctx, dir_ctx) ? 1 : 0;
 
 	if (ctx->pos == 0 || nfs_attribute_cache_expired(inode))
 		res = nfs_revalidate_mapping(inode, file->f_mapping);
