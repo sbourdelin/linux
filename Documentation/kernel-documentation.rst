@@ -77,9 +77,27 @@ Specific guidelines for the kernel documentation
 
 Here are some specific guidelines for the kernel documentation:
 
-* Please don't go overboard with reStructuredText markup. Keep it simple.
+* Please don't go overboard with reStructuredText markup. Keep it simple. A lot
+  of core kernel developers prefer plain text, with a big emphasis on plain. In
+  the end if we have pretty generated docs which the subject experts don't
+  like to edit and keep up-to-date everyone loses.
 
-* Please stick to this order of heading adornments:
+  Be especially considerate when converting existing documentation. There's a
+  wide scale from annotating every little bit with in-line styles to only
+  touching up the bare minimum needed to integrate an existing file into the
+  larger documentation. Please align with the wishes of the maintainer to make
+  sure that documentations stays useful for everyone.
+
+* Don't just blindly convert documents, also carefully review them and fix up
+  any issues in the text itself. Updated docs might trick readers into believing
+  they're accurately reflecting current best practice, which would be rather
+  harmful if the text itself is entirely outdated.
+
+* When converting existing documents, please try to retain the existing heading
+  styles as much as possible. Sphinx accept almost anything, as long as it's
+  consistent and headings all start in column 1.
+
+  For new documents please stick to this order of heading adornments:
 
   1. ``=`` with overline for document title::
 
@@ -106,6 +124,12 @@ Here are some specific guidelines for the kernel documentation:
   number and order of section title adornment styles, the order enforced will be
   the order as encountered."), having the higher levels the same overall makes
   it easier to follow the documents.
+
+* For inserting fixed width text blocks (for code examples, use case
+  examples, etc.), use ``::`` for anything that doesn't really benefit
+  from syntax highlighting, especially short snippets. Use
+  ``.. code-block:: <language>`` for longer code blocks that benefit
+  from highlighting.
 
 
 the C domain
