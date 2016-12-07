@@ -1117,7 +1117,7 @@ static int nvme_create_queue(struct nvme_queue *nvmeq, int qid)
 	struct nvme_dev *dev = nvmeq->dev;
 	int result;
 
-	nvmeq->cq_vector = qid - 1;
+	nvmeq->cq_vector = qid;
 	result = adapter_alloc_cq(dev, qid, nvmeq);
 	if (result < 0)
 		return result;
