@@ -69,7 +69,7 @@ ENTRY(stext)
 
 #ifdef CONFIG_SMP
 	GET_CPU_ID  r5
-	cmp	r5, 0
+	cmp	r5, CONFIG_ARC_MASTER_CORE
 	mov.nz	r0, r5
 #ifdef CONFIG_ARC_SMP_HALT_ON_RESET
 	; Non-Master can proceed as system would be booted sufficiently

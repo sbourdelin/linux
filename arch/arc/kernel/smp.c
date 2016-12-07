@@ -92,13 +92,13 @@ static volatile int wake_flag;
 
 static void arc_default_smp_cpu_kick(int cpu, unsigned long pc)
 {
-	BUG_ON(cpu == 0);
-	wake_flag = cpu;
+	BUG_ON(cpu == CONFIG_ARC_MASTER_CORE);
+	wake_flag = BIT(cpu);
 }
 
 void arc_platform_smp_wait_to_boot(int cpu)
 {
-	while (wake_flag != cpu)
+	while (wake_flag != BIT(cpu))
 		;
 
 	wake_flag = 0;

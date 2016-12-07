@@ -203,6 +203,23 @@ config ARC_SMP_HALT_ON_RESET
 	  at designated entry point. For other case, all jump to common
 	  entry point and spin wait for Master's signal.
 
+config ARC_MASTER_CORE
+	int "Master core index"
+	range 0 NR_CPUS
+	default "0"
+	help
+	  Any core might be used as a master, i.e. the one which does initial
+	  low-level setup before real SMP stuff is ready to be used.
+	  Default 0 (the first core) is what you most probably need but if you
+	  know what you are doing other cores might be used as a master.
+	  This is especially useful if one wants to run Linux just on one core out of
+	  many in SMP SoC and that core to be not the first one.
+
+	  Note that value MUST BE <= (NR_CPUS - 1), i.e. if NR_CPUS=4 then master core
+	  MUST BE in a range 0, 1, 2, 3. Unfortunately in Kconfig there's no way to
+	  set a range with expression, so it checks for <= NR_CPUS which is not entirely
+	  correct!
+
 endif	#SMP
 
 config ARC_MCIP

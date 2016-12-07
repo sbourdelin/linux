@@ -933,14 +933,16 @@ void arc_cache_init(void)
 
 	printk(arc_cache_mumbojumbo(0, str, sizeof(str)));
 
+#ifdef CONFIG_SMP
 	/*
 	 * Only master CPU needs to execute rest of function:
 	 *  - Assume SMP so all cores will have same cache config so
 	 *    any geomtry checks will be same for all
 	 *  - IOC setup / dma callbacks only need to be setup once
 	 */
-	if (cpu)
+	if (cpu != CONFIG_ARC_MASTER_CORE)
 		return;
+#endif
 
 	if (IS_ENABLED(CONFIG_ARC_HAS_ICACHE)) {
 		struct cpuinfo_arc_cache *ic = &cpuinfo_arc700[cpu].icache;
