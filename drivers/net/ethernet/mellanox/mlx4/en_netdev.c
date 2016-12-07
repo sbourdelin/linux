@@ -51,7 +51,8 @@
 #include "mlx4_en.h"
 #include "en_port.h"
 
-#define MLX4_EN_MAX_XDP_MTU ((int)(PAGE_SIZE - ETH_HLEN - (2 * VLAN_HLEN)))
+#define MLX4_EN_MAX_XDP_MTU ((int)(PAGE_SIZE - ETH_HLEN - (2 * VLAN_HLEN) - \
+				   XDP_PACKET_HEADROOM))
 
 int mlx4_en_setup_tc(struct net_device *dev, u8 up)
 {
@@ -2807,7 +2808,7 @@ static int mlx4_xdp(struct net_device *dev, struct netdev_xdp *xdp)
 		xdp->prog_attached = mlx4_xdp_attached(dev);
 		return 0;
 	case XDP_QUERY_FEATURES:
-		xdp->features = 0;
+		xdp->features = XDP_F_ADJUST_HEAD;
 		return 0;
 	default:
 		return -EINVAL;
