@@ -1476,8 +1476,7 @@ int denali_init(struct denali_nand_info *denali)
 	}
 
 	/* allocate a temporary buffer for nand_scan_ident() */
-	denali->buf.buf = devm_kzalloc(denali->dev, PAGE_SIZE,
-					GFP_DMA | GFP_KERNEL);
+	denali->buf.buf = kzalloc(PAGE_SIZE, GFP_DMA | GFP_KERNEL);
 	if (!denali->buf.buf)
 		return -ENOMEM;
 
@@ -1492,6 +1491,7 @@ int denali_init(struct denali_nand_info *denali)
 	if (request_irq(denali->irq, denali_isr, IRQF_SHARED,
 			DENALI_NAND_NAME, denali)) {
 		pr_err("Spectra: Unable to allocate IRQ\n");
+		kfree(denali->buf.buf);
 		return -ENODEV;
 	}
 
@@ -1512,11 +1512,12 @@ int denali_init(struct denali_nand_info *denali)
 	 */
 	if (nand_scan_ident(mtd, denali->max_banks, NULL)) {
 		ret = -ENXIO;
+		kfree(denali->buf.buf);
 		goto failed_req_irq;
 	}
 
 	/* allocate the right size buffer now */
-	devm_kfree(denali->dev, denali->buf.buf);
+	kfree(denali->buf.buf);
 	denali->buf.buf = devm_kzalloc(denali->dev,
 			     mtd->writesize + mtd->oobsize,
 			     GFP_KERNEL);
