@@ -493,6 +493,7 @@ struct sh_eth_cpu_data {
 	unsigned shift_rd0:1;	/* shift Rx descriptor word 0 right by 16 */
 	unsigned rmiimode:1;	/* EtherC has RMIIMODE register */
 	unsigned rtrate:1;	/* EtherC has RTRATE register */
+	unsigned magic:1;	/* EtherC have PMDE in ECMR and MPDIP in ECSIPR */
 };
 
 struct sh_eth_private {
@@ -529,6 +530,9 @@ struct sh_eth_private {
 	unsigned no_ether_link:1;
 	unsigned ether_link_active_low:1;
 	unsigned is_opened:1;
+
+	bool wol_enabled;
+	struct clk *clk;
 };
 
 static inline void sh_eth_soft_swap(char *src, int len)
