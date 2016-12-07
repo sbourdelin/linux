@@ -1694,7 +1694,10 @@ static void fcoe_recv_frame(struct sk_buff *skb)
 			skb->dev ? skb->dev->name : "<NULL>");
 
 	port = lport_priv(lport);
-	skb_linearize(skb); /* check for skb_is_nonlinear is within skb_linearize */
+	if (skb_linearize(skb)) {
+		kfree_skb(skb);
+		return;
+	}
 
 	/*
 	 * Frame length checks and setting up the header pointers

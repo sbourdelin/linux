@@ -542,8 +542,10 @@ static void bnx2fc_recv_frame(struct sk_buff *skb)
 		return;
 	}
 
-	if (skb_is_nonlinear(skb))
-		skb_linearize(skb);
+	if (skb_linearize(skb)) {
+		kfree_skb(skb);
+		return;
+	}
 	mac = eth_hdr(skb)->h_source;
 	dest_mac = eth_hdr(skb)->h_dest;
 
