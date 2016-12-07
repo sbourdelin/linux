@@ -6722,6 +6722,15 @@ int dev_change_xdp_fd(struct net_device *dev, int fd, u32 flags)
 		prog = bpf_prog_get_type(fd, BPF_PROG_TYPE_XDP);
 		if (IS_ERR(prog))
 			return PTR_ERR(prog);
+
+		xdp.command = XDP_QUERY_FEATURES;
+		err = ops->ndo_xdp(dev, &xdp);
+		if (err)
+			return err;
+
+		if (prog->xdp_adjust_head &&
+		    !(xdp.features & XDP_F_ADJUST_HEAD))
+			return -ENOTSUPP;
 	}
 
 	memset(&xdp, 0, sizeof(xdp));

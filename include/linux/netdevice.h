@@ -30,6 +30,7 @@
 #include <linux/delay.h>
 #include <linux/atomic.h>
 #include <linux/prefetch.h>
+#include <linux/bitops.h>
 #include <asm/cache.h>
 #include <asm/byteorder.h>
 
@@ -805,6 +806,13 @@ struct tc_to_netdev {
 	bool egress_dev;
 };
 
+/* Driver must allow a XDP prog to extend header by
+ * up to XDP_PACKET_HEADROOM.  It must also fill out
+ * the data_hard_start value in struct xdp_buff
+ * before calling out the xdp_prog.
+ */
+#define XDP_F_ADJUST_HEAD	BIT(0)
+
 /* These structures hold the attributes of xdp state that are being passed
  * to the netdevice through the xdp op.
  */
@@ -821,6 +829,8 @@ enum xdp_netdev_command {
 	 * return true if a program is currently attached and running.
 	 */
 	XDP_QUERY_PROG,
+	/* Check what XDP features are supported by a device */
+	XDP_QUERY_FEATURES,
 };
 
 struct netdev_xdp {
@@ -830,6 +840,8 @@ struct netdev_xdp {
 		struct bpf_prog *prog;
 		/* XDP_QUERY_PROG */
 		bool prog_attached;
+		/* XDP_QUERY_FEATURES */
+		u32 features;
 	};
 };
 

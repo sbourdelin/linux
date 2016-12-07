@@ -3265,6 +3265,9 @@ static int mlx5e_xdp(struct net_device *dev, struct netdev_xdp *xdp)
 	case XDP_QUERY_PROG:
 		xdp->prog_attached = mlx5e_xdp_attached(dev);
 		return 0;
+	case XDP_QUERY_FEATURES:
+		xdp->features = 0;
+		return 0;
 	default:
 		return -EINVAL;
 	}

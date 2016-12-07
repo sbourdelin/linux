@@ -2981,6 +2981,9 @@ static int nfp_net_xdp(struct net_device *netdev, struct netdev_xdp *xdp)
 	case XDP_QUERY_PROG:
 		xdp->prog_attached = !!nn->xdp_prog;
 		return 0;
+	case XDP_QUERY_FEATURES:
+		xdp->features = 0;
+		return 0;
 	default:
 		return -EINVAL;
 	}
