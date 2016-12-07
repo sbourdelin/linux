@@ -948,7 +948,7 @@ static int find_virq(unsigned int virq, unsigned int cpu)
 			continue;
 		if (status.status != EVTCHNSTAT_virq)
 			continue;
-		if (status.u.virq == virq && status.vcpu == cpu) {
+		if (status.u.virq == virq && status.vcpu == xen_vcpu_nr(cpu)) {
 			rc = port;
 			break;
 		}
@@ -1256,7 +1256,6 @@ void xen_evtchn_do_upcall(struct pt_regs *regs)
 
 	irq_enter();
 #ifdef CONFIG_X86
-	exit_idle();
 	inc_irq_stat(irq_hv_callback_count);
 #endif
 
