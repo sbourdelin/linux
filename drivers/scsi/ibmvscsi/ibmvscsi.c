@@ -232,6 +232,7 @@ static void ibmvscsi_task(void *data)
 		while ((crq = crq_queue_next_crq(&hostdata->queue)) != NULL) {
 			ibmvscsi_handle_crq(crq, hostdata);
 			crq->valid = VIOSRP_CRQ_FREE;
+			wmb();
 		}
 
 		vio_enable_interrupts(vdev);
@@ -240,6 +241,7 @@ static void ibmvscsi_task(void *data)
 			vio_disable_interrupts(vdev);
 			ibmvscsi_handle_crq(crq, hostdata);
 			crq->valid = VIOSRP_CRQ_FREE;
+			wmb();
 		} else {
 			done = 1;
 		}
