@@ -433,6 +433,7 @@ static struct page *kimage_alloc_crash_control_pages(struct kimage *image,
 	 */
 	unsigned long hole_start, hole_end, size;
 	struct page *pages;
+	unsigned long count = 0;
 
 	pages = NULL;
 	size = (1 << order) << PAGE_SHIFT;
@@ -440,6 +441,9 @@ static struct page *kimage_alloc_crash_control_pages(struct kimage *image,
 	hole_end   = hole_start + size - 1;
 	while (hole_end <= crashk_res.end) {
 		unsigned long i;
+
+		if (++count % 256 == 0)
+			cond_resched();
 
 		if (hole_end > KEXEC_CRASH_CONTROL_MEMORY_LIMIT)
 			break;
