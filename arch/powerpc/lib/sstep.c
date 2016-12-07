@@ -1128,6 +1128,11 @@ int __kprobes analyse_instr(struct instruction_op *op, struct pt_regs *regs,
 		case 266:	/* add */
 			regs->gpr[rd] = regs->gpr[ra] + regs->gpr[rb];
 			goto arith_done;
+
+		case 267:	/* moduw */
+			regs->gpr[rd] = (unsigned int) regs->gpr[ra] %
+				(unsigned int) regs->gpr[rb];
+			goto instr_done;
 #ifdef __powerpc64__
 		case 457:	/* divdu */
 			regs->gpr[rd] = regs->gpr[ra] / regs->gpr[rb];
@@ -1148,6 +1153,10 @@ int __kprobes analyse_instr(struct instruction_op *op, struct pt_regs *regs,
 				(int) regs->gpr[rb];
 			goto arith_done;
 
+		case 779:	/* modsw */
+			regs->gpr[rd] = (int) regs->gpr[ra] %
+				(int) regs->gpr[rb];
+			goto instr_done;
 
 /*
  * Logical instructions
