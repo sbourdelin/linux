@@ -14,8 +14,9 @@
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/threads.h>
+#include <asm/arcregs.h>
 
-#define raw_smp_processor_id() (current_thread_info()->cpu)
+#define raw_smp_processor_id() ((int)(read_aux_reg(AUX_IDENTITY) >> 8) & 0xFF)
 
 /* including cpumask.h leads to cyclic deps hence this Forward declaration */
 struct cpumask;
