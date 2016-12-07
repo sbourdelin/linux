@@ -1,0 +1,37 @@
+#
+# Synopsys DWC ethernet drivers configuration
+#
+
+config DWC_ETH
+	bool
+	depends on HAS_IOMEM && HAS_DMA
+	select BITREVERSE
+        select CRC32
+        select PTP_1588_CLOCK
+        select PHYLIB
+
+config DWC_XLGMAC_PCI
+	tristate "Synopsys DWC Enterprise Ethernet (XLGMAC) driver PCI support"
+        depends on HAS_IOMEM && HAS_DMA
+	depends on PCI
+        select BITREVERSE
+        select CRC32
+        select PTP_1588_CLOCK
+        select PHYLIB
+	select DWC_ETH
+	---help---
+	  This driver supports the Synopsys DWC Enterprise Ethernet (XLGMAC)
+	  for PCI platform
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snps-dwc-xlgmac.
+
+config DWC_ETH_DCB
+	bool "Data Center Bridging (DCB) support"
+	default n
+	depends on DWC_ETH && DCB
+	---help---
+	  Say Y here to enable Data Center Bridging (DCB) support in the
+	  driver.
+
+	  If unsure, say N.

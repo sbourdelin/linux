@@ -3,3 +3,4 @@
 #
 
 obj-$(CONFIG_SYNOPSYS_DWC_ETH_QOS) += dwc_eth_qos.o
+obj-y += dwc/

@@ -24,4 +24,6 @@ config SYNOPSYS_DWC_ETH_QOS
 	---help---
 	  This driver supports the DWC Ethernet QoS from Synopsys
 
+source "drivers/net/ethernet/synopsys/dwc/Kconfig"
+
 endif # NET_VENDOR_SYNOPSYS
