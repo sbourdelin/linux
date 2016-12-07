@@ -88,7 +88,7 @@ unsigned long pci_hotplug_mem_size = DEFAULT_HOTPLUG_MEM_SIZE;
 #define DEFAULT_HOTPLUG_BUS_SIZE	1
 unsigned long pci_hotplug_bus_size = DEFAULT_HOTPLUG_BUS_SIZE;
 
-enum pcie_bus_config_types pcie_bus_config = PCIE_BUS_DEFAULT;
+enum pcie_bus_config_types pcie_bus_config = PCIE_BUS_SAFE;
 
 /*
  * The default CLS is used if arch didn't set CLS explicitly and not
