@@ -1104,11 +1104,11 @@ static int mt_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	td->mt_report_id = -1;
 	hid_set_drvdata(hdev, td);
 
-	td->fields = devm_kzalloc(&hdev->dev, sizeof(struct mt_fields),
-				  GFP_KERNEL);
+	td->fields = kzalloc(sizeof(struct mt_fields), GFP_KERNEL);
 	if (!td->fields) {
 		dev_err(&hdev->dev, "cannot allocate multitouch fields data\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto error_nomem;
 	}
 
 	if (id->vendor == HID_ANY_ID && id->product == HID_ANY_ID)
@@ -1149,11 +1149,11 @@ static int mt_probe(struct hid_device *hdev, const struct hid_device_id *id)
 
 	ret = hid_parse(hdev);
 	if (ret != 0)
-		return ret;
+		goto error_free;
 
 	ret = hid_hw_start(hdev, HID_CONNECT_DEFAULT);
 	if (ret)
-		return ret;
+		goto error_free;
 
 	ret = sysfs_create_group(&hdev->dev.kobj, &mt_attribute_group);
 	if (ret)
@@ -1164,10 +1164,15 @@ static int mt_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	mt_set_input_mode(hdev);
 
 	/* release .fields memory as it is not used anymore */
-	devm_kfree(&hdev->dev, td->fields);
+	kfree(td->fields);
 	td->fields = NULL;
 
 	return 0;
+
+error_free:
+	kfree(td->fields);
+error_nomem:
+	return ret;
 }
 
 #ifdef CONFIG_PM
