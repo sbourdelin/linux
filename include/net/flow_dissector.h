@@ -2,6 +2,7 @@
 #define _NET_FLOW_DISSECTOR_H
 
 #include <linux/types.h>
+#include <linux/in.h>
 #include <linux/in6.h>
 #include <uapi/linux/if_ether.h>
 
@@ -104,6 +105,22 @@ struct flow_dissector_key_ports {
 	};
 };
 
+/**
+ * flow_dissector_key_icmp:
+ *	@ports: type and code of ICMP header
+ *		icmp: ICMP type (high) and code (low)
+ *		type: ICMP type
+ *		code: ICMP code
+ */
+struct flow_dissector_key_icmp {
+	union {
+		__be16 icmp;
+		struct {
+			u8 type;
+			u8 code;
+		};
+	};
+};
 
 /**
  * struct flow_dissector_key_eth_addrs:
@@ -122,6 +139,7 @@ enum flow_dissector_key_id {
 	FLOW_DISSECTOR_KEY_IPV4_ADDRS, /* struct flow_dissector_key_ipv4_addrs */
 	FLOW_DISSECTOR_KEY_IPV6_ADDRS, /* struct flow_dissector_key_ipv6_addrs */
 	FLOW_DISSECTOR_KEY_PORTS, /* struct flow_dissector_key_ports */
+	FLOW_DISSECTOR_KEY_ICMP, /* struct flow_dissector_key_icmp */
 	FLOW_DISSECTOR_KEY_ETH_ADDRS, /* struct flow_dissector_key_eth_addrs */
 	FLOW_DISSECTOR_KEY_TIPC_ADDRS, /* struct flow_dissector_key_tipc_addrs */
 	FLOW_DISSECTOR_KEY_VLAN, /* struct flow_dissector_key_flow_vlan */
@@ -160,7 +178,10 @@ struct flow_keys {
 	struct flow_dissector_key_tags tags;
 	struct flow_dissector_key_vlan vlan;
 	struct flow_dissector_key_keyid keyid;
-	struct flow_dissector_key_ports ports;
+	union {
+		struct flow_dissector_key_ports ports;
+		struct flow_dissector_key_icmp icmp;
+	};
 	struct flow_dissector_key_addrs addrs;
 };
 
@@ -187,6 +208,38 @@ struct flow_keys_digest {
 
 void make_flow_keys_digest(struct flow_keys_digest *digest,
 			   const struct flow_keys *flow);
+
+static inline bool flow_protos_are_icmpv4(__be16 n_proto, u8 ip_proto)
+{
+	return n_proto == htons(ETH_P_IP) && ip_proto == IPPROTO_ICMP;
+}
+
+static inline bool flow_protos_are_icmpv6(__be16 n_proto, u8 ip_proto)
+{
+	return n_proto == htons(ETH_P_IPV6) && ip_proto == IPPROTO_ICMPV6;
+}
+
+static inline bool flow_protos_are_icmp_any(__be16 n_proto, u8 ip_proto)
+{
+	return flow_protos_are_icmpv4(n_proto, ip_proto) ||
+		flow_protos_are_icmpv6(n_proto, ip_proto);
+}
+
+static inline bool flow_basic_key_is_icmpv4(const struct flow_dissector_key_basic *basic)
+{
+	return flow_protos_are_icmpv4(basic->n_proto, basic->ip_proto);
+}
+
+static inline bool flow_basic_key_is_icmpv6(const struct flow_dissector_key_basic *basic)
+{
+	return flow_protos_are_icmpv6(basic->n_proto, basic->ip_proto);
+}
+
+static inline bool flow_keys_are_icmp_any(const struct flow_keys *keys)
+{
+	return flow_protos_are_icmp_any(keys->basic.n_proto,
+					keys->basic.ip_proto);
+}
 
 static inline bool flow_keys_have_l4(const struct flow_keys *keys)
 {
