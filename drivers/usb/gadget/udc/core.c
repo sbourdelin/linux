@@ -1083,16 +1083,22 @@ static void usb_udc_nop_release(struct device *dev)
 /* should be called with udc_lock held */
 static int check_pending_gadget_drivers(struct usb_udc *udc)
 {
-	struct usb_gadget_driver *driver;
+	struct usb_gadget_driver *driver, *tmp;
 	int ret = 0;
 
-	list_for_each_entry(driver, &gadget_driver_pending_list, pending)
+	list_for_each_entry_safe(driver, tmp, &gadget_driver_pending_list,
+				 pending)
 		if (!driver->udc_name || strcmp(driver->udc_name,
 						dev_name(&udc->dev)) == 0) {
 			ret = udc_bind_to_driver(udc, driver);
+			if (ret == 0)
+				break;
 			if (ret != -EPROBE_DEFER)
 				list_del_init(&driver->pending);
-			break;
+			/*
+			 * We failed to bind this driver, so let's try
+			 * next one.
+			 */
 		}
 
 	return ret;
