@@ -25,6 +25,7 @@
 #include <linux/clk.h>
 
 #define UART1_REG(x)	(base + ((UART_##x) << 2))
+#define MICON_CMD_SIZE	4
 
 /* 4-byte magic hello command to UART1-attached microcontroller */
 static const unsigned char qnap_micon_magic[] = {
@@ -34,22 +35,33 @@ static const unsigned char qnap_micon_magic[] = {
 	0x00
 };
 
+// for each row, first byte is the size of command
+static const unsigned char qnap_power_off_cmd[][MICON_CMD_SIZE] = {
+	{ 1, 'A'},
+	{}
+};
+
+static const unsigned char synology_power_off_cmd[][MICON_CMD_SIZE] = {
+	{ 1, '1'},
+	{}
+};
+
 struct power_off_cfg {
 	u32 baud;
 	const unsigned char *magic;
-	char cmd;
+	const unsigned char (*cmd)[MICON_CMD_SIZE];
 };
 
 static const struct power_off_cfg qnap_power_off_cfg = {
 	.baud = 19200,
 	.magic = qnap_micon_magic,
-	.cmd = 'A',
+	.cmd = qnap_power_off_cmd,
 };
 
 static const struct power_off_cfg synology_power_off_cfg = {
 	.baud = 9600,
 	.magic = qnap_micon_magic,
-	.cmd = '1',
+	.cmd = synology_power_off_cmd,
 };
 
 static const struct of_device_id qnap_power_off_of_match_table[] = {
@@ -83,7 +95,10 @@ static void qnap_power_off(void)
 	writel(cfg->magic[3], UART1_REG(MCR));
 
 	/* send the power-off command to PIC */
-	writel(cfg->cmd, UART1_REG(TX));
+	if(cfg->cmd[0][0] == 1 && cfg->cmd[1][0] == 0) {
+		/* for qnap and synology, it's simply one-byte command */
+		writel(cfg->cmd[0][1], UART1_REG(TX));
+	}
 }
 
 static int qnap_power_off_probe(struct platform_device *pdev)
