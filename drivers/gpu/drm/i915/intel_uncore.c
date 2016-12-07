@@ -626,7 +626,12 @@ find_fw_domain(struct drm_i915_private *dev_priv, u32 offset)
 			dev_priv->uncore.fw_domains_table_entries,
 			fw_range_cmp);
 
-	return entry ? entry->domains : 0;
+	if (!entry)
+		return 0;
+
+	WARN_ON(entry->domains & ~dev_priv->uncore.fw_domains);
+
+	return entry->domains;
 }
 
 static void
