@@ -2033,11 +2033,14 @@ tx_only:
 		}
 	}
 
+	/* Work is done so exit the polling mode,
+	 * if not busy polling re-enable interrupts.
+	 */
+	if (!napi_complete_done(napi, work_done))
+		return 0;
+
 	if (vsi->back->flags & I40E_TXR_FLAGS_WB_ON_ITR)
 		q_vector->arm_wb_state = false;
-
-	/* Work is done so exit the polling mode and re-enable the interrupt */
-	napi_complete_done(napi, work_done);
 
 	/* If we're prematurely stopping polling to fix the interrupt
 	 * affinity we want to make sure polling starts back up so we
