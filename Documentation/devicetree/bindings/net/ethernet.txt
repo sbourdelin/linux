@@ -28,6 +28,7 @@ The following properties are common to the Ethernet controllers:
   * "rtbi"
   * "smii"
   * "xgmii"
+  * "xlgmii"
   * "trgmii"
 - phy-connection-type: the same as "phy-mode" property but described in ePAPR;
 - phy-handle: phandle, specifies a reference to a node representing a PHY
