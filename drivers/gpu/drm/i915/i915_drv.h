@@ -2685,13 +2685,6 @@ int intel_sanitize_enable_ppgtt(struct drm_i915_private *dev_priv,
 bool intel_sanitize_semaphores(struct drm_i915_private *dev_priv, int value);
 
 /* i915_drv.c */
-void __printf(3, 4)
-__i915_printk(struct drm_i915_private *dev_priv, const char *level,
-	      const char *fmt, ...);
-
-#define i915_report_error(dev_priv, fmt, ...)				   \
-	__i915_printk(dev_priv, KERN_ERR, fmt, ##__VA_ARGS__)
-
 #ifdef CONFIG_COMPAT
 extern long i915_compat_ioctl(struct file *filp, unsigned int cmd,
 			      unsigned long arg);

@@ -68,51 +68,48 @@ bool __i915_inject_load_failure(const char *func, int line)
 	return false;
 }
 
-#define FDO_BUG_URL "https://bugs.freedesktop.org/enter_bug.cgi?product=DRI"
-#define FDO_BUG_MSG "Please file a bug at " FDO_BUG_URL " against DRM/Intel " \
-		    "providing the dmesg log by booting with drm.debug=0xf"
-
-void
-__i915_printk(struct drm_i915_private *dev_priv, const char *level,
-	      const char *fmt, ...)
-{
-	static bool shown_bug_once;
-	struct device *kdev = dev_priv->drm.dev;
-	bool is_error = level[1] <= KERN_ERR[1];
-	bool is_debug = level[1] == KERN_DEBUG[1];
-	struct va_format vaf;
-	va_list args;
-
-	if (is_debug && !(drm_debug & DRM_UT_DRIVER))
-		return;
-
-	va_start(args, fmt);
-
-	vaf.fmt = fmt;
-	vaf.va = &args;
-
-	dev_printk(level, kdev, "[" DRM_NAME ":%ps] %pV",
-		   __builtin_return_address(0), &vaf);
-
-	if (is_error && !shown_bug_once) {
-		dev_notice(kdev, "%s", FDO_BUG_MSG);
-		shown_bug_once = true;
-	}
-
-	va_end(args);
-}
-
 static bool i915_error_injected(struct drm_i915_private *dev_priv)
 {
 	return i915.inject_load_failure &&
 	       i915_load_fail_count == i915.inject_load_failure;
 }
 
-#define i915_load_error(dev_priv, fmt, ...)				     \
-	__i915_printk(dev_priv,						     \
-		      i915_error_injected(dev_priv) ? KERN_DEBUG : KERN_ERR, \
-		      fmt, ##__VA_ARGS__)
+#define FDO_BUG_URL "https://bugs.freedesktop.org/enter_bug.cgi?product=DRI"
+#define FDO_BUG_MSG "Please file a bug at " FDO_BUG_URL " against DRM/Intel " \
+		    "providing the dmesg log by booting with drm.debug=0xf"
 
+static void __printf(2, 3)
+i915_load_error(struct drm_i915_private *dev_priv, const char *fmt, ...)
+{
+	static bool shown_bug_once __read_mostly;
+	struct device *kdev = dev_priv->drm.dev;
+	char *level;
+	bool is_error;
+	struct va_format vaf;
+	va_list args;
+
+	if (i915_error_injected(dev_priv)) {
+		is_error = false;
+		level = KERN_DEBUG;
+	} else {
+		is_error = true;
+		level = KERN_ERR;
+	}
+
+	va_start(args, fmt);
+
+	vaf.fmt = fmt;
+	vaf.va = &args;
+
+	drm_dev_printk(kdev, level, DRM_UT_DRIVER, __func__, "", fmt, &vaf);
+
+	va_end(args);
+
+	if (is_error && !shown_bug_once) {
+		dev_notice(kdev, "%s", FDO_BUG_MSG);
+		shown_bug_once = true;
+	}
+}
 
 static enum intel_pch intel_virt_detect_pch(struct drm_i915_private *dev_priv)
 {
