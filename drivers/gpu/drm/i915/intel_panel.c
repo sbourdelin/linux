@@ -1612,7 +1612,7 @@ bxt_setup_backlight(struct intel_connector *connector, enum pipe unused)
 	 * For BXT hard coding the Backlight controller to 0.
 	 * TODO : Read the controller value from VBT and generalize
 	 */
-	panel->backlight.controller = 0;
+	panel->backlight.controller = dev_priv->vbt.backlight.controller;
 
 	pwm_ctl = I915_READ(BXT_BLC_PWM_CTL(panel->backlight.controller));
 
