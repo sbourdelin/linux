@@ -2198,6 +2198,40 @@ static void x86_pmu_sched_task(struct perf_event_context *ctx, bool sched_in)
 		x86_pmu.sched_task(ctx, sched_in);
 }
 
+static int x86_pmu_stat(struct perf_event *event, u32 flag)
+{
+	struct perf_cpu_context *cpuctx;
+	struct pmu *pmu = event->pmu;
+	int cpu, i;
+
+	if (!(flag & (PERF_IOC_FLAG_STAT_START | PERF_IOC_FLAG_STAT_DONE)))
+		return -EINVAL;
+
+	if (!event->attr.overhead)
+		return -EINVAL;
+
+	if (flag & PERF_IOC_FLAG_STAT_DONE) {
+		for_each_possible_cpu(cpu) {
+			cpuctx = per_cpu_ptr(pmu->pmu_cpu_context, cpu);
+
+			for (i = 0; i < PERF_OVERHEAD_MAX; i++) {
+				if (!cpuctx->overhead[i].nr)
+					continue;
+				perf_log_overhead(event, i, cpu,
+						  cpuctx->overhead[i].nr,
+						  cpuctx->overhead[i].time);
+			}
+		}
+	}
+
+	for_each_possible_cpu(cpu) {
+		cpuctx = per_cpu_ptr(pmu->pmu_cpu_context, cpu);
+		memset(cpuctx->overhead, 0, PERF_OVERHEAD_MAX * sizeof(struct perf_overhead_entry));
+	}
+
+	return 0;
+}
+
 void perf_check_microcode(void)
 {
 	if (x86_pmu.check_microcode)
@@ -2228,6 +2262,9 @@ static struct pmu pmu = {
 
 	.event_idx		= x86_pmu_event_idx,
 	.sched_task		= x86_pmu_sched_task,
+
+	.stat			= x86_pmu_stat,
+
 	.task_ctx_size          = sizeof(struct x86_perf_task_context),
 };
 
