@@ -44,6 +44,36 @@ enum {
 	BXT_DPCM_AUDIO_HDMI3_PB,
 };
 
+static struct snd_soc_dai *skl_get_dai_widget(struct snd_soc_dapm_widget *w)
+{
+	struct snd_soc_dapm_path *p = NULL;
+
+	snd_soc_dapm_widget_for_each_sink_path(w, p) {
+		if (p->sink->id == snd_soc_dapm_dai_in)
+			return p->sink->priv;
+
+		return skl_get_dai_widget(p->sink);
+	}
+
+	return NULL;
+}
+
+static int ssp_set_clk(struct snd_soc_dapm_widget *w,
+		struct snd_kcontrol *k, int  event)
+{
+	struct snd_soc_dai *cpu_dai = NULL;
+
+	cpu_dai = skl_get_dai_widget(w);
+	if (!cpu_dai)
+		return -EIO;
+
+	/* Enable/Disable the SSP clk */
+	if (SND_SOC_DAPM_EVENT_ON(event))
+		return snd_soc_dai_set_tristate(cpu_dai, 0);
+	else
+		return snd_soc_dai_set_tristate(cpu_dai, 1);
+}
+
 static const struct snd_kcontrol_new broxton_controls[] = {
 	SOC_DAPM_PIN_SWITCH("Headphone Jack"),
 	SOC_DAPM_PIN_SWITCH("Headset Mic"),
@@ -58,6 +88,9 @@ static const struct snd_soc_dapm_widget broxton_widgets[] = {
 	SND_SOC_DAPM_SPK("HDMI1", NULL),
 	SND_SOC_DAPM_SPK("HDMI2", NULL),
 	SND_SOC_DAPM_SPK("HDMI3", NULL),
+	SND_SOC_DAPM_SUPPLY("ssp5 mclk", SND_SOC_NOPM, 0, 0,
+			ssp_set_clk, SND_SOC_DAPM_PRE_PMU |
+			SND_SOC_DAPM_POST_PMD),
 };
 
 static const struct snd_soc_dapm_route broxton_map[] = {
@@ -77,6 +110,7 @@ static const struct snd_soc_dapm_route broxton_map[] = {
 	/* CODEC BE connections */
 	{"HiFi Playback", NULL, "ssp5 Tx"},
 	{"ssp5 Tx", NULL, "codec0_out"},
+	{ "codec0_out", NULL, "ssp5 mclk"},
 
 	{"Playback", NULL, "ssp1 Tx"},
 	{"ssp1 Tx", NULL, "codec1_out"},
