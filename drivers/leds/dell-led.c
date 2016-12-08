@@ -71,23 +71,6 @@ int dell_micmute_led_set(int state)
 }
 EXPORT_SYMBOL_GPL(dell_micmute_led_set);
 
-int dell_app_wmi_led_set(int whichled, int on)
-{
-	int state = 0;
-
-	switch (whichled) {
-	case DELL_LED_MICMUTE:
-		state = dell_micmute_led_set(on);
-		break;
-	default:
-		pr_warn("led type %x is not supported\n", whichled);
-		break;
-	}
-
-	return state;
-}
-EXPORT_SYMBOL_GPL(dell_app_wmi_led_set);
-
 struct bios_args {
 	unsigned char length;
 	unsigned char result_code;
