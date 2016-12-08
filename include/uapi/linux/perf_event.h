@@ -1002,6 +1002,7 @@ struct perf_branch_entry {
 enum perf_record_overhead_type {
 	/* common overhead */
 	PERF_CORE_MUX_OVERHEAD	= 0,
+	PERF_CORE_SB_OVERHEAD,
 	/* PMU specific */
 	PERF_OVERHEAD_MAX,
 };

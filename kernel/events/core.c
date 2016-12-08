@@ -6137,9 +6137,13 @@ static void
 perf_iterate_sb(perf_iterate_f output, void *data,
 	       struct perf_event_context *task_ctx)
 {
+	struct perf_event_context *overhead_ctx = task_ctx;
+	struct perf_cpu_context *cpuctx;
 	struct perf_event_context *ctx;
+	u64 start_clock, end_clock;
 	int ctxn;
 
+	start_clock = perf_clock();
 	rcu_read_lock();
 	preempt_disable();
 
@@ -6157,12 +6161,23 @@ perf_iterate_sb(perf_iterate_f output, void *data,
 
 	for_each_task_context_nr(ctxn) {
 		ctx = rcu_dereference(current->perf_event_ctxp[ctxn]);
-		if (ctx)
+		if (ctx) {
 			perf_iterate_ctx(ctx, output, data, false);
+			if (!overhead_ctx)
+				overhead_ctx = ctx;
+		}
 	}
 done:
 	preempt_enable();
 	rcu_read_unlock();
+
+	/* calculate side-band event overhead */
+	end_clock = perf_clock();
+	if (overhead_ctx && overhead_ctx->pmu && overhead_ctx->pmu->stat) {
+		cpuctx = this_cpu_ptr(overhead_ctx->pmu->pmu_cpu_context);
+		cpuctx->overhead[PERF_CORE_SB_OVERHEAD].nr++;
+		cpuctx->overhead[PERF_CORE_SB_OVERHEAD].time += end_clock - start_clock;
+	}
 }
 
 /*
