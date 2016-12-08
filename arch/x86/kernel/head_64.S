@@ -453,17 +453,18 @@ NEXT_PAGE(level3_kernel_pgt)
 
 NEXT_PAGE(level2_kernel_pgt)
 	/*
-	 * 512 MB kernel mapping. We spend a full page on this pagetable
-	 * anyway.
+	 * Kernel image size is limited to 512 MB. The kernel code+data+bss
+	 * must not be bigger than that.
 	 *
-	 * The kernel code+data+bss must not be bigger than that.
+	 * We spend a full page on this pagetable anyway, so take the whole
+	 * page here so that the kernel mapping size can be decided at runtime,
+	 * 512M if no kaslr, 1G if kaslr enabled. Later cleanup_highmap will
+	 * clean up those unused entries.
 	 *
-	 * (NOTE: at +512MB starts the module area, see MODULES_VADDR.
-	 *  If you want to increase this then increase MODULES_VADDR
-	 *  too.)
+	 * The module area starts after kernel mapping area.
 	 */
 	PMDS(0, __PAGE_KERNEL_LARGE_EXEC,
-		KERNEL_IMAGE_SIZE/PMD_SIZE)
+		PTRS_PER_PMD)
 
 NEXT_PAGE(level2_fixmap_pgt)
 	.fill	506,8,0

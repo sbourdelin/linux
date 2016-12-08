@@ -56,8 +56,9 @@
  * are fully set up. If kernel ASLR is configured, it can extend the
  * kernel page table mapping, reducing the size of the modules area.
  */
+#define KERNEL_MAPPING_SIZE_EXT	(1024 * 1024 * 1024)
 #if defined(CONFIG_RANDOMIZE_BASE)
-#define KERNEL_IMAGE_SIZE	(1024 * 1024 * 1024)
+#define KERNEL_IMAGE_SIZE	KERNEL_MAPPING_SIZE_EXT
 #else
 #define KERNEL_IMAGE_SIZE	(512 * 1024 * 1024)
 #endif
