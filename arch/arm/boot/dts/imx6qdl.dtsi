@@ -427,6 +427,7 @@
 				power-domains = <&gpc 1>;
 				resets = <&src 1>;
 				iram = <&ocram>;
+				vdoa = <&vdoa>;
 			};
 
 			aipstz@0207c000 { /* AIPSTZ1 */
@@ -1152,7 +1153,7 @@
 				};
 			};
 
-			vdoa@021e4000 {
+			vdoa: vdoa@021e4000 {
 				compatible = "fsl,imx6q-vdoa";
 				reg = <0x021e4000 0x4000>;
 				interrupts = <0 18 IRQ_TYPE_LEVEL_HIGH>;

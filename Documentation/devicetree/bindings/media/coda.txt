@@ -17,6 +17,7 @@ Required properties:
   determined by the clock-names property.
 - clock-names : Should be "ahb", "per"
 - iram : phandle pointing to the SRAM device node
+- vdoa : phandle pointing to the VDOA device node
 
 Example:
 
@@ -27,4 +28,5 @@ vpu: vpu@63ff4000 {
 	clocks = <&clks 63>, <&clks 63>;
 	clock-names = "ahb", "per";
 	iram = <&ocram>;
+	vdoa = <&vdoa>;
 };
