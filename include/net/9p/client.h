@@ -110,6 +110,7 @@ enum p9_req_status_t {
  *
  */
 
+struct p9_client;
 struct p9_req_t {
 	int status;
 	int t_err;
@@ -117,6 +118,13 @@ struct p9_req_t {
 	struct p9_fcall *tc;
 	struct p9_fcall *rc;
 	void *aux;
+
+    /* Used for async requests */
+	void (*callback)(struct p9_client *c, struct p9_req_t *req, int status);
+	size_t offset;
+	u64 rsize;
+	struct page **pagevec;
+	struct kiocb *kiocb;
 
 	struct list_head req_list;
 };
