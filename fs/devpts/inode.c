@@ -22,7 +22,7 @@
 #include <linux/tty.h>
 #include <linux/mutex.h>
 #include <linux/magic.h>
-#include <linux/idr.h>
+#include <linux/tida.h>
 #include <linux/devpts_fs.h>
 #include <linux/parser.h>
 #include <linux/fsnotify.h>
@@ -122,7 +122,7 @@ static const match_table_t tokens = {
 };
 
 struct pts_fs_info {
-	struct ida allocated_ptys;
+	struct tida allocated_ptys;
 	struct pts_mount_opts mount_opts;
 	struct super_block *sb;
 	struct dentry *ptmx_dentry;
@@ -377,7 +377,7 @@ static void *new_pts_fs_info(struct super_block *sb)
 	if (!fsi)
 		return NULL;
 
-	ida_init(&fsi->allocated_ptys);
+	tida_init(&fsi->allocated_ptys);
 	fsi->mount_opts.mode = DEVPTS_DEFAULT_MODE;
 	fsi->mount_opts.ptmxmode = DEVPTS_DEFAULT_PTMX_MODE;
 	fsi->sb = sb;
@@ -453,7 +453,7 @@ static void devpts_kill_sb(struct super_block *sb)
 	struct pts_fs_info *fsi = DEVPTS_SB(sb);
 
 	if (fsi)
-		ida_destroy(&fsi->allocated_ptys);
+		tida_destroy(&fsi->allocated_ptys);
 	kfree(fsi);
 	kill_litter_super(sb);
 }
@@ -473,29 +473,21 @@ static struct file_system_type devpts_fs_type = {
 int devpts_new_index(struct pts_fs_info *fsi)
 {
 	int index;
-	int ida_ret;
 
-retry:
-	if (!ida_pre_get(&fsi->allocated_ptys, GFP_KERNEL))
-		return -ENOMEM;
+	index = tida_get(&fsi->allocated_ptys, GFP_KERNEL);
+	if (index < 0)
+		return index;
 
 	mutex_lock(&allocated_ptys_lock);
 	if (pty_count >= (pty_limit -
 			  (fsi->mount_opts.reserve ? 0 : pty_reserve))) {
+		tida_put(&fsi->allocated_ptys, index);
 		mutex_unlock(&allocated_ptys_lock);
 		return -ENOSPC;
 	}
 
-	ida_ret = ida_get_new(&fsi->allocated_ptys, &index);
-	if (ida_ret < 0) {
-		mutex_unlock(&allocated_ptys_lock);
-		if (ida_ret == -EAGAIN)
-			goto retry;
-		return -EIO;
-	}
-
 	if (index >= fsi->mount_opts.max) {
-		ida_remove(&fsi->allocated_ptys, index);
+		tida_put(&fsi->allocated_ptys, index);
 		mutex_unlock(&allocated_ptys_lock);
 		return -ENOSPC;
 	}
@@ -507,7 +499,7 @@ retry:
 void devpts_kill_index(struct pts_fs_info *fsi, int idx)
 {
 	mutex_lock(&allocated_ptys_lock);
-	ida_remove(&fsi->allocated_ptys, idx);
+	tida_put(&fsi->allocated_ptys, idx);
 	pty_count--;
 	mutex_unlock(&allocated_ptys_lock);
 }
