@@ -22,7 +22,7 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 #include <linux/pm_domain.h>
-#include <linux/idr.h>
+#include <linux/tida.h>
 #include <linux/acpi.h>
 #include <linux/clk/clk-conf.h>
 #include <linux/limits.h>
@@ -32,7 +32,7 @@
 #include "power/power.h"
 
 /* For automatically allocated device IDs */
-static DEFINE_IDA(platform_devid_ida);
+static DEFINE_TIDA(platform_devid_ida);
 
 struct device platform_bus = {
 	.init_name	= "platform",
@@ -372,7 +372,7 @@ int platform_device_add(struct platform_device *pdev)
 		 * that we remember it must be freed, and we append a suffix
 		 * to avoid namespace collision with explicit IDs.
 		 */
-		ret = ida_simple_get(&platform_devid_ida, 0, 0, GFP_KERNEL);
+		ret = tida_get(&platform_devid_ida, GFP_KERNEL);
 		if (ret < 0)
 			goto err_out;
 		pdev->id = ret;
@@ -411,7 +411,7 @@ int platform_device_add(struct platform_device *pdev)
 
  failed:
 	if (pdev->id_auto) {
-		ida_simple_remove(&platform_devid_ida, pdev->id);
+		tida_put(&platform_devid_ida, pdev->id);
 		pdev->id = PLATFORM_DEVID_AUTO;
 	}
 
@@ -443,7 +443,7 @@ void platform_device_del(struct platform_device *pdev)
 		device_del(&pdev->dev);
 
 		if (pdev->id_auto) {
-			ida_simple_remove(&platform_devid_ida, pdev->id);
+			tida_put(&platform_devid_ida, pdev->id);
 			pdev->id = PLATFORM_DEVID_AUTO;
 		}
 
