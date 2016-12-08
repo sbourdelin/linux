@@ -159,36 +159,36 @@ static int nokia_bind_config(struct usb_configuration *c)
 
 	if (!IS_ERR(fi_phonet)) {
 		f_phonet = usb_get_function(fi_phonet);
-		if (IS_ERR(f_phonet))
+		if (IS_ERR_OR_NULL(f_phonet))
 			pr_debug("could not get phonet function\n");
 	}
 
 	if (!IS_ERR(fi_obex1)) {
 		f_obex1 = usb_get_function(fi_obex1);
-		if (IS_ERR(f_obex1))
+		if (IS_ERR_OR_NULL(f_obex1))
 			pr_debug("could not get obex function 0\n");
 	}
 
 	if (!IS_ERR(fi_obex2)) {
 		f_obex2 = usb_get_function(fi_obex2);
-		if (IS_ERR(f_obex2))
+		if (IS_ERR_OR_NULL(f_obex2))
 			pr_debug("could not get obex function 1\n");
 	}
 
 	f_acm = usb_get_function(fi_acm);
-	if (IS_ERR(f_acm)) {
+	if (IS_ERR_OR_NULL(f_acm)) {
 		status = PTR_ERR(f_acm);
 		goto err_get_acm;
 	}
 
 	f_ecm = usb_get_function(fi_ecm);
-	if (IS_ERR(f_ecm)) {
+	if (IS_ERR_OR_NULL(f_ecm)) {
 		status = PTR_ERR(f_ecm);
 		goto err_get_ecm;
 	}
 
 	f_msg = usb_get_function(fi_msg);
-	if (IS_ERR(f_msg)) {
+	if (IS_ERR_OR_NULL(f_msg)) {
 		status = PTR_ERR(f_msg);
 		goto err_get_msg;
 	}
