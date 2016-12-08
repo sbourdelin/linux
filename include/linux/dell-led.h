@@ -5,6 +5,7 @@ enum {
 	DELL_LED_MICMUTE,
 };
 
+int dell_micmute_led_set(int on);
 int dell_app_wmi_led_set(int whichled, int on);
 
 #endif
