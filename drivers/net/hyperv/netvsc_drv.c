@@ -1169,9 +1169,10 @@ static void netvsc_free_netdev(struct net_device *netdev)
 	free_netdev(netdev);
 }
 
-static struct net_device *get_netvsc_bymac(const u8 *mac)
+static struct net_device *get_netvsc_byvfser(u32 vfser)
 {
 	struct net_device *dev;
+	struct net_device_context *ndev_ctx;
 
 	ASSERT_RTNL();
 
@@ -1179,7 +1180,8 @@ static struct net_device *get_netvsc_bymac(const u8 *mac)
 		if (dev->netdev_ops != &device_ops)
 			continue;	/* not a netvsc device */
 
-		if (ether_addr_equal(mac, dev->perm_addr))
+		ndev_ctx = netdev_priv(dev);
+		if (ndev_ctx->vf_serial == vfser)
 			return dev;
 	}
 
@@ -1209,21 +1211,66 @@ static struct net_device *get_netvsc_byref(struct net_device *vf_netdev)
 	return NULL;
 }
 
+static u32 netvsc_get_vfser(struct net_device *vf_netdev)
+{
+	struct device *dev;
+	struct hv_device *hdev;
+	struct hv_pcibus_device *hbus = NULL;
+	struct list_head *iter;
+	struct hv_pci_dev *hpdev;
+	unsigned long flags;
+	u32 vfser = 0;
+	u32 count = 0;
+
+	for (dev = &vf_netdev->dev; dev; dev = dev->parent) {
+		if (!dev_is_vmbus(dev))
+			continue;
+
+		hdev = device_to_hv_device(dev);
+		if (hdev->device_id != HV_PCIE)
+			continue;
+
+		hbus = hv_get_drvdata(hdev);
+		break;
+	}
+
+	if (!hbus)
+		return 0;
+
+	spin_lock_irqsave(&hbus->device_list_lock, flags);
+	list_for_each(iter, &hbus->children) {
+		hpdev = container_of(iter, struct hv_pci_dev, list_entry);
+		vfser = hpdev->desc.ser;
+		count++;
+	}
+	spin_unlock_irqrestore(&hbus->device_list_lock, flags);
+
+	if (count == 1)
+		return vfser;
+
+	return 0;
+}
+
 static int netvsc_register_vf(struct net_device *vf_netdev)
 {
 	struct net_device *ndev;
 	struct net_device_context *net_device_ctx;
 	struct netvsc_device *netvsc_dev;
+	u32 vfser;
 
 	if (vf_netdev->addr_len != ETH_ALEN)
 		return NOTIFY_DONE;
 
+	vfser = netvsc_get_vfser(vf_netdev);
+	if (!vfser)
+		return NOTIFY_DONE;
+
 	/*
-	 * We will use the MAC address to locate the synthetic interface to
+	 * We will use the VF serial to locate the synthetic interface to
 	 * associate with the VF interface. If we don't find a matching
 	 * synthetic interface, move on.
 	 */
-	ndev = get_netvsc_bymac(vf_netdev->perm_addr);
+	ndev = get_netvsc_byvfser(vfser);
 	if (!ndev)
 		return NOTIFY_DONE;
 
