@@ -947,6 +947,8 @@ static inline void clear_low_latency_mode(struct vmbus_channel *c)
 	c->low_latency = false;
 }
 
+bool dev_is_vmbus(struct device *dev);
+
 void vmbus_onmessage(void *context);
 
 int vmbus_request_offers(void);

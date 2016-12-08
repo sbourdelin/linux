@@ -845,6 +845,12 @@ struct onmessage_work_context {
 	struct hv_message msg;
 };
 
+bool dev_is_vmbus(struct device *dev)
+{
+	return dev->bus == &hv_bus;
+}
+EXPORT_SYMBOL_GPL(dev_is_vmbus);
+
 static void vmbus_onmessage_work(struct work_struct *work)
 {
 	struct onmessage_work_context *ctx;
