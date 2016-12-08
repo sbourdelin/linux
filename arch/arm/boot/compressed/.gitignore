@@ -4,6 +4,7 @@ font.c
 lib1funcs.S
 hyp-stub.S
 piggy_data
+piggy.*
 vmlinux
 vmlinux.lds
 
