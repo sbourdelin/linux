@@ -57,6 +57,7 @@ struct tvp5150 {
 	u16 rom_ver;
 
 	enum v4l2_mbus_type mbus_type;
+	bool has_dt;
 };
 
 static inline struct tvp5150 *to_tvp5150(struct v4l2_subdev *sd)
@@ -795,7 +796,7 @@ static int tvp5150_reset(struct v4l2_subdev *sd, u32 val)
 
 	tvp5150_set_std(sd, decoder->norm);
 
-	if (decoder->mbus_type == V4L2_MBUS_PARALLEL)
+	if (decoder->mbus_type == V4L2_MBUS_PARALLEL || !decoder->has_dt)
 		tvp5150_write(sd, TVP5150_DATA_RATE_SEL, 0x40);
 
 	return 0;
@@ -1052,6 +1053,9 @@ static int tvp5150_s_stream(struct v4l2_subdev *sd, int enable)
 	struct tvp5150 *decoder = to_tvp5150(sd);
 	/* Output format: 8-bit ITU-R BT.656 with embedded syncs */
 	int val = 0x09;
+
+	if (!decoder->has_dt)
+		return 0;
 
 	/* Output format: 8-bit 4:2:2 YUV with discrete sync */
 	if (decoder->mbus_type == V4L2_MBUS_PARALLEL)
@@ -1374,6 +1378,7 @@ static int tvp5150_parse_dt(struct tvp5150 *decoder, struct device_node *np)
 	}
 
 	decoder->mbus_type = bus_cfg.bus_type;
+	decoder->has_dt = true;
 
 #ifdef CONFIG_MEDIA_CONTROLLER
 	connectors = of_get_child_by_name(np, "connectors");
