@@ -450,6 +450,30 @@ static int coda_try_pixelformat(struct coda_ctx *ctx, struct v4l2_format *f)
 	return 0;
 }
 
+static int coda_try_vdoa(struct coda_ctx *ctx, struct v4l2_format *f)
+{
+	int err;
+
+	if (f->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+		return -EINVAL;
+
+	if (!ctx->vdoa) {
+		ctx->use_vdoa = false;
+		return 0;
+	}
+
+	err = vdoa_context_configure(ctx->vdoa, f->fmt.pix.width,
+				     f->fmt.pix.height, f->fmt.pix.pixelformat);
+	if (err) {
+		ctx->use_vdoa = false;
+		return 0;
+	}
+
+	ctx->use_vdoa = true;
+
+	return 0;
+}
+
 static unsigned int coda_estimate_sizeimage(struct coda_ctx *ctx, u32 sizeimage,
 					    u32 width, u32 height)
 {
@@ -564,6 +588,10 @@ static int coda_try_fmt_vid_cap(struct file *file, void *priv,
 		f->fmt.pix.bytesperline = round_up(f->fmt.pix.width, 16);
 		f->fmt.pix.sizeimage = f->fmt.pix.bytesperline *
 				       f->fmt.pix.height * 3 / 2;
+
+		ret = coda_try_vdoa(ctx, f);
+		if (ret < 0)
+			return ret;
 	}
 
 	return 0;
@@ -632,13 +660,20 @@ static int coda_s_fmt(struct coda_ctx *ctx, struct v4l2_format *f,
 		q_data->rect.height = f->fmt.pix.height;
 	}
 
+	/*
+	 * It would be nice to set use_vdoa in coda_s_fmt instead of
+	 * coda_try_vdoa() to have a single location where this is changed.
+	 * Unfortunately, if the capture format is V4L2_PIX_FMT_NV12, we
+	 * cannot be sure if the VDOA should be used, without storing the
+	 * result of coda_try_vdoa() or calling vdoa_context_configure()
+	 * again. Therefore, set use_vdoa in coda_try_vdoa.
+	 */
+
 	switch (f->fmt.pix.pixelformat) {
 	case V4L2_PIX_FMT_NV12:
-		if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-			ctx->tiled_map_type = GDI_TILED_FRAME_MB_RASTER_MAP;
-			if (!disable_tiling)
-				break;
-		}
+		ctx->tiled_map_type = GDI_TILED_FRAME_MB_RASTER_MAP;
+		if (!disable_tiling)
+			break;
 		/* else fall through */
 	case V4L2_PIX_FMT_YUV420:
 	case V4L2_PIX_FMT_YVU420:
@@ -1764,6 +1799,13 @@ static int coda_open(struct file *file)
 	default:
 		ctx->reg_idx = idx;
 	}
+	if (ctx->dev->vdoa) {
+		ctx->vdoa = vdoa_context_create(dev->vdoa);
+		if (!ctx->vdoa)
+			v4l2_warn(&dev->v4l2_dev,
+				  "Failed to create vdoa context: not using vdoa");
+	}
+	ctx->use_vdoa = false;
 
 	/* Power up and upload firmware if necessary */
 	ret = pm_runtime_get_sync(&dev->plat_dev->dev);
@@ -1838,6 +1880,9 @@ static int coda_release(struct file *file)
 
 	v4l2_dbg(1, coda_debug, &dev->v4l2_dev, "Releasing instance %p\n",
 		 ctx);
+
+	if (ctx->vdoa)
+		vdoa_context_destroy(ctx->vdoa);
 
 	if (ctx->inst_type == CODA_INST_DECODER && ctx->use_bit)
 		coda_bit_stream_end_flag(ctx);

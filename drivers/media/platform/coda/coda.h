@@ -237,6 +237,8 @@ struct coda_ctx {
 	int				display_idx;
 	struct dentry			*debugfs_entry;
 	bool				use_bit;
+	bool				use_vdoa;
+	struct vdoa_ctx			*vdoa;
 };
 
 extern int coda_debug;
