@@ -3072,12 +3072,16 @@ __alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
 	*did_some_progress = 0;
 
 	/*
-	 * Acquire the oom lock.  If that fails, somebody else is
-	 * making progress for us.
+	 * Give the OOM killer enough CPU time for sending SIGKILL.
+	 * Do not return without a short sleep unless TIF_MEMDIE is set, for
+	 * currently tsk_is_oom_victim(current) == true does not make
+	 * gfp_pfmemalloc_allowed() == true via TIF_MEMDIE until
+	 * mark_oom_victim(current) is called.
 	 */
-	if (!mutex_trylock(&oom_lock)) {
+	if (mutex_lock_killable(&oom_lock)) {
 		*did_some_progress = 1;
-		schedule_timeout_uninterruptible(1);
+		if (!test_thread_flag(TIF_MEMDIE))
+			schedule_timeout_uninterruptible(1);
 		return NULL;
 	}
 
