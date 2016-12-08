@@ -537,14 +537,15 @@ static int gb_camera_configure_streams(struct gb_camera *gcam,
 		return -EINVAL;
 
 	req_size = sizeof(*req) + nstreams * sizeof(req->config[0]);
-	resp_size = sizeof(*resp) + nstreams * sizeof(resp->config[0]);
-
 	req = kmalloc(req_size, GFP_KERNEL);
-	resp = kmalloc(resp_size, GFP_KERNEL);
-	if (!req || !resp) {
-		kfree(req);
-		kfree(resp);
+	if (!req)
 		return -ENOMEM;
+
+	resp_size = sizeof(*resp) + nstreams * sizeof(resp->config[0]);
+	resp = kmalloc(resp_size, GFP_KERNEL);
+	if (!resp) {
+		ret = -ENOMEM;
+		goto free_request;
 	}
 
 	req->num_streams = nstreams;
@@ -647,8 +648,9 @@ done:
 
 done_skip_pm_put:
 	mutex_unlock(&gcam->mutex);
-	kfree(req);
 	kfree(resp);
+free_request:
+	kfree(req);
 	return ret;
 }
 
