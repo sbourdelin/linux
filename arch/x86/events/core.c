@@ -1478,8 +1478,10 @@ void perf_events_lapic_init(void)
 static int
 perf_event_nmi_handler(unsigned int cmd, struct pt_regs *regs)
 {
+	struct perf_cpu_context *cpuctx = this_cpu_ptr(pmu.pmu_cpu_context);
 	u64 start_clock;
 	u64 finish_clock;
+	u64 clock;
 	int ret;
 
 	/*
@@ -1492,8 +1494,12 @@ perf_event_nmi_handler(unsigned int cmd, struct pt_regs *regs)
 	start_clock = sched_clock();
 	ret = x86_pmu.handle_irq(regs);
 	finish_clock = sched_clock();
+	clock = finish_clock - start_clock;
+	perf_sample_event_took(clock);
 
-	perf_sample_event_took(finish_clock - start_clock);
+	/* calculate NMI overhead */
+	cpuctx->overhead[PERF_PMU_SAMPLE_OVERHEAD].nr++;
+	cpuctx->overhead[PERF_PMU_SAMPLE_OVERHEAD].time += clock;
 
 	return ret;
 }
