@@ -3,14 +3,15 @@
 /*
  * Lock-less NULL terminated single linked list
  *
- * If there are multiple producers and multiple consumers, llist_add
- * can be used in producers and llist_del_all can be used in
- * consumers.  They can work simultaneously without lock.  But
- * llist_del_first can not be used here.  Because llist_del_first
- * depends on list->first->next does not changed if list->first is not
- * changed during its operation, but llist_del_first, llist_add,
- * llist_add (or llist_del_all, llist_add, llist_add) sequence in
- * another consumer may violate that.
+ * If there are multiple producers and multiple consumers, llist_add can be
+ * used in producers and llist_del_all can be used in consumers.  They can work
+ * simultaneously without lock.  But llist_del_first will need to use a lock
+ * with any other operation (ABA problem).  This is because llist_del_first
+ * depends on list->first->next not changing but there's no way to be sure
+ * about that and the cmpxchg in llist_del_first may succeed if list->first is
+ * the same after concurrent operations. For example, a llist_del_first,
+ * llist_add, llist_add (or llist_del_all, llist_add, llist_add) sequence in
+ * another consumer may cause violations.
  *
  * If there are multiple producers and one consumer, llist_add can be
  * used in producers and llist_del_all or llist_del_first can be used
@@ -19,7 +20,7 @@
  * This can be summarized as follow:
  *
  *           |   add    | del_first |  del_all
- * add       |    -     |     -     |     -
+ * add       |    -     |     L     |     -
  * del_first |          |     L     |     L
  * del_all   |          |           |     -
  *
