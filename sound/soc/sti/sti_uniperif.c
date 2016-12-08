@@ -248,34 +248,6 @@ int sti_uniperiph_get_tdm_word_pos(struct uniperif *uni,
 }
 
 /*
- * sti_uniperiph_dai_create_ctrl
- * This function is used to create Ctrl associated to DAI but also pcm device.
- * Request is done by front end to associate ctrl with pcm device id
- */
-static int sti_uniperiph_dai_create_ctrl(struct snd_soc_dai *dai)
-{
-	struct sti_uniperiph_data *priv = snd_soc_dai_get_drvdata(dai);
-	struct uniperif *uni = priv->dai_data.uni;
-	struct snd_kcontrol_new *ctrl;
-	int i;
-
-	if (!uni->num_ctrls)
-		return 0;
-
-	for (i = 0; i < uni->num_ctrls; i++) {
-		/*
-		 * Several Control can have same name. Controls are indexed on
-		 * Uniperipheral instance ID
-		 */
-		ctrl = &uni->snd_ctrls[i];
-		ctrl->index = uni->id;
-		ctrl->device = uni->id;
-	}
-
-	return snd_soc_add_dai_controls(dai, uni->snd_ctrls, uni->num_ctrls);
-}
-
-/*
  * DAI
  */
 int sti_uniperiph_dai_hw_params(struct snd_pcm_substream *substream,
@@ -365,7 +337,7 @@ static int sti_uniperiph_dai_probe(struct snd_soc_dai *dai)
 	dai_data->dma_data.addr = dai_data->uni->fifo_phys_address;
 	dai_data->dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
 
-	return sti_uniperiph_dai_create_ctrl(dai);
+	return 0;
 }
 
 static const struct snd_soc_dai_driver sti_uniperiph_dai_template = {
@@ -486,6 +458,9 @@ static int sti_uniperiph_probe(struct platform_device *pdev)
 	priv->pdev = pdev;
 
 	ret = sti_uniperiph_cpu_dai_of(node, priv);
+
+	priv->dai->pcm_controls = priv->dai_data.uni->snd_ctrls;
+	priv->dai->num_pcm_controls = priv->dai_data.uni->num_ctrls;
 
 	dev_set_drvdata(&pdev->dev, priv);
 
