@@ -903,7 +903,7 @@ int ida_pre_get(struct ida *ida, gfp_t gfp_mask)
 	if (!ida->free_bitmap) {
 		struct ida_bitmap *bitmap;
 
-		bitmap = kmalloc(sizeof(struct ida_bitmap), gfp_mask);
+		bitmap = kzalloc(sizeof(struct ida_bitmap), gfp_mask);
 		if (!bitmap)
 			return 0;
 
@@ -962,7 +962,6 @@ int ida_get_new_above(struct ida *ida, int starting_id, int *p_id)
 		if (!bitmap)
 			return -EAGAIN;
 
-		memset(bitmap, 0, sizeof(struct ida_bitmap));
 		rcu_assign_pointer(pa[0]->ary[idr_id & IDR_MASK],
 				(void *)bitmap);
 		pa[0]->count++;
