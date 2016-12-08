@@ -461,7 +461,8 @@ NEXT_PAGE(level2_kernel_pgt)
 	 * 512M if no kaslr, 1G if kaslr enabled. Later cleanup_highmap will
 	 * clean up those unused entries.
 	 *
-	 * The module area starts after kernel mapping area.
+	 * The module area starts after kernel mapping area, see MODULES_VADDR.
+	 * It will vary with KERNEL_MAPPING_SIZE.
 	 */
 	PMDS(0, __PAGE_KERNEL_LARGE_EXEC,
 		PTRS_PER_PMD)
