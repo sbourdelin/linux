@@ -652,7 +652,7 @@ static void blk_release_queue(struct kobject *kobj)
 	if (q->bio_split)
 		bioset_free(q->bio_split);
 
-	ida_simple_remove(&blk_queue_ida, q->id);
+	tida_put(&blk_queue_ida, q->id);
 	call_rcu(&q->rcu_head, blk_free_queue_rcu);
 }
 

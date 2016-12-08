@@ -1,7 +1,7 @@
 #ifndef BLK_INTERNAL_H
 #define BLK_INTERNAL_H
 
-#include <linux/idr.h>
+#include <linux/tida.h>
 #include <linux/blk-mq.h>
 #include "blk-mq.h"
 
@@ -34,7 +34,7 @@ struct blk_flush_queue {
 extern struct kmem_cache *blk_requestq_cachep;
 extern struct kmem_cache *request_cachep;
 extern struct kobj_type blk_queue_ktype;
-extern struct ida blk_queue_ida;
+extern struct tida blk_queue_ida;
 
 static inline struct blk_flush_queue *blk_get_flush_queue(
 		struct request_queue *q, struct blk_mq_ctx *ctx)

@@ -46,7 +46,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(block_bio_complete);
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_split);
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_unplug);
 
-DEFINE_IDA(blk_queue_ida);
+DEFINE_TIDA(blk_queue_ida);
 
 /*
  * For the allocated request tables
@@ -699,7 +699,7 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 	if (!q)
 		return NULL;
 
-	q->id = ida_simple_get(&blk_queue_ida, 0, 0, gfp_mask);
+	q->id = tida_get(&blk_queue_ida, gfp_mask);
 	if (q->id < 0)
 		goto fail_q;
 
@@ -771,7 +771,7 @@ fail_bdi:
 fail_split:
 	bioset_free(q->bio_split);
 fail_id:
-	ida_simple_remove(&blk_queue_ida, q->id);
+	tida_put(&blk_queue_ida, q->id);
 fail_q:
 	kmem_cache_free(blk_requestq_cachep, q);
 	return NULL;
