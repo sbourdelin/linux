@@ -636,6 +636,7 @@ static void xgene_enet_free_pagepool(struct xgene_enet_desc_ring *buf_pool,
 
 	dev = ndev_to_dev(buf_pool->ndev);
 	head = buf_pool->head;
+	slots = buf_pool->slots - 1;
 
 	for (i = 0; i < 4; i++) {
 		frag_size = xgene_enet_get_data_len(le64_to_cpu(desc[i ^ 1]));
