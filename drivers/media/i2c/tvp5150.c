@@ -57,6 +57,7 @@ struct tvp5150 {
 	u16 rom_ver;
 
 	enum v4l2_mbus_type mbus_type;
+	bool has_dt;
 };
 
 static inline struct tvp5150 *to_tvp5150(struct v4l2_subdev *sd)
@@ -1053,6 +1054,20 @@ static int tvp5150_s_stream(struct v4l2_subdev *sd, int enable)
 	/* Output format: 8-bit ITU-R BT.656 with embedded syncs */
 	int val = 0x09;
 
+	if (!decoder->has_dt)
+		return 0;
+
+	/*
+	 * FIXME: the logic below is hardcoded to work with some OMAP3
+	 * hardware with tvp5151. As such, it hardcodes values for
+	 * both TVP5150_CONF_SHARED_PIN and TVP5150_MISC_CTL, and ignores
+	 * what was set before at the driver. Ideally, we should have
+	 * DT nodes describing the setup, instead of hardcoding those
+	 * values, and doing a read before writing values to
+	 * TVP5150_MISC_CTL, but any patch adding support for it should
+	 * keep DT backward-compatible.
+	 */
+
 	/* Output format: 8-bit 4:2:2 YUV with discrete sync */
 	if (decoder->mbus_type == V4L2_MBUS_PARALLEL)
 		val = 0x0d;
@@ -1471,6 +1486,7 @@ static int tvp5150_probe(struct i2c_client *c,
 			dev_err(sd->dev, "DT parsing error: %d\n", res);
 			return res;
 		}
+		decoder->has_dt = true;
 	} else {
 		/* Default to BT.656 embedded sync */
 		core->mbus_type = V4L2_MBUS_BT656;
