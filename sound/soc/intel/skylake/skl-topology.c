@@ -87,6 +87,7 @@ static int is_skl_dsp_widget_type(struct snd_soc_dapm_widget *w)
 	case snd_soc_dapm_aif_out:
 	case snd_soc_dapm_dai_out:
 	case snd_soc_dapm_switch:
+	case snd_soc_dapm_supply:
 		return false;
 	default:
 		return true;
@@ -1484,12 +1485,13 @@ static int skl_tplg_be_set_src_pipe_params(struct snd_soc_dai *dai,
 	snd_soc_dapm_widget_for_each_source_path(w, p) {
 		if (p->connect && is_skl_dsp_widget_type(p->source) &&
 						p->source->priv) {
-
 			ret = skl_tplg_be_fill_pipe_params(dai,
 						p->source->priv, params);
 			if (ret < 0)
 				return ret;
 		} else {
+			if (p->source->id == snd_soc_dapm_supply)
+				continue;
 			ret = skl_tplg_be_set_src_pipe_params(dai,
 						p->source, params);
 			if (ret < 0)
@@ -1515,6 +1517,8 @@ static int skl_tplg_be_set_sink_pipe_params(struct snd_soc_dai *dai,
 			if (ret < 0)
 				return ret;
 		} else {
+			if (p->sink->id == snd_soc_dapm_supply)
+				continue;
 			ret = skl_tplg_be_set_sink_pipe_params(
 						dai, p->sink, params);
 			if (ret < 0)
