@@ -75,6 +75,7 @@ struct coda_dev {
 	struct platform_device	*plat_dev;
 	const struct coda_devtype *devtype;
 	int			firmware;
+	struct vdoa_data	*vdoa;
 
 	void __iomem		*regs_base;
 	struct clk		*clk_per;

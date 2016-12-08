@@ -41,6 +41,7 @@
 #include <media/videobuf2-vmalloc.h>
 
 #include "coda.h"
+#include "imx-vdoa.h"
 
 #define CODA_NAME		"coda"
 
@@ -65,6 +66,10 @@ MODULE_PARM_DESC(coda_debug, "Debug level (0-2)");
 static int disable_tiling;
 module_param(disable_tiling, int, 0644);
 MODULE_PARM_DESC(disable_tiling, "Disable tiled frame buffers");
+
+static int disable_vdoa;
+module_param(disable_vdoa, int, 0644);
+MODULE_PARM_DESC(disable_vdoa, "Disable Video Data Order Adapter tiled to raster-scan conversion");
 
 void coda_write(struct coda_dev *dev, u32 data, u32 reg)
 {
@@ -323,6 +328,34 @@ const char *coda_product_name(int product)
 		snprintf(buf, sizeof(buf), "(0x%04x)", product);
 		return buf;
 	}
+}
+
+static struct vdoa_data *coda_get_vdoa_data(struct device_node *np,
+					    const char *name)
+{
+	struct device_node *vdoa_node;
+	struct platform_device *vdoa_pdev;
+	struct vdoa_data *vdoa_data;
+
+	vdoa_node = of_parse_phandle(np, name, 0);
+	if (!vdoa_node)
+		return NULL;
+
+	vdoa_pdev = of_find_device_by_node(vdoa_node);
+	if (!vdoa_pdev) {
+		vdoa_data = NULL;
+		goto out;
+	}
+
+	vdoa_data = platform_get_drvdata(vdoa_pdev);
+	if (!vdoa_data)
+		vdoa_data = ERR_PTR(-EPROBE_DEFER);
+
+out:
+	if (vdoa_node)
+		of_node_put(vdoa_node);
+
+	return vdoa_data;
 }
 
 /*
@@ -2255,6 +2288,16 @@ static int coda_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 	dev->iram_pool = pool;
+
+	/* Get VDOA from device tree if available */
+	if (!disable_tiling && !disable_vdoa) {
+		dev->vdoa = coda_get_vdoa_data(np, "vdoa");
+		if (PTR_ERR(dev->vdoa) == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
+		if (!dev->vdoa)
+			dev_info(&pdev->dev,
+				 "vdoa not available; not using tiled intermediate format");
+	}
 
 	ret = v4l2_device_register(&pdev->dev, &dev->v4l2_dev);
 	if (ret)
