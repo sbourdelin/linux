@@ -1092,9 +1092,6 @@ int ida_simple_get(struct ida *ida, unsigned int start, unsigned int end,
 	}
 
 again:
-	if (!ida_pre_get(ida, gfp_mask))
-		return -ENOMEM;
-
 	spin_lock_irqsave(&simple_ida_lock, flags);
 	ret = ida_get_new_above(ida, start, &id);
 	if (!ret) {
@@ -1107,8 +1104,11 @@ again:
 	}
 	spin_unlock_irqrestore(&simple_ida_lock, flags);
 
-	if (unlikely(ret == -EAGAIN))
+	if (unlikely(ret == -EAGAIN)) {
+		if (!ida_pre_get(ida, gfp_mask))
+			return -ENOMEM;
 		goto again;
+	}
 
 	return ret;
 }
