@@ -3329,6 +3329,7 @@ static void rotate_ctx(struct perf_event_context *ctx)
 static int perf_rotate_context(struct perf_cpu_context *cpuctx)
 {
 	struct perf_event_context *ctx = NULL;
+	u64 start_clock, end_clock;
 	int rotate = 0;
 
 	if (cpuctx->ctx.nr_events) {
@@ -3345,6 +3346,7 @@ static int perf_rotate_context(struct perf_cpu_context *cpuctx)
 	if (!rotate)
 		goto done;
 
+	start_clock = perf_clock();
 	perf_ctx_lock(cpuctx, cpuctx->task_ctx);
 	perf_pmu_disable(cpuctx->ctx.pmu);
 
@@ -3360,6 +3362,13 @@ static int perf_rotate_context(struct perf_cpu_context *cpuctx)
 
 	perf_pmu_enable(cpuctx->ctx.pmu);
 	perf_ctx_unlock(cpuctx, cpuctx->task_ctx);
+
+	/* calculate multiplexing overhead */
+	if (cpuctx->ctx.pmu->stat) {
+		end_clock = perf_clock();
+		cpuctx->overhead[PERF_CORE_MUX_OVERHEAD].nr++;
+		cpuctx->overhead[PERF_CORE_MUX_OVERHEAD].time += end_clock - start_clock;
+	}
 done:
 
 	return rotate;
