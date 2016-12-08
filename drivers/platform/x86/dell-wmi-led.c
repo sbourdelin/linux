@@ -1,5 +1,5 @@
 /*
- * dell_led.c - Dell LED Driver
+ * dell-wmi-led.c - Dell WMI LED Driver
  *
  * Copyright (C) 2010 Dell Inc.
  * Louis Davis <louis_davis@dell.com>
