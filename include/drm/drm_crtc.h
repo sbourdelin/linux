@@ -29,6 +29,7 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 #include <linux/idr.h>
+#include <linux/tida.h>
 #include <linux/fb.h>
 #include <linux/hdmi.h>
 #include <linux/media-bus-format.h>
@@ -1045,7 +1046,7 @@ struct drm_mode_config {
 	/**
 	 * @connector_ida: ID allocator for connector indices.
 	 */
-	struct ida connector_ida;
+	struct tida connector_ida;
 	/**
 	 * @connector_list: List of connector objects.
 	 */

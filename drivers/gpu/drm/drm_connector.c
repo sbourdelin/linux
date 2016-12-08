@@ -61,7 +61,7 @@
 struct drm_conn_prop_enum_list {
 	int type;
 	const char *name;
-	struct ida ida;
+	struct tida ida;
 };
 
 /*
@@ -93,7 +93,7 @@ void drm_connector_ida_init(void)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(drm_connector_enum_list); i++)
-		ida_init(&drm_connector_enum_list[i].ida);
+		tida_init(&drm_connector_enum_list[i].ida);
 }
 
 void drm_connector_ida_destroy(void)
@@ -101,7 +101,7 @@ void drm_connector_ida_destroy(void)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(drm_connector_enum_list); i++)
-		ida_destroy(&drm_connector_enum_list[i].ida);
+		tida_destroy(&drm_connector_enum_list[i].ida);
 }
 
 /**
@@ -186,7 +186,7 @@ int drm_connector_init(struct drm_device *dev,
 {
 	struct drm_mode_config *config = &dev->mode_config;
 	int ret;
-	struct ida *connector_ida =
+	struct tida *connector_ida =
 		&drm_connector_enum_list[connector_type].ida;
 
 	drm_modeset_lock_all(dev);
@@ -201,7 +201,7 @@ int drm_connector_init(struct drm_device *dev,
 	connector->dev = dev;
 	connector->funcs = funcs;
 
-	ret = ida_simple_get(&config->connector_ida, 0, 0, GFP_KERNEL);
+	ret = tida_get(&config->connector_ida, GFP_KERNEL);
 	if (ret < 0)
 		goto out_put;
 	connector->index = ret;
@@ -209,7 +209,7 @@ int drm_connector_init(struct drm_device *dev,
 
 	connector->connector_type = connector_type;
 	connector->connector_type_id =
-		ida_simple_get(connector_ida, 1, 0, GFP_KERNEL);
+		tida_get_above(connector_ida, 1, GFP_KERNEL);
 	if (connector->connector_type_id < 0) {
 		ret = connector->connector_type_id;
 		goto out_put_id;
@@ -250,10 +250,10 @@ int drm_connector_init(struct drm_device *dev,
 	connector->debugfs_entry = NULL;
 out_put_type_id:
 	if (ret)
-		ida_simple_remove(connector_ida, connector->connector_type_id);
+		tida_put(connector_ida, connector->connector_type_id);
 out_put_id:
 	if (ret)
-		ida_simple_remove(&config->connector_ida, connector->index);
+		tida_put(&config->connector_ida, connector->index);
 out_put:
 	if (ret)
 		drm_mode_object_unregister(dev, &connector->base);
@@ -341,11 +341,10 @@ void drm_connector_cleanup(struct drm_connector *connector)
 	list_for_each_entry_safe(mode, t, &connector->modes, head)
 		drm_mode_remove(connector, mode);
 
-	ida_simple_remove(&drm_connector_enum_list[connector->connector_type].ida,
+	tida_put(&drm_connector_enum_list[connector->connector_type].ida,
 			  connector->connector_type_id);
 
-	ida_simple_remove(&dev->mode_config.connector_ida,
-			  connector->index);
+	tida_put(&dev->mode_config.connector_ida, connector->index);
 
 	kfree(connector->display_info.bus_formats);
 	drm_mode_object_unregister(dev, &connector->base);
