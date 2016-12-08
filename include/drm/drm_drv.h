@@ -71,6 +71,14 @@ struct drm_driver {
 	void (*postclose) (struct drm_device *, struct drm_file *);
 	void (*lastclose) (struct drm_device *);
 	int (*unload) (struct drm_device *);
+	/**
+	 * @release:
+	 *
+	 * Optional callback for destroying device state after the final
+	 * reference is released, i.e. the device is being destroyed.
+	 */
+	void (*release) (struct drm_device *);
+
 	int (*dma_ioctl) (struct drm_device *dev, void *data, struct drm_file *file_priv);
 	int (*dma_quiescent) (struct drm_device *);
 	int (*context_dtor) (struct drm_device *dev, int context);
