@@ -7037,6 +7037,52 @@ static void perf_log_itrace_start(struct perf_event *event)
 	perf_output_end(&handle);
 }
 
+
+/*
+ * Record overhead information
+ *
+ * The overhead logged here is the overhead for event pmu, not per-event overhead.
+ * This function only take advantage of the existing event log mechanism
+ * to log the overhead information.
+ *
+ */
+void perf_log_overhead(struct perf_event *event, u64 type,
+		       u32 cpu, u32 nr, u64 time)
+{
+	struct perf_output_handle handle;
+	struct perf_sample_data sample;
+	int ret;
+
+	struct {
+		struct perf_event_header	header;
+		u64				type;
+		struct perf_overhead_entry	overhead;
+	} overhead_event = {
+		.header = {
+			.type = PERF_RECORD_OVERHEAD,
+			.misc = 0,
+			.size = sizeof(overhead_event),
+		},
+		.type = type,
+		.overhead = {
+			.cpu = cpu,
+			.nr = nr,
+			.time = time,
+		},
+	};
+
+	perf_event_header__init_id(&overhead_event.header, &sample, event);
+	ret = perf_output_begin(&handle, event, overhead_event.header.size);
+
+	if (ret)
+		return;
+
+	perf_output_put(&handle, overhead_event);
+	perf_event__output_id_sample(event, &handle, &sample);
+
+	perf_output_end(&handle);
+}
+
 /*
  * Generic event overflow handling, sampling.
  */

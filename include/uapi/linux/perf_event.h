@@ -344,7 +344,8 @@ struct perf_event_attr {
 				use_clockid    :  1, /* use @clockid for time fields */
 				context_switch :  1, /* context switch data */
 				write_backward :  1, /* Write ring buffer from end to beginning */
-				__reserved_1   : 36;
+				overhead       :  1, /* Log overhead information */
+				__reserved_1   : 35;
 
 	union {
 		__u32		wakeup_events;	  /* wakeup every n events */
@@ -862,6 +863,17 @@ enum perf_event_type {
 	 */
 	PERF_RECORD_SWITCH_CPU_WIDE		= 15,
 
+	/*
+	 * Records perf overhead
+	 * struct {
+	 *	struct perf_event_header	header;
+	 *	u64				type;
+	 *	struct perf_overhead_entry	entry;
+	 *	struct sample_id		sample_id;
+	 * };
+	 */
+	PERF_RECORD_OVERHEAD			= 16,
+
 	PERF_RECORD_MAX,			/* non-ABI */
 };
 
@@ -978,6 +990,30 @@ struct perf_branch_entry {
 		abort:1,    /* transaction abort */
 		cycles:16,  /* cycle count to last branch */
 		reserved:44;
+};
+
+/*
+ * The overhead could be common overhead (in core codes) or
+ * PMU specific overhead (in pmu specific codes).
+ */
+enum perf_record_overhead_type {
+	/* common overhead */
+	/* PMU specific */
+	PERF_OVERHEAD_MAX,
+};
+
+/*
+ * single overhead record layout:
+ *
+ *	 cpu: CPU id
+ *	  nr: Times of overhead happens.
+ *	      E.g. for NMI, nr == times of NMI handler are called.
+ *	time: Total overhead cost(ns)
+ */
+struct perf_overhead_entry {
+	__u32	cpu;
+	__u32	nr;
+	__u64	time;
 };
 
 #endif /* _UAPI_LINUX_PERF_EVENT_H */

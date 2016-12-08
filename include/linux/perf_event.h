@@ -792,6 +792,8 @@ struct perf_cpu_context {
 
 	struct list_head		sched_cb_entry;
 	int				sched_cb_usage;
+
+	struct perf_overhead_entry	overhead[PERF_OVERHEAD_MAX];
 };
 
 struct perf_output_handle {
@@ -997,6 +999,10 @@ perf_event__output_id_sample(struct perf_event *event,
 
 extern void
 perf_log_lost_samples(struct perf_event *event, u64 lost);
+
+extern void
+perf_log_overhead(struct perf_event *event, u64 type,
+		  u32 cpu, u32 nr, u64 time);
 
 static inline bool is_sampling_event(struct perf_event *event)
 {
