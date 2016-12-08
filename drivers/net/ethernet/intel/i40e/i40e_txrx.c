@@ -1112,6 +1112,7 @@ void i40e_clean_rx_ring(struct i40e_ring *rx_ring)
 	struct device *dev = rx_ring->dev;
 	unsigned long bi_size;
 	u16 i;
+	struct bpf_prog *old_prog;
 
 	/* ring already cleared, nothing to do */
 	if (!rx_ring->rx_bi)
@@ -1145,10 +1146,10 @@ void i40e_clean_rx_ring(struct i40e_ring *rx_ring)
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
 
-	if (rx_ring->xdp_prog) {
-		bpf_prog_put(rx_ring->xdp_prog);
-		rx_ring->xdp_prog = NULL;
-	}
+	old_prog = rtnl_dereference(rx_ring->xdp_prog);
+	RCU_INIT_POINTER(rx_ring->xdp_prog, NULL);
+	if (old_prog)
+		bpf_prog_put(old_prog);
 }
 
 /**
@@ -1880,6 +1881,7 @@ bool i40e_fetch_rx_buffer(struct i40e_ring *rx_ring,
 {
 	struct i40e_rx_buffer *rx_buffer;
 	struct page *page;
+	struct bpf_prog *xdp_prog;
 
 	rx_buffer = &rx_ring->rx_bi[rx_ring->next_to_clean];
 	page = rx_buffer->page;
@@ -1892,14 +1894,17 @@ bool i40e_fetch_rx_buffer(struct i40e_ring *rx_ring,
 				      I40E_RXBUFFER_2048,
 				      DMA_FROM_DEVICE);
 
-	if (rx_ring->xdp_prog) {
-		bool xdp_consumed;
-
-		xdp_consumed = i40e_run_xdp(rx_ring, rx_buffer,
-					    rx_desc, rx_ring->xdp_prog);
-		if (xdp_consumed)
+	rcu_read_lock();
+	xdp_prog = rcu_dereference(rx_ring->xdp_prog);
+	if (xdp_prog) {
+		bool xdp_consumed = i40e_run_xdp(rx_ring, rx_buffer,
+						 rx_desc, xdp_prog);
+		if (xdp_consumed) {
+			rcu_read_unlock();
 			return true;
+		}
 	}
+	rcu_read_unlock();
 
 	*skb = rx_buffer->skb;
 

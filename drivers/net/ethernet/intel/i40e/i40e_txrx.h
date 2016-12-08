@@ -333,7 +333,7 @@ struct i40e_ring {
 	struct rcu_head rcu;		/* to avoid race on free */
 	u16 next_to_alloc;
 
-	struct bpf_prog *xdp_prog;
+	struct bpf_prog __rcu *xdp_prog;
 	struct i40e_ring *xdp_sibling;  /* rx to xdp, and xdp to rx */
 	bool xdp_needs_tail_bump;
 	u16 curr_in_use;
