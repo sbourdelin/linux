@@ -70,11 +70,14 @@
  * @V4L2_MBUS_BT656:	parallel interface with embedded synchronisation, can
  *			also be used for BT.1120
  * @V4L2_MBUS_CSI2:	MIPI CSI-2 serial interface
+ * @V4L2_MBUS_UNKNOWN:	used to indicate that the device is not controlled
+ *			via a V4L2 subdev devnode interface
  */
 enum v4l2_mbus_type {
 	V4L2_MBUS_PARALLEL,
 	V4L2_MBUS_BT656,
 	V4L2_MBUS_CSI2,
+	V4L2_MBUS_UNKNOWN,
 };
 
 /**

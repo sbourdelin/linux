@@ -593,6 +593,7 @@ static unsigned int pxa_mbus_config_compatible(const struct v4l2_mbus_config *cf
 	common_flags = cfg->flags & flags;
 
 	switch (cfg->type) {
+	case V4L2_MBUS_UNKNOWN:
 	case V4L2_MBUS_PARALLEL:
 		hsync = common_flags & (V4L2_MBUS_HSYNC_ACTIVE_HIGH |
 					V4L2_MBUS_HSYNC_ACTIVE_LOW);

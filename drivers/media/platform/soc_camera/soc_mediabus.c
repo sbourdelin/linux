@@ -490,6 +490,7 @@ unsigned int soc_mbus_config_compatible(const struct v4l2_mbus_config *cfg,
 
 	switch (cfg->type) {
 	case V4L2_MBUS_PARALLEL:
+	case V4L2_MBUS_UNKNOWN:
 		hsync = common_flags & (V4L2_MBUS_HSYNC_ACTIVE_HIGH |
 					V4L2_MBUS_HSYNC_ACTIVE_LOW);
 		vsync = common_flags & (V4L2_MBUS_VSYNC_ACTIVE_HIGH |

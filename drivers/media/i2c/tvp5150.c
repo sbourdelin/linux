@@ -795,7 +795,8 @@ static int tvp5150_reset(struct v4l2_subdev *sd, u32 val)
 
 	tvp5150_set_std(sd, decoder->norm);
 
-	if (decoder->mbus_type == V4L2_MBUS_PARALLEL)
+	if (decoder->mbus_type == V4L2_MBUS_PARALLEL ||
+	    decoder->mbus_type == V4L2_MBUS_UNKNOWN)
 		tvp5150_write(sd, TVP5150_DATA_RATE_SEL, 0x40);
 
 	return 0;
@@ -1052,6 +1053,9 @@ static int tvp5150_s_stream(struct v4l2_subdev *sd, int enable)
 	struct tvp5150 *decoder = to_tvp5150(sd);
 	/* Output format: 8-bit ITU-R BT.656 with embedded syncs */
 	int val = 0x09;
+
+	if (decoder->mbus_type == V4L2_MBUS_UNKNOWN)
+		return 0;
 
 	/* Output format: 8-bit 4:2:2 YUV with discrete sync */
 	if (decoder->mbus_type == V4L2_MBUS_PARALLEL)
@@ -1501,6 +1505,7 @@ static int tvp5150_probe(struct i2c_client *c,
 	core->norm = V4L2_STD_ALL;	/* Default is autodetect */
 	core->input = TVP5150_COMPOSITE1;
 	core->enable = true;
+	core->mbus_type = V4L2_MBUS_UNKNOWN;
 
 	v4l2_ctrl_handler_init(&core->hdl, 5);
 	v4l2_ctrl_new_std(&core->hdl, &tvp5150_ctrl_ops,
