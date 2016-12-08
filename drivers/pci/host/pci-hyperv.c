@@ -49,12 +49,10 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/pci.h>
 #include <linux/semaphore.h>
 #include <linux/irqdomain.h>
 #include <asm/irqdomain.h>
 #include <asm/apic.h>
-#include <linux/msi.h>
 #include <linux/hyperv.h>
 #include <asm/mshyperv.h>
 
@@ -120,35 +118,6 @@ union pci_version {
 		u16 major_version;
 	} parts;
 	u32 version;
-} __packed;
-
-/*
- * Function numbers are 8-bits wide on Express, as interpreted through ARI,
- * which is all this driver does.  This representation is the one used in
- * Windows, which is what is expected when sending this back and forth with
- * the Hyper-V parent partition.
- */
-union win_slot_encoding {
-	struct {
-		u32	func:8;
-		u32	reserved:24;
-	} bits;
-	u32 slot;
-} __packed;
-
-/*
- * Pretty much as defined in the PCI Specifications.
- */
-struct pci_function_description {
-	u16	v_id;	/* vendor ID */
-	u16	d_id;	/* device ID */
-	u8	rev;
-	u8	prog_intf;
-	u8	subclass;
-	u8	base_class;
-	u32	subsystem_id;
-	union win_slot_encoding win_slot;
-	u32	ser;	/* serial number */
 } __packed;
 
 /**
@@ -345,41 +314,6 @@ struct retarget_msi_interrupt {
  * Driver specific state.
  */
 
-enum hv_pcibus_state {
-	hv_pcibus_init = 0,
-	hv_pcibus_probed,
-	hv_pcibus_installed,
-	hv_pcibus_maximum
-};
-
-struct hv_pcibus_device {
-	struct pci_sysdata sysdata;
-	enum hv_pcibus_state state;
-	atomic_t remove_lock;
-	struct hv_device *hdev;
-	resource_size_t low_mmio_space;
-	resource_size_t high_mmio_space;
-	struct resource *mem_config;
-	struct resource *low_mmio_res;
-	struct resource *high_mmio_res;
-	struct completion *survey_event;
-	struct completion remove_event;
-	struct pci_bus *pci_bus;
-	spinlock_t config_lock;	/* Avoid two threads writing index page */
-	spinlock_t device_list_lock;	/* Protect lists below */
-	void __iomem *cfg_addr;
-
-	struct semaphore enum_sem;
-	struct list_head resources_for_children;
-
-	struct list_head children;
-	struct list_head dr_list;
-
-	struct msi_domain_info msi_info;
-	struct msi_controller msi_chip;
-	struct irq_domain *irq_domain;
-};
-
 /*
  * Tracks "Device Relations" messages from the host, which must be both
  * processed in order and deferred so that they don't run in the context
@@ -396,14 +330,6 @@ struct hv_dr_state {
 	struct pci_function_description func[0];
 };
 
-enum hv_pcichild_state {
-	hv_pcichild_init = 0,
-	hv_pcichild_requirements,
-	hv_pcichild_resourced,
-	hv_pcichild_ejecting,
-	hv_pcichild_maximum
-};
-
 enum hv_pcidev_ref_reason {
 	hv_pcidev_ref_invalid = 0,
 	hv_pcidev_ref_initial,
@@ -413,23 +339,6 @@ enum hv_pcidev_ref_reason {
 	hv_pcidev_ref_childlist,
 	hv_pcidev_irqdata,
 	hv_pcidev_ref_max
-};
-
-struct hv_pci_dev {
-	/* List protected by pci_rescan_remove_lock */
-	struct list_head list_entry;
-	atomic_t refs;
-	enum hv_pcichild_state state;
-	struct pci_function_description desc;
-	bool reported_missing;
-	struct hv_pcibus_device *hbus;
-	struct work_struct wrk;
-
-	/*
-	 * What would be observed if one wrote 0xFFFFFFFF to a BAR and then
-	 * read it back, for each of the BAR offsets within config space.
-	 */
-	u32 probed_bar[6];
 };
 
 struct hv_pci_compl {
