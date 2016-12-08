@@ -100,6 +100,36 @@ static int platform_clock_control(struct snd_soc_dapm_widget *w,
 	return ret;
 }
 
+static struct snd_soc_dai *skl_get_dai_widget(struct snd_soc_dapm_widget *w)
+{
+	struct snd_soc_dapm_path *p = NULL;
+
+	snd_soc_dapm_widget_for_each_sink_path(w, p) {
+		if (p->sink->id == snd_soc_dapm_dai_in)
+			return p->sink->priv;
+
+		return skl_get_dai_widget(p->sink);
+	}
+
+	return NULL;
+}
+
+static int ssp_set_clk(struct snd_soc_dapm_widget *w,
+		struct snd_kcontrol *k, int  event)
+{
+	struct snd_soc_dai *cpu_dai = NULL;
+
+	cpu_dai = skl_get_dai_widget(w);
+	if (!cpu_dai)
+		return -EIO;
+
+	/* Enable/Disable the SSP clk */
+	if (SND_SOC_DAPM_EVENT_ON(event))
+		return snd_soc_dai_set_tristate(cpu_dai, 0);
+	else
+		return snd_soc_dai_set_tristate(cpu_dai, 1);
+}
+
 static const struct snd_kcontrol_new skylake_controls[] = {
 	SOC_DAPM_PIN_SWITCH("Headphone Jack"),
 	SOC_DAPM_PIN_SWITCH("Headset Mic"),
@@ -113,6 +143,9 @@ static const struct snd_soc_dapm_widget skylake_widgets[] = {
 	SND_SOC_DAPM_MIC("SoC DMIC", NULL),
 	SND_SOC_DAPM_SPK("DP", NULL),
 	SND_SOC_DAPM_SPK("HDMI", NULL),
+	SND_SOC_DAPM_SUPPLY("ssp0 mclk", SND_SOC_NOPM, 0, 0,
+			ssp_set_clk, SND_SOC_DAPM_PRE_PMU |
+			SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_SUPPLY("Platform Clock", SND_SOC_NOPM, 0, 0,
 			platform_clock_control, SND_SOC_DAPM_PRE_PMU |
 			SND_SOC_DAPM_POST_PMD),
@@ -136,6 +169,7 @@ static const struct snd_soc_dapm_route skylake_map[] = {
 	/* CODEC BE connections */
 	{ "HiFi Playback", NULL, "ssp0 Tx" },
 	{ "ssp0 Tx", NULL, "codec0_out" },
+	{ "codec0_out", NULL, "ssp0 mclk"},
 
 	{ "Playback", NULL, "ssp1 Tx" },
 	{ "ssp1 Tx", NULL, "codec1_out" },
