@@ -2172,6 +2172,7 @@ static int mmc_blk_probe(struct mmc_card *card)
 {
 	struct mmc_blk_data *md, *part_md;
 	char cap_str[10];
+	int ret;
 
 	/*
 	 * Check that the card supports the command class(es) we need.
@@ -2181,9 +2182,15 @@ static int mmc_blk_probe(struct mmc_card *card)
 
 	mmc_fixup_device(card, blk_fixups);
 
+	ret = mmc_queue_alloc_shared_queue(card);
+	if (ret)
+		return ret;
+
 	md = mmc_blk_alloc(card);
-	if (IS_ERR(md))
+	if (IS_ERR(md)) {
+		mmc_queue_free_shared_queue(card);
 		return PTR_ERR(md);
+	}
 
 	string_get_size((u64)get_capacity(md->disk), 512, STRING_UNITS_2,
 			cap_str, sizeof(cap_str));
@@ -2221,6 +2228,7 @@ static int mmc_blk_probe(struct mmc_card *card)
  out:
 	mmc_blk_remove_parts(card, md);
 	mmc_blk_remove_req(md);
+	mmc_queue_free_shared_queue(card);
 	return 0;
 }
 
@@ -2238,6 +2246,7 @@ static void mmc_blk_remove(struct mmc_card *card)
 	pm_runtime_put_noidle(&card->dev);
 	mmc_blk_remove_req(md);
 	dev_set_drvdata(&card->dev, NULL);
+	mmc_queue_free_shared_queue(card);
 }
 
 static int _mmc_blk_suspend(struct mmc_card *card)
