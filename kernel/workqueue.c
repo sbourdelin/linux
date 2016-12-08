@@ -41,7 +41,7 @@
 #include <linux/kallsyms.h>
 #include <linux/debug_locks.h>
 #include <linux/lockdep.h>
-#include <linux/idr.h>
+#include <linux/tida.h>
 #include <linux/jhash.h>
 #include <linux/hashtable.h>
 #include <linux/rculist.h>
@@ -171,7 +171,7 @@ struct worker_pool {
 	struct list_head	workers;	/* A: attached workers */
 	struct completion	*detach_completion; /* all workers detached */
 
-	struct ida		worker_ida;	/* worker IDs for task name */
+	struct tida		worker_ida;	/* worker IDs for task name */
 
 	struct workqueue_attrs	*attrs;		/* I: worker attributes */
 	struct hlist_node	hash_node;	/* PL: unbound_pool_hash node */
@@ -1757,7 +1757,7 @@ static struct worker *create_worker(struct worker_pool *pool)
 	char id_buf[16];
 
 	/* ID is needed to determine kthread name */
-	id = ida_simple_get(&pool->worker_ida, 0, 0, GFP_KERNEL);
+	id = tida_get(&pool->worker_ida, GFP_KERNEL);
 	if (id < 0)
 		goto fail;
 
@@ -1796,7 +1796,7 @@ static struct worker *create_worker(struct worker_pool *pool)
 
 fail:
 	if (id >= 0)
-		ida_simple_remove(&pool->worker_ida, id);
+		tida_put(&pool->worker_ida, id);
 	kfree(worker);
 	return NULL;
 }
@@ -2186,7 +2186,7 @@ woke_up:
 		worker->task->flags &= ~PF_WQ_WORKER;
 
 		set_task_comm(worker->task, "kworker/dying");
-		ida_simple_remove(&pool->worker_ida, worker->id);
+		tida_put(&pool->worker_ida, worker->id);
 		worker_detach_from_pool(worker, pool);
 		kfree(worker);
 		return 0;
@@ -3207,7 +3207,7 @@ static int init_worker_pool(struct worker_pool *pool)
 	mutex_init(&pool->attach_mutex);
 	INIT_LIST_HEAD(&pool->workers);
 
-	ida_init(&pool->worker_ida);
+	tida_init(&pool->worker_ida);
 	INIT_HLIST_NODE(&pool->hash_node);
 	pool->refcnt = 1;
 
@@ -3236,7 +3236,7 @@ static void rcu_free_pool(struct rcu_head *rcu)
 {
 	struct worker_pool *pool = container_of(rcu, struct worker_pool, rcu);
 
-	ida_destroy(&pool->worker_ida);
+	tida_destroy(&pool->worker_ida);
 	free_workqueue_attrs(pool->attrs);
 	kfree(pool);
 }
