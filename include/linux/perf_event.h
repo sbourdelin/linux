@@ -403,6 +403,12 @@ struct pmu {
 	 */
 	void (*sched_task)		(struct perf_event_context *ctx,
 					bool sched_in);
+
+	/*
+	 * overhead statistics
+	 */
+	int (*stat)			(struct perf_event *event, u32 flag);
+
 	/*
 	 * PMU specific data size
 	 */

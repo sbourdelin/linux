@@ -4640,6 +4640,11 @@ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned lon
 		rcu_read_unlock();
 		return 0;
 	}
+	case PERF_EVENT_IOC_STAT: {
+		if (event->pmu->stat)
+			return event->pmu->stat(event, flags);
+		return 0;
+	}
 	default:
 		return -ENOTTY;
 	}
