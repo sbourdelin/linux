@@ -713,7 +713,7 @@ unsigned char ibm_architecture_vec[] = {
 	0,
 #endif
 	OV5_FEAT(OV5_TYPE1_AFFINITY) | OV5_FEAT(OV5_PRRN),
-	0,
+	OV5_FEAT(OV5_RESIZE_HPT),
 	0,
 	0,
 	/* WARNING: The offset of the "number of cores" field below
