@@ -330,6 +330,8 @@ struct i40e_ring {
 
 	struct rcu_head rcu;		/* to avoid race on free */
 	u16 next_to_alloc;
+
+	struct bpf_prog *xdp_prog;
 } ____cacheline_internodealigned_in_smp;
 
 enum i40e_latency_range {
