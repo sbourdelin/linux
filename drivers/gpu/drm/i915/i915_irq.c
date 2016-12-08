@@ -2990,8 +2990,10 @@ static void gen8_irq_reset(struct drm_device *dev)
 						   POWER_DOMAIN_PIPE(pipe)))
 			GEN8_IRQ_RESET_NDX(DE_PIPE, pipe);
 
-	GEN5_IRQ_RESET(GEN8_DE_PORT_);
-	GEN5_IRQ_RESET(GEN8_DE_MISC_);
+	if (INTEL_INFO(dev_priv)->num_pipes) {
+		GEN5_IRQ_RESET(GEN8_DE_PORT_);
+		GEN5_IRQ_RESET(GEN8_DE_MISC_);
+	}
 	GEN5_IRQ_RESET(GEN8_PCU_);
 
 	if (HAS_PCH_SPLIT(dev_priv))
@@ -3351,14 +3353,20 @@ static void gen8_gt_irq_postinstall(struct drm_i915_private *dev_priv)
 
 	dev_priv->pm_ier = 0x0;
 	dev_priv->pm_imr = ~dev_priv->pm_ier;
-	GEN8_IRQ_INIT_NDX(GT, 0, ~gt_interrupts[0], gt_interrupts[0]);
-	GEN8_IRQ_INIT_NDX(GT, 1, ~gt_interrupts[1], gt_interrupts[1]);
+
+	if (HAS_ENGINE(dev_priv, RCS) || HAS_ENGINE(dev_priv, BCS))
+		GEN8_IRQ_INIT_NDX(GT, 0, ~gt_interrupts[0], gt_interrupts[0]);
+
+	if (HAS_ENGINE(dev_priv, VCS))
+		GEN8_IRQ_INIT_NDX(GT, 1, ~gt_interrupts[1], gt_interrupts[1]);
 	/*
 	 * RPS interrupts will get enabled/disabled on demand when RPS itself
 	 * is enabled/disabled. Same wil be the case for GuC interrupts.
 	 */
 	GEN8_IRQ_INIT_NDX(GT, 2, dev_priv->pm_imr, dev_priv->pm_ier);
-	GEN8_IRQ_INIT_NDX(GT, 3, ~gt_interrupts[3], gt_interrupts[3]);
+
+	if (HAS_ENGINE(dev_priv, VECS))
+		GEN8_IRQ_INIT_NDX(GT, 3, ~gt_interrupts[3], gt_interrupts[3]);
 }
 
 static void gen8_de_irq_postinstall(struct drm_i915_private *dev_priv)
@@ -3414,7 +3422,9 @@ static int gen8_irq_postinstall(struct drm_device *dev)
 		ibx_irq_pre_postinstall(dev);
 
 	gen8_gt_irq_postinstall(dev_priv);
-	gen8_de_irq_postinstall(dev_priv);
+
+	if (INTEL_INFO(dev_priv)->num_pipes)
+		gen8_de_irq_postinstall(dev_priv);
 
 	if (HAS_PCH_SPLIT(dev_priv))
 		ibx_irq_postinstall(dev);
