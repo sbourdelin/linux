@@ -176,8 +176,9 @@ static void mark_screen_rdonly(struct mm_struct *mm)
 		goto out;
 	pmd = pmd_offset(pud, 0xA0000);
 
-	if (pmd_trans_huge(*pmd)) {
-		struct vm_area_struct *vma = find_vma(mm, 0xA0000);
+	if (IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE) && pmd_trans_huge(*pmd)) {
+		struct vm_area_struct __maybe_unused *vma = find_vma(mm,
+								     0xA0000);
 		split_huge_pmd(vma, pmd, 0xA0000);
 	}
 	if (pmd_none_or_clear_bad(pmd))
