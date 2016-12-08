@@ -23,16 +23,15 @@
  */
 
 static int
-tida_expand(struct tida *tida, gfp_t gfp, unsigned long *flags)
+tida_expand(struct tida *tida, gfp_t gfp, unsigned long *flags, unsigned long minalloc)
 	__releases(tida->lock)
 	__acquires(tida->lock)
 {
 	unsigned long newalloc, oldalloc = tida->alloc;
 	unsigned long *bits;
 
-	newalloc = oldalloc ? 2 * oldalloc : BITS_PER_LONG;
-
 	spin_unlock_irqrestore(&tida->lock, *flags);
+	newalloc = max(2*oldalloc, round_up(minalloc, BITS_PER_LONG));
 	bits = kcalloc(BITS_TO_LONGS(newalloc), sizeof(*bits), gfp);
 	spin_lock_irqsave(&tida->lock, *flags);
 
@@ -50,29 +49,34 @@ tida_expand(struct tida *tida, gfp_t gfp, unsigned long *flags)
 }
 
 int
-tida_get(struct tida *tida, gfp_t gfp)
+tida_get_above(struct tida *tida, int start, gfp_t gfp)
 {
 	unsigned long flags;
-	int ret;
+	int ret, from;
+
+	if (WARN_ON_ONCE(start < 0))
+		return -EINVAL;
 
 	spin_lock_irqsave(&tida->lock, flags);
 	while (1) {
 		/* find_next_zero_bit is fine with a NULL bitmap as long as size is 0 */
-		ret = find_next_zero_bit(tida->bits, tida->alloc, tida->hint);
+		from = max(start, tida->hint);
+		ret = find_next_zero_bit(tida->bits, tida->alloc, from);
 		if (ret < tida->alloc)
 			break;
-		ret = tida_expand(tida, gfp, &flags);
+		ret = tida_expand(tida, gfp, &flags, from + 1);
 		if (ret < 0)
 			goto out;
 	}
 
 	__set_bit(ret, tida->bits);
-	tida->hint = ret+1;
+	if (start <= tida->hint)
+		tida->hint = ret + 1;
 out:
 	spin_unlock_irqrestore(&tida->lock, flags);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(tida_get);
+EXPORT_SYMBOL_GPL(tida_get_above);
 
 void
 tida_put(struct tida *tida, int id)

@@ -19,8 +19,14 @@ struct tida {
 void tida_init(struct tida *tida);
 void tida_destroy(struct tida *tida);
 
-int tida_get(struct tida *tida, gfp_t gfp);
+int tida_get_above(struct tida *tida, int start, gfp_t gfp);
 void tida_put(struct tida *tida, int id);
+
+static inline int
+tida_get(struct tida *tida, gfp_t gfp)
+{
+	return tida_get_above(tida, 0, gfp);
+}
 
 
 #endif /* __LINUX_TIDA_H__ */
