@@ -63,6 +63,18 @@ static inline int rsi_usb_event_timeout(struct rsi_hw *adapter)
 
 int rsi_usb_device_init(struct rsi_common *common);
 int rsi_usb_write_register_multiple(struct rsi_hw *adapter, u32 addr,
-				    u8 *data, u32 count);
+				    u8 *data, u16 count);
 void rsi_usb_rx_thread(struct rsi_common *common);
+int rsi_usb_host_intf_write_pkt(struct rsi_hw *adapter, u8 *pkt, u32 len);
+int rsi_usb_master_reg_read(struct rsi_hw *adapter, u32 reg,
+			    u32 *value, u16 len);
+int rsi_usb_master_reg_write(struct rsi_hw *adapter, unsigned long reg,
+			     unsigned long value, u16 len);
+int rsi_usb_read_register_multiple(struct rsi_hw *adapter, u32 addr,
+				   u8 *data, u16 count);
+int rsi_usb_load_data_master_write(struct rsi_hw *adapter,
+				   u32 base_address,
+				   u32 instructions_sz,
+				   u16 block_size,
+				   u8 *ta_firmware);
 #endif
