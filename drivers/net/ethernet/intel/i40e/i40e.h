@@ -548,7 +548,7 @@ struct i40e_vsi {
 	 * regular rings, i.e. alloc_queue_pairs/num_queue_pairs
 	 */
 	struct i40e_ring **xdp_rings;
-	struct bpf_prog *xdp_prog;
+	bool xdp_enabled;
 
 	u32  active_filters;
 	u32  promisc_threshold;
@@ -916,6 +916,6 @@ void i40e_print_link_message(struct i40e_vsi *vsi, bool isup);
  **/
 static inline bool i40e_enabled_xdp_vsi(const struct i40e_vsi *vsi)
 {
-	return vsi->xdp_prog;
+	return vsi->xdp_enabled;
 }
 #endif /* _I40E_H_ */

@@ -3067,15 +3067,6 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	ring->tail = hw->hw_addr + I40E_QRX_TAIL(pf_q);
 	writel(0, ring->tail);
 
-	if (i40e_enabled_xdp_vsi(vsi)) {
-		struct bpf_prog *prog;
-
-		prog = bpf_prog_add(vsi->xdp_prog, 1);
-		if (IS_ERR(prog))
-			return PTR_ERR(prog);
-		ring->xdp_prog = prog;
-	}
-
 	i40e_alloc_rx_buffers(ring, I40E_DESC_UNUSED(ring));
 
 	return 0;
@@ -9380,7 +9371,9 @@ static int i40e_xdp_setup(struct i40e_vsi *vsi,
 {
 	struct i40e_pf *pf = vsi->back;
 	struct net_device *netdev = vsi->netdev;
-	int frame_size = netdev->mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
+	int i, frame_size = netdev->mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
+	bool need_reset;
+	struct bpf_prog *old_prog;
 
 	if (prog && prog->xdp_adjust_head)
 		return -EOPNOTSUPP;
@@ -9394,13 +9387,29 @@ static int i40e_xdp_setup(struct i40e_vsi *vsi,
 	if (!i40e_enabled_xdp_vsi(vsi) && !prog)
 		return 0;
 
-	i40e_prep_for_reset(pf);
+	if (prog) {
+		prog = bpf_prog_add(prog, vsi->num_queue_pairs - 1);
+		if (IS_ERR(prog))
+			return PTR_ERR(prog);
+	}
 
-	if (vsi->xdp_prog)
-		bpf_prog_put(vsi->xdp_prog);
-	vsi->xdp_prog = prog;
+	/* When turning XDP on->off/off->on we reset and rebuild the rings. */
+	need_reset = (i40e_enabled_xdp_vsi(vsi) != !!prog);
 
-	i40e_reset_and_rebuild(pf, true);
+	if (need_reset)
+		i40e_prep_for_reset(pf);
+
+	vsi->xdp_enabled = !!prog;
+
+	if (need_reset)
+		i40e_reset_and_rebuild(pf, true);
+
+	for (i = 0; i < vsi->num_queue_pairs; i++) {
+		old_prog = rtnl_dereference(vsi->rx_rings[i]->xdp_prog);
+		rcu_assign_pointer(vsi->rx_rings[i]->xdp_prog, prog);
+		if (old_prog)
+			bpf_prog_put(old_prog);
+	}
 	return 0;
 }
 
@@ -11688,7 +11697,9 @@ static void i40e_remove(struct pci_dev *pdev)
 		pf->flags &= ~I40E_FLAG_SRIOV_ENABLED;
 	}
 
+	rtnl_lock();
 	i40e_fdir_teardown(pf);
+	rtnl_unlock();
 
 	/* If there is a switch structure or any orphans, remove them.
 	 * This will leave only the PF's VSI remaining.
