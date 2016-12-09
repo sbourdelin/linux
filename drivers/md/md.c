@@ -843,15 +843,12 @@ static int sb_equal(mdp_super_t *sb1, mdp_super_t *sb2)
 	int ret;
 	mdp_super_t *tmp1, *tmp2;
 
-	tmp1 = kmalloc(sizeof(*tmp1),GFP_KERNEL);
-	tmp2 = kmalloc(sizeof(*tmp2),GFP_KERNEL);
-
-	if (!tmp1 || !tmp2) {
-		ret = 0;
-		goto abort;
-	}
+	tmp1 = kmalloc(2 * sizeof(*tmp1), GFP_KERNEL);
+	if (!tmp1)
+		return 0;
 
 	*tmp1 = *sb1;
+	tmp2 = tmp1 + 1;
 	*tmp2 = *sb2;
 
 	/*
@@ -861,9 +858,7 @@ static int sb_equal(mdp_super_t *sb1, mdp_super_t *sb2)
 	tmp2->nr_disks = 0;
 
 	ret = (memcmp(tmp1, tmp2, MD_SB_GENERIC_CONSTANT_WORDS * 4) == 0);
-abort:
 	kfree(tmp1);
-	kfree(tmp2);
 	return ret;
 }
 
