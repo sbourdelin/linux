@@ -148,6 +148,22 @@ enum phy_type_enum {
 	NR_PHY_TYPES
 };
 
+struct soc_pad_ctrl_table {
+	const char *soc;
+	void (*set_soc_pad)(struct sdhci_host *host,
+			    unsigned char signal_voltage);
+};
+
+struct soc_pad_ctrl {
+	/* Register address of SOC PHY PAD ctrl */
+	void __iomem	*reg;
+	/* SOC PHY PAD ctrl type */
+	enum soc_pad_ctrl_type pad_type;
+	/* SOC specific operation to set SOC PHY PAD */
+	void (*set_soc_pad)(struct sdhci_host *host,
+			    unsigned char signal_voltage);
+};
+
 static struct xenon_emmc_phy_regs xenon_emmc_5_0_phy_regs = {
 	.timing_adj	= SDHCI_EMMC_5_0_PHY_TIMING_ADJUST,
 	.func_ctrl	= SDHCI_EMMC_5_0_PHY_FUNC_CONTROL,
@@ -181,6 +197,8 @@ struct emmc_phy_params {
 	u8	nr_tun_times;
 	/* Divider for calculating Tuning Step */
 	u8	tun_step_divider;
+
+	struct soc_pad_ctrl pad_ctrl;
 };
 
 static int alloc_emmc_phy(struct sdhci_xenon_priv *priv)
@@ -255,6 +273,45 @@ static int emmc_phy_init(struct sdhci_host *host)
 	}
 
 	return 0;
+}
+
+#define ARMADA_3700_SOC_PAD_1_8V	0x1
+#define ARMADA_3700_SOC_PAD_3_3V	0x0
+
+static void armada_3700_soc_pad_voltage_set(struct sdhci_host *host,
+					    unsigned char signal_voltage)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+	struct emmc_phy_params *params = priv->phy_params;
+
+	if (params->pad_ctrl.pad_type == SOC_PAD_FIXED_1_8V) {
+		writel(ARMADA_3700_SOC_PAD_1_8V, params->pad_ctrl.reg);
+	} else if (params->pad_ctrl.pad_type == SOC_PAD_SD) {
+		if (signal_voltage == MMC_SIGNAL_VOLTAGE_180)
+			writel(ARMADA_3700_SOC_PAD_1_8V, params->pad_ctrl.reg);
+		else if (signal_voltage == MMC_SIGNAL_VOLTAGE_330)
+			writel(ARMADA_3700_SOC_PAD_3_3V, params->pad_ctrl.reg);
+	}
+}
+
+/*
+ * Set SOC PHY voltage PAD control register,
+ * according to the operation voltage on PAD.
+ * The detailed operation depends on SOC implementaion.
+ */
+static void emmc_phy_set_soc_pad(struct sdhci_host *host,
+				 unsigned char signal_voltage)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+	struct emmc_phy_params *params = priv->phy_params;
+
+	if (!params->pad_ctrl.reg)
+		return;
+
+	if (params->pad_ctrl.set_soc_pad)
+		params->pad_ctrl.set_soc_pad(host, signal_voltage);
 }
 
 /*
@@ -630,6 +687,51 @@ phy_init:
 	dev_dbg(mmc_dev(host->mmc), "eMMC PHY setting completes\n");
 }
 
+static int get_dt_pad_ctrl_data(struct sdhci_host *host,
+				struct device_node *np,
+				struct emmc_phy_params *params)
+{
+	int ret = 0;
+	const char *name;
+	struct resource iomem;
+
+	if (of_device_is_compatible(np, "marvell,armada-3700-sdhci"))
+		params->pad_ctrl.set_soc_pad = armada_3700_soc_pad_voltage_set;
+	else
+		return 0;
+
+	if (of_address_to_resource(np, 1, &iomem)) {
+		dev_err(mmc_dev(host->mmc), "Unable to find SOC PAD ctrl register address for %s\n",
+			np->name);
+		return -EINVAL;
+	}
+
+	params->pad_ctrl.reg = devm_ioremap_resource(mmc_dev(host->mmc),
+						     &iomem);
+	if (IS_ERR(params->pad_ctrl.reg)) {
+		dev_err(mmc_dev(host->mmc), "Unable to get SOC PHY PAD ctrl regiser for %s\n",
+			np->name);
+		return PTR_ERR(params->pad_ctrl.reg);
+	}
+
+	ret = of_property_read_string(np, "marvell,pad-type", &name);
+	if (ret) {
+		dev_err(mmc_dev(host->mmc), "Unable to determine SOC PHY PAD ctrl type\n");
+		return ret;
+	}
+	if (!strcmp(name, "sd")) {
+		params->pad_ctrl.pad_type = SOC_PAD_SD;
+	} else if (!strcmp(name, "fixed-1-8v")) {
+		params->pad_ctrl.pad_type = SOC_PAD_FIXED_1_8V;
+	} else {
+		dev_err(mmc_dev(host->mmc), "Unsupported SOC PHY PAD ctrl type %s\n",
+			name);
+		return -EINVAL;
+	}
+
+	return ret;
+}
+
 static int emmc_phy_parse_param_dt(struct sdhci_host *host,
 				   struct device_node *np,
 				   struct emmc_phy_params *params)
@@ -663,7 +765,14 @@ static int emmc_phy_parse_param_dt(struct sdhci_host *host,
 	else
 		params->tun_step_divider = SDHCI_TUNING_STEP_DIVIDER;
 
-	return 0;
+	return get_dt_pad_ctrl_data(host, np, params);
+}
+
+/* Set SOC PHY Voltage PAD */
+void xenon_soc_pad_ctrl(struct sdhci_host *host,
+			unsigned char signal_voltage)
+{
+	emmc_phy_set_soc_pad(host, signal_voltage);
 }
 
 /*

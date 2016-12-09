@@ -322,6 +322,8 @@ static int xenon_start_signal_voltage_switch(struct mmc_host *mmc,
 	 */
 	enable_xenon_internal_clk(host);
 
+	xenon_soc_pad_ctrl(host, ios->signal_voltage);
+
 	if (priv->init_card_type == MMC_TYPE_MMC)
 		return xenon_emmc_signal_voltage_switch(mmc, ios);
 
