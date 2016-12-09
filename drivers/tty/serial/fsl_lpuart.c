@@ -892,9 +892,16 @@ static inline int lpuart_start_rx_dma(struct lpuart_port *sport)
 	struct circ_buf *ring = &sport->rx_ring;
 	int ret, nent;
 	int bits, baud;
-	struct tty_struct *tty = tty_port_tty_get(&sport->port.state->port);
-	struct ktermios *termios = &tty->termios;
+	struct tty_struct *tty;
+	struct ktermios *termios;
 
+	tty = tty_port_tty_get(&sport->port.state->port);
+	if (!tty) {
+		dev_err(sport->port.dev, "Port is not associated with a tty\n");
+		return -ENODEV;
+	}
+
+	termios = &tty->termios;
 	baud = tty_get_baud_rate(tty);
 
 	bits = (termios->c_cflag & CSIZE) == CS7 ? 9 : 10;
