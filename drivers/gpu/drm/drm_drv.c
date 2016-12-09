@@ -485,7 +485,9 @@ int drm_dev_init(struct drm_device *dev,
 
 	spin_lock_init(&dev->buf_lock);
 	spin_lock_init(&dev->event_lock);
-	mutex_init(&dev->struct_mutex);
+	__mutex_init(&dev->struct_mutex,
+		     "&dev->struct_mutex",
+		     &driver->class.struct_mutex_key);
 	mutex_init(&dev->filelist_mutex);
 	mutex_init(&dev->ctxlist_mutex);
 	mutex_init(&dev->master_mutex);

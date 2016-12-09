@@ -39,6 +39,10 @@ struct dma_buf_attachment;
 struct drm_display_mode;
 struct drm_mode_create_dumb;
 
+struct drm_driver_class {
+	struct lock_class_key struct_mutex_key;
+};
+
 /* driver capabilities and requirements mask */
 #define DRIVER_USE_AGP			0x1
 #define DRIVER_LEGACY			0x2
@@ -64,6 +68,8 @@ struct drm_mode_create_dumb;
  * structure for GEM drivers.
  */
 struct drm_driver {
+	struct drm_driver_class class;
+
 	int (*load) (struct drm_device *, unsigned long flags);
 	int (*firstopen) (struct drm_device *);
 	int (*open) (struct drm_device *, struct drm_file *);
