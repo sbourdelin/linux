@@ -452,6 +452,8 @@ static int bnxt_re_register_ib(struct bnxt_re_dev *rdev)
 	ibdev->destroy_qp		= bnxt_re_destroy_qp;
 
 	ibdev->post_send		= bnxt_re_post_send;
+	ibdev->post_recv		= bnxt_re_post_recv;
+
 	ibdev->create_cq		= bnxt_re_create_cq;
 	ibdev->destroy_cq		= bnxt_re_destroy_cq;
 	ibdev->req_notify_cq		= bnxt_re_req_notify_cq;

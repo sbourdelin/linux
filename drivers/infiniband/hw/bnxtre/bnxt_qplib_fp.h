@@ -395,8 +395,16 @@ int bnxt_qplib_query_qp(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp);
 int bnxt_qplib_destroy_qp(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp);
 void *bnxt_qplib_get_qp1_sq_buf(struct bnxt_qplib_qp *qp,
 				struct bnxt_qplib_sge *sge);
+void *bnxt_qplib_get_qp1_rq_buf(struct bnxt_qplib_qp *qp,
+				struct bnxt_qplib_sge *sge);
+u32 bnxt_qplib_get_rq_prod_index(struct bnxt_qplib_qp *qp);
+dma_addr_t bnxt_qplib_get_qp_buf_from_index(struct bnxt_qplib_qp *qp,
+					    u32 index);
 void bnxt_qplib_post_send_db(struct bnxt_qplib_qp *qp);
 int bnxt_qplib_post_send(struct bnxt_qplib_qp *qp,
+			 struct bnxt_qplib_swqe *wqe);
+void bnxt_qplib_post_recv_db(struct bnxt_qplib_qp *qp);
+int bnxt_qplib_post_recv(struct bnxt_qplib_qp *qp,
 			 struct bnxt_qplib_swqe *wqe);
 int bnxt_qplib_create_cq(struct bnxt_qplib_res *res, struct bnxt_qplib_cq *cq);
 int bnxt_qplib_destroy_cq(struct bnxt_qplib_res *res, struct bnxt_qplib_cq *cq);

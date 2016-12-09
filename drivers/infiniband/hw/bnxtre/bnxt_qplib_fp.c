@@ -1107,6 +1107,37 @@ void *bnxt_qplib_get_qp1_sq_buf(struct bnxt_qplib_qp *qp,
 	return NULL;
 }
 
+u32 bnxt_qplib_get_rq_prod_index(struct bnxt_qplib_qp *qp)
+{
+	struct bnxt_qplib_q *rq = &qp->rq;
+
+	return HWQ_CMP(rq->hwq.prod, &rq->hwq);
+}
+
+dma_addr_t bnxt_qplib_get_qp_buf_from_index(struct bnxt_qplib_qp *qp, u32 index)
+{
+	return (qp->rq_hdr_buf_map + index * qp->rq_hdr_buf_size);
+}
+
+void *bnxt_qplib_get_qp1_rq_buf(struct bnxt_qplib_qp *qp,
+				struct bnxt_qplib_sge *sge)
+{
+	struct bnxt_qplib_q *rq = &qp->rq;
+	u32 sw_prod;
+
+	memset(sge, 0, sizeof(*sge));
+
+	if (qp->rq_hdr_buf) {
+		sw_prod = HWQ_CMP(rq->hwq.prod, &rq->hwq);
+		sge->addr = (dma_addr_t)(qp->rq_hdr_buf_map +
+					 sw_prod * qp->rq_hdr_buf_size);
+		sge->lkey = 0xFFFFFFFF;
+		sge->size = qp->rq_hdr_buf_size;
+		return qp->rq_hdr_buf + sw_prod * sge->size;
+	}
+	return NULL;
+}
+
 void bnxt_qplib_post_send_db(struct bnxt_qplib_qp *qp)
 {
 	struct bnxt_qplib_q *sq = &qp->sq;
@@ -1351,6 +1382,75 @@ int bnxt_qplib_post_send(struct bnxt_qplib_qp *qp,
 	}
 
 	sq->hwq.prod++;
+done:
+	return rc;
+}
+
+void bnxt_qplib_post_recv_db(struct bnxt_qplib_qp *qp)
+{
+	struct bnxt_qplib_q *rq = &qp->rq;
+	struct dbr_dbr db_msg = { 0 };
+	u32 sw_prod;
+
+	sw_prod = HWQ_CMP(rq->hwq.prod, &rq->hwq);
+	db_msg.index = cpu_to_le32((sw_prod << DBR_DBR_INDEX_SFT) &
+				   DBR_DBR_INDEX_MASK);
+	db_msg.type_xid =
+		cpu_to_le32(((qp->id << DBR_DBR_XID_SFT) & DBR_DBR_XID_MASK) |
+			    DBR_DBR_TYPE_RQ);
+
+	/* Flush the writes to HW Rx WQE before the ringing Rx DB */
+	wmb();
+	__iowrite64_copy(qp->dpi->dbr, &db_msg, sizeof(db_msg) / sizeof(u64));
+}
+
+int bnxt_qplib_post_recv(struct bnxt_qplib_qp *qp,
+			 struct bnxt_qplib_swqe *wqe)
+{
+	struct bnxt_qplib_q *rq = &qp->rq;
+	struct rq_wqe *rqe, **rqe_ptr;
+	struct sq_sge *hw_sge;
+	u32 sw_prod;
+	int i, rc = 0;
+
+	if (qp->state == CMDQ_MODIFY_QP_NEW_STATE_ERR) {
+		dev_err(&rq->hwq.pdev->dev,
+			"QPLIB: FP: QP (0x%x) is in the 0x%x state",
+			qp->id, qp->state);
+		rc = -EINVAL;
+		goto done;
+	}
+	if (HWQ_CMP((rq->hwq.prod + 1), &rq->hwq) ==
+	    HWQ_CMP(rq->hwq.cons, &rq->hwq)) {
+		dev_err(&rq->hwq.pdev->dev,
+			"QPLIB: FP: QP (0x%x) RQ is full!", qp->id);
+		rc = -EINVAL;
+		goto done;
+	}
+	sw_prod = HWQ_CMP(rq->hwq.prod, &rq->hwq);
+	rq->swq[sw_prod].wr_id = wqe->wr_id;
+
+	rqe_ptr = (struct rq_wqe **)rq->hwq.pbl_ptr;
+	rqe = &rqe_ptr[RQE_PG(sw_prod)][RQE_IDX(sw_prod)];
+
+	memset(rqe, 0, BNXT_QPLIB_MAX_RQE_ENTRY_SIZE);
+
+	/* Calculate wqe_size16 and data_len */
+	for (i = 0, hw_sge = (struct sq_sge *)rqe->data;
+	     i < wqe->num_sge; i++, hw_sge++) {
+		hw_sge->va_or_pa = cpu_to_le64(wqe->sg_list[i].addr);
+		hw_sge->l_key = cpu_to_le32(wqe->sg_list[i].lkey);
+		hw_sge->size = cpu_to_le32(wqe->sg_list[i].size);
+	}
+	rqe->wqe_type = wqe->type;
+	rqe->flags = wqe->flags;
+	rqe->wqe_size = wqe->num_sge +
+			((offsetof(typeof(*rqe), data) + 15) >> 4);
+
+	/* Supply the rqe->wr_id index to the wr_id_tbl for now */
+	rqe->wr_id[0] = cpu_to_le32(sw_prod);
+
+	rq->hwq.prod++;
 done:
 	return rc;
 }
