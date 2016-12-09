@@ -66,4 +66,11 @@ struct bnxt_re_cq_resp {
 	__u32 phase;
 } __packed;
 
+enum bnxt_re_shpg_offt {
+	BNXT_RE_BEG_RESV_OFFT	= 0x00,
+	BNXT_RE_AVID_OFFT	= 0x10,
+	BNXT_RE_AVID_SIZE	= 0x04,
+	BNXT_RE_END_RESV_OFFT	= 0xFF0
+};
+
 #endif /* __BNXT_RE_UVERBS_ABI_H__*/

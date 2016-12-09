@@ -502,6 +502,153 @@ fail:
 	return ERR_PTR(rc);
 }
 
+/* Address Handles */
+int bnxt_re_destroy_ah(struct ib_ah *ib_ah)
+{
+	struct bnxt_re_ah *ah = to_bnxt_re(ib_ah, struct bnxt_re_ah, ib_ah);
+	struct bnxt_re_dev *rdev = ah->rdev;
+	int rc;
+
+	rc = bnxt_qplib_destroy_ah(&rdev->qplib_res, &ah->qplib_ah);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev), "Failed to destroy HW AH");
+		return rc;
+	}
+	kfree(ah);
+	return 0;
+}
+
+struct ib_ah *bnxt_re_create_ah(struct ib_pd *ib_pd,
+				struct ib_ah_attr *ah_attr)
+{
+	struct bnxt_re_pd *pd = to_bnxt_re(ib_pd, struct bnxt_re_pd, ib_pd);
+	struct bnxt_re_dev *rdev = pd->rdev;
+	struct bnxt_re_ah *ah;
+	int rc;
+	u16 vlan_tag;
+	u8 nw_type;
+
+	struct ib_gid_attr sgid_attr;
+
+	if (!(ah_attr->ah_flags & IB_AH_GRH)) {
+		dev_err(rdev_to_dev(rdev), "Failed to alloc AH: GRH not set");
+		return ERR_PTR(-EINVAL);
+	}
+	ah = kzalloc(sizeof(*ah), GFP_ATOMIC);
+	if (!ah)
+		return ERR_PTR(-ENOMEM);
+
+	ah->rdev = rdev;
+	ah->qplib_ah.pd = &pd->qplib_pd;
+
+	/* Supply the configuration for the HW */
+	memcpy(ah->qplib_ah.dgid.data, ah_attr->grh.dgid.raw,
+	       sizeof(union ib_gid));
+	/*
+	 * If RoCE V2 is enabled, stack will have two entries for
+	 * each GID entry. Avoiding this duplicte entry in HW. Dividing
+	 * the GID index by 2 for RoCE V2
+	 */
+	ah->qplib_ah.sgid_index = ah_attr->grh.sgid_index / 2;
+	ah->qplib_ah.host_sgid_index = ah_attr->grh.sgid_index;
+	ah->qplib_ah.traffic_class = ah_attr->grh.traffic_class;
+	ah->qplib_ah.flow_label = ah_attr->grh.flow_label;
+	ah->qplib_ah.hop_limit = ah_attr->grh.hop_limit;
+	ah->qplib_ah.sl = ah_attr->sl;
+	if (ib_pd->uobject &&
+	    !rdma_is_multicast_addr((struct in6_addr *)
+				    ah_attr->grh.dgid.raw) &&
+	    !rdma_link_local_addr((struct in6_addr *)
+				  ah_attr->grh.dgid.raw)) {
+		union ib_gid sgid;
+
+		rc = ib_get_cached_gid(&rdev->ibdev, 1,
+				       ah_attr->grh.sgid_index, &sgid,
+				       &sgid_attr);
+		if (rc) {
+			dev_err(rdev_to_dev(rdev),
+				"Failed to query gid at index %d",
+				ah_attr->grh.sgid_index);
+			goto fail;
+		}
+		if (sgid_attr.ndev) {
+			if (is_vlan_dev(sgid_attr.ndev))
+				vlan_tag = vlan_dev_vlan_id(sgid_attr.ndev);
+			dev_put(sgid_attr.ndev);
+		}
+		/* Get network header type for this GID */
+		nw_type = ib_gid_to_network_type(sgid_attr.gid_type, &sgid);
+		switch (nw_type) {
+		case RDMA_NETWORK_IPV4:
+			ah->qplib_ah.nw_type = CMDQ_CREATE_AH_TYPE_V2IPV4;
+			break;
+		case RDMA_NETWORK_IPV6:
+			ah->qplib_ah.nw_type = CMDQ_CREATE_AH_TYPE_V2IPV6;
+			break;
+		default:
+			ah->qplib_ah.nw_type = CMDQ_CREATE_AH_TYPE_V1;
+			break;
+		}
+		rc = rdma_addr_find_l2_eth_by_grh(&sgid, &ah_attr->grh.dgid,
+						  ah_attr->dmac, &vlan_tag,
+						  &sgid_attr.ndev->ifindex,
+						  NULL);
+		if (rc) {
+			dev_err(rdev_to_dev(rdev), "Failed to get dmac\n");
+			goto fail;
+		}
+	}
+
+	memcpy(ah->qplib_ah.dmac, ah_attr->dmac, ETH_ALEN);
+	rc = bnxt_qplib_create_ah(&rdev->qplib_res, &ah->qplib_ah);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev), "Failed to allocate HW AH");
+		goto fail;
+	}
+
+	/* Write AVID to shared page. */
+	if (ib_pd->uobject) {
+		struct ib_ucontext *ib_uctx = ib_pd->uobject->context;
+		struct bnxt_re_ucontext *uctx;
+		unsigned long flag;
+		u32 *wrptr;
+
+		uctx = to_bnxt_re(ib_uctx, struct bnxt_re_ucontext, ib_uctx);
+		spin_lock_irqsave(&uctx->sh_lock, flag);
+		wrptr = (u32 *)(uctx->shpg + BNXT_RE_AVID_OFFT);
+		*wrptr = ah->qplib_ah.id;
+		wmb(); /* make sure cache is updated. */
+		spin_unlock_irqrestore(&uctx->sh_lock, flag);
+	}
+
+	return &ah->ib_ah;
+
+fail:
+	kfree(ah);
+	return ERR_PTR(rc);
+}
+
+int bnxt_re_modify_ah(struct ib_ah *ib_ah, struct ib_ah_attr *ah_attr)
+{
+	return 0;
+}
+
+int bnxt_re_query_ah(struct ib_ah *ib_ah, struct ib_ah_attr *ah_attr)
+{
+	struct bnxt_re_ah *ah = to_bnxt_re(ib_ah, struct bnxt_re_ah, ib_ah);
+
+	memcpy(ah_attr->grh.dgid.raw, ah->qplib_ah.dgid.data,
+	       sizeof(union ib_gid));
+	ah_attr->grh.sgid_index = ah->qplib_ah.host_sgid_index;
+	ah_attr->grh.traffic_class = ah->qplib_ah.traffic_class;
+	ah_attr->sl = ah->qplib_ah.sl;
+	memcpy(ah_attr->dmac, ah->qplib_ah.dmac, ETH_ALEN);
+	ah_attr->ah_flags = IB_AH_GRH;
+	ah_attr->port_num = 1;
+	ah_attr->static_rate = 0;
+	return 0;
+}
+
 /* Completion Queues */
 int bnxt_re_destroy_cq(struct ib_cq *ib_cq)
 {

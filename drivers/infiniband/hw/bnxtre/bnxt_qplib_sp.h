@@ -78,6 +78,22 @@ struct bnxt_qplib_gid {
 	u8				data[16];
 };
 
+struct bnxt_qplib_ah {
+	struct bnxt_qplib_gid		dgid;
+	struct bnxt_qplib_pd		*pd;
+	u32				id;
+	u8				sgid_index;
+	/* For Query AH if the hw table and SW table are differnt */
+	u8				host_sgid_index;
+	u8				traffic_class;
+	u32				flow_label;
+	u8				hop_limit;
+	u8				sl;
+	u8				dmac[6];
+	u16				vlan_id;
+	u8				nw_type;
+};
+
 int bnxt_qplib_get_sgid(struct bnxt_qplib_res *res,
 			struct bnxt_qplib_sgid_tbl *sgid_tbl, int index,
 			struct bnxt_qplib_gid *gid);
@@ -97,4 +113,6 @@ int bnxt_qplib_add_pkey(struct bnxt_qplib_res *res,
 			bool update);
 int bnxt_qplib_get_dev_attr(struct bnxt_qplib_rcfw *rcfw,
 			    struct bnxt_qplib_dev_attr *attr);
+int bnxt_qplib_create_ah(struct bnxt_qplib_res *res, struct bnxt_qplib_ah *ah);
+int bnxt_qplib_destroy_ah(struct bnxt_qplib_res *res, struct bnxt_qplib_ah *ah);
 #endif /* __BNXT_QPLIB_SP_H__*/

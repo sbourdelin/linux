@@ -416,3 +416,97 @@ int bnxt_qplib_add_pkey(struct bnxt_qplib_res *res,
 	/* unlock */
 	return rc;
 }
+
+/* AH */
+int bnxt_qplib_create_ah(struct bnxt_qplib_res *res, struct bnxt_qplib_ah *ah)
+{
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	struct cmdq_create_ah req;
+	struct creq_create_ah_resp *resp;
+	u16 cmd_flags = 0;
+	u32 temp32[4];
+	u16 temp16[3];
+
+	RCFW_CMD_PREP(req, CREATE_AH, cmd_flags);
+
+	memcpy(temp32, ah->dgid.data, sizeof(struct bnxt_qplib_gid));
+	req.dgid[0] = cpu_to_le32(temp32[0]);
+	req.dgid[1] = cpu_to_le32(temp32[1]);
+	req.dgid[2] = cpu_to_le32(temp32[2]);
+	req.dgid[3] = cpu_to_le32(temp32[3]);
+
+	req.type = ah->nw_type;
+	req.hop_limit = ah->hop_limit;
+	req.sgid_index = cpu_to_le16(res->sgid_tbl.hw_id[ah->sgid_index]);
+	req.dest_vlan_id_flow_label = cpu_to_le32((ah->flow_label &
+					CMDQ_CREATE_AH_FLOW_LABEL_MASK) |
+					CMDQ_CREATE_AH_DEST_VLAN_ID_MASK);
+	req.pd_id = cpu_to_le32(ah->pd->id);
+	req.traffic_class = ah->traffic_class;
+
+	/* MAC in network format */
+	memcpy(temp16, ah->dmac, 6);
+	req.dest_mac[0] = cpu_to_le16(temp16[0]);
+	req.dest_mac[1] = cpu_to_le16(temp16[1]);
+	req.dest_mac[2] = cpu_to_le16(temp16[2]);
+
+	resp = (struct creq_create_ah_resp *)
+			bnxt_qplib_rcfw_send_message(rcfw, (void *)&req,
+						     NULL, 1);
+	if (!resp) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: SP: CREATE_AH send failed");
+		return -EINVAL;
+	}
+	if (!bnxt_qplib_rcfw_block_for_resp(rcfw, le16_to_cpu(req.cookie))) {
+		/* Cmd timed out */
+		dev_err(&rcfw->pdev->dev, "QPLIB: SP: CREATE_AH timed out");
+		return -ETIMEDOUT;
+	}
+	if (RCFW_RESP_STATUS(resp) ||
+	    RCFW_RESP_COOKIE(resp) != RCFW_CMDQ_COOKIE(req)) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: SP: CREATE_AH failed ");
+		dev_err(&rcfw->pdev->dev,
+			"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+			RCFW_RESP_STATUS(resp), RCFW_CMDQ_COOKIE(req),
+			RCFW_RESP_COOKIE(resp));
+		return -EINVAL;
+	}
+	ah->id = le32_to_cpu(resp->xid);
+	return 0;
+}
+
+int bnxt_qplib_destroy_ah(struct bnxt_qplib_res *res, struct bnxt_qplib_ah *ah)
+{
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	struct cmdq_destroy_ah req;
+	struct creq_destroy_ah_resp *resp;
+	u16 cmd_flags = 0;
+
+	/* Clean up the AH table in the device */
+	RCFW_CMD_PREP(req, DESTROY_AH, cmd_flags);
+
+	req.ah_cid = cpu_to_le32(ah->id);
+
+	resp = (struct creq_destroy_ah_resp *)
+			bnxt_qplib_rcfw_send_message(rcfw, (void *)&req,
+						     NULL, 1);
+	if (!resp) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: SP: DESTROY_AH send failed");
+		return -EINVAL;
+	}
+	if (!bnxt_qplib_rcfw_block_for_resp(rcfw, le16_to_cpu(req.cookie))) {
+		/* Cmd timed out */
+		dev_err(&rcfw->pdev->dev, "QPLIB: SP: DESTROY_AH timed out");
+		return -ETIMEDOUT;
+	}
+	if (RCFW_RESP_STATUS(resp) ||
+	    RCFW_RESP_COOKIE(resp) != RCFW_CMDQ_COOKIE(req)) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: SP: DESTROY_AH failed ");
+		dev_err(&rcfw->pdev->dev,
+			"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+			RCFW_RESP_STATUS(resp), RCFW_CMDQ_COOKIE(req),
+			RCFW_RESP_COOKIE(resp));
+		return -EINVAL;
+	}
+	return 0;
+}

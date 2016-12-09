@@ -51,6 +51,12 @@ struct bnxt_re_pd {
 	struct bnxt_qplib_dpi	dpi;
 };
 
+struct bnxt_re_ah {
+	struct bnxt_re_dev	*rdev;
+	struct ib_ah		ib_ah;
+	struct bnxt_qplib_ah	qplib_ah;
+};
+
 struct bnxt_re_cq {
 	struct bnxt_re_dev	*rdev;
 	spinlock_t              cq_lock;	/* protect cq */
@@ -102,6 +108,11 @@ struct ib_pd *bnxt_re_alloc_pd(struct ib_device *ibdev,
 			       struct ib_ucontext *context,
 			       struct ib_udata *udata);
 int bnxt_re_dealloc_pd(struct ib_pd *pd);
+struct ib_ah *bnxt_re_create_ah(struct ib_pd *pd,
+				struct ib_ah_attr *ah_attr);
+int bnxt_re_modify_ah(struct ib_ah *ah, struct ib_ah_attr *ah_attr);
+int bnxt_re_query_ah(struct ib_ah *ah, struct ib_ah_attr *ah_attr);
+int bnxt_re_destroy_ah(struct ib_ah *ah);
 struct ib_cq *bnxt_re_create_cq(struct ib_device *ibdev,
 				const struct ib_cq_init_attr *attr,
 				struct ib_ucontext *context,
