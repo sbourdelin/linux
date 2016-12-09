@@ -131,6 +131,21 @@ static int f81232_set_register(struct usb_serial_port *port, u16 reg, u8 val)
 	return status;
 }
 
+static int f81232_set_mask_register(struct usb_serial_port *port, u16 reg,
+						u8 mask, u8 val)
+{
+	int status;
+	u8 tmp;
+
+	status = f81232_get_register(port, reg, &tmp);
+	if (status)
+		return status;
+
+	tmp = (tmp & ~mask) | (val & mask);
+
+	return f81232_set_register(port, reg, tmp);
+}
+
 static void f81232_read_msr(struct usb_serial_port *port)
 {
 	int status;
@@ -335,15 +350,27 @@ static void f81232_process_read_urb(struct urb *urb)
 	tty_flip_buffer_push(&port->port);
 }
 
+static void f81232_set_break(struct usb_serial_port *port, bool enable)
+{
+	int status;
+	u8 tmp = 0;
+
+	if (enable)
+		tmp = UART_LCR_SBC;
+
+	status = f81232_set_mask_register(port, LINE_CONTROL_REGISTER,
+				UART_LCR_SBC, tmp);
+	if (status) {
+		dev_err(&port->dev, "%s: set break failed: %x\n", __func__,
+				status);
+	}
+}
+
 static void f81232_break_ctl(struct tty_struct *tty, int break_state)
 {
-	/* FIXME - Stubbed out for now */
+	struct usb_serial_port *port = tty->driver_data;
 
-	/*
-	 * break_state = -1 to turn on break, and 0 to turn off break
-	 * see drivers/char/tty_io.c to see it used.
-	 * last_set_data_urb_value NEVER has the break bit set in it.
-	 */
+	f81232_set_break(port, break_state);
 }
 
 static void f81232_set_baudrate(struct usb_serial_port *port, speed_t baudrate)
@@ -563,6 +590,7 @@ static void f81232_close(struct usb_serial_port *port)
 	f81232_port_disable(port);
 	usb_serial_generic_close(port);
 	usb_kill_urb(port->interrupt_in_urb);
+	f81232_set_break(port, false);
 }
 
 static void f81232_dtr_rts(struct usb_serial_port *port, int on)
