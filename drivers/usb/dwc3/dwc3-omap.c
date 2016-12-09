@@ -511,18 +511,18 @@ static int dwc3_omap_probe(struct platform_device *pdev)
 	/* check the DMA Status */
 	reg = dwc3_omap_readl(omap->base, USBOTGSS_SYSCONFIG);
 
-	ret = devm_request_threaded_irq(dev, omap->irq, dwc3_omap_interrupt,
-					dwc3_omap_interrupt_thread, IRQF_SHARED,
-					"dwc3-omap", omap);
+	ret = request_threaded_irq(omap->irq, dwc3_omap_interrupt,
+				   dwc3_omap_interrupt_thread, IRQF_SHARED,
+				   "dwc3-omap", omap);
 	if (ret) {
 		dev_err(dev, "failed to request IRQ #%d --> %d\n",
 				omap->irq, ret);
-		goto err1;
+		goto err11;
 	}
 
 	ret = dwc3_omap_extcon_register(omap);
 	if (ret < 0)
-		goto err1;
+		goto err11;
 
 	ret = of_platform_populate(node, NULL, NULL, dev);
 	if (ret) {
@@ -538,6 +538,8 @@ err2:
 	extcon_unregister_notifier(omap->edev, EXTCON_USB, &omap->vbus_nb);
 	extcon_unregister_notifier(omap->edev, EXTCON_USB_HOST, &omap->id_nb);
 
+err11:
+	free_irq(omap->irq, omap);
 err1:
 	pm_runtime_put_sync(dev);
 	pm_runtime_disable(dev);
@@ -552,6 +554,7 @@ static int dwc3_omap_remove(struct platform_device *pdev)
 	extcon_unregister_notifier(omap->edev, EXTCON_USB, &omap->vbus_nb);
 	extcon_unregister_notifier(omap->edev, EXTCON_USB_HOST, &omap->id_nb);
 	dwc3_omap_disable_irqs(omap);
+	free_irq(omap->irq, omap);
 	of_platform_depopulate(omap->dev);
 	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
