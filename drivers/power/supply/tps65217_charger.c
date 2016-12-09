@@ -48,8 +48,6 @@ struct tps65217_charger {
 	int	prev_ac_online;
 
 	struct task_struct	*poll_task;
-
-	int	irq;
 };
 
 static enum power_supply_property tps65217_ac_props[] = {
