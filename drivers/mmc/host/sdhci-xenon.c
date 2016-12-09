@@ -244,6 +244,7 @@ static void xenon_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	spin_unlock_irqrestore(&host->lock, flags);
 
 	sdhci_set_ios(mmc, ios);
+	xenon_phy_adj(host, ios);
 
 	if (host->clock > SDHCI_DEFAULT_SDCLK_FREQ) {
 		spin_lock_irqsave(&host->lock, flags);
@@ -482,7 +483,7 @@ static int xenon_probe_dt(struct platform_device *pdev)
 	}
 	priv->tuning_count = tuning_count;
 
-	return err;
+	return xenon_phy_parse_dt(np, host);
 }
 
 static int xenon_sdhc_probe(struct sdhci_host *host)
