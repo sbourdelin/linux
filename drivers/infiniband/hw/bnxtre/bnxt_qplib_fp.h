@@ -38,7 +38,245 @@
 
 #ifndef __BNXT_QPLIB_FP_H__
 #define __BNXT_QPLIB_FP_H__
+struct bnxt_qplib_sge {
+	u64				addr;
+	u32				lkey;
+	u32				size;
+};
+
+#define BNXT_QPLIB_MAX_SQE_ENTRY_SIZE	sizeof(struct sq_send)
+
+#define SQE_CNT_PER_PG		(PAGE_SIZE / BNXT_QPLIB_MAX_SQE_ENTRY_SIZE)
+#define SQE_MAX_IDX_PER_PG	(SQE_CNT_PER_PG - 1)
+#define SQE_PG(x)		(((x) & ~SQE_MAX_IDX_PER_PG) / SQE_CNT_PER_PG)
+#define SQE_IDX(x)		((x) & SQE_MAX_IDX_PER_PG)
+
+#define BNXT_QPLIB_MAX_PSNE_ENTRY_SIZE	sizeof(struct sq_psn_search)
+
+#define PSNE_CNT_PER_PG		(PAGE_SIZE / BNXT_QPLIB_MAX_PSNE_ENTRY_SIZE)
+#define PSNE_MAX_IDX_PER_PG	(PSNE_CNT_PER_PG - 1)
+#define PSNE_PG(x)		(((x) & ~PSNE_MAX_IDX_PER_PG) / PSNE_CNT_PER_PG)
+#define PSNE_IDX(x)		((x) & PSNE_MAX_IDX_PER_PG)
+
+#define BNXT_QPLIB_QP_MAX_SGL	6
+
+struct bnxt_qplib_swq {
+	u64				wr_id;
+	u8				type;
+	u8				flags;
+	u32				start_psn;
+	u32				next_psn;
+	struct sq_psn_search		*psn_search;
+};
+
+struct bnxt_qplib_swqe {
+	/* General */
+	u64				wr_id;
+	u8				reqs_type;
+	u8				type;
+#define BNXT_QPLIB_SWQE_TYPE_SEND			0
+#define BNXT_QPLIB_SWQE_TYPE_SEND_WITH_IMM		1
+#define BNXT_QPLIB_SWQE_TYPE_SEND_WITH_INV		2
+#define BNXT_QPLIB_SWQE_TYPE_RDMA_WRITE			4
+#define BNXT_QPLIB_SWQE_TYPE_RDMA_WRITE_WITH_IMM	5
+#define BNXT_QPLIB_SWQE_TYPE_RDMA_READ			6
+#define BNXT_QPLIB_SWQE_TYPE_ATOMIC_CMP_AND_SWP		8
+#define BNXT_QPLIB_SWQE_TYPE_ATOMIC_FETCH_AND_ADD	11
+#define BNXT_QPLIB_SWQE_TYPE_LOCAL_INV			12
+#define BNXT_QPLIB_SWQE_TYPE_FAST_REG_MR		13
+#define BNXT_QPLIB_SWQE_TYPE_REG_MR			13
+#define BNXT_QPLIB_SWQE_TYPE_BIND_MW			14
+#define BNXT_QPLIB_SWQE_TYPE_RECV			128
+#define BNXT_QPLIB_SWQE_TYPE_RECV_RDMA_IMM		129
+	u8				flags;
+#define BNXT_QPLIB_SWQE_FLAGS_SIGNAL_COMP		BIT(0)
+#define BNXT_QPLIB_SWQE_FLAGS_RD_ATOMIC_FENCE		BIT(1)
+#define BNXT_QPLIB_SWQE_FLAGS_UC_FENCE			BIT(2)
+#define BNXT_QPLIB_SWQE_FLAGS_SOLICIT_EVENT		BIT(3)
+#define BNXT_QPLIB_SWQE_FLAGS_INLINE			BIT(4)
+	struct bnxt_qplib_sge		sg_list[BNXT_QPLIB_QP_MAX_SGL];
+	int				num_sge;
+	/* Max inline data is 96 bytes */
+	u32				inline_len;
+#define BNXT_QPLIB_SWQE_MAX_INLINE_LENGTH		96
+	u8		inline_data[BNXT_QPLIB_SWQE_MAX_INLINE_LENGTH];
+
+	union {
+		/* Send, with imm, inval key */
+		struct {
+			u32		imm_data_or_inv_key;
+			u32		q_key;
+			u32		dst_qp;
+			u16		avid;
+		} send;
+
+		/* Send Raw Ethernet and QP1 */
+		struct {
+			u16		lflags;
+			u16		cfa_action;
+			u32		cfa_meta;
+		} rawqp1;
+
+		/* RDMA write, with imm, read */
+		struct {
+			u32		imm_data_or_inv_key;
+			u64		remote_va;
+			u32		r_key;
+		} rdma;
+
+		/* Atomic cmp/swap, fetch/add */
+		struct {
+			u64		remote_va;
+			u32		r_key;
+			u64		swap_data;
+			u64		cmp_data;
+		} atomic;
+
+		/* Local Invalidate */
+		struct {
+			u32		inv_l_key;
+		} local_inv;
+
+		/* FR-PMR */
+		struct {
+			u8		access_cntl;
+			u8		pg_sz_log;
+			bool		zero_based;
+			u32		l_key;
+			u32		length;
+			u8		pbl_pg_sz_log;
+#define BNXT_QPLIB_SWQE_PAGE_SIZE_4K			0
+#define BNXT_QPLIB_SWQE_PAGE_SIZE_8K			1
+#define BNXT_QPLIB_SWQE_PAGE_SIZE_64K			4
+#define BNXT_QPLIB_SWQE_PAGE_SIZE_256K			6
+#define BNXT_QPLIB_SWQE_PAGE_SIZE_1M			8
+#define BNXT_QPLIB_SWQE_PAGE_SIZE_2M			9
+#define BNXT_QPLIB_SWQE_PAGE_SIZE_4M			10
+#define BNXT_QPLIB_SWQE_PAGE_SIZE_1G			18
+			u8		levels;
+#define PAGE_SHIFT_4K	12
+			u64		*pbl_ptr;
+			dma_addr_t	pbl_dma_ptr;
+			u64		*page_list;
+			u16		page_list_len;
+			u64		va;
+		} frmr;
+
+		/* Bind */
+		struct {
+			u8		access_cntl;
+#define BNXT_QPLIB_BIND_SWQE_ACCESS_LOCAL_WRITE		BIT(0)
+#define BNXT_QPLIB_BIND_SWQE_ACCESS_REMOTE_READ		BIT(1)
+#define BNXT_QPLIB_BIND_SWQE_ACCESS_REMOTE_WRITE	BIT(2)
+#define BNXT_QPLIB_BIND_SWQE_ACCESS_REMOTE_ATOMIC	BIT(3)
+#define BNXT_QPLIB_BIND_SWQE_ACCESS_WINDOW_BIND		BIT(4)
+			bool		zero_based;
+			u8		mw_type;
+			u32		parent_l_key;
+			u32		r_key;
+			u64		va;
+			u32		length;
+		} bind;
+	};
+};
+
+#define BNXT_QPLIB_MAX_RQE_ENTRY_SIZE	sizeof(struct rq_wqe)
+
+#define RQE_CNT_PER_PG		(PAGE_SIZE / BNXT_QPLIB_MAX_RQE_ENTRY_SIZE)
+#define RQE_MAX_IDX_PER_PG	(RQE_CNT_PER_PG - 1)
+#define RQE_PG(x)		(((x) & ~RQE_MAX_IDX_PER_PG) / RQE_CNT_PER_PG)
+#define RQE_IDX(x)		((x) & RQE_MAX_IDX_PER_PG)
+
+struct bnxt_qplib_q {
+	struct bnxt_qplib_hwq		hwq;
+	struct bnxt_qplib_swq		*swq;
+	struct scatterlist		*sglist;
+	u32				nmap;
+	u32				max_wqe;
+	u16				max_sge;
+	u32				psn;
+	bool				flush_in_progress;
+};
+
+struct bnxt_qplib_qp {
+	struct bnxt_qplib_pd		*pd;
+	struct bnxt_qplib_dpi		*dpi;
+	u64				qp_handle;
+	u32				id;
+	u8				type;
+	u8				sig_type;
+	u64				modify_flags;
+	u8				state;
+	u8				cur_qp_state;
+	u32				max_inline_data;
+	u32				mtu;
+	u32				path_mtu;
+	bool				en_sqd_async_notify;
+	u16				pkey_index;
+	u32				qkey;
+	u32				dest_qp_id;
+	u8				access;
+	u8				timeout;
+	u8				retry_cnt;
+	u8				rnr_retry;
+	u32				min_rnr_timer;
+	u32				max_rd_atomic;
+	u32				max_dest_rd_atomic;
+	u32				dest_qpn;
+	u8				smac[6];
+	u16				vlan_id;
+	u8				nw_type;
+	struct bnxt_qplib_ah		ah;
+
+#define BTH_PSN_MASK			((1 << 24) - 1)
+	/* SQ */
+	struct bnxt_qplib_q		sq;
+	/* RQ */
+	struct bnxt_qplib_q		rq;
+	/* SRQ */
+	struct bnxt_qplib_srq		*srq;
+	/* CQ */
+	struct bnxt_qplib_cq		*scq;
+	struct bnxt_qplib_cq		*rcq;
+	/* IRRQ and ORRQ */
+	struct bnxt_qplib_hwq		irrq;
+	struct bnxt_qplib_hwq		orrq;
+	/* Header buffer for QP1 */
+	int				sq_hdr_buf_size;
+	int				rq_hdr_buf_size;
+/*
+ * Buffer space for ETH(14), IP or GRH(40), UDP header(8)
+ * and ib_bth + ib_deth (20).
+ * Max required is 82 when RoCE V2 is enabled
+ */
+#define BNXT_QPLIB_MAX_QP1_SQ_HDR_SIZE_V2	86
+	/* Ethernet header	=  14 */
+	/* ib_grh		=  40 (provided by MAD) */
+	/* ib_bth + ib_deth	=  20 */
+	/* MAD			= 256 (provided by MAD) */
+	/* iCRC			=   4 */
+#define BNXT_QPLIB_MAX_QP1_RQ_ETH_HDR_SIZE	14
+#define BNXT_QPLIB_MAX_QP1_RQ_HDR_SIZE_V2	512
+#define BNXT_QPLIB_MAX_GRH_HDR_SIZE_IPV4	20
+#define BNXT_QPLIB_MAX_GRH_HDR_SIZE_IPV6	40
+#define BNXT_QPLIB_MAX_QP1_RQ_BDETH_HDR_SIZE	20
+	void				*sq_hdr_buf;
+	dma_addr_t			sq_hdr_buf_map;
+	void				*rq_hdr_buf;
+	dma_addr_t			rq_hdr_buf_map;
+};
+
 #define BNXT_QPLIB_MAX_CQE_ENTRY_SIZE	sizeof(struct cq_base)
+
+#define CQE_CNT_PER_PG		(PAGE_SIZE / BNXT_QPLIB_MAX_CQE_ENTRY_SIZE)
+#define CQE_MAX_IDX_PER_PG	(CQE_CNT_PER_PG - 1)
+#define CQE_PG(x)		(((x) & ~CQE_MAX_IDX_PER_PG) / CQE_CNT_PER_PG)
+#define CQE_IDX(x)		((x) & CQE_MAX_IDX_PER_PG)
+
+#define ROCE_CQE_CMP_V			0
+#define CQE_CMP_VALID(hdr, raw_cons, cp_bit)			\
+	(!!((hdr)->cqe_type_toggle & CQ_BASE_TOGGLE) ==		\
+	   !((raw_cons) & (cp_bit)))
 
 struct bnxt_qplib_cqe {
 	u8				status;
@@ -81,6 +319,13 @@ struct bnxt_qplib_cq {
 #define CQ_FLAGS_RESIZE_IN_PROG		1
 	wait_queue_head_t		waitq;
 };
+
+#define BNXT_QPLIB_MAX_IRRQE_ENTRY_SIZE	sizeof(struct xrrq_irrq)
+#define BNXT_QPLIB_MAX_ORRQE_ENTRY_SIZE	sizeof(struct xrrq_orrq)
+#define IRD_LIMIT_TO_IRRQ_SLOTS(x)	(2 * (x) + 2)
+#define IRRQ_SLOTS_TO_IRD_LIMIT(s)	(((s) >> 1) - 1)
+#define ORD_LIMIT_TO_ORRQ_SLOTS(x)	((x) + 1)
+#define ORRQ_SLOTS_TO_ORD_LIMIT(s)	((s) - 1)
 
 #define BNXT_QPLIB_MAX_NQE_ENTRY_SIZE	sizeof(struct nq_base)
 
@@ -140,6 +385,11 @@ int bnxt_qplib_enable_nq(struct pci_dev *pdev, struct bnxt_qplib_nq *nq,
 			 int (*srqn_handler)(struct bnxt_qplib_nq *nq,
 					     void *srq,
 					     u8 event));
+int bnxt_qplib_create_qp1(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp);
+int bnxt_qplib_create_qp(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp);
+int bnxt_qplib_modify_qp(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp);
+int bnxt_qplib_query_qp(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp);
+int bnxt_qplib_destroy_qp(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp);
 int bnxt_qplib_create_cq(struct bnxt_qplib_res *res, struct bnxt_qplib_cq *cq);
 int bnxt_qplib_destroy_cq(struct bnxt_qplib_res *res, struct bnxt_qplib_cq *cq);
 

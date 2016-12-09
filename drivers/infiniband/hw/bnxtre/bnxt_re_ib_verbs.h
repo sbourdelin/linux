@@ -57,6 +57,19 @@ struct bnxt_re_ah {
 	struct bnxt_qplib_ah	qplib_ah;
 };
 
+struct bnxt_re_qp {
+	struct list_head	list;
+	struct bnxt_re_dev	*rdev;
+	struct ib_qp		ib_qp;
+	spinlock_t		sq_lock;	/* protect sq */
+	struct bnxt_qplib_qp	qplib_qp;
+	struct ib_umem		*sumem;
+	struct ib_umem		*rumem;
+	/* QP1 */
+	u32			send_psn;
+	struct ib_ud_header	qp1_hdr;
+};
+
 struct bnxt_re_cq {
 	struct bnxt_re_dev	*rdev;
 	spinlock_t              cq_lock;	/* protect cq */
@@ -141,6 +154,14 @@ struct ib_ah *bnxt_re_create_ah(struct ib_pd *pd,
 int bnxt_re_modify_ah(struct ib_ah *ah, struct ib_ah_attr *ah_attr);
 int bnxt_re_query_ah(struct ib_ah *ah, struct ib_ah_attr *ah_attr);
 int bnxt_re_destroy_ah(struct ib_ah *ah);
+struct ib_qp *bnxt_re_create_qp(struct ib_pd *pd,
+				struct ib_qp_init_attr *qp_init_attr,
+				struct ib_udata *udata);
+int bnxt_re_modify_qp(struct ib_qp *qp, struct ib_qp_attr *qp_attr,
+		      int qp_attr_mask, struct ib_udata *udata);
+int bnxt_re_query_qp(struct ib_qp *qp, struct ib_qp_attr *qp_attr,
+		     int qp_attr_mask, struct ib_qp_init_attr *qp_init_attr);
+int bnxt_re_destroy_qp(struct ib_qp *qp);
 struct ib_cq *bnxt_re_create_cq(struct ib_device *ibdev,
 				const struct ib_cq_init_attr *attr,
 				struct ib_ucontext *context,
