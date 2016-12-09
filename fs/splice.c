@@ -396,6 +396,9 @@ static ssize_t default_file_splice_read(struct file *in, loff_t *ppos,
 	if (pipe->nrbufs == pipe->buffers)
 		return -EAGAIN;
 
+	if (unlikely(!(in->f_mode & FMODE_SPLICE_READ)))
+		return -EINVAL;
+
 	/*
 	 * Try to keep page boundaries matching to source pagecache ones -
 	 * it probably won't be much help, but...
@@ -823,6 +826,9 @@ static ssize_t default_file_splice_write(struct pipe_inode_info *pipe,
 					 size_t len, unsigned int flags)
 {
 	ssize_t ret;
+
+	if (unlikely(!(out->f_mode & FMODE_SPLICE_WRITE)))
+		return -EINVAL;
 
 	ret = splice_from_pipe(pipe, out, ppos, len, flags, write_pipe_buf);
 	if (ret > 0)
