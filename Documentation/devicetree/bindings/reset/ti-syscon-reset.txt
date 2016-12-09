@@ -44,7 +44,7 @@ Required properties:
 			              reset status register
 			    Cell #7 : Flags used to control reset behavior,
 			              availible flags defined in the DT include
-			              file <dt-bindings/reset/ti-syscon.h>
+			              file <include/dt-bindings/reset/ti-syscon.h>
 
 SysCon Reset Consumer Nodes
 ===========================
