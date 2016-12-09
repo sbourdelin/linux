@@ -59,6 +59,7 @@
 #include "bnxt_qplib_fp.h"
 #include "bnxt_qplib_rcfw.h"
 #include "bnxt_re.h"
+#include "bnxt_re_ib_verbs.h"
 #include "bnxt.h"
 static char version[] =
 		BNXT_RE_DESC " v" ROCE_DRV_MODULE_VERSION "\n";
@@ -424,6 +425,12 @@ static int bnxt_re_register_ib(struct bnxt_re_dev *rdev)
 
 	ibdev->num_comp_vectors	= 1;
 	ibdev->dma_device = &rdev->en_dev->pdev->dev;
+	ibdev->alloc_pd			= bnxt_re_alloc_pd;
+	ibdev->dealloc_pd		= bnxt_re_dealloc_pd;
+	ibdev->alloc_ucontext		= bnxt_re_alloc_ucontext;
+	ibdev->dealloc_ucontext		= bnxt_re_dealloc_ucontext;
+	ibdev->mmap			= bnxt_re_mmap;
+
 	return ib_register_device(ibdev, NULL);
 }
 

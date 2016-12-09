@@ -39,4 +39,27 @@
 #ifndef __BNXT_RE_IB_VERBS_H__
 #define __BNXT_RE_IB_VERBS_H__
 
+struct bnxt_re_pd {
+	struct bnxt_re_dev	*rdev;
+	struct ib_pd		ib_pd;
+	struct bnxt_qplib_pd	qplib_pd;
+	struct bnxt_qplib_dpi	dpi;
+};
+
+struct bnxt_re_ucontext {
+	struct bnxt_re_dev	*rdev;
+	struct ib_ucontext	ib_uctx;
+	struct bnxt_qplib_dpi	*dpi;
+	void			*shpg;
+	spinlock_t		sh_lock;	/* protect shpg */
+};
+
+struct ib_pd *bnxt_re_alloc_pd(struct ib_device *ibdev,
+			       struct ib_ucontext *context,
+			       struct ib_udata *udata);
+int bnxt_re_dealloc_pd(struct ib_pd *pd);
+struct ib_ucontext *bnxt_re_alloc_ucontext(struct ib_device *ibdev,
+					   struct ib_udata *udata);
+int bnxt_re_dealloc_ucontext(struct ib_ucontext *context);
+int bnxt_re_mmap(struct ib_ucontext *context, struct vm_area_struct *vma);
 #endif /* __BNXT_RE_IB_VERBS_H__ */
