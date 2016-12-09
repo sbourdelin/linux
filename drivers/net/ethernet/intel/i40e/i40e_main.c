@@ -24,6 +24,7 @@
  *
  ******************************************************************************/
 
+#include <linux/bpf.h>
 #include <linux/etherdevice.h>
 #include <linux/of_net.h>
 #include <linux/pci.h>
@@ -2361,6 +2362,13 @@ static int i40e_change_mtu(struct net_device *netdev, int new_mtu)
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_vsi *vsi = np->vsi;
 
+	if (i40e_enabled_xdp_vsi(vsi)) {
+		int max_frame = new_mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
+
+		if (max_frame > I40E_RXBUFFER_2048)
+			return -EINVAL;
+	}
+
 	netdev_info(netdev, "changing MTU from %d to %d\n",
 		    netdev->mtu, new_mtu);
 	netdev->mtu = new_mtu;
@@ -3035,6 +3043,15 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	/* cache tail for quicker writes, and clear the reg before use */
 	ring->tail = hw->hw_addr + I40E_QRX_TAIL(pf_q);
 	writel(0, ring->tail);
+
+	if (i40e_enabled_xdp_vsi(vsi)) {
+		struct bpf_prog *prog;
+
+		prog = bpf_prog_add(vsi->xdp_prog, 1);
+		if (IS_ERR(prog))
+			return PTR_ERR(prog);
+		ring->xdp_prog = prog;
+	}
 
 	i40e_alloc_rx_buffers(ring, I40E_DESC_UNUSED(ring));
 
@@ -9186,6 +9203,65 @@ out_err:
 	return features & ~(NETIF_F_CSUM_MASK | NETIF_F_GSO_MASK);
 }
 
+/**
+ * i40e_xdp_setup - Add/remove an XDP program to a VSI
+ * @vsi: the VSI to add the program
+ * @prog: the XDP program
+ **/
+static int i40e_xdp_setup(struct i40e_vsi *vsi,
+			  struct bpf_prog *prog)
+{
+	struct i40e_pf *pf = vsi->back;
+	struct net_device *netdev = vsi->netdev;
+	int frame_size = netdev->mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
+
+	if (prog && prog->xdp_adjust_head)
+		return -EOPNOTSUPP;
+
+	if (frame_size > I40E_RXBUFFER_2048)
+		return -EINVAL;
+
+	if (!(pf->flags & I40E_FLAG_MSIX_ENABLED))
+		return -EINVAL;
+
+	if (!i40e_enabled_xdp_vsi(vsi) && !prog)
+		return 0;
+
+	i40e_prep_for_reset(pf);
+
+	if (vsi->xdp_prog)
+		bpf_prog_put(vsi->xdp_prog);
+	vsi->xdp_prog = prog;
+
+	i40e_reset_and_rebuild(pf, true);
+	return 0;
+}
+
+/**
+ * i40e_xdp - NDO for enabled/query
+ * @dev: the netdev
+ * @xdp: XDP program
+ **/
+static int i40e_xdp(struct net_device *dev,
+		    struct netdev_xdp *xdp)
+{
+	struct i40e_netdev_priv *np = netdev_priv(dev);
+	struct i40e_vsi *vsi = np->vsi;
+
+	if (vsi->type != I40E_VSI_MAIN)
+		return -EINVAL;
+
+	switch (xdp->command) {
+	case XDP_SETUP_PROG:
+		return i40e_xdp_setup(vsi, xdp->prog);
+	case XDP_QUERY_PROG:
+		xdp->prog_attached = i40e_enabled_xdp_vsi(vsi);
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
 static const struct net_device_ops i40e_netdev_ops = {
 	.ndo_open		= i40e_open,
 	.ndo_stop		= i40e_close,
@@ -9222,6 +9298,7 @@ static const struct net_device_ops i40e_netdev_ops = {
 	.ndo_features_check	= i40e_features_check,
 	.ndo_bridge_getlink	= i40e_ndo_bridge_getlink,
 	.ndo_bridge_setlink	= i40e_ndo_bridge_setlink,
+	.ndo_xdp                = i40e_xdp,
 };
 
 /**
