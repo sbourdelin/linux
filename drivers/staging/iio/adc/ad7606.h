@@ -34,6 +34,7 @@ struct ad7606_state {
 	const struct ad7606_bus_ops	*bops;
 	unsigned int			range;
 	unsigned int			oversampling;
+	unsigned int			scale_avail[2][2];
 	bool				done;
 	void __iomem			*base_address;
 
