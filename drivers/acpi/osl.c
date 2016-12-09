@@ -452,8 +452,12 @@ acpi_get_table_with_size(char *signature,
 
 	status = acpi_get_table(signature, instance, out_table);
 	if (ACPI_SUCCESS(status)) {
-		/* No longer used by early_acpi_os_unmap_memory() */
-		*tbl_size = 0;
+		/*
+		 * No longer used by early_acpi_os_unmap_memory(), but still
+		 * used by the ACPI table drivers.
+		 */
+		if (*out_table)
+			*tbl_size = (*out_table)->length;
 	}
 
 	return (status);
