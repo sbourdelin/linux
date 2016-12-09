@@ -45,6 +45,9 @@
 #define BNXT_RE_REF_WAIT_COUNT		10
 #define BNXT_RE_DESC	"Broadcom NetXtreme-C/E RoCE Driver"
 
+#define BNXT_RE_ROCE_V1_ETH_TYPE	0x8915
+#define BNXT_RE_ROCE_V2_PORT_NO		4791
+
 #define BNXT_RE_PAGE_SIZE_4K		BIT(12)
 #define BNXT_RE_PAGE_SIZE_8K		BIT(13)
 #define BNXT_RE_PAGE_SIZE_64K		BIT(16)
@@ -94,6 +97,9 @@ struct bnxt_re_dev {
 	int				num_msix;
 
 	int				id;
+
+	struct delayed_work		worker;
+	u8				cur_prio_map;
 
 	/* FP Notification Queue (CQ & SRQ) */
 	struct tasklet_struct		nq_task;

@@ -44,6 +44,7 @@
 #include <linux/rculist.h>
 #include <linux/spinlock.h>
 #include <linux/pci.h>
+#include <net/dcbnl.h>
 #include <net/ipv6.h>
 #include <net/addrconf.h>
 
@@ -734,6 +735,50 @@ static void bnxt_re_dispatch_event(struct ib_device *ibdev, struct ib_qp *qp,
 	ib_dispatch_event(&ib_event);
 }
 
+#define HWRM_QUEUE_PRI2COS_QCFG_INPUT_FLAGS_IVLAN      0x02
+static int bnxt_re_query_hwrm_pri2cos(struct bnxt_re_dev *rdev, u8 dir,
+				      u64 *cid_map)
+{
+	struct hwrm_queue_pri2cos_qcfg_input req = {0};
+	struct bnxt *bp = netdev_priv(rdev->netdev);
+	struct hwrm_queue_pri2cos_qcfg_output resp;
+	struct bnxt_en_dev *en_dev = rdev->en_dev;
+	struct bnxt_fw_msg fw_msg;
+	u32 flags = 0;
+	u8 *qcfgmap, *tmp_map;
+	int rc = 0, i;
+
+	if (!cid_map)
+		return -EINVAL;
+
+	memset(&fw_msg, 0, sizeof(fw_msg));
+	bnxt_re_init_hwrm_hdr(rdev, (void *)&req,
+			      HWRM_QUEUE_PRI2COS_QCFG, -1, -1);
+	flags |= (dir & 0x01);
+	flags |= HWRM_QUEUE_PRI2COS_QCFG_INPUT_FLAGS_IVLAN;
+	req.flags = cpu_to_le32(flags);
+	req.port_id = bp->pf.port_id;
+
+	bnxt_re_fill_fw_msg(&fw_msg, (void *)&req, sizeof(req), (void *)&resp,
+			    sizeof(resp), DFLT_HWRM_CMD_TIMEOUT);
+	rc = en_dev->en_ops->bnxt_send_fw_msg(en_dev, BNXT_ROCE_ULP, &fw_msg);
+	if (rc)
+		return rc;
+
+	if (resp.queue_cfg_info) {
+		dev_warn(rdev_to_dev(rdev),
+			 "Asymmetric cos queue configuration detected");
+		dev_warn(rdev_to_dev(rdev),
+			 " on device, QoS may not be fully functional\n");
+	}
+	qcfgmap = &resp.pri0_cos_queue_id;
+	tmp_map = (u8 *)cid_map;
+	for (i = 0; i < IEEE_8021QAZ_MAX_TCS; i++)
+		tmp_map[i] = qcfgmap[i];
+
+	return rc;
+}
+
 static bool bnxt_re_is_qp1_or_shadow_qp(struct bnxt_re_dev *rdev,
 					struct bnxt_re_qp *qp)
 {
@@ -774,6 +819,80 @@ static void bnxt_re_dev_stop(struct bnxt_re_dev *rdev, bool qp_wait)
 	}
 }
 
+static u32 bnxt_re_get_priority_mask(struct bnxt_re_dev *rdev)
+{
+	u32 prio_map = 0, tmp_map = 0;
+	struct net_device *netdev;
+	struct dcb_app app;
+
+	netdev = rdev->netdev;
+
+	memset(&app, 0, sizeof(app));
+	app.selector = IEEE_8021QAZ_APP_SEL_ETHERTYPE;
+	app.protocol = BNXT_RE_ROCE_V1_ETH_TYPE;
+	tmp_map = dcb_ieee_getapp_mask(netdev, &app);
+	prio_map = tmp_map;
+
+	app.selector = IEEE_8021QAZ_APP_SEL_DGRAM;
+	app.protocol = BNXT_RE_ROCE_V2_PORT_NO;
+	tmp_map = dcb_ieee_getapp_mask(netdev, &app);
+	prio_map |= tmp_map;
+
+	if (!prio_map)
+		prio_map = -EFAULT;
+	return prio_map;
+}
+
+static void bnxt_re_parse_cid_map(u8 prio_map, u8 *cid_map, u16 *cosq)
+{
+	u16 prio;
+	u8 id;
+
+	for (prio = 0, id = 0; prio < 8; prio++) {
+		if (prio_map & (1 << prio)) {
+			cosq[id] = cid_map[prio];
+			id++;
+			if (id == 2) /* Max 2 tcs supported */
+				break;
+		}
+	}
+}
+
+static int bnxt_re_setup_qos(struct bnxt_re_dev *rdev)
+{
+	u8 prio_map = 0;
+	u64 cid_map;
+	int rc;
+
+	/* Get priority for roce */
+	rc = bnxt_re_get_priority_mask(rdev);
+	if (rc < 0)
+		return rc;
+	prio_map = (u8)rc;
+
+	if (prio_map == rdev->cur_prio_map)
+		return 0;
+	rdev->cur_prio_map = prio_map;
+	/* Get cosq id for this priority */
+	rc = bnxt_re_query_hwrm_pri2cos(rdev, 0, &cid_map);
+	if (rc) {
+		dev_warn(rdev_to_dev(rdev), "no cos for p_mask %x\n", prio_map);
+		return rc;
+	}
+	/* Parse CoS IDs for app priority */
+	bnxt_re_parse_cid_map(prio_map, (u8 *)&cid_map, rdev->cosq);
+
+	/* Config BONO. */
+	rc = bnxt_qplib_map_tc2cos(&rdev->qplib_res, rdev->cosq);
+	if (rc) {
+		dev_warn(rdev_to_dev(rdev), "no tc for cos{%x, %x}\n",
+			 rdev->cosq[0], rdev->cosq[1]);
+		return rc;
+	}
+
+	return 0;
+}
+
 static void bnxt_re_ib_unreg(struct bnxt_re_dev *rdev, bool lock_wait)
 {
 	int i, rc;
@@ -785,6 +904,9 @@ static void bnxt_re_ib_unreg(struct bnxt_re_dev *rdev, bool lock_wait)
 		/* Cleanup ib dev */
 		bnxt_re_unregister_ib(rdev);
 	}
+	if (test_and_clear_bit(BNXT_RE_FLAG_QOS_WORK_REG, &rdev->flags))
+		cancel_delayed_work(&rdev->worker);
+
 	bnxt_re_cleanup_res(rdev);
 	bnxt_re_free_res(rdev, lock_wait);
 
@@ -825,6 +947,16 @@ static void bnxt_re_set_resource_limits(struct bnxt_re_dev *rdev)
 	for (i = 0; i < MAX_TQM_ALLOC_REQ; i++)
 		rdev->qplib_ctx.tqm_count[i] =
 		rdev->dev_attr.tqm_alloc_reqs[i];
+}
+
+/* worker thread for polling periodic events. Now used for QoS programming*/
+static void bnxt_re_worker(struct work_struct *work)
+{
+	struct bnxt_re_dev *rdev = container_of(work, struct bnxt_re_dev,
+						worker.work);
+
+	bnxt_re_setup_qos(rdev);
+	schedule_delayed_work(&rdev->worker, msecs_to_jiffies(30000));
 }
 
 static int bnxt_re_ib_reg(struct bnxt_re_dev *rdev)
@@ -910,6 +1042,14 @@ static int bnxt_re_ib_reg(struct bnxt_re_dev *rdev)
 		pr_err("Failed to initialize resources: %#x\n", rc);
 		goto fail;
 	}
+
+	rc = bnxt_re_setup_qos(rdev);
+	if (rc)
+		pr_info("RoCE priority not yet configured\n");
+
+	INIT_DELAYED_WORK(&rdev->worker, bnxt_re_worker);
+	set_bit(BNXT_RE_FLAG_QOS_WORK_REG, &rdev->flags);
+	schedule_delayed_work(&rdev->worker, msecs_to_jiffies(30000));
 
 	/* Register ib dev */
 	rc = bnxt_re_register_ib(rdev);

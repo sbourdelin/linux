@@ -156,4 +156,5 @@ int bnxt_qplib_alloc_fast_reg_page_list(struct bnxt_qplib_res *res,
 					struct bnxt_qplib_frpl *frpl, int max);
 int bnxt_qplib_free_fast_reg_page_list(struct bnxt_qplib_res *res,
 				       struct bnxt_qplib_frpl *frpl);
-#endif /* __BNXT_QPLIB_SP_H__*/
+int bnxt_qplib_map_tc2cos(struct bnxt_qplib_res *res, u16 *cids);
+#endif
