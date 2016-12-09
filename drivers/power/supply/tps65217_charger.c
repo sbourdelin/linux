@@ -202,6 +202,7 @@ static int tps65217_charger_probe(struct platform_device *pdev)
 	struct tps65217 *tps = dev_get_drvdata(pdev->dev.parent);
 	struct tps65217_charger *charger;
 	struct power_supply_config cfg = {};
+	struct task_struct *poll_task;
 	int irq[NUM_CHARGER_IRQS];
 	int ret;
 	int i;
@@ -238,15 +239,16 @@ static int tps65217_charger_probe(struct platform_device *pdev)
 
 	/* Create a polling thread if an interrupt is invalid */
 	if (irq[0] < 0 || irq[1] < 0) {
-		charger->poll_task = kthread_run(tps65217_charger_poll_task,
-						charger, "ktps65217charger");
-		if (IS_ERR(charger->poll_task)) {
-			ret = PTR_ERR(charger->poll_task);
+		poll_task = kthread_run(tps65217_charger_poll_task,
+					charger, "ktps65217charger");
+		if (IS_ERR(poll_task)) {
+			ret = PTR_ERR(poll_task);
 			dev_err(charger->dev,
 				"Unable to run kthread err %d\n", ret);
 			return ret;
 		}
 
+		charger->poll_task = poll_task;
 		return 0;
 	}
 
@@ -274,7 +276,7 @@ static int tps65217_charger_remove(struct platform_device *pdev)
 {
 	struct tps65217_charger *charger = platform_get_drvdata(pdev);
 
-	if (charger->irq == -ENXIO)
+	if (charger->poll_task)
 		kthread_stop(charger->poll_task);
 
 	return 0;
