@@ -425,6 +425,8 @@ static int bnxt_re_register_ib(struct bnxt_re_dev *rdev)
 
 	ibdev->num_comp_vectors	= 1;
 	ibdev->dma_device = &rdev->en_dev->pdev->dev;
+	ibdev->query_device		= bnxt_re_query_device;
+	ibdev->modify_device		= bnxt_re_modify_device;
 	ibdev->alloc_pd			= bnxt_re_alloc_pd;
 	ibdev->dealloc_pd		= bnxt_re_dealloc_pd;
 	ibdev->alloc_ucontext		= bnxt_re_alloc_ucontext;
