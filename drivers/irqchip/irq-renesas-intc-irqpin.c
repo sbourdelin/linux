@@ -374,7 +374,6 @@ static const struct intc_irqpin_config intc_irqpin_rmobile = {
 };
 
 static const struct of_device_id intc_irqpin_dt_ids[] = {
-	{ .compatible = "renesas,intc-irqpin", },
 	{ .compatible = "renesas,intc-irqpin-r8a7778",
 	  .data = &intc_irqpin_irlm_r8a777x },
 	{ .compatible = "renesas,intc-irqpin-r8a7779",
@@ -383,6 +382,7 @@ static const struct of_device_id intc_irqpin_dt_ids[] = {
 	  .data = &intc_irqpin_rmobile },
 	{ .compatible = "renesas,intc-irqpin-sh73a0",
 	  .data = &intc_irqpin_rmobile },
+	{ .compatible = "renesas,intc-irqpin", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, intc_irqpin_dt_ids);
