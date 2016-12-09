@@ -55,4 +55,15 @@ struct bnxt_re_pd_resp {
 	__u64 dbr;
 } __packed;
 
+struct bnxt_re_cq_req {
+	__u64 cq_va;
+	__u64 cq_handle;
+} __packed;
+
+struct bnxt_re_cq_resp {
+	__u32 cqid;
+	__u32 tail;
+	__u32 phase;
+} __packed;
+
 #endif /* __BNXT_RE_UVERBS_ABI_H__*/

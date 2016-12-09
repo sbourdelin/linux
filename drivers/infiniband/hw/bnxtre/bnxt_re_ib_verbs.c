@@ -60,6 +60,16 @@
 #include "bnxt_re_ib_verbs.h"
 #include <rdma/bnxt_re_uverbs_abi.h>
 
+static int bnxt_re_copy_to_udata(struct bnxt_re_dev *rdev, void *data, int len,
+				 struct ib_udata *udata)
+{
+	int rc;
+
+	rc = ib_copy_to_udata(udata, data, len);
+
+	return rc ? -EFAULT : 0;
+}
+
 /* Device */
 struct net_device *bnxt_re_get_netdev(struct ib_device *ibdev, u8 port_num)
 {
@@ -490,6 +500,150 @@ dbfail:
 fail:
 	kfree(pd);
 	return ERR_PTR(rc);
+}
+
+/* Completion Queues */
+int bnxt_re_destroy_cq(struct ib_cq *ib_cq)
+{
+	struct bnxt_re_cq *cq = to_bnxt_re(ib_cq, struct bnxt_re_cq, ib_cq);
+	struct bnxt_re_dev *rdev = cq->rdev;
+	int rc;
+
+	rc = bnxt_qplib_destroy_cq(&rdev->qplib_res, &cq->qplib_cq);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev), "Failed to destroy HW CQ");
+		return rc;
+	}
+	if (cq->umem && !IS_ERR(cq->umem))
+		ib_umem_release(cq->umem);
+
+	if (cq) {
+		kfree(cq->cql);
+		kfree(cq);
+	}
+	atomic_dec(&rdev->cq_count);
+	rdev->nq.budget--;
+	return 0;
+}
+
+struct ib_cq *bnxt_re_create_cq(struct ib_device *ibdev,
+				const struct ib_cq_init_attr *attr,
+				struct ib_ucontext *context,
+				struct ib_udata *udata)
+{
+	struct bnxt_re_dev *rdev = to_bnxt_re_dev(ibdev, ibdev);
+	struct bnxt_qplib_dev_attr *dev_attr = &rdev->dev_attr;
+	struct bnxt_re_cq *cq = NULL;
+	int rc, entries;
+	int cqe = attr->cqe;
+
+	/* Validate CQ fields */
+	if (cqe < 1 || cqe > dev_attr->max_cq_wqes) {
+		dev_err(rdev_to_dev(rdev), "Failed to create CQ -max exceeded");
+		return ERR_PTR(-EINVAL);
+	}
+	cq = kzalloc(sizeof(*cq), GFP_KERNEL);
+	if (!cq)
+		return ERR_PTR(-ENOMEM);
+
+	cq->rdev = rdev;
+	cq->qplib_cq.cq_handle = (u64)&cq->qplib_cq;
+
+	entries = roundup_pow_of_two(cqe + 1);
+	if (entries > dev_attr->max_cq_wqes + 1)
+		entries = dev_attr->max_cq_wqes + 1;
+
+	if (context) {
+		struct bnxt_re_cq_req req;
+		struct bnxt_re_ucontext *uctx = to_bnxt_re(context,
+						   struct bnxt_re_ucontext,
+						   ib_uctx);
+		if (ib_copy_from_udata(&req, udata, sizeof(req))) {
+			rc = -EFAULT;
+			goto fail;
+		}
+
+		cq->umem = ib_umem_get(context, req.cq_va,
+				       entries * sizeof(struct cq_base),
+				       IB_ACCESS_LOCAL_WRITE, 1);
+		if (IS_ERR(cq->umem)) {
+			rc = PTR_ERR(cq->umem);
+			goto fail;
+		}
+		cq->qplib_cq.sghead = cq->umem->sg_head.sgl;
+		cq->qplib_cq.nmap = cq->umem->nmap;
+		cq->qplib_cq.dpi = uctx->dpi;
+	} else {
+		cq->max_cql = entries > MAX_CQL_PER_POLL ? MAX_CQL_PER_POLL :
+					entries;
+		cq->max_cql = min_t(u32, entries, MAX_CQL_PER_POLL);
+		cq->cql = kcalloc(cq->max_cql, sizeof(struct bnxt_qplib_cqe),
+				  GFP_KERNEL);
+		if (!cq->cql) {
+			rc = -ENOMEM;
+			goto fail;
+		}
+
+		cq->qplib_cq.dpi = &rdev->dpi_privileged;
+		cq->qplib_cq.sghead = NULL;
+		cq->qplib_cq.nmap = 0;
+	}
+	cq->qplib_cq.max_wqe = entries;
+	cq->qplib_cq.cnq_hw_ring_id = rdev->nq.ring_id;
+
+	rc = bnxt_qplib_create_cq(&rdev->qplib_res, &cq->qplib_cq);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev), "Failed to create HW CQ");
+		goto fail;
+	}
+
+	cq->ib_cq.cqe = entries;
+	cq->cq_period = cq->qplib_cq.period;
+	rdev->nq.budget++;
+
+	atomic_inc(&rdev->cq_count);
+
+	if (context) {
+		struct bnxt_re_cq_resp resp;
+
+		resp.cqid = cq->qplib_cq.id;
+		resp.tail = cq->qplib_cq.hwq.cons;
+		resp.phase = cq->qplib_cq.period;
+		rc = bnxt_re_copy_to_udata(rdev, &resp, sizeof(resp), udata);
+		if (rc) {
+			dev_err(rdev_to_dev(rdev), "Failed to copy CQ udata");
+			bnxt_qplib_destroy_cq(&rdev->qplib_res, &cq->qplib_cq);
+			goto c2fail;
+		}
+	}
+
+	return &cq->ib_cq;
+
+c2fail:
+	if (context && cq->umem && !IS_ERR(cq->umem))
+		ib_umem_release(cq->umem);
+fail:
+	kfree(cq->cql);
+	kfree(cq);
+	return ERR_PTR(rc);
+}
+
+int bnxt_re_req_notify_cq(struct ib_cq *ib_cq,
+			  enum ib_cq_notify_flags ib_cqn_flags)
+{
+	struct bnxt_re_cq *cq = to_bnxt_re(ib_cq, struct bnxt_re_cq, ib_cq);
+	int type = 0;
+
+	/* Trigger on the very next completion */
+	if (ib_cqn_flags & IB_CQ_NEXT_COMP)
+		type = DBR_DBR_TYPE_CQ_ARMALL;
+	/* Trigger on the next solicited completion */
+	else if (ib_cqn_flags & IB_CQ_SOLICITED)
+		type = DBR_DBR_TYPE_CQ_ARMSE;
+
+	bnxt_qplib_req_notify_cq(&cq->qplib_cq, type);
+
+	return 0;
 }
 
 struct ib_ucontext *bnxt_re_alloc_ucontext(struct ib_device *ibdev,
