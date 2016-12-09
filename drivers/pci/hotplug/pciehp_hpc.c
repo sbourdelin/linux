@@ -311,8 +311,6 @@ int pciehp_check_link_status(struct controller *ctrl)
 	else
 		msleep(1000);
 
-	/* wait 100ms before read pci conf, and try in 1s */
-	msleep(100);
 	found = pci_bus_check_dev(ctrl->pcie->port->subordinate,
 					PCI_DEVFN(0, 0));
 
