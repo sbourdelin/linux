@@ -60,6 +60,8 @@ struct bnxt_re_work {
 #define BNXT_RE_MIN_MSIX		2
 #define BNXT_RE_MAX_MSIX		16
 #define BNXT_RE_AEQ_IDX			0
+#define BNXT_RE_NQ_IDX			1
+
 struct bnxt_re_dev {
 	struct ib_device		ibdev;
 	struct list_head		list;
@@ -78,8 +80,14 @@ struct bnxt_re_dev {
 
 	int				id;
 
+	/* FP Notification Queue (CQ & SRQ) */
+	struct tasklet_struct		nq_task;
+
 	/* RCFW Channel */
 	struct bnxt_qplib_rcfw		rcfw;
+
+	/* NQ */
+	struct bnxt_qplib_nq		nq;
 
 	/* Device Resources */
 	struct bnxt_qplib_dev_attr	dev_attr;
