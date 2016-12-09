@@ -246,6 +246,46 @@ static int bnxt_qplib_process_func_event(struct bnxt_qplib_rcfw *rcfw,
 	return 0;
 }
 
+static int bnxt_qplib_process_qp_event(struct bnxt_qplib_rcfw *rcfw,
+				       struct creq_qp_event *qp_event)
+{
+	struct bnxt_qplib_crsq *crsq = &rcfw->crsq;
+	struct bnxt_qplib_hwq *cmdq = &rcfw->cmdq;
+	struct bnxt_qplib_crsqe *crsqe;
+	u16 cbit, cookie, blocked = 0;
+	unsigned long flags;
+	u32 sw_cons;
+
+	switch (qp_event->event) {
+	case CREQ_QP_EVENT_EVENT_QP_ERROR_NOTIFICATION:
+		break;
+	default:
+	{
+		/* Command Response */
+		spin_lock_irqsave(&cmdq->lock, flags);
+		sw_cons = HWQ_CMP(crsq->cons, crsq);
+		crsqe = &crsq->crsq[sw_cons];
+		crsq->cons++;
+		memcpy(&crsqe->qp_event, qp_event, sizeof(crsqe->qp_event));
+
+		cookie = le16_to_cpu(crsqe->qp_event.cookie);
+		blocked = cookie & RCFW_CMD_IS_BLOCKING;
+		cookie &= RCFW_MAX_COOKIE_VALUE;
+		cbit = cookie % RCFW_MAX_OUTSTANDING_CMD;
+		if (!test_and_clear_bit(cbit, rcfw->cmdq_bitmap))
+			dev_warn(&rcfw->pdev->dev,
+				 "QPLIB: CMD bit %d was not requested", cbit);
+
+		cmdq->cons += crsqe->req_size;
+		spin_unlock_irqrestore(&cmdq->lock, flags);
+		if (!blocked)
+			wake_up(&rcfw->waitq);
+		break;
+	}
+	}
+	return 0;
+}
+
 /* SP - CREQ Completion handlers */
 static void bnxt_qplib_service_creq(unsigned long data)
 {
@@ -269,6 +309,15 @@ static void bnxt_qplib_service_creq(unsigned long data)
 		type = creqe->type & CREQ_BASE_TYPE_MASK;
 		switch (type) {
 		case CREQ_BASE_TYPE_QP_EVENT:
+			if (!bnxt_qplib_process_qp_event
+			    (rcfw, (struct creq_qp_event *)creqe))
+				rcfw->creq_qp_event_processed++;
+			else {
+				dev_warn(&rcfw->pdev->dev, "QPLIB: crsqe with");
+				dev_warn(&rcfw->pdev->dev,
+					 "QPLIB: type = 0x%x not handled",
+					 type);
+			}
 			break;
 		case CREQ_BASE_TYPE_FUNC_EVENT:
 			if (!bnxt_qplib_process_func_event
