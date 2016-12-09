@@ -133,6 +133,11 @@ struct bnxt_re_dev {
 
 #define to_bnxt_re_dev(ptr, member)	\
 	container_of((ptr), struct bnxt_re_dev, member)
+
+#define BNXT_RE_ROCE_V1_PACKET		0
+#define BNXT_RE_ROCEV2_IPV4_PACKET	2
+#define BNXT_RE_ROCEV2_IPV6_PACKET	3
+
 #define	rdev_to_dev(rdev)	((rdev) ? (&(rdev)->ibdev.dev) : NULL)
 
 #endif
