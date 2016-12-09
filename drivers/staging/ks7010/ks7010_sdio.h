@@ -46,7 +46,7 @@
  */
 #define WSTATUS_RSIZE		0x000014
 #define WSTATUS_MASK		0x80	/* Write Status Register value */
-#define RSIZE_MASK		0x7F	/* Read Data Size Register value [10:4] */
+#define RSIZE_MASK		0x7F	// Read Data Size Register value [10:4]
 
 /* ARM to SD interrupt Enable */
 #define INT_ENABLE		0x000020
@@ -81,11 +81,11 @@
 
 /* AHB Data Window  0x010000-0x01FFFF */
 #define DATA_WINDOW		0x010000
-#define WINDOW_SIZE		64*1024
+#define WINDOW_SIZE		(64 * 1024)
 
 #define KS7010_IRAM_ADDRESS	0x06000000
 
-/* 
+/*
  * struct define
  */
 struct hw_info_t {
@@ -115,7 +115,7 @@ struct ks_sdio_card {
 struct tx_device_buffer {
 	unsigned char *sendp;	/* pointer of send req data */
 	unsigned int size;
-	void (*complete_handler) (void *arg1, void *arg2);
+	void (*complete_handler)(void *arg1, void *arg2);
 	void *arg1;
 	void *arg2;
 };
@@ -142,6 +142,7 @@ struct rx_device {
 	unsigned int qtail;	/* rx buffer queue last pointer */
 	spinlock_t rx_dev_lock;
 };
+
 #define	ROM_FILE "ks7010sd.rom"
 
 #endif /* _KS7010_SDIO_H */
