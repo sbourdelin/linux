@@ -2043,7 +2043,7 @@ bad:
 	return rc;
 }
 
-int bnxt_re_post_recv_shadow_qp(struct bnxt_re_dev *rdev,
+static int bnxt_re_post_recv_shadow_qp(struct bnxt_re_dev *rdev,
 				struct bnxt_re_qp *qp,
 				struct ib_recv_wr *wr)
 {
@@ -2245,6 +2245,525 @@ fail:
 	kfree(cq->cql);
 	kfree(cq);
 	return ERR_PTR(rc);
+}
+
+static u8 __req_to_ib_wc_status(u8 qstatus)
+{
+	switch (qstatus) {
+	case CQ_REQ_STATUS_OK:
+		return IB_WC_SUCCESS;
+	case CQ_REQ_STATUS_BAD_RESPONSE_ERR:
+		return IB_WC_BAD_RESP_ERR;
+	case CQ_REQ_STATUS_LOCAL_LENGTH_ERR:
+		return IB_WC_LOC_LEN_ERR;
+	case CQ_REQ_STATUS_LOCAL_QP_OPERATION_ERR:
+		return IB_WC_LOC_QP_OP_ERR;
+	case CQ_REQ_STATUS_LOCAL_PROTECTION_ERR:
+		return IB_WC_LOC_PROT_ERR;
+	case CQ_REQ_STATUS_MEMORY_MGT_OPERATION_ERR:
+		return IB_WC_GENERAL_ERR;
+	case CQ_REQ_STATUS_REMOTE_INVALID_REQUEST_ERR:
+		return IB_WC_REM_INV_REQ_ERR;
+	case CQ_REQ_STATUS_REMOTE_ACCESS_ERR:
+		return IB_WC_REM_ACCESS_ERR;
+	case CQ_REQ_STATUS_REMOTE_OPERATION_ERR:
+		return IB_WC_REM_OP_ERR;
+	case CQ_REQ_STATUS_RNR_NAK_RETRY_CNT_ERR:
+		return IB_WC_RNR_RETRY_EXC_ERR;
+	case CQ_REQ_STATUS_TRANSPORT_RETRY_CNT_ERR:
+		return IB_WC_RETRY_EXC_ERR;
+	case CQ_REQ_STATUS_WORK_REQUEST_FLUSHED_ERR:
+		return IB_WC_WR_FLUSH_ERR;
+	default:
+		return IB_WC_GENERAL_ERR;
+	}
+	return 0;
+}
+
+static u8 __rawqp1_to_ib_wc_status(u8 qstatus)
+{
+	switch (qstatus) {
+	case CQ_RES_RAWETH_QP1_STATUS_OK:
+		return IB_WC_SUCCESS;
+	case CQ_RES_RAWETH_QP1_STATUS_LOCAL_ACCESS_ERROR:
+		return IB_WC_LOC_ACCESS_ERR;
+	case CQ_RES_RAWETH_QP1_STATUS_HW_LOCAL_LENGTH_ERR:
+		return IB_WC_LOC_LEN_ERR;
+	case CQ_RES_RAWETH_QP1_STATUS_LOCAL_PROTECTION_ERR:
+		return IB_WC_LOC_PROT_ERR;
+	case CQ_RES_RAWETH_QP1_STATUS_LOCAL_QP_OPERATION_ERR:
+		return IB_WC_LOC_QP_OP_ERR;
+	case CQ_RES_RAWETH_QP1_STATUS_MEMORY_MGT_OPERATION_ERR:
+		return IB_WC_GENERAL_ERR;
+	case CQ_RES_RAWETH_QP1_STATUS_WORK_REQUEST_FLUSHED_ERR:
+		return IB_WC_WR_FLUSH_ERR;
+	case CQ_RES_RAWETH_QP1_STATUS_HW_FLUSH_ERR:
+		return IB_WC_WR_FLUSH_ERR;
+	default:
+		return IB_WC_GENERAL_ERR;
+	}
+}
+
+static u8 __rc_to_ib_wc_status(u8 qstatus)
+{
+	switch (qstatus) {
+	case CQ_RES_RC_STATUS_OK:
+		return IB_WC_SUCCESS;
+	case CQ_RES_RC_STATUS_LOCAL_ACCESS_ERROR:
+		return IB_WC_LOC_ACCESS_ERR;
+	case CQ_RES_RC_STATUS_LOCAL_LENGTH_ERR:
+		return IB_WC_LOC_LEN_ERR;
+	case CQ_RES_RC_STATUS_LOCAL_PROTECTION_ERR:
+		return IB_WC_LOC_PROT_ERR;
+	case CQ_RES_RC_STATUS_LOCAL_QP_OPERATION_ERR:
+		return IB_WC_LOC_QP_OP_ERR;
+	case CQ_RES_RC_STATUS_MEMORY_MGT_OPERATION_ERR:
+		return IB_WC_GENERAL_ERR;
+	case CQ_RES_RC_STATUS_REMOTE_INVALID_REQUEST_ERR:
+		return IB_WC_REM_INV_REQ_ERR;
+	case CQ_RES_RC_STATUS_WORK_REQUEST_FLUSHED_ERR:
+		return IB_WC_WR_FLUSH_ERR;
+	case CQ_RES_RC_STATUS_HW_FLUSH_ERR:
+		return IB_WC_WR_FLUSH_ERR;
+	default:
+		return IB_WC_GENERAL_ERR;
+	}
+}
+
+static void bnxt_re_process_req_wc(struct ib_wc *wc, struct bnxt_qplib_cqe *cqe)
+{
+	switch (cqe->type) {
+	case BNXT_QPLIB_SWQE_TYPE_SEND:
+		wc->opcode = IB_WC_SEND;
+		break;
+	case BNXT_QPLIB_SWQE_TYPE_SEND_WITH_IMM:
+		wc->opcode = IB_WC_SEND;
+		wc->wc_flags |= IB_WC_WITH_IMM;
+		break;
+	case BNXT_QPLIB_SWQE_TYPE_SEND_WITH_INV:
+		wc->opcode = IB_WC_SEND;
+		wc->wc_flags |= IB_WC_WITH_INVALIDATE;
+		break;
+	case BNXT_QPLIB_SWQE_TYPE_RDMA_WRITE:
+		wc->opcode = IB_WC_RDMA_WRITE;
+		break;
+	case BNXT_QPLIB_SWQE_TYPE_RDMA_WRITE_WITH_IMM:
+		wc->opcode = IB_WC_RDMA_WRITE;
+		wc->wc_flags |= IB_WC_WITH_IMM;
+		break;
+	case BNXT_QPLIB_SWQE_TYPE_RDMA_READ:
+		wc->opcode = IB_WC_RDMA_READ;
+		break;
+	case BNXT_QPLIB_SWQE_TYPE_ATOMIC_CMP_AND_SWP:
+		wc->opcode = IB_WC_COMP_SWAP;
+		break;
+	case BNXT_QPLIB_SWQE_TYPE_ATOMIC_FETCH_AND_ADD:
+		wc->opcode = IB_WC_FETCH_ADD;
+		break;
+	case BNXT_QPLIB_SWQE_TYPE_LOCAL_INV:
+		wc->opcode = IB_WC_LOCAL_INV;
+		break;
+	case BNXT_QPLIB_SWQE_TYPE_REG_MR:
+		wc->opcode = IB_WC_REG_MR;
+		break;
+	default:
+		wc->opcode = IB_WC_SEND;
+		break;
+	}
+
+	wc->status = __req_to_ib_wc_status(cqe->status);
+}
+
+static int bnxt_re_check_packet_type(u16 raweth_qp1_flags, u16 raweth_qp1_flags2)
+{
+	bool is_udp = false, is_ipv6 = false, is_ipv4 = false;
+
+	/* raweth_qp1_flags Bit 9-6 indicates itype */
+	if ((raweth_qp1_flags & CQ_RES_RAWETH_QP1_RAWETH_QP1_FLAGS_ITYPE_ROCE)
+	    != CQ_RES_RAWETH_QP1_RAWETH_QP1_FLAGS_ITYPE_ROCE)
+		return -1;
+
+	if (raweth_qp1_flags2 &
+	    CQ_RES_RAWETH_QP1_RAWETH_QP1_FLAGS2_IP_CS_CALC &&
+	    raweth_qp1_flags2 &
+	    CQ_RES_RAWETH_QP1_RAWETH_QP1_FLAGS2_L4_CS_CALC) {
+		is_udp = true;
+		/* raweth_qp1_flags2 Bit 8 indicates ip_type. 0-v4 1 - v6 */
+		(raweth_qp1_flags2 &
+		 CQ_RES_RAWETH_QP1_RAWETH_QP1_FLAGS2_IP_TYPE) ?
+			(is_ipv6 = true) : (is_ipv4 = true);
+		return ((is_ipv6) ?
+			 BNXT_RE_ROCEV2_IPV6_PACKET :
+			 BNXT_RE_ROCEV2_IPV4_PACKET);
+	} else {
+		return BNXT_RE_ROCE_V1_PACKET;
+	}
+}
+
+static int bnxt_re_to_ib_nw_type(int nw_type)
+{
+	u8 nw_hdr_type = 0xFF;
+
+	switch (nw_type) {
+	case BNXT_RE_ROCE_V1_PACKET:
+		nw_hdr_type = RDMA_NETWORK_ROCE_V1;
+		break;
+	case BNXT_RE_ROCEV2_IPV4_PACKET:
+		nw_hdr_type = RDMA_NETWORK_IPV4;
+		break;
+	case BNXT_RE_ROCEV2_IPV6_PACKET:
+		nw_hdr_type = RDMA_NETWORK_IPV6;
+		break;
+	}
+	return nw_hdr_type;
+}
+
+static bool bnxt_re_is_loopback_packet(struct bnxt_re_dev *rdev,
+				       void *rq_hdr_buf)
+{
+	u8 *tmp_buf = NULL;
+	struct ethhdr *eth_hdr;
+	u16 eth_type;
+	bool rc = false;
+
+	tmp_buf = (u8 *)rq_hdr_buf;
+	/*
+	 * If dest mac is not same as I/F mac, this could be a
+	 * loopback address or multicast address, check whether
+	 * it is a loopback packet
+	 */
+	if (!ether_addr_equal(tmp_buf, rdev->netdev->dev_addr)) {
+		tmp_buf += 4;
+		/* Check the  ether type */
+		eth_hdr = (struct ethhdr *)tmp_buf;
+		eth_type = ntohs(eth_hdr->h_proto);
+		switch (eth_type) {
+		case BNXT_QPLIB_ETHTYPE_ROCEV1:
+			rc = true;
+			break;
+		case ETH_P_IP:
+		case ETH_P_IPV6: {
+			u32 len;
+			struct udphdr *udp_hdr;
+
+			len = (eth_type == ETH_P_IP ? sizeof(struct iphdr) :
+						      sizeof(struct ipv6hdr));
+			tmp_buf += sizeof(struct ethhdr) + len;
+			udp_hdr = (struct udphdr *)tmp_buf;
+			if (ntohs(udp_hdr->dest) ==
+				    ROCE_V2_UDP_DPORT)
+				rc = true;
+				break;
+			}
+		default:
+			break;
+		}
+	}
+
+	return rc;
+}
+
+static int bnxt_re_process_raw_qp_pkt_rx(struct bnxt_re_qp *qp1_qp,
+					 struct bnxt_qplib_cqe *cqe)
+{
+	struct bnxt_re_dev *rdev = qp1_qp->rdev;
+	struct bnxt_re_sqp_entries *sqp_entry = NULL;
+	struct bnxt_re_qp *qp = rdev->qp1_sqp;
+	struct ib_send_wr *swr;
+	struct ib_ud_wr udwr;
+	struct ib_recv_wr rwr;
+	u8 pkt_type = 0;
+	u32 tbl_idx;
+	void *rq_hdr_buf;
+	dma_addr_t rq_hdr_buf_map;
+	dma_addr_t shrq_hdr_buf_map;
+	u32 offset = 0;
+	u32 skip_bytes = 0;
+	struct ib_sge s_sge[2];
+	struct ib_sge r_sge[2];
+	int rc;
+
+	memset(&udwr, 0, sizeof(udwr));
+	memset(&rwr, 0, sizeof(rwr));
+	memset(&s_sge, 0, sizeof(s_sge));
+	memset(&r_sge, 0, sizeof(r_sge));
+
+	swr = &udwr.wr;
+	tbl_idx = cqe->wr_id;
+
+	rq_hdr_buf = qp1_qp->qplib_qp.rq_hdr_buf +
+			(tbl_idx * qp1_qp->qplib_qp.rq_hdr_buf_size);
+	rq_hdr_buf_map = bnxt_qplib_get_qp_buf_from_index(&qp1_qp->qplib_qp,
+							  tbl_idx);
+
+	/* Shadow QP header buffer */
+	shrq_hdr_buf_map = bnxt_qplib_get_qp_buf_from_index(&qp->qplib_qp,
+							    tbl_idx);
+	sqp_entry = &rdev->sqp_tbl[tbl_idx];
+
+	/* Store this cqe */
+	memcpy(&sqp_entry->cqe, cqe, sizeof(struct bnxt_qplib_cqe));
+	sqp_entry->qp1_qp = qp1_qp;
+
+	/* Find packet type from the cqe */
+
+	pkt_type = bnxt_re_check_packet_type(cqe->raweth_qp1_flags,
+					     cqe->raweth_qp1_flags2);
+	if (pkt_type < 0) {
+		dev_err(rdev_to_dev(rdev), "Invalid packet\n");
+		return -EINVAL;
+	}
+
+	/* Adjust the offset for the user buffer and post in the rq */
+
+	if (pkt_type == BNXT_RE_ROCEV2_IPV4_PACKET)
+		offset = 20;
+
+	/*
+	 * QP1 loopback packet has 4 bytes of internal header before
+	 * ether header. Skip these four bytes.
+	 */
+	if (bnxt_re_is_loopback_packet(rdev, rq_hdr_buf))
+		skip_bytes = 4;
+
+	/* First send SGE . Skip the ether header*/
+	s_sge[0].addr = rq_hdr_buf_map + BNXT_QPLIB_MAX_QP1_RQ_ETH_HDR_SIZE
+			+ skip_bytes;
+	s_sge[0].lkey = 0xFFFFFFFF;
+	s_sge[0].length = offset ? BNXT_QPLIB_MAX_GRH_HDR_SIZE_IPV4 :
+				BNXT_QPLIB_MAX_GRH_HDR_SIZE_IPV6;
+
+	/* Second Send SGE */
+	s_sge[1].addr = s_sge[0].addr + s_sge[0].length +
+			BNXT_QPLIB_MAX_QP1_RQ_BDETH_HDR_SIZE;
+	if (pkt_type != BNXT_RE_ROCE_V1_PACKET)
+		s_sge[1].addr += 8;
+	s_sge[1].lkey = 0xFFFFFFFF;
+	s_sge[1].length = 256;
+
+	/* First recv SGE */
+
+	r_sge[0].addr = shrq_hdr_buf_map;
+	r_sge[0].lkey = 0xFFFFFFFF;
+	r_sge[0].length = 40;
+
+	r_sge[1].addr = sqp_entry->sge.addr + offset;
+	r_sge[1].lkey = sqp_entry->sge.lkey;
+	r_sge[1].length = BNXT_QPLIB_MAX_GRH_HDR_SIZE_IPV6 + 256 - offset;
+
+	/* Create receive work request */
+	rwr.num_sge = 2;
+	rwr.sg_list = r_sge;
+	rwr.wr_id = tbl_idx;
+	rwr.next = NULL;
+
+	rc = bnxt_re_post_recv_shadow_qp(rdev, qp, &rwr);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev),
+			"Failed to post Rx buffers to shadow QP");
+		return -ENOMEM;
+	}
+
+	swr->num_sge = 2;
+	swr->sg_list = s_sge;
+	swr->wr_id = tbl_idx;
+	swr->opcode = IB_WR_SEND;
+	swr->next = NULL;
+
+	udwr.ah = &rdev->sqp_ah->ib_ah;
+	udwr.remote_qpn = rdev->qp1_sqp->qplib_qp.id;
+	udwr.remote_qkey = rdev->qp1_sqp->qplib_qp.qkey;
+
+	/* post data received  in the send queue */
+	rc = bnxt_re_post_send_shadow_qp(rdev, qp, swr);
+
+	return 0;
+}
+
+static void bnxt_re_process_res_rawqp1_wc(struct ib_wc *wc,
+					  struct bnxt_qplib_cqe *cqe)
+{
+	wc->opcode = IB_WC_RECV;
+	wc->status = __rawqp1_to_ib_wc_status(cqe->status);
+	wc->wc_flags |= IB_WC_GRH;
+}
+
+static void bnxt_re_process_res_rc_wc(struct ib_wc *wc,
+				      struct bnxt_qplib_cqe *cqe)
+{
+	wc->opcode = IB_WC_RECV;
+	wc->status = __rc_to_ib_wc_status(cqe->status);
+
+	if (cqe->flags & CQ_RES_RC_FLAGS_IMM)
+		wc->wc_flags |= IB_WC_WITH_IMM;
+	if (cqe->flags & CQ_RES_RC_FLAGS_INV)
+		wc->wc_flags |= IB_WC_WITH_INVALIDATE;
+	if ((cqe->flags & (CQ_RES_RC_FLAGS_RDMA | CQ_RES_RC_FLAGS_IMM)) ==
+	    (CQ_RES_RC_FLAGS_RDMA | CQ_RES_RC_FLAGS_IMM))
+		wc->opcode = IB_WC_RECV_RDMA_WITH_IMM;
+}
+
+static void bnxt_re_process_res_shadow_qp_wc(struct bnxt_re_qp *qp,
+					     struct ib_wc *wc,
+					     struct bnxt_qplib_cqe *cqe)
+{
+	u32 tbl_idx;
+	struct bnxt_re_dev *rdev = qp->rdev;
+	struct bnxt_re_qp *qp1_qp = NULL;
+	struct bnxt_qplib_cqe *orig_cqe = NULL;
+	struct bnxt_re_sqp_entries *sqp_entry = NULL;
+	int nw_type;
+
+	tbl_idx = cqe->wr_id;
+
+	sqp_entry = &rdev->sqp_tbl[tbl_idx];
+	qp1_qp = sqp_entry->qp1_qp;
+	orig_cqe = &sqp_entry->cqe;
+
+	wc->wr_id = sqp_entry->wrid;
+	wc->byte_len = orig_cqe->length;
+	wc->qp = &qp1_qp->ib_qp;
+
+	wc->ex.imm_data = orig_cqe->immdata_or_invrkey;
+	wc->src_qp = orig_cqe->src_qp;
+	memcpy(wc->smac, orig_cqe->smac, ETH_ALEN);
+	wc->port_num = 1;
+	wc->vendor_err = orig_cqe->status;
+
+	wc->opcode = IB_WC_RECV;
+	wc->status = __rawqp1_to_ib_wc_status(orig_cqe->status);
+	wc->wc_flags |= IB_WC_GRH;
+
+	nw_type = bnxt_re_check_packet_type(orig_cqe->raweth_qp1_flags,
+					    orig_cqe->raweth_qp1_flags2);
+	if (nw_type >= 0) {
+		wc->network_hdr_type = bnxt_re_to_ib_nw_type(nw_type);
+		wc->wc_flags |= IB_WC_WITH_NETWORK_HDR_TYPE;
+	}
+}
+
+static void bnxt_re_process_res_ud_wc(struct ib_wc *wc,
+				      struct bnxt_qplib_cqe *cqe)
+{
+	wc->opcode = IB_WC_RECV;
+	wc->status = __rc_to_ib_wc_status(cqe->status);
+
+	if (cqe->flags & CQ_RES_RC_FLAGS_IMM)
+		wc->wc_flags |= IB_WC_WITH_IMM;
+	if (cqe->flags & CQ_RES_RC_FLAGS_INV)
+		wc->wc_flags |= IB_WC_WITH_INVALIDATE;
+	if ((cqe->flags & (CQ_RES_RC_FLAGS_RDMA | CQ_RES_RC_FLAGS_IMM)) ==
+	    (CQ_RES_RC_FLAGS_RDMA | CQ_RES_RC_FLAGS_IMM))
+		wc->opcode = IB_WC_RECV_RDMA_WITH_IMM;
+}
+
+int bnxt_re_poll_cq(struct ib_cq *ib_cq, int num_entries, struct ib_wc *wc)
+{
+	struct bnxt_re_cq *cq = to_bnxt_re(ib_cq, struct bnxt_re_cq, ib_cq);
+	struct bnxt_re_qp *qp;
+	struct bnxt_qplib_cqe *cqe;
+	int i, ncqe, budget;
+	u32 tbl_idx;
+	struct bnxt_re_sqp_entries *sqp_entry = NULL;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cq->cq_lock, flags);
+	budget = min_t(u32, num_entries, cq->max_cql);
+	if (!cq->cql) {
+		dev_err(rdev_to_dev(cq->rdev), "POLL CQ : no CQL to use");
+		goto exit;
+	}
+	cqe = &cq->cql[0];
+	while (budget) {
+		ncqe = bnxt_qplib_poll_cq(&cq->qplib_cq, cqe, budget);
+		if (!ncqe)
+			break;
+
+		for (i = 0; i < ncqe; i++, cqe++) {
+			/* Transcribe each qplib_wqe back to ib_wc */
+			memset(wc, 0, sizeof(*wc));
+
+			wc->wr_id = cqe->wr_id;
+			wc->byte_len = cqe->length;
+			qp = to_bnxt_re((struct bnxt_qplib_qp *)cqe->qp_handle,
+					struct bnxt_re_qp, qplib_qp);
+			if (!qp) {
+				dev_err(rdev_to_dev(cq->rdev),
+					"POLL CQ : bad QP handle");
+				continue;
+			}
+			wc->qp = &qp->ib_qp;
+			wc->ex.imm_data = cqe->immdata_or_invrkey;
+			wc->src_qp = cqe->src_qp;
+			memcpy(wc->smac, cqe->smac, ETH_ALEN);
+			wc->port_num = 1;
+			wc->vendor_err = cqe->status;
+
+			switch (cqe->opcode) {
+			case CQ_BASE_CQE_TYPE_REQ:
+				if (qp->qplib_qp.id ==
+				    qp->rdev->qp1_sqp->qplib_qp.id) {
+					/* Handle this completion with
+					 * the stored completion
+					 */
+					memset(wc, 0, sizeof(*wc));
+					continue;
+				}
+				bnxt_re_process_req_wc(wc, cqe);
+				break;
+			case CQ_BASE_CQE_TYPE_RES_RAWETH_QP1:
+				if (!cqe->status) {
+					int rc = 0;
+
+					rc = bnxt_re_process_raw_qp_pkt_rx
+								(qp, cqe);
+					if (!rc) {
+						memset(wc, 0, sizeof(*wc));
+						continue;
+					}
+					cqe->status = -1;
+				}
+				/* Errors need not be looped back.
+				 * But change the wr_id to the one
+				 * stored in the table
+				 */
+				tbl_idx = cqe->wr_id;
+				sqp_entry = &cq->rdev->sqp_tbl[tbl_idx];
+				wc->wr_id = sqp_entry->wrid;
+				bnxt_re_process_res_rawqp1_wc(wc, cqe);
+				break;
+			case CQ_BASE_CQE_TYPE_RES_RC:
+				bnxt_re_process_res_rc_wc(wc, cqe);
+				break;
+			case CQ_BASE_CQE_TYPE_RES_UD:
+				if (qp->qplib_qp.id ==
+				    qp->rdev->qp1_sqp->qplib_qp.id) {
+					/* Handle this completion with
+					 * the stored completion
+					 */
+					if (cqe->status) {
+						continue;
+					} else {
+						bnxt_re_process_res_shadow_qp_wc
+								(qp, wc, cqe);
+						break;
+					}
+				}
+				bnxt_re_process_res_ud_wc(wc, cqe);
+				break;
+			default:
+				dev_err(rdev_to_dev(cq->rdev),
+					"POLL CQ : type 0x%x not handled",
+					cqe->opcode);
+				continue;
+			}
+			wc++;
+			budget--;
+		}
+	}
+exit:
+	spin_unlock_irqrestore(&cq->cq_lock, flags);
+	return num_entries - budget;
 }
 
 int bnxt_re_req_notify_cq(struct ib_cq *ib_cq,
