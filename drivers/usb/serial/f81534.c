@@ -126,8 +126,10 @@ struct f81534_serial_private {
 
 struct f81534_port_private {
 	struct mutex mcr_mutex;
+	struct mutex lcr_mutex;
 	unsigned long tx_empty;
 	spinlock_t msr_lock;
+	u8 shadow_lcr;
 	u8 shadow_mcr;
 	u8 shadow_msr;
 	u8 phy_num;
@@ -683,6 +685,7 @@ static void f81534_set_termios(struct tty_struct *tty,
 				struct usb_serial_port *port,
 				struct ktermios *old_termios)
 {
+	struct f81534_port_private *port_priv = usb_get_serial_port_data(port);
 	u8 new_lcr = 0;
 	int status;
 	u32 baud;
@@ -720,6 +723,10 @@ static void f81534_set_termios(struct tty_struct *tty,
 		new_lcr |= UART_LCR_WLEN8;
 		break;
 	}
+
+	mutex_lock(&port_priv->lcr_mutex);
+	port_priv->shadow_lcr = new_lcr;
+	mutex_unlock(&port_priv->lcr_mutex);
 
 	baud = tty_get_baud_rate(tty);
 	if (!baud)
@@ -812,6 +819,35 @@ static int f81534_read_msr(struct usb_serial_port *port)
 	return 0;
 }
 
+static void f81534_set_break(struct usb_serial_port *port, bool enable)
+{
+	struct f81534_port_private *port_priv = usb_get_serial_port_data(port);
+	int status;
+
+	mutex_lock(&port_priv->lcr_mutex);
+
+	if (enable)
+		port_priv->shadow_lcr |= UART_LCR_SBC;
+	else
+		port_priv->shadow_lcr &= ~UART_LCR_SBC;
+
+	status = f81534_set_port_register(port, F81534_LINE_CONTROL_REG,
+			port_priv->shadow_lcr);
+	if (status) {
+		dev_err(&port->dev, "%s: set break failed: %x\n", __func__,
+				status);
+	}
+
+	mutex_unlock(&port_priv->lcr_mutex);
+}
+
+static void f81534_break_ctl(struct tty_struct *tty, int break_state)
+{
+	struct usb_serial_port *port = tty->driver_data;
+
+	f81534_set_break(port, break_state);
+}
+
 static int f81534_open(struct tty_struct *tty, struct usb_serial_port *port)
 {
 	struct f81534_serial_private *serial_priv =
@@ -877,6 +913,8 @@ static void f81534_close(struct usb_serial_port *port)
 	}
 
 	mutex_unlock(&serial_priv->urb_mutex);
+
+	f81534_set_break(port, false);
 }
 
 static int f81534_get_serial_info(struct usb_serial_port *port,
@@ -1244,6 +1282,7 @@ static int f81534_port_probe(struct usb_serial_port *port)
 
 	spin_lock_init(&port_priv->msr_lock);
 	mutex_init(&port_priv->mcr_mutex);
+	mutex_init(&port_priv->lcr_mutex);
 
 	/* Assign logic-to-phy mapping */
 	port_priv->phy_num = f81534_logic_to_phy_port(port->serial, port);
@@ -1389,6 +1428,7 @@ static struct usb_serial_driver f81534_device = {
 	.dtr_rts =		f81534_dtr_rts,
 	.process_read_urb =	f81534_process_read_urb,
 	.ioctl =		f81534_ioctl,
+	.break_ctl =		f81534_break_ctl,
 	.tiocmget =		f81534_tiocmget,
 	.tiocmset =		f81534_tiocmset,
 	.write_bulk_callback =	f81534_write_usb_callback,
