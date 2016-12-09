@@ -39,6 +39,11 @@
 #ifndef __BNXT_RE_IB_VERBS_H__
 #define __BNXT_RE_IB_VERBS_H__
 
+struct bnxt_re_gid_ctx {
+	u32			idx;
+	u32			refcnt;
+};
+
 struct bnxt_re_pd {
 	struct bnxt_re_dev	*rdev;
 	struct ib_pd		ib_pd;
@@ -54,6 +59,8 @@ struct bnxt_re_ucontext {
 	spinlock_t		sh_lock;	/* protect shpg */
 };
 
+struct net_device *bnxt_re_get_netdev(struct ib_device *ibdev, u8 port_num);
+
 int bnxt_re_query_device(struct ib_device *ibdev,
 			 struct ib_device_attr *ib_attr,
 			 struct ib_udata *udata);
@@ -67,6 +74,17 @@ int bnxt_re_modify_port(struct ib_device *ibdev, u8 port_num,
 			struct ib_port_modify *port_modify);
 int bnxt_re_get_port_immutable(struct ib_device *ibdev, u8 port_num,
 			       struct ib_port_immutable *immutable);
+int bnxt_re_query_pkey(struct ib_device *ibdev, u8 port_num,
+		       u16 index, u16 *pkey);
+int bnxt_re_del_gid(struct ib_device *ibdev, u8 port_num,
+		    unsigned int index, void **context);
+int bnxt_re_add_gid(struct ib_device *ibdev, u8 port_num,
+		    unsigned int index, const union ib_gid *gid,
+		    const struct ib_gid_attr *attr, void **context);
+int bnxt_re_query_gid(struct ib_device *ibdev, u8 port_num,
+		      int index, union ib_gid *gid);
+enum rdma_link_layer bnxt_re_get_link_layer(struct ib_device *ibdev,
+					    u8 port_num);
 struct ib_pd *bnxt_re_alloc_pd(struct ib_device *ibdev,
 			       struct ib_ucontext *context,
 			       struct ib_udata *udata);

@@ -431,6 +431,13 @@ static int bnxt_re_register_ib(struct bnxt_re_dev *rdev)
 	ibdev->query_port		= bnxt_re_query_port;
 	ibdev->modify_port		= bnxt_re_modify_port;
 	ibdev->get_port_immutable	= bnxt_re_get_port_immutable;
+	ibdev->query_pkey		= bnxt_re_query_pkey;
+	ibdev->query_gid		= bnxt_re_query_gid;
+	ibdev->get_netdev		= bnxt_re_get_netdev;
+	ibdev->add_gid			= bnxt_re_add_gid;
+	ibdev->del_gid			= bnxt_re_del_gid;
+	ibdev->get_link_layer		= bnxt_re_get_link_layer;
+
 	ibdev->alloc_pd			= bnxt_re_alloc_pd;
 	ibdev->dealloc_pd		= bnxt_re_dealloc_pd;
 	ibdev->alloc_ucontext		= bnxt_re_alloc_ucontext;

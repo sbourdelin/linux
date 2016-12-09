@@ -509,6 +509,11 @@ static void bnxt_qplib_cleanup_sgid_tbl(struct bnxt_qplib_res *res,
 {
 	int i;
 
+	for (i = 0; i < sgid_tbl->max; i++) {
+		if (memcmp(&sgid_tbl->tbl[i], &bnxt_qplib_gid_zero,
+			   sizeof(bnxt_qplib_gid_zero)))
+			bnxt_qplib_del_sgid(sgid_tbl, &sgid_tbl->tbl[i], true);
+	}
 	memset(sgid_tbl->tbl, 0, sizeof(struct bnxt_qplib_gid) * sgid_tbl->max);
 	memset(sgid_tbl->hw_id, -1, sizeof(u16) * sgid_tbl->max);
 	sgid_tbl->active = 0;

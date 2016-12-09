@@ -78,6 +78,17 @@ struct bnxt_qplib_gid {
 	u8				data[16];
 };
 
+int bnxt_qplib_get_sgid(struct bnxt_qplib_res *res,
+			struct bnxt_qplib_sgid_tbl *sgid_tbl, int index,
+			struct bnxt_qplib_gid *gid);
+int bnxt_qplib_del_sgid(struct bnxt_qplib_sgid_tbl *sgid_tbl,
+			struct bnxt_qplib_gid *gid, bool update);
+int bnxt_qplib_add_sgid(struct bnxt_qplib_sgid_tbl *sgid_tbl,
+			struct bnxt_qplib_gid *gid, u8 *mac, u16 vlan_id,
+			bool update, u32 *index);
+int bnxt_qplib_get_pkey(struct bnxt_qplib_res *res,
+			struct bnxt_qplib_pkey_tbl *pkey_tbl, u16 index,
+			u16 *pkey);
 int bnxt_qplib_del_pkey(struct bnxt_qplib_res *res,
 			struct bnxt_qplib_pkey_tbl *pkey_tbl, u16 *pkey,
 			bool update);
