@@ -1030,9 +1030,9 @@ static int gb_lights_light_config(struct gb_lights *glights, u8 id)
 
 	light->channels_count = conf.channel_count;
 	light->name = kstrndup(conf.name, NAMES_MAX, GFP_KERNEL);
-
-	light->channels = kzalloc(light->channels_count *
-				  sizeof(struct gb_channel), GFP_KERNEL);
+	light->channels = kcalloc(light->channels_count,
+				  sizeof(*light->channels),
+				  GFP_KERNEL);
 	if (!light->channels)
 		return -ENOMEM;
 
@@ -1168,8 +1168,9 @@ static int gb_lights_create_all(struct gb_lights *glights)
 	if (ret < 0)
 		goto out;
 
-	glights->lights = kzalloc(glights->lights_count *
-				  sizeof(struct gb_light), GFP_KERNEL);
+	glights->lights = kcalloc(glights->lights_count,
+				  sizeof(*glights->lights),
+				  GFP_KERNEL);
 	if (!glights->lights) {
 		ret = -ENOMEM;
 		goto out;
