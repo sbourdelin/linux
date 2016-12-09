@@ -448,6 +448,17 @@ static int bnxt_re_register_ib(struct bnxt_re_dev *rdev)
 	ibdev->create_cq		= bnxt_re_create_cq;
 	ibdev->destroy_cq		= bnxt_re_destroy_cq;
 	ibdev->req_notify_cq		= bnxt_re_req_notify_cq;
+
+	ibdev->get_dma_mr		= bnxt_re_get_dma_mr;
+	ibdev->dereg_mr			= bnxt_re_dereg_mr;
+	ibdev->alloc_mr			= bnxt_re_alloc_mr;
+	ibdev->map_mr_sg		= bnxt_re_map_mr_sg;
+	ibdev->alloc_fmr		= bnxt_re_alloc_fmr;
+	ibdev->map_phys_fmr		= bnxt_re_map_phys_fmr;
+	ibdev->unmap_fmr		= bnxt_re_unmap_fmr;
+	ibdev->dealloc_fmr		= bnxt_re_dealloc_fmr;
+
+	ibdev->reg_user_mr		= bnxt_re_reg_user_mr;
 	ibdev->alloc_ucontext		= bnxt_re_alloc_ucontext;
 	ibdev->dealloc_ucontext		= bnxt_re_dealloc_ucontext;
 	ibdev->mmap			= bnxt_re_mmap;

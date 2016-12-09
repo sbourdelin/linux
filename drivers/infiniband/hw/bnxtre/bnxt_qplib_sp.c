@@ -510,3 +510,327 @@ int bnxt_qplib_destroy_ah(struct bnxt_qplib_res *res, struct bnxt_qplib_ah *ah)
 	}
 	return 0;
 }
+
+/* MRW */
+int bnxt_qplib_free_mrw(struct bnxt_qplib_res *res, struct bnxt_qplib_mrw *mrw)
+{
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	struct cmdq_deallocate_key req;
+	struct creq_deallocate_key_resp *resp;
+	u16 cmd_flags = 0;
+
+	if (mrw->lkey == 0xFFFFFFFF) {
+		dev_info(&res->pdev->dev,
+			 "QPLIB: SP: Free a reserved lkey MRW");
+		return 0;
+	}
+
+	RCFW_CMD_PREP(req, DEALLOCATE_KEY, cmd_flags);
+
+	req.mrw_flags = mrw->type;
+
+	if ((mrw->type == CMDQ_ALLOCATE_MRW_MRW_FLAGS_MW_TYPE1)  ||
+	    (mrw->type == CMDQ_ALLOCATE_MRW_MRW_FLAGS_MW_TYPE2A) ||
+	    (mrw->type == CMDQ_ALLOCATE_MRW_MRW_FLAGS_MW_TYPE2B))
+		req.key = cpu_to_le32(mrw->rkey);
+	else
+		req.key = cpu_to_le32(mrw->lkey);
+
+	resp = (struct creq_deallocate_key_resp *)
+			bnxt_qplib_rcfw_send_message(rcfw, (void *)&req,
+						     NULL, 0);
+	if (!resp) {
+		dev_err(&res->pdev->dev, "QPLIB: SP: FREE_MR send failed");
+		return -EINVAL;
+	}
+	if (!bnxt_qplib_rcfw_wait_for_resp(rcfw, le16_to_cpu(req.cookie))) {
+		/* Cmd timed out */
+		dev_err(&res->pdev->dev, "QPLIB: SP: FREE_MR timed out");
+		return -ETIMEDOUT;
+	}
+	if (RCFW_RESP_STATUS(resp) ||
+	    RCFW_RESP_COOKIE(resp) != RCFW_CMDQ_COOKIE(req)) {
+		dev_err(&res->pdev->dev, "QPLIB: SP: FREE_MR failed ");
+		dev_err(&res->pdev->dev,
+			"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+			RCFW_RESP_STATUS(resp), RCFW_CMDQ_COOKIE(req),
+			RCFW_RESP_COOKIE(resp));
+		return -EINVAL;
+	}
+	/* Free the qplib's MRW memory */
+	if (mrw->hwq.max_elements)
+		bnxt_qplib_free_hwq(res->pdev, &mrw->hwq);
+
+	return 0;
+}
+
+int bnxt_qplib_alloc_mrw(struct bnxt_qplib_res *res, struct bnxt_qplib_mrw *mrw)
+{
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	struct cmdq_allocate_mrw req;
+	struct creq_allocate_mrw_resp *resp;
+	u16 cmd_flags = 0;
+
+	RCFW_CMD_PREP(req, ALLOCATE_MRW, cmd_flags);
+
+	req.pd_id = cpu_to_le32(mrw->pd->id);
+	req.mrw_flags = mrw->type;
+	if ((mrw->type == CMDQ_ALLOCATE_MRW_MRW_FLAGS_PMR &&
+	     mrw->flags & BNXT_QPLIB_FR_PMR) ||
+	    mrw->type == CMDQ_ALLOCATE_MRW_MRW_FLAGS_MW_TYPE2A ||
+	    mrw->type == CMDQ_ALLOCATE_MRW_MRW_FLAGS_MW_TYPE2B)
+		req.access = CMDQ_ALLOCATE_MRW_ACCESS_CONSUMER_OWNED_KEY;
+	req.mrw_handle = cpu_to_le64(mrw);
+
+	resp = (struct creq_allocate_mrw_resp *)
+			bnxt_qplib_rcfw_send_message(rcfw, (void *)&req,
+						     NULL, 0);
+	if (!resp) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: SP: ALLOC_MRW send failed");
+		return -EINVAL;
+	}
+	if (!bnxt_qplib_rcfw_wait_for_resp(rcfw, le16_to_cpu(req.cookie))) {
+		/* Cmd timed out */
+		dev_err(&rcfw->pdev->dev, "QPLIB: SP: ALLOC_MRW timed out");
+		return -ETIMEDOUT;
+	}
+	if (RCFW_RESP_STATUS(resp) ||
+	    RCFW_RESP_COOKIE(resp) != RCFW_CMDQ_COOKIE(req)) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: SP: ALLOC_MRW failed ");
+		dev_err(&rcfw->pdev->dev,
+			"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+			RCFW_RESP_STATUS(resp), RCFW_CMDQ_COOKIE(req),
+			RCFW_RESP_COOKIE(resp));
+		return -EINVAL;
+	}
+	if ((mrw->type == CMDQ_ALLOCATE_MRW_MRW_FLAGS_MW_TYPE1)  ||
+	    (mrw->type == CMDQ_ALLOCATE_MRW_MRW_FLAGS_MW_TYPE2A) ||
+	    (mrw->type == CMDQ_ALLOCATE_MRW_MRW_FLAGS_MW_TYPE2B))
+		mrw->rkey = le32_to_cpu(resp->xid);
+	else
+		mrw->lkey = le32_to_cpu(resp->xid);
+	return 0;
+}
+
+int bnxt_qplib_dereg_mrw(struct bnxt_qplib_res *res, struct bnxt_qplib_mrw *mrw,
+			 bool block)
+{
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	struct cmdq_deregister_mr req;
+	struct creq_deregister_mr_resp *resp;
+	u16 cmd_flags = 0;
+	int rc;
+
+	RCFW_CMD_PREP(req, DEREGISTER_MR, cmd_flags);
+
+	req.lkey = cpu_to_le32(mrw->lkey);
+	resp = (struct creq_deregister_mr_resp *)
+			bnxt_qplib_rcfw_send_message(rcfw, (void *)&req,
+						     NULL, block);
+	if (!resp) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: SP: DEREG_MR send failed");
+		return -EINVAL;
+	}
+	if (block)
+		rc = bnxt_qplib_rcfw_block_for_resp(rcfw,
+						    le16_to_cpu(req.cookie));
+	else
+		rc = bnxt_qplib_rcfw_wait_for_resp(rcfw,
+						   le16_to_cpu(req.cookie));
+	if (!rc) {
+		/* Cmd timed out */
+		dev_err(&res->pdev->dev, "QPLIB: SP: DEREG_MR timed out");
+		return -ETIMEDOUT;
+	}
+	if (RCFW_RESP_STATUS(resp) ||
+	    RCFW_RESP_COOKIE(resp) != RCFW_CMDQ_COOKIE(req)) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: SP: DEREG_MR failed ");
+		dev_err(&rcfw->pdev->dev,
+			"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+			RCFW_RESP_STATUS(resp), RCFW_CMDQ_COOKIE(req),
+			RCFW_RESP_COOKIE(resp));
+		return -EINVAL;
+	}
+
+	/* Free the qplib's MR memory */
+	if (mrw->hwq.max_elements) {
+		mrw->va = 0;
+		mrw->total_size = 0;
+		bnxt_qplib_free_hwq(res->pdev, &mrw->hwq);
+	}
+
+	return 0;
+}
+
+int bnxt_qplib_reg_mr(struct bnxt_qplib_res *res, struct bnxt_qplib_mrw *mr,
+		      u64 *pbl_tbl, int num_pbls, bool block)
+{
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	struct cmdq_register_mr req;
+	struct creq_register_mr_resp *resp;
+	u16 cmd_flags = 0, level;
+	int pg_ptrs, pages, i, rc;
+	dma_addr_t **pbl_ptr;
+	u32 pg_size;
+
+	if (num_pbls) {
+		pg_ptrs = roundup_pow_of_two(num_pbls);
+		pages = pg_ptrs >> MAX_PBL_LVL_1_PGS_SHIFT;
+		if (!pages)
+			pages++;
+
+		if (pages > MAX_PBL_LVL_1_PGS) {
+			dev_err(&res->pdev->dev, "QPLIB: SP: Reg MR pages ");
+			dev_err(&res->pdev->dev,
+				"requested (0x%x) exceeded max (0x%x)",
+				pages, MAX_PBL_LVL_1_PGS);
+			return -ENOMEM;
+		}
+		/* Free the hwq if it already exist, must be a rereg */
+		if (mr->hwq.max_elements)
+			bnxt_qplib_free_hwq(res->pdev, &mr->hwq);
+
+		mr->hwq.max_elements = pages;
+		rc = bnxt_qplib_alloc_init_hwq(res->pdev, &mr->hwq, NULL, 0,
+					       &mr->hwq.max_elements,
+					       PAGE_SIZE, 0, PAGE_SIZE,
+					       HWQ_TYPE_CTX);
+		if (rc) {
+			dev_err(&res->pdev->dev,
+				"SP: Reg MR memory allocation failed");
+			return -ENOMEM;
+		}
+		/* Write to the hwq */
+		pbl_ptr = (u64 **)mr->hwq.pbl_ptr;
+		for (i = 0; i < num_pbls; i++)
+			pbl_ptr[PTR_PG(i)][PTR_IDX(i)] =
+				(pbl_tbl[i] & PAGE_MASK) | PTU_PTE_VALID;
+	}
+
+	RCFW_CMD_PREP(req, REGISTER_MR, cmd_flags);
+
+	/* Configure the request */
+	if (mr->hwq.level == PBL_LVL_MAX) {
+		level = 0;
+		req.pbl = 0;
+		pg_size = PAGE_SIZE;
+	} else {
+		level = mr->hwq.level + 1;
+		req.pbl = cpu_to_le64(mr->hwq.pbl[PBL_LVL_0].pg_map_arr[0]);
+		pg_size = mr->hwq.pbl[PBL_LVL_0].pg_size;
+	}
+	req.log2_pg_size_lvl = (level << CMDQ_REGISTER_MR_LVL_SFT) |
+			       ((ilog2(pg_size) <<
+				 CMDQ_REGISTER_MR_LOG2_PG_SIZE_SFT) &
+				CMDQ_REGISTER_MR_LOG2_PG_SIZE_MASK);
+	req.access = (mr->flags & 0xFFFF);
+	req.va = cpu_to_le64(mr->va);
+	req.key = cpu_to_le32(mr->lkey);
+	req.mr_size = cpu_to_le64(mr->total_size);
+
+	resp = (struct creq_register_mr_resp *)
+			bnxt_qplib_rcfw_send_message(rcfw, (void *)&req,
+						     NULL, block);
+	if (!resp) {
+		dev_err(&res->pdev->dev, "SP: REG_MR send failed");
+		rc = -EINVAL;
+		goto fail;
+	}
+	if (block)
+		rc = bnxt_qplib_rcfw_block_for_resp(rcfw,
+						    le16_to_cpu(req.cookie));
+	else
+		rc = bnxt_qplib_rcfw_wait_for_resp(rcfw,
+						   le16_to_cpu(req.cookie));
+	if (!rc) {
+		/* Cmd timed out */
+		dev_err(&res->pdev->dev, "SP: REG_MR timed out");
+		rc = -ETIMEDOUT;
+		goto fail;
+	}
+	if (RCFW_RESP_STATUS(resp) ||
+	    RCFW_RESP_COOKIE(resp) != RCFW_CMDQ_COOKIE(req)) {
+		dev_err(&res->pdev->dev, "QPLIB: SP: REG_MR failed ");
+		dev_err(&res->pdev->dev,
+			"QPLIB: SP: with status 0x%x cmdq 0x%x resp 0x%x",
+			RCFW_RESP_STATUS(resp), RCFW_CMDQ_COOKIE(req),
+			RCFW_RESP_COOKIE(resp));
+		rc = -EINVAL;
+		goto fail;
+	}
+	return 0;
+
+fail:
+	if (mr->hwq.max_elements)
+		bnxt_qplib_free_hwq(res->pdev, &mr->hwq);
+	return rc;
+}
+
+int bnxt_qplib_alloc_fast_reg_page_list(struct bnxt_qplib_res *res,
+					struct bnxt_qplib_frpl *frpl,
+					int max_pg_ptrs)
+{
+	int pg_ptrs, pages, rc;
+
+	/* Re-calculate the max to fit the HWQ allocation model */
+	pg_ptrs = roundup_pow_of_two(max_pg_ptrs);
+	pages = pg_ptrs >> MAX_PBL_LVL_1_PGS_SHIFT;
+	if (!pages)
+		pages++;
+
+	if (pages > MAX_PBL_LVL_1_PGS)
+		return -ENOMEM;
+
+	frpl->hwq.max_elements = pages;
+	rc = bnxt_qplib_alloc_init_hwq(res->pdev, &frpl->hwq, NULL, 0,
+				       &frpl->hwq.max_elements, PAGE_SIZE, 0,
+				       PAGE_SIZE, HWQ_TYPE_CTX);
+	if (!rc)
+		frpl->max_pg_ptrs = pg_ptrs;
+
+	return rc;
+}
+
+int bnxt_qplib_free_fast_reg_page_list(struct bnxt_qplib_res *res,
+				       struct bnxt_qplib_frpl *frpl)
+{
+	bnxt_qplib_free_hwq(res->pdev, &frpl->hwq);
+	return 0;
+}
+
+int bnxt_qplib_map_tc2cos(struct bnxt_qplib_res *res, u16 *cids)
+{
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	struct cmdq_map_tc_to_cos req;
+	struct creq_map_tc_to_cos_resp *resp;
+	u16 cmd_flags = 0;
+	int tleft;
+
+	RCFW_CMD_PREP(req, MAP_TC_TO_COS, cmd_flags);
+	req.cos0 = cids[0];
+	req.cos1 = cids[1];
+
+	resp = bnxt_qplib_rcfw_send_message(rcfw, (void *)&req, NULL, 0);
+	if (!resp) {
+		dev_err(&res->pdev->dev, "QPLIB: SP: MAP_TC2COS send failed");
+		return -EINVAL;
+	}
+
+	tleft = bnxt_qplib_rcfw_block_for_resp(rcfw, le16_to_cpu(req.cookie));
+	if (!tleft) {
+		dev_err(&res->pdev->dev, "QPLIB: SP: MAP_TC2COS timed out");
+		return -ETIMEDOUT;
+	}
+
+	if (RCFW_RESP_STATUS(resp) ||
+	    RCFW_RESP_COOKIE(resp) != RCFW_CMDQ_COOKIE(req)) {
+		dev_err(&res->pdev->dev, "QPLIB: SP: MAP_TC2COS failed ");
+		dev_err(&res->pdev->dev,
+			"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+			RCFW_RESP_STATUS(resp), RCFW_CMDQ_COOKIE(req),
+			RCFW_RESP_COOKIE(resp));
+		return -EINVAL;
+	}
+
+	return 0;
+}
