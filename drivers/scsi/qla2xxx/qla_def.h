@@ -1159,28 +1159,28 @@ typedef struct {
 	 */
 	uint8_t  firmware_options[2];
 
-	uint16_t frame_payload_size;
-	uint16_t max_iocb_allocation;
-	uint16_t execution_throttle;
+	__le16 frame_payload_size;
+	__le16 max_iocb_allocation;
+	__le16 execution_throttle;
 	uint8_t  retry_count;
 	uint8_t	 retry_delay;			/* unused */
 	uint8_t	 port_name[WWN_SIZE];		/* Big endian. */
-	uint16_t hard_address;
+	__le16 hard_address;
 	uint8_t	 inquiry_data;
 	uint8_t	 login_timeout;
 	uint8_t	 node_name[WWN_SIZE];		/* Big endian. */
 
-	uint16_t request_q_outpointer;
-	uint16_t response_q_inpointer;
-	uint16_t request_q_length;
-	uint16_t response_q_length;
-	uint32_t request_q_address[2];
-	uint32_t response_q_address[2];
+	__le16 request_q_outpointer;
+	__le16 response_q_inpointer;
+	__le16 request_q_length;
+	__le16 response_q_length;
+	__le32 request_q_address[2];
+	__le32 response_q_address[2];
 
-	uint16_t lun_enables;
+	__le16 lun_enables;
 	uint8_t  command_resource_count;
 	uint8_t  immediate_notify_resource_count;
-	uint16_t timeout;
+	__le16 timeout;
 	uint8_t  reserved_2[2];
 
 	/*
@@ -1238,48 +1238,48 @@ typedef struct {
 #define GLSO_USE_DID	BIT_3
 
 struct link_statistics {
-	uint32_t link_fail_cnt;
-	uint32_t loss_sync_cnt;
-	uint32_t loss_sig_cnt;
-	uint32_t prim_seq_err_cnt;
-	uint32_t inval_xmit_word_cnt;
-	uint32_t inval_crc_cnt;
-	uint32_t lip_cnt;
-	uint32_t link_up_cnt;
-	uint32_t link_down_loop_init_tmo;
-	uint32_t link_down_los;
-	uint32_t link_down_loss_rcv_clk;
-	uint32_t reserved0[5];
-	uint32_t port_cfg_chg;
-	uint32_t reserved1[11];
-	uint32_t rsp_q_full;
-	uint32_t atio_q_full;
-	uint32_t drop_ae;
-	uint32_t els_proto_err;
-	uint32_t reserved2;
-	uint32_t tx_frames;
-	uint32_t rx_frames;
-	uint32_t discarded_frames;
-	uint32_t dropped_frames;
-	uint32_t reserved3;
-	uint32_t nos_rcvd;
-	uint32_t reserved4[4];
-	uint32_t tx_prjt;
-	uint32_t rcv_exfail;
-	uint32_t rcv_abts;
-	uint32_t seq_frm_miss;
-	uint32_t corr_err;
-	uint32_t mb_rqst;
-	uint32_t nport_full;
-	uint32_t eofa;
-	uint32_t reserved5;
-	uint32_t fpm_recv_word_cnt_lo;
-	uint32_t fpm_recv_word_cnt_hi;
-	uint32_t fpm_disc_word_cnt_lo;
-	uint32_t fpm_disc_word_cnt_hi;
-	uint32_t fpm_xmit_word_cnt_lo;
-	uint32_t fpm_xmit_word_cnt_hi;
-	uint32_t reserved6[70];
+	__le32 link_fail_cnt;
+	__le32 loss_sync_cnt;
+	__le32 loss_sig_cnt;
+	__le32 prim_seq_err_cnt;
+	__le32 inval_xmit_word_cnt;
+	__le32 inval_crc_cnt;
+	__le32 lip_cnt;
+	__le32 link_up_cnt;
+	__le32 link_down_loop_init_tmo;
+	__le32 link_down_los;
+	__le32 link_down_loss_rcv_clk;
+	__le32 reserved0[5];
+	__le32 port_cfg_chg;
+	__le32 reserved1[11];
+	__le32 rsp_q_full;
+	__le32 atio_q_full;
+	__le32 drop_ae;
+	__le32 els_proto_err;
+	__le32 reserved2;
+	__le32 tx_frames;
+	__le32 rx_frames;
+	__le32 discarded_frames;
+	__le32 dropped_frames;
+	__le32 reserved3;
+	__le32 nos_rcvd;
+	__le32 reserved4[4];
+	__le32 tx_prjt;
+	__le32 rcv_exfail;
+	__le32 rcv_abts;
+	__le32 seq_frm_miss;
+	__le32 corr_err;
+	__le32 mb_rqst;
+	__le32 nport_full;
+	__le32 eofa;
+	__le32 reserved5;
+	__le32 fpm_recv_word_cnt_lo;
+	__le32 fpm_recv_word_cnt_hi;
+	__le32 fpm_disc_word_cnt_lo;
+	__le32 fpm_disc_word_cnt_hi;
+	__le32 fpm_xmit_word_cnt_lo;
+	__le32 fpm_xmit_word_cnt_hi;
+	__le32 reserved6[70];
 };
 
 /*
@@ -1330,13 +1330,13 @@ typedef struct {
 	 */
 	uint8_t	 firmware_options[2];
 
-	uint16_t frame_payload_size;
-	uint16_t max_iocb_allocation;
-	uint16_t execution_throttle;
+	__le16 frame_payload_size;
+	__le16 max_iocb_allocation;
+	__le16 execution_throttle;
 	uint8_t	 retry_count;
 	uint8_t	 retry_delay;			/* unused */
 	uint8_t	 port_name[WWN_SIZE];		/* Big endian. */
-	uint16_t hard_address;
+	__le16 hard_address;
 	uint8_t	 inquiry_data;
 	uint8_t	 login_timeout;
 	uint8_t	 node_name[WWN_SIZE];		/* Big endian. */
@@ -1456,7 +1456,7 @@ typedef struct {
 	uint8_t reset_delay;
 	uint8_t port_down_retry_count;
 	uint8_t boot_id_number;
-	uint16_t max_luns_per_target;
+	__le16 max_luns_per_target;
 	uint8_t fcode_boot_port_name[WWN_SIZE];
 	uint8_t alternate_port_name[WWN_SIZE];
 	uint8_t alternate_node_name[WWN_SIZE];
@@ -1478,19 +1478,19 @@ typedef struct {
 	uint8_t adapter_id[16];
 
 	uint8_t alt1_boot_node_name[WWN_SIZE];
-	uint16_t alt1_boot_lun_number;
+	__le16 alt1_boot_lun_number;
 	uint8_t alt2_boot_node_name[WWN_SIZE];
-	uint16_t alt2_boot_lun_number;
+	__le16 alt2_boot_lun_number;
 	uint8_t alt3_boot_node_name[WWN_SIZE];
-	uint16_t alt3_boot_lun_number;
+	__le16 alt3_boot_lun_number;
 	uint8_t alt4_boot_node_name[WWN_SIZE];
-	uint16_t alt4_boot_lun_number;
+	__le16 alt4_boot_lun_number;
 	uint8_t alt5_boot_node_name[WWN_SIZE];
-	uint16_t alt5_boot_lun_number;
+	__le16 alt5_boot_lun_number;
 	uint8_t alt6_boot_node_name[WWN_SIZE];
-	uint16_t alt6_boot_lun_number;
+	__le16 alt6_boot_lun_number;
 	uint8_t alt7_boot_node_name[WWN_SIZE];
-	uint16_t alt7_boot_lun_number;
+	__le16 alt7_boot_lun_number;
 
 	uint8_t reserved_3[2];
 
@@ -1526,10 +1526,10 @@ typedef struct {
 	uint8_t reserved_4[16];
 
 	/* Subsystem vendor ID for ISP2200 */
-	uint16_t subsystem_vendor_id_2200;
+	__le16 subsystem_vendor_id_2200;
 
 	/* Subsystem device ID for ISP2200 */
-	uint16_t subsystem_device_id_2200;
+	__le16 subsystem_device_id_2200;
 
 	uint8_t	 reserved_5;
 	uint8_t	 checksum;
@@ -1561,7 +1561,7 @@ struct atio {
 };
 
 typedef union {
-	uint16_t extended;
+	__le16 extended;
 	struct {
 		uint8_t reserved;
 		uint8_t standard;
@@ -1585,26 +1585,26 @@ typedef struct {
 	uint8_t entry_count;		/* Entry count. */
 	uint8_t sys_define;		/* System defined. */
 	uint8_t entry_status;		/* Entry Status. */
-	uint32_t handle;		/* System handle. */
+	__le32 handle;		/* System handle. */
 	target_id_t target;		/* SCSI ID */
-	uint16_t lun;			/* SCSI LUN */
-	uint16_t control_flags;		/* Control flags. */
+	__le16 lun;			/* SCSI LUN */
+	__le16 control_flags;		/* Control flags. */
 #define CF_WRITE	BIT_6
 #define CF_READ		BIT_5
 #define CF_SIMPLE_TAG	BIT_3
 #define CF_ORDERED_TAG	BIT_2
 #define CF_HEAD_TAG	BIT_1
-	uint16_t reserved_1;
-	uint16_t timeout;		/* Command timeout. */
-	uint16_t dseg_count;		/* Data segment count. */
+	__le16 reserved_1;
+	__le16 timeout;		/* Command timeout. */
+	__le16 dseg_count;		/* Data segment count. */
 	uint8_t scsi_cdb[MAX_CMDSZ]; 	/* SCSI command words. */
-	uint32_t byte_count;		/* Total byte count. */
-	uint32_t dseg_0_address;	/* Data segment 0 address. */
-	uint32_t dseg_0_length;		/* Data segment 0 length. */
-	uint32_t dseg_1_address;	/* Data segment 1 address. */
-	uint32_t dseg_1_length;		/* Data segment 1 length. */
-	uint32_t dseg_2_address;	/* Data segment 2 address. */
-	uint32_t dseg_2_length;		/* Data segment 2 length. */
+	__le32 byte_count;		/* Total byte count. */
+	__le32 dseg_0_address;	/* Data segment 0 address. */
+	__le32 dseg_0_length;		/* Data segment 0 length. */
+	__le32 dseg_1_address;	/* Data segment 1 address. */
+	__le32 dseg_1_length;		/* Data segment 1 length. */
+	__le32 dseg_2_address;	/* Data segment 2 address. */
+	__le32 dseg_2_length;		/* Data segment 2 length. */
 } cmd_entry_t;
 
 /*
@@ -1616,19 +1616,19 @@ typedef struct {
 	uint8_t entry_count;		/* Entry count. */
 	uint8_t sys_define;		/* System defined. */
 	uint8_t entry_status;		/* Entry Status. */
-	uint32_t handle;		/* System handle. */
+	__le32 handle;		/* System handle. */
 	target_id_t target;		/* SCSI ID */
-	uint16_t lun;			/* SCSI LUN */
-	uint16_t control_flags;		/* Control flags. */
-	uint16_t reserved_1;
-	uint16_t timeout;		/* Command timeout. */
-	uint16_t dseg_count;		/* Data segment count. */
+	__le16 lun;			/* SCSI LUN */
+	__le16 control_flags;		/* Control flags. */
+	__le16 reserved_1;
+	__le16 timeout;		/* Command timeout. */
+	__le16 dseg_count;		/* Data segment count. */
 	uint8_t scsi_cdb[MAX_CMDSZ];	/* SCSI command words. */
-	uint32_t byte_count;		/* Total byte count. */
-	uint32_t dseg_0_address[2];	/* Data segment 0 address. */
-	uint32_t dseg_0_length;		/* Data segment 0 length. */
-	uint32_t dseg_1_address[2];	/* Data segment 1 address. */
-	uint32_t dseg_1_length;		/* Data segment 1 length. */
+	__le32 byte_count;		/* Total byte count. */
+	__le32 dseg_0_address[2];	/* Data segment 0 address. */
+	__le32 dseg_0_length;		/* Data segment 0 length. */
+	__le32 dseg_1_address[2];	/* Data segment 1 address. */
+	__le32 dseg_1_length;		/* Data segment 1 length. */
 } cmd_a64_entry_t, request_t;
 
 /*
@@ -1640,21 +1640,21 @@ typedef struct {
 	uint8_t entry_count;		/* Entry count. */
 	uint8_t sys_define;		/* System defined. */
 	uint8_t entry_status;		/* Entry Status. */
-	uint32_t reserved;
-	uint32_t dseg_0_address;	/* Data segment 0 address. */
-	uint32_t dseg_0_length;		/* Data segment 0 length. */
-	uint32_t dseg_1_address;	/* Data segment 1 address. */
-	uint32_t dseg_1_length;		/* Data segment 1 length. */
-	uint32_t dseg_2_address;	/* Data segment 2 address. */
-	uint32_t dseg_2_length;		/* Data segment 2 length. */
-	uint32_t dseg_3_address;	/* Data segment 3 address. */
-	uint32_t dseg_3_length;		/* Data segment 3 length. */
-	uint32_t dseg_4_address;	/* Data segment 4 address. */
-	uint32_t dseg_4_length;		/* Data segment 4 length. */
-	uint32_t dseg_5_address;	/* Data segment 5 address. */
-	uint32_t dseg_5_length;		/* Data segment 5 length. */
-	uint32_t dseg_6_address;	/* Data segment 6 address. */
-	uint32_t dseg_6_length;		/* Data segment 6 length. */
+	__le32 reserved;
+	__le32 dseg_0_address;	/* Data segment 0 address. */
+	__le32 dseg_0_length;		/* Data segment 0 length. */
+	__le32 dseg_1_address;	/* Data segment 1 address. */
+	__le32 dseg_1_length;		/* Data segment 1 length. */
+	__le32 dseg_2_address;	/* Data segment 2 address. */
+	__le32 dseg_2_length;		/* Data segment 2 length. */
+	__le32 dseg_3_address;	/* Data segment 3 address. */
+	__le32 dseg_3_length;		/* Data segment 3 length. */
+	__le32 dseg_4_address;	/* Data segment 4 address. */
+	__le32 dseg_4_length;		/* Data segment 4 length. */
+	__le32 dseg_5_address;	/* Data segment 5 address. */
+	__le32 dseg_5_length;		/* Data segment 5 length. */
+	__le32 dseg_6_address;	/* Data segment 6 address. */
+	__le32 dseg_6_length;		/* Data segment 6 length. */
 } cont_entry_t;
 
 /*
@@ -1666,16 +1666,16 @@ typedef struct {
 	uint8_t entry_count;		/* Entry count. */
 	uint8_t sys_define;		/* System defined. */
 	uint8_t entry_status;		/* Entry Status. */
-	uint32_t dseg_0_address[2];	/* Data segment 0 address. */
-	uint32_t dseg_0_length;		/* Data segment 0 length. */
-	uint32_t dseg_1_address[2];	/* Data segment 1 address. */
-	uint32_t dseg_1_length;		/* Data segment 1 length. */
-	uint32_t dseg_2_address	[2];	/* Data segment 2 address. */
-	uint32_t dseg_2_length;		/* Data segment 2 length. */
-	uint32_t dseg_3_address[2];	/* Data segment 3 address. */
-	uint32_t dseg_3_length;		/* Data segment 3 length. */
-	uint32_t dseg_4_address[2];	/* Data segment 4 address. */
-	uint32_t dseg_4_length;		/* Data segment 4 length. */
+	__le32 dseg_0_address[2];	/* Data segment 0 address. */
+	__le32 dseg_0_length;		/* Data segment 0 length. */
+	__le32 dseg_1_address[2];	/* Data segment 1 address. */
+	__le32 dseg_1_length;		/* Data segment 1 length. */
+	__le32 dseg_2_address	[2];	/* Data segment 2 address. */
+	__le32 dseg_2_length;		/* Data segment 2 length. */
+	__le32 dseg_3_address[2];	/* Data segment 3 address. */
+	__le32 dseg_3_length;		/* Data segment 3 length. */
+	__le32 dseg_4_address[2];	/* Data segment 4 address. */
+	__le32 dseg_4_length;		/* Data segment 4 length. */
 } cont_a64_entry_t;
 
 #define PO_MODE_DIF_INSERT	0
@@ -1701,7 +1701,7 @@ typedef struct {
  * ISP queue - 64-Bit addressing, continuation crc entry structure definition.
  */
 struct crc_context {
-	uint32_t handle;		/* System handle. */
+	__le32 handle;		/* System handle. */
 	__le32 ref_tag;
 	__le16 app_tag;
 	uint8_t ref_tag_mask[4];	/* Validation/Replacement Mask*/
@@ -1709,31 +1709,31 @@ struct crc_context {
 	__le16 guard_seed;		/* Initial Guard Seed */
 	__le16 prot_opts;		/* Requested Data Protection Mode */
 	__le16 blk_size;		/* Data size in bytes */
-	uint16_t runt_blk_guard;	/* Guard value for runt block (tape
+	__le16 runt_blk_guard;	/* Guard value for runt block (tape
 					 * only) */
 	__le32 byte_count;		/* Total byte count/ total data
 					 * transfer count */
 	union {
 		struct {
-			uint32_t	reserved_1;
-			uint16_t	reserved_2;
-			uint16_t	reserved_3;
-			uint32_t	reserved_4;
-			uint32_t	data_address[2];
-			uint32_t	data_length;
-			uint32_t	reserved_5[2];
-			uint32_t	reserved_6;
+			__le32	reserved_1;
+			__le16	reserved_2;
+			__le16	reserved_3;
+			__le32	reserved_4;
+			__le32	data_address[2];
+			__le32	data_length;
+			__le32	reserved_5[2];
+			__le32	reserved_6;
 		} nobundling;
 		struct {
 			__le32	dif_byte_count;	/* Total DIF byte
 							 * count */
-			uint16_t	reserved_1;
+			__le16	reserved_1;
 			__le16	dseg_count;	/* Data segment count */
-			uint32_t	reserved_2;
-			uint32_t	data_address[2];
-			uint32_t	data_length;
-			uint32_t	dif_address[2];
-			uint32_t	dif_length;	/* Data segment 0
+			__le32	reserved_2;
+			__le32	data_address[2];
+			__le32	data_length;
+			__le32	dif_address[2];
+			__le32	dif_length;	/* Data segment 0
 							 * length */
 		} bundling;
 	} u;
@@ -1758,14 +1758,14 @@ typedef struct {
 	uint8_t entry_count;		/* Entry count. */
 	uint8_t sys_define;		/* System defined. */
 	uint8_t entry_status;		/* Entry Status. */
-	uint32_t handle;		/* System handle. */
-	uint16_t scsi_status;		/* SCSI status. */
-	uint16_t comp_status;		/* Completion status. */
-	uint16_t state_flags;		/* State flags. */
-	uint16_t status_flags;		/* Status flags. */
-	uint16_t rsp_info_len;		/* Response Info Length. */
-	uint16_t req_sense_length;	/* Request sense data length. */
-	uint32_t residual_length;	/* Residual transfer length. */
+	__le32 handle;		/* System handle. */
+	__le16 scsi_status;		/* SCSI status. */
+	__le16 comp_status;		/* Completion status. */
+	__le16 state_flags;		/* State flags. */
+	__le16 status_flags;		/* Status flags. */
+	__le16 rsp_info_len;		/* Response Info Length. */
+	__le16 req_sense_length;	/* Request sense data length. */
+	__le32 residual_length;	/* Residual transfer length. */
 	uint8_t rsp_info[8];		/* FCP response information. */
 	uint8_t req_sense_data[32];	/* Request sense data. */
 } sts_entry_t;
@@ -1861,7 +1861,7 @@ typedef struct {
 	uint8_t entry_count;		/* Entry count. */
 	uint8_t handle_count;		/* Handle count. */
 	uint8_t entry_status;		/* Entry Status. */
-	uint32_t handle[15];		/* System handles. */
+	__le32 handle[15];		/* System handles. */
 } sts21_entry_t;
 
 /*
@@ -1874,7 +1874,7 @@ typedef struct {
 	uint8_t entry_count;		/* Entry count. */
 	uint8_t handle_count;		/* Handle count. */
 	uint8_t entry_status;		/* Entry Status. */
-	uint16_t handle[30];		/* System handles. */
+	__le16 handle[30];		/* System handles. */
 } sts22_entry_t;
 
 /*
@@ -1886,7 +1886,7 @@ typedef struct {
 	uint8_t entry_count;		/* Entry count. */
 	uint8_t handle_count;		/* Handle count. */
 	uint8_t entry_status;		/* Entry Status. */
-	uint32_t sys_define_2;		/* System defined. */
+	__le32 sys_define_2;		/* System defined. */
 	target_id_t target;		/* SCSI ID */
 	uint8_t modifier;		/* Modifier (7-0). */
 #define MK_SYNC_ID_LUN	0		/* Synchronize ID/LUN */
@@ -1896,8 +1896,8 @@ typedef struct {
 					/* clear port changed, */
 					/* use sequence number. */
 	uint8_t reserved_1;
-	uint16_t sequence_number;	/* Sequence number of event */
-	uint16_t lun;			/* SCSI LUN */
+	__le16 sequence_number;	/* Sequence number of event */
+	__le16 lun;			/* SCSI LUN */
 	uint8_t reserved_2[48];
 } mrk_entry_t;
 
@@ -1910,25 +1910,25 @@ typedef struct {
 	uint8_t entry_count;		/* Entry count. */
 	uint8_t handle_count;		/* Handle count. */
 	uint8_t entry_status;		/* Entry Status. */
-	uint32_t handle1;		/* System handle. */
+	__le32 handle1;		/* System handle. */
 	target_id_t loop_id;
-	uint16_t status;
-	uint16_t control_flags;		/* Control flags. */
-	uint16_t reserved2;
-	uint16_t timeout;
-	uint16_t cmd_dsd_count;
-	uint16_t total_dsd_count;
+	__le16 status;
+	__le16 control_flags;		/* Control flags. */
+	__le16 reserved2;
+	__le16 timeout;
+	__le16 cmd_dsd_count;
+	__le16 total_dsd_count;
 	uint8_t type;
 	uint8_t r_ctl;
-	uint16_t rx_id;
-	uint16_t reserved3;
-	uint32_t handle2;
-	uint32_t rsp_bytecount;
-	uint32_t req_bytecount;
-	uint32_t dseg_req_address[2];	/* Data segment 0 address. */
-	uint32_t dseg_req_length;	/* Data segment 0 length. */
-	uint32_t dseg_rsp_address[2];	/* Data segment 1 address. */
-	uint32_t dseg_rsp_length;	/* Data segment 1 length. */
+	__le16 rx_id;
+	__le16 reserved3;
+	__le32 handle2;
+	__le32 rsp_bytecount;
+	__le32 req_bytecount;
+	__le32 dseg_req_address[2];	/* Data segment 0 address. */
+	__le32 dseg_req_length;	/* Data segment 0 length. */
+	__le32 dseg_rsp_address[2];	/* Data segment 1 address. */
+	__le32 dseg_rsp_length;	/* Data segment 1 length. */
 } ms_iocb_entry_t;
 
 
@@ -1951,24 +1951,24 @@ struct mbx_entry {
 
 	uint8_t entry_status;
 
-	uint32_t handle;
+	__le32 handle;
 	target_id_t loop_id;
 
-	uint16_t status;
-	uint16_t state_flags;
-	uint16_t status_flags;
+	__le16 status;
+	__le16 state_flags;
+	__le16 status_flags;
 
-	uint32_t sys_define2[2];
+	__le32 sys_define2[2];
 
-	uint16_t mb0;
-	uint16_t mb1;
-	uint16_t mb2;
-	uint16_t mb3;
-	uint16_t mb6;
-	uint16_t mb7;
-	uint16_t mb9;
-	uint16_t mb10;
-	uint32_t reserved_2[2];
+	__le16 mb0;
+	__le16 mb1;
+	__le16 mb2;
+	__le16 mb3;
+	__le16 mb6;
+	__le16 mb7;
+	__le16 mb9;
+	__le16 mb10;
+	__le32 reserved_2[2];
 	uint8_t node_name[WWN_SIZE];
 	uint8_t port_name[WWN_SIZE];
 };
@@ -2204,8 +2204,8 @@ static const char * const port_state_str[] = {
 #define FDMI_HBA_TYPE_VENDOR_IDENTIFIER		0xe0
 
 struct ct_fdmi_hba_attr {
-	uint16_t type;
-	uint16_t len;
+	__be16 type;
+	__be16 len;
 	union {
 		uint8_t node_name[WWN_SIZE];
 		uint8_t manufacturer[64];
@@ -2217,18 +2217,18 @@ struct ct_fdmi_hba_attr {
 		uint8_t orom_version[16];
 		uint8_t fw_version[32];
 		uint8_t os_version[128];
-		uint32_t max_ct_len;
+		__be32 max_ct_len;
 	} a;
 };
 
 struct ct_fdmi_hba_attributes {
-	uint32_t count;
+	__be32 count;
 	struct ct_fdmi_hba_attr entry[FDMI_HBA_ATTR_COUNT];
 };
 
 struct ct_fdmiv2_hba_attr {
-	uint16_t type;
-	uint16_t len;
+	__be16 type;
+	__be16 len;
 	union {
 		uint8_t node_name[WWN_SIZE];
 		uint8_t manufacturer[64];
@@ -2240,10 +2240,10 @@ struct ct_fdmiv2_hba_attr {
 		uint8_t orom_version[16];
 		uint8_t fw_version[32];
 		uint8_t os_version[128];
-		uint32_t max_ct_len;
+		__be32 max_ct_len;
 		uint8_t sym_name[256];
-		uint32_t vendor_id;
-		uint32_t num_ports;
+		__be32 vendor_id;
+		__be32 num_ports;
 		uint8_t fabric_name[WWN_SIZE];
 		uint8_t bios_name[32];
 		uint8_t vendor_indentifer[8];
@@ -2251,7 +2251,7 @@ struct ct_fdmiv2_hba_attr {
 };
 
 struct ct_fdmiv2_hba_attributes {
-	uint32_t count;
+	__be32 count;
 	struct ct_fdmiv2_hba_attr entry[FDMIV2_HBA_ATTR_COUNT];
 };
 
@@ -2291,25 +2291,25 @@ struct ct_fdmiv2_hba_attributes {
 #define FC_CLASS_2_3	0x0C
 
 struct ct_fdmiv2_port_attr {
-	uint16_t type;
-	uint16_t len;
+	__be16 type;
+	__be16 len;
 	union {
 		uint8_t fc4_types[32];
-		uint32_t sup_speed;
-		uint32_t cur_speed;
-		uint32_t max_frame_size;
+		__be32 sup_speed;
+		__be32 cur_speed;
+		__be32 max_frame_size;
 		uint8_t os_dev_name[32];
 		uint8_t host_name[256];
 		uint8_t node_name[WWN_SIZE];
 		uint8_t port_name[WWN_SIZE];
 		uint8_t port_sym_name[128];
-		uint32_t port_type;
-		uint32_t port_supported_cos;
+		__be32 port_type;
+		__be32 port_supported_cos;
 		uint8_t fabric_name[WWN_SIZE];
 		uint8_t port_fc4_type[32];
-		uint32_t port_state;
-		uint32_t num_ports;
-		uint32_t port_id;
+		__be32 port_state;
+		__be32 num_ports;
+		__be32 port_id;
 	} a;
 };
 
@@ -2317,25 +2317,25 @@ struct ct_fdmiv2_port_attr {
  * Port Attribute Block.
  */
 struct ct_fdmiv2_port_attributes {
-	uint32_t count;
+	__be32 count;
 	struct ct_fdmiv2_port_attr entry[FDMIV2_PORT_ATTR_COUNT];
 };
 
 struct ct_fdmi_port_attr {
-	uint16_t type;
-	uint16_t len;
+	__be16 type;
+	__be16 len;
 	union {
 		uint8_t fc4_types[32];
-		uint32_t sup_speed;
-		uint32_t cur_speed;
-		uint32_t max_frame_size;
+		__be32 sup_speed;
+		__be32 cur_speed;
+		__be32 max_frame_size;
 		uint8_t os_dev_name[32];
 		uint8_t host_name[256];
 	} a;
 };
 
 struct ct_fdmi_port_attributes {
-	uint32_t count;
+	__be32 count;
 	struct ct_fdmi_port_attr entry[FDMI_PORT_ATTR_COUNT];
 };
 
@@ -2375,8 +2375,8 @@ struct ct_cmd_hdr {
 /* CT command request */
 struct ct_sns_req {
 	struct ct_cmd_hdr header;
-	uint16_t command;
-	uint16_t max_rsp_size;
+	__be16 command;
+	__be16 max_rsp_size;
 	uint8_t fragment_id;
 	uint8_t reserved[3];
 
@@ -2403,7 +2403,7 @@ struct ct_sns_req {
 		struct {
 			uint8_t reserved;
 			uint8_t port_id[3];
-			uint16_t reserved2;
+			__be16 reserved2;
 			uint8_t fc4_feature;
 			uint8_t fc4_type;
 		} rff_id;
@@ -2426,14 +2426,14 @@ struct ct_sns_req {
 
 		struct {
 			uint8_t hba_identifier[8];
-			uint32_t entry_count;
+			__be32 entry_count;
 			uint8_t port_name[8];
 			struct ct_fdmi_hba_attributes attrs;
 		} rhba;
 
 		struct {
 			uint8_t hba_identifier[8];
-			uint32_t entry_count;
+			__be32 entry_count;
 			uint8_t port_name[8];
 			struct ct_fdmiv2_hba_attributes attrs;
 		} rhba2;
@@ -2483,8 +2483,8 @@ struct ct_sns_req {
 /* CT command response header */
 struct ct_rsp_hdr {
 	struct ct_cmd_hdr header;
-	uint16_t response;
-	uint16_t residual;
+	__be16 response;
+	__be16 residual;
 	uint8_t fragment_id;
 	uint8_t reason_code;
 	uint8_t explanation_code;
@@ -2538,7 +2538,7 @@ struct ct_sns_rsp {
 		} gft_id;
 
 		struct {
-			uint32_t entry_count;
+			__be32 entry_count;
 			uint8_t port_name[8];
 			struct ct_fdmi_hba_attributes attrs;
 		} ghat;
@@ -2548,8 +2548,8 @@ struct ct_sns_rsp {
 		} gfpn_id;
 
 		struct {
-			uint16_t speeds;
-			uint16_t speed;
+			__be16 speeds;
+			__be16 speed;
 		} gpsc;
 
 #define GFF_FCP_SCSI_OFFSET	7
@@ -2600,14 +2600,14 @@ struct ct_sns_pkt {
 struct sns_cmd_pkt {
 	union {
 		struct {
-			uint16_t buffer_length;
-			uint16_t reserved_1;
-			uint32_t buffer_address[2];
-			uint16_t subcommand_length;
-			uint16_t reserved_2;
-			uint16_t subcommand;
-			uint16_t size;
-			uint32_t reserved_3;
+			__le16 buffer_length;
+			__le16 reserved_1;
+			__le32 buffer_address[2];
+			__le16 subcommand_length;
+			__le16 reserved_2;
+			__le16 subcommand;
+			__le16 size;
+			__le32 reserved_3;
 			uint8_t param[36];
 		} cmd;
 
@@ -2632,7 +2632,7 @@ struct gid_list_info {
 	uint8_t	area;
 	uint8_t	domain;
 	uint8_t	loop_id_2100;	/* ISP2100/ISP2200 -- 4 bytes. */
-	uint16_t loop_id;	/* ISP23XX         -- 6 bytes. */
+	__le16 loop_id;	/* ISP23XX         -- 6 bytes. */
 	uint16_t reserved_1;	/* ISP24XX         -- 8 bytes. */
 };
 
