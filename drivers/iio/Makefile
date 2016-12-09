@@ -34,4 +34,5 @@ obj-y += potentiostat/
 obj-y += pressure/
 obj-y += proximity/
 obj-y += temperature/
+obj-y += timer/
 obj-y += trigger/

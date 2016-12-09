@@ -46,5 +46,4 @@ config IIO_SYSFS_TRIGGER
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called iio-trig-sysfs.
-
 endmenu
