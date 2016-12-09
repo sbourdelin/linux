@@ -27,12 +27,12 @@ static struct usb_function_instance *try_get_usb_function_instance(const char *n
 		fi = fd->alloc_inst();
 		if (IS_ERR(fi))
 			module_put(fd->mod);
-		else
+		else if (fi)  /* This should always be true but be defensive. */
 			fi->fd = fd;
 		break;
 	}
 	mutex_unlock(&func_lock);
-	return fi;
+	return fi ? fi : ERR_PTR(-ENOMEM);
 }
 
 struct usb_function_instance *usb_get_function_instance(const char *name)
@@ -43,6 +43,8 @@ struct usb_function_instance *usb_get_function_instance(const char *name)
 	fi = try_get_usb_function_instance(name);
 	if (!IS_ERR(fi))
 		return fi;
+	else if (!fi)  /* We should never be here but be defensive about it. */
+		return ERR_PTR(-ENOMEM);
 	ret = PTR_ERR(fi);
 	if (ret != -ENOENT)
 		return fi;
@@ -60,6 +62,8 @@ struct usb_function *usb_get_function(struct usb_function_instance *fi)
 	f = fi->fd->alloc_func(fi);
 	if (IS_ERR(f))
 		return f;
+	else if (!f)  /* We should never be here but be defensive about it. */
+		return ERR_PTR(-ENOMEM);
 	f->fi = fi;
 	return f;
 }
