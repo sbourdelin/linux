@@ -440,8 +440,10 @@ search_free:
 						       obj->cache_level,
 						       start, end,
 						       flags);
-			if (ret == 0)
+			if (ret == 0) {
+				search_flag = DRM_MM_SEARCH_DEFAULT;
 				goto search_free;
+			}
 
 			goto err_unpin;
 		}
