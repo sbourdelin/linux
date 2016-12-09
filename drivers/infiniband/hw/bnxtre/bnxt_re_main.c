@@ -60,6 +60,7 @@
 #include "bnxt_qplib_fp.h"
 #include "bnxt_qplib_rcfw.h"
 #include "bnxt_re.h"
+#include "bnxt_re_debugfs.h"
 #include "bnxt_re_ib_verbs.h"
 #include "bnxt.h"
 static char version[] =
@@ -72,8 +73,8 @@ MODULE_LICENSE("Dual BSD/GPL");
 MODULE_VERSION(ROCE_DRV_MODULE_VERSION);
 
 /* globals */
-static struct list_head bnxt_re_dev_list = LIST_HEAD_INIT(bnxt_re_dev_list);
-static DEFINE_MUTEX(bnxt_re_dev_lock);
+struct list_head bnxt_re_dev_list = LIST_HEAD_INIT(bnxt_re_dev_list);
+DEFINE_MUTEX(bnxt_re_dev_lock);
 static struct workqueue_struct *bnxt_re_wq;
 
 /* for handling bnxt_en callbacks later */
@@ -1264,6 +1265,7 @@ static int __init bnxt_re_mod_init(void)
 	if (!bnxt_re_wq)
 		return -ENOMEM;
 
+	bnxt_re_debugfs_init();
 	INIT_LIST_HEAD(&bnxt_re_dev_list);
 
 	rc = register_netdevice_notifier(&bnxt_re_netdev_notifier);
@@ -1275,6 +1277,7 @@ static int __init bnxt_re_mod_init(void)
 	return 0;
 
 err_netdev:
+	bnxt_re_debugfs_remove();
 	destroy_workqueue(bnxt_re_wq);
 
 	return rc;
@@ -1282,6 +1285,7 @@ err_netdev:
 static void __exit bnxt_re_mod_exit(void)
 {
 	unregister_netdevice_notifier(&bnxt_re_netdev_notifier);
+	bnxt_re_debugfs_remove();
 	if (bnxt_re_wq)
 		destroy_workqueue(bnxt_re_wq);
 }
