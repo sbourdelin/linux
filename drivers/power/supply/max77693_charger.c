@@ -445,6 +445,17 @@ static DEVICE_ATTR_RW(fast_charge_timer);
 static DEVICE_ATTR_RW(top_off_threshold_current);
 static DEVICE_ATTR_RW(top_off_timer);
 
+static struct attribute *max77693_charger_attribute[] = {
+	&dev_attr_fast_charge_timer.attr,
+	&dev_attr_top_off_threshold_current.attr,
+	&dev_attr_top_off_timer.attr,
+	NULL,
+};
+
+static const struct attribute_group max77693_attr_group = {
+	.attrs = max77693_charger_attribute,
+};
+
 static int max77693_set_constant_volt(struct max77693_charger *chg,
 		unsigned int uvolt)
 {
@@ -699,53 +710,27 @@ static int max77693_charger_probe(struct platform_device *pdev)
 
 	psy_cfg.drv_data = chg;
 
-	ret = device_create_file(&pdev->dev, &dev_attr_fast_charge_timer);
-	if (ret) {
-		dev_err(&pdev->dev, "failed: create fast charge timer sysfs entry\n");
-		goto err;
+	ret = sysfs_create_group(&pdev->dev.kobj, &max77693_attr_group);
+	if (ret != 0) {
+		dev_err(&pdev->dev, "Can't create sysfs entries\n");
+		return ret;
 	}
 
-	ret = device_create_file(&pdev->dev,
-			&dev_attr_top_off_threshold_current);
-	if (ret) {
-		dev_err(&pdev->dev, "failed: create top off current sysfs entry\n");
-		goto err;
-	}
-
-	ret = device_create_file(&pdev->dev, &dev_attr_top_off_timer);
-	if (ret) {
-		dev_err(&pdev->dev, "failed: create top off timer sysfs entry\n");
-		goto err;
-	}
-
-	chg->charger = power_supply_register(&pdev->dev,
+	chg->charger = devm_power_supply_register(&pdev->dev,
 						&max77693_charger_desc,
 						&psy_cfg);
 	if (IS_ERR(chg->charger)) {
 		dev_err(&pdev->dev, "failed: power supply register\n");
 		ret = PTR_ERR(chg->charger);
-		goto err;
+		return ret;
 	}
 
 	return 0;
-
-err:
-	device_remove_file(&pdev->dev, &dev_attr_top_off_timer);
-	device_remove_file(&pdev->dev, &dev_attr_top_off_threshold_current);
-	device_remove_file(&pdev->dev, &dev_attr_fast_charge_timer);
-
-	return ret;
 }
 
 static int max77693_charger_remove(struct platform_device *pdev)
 {
-	struct max77693_charger *chg = platform_get_drvdata(pdev);
-
-	device_remove_file(&pdev->dev, &dev_attr_top_off_timer);
-	device_remove_file(&pdev->dev, &dev_attr_top_off_threshold_current);
-	device_remove_file(&pdev->dev, &dev_attr_fast_charge_timer);
-
-	power_supply_unregister(chg->charger);
+	sysfs_remove_group(&pdev->dev.kobj, &max77693_attr_group);
 
 	return 0;
 }
