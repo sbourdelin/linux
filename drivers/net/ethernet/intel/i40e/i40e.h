@@ -544,6 +544,10 @@ struct i40e_vsi {
 	struct i40e_ring **rx_rings;
 	struct i40e_ring **tx_rings;
 
+	/* The XDP rings are Tx only, and follows the count of the
+	 * regular rings, i.e. alloc_queue_pairs/num_queue_pairs
+	 */
+	struct i40e_ring **xdp_rings;
 	struct bpf_prog *xdp_prog;
 
 	u32  active_filters;
@@ -620,6 +624,7 @@ struct i40e_q_vector {
 
 	struct i40e_ring_container rx;
 	struct i40e_ring_container tx;
+	struct i40e_ring_container xdp;
 
 	u8 num_ringpairs;	/* total number of ring pairs in vector */
 
