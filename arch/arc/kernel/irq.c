@@ -20,6 +20,12 @@
  */
 void __init init_IRQ(void)
 {
+#ifdef CONFIG_SMP
+	/* Set the default affinity to the boot cpu. */
+	cpumask_clear(irq_default_affinity);
+	cpumask_set_cpu(smp_processor_id(), irq_default_affinity);
+#endif
+
 	/*
 	 * process the entire interrupt tree in one go
 	 * Any external intc will be setup provided DT chains them
