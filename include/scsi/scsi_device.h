@@ -31,7 +31,7 @@ struct scsi_mode_data {
 enum scsi_device_state {
 	SDEV_CREATED = 1,	/* device created but not added to sysfs
 				 * Only internal commands allowed (for inq) */
-	SDEV_RUNNING,		/* device properly configured
+	SDEV_RUNNING,		/* device properly initialized
 				 * All commands allowed */
 	SDEV_CANCEL,		/* beginning to delete device
 				 * Only error handler commands allowed */
