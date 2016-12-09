@@ -151,13 +151,14 @@ static inline int is_device_dma_capable(struct device *dev)
  * Don't use them in device drivers.
  */
 int dma_alloc_from_coherent(struct device *dev, ssize_t size,
-				       dma_addr_t *dma_handle, void **ret);
+				       dma_addr_t *dma_handle, void **ret,
+				       struct dma_attrs *attrs);
 int dma_release_from_coherent(struct device *dev, int order, void *vaddr);
 
 int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
 			    void *cpu_addr, size_t size, int *ret);
 #else
-#define dma_alloc_from_coherent(dev, size, handle, ret) (0)
+#define dma_alloc_from_coherent(dev, size, handle, ret, attrs) (0)
 #define dma_release_from_coherent(dev, order, vaddr) (0)
 #define dma_mmap_from_coherent(dev, vma, vaddr, order, ret) (0)
 #endif /* CONFIG_HAVE_GENERIC_DMA_COHERENT */
@@ -456,7 +457,7 @@ static inline void *dma_alloc_attrs(struct device *dev, size_t size,
 
 	BUG_ON(!ops);
 
-	if (dma_alloc_from_coherent(dev, size, dma_handle, &cpu_addr))
+	if (dma_alloc_from_coherent(dev, size, dma_handle, &cpu_addr, attrs))
 		return cpu_addr;
 
 	if (!arch_dma_alloc_attrs(&dev, &flag))

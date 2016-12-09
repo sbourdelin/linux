@@ -151,6 +151,7 @@ EXPORT_SYMBOL(dma_mark_declared_memory_occupied);
  * @dma_handle:	This will be filled with the correct dma handle
  * @ret:	This pointer will be filled with the virtual address
  *		to allocated area.
+ * @attrs:	dma_attrs to pass additional information
  *
  * This function should be only called from per-arch dma_alloc_coherent()
  * to support allocation from per-device coherent memory pools.
@@ -159,7 +160,8 @@ EXPORT_SYMBOL(dma_mark_declared_memory_occupied);
  * generic memory areas, or !0 if dma_alloc_coherent should return @ret.
  */
 int dma_alloc_from_coherent(struct device *dev, ssize_t size,
-				       dma_addr_t *dma_handle, void **ret)
+				       dma_addr_t *dma_handle, void **ret,
+				       struct dma_attrs *attrs)
 {
 	struct dma_coherent_mem *mem;
 	int order = get_order(size);
@@ -190,6 +192,8 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
 	*ret = mem->virt_base + (pageno << PAGE_SHIFT);
 	dma_memory_map = (mem->flags & DMA_MEMORY_MAP);
 	spin_unlock_irqrestore(&mem->spinlock, flags);
+	if (dma_get_attr(DMA_ATTR_SKIP_ZEROING, attrs))
+		return 1;
 	if (dma_memory_map)
 		memset(*ret, 0, size);
 	else
