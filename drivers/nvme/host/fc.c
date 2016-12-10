@@ -2402,7 +2402,7 @@ __nvme_fc_create_ctrl(struct device *dev, struct nvmf_ctrl_options *opts,
 
 	dev_info(ctrl->ctrl.device,
 		"NVME-FC{%d}: new ctrl: NQN \"%s\" (%p)\n",
-		ctrl->cnum, ctrl->ctrl.opts->subsysnqn, &ctrl);
+		ctrl->cnum, ctrl->ctrl.opts->subsysnqn, ctrl);
 
 	kref_get(&ctrl->ctrl.kref);
 
