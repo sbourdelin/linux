@@ -384,6 +384,8 @@ re_probe:
 	if (test_remove) {
 		test_remove = false;
 
+		async_synchronize_full();
+
 		if (dev->bus->remove)
 			dev->bus->remove(dev);
 		else if (drv->remove)
