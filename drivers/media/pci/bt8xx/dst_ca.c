@@ -559,15 +559,26 @@ static long dst_ca_ioctl(struct file *file, unsigned int cmd, unsigned long ioct
 	int result = 0;
 
 	mutex_lock(&dst_ca_mutex);
+	p_ca_message = kmalloc(sizeof(*p_ca_message), GFP_KERNEL);
+	if (!p_ca_message) {
+		result = -ENOMEM;
+		goto unlock;
+	}
+
+	p_ca_slot_info = kmalloc(sizeof(*p_ca_slot_info), GFP_KERNEL);
+	if (!p_ca_slot_info) {
+		result = -ENOMEM;
+		goto free_message;
+	}
+
+	p_ca_caps = kmalloc(sizeof(*p_ca_caps), GFP_KERNEL);
+	if (!p_ca_caps) {
+		result = -ENOMEM;
+		goto free_slot_info;
+	}
+
 	dvbdev = file->private_data;
 	state = (struct dst_state *)dvbdev->priv;
-	p_ca_message = kmalloc(sizeof (struct ca_msg), GFP_KERNEL);
-	p_ca_slot_info = kmalloc(sizeof (struct ca_slot_info), GFP_KERNEL);
-	p_ca_caps = kmalloc(sizeof (struct ca_caps), GFP_KERNEL);
-	if (!p_ca_message || !p_ca_slot_info || !p_ca_caps) {
-		result = -ENOMEM;
-		goto free_mem_and_exit;
-	}
 
 	/*	We have now only the standard ioctl's, the driver is upposed to handle internals.	*/
 	switch (cmd) {
@@ -576,7 +587,7 @@ static long dst_ca_ioctl(struct file *file, unsigned int cmd, unsigned long ioct
 		if ((ca_send_message(state, p_ca_message, arg)) < 0) {
 			dprintk(verbose, DST_CA_ERROR, 1, " -->CA_SEND_MSG Failed !");
 			result = -1;
-			goto free_mem_and_exit;
+			goto free_caps;
 		}
 		break;
 	case CA_GET_MSG:
@@ -584,7 +595,7 @@ static long dst_ca_ioctl(struct file *file, unsigned int cmd, unsigned long ioct
 		if ((ca_get_message(state, p_ca_message, arg)) < 0) {
 			dprintk(verbose, DST_CA_ERROR, 1, " -->CA_GET_MSG Failed !");
 			result = -1;
-			goto free_mem_and_exit;
+			goto free_caps;
 		}
 		dprintk(verbose, DST_CA_INFO, 1, " -->CA_GET_MSG Success !");
 		break;
@@ -598,7 +609,7 @@ static long dst_ca_ioctl(struct file *file, unsigned int cmd, unsigned long ioct
 		if ((ca_get_slot_info(state, p_ca_slot_info, arg)) < 0) {
 			dprintk(verbose, DST_CA_ERROR, 1, " -->CA_GET_SLOT_INFO Failed !");
 			result = -1;
-			goto free_mem_and_exit;
+			goto free_caps;
 		}
 		dprintk(verbose, DST_CA_INFO, 1, " -->CA_GET_SLOT_INFO Success !");
 		break;
@@ -607,7 +618,7 @@ static long dst_ca_ioctl(struct file *file, unsigned int cmd, unsigned long ioct
 		if ((ca_get_slot_caps(state, p_ca_caps, arg)) < 0) {
 			dprintk(verbose, DST_CA_ERROR, 1, " -->CA_GET_CAP Failed !");
 			result = -1;
-			goto free_mem_and_exit;
+			goto free_caps;
 		}
 		dprintk(verbose, DST_CA_INFO, 1, " -->CA_GET_CAP Success !");
 		break;
@@ -616,7 +627,7 @@ static long dst_ca_ioctl(struct file *file, unsigned int cmd, unsigned long ioct
 		if ((ca_get_slot_descr(state, p_ca_message, arg)) < 0) {
 			dprintk(verbose, DST_CA_ERROR, 1, " -->CA_GET_DESCR_INFO Failed !");
 			result = -1;
-			goto free_mem_and_exit;
+			goto free_caps;
 		}
 		dprintk(verbose, DST_CA_INFO, 1, " -->CA_GET_DESCR_INFO Success !");
 		break;
@@ -625,7 +636,7 @@ static long dst_ca_ioctl(struct file *file, unsigned int cmd, unsigned long ioct
 		if ((ca_set_slot_descr()) < 0) {
 			dprintk(verbose, DST_CA_ERROR, 1, " -->CA_SET_DESCR Failed !");
 			result = -1;
-			goto free_mem_and_exit;
+			goto free_caps;
 		}
 		dprintk(verbose, DST_CA_INFO, 1, " -->CA_SET_DESCR Success !");
 		break;
@@ -634,17 +645,19 @@ static long dst_ca_ioctl(struct file *file, unsigned int cmd, unsigned long ioct
 		if ((ca_set_pid()) < 0) {
 			dprintk(verbose, DST_CA_ERROR, 1, " -->CA_SET_PID Failed !");
 			result = -1;
-			goto free_mem_and_exit;
+			goto free_caps;
 		}
 		dprintk(verbose, DST_CA_INFO, 1, " -->CA_SET_PID Success !");
 	default:
 		result = -EOPNOTSUPP;
 	}
- free_mem_and_exit:
-	kfree (p_ca_message);
-	kfree (p_ca_slot_info);
-	kfree (p_ca_caps);
-
+free_caps:
+	kfree(p_ca_caps);
+free_slot_info:
+	kfree(p_ca_slot_info);
+free_message:
+	kfree(p_ca_message);
+unlock:
 	mutex_unlock(&dst_ca_mutex);
 	return result;
 }
