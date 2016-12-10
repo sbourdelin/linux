@@ -240,6 +240,7 @@ static inline unsigned long __cmpxchg_local(volatile void *ptr,
 				        sizeof(*(ptr)));		\
 })
 
+#ifndef CONFIG_CPU_V7M
 static inline unsigned long long __cmpxchg64(unsigned long long *ptr,
 					     unsigned long long old,
 					     unsigned long long new)
@@ -272,6 +273,18 @@ static inline unsigned long long __cmpxchg64(unsigned long long *ptr,
 })
 
 #define cmpxchg64_local(ptr, o, n) cmpxchg64_relaxed((ptr), (o), (n))
+
+#else
+
+/* ARMv7-M has 32-bit ldrex/strex but no ldrexd/strexd */
+
+#define cmpxchg64(ptr, o, n)		__cmpxchg64_local_generic((ptr), (o), (n))
+#define cmpxchg64_relaxed(ptr, o, n)	__cmpxchg64_local_generic((ptr), (o), (n))
+#define cmpxchg64_local(ptr, o, n)	__cmpxchg64_local_generic((ptr), (o), (n))
+
+#include <asm-generic/cmpxchg-local.h>
+
+#endif
 
 #endif	/* __LINUX_ARM_ARCH__ >= 6 */
 
