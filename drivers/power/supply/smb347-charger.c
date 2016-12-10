@@ -837,19 +837,21 @@ static int smb347_irq_init(struct smb347_charger *smb,
 	const struct smb347_charger_platform_data *pdata = smb->pdata;
 	int ret, irq = gpio_to_irq(pdata->irq_gpio);
 
-	ret = gpio_request_one(pdata->irq_gpio, GPIOF_IN, client->name);
+	ret = devm_gpio_request_one(&client->dev, pdata->irq_gpio, GPIOF_IN,
+				client->name);
 	if (ret < 0)
 		goto fail;
 
-	ret = request_threaded_irq(irq, NULL, smb347_interrupt,
-				   IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-				   client->name, smb);
+	ret = devm_request_threaded_irq(&client->dev, irq, NULL,
+				smb347_interrupt,
+				IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+				client->name, smb);
 	if (ret < 0)
-		goto fail_gpio;
+		goto fail;
 
 	ret = smb347_set_writable(smb, true);
 	if (ret < 0)
-		goto fail_irq;
+		goto fail;
 
 	/*
 	 * Configure the STAT output to be suitable for interrupts: disable
@@ -867,10 +869,6 @@ static int smb347_irq_init(struct smb347_charger *smb,
 
 fail_readonly:
 	smb347_set_writable(smb, false);
-fail_irq:
-	free_irq(irq, smb);
-fail_gpio:
-	gpio_free(pdata->irq_gpio);
 fail:
 	client->irq = 0;
 	return ret;
@@ -1249,32 +1247,24 @@ static int smb347_probe(struct i2c_client *client,
 	mains_usb_cfg.num_supplicants = ARRAY_SIZE(battery);
 	mains_usb_cfg.drv_data = smb;
 	if (smb->pdata->use_mains) {
-		smb->mains = power_supply_register(dev, &smb347_mains_desc,
+		smb->mains = devm_power_supply_register(dev, &smb347_mains_desc,
 						   &mains_usb_cfg);
 		if (IS_ERR(smb->mains))
 			return PTR_ERR(smb->mains);
 	}
 
 	if (smb->pdata->use_usb) {
-		smb->usb = power_supply_register(dev, &smb347_usb_desc,
+		smb->usb = devm_power_supply_register(dev, &smb347_usb_desc,
 						 &mains_usb_cfg);
-		if (IS_ERR(smb->usb)) {
-			if (smb->pdata->use_mains)
-				power_supply_unregister(smb->mains);
+		if (IS_ERR(smb->usb))
 			return PTR_ERR(smb->usb);
-		}
 	}
 
 	battery_cfg.drv_data = smb;
-	smb->battery = power_supply_register(dev, &smb347_battery_desc,
+	smb->battery = devm_power_supply_register(dev, &smb347_battery_desc,
 					     &battery_cfg);
-	if (IS_ERR(smb->battery)) {
-		if (smb->pdata->use_usb)
-			power_supply_unregister(smb->usb);
-		if (smb->pdata->use_mains)
-			power_supply_unregister(smb->mains);
+	if (IS_ERR(smb->battery))
 		return PTR_ERR(smb->battery);
-	}
 
 	/*
 	 * Interrupt pin is optional. If it is connected, we setup the
@@ -1297,17 +1287,9 @@ static int smb347_remove(struct i2c_client *client)
 {
 	struct smb347_charger *smb = i2c_get_clientdata(client);
 
-	if (client->irq) {
+	if (client->irq)
 		smb347_irq_disable(smb);
-		free_irq(client->irq, smb);
-		gpio_free(smb->pdata->irq_gpio);
-	}
 
-	power_supply_unregister(smb->battery);
-	if (smb->pdata->use_usb)
-		power_supply_unregister(smb->usb);
-	if (smb->pdata->use_mains)
-		power_supply_unregister(smb->mains);
 	return 0;
 }
 
