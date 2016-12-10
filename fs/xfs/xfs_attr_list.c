@@ -433,7 +433,6 @@ xfs_attr3_leaf_list_int(
 		cursor->offset++;
 	}
 	trace_xfs_attr_list_leaf_end(context);
-	return;
 }
 
 /*
@@ -543,7 +542,6 @@ xfs_attr_put_listent(
 	alist->al_offset[context->count++] = context->firstu;
 	alist->al_count = context->count;
 	trace_xfs_attr_list_add(context);
-	return;
 }
 
 /*
