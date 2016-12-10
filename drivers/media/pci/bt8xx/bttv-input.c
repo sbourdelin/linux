@@ -418,15 +418,20 @@ int bttv_input_init(struct bttv *btv)
 	struct bttv_ir *ir;
 	char *ir_codes = NULL;
 	struct rc_dev *rc;
-	int err = -ENOMEM;
+	int err;
 
 	if (!btv->has_remote)
 		return -ENODEV;
 
-	ir = kzalloc(sizeof(*ir),GFP_KERNEL);
+	ir = kzalloc(sizeof(*ir), GFP_KERNEL);
+	if (!ir)
+		return -ENOMEM;
+
 	rc = rc_allocate_device();
-	if (!ir || !rc)
-		goto err_out_free;
+	if (!rc) {
+		err = -ENOMEM;
+		goto free_ir;
+	}
 
 	/* detect & configure */
 	switch (btv->c.type) {
@@ -569,6 +574,7 @@ int bttv_input_init(struct bttv *btv)
 	btv->remote = NULL;
  err_out_free:
 	rc_free_device(rc);
+free_ir:
 	kfree(ir);
 	return err;
 }
