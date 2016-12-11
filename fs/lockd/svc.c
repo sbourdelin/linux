@@ -658,7 +658,7 @@ module_param_call(nlm_udpport, param_set_port, param_get_int,
 		  &nlm_udpport, 0644);
 module_param_call(nlm_tcpport, param_set_port, param_get_int,
 		  &nlm_tcpport, 0644);
-module_param(nsm_use_hostnames, bool, 0644);
+module_param(nsm_use_hostnames, u32, 0644);
 module_param(nlm_max_connections, uint, 0644);
 
 static int lockd_init_net(struct net *net)
