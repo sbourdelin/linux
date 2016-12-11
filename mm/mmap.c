@@ -1504,6 +1504,31 @@ static int mmap_pgoff_prepare(struct file **f, unsigned long *l,
 	return 0;
 }
 
+SYSCALL_DEFINE6(mmap64, unsigned long, addr, unsigned long, len,
+		unsigned long, prot, unsigned long, flags,
+		unsigned long, fd, unsigned long long __user *, offset)
+{
+	int err;
+	unsigned long long koffset;
+	unsigned long retval;
+	struct file *file = NULL;
+
+	if (copy_from_user(&koffset, offset, sizeof(koffset)))
+		return -EFAULT;
+	if (offset_in_page(koffset))
+		return -EINVAL;
+
+	err = mmap_pgoff_prepare(&file, &len, &flags, fd);
+	if (err)
+		return err;
+
+	retval = vm_mmap_pgoff(file, addr, len, prot,
+			flags, koffset >> PAGE_SHIFT);
+	if (file)
+		fput(file);
+	return retval;
+}
+
 SYSCALL_DEFINE6(mmap_pgoff, unsigned long, addr, unsigned long, len,
 		unsigned long, prot, unsigned long, flags,
 		unsigned long, fd, unsigned long, pgoff)
