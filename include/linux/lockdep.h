@@ -549,9 +549,13 @@ static inline void print_irqtrace_events(struct task_struct *curr)
 #define lock_map_acquire_tryread(l)		lock_acquire_shared_recursive(l, 0, 1, NULL, _THIS_IP_)
 #define lock_map_release(l)			lock_release(l, 1, _THIS_IP_)
 
+#define lock_is_mutex(lock) \
+	__builtin_types_compatible_p(typeof(*lock), struct mutex)
+
 #ifdef CONFIG_PROVE_LOCKING
 # define might_lock(lock) 						\
 do {									\
+	might_sleep_if(lock_is_mutex(lock));				\
 	typecheck(struct lockdep_map *, &(lock)->dep_map);		\
 	lock_acquire(&(lock)->dep_map, 0, 0, 0, 1, NULL, _THIS_IP_);	\
 	lock_release(&(lock)->dep_map, 0, _THIS_IP_);			\
@@ -563,7 +567,9 @@ do {									\
 	lock_release(&(lock)->dep_map, 0, _THIS_IP_);			\
 } while (0)
 #else
-# define might_lock(lock) do { } while (0)
+# define might_lock(lock) do {						\
+	might_sleep_if(lock_is_mutex(lock));				\
+} while (0)
 # define might_lock_read(lock) do { } while (0)
 #endif
 
