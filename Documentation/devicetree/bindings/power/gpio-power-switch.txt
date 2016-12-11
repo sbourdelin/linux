@@ -1,0 +1,25 @@
+GPIO Power Switch
+-----------------
+
+This is the device tree binding for simple, GPIO-driven power load switches
+that do not have any control signals.
+
+Required properties:
+
+- compatible:           must be "gpio-power-switch"
+- power-gpios:          phandle for the GPIO driving the power load switch
+
+Optional properties:
+
+- power-switch-name:    the name of the power switch
+- power-switch-on:      the power switch GPIO is driven high by default
+
+Example
+-------
+
+acme_probe0_power_switch: gpio_power_switch@0 {
+	compatible = "gpio-power-switch";
+	power-switch-name = "acme_probe0_switch";
+	power-gpios = <&pca9535 1 GPIO_ACTIVE_HIGH>;
+	power-switch-on;
+};
