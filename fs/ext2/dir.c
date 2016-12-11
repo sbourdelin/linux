@@ -174,7 +174,7 @@ Einumber:
 	error = "inode out of bounds";
 bad_entry:
 	if (!quiet)
-		ext2_error(sb, __func__, "bad entry in directory #%lu: : %s - "
+		ext2_error(sb, __func__, "bad entry in directory #%llu: : %s - "
 			"offset=%lu, inode=%lu, rec_len=%d, name_len=%d",
 			dir->i_ino, error, (page->index<<PAGE_SHIFT)+offs,
 			(unsigned long) le32_to_cpu(p->inode),
@@ -184,7 +184,7 @@ Eend:
 	if (!quiet) {
 		p = (ext2_dirent *)(kaddr + offs);
 		ext2_error(sb, "ext2_check_page",
-			"entry in directory #%lu spans the page boundary"
+			"entry in directory #%llu spans the page boundary"
 			"offset=%lu, inode=%lu",
 			dir->i_ino, (page->index<<PAGE_SHIFT)+offs,
 			(unsigned long) le32_to_cpu(p->inode));

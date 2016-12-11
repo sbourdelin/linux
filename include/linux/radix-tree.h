@@ -287,7 +287,7 @@ unsigned int radix_tree_gang_lookup(struct radix_tree_root *root,
 			void **results, unsigned long first_index,
 			unsigned int max_items);
 unsigned int radix_tree_gang_lookup_slot(struct radix_tree_root *root,
-			void ***results, unsigned long *indices,
+			void ***results, unsigned long long *indices,
 			unsigned long first_index, unsigned int max_items);
 int radix_tree_preload(gfp_t gfp_mask);
 int radix_tree_maybe_preload(gfp_t gfp_mask);
@@ -308,7 +308,7 @@ radix_tree_gang_lookup_tag_slot(struct radix_tree_root *root, void ***results,
 		unsigned long first_index, unsigned int max_items,
 		unsigned int tag);
 unsigned long radix_tree_range_tag_if_tagged(struct radix_tree_root *root,
-		unsigned long *first_indexp, unsigned long last_index,
+		unsigned long long *first_indexp, unsigned long last_index,
 		unsigned long nr_to_tag,
 		unsigned int fromtag, unsigned int totag);
 int radix_tree_tagged(struct radix_tree_root *root, unsigned int tag);
@@ -335,8 +335,8 @@ static inline void radix_tree_preload_end(void)
  * radix tree tag.
  */
 struct radix_tree_iter {
-	unsigned long	index;
-	unsigned long	next_index;
+	unsigned long long	index;
+	unsigned long long	next_index;
 	unsigned long	tags;
 #ifdef CONFIG_RADIX_TREE_MULTIORDER
 	unsigned int	shift;

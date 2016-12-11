@@ -332,8 +332,8 @@ static pgoff_t count_history_pages(struct address_space *mapping,
 static int try_context_readahead(struct address_space *mapping,
 				 struct file_ra_state *ra,
 				 pgoff_t offset,
-				 unsigned long req_size,
-				 unsigned long max)
+				 unsigned long long req_size,
+				 unsigned long long max)
 {
 	pgoff_t size;
 

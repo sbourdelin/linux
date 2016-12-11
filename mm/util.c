@@ -2,6 +2,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/compiler.h>
+#include <linux/types.h>
 #include <linux/export.h>
 #include <linux/err.h>
 #include <linux/sched.h>
@@ -292,7 +293,7 @@ EXPORT_SYMBOL_GPL(get_user_pages_fast);
 
 unsigned long vm_mmap_pgoff(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
-	unsigned long flag, unsigned long pgoff)
+	unsigned long flag, pgoff_t pgoff)
 {
 	unsigned long ret;
 	struct mm_struct *mm = current->mm;

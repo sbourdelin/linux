@@ -49,7 +49,7 @@ void __dump_page(struct page *page, const char *reason)
 	 */
 	int mapcount = PageSlab(page) ? 0 : page_mapcount(page);
 
-	pr_emerg("page:%p count:%d mapcount:%d mapping:%p index:%#lx",
+	pr_emerg("page:%p count:%d mapcount:%d mapping:%p index:%#llx",
 		  page, page_ref_count(page), mapcount,
 		  page->mapping, page_to_pgoff(page));
 	if (PageCompound(page))

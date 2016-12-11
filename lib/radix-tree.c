@@ -98,7 +98,7 @@ static inline unsigned long get_slot_offset(struct radix_tree_node *parent,
 }
 
 static unsigned int radix_tree_descend(struct radix_tree_node *parent,
-			struct radix_tree_node **nodep, unsigned long index)
+			struct radix_tree_node **nodep, unsigned long long index)
 {
 	unsigned int offset = (index >> parent->shift) & RADIX_TREE_MAP_MASK;
 	void **entry = rcu_dereference_raw(parent->slots[offset]);
@@ -1041,14 +1041,14 @@ EXPORT_SYMBOL(radix_tree_next_chunk);
  * be prepared to handle that.
  */
 unsigned long radix_tree_range_tag_if_tagged(struct radix_tree_root *root,
-		unsigned long *first_indexp, unsigned long last_index,
+		unsigned long long *first_indexp, unsigned long last_index,
 		unsigned long nr_to_tag,
 		unsigned int iftag, unsigned int settag)
 {
 	struct radix_tree_node *parent, *node, *child;
 	unsigned long maxindex;
 	unsigned long tagged = 0;
-	unsigned long index = *first_indexp;
+	unsigned long long index = *first_indexp;
 
 	radix_tree_load_root(root, &child, &maxindex);
 	last_index = min(last_index, maxindex);
@@ -1196,7 +1196,7 @@ EXPORT_SYMBOL(radix_tree_gang_lookup);
  */
 unsigned int
 radix_tree_gang_lookup_slot(struct radix_tree_root *root,
-			void ***results, unsigned long *indices,
+			void ***results, unsigned long long *indices,
 			unsigned long first_index, unsigned int max_items)
 {
 	struct radix_tree_iter iter;

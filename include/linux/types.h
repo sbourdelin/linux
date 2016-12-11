@@ -137,7 +137,7 @@ typedef unsigned long blkcnt_t;
 /*
  * The type of an index into the pagecache.
  */
-#define pgoff_t unsigned long
+#define pgoff_t unsigned long long
 
 /*
  * A dma_addr_t can hold any valid DMA address, i.e., any address returned
