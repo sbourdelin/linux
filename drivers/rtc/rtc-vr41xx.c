@@ -292,21 +292,21 @@ static int rtc_probe(struct platform_device *pdev)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res)
-		return -EBUSY;
+		return -ENOMEM;
 
 	rtc1_base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
 	if (!rtc1_base)
-		return -EBUSY;
+		return -ENOMEM;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (!res) {
-		retval = -EBUSY;
+		retval = -ENOMEM;
 		goto err_rtc1_iounmap;
 	}
 
 	rtc2_base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
 	if (!rtc2_base) {
-		retval = -EBUSY;
+		retval = -ENOMEM;
 		goto err_rtc1_iounmap;
 	}
 
@@ -342,7 +342,7 @@ static int rtc_probe(struct platform_device *pdev)
 
 	pie_irq = platform_get_irq(pdev, 1);
 	if (pie_irq <= 0) {
-		retval = -EBUSY;
+		retval = -ENODEV;
 		goto err_iounmap_all;
 	}
 
