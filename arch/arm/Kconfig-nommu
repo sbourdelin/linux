@@ -46,9 +46,9 @@ config REMAP_VECTORS_TO_RAM
 	  If your CPU provides a remap facility which allows the exception
 	  vectors to be mapped to writable memory, say 'n' here.
 
-	  Otherwise, say 'y' here.  In this case, the kernel will require
-	  external support to redirect the hardware exception vectors to
-	  the writable versions located at DRAM_BASE.
+	  Otherwise, say 'y' here.  In this case, the kernel will
+	  redirect the hardware exception vectors to the writable
+	  versions located at DRAM_BASE.
 
 config ARM_MPU
        bool 'Use the ARM v7 PMSA Compliant MPU'

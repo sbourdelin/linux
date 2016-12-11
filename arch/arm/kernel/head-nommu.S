@@ -158,6 +158,12 @@ __after_proc_init:
 	bic	r0, r0, #CR_V
 #endif
 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+
+#ifdef CONFIG_REMAP_VECTORS_TO_RAM
+	mov	r3, #CONFIG_VECTORS_BASE	@ read VECTORS_BASE
+	mcr	p15, 0, r3, c12, c0, 0		@ write to VBAR
+#endif
+
 #elif defined (CONFIG_CPU_V7M)
 	/* For V7M systems we want to modify the CCR similarly to the SCTLR */
 #ifdef CONFIG_CPU_DCACHE_DISABLE
