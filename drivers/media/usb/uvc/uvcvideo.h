@@ -679,6 +679,10 @@ static inline int uvc_queue_streaming(struct uvc_video_queue *queue)
 {
 	return vb2_is_streaming(&queue->queue);
 }
+static inline struct uvc_buffer *uvc_vbuf_to_buffer(struct vb2_v4l2_buffer *vbuf)
+{
+	return container_of(vbuf, struct uvc_buffer, buf);
+}
 
 /* V4L2 interface */
 extern const struct v4l2_ioctl_ops uvc_ioctl_ops;
