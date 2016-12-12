@@ -23,6 +23,7 @@
 #ifndef FS_9P_V9FS_H
 #define FS_9P_V9FS_H
 
+#include <linux/kconfig.h>
 #include <linux/backing-dev.h>
 
 /**
@@ -69,6 +70,13 @@ enum p9_cache_modes {
 	CACHE_FSCACHE,
 };
 
+struct v9fs_flush_set {
+        struct page **pages;
+	int num_pages;
+        char *buf;
+	spinlock_t lock;
+};
+
 /**
  * struct v9fs_session_info - per-instance session information
  * @flags: session options of type &p9_session_flags
@@ -105,7 +113,7 @@ struct v9fs_session_info {
 	char *cachetag;
 	struct fscache_cookie *fscache;
 #endif
-
+	struct v9fs_flush_set *flush; /* flush set for writepages */
 	char *uname;		/* user name to mount as */
 	char *aname;		/* name of remote hierarchy being mounted */
 	unsigned int maxdata;	/* max data for client interface */
@@ -159,6 +167,8 @@ extern const struct inode_operations v9fs_symlink_inode_operations_dotl;
 extern struct inode *v9fs_inode_from_fid_dotl(struct v9fs_session_info *v9ses,
 					      struct p9_fid *fid,
 					      struct super_block *sb, int new);
+extern int alloc_init_flush_set(struct v9fs_session_info *v9ses);
+extern void put_flush_set(struct v9fs_flush_set *fset);
 
 /* other default globals */
 #define V9FS_PORT	564
@@ -221,6 +231,16 @@ v9fs_get_new_inode_from_fid(struct v9fs_session_info *v9ses, struct p9_fid *fid,
 		return v9fs_inode_from_fid_dotl(v9ses, fid, sb, 1);
 	else
 		return v9fs_inode_from_fid(v9ses, fid, sb, 1);
+}
+
+static inline int spin_trylock_flush_set(struct v9fs_flush_set *fset)
+{
+	return spin_trylock(&(fset->lock));
+}
+
+static inline void spin_unlock_flush_set(struct v9fs_flush_set *fset)
+{
+	spin_unlock(&(fset->lock));
 }
 
 #endif

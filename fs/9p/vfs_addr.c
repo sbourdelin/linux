@@ -36,6 +36,7 @@
 #include <linux/uio.h>
 #include <net/9p/9p.h>
 #include <net/9p/client.h>
+#include <trace/events/writeback.h>
 
 #include "v9fs.h"
 #include "v9fs_vfs.h"
@@ -209,6 +210,361 @@ static int v9fs_vfs_writepage(struct page *page, struct writeback_control *wbc)
 	return retval;
 }
 
+static void redirty_pages_for_writeback(struct page **pages, int nr,
+					struct writeback_control *wbc)
+{
+	int i;
+	for (i = 0; i < nr; i++) {
+		lock_page(pages[i]);
+		redirty_page_for_writepage(wbc, pages[i]);
+		unlock_page(pages[i]);
+	}
+}
+
+static void set_pages_error(struct page **pages, int nr, int error)
+{
+	int i;
+	for (i = 0; i < nr; i++) {
+		lock_page(pages[i]);
+		SetPageError(pages[i]);
+		mapping_set_error(pages[i]->mapping, error);
+		unlock_page(pages[i]);
+	}
+}
+
+#define V9FS_WRITEPAGES_DEBUG   (0)
+
+struct flush_context {
+	struct writeback_control *wbc;
+	struct address_space *mapping;
+	struct v9fs_flush_set *fset;
+	pgoff_t done_index;
+	pgoff_t writeback_index;
+	pgoff_t index;
+	pgoff_t end; /* Inclusive */
+	const char *msg;
+	int cycled;
+	int range_whole;
+	int done;
+};
+
+/**
+ * Copy a page with file's data to buffer.
+ * Handle races with truncate, etc.
+ * Return number of copied bytes
+ *
+ * @page: page to copy data from;
+ * @page_nr: serial number of the page
+ */
+static int flush_page(struct page *page, int page_nr, struct flush_context *ctx)
+{
+	char *kdata;
+	loff_t isize;
+	int copied = 0;
+	struct writeback_control *wbc = ctx->wbc;
+	/*
+	 * At this point, the page may be truncated or
+	 * invalidated (changing page->mapping to NULL), or
+	 * even swizzled back from swapper_space to tmpfs file
+	 * mapping. However, page->index will not change
+	 * because we have a reference on the page.
+	 */
+	if (page->index > ctx->end) {
+		/*
+		 * can't be range_cyclic (1st pass) because
+		 * end == -1 in that case.
+		 */
+		ctx->done = 1;
+		ctx->msg = "page out of range";
+		goto exit;
+	}
+	ctx->done_index = page->index;
+	lock_page(page);
+	/*
+	 * Page truncated or invalidated. We can freely skip it
+	 * then, even for data integrity operations: the page
+	 * has disappeared concurrently, so there could be no
+	 * real expectation of this data interity operation
+	 * even if there is now a new, dirty page at the same
+	 * pagecache address.
+	 */
+	if (unlikely(page->mapping != ctx->mapping)) {
+		unlock_page(page);
+		ctx->msg = "page truncated or invalidated";
+		goto exit;
+	}
+	if (!PageDirty(page)) {
+		/*
+		 * someone wrote it for us
+		 */
+		unlock_page(page);
+		ctx->msg = "page not dirty";
+		goto exit;
+	}
+	if (PageWriteback(page)) {
+		if (wbc->sync_mode != WB_SYNC_NONE)
+			wait_on_page_writeback(page);
+		else {
+			unlock_page(page);
+			ctx->msg = "page is writeback";
+			goto exit;
+		}
+	}
+	BUG_ON(PageWriteback(page));
+	if (!clear_page_dirty_for_io(page)) {
+		unlock_page(page);
+		ctx->msg = "failed to clear page dirty";
+		goto exit;
+	}
+	trace_wbc_writepage(wbc, inode_to_bdi(ctx->mapping->host));
+
+	set_page_writeback(page);
+	isize = i_size_read(ctx->mapping->host);
+	if (page->index == isize >> PAGE_SHIFT)
+		copied = isize & ~PAGE_MASK;
+	else
+		copied = PAGE_SIZE;
+	kdata = kmap_atomic(page);
+	memcpy(ctx->fset->buf + (page_nr << PAGE_SHIFT), kdata, copied);
+	kunmap_atomic(kdata);
+	end_page_writeback(page);
+
+	unlock_page(page);
+	/*
+	 * We stop writing back only if we are not doing
+	 * integrity sync. In case of integrity sync we have to
+	 * keep going until we have written all the pages
+	 * we tagged for writeback prior to entering this loop.
+	 */
+	if (--wbc->nr_to_write <= 0 && wbc->sync_mode == WB_SYNC_NONE)
+		ctx->done = 1;
+ exit:
+	return copied;
+}
+
+static int send_buffer(off_t offset, int len, struct flush_context *ctx)
+{
+	int ret = 0;
+	struct kvec kvec;
+	struct iov_iter iter;
+	struct v9fs_inode *v9inode = V9FS_I(ctx->mapping->host);
+
+	kvec.iov_base = ctx->fset->buf;
+	kvec.iov_len = len;
+	iov_iter_kvec(&iter, WRITE | ITER_KVEC, &kvec, 1, len);
+	BUG_ON(!v9inode->writeback_fid);
+
+	p9_client_write(v9inode->writeback_fid, offset, &iter, &ret);
+	return ret;
+}
+
+/**
+ * Helper function for managing 9pFS write requests.
+ * The main purpose of this function is to provide support for
+ * the coalescing of several pages into a single 9p message.
+ * This is similarly to NFS's pagelist.
+ *
+ * Copy pages with adjusent indices to a buffer and send it to
+ * the server.
+ *
+ * @pages: array of pages with ascending indices;
+ * @nr_pages: number of pages in the array;
+ */
+static int flush_pages(struct page **pages, int nr_pages,
+		       struct flush_context *ctx)
+{
+	int ret;
+	int pos = 0;
+	int iter_pos;
+	int iter_nrpages;
+	pgoff_t iter_page_idx;
+
+	while (pos < nr_pages) {
+
+		int i;
+		int iter_len = 0;
+		struct page *page;
+
+		iter_pos = pos;
+		iter_nrpages = 0;
+		iter_page_idx = pages[pos]->index;
+
+		for (i = 0; pos < nr_pages; i++) {
+			int from_page;
+
+			page = pages[pos];
+			if (page->index != iter_page_idx + i) {
+				/*
+				 * Hole in the indices,
+				 * further coalesce impossible.
+				 * Try to send what we have accumulated.
+				 * This page will be processed in the next
+				 * iteration
+				 */
+				goto iter_send;
+			}
+			from_page = flush_page(page, i, ctx);
+
+			iter_len += from_page;
+			iter_nrpages++;
+			pos++;
+
+			if (from_page != PAGE_SIZE) {
+				/*
+				 * Not full page was flushed,
+				 * further coalesce impossible.
+				 * Try to send what we have accumulated.
+				 */
+#if V9FS_WRITEPAGES_DEBUG
+				if (from_page == 0)
+				    printk("9p: page %lu is not flushed (%s)\n",
+					   page->index, ctx->msg);
+#endif
+				goto iter_send;
+			}
+		};
+	iter_send:
+		if (iter_len == 0)
+			/*
+			 * Nothing to send
+			 */
+			goto next_iter;
+		ret = send_buffer(iter_page_idx << PAGE_SHIFT,
+				  iter_len, ctx);
+		if (ret == -EAGAIN) {
+			redirty_pages_for_writeback(pages + iter_pos,
+						    iter_nrpages, ctx->wbc);
+			ret = 0;
+		} else if (ret < 0) {
+			/*
+			 * Something bad happened.
+			 * done_index is set past this chunk,
+			 * so media errors will not choke
+			 * background writeout for the entire
+			 * file.
+			 */
+			printk("9p: send_buffer failed (%d)\n", ret);
+
+			set_pages_error(pages + iter_pos, iter_nrpages, ret);
+			ctx->done_index =
+				pages[iter_pos + iter_nrpages - 1]->index + 1;
+			ctx->done = 1;
+			return ret;
+		} else
+			ret = 0;
+	next_iter:
+		if (ctx->done)
+			return ret;
+	};
+	return 0;
+}
+
+static void init_flush_context(struct flush_context *ctx,
+			       struct address_space *mapping,
+			       struct writeback_control *wbc,
+			       struct v9fs_flush_set *fset)
+{
+	ctx->wbc = wbc;
+	ctx->mapping = mapping;
+	ctx->fset = fset;
+	ctx->done = 0;
+	ctx->range_whole = 0;
+
+	if (wbc->range_cyclic) {
+		ctx->writeback_index = mapping->writeback_index;
+		ctx->index = ctx->writeback_index;
+		if (ctx->index == 0)
+			ctx->cycled = 1;
+		else
+			ctx->cycled = 0;
+		ctx->end = -1;
+	} else {
+		ctx->index = wbc->range_start >> PAGE_SHIFT;
+		ctx->end = wbc->range_end >> PAGE_SHIFT;
+		if (wbc->range_start == 0 && wbc->range_end == LLONG_MAX)
+			ctx->range_whole = 1;
+		ctx->cycled = 1; /* ignore range_cyclic tests */
+	}
+}
+
+/**
+ * Pre-condition: flush set is locked
+ */
+static int v9fs_writepages_fastpath(struct address_space *mapping,
+				    struct writeback_control *wbc,
+				    struct v9fs_flush_set *fset)
+{
+	int ret = 0;
+	int tag;
+	int nr_pages;
+        struct page **pages = fset->pages;
+	struct flush_context ctx;
+
+	init_flush_context(&ctx, mapping, wbc, fset);
+
+	if (wbc->sync_mode == WB_SYNC_ALL || wbc->tagged_writepages)
+		tag = PAGECACHE_TAG_TOWRITE;
+	else
+		tag = PAGECACHE_TAG_DIRTY;
+retry:
+	if (wbc->sync_mode == WB_SYNC_ALL || wbc->tagged_writepages)
+		tag_pages_for_writeback(mapping, ctx.index, ctx.end);
+
+	ctx.done_index = ctx.index;
+
+	while (!ctx.done && (ctx.index <= ctx.end)) {
+		int i;
+		nr_pages = find_get_pages_tag(mapping, &ctx.index, tag,
+					      1 + min(ctx.end - ctx.index,
+					      (pgoff_t)(fset->num_pages - 1)),
+					      pages);
+		if (nr_pages == 0)
+			break;
+
+		ret = flush_pages(pages, nr_pages, &ctx);
+		/*
+		 * unpin pages
+		 */
+		for (i = 0; i < nr_pages; i++)
+			put_page(pages[i]);
+		if (ret < 0)
+			break;
+		cond_resched();
+	}
+	if (!ctx.cycled && !ctx.done) {
+		/*
+		 * range_cyclic:
+		 * We hit the last page and there is more work
+		 * to be done: wrap back to the start of the file
+		 */
+		ctx.cycled = 1;
+		ctx.index = 0;
+		ctx.end = ctx.writeback_index - 1;
+		goto retry;
+	}
+	if (wbc->range_cyclic || (ctx.range_whole && wbc->nr_to_write > 0))
+		mapping->writeback_index = ctx.done_index;
+	return ret;
+}
+
+static int v9fs_writepages(struct address_space *mapping,
+			   struct writeback_control *wbc)
+{
+	int ret;
+	struct v9fs_flush_set *fset;
+
+	fset = v9fs_inode2v9ses(mapping->host)->flush;
+	if (!fset || !spin_trylock_flush_set(fset))
+		/*
+		 * do it by slow way
+		 */
+		return generic_writepages(mapping, wbc);
+
+	ret = v9fs_writepages_fastpath(mapping, wbc, fset);
+	spin_unlock_flush_set(fset);
+	return ret;
+}
+
 /**
  * v9fs_launder_page - Writeback a dirty page
  * Returns 0 on success.
@@ -342,6 +698,7 @@ const struct address_space_operations v9fs_addr_operations = {
 	.readpages = v9fs_vfs_readpages,
 	.set_page_dirty = __set_page_dirty_nobuffers,
 	.writepage = v9fs_vfs_writepage,
+	.writepages = v9fs_writepages,
 	.write_begin = v9fs_write_begin,
 	.write_end = v9fs_write_end,
 	.releasepage = v9fs_release_page,
