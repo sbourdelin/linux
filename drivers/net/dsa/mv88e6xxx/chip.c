@@ -2008,6 +2008,67 @@ static int _mv88e6xxx_atu_load(struct mv88e6xxx_chip *chip,
 	return _mv88e6xxx_atu_cmd(chip, entry->fid, GLOBAL_ATU_OP_LOAD_DB);
 }
 
+static struct pvec_tbl_entry *
+mv88e6xxx_pvec_tbl_find(struct mv88e6xxx_chip *chip, struct pvec_tbl_entry *match)
+{
+        struct pvec_tbl_entry *found;
+
+        hash_for_each_possible(chip->pvec_tbl, found, entry, match->key_crc32)
+                if (memcmp(&found->key, &match->key, sizeof(found->key)) == 0)
+                        return found;
+        return NULL;
+}
+
+static int mv88e6xxx_pvec_tbl_update(struct mv88e6xxx_chip *chip, u16 fid,
+			      const unsigned char *addr, u16 pvec)
+{
+        struct pvec_tbl_entry *obj;
+        struct pvec_tbl_entry *found;
+        bool remove = pvec ? false : true;
+
+        obj = kzalloc(sizeof(*obj), GFP_KERNEL);
+        if (!obj)
+                return -ENOMEM;
+
+	obj->pvec = pvec;
+        ether_addr_copy(obj->key.addr, addr);
+        obj->key.fid = fid;
+        obj->key_crc32 = crc32(~0, &obj->key, sizeof(obj->key));
+
+        found = mv88e6xxx_pvec_tbl_find(chip, obj);
+
+        if (remove && found) {
+                kfree(obj);
+                hash_del(&found->entry);
+        } else if (!remove && !found) {
+                hash_add(chip->pvec_tbl, &obj->entry, obj->key_crc32);
+        } else if (!remove && found) {
+                kfree(obj);
+                found->pvec = pvec; /* update */
+        } else {
+                kfree(obj);
+        }
+
+        return 0;
+}
+
+static u16 mv88e6xxx_pvec_tbl_get(struct mv88e6xxx_chip *chip,
+			   u16 fid, const unsigned char *addr)
+{
+        struct pvec_tbl_entry obj;
+        struct pvec_tbl_entry *found;
+
+        ether_addr_copy(obj.key.addr, addr);
+        obj.key.fid = fid;
+        obj.key_crc32 = crc32(~0, &obj.key, sizeof(obj.key));
+
+        found = mv88e6xxx_pvec_tbl_find(chip, &obj);
+        if (found)
+                return found->pvec;
+
+        return 0;
+}
+
 static int _mv88e6xxx_atu_getnext(struct mv88e6xxx_chip *chip, u16 fid,
 				  struct mv88e6xxx_atu_entry *entry);
 
