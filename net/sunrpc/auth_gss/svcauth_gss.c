@@ -1393,6 +1393,26 @@ static void destroy_use_gss_proxy_proc_entry(struct net *net) {}
 
 #endif /* CONFIG_PROC_FS */
 
+static int rsc_destroy(struct sunrpc_net *sn, struct rsc *rscp)
+{
+	struct rsc new;
+	int ret = -ENOMEM;
+
+	memset(&new, 0, sizeof(struct rsc));
+	if (dup_netobj(&new.handle, &rscp->handle))
+		goto out;
+	new.h.expiry_time = get_seconds();
+	set_bit(CACHE_NEGATIVE, &new.h.flags);
+
+	rscp = rsc_update(sn->rsc_cache, &new, rscp);
+	if (!rscp)
+		goto out;
+	ret = 0;
+out:
+	rsc_free(&new);
+	return ret;
+}
+
 /*
  * Accept an rpcsec packet.
  * If context establishment, punt to user space
@@ -1489,10 +1509,18 @@ svcauth_gss_accept(struct svc_rqst *rqstp, __be32 *authp)
 	case RPC_GSS_PROC_DESTROY:
 		if (gss_write_verf(rqstp, rsci->mechctx, gc->gc_seq))
 			goto auth_err;
-		rsci->h.expiry_time = get_seconds();
-		set_bit(CACHE_NEGATIVE, &rsci->h.flags);
+		if (rsc_destroy(sn, rsci))
+			goto drop;
+		/**
+		 * Balance the cache_put at the end of svcauth_gss_accept.This
+		 * will leave the refcount = 1 so that the cache_clean cache_put
+		 * will call rsc_put.
+		 */
+		cache_get(&rsci->h);
+
 		if (resv->iov_len + 4 > PAGE_SIZE)
 			goto drop;
+
 		svc_putnl(resv, RPC_SUCCESS);
 		goto complete;
 	case RPC_GSS_PROC_DATA:
