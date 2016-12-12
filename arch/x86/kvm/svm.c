@@ -3718,6 +3718,15 @@ static int mwait_interception(struct vcpu_svm *svm)
 	return nop_interception(svm);
 }
 
+static int svm_check_nested_events(struct kvm_vcpu *vcpu, bool external_intr)
+{
+	struct vcpu_svm *svm = to_svm(vcpu);
+
+	if (kvm_async_pf_has_ready(vcpu))
+		nested_svm_intr(svm);
+	return 0;
+}
+
 enum avic_ipi_failure_cause {
 	AVIC_IPI_FAILURE_INVALID_INT_TYPE,
 	AVIC_IPI_FAILURE_TARGET_NOT_RUNNING,
@@ -5401,6 +5410,7 @@ static struct kvm_x86_ops svm_x86_ops __ro_after_init = {
 
 	.check_intercept = svm_check_intercept,
 	.handle_external_intr = svm_handle_external_intr,
+	.check_nested_events = svm_check_nested_events,
 
 	.sched_in = svm_sched_in,
 
