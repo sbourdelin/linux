@@ -536,6 +536,27 @@ struct sort_entry sort_cpu = {
 	.se_width_idx	= HISTC_CPU,
 };
 
+/* --sort cgroup_id */
+
+static int64_t
+sort__cgroup_id_cmp(struct hist_entry *left, struct hist_entry *right)
+{
+	return (int64_t)right->cgroup_id - (int64_t)left->cgroup_id;
+}
+
+static int hist_entry__cgroup_id_snprintf(struct hist_entry *he, char *bf,
+					  size_t size, unsigned int width)
+{
+	return repsep_snprintf(bf, size, "%-*u", width, he->cgroup_id);
+}
+
+struct sort_entry sort_cgroup_id = {
+	.se_header      = "cgroup id",
+	.se_cmp	        = sort__cgroup_id_cmp,
+	.se_snprintf    = hist_entry__cgroup_id_snprintf,
+	.se_width_idx	= HISTC_CGROUP_ID,
+};
+
 /* --sort socket */
 
 static int64_t
@@ -1418,6 +1439,7 @@ static struct sort_dimension common_sort_dimensions[] = {
 	DIM(SORT_GLOBAL_WEIGHT, "weight", sort_global_weight),
 	DIM(SORT_TRANSACTION, "transaction", sort_transaction),
 	DIM(SORT_TRACE, "trace", sort_trace),
+	DIM(SORT_CGROUP_ID, "cgroup_id", sort_cgroup_id),
 };
 
 #undef DIM

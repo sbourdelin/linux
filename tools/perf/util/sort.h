@@ -95,6 +95,7 @@ struct hist_entry {
 	u64			transaction;
 	s32			socket;
 	s32			cpu;
+	u32			cgroup_id;
 	u8			cpumode;
 	u8			depth;
 
@@ -211,6 +212,7 @@ enum sort_type {
 	SORT_GLOBAL_WEIGHT,
 	SORT_TRANSACTION,
 	SORT_TRACE,
+	SORT_CGROUP_ID,
 
 	/* branch stack specific sort keys */
 	__SORT_BRANCH_STACK,

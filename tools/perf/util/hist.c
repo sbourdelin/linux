@@ -2,6 +2,7 @@
 #include "build-id.h"
 #include "hist.h"
 #include "session.h"
+#include "namespaces.h"
 #include "sort.h"
 #include "evlist.h"
 #include "evsel.h"
@@ -168,6 +169,7 @@ void hists__calc_col_len(struct hists *hists, struct hist_entry *h)
 		hists__set_unres_dso_col_len(hists, HISTC_MEM_DADDR_DSO);
 	}
 
+	hists__new_col_len(hists, HISTC_CGROUP_ID, 10);
 	hists__new_col_len(hists, HISTC_CPU, 3);
 	hists__new_col_len(hists, HISTC_SOCKET, 6);
 	hists__new_col_len(hists, HISTC_MEM_LOCKED, 6);
@@ -573,9 +575,11 @@ __hists__add_entry(struct hists *hists,
 		   bool sample_self,
 		   struct hist_entry_ops *ops)
 {
+	struct namespaces *ns = thread__namespaces(al->thread);
 	struct hist_entry entry = {
 		.thread	= al->thread,
 		.comm = thread__comm(al->thread),
+		.cgroup_id = ns ? ns->inode_num[CGROUP_NS_INDEX] : 0,
 		.ms = {
 			.map	= al->map,
 			.sym	= al->sym,
