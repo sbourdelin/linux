@@ -1498,7 +1498,14 @@ static void __vunmap(const void *addr, int deallocate_pages)
 
 static inline void __vfree_deferred(const void *addr)
 {
-	struct vfree_deferred *p = this_cpu_ptr(&vfree_deferred);
+	/*
+	 * Use raw_cpu_ptr() because this can be called from preemptible
+	 * context. Preemption is absolutely fine here, because llist_add()
+	 * implementation is lockless, so it works even if we adding to list
+	 * of the other cpu.
+	 * schedule_work() should be fine with this too.
+	 */
+	struct vfree_deferred *p = raw_cpu_ptr(&vfree_deferred);
 
 	if (llist_add((struct llist_node *)addr, &p->list))
 		schedule_work(&p->wq);
