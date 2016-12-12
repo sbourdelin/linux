@@ -2069,42 +2069,6 @@ static u16 mv88e6xxx_pvec_tbl_get(struct mv88e6xxx_chip *chip,
         return 0;
 }
 
-static int _mv88e6xxx_atu_getnext(struct mv88e6xxx_chip *chip, u16 fid,
-				  struct mv88e6xxx_atu_entry *entry);
-
-static int mv88e6xxx_atu_get(struct mv88e6xxx_chip *chip, int fid,
-			     const u8 *addr, struct mv88e6xxx_atu_entry *entry)
-{
-	struct mv88e6xxx_atu_entry next;
-	int err;
-
-	eth_broadcast_addr(next.mac);
-
-	err = _mv88e6xxx_atu_mac_write(chip, next.mac);
-	if (err)
-		return err;
-
-	do {
-		err = _mv88e6xxx_atu_getnext(chip, fid, &next);
-		if (err)
-			return err;
-
-		if (next.state == GLOBAL_ATU_DATA_STATE_UNUSED)
-			break;
-
-		if (ether_addr_equal(next.mac, addr)) {
-			*entry = next;
-			return 0;
-		}
-	} while (!is_broadcast_ether_addr(next.mac));
-
-	memset(entry, 0, sizeof(*entry));
-	entry->fid = fid;
-	ether_addr_copy(entry->mac, addr);
-
-	return 0;
-}
-
 static int mv88e6xxx_port_db_load_purge(struct mv88e6xxx_chip *chip, int port,
 					const unsigned char *addr, u16 vid,
 					u8 state)
@@ -2121,18 +2085,25 @@ static int mv88e6xxx_port_db_load_purge(struct mv88e6xxx_chip *chip, int port,
 	if (err)
 		return err;
 
-	err = mv88e6xxx_atu_get(chip, vlan.fid, addr, &entry);
-	if (err)
-		return err;
+	entry.fid = vlan.fid;
+	entry.state = state;
+	ether_addr_copy(entry.mac, addr);
 
-	/* Purge the ATU entry only if no port is using it anymore */
-	if (state == GLOBAL_ATU_DATA_STATE_UNUSED) {
-		entry.portv_trunkid &= ~BIT(port);
-		if (!entry.portv_trunkid)
-			entry.state = GLOBAL_ATU_DATA_STATE_UNUSED;
+	/* multicast entries can use several ports for each address */
+	if (is_multicast_ether_addr(addr)) {
+		entry.portv_trunkid = mv88e6xxx_pvec_tbl_get(chip, entry.fid, addr);
+		if (state == GLOBAL_ATU_DATA_STATE_UNUSED)
+			entry.portv_trunkid &= ~BIT(port);
+		else
+			entry.portv_trunkid |= BIT(port);
+
+		mv88e6xxx_pvec_tbl_update(chip, entry.fid, addr, entry.portv_trunkid);
+		entry.trunk = false;
 	} else {
-		entry.portv_trunkid |= BIT(port);
-		entry.state = state;
+		if (state != GLOBAL_ATU_DATA_STATE_UNUSED) {
+			entry.trunk = false;
+			entry.portv_trunkid = BIT(port);
+		}
 	}
 
 	return _mv88e6xxx_atu_load(chip, &entry);
