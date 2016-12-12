@@ -199,6 +199,8 @@ static void r8a7795_thermal_init(struct rcar_gen3_thermal_tsc *tsc)
 	rcar_gen3_thermal_write(tsc, REG_GEN3_CTSR,
 				CTSR_PONM | CTSR_AOUT | CTSR_THBGR | CTSR_VMEN |
 				CTSR_VMST | CTSR_THSST);
+
+	usleep_range(1000, 2000);
 }
 
 static void r8a7796_thermal_init(struct rcar_gen3_thermal_tsc *tsc)
