@@ -45,6 +45,22 @@ config KASAN_INLINE
 
 endchoice
 
+config KASAN_READS
+		prompt "Read instrumentation"
+		bool
+		default y
+		depends on KASAN
+		help
+			This configuration controls the sanity of  memory read.
+
+config KASAN_WRITES
+		prompt "Write instrumentation"
+		bool
+		default y
+		depends on KASAN
+		help
+			This configuration controls the sanity of memory write.
+
 config TEST_KASAN
 	tristate "Module for testing kasan for bug detection"
 	depends on m && KASAN

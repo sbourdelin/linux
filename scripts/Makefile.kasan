@@ -29,3 +29,7 @@ else
     endif
 endif
 endif
+
+CFLAGS_KASAN += $(call cc-option, \
+		$(if $(CONFIG_KASAN_READS),, --param asan-instrument-reads=0) \
+		$(if $(CONFIG_KASAN_WRITES),, --param asan-instrument-writes=0))
