@@ -709,6 +709,7 @@ paramter||parameter
 paramters||parameters
 particuarly||particularly
 particularily||particularly
+partiton||partition
 pased||passed
 passin||passing
 pathes||paths
