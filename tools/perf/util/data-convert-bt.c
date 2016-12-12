@@ -1468,6 +1468,7 @@ int bt_convert__perf2ctf(const char *input, const char *path,
 			.lost            = perf_event__process_lost,
 			.tracing_data    = perf_event__process_tracing_data,
 			.build_id        = perf_event__process_build_id,
+			.namespaces      = perf_event__process_namespaces,
 			.ordered_events  = true,
 			.ordering_requires_timestamps = true,
 		},
@@ -1479,6 +1480,7 @@ int bt_convert__perf2ctf(const char *input, const char *path,
 		c.tool.comm = process_comm_event;
 		c.tool.exit = process_exit_event;
 		c.tool.fork = process_fork_event;
+		c.tool.namespaces = process_namespaces_event;
 	}
 
 	perf_config(convert__config, &c);

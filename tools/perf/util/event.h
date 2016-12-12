@@ -39,6 +39,13 @@ struct comm_event {
 	char comm[16];
 };
 
+struct namespaces_event {
+	struct perf_event_header header;
+	u32 pid, tid;
+	u64 dev_num;
+	u64 inode_num[NAMESPACES_MAX];
+};
+
 struct fork_event {
 	struct perf_event_header header;
 	u32 pid, ppid;
@@ -482,6 +489,7 @@ union perf_event {
 	struct mmap_event		mmap;
 	struct mmap2_event		mmap2;
 	struct comm_event		comm;
+	struct namespaces_event		namespaces;
 	struct fork_event		fork;
 	struct lost_event		lost;
 	struct lost_samples_event	lost_samples;
@@ -584,6 +592,10 @@ int perf_event__process_switch(struct perf_tool *tool,
 			       union perf_event *event,
 			       struct perf_sample *sample,
 			       struct machine *machine);
+int perf_event__process_namespaces(struct perf_tool *tool,
+				   union perf_event *event,
+				   struct perf_sample *sample,
+				   struct machine *machine);
 int perf_event__process_mmap(struct perf_tool *tool,
 			     union perf_event *event,
 			     struct perf_sample *sample,
@@ -633,6 +645,12 @@ pid_t perf_event__synthesize_comm(struct perf_tool *tool,
 				  perf_event__handler_t process,
 				  struct machine *machine);
 
+int perf_event__synthesize_namespaces(struct perf_tool *tool,
+				      union perf_event *event,
+				      pid_t pid, pid_t tgid,
+				      perf_event__handler_t process,
+				      struct machine *machine);
+
 int perf_event__synthesize_mmap_events(struct perf_tool *tool,
 				       union perf_event *event,
 				       pid_t pid, pid_t tgid,
@@ -650,6 +668,7 @@ size_t perf_event__fprintf_itrace_start(union perf_event *event, FILE *fp);
 size_t perf_event__fprintf_switch(union perf_event *event, FILE *fp);
 size_t perf_event__fprintf_thread_map(union perf_event *event, FILE *fp);
 size_t perf_event__fprintf_cpu_map(union perf_event *event, FILE *fp);
+size_t perf_event__fprintf_namespaces(union perf_event *event, FILE *fp);
 size_t perf_event__fprintf(union perf_event *event, FILE *fp);
 
 u64 kallsyms__get_function_start(const char *kallsyms_filename,
