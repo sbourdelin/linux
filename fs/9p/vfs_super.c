@@ -143,7 +143,7 @@ static struct dentry *v9fs_mount(struct file_system_type *fs_type, int flags,
 	if (v9ses->cache == CACHE_LOOSE || v9ses->cache == CACHE_FSCACHE) {
 		retval = alloc_init_flush_set(v9ses);
 		if (IS_ERR(v9ses->flush)) {
-			retval = PTR_ERR(fid);
+			retval = PTR_ERR(v9ses->flush);
 			goto release_sb;
 		}
 		sb->s_d_op = &v9fs_cached_dentry_operations;
