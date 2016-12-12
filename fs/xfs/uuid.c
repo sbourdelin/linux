@@ -33,7 +33,7 @@ typedef struct {
  * it just something that's needed for user-level file handles.
  */
 void
-uuid_getnodeuniq(uuid_t *uuid, int fsid [2])
+uuid_getnodeuniq(uuid_t (*uuid), int fsid [2])
 {
 	xfs_uu_t *uup = (xfs_uu_t *)uuid;
 
@@ -51,8 +51,8 @@ uuid_is_nil(uuid_t *uuid)
 	if (uuid == NULL)
 		return 0;
 	/* implied check of version number here... */
-	for (i = 0; i < sizeof *uuid; i++)
-		if (*cp++) return 0;	/* not nil */
+	for (i = 0; i < sizeof (*uuid); i++) 
+	if (*cp++) return 0;	/* not nil */
 	return 1;	/* is nil */
 }
 
