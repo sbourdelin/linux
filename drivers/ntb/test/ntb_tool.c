@@ -264,14 +264,17 @@ static ssize_t tool_dbfn_write(struct tool_ctx *tc,
 
 static ssize_t tool_spadfn_read(struct tool_ctx *tc, char __user *ubuf,
 				size_t size, loff_t *offp,
-				u32 (*spad_read_fn)(struct ntb_dev *, int))
+				u32 (*spad_read_fn)(struct ntb_dev *, int),
+				u32 (*spad_peer_read_fn)(struct ntb_dev *, int,
+							 int))
 {
 	size_t buf_size;
 	char *buf;
 	ssize_t pos, rc;
 	int i, spad_count;
+	u32 data;
 
-	if (!spad_read_fn)
+	if (!spad_read_fn && !spad_peer_read_fn)
 		return -EINVAL;
 
 	spad_count = ntb_spad_count(tc->ntb);
@@ -290,8 +293,12 @@ static ssize_t tool_spadfn_read(struct tool_ctx *tc, char __user *ubuf,
 	pos = 0;
 
 	for (i = 0; i < spad_count; ++i) {
+		if (spad_read_fn)
+			data = spad_read_fn(tc->ntb, i);
+		else
+			data = spad_peer_read_fn(tc->ntb, PIDX, i);
 		pos += scnprintf(buf + pos, buf_size - pos, "%d\t%#x\n",
-				 i, spad_read_fn(tc->ntb, i));
+				 i, data);
 	}
 
 	rc = simple_read_from_buffer(ubuf, size, offp, buf, pos);
@@ -305,7 +312,9 @@ static ssize_t tool_spadfn_write(struct tool_ctx *tc,
 				 const char __user *ubuf,
 				 size_t size, loff_t *offp,
 				 int (*spad_write_fn)(struct ntb_dev *,
-						      int, u32))
+						      int, u32),
+				 int (*spad_peer_write_fn)(struct ntb_dev *,
+							   int, int, u32))
 {
 	int spad_idx;
 	u32 spad_val;
@@ -313,7 +322,7 @@ static ssize_t tool_spadfn_write(struct tool_ctx *tc,
 	int pos, n;
 	ssize_t rc;
 
-	if (!spad_write_fn) {
+	if (!spad_write_fn || !spad_peer_write_fn) {
 		dev_dbg(&tc->ntb->dev, "no spad write fn\n");
 		return -EINVAL;
 	}
@@ -333,7 +342,11 @@ static ssize_t tool_spadfn_write(struct tool_ctx *tc,
 	n = sscanf(buf_ptr, "%d %i%n", &spad_idx, &spad_val, &pos);
 	while (n == 2) {
 		buf_ptr += pos;
-		rc = spad_write_fn(tc->ntb, spad_idx, spad_val);
+		if (spad_write_fn)
+			rc = spad_write_fn(tc->ntb, spad_idx, spad_val);
+		else
+			rc = spad_peer_write_fn(tc->ntb, PIDX, spad_idx,
+						spad_val);
 		if (rc)
 			break;
 
@@ -446,7 +459,7 @@ static ssize_t tool_spad_read(struct file *filep, char __user *ubuf,
 	struct tool_ctx *tc = filep->private_data;
 
 	return tool_spadfn_read(tc, ubuf, size, offp,
-				tc->ntb->ops->spad_read);
+				tc->ntb->ops->spad_read, NULL);
 }
 
 static ssize_t tool_spad_write(struct file *filep, const char __user *ubuf,
@@ -455,7 +468,7 @@ static ssize_t tool_spad_write(struct file *filep, const char __user *ubuf,
 	struct tool_ctx *tc = filep->private_data;
 
 	return tool_spadfn_write(tc, ubuf, size, offp,
-				 tc->ntb->ops->spad_write);
+				 tc->ntb->ops->spad_write, NULL);
 }
 
 static TOOL_FOPS_RDWR(tool_spad_fops,
@@ -467,7 +480,7 @@ static ssize_t tool_peer_spad_read(struct file *filep, char __user *ubuf,
 {
 	struct tool_ctx *tc = filep->private_data;
 
-	return tool_spadfn_read(tc, ubuf, size, offp,
+	return tool_spadfn_read(tc, ubuf, size, offp, NULL,
 				tc->ntb->ops->peer_spad_read);
 }
 
@@ -476,7 +489,7 @@ static ssize_t tool_peer_spad_write(struct file *filep, const char __user *ubuf,
 {
 	struct tool_ctx *tc = filep->private_data;
 
-	return tool_spadfn_write(tc, ubuf, size, offp,
+	return tool_spadfn_write(tc, ubuf, size, offp, NULL,
 				 tc->ntb->ops->peer_spad_write);
 }
 
@@ -934,6 +947,18 @@ static int tool_probe(struct ntb_client *self, struct ntb_dev *ntb)
 
 	if (ntb_peer_port_count(ntb) != 1)
 		dev_warn(&ntb->dev, "multi-port NTB is unsupported\n");
+
+	if (ntb_spad_count(ntb) < 1) {
+		dev_dbg(&ntb->dev, "no enough scratchpads\n");
+		rc = -EINVAL;
+		goto err_tc;
+	}
+
+	if (!ntb->ops->mw_set_trans) {
+		dev_dbg(&ntb->dev, "need inbound MW based NTB API\n");
+		rc = -EINVAL;
+		goto err_tc;
+	}
 
 	tc = kzalloc(sizeof(*tc), GFP_KERNEL);
 	if (!tc) {
