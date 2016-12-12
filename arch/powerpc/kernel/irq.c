@@ -498,6 +498,21 @@ static inline void check_stack_overflow(void)
 #endif
 }
 
+void handle_elevated_irq(struct pt_regs *regs)
+{
+	unsigned int irq;
+	/*
+	 * NOTE, we don't use irq_enter/exit, otherwise
+	 * our accounting and tracing might be incorrect.
+	 */
+	irq = ppc_md.get_irq();
+
+	/*
+	 * Store away irq in PACA for replay later
+	 */
+	local_paca->irq = irq;
+}
+
 void __do_irq(struct pt_regs *regs)
 {
 	unsigned int irq;
@@ -513,7 +528,11 @@ void __do_irq(struct pt_regs *regs)
 	 *
 	 * This will typically lower the interrupt line to the CPU
 	 */
-	irq = ppc_md.get_irq();
+	if (local_paca->irq) {
+		irq = local_paca->irq;
+		local_paca->irq = 0;
+	} else
+		irq = ppc_md.get_irq();
 
 	/* We can hard enable interrupts now to allow perf interrupts */
 	may_hard_irq_enable();

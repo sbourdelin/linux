@@ -117,6 +117,7 @@ struct clock_event_device decrementer_clockevent = {
 };
 EXPORT_SYMBOL(decrementer_clockevent);
 
+DEFINE_PER_CPU(unsigned long long, nmi_started);
 DEFINE_PER_CPU(u64, decrementers_next_tb);
 static DEFINE_PER_CPU(struct clock_event_device, decrementers);
 
@@ -520,6 +521,7 @@ static void __timer_interrupt(void)
 	u64 now;
 
 	trace_timer_interrupt_entry(regs);
+	__this_cpu_write(nmi_started, 0);
 
 	if (test_irq_work_pending()) {
 		clear_irq_work_pending();
@@ -549,7 +551,6 @@ static void __timer_interrupt(void)
 		cu->current_tb = mfspr(SPRN_PURR);
 	}
 #endif
-
 	trace_timer_interrupt_exit(regs);
 }
 
@@ -566,6 +567,7 @@ void timer_interrupt(struct pt_regs * regs)
 	 * some CPUs will continue to take decrementer exceptions.
 	 */
 	set_dec(decrementer_max);
+	__this_cpu_write(nmi_started, 0);
 
 	/* Some implementations of hotplug will get timer interrupts while
 	 * offline, just ignore these and we also need to set
@@ -597,6 +599,29 @@ void timer_interrupt(struct pt_regs * regs)
 	set_irq_regs(old_regs);
 }
 EXPORT_SYMBOL(timer_interrupt);
+
+
+/*
+ * If we have watchdog enabled, we do expect to hit this
+ * at-least once per sample_frequence (20 seconds).
+ * We set the decrement to 20 seconds and if we hit it
+ * again.. it's an NMI panic
+ */
+void handle_soft_nmi(struct pt_regs *regs)
+{
+	unsigned long long tb = mftb();
+	unsigned long long nmi_started_tb = __this_cpu_read(nmi_started);
+
+	if (!nmi_started_tb) {
+		set_dec(ppc_tb_freq);
+		__this_cpu_write(nmi_started, tb);
+	} else {
+		if ((tb - nmi_started_tb) >= (30 * ppc_tb_freq)) {
+			BUG_ON(1);
+		} else
+			set_dec(ppc_tb_freq);
+	}
+}
 
 /*
  * Hypervisor decrementer interrupts shouldn't occur but are sometimes

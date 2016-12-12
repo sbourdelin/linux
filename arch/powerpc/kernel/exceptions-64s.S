@@ -1282,23 +1282,23 @@ EXC_VIRT_NONE(0x5800, 0x5900)
 #define MASKED_INTERRUPT(_H)				\
 masked_##_H##interrupt:					\
 	std	r11,PACA_EXGEN+EX_R11(r13);		\
+	std	r12,PACA_EXGEN+EX_R12(r13);		\
 	lbz	r11,PACAIRQHAPPENED(r13);		\
 	or	r11,r11,r10;				\
 	stb	r11,PACAIRQHAPPENED(r13);		\
 	cmpwi	r10,PACA_IRQ_DEC;			\
 	bne	1f;					\
-	lis	r10,0x7fff;				\
-	ori	r10,r10,0xffff;				\
-	mtspr	SPRN_DEC,r10;				\
+	GET_SCRATCH0(r10);				\
+	std	r13,PACA_EXGEN+EX_R13(r13);		\
+	EXCEPTION_PROLOG_PSERIES_1(handle_nmi_dec, _H);	\
 	b	2f;					\
 1:	cmpwi	r10,PACA_IRQ_DBELL;			\
 	beq	2f;					\
 	cmpwi	r10,PACA_IRQ_HMI;			\
 	beq	2f;					\
-	mfspr	r10,SPRN_##_H##SRR1;			\
-	rldicl	r10,r10,48,1; /* clear MSR_EE */	\
-	rotldi	r10,r10,16;				\
-	mtspr	SPRN_##_H##SRR1,r10;			\
+	GET_SCRATCH0(r10);				\
+	std	r13,PACA_EXGEN+EX_R13(r13);		\
+	EXCEPTION_PROLOG_PSERIES_1(elevate_save_irq, _H);\
 2:	mtcrf	0x80,r9;				\
 	ld	r9,PACA_EXGEN+EX_R9(r13);		\
 	ld	r10,PACA_EXGEN+EX_R10(r13);		\
@@ -1315,6 +1315,9 @@ masked_##_H##interrupt:					\
 USE_FIXED_SECTION(virt_trampolines)
 	MASKED_INTERRUPT()
 	MASKED_INTERRUPT(H)
+
+EXC_COMMON(handle_nmi_dec, 0x900, handle_soft_nmi)
+EXC_COMMON(elevate_save_irq, 0x500, handle_elevated_irq)
 
 #ifdef CONFIG_KVM_BOOK3S_64_HANDLER
 TRAMP_REAL_BEGIN(kvmppc_skip_interrupt)
