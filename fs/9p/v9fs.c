@@ -319,6 +319,8 @@ void put_flush_set(struct v9fs_flush_set *fset)
 	kfree(fset);
 }
 
+#define MAX_FLUSH_DATA_SIZE (262144)
+
 /**
  * Allocate and initalize flush set
  * Pre-conditions: valid msize is set
@@ -333,6 +335,11 @@ int alloc_init_flush_set(struct v9fs_session_info *v9ses)
 	if (num_pages < 2)
 		/* speedup impossible */
 		return 0;
+	if (num_pages > (MAX_FLUSH_DATA_SIZE >> PAGE_SHIFT))
+		/*
+		 * no performance gain with larger values
+		 */
+		num_pages = MAX_FLUSH_DATA_SIZE >> PAGE_SHIFT;
 	fset = kzalloc(sizeof(*fset), GFP_KERNEL);
 	if (!fset)
 		goto error;
