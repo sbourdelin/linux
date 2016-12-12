@@ -340,7 +340,7 @@ int alloc_init_flush_set(struct v9fs_session_info *v9ses)
 	fset->pages = kzalloc(num_pages * sizeof(*fset->pages), GFP_KERNEL);
 	if (!fset->pages)
 		goto error;
-	fset->buf = kzalloc(num_pages << PAGE_SHIFT, GFP_USER);
+	fset->buf = kzalloc(num_pages << PAGE_SHIFT, GFP_KERNEL);
 	if (!fset->buf)
 		goto error;
 	spin_lock_init(&(fset->lock));

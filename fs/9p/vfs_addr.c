@@ -119,7 +119,7 @@ static int init_readpages_ctx(struct v9fs_readpages_ctx *ctx,
 			      int num_pages)
 {
 	memset(ctx, 0, sizeof(*ctx));
-	ctx->buf = kmalloc(num_pages << PAGE_SHIFT, GFP_USER);
+	ctx->buf = kmalloc(num_pages << PAGE_SHIFT, GFP_KERNEL);
 	if (!ctx->buf)
 		return -ENOMEM;
 	ctx->filp = filp;
