@@ -120,6 +120,8 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESCRIPTION);
 
 #define MAX_MWS 16
+/* Only two-ports devices are supported */
+#define PIDX	0
 
 static struct dentry *tool_dbgfs;
 
@@ -918,6 +920,9 @@ static int tool_probe(struct ntb_client *self, struct ntb_dev *ntb)
 
 	if (ntb_spad_is_unsafe(ntb))
 		dev_dbg(&ntb->dev, "scratchpad is unsafe\n");
+
+	if (ntb_peer_port_count(ntb) != 1)
+		dev_warn(&ntb->dev, "multi-port NTB is unsupported\n");
 
 	tc = kzalloc(sizeof(*tc), GFP_KERNEL);
 	if (!tc) {

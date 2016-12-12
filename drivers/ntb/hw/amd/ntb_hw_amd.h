@@ -62,6 +62,10 @@
 #define NTB_LNK_STA_SPEED(x)	(((x) & NTB_LNK_STA_SPEED_MASK) >> 16)
 #define NTB_LNK_STA_WIDTH(x)	(((x) & NTB_LNK_STA_WIDTH_MASK) >> 20)
 
+/* port related constants */
+#define NTB_PEER_CNT			(1)
+#define NTB_PIDX_MAX			(0)
+
 #ifndef read64
 #ifdef readq
 #define read64 readq
@@ -90,6 +94,11 @@ static inline void _write64(u64 val, void __iomem *mmio)
 }
 #endif
 #endif
+
+enum amd_ntb_port {
+	NTB_PORT_PRI_USD,
+	NTB_PORT_SEC_DSD
+};
 
 enum {
 	/* AMD NTB Capability */

@@ -71,6 +71,49 @@ MODULE_AUTHOR("AMD Inc.");
 static const struct file_operations amd_ntb_debugfs_info;
 static struct dentry *debugfs_dir;
 
+static int amd_ntb_port_number(struct ntb_dev *ntb)
+{
+	switch (ntb->topo) {
+	case NTB_TOPO_PRI:
+	case NTB_TOPO_B2B_USD:
+		return NTB_PORT_PRI_USD;
+	case NTB_TOPO_SEC:
+	case NTB_TOPO_B2B_DSD:
+		return NTB_PORT_SEC_DSD;
+	default:
+		break;
+	}
+
+	return -EINVAL;
+}
+
+static int amd_ntb_peer_port_count(struct ntb_dev *ntb)
+{
+	return NTB_PEER_CNT;
+}
+
+static int amd_ntb_peer_port_number(struct ntb_dev *ntb, int pidx)
+{
+	int local_port = amd_ntb_port_number(ntb);
+
+	if (pidx > NTB_PIDX_MAX)
+		return -EINVAL;
+
+	return (local_port == NTB_PORT_PRI_USD ?
+		NTB_PORT_SEC_DSD : NTB_PORT_PRI_USD);
+}
+
+static int amd_ntb_peer_port_idx(struct ntb_dev *ntb, int port)
+{
+	int local_port = amd_ntb_port_number(ntb);
+
+	if ((local_port == NTB_PORT_PRI_USD && port != NTB_PORT_SEC_DSD) ||
+	    (local_port == NTB_PORT_SEC_DSD && port != NTB_PORT_PRI_USD))
+		return -EINVAL;
+
+	return 0;
+}
+
 static int amd_link_is_up(struct amd_ntb_dev *ndev)
 {
 	if (!ndev->peer_sta)
@@ -431,6 +474,10 @@ static int amd_ntb_peer_spad_write(struct ntb_dev *ntb,
 }
 
 static const struct ntb_dev_ops amd_ntb_ops = {
+	.port_number		= amd_ntb_port_number,
+	.peer_port_count	= amd_ntb_peer_port_count,
+	.peer_port_number	= amd_ntb_peer_port_number,
+	.peer_port_idx		= amd_ntb_peer_port_idx,
 	.link_is_up		= amd_ntb_link_is_up,
 	.link_enable		= amd_ntb_link_enable,
 	.link_disable		= amd_ntb_link_disable,

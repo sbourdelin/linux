@@ -179,6 +179,10 @@ static inline int ntb_ctx_ops_is_valid(const struct ntb_ctx_ops *ops)
 
 /**
  * struct ntb_ctx_ops - ntb device operations
+ * @port_number:	See ntb_port_number().
+ * @peer_port_count:	See ntb_peer_port_count().
+ * @peer_port_number:	See ntb_peer_port_number().
+ * @peer_port_idx:	See ntb_peer_port_idx().
  * @link_is_up:		See ntb_link_is_up().
  * @link_enable:	See ntb_link_enable().
  * @link_disable:	See ntb_link_disable().
@@ -212,6 +216,11 @@ static inline int ntb_ctx_ops_is_valid(const struct ntb_ctx_ops *ops)
  * @peer_spad_write:	See ntb_peer_spad_write().
  */
 struct ntb_dev_ops {
+	int (*port_number)(struct ntb_dev *ntb);
+	int (*peer_port_count)(struct ntb_dev *ntb);
+	int (*peer_port_number)(struct ntb_dev *ntb, int pidx);
+	int (*peer_port_idx)(struct ntb_dev *ntb, int port);
+
 	int (*link_is_up)(struct ntb_dev *ntb,
 			  enum ntb_speed *speed, enum ntb_width *width);
 	int (*link_enable)(struct ntb_dev *ntb,
@@ -265,6 +274,10 @@ static inline int ntb_dev_ops_is_valid(const struct ntb_dev_ops *ops)
 {
 	/* commented callbacks are not required: */
 	return
+		ops->port_number			&&
+		ops->peer_port_count			&&
+		ops->peer_port_number			&&
+		ops->peer_port_idx			&&
 		ops->link_is_up				&&
 		ops->link_enable			&&
 		ops->link_disable			&&
@@ -440,6 +453,64 @@ void ntb_link_event(struct ntb_dev *ntb);
  * those bits are associated with the vector number.
  */
 void ntb_db_event(struct ntb_dev *ntb, int vector);
+
+/**
+ * ntb_port_number() - get the local port number
+ * @ntb:	NTB device context.
+ *
+ * Hardware must support at least simple two-ports ntb connection
+ *
+ * Return: the local port number
+ */
+static inline int ntb_port_number(struct ntb_dev *ntb)
+{
+	return ntb->ops->port_number(ntb);
+}
+
+/**
+ * ntb_peer_port_count() - get the number of peer device ports
+ * @ntb:	NTB device context.
+ *
+ * Hardware may support an access to memory of several remote domains
+ * over multi-port NTB devices. This method returns the number of peers,
+ * local device can have shared memory with.
+ *
+ * Return: the number of peer ports
+ */
+static inline int ntb_peer_port_count(struct ntb_dev *ntb)
+{
+	return ntb->ops->peer_port_count(ntb);
+}
+
+/**
+ * ntb_peer_port_number() - get the peer port by given index
+ * @ntb:	NTB device context.
+ * @pidx:	Peer port index.
+ *
+ * Peer ports are continuously enumerated by NTB API logic, so this methods
+ * lets to retrieve port real number by its index.
+ *
+ * Return: the peer device port or negative value indicating an error
+ */
+static inline int ntb_peer_port_number(struct ntb_dev *ntb, int pidx)
+{
+	return ntb->ops->peer_port_number(ntb, pidx);
+}
+
+/**
+ * ntb_peer_port_idx() - get the peer device port index by given port number
+ * @ntb:	NTB device context.
+ * @port:	Peer port number.
+ *
+ * Inverse operation of ntb_peer_port_number(), so one can get port index
+ * by specified port number.
+ *
+ * Return: the peer port index or negative value indicating an error
+ */
+static inline int ntb_peer_port_idx(struct ntb_dev *ntb, int port)
+{
+	return ntb->ops->peer_port_idx(ntb, port);
+}
 
 /**
  * ntb_link_is_up() - get the current ntb link state

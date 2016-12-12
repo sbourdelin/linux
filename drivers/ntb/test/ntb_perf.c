@@ -76,6 +76,7 @@
 #define DMA_RETRIES		20
 #define SZ_4G			(1ULL << 32)
 #define MAX_SEG_ORDER		20 /* no larger than 1M for kmalloc buffer */
+#define PIDX			0
 
 MODULE_LICENSE(DRIVER_LICENSE);
 MODULE_VERSION(DRIVER_VERSION);
@@ -763,6 +764,9 @@ static int perf_probe(struct ntb_client *client, struct ntb_dev *ntb)
 			DRIVER_NAME);
 		return -EIO;
 	}
+
+	if (ntb_peer_port_count(ntb) != 1)
+		dev_warn(&ntb->dev, "Multi-port NTB devices unsupported\n");
 
 	node = dev_to_node(&pdev->dev);
 
