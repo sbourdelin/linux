@@ -769,6 +769,11 @@ int dlpar_memory(struct pseries_hp_errorlog *hp_elog)
 		else
 			rc = -EINVAL;
 		break;
+	case PSERIES_HP_ELOG_ACTION_READD:
+		rc = dlpar_memory_remove_by_index(drc_index, prop);
+		if (!rc)
+			dlpar_memory_add_by_index(drc_index, prop);
+		break;
 	default:
 		pr_err("Invalid action (%d) specified\n", hp_elog->action);
 		rc = -EINVAL;
