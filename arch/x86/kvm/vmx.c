@@ -10699,7 +10699,8 @@ static int vmx_check_nested_events(struct kvm_vcpu *vcpu, bool external_intr)
 		return 0;
 	}
 
-	if ((kvm_cpu_has_interrupt(vcpu) || external_intr) &&
+	if ((kvm_cpu_has_interrupt(vcpu) || external_intr ||
+	     kvm_async_pf_has_ready(vcpu)) &&
 	    nested_exit_on_intr(vcpu)) {
 		if (vmx->nested.nested_run_pending)
 			return -EBUSY;
@@ -11060,9 +11061,9 @@ static void nested_vmx_vmexit(struct kvm_vcpu *vcpu, u32 exit_reason,
 	if ((exit_reason == EXIT_REASON_EXTERNAL_INTERRUPT)
 	    && nested_exit_intr_ack_set(vcpu)) {
 		int irq = kvm_cpu_get_interrupt(vcpu);
-		WARN_ON(irq < 0);
-		vmcs12->vm_exit_intr_info = irq |
-			INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR;
+		if (irq >= 0)
+			vmcs12->vm_exit_intr_info = irq |
+				INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR;
 	}
 
 	trace_kvm_nested_vmexit_inject(vmcs12->vm_exit_reason,
