@@ -46,6 +46,10 @@
 #include <linux/filter.h>
 #include <linux/namei.h>
 #include <linux/parser.h>
+#include <linux/proc_ns.h>
+#include <linux/mount.h>
+#include <linux/ipc_namespace.h>
+#include <linux/utsname.h>
 
 #include "internal.h"
 
@@ -375,6 +379,7 @@ static DEFINE_PER_CPU(struct pmu_event_list, pmu_sb_events);
 
 static atomic_t nr_mmap_events __read_mostly;
 static atomic_t nr_comm_events __read_mostly;
+static atomic_t nr_namespaces_events __read_mostly;
 static atomic_t nr_task_events __read_mostly;
 static atomic_t nr_freq_events __read_mostly;
 static atomic_t nr_switch_events __read_mostly;
@@ -3882,6 +3887,8 @@ static void unaccount_event(struct perf_event *event)
 		atomic_dec(&nr_mmap_events);
 	if (event->attr.comm)
 		atomic_dec(&nr_comm_events);
+	if (event->attr.namespaces)
+		atomic_dec(&nr_namespaces_events);
 	if (event->attr.task)
 		atomic_dec(&nr_task_events);
 	if (event->attr.freq)
@@ -6382,6 +6389,7 @@ static void perf_event_task(struct task_struct *task,
 void perf_event_fork(struct task_struct *task)
 {
 	perf_event_task(task, NULL, 1);
+	perf_event_namespaces(task);
 }
 
 /*
@@ -6481,6 +6489,125 @@ void perf_event_comm(struct task_struct *task, bool exec)
 	};
 
 	perf_event_comm_event(&comm_event);
+}
+
+/*
+ * namespaces tracking
+ */
+
+struct namespaces_event_id {
+	struct perf_event_header	header;
+	u32				pid;
+	u32				tid;
+	u64				dev_num;
+	u64				inode_num[NAMESPACES_MAX];
+};
+
+struct perf_namespaces_event {
+	struct task_struct		*task;
+
+	struct namespaces_event_id	event_id;
+};
+
+static int perf_event_namespaces_match(struct perf_event *event)
+{
+	return event->attr.namespaces;
+}
+
+static void perf_event_namespaces_output(struct perf_event *event,
+					 void *data)
+{
+	struct perf_namespaces_event *namespaces_event = data;
+	struct perf_output_handle handle;
+	struct perf_sample_data sample;
+	struct path ns_path;
+	struct task_struct *task = namespaces_event->task;
+	struct namespaces_event_id *ei = &namespaces_event->event_id;
+	struct ns_common *ns_common;
+	struct nsproxy *nsproxy;
+	void *error;
+	int ret;
+
+	if (!perf_event_namespaces_match(event))
+		return;
+
+	perf_event_header__init_id(&ei->header, &sample, event);
+	ret = perf_output_begin(&handle, event, ei->header.size);
+	if (ret)
+		return;
+
+	ei->pid = perf_event_pid(event, task);
+	ei->tid = perf_event_tid(event, task);
+
+	error = ns_get_path(&ns_path, task, &mntns_operations);
+	if (!error)
+		ei->dev_num = ns_path.mnt->mnt_sb->s_dev;
+
+	ns_common = mntns_operations.get(task);
+	ei->inode_num[MNT_NS_INDEX] = ns_common->inum;
+	mntns_operations.put(ns_common);
+
+#ifdef CONFIG_USER_NS
+	ei->inode_num[USER_NS_INDEX] = __task_cred(task)->user_ns->ns.inum;
+#endif
+
+	if (task != current)
+		task_lock(task);
+
+	nsproxy = task->nsproxy;
+	if (nsproxy != NULL) {
+#ifdef CONFIG_NET_NS
+		ei->inode_num[NET_NS_INDEX] = nsproxy->net_ns->ns.inum;
+#endif
+#ifdef CONFIG_UTS_NS
+		ei->inode_num[UTS_NS_INDEX] = nsproxy->uts_ns->ns.inum;
+#endif
+#ifdef CONFIG_IPC_NS
+		ei->inode_num[IPC_NS_INDEX] = nsproxy->ipc_ns->ns.inum;
+#endif
+#ifdef CONFIG_PID_NS
+		ei->inode_num[PID_NS_INDEX] = nsproxy->pid_ns_for_children->ns.inum;
+#endif
+#ifdef CONFIG_CGROUPS
+		ei->inode_num[CGROUP_NS_INDEX] = nsproxy->cgroup_ns->ns.inum;
+#endif
+	}
+
+	if (task != current)
+		task_unlock(task);
+
+	perf_output_put(&handle, namespaces_event->event_id);
+
+	perf_event__output_id_sample(event, &handle, &sample);
+
+	perf_output_end(&handle);
+}
+
+void perf_event_namespaces(struct task_struct *task)
+{
+	struct perf_namespaces_event namespaces_event;
+
+	if (!atomic_read(&nr_namespaces_events))
+		return;
+
+	namespaces_event = (struct perf_namespaces_event){
+		.task	= task,
+		.event_id  = {
+			.header = {
+				.type = PERF_RECORD_NAMESPACES,
+				.misc = 0,
+				.size = sizeof(namespaces_event.event_id),
+			},
+			/* .pid */
+			/* .tid */
+			/* .dev_num */
+			/* .inode_num[NAMESPACES_MAX] */
+		},
+	};
+
+	perf_iterate_sb(perf_event_namespaces_output,
+			&namespaces_event,
+			NULL);
 }
 
 /*
@@ -9028,6 +9155,8 @@ static void account_event(struct perf_event *event)
 		atomic_inc(&nr_mmap_events);
 	if (event->attr.comm)
 		atomic_inc(&nr_comm_events);
+	if (event->attr.namespaces)
+		atomic_inc(&nr_namespaces_events);
 	if (event->attr.task)
 		atomic_inc(&nr_task_events);
 	if (event->attr.freq)
@@ -9539,6 +9668,11 @@ SYSCALL_DEFINE5(perf_event_open,
 
 	if (!attr.exclude_kernel) {
 		if (perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN))
+			return -EACCES;
+	}
+
+	if (attr.namespaces) {
+		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
 	}
 

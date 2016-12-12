@@ -344,7 +344,8 @@ struct perf_event_attr {
 				use_clockid    :  1, /* use @clockid for time fields */
 				context_switch :  1, /* context switch data */
 				write_backward :  1, /* Write ring buffer from end to beginning */
-				__reserved_1   : 36;
+				namespaces     :  1, /* include namespaces data */
+				__reserved_1   : 35;
 
 	union {
 		__u32		wakeup_events;	  /* wakeup every n events */
@@ -610,6 +611,18 @@ struct perf_event_header {
 	__u16	size;
 };
 
+enum {
+	NET_NS_INDEX		= 0,
+	UTS_NS_INDEX		= 1,
+	IPC_NS_INDEX		= 2,
+	PID_NS_INDEX		= 3,
+	USER_NS_INDEX		= 4,
+	MNT_NS_INDEX		= 5,
+	CGROUP_NS_INDEX		= 6,
+
+	NAMESPACES_MAX,		/* maximum available namespaces */
+};
+
 enum perf_event_type {
 
 	/*
@@ -861,6 +874,18 @@ enum perf_event_type {
 	 * };
 	 */
 	PERF_RECORD_SWITCH_CPU_WIDE		= 15,
+
+	/*
+	 * struct {
+	 *	struct perf_event_header	header;
+	 *
+	 *	u32				pid, tid;
+	 *	u64				dev_num;
+	 *	u64				inode_num[NAMESPACES_MAX];
+	 *	struct sample_id		sample_id;
+	 * };
+	 */
+	PERF_RECORD_NAMESPACES			= 16,
 
 	PERF_RECORD_MAX,			/* non-ABI */
 };
