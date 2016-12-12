@@ -117,7 +117,7 @@ static void snb_uncore_msr_exit_box(struct intel_uncore_box *box)
 }
 
 static struct uncore_event_desc snb_uncore_events[] = {
-	INTEL_UNCORE_EVENT_DESC(clockticks, "event=0xff,umask=0x00"),
+	INTEL_UNCORE_EVENT_DESC(clockticks, "event=0xff"),
 	{ /* end: all zeroes */ },
 };
 
@@ -155,17 +155,12 @@ static struct intel_uncore_type snb_uncore_cbox = {
 	.num_counters   = 2,
 	.num_boxes	= 4,
 	.perf_ctr_bits	= 44,
-	.fixed_ctr_bits	= 48,
 	.perf_ctr	= SNB_UNC_CBO_0_PER_CTR0,
 	.event_ctl	= SNB_UNC_CBO_0_PERFEVTSEL0,
-	.fixed_ctr	= SNB_UNC_FIXED_CTR,
-	.fixed_ctl	= SNB_UNC_FIXED_CTR_CTRL,
-	.single_fixed	= 1,
 	.event_mask	= SNB_UNC_RAW_EVENT_MASK,
 	.msr_offset	= SNB_UNC_CBO_MSR_OFFSET,
 	.ops		= &snb_uncore_msr_ops,
 	.format_group	= &snb_uncore_format_group,
-	.event_descs	= snb_uncore_events,
 };
 
 static struct intel_uncore_type snb_uncore_arb = {
@@ -182,9 +177,34 @@ static struct intel_uncore_type snb_uncore_arb = {
 	.format_group	= &snb_uncore_format_group,
 };
 
+static struct attribute *snb_uncore_clock_formats_attr[] = {
+	&format_attr_event.attr,
+	NULL,
+};
+
+static struct attribute_group snb_uncore_clock_format_group = {
+	.name = "format",
+	.attrs = snb_uncore_clock_formats_attr,
+};
+
+static struct intel_uncore_type snb_uncore_clockbox = {
+	.name		= "clock",
+	.num_counters   = 1,
+	.num_boxes	= 1,
+	.fixed_ctr_bits	= 48,
+	.fixed_ctr	= SNB_UNC_FIXED_CTR,
+	.fixed_ctl	= SNB_UNC_FIXED_CTR_CTRL,
+	.single_fixed	= 1,
+	.event_mask	= SNB_UNC_CTL_EV_SEL_MASK,
+	.format_group	= &snb_uncore_clock_format_group,
+	.ops		= &snb_uncore_msr_ops,
+	.event_descs	= snb_uncore_events,
+};
+
 static struct intel_uncore_type *snb_msr_uncores[] = {
 	&snb_uncore_cbox,
 	&snb_uncore_arb,
+	&snb_uncore_clockbox,
 	NULL,
 };
 
@@ -229,22 +249,18 @@ static struct intel_uncore_type skl_uncore_cbox = {
 	.num_counters   = 4,
 	.num_boxes	= 5,
 	.perf_ctr_bits	= 44,
-	.fixed_ctr_bits	= 48,
 	.perf_ctr	= SNB_UNC_CBO_0_PER_CTR0,
 	.event_ctl	= SNB_UNC_CBO_0_PERFEVTSEL0,
-	.fixed_ctr	= SNB_UNC_FIXED_CTR,
-	.fixed_ctl	= SNB_UNC_FIXED_CTR_CTRL,
-	.single_fixed	= 1,
 	.event_mask	= SNB_UNC_RAW_EVENT_MASK,
 	.msr_offset	= SNB_UNC_CBO_MSR_OFFSET,
 	.ops		= &skl_uncore_msr_ops,
 	.format_group	= &snb_uncore_format_group,
-	.event_descs	= snb_uncore_events,
 };
 
 static struct intel_uncore_type *skl_msr_uncores[] = {
 	&skl_uncore_cbox,
 	&snb_uncore_arb,
+	&snb_uncore_clockbox,
 	NULL,
 };
 
