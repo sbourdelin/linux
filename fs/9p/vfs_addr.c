@@ -576,7 +576,7 @@ static int flush_pages(struct page **pages, int nr_pages,
 #endif
 				goto iter_send;
 			}
-		};
+		}
 	iter_send:
 		if (iter_len == 0)
 			/*
@@ -609,7 +609,7 @@ static int flush_pages(struct page **pages, int nr_pages,
 	next_iter:
 		if (ctx->done)
 			return ret;
-	};
+	}
 	return 0;
 }
 
