@@ -15,6 +15,8 @@
 #include <linux/if_vlan.h>
 #include <linux/irq.h>
 #include <linux/gpio/consumer.h>
+#include <linux/crc32.h>
+#include <linux/hashtable.h>
 
 #ifndef UINT64_MAX
 #define UINT64_MAX		(u64)(~((u64)0))
@@ -671,6 +673,16 @@ struct mv88e6xxx_info {
 	const struct mv88e6xxx_ops *ops;
 };
 
+struct pvec_tbl_entry {
+        struct hlist_node entry;
+        u32 key_crc32; /* key */
+        u16 pvec;
+        struct pvec_tbl_key {
+                u8 addr[ETH_ALEN];
+                u16 fid;
+        } key;
+};
+
 struct mv88e6xxx_atu_entry {
 	u16	fid;
 	u8	state;
@@ -734,6 +746,9 @@ struct mv88e6xxx_chip {
 	struct mutex	stats_mutex;
 
 	struct mv88e6xxx_priv_port	ports[DSA_MAX_PORTS];
+
+	/* This table hold a port vector for each multicast address */
+	DECLARE_HASHTABLE(pvec_tbl, 12);
 
 	/* A switch may have a GPIO line tied to its reset pin. Parse
 	 * this from the device tree, and use it before performing
