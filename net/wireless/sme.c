@@ -727,6 +727,7 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
 		kzfree(wdev->connect_keys);
 		wdev->connect_keys = NULL;
 		wdev->ssid_len = 0;
+		wdev->conn_owner_nlportid = 0;
 		if (bss) {
 			cfg80211_unhold_bss(bss_from_pub(bss));
 			cfg80211_put_bss(wdev->wiphy, bss);
@@ -955,6 +956,7 @@ void __cfg80211_disconnected(struct net_device *dev, const u8 *ie,
 
 	wdev->current_bss = NULL;
 	wdev->ssid_len = 0;
+	wdev->conn_owner_nlportid = 0;
 
 	nl80211_send_disconnected(rdev, dev, reason, ie, ie_len, from_ap);
 
@@ -1097,6 +1099,8 @@ int cfg80211_disconnect(struct cfg80211_registered_device *rdev,
 
 	kzfree(wdev->connect_keys);
 	wdev->connect_keys = NULL;
+
+	wdev->conn_owner_nlportid = 0;
 
 	if (wdev->conn)
 		err = cfg80211_sme_disconnect(wdev, reason);

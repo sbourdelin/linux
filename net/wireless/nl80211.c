@@ -8058,6 +8058,12 @@ static int nl80211_associate(struct sk_buff *skb, struct genl_info *info)
 		wdev_unlock(dev->ieee80211_ptr);
 	}
 
+	if (!err && info->attrs[NL80211_ATTR_SOCKET_OWNER]) {
+		dev->ieee80211_ptr->conn_owner_nlportid = info->snd_portid;
+
+		memcpy(dev->ieee80211_ptr->disconnect_bssid, bssid, ETH_ALEN);
+	}
+
 	return err;
 }
 
@@ -8105,6 +8111,10 @@ static int nl80211_deauthenticate(struct sk_buff *skb, struct genl_info *info)
 	err = cfg80211_mlme_deauth(rdev, dev, bssid, ie, ie_len, reason_code,
 				   local_state_change);
 	wdev_unlock(dev->ieee80211_ptr);
+
+	if (!err)
+		dev->ieee80211_ptr->conn_owner_nlportid = 0;
+
 	return err;
 }
 
@@ -8152,6 +8162,10 @@ static int nl80211_disassociate(struct sk_buff *skb, struct genl_info *info)
 	err = cfg80211_mlme_disassoc(rdev, dev, bssid, ie, ie_len, reason_code,
 				     local_state_change);
 	wdev_unlock(dev->ieee80211_ptr);
+
+	if (!err)
+		dev->ieee80211_ptr->conn_owner_nlportid = 0;
+
 	return err;
 }
 
@@ -8778,6 +8792,10 @@ static int nl80211_connect(struct sk_buff *skb, struct genl_info *info)
 	wdev_unlock(dev->ieee80211_ptr);
 	if (err)
 		kzfree(connkeys);
+
+	if (!err && info->attrs[NL80211_ATTR_SOCKET_OWNER])
+		dev->ieee80211_ptr->conn_owner_nlportid = info->snd_portid;
+
 	return err;
 }
 
@@ -14539,13 +14557,21 @@ static int nl80211_netlink_notify(struct notifier_block * nb,
 				spin_unlock(&rdev->destroy_list_lock);
 				schedule_work(&rdev->destroy_work);
 			}
-		} else if (schedule_scan_stop) {
+
+			continue;
+		}
+
+		if (schedule_scan_stop) {
 			sched_scan_req->owner_nlportid = 0;
 
 			if (rdev->ops->sched_scan_stop &&
 			    rdev->wiphy.flags & WIPHY_FLAG_SUPPORTS_SCHED_SCAN)
 				schedule_work(&rdev->sched_scan_stop_wk);
 		}
+
+		list_for_each_entry_rcu(wdev, &rdev->wiphy.wdev_list, list)
+			if (wdev->conn_owner_nlportid == notify->portid)
+				schedule_work(&wdev->disconnect_wk);
 	}
 
 	rcu_read_unlock();
