@@ -364,35 +364,6 @@ static void zip_remove(struct pci_dev *pdev)
 	zip_dbg_exit();
 }
 
-/* Dummy Functions */
-int zip_alloc_lzs_ctx(struct crypto_tfm *tfm)
-{
-	return 0;
-}
-
-int zip_alloc_zip_ctx(struct crypto_tfm *tfm)
-{
-	return 0;
-}
-
-void zip_free_zip_ctx(struct crypto_tfm *tfm)
-{
-}
-
-int  zip_deflate_comp(struct crypto_tfm *tfm,
-		      const u8 *src, unsigned int slen,
-		      u8 *dst, unsigned int *dlen)
-{
-	return 0;
-}
-
-int  zip_inflate_comp(struct crypto_tfm *tfm,
-		      const u8 *src, unsigned int slen,
-		      u8 *dst, unsigned int *dlen)
-{
-	return 0;
-}
-
 /* PCI Sub-System Interface */
 static struct pci_driver zip_driver = {
 	.name	    =  DRV_NAME,

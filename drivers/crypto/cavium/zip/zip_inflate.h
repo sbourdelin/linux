@@ -43,25 +43,20 @@
  * WITH YOU.
  ***********************license end**************************************/
 
-#ifndef __ZIP_CRYPTO_H__
-#define __ZIP_CRYPTO_H__
+#ifndef __ZIP_INFLATE_H__
+#define __ZIP_INFLATE_H__
 
-#include <linux/crypto.h>
-#include "common.h"
-#include "zip_deflate.h"
-#include "zip_inflate.h"
-
-struct zip_kernel_ctx {
-	struct zip_operation zip_comp;
-	struct zip_operation zip_decomp;
-};
-
-int  zip_alloc_zip_ctx(struct crypto_tfm *tfm);
-int  zip_alloc_lzs_ctx(struct crypto_tfm *tfm);
-void zip_free_zip_ctx(struct crypto_tfm *tfm);
-int  zip_deflate_comp(struct crypto_tfm *tfm, const u8 *src, unsigned int slen,
-		      u8 *dst, unsigned int *dlen);
-int  zip_inflate_comp(struct crypto_tfm *tfm, const u8 *src, unsigned int slen,
-		      u8 *dst, unsigned int *dlen);
-
+/**
+ * zip_inflate - API to offload inflate operation to hardware
+ * @zip_ops: Pointer to zip operation structure
+ * @s:       Pointer to the structure representing zip state
+ * @zip_dev: Pointer to the structure representing zip device
+ *
+ * This function prepares the zip inflate command and submits it to the zip
+ * engine for processing.
+ *
+ * Return: 0 if successful or error code
+ */
+int zip_inflate(struct zip_operation *zip_ops, struct zip_state *s,
+		struct zip_device *zip_dev);
 #endif
