@@ -2990,8 +2990,10 @@ static void gen8_irq_reset(struct drm_device *dev)
 						   POWER_DOMAIN_PIPE(pipe)))
 			GEN8_IRQ_RESET_NDX(DE_PIPE, pipe);
 
-	GEN5_IRQ_RESET(GEN8_DE_PORT_);
-	GEN5_IRQ_RESET(GEN8_DE_MISC_);
+	if (!HAS_PCH_NOP(dev_priv)) {
+		GEN5_IRQ_RESET(GEN8_DE_PORT_);
+		GEN5_IRQ_RESET(GEN8_DE_MISC_);
+	}
 	GEN5_IRQ_RESET(GEN8_PCU_);
 
 	if (HAS_PCH_SPLIT(dev_priv))
@@ -3414,7 +3416,9 @@ static int gen8_irq_postinstall(struct drm_device *dev)
 		ibx_irq_pre_postinstall(dev);
 
 	gen8_gt_irq_postinstall(dev_priv);
-	gen8_de_irq_postinstall(dev_priv);
+
+	if (!HAS_PCH_NOP(dev_priv))
+		gen8_de_irq_postinstall(dev_priv);
 
 	if (HAS_PCH_SPLIT(dev_priv))
 		ibx_irq_postinstall(dev);
