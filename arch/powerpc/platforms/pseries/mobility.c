@@ -39,6 +39,7 @@ struct update_props_workarea {
 #define ADD_DT_NODE	0x03000000
 
 #define MIGRATION_SCOPE	(1)
+#define PRRN_SCOPE -2
 
 static int mobility_rtas_call(int token, char *buf, s32 scope)
 {
@@ -236,6 +237,49 @@ static int add_dt_node(__be32 parent_phandle, __be32 drc_index)
 	return rc;
 }
 
+void pseries_prrn_update_node(__be32 phandle)
+{
+	struct pseries_hp_errorlog *hp_elog;
+	struct completion hotplug_done;
+	struct device_node *dn;
+	char *type;
+	int rc = 0;
+
+	hp_elog = kzalloc(sizeof(*hp_elog), GFP_KERNEL);
+	if (!hp_elog)
+		return;
+
+	dn = of_find_node_by_phandle(be32_to_cpu(phandle));
+
+	/*
+	 * If the phandle was not found, assume phandle is the drc index of
+	 * an LMB.
+	 */
+	if (!dn) {
+		type = "memory";
+		hp_elog->resource = PSERIES_HP_ELOG_RESOURCE_MEM;
+		hp_elog->action = PSERIES_HP_ELOG_ACTION_READD;
+		hp_elog->id_type = PSERIES_HP_ELOG_ID_DRC_INDEX;
+		hp_elog->_drc_u.drc_index = cpu_to_be32(phandle);
+
+		pr_info("Attempting to update %s at drc index %x\n", type,
+			hp_elog->_drc_u.drc_index);
+
+		init_completion(&hotplug_done);
+		queue_hotplug_event(hp_elog, &hotplug_done, &rc);
+		wait_for_completion(&hotplug_done);
+
+		if (rc)
+			pr_info("Failed to update %s at drc index %x\n", type,
+				hp_elog->_drc_u.drc_index);
+		else
+			pr_info("Updated %s at drc index %x\n", type,
+				hp_elog->_drc_u.drc_index);
+	}
+
+	kfree(hp_elog);
+}
+
 int pseries_devicetree_update(s32 scope)
 {
 	char *rtas_buf;
@@ -274,6 +318,10 @@ int pseries_devicetree_update(s32 scope)
 					break;
 				case UPDATE_DT_NODE:
 					update_dt_node(phandle, scope);
+
+					if (scope == PRRN_SCOPE)
+						pseries_prrn_update_node(phandle);
+
 					break;
 				case ADD_DT_NODE:
 					drc_index = *data++;
