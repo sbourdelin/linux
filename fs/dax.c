@@ -351,14 +351,6 @@ restart:
 		}
 
 		spin_unlock_irq(&mapping->tree_lock);
-		err = radix_tree_preload(
-				mapping_gfp_mask(mapping) & ~__GFP_HIGHMEM);
-		if (err) {
-			if (pmd_downgrade)
-				put_locked_mapping_entry(mapping, index, entry);
-			return ERR_PTR(err);
-		}
-
 		/*
 		 * Besides huge zero pages the only other thing that gets
 		 * downgraded are empty entries which don't need to be
@@ -368,6 +360,13 @@ restart:
 			unmap_mapping_range(mapping,
 				(index << PAGE_SHIFT) & PMD_MASK, PMD_SIZE, 0);
 
+		err = radix_tree_preload(
+				mapping_gfp_mask(mapping) & ~__GFP_HIGHMEM);
+		if (err) {
+			if (pmd_downgrade)
+				put_locked_mapping_entry(mapping, index, entry);
+			return ERR_PTR(err);
+		}
 		spin_lock_irq(&mapping->tree_lock);
 
 		if (pmd_downgrade) {
