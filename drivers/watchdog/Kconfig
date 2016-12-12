@@ -52,6 +52,25 @@ config WATCHDOG_SYSFS
 	  Say Y here if you want to enable watchdog device status read through
 	  sysfs attributes.
 
+config WATCHDOG_OPEN_DEADLINE
+	bool "Allow deadline for opening watchdog device"
+	help
+	  If a watchdog driver indicates that to the framework that
+	  the hardware watchdog is running, the framework takes care
+	  of pinging the watchdog until userspace opens
+	  /dev/watchdogN. By selecting this option, the open-timeout
+	  device tree property is used as an upper bound for which the
+	  kernel does this - thus, if userspace hasn't opened the
+	  device within this time, the board reboots.
+
+config WATCHDOG_DEFAULT_OPEN_TIMEOUT
+	int "Default timeout value for opening watchdog device"
+	depends on WATCHDOG_OPEN_DEADLINE
+	default 300
+	help
+	  The default value used when the watchdog's device tree node
+	  does not have the "open-timeout" property.
+
 #
 # General Watchdog drivers
 #

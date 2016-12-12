@@ -76,6 +76,11 @@ struct watchdog_ops {
  * @max_hw_heartbeat_ms:
  *		Hardware limit for maximum timeout, in milli-seconds.
  *		Replaces max_timeout if specified.
+ * @open_timeout:
+ *              The maximum time for which the kernel will ping the
+ *              device after registration.
+ * @open_deadline:
+ *              Set to jiffies + @open_timeout at registration.
  * @reboot_nb:	The notifier block to stop watchdog on reboot.
  * @restart_nb:	The notifier block to register a restart function.
  * @driver_data:Pointer to the drivers private data.
@@ -107,6 +112,10 @@ struct watchdog_device {
 	unsigned int max_timeout;
 	unsigned int min_hw_heartbeat_ms;
 	unsigned int max_hw_heartbeat_ms;
+#ifdef CONFIG_WATCHDOG_OPEN_DEADLINE
+	unsigned long open_timeout;
+	unsigned long open_deadline;
+#endif
 	struct notifier_block reboot_nb;
 	struct notifier_block restart_nb;
 	void *driver_data;

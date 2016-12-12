@@ -191,6 +191,21 @@ void watchdog_set_restart_priority(struct watchdog_device *wdd, int priority)
 }
 EXPORT_SYMBOL_GPL(watchdog_set_restart_priority);
 
+static void
+watchdog_set_open_timeout(struct watchdog_device *wdd)
+{
+#ifdef CONFIG_WATCHDOG_OPEN_DEADLINE
+	u32 t;
+	struct device *dev;
+
+	dev = wdd->parent;
+	if (dev && !of_property_read_u32(dev->of_node, "open-timeout", &t))
+		wdd->open_timeout = t;
+	else
+		wdd->open_timeout = CONFIG_WATCHDOG_DEFAULT_OPEN_TIMEOUT;
+#endif
+}
+
 static int __watchdog_register_device(struct watchdog_device *wdd)
 {
 	int ret, id = -1;
@@ -224,6 +239,8 @@ static int __watchdog_register_device(struct watchdog_device *wdd)
 	if (id < 0)
 		return id;
 	wdd->id = id;
+
+	watchdog_set_open_timeout(wdd);
 
 	ret = watchdog_dev_register(wdd);
 	if (ret) {

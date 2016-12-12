@@ -80,6 +80,29 @@ static struct watchdog_core_data *old_wd_data;
 
 static struct workqueue_struct *watchdog_wq;
 
+#ifdef CONFIG_WATCHDOG_OPEN_DEADLINE
+static bool watchdog_past_open_deadline(struct watchdog_device *wdd)
+{
+	if (!wdd->open_timeout)
+		return false;
+	return time_is_before_jiffies(wdd->open_deadline);
+}
+
+static void watchdog_set_open_deadline(struct watchdog_device *wdd)
+{
+	wdd->open_deadline = jiffies + msecs_to_jiffies(1000 * wdd->open_timeout);
+}
+#else
+static bool watchdog_past_open_deadline(struct watchdog_device *wdd)
+{
+	return false;
+}
+
+static void watchdog_set_open_deadline(struct watchdog_device *wdd)
+{
+}
+#endif
+
 static inline bool watchdog_need_worker(struct watchdog_device *wdd)
 {
 	/* All variables in milli-seconds */
@@ -194,7 +217,13 @@ static int watchdog_ping(struct watchdog_device *wdd)
 
 static bool watchdog_worker_should_ping(struct watchdog_device *wdd)
 {
-	return wdd && (watchdog_active(wdd) || watchdog_hw_running(wdd));
+	if (!wdd)
+		return false;
+
+	if (watchdog_active(wdd))
+		return true;
+
+	return watchdog_hw_running(wdd) && !watchdog_past_open_deadline(wdd);
 }
 
 static void watchdog_ping_work(struct work_struct *work)
@@ -857,6 +886,7 @@ static int watchdog_release(struct inode *inode, struct file *file)
 		watchdog_ping(wdd);
 	}
 
+	watchdog_set_open_deadline(wdd);
 	watchdog_update_worker(wdd);
 
 	/* make sure that /dev/watchdog can be re-opened */
@@ -955,6 +985,7 @@ static int watchdog_cdev_register(struct watchdog_device *wdd, dev_t devno)
 
 	/* Record time of most recent heartbeat as 'just before now'. */
 	wd_data->last_hw_keepalive = jiffies - 1;
+	watchdog_set_open_deadline(wdd);
 
 	/*
 	 * If the watchdog is running, prevent its driver from being unloaded,
