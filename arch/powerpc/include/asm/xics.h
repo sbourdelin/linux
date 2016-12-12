@@ -14,17 +14,13 @@
 /* Want a priority other than 0.  Various HW issues require this. */
 #define	DEFAULT_PRIORITY	5
 
-/*
- * Mark IPIs as higher priority so we can take them inside interrupts
- * FIXME: still true now?
- */
-#define IPI_PRIORITY		4
+#define IPI_PRIORITY		5
 
 /* The least favored priority */
 #define LOWEST_PRIORITY		0xFF
 
 /* The number of priorities defined above */
-#define MAX_NUM_PRIORITIES	3
+#define MAX_NUM_PRIORITIES	2
 
 /* Native ICP */
 #ifdef CONFIG_PPC_ICP_NATIVE
