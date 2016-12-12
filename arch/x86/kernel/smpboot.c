@@ -1459,6 +1459,9 @@ __init void prefill_possible_map(void)
 	pr_info("Allowing %d CPUs, %d hotplug CPUs\n",
 		possible, max_t(int, possible - num_processors, 0));
 
+	/* Avoid WARN() in set_cpu_possible()=>cpumask_check() */
+	nr_cpu_ids = NR_CPUS;
+
 	for (i = 0; i < possible; i++)
 		set_cpu_possible(i, true);
 	for (; i < NR_CPUS; i++)
