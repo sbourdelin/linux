@@ -25,6 +25,8 @@ Optional properties :
  - ti,external-control : Indicates that the charger is configured externally
    and that the host should not attempt to enable/disable charging or set the
    charge voltage/current.
+ - ti,poll-interval-ms : In case there is no interrupts specified, poll AC
+   presense on the ti,ac-detect-gpios GPIO with this interval.
 
 Example:
 
