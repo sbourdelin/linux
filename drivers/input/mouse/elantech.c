@@ -1687,6 +1687,13 @@ int elantech_init(struct psmouse *psmouse)
 			     etd->samples[0], etd->samples[1], etd->samples[2]);
 	}
 
+	if (etd->samples[1] == 0x74 && etd->hw_version == 0x03) {
+		/*This module has a bug in absolute mode, let it be defualt mode  */
+		psmouse_info(psmouse,
+			     "This module only active in default mode\n");
+		goto init_fail;
+	}
+
 	if (elantech_set_absolute_mode(psmouse)) {
 		psmouse_err(psmouse,
 			    "failed to put touchpad into absolute mode.\n");
