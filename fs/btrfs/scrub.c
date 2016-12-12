@@ -1066,6 +1066,7 @@ static int scrub_handle_errored_block(struct scrub_block *sblock_to_check)
 	unsigned int have_csum;
 	struct scrub_block *sblocks_for_recheck; /* holds one for each mirror */
 	struct scrub_block *sblock_bad;
+	int lock_ret;
 	int ret;
 	int mirror_index;
 	int page_num;
@@ -1094,6 +1095,17 @@ static int scrub_handle_errored_block(struct scrub_block *sblock_to_check)
 			BTRFS_EXTENT_FLAG_DATA);
 	have_csum = sblock_to_check->pagev[0]->have_csum;
 	dev = sblock_to_check->pagev[0]->dev;
+
+	/*
+	 * For RAID5/6 race can happen for different dev scrub thread.
+	 * For data corruption, Parity and Data thread will both try
+	 * to recovery the data.
+	 * Race can lead to double added csum error, or even unrecoverable
+	 * error.
+	 */
+	ret = lock_full_stripe(fs_info, logical, GFP_NOFS);
+	if (ret < 0)
+		return ret;
 
 	if (sctx->is_dev_replace && !is_metadata && !have_csum) {
 		sblocks_for_recheck = NULL;
@@ -1431,6 +1443,9 @@ out:
 		kfree(sblocks_for_recheck);
 	}
 
+	lock_ret = unlock_full_stripe(fs_info, logical);
+	if (lock_ret < 0)
+		return lock_ret;
 	return 0;
 }
 
