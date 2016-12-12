@@ -8219,7 +8219,7 @@ void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
 
 static inline bool kvm_vcpu_has_events(struct kvm_vcpu *vcpu)
 {
-	if (!list_empty_careful(&vcpu->async_pf.done))
+	if (kvm_async_pf_has_ready(vcpu))
 		return true;
 
 	if (kvm_apic_has_events(vcpu))

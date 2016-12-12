@@ -1217,4 +1217,11 @@ static inline bool vcpu_valid_wakeup(struct kvm_vcpu *vcpu)
 }
 #endif /* CONFIG_HAVE_KVM_INVALID_WAKEUPS */
 
+#ifdef CONFIG_KVM_ASYNC_PF
+static inline bool kvm_async_pf_has_ready(struct kvm_vcpu *vcpu)
+{
+	return !list_empty_careful(&vcpu->async_pf.done);
+}
+#endif
+
 #endif
