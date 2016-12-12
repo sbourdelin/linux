@@ -1078,7 +1078,7 @@ static int intel_ntb_peer_port_idx(struct ntb_dev *ntb, int port)
 	return 0;
 }
 
-static int intel_ntb_link_is_up(struct ntb_dev *ntb,
+static u64 intel_ntb_link_is_up(struct ntb_dev *ntb,
 				enum ntb_speed *speed,
 				enum ntb_width *width)
 {
