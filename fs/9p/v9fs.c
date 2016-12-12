@@ -314,10 +314,8 @@ void put_flush_set(struct v9fs_flush_set *fset)
 {
 	if (!fset)
 		return;
-	if (fset->pages)
-		kfree(fset->pages);
-	if (fset->buf)
-		kfree(fset->buf);
+	kfree(fset->pages);
+	kfree(fset->buf);
 	kfree(fset);
 }
 
