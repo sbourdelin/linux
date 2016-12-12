@@ -1158,8 +1158,30 @@ static void uvc_video_validate_buffer(const struct uvc_streaming *stream,
 /*
  * Completion handler for video URBs.
  */
+static struct uvc_buffer *uvc_video_decode_meta(struct uvc_streaming *stream,
+			struct uvc_buffer *buf, struct uvc_buffer *meta_buf,
+			u8 *mem, unsigned int length)
+{
+	size_t nbytes;
+
+	if (!meta_buf || !length)
+		return NULL;
+
+	nbytes = min(length, meta_buf->length);
+
+	meta_buf->buf.sequence = buf->buf.sequence;
+	meta_buf->buf.field = buf->buf.field;
+	meta_buf->buf.vb2_buf.timestamp = buf->buf.vb2_buf.timestamp;
+
+	memcpy(meta_buf->mem, mem, nbytes);
+	meta_buf->bytesused = nbytes;
+	meta_buf->state = UVC_BUF_STATE_READY;
+
+	return uvc_queue_next_buffer(&stream->meta.queue, meta_buf);
+}
+
 static void uvc_video_decode_isoc(struct urb *urb, struct uvc_streaming *stream,
-	struct uvc_buffer *buf)
+			struct uvc_buffer *buf, struct uvc_buffer *meta_buf)
 {
 	u8 *mem;
 	int ret, i;
@@ -1205,7 +1227,7 @@ static void uvc_video_decode_isoc(struct urb *urb, struct uvc_streaming *stream,
 }
 
 static void uvc_video_decode_bulk(struct urb *urb, struct uvc_streaming *stream,
-	struct uvc_buffer *buf)
+			struct uvc_buffer *buf, struct uvc_buffer *meta_buf)
 {
 	u8 *mem;
 	int len, ret;
@@ -1238,6 +1260,8 @@ static void uvc_video_decode_bulk(struct urb *urb, struct uvc_streaming *stream,
 		} else {
 			memcpy(stream->bulk.header, mem, ret);
 			stream->bulk.header_size = ret;
+
+			uvc_video_decode_meta(stream, buf, meta_buf, mem, ret);
 
 			mem += ret;
 			len -= ret;
@@ -1272,7 +1296,7 @@ static void uvc_video_decode_bulk(struct urb *urb, struct uvc_streaming *stream,
 }
 
 static void uvc_video_encode_bulk(struct urb *urb, struct uvc_streaming *stream,
-	struct uvc_buffer *buf)
+	struct uvc_buffer *buf, struct uvc_buffer *meta_buf)
 {
 	u8 *mem = urb->transfer_buffer;
 	int len = stream->urb_size, ret;
@@ -1318,7 +1342,9 @@ static void uvc_video_complete(struct urb *urb)
 {
 	struct uvc_streaming *stream = urb->context;
 	struct uvc_video_queue *queue = &stream->queue;
+	struct uvc_video_queue *qmeta = &stream->meta.queue;
 	struct uvc_buffer *buf = NULL;
+	struct uvc_buffer *buf_meta = NULL;
 	unsigned long flags;
 	int ret;
 
@@ -1337,6 +1363,7 @@ static void uvc_video_complete(struct urb *urb)
 	case -ECONNRESET:	/* usb_unlink_urb() called. */
 	case -ESHUTDOWN:	/* The endpoint is being disabled. */
 		uvc_queue_cancel(queue, urb->status == -ESHUTDOWN);
+		uvc_queue_cancel(qmeta, urb->status == -ESHUTDOWN);
 		return;
 	}
 
@@ -1346,7 +1373,13 @@ static void uvc_video_complete(struct urb *urb)
 				       queue);
 	spin_unlock_irqrestore(&queue->irqlock, flags);
 
-	stream->decode(urb, stream, buf);
+	spin_lock_irqsave(&qmeta->irqlock, flags);
+	if (!list_empty(&qmeta->irqqueue))
+		buf_meta = list_first_entry(&qmeta->irqqueue, struct uvc_buffer,
+					    queue);
+	spin_unlock_irqrestore(&qmeta->irqlock, flags);
+
+	stream->decode(urb, stream, buf, buf_meta);
 
 	if ((ret = usb_submit_urb(urb, GFP_ATOMIC)) < 0) {
 		uvc_printk(KERN_ERR, "Failed to resubmit video URB (%d).\n",

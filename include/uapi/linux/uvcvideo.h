@@ -67,4 +67,11 @@ struct uvc_xu_control_query {
 #define UVCIOC_CTRL_MAP		_IOWR('u', 0x20, struct uvc_xu_control_mapping)
 #define UVCIOC_CTRL_QUERY	_IOWR('u', 0x21, struct uvc_xu_control_query)
 
+/*
+ * Metadata node
+ */
+
+/* Header size is stored in 1 byte, i.e. <= 255 */
+#define UVC_PAYLOAD_HEADER_MAX_SIZE 255
+
 #endif
