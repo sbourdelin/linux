@@ -224,6 +224,43 @@ struct i40e_fdir_filter {
 	u32 fd_id;
 };
 
+#define I40E_CLOUD_FIELD_OMAC   0x01
+#define I40E_CLOUD_FIELD_IMAC   0x02
+#define I40E_CLOUD_FIELD_IVLAN  0x04
+#define I40E_CLOUD_FIELD_TEN_ID 0x08
+#define I40E_CLOUD_FIELD_IIP    0x10
+
+#define I40E_CLOUD_FILTER_FLAGS_OMAC I40E_CLOUD_FIELD_OMAC
+#define I40E_CLOUD_FILTER_FLAGS_IMAC I40E_CLOUD_FIELD_IMAC
+#define I40E_CLOUD_FILTER_FLAGS_IMAC_IVLAN (I40E_CLOUD_FIELD_IMAC | \
+					    I40E_CLOUD_FIELD_IVLAN)
+#define I40E_CLOUD_FILTER_FLAGS_IMAC_TEN_ID (I40E_CLOUD_FIELD_IMAC | \
+					     I40E_CLOUD_FIELD_TEN_ID)
+#define I40E_CLOUD_FILTER_FLAGS_OMAC_TEN_ID_IMAC (I40E_CLOUD_FIELD_OMAC | \
+						  I40E_CLOUD_FIELD_IMAC | \
+						  I40E_CLOUD_FIELD_TEN_ID)
+#define I40E_CLOUD_FILTER_FLAGS_IMAC_IVLAN_TEN_ID (I40E_CLOUD_FIELD_IMAC | \
+						   I40E_CLOUD_FIELD_IVLAN | \
+						   I40E_CLOUD_FIELD_TEN_ID)
+#define I40E_CLOUD_FILTER_FLAGS_IIP  I40E_CLOUD_FIELD_IIP
+
+struct i40e_cloud_filter {
+	struct hlist_node cloud_node;
+	/* cloud filter input set follows */
+	u8 outer_mac[ETH_ALEN];
+	u8 inner_mac[ETH_ALEN];
+	__be16 inner_vlan;
+	__be32 inner_ip[4];
+	u32 tenant_id;
+	u8 flags;
+#define I40E_CLOUD_TNL_TYPE_NONE	0xff
+	u8 tunnel_type;
+	/* filter control */
+	u16 seid;
+	u16 queue_id;
+	u32 id;
+};
+
 #define I40E_ETH_P_LLDP			0x88cc
 
 #define I40E_DCB_PRIO_TYPE_STRICT	0
@@ -290,6 +327,8 @@ struct i40e_pf {
 	struct i40e_udp_port_config udp_ports[I40E_MAX_PF_UDP_OFFLOAD_PORTS];
 	u16 pending_udp_bitmap;
 
+	struct hlist_head cloud_filter_list;
+	u16 num_cloud_filters;
 	enum i40e_interrupt_policy int_policy;
 	u16 rx_itr_default;
 	u16 tx_itr_default;
