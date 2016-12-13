@@ -3051,7 +3051,7 @@ static void force_qs_rnp(struct rcu_state *rsp,
 
 		leaf_node_for_each_mask_possible_cpu(rnp, rnp->qsmask, bit, cpu)
 			if (f(per_cpu_ptr(rsp->rda, cpu), isidle, maxj))
-				mask |= 1 << bit;
+				mask |= 1UL << bit;
 
 		if (mask != 0) {
 			/* Idle/offline CPUs, report (releases rnp->lock. */
