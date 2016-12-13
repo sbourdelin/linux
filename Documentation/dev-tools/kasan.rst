@@ -40,6 +40,22 @@ similar to the following to the respective kernel Makefile:
 
     KASAN_SANITIZE := n
 
+Control Over Read/Write Instrumentation of kernel::
+
+- To Disable Read Instrumentation of kernel with:
+
+    CONFIG_KASAN_READS = n
+
+Because in some cases we need to check only memory write sanitization
+for better performance, read instrumentation can be disabled.
+
+- To Disable Write Instrumentation of kernel with:
+
+    CONFIG_KASAN_WRITES = n
+
+In case when to instrument only external modules, not the entire kernel
+for read or write intrumentation or both.
+
 Error reports
 ~~~~~~~~~~~~~
 
