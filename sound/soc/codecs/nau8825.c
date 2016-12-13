@@ -1062,6 +1062,10 @@ static const char * const nau8825_dac_src[] = {
 	"DACL", "DACR",
 };
 
+static const char * const nau8825_class_g_src[] = {
+	"Switching", "1.8V"
+};
+
 static SOC_ENUM_SINGLE_DECL(
 	nau8825_dacl_enum, NAU8825_REG_DACL_CTRL,
 	NAU8825_DACL_CH_SEL_SFT, nau8825_dac_src);
@@ -1070,12 +1074,17 @@ static SOC_ENUM_SINGLE_DECL(
 	nau8825_dacr_enum, NAU8825_REG_DACR_CTRL,
 	NAU8825_DACR_CH_SEL_SFT, nau8825_dac_src);
 
+static SOC_ENUM_SINGLE_DECL(
+	nau8825_class_g_enum, SND_SOC_NOPM, 0, nau8825_class_g_src);
+
 static const struct snd_kcontrol_new nau8825_dacl_mux =
 	SOC_DAPM_ENUM("DACL Source", nau8825_dacl_enum);
 
 static const struct snd_kcontrol_new nau8825_dacr_mux =
 	SOC_DAPM_ENUM("DACR Source", nau8825_dacr_enum);
 
+static const struct snd_kcontrol_new nau8825_class_g_mux =
+	SOC_DAPM_ENUM("Class G Source", nau8825_class_g_enum);
 
 static const struct snd_soc_dapm_widget nau8825_dapm_widgets[] = {
 	SND_SOC_DAPM_AIF_OUT("AIFTX", "Capture", 0, NAU8825_REG_I2S_PCM_CTRL2,
@@ -1154,9 +1163,16 @@ static const struct snd_soc_dapm_widget nau8825_dapm_widgets[] = {
 	SND_SOC_DAPM_PGA_S("HP Boost Driver", 9,
 		NAU8825_REG_BOOST, 9, 1, NULL, 0),
 
-	/* Class G operation control*/
-	SND_SOC_DAPM_PGA_S("Class G", 10,
+	/* Class G operation control. "Class G" MUX options:
+	 * "Switching": Use +-1.8V or +-0.9V supply, based on signal amplitude.
+	 * "1.8V": Always use +-1.8V.
+	 * The PGA_S widget is used to ensure the Class G control bit is set at
+	 * the correct time w.r.t the other widgets.
+	 */
+	SND_SOC_DAPM_PGA_S("Class G Driver", 10,
 		NAU8825_REG_CLASSG_CTRL, 0, 0, NULL, 0),
+	SND_SOC_DAPM_MUX("Class G", SND_SOC_NOPM, 0, 0,
+		&nau8825_class_g_mux),
 
 	SND_SOC_DAPM_OUTPUT("HPOL"),
 	SND_SOC_DAPM_OUTPUT("HPOR"),
@@ -1197,7 +1213,9 @@ static const struct snd_soc_dapm_route nau8825_dapm_routes[] = {
 	{"HPOR Pulldown", NULL, "Output DACR"},
 	{"HP Boost Driver", NULL, "HPOL Pulldown"},
 	{"HP Boost Driver", NULL, "HPOR Pulldown"},
-	{"Class G", NULL, "HP Boost Driver"},
+	{"Class G Driver", NULL, "HP Boost Driver"},
+	{"Class G", "1.8V", "HP Boost Driver"},
+	{"Class G", "Switching", "Class G Driver"},
 	{"HPOL", NULL, "Class G"},
 	{"HPOR", NULL, "Class G"},
 };
