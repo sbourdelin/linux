@@ -791,6 +791,8 @@ struct mvpp2_txq_pcpu {
 	/* Array of transmitted buffers' physical addresses */
 	dma_addr_t *tx_buffs;
 
+	size_t *tx_data_size;
+
 	/* Index of last TX DMA descriptor that was inserted */
 	int txq_put_index;
 
@@ -980,9 +982,10 @@ static void mvpp2_txq_inc_put(struct mvpp2_txq_pcpu *txq_pcpu,
 			      struct mvpp2_tx_desc *tx_desc)
 {
 	txq_pcpu->tx_skb[txq_pcpu->txq_put_index] = skb;
-	if (skb)
-		txq_pcpu->tx_buffs[txq_pcpu->txq_put_index] =
-							 tx_desc->buf_phys_addr;
+	txq_pcpu->tx_data_size[txq_pcpu->txq_put_index] =
+		tx_desc->data_size;
+	txq_pcpu->tx_buffs[txq_pcpu->txq_put_index] =
+		tx_desc->buf_phys_addr;
 	txq_pcpu->txq_put_index++;
 	if (txq_pcpu->txq_put_index == txq_pcpu->size)
 		txq_pcpu->txq_put_index = 0;
@@ -4404,11 +4407,13 @@ static void mvpp2_txq_bufs_free(struct mvpp2_port *port,
 		dma_addr_t buf_phys_addr =
 				    txq_pcpu->tx_buffs[txq_pcpu->txq_get_index];
 		struct sk_buff *skb = txq_pcpu->tx_skb[txq_pcpu->txq_get_index];
+		size_t data_size =
+			txq_pcpu->tx_data_size[txq_pcpu->txq_get_index];
 
 		mvpp2_txq_inc_get(txq_pcpu);
 
 		dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
-				 skb_headlen(skb), DMA_TO_DEVICE);
+				 data_size, DMA_TO_DEVICE);
 		if (!skb)
 			continue;
 		dev_kfree_skb_any(skb);
@@ -4662,6 +4667,11 @@ static int mvpp2_txq_init(struct mvpp2_port *port,
 		if (!txq_pcpu->tx_buffs)
 			goto error;
 
+		txq_pcpu->tx_data_size = kmalloc(txq_pcpu->size *
+						 sizeof(size_t), GFP_KERNEL);
+		if (!txq_pcpu->tx_data_size)
+			goto error;
+
 		txq_pcpu->count = 0;
 		txq_pcpu->reserved_num = 0;
 		txq_pcpu->txq_put_index = 0;
@@ -4675,6 +4685,7 @@ error:
 		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
 		kfree(txq_pcpu->tx_skb);
 		kfree(txq_pcpu->tx_buffs);
+		kfree(txq_pcpu->tx_data_size);
 	}
 
 	dma_free_coherent(port->dev->dev.parent,
@@ -4695,6 +4706,7 @@ static void mvpp2_txq_deinit(struct mvpp2_port *port,
 		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
 		kfree(txq_pcpu->tx_skb);
 		kfree(txq_pcpu->tx_buffs);
+		kfree(txq_pcpu->tx_data_size);
 	}
 
 	if (txq->descs)
