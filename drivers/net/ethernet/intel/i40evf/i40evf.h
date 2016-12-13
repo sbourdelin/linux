@@ -336,4 +336,11 @@ void i40evf_virtchnl_completion(struct i40evf_adapter *adapter,
 				enum i40e_virtchnl_ops v_opcode,
 				i40e_status v_retval, u8 *msg, u16 msglen);
 int i40evf_config_rss(struct i40evf_adapter *adapter);
+int i40evf_lan_add_device(struct i40evf_adapter *adapter);
+int i40evf_lan_del_device(struct i40evf_adapter *adapter);
+void i40evf_client_subtask(struct i40evf_adapter *adapter);
+void i40evf_notify_client_message(struct i40e_vsi *vsi, u8 *msg, u16 len);
+void i40evf_notify_client_l2_params(struct i40e_vsi *vsi);
+void i40evf_notify_client_open(struct i40e_vsi *vsi);
+void i40evf_notify_client_close(struct i40e_vsi *vsi);
 #endif /* _I40EVF_H_ */
