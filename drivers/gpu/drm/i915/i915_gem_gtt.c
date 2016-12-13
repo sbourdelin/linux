@@ -3343,17 +3343,17 @@ void i915_gem_restore_gtt_mappings(struct drm_i915_private *dev_priv)
 	i915_ggtt_flush(dev_priv);
 }
 
-struct i915_vma *
-i915_gem_obj_to_vma(struct drm_i915_gem_object *obj,
-		    struct i915_address_space *vm,
-		    const struct i915_ggtt_view *view)
+static inline struct i915_vma *
+__i915_gem_obj_to_vma(struct drm_i915_gem_object *obj,
+		      struct i915_address_space *vm,
+		      const struct i915_ggtt_view *view)
 {
 	struct rb_node *rb;
 
 	rb = obj->vma_tree.rb_node;
 	while (rb) {
 		struct i915_vma *vma = rb_entry(rb, struct i915_vma, obj_node);
-		long cmp;
+		int cmp;
 
 		cmp = i915_vma_compare(vma, vm, view);
 		if (cmp == 0)
@@ -3368,6 +3368,14 @@ i915_gem_obj_to_vma(struct drm_i915_gem_object *obj,
 	return NULL;
 }
 
+noinline struct i915_vma *
+i915_gem_obj_to_vma(struct drm_i915_gem_object *obj,
+		    struct i915_address_space *vm,
+		    const struct i915_ggtt_view *view)
+{
+	return __i915_gem_obj_to_vma(obj, vm, view);
+}
+
 struct i915_vma *
 i915_gem_obj_lookup_or_create_vma(struct drm_i915_gem_object *obj,
 				  struct i915_address_space *vm,
@@ -3378,7 +3386,10 @@ i915_gem_obj_lookup_or_create_vma(struct drm_i915_gem_object *obj,
 	lockdep_assert_held(&obj->base.dev->struct_mutex);
 	GEM_BUG_ON(view && !i915_is_ggtt(vm));
 
-	vma = i915_gem_obj_to_vma(obj, vm, view);
+	if (likely(!view))
+		vma = __i915_gem_obj_to_vma(obj, vm, NULL);
+	else
+		vma = i915_gem_obj_to_vma(obj, vm, view);
 	if (!vma) {
 		vma = i915_vma_create(obj, vm, view);
 		GEM_BUG_ON(vma != i915_gem_obj_to_vma(obj, vm, view));

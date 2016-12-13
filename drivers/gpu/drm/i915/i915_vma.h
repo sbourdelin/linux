@@ -178,15 +178,18 @@ static inline void i915_vma_put(struct i915_vma *vma)
 	i915_gem_object_put(vma->obj);
 }
 
-static inline long
+static inline int
 i915_vma_compare(struct i915_vma *vma,
 		 struct i915_address_space *vm,
 		 const struct i915_ggtt_view *view)
 {
+	long cmp;
+
 	GEM_BUG_ON(view && !i915_is_ggtt(vm));
 
-	if (vma->vm != vm)
-		return vma->vm - vm;
+	cmp = (unsigned long)vma->vm - (unsigned long)vm;
+	if (cmp)
+		return cmp;
 
 	if (!view)
 		return vma->ggtt_view.type;
