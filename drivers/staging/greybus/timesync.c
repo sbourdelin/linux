@@ -1055,10 +1055,9 @@ int gb_timesync_svc_add(struct gb_svc *svc)
 		goto done;
 	}
 
-	init_timer(&timesync_svc->ktime_timer);
-	timesync_svc->ktime_timer.function = gb_timesync_ktime_timer_fn;
+	setup_timer(&timesync_svc->ktime_timer, gb_timesync_ktime_timer_fn,
+		(unsigned long)timesync_svc);
 	timesync_svc->ktime_timer.expires = jiffies + GB_TIMESYNC_KTIME_UPDATE;
-	timesync_svc->ktime_timer.data = (unsigned long)timesync_svc;
 	add_timer(&timesync_svc->ktime_timer);
 done:
 	mutex_unlock(&gb_timesync_svc_list_mutex);
