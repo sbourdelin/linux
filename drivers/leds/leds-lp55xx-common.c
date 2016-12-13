@@ -219,6 +219,7 @@ out:
 	release_firmware(chip->fw);
 }
 
+DECLARE_FW_CUSTOM_FALLBACK("Documentation/leds/leds-lp55xx.txt");
 static int lp55xx_request_firmware(struct lp55xx_chip *chip)
 {
 	const char *name = chip->cl->name;

@@ -586,6 +586,7 @@ static ssize_t read_rbu_image_type(struct file *filp, struct kobject *kobj,
 	return size;
 }
 
+DECLARE_FW_CUSTOM_FALLBACK("Documentation/dell_rbu.txt");
 static ssize_t write_rbu_image_type(struct file *filp, struct kobject *kobj,
 				    struct bin_attribute *bin_attr,
 				    char *buffer, loff_t pos, size_t count)
