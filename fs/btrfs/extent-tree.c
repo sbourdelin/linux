@@ -2588,6 +2588,7 @@ static noinline int __btrfs_run_delayed_refs(struct btrfs_trans_handle *trans,
 					if (must_insert_reserved)
 						locked_ref->must_insert_reserved = 1;
 					locked_ref->processing = 0;
+					delayed_refs->num_heads_ready++;
 					btrfs_debug(fs_info,
 						    "run_delayed_extent_op returned %d",
 						    ret);
