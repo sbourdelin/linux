@@ -7,5 +7,5 @@ config AF_KCM
 	---help---
 	  KCM (Kernel Connection Multiplexor) sockets provide a method
 	  for multiplexing messages of a message based application
-	  protocol over kernel connectons (e.g. TCP connections).
+	  protocol over kernel connections (e.g. TCP connections).
 
