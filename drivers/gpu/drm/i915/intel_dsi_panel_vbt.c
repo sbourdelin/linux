@@ -576,13 +576,20 @@ struct drm_panel *vbt_panel_init(struct intel_dsi *intel_dsi, u16 panel_id)
 	if (intel_dsi->dual_link) {
 		pclk = pclk / 2;
 
-		/* we can enable pixel_overlap if needed by panel. In this
-		 * case we need to increase the pixelclock for extra pixels
+		/*
+		 * In front-back mode the display is split vertically
+		 * and the first half of pixels are transmitted by the
+		 * first port, the second half by the second port. An
+		 * overlapping strip of pixels is transmitted by both
+		 * ports. The way this is specified is the number of
+		 * pixels each half is extended horizontally (ie,
+		 * pixel_overlap==1 actually means an overlap of two
+		 * pixels). Thus we do this after the division by 2,
+		 * otherwise we'd have to multiply the extra by two.
 		 */
 		if (intel_dsi->dual_link == DSI_DUAL_LINK_FRONT_BACK) {
-			pclk += DIV_ROUND_UP(mode->vtotal *
-						intel_dsi->pixel_overlap *
-						60, 1000);
+			pclk += DIV_ROUND_CLOSEST(intel_dsi->pixel_overlap *
+						  mode->clock, mode->htotal);
 		}
 	}
 
