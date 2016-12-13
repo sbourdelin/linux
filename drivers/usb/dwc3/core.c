@@ -667,6 +667,12 @@ static int dwc3_core_init(struct dwc3 *dwc)
 		goto err0;
 	}
 
+	/* Enable Undefined Length INCR Burst Type and Enable INCR16 Burst */
+	reg = dwc3_readl(dwc->regs, DWC3_GSBUSCFG0);
+	reg &= ~DWC3_GSBUSCFG0_INCRBRSTMASK;
+	reg |= DWC3_GSBUSCFG0_INCR16BRSTENA | DWC3_GSBUSCFG0_INCRBRSTENA;
+	dwc3_writel(dwc->regs, DWC3_GSBUSCFG0, reg);
+
 	/*
 	 * Write Linux Version Code to our GUID register so it's easy to figure
 	 * out which kernel version a bug was found.

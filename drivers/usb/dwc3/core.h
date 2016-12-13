@@ -161,6 +161,19 @@
 
 /* Bit fields */
 
+/* Global SoC Bus Configuration Register 0 */
+#define DWC3_GSBUSCFG0_DATABIGEND	(1 << 11)
+#define DWC3_GSBUSCFG0_DESCBIGEND	(1 << 10)
+#define DWC3_GSBUSCFG0_INCR256BRSTENA	(1 << 7)
+#define DWC3_GSBUSCFG0_INCR128BRSTENA	(1 << 6)
+#define DWC3_GSBUSCFG0_INCR64BRSTENA	(1 << 5)
+#define DWC3_GSBUSCFG0_INCR32BRSTENA	(1 << 4)
+#define DWC3_GSBUSCFG0_INCR16BRSTENA	(1 << 3)
+#define DWC3_GSBUSCFG0_INCR8BRSTENA	(1 << 2)
+#define DWC3_GSBUSCFG0_INCR4BRSTENA	(1 << 1)
+#define DWC3_GSBUSCFG0_INCRBRSTENA	(1 << 0)
+#define DWC3_GSBUSCFG0_INCRBRSTMASK	0xff
+
 /* Global Debug Queue/FIFO Space Available Register */
 #define DWC3_GDBGFIFOSPACE_NUM(n)	((n) & 0x1f)
 #define DWC3_GDBGFIFOSPACE_TYPE(n)	(((n) << 5) & 0x1e0)
