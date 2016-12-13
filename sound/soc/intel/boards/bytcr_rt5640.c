@@ -828,7 +828,9 @@ static int snd_byt_rt5640_mc_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev,
 				"Failed to get MCLK from pmc_plt_clk_3: %ld\n",
 				PTR_ERR(priv->mclk));
-			return PTR_ERR(priv->mclk);
+
+			/* Fall back to bitclock only */
+			byt_rt5640_quirk &= ~BYT_RT5640_MCLK_EN;
 		}
 	}
 
