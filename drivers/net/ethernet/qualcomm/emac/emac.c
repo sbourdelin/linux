@@ -627,11 +627,12 @@ static int emac_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_undo_netdev;
 
-	/* initialize clocks */
-	ret = emac_clks_phase1_init(pdev, adpt);
-	if (ret) {
-		dev_err(&pdev->dev, "could not initialize clocks\n");
-		goto err_undo_netdev;
+	if (!has_acpi_companion(&pdev->dev)) {
+		ret = emac_clks_phase1_init(pdev, adpt);
+		if (ret) {
+			dev_err(&pdev->dev, "could not initialize clocks\n");
+			goto err_undo_netdev;
+		}
 	}
 
 	netdev->watchdog_timeo = EMAC_WATCHDOG_TIME;
@@ -655,11 +656,12 @@ static int emac_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_undo_mdiobus;
 
-	/* enable clocks */
-	ret = emac_clks_phase2_init(pdev, adpt);
-	if (ret) {
-		dev_err(&pdev->dev, "could not initialize clocks\n");
-		goto err_undo_mdiobus;
+	if (!has_acpi_companion(&pdev->dev)) {
+		ret = emac_clks_phase2_init(pdev, adpt);
+		if (ret) {
+			dev_err(&pdev->dev, "could not initialize clocks\n");
+			goto err_undo_mdiobus;
+		}
 	}
 
 	emac_mac_reset(adpt);
