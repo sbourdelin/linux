@@ -54,12 +54,6 @@ int i915_gem_stolen_insert_node_in_range(struct drm_i915_private *dev_priv,
 	if (!drm_mm_initialized(&dev_priv->mm.stolen))
 		return -ENODEV;
 
-	/* See the comment at the drm_mm_init() call for more about this check.
-	 * WaSkipStolenMemoryFirstPage:bdw+ (incomplete)
-	 */
-	if (start < 4096 && INTEL_GEN(dev_priv) >= 8)
-		start = 4096;
-
 	mutex_lock(&dev_priv->mm.stolen_lock);
 	ret = drm_mm_insert_node_in_range(&dev_priv->mm.stolen, node, size,
 					  alignment, start, end,
@@ -286,6 +280,9 @@ void i915_gem_cleanup_stolen(struct drm_device *dev)
 	if (!drm_mm_initialized(&dev_priv->mm.stolen))
 		return;
 
+	if (drm_mm_node_allocated(&dev_priv->mm.first_page))
+		drm_mm_remove_node(&dev_priv->mm.first_page);
+
 	drm_mm_takedown(&dev_priv->mm.stolen);
 }
 
@@ -491,18 +488,17 @@ int i915_gem_init_stolen(struct drm_i915_private *dev_priv)
 
 	ggtt->stolen_usable_size = ggtt->stolen_size - reserved_total;
 
-	/*
-	 * Basic memrange allocator for stolen space.
-	 *
-	 * TODO: Notice that some platforms require us to not use the first page
-	 * of the stolen memory but their BIOSes may still put the framebuffer
-	 * on the first page. So we don't reserve this page for now because of
-	 * that. Our current solution is to just prevent new nodes from being
-	 * inserted on the first page - see the check we have at
-	 * i915_gem_stolen_insert_node_in_range(). We may want to fix the fbcon
-	 * problem later.
-	 */
+	/* Basic memrange allocator for stolen space. */
 	drm_mm_init(&dev_priv->mm.stolen, 0, ggtt->stolen_usable_size);
+
+	/* WaSkipStolenMemoryFirstPage:bdw+ */
+	if (INTEL_GEN(dev_priv) >= 8) {
+		dev_priv->mm.first_page.start = 0;
+		dev_priv->mm.first_page.size = 4096;
+		if (drm_mm_reserve_node(&dev_priv->mm.stolen,
+					&dev_priv->mm.first_page))
+			DRM_DEBUG_KMS("Failed to reserve the first page of stolen memory.\n");
+	}
 
 	return 0;
 }

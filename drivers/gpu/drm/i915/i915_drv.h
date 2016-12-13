@@ -1408,6 +1408,9 @@ struct i915_gem_mm {
 	/** LRU list of objects with fence regs on them. */
 	struct list_head fence_list;
 
+	/** First page of stolen, for platforms where it's reserved. */
+	struct drm_mm_node first_page;
+
 	/**
 	 * Are we in a non-interruptible section of code like
 	 * modesetting?
