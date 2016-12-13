@@ -37,8 +37,8 @@ static void *prism2_wep_init(int keyidx)
 	struct prism2_wep_data *priv;
 
 	priv = kzalloc(sizeof(*priv), GFP_ATOMIC);
-	if (priv == NULL)
-		goto fail;
+	if (!priv)
+		return NULL;
 	priv->key_idx = keyidx;
 
 	priv->tx_tfm = crypto_alloc_skcipher("ecb(arc4)", 0, CRYPTO_ALG_ASYNC);
