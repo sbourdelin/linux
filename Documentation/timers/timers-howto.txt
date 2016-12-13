@@ -93,6 +93,13 @@ NON-ATOMIC CONTEXT:
 			tolerances here are very situation specific, thus it
 			is left to the caller to determine a reasonable range.
 
+			A range of 0, that is usleep_range(100,100) or the
+			like, do not make sense as this code is in a
+			non-atomic section and a system can not be expected
+			to have jitter 0. For any non-RT code any delta
+			less than 50 microseconds probably is only preventing
+			timer subsystem optimization but providing no benefit.
+
 	SLEEPING FOR LARGER MSECS ( 10ms+ )
 		* Use msleep or possibly msleep_interruptible
 
