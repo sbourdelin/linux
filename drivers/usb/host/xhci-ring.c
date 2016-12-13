@@ -902,6 +902,7 @@ void xhci_stop_endpoint_command_watchdog(unsigned long arg)
 			xhci_kill_endpoint_urbs(xhci, i, j);
 	}
 	spin_unlock_irqrestore(&xhci->lock, flags);
+	xhci_cleanup_command_queue(xhci);
 	xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
 			"Calling usb_hc_died()");
 	usb_hc_died(xhci_to_hcd(xhci));
