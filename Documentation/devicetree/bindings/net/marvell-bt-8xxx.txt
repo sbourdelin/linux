@@ -1,4 +1,4 @@
-Marvell 8897/8997 (sd8897/sd8997) bluetooth SDIO devices
+Marvell 8897/8997 (sd8897/sd8997) bluetooth devices (SDIO or USB based)
 ------
 
 Required properties:
@@ -6,11 +6,13 @@ Required properties:
   - compatible : should be one of the following:
 	* "marvell,sd8897-bt"
 	* "marvell,sd8997-bt"
+	* "usb1286,204e"
 
 Optional properties:
 
   - marvell,cal-data: Calibration data downloaded to the device during
 		      initialization. This is an array of 28 values(u8).
+		      This is only applicable to SDIO devices.
 
   - marvell,wakeup-pin: It represents wakeup pin number of the bluetooth chip.
 		        firmware will use the pin to wakeup host system (u16).
@@ -29,7 +31,9 @@ Example:
 IRQ pin 119 is used as system wakeup source interrupt.
 wakeup pin 13 and gap 100ms are configured so that firmware can wakeup host
 using this device side pin and wakeup latency.
-calibration data is also available in below example.
+
+Example for SDIO device follows (calibration data is also available in
+below example).
 
 &mmc3 {
 	status = "okay";
@@ -53,4 +57,21 @@ calibration data is also available in below example.
 		marvell,wakeup-pin = /bits/ 16 <0x0d>;
 		marvell,wakeup-gap-ms = /bits/ 16 <0x64>;
 	};
+};
+
+Example for USB device:
+
+&usb_host1_ohci {
+    status = "okay";
+    #address-cells = <1>;
+    #size-cells = <0>;
+
+    mvl_bt1: bt@1 {
+	compatible = "usb1286,204e";
+	reg = <1>;
+	interrupt-parent = <&gpio0>;
+	interrupts = <119 IRQ_TYPE_LEVEL_LOW>;
+	marvell,wakeup-pin = /bits/ 16 <0x0d>;
+	marvell,wakeup-gap-ms = /bits/ 16 <0x64>;
+    };
 };
