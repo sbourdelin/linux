@@ -29,6 +29,14 @@ config MACB
 	  support for the MACB/GEM chip.
 
 	  To compile this driver as a module, choose M here: the module
-	  will be called macb.
+	  will be called cadence-macb.
+
+config MACB_USE_HWSTAMP
+	bool "Use IEEE 1588 hwstamp"
+	depends on MACB
+	default y
+	select PTP_1588_CLOCK
+	---help---
+	  Enable IEEE 1588 Precision Time Protocol (PTP) support for MACB.
 
 endif # NET_CADENCE
