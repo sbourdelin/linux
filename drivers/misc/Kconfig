@@ -772,6 +772,15 @@ config FLEXCARD_MISC
 	help
 	  Misc driver for Flexcard PMC II.
 
+config FLEXCARD_PCLOCK
+	tristate "Flexcard posix clock Function driver"
+	depends on MFD_FLEXCARD
+	help
+	  This is the posix clock function driver for the
+	  Eberspaecher Flexcard PMC II carrier board. The
+	  Flexcard provide a Flexray synchronized counter
+	  configurable at 1, 10 or 100MHz.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

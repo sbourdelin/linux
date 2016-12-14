@@ -304,6 +304,7 @@ config MFD_FLEXCARD
 	select MFD_CORE
 	select IRQ_DOMAIN
 	select FLEXCARD_MISC
+	select FLEXCARD_PCLOCK
 	depends on PCI
 	help
 	  This is the core driver for the Eberspaecher Flexcard
