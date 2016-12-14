@@ -564,7 +564,6 @@ if_sendbuf(int id, int channel, int ack, struct sk_buff *skb)
 	return -ENODEV;
 }
 
-
 /*
  * Allocate a new card-struct, initialize it
  * link it into cards-list.
