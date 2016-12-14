@@ -262,6 +262,7 @@
 #include <linux/syscalls.h>
 #include <linux/completion.h>
 #include <linux/uuid.h>
+#include <linux/siphash.h>
 #include <crypto/chacha20.h>
 
 #include <asm/processor.h>
@@ -2042,7 +2043,7 @@ struct ctl_table random_table[] = {
 };
 #endif 	/* CONFIG_SYSCTL */
 
-static u32 random_int_secret[MD5_MESSAGE_BYTES / 4] ____cacheline_aligned;
+static u8 random_int_secret[SIPHASH24_KEY_LEN];
 
 int random_int_secret_init(void)
 {
@@ -2050,8 +2051,7 @@ int random_int_secret_init(void)
 	return 0;
 }
 
-static DEFINE_PER_CPU(__u32 [MD5_DIGEST_WORDS], get_random_int_hash)
-		__aligned(sizeof(unsigned long));
+static DEFINE_PER_CPU(u64, get_random_int_chaining);
 
 /*
  * Get a random word for internal kernel use only. Similar to urandom but
@@ -2061,19 +2061,25 @@ static DEFINE_PER_CPU(__u32 [MD5_DIGEST_WORDS], get_random_int_hash)
  */
 unsigned int get_random_int(void)
 {
-	__u32 *hash;
 	unsigned int ret;
+	struct {
+		u64 chaining;
+		unsigned long ts;
+		unsigned long entropy;
+		pid_t pid;
+	} __packed combined;
+	u64 *chaining;
 
 	if (arch_get_random_int(&ret))
 		return ret;
 
-	hash = get_cpu_var(get_random_int_hash);
-
-	hash[0] += current->pid + jiffies + random_get_entropy();
-	md5_transform(hash, random_int_secret);
-	ret = hash[0];
-	put_cpu_var(get_random_int_hash);
-
+	chaining = get_cpu_ptr(&get_random_int_chaining);
+	combined.chaining = *chaining;
+	combined.ts = jiffies;
+	combined.entropy = random_get_entropy();
+	combined.pid = current->pid;
+	ret = *chaining = siphash24((u8 *)&combined, sizeof(combined), random_int_secret);
+	put_cpu_ptr(chaining);
 	return ret;
 }
 EXPORT_SYMBOL(get_random_int);
@@ -2083,19 +2089,25 @@ EXPORT_SYMBOL(get_random_int);
  */
 unsigned long get_random_long(void)
 {
-	__u32 *hash;
 	unsigned long ret;
+	struct {
+		u64 chaining;
+		unsigned long ts;
+		unsigned long entropy;
+		pid_t pid;
+	} __packed combined;
+	u64 *chaining;
 
 	if (arch_get_random_long(&ret))
 		return ret;
 
-	hash = get_cpu_var(get_random_int_hash);
-
-	hash[0] += current->pid + jiffies + random_get_entropy();
-	md5_transform(hash, random_int_secret);
-	ret = *(unsigned long *)hash;
-	put_cpu_var(get_random_int_hash);
-
+	chaining = get_cpu_ptr(&get_random_int_chaining);
+	combined.chaining = *chaining;
+	combined.ts = jiffies;
+	combined.entropy = random_get_entropy();
+	combined.pid = current->pid;
+	ret = *chaining = siphash24((u8 *)&combined, sizeof(combined), random_int_secret);
+	put_cpu_ptr(chaining);
 	return ret;
 }
 EXPORT_SYMBOL(get_random_long);
