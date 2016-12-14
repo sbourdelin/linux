@@ -203,6 +203,7 @@ static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 	char *buffer;
 	int r;
 	const unsigned size = 8;
+	u8 lcr;
 
 	buffer = kmalloc(size, GFP_KERNEL);
 	if (!buffer)
@@ -218,12 +219,12 @@ static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 	if (r < 0)
 		goto out;
 
-	/* expect two bytes 0x56 0x00 */
-	r = ch341_control_in(dev, CH341_REQ_READ_REG, 0x2518, 0, buffer, size);
-	if (r < 0)
-		goto out;
-
-	r = ch341_control_out(dev, CH341_REQ_WRITE_REG, 0x2518, 0x0050);
+	/*
+	 * Some CH340 devices appear unable to change the initial LCR
+	 * settings, so set a sane 8N1 default.
+	 */
+	lcr = CH341_LCR_ENABLE_RX | CH341_LCR_ENABLE_TX | CH341_LCR_CS8;
+	r = ch341_control_out(dev, CH341_REQ_WRITE_REG, 0x2518, lcr);
 	if (r < 0)
 		goto out;
 
@@ -232,7 +233,7 @@ static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 	if (r < 0)
 		goto out;
 
-	r = ch341_init_set_baudrate(dev, priv, 0);
+	r = ch341_init_set_baudrate(dev, priv, lcr);
 	if (r < 0)
 		goto out;
 
