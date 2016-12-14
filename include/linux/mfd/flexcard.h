@@ -94,6 +94,7 @@ struct fc_bar0 {
 } __packed;
 
 struct flexcard_device {
+	unsigned int cardnr;
 	struct pci_dev *pdev;
 	struct fc_bar0 __iomem *bar0;
 	struct mfd_cell *cells;

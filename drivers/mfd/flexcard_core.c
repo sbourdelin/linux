@@ -11,6 +11,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/ioport.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pci.h>
@@ -25,10 +26,47 @@
 #define FLEXCARD_FR_OFFSET	0x4000
 #define FLEXCARD_FR_SIZE	0x2000
 
+#define FLEXCARD_CONF_START	0x000
+#define FLEXCARD_CONF_SIZE	0x13F
+#define FLEXCARD_NF_START	0x170
+#define FLEXCARD_NF_SIZE	0x7
+
+static DEFINE_IDA(flexcard_ida);
+
+static struct resource flexcard_misc_res[] = {
+	DEFINE_RES_MEM_NAMED(FLEXCARD_CONF_START,
+			     FLEXCARD_CONF_SIZE,
+			     "flexcard-conf"),
+	DEFINE_RES_MEM_NAMED(FLEXCARD_NF_START,
+			     FLEXCARD_NF_SIZE,
+			     "flexcard-nf"),
+};
+
+static struct mfd_cell flexcard_misc_dev[] = {
+	{
+		.name = "flexcard-misc",
+		.num_resources = ARRAY_SIZE(flexcard_misc_res),
+		.resources = flexcard_misc_res,
+	},
+};
+
 enum flexcard_cell_id {
 	FLEXCARD_CELL_CAN,
 	FLEXCARD_CELL_FLEXRAY,
 };
+
+static int flexcard_misc_setup(struct flexcard_device *priv)
+{
+	struct pci_dev *pdev = priv->pdev;
+
+	flexcard_misc_dev[0].id = priv->cardnr;
+	flexcard_misc_res[0].parent = &pdev->resource[0];
+	flexcard_misc_res[1].parent = &pdev->resource[0];
+
+	return mfd_add_devices(&pdev->dev, 0, flexcard_misc_dev,
+			       ARRAY_SIZE(flexcard_misc_dev),
+			       &pdev->resource[0], 0, NULL);
+}
 
 static int flexcard_tiny_can(struct flexcard_device *priv,
 			     int idx, int id, u32 offset)
@@ -163,10 +201,23 @@ static int flexcard_probe(struct pci_dev *pdev,
 	fw_ver.reg = readl(&priv->bar0->conf.fc_fw_ver);
 	hw_ver.reg = readl(&priv->bar0->conf.fc_hw_ver);
 
+	ret = ida_simple_get(&flexcard_ida, 0, 0, GFP_KERNEL);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "could not get new Flexcard id:%d\n", ret);
+		goto out_unmap;
+	}
+	priv->cardnr = ret;
+
 	ret = flexcard_tiny_probe(priv);
 	if (ret) {
 		dev_err(&pdev->dev, "unable to probe tinys: %d", ret);
-		goto out_unmap;
+		goto out_ida;
+	}
+
+	ret = flexcard_misc_setup(priv);
+	if (ret) {
+		dev_err(&pdev->dev, "unable to probe tinys: %d", ret);
+		goto out_mfd_dev_remove;
 	}
 
 	dev_info(&pdev->dev, "HW %02x.%02x.%02x FW %02x.%02x.%02x\n",
@@ -175,6 +226,10 @@ static int flexcard_probe(struct pci_dev *pdev,
 
 	return 0;
 
+out_mfd_dev_remove:
+	mfd_remove_devices(&pdev->dev);
+out_ida:
+	ida_simple_remove(&flexcard_ida, priv->cardnr);
 out_unmap:
 	iounmap(priv->bar0);
 out_release:
@@ -190,6 +245,7 @@ static void flexcard_remove(struct pci_dev *pdev)
 	struct flexcard_device *priv = pci_get_drvdata(pdev);
 
 	mfd_remove_devices(&pdev->dev);
+	ida_simple_remove(&flexcard_ida, priv->cardnr);
 	iounmap(priv->bar0);
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);
