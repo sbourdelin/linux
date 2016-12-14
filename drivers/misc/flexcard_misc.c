@@ -31,6 +31,183 @@ struct flexcard_misc {
 	struct fc_bar0_nf __iomem	*nf;
 };
 
+static ssize_t fw_version_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+	union {
+		struct fc_version ver;
+		u32 reg;
+	} fw_ver;
+
+	fw_ver.reg = readl(&priv->conf->fc_fw_ver);
+	return sprintf(buf, "%02x.%02x.%02x\n",
+		       fw_ver.ver.maj, fw_ver.ver.min, fw_ver.ver.dev);
+}
+static DEVICE_ATTR_RO(fw_version);
+
+static ssize_t hw_version_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+	union {
+		struct fc_version ver;
+		u32 reg;
+	} hw_ver;
+
+	hw_ver.reg = readl(&priv->conf->fc_hw_ver);
+	return sprintf(buf, "%02x.%02x.%02x\n",
+		       hw_ver.ver.maj, hw_ver.ver.min, hw_ver.ver.dev);
+}
+static DEVICE_ATTR_RO(hw_version);
+
+static ssize_t serialno_show(struct device *dev,
+			     struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+	u64 fc_sn;
+
+	fc_sn = readq(&priv->conf->fc_sn);
+	return sprintf(buf, "%lld\n", fc_sn);
+}
+static DEVICE_ATTR_RO(serialno);
+
+static ssize_t tiny_stat_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+
+	return sprintf(buf, "0x%x\n", readl(&priv->conf->tiny_stat));
+}
+static DEVICE_ATTR_RO(tiny_stat);
+
+static ssize_t can_dat_show(struct device *dev,
+			    struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", readl(&priv->conf->can_dat_cnt));
+}
+static DEVICE_ATTR_RO(can_dat);
+
+static ssize_t can_err_show(struct device *dev,
+			    struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", readl(&priv->conf->can_err_cnt));
+}
+static DEVICE_ATTR_RO(can_err);
+
+static ssize_t fc_data_show(struct device *dev,
+			    struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", readl(&priv->conf->fc_data_cnt));
+}
+static DEVICE_ATTR_RO(fc_data);
+
+static ssize_t fr_rx_show(struct device *dev,
+			    struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", readl(&priv->conf->fr_rx_cnt));
+}
+static DEVICE_ATTR_RO(fr_rx);
+
+static ssize_t fr_tx_show(struct device *dev,
+			    struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", readl(&priv->conf->fr_tx_cnt));
+}
+static DEVICE_ATTR_RO(fr_tx);
+
+static ssize_t nmv_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", readl(&priv->conf->nmv_cnt));
+}
+static DEVICE_ATTR_RO(nmv);
+
+static ssize_t info_show(struct device *dev,
+			 struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", readl(&priv->conf->info_cnt));
+}
+static DEVICE_ATTR_RO(info);
+
+static ssize_t stat_trg_show(struct device *dev,
+			     struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", readl(&priv->conf->stat_trg_cnt));
+}
+static DEVICE_ATTR_RO(stat_trg);
+
+static ssize_t nf_show(struct device *dev,
+		       struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", readl(&priv->nf->nf_cnt));
+}
+static DEVICE_ATTR_RO(nf);
+
+static ssize_t uid_store(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t count)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+	u32 uid;
+	int ret;
+
+	ret = kstrtou32(buf, 0, &uid);
+	if (ret)
+		return ret;
+
+	writel(uid, &priv->conf->fc_uid);
+	return count;
+}
+
+static ssize_t uid_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct flexcard_misc *priv = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%u\n", readl(&priv->conf->fc_uid));
+}
+static DEVICE_ATTR(uid, 0644, uid_show, uid_store);
+
+static struct attribute *flexcard_misc_dev_attrs[] = {
+	&dev_attr_fw_version.attr,
+	&dev_attr_hw_version.attr,
+	&dev_attr_serialno.attr,
+	&dev_attr_tiny_stat.attr,
+	&dev_attr_can_dat.attr,
+	&dev_attr_can_err.attr,
+	&dev_attr_fc_data.attr,
+	&dev_attr_fr_rx.attr,
+	&dev_attr_fr_tx.attr,
+	&dev_attr_nmv.attr,
+	&dev_attr_info.attr,
+	&dev_attr_stat_trg.attr,
+	&dev_attr_nf.attr,
+	&dev_attr_uid.attr,
+	NULL,
+};
+
+static const struct attribute_group flexcard_misc_dev_group = {
+	.attrs = flexcard_misc_dev_attrs,
+};
+
 static int flexcard_misc_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	unsigned long offset, vsize, psize, addr;
@@ -109,6 +286,7 @@ out:
 static int flexcard_misc_probe(struct platform_device *pdev)
 {
 	struct flexcard_misc *priv;
+	struct device *this_device;
 	int ret;
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
@@ -137,13 +315,31 @@ static int flexcard_misc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	this_device = priv->dev.this_device;
+	dev_set_drvdata(this_device, priv);
+
+	ret = sysfs_create_group(&this_device->kobj,
+				 &flexcard_misc_dev_group);
+	if (ret) {
+		dev_err(&pdev->dev,
+			"failed to create sysfs attributes: %d\n", ret);
+		goto out;
+	}
+
 	return 0;
+
+out:
+	misc_deregister(&priv->dev);
+	return ret;
 }
 
 static int flexcard_misc_remove(struct platform_device *pdev)
 {
 	struct flexcard_misc *priv = platform_get_drvdata(pdev);
+	struct device *this_device = priv->dev.this_device;
 
+	sysfs_remove_group(&this_device->kobj,
+			   &flexcard_misc_dev_group);
 	misc_deregister(&priv->dev);
 
 	return 0;
