@@ -28,10 +28,31 @@
 
 #define FLEXCARD_CONF_START	0x000
 #define FLEXCARD_CONF_SIZE	0x13F
+#define FLEXCARD_CLKRST_START	0x144
+#define FLEXCARD_CLKRST_SIZE	0x3
 #define FLEXCARD_NF_START	0x170
 #define FLEXCARD_NF_SIZE	0x7
+#define FLEXCARD_CLK_START	0x700
+#define FLEXCARD_CLK_SIZE	0x13
 
 static DEFINE_IDA(flexcard_ida);
+
+static struct resource flexcard_clk_res[] = {
+	DEFINE_RES_MEM_NAMED(FLEXCARD_CLK_START,
+			     FLEXCARD_CLK_SIZE,
+			     "flexcard-clock"),
+	DEFINE_RES_MEM_NAMED(FLEXCARD_CLKRST_START,
+			     FLEXCARD_CLKRST_SIZE,
+			     "flexcard-clock-reset"),
+};
+
+static struct mfd_cell flexcard_clk_dev[] = {
+	{
+		.name = "flexcard-clock",
+		.num_resources = ARRAY_SIZE(flexcard_clk_res),
+		.resources = flexcard_clk_res,
+	},
+};
 
 static struct resource flexcard_misc_res[] = {
 	DEFINE_RES_MEM_NAMED(FLEXCARD_CONF_START,
@@ -54,6 +75,19 @@ enum flexcard_cell_id {
 	FLEXCARD_CELL_CAN,
 	FLEXCARD_CELL_FLEXRAY,
 };
+
+static int flexcard_clk_setup(struct flexcard_device *priv)
+{
+	struct pci_dev *pdev = priv->pdev;
+
+	flexcard_clk_dev[0].id = priv->cardnr;
+	flexcard_clk_res[0].parent = &pdev->resource[0];
+	flexcard_clk_res[1].parent = &pdev->resource[0];
+
+	return mfd_add_devices(&pdev->dev, 0, flexcard_clk_dev,
+			       ARRAY_SIZE(flexcard_clk_dev),
+			       &pdev->resource[0], 0, NULL);
+}
 
 static int flexcard_misc_setup(struct flexcard_device *priv)
 {
@@ -217,6 +251,12 @@ static int flexcard_probe(struct pci_dev *pdev,
 	ret = flexcard_misc_setup(priv);
 	if (ret) {
 		dev_err(&pdev->dev, "unable to probe tinys: %d", ret);
+		goto out_mfd_dev_remove;
+	}
+
+	ret = flexcard_clk_setup(priv);
+	if (ret) {
+		dev_err(&pdev->dev, "unable to register clksrc: %d\n", ret);
 		goto out_mfd_dev_remove;
 	}
 
