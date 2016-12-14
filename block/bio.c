@@ -648,6 +648,30 @@ struct bio *bio_clone_fast(struct bio *bio, gfp_t gfp_mask, struct bio_set *bs)
 EXPORT_SYMBOL(bio_clone_fast);
 
 /**
+ *	bio_set_task_prio - set bio's ioprio to task's ioprio, if any.
+ *	@bio: bio to set the ioprio of, can be NULL
+ *	@task: task of interest
+ *	@gfp_flags: allocation flags, used if allocation is necessary
+ *	@node: allocation node, used if allocation is necessary
+ */
+void bio_set_task_prio(struct bio *bio, struct task_struct *task,
+		       gfp_t gfp_flags, int node)
+{
+	struct io_context *ioc;
+
+	if (!bio)
+		return;
+
+	ioc = get_task_io_context(current, gfp_flags, node);
+	if (ioc) {
+		if (ioprio_valid(ioc->ioprio))
+			bio_set_prio(bio, ioc->ioprio);
+		put_io_context(ioc);
+	}
+}
+EXPORT_SYMBOL(bio_set_task_prio);
+
+/**
  *	bio_add_pc_page	-	attempt to add page to bio
  *	@q: the target queue
  *	@bio: destination bio

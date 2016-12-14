@@ -46,6 +46,8 @@
 
 #define bio_prio(bio)			(bio)->bi_ioprio
 #define bio_set_prio(bio, prio)		((bio)->bi_ioprio = prio)
+extern void bio_set_task_prio(struct bio *bio, struct task_struct *task,
+			      gfp_t gfp_flags, int node);
 
 #define bio_iter_iovec(bio, iter)				\
 	bvec_iter_bvec((bio)->bi_io_vec, (iter))

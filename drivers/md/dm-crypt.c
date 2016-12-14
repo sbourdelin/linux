@@ -1548,6 +1548,7 @@ static void clone_init(struct dm_crypt_io *io, struct bio *clone)
 	clone->bi_private = io;
 	clone->bi_end_io  = crypt_endio;
 	bio_set_dev(clone, cc->dev->bdev);
+	bio_set_prio(clone, bio_prio(io->base_bio));
 	clone->bi_opf	  = io->base_bio->bi_opf;
 }
 
@@ -2916,10 +2917,20 @@ static int crypt_map(struct dm_target *ti, struct bio *bio)
 		io->ctx.r.req = (struct skcipher_request *)(io + 1);
 
 	if (bio_data_dir(io->base_bio) == READ) {
-		if (kcryptd_io_read(io, GFP_NOWAIT))
+		if (kcryptd_io_read(io, GFP_NOWAIT)) {
+			if (!ioprio_valid(bio_prio(io->base_bio))) {
+				bio_set_task_prio(io->base_bio, current,
+						  GFP_NOIO, NUMA_NO_NODE);
+			}
 			kcryptd_queue_read(io);
-	} else
+		}
+	} else {
+		if (!ioprio_valid(bio_prio(io->base_bio))) {
+			bio_set_task_prio(io->base_bio, current,
+					  GFP_NOIO, NUMA_NO_NODE);
+		}
 		kcryptd_queue_crypt(io);
+	}
 
 	return DM_MAPIO_SUBMITTED;
 }
