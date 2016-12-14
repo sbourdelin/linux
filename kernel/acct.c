@@ -446,7 +446,7 @@ static void fill_ac(acct_t *ac)
 #endif
 	do_div(elapsed, AHZ);
 	ac->ac_btime = get_seconds() - elapsed;
-#if ACCT_VERSION==2
+#if ACCT_VERSION == 2
 	ac->ac_ahz = AHZ;
 #endif
 
