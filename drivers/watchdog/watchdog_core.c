@@ -38,6 +38,7 @@
 #include <linux/idr.h>		/* For ida_* macros */
 #include <linux/err.h>		/* For IS_ERR macros */
 #include <linux/of.h>		/* For of_get_timeout_sec */
+#include <linux/property.h>	/* For device_property_read_u32 */
 
 #include "watchdog_core.h"	/* For watchdog_dev_register/... */
 
@@ -191,6 +192,19 @@ void watchdog_set_restart_priority(struct watchdog_device *wdd, int priority)
 }
 EXPORT_SYMBOL_GPL(watchdog_set_restart_priority);
 
+static void
+watchdog_set_open_timeout(struct watchdog_device *wdd)
+{
+	u32 t;
+	struct device *dev;
+
+	dev = wdd->parent;
+	if (dev && !device_property_read_u32(dev, "open-timeout", &t))
+		wdd->open_timeout = t;
+	else
+		wdd->open_timeout = CONFIG_WATCHDOG_OPEN_TIMEOUT;
+}
+
 static int __watchdog_register_device(struct watchdog_device *wdd)
 {
 	int ret, id = -1;
@@ -224,6 +238,8 @@ static int __watchdog_register_device(struct watchdog_device *wdd)
 	if (id < 0)
 		return id;
 	wdd->id = id;
+
+	watchdog_set_open_timeout(wdd);
 
 	ret = watchdog_dev_register(wdd);
 	if (ret) {
