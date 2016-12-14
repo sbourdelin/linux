@@ -16,6 +16,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/platform_device.h>
+#include <linux/uio_driver.h>
 
 #include <linux/mfd/core.h>
 #include <linux/mfd/flexcard.h>
@@ -46,6 +47,46 @@
 #define DMA_MIN_FW_MAJOR	6
 #define DMA_MIN_FW_MINOR	4
 #define DMA_MIN_FW_UPDATE	0
+
+#define FLEXCARD_IRQ_CC1CCYS_OFF	0
+#define FLEXCARD_IRQ_CC2CCYS_OFF	1
+#define FLEXCARD_IRQ_CC3CCYS_OFF	2
+#define FLEXCARD_IRQ_CC4CCYS_OFF	3
+#define FLEXCARD_IRQ_WAKE4A_OFF		4
+#define FLEXCARD_IRQ_WAKE4B_OFF		5
+#define FLEXCARD_IRQ_WAKE3A_OFF		6
+#define FLEXCARD_IRQ_WAKE3B_OFF		7
+#define FLEXCARD_IRQ_WAKE2A_OFF		8
+#define FLEXCARD_IRQ_WAKE2B_OFF		9
+#define FLEXCARD_IRQ_WAKE1A_OFF		10
+#define FLEXCARD_IRQ_WAKE1B_OFF		11
+#define FLEXCARD_IRQ_CC1T0_OFF		12
+#define FLEXCARD_IRQ_CC2T0_OFF		13
+#define FLEXCARD_IRQ_CC3T0_OFF		14
+#define FLEXCARD_IRQ_CC4T0_OFF		15
+
+#define flexcard_irq_resource(irq_name)					\
+	static struct resource flexcard_irq_res_##irq_name = {		\
+		.name = __stringify(fc_irq_##irq_name##_off),		\
+		.start  = FLEXCARD_IRQ_##irq_name##_OFF,		\
+		.end  = FLEXCARD_IRQ_##irq_name##_OFF,			\
+		.flags  = IORESOURCE_IRQ,				\
+	};								\
+									\
+	static struct uio_info flexcard_irq_pdata_##irq_name = {	\
+		.name   = __stringify(irq_name),			\
+		.version = "0",						\
+	}
+
+#define flexcard_irq_cell(irq_name, irq_id)				\
+	{								\
+		.id = irq_id,						\
+		.name = "uio_pdrv_genirq",				\
+		.platform_data = &flexcard_irq_pdata_##irq_name,	\
+		.pdata_size = sizeof(flexcard_irq_pdata_##irq_name),	\
+		.num_resources = 1,					\
+		.resources = &flexcard_irq_res_##irq_name		\
+	}
 
 static DEFINE_IDA(flexcard_ida);
 
@@ -162,6 +203,42 @@ out:
 
 	return 0;
 }
+
+flexcard_irq_resource(CC1CCYS);
+flexcard_irq_resource(CC2CCYS);
+flexcard_irq_resource(CC3CCYS);
+flexcard_irq_resource(CC4CCYS);
+flexcard_irq_resource(WAKE4A);
+flexcard_irq_resource(WAKE4B);
+flexcard_irq_resource(WAKE3A);
+flexcard_irq_resource(WAKE3B);
+flexcard_irq_resource(WAKE2A);
+flexcard_irq_resource(WAKE2B);
+flexcard_irq_resource(WAKE1A);
+flexcard_irq_resource(WAKE1B);
+flexcard_irq_resource(CC1T0);
+flexcard_irq_resource(CC2T0);
+flexcard_irq_resource(CC3T0);
+flexcard_irq_resource(CC4T0);
+
+static struct mfd_cell flexcard_uio_dev[] = {
+	flexcard_irq_cell(CC3CCYS, 0),
+	flexcard_irq_cell(CC4CCYS, 1),
+	flexcard_irq_cell(WAKE4A, 2),
+	flexcard_irq_cell(WAKE4B, 3),
+	flexcard_irq_cell(WAKE3A, 4),
+	flexcard_irq_cell(WAKE3B, 5),
+	flexcard_irq_cell(WAKE2A, 6),
+	flexcard_irq_cell(WAKE2B, 7),
+	flexcard_irq_cell(WAKE1A, 8),
+	flexcard_irq_cell(WAKE1B, 9),
+	flexcard_irq_cell(CC1CCYS, 10),
+	flexcard_irq_cell(CC2CCYS, 11),
+	flexcard_irq_cell(CC1T0, 12),
+	flexcard_irq_cell(CC2T0, 13),
+	flexcard_irq_cell(CC3T0, 14),
+	flexcard_irq_cell(CC4T0, 15),
+};
 
 static int flexcard_tiny_can(struct flexcard_device *priv,
 			     int idx, int id, u32 offset)
@@ -331,6 +408,14 @@ static int flexcard_probe(struct pci_dev *pdev,
 	ret = flexcard_add_dma(priv);
 	if (ret) {
 		dev_err(&pdev->dev, "unable to add DMA device: %d", ret);
+		goto out_mfd_dev_remove;
+	}
+
+	ret = mfd_add_devices(&pdev->dev, 0, flexcard_uio_dev,
+			      ARRAY_SIZE(flexcard_uio_dev),
+			      NULL, 0, priv->irq_domain);
+	if (ret) {
+		dev_err(&pdev->dev, "unable to add irq UIO devices: %d", ret);
 		goto out_mfd_dev_remove;
 	}
 
