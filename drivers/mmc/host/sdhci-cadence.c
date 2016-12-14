@@ -262,6 +262,7 @@ disable_clk:
 }
 
 static const struct of_device_id sdhci_cdns_match[] = {
+	{ .compatible = "socionext,sd4hc" },
 	{ .compatible = "cdns,sd4hc" },
 	{ /* sentinel */ }
 };
