@@ -303,6 +303,7 @@ config MFD_FLEXCARD
 	tristate "Eberspaecher Flexcard PMC II Carrier Board"
 	select MFD_CORE
 	select IRQ_DOMAIN
+	select FLEXCARD_DMA
 	select FLEXCARD_MISC
 	select FLEXCARD_PCLOCK
 	depends on PCI

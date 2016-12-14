@@ -109,4 +109,8 @@ struct flexcard_device {
 int flexcard_setup_irq(struct pci_dev *pdev);
 void flexcard_remove_irq(struct pci_dev *pdev);
 
+int flexcard_register_rx_cb(int cc, void *priv,
+			    int (*rx_cb)(void *priv, void *data, size_t len));
+void flexcard_unregister_rx_cb(int cc);
+
 #endif /* _LINUX_FLEXCARD_H */

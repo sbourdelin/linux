@@ -40,6 +40,15 @@ config ASYNC_TX_ENABLE_CHANNEL_SWITCH
 config ARCH_HAS_ASYNC_TX_FIND_CHANNEL
 	bool
 
+config FLEXCARD_DMA
+	tristate "DMA support for Eberspaecher Flexcard PMC II Carrier Board"
+	depends on MFD_FLEXCARD
+	help
+	  The Eberspaecher Flexcard PMC (PCI Mezzanine Card) II carrier
+	  board support one DMA capable receive ringbuffer for all devices.
+	  A card specific protocol is used to multiplex the received packets
+	  through the ringbuffer. Enable DMA and Packet parser.
+
 config DMA_ENGINE
 	bool
 
