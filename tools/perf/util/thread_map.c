@@ -89,6 +89,39 @@ struct thread_map *thread_map__new_by_tid(pid_t tid)
 	return threads;
 }
 
+static bool is_zombie_process(pid_t pid)
+{
+	char filename[PATH_MAX];
+	char comm[PATH_MAX];
+	char bf[BUFSIZ];
+	char s_state;
+	int s_pid;
+	FILE *fp;
+	ssize_t n;
+
+	snprintf(filename, sizeof(filename), "/proc/%d/stat", pid);
+	fp = fopen(filename, "r");
+	if (!fp) {
+		pr_warning("couldn't open %s\n", filename);
+		return false;
+	}
+	if (fgets(bf, sizeof(bf), fp) == NULL) {
+		pr_warning("Couldn't read stat for pid %d\n", pid);
+		fclose(fp);
+		return false;
+	}
+	fclose(fp);
+
+	n = sscanf(bf, "%d %s %c ", &s_pid, comm, &s_state);
+	if (n < 3)
+		return false;
+
+	if (s_state == 'Z')
+		return true;
+
+	return false;
+}
+
 struct thread_map *thread_map__new_by_uid(uid_t uid)
 {
 	DIR *proc;
@@ -122,6 +155,9 @@ struct thread_map *thread_map__new_by_uid(uid_t uid)
 			continue;
 
 		if (st.st_uid != uid)
+			continue;
+
+		if (is_zombie_process(pid))
 			continue;
 
 		snprintf(path, sizeof(path), "/proc/%d/task", pid);
