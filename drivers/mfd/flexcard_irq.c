@@ -23,6 +23,12 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/flexcard.h>
 
+/*
+ * Bit 31 in dma interrupt register:
+ * DMA interrupt enable. Must be 1 to enable the DMA interrupts
+ */
+#define FLEXCARD_DMA_IRER_DIRE		(1U << 31)
+
 struct fc_irq_tab {
 	u32 mskcache;
 	u32 mskoffs;
@@ -49,12 +55,20 @@ struct fc_irq_tab {
 #define DEVACK_OFFS	offsetof(struct fc_bar0, conf.irs)
 #define DEVMSK_CACHE	offsetof(struct flexcard_device, dev_irqmsk)
 
+#define DMAMSK_OFFS	offsetof(struct fc_bar0, dma.dma_irer)
+#define DMAACK_OFFS	offsetof(struct fc_bar0, dma.dma_irsr)
+#define DMAMSK_CACHE	offsetof(struct flexcard_device, dma_irqmsk)
+
 #define dev_to_irq_tab_ack(s, m, a)				\
 		to_irq_tab_ack(s, DEVMSK_CACHE, DEVMSK_OFFS, m,	\
 			       DEVACK_OFFS, a)
 
 #define dev_to_irq_tab(s, m)				\
 		to_irq_tab(s, DEVMSK_CACHE, DEVMSK_OFFS, m)
+
+#define dma_to_irq_tab_ack(s, m, a)				\
+		to_irq_tab_ack(s, DMAMSK_CACHE, DMAMSK_OFFS, m,	\
+			       DMAACK_OFFS, a)
 
 static const struct fc_irq_tab flexcard_irq_tab[] = {
 	/* Device Interrupts */
@@ -75,6 +89,11 @@ static const struct fc_irq_tab flexcard_irq_tab[] = {
 	dev_to_irq_tab(3, 14),		/* CC2T0  */
 	dev_to_irq_tab(24, 16),		/* CC3T0  */
 	dev_to_irq_tab(20, 17),		/* CC4T0  */
+	/* DMA Interrupts */
+	dma_to_irq_tab_ack(0, 0, 0),	/* DMA_C0 */
+	dma_to_irq_tab_ack(1, 1, 1),	/* DMA_TE */
+	dma_to_irq_tab_ack(4, 4, 4),	/* DMA_TI */
+	dma_to_irq_tab_ack(5, 5, 5),	/* DMA_CBL */
 };
 
 #define NR_FLEXCARD_IRQ		ARRAY_SIZE(flexcard_irq_tab)
@@ -96,6 +115,10 @@ static const struct fc_irq_tab flexcard_irq_tab[] = {
 				 (1U << 3)  | \
 				 (1U << 24) | \
 				 (1U << 20))
+#define VALID_DMAIRQ_MSK	((1U << 0) | \
+				 (1U << 1) | \
+				 (1U << 4) | \
+				 (1U << 5))
 
 static irqreturn_t flexcard_demux(int irq, void *data)
 {
@@ -104,6 +127,7 @@ static irqreturn_t flexcard_demux(int irq, void *data)
 	unsigned int slot, cur, stat;
 
 	stat = readl(&priv->bar0->conf.irs) & VALID_DEVIRQ_MSK;
+	stat |= readl(&priv->bar0->dma.dma_irsr) & VALID_DMAIRQ_MSK;
 	while (stat) {
 		slot = __ffs(stat);
 		stat &= (1 << slot);
@@ -196,6 +220,30 @@ static const struct irq_domain_ops flexcard_irq_domain_ops = {
 	.map = flexcard_irq_domain_map,
 };
 
+static struct irq_chip flexcard_dma_irq_chip = {
+	.name		= "flexcard_dma_irq",
+	.irq_ack	= flexcard_irq_ack,
+	.irq_mask	= flexcard_irq_mask,
+	.irq_unmask	= flexcard_irq_unmask,
+};
+
+static int flexcard_dma_irq_domain_map(struct irq_domain *d, unsigned int irq,
+				       irq_hw_number_t hw)
+{
+	struct flexcard_device *priv = d->host_data;
+
+	irq_set_chip_and_handler_name(irq, &flexcard_dma_irq_chip,
+				      handle_level_irq, "flexcard-dma");
+	irq_set_chip_data(irq, priv);
+	irq_modify_status(irq, IRQ_NOREQUEST | IRQ_NOAUTOEN, IRQ_NOPROBE);
+
+	return 0;
+}
+
+static const struct irq_domain_ops flexcard_dma_irq_domain_ops = {
+	.map = flexcard_dma_irq_domain_map,
+};
+
 int flexcard_setup_irq(struct pci_dev *pdev)
 {
 	struct flexcard_device *priv = pci_get_drvdata(pdev);
@@ -217,9 +265,27 @@ int flexcard_setup_irq(struct pci_dev *pdev)
 
 	priv->irq_domain = domain;
 
+	domain = irq_domain_add_linear(NULL, NR_FLEXCARD_IRQ,
+				       &flexcard_dma_irq_domain_ops, priv);
+	if (!domain) {
+		dev_err(&pdev->dev, "could not request dma irq domain\n");
+		ret = -ENODEV;
+		goto out_irq;
+	}
+	priv->dma_domain = domain;
+
+	/* DMA IRQs must be device-globally enabled by setting bit 31 to 1 */
+	writel(FLEXCARD_DMA_IRER_DIRE, &priv->bar0->dma.dma_irer);
+
 	ret = flexcard_req_irq(pdev);
 	if (ret)
-		irq_domain_remove(priv->irq_domain);
+		goto out_dma;
+
+	return 0;
+out_dma:
+	irq_domain_remove(priv->dma_domain);
+out_irq:
+	irq_domain_remove(priv->irq_domain);
 
 	return ret;
 }
@@ -228,11 +294,12 @@ void flexcard_remove_irq(struct pci_dev *pdev)
 {
 	struct flexcard_device *priv = pci_get_drvdata(pdev);
 
-	/* Disable all subirqs */
+	/* Disable all subirqs (including global DMA-IRQ bit 31) */
 	writel(0, &priv->bar0->conf.irc);
 	writel(0, &priv->bar0->dma.dma_irer);
 
 	free_irq(pdev->irq, priv);
 	pci_disable_msi(pdev);
+	irq_domain_remove(priv->dma_domain);
 	irq_domain_remove(priv->irq_domain);
 }

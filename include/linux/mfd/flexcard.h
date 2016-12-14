@@ -98,10 +98,12 @@ struct flexcard_device {
 	struct pci_dev *pdev;
 	raw_spinlock_t irq_lock;
 	struct irq_domain *irq_domain;
+	struct irq_domain *dma_domain;
 	struct fc_bar0 __iomem *bar0;
 	struct mfd_cell *cells;
 	struct resource *res;
 	u32 dev_irqmsk;
+	u32 dma_irqmsk;
 };
 
 int flexcard_setup_irq(struct pci_dev *pdev);
