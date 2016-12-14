@@ -32,10 +32,40 @@
 #define FLEXCARD_CLKRST_SIZE	0x3
 #define FLEXCARD_NF_START	0x170
 #define FLEXCARD_NF_SIZE	0x7
+#define FLEXCARD_DMA_START	0x500
+#define FLEXCARD_DMA_SIZE	0x80
 #define FLEXCARD_CLK_START	0x700
 #define FLEXCARD_CLK_SIZE	0x13
 
+#define FLEXCARD_DMA_IRQ_CO	0
+#define FLEXCARD_DMA_IRQ_TE	1
+#define FLEXCARD_DMA_IRQ_TI	2
+#define FLEXCARD_DMA_IRQ_CBL	3
+
+/* The first FW Version supporting DMA is 6.4.0 */
+#define DMA_MIN_FW_MAJOR	6
+#define DMA_MIN_FW_MINOR	4
+#define DMA_MIN_FW_UPDATE	0
+
 static DEFINE_IDA(flexcard_ida);
+
+static struct resource flexcard_dma_res[] = {
+	DEFINE_RES_MEM_NAMED(FLEXCARD_DMA_START,
+			     FLEXCARD_DMA_SIZE,
+			     "flexcard-dma"),
+	DEFINE_RES_IRQ_NAMED(FLEXCARD_DMA_IRQ_CBL,
+			     "flexcard-dma-cbl"),
+	DEFINE_RES_IRQ_NAMED(FLEXCARD_DMA_IRQ_CO,
+			     "flexcard-dma-co"),
+};
+
+static struct mfd_cell flexcard_dma_dev[] = {
+	{
+		.name = "flexcard-dma",
+		.num_resources = ARRAY_SIZE(flexcard_dma_res),
+		.resources = flexcard_dma_res,
+	},
+};
 
 static struct resource flexcard_clk_res[] = {
 	DEFINE_RES_MEM_NAMED(FLEXCARD_CLK_START,
@@ -100,6 +130,37 @@ static int flexcard_misc_setup(struct flexcard_device *priv)
 	return mfd_add_devices(&pdev->dev, 0, flexcard_misc_dev,
 			       ARRAY_SIZE(flexcard_misc_dev),
 			       &pdev->resource[0], 0, NULL);
+}
+
+static int flexcard_add_dma(struct flexcard_device *priv)
+{
+	struct pci_dev *pdev = priv->pdev;
+	union {
+		struct fc_version ver;
+		u32 reg;
+	} fw_ver;
+
+	/* check for a DMA capable firmware version*/
+	fw_ver.reg = readl(&priv->bar0->conf.fc_fw_ver);
+	if (fw_ver.ver.maj < DMA_MIN_FW_MAJOR)
+		goto out;
+
+	if (fw_ver.ver.maj == DMA_MIN_FW_MAJOR) {
+		if (fw_ver.ver.min < DMA_MIN_FW_MINOR)
+			goto out;
+		if ((fw_ver.ver.min == DMA_MIN_FW_MINOR) &&
+		    (fw_ver.ver.dev < DMA_MIN_FW_UPDATE))
+			goto out;
+	}
+
+	return mfd_add_devices(&pdev->dev, 0, flexcard_dma_dev,
+			       ARRAY_SIZE(flexcard_dma_dev),
+			       &pdev->resource[0], 0, priv->dma_domain);
+
+out:
+	dev_info(&pdev->dev, "Firmware is not DMA capable\n");
+
+	return 0;
 }
 
 static int flexcard_tiny_can(struct flexcard_device *priv,
@@ -264,6 +325,12 @@ static int flexcard_probe(struct pci_dev *pdev,
 	ret = flexcard_clk_setup(priv);
 	if (ret) {
 		dev_err(&pdev->dev, "unable to register clksrc: %d\n", ret);
+		goto out_mfd_dev_remove;
+	}
+
+	ret = flexcard_add_dma(priv);
+	if (ret) {
+		dev_err(&pdev->dev, "unable to add DMA device: %d", ret);
 		goto out_mfd_dev_remove;
 	}
 
