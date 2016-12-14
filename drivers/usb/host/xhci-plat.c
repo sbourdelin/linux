@@ -20,6 +20,10 @@
 #include <linux/slab.h>
 #include <linux/acpi.h>
 
+#ifdef CONFIG_USB_OTG
+#include <linux/usb/otg.h>
+#endif
+
 #include "xhci.h"
 #include "xhci-plat.h"
 #include "xhci-mvebu.h"
@@ -255,6 +259,24 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	if (ret)
 		goto dealloc_usb2_hcd;
 
+#ifdef CONFIG_USB_OTG
+	hcd->usb_phy = usb_get_phy(USB_PHY_TYPE_USB3);
+	if (!IS_ERR_OR_NULL(hcd->usb_phy) && hcd->usb_phy->otg) {
+		dev_dbg(&pdev->dev, "%s otg support available\n", __func__);
+		ret = otg_set_host(hcd->usb_phy->otg, &hcd->self);
+		if (ret) {
+			dev_err(&pdev->dev, "%s otg_set_host failed\n",
+					__func__);
+			usb_put_phy(hcd->usb_phy);
+			hcd->usb_phy = NULL;
+			goto dealloc_usb2_hcd;
+		}
+	} else {
+		usb_put_phy(hcd->usb_phy);
+		hcd->usb_phy = NULL;
+	}
+#endif
+
 	return 0;
 
 
@@ -282,6 +304,19 @@ static int xhci_plat_remove(struct platform_device *dev)
 	struct usb_hcd	*hcd = platform_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 	struct clk *clk = xhci->clk;
+
+#ifdef CONFIG_USB_OTG
+	if (hcd->usb_phy) {
+		if (!IS_ERR(hcd->usb_phy)) {
+			if (hcd->usb_phy->otg)
+				otg_set_host(hcd->usb_phy->otg, NULL);
+			usb_put_phy(hcd->usb_phy);
+		}
+		hcd->usb_phy = NULL;
+		if (xhci->shared_hcd)
+			xhci->shared_hcd->usb_phy = NULL;
+	}
+#endif
 
 	usb_remove_hcd(xhci->shared_hcd);
 	usb_phy_shutdown(hcd->usb_phy);
