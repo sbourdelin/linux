@@ -2841,7 +2841,7 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 done:
 	if (status == 0) {
 		/* TRSTRCY = 10 ms; plus some extra */
-		msleep(10 + 40);
+		msleep(usb_timing.trstrcy);
 		if (udev) {
 			struct usb_hcd *hcd = bus_to_hcd(udev->bus);
 
@@ -3433,10 +3433,10 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 	if (status) {
 		dev_dbg(&port_dev->dev, "can't resume, status %d\n", status);
 	} else {
-		/* drive resume for USB_RESUME_TIMEOUT msec */
+		/* drive resume for TDRSMDN msec */
 		dev_dbg(&udev->dev, "usb %sresume\n",
 				(PMSG_IS_AUTO(msg) ? "auto-" : ""));
-		msleep(USB_RESUME_TIMEOUT);
+		msleep(usb_timing.tdrsmdn);
 
 		/* Virtual root hubs can trigger on GET_PORT_STATUS to
 		 * stop resume signaling.  Then finish the resume
@@ -3445,7 +3445,7 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 		status = hub_port_status(hub, port1, &portstatus, &portchange);
 
 		/* TRSMRCY = 10 msec */
-		msleep(10);
+		msleep(usb_timing.trsmrcy);
 	}
 
  SuspendCleared:
@@ -3531,7 +3531,7 @@ static int hub_handle_remote_wakeup(struct usb_hub *hub, unsigned int port,
 
 	if (udev) {
 		/* TRSMRCY = 10 msec */
-		msleep(10);
+		msleep(usb_timing.trsmrcy);
 
 		usb_unlock_port(port_dev);
 		ret = usb_remote_wakeup(udev);
@@ -4108,7 +4108,7 @@ static void hub_usb3_port_prepare_disable(struct usb_hub *hub,
 		ret = hub_set_port_link_state(hub, port_dev->portnum,
 					      USB_SS_PORT_LS_U0);
 		if (!ret) {
-			msleep(USB_RESUME_TIMEOUT);
+			msleep(usb_timing.tdrsmdn);
 			ret = usb_disable_remote_wakeup(udev);
 		}
 		if (ret)

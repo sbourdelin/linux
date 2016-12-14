@@ -3388,7 +3388,7 @@ static void dwc2_port_resume(struct dwc2_hsotg *hsotg)
 	dwc2_writel(hprt0, hsotg->regs + HPRT0);
 	spin_unlock_irqrestore(&hsotg->lock, flags);
 
-	msleep(USB_RESUME_TIMEOUT);
+	msleep(usb_timing.tdrsmdn);
 
 	spin_lock_irqsave(&hsotg->lock, flags);
 	hprt0 = dwc2_read_hprt0(hsotg);
