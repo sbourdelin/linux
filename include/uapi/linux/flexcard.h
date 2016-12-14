@@ -15,6 +15,22 @@
 
 #include <linux/types.h>
 
+enum flexcard_clk_type {
+	FLEXCARD_CLK_1MHZ = 0x0,
+	FLEXCARD_CLK_10MHZ = 0x1,
+	FLEXCARD_CLK_100MHZ = 0x2,
+	FLEXCARD_CLK_EXT1 = 0x11,
+	FLEXCARD_CLK_EXT2 = 0x12,
+};
+
+struct flexcard_clk_desc {
+	enum flexcard_clk_type type;
+	__u32 freq;
+};
+
+#define FCGCLKSRC       _IOR(0xeb, 0, struct flexcard_clk_desc)
+#define FCSCLKSRC       _IOW(0xeb, 1, struct flexcard_clk_desc)
+
 struct fc_version {
 	__u8	dev;
 	__u8	min;

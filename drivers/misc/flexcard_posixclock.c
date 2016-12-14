@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/flexcard.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
 #include <linux/platform_device.h>
@@ -35,12 +36,15 @@ struct flexcard_clk {
 	struct device		*dev;
 	void __iomem		*ts64;
 	void __iomem		*reset;
+	u32			mul;
+	struct flexcard_clk_desc desc;
 };
 
 static int flexcard_clk_getres(struct posix_clock *pc, struct timespec *tp)
 {
+	struct flexcard_clk *clk = container_of(pc, struct flexcard_clk, clock);
 	tp->tv_sec = 0;
-	tp->tv_nsec = 1000;
+	tp->tv_nsec = clk->mul;
 
 	return 0;
 }
@@ -57,8 +61,8 @@ retry:
 	if (upper != readl(clk->ts64))
 		goto retry;
 
-	tp->tv_sec = div_u64_rem(now, 1000000, &rem);
-	tp->tv_nsec = rem * 1000;
+	tp->tv_sec = div_u64_rem(now, clk->desc.freq, &rem);
+	tp->tv_nsec = rem * clk->mul;
 
 	return 0;
 }
@@ -77,11 +81,59 @@ static int flexcard_clk_settime(struct posix_clock *pc,
 	return 0;
 }
 
+static long flexcard_clk_ioctl(struct posix_clock *pc, unsigned int cmd,
+			       unsigned long arg)
+{
+	struct flexcard_clk *clk = container_of(pc, struct flexcard_clk, clock);
+	struct flexcard_clk_desc desc;
+
+	switch (cmd) {
+	case FCSCLKSRC:
+		if (copy_from_user(&desc, (void __user *)arg, sizeof(desc)))
+			return -EFAULT;
+
+		switch (desc.type) {
+		case FLEXCARD_CLK_1MHZ:
+			desc.freq = 1000000;
+			break;
+		case FLEXCARD_CLK_10MHZ:
+			desc.freq = 10000000;
+			break;
+		case FLEXCARD_CLK_100MHZ:
+			desc.freq = 100000000;
+			break;
+		case FLEXCARD_CLK_EXT1:
+		case FLEXCARD_CLK_EXT2:
+			if (desc.freq < 1 || desc.freq > NSEC_PER_SEC)
+				return -EINVAL;
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		clk->desc = desc;
+		clk->mul = NSEC_PER_SEC/desc.freq;
+		writel(clk->desc.type, clk->ts64 + CLKSEL_OFF);
+		writel(FLEXCARD_RST_TS, clk->reset);
+
+		break;
+	case FCGCLKSRC:
+		if (copy_to_user((void __user *)arg, &clk->desc, sizeof(desc)))
+			return -EFAULT;
+		break;
+	default:
+		return -ENOTTY;
+	}
+
+	return 0;
+}
+
 static struct posix_clock_operations flexcard_clk_ops = {
 	.owner		= THIS_MODULE,
 	.clock_getres	= flexcard_clk_getres,
 	.clock_gettime	= flexcard_clk_gettime,
 	.clock_settime	= flexcard_clk_settime,
+	.ioctl		= flexcard_clk_ioctl,
 };
 
 static int flexcard_clk_iomap(struct platform_device *pdev)
@@ -139,8 +191,11 @@ static int flexcard_clk_probe(struct platform_device *pdev)
 
 	clk->devid = MKDEV(major, cell->id);
 	clk->clock.ops = flexcard_clk_ops;
+	clk->desc.type = FLEXCARD_CLK_1MHZ;
+	clk->desc.freq = 1000000;
+	clk->mul = 1000;
 
-	writel(FLEXCARD_CLK_1MHZ, clk->ts64 + CLKSEL_OFF);
+	writel(clk->desc.type, clk->ts64 + CLKSEL_OFF);
 	writel(FLEXCARD_RST_TS, clk->reset);
 
 	clk->dev = device_create(flexcard_clk_class, &pdev->dev, clk->devid,
