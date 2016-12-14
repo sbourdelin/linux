@@ -44,6 +44,8 @@ SECTIONS
         /* Read-only sections, merged into text segment: */
         . = LOAD_BASE ;
 
+	_text = .;
+
 	/* _s_kernel_ro must be page aligned */
 	. = ALIGN(PAGE_SIZE);
 	_s_kernel_ro = .;
@@ -66,6 +68,7 @@ SECTIONS
 	 * fixup is definitely necessary
 	 */
 
+	_data = .;
 	_sdata = .;
 
 	/* Page alignment required for RO_DATA_SECTION */
