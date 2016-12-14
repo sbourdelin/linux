@@ -17,4 +17,37 @@ enum siphash_lengths {
 
 u64 siphash24(const u8 *data, size_t len, const u8 key[SIPHASH24_KEY_LEN]);
 
+static inline u64 siphash24_1word(const u32 a, const u8 key[SIPHASH24_KEY_LEN])
+{
+	return siphash24((u8 *)&a, sizeof(a), key);
+}
+
+static inline u64 siphash24_2words(const u32 a, const u32 b, const u8 key[SIPHASH24_KEY_LEN])
+{
+	const struct {
+		u32 a;
+		u32 b;
+	} __packed combined = {
+		.a = a,
+		.b = b
+	};
+
+	return siphash24((const u8 *)&combined, sizeof(combined), key);
+}
+
+static inline u64 siphash24_3words(const u32 a, const u32 b, const u32 c, const u8 key[SIPHASH24_KEY_LEN])
+{
+	const struct {
+		u32 a;
+		u32 b;
+		u32 c;
+	} __packed combined = {
+		.a = a,
+		.b = b,
+		.c = c
+	};
+
+	return siphash24((const u8 *)&combined, sizeof(combined), key);
+}
+
 #endif /* _LINUX_SIPHASH_H */
