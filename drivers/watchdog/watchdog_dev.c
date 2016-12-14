@@ -192,6 +192,11 @@ static int watchdog_ping(struct watchdog_device *wdd)
 	return __watchdog_ping(wdd);
 }
 
+static bool watchdog_worker_should_ping(struct watchdog_device *wdd)
+{
+	return wdd && (watchdog_active(wdd) || watchdog_hw_running(wdd));
+}
+
 static void watchdog_ping_work(struct work_struct *work)
 {
 	struct watchdog_core_data *wd_data;
@@ -202,7 +207,7 @@ static void watchdog_ping_work(struct work_struct *work)
 
 	mutex_lock(&wd_data->lock);
 	wdd = wd_data->wdd;
-	if (wdd && (watchdog_active(wdd) || watchdog_hw_running(wdd)))
+	if (watchdog_worker_should_ping(wdd))
 		__watchdog_ping(wdd);
 	mutex_unlock(&wd_data->lock);
 }
