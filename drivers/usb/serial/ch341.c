@@ -95,6 +95,7 @@ struct ch341_private {
 	unsigned baud_rate; /* set baud rate */
 	u8 line_control; /* set line control value RTS/DTR */
 	u8 line_status; /* active status of modem control inputs */
+	u8 lcr;
 };
 
 static void ch341_set_termios(struct tty_struct *tty,
@@ -213,7 +214,6 @@ static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 	const unsigned int size = 2;
 	char *buffer;
 	int r;
-	u8 lcr;
 
 	buffer = kmalloc(size, GFP_KERNEL);
 	if (!buffer)
@@ -229,16 +229,11 @@ static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 	if (r < 0)
 		goto out;
 
-	/*
-	 * Some CH340 devices appear unable to change the initial LCR
-	 * settings, so set a sane 8N1 default.
-	 */
-	lcr = CH341_LCR_ENABLE_RX | CH341_LCR_ENABLE_TX | CH341_LCR_CS8;
-	r = ch341_control_out(dev, CH341_REQ_WRITE_REG, 0x2518, lcr);
+	r = ch341_control_out(dev, CH341_REQ_WRITE_REG, 0x2518, priv->lcr);
 	if (r < 0)
 		goto out;
 
-	r = ch341_init_set_baudrate(dev, priv, lcr);
+	r = ch341_init_set_baudrate(dev, priv, priv->lcr);
 	if (r < 0)
 		goto out;
 
@@ -259,6 +254,11 @@ static int ch341_port_probe(struct usb_serial_port *port)
 
 	spin_lock_init(&priv->lock);
 	priv->baud_rate = DEFAULT_BAUD_RATE;
+	/*
+	 * Some CH340 devices appear unable to change the initial LCR
+	 * settings, so set a sane 8N1 default.
+	 */
+	priv->lcr = CH341_LCR_ENABLE_RX | CH341_LCR_ENABLE_TX | CH341_LCR_CS8;
 
 	r = ch341_configure(port->serial->dev, priv);
 	if (r < 0)
@@ -399,6 +399,8 @@ static void ch341_set_termios(struct tty_struct *tty,
 		if (r < 0 && old_termios) {
 			priv->baud_rate = tty_termios_baud_rate(old_termios);
 			tty_termios_copy_hw(&tty->termios, old_termios);
+		} else if (r == 0) {
+			priv->lcr = ctrl;
 		}
 	}
 
