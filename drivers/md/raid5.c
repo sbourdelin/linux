@@ -232,7 +232,9 @@ static void do_release_stripe(struct r5conf *conf, struct stripe_head *sh,
 	 * When quiesce in r5c write back, set STRIPE_HANDLE for stripes with
 	 * data in journal, so they are not released to cached lists
 	 */
-	if (conf->quiesce && r5c_is_writeback(conf->log) &&
+	if ((conf->quiesce ||
+	     test_bit(R5C_PRE_INIT_FLUSH, &conf->cache_state)) &&
+	    r5c_is_writeback(conf->log) &&
 	    !test_bit(STRIPE_HANDLE, &sh->state) && injournal != 0) {
 		if (test_bit(STRIPE_R5C_CACHING, &sh->state))
 			r5c_make_stripe_write_out(sh);
@@ -264,6 +266,10 @@ static void do_release_stripe(struct r5conf *conf, struct stripe_head *sh,
 			    < IO_THRESHOLD)
 				md_wakeup_thread(conf->mddev->thread);
 		atomic_dec(&conf->active_stripes);
+		if (test_bit(R5C_PRE_INIT_FLUSH, &conf->cache_state) &&
+		    atomic_read(&conf->active_stripes) == 0)
+			wake_up(&sh->raid_conf->wait_for_r5c_pre_init_flush);
+
 		if (!test_bit(STRIPE_EXPANDING, &sh->state)) {
 			if (!r5c_is_writeback(conf->log))
 				list_add_tail(&sh->lru, temp_inactive_list);
@@ -6633,6 +6639,7 @@ static struct r5conf *setup_conf(struct mddev *mddev)
 	init_waitqueue_head(&conf->wait_for_quiescent);
 	init_waitqueue_head(&conf->wait_for_stripe);
 	init_waitqueue_head(&conf->wait_for_overlap);
+	init_waitqueue_head(&conf->wait_for_r5c_pre_init_flush);
 	INIT_LIST_HEAD(&conf->handle_list);
 	INIT_LIST_HEAD(&conf->hold_list);
 	INIT_LIST_HEAD(&conf->delayed_list);
