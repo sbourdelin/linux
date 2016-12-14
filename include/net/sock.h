@@ -434,6 +434,7 @@ struct sock {
 	struct sk_buff		*sk_send_head;
 	__s32			sk_peek_off;
 	int			sk_write_pending;
+	unsigned short          sk_dst_pending_confirm;
 #ifdef CONFIG_SECURITY
 	void			*sk_security;
 #endif
@@ -2261,6 +2262,23 @@ static inline int sk_state_load(const struct sock *sk)
 static inline void sk_state_store(struct sock *sk, int newstate)
 {
 	smp_store_release(&sk->sk_state, newstate);
+}
+
+static inline void dst_confirm_sk(struct sock *sk)
+{
+        sk->sk_dst_pending_confirm = 1;
+}
+
+static inline void dst_neigh_confirm_sk(struct sock *sk, struct neighbour *n)
+{
+        if (sk && sk->sk_dst_pending_confirm) {
+                unsigned long now = jiffies;
+
+                sk->sk_dst_pending_confirm = 0;
+                /* avoid dirtying neighbour */
+                if (n->confirmed != now)
+                        n->confirmed = now;
+        }
 }
 
 void sock_enable_timestamp(struct sock *sk, int flag);

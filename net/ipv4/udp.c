@@ -1111,7 +1111,7 @@ out:
 	return err;
 
 do_confirm:
-	dst_confirm(&rt->dst);
+	dst_confirm_sk(sk);
 	if (!(msg->msg_flags&MSG_PROBE) || len)
 		goto back_from_confirm;
 	err = 0;

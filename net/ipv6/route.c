@@ -1356,7 +1356,7 @@ static bool rt6_cache_allowed_for_pmtu(const struct rt6_info *rt)
 		(rt->rt6i_flags & RTF_PCPU || rt->rt6i_node);
 }
 
-static void __ip6_rt_update_pmtu(struct dst_entry *dst, const struct sock *sk,
+static void __ip6_rt_update_pmtu(struct dst_entry *dst, struct sock *sk,
 				 const struct ipv6hdr *iph, u32 mtu)
 {
 	struct rt6_info *rt6 = (struct rt6_info *)dst;
@@ -1367,7 +1367,7 @@ static void __ip6_rt_update_pmtu(struct dst_entry *dst, const struct sock *sk,
 	if (dst_metric_locked(dst, RTAX_MTU))
 		return;
 
-	dst_confirm(dst);
+	dst_confirm_sk(sk);
 	mtu = max_t(u32, mtu, IPV6_MIN_MTU);
 	if (mtu >= dst_mtu(dst))
 		return;
@@ -2248,7 +2248,7 @@ static void rt6_do_redirect(struct dst_entry *dst, struct sock *sk, struct sk_bu
 	 * Look, redirects are sent only in response to data packets,
 	 * so that this nexthop apparently is reachable. --ANK
 	 */
-	dst_confirm(&rt->dst);
+	dst_confirm_sk(sk);
 
 	neigh = __neigh_lookup(&nd_tbl, &msg->target, skb->dev, 1);
 	if (!neigh)

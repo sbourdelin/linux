@@ -379,7 +379,8 @@ void tcp_update_metrics(struct sock *sk)
 		return;
 
 	if (dst->flags & DST_HOST)
-		dst_confirm(dst);
+		dst_confirm_sk(sk);
+		
 
 	rcu_read_lock();
 	if (icsk->icsk_backoff || !tp->srtt_us) {
@@ -496,7 +497,7 @@ void tcp_init_metrics(struct sock *sk)
 	if (!dst)
 		goto reset;
 
-	dst_confirm(dst);
+	dst_confirm_sk(sk);
 
 	rcu_read_lock();
 	tm = tcp_get_metrics(sk, dst, true);
