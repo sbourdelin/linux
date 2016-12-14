@@ -541,6 +541,18 @@ out:
 	return err;
 }
 
+static void mmc_sdio_retry_init_card(struct mmc_host *host,
+				     struct mmc_card *card,
+				     int *retries)
+{
+	sdio_reset(host);
+	mmc_go_idle(host);
+	mmc_send_if_cond(host, host->ocr_avail);
+	mmc_remove_card(card);
+	(*retries)--;
+
+}
+
 /*
  * Handle the detection and initialisation of a card.
  *
@@ -630,11 +642,7 @@ try_again:
 		err = mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_180,
 					ocr_card);
 		if (err == -EAGAIN) {
-			sdio_reset(host);
-			mmc_go_idle(host);
-			mmc_send_if_cond(host, host->ocr_avail);
-			mmc_remove_card(card);
-			retries--;
+			mmc_sdio_retry_init_card(host, card, &retries);
 			goto try_again;
 		} else if (err) {
 			ocr &= ~R4_18V_PRESENT;
