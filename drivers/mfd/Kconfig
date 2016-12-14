@@ -299,6 +299,16 @@ config MFD_EXYNOS_LPASS
 	  Select this option to enable support for Samsung Exynos Low Power
 	  Audio Subsystem.
 
+config MFD_FLEXCARD
+	tristate "Eberspaecher Flexcard PMC II Carrier Board"
+	select MFD_CORE
+	depends on PCI
+	help
+	  This is the core driver for the Eberspaecher Flexcard
+	  PMC (PCI Mezzanine Card) II carrier board. This carrier board
+	  can take up to 4 exchangeable physical layer boards for
+	  CAN, FlexRay or Ethernet.
+
 config MFD_MC13XXX
 	tristate
 	depends on (SPI_MASTER || I2C)
