@@ -158,6 +158,7 @@ typedef struct page *pgtable_t;
 
 #ifdef CONFIG_HAVE_ARCH_PFN_VALID
 extern int pfn_valid(unsigned long);
+#define early_pfn_valid(pfn)	pfn_valid(pfn)
 #endif
 
 #include <asm/memory.h>

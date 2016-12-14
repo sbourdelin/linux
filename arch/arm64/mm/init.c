@@ -145,11 +145,23 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
 #endif /* CONFIG_NUMA */
 
 #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+
 int pfn_valid(unsigned long pfn)
 {
 	return memblock_is_map_memory(pfn << PAGE_SHIFT);
 }
 EXPORT_SYMBOL(pfn_valid);
+
+/*
+ * We use pfn_present() here to make sure all pages of a section
+ * including NOMAP pages are initialized with __init_single_page().
+ */
+int early_pfn_valid(unsigned long pfn)
+{
+	return pfn_present(pfn);
+}
+EXPORT_SYMBOL(early_pfn_valid);
+
 #endif
 
 #ifndef CONFIG_SPARSEMEM
