@@ -82,10 +82,12 @@
 #define CH341_LCR_CS6          0x01
 #define CH341_LCR_CS5          0x00
 
+#define CH341_QUIRK_INIT	BIT(0)
+
 static const struct usb_device_id id_table[] = {
 	{ USB_DEVICE(0x4348, 0x5523) },
 	{ USB_DEVICE(0x1a86, 0x7523) },
-	{ USB_DEVICE(0x1a86, 0x5523) },
+	{ USB_DEVICE(0x1a86, 0x5523), .driver_info = CH341_QUIRK_INIT },
 	{ },
 };
 MODULE_DEVICE_TABLE(usb, id_table);
@@ -96,6 +98,8 @@ struct ch341_private {
 	u8 line_control; /* set line control value RTS/DTR */
 	u8 line_status; /* active status of modem control inputs */
 	u8 lcr;
+
+	unsigned long quirks;
 };
 
 static void ch341_set_termios(struct tty_struct *tty,
@@ -148,7 +152,7 @@ static int ch341_control_in(struct usb_device *dev,
 	return 0;
 }
 
-static int ch341_init_set_baudrate(struct usb_device *dev,
+static int ch341_set_baudrate_lcr(struct usb_device *dev,
 				   struct ch341_private *priv, unsigned ctrl)
 {
 	short a;
@@ -172,9 +176,23 @@ static int ch341_init_set_baudrate(struct usb_device *dev,
 	factor = 0x10000 - factor;
 	a = (factor & 0xff00) | divisor;
 
-	/* 0x9c is "enable SFR_UART Control register and timer" */
-	r = ch341_control_out(dev, CH341_REQ_SERIAL_INIT,
-			      0x9c | (ctrl << 8), a | 0x80);
+	/*
+	 * Some CH341 devices require us to use the init vendor command to set
+	 * the baud rate and LCR.
+	 */
+	if (priv->quirks & CH341_QUIRK_INIT) {
+		/* 0x9c is "enable SFR_UART Control register and timer" */
+		r = ch341_control_out(dev, CH341_REQ_SERIAL_INIT,
+				      0x9c | (ctrl << 8), a | 0x80);
+	} else {
+		r = ch341_control_out(dev, CH341_REQ_WRITE_REG, 0x1312, a);
+		if (r)
+			return r;
+
+		r = ch341_control_out(dev, CH341_REQ_WRITE_REG, 0x2518, ctrl);
+		if (r)
+			return r;
+	}
 
 	return r;
 }
@@ -209,6 +227,14 @@ out:	kfree(buffer);
 
 /* -------------------------------------------------------------------------- */
 
+static int ch341_probe(struct usb_serial *serial,
+		       const struct usb_device_id *id)
+{
+	usb_set_serial_data(serial, (void *)id->driver_info);
+
+	return 0;
+}
+
 static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 {
 	const unsigned int size = 2;
@@ -229,11 +255,7 @@ static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 	if (r < 0)
 		goto out;
 
-	r = ch341_control_out(dev, CH341_REQ_WRITE_REG, 0x2518, priv->lcr);
-	if (r < 0)
-		goto out;
-
-	r = ch341_init_set_baudrate(dev, priv, priv->lcr);
+	r = ch341_set_baudrate_lcr(dev, priv, priv->lcr);
 	if (r < 0)
 		goto out;
 
@@ -259,6 +281,7 @@ static int ch341_port_probe(struct usb_serial_port *port)
 	 * settings, so set a sane 8N1 default.
 	 */
 	priv->lcr = CH341_LCR_ENABLE_RX | CH341_LCR_ENABLE_TX | CH341_LCR_CS8;
+	priv->quirks = (unsigned long)usb_get_serial_data(port->serial);
 
 	r = ch341_configure(port->serial->dev, priv);
 	if (r < 0)
@@ -395,7 +418,7 @@ static void ch341_set_termios(struct tty_struct *tty,
 	if (baud_rate) {
 		priv->baud_rate = baud_rate;
 
-		r = ch341_init_set_baudrate(port->serial->dev, priv, ctrl);
+		r = ch341_set_baudrate_lcr(port->serial->dev, priv, ctrl);
 		if (r < 0 && old_termios) {
 			priv->baud_rate = tty_termios_baud_rate(old_termios);
 			tty_termios_copy_hw(&tty->termios, old_termios);
@@ -628,6 +651,7 @@ static struct usb_serial_driver ch341_device = {
 	.tiocmset          = ch341_tiocmset,
 	.tiocmiwait        = usb_serial_generic_tiocmiwait,
 	.read_int_callback = ch341_read_int_callback,
+	.probe             = ch341_probe,
 	.port_probe        = ch341_port_probe,
 	.port_remove       = ch341_port_remove,
 	.reset_resume      = ch341_reset_resume,
