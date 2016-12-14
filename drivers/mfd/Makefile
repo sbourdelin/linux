@@ -212,4 +212,5 @@ obj-$(CONFIG_MFD_MT6397)	+= mt6397-core.o
 
 obj-$(CONFIG_MFD_ALTERA_A10SR)	+= altera-a10sr.o
 flexcard-objs			:= flexcard_core.o
+flexcard-objs			:= flexcard_core.o flexcard_irq.o
 obj-$(CONFIG_MFD_FLEXCARD)	+= flexcard.o

@@ -96,9 +96,15 @@ struct fc_bar0 {
 struct flexcard_device {
 	unsigned int cardnr;
 	struct pci_dev *pdev;
+	raw_spinlock_t irq_lock;
+	struct irq_domain *irq_domain;
 	struct fc_bar0 __iomem *bar0;
 	struct mfd_cell *cells;
 	struct resource *res;
+	u32 dev_irqmsk;
 };
+
+int flexcard_setup_irq(struct pci_dev *pdev);
+void flexcard_remove_irq(struct pci_dev *pdev);
 
 #endif /* _LINUX_FLEXCARD_H */

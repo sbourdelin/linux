@@ -192,7 +192,8 @@ static int flexcard_tiny_probe(struct flexcard_device *priv)
 		offset += FLEXCARD_CAN_OFFSET;
 	}
 
-	return mfd_add_devices(&pdev->dev, 0, priv->cells, nr, NULL, 0, NULL);
+	return mfd_add_devices(&pdev->dev, 0, priv->cells, nr, NULL,
+			       0, priv->irq_domain);
 }
 
 static int flexcard_probe(struct pci_dev *pdev,
@@ -242,10 +243,16 @@ static int flexcard_probe(struct pci_dev *pdev,
 	}
 	priv->cardnr = ret;
 
+	ret = flexcard_setup_irq(pdev);
+	if (ret) {
+		dev_err(&pdev->dev, "unable to setup irq controller: %d", ret);
+		goto out_ida;
+	}
+
 	ret = flexcard_tiny_probe(priv);
 	if (ret) {
 		dev_err(&pdev->dev, "unable to probe tinys: %d", ret);
-		goto out_ida;
+		goto out_remove_irq;
 	}
 
 	ret = flexcard_misc_setup(priv);
@@ -268,6 +275,8 @@ static int flexcard_probe(struct pci_dev *pdev,
 
 out_mfd_dev_remove:
 	mfd_remove_devices(&pdev->dev);
+out_remove_irq:
+	flexcard_remove_irq(pdev);
 out_ida:
 	ida_simple_remove(&flexcard_ida, priv->cardnr);
 out_unmap:
@@ -285,6 +294,7 @@ static void flexcard_remove(struct pci_dev *pdev)
 	struct flexcard_device *priv = pci_get_drvdata(pdev);
 
 	mfd_remove_devices(&pdev->dev);
+	flexcard_remove_irq(pdev);
 	ida_simple_remove(&flexcard_ida, priv->cardnr);
 	iounmap(priv->bar0);
 	pci_release_regions(pdev);
