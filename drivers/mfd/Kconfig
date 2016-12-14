@@ -303,6 +303,7 @@ config MFD_FLEXCARD
 	tristate "Eberspaecher Flexcard PMC II Carrier Board"
 	select MFD_CORE
 	select IRQ_DOMAIN
+	select FLEXCARD_MISC
 	depends on PCI
 	help
 	  This is the core driver for the Eberspaecher Flexcard
