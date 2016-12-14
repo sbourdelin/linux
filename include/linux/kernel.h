@@ -74,15 +74,15 @@
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
 
-#define FIELD_SIZEOF(t, f) (sizeof(((t*)0)->f))
+#define FIELD_SIZEOF(t, f) (sizeof(((t *)0)->f))
 #define DIV_ROUND_UP __KERNEL_DIV_ROUND_UP
-#define DIV_ROUND_UP_ULL(ll,d) \
+#define DIV_ROUND_UP_ULL(ll, d) \
 	({ unsigned long long _tmp = (ll)+(d)-1; do_div(_tmp, d); _tmp; })
 
 #if BITS_PER_LONG == 32
-# define DIV_ROUND_UP_SECTOR_T(ll,d) DIV_ROUND_UP_ULL(ll, d)
+# define DIV_ROUND_UP_SECTOR_T(ll, d) DIV_ROUND_UP_ULL(ll, d)
 #else
-# define DIV_ROUND_UP_SECTOR_T(ll,d) DIV_ROUND_UP(ll,d)
+# define DIV_ROUND_UP_SECTOR_T(ll, d) DIV_ROUND_UP(ll, d)
 #endif
 
 /* The `const' in roundup() prevents gcc-3.3 from calling __divdi3 */
@@ -115,7 +115,7 @@
 }							\
 )
 /*
- * Same as above but for u64 dividends. divisor must be a 32-bit
+ * Same as above but for u64 dividends. Divisor must be a 32-bit
  * number.
  */
 #define DIV_ROUND_CLOSEST_ULL(x, divisor)(		\
@@ -140,7 +140,7 @@
 )
 
 
-#define _RET_IP_		(unsigned long)__builtin_return_address(0)
+#define _RET_IP_	(unsigned long)__builtin_return_address(0)
 #define _THIS_IP_  ({ __label__ __here; __here: (unsigned long)&&__here; })
 
 #ifdef CONFIG_LBDAF
@@ -185,8 +185,8 @@ extern int _cond_resched(void);
 #endif
 
 #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
-  void ___might_sleep(const char *file, int line, int preempt_offset);
-  void __might_sleep(const char *file, int line, int preempt_offset);
+void ___might_sleep(const char *file, int line, int preempt_offset);
+void __might_sleep(const char *file, int line, int preempt_offset);
 /**
  * might_sleep - annotation for functions that can sleep
  *
@@ -201,10 +201,10 @@ extern int _cond_resched(void);
 	do { __might_sleep(__FILE__, __LINE__, 0); might_resched(); } while (0)
 # define sched_annotate_sleep()	(current->task_state_change = 0)
 #else
-  static inline void ___might_sleep(const char *file, int line,
-				   int preempt_offset) { }
-  static inline void __might_sleep(const char *file, int line,
-				   int preempt_offset) { }
+static inline void ___might_sleep(const char *file, int line,
+				  int preempt_offset) { }
+static inline void __might_sleep(const char *file, int line,
+				 int preempt_offset) { }
 # define might_sleep() do { might_resched(); } while (0)
 # define sched_annotate_sleep() do { } while (0)
 #endif
@@ -226,8 +226,8 @@ extern int _cond_resched(void);
 		__abs_choose_expr(x, char,				\
 		__builtin_choose_expr(					\
 			__builtin_types_compatible_p(typeof(x), char),	\
-			(char)({ signed char __x = (x); __x<0?-__x:__x; }), \
-			((void)0)))))))
+			(char)({ signed char __x = (x); __x < 0 ?	\
+			       -__x : __x; }), ((void)0)))))))
 
 #define __abs_choose_expr(x, type, other) __builtin_choose_expr(	\
 	__builtin_types_compatible_p(typeof(x),   signed type) ||	\
@@ -274,29 +274,32 @@ void do_exit(long error_code) __noreturn;
 void complete_and_exit(struct completion *, long) __noreturn;
 
 /* Internal, do not use. */
-int __must_check _kstrtoul(const char *s, unsigned int base, unsigned long *res);
+int __must_check _kstrtoul(const char *s, unsigned int base,
+			   unsigned long *res);
 int __must_check _kstrtol(const char *s, unsigned int base, long *res);
 
-int __must_check kstrtoull(const char *s, unsigned int base, unsigned long long *res);
+int __must_check kstrtoull(const char *s, unsigned int base,
+			   unsigned long long *res);
 int __must_check kstrtoll(const char *s, unsigned int base, long long *res);
 
 /**
  * kstrtoul - convert a string to an unsigned long
  * @s: The start of the string. The string must be null-terminated, and may also
- *  include a single newline before its terminating null. The first character
- *  may also be a plus sign, but not a minus sign.
+ * include a single newline before its terminating null. The first character
+ * may also be a plus sign, but not a minus sign.
  * @base: The number base to use. The maximum supported base is 16. If base is
- *  given as 0, then the base of the string is automatically detected with the
- *  conventional semantics - If it begins with 0x the number will be parsed as a
- *  hexadecimal (case insensitive), if it otherwise begins with 0, it will be
- *  parsed as an octal number. Otherwise it will be parsed as a decimal.
+ * given as 0, then the base of the string is automatically detected with the
+ * conventional semantics - If it begins with 0x the number will be parsed as a
+ * hexadecimal (case insensitive), if it otherwise begins with 0, it will be
+ * parsed as an octal number. Otherwise it will be parsed as a decimal.
  * @res: Where to write the result of the conversion on success.
  *
  * Returns 0 on success, -ERANGE on overflow and -EINVAL on parsing error.
  * Used as a replacement for the obsolete simple_strtoull. Return code must
  * be checked.
 */
-static inline int __must_check kstrtoul(const char *s, unsigned int base, unsigned long *res)
+static inline int __must_check kstrtoul(const char *s, unsigned int base,
+					unsigned long *res)
 {
 	/*
 	 * We want to shortcut function call, but
@@ -312,20 +315,21 @@ static inline int __must_check kstrtoul(const char *s, unsigned int base, unsign
 /**
  * kstrtol - convert a string to a long
  * @s: The start of the string. The string must be null-terminated, and may also
- *  include a single newline before its terminating null. The first character
- *  may also be a plus sign or a minus sign.
+ * include a single newline before its terminating null. The first character
+ * may also be a plus sign or a minus sign.
  * @base: The number base to use. The maximum supported base is 16. If base is
- *  given as 0, then the base of the string is automatically detected with the
- *  conventional semantics - If it begins with 0x the number will be parsed as a
- *  hexadecimal (case insensitive), if it otherwise begins with 0, it will be
- *  parsed as an octal number. Otherwise it will be parsed as a decimal.
+ * given as 0, then the base of the string is automatically detected with the
+ * conventional semantics - If it begins with 0x the number will be parsed as a
+ * hexadecimal (case insensitive), if it otherwise begins with 0, it will be
+ * parsed as an octal number. Otherwise it will be parsed as a decimal.
  * @res: Where to write the result of the conversion on success.
  *
  * Returns 0 on success, -ERANGE on overflow and -EINVAL on parsing error.
  * Used as a replacement for the obsolete simple_strtoull. Return code must
  * be checked.
  */
-static inline int __must_check kstrtol(const char *s, unsigned int base, long *res)
+static inline int __must_check kstrtol(const char *s, unsigned int base,
+				       long *res)
 {
 	/*
 	 * We want to shortcut function call, but
@@ -338,25 +342,30 @@ static inline int __must_check kstrtol(const char *s, unsigned int base, long *r
 		return _kstrtol(s, base, res);
 }
 
-int __must_check kstrtouint(const char *s, unsigned int base, unsigned int *res);
+int __must_check kstrtouint(const char *s, unsigned int base,
+			    unsigned int *res);
 int __must_check kstrtoint(const char *s, unsigned int base, int *res);
 
-static inline int __must_check kstrtou64(const char *s, unsigned int base, u64 *res)
+static inline int __must_check kstrtou64(const char *s, unsigned int base,
+					 u64 *res)
 {
 	return kstrtoull(s, base, res);
 }
 
-static inline int __must_check kstrtos64(const char *s, unsigned int base, s64 *res)
+static inline int __must_check kstrtos64(const char *s, unsigned int base,
+					 s64 *res)
 {
 	return kstrtoll(s, base, res);
 }
 
-static inline int __must_check kstrtou32(const char *s, unsigned int base, u32 *res)
+static inline int __must_check kstrtou32(const char *s, unsigned int base,
+					 u32 *res)
 {
 	return kstrtouint(s, base, res);
 }
 
-static inline int __must_check kstrtos32(const char *s, unsigned int base, s32 *res)
+static inline int __must_check kstrtos32(const char *s, unsigned int base,
+					 s32 *res)
 {
 	return kstrtoint(s, base, res);
 }
@@ -367,50 +376,68 @@ int __must_check kstrtou8(const char *s, unsigned int base, u8 *res);
 int __must_check kstrtos8(const char *s, unsigned int base, s8 *res);
 int __must_check kstrtobool(const char *s, bool *res);
 
-int __must_check kstrtoull_from_user(const char __user *s, size_t count, unsigned int base, unsigned long long *res);
-int __must_check kstrtoll_from_user(const char __user *s, size_t count, unsigned int base, long long *res);
-int __must_check kstrtoul_from_user(const char __user *s, size_t count, unsigned int base, unsigned long *res);
-int __must_check kstrtol_from_user(const char __user *s, size_t count, unsigned int base, long *res);
-int __must_check kstrtouint_from_user(const char __user *s, size_t count, unsigned int base, unsigned int *res);
-int __must_check kstrtoint_from_user(const char __user *s, size_t count, unsigned int base, int *res);
-int __must_check kstrtou16_from_user(const char __user *s, size_t count, unsigned int base, u16 *res);
-int __must_check kstrtos16_from_user(const char __user *s, size_t count, unsigned int base, s16 *res);
-int __must_check kstrtou8_from_user(const char __user *s, size_t count, unsigned int base, u8 *res);
-int __must_check kstrtos8_from_user(const char __user *s, size_t count, unsigned int base, s8 *res);
-int __must_check kstrtobool_from_user(const char __user *s, size_t count, bool *res);
+int __must_check kstrtoull_from_user(const char __user *s, size_t count,
+				unsigned int base, unsigned long long *res);
+int __must_check kstrtoll_from_user(const char __user *s, size_t count,
+				    unsigned int base, long long *res);
+int __must_check kstrtoul_from_user(const char __user *s, size_t count,
+				    unsigned int base, unsigned long *res);
+int __must_check kstrtol_from_user(const char __user *s, size_t count,
+				   unsigned int base, long *res);
+int __must_check kstrtouint_from_user(const char __user *s, size_t count,
+				      unsigned int base, unsigned int *res);
+int __must_check kstrtoint_from_user(const char __user *s, size_t count,
+				     unsigned int base, int *res);
+int __must_check kstrtou16_from_user(const char __user *s, size_t count,
+				     unsigned int base, u16 *res);
+int __must_check kstrtos16_from_user(const char __user *s, size_t count,
+				     unsigned int base, s16 *res);
+int __must_check kstrtou8_from_user(const char __user *s, size_t count,
+				    unsigned int base, u8 *res);
+int __must_check kstrtos8_from_user(const char __user *s, size_t count,
+				    unsigned int base, s8 *res);
+int __must_check kstrtobool_from_user(const char __user *s, size_t count,
+				      bool *res);
 
-static inline int __must_check kstrtou64_from_user(const char __user *s, size_t count, unsigned int base, u64 *res)
+static inline int __must_check kstrtou64_from_user(const char __user *s,
+				size_t count, unsigned int base, u64 *res)
 {
 	return kstrtoull_from_user(s, count, base, res);
 }
 
-static inline int __must_check kstrtos64_from_user(const char __user *s, size_t count, unsigned int base, s64 *res)
+static inline int __must_check kstrtos64_from_user(const char __user *s,
+				size_t count, unsigned int base, s64 *res)
 {
 	return kstrtoll_from_user(s, count, base, res);
 }
 
-static inline int __must_check kstrtou32_from_user(const char __user *s, size_t count, unsigned int base, u32 *res)
+static inline int __must_check kstrtou32_from_user(const char __user *s,
+				size_t count, unsigned int base, u32 *res)
 {
 	return kstrtouint_from_user(s, count, base, res);
 }
 
-static inline int __must_check kstrtos32_from_user(const char __user *s, size_t count, unsigned int base, s32 *res)
+static inline int __must_check kstrtos32_from_user(const char __user *s,
+				size_t count, unsigned int base, s32 *res)
 {
 	return kstrtoint_from_user(s, count, base, res);
 }
 
 /* Obsolete, do not use.  Use kstrto<foo> instead */
 
-extern unsigned long simple_strtoul(const char *,char **,unsigned int);
-extern long simple_strtol(const char *,char **,unsigned int);
-extern unsigned long long simple_strtoull(const char *,char **,unsigned int);
-extern long long simple_strtoll(const char *,char **,unsigned int);
+extern unsigned long simple_strtoul(const char *cp, char **endp,
+				    unsigned int base);
+extern long simple_strtol(const char *cp, char **endp,
+			  unsigned int base);
+extern unsigned long long simple_strtoull(const char *cp, char **endp,
+					  unsigned int base);
+extern long long simple_strtoll(const char *cp, char **endp, unsigned int base);
 
 extern int num_to_str(char *buf, int size, unsigned long long num);
 
 /* lib/printf utilities */
 
-extern __printf(2, 3) int sprintf(char *buf, const char * fmt, ...);
+extern __printf(2, 3) int sprintf(char *buf, const char *fmt, ...);
 extern __printf(2, 0) int vsprintf(char *buf, const char *, va_list);
 extern __printf(3, 4)
 int snprintf(char *buf, size_t size, const char *fmt, ...);
@@ -428,9 +455,9 @@ extern __printf(2, 0)
 const char *kvasprintf_const(gfp_t gfp, const char *fmt, va_list args);
 
 extern __scanf(2, 3)
-int sscanf(const char *, const char *, ...);
+int sscanf(const char *str, const char *format, ...);
 extern __scanf(2, 0)
-int vsscanf(const char *, const char *, va_list);
+int vsscanf(const char *str, const char *format, va_list ap);
 
 extern int get_option(char **str, int *pint);
 extern char *get_options(const char *str, int nints, int *ints);
@@ -443,10 +470,14 @@ extern int __kernel_text_address(unsigned long addr);
 extern int kernel_text_address(unsigned long addr);
 extern int func_ptr_is_kernel_text(void *ptr);
 
-unsigned long int_sqrt(unsigned long);
+unsigned long int_sqrt(unsigned long x);
 
 extern void bust_spinlocks(int yes);
-extern int oops_in_progress;		/* If set, an oops, panic(), BUG() or die() is in progress */
+
+/*
+ * If set, an oops, panic(), BUG() or die() is in progress
+ */
+extern int oops_in_progress;
 extern int panic_timeout;
 extern int panic_on_oops;
 extern int panic_on_unrecovered_nmi;
@@ -479,8 +510,8 @@ enum lockdep_ok {
 	LOCKDEP_STILL_OK,
 	LOCKDEP_NOW_UNRELIABLE
 };
-extern void add_taint(unsigned flag, enum lockdep_ok);
-extern int test_taint(unsigned flag);
+extern void add_taint(unsigned int flag, enum lockdep_ok);
+extern int test_taint(unsigned int flag);
 extern unsigned long get_taint(void);
 extern int root_mountflags;
 
@@ -838,8 +869,8 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
  *
  */
 #define container_of(ptr, type, member) ({			\
-	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
-	(type *)( (char *)__mptr - offsetof(type,member) );})
+	const typeof(((type *)0)->member)*__mptr = (ptr);	\
+	(type *)((char *)__mptr - offsetof(type, member)); })
 
 /* Rebuild everything on CONFIG_FTRACE_MCOUNT_RECORD */
 #ifdef CONFIG_FTRACE_MCOUNT_RECORD
@@ -847,15 +878,16 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
 #endif
 
 /* Permissions on a sysfs file: you didn't miss the 0 prefix did you? */
-#define VERIFY_OCTAL_PERMISSIONS(perms)						\
-	(BUILD_BUG_ON_ZERO((perms) < 0) +					\
-	 BUILD_BUG_ON_ZERO((perms) > 0777) +					\
-	 /* USER_READABLE >= GROUP_READABLE >= OTHER_READABLE */		\
-	 BUILD_BUG_ON_ZERO((((perms) >> 6) & 4) < (((perms) >> 3) & 4)) +	\
-	 BUILD_BUG_ON_ZERO((((perms) >> 3) & 4) < ((perms) & 4)) +		\
-	 /* USER_WRITABLE >= GROUP_WRITABLE */					\
-	 BUILD_BUG_ON_ZERO((((perms) >> 6) & 2) < (((perms) >> 3) & 2)) +	\
-	 /* OTHER_WRITABLE?  Generally considered a bad idea. */		\
-	 BUILD_BUG_ON_ZERO((perms) & 2) +					\
+#define VERIFY_OCTAL_PERMISSIONS(perms)					\
+	(BUILD_BUG_ON_ZERO((perms) < 0) +				\
+	 BUILD_BUG_ON_ZERO((perms) > 0777) +				\
+	 /* USER_READABLE >= GROUP_READABLE >= OTHER_READABLE */	\
+	 BUILD_BUG_ON_ZERO((((perms) >> 6) & 4) < (((perms) >> 3) & 4)) \
+	 + BUILD_BUG_ON_ZERO((((perms) >> 3) & 4) < ((perms) & 4)) +	\
+	 /* USER_WRITABLE >= GROUP_WRITABLE */				\
+	 BUILD_BUG_ON_ZERO((((perms) >> 6) & 2) < (((perms) >> 3) & 2)) \
+	 +								\
+	 /* OTHER_WRITABLE?  Generally considered a bad idea. */	\
+	 BUILD_BUG_ON_ZERO((perms) & 2) +				\
 	 (perms))
 #endif
