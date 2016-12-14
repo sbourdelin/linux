@@ -3143,7 +3143,7 @@ typedef tpacpi_keymap_entry_t tpacpi_keymap_t[TPACPI_HOTKEY_MAP_LEN];
 
 static int hotkey_init_tablet_mode(void)
 {
-	int in_tablet_mode, res;
+	int in_tablet_mode = 0, res;
 	char *type;
 
 	if (acpi_evalf(hkey_handle, &res, "MHKG", "qd")) {
