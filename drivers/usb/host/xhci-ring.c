@@ -1607,7 +1607,7 @@ static void handle_port_status(struct xhci_hcd *xhci,
 				     &bus_state->resuming_ports)) {
 			xhci_dbg(xhci, "resume HS port %d\n", port_id);
 			bus_state->resume_done[faked_port_index] = jiffies +
-				msecs_to_jiffies(USB_RESUME_TIMEOUT);
+				msecs_to_jiffies(usb_timing.tdrsmdn);
 			set_bit(faked_port_index, &bus_state->resuming_ports);
 			mod_timer(&hcd->rh_timer,
 				  bus_state->resume_done[faked_port_index]);

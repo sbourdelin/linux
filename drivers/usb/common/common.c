@@ -19,6 +19,13 @@
 #include <linux/usb/otg.h>
 #include <linux/of_platform.h>
 
+struct _usb_timing_config usb_timing = {
+		.tdrsmdn = USB_TIMING_TDRSMDN_DEF,
+		.trsmrcy = USB_TIMING_TRSMRCY_DEF,
+		.trstrcy = USB_TIMING_TRSTRCY_DEF
+};
+EXPORT_SYMBOL_GPL(usb_timing);
+
 const char *usb_otg_state_string(enum usb_otg_state state)
 {
 	static const char *const names[] = {
