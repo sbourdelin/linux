@@ -46,6 +46,7 @@
 #include <linux/slab.h>
 #include <linux/clk.h>
 #include <linux/io-64-nonatomic-lo-hi.h>
+#include <linux/reset.h>
 
 #include "../dmaengine.h"
 
@@ -409,6 +410,7 @@ struct xilinx_dma_device {
 	struct clk *rxs_clk;
 	u32 nr_channels;
 	u32 chan_id;
+	struct reset_control *rst;
 };
 
 /* Macros */
@@ -2539,6 +2541,27 @@ static int xilinx_dma_probe(struct platform_device *pdev)
 	xdev->regs = devm_ioremap_resource(&pdev->dev, io);
 	if (IS_ERR(xdev->regs))
 		return PTR_ERR(xdev->regs);
+
+	xdev->rst = devm_reset_control_get_optional(&pdev->dev, "reset");
+	if (IS_ERR(xdev->rst)) {
+		err = PTR_ERR(xdev->rst);
+		switch (err) {
+		case -ENOENT:
+		case -ENOTSUPP:
+			xdev->rst = NULL;
+		break;
+		default:
+			dev_err(xdev->dev, "error getting reset %d\n", err);
+		return err;
+		}
+	} else {
+		err = reset_control_deassert(xdev->rst);
+		if (err) {
+			dev_err(xdev->dev, "failed to deassert reset: %d\n",
+					err);
+			return err;
+		}
+	}
 
 	/* Retrieve the DMA engine properties from the device tree */
 	xdev->has_sg = of_property_read_bool(node, "xlnx,include-sg");
