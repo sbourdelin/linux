@@ -1488,11 +1488,17 @@ int omap3isp_video_register(struct isp_video *video, struct v4l2_device *vdev)
 			"%s: could not register video device (%d)\n",
 			__func__, ret);
 
+	/* Prevent destroying MC before unregistering */
+	kobject_get(vdev->v4l2_dev->mdev->devnode->dev.parent);
+
 	return ret;
 }
 
 void omap3isp_video_unregister(struct isp_video *video)
 {
-	if (video_is_registered(&video->video))
-		video_unregister_device(&video->video);
+	if (!video_is_registered(&video->video))
+		return;
+
+	video_unregister_device(&video->video);
+	kobject_put(vdev->v4l2_dev->mdev->devnode->dev.parent);
 }
