@@ -398,7 +398,6 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 	struct super_block *sb = inode->i_sb;
 	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
 	struct vfsmount *mnt = filp->f_path.mnt;
-	struct dentry *dir;
 	struct path path;
 	char buf[64], *cp;
 	int ret;
@@ -443,17 +442,6 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 			return -ENOKEY;
 	}
 
-	dir = dget_parent(file_dentry(filp));
-	if (ext4_encrypted_inode(d_inode(dir)) &&
-			!fscrypt_has_permitted_context(d_inode(dir), inode)) {
-		ext4_warning(inode->i_sb,
-			     "Inconsistent encryption contexts: %lu/%lu",
-			     (unsigned long) d_inode(dir)->i_ino,
-			     (unsigned long) inode->i_ino);
-		dput(dir);
-		return -EPERM;
-	}
-	dput(dir);
 	/*
 	 * Set up the jbd2_inode if we are opening the inode for
 	 * writing and the journal is present
