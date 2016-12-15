@@ -152,6 +152,7 @@ void nf_send_reset6(struct net *net, struct sk_buff *oldskb, int hook)
 
 	memset(&fl6, 0, sizeof(fl6));
 	fl6.flowi6_proto = IPPROTO_TCP;
+	fl6.flowi6_mark = IP6_REPLY_MARK(dev_net(oldskb->dev), oldskb->mark);
 	fl6.saddr = oip6h->daddr;
 	fl6.daddr = oip6h->saddr;
 	fl6.fl6_sport = otcph->dest;
@@ -179,6 +180,8 @@ void nf_send_reset6(struct net *net, struct sk_buff *oldskb, int hook)
 	}
 
 	skb_dst_set(nskb, dst);
+
+	nskb->mark = fl6.flowi6_mark;
 
 	skb_reserve(nskb, hh_len + dst->header_len);
 	ip6h = nf_reject_ip6hdr_put(nskb, oldskb, IPPROTO_TCP,
