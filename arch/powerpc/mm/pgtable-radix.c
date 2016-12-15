@@ -465,6 +465,25 @@ void radix__setup_initial_memory_limit(phys_addr_t first_memblock_base,
 	memblock_set_current_limit(first_memblock_base + first_memblock_size);
 }
 
+#ifdef CONFIG_MEMORY_HOTPLUG
+int radix__create_section_mapping(unsigned long start, unsigned long end)
+{
+	unsigned long page_size = 1 << mmu_psize_defs[mmu_linear_psize].shift;
+
+	/* Align to the page size of the linear mapping. */
+	start = _ALIGN_DOWN(start, page_size);
+
+	for (; start < end; start += page_size) {
+		int rc = radix__map_kernel_page(start, __pa(start),
+						PAGE_KERNEL, page_size);
+		if (rc)
+			return rc;
+	}
+
+	return 0;
+}
+#endif /* CONFIG_MEMORY_HOTPLUG */
+
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
 int __meminit radix__vmemmap_create_mapping(unsigned long start,
 				      unsigned long page_size,
