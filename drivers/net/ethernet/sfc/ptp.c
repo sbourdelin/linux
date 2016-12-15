@@ -1220,6 +1220,10 @@ int efx_ptp_probe(struct efx_nic *efx, struct efx_channel *channel)
 	int rc = 0;
 	unsigned int pos;
 
+	if (!(efx->mcdi->fn_flags &
+	    (1 << MC_CMD_DRV_ATTACH_EXT_OUT_FLAG_PRIMARY)))
+		return 0;
+
 	ptp = kzalloc(sizeof(struct efx_ptp_data), GFP_KERNEL);
 	efx->ptp_data = ptp;
 	if (!efx->ptp_data)
@@ -1261,23 +1265,21 @@ int efx_ptp_probe(struct efx_nic *efx, struct efx_channel *channel)
 	if (rc < 0)
 		goto fail3;
 
-	if (efx->mcdi->fn_flags &
-	    (1 << MC_CMD_DRV_ATTACH_EXT_OUT_FLAG_PRIMARY)) {
-		ptp->phc_clock_info = efx_phc_clock_info;
-		ptp->phc_clock = ptp_clock_register(&ptp->phc_clock_info,
-						    &efx->pci_dev->dev);
-		if (IS_ERR(ptp->phc_clock)) {
-			rc = PTR_ERR(ptp->phc_clock);
-			goto fail3;
-		} else if (ptp->phc_clock) {
-			INIT_WORK(&ptp->pps_work, efx_ptp_pps_worker);
-			ptp->pps_workwq = create_singlethread_workqueue("sfc_pps");
-			if (!ptp->pps_workwq) {
-				rc = -ENOMEM;
-				goto fail4;
-			}
+	ptp->phc_clock_info = efx_phc_clock_info;
+	ptp->phc_clock = ptp_clock_register(&ptp->phc_clock_info,
+					    &efx->pci_dev->dev);
+	if (IS_ERR(ptp->phc_clock)) {
+		rc = PTR_ERR(ptp->phc_clock);
+		goto fail3;
+	} else if (ptp->phc_clock) {
+		INIT_WORK(&ptp->pps_work, efx_ptp_pps_worker);
+		ptp->pps_workwq = create_singlethread_workqueue("sfc_pps");
+		if (!ptp->pps_workwq) {
+			rc = -ENOMEM;
+			goto fail4;
 		}
 	}
+
 	ptp->nic_ts_enabled = false;
 
 	return 0;
