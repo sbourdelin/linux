@@ -661,12 +661,8 @@ found:
 		if (flags & EXT4_GET_BLOCKS_ZERO &&
 		    map->m_flags & EXT4_MAP_MAPPED &&
 		    map->m_flags & EXT4_MAP_NEW) {
-			ext4_lblk_t i;
-
-			for (i = 0; i < map->m_len; i++) {
-				unmap_underlying_metadata(inode->i_sb->s_bdev,
-							  map->m_pblk + i);
-			}
+			clean_bdev_aliases(inode->i_sb->s_bdev, map->m_pblk,
+					   map->m_len);
 			ret = ext4_issue_zeroout(inode, map->m_lblk,
 						 map->m_pblk, map->m_len);
 			if (ret) {
@@ -1137,8 +1133,7 @@ static int ext4_block_write_begin(struct page *page, loff_t pos, unsigned len,
 			if (err)
 				break;
 			if (buffer_new(bh)) {
-				unmap_underlying_metadata(bh->b_bdev,
-							  bh->b_blocknr);
+				clean_bdev_bh_alias(bh);
 				if (PageUptodate(page)) {
 					clear_buffer_new(bh);
 					set_buffer_uptodate(bh);
@@ -2371,11 +2366,8 @@ static int mpage_map_one_extent(handle_t *handle, struct mpage_da_data *mpd)
 
 	BUG_ON(map->m_len == 0);
 	if (map->m_flags & EXT4_MAP_NEW) {
-		struct block_device *bdev = inode->i_sb->s_bdev;
-		int i;
-
-		for (i = 0; i < map->m_len; i++)
-			unmap_underlying_metadata(bdev, map->m_pblk + i);
+		clean_bdev_aliases(inode->i_sb->s_bdev, map->m_pblk,
+				   map->m_len);
 	}
 	return 0;
 }
@@ -3294,6 +3286,7 @@ static int ext4_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 
 	map.m_lblk = first_block;
 	map.m_len = last_block - first_block + 1;
+<<<<<<< HEAD
 
 	if (!(flags & IOMAP_WRITE)) {
 		ret = ext4_map_blocks(NULL, inode, &map, 0);
@@ -3302,6 +3295,16 @@ static int ext4_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 		handle_t *handle;
 		int retries = 0;
 
+=======
+
+	if (!(flags & IOMAP_WRITE)) {
+		ret = ext4_map_blocks(NULL, inode, &map, 0);
+	} else {
+		int dio_credits;
+		handle_t *handle;
+		int retries = 0;
+
+>>>>>>> linux-next/akpm-base
 		/* Trim mapping request to maximum we can map at once for DIO */
 		if (map.m_len > DIO_MAX_BLOCKS)
 			map.m_len = DIO_MAX_BLOCKS;

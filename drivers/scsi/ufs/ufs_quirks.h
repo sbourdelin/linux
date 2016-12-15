@@ -134,10 +134,23 @@ struct ufs_dev_fix {
  */
 #define UFS_DEVICE_QUIRK_HOST_PA_TACTIVATE	(1 << 7)
 
+<<<<<<< HEAD
+=======
+/*
+ * The max. value PA_SaveConfigTime is 250 (10us) but this is not enough for
+ * some vendors.
+ * Gear switch from PWM to HS may fail even with this max. PA_SaveConfigTime.
+ * Gear switch can be issued by host controller as an error recovery and any
+ * software delay will not help on this case so we need to increase
+ * PA_SaveConfigTime to >32us as per vendor recommendation.
+ */
+#define UFS_DEVICE_QUIRK_HOST_PA_SAVECONFIGTIME	(1 << 8)
+>>>>>>> linux-next/akpm-base
 
 struct ufs_hba;
 void ufs_advertise_fixup_device(struct ufs_hba *hba);
 
+<<<<<<< HEAD
 static struct ufs_dev_fix ufs_fixups[] = {
 	/* UFS cards deviations table */
 	UFS_FIX(UFS_VENDOR_SAMSUNG, UFS_ANY_MODEL,
@@ -159,4 +172,6 @@ static struct ufs_dev_fix ufs_fixups[] = {
 
 	END_FIX
 };
+=======
+>>>>>>> linux-next/akpm-base
 #endif /* UFS_QUIRKS_H_ */

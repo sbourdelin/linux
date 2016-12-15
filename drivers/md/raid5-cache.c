@@ -574,18 +574,30 @@ static void r5l_do_submit_io(struct r5l_log *log, struct r5l_io_unit *io)
 	spin_unlock_irqrestore(&log->io_list_lock, flags);
 
 	if (io->has_flush)
+<<<<<<< HEAD
 		io->current_bio->bi_opf |= REQ_PREFLUSH;
 	if (io->has_fua)
 		io->current_bio->bi_opf |= REQ_FUA;
+=======
+		io->current_bio->bi_opf = REQ_OP_WRITE | REQ_PREFLUSH;
+	if (io->has_fua)
+		io->current_bio->bi_opf = REQ_OP_WRITE | REQ_FUA;
+>>>>>>> linux-next/akpm-base
 	submit_bio(io->current_bio);
 
 	if (!io->split_bio)
 		return;
 
 	if (io->has_flush)
+<<<<<<< HEAD
 		io->split_bio->bi_opf |= REQ_PREFLUSH;
 	if (io->has_fua)
 		io->split_bio->bi_opf |= REQ_FUA;
+=======
+		io->split_bio->bi_opf = REQ_OP_WRITE | REQ_PREFLUSH;
+	if (io->has_fua)
+		io->split_bio->bi_opf = REQ_OP_WRITE | REQ_FUA;
+>>>>>>> linux-next/akpm-base
 	submit_bio(io->split_bio);
 }
 

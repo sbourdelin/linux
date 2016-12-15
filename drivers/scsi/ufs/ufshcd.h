@@ -266,7 +266,11 @@ struct ufs_pwr_mode_info {
  * @setup_task_mgmt: called before any task management request is issued
  *                  to set some things
  * @hibern8_notify: called around hibern8 enter/exit
+<<<<<<< HEAD
  *		    to configure some things
+=======
+ * @apply_dev_quirks: called to apply device specific quirks
+>>>>>>> linux-next/akpm-base
  * @suspend: called during host controller PM callback
  * @resume: called during host controller PM callback
  * @dbg_register_dump: used to dump controller debug information
@@ -293,7 +297,12 @@ struct ufs_hba_variant_ops {
 	void	(*setup_xfer_req)(struct ufs_hba *, int, bool);
 	void	(*setup_task_mgmt)(struct ufs_hba *, int, u8);
 	void    (*hibern8_notify)(struct ufs_hba *, enum uic_cmd_dme,
+<<<<<<< HEAD
 				       enum ufs_notify_change_status);
+=======
+					enum ufs_notify_change_status);
+	int	(*apply_dev_quirks)(struct ufs_hba *);
+>>>>>>> linux-next/akpm-base
 	int     (*suspend)(struct ufs_hba *, enum ufs_pm_op);
 	int     (*resume)(struct ufs_hba *, enum ufs_pm_op);
 	void	(*dbg_register_dump)(struct ufs_hba *hba);
@@ -839,6 +848,16 @@ static inline void ufshcd_vops_hibern8_notify(struct ufs_hba *hba,
 		return hba->vops->hibern8_notify(hba, cmd, status);
 }
 
+<<<<<<< HEAD
+=======
+static inline int ufshcd_vops_apply_dev_quirks(struct ufs_hba *hba)
+{
+	if (hba->vops && hba->vops->apply_dev_quirks)
+		return hba->vops->apply_dev_quirks(hba);
+	return 0;
+}
+
+>>>>>>> linux-next/akpm-base
 static inline int ufshcd_vops_suspend(struct ufs_hba *hba, enum ufs_pm_op op)
 {
 	if (hba->vops && hba->vops->suspend)
