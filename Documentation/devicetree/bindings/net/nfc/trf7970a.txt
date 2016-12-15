@@ -21,6 +21,7 @@ Optional SoC Specific Properties:
 - t5t-rmb-extra-byte-quirk: Specify that the trf7970a has the erratum
   where an extra byte is returned by Read Multiple Block commands issued
   to Type 5 tags.
+- vdd_io_1v8: Set to specify that the trf7970a io voltage should be set to 1.8V
 - crystal_27mhz: Set to specify that the input frequency to the trf7970a is 27.12MHz
 
 
@@ -45,6 +46,7 @@ Example (for ARM-based BeagleBone with TRF7970A on SPI1):
 		irq-status-read-quirk;
 		en2-rf-quirk;
 		t5t-rmb-extra-byte-quirk;
+		vdd_io_1v8;
 		crystal_27mhz;
 		status = "okay";
 	};
