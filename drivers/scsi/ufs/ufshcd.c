@@ -5237,11 +5237,8 @@ static void ufshcd_tune_unipro_params(struct ufs_hba *hba)
 
 	if (hba->dev_quirks & UFS_DEVICE_QUIRK_HOST_PA_TACTIVATE)
 		ufshcd_quirk_tune_host_pa_tactivate(hba);
-<<<<<<< HEAD
-=======
 
 	ufshcd_vops_apply_dev_quirks(hba);
->>>>>>> linux-next/akpm-base
 }
 
 /**

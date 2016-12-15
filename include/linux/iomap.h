@@ -50,10 +50,7 @@ struct iomap {
 #define IOMAP_ZERO		(1 << 1) /* zeroing operation, may skip holes */
 #define IOMAP_REPORT		(1 << 2) /* report extent status, e.g. FIEMAP */
 #define IOMAP_FAULT		(1 << 3) /* mapping for page fault */
-<<<<<<< HEAD
-=======
 #define IOMAP_DIRECT		(1 << 4) /* direct I/O */
->>>>>>> linux-next/akpm-base
 
 struct iomap_ops {
 	/*

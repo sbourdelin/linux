@@ -67,8 +67,6 @@ MODULE_PARM_DESC(card, "card type (0=NCR5380, 1=NCR53C400, 2=NCR53C400A, 3=DTC31
 MODULE_ALIAS("g_NCR5380_mmio");
 MODULE_LICENSE("GPL");
 
-<<<<<<< HEAD
-=======
 static void g_NCR5380_trigger_irq(struct Scsi_Host *instance)
 {
 	struct NCR5380_hostdata *hostdata = shost_priv(instance);
@@ -119,7 +117,6 @@ static int g_NCR5380_probe_irq(struct Scsi_Host *instance)
 	return irq;
 }
 
->>>>>>> linux-next/akpm-base
 /*
  * Configure I/O address of 53C400A or DTC436 by writing magic numbers
  * to ports 0x779 and 0x379.
@@ -142,8 +139,6 @@ static void magic_configure(int idx, u8 irq, u8 magic[])
 	outb(cfg, 0x379);
 }
 
-<<<<<<< HEAD
-=======
 static irqreturn_t legacy_empty_irq_handler(int irq, void *dev_id)
 {
 	return IRQ_HANDLED;
@@ -163,7 +158,6 @@ static int legacy_find_free_irq(int *irq_table)
 	return -1;
 }
 
->>>>>>> linux-next/akpm-base
 static unsigned int ncr_53c400a_ports[] = {
 	0x280, 0x290, 0x300, 0x310, 0x330, 0x340, 0x348, 0x350, 0
 };
@@ -176,12 +170,9 @@ static u8 ncr_53c400a_magic[] = {	/* 53C400A & DTC436 */
 static u8 hp_c2502_magic[] = {	/* HP C2502 */
 	0x0f, 0x22, 0xf0, 0x20, 0x80
 };
-<<<<<<< HEAD
-=======
 static int hp_c2502_irqs[] = {
 	9, 5, 7, 3, 4, -1
 };
->>>>>>> linux-next/akpm-base
 
 static int generic_NCR5380_init_one(struct scsi_host_template *tpnt,
 			struct device *pdev, int base, int irq, int board)
@@ -327,8 +318,6 @@ static int generic_NCR5380_init_one(struct scsi_host_template *tpnt,
 			ret = -EINVAL;
 			goto out_unregister;
 		}
-<<<<<<< HEAD
-=======
 	}
 
 	/* Check for vacant slot */
@@ -336,7 +325,6 @@ static int generic_NCR5380_init_one(struct scsi_host_template *tpnt,
 	if (NCR5380_read(MODE_REG) != 0) {
 		ret = -ENODEV;
 		goto out_unregister;
->>>>>>> linux-next/akpm-base
 	}
 
 	ret = NCR5380_init(instance, flags | FLAG_LATE_DMA_SETUP);
@@ -395,12 +383,6 @@ static int generic_NCR5380_init_one(struct scsi_host_template *tpnt,
 	}
 
 	if (instance->irq != NO_IRQ) {
-<<<<<<< HEAD
-		/* set IRQ for HP C2502 */
-		if (board == BOARD_HP_C2502)
-			magic_configure(port_idx, instance->irq, magic);
-=======
->>>>>>> linux-next/akpm-base
 		if (request_irq(instance->irq, generic_NCR5380_intr,
 				0, "NCR5380", instance)) {
 			instance->irq = NO_IRQ;

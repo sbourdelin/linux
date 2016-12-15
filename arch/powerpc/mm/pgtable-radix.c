@@ -405,10 +405,7 @@ void __init radix__early_init_mmu(void)
 
 	memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
 
-<<<<<<< HEAD
-=======
 	radix_init_iamr();
->>>>>>> linux-next/akpm-base
 	radix_init_pgtable();
 }
 

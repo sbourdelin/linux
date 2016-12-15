@@ -237,15 +237,9 @@ xfs_file_dax_read(
 	if (!count)
 		return 0; /* skip atime */
 
-<<<<<<< HEAD
-	xfs_rw_ilock(ip, XFS_IOLOCK_SHARED);
-	ret = dax_iomap_rw(iocb, to, &xfs_iomap_ops);
-	xfs_rw_iunlock(ip, XFS_IOLOCK_SHARED);
-=======
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 	ret = dax_iomap_rw(iocb, to, &xfs_iomap_ops);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
->>>>>>> linux-next/akpm-base
 
 	file_accessed(iocb->ki_filp);
 	return ret;
@@ -599,10 +593,6 @@ xfs_file_dax_write(
 	count = iov_iter_count(from);
 
 	trace_xfs_file_dax_write(ip, count, pos);
-<<<<<<< HEAD
-
-=======
->>>>>>> linux-next/akpm-base
 	ret = dax_iomap_rw(iocb, from, &xfs_iomap_ops);
 	if (ret > 0 && iocb->ki_pos > i_size_read(inode)) {
 		i_size_write(inode, iocb->ki_pos);
@@ -1423,21 +1413,9 @@ xfs_filemap_fault(
 		return xfs_filemap_page_mkwrite(vma, vmf);
 
 	xfs_ilock(XFS_I(inode), XFS_MMAPLOCK_SHARED);
-<<<<<<< HEAD
-	if (IS_DAX(inode)) {
-		/*
-		 * we do not want to trigger unwritten extent conversion on read
-		 * faults - that is unnecessary overhead and would also require
-		 * changes to xfs_get_blocks_direct() to map unwritten extent
-		 * ioend for conversion on read-only mappings.
-		 */
-		ret = dax_iomap_fault(vma, vmf, &xfs_iomap_ops);
-	} else
-=======
 	if (IS_DAX(inode))
 		ret = dax_iomap_fault(vma, vmf, &xfs_iomap_ops);
 	else
->>>>>>> linux-next/akpm-base
 		ret = filemap_fault(vma, vmf);
 	xfs_iunlock(XFS_I(inode), XFS_MMAPLOCK_SHARED);
 

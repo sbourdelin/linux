@@ -3286,7 +3286,6 @@ static int ext4_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 
 	map.m_lblk = first_block;
 	map.m_len = last_block - first_block + 1;
-<<<<<<< HEAD
 
 	if (!(flags & IOMAP_WRITE)) {
 		ret = ext4_map_blocks(NULL, inode, &map, 0);
@@ -3295,16 +3294,6 @@ static int ext4_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 		handle_t *handle;
 		int retries = 0;
 
-=======
-
-	if (!(flags & IOMAP_WRITE)) {
-		ret = ext4_map_blocks(NULL, inode, &map, 0);
-	} else {
-		int dio_credits;
-		handle_t *handle;
-		int retries = 0;
-
->>>>>>> linux-next/akpm-base
 		/* Trim mapping request to maximum we can map at once for DIO */
 		if (map.m_len > DIO_MAX_BLOCKS)
 			map.m_len = DIO_MAX_BLOCKS;
