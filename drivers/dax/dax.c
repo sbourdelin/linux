@@ -94,7 +94,7 @@ static unsigned long long dax_region_avail_size(
 	unsigned long long size;
 	struct resource *res;
 
-	WARN_ON_ONCE(!mutex_is_locked(&dax_region->lock));
+	lockdep_assert_held(&dax_region->lock);
 
 	size = resource_size(&dax_region->res);
 	for_each_dax_region_resource(dax_region, res) {
@@ -414,7 +414,7 @@ static unsigned long long dax_dev_size(struct dax_dev *dax_dev)
 	unsigned long long size = 0;
 	int i;
 
-	WARN_ON_ONCE(!mutex_is_locked(&dax_region->lock));
+	lockdep_assert_held(&dax_region->lock);
 
 	if (!dax_dev->alive)
 		return 0;
