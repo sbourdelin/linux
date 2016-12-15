@@ -151,6 +151,7 @@ struct throtl_grp {
 
 	unsigned long last_check_time;
 
+	u64 latency_target;
 	/* When did we start a new slice */
 	unsigned long slice_start[2];
 	unsigned long slice_end[2];
@@ -437,6 +438,11 @@ static struct blkg_policy_data *throtl_pd_alloc(gfp_t gfp, int node)
 		}
 	}
 	tg->idle_ttime_threshold = U64_MAX;
+
+	/*
+	 * target latency default 0, eg, latency threshold is 0, which means
+	 * cgroup's latency is always higher than threshold
+	 */
 
 	return &tg->pd;
 }
@@ -1426,6 +1432,7 @@ static u64 tg_prfill_limit(struct seq_file *sf, struct blkg_policy_data *pd,
 	const char *dname = blkg_dev_name(pd->blkg);
 	char bufs[4][21] = { "max", "max", "max", "max" };
 	char idle_time[26] = "";
+	char latency_time[26] = "";
 
 	if (!dname)
 		return 0;
@@ -1434,8 +1441,9 @@ static u64 tg_prfill_limit(struct seq_file *sf, struct blkg_policy_data *pd,
 	    tg->bps_conf[WRITE][off] == U64_MAX &&
 	    tg->iops_conf[READ][off] == UINT_MAX &&
 	    tg->iops_conf[WRITE][off] == UINT_MAX &&
-	    (off != LIMIT_LOW || tg->idle_ttime_threshold ==
-				  tg->td->dft_idle_ttime_threshold))
+	    (off != LIMIT_LOW ||
+	     (tg->idle_ttime_threshold == tg->td->dft_idle_ttime_threshold &&
+	      tg->latency_target == 0)))
 		return 0;
 
 	if (tg->bps_conf[READ][off] != U64_MAX)
@@ -1456,10 +1464,18 @@ static u64 tg_prfill_limit(struct seq_file *sf, struct blkg_policy_data *pd,
 		else
 			snprintf(idle_time, sizeof(idle_time), " idle=%llu",
 				div_u64(tg->idle_ttime_threshold, 1000));
+
+		if (tg->latency_target == U64_MAX)
+			strcpy(latency_time, " latency=max");
+		else
+			snprintf(latency_time, sizeof(latency_time),
+				" latency=%llu",
+				div_u64(tg->latency_target, 1000));
 	}
 
-	seq_printf(sf, "%s rbps=%s wbps=%s riops=%s wiops=%s%s\n",
-		   dname, bufs[0], bufs[1], bufs[2], bufs[3], idle_time);
+	seq_printf(sf, "%s rbps=%s wbps=%s riops=%s wiops=%s%s%s\n",
+		   dname, bufs[0], bufs[1], bufs[2], bufs[3], idle_time,
+		   latency_time);
 	return 0;
 }
 
@@ -1478,6 +1494,7 @@ static ssize_t tg_set_limit(struct kernfs_open_file *of,
 	struct throtl_grp *tg;
 	u64 v[4];
 	u64 idle_time;
+	u64 latency_time;
 	int ret;
 	int index = of_cft(of)->private;
 
@@ -1493,6 +1510,7 @@ static ssize_t tg_set_limit(struct kernfs_open_file *of,
 	v[3] = tg->iops_conf[WRITE][index];
 
 	idle_time = tg->idle_ttime_threshold;
+	latency_time = tg->latency_target;
 	while (true) {
 		char tok[27];	/* wiops=18446744073709551616 */
 		char *p;
@@ -1526,6 +1544,8 @@ static ssize_t tg_set_limit(struct kernfs_open_file *of,
 			v[3] = min_t(u64, val, UINT_MAX);
 		else if (off == LIMIT_LOW && !strcmp(tok, "idle"))
 			idle_time = val;
+		else if (off == LIMIT_LOW && !strcmp(tok, "latency"))
+			latency_time = val;
 		else
 			goto out_finish;
 	}
@@ -1556,6 +1576,8 @@ static ssize_t tg_set_limit(struct kernfs_open_file *of,
 			tg->td->limit_index = LIMIT_LOW;
 		tg->idle_ttime_threshold = (idle_time == U64_MAX) ?
 			U64_MAX : idle_time * 1000;
+		tg->latency_target = (latency_time == U64_MAX) ?
+			U64_MAX : latency_time * 1000;
 	}
 	tg_conf_updated(tg);
 	ret = 0;
