@@ -2286,6 +2286,9 @@ bad_unshare_cleanup_fs:
 		free_fs_struct(new_fs);
 
 bad_unshare_out:
+	if (!err)
+		perf_event_namespaces(current);
+
 	return err;
 }
 
