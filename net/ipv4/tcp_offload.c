@@ -96,7 +96,7 @@ struct sk_buff *tcp_gso_segment(struct sk_buff *skb,
 	skb->ooo_okay = 0;
 
 	segs = skb_segment(skb, features);
-	if (IS_ERR(segs))
+	if (IS_ERR_OR_NULL(segs))
 		goto out;
 
 	/* Only first segment might have ooo_okay set */
