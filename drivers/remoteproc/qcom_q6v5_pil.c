@@ -93,8 +93,22 @@
 #define QDSS_BHS_ON			BIT(21)
 #define QDSS_LDO_BYP			BIT(22)
 
+struct reg_info {
+	struct regulator *reg;
+	int uV;
+	int uA;
+};
+
+struct qcom_mss_reg_res {
+	const char *supply;
+	int uV;
+	int uA;
+};
+
 struct rproc_hexagon_res {
 	const char *hexagon_mba_image;
+	struct qcom_mss_reg_res proxy_supply[4];
+	struct qcom_mss_reg_res active_supply[2];
 	char **proxy_clk_string;
 	char **active_clk_string;
 };
@@ -120,6 +134,11 @@ struct q6v5 {
 	struct clk *proxy_clks[4];
 	int active_clk_count;
 	int proxy_clk_count;
+
+	struct reg_info active_regs[1];
+	struct reg_info proxy_regs[3];
+	int active_reg_count;
+	int proxy_reg_count;
 
 	struct regulator_bulk_data supply[4];
 
@@ -148,28 +167,33 @@ enum {
 	Q6V5_SUPPLY_PLL,
 };
 
-static int q6v5_regulator_init(struct q6v5 *qproc)
+static int q6v5_regulator_init(struct device *dev, struct reg_info *regs,
+				const struct qcom_mss_reg_res *reg_res)
 {
-	int ret;
+	int count = 0;
+	int rc;
+	int i;
 
-	qproc->supply[Q6V5_SUPPLY_CX].supply = "cx";
-	qproc->supply[Q6V5_SUPPLY_MX].supply = "mx";
-	qproc->supply[Q6V5_SUPPLY_MSS].supply = "mss";
-	qproc->supply[Q6V5_SUPPLY_PLL].supply = "pll";
+	while (reg_res[count].supply)
+	count++;
 
-	ret = devm_regulator_bulk_get(qproc->dev,
-				      ARRAY_SIZE(qproc->supply), qproc->supply);
-	if (ret < 0) {
-		dev_err(qproc->dev, "failed to get supplies\n");
-		return ret;
+	for (i = 0; i < count; i++) {
+		regs[i].reg = devm_regulator_get(dev, reg_res[i].supply);
+		if (IS_ERR(regs[i].reg)) {
+			rc = PTR_ERR(regs[i].reg);
+			if (rc != -EPROBE_DEFER)
+				dev_err(dev, "Failed to get %s\n regulator",
+						reg_res[i].supply);
+			return rc;
+		}
+
+		regs[i].uV = reg_res[i].uV;
+		regs[i].uA = reg_res[i].uA;
 	}
 
-	regulator_set_load(qproc->supply[Q6V5_SUPPLY_CX].consumer, 100000);
-	regulator_set_load(qproc->supply[Q6V5_SUPPLY_MSS].consumer, 100000);
-	regulator_set_load(qproc->supply[Q6V5_SUPPLY_PLL].consumer, 10000);
-
-	return 0;
+	return count;
 }
+
 
 static int q6v5_regulator_enable(struct q6v5 *qproc)
 {
@@ -872,9 +896,21 @@ static int q6v5_probe(struct platform_device *pdev)
 	}
 	qproc->active_clk_count = ret;
 
-	ret = q6v5_regulator_init(qproc);
-	if (ret)
+	ret = q6v5_regulator_init(&pdev->dev, qproc->proxy_regs,
+					desc->proxy_supply);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "Failed to setup proxy regulators.\n");
 		goto free_rproc;
+	}
+	qproc->proxy_reg_count = ret;
+
+	ret = q6v5_regulator_init(&pdev->dev,  qproc->active_regs,
+					desc->active_supply);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "Failed to setup active regulators.\n");
+		goto free_rproc;
+	}
+	qproc->active_reg_count = ret;
 
 	ret = q6v5_init_reset(qproc);
 	if (ret)
@@ -926,12 +962,58 @@ static int q6v5_remove(struct platform_device *pdev)
 
 static const struct rproc_hexagon_res msm8916_mss = {
 	.hexagon_mba_image = "mba.mbn",
+	.proxy_supply = (struct qcom_mss_reg_res[]) {
+		{
+			.supply = "mx",
+			.uV = 1050000,
+		},
+		{
+			.supply = "cx",
+			.uA = 100000,
+		},
+		{
+			.supply = "pll",
+			.uA = 100000,
+		},
+		{ NULL }
+	},
+	.active_supply = (struct qcom_mss_reg_res[]) {
+		{
+			.supply = "mss",
+			.uV = 1050000,
+			.uA = 100000,
+		},
+		{ NULL }
+	},
 	.proxy_clk_string = (char*[]){"xo", NULL},
 	.active_clk_string = (char*[]){"iface", "bus", "mem", NULL},
 };
 
 static const struct rproc_hexagon_res msm8974_mss = {
 	.hexagon_mba_image = "mba.b00",
+	.proxy_supply = (struct qcom_mss_reg_res[]) {
+		{
+			.supply = "mx",
+			.uV = 1050000,
+		},
+		{
+			.supply = "cx",
+			.uA = 100000,
+		},
+		{
+			.supply = "pll",
+			.uA = 100000,
+		},
+		{ NULL }
+	},
+	.active_supply = (struct qcom_mss_reg_res[]) {
+		{
+			.supply = "mss",
+			.uV = 1050000,
+			.uA = 100000,
+		},
+		{ NULL }
+	},
 	.proxy_clk_string = (char*[]){"xo", NULL},
 	.active_clk_string = (char*[]){"iface", "bus", "mem", NULL},
 };
