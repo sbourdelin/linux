@@ -339,6 +339,9 @@ void arch_crash_save_vmcoreinfo(void)
 			      kaslr_offset());
 	VMCOREINFO_NUMBER(KERNEL_IMAGE_SIZE);
 	VMCOREINFO_PHYS_BASE(phys_base);
+	VMCOREINFO_PAGE_OFFSET(PAGE_OFFSET);
+	VMCOREINFO_VMALLOC_START(VMALLOC_START);
+	VMCOREINFO_VMEMMAP_START(VMEMMAP_START);
 }
 
 /* arch-dependent functionality related to kexec file-based syscall */
