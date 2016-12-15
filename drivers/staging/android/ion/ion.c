@@ -776,6 +776,11 @@ static struct sg_table *dup_sg_table(struct sg_table *table)
 	return new_table;
 }
 
+static void free_duped_table(struct sg_table *table)
+{
+	sg_free_table(table);
+	kfree(table);
+}
 
 static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
 					enum dma_data_direction direction)
@@ -784,15 +789,29 @@ static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
 	struct ion_buffer *buffer = dmabuf->priv;
 	struct sg_table *table;
 
-	return dup_sg_table(buffer->sg_table);
+	/*
+	 * TODO: Need to sync wrt CPU or device completely owning?
+	 */
+
+	table = dup_sg_table(buffer->sg_table);
+
+	if (!dma_map_sg(attachment->dev, table->sgl, table->nents,
+			direction)){
+		ret = -ENOMEM;
+		goto err;
+	}
+
+err:
+	free_duped_table(table);
+	return ERR_PTR(ret);
 }
 
 static void ion_unmap_dma_buf(struct dma_buf_attachment *attachment,
 			      struct sg_table *table,
 			      enum dma_data_direction direction)
 {
-	sg_free_table(table);
-	kfree(table);
+	dma_unmap_sg(attachment->dev, table->sgl, table->nents, direction);
+	free_duped_table(table);
 }
 
 struct ion_vma_list {
@@ -889,16 +908,24 @@ static int ion_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 	struct ion_buffer *buffer = dmabuf->priv;
 	void *vaddr;
 
-	if (!buffer->heap->ops->map_kernel) {
-		pr_err("%s: map kernel is not implemented by this heap.\n",
-		       __func__);
-		return -ENODEV;
+	/*
+	 * TODO: Move this elsewhere because we don't always need a vaddr
+	 */
+	if (buffer->heap->ops->map_kernel) {
+		mutex_lock(&buffer->lock);
+		vaddr = ion_buffer_kmap_get(buffer);
+		mutex_unlock(&buffer->lock);
 	}
 
-	mutex_lock(&buffer->lock);
-	vaddr = ion_buffer_kmap_get(buffer);
-	mutex_unlock(&buffer->lock);
-	return PTR_ERR_OR_ZERO(vaddr);
+	/*
+	 * Close enough right now? Flag to skip sync?
+	 */
+	if (!dma_map_sg(buffer->dev->dev.this_device, buffer->sg_table->sgl,
+			buffer->sg_table->nents,
+                        DMA_BIDIRECTIONAL))
+		return -ENOMEM;
+
+	return 0;
 }
 
 static int ion_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
@@ -906,9 +933,15 @@ static int ion_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 {
 	struct ion_buffer *buffer = dmabuf->priv;
 
-	mutex_lock(&buffer->lock);
-	ion_buffer_kmap_put(buffer);
-	mutex_unlock(&buffer->lock);
+	if (buffer->heap->ops->map_kernel) {
+		mutex_lock(&buffer->lock);
+		ion_buffer_kmap_put(buffer);
+		mutex_unlock(&buffer->lock);
+	}
+
+	dma_unmap_sg(buffer->dev->dev.this_device, buffer->sg_table->sgl,
+			buffer->sg_table->nents,
+			DMA_BIDIRECTIONAL);
 
 	return 0;
 }
