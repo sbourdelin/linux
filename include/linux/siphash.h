@@ -29,4 +29,37 @@ static inline u64 siphash_unaligned(const void *data, size_t len,
 u64 siphash_unaligned(const void *data, size_t len, const siphash_key_t key);
 #endif
 
+u64 siphash_1u64(const u64 a, const siphash_key_t key);
+u64 siphash_2u64(const u64 a, const u64 b, const siphash_key_t key);
+u64 siphash_3u64(const u64 a, const u64 b, const u64 c,
+		 const siphash_key_t key);
+u64 siphash_4u64(const u64 a, const u64 b, const u64 c, const u64 d,
+		 const siphash_key_t key);
+
+static inline u64 siphash_2u32(const u32 a, const u32 b, const siphash_key_t key)
+{
+	return siphash_1u64((u64)b << 32 | a, key);
+}
+
+static inline u64 siphash_4u32(const u32 a, const u32 b, const u32 c, const u32 d,
+			       const siphash_key_t key)
+{
+	return siphash_2u64((u64)b << 32 | a, (u64)d << 32 | c, key);
+}
+
+static inline u64 siphash_6u32(const u32 a, const u32 b, const u32 c, const u32 d,
+			       const u32 e, const u32 f, const siphash_key_t key)
+{
+	return siphash_3u64((u64)b << 32 | a, (u64)d << 32 | c, (u64)f << 32 | e,
+			    key);
+}
+
+static inline u64 siphash_8u32(const u32 a, const u32 b, const u32 c, const u32 d,
+			       const u32 e, const u32 f, const u32 g, const u32 h,
+			       const siphash_key_t key)
+{
+	return siphash_4u64((u64)b << 32 | a, (u64)d << 32 | c, (u64)f << 32 | e,
+			    (u64)h << 32 | g, key);
+}
+
 #endif /* _LINUX_SIPHASH_H */

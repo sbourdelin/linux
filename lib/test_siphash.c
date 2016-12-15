@@ -67,6 +67,24 @@ static int __init siphash_test_init(void)
 			ret = -EINVAL;
 		}
 	}
+	if (siphash_1u64(0x0706050403020100ULL, test_key) != test_vectors[8]) {
+		pr_info("self-test 1u64: FAIL\n");
+		ret = -EINVAL;
+	}
+	if (siphash_2u64(0x0706050403020100ULL, 0x0f0e0d0c0b0a0908ULL, test_key) != test_vectors[16]) {
+		pr_info("self-test 2u64: FAIL\n");
+		ret = -EINVAL;
+	}
+	if (siphash_3u64(0x0706050403020100ULL, 0x0f0e0d0c0b0a0908ULL,
+			 0x1716151413121110ULL, test_key) != test_vectors[24]) {
+		pr_info("self-test 3u64: FAIL\n");
+		ret = -EINVAL;
+	}
+	if (siphash_4u64(0x0706050403020100ULL, 0x0f0e0d0c0b0a0908ULL,
+			 0x1716151413121110ULL, 0x1f1e1d1c1b1a1918ULL, test_key) != test_vectors[32]) {
+		pr_info("self-test 4u64: FAIL\n");
+		ret = -EINVAL;
+	}
 	if (!ret)
 		pr_info("self-tests: pass\n");
 	return ret;
