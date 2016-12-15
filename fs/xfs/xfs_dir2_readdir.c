@@ -503,7 +503,7 @@ xfs_dir2_leaf_getdents(
 	length = howmany(bufsize + geo->blksize, (1 << geo->fsblog));
 	map_info = kmem_zalloc(offsetof(struct xfs_dir2_leaf_map_info, map) +
 				(length * sizeof(struct xfs_bmbt_irec)),
-			       KM_SLEEP | KM_NOFS);
+			       KM_SLEEP | KM_NOLOCKDEP);
 	map_info->map_size = length;
 
 	/*
