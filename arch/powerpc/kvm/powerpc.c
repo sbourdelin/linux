@@ -606,7 +606,10 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 		r = 1;
 		break;
 	case KVM_CAP_SPAPR_RESIZE_HPT:
-		r = 1; /* resize allowed only if HPT is outside kernel */
+		if (hv_enabled)
+			r = 2; /* In-kernel resize implementation */
+		else
+			r = 1; /* outside kernel resize allowed */
 		break;
 #endif
 	case KVM_CAP_PPC_HTM:
