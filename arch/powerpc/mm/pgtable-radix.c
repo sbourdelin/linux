@@ -351,8 +351,10 @@ void __init radix__early_init_mmu(void)
 #ifdef CONFIG_PPC_64K_PAGES
 	/* PAGE_SIZE mappings */
 	mmu_virtual_psize = MMU_PAGE_64K;
+	mmu_linear_psize = MMU_PAGE_64K;
 #else
 	mmu_virtual_psize = MMU_PAGE_4K;
+	mmu_linear_psize = MMU_PAGE_4K;
 #endif
 
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
