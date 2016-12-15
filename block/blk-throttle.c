@@ -21,6 +21,9 @@ static int throtl_quantum = 32;
 /* Throttling is performed over 100ms slice and after that slice is renewed */
 #define DFL_THROTL_SLICE (HZ / 10)
 #define MAX_THROTL_SLICE (HZ / 5)
+#define DFL_IDLE_THRESHOLD_SSD (50 * 1000) /* 50 us */
+#define DFL_IDLE_THRESHOLD_HD (1000 * 1000) /* 1 ms */
+#define MAX_IDLE_TIME (500L * 1000 * 1000) /* 500 ms */
 
 static struct blkcg_policy blkcg_policy_throtl;
 
@@ -153,6 +156,11 @@ struct throtl_grp {
 	/* When did we start a new slice */
 	unsigned long slice_start[2];
 	unsigned long slice_end[2];
+
+	u64 last_finish_time;
+	u64 checked_last_finish_time;
+	u64 avg_ttime;
+	u64 idle_ttime_threshold;
 };
 
 struct throtl_data
@@ -428,6 +436,7 @@ static struct blkg_policy_data *throtl_pd_alloc(gfp_t gfp, int node)
 			tg->iops_conf[rw][index] = UINT_MAX;
 		}
 	}
+	tg->idle_ttime_threshold = U64_MAX;
 
 	return &tg->pd;
 }
@@ -1607,6 +1616,20 @@ static unsigned long tg_last_low_overflow_time(struct throtl_grp *tg)
 	return ret;
 }
 
+static bool throtl_tg_is_idle(struct throtl_grp *tg)
+{
+	/*
+	 * cgroup is idle if:
+	 * - single idle is too long, longer than a fixed value (in case user
+	 *   configure a too big threshold) or 4 times of slice
+	 * - average think time is more than threshold
+	 */
+	u64 time = (u64)jiffies_to_usecs(4 * tg->td->throtl_slice) * 1000;
+	time = min_t(u64, MAX_IDLE_TIME, time);
+	return ktime_get_ns() - tg->last_finish_time > time ||
+	       tg->avg_ttime > tg->idle_ttime_threshold;
+}
+
 static bool throtl_tg_can_upgrade(struct throtl_grp *tg)
 {
 	struct throtl_service_queue *sq = &tg->service_queue;
@@ -1808,6 +1831,19 @@ static void throtl_downgrade_check(struct throtl_grp *tg)
 	tg->last_io_disp[WRITE] = 0;
 }
 
+static void blk_throtl_update_ttime(struct throtl_grp *tg)
+{
+	u64 now = ktime_get_ns();
+	u64 last_finish_time = tg->last_finish_time;
+
+	if (now <= last_finish_time || last_finish_time == 0 ||
+	    last_finish_time == tg->checked_last_finish_time)
+		return;
+
+	tg->avg_ttime = (tg->avg_ttime * 7 + now - last_finish_time) >> 3;
+	tg->checked_last_finish_time = last_finish_time;
+}
+
 bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 		    struct bio *bio)
 {
@@ -1816,8 +1852,17 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 	struct throtl_service_queue *sq;
 	bool rw = bio_data_dir(bio);
 	bool throttled = false;
+	int ret;
 
 	WARN_ON_ONCE(!rcu_read_lock_held());
+
+	/* nonrot bit isn't set in queue creation */
+	if (tg->idle_ttime_threshold == U64_MAX) {
+		if (blk_queue_nonrot(q))
+			tg->idle_ttime_threshold = DFL_IDLE_THRESHOLD_SSD;
+		else
+			tg->idle_ttime_threshold = DFL_IDLE_THRESHOLD_HD;
+	}
 
 	/* see throtl_charge_bio() */
 	if (bio_flagged(bio, BIO_THROTTLED) || !tg->has_rules[rw])
@@ -1827,6 +1872,12 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 
 	if (unlikely(blk_queue_bypass(q)))
 		goto out_unlock;
+
+	ret = bio_associate_current(bio);
+	if (ret == 0 || ret == -EBUSY)
+		bio->bi_cg_private = tg;
+
+	blk_throtl_update_ttime(tg);
 
 	sq = &tg->service_queue;
 
@@ -1888,7 +1939,6 @@ again:
 
 	tg->last_low_overflow_time[rw] = jiffies;
 
-	bio_associate_current(bio);
 	tg->td->nr_queued[rw]++;
 	throtl_add_bio_tg(bio, qn, tg);
 	throttled = true;
@@ -1915,6 +1965,18 @@ out:
 	if (!throttled)
 		bio_clear_flag(bio, BIO_THROTTLED);
 	return throttled;
+}
+
+void blk_throtl_bio_endio(struct bio *bio)
+{
+	struct throtl_grp *tg;
+
+	tg = bio->bi_cg_private;
+	if (!tg)
+		return;
+	bio->bi_cg_private = NULL;
+
+	tg->last_finish_time = ktime_get_ns();
 }
 
 /*
@@ -2001,6 +2063,7 @@ int blk_throtl_init(struct request_queue *q)
 	td->limit_index = LIMIT_MAX;
 	td->low_upgrade_time = jiffies;
 	td->low_downgrade_time = jiffies;
+
 	/* activate policy */
 	ret = blkcg_activate_policy(q, &blkcg_policy_throtl);
 	if (ret)
