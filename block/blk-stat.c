@@ -7,6 +7,7 @@
 #include <linux/blk-mq.h>
 
 #include "blk-stat.h"
+#include "blk.h"
 #include "blk-mq.h"
 
 static void blk_stat_flush_batch(struct blk_rq_stat *stat)
@@ -204,6 +205,9 @@ void blk_stat_add(struct blk_rq_stat *stat, struct request *rq)
 		__blk_stat_init(stat, now);
 
 	value = now - blk_stat_time(&rq->issue_stat);
+
+	blk_throtl_stat_add(rq, value);
+
 	if (value > stat->max)
 		stat->max = value;
 	if (value < stat->min)

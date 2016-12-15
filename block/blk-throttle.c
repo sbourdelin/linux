@@ -25,6 +25,8 @@ static int throtl_quantum = 32;
 #define DFL_IDLE_THRESHOLD_HD (1000 * 1000) /* 1 ms */
 #define MAX_IDLE_TIME (500L * 1000 * 1000) /* 500 ms */
 
+#define SKIP_TRACK (((u64)1) << BLK_STAT_RES_SHIFT)
+
 static struct blkcg_policy blkcg_policy_throtl;
 
 /* A workqueue to queue throttle related work */
@@ -162,6 +164,19 @@ struct throtl_grp {
 	u64 idle_ttime_threshold;
 };
 
+/* We measure latency for request size from <= 4k to >= 1M */
+#define LATENCY_BUCKET_SIZE 9
+
+struct latency_bucket {
+	u64 total_latency;
+	int samples;
+};
+
+struct avg_latency_bucket {
+	u64 latency;
+	bool valid;
+};
+
 struct throtl_data
 {
 	/* service tree for active throtl groups */
@@ -185,6 +200,13 @@ struct throtl_data
 	unsigned long low_downgrade_time;
 
 	unsigned int scale;
+
+	struct latency_bucket tmp_buckets[LATENCY_BUCKET_SIZE];
+	struct avg_latency_bucket avg_buckets[LATENCY_BUCKET_SIZE];
+	struct latency_bucket __percpu *latency_buckets;
+	unsigned long last_calculate_time;
+
+	unsigned int track_bio_latency;
 };
 
 static void throtl_pending_timer_fn(unsigned long arg);
@@ -291,6 +313,13 @@ static unsigned int tg_iops_limit(struct throtl_grp *tg, int rw)
 			tg->iops[rw][LIMIT_LOW] + (unsigned int)increase);
 	}
 	return ret;
+}
+
+static int request_bucket_index(sector_t sectors)
+{
+	int order = order_base_2(sectors);
+
+	return clamp_t(int, order - 3, 0, LATENCY_BUCKET_SIZE - 1);
 }
 
 /**
@@ -1896,12 +1925,74 @@ static void blk_throtl_update_ttime(struct throtl_grp *tg)
 	tg->checked_last_finish_time = last_finish_time;
 }
 
+static void throtl_update_latency_buckets(struct throtl_data *td)
+{
+	struct avg_latency_bucket avg_latency[LATENCY_BUCKET_SIZE];
+	int i, cpu;
+	u64 last_latency = 0;
+	u64 latency;
+
+	if (!blk_queue_nonrot(td->queue))
+		return;
+	if (time_before(jiffies, td->last_calculate_time + HZ))
+		return;
+	td->last_calculate_time = jiffies;
+
+	memset(avg_latency, 0, sizeof(avg_latency));
+	for (i = 0; i < LATENCY_BUCKET_SIZE; i++) {
+		struct latency_bucket *tmp = &td->tmp_buckets[i];
+
+		for_each_possible_cpu(cpu) {
+			struct latency_bucket *bucket;
+
+			/* this isn't race free, but ok in practice */
+			bucket = per_cpu_ptr(td->latency_buckets, cpu);
+			tmp->total_latency += bucket[i].total_latency;
+			tmp->samples += bucket[i].samples;
+			bucket[i].total_latency = 0;
+			bucket[i].samples = 0;
+		}
+
+		if (tmp->samples >= 32) {
+			int samples = tmp->samples;
+
+			latency = tmp->total_latency;
+
+			tmp->total_latency = 0;
+			tmp->samples = 0;
+			do_div(latency, samples);
+			if (latency == 0)
+				continue;
+			avg_latency[i].latency = latency;
+		}
+	}
+
+	for (i = 0; i < LATENCY_BUCKET_SIZE; i++) {
+		if (!avg_latency[i].latency) {
+			if (td->avg_buckets[i].latency < last_latency)
+				td->avg_buckets[i].latency = last_latency;
+			continue;
+		}
+
+		if (!td->avg_buckets[i].valid)
+			latency = avg_latency[i].latency;
+		else
+			latency = (td->avg_buckets[i].latency * 7 +
+				avg_latency[i].latency) >> 3;
+
+		td->avg_buckets[i].latency = max(latency, last_latency);
+		td->avg_buckets[i].valid = true;
+		last_latency = td->avg_buckets[i].latency;
+	}
+}
+
 bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 		    struct bio *bio)
 {
 	struct throtl_qnode *qn = NULL;
 	struct throtl_grp *tg = blkg_to_tg(blkg ?: q->root_blkg);
 	struct throtl_service_queue *sq;
+	struct throtl_data *td;
 	bool rw = bio_data_dir(bio);
 	bool throttled = false;
 	int ret;
@@ -1919,11 +2010,20 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 				tg->idle_ttime_threshold;
 	}
 
+	td = tg->td;
+	if (td->track_bio_latency == UINT_MAX) {
+		td->track_bio_latency = !q->mq_ops && !q->request_fn;
+		if (!td->track_bio_latency)
+			blk_stat_enable(q);
+	}
+
 	/* see throtl_charge_bio() */
 	if (bio_flagged(bio, BIO_THROTTLED) || !tg->has_rules[rw])
 		goto out;
 
 	spin_lock_irq(q->queue_lock);
+
+	throtl_update_latency_buckets(tg->td);
 
 	if (unlikely(blk_queue_bypass(q)))
 		goto out_unlock;
@@ -1931,6 +2031,8 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 	ret = bio_associate_current(bio);
 	if (ret == 0 || ret == -EBUSY)
 		bio->bi_cg_private = tg;
+
+	blk_stat_set_issue(&bio->bi_issue_stat, bio_sectors(bio));
 
 	blk_throtl_update_ttime(tg);
 
@@ -2019,19 +2121,62 @@ out:
 	 */
 	if (!throttled)
 		bio_clear_flag(bio, BIO_THROTTLED);
+	else
+		bio->bi_issue_stat.stat |= SKIP_TRACK;
 	return throttled;
+}
+
+static void throtl_track_latency(struct throtl_data *td, sector_t size,
+	int op, u64 time)
+{
+	struct latency_bucket *latency;
+	int index;
+
+	if (!td || td->limit_index != LIMIT_LOW || op != REQ_OP_READ ||
+	    !blk_queue_nonrot(td->queue))
+		return;
+
+	index = request_bucket_index(size);
+
+	latency = get_cpu_ptr(td->latency_buckets);
+	latency[index].total_latency += time;
+	latency[index].samples++;
+	put_cpu_ptr(td->latency_buckets);
+}
+
+void blk_throtl_stat_add(struct request *rq, u64 time)
+{
+	struct request_queue *q = rq->q;
+	struct throtl_data *td = q->td;
+
+	throtl_track_latency(td, blk_stat_size(&rq->issue_stat),
+		req_op(rq), time);
 }
 
 void blk_throtl_bio_endio(struct bio *bio)
 {
 	struct throtl_grp *tg;
+	u64 finish_time;
+	u64 start_time;
+	u64 lat;
 
 	tg = bio->bi_cg_private;
 	if (!tg)
 		return;
 	bio->bi_cg_private = NULL;
 
-	tg->last_finish_time = ktime_get_ns();
+	finish_time = ktime_get_ns();
+	tg->last_finish_time = finish_time;
+
+	start_time = blk_stat_time(&bio->bi_issue_stat);
+	finish_time = __blk_stat_time(finish_time);
+	if (start_time && finish_time > start_time &&
+	    tg->td->track_bio_latency == 1 &&
+	    !(bio->bi_issue_stat.stat & SKIP_TRACK)) {
+		lat = finish_time - start_time;
+		throtl_track_latency(tg->td, blk_stat_size(&bio->bi_issue_stat),
+			bio_op(bio), lat);
+	}
 }
 
 /*
@@ -2106,6 +2251,12 @@ int blk_throtl_init(struct request_queue *q)
 	td = kzalloc_node(sizeof(*td), GFP_KERNEL, q->node);
 	if (!td)
 		return -ENOMEM;
+	td->latency_buckets = __alloc_percpu(sizeof(struct latency_bucket) *
+		LATENCY_BUCKET_SIZE, __alignof__(u64));
+	if (!td->latency_buckets) {
+		kfree(td);
+		return -ENOMEM;
+	}
 
 	INIT_WORK(&td->dispatch_work, blk_throtl_dispatch_work_fn);
 	throtl_service_queue_init(&td->service_queue);
@@ -2119,10 +2270,13 @@ int blk_throtl_init(struct request_queue *q)
 	td->low_upgrade_time = jiffies;
 	td->low_downgrade_time = jiffies;
 
+	td->track_bio_latency = UINT_MAX;
 	/* activate policy */
 	ret = blkcg_activate_policy(q, &blkcg_policy_throtl);
-	if (ret)
+	if (ret) {
+		free_percpu(td->latency_buckets);
 		kfree(td);
+	}
 	return ret;
 }
 
@@ -2131,6 +2285,7 @@ void blk_throtl_exit(struct request_queue *q)
 	BUG_ON(!q->td);
 	throtl_shutdown_wq(q);
 	blkcg_deactivate_policy(q, &blkcg_policy_throtl);
+	free_percpu(q->td->latency_buckets);
 	kfree(q->td);
 }
 
