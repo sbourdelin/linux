@@ -2099,14 +2099,24 @@ out:
 		d_rehash(rehash);
 	trace_nfs_rename_exit(old_dir, old_dentry,
 			new_dir, new_dentry, error);
-	if (!error) {
+
+	switch (error) {
+	case 0:
 		if (new_inode != NULL)
 			nfs_drop_nlink(new_inode);
 		d_move(old_dentry, new_dentry);
 		nfs_set_verifier(new_dentry,
 					nfs_save_change_attribute(new_dir));
-	} else if (error == -ENOENT)
+		break;
+	case -ENOENT:
 		nfs_dentry_handle_enoent(old_dentry);
+		break;
+	case -ERESTARTSYS:
+		/* The result of the rename is unknown. Play it safe by
+		 * forcing a new lookup */
+		nfs_force_lookup_revalidate(old_dir);
+		nfs_force_lookup_revalidate(new_dir);
+	}
 
 	/* new dentry created? */
 	if (dentry)
