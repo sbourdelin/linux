@@ -180,6 +180,8 @@ struct throtl_data
 	unsigned int limit_index;
 	bool limit_valid[LIMIT_CNT];
 
+	u64 dft_idle_ttime_threshold;
+
 	unsigned long low_upgrade_time;
 	unsigned long low_downgrade_time;
 
@@ -1427,6 +1429,7 @@ static u64 tg_prfill_limit(struct seq_file *sf, struct blkg_policy_data *pd,
 	struct throtl_grp *tg = pd_to_tg(pd);
 	const char *dname = blkg_dev_name(pd->blkg);
 	char bufs[4][21] = { "max", "max", "max", "max" };
+	char idle_time[26] = "";
 
 	if (!dname)
 		return 0;
@@ -1434,7 +1437,9 @@ static u64 tg_prfill_limit(struct seq_file *sf, struct blkg_policy_data *pd,
 	if (tg->bps_conf[READ][off] == U64_MAX &&
 	    tg->bps_conf[WRITE][off] == U64_MAX &&
 	    tg->iops_conf[READ][off] == UINT_MAX &&
-	    tg->iops_conf[WRITE][off] == UINT_MAX)
+	    tg->iops_conf[WRITE][off] == UINT_MAX &&
+	    (off != LIMIT_LOW || tg->idle_ttime_threshold ==
+				  tg->td->dft_idle_ttime_threshold))
 		return 0;
 
 	if (tg->bps_conf[READ][off] != U64_MAX)
@@ -1449,9 +1454,16 @@ static u64 tg_prfill_limit(struct seq_file *sf, struct blkg_policy_data *pd,
 	if (tg->iops_conf[WRITE][off] != UINT_MAX)
 		snprintf(bufs[3], sizeof(bufs[3]), "%u",
 			tg->iops_conf[WRITE][off]);
+	if (off == LIMIT_LOW) {
+		if (tg->idle_ttime_threshold == U64_MAX)
+			strcpy(idle_time, " idle=max");
+		else
+			snprintf(idle_time, sizeof(idle_time), " idle=%llu",
+				div_u64(tg->idle_ttime_threshold, 1000));
+	}
 
-	seq_printf(sf, "%s rbps=%s wbps=%s riops=%s wiops=%s\n",
-		   dname, bufs[0], bufs[1], bufs[2], bufs[3]);
+	seq_printf(sf, "%s rbps=%s wbps=%s riops=%s wiops=%s%s\n",
+		   dname, bufs[0], bufs[1], bufs[2], bufs[3], idle_time);
 	return 0;
 }
 
@@ -1469,6 +1481,7 @@ static ssize_t tg_set_limit(struct kernfs_open_file *of,
 	struct blkg_conf_ctx ctx;
 	struct throtl_grp *tg;
 	u64 v[4];
+	u64 idle_time;
 	int ret;
 	int index = of_cft(of)->private;
 
@@ -1483,6 +1496,7 @@ static ssize_t tg_set_limit(struct kernfs_open_file *of,
 	v[2] = tg->iops_conf[READ][index];
 	v[3] = tg->iops_conf[WRITE][index];
 
+	idle_time = tg->idle_ttime_threshold;
 	while (true) {
 		char tok[27];	/* wiops=18446744073709551616 */
 		char *p;
@@ -1514,6 +1528,8 @@ static ssize_t tg_set_limit(struct kernfs_open_file *of,
 			v[2] = min_t(u64, val, UINT_MAX);
 		else if (!strcmp(tok, "wiops"))
 			v[3] = min_t(u64, val, UINT_MAX);
+		else if (off == LIMIT_LOW && !strcmp(tok, "idle"))
+			idle_time = val;
 		else
 			goto out_finish;
 	}
@@ -1542,6 +1558,8 @@ static ssize_t tg_set_limit(struct kernfs_open_file *of,
 		blk_throtl_update_valid_limit(tg->td);
 		if (tg->td->limit_valid[LIMIT_LOW])
 			tg->td->limit_index = LIMIT_LOW;
+		tg->idle_ttime_threshold = (idle_time == U64_MAX) ?
+			U64_MAX : idle_time * 1000;
 	}
 	tg_conf_updated(tg);
 	ret = 0;
@@ -1862,6 +1880,9 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 			tg->idle_ttime_threshold = DFL_IDLE_THRESHOLD_SSD;
 		else
 			tg->idle_ttime_threshold = DFL_IDLE_THRESHOLD_HD;
+		if (tg->td->dft_idle_ttime_threshold == 0)
+			tg->td->dft_idle_ttime_threshold =
+				tg->idle_ttime_threshold;
 	}
 
 	/* see throtl_charge_bio() */
