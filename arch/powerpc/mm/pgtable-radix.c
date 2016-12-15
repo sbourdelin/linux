@@ -466,6 +466,159 @@ void radix__setup_initial_memory_limit(phys_addr_t first_memblock_base,
 }
 
 #ifdef CONFIG_MEMORY_HOTPLUG
+static void free_pte_table(pte_t *pte_start, pmd_t *pmd)
+{
+	pte_t *pte;
+	int i;
+
+	for (i = 0; i < PTRS_PER_PTE; i++) {
+		pte = pte_start + i;
+		if (!pte_none(*pte))
+			return;
+	}
+
+	pte_free_kernel(&init_mm, pte_start);
+	spin_lock(&init_mm.page_table_lock);
+	pmd_clear(pmd);
+	spin_unlock(&init_mm.page_table_lock);
+}
+
+static void free_pmd_table(pmd_t *pmd_start, pud_t *pud)
+{
+	pmd_t *pmd;
+	int i;
+
+	for (i = 0; i < PTRS_PER_PMD; i++) {
+		pmd = pmd_start + i;
+		if (!pmd_none(*pmd))
+			return;
+	}
+
+	pmd_free(&init_mm, pmd_start);
+	spin_lock(&init_mm.page_table_lock);
+	pud_clear(pud);
+	spin_unlock(&init_mm.page_table_lock);
+}
+
+static void free_pud_table(pud_t *pud_start, pgd_t *pgd)
+{
+	pud_t *pud;
+	int i;
+
+	for (i = 0; i < PTRS_PER_PUD; i++) {
+		pud = pud_start + i;
+		if (!pud_none(*pud))
+			return;
+	}
+
+	pud_free(&init_mm, pud_start);
+	spin_lock(&init_mm.page_table_lock);
+	pgd_clear(pgd);
+	spin_unlock(&init_mm.page_table_lock);
+}
+
+static void remove_pte_table(pte_t *pte_start, unsigned long addr,
+			     unsigned long end)
+{
+	unsigned long next;
+	pte_t *pte;
+
+	pte = pte_start + pte_index(addr);
+	for (; addr < end; addr = next, pte++) {
+		next = (addr + PAGE_SIZE) & PAGE_MASK;
+		if (next > end)
+			next = end;
+
+		if (!pte_present(*pte))
+			continue;
+
+		spin_lock(&init_mm.page_table_lock);
+		pte_clear(&init_mm, addr, pte);
+		spin_unlock(&init_mm.page_table_lock);
+	}
+
+	flush_tlb_mm(&init_mm);
+}
+
+static void remove_pmd_table(pmd_t *pmd_start, unsigned long addr,
+			     unsigned long end, unsigned long map_page_size)
+{
+	unsigned long next;
+	pte_t *pte_base;
+	pmd_t *pmd;
+
+	pmd = pmd_start + pmd_index(addr);
+	for (; addr < end; addr = next, pmd++) {
+		next = pmd_addr_end(addr, end);
+
+		if (!pmd_present(*pmd))
+			continue;
+
+		if (map_page_size == PMD_SIZE) {
+			spin_lock(&init_mm.page_table_lock);
+			pte_clear(&init_mm, addr, (pte_t *)pmd);
+			spin_unlock(&init_mm.page_table_lock);
+
+			continue;
+		}
+
+		pte_base = (pte_t *)pmd_page_vaddr(*pmd);
+		remove_pte_table(pte_base, addr, next);
+		free_pte_table(pte_base, pmd);
+	}
+}
+
+static void remove_pud_table(pud_t *pud_start, unsigned long addr,
+			     unsigned long end, unsigned long map_page_size)
+{
+	unsigned long next;
+	pmd_t *pmd_base;
+	pud_t *pud;
+
+	pud = pud_start + pud_index(addr);
+	for (; addr < end; addr = next, pud++) {
+		next = pud_addr_end(addr, end);
+
+		if (!pud_present(*pud))
+			continue;
+
+		if (map_page_size == PUD_SIZE) {
+			spin_lock(&init_mm.page_table_lock);
+			pte_clear(&init_mm, addr, (pte_t *)pud);
+			spin_unlock(&init_mm.page_table_lock);
+
+			continue;
+		}
+
+		pmd_base = (pmd_t *)pud_page_vaddr(*pud);
+		remove_pmd_table(pmd_base, addr, next, map_page_size);
+		free_pmd_table(pmd_base, pud);
+	}
+}
+
+static void remove_pagetable(unsigned long start, unsigned long end,
+			     unsigned long map_page_size)
+{
+	unsigned long next;
+	unsigned long addr;
+	pgd_t *pgd;
+	pud_t *pud;
+
+	for (addr = start; addr < end; addr = next) {
+		next = pgd_addr_end(addr, end);
+
+		pgd = pgd_offset_k(addr);
+		if (!pgd_present(*pgd))
+			continue;
+
+		pud = (pud_t *)pgd_page_vaddr(*pgd);
+		remove_pud_table(pud, addr, next, map_page_size);
+		free_pud_table(pud, pgd);
+	}
+
+	flush_tlb_mm(&init_mm);
+}
+
 int radix__create_section_mapping(unsigned long start, unsigned long end)
 {
 	unsigned long page_size = 1 << mmu_psize_defs[mmu_linear_psize].shift;
@@ -479,6 +632,16 @@ int radix__create_section_mapping(unsigned long start, unsigned long end)
 		if (rc)
 			return rc;
 	}
+
+	return 0;
+}
+
+int radix__remove_section_mapping(unsigned long start, unsigned long end)
+{
+	unsigned long page_size = 1 << mmu_psize_defs[mmu_linear_psize].shift;
+
+	start = _ALIGN_DOWN(start, page_size);
+	remove_pagetable(start, end, page_size);
 
 	return 0;
 }
