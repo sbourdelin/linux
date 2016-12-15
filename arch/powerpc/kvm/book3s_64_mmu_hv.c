@@ -1160,6 +1160,22 @@ void kvmppc_unpin_guest_page(struct kvm *kvm, void *va, unsigned long gpa,
 }
 
 /*
+ * HPT resizing
+ */
+
+long kvm_vm_ioctl_resize_hpt_prepare(struct kvm *kvm,
+				     struct kvm_ppc_resize_hpt *rhpt)
+{
+	return -EIO;
+}
+
+long kvm_vm_ioctl_resize_hpt_commit(struct kvm *kvm,
+				    struct kvm_ppc_resize_hpt *rhpt)
+{
+	return -EIO;
+}
+
+/*
  * Functions for reading and writing the hash table via reads and
  * writes on a file descriptor.
  *
