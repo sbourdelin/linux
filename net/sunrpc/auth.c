@@ -622,7 +622,7 @@ rpcauth_lookupcred(struct rpc_auth *auth, int flags)
 {
 	struct auth_cred acred;
 	struct rpc_cred *ret;
-	const struct cred *cred = current_cred();
+	const struct cred *cred = current_real_cred();
 
 	dprintk("RPC:       looking up %s cred\n",
 		auth->au_ops->au_name);
