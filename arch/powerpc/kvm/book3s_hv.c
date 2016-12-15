@@ -3349,6 +3349,9 @@ static int kvmppc_core_init_vm_hv(struct kvm *kvm)
 
 	kvm->arch.lpcr = lpcr;
 
+	/* Initialization for future HPT resizes */
+	kvm->arch.resize_hpt = NULL;
+
 	/*
 	 * Work out how many sets the TLB has, for the use of
 	 * the TLB invalidation loop in book3s_hv_rmhandlers.S.
