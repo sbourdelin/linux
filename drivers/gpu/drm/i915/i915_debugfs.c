@@ -1446,6 +1446,8 @@ static int vlv_drpc_info(struct seq_file *m)
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
 	u32 rpmodectl1, rcctl1, pw_status;
 
+	i915_forcewake_domains(m, NULL);
+
 	intel_runtime_pm_get(dev_priv);
 
 	pw_status = I915_READ(VLV_GTLC_PW_STATUS);
@@ -1476,7 +1478,7 @@ static int vlv_drpc_info(struct seq_file *m)
 	seq_printf(m, "Media RC6 residency since boot: %u\n",
 		   I915_READ(VLV_GT_MEDIA_RC6));
 
-	return i915_forcewake_domains(m, NULL);
+	return 0;
 }
 
 static int gen6_drpc_info(struct seq_file *m)
@@ -1487,6 +1489,8 @@ static int gen6_drpc_info(struct seq_file *m)
 	u32 gen9_powergate_enable = 0, gen9_powergate_status = 0;
 	unsigned forcewake_count;
 	int count = 0, ret;
+
+	i915_forcewake_domains(m, NULL);
 
 	ret = mutex_lock_interruptible(&dev->struct_mutex);
 	if (ret)
@@ -1593,7 +1597,7 @@ static int gen6_drpc_info(struct seq_file *m)
 		   GEN6_DECODE_RC6_VID(((rc6vids >> 8) & 0xff)));
 	seq_printf(m, "RC6++ voltage: %dmV\n",
 		   GEN6_DECODE_RC6_VID(((rc6vids >> 16) & 0xff)));
-	return i915_forcewake_domains(m, NULL);
+	return 0;
 }
 
 static int i915_drpc_info(struct seq_file *m, void *unused)
