@@ -3150,6 +3150,15 @@ static pte_t make_huge_pte(struct vm_area_struct *vma, struct page *page,
 	entry = pte_mkhuge(entry);
 	entry = arch_make_huge_pte(entry, vma, page, writable);
 
+#if defined(CONFIG_SHARED_MMU_CTX)
+	/*
+	 * FIXME
+	 * needs arch independent way of setting - perhaps arch_make_huge_pte
+	 */
+	if (vma->vm_flags & VM_SHARED_CTX)
+		pte_val(entry) |= _PAGE_SHR_CTX_4V;
+#endif
+
 	return entry;
 }
 

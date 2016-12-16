@@ -813,6 +813,25 @@ void set_mm_shared_ctx(struct mm_struct *mm, struct shared_mmu_ctx *ctx)
 	atomic_inc(&ctx->refcount);
 	mm->context.shared_ctx = ctx;
 }
+
+/*
+ * Set the shared context value in the vma to that in the mm.
+ *
+ *
+ * Note that we are called from mmap with mmap_sem held.
+ */
+void set_vma_shared_ctx(struct vm_area_struct *vma)
+{
+	struct mm_struct *mm = vma->vm_mm;
+
+	BUG_ON(vma->vm_shared_mmu_ctx.ctx);
+
+	if (!mm_shared_ctx_val(mm))
+		return;
+
+	atomic_inc(&mm->context.shared_ctx->refcount);
+	vma->vm_shared_mmu_ctx.ctx = mm->context.shared_ctx;
+}
 #endif
 
 static int numa_enabled = 1;

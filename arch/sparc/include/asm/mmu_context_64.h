@@ -23,6 +23,7 @@ void get_new_mmu_shared_context(struct mm_struct *mm);
 void put_shared_context(struct mm_struct *mm);
 void set_mm_shared_ctx(struct mm_struct *mm, struct shared_mmu_ctx *ctx);
 void destroy_shared_context(struct mm_struct *mm);
+void set_vma_shared_ctx(struct vm_area_struct *vma);
 #endif
 #ifdef CONFIG_SMP
 void smp_new_mmu_context_version(void);

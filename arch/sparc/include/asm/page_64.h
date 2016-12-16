@@ -33,6 +33,7 @@
 #if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_TRANSPARENT_HUGEPAGE)
 struct pt_regs;
 void hugetlb_setup(struct pt_regs *regs);
+void hugetlb_shared_setup(struct pt_regs *regs);
 #endif
 
 #define WANT_PAGE_VIRTUAL

@@ -127,6 +127,80 @@ hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
 				pgoff, flags);
 }
 
+#if defined(CONFIG_SHARED_MMU_CTX)
+static bool huge_vma_can_share_ctx(struct vm_area_struct *vma,
+					struct vm_area_struct *tvma)
+{
+	/*
+	 * Do not match unless there is an actual context value.  It
+	 * could be the case that tvma is a new mapping with VM_SHARED_CTX
+	 * set, but still not associated with a shared context ID.
+	 */
+	if (!vma_shared_ctx_val(tvma))
+		return false;
+
+	/*
+	 * For simple functionality now, vmas must be exactly the same
+	 */
+	if ((vma->vm_flags & VM_LOCKED_CLEAR_MASK) ==
+	    (tvma->vm_flags & VM_LOCKED_CLEAR_MASK) &&
+	    vma->vm_pgoff == tvma->vm_pgoff &&
+	    vma->vm_start == tvma->vm_start &&
+	    vma->vm_end == tvma->vm_end)
+		return true;
+
+	return false;
+}
+
+/*
+ * If vma is marked as desiring shared contexxt, search for a context to
+ * share.  If no context found, assign one.
+ */
+void huge_get_shared_ctx(struct mm_struct *mm, unsigned long addr)
+{
+	struct vm_area_struct *vma = find_vma(mm, addr);
+	struct address_space *mapping = vma->vm_file->f_mapping;
+	pgoff_t idx = ((addr - vma->vm_start) >> PAGE_SHIFT) +
+			vma->vm_pgoff;
+	struct vm_area_struct *tvma;
+
+	/*
+	 * FIXME
+	 *
+	 * For now limit a task to a single shared context mapping
+	 */
+	if (!(vma->vm_flags & VM_SHARED_CTX) || vma_shared_ctx_val(vma) ||
+	    mm_shared_ctx_val(mm))
+		return;
+
+	i_mmap_lock_write(mapping);
+	vma_interval_tree_foreach(tvma, &mapping->i_mmap, idx, idx) {
+		if (tvma == vma)
+			continue;
+
+		if (huge_vma_can_share_ctx(vma, tvma)) {
+			set_mm_shared_ctx(mm, tvma->vm_shared_mmu_ctx.ctx);
+			set_vma_shared_ctx(vma);
+			if (likely(mm_shared_ctx_val(mm))) {
+				load_secondary_context(mm);
+				/*
+				 * What about multiple matches ?
+				 */
+				break;
+			}
+		}
+	}
+
+	if (!mm_shared_ctx_val(mm)) {
+		get_new_mmu_shared_context(mm);
+		set_vma_shared_ctx(vma);
+		load_secondary_context(mm);
+	}
+
+	i_mmap_unlock_write(mapping);
+}
+#endif
+
 pte_t *huge_pte_alloc(struct mm_struct *mm,
 			unsigned long addr, unsigned long sz)
 {
@@ -164,7 +238,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
 
 	if (!pte_present(*ptep) && pte_present(entry)) {
 #if defined(CONFIG_SHARED_MMU_CTX)
-		if (pte_val(entry) | _PAGE_SHR_CTX_4V)
+		if (is_sharedctx_pte(entry))
 			mm->context.shared_hugetlb_pte_count++;
 		else
 #endif
@@ -188,7 +262,7 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
 	entry = *ptep;
 	if (pte_present(entry)) {
 #if defined(CONFIG_SHARED_MMU_CTX)
-		if (pte_val(entry) | _PAGE_SHR_CTX_4V)
+		if (is_sharedctx_pte(entry))
 			mm->context.shared_hugetlb_pte_count--;
 		else
 #endif
