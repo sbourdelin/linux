@@ -166,6 +166,7 @@ bool kern_addr_valid(unsigned long addr);
 #define _PAGE_EXEC_4V	  _AC(0x0000000000000080,UL) /* Executable Page      */
 #define _PAGE_W_4V	  _AC(0x0000000000000040,UL) /* Writable             */
 #define _PAGE_SOFT_4V	  _AC(0x0000000000000030,UL) /* Software bits        */
+#define _PAGE_SHR_CTX_4V  _AC(0x0000000000000020,UL) /* Shared Context       */
 #define _PAGE_PRESENT_4V  _AC(0x0000000000000010,UL) /* Present              */
 #define _PAGE_RESV_4V	  _AC(0x0000000000000008,UL) /* Reserved             */
 #define _PAGE_SZ16GB_4V	  _AC(0x0000000000000007,UL) /* 16GB Page            */
@@ -421,6 +422,18 @@ static inline pmd_t pmd_mkhuge(pmd_t pmd)
 #endif
 #else
 static inline bool is_hugetlb_pte(pte_t pte)
+{
+	return false;
+}
+#endif
+
+#if defined(CONFIG_SHARED_MMU_CTX)
+static inline bool is_sharedctx_pte(pte_t pte)
+{
+	return !!(pte_val(pte) & _PAGE_SHR_CTX_4V);
+}
+#else
+static inline bool is_sharedctx_pte(pte_t pte)
 {
 	return false;
 }
