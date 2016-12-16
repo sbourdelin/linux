@@ -30,6 +30,7 @@
 #include "s5p_mfc_intr.h"
 #include "s5p_mfc_opr.h"
 #include "s5p_mfc_pm.h"
+#include "s5p_mfc_iommu.h"
 
 static struct s5p_mfc_fmt formats[] = {
 	{
@@ -929,16 +930,18 @@ static int s5p_mfc_queue_setup(struct vb2_queue *vq,
 	    vq->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
 		psize[0] = ctx->luma_size;
 		psize[1] = ctx->chroma_size;
-
-		if (IS_MFCV6_PLUS(dev))
-			alloc_devs[0] = ctx->dev->mem_dev_l;
-		else
-			alloc_devs[0] = ctx->dev->mem_dev_r;
-		alloc_devs[1] = ctx->dev->mem_dev_l;
+		if (exynos_is_iommu_available(&dev->plat_dev->dev)) {
+			if (IS_MFCV6_PLUS(dev))
+				alloc_devs[0] = ctx->dev->mem_dev_l;
+			else
+				alloc_devs[0] = ctx->dev->mem_dev_r;
+			alloc_devs[1] = ctx->dev->mem_dev_l;
+		}
 	} else if (vq->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE &&
 		   ctx->state == MFCINST_INIT) {
 		psize[0] = ctx->dec_src_buf_size;
-		alloc_devs[0] = ctx->dev->mem_dev_l;
+		if (exynos_is_iommu_available(&dev->plat_dev->dev))
+			alloc_devs[0] = ctx->dev->mem_dev_l;
 	} else {
 		mfc_err("This video node is dedicated to decoding. Decoding not initialized\n");
 		return -EINVAL;
