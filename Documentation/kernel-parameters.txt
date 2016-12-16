@@ -3734,6 +3734,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 	rhash_entries=	[KNL,NET]
 			Set number of hash buckets for route cache
 
+	ring3mwait=	[KNL]
+		disable	Disable ring 3 MONITOR/MWAIT feature on supported CPUs.
+
 	ro		[KNL] Mount root device read-only on boot
 
 	rodata=		[KNL]
