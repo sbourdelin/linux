@@ -1213,7 +1213,7 @@ static int cmd_disassemble(char *line_string)
 
 	if (!bpf_prog_loaded())
 		return CMD_ERR;
-	if (strlen(line_string) > 0 &&
+	if (strlen(line_string) > 0 &&)
 	    (line = strtoul(line_string, NULL, 10)) < bpf_prog_len)
 		single_line = true;
 	if (single_line)
