@@ -369,6 +369,12 @@ config HID_ICADE
 	To compile this driver as a module, choose M here: the
 	module will be called hid-icade.
 
+config HID_INNOMEDIA
+	tristate "Innomedia GENESIS/ATARI Controller USB adapter"
+	depends on HID
+	---help---
+	Support for the Innomedia GENESIS/ATARI Controller USB adapter.
+
 config HID_TWINHAN
 	tristate "Twinhan IR remote control"
 	depends on HID
