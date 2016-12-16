@@ -7,9 +7,6 @@ TODO:
 
 
 ion/
- - Remove ION_IOC_SYNC: Flushing for devices should be purely a kernel internal
-   interface on top of dma-buf. flush_for_device needs to be added to dma-buf
-   first.
  - Remove ION_IOC_CUSTOM: Atm used for cache flushing for cpu access in some
    vendor trees. Should be replaced with an ioctl on the dma-buf to expose the
    begin/end_cpu_access hooks to userspace.
