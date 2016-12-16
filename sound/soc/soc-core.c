@@ -34,6 +34,7 @@
 #include <linux/ctype.h>
 #include <linux/slab.h>
 #include <linux/of.h>
+#include <linux/dmi.h>
 #include <sound/core.h>
 #include <sound/jack.h>
 #include <sound/pcm.h>
@@ -1887,6 +1888,139 @@ int snd_soc_runtime_set_dai_fmt(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_soc_runtime_set_dai_fmt);
+
+/* Move the DMI stuff below to a new file soc-dmi.c? */
+struct snd_soc_dmi_name  {
+	const char *vendor;
+	const char *product;
+	const char *board;
+	const char *name;
+};
+
+#define SOC_DMI_ENTRY(_vendor, _product, _board, _name) \
+	{ .vendor = (_vendor), .board = (_board), \
+	  .product = (_product), .name = (_name) }
+
+/* DMI names. The matched DMI name will be appended to the card short name
+ * to make up the card long name. Machine drivers ususally use their own name
+ * as the card short name, and leave the long name empty. Machine driver may
+ * call API snd_soc_set_dmi_name() to get a unique long name. In user space,
+ * Use Case Manager (UCM) will try to find the best configuration file by
+ * matching the card long name at first, and if unavailable, match the short
+ * name as a fallback.
+ * For example, for a Boradwell-based Dell XPS 13-2015(9343), the card short
+ * name is "broadwell-rt286" and the DMI name is "DELL-XPS", so the long name
+ * will be "broadwell-rt286-Dell-XPS". For a new Skylake-based Dell XPS 13/15,
+ * if the short name is "skl-xyz" and DMI name is "Dell-XPS", the long name
+ * will be "skl-xyz-Dell-XPS".In user space, Use Case Manager (UCM) will try
+ * to find the best configuration file by matching the card long name (e.g.
+ * broadwell-rt286-Dell-XPS), and if unavailable, fallback to the default
+ * configuration file by matching the short name (e.g. broadwell-rt286).
+ */
+static struct snd_soc_dmi_name dmi_names[]  = {
+	SOC_DMI_ENTRY("Intel Corp.", "Broadwell Client platform",
+		      "Wilson Beach SDS", "Intel-Wilson-Beach"),
+	SOC_DMI_ENTRY("Dell Inc.", "XPS 13 9343", "0310JH", "Dell-XPS"),
+	SOC_DMI_ENTRY("ASUSTeK COMPUTER INC.", "T100TA", "T100TA",
+		      "ASUS-T100"),
+	{}	/* terminator */
+};
+
+/* retrieve the last word of shortname or longname */
+static const char *retrieve_id_from_card_name(const char *name)
+{
+	const char *spos = name;
+
+	while (*name) {
+		if (isspace(*name) && isalnum(name[1]))
+			spos = name + 1;
+		name++;
+	}
+	return spos;
+}
+
+static const char *find_dmi_name(const char *vendor, const char *product,
+			const char *board)
+{
+	struct snd_soc_dmi_name *name_entry;
+
+	/* vendor must be valid, either product or board must to be valid */
+	if (!vendor || (!product && !board))
+		return NULL;
+
+	name_entry = dmi_names;
+	while (name_entry->vendor) {
+		if (!strncmp(vendor, name_entry->vendor, 32)
+		    && (!product
+			|| !strncmp(product, name_entry->product, 32))
+		    && (!board || !strncmp(board, name_entry->board, 32)))
+			return name_entry->name;
+
+		name_entry++;
+	}
+
+	return NULL;
+}
+
+/**
+ * snd_soc_set_dmi_name() - Register DMI names to card
+ * @card: The card to register DMI names
+ * @flavour: The flavour "differentiator" for the card amongst its peers.
+ *
+ * Returns 0 on success, otherwise a negative error code.
+ */
+int snd_soc_set_dmi_name(struct snd_soc_card *card, const char *flavour)
+{
+	const char *vendor, *product, *board, *name;
+	char *spos;
+
+	if (card->long_name)
+		return 0; /* already set long name by driver or from DMI */
+
+	vendor = dmi_get_system_info(DMI_BOARD_VENDOR);
+	if (!vendor) {
+		dev_warn(card->dev, "ASoC: the DMI vendor name is empty!\n");
+		return 0;
+	}
+
+	product = dmi_get_system_info(DMI_PRODUCT_NAME);
+	board = dmi_get_system_info(DMI_BOARD_NAME);
+	if (!board && !product) {
+		/* fall back to using legacy name */
+		dev_warn(card->dev, "ASoC: both board/product name are empty!\n");
+		return 0;
+	}
+
+	name = find_dmi_name(vendor, product, board);
+	if (name)
+		snprintf(card->board_name, sizeof(card->board_name),
+			"%s-%s", card->name, name);
+	else
+		snprintf(card->board_name, sizeof(card->snd_card->longname),
+			"%s-%s-%s-%s", card->name, vendor, product, board);
+
+	/* replace SPACE with '-' */
+	spos = card->board_name;
+	while (*spos) {
+		if (isspace(*spos))
+			*spos = '-';
+		spos++;
+	}
+
+	/* long name */
+	card->long_name = card->board_name;
+
+	/* Add flavour to long name */
+	if (flavour) {
+		snprintf(card->dmi_longname, sizeof(card->snd_card->longname),
+			"%s-%s", retrieve_id_from_card_name(card->long_name),
+			flavour);
+		card->long_name = card->dmi_longname;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(snd_soc_set_dmi_name);
 
 static int snd_soc_instantiate_card(struct snd_soc_card *card)
 {
