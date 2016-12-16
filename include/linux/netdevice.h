@@ -112,6 +112,15 @@ enum netdev_tx {
 };
 typedef enum netdev_tx netdev_tx_t;
 
+#if IS_ENABLED(CONFIG_TSN)
+enum sr_class {
+	SR_CLASS_A = 1,
+	SR_CLASS_B = 2,
+	SR_CLASS_LAST,
+	SR_CLASS_ERR,
+};
+#endif
+
 /*
  * Current order: NETDEV_TX_MASK > NET_XMIT_MASK >= 0 is significant;
  * hard_start_xmit() return < NET_XMIT_MASK means skb was consumed.
@@ -945,6 +954,31 @@ struct netdev_xdp {
  *
  * void (*ndo_poll_controller)(struct net_device *dev);
  *
+ *	TSN functions (if CONFIG_TSN)
+ *
+ * int (*ndo_tsn_capable)(struct net_device *dev);
+ *	If a particular device is capable of sustaining TSN traffic
+ *	provided current configuration
+ *
+ * int (*ndo_tsn_link_configure)(struct net_device *dev,
+ *				 enum sr_class class,
+ *				 u16 framesize,
+ *				 u16 vid,
+ *				 u8 add_link,
+ *				 u8 pcp_hi,
+ *				 u8 pcp_lo)
+);
+ *     Configure a NIC to handle TSN-streams
+ *     - Update the bandwidth for the particular stream-class.
+ *     - The framesize is the size of the _entire_ frame (not just the payload)
+ *       since the full size is required to allocate bandwidth through
+ *       the credit based shaper in the NIC
+ *     - the vlan_id is the configured vlan for TSN in this session.
+ *     - add_link: if the link should be added or subtracted from the current
+ *       budget.
+ *    - u8 pcp_hi: 802.1Q priority value for high-class traffic (class A)
+ *    - u8 pcp_lo: 802.1Q priority value for low-class traffic (class B)
+ *
  *	SR-IOV management functions.
  * int (*ndo_set_vf_mac)(struct net_device *dev, int vf, u8* mac);
  * int (*ndo_set_vf_vlan)(struct net_device *dev, int vf, u16 vlan,
@@ -1186,6 +1220,16 @@ struct net_device_ops {
 #ifdef CONFIG_NET_RX_BUSY_POLL
 	int			(*ndo_busy_poll)(struct napi_struct *dev);
 #endif
+
+#if IS_ENABLED(CONFIG_TSN)
+	int			(*ndo_tsn_capable)(struct net_device *dev);
+	int			(*ndo_tsn_link_configure)(struct net_device *dev,
+							  enum sr_class class,
+							  u16 framesize,
+							  u16 vid, u8 add_link,
+							  u8 pcp_hi, u8 pcp_lo);
+#endif	/* CONFIG_TSN */
+
 	int			(*ndo_set_vf_mac)(struct net_device *dev,
 						  int queue, u8 *mac);
 	int			(*ndo_set_vf_vlan)(struct net_device *dev,
