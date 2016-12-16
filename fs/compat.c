@@ -1,7 +1,7 @@
 /*
  *  linux/fs/compat.c
  *
- *  Kernel compatibililty routines for e.g. 32 bit syscall support
+ *  Kernel compatibility routines for e.g. 32 bit syscall support
  *  on 64 bit kernels.
  *
  *  Copyright (C) 2002       Stephen Rothwell, IBM Corporation
