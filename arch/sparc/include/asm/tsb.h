@@ -72,6 +72,8 @@ struct tsb_phys_patch_entry {
 	unsigned int	insn;
 };
 extern struct tsb_phys_patch_entry __tsb_phys_patch, __tsb_phys_patch_end;
+
+extern struct kmem_cache *shared_mmu_ctx_cachep __read_mostly;
 #endif
 #define TSB_LOAD_QUAD(TSB, REG)	\
 661:	ldda		[TSB] ASI_NUCLEUS_QUAD_LDD, REG; \

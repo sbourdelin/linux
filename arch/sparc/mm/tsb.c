@@ -277,6 +277,8 @@ static void setup_tsb_params(struct mm_struct *mm, unsigned long tsb_idx, unsign
 	}
 }
 
+struct kmem_cache *shared_mmu_ctx_cachep __read_mostly;
+
 struct kmem_cache *pgtable_cache __read_mostly;
 
 static struct kmem_cache *tsb_caches[8] __read_mostly;
@@ -291,6 +293,27 @@ static const char *tsb_cache_names[8] = {
 	"tsb_512KB",
 	"tsb_1MB",
 };
+
+#if defined(CONFIG_SHARED_MMU_CTX)
+static void init_once_shared_mmu_ctx(void *mem)
+{
+	struct shared_mmu_ctx *ctx = (struct shared_mmu_ctx *) mem;
+
+	ctx->shared_ctx_val = 0;
+	atomic_set(&ctx->refcount, 1);
+}
+
+static void __init sun4v_shared_mmu_ctx_init(void)
+{
+	shared_mmu_ctx_cachep = kmem_cache_create("shared_mmu_ctx_cache",
+					sizeof(struct shared_mmu_ctx),
+					0,
+					SLAB_HWCACHE_ALIGN|SLAB_PANIC,
+					init_once_shared_mmu_ctx);
+}
+#else
+static void __init sun4v_shared_mmu_ctx_init(void) { }
+#endif
 
 void __init pgtable_cache_init(void)
 {
@@ -317,6 +340,13 @@ void __init pgtable_cache_init(void)
 			prom_halt();
 		}
 	}
+
+	if (tlb_type == hypervisor)
+		/*
+		 * FIXME - shared context enables/supported on most
+		 * but not all sun4v priocessors
+		 */
+		sun4v_shared_mmu_ctx_init();
 }
 
 int sysctl_tsb_ratio = -2;
@@ -546,6 +576,30 @@ static void tsb_destroy_one(struct tsb_config *tp)
 	tp->tsb = NULL;
 	tp->tsb_reg_val = 0UL;
 }
+
+#if defined(CONFIG_SHARED_MMU_CTX)
+void destroy_shared_context(struct mm_struct *mm)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&ctx_alloc_lock, flags);
+
+	if (SHARED_CTX_VALID(mm->context)) {
+		unsigned long nr = SHARED_CTX_NRBITS(mm->context);
+
+		mmu_context_bmap[nr>>6] &= ~(1UL << (nr & 63));
+	}
+
+	spin_unlock_irqrestore(&ctx_alloc_lock, flags);
+
+#if defined(CONFIG_SHARED_MMU_CTX)
+	/*
+	 * Any shared context should have been cleaned up by now
+	 */
+	BUG_ON(SHARED_CTX_VALID(mm->context));
+#endif
+}
+#endif
 
 void destroy_context(struct mm_struct *mm)
 {

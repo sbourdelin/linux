@@ -18,6 +18,12 @@ extern unsigned long tlb_context_cache;
 extern unsigned long mmu_context_bmap[];
 
 void get_new_mmu_context(struct mm_struct *mm);
+#if defined(CONFIG_SHARED_MMU_CTX)
+void get_new_mmu_shared_context(struct mm_struct *mm);
+void put_shared_context(struct mm_struct *mm);
+void set_mm_shared_ctx(struct mm_struct *mm, struct shared_mmu_ctx *ctx);
+void destroy_shared_context(struct mm_struct *mm);
+#endif
 #ifdef CONFIG_SMP
 void smp_new_mmu_context_version(void);
 #else

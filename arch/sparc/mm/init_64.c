@@ -673,14 +673,24 @@ DECLARE_BITMAP(mmu_context_bmap, MAX_CTX_NR);
  *
  * Always invoked with interrupts disabled.
  */
-void get_new_mmu_context(struct mm_struct *mm)
+static void __get_new_mmu_context_common(struct mm_struct *mm, bool shared)
 {
 	unsigned long ctx, new_ctx;
 	unsigned long orig_pgsz_bits;
 	int new_version;
 
 	spin_lock(&ctx_alloc_lock);
-	orig_pgsz_bits = (mm->context.sparc64_ctx_val & CTX_PGSZ_MASK);
+#if defined(CONFIG_SHARED_MMU_CTX)
+	if (shared)
+		/*
+		 * Note that we are only called from get_new_mmu_shared_context
+		 * which guarantees the existence of shared_ctx structure.
+		 */
+		orig_pgsz_bits = (mm->context.shared_ctx->shared_ctx_val &
+				  CTX_PGSZ_MASK);
+	else
+#endif
+		orig_pgsz_bits = (mm->context.sparc64_ctx_val & CTX_PGSZ_MASK);
 	ctx = (tlb_context_cache + 1) & CTX_NR_MASK;
 	new_ctx = find_next_zero_bit(mmu_context_bmap, 1 << CTX_NR_BITS, ctx);
 	new_version = 0;
@@ -714,12 +724,80 @@ void get_new_mmu_context(struct mm_struct *mm)
 	new_ctx |= (tlb_context_cache & CTX_VERSION_MASK);
 out:
 	tlb_context_cache = new_ctx;
-	mm->context.sparc64_ctx_val = new_ctx | orig_pgsz_bits;
+#if defined(CONFIG_SHARED_MMU_CTX)
+	if (shared)
+		mm->context.shared_ctx->shared_ctx_val =
+					new_ctx | orig_pgsz_bits;
+	else
+#endif
+		mm->context.sparc64_ctx_val = new_ctx | orig_pgsz_bits;
 	spin_unlock(&ctx_alloc_lock);
 
+	/*
+	 * FIXME
+	 * Not sure if the case where a shared context ID changed (not just
+	 * newly allocated) is handled properly.  May need to modify
+	 * smp_new_mmu_context_version to handle correctly.
+	 */
 	if (unlikely(new_version))
 		smp_new_mmu_context_version();
 }
+
+void get_new_mmu_context(struct mm_struct *mm)
+{
+	__get_new_mmu_context_common(mm, false);
+}
+
+#if defined(CONFIG_SHARED_MMU_CTX)
+void get_new_mmu_shared_context(struct mm_struct *mm)
+{
+	/*
+	 * For now, we only support one shared context mapping per mm.  So,
+	 * if mm->context.shared_ctx  is already set, we have a bug
+	 *
+	 * Note that we are called from mmap with mmap_sem held.  Thus,
+	 * there can not be two threads racing to initialize.
+	 */
+	BUG_ON(mm->context.shared_ctx);
+
+	mm->context.shared_ctx = kmem_cache_alloc(shared_mmu_ctx_cachep,
+						GFP_NOWAIT);
+	if (!mm->context.shared_ctx)
+		return;
+
+	__get_new_mmu_context_common(mm, true);
+}
+
+void put_shared_context(struct mm_struct *mm)
+{
+	if (!mm->context.shared_ctx)
+		return;
+
+	if (atomic_dec_and_test(&mm->context.shared_ctx->refcount)) {
+		smp_flush_shared_tlb_mm(mm);
+		destroy_shared_context(mm);
+		kmem_cache_free(shared_mmu_ctx_cachep, mm->context.shared_ctx);
+	}
+
+	/*
+	 * For now we assume/expect only one shared context reference per mm
+	 */
+	mm->context.shared_ctx = NULL;
+}
+
+void set_mm_shared_ctx(struct mm_struct *mm, struct shared_mmu_ctx *ctx)
+{
+	BUG_ON(mm->context.shared_ctx || !ctx);
+
+	/*
+	 * Note that we are called with mmap_lock held on underlying
+	 * mapping.  Hence, the ctx structure pointed to by the matching
+	 * vma can not go away.
+	 */
+	atomic_inc(&ctx->refcount);
+	mm->context.shared_ctx = ctx;
+}
+#endif
 
 static int numa_enabled = 1;
 static int numa_debug;

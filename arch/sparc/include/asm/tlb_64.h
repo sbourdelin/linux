@@ -14,6 +14,9 @@ void smp_flush_tlb_pending(struct mm_struct *,
 
 #ifdef CONFIG_SMP
 void smp_flush_tlb_mm(struct mm_struct *mm);
+#if defined(CONFIG_SHARED_MMU_CTX)
+void smp_flush_shared_tlb_mm(struct mm_struct *mm);
+#endif
 #define do_flush_tlb_mm(mm) smp_flush_tlb_mm(mm)
 #else
 #define do_flush_tlb_mm(mm) __flush_tlb_mm(CTX_HWBITS(mm->context), SECONDARY_CONTEXT)

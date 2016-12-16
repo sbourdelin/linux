@@ -1078,6 +1078,28 @@ local_flush_and_out:
 	put_cpu();
 }
 
+#if defined(CONFIG_SHARED_MMU_CTX)
+/*
+ * Called when last reference to shared context is dropped.  Flush
+ * all TLB entries associated with the shared clontext ID.
+ *
+ * FIXME
+ * Future optimization would be to store cpumask in shared context
+ * structure and only make cross call to those cpus.
+ */
+void smp_flush_shared_tlb_mm(struct mm_struct *mm)
+{
+	u32 ctx = SHARED_CTX_HWBITS(mm->context);
+
+	(void)get_cpu();		/* prevent preemption */
+
+	smp_cross_call(&xcall_flush_tlb_mm, ctx, 0, 0);
+	__flush_tlb_mm(ctx, SECONDARY_CONTEXT);
+
+	put_cpu();
+}
+#endif
+
 struct tlb_pending_info {
 	unsigned long ctx;
 	unsigned long nr;
