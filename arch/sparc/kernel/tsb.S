@@ -374,7 +374,8 @@ tsb_flush:
 	 * %o0: page table physical address
 	 * %o1:	TSB base config pointer
 	 * %o2:	TSB huge config pointer, or NULL if none
-	 * %o3:	Hypervisor TSB descriptor physical address
+	 * %o3: TSB huge shared config pointer, or NULL if none
+	 * %o4: Hypervisor TSB descriptor physical address
 	 *
 	 * We have to run this whole thing with interrupts
 	 * disabled so that the current cpu doesn't change
@@ -387,6 +388,8 @@ __tsb_context_switch:
 	rdpr	%pstate, %g1
 	wrpr	%g1, PSTATE_IE, %pstate
 
+	mov	%o4, %g7
+
 	TRAP_LOAD_TRAP_BLOCK(%g2, %g3)
 
 	stx	%o0, [%g2 + TRAP_PER_CPU_PGD_PADDR]
@@ -397,13 +400,8 @@ __tsb_context_switch:
 
 	ldx	[%o2 + TSB_CONFIG_REG_VAL], %g3
 
-1:	stx	%g3, [%g2 + TRAP_PER_CPU_TSB_HUGE]
-
-	sethi	%hi(tlb_type), %g2
-	lduw	[%g2 + %lo(tlb_type)], %g2
-	cmp	%g2, 3
-	bne,pt	%icc, 50f
-	 nop
+1:	IF_TLB_TYPE_NOT_HYPE(%o5, 50f)
+	/* Only setup HV TSB descriptors on appropriate MMU */
 
 	/* Hypervisor TSB switch. */
 	mov	SCRATCHPAD_UTSBREG1, %o5
@@ -411,27 +409,43 @@ __tsb_context_switch:
 	mov	SCRATCHPAD_UTSBREG2, %o5
 	stxa	%g3, [%o5] ASI_SCRATCHPAD
 
-	mov	2, %o0
+	/* Start counting HV tsb descriptors. */
+	mov	1, %o0				/* Always MM_TSB_BASE */
+	cmp	%g3, -1				/* MM_TSB_HUGE ? */
+	beq	%xcc, 2f
+	 nop
+	add	%o0, 1, %o0
+2:
+	brz,pt	%o3, 3f				/* MM_TSB_HUGE_SHARED ? */
+	 mov	-1, %g3
+	ldx	[%o3 + TSB_CONFIG_REG_VAL], %g3
+3:
+	/* Put Huge Shared TSB in trap block */
+	stx	%g3, [%g2 + TRAP_PER_CPU_TSB_HUGE_SHARED]
 	cmp	%g3, -1
-	move	%xcc, 1, %o0
-
+	beq	%xcc, 4f
+	 nop
+	add	%o0, 1, %o0
+4:
 	mov	HV_FAST_MMU_TSB_CTXNON0, %o5
-	mov	%o3, %o1
+	mov	%g7, %o1
 	ta	HV_FAST_TRAP
 
 	/* Finish up.  */
-	ba,pt	%xcc, 9f
+	ba,pt	%xcc, 60f
 	 nop
 
 	/* SUN4U TSB switch.  */
-50:	mov	TSB_REG, %o5
+50:	stx	%g3, [%g2 + TRAP_PER_CPU_TSB_HUGE]
+
+	mov	TSB_REG, %o5
 	stxa	%o0, [%o5] ASI_DMMU
 	membar	#Sync
 	stxa	%o0, [%o5] ASI_IMMU
 	membar	#Sync
 
-2:	ldx	[%o1 + TSB_CONFIG_MAP_VADDR], %o4
-	brz	%o4, 9f
+	ldx	[%o1 + TSB_CONFIG_MAP_VADDR], %o4
+	brz	%o4, 60f
 	 ldx	[%o1 + TSB_CONFIG_MAP_PTE], %o5
 
 	sethi	%hi(sparc64_highest_unlocked_tlb_ent), %g2
@@ -443,7 +457,7 @@ __tsb_context_switch:
 	stxa	%o5, [%g2] ASI_DTLB_DATA_ACCESS
 	membar	#Sync
 
-	brz,pt	%o2, 9f
+	brz,pt	%o2, 60f
 	 nop
 
 	ldx	[%o2 + TSB_CONFIG_MAP_VADDR], %o4
@@ -455,7 +469,7 @@ __tsb_context_switch:
 	stxa	%o5, [%g2] ASI_DTLB_DATA_ACCESS
 	membar	#Sync
 
-9:
+60:
 	wrpr	%g1, %pstate
 
 	retl

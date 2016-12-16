@@ -96,7 +96,8 @@ extern struct sun4v_2insn_patch_entry __sun_m7_2insn_patch,
 #define TRAP_PER_CPU_FAULT_INFO		0x40
 #define TRAP_PER_CPU_CPU_MONDO_BLOCK_PA	0xc0
 #define TRAP_PER_CPU_CPU_LIST_PA	0xc8
-#define TRAP_PER_CPU_TSB_HUGE		0xd0
+#define TRAP_PER_CPU_TSB_HUGE		0xd0	/* sun4u only */
+#define TRAP_PER_CPU_TSB_HUGE_SHARED	0xd0	/* sun4v only */
 #define TRAP_PER_CPU_TSB_HUGE_TEMP	0xd8
 #define TRAP_PER_CPU_IRQ_WORKLIST_PA	0xe0
 #define TRAP_PER_CPU_CPU_MONDO_QMASK	0xe8

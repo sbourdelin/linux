@@ -875,7 +875,6 @@ sparc64_boot_end:
 #include "sun4v_tlb_miss.S"
 #include "sun4v_ivec.S"
 #include "ktlb.S"
-#include "tsb.S"
 
 /*
  * The following skip makes sure the trap table in ttable.S is aligned
@@ -916,6 +915,7 @@ swapper_4m_tsb:
 
 ! 0x0000000000428000
 
+#include "tsb.S"
 #include "systbls_64.S"
 
 	.data

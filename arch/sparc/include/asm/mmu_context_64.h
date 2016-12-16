@@ -36,21 +36,38 @@ void destroy_context(struct mm_struct *mm);
 void __tsb_context_switch(unsigned long pgd_pa,
 			  struct tsb_config *tsb_base,
 			  struct tsb_config *tsb_huge,
+			  struct tsb_config *tsb_huge_shared,
 			  unsigned long tsb_descr_pa);
 
+#if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_TRANSPARENT_HUGEPAGE)
+static inline void tsb_context_switch(struct mm_struct *mm)
+{
+	/*
+	 * The conditional for tsb_descr_pa handles shared context
+	 * case where tsb_block[0] may not be used.
+	 */
+	__tsb_context_switch(__pa(mm->pgd),
+			     &mm->context.tsb_block[MM_TSB_BASE],
+			     (mm->context.tsb_block[MM_TSB_HUGE].tsb ?
+			      &mm->context.tsb_block[MM_TSB_HUGE] :
+			      NULL),
+			     (mm->context.tsb_block[MM_TSB_HUGE_SHARED].tsb ?
+			      &mm->context.tsb_block[MM_TSB_HUGE_SHARED] :
+			      NULL),
+			     (mm->context.tsb_block[0].tsb ?
+			      __pa(&mm->context.tsb_descr[0]) :
+			      __pa(&mm->context.tsb_descr[1])));
+}
+#else
 static inline void tsb_context_switch(struct mm_struct *mm)
 {
 	__tsb_context_switch(__pa(mm->pgd),
 			     &mm->context.tsb_block[MM_TSB_BASE],
-#if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_TRANSPARENT_HUGEPAGE)
-			     (mm->context.tsb_block[MM_TSB_HUGE].tsb ?
-			      &mm->context.tsb_block[MM_TSB_HUGE] :
-			      NULL)
-#else
-			     NULL
-#endif
-			     , __pa(&mm->context.tsb_descr[MM_TSB_BASE]));
+			     NULL,
+			     NULL,
+			     __pa(&mm->context.tsb_descr[MM_TSB_BASE]);
 }
+#endif
 
 void tsb_grow(struct mm_struct *mm,
 	      unsigned long tsb_index,
