@@ -17,6 +17,9 @@
  * battery charging and regulator control, firmware update.
  */
 
+#ifdef CONFIG_ACPI
+#include <linux/acpi.h>
+#endif
 #include <linux/of_platform.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
@@ -28,6 +31,73 @@
 
 #define CROS_EC_DEV_EC_INDEX 0
 #define CROS_EC_DEV_PD_INDEX 1
+
+#ifdef CONFIG_ACPI
+
+#define ACPI_LID_DEVICE      "LID0"
+
+static int ec_wake_gpe = -EINVAL;
+
+/*
+ * This handler indicates to ACPI core that this GPE should stay enabled for
+ * lid to work in suspend to idle path.
+ */
+static u32 cros_ec_gpe_handler(acpi_handle gpe_device, u32 gpe_number,
+			       void *data)
+{
+	return ACPI_INTERRUPT_HANDLED | ACPI_REENABLE_GPE;
+}
+
+/*
+ * Get ACPI GPE for LID0 device.
+ */
+static int cros_ec_get_ec_wake_gpe(struct device *dev)
+{
+	struct acpi_device *cros_acpi_dev;
+	struct acpi_device *adev;
+	acpi_handle handle;
+	acpi_status status;
+	int ret;
+
+	cros_acpi_dev = ACPI_COMPANION(dev);
+
+	if (!cros_acpi_dev || !cros_acpi_dev->parent ||
+	   !cros_acpi_dev->parent->handle)
+		return -EINVAL;
+
+	status = acpi_get_handle(cros_acpi_dev->parent->handle, ACPI_LID_DEVICE,
+				 &handle);
+	if (ACPI_FAILURE(status))
+		return -EINVAL;
+
+	ret = acpi_bus_get_device(handle, &adev);
+	if (ret)
+		return ret;
+
+	return adev->wakeup.gpe_number;
+}
+
+static int cros_ec_install_handler(struct device *dev)
+{
+	acpi_status status;
+
+	ec_wake_gpe = cros_ec_get_ec_wake_gpe(dev);
+
+	if (ec_wake_gpe < 0)
+		return ec_wake_gpe;
+
+	status = acpi_install_gpe_handler(NULL, ec_wake_gpe,
+					  ACPI_GPE_EDGE_TRIGGERED,
+					  &cros_ec_gpe_handler, NULL);
+	if (ACPI_FAILURE(status))
+		return -ENODEV;
+
+	dev_info(dev, "Initialized, GPE = 0x%x\n", ec_wake_gpe);
+
+	return 0;
+}
+
+#endif
 
 static struct cros_ec_platform ec_p = {
 	.ec_name = CROS_EC_DEV_NAME,
@@ -166,6 +236,10 @@ int cros_ec_register(struct cros_ec_device *ec_dev)
 
 	dev_info(dev, "Chrome EC device registered\n");
 
+#ifdef CONFIG_ACPI
+	cros_ec_install_handler(dev);
+#endif
+
 	return 0;
 
 fail_mfd:
@@ -179,6 +253,17 @@ int cros_ec_remove(struct cros_ec_device *ec_dev)
 {
 	mfd_remove_devices(ec_dev->dev);
 
+#ifdef CONFIG_ACPI
+	if (ec_wake_gpe >= 0) {
+		acpi_status status;
+
+		status = acpi_remove_gpe_handler(NULL, ec_wake_gpe,
+						 &cros_ec_gpe_handler);
+		if (ACPI_FAILURE(status))
+			pr_err("failed to remove gpe handler\n");
+	}
+#endif
+
 	return 0;
 }
 EXPORT_SYMBOL(cros_ec_remove);
@@ -190,8 +275,16 @@ int cros_ec_suspend(struct cros_ec_device *ec_dev)
 	int ret;
 	u8 sleep_event;
 
-	sleep_event = pm_suspend_via_firmware() ? HOST_SLEEP_EVENT_S3_RESUME :
-						  HOST_SLEEP_EVENT_S0IX_RESUME;
+	if (!pm_suspend_via_firmware()) {
+		sleep_event = HOST_SLEEP_EVENT_S0IX_SUSPEND;
+#ifdef CONFIG_ACPI
+		/* Clearing the GPE status for any pending event */
+		if (ec_wake_gpe >= 0)
+			acpi_clear_gpe(NULL, ec_wake_gpe);
+#endif
+	} else {
+		sleep_event = HOST_SLEEP_EVENT_S3_SUSPEND;
+	}
 
 	ret = cros_ec_sleep_event(ec_dev, sleep_event);
 	if (ret < 0)
