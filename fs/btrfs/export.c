@@ -233,7 +233,7 @@ static int btrfs_get_name(struct dentry *parent, char *name,
 	int ret;
 	u64 ino;
 
-	if (!dir || !inode)
+	if (!dir)
 		return -EINVAL;
 
 	if (!S_ISDIR(dir->i_mode))
