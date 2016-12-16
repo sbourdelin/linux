@@ -25,6 +25,7 @@
 #include <linux/random.h>
 #include <linux/export.h>
 #include <linux/context_tracking.h>
+#include <linux/hugetlb.h>
 
 #include <asm/uaccess.h>
 #include <asm/utrap.h>
@@ -439,6 +440,22 @@ int sparc_mmap_check(unsigned long addr, unsigned long len)
 
 		if (invalid_64bit_range(addr, len))
 			return -EINVAL;
+	}
+
+	return 0;
+}
+
+int sparc_shmat_check(struct file *file, int shmflg, unsigned long *flags)
+{
+	if (shmflg & SHM_SHAREDCTX) {
+		if ((*flags & (MAP_SHARED | MAP_FIXED)) !=
+		    (unsigned long)(MAP_SHARED | MAP_FIXED))
+			return -EINVAL;
+
+		if (!is_file_hugepages(file))
+			return -EINVAL;
+
+		*flags |= MAP_SHAREDCTX;
 	}
 
 	return 0;

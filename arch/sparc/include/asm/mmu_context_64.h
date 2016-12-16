@@ -7,7 +7,6 @@
 
 #include <linux/spinlock.h>
 #include <asm/spitfire.h>
-#include <asm-generic/mm_hooks.h>
 
 static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
@@ -24,6 +23,13 @@ void put_shared_context(struct mm_struct *mm);
 void set_mm_shared_ctx(struct mm_struct *mm, struct shared_mmu_ctx *ctx);
 void destroy_shared_context(struct mm_struct *mm);
 void set_vma_shared_ctx(struct vm_area_struct *vma);
+void sparc64_exit_mmap(struct mm_struct *mm);
+void sparc64_unmap(struct mm_struct *mm, struct vm_area_struct *vma,
+			unsigned long start, unsigned long end);
+unsigned long sparc64_pre_mmap_flags(struct file *file, unsigned long flags,
+					vm_flags_t *vm_flags);
+void sparc64_post_mmap(struct mm_struct *mm, unsigned long addr,
+					vm_flags_t vm_flags);
 #endif
 #ifdef CONFIG_SMP
 void smp_new_mmu_context_version(void);
@@ -208,6 +214,60 @@ static inline void activate_mm(struct mm_struct *active_mm, struct mm_struct *mm
 	spin_unlock_irqrestore(&mm->context.lock, flags);
 }
 
+#if defined(CONFIG_SHARED_MMU_CTX)
+/*
+ * mm_hooks only needed for CONFIG_SHARED_MMU_CTX
+ */
+static inline unsigned long arch_pre_mmap_flags(struct file *file,
+						unsigned long flags,
+						vm_flags_t *vm_flags)
+{
+	return sparc64_pre_mmap_flags(file, flags, vm_flags);
+}
+
+static inline void arch_post_mmap(struct mm_struct *mm, unsigned long addr,
+							vm_flags_t vm_flags)
+{
+	sparc64_post_mmap(mm, addr, vm_flags);
+}
+
+static inline void arch_dup_mmap(struct mm_struct *oldmm,
+				 struct mm_struct *mm)
+{
+}
+
+static inline void arch_exit_mmap(struct mm_struct *mm)
+{
+	sparc64_exit_mmap(mm);
+}
+
+static inline void arch_unmap(struct mm_struct *mm,
+			struct vm_area_struct *vma,
+			unsigned long start, unsigned long end)
+{
+	sparc64_unmap(mm, vma, start, end);
+}
+
+static inline void arch_bprm_mm_init(struct mm_struct *mm,
+				     struct vm_area_struct *vma)
+{
+}
+
+static inline bool arch_vma_access_permitted(struct vm_area_struct *vma,
+		bool write, bool execute, bool foreign)
+{
+	/* by default, allow everything */
+	return true;
+}
+
+static inline bool arch_pte_access_permitted(pte_t pte, bool write)
+{
+	/* by default, allow everything */
+	return true;
+}
+#else
+#include <asm-generic/mm_hooks.h>
+#endif
 #endif /* !(__ASSEMBLY__) */
 
 #endif /* !(__SPARC64_MMU_CONTEXT_H) */

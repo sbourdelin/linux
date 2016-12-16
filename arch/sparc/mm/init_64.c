@@ -27,6 +27,7 @@
 #include <linux/memblock.h>
 #include <linux/mmzone.h>
 #include <linux/gfp.h>
+#include <linux/mman.h>
 
 #include <asm/head.h>
 #include <asm/page.h>
@@ -831,6 +832,41 @@ void set_vma_shared_ctx(struct vm_area_struct *vma)
 
 	atomic_inc(&mm->context.shared_ctx->refcount);
 	vma->vm_shared_mmu_ctx.ctx = mm->context.shared_ctx;
+}
+
+unsigned long sparc64_pre_mmap_flags(struct file *file, unsigned long flags,
+					vm_flags_t *vm_flags)
+{
+	if (flags & MAP_SHAREDCTX) {
+		/* Must be a shared huge page mapping */
+		if (!(flags & (MAP_SHARED | MAP_FIXED)))
+			return -EINVAL;
+		if (!(flags & MAP_HUGETLB)  &&
+		    !(file && is_file_hugepages(file)))
+			return -EINVAL;
+
+		*vm_flags |= VM_SHARED_CTX;
+	}
+
+	return 0;
+}
+
+void sparc64_post_mmap(struct mm_struct *mm, unsigned long addr,
+							vm_flags_t vm_flags)
+{
+	if (vm_flags & VM_SHARED_CTX)
+		huge_get_shared_ctx(mm, addr);
+}
+
+void sparc64_exit_mmap(struct mm_struct *mm)
+{
+	put_shared_context(mm);
+}
+
+void sparc64_unmap(struct mm_struct *mm, struct vm_area_struct *vma,
+			unsigned long start, unsigned long end)
+{
+	put_shared_context(mm);
 }
 #endif
 
