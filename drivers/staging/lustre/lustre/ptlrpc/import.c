@@ -1182,9 +1182,9 @@ static int ptlrpc_connect_interpret(const struct lu_env *env,
 	}
 
 	/* Sanity checks for a reconnected import. */
-	if (!(imp->imp_replayable) != !(msg_flags & MSG_CONNECT_REPLAYABLE)) {
+	if (!(imp->imp_replayable) != !(msg_flags & MSG_CONNECT_REPLAYABLE))
 		CERROR("imp_replayable flag does not match server after reconnect. We should LBUG right here.\n");
-	}
+
 
 	if (lustre_msg_get_last_committed(request->rq_repmsg) > 0 &&
 	    lustre_msg_get_last_committed(request->rq_repmsg) <
