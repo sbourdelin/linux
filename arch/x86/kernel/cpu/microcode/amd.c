@@ -297,6 +297,7 @@ void __init load_ucode_amd_bsp(unsigned int family)
 	struct cpio_data cp;
 	const char *path;
 	bool use_pa;
+	u32 eax, ebx, ecx, edx;
 
 	if (IS_ENABLED(CONFIG_X86_32)) {
 		uci	= (struct ucode_cpu_info *)__pa_nodebug(ucode_cpu_info);
@@ -315,7 +316,10 @@ void __init load_ucode_amd_bsp(unsigned int family)
 		return;
 
 	/* Get BSP's CPUID.EAX(1), needed in load_microcode_amd() */
-	uci->cpu_sig.sig = cpuid_eax(1);
+	eax = 0x00000001;
+	ecx = 0;
+	native_cpuid(&eax, &ebx, &ecx, &edx);
+	uci->cpu_sig.sig = eax;
 
 	apply_microcode_early_amd(cp.data, cp.size, true);
 }
