@@ -3445,8 +3445,10 @@ static noinline_for_stack int __extent_writepage_io(struct inode *inode,
 					 bdev, &epd->bio, max_nr,
 					 end_bio_extent_writepage,
 					 0, 0, 0, false);
-		if (ret)
+		if (ret) {
 			SetPageError(page);
+			end_page_writeback(page);
+		}
 
 		cur = cur + iosize;
 		pg_offset += iosize;
