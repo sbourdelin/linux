@@ -68,7 +68,9 @@ unsigned native_patch(u8 type, u16 clobbers, void *ibuf,
 #endif
 
 	default:
+#if defined(CONFIG_PARAVIRT_SPINLOCKS)
 patch_default:
+#endif
 		ret = paravirt_patch_default(type, clobbers, ibuf, addr, len);
 		break;
 
