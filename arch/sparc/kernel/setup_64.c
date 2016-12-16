@@ -276,6 +276,17 @@ void sun_m7_patch_2insn_range(struct sun4v_2insn_patch_entry *start,
 	}
 }
 
+/*
+ * FIXME - TODO
+ *
+ * Shared MMU context support will only be provided on sun4v platforms
+ * with Niagara 2 or later processors.  A patching mechanism for this
+ * this type of support will need to be implemented.  For now, the code
+ * is making the too general assumption of supporting shared context on
+ * all sun4v platforms.  This is a placeholder to add correct support
+ * at a later time.
+ */
+
 static void __init sun4v_patch(void)
 {
 	extern void sun4v_hvapi_init(void);
