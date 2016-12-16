@@ -152,6 +152,14 @@ sun4v_tsb_miss_common:
 	sub	%g2, TRAP_PER_CPU_FAULT_INFO, %g2
 
 #if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_TRANSPARENT_HUGEPAGE)
+	/*
+	 * FIXME
+	 *
+	 * This just computes the possible huge page TSB entry.  It does
+	 * not consider the shared huge page TSB.  Also, care must be taken
+	 * so that TRAP_PER_CPU_TSB_HUGE_TEMP is only used for non-shared
+	 * huge TSB.
+	 */
 	mov	SCRATCHPAD_UTSBREG2, %g5
 	ldxa	[%g5] ASI_SCRATCHPAD, %g5
 	cmp	%g5, -1

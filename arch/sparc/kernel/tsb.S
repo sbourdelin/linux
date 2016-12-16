@@ -55,6 +55,9 @@ tsb_miss_page_table_walk:
 	 */
 #if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_TRANSPARENT_HUGEPAGE)
 
+	/*
+	 * First check the normal huge page TSB
+	 */
 661:	ldx		[%g7 + TRAP_PER_CPU_TSB_HUGE], %g5
 	nop
 	.section	.sun4v_2insn_patch, "ax"
@@ -64,7 +67,7 @@ tsb_miss_page_table_walk:
 	.previous
 
 	cmp		%g5, -1
-	be,pt		%xcc, 80f
+	be,pt		%xcc, chk_huge_page_shared
 	 nop
 
 	/* We need an aligned pair of registers containing 2 values
@@ -75,15 +78,48 @@ tsb_miss_page_table_walk:
 	 * Perform a huge page TSB lookup.
 	 */
 	mov		%g6, %g2
-	and		%g5, 0x7, %g6
-	mov		512, %g7
-	andn		%g5, 0x7, %g5
-	sllx		%g7, %g6, %g7
-	srlx		%g4, REAL_HPAGE_SHIFT, %g6
-	sub		%g7, 1, %g7
-	and		%g6, %g7, %g6
-	sllx		%g6, 4, %g6
-	add		%g5, %g6, %g5
+
+	COMPUTE_TSB_PTR(%g5, %g4, REAL_HPAGE_SHIFT, %g6, %g7)
+
+	TSB_LOAD_QUAD(%g5, %g6)
+	cmp		%g6, %g2
+	be,a,pt		%xcc, tsb_tlb_reload
+	 mov		%g7, %g5
+
+	/*
+	 * No match, restore %g6 and %g7.
+	 * Store huge page TSB entry address
+	 *
+	 * FIXME - Look into use of TRAP_PER_CPU_TSB_HUGE_TEMP as it
+	 * is only used for regular, not shared huge pages.
+	 */
+	TRAP_LOAD_TRAP_BLOCK(%g7, %g6)
+	srlx		%g4, 22, %g6
+
+chk_huge_page_shared:
+	stx		%g5, [%g7 + TRAP_PER_CPU_TSB_HUGE_TEMP]
+
+	/*
+	 * For now (POC) only check shared context on hypervisor
+	 */
+	IF_TLB_TYPE_NOT_HYPE(%g2, huge_checks_done)
+
+	/* Check the shared huge page TSB */
+	ldx		[%g7 + TRAP_PER_CPU_TSB_HUGE_SHARED], %g5
+	cmp		%g5, -1
+	bne,pn		%xcc, huge_checks_done
+	 nop
+
+	/* We need an aligned pair of registers containing 2 values
+	 * which can be easily rematerialized.  %g6 and %g7 foot the
+	 * bill just nicely.  We'll save %g6 away into %g2 for the
+	 * huge page TSB TAG comparison.
+	 *
+	 * Perform a huge page TSB lookup.
+	 */
+	mov		%g6, %g2
+
+	COMPUTE_TSB_PTR(%g5, %g4, REAL_HPAGE_SHIFT, %g6, %g7)
 
 	TSB_LOAD_QUAD(%g5, %g6)
 	cmp		%g6, %g2
@@ -91,25 +127,29 @@ tsb_miss_page_table_walk:
 	 mov		%g7, %g5
 
 	/* No match, remember the huge page TSB entry address,
-	 * and restore %g6 and %g7.
+	 * restore %g6 and %g7.
+	 *
+	 * NOT REALLY REMEMBERING -  See FIXME above
 	 */
 	TRAP_LOAD_TRAP_BLOCK(%g7, %g6)
 	srlx		%g4, 22, %g6
-80:	stx		%g5, [%g7 + TRAP_PER_CPU_TSB_HUGE_TEMP]
 
+huge_checks_done:
+	stx		%g5, [%g7 + TRAP_PER_CPU_TSB_HUGE_TEMP]
 #endif
 
 	ldx		[%g7 + TRAP_PER_CPU_PGD_PADDR], %g7
 
 	/* At this point we have:
-	 * %g1 --	TSB entry address
+	 * %g1 --	Base TSB entry address
 	 * %g3 --	FAULT_CODE_{D,I}TLB
 	 * %g4 --	missing virtual address
 	 * %g6 --	TAG TARGET (vaddr >> 22)
 	 * %g7 --	page table physical address
 	 *
 	 * We know that both the base PAGE_SIZE TSB and the HPAGE_SIZE
-	 * TSB both lack a matching entry.
+	 * TSB both lack a matching entry, as well as shared TSBs if
+	 * present.
 	 */
 tsb_miss_page_table_walk_sun4v_fastpath:
 	USER_PGTABLE_WALK_TL1(%g4, %g7, %g5, %g2, tsb_do_fault)
@@ -152,12 +192,42 @@ tsb_miss_page_table_walk_sun4v_fastpath:
 	 * thus handle it here.  This also makes sure that we can
 	 * allocate the TSB hash table on the correct NUMA node.
 	 */
+
+	/*
+	 * Check for shared context PTE, in this case we do not have
+	 * a saved TSB entry pointer and must compute now
+	 */
+	IF_TLB_TYPE_NOT_HYPE(%g2, no_shared_ctx_pte)
+
+	mov		_PAGE_SHR_CTX_4V, %g2
+	andcc		%g5, %g2, %g2
+	be,pn		%xcc, no_shared_ctx_pte
+
+	/*
+	 * If there was a shared context TSB, then we need to copmute the
+	 * TSB entry address.  Previously, only the non-shared context
+	 * TSB entry address was calculated.
+	 *
+	 * FIXME
+	 */
+	TRAP_LOAD_TRAP_BLOCK(%g7, %g1)
+	ldx		[%g7 + TRAP_PER_CPU_TSB_HUGE_SHARED], %g1
+	cmp		%g1, -1
+	be,pn		%xcc, no_shared_hugetlb
+	 nop
+
+	COMPUTE_TSB_PTR(%g1, %g4, REAL_HPAGE_SHIFT, %g2, %g7)
+
+	ba,a,pt %xcc,tsb_reload
+
+no_shared_ctx_pte:
 	TRAP_LOAD_TRAP_BLOCK(%g7, %g2)
 	ldx		[%g7 + TRAP_PER_CPU_TSB_HUGE_TEMP], %g1
 	cmp		%g1, -1
 	bne,pt		%xcc, 60f
 	 nop
 
+no_hugetlb:
 661:	rdpr		%pstate, %g5
 	wrpr		%g5, PSTATE_AG | PSTATE_MG, %pstate
 	.section	.sun4v_2insn_patch, "ax"
@@ -173,6 +243,30 @@ tsb_miss_page_table_walk_sun4v_fastpath:
 	ba,pt	%xcc, etrap
 	 rd	%pc, %g7
 	call	hugetlb_setup
+	 add	%sp, PTREGS_OFF, %o0
+	ba,pt	%xcc, rtrap
+	 nop
+
+	/*
+	 * This is the same as above call to hugetlb_setup.
+	 * FIXME
+	 */
+no_shared_hugetlb:
+661:	rdpr		%pstate, %g5
+	wrpr		%g5, PSTATE_AG | PSTATE_MG, %pstate
+	.section	.sun4v_2insn_patch, "ax"
+	.word		661b
+	SET_GL(1)
+	nop
+	.previous
+
+	rdpr	%tl, %g7
+	cmp	%g7, 1
+	bne,pn	%xcc, winfix_trampoline
+	 mov	%g3, %g4
+	ba,pt	%xcc, etrap
+	 rd	%pc, %g7
+	call	hugetlb_shared_setup
 	 add	%sp, PTREGS_OFF, %o0
 	ba,pt	%xcc, rtrap
 	 nop
