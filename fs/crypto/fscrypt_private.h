@@ -86,8 +86,22 @@ struct fscrypt_completion_result {
 
 /* crypto.c */
 int fscrypt_initialize(unsigned int cop_flags);
+extern struct workqueue_struct *fscrypt_read_workqueue;
 
 /* keyinfo.c */
 extern int fscrypt_get_crypt_info(struct inode *);
+
+/* bio.c */
+#ifdef CONFIG_BLOCK
+extern int fscrypt_bio_submit_page(const struct inode *inode, sector_t blk,
+				   struct page *page);
+#else
+static inline int fscrypt_bio_submit_page(const struct inode *inode,
+					  sector_t blk, struct page *page)
+{
+	WARN_ON_ONCE(1);
+	return -EINVAL;
+}
+#endif
 
 #endif /* _FSCRYPT_PRIVATE_H */

@@ -174,8 +174,6 @@ extern struct page *fscrypt_encrypt_page(const struct inode *, struct page *,
 						u64, gfp_t);
 extern int fscrypt_decrypt_page(const struct inode *, struct page *, unsigned int,
 				unsigned int, u64);
-extern void fscrypt_decrypt_bio_pages(struct fscrypt_ctx *, struct bio *);
-extern void fscrypt_pullback_bio_page(struct page **, bool);
 extern void fscrypt_restore_control_page(struct page *);
 extern int fscrypt_zeroout_range(const struct inode *, pgoff_t, sector_t,
 						unsigned int);
@@ -201,6 +199,10 @@ extern int fscrypt_fname_disk_to_usr(struct inode *, u32, u32,
 			const struct fscrypt_str *, struct fscrypt_str *);
 extern int fscrypt_fname_usr_to_disk(struct inode *, const struct qstr *,
 			struct fscrypt_str *);
+
+/* bio.c */
+extern void fscrypt_decrypt_bio_pages(struct fscrypt_ctx *, struct bio *);
+extern void fscrypt_pullback_bio_page(struct page **, bool);
 #endif
 
 /* crypto.c */
