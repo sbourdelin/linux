@@ -312,6 +312,18 @@ xprt_rdma_destroy(struct rpc_xprt *xprt)
 	module_put(THIS_MODULE);
 }
 
+static bool
+rpcrdma_need_keepalive(struct rpcrdma_xprt *r_xprt)
+{
+	struct rdma_cm_id *id = r_xprt->rx_ia.ri_id;
+
+	/* RDMA RC on InfiniBand has no native keepalive
+	 * mechanism. iWARP runs on a lower layer that
+	 * already provides keepalive.
+	 */
+	return !rdma_protocol_iwarp(id->device, id->port_num);
+}
+
 static const struct rpc_timeout xprt_rdma_default_timeout = {
 	.to_initval = 60 * HZ,
 	.to_maxval = 60 * HZ,
@@ -433,6 +445,7 @@ xprt_setup_rdma(struct xprt_create *args)
 	xprt->max_payload = new_xprt->rx_ia.ri_ops->ro_maxpages(new_xprt);
 	if (xprt->max_payload == 0)
 		goto out4;
+	xprt->keepalive = rpcrdma_need_keepalive(new_xprt);
 	xprt->max_payload <<= PAGE_SHIFT;
 	dprintk("RPC:       %s: transport data payload maximum: %zu bytes\n",
 		__func__, xprt->max_payload);

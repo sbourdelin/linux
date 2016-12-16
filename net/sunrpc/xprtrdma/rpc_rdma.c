@@ -1083,7 +1083,9 @@ out:
 
 	spin_lock_bh(&xprt->transport_lock);
 	cwnd = xprt->cwnd;
-	xprt->cwnd = atomic_read(&r_xprt->rx_buf.rb_credits) << RPC_CWNDSHIFT;
+	/* Reserve one credit for keepalive ping */
+	xprt->cwnd = atomic_read(&r_xprt->rx_buf.rb_credits) - 1;
+	xprt->cwnd <<= RPC_CWNDSHIFT;
 	if (xprt->cwnd > cwnd)
 		xprt_release_rqst_cong(rqst->rq_task);
 

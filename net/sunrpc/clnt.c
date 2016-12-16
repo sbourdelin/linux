@@ -79,6 +79,7 @@ static void	call_connect_status(struct rpc_task *task);
 static __be32	*rpc_encode_header(struct rpc_task *task);
 static __be32	*rpc_verify_header(struct rpc_task *task);
 static int	rpc_ping(struct rpc_clnt *clnt);
+static void rpc_clnt_keepalive(struct work_struct *work);
 
 static void rpc_register_client(struct rpc_clnt *clnt)
 {
@@ -413,6 +414,7 @@ static struct rpc_clnt * rpc_new_client(const struct rpc_create_args *args,
 	rpc_clnt_set_transport(clnt, xprt, timeout);
 	xprt_iter_init(&clnt->cl_xpi, xps);
 	xprt_switch_put(xps);
+	INIT_DELAYED_WORK(&clnt->cl_ka_worker, rpc_clnt_keepalive);
 
 	clnt->cl_rtt = &clnt->cl_rtt_default;
 	rpc_init_rtt(&clnt->cl_rtt_default, clnt->cl_timeout->to_initval);
@@ -871,6 +873,7 @@ rpc_free_client(struct rpc_clnt *clnt)
 			rcu_dereference(clnt->cl_xprt)->servername);
 	if (clnt->cl_parent != clnt)
 		parent = clnt->cl_parent;
+	cancel_delayed_work_sync(&clnt->cl_ka_worker);
 	rpc_clnt_debugfs_unregister(clnt);
 	rpc_clnt_remove_pipedir(clnt);
 	rpc_unregister_client(clnt);
@@ -2783,6 +2786,104 @@ bool rpc_clnt_xprt_switch_has_addr(struct rpc_clnt *clnt,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(rpc_clnt_xprt_switch_has_addr);
+
+struct rpc_keepalive_calldata {
+	struct rpc_xprt		*xprt;
+};
+
+static void rpc_keepalive_done(struct rpc_task *task, void *calldata)
+{
+	struct rpc_keepalive_calldata *data = calldata;
+
+	dprintk("RPC:       %s: keepalive ping on xprt %p, status %d\n",
+		__func__, data->xprt, task->tk_status);
+
+	if (task->tk_status)
+		xprt_force_disconnect(data->xprt);
+}
+
+static void rpc_keepalive_release(void *calldata)
+{
+	struct rpc_keepalive_calldata *data = calldata;
+
+	data->xprt->keepalive = true;
+	xprt_put(data->xprt);
+	kfree(data);
+}
+
+static const struct rpc_call_ops rpc_keepalive_call_ops = {
+	.rpc_call_done		= rpc_keepalive_done,
+	.rpc_release		= rpc_keepalive_release,
+};
+
+static int rpc_xprt_keepalive(struct rpc_clnt *clnt, struct rpc_xprt *xprt,
+			      void *unused)
+{
+	struct rpc_keepalive_calldata *data;
+	struct rpc_cred *cred;
+	struct rpc_task *task;
+
+	if (!xprt->keepalive)
+		goto out;
+	if (!xprt_connected(xprt))
+		goto out;
+
+	/* When there are no pending RPCs, squelch keepalive so that a
+	 * truly idle connection can be auto-closed.
+	 */
+	if (!rpc_wait_queue_is_active(&xprt->pending))
+		goto out;
+
+	dprintk("RPC:       %s: sending keepalive ping on xprt %p\n",
+		__func__, xprt);
+
+	data = kmalloc(sizeof(*data), GFP_NOFS);
+	if (!data)
+		goto out;
+	data->xprt = xprt_get(xprt);
+
+	/* Send only one keepalive ping at a time.
+	 */
+	xprt->keepalive = false;
+
+	cred = authnull_ops.lookup_cred(NULL, NULL, 0);
+	task = rpc_call_null_helper(clnt, xprt, cred,
+				    RPC_TASK_SOFT |
+				    RPC_TASK_ASYNC |
+				    RPC_TASK_PRIORITY,
+				    &rpc_keepalive_call_ops,
+				    data);
+
+	put_rpccred(cred);
+	if (!IS_ERR(task))
+		rpc_put_task(task);
+out:
+	return 0;
+}
+
+static void rpc_clnt_keepalive(struct work_struct *work)
+{
+	struct rpc_clnt *clnt = container_of(work, struct rpc_clnt,
+					     cl_ka_worker.work);
+
+	rpc_clnt_iterate_for_each_xprt(clnt, rpc_xprt_keepalive, NULL);
+	rpc_schedule_keepalive(clnt);
+}
+
+/**
+ * rpc_schedule_keepalive - Start keepalive heartbeat
+ * @clnt: rpc_clnt with transports that might need keepalive
+ *
+ * For transport classes that do not have a native keepalive mechanism,
+ * detect dead transports as quickly as possible. An RPC NULL is used
+ * as the ping.
+ */
+void rpc_schedule_keepalive(struct rpc_clnt *clnt)
+{
+	schedule_delayed_work(&clnt->cl_ka_worker,
+			      clnt->cl_timeout->to_initval >> 1);
+}
+EXPORT_SYMBOL_GPL(rpc_schedule_keepalive);
 
 #if IS_ENABLED(CONFIG_SUNRPC_DEBUG)
 static void rpc_show_header(void)

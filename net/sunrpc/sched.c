@@ -635,6 +635,25 @@ void rpc_wake_up_status(struct rpc_wait_queue *queue, int status)
 }
 EXPORT_SYMBOL_GPL(rpc_wake_up_status);
 
+/**
+ * rpc_wait_queue_is_active - check if there are queue waiters
+ * @queue: rpc_wait_queue on which the tasks are sleeping
+ *
+ * Grabs queue->lock
+ */
+bool rpc_wait_queue_is_active(struct rpc_wait_queue *queue)
+{
+	struct list_head *head;
+	bool result;
+
+	spin_lock_bh(&queue->lock);
+	head = &queue->tasks[queue->maxpriority];
+	result = !list_empty(head);
+	spin_unlock_bh(&queue->lock);
+
+	return result;
+}
+
 static void __rpc_queue_timer_fn(unsigned long ptr)
 {
 	struct rpc_wait_queue *queue = (struct rpc_wait_queue *)ptr;

@@ -392,6 +392,10 @@ __xprt_get_cong(struct rpc_xprt *xprt, struct rpc_task *task)
 {
 	struct rpc_rqst *req = task->tk_rqstp;
 
+	if (RPC_HAS_PRIORITY(task)) {
+		req->rq_cong = 0;
+		return 1;
+	}
 	if (req->rq_cong)
 		return 1;
 	dprintk("RPC: %5u xprt_cwnd_limited cong = %lu cwnd = %lu\n",
@@ -1329,6 +1333,7 @@ static void xprt_init(struct rpc_xprt *xprt, struct net *net)
 	xprt->last_used = jiffies;
 	xprt->cwnd = RPC_INITCWND;
 	xprt->bind_index = 0;
+	xprt->keepalive = false;
 
 	rpc_init_wait_queue(&xprt->binding, "xprt_binding");
 	rpc_init_wait_queue(&xprt->pending, "xprt_pending");

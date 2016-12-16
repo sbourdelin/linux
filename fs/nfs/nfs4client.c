@@ -378,6 +378,7 @@ struct nfs_client *nfs4_init_client(struct nfs_client *clp,
 		error = nfs_create_rpc_client(clp, cl_init, RPC_AUTH_UNIX);
 	if (error < 0)
 		goto error;
+	rpc_schedule_keepalive(clp->cl_rpcclient);
 
 	/* If no clientaddr= option was specified, find a usable cb address */
 	if (ip_addr == NULL) {

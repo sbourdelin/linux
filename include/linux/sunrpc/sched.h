@@ -127,6 +127,7 @@ struct rpc_task_setup {
 #define RPC_TASK_TIMEOUT	0x1000		/* fail with ETIMEDOUT on timeout */
 #define RPC_TASK_NOCONNECT	0x2000		/* return ENOTCONN if not connected */
 #define RPC_TASK_NO_RETRANS_TIMEOUT	0x4000		/* wait forever for a reply */
+#define RPC_TASK_PRIORITY	0x8000		/* skip congestion control */
 
 #define RPC_IS_ASYNC(t)		((t)->tk_flags & RPC_TASK_ASYNC)
 #define RPC_IS_SWAPPER(t)	((t)->tk_flags & RPC_TASK_SWAPPER)
@@ -135,6 +136,7 @@ struct rpc_task_setup {
 #define RPC_IS_SOFT(t)		((t)->tk_flags & (RPC_TASK_SOFT|RPC_TASK_TIMEOUT))
 #define RPC_IS_SOFTCONN(t)	((t)->tk_flags & RPC_TASK_SOFTCONN)
 #define RPC_WAS_SENT(t)		((t)->tk_flags & RPC_TASK_SENT)
+#define RPC_HAS_PRIORITY(t)	((t)->tk_flags & RPC_TASK_PRIORITY)
 
 #define RPC_TASK_RUNNING	0
 #define RPC_TASK_QUEUED		1
@@ -238,6 +240,7 @@ struct rpc_task *rpc_wake_up_first(struct rpc_wait_queue *,
 					bool (*)(struct rpc_task *, void *),
 					void *);
 void		rpc_wake_up_status(struct rpc_wait_queue *, int);
+bool		rpc_wait_queue_is_active(struct rpc_wait_queue *queue);
 void		rpc_delay(struct rpc_task *, unsigned long);
 int		rpc_malloc(struct rpc_task *);
 void		rpc_free(struct rpc_task *);

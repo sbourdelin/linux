@@ -222,6 +222,7 @@ struct rpc_xprt {
 	unsigned long		last_used,
 				idle_timeout,
 				max_reconnect_timeout;
+	bool			keepalive;
 
 	/*
 	 * Send stuff
