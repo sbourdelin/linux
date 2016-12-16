@@ -73,8 +73,8 @@ config TI_CPSW
 	  To compile this driver as a module, choose M here: the module
 	  will be called cpsw.
 
-config TI_CPTS
-	tristate "TI Common Platform Time Sync (CPTS) Support"
+config TI_CPTS_ENABLE
+	bool "TI Common Platform Time Sync (CPTS) Support"
 	depends on TI_CPSW || TI_KEYSTONE_NETCP
 	depends on POSIX_TIMERS
 	select PTP_1588_CLOCK
@@ -83,6 +83,12 @@ config TI_CPTS
 	  the CPSW Ethernet Switch and Keystone 2 1g/10g Switch Subsystem.
 	  The unit can time stamp PTP UDP/IPv4 and Layer 2 packets, and the
 	  driver offers a PTP Hardware Clock.
+
+config TI_CPTS
+	tristate
+	depends on TI_CPTS_ENABLE
+	default y if TI_CPSW=y || TI_KEYSTONE_NETCP=y
+	default m
 
 config TI_KEYSTONE_NETCP
 	tristate "TI Keystone NETCP Core Support"
