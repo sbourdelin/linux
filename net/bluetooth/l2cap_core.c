@@ -3872,18 +3872,8 @@ sendresp:
 	rsp.status = cpu_to_le16(status);
 	l2cap_send_cmd(conn, cmd->ident, rsp_code, sizeof(rsp), &rsp);
 
-	if (result == L2CAP_CR_PEND && status == L2CAP_CS_NO_INFO) {
-		struct l2cap_info_req info;
-		info.type = cpu_to_le16(L2CAP_IT_FEAT_MASK);
-
-		conn->info_state |= L2CAP_INFO_FEAT_MASK_REQ_SENT;
-		conn->info_ident = l2cap_get_ident(conn);
-
-		schedule_delayed_work(&conn->info_timer, L2CAP_INFO_TIMEOUT);
-
-		l2cap_send_cmd(conn, conn->info_ident, L2CAP_INFO_REQ,
-			       sizeof(info), &info);
-	}
+	if (result == L2CAP_CR_PEND && status == L2CAP_CS_NO_INFO)
+		l2cap_request_info(conn);
 
 	if (chan && !test_bit(CONF_REQ_SENT, &chan->conf_state) &&
 	    result == L2CAP_CR_SUCCESS) {
