@@ -184,8 +184,11 @@ load firmware for you through a custom path.
 
 The custom fallback mechanism can often be enabled by mistake. We currently
 have only 2 users of it, and little justification to enable it for other users.
-Since it is a common driver developer mistake to enable it, help police for
-new users of the custom fallback mechanism with::
+Since it is a common driver developer mistake to enable it, driver developers
+should use DECLARE_FW_CUSTOM_FALLBACK() to both white-list and validate their
+use and also refer to the documentation for the custom loading solution.
+
+Invalid users of the custom fallback mechanism can be policed using::
 
         $ export COCCI=scripts/coccinelle/api/request_firmware-avoid-init-probe-init.cocci
         $ make coccicheck MODE=report

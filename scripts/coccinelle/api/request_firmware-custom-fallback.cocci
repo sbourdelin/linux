@@ -17,6 +17,13 @@
 virtual report
 virtual context
 
+@ r0 depends on report || context @
+declarer name DECLARE_FW_CUSTOM_FALLBACK;
+expression E;
+@@
+
+DECLARE_FW_CUSTOM_FALLBACK(E);
+
 @ r1 depends on report || context @
 expression mod, name, dev, gfp, drv, cb;
 position p;
@@ -30,7 +37,7 @@ position p;
 *request_firmware_nowait@p(mod, FW_ACTION_NOHOTPLUG, name, dev, gfp, drv, cb)
 )
 
-@script:python depends on report@
+@script:python depends on report && !r0 @
 p << r1.p;
 @@
 

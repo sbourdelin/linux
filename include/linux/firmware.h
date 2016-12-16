@@ -8,6 +8,13 @@
 #define FW_ACTION_NOHOTPLUG 0
 #define FW_ACTION_HOTPLUG 1
 
+/*
+ * Helper for scripts/coccinelle/api/request_firmware-custom-fallback.cocci
+ * and so users can also easily search for the documentation for the
+ * respectively needed custom fallback mechanism.
+ */
+#define DECLARE_FW_CUSTOM_FALLBACK(__usermode_helper)
+
 struct firmware {
 	size_t size;
 	const u8 *data;
