@@ -260,6 +260,16 @@ after_lock_tlb:
 	stxa		%g0, [%g7] ASI_MMU
 	.previous
 
+	/* Save SECONDARY_CONTEXT_R1, membar should be part of patch */
+	membar		#Sync
+661:	nop
+	nop
+	.section	.sun4v_2insn_patch, "ax"
+	.word		661b
+	mov		SECONDARY_CONTEXT_R1, %g7
+	ldxa		[%g7] ASI_MMU, %g1
+	.previous
+
 	membar		#Sync
 	mov		SECONDARY_CONTEXT, %g7
 
@@ -267,6 +277,16 @@ after_lock_tlb:
 	.section	.sun4v_1insn_patch, "ax"
 	.word		661b
 	stxa		%g0, [%g7] ASI_MMU
+	.previous
+
+	/* Restore SECONDARY_CONTEXT_R1, membar should be part of patch */
+	membar		#Sync
+661:	nop
+	nop
+	.section	.sun4v_2insn_patch, "ax"
+	.word		661b
+	mov		SECONDARY_CONTEXT_R1, %g7
+	stxa		%g1, [%g7] ASI_MMU
 	.previous
 
 	membar		#Sync

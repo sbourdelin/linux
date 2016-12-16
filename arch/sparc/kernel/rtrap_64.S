@@ -202,6 +202,7 @@ rt_continue:	ldx			[%sp + PTREGS_OFF + PT_V9_G1], %g1
 		brnz,pn			%l3, kern_rtt
 		 mov			PRIMARY_CONTEXT, %l7
 
+		/* Get value from SECONDARY_CONTEXT register */
 661:		ldxa			[%l7 + %l7] ASI_DMMU, %l0
 		.section		.sun4v_1insn_patch, "ax"
 		.word			661b
@@ -212,9 +213,28 @@ rt_continue:	ldx			[%sp + PTREGS_OFF + PT_V9_G1], %g1
 		ldx			[%l1 + %lo(sparc64_kern_pri_nuc_bits)], %l1
 		or			%l0, %l1, %l0
 
+		/* and, put into PRIMARY_CONTEXT register */
 661:		stxa			%l0, [%l7] ASI_DMMU
 		.section		.sun4v_1insn_patch, "ax"
 		.word			661b
+		stxa			%l0, [%l7] ASI_MMU
+		.previous
+
+		/* Get value from SECONDARY_CONTEXT_R1 register */
+661:		nop
+		nop
+		.section		.sun4v_2insn_patch, "ax"
+		.word			661b
+		mov			SECONDARY_CONTEXT_R1, %l7
+		ldxa			[%l7] ASI_MMU, %l0
+		.previous
+
+		/* and, put into PRIMARY_CONTEXT_R1 register */
+661:		nop
+		nop
+		.section		.sun4v_2insn_patch, "ax"
+		.word			661b
+		mov			PRIMARY_CONTEXT_R1, %l7
 		stxa			%l0, [%l7] ASI_MMU
 		.previous
 

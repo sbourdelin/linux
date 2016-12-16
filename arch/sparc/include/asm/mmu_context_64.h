@@ -61,8 +61,11 @@ void smp_tsb_sync(struct mm_struct *mm);
 #define smp_tsb_sync(__mm) do { } while (0)
 #endif
 
-/* Set MMU context in the actual hardware. */
-#define load_secondary_context(__mm) \
+/*
+ * Set MMU context in the actual hardware.  Secondary context register
+ * zero is loaded with task specific context.
+ */
+#define load_secondary_context_0(__mm) \
 	__asm__ __volatile__( \
 	"\n661:	stxa		%0, [%1] %2\n" \
 	"	.section	.sun4v_1insn_patch, \"ax\"\n" \
@@ -73,6 +76,36 @@ void smp_tsb_sync(struct mm_struct *mm);
 	: /* No outputs */ \
 	: "r" (CTX_HWBITS((__mm)->context)), \
 	  "r" (SECONDARY_CONTEXT), "i" (ASI_DMMU), "i" (ASI_MMU))
+
+/*
+ * Secondary context register one is loaded with shared context if
+ * it exists for the task.
+ */
+#define load_secondary_context_1(__mm) \
+	__asm__ __volatile__( \
+	"\n661: stxa		%0, [%1] %2\n" \
+	"	.section	.sun4v_1insn_patch, \"ax\"\n" \
+	"	.word		661b\n" \
+	"	stxa		%0, [%1] %3\n" \
+	"	.previous\n" \
+	"	flush		%%g6\n" \
+	: /* No outputs */ \
+	: "r" (SHARED_CTX_HWBITS((__mm)->context)), \
+	  "r" (SECONDARY_CONTEXT_R1), "i" (ASI_DMMU), "i" (ASI_MMU))
+
+#if defined(CONFIG_SHARED_MMU_CTX)
+#define load_secondary_context(__mm) \
+	do { \
+		load_secondary_context_0(__mm); \
+		if ((__mm)->context.shared_ctx) \
+			load_secondary_context_1(__mm); \
+	} while (0)
+#else
+#define load_secondary_context(__mm) \
+	do { \
+		load_secondary_context_0(__mm); \
+	} while (0)
+#endif
 
 void __flush_tlb_mm(unsigned long, unsigned long);
 

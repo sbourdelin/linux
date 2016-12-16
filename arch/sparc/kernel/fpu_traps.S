@@ -73,6 +73,16 @@ do_fpdis:
 	ldxa		[%g3] ASI_MMU, %g5
 	.previous
 
+661:	nop
+	nop
+	.section	.sun4v_2insn_patch, "ax"
+	.word		661b
+	mov		SECONDARY_CONTEXT_R1, %g3
+	ldxa		[%g3] ASI_MMU, %g4
+	.previous
+	/* Unnecessary on sun4u and pre-Niagara 2 sun4v */
+	mov		SECONDARY_CONTEXT, %g3
+
 	sethi		%hi(sparc64_kern_sec_context), %g2
 	ldx		[%g2 + %lo(sparc64_kern_sec_context)], %g2
 
@@ -113,6 +123,16 @@ do_fpdis:
 	.word		661b
 	ldxa		[%g3] ASI_MMU, %g5
 	.previous
+
+661:	nop
+	nop
+	.section	.sun4v_2insn_patch, "ax"
+	.word		661b
+	mov		SECONDARY_CONTEXT_R1, %g3
+	ldxa		[%g3] ASI_MMU, %g4
+	.previous
+	/* Unnecessary on sun4u and pre-Niagara 2 sun4v */
+	mov		SECONDARY_CONTEXT, %g3
 
 	add		%g6, TI_FPREGS, %g1
 	sethi		%hi(sparc64_kern_sec_context), %g2
@@ -155,6 +175,16 @@ do_fpdis:
 	ldxa		[%g3] ASI_MMU, %g5
 	.previous
 
+661:	nop
+	nop
+	.section	.sun4v_2insn_patch, "ax"
+	.word		661b
+	mov		SECONDARY_CONTEXT_R1, %g3
+	ldxa		[%g3] ASI_MMU, %g4
+	.previous
+	/* Unnecessary on sun4u and pre-Niagara 2 sun4v */
+	mov		SECONDARY_CONTEXT, %g3
+
 	sethi		%hi(sparc64_kern_sec_context), %g2
 	ldx		[%g2 + %lo(sparc64_kern_sec_context)], %g2
 
@@ -181,11 +211,24 @@ fpdis_exit:
 	stxa		%g5, [%g3] ASI_MMU
 	.previous
 
+661:	nop
+	nop
+	.section	.sun4v_2insn_patch, "ax"
+	.word		661b
+	mov		SECONDARY_CONTEXT_R1, %g3
+	stxa		%g4, [%g3] ASI_MMU
+	.previous
+
 	membar		#Sync
 fpdis_exit2:
 	wr		%g7, 0, %gsr
 	ldx		[%g6 + TI_XFSR], %fsr
 	rdpr		%tstate, %g3
+661:	nop
+	.section	.sun4v_1insn_patch, "ax"
+	.word		661b
+	sethi		%hi(TSTATE_PEF), %g4
+	.previous
 	or		%g3, %g4, %g3		! anal...
 	wrpr		%g3, %tstate
 	wr		%g0, FPRS_FEF, %fprs	! clean DU/DL bits
@@ -347,6 +390,16 @@ do_fptrap_after_fsr:
 	ldxa		[%g3] ASI_MMU, %g5
 	.previous
 
+661:	nop
+	nop
+	.section	.sun4v_2insn_patch, "ax"
+	.word		661b
+	mov		SECONDARY_CONTEXT_R1, %g3
+	ldxa		[%g3] ASI_MMU, %g4
+	.previous
+	/* Unnecessary on sun4u and pre-Niagara 2 sun4v */
+	mov		SECONDARY_CONTEXT, %g3
+
 	sethi		%hi(sparc64_kern_sec_context), %g2
 	ldx		[%g2 + %lo(sparc64_kern_sec_context)], %g2
 
@@ -377,7 +430,17 @@ do_fptrap_after_fsr:
 	stxa		%g5, [%g1] ASI_MMU
 	.previous
 
+661:	nop
+	nop
+	.section	.sun4v_2insn_patch, "ax"
+	.word		661b
+	mov		SECONDARY_CONTEXT_R1, %g1
+	stxa		%g4, [%g1] ASI_MMU
+	.previous
+
 	membar		#Sync
+	/* Unnecessary on sun4u and pre-Niagara 2 sun4v */
+	mov		SECONDARY_CONTEXT, %g1
 	ba,pt		%xcc, etrap
 	 wr		%g0, 0, %fprs
 	.size		do_fptrap,.-do_fptrap
