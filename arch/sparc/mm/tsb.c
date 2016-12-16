@@ -108,6 +108,12 @@ void flush_tsb_user(struct tlb_batch *tb)
 			base = __pa(base);
 		__flush_tsb_one(tb, REAL_HPAGE_SHIFT, base, nentries);
 	}
+
+	/*
+	 * FIXME
+	 * I don't "think" we want to flush shared context tsb entries here.
+	 * There should at least be a comment.
+	 */
 #endif
 	spin_unlock_irqrestore(&mm->context.lock, flags);
 }
@@ -133,6 +139,11 @@ void flush_tsb_user_page(struct mm_struct *mm, unsigned long vaddr, bool huge)
 			base = __pa(base);
 		__flush_tsb_one_entry(base, vaddr, REAL_HPAGE_SHIFT, nentries);
 	}
+	/*
+	 * FIXME
+	 * Again, we should give more thought to the need for flushing
+	 * shared context pages.  At least a comment is needed.
+	 */
 #endif
 	spin_unlock_irqrestore(&mm->context.lock, flags);
 }
@@ -159,6 +170,7 @@ static void setup_tsb_params(struct mm_struct *mm, unsigned long tsb_idx, unsign
 		break;
 #if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_TRANSPARENT_HUGEPAGE)
 	case MM_TSB_HUGE:
+	case MM_TSB_HUGE_SHARED:
 		base = TSBMAP_4M_BASE;
 		break;
 #endif
@@ -251,6 +263,7 @@ static void setup_tsb_params(struct mm_struct *mm, unsigned long tsb_idx, unsign
 			break;
 #if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_TRANSPARENT_HUGEPAGE)
 		case MM_TSB_HUGE:
+		case MM_TSB_HUGE_SHARED:
 			hp->pgsz_idx = HV_PGSZ_IDX_HUGE;
 			break;
 #endif
@@ -260,12 +273,21 @@ static void setup_tsb_params(struct mm_struct *mm, unsigned long tsb_idx, unsign
 		hp->assoc = 1;
 		hp->num_ttes = tsb_bytes / 16;
 		hp->ctx_idx = 0;
+
+#if defined(CONFIG_SHARED_MMU_CTX)
+		/*
+		 * For shared context TSBs, adjust the context register index
+		 */
+		if (mm->context.shared_ctx && tsb_idx == MM_TSB_HUGE_SHARED)
+			hp->ctx_idx = 1;
+#endif
 		switch (tsb_idx) {
 		case MM_TSB_BASE:
 			hp->pgsz_mask = HV_PGSZ_MASK_BASE;
 			break;
 #if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_TRANSPARENT_HUGEPAGE)
 		case MM_TSB_HUGE:
+		case MM_TSB_HUGE_SHARED:
 			hp->pgsz_mask = HV_PGSZ_MASK_HUGE;
 			break;
 #endif
@@ -520,12 +542,18 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 #if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_TRANSPARENT_HUGEPAGE)
 	unsigned long saved_hugetlb_pte_count;
 	unsigned long saved_thp_pte_count;
+#if defined(CONFIG_SHARED_MMU_CTX)
+	unsigned long saved_shared_hugetlb_pte_count;
+#endif
 #endif
 	unsigned int i;
 
 	spin_lock_init(&mm->context.lock);
 
 	mm->context.sparc64_ctx_val = 0UL;
+#if defined(CONFIG_SHARED_MMU_CTX)
+	mm->context.shared_ctx = NULL;
+#endif
 
 #if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_TRANSPARENT_HUGEPAGE)
 	/* We reset them to zero because the fork() page copying
@@ -536,6 +564,10 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 	saved_thp_pte_count = mm->context.thp_pte_count;
 	mm->context.hugetlb_pte_count = 0;
 	mm->context.thp_pte_count = 0;
+#if defined(CONFIG_SHARED_MMU_CTX)
+	saved_shared_hugetlb_pte_count = mm->context.shared_hugetlb_pte_count;
+	mm->context.shared_hugetlb_pte_count = 0;
+#endif
 
 	mm_rss -= saved_thp_pte_count * (HPAGE_SIZE / PAGE_SIZE);
 #endif
@@ -544,8 +576,10 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 	 * us, so we need to zero out the TSB pointer or else tsb_grow()
 	 * will be confused and think there is an older TSB to free up.
 	 */
-	for (i = 0; i < MM_NUM_TSBS; i++)
+	for (i = 0; i < MM_NUM_TSBS; i++) {
 		mm->context.tsb_block[i].tsb = NULL;
+		mm->context.tsb_descr[i].tsb_base = 0UL;
+	}
 
 	/* If this is fork, inherit the parent's TSB size.  We would
 	 * grow it to that size on the first page fault anyways.
@@ -557,6 +591,11 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 		tsb_grow(mm, MM_TSB_HUGE,
 			 (saved_hugetlb_pte_count + saved_thp_pte_count) *
 			 REAL_HPAGE_PER_HPAGE);
+#if defined(CONFIG_SHARED_MMU_CTX)
+	if (unlikely(saved_shared_hugetlb_pte_count))
+		tsb_grow(mm, MM_TSB_HUGE_SHARED,
+			saved_shared_hugetlb_pte_count * REAL_HPAGE_PER_HPAGE);
+#endif
 #endif
 
 	if (unlikely(!mm->context.tsb_block[MM_TSB_BASE].tsb))

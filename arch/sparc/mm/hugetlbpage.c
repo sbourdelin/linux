@@ -162,8 +162,14 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
 {
 	pte_t orig;
 
-	if (!pte_present(*ptep) && pte_present(entry))
-		mm->context.hugetlb_pte_count++;
+	if (!pte_present(*ptep) && pte_present(entry)) {
+#if defined(CONFIG_SHARED_MMU_CTX)
+		if (pte_val(entry) | _PAGE_SHR_CTX_4V)
+			mm->context.shared_hugetlb_pte_count++;
+		else
+#endif
+			mm->context.hugetlb_pte_count++;
+	}
 
 	addr &= HPAGE_MASK;
 	orig = *ptep;
@@ -180,8 +186,14 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
 	pte_t entry;
 
 	entry = *ptep;
-	if (pte_present(entry))
-		mm->context.hugetlb_pte_count--;
+	if (pte_present(entry)) {
+#if defined(CONFIG_SHARED_MMU_CTX)
+		if (pte_val(entry) | _PAGE_SHR_CTX_4V)
+			mm->context.shared_hugetlb_pte_count--;
+		else
+#endif
+			mm->context.hugetlb_pte_count--;
+	}
 
 	addr &= HPAGE_MASK;
 	*ptep = __pte(0UL);

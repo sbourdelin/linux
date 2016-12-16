@@ -346,6 +346,21 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t *
 	spin_lock_irqsave(&mm->context.lock, flags);
 
 #if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_TRANSPARENT_HUGEPAGE)
+#if defined(CONFIG_SHARED_MMU_CTX)
+	if ((mm->context.hugetlb_pte_count || mm->context.thp_pte_count ||
+	    mm->context.shared_hugetlb_pte_count) && is_hugetlb_pte(pte)) {
+		/* We are fabricating 8MB pages using 4MB real hw pages.  */
+		pte_val(pte) |= (address & (1UL << REAL_HPAGE_SHIFT));
+		if (is_sharedctx_pte(pte))
+			__update_mmu_tsb_insert(mm, MM_TSB_HUGE_SHARED,
+					REAL_HPAGE_SHIFT, address,
+					pte_val(pte));
+		else
+			__update_mmu_tsb_insert(mm, MM_TSB_HUGE,
+					REAL_HPAGE_SHIFT, address,
+					pte_val(pte));
+	} else
+#else
 	if ((mm->context.hugetlb_pte_count || mm->context.thp_pte_count) &&
 	    is_hugetlb_pte(pte)) {
 		/* We are fabricating 8MB pages using 4MB real hw pages.  */
@@ -353,6 +368,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t *
 		__update_mmu_tsb_insert(mm, MM_TSB_HUGE, REAL_HPAGE_SHIFT,
 					address, pte_val(pte));
 	} else
+#endif
 #endif
 		__update_mmu_tsb_insert(mm, MM_TSB_BASE, PAGE_SHIFT,
 					address, pte_val(pte));
@@ -2915,7 +2931,7 @@ static void context_reload(void *__data)
 		load_secondary_context(mm);
 }
 
-void hugetlb_setup(struct pt_regs *regs)
+static void __hugetlb_setup_common(struct pt_regs *regs, unsigned long tsb_idx)
 {
 	struct mm_struct *mm = current->mm;
 	struct tsb_config *tp;
@@ -2933,15 +2949,18 @@ void hugetlb_setup(struct pt_regs *regs)
 		die_if_kernel("HugeTSB in atomic", regs);
 	}
 
-	tp = &mm->context.tsb_block[MM_TSB_HUGE];
+	tp = &mm->context.tsb_block[tsb_idx];
 	if (likely(tp->tsb == NULL))
-		tsb_grow(mm, MM_TSB_HUGE, 0);
+		tsb_grow(mm, tsb_idx, 0);
 
 	tsb_context_switch(mm);
 	smp_tsb_sync(mm);
 
 	/* On UltraSPARC-III+ and later, configure the second half of
 	 * the Data-TLB for huge pages.
+	 *
+	 * Note that the following does not execute on platforms where
+	 * shared context is supported.
 	 */
 	if (tlb_type == cheetah_plus) {
 		bool need_context_reload = false;
@@ -2974,6 +2993,23 @@ void hugetlb_setup(struct pt_regs *regs)
 			on_each_cpu(context_reload, mm, 0);
 	}
 }
+
+void hugetlb_setup(struct pt_regs *regs)
+{
+	__hugetlb_setup_common(regs, MM_TSB_HUGE);
+}
+
+#if defined(CONFIG_SHARED_MMU_CTX)
+void hugetlb_shared_setup(struct pt_regs *regs)
+{
+	__hugetlb_setup_common(regs, MM_TSB_HUGE_SHARED);
+}
+#else
+void hugetlb_shared_setup(struct pt_regs *regs)
+{
+	BUG();
+}
+#endif
 #endif
 
 static struct resource code_resource = {

@@ -493,6 +493,16 @@ good_area:
 			hugetlb_setup(regs);
 
 	}
+#if defined(CONFIG_SHARED_MMU_CTX)
+	mm_rss = mm->context.shared_hugetlb_pte_count * REAL_HPAGE_PER_HPAGE;
+	if (unlikely(mm_shared_ctx_val(mm) && mm_rss >
+		     mm->context.tsb_block[MM_TSB_HUGE_SHARED].tsb_rss_limit)) {
+		if (mm->context.tsb_block[MM_TSB_HUGE_SHARED].tsb)
+			tsb_grow(mm, MM_TSB_HUGE_SHARED, mm_rss);
+		else
+			hugetlb_shared_setup(regs);
+	}
+#endif
 #endif
 exit_exception:
 	exception_exit(prev_state);
