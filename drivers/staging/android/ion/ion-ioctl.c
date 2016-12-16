@@ -52,7 +52,6 @@ static unsigned int ion_ioctl_dir(unsigned int cmd)
 {
 	switch (cmd) {
 	case ION_IOC_FREE:
-	case ION_IOC_CUSTOM:
 		return _IOC_WRITE;
 	default:
 		return _IOC_DIR(cmd);
@@ -143,14 +142,6 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			ret = PTR_ERR(handle);
 		else
 			data.handle.handle = handle->id;
-		break;
-	}
-	case ION_IOC_CUSTOM:
-	{
-		if (!dev->custom_ioctl)
-			return -ENOTTY;
-		ret = dev->custom_ioctl(client, data.custom.cmd,
-						data.custom.arg);
 		break;
 	}
 	case ION_IOC_HEAP_QUERY:

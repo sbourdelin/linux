@@ -166,23 +166,6 @@ long compat_ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		return filp->f_op->unlocked_ioctl(filp, ION_IOC_FREE,
 							(unsigned long)data);
 	}
-	case COMPAT_ION_IOC_CUSTOM: {
-		struct compat_ion_custom_data __user *data32;
-		struct ion_custom_data __user *data;
-		int err;
-
-		data32 = compat_ptr(arg);
-		data = compat_alloc_user_space(sizeof(*data));
-		if (!data)
-			return -EFAULT;
-
-		err = compat_get_ion_custom_data(data32, data);
-		if (err)
-			return err;
-
-		return filp->f_op->unlocked_ioctl(filp, ION_IOC_CUSTOM,
-							(unsigned long)data);
-	}
 	case ION_IOC_SHARE:
 	case ION_IOC_MAP:
 	case ION_IOC_IMPORT:

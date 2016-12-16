@@ -7,9 +7,6 @@ TODO:
 
 
 ion/
- - Remove ION_IOC_CUSTOM: Atm used for cache flushing for cpu access in some
-   vendor trees. Should be replaced with an ioctl on the dma-buf to expose the
-   begin/end_cpu_access hooks to userspace.
  - Clarify the tricks ion plays with explicitly managing coherency behind the
    dma api's back (this is absolutely needed for high-perf gpu drivers): Add an
    explicit coherency management mode to flush_for_device to be used by drivers

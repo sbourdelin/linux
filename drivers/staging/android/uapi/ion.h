@@ -207,14 +207,6 @@ struct ion_heap_query {
 #define ION_IOC_IMPORT		_IOWR(ION_IOC_MAGIC, 5, struct ion_fd_data)
 
 /**
- * DOC: ION_IOC_CUSTOM - call architecture specific ion ioctl
- *
- * Takes the argument of the architecture specific ioctl to call and
- * passes appropriate userdata for that ioctl
- */
-#define ION_IOC_CUSTOM		_IOWR(ION_IOC_MAGIC, 6, struct ion_custom_data)
-
-/**
  * DOC: ION_IOC_HEAP_QUERY - information about available heaps
  *
  * Takes an ion_heap_query structure and populates information about
