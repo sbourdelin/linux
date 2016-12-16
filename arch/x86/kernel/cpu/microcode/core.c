@@ -32,6 +32,8 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 
+#include <xen/xen.h>
+
 #include <asm/microcode_intel.h>
 #include <asm/cpu_device_id.h>
 #include <asm/microcode_amd.h>
@@ -88,6 +90,9 @@ static bool __init check_loader_disabled_bsp(void)
 	if (cmdline_find_option_bool(cmdline, option))
 		*res = true;
 
+	if (xen_domain())
+		*res = true;
+
 	return *res;
 }
 
@@ -140,6 +145,9 @@ void __init load_ucode_bsp(void)
 
 static bool check_loader_disabled_ap(void)
 {
+	if (xen_domain())
+		return true;
+
 #ifdef CONFIG_X86_32
 	return *((bool *)__pa_nodebug(&dis_ucode_ldr));
 #else
