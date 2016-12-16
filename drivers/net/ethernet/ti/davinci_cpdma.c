@@ -628,6 +628,23 @@ int cpdma_ctlr_destroy(struct cpdma_ctlr *ctlr)
 }
 EXPORT_SYMBOL_GPL(cpdma_ctlr_destroy);
 
+static int cpdma_chan_int_ctrl(struct cpdma_chan *chan, bool enable)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&chan->lock, flags);
+	if (chan->state != CPDMA_STATE_ACTIVE) {
+		spin_unlock_irqrestore(&chan->lock, flags);
+		return -EINVAL;
+	}
+
+	dma_reg_write(chan->ctlr, enable ? chan->int_set : chan->int_clear,
+		      chan->mask);
+	spin_unlock_irqrestore(&chan->lock, flags);
+
+	return 0;
+}
+
 int cpdma_ctlr_int_ctrl(struct cpdma_ctlr *ctlr, bool enable)
 {
 	unsigned long flags;
@@ -1273,47 +1290,5 @@ int cpdma_chan_stop(struct cpdma_chan *chan)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(cpdma_chan_stop);
-
-int cpdma_chan_int_ctrl(struct cpdma_chan *chan, bool enable)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&chan->lock, flags);
-	if (chan->state != CPDMA_STATE_ACTIVE) {
-		spin_unlock_irqrestore(&chan->lock, flags);
-		return -EINVAL;
-	}
-
-	dma_reg_write(chan->ctlr, enable ? chan->int_set : chan->int_clear,
-		      chan->mask);
-	spin_unlock_irqrestore(&chan->lock, flags);
-
-	return 0;
-}
-
-int cpdma_control_get(struct cpdma_ctlr *ctlr, int control)
-{
-	unsigned long flags;
-	int ret;
-
-	spin_lock_irqsave(&ctlr->lock, flags);
-	ret = _cpdma_control_get(ctlr, control);
-	spin_unlock_irqrestore(&ctlr->lock, flags);
-
-	return ret;
-}
-
-int cpdma_control_set(struct cpdma_ctlr *ctlr, int control, int value)
-{
-	unsigned long flags;
-	int ret;
-
-	spin_lock_irqsave(&ctlr->lock, flags);
-	ret = _cpdma_control_set(ctlr, control, value);
-	spin_unlock_irqrestore(&ctlr->lock, flags);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(cpdma_control_set);
 
 MODULE_LICENSE("GPL");
