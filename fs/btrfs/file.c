@@ -464,6 +464,7 @@ static noinline int btrfs_copy_from_user(loff_t pos, size_t write_bytes,
 static void btrfs_drop_pages(struct page **pages, size_t num_pages)
 {
 	size_t i;
+
 	for (i = 0; i < num_pages; i++) {
 		/* page checked is some magic around finding pages that
 		 * have been modified without going through btrfs_set_page_dirty
@@ -509,6 +510,7 @@ int btrfs_dirty_pages(struct btrfs_root *root, struct inode *inode,
 
 	for (i = 0; i < num_pages; i++) {
 		struct page *p = pages[i];
+
 		SetPageUptodate(p);
 		ClearPageChecked(p);
 		set_page_dirty(p);
@@ -1396,6 +1398,7 @@ lock_and_cleanup_extent_if_need(struct inode *inode, struct page **pages,
 
 	if (start_pos < inode->i_size) {
 		struct btrfs_ordered_extent *ordered;
+
 		lock_extent_bits(&BTRFS_I(inode)->io_tree,
 				 start_pos, last_pos, cached_state);
 		ordered = btrfs_lookup_ordered_range(inode, start_pos,
@@ -1456,9 +1459,8 @@ static noinline int check_can_nocow(struct inode *inode, loff_t pos,
 		lock_extent(&BTRFS_I(inode)->io_tree, lockstart, lockend);
 		ordered = btrfs_lookup_ordered_range(inode, lockstart,
 						     lockend - lockstart + 1);
-		if (!ordered) {
+		if (!ordered)
 			break;
-		}
 		unlock_extent(&BTRFS_I(inode)->io_tree, lockstart, lockend);
 		btrfs_start_ordered_extent(inode, ordered, 1);
 		btrfs_put_ordered_extent(ordered);
@@ -1470,7 +1472,7 @@ static noinline int check_can_nocow(struct inode *inode, loff_t pos,
 		ret = 0;
 		btrfs_end_write_no_snapshoting(root);
 	} else {
-		*write_bytes = min_t(size_t, *write_bytes ,
+		*write_bytes = min_t(size_t, *write_bytes,
 				     num_bytes - pos + lockstart);
 	}
 
@@ -1702,8 +1704,8 @@ again:
 			btrfs_delalloc_release_metadata(inode, release_bytes);
 		} else {
 			btrfs_delalloc_release_space(inode,
-						round_down(pos, root->sectorsize),
-						release_bytes);
+					round_down(pos, root->sectorsize),
+					release_bytes);
 		}
 	}
 
@@ -1879,8 +1881,8 @@ int btrfs_release_file(struct inode *inode, struct file *filp)
 	 * application were using truncate to replace a file in place.
 	 */
 	if (test_and_clear_bit(BTRFS_INODE_ORDERED_DATA_CLOSE,
-			       &BTRFS_I(inode)->runtime_flags))
-			filemap_flush(inode->i_mapping);
+		&BTRFS_I(inode)->runtime_flags))
+		filemap_flush(inode->i_mapping);
 	return 0;
 }
 
@@ -1918,8 +1920,9 @@ int btrfs_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 	u64 len;
 
 	/*
-	 * The range length can be represented by u64, we have to do the typecasts
-	 * to avoid signed overflow if it's [0, LLONG_MAX] eg. from fsync()
+	 * The range length can be represented by u64, we have to do the
+	 * typecasts to avoid signed overflow if it's [0, LLONG_MAX]
+	 * eg. from fsync()
 	 */
 	len = (u64)end - (u64)start + 1;
 	trace_btrfs_sync_file(file, datasync);
@@ -2376,7 +2379,8 @@ static int btrfs_punch_hole(struct inode *inode, loff_t offset, loff_t len)
 	/* Check the aligned pages after the first unaligned page,
 	 * if offset != orig_start, which means the first unaligned page
 	 * including several following pages are already in holes,
-	 * the extra check can be skipped */
+	 * the extra check can be skipped
+	 */
 	if (offset == orig_start) {
 		/* after truncate page, check hole again */
 		len = offset + len - lockstart;
