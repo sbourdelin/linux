@@ -121,6 +121,14 @@ enum {
 #define NVME_CMB_CQS(cmbsz)	((cmbsz) & 0x2)
 #define NVME_CMB_SQS(cmbsz)	((cmbsz) & 0x1)
 
+enum {
+	NVME_CMB_CAP_SQS = 0,
+	NVME_CMB_CAP_CQS,
+	NVME_CMB_CAP_LISTS,
+	NVME_CMB_CAP_RDS,
+	NVME_CMB_CAP_WDS,
+};
+
 /*
  * Submission and Completion Queue Entry Sizes for the NVM command set.
  * (In bytes and specified as a power of two (2^n)).

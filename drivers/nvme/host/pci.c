@@ -98,6 +98,7 @@ struct nvme_dev {
 	void __iomem *cmb;
 	dma_addr_t cmb_dma_addr;
 	u64 cmb_size;
+	u64 cmb_offset;
 	u32 cmbsz;
 	u32 cmbloc;
 	struct nvme_ctrl ctrl;
@@ -1327,14 +1328,39 @@ static int nvme_create_io_queues(struct nvme_dev *dev)
 	return ret >= 0 ? 0 : ret;
 }
 
+static const char * const cmb_caps[] = {
+	[NVME_CMB_CAP_SQS] = "SQS",
+	[NVME_CMB_CAP_CQS] = "CQS",
+	[NVME_CMB_CAP_LISTS] = "LISTS",
+	[NVME_CMB_CAP_RDS] = "RDS",
+	[NVME_CMB_CAP_WDS] = "WDS",
+};
+
 static ssize_t nvme_cmb_show(struct device *dev,
 			     struct device_attribute *attr,
 			     char *buf)
 {
 	struct nvme_dev *ndev = to_nvme_dev(dev_get_drvdata(dev));
+	unsigned int i, len = 0;
 
-	return scnprintf(buf, PAGE_SIZE, "cmbloc : x%08x\ncmbsz  : x%08x\n",
-		       ndev->cmbloc, ndev->cmbsz);
+	len += scnprintf(buf+len, PAGE_SIZE-len,
+			"cmbloc  : 0x%08x\ncmbsz   : 0x%08x\n\n",
+			ndev->cmbloc, ndev->cmbsz);
+
+	len += scnprintf(buf+len, PAGE_SIZE-len,
+			"OFFSET   : 0x%016llx\nSIZE     : %llu Bytes\n" \
+			"DMA ADDR : %pad\n\n",
+			ndev->cmb_offset, ndev->cmb_size,
+			&ndev->cmb_dma_addr);
+
+	for (i = NVME_CMB_CAP_SQS; i <= NVME_CMB_CAP_WDS; i++)
+		len += scnprintf(buf+len, PAGE_SIZE-len, "%-7s: %s\n",
+				 cmb_caps[i],
+				 ((ndev->cmbsz) & (1<<i)) ? "SUPPORTED" :
+				 "NOT SUPPORTED");
+
+	return len;
+
 }
 static DEVICE_ATTR(cmb, S_IRUGO, nvme_cmb_show, NULL);
 
@@ -1377,6 +1403,7 @@ static void __iomem *nvme_map_cmb(struct nvme_dev *dev)
 
 	dev->cmb_dma_addr = dma_addr;
 	dev->cmb_size = size;
+	dev->cmb_offset = offset;
 	return cmb;
 }
 
