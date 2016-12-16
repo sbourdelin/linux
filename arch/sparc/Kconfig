@@ -155,6 +155,9 @@ config PGTABLE_LEVELS
 	default 4 if 64BIT
 	default 3
 
+config SHARED_MMU_CTX
+	def_bool y if SPARC64 && HUGETLB_PAGE
+
 source "init/Kconfig"
 
 source "kernel/Kconfig.freezer"
