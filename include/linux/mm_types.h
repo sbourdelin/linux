@@ -291,6 +291,18 @@ struct vm_userfaultfd_ctx {
 struct vm_userfaultfd_ctx {};
 #endif /* CONFIG_USERFAULTFD */
 
+#ifdef CONFIG_SHARED_MMU_CTX
+#define NULL_VM_SHARED_MMU_CTX ((struct vm_shared_mmu_ctx) { NULL, })
+struct vm_shared_mmu_ctx {
+	struct shared_mmu_ctx *ctx;
+};
+#define vma_shared_ctx_val(vma)					\
+	((vma)->vm_shared_mmu_ctx.ctx ?				\
+	 (vma)->vm_shared_mmu_ctx.ctx->shared_ctx_val : 0UL)
+#else /* CONFIG_SHARED__MMU_CTX */
+struct vm_shared_mmu_ctx {};
+#endif /* CONFIG_SHARED_MMU_CTX */
+
 /*
  * This struct defines a memory VMM memory area. There is one of these
  * per VM-area/task.  A VM area is any part of the process virtual memory
@@ -358,6 +370,7 @@ struct vm_area_struct {
 	struct mempolicy *vm_policy;	/* NUMA policy for the VMA */
 #endif
 	struct vm_userfaultfd_ctx vm_userfaultfd_ctx;
+	struct vm_shared_mmu_ctx vm_shared_mmu_ctx;
 };
 
 struct core_thread {
