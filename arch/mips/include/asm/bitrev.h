@@ -27,4 +27,10 @@ static __always_inline __attribute_const__ u8 __arch_bitrev8(u8 x)
 	return ret;
 }
 
+static __always_inline __attribute_const__ u32 __arch_bitrev8x4(u32 x)
+{
+	u32 ret;
+	asm("bitswap    %0, %1" : "=r"(ret) : "r"(x));
+	return ret;
+}
 #endif /* __MIPS_ASM_BITREV_H__ */

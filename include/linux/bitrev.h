@@ -9,6 +9,7 @@
 #define __bitrev32 __arch_bitrev32
 #define __bitrev16 __arch_bitrev16
 #define __bitrev8 __arch_bitrev8
+#define __bitrev8x4 __arch_bitrev8x4
 
 #else
 extern u8 const byte_rev_table[256];
