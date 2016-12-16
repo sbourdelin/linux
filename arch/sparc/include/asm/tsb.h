@@ -75,6 +75,44 @@ extern struct tsb_phys_patch_entry __tsb_phys_patch, __tsb_phys_patch_end;
 
 extern struct kmem_cache *shared_mmu_ctx_cachep __read_mostly;
 #endif
+
+	/*
+	 * If tlb type is not hypervisor, branch to label
+	 */
+#define	IF_TLB_TYPE_NOT_HYPE(TMP, NOT_HYPE_LABEL)	\
+	sethi	%hi(tlb_type), TMP;			\
+	lduw	[TMP + %lo(tlb_type)], TMP;		\
+	cmp	TMP, 3;					\
+	bne,pn	%icc, NOT_HYPE_LABEL;			\
+	nop
+
+	/* DEST = (VADDR >> 22)
+	 *
+	 * Branch to ZERO_CTX_LABEL if context is zero.
+	 */
+#define	COMPUTE_TAG_TARGET(DEST, VADDR, CTX, ZERO_CTX_LABEL) \
+	srlx	VADDR, 22, DEST; \
+	brz,pn	CTX, ZERO_CTX_LABEL; \
+	 nop;
+
+	/* Create TSB pointer.  This is something like:
+	 *
+	 * index_mask = (512 << (tsb_reg & 0x7UL)) - 1UL;
+	 * tsb_base = tsb_reg & ~0x7UL;
+	 * tsb_index = ((vaddr >> HASH_SHIFT) & tsb_mask);
+	 * tsb_ptr = tsb_base + (tsb_index * 16);
+	 */
+#define COMPUTE_TSB_PTR(TSB_PTR, VADDR, HASH_SHIFT, TMP1, TMP2) \
+	and	TSB_PTR, 0x7, TMP1;			\
+	mov	512, TMP2;				\
+	andn	TSB_PTR, 0x7, TSB_PTR;			\
+	sllx	TMP2, TMP1, TMP2;			\
+	srlx	VADDR, HASH_SHIFT, TMP1;		\
+	sub	TMP2, 1, TMP2;				\
+	and	TMP1, TMP2, TMP1;			\
+	sllx	TMP1, 4, TMP1;				\
+	add	TSB_PTR, TMP1, TSB_PTR;
+
 #define TSB_LOAD_QUAD(TSB, REG)	\
 661:	ldda		[TSB] ASI_NUCLEUS_QUAD_LDD, REG; \
 	.section	.tsb_ldquad_phys_patch, "ax"; \
