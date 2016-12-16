@@ -57,6 +57,13 @@
 	 (!(((__ctx.sparc64_ctx_val) ^ tlb_context_cache) & CTX_VERSION_MASK))
 #define CTX_HWBITS(__ctx)	((__ctx.sparc64_ctx_val) & CTX_HW_MASK)
 #define CTX_NRBITS(__ctx)	((__ctx.sparc64_ctx_val) & CTX_NR_MASK)
+#define	SHARED_CTX_VALID(__ctx)	(__ctx.shared_ctx && \
+	 (!(((__ctx.shared_ctx->shared_ctx_val) ^ tlb_context_cache) & \
+	   CTX_VERSION_MASK)))
+#define	SHARED_CTX_HWBITS(__ctx)	\
+	 ((__ctx.shared_ctx->shared_ctx_val) & CTX_HW_MASK)
+#define	SHARED_CTX_NRBITS(__ctx)	\
+	 ((__ctx.shared_ctx->shared_ctx_val) & CTX_NR_MASK)
 
 #ifndef __ASSEMBLY__
 
@@ -80,23 +87,44 @@ struct tsb_config {
 	unsigned long		tsb_map_pte;
 };
 
-#define MM_TSB_BASE	0
+#if defined(CONFIG_SHARED_MMU_CTX)
+struct shared_mmu_ctx {
+	atomic_t	refcount;
+	unsigned long	shared_ctx_val;
+};
 
-#if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_TRANSPARENT_HUGEPAGE)
-#define MM_TSB_HUGE	1
-#define MM_NUM_TSBS	2
+#define MM_TSB_HUGE_SHARED	0
+#define MM_TSB_BASE		1
+#define MM_TSB_HUGE		2
+#define MM_NUM_TSBS		3
 #else
-#define MM_NUM_TSBS	1
+
+#define MM_TSB_BASE		0
+#if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_TRANSPARENT_HUGEPAGE)
+#define MM_TSB_HUGE		1
+#define MM_TSB_HUGE_SHARED	1	/* Simplifies conditions in code */
+#define MM_NUM_TSBS		2
+#else
+#define MM_NUM_TSBS		1
+#endif
 #endif
 
 typedef struct {
 	spinlock_t		lock;
 	unsigned long		sparc64_ctx_val;
+#if defined(CONFIG_SHARED_MMU_CTX)
+	struct shared_mmu_ctx	*shared_ctx;
+	unsigned long		shared_hugetlb_pte_count;
+#endif
 	unsigned long		hugetlb_pte_count;
 	unsigned long		thp_pte_count;
 	struct tsb_config	tsb_block[MM_NUM_TSBS];
 	struct hv_tsb_descr	tsb_descr[MM_NUM_TSBS];
 } mm_context_t;
+
+#define	mm_shared_ctx_val(mm)					\
+	((mm)->context.shared_ctx ?				\
+	 (mm)->context.shared_ctx->shared_ctx_val : 0UL)
 
 #endif /* !__ASSEMBLY__ */
 
