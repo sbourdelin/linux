@@ -171,7 +171,8 @@ int octeon_mbox_write(struct octeon_device *oct,
 			count = 0;
 			while (readq(mbox->mbox_write_reg) !=
 			       OCTEON_PFVFACK) {
-				schedule_timeout_uninterruptible(10);
+				schedule_timeout_uninterruptible(
+							msecs_to_jiffies(10));
 				if (count++ == LIO_MBOX_WRITE_WAIT_CNT) {
 					ret = OCTEON_MBOX_STATUS_FAILED;
 					break;
