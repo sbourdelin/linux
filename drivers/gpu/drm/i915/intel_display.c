@@ -15929,6 +15929,9 @@ static const struct drm_mode_config_funcs intel_mode_funcs = {
  */
 void intel_init_display_hooks(struct drm_i915_private *dev_priv)
 {
+	if (INTEL_INFO(dev_priv)->num_pipes == 0)
+		return;
+
 	if (INTEL_INFO(dev_priv)->gen >= 9) {
 		dev_priv->display.get_pipe_config = haswell_get_pipe_config;
 		dev_priv->display.get_initial_plane_config =
@@ -16311,6 +16314,9 @@ void intel_modeset_init_hw(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 
+	if (INTEL_INFO(dev_priv)->num_pipes == 0)
+		return;
+
 	intel_update_cdclk(dev_priv);
 
 	dev_priv->atomic_cdclk_freq = dev_priv->cdclk_freq;
@@ -16423,11 +16429,10 @@ int intel_modeset_init(struct drm_device *dev)
 
 	intel_init_quirks(dev);
 
-	intel_init_pm(dev_priv);
-
 	if (INTEL_INFO(dev_priv)->num_pipes == 0)
 		return 0;
 
+	intel_init_pm(dev_priv);
 	/*
 	 * There may be no VBT; and if the BIOS enabled SSC we can
 	 * just keep using it to avoid unnecessary flicker.  Whereas if the
