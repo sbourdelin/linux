@@ -341,6 +341,8 @@ struct vfs_cap_data {
 
 #define CAP_WAKE_ALARM            35
 
+#define CAP_WAKE_SYSTEM      CAP_WAKE_ALARM
+
 /* Allow preventing system suspends */
 
 #define CAP_BLOCK_SUSPEND    36
