@@ -105,22 +105,6 @@ static int compat_put_ion_allocation_data(
 	return err;
 }
 
-static int compat_get_ion_custom_data(
-			struct compat_ion_custom_data __user *data32,
-			struct ion_custom_data __user *data)
-{
-	compat_uint_t cmd;
-	compat_ulong_t arg;
-	int err;
-
-	err = get_user(cmd, &data32->cmd);
-	err |= put_user(cmd, &data->cmd);
-	err |= get_user(arg, &data32->arg);
-	err |= put_user(arg, &data->arg);
-
-	return err;
-};
-
 long compat_ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	long ret;
