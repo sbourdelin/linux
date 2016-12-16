@@ -223,7 +223,7 @@ static int btrfs_get_name(struct dentry *parent, char *name,
 {
 	struct inode *inode = d_inode(child);
 	struct inode *dir = d_inode(parent);
-	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
+	struct btrfs_fs_info *fs_info;
 	struct btrfs_path *path;
 	struct btrfs_root *root = BTRFS_I(dir)->root;
 	struct btrfs_inode_ref *iref;
@@ -241,6 +241,7 @@ static int btrfs_get_name(struct dentry *parent, char *name,
 	if (!S_ISDIR(dir->i_mode))
 		return -EINVAL;
 
+	fs_info = btrfs_sb(inode->i_sb);
 	ino = btrfs_ino(inode);
 
 	path = btrfs_alloc_path();
