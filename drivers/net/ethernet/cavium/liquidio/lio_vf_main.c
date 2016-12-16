@@ -189,7 +189,7 @@ static void pcierror_quiesce_device(struct octeon_device *oct)
 	 */
 
 	/* To allow for in-flight requests */
-	schedule_timeout_uninterruptible(100);
+	schedule_timeout_uninterruptible(msecs_to_jiffies(100));
 
 	if (wait_for_pending_requests(oct))
 		dev_err(&oct->pci_dev->dev, "There were pending requests\n");
