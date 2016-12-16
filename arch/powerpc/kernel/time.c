@@ -925,18 +925,16 @@ static void register_decrementer_clockevent(int cpu)
 
 static void enable_large_decrementer(void)
 {
-	if (!cpu_has_feature(CPU_FTR_ARCH_300))
-		return;
-
-	if (decrementer_max <= DECREMENTER_DEFAULT_MAX)
-		return;
-
 	/*
 	 * If we're running as the hypervisor we need to enable the LD manually
 	 * otherwise firmware should have done it for us.
 	 */
-	if (cpu_has_feature(CPU_FTR_HVMODE))
+	if (decrementer_max > DECREMENTER_DEFAULT_MAX
+	    && cpu_has_feature(CPU_FTR_HVMODE)
+	    && cpu_has_feature(CPU_FTR_ARCH_300))
 		mtspr(SPRN_LPCR, mfspr(SPRN_LPCR) | LPCR_LD);
+	else
+		mtspr(SPRN_LPCR, mfspr(SPRN_LPCR) & ~LPCR_LD);
 }
 
 static void __init set_decrementer_max(void)
