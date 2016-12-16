@@ -315,7 +315,7 @@ static unsigned int clamp_align(unsigned int x, unsigned int min,
 
 	/* Round to nearest aligned value */
 	if (align)
-		x = (x + (1 << (align - 1))) & mask;
+		x = (x + ((1 << align) - 1)) & mask;
 
 	return x;
 }
