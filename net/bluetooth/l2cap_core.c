@@ -3828,6 +3828,21 @@ static struct l2cap_chan *l2cap_connect(struct l2cap_conn *conn,
 
 	chan->ident = cmd->ident;
 
+	hci_dev_lock(conn->hcon->hdev);
+	if (hci_dev_test_flag(conn->hcon->hdev, HCI_MGMT) &&
+	    !test_bit(HCI_CONN_MGMT_CONNECTED, &conn->hcon->flags)) {
+		/* Wait for MGMT Device Connected event to complete the
+		 * connection.
+		 */
+		set_bit(FLAG_PENDING_CONNECT_RSP, &chan->flags);
+		l2cap_state_change(chan, BT_CONNECT2);
+		result = L2CAP_CR_PEND;
+		status = L2CAP_CS_NO_INFO;
+		hci_dev_unlock(conn->hcon->hdev);
+		goto response;
+	}
+	hci_dev_unlock(conn->hcon->hdev);
+
 	if (conn->info_state & L2CAP_INFO_FEAT_MASK_REQ_DONE) {
 		if (l2cap_chan_check_security(chan, false)) {
 			if (test_bit(FLAG_DEFER_SETUP, &chan->flags)) {
@@ -3890,17 +3905,8 @@ sendresp:
 static int l2cap_connect_req(struct l2cap_conn *conn,
 			     struct l2cap_cmd_hdr *cmd, u16 cmd_len, u8 *data)
 {
-	struct hci_dev *hdev = conn->hcon->hdev;
-	struct hci_conn *hcon = conn->hcon;
-
 	if (cmd_len < sizeof(struct l2cap_conn_req))
 		return -EPROTO;
-
-	hci_dev_lock(hdev);
-	if (hci_dev_test_flag(hdev, HCI_MGMT) &&
-	    !test_and_set_bit(HCI_CONN_MGMT_CONNECTED, &hcon->flags))
-		mgmt_device_connected(hdev, hcon, 0, NULL, 0);
-	hci_dev_unlock(hdev);
 
 	l2cap_connect(conn, cmd, data, L2CAP_CONN_RSP, 0);
 	return 0;
@@ -7269,6 +7275,76 @@ static struct l2cap_chan *l2cap_global_fixed_chan(struct l2cap_chan *c,
 	return NULL;
 }
 
+static void l2cap_connect2_ready(struct hci_conn *hcon)
+{
+	struct l2cap_conn *conn = hcon->l2cap_data;
+	struct l2cap_chan *chan;
+
+	if (!conn)
+		return;
+
+	BT_DBG("conn %p bdaddr %pMR", conn, &hcon->dst);
+
+	mutex_lock(&conn->chan_lock);
+
+	list_for_each_entry(chan, &conn->chan_l, list) {
+		struct l2cap_conn_rsp rsp;
+
+		l2cap_chan_lock(chan);
+
+		BT_DBG("chan %p scid 0x%4.4x state %s", chan, chan->scid,
+		       state_to_string(chan->state));
+
+		if (chan->state != BT_CONNECT2 ||
+		    !test_and_clear_bit(FLAG_PENDING_CONNECT_RSP, &chan->flags))
+			goto next;
+
+		rsp.result = cpu_to_le16(L2CAP_CR_SUCCESS);
+		rsp.status = cpu_to_le16(L2CAP_CS_NO_INFO);
+
+		if (l2cap_chan_check_security(chan, false)) {
+			if (test_bit(FLAG_DEFER_SETUP, &chan->flags)) {
+				rsp.result = cpu_to_le16(L2CAP_CR_PEND);
+				rsp.status = cpu_to_le16(L2CAP_CS_AUTHOR_PEND);
+				chan->ops->defer(chan);
+			} else {
+				/* Force pending result for AMP controllers.
+				 * The connection will succeed after the
+				 * physical link is up.
+				 */
+				if (chan->local_amp_id != AMP_ID_BREDR)
+					rsp.result = cpu_to_le16(L2CAP_CR_PEND);
+				else
+					l2cap_state_change(chan, BT_CONFIG);
+			}
+		} else {
+			rsp.result = cpu_to_le16(L2CAP_CR_PEND);
+			rsp.status = cpu_to_le16(L2CAP_CS_AUTHEN_PEND);
+		}
+
+		rsp.scid = cpu_to_le16(chan->dcid);
+		rsp.dcid = cpu_to_le16(chan->scid);
+		l2cap_send_cmd(conn, chan->ident, L2CAP_CONN_RSP,
+			       sizeof(rsp), &rsp);
+
+		if (!test_bit(CONF_REQ_SENT, &chan->conf_state) &&
+		    chan->state == BT_CONFIG) {
+			u8 buf[128];
+			set_bit(CONF_REQ_SENT, &chan->conf_state);
+			l2cap_send_cmd(conn, l2cap_get_ident(conn),
+				       L2CAP_CONF_REQ,
+				       l2cap_build_conf_req(chan, buf),
+				       buf);
+			chan->num_conf_req++;
+		}
+
+next:
+		l2cap_chan_unlock(chan);
+	}
+
+	mutex_unlock(&conn->chan_lock);
+}
+
 static void l2cap_connect_cfm(struct hci_conn *hcon, u8 status)
 {
 	struct hci_dev *hdev = hcon->hdev;
@@ -7565,6 +7641,7 @@ drop:
 
 static struct hci_cb l2cap_cb = {
 	.name		= "L2CAP",
+	.connect2_ready	= l2cap_connect2_ready,
 	.connect_cfm	= l2cap_connect_cfm,
 	.disconn_cfm	= l2cap_disconn_cfm,
 	.security_cfm	= l2cap_security_cfm,

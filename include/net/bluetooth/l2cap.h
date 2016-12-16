@@ -722,6 +722,7 @@ enum {
 	FLAG_LE_CONN_REQ_SENT,
 	FLAG_PENDING_SECURITY,
 	FLAG_HOLD_HCI_CONN,
+	FLAG_PENDING_CONNECT_RSP,
 };
 
 /* Lock nesting levels for L2CAP channels. We need these because lockdep

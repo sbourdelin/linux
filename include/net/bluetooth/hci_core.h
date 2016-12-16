@@ -1188,6 +1188,7 @@ struct hci_cb {
 
 	char *name;
 
+	void (*connect2_ready)	(struct hci_conn *conn);
 	void (*connect_cfm)	(struct hci_conn *conn, __u8 status);
 	void (*disconn_cfm)	(struct hci_conn *conn, __u8 status);
 	void (*security_cfm)	(struct hci_conn *conn, __u8 status,
@@ -1195,6 +1196,18 @@ struct hci_cb {
 	void (*key_change_cfm)	(struct hci_conn *conn, __u8 status);
 	void (*role_switch_cfm)	(struct hci_conn *conn, __u8 status, __u8 role);
 };
+
+static inline void hci_connect2_ready(struct hci_conn *conn)
+{
+	struct hci_cb *cb;
+
+	mutex_lock(&hci_cb_list_lock);
+	list_for_each_entry(cb, &hci_cb_list, list) {
+		if (cb->connect2_ready)
+			cb->connect2_ready(conn);
+	}
+	mutex_unlock(&hci_cb_list_lock);
+}
 
 static inline void hci_connect_cfm(struct hci_conn *conn, __u8 status)
 {
