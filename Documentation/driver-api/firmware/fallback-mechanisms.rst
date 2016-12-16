@@ -28,6 +28,12 @@ CONFIG_FW_LOADER_USER_HELPER_FALLBACK=n
 the kobject uevent fallback mechanism will never take effect even
 for request_firmware_nowait() when uevent is set to true.
 
+Although the fallback mechanisms are not used widely today they cannot be
+removed from the kernel since some old userspace may exist which could
+entirely depend on the fallback mechanism enabled with the kernel config option
+CONFIG_FW_LOADER_USER_HELPER_FALLBACK. In the future though drivers may opt
+to embrace a different API which provides alternative fallback mechanisms.
+
 Justifying the firmware fallback mechanism
 ==========================================
 
@@ -175,6 +181,17 @@ the uevent flag means you want to opt-in for the firmware fallback mechanism
 but you want to suppress kobject uevents, as you have a custom solution which
 will monitor for your device addition into the device hierarchy somehow and
 load firmware for you through a custom path.
+
+The custom fallback mechanism can often be enabled by mistake. We currently
+have only 2 users of it, and little justification to enable it for other users.
+Since it is a common driver developer mistake to enable it, help police for
+new users of the custom fallback mechanism with::
+
+        $ export COCCI=scripts/coccinelle/api/request_firmware-avoid-init-probe-init.cocci
+        $ make coccicheck MODE=report
+
+Drivers can only be transitioned out of the custom fallback mechanism
+once we know old userspace cannot be not be broken by a kernel change.
 
 Firmware fallback timeout
 =========================
