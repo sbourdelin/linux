@@ -17,7 +17,6 @@
 
 #include <linux/err.h>
 #include <linux/kernel.h>
-#include <linux/kthread.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/module.h>
@@ -365,22 +364,6 @@ void wkup_m3_ipc_put(struct wkup_m3_ipc *m3_ipc)
 }
 EXPORT_SYMBOL_GPL(wkup_m3_ipc_put);
 
-static void wkup_m3_rproc_boot_thread(struct wkup_m3_ipc *m3_ipc)
-{
-	struct device *dev = m3_ipc->dev;
-	int ret;
-
-	wait_for_completion(&m3_ipc->rproc->firmware_loading_complete);
-
-	init_completion(&m3_ipc->sync_complete);
-
-	ret = rproc_boot(m3_ipc->rproc);
-	if (ret)
-		dev_err(dev, "rproc_boot failed\n");
-
-	do_exit(0);
-}
-
 static int wkup_m3_ipc_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -388,7 +371,6 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
 	phandle rproc_phandle;
 	struct rproc *m3_rproc;
 	struct resource *res;
-	struct task_struct *task;
 	struct wkup_m3_ipc *m3_ipc;
 
 	m3_ipc = devm_kzalloc(dev, sizeof(*m3_ipc), GFP_KERNEL);
@@ -401,6 +383,8 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
 		dev_err(dev, "could not ioremap ipc_mem\n");
 		return PTR_ERR(m3_ipc->ipc_mem_base);
 	}
+
+	init_completion(&m3_ipc->sync_complete);
 
 	irq = platform_get_irq(pdev, 0);
 	if (!irq) {
@@ -449,25 +433,10 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
 
 	m3_ipc->ops = &ipc_ops;
 
-	/*
-	 * Wait for firmware loading completion in a thread so we
-	 * can boot the wkup_m3 as soon as it's ready without holding
-	 * up kernel boot
-	 */
-	task = kthread_run((void *)wkup_m3_rproc_boot_thread, m3_ipc,
-			   "wkup_m3_rproc_loader");
-
-	if (IS_ERR(task)) {
-		dev_err(dev, "can't create rproc_boot thread\n");
-		goto err_put_rproc;
-	}
-
 	m3_ipc_state = m3_ipc;
 
 	return 0;
 
-err_put_rproc:
-	rproc_put(m3_rproc);
 err_free_mbox:
 	mbox_free_channel(m3_ipc->mbox);
 	return ret;
