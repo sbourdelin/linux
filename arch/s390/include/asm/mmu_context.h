@@ -129,6 +129,18 @@ static inline void activate_mm(struct mm_struct *prev,
 	set_user_asce(next);
 }
 
+static inline unsigned long arch_pre_mmap_flags(struct file *file,
+						unsigned long flags,
+						vm_flags_t *vm_flags)
+{
+	return 0;	/* no errors */
+}
+
+static inline void arch_post_mmap(struct mm_struct *mm, unsigned long addr,
+					vm_flags_t vm_flags)
+{
+}
+
 static inline void arch_dup_mmap(struct mm_struct *oldmm,
 				 struct mm_struct *mm)
 {

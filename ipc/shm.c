@@ -72,6 +72,14 @@ static void shm_destroy(struct ipc_namespace *ns, struct shmid_kernel *shp);
 static int sysvipc_shm_proc_show(struct seq_file *s, void *it);
 #endif
 
+#ifndef arch_shmat_check
+#define arch_shmat_check(file, shmflg, flags) (0)
+#endif
+
+#ifndef arch_shmat_check
+#define arch_shmat_check(file, shmflg, flags) (0)
+#endif
+
 void shm_init_ns(struct ipc_namespace *ns)
 {
 	ns->shm_ctlmax = SHMMAX;
@@ -1148,6 +1156,11 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr,
 		err = PTR_ERR(shp);
 		goto out_unlock;
 	}
+
+	/* arch specific check and possible flag modification */
+	err = arch_shmat_check(shp->shm_file, shmflg, &flags);
+	if (err)
+		goto out_unlock;
 
 	err = -EACCES;
 	if (ipcperms(ns, &shp->shm_perm, acc_mode))

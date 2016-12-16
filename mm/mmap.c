@@ -1307,12 +1307,18 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 			unsigned long pgoff, unsigned long *populate)
 {
 	struct mm_struct *mm = current->mm;
+	unsigned long ret;
 	int pkey = 0;
 
 	*populate = 0;
 
 	if (!len)
 		return -EINVAL;
+
+	/* arch specific check and possible modification of vm_flags */
+	ret = arch_pre_mmap_flags(file, flags, &vm_flags);
+	if (ret)
+		return ret;
 
 	/*
 	 * Does the application expect PROT_READ to imply PROT_EXEC?
@@ -1452,6 +1458,10 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 	    ((vm_flags & VM_LOCKED) ||
 	     (flags & (MAP_POPULATE | MAP_NONBLOCK)) == MAP_POPULATE))
 		*populate = len;
+
+	if (!IS_ERR_VALUE(addr))
+		arch_post_mmap(mm, addr, vm_flags);
+
 	return addr;
 }
 
