@@ -3044,23 +3044,41 @@ static int ath10k_wmi_10_4_op_pull_fw_stats(struct ath10k *ar,
 	if ((stats_id & WMI_10_4_STAT_PEER_EXTD) == 0)
 		return 0;
 
-	stats->extended = true;
-
 	for (i = 0; i < num_peer_stats; i++) {
 		const struct wmi_10_4_peer_extd_stats *src;
-		struct ath10k_fw_extd_stats_peer *dst;
+		struct ath10k_fw_stats_peer *dst;
 
 		src = (void *)skb->data;
 		if (!skb_pull(skb, sizeof(*src)))
 			return -EPROTO;
 
-		dst = kzalloc(sizeof(*dst), GFP_ATOMIC);
-		if (!dst)
-			continue;
+		/* Because the stat data may exceed htc-wmi buffer
+		 * limit the firmware might split the stats data
+		 * and delivers it in multiple update events.
+		 * if we can't find the entry in the current event
+		 * payload, we have to look in main list as well.
+		 */
+		list_for_each_entry(dst, &stats->peers, list) {
+			if (ether_addr_equal(dst->peer_macaddr,
+					     src->peer_macaddr.addr))
+				goto found;
+		}
 
-		ether_addr_copy(dst->peer_macaddr, src->peer_macaddr.addr);
+#ifdef CONFIG_ATH10K_DEBUGFS
+		list_for_each_entry(dst, &ar->debug.fw_stats.peers, list) {
+			if (ether_addr_equal(dst->peer_macaddr,
+					     src->peer_macaddr.addr))
+				goto found;
+		}
+#endif
+
+		ath10k_dbg(ar, ATH10K_DBG_WMI,
+			   "Orphaned extended stats entry for station %pM.\n",
+			   src->peer_macaddr.addr);
+		continue;
+
+found:
 		dst->rx_duration = __le32_to_cpu(src->rx_duration);
-		list_add_tail(&dst->list, &stats->peers_extd);
 	}
 
 	return 0;

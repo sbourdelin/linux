@@ -268,11 +268,9 @@ struct ath10k_fw_stats_pdev {
 };
 
 struct ath10k_fw_stats {
-	bool extended;
 	struct list_head pdevs;
 	struct list_head vdevs;
 	struct list_head peers;
-	struct list_head peers_extd;
 };
 
 #define ATH10K_TPC_TABLE_TYPE_FLAG	1

@@ -18,27 +18,8 @@
 #include "wmi-ops.h"
 #include "debug.h"
 
-static void ath10k_sta_update_extd_stats_rx_duration(struct ath10k *ar,
-						     struct ath10k_fw_stats *stats)
-{
-	struct ath10k_fw_extd_stats_peer *peer;
-	struct ieee80211_sta *sta;
-	struct ath10k_sta *arsta;
-
-	rcu_read_lock();
-	list_for_each_entry(peer, &stats->peers_extd, list) {
-		sta = ieee80211_find_sta_by_ifaddr(ar->hw, peer->peer_macaddr,
-						   NULL);
-		if (!sta)
-			continue;
-		arsta = (struct ath10k_sta *)sta->drv_priv;
-		arsta->rx_duration += (u64)peer->rx_duration;
-	}
-	rcu_read_unlock();
-}
-
-static void ath10k_sta_update_stats_rx_duration(struct ath10k *ar,
-						struct ath10k_fw_stats *stats)
+void ath10k_sta_update_rx_duration(struct ath10k *ar,
+				   struct ath10k_fw_stats *stats)
 {
 	struct ath10k_fw_stats_peer *peer;
 	struct ieee80211_sta *sta;
@@ -54,15 +35,6 @@ static void ath10k_sta_update_stats_rx_duration(struct ath10k *ar,
 		arsta->rx_duration += (u64)peer->rx_duration;
 	}
 	rcu_read_unlock();
-}
-
-void ath10k_sta_update_rx_duration(struct ath10k *ar,
-				   struct ath10k_fw_stats *stats)
-{
-	if (stats->extended)
-		ath10k_sta_update_extd_stats_rx_duration(ar, stats);
-	else
-		ath10k_sta_update_stats_rx_duration(ar, stats);
 }
 
 void ath10k_sta_statistics(struct ieee80211_hw *hw, struct ieee80211_vif *vif,

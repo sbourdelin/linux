@@ -315,25 +315,13 @@ static void ath10k_fw_stats_peers_free(struct list_head *head)
 	}
 }
 
-static void ath10k_fw_extd_stats_peers_free(struct list_head *head)
-{
-	struct ath10k_fw_extd_stats_peer *i, *tmp;
-
-	list_for_each_entry_safe(i, tmp, head, list) {
-		list_del(&i->list);
-		kfree(i);
-	}
-}
-
 static void ath10k_debug_fw_stats_reset(struct ath10k *ar)
 {
 	spin_lock_bh(&ar->data_lock);
 	ar->debug.fw_stats_done = false;
-	ar->debug.fw_stats.extended = false;
 	ath10k_fw_stats_pdevs_free(&ar->debug.fw_stats.pdevs);
 	ath10k_fw_stats_vdevs_free(&ar->debug.fw_stats.vdevs);
 	ath10k_fw_stats_peers_free(&ar->debug.fw_stats.peers);
-	ath10k_fw_extd_stats_peers_free(&ar->debug.fw_stats.peers_extd);
 	spin_unlock_bh(&ar->data_lock);
 }
 
@@ -348,7 +336,6 @@ void ath10k_debug_fw_stats_process(struct ath10k *ar, struct sk_buff *skb)
 	INIT_LIST_HEAD(&stats.pdevs);
 	INIT_LIST_HEAD(&stats.vdevs);
 	INIT_LIST_HEAD(&stats.peers);
-	INIT_LIST_HEAD(&stats.peers_extd);
 
 	spin_lock_bh(&ar->data_lock);
 	ret = ath10k_wmi_pull_fw_stats(ar, skb, &stats);
@@ -411,8 +398,6 @@ void ath10k_debug_fw_stats_process(struct ath10k *ar, struct sk_buff *skb)
 
 		list_splice_tail_init(&stats.peers, &ar->debug.fw_stats.peers);
 		list_splice_tail_init(&stats.vdevs, &ar->debug.fw_stats.vdevs);
-		list_splice_tail_init(&stats.peers_extd,
-				      &ar->debug.fw_stats.peers_extd);
 	}
 
 	complete(&ar->debug.fw_stats_complete);
@@ -424,7 +409,6 @@ free:
 	ath10k_fw_stats_pdevs_free(&stats.pdevs);
 	ath10k_fw_stats_vdevs_free(&stats.vdevs);
 	ath10k_fw_stats_peers_free(&stats.peers);
-	ath10k_fw_extd_stats_peers_free(&stats.peers_extd);
 
 	spin_unlock_bh(&ar->data_lock);
 }
@@ -2347,7 +2331,6 @@ int ath10k_debug_create(struct ath10k *ar)
 	INIT_LIST_HEAD(&ar->debug.fw_stats.pdevs);
 	INIT_LIST_HEAD(&ar->debug.fw_stats.vdevs);
 	INIT_LIST_HEAD(&ar->debug.fw_stats.peers);
-	INIT_LIST_HEAD(&ar->debug.fw_stats.peers_extd);
 
 	return 0;
 }
