@@ -12,6 +12,7 @@
 #include <linux/debug_locks.h>
 #include <linux/delay.h>
 #include <linux/export.h>
+#include <linux/jiffies.h>
 
 void __raw_spin_lock_init(raw_spinlock_t *lock, const char *name,
 			  struct lock_class_key *key)
@@ -27,6 +28,7 @@ void __raw_spin_lock_init(raw_spinlock_t *lock, const char *name,
 	lock->magic = SPINLOCK_MAGIC;
 	lock->owner = SPINLOCK_OWNER_INIT;
 	lock->owner_cpu = -1;
+	lock->acquire_tstamp = 0;
 }
 
 EXPORT_SYMBOL(__raw_spin_lock_init);
@@ -90,6 +92,7 @@ static inline void debug_spin_lock_after(raw_spinlock_t *lock)
 {
 	lock->owner_cpu = raw_smp_processor_id();
 	lock->owner = current;
+	lock->acquire_tstamp = jiffies;
 }
 
 static inline void debug_spin_unlock(raw_spinlock_t *lock)
@@ -99,6 +102,8 @@ static inline void debug_spin_unlock(raw_spinlock_t *lock)
 	SPIN_BUG_ON(lock->owner != current, lock, "wrong owner");
 	SPIN_BUG_ON(lock->owner_cpu != raw_smp_processor_id(),
 							lock, "wrong CPU");
+	SPIN_BUG_ON(time_after_eq(jiffies, lock->acquire_tstamp + HZ),
+			lock, "missed unlock deadline");
 	lock->owner = SPINLOCK_OWNER_INIT;
 	lock->owner_cpu = -1;
 }
