@@ -2852,7 +2852,7 @@ int vfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 		return error;
 	error = dir->i_op->create(dir, dentry, mode, want_excl);
 	if (!error)
-		fsnotify_create(dir, dentry);
+		fsnotify_create(dentry);
 	return error;
 }
 EXPORT_SYMBOL(vfs_create);
@@ -2996,7 +2996,7 @@ static int atomic_open(struct nameidata *nd, struct dentry *dentry,
 		int acc_mode = op->acc_mode;
 		if (*opened & FILE_CREATED) {
 			WARN_ON(!(open_flag & O_CREAT));
-			fsnotify_create(dir, dentry);
+			fsnotify_create(dentry);
 			acc_mode = 0;
 		}
 		error = may_open(&file->f_path, acc_mode, open_flag);
@@ -3011,7 +3011,7 @@ static int atomic_open(struct nameidata *nd, struct dentry *dentry,
 				dentry = file->f_path.dentry;
 			}
 			if (*opened & FILE_CREATED)
-				fsnotify_create(dir, dentry);
+				fsnotify_create(dentry);
 			if (unlikely(d_is_negative(dentry))) {
 				error = -ENOENT;
 			} else {
@@ -3157,7 +3157,7 @@ no_open:
 						open_flag & O_EXCL);
 		if (error)
 			goto out_dput;
-		fsnotify_create(dir_inode, dentry);
+		fsnotify_create(dentry);
 	}
 	if (unlikely(create_error) && !dentry->d_inode) {
 		error = create_error;
@@ -3646,7 +3646,7 @@ int vfs_mknod(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev)
 
 	error = dir->i_op->mknod(dir, dentry, mode, dev);
 	if (!error)
-		fsnotify_create(dir, dentry);
+		fsnotify_create(dentry);
 	return error;
 }
 EXPORT_SYMBOL(vfs_mknod);
@@ -3738,7 +3738,7 @@ int vfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 
 	error = dir->i_op->mkdir(dir, dentry, mode);
 	if (!error)
-		fsnotify_mkdir(dir, dentry);
+		fsnotify_mkdir(dentry);
 	return error;
 }
 EXPORT_SYMBOL(vfs_mkdir);
@@ -4045,7 +4045,7 @@ int vfs_symlink(struct inode *dir, struct dentry *dentry, const char *oldname)
 
 	error = dir->i_op->symlink(dir, dentry, oldname);
 	if (!error)
-		fsnotify_create(dir, dentry);
+		fsnotify_create(dentry);
 	return error;
 }
 EXPORT_SYMBOL(vfs_symlink);
@@ -4161,7 +4161,7 @@ int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_de
 	}
 	inode_unlock(inode);
 	if (!error)
-		fsnotify_link(dir, inode, new_dentry);
+		fsnotify_link(inode, new_dentry);
 	return error;
 }
 EXPORT_SYMBOL(vfs_link);
