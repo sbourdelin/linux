@@ -577,6 +577,9 @@ struct bpf_prog *bpf_prog_realloc(struct bpf_prog *fp_old, unsigned int size,
 				  gfp_t gfp_extra_flags);
 void __bpf_prog_free(struct bpf_prog *fp);
 
+int bpf_prog_charge_memlock(struct bpf_prog *prog);
+void bpf_prog_uncharge_memlock(struct bpf_prog *prog);
+
 static inline void bpf_prog_unlock_free(struct bpf_prog *fp)
 {
 	bpf_prog_unlock_ro(fp);

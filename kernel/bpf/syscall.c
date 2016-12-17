@@ -615,31 +615,6 @@ static void free_used_maps(struct bpf_prog_aux *aux)
 	kfree(aux->used_maps);
 }
 
-static int bpf_prog_charge_memlock(struct bpf_prog *prog)
-{
-	struct user_struct *user = get_current_user();
-	unsigned long memlock_limit;
-
-	memlock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
-
-	atomic_long_add(prog->pages, &user->locked_vm);
-	if (atomic_long_read(&user->locked_vm) > memlock_limit) {
-		atomic_long_sub(prog->pages, &user->locked_vm);
-		free_uid(user);
-		return -EPERM;
-	}
-	prog->aux->user = user;
-	return 0;
-}
-
-static void bpf_prog_uncharge_memlock(struct bpf_prog *prog)
-{
-	struct user_struct *user = prog->aux->user;
-
-	atomic_long_sub(prog->pages, &user->locked_vm);
-	free_uid(user);
-}
-
 static void __bpf_prog_put_rcu(struct rcu_head *rcu)
 {
 	struct bpf_prog_aux *aux = container_of(rcu, struct bpf_prog_aux, rcu);
