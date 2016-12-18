@@ -388,10 +388,10 @@ vep_set_halt_and_wedge(struct usb_ep *_ep, int value, int wedged)
 	unsigned long flags;
 	int ret = 0;
 
-	ep = to_vep(_ep);
 	if (!_ep)
 		return -EINVAL;
 
+	ep = to_vep(_ep);
 	udc = ep_to_vudc(ep);
 	if (!udc->driver)
 		return -ESHUTDOWN;
