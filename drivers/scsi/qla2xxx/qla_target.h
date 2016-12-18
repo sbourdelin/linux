@@ -709,10 +709,8 @@ struct abts_resp_from_24xx_fw {
 /********************************************************************\
  * Type Definitions used by initiator & target halves
 \********************************************************************/
-
 struct qla_tgt_mgmt_cmd;
 struct qla_tgt_sess;
-
 /*
  * This structure provides a template of function calls that the
  * target driver (from within qla_target.c) can issue to the
@@ -979,7 +977,7 @@ typedef enum {
 } cmd_flags_t;
 
 struct qla_tgt_cmd {
-	struct se_cmd se_cmd;
+	void *ulp_cmd;
 	struct qla_tgt_sess *sess;
 	int state;
 	struct work_struct free_work;
@@ -1051,7 +1049,7 @@ struct qla_tgt_mgmt_cmd {
 	uint16_t tmr_func;
 	uint8_t fc_tm_rsp;
 	struct qla_tgt_sess *sess;
-	struct se_cmd se_cmd;
+	void *ulp_cmd;
 	struct work_struct free_work;
 	unsigned int flags;
 	uint32_t reset_count;
@@ -1080,18 +1078,6 @@ struct qla_tgt_prm {
 	struct scatterlist *prot_sg;
 	uint16_t prot_seg_cnt;
 	uint16_t tot_dsds;
-};
-
-struct qla_tgt_srr_imm {
-	struct list_head srr_list_entry;
-	int srr_id;
-	struct imm_ntfy_from_isp imm_ntfy;
-};
-
-struct qla_tgt_srr_ctio {
-	struct list_head srr_list_entry;
-	int srr_id;
-	struct qla_tgt_cmd *cmd;
 };
 
 /* Check for Switch reserved address */

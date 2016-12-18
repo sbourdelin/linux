@@ -51,6 +51,38 @@
 static struct workqueue_struct *tcm_qla2xxx_free_wq;
 static struct workqueue_struct *tcm_qla2xxx_cmd_wq;
 
+inline struct se_cmd *Q_TO_SE_CMD(struct qla_tgt_cmd *qcmd)
+{
+	struct tcm_qla_tgt_cmd *tc =
+		container_of(qcmd, struct tcm_qla_tgt_cmd, qcmd);
+
+	return &tc->se_cmd;
+}
+
+inline struct qla_tgt_cmd *SE_TO_Q_CMD(struct se_cmd *se_cmd)
+{
+	struct tcm_qla_tgt_cmd *tc =
+		container_of(se_cmd, struct tcm_qla_tgt_cmd, se_cmd);
+
+	return &tc->qcmd;
+}
+
+inline struct se_cmd *QMGT_TO_SE_CMD(struct qla_tgt_mgmt_cmd *qcmd)
+{
+	struct tcm_qla_tgt_mgmt_cmd *tc =
+		container_of(qcmd, struct tcm_qla_tgt_mgmt_cmd, mgt_cmd);
+
+	return &tc->se_cmd;
+}
+
+inline struct qla_tgt_mgmt_cmd *SE_TO_QMGT_CMD(struct se_cmd *se_cmd)
+{
+	struct tcm_qla_tgt_mgmt_cmd *tc =
+		container_of(se_cmd, struct tcm_qla_tgt_mgmt_cmd, se_cmd);
+
+	return &tc->mgt_cmd;
+}
+
 /*
  * Parse WWN.
  * If strict, we require lower-case hex and colon separators to be sure
@@ -262,7 +294,7 @@ static void tcm_qla2xxx_complete_mcmd(struct work_struct *work)
 	struct qla_tgt_mgmt_cmd *mcmd = container_of(work,
 			struct qla_tgt_mgmt_cmd, free_work);
 
-	transport_generic_free_cmd(&mcmd->se_cmd, 0);
+	transport_generic_free_cmd(QMGT_TO_SE_CMD(mcmd), 0);
 }
 
 static void tcm_qla2xxx_check_resid(struct se_cmd *se_cmd,
@@ -295,7 +327,7 @@ static void tcm_qla2xxx_complete_free(struct work_struct *work)
 
 	cmd->vha->tgt_counters.qla_core_ret_sta_ctio++;
 	cmd->cmd_flags |= BIT_16;
-	transport_generic_free_cmd(&cmd->se_cmd, 0);
+	transport_generic_free_cmd(Q_TO_SE_CMD(cmd), 0);
 }
 
 /*
@@ -323,7 +355,7 @@ static int tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 	struct qla_tgt_cmd *cmd;
 
 	if ((se_cmd->se_cmd_flags & SCF_SCSI_TMR_CDB) == 0) {
-		cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
+		cmd = SE_TO_Q_CMD(se_cmd);
 		cmd->cmd_flags |= BIT_14;
 	}
 
@@ -347,13 +379,12 @@ static void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 	struct se_session *se_sess;
 
 	if (se_cmd->se_cmd_flags & SCF_SCSI_TMR_CDB) {
-		struct qla_tgt_mgmt_cmd *mcmd = container_of(se_cmd,
-				struct qla_tgt_mgmt_cmd, se_cmd);
+		struct qla_tgt_mgmt_cmd *mcmd = SE_TO_QMGT_CMD(se_cmd);
 		qlt_free_mcmd(mcmd);
 		return;
 	}
 
-	cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
+	cmd = SE_TO_Q_CMD(se_cmd);
 	qlt_free_cmd(cmd);
 
 	if (!cmd->sess || !cmd->sess->se_sess) {
@@ -369,7 +400,7 @@ static void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 
 static void tcm_qla2xxx_rel_cmd(struct qla_tgt_cmd *cmd)
 {
-	tcm_qla2xxx_release_cmd(&cmd->se_cmd);
+	tcm_qla2xxx_release_cmd(Q_TO_SE_CMD(cmd));
 }
 
 static struct qla_tgt_cmd *tcm_qla2xxx_alloc_cmd(struct qla_tgt_sess *sess)
@@ -377,15 +408,23 @@ static struct qla_tgt_cmd *tcm_qla2xxx_alloc_cmd(struct qla_tgt_sess *sess)
 	struct se_session *se_sess = (struct se_session *)sess->se_sess;
 	int tag;
 	struct qla_tgt_cmd *cmd = NULL;
+	struct tcm_qla_tgt_cmd *tc = NULL;
+	struct qla_hw_data *ha = sess->vha->hw;
 
 	tag = percpu_ida_alloc(&se_sess->sess_tag_pool, TASK_RUNNING);
 	if (tag < 0)
 		return NULL;
 
-	cmd = &((struct qla_tgt_cmd *)se_sess->sess_cmd_map)[tag];
-	if (cmd) {
-		memset(cmd, 0, sizeof(struct qla_tgt_cmd));
-		cmd->se_cmd.map_tag = tag;
+	tc = &((struct tcm_qla_tgt_cmd *)se_sess->sess_cmd_map)[tag];
+	if (tc) {
+		memset(tc, 0, sizeof(struct tcm_qla_tgt_cmd));
+		tc->se_cmd.map_tag = tag;
+		tc->se_cmd.cpuid = -1;
+
+		if (ha->msix_count)
+			tc->se_cmd.cpuid = ha->tgt.rspq_vector_cpuid;
+
+		tc->qcmd.ulp_cmd = (void *)&tc->se_cmd;
 	}
 	return cmd;
 }
@@ -412,8 +451,7 @@ static u32 tcm_qla2xxx_sess_get_index(struct se_session *se_sess)
 
 static int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 {
-	struct qla_tgt_cmd *cmd = container_of(se_cmd,
-				struct qla_tgt_cmd, se_cmd);
+	struct qla_tgt_cmd *cmd = SE_TO_Q_CMD(se_cmd);
 
 	if (cmd->aborted) {
 		/* Cmd can loop during Q-full.  tcm_qla2xxx_aborted_task
@@ -422,10 +460,10 @@ static int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 		 */
 		pr_debug("write_pending aborted cmd[%p] refcount %d "
 			"transport_state %x, t_state %x, se_cmd_flags %x\n",
-			cmd,cmd->se_cmd.cmd_kref.refcount.counter,
-			cmd->se_cmd.transport_state,
-			cmd->se_cmd.t_state,
-			cmd->se_cmd.se_cmd_flags);
+			cmd, se_cmd->cmd_kref.refcount.counter,
+			se_cmd->transport_state,
+			se_cmd->t_state,
+			se_cmd->se_cmd_flags);
 		return 0;
 	}
 	cmd->cmd_flags |= BIT_3;
@@ -477,8 +515,7 @@ static void tcm_qla2xxx_set_default_node_attrs(struct se_node_acl *nacl)
 static int tcm_qla2xxx_get_cmd_state(struct se_cmd *se_cmd)
 {
 	if (!(se_cmd->se_cmd_flags & SCF_SCSI_TMR_CDB)) {
-		struct qla_tgt_cmd *cmd = container_of(se_cmd,
-				struct qla_tgt_cmd, se_cmd);
+		struct qla_tgt_cmd *cmd = SE_TO_Q_CMD(se_cmd);
 		return cmd->state;
 	}
 
@@ -492,7 +529,7 @@ static int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	unsigned char *cdb, uint32_t data_length, int fcp_task_attr,
 	int data_dir, int bidi)
 {
-	struct se_cmd *se_cmd = &cmd->se_cmd;
+	struct se_cmd *se_cmd =  Q_TO_SE_CMD(cmd);
 	struct se_session *se_sess;
 	struct qla_tgt_sess *sess;
 #ifdef CONFIG_TCM_QLA2XXX_DEBUG
@@ -513,6 +550,7 @@ static int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 		return -EINVAL;
 	}
 
+	se_cmd->tag = cmd->atio.u.isp24.exchange_addr;
 	se_sess = sess->se_sess;
 	if (!se_sess) {
 		pr_err("Unable to locate active struct se_session\n");
@@ -534,10 +572,58 @@ static int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 				data_dir, flags);
 }
 
+static void tcm_qla2xxx_check_dif_err(struct qla_tgt_cmd *cmd)
+{
+	struct se_cmd *se_cmd = Q_TO_SE_CMD(cmd);
+
+	if ((cmd->a_app_tag == 0xffff) &&
+	    ((cmd->prot_type != TARGET_DIF_TYPE3_PROT) ||
+	     (cmd->a_ref_tag == 0xffffffff))) {
+		se_cmd->bad_sector = cmd->e_ref_tag;
+		se_cmd->pi_err = 0;
+		return;
+	}
+
+	/* check guard */
+	if (cmd->e_guard != cmd->a_guard) {
+		se_cmd->pi_err = TCM_LOGICAL_BLOCK_GUARD_CHECK_FAILED;
+		se_cmd->bad_sector = cmd->lba;
+		pr_err("Guard ERR: cdb 0x%x lba 0x%llx: [Actual|Expected] Ref Tag[0x%x|0x%x], App Tag [0x%x|0x%x], Guard [0x%x|0x%x] cmd=%p\n",
+		    cmd->atio.u.isp24.fcp_cmnd.cdb[0], cmd->lba, cmd->a_ref_tag,
+		    cmd->e_ref_tag, cmd->a_app_tag, cmd->e_app_tag, cmd->a_guard, cmd->e_guard, cmd);
+		goto out;
+	}
+
+	/* check ref tag */
+	if (cmd->e_ref_tag != cmd->a_ref_tag) {
+		se_cmd->pi_err = TCM_LOGICAL_BLOCK_REF_TAG_CHECK_FAILED;
+		se_cmd->bad_sector = cmd->e_ref_tag;
+		pr_err("Ref Tag ERR: cdb 0x%x lba 0x%llx: [Actual|Expected] Ref Tag[0x%x|0x%x], App Tag [0x%x|0x%x], Guard [0x%x|0x%x] cmd=%p\n",
+		    cmd->atio.u.isp24.fcp_cmnd.cdb[0], cmd->lba, cmd->a_ref_tag,
+		    cmd->e_ref_tag, cmd->a_app_tag, cmd->e_app_tag,
+		    cmd->a_guard, cmd->e_guard, cmd);
+		goto out;
+	}
+
+	/* check appl tag */
+	if (cmd->e_app_tag != cmd->a_app_tag) {
+		se_cmd->pi_err = TCM_LOGICAL_BLOCK_APP_TAG_CHECK_FAILED;
+		se_cmd->bad_sector = cmd->lba;
+		pr_err("App Tag ERR: cdb 0x%x lba 0x%llx: [Actual|Expected] Ref Tag[0x%x|0x%x], App Tag [0x%x|0x%x], Guard [0x%x|0x%x] cmd=%p\n",
+		    cmd->atio.u.isp24.fcp_cmnd.cdb[0], cmd->lba, cmd->a_ref_tag,
+		    cmd->e_ref_tag, cmd->a_app_tag, cmd->e_app_tag,
+		    cmd->a_guard, cmd->e_guard, cmd);
+		goto out;
+	}
+out:
+	return;
+}
+
 static void tcm_qla2xxx_handle_data_work(struct work_struct *work)
 {
 	struct qla_tgt_cmd *cmd = container_of(work, struct qla_tgt_cmd, work);
 	unsigned long flags;
+	struct se_cmd *se_cmd = Q_TO_SE_CMD(cmd);
 
 	/*
 	 * Ensure that the complete FCP WRITE payload has been received.
@@ -557,27 +643,31 @@ static void tcm_qla2xxx_handle_data_work(struct work_struct *work)
 	spin_unlock_irqrestore(&cmd->cmd_lock, flags);
 
 	cmd->vha->tgt_counters.qla_core_ret_ctio++;
+
+	if (cmd->prot_op)
+		tcm_qla2xxx_check_dif_err(cmd);
+
 	if (!cmd->write_data_transferred) {
 		/*
 		 * Check if se_cmd has already been aborted via LUN_RESET, and
 		 * waiting upon completion in tcm_qla2xxx_write_pending_status()
 		 */
-		if (cmd->se_cmd.transport_state & CMD_T_ABORTED) {
-			complete(&cmd->se_cmd.t_transport_stop_comp);
+		if (se_cmd->transport_state & CMD_T_ABORTED) {
+			complete(&se_cmd->t_transport_stop_comp);
 			return;
 		}
 
-		if (cmd->se_cmd.pi_err)
-			transport_generic_request_failure(&cmd->se_cmd,
-				cmd->se_cmd.pi_err);
+		if (se_cmd->pi_err)
+			transport_generic_request_failure(se_cmd,
+				se_cmd->pi_err);
 		else
-			transport_generic_request_failure(&cmd->se_cmd,
+			transport_generic_request_failure(se_cmd,
 				TCM_CHECK_CONDITION_ABORT_CMD);
 
 		return;
 	}
 
-	return target_execute_cmd(&cmd->se_cmd);
+	return target_execute_cmd(se_cmd);
 }
 
 /*
@@ -594,13 +684,16 @@ static void tcm_qla2xxx_handle_data(struct qla_tgt_cmd *cmd)
 static void tcm_qla2xxx_handle_dif_work(struct work_struct *work)
 {
 	struct qla_tgt_cmd *cmd = container_of(work, struct qla_tgt_cmd, work);
+	struct se_cmd *se_cmd = Q_TO_SE_CMD(cmd);
+
+	tcm_qla2xxx_check_dif_err(cmd);
 
 	/* take an extra kref to prevent cmd free too early.
 	 * need to wait for SCSI status/check condition to
 	 * finish responding generate by transport_generic_request_failure.
 	 */
-	kref_get(&cmd->se_cmd.cmd_kref);
-	transport_generic_request_failure(&cmd->se_cmd, cmd->se_cmd.pi_err);
+	kref_get(&se_cmd->cmd_kref);
+	transport_generic_request_failure(se_cmd, se_cmd->pi_err);
 }
 
 /*
@@ -619,7 +712,7 @@ static int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun,
 	uint16_t tmr_func, uint32_t tag)
 {
 	struct qla_tgt_sess *sess = mcmd->sess;
-	struct se_cmd *se_cmd = &mcmd->se_cmd;
+	struct se_cmd *se_cmd = QMGT_TO_SE_CMD(mcmd);
 	struct se_session *se_sess = sess->se_sess;
 	bool found_lun = false;
 	int transl_tmr_func;
@@ -628,8 +721,7 @@ static int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun,
 	case QLA_TGT_ABTS:
 		spin_lock(&se_sess->sess_cmd_lock);
 		list_for_each_entry(se_cmd, &se_sess->sess_cmd_list, se_cmd_list) {
-			struct qla_tgt_cmd *cmd =
-				container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
+			struct qla_tgt_cmd *cmd = SE_TO_Q_CMD(se_cmd);
 			struct abts_recv_from_24xx *abts = &mcmd->orig_iocb.abts;
 
 			if (se_cmd->tag == abts->exchange_addr_to_abort) {
@@ -682,8 +774,7 @@ static int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun,
 
 static int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 {
-	struct qla_tgt_cmd *cmd = container_of(se_cmd,
-				struct qla_tgt_cmd, se_cmd);
+	struct qla_tgt_cmd *cmd = SE_TO_Q_CMD(se_cmd);
 
 	if (cmd->aborted) {
 		/* Cmd can loop during Q-full.  tcm_qla2xxx_aborted_task
@@ -692,10 +783,10 @@ static int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 		 */
 		pr_debug("queue_data_in aborted cmd[%p] refcount %d "
 			"transport_state %x, t_state %x, se_cmd_flags %x\n",
-			cmd,cmd->se_cmd.cmd_kref.refcount.counter,
-			cmd->se_cmd.transport_state,
-			cmd->se_cmd.t_state,
-			cmd->se_cmd.se_cmd_flags);
+			cmd, se_cmd->cmd_kref.refcount.counter,
+			se_cmd->transport_state,
+			se_cmd->t_state,
+			se_cmd->se_cmd_flags);
 		return 0;
 	}
 
@@ -725,8 +816,8 @@ static int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 
 static int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 {
-	struct qla_tgt_cmd *cmd = container_of(se_cmd,
-				struct qla_tgt_cmd, se_cmd);
+	struct qla_tgt_cmd *cmd = SE_TO_Q_CMD(se_cmd);
+
 	int xmit_type = QLA_TGT_XMIT_STATUS;
 
 	cmd->bufflen = se_cmd->data_length;
@@ -766,8 +857,8 @@ static int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 static void tcm_qla2xxx_queue_tm_rsp(struct se_cmd *se_cmd)
 {
 	struct se_tmr_req *se_tmr = se_cmd->se_tmr_req;
-	struct qla_tgt_mgmt_cmd *mcmd = container_of(se_cmd,
-				struct qla_tgt_mgmt_cmd, se_cmd);
+	struct qla_tgt_mgmt_cmd *mcmd = SE_TO_QMGT_CMD(se_cmd);
+
 
 	pr_debug("queue_tm_rsp: mcmd: %p func: 0x%02x response: 0x%02x\n",
 			mcmd, se_tmr->function, se_tmr->response);
@@ -803,8 +894,7 @@ static void tcm_qla2xxx_queue_tm_rsp(struct se_cmd *se_cmd)
 	 CMD_FLAG_DATA_WORK)
 static void tcm_qla2xxx_aborted_task(struct se_cmd *se_cmd)
 {
-	struct qla_tgt_cmd *cmd = container_of(se_cmd,
-				struct qla_tgt_cmd, se_cmd);
+	struct qla_tgt_cmd *cmd = SE_TO_Q_CMD(se_cmd);
 	unsigned long flags;
 
 	if (qlt_abort_cmd(cmd))
@@ -1585,9 +1675,9 @@ static int tcm_qla2xxx_check_initiator_node_acl(
 	 * via ConfigFS, or via running in TPG demo mode.
 	 */
 	se_sess = target_alloc_session(&tpg->se_tpg, num_tags,
-				       sizeof(struct qla_tgt_cmd),
-				       TARGET_PROT_ALL, port_name,
-				       qlat_sess, tcm_qla2xxx_session_cb);
+	    sizeof(struct tcm_qla_tgt_cmd), TARGET_PROT_ALL, port_name,
+	    qlat_sess, tcm_qla2xxx_session_cb);
+
 	if (IS_ERR(se_sess))
 		return PTR_ERR(se_sess);
 

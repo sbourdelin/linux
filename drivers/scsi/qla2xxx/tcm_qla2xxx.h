@@ -81,3 +81,13 @@ struct tcm_qla2xxx_lport {
 	/* Returned by tcm_qla2xxx_make_lport() */
 	struct se_wwn lport_wwn;
 };
+
+struct tcm_qla_tgt_cmd {
+	struct se_cmd se_cmd;
+	struct qla_tgt_cmd qcmd;
+};
+
+struct tcm_qla_tgt_mgmt_cmd {
+	struct se_cmd se_cmd;
+	struct qla_tgt_mgmt_cmd mgt_cmd;
+};
