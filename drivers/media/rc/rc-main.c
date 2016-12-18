@@ -1357,7 +1357,7 @@ static struct device_type rc_dev_type = {
 	.uevent		= rc_dev_uevent,
 };
 
-struct rc_dev *rc_allocate_device(void)
+struct rc_dev *rc_allocate_device(enum rc_driver_type type)
 {
 	struct rc_dev *dev;
 
@@ -1383,6 +1383,8 @@ struct rc_dev *rc_allocate_device(void)
 	dev->dev.type = &rc_dev_type;
 	dev->dev.class = &rc_class;
 	device_initialize(&dev->dev);
+
+	dev->driver_type = type;
 
 	__module_get(THIS_MODULE);
 	return dev;
@@ -1410,7 +1412,8 @@ static void devm_rc_alloc_release(struct device *dev, void *res)
 	rc_free_device(*(struct rc_dev **)res);
 }
 
-struct rc_dev *devm_rc_allocate_device(struct device *dev)
+struct rc_dev *devm_rc_allocate_device(struct device *dev,
+					enum rc_driver_type type)
 {
 	struct rc_dev **dr, *rc;
 
@@ -1418,7 +1421,7 @@ struct rc_dev *devm_rc_allocate_device(struct device *dev)
 	if (!dr)
 		return NULL;
 
-	rc = rc_allocate_device();
+	rc = rc_allocate_device(type);
 	if (!rc) {
 		devres_free(dr);
 		return NULL;
