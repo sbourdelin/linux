@@ -739,6 +739,8 @@ struct qla_tgt_func_tmpl {
 						const uint8_t *);
 	void (*clear_nacl_from_fcport_map)(struct qla_tgt_sess *);
 	void (*shutdown_sess)(struct qla_tgt_sess *);
+	void (*release_cmd)(struct qla_tgt_cmd *);
+	struct qla_tgt_cmd *(*alloc_cmd)(struct qla_tgt_sess *);
 };
 
 int qla2x00_wait_for_hba_online(struct scsi_qla_host *);

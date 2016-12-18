@@ -327,6 +327,7 @@ static int tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 static void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 {
 	struct qla_tgt_cmd *cmd;
+	struct se_session *se_sess;
 
 	if (se_cmd->se_cmd_flags & SCF_SCSI_TMR_CDB) {
 		struct qla_tgt_mgmt_cmd *mcmd = container_of(se_cmd,
@@ -337,6 +338,39 @@ static void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 
 	cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
 	qlt_free_cmd(cmd);
+
+	if (!cmd->sess || !cmd->sess->se_sess) {
+		WARN_ON(1);
+		return;
+	}
+
+	se_sess = (struct se_session *)cmd->sess->se_sess;
+
+	cmd->jiffies_at_free = get_jiffies_64();
+	percpu_ida_free(&se_sess->sess_tag_pool, se_cmd->map_tag);
+}
+
+static void tcm_qla2xxx_rel_cmd(struct qla_tgt_cmd *cmd)
+{
+	tcm_qla2xxx_release_cmd(&cmd->se_cmd);
+}
+
+static struct qla_tgt_cmd *tcm_qla2xxx_alloc_cmd(struct qla_tgt_sess *sess)
+{
+	struct se_session *se_sess = (struct se_session *)sess->se_sess;
+	int tag;
+	struct qla_tgt_cmd *cmd = NULL;
+
+	tag = percpu_ida_alloc(&se_sess->sess_tag_pool, TASK_RUNNING);
+	if (tag < 0)
+		return NULL;
+
+	cmd = &((struct qla_tgt_cmd *)se_sess->sess_cmd_map)[tag];
+	if (cmd) {
+		memset(cmd, 0, sizeof(struct qla_tgt_cmd));
+		cmd->se_cmd.map_tag = tag;
+	}
+	return cmd;
 }
 
 static void tcm_qla2xxx_close_session(struct se_session *se_sess)
@@ -1623,6 +1657,8 @@ static struct qla_tgt_func_tmpl tcm_qla2xxx_template = {
 	.find_sess_by_loop_id	= tcm_qla2xxx_find_sess_by_loop_id,
 	.clear_nacl_from_fcport_map = tcm_qla2xxx_clear_nacl_from_fcport_map,
 	.shutdown_sess		= tcm_qla2xxx_shutdown_sess,
+	.release_cmd		= tcm_qla2xxx_rel_cmd,
+	.alloc_cmd		= tcm_qla2xxx_alloc_cmd,
 };
 
 static int tcm_qla2xxx_init_lport(struct tcm_qla2xxx_lport *lport)

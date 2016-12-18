@@ -3225,7 +3225,7 @@ static void qlt_init_term_exchange(struct scsi_qla_host *vha)
 			/* This cmd was never sent to TCM.  There is no need
 			 * to schedule free or call free_cmd
 			 */
-			qlt_free_cmd(cmd);
+			vha->hw->tgt.tgt_ops->release_cmd(cmd);
 			vha->hw->tgt.num_qfull_cmds_alloc--;
 		}
 	}
@@ -3291,8 +3291,6 @@ EXPORT_SYMBOL(qlt_abort_cmd);
 
 void qlt_free_cmd(struct qla_tgt_cmd *cmd)
 {
-	struct qla_tgt_sess *sess = cmd->sess;
-
 	ql_dbg(ql_dbg_tgt, cmd->vha, 0xe074,
 	    "%s: se_cmd[%p] ox_id %04x\n",
 	    __func__, &cmd->se_cmd,
@@ -3310,13 +3308,6 @@ void qlt_free_cmd(struct qla_tgt_cmd *cmd)
 	cmd->jiffies_at_free = get_jiffies_64();
 	if (unlikely(cmd->free_sg))
 		kfree(cmd->sg);
-
-	if (!sess || !sess->se_sess) {
-		WARN_ON(1);
-		return;
-	}
-	cmd->jiffies_at_free = get_jiffies_64();
-	percpu_ida_free(&sess->se_sess->sess_tag_pool, cmd->se_cmd.map_tag);
 }
 EXPORT_SYMBOL(qlt_free_cmd);
 
@@ -3822,7 +3813,7 @@ out_term:
 	qlt_send_term_exchange(vha, NULL, &cmd->atio, 1, 0);
 
 	qlt_decr_num_pend_cmds(vha);
-	percpu_ida_free(&sess->se_sess->sess_tag_pool, cmd->se_cmd.map_tag);
+	ha->tgt.tgt_ops->release_cmd(cmd);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	spin_lock_irqsave(&ha->tgt.sess_lock, flags);
@@ -3847,23 +3838,17 @@ static struct qla_tgt_cmd *qlt_get_tag(scsi_qla_host_t *vha,
 				       struct qla_tgt_sess *sess,
 				       struct atio_from_isp *atio)
 {
-	struct se_session *se_sess = sess->se_sess;
 	struct qla_tgt_cmd *cmd;
-	int tag;
 
-	tag = percpu_ida_alloc(&se_sess->sess_tag_pool, TASK_RUNNING);
-	if (tag < 0)
+	cmd = vha->hw->tgt.tgt_ops->alloc_cmd(sess);
+	if (!cmd)
 		return NULL;
-
-	cmd = &((struct qla_tgt_cmd *)se_sess->sess_cmd_map)[tag];
-	memset(cmd, 0, sizeof(struct qla_tgt_cmd));
 
 	memcpy(&cmd->atio, atio, sizeof(*atio));
 	cmd->state = QLA_TGT_STATE_NEW;
 	cmd->tgt = vha->vha_tgt.qla_tgt;
 	qlt_incr_num_pend_cmds(vha);
 	cmd->vha = vha;
-	cmd->se_cmd.map_tag = tag;
 	cmd->sess = sess;
 	cmd->loop_id = sess->loop_id;
 	cmd->conf_compl_supported = sess->conf_compl_supported;
@@ -5138,9 +5123,7 @@ qlt_alloc_qfull_cmd(struct scsi_qla_host *vha,
 	struct qla_tgt *tgt = vha->vha_tgt.qla_tgt;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_sess *sess;
-	struct se_session *se_sess;
 	struct qla_tgt_cmd *cmd;
-	int tag;
 
 	if (unlikely(tgt->tgt_stop)) {
 		ql_dbg(ql_dbg_io, vha, 0x300a,
@@ -5169,13 +5152,7 @@ qlt_alloc_qfull_cmd(struct scsi_qla_host *vha,
 	if (!sess)
 		return;
 
-	se_sess = sess->se_sess;
-
-	tag = percpu_ida_alloc(&se_sess->sess_tag_pool, TASK_RUNNING);
-	if (tag < 0)
-		return;
-
-	cmd = &((struct qla_tgt_cmd *)se_sess->sess_cmd_map)[tag];
+	cmd = ha->tgt.tgt_ops->alloc_cmd(sess);
 	if (!cmd) {
 		ql_dbg(ql_dbg_io, vha, 0x3009,
 			"qla_target(%d): %s: Allocation of cmd failed\n",
@@ -5190,8 +5167,6 @@ qlt_alloc_qfull_cmd(struct scsi_qla_host *vha,
 		qlt_chk_exch_leak_thresh_hold(vha);
 		return;
 	}
-
-	memset(cmd, 0, sizeof(struct qla_tgt_cmd));
 
 	qlt_incr_num_pend_cmds(vha);
 	INIT_LIST_HEAD(&cmd->cmd_list);
@@ -5277,7 +5252,7 @@ qlt_free_qfull_cmds(struct scsi_qla_host *vha)
 		/* This cmd was never sent to TCM.  There is no need
 		 * to schedule free or call free_cmd
 		 */
-		qlt_free_cmd(cmd);
+		ha->tgt.tgt_ops->release_cmd(cmd);
 	}
 	return rc;
 }
