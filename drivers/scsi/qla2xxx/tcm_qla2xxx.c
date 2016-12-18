@@ -439,6 +439,8 @@ static int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 	cmd->prot_sg = se_cmd->t_prot_sg;
 	cmd->blk_sz  = se_cmd->se_dev->dev_attrib.block_size;
 	se_cmd->pi_err = 0;
+	cmd->cdb = se_cmd->t_task_cdb;
+	cmd->lba = se_cmd->t_task_lba;
 
 	/*
 	 * qla_target.c:qlt_rdy_to_xfer() will call pci_map_sg() to setup
@@ -709,6 +711,8 @@ static int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 	cmd->prot_sg = se_cmd->t_prot_sg;
 	cmd->blk_sz  = se_cmd->se_dev->dev_attrib.block_size;
 	se_cmd->pi_err = 0;
+	cmd->cdb = se_cmd->t_task_cdb;
+	cmd->lba = se_cmd->t_task_lba;
 
 	tcm_qla2xxx_check_resid(se_cmd, cmd);
 

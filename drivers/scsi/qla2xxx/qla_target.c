@@ -2100,7 +2100,6 @@ static int qlt_pre_xmit_response(struct qla_tgt_cmd *cmd,
 	struct qla_tgt *tgt = cmd->tgt;
 	struct scsi_qla_host *vha = tgt->vha;
 	struct qla_hw_data *ha = vha->hw;
-	struct se_cmd *se_cmd = &cmd->se_cmd;
 
 	prm->cmd = cmd;
 	prm->tgt = tgt;
@@ -2126,17 +2125,18 @@ static int qlt_pre_xmit_response(struct qla_tgt_cmd *cmd,
 	if (cmd->residual < 0) {
 		prm->residual = -(cmd->residual);
 		ql_dbg(ql_dbg_io + ql_dbg_verbose, vha, 0x305c,
-		    "Residual underflow: %d (tag %lld, op %x, bufflen %d, rq_result %x)\n",
-		       prm->residual, se_cmd->tag,
-		       se_cmd->t_task_cdb ? se_cmd->t_task_cdb[0] : 0,
-		       cmd->bufflen, prm->rq_result);
+		    "Residual underflow: %d (tag %d, op %x, bufflen %d, rq_result %x)\n",
+		    prm->residual, cmd->atio.u.isp24.exchange_addr,
+		    cmd->cdb ? cmd->cdb[0] : 0,
+		    cmd->bufflen, prm->rq_result);
 		prm->rq_result |= SS_RESIDUAL_UNDER;
 	} else if (cmd->residual > 0) {
 		prm->residual = cmd->residual;
 		ql_dbg(ql_dbg_io, vha, 0x305d,
-		    "Residual overflow: %d (tag %lld, op %x, bufflen %d, rq_result %x)\n",
-		       prm->residual, se_cmd->tag, se_cmd->t_task_cdb ?
-		       se_cmd->t_task_cdb[0] : 0, cmd->bufflen, prm->rq_result);
+		    "Residual overflow: %d (tag %d, op %x, bufflen %d, rq_result %x)\n",
+		    prm->residual, cmd->atio.u.isp24.exchange_addr,
+		    cmd->cdb ? cmd->cdb[0] : 0,
+		    cmd->bufflen, prm->rq_result);
 		prm->rq_result |= SS_RESIDUAL_OVER;
 	}
 
@@ -2463,7 +2463,7 @@ qlt_build_ctio_crc2_pkt(struct qla_tgt_prm *prm, scsi_qla_host_t *vha)
 	ql_dbg(ql_dbg_tgt, vha, 0xe071,
 		"qla_target(%d):%s: se_cmd[%p] CRC2 prot_op[0x%x] cmd prot sg:cnt[%p:%x] lba[%llu]\n",
 		vha->vp_idx, __func__, se_cmd, se_cmd->prot_op,
-		prm->prot_sg, prm->prot_seg_cnt, se_cmd->t_task_lba);
+		prm->prot_sg, prm->prot_seg_cnt, cmd->lba);
 
 	if ((se_cmd->prot_op == TARGET_PROT_DIN_INSERT) ||
 	    (se_cmd->prot_op == TARGET_PROT_DOUT_STRIP))
@@ -2905,7 +2905,7 @@ qlt_handle_dif_error(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
 	uint32_t	e_ref_tag, a_ref_tag;
 	uint16_t	e_app_tag, a_app_tag;
 	uint16_t	e_guard, a_guard;
-	uint64_t	lba = cmd->se_cmd.t_task_lba;
+	uint64_t	lba = cmd->lba;
 
 	a_guard   = be16_to_cpu(*(uint16_t *)(ap + 0));
 	a_app_tag = be16_to_cpu(*(uint16_t *)(ap + 2));
@@ -2987,7 +2987,7 @@ qlt_handle_dif_error(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
 	/* check guard */
 	if (e_guard != a_guard) {
 		cmd->se_cmd.pi_err = TCM_LOGICAL_BLOCK_GUARD_CHECK_FAILED;
-		cmd->se_cmd.bad_sector = cmd->se_cmd.t_task_lba;
+		cmd->se_cmd.bad_sector = cmd->lba;
 
 		ql_log(ql_log_warn, vha, 0xe076,
 		    "Guard ERR: cdb 0x%x lba 0x%llx: [Actual|Expected] Ref Tag[0x%x|0x%x], App Tag [0x%x|0x%x], Guard [0x%x|0x%x] cmd=%p\n",
@@ -3013,7 +3013,7 @@ qlt_handle_dif_error(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
 	/* check appl tag */
 	if (e_app_tag != a_app_tag) {
 		cmd->se_cmd.pi_err = TCM_LOGICAL_BLOCK_APP_TAG_CHECK_FAILED;
-		cmd->se_cmd.bad_sector = cmd->se_cmd.t_task_lba;
+		cmd->se_cmd.bad_sector = cmd->lba;
 
 		ql_log(ql_log_warn, vha, 0xe078,
 			"App Tag ERR: cdb 0x%x lba 0x%llx: [Actual|Expected] Ref Tag[0x%x|0x%x], App Tag [0x%x|0x%x], Guard [0x%x|0x%x] cmd=%p\n",
@@ -4813,9 +4813,11 @@ restart:
 		cmd->sg = se_cmd->t_data_sg;
 
 		ql_dbg(ql_dbg_tgt_mgt, vha, 0xf02c,
-		       "SRR cmd %p (se_cmd %p, tag %lld, op %x), sg_cnt=%d, offset=%d",
-		       cmd, &cmd->se_cmd, se_cmd->tag, se_cmd->t_task_cdb ?
-		       se_cmd->t_task_cdb[0] : 0, cmd->sg_cnt, cmd->offset);
+		    "SRR cmd %p (se_cmd %p, tag %d, op %x), "
+		    "sg_cnt=%d, offset=%d",
+		    cmd, &cmd->se_cmd, cmd->atio.u.isp24.exchange_addr,
+		    cmd->cdb ? cmd->cdb[0] : 0,
+		    cmd->sg_cnt, cmd->offset);
 
 		qlt_handle_srr(vha, sctio, imm);
 
