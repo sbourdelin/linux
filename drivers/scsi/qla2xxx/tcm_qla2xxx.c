@@ -563,15 +563,16 @@ static void tcm_qla2xxx_handle_dif_err(struct qla_tgt_cmd *cmd)
  * Called from qla_target.c:qlt_issue_task_mgmt()
  */
 static int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun,
-	uint8_t tmr_func, uint32_t tag)
+	uint16_t tmr_func, uint32_t tag)
 {
 	struct qla_tgt_sess *sess = mcmd->sess;
 	struct se_cmd *se_cmd = &mcmd->se_cmd;
 	struct se_session *se_sess = sess->se_sess;
 	bool found_lun = false;
+	int transl_tmr_func;
 
 	switch (tmr_func) {
-	case TMR_ABORT_TASK:
+	case QLA_TGT_ABTS:
 		spin_lock(&se_sess->sess_cmd_lock);
 		list_for_each_entry(se_cmd, &se_sess->sess_cmd_list, se_cmd_list) {
 			struct qla_tgt_cmd *cmd =
@@ -587,13 +588,43 @@ static int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun,
 		spin_unlock(&se_sess->sess_cmd_lock);
 		if (!found_lun)
 			return -ENOBUFS;
+
+		pr_debug("%ld: ABTS received\n", sess->vha->host_no);
+		transl_tmr_func = TMR_ABORT_TASK;
+		break;
+	case QLA_TGT_2G_ABORT_TASK:
+		pr_debug("%ld: 2G Abort Task received\n", sess->vha->host_no);
+		transl_tmr_func = TMR_ABORT_TASK;
+		break;
+	case QLA_TGT_CLEAR_ACA:
+		pr_debug("%ld: CLEAR_ACA received\n", sess->vha->host_no);
+		transl_tmr_func = TMR_CLEAR_ACA;
+		break;
+	case QLA_TGT_TARGET_RESET:
+		pr_debug("%ld: TARGET_RESET received\n", sess->vha->host_no);
+		transl_tmr_func = TMR_TARGET_WARM_RESET;
+		break;
+	case QLA_TGT_LUN_RESET:
+		pr_debug("%ld: LUN_RESET received\n", sess->vha->host_no);
+		transl_tmr_func = TMR_LUN_RESET;
+		break;
+	case QLA_TGT_CLEAR_TS:
+		pr_debug("%ld: CLEAR_TS received\n", sess->vha->host_no);
+		transl_tmr_func = TMR_CLEAR_TASK_SET;
+		break;
+	case QLA_TGT_ABORT_TS:
+		pr_debug("%ld: ABORT_TS received\n", sess->vha->host_no);
+		transl_tmr_func = TMR_ABORT_TASK_SET;
 		break;
 	default:
+		pr_debug("%ld: Unknown task mgmt fn 0x%x\n",
+		    sess->vha->host_no, tmr_func);
+		return -ENOSYS;
 		break;
 	}
 
 	return target_submit_tmr(se_cmd, sess->se_sess, NULL, lun, mcmd,
-			tmr_func, GFP_ATOMIC, tag, TARGET_SCF_ACK_KREF);
+	    transl_tmr_func, GFP_ATOMIC, tag, TARGET_SCF_ACK_KREF);
 }
 
 static int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
