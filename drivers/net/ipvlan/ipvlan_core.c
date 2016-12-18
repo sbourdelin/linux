@@ -660,6 +660,9 @@ rx_handler_result_t ipvlan_handle_frame(struct sk_buff **pskb)
 	if (!port)
 		return RX_HANDLER_PASS;
 
+	if (unlikely(!pskb_may_pull(skb, sizeof(struct ethhdr))))
+		goto out;
+
 	switch (port->mode) {
 	case IPVLAN_MODE_L2:
 		return ipvlan_handle_mode_l2(pskb, port);
@@ -672,6 +675,8 @@ rx_handler_result_t ipvlan_handle_frame(struct sk_buff **pskb)
 	/* Should not reach here */
 	WARN_ONCE(true, "ipvlan_handle_frame() called for mode = [%hx]\n",
 			  port->mode);
+
+out:
 	kfree_skb(skb);
 	return RX_HANDLER_CONSUMED;
 }
