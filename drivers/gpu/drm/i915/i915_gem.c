@@ -4198,8 +4198,12 @@ int i915_gem_suspend(struct drm_device *dev)
 
 	cancel_delayed_work_sync(&dev_priv->gpu_error.hangcheck_work);
 	cancel_delayed_work_sync(&dev_priv->gt.retire_work);
-	flush_delayed_work(&dev_priv->gt.idle_work);
-	flush_work(&dev_priv->mm.free_work);
+	while (flush_delayed_work(&dev_priv->gt.idle_work))
+		;
+
+	rcu_barrier();
+	while (flush_work(&dev_priv->mm.free_work))
+		rcu_barrier();
 
 	/* Assert that we sucessfully flushed all the work and
 	 * reset the GPU back to its idle, low power state.
