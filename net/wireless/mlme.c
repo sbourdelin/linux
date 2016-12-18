@@ -340,6 +340,8 @@ int cfg80211_mlme_deauth(struct cfg80211_registered_device *rdev,
 
 	ASSERT_WDEV_LOCK(wdev);
 
+	wdev->conn_owner_nlportid = 0;
+
 	if (local_state_change &&
 	    (!wdev->current_bss ||
 	     !ether_addr_equal(wdev->current_bss->pub.bssid, bssid)))
