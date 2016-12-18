@@ -553,25 +553,25 @@ static void _nbu2ss_dma_unmap_single(
 
 /*-------------------------------------------------------------------------*/
 /* Endpoint 0 OUT Transfer (PIO) */
-static int EP0_out_PIO(struct nbu2ss_udc *udc, u8 *pBuf, u32 length)
+static int EP0_out_PIO(struct nbu2ss_udc *udc, u8 *p_buf, u32 length)
 {
 	u32		i;
 	int		nret   = 0;
-	u32		iWordLength = 0;
-	union usb_reg_access *pBuf32 = (union usb_reg_access *)pBuf;
+	u32		i_word_length = 0;
+	union usb_reg_access *p_buf32 = (union usb_reg_access *)p_buf;
 
 	/*------------------------------------------------------------*/
 	/* Read Length */
-	iWordLength = length / sizeof(u32);
+	i_word_length = length / sizeof(u32);
 
 	/*------------------------------------------------------------*/
 	/* PIO Read */
-	if (iWordLength) {
-		for (i = 0; i < iWordLength; i++) {
-			pBuf32->dw = _nbu2ss_readl(&udc->p_regs->EP0_READ);
-			pBuf32++;
+	if (i_word_length) {
+		for (i = 0; i < i_word_length; i++) {
+			p_buf32->dw = _nbu2ss_readl(&udc->p_regs->EP0_READ);
+			p_buf32++;
 		}
-		nret = iWordLength * sizeof(u32);
+		nret = i_word_length * sizeof(u32);
 	}
 
 	return nret;
