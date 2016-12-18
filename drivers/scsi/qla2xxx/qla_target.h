@@ -1020,8 +1020,12 @@ struct qla_tgt_cmd {
 	uint32_t prot_sg_cnt;
 	uint32_t blk_sz;
 	struct crc_context *ctx;
+	uint32_t prot_op;
+	uint32_t prot_type;
 	uint8_t  *cdb;
 	uint64_t lba;
+	uint32_t a_ref_tag, e_ref_tag;
+	uint16_t a_guard, e_guard, a_app_tag, e_app_tag;
 
 	uint64_t jiffies_at_alloc;
 	uint64_t jiffies_at_free;
