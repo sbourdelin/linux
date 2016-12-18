@@ -566,6 +566,10 @@ static int ioctl_fsthaw(struct file *filp)
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
+	/* If filesystem doesn't support thaw feature, return. */
+	if (!sb->s_op->unfreeze_fs)
+		return -EOPNOTSUPP;
+
 	/* Thaw */
 	if (sb->s_op->thaw_super)
 		return sb->s_op->thaw_super(sb);
