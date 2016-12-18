@@ -1500,10 +1500,9 @@ static int alloc_and_init_dma_members(struct comedi_device *dev)
 		if (ao_cmd_is_supported(board)) {
 			devpriv->ao_buffer[i] =
 				dma_alloc_coherent(&pcidev->dev,
-						   DMA_BUFFER_SIZE,
-						   &devpriv->
-						   ao_buffer_bus_addr[i],
-						   GFP_KERNEL);
+				   DMA_BUFFER_SIZE,
+				   &devpriv->ao_buffer_bus_addr[i],
+				   GFP_KERNEL);
 			if (!devpriv->ao_buffer[i])
 				return -ENOMEM;
 		}
@@ -2476,18 +2475,15 @@ static int setup_channel_queue(struct comedi_device *dev,
 			for (i = 0; i < cmd->chanlist_len; i++) {
 				bits = 0;
 				/* set channel */
-				bits |= adc_chan_bits(CR_CHAN(cmd->
-							      chanlist[i]));
+				bits |= adc_chan_bits(
+				CR_CHAN(cmd->chanlist[i]));
 				/* set gain */
 				bits |= ai_range_bits_6xxx(dev,
-							   CR_RANGE(cmd->
-								    chanlist
-								    [i]));
+				   CR_RANGE(cmd->chanlist[i]));
 				/* set single-ended / differential */
 				bits |= se_diff_bit_6xxx(dev,
-							 CR_AREF(cmd->
-								 chanlist[i]) ==
-							 AREF_DIFF);
+					 CR_AREF(cmd->chanlist[i]) ==
+					 AREF_DIFF);
 				if (CR_AREF(cmd->chanlist[i]) == AREF_COMMON)
 					bits |= ADC_COMMON_BIT;
 				/* mark end of queue */
