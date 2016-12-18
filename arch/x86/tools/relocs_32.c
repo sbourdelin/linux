@@ -14,4 +14,7 @@
 #define ELF_ST_BIND(o)		ELF32_ST_BIND(o)
 #define ELF_ST_VISIBILITY(o)	ELF32_ST_VISIBILITY(o)
 
+/* printf format for Elf32_Off */
+#define PRIuELF PRIu32
+
 #include "relocs.c"
