@@ -567,6 +567,30 @@ static int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun,
 {
 	struct qla_tgt_sess *sess = mcmd->sess;
 	struct se_cmd *se_cmd = &mcmd->se_cmd;
+	struct se_session *se_sess = sess->se_sess;
+	bool found_lun = false;
+
+	switch (tmr_func) {
+	case TMR_ABORT_TASK:
+		spin_lock(&se_sess->sess_cmd_lock);
+		list_for_each_entry(se_cmd, &se_sess->sess_cmd_list, se_cmd_list) {
+			struct qla_tgt_cmd *cmd =
+				container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
+			struct abts_recv_from_24xx *abts = &mcmd->orig_iocb.abts;
+
+			if (se_cmd->tag == abts->exchange_addr_to_abort) {
+				lun = cmd->unpacked_lun;
+				found_lun = true;
+				break;
+			}
+		}
+		spin_unlock(&se_sess->sess_cmd_lock);
+		if (!found_lun)
+			return -ENOBUFS;
+		break;
+	default:
+		break;
+	}
 
 	return target_submit_tmr(se_cmd, sess->se_sess, NULL, lun, mcmd,
 			tmr_func, GFP_ATOMIC, tag, TARGET_SCF_ACK_KREF);
