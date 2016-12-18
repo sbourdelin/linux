@@ -227,7 +227,7 @@ void sctp_transport_pmtu(struct sctp_transport *transport, struct sock *sk)
 {
 	/* If we don't have a fresh route, look one up */
 	if (!transport->dst || transport->dst->obsolete) {
-		dst_release(transport->dst);
+		sctp_transport_dst_release(transport);
 		transport->af_specific->get_dst(transport, &transport->saddr,
 						&transport->fl, sk);
 	}
@@ -659,3 +659,19 @@ void sctp_transport_immediate_rtx(struct sctp_transport *t)
 			sctp_transport_hold(t);
 	}
 }
+
+/* Drop dst */
+void sctp_transport_dst_release(struct sctp_transport *t)
+{
+	dst_release(t->dst);
+	t->dst = NULL;
+	t->dst_pending_confirm = 0;
+}
+
+/* Schedule neighbour confirm */
+void sctp_transport_dst_confirm(struct sctp_transport *t)
+{
+	if (!t->dst_pending_confirm)
+		t->dst_pending_confirm = 1;
+}
+
