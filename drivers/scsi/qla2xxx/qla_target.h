@@ -1007,6 +1007,7 @@ struct qla_tgt_cmd {
 	uint32_t unpacked_lun;
 	enum dma_data_direction dma_data_direction;
 	uint32_t reset_count;
+	int residual;				/* + = over, - = under */
 
 	uint16_t loop_id;	/* to save extra sess dereferences */
 	struct qla_tgt *tgt;	/* to save extra sess dereferences */

@@ -265,6 +265,15 @@ static void tcm_qla2xxx_complete_mcmd(struct work_struct *work)
 	transport_generic_free_cmd(&mcmd->se_cmd, 0);
 }
 
+static void tcm_qla2xxx_check_resid(struct se_cmd *se_cmd,
+    struct qla_tgt_cmd *cmd)
+{
+	if (se_cmd->se_cmd_flags & SCF_UNDERFLOW_BIT)
+		cmd->residual = -(se_cmd->residual_count);
+	else if (se_cmd->se_cmd_flags & SCF_OVERFLOW_BIT)
+		cmd->residual = se_cmd->residual_count;
+}
+
 /*
  * Called from qla_target_template->free_mcmd(), and will call
  * tcm_qla2xxx_release_cmd() via normal struct target_core_fabric_ops
@@ -701,6 +710,8 @@ static int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 	cmd->blk_sz  = se_cmd->se_dev->dev_attrib.block_size;
 	se_cmd->pi_err = 0;
 
+	tcm_qla2xxx_check_resid(se_cmd, cmd);
+
 	/*
 	 * Now queue completed DATA_IN the qla2xxx LLD and response ring
 	 */
@@ -739,6 +750,9 @@ static int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 
 		cmd->bufflen = 0;
 	}
+
+	tcm_qla2xxx_check_resid(se_cmd, cmd);
+
 	/*
 	 * Now queue status response to qla2xxx LLD code and response ring
 	 */

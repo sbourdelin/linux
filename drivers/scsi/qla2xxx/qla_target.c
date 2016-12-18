@@ -2123,16 +2123,16 @@ static int qlt_pre_xmit_response(struct qla_tgt_cmd *cmd,
 
 	*full_req_cnt = prm->req_cnt;
 
-	if (se_cmd->se_cmd_flags & SCF_UNDERFLOW_BIT) {
-		prm->residual = se_cmd->residual_count;
+	if (cmd->residual < 0) {
+		prm->residual = -(cmd->residual);
 		ql_dbg(ql_dbg_io + ql_dbg_verbose, vha, 0x305c,
 		    "Residual underflow: %d (tag %lld, op %x, bufflen %d, rq_result %x)\n",
 		       prm->residual, se_cmd->tag,
 		       se_cmd->t_task_cdb ? se_cmd->t_task_cdb[0] : 0,
 		       cmd->bufflen, prm->rq_result);
 		prm->rq_result |= SS_RESIDUAL_UNDER;
-	} else if (se_cmd->se_cmd_flags & SCF_OVERFLOW_BIT) {
-		prm->residual = se_cmd->residual_count;
+	} else if (cmd->residual > 0) {
+		prm->residual = cmd->residual;
 		ql_dbg(ql_dbg_io, vha, 0x305d,
 		    "Residual overflow: %d (tag %lld, op %x, bufflen %d, rq_result %x)\n",
 		       prm->residual, se_cmd->tag, se_cmd->t_task_cdb ?
