@@ -924,7 +924,8 @@ static struct qla_tgt_sess *qlt_create_sess(
 				}
 			}
 
-			kref_get(&sess->sess_kref);
+			ha->tgt.tgt_ops->get_sess(sess);
+
 			ha->tgt.tgt_ops->update_sess(sess, fcport->d_id, fcport->loop_id,
 						(fcport->flags & FCF_CONF_COMP_SUPPORTED));
 
@@ -999,7 +1000,7 @@ static struct qla_tgt_sess *qlt_create_sess(
 		 * Take an extra reference to ->sess_kref here to handle qla_tgt_sess
 		 * access across ->tgt.sess_lock reaquire.
 		 */
-		kref_get(&sess->sess_kref);
+		ha->tgt.tgt_ops->get_sess(sess);
 	}
 
 	return sess;
@@ -1043,7 +1044,7 @@ void qlt_fc_port_added(struct scsi_qla_host *vha, fc_port_t *fcport)
 		spin_unlock_irqrestore(&ha->tgt.sess_lock, flags);
 		return;
 	} else {
-		kref_get(&sess->sess_kref);
+		ha->tgt.tgt_ops->get_sess(sess);
 
 		if (sess->deleted) {
 			qlt_undelete_sess(sess);
@@ -3978,7 +3979,7 @@ static int qlt_handle_cmd_for_atio(struct scsi_qla_host *vha,
 	/*
 	 * Do kref_get() before returning + dropping qla_hw_data->hardware_lock.
 	 */
-	kref_get(&sess->sess_kref);
+	ha->tgt.tgt_ops->get_sess(sess);
 
 	cmd = qlt_get_tag(vha, sess, atio);
 	if (!cmd) {
@@ -5814,7 +5815,7 @@ static void qlt_abort_work(struct qla_tgt *tgt,
 			goto out_term2;
 		}
 
-		kref_get(&sess->sess_kref);
+		ha->tgt.tgt_ops->get_sess(sess);
 	}
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
@@ -5878,7 +5879,7 @@ static void qlt_tmr_work(struct qla_tgt *tgt,
 			goto out_term;
 		}
 
-		kref_get(&sess->sess_kref);
+		ha->tgt.tgt_ops->get_sess(sess);
 	}
 
 	iocb = a;

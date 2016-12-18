@@ -321,6 +321,14 @@ static int tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 	return target_put_sess_cmd(se_cmd);
 }
 
+static void tcm_qla2xxx_get_sess(struct qla_tgt_sess *sess)
+{
+	if (!sess)
+		return;
+
+	kref_get(&sess->sess_kref);
+}
+
 /* tcm_qla2xxx_release_cmd - Callback from TCM Core to release underlying
  * fabric descriptor @se_cmd command to release
  */
@@ -808,7 +816,8 @@ static void tcm_qla2xxx_clear_sess_lookup(struct tcm_qla2xxx_lport *,
  */
 static void tcm_qla2xxx_clear_nacl_from_fcport_map(struct qla_tgt_sess *sess)
 {
-	struct se_node_acl *se_nacl = sess->se_sess->se_node_acl;
+	struct se_node_acl *se_nacl =
+	    ((struct se_session *)sess->se_sess)->se_node_acl;
 	struct se_portal_group *se_tpg = se_nacl->se_tpg;
 	struct se_wwn *se_wwn = se_tpg->se_tpg_wwn;
 	struct tcm_qla2xxx_lport *lport = container_of(se_wwn,
@@ -1574,11 +1583,11 @@ static void tcm_qla2xxx_update_sess(struct qla_tgt_sess *sess, port_id_t s_id,
 	struct qla_hw_data *ha = tgt->ha;
 	scsi_qla_host_t *vha = pci_get_drvdata(ha->pdev);
 	struct tcm_qla2xxx_lport *lport = vha->vha_tgt.target_lport_ptr;
-	struct se_node_acl *se_nacl = sess->se_sess->se_node_acl;
+	struct se_node_acl *se_nacl =
+	    ((struct se_session *)sess->se_sess)->se_node_acl;
 	struct tcm_qla2xxx_nacl *nacl = container_of(se_nacl,
 			struct tcm_qla2xxx_nacl, se_node_acl);
 	u32 key;
-
 
 	if (sess->loop_id != loop_id || sess->s_id.b24 != s_id.b24)
 		pr_info("Updating session %p from port %8phC loop_id %d -> %d s_id %x:%x:%x -> %x:%x:%x\n",
@@ -1652,6 +1661,7 @@ static struct qla_tgt_func_tmpl tcm_qla2xxx_template = {
 	.free_mcmd		= tcm_qla2xxx_free_mcmd,
 	.free_session		= tcm_qla2xxx_free_session,
 	.update_sess		= tcm_qla2xxx_update_sess,
+	.get_sess		= tcm_qla2xxx_get_sess,
 	.check_initiator_node_acl = tcm_qla2xxx_check_initiator_node_acl,
 	.find_sess_by_s_id	= tcm_qla2xxx_find_sess_by_s_id,
 	.find_sess_by_loop_id	= tcm_qla2xxx_find_sess_by_loop_id,
