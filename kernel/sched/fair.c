@@ -2657,8 +2657,8 @@ static long calc_cfs_shares(struct cfs_rq *cfs_rq, struct task_group *tg)
 	if (tg_weight)
 		shares /= tg_weight;
 
-	if (shares < MIN_SHARES)
-		shares = MIN_SHARES;
+	if (shares < scale_load(MIN_SHARES))
+		shares = scale_load(MIN_SHARES);
 	if (shares > tg->shares)
 		shares = tg->shares;
 
