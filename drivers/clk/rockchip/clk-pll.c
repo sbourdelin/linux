@@ -29,6 +29,7 @@
 #define PLL_MODE_SLOW		0x0
 #define PLL_MODE_NORM		0x1
 #define PLL_MODE_DEEP		0x2
+#define PLL_RK3328_MODE_MASK	0x1
 
 struct rockchip_clk_pll {
 	struct clk_hw		hw;
@@ -865,13 +866,17 @@ struct clk *rockchip_clk_register_pll(struct rockchip_clk_provider *ctx,
 	pll_mux = &pll->pll_mux;
 	pll_mux->reg = ctx->reg_base + mode_offset;
 	pll_mux->shift = mode_shift;
-	pll_mux->mask = PLL_MODE_MASK;
+	if (pll_type == pll_rk3328)
+		pll_mux->mask = PLL_RK3328_MODE_MASK;
+	else
+		pll_mux->mask = PLL_MODE_MASK;
 	pll_mux->flags = 0;
 	pll_mux->lock = &ctx->lock;
 	pll_mux->hw.init = &init;
 
 	if (pll_type == pll_rk3036 ||
 	    pll_type == pll_rk3066 ||
+	    pll_type == pll_rk3328 ||
 	    pll_type == pll_rk3399)
 		pll_mux->flags |= CLK_MUX_HIWORD_MASK;
 
@@ -928,6 +933,12 @@ struct clk *rockchip_clk_register_pll(struct rockchip_clk_provider *ctx,
 			init.ops = &rockchip_rk3066_pll_clk_norate_ops;
 		else
 			init.ops = &rockchip_rk3066_pll_clk_ops;
+		break;
+	case pll_rk3328:
+		if (!pll->rate_table || IS_ERR(ctx->grf))
+			init.ops = &rockchip_rk3036_pll_clk_norate_ops;
+		else
+			init.ops = &rockchip_rk3036_pll_clk_ops;
 		break;
 	case pll_rk3399:
 		if (!pll->rate_table)
