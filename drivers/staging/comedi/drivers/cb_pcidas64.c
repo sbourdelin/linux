@@ -2475,20 +2475,17 @@ static int setup_channel_queue(struct comedi_device *dev,
 			/* load external queue */
 			for (i = 0; i < cmd->chanlist_len; i++) {
 				bits = 0;
+				unsigned int ch = cmd->chanlist[i];
 				/* set channel */
-				bits |= adc_chan_bits(CR_CHAN(cmd->
-							      chanlist[i]));
+				bits |= adc_chan_bits(CR_CHAN(ch));
 				/* set gain */
 				bits |= ai_range_bits_6xxx(dev,
-							   CR_RANGE(cmd->
-								    chanlist
-								    [i]));
+							   CR_RANGE(ch));
 				/* set single-ended / differential */
 				bits |= se_diff_bit_6xxx(dev,
-							 CR_AREF(cmd->
-								 chanlist[i]) ==
+							 CR_AREF(ch) ==
 							 AREF_DIFF);
-				if (CR_AREF(cmd->chanlist[i]) == AREF_COMMON)
+				if (CR_AREF(ch) == AREF_COMMON)
 					bits |= ADC_COMMON_BIT;
 				/* mark end of queue */
 				if (i == cmd->chanlist_len - 1)
