@@ -200,11 +200,16 @@ void __init detect_memory_region(phys_addr_t start, phys_addr_t sz_min, phys_add
 	add_memory_region(start, size, BOOT_MEM_RAM);
 }
 
+/*
+ * Print declared memory layout
+ */
 static void __init print_memory_map(void)
 {
 	int i;
 	const int field = 2 * sizeof(unsigned long);
 
+	/* Print the added memory map  */
+	pr_info("Determined physical RAM map:\n");
 	for (i = 0; i < boot_mem_map.nr_map; i++) {
 		printk(KERN_INFO " memory: %0*Lx @ %0*Lx ",
 		       field, (unsigned long long) boot_mem_map.map[i].size,
@@ -228,6 +233,9 @@ static void __init print_memory_map(void)
 			break;
 		}
 	}
+
+	/* Print memblocks if memblock_debug is set */
+	memblock_dump_all();
 }
 
 /*
@@ -795,10 +803,10 @@ static void __init arch_mem_init(char **cmdline_p)
 	/* Sanity check the specified memory */
 	sanity_check_meminfo();
 
-	pr_info("Determined physical RAM map:\n");
-	print_memory_map();
-
 	bootmem_init();
+
+	/* Print memory map initialized by arch-specific code and params */
+	print_memory_map();
 
 	device_tree_init();
 	sparse_init();
