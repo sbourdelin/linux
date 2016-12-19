@@ -2764,6 +2764,10 @@ struct cfg80211_nan_func {
  *	All other parameters must be ignored.
  *
  * @set_multicast_to_unicast: configure multicast to unicast conversion for BSS
+ *
+ * @set_link_loss_profile: Set link loss profile for specific connection.
+ * @get_link_loss_profile: Get the current link loss profile of specific
+ *	connection.
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -3048,6 +3052,15 @@ struct cfg80211_ops {
 	int	(*set_multicast_to_unicast)(struct wiphy *wiphy,
 					    struct net_device *dev,
 					    const bool enabled);
+
+	int	(*set_link_loss_profile)(struct wiphy *wiphy,
+					 struct wireless_dev *wdev,
+					 enum nl80211_link_loss_profile profile,
+					 const u8 *addr);
+	enum nl80211_link_loss_profile	(*get_link_loss_profile)(
+					 struct wiphy *wiphy,
+					 struct wireless_dev *wdev,
+					 const u8 *addr);
 };
 
 /*

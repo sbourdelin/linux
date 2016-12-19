@@ -1499,6 +1499,22 @@ static int wil_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 	return rc;
 }
 
+static int
+wil_cfg80211_set_link_loss_profile(struct wiphy *wiphy,
+				   struct wireless_dev *wdev,
+				   enum nl80211_link_loss_profile profile,
+				   const u8 *addr)
+{
+	return -ENOTSUPP;
+}
+
+static enum nl80211_link_loss_profile
+wil_cfg80211_get_link_loss_profile(struct wiphy *wiphy,
+				   struct wireless_dev *wdev, const u8 *addr)
+{
+	return -ENOTSUPP;
+}
+
 static struct cfg80211_ops wil_cfg80211_ops = {
 	.add_virtual_intf = wil_cfg80211_add_iface,
 	.del_virtual_intf = wil_cfg80211_del_iface,
@@ -1528,6 +1544,8 @@ static struct cfg80211_ops wil_cfg80211_ops = {
 	.start_p2p_device = wil_cfg80211_start_p2p_device,
 	.stop_p2p_device = wil_cfg80211_stop_p2p_device,
 	.set_power_mgmt = wil_cfg80211_set_power_mgmt,
+	.set_link_loss_profile = wil_cfg80211_set_link_loss_profile,
+	.get_link_loss_profile = wil_cfg80211_get_link_loss_profile,
 };
 
 static void wil_wiphy_init(struct wiphy *wiphy)

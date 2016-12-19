@@ -894,6 +894,11 @@
  *	does not result in a change for the current association. Currently,
  *	only the %NL80211_ATTR_IE data is used and updated with this command.
  *
+ * @NL80211_CMD_SET_LINK_LOSS_PROFILE: Set link loss profile (behavior) for
+ *	specific connection.
+ * @NL80211_CMD_GET_LINK_LOSS_PROFILE: Get current link loss profile of specific
+ *	connection.
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -1092,6 +1097,9 @@ enum nl80211_commands {
 	NL80211_CMD_SET_MULTICAST_TO_UNICAST,
 
 	NL80211_CMD_UPDATE_CONNECT_PARAMS,
+
+	NL80211_CMD_SET_LINK_LOSS_PROFILE,
+	NL80211_CMD_GET_LINK_LOSS_PROFILE,
 
 	/* add new commands above here */
 
@@ -1980,6 +1988,9 @@ enum nl80211_commands {
  * @NL80211_ATTR_BSSID: The BSSID of the AP. Note that %NL80211_ATTR_MAC is also
  *	used in various commands/events for specifying the BSSID.
  *
+ * @NL80211_ATTR_LINK_LOSS_PROFILE: attribute that indicate the link loss
+ *	behavior using &enum nl80211_link_loss_profile values.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2385,6 +2396,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED,
 
 	NL80211_ATTR_BSSID,
+
+	NL80211_ATTR_LINK_LOSS_PROFILE,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -5186,6 +5199,25 @@ enum nl80211_nan_match_attributes {
 	/* keep last */
 	NUM_NL80211_NAN_MATCH_ATTR,
 	NL80211_NAN_MATCH_ATTR_MAX = NUM_NL80211_NAN_MATCH_ATTR - 1
+};
+
+/**
+ * enum nl80211_link_loss_profile.
+ *
+ * Used by set_link_loss_profile() and get_link_loss_profile()
+ * to set/get link loss behavior.
+ *
+ * @NL80211_LINK_LOSS_PROFILE_RELAXED: prefer maintaining link
+ *	up even in poor link quality environment
+ * @NL80211_LINK_LOSS_PROFILE_DEFAULT: The default behavior for
+ *	maintaining link up vs link quality.
+ * @NL80211_LINK_LOSS_PROFILE_AGGRESSIVE: prefer losing link
+ *	up in poor link quality environment
+ */
+enum nl80211_link_loss_profile {
+	NL80211_LINK_LOSS_PROFILE_RELAXED,
+	NL80211_LINK_LOSS_PROFILE_DEFAULT,
+	NL80211_LINK_LOSS_PROFILE_AGGRESSIVE
 };
 
 #endif /* __LINUX_NL80211_H */

@@ -405,6 +405,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_FILS_NONCES] = { .len = 2 * FILS_NONCE_LEN },
 	[NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED] = { .type = NLA_FLAG, },
 	[NL80211_ATTR_BSSID] = { .len = ETH_ALEN },
+	[NL80211_ATTR_LINK_LOSS_PROFILE] = { .type = NLA_U8 },
 };
 
 /* policy for the key attributes */
@@ -11817,6 +11818,60 @@ static int nl80211_set_multicast_to_unicast(struct sk_buff *skb,
 	return rdev_set_multicast_to_unicast(rdev, dev, enabled);
 }
 
+static int nl80211_set_link_loss_profile(struct sk_buff *skb,
+					 struct genl_info *info)
+{
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct wireless_dev *wdev = info->user_ptr[1];
+	enum nl80211_link_loss_profile profile;
+	const u8 *addr;
+	int ret;
+
+	if (!info->attrs[NL80211_ATTR_LINK_LOSS_PROFILE] ||
+	    !info->attrs[NL80211_ATTR_MAC])
+		return -EINVAL;
+
+	profile = nla_get_u8(info->attrs[NL80211_ATTR_LINK_LOSS_PROFILE]);
+	addr = nla_data(info->attrs[NL80211_ATTR_MAC]);
+
+	if (profile != NL80211_LINK_LOSS_PROFILE_RELAXED &&
+	    profile != NL80211_LINK_LOSS_PROFILE_DEFAULT &&
+	    profile != NL80211_LINK_LOSS_PROFILE_AGGRESSIVE)
+		return -EINVAL;
+
+	if (!rdev->ops->set_link_loss_profile)
+		return -EOPNOTSUPP;
+
+	wdev_lock(wdev);
+	ret = rdev_set_link_loss_profile(rdev, wdev, profile, addr);
+	wdev_unlock(wdev);
+
+	return ret;
+}
+
+static int nl80211_get_link_loss_profile(struct sk_buff *skb,
+					 struct genl_info *info)
+{
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct wireless_dev *wdev = info->user_ptr[1];
+	const u8 *addr;
+	enum nl80211_link_loss_profile profile;
+
+	if (!info->attrs[NL80211_ATTR_MAC])
+		return -EINVAL;
+
+	addr = nla_data(info->attrs[NL80211_ATTR_MAC]);
+
+	if (!rdev->ops->get_link_loss_profile)
+		return -EOPNOTSUPP;
+
+	wdev_lock(wdev);
+	profile = rdev_get_link_loss_profile(rdev, wdev, addr);
+	wdev_unlock(wdev);
+
+	return profile;
+}
+
 #define NL80211_FLAG_NEED_WIPHY		0x01
 #define NL80211_FLAG_NEED_NETDEV	0x02
 #define NL80211_FLAG_NEED_RTNL		0x04
@@ -12690,6 +12745,21 @@ static const struct genl_ops nl80211_ops[] = {
 		.policy = nl80211_policy,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
+				  NL80211_FLAG_NEED_RTNL,
+	},
+	{
+	.cmd = NL80211_CMD_SET_LINK_LOSS_PROFILE,
+		.doit = nl80211_set_link_loss_profile,
+		.policy = nl80211_policy,
+		.flags = GENL_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
+				  NL80211_FLAG_NEED_RTNL,
+	},
+	{
+	.cmd = NL80211_CMD_GET_LINK_LOSS_PROFILE,
+		.doit = nl80211_get_link_loss_profile,
+		.policy = nl80211_policy,
+		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
 				  NL80211_FLAG_NEED_RTNL,
 	},
 };

@@ -1153,4 +1153,32 @@ rdev_set_coalesce(struct cfg80211_registered_device *rdev,
 	trace_rdev_return_int(&rdev->wiphy, ret);
 	return ret;
 }
+
+static inline int
+rdev_set_link_loss_profile(struct cfg80211_registered_device *rdev,
+			   struct wireless_dev *wdev,
+			   enum nl80211_link_loss_profile profile,
+			   const u8 *addr)
+{
+	int ret;
+
+	trace_rdev_set_link_loss_profile(&rdev->wiphy, wdev, profile, addr);
+	ret = rdev->ops->set_link_loss_profile(&rdev->wiphy, wdev, profile,
+					       addr);
+	trace_rdev_return_int(&rdev->wiphy, ret);
+	return ret;
+}
+
+static inline enum nl80211_link_loss_profile
+rdev_get_link_loss_profile(struct cfg80211_registered_device *rdev,
+			   struct wireless_dev *wdev,
+			   const u8 *addr)
+{
+	enum nl80211_link_loss_profile profile;
+
+	trace_rdev_get_link_loss_profile(&rdev->wiphy, wdev, addr);
+	profile = rdev->ops->get_link_loss_profile(&rdev->wiphy, wdev, addr);
+	trace_rdev_return_int(&rdev->wiphy, profile);
+	return profile;
+}
 #endif /* __CFG80211_RDEV_OPS */
