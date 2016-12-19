@@ -163,6 +163,7 @@ int open_related_ns(struct ns_common *ns,
 static long ns_ioctl(struct file *filp, unsigned int ioctl,
 			unsigned long arg)
 {
+	struct user_namespace *user_ns;
 	struct ns_common *ns = get_proc_ns(file_inode(filp));
 
 	switch (ioctl) {
@@ -174,6 +175,11 @@ static long ns_ioctl(struct file *filp, unsigned int ioctl,
 		return open_related_ns(ns, ns->ops->get_parent);
 	case NS_GET_NSTYPE:
 		return ns->ops->type;
+	case NS_GET_CREATOR_UID:
+		if (ns->ops->type != CLONE_NEWUSER)
+			return -EINVAL;
+		user_ns = container_of(ns, struct user_namespace, ns);
+		return from_kuid_munged(current_user_ns(), user_ns->owner);
 	default:
 		return -ENOTTY;
 	}
