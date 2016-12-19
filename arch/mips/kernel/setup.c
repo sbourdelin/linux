@@ -231,6 +231,51 @@ static void __init print_memory_map(void)
 }
 
 /*
+ * Parse passed cmdline
+ */
+#define USE_PROM_CMDLINE	IS_ENABLED(CONFIG_MIPS_CMDLINE_FROM_BOOTLOADER)
+#define USE_DTB_CMDLINE		IS_ENABLED(CONFIG_MIPS_CMDLINE_FROM_DTB)
+#define EXTEND_WITH_PROM	IS_ENABLED(CONFIG_MIPS_CMDLINE_EXTEND)
+#define BUILTIN_EXTEND_WITH_PROM	\
+	IS_ENABLED(CONFIG_MIPS_CMDLINE_BUILTIN_EXTEND)
+
+static void __init mips_parse_param(char **cmdline_p)
+{
+#if defined(CONFIG_CMDLINE_BOOL) && defined(CONFIG_CMDLINE_OVERRIDE)
+	strlcpy(boot_command_line, builtin_cmdline, COMMAND_LINE_SIZE);
+#else
+	if ((USE_PROM_CMDLINE && arcs_cmdline[0]) ||
+	    (USE_DTB_CMDLINE && !boot_command_line[0]))
+		strlcpy(boot_command_line, arcs_cmdline, COMMAND_LINE_SIZE);
+
+	if (EXTEND_WITH_PROM && arcs_cmdline[0]) {
+		if (boot_command_line[0])
+			strlcat(boot_command_line, " ", COMMAND_LINE_SIZE);
+		strlcat(boot_command_line, arcs_cmdline, COMMAND_LINE_SIZE);
+	}
+
+#if defined(CONFIG_CMDLINE_BOOL)
+	if (builtin_cmdline[0]) {
+		if (boot_command_line[0])
+			strlcat(boot_command_line, " ", COMMAND_LINE_SIZE);
+		strlcat(boot_command_line, builtin_cmdline, COMMAND_LINE_SIZE);
+	}
+
+	if (BUILTIN_EXTEND_WITH_PROM && arcs_cmdline[0]) {
+		if (boot_command_line[0])
+			strlcat(boot_command_line, " ", COMMAND_LINE_SIZE);
+		strlcat(boot_command_line, arcs_cmdline, COMMAND_LINE_SIZE);
+	}
+#endif
+#endif
+	strlcpy(command_line, boot_command_line, COMMAND_LINE_SIZE);
+
+	*cmdline_p = command_line;
+
+	parse_early_param();
+}
+
+/*
  * Parse "mem=size@start" parameter rewriting a defined memory map
  * We look for mem=size@start, where start and size are "value[KkMm]"
  */
@@ -790,12 +835,6 @@ static void __init arch_mem_addpart(phys_addr_t mem, phys_addr_t end, int type)
 	add_memory_region(mem, size, type);
 }
 
-#define USE_PROM_CMDLINE	IS_ENABLED(CONFIG_MIPS_CMDLINE_FROM_BOOTLOADER)
-#define USE_DTB_CMDLINE		IS_ENABLED(CONFIG_MIPS_CMDLINE_FROM_DTB)
-#define EXTEND_WITH_PROM	IS_ENABLED(CONFIG_MIPS_CMDLINE_DTB_EXTEND)
-#define BUILTIN_EXTEND_WITH_PROM	\
-	IS_ENABLED(CONFIG_MIPS_CMDLINE_BUILTIN_EXTEND)
-
 static void __init arch_mem_init(char **cmdline_p)
 {
 	struct memblock_region *reg;
@@ -803,6 +842,9 @@ static void __init arch_mem_init(char **cmdline_p)
 
 	/* call board setup routine */
 	plat_mem_setup();
+
+	/* Parse passed parameters */
+	mips_parse_param(cmdline_p);
 
 	/*
 	 * Make sure all kernel memory is in the maps.  The "UP" and
@@ -819,39 +861,6 @@ static void __init arch_mem_init(char **cmdline_p)
 
 	pr_info("Determined physical RAM map:\n");
 	print_memory_map();
-
-#if defined(CONFIG_CMDLINE_BOOL) && defined(CONFIG_CMDLINE_OVERRIDE)
-	strlcpy(boot_command_line, builtin_cmdline, COMMAND_LINE_SIZE);
-#else
-	if ((USE_PROM_CMDLINE && arcs_cmdline[0]) ||
-	    (USE_DTB_CMDLINE && !boot_command_line[0]))
-		strlcpy(boot_command_line, arcs_cmdline, COMMAND_LINE_SIZE);
-
-	if (EXTEND_WITH_PROM && arcs_cmdline[0]) {
-		if (boot_command_line[0])
-			strlcat(boot_command_line, " ", COMMAND_LINE_SIZE);
-		strlcat(boot_command_line, arcs_cmdline, COMMAND_LINE_SIZE);
-	}
-
-#if defined(CONFIG_CMDLINE_BOOL)
-	if (builtin_cmdline[0]) {
-		if (boot_command_line[0])
-			strlcat(boot_command_line, " ", COMMAND_LINE_SIZE);
-		strlcat(boot_command_line, builtin_cmdline, COMMAND_LINE_SIZE);
-	}
-
-	if (BUILTIN_EXTEND_WITH_PROM && arcs_cmdline[0]) {
-		if (boot_command_line[0])
-			strlcat(boot_command_line, " ", COMMAND_LINE_SIZE);
-		strlcat(boot_command_line, arcs_cmdline, COMMAND_LINE_SIZE);
-	}
-#endif
-#endif
-	strlcpy(command_line, boot_command_line, COMMAND_LINE_SIZE);
-
-	*cmdline_p = command_line;
-
-	parse_early_param();
 
 	bootmem_init();
 
