@@ -1114,44 +1114,65 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 #define MAX_MEMBLOCK_ADDR	((phys_addr_t)~0)
 #endif
 
-void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
+int __init sanity_check_dt_memory(phys_addr_t *out_base,
+				  phys_addr_t *out_size)
 {
+	phys_addr_t base = *out_base, size = *out_size;
 	const u64 phys_offset = MIN_MEMBLOCK_ADDR;
 
 	if (!PAGE_ALIGNED(base)) {
 		if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
-			pr_warn("Ignoring memory block 0x%llx - 0x%llx\n",
+			pr_err("Memblock 0x%llx - 0x%llx isn't page aligned\n",
 				base, base + size);
-			return;
+			return -EINVAL;
 		}
+		pr_warn("Memblock 0x%llx - 0x%llx shifted to ",
+			base, base + size);
 		size -= PAGE_SIZE - (base & ~PAGE_MASK);
 		base = PAGE_ALIGN(base);
+		pr_cont("0x%llx - 0x%llx\n", base, base + size);
 	}
 	size &= PAGE_MASK;
 
 	if (base > MAX_MEMBLOCK_ADDR) {
-		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
-				base, base + size);
-		return;
+		pr_err("Memblock 0x%llx - 0x%llx exceeds max address\n",
+			base, base + size);
+		return -EINVAL;
 	}
 
 	if (base + size - 1 > MAX_MEMBLOCK_ADDR) {
-		pr_warning("Ignoring memory range 0x%llx - 0x%llx\n",
-				((u64)MAX_MEMBLOCK_ADDR) + 1, base + size);
+		pr_warn("Memblock 0x%llx - 0x%llx truncated to ",
+			base, base + size);
 		size = MAX_MEMBLOCK_ADDR - base + 1;
+		pr_cont("0x%llx - 0x%llx\n", base, base + size);
 	}
 
 	if (base + size < phys_offset) {
-		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
-			   base, base + size);
-		return;
+		pr_err("Memblock 0x%llx - 0x%llx is below phys offset\n",
+			base, base + size);
+		return -EINVAL;
 	}
+
 	if (base < phys_offset) {
-		pr_warning("Ignoring memory range 0x%llx - 0x%llx\n",
-			   base, phys_offset);
+		pr_warn("Memblock 0x%llx - 0x%llx truncated to ",
+			base, base + size);
 		size -= phys_offset - base;
 		base = phys_offset;
+		pr_cont("0x%llx - 0x%llx\n", base, base + size);
 	}
+
+	/* Set the output base address and size */
+	*out_base = base;
+	*out_size = size;
+
+	return 0;
+}
+
+void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
+{
+	if (sanity_check_dt_memory(&base, &size))
+		return;
+
 	memblock_add(base, size);
 }
 

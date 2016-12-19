@@ -90,6 +90,7 @@ extern const void *of_flat_dt_match_machine(const void *default_match,
 		const void * (*get_next_compat)(const char * const**));
 
 /* Other Prototypes */
+extern int sanity_check_dt_memory(phys_addr_t *base, phys_addr_t *size);
 extern void unflatten_device_tree(void);
 extern void unflatten_and_copy_device_tree(void);
 extern void early_init_devtree(void *);
