@@ -22,6 +22,7 @@
 #include <linux/ptrace.h>
 #include <linux/mman.h>
 #include <linux/mm.h>
+#include <linux/memblock.h>
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
 #include <linux/swap.h>
@@ -257,28 +258,26 @@ void __init fixrange_init(unsigned long start, unsigned long end,
 #endif
 }
 
-unsigned __weak platform_maar_init(unsigned num_pairs)
+/*
+ * Platform-specific method of MAAR registers initialization
+ */
+unsigned int __weak platform_maar_init(unsigned int num_pairs)
 {
 	struct maar_config cfg[BOOT_MEM_MAP_MAX];
-	unsigned i, num_configured, num_cfg = 0;
+	struct memblock_region *reg;
+	unsigned int num_configured, num_cfg = 0;
 
-	for (i = 0; i < boot_mem_map.nr_map; i++) {
-		switch (boot_mem_map.map[i].type) {
-		case BOOT_MEM_RAM:
-		case BOOT_MEM_INIT_RAM:
+	/* Collect RAM regions within MAAR config array */
+	for_each_memblock(memory, reg) {
+		if (num_cfg >= BOOT_MEM_MAP_MAX) {
+			pr_info("Too many memory regions to init MAARs");
 			break;
-		default:
-			continue;
 		}
-
 		/* Round lower up */
-		cfg[num_cfg].lower = boot_mem_map.map[i].addr;
-		cfg[num_cfg].lower = (cfg[num_cfg].lower + 0xffff) & ~0xffff;
+		cfg[num_cfg].lower = (reg->base + 0xffff) & ~0xffff;
 
 		/* Round upper down */
-		cfg[num_cfg].upper = boot_mem_map.map[i].addr +
-					boot_mem_map.map[i].size;
-		cfg[num_cfg].upper = (cfg[num_cfg].upper & ~0xffff) - 1;
+		cfg[num_cfg].upper = ((reg->base + reg->size) & ~0xffff) - 1;
 
 		cfg[num_cfg].attrs = MIPS_MAAR_S;
 		num_cfg++;
