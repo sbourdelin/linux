@@ -228,11 +228,11 @@ notrace void arch_local_irq_restore(unsigned long en)
 	unsigned int replay;
 
 #ifdef CONFIG_IRQ_DEBUG_SUPPORT
-	WARN_ON(en & local_paca->soft_enabled & ~IRQ_DISABLE_MASK_LINUX);
+	WARN_ON(en & local_paca->soft_disabled_mask & ~IRQ_DISABLE_MASK_LINUX);
 #endif
 
 	/* Write the new soft-enabled value */
-	soft_enabled_set(en);
+	soft_disabled_mask_set(en);
 
 	/* any bits still disabled */
 	if (en)
@@ -280,7 +280,7 @@ notrace void arch_local_irq_restore(unsigned long en)
 	}
 #endif /* CONFIG_IRQ_DEBUG_SUPPORT */
 
-	soft_enabled_set(IRQ_DISABLE_MASK_LINUX);
+	soft_disabled_mask_set(IRQ_DISABLE_MASK_LINUX);
 
 	/*
 	 * Check if anything needs to be re-emitted. We haven't
@@ -290,7 +290,7 @@ notrace void arch_local_irq_restore(unsigned long en)
 	replay = __check_irq_replay();
 
 	/* We can soft-enable now */
-	soft_enabled_set(IRQ_DISABLE_MASK_NONE);
+	soft_disabled_mask_set(IRQ_DISABLE_MASK_NONE);
 
 	/*
 	 * And replay if we have to. This will return with interrupts
@@ -364,7 +364,7 @@ bool prep_irq_for_idle(void)
 	 * of entering the low power state.
 	 */
 	local_paca->irq_happened &= ~PACA_IRQ_HARD_DIS;
-	soft_enabled_set(IRQ_DISABLE_MASK_NONE);
+	soft_disabled_mask_set(IRQ_DISABLE_MASK_NONE);
 
 	/* Tell the caller to enter the low power state */
 	return true;
