@@ -47,6 +47,21 @@ extern void unknown_exception(struct pt_regs *regs);
 #ifdef CONFIG_PPC64
 #include <asm/paca.h>
 
+/*
+ *TODO:
+ * Currently none of the soft_eanbled modification helpers have clobbers
+ * for modifying the r13->soft_enabled memory itself. Secondly they only
+ * include "memory" clobber as a hint. Ideally, if all the accesses to
+ * soft_enabled go via these helpers, we could avoid the "memory" clobber.
+ * Former could be taken care by having location in the constraints.
+ */
+static inline notrace void soft_enabled_set(unsigned long enable)
+{
+	__asm__ __volatile__("stb %0,%1(13)"
+	: : "r" (enable), "i" (offsetof(struct paca_struct, soft_enabled))
+	: "memory");
+}
+
 static inline unsigned long arch_local_save_flags(void)
 {
 	unsigned long flags;
