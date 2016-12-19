@@ -65,3 +65,11 @@ Description:
 		bindings. The format is UUID format similar to
 		/sys/bus/vmbus/devices/. For example:
 		# echo f8615163-df3e-46c5-913f-f2d2f965ed0e > /sys/bus/pci/drivers/foo/unbind
+
+What:		/sys/bus/vmbus/devices/.../numa_node
+Date:		Dec 2016
+Contact:	Stephen Hemminger <sthemmin@microsoft.com>
+Description:
+		This file contains the NUMA node to which the VMBUS device is
+		attached, or -1 if the node is unknown. The value comes from
+		the primary channel CPU mapping.
