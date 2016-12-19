@@ -504,7 +504,11 @@ struct f2fs_inline_dentry {
 	__u8 filename[NR_INLINE_DENTRY][F2FS_SLOT_LEN];
 } __packed;
 
-/* file types used in inode_info->flags */
+/*
+ * file types used in inode_info->flags
+ *
+ * Values should match common file type values in file_type.h.
+ */
 enum {
 	F2FS_FT_UNKNOWN,
 	F2FS_FT_REG_FILE,
@@ -516,7 +520,5 @@ enum {
 	F2FS_FT_SYMLINK,
 	F2FS_FT_MAX
 };
-
-#define S_SHIFT 12
 
 #endif  /* _LINUX_F2FS_FS_H */
