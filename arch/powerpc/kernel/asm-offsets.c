@@ -242,6 +242,7 @@ int main(void)
 #endif /* CONFIG_PPC_STD_MMU_64 */
 	DEFINE(PACAEMERGSP, offsetof(struct paca_struct, emergency_sp));
 #ifdef CONFIG_PPC_BOOK3S_64
+	DEFINE(PACANMIEMERGSP, offsetof(struct paca_struct, nmi_emergency_sp));
 	DEFINE(PACAMCEMERGSP, offsetof(struct paca_struct, mc_emergency_sp));
 	DEFINE(PACA_IN_MCE, offsetof(struct paca_struct, in_mce));
 	DEFINE(PACA_IN_NMI, offsetof(struct paca_struct, in_nmi));
