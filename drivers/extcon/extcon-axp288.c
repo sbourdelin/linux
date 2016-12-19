@@ -167,8 +167,10 @@ static int axp288_handle_chrg_det_event(struct axp288_extcon_info *info)
 	}
 
 	vbus_attach = (pwr_stat & PS_STAT_VBUS_PRESENT);
-	if (!vbus_attach)
+	if (!vbus_attach) {
+		dev_info(info->dev, "vbus/cable disconnected\n");
 		goto no_vbus;
+	}
 
 	/* Check charger detection completion status */
 	ret = regmap_read(info->regmap, AXP288_BC_GLOBAL_REG, &cfg);
@@ -187,15 +189,15 @@ static int axp288_handle_chrg_det_event(struct axp288_extcon_info *info)
 
 	switch (chrg_type) {
 	case DET_STAT_SDP:
-		dev_dbg(info->dev, "sdp cable is connected\n");
+		dev_info(info->dev, "sdp cable is connected\n");
 		cable = EXTCON_CHG_USB_SDP;
 		break;
 	case DET_STAT_CDP:
-		dev_dbg(info->dev, "cdp cable is connected\n");
+		dev_info(info->dev, "cdp cable is connected\n");
 		cable = EXTCON_CHG_USB_CDP;
 		break;
 	case DET_STAT_DCP:
-		dev_dbg(info->dev, "dcp cable is connected\n");
+		dev_info(info->dev, "dcp cable is connected\n");
 		cable = EXTCON_CHG_USB_DCP;
 		break;
 	default:
