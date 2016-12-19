@@ -516,14 +516,25 @@ static int xmon_core(struct pt_regs *regs, int fromipi)
 		xmon_owner = cpu;
 		mb();
 		if (ncpus > 1) {
+			/*
+			 * system resets can be triggered on all CPUs, so
+			 * wait for others to come in and avoid the IPI. This
+			 * is similar to crash_kexec_secondary()
+			 */
+			for (timeout = 100000000; timeout != 0; --timeout) {
+				if (cpumask_weight(&cpus_in_xmon) >= ncpus)
+					goto got_cpus;
+				barrier();
+			}
 			smp_send_debugger_break();
 			/* wait for other cpus to come in */
 			for (timeout = 100000000; timeout != 0; --timeout) {
 				if (cpumask_weight(&cpus_in_xmon) >= ncpus)
-					break;
+					goto got_cpus;
 				barrier();
 			}
 		}
+got_cpus:
 		remove_bpts();
 		disable_surveillance();
 		/* for breakpoint or single step, print the current instr. */
