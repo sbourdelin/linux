@@ -228,7 +228,7 @@ static void dwc2_hsotg_init_fifo(struct dwc2_hsotg *hsotg)
 	 * them to endpoints dynamically according to maxpacket size value of
 	 * given endpoint.
 	 */
-	for (ep = 1; ep < MAX_EPS_CHANNELS; ep++) {
+	for (ep = 1; ep < hsotg->num_of_eps; ep++) {
 		if (!txfsz[ep])
 			continue;
 		val = addr;
