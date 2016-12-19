@@ -118,8 +118,8 @@ EXC_REAL_BEGIN(system_reset, 0x100, 0x200)
 	SET_SCRATCH0(r13)
 	GET_PACA(r13)
 	clrrdi	r13,r13,1 /* Last bit of HSPRG0 is set if waking from winkle */
-	EXCEPTION_PROLOG_PSERIES_PACA(PACA_EXGEN, system_reset_common, EXC_STD,
-				 IDLETEST, 0x100)
+	EXCEPTION_PROLOG_PSERIES_PACA(PACA_EXNMI, system_reset_common,
+						EXC_STD, IDLETEST, 0x100)
 
 EXC_REAL_END(system_reset, 0x100, 0x200)
 EXC_VIRT_NONE(0x4100, 0x4200)
@@ -153,7 +153,10 @@ END_FTR_SECTION_IFCLR(CPU_FTR_ARCH_300)
 2:	b	pnv_wakeup_noloss
 #endif
 
-EXC_COMMON(system_reset_common, 0x100, system_reset_exception)
+EXC_COMMON_BEGIN(system_reset_common)
+	EXCEPTION_COMMON(PACA_EXNMI, 0x100,
+			system_reset, system_reset_exception,
+			ret_from_except, ADD_NVGPRS;ADD_RECONCILE)
 
 #ifdef CONFIG_PPC_PSERIES
 /*
@@ -161,7 +164,7 @@ EXC_COMMON(system_reset_common, 0x100, system_reset_exception)
  */
 TRAMP_REAL_BEGIN(system_reset_fwnmi)
 	SET_SCRATCH0(r13)		/* save r13 */
-	EXCEPTION_PROLOG_PSERIES(PACA_EXGEN, system_reset_common, EXC_STD,
+	EXCEPTION_PROLOG_PSERIES(PACA_EXNMI, system_reset_common, EXC_STD,
 				 NOTEST, 0x100)
 #endif /* CONFIG_PPC_PSERIES */
 
