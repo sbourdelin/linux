@@ -163,6 +163,15 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
 {
 	struct siginfo si;
 
+	tsk->thread.address = addr;
+	tsk->thread.error_code = fsr;
+	tsk->thread.trap_no = 14;
+	si.si_signo = sig;
+	si.si_errno = 0;
+	si.si_code = code;
+	si.si_addr = (void __user *)addr;
+	force_sig_info(sig, &si, tsk);
+
 #ifdef CONFIG_DEBUG_USER
 	if (((user_debug & UDBG_SEGV) && (sig == SIGSEGV)) ||
 	    ((user_debug & UDBG_BUS)  && (sig == SIGBUS))) {
@@ -172,15 +181,6 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
 		show_regs(regs);
 	}
 #endif
-
-	tsk->thread.address = addr;
-	tsk->thread.error_code = fsr;
-	tsk->thread.trap_no = 14;
-	si.si_signo = sig;
-	si.si_errno = 0;
-	si.si_code = code;
-	si.si_addr = (void __user *)addr;
-	force_sig_info(sig, &si, tsk);
 }
 
 void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
