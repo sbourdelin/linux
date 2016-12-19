@@ -1409,7 +1409,9 @@ svcauth_gss_accept(struct svc_rqst *rqstp, __be32 *authp)
 	u32		crlen;
 	struct gss_svc_data *svcdata = rqstp->rq_auth_data;
 	struct rpc_gss_wire_cred *gc;
-	struct rsc	*rsci = NULL;
+	struct rsc	*rsci = NULL, new = {
+		.mechctx = 0,
+	};
 	__be32		*rpcstart;
 	__be32		*reject_stat = resv->iov_base + resv->iov_len;
 	int		ret;
@@ -1489,10 +1491,20 @@ svcauth_gss_accept(struct svc_rqst *rqstp, __be32 *authp)
 	case RPC_GSS_PROC_DESTROY:
 		if (gss_write_verf(rqstp, rsci->mechctx, gc->gc_seq))
 			goto auth_err;
-		rsci->h.expiry_time = get_seconds();
-		set_bit(CACHE_NEGATIVE, &rsci->h.flags);
+
+		/** Invalidate the cache entry so sunrpc_update_cache
+		 * direclty updates rsci. new->h.expiry_time is zero,
+		 * so rsci->h.expiry_time will be set to zero and 
+		 * cache_clean will properly remove rsci.
+		 */
+		clear_bit(CACHE_VALID, &rsci->h.flags);
+		rsci = rsc_update(sn->rsc_cache, &new, rsci);
+		if (!rsci)
+			goto drop;
+
 		if (resv->iov_len + 4 > PAGE_SIZE)
 			goto drop;
+
 		svc_putnl(resv, RPC_SUCCESS);
 		goto complete;
 	case RPC_GSS_PROC_DATA:
