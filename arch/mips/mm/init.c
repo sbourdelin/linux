@@ -7,6 +7,7 @@
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
  * Kevin D. Kissell, kevink@mips.com and Carsten Langgaard, carstenl@mips.com
  * Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
+ * Copyright (C) 2016 T-Platforms. All Rights Reserved.
  */
 #include <linux/bug.h>
 #include <linux/init.h>
@@ -474,22 +475,36 @@ static inline void mem_init_free_highmem(void)
 #endif
 }
 
+/*
+ * Let buddy allocator run
+ */
 void __init mem_init(void)
 {
+	/* Setup maximum number of pages of memory map array */
 #ifdef CONFIG_HIGHMEM
 #ifdef CONFIG_DISCONTIGMEM
 #error "CONFIG_HIGHMEM and CONFIG_DISCONTIGMEM dont work together yet"
 #endif
-	max_mapnr = highend_pfn ? highend_pfn : max_low_pfn;
+	set_max_mapnr(highend_pfn);
 #else
-	max_mapnr = max_low_pfn;
+	set_max_mapnr(max_low_pfn);
 #endif
-	high_memory = (void *) __va(max_low_pfn << PAGE_SHIFT);
+	/* Highmem starts right after lowmem */
+	high_memory = __va(PFN_PHYS(max_low_pfn));
 
+	/* Initialize speculative access registers - MAAR */
 	maar_init();
+
+	/* Free low memory registered within memblock allocator */
 	free_all_bootmem();
-	setup_zero_pages();	/* Setup zeroed pages.  */
+
+	/* Allocate zeroed pages */
+	setup_zero_pages();
+
+	/* Free highmemory registered in memblocks */
 	mem_init_free_highmem();
+
+	/* Print out memory areas statistics */
 	mem_init_print_info(NULL);
 
 #ifdef CONFIG_64BIT
