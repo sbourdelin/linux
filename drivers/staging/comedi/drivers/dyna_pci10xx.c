@@ -122,6 +122,7 @@ static int dyna_pci10xx_insn_write_ao(struct comedi_device *dev,
 
 	mutex_lock(&devpriv->mutex);
 	for (n = 0; n < insn->n; n++) {
+		/*multi-processor memory barrier*/
 		smp_mb();
 		/* trigger conversion and write data */
 		outw_p(data[n], dev->iobase);
@@ -141,6 +142,7 @@ static int dyna_pci10xx_di_insn_bits(struct comedi_device *dev,
 	u16 d = 0;
 
 	mutex_lock(&devpriv->mutex);
+	/*multi-processor memory barrier*/
 	smp_mb();
 	d = inw_p(devpriv->BADR3);
 	udelay(10);
@@ -161,6 +163,7 @@ static int dyna_pci10xx_do_insn_bits(struct comedi_device *dev,
 
 	mutex_lock(&devpriv->mutex);
 	if (comedi_dio_update_state(s, data)) {
+		/*multi-processor memory barrier*/
 		smp_mb();
 		outw_p(s->state, devpriv->BADR3);
 		udelay(10);
