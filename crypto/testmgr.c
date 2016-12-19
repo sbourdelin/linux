@@ -1464,7 +1464,7 @@ static int test_acomp(struct crypto_acomp *tfm, struct comp_testvec *ctemplate,
 
 		memset(output, 0, dlen);
 		init_completion(&result.completion);
-		sg_init_one(&src, ctemplate[i].input, ilen);
+		sg_init_one(&src, __va(__pa_symbol(ctemplate[i].input)), ilen);
 		sg_init_one(&dst, output, dlen);
 
 		req = acomp_request_alloc(tfm);
@@ -1513,7 +1513,7 @@ static int test_acomp(struct crypto_acomp *tfm, struct comp_testvec *ctemplate,
 
 		memset(output, 0, dlen);
 		init_completion(&result.completion);
-		sg_init_one(&src, dtemplate[i].input, ilen);
+		sg_init_one(&src, __va(__pa_symbol(dtemplate[i].input)), ilen);
 		sg_init_one(&dst, output, dlen);
 
 		req = acomp_request_alloc(tfm);
