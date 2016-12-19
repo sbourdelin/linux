@@ -390,7 +390,7 @@ static inline int hb_waiters_pending(struct futex_hash_bucket *hb)
  */
 static struct futex_hash_bucket *hash_futex(union futex_key *key)
 {
-	u32 hash = jhash2((u32*)&key->both.word,
+	u32 hash = jhash2((u32 *)&key->both.word,
 			  (sizeof(key->both.word)+sizeof(key->both.ptr))/4,
 			  key->both.offset);
 	return &futex_queues[hash & (futex_hashsize - 1)];
@@ -545,10 +545,10 @@ again:
 		err = get_user_pages_fast(address, 1, 0, &page);
 		ro = 1;
 	}
-	if (err < 0)
+	if (err < 0) {
 		return err;
-	else
 		err = 0;
+	}
 
 	/*
 	 * The treatment of mapping from this point on is critical. The page
@@ -800,7 +800,7 @@ static int refill_pi_state_cache(void)
 	return 0;
 }
 
-static struct futex_pi_state * alloc_pi_state(void)
+static struct futex_pi_state *alloc_pi_state(void)
 {
 	struct futex_pi_state *pi_state = current->pi_state_cache;
 
@@ -854,7 +854,7 @@ static void put_pi_state(struct futex_pi_state *pi_state)
  * Look up the task based on what TID userspace gave us.
  * We dont trust it.
  */
-static struct task_struct * futex_find_get_task(pid_t pid)
+static struct task_struct *futex_find_get_task(pid_t pid)
 {
 	struct task_struct *p;
 
@@ -3323,4 +3323,4 @@ static int __init futex_init(void)
 
 	return 0;
 }
-__initcall(futex_init);
+device_initcall(futex_init);
