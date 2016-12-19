@@ -198,6 +198,11 @@ int fscrypt_has_permitted_context(struct inode *parent, struct inode *child)
 	if (!cops->is_encrypted(parent))
 		return 1;
 
+	/* No restrictions on file types which are never encrypted */
+	if (!S_ISREG(child->i_mode) && !S_ISDIR(child->i_mode) &&
+	    !S_ISLNK(child->i_mode))
+		return 1;
+
 	/* Encrypted directories must not contain unencrypted files */
 	if (!cops->is_encrypted(child))
 		return 0;
