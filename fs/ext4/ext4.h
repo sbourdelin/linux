@@ -1932,17 +1932,18 @@ struct ext4_dir_entry_tail {
 /*
  * Ext4 directory file types.  Only the low 3 bits are used.  The
  * other bits are reserved for now.
+ * Values are taken from common file type implementation.
  */
-#define EXT4_FT_UNKNOWN		0
-#define EXT4_FT_REG_FILE	1
-#define EXT4_FT_DIR		2
-#define EXT4_FT_CHRDEV		3
-#define EXT4_FT_BLKDEV		4
-#define EXT4_FT_FIFO		5
-#define EXT4_FT_SOCK		6
-#define EXT4_FT_SYMLINK		7
+#define EXT4_FT_UNKNOWN		FT_UNKNOWN
+#define EXT4_FT_REG_FILE	FT_REG_FILE
+#define EXT4_FT_DIR		FT_DIR
+#define EXT4_FT_CHRDEV		FT_CHRDEV
+#define EXT4_FT_BLKDEV		FT_BLKDEV
+#define EXT4_FT_FIFO		FT_FIFO
+#define EXT4_FT_SOCK		FT_SOCK
+#define EXT4_FT_SYMLINK		FT_SYMLINK
 
-#define EXT4_FT_MAX		8
+#define EXT4_FT_MAX		FT_MAX
 
 #define EXT4_FT_DIR_CSUM	0xDE
 
@@ -2373,16 +2374,13 @@ static inline void ext4_update_dx_flag(struct inode *inode)
 	if (!ext4_has_feature_dir_index(inode->i_sb))
 		ext4_clear_inode_flag(inode, EXT4_INODE_INDEX);
 }
-static unsigned char ext4_filetype_table[] = {
-	DT_UNKNOWN, DT_REG, DT_DIR, DT_CHR, DT_BLK, DT_FIFO, DT_SOCK, DT_LNK
-};
 
 static inline  unsigned char get_dtype(struct super_block *sb, int filetype)
 {
-	if (!ext4_has_feature_filetype(sb) || filetype >= EXT4_FT_MAX)
+	if (!ext4_has_feature_filetype(sb))
 		return DT_UNKNOWN;
 
-	return ext4_filetype_table[filetype];
+	return fs_dtype(filetype);
 }
 extern int ext4_check_all_de(struct inode *dir, struct buffer_head *bh,
 			     void *buf, int buf_size);
@@ -3057,22 +3055,12 @@ extern void initialize_dirent_tail(struct ext4_dir_entry_tail *t,
 extern int ext4_handle_dirty_dirent_node(handle_t *handle,
 					 struct inode *inode,
 					 struct buffer_head *bh);
-#define S_SHIFT 12
-static unsigned char ext4_type_by_mode[S_IFMT >> S_SHIFT] = {
-	[S_IFREG >> S_SHIFT]	= EXT4_FT_REG_FILE,
-	[S_IFDIR >> S_SHIFT]	= EXT4_FT_DIR,
-	[S_IFCHR >> S_SHIFT]	= EXT4_FT_CHRDEV,
-	[S_IFBLK >> S_SHIFT]	= EXT4_FT_BLKDEV,
-	[S_IFIFO >> S_SHIFT]	= EXT4_FT_FIFO,
-	[S_IFSOCK >> S_SHIFT]	= EXT4_FT_SOCK,
-	[S_IFLNK >> S_SHIFT]	= EXT4_FT_SYMLINK,
-};
 
 static inline void ext4_set_de_type(struct super_block *sb,
 				struct ext4_dir_entry_2 *de,
 				umode_t mode) {
 	if (ext4_has_feature_filetype(sb))
-		de->file_type = ext4_type_by_mode[(mode & S_IFMT)>>S_SHIFT];
+		de->file_type = fs_umode_to_ftype(mode);
 }
 
 /* readpages.c */
