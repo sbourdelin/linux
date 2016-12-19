@@ -464,6 +464,12 @@ void maar_init(void)
 
 void __init paging_init(void)
 {
+	/*
+	 * Test low memory registered within memblock. The method shall test
+	 * valid and free memory only
+	 */
+	early_memtest(PFN_PHYS(min_low_pfn), PFN_PHYS(max_low_pfn));
+
 	/* Initialize page tables */
 	pagetable_init();
 
