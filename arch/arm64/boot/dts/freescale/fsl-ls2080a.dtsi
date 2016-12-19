@@ -704,6 +704,7 @@
 			dr_mode = "host";
 			snps,quirk-frame-length-adjustment = <0x20>;
 			snps,dis_rxdet_inp3_quirk;
+			snps,incr-burst-type-adjustment = <0x1>, <16>;
 		};
 
 		usb1: usb3@3110000 {
@@ -714,6 +715,7 @@
 			dr_mode = "host";
 			snps,quirk-frame-length-adjustment = <0x20>;
 			snps,dis_rxdet_inp3_quirk;
+			snps,incr-burst-type-adjustment = <0x1>, <16>;
 		};
 
 		ccn@4000000 {

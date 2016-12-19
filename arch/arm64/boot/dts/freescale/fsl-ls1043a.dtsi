@@ -482,6 +482,7 @@
 			dr_mode = "host";
 			snps,quirk-frame-length-adjustment = <0x20>;
 			snps,dis_rxdet_inp3_quirk;
+			snps,incr-burst-type-adjustment = <0x1>, <16>;
 		};
 
 		usb1: usb3@3000000 {
@@ -491,6 +492,7 @@
 			dr_mode = "host";
 			snps,quirk-frame-length-adjustment = <0x20>;
 			snps,dis_rxdet_inp3_quirk;
+			snps,incr-burst-type-adjustment = <0x1>, <16>;
 		};
 
 		usb2: usb3@3100000 {
@@ -500,6 +502,7 @@
 			dr_mode = "host";
 			snps,quirk-frame-length-adjustment = <0x20>;
 			snps,dis_rxdet_inp3_quirk;
+			snps,incr-burst-type-adjustment = <0x1>, <16>;
 		};
 
 		sata: sata@3200000 {
