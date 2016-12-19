@@ -2489,7 +2489,7 @@ static int pcm_chmap_ctl_get(struct snd_kcontrol *kcontrol,
 	struct snd_pcm_chmap *info = snd_kcontrol_chip(kcontrol);
 	unsigned int idx = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id);
 	struct snd_pcm_substream *substream;
-	const struct snd_pcm_chmap_elem *map;
+	struct snd_pcm_chmap_elem *map;
 
 	if (snd_BUG_ON(!info->chmap))
 		return -EINVAL;
@@ -2519,7 +2519,7 @@ static int pcm_chmap_ctl_tlv(struct snd_kcontrol *kcontrol, int op_flag,
 			     unsigned int size, unsigned int __user *tlv)
 {
 	struct snd_pcm_chmap *info = snd_kcontrol_chip(kcontrol);
-	const struct snd_pcm_chmap_elem *map;
+	struct snd_pcm_chmap_elem *map;
 	unsigned int __user *dst;
 	int c, count = 0;
 
@@ -2578,7 +2578,7 @@ static void pcm_chmap_ctl_private_free(struct snd_kcontrol *kcontrol)
  * Return: Zero if successful, or a negative error value.
  */
 int snd_pcm_add_chmap_ctls(struct snd_pcm *pcm, int stream,
-			   const struct snd_pcm_chmap_elem *chmap,
+			   struct snd_pcm_chmap_elem *chmap,
 			   int max_channels,
 			   unsigned long private_value,
 			   struct snd_pcm_chmap **info_ret)
