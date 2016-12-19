@@ -166,7 +166,7 @@ static int axp288_handle_chrg_det_event(struct axp288_extcon_info *info)
 		return ret;
 	}
 
-	vbus_attach = (pwr_stat & PS_STAT_VBUS_PRESENT);
+	vbus_attach = (pwr_stat & PS_STAT_VBUS_VALID);
 	if (!vbus_attach) {
 		dev_info(info->dev, "vbus/cable disconnected\n");
 		goto no_vbus;
