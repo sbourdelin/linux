@@ -41,3 +41,27 @@ KernelVersion:	4.5
 Contact:	K. Y. Srinivasan <kys@microsoft.com>
 Description:	The 16 bit vendor ID of the device
 Users:		tools/hv/lsvmbus and user level RDMA libraries
+
+What:		/sys/bus/vmbus/drivers/.../bind
+Date:		Nov. 2015
+KernelVersion:	4.9
+Contact:	Stephen Hemminger <sthemmin@microsoft.com>
+Description:
+		Writing a device location to this file will cause
+		the driver to attempt to bind to the device found at
+		this location.	This is useful for overriding default
+		bindings.  The format is UUID format similar to
+		/sys/bus/vmbus/devices/. For example:
+		# echo f8615163-df3e-46c5-913f-f2d2f965ed0e > /sys/bus/pci/drivers/foo/bind
+
+What:		/sys/bus/vmbus/drivers/.../unbind
+Date:		Nov. 2015
+KernelVersion:	4.9
+Contact:	Stephen Hemminger <sthemmin@microsoft.com>
+Description:
+		Writing a device location to this file will cause the
+		driver to attempt to unbind from the device found at
+		this location.	This may be useful when overriding default
+		bindings. The format is UUID format similar to
+		/sys/bus/vmbus/devices/. For example:
+		# echo f8615163-df3e-46c5-913f-f2d2f965ed0e > /sys/bus/pci/drivers/foo/unbind
