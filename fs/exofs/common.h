@@ -204,18 +204,6 @@ struct exofs_dir_entry {
 	char		name[EXOFS_NAME_LEN];	/* file name              */
 };
 
-enum {
-	EXOFS_FT_UNKNOWN,
-	EXOFS_FT_REG_FILE,
-	EXOFS_FT_DIR,
-	EXOFS_FT_CHRDEV,
-	EXOFS_FT_BLKDEV,
-	EXOFS_FT_FIFO,
-	EXOFS_FT_SOCK,
-	EXOFS_FT_SYMLINK,
-	EXOFS_FT_MAX
-};
-
 #define EXOFS_DIR_PAD			4
 #define EXOFS_DIR_ROUND			(EXOFS_DIR_PAD - 1)
 #define EXOFS_DIR_REC_LEN(name_len) \
