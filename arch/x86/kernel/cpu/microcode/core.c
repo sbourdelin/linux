@@ -217,8 +217,11 @@ struct cpio_data find_microcode_in_initrd(const char *path, bool use_pa)
 	 * Set start only if we have an initrd image. We cannot use initrd_start
 	 * because it is not set that early yet.
 	 */
-	if (size)
+	if (size) {
 		start = params->hdr.ramdisk_image;
+		if (!use_pa)
+			start += PAGE_OFFSET;
+	}
 
 # else /* CONFIG_X86_64 */
 	size  = (unsigned long)boot_params.ext_ramdisk_size << 32;
