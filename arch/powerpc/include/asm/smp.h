@@ -42,6 +42,7 @@ struct smp_ops_t {
 #ifdef CONFIG_PPC_SMP_MUXED_IPI
 	void  (*cause_ipi)(int cpu, unsigned long data);
 #endif
+	int   (*cause_nmi_ipi)(int cpu);
 	void  (*probe)(void);
 	int   (*kick_cpu)(int nr);
 	void  (*setup_cpu)(int nr);
