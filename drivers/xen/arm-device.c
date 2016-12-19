@@ -87,6 +87,9 @@ static int xen_map_device_mmio(const struct resource *resources,
 			idxs[j] = XEN_PFN_DOWN(r->start) + j;
 		}
 
+		/* Ensure reserved fields are set to zero */
+		memset(&xatp, 0, sizeof(xatp));
+
 		xatp.domid = DOMID_SELF;
 		xatp.size = nr;
 		xatp.space = XENMAPSPACE_dev_mmio;
