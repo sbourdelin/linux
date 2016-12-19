@@ -416,32 +416,6 @@ void maar_init(void)
 }
 
 #ifndef CONFIG_NEED_MULTIPLE_NODES
-int page_is_ram(unsigned long pagenr)
-{
-	int i;
-
-	for (i = 0; i < boot_mem_map.nr_map; i++) {
-		unsigned long addr, end;
-
-		switch (boot_mem_map.map[i].type) {
-		case BOOT_MEM_RAM:
-		case BOOT_MEM_INIT_RAM:
-			break;
-		default:
-			/* not usable memory */
-			continue;
-		}
-
-		addr = PFN_UP(boot_mem_map.map[i].addr);
-		end = PFN_DOWN(boot_mem_map.map[i].addr +
-			       boot_mem_map.map[i].size);
-
-		if (pagenr >= addr && pagenr < end)
-			return 1;
-	}
-
-	return 0;
-}
 
 void __init paging_init(void)
 {
@@ -470,18 +444,32 @@ static struct kcore_list kcore_kseg0;
 static inline void mem_init_free_highmem(void)
 {
 #ifdef CONFIG_HIGHMEM
-	unsigned long tmp;
+	struct memblock_region *reg;
+	unsigned long pfn;
 
 	if (cpu_has_dc_aliases)
 		return;
 
-	for (tmp = highstart_pfn; tmp < highend_pfn; tmp++) {
-		struct page *page = pfn_to_page(tmp);
+	/* Walk through all memory regions freeing highmem pages only */
+	for_each_memblock(memory, reg) {
+		unsigned long start = memblock_region_memory_base_pfn(reg);
+		unsigned long end = memblock_region_memory_end_pfn(reg);
 
-		if (!page_is_ram(tmp))
-			SetPageReserved(page);
-		else
-			free_highmem_page(page);
+		/* Ignore complete lowmem entries */
+		if (end <= max_low_pfn)
+			continue;
+
+		/* Truncate partial highmem entries */
+		if (start < max_low_pfn)
+			start = max_low_pfn;
+
+		/*
+		 * MIPS memblock allocator doesn't allocate regions from high
+		 * memory (see mips_lowmem_limit variable initialization), so
+		 * just set corresponding pages free
+		 */
+		for (pfn = start; pfn < end; pfn++)
+			free_highmem_page(pfn_to_page(pfn));
 	}
 #endif
 }
