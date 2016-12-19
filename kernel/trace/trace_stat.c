@@ -91,7 +91,7 @@ static int insert_stat(struct rb_root *root, void *stat, cmp_stat_t cmp)
 		struct stat_node *this;
 		int result;
 
-		this = container_of(*new, struct stat_node, node);
+		this = rb_entry(*new, struct stat_node, node);
 		result = cmp(data->stat, this->stat);
 
 		parent = *new;
@@ -215,7 +215,7 @@ static void stat_seq_stop(struct seq_file *s, void *p)
 static int stat_seq_show(struct seq_file *s, void *v)
 {
 	struct stat_session *session = s->private;
-	struct stat_node *l = container_of(v, struct stat_node, node);
+	struct stat_node *l = rb_entry(v, struct stat_node, node);
 
 	if (v == SEQ_START_TOKEN)
 		return session->ts->stat_headers(s);
