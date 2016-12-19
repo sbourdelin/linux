@@ -58,7 +58,7 @@ struct ovl_dir_file {
 
 static struct ovl_cache_entry *ovl_cache_entry_from_node(struct rb_node *n)
 {
-	return container_of(n, struct ovl_cache_entry, node);
+	return rb_entry(n, struct ovl_cache_entry, node);
 }
 
 static struct ovl_cache_entry *ovl_cache_entry_find(struct rb_root *root,
