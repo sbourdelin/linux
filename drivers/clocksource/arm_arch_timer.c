@@ -521,6 +521,8 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
 
 static void arch_timer_banner(unsigned type)
 {
+	unsigned long cnt = arch_timer_read_counter();
+
 	pr_info("Architected %s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
 		     type & ARCH_CP15_TIMER ? "cp15" : "",
 		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
@@ -534,6 +536,8 @@ static void arch_timer_banner(unsigned type)
 		     type & ARCH_MEM_TIMER ?
 			arch_timer_mem_use_virtual ? "virt" : "phys" :
 			"");
+	pr_info("Initial timer value: 0x%lx: %ld.%02lds\n",
+		cnt, cnt/arch_timer_rate, (cnt/(arch_timer_rate/100)) % 100);
 }
 
 u32 arch_timer_get_rate(void)
