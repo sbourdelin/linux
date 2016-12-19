@@ -43,6 +43,7 @@
 #include <linux/types.h>
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <asm/unaligned.h>
+#include <linux/sed-opal.h>
 
 #include "nvme.h"
 
@@ -1765,7 +1766,7 @@ static void nvme_reset_work(struct work_struct *work)
 {
 	struct nvme_dev *dev = container_of(work, struct nvme_dev, reset_work);
 	int result = -ENODEV;
-
+	bool was_suspend = !!(dev->ctrl.ctrl_config & NVME_CC_SHN_NORMAL);
 	if (WARN_ON(dev->ctrl.state == NVME_CTRL_RESETTING))
 		goto out;
 
@@ -1795,6 +1796,13 @@ static void nvme_reset_work(struct work_struct *work)
 	result = nvme_init_identify(&dev->ctrl);
 	if (result)
 		goto out;
+
+	result = nvme_opal_initialize(&dev->ctrl);
+	if (result)
+		goto out;
+
+	if (was_suspend)
+		nvme_unlock_from_suspend(&dev->ctrl);
 
 	result = nvme_setup_io_queues(dev);
 	if (result)

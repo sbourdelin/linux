@@ -28,6 +28,8 @@
 #include <linux/t10-pi.h>
 #include <scsi/sg.h>
 #include <asm/unaligned.h>
+#include <linux/sed.h>
+#include <linux/sed-opal.h>
 
 #include "nvme.h"
 #include "fabrics.h"
@@ -762,6 +764,48 @@ static int nvme_user_cmd(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
 	return status;
 }
 
+static int nvme_sec_submit(struct nvme_ctrl *ctrl, u16 spsp, u8 secp,
+			   void *buffer, size_t len, u8 opcode)
+{
+	struct nvme_command cmd = { 0 };
+	struct nvme_ns *ns = NULL;
+
+	mutex_lock(&ctrl->namespaces_mutex);
+	if (!list_empty(&ctrl->namespaces))
+		ns = list_first_entry(&ctrl->namespaces, struct nvme_ns, list);
+
+	mutex_unlock(&ctrl->namespaces_mutex);
+	if (!ns)
+		return -ENODEV;
+
+	cmd.common.opcode = opcode;
+	cmd.common.nsid = ns->ns_id;
+	cmd.common.cdw10[0] = cpu_to_le32(((u32)secp) << 24 | ((u32)spsp) << 8);
+	cmd.common.cdw10[1] = cpu_to_le32(len);
+
+	return __nvme_submit_sync_cmd(ctrl->admin_q, &cmd, NULL, buffer, len,
+				      ADMIN_TIMEOUT, NVME_QID_ANY, 1, 0);
+}
+
+static int nvme_sec_send(void *ctrl_data, u16 spsp, u8 secp,
+			 void *buf, size_t len)
+{
+	return nvme_sec_submit(ctrl_data, spsp, secp, buf, len,
+			       nvme_admin_security_send);
+}
+
+static int nvme_sec_recv(void *ctrl_data, u16 spsp, u8 secp,
+			 void *buf, size_t len)
+{
+	return nvme_sec_submit(ctrl_data, spsp, secp, buf, len,
+			       nvme_admin_security_recv);
+}
+
+static const struct sec_ops nvme_sec_ops = {
+	.sec_send = nvme_sec_send,
+	.sec_recv = nvme_sec_recv,
+};
+
 static int nvme_ioctl(struct block_device *bdev, fmode_t mode,
 		unsigned int cmd, unsigned long arg)
 {
@@ -1051,6 +1095,28 @@ static const struct pr_ops nvme_pr_ops = {
 	.pr_clear	= nvme_pr_clear,
 };
 
+int nvme_opal_initialize(struct nvme_ctrl *ctrl)
+{
+	/* Opal dev has already been allocated for this controller */
+	if (ctrl->sed_ctx.dev)
+		return 0;
+
+	ctrl->sed_ctx.dev = alloc_opal_dev(ctrl->admin_q);
+	if (!ctrl->sed_ctx.dev)
+		return -ENOMEM;
+	ctrl->sed_ctx.ops = &nvme_sec_ops;
+	ctrl->sed_ctx.sec_data = ctrl;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(nvme_opal_initialize);
+
+void nvme_unlock_from_suspend(struct nvme_ctrl *ctrl)
+{
+	if (opal_unlock_from_suspend(&ctrl->sed_ctx))
+		pr_warn("Failed to unlock one or more locking ranges!\n");
+}
+EXPORT_SYMBOL_GPL(nvme_unlock_from_suspend);
+
 static const struct block_device_operations nvme_fops = {
 	.owner		= THIS_MODULE,
 	.ioctl		= nvme_ioctl,
@@ -1312,6 +1378,7 @@ static int nvme_dev_open(struct inode *inode, struct file *file)
 		if (!kref_get_unless_zero(&ctrl->kref))
 			break;
 		file->private_data = ctrl;
+		file->f_sedctx = &ctrl->sed_ctx;
 		ret = 0;
 		break;
 	}
