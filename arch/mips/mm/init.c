@@ -32,6 +32,7 @@
 #include <linux/hardirq.h>
 #include <linux/gfp.h>
 #include <linux/kcore.h>
+#include <linux/sizes.h>
 
 #include <asm/asm-offsets.h>
 #include <asm/bootinfo.h>
@@ -105,6 +106,49 @@ static void __init zone_sizes_init(void)
 	/* Finally initialize nodes and page maps using memblock info */
 	free_area_init_nodes(max_zone_pfns);
 }
+
+/*
+ * Print out kernel memory layout
+ */
+#define MLK(b, t) b, t, ((t) - (b)) >> 10
+#define MLM(b, t) b, t, ((t) - (b)) >> 20
+#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
+static void __init mem_print_kmap_info(void)
+{
+	pr_notice("Virtual kernel memory layout:\n"
+		  "    lowmem  : 0x%08lx - 0x%08lx   (%4ld MB)\n"
+		  "    vmalloc : 0x%08lx - 0x%08lx   (%4ld MB)\n"
+#ifdef CONFIG_HIGHMEM
+		  "    pkmap   : 0x%08lx - 0x%08lx   (%4ld MB)\n"
+#endif
+		  "    fixmap  : 0x%08lx - 0x%08lx   (%4ld kB)\n"
+		  "      .text : 0x%p" " - 0x%p" "   (%4td kB)\n"
+		  "      .data : 0x%p" " - 0x%p" "   (%4td kB)\n"
+		  "      .init : 0x%p" " - 0x%p" "   (%4td kB)\n",
+		MLM(PAGE_OFFSET, (unsigned long)high_memory),
+		MLM(VMALLOC_START, VMALLOC_END),
+#ifdef CONFIG_HIGHMEM
+		MLM(PKMAP_BASE, (PKMAP_BASE) + (LAST_PKMAP)*(PAGE_SIZE)),
+#endif
+		MLK(FIXADDR_START, FIXADDR_TOP),
+		MLK_ROUNDUP(_text, _etext),
+		MLK_ROUNDUP(_sdata, _edata),
+		MLK_ROUNDUP(__init_begin, __init_end));
+
+	/* Check some fundamental inconsistencies. May add something else? */
+#ifdef CONFIG_HIGHMEM
+	BUILD_BUG_ON(VMALLOC_END < PAGE_OFFSET);
+	BUG_ON(VMALLOC_END < (unsigned long)high_memory);
+#endif
+	BUILD_BUG_ON((PKMAP_BASE) + (LAST_PKMAP)*(PAGE_SIZE) < PAGE_OFFSET);
+	BUG_ON((PKMAP_BASE) + (LAST_PKMAP)*(PAGE_SIZE) <
+					(unsigned long)high_memory);
+	BUILD_BUG_ON(FIXADDR_TOP < PAGE_OFFSET);
+	BUG_ON(FIXADDR_TOP < (unsigned long)high_memory);
+}
+#undef MLK
+#undef MLM
+#undef MLK_ROUNDUP
 
 /*
  * Not static inline because used by IP27 special magic initialization code
@@ -503,6 +547,9 @@ void __init mem_init(void)
 
 	/* Free highmemory registered in memblocks */
 	mem_init_free_highmem();
+
+	/* Print out kernel memory layout */
+	mem_print_kmap_info();
 
 	/* Print out memory areas statistics */
 	mem_init_print_info(NULL);
