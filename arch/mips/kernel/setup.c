@@ -426,6 +426,55 @@ static void __init mips_reserve_initrd_mem(void) { }
 
 #endif
 
+#ifdef CONFIG_KEXEC
+/*
+ * Parse passed crashkernel parameter and reserve corresponding memory
+ */
+static void __init mips_parse_crashkernel(void)
+{
+	unsigned long long total_mem;
+	unsigned long long crash_size, crash_base;
+	int ret;
+
+	/* Parse crachkernel parameter */
+	total_mem = memblock_phys_mem_size();
+	ret = parse_crashkernel(boot_command_line, total_mem,
+				&crash_size, &crash_base);
+	if (ret != 0 || crash_size <= 0)
+		return;
+
+	crashk_res.start = crash_base;
+	crashk_res.end	 = crash_base + crash_size - 1;
+
+	/* Check whether the region belogs to lowmem and valid */
+	if (!is_lowmem_and_valid("Crashkernel", crash_base, crash_size))
+		return;
+
+	/* Reserve crashkernel resource */
+	memblock_reserve(crash_base, crash_size);
+}
+
+/*
+ * Reserve crashkernel memory within passed RAM resource
+ */
+static void __init request_crashkernel(struct resource *res)
+{
+	int ret;
+
+	ret = request_resource(res, &crashk_res);
+	if (!ret)
+		pr_info("Reserving %ldMB of memory at %ldMB for crashkernel\n",
+			(unsigned long)((crashk_res.end -
+					 crashk_res.start + 1) >> 20),
+			(unsigned long)(crashk_res.start  >> 20));
+}
+#else /* !CONFIG_KEXEC */
+
+static void __init mips_parse_crashkernel(void) { }
+static void __init request_crashkernel(struct resource *res) { }
+
+#endif /* !CONFIG_KEXEC */
+
 /*
  * Initialize the bootmem allocator. It also setup initrd related data
  * if needed.
@@ -449,6 +498,9 @@ static void __init bootmem_init(void)
 
 	/* Check and reserve memory occupied by initrd */
 	mips_reserve_initrd_mem();
+
+	/* Parse crashkernel parameter */
+	mips_parse_crashkernel();
 
 	reserved_end = (unsigned long) PFN_UP(__pa_symbol(&_end));
 
@@ -717,52 +769,6 @@ static void __init arch_mem_addpart(phys_addr_t mem, phys_addr_t end, int type)
 	add_memory_region(mem, size, type);
 }
 
-#ifdef CONFIG_KEXEC
-static inline unsigned long long get_total_mem(void)
-{
-	unsigned long long total;
-
-	total = max_pfn - min_low_pfn;
-	return total << PAGE_SHIFT;
-}
-
-static void __init mips_parse_crashkernel(void)
-{
-	unsigned long long total_mem;
-	unsigned long long crash_size, crash_base;
-	int ret;
-
-	total_mem = get_total_mem();
-	ret = parse_crashkernel(boot_command_line, total_mem,
-				&crash_size, &crash_base);
-	if (ret != 0 || crash_size <= 0)
-		return;
-
-	crashk_res.start = crash_base;
-	crashk_res.end	 = crash_base + crash_size - 1;
-}
-
-static void __init request_crashkernel(struct resource *res)
-{
-	int ret;
-
-	ret = request_resource(res, &crashk_res);
-	if (!ret)
-		pr_info("Reserving %ldMB of memory at %ldMB for crashkernel\n",
-			(unsigned long)((crashk_res.end -
-					 crashk_res.start + 1) >> 20),
-			(unsigned long)(crashk_res.start  >> 20));
-}
-#else /* !defined(CONFIG_KEXEC)		*/
-static void __init mips_parse_crashkernel(void)
-{
-}
-
-static void __init request_crashkernel(struct resource *res)
-{
-}
-#endif /* !defined(CONFIG_KEXEC)  */
-
 #define USE_PROM_CMDLINE	IS_ENABLED(CONFIG_MIPS_CMDLINE_FROM_BOOTLOADER)
 #define USE_DTB_CMDLINE		IS_ENABLED(CONFIG_MIPS_CMDLINE_FROM_DTB)
 #define EXTEND_WITH_PROM	IS_ENABLED(CONFIG_MIPS_CMDLINE_DTB_EXTEND)
@@ -836,13 +842,6 @@ static void __init arch_mem_init(char **cmdline_p)
 	}
 #endif
 
-	mips_parse_crashkernel();
-#ifdef CONFIG_KEXEC
-	if (crashk_res.start != crashk_res.end)
-		reserve_bootmem(crashk_res.start,
-				crashk_res.end - crashk_res.start + 1,
-				BOOTMEM_DEFAULT);
-#endif
 	device_tree_init();
 	sparse_init();
 	plat_swiotlb_setup();
