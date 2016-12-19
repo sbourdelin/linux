@@ -55,6 +55,7 @@ struct workqueue_struct;
 struct iov_iter;
 struct fscrypt_info;
 struct fscrypt_operations;
+struct sed_context;
 
 extern void __init inode_init(void);
 extern void __init inode_init_early(void);
@@ -853,6 +854,7 @@ struct file {
 #ifdef CONFIG_SECURITY
 	void			*f_security;
 #endif
+	struct sed_context      *f_sedctx;
 	/* needed for tty driver, and maybe others */
 	void			*private_data;
 

@@ -15,6 +15,7 @@
 #include <linux/writeback.h>
 #include <linux/buffer_head.h>
 #include <linux/falloc.h>
+#include <linux/sed.h>
 #include "internal.h"
 
 #include <asm/ioctls.h>
@@ -679,6 +680,8 @@ int do_vfs_ioctl(struct file *filp, unsigned int fd, unsigned int cmd,
 	default:
 		if (S_ISREG(inode->i_mode))
 			error = file_ioctl(filp, cmd, arg);
+		else if (is_sed_ioctl(cmd))
+			error = fdev_sed_ioctl(filp, cmd, arg);
 		else
 			error = vfs_ioctl(filp, cmd, arg);
 		break;
