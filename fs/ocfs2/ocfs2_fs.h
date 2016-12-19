@@ -395,17 +395,18 @@ static struct ocfs2_system_inode_info ocfs2_system_inodes[NUM_SYSTEM_INODES] = {
 /*
  * OCFS2 directory file types.  Only the low 3 bits are used.  The
  * other bits are reserved for now.
+ * Values are taken from common file type implementation.
  */
-#define OCFS2_FT_UNKNOWN	0
-#define OCFS2_FT_REG_FILE	1
-#define OCFS2_FT_DIR		2
-#define OCFS2_FT_CHRDEV		3
-#define OCFS2_FT_BLKDEV		4
-#define OCFS2_FT_FIFO		5
-#define OCFS2_FT_SOCK		6
-#define OCFS2_FT_SYMLINK	7
+#define OCFS2_FT_UNKNOWN	FT_UNKNOWN
+#define OCFS2_FT_REG_FILE	FT_REG_FILE
+#define OCFS2_FT_DIR		FT_DIR
+#define OCFS2_FT_CHRDEV		FT_CHRDEV
+#define OCFS2_FT_BLKDEV		FT_BLKDEV
+#define OCFS2_FT_FIFO		FT_FIFO
+#define OCFS2_FT_SOCK		FT_SOCK
+#define OCFS2_FT_SYMLINK	FT_SYMLINK
 
-#define OCFS2_FT_MAX		8
+#define OCFS2_FT_MAX		FT_MAX
 
 /*
  * OCFS2_DIR_PAD defines the directory entries boundaries
@@ -424,17 +425,6 @@ static struct ocfs2_system_inode_info ocfs2_system_inodes[NUM_SYSTEM_INODES] = {
 #define	OCFS2_DX_LINK_MAX	((1U << 31) - 1U)
 #define	OCFS2_LINKS_HI_SHIFT	16
 #define	OCFS2_DX_ENTRIES_MAX	(0xffffffffU)
-
-#define S_SHIFT			12
-static unsigned char ocfs2_type_by_mode[S_IFMT >> S_SHIFT] = {
-	[S_IFREG >> S_SHIFT]  = OCFS2_FT_REG_FILE,
-	[S_IFDIR >> S_SHIFT]  = OCFS2_FT_DIR,
-	[S_IFCHR >> S_SHIFT]  = OCFS2_FT_CHRDEV,
-	[S_IFBLK >> S_SHIFT]  = OCFS2_FT_BLKDEV,
-	[S_IFIFO >> S_SHIFT]  = OCFS2_FT_FIFO,
-	[S_IFSOCK >> S_SHIFT] = OCFS2_FT_SOCK,
-	[S_IFLNK >> S_SHIFT]  = OCFS2_FT_SYMLINK,
-};
 
 
 /*
@@ -1630,7 +1620,7 @@ static inline int ocfs2_sprintf_system_inode_name(char *buf, int len,
 static inline void ocfs2_set_de_type(struct ocfs2_dir_entry *de,
 				    umode_t mode)
 {
-	de->file_type = ocfs2_type_by_mode[(mode & S_IFMT)>>S_SHIFT];
+	de->file_type = fs_umode_to_ftype(mode);
 }
 
 static inline int ocfs2_gd_is_discontig(struct ocfs2_group_desc *gd)
