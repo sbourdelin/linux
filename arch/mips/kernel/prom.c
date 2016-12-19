@@ -17,6 +17,7 @@
 #include <linux/of.h>
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
+#include <linux/memblock.h>
 
 #include <asm/bootinfo.h>
 #include <asm/page.h>
@@ -41,7 +42,36 @@ char *mips_get_machine_name(void)
 #ifdef CONFIG_USE_OF
 void __init early_init_dt_add_memory_arch(u64 base, u64 size)
 {
-	return add_memory_region(base, size, BOOT_MEM_RAM);
+	/* Check whether specified region is well formed */
+	if (sanity_check_dt_memory(&base, &size))
+		return;
+
+	/* Memory region should be in boot_mem_map, so use the old method */
+	add_memory_region(base, size, BOOT_MEM_RAM);
+}
+
+int __init early_init_dt_reserve_memory_arch(phys_addr_t base,
+					     phys_addr_t size, bool nomap)
+{
+	/*
+	 * NOTE We don't use add_memory_region() method here, since fdt
+	 * reserved-memory regions are declared within already added memory,
+	 * while boot_mem_map consists of unique regions
+	 */
+
+	/* Check whether region is free. If so just ignore it */
+	if (memblock_is_region_reserved(base, size)) {
+		pr_err("FDT reserve-node %08zx @ %pa overlaps in-use memory\n",
+			(size_t)size, &base);
+		return -EBUSY;
+	}
+
+	/* If it can be mapped, then just reserve the region */
+	if (!nomap)
+		return memblock_reserve(base, size);
+
+	/* Completely remove region if it shouldn't be mapped */
+	return memblock_remove(base, size);
 }
 
 void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
