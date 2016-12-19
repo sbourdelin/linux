@@ -285,6 +285,14 @@ static struct dentry *ubifs_lookup(struct inode *dir, struct dentry *dentry,
 		goto out_dent;
 	}
 
+	if (ubifs_crypt_is_encrypted(dir) &&
+	    !fscrypt_has_permitted_context(dir, inode)) {
+		ubifs_err(c, "Inconsistent encryption contexts: %lu/%lu",
+			  dir->i_ino, inode->i_ino);
+		err = -EPERM;
+		goto out_inode;
+	}
+
 done:
 	kfree(dent);
 	fscrypt_free_filename(&nm);
@@ -295,6 +303,8 @@ done:
 	d_add(dentry, inode);
 	return NULL;
 
+out_inode:
+	iput(inode);
 out_dent:
 	kfree(dent);
 out_fname:
