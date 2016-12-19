@@ -300,7 +300,7 @@ static const struct regmap_irq palmas_irqs[] = {
 	},
 };
 
-static struct regmap_irq_chip palmas_irq_chip = {
+static const struct regmap_irq_chip palmas_irq_chip = {
 	.name = "palmas",
 	.irqs = palmas_irqs,
 	.num_irqs = ARRAY_SIZE(palmas_irqs),
@@ -313,7 +313,7 @@ static struct regmap_irq_chip palmas_irq_chip = {
 			PALMAS_INT1_MASK),
 };
 
-static struct regmap_irq_chip tps65917_irq_chip = {
+static const struct regmap_irq_chip tps65917_irq_chip = {
 	.name = "tps65917",
 	.irqs = tps65917_irqs,
 	.num_irqs = ARRAY_SIZE(tps65917_irqs),
@@ -453,20 +453,20 @@ static unsigned int tps659038_features;
 
 struct palmas_driver_data {
 	unsigned int *features;
-	struct regmap_irq_chip *irq_chip;
+	const struct regmap_irq_chip *irq_chip;
 };
 
-static struct palmas_driver_data palmas_data = {
+static const struct palmas_driver_data palmas_data = {
 	.features = &palmas_features,
 	.irq_chip = &palmas_irq_chip,
 };
 
-static struct palmas_driver_data tps659038_data = {
+static const struct palmas_driver_data tps659038_data = {
 	.features = &tps659038_features,
 	.irq_chip = &palmas_irq_chip,
 };
 
-static struct palmas_driver_data tps65917_data = {
+static const struct palmas_driver_data tps65917_data = {
 	.features = &tps659038_features,
 	.irq_chip = &tps65917_irq_chip,
 };
@@ -493,12 +493,11 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 {
 	struct palmas *palmas;
 	struct palmas_platform_data *pdata;
-	struct palmas_driver_data *driver_data;
+	const struct palmas_driver_data *driver_data;
 	struct device_node *node = i2c->dev.of_node;
 	int ret = 0, i;
 	unsigned int reg, addr;
 	int slave;
-	const struct of_device_id *match;
 
 	pdata = dev_get_platdata(&i2c->dev);
 
@@ -522,12 +521,9 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 	palmas->dev = &i2c->dev;
 	palmas->irq = i2c->irq;
 
-	match = of_match_device(of_palmas_match_tbl, &i2c->dev);
-
-	if (!match)
+	driver_data = of_device_get_match_data(&i2c->dev);
+	if (!driver_data)
 		return -ENODATA;
-
-	driver_data = (struct palmas_driver_data *)match->data;
 	palmas->features = *driver_data->features;
 
 	for (i = 0; i < PALMAS_NUM_CLIENTS; i++) {
