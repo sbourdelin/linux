@@ -169,8 +169,9 @@ struct xfs_da3_icnode_hdr {
 
 /*
  * Dirents in version 3 directories have a file type field. Additions to this
- * list are an on-disk format change, requiring feature bits. Valid values
- * are as follows:
+ * list are an on-disk format change, requiring feature bits.
+ * Values 0..7 should match common file type values in file_type.h.
+ * Valid values are as follows:
  */
 #define XFS_DIR3_FT_UNKNOWN		0
 #define XFS_DIR3_FT_REG_FILE		1
