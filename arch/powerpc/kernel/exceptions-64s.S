@@ -118,7 +118,11 @@ EXC_REAL_BEGIN(system_reset, 0x100, 0x200)
 	SET_SCRATCH0(r13)
 	GET_PACA(r13)
 	clrrdi	r13,r13,1 /* Last bit of HSPRG0 is set if waking from winkle */
-	EXCEPTION_PROLOG_PSERIES_PACA(PACA_EXNMI, system_reset_common,
+	/*
+	 * MSR_RI is not enabled, because PACA_EXNMI and nmi stack is
+	 * being used, so a nested NMI exception would corrupt it.
+	 */
+	EXCEPTION_PROLOG_PSERIES_PACA_NORI(PACA_EXNMI, system_reset_common,
 						EXC_STD, IDLETEST, 0x100)
 
 EXC_REAL_END(system_reset, 0x100, 0x200)
@@ -154,9 +158,31 @@ END_FTR_SECTION_IFCLR(CPU_FTR_ARCH_300)
 #endif
 
 EXC_COMMON_BEGIN(system_reset_common)
+	/*
+	 * Increment paca->in_nmi then enable MSR_RI. SLB or MCE will be able
+	 * to recover, but nested NMI will notice in_nmi and not recover
+	 * because of the use of the NMI stack. in_nmi reentrancy is tested in
+	 * system_reset_exception.
+	 */
+	lhz	r10,PACA_IN_NMI(r13)
+	addi	r10,r10,1
+	sth	r10,PACA_IN_NMI(r13)
+	li	r10,MSR_RI
+	mtmsrd 	r10,1
+
 	EXCEPTION_COMMON(PACA_EXNMI, 0x100,
-			system_reset, system_reset_exception,
-			ret_from_except, ADD_NVGPRS;ADD_RECONCILE)
+			system_reset, system_reset_exception, 1f,
+			ADD_NVGPRS;ADD_RECONCILE)
+1: /* EXCEPTION_COMMON continues here */
+
+	/*
+	 * The stack is no longer in use, decrement in_nmi.
+	 */
+	lhz	r10,PACA_IN_NMI(r13)
+	subi	r10,r10,1
+	sth	r10,PACA_IN_NMI(r13)
+
+	b	ret_from_except
 
 #ifdef CONFIG_PPC_PSERIES
 /*
@@ -164,8 +190,9 @@ EXC_COMMON_BEGIN(system_reset_common)
  */
 TRAMP_REAL_BEGIN(system_reset_fwnmi)
 	SET_SCRATCH0(r13)		/* save r13 */
-	EXCEPTION_PROLOG_PSERIES(PACA_EXNMI, system_reset_common, EXC_STD,
-				 NOTEST, 0x100)
+	/* See comment at system_reset exception */
+	EXCEPTION_PROLOG_PSERIES_NORI(PACA_EXNMI, system_reset_common,
+						EXC_STD, NOTEST, 0x100)
 #endif /* CONFIG_PPC_PSERIES */
 
 
