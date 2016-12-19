@@ -7620,7 +7620,8 @@ static void i830_init_clock_gating(struct drm_i915_private *dev_priv)
 
 void intel_init_clock_gating(struct drm_i915_private *dev_priv)
 {
-	dev_priv->display.init_clock_gating(dev_priv);
+	if (INTEL_INFO(dev_priv)->num_pipes)
+		dev_priv->display.init_clock_gating(dev_priv);
 }
 
 void intel_suspend_hw(struct drm_i915_private *dev_priv)
@@ -7645,6 +7646,10 @@ static void nop_init_clock_gating(struct drm_i915_private *dev_priv)
  */
 void intel_init_clock_gating_hooks(struct drm_i915_private *dev_priv)
 {
+
+	if (INTEL_INFO(dev_priv)->num_pipes == 0)
+		return;
+
 	if (IS_SKYLAKE(dev_priv))
 		dev_priv->display.init_clock_gating = skylake_init_clock_gating;
 	else if (IS_KABYLAKE(dev_priv))
@@ -7686,6 +7691,9 @@ void intel_init_clock_gating_hooks(struct drm_i915_private *dev_priv)
 /* Set up chip specific power management-related functions */
 void intel_init_pm(struct drm_i915_private *dev_priv)
 {
+	if (INTEL_INFO(dev_priv)->num_pipes == 0)
+		return;
+
 	intel_fbc_init(dev_priv);
 
 	/* For cxsr */
