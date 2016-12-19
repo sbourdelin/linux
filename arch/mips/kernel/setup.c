@@ -229,6 +229,43 @@ static void __init print_memory_map(void)
 }
 
 /*
+ * Parse "mem=size@start" parameter rewriting a defined memory map
+ * We look for mem=size@start, where start and size are "value[KkMm]"
+ */
+static int __init early_parse_mem(char *p)
+{
+	static int usermem;
+	phys_addr_t start, size;
+
+	start = PHYS_OFFSET;
+	size = memparse(p, &p);
+	if (*p == '@')
+		start = memparse(p + 1, &p);
+
+	/*
+	 * If a user specifies memory size, we blow away any automatically
+	 * generated regions.
+	 */
+	if (usermem == 0) {
+		phys_addr_t ram_start = memblock_start_of_DRAM();
+		phys_addr_t ram_end = memblock_end_of_DRAM() - ram_start;
+
+		pr_notice("Discard memory layout %pa - %pa",
+			  &ram_start, &ram_end);
+
+		memblock_remove(ram_start, ram_end - ram_start);
+		boot_mem_map.nr_map = 0;
+		usermem = 1;
+	}
+	pr_notice("Add userdefined memory region %08zx @ %pa",
+		  (size_t)size, &start);
+
+	add_memory_region(start, size, BOOT_MEM_RAM);
+	return 0;
+}
+early_param("mem", early_parse_mem);
+
+/*
  * Manage initrd
  */
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -613,31 +650,6 @@ static void __init bootmem_init(void)
  * initialization hook for anything else was introduced.
  */
 
-static int usermem __initdata;
-
-static int __init early_parse_mem(char *p)
-{
-	phys_addr_t start, size;
-
-	/*
-	 * If a user specifies memory size, we
-	 * blow away any automatically generated
-	 * size.
-	 */
-	if (usermem == 0) {
-		boot_mem_map.nr_map = 0;
-		usermem = 1;
-	}
-	start = 0;
-	size = memparse(p, &p);
-	if (*p == '@')
-		start = memparse(p + 1, &p);
-
-	add_memory_region(start, size, BOOT_MEM_RAM);
-	return 0;
-}
-early_param("mem", early_parse_mem);
-
 #ifdef CONFIG_PROC_VMCORE
 unsigned long setup_elfcorehdr, setup_elfcorehdr_size;
 static int __init early_parse_elfcorehdr(char *p)
@@ -796,11 +808,6 @@ static void __init arch_mem_init(char **cmdline_p)
 	*cmdline_p = command_line;
 
 	parse_early_param();
-
-	if (usermem) {
-		pr_info("User-defined physical RAM map:\n");
-		print_memory_map();
-	}
 
 	bootmem_init();
 #ifdef CONFIG_PROC_VMCORE
