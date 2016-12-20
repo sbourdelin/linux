@@ -20,9 +20,12 @@
 #include "block-range.h"
 #include "arch/common.h"
 #include <regex.h>
+#include <unistd.h>
 #include <pthread.h>
 #include <linux/bitops.h>
 #include <sys/utsname.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 const char 	*disassembler_style;
 const char	*objdump_path;
@@ -1286,6 +1289,21 @@ int symbol__strerror_disassemble(struct symbol *sym __maybe_unused, struct map *
 			  "  --vmlinux vmlinux\n", build_id_msg ?: "");
 	}
 		break;
+
+	case SYMBOL_ANNOTATE_ERRNO__NO_OBJDUMP:
+		scnprintf(buf, buflen, "No objdump tool available in $PATH\n");
+		break;
+
+	case SYMBOL_ANNOTATE_ERRNO__NO_EXEC_OBJDUMP:
+		scnprintf(buf, buflen,
+			"The objdump tool found in $PATH cannot be executed\n");
+		break;
+
+	case SYMBOL_ANNOTATE_ERRNO__NO_OUTPUT:
+		scnprintf(buf, buflen,
+			"The objdump tool returned no disassembled code\n");
+		break;
+
 	default:
 		scnprintf(buf, buflen, "Internal error: Invalid %d error code\n", errnum);
 		break;
@@ -1327,6 +1345,44 @@ fallback:
 	}
 
 	return 0;
+}
+
+static int annotate__check_exec(int pid, const char *command)
+{
+	int wstatus, err;
+
+	err = waitpid(pid, &wstatus, 0);
+	if (err < 0) {
+		pr_err("Failure calling waitpid: %s: (%s)\n",
+			strerror(errno), command);
+		return -1;
+	}
+
+	pr_debug("%s: %d %d\n", command, pid, WEXITSTATUS(wstatus));
+
+	switch (WEXITSTATUS(wstatus)) {
+	case 0:
+		/* Success */
+		err = 0;
+		break;
+	case 127:
+		/* The shell did not find objdump in the path */
+		err = SYMBOL_ANNOTATE_ERRNO__NO_OBJDUMP;
+		break;
+	default:
+		/*
+		 * In the default case, we consider that objdump
+		 * cannot be executed; so it gathers many fault
+		 * scenarii:
+		 * - objdump is not an executable (126);
+		 * - objdump has some dependency issue;
+		 * - ...
+		 */
+		err = SYMBOL_ANNOTATE_ERRNO__NO_EXEC_OBJDUMP;
+		break;
+	}
+
+	return err;
 }
 
 static const char *annotate__norm_arch(const char *arch_name)
@@ -1426,7 +1482,8 @@ int symbol__disassemble(struct symbol *sym, struct map *map, const char *arch_na
 	snprintf(command, sizeof(command),
 		 "%s %s%s --start-address=0x%016" PRIx64
 		 " --stop-address=0x%016" PRIx64
-		 " -l -d %s %s -C %s 2>/dev/null|grep -v %s|expand",
+		 " -l -d %s %s -C %s 2>/dev/null | "
+		 "{ grep -v %s || true; } | expand",
 		 objdump_path ? objdump_path : "objdump",
 		 disassembler_style ? "-M " : "",
 		 disassembler_style ? disassembler_style : "",
@@ -1454,7 +1511,7 @@ int symbol__disassemble(struct symbol *sym, struct map *map, const char *arch_na
 		close(stdout_fd[0]);
 		dup2(stdout_fd[1], 1);
 		close(stdout_fd[1]);
-		execl("/bin/sh", "sh", "-c", command, NULL);
+		execl("/bin/sh", "sh", "-o", "pipefail", "-c", command, NULL);
 		perror(command);
 		exit(-1);
 	}
@@ -1479,8 +1536,12 @@ int symbol__disassemble(struct symbol *sym, struct map *map, const char *arch_na
 		nline++;
 	}
 
-	if (nline == 0)
+	err = annotate__check_exec(pid, command);
+
+	if (err == 0 && nline == 0) {
 		pr_err("No output from %s\n", command);
+		err = SYMBOL_ANNOTATE_ERRNO__NO_OUTPUT;
+	}
 
 	/*
 	 * kallsyms does not have symbol sizes so there may a nop at the end.
@@ -1490,7 +1551,7 @@ int symbol__disassemble(struct symbol *sym, struct map *map, const char *arch_na
 		delete_last_nop(sym);
 
 	fclose(file);
-	err = 0;
+
 out_remove_tmp:
 	close(stdout_fd[0]);
 
