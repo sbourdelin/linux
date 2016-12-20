@@ -766,11 +766,6 @@ static inline void put_page(struct page *page)
 {
 	page = compound_head(page);
 
-	if (PagePool(page)) {
-		page_pool_put_page(page);
-		return;
-	}
-
 	if (put_page_testzero(page))
 		__put_page(page);
 

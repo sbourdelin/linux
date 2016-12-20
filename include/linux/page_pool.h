@@ -112,6 +112,7 @@ struct page_pool {
 	 * wise, because free's can happen on remote CPUs, with no
 	 * association with allocation resource.
 	 *
+	 * XXX: Mel says drop comment
 	 * For now use ptr_ring, as it separates consumer and
 	 * producer, which is a common use-case. The ptr_ring is not
 	 * though as the final data structure, expecting this to
@@ -145,6 +146,7 @@ void page_pool_destroy(struct page_pool *pool);
 /* Never call this directly, use helpers below */
 void __page_pool_put_page(struct page *page, bool allow_direct);
 
+/* XXX: Mel: needs descriptions*/
 static inline void page_pool_put_page(struct page *page)
 {
 	__page_pool_put_page(page, false);
@@ -154,5 +156,13 @@ static inline void page_pool_recycle_direct(struct page *page)
 {
 	__page_pool_put_page(page, true);
 }
+
+/*
+ * Called when refcnt reach zero.  On failure page_pool state is
+ * cleared, and caller can return page to page allocator.
+ */
+bool page_pool_recycle(struct page *page);
+// XXX: compile out trick, let this return false compile time,
+// or let PagePool() check compile to false.
 
 #endif /* _LINUX_PAGE_POOL_H */

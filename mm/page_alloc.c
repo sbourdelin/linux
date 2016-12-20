@@ -1237,6 +1237,9 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 	int migratetype;
 	unsigned long pfn = page_to_pfn(page);
 
+	if (PagePool(page) && page_pool_recycle(page))
+		return;
+
 	if (!free_pages_prepare(page, order, true))
 		return;
 
@@ -2444,6 +2447,9 @@ void free_hot_cold_page(struct page *page, bool cold)
 	unsigned long flags;
 	unsigned long pfn = page_to_pfn(page);
 	int migratetype;
+
+	if (PagePool(page) && page_pool_recycle(page))
+		return;
 
 	if (!free_pcp_prepare(page))
 		return;
@@ -3880,11 +3886,6 @@ EXPORT_SYMBOL(get_zeroed_page);
 
 void __free_pages(struct page *page, unsigned int order)
 {
-	if (PagePool(page)) {
-		page_pool_put_page(page);
-		return;
-	}
-
 	if (put_page_testzero(page)) {
 		if (order == 0)
 			free_hot_cold_page(page, false);
@@ -4011,11 +4012,6 @@ EXPORT_SYMBOL(__alloc_page_frag);
 void __free_page_frag(void *addr)
 {
 	struct page *page = virt_to_head_page(addr);
-
-	if (PagePool(page)) {
-		page_pool_put_page(page);
-		return;
-	}
 
 	if (unlikely(put_page_testzero(page)))
 		__free_pages_ok(page, compound_order(page));

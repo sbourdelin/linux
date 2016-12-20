@@ -96,6 +96,9 @@ static void __put_compound_page(struct page *page)
 
 void __put_page(struct page *page)
 {
+	if (PagePool(page) && page_pool_recycle(page))
+		return;
+
 	if (unlikely(PageCompound(page)))
 		__put_compound_page(page);
 	else

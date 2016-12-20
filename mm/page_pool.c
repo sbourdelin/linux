@@ -21,14 +21,15 @@
 #include <linux/dma-mapping.h>
 #include <linux/page-flags.h>
 #include <linux/mm.h> /* for __put_page() */
+#include "internal.h" /* for set_page_refcounted() */
 
 /*
  * The struct page_pool (likely) cannot be embedded into another
  * structure, because freeing this struct depend on outstanding pages,
  * which can point back to the page_pool. Thus, don't export "init".
  */
-int page_pool_init(struct page_pool *pool,
-		   const struct page_pool_params *params)
+static int page_pool_init(struct page_pool *pool,
+			  const struct page_pool_params *params)
 {
 	int ring_qsize = 1024; /* Default */
 	int param_copy_sz;
@@ -108,40 +109,33 @@ EXPORT_SYMBOL(page_pool_create);
 /* fast path */
 static struct page *__page_pool_get_cached(struct page_pool *pool)
 {
+	struct ptr_ring *r;
 	struct page *page;
 
-	/* FIXME: use another test for safe-context, caller should
-	 * simply provide this guarantee
-	 */
-	if (likely(in_serving_softirq())) { // FIXME add use of PP_FLAG_NAPI
-		struct ptr_ring *r;
-
-		if (likely(pool->alloc.count)) {
-			/* Fast-path */
-			page = pool->alloc.cache[--pool->alloc.count];
-			return page;
-		}
-		/* Slower-path: Alloc array empty, time to refill */
-		r = &pool->ring;
-		/* Open-coded bulk ptr_ring consumer.
-		 *
-		 * Discussion: ATM the ring consumer lock is not
-		 * really needed due to the softirq/NAPI protection,
-		 * but later MM-layer need the ability to reclaim
-		 * pages on the ring. Thus, keeping the locks.
-		 */
-		spin_lock(&r->consumer_lock);
-		while ((page = __ptr_ring_consume(r))) {
-			if (pool->alloc.count == PP_ALLOC_CACHE_REFILL)
-				break;
-			pool->alloc.cache[pool->alloc.count++] = page;
-		}
-		spin_unlock(&r->consumer_lock);
+	/* Caller guarantee safe context for accessing alloc.cache */
+	if (likely(pool->alloc.count)) {
+		/* Fast-path */
+		page = pool->alloc.cache[--pool->alloc.count];
 		return page;
 	}
 
-	/* Slow-path: Get page from locked ring queue */
-	page = ptr_ring_consume(&pool->ring);
+	/* Slower-path: Alloc array empty, time to refill */
+	r = &pool->ring;
+	/* Open-coded bulk ptr_ring consumer.
+	 *
+	 * Discussion: ATM ring *consumer* lock is not really needed
+	 * due to caller protecton, but later MM-layer need the
+	 * ability to reclaim pages from ring. Thus, keeping locks.
+	 */
+	spin_lock(&r->consumer_lock);
+	while ((page = __ptr_ring_consume(r))) {
+		/* Pages on ring refcnt==0, on alloc.cache refcnt==1 */
+		set_page_refcounted(page);
+		if (pool->alloc.count == PP_ALLOC_CACHE_REFILL)
+			break;
+		pool->alloc.cache[pool->alloc.count++] = page;
+	}
+	spin_unlock(&r->consumer_lock);
 	return page;
 }
 
@@ -290,15 +284,9 @@ static void __page_pool_clean_page(struct page *page)
 /* Return a page to the page allocator, cleaning up our state */
 static void __page_pool_return_page(struct page *page)
 {
-	struct page_pool *pool = page->pool;
-
+	VM_BUG_ON_PAGE(page_ref_count(page) != 0, page);
 	__page_pool_clean_page(page);
-	/*
-	 * Given page pool state and flags were just cleared, the page
-	 * must be freed here.  Thus, code invariant assumes
-	 * refcnt==1, as __free_pages() call put_page_testzero().
-	 */
-	__free_pages(page, pool->p.order);
+	__put_page(page);
 }
 
 bool __page_pool_recycle_into_ring(struct page_pool *pool,
@@ -332,70 +320,61 @@ bool __page_pool_recycle_into_ring(struct page_pool *pool,
  *
  * Caller must provide appropiate safe context.
  */
-static bool __page_pool_recycle_direct(struct page *page,
+// noinline /* hack for perf-record test */
+static
+bool __page_pool_recycle_direct(struct page *page,
 				       struct page_pool *pool)
 {
-	// BUG_ON(!in_serving_softirq());
+	VM_BUG_ON_PAGE(page_ref_count(page) != 1, page);
+	/* page refcnt==1 invarians on alloc.cache */
 
 	if (unlikely(pool->alloc.count == PP_ALLOC_CACHE_SIZE))
 		return false;
 
-	/* Caller MUST have verified/know (page_ref_count(page) == 1) */
 	pool->alloc.cache[pool->alloc.count++] = page;
 	return true;
 }
+
+/*
+ * Called when refcnt reach zero.  On failure page_pool state is
+ * cleared, and caller can return page to page allocator.
+ */
+bool page_pool_recycle(struct page *page)
+{
+	struct page_pool *pool = page->pool;
+
+	VM_BUG_ON_PAGE(page_ref_count(page) != 0, page);
+
+	/* Pages on recycle ring have refcnt==0 */
+	if (!__page_pool_recycle_into_ring(pool, page)) {
+		__page_pool_clean_page(page);
+		return false;
+	}
+	return true;
+}
+EXPORT_SYMBOL(page_pool_recycle);
 
 void __page_pool_put_page(struct page *page, bool allow_direct)
 {
 	struct page_pool *pool = page->pool;
 
-	/* This is a fast-path optimization, that avoids an atomic
-	 * operation, in the case where a single object is (refcnt)
-	 * using the page.
-	 *
-	 * refcnt == 1 means page_pool owns page, and can recycle it.
-	 */
-	if (likely(page_ref_count(page) == 1)) {
-		/* Read barrier implicit paired with full MB of atomic ops */
-		smp_rmb();
+	if (allow_direct && (page_ref_count(page) == 1))
+		if (__page_pool_recycle_direct(page, pool))
+			return;
 
-		if (allow_direct)
-			if (__page_pool_recycle_direct(page, pool))
-			    return;
+	if (put_page_testzero(page))
+		if (!page_pool_recycle(page))
+			__put_page(page);
 
-		if (!__page_pool_recycle_into_ring(pool, page)) {
-			/* Cache full, do real __free_pages() */
-			__page_pool_return_page(page);
-		}
-		return;
-	}
-	/*
-	 * Many drivers splitting up the page into fragments, and some
-	 * want to keep doing this to save memory. The put_page_testzero()
-	 * function as a refcnt decrement, and should not return true.
-	 */
-	if (unlikely(put_page_testzero(page))) {
-		/*
-		 * Reaching refcnt zero should not be possible,
-		 * indicate code error.  Don't crash but warn, handle
-		 * case by not-recycling, but return page to page
-		 * allocator.
-		 */
-		WARN(1, "%s() violating page_pool invariance refcnt:%d\n",
-		     __func__, page_ref_count(page));
-		/* Cleanup state before directly returning page */
-		__page_pool_clean_page(page);
-		__put_page(page);
-	}
 }
 EXPORT_SYMBOL(__page_pool_put_page);
 
-static void __destructor_put_page(void *ptr)
+void __destructor_return_page(void *ptr)
 {
 	struct page *page = ptr;
 
 	/* Verify the refcnt invariant of cached pages */
-	if (!(page_ref_count(page) == 1)) {
+	if (page_ref_count(page) != 0) {
 		pr_crit("%s() page_pool refcnt %d violation\n",
 			__func__, page_ref_count(page));
 		BUG();
@@ -407,7 +386,7 @@ static void __destructor_put_page(void *ptr)
 void page_pool_destroy(struct page_pool *pool)
 {
 	/* Empty recycle ring */
-	ptr_ring_cleanup(&pool->ring, __destructor_put_page);
+	ptr_ring_cleanup(&pool->ring, __destructor_return_page);
 
 	/* FIXME-mem-leak: cleanup array/stack cache
 	 * pool->alloc. Driver usually will destroy RX ring after
