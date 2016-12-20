@@ -3880,6 +3880,11 @@ EXPORT_SYMBOL(get_zeroed_page);
 
 void __free_pages(struct page *page, unsigned int order)
 {
+	if (PagePool(page)) {
+		page_pool_put_page(page);
+		return;
+	}
+
 	if (put_page_testzero(page)) {
 		if (order == 0)
 			free_hot_cold_page(page, false);
@@ -4006,6 +4011,11 @@ EXPORT_SYMBOL(__alloc_page_frag);
 void __free_page_frag(void *addr)
 {
 	struct page *page = virt_to_head_page(addr);
+
+	if (PagePool(page)) {
+		page_pool_put_page(page);
+		return;
+	}
 
 	if (unlikely(put_page_testzero(page)))
 		__free_pages_ok(page, compound_order(page));

@@ -2584,7 +2584,7 @@ static inline void __skb_frag_ref(skb_frag_t *frag)
  * @f: the fragment offset.
  *
  * Takes an additional reference on the @f'th paged fragment of @skb.
- */
+ */ // XXX
 static inline void skb_frag_ref(struct sk_buff *skb, int f)
 {
 	__skb_frag_ref(&skb_shinfo(skb)->frags[f]);

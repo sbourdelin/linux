@@ -91,7 +91,8 @@ enum pageflags {
 	PG_mappedtodisk,	/* Has blocks allocated on-disk */
 	PG_reclaim,		/* To be reclaimed asap */
 	PG_swapbacked,		/* Page is backed by RAM/swap */
-	PG_unevictable,		/* Page is "unevictable"  */
+/*20*/	PG_unevictable,		/* Page is "unevictable"  */
+// XXX stable flag?
 #ifdef CONFIG_MMU
 	PG_mlocked,		/* Page is vma mlocked */
 #endif
@@ -101,6 +102,8 @@ enum pageflags {
 #ifdef CONFIG_MEMORY_FAILURE
 	PG_hwpoison,		/* hardware poisoned page. Don't touch */
 #endif
+	/* Question: can we squeeze in here and avoid CONFIG_64BIT hacks?*/
+	PG_pool, // XXX macros called: SetPagePool / PagePool
 #if defined(CONFIG_IDLE_PAGE_TRACKING) && defined(CONFIG_64BIT)
 	PG_young,
 	PG_idle,
@@ -346,6 +349,12 @@ TESTSCFLAG(HWPoison, hwpoison, PF_ANY)
 PAGEFLAG_FALSE(HWPoison)
 #define __PG_HWPOISON 0
 #endif
+
+// XXX: Define some macros for page_pool
+// XXX: avoiding atomic set_bit() operation (like slab)
+// XXX: PF_HEAD vs PF_ANY vs PF_NO_TAIL????
+__PAGEFLAG(Pool, pool, PF_ANY)
+
 
 #if defined(CONFIG_IDLE_PAGE_TRACKING) && defined(CONFIG_64BIT)
 TESTPAGEFLAG(Young, young, PF_ANY)
@@ -700,7 +709,7 @@ static inline void ClearPageSlabPfmemalloc(struct page *page)
 /*
  * Flags checked when a page is freed.  Pages being freed should not have
  * these flags set.  It they are, there is a problem.
- */
+ */ /* XXX add PG_pool here??? */
 #define PAGE_FLAGS_CHECK_AT_FREE \
 	(1UL << PG_lru	 | 1UL << PG_locked    | \
 	 1UL << PG_private | 1UL << PG_private_2 | \

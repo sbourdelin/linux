@@ -1572,8 +1572,8 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	page->objects = oo_objects(oo);
 
 	order = compound_order(page);
-	page->slab_cache = s;
-	__SetPageSlab(page);
+	page->slab_cache = s; // Example: Saving kmem_cache in struct page
+	__SetPageSlab(page); // Example: Setting flag
 	if (page_is_pfmemalloc(page))
 		SetPageSlabPfmemalloc(page);
 

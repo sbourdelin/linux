@@ -23,6 +23,7 @@
 #include <linux/page_ext.h>
 #include <linux/err.h>
 #include <linux/page_ref.h>
+#include <linux/page_pool.h>
 
 struct mempolicy;
 struct anon_vma;
@@ -764,6 +765,11 @@ static inline void get_page(struct page *page)
 static inline void put_page(struct page *page)
 {
 	page = compound_head(page);
+
+	if (PagePool(page)) {
+		page_pool_put_page(page);
+		return;
+	}
 
 	if (put_page_testzero(page))
 		__put_page(page);

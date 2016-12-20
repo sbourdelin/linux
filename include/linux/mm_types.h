@@ -47,6 +47,12 @@ struct page {
 	unsigned long flags;		/* Atomic flags, some possibly
 					 * updated asynchronously */
 	union {
+		/* DISCUSS: Considered moving page_pool pointer here,
+		 * but I'm unsure if 'mapping' is needed for userspace
+		 * mapping the page, as this is a use-case the
+		 * page_pool need to support in the future. (Basically
+		 * mapping a NIC RX ring into userspace).
+		 */
 		struct address_space *mapping;	/* If low bit clear, points to
 						 * inode address_space, or NULL.
 						 * If page mapped as anonymous
@@ -63,6 +69,7 @@ struct page {
 	union {
 		pgoff_t index;		/* Our offset within mapping. */
 		void *freelist;		/* sl[aou]b first free object */
+		dma_addr_t dma_addr;    /* used by page_pool */
 		/* page_deferred_list().prev	-- second tail page */
 	};
 
@@ -117,6 +124,8 @@ struct page {
 	 * avoid collision and false-positive PageTail().
 	 */
 	union {
+		/* XXX: Idea reuse lru list, in page_pool to align with PCP */
+
 		struct list_head lru;	/* Pageout list, eg. active_list
 					 * protected by zone_lru_lock !
 					 * Can be used as a generic list
@@ -189,6 +198,8 @@ struct page {
 #endif
 #endif
 		struct kmem_cache *slab_cache;	/* SL[AU]B: Pointer to slab */
+		/* XXX: Sure page_pool will have no users of "private"? */
+		struct page_pool *pool;
 	};
 
 #ifdef CONFIG_MEMCG
