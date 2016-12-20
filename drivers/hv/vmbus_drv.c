@@ -883,7 +883,7 @@ void vmbus_on_msg_dpc(unsigned long data)
 		/* no msg */
 		return;
 
-	hdr = (struct vmbus_channel_message_header *)msg->u.payload;
+	hdr = (struct vmbus_channel_message_header *)msg->payload;
 
 	if (hdr->msgtype >= CHANNELMSG_COUNT) {
 		WARN_ONCE(1, "unknown msgtype=%d\n", hdr->msgtype);

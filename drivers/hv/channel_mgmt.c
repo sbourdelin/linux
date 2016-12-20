@@ -680,7 +680,7 @@ static void vmbus_wait_for_unload(void)
 				continue;
 
 			hdr = (struct vmbus_channel_message_header *)
-				msg->u.payload;
+				msg->payload;
 
 			if (hdr->msgtype == CHANNELMSG_UNLOAD_RESPONSE)
 				complete(&vmbus_connection.unload_event);
@@ -1071,14 +1071,14 @@ void vmbus_onmessage(void *context)
 	struct vmbus_channel_message_header *hdr;
 	int size;
 
-	hdr = (struct vmbus_channel_message_header *)msg->u.payload;
+	hdr = (struct vmbus_channel_message_header *)msg->payload;
 	size = msg->header.payload_size;
 
 	if (hdr->msgtype >= CHANNELMSG_COUNT) {
 		pr_err("Received invalid channel message type %d size %d\n",
 			   hdr->msgtype, size);
 		print_hex_dump_bytes("", DUMP_PREFIX_NONE,
-				     (unsigned char *)msg->u.payload, size);
+				     (unsigned char *)msg->payload, size);
 		return;
 	}
 

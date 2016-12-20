@@ -137,7 +137,7 @@ static void synic_clear_sint_msg_pending(struct kvm_vcpu_hv_synic *synic,
 	msg_page = kmap_atomic(page);
 
 	msg = &msg_page->sint_message[sint];
-	msg->header.message_flags.msg_pending = 0;
+	msg->header.message_flags &= ~HV_MESSAGE_FLAG_PENDING;
 
 	kunmap_atomic(msg_page);
 	kvm_release_page_dirty(page);
@@ -564,10 +564,10 @@ static int synic_deliver_msg(struct kvm_vcpu_hv_synic *synic, u32 sint,
 	dst_msg = &msg_page->sint_message[sint];
 	if (sync_cmpxchg(&dst_msg->header.message_type, HVMSG_NONE,
 			 src_msg->header.message_type) != HVMSG_NONE) {
-		dst_msg->header.message_flags.msg_pending = 1;
+		dst_msg->header.message_flags |= HV_MESSAGE_FLAG_PENDING;
 		r = -EAGAIN;
 	} else {
-		memcpy(&dst_msg->u.payload, &src_msg->u.payload,
+		memcpy(&dst_msg->payload, &src_msg->payload,
 		       src_msg->header.payload_size);
 		dst_msg->header.message_type = src_msg->header.message_type;
 		dst_msg->header.payload_size = src_msg->header.payload_size;
@@ -588,7 +588,7 @@ static int stimer_send_msg(struct kvm_vcpu_hv_stimer *stimer)
 	struct kvm_vcpu *vcpu = stimer_to_vcpu(stimer);
 	struct hv_message *msg = &stimer->msg;
 	struct hv_timer_message_payload *payload =
-			(struct hv_timer_message_payload *)&msg->u.payload;
+			(struct hv_timer_message_payload *)&msg->payload;
 
 	payload->expiration_time = stimer->exp_time;
 	payload->delivery_time = get_time_ref_counter(vcpu->kvm);
@@ -653,7 +653,7 @@ static void stimer_prepare_msg(struct kvm_vcpu_hv_stimer *stimer)
 {
 	struct hv_message *msg = &stimer->msg;
 	struct hv_timer_message_payload *payload =
-			(struct hv_timer_message_payload *)&msg->u.payload;
+			(struct hv_timer_message_payload *)&msg->payload;
 
 	memset(&msg->header, 0, sizeof(msg->header));
 	msg->header.message_type = HVMSG_TIMER_EXPIRED;

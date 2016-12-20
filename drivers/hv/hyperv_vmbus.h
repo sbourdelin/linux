@@ -260,7 +260,7 @@ static inline void vmbus_signal_eom(struct hv_message *msg, u32 old_msg_type)
 	 */
 	mb();
 
-	if (msg->header.message_flags.msg_pending) {
+	if (msg->header.message_flags & HV_MESSAGE_FLAG_PENDING) {
 		/*
 		 * This will cause message queue rescan to
 		 * possibly deliver another msg from the

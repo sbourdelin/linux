@@ -276,7 +276,8 @@ struct hv_ref_tsc_page {
 /* Define synthetic interrupt controller message constants. */
 #define HV_MESSAGE_SIZE			(256)
 #define HV_MESSAGE_PAYLOAD_BYTE_COUNT	(240)
-#define HV_MESSAGE_PAYLOAD_QWORD_COUNT	(30)
+
+#define HV_MESSAGE_FLAG_PENDING		(1)
 
 /* Define hypervisor message types. */
 enum hv_message_type {
@@ -308,42 +309,19 @@ enum hv_message_type {
 	HVMSG_X64_LEGACY_FP_ERROR		= 0x80010005
 };
 
-/* Define synthetic interrupt controller message flags. */
-union hv_message_flags {
-	__u8 asu8;
-	struct {
-		__u8 msg_pending:1;
-		__u8 reserved:7;
-	};
-};
-
-/* Define port identifier type. */
-union hv_port_id {
-	__u32 asu32;
-	struct {
-		__u32 id:24;
-		__u32 reserved:8;
-	} u;
-};
-
 /* Define synthetic interrupt controller message header. */
 struct hv_message_header {
 	__u32 message_type;
 	__u8 payload_size;
-	union hv_message_flags message_flags;
+	__u8 message_flags;
 	__u8 reserved[2];
-	union {
-		__u64 sender;
-		union hv_port_id port;
-	};
+	__u64 origination_id;
 };
 
 /* Define synthetic interrupt controller message format. */
 struct hv_message {
 	struct hv_message_header header;
-	union {
-		__u64 payload[HV_MESSAGE_PAYLOAD_QWORD_COUNT];
-	} u;
+	__u64 payload[HV_MESSAGE_PAYLOAD_BYTE_COUNT / 8];
 };
 
 /* Define the synthetic interrupt message page layout. */
