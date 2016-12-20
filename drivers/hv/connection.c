@@ -432,7 +432,7 @@ int vmbus_post_msg(void *buffer, size_t buflen)
 	 * times before giving up.
 	 */
 	while (retries < 20) {
-		ret = hv_post_message(conn_id, 1, buffer, buflen);
+		ret = hv_post_message(conn_id, HVMSG_VMBUS, buffer, buflen);
 
 		switch (ret) {
 		case HV_STATUS_INVALID_CONNECTION_ID:

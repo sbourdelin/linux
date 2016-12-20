@@ -282,6 +282,8 @@ struct hv_ref_tsc_page {
 enum hv_message_type {
 	HVMSG_NONE			= 0x00000000,
 
+	HVMSG_VMBUS			= 0x00000001,
+
 	/* Memory access messages. */
 	HVMSG_UNMAPPED_GPA		= 0x80000000,
 	HVMSG_GPA_INTERCEPT		= 0x80000001,
