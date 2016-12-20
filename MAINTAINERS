@@ -143,7 +143,7 @@ S:	Maintained
 F:	drivers/net/ethernet/3com/typhoon*
 
 3WARE SAS/SATA-RAID SCSI DRIVERS (3W-XXXX, 3W-9XXX, 3W-SAS)
-M:	Adam Radford <linuxraid@lsi.com>
+M:	Adam Radford <aradford@gmail.com>
 L:	linux-scsi@vger.kernel.org
 W:	http://www.lsi.com
 S:	Supported
@@ -3965,7 +3965,7 @@ F:	drivers/dma-buf/
 F:	include/linux/dma-buf*
 F:	include/linux/reservation.h
 F:	include/linux/*fence.h
-F:	Documentation/dma-buf-sharing.txt
+F:	Documentation/driver-api/dma-buf.rst
 T:	git git://anongit.freedesktop.org/drm/drm-misc
 
 SYNC FILE FRAMEWORK
@@ -3980,6 +3980,17 @@ F:	include/linux/sync_file.h
 F:	include/uapi/linux/sync_file.h
 F:	Documentation/sync_file.txt
 T:	git git://anongit.freedesktop.org/drm/drm-misc
+
+SYNC FILE FRAMEWORK
+M:	Sumit Semwal <sumit.semwal@linaro.org>
+R:	Gustavo Padovan <gustavo@padovan.org>
+S:	Maintained
+L:	linux-media@vger.kernel.org
+L:	dri-devel@lists.freedesktop.org
+F:	drivers/dma-buf/sync_file.c
+F:	include/linux/sync_file.h
+F:	Documentation/sync_file.txt
+T:	git git://git.linaro.org/people/sumitsemwal/linux-dma-buf.git
 
 DMA GENERIC OFFLOAD ENGINE SUBSYSTEM
 M:	Vinod Koul <vinod.koul@intel.com>
@@ -10136,6 +10147,12 @@ F:	drivers/net/ethernet/qlogic/qed/
 F:	include/linux/qed/
 F:	drivers/net/ethernet/qlogic/qede/
 
+QLOGIC QL41xxx ISCSI DRIVER
+M:	QLogic-Storage-Upstream@cavium.com
+L:	linux-scsi@vger.kernel.org
+S:	Supported
+F:	drivers/scsi/qedi/
+
 QNX4 FILESYSTEM
 M:	Anders Larsen <al@alarsen.net>
 W:	http://www.alarsen.net/linux/qnx4fs/
@@ -10326,6 +10343,14 @@ M:	Dennis Dalessandro <dennis.dalessandro@intel.com>
 L:	linux-rdma@vger.kernel.org
 S:	Supported
 F:	drivers/infiniband/sw/rdmavt
+
+RDT - RESOURCE ALLOCATION
+M:	Fenghua Yu <fenghua.yu@intel.com>
+L:	linux-kernel@vger.kernel.org
+S:	Supported
+F:	arch/x86/kernel/cpu/intel_rdt*
+F:	arch/x86/include/asm/intel_rdt*
+F:	Documentation/x86/intel_rdt*
 
 READ-COPY UPDATE (RCU)
 M:	"Paul E. McKenney" <paulmck@linux.vnet.ibm.com>

@@ -223,7 +223,8 @@ static int ast_get_dram_info(struct drm_device *dev)
 	ast_write32(ast, 0x10000, 0xfc600309);
 
 	do {
-		;
+		if (pci_channel_offline(dev->pdev))
+			return -EIO;
 	} while (ast_read32(ast, 0x10000) != 0x01);
 	data = ast_read32(ast, 0x10004);
 
@@ -313,7 +314,7 @@ int ast_framebuffer_init(struct drm_device *dev,
 {
 	int ret;
 
-	drm_helper_mode_fill_fb_struct(&ast_fb->base, mode_cmd);
+	drm_helper_mode_fill_fb_struct(dev, &ast_fb->base, mode_cmd);
 	ast_fb->obj = obj;
 	ret = drm_framebuffer_init(dev, &ast_fb->base, &ast_fb_funcs);
 	if (ret) {
@@ -428,7 +429,9 @@ int ast_driver_load(struct drm_device *dev, unsigned long flags)
 	ast_detect_chip(dev, &need_post);
 
 	if (ast->chip != AST1180) {
-		ast_get_dram_info(dev);
+		ret = ast_get_dram_info(dev);
+		if (ret)
+			goto out_free;
 		ast->vram_size = ast_get_vram_info(dev);
 		DRM_INFO("dram %d %d %d %08x\n", ast->mclk, ast->dram_type, ast->dram_bus_width, ast->vram_size);
 	}
