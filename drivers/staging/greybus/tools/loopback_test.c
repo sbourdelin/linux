@@ -747,7 +747,7 @@ static int wait_for_complete(struct loopback_test *t)
 	if (t->poll_timeout.tv_sec != 0)
 		ts = &t->poll_timeout;
 
-	while (1) {
+	while (!is_complete(t)) {
 
 		ret = ppoll(t->fds, t->poll_count, ts, &mask_old);
 		if (ret <= 0) {
@@ -763,14 +763,6 @@ static int wait_for_complete(struct loopback_test *t)
 				number_of_events++;
 			}
 		}
-
-		if (number_of_events == t->poll_count)
-			break;
-	}
-
-	if (!is_complete(t)) {
-		fprintf(stderr, "Iteration count did not finish!\n");
-		return -1;
 	}
 
 	return 0;
