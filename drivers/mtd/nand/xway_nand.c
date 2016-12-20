@@ -7,6 +7,7 @@
  *  Copyright © 2016 Hauke Mehrtens <hauke@hauke-m.de>
  */
 
+#include <linux/module.h>
 #include <linux/mtd/nand.h>
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
