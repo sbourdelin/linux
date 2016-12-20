@@ -342,7 +342,7 @@ static int compress_lz4(const void *in, void *out, size_t inlen, size_t outlen)
 {
 	int ret;
 
-	ret = lz4_compress(in, inlen, out, &outlen, workspace);
+	ret = LZ4_compress_default(in, out, inlen, outlen, workspace);
 	if (ret) {
 		pr_err("lz4_compress error, ret = %d!\n", ret);
 		return -EIO;
@@ -355,7 +355,7 @@ static int decompress_lz4(void *in, void *out, size_t inlen, size_t outlen)
 {
 	int ret;
 
-	ret = lz4_decompress_unknownoutputsize(in, inlen, out, &outlen);
+	ret = LZ4_decompress_safe(in, out, inlen, outlen);
 	if (ret) {
 		pr_err("lz4_decompress error, ret = %d!\n", ret);
 		return -EIO;
@@ -366,7 +366,7 @@ static int decompress_lz4(void *in, void *out, size_t inlen, size_t outlen)
 
 static void allocate_lz4(void)
 {
-	big_oops_buf_sz = lz4_compressbound(psinfo->bufsize);
+	big_oops_buf_sz = LZ4_compressBound(psinfo->bufsize);
 	big_oops_buf = kmalloc(big_oops_buf_sz, GFP_KERNEL);
 	if (big_oops_buf) {
 		workspace = kmalloc(LZ4_MEM_COMPRESS, GFP_KERNEL);
@@ -493,7 +493,6 @@ static void pstore_dump(struct kmsg_dumper *dumper,
 		if (!is_locked) {
 			pr_err("pstore dump routine blocked in %s path, may corrupt error record\n"
 				       , in_nmi() ? "NMI" : why);
-			return;
 		}
 	} else {
 		spin_lock_irqsave(&psinfo->buf_lock, flags);
@@ -585,8 +584,8 @@ static void pstore_console_write(struct console *con, const char *s, unsigned c)
 		} else {
 			spin_lock_irqsave(&psinfo->buf_lock, flags);
 		}
-		psinfo->write_buf(PSTORE_TYPE_CONSOLE, 0, &id, 0,
-				  s, 0, c, psinfo);
+		memcpy(psinfo->buf, s, c);
+		psinfo->write(PSTORE_TYPE_CONSOLE, 0, &id, 0, 0, 0, c, psinfo);
 		spin_unlock_irqrestore(&psinfo->buf_lock, flags);
 		s += c;
 		c = e - s;
