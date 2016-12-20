@@ -19,7 +19,7 @@
  * current->executable is only used by the procfs.  This allows a dispatch
  * table to check for several different types  of binary formats.  We keep
  * trying until we recognize the file or we run out of supported binary
- * formats. 
+ * formats.
  */
 
 #include <linux/slab.h>
@@ -1303,6 +1303,13 @@ void setup_new_exec(struct linux_binprm * bprm)
 	/* This is the point of no return */
 	current->sas_ss_sp = current->sas_ss_size = 0;
 
+	/*
+	 * We have to apply CLOEXEC before we change whether the process is
+	 * dumpable to avoid a race with a process in userspace trying to access
+	 * the should-be-closed file descriptors of a process undergoing exec(2).
+	 */
+	do_close_on_exec(current->files);
+
 	if (uid_eq(current_euid(), current_uid()) && gid_eq(current_egid(), current_gid()))
 		set_dumpable(current->mm, SUID_DUMP_USER);
 	else
@@ -1330,7 +1337,6 @@ void setup_new_exec(struct linux_binprm * bprm)
 	   group */
 	current->self_exec_id++;
 	flush_signal_handlers(current, 0);
-	do_close_on_exec(current->files);
 }
 EXPORT_SYMBOL(setup_new_exec);
 
