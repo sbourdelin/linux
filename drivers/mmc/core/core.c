@@ -1139,6 +1139,9 @@ void mmc_set_clock(struct mmc_host *host, unsigned int hz)
 	if (hz > host->f_max)
 		hz = host->f_max;
 
+	if (hz == host->ios.clock)
+		return;
+
 	host->ios.clock = hz;
 	mmc_set_ios(host);
 }
