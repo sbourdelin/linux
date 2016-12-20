@@ -654,7 +654,6 @@ static void init_vp_index(struct vmbus_channel *channel, u16 dev_type)
 static void vmbus_wait_for_unload(void)
 {
 	int cpu;
-	void *page_addr;
 	struct hv_message *msg;
 	struct vmbus_channel_message_header *hdr;
 	u32 message_type;
@@ -673,9 +672,8 @@ static void vmbus_wait_for_unload(void)
 			break;
 
 		for_each_online_cpu(cpu) {
-			page_addr = hv_context.synic_message_page[cpu];
-			msg = (struct hv_message *)page_addr +
-				VMBUS_MESSAGE_SINT;
+			msg = &hv_context.synic_message_page[cpu]->
+					sint_message[VMBUS_MESSAGE_SINT];
 
 			message_type = READ_ONCE(msg->header.message_type);
 			if (message_type == HVMSG_NONE)
@@ -699,8 +697,8 @@ static void vmbus_wait_for_unload(void)
 	 * messages after we reconnect.
 	 */
 	for_each_online_cpu(cpu) {
-		page_addr = hv_context.synic_message_page[cpu];
-		msg = (struct hv_message *)page_addr + VMBUS_MESSAGE_SINT;
+		msg = &hv_context.synic_message_page[cpu]->
+				sint_message[VMBUS_MESSAGE_SINT];
 		msg->header.message_type = HVMSG_NONE;
 	}
 }

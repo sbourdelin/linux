@@ -381,17 +381,12 @@ static void process_chn_event(u32 relid)
  */
 void vmbus_on_event(unsigned long data)
 {
-	u32 dword;
-	u32 maxdword;
-	int bit;
-	u32 relid;
-	u32 *recv_int_page = NULL;
-	void *page_addr;
+	u32 relid, max_relid;
+	unsigned long *recv_int_page;
 	int cpu = smp_processor_id();
-	union hv_synic_event_flags *event;
 
 	if (vmbus_proto_version < VERSION_WIN8) {
-		maxdword = MAX_NUM_CHANNELS_SUPPORTED >> 5;
+		max_relid = MAX_NUM_CHANNELS_SUPPORTED;
 		recv_int_page = vmbus_connection.recv_int_page;
 	} else {
 		/*
@@ -399,36 +394,22 @@ void vmbus_on_event(unsigned long data)
 		 * can be directly checked to get the id of the channel
 		 * that has the interrupt pending.
 		 */
-		maxdword = HV_EVENT_FLAGS_DWORD_COUNT;
-		page_addr = hv_context.synic_event_page[cpu];
-		event = (union hv_synic_event_flags *)page_addr +
-						 VMBUS_MESSAGE_SINT;
-		recv_int_page = event->flags32;
+		struct hv_synic_event_flags *event =
+			&hv_context.synic_event_page[cpu]->
+				sintevent_flags[VMBUS_MESSAGE_SINT];
+		max_relid = HV_EVENT_FLAGS_COUNT;
+		recv_int_page = (unsigned long *)event->flags;
 	}
-
-
 
 	/* Check events */
 	if (!recv_int_page)
 		return;
-	for (dword = 0; dword < maxdword; dword++) {
-		if (!recv_int_page[dword])
-			continue;
-		for (bit = 0; bit < 32; bit++) {
-			if (sync_test_and_clear_bit(bit,
-				(unsigned long *)&recv_int_page[dword])) {
-				relid = (dword << 5) + bit;
 
-				if (relid == 0)
-					/*
-					 * Special case - vmbus
-					 * channel protocol msg
-					 */
-					continue;
-
-				process_chn_event(relid);
-			}
-		}
+	/* relid == 0 is vmbus channel protocol msg */
+	relid = 1;
+	for_each_set_bit_from(relid, recv_int_page, max_relid) {
+		clear_bit(relid, recv_int_page);
+		process_chn_event(relid);
 	}
 }
 

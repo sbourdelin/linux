@@ -872,9 +872,8 @@ static void hv_process_timer_expiration(struct hv_message *msg, int cpu)
 void vmbus_on_msg_dpc(unsigned long data)
 {
 	int cpu = smp_processor_id();
-	void *page_addr = hv_context.synic_message_page[cpu];
-	struct hv_message *msg = (struct hv_message *)page_addr +
-				  VMBUS_MESSAGE_SINT;
+	struct hv_message *msg = &hv_context.synic_message_page[cpu]->
+					sint_message[VMBUS_MESSAGE_SINT];
 	struct vmbus_channel_message_header *hdr;
 	struct vmbus_channel_message_table_entry *entry;
 	struct onmessage_work_context *ctx;
@@ -911,54 +910,40 @@ msg_handled:
 static void vmbus_isr(void)
 {
 	int cpu = smp_processor_id();
-	void *page_addr;
 	struct hv_message *msg;
-	union hv_synic_event_flags *event;
-	bool handled = false;
+	struct hv_synic_event_flags *event;
 
-	page_addr = hv_context.synic_event_page[cpu];
-	if (page_addr == NULL)
+	if (!hv_context.synic_event_page[cpu])
 		return;
 
-	event = (union hv_synic_event_flags *)page_addr +
-					 VMBUS_MESSAGE_SINT;
+	event = &hv_context.synic_event_page[cpu]->
+			sintevent_flags[VMBUS_MESSAGE_SINT];
 	/*
 	 * Check for events before checking for messages. This is the order
 	 * in which events and messages are checked in Windows guests on
 	 * Hyper-V, and the Windows team suggested we do the same.
 	 */
 
-	if ((vmbus_proto_version == VERSION_WS2008) ||
-		(vmbus_proto_version == VERSION_WIN7)) {
-
+	/* On win8 and above the channel interrupts are signaled directly in
+	 * the event page and will be checked in the .event_dpc
+	 */
+	if (vmbus_proto_version >= VERSION_WIN8 ||
 		/* Since we are a child, we only need to check bit 0 */
-		if (sync_test_and_clear_bit(0,
-			(unsigned long *) &event->flags32[0])) {
-			handled = true;
-		}
-	} else {
-		/*
-		 * Our host is win8 or above. The signaling mechanism
-		 * has changed and we can directly look at the event page.
-		 * If bit n is set then we have an interrup on the channel
-		 * whose id is n.
-		 */
-		handled = true;
-	}
-
-	if (handled)
+	    test_and_clear_bit(0, (unsigned long *)event->flags))
 		tasklet_schedule(hv_context.event_dpc[cpu]);
 
-
-	page_addr = hv_context.synic_message_page[cpu];
-	msg = (struct hv_message *)page_addr + VMBUS_MESSAGE_SINT;
+	msg = &hv_context.synic_message_page[cpu]->
+			sint_message[VMBUS_MESSAGE_SINT];
 
 	/* Check if there are actual msgs to be processed */
-	if (msg->header.message_type != HVMSG_NONE) {
-		if (msg->header.message_type == HVMSG_TIMER_EXPIRED)
-			hv_process_timer_expiration(msg, cpu);
-		else
-			tasklet_schedule(hv_context.msg_dpc[cpu]);
+	switch (READ_ONCE(msg->header.message_type)) {
+	case HVMSG_NONE:
+		break;
+	case HVMSG_TIMER_EXPIRED:
+		hv_process_timer_expiration(msg, cpu);
+		break;
+	default:
+		tasklet_schedule(hv_context.msg_dpc[cpu]);
 	}
 
 	add_interrupt_randomness(HYPERVISOR_CALLBACK_VECTOR, 0);

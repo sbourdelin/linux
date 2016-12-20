@@ -363,4 +363,17 @@ struct hv_timer_message_payload {
 #define HV_STIMER_AUTOENABLE		(1ULL << 3)
 #define HV_STIMER_SINT(config)		(__u8)(((config) >> 16) & 0x0F)
 
+/* Define synthetic interrupt controller flag constants. */
+#define HV_EVENT_FLAGS_COUNT		(256 * 8)
+
+/* Define the synthetic interrupt controller event flags format. */
+struct hv_synic_event_flags {
+	__u64 flags[HV_EVENT_FLAGS_COUNT / 64];
+};
+
+/* Define the synthetic interrupt flags page layout. */
+struct hv_synic_event_flags_page {
+	struct hv_synic_event_flags sintevent_flags[HV_SYNIC_SINT_COUNT];
+};
+
 #endif

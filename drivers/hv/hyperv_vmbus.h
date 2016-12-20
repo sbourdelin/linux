@@ -26,7 +26,6 @@
 #define _HYPERV_VMBUS_H
 
 #include <linux/list.h>
-#include <asm/sync_bitops.h>
 #include <linux/atomic.h>
 #include <linux/hyperv.h>
 
@@ -74,11 +73,6 @@ enum hv_cpuid_function {
 #define HV_SYNIC_VERSION		(1)
 
 #define HV_ANY_VP			(0xFFFFFFFF)
-
-/* Define synthetic interrupt controller flag constants. */
-#define HV_EVENT_FLAGS_COUNT		(256 * 8)
-#define HV_EVENT_FLAGS_BYTE_COUNT	(256)
-#define HV_EVENT_FLAGS_DWORD_COUNT	(256 / sizeof(u32))
 
 /* Define invalid partition identifier. */
 #define HV_PARTITION_ID_INVALID		((u64)0x0)
@@ -144,20 +138,6 @@ union hv_timer_config {
 		u64 sintx:4;
 		u64 reserved_z1:44;
 	};
-};
-
-/* Define the number of message buffers associated with each port. */
-#define HV_PORT_MESSAGE_BUFFER_COUNT	(16)
-
-/* Define the synthetic interrupt controller event flags format. */
-union hv_synic_event_flags {
-	u8 flags8[HV_EVENT_FLAGS_BYTE_COUNT];
-	u32 flags32[HV_EVENT_FLAGS_DWORD_COUNT];
-};
-
-/* Define the synthetic interrupt flags page layout. */
-struct hv_synic_event_flags_page {
-	union hv_synic_event_flags sintevent_flags[HV_SYNIC_SINT_COUNT];
 };
 
 /* Define SynIC control register. */
@@ -434,8 +414,8 @@ struct hv_context {
 
 	bool synic_initialized;
 
-	void *synic_message_page[NR_CPUS];
-	void *synic_event_page[NR_CPUS];
+	struct hv_message_page *synic_message_page[NR_CPUS];
+	struct hv_synic_event_flags_page *synic_event_page[NR_CPUS];
 	/*
 	 * Hypervisor's notion of virtual processor ID is different from
 	 * Linux' notion of CPU ID. This information can only be retrieved
