@@ -378,4 +378,22 @@ struct hv_synic_event_flags_page {
 	struct hv_synic_event_flags sintevent_flags[HV_SYNIC_SINT_COUNT];
 };
 
+#define HV_HYPERCALL_PARAM_ALIGN	8
+
+/* Definition of the hv_post_message hypercall input structure. */
+struct hv_input_post_message {
+	__u32 connectionid;
+	__u32 reserved;
+	__u32 message_type;
+	__u32 payload_size;
+	__u64 payload[HV_MESSAGE_PAYLOAD_BYTE_COUNT];
+} __attribute__((aligned(HV_HYPERCALL_PARAM_ALIGN)));
+
+/* Definition of the hv_signal_event hypercall input structure. */
+struct hv_input_signal_event {
+	__u32 connectionid;
+	__u16 flag_number;
+	__u16 rsvdz;
+} __attribute__((aligned(HV_HYPERCALL_PARAM_ALIGN)));
+
 #endif

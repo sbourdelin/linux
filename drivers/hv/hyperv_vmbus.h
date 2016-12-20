@@ -104,7 +104,7 @@ union hv_monitor_trigger_group {
 };
 
 struct hv_monitor_parameter {
-	union hv_connection_id connectionid;
+	u32 connectionid;
 	u16 flagnumber;
 	u16 rsvdz;
 };
@@ -152,15 +152,6 @@ struct hv_monitor_page {
 	struct hv_monitor_parameter parameter[4][32];
 
 	u8 rsvdz4[1984];
-};
-
-/* Definition of the hv_post_message hypercall input structure. */
-struct hv_input_post_message {
-	union hv_connection_id connectionid;
-	u32 reserved;
-	u32 message_type;
-	u32 payload_size;
-	u64 payload[HV_MESSAGE_PAYLOAD_QWORD_COUNT];
 };
 
 /*
@@ -246,9 +237,6 @@ static inline  __u64 generate_guest_id(__u8 d_info1, __u32 kernel_version,
 
 #define HV_X64_MAX			5
 #define HV_CAPS_MAX			8
-
-
-#define HV_HYPERCALL_PARAM_ALIGN	sizeof(u64)
 
 
 /* Service definitions */
@@ -351,7 +339,7 @@ extern int hv_init(void);
 
 extern void hv_cleanup(bool crash);
 
-extern int hv_post_message(union hv_connection_id connection_id,
+extern int hv_post_message(u32 connection_id,
 			 enum hv_message_type message_type,
 			 void *payload, size_t payload_size);
 

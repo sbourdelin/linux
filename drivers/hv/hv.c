@@ -297,7 +297,7 @@ void hv_cleanup(bool crash)
  *
  * This involves a hypercall.
  */
-int hv_post_message(union hv_connection_id connection_id,
+int hv_post_message(u32 connection_id,
 		  enum hv_message_type message_type,
 		  void *payload, size_t payload_size)
 {

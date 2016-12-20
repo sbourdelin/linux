@@ -418,13 +418,9 @@ void vmbus_on_event(unsigned long data)
  */
 int vmbus_post_msg(void *buffer, size_t buflen)
 {
-	union hv_connection_id conn_id;
 	int ret = 0;
 	int retries = 0;
 	u32 usec = 1;
-
-	conn_id.asu32 = 0;
-	conn_id.u.id = VMBUS_MESSAGE_CONNECTION_ID;
 
 	/*
 	 * hv_post_message() can have transient failures because of
@@ -432,7 +428,8 @@ int vmbus_post_msg(void *buffer, size_t buflen)
 	 * times before giving up.
 	 */
 	while (retries < 20) {
-		ret = hv_post_message(conn_id, HVMSG_VMBUS, buffer, buflen);
+		ret = hv_post_message(VMBUS_MESSAGE_CONNECTION_ID, HVMSG_VMBUS,
+				      buffer, buflen);
 
 		switch (ret) {
 		case HV_STATUS_INVALID_CONNECTION_ID:
@@ -472,6 +469,6 @@ void vmbus_set_event(struct vmbus_channel *channel)
 		set_bit(child_relid,
 			(unsigned long *)vmbus_connection.send_int_page);
 
-	hv_do_hypercall(HVCALL_SIGNAL_EVENT, channel->sig_event, NULL);
+	hv_do_hypercall(HVCALL_SIGNAL_EVENT, &channel->sig_event, NULL);
 }
 EXPORT_SYMBOL_GPL(vmbus_set_event);

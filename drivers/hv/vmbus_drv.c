@@ -159,7 +159,7 @@ static u32 channel_conn_id(struct vmbus_channel *channel,
 {
 	u8 monitor_group = channel_monitor_group(channel);
 	u8 monitor_offset = channel_monitor_offset(channel);
-	return monitor_page->parameter[monitor_group][monitor_offset].connectionid.u.id;
+	return monitor_page->parameter[monitor_group][monitor_offset].connectionid;
 }
 
 static ssize_t id_show(struct device *dev, struct device_attribute *dev_attr,

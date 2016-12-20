@@ -648,27 +648,6 @@ struct vmbus_close_msg {
 	struct vmbus_channel_close_channel msg;
 };
 
-/* Define connection identifier type. */
-union hv_connection_id {
-	u32 asu32;
-	struct {
-		u32 id:24;
-		u32 reserved:8;
-	} u;
-};
-
-/* Definition of the hv_signal_event hypercall input structure. */
-struct hv_input_signal_event {
-	union hv_connection_id connectionid;
-	u16 flag_number;
-	u16 rsvdz;
-};
-
-struct hv_input_signal_event_buffer {
-	u64 align8;
-	struct hv_input_signal_event event;
-};
-
 enum hv_signal_policy {
 	HV_SIGNAL_POLICY_DEFAULT = 0,
 	HV_SIGNAL_POLICY_EXPLICIT,
@@ -755,8 +734,7 @@ struct vmbus_channel {
 	bool batched_reading;
 
 	bool is_dedicated_interrupt;
-	struct hv_input_signal_event_buffer sig_buf;
-	struct hv_input_signal_event *sig_event;
+	struct hv_input_signal_event sig_event;
 
 	/*
 	 * Starting with win8, this field will be used to specify
