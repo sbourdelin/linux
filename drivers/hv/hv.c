@@ -29,6 +29,7 @@
 #include <linux/version.h>
 #include <linux/interrupt.h>
 #include <linux/clockchips.h>
+#include <asm/cacheflush.h>
 #include <asm/hyperv.h>
 #include <asm/mshyperv.h>
 #include "hyperv_vmbus.h"
@@ -208,14 +209,15 @@ int hv_init(void)
 	/* See if the hypercall page is already set */
 	rdmsrl(HV_X64_MSR_HYPERCALL, hypercall_msr.as_uint64);
 
-	virtaddr = __vmalloc(PAGE_SIZE, GFP_KERNEL, PAGE_KERNEL_EXEC);
-
-	if (!virtaddr)
+	virtaddr = (void *)get_zeroed_page(GFP_KERNEL);
+	if (!virtaddr || set_memory_x((unsigned long)virtaddr, 1))
 		goto cleanup;
+	hv_context.hypercall_page = virtaddr;
 
 	hypercall_msr.enable = 1;
 
-	hypercall_msr.guest_physical_address = vmalloc_to_pfn(virtaddr);
+	hypercall_msr.guest_physical_address =
+				virt_to_phys(virtaddr) >> PAGE_SHIFT;
 	wrmsrl(HV_X64_MSR_HYPERCALL, hypercall_msr.as_uint64);
 
 	/* Confirm that hypercall page did get setup. */
@@ -225,14 +227,12 @@ int hv_init(void)
 	if (!hypercall_msr.enable)
 		goto cleanup;
 
-	hv_context.hypercall_page = virtaddr;
-
 #ifdef CONFIG_X86_64
 	if (ms_hyperv.features & HV_X64_MSR_REFERENCE_TSC_AVAILABLE) {
 		union hv_x64_msr_hypercall_contents tsc_msr;
 		void *va_tsc;
 
-		va_tsc = __vmalloc(PAGE_SIZE, GFP_KERNEL, PAGE_KERNEL);
+		va_tsc = (void *)get_zeroed_page(GFP_KERNEL);
 		if (!va_tsc)
 			goto cleanup;
 		hv_context.tsc_page = va_tsc;
@@ -240,7 +240,8 @@ int hv_init(void)
 		rdmsrl(HV_X64_MSR_REFERENCE_TSC, tsc_msr.as_uint64);
 
 		tsc_msr.enable = 1;
-		tsc_msr.guest_physical_address = vmalloc_to_pfn(va_tsc);
+		tsc_msr.guest_physical_address =
+				virt_to_phys(va_tsc) >> PAGE_SHIFT;
 
 		wrmsrl(HV_X64_MSR_REFERENCE_TSC, tsc_msr.as_uint64);
 		clocksource_register_hz(&hyperv_cs_tsc, NSEC_PER_SEC/100);
@@ -249,14 +250,9 @@ int hv_init(void)
 	return 0;
 
 cleanup:
-	if (virtaddr) {
-		if (hypercall_msr.enable) {
-			hypercall_msr.as_uint64 = 0;
-			wrmsrl(HV_X64_MSR_HYPERCALL, hypercall_msr.as_uint64);
-		}
-
-		vfree(virtaddr);
-	}
+	hypercall_msr.as_uint64 = 0;
+	wrmsrl(HV_X64_MSR_HYPERCALL, hypercall_msr.as_uint64);
+	free_page((unsigned long)virtaddr);
 
 	return -ENOTSUPP;
 }
@@ -273,13 +269,11 @@ void hv_cleanup(bool crash)
 	/* Reset our OS id */
 	wrmsrl(HV_X64_MSR_GUEST_OS_ID, 0);
 
-	if (hv_context.hypercall_page) {
-		hypercall_msr.as_uint64 = 0;
-		wrmsrl(HV_X64_MSR_HYPERCALL, hypercall_msr.as_uint64);
-		if (!crash)
-			vfree(hv_context.hypercall_page);
-		hv_context.hypercall_page = NULL;
-	}
+	hypercall_msr.as_uint64 = 0;
+	wrmsrl(HV_X64_MSR_HYPERCALL, hypercall_msr.as_uint64);
+	if (!crash)
+		free_page((unsigned long)hv_context.hypercall_page);
+	hv_context.hypercall_page = NULL;
 
 #ifdef CONFIG_X86_64
 	/*
@@ -298,7 +292,7 @@ void hv_cleanup(bool crash)
 		hypercall_msr.as_uint64 = 0;
 		wrmsrl(HV_X64_MSR_REFERENCE_TSC, hypercall_msr.as_uint64);
 		if (!crash)
-			vfree(hv_context.tsc_page);
+			free_page((unsigned long)hv_context.tsc_page);
 		hv_context.tsc_page = NULL;
 	}
 #endif
