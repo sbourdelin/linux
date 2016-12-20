@@ -1327,12 +1327,18 @@ static int mmc_select_hs400es(struct mmc_card *card)
 		goto out_err;
 	}
 
+	/*
+	 * Enable enhanced_strobe in ios, as some controllers
+	 * may need to configure few registers based on enhanced
+	 * strobe while changing HS400 timing.
+	 */
+	host->ios.enhanced_strobe = true;
+
 	/* Set host controller to HS400 timing and frequency */
 	mmc_set_timing(host, MMC_TIMING_MMC_HS400);
 	mmc_set_bus_speed(card);
 
 	/* Controller enable enhanced strobe function */
-	host->ios.enhanced_strobe = true;
 	if (host->ops->hs400_enhanced_strobe)
 		host->ops->hs400_enhanced_strobe(host, &host->ios);
 
