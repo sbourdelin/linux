@@ -419,4 +419,13 @@ struct hv_monitor_page {
 	__u8 rsvdz4[1984];
 };
 
+/* VMBus expects pre-established communication with the following IDs */
+#define VMBUS_MESSAGE_CONNECTION_ID	1
+#define VMBUS_MESSAGE_PORT_ID		1
+#define VMBUS_EVENT_CONNECTION_ID	2
+#define VMBUS_EVENT_PORT_ID		2
+#define VMBUS_MONITOR_CONNECTION_ID	3
+#define VMBUS_MONITOR_PORT_ID		3
+#define VMBUS_MESSAGE_SINT		2
+
 #endif
