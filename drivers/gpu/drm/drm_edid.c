@@ -3223,6 +3223,23 @@ cea_db_offsets(const u8 *cea, int *start, int *end)
 	return 0;
 }
 
+static bool cea_db_is_hf_vsdb(const u8 *db)
+{
+	u8 len;
+	int hfvsdb_id;
+
+	if (cea_db_tag(db) != VENDOR_BLOCK)
+		return false;
+
+	len = cea_db_payload_len(db);
+	if (len < 7)
+		return false;
+
+	hfvsdb_id = db[1] | (db[2] << 8) | (db[3] << 16);
+
+	return hfvsdb_id == HDMI_IEEE_OUI_HFVSDB;
+}
+
 static bool cea_db_is_hdmi_vsdb(const u8 *db)
 {
 	int hdmi_id;
@@ -3767,6 +3784,57 @@ bool drm_rgb_quant_range_selectable(struct edid *edid)
 }
 EXPORT_SYMBOL(drm_rgb_quant_range_selectable);
 
+static void drm_parse_yuv420_deep_color_info(struct drm_connector *connector,
+						const u8 *db)
+{
+	struct drm_hdmi_info *info = &connector->display_info.hdmi_info;
+
+	if (db[7] & DRM_EDID_YUV420_DC_48)
+		info->edid_yuv420_dc_modes |= DRM_EDID_YUV420_DC_48;
+	if (db[7] & DRM_EDID_YUV420_DC_36)
+		info->edid_yuv420_dc_modes |= DRM_EDID_YUV420_DC_36;
+	if (db[7] & DRM_EDID_YUV420_DC_30)
+		info->edid_yuv420_dc_modes |= DRM_EDID_YUV420_DC_30;
+
+	if (!info->edid_yuv420_dc_modes) {
+		DRM_DEBUG("%s: No YUV 420 deep color support in sink.\n",
+			  connector->name);
+		return;
+	}
+}
+
+static void
+drm_parse_hf_vsdb(struct drm_connector *connector, const u8 *db)
+{
+	struct drm_display_info *info = &connector->display_info;
+	struct drm_hdmi_info *hdmi_info = &info->hdmi_info;
+
+	if (db[5]) {
+		/*
+		 * If the sink supplies max tmds char rate in db,
+		 * the actual max tmds rate = db[5] * 5Mhz.
+		 */
+		info->max_tmds_clock = db[5] * 5000;
+		DRM_DEBUG_KMS("HF-VSDB: max TMDS clock %d kHz\n",
+		info->max_tmds_clock);
+	}
+
+	if (db[6] & DRM_HFVSDB_SCDC_SUPPORT)
+		hdmi_info->scdc_supported = true;
+	if (db[6] & DRM_HFVSDB_SCDC_RR_CAP)
+		hdmi_info->scdc_rr_cap = true;
+	if (db[6] & DRM_HFVSDB_SCRAMBLING)
+		hdmi_info->scrambling = true;
+	if (db[6] & DRM_HFVSDB_INDEPENDENT_VIEW)
+		hdmi_info->independent_view_3d = true;
+	if (db[6] & DRM_HFVSDB_DUAL_VIEW)
+		hdmi_info->dual_view_3d = true;
+	if (db[6] & DRM_HFVSDB_3D_OSD)
+		hdmi_info->osd_disparity_3d = true;
+
+	drm_parse_yuv420_deep_color_info(connector, db);
+}
+
 static void drm_parse_hdmi_deep_color_info(struct drm_connector *connector,
 					   const u8 *hdmi)
 {
@@ -3881,6 +3949,8 @@ static void drm_parse_cea_ext(struct drm_connector *connector,
 
 		if (cea_db_is_hdmi_vsdb(db))
 			drm_parse_hdmi_vsdb_video(connector, db);
+		if (cea_db_is_hf_vsdb(db))
+			drm_parse_hf_vsdb(connector, db);
 	}
 }
 
