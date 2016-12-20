@@ -393,28 +393,28 @@ int hv_synic_alloc(void)
 	int cpu;
 
 	hv_context.hv_numa_map = kzalloc(sizeof(struct cpumask) * nr_node_ids,
-					 GFP_ATOMIC);
+					 GFP_KERNEL);
 	if (hv_context.hv_numa_map == NULL) {
 		pr_err("Unable to allocate NUMA map\n");
 		goto err;
 	}
 
 	for_each_online_cpu(cpu) {
-		hv_context.event_dpc[cpu] = kmalloc(size, GFP_ATOMIC);
+		hv_context.event_dpc[cpu] = kmalloc(size, GFP_KERNEL);
 		if (hv_context.event_dpc[cpu] == NULL) {
 			pr_err("Unable to allocate event dpc\n");
 			goto err;
 		}
 		tasklet_init(hv_context.event_dpc[cpu], vmbus_on_event, cpu);
 
-		hv_context.msg_dpc[cpu] = kmalloc(size, GFP_ATOMIC);
+		hv_context.msg_dpc[cpu] = kmalloc(size, GFP_KERNEL);
 		if (hv_context.msg_dpc[cpu] == NULL) {
 			pr_err("Unable to allocate event dpc\n");
 			goto err;
 		}
 		tasklet_init(hv_context.msg_dpc[cpu], vmbus_on_msg_dpc, cpu);
 
-		hv_context.clk_evt[cpu] = kzalloc(ced_size, GFP_ATOMIC);
+		hv_context.clk_evt[cpu] = kzalloc(ced_size, GFP_KERNEL);
 		if (hv_context.clk_evt[cpu] == NULL) {
 			pr_err("Unable to allocate clock event device\n");
 			goto err;
@@ -423,7 +423,7 @@ int hv_synic_alloc(void)
 		hv_init_clockevent_device(hv_context.clk_evt[cpu], cpu);
 
 		hv_context.synic_message_page[cpu] =
-			(void *)get_zeroed_page(GFP_ATOMIC);
+			(void *)get_zeroed_page(GFP_KERNEL);
 
 		if (hv_context.synic_message_page[cpu] == NULL) {
 			pr_err("Unable to allocate SYNIC message page\n");
@@ -431,7 +431,7 @@ int hv_synic_alloc(void)
 		}
 
 		hv_context.synic_event_page[cpu] =
-			(void *)get_zeroed_page(GFP_ATOMIC);
+			(void *)get_zeroed_page(GFP_KERNEL);
 
 		if (hv_context.synic_event_page[cpu] == NULL) {
 			pr_err("Unable to allocate SYNIC event page\n");
@@ -439,7 +439,7 @@ int hv_synic_alloc(void)
 		}
 
 		hv_context.post_msg_page[cpu] =
-			(void *)get_zeroed_page(GFP_ATOMIC);
+			(void *)get_zeroed_page(GFP_KERNEL);
 
 		if (hv_context.post_msg_page[cpu] == NULL) {
 			pr_err("Unable to allocate post msg page\n");
@@ -457,12 +457,9 @@ static void hv_synic_free_cpu(int cpu)
 	kfree(hv_context.event_dpc[cpu]);
 	kfree(hv_context.msg_dpc[cpu]);
 	kfree(hv_context.clk_evt[cpu]);
-	if (hv_context.synic_event_page[cpu])
-		free_page((unsigned long)hv_context.synic_event_page[cpu]);
-	if (hv_context.synic_message_page[cpu])
-		free_page((unsigned long)hv_context.synic_message_page[cpu]);
-	if (hv_context.post_msg_page[cpu])
-		free_page((unsigned long)hv_context.post_msg_page[cpu]);
+	free_page((unsigned long)hv_context.synic_event_page[cpu]);
+	free_page((unsigned long)hv_context.synic_message_page[cpu]);
+	free_page((unsigned long)hv_context.post_msg_page[cpu]);
 }
 
 void hv_synic_free(void)
