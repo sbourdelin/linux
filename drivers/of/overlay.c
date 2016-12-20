@@ -587,3 +587,53 @@ int of_overlay_destroy_all(void)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(of_overlay_destroy_all);
+
+/**
+ * of_overlay_destroy_last() - Removes the last overlay from the system
+ *
+ * It is allways possible to delete the last overlay.
+ *
+ * Returns 0 on success, or a negative error number
+ */
+int of_overlay_destroy_last(void)
+{
+	struct of_overlay *ov, *ovn;
+	int id;
+
+	mutex_lock(&of_mutex);
+
+	list_for_each_entry_safe_reverse(ov, ovn, &ov_list, node) {
+		id = ov->id;
+		mutex_unlock(&of_mutex);
+		return of_overlay_destroy(id);
+	}
+
+	mutex_unlock(&of_mutex);
+
+	pr_info("destroy: No overlay to destroy");
+
+	return -ENODEV;
+}
+EXPORT_SYMBOL_GPL(of_overlay_destroy_last);
+
+/**
+ * of_overlay_count - Counts number of loaded overlays
+ *
+ * Returns number of loaded overlays
+ */
+int of_overlay_count(void)
+{
+	struct of_overlay *ov, *ovn;
+	int count = 0;
+
+	mutex_lock(&of_mutex);
+
+	list_for_each_entry_safe(ov, ovn, &ov_list, node) {
+		++count;
+	}
+
+	mutex_unlock(&of_mutex);
+
+	return count;
+}
+EXPORT_SYMBOL_GPL(of_overlay_count);
