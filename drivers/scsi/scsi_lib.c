@@ -830,6 +830,45 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	}
 
 	/*
+	 * If the SCSI command is successful but has residual bytes,
+	 * align good_bytes to the device sector size to ensure the
+	 * requeued request (to complete the remainder transfer) is
+	 * also aligned and does not fail alignment/size validation.
+	 */
+	if (unlikely(!result && scsi_get_resid(cmd) &&
+		     req->cmd_type == REQ_TYPE_FS)) {
+
+		unsigned int sector_size = cmd->device->sector_size;
+		unsigned int remainder = good_bytes % sector_size;
+		int resid = scsi_get_resid(cmd);
+
+		SCSI_LOG_HLCOMPLETE(1, scmd_printk(KERN_INFO, cmd,
+			"checking %d bytes for alignment "
+			"(sector size %u, remainder %u, resid %d)\n",
+			good_bytes, sector_size, remainder, resid));
+
+		if (remainder) {
+			good_bytes -= remainder;
+			resid += remainder;
+			scsi_set_resid(cmd, resid);
+
+			/*
+			 * If less than one device sector has completed, retry the
+			 * request after delay (up to the retry limit) or timeout.
+			 */
+			if (!good_bytes) {
+				if ((++cmd->retries) <= cmd->allowed
+				&& !scsi_noretry_cmd(cmd)) {
+					goto delayed_retry;
+				} else {
+					set_host_byte(cmd, DID_TIME_OUT);
+					goto error;
+				}
+			}
+		}
+	}
+
+	/*
 	 * special case: failed zero length commands always need to
 	 * drop down into the retry code. Otherwise, if we finished
 	 * all bytes in the request we are done now.
@@ -854,6 +893,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	if (result == 0)
 		goto requeue;
 
+	error:
 	error = __scsi_error_from_host_byte(cmd, result);
 
 	if (host_byte(result) == DID_RESET) {
@@ -994,6 +1034,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 		__scsi_queue_insert(cmd, SCSI_MLQUEUE_EH_RETRY, 0);
 		break;
 	case ACTION_DELAYED_RETRY:
+	delayed_retry:
 		/* Retry the same command after a delay */
 		__scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY, 0);
 		break;
