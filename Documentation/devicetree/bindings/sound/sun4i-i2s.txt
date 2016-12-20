@@ -18,6 +18,8 @@ Required properties:
    - "apb" : clock for the I2S bus interface
    - "mod" : module clock for the I2S controller
 - #sound-dai-cells : Must be equal to 0
+- resets: reset specifier for the ahb reset (A31 and newer only)
+
 
 Example:
 
