@@ -94,63 +94,6 @@ struct hv_connection_info {
 	};
 };
 
-/*
- * Timer configuration register.
- */
-union hv_timer_config {
-	u64 as_uint64;
-	struct {
-		u64 enable:1;
-		u64 periodic:1;
-		u64 lazy:1;
-		u64 auto_enable:1;
-		u64 reserved_z0:12;
-		u64 sintx:4;
-		u64 reserved_z1:44;
-	};
-};
-
-/* Define SynIC control register. */
-union hv_synic_scontrol {
-	u64 as_uint64;
-	struct {
-		u64 enable:1;
-		u64 reserved:63;
-	};
-};
-
-/* Define synthetic interrupt source. */
-union hv_synic_sint {
-	u64 as_uint64;
-	struct {
-		u64 vector:8;
-		u64 reserved1:8;
-		u64 masked:1;
-		u64 auto_eoi:1;
-		u64 reserved2:46;
-	};
-};
-
-/* Define the format of the SIMP register */
-union hv_synic_simp {
-	u64 as_uint64;
-	struct {
-		u64 simp_enabled:1;
-		u64 preserved:11;
-		u64 base_simp_gpa:52;
-	};
-};
-
-/* Define the format of the SIEFP register */
-union hv_synic_siefp {
-	u64 as_uint64;
-	struct {
-		u64 siefp_enabled:1;
-		u64 preserved:11;
-		u64 base_siefp_gpa:52;
-	};
-};
-
 /* Definitions for the monitored notification facility */
 union hv_monitor_trigger_group {
 	u64 as_uint64;
@@ -237,37 +180,6 @@ enum hv_guest_os_microsoft_ids {
 	HVGUESTOS_MICROSOFT_WINDOWS9X	= 0x03,
 	HVGUESTOS_MICROSOFT_WINDOWSNT	= 0x04,
 	HVGUESTOS_MICROSOFT_WINDOWSCE	= 0x05
-};
-
-/*
- * Declare the MSR used to identify the guest OS.
- */
-#define HV_X64_MSR_GUEST_OS_ID	0x40000000
-
-union hv_x64_msr_guest_os_id_contents {
-	u64 as_uint64;
-	struct {
-		u64 build_number:16;
-		u64 service_version:8; /* Service Pack, etc. */
-		u64 minor_version:8;
-		u64 major_version:8;
-		u64 os_id:8; /* enum hv_guest_os_microsoft_ids (if Vendor=MS) */
-		u64 vendor_id:16; /* enum hv_guest_os_vendor */
-	};
-};
-
-/*
- * Declare the MSR used to setup pages used to communicate with the hypervisor.
- */
-#define HV_X64_MSR_HYPERCALL	0x40000001
-
-union hv_x64_msr_hypercall_contents {
-	u64 as_uint64;
-	struct {
-		u64 enable:1;
-		u64 reserved:11;
-		u64 guest_physical_address:52;
-	};
 };
 
 
