@@ -813,15 +813,28 @@ void mtrr_save_state(void)
 	put_online_cpus();
 }
 
+static bool __read_mostly no_aps_delay;
+
+static int __init no_aps_setup(char *str)
+{
+	no_aps_delay = true;
+	pr_info("hack: do not delay aps mtrr/pat initialization.\n");
+
+	return 0;
+}
+
 void set_mtrr_aps_delayed_init(void)
 {
 	if (!mtrr_enabled())
 		return;
 	if (!use_intel())
 		return;
+	if (no_aps_delay)
+		return;
 
 	mtrr_aps_delayed_init = true;
 }
+early_param("no_aps_delay", no_aps_setup);
 
 /*
  * Delayed MTRR initialization for all AP's
