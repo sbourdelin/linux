@@ -567,6 +567,9 @@
  *	%NL80211_ATTR_CSA_C_OFFSETS_TX is an array of offsets to CSA
  *	counters which will be updated to the current value. This attribute
  *	is used during CSA period.
+ *	When sending a Public Action frame, %NL80211_ATTR_MGMT_TX_RANDOM_SA can
+ *	be used to indicate that random local address (SA) is used for the
+ *	exchange.
  * @NL80211_CMD_FRAME_WAIT_CANCEL: When an off-channel TX was requested, this
  *	command may be used with the corresponding cookie to cancel the wait
  *	time if it is known that it is no longer necessary.
@@ -1915,6 +1918,11 @@ enum nl80211_commands {
  *	%NL80211_ATTR_IFTYPE, %NL80211_ATTR_EXT_CAPA,
  *	%NL80211_ATTR_EXT_CAPA_MASK, to specify the extended capabilities per
  *	interface type.
+ * @NL80211_ATTR_MGMT_TX_RANDOM_SA: A flag attribute indicating whether the
+ *	source address is randomized in frames sent using %NL80211_CMD_FRAME.
+ *	If this flag is not set, the source address field is verified to match
+ *	local MAC address. Random SA can be used only with Public Action frames
+ *	(e.g., GAS/ANQP).
  *
  * @NL80211_ATTR_MU_MIMO_GROUP_DATA: array of 24 bytes that defines a MU-MIMO
  *	groupID for monitor mode.
@@ -2385,6 +2393,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED,
 
 	NL80211_ATTR_BSSID,
+
+	NL80211_ATTR_MGMT_TX_RANDOM_SA,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -4697,6 +4707,10 @@ enum nl80211_feature_flags {
  *	configuration (AP/mesh) with VHT rates.
  * @NL80211_EXT_FEATURE_FILS_STA: This driver supports Fast Initial Link Setup
  *	with user space SME (NL80211_CMD_AUTHENTICATE) in station mode.
+ * @NL80211_EXT_FEATURE_MGMT_TX_RANDOM_SA: This driver supports randomized SA
+ *	in @NL80211_CMD_FRAME while not associated.
+ * @NL80211_EXT_FEATURE_MGMT_TX_RANDOM_SA_CONNECTED: This driver supports
+ *	randomized SA in @NL80211_CMD_FRAME while associated.
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
@@ -4712,6 +4726,8 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_BEACON_RATE_HT,
 	NL80211_EXT_FEATURE_BEACON_RATE_VHT,
 	NL80211_EXT_FEATURE_FILS_STA,
+	NL80211_EXT_FEATURE_MGMT_TX_RANDOM_SA,
+	NL80211_EXT_FEATURE_MGMT_TX_RANDOM_SA_CONNECTED,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,

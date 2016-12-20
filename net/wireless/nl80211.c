@@ -405,6 +405,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_FILS_NONCES] = { .len = 2 * FILS_NONCE_LEN },
 	[NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED] = { .type = NLA_FLAG, },
 	[NL80211_ATTR_BSSID] = { .len = ETH_ALEN },
+	[NL80211_ATTR_MGMT_TX_RANDOM_SA] = { .type = NLA_FLAG },
 };
 
 /* policy for the key attributes */
@@ -9208,6 +9209,19 @@ static int nl80211_tx_mgmt(struct sk_buff *skb, struct genl_info *info)
 				return -EINVAL;
 		}
 	}
+
+	params.random_sa = nla_get_flag(
+		info->attrs[NL80211_ATTR_MGMT_TX_RANDOM_SA]);
+	if (params.random_sa &&
+	    ((!wdev->current_bss &&
+	      !wiphy_ext_feature_isset(
+		      &rdev->wiphy,
+		      NL80211_EXT_FEATURE_MGMT_TX_RANDOM_SA)) ||
+	     (wdev->current_bss &&
+	      !wiphy_ext_feature_isset(
+		      &rdev->wiphy,
+		      NL80211_EXT_FEATURE_MGMT_TX_RANDOM_SA_CONNECTED))))
+		return -EINVAL;
 
 	if (!params.dont_wait_for_ack) {
 		msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);

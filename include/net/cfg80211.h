@@ -2303,6 +2303,11 @@ struct cfg80211_update_ft_ies_params {
  * @dont_wait_for_ack: tells the low level not to wait for an ack
  * @n_csa_offsets: length of csa_offsets array
  * @csa_offsets: array of all the csa offsets in the frame
+ * @random_sa: indicates whether the source address is randomized. When this is
+ *	true, the driver needs to transmit the management frame using the
+ *	address specified in the SA field (Address 2) in the buffer and the
+ *	driver needs to receive and acknowledge the response frame to this
+ *	address instead of its permanent MAC address.
  */
 struct cfg80211_mgmt_tx_params {
 	struct ieee80211_channel *chan;
@@ -2314,6 +2319,7 @@ struct cfg80211_mgmt_tx_params {
 	bool dont_wait_for_ack;
 	int n_csa_offsets;
 	const u16 *csa_offsets;
+	bool random_sa;
 };
 
 /**

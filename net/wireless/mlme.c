@@ -657,7 +657,10 @@ int cfg80211_mlme_mgmt_tx(struct cfg80211_registered_device *rdev,
 			return err;
 	}
 
-	if (!ether_addr_equal(mgmt->sa, wdev_address(wdev)))
+	if (!(params->random_sa &&
+	      (ieee80211_is_action(mgmt->frame_control) &&
+	       mgmt->u.action.category == WLAN_CATEGORY_PUBLIC)) &&
+	    !ether_addr_equal(mgmt->sa, wdev_address(wdev)))
 		return -EINVAL;
 
 	/* Transmit the Action frame as requested by user space */
