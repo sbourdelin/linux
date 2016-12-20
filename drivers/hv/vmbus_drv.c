@@ -77,7 +77,7 @@ static void hyperv_report_panic(struct pt_regs *regs)
 	/*
 	 * Let Hyper-V know there is crash data available
 	 */
-	wrmsrl(HV_X64_MSR_CRASH_CTL, HV_CRASH_CTL_CRASH_NOTIFY);
+	wrmsrl(HV_X64_MSR_CRASH_CTL, HV_X64_MSR_CRASH_CTL_NOTIFY);
 }
 
 static int hyperv_panic_event(struct notifier_block *nb, unsigned long val,
@@ -993,7 +993,7 @@ static int vmbus_bus_init(void)
 	/*
 	 * Only register if the crash MSRs are available
 	 */
-	if (ms_hyperv.misc_features & HV_FEATURE_GUEST_CRASH_MSR_AVAILABLE) {
+	if (ms_hyperv.misc_features & HV_X64_GUEST_CRASH_MSR_AVAILABLE) {
 		register_die_notifier(&hyperv_die_block);
 		atomic_notifier_chain_register(&panic_notifier_list,
 					       &hyperv_panic_block);
@@ -1535,7 +1535,7 @@ static void __exit vmbus_exit(void)
 	for_each_online_cpu(cpu)
 		tasklet_kill(hv_context.msg_dpc[cpu]);
 	vmbus_free_channels();
-	if (ms_hyperv.misc_features & HV_FEATURE_GUEST_CRASH_MSR_AVAILABLE) {
+	if (ms_hyperv.misc_features & HV_X64_GUEST_CRASH_MSR_AVAILABLE) {
 		unregister_die_notifier(&hyperv_die_block);
 		atomic_notifier_chain_unregister(&panic_notifier_list,
 						 &hyperv_panic_block);
