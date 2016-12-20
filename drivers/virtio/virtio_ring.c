@@ -159,6 +159,10 @@ static bool vring_use_dma_api(struct virtio_device *vdev)
 	if (xen_domain())
 		return true;
 
+	/* On ARM-based machines, the DMA ops will do the right thing */
+	if (IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
+		return true;
+
 	return false;
 }
 
