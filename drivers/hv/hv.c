@@ -69,17 +69,17 @@ static int query_hypervisor_info(void)
 	ebx = 0;
 	ecx = 0;
 	edx = 0;
-	op = HVCPUID_VENDOR_MAXFUNCTION;
+	op = HYPERV_CPUID_VENDOR_AND_MAX_FUNCTIONS;
 	cpuid(op, &eax, &ebx, &ecx, &edx);
 
 	max_leaf = eax;
 
-	if (max_leaf >= HVCPUID_VERSION) {
+	if (max_leaf >= HYPERV_CPUID_VERSION) {
 		eax = 0;
 		ebx = 0;
 		ecx = 0;
 		edx = 0;
-		op = HVCPUID_VERSION;
+		op = HYPERV_CPUID_VERSION;
 		cpuid(op, &eax, &ebx, &ecx, &edx);
 		host_info_eax = eax;
 		host_info_ebx = ebx;
