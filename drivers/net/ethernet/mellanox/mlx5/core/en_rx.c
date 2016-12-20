@@ -182,6 +182,7 @@ unlock:
 
 #define RQ_PAGE_SIZE(rq) ((1 << rq->buff.page_order) << PAGE_SHIFT)
 
+// TODO: Remove mlx5-page-cache
 static inline bool mlx5e_rx_cache_put(struct mlx5e_rq *rq,
 				      struct mlx5e_dma_info *dma_info)
 {
@@ -198,6 +199,7 @@ static inline bool mlx5e_rx_cache_put(struct mlx5e_rq *rq,
 	return true;
 }
 
+// TODO: Remove mlx5-page-cache
 static inline bool mlx5e_rx_cache_get(struct mlx5e_rq *rq,
 				      struct mlx5e_dma_info *dma_info)
 {
@@ -228,20 +230,27 @@ static inline int mlx5e_page_alloc_mapped(struct mlx5e_rq *rq,
 {
 	struct page *page;
 
-	if (mlx5e_rx_cache_get(rq, dma_info))
-		return 0;
+//	if (mlx5e_rx_cache_get(rq, dma_info))
+//		return 0;
 
-	page = dev_alloc_pages(rq->buff.page_order);
+	//page = dev_alloc_pages(rq->buff.page_order);
+	page = page_pool_dev_alloc_pages(rq->page_pool);
 	if (unlikely(!page))
 		return -ENOMEM;
 
 	dma_info->page = page;
-	dma_info->addr = dma_map_page(rq->pdev, page, 0,
-				      RQ_PAGE_SIZE(rq), rq->buff.map_dir);
-	if (unlikely(dma_mapping_error(rq->pdev, dma_info->addr))) {
-		put_page(page);
-		return -ENOMEM;
-	}
+	dma_info->addr = page->dma_addr;
+//	dma_info->addr = dma_map_page(rq->pdev, page, 0,
+//				      RQ_PAGE_SIZE(rq), rq->buff.map_dir);
+
+	/* DISCUSS: should this be moved into page_pool API?  Here we
+	 * sync entire page, but some drivers might want have more
+	 * control?  Like using the dma_sync_single_range_for_device()
+	 * like Alex is doing in the Intel drivers...
+	 */
+	dma_sync_single_for_device(rq->pdev, dma_info->addr,
+				   RQ_PAGE_SIZE(rq),
+				   DMA_FROM_DEVICE);
 
 	return 0;
 }
@@ -249,11 +258,21 @@ static inline int mlx5e_page_alloc_mapped(struct mlx5e_rq *rq,
 void mlx5e_page_release(struct mlx5e_rq *rq, struct mlx5e_dma_info *dma_info,
 			bool recycle)
 {
-	if (likely(recycle) && mlx5e_rx_cache_put(rq, dma_info))
+//	if (likely(recycle) && mlx5e_rx_cache_put(rq, dma_info))
+//		return;
+	// TODO: use page_pool_recycle_direct(dma_info->page);
+	if (recycle) {
+		page_pool_recycle_direct(dma_info->page);
 		return;
+	}
 
-	dma_unmap_page(rq->pdev, dma_info->addr, RQ_PAGE_SIZE(rq),
-		       rq->buff.map_dir);
+// page_pool take over dma_unmap
+//	dma_unmap_page(rq->pdev, dma_info->addr, RQ_PAGE_SIZE(rq),
+//		       rq->buff.map_dir);
+	// XXX: do we need to call dma_sync_single_range_for_cpu here???
+	// dma_sync_single_range_for_cpu(rq->pdev, dma_info->addr,
+	//			      RQ_PAGE_SIZE(rq), rq->buff.map_dir);
+
 	put_page(dma_info->page);
 }
 
@@ -772,10 +791,6 @@ struct sk_buff *skb_from_cqe(struct mlx5e_rq *rq, struct mlx5_cqe64 *cqe,
 		mlx5e_page_release(rq, di, true);
 		return NULL;
 	}
-
-	/* queue up for recycling ..*/
-	page_ref_inc(di->page);
-	mlx5e_page_release(rq, di, true);
 
 	skb_reserve(skb, MLX5_RX_HEADROOM);
 	skb_put(skb, cqe_bcnt);

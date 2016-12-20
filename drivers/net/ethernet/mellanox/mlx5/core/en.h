@@ -361,6 +361,7 @@ struct mlx5e_rq {
 	struct mlx5e_tstamp   *tstamp;
 	struct mlx5e_rq_stats  stats;
 	struct mlx5e_cq        cq;
+	struct page_pool      *page_pool;
 	struct mlx5e_page_cache page_cache;
 
 	mlx5e_fp_handle_rx_cqe handle_rx_cqe;

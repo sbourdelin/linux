@@ -34,6 +34,7 @@
 #include <net/pkt_cls.h>
 #include <linux/mlx5/fs.h>
 #include <net/vxlan.h>
+#include <linux/page_pool.h>
 #include <linux/bpf.h>
 #include "en.h"
 #include "en_tc.h"
@@ -521,6 +522,7 @@ static int mlx5e_create_rq(struct mlx5e_channel *c,
 			   struct mlx5e_rq_param *param,
 			   struct mlx5e_rq *rq)
 {
+	struct page_pool_params pp_params = { 0 };
 	struct mlx5e_priv *priv = c->priv;
 	struct mlx5_core_dev *mdev = priv->mdev;
 	void *rqc = param->rqc;
@@ -591,6 +593,7 @@ static int mlx5e_create_rq(struct mlx5e_channel *c,
 	default: /* MLX5_WQ_TYPE_LINKED_LIST */
 		rq->dma_info = kzalloc_node(wq_sz * sizeof(*rq->dma_info),
 					    GFP_KERNEL, cpu_to_node(c->cpu));
+//		rq->dma_info = NULL; //HACK ALWAYS FAIL TEST
 		if (!rq->dma_info) {
 			err = -ENOMEM;
 			goto err_rq_wq_destroy;
@@ -617,6 +620,24 @@ static int mlx5e_create_rq(struct mlx5e_channel *c,
 
 		npages = DIV_ROUND_UP(frag_sz, PAGE_SIZE);
 		rq->buff.page_order = order_base_2(npages);
+
+		pp_params.size		= PAGE_POOL_PARAMS_SIZE;
+		pp_params.order		= rq->buff.page_order;
+		pp_params.dev		= c->pdev;
+		pp_params.nid		= cpu_to_node(c->cpu);
+		pp_params.dma_dir	= DMA_BIDIRECTIONAL;
+		pp_params.pool_size	= 2000;
+		pr_info("XXX: %s() pp_params.size=%d end=%lu\n",
+			__func__, pp_params.size,
+			offsetof(struct page_pool_params, end_marker));
+
+		rq->page_pool = page_pool_create(&pp_params);
+		if (IS_ERR_OR_NULL(rq->page_pool)) {
+			rq->page_pool = NULL;
+			kfree(rq->dma_info);
+			err = -ENOMEM;
+			goto err_rq_wq_destroy;
+		}
 
 		byte_count |= MLX5_HW_START_PADDING;
 		rq->mkey_be = c->mkey_be;
@@ -662,6 +683,13 @@ static void mlx5e_destroy_rq(struct mlx5e_rq *rq)
 		break;
 	default: /* MLX5_WQ_TYPE_LINKED_LIST */
 		kfree(rq->dma_info);
+		if (rq->page_pool)
+			page_pool_destroy(rq->page_pool);
+		else
+			// Can happen because mlx5 have some extra
+			// rq's for some other purposes... (explain?)
+			pr_err("XXX: %s() NULL pointer at rq->page_pool\n",
+			       __func__);
 	}
 
 	for (i = rq->page_cache.head; i != rq->page_cache.tail;
