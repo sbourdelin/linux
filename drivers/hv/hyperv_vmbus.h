@@ -94,66 +94,6 @@ struct hv_connection_info {
 	};
 };
 
-/* Definitions for the monitored notification facility */
-union hv_monitor_trigger_group {
-	u64 as_uint64;
-	struct {
-		u32 pending;
-		u32 armed;
-	};
-};
-
-struct hv_monitor_parameter {
-	u32 connectionid;
-	u16 flagnumber;
-	u16 rsvdz;
-};
-
-union hv_monitor_trigger_state {
-	u32 asu32;
-
-	struct {
-		u32 group_enable:4;
-		u32 rsvdz:28;
-	};
-};
-
-/* struct hv_monitor_page Layout */
-/* ------------------------------------------------------ */
-/* | 0   | TriggerState (4 bytes) | Rsvd1 (4 bytes)     | */
-/* | 8   | TriggerGroup[0]                              | */
-/* | 10  | TriggerGroup[1]                              | */
-/* | 18  | TriggerGroup[2]                              | */
-/* | 20  | TriggerGroup[3]                              | */
-/* | 28  | Rsvd2[0]                                     | */
-/* | 30  | Rsvd2[1]                                     | */
-/* | 38  | Rsvd2[2]                                     | */
-/* | 40  | NextCheckTime[0][0]    | NextCheckTime[0][1] | */
-/* | ...                                                | */
-/* | 240 | Latency[0][0..3]                             | */
-/* | 340 | Rsvz3[0]                                     | */
-/* | 440 | Parameter[0][0]                              | */
-/* | 448 | Parameter[0][1]                              | */
-/* | ...                                                | */
-/* | 840 | Rsvd4[0]                                     | */
-/* ------------------------------------------------------ */
-struct hv_monitor_page {
-	union hv_monitor_trigger_state trigger_state;
-	u32 rsvdz1;
-
-	union hv_monitor_trigger_group trigger_group[4];
-	u64 rsvdz2[3];
-
-	s32 next_checktime[4][32];
-
-	u16 latency[4][32];
-	u64 rsvdz3[32];
-
-	struct hv_monitor_parameter parameter[4][32];
-
-	u8 rsvdz4[1984];
-};
-
 /*
  * Versioning definitions used for guests reporting themselves to the
  * hypervisor, and visa versa.

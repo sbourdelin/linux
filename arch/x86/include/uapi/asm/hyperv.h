@@ -396,4 +396,27 @@ struct hv_input_signal_event {
 	__u16 rsvdz;
 } __attribute__((aligned(HV_HYPERCALL_PARAM_ALIGN)));
 
+/* Definitions for the monitored notification facility */
+struct hv_monitor_trigger_group {
+	__u32 pending;
+	__u32 armed;
+};
+
+struct hv_monitor_page {
+	__u32 trigger_state;
+	__u32 rsvdz1;
+
+	struct hv_monitor_trigger_group trigger_group[4];
+	__u64 rsvdz2[3];
+
+	__s32 next_checktime[4][32];
+
+	__u16 latency[4][32];
+	__u64 rsvdz3[32];
+
+	struct hv_input_signal_event parameter[4][32];
+
+	__u8 rsvdz4[1984];
+};
+
 #endif
