@@ -371,7 +371,7 @@ static void _mic_ack_interrupt(struct mbus_device *mbdev, int num)
 	mdev->ops->intr_workarounds(mdev);
 }
 
-static struct mbus_hw_ops mbus_hw_ops = {
+static const struct mbus_hw_ops mbus_hw_ops = {
 	.request_threaded_irq = _mic_request_threaded_irq,
 	.free_irq = _mic_free_irq,
 	.ack_interrupt = _mic_ack_interrupt,

@@ -49,7 +49,7 @@ struct mbus_device_id {
  */
 struct mbus_device {
 	void __iomem *mmio_va;
-	struct mbus_hw_ops *hw_ops;
+	const struct mbus_hw_ops *hw_ops;
 	struct mbus_device_id id;
 	struct device dev;
 	int index;
@@ -91,7 +91,7 @@ struct mbus_hw_ops {
 
 struct mbus_device *
 mbus_register_device(struct device *pdev, int id, struct dma_map_ops *dma_ops,
-		     struct mbus_hw_ops *hw_ops, int index,
+		     const struct mbus_hw_ops *hw_ops, int index,
 		     void __iomem *mmio_va);
 void mbus_unregister_device(struct mbus_device *mbdev);
 

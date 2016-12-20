@@ -165,7 +165,7 @@ static inline struct mbus_device *to_mbus_device(struct mic_dma_chan *ch)
 	return to_mic_dma_dev(ch)->mbdev;
 }
 
-static inline struct mbus_hw_ops *to_mbus_hw_ops(struct mic_dma_chan *ch)
+static inline const struct mbus_hw_ops *to_mbus_hw_ops(struct mic_dma_chan *ch)
 {
 	return to_mbus_device(ch)->hw_ops;
 }
