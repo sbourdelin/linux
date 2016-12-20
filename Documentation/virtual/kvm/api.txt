@@ -3177,7 +3177,7 @@ of IOMMU pages.
 
 The rest of functionality is identical to KVM_CREATE_SPAPR_TCE.
 
-4.98 KVM_REINJECT_CONTROL
+4.99 KVM_REINJECT_CONTROL
 
 Capability: KVM_CAP_REINJECT_CONTROL
 Architectures: x86
