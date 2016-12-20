@@ -90,6 +90,76 @@ enum subpixel_order {
 };
 
 /**
+ * struct drm_hdmi_info - runtime data specific to a connected hdmi sink
+ *
+ * Describes a given hdmi display (e.g. CRT or flat panel) and its capabilities.
+ * Mostly refects the advanced features added in HDMI 2.0 specs and the deep
+ * color support. This is a sub-segment of struct drm_display_info and should be
+ * used within.
+ *
+ * For sinks which provide an EDID this can be filled out by calling
+ * drm_add_edid_modes().
+ */
+
+struct drm_hdmi_info {
+
+	/**
+	 * @edid_hdmi_dc_modes: Mask of supported hdmi deep color modes. Even
+	 * more stuff redundant with @bus_formats.
+	 */
+	u8 edid_hdmi_dc_modes;
+
+	/**
+	 * @edid_yuv420_dc_modes: bpc for deep color yuv420 encoding.
+	 * various sinks can support 10/12/16 bit per channel deep
+	 * color encoding. edid_yuv420_dc_modes = 0 means sink doesn't
+	 * support deep color yuv420 encoding.
+	 */
+	u8 edid_yuv420_dc_modes;
+
+
+#define DRM_HFVSDB_SCDC_SUPPORT	(1<<7)
+#define DRM_HFVSDB_SCDC_RR_CAP		(1<<6)
+#define DRM_HFVSDB_SCRAMBLING		(1<<3)
+#define DRM_HFVSDB_INDEPENDENT_VIEW	(1<<2)
+#define DRM_HFVSDB_DUAL_VIEW		(1<<1)
+#define DRM_HFVSDB_3D_OSD		(1<<0)
+
+	/**
+	 * @scdc_supported: Sink supports SCDC functionality.
+	 */
+	bool scdc_supported;
+
+	/**
+	 * @scdc_rr_cap: Sink has SCDC read request capability.
+	 */
+	bool scdc_rr_cap;
+
+	/**
+	 * @scrambling: Sync supports scrambling for <=340 Mcsc TMDS
+	 * char rates. Above 340 Mcsc rates, scrambling is always reqd.
+	 */
+	bool scrambling;
+
+	/**
+	 * @independent_view_3d: Sink supports 3d independent view signaling
+	 * in HF-VSIF.
+	 */
+	bool independent_view_3d;
+
+	/**
+	 * @dual_view_3d: Sink supports 3d dual view signaling in HF-VSIF.
+	 */
+	bool dual_view_3d;
+
+	/**
+	 * @osd_disparity_3d: Sink supports 3d osd disparity indication
+	 * in HF-VSIF.
+	 */
+	bool osd_disparity_3d;
+};
+
+/**
  * struct drm_display_info - runtime data about the connected sink
  *
  * Describes a given display (e.g. CRT or flat panel) and its limitations. For
@@ -179,15 +249,14 @@ struct drm_display_info {
 	bool dvi_dual;
 
 	/**
-	 * @edid_hdmi_dc_modes: Mask of supported hdmi deep color modes. Even
-	 * more stuff redundant with @bus_formats.
-	 */
-	u8 edid_hdmi_dc_modes;
-
-	/**
 	 * @cea_rev: CEA revision of the HDMI sink.
 	 */
 	u8 cea_rev;
+
+	/**
+	 * @ drm_hdmi_info: Capabilities of connected HDMI display
+	 */
+	struct drm_hdmi_info hdmi_info;
 };
 
 int drm_display_info_set_bus_formats(struct drm_display_info *info,
