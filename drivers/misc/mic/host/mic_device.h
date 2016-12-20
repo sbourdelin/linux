@@ -43,7 +43,7 @@ enum mic_stepping {
 	MIC_C0_STEP = 0x20,
 };
 
-extern struct cosm_hw_ops cosm_hw_ops;
+extern const struct cosm_hw_ops cosm_hw_ops;
 
 /**
  * struct mic_device -  MIC device information for each card.

@@ -586,7 +586,7 @@ static struct mic_mw *_mic_aper(struct cosm_device *cdev)
 	return &mdev->aper;
 }
 
-struct cosm_hw_ops cosm_hw_ops = {
+const struct cosm_hw_ops cosm_hw_ops = {
 	.reset = _mic_reset,
 	.force_reset = _mic_reset,
 	.post_reset = NULL,

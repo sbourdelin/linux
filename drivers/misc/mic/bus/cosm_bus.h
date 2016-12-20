@@ -69,7 +69,7 @@ struct cosm_device {
 	void *log_buf_addr;
 	int *log_buf_len;
 	struct kernfs_node *state_sysfs;
-	struct cosm_hw_ops *hw_ops;
+	const struct cosm_hw_ops *hw_ops;
 	struct device dev;
 	int index;
 	struct dentry *dbg_dir;
@@ -118,7 +118,7 @@ struct cosm_hw_ops {
 };
 
 struct cosm_device *
-cosm_register_device(struct device *pdev, struct cosm_hw_ops *hw_ops);
+cosm_register_device(struct device *pdev, const struct cosm_hw_ops *hw_ops);
 void cosm_unregister_device(struct cosm_device *dev);
 int cosm_register_driver(struct cosm_driver *drv);
 void cosm_unregister_driver(struct cosm_driver *drv);

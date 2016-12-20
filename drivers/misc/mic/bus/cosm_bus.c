@@ -69,7 +69,7 @@ static inline void cosm_release_dev(struct device *d)
 }
 
 struct cosm_device *
-cosm_register_device(struct device *pdev, struct cosm_hw_ops *hw_ops)
+cosm_register_device(struct device *pdev, const struct cosm_hw_ops *hw_ops)
 {
 	struct cosm_device *cdev;
 	int ret;
