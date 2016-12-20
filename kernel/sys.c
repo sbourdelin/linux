@@ -110,9 +110,8 @@
  */
 
 int overflowuid = DEFAULT_OVERFLOWUID;
-int overflowgid = DEFAULT_OVERFLOWGID;
-
 EXPORT_SYMBOL(overflowuid);
+int overflowgid = DEFAULT_OVERFLOWGID;
 EXPORT_SYMBOL(overflowgid);
 
 /*
@@ -121,9 +120,8 @@ EXPORT_SYMBOL(overflowgid);
  */
 
 int fs_overflowuid = DEFAULT_FS_OVERFLOWUID;
-int fs_overflowgid = DEFAULT_FS_OVERFLOWUID;
-
 EXPORT_SYMBOL(fs_overflowuid);
+int fs_overflowgid = DEFAULT_FS_OVERFLOWUID;
 EXPORT_SYMBOL(fs_overflowgid);
 
 /*
