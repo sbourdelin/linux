@@ -1349,9 +1349,35 @@ static int nau8825_set_dai_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
 	return 0;
 }
 
+static int nau8825_set_clkdiv(struct snd_soc_dai *codec_dai,
+	int div_id, int div)
+{
+	struct snd_soc_codec *codec = codec_dai->codec;
+	struct nau8825 *nau8825 = snd_soc_codec_get_drvdata(codec);
+
+	switch (div_id) {
+	case NAU8825_BCLKDIV:
+		regmap_update_bits(nau8825->regmap, NAU8825_REG_I2S_PCM_CTRL2,
+			NAU8825_I2S_BLK_DIV_MASK, div);
+		break;
+
+	case NAU8825_FSDIV:
+		regmap_update_bits(nau8825->regmap, NAU8825_REG_I2S_PCM_CTRL2,
+			NAU8825_I2S_LRC_DIV_MASK,
+			div << NAU8825_I2S_LRC_DIV_SFT);
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static const struct snd_soc_dai_ops nau8825_dai_ops = {
 	.hw_params	= nau8825_hw_params,
 	.set_fmt	= nau8825_set_dai_fmt,
+	.set_clkdiv	= nau8825_set_clkdiv,
 };
 
 #define NAU8825_RATES	SNDRV_PCM_RATE_8000_192000

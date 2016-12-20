@@ -424,6 +424,12 @@
 #define NAU8825_CHANRGE_PUMP_EN	(1 << 5)
 
 
+/* Programmable divide */
+enum {
+	NAU8825_BCLKDIV,
+	NAU8825_FSDIV,
+};
+
 /* System Clock Source */
 enum {
 	NAU8825_CLK_DIS = 0,
