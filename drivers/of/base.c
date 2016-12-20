@@ -43,6 +43,7 @@ struct device_node *of_stdout;
 static const char *of_stdout_options;
 
 struct kset *of_kset;
+EXPORT_SYMBOL(of_kset);
 
 /*
  * Used to protect the of_aliases, to hold off addition of nodes to sysfs.

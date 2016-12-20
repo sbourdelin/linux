@@ -109,6 +109,21 @@ config OF_OVERLAY
 	  While this option is selected automatically when needed, you can
 	  enable it manually to improve device tree unit test coverage.
 
+if OF_OVERLAY
+
+config OF_OVERLAY_SYSFS
+
+	tristate "Sysfs support for device tree overlays"
+	default m
+	depends on SYSFS
+	select OF_EARLY_FLATTREE
+	help
+	  This module provides a sysfs based ABI to manage device tree
+	  overlays. You can use it to create overlays based on flattened
+	  device tree overlay files and to destroy them.
+
+endif # OF_OVERLAY
+
 config OF_NUMA
 	bool
 
