@@ -1,0 +1,24 @@
+What:		/sys/firmware/devicetree/overlays
+Date:		Dec 2016
+KernelVersion:	4.11
+Contact:	Heinrich Schuchardt <xypron.glpk@gmx.de>
+Description:	Devicetree overlays can be used to update the devicetree
+		while the system is running. For details see
+		Documentation/devicetree/overlay-notes.txt.
+
+		The following attributes are provided:
+
+		load:	This is a write only file.
+			A string written to it is interpreted as the path to a
+			flattened device tree overlay file. It is used to create
+			and apply the contained overlays.
+
+		loaded: This is a read only file.
+			It provides the count of loaded overlays as a decimal
+			number.
+
+		unload: This is a write only file.
+		        If a positive number n is wrtten to this file the n
+			most recent overlays are destroyed.
+			If a negative number is written to this file all
+			overlays are destroyed.
