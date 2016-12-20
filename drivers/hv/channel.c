@@ -49,15 +49,13 @@ void vmbus_setevent(struct vmbus_channel *channel)
 	 */
 	if ((channel->offermsg.monitor_allocated) &&
 	    (!channel->low_latency)) {
-		/* Each u32 represents 32 channels */
-		sync_set_bit(channel->offermsg.child_relid & 31,
-			(unsigned long *) vmbus_connection.send_int_page +
-			(channel->offermsg.child_relid >> 5));
+		set_bit(channel->offermsg.child_relid,
+			(unsigned long *)vmbus_connection.send_int_page);
 
 		/* Get the child to parent monitor page */
 		monitorpage = vmbus_connection.monitor_pages[1];
 
-		sync_set_bit(channel->monitor_bit,
+		set_bit(channel->monitor_bit,
 			(unsigned long *)&monitorpage->trigger_group
 					[channel->monitor_grp].pending);
 

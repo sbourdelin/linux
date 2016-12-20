@@ -468,12 +468,9 @@ void vmbus_set_event(struct vmbus_channel *channel)
 {
 	u32 child_relid = channel->offermsg.child_relid;
 
-	if (!channel->is_dedicated_interrupt) {
-		/* Each u32 represents 32 channels */
-		sync_set_bit(child_relid & 31,
-			(unsigned long *)vmbus_connection.send_int_page +
-			(child_relid >> 5));
-	}
+	if (!channel->is_dedicated_interrupt)
+		set_bit(child_relid,
+			(unsigned long *)vmbus_connection.send_int_page);
 
 	hv_do_hypercall(HVCALL_SIGNAL_EVENT, channel->sig_event, NULL);
 }
