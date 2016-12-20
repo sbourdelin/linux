@@ -266,7 +266,7 @@ static struct dm_buffer *__find(struct dm_bufio_client *c, sector_t block)
 	struct dm_buffer *b;
 
 	while (n) {
-		b = container_of(n, struct dm_buffer, node);
+		b = rb_entry(n, struct dm_buffer, node);
 
 		if (b->block == block)
 			return b;
@@ -283,7 +283,7 @@ static void __insert(struct dm_bufio_client *c, struct dm_buffer *b)
 	struct dm_buffer *found;
 
 	while (*new) {
-		found = container_of(*new, struct dm_buffer, node);
+		found = rb_entry(*new, struct dm_buffer, node);
 
 		if (found->block == b->block) {
 			BUG_ON(found != b);
