@@ -137,41 +137,29 @@ EXPORT_SYMBOL_GPL(hv_do_hypercall);
 #ifdef CONFIG_X86_64
 static cycle_t read_hv_clock_tsc(struct clocksource *arg)
 {
-	cycle_t current_tick;
-	struct ms_hyperv_tsc_page *tsc_pg = hv_context.tsc_page;
+	struct hv_ref_tsc_page *tsc_pg = hv_context.tsc_page;
+	u32 sequence;
+	u64 scale;
+	s64 offset;
 
-	if (tsc_pg->tsc_sequence != 0) {
-		/*
-		 * Use the tsc page to compute the value.
-		 */
+	do {
+		sequence = tsc_pg->tsc_sequence;
+		virt_rmb();
 
-		while (1) {
-			cycle_t tmp;
-			u32 sequence = tsc_pg->tsc_sequence;
-			u64 cur_tsc;
-			u64 scale = tsc_pg->tsc_scale;
-			s64 offset = tsc_pg->tsc_offset;
-
-			rdtscll(cur_tsc);
-			/* current_tick = ((cur_tsc *scale) >> 64) + offset */
-			asm("mulq %3"
-				: "=d" (current_tick), "=a" (tmp)
-				: "a" (cur_tsc), "r" (scale));
-
-			current_tick += offset;
-			if (tsc_pg->tsc_sequence == sequence)
-				return current_tick;
-
-			if (tsc_pg->tsc_sequence != 0)
-				continue;
-			/*
-			 * Fallback using MSR method.
-			 */
-			break;
+		if (!sequence) {
+			/* fallback to MSR */
+			cycle_t current_tick;
+			rdmsrl(HV_X64_MSR_TIME_REF_COUNT, current_tick);
+			return current_tick;
 		}
-	}
-	rdmsrl(HV_X64_MSR_TIME_REF_COUNT, current_tick);
-	return current_tick;
+
+		scale = tsc_pg->tsc_scale;
+		offset = tsc_pg->tsc_offset;
+
+		virt_rmb();
+	} while (tsc_pg->tsc_sequence != sequence);
+
+	return mul_u64_u64_shr(rdtsc_ordered(), scale, 64) + offset;
 }
 
 static struct clocksource hyperv_cs_tsc = {

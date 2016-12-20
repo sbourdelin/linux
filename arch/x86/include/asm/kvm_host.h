@@ -713,7 +713,7 @@ struct kvm_hv {
 	u64 hv_crash_param[HV_X64_MSR_CRASH_PARAMS];
 	u64 hv_crash_ctl;
 
-	HV_REFERENCE_TSC_PAGE tsc_ref;
+	struct hv_ref_tsc_page tsc_ref;
 };
 
 struct kvm_arch {

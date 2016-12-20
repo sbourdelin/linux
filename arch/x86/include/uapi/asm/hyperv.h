@@ -252,12 +252,12 @@
 #define HV_STATUS_INVALID_CONNECTION_ID		18
 #define HV_STATUS_INSUFFICIENT_BUFFERS		19
 
-typedef struct _HV_REFERENCE_TSC_PAGE {
+struct hv_ref_tsc_page {
 	__u32 tsc_sequence;
 	__u32 res1;
 	__u64 tsc_scale;
 	__s64 tsc_offset;
-} HV_REFERENCE_TSC_PAGE, *PHV_REFERENCE_TSC_PAGE;
+};
 
 /* Define the number of synthetic interrupt sources. */
 #define HV_SYNIC_SINT_COUNT		(16)
