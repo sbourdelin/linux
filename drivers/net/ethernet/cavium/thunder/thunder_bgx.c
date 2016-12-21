@@ -121,6 +121,31 @@ static int bgx_poll_reg(struct bgx *bgx, u8 lmac, u64 reg, u64 mask, bool zero)
 	return 1;
 }
 
+void enable_pause_frames(int node, int bgx_idx, int lmac)
+{
+	u64 reg_value = 0;
+	struct bgx *bgx = bgx_vnic[(node * MAX_BGX_PER_NODE) + bgx_idx];
+
+	reg_value =  bgx_reg_read(bgx, lmac, BGX_SMUX_TX_CTL);
+	/* Enable BGX()_SMU()_TX_CTL */
+	if (!(reg_value & L2P_BP_CONV))
+		bgx_reg_write(bgx, lmac, BGX_SMUX_TX_CTL,
+			      (reg_value | (L2P_BP_CONV)));
+
+	reg_value =  bgx_reg_read(bgx, lmac, BGX_SMUX_HG2_CTL);
+	/* Clear if BGX()_SMU()_HG2_CONTROL[HG2TX_EN] is set */
+	if (reg_value & SMUX_HG2_CTL_HG2TX_EN)
+		bgx_reg_write(bgx, lmac, BGX_SMUX_HG2_CTL,
+			      (reg_value & (~SMUX_HG2_CTL_HG2TX_EN)));
+
+	reg_value =  bgx_reg_read(bgx, lmac, BGX_SMUX_CBFC_CTL);
+	/* Clear if BGX()_SMU()_CBFC_CTL[TX_EN] is set */
+	if (reg_value & CBFC_CTL_TX_EN)
+		bgx_reg_write(bgx, lmac, BGX_SMUX_CBFC_CTL,
+			      (reg_value & (~CBFC_CTL_TX_EN)));
+}
+EXPORT_SYMBOL(enable_pause_frames);
+
 /* Return number of BGX present in HW */
 unsigned bgx_get_map(int node)
 {

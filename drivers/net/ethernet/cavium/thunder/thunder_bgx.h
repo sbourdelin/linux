@@ -131,6 +131,11 @@
 #define BGX_SMUX_TX_CTL			0x20178
 #define  SMU_TX_CTL_DIC_EN			BIT_ULL(0)
 #define  SMU_TX_CTL_UNI_EN			BIT_ULL(1)
+#define  L2P_BP_CONV				BIT_ULL(7)
+#define  BGX_SMUX_CBFC_CTL		0x20218
+#define  CBFC_CTL_TX_EN				BIT_ULL(1)
+#define  BGX_SMUX_HG2_CTL		0x20210
+#define SMUX_HG2_CTL_HG2TX_EN			BIT_ULL(18)
 #define  SMU_TX_CTL_LNK_STATUS			(3ull << 4)
 #define BGX_SMUX_TX_THRESH		0x20180
 #define BGX_SMUX_CTL			0x20200
@@ -212,6 +217,8 @@ void xcv_setup_link(bool link_up, int link_speed);
 
 u64 bgx_get_rx_stats(int node, int bgx_idx, int lmac, int idx);
 u64 bgx_get_tx_stats(int node, int bgx_idx, int lmac, int idx);
+void enable_pause_frames(int node, int bgx_idx, int lmac);
+
 #define BGX_RX_STATS_COUNT 11
 #define BGX_TX_STATS_COUNT 18
 
