@@ -45,12 +45,12 @@ static int svc_watchdog_pm_notifier(struct notifier_block *notifier,
 static void greybus_reset(struct work_struct *work)
 {
 	static char start_path[256] = "/system/bin/start";
-	static char *envp[] = {
+	static char * const envp[] = {
 		"HOME=/",
 		"PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin",
 		NULL,
 	};
-	static char *argv[] = {
+	static char * const argv[] = {
 		start_path,
 		"unipro_reset",
 		NULL,
