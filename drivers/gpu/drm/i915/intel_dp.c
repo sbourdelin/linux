@@ -2972,6 +2972,22 @@ intel_dp_get_link_status(struct intel_dp *intel_dp, uint8_t link_status[DP_LINK_
 				DP_LINK_STATUS_SIZE) == DP_LINK_STATUS_SIZE;
 }
 
+bool intel_dp_get_y_cord_status(struct intel_dp *intel_dp)
+{
+	uint8_t psr_caps;
+
+	drm_dp_dpcd_readb(&intel_dp->aux, DP_PSR_CAPS, &psr_caps);
+	return (psr_caps & DP_PSR_Y_COORDINATE);
+}
+
+bool intel_dp_get_colorimetry_status(struct intel_dp *intel_dp)
+{
+	uint8_t dprx;
+
+	drm_dp_dpcd_readb(&intel_dp->aux, DPRX_FEATURE_ENUMERATION_LIST, &dprx);
+	return (dprx & VSC_SDP_EXT_FOR_COLORIMETRY_SUPPORTED);
+}
+
 /* These are source-specific values. */
 uint8_t
 intel_dp_voltage_max(struct intel_dp *intel_dp)
@@ -3544,6 +3560,14 @@ intel_edp_init_dpcd(struct intel_dp *intel_dp)
 		dev_priv->psr.psr2_support = dev_priv->psr.aux_frame_sync;
 		DRM_DEBUG_KMS("PSR2 %s on sink",
 			      dev_priv->psr.psr2_support ? "supported" : "not supported");
+
+		if (dev_priv->psr.psr2_support) {
+			dev_priv->psr.y_cord_support =
+			intel_dp_get_y_cord_status(intel_dp);
+			dev_priv->psr.colorimetry_support =
+			intel_dp_get_colorimetry_status(intel_dp);
+		}
+
 	}
 
 	/* Read the eDP Display control capabilities registers */
