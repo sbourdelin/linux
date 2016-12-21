@@ -45,6 +45,13 @@
 #define BNXT_RE_REF_WAIT_COUNT		10
 #define BNXT_RE_DESC	"Broadcom NetXtreme-C/E RoCE Driver"
 
+#define BNXT_RE_PAGE_SIZE_4K		BIT(12)
+#define BNXT_RE_PAGE_SIZE_8K		BIT(13)
+#define BNXT_RE_PAGE_SIZE_64K		BIT(16)
+#define BNXT_RE_PAGE_SIZE_2M		BIT(21)
+#define BNXT_RE_PAGE_SIZE_8M		BIT(23)
+#define BNXT_RE_PAGE_SIZE_1G		BIT(30)
+
 #define BNXT_RE_MAX_QPC_COUNT		(64 * 1024)
 #define BNXT_RE_MAX_MRW_COUNT		(64 * 1024)
 #define BNXT_RE_MAX_SRQC_COUNT		(64 * 1024)
