@@ -891,7 +891,8 @@ cfg80211_get_chan_state(struct wireless_dev *wdev,
 				  : CHAN_MODE_EXCLUSIVE;
 
 			/* consider worst-case - IBSS can try to return to the
-			 * original user-specified channel as creator */
+			 * original user-specified channel as creator 
+			 */
 			if (wdev->ibss_dfs_possible)
 				*radar_detect |= BIT(wdev->chandef.width);
 			return;
