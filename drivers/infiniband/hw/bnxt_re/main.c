@@ -568,6 +568,9 @@ static int bnxt_re_aeq_handler(struct bnxt_qplib_rcfw *rcfw,
 
 static void bnxt_re_cleanup_res(struct bnxt_re_dev *rdev)
 {
+	if (rdev->nq.hwq.max_elements)
+		bnxt_qplib_disable_nq(&rdev->nq);
+
 	if (rdev->qplib_res.rcfw)
 		bnxt_qplib_cleanup_res(&rdev->qplib_res);
 }
@@ -578,11 +581,32 @@ static int bnxt_re_init_res(struct bnxt_re_dev *rdev)
 
 	bnxt_qplib_init_res(&rdev->qplib_res);
 
+	if (rdev->msix_entries[BNXT_RE_NQ_IDX].vector <= 0)
+		return -EINVAL;
+
+	rc = bnxt_qplib_enable_nq(rdev->en_dev->pdev, &rdev->nq,
+				  rdev->msix_entries[BNXT_RE_NQ_IDX].vector,
+				  rdev->msix_entries[BNXT_RE_NQ_IDX].db_offset,
+				  NULL,
+				  NULL);
+
+	if (rc)
+		dev_err(rdev_to_dev(rdev), "Failed to enable NQ: %#x", rc);
+
 	return rc;
 }
 
 static void bnxt_re_free_res(struct bnxt_re_dev *rdev, bool lock_wait)
 {
+	if (rdev->nq.hwq.max_elements) {
+		bnxt_re_net_ring_free(rdev, rdev->nq.ring_id, lock_wait);
+		bnxt_qplib_free_nq(&rdev->nq);
+	}
+	if (rdev->qplib_res.dpi_tbl.max) {
+		bnxt_qplib_dealloc_dpi(&rdev->qplib_res,
+				       &rdev->qplib_res.dpi_tbl,
+				       &rdev->dpi_privileged);
+	}
 	if (rdev->qplib_res.rcfw) {
 		bnxt_qplib_free_res(&rdev->qplib_res);
 		rdev->qplib_res.rcfw = NULL;
@@ -604,8 +628,34 @@ static int bnxt_re_alloc_res(struct bnxt_re_dev *rdev)
 	if (rc)
 		goto fail;
 
-	return 0;
+	rc = bnxt_qplib_alloc_dpi(&rdev->qplib_res.dpi_tbl,
+				  &rdev->dpi_privileged,
+				  rdev);
+	if (rc)
+		goto fail;
 
+	rdev->nq.hwq.max_elements = BNXT_RE_MAX_CQ_COUNT +
+				    BNXT_RE_MAX_SRQC_COUNT + 2;
+	rc = bnxt_qplib_alloc_nq(rdev->en_dev->pdev, &rdev->nq);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev),
+			"Failed to allocate NQ memory: %#x", rc);
+		goto fail;
+	}
+	rc = bnxt_re_net_ring_alloc
+			(rdev, rdev->nq.hwq.pbl[PBL_LVL_0].pg_map_arr,
+			 rdev->nq.hwq.pbl[rdev->nq.hwq.level].pg_count,
+			 HWRM_RING_ALLOC_CMPL, BNXT_QPLIB_NQE_MAX_CNT - 1,
+			 rdev->msix_entries[BNXT_RE_NQ_IDX].ring_idx,
+			 &rdev->nq.ring_id);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev),
+			"Failed to allocate NQ ring: %#x", rc);
+		goto free_nq;
+	}
+	return 0;
+free_nq:
+	bnxt_qplib_free_nq(&rdev->nq);
 fail:
 	rdev->qplib_res.rcfw = NULL;
 	return rc;
