@@ -3637,18 +3637,20 @@ static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 			if (pmd_protnone(orig_pmd) && vma_is_accessible(vma))
 				return do_huge_pmd_numa_page(&vmf, orig_pmd);
 
-			if ((vmf.flags & FAULT_FLAG_WRITE) &&
-					!pmd_write(orig_pmd)) {
-				ret = wp_huge_pmd(&vmf, orig_pmd);
-				if (!(ret & VM_FAULT_FALLBACK))
+			if (vmf.flags & FAULT_FLAG_WRITE) {
+				if (!pmd_write(orig_pmd)) {
+					ret = wp_huge_pmd(&vmf, orig_pmd);
+					if (ret == VM_FAULT_FALLBACK)
+						goto pte_fault;
 					return ret;
-			} else {
-				huge_pmd_set_accessed(&vmf, orig_pmd);
-				return 0;
+				}
 			}
+
+			huge_pmd_set_accessed(&vmf, orig_pmd);
+			return 0;
 		}
 	}
-
+pte_fault:
 	return handle_pte_fault(&vmf);
 }
 
