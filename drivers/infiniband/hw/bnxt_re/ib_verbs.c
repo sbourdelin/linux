@@ -1637,6 +1637,51 @@ static int bnxt_re_build_qp1_send_v2(struct bnxt_re_qp *qp,
 	return rc;
 }
 
+/* For the MAD layer, it only provides the recv SGE the size of
+ * ib_grh + MAD datagram.  No Ethernet headers, Ethertype, BTH, DETH,
+ * nor RoCE iCRC.  The Cu+ solution must provide buffer for the entire
+ * receive packet (334 bytes) with no VLAN and then copy the GRH
+ * and the MAD datagram out to the provided SGE.
+ */
+static int bnxt_re_build_qp1_shadow_qp_recv(struct bnxt_re_qp *qp,
+					    struct ib_recv_wr *wr,
+					    struct bnxt_qplib_swqe *wqe,
+					    int payload_size)
+{
+	struct bnxt_qplib_sge ref, sge;
+	u32 rq_prod_index;
+	struct bnxt_re_sqp_entries *sqp_entry;
+
+	rq_prod_index = bnxt_qplib_get_rq_prod_index(&qp->qplib_qp);
+
+	if (bnxt_qplib_get_qp1_rq_buf(&qp->qplib_qp, &sge)) {
+		/* Create 1 SGE to receive the entire
+		 * ethernet packet
+		 */
+		/* Save the reference from ULP */
+		ref.addr = wqe->sg_list[0].addr;
+		ref.lkey = wqe->sg_list[0].lkey;
+		ref.size = wqe->sg_list[0].size;
+
+		sqp_entry = &qp->rdev->sqp_tbl[rq_prod_index];
+
+		/* SGE 1 */
+		wqe->sg_list[0].addr = sge.addr;
+		wqe->sg_list[0].lkey = sge.lkey;
+		wqe->sg_list[0].size = BNXT_QPLIB_MAX_QP1_RQ_HDR_SIZE_V2;
+		sge.size -= wqe->sg_list[0].size;
+
+		sqp_entry->sge.addr = ref.addr;
+		sqp_entry->sge.lkey = ref.lkey;
+		sqp_entry->sge.size = ref.size;
+		/* Store the wrid for reporting completion */
+		sqp_entry->wrid = wqe->wr_id;
+		/* change the wqe->wrid to table index */
+		wqe->wr_id = rq_prod_index;
+	}
+	return 0;
+}
+
 static int is_ud_qp(struct bnxt_re_qp *qp)
 {
 	return qp->qplib_qp.type == CMDQ_CREATE_QP_TYPE_UD;
@@ -1980,6 +2025,84 @@ bad:
 	bnxt_qplib_post_send_db(&qp->qplib_qp);
 	spin_unlock_irqrestore(&qp->sq_lock, flags);
 
+	return rc;
+}
+
+static int bnxt_re_post_recv_shadow_qp(struct bnxt_re_dev *rdev,
+				       struct bnxt_re_qp *qp,
+				       struct ib_recv_wr *wr)
+{
+	struct bnxt_qplib_swqe wqe;
+	int rc = 0, payload_sz = 0;
+
+	memset(&wqe, 0, sizeof(wqe));
+	while (wr) {
+		/* House keeping */
+		memset(&wqe, 0, sizeof(wqe));
+
+		/* Common */
+		wqe.num_sge = wr->num_sge;
+		if (wr->num_sge > qp->qplib_qp.rq.max_sge) {
+			dev_err(rdev_to_dev(rdev),
+				"Limit exceeded for Receive SGEs");
+			rc = -EINVAL;
+			goto bad;
+		}
+		payload_sz = bnxt_re_build_sgl(wr->sg_list, wqe.sg_list,
+					       wr->num_sge);
+		wqe.wr_id = wr->wr_id;
+		wqe.type = BNXT_QPLIB_SWQE_TYPE_RECV;
+
+		if (!rc)
+			rc = bnxt_qplib_post_recv(&qp->qplib_qp, &wqe);
+bad:
+		if (rc)
+			break;
+
+		wr = wr->next;
+	}
+	bnxt_qplib_post_recv_db(&qp->qplib_qp);
+	return rc;
+}
+
+int bnxt_re_post_recv(struct ib_qp *ib_qp, struct ib_recv_wr *wr,
+		      struct ib_recv_wr **bad_wr)
+{
+	struct bnxt_re_qp *qp = container_of(ib_qp, struct bnxt_re_qp, ib_qp);
+	struct bnxt_qplib_swqe wqe;
+	int rc = 0, payload_sz = 0;
+
+	while (wr) {
+		/* House keeping */
+		memset(&wqe, 0, sizeof(wqe));
+
+		/* Common */
+		wqe.num_sge = wr->num_sge;
+		if (wr->num_sge > qp->qplib_qp.rq.max_sge) {
+			dev_err(rdev_to_dev(qp->rdev),
+				"Limit exceeded for Receive SGEs");
+			rc = -EINVAL;
+			goto bad;
+		}
+
+		payload_sz = bnxt_re_build_sgl(wr->sg_list, wqe.sg_list,
+					       wr->num_sge);
+		wqe.wr_id = wr->wr_id;
+		wqe.type = BNXT_QPLIB_SWQE_TYPE_RECV;
+
+		if (ib_qp->qp_type == IB_QPT_GSI)
+			rc = bnxt_re_build_qp1_shadow_qp_recv(qp, wr, &wqe,
+							      payload_sz);
+		if (!rc)
+			rc = bnxt_qplib_post_recv(&qp->qplib_qp, &wqe);
+bad:
+		if (rc) {
+			*bad_wr = wr;
+			break;
+		}
+		wr = wr->next;
+	}
+	bnxt_qplib_post_recv_db(&qp->qplib_qp);
 	return rc;
 }
 
