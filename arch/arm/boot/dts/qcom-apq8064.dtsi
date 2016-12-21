@@ -303,6 +303,9 @@
 	firmware {
 		scm {
 			compatible = "qcom,scm-apq8064";
+
+			clocks = <&gcc CE3_CORE_CLK>;
+			clock-names = "core";
 		};
 	};
 
