@@ -34,6 +34,7 @@
 #include <linux/ctype.h>
 #include <linux/slab.h>
 #include <linux/of.h>
+#include <linux/dmi.h>
 #include <sound/core.h>
 #include <sound/jack.h>
 #include <sound/pcm.h>
@@ -1887,6 +1888,86 @@ int snd_soc_runtime_set_dai_fmt(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_soc_runtime_set_dai_fmt);
+
+/**
+ * snd_soc_set_dmi_name() - Register DMI names to card
+ * @card: The card to register DMI names
+ * @flavour: The flavour "differentiator" for the card amongst its peers.
+ *
+ * Intel DSP platform drivers are used by many different devices but are
+ * difficult for userspace to differentiate, since machine drivers ususally
+ * use their own name as the card name (short name) and leave the card long
+ * name blank. This function will allow DMI info to be used in the sound
+ * card long name, thereby helping userspace load the correct UCM (Use Case
+ * Manager) configuration.
+ * Possible card long names may be:
+ * broadwell-rt286-Dell Inc.-XPS 13 9343-0310JH
+ * broadwell-rt286-Intel Corp.-Broadwell Client platform-Wilson Beach SDS
+ * bytcr-rt5640-ASUSTeK COMPUTER INC.-T100TA-T100TA
+ * bytcr-rt5651-Circuitco-Minnowboard Max D0 PLATFORM-MinnowBoard MAX
+ *
+ * This function also supports flavoring the card longname to provide
+ * the extra differentiation.
+ *
+ * Returns 0 on success, otherwise a negative error code.
+ */
+int snd_soc_set_dmi_name(struct snd_soc_card *card, const char *flavour)
+{
+	const char *vendor, *product, *board;
+
+	if (card->long_name)
+		return 0; /* long name already set by driver or from DMI */
+
+	vendor = dmi_get_system_info(DMI_BOARD_VENDOR);
+	if (!vendor) {
+		dev_warn(card->dev, "ASoC: no DMI vendor name!\n");
+		return 0;
+	}
+
+	product = dmi_get_system_info(DMI_PRODUCT_NAME);
+	board = dmi_get_system_info(DMI_BOARD_NAME);
+	if (!board && !product) {
+		/* fall back to using legacy name */
+		dev_warn(card->dev, "ASoC: no DMI board/product name!\n");
+		return 0;
+	}
+
+	/* make up dmi long name as:
+	 * card name (usually machine driver name) -vendor -product -board
+	 */
+	snprintf(card->dmi_longname, sizeof(card->snd_card->longname),
+			"%s-%s", card->name, vendor);
+
+	if (product) {
+		strncat(card->dmi_longname, "-",
+			sizeof(card->snd_card->longname));
+		strncat(card->dmi_longname, product,
+			sizeof(card->snd_card->longname));
+	}
+
+	if (board) {
+		strncat(card->dmi_longname, "-",
+			sizeof(card->snd_card->longname));
+		strncat(card->dmi_longname, board,
+			sizeof(card->snd_card->longname));
+	}
+
+
+	/* Add flavour to dmi long name */
+	if (flavour) {
+		strncat(card->dmi_longname, "-",
+			sizeof(card->snd_card->longname));
+		strncat(card->dmi_longname, flavour,
+			sizeof(card->snd_card->longname));
+	}
+
+	/* set long name */
+	card->long_name = card->dmi_longname;
+
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(snd_soc_set_dmi_name);
 
 static int snd_soc_instantiate_card(struct snd_soc_card *card)
 {
