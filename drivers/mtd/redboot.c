@@ -212,6 +212,10 @@ static int parse_redboot_partitions(struct mtd_info *master,
 
 		nrparts++;
 	}
+	if (!fl) {
+		ret = -EINVAL;
+		goto out;
+	}
 #ifdef CONFIG_MTD_REDBOOT_PARTS_UNALLOCATED
 	if (fl->img->flash_base) {
 		nrparts++;
