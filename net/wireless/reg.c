@@ -490,7 +490,7 @@ static int reg_query_builtin(const char *alpha2)
 	if (!regdom)
 		return -ENODATA;
 
-	request = kzalloc(sizeof(struct reg_regdb_apply_request), GFP_KERNEL);
+	request = kzalloc(sizeof(*reg_regdb_apply_request), GFP_KERNEL);
 	if (!request)
 		return -ENOMEM;
 
@@ -2291,7 +2291,7 @@ static int regulatory_hint_core(const char *alpha2)
 {
 	struct regulatory_request *request;
 
-	request = kzalloc(sizeof(struct regulatory_request), GFP_KERNEL);
+	request = kzalloc(sizeof(*regulatory_request), GFP_KERNEL);
 	if (!request)
 		return -ENOMEM;
 
@@ -2313,7 +2313,7 @@ int regulatory_hint_user(const char *alpha2,
 	if (WARN_ON(!alpha2))
 		return -EINVAL;
 
-	request = kzalloc(sizeof(struct regulatory_request), GFP_KERNEL);
+	request = kzalloc(sizeof(*regulatory_request), GFP_KERNEL);
 	if (!request)
 		return -ENOMEM;
 
@@ -2385,7 +2385,7 @@ int regulatory_hint(struct wiphy *wiphy, const char *alpha2)
 
 	wiphy->regulatory_flags &= ~REGULATORY_CUSTOM_REG;
 
-	request = kzalloc(sizeof(struct regulatory_request), GFP_KERNEL);
+	request = kzalloc(sizeof(*regulatory_request), GFP_KERNEL);
 	if (!request)
 		return -ENOMEM;
 
@@ -2661,7 +2661,7 @@ int regulatory_hint_found_beacon(struct wiphy *wiphy,
 	if (processing)
 		return 0;
 
-	reg_beacon = kzalloc(sizeof(struct reg_beacon), gfp);
+	reg_beacon = kzalloc(sizeof(*reg_beacon), gfp);
 	if (!reg_beacon)
 		return -ENOMEM;
 
