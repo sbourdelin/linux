@@ -451,6 +451,10 @@ static int bnxt_re_register_ib(struct bnxt_re_dev *rdev)
 
 	ibdev->alloc_pd			= bnxt_re_alloc_pd;
 	ibdev->dealloc_pd		= bnxt_re_dealloc_pd;
+
+	ibdev->create_cq		= bnxt_re_create_cq;
+	ibdev->destroy_cq		= bnxt_re_destroy_cq;
+	ibdev->req_notify_cq		= bnxt_re_req_notify_cq;
 	ibdev->alloc_ucontext		= bnxt_re_alloc_ucontext;
 	ibdev->dealloc_ucontext		= bnxt_re_dealloc_ucontext;
 	ibdev->mmap			= bnxt_re_mmap;

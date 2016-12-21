@@ -51,6 +51,19 @@ struct bnxt_re_pd {
 	struct bnxt_qplib_dpi	dpi;
 };
 
+struct bnxt_re_cq {
+	struct bnxt_re_dev	*rdev;
+	spinlock_t              cq_lock;	/* protect cq */
+	u16			cq_count;
+	u16			cq_period;
+	struct ib_cq		ib_cq;
+	struct bnxt_qplib_cq	qplib_cq;
+	struct bnxt_qplib_cqe	*cql;
+#define MAX_CQL_PER_POLL	1024
+	u32			max_cql;
+	struct ib_umem		*umem;
+};
+
 struct bnxt_re_ucontext {
 	struct bnxt_re_dev	*rdev;
 	struct ib_ucontext	ib_uctx;
@@ -89,6 +102,12 @@ struct ib_pd *bnxt_re_alloc_pd(struct ib_device *ibdev,
 			       struct ib_ucontext *context,
 			       struct ib_udata *udata);
 int bnxt_re_dealloc_pd(struct ib_pd *pd);
+struct ib_cq *bnxt_re_create_cq(struct ib_device *ibdev,
+				const struct ib_cq_init_attr *attr,
+				struct ib_ucontext *context,
+				struct ib_udata *udata);
+int bnxt_re_destroy_cq(struct ib_cq *cq);
+int bnxt_re_req_notify_cq(struct ib_cq *cq, enum ib_cq_notify_flags flags);
 struct ib_ucontext *bnxt_re_alloc_ucontext(struct ib_device *ibdev,
 					   struct ib_udata *udata);
 int bnxt_re_dealloc_ucontext(struct ib_ucontext *context);
