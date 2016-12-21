@@ -64,6 +64,14 @@ struct bnxt_re_work {
 	struct net_device	*vlan_dev;
 };
 
+struct bnxt_re_sqp_entries {
+	struct bnxt_qplib_sge sge;
+	u64 wrid;
+	/* For storing the actual qp1 cqe */
+	struct bnxt_qplib_cqe cqe;
+	struct bnxt_re_qp *qp1_qp;
+};
+
 #define BNXT_RE_MIN_MSIX		2
 #define BNXT_RE_MAX_MSIX		16
 #define BNXT_RE_AEQ_IDX			0
@@ -112,6 +120,12 @@ struct bnxt_re_dev {
 	atomic_t			mw_count;
 	/* Max of 2 lossless traffic class supported per port */
 	u16				cosq[2];
+
+	/* QP for for handling QP1 packets */
+	u32				sqp_id;
+	struct bnxt_re_qp		*qp1_sqp;
+	struct bnxt_re_ah		*sqp_ah;
+	struct bnxt_re_sqp_entries sqp_tbl[1024];
 };
 
 #define to_bnxt_re_dev(ptr, member)	\

@@ -51,6 +51,69 @@
 #include "qplib_fp.h"
 
 static void bnxt_qplib_arm_cq_enable(struct bnxt_qplib_cq *cq);
+
+static void bnxt_qplib_free_qp_hdr_buf(struct bnxt_qplib_res *res,
+				       struct bnxt_qplib_qp *qp)
+{
+	struct bnxt_qplib_q *rq = &qp->rq;
+	struct bnxt_qplib_q *sq = &qp->sq;
+
+	if (qp->rq_hdr_buf)
+		dma_free_coherent(&res->pdev->dev,
+				  rq->hwq.max_elements * qp->rq_hdr_buf_size,
+				  qp->rq_hdr_buf, qp->rq_hdr_buf_map);
+	if (qp->sq_hdr_buf)
+		dma_free_coherent(&res->pdev->dev,
+				  sq->hwq.max_elements * qp->sq_hdr_buf_size,
+				  qp->sq_hdr_buf, qp->sq_hdr_buf_map);
+	qp->rq_hdr_buf = NULL;
+	qp->sq_hdr_buf = NULL;
+	qp->rq_hdr_buf_map = 0;
+	qp->sq_hdr_buf_map = 0;
+	qp->sq_hdr_buf_size = 0;
+	qp->rq_hdr_buf_size = 0;
+}
+
+static int bnxt_qplib_alloc_qp_hdr_buf(struct bnxt_qplib_res *res,
+				       struct bnxt_qplib_qp *qp)
+{
+	struct bnxt_qplib_q *rq = &qp->rq;
+	struct bnxt_qplib_q *sq = &qp->rq;
+	int rc = 0;
+
+	if (qp->sq_hdr_buf_size && sq->hwq.max_elements) {
+		qp->sq_hdr_buf = dma_alloc_coherent(&res->pdev->dev,
+					sq->hwq.max_elements *
+					qp->sq_hdr_buf_size,
+					&qp->sq_hdr_buf_map, GFP_KERNEL);
+		if (!qp->sq_hdr_buf) {
+			rc = -ENOMEM;
+			dev_err(&res->pdev->dev,
+				"QPLIB: Failed to create sq_hdr_buf");
+			goto fail;
+		}
+	}
+
+	if (qp->rq_hdr_buf_size && rq->hwq.max_elements) {
+		qp->rq_hdr_buf = dma_alloc_coherent(&res->pdev->dev,
+						    rq->hwq.max_elements *
+						    qp->rq_hdr_buf_size,
+						    &qp->rq_hdr_buf_map,
+						    GFP_KERNEL);
+		if (!qp->rq_hdr_buf) {
+			rc = -ENOMEM;
+			dev_err(&res->pdev->dev,
+				"QPLIB: Failed to create rq_hdr_buf");
+			goto fail;
+		}
+	}
+	return 0;
+
+fail:
+	bnxt_qplib_free_qp_hdr_buf(res, qp);
+	return rc;
+}
+
 static void bnxt_qplib_service_nq(unsigned long data)
 {
 	struct bnxt_qplib_nq *nq = (struct bnxt_qplib_nq *)data;
@@ -213,6 +276,805 @@ int bnxt_qplib_alloc_nq(struct pci_dev *pdev, struct bnxt_qplib_nq *nq)
 		return -ENOMEM;
 
 	nq->budget = 8;
+	return 0;
+}
+
+/* QP */
+int bnxt_qplib_create_qp1(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp)
+{
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	struct cmdq_create_qp1 req;
+	struct creq_create_qp1_resp *resp;
+	struct bnxt_qplib_pbl *pbl;
+	struct bnxt_qplib_q *sq = &qp->sq;
+	struct bnxt_qplib_q *rq = &qp->rq;
+	int rc;
+	u16 cmd_flags = 0;
+	u32 qp_flags = 0;
+
+	RCFW_CMD_PREP(req, CREATE_QP1, cmd_flags);
+
+	/* General */
+	req.type = qp->type;
+	req.dpi = cpu_to_le32(qp->dpi->dpi);
+	req.qp_handle = cpu_to_le64(qp->qp_handle);
+
+	/* SQ */
+	sq->hwq.max_elements = sq->max_wqe;
+	rc = bnxt_qplib_alloc_init_hwq(res->pdev, &sq->hwq, NULL, 0,
+				       &sq->hwq.max_elements,
+				       BNXT_QPLIB_MAX_SQE_ENTRY_SIZE, 0,
+				       PAGE_SIZE, HWQ_TYPE_QUEUE);
+	if (rc)
+		goto exit;
+
+	sq->swq = kcalloc(sq->hwq.max_elements, sizeof(*sq->swq), GFP_KERNEL);
+	if (!sq->swq) {
+		rc = -ENOMEM;
+		goto fail_sq;
+	}
+	pbl = &sq->hwq.pbl[PBL_LVL_0];
+	req.sq_pbl = cpu_to_le64(pbl->pg_map_arr[0]);
+	req.sq_pg_size_sq_lvl =
+		((sq->hwq.level & CMDQ_CREATE_QP1_SQ_LVL_MASK)
+				<<  CMDQ_CREATE_QP1_SQ_LVL_SFT) |
+		(pbl->pg_size == ROCE_PG_SIZE_4K ?
+				CMDQ_CREATE_QP1_SQ_PG_SIZE_PG_4K :
+		 pbl->pg_size == ROCE_PG_SIZE_8K ?
+				CMDQ_CREATE_QP1_SQ_PG_SIZE_PG_8K :
+		 pbl->pg_size == ROCE_PG_SIZE_64K ?
+				CMDQ_CREATE_QP1_SQ_PG_SIZE_PG_64K :
+		 pbl->pg_size == ROCE_PG_SIZE_2M ?
+				CMDQ_CREATE_QP1_SQ_PG_SIZE_PG_2M :
+		 pbl->pg_size == ROCE_PG_SIZE_8M ?
+				CMDQ_CREATE_QP1_SQ_PG_SIZE_PG_8M :
+		 pbl->pg_size == ROCE_PG_SIZE_1G ?
+				CMDQ_CREATE_QP1_SQ_PG_SIZE_PG_1G :
+		 CMDQ_CREATE_QP1_SQ_PG_SIZE_PG_4K);
+
+	if (qp->scq)
+		req.scq_cid = cpu_to_le32(qp->scq->id);
+
+	qp_flags |= CMDQ_CREATE_QP1_QP_FLAGS_RESERVED_LKEY_ENABLE;
+
+	/* RQ */
+	if (rq->max_wqe) {
+		rq->hwq.max_elements = qp->rq.max_wqe;
+		rc = bnxt_qplib_alloc_init_hwq(res->pdev, &rq->hwq, NULL, 0,
+					       &rq->hwq.max_elements,
+					       BNXT_QPLIB_MAX_RQE_ENTRY_SIZE, 0,
+					       PAGE_SIZE, HWQ_TYPE_QUEUE);
+		if (rc)
+			goto fail_sq;
+
+		rq->swq = kcalloc(rq->hwq.max_elements, sizeof(*rq->swq),
+				  GFP_KERNEL);
+		if (!rq->swq) {
+			rc = -ENOMEM;
+			goto fail_rq;
+		}
+		pbl = &rq->hwq.pbl[PBL_LVL_0];
+		req.rq_pbl = cpu_to_le64(pbl->pg_map_arr[0]);
+		req.rq_pg_size_rq_lvl =
+			((rq->hwq.level & CMDQ_CREATE_QP1_RQ_LVL_MASK) <<
+			 CMDQ_CREATE_QP1_RQ_LVL_SFT) |
+				(pbl->pg_size == ROCE_PG_SIZE_4K ?
+					CMDQ_CREATE_QP1_RQ_PG_SIZE_PG_4K :
+				 pbl->pg_size == ROCE_PG_SIZE_8K ?
+					CMDQ_CREATE_QP1_RQ_PG_SIZE_PG_8K :
+				 pbl->pg_size == ROCE_PG_SIZE_64K ?
+					CMDQ_CREATE_QP1_RQ_PG_SIZE_PG_64K :
+				 pbl->pg_size == ROCE_PG_SIZE_2M ?
+					CMDQ_CREATE_QP1_RQ_PG_SIZE_PG_2M :
+				 pbl->pg_size == ROCE_PG_SIZE_8M ?
+					CMDQ_CREATE_QP1_RQ_PG_SIZE_PG_8M :
+				 pbl->pg_size == ROCE_PG_SIZE_1G ?
+					CMDQ_CREATE_QP1_RQ_PG_SIZE_PG_1G :
+				 CMDQ_CREATE_QP1_RQ_PG_SIZE_PG_4K);
+		if (qp->rcq)
+			req.rcq_cid = cpu_to_le32(qp->rcq->id);
+	}
+
+	/* Header buffer - allow hdr_buf pass in */
+	rc = bnxt_qplib_alloc_qp_hdr_buf(res, qp);
+	if (rc) {
+		rc = -ENOMEM;
+		goto fail;
+	}
+	req.qp_flags = cpu_to_le32(qp_flags);
+	req.sq_size = cpu_to_le32(sq->hwq.max_elements);
+	req.rq_size = cpu_to_le32(rq->hwq.max_elements);
+
+	req.sq_fwo_sq_sge =
+		cpu_to_le16((sq->max_sge & CMDQ_CREATE_QP1_SQ_SGE_MASK) <<
+			    CMDQ_CREATE_QP1_SQ_SGE_SFT);
+	req.rq_fwo_rq_sge =
+		cpu_to_le16((rq->max_sge & CMDQ_CREATE_QP1_RQ_SGE_MASK) <<
+			    CMDQ_CREATE_QP1_RQ_SGE_SFT);
+
+	req.pd_id = cpu_to_le32(qp->pd->id);
+
+	resp = (struct creq_create_qp1_resp *)
+			bnxt_qplib_rcfw_send_message(rcfw, (void *)&req,
+						     NULL, 0);
+	if (!resp) {
+		dev_err(&res->pdev->dev, "QPLIB: FP: CREATE_QP1 send failed");
+		rc = -EINVAL;
+		goto fail;
+	}
+	if (!bnxt_qplib_rcfw_wait_for_resp(rcfw, le16_to_cpu(req.cookie))) {
+		/* Cmd timed out */
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: CREATE_QP1 timed out");
+		rc = -ETIMEDOUT;
+		goto fail;
+	}
+	if (resp->status ||
+	    le16_to_cpu(resp->cookie) != le16_to_cpu(req.cookie)) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: CREATE_QP1 failed ");
+		dev_err(&rcfw->pdev->dev,
+			"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+			resp->status, le16_to_cpu(req.cookie),
+			le16_to_cpu(resp->cookie));
+		rc = -EINVAL;
+		goto fail;
+	}
+	qp->id = le32_to_cpu(resp->xid);
+	qp->cur_qp_state = CMDQ_MODIFY_QP_NEW_STATE_RESET;
+	sq->flush_in_progress = false;
+	rq->flush_in_progress = false;
+
+	return 0;
+
+fail:
+	bnxt_qplib_free_qp_hdr_buf(res, qp);
+fail_rq:
+	bnxt_qplib_free_hwq(res->pdev, &rq->hwq);
+	kfree(rq->swq);
+fail_sq:
+	bnxt_qplib_free_hwq(res->pdev, &sq->hwq);
+	kfree(sq->swq);
+exit:
+	return rc;
+}
+
+int bnxt_qplib_create_qp(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp)
+{
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	struct sq_send *hw_sq_send_hdr, **hw_sq_send_ptr;
+	struct cmdq_create_qp req;
+	struct creq_create_qp_resp *resp;
+	struct bnxt_qplib_pbl *pbl;
+	struct sq_psn_search **psn_search_ptr;
+	unsigned long int psn_search, poff = 0;
+	struct bnxt_qplib_q *sq = &qp->sq;
+	struct bnxt_qplib_q *rq = &qp->rq;
+	struct bnxt_qplib_hwq *xrrq;
+	int i, rc, req_size, psn_sz;
+	u16 cmd_flags = 0, max_ssge;
+	u32 sw_prod, qp_flags = 0;
+
+	RCFW_CMD_PREP(req, CREATE_QP, cmd_flags);
+
+	/* General */
+	req.type = qp->type;
+	req.dpi = cpu_to_le32(qp->dpi->dpi);
+	req.qp_handle = cpu_to_le64(qp->qp_handle);
+
+	/* SQ */
+	psn_sz = (qp->type == CMDQ_CREATE_QP_TYPE_RC) ?
+		 sizeof(struct sq_psn_search) : 0;
+	sq->hwq.max_elements = sq->max_wqe;
+	rc = bnxt_qplib_alloc_init_hwq(res->pdev, &sq->hwq, sq->sglist,
+				       sq->nmap, &sq->hwq.max_elements,
+				       BNXT_QPLIB_MAX_SQE_ENTRY_SIZE,
+				       psn_sz,
+				       PAGE_SIZE, HWQ_TYPE_QUEUE);
+	if (rc)
+		goto exit;
+
+	sq->swq = kcalloc(sq->hwq.max_elements, sizeof(*sq->swq), GFP_KERNEL);
+	if (!sq->swq) {
+		rc = -ENOMEM;
+		goto fail_sq;
+	}
+	hw_sq_send_ptr = (struct sq_send **)sq->hwq.pbl_ptr;
+	if (psn_sz) {
+		psn_search_ptr = (struct sq_psn_search **)
+				  &hw_sq_send_ptr[get_sqe_pg
+					(sq->hwq.max_elements)];
+		psn_search = (unsigned long int)
+			      &hw_sq_send_ptr[get_sqe_pg(sq->hwq.max_elements)]
+			      [get_sqe_idx(sq->hwq.max_elements)];
+		if (psn_search & ~PAGE_MASK) {
+			/* If the psn_search does not start on a page boundary,
+			 * then calculate the offset
+			 */
+			poff = (psn_search & ~PAGE_MASK) /
+				BNXT_QPLIB_MAX_PSNE_ENTRY_SIZE;
+		}
+		for (i = 0; i < sq->hwq.max_elements; i++)
+			sq->swq[i].psn_search =
+				&psn_search_ptr[get_psne_pg(i + poff)]
+					       [get_psne_idx(i + poff)];
+	}
+	pbl = &sq->hwq.pbl[PBL_LVL_0];
+	req.sq_pbl = cpu_to_le64(pbl->pg_map_arr[0]);
+	req.sq_pg_size_sq_lvl =
+		((sq->hwq.level & CMDQ_CREATE_QP_SQ_LVL_MASK)
+				 <<  CMDQ_CREATE_QP_SQ_LVL_SFT) |
+		(pbl->pg_size == ROCE_PG_SIZE_4K ?
+				CMDQ_CREATE_QP_SQ_PG_SIZE_PG_4K :
+		 pbl->pg_size == ROCE_PG_SIZE_8K ?
+				CMDQ_CREATE_QP_SQ_PG_SIZE_PG_8K :
+		 pbl->pg_size == ROCE_PG_SIZE_64K ?
+				CMDQ_CREATE_QP_SQ_PG_SIZE_PG_64K :
+		 pbl->pg_size == ROCE_PG_SIZE_2M ?
+				CMDQ_CREATE_QP_SQ_PG_SIZE_PG_2M :
+		 pbl->pg_size == ROCE_PG_SIZE_8M ?
+				CMDQ_CREATE_QP_SQ_PG_SIZE_PG_8M :
+		 pbl->pg_size == ROCE_PG_SIZE_1G ?
+				CMDQ_CREATE_QP_SQ_PG_SIZE_PG_1G :
+		 CMDQ_CREATE_QP_SQ_PG_SIZE_PG_4K);
+
+	/* initialize all SQ WQEs to LOCAL_INVALID (sq prep for hw fetch) */
+	hw_sq_send_ptr = (struct sq_send **)sq->hwq.pbl_ptr;
+	for (sw_prod = 0; sw_prod < sq->hwq.max_elements; sw_prod++) {
+		hw_sq_send_hdr = &hw_sq_send_ptr[get_sqe_pg(sw_prod)]
+						[get_sqe_idx(sw_prod)];
+		hw_sq_send_hdr->wqe_type = SQ_BASE_WQE_TYPE_LOCAL_INVALID;
+	}
+
+	if (qp->scq)
+		req.scq_cid = cpu_to_le32(qp->scq->id);
+
+	qp_flags |= CMDQ_CREATE_QP_QP_FLAGS_RESERVED_LKEY_ENABLE;
+	qp_flags |= CMDQ_CREATE_QP_QP_FLAGS_FR_PMR_ENABLED;
+	if (qp->sig_type)
+		qp_flags |= CMDQ_CREATE_QP_QP_FLAGS_FORCE_COMPLETION;
+
+	/* RQ */
+	if (rq->max_wqe) {
+		rq->hwq.max_elements = rq->max_wqe;
+		rc = bnxt_qplib_alloc_init_hwq(res->pdev, &rq->hwq, rq->sglist,
+					       rq->nmap, &rq->hwq.max_elements,
+					       BNXT_QPLIB_MAX_RQE_ENTRY_SIZE, 0,
+					       PAGE_SIZE, HWQ_TYPE_QUEUE);
+		if (rc)
+			goto fail_sq;
+
+		rq->swq = kcalloc(rq->hwq.max_elements, sizeof(*rq->swq),
+				  GFP_KERNEL);
+		if (!rq->swq) {
+			rc = -ENOMEM;
+			goto fail_rq;
+		}
+		pbl = &rq->hwq.pbl[PBL_LVL_0];
+		req.rq_pbl = cpu_to_le64(pbl->pg_map_arr[0]);
+		req.rq_pg_size_rq_lvl =
+			((rq->hwq.level & CMDQ_CREATE_QP_RQ_LVL_MASK) <<
+			 CMDQ_CREATE_QP_RQ_LVL_SFT) |
+				(pbl->pg_size == ROCE_PG_SIZE_4K ?
+					CMDQ_CREATE_QP_RQ_PG_SIZE_PG_4K :
+				 pbl->pg_size == ROCE_PG_SIZE_8K ?
+					CMDQ_CREATE_QP_RQ_PG_SIZE_PG_8K :
+				 pbl->pg_size == ROCE_PG_SIZE_64K ?
+					CMDQ_CREATE_QP_RQ_PG_SIZE_PG_64K :
+				 pbl->pg_size == ROCE_PG_SIZE_2M ?
+					CMDQ_CREATE_QP_RQ_PG_SIZE_PG_2M :
+				 pbl->pg_size == ROCE_PG_SIZE_8M ?
+					CMDQ_CREATE_QP_RQ_PG_SIZE_PG_8M :
+				 pbl->pg_size == ROCE_PG_SIZE_1G ?
+					CMDQ_CREATE_QP_RQ_PG_SIZE_PG_1G :
+				 CMDQ_CREATE_QP_RQ_PG_SIZE_PG_4K);
+	}
+
+	if (qp->rcq)
+		req.rcq_cid = cpu_to_le32(qp->rcq->id);
+	req.qp_flags = cpu_to_le32(qp_flags);
+	req.sq_size = cpu_to_le32(sq->hwq.max_elements);
+	req.rq_size = cpu_to_le32(rq->hwq.max_elements);
+	qp->sq_hdr_buf = NULL;
+	qp->rq_hdr_buf = NULL;
+
+	rc = bnxt_qplib_alloc_qp_hdr_buf(res, qp);
+	if (rc)
+		goto fail_rq;
+
+	/* CTRL-22434: Irrespective of the requested SGE count on the SQ
+	 * always create the QP with max send sges possible if the requested
+	 * inline size is greater than 0.
+	 */
+	max_ssge = qp->max_inline_data ? 6 : sq->max_sge;
+	req.sq_fwo_sq_sge = cpu_to_le16(
+				((max_ssge & CMDQ_CREATE_QP_SQ_SGE_MASK)
+				 << CMDQ_CREATE_QP_SQ_SGE_SFT) | 0);
+	req.rq_fwo_rq_sge = cpu_to_le16(
+				((rq->max_sge & CMDQ_CREATE_QP_RQ_SGE_MASK)
+				 << CMDQ_CREATE_QP_RQ_SGE_SFT) | 0);
+	/* ORRQ and IRRQ */
+	if (psn_sz) {
+		xrrq = &qp->orrq;
+		xrrq->max_elements =
+			ORD_LIMIT_TO_ORRQ_SLOTS(qp->max_rd_atomic);
+		req_size = xrrq->max_elements *
+			   BNXT_QPLIB_MAX_ORRQE_ENTRY_SIZE + PAGE_SIZE - 1;
+		req_size &= ~(PAGE_SIZE - 1);
+		rc = bnxt_qplib_alloc_init_hwq(res->pdev, xrrq, NULL, 0,
+					       &xrrq->max_elements,
+					       BNXT_QPLIB_MAX_ORRQE_ENTRY_SIZE,
+					       0, req_size, HWQ_TYPE_CTX);
+		if (rc)
+			goto fail_buf_free;
+		pbl = &xrrq->pbl[PBL_LVL_0];
+		req.orrq_addr = cpu_to_le64(pbl->pg_map_arr[0]);
+
+		xrrq = &qp->irrq;
+		xrrq->max_elements = IRD_LIMIT_TO_IRRQ_SLOTS(
+						qp->max_dest_rd_atomic);
+		req_size = xrrq->max_elements *
+			   BNXT_QPLIB_MAX_IRRQE_ENTRY_SIZE + PAGE_SIZE - 1;
+		req_size &= ~(PAGE_SIZE - 1);
+
+		rc = bnxt_qplib_alloc_init_hwq(res->pdev, xrrq, NULL, 0,
+					       &xrrq->max_elements,
+					       BNXT_QPLIB_MAX_IRRQE_ENTRY_SIZE,
+					       0, req_size, HWQ_TYPE_CTX);
+		if (rc)
+			goto fail_orrq;
+
+		pbl = &xrrq->pbl[PBL_LVL_0];
+		req.irrq_addr = cpu_to_le64(pbl->pg_map_arr[0]);
+	}
+	req.pd_id = cpu_to_le32(qp->pd->id);
+
+	resp = (struct creq_create_qp_resp *)
+			bnxt_qplib_rcfw_send_message(rcfw, (void *)&req,
+						     NULL, 0);
+	if (!resp) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: CREATE_QP send failed");
+		rc = -EINVAL;
+		goto fail;
+	}
+	if (!bnxt_qplib_rcfw_wait_for_resp(rcfw, le16_to_cpu(req.cookie))) {
+		/* Cmd timed out */
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: CREATE_QP timed out");
+		rc = -ETIMEDOUT;
+		goto fail;
+	}
+	if (resp->status ||
+	    le16_to_cpu(resp->cookie) != le16_to_cpu(req.cookie)) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: CREATE_QP failed ");
+		dev_err(&rcfw->pdev->dev,
+			"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+			resp->status, le16_to_cpu(req.cookie),
+			le16_to_cpu(resp->cookie));
+		rc = -EINVAL;
+		goto fail;
+	}
+	qp->id = le32_to_cpu(resp->xid);
+	qp->cur_qp_state = CMDQ_MODIFY_QP_NEW_STATE_RESET;
+	sq->flush_in_progress = false;
+	rq->flush_in_progress = false;
+
+	return 0;
+
+fail:
+	if (qp->irrq.max_elements)
+		bnxt_qplib_free_hwq(res->pdev, &qp->irrq);
+fail_orrq:
+	if (qp->orrq.max_elements)
+		bnxt_qplib_free_hwq(res->pdev, &qp->orrq);
+fail_buf_free:
+	bnxt_qplib_free_qp_hdr_buf(res, qp);
+fail_rq:
+	bnxt_qplib_free_hwq(res->pdev, &rq->hwq);
+	kfree(rq->swq);
+fail_sq:
+	bnxt_qplib_free_hwq(res->pdev, &sq->hwq);
+	kfree(sq->swq);
+exit:
+	return rc;
+}
+
+static void __modify_flags_from_init_state(struct bnxt_qplib_qp *qp)
+{
+	switch (qp->state) {
+	case CMDQ_MODIFY_QP_NEW_STATE_RTR:
+		/* INIT->RTR, configure the path_mtu to the default
+		 * 2048 if not being requested
+		 */
+		if (!(qp->modify_flags &
+		    CMDQ_MODIFY_QP_MODIFY_MASK_PATH_MTU)) {
+			qp->modify_flags |=
+				CMDQ_MODIFY_QP_MODIFY_MASK_PATH_MTU;
+			qp->path_mtu =
+				CMDQ_MODIFY_QP_PATH_MTU_MTU_2048;
+		}
+		qp->modify_flags &=
+			~CMDQ_MODIFY_QP_MODIFY_MASK_VLAN_ID;
+		/* Bono FW require the max_dest_rd_atomic to be >= 1 */
+		if (qp->max_dest_rd_atomic < 1)
+			qp->max_dest_rd_atomic = 1;
+		qp->modify_flags &= ~CMDQ_MODIFY_QP_MODIFY_MASK_SRC_MAC;
+		/* Bono FW 20.6.5 requires SGID_INDEX configuration */
+		if (!(qp->modify_flags &
+		    CMDQ_MODIFY_QP_MODIFY_MASK_SGID_INDEX)) {
+			qp->modify_flags |=
+				CMDQ_MODIFY_QP_MODIFY_MASK_SGID_INDEX;
+			qp->ah.sgid_index = 0;
+		}
+		break;
+	default:
+		break;
+	}
+}
+
+static void __modify_flags_from_rtr_state(struct bnxt_qplib_qp *qp)
+{
+	switch (qp->state) {
+	case CMDQ_MODIFY_QP_NEW_STATE_RTS:
+		/* Bono FW requires the max_rd_atomic to be >= 1 */
+		if (qp->max_rd_atomic < 1)
+			qp->max_rd_atomic = 1;
+		/* Bono FW does not allow PKEY_INDEX,
+		 * DGID, FLOW_LABEL, SGID_INDEX, HOP_LIMIT,
+		 * TRAFFIC_CLASS, DEST_MAC, PATH_MTU, RQ_PSN,
+		 * MIN_RNR_TIMER, MAX_DEST_RD_ATOMIC, DEST_QP_ID
+		 * modification
+		 */
+		qp->modify_flags &=
+			~(CMDQ_MODIFY_QP_MODIFY_MASK_PKEY |
+			  CMDQ_MODIFY_QP_MODIFY_MASK_DGID |
+			  CMDQ_MODIFY_QP_MODIFY_MASK_FLOW_LABEL |
+			  CMDQ_MODIFY_QP_MODIFY_MASK_SGID_INDEX |
+			  CMDQ_MODIFY_QP_MODIFY_MASK_HOP_LIMIT |
+			  CMDQ_MODIFY_QP_MODIFY_MASK_TRAFFIC_CLASS |
+			  CMDQ_MODIFY_QP_MODIFY_MASK_DEST_MAC |
+			  CMDQ_MODIFY_QP_MODIFY_MASK_PATH_MTU |
+			  CMDQ_MODIFY_QP_MODIFY_MASK_RQ_PSN |
+			  CMDQ_MODIFY_QP_MODIFY_MASK_MIN_RNR_TIMER |
+			  CMDQ_MODIFY_QP_MODIFY_MASK_MAX_DEST_RD_ATOMIC |
+			  CMDQ_MODIFY_QP_MODIFY_MASK_DEST_QP_ID);
+		break;
+	default:
+		break;
+	}
+}
+
+static void __filter_modify_flags(struct bnxt_qplib_qp *qp)
+{
+	switch (qp->cur_qp_state) {
+	case CMDQ_MODIFY_QP_NEW_STATE_RESET:
+		break;
+	case CMDQ_MODIFY_QP_NEW_STATE_INIT:
+		__modify_flags_from_init_state(qp);
+		break;
+	case CMDQ_MODIFY_QP_NEW_STATE_RTR:
+		__modify_flags_from_rtr_state(qp);
+		break;
+	case CMDQ_MODIFY_QP_NEW_STATE_RTS:
+		break;
+	case CMDQ_MODIFY_QP_NEW_STATE_SQD:
+		break;
+	case CMDQ_MODIFY_QP_NEW_STATE_SQE:
+		break;
+	case CMDQ_MODIFY_QP_NEW_STATE_ERR:
+		break;
+	default:
+		break;
+	}
+}
+
+int bnxt_qplib_modify_qp(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp)
+{
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	struct cmdq_modify_qp req;
+	struct creq_modify_qp_resp *resp;
+	u16 cmd_flags = 0, pkey;
+	u32 temp32[4];
+	u32 bmask;
+
+	RCFW_CMD_PREP(req, MODIFY_QP, cmd_flags);
+
+	/* Filter out the qp_attr_mask based on the state->new transition */
+	__filter_modify_flags(qp);
+	bmask = qp->modify_flags;
+	req.modify_mask = cpu_to_le32(qp->modify_flags);
+	req.qp_cid = cpu_to_le32(qp->id);
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_STATE) {
+		req.network_type_en_sqd_async_notify_new_state =
+				(qp->state & CMDQ_MODIFY_QP_NEW_STATE_MASK) |
+				(qp->en_sqd_async_notify ?
+					CMDQ_MODIFY_QP_EN_SQD_ASYNC_NOTIFY : 0);
+	}
+	req.network_type_en_sqd_async_notify_new_state |= qp->nw_type;
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_ACCESS)
+		req.access = qp->access;
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_PKEY) {
+		if (!bnxt_qplib_get_pkey(res, &res->pkey_tbl,
+					 qp->pkey_index, &pkey))
+			req.pkey = cpu_to_le16(pkey);
+	}
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_QKEY)
+		req.qkey = cpu_to_le32(qp->qkey);
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_DGID) {
+		memcpy(temp32, qp->ah.dgid.data, sizeof(struct bnxt_qplib_gid));
+		req.dgid[0] = cpu_to_le32(temp32[0]);
+		req.dgid[1] = cpu_to_le32(temp32[1]);
+		req.dgid[2] = cpu_to_le32(temp32[2]);
+		req.dgid[3] = cpu_to_le32(temp32[3]);
+	}
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_FLOW_LABEL)
+		req.flow_label = cpu_to_le32(qp->ah.flow_label);
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_SGID_INDEX)
+		req.sgid_index = cpu_to_le16(res->sgid_tbl.hw_id
+					     [qp->ah.sgid_index]);
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_HOP_LIMIT)
+		req.hop_limit = qp->ah.hop_limit;
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_TRAFFIC_CLASS)
+		req.traffic_class = qp->ah.traffic_class;
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_DEST_MAC)
+		memcpy(req.dest_mac, qp->ah.dmac, 6);
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_PATH_MTU)
+		req.path_mtu = qp->path_mtu;
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_TIMEOUT)
+		req.timeout = qp->timeout;
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_RETRY_CNT)
+		req.retry_cnt = qp->retry_cnt;
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_RNR_RETRY)
+		req.rnr_retry = qp->rnr_retry;
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_MIN_RNR_TIMER)
+		req.min_rnr_timer = qp->min_rnr_timer;
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_RQ_PSN)
+		req.rq_psn = cpu_to_le32(qp->rq.psn);
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_SQ_PSN)
+		req.sq_psn = cpu_to_le32(qp->sq.psn);
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_MAX_RD_ATOMIC)
+		req.max_rd_atomic =
+			ORD_LIMIT_TO_ORRQ_SLOTS(qp->max_rd_atomic);
+
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_MAX_DEST_RD_ATOMIC)
+		req.max_dest_rd_atomic =
+			IRD_LIMIT_TO_IRRQ_SLOTS(qp->max_dest_rd_atomic);
+
+	req.sq_size = cpu_to_le32(qp->sq.hwq.max_elements);
+	req.rq_size = cpu_to_le32(qp->rq.hwq.max_elements);
+	req.sq_sge = cpu_to_le16(qp->sq.max_sge);
+	req.rq_sge = cpu_to_le16(qp->rq.max_sge);
+	req.max_inline_data = cpu_to_le32(qp->max_inline_data);
+	if (bmask & CMDQ_MODIFY_QP_MODIFY_MASK_DEST_QP_ID)
+		req.dest_qp_id = cpu_to_le32(qp->dest_qpn);
+
+	req.vlan_pcp_vlan_dei_vlan_id = cpu_to_le16(qp->vlan_id);
+
+	resp = (struct creq_modify_qp_resp *)
+			bnxt_qplib_rcfw_send_message(rcfw, (void *)&req,
+						     NULL, 0);
+	if (!resp) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: MODIFY_QP send failed");
+		return -EINVAL;
+	}
+	if (!bnxt_qplib_rcfw_wait_for_resp(rcfw, le16_to_cpu(req.cookie))) {
+		/* Cmd timed out */
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: MODIFY_QP timed out");
+		return -ETIMEDOUT;
+	}
+	if (resp->status ||
+	    le16_to_cpu(resp->cookie) != le16_to_cpu(req.cookie)) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: MODIFY_QP failed ");
+		dev_err(&rcfw->pdev->dev,
+			"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+			resp->status, le16_to_cpu(req.cookie),
+			le16_to_cpu(resp->cookie));
+		return -EINVAL;
+	}
+	qp->cur_qp_state = qp->state;
+	return 0;
+}
+
+int bnxt_qplib_query_qp(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp)
+{
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	struct cmdq_query_qp req;
+	struct creq_query_qp_resp *resp;
+	struct creq_query_qp_resp_sb *sb;
+	u16 cmd_flags = 0;
+	u32 temp32[4];
+	int i;
+
+	RCFW_CMD_PREP(req, QUERY_QP, cmd_flags);
+
+	req.qp_cid = cpu_to_le32(qp->id);
+	req.resp_size = sizeof(*sb) / BNXT_QPLIB_CMDQE_UNITS;
+	resp = (struct creq_query_qp_resp *)
+			bnxt_qplib_rcfw_send_message(rcfw, (void *)&req,
+						     (void **)&sb, 0);
+	if (!resp) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: QUERY_QP send failed");
+		return -EINVAL;
+	}
+	if (!bnxt_qplib_rcfw_wait_for_resp(rcfw, le16_to_cpu(req.cookie))) {
+		/* Cmd timed out */
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: QUERY_QP timed out");
+		return -ETIMEDOUT;
+	}
+	if (resp->status ||
+	    le16_to_cpu(resp->cookie) != le16_to_cpu(req.cookie)) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: QUERY_QP failed ");
+		dev_err(&rcfw->pdev->dev,
+			"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+			resp->status, le16_to_cpu(req.cookie),
+			le16_to_cpu(resp->cookie));
+		return -EINVAL;
+	}
+	/* Extract the context from the side buffer */
+	qp->state = sb->en_sqd_async_notify_state &
+			CREQ_QUERY_QP_RESP_SB_STATE_MASK;
+	qp->en_sqd_async_notify = sb->en_sqd_async_notify_state &
+				  CREQ_QUERY_QP_RESP_SB_EN_SQD_ASYNC_NOTIFY ?
+				  true : false;
+	qp->access = sb->access;
+	qp->pkey_index = le16_to_cpu(sb->pkey);
+	qp->qkey = le32_to_cpu(sb->qkey);
+
+	temp32[0] = le32_to_cpu(sb->dgid[0]);
+	temp32[1] = le32_to_cpu(sb->dgid[1]);
+	temp32[2] = le32_to_cpu(sb->dgid[2]);
+	temp32[3] = le32_to_cpu(sb->dgid[3]);
+	memcpy(qp->ah.dgid.data, temp32, sizeof(qp->ah.dgid.data));
+
+	qp->ah.flow_label = le32_to_cpu(sb->flow_label);
+
+	qp->ah.sgid_index = 0;
+	for (i = 0; i < res->sgid_tbl.max; i++) {
+		if (res->sgid_tbl.hw_id[i] == le16_to_cpu(sb->sgid_index)) {
+			qp->ah.sgid_index = i;
+			break;
+		}
+	}
+	if (i == res->sgid_tbl.max)
+		dev_warn(&res->pdev->dev, "QPLIB: SGID not found??");
+
+	qp->ah.hop_limit = sb->hop_limit;
+	qp->ah.traffic_class = sb->traffic_class;
+	memcpy(qp->ah.dmac, sb->dest_mac, 6);
+	qp->ah.vlan_id = (le16_to_cpu(sb->path_mtu_dest_vlan_id) &
+				CREQ_QUERY_QP_RESP_SB_VLAN_ID_MASK) >>
+				CREQ_QUERY_QP_RESP_SB_VLAN_ID_SFT;
+	qp->path_mtu = (le16_to_cpu(sb->path_mtu_dest_vlan_id) &
+				    CREQ_QUERY_QP_RESP_SB_PATH_MTU_MASK) >>
+				    CREQ_QUERY_QP_RESP_SB_PATH_MTU_SFT;
+	qp->timeout = sb->timeout;
+	qp->retry_cnt = sb->retry_cnt;
+	qp->rnr_retry = sb->rnr_retry;
+	qp->min_rnr_timer = sb->min_rnr_timer;
+	qp->rq.psn = le32_to_cpu(sb->rq_psn);
+	qp->max_rd_atomic = ORRQ_SLOTS_TO_ORD_LIMIT(sb->max_rd_atomic);
+	qp->sq.psn = le32_to_cpu(sb->sq_psn);
+	qp->max_dest_rd_atomic =
+			IRRQ_SLOTS_TO_IRD_LIMIT(sb->max_dest_rd_atomic);
+	qp->sq.max_wqe = qp->sq.hwq.max_elements;
+	qp->rq.max_wqe = qp->rq.hwq.max_elements;
+	qp->sq.max_sge = le16_to_cpu(sb->sq_sge);
+	qp->rq.max_sge = le16_to_cpu(sb->rq_sge);
+	qp->max_inline_data = le32_to_cpu(sb->max_inline_data);
+	qp->dest_qpn = le32_to_cpu(sb->dest_qp_id);
+	memcpy(qp->smac, sb->src_mac, 6);
+	qp->vlan_id = le16_to_cpu(sb->vlan_pcp_vlan_dei_vlan_id);
+	return 0;
+}
+
+static void __clean_cq(struct bnxt_qplib_cq *cq, u64 qp)
+{
+	struct bnxt_qplib_hwq *cq_hwq = &cq->hwq;
+	struct cq_base *hw_cqe, **hw_cqe_ptr;
+	int i;
+
+	for (i = 0; i < cq_hwq->max_elements; i++) {
+		hw_cqe_ptr = (struct cq_base **)cq_hwq->pbl_ptr;
+		hw_cqe = &hw_cqe_ptr[CQE_PG(i)][CQE_IDX(i)];
+		if (!CQE_CMP_VALID(hw_cqe, i, cq_hwq->max_elements))
+			continue;
+		switch (hw_cqe->cqe_type_toggle & CQ_BASE_CQE_TYPE_MASK) {
+		case CQ_BASE_CQE_TYPE_REQ:
+		case CQ_BASE_CQE_TYPE_TERMINAL:
+		{
+			struct cq_req *cqe = (struct cq_req *)hw_cqe;
+
+			if (qp == le64_to_cpu(cqe->qp_handle))
+				cqe->qp_handle = 0;
+			break;
+		}
+		case CQ_BASE_CQE_TYPE_RES_RC:
+		case CQ_BASE_CQE_TYPE_RES_UD:
+		case CQ_BASE_CQE_TYPE_RES_RAWETH_QP1:
+		{
+			struct cq_res_rc *cqe = (struct cq_res_rc *)hw_cqe;
+
+			if (qp == le64_to_cpu(cqe->qp_handle))
+				cqe->qp_handle = 0;
+			break;
+		}
+		default:
+			break;
+		}
+	}
+}
+
+int bnxt_qplib_destroy_qp(struct bnxt_qplib_res *res,
+			  struct bnxt_qplib_qp *qp)
+{
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	struct cmdq_destroy_qp req;
+	struct creq_destroy_qp_resp *resp;
+	unsigned long flags;
+	u16 cmd_flags = 0;
+
+	RCFW_CMD_PREP(req, DESTROY_QP, cmd_flags);
+
+	req.qp_cid = cpu_to_le32(qp->id);
+	resp = (struct creq_destroy_qp_resp *)
+			bnxt_qplib_rcfw_send_message(rcfw, (void *)&req,
+						     NULL, 0);
+	if (!resp) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: DESTROY_QP send failed");
+		return -EINVAL;
+	}
+	if (!bnxt_qplib_rcfw_wait_for_resp(rcfw, le16_to_cpu(req.cookie))) {
+		/* Cmd timed out */
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: DESTROY_QP timed out");
+		return -ETIMEDOUT;
+	}
+	if (resp->status ||
+	    le16_to_cpu(resp->cookie) != le16_to_cpu(req.cookie)) {
+		dev_err(&rcfw->pdev->dev, "QPLIB: FP: DESTROY_QP failed ");
+		dev_err(&rcfw->pdev->dev,
+			"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+			resp->status, le16_to_cpu(req.cookie),
+			le16_to_cpu(resp->cookie));
+		return -EINVAL;
+	}
+
+	/* Must walk the associated CQs to nullified the QP ptr */
+	spin_lock_irqsave(&qp->scq->hwq.lock, flags);
+
+	__clean_cq(qp->scq, (u64)(unsigned long)qp);
+
+	if (qp->rcq && qp->rcq != qp->scq) {
+		spin_lock(&qp->rcq->hwq.lock);
+		__clean_cq(qp->rcq, (u64)(unsigned long)qp);
+		spin_unlock(&qp->rcq->hwq.lock);
+	}
+
+	spin_unlock_irqrestore(&qp->scq->hwq.lock, flags);
+
+	bnxt_qplib_free_qp_hdr_buf(res, qp);
+	bnxt_qplib_free_hwq(res->pdev, &qp->sq.hwq);
+	kfree(qp->sq.swq);
+
+	bnxt_qplib_free_hwq(res->pdev, &qp->rq.hwq);
+	kfree(qp->rq.swq);
+
+	if (qp->irrq.max_elements)
+		bnxt_qplib_free_hwq(res->pdev, &qp->irrq);
+	if (qp->orrq.max_elements)
+		bnxt_qplib_free_hwq(res->pdev, &qp->orrq);
+
 	return 0;
 }
 

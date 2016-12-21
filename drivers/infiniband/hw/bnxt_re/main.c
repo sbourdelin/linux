@@ -456,6 +456,12 @@ static int bnxt_re_register_ib(struct bnxt_re_dev *rdev)
 	ibdev->modify_ah		= bnxt_re_modify_ah;
 	ibdev->query_ah			= bnxt_re_query_ah;
 	ibdev->destroy_ah		= bnxt_re_destroy_ah;
+
+	ibdev->create_qp		= bnxt_re_create_qp;
+	ibdev->modify_qp		= bnxt_re_modify_qp;
+	ibdev->query_qp			= bnxt_re_query_qp;
+	ibdev->destroy_qp		= bnxt_re_destroy_qp;
+
 	ibdev->create_cq		= bnxt_re_create_cq;
 	ibdev->destroy_cq		= bnxt_re_destroy_cq;
 	ibdev->req_notify_cq		= bnxt_re_req_notify_cq;

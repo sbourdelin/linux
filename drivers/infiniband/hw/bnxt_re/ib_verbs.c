@@ -639,6 +639,484 @@ int bnxt_re_query_ah(struct ib_ah *ib_ah, struct ib_ah_attr *ah_attr)
 	return 0;
 }
 
+/* Queue Pairs */
+int bnxt_re_destroy_qp(struct ib_qp *ib_qp)
+{
+	struct bnxt_re_qp *qp = container_of(ib_qp, struct bnxt_re_qp, ib_qp);
+	struct bnxt_re_dev *rdev = qp->rdev;
+	int rc;
+
+	rc = bnxt_qplib_destroy_qp(&rdev->qplib_res, &qp->qplib_qp);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev), "Failed to destroy HW QP");
+		return rc;
+	}
+	if (ib_qp->qp_type == IB_QPT_GSI && rdev->qp1_sqp) {
+		rc = bnxt_qplib_destroy_ah(&rdev->qplib_res,
+					   &rdev->sqp_ah->qplib_ah);
+		if (rc) {
+			dev_err(rdev_to_dev(rdev),
+				"Failed to destroy HW AH for shadow QP");
+			return rc;
+		}
+
+		rc = bnxt_qplib_destroy_qp(&rdev->qplib_res,
+					   &rdev->qp1_sqp->qplib_qp);
+		if (rc) {
+			dev_err(rdev_to_dev(rdev),
+				"Failed to destroy Shadow QP");
+			return rc;
+		}
+		mutex_lock(&rdev->qp_lock);
+		list_del(&rdev->qp1_sqp->list);
+		atomic_dec(&rdev->qp_count);
+		mutex_unlock(&rdev->qp_lock);
+
+		kfree(rdev->sqp_ah);
+		kfree(rdev->qp1_sqp);
+	}
+
+	if (qp->rumem && !IS_ERR(qp->rumem))
+		ib_umem_release(qp->rumem);
+	if (qp->sumem && !IS_ERR(qp->sumem))
+		ib_umem_release(qp->sumem);
+
+	mutex_lock(&rdev->qp_lock);
+	list_del(&qp->list);
+	atomic_dec(&rdev->qp_count);
+	mutex_unlock(&rdev->qp_lock);
+	kfree(qp);
+	return 0;
+}
+
+static u8 __from_ib_qp_type(enum ib_qp_type type)
+{
+	switch (type) {
+	case IB_QPT_GSI:
+		return CMDQ_CREATE_QP1_TYPE_GSI;
+	case IB_QPT_RC:
+		return CMDQ_CREATE_QP_TYPE_RC;
+	case IB_QPT_UD:
+		return CMDQ_CREATE_QP_TYPE_UD;
+	case IB_QPT_RAW_ETHERTYPE:
+		return CMDQ_CREATE_QP_TYPE_RAW_ETHERTYPE;
+	default:
+		return IB_QPT_MAX;
+	}
+}
+
+static int bnxt_re_init_user_qp(struct bnxt_re_dev *rdev, struct bnxt_re_pd *pd,
+				struct bnxt_re_qp *qp, struct ib_udata *udata)
+{
+	struct bnxt_re_qp_req ureq;
+	struct bnxt_qplib_qp *qplib_qp = &qp->qplib_qp;
+	struct ib_umem *umem;
+	int bytes = 0;
+	struct ib_ucontext *context = pd->ib_pd.uobject->context;
+	struct bnxt_re_ucontext *cntx = container_of(context,
+						     struct bnxt_re_ucontext,
+						     ib_uctx);
+	if (ib_copy_from_udata(&ureq, udata, sizeof(ureq)))
+		return -EFAULT;
+
+	bytes = (qplib_qp->sq.max_wqe * BNXT_QPLIB_MAX_SQE_ENTRY_SIZE);
+	/* Consider mapping PSN search memory only for RC QPs. */
+	if (qplib_qp->type == CMDQ_CREATE_QP_TYPE_RC)
+		bytes += (qplib_qp->sq.max_wqe * sizeof(struct sq_psn_search));
+	bytes = PAGE_ALIGN(bytes);
+	umem = ib_umem_get(context, ureq.qpsva, bytes,
+			   IB_ACCESS_LOCAL_WRITE, 1);
+	if (IS_ERR(umem))
+		return PTR_ERR(umem);
+
+	qp->sumem = umem;
+	qplib_qp->sq.sglist = umem->sg_head.sgl;
+	qplib_qp->sq.nmap = umem->nmap;
+	qplib_qp->qp_handle = ureq.qp_handle;
+
+	if (!qp->qplib_qp.srq) {
+		bytes = (qplib_qp->rq.max_wqe * BNXT_QPLIB_MAX_RQE_ENTRY_SIZE);
+		bytes = PAGE_ALIGN(bytes);
+		umem = ib_umem_get(context, ureq.qprva, bytes,
+				   IB_ACCESS_LOCAL_WRITE, 1);
+		if (IS_ERR(umem))
+			goto rqfail;
+		qp->rumem = umem;
+		qplib_qp->rq.sglist = umem->sg_head.sgl;
+		qplib_qp->rq.nmap = umem->nmap;
+	}
+
+	qplib_qp->dpi = cntx->dpi;
+	return 0;
+rqfail:
+	ib_umem_release(qp->sumem);
+	qp->sumem = NULL;
+	qplib_qp->sq.sglist = NULL;
+	qplib_qp->sq.nmap = 0;
+
+	return PTR_ERR(umem);
+}
+
+static struct bnxt_re_ah *bnxt_re_create_shadow_qp_ah
+				(struct bnxt_re_pd *pd,
+				 struct bnxt_qplib_res *qp1_res,
+				 struct bnxt_qplib_qp *qp1_qp)
+{
+	struct bnxt_re_dev *rdev = pd->rdev;
+	struct bnxt_re_ah *ah;
+	union ib_gid sgid;
+	int rc;
+
+	ah = kzalloc(sizeof(*ah), GFP_KERNEL);
+	if (!ah)
+		return NULL;
+
+	memset(ah, 0, sizeof(*ah));
+	ah->rdev = rdev;
+	ah->qplib_ah.pd = &pd->qplib_pd;
+
+	rc = bnxt_re_query_gid(&rdev->ibdev, 1, 0, &sgid);
+	if (rc)
+		goto fail;
+
+	/* supply the dgid data same as sgid */
+	memcpy(ah->qplib_ah.dgid.data, &sgid.raw,
+	       sizeof(union ib_gid));
+	ah->qplib_ah.sgid_index = 0;
+
+	ah->qplib_ah.traffic_class = 0;
+	ah->qplib_ah.flow_label = 0;
+	ah->qplib_ah.hop_limit = 1;
+	ah->qplib_ah.sl = 0;
+	/* Have DMAC same as SMAC */
+	ether_addr_copy(ah->qplib_ah.dmac, rdev->netdev->dev_addr);
+
+	rc = bnxt_qplib_create_ah(&rdev->qplib_res, &ah->qplib_ah);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev),
+			"Failed to allocate HW AH for Shadow QP");
+		goto fail;
+	}
+
+	return ah;
+
+fail:
+	kfree(ah);
+	return NULL;
+}
+
+static struct bnxt_re_qp *bnxt_re_create_shadow_qp
+				(struct bnxt_re_pd *pd,
+				 struct bnxt_qplib_res *qp1_res,
+				 struct bnxt_qplib_qp *qp1_qp)
+{
+	struct bnxt_re_dev *rdev = pd->rdev;
+	struct bnxt_re_qp *qp;
+	int rc;
+
+	qp = kzalloc(sizeof(*qp), GFP_KERNEL);
+	if (!qp)
+		return NULL;
+
+	memset(qp, 0, sizeof(*qp));
+	qp->rdev = rdev;
+
+	/* Initialize the shadow QP structure from the QP1 values */
+	ether_addr_copy(qp->qplib_qp.smac, rdev->netdev->dev_addr);
+
+	qp->qplib_qp.pd = &pd->qplib_pd;
+	qp->qplib_qp.qp_handle = (u64)(unsigned long)(&qp->qplib_qp);
+	qp->qplib_qp.type = IB_QPT_UD;
+
+	qp->qplib_qp.max_inline_data = 0;
+	qp->qplib_qp.sig_type = true;
+
+	/* Shadow QP SQ depth should be same as QP1 RQ depth */
+	qp->qplib_qp.sq.max_wqe = qp1_qp->rq.max_wqe;
+	qp->qplib_qp.sq.max_sge = 2;
+
+	qp->qplib_qp.scq = qp1_qp->scq;
+	qp->qplib_qp.rcq = qp1_qp->rcq;
+
+	qp->qplib_qp.rq.max_wqe = qp1_qp->rq.max_wqe;
+	qp->qplib_qp.rq.max_sge = qp1_qp->rq.max_sge;
+
+	qp->qplib_qp.mtu = qp1_qp->mtu;
+
+	qp->qplib_qp.sq_hdr_buf_size = 0;
+	qp->qplib_qp.rq_hdr_buf_size = BNXT_QPLIB_MAX_GRH_HDR_SIZE_IPV6;
+	qp->qplib_qp.dpi = &rdev->dpi_privileged;
+
+	rc = bnxt_qplib_create_qp(qp1_res, &qp->qplib_qp);
+	if (rc)
+		goto fail;
+
+	rdev->sqp_id = qp->qplib_qp.id;
+
+	spin_lock_init(&qp->sq_lock);
+	INIT_LIST_HEAD(&qp->list);
+	mutex_lock(&rdev->qp_lock);
+	list_add_tail(&qp->list, &rdev->qp_list);
+	atomic_inc(&rdev->qp_count);
+	mutex_unlock(&rdev->qp_lock);
+	return qp;
+fail:
+	kfree(qp);
+	return NULL;
+}
+
+struct ib_qp *bnxt_re_create_qp(struct ib_pd *ib_pd,
+				struct ib_qp_init_attr *qp_init_attr,
+				struct ib_udata *udata)
+{
+	struct bnxt_re_pd *pd = container_of(ib_pd, struct bnxt_re_pd, ib_pd);
+	struct bnxt_re_dev *rdev = pd->rdev;
+	struct bnxt_qplib_dev_attr *dev_attr = &rdev->dev_attr;
+	struct bnxt_re_qp *qp;
+	struct bnxt_re_srq *srq;
+	struct bnxt_re_cq *cq;
+	int rc, entries;
+
+	if ((qp_init_attr->cap.max_send_wr > dev_attr->max_qp_wqes) ||
+	    (qp_init_attr->cap.max_recv_wr > dev_attr->max_qp_wqes) ||
+	    (qp_init_attr->cap.max_send_sge > dev_attr->max_qp_sges) ||
+	    (qp_init_attr->cap.max_recv_sge > dev_attr->max_qp_sges) ||
+	    (qp_init_attr->cap.max_inline_data > dev_attr->max_inline_data))
+		return ERR_PTR(-EINVAL);
+
+	qp = kzalloc(sizeof(*qp), GFP_KERNEL);
+	if (!qp)
+		return ERR_PTR(-ENOMEM);
+
+	qp->rdev = rdev;
+	ether_addr_copy(qp->qplib_qp.smac, rdev->netdev->dev_addr);
+	qp->qplib_qp.pd = &pd->qplib_pd;
+	qp->qplib_qp.qp_handle = (u64)(unsigned long)(&qp->qplib_qp);
+	qp->qplib_qp.type = __from_ib_qp_type(qp_init_attr->qp_type);
+	if (qp->qplib_qp.type == IB_QPT_MAX) {
+		dev_err(rdev_to_dev(rdev), "QP type 0x%x not supported",
+			qp->qplib_qp.type);
+		rc = -EINVAL;
+		goto fail;
+	}
+	qp->qplib_qp.max_inline_data = qp_init_attr->cap.max_inline_data;
+	qp->qplib_qp.sig_type = ((qp_init_attr->sq_sig_type ==
+				  IB_SIGNAL_ALL_WR) ? true : false);
+
+	entries = roundup_pow_of_two(qp_init_attr->cap.max_send_wr + 1);
+	if (entries > dev_attr->max_qp_wqes + 1)
+		entries = dev_attr->max_qp_wqes + 1;
+	qp->qplib_qp.sq.max_wqe = entries;
+
+	qp->qplib_qp.sq.max_sge = qp_init_attr->cap.max_send_sge;
+	if (qp->qplib_qp.sq.max_sge > dev_attr->max_qp_sges)
+		qp->qplib_qp.sq.max_sge = dev_attr->max_qp_sges;
+
+	if (qp_init_attr->send_cq) {
+		cq = container_of(qp_init_attr->send_cq, struct bnxt_re_cq,
+				  ib_cq);
+		if (!cq) {
+			dev_err(rdev_to_dev(rdev), "Send CQ not found");
+			rc = -EINVAL;
+			goto fail;
+		}
+		qp->qplib_qp.scq = &cq->qplib_cq;
+	}
+
+	if (qp_init_attr->recv_cq) {
+		cq = container_of(qp_init_attr->recv_cq, struct bnxt_re_cq,
+				  ib_cq);
+		if (!cq) {
+			dev_err(rdev_to_dev(rdev), "Receive CQ not found");
+			rc = -EINVAL;
+			goto fail;
+		}
+		qp->qplib_qp.rcq = &cq->qplib_cq;
+	}
+
+	if (qp_init_attr->srq) {
+		dev_err(rdev_to_dev(rdev), "SRQ not supported");
+		rc = -ENOTSUPP;
+		goto fail;
+	} else {
+		/* Allocate 1 more than what's provided so posting max doesn't
+		 * mean empty
+		 */
+		entries = roundup_pow_of_two(qp_init_attr->cap.max_recv_wr + 1);
+		if (entries > dev_attr->max_qp_wqes + 1)
+			entries = dev_attr->max_qp_wqes + 1;
+		qp->qplib_qp.rq.max_wqe = entries;
+
+		qp->qplib_qp.rq.max_sge = qp_init_attr->cap.max_recv_sge;
+		if (qp->qplib_qp.rq.max_sge > dev_attr->max_qp_sges)
+			qp->qplib_qp.rq.max_sge = dev_attr->max_qp_sges;
+	}
+
+	qp->qplib_qp.mtu = ib_mtu_enum_to_int(iboe_get_mtu(rdev->netdev->mtu));
+
+	if (qp_init_attr->qp_type == IB_QPT_GSI) {
+		qp->qplib_qp.rq.max_sge = dev_attr->max_qp_sges;
+		if (qp->qplib_qp.rq.max_sge > dev_attr->max_qp_sges)
+			qp->qplib_qp.rq.max_sge = dev_attr->max_qp_sges;
+		qp->qplib_qp.sq.max_sge++;
+		if (qp->qplib_qp.sq.max_sge > dev_attr->max_qp_sges)
+			qp->qplib_qp.sq.max_sge = dev_attr->max_qp_sges;
+
+		qp->qplib_qp.rq_hdr_buf_size =
+					BNXT_QPLIB_MAX_QP1_RQ_HDR_SIZE_V2;
+
+		qp->qplib_qp.sq_hdr_buf_size =
+					BNXT_QPLIB_MAX_QP1_SQ_HDR_SIZE_V2;
+		qp->qplib_qp.dpi = &rdev->dpi_privileged;
+		rc = bnxt_qplib_create_qp1(&rdev->qplib_res, &qp->qplib_qp);
+		if (rc) {
+			dev_err(rdev_to_dev(rdev), "Failed to create HW QP1");
+			goto fail;
+		}
+		/* Create a shadow QP to handle the QP1 traffic */
+		rdev->qp1_sqp = bnxt_re_create_shadow_qp(pd, &rdev->qplib_res,
+							 &qp->qplib_qp);
+		if (!rdev->qp1_sqp) {
+			rc = -EINVAL;
+			dev_err(rdev_to_dev(rdev),
+				"Failed to create Shadow QP for QP1");
+			goto qp_destroy;
+		}
+		rdev->sqp_ah = bnxt_re_create_shadow_qp_ah(pd, &rdev->qplib_res,
+							   &qp->qplib_qp);
+		if (!rdev->sqp_ah) {
+			bnxt_qplib_destroy_qp(&rdev->qplib_res,
+					      &rdev->qp1_sqp->qplib_qp);
+			rc = -EINVAL;
+			dev_err(rdev_to_dev(rdev),
+				"Failed to create AH entry for ShadowQP");
+			goto qp_destroy;
+		}
+
+	} else {
+		qp->qplib_qp.max_rd_atomic = dev_attr->max_qp_rd_atom;
+		qp->qplib_qp.max_dest_rd_atomic = dev_attr->max_qp_init_rd_atom;
+		if (udata) {
+			rc = bnxt_re_init_user_qp(rdev, pd, qp, udata);
+			if (rc)
+				goto fail;
+		} else {
+			qp->qplib_qp.dpi = &rdev->dpi_privileged;
+		}
+
+		rc = bnxt_qplib_create_qp(&rdev->qplib_res, &qp->qplib_qp);
+		if (rc) {
+			dev_err(rdev_to_dev(rdev), "Failed to create HW QP");
+			goto fail;
+		}
+	}
+
+	qp->ib_qp.qp_num = qp->qplib_qp.id;
+	spin_lock_init(&qp->sq_lock);
+
+	if (udata) {
+		struct bnxt_re_qp_resp resp;
+
+		resp.qpid = qp->ib_qp.qp_num;
+		resp.rsvd = 0;
+		rc = ib_copy_to_udata(udata, &resp, sizeof(resp));
+		if (rc) {
+			dev_err(rdev_to_dev(rdev), "Failed to copy QP udata");
+			goto qp_destroy;
+		}
+	}
+	INIT_LIST_HEAD(&qp->list);
+	mutex_lock(&rdev->qp_lock);
+	list_add_tail(&qp->list, &rdev->qp_list);
+	atomic_inc(&rdev->qp_count);
+	mutex_unlock(&rdev->qp_lock);
+
+	return &qp->ib_qp;
+qp_destroy:
+	bnxt_qplib_destroy_qp(&rdev->qplib_res, &qp->qplib_qp);
+fail:
+	kfree(qp);
+	return ERR_PTR(rc);
+}
+
+static u8 __from_ib_qp_state(enum ib_qp_state state)
+{
+	switch (state) {
+	case IB_QPS_RESET:
+		return CMDQ_MODIFY_QP_NEW_STATE_RESET;
+	case IB_QPS_INIT:
+		return CMDQ_MODIFY_QP_NEW_STATE_INIT;
+	case IB_QPS_RTR:
+		return CMDQ_MODIFY_QP_NEW_STATE_RTR;
+	case IB_QPS_RTS:
+		return CMDQ_MODIFY_QP_NEW_STATE_RTS;
+	case IB_QPS_SQD:
+		return CMDQ_MODIFY_QP_NEW_STATE_SQD;
+	case IB_QPS_SQE:
+		return CMDQ_MODIFY_QP_NEW_STATE_SQE;
+	case IB_QPS_ERR:
+	default:
+		return CMDQ_MODIFY_QP_NEW_STATE_ERR;
+	}
+}
+
+static enum ib_qp_state __to_ib_qp_state(u8 state)
+{
+	switch (state) {
+	case CMDQ_MODIFY_QP_NEW_STATE_RESET:
+		return IB_QPS_RESET;
+	case CMDQ_MODIFY_QP_NEW_STATE_INIT:
+		return IB_QPS_INIT;
+	case CMDQ_MODIFY_QP_NEW_STATE_RTR:
+		return IB_QPS_RTR;
+	case CMDQ_MODIFY_QP_NEW_STATE_RTS:
+		return IB_QPS_RTS;
+	case CMDQ_MODIFY_QP_NEW_STATE_SQD:
+		return IB_QPS_SQD;
+	case CMDQ_MODIFY_QP_NEW_STATE_SQE:
+		return IB_QPS_SQE;
+	case CMDQ_MODIFY_QP_NEW_STATE_ERR:
+	default:
+		return IB_QPS_ERR;
+	}
+}
+
+static u32 __from_ib_mtu(enum ib_mtu mtu)
+{
+	switch (mtu) {
+	case IB_MTU_256:
+		return CMDQ_MODIFY_QP_PATH_MTU_MTU_256;
+	case IB_MTU_512:
+		return CMDQ_MODIFY_QP_PATH_MTU_MTU_512;
+	case IB_MTU_1024:
+		return CMDQ_MODIFY_QP_PATH_MTU_MTU_1024;
+	case IB_MTU_2048:
+		return CMDQ_MODIFY_QP_PATH_MTU_MTU_2048;
+	case IB_MTU_4096:
+		return CMDQ_MODIFY_QP_PATH_MTU_MTU_4096;
+	default:
+		return CMDQ_MODIFY_QP_PATH_MTU_MTU_2048;
+	}
+}
+
+static enum ib_mtu __to_ib_mtu(u32 mtu)
+{
+	switch (mtu & CREQ_QUERY_QP_RESP_SB_PATH_MTU_MASK) {
+	case CMDQ_MODIFY_QP_PATH_MTU_MTU_256:
+		return IB_MTU_256;
+	case CMDQ_MODIFY_QP_PATH_MTU_MTU_512:
+		return IB_MTU_512;
+	case CMDQ_MODIFY_QP_PATH_MTU_MTU_1024:
+		return IB_MTU_1024;
+	case CMDQ_MODIFY_QP_PATH_MTU_MTU_2048:
+		return IB_MTU_2048;
+	case CMDQ_MODIFY_QP_PATH_MTU_MTU_4096:
+		return IB_MTU_4096;
+	default:
+		return IB_MTU_2048;
+	}
+}
+
 static int __from_ib_access_flags(int iflags)
 {
 	int qflags = 0;
@@ -680,6 +1158,292 @@ static enum ib_access_flags __to_ib_access_flags(int qflags)
 		iflags |= IB_ACCESS_ON_DEMAND;
 	return iflags;
 };
+
+static int bnxt_re_modify_shadow_qp(struct bnxt_re_dev *rdev,
+				    struct bnxt_re_qp *qp1_qp,
+				    int qp_attr_mask)
+{
+	struct bnxt_re_qp *qp = rdev->qp1_sqp;
+	int rc = 0;
+
+	if (qp_attr_mask & IB_QP_STATE) {
+		qp->qplib_qp.modify_flags |= CMDQ_MODIFY_QP_MODIFY_MASK_STATE;
+		qp->qplib_qp.state = qp1_qp->qplib_qp.state;
+	}
+	if (qp_attr_mask & IB_QP_PKEY_INDEX) {
+		qp->qplib_qp.modify_flags |= CMDQ_MODIFY_QP_MODIFY_MASK_PKEY;
+		qp->qplib_qp.pkey_index = qp1_qp->qplib_qp.pkey_index;
+	}
+
+	if (qp_attr_mask & IB_QP_QKEY) {
+		qp->qplib_qp.modify_flags |= CMDQ_MODIFY_QP_MODIFY_MASK_QKEY;
+		/* Using a Random  QKEY */
+		qp->qplib_qp.qkey = 0x81818181;
+	}
+	if (qp_attr_mask & IB_QP_SQ_PSN) {
+		qp->qplib_qp.modify_flags |= CMDQ_MODIFY_QP_MODIFY_MASK_SQ_PSN;
+		qp->qplib_qp.sq.psn = qp1_qp->qplib_qp.sq.psn;
+	}
+
+	rc = bnxt_qplib_modify_qp(&rdev->qplib_res, &qp->qplib_qp);
+	if (rc)
+		dev_err(rdev_to_dev(rdev),
+			"Failed to modify Shadow QP for QP1");
+	return rc;
+}
+
+int bnxt_re_modify_qp(struct ib_qp *ib_qp, struct ib_qp_attr *qp_attr,
+		      int qp_attr_mask, struct ib_udata *udata)
+{
+	struct bnxt_re_qp *qp = container_of(ib_qp, struct bnxt_re_qp, ib_qp);
+	struct bnxt_re_dev *rdev = qp->rdev;
+	struct bnxt_qplib_dev_attr *dev_attr = &rdev->dev_attr;
+	enum ib_qp_state curr_qp_state, new_qp_state;
+	int rc, entries;
+	int status;
+	union ib_gid sgid;
+	struct ib_gid_attr sgid_attr;
+	u8 nw_type;
+
+	qp->qplib_qp.modify_flags = 0;
+	if (qp_attr_mask & IB_QP_STATE) {
+		curr_qp_state = __to_ib_qp_state(qp->qplib_qp.cur_qp_state);
+		new_qp_state = qp_attr->qp_state;
+		if (!ib_modify_qp_is_ok(curr_qp_state, new_qp_state,
+					ib_qp->qp_type, qp_attr_mask,
+					IB_LINK_LAYER_ETHERNET)) {
+			dev_err(rdev_to_dev(rdev),
+				"Invalid attribute mask: %#x specified ",
+				qp_attr_mask);
+			dev_err(rdev_to_dev(rdev),
+				"for qpn: %#x type: %#x",
+				ib_qp->qp_num, ib_qp->qp_type);
+			dev_err(rdev_to_dev(rdev),
+				"curr_qp_state=0x%x, new_qp_state=0x%x\n",
+				curr_qp_state, new_qp_state);
+			return -EINVAL;
+		}
+		qp->qplib_qp.modify_flags |= CMDQ_MODIFY_QP_MODIFY_MASK_STATE;
+		qp->qplib_qp.state = __from_ib_qp_state(qp_attr->qp_state);
+	}
+	if (qp_attr_mask & IB_QP_EN_SQD_ASYNC_NOTIFY) {
+		qp->qplib_qp.modify_flags |=
+				CMDQ_MODIFY_QP_MODIFY_MASK_EN_SQD_ASYNC_NOTIFY;
+		qp->qplib_qp.en_sqd_async_notify = true;
+	}
+	if (qp_attr_mask & IB_QP_ACCESS_FLAGS) {
+		qp->qplib_qp.modify_flags |= CMDQ_MODIFY_QP_MODIFY_MASK_ACCESS;
+		qp->qplib_qp.access =
+			__from_ib_access_flags(qp_attr->qp_access_flags);
+		/* LOCAL_WRITE access must be set to allow RC receive */
+		qp->qplib_qp.access |= BNXT_QPLIB_ACCESS_LOCAL_WRITE;
+	}
+	if (qp_attr_mask & IB_QP_PKEY_INDEX) {
+		qp->qplib_qp.modify_flags |= CMDQ_MODIFY_QP_MODIFY_MASK_PKEY;
+		qp->qplib_qp.pkey_index = qp_attr->pkey_index;
+	}
+	if (qp_attr_mask & IB_QP_QKEY) {
+		qp->qplib_qp.modify_flags |= CMDQ_MODIFY_QP_MODIFY_MASK_QKEY;
+		qp->qplib_qp.qkey = qp_attr->qkey;
+	}
+	if (qp_attr_mask & IB_QP_AV) {
+		qp->qplib_qp.modify_flags |= CMDQ_MODIFY_QP_MODIFY_MASK_DGID |
+				     CMDQ_MODIFY_QP_MODIFY_MASK_FLOW_LABEL |
+				     CMDQ_MODIFY_QP_MODIFY_MASK_SGID_INDEX |
+				     CMDQ_MODIFY_QP_MODIFY_MASK_HOP_LIMIT |
+				     CMDQ_MODIFY_QP_MODIFY_MASK_TRAFFIC_CLASS |
+				     CMDQ_MODIFY_QP_MODIFY_MASK_DEST_MAC |
+				     CMDQ_MODIFY_QP_MODIFY_MASK_VLAN_ID;
+		memcpy(qp->qplib_qp.ah.dgid.data, qp_attr->ah_attr.grh.dgid.raw,
+		       sizeof(qp->qplib_qp.ah.dgid.data));
+		qp->qplib_qp.ah.flow_label = qp_attr->ah_attr.grh.flow_label;
+		/* If RoCE V2 is enabled, stack will have two entries for
+		 * each GID entry. Avoiding this duplicte entry in HW. Dividing
+		 * the GID index by 2 for RoCE V2
+		 */
+		qp->qplib_qp.ah.sgid_index =
+					qp_attr->ah_attr.grh.sgid_index / 2;
+		qp->qplib_qp.ah.host_sgid_index =
+					qp_attr->ah_attr.grh.sgid_index;
+		qp->qplib_qp.ah.hop_limit = qp_attr->ah_attr.grh.hop_limit;
+		qp->qplib_qp.ah.traffic_class =
+					qp_attr->ah_attr.grh.traffic_class;
+		qp->qplib_qp.ah.sl = qp_attr->ah_attr.sl;
+		ether_addr_copy(qp->qplib_qp.ah.dmac, qp_attr->ah_attr.dmac);
+
+		status = ib_get_cached_gid(&rdev->ibdev, 1,
+					   qp_attr->ah_attr.grh.sgid_index,
+					   &sgid, &sgid_attr);
+		if (!status && sgid_attr.ndev) {
+			memcpy(qp->qplib_qp.smac, sgid_attr.ndev->dev_addr,
+			       ETH_ALEN);
+			dev_put(sgid_attr.ndev);
+			nw_type = ib_gid_to_network_type(sgid_attr.gid_type,
+							 &sgid);
+			switch (nw_type) {
+			case RDMA_NETWORK_IPV4:
+				qp->qplib_qp.nw_type =
+					CMDQ_MODIFY_QP_NETWORK_TYPE_ROCEV2_IPV4;
+				break;
+			case RDMA_NETWORK_IPV6:
+				qp->qplib_qp.nw_type =
+					CMDQ_MODIFY_QP_NETWORK_TYPE_ROCEV2_IPV6;
+				break;
+			default:
+				qp->qplib_qp.nw_type =
+					CMDQ_MODIFY_QP_NETWORK_TYPE_ROCEV1;
+				break;
+			}
+		}
+	}
+
+	if (qp_attr_mask & IB_QP_PATH_MTU) {
+		qp->qplib_qp.modify_flags |=
+				CMDQ_MODIFY_QP_MODIFY_MASK_PATH_MTU;
+		qp->qplib_qp.path_mtu = __from_ib_mtu(qp_attr->path_mtu);
+	} else if (qp_attr->qp_state == IB_QPS_RTR) {
+		qp->qplib_qp.modify_flags |=
+			CMDQ_MODIFY_QP_MODIFY_MASK_PATH_MTU;
+		qp->qplib_qp.path_mtu =
+			__from_ib_mtu(iboe_get_mtu(rdev->netdev->mtu));
+	}
+
+	if (qp_attr_mask & IB_QP_TIMEOUT) {
+		qp->qplib_qp.modify_flags |= CMDQ_MODIFY_QP_MODIFY_MASK_TIMEOUT;
+		qp->qplib_qp.timeout = qp_attr->timeout;
+	}
+	if (qp_attr_mask & IB_QP_RETRY_CNT) {
+		qp->qplib_qp.modify_flags |=
+				CMDQ_MODIFY_QP_MODIFY_MASK_RETRY_CNT;
+		qp->qplib_qp.retry_cnt = qp_attr->retry_cnt;
+	}
+	if (qp_attr_mask & IB_QP_RNR_RETRY) {
+		qp->qplib_qp.modify_flags |=
+				CMDQ_MODIFY_QP_MODIFY_MASK_RNR_RETRY;
+		qp->qplib_qp.rnr_retry = qp_attr->rnr_retry;
+	}
+	if (qp_attr_mask & IB_QP_MIN_RNR_TIMER) {
+		qp->qplib_qp.modify_flags |=
+				CMDQ_MODIFY_QP_MODIFY_MASK_MIN_RNR_TIMER;
+		qp->qplib_qp.min_rnr_timer = qp_attr->min_rnr_timer;
+	}
+	if (qp_attr_mask & IB_QP_RQ_PSN) {
+		qp->qplib_qp.modify_flags |= CMDQ_MODIFY_QP_MODIFY_MASK_RQ_PSN;
+		qp->qplib_qp.rq.psn = qp_attr->rq_psn;
+	}
+	if (qp_attr_mask & IB_QP_MAX_QP_RD_ATOMIC) {
+		qp->qplib_qp.modify_flags |=
+				CMDQ_MODIFY_QP_MODIFY_MASK_MAX_RD_ATOMIC;
+		qp->qplib_qp.max_rd_atomic = qp_attr->max_rd_atomic;
+	}
+	if (qp_attr_mask & IB_QP_SQ_PSN) {
+		qp->qplib_qp.modify_flags |= CMDQ_MODIFY_QP_MODIFY_MASK_SQ_PSN;
+		qp->qplib_qp.sq.psn = qp_attr->sq_psn;
+	}
+	if (qp_attr_mask & IB_QP_MAX_DEST_RD_ATOMIC) {
+		qp->qplib_qp.modify_flags |=
+				CMDQ_MODIFY_QP_MODIFY_MASK_MAX_DEST_RD_ATOMIC;
+		qp->qplib_qp.max_dest_rd_atomic = qp_attr->max_dest_rd_atomic;
+	}
+	if (qp_attr_mask & IB_QP_CAP) {
+		qp->qplib_qp.modify_flags |=
+				CMDQ_MODIFY_QP_MODIFY_MASK_SQ_SIZE |
+				CMDQ_MODIFY_QP_MODIFY_MASK_RQ_SIZE |
+				CMDQ_MODIFY_QP_MODIFY_MASK_SQ_SGE |
+				CMDQ_MODIFY_QP_MODIFY_MASK_RQ_SGE |
+				CMDQ_MODIFY_QP_MODIFY_MASK_MAX_INLINE_DATA;
+		if ((qp_attr->cap.max_send_wr >= dev_attr->max_qp_wqes) ||
+		    (qp_attr->cap.max_recv_wr >= dev_attr->max_qp_wqes) ||
+		    (qp_attr->cap.max_send_sge >= dev_attr->max_qp_sges) ||
+		    (qp_attr->cap.max_recv_sge >= dev_attr->max_qp_sges) ||
+		    (qp_attr->cap.max_inline_data >=
+						dev_attr->max_inline_data)) {
+			dev_err(rdev_to_dev(rdev),
+				"Create QP failed - max exceeded");
+			return -EINVAL;
+		}
+		entries = roundup_pow_of_two(qp_attr->cap.max_send_wr);
+		if (entries > dev_attr->max_qp_wqes)
+			entries = dev_attr->max_qp_wqes;
+		qp->qplib_qp.sq.max_wqe = entries;
+		qp->qplib_qp.sq.max_sge = qp_attr->cap.max_send_sge;
+		if (qp->qplib_qp.rq.max_wqe) {
+			entries = roundup_pow_of_two(qp_attr->cap.max_recv_wr);
+			if (entries > dev_attr->max_qp_wqes)
+				entries = dev_attr->max_qp_wqes;
+			qp->qplib_qp.rq.max_wqe = entries;
+			qp->qplib_qp.rq.max_sge = qp_attr->cap.max_recv_sge;
+		} else {
+			/* SRQ was used prior, just ignore the RQ caps */
+		}
+	}
+	if (qp_attr_mask & IB_QP_DEST_QPN) {
+		qp->qplib_qp.modify_flags |=
+				CMDQ_MODIFY_QP_MODIFY_MASK_DEST_QP_ID;
+		qp->qplib_qp.dest_qpn = qp_attr->dest_qp_num;
+	}
+	rc = bnxt_qplib_modify_qp(&rdev->qplib_res, &qp->qplib_qp);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev), "Failed to modify HW QP");
+		return rc;
+	}
+	if (ib_qp->qp_type == IB_QPT_GSI && rdev->qp1_sqp)
+		rc = bnxt_re_modify_shadow_qp(rdev, qp, qp_attr_mask);
+	return rc;
+}
+
+int bnxt_re_query_qp(struct ib_qp *ib_qp, struct ib_qp_attr *qp_attr,
+		     int qp_attr_mask, struct ib_qp_init_attr *qp_init_attr)
+{
+	struct bnxt_re_qp *qp = container_of(ib_qp, struct bnxt_re_qp, ib_qp);
+	struct bnxt_re_dev *rdev = qp->rdev;
+	struct bnxt_qplib_qp qplib_qp;
+	int rc;
+
+	memset(&qplib_qp, 0, sizeof(struct bnxt_qplib_qp));
+	qplib_qp.id = qp->qplib_qp.id;
+	qplib_qp.ah.host_sgid_index = qp->qplib_qp.ah.host_sgid_index;
+
+	rc = bnxt_qplib_query_qp(&rdev->qplib_res, &qplib_qp);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev), "Failed to query HW QP");
+		return rc;
+	}
+	qp_attr->qp_state = __to_ib_qp_state(qplib_qp.state);
+	qp_attr->en_sqd_async_notify = qplib_qp.en_sqd_async_notify ? 1 : 0;
+	qp_attr->qp_access_flags = __to_ib_access_flags(qplib_qp.access);
+	qp_attr->pkey_index = qplib_qp.pkey_index;
+	qp_attr->qkey = qplib_qp.qkey;
+	memcpy(qp_attr->ah_attr.grh.dgid.raw, qplib_qp.ah.dgid.data,
+	       sizeof(qplib_qp.ah.dgid.data));
+	qp_attr->ah_attr.grh.flow_label = qplib_qp.ah.flow_label;
+	qp_attr->ah_attr.grh.sgid_index = qplib_qp.ah.host_sgid_index;
+	qp_attr->ah_attr.grh.hop_limit = qplib_qp.ah.hop_limit;
+	qp_attr->ah_attr.grh.traffic_class = qplib_qp.ah.traffic_class;
+	qp_attr->ah_attr.sl = qplib_qp.ah.sl;
+	ether_addr_copy(qp_attr->ah_attr.dmac, qplib_qp.ah.dmac);
+	qp_attr->path_mtu = __to_ib_mtu(qplib_qp.path_mtu);
+	qp_attr->timeout = qplib_qp.timeout;
+	qp_attr->retry_cnt = qplib_qp.retry_cnt;
+	qp_attr->rnr_retry = qplib_qp.rnr_retry;
+	qp_attr->min_rnr_timer = qplib_qp.min_rnr_timer;
+	qp_attr->rq_psn = qplib_qp.rq.psn;
+	qp_attr->max_rd_atomic = qplib_qp.max_rd_atomic;
+	qp_attr->sq_psn = qplib_qp.sq.psn;
+	qp_attr->max_dest_rd_atomic = qplib_qp.max_dest_rd_atomic;
+	qp_init_attr->sq_sig_type = qplib_qp.sig_type ? IB_SIGNAL_ALL_WR :
+							IB_SIGNAL_REQ_WR;
+	qp_attr->dest_qp_num = qplib_qp.dest_qpn;
+
+	qp_attr->cap.max_send_wr = qp->qplib_qp.sq.max_wqe;
+	qp_attr->cap.max_send_sge = qp->qplib_qp.sq.max_sge;
+	qp_attr->cap.max_recv_wr = qp->qplib_qp.rq.max_wqe;
+	qp_attr->cap.max_recv_sge = qp->qplib_qp.rq.max_sge;
+	qp_attr->cap.max_inline_data = qp->qplib_qp.max_inline_data;
+	qp_init_attr->cap = qp_attr->cap;
+
+	return 0;
+}
 
 /* Completion Queues */
 int bnxt_re_destroy_cq(struct ib_cq *ib_cq)
