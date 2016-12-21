@@ -186,6 +186,9 @@ struct bnxt_qplib_res {
 	struct bnxt_qplib_dpi_tbl	dpi_tbl;
 };
 
+#define to_bnxt_qplib(ptr, type, member)	\
+	container_of(ptr, type, member)
+
 struct bnxt_qplib_pd;
 struct bnxt_qplib_dev_attr;
 
