@@ -214,7 +214,7 @@ void __init efi_arch_mem_reserve(phys_addr_t addr, u64 size)
 
 	new_size = efi.memmap.desc_size * num_entries;
 
-	new_phys = memblock_alloc(new_size, 0);
+	new_phys = memblock_alloc(new_size, EFI_PAGE_SIZE);
 	if (!new_phys) {
 		pr_err("Could not allocate boot services memmap\n");
 		return;
