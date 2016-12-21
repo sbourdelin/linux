@@ -15,6 +15,7 @@
 #include <linux/of.h>
 #include <linux/types.h>
 #include <asm/barrier.h>
+#include <linux/interrupt.h>
 
 /* OPAL in-memory console. Defined in OPAL source at core/console.c */
 struct memcons {
@@ -102,8 +103,36 @@ static struct bin_attribute opal_msglog_attr = {
 	.read = opal_msglog_read
 };
 
+static char *log_levels[] = { "Emergency", "Alert", "Critical", "Error", "Warning" };
+static int64_t offset = -1;
+
+static irqreturn_t opal_print_log(int irq, void *data)
+{
+	int64_t rc, log_lvl;
+	char buffer[320];
+
+	/*
+	 * only print one message per invokation of the IRQ handler
+	 */
+
+	rc = opal_scrape_log(&offset, buffer, sizeof(buffer), &log_lvl);
+
+	if (rc == OPAL_SUCCESS || rc == OPAL_PARTIAL) {
+		log_lvl = be64_to_cpu(log_lvl);
+		if (log_lvl > 4)
+			log_lvl = 4;
+
+		printk_emit(0, log_lvl, NULL, 0, "OPAL %s: %s%s\r\n",
+			log_levels[log_lvl], buffer,
+			rc == OPAL_PARTIAL ? "<truncated>" : "");
+	}
+
+	return IRQ_HANDLED;
+}
+
 void __init opal_msglog_init(void)
 {
+	int virq, rc = -1;
 	u64 mcaddr;
 	struct memcons *mc;
 
@@ -122,6 +151,18 @@ void __init opal_msglog_init(void)
 		pr_warn("OPAL: memory console version is invalid\n");
 		return;
 	}
+
+	virq = opal_event_request(ilog2(OPAL_EVENT_LOG_PENDING));
+	if (virq) {
+		rc = request_irq(virq, opal_print_log,
+			IRQF_TRIGGER_HIGH, "opal memcons", NULL);
+
+		if (rc)
+			irq_dispose_mapping(virq);
+	}
+
+	if (!virq || rc)
+		pr_warn("Unable to register OPAL log event handler\n");
 
 	opal_memcons = mc;
 }

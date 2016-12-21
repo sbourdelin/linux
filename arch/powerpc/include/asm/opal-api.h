@@ -167,7 +167,8 @@
 #define OPAL_INT_EOI				124
 #define OPAL_INT_SET_MFRR			125
 #define OPAL_PCI_TCE_KILL			126
-#define OPAL_LAST				126
+#define OPAL_SCRAPE_LOG				128
+#define OPAL_LAST				128
 
 /* Device tree flags */
 
@@ -288,6 +289,7 @@ enum OpalPendingState {
 	OPAL_EVENT_PCI_ERROR	   = 0x200,
 	OPAL_EVENT_DUMP_AVAIL	   = 0x400,
 	OPAL_EVENT_MSG_PENDING	   = 0x800,
+	OPAL_EVENT_LOG_PENDING	   = 0x1000,
 };
 
 enum OpalThreadStatus {
@@ -406,6 +408,7 @@ enum opal_msg_type {
 	OPAL_MSG_DPO		= 5,
 	OPAL_MSG_PRD		= 6,
 	OPAL_MSG_OCC		= 7,
+	OPAL_MSG_LOG		= 8,
 	OPAL_MSG_TYPE_MAX,
 };
 
