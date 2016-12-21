@@ -70,6 +70,34 @@ struct bnxt_re_cq {
 	struct ib_umem		*umem;
 };
 
+struct bnxt_re_mr {
+	struct bnxt_re_dev	*rdev;
+	struct ib_mr		ib_mr;
+	struct ib_umem		*ib_umem;
+	struct bnxt_qplib_mrw	qplib_mr;
+	u32			npages;
+	u64			*pages;
+	struct bnxt_qplib_frpl	qplib_frpl;
+};
+
+struct bnxt_re_frpl {
+	struct bnxt_re_dev		*rdev;
+	struct bnxt_qplib_frpl		qplib_frpl;
+	u64				*page_list;
+};
+
+struct bnxt_re_fmr {
+	struct bnxt_re_dev	*rdev;
+	struct ib_fmr		ib_fmr;
+	struct bnxt_qplib_mrw	qplib_fmr;
+};
+
+struct bnxt_re_mw {
+	struct bnxt_re_dev	*rdev;
+	struct ib_mw		ib_mw;
+	struct bnxt_qplib_mrw	qplib_mw;
+};
+
 struct bnxt_re_ucontext {
 	struct bnxt_re_dev	*rdev;
 	struct ib_ucontext	ib_uctx;
@@ -119,6 +147,22 @@ struct ib_cq *bnxt_re_create_cq(struct ib_device *ibdev,
 				struct ib_udata *udata);
 int bnxt_re_destroy_cq(struct ib_cq *cq);
 int bnxt_re_req_notify_cq(struct ib_cq *cq, enum ib_cq_notify_flags flags);
+struct ib_mr *bnxt_re_get_dma_mr(struct ib_pd *pd, int mr_access_flags);
+
+int bnxt_re_map_mr_sg(struct ib_mr *ib_mr, struct scatterlist *sg, int sg_nents,
+		      unsigned int *sg_offset);
+struct ib_mr *bnxt_re_alloc_mr(struct ib_pd *ib_pd, enum ib_mr_type mr_type,
+			       u32 max_num_sg);
+int bnxt_re_dereg_mr(struct ib_mr *mr);
+struct ib_fmr *bnxt_re_alloc_fmr(struct ib_pd *pd, int mr_access_flags,
+				 struct ib_fmr_attr *fmr_attr);
+int bnxt_re_map_phys_fmr(struct ib_fmr *fmr, u64 *page_list, int list_len,
+			 u64 iova);
+int bnxt_re_unmap_fmr(struct list_head *fmr_list);
+int bnxt_re_dealloc_fmr(struct ib_fmr *fmr);
+struct ib_mr *bnxt_re_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
+				  u64 virt_addr, int mr_access_flags,
+				  struct ib_udata *udata);
 struct ib_ucontext *bnxt_re_alloc_ucontext(struct ib_device *ibdev,
 					   struct ib_udata *udata);
 int bnxt_re_dealloc_ucontext(struct ib_ucontext *context);

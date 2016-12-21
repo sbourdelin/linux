@@ -639,6 +639,48 @@ int bnxt_re_query_ah(struct ib_ah *ib_ah, struct ib_ah_attr *ah_attr)
 	return 0;
 }
 
+static int __from_ib_access_flags(int iflags)
+{
+	int qflags = 0;
+
+	if (iflags & IB_ACCESS_LOCAL_WRITE)
+		qflags |= BNXT_QPLIB_ACCESS_LOCAL_WRITE;
+	if (iflags & IB_ACCESS_REMOTE_READ)
+		qflags |= BNXT_QPLIB_ACCESS_REMOTE_READ;
+	if (iflags & IB_ACCESS_REMOTE_WRITE)
+		qflags |= BNXT_QPLIB_ACCESS_REMOTE_WRITE;
+	if (iflags & IB_ACCESS_REMOTE_ATOMIC)
+		qflags |= BNXT_QPLIB_ACCESS_REMOTE_ATOMIC;
+	if (iflags & IB_ACCESS_MW_BIND)
+		qflags |= BNXT_QPLIB_ACCESS_MW_BIND;
+	if (iflags & IB_ZERO_BASED)
+		qflags |= BNXT_QPLIB_ACCESS_ZERO_BASED;
+	if (iflags & IB_ACCESS_ON_DEMAND)
+		qflags |= BNXT_QPLIB_ACCESS_ON_DEMAND;
+	return qflags;
+};
+
+static enum ib_access_flags __to_ib_access_flags(int qflags)
+{
+	enum ib_access_flags iflags = 0;
+
+	if (qflags & BNXT_QPLIB_ACCESS_LOCAL_WRITE)
+		iflags |= IB_ACCESS_LOCAL_WRITE;
+	if (qflags & BNXT_QPLIB_ACCESS_REMOTE_WRITE)
+		iflags |= IB_ACCESS_REMOTE_WRITE;
+	if (qflags & BNXT_QPLIB_ACCESS_REMOTE_READ)
+		iflags |= IB_ACCESS_REMOTE_READ;
+	if (qflags & BNXT_QPLIB_ACCESS_REMOTE_ATOMIC)
+		iflags |= IB_ACCESS_REMOTE_ATOMIC;
+	if (qflags & BNXT_QPLIB_ACCESS_MW_BIND)
+		iflags |= IB_ACCESS_MW_BIND;
+	if (qflags & BNXT_QPLIB_ACCESS_ZERO_BASED)
+		iflags |= IB_ZERO_BASED;
+	if (qflags & BNXT_QPLIB_ACCESS_ON_DEMAND)
+		iflags |= IB_ACCESS_ON_DEMAND;
+	return iflags;
+};
+
 /* Completion Queues */
 int bnxt_re_destroy_cq(struct ib_cq *ib_cq)
 {
@@ -783,6 +825,340 @@ int bnxt_re_req_notify_cq(struct ib_cq *ib_cq,
 	bnxt_qplib_req_notify_cq(&cq->qplib_cq, type);
 
 	return 0;
+}
+
+/* Memory Regions */
+struct ib_mr *bnxt_re_get_dma_mr(struct ib_pd *ib_pd, int mr_access_flags)
+{
+	struct bnxt_re_pd *pd = container_of(ib_pd, struct bnxt_re_pd, ib_pd);
+	struct bnxt_re_dev *rdev = pd->rdev;
+	struct bnxt_re_mr *mr;
+	u64 pbl = 0;
+	int rc;
+
+	mr = kzalloc(sizeof(*mr), GFP_KERNEL);
+	if (!mr)
+		return ERR_PTR(-ENOMEM);
+
+	mr->rdev = rdev;
+	mr->qplib_mr.pd = &pd->qplib_pd;
+	mr->qplib_mr.flags = __from_ib_access_flags(mr_access_flags);
+	mr->qplib_mr.type = CMDQ_ALLOCATE_MRW_MRW_FLAGS_PMR;
+
+	/* Allocate and register 0 as the address */
+	rc = bnxt_qplib_alloc_mrw(&rdev->qplib_res, &mr->qplib_mr);
+	if (rc)
+		goto fail;
+
+	mr->qplib_mr.hwq.level = PBL_LVL_MAX;
+	mr->qplib_mr.total_size = -1; /* Infinte length */
+	rc = bnxt_qplib_reg_mr(&rdev->qplib_res, &mr->qplib_mr, &pbl, 0, false);
+	if (rc)
+		goto fail_mr;
+
+	mr->ib_mr.lkey = mr->qplib_mr.lkey;
+	if (mr_access_flags & (IB_ACCESS_REMOTE_WRITE | IB_ACCESS_REMOTE_READ |
+			       IB_ACCESS_REMOTE_ATOMIC))
+		mr->ib_mr.rkey = mr->ib_mr.lkey;
+	atomic_inc(&rdev->mr_count);
+
+	return &mr->ib_mr;
+
+fail_mr:
+	bnxt_qplib_free_mrw(&rdev->qplib_res, &mr->qplib_mr);
+fail:
+	kfree(mr);
+	return ERR_PTR(rc);
+}
+
+int bnxt_re_dereg_mr(struct ib_mr *ib_mr)
+{
+	struct bnxt_re_mr *mr = container_of(ib_mr, struct bnxt_re_mr, ib_mr);
+	struct bnxt_re_dev *rdev = mr->rdev;
+	int rc = 0;
+
+	if (mr->npages && mr->pages) {
+		rc = bnxt_qplib_free_fast_reg_page_list(&rdev->qplib_res,
+							&mr->qplib_frpl);
+		kfree(mr->pages);
+		mr->npages = 0;
+		mr->pages = NULL;
+	}
+	rc = bnxt_qplib_free_mrw(&rdev->qplib_res, &mr->qplib_mr);
+
+	if (!IS_ERR(mr->ib_umem) && mr->ib_umem)
+		ib_umem_release(mr->ib_umem);
+
+	kfree(mr);
+	atomic_dec(&rdev->mr_count);
+	return rc;
+}
+
+static int bnxt_re_set_page(struct ib_mr *ib_mr, u64 addr)
+{
+	struct bnxt_re_mr *mr = container_of(ib_mr, struct bnxt_re_mr, ib_mr);
+
+	if (unlikely(mr->npages == mr->qplib_frpl.max_pg_ptrs))
+		return -ENOMEM;
+
+	mr->pages[mr->npages++] = addr;
+	return 0;
+}
+
+int bnxt_re_map_mr_sg(struct ib_mr *ib_mr, struct scatterlist *sg, int sg_nents,
+		      unsigned int *sg_offset)
+{
+	struct bnxt_re_mr *mr = container_of(ib_mr, struct bnxt_re_mr, ib_mr);
+
+	mr->npages = 0;
+	return ib_sg_to_pages(ib_mr, sg, sg_nents, sg_offset, bnxt_re_set_page);
+}
+
+struct ib_mr *bnxt_re_alloc_mr(struct ib_pd *ib_pd, enum ib_mr_type type,
+			       u32 max_num_sg)
+{
+	struct bnxt_re_pd *pd = container_of(ib_pd, struct bnxt_re_pd, ib_pd);
+	struct bnxt_re_dev *rdev = pd->rdev;
+	struct bnxt_re_mr *mr = NULL;
+	int rc;
+
+	if (type != IB_MR_TYPE_MEM_REG) {
+		dev_dbg(rdev_to_dev(rdev), "MR type 0x%x not supported", type);
+		return ERR_PTR(-EINVAL);
+	}
+	if (max_num_sg > MAX_PBL_LVL_1_PGS)
+		return ERR_PTR(-EINVAL);
+
+	mr = kzalloc(sizeof(*mr), GFP_KERNEL);
+	if (!mr)
+		return ERR_PTR(-ENOMEM);
+
+	mr->rdev = rdev;
+	mr->qplib_mr.pd = &pd->qplib_pd;
+	mr->qplib_mr.flags = BNXT_QPLIB_FR_PMR;
+	mr->qplib_mr.type = CMDQ_ALLOCATE_MRW_MRW_FLAGS_PMR;
+
+	rc = bnxt_qplib_alloc_mrw(&rdev->qplib_res, &mr->qplib_mr);
+	if (rc)
+		goto fail;
+
+	mr->ib_mr.lkey = mr->qplib_mr.lkey;
+	mr->ib_mr.rkey = mr->ib_mr.lkey;
+
+	mr->pages = kcalloc(max_num_sg, sizeof(u64), GFP_KERNEL);
+	if (!mr->pages) {
+		rc = -ENOMEM;
+		goto fail;
+	}
+	rc = bnxt_qplib_alloc_fast_reg_page_list(&rdev->qplib_res,
+						 &mr->qplib_frpl, max_num_sg);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev),
+			"Failed to allocate HW FR page list");
+		goto fail_mr;
+	}
+
+	atomic_inc(&rdev->mr_count);
+	return &mr->ib_mr;
+
+fail_mr:
+	bnxt_qplib_free_mrw(&rdev->qplib_res, &mr->qplib_mr);
+fail:
+	kfree(mr->pages);
+	kfree(mr);
+	return ERR_PTR(rc);
+}
+
+/* Fast Memory Regions */
+struct ib_fmr *bnxt_re_alloc_fmr(struct ib_pd *ib_pd, int mr_access_flags,
+				 struct ib_fmr_attr *fmr_attr)
+{
+	struct bnxt_re_pd *pd = container_of(ib_pd, struct bnxt_re_pd, ib_pd);
+	struct bnxt_re_dev *rdev = pd->rdev;
+	struct bnxt_re_fmr *fmr;
+	int rc;
+
+	if (fmr_attr->max_pages > MAX_PBL_LVL_2_PGS ||
+	    fmr_attr->max_maps > rdev->dev_attr.max_map_per_fmr) {
+		dev_err(rdev_to_dev(rdev), "Allocate FMR exceeded Max limit");
+		return ERR_PTR(-ENOMEM);
+	}
+	fmr = kzalloc(sizeof(*fmr), GFP_KERNEL);
+	if (!fmr)
+		return ERR_PTR(-ENOMEM);
+
+	fmr->rdev = rdev;
+	fmr->qplib_fmr.pd = &pd->qplib_pd;
+	fmr->qplib_fmr.type = CMDQ_ALLOCATE_MRW_MRW_FLAGS_PMR;
+
+	rc = bnxt_qplib_alloc_mrw(&rdev->qplib_res, &fmr->qplib_fmr);
+	if (rc)
+		goto fail;
+
+	fmr->qplib_fmr.flags = __from_ib_access_flags(mr_access_flags);
+	fmr->ib_fmr.lkey = fmr->qplib_fmr.lkey;
+	fmr->ib_fmr.rkey = fmr->ib_fmr.lkey;
+
+	atomic_inc(&rdev->mr_count);
+	return &fmr->ib_fmr;
+fail:
+	kfree(fmr);
+	return ERR_PTR(rc);
+}
+
+int bnxt_re_map_phys_fmr(struct ib_fmr *ib_fmr, u64 *page_list, int list_len,
+			 u64 iova)
+{
+	struct bnxt_re_fmr *fmr = container_of(ib_fmr, struct bnxt_re_fmr,
+					     ib_fmr);
+	struct bnxt_re_dev *rdev = fmr->rdev;
+	int rc;
+
+	fmr->qplib_fmr.va = iova;
+	fmr->qplib_fmr.total_size = list_len * PAGE_SIZE;
+
+	rc = bnxt_qplib_reg_mr(&rdev->qplib_res, &fmr->qplib_fmr, page_list,
+			       list_len, true);
+	if (rc)
+		dev_err(rdev_to_dev(rdev), "Failed to map FMR for lkey = 0x%x!",
+			fmr->ib_fmr.lkey);
+	return rc;
+}
+
+int bnxt_re_unmap_fmr(struct list_head *fmr_list)
+{
+	struct bnxt_re_dev *rdev;
+	struct bnxt_re_fmr *fmr;
+	struct ib_fmr *ib_fmr;
+	int rc = 0;
+
+	/* Validate each FMRs inside the fmr_list */
+	list_for_each_entry(ib_fmr, fmr_list, list) {
+		fmr = container_of(ib_fmr, struct bnxt_re_fmr, ib_fmr);
+		rdev = fmr->rdev;
+
+		if (rdev) {
+			rc = bnxt_qplib_dereg_mrw(&rdev->qplib_res,
+						  &fmr->qplib_fmr, true);
+			if (rc)
+				break;
+		}
+	}
+	return rc;
+}
+
+int bnxt_re_dealloc_fmr(struct ib_fmr *ib_fmr)
+{
+	struct bnxt_re_fmr *fmr = container_of(ib_fmr, struct bnxt_re_fmr,
+					       ib_fmr);
+	struct bnxt_re_dev *rdev = fmr->rdev;
+	int rc;
+
+	rc = bnxt_qplib_free_mrw(&rdev->qplib_res, &fmr->qplib_fmr);
+	if (rc)
+		dev_err(rdev_to_dev(rdev), "Failed to free FMR");
+
+	kfree(fmr);
+	atomic_dec(&rdev->mr_count);
+	return rc;
+}
+
+/* uverbs */
+struct ib_mr *bnxt_re_reg_user_mr(struct ib_pd *ib_pd, u64 start, u64 length,
+				  u64 virt_addr, int mr_access_flags,
+				  struct ib_udata *udata)
+{
+	struct bnxt_re_pd *pd = container_of(ib_pd, struct bnxt_re_pd, ib_pd);
+	struct bnxt_re_dev *rdev = pd->rdev;
+	struct bnxt_re_mr *mr;
+	struct ib_umem *umem;
+	u64 *pbl_tbl, *pbl_tbl_orig;
+	int i, umem_pgs, pages, page_shift, rc;
+	struct scatterlist *sg;
+	int entry;
+
+	mr = kzalloc(sizeof(*mr), GFP_KERNEL);
+	if (!mr)
+		return ERR_PTR(-ENOMEM);
+
+	mr->rdev = rdev;
+	mr->qplib_mr.pd = &pd->qplib_pd;
+	mr->qplib_mr.flags = __from_ib_access_flags(mr_access_flags);
+	mr->qplib_mr.type = CMDQ_ALLOCATE_MRW_MRW_FLAGS_MR;
+
+	umem = ib_umem_get(ib_pd->uobject->context, start, length,
+			   mr_access_flags, 0);
+	if (IS_ERR(umem)) {
+		dev_err(rdev_to_dev(rdev), "Failed to get umem");
+		rc = -EFAULT;
+		goto free_mr;
+	}
+	mr->ib_umem = umem;
+
+	rc = bnxt_qplib_alloc_mrw(&rdev->qplib_res, &mr->qplib_mr);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev), "Failed to allocate MR");
+		goto release_umem;
+	}
+	/* The fixed portion of the rkey is the same as the lkey */
+	mr->ib_mr.rkey = mr->qplib_mr.rkey;
+
+	mr->qplib_mr.va = virt_addr;
+	umem_pgs = ib_umem_page_count(umem);
+	if (!umem_pgs) {
+		dev_err(rdev_to_dev(rdev), "umem is invalid!");
+		rc = -EINVAL;
+		goto free_mrw;
+	}
+	mr->qplib_mr.total_size = length;
+
+	pbl_tbl = kcalloc(umem_pgs, sizeof(u64 *), GFP_KERNEL);
+	if (!pbl_tbl) {
+		rc = -EINVAL;
+		goto free_mrw;
+	}
+	pbl_tbl_orig = pbl_tbl;
+
+	page_shift = ilog2(umem->page_size);
+	if (umem->hugetlb) {
+		dev_err(rdev_to_dev(rdev), "umem hugetlb not supported!");
+		rc = -EFAULT;
+		goto fail;
+	}
+	if (umem->page_size != PAGE_SIZE) {
+		dev_err(rdev_to_dev(rdev), "umem page size unsupported!");
+		rc = -EFAULT;
+		goto fail;
+	}
+	/* Map umem buf ptrs to the PBL */
+	for_each_sg(umem->sg_head.sgl, sg, umem->nmap, entry) {
+		pages = sg_dma_len(sg) >> page_shift;
+		for (i = 0; i < pages; i++, pbl_tbl++)
+			*pbl_tbl = sg_dma_address(sg) + (i << page_shift);
+	}
+	rc = bnxt_qplib_reg_mr(&rdev->qplib_res, &mr->qplib_mr, pbl_tbl_orig,
+			       umem_pgs, false);
+	if (rc) {
+		dev_err(rdev_to_dev(rdev), "Failed to register user MR");
+		goto fail;
+	}
+
+	kfree(pbl_tbl_orig);
+
+	mr->ib_mr.lkey = mr->qplib_mr.lkey;
+	mr->ib_mr.rkey = mr->qplib_mr.lkey;
+	atomic_inc(&rdev->mr_count);
+
+	return &mr->ib_mr;
+fail:
+	kfree(pbl_tbl_orig);
+free_mrw:
+	bnxt_qplib_free_mrw(&rdev->qplib_res, &mr->qplib_mr);
+release_umem:
+	ib_umem_release(umem);
+free_mr:
+	kfree(mr);
+	return ERR_PTR(rc);
 }
 
 struct ib_ucontext *bnxt_re_alloc_ucontext(struct ib_device *ibdev,
