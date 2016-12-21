@@ -166,10 +166,8 @@ static int alx_get_link_ksettings(struct net_device *netdev,
 	cmd->base.speed = hw->link_speed;
 	cmd->base.duplex = hw->duplex;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }
@@ -184,8 +182,7 @@ static int alx_set_link_ksettings(struct net_device *netdev,
 
 	ASSERT_RTNL();
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	if (cmd->base.autoneg == AUTONEG_ENABLE) {
 		if (advertising & ~alx_get_supported_speeds(hw))
