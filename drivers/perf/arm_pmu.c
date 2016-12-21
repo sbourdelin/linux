@@ -1022,6 +1022,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
 	armpmu_init(pmu);
 
 	pmu->plat_device = pdev;
+	platform_set_drvdata(pdev, pmu);
 
 	if (node && (of_id = of_match_node(of_table, pdev->dev.of_node))) {
 		init_fn = of_id->data;
@@ -1071,6 +1072,19 @@ out_free:
 	pr_info("%s: failed to register PMU devices!\n",
 		of_node_full_name(node));
 	return ret;
+}
+
+int arm_pmu_device_remove(struct platform_device *pdev)
+{
+	struct arm_pmu *pmu = platform_get_drvdata(pdev);
+
+	__oprofile_cpu_pmu = NULL;
+
+	perf_pmu_unregister(&pmu->pmu);
+
+	cpu_pmu_destroy(pmu);
+
+	return 0;
 }
 
 static int arm_pmu_hp_init(void)
