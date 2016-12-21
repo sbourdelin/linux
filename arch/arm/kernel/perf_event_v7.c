@@ -2026,12 +2026,18 @@ static int armv7_pmu_device_probe(struct platform_device *pdev)
 				    armv7_pmu_probe_table);
 }
 
+static int armv7_pmu_device_remove(struct platform_device *pdev)
+{
+	return arm_pmu_device_remove(pdev);
+}
+
 static struct platform_driver armv7_pmu_driver = {
 	.driver		= {
 		.name	= "armv7-pmu",
 		.of_match_table = armv7_pmu_of_device_ids,
 	},
 	.probe		= armv7_pmu_device_probe,
+	.remove		= armv7_pmu_device_remove,
 };
 
 static int __init register_armv7_pmu_driver(void)
