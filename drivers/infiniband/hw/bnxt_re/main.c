@@ -438,6 +438,10 @@ static int bnxt_re_register_ib(struct bnxt_re_dev *rdev)
 	ibdev->dma_device = &rdev->en_dev->pdev->dev;
 	ibdev->query_device		= bnxt_re_query_device;
 	ibdev->modify_device		= bnxt_re_modify_device;
+
+	ibdev->query_port		= bnxt_re_query_port;
+	ibdev->modify_port		= bnxt_re_modify_port;
+	ibdev->get_port_immutable	= bnxt_re_get_port_immutable;
 	ibdev->alloc_pd			= bnxt_re_alloc_pd;
 	ibdev->dealloc_pd		= bnxt_re_dealloc_pd;
 	ibdev->alloc_ucontext		= bnxt_re_alloc_ucontext;
