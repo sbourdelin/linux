@@ -131,6 +131,10 @@ struct bnxt_re_dev {
 #define to_bnxt_re_dev(ptr, member)	\
 	container_of((ptr), struct bnxt_re_dev, member)
 
+#define BNXT_RE_ROCE_V1_PACKET		0
+#define BNXT_RE_ROCEV2_IPV4_PACKET	2
+#define BNXT_RE_ROCEV2_IPV6_PACKET	3
+
 static inline struct device *rdev_to_dev(struct bnxt_re_dev *rdev)
 {
 	if (rdev)

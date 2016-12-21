@@ -38,6 +38,9 @@
 
 #ifndef __BNXT_QPLIB_FP_H__
 #define __BNXT_QPLIB_FP_H__
+
+#define BNXT_QPLIB_ETHTYPE_ROCEV1      0x8915
+
 struct bnxt_qplib_sge {
 	u64				addr;
 	u32				lkey;
@@ -415,6 +418,11 @@ int bnxt_qplib_create_qp(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp);
 int bnxt_qplib_modify_qp(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp);
 int bnxt_qplib_query_qp(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp);
 int bnxt_qplib_destroy_qp(struct bnxt_qplib_res *res, struct bnxt_qplib_qp *qp);
+void *bnxt_qplib_get_qp1_sq_buf(struct bnxt_qplib_qp *qp,
+				struct bnxt_qplib_sge *sge);
+void bnxt_qplib_post_send_db(struct bnxt_qplib_qp *qp);
+int bnxt_qplib_post_send(struct bnxt_qplib_qp *qp,
+			 struct bnxt_qplib_swqe *wqe);
 int bnxt_qplib_create_cq(struct bnxt_qplib_res *res, struct bnxt_qplib_cq *cq);
 int bnxt_qplib_destroy_cq(struct bnxt_qplib_res *res, struct bnxt_qplib_cq *cq);
 
