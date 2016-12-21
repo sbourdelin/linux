@@ -35,7 +35,6 @@ struct mdev_device {
 
 	/* internal */
 	struct kref		ref;
-	struct list_head	next;
 	struct kobject		*type_kobj;
 };
 
