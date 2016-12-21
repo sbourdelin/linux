@@ -102,6 +102,7 @@ enum axp288_extcon_irq {
 };
 
 static const unsigned int axp288_extcon_cables[] = {
+	EXTCON_USB,
 	EXTCON_CHG_USB_SDP,
 	EXTCON_CHG_USB_CDP,
 	EXTCON_CHG_USB_DCP,
@@ -225,8 +226,12 @@ notify_otg:
 			vbus_attach ? USB_EVENT_VBUS : USB_EVENT_NONE, NULL);
 	}
 
-	if (notify_charger)
+	if (notify_charger) {
 		extcon_set_state_sync(info->edev, cable, vbus_attach);
+		if (cable == EXTCON_CHG_USB_SDP)
+			extcon_set_state_sync(info->edev, EXTCON_USB,
+					      vbus_attach);
+	}
 
 	/* Clear the flags on disconnect event */
 	if (!vbus_attach)
