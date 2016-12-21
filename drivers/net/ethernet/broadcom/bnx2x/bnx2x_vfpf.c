@@ -1985,7 +1985,7 @@ static void bnx2x_vf_mbx_update_rss(struct bnx2x *bp, struct bnx2x_virtf *vf,
 	/* set vfop params according to rss tlv */
 	memcpy(rss.ind_table, rss_tlv->ind_table,
 	       T_ETH_INDIRECTION_TABLE_SIZE);
-	memcpy(rss.rss_key, rss_tlv->rss_key, sizeof(rss_tlv->rss_key));
+	memcpy(&vf->rss_conf_obj.rss_key, rss_tlv->rss_key, sizeof(rss_tlv->rss_key));
 	rss.rss_obj = &vf->rss_conf_obj;
 	rss.rss_result_mask = rss_tlv->rss_result_mask;
 

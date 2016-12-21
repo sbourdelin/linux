@@ -3429,6 +3429,13 @@ static u32 bnx2x_get_rxfh_indir_size(struct net_device *dev)
 	return T_ETH_INDIRECTION_TABLE_SIZE;
 }
 
+static u32 bnx2x_get_rxfh_key_size(struct net_device *dev)
+{
+	struct bnx2x *bp = netdev_priv(dev);
+
+	return (bp->port.pmf || !CHIP_IS_E1x(bp)) ? T_ETH_RSS_KEY * 4 : 0;
+}
+
 static int bnx2x_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
 			  u8 *hfunc)
 {
@@ -3438,23 +3445,28 @@ static int bnx2x_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
 
 	if (hfunc)
 		*hfunc = ETH_RSS_HASH_TOP;
-	if (!indir)
-		return 0;
 
-	/* Get the current configuration of the RSS indirection table */
-	bnx2x_get_rss_ind_table(&bp->rss_conf_obj, ind_table);
+	if (key) {
+		WARN_ON_ONCE(bnx2x_get_rxfh_key_size(dev) != T_ETH_RSS_KEY * 4);
+		bnx2x_get_rss_key(&bp->rss_conf_obj, key);
+	}
 
-	/*
-	 * We can't use a memcpy() as an internal storage of an
-	 * indirection table is a u8 array while indir->ring_index
-	 * points to an array of u32.
-	 *
-	 * Indirection table contains the FW Client IDs, so we need to
-	 * align the returned table to the Client ID of the leading RSS
-	 * queue.
-	 */
-	for (i = 0; i < T_ETH_INDIRECTION_TABLE_SIZE; i++)
-		indir[i] = ind_table[i] - bp->fp->cl_id;
+	if (indir) {
+		/* Get the current configuration of the RSS indirection table */
+		bnx2x_get_rss_ind_table(&bp->rss_conf_obj, ind_table);
+
+		/*
+		 * We can't use a memcpy() as an internal storage of an
+		 * indirection table is a u8 array while indir->ring_index
+		 * points to an array of u32.
+		 *
+		 * Indirection table contains the FW Client IDs, so we need to
+		 * align the returned table to the Client ID of the leading RSS
+		 * queue.
+		 */
+		for (i = 0; i < T_ETH_INDIRECTION_TABLE_SIZE; i++)
+			indir[i] = ind_table[i] - bp->fp->cl_id;
+	}
 
 	return 0;
 }
@@ -3636,6 +3648,7 @@ static const struct ethtool_ops bnx2x_ethtool_ops = {
 	.get_ethtool_stats	= bnx2x_get_ethtool_stats,
 	.get_rxnfc		= bnx2x_get_rxnfc,
 	.set_rxnfc		= bnx2x_set_rxnfc,
+	.get_rxfh_key_size	= bnx2x_get_rxfh_key_size,
 	.get_rxfh_indir_size	= bnx2x_get_rxfh_indir_size,
 	.get_rxfh		= bnx2x_get_rxfh,
 	.set_rxfh		= bnx2x_set_rxfh,

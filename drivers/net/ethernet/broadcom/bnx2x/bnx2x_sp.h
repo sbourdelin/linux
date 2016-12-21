@@ -760,6 +760,8 @@ struct bnx2x_rss_config_obj {
 	/* Last configured indirection table */
 	u8			ind_table[T_ETH_INDIRECTION_TABLE_SIZE];
 
+	u32			rss_key[T_ETH_RSS_KEY];
+
 	/* flags for enabling 4-tupple hash on UDP */
 	u8			udp_rss_v4;
 	u8			udp_rss_v6;
@@ -1529,6 +1531,8 @@ int bnx2x_config_rss(struct bnx2x *bp,
  */
 void bnx2x_get_rss_ind_table(struct bnx2x_rss_config_obj *rss_obj,
 			     u8 *ind_table);
+
+void bnx2x_get_rss_key(const struct bnx2x_rss_config_obj *rss_obj, u8 *key);
 
 #define PF_MAC_CREDIT_E2(bp, func_num)					\
 	((MAX_MAC_CREDIT_E2 - GET_NUM_VFS_PER_PATH(bp) * VF_MAC_CREDIT_CNT) / \
