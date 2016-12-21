@@ -171,6 +171,7 @@ struct ib_cq *bnxt_re_create_cq(struct ib_device *ibdev,
 				struct ib_ucontext *context,
 				struct ib_udata *udata);
 int bnxt_re_destroy_cq(struct ib_cq *cq);
+int bnxt_re_poll_cq(struct ib_cq *cq, int num_entries, struct ib_wc *wc);
 int bnxt_re_req_notify_cq(struct ib_cq *cq, enum ib_cq_notify_flags flags);
 struct ib_mr *bnxt_re_get_dma_mr(struct ib_pd *pd, int mr_access_flags);
 

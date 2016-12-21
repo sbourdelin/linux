@@ -467,6 +467,7 @@ static int bnxt_re_register_ib(struct bnxt_re_dev *rdev)
 
 	ibdev->create_cq		= bnxt_re_create_cq;
 	ibdev->destroy_cq		= bnxt_re_destroy_cq;
+	ibdev->poll_cq			= bnxt_re_poll_cq;
 	ibdev->req_notify_cq		= bnxt_re_req_notify_cq;
 
 	ibdev->get_dma_mr		= bnxt_re_get_dma_mr;
@@ -614,6 +615,25 @@ static int bnxt_re_aeq_handler(struct bnxt_qplib_rcfw *rcfw,
 	return 0;
 }
 
+static int bnxt_re_cqn_handler(struct bnxt_qplib_nq *nq,
+			       struct bnxt_qplib_cq *handle)
+{
+	struct bnxt_re_cq *cq = container_of(handle, struct bnxt_re_cq,
+					     qplib_cq);
+
+	if (!cq) {
+		dev_err(NULL, "%s: CQ is NULL, CQN not handled",
+			ROCE_DRV_MODULE_NAME);
+		return -EINVAL;
+	}
+	if (cq->ib_cq.comp_handler) {
+		/* Lock comp_handler? */
+		(*cq->ib_cq.comp_handler)(&cq->ib_cq, cq->ib_cq.cq_context);
+	}
+
+	return 0;
+}
+
 static void bnxt_re_cleanup_res(struct bnxt_re_dev *rdev)
 {
 	if (rdev->nq.hwq.max_elements)
@@ -635,7 +655,7 @@ static int bnxt_re_init_res(struct bnxt_re_dev *rdev)
 	rc = bnxt_qplib_enable_nq(rdev->en_dev->pdev, &rdev->nq,
 				  rdev->msix_entries[BNXT_RE_NQ_IDX].vector,
 				  rdev->msix_entries[BNXT_RE_NQ_IDX].db_offset,
-				  NULL,
+				  &bnxt_re_cqn_handler,
 				  NULL);
 
 	if (rc)
