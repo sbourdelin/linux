@@ -33,57 +33,27 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Description: Slow Path Operators (header)
- *
+ * Description: Uverbs ABI header file
  */
 
-#ifndef __BNXT_QPLIB_SP_H__
-#define __BNXT_QPLIB_SP_H__
+#ifndef __BNXT_RE_UVERBS_ABI_H__
+#define __BNXT_RE_UVERBS_ABI_H__
 
-struct bnxt_qplib_dev_attr {
-	char				fw_ver[32];
-	u16				max_sgid;
-	u16				max_mrw;
-	u32				max_qp;
-#define BNXT_QPLIB_MAX_OUT_RD_ATOM	126
-	u32				max_qp_rd_atom;
-	u32				max_qp_init_rd_atom;
-	u32				max_qp_wqes;
-	u32				max_qp_sges;
-	u32				max_cq;
-	u32				max_cq_wqes;
-	u32				max_cq_sges;
-	u32				max_mr;
-	u64				max_mr_size;
-	u32				max_pd;
-	u32				max_mw;
-	u32				max_raw_ethy_qp;
-	u32				max_ah;
-	u32				max_fmr;
-	u32				max_map_per_fmr;
-	u32				max_srq;
-	u32				max_srq_wqes;
-	u32				max_srq_sges;
-	u32				max_pkey;
-	u32				max_inline_data;
-	u32				l2_db_size;
-	u8				tqm_alloc_reqs[MAX_TQM_ALLOC_REQ];
+#define BNXT_RE_ABI_VERSION	1
+
+struct bnxt_re_uctx_resp {
+	__u32 dev_id;
+	__u32 max_qp;
+	__u32 pg_size;
+	__u32 cqe_sz;
+	__u32 max_cqd;
+	__u32 rsvd;
 };
 
-struct bnxt_qplib_pd {
-	u32				id;
+struct bnxt_re_pd_resp {
+	__u32 pdid;
+	__u32 dpi;
+	__u64 dbr;
 };
 
-struct bnxt_qplib_gid {
-	u8				data[16];
-};
-
-int bnxt_qplib_del_pkey(struct bnxt_qplib_res *res,
-			struct bnxt_qplib_pkey_tbl *pkey_tbl, u16 *pkey,
-			bool update);
-int bnxt_qplib_add_pkey(struct bnxt_qplib_res *res,
-			struct bnxt_qplib_pkey_tbl *pkey_tbl, u16 *pkey,
-			bool update);
-int bnxt_qplib_get_dev_attr(struct bnxt_qplib_rcfw *rcfw,
-			    struct bnxt_qplib_dev_attr *attr);
-#endif /* __BNXT_QPLIB_SP_H__*/
+#endif /* __BNXT_RE_UVERBS_ABI_H__*/
