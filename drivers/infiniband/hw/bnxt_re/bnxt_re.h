@@ -42,5 +42,56 @@
 #define ROCE_DRV_MODULE_NAME		"bnxt_re"
 #define ROCE_DRV_MODULE_VERSION		"1.0.0"
 
+#define BNXT_RE_REF_WAIT_COUNT		10
 #define BNXT_RE_DESC	"Broadcom NetXtreme-C/E RoCE Driver"
+
+struct bnxt_re_work {
+	struct work_struct	work;
+	unsigned long		event;
+	struct bnxt_re_dev      *rdev;
+	struct net_device	*vlan_dev;
+};
+
+#define BNXT_RE_MIN_MSIX		2
+#define BNXT_RE_MAX_MSIX		16
+struct bnxt_re_dev {
+	struct ib_device		ibdev;
+	struct list_head		list;
+	atomic_t			ref_count;
+	unsigned long			flags;
+#define BNXT_RE_FLAG_NETDEV_REGISTERED	0
+#define BNXT_RE_FLAG_IBDEV_REGISTERED	1
+#define BNXT_RE_FLAG_GOT_MSIX		2
+#define BNXT_RE_FLAG_RCFW_CHANNEL_EN	8
+#define BNXT_RE_FLAG_QOS_WORK_REG	16
+	struct net_device		*netdev;
+	unsigned int			version, major, minor;
+	struct bnxt_en_dev		*en_dev;
+	struct bnxt_msix_entry		msix_entries[BNXT_RE_MAX_MSIX];
+	int				num_msix;
+
+	int				id;
+
+	atomic_t			qp_count;
+	struct mutex			qp_lock;	/* protect qp list */
+	struct list_head		qp_list;
+
+	atomic_t			cq_count;
+	atomic_t			srq_count;
+	atomic_t			mr_count;
+	atomic_t			mw_count;
+	/* Max of 2 lossless traffic class supported per port */
+	u16				cosq[2];
+};
+
+#define to_bnxt_re_dev(ptr, member)	\
+	container_of((ptr), struct bnxt_re_dev, member)
+
+static inline struct device *rdev_to_dev(struct bnxt_re_dev *rdev)
+{
+	if (rdev)
+		return  &rdev->ibdev.dev;
+	return NULL;
+}
+
 #endif
