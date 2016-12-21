@@ -16,25 +16,7 @@
  */
 #include <linux/percpu.h>
 
-typedef __printf(1, 0) int (*printk_func_t)(const char *fmt, va_list args);
-
-int __printf(1, 0) vprintk_default(const char *fmt, va_list args);
-
 #ifdef CONFIG_PRINTK_NMI
-
-extern raw_spinlock_t logbuf_lock;
-
-/*
- * printk() could not take logbuf_lock in NMI context. Instead,
- * it temporary stores the strings into a per-CPU buffer.
- * The alternative implementation is chosen transparently
- * via per-CPU variable.
- */
-DECLARE_PER_CPU(printk_func_t, printk_func);
-static inline __printf(1, 0) int vprintk_func(const char *fmt, va_list args)
-{
-	return this_cpu_read(printk_func)(fmt, args);
-}
 
 extern atomic_t nmi_message_lost;
 static inline int get_nmi_message_lost(void)
@@ -44,14 +26,42 @@ static inline int get_nmi_message_lost(void)
 
 #else /* CONFIG_PRINTK_NMI */
 
-static inline __printf(1, 0) int vprintk_func(const char *fmt, va_list args)
-{
-	return vprintk_default(fmt, args);
-}
-
 static inline int get_nmi_message_lost(void)
 {
 	return 0;
 }
 
 #endif /* CONFIG_PRINTK_NMI */
+
+#ifdef CONFIG_PRINTK
+
+#define PRINTK_SAFE_CONTEXT_MASK	0x7fffffff
+#define PRINTK_NMI_CONTEXT_MASK	0x80000000
+
+extern raw_spinlock_t logbuf_lock;
+
+__printf(1, 0) int vprintk_default(const char *fmt, va_list args);
+__printf(1, 0) int vprintk_func(const char *fmt, va_list args);
+void __printk_safe_enter(void);
+void __printk_safe_exit(void);
+
+#define printk_safe_enter(flags)		\
+	do {					\
+		local_irq_save(flags);		\
+		__printk_safe_enter();		\
+	} while (0)
+
+#define printk_safe_exit(flags)		\
+	do {					\
+		__printk_safe_exit();		\
+		local_irq_restore(flags);	\
+	} while (0)
+
+#else
+
+__printf(1, 0) int vprintk_func(const char *fmt, va_list args) { return 0; }
+
+#define printk_safe_enter(f)	((void)(f))
+#define printk_safe_exit(f)	((void)(f))
+
+#endif /* CONFIG_PRINTK */
