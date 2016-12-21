@@ -24,6 +24,7 @@
  *
  ******************************************************************************/
 
+#include <linux/bpf.h>
 #include <linux/prefetch.h>
 #include <net/busy_poll.h>
 #include "i40e.h"
@@ -1013,6 +1014,7 @@ void i40e_clean_rx_ring(struct i40e_ring *rx_ring)
 	struct device *dev = rx_ring->dev;
 	unsigned long bi_size;
 	u16 i;
+	struct bpf_prog *old_prog;
 
 	/* ring already cleared, nothing to do */
 	if (!rx_ring->rx_bi)
@@ -1046,6 +1048,11 @@ void i40e_clean_rx_ring(struct i40e_ring *rx_ring)
 	rx_ring->next_to_alloc = 0;
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
+
+	old_prog = rtnl_dereference(rx_ring->xdp_prog);
+	RCU_INIT_POINTER(rx_ring->xdp_prog, NULL);
+	if (old_prog)
+		bpf_prog_put(old_prog);
 }
 
 /**
@@ -1620,19 +1627,84 @@ add_tail_frag:
 }
 
 /**
+ * i40e_run_xdp - Runs an XDP program for an Rx ring
+ * @rx_ring: Rx ring used for XDP
+ * @rx_buffer: current Rx buffer
+ * @rx_desc: current Rx descriptor
+ * @size: buffer size
+ * @xdp_prog: the XDP program to run
+ *
+ * Returns true if the XDP program consumed the incoming frame. False
+ * means pass the frame to the good old stack.
+ **/
+static bool i40e_run_xdp(struct i40e_ring *rx_ring,
+			 struct i40e_rx_buffer *rx_buffer,
+			 union i40e_rx_desc *rx_desc,
+			 unsigned int size,
+			 struct bpf_prog *xdp_prog)
+{
+	struct xdp_buff xdp;
+	u32 xdp_action;
+
+	if (unlikely(!i40e_test_staterr(rx_desc,
+					BIT(I40E_RX_DESC_STATUS_EOF_SHIFT)))) {
+		dev_warn_once(&rx_ring->vsi->back->pdev->dev,
+			      "Received unexpected RXD_EOF!\n");
+		goto do_drop;
+	}
+
+	xdp.data = page_address(rx_buffer->page) + rx_buffer->page_offset;
+	xdp.data_end = xdp.data + size;
+	xdp.data_hard_start = xdp.data;
+	xdp_action = bpf_prog_run_xdp(xdp_prog, &xdp);
+
+	switch (xdp_action) {
+	case XDP_PASS:
+		return false;
+	default:
+		bpf_warn_invalid_xdp_action(xdp_action);
+	case XDP_ABORTED:
+	case XDP_TX:
+	case XDP_DROP:
+do_drop:
+		if (likely(i40e_page_is_reusable(rx_buffer->page))) {
+			i40e_reuse_rx_page(rx_ring, rx_buffer);
+			rx_ring->rx_stats.page_reuse_count++;
+			break;
+		}
+
+		/* we are not reusing the buffer so unmap it */
+		dma_unmap_page(rx_ring->dev, rx_buffer->dma, PAGE_SIZE,
+			       DMA_FROM_DEVICE);
+		__free_pages(rx_buffer->page, 0);
+	}
+
+	/* clear contents of buffer_info */
+	rx_buffer->page = NULL;
+	return true; /* Swallowed by XDP */
+}
+
+/**
  * i40e_fetch_rx_buffer - Allocate skb and populate it
  * @rx_ring: rx descriptor ring to transact packets on
  * @rx_desc: descriptor containing info written by hardware
+ * @skb: The allocated skb, if any
+ * @xdp_consumed_bytes: The size of the frame consumed by XDP
  *
- * This function allocates an skb on the fly, and populates it with the page
- * data from the current receive descriptor, taking care to set up the skb
- * correctly, as well as handling calling the page recycle function if
- * necessary.
+ * Unless XDP is enabled, this function allocates an skb on the fly,
+ * and populates it with the page data from the current receive
+ * descriptor, taking care to set up the skb correctly, as well as
+ * handling calling the page recycle function if necessary.
+ *
+ * If the received frame was handled by XDP, true is
+ * returned. Otherwise, the skb is returned to the caller via the skb
+ * parameter.
  */
 static inline
 struct sk_buff *i40e_fetch_rx_buffer(struct i40e_ring *rx_ring,
 				     union i40e_rx_desc *rx_desc,
-				     struct sk_buff *skb)
+				     struct sk_buff *skb,
+				     unsigned int *xdp_consumed_bytes)
 {
 	u64 local_status_error_len =
 		le64_to_cpu(rx_desc->wb.qword1.status_error_len);
@@ -1641,6 +1713,7 @@ struct sk_buff *i40e_fetch_rx_buffer(struct i40e_ring *rx_ring,
 		I40E_RXD_QW1_LENGTH_PBUF_SHIFT;
 	struct i40e_rx_buffer *rx_buffer;
 	struct page *page;
+	struct bpf_prog *xdp_prog;
 
 	rx_buffer = &rx_ring->rx_bi[rx_ring->next_to_clean];
 	page = rx_buffer->page;
@@ -1652,6 +1725,19 @@ struct sk_buff *i40e_fetch_rx_buffer(struct i40e_ring *rx_ring,
 				      rx_buffer->page_offset,
 				      size,
 				      DMA_FROM_DEVICE);
+
+	rcu_read_lock();
+	xdp_prog = rcu_dereference(rx_ring->xdp_prog);
+	if (xdp_prog) {
+		bool xdp_consumed = i40e_run_xdp(rx_ring, rx_buffer, rx_desc,
+						 size, xdp_prog);
+		if (xdp_consumed) {
+			rcu_read_unlock();
+			*xdp_consumed_bytes = size;
+			return NULL;
+		}
+	}
+	rcu_read_unlock();
 
 	if (likely(!skb)) {
 		void *page_addr = page_address(page) + rx_buffer->page_offset;
@@ -1734,6 +1820,20 @@ static bool i40e_is_non_eop(struct i40e_ring *rx_ring,
 }
 
 /**
+ * i40e_update_rx_next_to_clean - Bumps the next-to-clean for an Rx ing
+ * @rx_ring: Rx ring to bump
+ **/
+static void i40e_update_rx_next_to_clean(struct i40e_ring *rx_ring)
+{
+	u32 ntc = rx_ring->next_to_clean + 1;
+
+	ntc = (ntc < rx_ring->count) ? ntc : 0;
+	rx_ring->next_to_clean = ntc;
+
+	prefetch(I40E_RX_DESC(rx_ring, ntc));
+}
+
+/**
  * i40e_clean_rx_irq - Clean completed descriptors from Rx ring - bounce buf
  * @rx_ring: rx descriptor ring to transact packets on
  * @budget: Total limit on number of packets to process
@@ -1757,6 +1857,7 @@ static int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget)
 		u16 vlan_tag;
 		u8 rx_ptype;
 		u64 qword;
+		unsigned int xdp_consumed_bytes = 0;
 
 		/* return some buffers to hardware, one at a time is too slow */
 		if (cleaned_count >= I40E_RX_BUFFER_WRITE) {
@@ -1782,7 +1883,18 @@ static int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget)
 		 */
 		dma_rmb();
 
-		skb = i40e_fetch_rx_buffer(rx_ring, rx_desc, skb);
+		skb = i40e_fetch_rx_buffer(rx_ring, rx_desc, skb,
+					   &xdp_consumed_bytes);
+		if (xdp_consumed_bytes) {
+			cleaned_count++;
+
+			i40e_update_rx_next_to_clean(rx_ring);
+
+			total_rx_bytes += xdp_consumed_bytes;
+			total_rx_packets++;
+			continue;
+		}
+
 		if (!skb)
 			break;
 
