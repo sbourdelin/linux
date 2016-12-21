@@ -45,6 +45,11 @@
 #define BNXT_RE_REF_WAIT_COUNT		10
 #define BNXT_RE_DESC	"Broadcom NetXtreme-C/E RoCE Driver"
 
+#define BNXT_RE_MAX_QPC_COUNT		(64 * 1024)
+#define BNXT_RE_MAX_MRW_COUNT		(64 * 1024)
+#define BNXT_RE_MAX_SRQC_COUNT		(64 * 1024)
+#define BNXT_RE_MAX_CQ_COUNT		(64 * 1024)
+
 struct bnxt_re_work {
 	struct work_struct	work;
 	unsigned long		event;
@@ -54,6 +59,7 @@ struct bnxt_re_work {
 
 #define BNXT_RE_MIN_MSIX		2
 #define BNXT_RE_MAX_MSIX		16
+#define BNXT_RE_AEQ_IDX			0
 struct bnxt_re_dev {
 	struct ib_device		ibdev;
 	struct list_head		list;
@@ -71,6 +77,15 @@ struct bnxt_re_dev {
 	int				num_msix;
 
 	int				id;
+
+	/* RCFW Channel */
+	struct bnxt_qplib_rcfw		rcfw;
+
+	/* Device Resources */
+	struct bnxt_qplib_dev_attr	dev_attr;
+	struct bnxt_qplib_ctx		qplib_ctx;
+	struct bnxt_qplib_res		qplib_res;
+	struct bnxt_qplib_dpi		dpi_privileged;
 
 	atomic_t			qp_count;
 	struct mutex			qp_lock;	/* protect qp list */
