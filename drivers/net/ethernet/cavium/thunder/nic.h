@@ -54,6 +54,7 @@
 
 /* Max when CPI_ALG is IP diffserv */
 #define	NIC_MAX_CPI_PER_LMAC		64
+#define NIC_TNS_CPI_PER_LMAC		16
 
 /* NIC VF Interrupts */
 #define	NICVF_INTR_CQ			0
@@ -111,6 +112,7 @@
  * 1 tick per 0.025usec
  */
 #define NICPF_CLK_PER_INT_TICK		1
+#define NICPF_TNS_CLK_PER_INT_TICK	2
 
 /* Time to wait before we decide that a SQ is stuck.
  *
@@ -129,6 +131,7 @@ struct nicvf_cq_poll {
 
 #define NIC_MAX_RSS_HASH_BITS		8
 #define NIC_MAX_RSS_IDR_TBL_SIZE	(1 << NIC_MAX_RSS_HASH_BITS)
+#define NIC_TNS_RSS_IDR_TBL_SIZE	5
 #define RSS_HASH_KEY_SIZE		5 /* 320 bit key */
 
 struct nicvf_rss_info {
@@ -255,74 +258,6 @@ struct nicvf_drv_stats {
 	struct u64_stats_sync   syncp;
 };
 
-struct nicvf {
-	struct nicvf		*pnicvf;
-	struct net_device	*netdev;
-	struct pci_dev		*pdev;
-	void __iomem		*reg_base;
-#define	MAX_QUEUES_PER_QSET			8
-	struct queue_set	*qs;
-	struct nicvf_cq_poll	*napi[8];
-	u8			vf_id;
-	u8			sqs_id;
-	bool                    sqs_mode;
-	bool			hw_tso;
-	bool			t88;
-
-	/* Receive buffer alloc */
-	u32			rb_page_offset;
-	u16			rb_pageref;
-	bool			rb_alloc_fail;
-	bool			rb_work_scheduled;
-	struct page		*rb_page;
-	struct delayed_work	rbdr_work;
-	struct tasklet_struct	rbdr_task;
-
-	/* Secondary Qset */
-	u8			sqs_count;
-#define	MAX_SQS_PER_VF_SINGLE_NODE		5
-#define	MAX_SQS_PER_VF				11
-	struct nicvf		*snicvf[MAX_SQS_PER_VF];
-
-	/* Queue count */
-	u8			rx_queues;
-	u8			tx_queues;
-	u8			max_queues;
-
-	u8			node;
-	u8			cpi_alg;
-	bool			link_up;
-	u8			duplex;
-	u32			speed;
-	bool			tns_mode;
-	bool			loopback_supported;
-	struct nicvf_rss_info	rss_info;
-	struct tasklet_struct	qs_err_task;
-	struct work_struct	reset_task;
-
-	/* Interrupt coalescing settings */
-	u32			cq_coalesce_usecs;
-	u32			msg_enable;
-
-	/* Stats */
-	struct nicvf_hw_stats   hw_stats;
-	struct nicvf_drv_stats  __percpu *drv_stats;
-	struct bgx_stats	bgx_stats;
-
-	/* MSI-X  */
-	bool			msix_enabled;
-	u8			num_vec;
-	struct msix_entry	msix_entries[NIC_VF_MSIX_VECTORS];
-	char			irq_name[NIC_VF_MSIX_VECTORS][IFNAMSIZ + 15];
-	bool			irq_allocated[NIC_VF_MSIX_VECTORS];
-	cpumask_var_t		affinity_mask[NIC_VF_MSIX_VECTORS];
-
-	/* VF <-> PF mailbox communication */
-	bool			pf_acked;
-	bool			pf_nacked;
-	bool			set_mac_pending;
-} ____cacheline_aligned_in_smp;
-
 /* PF <--> VF Mailbox communication
  * Eight 64bit registers are shared between PF and VF.
  * Separate set for each VF.
@@ -357,6 +292,18 @@ struct nicvf {
 #define	NIC_MBOX_MSG_SNICVF_PTR		0x15	/* Send sqet nicvf ptr to PVF */
 #define	NIC_MBOX_MSG_LOOPBACK		0x16	/* Set interface in loopback */
 #define	NIC_MBOX_MSG_RESET_STAT_COUNTER 0x17	/* Reset statistics counters */
+/* Communicate regarding the added/deleted unicast/multicase address */
+#define NIC_MBOX_MSG_UC_MC              0x18
+/* Communicate regarding the setting of Promisc mode */
+#define NIC_MBOX_MSG_PROMISC		0x19
+/* Communicate with vf regarding admin vlan */
+#define NIC_MBOX_MSG_ADMIN_VLAN         0x20
+/* Communicate regarding the added/deleted VLAN */
+#define NIC_MBOX_MSG_VLAN               0x21
+/* Communicate to Pf that the VF carrier and tx queue are turned on */
+#define NIC_MBOX_MSG_OP_UP		0x22
+/* Communicate to Pf that the VF carrier and tx queue are turned off */
+#define NIC_MBOX_MSG_OP_DOWN		0x23
 #define	NIC_MBOX_MSG_CFG_DONE		0xF0	/* VF configuration done */
 #define	NIC_MBOX_MSG_SHUTDOWN		0xF1	/* VF is being shutdown */
 
@@ -367,6 +314,29 @@ struct nic_cfg_msg {
 	u8    tns_mode:1;
 	u8    sqs_mode:1;
 	u8    loopback_supported:1;
+	u8    pf_up:1;
+	bool  is_pf;
+	bool  veb_enabled;
+	bool  bgx_id;
+	u8    lmac;
+	u8    chan;
+	u8    mac_addr[ETH_ALEN];
+};
+
+/* VLAN INFO */
+struct vlan_msg {
+	u8 msg;
+	u8 vf_id;
+	bool vlan_add:1;
+	u16 vlan_id;
+};
+
+struct uc_mc_msg {
+	u8 msg;
+	u8 vf_id;
+	uint64_t addr_type:1;
+	uint64_t is_flush:1;
+	uint64_t is_add:1;
 	u8    mac_addr[ETH_ALEN];
 };
 
@@ -446,6 +416,7 @@ struct bgx_stats_msg {
 /* Physical interface link status */
 struct bgx_link_status {
 	u8    msg;
+	u8    lmac;
 	u8    link_up;
 	u8    duplex;
 	u32   speed;
@@ -498,9 +469,18 @@ struct reset_stat_cfg {
 	u16   sq_stat_mask;
 };
 
+struct promisc_info {
+	u8    msg;
+	u8    vf_id;
+	bool  on;
+};
+
 /* 128 bit shared memory between PF and each VF */
 union nic_mbx {
 	struct { u8 msg; }	msg;
+	struct promisc_info     promisc_cfg;
+	struct vlan_msg		vlan_cfg;
+	struct uc_mc_msg	uc_mc_cfg;
 	struct nic_cfg_msg	nic_cfg;
 	struct qs_cfg_msg	qs;
 	struct rq_cfg_msg	rq;
@@ -517,6 +497,93 @@ union nic_mbx {
 	struct set_loopback	lbk;
 	struct reset_stat_cfg	reset_stat;
 };
+
+struct nicvf {
+	struct nicvf		*pnicvf;
+	struct net_device	*netdev;
+	struct pci_dev		*pdev;
+	void __iomem		*reg_base;
+#define	MAX_QUEUES_PER_QSET			8
+	struct queue_set	*qs;
+	struct nicvf_cq_poll	*napi[8];
+	u8			vf_id;
+	u8			sqs_id;
+	bool                    sqs_mode;
+	bool			hw_tso;
+	bool			t88;
+
+	/* Receive buffer alloc */
+	u32			rb_page_offset;
+	u16			rb_pageref;
+	bool			rb_alloc_fail;
+	bool			rb_work_scheduled;
+	struct page		*rb_page;
+	struct delayed_work	rbdr_work;
+	struct tasklet_struct	rbdr_task;
+
+	/* Secondary Qset */
+	u8			sqs_count;
+#define	MAX_SQS_PER_VF_SINGLE_NODE		5
+#define	MAX_SQS_PER_VF				11
+	struct nicvf		*snicvf[MAX_SQS_PER_VF];
+
+	/* Queue count */
+	u8			rx_queues;
+	u8			tx_queues;
+	u8			max_queues;
+
+	u8			node;
+	u8			cpi_alg;
+	u16			mtu;
+	bool			link_up;
+	u8			duplex;
+	u32			speed;
+	bool			tns_mode;
+	bool			loopback_supported;
+	/* In VEB mode, true_vf directely attached to physical port,
+	 * it acts as PF in this VF group (set of VF's attached to same
+	 * physical port).
+	 */
+	bool			true_vf;
+	struct nicvf_rss_info	rss_info;
+	struct tasklet_struct	qs_err_task;
+	struct work_struct	reset_task;
+
+	/* Interrupt coalescing settings */
+	u32			cq_coalesce_usecs;
+	u32			msg_enable;
+
+	/* Stats */
+	struct nicvf_hw_stats   hw_stats;
+	struct nicvf_drv_stats  __percpu *drv_stats;
+	struct bgx_stats	bgx_stats;
+
+	/* MSI-X  */
+	bool			msix_enabled;
+	u8			num_vec;
+	struct msix_entry	msix_entries[NIC_VF_MSIX_VECTORS];
+	char			irq_name[NIC_VF_MSIX_VECTORS][IFNAMSIZ + 15];
+	bool			irq_allocated[NIC_VF_MSIX_VECTORS];
+	cpumask_var_t		affinity_mask[NIC_VF_MSIX_VECTORS];
+
+	char			phys_port_name[IFNAMSIZ + 15];
+	/* VF <-> PF mailbox communication */
+	bool			pf_acked;
+	bool			pf_nacked;
+	bool			set_mac_pending;
+	struct netdev_hw_addr_list uc_shadow;
+	struct netdev_hw_addr_list mc_shadow;
+
+	/* work queue for handling UC MC mailbox messages */
+	bool			send_op_link_status;
+	struct delayed_work	dwork;
+	struct workqueue_struct *uc_mc_msg;
+
+	/* Admin vlan id */
+	int			admin_vlan_id;
+	bool			pf_ack_waiting;
+	bool			wait_for_ack;
+} ____cacheline_aligned_in_smp;
 
 #define NIC_NODE_ID_MASK	0x03
 #define NIC_NODE_ID_SHIFT	44

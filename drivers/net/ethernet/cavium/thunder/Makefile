@@ -7,6 +7,6 @@ obj-$(CONFIG_THUNDER_NIC_BGX) += thunder_bgx.o
 obj-$(CONFIG_THUNDER_NIC_PF) += nicpf.o
 obj-$(CONFIG_THUNDER_NIC_VF) += nicvf.o
 
-nicpf-y := nic_main.o
+nicpf-y := pf_vf.o pf_reg.o pf_filter.o tbl_access.o nic_main.o
 nicvf-y := nicvf_main.o nicvf_queues.o
 nicvf-y += nicvf_ethtool.o
