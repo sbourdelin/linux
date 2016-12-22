@@ -1060,7 +1060,7 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 
 		if (early_init_dt_mark_hotplug_memory_arch(base, size))
 			pr_warn("failed to mark hotplug range 0x%llx - 0x%llx\n",
-				base, base + size);
+				base, base + size - 1);
 	}
 
 	return 0;
