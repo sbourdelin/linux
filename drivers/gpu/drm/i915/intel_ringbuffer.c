@@ -1807,8 +1807,11 @@ static int init_phys_status_page(struct intel_engine_cs *engine)
 
 int intel_ring_pin(struct intel_ring *ring)
 {
-	/* Ring wraparound at offset 0 sometimes hangs. No idea why. */
-	unsigned int flags = PIN_GLOBAL | PIN_OFFSET_BIAS | 4096;
+	/* Need a bias for 2 reasons:
+	 * 1: ring wraparound at offset 0 sometimes hangs. No idea why.
+	 * 2: GuC requires the ring to be placed above GUC_WOPCM_TOP
+	 */
+	unsigned int flags = PIN_GLOBAL | PIN_OFFSET_BIAS | GUC_WOPCM_TOP;
 	enum i915_map_type map;
 	struct i915_vma *vma = ring->vma;
 	void *addr;
