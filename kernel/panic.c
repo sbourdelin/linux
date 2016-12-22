@@ -355,7 +355,7 @@ const char *print_tainted(void)
 		for (i = 0; i < TAINT_FLAGS_COUNT; i++) {
 			const struct taint_flag *t = &taint_flags[i];
 			*s++ = test_bit(i, &tainted_mask) ?
-					t->true : t->false;
+					t->tainted : t->untainted;
 		}
 		*s = 0;
 	} else
