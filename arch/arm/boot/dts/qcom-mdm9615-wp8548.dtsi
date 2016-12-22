@@ -54,6 +54,56 @@
 	};
 };
 
+&nand0 {
+	nandcs@0 {
+		compatible = "qcom,nandcs";
+		reg = <0>;
+
+		linux,mtd-name = "micron,mt29f4g08";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		nand-ecc-strength = <4>;
+		nand-ecc-step-size = <512>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			bootloader@0x051c0000 {
+				reg = <0x51c0000 0x100000>;
+				read-only;
+			};
+
+			kernel@0x052c0000 {
+				reg = <0x52c0000 0x1400000>;
+				read-only;
+			};
+
+			rootfs@0x066c0000 {
+				reg = <0x66c0000 0x3140000>;
+				read-only;
+			};
+
+			user0@0x09800000 {
+				reg = <0x9800000 0x2780000>;
+			};
+
+			user1@0x0bf80000 {
+				reg = <0xbf80000 0x8B80000>;
+			};
+
+			user2@0x14b00000 {
+				reg = <0x14b00000 0x500000>;
+			};
+
+			user3@0x15000000 {
+				reg = <0x15000000 0x200000>;
+			};
+		};
+	};
+};
+
 &msmgpio {
 	pinctrl-0 = <&reset_out_pins>;
 	pinctrl-names = "default";
