@@ -373,6 +373,22 @@
 			qcom,ee = <0>;
 		};
 
+		nand0: nand@1b400000 {
+			compatible = "qcom,ipq806x-nand";
+			reg = <0x1b400000 0x800>;
+			clocks = <&gcc EBI2_CLK>,
+				 <&gcc EBI2_AON_CLK>;
+			clock-names = "core", "aon";
+
+			dmas = <&adm_dma 3>;
+			dma-names = "rxtx";
+			qcom,cmd-crci = <15>;
+			qcom,data-crci = <3>;
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+		};
+
 		amba {
 			compatible = "arm,amba-bus";
 			#address-cells = <1>;
