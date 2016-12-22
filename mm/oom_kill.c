@@ -470,18 +470,9 @@ static bool __oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
 	bool ret = true;
 
 	/*
-	 * We have to make sure to not race with the victim exit path
-	 * and cause premature new oom victim selection:
-	 * __oom_reap_task_mm		exit_mm
-	 *   mmget_not_zero
-	 *				  mmput
-	 *				    atomic_dec_and_test
-	 *				  exit_oom_victim
-	 *				[...]
-	 *				out_of_memory
-	 *				  select_bad_process
-	 *				    # no TIF_MEMDIE task selects new victim
-	 *  unmap_page_range # frees some memory
+	 * Make sure that other threads waiting for oom_lock at
+	 * __alloc_pages_may_oom() are given a chance to call
+	 * get_page_from_freelist() after MMF_OOM_SKIP is set.
 	 */
 	mutex_lock(&oom_lock);
 
