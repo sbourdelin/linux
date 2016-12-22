@@ -194,9 +194,18 @@ i915_vma_compare(struct i915_vma *vma,
 	if (vma->ggtt_view.type != view->type)
 		return vma->ggtt_view.type - view->type;
 
-	return memcmp(&vma->ggtt_view.params,
-		      &view->params,
-		      sizeof(view->params));
+	switch (view->type) {
+	case I915_GGTT_VIEW_ROTATED:
+		return memcmp(&vma->ggtt_view.rotated,
+			      &view->rotated,
+			      sizeof(view->rotated));
+	case I915_GGTT_VIEW_PARTIAL:
+		return memcmp(&vma->ggtt_view.partial,
+			      &view->partial,
+			      sizeof(view->partial));
+	default:
+		return 0;
+	}
 }
 
 int i915_vma_bind(struct i915_vma *vma, enum i915_cache_level cache_level,

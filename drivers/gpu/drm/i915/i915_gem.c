@@ -1865,10 +1865,10 @@ int i915_gem_fault(struct vm_area_struct *area, struct vm_fault *vmf)
 
 		memset(&view, 0, sizeof(view));
 		view.type = I915_GGTT_VIEW_PARTIAL;
-		view.params.partial.offset = rounddown(page_offset, chunk_size);
-		view.params.partial.size =
+		view.partial.offset = rounddown(page_offset, chunk_size);
+		view.partial.size =
 			min_t(unsigned int, chunk_size,
-			      vma_pages(area) - view.params.partial.offset);
+			      vma_pages(area) - view.partial.offset);
 
 		/* If the partial covers the entire object, just create a
 		 * normal VMA.
@@ -1903,7 +1903,7 @@ int i915_gem_fault(struct vm_area_struct *area, struct vm_fault *vmf)
 
 	/* Finally, remap it using the new GTT offset */
 	ret = remap_io_mapping(area,
-			       area->vm_start + (vma->ggtt_view.params.partial.offset << PAGE_SHIFT),
+			       area->vm_start + (vma->ggtt_view.partial.offset << PAGE_SHIFT),
 			       (ggtt->mappable_base + vma->node.start) >> PAGE_SHIFT,
 			       min_t(u64, vma->size, area->vm_end - area->vm_start),
 			       &ggtt->mappable);

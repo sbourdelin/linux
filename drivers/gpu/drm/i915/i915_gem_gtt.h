@@ -164,7 +164,7 @@ struct i915_ggtt_view {
 			unsigned int size;
 		} partial;
 		struct intel_rotation_info rotated;
-	} params;
+	};
 };
 
 extern const struct i915_ggtt_view i915_ggtt_view_normal;
