@@ -518,6 +518,23 @@ static inline void cpumask_copy(struct cpumask *dstp,
 }
 
 /**
+ * cpumask_remap - *dstp = map(old, new)(*srcp)
+ * @dstp: the result
+ * @srcp: the input cpumask
+ * @oldp: the old mask
+ * @newp: the new mask
+ */
+static inline void cpumask_remap(struct cpumask *dstp,
+				 const struct cpumask *srcp,
+				 const struct cpumask *oldp,
+				 const struct cpumask *newp)
+{
+	bitmap_remap(cpumask_bits(dstp), cpumask_bits(srcp),
+		     cpumask_bits(oldp), cpumask_bits(newp),
+		     nr_cpumask_bits);
+}
+
+/**
  * cpumask_any - pick a "random" cpu from *srcp
  * @srcp: the input cpumask
  *
