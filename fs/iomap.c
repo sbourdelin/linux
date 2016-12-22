@@ -844,7 +844,6 @@ iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter, struct iomap_ops *ops,
 	size_t count = iov_iter_count(iter);
 	loff_t pos = iocb->ki_pos, end = iocb->ki_pos + count - 1, ret = 0;
 	unsigned int flags = IOMAP_DIRECT;
-	struct blk_plug plug;
 	struct iomap_dio *dio;
 
 	lockdep_assert_held(&inode->i_rwsem);
