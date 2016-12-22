@@ -40,11 +40,10 @@ phys_addr_t pci_mcfg_lookup(u16 seg, struct resource *bus_res)
 	struct mcfg_entry *e;
 
 	/*
-	 * We expect exact match, unless MCFG entry end bus covers more than
-	 * specified by caller.
+	 * We expect the range in bus_res in the coverage of MCFG bus range.
 	 */
 	list_for_each_entry(e, &pci_mcfg_list, list) {
-		if (e->segment == seg && e->bus_start == bus_res->start &&
+		if (e->segment == seg && e->bus_start <= bus_res->start &&
 		    e->bus_end >= bus_res->end)
 			return e->addr;
 	}
