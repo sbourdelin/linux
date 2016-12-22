@@ -194,7 +194,8 @@
 # define DP_PSR_SETUP_TIME_0                (6 << 1)
 # define DP_PSR_SETUP_TIME_MASK             (7 << 1)
 # define DP_PSR_SETUP_TIME_SHIFT            1
-
+# define DP_PSR2_SU_Y_COORDINATE_REQUIRED   (1 << 4)  /* eDP 1.4a */
+# define DP_PSR2_SU_GRANULARITY_REQUIRED    (1 << 5)  /* eDP 1.4b */
 /*
  * 0x80-0x8f describe downstream port capabilities, but there are two layouts
  * based on whether DP_DETAILED_CAP_INFO_AVAILABLE was set.  If it was not,
@@ -567,6 +568,11 @@
 
 #define DP_RECEIVER_ALPM_STATUS		    0x200b  /* eDP 1.4 */
 # define DP_ALPM_LOCK_TIMEOUT_ERROR	    (1 << 0)
+
+#define DP_DPRX_FEATURE_ENUMERATION_LIST    0x2210
+# define DP_GTC_CAP					(1 << 0)
+# define DP_AV_SYNC_CAP					(1 << 2)
+# define DP_VSC_SDP_EXT_FOR_COLORIMETRY_SUPPORTED	(1 << 3)
 
 /* DP 1.2 Sideband message defines */
 /* peer device type - DP 1.2a Table 2-92 */
