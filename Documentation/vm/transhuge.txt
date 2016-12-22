@@ -121,8 +121,11 @@ to utilise them.
 
 "defer" means that an application will wake kswapd in the background
 to reclaim pages and wake kcompact to compact memory so that THP is
-available in the near future. It's the responsibility of khugepaged
-to then install the THP pages later.
+available in the near future, unless it is for a region where
+madvise(MADV_HUGEPAGE) has been used, in which case direct reclaim will be
+used. Kcompactd will attempt to make hugepages available for allocation in
+the near future and khugepaged will try to collapse existing memory into
+hugepages later.
 
 "madvise" will enter direct reclaim like "always" but only for regions
 that are have used madvise(MADV_HUGEPAGE). This is the default behaviour.
