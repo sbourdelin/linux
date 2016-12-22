@@ -1156,8 +1156,16 @@ static const struct sectioncheck *section_mismatch(
  *   fromsec = text section
  *   refsymname = *.constprop.*
  *
+ * Pattern 6:
+ *   powerpc64 has early boot functions that reference init, but must
+ *   remain close to architectural boot entry address.
+ *   This pattern is identified by
+ *   tosec   = init section
+ *   fromsym = boot_initref__*
+ *
  **/
-static int secref_whitelist(const struct sectioncheck *mismatch,
+static int secref_whitelist(const struct elf_info *elf,
+			    const struct sectioncheck *mismatch,
 			    const char *fromsec, const char *fromsym,
 			    const char *tosec, const char *tosym)
 {
@@ -1193,6 +1201,12 @@ static int secref_whitelist(const struct sectioncheck *mismatch,
 	    match(tosec, init_sections) &&
 	    match(fromsym, optim_symbols))
 		return 0;
+
+	/* Check for pattern 6 */
+	if (elf->hdr->e_machine == EM_PPC64)
+		if (match(tosec, init_sections) &&
+		    !strncmp(fromsym, "boot_initref__", strlen("boot_initref__")))
+			return 0;
 
 	return 1;
 }
@@ -1534,7 +1548,7 @@ static void default_mismatch_handler(const char *modname, struct elf_info *elf,
 	tosym = sym_name(elf, to);
 
 	/* check whitelist - we may ignore it */
-	if (secref_whitelist(mismatch,
+	if (secref_whitelist(elf, mismatch,
 			     fromsec, fromsym, tosec, tosym)) {
 		report_sec_mismatch(modname, mismatch,
 				    fromsec, r->r_offset, fromsym,

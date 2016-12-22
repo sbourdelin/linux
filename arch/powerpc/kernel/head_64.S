@@ -478,7 +478,6 @@ __mmu_off:
  *   
  *   r5 == NULL -> kexec style entry. r3 is a physical pointer to the
  *                 DT block, r4 is a physical pointer to the kernel itself
- *
  */
 __start_initialization_multiplatform:
 	/* Make sure we are running in 64 bits mode */
@@ -498,7 +497,7 @@ __start_initialization_multiplatform:
 	 */
 	cmpldi	cr0,r5,0
 	beq	1f
-	b	__boot_from_prom		/* yes -> prom */
+	b	boot_initref__boot_from_prom	/* yes -> prom */
 1:
 	/* Save parameters */
 	mr	r31,r3
@@ -532,7 +531,7 @@ __start_initialization_multiplatform:
 	b	__after_prom_start
 #endif /* CONFIG_PPC_BOOK3E */
 
-__boot_from_prom:
+boot_initref__boot_from_prom:
 #ifdef CONFIG_PPC_OF_BOOT_TRAMPOLINE
 	/* Save parameters */
 	mr	r31,r3
@@ -662,7 +661,7 @@ p_end: .llong _end - copy_to_here
 	add	r5,r5,r8
 5:	bl	copy_and_flush		/* copy the rest */
 
-9:	b	start_here_multiplatform
+9:	b	boot_initref__start_here_multiplatform
 
 /*
  * Copy routine used to copy the kernel to start at physical address 0
@@ -897,7 +896,7 @@ p_toc:	.llong	__toc_start + 0x8000 - 0b
 /*
  * This is where the main kernel code starts.
  */
-start_here_multiplatform:
+boot_initref__start_here_multiplatform:
 	/* set up the TOC */
 	bl      relative_toc
 	tovirt(r2,r2)
@@ -962,7 +961,7 @@ start_here_multiplatform:
 	mr	r3,r31
 	bl	early_setup		/* also sets r13 and SPRG_PACA */
 
-	LOAD_REG_ADDR(r3, start_here_common)
+	LOAD_REG_ADDR(r3, boot_initref__start_here_common)
 	ld	r4,PACAKMSR(r13)
 	mtspr	SPRN_SRR0,r3
 	mtspr	SPRN_SRR1,r4
@@ -970,8 +969,7 @@ start_here_multiplatform:
 	b	.	/* prevent speculative execution */
 
 	/* This is where all platforms converge execution */
-
-start_here_common:
+boot_initref__start_here_common:
 	/* relocation is on at this point */
 	std	r1,PACAKSAVE(r13)
 
