@@ -219,7 +219,7 @@ int phy_init(struct phy *phy)
 {
 	int ret;
 
-	if (!phy)
+	if (!phy || !phy->ops->init)
 		return 0;
 
 	ret = phy_pm_runtime_get_sync(phy);
@@ -248,7 +248,7 @@ int phy_exit(struct phy *phy)
 {
 	int ret;
 
-	if (!phy)
+	if (!phy || !phy->ops->exit)
 		return 0;
 
 	ret = phy_pm_runtime_get_sync(phy);
@@ -277,7 +277,7 @@ int phy_power_on(struct phy *phy)
 {
 	int ret = 0;
 
-	if (!phy)
+	if (!phy || !phy->ops->power_on)
 		goto out;
 
 	if (phy->pwr) {
@@ -319,7 +319,7 @@ int phy_power_off(struct phy *phy)
 {
 	int ret;
 
-	if (!phy)
+	if (!phy || !phy->ops->power_off)
 		return 0;
 
 	mutex_lock(&phy->mutex);
