@@ -20,3 +20,19 @@ echo 1 > /sys/kernel/config/target/qla2xxx/21:00:00:24:ff:27:8f:ae/tpgt_1/attrib
 
 Disable jamming on host 4
 echo 0 > /sys/kernel/config/target/qla2xxx/21:00:00:24:ff:27:8f:ae/tpgt_1/attrib/jam_host
+
+New feature added with a new attribute called jam_data.
+
+Setting a boolean of 1 for jam_data will allow the allow the dropping of data-only SCSI 
+ commands but allow TUR commands to pass.
+Note that for this to work jam_host needs to be set to 0
+
+This has proven very useful for testing Low Level driver response.
+
+Enable host 4 for only data commands to be jammed
+echo 0 > /sys/kernel/config/target/qla2xxx/21:00:00:24:ff:27:8f:ae/tpgt_1/attrib/jam_host
+echo 1 > /sys/kernel/config/target/qla2xxx/21:00:00:24:ff:27:8f:ae/tpgt_1/attrib/jam_data
+
+Disable jamming on host 4
+echo 0 > /sys/kernel/config/target/qla2xxx/21:00:00:24:ff:27:8f:ae/tpgt_1/attrib/jam_host
+echo 0 > /sys/kernel/config/target/qla2xxx/21:00:00:24:ff:27:8f:ae/tpgt_1/attrib/jam_data

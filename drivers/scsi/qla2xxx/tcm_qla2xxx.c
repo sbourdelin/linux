@@ -473,6 +473,10 @@ static int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 		/* return, and dont run target_submit_cmd,discarding command */
 		return 0;
 	}
+	if (unlikely(tpg->tpg_attrib.jam_data && (cdb[0]==0x08 || cdb[0]==0x0A || cdb[0]==0x28 || cdb[0]==0x2A))) {
+                /* return, and dont run target_submit_cmd,discarding command if not TUR*/
+                return 0;
+        }
 #endif
 
 	cmd->vha->tgt_counters.qla_core_sbt_cmd++;
@@ -827,6 +831,7 @@ DEF_QLA_TPG_ATTRIB(prod_mode_write_protect);
 DEF_QLA_TPG_ATTRIB(demo_mode_login_only);
 #ifdef CONFIG_TCM_QLA2XXX_DEBUG
 DEF_QLA_TPG_ATTRIB(jam_host);
+DEF_QLA_TPG_ATTRIB(jam_data);
 #endif
 
 static struct configfs_attribute *tcm_qla2xxx_tpg_attrib_attrs[] = {
@@ -837,6 +842,7 @@ static struct configfs_attribute *tcm_qla2xxx_tpg_attrib_attrs[] = {
 	&tcm_qla2xxx_tpg_attrib_attr_demo_mode_login_only,
 #ifdef CONFIG_TCM_QLA2XXX_DEBUG
 	&tcm_qla2xxx_tpg_attrib_attr_jam_host,
+	&tcm_qla2xxx_tpg_attrib_attr_jam_data,
 #endif
 	NULL,
 };
@@ -1011,6 +1017,7 @@ static struct se_portal_group *tcm_qla2xxx_make_tpg(
 	tpg->tpg_attrib.cache_dynamic_acls = 1;
 	tpg->tpg_attrib.demo_mode_login_only = 1;
 	tpg->tpg_attrib.jam_host = 0;
+	tpg->tpg_attrib.jam_data = 0;
 
 	ret = core_tpg_register(wwn, &tpg->se_tpg, SCSI_PROTOCOL_FCP);
 	if (ret < 0) {

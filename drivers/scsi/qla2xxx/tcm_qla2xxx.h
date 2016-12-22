@@ -35,6 +35,7 @@ struct tcm_qla2xxx_tpg_attrib {
 	int demo_mode_login_only;
 	int fabric_prot_type;
 	int jam_host;
+	int jam_data;
 };
 
 struct tcm_qla2xxx_tpg {
