@@ -37,8 +37,8 @@ SECTIONS
 	}
 
 #ifdef CONFIG_ARC_HAS_ICCM
-	.text.arcfp : {
-		*(.text.arcfp)
+	.text..arcfp : {
+		*(.text..arcfp)
 		. = ALIGN(CONFIG_ARC_ICCM_SZ * 1024);
 	}
 #endif
@@ -151,8 +151,8 @@ SECTIONS
 #ifdef CONFIG_ARC_HAS_DCCM
 	. = CONFIG_ARC_DCCM_BASE;
 	__arc_dccm_base = .;
-	.data.arcfp : {
-		*(.data.arcfp)
+	.data..arcfp : {
+		*(.data..arcfp)
 	}
 	. = ALIGN(CONFIG_ARC_DCCM_SZ * 1024);
 #endif
