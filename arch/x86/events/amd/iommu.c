@@ -258,21 +258,21 @@ static void perf_iommu_enable_event(struct perf_event *ev)
 	amd_iommu_pc_set_reg(0, devid, bank, cntr,
 			     IOMMU_PC_COUNTER_SRC_REG, &reg);
 
-	reg = 0ULL | devid | (_GET_DEVID_MASK(ev) << 32);
+	reg = devid | (_GET_DEVID_MASK(ev) << 32);
 	if (reg)
-		reg |= (1UL << 31);
+		reg |= BIT(31);
 	amd_iommu_pc_set_reg(0, devid, bank, cntr,
 			     IOMMU_PC_DEVID_MATCH_REG, &reg);
 
-	reg = 0ULL | _GET_PASID(ev) | (_GET_PASID_MASK(ev) << 32);
+	reg = _GET_PASID(ev) | (_GET_PASID_MASK(ev) << 32);
 	if (reg)
-		reg |= (1UL << 31);
+		reg |= BIT(31);
 	amd_iommu_pc_set_reg(0, devid, bank, cntr,
 			     IOMMU_PC_PASID_MATCH_REG, &reg);
 
-	reg = 0ULL | _GET_DOMID(ev) | (_GET_DOMID_MASK(ev) << 32);
+	reg = _GET_DOMID(ev) | (_GET_DOMID_MASK(ev) << 32);
 	if (reg)
-		reg |= (1UL << 31);
+		reg |= BIT(31);
 	amd_iommu_pc_set_reg(0, devid, bank, cntr,
 			     IOMMU_PC_DOMID_MATCH_REG, &reg);
 }
