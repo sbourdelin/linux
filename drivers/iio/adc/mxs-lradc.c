@@ -1702,7 +1702,7 @@ static int mxs_lradc_probe(struct platform_device *pdev)
 	ret = iio_device_register(iio);
 	if (ret) {
 		dev_err(dev, "Failed to register IIO device\n");
-		return ret;
+		goto err_ts_register;
 	}
 
 	return 0;
