@@ -7629,7 +7629,10 @@ static void nop_init_clock_gating(struct drm_i915_private *dev_priv)
  */
 void intel_init_clock_gating_hooks(struct drm_i915_private *dev_priv)
 {
-	if (IS_SKYLAKE(dev_priv))
+
+	if (INTEL_INFO(dev_priv)->num_pipes == 0)
+		dev_priv->display.init_clock_gating = nop_init_clock_gating;
+	else if (IS_SKYLAKE(dev_priv))
 		dev_priv->display.init_clock_gating = skylake_init_clock_gating;
 	else if (IS_KABYLAKE(dev_priv))
 		dev_priv->display.init_clock_gating = kabylake_init_clock_gating;
@@ -7670,6 +7673,9 @@ void intel_init_clock_gating_hooks(struct drm_i915_private *dev_priv)
 /* Set up chip specific power management-related functions */
 void intel_init_pm(struct drm_i915_private *dev_priv)
 {
+	if (INTEL_INFO(dev_priv)->num_pipes == 0)
+		return;
+
 	intel_fbc_init(dev_priv);
 
 	/* For cxsr */

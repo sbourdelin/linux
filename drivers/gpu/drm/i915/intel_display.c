@@ -15919,6 +15919,9 @@ static const struct drm_mode_config_funcs intel_mode_funcs = {
  */
 void intel_init_display_hooks(struct drm_i915_private *dev_priv)
 {
+	if (INTEL_INFO(dev_priv)->num_pipes == 0)
+		return;
+
 	if (INTEL_INFO(dev_priv)->gen >= 9) {
 		dev_priv->display.get_pipe_config = haswell_get_pipe_config;
 		dev_priv->display.get_initial_plane_config =
@@ -16300,6 +16303,9 @@ static void i915_disable_vga(struct drm_i915_private *dev_priv)
 void intel_modeset_init_hw(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
+
+	if (INTEL_INFO(dev_priv)->num_pipes == 0)
+		return;
 
 	intel_update_cdclk(dev_priv);
 
