@@ -138,11 +138,20 @@ static inline int nvmem_device_write(struct nvmem_device *nvmem,
 #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
 struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
 				     const char *name);
+struct nvmem_cell *of_nvmem_cell_get_by_index(struct device_node *np,
+					      int index);
 struct nvmem_device *of_nvmem_device_get(struct device_node *np,
 					 const char *name);
 #else
+static inline
+struct nvmem_cell *of_nvmem_cell_get_by_index(struct device_node *np,
+					      int index)
+{
+	return ERR_PTR(-ENOSYS);
+}
+
 static inline struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
-				     const char *name)
+						   const char *name)
 {
 	return ERR_PTR(-ENOSYS);
 }

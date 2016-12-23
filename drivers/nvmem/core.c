@@ -743,25 +743,24 @@ static struct nvmem_cell *nvmem_cell_get_from_list(const char *cell_id)
 
 #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
 /**
- * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
+ * of_nvmem_cell_get_by_index() - Get a nvmem cell from given device node and
+				  cell index
  *
  * @dev node: Device tree node that uses the nvmem cell
- * @id: nvmem cell name from nvmem-cell-names property.
+ * @index: index of nvmem cell
  *
  * Return: Will be an ERR_PTR() on error or a valid pointer
  * to a struct nvmem_cell.  The nvmem_cell will be freed by the
  * nvmem_cell_put().
  */
-struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
-					    const char *name)
+struct nvmem_cell *of_nvmem_cell_get_by_index(struct device_node *np,
+							int index)
 {
 	struct device_node *cell_np, *nvmem_np;
 	struct nvmem_cell *cell;
 	struct nvmem_device *nvmem;
 	const __be32 *addr;
-	int rval, len, index;
-
-	index = of_property_match_string(np, "nvmem-cell-names", name);
+	int rval, len;
 
 	cell_np = of_parse_phandle(np, "nvmem-cells", index);
 	if (!cell_np)
@@ -823,6 +822,28 @@ err_mem:
 	__nvmem_device_put(nvmem);
 
 	return ERR_PTR(rval);
+}
+EXPORT_SYMBOL_GPL(of_nvmem_cell_get_by_index);
+
+/**
+ * of_nvmem_cell_get() - Get a nvmem cell from given device node and
+ *				cell id.
+ *
+ * @dev node: Device tree node that uses the nvmem cell
+ * @id: nvmem cell name from nvmem-cell-names property
+ *
+ * Return: Will be an ERR_PTR() on error or a valid pointer
+ * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+ * nvmem_cell_put().
+ */
+struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+					    const char *id)
+{
+	int index;
+
+	index = of_property_match_string(np, "nvmem-cell-names", id);
+
+	return of_nvmem_cell_get_by_index(np, index);
 }
 EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
 #endif
