@@ -13,6 +13,7 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/qed/qed_fcoe_if.h>
 #include "qed_hsi.h"
 
 struct qed_mcp_link_speed_params {
