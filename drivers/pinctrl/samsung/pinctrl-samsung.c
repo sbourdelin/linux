@@ -356,7 +356,7 @@ static void pin_to_reg_bank(struct samsung_pinctrl_drv_data *drvdata,
 
 /* enable or disable a pinmux function */
 static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
-					unsigned group, bool enable)
+					unsigned group)
 {
 	struct samsung_pinctrl_drv_data *drvdata;
 	const struct samsung_pin_bank_type *type;
@@ -386,8 +386,7 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
 
 	data = readl(reg + type->reg_offset[PINCFG_TYPE_FUNC]);
 	data &= ~(mask << shift);
-	if (enable)
-		data |= func->val << shift;
+	data |= func->val << shift;
 	writel(data, reg + type->reg_offset[PINCFG_TYPE_FUNC]);
 
 	spin_unlock_irqrestore(&bank->slock, flags);
@@ -398,7 +397,7 @@ static int samsung_pinmux_set_mux(struct pinctrl_dev *pctldev,
 				  unsigned selector,
 				  unsigned group)
 {
-	samsung_pinmux_setup(pctldev, selector, group, true);
+	samsung_pinmux_setup(pctldev, selector, group);
 	return 0;
 }
 
