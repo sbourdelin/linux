@@ -12,11 +12,7 @@
 
 #include "sha256.h"
 #include "../boot/string.h"
-
-struct sha_region {
-	unsigned long start;
-	unsigned long len;
-};
+#include <asm/kexec-bzimage64.h>
 
 unsigned long backup_dest = 0;
 unsigned long backup_src = 0;
@@ -24,7 +20,7 @@ unsigned long backup_sz = 0;
 
 u8 sha256_digest[SHA256_DIGEST_SIZE] = { 0 };
 
-struct sha_region sha_regions[16] = {};
+struct sha_region sha_regions[16] = { { 0, 0 } };
 
 /*
  * On x86, second kernel requries first 640K of memory to boot. Copy
