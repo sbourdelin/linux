@@ -24,6 +24,36 @@ static DEFINE_TIMER(poll_spurious_irq_timer, poll_spurious_irqs, 0, 0);
 static int irq_poll_cpu;
 static atomic_t irq_poll_active;
 
+#ifdef CONFIG_PREEMPT_RT_FULL
+#include <linux/work-simple.h>
+
+static bool mod_timer_work_ready __read_mostly;
+static struct swork_event mod_timer_work;
+
+static void __mod_timer_work(struct swork_event *event)
+{
+	mod_timer(&poll_spurious_irq_timer,
+		  jiffies + POLL_SPURIOUS_IRQ_INTERVAL);
+}
+
+static int __init mod_timer_work_init(void)
+{
+	int err;
+
+	err = swork_get();
+	if(err) {
+		printk(KERN_ERR "mod_timer work init failed.\n");
+		return err;
+	}
+
+	INIT_SWORK(&mod_timer_work, __mod_timer_work);
+	mod_timer_work_ready = true;
+	return 0;
+}
+
+early_initcall(mod_timer_work_init);
+#endif /* CONFIG_PREEMPT_RT_FULL */
+
 /*
  * We wait here for a poller to finish.
  *
@@ -420,8 +450,17 @@ void note_interrupt(struct irq_desc *desc, irqreturn_t action_ret)
 		desc->depth++;
 		irq_disable(desc);
 
+#ifdef CONFIG_PREEMPT_RT_FULL
+		/*
+		 * Avoid calling mod_timer directly in interrupt
+		 * contex here. Let simple workqueue do it.
+		 */
+		if(mod_timer_work_ready)
+			swork_queue(&mod_timer_work);
+#else
 		mod_timer(&poll_spurious_irq_timer,
 			  jiffies + POLL_SPURIOUS_IRQ_INTERVAL);
+#endif /* CONFIG_PREEMPT_RT_FULL */
 	}
 	desc->irqs_unhandled = 0;
 }
