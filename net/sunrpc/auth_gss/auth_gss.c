@@ -57,6 +57,8 @@
 #include "../netns.h"
 
 static int gss3_create_label(struct rpc_cred *cred);
+static struct gss3_assert *gss3_use_child_handle(struct gss_cl_ctx *ctx);
+static struct gss3_assert *gss3_match_label(struct gss3_assert_list *in);
 
 static const struct rpc_authops authgss_ops;
 
@@ -206,6 +208,8 @@ gss_alloc_context(void)
 		ctx->gc_seq = 1;	/* NetApp 6.4R1 doesn't accept seq. no. 0 */
 		spin_lock_init(&ctx->gc_seq_lock);
 		atomic_set(&ctx->count,1);
+		INIT_LIST_HEAD(&ctx->gc_alist.assert_list);
+		spin_lock_init(&ctx->gc_alist.assert_lock);
 	}
 	return ctx;
 }
@@ -1452,6 +1456,7 @@ gss_match(struct auth_cred *acred, struct rpc_cred *rc, int flags)
 {
 	struct gss_cred *gss_cred = container_of(rc, struct gss_cred, gc_base);
 	struct gss_cl_ctx *ctx;
+	struct gss3_assert *g3a;
 	int ret;
 
 	if (test_bit(RPCAUTH_CRED_NEW, &rc->cr_flags))
@@ -1489,6 +1494,13 @@ check_expire:
 		/* tell NFS layer that key will expire soon */
 		set_bit(RPC_CRED_KEY_EXPIRE_SOON, &acred->ac_flags);
 	}
+	if (ret) {
+		ctx = gss_cred_get_ctx(rc);
+		g3a = gss3_match_label(&ctx->gc_alist);
+		if (!g3a)
+			gss3_create_label(rc);
+		gss_put_ctx(ctx);
+	}
 	return ret;
 }
 
@@ -1509,6 +1521,7 @@ gss_marshal(struct rpc_task *task, __be32 *p)
 	struct xdr_netobj mic;
 	struct kvec	iov;
 	struct xdr_buf	verf_buf;
+	struct gss3_assert *g3a;
 
 	dprintk("RPC: %5u %s\n", task->tk_pid, __func__);
 
@@ -1523,7 +1536,11 @@ gss_marshal(struct rpc_task *task, __be32 *p)
 	*p++ = htonl((u32)ctx->gc_proc);
 	*p++ = htonl((u32)req->rq_seqno);
 	*p++ = htonl((u32)gss_cred->gc_service);
-	p = xdr_encode_netobj(p, &ctx->gc_wire_ctx);
+	g3a = gss3_use_child_handle(ctx);
+	if (g3a)
+		p = xdr_encode_netobj(p, &g3a->gss3_handle);
+	else
+		p = xdr_encode_netobj(p, &ctx->gc_wire_ctx);
 	*cred_len = htonl((p - (cred_len + 1)) << 2);
 
 	/* We compute the checksum for the verifier over the xdr-encoded bytes
@@ -1589,6 +1606,73 @@ static int gss_cred_is_negative_entry(struct rpc_cred *cred)
 			return 1;
 	}
 	return 0;
+}
+
+/**
+ * The gss3_handle and gss3_assertions are allocated in gss3_dec_label
+ */
+static struct gss3_assert *
+gss3_alloc_init_assertion(struct gss3_create_res *cres)
+{
+	struct gss3_assert *ret;
+
+	ret = kzalloc(sizeof(*ret), GFP_NOFS);
+	if (!ret)
+		return ERR_PTR(-ENOMEM);
+
+	INIT_LIST_HEAD(&ret->gss3_list);
+	ret->gss3_handle.len = cres->cr_hlen;
+	ret->gss3_handle.data = cres->cr_handle;
+	ret->gss3_num = cres->cr_num;
+	ret->gss3_assertion = cres->cr_assertions;
+	return ret;
+}
+
+void
+gss3_insert_assertion(struct gss3_assert_list *alist, struct gss3_assert *g3a)
+{
+	spin_lock(&alist->assert_lock);
+	/* list_add_tail_rcu(new,head) inserts new before head */
+	list_add_tail_rcu(&g3a->gss3_list, &alist->assert_list);
+	spin_unlock(&alist->assert_lock);
+}
+
+static struct gss3_assert *
+gss3_match_label(struct gss3_assert_list *in)
+{
+	struct gss3_assert *found;
+	struct xdr_netobj label;
+
+	/* Need a Full Mode stanza in /etc/selinux/config to check */
+	if (!selinux_is_enabled())
+		return NULL;
+
+	/* grab the current threads subject label */
+	security_current_sid_to_context((char **)&label.data, &label.len);
+	rcu_read_lock();
+	list_for_each_entry_rcu(found, &in->assert_list, gss3_list) {
+		struct gss3_label *gl;
+
+		if (found->gss3_assertion->au_type != GSS3_LABEL)
+			continue;
+		gl = &found->gss3_assertion->u.au_label;
+		if (netobj_equal(&gl->la_label, &label))
+			goto out;
+	}
+	found = NULL;
+out:
+	rcu_read_lock();
+	return found;
+}
+
+static struct gss3_assert *
+gss3_use_child_handle(struct gss_cl_ctx *ctx)
+{
+	struct gss3_assert *g3a = NULL;
+
+	if (ctx->gc_v == RPC_GSS3_VERSION && ctx->gc_proc == RPC_GSS_PROC_DATA)
+		g3a = gss3_match_label(&ctx->gc_alist);
+	return g3a;
 }
 
 /**
@@ -1686,10 +1770,6 @@ gss3_dec_label(struct rpc_rqst *req, struct xdr_stream *xdr,
 	gl->la_label.data = kmemdup(p, gl->la_label.len, GFP_KERNEL);
 	if (!gl->la_label.data)
 		goto out_free_assert;
-	/**
-	 * Note: need to store the assertion with the child handle
-	 * in the gss context cache.
-	 */
 
 	g3cr->cr_assertions = g3a;
 
@@ -1806,6 +1886,7 @@ gss3_create_label(struct rpc_cred *cred)
 	};
 	struct gss3_create_args *cargs = NULL;
 	struct gss3_label *gl;
+	struct gss3_assert *g3a = NULL;
 	int ret = -EINVAL;
 
 	if (!ctx)
@@ -1855,6 +1936,13 @@ gss3_create_label(struct rpc_cred *cred)
 		goto out_free_assert;
 	}
 	rpc_put_task(task);
+
+	g3a = gss3_alloc_init_assertion(&cres);
+	if (IS_ERR(g3a)) {
+		ret = PTR_ERR(task);
+		goto out_free_assert;
+	}
+	gss3_insert_assertion(&ctx->gc_alist, g3a);
 
 out_free_assert:
 	kfree(cargs->ca_assertions);
@@ -1911,6 +1999,7 @@ gss3_reply_verifier(struct rpc_cred *cred, struct gss_cl_ctx *ctx,
 {
 	struct gss_cred *g_cred = container_of(cred, struct gss_cred, gc_base);
 	void	*gss3_buf = NULL;
+	struct gss3_assert *g3a;
 	__be32 *crlen, *ptr = NULL;
 	int len;
 
@@ -1937,7 +2026,11 @@ gss3_reply_verifier(struct rpc_cred *cred, struct gss_cl_ctx *ctx,
 	*ptr++ = htonl(ctx->gc_proc);
 	*ptr++ = *seq;
 	*ptr++ = htonl(g_cred->gc_service);
-	ptr = xdr_encode_netobj(ptr, &ctx->gc_wire_ctx);
+	g3a = gss3_use_child_handle(ctx);
+	if (g3a)
+		ptr = xdr_encode_netobj(ptr, &g3a->gss3_handle);
+	else
+		ptr = xdr_encode_netobj(ptr, &ctx->gc_wire_ctx);
 
 	/* backfill cred length */
 	*crlen = htonl((ptr - (crlen + 1)) << 2);

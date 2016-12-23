@@ -63,6 +63,11 @@ struct rpc_gss_init_res {
 	struct xdr_netobj	gr_token;	/* token */
 };
 
+struct gss3_assert_list {
+	struct list_head	assert_list;
+	spinlock_t		assert_lock;
+};
+
 /* The gss_cl_ctx struct holds all the information the rpcsec_gss client
  * code needs to know about a single security context.  In particular,
  * gc_gss_ctx is the context handle that is used to do gss-api calls, while
@@ -80,6 +85,7 @@ struct gss_cl_ctx {
 	struct xdr_netobj	gc_acceptor;
 	u32			gc_win;
 	unsigned long		gc_expiry;
+	struct gss3_assert_list	gc_alist;
 	struct rcu_head		gc_rcu;
 };
 
