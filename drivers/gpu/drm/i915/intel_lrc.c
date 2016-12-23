@@ -1450,7 +1450,7 @@ static void reset_common_ring(struct intel_engine_cs *engine,
 
 	/* Catch up with any missed context-switch interrupts */
 	I915_WRITE(RING_CONTEXT_STATUS_PTR(engine), _MASKED_FIELD(0xffff, 0));
-	if (request->ctx != port[0].request->ctx) {
+	if (!execlists_elsp_idle(engine) && request->ctx != port[0].request->ctx) {
 		i915_gem_request_put(port[0].request);
 		port[0] = port[1];
 		memset(&port[1], 0, sizeof(port[1]));
