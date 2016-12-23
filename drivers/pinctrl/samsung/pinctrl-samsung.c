@@ -28,6 +28,7 @@
 #include <linux/gpio.h>
 #include <linux/irqdomain.h>
 #include <linux/of_device.h>
+#include <linux/pm_runtime.h>
 #include <linux/spinlock.h>
 
 #include "../core.h"
@@ -378,6 +379,17 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
 		shift -= 32;
 		reg += 4;
 	}
+	if (func->rpm_active) {
+		if (!(bank->rpm_map & (1 << pin_offset))) {
+			bank->rpm_map |= 1 << pin_offset;
+			pm_runtime_get_sync(drvdata->dev);
+		}
+	} else {
+		if ((bank->rpm_map & (1 << pin_offset))) {
+			bank->rpm_map &= ~(1 << pin_offset);
+			pm_runtime_put(drvdata->dev);
+		}
+	}
 
 	spin_lock_irqsave(&bank->slock, flags);
 
@@ -427,6 +439,8 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
 	if (cfg_type >= PINCFG_TYPE_NUM || !type->fld_width[cfg_type])
 		return -EINVAL;
 
+	pm_runtime_get_sync(drvdata->dev);
+
 	width = type->fld_width[cfg_type];
 	cfg_reg = type->reg_offset[cfg_type];
 
@@ -448,6 +462,8 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
 	}
 
 	spin_unlock_irqrestore(&bank->slock, flags);
+
+	pm_runtime_put(drvdata->dev);
 
 	return 0;
 }
@@ -1096,6 +1112,8 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
 		ctrl->retention_init(drvdata);
 
 	platform_set_drvdata(pdev, drvdata);
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
 
 	return 0;
 }
@@ -1242,8 +1260,10 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
 MODULE_DEVICE_TABLE(of, samsung_pinctrl_dt_match);
 
 static const struct dev_pm_ops samsung_pinctrl_pm_ops = {
-	SET_LATE_SYSTEM_SLEEP_PM_OPS(samsung_pinctrl_suspend,
-				     samsung_pinctrl_resume)
+	SET_RUNTIME_PM_OPS(samsung_pinctrl_suspend,
+			   samsung_pinctrl_resume, NULL)
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+				     pm_runtime_force_resume)
 };
 
 static struct platform_driver samsung_pinctrl_driver = {
