@@ -2501,6 +2501,26 @@ static int rpcproc_decode_null(void *rqstp, struct xdr_stream *xdr, void *obj)
 	return 0;
 }
 
+struct rpc_task *
+rpc_call_null_payload(struct rpc_clnt *clnt, struct rpc_cred *cred, int flags,
+		      void *argp, void *resp, struct rpc_procinfo *pinfo)
+{
+	struct rpc_message msg = {
+		.rpc_proc = pinfo,
+		.rpc_argp = argp,
+		.rpc_resp = resp,
+		.rpc_cred = cred,
+	};
+	struct rpc_task_setup task_setup_data = {
+		.rpc_client = clnt,
+		.rpc_message = &msg,
+		.callback_ops = &rpc_default_ops,
+		.flags = flags,
+	};
+	return rpc_run_task(&task_setup_data);
+}
+EXPORT_SYMBOL_GPL(rpc_call_null_payload);
+
 static struct rpc_procinfo rpcproc_null = {
 	.p_encode = rpcproc_encode_null,
 	.p_decode = rpcproc_decode_null,

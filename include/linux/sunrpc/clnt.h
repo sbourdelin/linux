@@ -175,6 +175,9 @@ int		rpc_call_sync(struct rpc_clnt *clnt,
 			      const struct rpc_message *msg, int flags);
 struct rpc_task *rpc_call_null(struct rpc_clnt *clnt, struct rpc_cred *cred,
 			       int flags);
+struct rpc_task *rpc_call_null_payload(struct rpc_clnt *clnt,
+				struct rpc_cred *cred, int flags, void *argp,
+				void *resp, struct rpc_procinfo *pinfo);
 int		rpc_restart_call_prepare(struct rpc_task *);
 int		rpc_restart_call(struct rpc_task *);
 void		rpc_setbufsize(struct rpc_clnt *, unsigned int, unsigned int);
