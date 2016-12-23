@@ -1052,25 +1052,38 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
 	if (chan->has_sg) {
 		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
 				tail_segment->phys);
+		list_splice_tail_init(&chan->pending_list, &chan->active_list);
+		chan->desc_pendingcount = 0;
 	} else {
 		struct xilinx_vdma_tx_segment *segment, *last = NULL;
-		int i = 0;
+		int i = 0, j = 0;
 
 		if (chan->desc_submitcount < chan->num_frms)
 			i = chan->desc_submitcount;
 
-		list_for_each_entry(segment, &desc->segments, node) {
-			if (chan->ext_addr)
-				vdma_desc_write_64(chan,
-					XILINX_VDMA_REG_START_ADDRESS_64(i++),
-					segment->hw.buf_addr,
-					segment->hw.buf_addr_msb);
-			else
-				vdma_desc_write(chan,
-					XILINX_VDMA_REG_START_ADDRESS(i++),
-					segment->hw.buf_addr);
+		for (j = 0; j < chan->num_frms; ) {
+			list_for_each_entry(segment, &desc->segments, node) {
+				if (chan->ext_addr)
+					vdma_desc_write_64(chan,
+					  XILINX_VDMA_REG_START_ADDRESS_64(i++),
+					  segment->hw.buf_addr,
+					  segment->hw.buf_addr_msb);
+				else
+					vdma_desc_write(chan,
+					    XILINX_VDMA_REG_START_ADDRESS(i++),
+					    segment->hw.buf_addr);
 
-			last = segment;
+				last = segment;
+			}
+			list_del(&desc->node);
+			list_add_tail(&desc->node, &chan->active_list);
+			j++;
+			if (list_empty(&chan->pending_list) ||
+			    (i == chan->num_frms))
+				break;
+			desc = list_first_entry(&chan->pending_list,
+						struct xilinx_dma_tx_descriptor,
+						node);
 		}
 
 		if (!last)
@@ -1081,20 +1094,14 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
 		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
 				last->hw.stride);
 		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last->hw.vsize);
+
+		chan->desc_submitcount += j;
+		chan->desc_pendingcount -= j;
+		if (chan->desc_submitcount == chan->num_frms)
+			chan->desc_submitcount = 0;
 	}
 
 	chan->idle = false;
-	if (!chan->has_sg) {
-		list_del(&desc->node);
-		list_add_tail(&desc->node, &chan->active_list);
-		chan->desc_submitcount++;
-		chan->desc_pendingcount--;
-		if (chan->desc_submitcount == chan->num_frms)
-			chan->desc_submitcount = 0;
-	} else {
-		list_splice_tail_init(&chan->pending_list, &chan->active_list);
-		chan->desc_pendingcount = 0;
-	}
 }
 
 /**
@@ -1342,6 +1349,7 @@ static int xilinx_dma_reset(struct xilinx_dma_chan *chan)
 
 	chan->err = false;
 	chan->idle = true;
+	chan->desc_submitcount = 0;
 
 	return err;
 }
