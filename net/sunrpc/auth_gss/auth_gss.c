@@ -2320,7 +2320,8 @@ gss_wrap_req(struct rpc_task *task,
 	int             status = -EIO;
 
 	dprintk("RPC: %5u %s\n", task->tk_pid, __func__);
-	if (ctx->gc_proc != RPC_GSS_PROC_DATA) {
+	if (!(ctx->gc_proc == RPC_GSS_PROC_DATA  ||
+	      ctx->gc_proc == RPC_GSS_PROC_CREATE)) {
 		/* The spec seems a little ambiguous here, but I think that not
 		 * wrapping context destruction requests makes the most sense.
 		 */
@@ -2439,7 +2440,8 @@ gss_unwrap_resp(struct rpc_task *task,
 	int		savedlen = head->iov_len;
 	int             status = -EIO;
 
-	if (ctx->gc_proc != RPC_GSS_PROC_DATA)
+	if (!(ctx->gc_proc == RPC_GSS_PROC_DATA  ||
+	      ctx->gc_proc == RPC_GSS_PROC_CREATE))
 		goto out_decode;
 	switch (gss_cred->gc_service) {
 	case RPC_GSS_SVC_NONE:
