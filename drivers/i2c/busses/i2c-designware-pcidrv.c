@@ -228,8 +228,10 @@ static int i2c_dw_pci_probe(struct pci_dev *pdev,
 	}
 
 	dev = devm_kzalloc(&pdev->dev, sizeof(struct dw_i2c_dev), GFP_KERNEL);
-	if (!dev)
-		return -ENOMEM;
+	if (!dev) {
+		r = -ENOMEM;
+		goto error;
+	}
 
 	dev->clk = NULL;
 	dev->controller = controller;
@@ -241,7 +243,7 @@ static int i2c_dw_pci_probe(struct pci_dev *pdev,
 	if (controller->setup) {
 		r = controller->setup(pdev, controller);
 		if (r)
-			return r;
+			goto error;
 	}
 
 	dev->functionality = controller->functionality |
@@ -270,7 +272,7 @@ static int i2c_dw_pci_probe(struct pci_dev *pdev,
 
 	r = i2c_dw_probe(dev);
 	if (r)
-		return r;
+		goto error;
 
 	pm_runtime_set_autosuspend_delay(&pdev->dev, 1000);
 	pm_runtime_use_autosuspend(&pdev->dev);
@@ -278,6 +280,8 @@ static int i2c_dw_pci_probe(struct pci_dev *pdev,
 	pm_runtime_allow(&pdev->dev);
 
 	return 0;
+error:
+	pcim_iounmap_regions(pdev, 1 << 0);
 }
 
 static void i2c_dw_pci_remove(struct pci_dev *pdev)
