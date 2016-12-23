@@ -321,6 +321,7 @@
 			compatible = "samsung,exynos5420-pinctrl";
 			reg = <0x13400000 0x1000>;
 			interrupts = <0 45 IRQ_TYPE_LEVEL_HIGH>;
+			samsung,pmu-syscon = <&pmu_system_controller>;
 
 			wakeup-interrupt-controller {
 				compatible = "samsung,exynos4210-wakeup-eint";
@@ -333,24 +334,28 @@
 			compatible = "samsung,exynos5420-pinctrl";
 			reg = <0x13410000 0x1000>;
 			interrupts = <0 78 IRQ_TYPE_LEVEL_HIGH>;
+			samsung,pmu-syscon = <&pmu_system_controller>;
 		};
 
 		pinctrl_2: pinctrl@14000000 {
 			compatible = "samsung,exynos5420-pinctrl";
 			reg = <0x14000000 0x1000>;
 			interrupts = <0 46 IRQ_TYPE_LEVEL_HIGH>;
+			samsung,pmu-syscon = <&pmu_system_controller>;
 		};
 
 		pinctrl_3: pinctrl@14010000 {
 			compatible = "samsung,exynos5420-pinctrl";
 			reg = <0x14010000 0x1000>;
 			interrupts = <0 50 IRQ_TYPE_LEVEL_HIGH>;
+			samsung,pmu-syscon = <&pmu_system_controller>;
 		};
 
 		pinctrl_4: pinctrl@03860000 {
 			compatible = "samsung,exynos5420-pinctrl";
 			reg = <0x03860000 0x1000>;
 			interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
+			samsung,pmu-syscon = <&pmu_system_controller>;
 		};
 
 		amba {

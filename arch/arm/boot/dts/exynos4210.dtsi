@@ -128,12 +128,14 @@
 		compatible = "samsung,exynos4210-pinctrl";
 		reg = <0x11400000 0x1000>;
 		interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+		samsung,pmu-syscon = <&pmu_system_controller>;
 	};
 
 	pinctrl_1: pinctrl@11000000 {
 		compatible = "samsung,exynos4210-pinctrl";
 		reg = <0x11000000 0x1000>;
 		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+		samsung,pmu-syscon = <&pmu_system_controller>;
 
 		wakup_eint: wakeup-interrupt-controller {
 			compatible = "samsung,exynos4210-wakeup-eint";
@@ -145,6 +147,7 @@
 	pinctrl_2: pinctrl@03860000 {
 		compatible = "samsung,exynos4210-pinctrl";
 		reg = <0x03860000 0x1000>;
+		samsung,pmu-syscon = <&pmu_system_controller>;
 	};
 
 	tmu: tmu@100C0000 {

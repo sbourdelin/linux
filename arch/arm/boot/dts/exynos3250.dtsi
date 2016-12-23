@@ -260,6 +260,7 @@
 			compatible = "samsung,exynos3250-pinctrl";
 			reg = <0x11000000 0x1000>;
 			interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>;
+			samsung,pmu-syscon = <&pmu_system_controller>;
 
 			wakeup-interrupt-controller {
 				compatible = "samsung,exynos4210-wakeup-eint";
@@ -271,6 +272,7 @@
 			compatible = "samsung,exynos3250-pinctrl";
 			reg = <0x11400000 0x1000>;
 			interrupts = <GIC_SPI 240 IRQ_TYPE_LEVEL_HIGH>;
+			samsung,pmu-syscon = <&pmu_system_controller>;
 		};
 
 		jpeg: codec@11830000 {

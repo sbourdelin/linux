@@ -546,12 +546,14 @@
 	compatible = "samsung,exynos4x12-pinctrl";
 	reg = <0x11400000 0x1000>;
 	interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+	samsung,pmu-syscon = <&pmu_system_controller>;
 };
 
 &pinctrl_1 {
 	compatible = "samsung,exynos4x12-pinctrl";
 	reg = <0x11000000 0x1000>;
 	interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+	samsung,pmu-syscon = <&pmu_system_controller>;
 
 	wakup_eint: wakeup-interrupt-controller {
 		compatible = "samsung,exynos4210-wakeup-eint";
@@ -565,6 +567,7 @@
 	reg = <0x03860000 0x1000>;
 	interrupt-parent = <&combiner>;
 	interrupts = <10 0>;
+	samsung,pmu-syscon = <&pmu_system_controller>;
 };
 
 &pinctrl_3 {
