@@ -43,6 +43,11 @@
  */
 
 &pinctrl {
+	pinctrl_emmc: emmc_grp {
+		groups = "emmc", "emmc_dat8";
+		function = "emmc";
+	};
+
 	pinctrl_i2c0: i2c0_grp {
 		groups = "i2c0";
 		function = "i2c0";
