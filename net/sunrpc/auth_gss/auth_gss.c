@@ -213,6 +213,7 @@ gss_fill_context(const void *p, const void *end, struct gss_cl_ctx *ctx, struct 
 	unsigned int seclen;
 	unsigned int timeout;
 	unsigned long now = jiffies;
+	unsigned int gss_v;
 	u32 window_size;
 	int ret;
 
@@ -226,6 +227,13 @@ gss_fill_context(const void *p, const void *end, struct gss_cl_ctx *ctx, struct 
 	if (timeout == 0)
 		timeout = GSSD_MIN_TIMEOUT;
 	ctx->gc_expiry = now + ((unsigned long)timeout * HZ);
+
+	/* RPCSEC_GSS version used to obtain context */
+	p = simple_get_bytes(p, end, &gss_v, sizeof(gss_v));
+	if (IS_ERR(p))
+		goto err;
+	ctx->gc_v = gss_v;
+
 	/* Sequence number window. Determines the maximum number of
 	 * simultaneous requests
 	 */
@@ -1506,10 +1514,10 @@ gss_marshal(struct rpc_task *task, __be32 *p)
 	req->rq_seqno = ctx->gc_seq++;
 	spin_unlock(&ctx->gc_seq_lock);
 
-	*p++ = htonl((u32) RPC_GSS_VERSION);
-	*p++ = htonl((u32) ctx->gc_proc);
-	*p++ = htonl((u32) req->rq_seqno);
-	*p++ = htonl((u32) gss_cred->gc_service);
+	*p++ = htonl((u32)ctx->gc_v);
+	*p++ = htonl((u32)ctx->gc_proc);
+	*p++ = htonl((u32)req->rq_seqno);
+	*p++ = htonl((u32)gss_cred->gc_service);
 	p = xdr_encode_netobj(p, &ctx->gc_wire_ctx);
 	*cred_len = htonl((p - (cred_len + 1)) << 2);
 
