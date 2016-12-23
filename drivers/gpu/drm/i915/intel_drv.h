@@ -405,6 +405,9 @@ struct intel_plane_state {
 	 */
 	int scaler_id;
 
+	/* 0: not suitable for FBC, 1+: suitable for FBC, more is better. */
+	unsigned int fbc_score;
+
 	struct drm_intel_sprite_colorkey ckey;
 };
 
@@ -650,8 +653,6 @@ struct intel_crtc_state {
 	struct intel_link_m_n fdi_m_n;
 
 	bool ips_enabled;
-
-	bool enable_fbc;
 
 	bool double_wide;
 
@@ -1499,8 +1500,7 @@ static inline void intel_fbdev_restore_mode(struct drm_device *dev)
 #endif
 
 /* intel_fbc.c */
-void intel_fbc_choose_crtc(struct drm_i915_private *dev_priv,
-			   struct drm_atomic_state *state);
+void intel_fbc_check_plane(struct intel_plane_state *plane_state);
 bool intel_fbc_is_active(struct drm_i915_private *dev_priv);
 void intel_fbc_pre_update(struct intel_crtc *crtc,
 			  struct intel_crtc_state *crtc_state,

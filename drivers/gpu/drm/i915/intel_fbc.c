@@ -1040,68 +1040,32 @@ out:
 }
 
 /**
- * intel_fbc_choose_crtc - select a CRTC to enable FBC on
- * @dev_priv: i915 device instance
- * @state: the atomic state structure
+ * intel_fbc_check_plane - check plane for FBC suitability
+ * @plane_state: the plane state
  *
- * This function looks at the proposed state for CRTCs and planes, then chooses
- * which pipe is going to have FBC by setting intel_crtc_state->enable_fbc to
- * true.
+ * This function should set fbc_score based on how suitable the plane is for
+ * FBC. For now the only scores used are 0 and 1.
  *
- * Later, intel_fbc_enable is going to look for state->enable_fbc and then maybe
- * enable FBC for the chosen CRTC. If it does, it will set dev_priv->fbc.crtc.
+ * We're not changing dev_priv->fbc, so there's no need for the FBC lock.
  */
-void intel_fbc_choose_crtc(struct drm_i915_private *dev_priv,
-			   struct drm_atomic_state *state)
+void intel_fbc_check_plane(struct intel_plane_state *plane_state)
 {
-	struct intel_fbc *fbc = &dev_priv->fbc;
-	struct drm_plane *plane;
-	struct drm_plane_state *plane_state;
-	bool crtc_chosen = false;
-	int i;
+	struct drm_plane *plane = plane_state->base.plane;
+	struct drm_i915_private *dev_priv = to_i915(plane->dev);
+	struct intel_crtc *crtc = to_intel_crtc(plane_state->base.crtc);
 
-	mutex_lock(&fbc->lock);
-
-	/* Does this atomic commit involve the CRTC currently tied to FBC? */
-	if (fbc->crtc &&
-	    !drm_atomic_get_existing_crtc_state(state, &fbc->crtc->base))
-		goto out;
+	plane_state->fbc_score = 0;
 
 	if (!intel_fbc_can_enable(dev_priv))
-		goto out;
+		return;
+	if (fbc_on_pipe_a_only(dev_priv) && crtc->pipe != PIPE_A)
+		return;
+	if (fbc_on_plane_a_only(dev_priv) && crtc->plane != PLANE_A)
+		return;
+	if (!plane_state->base.visible)
+		return;
 
-	/* Simply choose the first CRTC that is compatible and has a visible
-	 * plane. We could go for fancier schemes such as checking the plane
-	 * size, but this would just affect the few platforms that don't tie FBC
-	 * to pipe or plane A. */
-	for_each_plane_in_state(state, plane, plane_state, i) {
-		struct intel_plane_state *intel_plane_state =
-			to_intel_plane_state(plane_state);
-		struct intel_crtc_state *intel_crtc_state;
-		struct intel_crtc *crtc = to_intel_crtc(plane_state->crtc);
-
-		if (!intel_plane_state->base.visible)
-			continue;
-
-		if (fbc_on_pipe_a_only(dev_priv) && crtc->pipe != PIPE_A)
-			continue;
-
-		if (fbc_on_plane_a_only(dev_priv) && crtc->plane != PLANE_A)
-			continue;
-
-		intel_crtc_state = to_intel_crtc_state(
-			drm_atomic_get_existing_crtc_state(state, &crtc->base));
-
-		intel_crtc_state->enable_fbc = true;
-		crtc_chosen = true;
-		break;
-	}
-
-	if (!crtc_chosen)
-		fbc->no_fbc_reason = "no suitable CRTC for FBC";
-
-out:
-	mutex_unlock(&fbc->lock);
+	plane_state->fbc_score = 1;
 }
 
 /**
@@ -1114,6 +1078,13 @@ out:
  * possible. Notice that it doesn't activate FBC. It is valid to call
  * intel_fbc_enable multiple times for the same pipe without an
  * intel_fbc_disable in the middle, as long as it is deactivated.
+ *
+ * In the future this function could make better use of the fbc_score variable.
+ * We could, for example, loop through all the primary planes involved in the
+ * atomic commit and only enable FBC for the plane with the best fbc_score. We
+ * could also try to do some scheme where a plane with better score takes over
+ * FBC from another plane, but our driver currently can't handle the complexity
+ * of switching planes on the fly. This would only affect from Gen 4 up to IVB.
  */
 void intel_fbc_enable(struct intel_crtc *crtc,
 		      struct intel_crtc_state *crtc_state,
@@ -1130,14 +1101,16 @@ void intel_fbc_enable(struct intel_crtc *crtc,
 	if (fbc->enabled) {
 		WARN_ON(fbc->crtc == NULL);
 		if (fbc->crtc == crtc) {
-			WARN_ON(!crtc_state->enable_fbc);
+			WARN_ON(plane_state->fbc_score == 0);
 			WARN_ON(fbc->active);
 		}
 		goto out;
 	}
 
-	if (!crtc_state->enable_fbc)
+	if (plane_state->fbc_score == 0) {
+		fbc->no_fbc_reason = "no suitable CRTC for FBC";
 		goto out;
+	}
 
 	WARN_ON(fbc->active);
 	WARN_ON(fbc->crtc != NULL);

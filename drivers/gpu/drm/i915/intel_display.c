@@ -14095,7 +14095,6 @@ static int intel_atomic_check(struct drm_device *dev,
 	if (ret)
 		return ret;
 
-	intel_fbc_choose_crtc(dev_priv, state);
 	return calc_watermark_data(state);
 }
 
@@ -14869,6 +14868,8 @@ intel_check_primary_plane(struct drm_plane *plane,
 		if (ret)
 			return ret;
 	}
+
+	intel_fbc_check_plane(state);
 
 	return 0;
 }
