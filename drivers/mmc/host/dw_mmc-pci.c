@@ -65,8 +65,10 @@ static int dw_mci_pci_probe(struct pci_dev *pdev,
 	pci_set_master(pdev);
 
 	ret = dw_mci_probe(host);
-	if (ret)
+	if (ret) {
+		pcim_iounmap_regions(pdev, 1 << PCI_BAR_NO);
 		return ret;
+	}
 
 	pci_set_drvdata(pdev, host);
 
