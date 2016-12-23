@@ -692,6 +692,10 @@ static int samsung_pinctrl_create_function(struct device *dev,
 	}
 
 	func->name = func_np->full_name;
+	if (of_property_read_bool(func_np, "samsung,off-state"))
+		func->rpm_active = false;
+	else
+		func->rpm_active = true;
 
 	func->groups = devm_kzalloc(dev, npins * sizeof(char *), GFP_KERNEL);
 	if (!func->groups)

@@ -105,6 +105,7 @@ Required Properties:
   - samsung,pin-drv: Drive strength configuration.
   - samsung,pin-pud-pdn: Pull up/down configuration in power down mode.
   - samsung,pin-drv-pdn: Drive strength configuration in power down mode.
+  - samsung,off-state: Mark this configuration as suitable for bank power off.
 
   The values specified by these config properties should be derived from the
   hardware manual and these values are programmed as-is into the pin
@@ -112,6 +113,13 @@ Required Properties:
 
   Note: A child should include atleast a pin function selection property or
   pin configuration property (one or more) or both.
+
+  Note: Special property "samsung,off-state" indicates that this state can
+  be used for device's "sleep" pins state. Its pin values/properties should
+  match the configuration in power down mode. It indicates that pin control
+  can notify runtime power management subsystem, that it is ready for runtime
+  suspend if its all pins are configured for such state. This in turn might
+  allow to turn respective power domain off to reduce power consumption.
 
   The client nodes that require a particular pin function selection and/or
   pin configuration should use the bindings listed in the "pinctrl-bindings.txt"
