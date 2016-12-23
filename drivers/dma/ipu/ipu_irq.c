@@ -265,8 +265,8 @@ int ipu_irq_unmap(unsigned int source)
 	return ret;
 }
 
-/* Chained IRQ handler for IPU function and error interrupt */
-static void ipu_irq_handler(struct irq_desc *desc)
+/* Chained IRQ handler for IPU error interrupt */
+static void ipu_irq_err(struct irq_desc *desc)
 {
 	struct ipu *ipu = irq_desc_get_handler_data(desc);
 	u32 status;
@@ -301,6 +301,44 @@ static void ipu_irq_handler(struct irq_desc *desc)
 			}
 			irq = map->irq;
 			raw_spin_unlock(&bank_lock);
+			generic_handle_irq(irq);
+		}
+	}
+}
+
+/* Chained IRQ handler for IPU function interrupt */
+static void ipu_irq_fn(struct irq_desc *desc)
+{
+	struct ipu *ipu = irq_desc_get_handler_data(desc);
+	u32 status;
+	int i, line;
+
+	for (i = 0; i < IPU_IRQ_NR_FN_BANKS; i++) {
+		struct ipu_irq_bank *bank = irq_bank + i;
+
+		raw_spin_lock(&bank_lock);
+		status = ipu_read_reg(ipu, bank->status);
+		/* Not clearing all interrupts, see above */
+		status &= ipu_read_reg(ipu, bank->control);
+		raw_spin_unlock(&bank_lock);
+		while ((line = ffs(status))) {
+			struct ipu_irq_map *map;
+			unsigned int irq;
+
+			line--;
+			status &= ~(1UL << line);
+
+			raw_spin_lock(&bank_lock);
+			map = src2map(32 * i + line);
+			if (map)
+				irq = map->irq;
+			raw_spin_unlock(&bank_lock);
+
+			if (!map) {
+				pr_err("IPU: Interrupt on unmapped source %u bank %d\n",
+				       line, i);
+				continue;
+			}
 			generic_handle_irq(irq);
 		}
 	}
@@ -343,9 +381,9 @@ int __init ipu_irq_attach_irq(struct ipu *ipu, struct platform_device *dev)
 		irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
 	}
 
-	irq_set_chained_handler_and_data(ipu->irq_fn, ipu_irq_handler, ipu);
+	irq_set_chained_handler_and_data(ipu->irq_fn, ipu_irq_fn, ipu);
 
-	irq_set_chained_handler_and_data(ipu->irq_err, ipu_irq_handler, ipu);
+	irq_set_chained_handler_and_data(ipu->irq_err, ipu_irq_err, ipu);
 
 	ipu->irq_base = irq_base;
 
