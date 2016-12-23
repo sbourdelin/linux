@@ -43,6 +43,10 @@ Required Properties:
 		};
 	};
 
+- samsung,pmu-syscon: Phandle to the PMU system controller, to let driver
+  to control pad retention after system suspend/resume cycle (only for Exynos
+  SoC series).
+
 - Pin banks as child nodes: Pin banks of the controller are represented by child
   nodes of the controller node. Bank name is taken from name of the node. Each
   bank node must contain following properties:

@@ -199,10 +199,17 @@ struct samsung_pin_ctrl {
 	u32		nr_banks;
 	int		nr_ext_resources;
 
+	const u32	*retention_regs;
+	int		nr_retention_regs;
+
 	int		(*eint_gpio_init)(struct samsung_pinctrl_drv_data *);
 	int		(*eint_wkup_init)(struct samsung_pinctrl_drv_data *);
 	void		(*suspend)(struct samsung_pinctrl_drv_data *);
 	void		(*resume)(struct samsung_pinctrl_drv_data *);
+
+	int		(*retention_init)(struct samsung_pinctrl_drv_data *);
+	void		(*retention_on)(struct samsung_pinctrl_drv_data *);
+	void		(*retention_off)(struct samsung_pinctrl_drv_data *);
 };
 
 /**
@@ -237,6 +244,12 @@ struct samsung_pinctrl_drv_data {
 	u32				nr_banks;
 	unsigned int			pin_base;
 	unsigned int			nr_pins;
+
+	const u32			*retention_regs;
+	int				nr_retention_regs;
+
+	void (*retention_on)(struct samsung_pinctrl_drv_data *);
+	void (*retention_off)(struct samsung_pinctrl_drv_data *);
 
 	void (*suspend)(struct samsung_pinctrl_drv_data *);
 	void (*resume)(struct samsung_pinctrl_drv_data *);
