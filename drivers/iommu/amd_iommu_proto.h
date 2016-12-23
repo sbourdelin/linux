@@ -61,6 +61,7 @@ extern struct iommu_domain *amd_iommu_get_v2_domain(struct pci_dev *pdev);
 #define IOMMU_PC_COUNTER_REG			0x00
 #endif
 
+extern int amd_iommu_get_num_iommus(void);
 extern bool amd_iommu_pc_supported(void);
 extern u8 amd_iommu_pc_get_max_banks(uint devid);
 extern u8 amd_iommu_pc_get_max_counters(uint devid);
