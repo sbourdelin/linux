@@ -444,8 +444,9 @@
 			clock-output-names = "i2s_cdclk0";
 			#sound-dai-cells = <1>;
 			samsung,idma-addr = <0x03000000>;
-			pinctrl-names = "default";
+			pinctrl-names = "default", "sleep";
 			pinctrl-0 = <&i2s0_bus>;
+			pinctrl-1 = <&i2s0_bus_slp>;
 			status = "disabled";
 		};
 
