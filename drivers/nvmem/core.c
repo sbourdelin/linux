@@ -907,6 +907,39 @@ struct nvmem_cell *devm_nvmem_cell_get(struct device *dev, const char *id)
 }
 EXPORT_SYMBOL_GPL(devm_nvmem_cell_get);
 
+#if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+/**
+ * devm_nvmem_cell_get_by_index() - Get nvmem cell of device from cell index;
+ *				    resource managed.
+ *
+ * @dev node: Device tree node that uses the nvmem cell
+ * @index: index of nvmem cell
+ *
+ * Return: Will be an ERR_PTR() on error or a valid pointer
+ * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+ * automatically once the device is freed.
+ */
+struct nvmem_cell *devm_nvmem_cell_get_by_index(struct device *dev, int index)
+{
+	struct nvmem_cell **ptr, *cell;
+
+	ptr = devres_alloc(devm_nvmem_cell_release, sizeof(*ptr), GFP_KERNEL);
+	if (!ptr)
+		return ERR_PTR(-ENOMEM);
+
+	cell = of_nvmem_cell_get_by_index(dev->of_node, index);
+	if (!IS_ERR(cell)) {
+		*ptr = cell;
+		devres_add(dev, ptr);
+	} else {
+		devres_free(ptr);
+	}
+
+	return cell;
+}
+EXPORT_SYMBOL_GPL(devm_nvmem_cell_get_by_index);
+#endif
+
 static int devm_nvmem_cell_match(struct device *dev, void *res, void *data)
 {
 	struct nvmem_cell **c = res;
