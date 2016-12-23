@@ -981,6 +981,10 @@ compatibility.
       removed later. The kernel can take this into consideration when
       doing nonmovable allocations and when laying out memory zones.
 
+    - linux,usable-memory : This property overrides the reg property.
+      It can be used if the bootloader changes the reg property to
+      improper values.
+
   e) The /chosen node
 
   This node is a bit "special". Normally, that's where Open Firmware
