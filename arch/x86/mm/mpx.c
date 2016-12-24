@@ -120,6 +120,13 @@ static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 
 	case REG_TYPE_BASE:
 		regno = X86_SIB_BASE(insn->sib.value);
+		if (regno == 5 && X86_MODRM_RM(insn->modrm.value) == 0) {
+			WARN_ONCE(1, "An explicit displacement is required when %sBP used as SIB base.",
+				  (IS_ENABLED(CONFIG_X86_64) && insn->x86_64) ?
+				  "R13 or R" : "E");
+			return -EINVAL;
+		}
+
 		if (X86_REX_B(insn->rex_prefix.value))
 			regno += 8;
 		break;
