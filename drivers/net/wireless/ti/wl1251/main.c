@@ -1465,6 +1465,24 @@ static int wl1251_read_nvs_mac(struct wl1251 *wl)
 	return 0;
 }
 
+static int wl1251_write_nvs_mac(struct wl1251 *wl)
+{
+	int i;
+
+	if (wl->nvs_len < 0x24)
+		return -ENODATA;
+
+	/* length is 2 and data address is 0x546c (mask is 0xfffe) */
+	if (wl->nvs[0x19] != 2 || wl->nvs[0x1a] != 0x6d || wl->nvs[0x1b] != 0x54)
+		return -EINVAL;
+
+	/* MAC is stored in reverse order */
+	for (i = 0; i < ETH_ALEN; i++)
+		wl->nvs[0x1c + i] = wl->mac_addr[ETH_ALEN - i - 1];
+
+	return 0;
+}
+
 static int wl1251_register_hw(struct wl1251 *wl)
 {
 	int ret;
@@ -1530,6 +1548,8 @@ int wl1251_init_ieee80211(struct wl1251 *wl)
 		static const u8 nokia_oui[3] = {0x00, 0x1f, 0xdf};
 		memcpy(wl->mac_addr, nokia_oui, 3);
 		get_random_bytes(wl->mac_addr + 3, 3);
+		if (!wl->use_eeprom)
+			wl1251_write_nvs_mac(wl);
 		wl1251_warning("MAC address in eeprom or nvs data is not valid");
 		wl1251_warning("Setting random MAC address: %pM", wl->mac_addr);
 	}
