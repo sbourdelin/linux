@@ -16,7 +16,6 @@
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/errno.h>
-#include <linux/string.h>
 #include <linux/slab.h>
 
 /* illegal phandle value (set when unresolved) */
