@@ -22,6 +22,10 @@
 
 /* insn_attr_t is defined in inat.h */
 #include <asm/inat.h>
+#include <linux/compiler.h>
+#include <linux/bug.h>
+#include <linux/err.h>
+#include <asm/ptrace.h>
 
 struct insn_field {
 	union {
@@ -106,6 +110,8 @@ extern void insn_get_sib(struct insn *insn);
 extern void insn_get_displacement(struct insn *insn);
 extern void insn_get_immediate(struct insn *insn);
 extern void insn_get_length(struct insn *insn);
+extern void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs);
+extern int get_reg_offset_rm(struct insn *insn, struct pt_regs *regs);
 
 /* Attribute will be determined after getting ModRM (for opcode groups) */
 static inline void insn_get_attribute(struct insn *insn)
