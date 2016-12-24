@@ -109,6 +109,13 @@ static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 		regno = X86_SIB_INDEX(insn->sib.value);
 		if (X86_REX_X(insn->rex_prefix.value))
 			regno += 8;
+		/*
+		 * If mod !=3, SP is not used as index. Check is done after
+		 * looking at REX.X This is because R12 can be used as an
+		 * index.
+		 */
+		if (regno == 4 && X86_MODRM_RM(insn->modrm.value) != 3)
+			return 0;
 		break;
 
 	case REG_TYPE_BASE:
@@ -161,7 +168,10 @@ static void __user *mpx_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 				goto out_err;
 
 			base = regs_get_register(regs, base_offset);
-			indx = regs_get_register(regs, indx_offset);
+			if (indx_offset)
+				indx = regs_get_register(regs, indx_offset);
+			else
+				indx = 0;
 			addr = base + indx * (1 << X86_SIB_SCALE(sib));
 		} else {
 			addr_offset = get_reg_offset(insn, regs, REG_TYPE_RM);
