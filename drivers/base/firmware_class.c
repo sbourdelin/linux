@@ -119,6 +119,11 @@ static inline long firmware_loading_timeout(void)
 #endif
 #define FW_OPT_NO_WARN	(1U << 3)
 #define FW_OPT_NOCACHE	(1U << 4)
+#ifdef CONFIG_FW_LOADER_USER_HELPER
+#define FW_OPT_PREFER_USER	(1U << 5)
+#else
+#define FW_OPT_PREFER_USER	0
+#endif
 
 struct firmware_cache {
 	/* firmware_buf instance will be added into the below list */
@@ -1169,13 +1174,26 @@ _request_firmware(const struct firmware **firmware_p, const char *name,
 		}
 	}
 
-	ret = fw_get_filesystem_firmware(device, fw->priv);
+	if (opt_flags & FW_OPT_PREFER_USER) {
+		ret = fw_load_from_user_helper(fw, name, device, opt_flags, timeout);
+		if (ret && !(opt_flags & FW_OPT_NO_WARN)) {
+			dev_warn(device,
+				 "User helper firmware load for %s failed with error %d\n",
+				 name, ret);
+			dev_warn(device, "Falling back to direct firmware load\n");
+		}
+	} else {
+		ret = -EINVAL;
+	}
+
+	if (ret)
+		ret = fw_get_filesystem_firmware(device, fw->priv);
 	if (ret) {
 		if (!(opt_flags & FW_OPT_NO_WARN))
 			dev_warn(device,
 				 "Direct firmware load for %s failed with error %d\n",
 				 name, ret);
-		if (opt_flags & FW_OPT_USERHELPER) {
+		if ((opt_flags & FW_OPT_USERHELPER) && !(opt_flags & FW_OPT_PREFER_USER)) {
 			dev_warn(device, "Falling back to user helper\n");
 			ret = fw_load_from_user_helper(fw, name, device,
 						       opt_flags, timeout);
@@ -1285,6 +1303,29 @@ request_firmware_into_buf(const struct firmware **firmware_p, const char *name,
 	return ret;
 }
 EXPORT_SYMBOL(request_firmware_into_buf);
+
+/**
+ * request_firmware_prefer_user: - prefer usermode helper for loading firmware
+ * @firmware_p: pointer to firmware image
+ * @name: name of firmware file
+ * @device: device for which firmware is being loaded
+ *
+ * This function works pretty much like request_firmware(), but it prefer
+ * usermode helper. If usermode helper fails then it fallback to direct access.
+ * Useful for dynamic or model specific firmware data.
+ **/
+int request_firmware_prefer_user(const struct firmware **firmware_p,
+			    const char *name, struct device *device)
+{
+	int ret;
+
+	__module_get(THIS_MODULE);
+	ret = _request_firmware(firmware_p, name, device, NULL, 0,
+				FW_OPT_UEVENT | FW_OPT_PREFER_USER);
+	module_put(THIS_MODULE);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(request_firmware_prefer_user);
 
 /**
  * release_firmware: - release the resource associated with a firmware image
