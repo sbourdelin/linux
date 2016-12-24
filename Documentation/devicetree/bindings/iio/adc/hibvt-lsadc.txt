@@ -1,0 +1,26 @@
+Hisilicon BVT Low Speed (LS) A/D Converter bindings
+
+Required properties:
+- compatible: should be "hisilicon,<name>-lsadc"
+   - "hisilicon,hibvt-lsadc": for hi3516cv300
+
+- reg: physical base address of the controller and length of memory mapped
+       region.
+- interrupts: The interrupt number to the cpu. The interrupt specifier format
+              depends on the interrupt controller.
+- #io-channel-cells: Should be 1, see ../iio-bindings.txt
+
+Optional properties:
+- resets: Must contain an entry for each entry in reset-names if need support
+	  this option. See ../reset/reset.txt for details.
+- reset-names: Must include the name "saradc-apb".
+
+Example:
+	lsadc: hibvt-lsadc@120e0000 {
+			compatible = "hisilicon,hibvt-lsadc";
+			reg = <0x120e0000 0x1000>;
+			interrupts = <19>;
+			resets = <&crg 0x7c 3>;
+			reset-names = "lsadc-crg";
+			status = "disabled";
+	};
