@@ -102,6 +102,11 @@ enum {
 #define POWER9_MMCRA_IFM1		0x0000000040000000UL
 #define POWER9_MMCRA_IFM2		0x0000000080000000UL
 #define POWER9_MMCRA_IFM3		0x00000000C0000000UL
+#define POWER9_MMCRA_FJ			0x0000000100000000UL
+#define POWER9_MMCRA_FR			0x0000000200000000UL
+#define POWER9_MMCRA_FC			0x0000000400000000UL
+#define POWER9_MMCRA_FU			0x0000000800000000UL
+#define POWER9_MMCRA_FD			0x0000001000000000UL
 
 /* PowerISA v2.07 format attribute structure*/
 extern struct attribute_group isa207_pmu_format_group;
@@ -240,14 +245,30 @@ static u64 power9_bhrb_filter_map(u64 branch_sample_type)
 		return pmu_bhrb_filter;
 
 	/* Invalid branch filter options - HW does not support */
-	if (branch_sample_type & PERF_SAMPLE_BRANCH_ANY_RETURN)
-		return -1;
+	if (branch_sample_type & PERF_SAMPLE_BRANCH_ANY_RETURN) {
+		pmu_bhrb_filter = POWER9_MMCRA_FC | POWER9_MMCRA_FJ;
+		return pmu_bhrb_filter;
+	}
 
-	if (branch_sample_type & PERF_SAMPLE_BRANCH_IND_CALL)
-		return -1;
+	if (branch_sample_type & PERF_SAMPLE_BRANCH_IND_CALL) {
+		pmu_bhrb_filter = POWER9_MMCRA_FD | POWER9_MMCRA_FR | POWER9_MMCRA_FJ;
+		return pmu_bhrb_filter;
+	}
 
-	if (branch_sample_type & PERF_SAMPLE_BRANCH_CALL)
-		return -1;
+	if (branch_sample_type & PERF_SAMPLE_BRANCH_COND) {
+		pmu_bhrb_filter = POWER9_MMCRA_FU;
+		return pmu_bhrb_filter;
+	}
+
+	if (branch_sample_type & PERF_SAMPLE_BRANCH_IND_JUMP) {
+		pmu_bhrb_filter = POWER9_MMCRA_FD | POWER9_MMCRA_FC | POWER9_MMCRA_FR;
+		return pmu_bhrb_filter;
+	}
+
+	if (branch_sample_type & PERF_SAMPLE_BRANCH_CALL) {
+		pmu_bhrb_filter = POWER9_MMCRA_FC;
+		return pmu_bhrb_filter;
+	}
 
 	if (branch_sample_type & PERF_SAMPLE_BRANCH_ANY_CALL) {
 		pmu_bhrb_filter |= POWER9_MMCRA_IFM1;
