@@ -117,6 +117,8 @@ struct input_value {
  * @vals: array of values queued in the current frame
  * @devres_managed: indicates that devices is managed with devres framework
  *	and needs not be explicitly unregistered or freed.
+ * @disabled: indicates that device is in disabled state and kernel drop
+ *	all events from it
  */
 struct input_dev {
 	const char *name;
@@ -187,6 +189,8 @@ struct input_dev {
 	struct input_value *vals;
 
 	bool devres_managed;
+
+	bool disabled;
 };
 #define to_input_dev(d) container_of(d, struct input_dev, dev)
 

@@ -430,6 +430,9 @@ void input_event(struct input_dev *dev,
 {
 	unsigned long flags;
 
+	if (unlikely(dev->disabled))
+		return;
+
 	if (is_event_supported(type, dev->evbit, EV_MAX)) {
 
 		spin_lock_irqsave(&dev->event_lock, flags);
@@ -456,6 +459,9 @@ void input_inject_event(struct input_handle *handle,
 	struct input_dev *dev = handle->dev;
 	struct input_handle *grab;
 	unsigned long flags;
+
+	if (unlikely(dev->disabled))
+		return;
 
 	if (is_event_supported(type, dev->evbit, EV_MAX)) {
 		spin_lock_irqsave(&dev->event_lock, flags);
@@ -1389,12 +1395,41 @@ static ssize_t input_dev_show_properties(struct device *dev,
 }
 static DEVICE_ATTR(properties, S_IRUGO, input_dev_show_properties, NULL);
 
+static ssize_t input_dev_show_disable(struct device *dev,
+				      struct device_attribute *attr,
+				      char *buf)
+{
+	struct input_dev *input_dev = to_input_dev(dev);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", input_dev->disabled ? 1 : 0);
+}
+static ssize_t input_dev_store_disable(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t count)
+{
+	struct input_dev *input_dev = to_input_dev(dev);
+	int disable;
+	int ret;
+
+	ret = kstrtoint(buf, 0, &disable);
+	if (ret)
+		return ret;
+
+	if (disable != 0 && disable != 1)
+		return -EINVAL;
+
+	input_dev->disabled = disable;
+	return count;
+}
+static DEVICE_ATTR(disable, S_IRUGO | S_IWUSR, input_dev_show_disable, input_dev_store_disable);
+
 static struct attribute *input_dev_attrs[] = {
 	&dev_attr_name.attr,
 	&dev_attr_phys.attr,
 	&dev_attr_uniq.attr,
 	&dev_attr_modalias.attr,
 	&dev_attr_properties.attr,
+	&dev_arrr_disable.attr,
 	NULL
 };
 
