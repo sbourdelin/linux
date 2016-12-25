@@ -1812,7 +1812,7 @@ int uvc_video_init(struct uvc_streaming *stream)
 	 * available format otherwise.
 	 */
 	for (i = stream->nformats; i > 0; --i) {
-		format = &stream->format[i-1];
+		format = &stream->format[i - 1];
 		if (format->index == probe->bFormatIndex)
 			break;
 	}
@@ -1829,7 +1829,7 @@ int uvc_video_init(struct uvc_streaming *stream)
 	 * descriptor is not found, use the first available frame.
 	 */
 	for (i = format->nframes; i > 0; --i) {
-		frame = &format->frame[i-1];
+		frame = &format->frame[i - 1];
 		if (frame->bFrameIndex == probe->bFrameIndex)
 			break;
 	}
