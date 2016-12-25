@@ -1350,10 +1350,10 @@ static void uvc_video_complete(struct urb *urb)
 
 	stream->decode(urb, stream, buf);
 
-	if ((ret = usb_submit_urb(urb, GFP_ATOMIC)) < 0) {
+	ret = usb_submit_urb(urb, GFP_ATOMIC);
+	if (ret < 0)
 		uvc_printk(KERN_ERR, "Failed to resubmit video URB (%d).\n",
 			ret);
-	}
 }
 
 /*
