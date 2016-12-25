@@ -1275,7 +1275,8 @@ static int uvc_parse_control(struct uvc_device *dev)
 		    buffer[1] != USB_DT_CS_INTERFACE)
 			goto next_descriptor;
 
-		if ((ret = uvc_parse_standard_control(dev, buffer, buflen)) < 0)
+		ret = uvc_parse_standard_control(dev, buffer, buflen);
+		if (ret < 0)
 			return ret;
 
 next_descriptor:
@@ -2030,7 +2031,8 @@ static int uvc_probe(struct usb_interface *intf,
 				udev->devpath);
 
 	/* Allocate memory for the device and initialize it. */
-	if ((dev = kzalloc(sizeof *dev, GFP_KERNEL)) == NULL)
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+	if (!dev)
 		return -ENOMEM;
 
 	INIT_LIST_HEAD(&dev->entities);
@@ -2113,11 +2115,11 @@ static int uvc_probe(struct usb_interface *intf,
 	usb_set_intfdata(intf, dev);
 
 	/* Initialize the interrupt URB. */
-	if ((ret = uvc_status_init(dev)) < 0) {
+	ret = uvc_status_init(dev);
+	if (ret < 0)
 		uvc_printk(KERN_INFO,
 			   "Unable to initialize the status endpoint (%d), status interrupt will not be supported.\n",
 			   ret);
-	}
 
 	uvc_trace(UVC_TRACE_PROBE, "UVC device initialized.\n");
 	usb_enable_autosuspend(udev);
