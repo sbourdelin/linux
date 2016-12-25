@@ -434,7 +434,6 @@ static ssize_t adt7316_store_ad_channel(struct device *dev,
 		config2 = chip->config2 & (~ADT7316_AD_SINGLE_CH_MASK);
 	}
 
-
 	config2 |= data;
 
 	ret = chip->bus.write(chip->bus.client, ADT7316_CONFIG2, config2);
