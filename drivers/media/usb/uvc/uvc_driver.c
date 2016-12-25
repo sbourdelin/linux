@@ -702,7 +702,7 @@ static int uvc_parse_streaming(struct uvc_device *dev,
 	if (buflen <= 2) {
 		uvc_trace(UVC_TRACE_DESCR,
 			  "no class-specific streaming interface descriptors found.\n");
-		goto error;
+		goto release_interface;
 	}
 
 	/* Parse the header descriptor. */
@@ -721,7 +721,7 @@ static int uvc_parse_streaming(struct uvc_device *dev,
 		uvc_trace(UVC_TRACE_DESCR,
 			  "device %d videostreaming interface %d HEADER descriptor not found.\n",
 			  dev->udev->devnum, alts->desc.bInterfaceNumber);
-		goto error;
+		goto release_interface;
 	}
 
 	p = buflen >= 4 ? buffer[3] : 0;
@@ -731,7 +731,7 @@ static int uvc_parse_streaming(struct uvc_device *dev,
 		uvc_trace(UVC_TRACE_DESCR,
 			  "device %d videostreaming interface %d HEADER descriptor is invalid.\n",
 			  dev->udev->devnum, alts->desc.bInterfaceNumber);
-		goto error;
+		goto release_interface;
 	}
 
 	streaming->header.bNumFormats = p;
@@ -751,7 +751,7 @@ static int uvc_parse_streaming(struct uvc_device *dev,
 						GFP_KERNEL);
 	if (!streaming->header.bmaControls) {
 		ret = -ENOMEM;
-		goto error;
+		goto release_interface;
 	}
 
 	buflen -= buffer[0];
@@ -809,7 +809,7 @@ static int uvc_parse_streaming(struct uvc_device *dev,
 		uvc_trace(UVC_TRACE_DESCR,
 			  "device %d videostreaming interface %d has no supported formats defined.\n",
 			  dev->udev->devnum, alts->desc.bInterfaceNumber);
-		goto error;
+		goto release_interface;
 	}
 
 	size = nformats * sizeof(*format) + nframes * sizeof(*frame)
@@ -817,7 +817,7 @@ static int uvc_parse_streaming(struct uvc_device *dev,
 	format = kzalloc(size, GFP_KERNEL);
 	if (!format) {
 		ret = -ENOMEM;
-		goto error;
+		goto free_controls;
 	}
 
 	frame = (struct uvc_frame *)&format[nformats];
@@ -837,7 +837,7 @@ static int uvc_parse_streaming(struct uvc_device *dev,
 			ret = uvc_parse_format(dev, streaming, format,
 				&interval, buffer, buflen);
 			if (ret < 0)
-				goto error;
+				goto free_format;
 
 			frame += format->nframes;
 			format++;
@@ -878,12 +878,13 @@ static int uvc_parse_streaming(struct uvc_device *dev,
 
 	list_add_tail(&streaming->list, &dev->streams);
 	return 0;
-
-error:
+free_format:
+	kfree(streaming->format);
+free_controls:
+	kfree(streaming->header.bmaControls);
+release_interface:
 	usb_driver_release_interface(&uvc_driver.driver, intf);
 	usb_put_intf(intf);
-	kfree(streaming->format);
-	kfree(streaming->header.bmaControls);
 	kfree(streaming);
 	return ret;
 }
