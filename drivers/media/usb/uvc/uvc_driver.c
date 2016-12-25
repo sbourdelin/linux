@@ -631,7 +631,7 @@ static int uvc_parse_format(struct uvc_device *dev,
 static int uvc_parse_streaming(struct uvc_device *dev,
 	struct usb_interface *intf)
 {
-	struct uvc_streaming *streaming = NULL;
+	struct uvc_streaming *streaming;
 	struct uvc_format *format;
 	struct uvc_frame *frame;
 	struct usb_host_interface *alts = &intf->altsetting[0];
