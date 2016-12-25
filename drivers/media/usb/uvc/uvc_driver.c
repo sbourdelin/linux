@@ -1698,7 +1698,7 @@ static int uvc_scan_fallback(struct uvc_device *dev)
 		return -ENOMEM;
 
 	if (uvc_scan_chain_entity(chain, oterm) < 0)
-		goto error;
+		goto free_chain;
 
 	prev = oterm;
 
@@ -1718,14 +1718,14 @@ static int uvc_scan_fallback(struct uvc_device *dev)
 			continue;
 
 		if (uvc_scan_chain_entity(chain, entity) < 0)
-			goto error;
+			goto free_chain;
 
 		prev->baSourceID[0] = entity->id;
 		prev = entity;
 	}
 
 	if (uvc_scan_chain_entity(chain, iterm) < 0)
-		goto error;
+		goto free_chain;
 
 	prev->baSourceID[0] = iterm->id;
 
@@ -1736,8 +1736,7 @@ static int uvc_scan_fallback(struct uvc_device *dev)
 		  uvc_print_chain(chain));
 
 	return 0;
-
-error:
+free_chain:
 	kfree(chain);
 	return -EINVAL;
 }
