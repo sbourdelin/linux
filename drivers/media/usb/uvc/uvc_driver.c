@@ -663,7 +663,7 @@ static int uvc_parse_streaming(struct uvc_device *dev,
 	streaming = kzalloc(sizeof(*streaming), GFP_KERNEL);
 	if (!streaming) {
 		usb_driver_release_interface(&uvc_driver.driver, intf);
-		return -EINVAL;
+		return -ENOMEM;
 	}
 
 	mutex_init(&streaming->mutex);
