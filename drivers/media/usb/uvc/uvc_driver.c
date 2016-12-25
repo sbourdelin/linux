@@ -2060,7 +2060,7 @@ static int uvc_probe(struct usb_interface *intf,
 	if (uvc_parse_control(dev) < 0) {
 		uvc_trace(UVC_TRACE_PROBE,
 			  "Unable to parse UVC descriptors.\n");
-		goto error;
+		goto unregister_video;
 	}
 
 	uvc_printk(KERN_INFO, "Found UVC %u.%02x device %s (%04x:%04x)\n",
@@ -2092,24 +2092,24 @@ static int uvc_probe(struct usb_interface *intf,
 	dev->vdev.mdev = &dev->mdev;
 #endif
 	if (v4l2_device_register(&intf->dev, &dev->vdev) < 0)
-		goto error;
+		goto unregister_video;
 
 	/* Initialize controls. */
 	if (uvc_ctrl_init_device(dev) < 0)
-		goto error;
+		goto unregister_video;
 
 	/* Scan the device for video chains. */
 	if (uvc_scan_device(dev) < 0)
-		goto error;
+		goto unregister_video;
 
 	/* Register video device nodes. */
 	if (uvc_register_chains(dev) < 0)
-		goto error;
+		goto unregister_video;
 
 #ifdef CONFIG_MEDIA_CONTROLLER
 	/* Register the media device node */
 	if (media_device_register(&dev->mdev) < 0)
-		goto error;
+		goto unregister_video;
 #endif
 	/* Save our data pointer in the interface data. */
 	usb_set_intfdata(intf, dev);
@@ -2124,8 +2124,7 @@ static int uvc_probe(struct usb_interface *intf,
 	uvc_trace(UVC_TRACE_PROBE, "UVC device initialized.\n");
 	usb_enable_autosuspend(udev);
 	return 0;
-
-error:
+unregister_video:
 	uvc_unregister_video(dev);
 	return -ENODEV;
 }
