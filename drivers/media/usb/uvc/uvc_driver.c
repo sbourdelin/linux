@@ -634,11 +634,10 @@ static int uvc_parse_streaming(struct uvc_device *dev,
 	struct uvc_streaming *streaming;
 	struct uvc_format *format;
 	struct uvc_frame *frame;
-	struct usb_host_interface *alts = &intf->altsetting[0];
-	unsigned char *_buffer, *buffer = alts->extra;
-	int _buflen, buflen = alts->extralen;
-	unsigned int nformats = 0, nframes = 0, nintervals = 0;
-	unsigned int size, i, n, p;
+	struct usb_host_interface *alts;
+	unsigned char *_buffer, *buffer;
+	int _buflen, buflen;
+	unsigned int nformats, nframes, nintervals, size, i, n, p;
 	__u32 *interval;
 	__u16 psize;
 	int ret = -EINVAL;
@@ -670,6 +669,9 @@ static int uvc_parse_streaming(struct uvc_device *dev,
 	streaming->dev = dev;
 	streaming->intf = usb_get_intf(intf);
 	streaming->intfnum = intf->cur_altsetting->desc.bInterfaceNumber;
+	alts = &intf->altsetting[0];
+	buffer = alts->extra;
+	buflen = alts->extralen;
 
 	/* The Pico iMage webcam has its class-specific interface descriptors
 	 * after the endpoint descriptors.
@@ -759,6 +761,9 @@ static int uvc_parse_streaming(struct uvc_device *dev,
 
 	_buffer = buffer;
 	_buflen = buflen;
+	nformats = 0;
+	nframes = 0;
+	nintervals = 0;
 
 	/* Count the format and frame descriptors. */
 	while (_buflen > 2 && _buffer[1] == USB_DT_CS_INTERFACE) {
