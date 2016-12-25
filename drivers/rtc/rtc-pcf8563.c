@@ -22,6 +22,8 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/err.h>
+#include <linux/spi/spi.h>
+#include <linux/regmap.h>
 
 #define PCF8563_REG_ST1		0x00 /* status */
 #define PCF8563_REG_ST2		0x01
@@ -59,6 +61,7 @@
 
 #define PCF8563_SC_LV		0x80 /* low voltage */
 #define PCF8563_MO_C		0x80 /* century */
+#define PCF8563_REG_SR		0x01 /*control-status register*/
 
 static struct i2c_driver pcf8563_driver;
 
@@ -84,6 +87,9 @@ struct pcf8563 {
 	struct i2c_client *client;
 #ifdef CONFIG_COMMON_CLK
 	struct clk_hw		clkout_hw;
+const	struct device *dev;
+const	struct regmap *regmap;
+	bool suspended;
 #endif
 };
 
@@ -629,6 +635,7 @@ static int pcf8563_probe(struct i2c_client *client,
 static const struct i2c_device_id pcf8563_id[] = {
 	{ "pcf8563", 0 },
 	{ "rtc8564", 0 },
+	{ "pca8565", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, pcf8563_id);
@@ -636,10 +643,85 @@ MODULE_DEVICE_TABLE(i2c, pcf8563_id);
 #ifdef CONFIG_OF
 static const struct of_device_id pcf8563_of_match[] = {
 	{ .compatible = "nxp,pcf8563" },
+	{ .compatible = "nxp,pca8565" },
 	{}
 };
 MODULE_DEVICE_TABLE(of, pcf8563_of_match);
 #endif
+
+#if IS_ENABLED(CONFIG_SPI_MASTER)
+
+static int pca21125_probe(const struct spi_device *spi)
+{
+	int res;
+	unsigned int tmp;
+	static const struct regmap_config config = {
+				.reg_bits = 8,
+				.val_bits = 8,
+				.write_flag_mask = 0x80,
+		};
+const struct regmap *regmap;
+const struct pcf8563 *pcf8563;
+
+	regmap = devm_regmap_init_spi(spi, &config);
+
+			if (IS_ERR(regmap)) {
+				dev_err(&spi->dev, "%s: regmap allocation failed: %ld\n",
+					__func__, PTR_ERR(regmap));
+				return PTR_ERR(regmap);
+		}
+
+	spi->mode = SPI_MODE_3;
+	spi->bits_per_word = 8;
+	spi_setup(spi);
+
+	res = regmap_read(regmap, PCF8563_REG_SC, &tmp);
+
+	if (res)
+		return res;
+	res = regmap_read(regmap, PCF8563_REG_CLKO, &tmp);
+
+	if (res)
+		return res;
+
+	res = regmap_write(regmap, PCF8563_REG_CLKO, tmp & 0x1c);
+
+	if (res)
+		return res;
+
+	res = regmap_read(regmap, PCF8563_REG_SR, &tmp);
+
+	if (res)
+		return res;
+
+	res = regmap_write(regmap, PCF8563_REG_SR, tmp & 0x88);
+
+	if (res)
+		return res;
+
+       /* Print our settings */
+	res = regmap_read(regmap, PCF8563_REG_CLKO, &tmp);
+
+	if (res)
+		return res;
+
+	dev_info(&spi->dev, "Control Reg: 0x%02x\n", tmp);
+	res = regmap_read(regmap, PCF8563_REG_SR, &tmp);
+
+	if (res)
+		return res;
+
+	dev_info(&spi->dev, "Ctrl/Stat Reg: 0x%02x\n", tmp);
+
+	pcf8563->rtc = devm_rtc_device_register(&spi->dev,
+								"pcf8563",
+						&pcf8563_rtc_ops, THIS_MODULE);
+}
+
+const struct spi_driver pca21125_driver = {
+		.driver = {
+				.name    = "pca21125",
+		},
 
 static struct i2c_driver pcf8563_driver = {
 	.driver		= {
