@@ -2894,10 +2894,13 @@ static irqreturn_t dwc3_check_event_buf(struct dwc3_event_buffer *evt)
 		return IRQ_HANDLED;
 	}
 
+	spin_lock(&dwc->lock);
 	count = dwc3_readl(dwc->regs, DWC3_GEVNTCOUNT(0));
 	count &= DWC3_GEVNTCOUNT_MASK;
-	if (!count)
+	if (!count) {
+		spin_unlock(&dwc->lock);
 		return IRQ_NONE;
+	}
 
 	evt->count = count;
 	evt->flags |= DWC3_EVENT_PENDING;
@@ -2914,6 +2917,7 @@ static irqreturn_t dwc3_check_event_buf(struct dwc3_event_buffer *evt)
 		memcpy(evt->cache, evt->buf, count - amount);
 
 	dwc3_writel(dwc->regs, DWC3_GEVNTCOUNT(0), count);
+	spin_unlock(&dwc->lock);
 
 	return IRQ_WAKE_THREAD;
 }
