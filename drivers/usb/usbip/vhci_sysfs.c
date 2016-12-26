@@ -214,7 +214,7 @@ static ssize_t store_detach(struct device *dev, struct device_attribute *attr,
 
 	ret = vhci_port_disconnect(hcd_to_vhci(hcd), rhport);
 	if (ret < 0)
-		return -EINVAL;
+		return ret;
 
 	usbip_dbg_vhci_sysfs("Leave\n");
 
@@ -314,7 +314,11 @@ static ssize_t store_attach(struct device *dev, struct device_attribute *attr,
 		sockfd_put(socket);
 
 		dev_err(dev, "port %d already used\n", rhport);
-		return -EINVAL;
+		/*
+		 * Will be retried from userspace
+		 * if there's another free port.
+		 */
+		return -EBUSY;
 	}
 
 	dev_info(dev, "pdev(%u) rhport(%u) sockfd(%d)\n",

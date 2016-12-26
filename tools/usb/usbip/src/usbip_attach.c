@@ -101,20 +101,22 @@ static int import_device(int sockfd, struct usbip_usb_device *udev)
 		return -1;
 	}
 
-	port = usbip_vhci_get_free_port();
-	if (port < 0) {
-		err("no free port");
-		usbip_vhci_driver_close();
-		return -1;
-	}
+	do {
+		port = usbip_vhci_get_free_port();
+		if (port < 0) {
+			err("no free port");
+			usbip_vhci_driver_close();
+			return -1;
+		}
 
-	rc = usbip_vhci_attach_device(port, sockfd, udev->busnum,
-				      udev->devnum, udev->speed);
-	if (rc < 0) {
-		err("import device");
-		usbip_vhci_driver_close();
-		return -1;
-	}
+		rc = usbip_vhci_attach_device(port, sockfd, udev->busnum,
+					      udev->devnum, udev->speed);
+		if (rc < 0 && errno != EBUSY) {
+			err("import device");
+			usbip_vhci_driver_close();
+			return -1;
+		}
+	} while (rc < 0);
 
 	usbip_vhci_driver_close();
 
