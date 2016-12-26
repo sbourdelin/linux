@@ -203,11 +203,6 @@ void v4l2_async_notifier_unregister(struct v4l2_async_notifier *notifier)
 		return;
 
 	dev = kmalloc_array(n_subdev, sizeof(*dev), GFP_KERNEL);
-	if (!dev) {
-		dev_err(notifier->v4l2_dev->dev,
-			"Failed to allocate device cache!\n");
-	}
-
 	mutex_lock(&list_lock);
 
 	list_del(&notifier->list);
