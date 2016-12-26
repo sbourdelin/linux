@@ -427,7 +427,6 @@ static void videobuf_vm_close(struct vm_area_struct *vma)
 		videobuf_queue_unlock(q);
 		kfree(map);
 	}
-	return;
 }
 
 /*
