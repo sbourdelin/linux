@@ -596,8 +596,6 @@ static int __videobuf_mmap_mapper(struct videobuf_queue *q,
 	unsigned int first, last, size = 0, i;
 	int retval;
 
-	retval = -EINVAL;
-
 	BUG_ON(!mem);
 	MAGIC_CHECK(mem->magic, MAGIC_SG_MEM);
 
@@ -613,16 +611,18 @@ static int __videobuf_mmap_mapper(struct videobuf_queue *q,
 	if (!size) {
 		dprintk(1, "mmap app bug: offset invalid [offset=0x%lx]\n",
 				(vma->vm_pgoff << PAGE_SHIFT));
+		retval = -EINVAL;
 		goto done;
 	}
 
 	last = first;
 
 	/* create mapping + update buffer list */
-	retval = -ENOMEM;
 	map = kmalloc(sizeof(struct videobuf_mapping), GFP_KERNEL);
-	if (!map)
+	if (!map) {
+		retval = -ENOMEM;
 		goto done;
+	}
 
 	size = 0;
 	for (i = first; i <= last; i++) {
