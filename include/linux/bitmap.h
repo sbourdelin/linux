@@ -46,6 +46,7 @@
  * bitmap_clear(dst, pos, nbits)		Clear specified bit area
  * bitmap_find_next_zero_area(buf, len, pos, n, mask)	Find bit free area
  * bitmap_find_next_zero_area_off(buf, len, pos, n, mask)	as above
+ * bitmap_find_next_zero_area_and_size(buf, len, pos, n, mask)	Find bit free area and its size
  * bitmap_shift_right(dst, src, n, nbits)	*dst = *src >> n
  * bitmap_shift_left(dst, src, n, nbits)	*dst = *src << n
  * bitmap_remap(dst, src, old, new, nbits)	*dst = map(old, new)(src)
@@ -122,6 +123,11 @@ extern unsigned long bitmap_find_next_zero_area_off(unsigned long *map,
 						    unsigned int nr,
 						    unsigned long align_mask,
 						    unsigned long align_offset);
+
+extern unsigned long bitmap_find_next_zero_area_and_size(unsigned long *map,
+							 unsigned long size,
+							 unsigned long start,
+							 unsigned int *nr);
 
 /**
  * bitmap_find_next_zero_area - find a contiguous aligned zero area
