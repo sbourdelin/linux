@@ -1,0 +1,36 @@
+* Samsung Exynos5433 PCIe interface
+
+This PCIe host controller is based on the Synopsis Designware PCIe IP
+and thus inherits all the common properties defined in designware-pcie.txt.
+
+Required properties:
+- compatible: "samsung,exynos5433-pcie"
+- reg: base addresses and lengths of the pcie controller,
+	the phy controller, additional register for the phy controller.
+- reg-names: Must be "elbi", "phy" and "dbi" for each regs
+- interrupt-names: Must be "intr" for legacy interrupt pin.
+
+Other common properites refer to
+	Documentation/devicetree/binding/pci/designware-pcie.txt
+
+Example:
+
+	pcie: pcie@15700000 {
+		compatible ="samsung,exynos5433-pcie", "snps,dw-pcie";
+		#address-cells = <3>;
+		#size-cells = <2>;
+		device_type = "pci";
+		interrupts = <GIC_SPI 245 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "intr";
+		clocks = <&cmu_fsys CLK_PCIE>, <&cmu_fsys CLK_PCLK_PCIE_PHY>;
+		clock-names = "pcie", "pcie_bus";
+		num-lanes = <1>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pcie_bus>;
+		reg = <0x156b0000 0x1000>, <0x15680000 0x1000>,
+		    <0x15700000 0x1000>, <0x0c000000 0x1000>;
+		reg-names = "elbi", "phy", "dbi", "config";
+		ranges = <0x81000000 0 0	  0x0c001000 0 0x00010000
+			  0x82000000 0 0x0c011000 0x0c011000 0 0x3feefff>;
+		status = "disabled";
+	};
