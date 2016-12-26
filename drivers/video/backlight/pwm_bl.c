@@ -202,7 +202,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 	struct pwm_bl_data *pb;
 	int initial_blank = FB_BLANK_UNBLANK;
 	struct pwm_args pargs;
-	int ret;
+	int ret, i;
 
 	if (!data) {
 		ret = pwm_backlight_parse_dt(&pdev->dev, &defdata);
@@ -348,6 +348,14 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 
 	bl->props.brightness = data->dft_brightness;
 	bl->props.power = initial_blank;
+
+	if (initial_blank == FB_BLANK_UNBLANK) {
+		for (i = 0; i < FB_MAX; i++)
+			bl->fb_bl_on[i] = true;
+
+		bl->use_count = 1;
+	}
+
 	backlight_update_status(bl);
 
 	platform_set_drvdata(pdev, bl);
