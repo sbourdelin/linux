@@ -805,6 +805,11 @@
 			reg = <0x145f0000 0x1038>;
 		};
 
+		syscon_fsys: syscon@156f0000 {
+			compatible = "syscon";
+			reg = <0x156f0000 0x1044>;
+		};
+
 		gsc_0: video-scaler@13C00000 {
 			compatible = "samsung,exynos5433-gsc";
 			reg = <0x13c00000 0x1000>;
@@ -1442,6 +1447,15 @@
 				pinctrl-0 = <&uart_aud_bus>;
 				status = "disabled";
 			};
+		};
+
+		pcie_phy: pcie-phy@15680000 {
+			#phy-cells = <0>;
+			compatible = "samsung,exynos5433-pcie-phy";
+			reg = <0x15680000 0x1000>;
+			samsung,pmureg-phandle = <&pmu_system_controller>;
+			samsung,fsys-sysreg = <&syscon_fsys>;
+			status = "okay";
 		};
 	};
 
