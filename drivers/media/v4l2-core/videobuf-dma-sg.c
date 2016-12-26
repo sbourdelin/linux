@@ -618,7 +618,7 @@ static int __videobuf_mmap_mapper(struct videobuf_queue *q,
 	last = first;
 
 	/* create mapping + update buffer list */
-	map = kmalloc(sizeof(struct videobuf_mapping), GFP_KERNEL);
+	map = kmalloc(sizeof(*map), GFP_KERNEL);
 	if (!map) {
 		retval = -ENOMEM;
 		goto done;
