@@ -1457,6 +1457,29 @@
 			samsung,fsys-sysreg = <&syscon_fsys>;
 			status = "okay";
 		};
+
+		pcie: pcie@15700000 {
+			compatible = "samsung,exynos5433-pcie", "snps,dw-pcie";
+			#address-cells = <3>;
+			#size-cells = <2>;
+			device_type = "pci";
+			interrupts = <GIC_SPI 245 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "intr";
+			clocks = <&cmu_fsys CLK_PCIE>,
+			       <&cmu_fsys CLK_PCLK_PCIE_PHY>;
+			clock-names = "pcie", "pcie_bus";
+			num-lanes = <1>;
+			pinctrl-names = "default";
+			phys = <&pcie_phy>;
+			phy-names = "pcie-phy";
+			pinctrl-0 = <&pcie_bus &pcie_wlanen>;
+			reg = <0x156b0000 0x1000>, <0x15700000 0x1000>,
+			    <0x0c000000 0x1000>;
+			reg-names = "elbi", "dbi", "config";
+			ranges = <0x81000000 0 0	  0x0c001000 0 0x00010000
+				  0x82000000 0 0x0c011000 0x0c011000 0 0x3feefff>;
+			status = "disabled";
+		};
 	};
 
 	timer: timer {

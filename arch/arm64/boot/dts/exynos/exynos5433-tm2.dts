@@ -737,6 +737,15 @@
 	bus-width = <4>;
 };
 
+&pcie {
+	assigned-clocks = <&cmu_fsys CLK_MOUT_SCLK_PCIE_100_USER>,
+			<&cmu_top CLK_MOUT_SCLK_PCIE_100>;
+	assigned-clock-parents = <&cmu_top CLK_SCLK_PCIE_100_FSYS>,
+			<&cmu_top CLK_MOUT_BUS_PLL_USER>;
+	assigned-clock-rates = <0>, <100000000>;
+	status = "okay";
+};
+
 &pinctrl_alive {
 	pinctrl-names = "default";
 	pinctrl-0 = <&initial_alive>;
@@ -836,7 +845,6 @@
 	pinctrl-0 = <&initial_ese>;
 
 	initial_ese: initial-state {
-		PIN(IN, gpj2-0, DOWN, LV1);
 		PIN(IN, gpj2-1, DOWN, LV1);
 		PIN(IN, gpj2-2, DOWN, LV1);
 	};
@@ -851,7 +859,6 @@
 		PIN(IN, gpr3-1, DOWN, LV1);
 		PIN(IN, gpr3-2, DOWN, LV1);
 		PIN(IN, gpr3-3, DOWN, LV1);
-		PIN(IN, gpr3-7, NONE, LV1);
 	};
 };
 
