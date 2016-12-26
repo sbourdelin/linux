@@ -171,10 +171,10 @@ static int videobuf_dma_init_user_locked(struct videobuf_dmabuf *dma,
 	}
 
 	first = (data          & PAGE_MASK) >> PAGE_SHIFT;
-	last  = ((data+size-1) & PAGE_MASK) >> PAGE_SHIFT;
+	last  = ((data + size - 1) & PAGE_MASK) >> PAGE_SHIFT;
 	dma->offset = data & ~PAGE_MASK;
 	dma->size = size;
-	dma->nr_pages = last-first+1;
+	dma->nr_pages = last - first + 1;
 	dma->pages = kmalloc_array(dma->nr_pages,
 				   sizeof(*dma->pages),
 				   GFP_KERNEL);
