@@ -1,0 +1,9 @@
+#
+# Aquantia device configuration
+#
+
+config AQTION
+	tristate "Aquantia AQtion Support"
+	depends on PCI
+	---help---
+	  This enables the support for the Aquantia AQtion Ethernet card.
