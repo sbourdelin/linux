@@ -31,6 +31,11 @@ enum led_brightness {
 	LED_FULL	= 255,
 };
 
+enum led_brightness_update_reason {
+	LED_BRIGHTNESS_UPDATE_HOTKEY,
+	LED_BRIGHTNESS_UPDATE_SYSFS,
+};
+
 struct led_classdev {
 	const char		*name;
 	enum led_brightness	 brightness;
@@ -123,6 +128,8 @@ extern void devm_led_classdev_unregister(struct device *parent,
 					 struct led_classdev *led_cdev);
 extern void led_classdev_suspend(struct led_classdev *led_cdev);
 extern void led_classdev_resume(struct led_classdev *led_cdev);
+extern void led_brightness_force_update(struct led_classdev *led_cdev,
+				enum led_brightness_update_reason reason);
 
 /**
  * led_blink_set - set blinking with software fallback

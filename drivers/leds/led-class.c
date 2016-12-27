@@ -25,6 +25,27 @@
 
 static struct class *leds_class;
 
+static void brightness_generate_event(struct led_classdev *led_cdev,
+				      enum led_brightness_update_reason reason)
+{
+	char *envp[2];
+
+	switch (reason) {
+	case LED_BRIGHTNESS_UPDATE_SYSFS:
+		envp[0] = "SOURCE=sysfs";
+		break;
+	case LED_BRIGHTNESS_UPDATE_HOTKEY:
+		envp[0] = "SOURCE=hotkey";
+		break;
+	default:
+		envp[0] = "SOURCE=unknown";
+		break;
+	}
+	envp[1] = NULL;
+	kobject_uevent_env(&led_cdev->dev->kobj, KOBJ_CHANGE, envp);
+	sysfs_notify(&led_cdev->dev->kobj, NULL, "brightness");
+}
+
 static ssize_t brightness_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -57,6 +78,8 @@ static ssize_t brightness_store(struct device *dev,
 	if (state == LED_OFF)
 		led_trigger_remove(led_cdev);
 	led_set_brightness(led_cdev, state);
+
+	brightness_generate_event(led_cdev, LED_BRIGHTNESS_UPDATE_SYSFS);
 
 	ret = size;
 unlock:
@@ -128,6 +151,25 @@ void led_classdev_resume(struct led_classdev *led_cdev)
 	led_cdev->flags &= ~LED_SUSPENDED;
 }
 EXPORT_SYMBOL_GPL(led_classdev_resume);
+
+/**
+ * led_brightness_force_update - tell the backlight subsystem that hardware
+ *   state has changed
+ * @led_cdev: the led device to update
+ *
+ * Updates the internal state of the backlight in response to a hardware event,
+ * and generate a uevent to notify userspace
+ */
+void led_brightness_force_update(struct led_classdev *led_cdev,
+				 enum led_brightness_update_reason reason)
+{
+	mutex_lock(&led_cdev->led_access);
+	if (led_cdev->brightness_get)
+		led_cdev->brightness = led_cdev->brightness_get(led_cdev);
+	mutex_unlock(&led_cdev->led_access);
+	brightness_generate_event(led_cdev, reason);
+}
+EXPORT_SYMBOL(led_brightness_force_update);
 
 #ifdef CONFIG_PM_SLEEP
 static int led_suspend(struct device *dev)
