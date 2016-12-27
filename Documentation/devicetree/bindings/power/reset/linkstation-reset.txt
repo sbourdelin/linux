@@ -1,0 +1,26 @@
+* Buffalo Linkstation Reset Driver
+
+Power of some Buffalo Linkstation or KuroBox Pro is managed by
+micro-controller, which connects to UART1. After being fed from UART1
+by a few magic numbers, the so-called power-off command,
+the micro-controller will turn power off the device.
+
+This is very similar to QNAP or Synology NAS devices, which is
+described in qnap-poweroff.txt, however the command is much simpler,
+only 1-byte long and without checksums.
+
+This driver adds a handler to pm_power_off which is called to turn the
+power off.
+
+Required Properties:
+- compatible: Should be "linkstation,power-off"
+- reg: Address and length of the register set for UART1
+- clocks: tclk clock
+
+Example:
+
+	reset {
+		compatible = "linkstation,power-off";
+		reg = <0x12100 0x100>;
+		clocks = <&core_clk 0>;
+	};
