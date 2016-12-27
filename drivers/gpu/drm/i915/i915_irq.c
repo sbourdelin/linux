@@ -115,6 +115,12 @@ static const u32 hpd_bxt[HPD_NUM_PINS] = {
 	[HPD_PORT_C] = BXT_DE_PORT_HP_DDIC
 };
 
+static const u32 hpd_bxt_pcu[HPD_NUM_PINS] = {
+	[HPD_PORT_A] = BXT_PCU_DC9_HP_DDIA,
+	[HPD_PORT_B] = BXT_PCU_DC9_HP_DDIB,
+	[HPD_PORT_C] = BXT_PCU_DC9_HP_DDIC
+};
+
 /* IIR can theoretically queue up two events. Be paranoid. */
 #define GEN8_IRQ_RESET_NDX(type, which) do { \
 	I915_WRITE(GEN8_##type##_IMR(which), 0xffffffff); \
@@ -2537,12 +2543,49 @@ gen8_de_irq_handler(struct drm_i915_private *dev_priv, u32 master_ctl)
 	return ret;
 }
 
+static irqreturn_t
+gen8_pcu_irq_ack(struct drm_i915_private *dev_priv,
+		 u32 master_ctl, u32 *pcu_iir)
+{
+	irqreturn_t ret = IRQ_NONE;
+
+	if (master_ctl & GEN8_PCU_IRQ) {
+		*pcu_iir = I915_READ(GEN8_PCU_IIR);
+
+		if (*pcu_iir) {
+			I915_WRITE(GEN8_PCU_IIR, *pcu_iir);
+			ret = IRQ_HANDLED;
+		} else {
+			DRM_ERROR("The master control interrupt lied (PCU)!\n");
+		}
+	}
+
+	return ret;
+}
+
+static void
+gen8_pcu_irq_handler(struct drm_i915_private *dev_priv, u32 pcu_iir)
+{
+	bool found = false;
+
+	if (IS_BROXTON(dev_priv) && (pcu_iir & BXT_PCU_DC9_HOTPLUG_MASK)) {
+		u32 tmp_mask = pcu_iir & BXT_PCU_DC9_HOTPLUG_MASK;
+
+		bxt_hpd_irq_handler(dev_priv, tmp_mask,	hpd_bxt_pcu);
+		found = true;
+	}
+
+	if (!found)
+		DRM_ERROR("Unexpected PCU interrupt\n");
+}
+
 static irqreturn_t gen8_irq_handler(int irq, void *arg)
 {
 	struct drm_device *dev = arg;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	u32 master_ctl;
 	u32 gt_iir[4] = {};
+	u32 pcu_iir = 0;
 	irqreturn_t ret;
 
 	if (!intel_irqs_enabled(dev_priv))
@@ -2560,7 +2603,9 @@ static irqreturn_t gen8_irq_handler(int irq, void *arg)
 
 	/* Find, clear, then process each source of interrupt */
 	ret = gen8_gt_irq_ack(dev_priv, master_ctl, gt_iir);
+	ret |= gen8_pcu_irq_ack(dev_priv, master_ctl, &pcu_iir);
 	gen8_gt_irq_handler(dev_priv, gt_iir);
+	gen8_pcu_irq_handler(dev_priv, pcu_iir);
 	ret |= gen8_de_irq_handler(dev_priv, master_ctl);
 
 	I915_WRITE_FW(GEN8_MASTER_IRQ, GEN8_MASTER_IRQ_CONTROL);
@@ -4290,6 +4335,17 @@ void intel_irq_uninstall(struct drm_i915_private *dev_priv)
 	dev_priv->pm.irqs_enabled = false;
 }
 
+static void bxt_enable_pcu_interrupt(struct drm_i915_private *dev_priv)
+{
+	u32 de_pcu_hpd_enable_mask, de_pcu_imr, de_pcu_ier;
+
+	de_pcu_hpd_enable_mask = BXT_PCU_DC9_HOTPLUG_MASK;
+
+	de_pcu_imr = (I915_READ(GEN8_PCU_IMR) & ~de_pcu_hpd_enable_mask);
+	de_pcu_ier = (I915_READ(GEN8_PCU_IER) | de_pcu_hpd_enable_mask);
+	GEN5_IRQ_INIT(GEN8_PCU_, de_pcu_imr, de_pcu_ier);
+}
+
 /**
  * intel_runtime_pm_disable_interrupts - runtime interrupt disabling
  * @dev_priv: i915 device instance
@@ -4302,6 +4358,23 @@ void intel_runtime_pm_disable_interrupts(struct drm_i915_private *dev_priv)
 	dev_priv->drm.driver->irq_uninstall(&dev_priv->drm);
 	dev_priv->pm.irqs_enabled = false;
 	synchronize_irq(dev_priv->drm.irq);
+
+	if (IS_BROXTON(dev_priv) && dev_priv->vbt.hpd_wakeup_enabled) {
+		unsigned long flags = 0;
+
+		/* Enable HPD related interrupts during DC9 for HPD wakeup */
+		spin_lock_irqsave(&dev_priv->irq_lock, flags);
+		if (dev_priv->display.hpd_irq_setup)
+			dev_priv->display.hpd_irq_setup(dev_priv);
+		spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
+
+		bxt_enable_pcu_interrupt(dev_priv);
+
+		dev_priv->pm.irqs_enabled = true;
+		I915_WRITE(GEN8_MASTER_IRQ, GEN8_MASTER_IRQ_CONTROL);
+		POSTING_READ(GEN8_MASTER_IRQ);
+
+	}
 }
 
 /**
