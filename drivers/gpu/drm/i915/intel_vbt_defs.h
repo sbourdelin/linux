@@ -563,7 +563,8 @@ struct bdb_driver_features {
 	u16 tbt_enabled:1;
 	u16 psr_enabled:1;
 	u16 ips_enabled:1;
-	u16 reserved3:4;
+	u16 reserved3:3;
+	u16 hpd_wakeup_source:1;
 	u16 pc_feature_valid:1;
 } __packed;
 
