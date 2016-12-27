@@ -1043,19 +1043,32 @@ void gb_connection_recv(struct gb_connection *connection,
 }
 
 /*
- * Cancel an outgoing operation synchronously, and record the given error to
+ * Cancel an outgoing operation asynchronously, and record the given error to
  * indicate why.
  */
-void gb_operation_cancel(struct gb_operation *operation, int errno)
+int gb_operation_cancel_async(struct gb_operation *operation, int errno)
 {
 	if (WARN_ON(gb_operation_is_incoming(operation)))
-		return;
+		return -EINVAL;
 
 	if (gb_operation_result_set(operation, errno)) {
 		gb_message_cancel(operation->request);
 		queue_work(gb_operation_completion_wq, &operation->work);
 	}
 	trace_gb_message_cancel_outgoing(operation->request);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(gb_operation_cancel_async);
+
+/*
+ * Cancel an outgoing operation synchronously, and record the given error to
+ * indicate why.
+ */
+void gb_operation_cancel(struct gb_operation *operation, int errno)
+{
+	if (gb_operation_cancel_async(operation, errno))
+		return;
 
 	atomic_inc(&operation->waiters);
 	wait_event(gb_operation_cancellation_queue,
