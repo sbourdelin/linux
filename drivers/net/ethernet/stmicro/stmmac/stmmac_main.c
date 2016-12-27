@@ -1770,6 +1770,14 @@ static int stmmac_open(struct net_device *dev)
 	struct stmmac_priv *priv = netdev_priv(dev);
 	int ret;
 
+	ret = wait_for_completion_interruptible(&priv->probe_done);
+	if (ret) {
+		netdev_err(priv->dev,
+			   "%s: Interrupted while waiting probe completion\n",
+			   __func__);
+		return ret;
+	}
+
 	stmmac_check_ether_addr(priv);
 
 	if (priv->hw->pcs != STMMAC_PCS_RGMII &&
@@ -3226,6 +3234,7 @@ int stmmac_dvr_probe(struct device *device,
 	priv = netdev_priv(ndev);
 	priv->device = device;
 	priv->dev = ndev;
+	init_completion(&priv->probe_done);
 
 	stmmac_set_ethtool_ops(ndev);
 	priv->pause = pause;
@@ -3372,6 +3381,7 @@ int stmmac_dvr_probe(struct device *device,
 		}
 	}
 
+	complete_all(&priv->probe_done);
 	return 0;
 
 error_mdio_register:

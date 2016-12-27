@@ -131,6 +131,7 @@ struct stmmac_priv {
 	u32 rx_tail_addr;
 	u32 tx_tail_addr;
 	u32 mss;
+	struct completion probe_done;
 
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *dbgfs_dir;
