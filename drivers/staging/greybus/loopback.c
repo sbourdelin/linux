@@ -95,7 +95,7 @@ struct gb_loopback {
 	u32 requests_completed;
 	u32 requests_timedout;
 	u32 timeout;
-	u32 jiffy_timeout;
+	u32 msec_timeout;
 	u32 timeout_min;
 	u32 timeout_max;
 	u32 outstanding_operations_max;
@@ -113,7 +113,7 @@ static struct class loopback_class = {
 };
 static DEFINE_IDA(loopback_ida);
 
-/* Min/max values in jiffies */
+/* Min/max values in milliseconds */
 #define GB_LOOPBACK_TIMEOUT_MIN				1
 #define GB_LOOPBACK_TIMEOUT_MAX				10000
 
@@ -263,11 +263,11 @@ static void gb_loopback_check_attr(struct gb_loopback *gb)
 	case GB_LOOPBACK_TYPE_PING:
 	case GB_LOOPBACK_TYPE_TRANSFER:
 	case GB_LOOPBACK_TYPE_SINK:
-		gb->jiffy_timeout = usecs_to_jiffies(gb->timeout);
-		if (!gb->jiffy_timeout)
-			gb->jiffy_timeout = GB_LOOPBACK_TIMEOUT_MIN;
-		else if (gb->jiffy_timeout > GB_LOOPBACK_TIMEOUT_MAX)
-			gb->jiffy_timeout = GB_LOOPBACK_TIMEOUT_MAX;
+		gb->msec_timeout = gb->timeout / 1000;
+		if (!gb->msec_timeout)
+			gb->msec_timeout = GB_LOOPBACK_TIMEOUT_MIN;
+		else if (gb->msec_timeout > GB_LOOPBACK_TIMEOUT_MAX)
+			gb->msec_timeout = GB_LOOPBACK_TIMEOUT_MAX;
 		gb_loopback_reset_stats(gb);
 		wake_up(&gb->wq);
 		break;
@@ -525,7 +525,7 @@ static int gb_loopback_async_operation(struct gb_loopback *gb, int type,
 
 	mutex_lock(&gb->mutex);
 	ret = gb_operation_request_send_timeout(operation,
-					jiffies_to_msecs(gb->jiffy_timeout),
+					gb->msec_timeout,
 					gb_loopback_async_operation_callback,
 					GFP_KERNEL);
 	if (ret)
