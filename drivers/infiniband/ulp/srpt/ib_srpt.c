@@ -809,7 +809,7 @@ static int srpt_alloc_rw_ctxs(struct srpt_send_ioctx *ioctx,
 	enum dma_data_direction dir = target_reverse_dma_direction(&ioctx->cmd);
 	struct srpt_rdma_ch *ch = ioctx->ch;
 	struct scatterlist *prev = NULL;
-	unsigned prev_nents;
+	unsigned prev_nents = 0;
 	int ret, i;
 
 	if (nbufs == 1) {
