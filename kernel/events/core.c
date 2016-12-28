@@ -7079,9 +7079,9 @@ int perf_event_account_interrupt(struct perf_event *event)
  * Generic event overflow handling, sampling.
  */
 
-static int __perf_event_overflow(struct perf_event *event,
-				   int throttle, struct perf_sample_data *data,
-				   struct pt_regs *regs)
+int perf_event_overflow_throttle(struct perf_event *event,
+				 int throttle, struct perf_sample_data *data,
+				 struct pt_regs *regs)
 {
 	int events = atomic_read(&event->event_limit);
 	int ret = 0;
@@ -7122,7 +7122,7 @@ int perf_event_overflow(struct perf_event *event,
 			  struct perf_sample_data *data,
 			  struct pt_regs *regs)
 {
-	return __perf_event_overflow(event, 1, data, regs);
+	return perf_event_overflow_throttle(event, 1, data, regs);
 }
 
 /*
@@ -7184,8 +7184,8 @@ static void perf_swevent_overflow(struct perf_event *event, u64 overflow,
 		return;
 
 	for (; overflow; overflow--) {
-		if (__perf_event_overflow(event, throttle,
-					    data, regs)) {
+		if (perf_event_overflow_throttle(event, throttle,
+						 data, regs)) {
 			/*
 			 * We inhibit the overflow from happening when
 			 * hwc->interrupts == MAX_INTERRUPTS.
@@ -8298,7 +8298,7 @@ static enum hrtimer_restart perf_swevent_hrtimer(struct hrtimer *hrtimer)
 
 	if (regs && !perf_exclude_event(event, regs)) {
 		if (!(event->attr.exclude_idle && is_idle_task(current)))
-			if (__perf_event_overflow(event, 1, &data, regs))
+			if (perf_event_overflow_throttle(event, 1, &data, regs))
 				ret = HRTIMER_NORESTART;
 	}
 

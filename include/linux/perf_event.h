@@ -966,6 +966,10 @@ extern int perf_event_overflow(struct perf_event *event,
 				 struct perf_sample_data *data,
 				 struct pt_regs *regs);
 
+extern int perf_event_overflow_throttle(struct perf_event *event,
+					int throttle, struct perf_sample_data *data,
+					struct pt_regs *regs);
+
 extern void perf_event_output_forward(struct perf_event *event,
 				     struct perf_sample_data *data,
 				     struct pt_regs *regs);
