@@ -1116,6 +1116,13 @@ int x86_perf_event_set_period(struct perf_event *event)
 		return 0;
 
 	/*
+	 * For non sampling event, we are not interested
+	 * in leftover, force the count from beginning.
+	 */
+	if (left && !is_sampling_event(event))
+		left = 0;
+
+	/*
 	 * If we are way outside a reasonable range then just skip forward:
 	 */
 	if (unlikely(left <= -period)) {
