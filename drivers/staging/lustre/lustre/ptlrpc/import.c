@@ -1447,9 +1447,9 @@ int ptlrpc_import_recovery_state_machine(struct obd_import *imp)
 	}
 
 	if (imp->imp_state == LUSTRE_IMP_REPLAY_WAIT) {
-		if (atomic_read(&imp->imp_replay_inflight) == 0) {
+		if (atomic_read(&imp->imp_replay_inflight) == 0)
 			IMPORT_SET_STATE(imp, LUSTRE_IMP_RECOVER);
-		}
+
 	}
 
 	if (imp->imp_state == LUSTRE_IMP_RECOVER) {
