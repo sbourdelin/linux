@@ -1123,6 +1123,26 @@ const char *reg_initiator_name(enum nl80211_reg_initiator initiator)
 }
 EXPORT_SYMBOL(reg_initiator_name);
 
+static bool reg_center_freq_of_valid(struct wiphy *wiphy,
+				     struct ieee80211_channel *chan)
+{
+	struct device_node *np = wiphy_dev(wiphy)->of_node;
+	u32 val;
+
+	if (!np)
+		return true;
+
+	if (!of_property_read_u32(np, "ieee80211-min-center-freq", &val) &&
+	    chan->center_freq < KHZ_TO_MHZ(val))
+		return false;
+
+	if (!of_property_read_u32(np, "ieee80211-max-center-freq", &val) &&
+	    chan->center_freq > KHZ_TO_MHZ(val))
+		return false;
+
+	return true;
+}
+
 static uint32_t reg_rule_to_chan_bw_flags(const struct ieee80211_regdomain *regd,
 					  const struct ieee80211_reg_rule *reg_rule,
 					  const struct ieee80211_channel *chan)
@@ -1206,6 +1226,13 @@ static void handle_channel(struct wiphy *wiphy,
 				 chan->center_freq);
 			chan->flags |= IEEE80211_CHAN_DISABLED;
 		}
+		return;
+	}
+
+	if (!reg_center_freq_of_valid(wiphy, chan)) {
+		pr_debug("Disabling freq %d MHz as it's out of OF limits\n",
+			 chan->center_freq);
+		chan->flags |= IEEE80211_CHAN_DISABLED;
 		return;
 	}
 
@@ -1738,6 +1765,13 @@ static void handle_channel_custom(struct wiphy *wiphy,
 			chan->orig_flags |= IEEE80211_CHAN_DISABLED;
 			chan->flags = chan->orig_flags;
 		}
+		return;
+	}
+
+	if (!reg_center_freq_of_valid(wiphy, chan)) {
+		pr_debug("Disabling freq %d MHz as it's out of OF limits\n",
+			 chan->center_freq);
+		chan->flags |= IEEE80211_CHAN_DISABLED;
 		return;
 	}
 
