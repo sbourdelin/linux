@@ -708,7 +708,8 @@ static void cpdma_chan_set_descs(struct cpdma_ctlr *ctlr,
 		}
 	}
 	/* use remains */
-	most_chan->desc_num += desc_cnt;
+	if (most_chan)
+		most_chan->desc_num += desc_cnt;
 }
 
 /**
