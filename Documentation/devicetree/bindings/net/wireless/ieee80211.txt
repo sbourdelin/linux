@@ -1,0 +1,16 @@
+Common IEEE 802.11 properties
+
+This provides documentation of common properties that are handled by a proper
+net layer and don't require extra driver code.
+
+Optional properties:
+ - ieee80211-min-center-freq : minimal supported frequency in KHz
+ - ieee80211-max-center-freq : maximal supported frequency in KHz
+
+Example:
+
+pcie@0,0 {
+	reg = <0x0000 0 0 0 0>;
+	ieee80211-min-center-freq = <2437000>;
+	ieee80211-max-center-freq = <2457000>;
+};
