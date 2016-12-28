@@ -1865,6 +1865,7 @@ int tc_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 	const struct tcf_proto *old_tp = tp;
 	int limit = 0;
 
+	skb->tc_at_ingress = !!(tp && tp->q->flags & TCQ_F_INGRESS);
 reclassify:
 #endif
 	for (; tp; tp = rcu_dereference_bh(tp->next)) {
