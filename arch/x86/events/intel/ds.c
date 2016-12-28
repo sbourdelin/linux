@@ -603,7 +603,7 @@ static inline void intel_pmu_drain_pebs_buffer(void)
 {
 	struct pt_regs regs;
 
-	x86_pmu.drain_pebs(&regs);
+	x86_pmu.drain_pebs(&regs, 0);
 }
 
 void intel_pmu_pebs_sched_task(struct perf_event_context *ctx, bool sched_in)
@@ -1233,7 +1233,7 @@ get_next_pebs_record_by_bit(void *base, void *top, int bit)
 static void __intel_pmu_pebs_event(struct perf_event *event,
 				   struct pt_regs *iregs,
 				   void *base, void *top,
-				   int bit, int count)
+				   int bit, int count, int pmi)
 {
 	struct perf_sample_data data;
 	struct pt_regs regs;
@@ -1257,14 +1257,14 @@ static void __intel_pmu_pebs_event(struct perf_event *event,
 	 * All but the last records are processed.
 	 * The last one is left to be able to call the overflow handler.
 	 */
-	if (perf_event_overflow(event, &data, &regs)) {
+	if (perf_event_overflow_throttle(event, pmi, &data, &regs)) {
 		x86_pmu_stop(event, 0);
 		return;
 	}
 
 }
 
-static void intel_pmu_drain_pebs_core(struct pt_regs *iregs)
+static void intel_pmu_drain_pebs_core(struct pt_regs *iregs, int pmi)
 {
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
 	struct debug_store *ds = cpuc->ds;
@@ -1295,10 +1295,10 @@ static void intel_pmu_drain_pebs_core(struct pt_regs *iregs)
 	if (n <= 0)
 		return;
 
-	__intel_pmu_pebs_event(event, iregs, at, top, 0, n);
+	__intel_pmu_pebs_event(event, iregs, at, top, 0, n, pmi);
 }
 
-static void intel_pmu_drain_pebs_nhm(struct pt_regs *iregs)
+static void intel_pmu_drain_pebs_nhm(struct pt_regs *iregs, int pmi)
 {
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
 	struct debug_store *ds = cpuc->ds;
@@ -1392,13 +1392,14 @@ static void intel_pmu_drain_pebs_nhm(struct pt_regs *iregs)
 		if (error[bit]) {
 			perf_log_lost_samples(event, error[bit]);
 
-			if (perf_event_account_interrupt(event))
+			if (pmi && perf_event_account_interrupt(event))
 				x86_pmu_stop(event, 0);
 		}
 
 		if (counts[bit]) {
 			__intel_pmu_pebs_event(event, iregs, base,
-					       top, bit, counts[bit]);
+					       top, bit, counts[bit],
+					       pmi);
 		}
 	}
 }

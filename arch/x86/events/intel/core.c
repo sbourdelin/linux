@@ -2137,7 +2137,7 @@ again:
 	 */
 	if (__test_and_clear_bit(62, (unsigned long *)&status)) {
 		handled++;
-		x86_pmu.drain_pebs(regs);
+		x86_pmu.drain_pebs(regs, 1);
 		status &= x86_pmu.intel_ctrl | GLOBAL_STATUS_TRACE_TOPAPMI;
 	}
 
