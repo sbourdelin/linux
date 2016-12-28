@@ -426,11 +426,9 @@ int tcf_action_exec(struct sk_buff *skb, struct tc_action **actions,
 {
 	int ret = -1, i;
 
-	if (skb->tc_verd & TC_NCLS) {
-		skb->tc_verd = CLR_TC_NCLS(skb->tc_verd);
-		ret = TC_ACT_OK;
-		goto exec_done;
-	}
+	if (skb_skip_tc_classify(skb))
+		return TC_ACT_OK;
+
 	for (i = 0; i < nr_actions; i++) {
 		const struct tc_action *a = actions[i];
 
