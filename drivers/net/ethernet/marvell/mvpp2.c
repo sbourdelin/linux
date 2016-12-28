@@ -154,6 +154,7 @@
 
 /* Interrupt Cause and Mask registers */
 #define MVPP2_ISR_RX_THRESHOLD_REG(rxq)		(0x5200 + 4 * (rxq))
+#define     MVPP2_MAX_ISR_RX_THRESHOLD		0xfffff0
 #define MVPP2_ISR_RXQ_GROUP_REG(rxq)		(0x5400 + 4 * (rxq))
 #define MVPP2_ISR_ENABLE_REG(port)		(0x5420 + 4 * (port))
 #define     MVPP2_ISR_ENABLE_INTERRUPT(mask)	((mask) & 0xffff)
@@ -4397,6 +4398,12 @@ static void mvpp2_rx_time_coal_set(struct mvpp2_port *port,
 	u32 val;
 
 	val = (port->priv->tclk / USEC_PER_SEC) * usec;
+
+	if (val > MVPP2_MAX_ISR_RX_THRESHOLD) {
+		val = MVPP2_MAX_ISR_RX_THRESHOLD;
+		usec = (val * USEC_PER_SEC) / port->priv->tclk;
+	}
+
 	mvpp2_write(port->priv, MVPP2_ISR_RX_THRESHOLD_REG(rxq->id), val);
 
 	rxq->time_coal = usec;
