@@ -1934,6 +1934,7 @@ static int process_ctrl_td(struct xhci_hcd *xhci, struct xhci_td *td,
 {
 	struct xhci_virt_device *xdev;
 	struct xhci_ring *ep_ring;
+	struct device *dev;
 	unsigned int slot_id;
 	int ep_index;
 	struct xhci_ep_ctx *ep_ctx;
@@ -1950,15 +1951,15 @@ static int process_ctrl_td(struct xhci_hcd *xhci, struct xhci_td *td,
 	trb_comp_code = GET_COMP_CODE(le32_to_cpu(event->transfer_len));
 	requested = td->urb->transfer_buffer_length;
 	remaining = EVENT_TRB_LEN(le32_to_cpu(event->transfer_len));
+	dev = xhci_to_hcd(xhci)->self.controller;
 
 	switch (trb_comp_code) {
 	case COMP_SUCCESS:
-		if (trb_type != TRB_STATUS) {
-			xhci_warn(xhci, "WARN: Success on ctrl %s TRB without IOC set?\n",
-					(trb_type == TRB_DATA) ? "data" : "setup");
-			*status = -ESHUTDOWN;
-			break;
-		}
+		dev_WARN_ONCE(dev, trb_type != TRB_STATUS,
+				"ep%d%s: unexpected success! TRB Type %d\n",
+				usb_endpoint_num(&td->urb->ep->desc),
+				usb_endpoint_dir_in(&td->urb->ep->desc) ?
+				"in" : "out", trb_type);
 		*status = 0;
 		break;
 	case COMP_SHORT_PACKET:
@@ -2150,6 +2151,7 @@ static int process_bulk_intr_td(struct xhci_hcd *xhci, struct xhci_td *td,
 	struct xhci_virt_ep *ep, int *status)
 {
 	struct xhci_ring *ep_ring;
+	struct device *dev;
 	u32 trb_comp_code;
 	u32 remaining, requested, ep_trb_len;
 
@@ -2158,16 +2160,16 @@ static int process_bulk_intr_td(struct xhci_hcd *xhci, struct xhci_td *td,
 	remaining = EVENT_TRB_LEN(le32_to_cpu(event->transfer_len));
 	ep_trb_len = TRB_LEN(le32_to_cpu(ep_trb->generic.field[2]));
 	requested = td->urb->transfer_buffer_length;
+	dev = xhci_to_hcd(xhci)->self.controller;
 
 	switch (trb_comp_code) {
 	case COMP_SUCCESS:
-		/* handle success with untransferred data as short packet */
-		if (ep_trb != td->last_trb || remaining) {
-			xhci_warn(xhci, "WARN Successful completion on short TX\n");
-			xhci_dbg(xhci, "ep %#x - asked for %d bytes, %d bytes untransferred\n",
-				 td->urb->ep->desc.bEndpointAddress,
-				 requested, remaining);
-		}
+		dev_WARN_ONCE(dev, (ep_trb != td->last_trb) || remaining,
+				"ep%d%s: unexpected success! TRB %p/%p size %d/%d\n",
+				usb_endpoint_num(&td->urb->ep->desc),
+				usb_endpoint_dir_in(&td->urb->ep->desc) ?
+				"in" : "out", ep_trb, td->last_trb, remaining,
+				requested);
 		*status = 0;
 		break;
 	case COMP_SHORT_PACKET:
