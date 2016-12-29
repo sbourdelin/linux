@@ -14,19 +14,6 @@
 
 #include <dt-bindings/pinctrl/samsung.h>
 
-#define PIN_PULL_NONE		0
-#define PIN_PULL_DOWN		1
-#define PIN_PULL_UP		3
-
-#define PIN_DRV_LV1		0
-#define PIN_DRV_LV2		2
-#define PIN_DRV_LV3		1
-#define PIN_DRV_LV4		3
-
-#define PIN_IN			0
-#define PIN_OUT			1
-#define PIN_FUNC1		2
-
 #define PIN(_func, _pin, _pull, _drv)					\
 	_pin {								\
 		samsung,pins = #_pin;					\
