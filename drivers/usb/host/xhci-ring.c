@@ -542,6 +542,27 @@ static void trb_to_noop(union xhci_trb *trb)
 		trb->generic.field[3] &= cpu_to_le32(TRB_CYCLE);
 		trb->generic.field[3] |= cpu_to_le32(TRB_TYPE(TRB_TR_NOOP));
 		break;
+	case TRB_ENABLE_SLOT:
+	case TRB_DISABLE_SLOT:
+	case TRB_ADDR_DEV:
+	case TRB_CONFIG_EP:
+	case TRB_EVAL_CONTEXT:
+	case TRB_RESET_EP:
+	case TRB_STOP_RING:
+	case TRB_SET_DEQ:
+	case TRB_RESET_DEV:
+	case TRB_FORCE_EVENT:
+	case TRB_NEG_BANDWIDTH:
+	case TRB_SET_LT:
+	case TRB_GET_BW:
+	case TRB_FORCE_HEADER:
+		trb->generic.field[0] = 0;
+		trb->generic.field[1] = 0;
+		trb->generic.field[2] = 0;
+		/* Preserve only the cycle bit of this TRB */
+		trb->generic.field[3] &= cpu_to_le32(TRB_CYCLE);
+		trb->generic.field[3] = cpu_to_le32(TRB_TYPE(TRB_CMD_NOOP));
+		break;
 	default:
 		/* nothing */
 		break;
@@ -1229,7 +1250,6 @@ static void xhci_handle_stopped_cmd_ring(struct xhci_hcd *xhci,
 					 struct xhci_command *cur_cmd)
 {
 	struct xhci_command *cmd;
-	u32 cycle_state;
 
 	/* Turn all aborted commands in list to no-ops, then restart */
 	list_for_each_entry(cmd, &xhci->cmd_list,
@@ -1242,15 +1262,8 @@ static void xhci_handle_stopped_cmd_ring(struct xhci_hcd *xhci,
 
 		xhci_dbg(xhci, "Turn aborted command %p to no-op\n",
 			 cmd->command_trb);
-		/* get cycle state from the original cmd trb */
-		cycle_state = le32_to_cpu(
-			cmd->command_trb->generic.field[3]) & TRB_CYCLE;
-		/* modify the command trb to no-op command */
-		cmd->command_trb->generic.field[0] = 0;
-		cmd->command_trb->generic.field[1] = 0;
-		cmd->command_trb->generic.field[2] = 0;
-		cmd->command_trb->generic.field[3] = cpu_to_le32(
-			TRB_TYPE(TRB_CMD_NOOP) | cycle_state);
+
+		trb_to_noop(cmd->command_trb);
 
 		/*
 		 * caller waiting for completion is called when command
