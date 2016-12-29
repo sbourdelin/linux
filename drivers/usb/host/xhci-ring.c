@@ -523,6 +523,31 @@ void xhci_find_new_dequeue_state(struct xhci_hcd *xhci,
 			(unsigned long long) addr);
 }
 
+static void trb_to_noop(union xhci_trb *trb)
+{
+	switch (TRB_FIELD_TO_TYPE(cpu_to_le32(trb->generic.field[3]))) {
+	case TRB_LINK:
+		/* unchain chained link TRBs */
+		trb->link.control &= cpu_to_le32(~TRB_CHAIN);
+		break;
+	case TRB_NORMAL:
+	case TRB_SETUP:
+	case TRB_DATA:
+	case TRB_STATUS:
+	case TRB_ISOC:
+		trb->generic.field[0] = 0;
+		trb->generic.field[1] = 0;
+		trb->generic.field[2] = 0;
+		/* Preserve only the cycle bit of this TRB */
+		trb->generic.field[3] &= cpu_to_le32(TRB_CYCLE);
+		trb->generic.field[3] |= cpu_to_le32(TRB_TYPE(TRB_TR_NOOP));
+		break;
+	default:
+		/* nothing */
+		break;
+	}
+}
+
 /* flip_cycle means flip the cycle bit of all but the first and last TRB.
  * (The last TRB actually points to the ring enqueue pointer, which is not part
  * of this TD.)  This is used to remove partially enqueued isoc TDs from a ring.
@@ -534,18 +559,8 @@ static void td_to_noop(struct xhci_hcd *xhci, struct xhci_ring *ep_ring,
 	union xhci_trb *trb		= td->first_trb;
 
 	while (1) {
-		if (trb_is_link(trb)) {
-			/* unchain chained link TRBs */
-			trb->link.control &= cpu_to_le32(~TRB_CHAIN);
-		} else {
-			trb->generic.field[0] = 0;
-			trb->generic.field[1] = 0;
-			trb->generic.field[2] = 0;
-			/* Preserve only the cycle bit of this TRB */
-			trb->generic.field[3] &= cpu_to_le32(TRB_CYCLE);
-			trb->generic.field[3] |= cpu_to_le32(
-				TRB_TYPE(TRB_TR_NOOP));
-		}
+		trb_to_noop(trb);
+
 		/* flip cycle if asked to */
 		if (flip_cycle && trb != td->first_trb && trb != td->last_trb)
 			trb->generic.field[3] ^= cpu_to_le32(TRB_CYCLE);
