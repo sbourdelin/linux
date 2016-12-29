@@ -88,8 +88,10 @@ futex_cmp_requeue(u_int32_t *uaddr, u_int32_t val, u_int32_t *uaddr2, int nr_wak
 }
 
 #ifndef FUTEX_LOCK
-#define FUTEX_LOCK	0xff	/* Disable the use of TP futexes */
-#define FUTEX_UNLOCK	0xff
+#define FUTEX_LOCK		0xff	/* Disable the use of TP futexes */
+#define FUTEX_UNLOCK		0xff
+#define FUTEX_LOCK_SHARED	0xff
+#define FUTEX_UNLOCK_SHARED	0xff
 #endif /* FUTEX_LOCK */
 
 /**
@@ -108,6 +110,24 @@ static inline int
 futex_unlock(u_int32_t *uaddr, int opflags)
 {
 	return futex(uaddr, FUTEX_UNLOCK, 0, NULL, NULL, 0, opflags);
+}
+
+/**
+ * futex_lock_shared() - shared locking of TP futex
+ */
+static inline int
+futex_lock_shared(u_int32_t *uaddr, struct timespec *timeout, int opflags)
+{
+	return futex(uaddr, FUTEX_LOCK_SHARED, 0, timeout, NULL, 0, opflags);
+}
+
+/**
+ * futex_unlock_shared() - shared unlocking of TP futex
+ */
+static inline int
+futex_unlock_shared(u_int32_t *uaddr, int opflags)
+{
+	return futex(uaddr, FUTEX_UNLOCK_SHARED, 0, NULL, NULL, 0, opflags);
 }
 
 #ifndef HAVE_PTHREAD_ATTR_SETAFFINITY_NP

@@ -37,6 +37,7 @@ int bench_futex_requeue(int argc, const char **argv, const char *prefix);
 /* pi futexes */
 int bench_futex_lock_pi(int argc, const char **argv, const char *prefix);
 int bench_futex_mutex(int argc, const char **argv, const char *prefix);
+int bench_futex_rwlock(int argc, const char **argv, const char *prefix);
 
 #define BENCH_FORMAT_DEFAULT_STR	"default"
 #define BENCH_FORMAT_DEFAULT		0
