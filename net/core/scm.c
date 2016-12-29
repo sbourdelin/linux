@@ -238,7 +238,9 @@ int put_cmsg(struct msghdr * msg, int level, int type, int len, void *data)
 	err = -EFAULT;
 	if (copy_to_user(cm, &cmhdr, sizeof cmhdr))
 		goto out;
-	if (copy_to_user(CMSG_DATA(cm), data, cmlen - sizeof(struct cmsghdr)))
+	if (cmlen > CMSG_ALIGN(sizeof(struct cmsghdr)) && 
+	    copy_to_user(CMSG_DATA(cm), data, 
+			cmlen - CMSG_ALIGN(sizeof(struct cmsghdr))))
 		goto out;
 	cmlen = CMSG_SPACE(len);
 	if (msg->msg_controllen < cmlen)
@@ -267,8 +269,8 @@ void scm_detach_fds(struct msghdr *msg, struct scm_cookie *scm)
 		return;
 	}
 
-	if (msg->msg_controllen > sizeof(struct cmsghdr))
-		fdmax = ((msg->msg_controllen - sizeof(struct cmsghdr))
+	if (msg->msg_controllen > CMSG_ALIGN(sizeof(struct cmsghdr)))
+		fdmax = ((msg->msg_controllen - CMSG_ALIGN(sizeof(struct cmsghdr)))
 			 / sizeof(int));
 
 	if (fdnum < fdmax)
