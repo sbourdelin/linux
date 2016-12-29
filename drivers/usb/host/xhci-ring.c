@@ -2526,14 +2526,16 @@ cleanup:
 static int xhci_handle_event(struct xhci_hcd *xhci)
 {
 	union xhci_trb *event;
+	struct device *dev;
 	int update_ptrs = 1;
 	int ret;
 
+	dev = xhci_to_hcd(xhci)->self.controller;
+
 	/* Event ring hasn't been allocated yet. */
-	if (!xhci->event_ring || !xhci->event_ring->dequeue) {
-		xhci_err(xhci, "ERROR event ring not ready\n");
+	if (dev_WARN_ONCE(dev, !xhci->event_ring || !xhci->event_ring->dequeue,
+					"event ring not ready\n"))
 		return -ENOMEM;
-	}
 
 	event = xhci->event_ring->dequeue;
 	/* Does the HC or OS own the TRB? */
