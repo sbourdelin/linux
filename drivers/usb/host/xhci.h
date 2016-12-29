@@ -750,7 +750,8 @@ struct xhci_ep_ctx {
 #define MAX_PACKET_DECODED(p)	(((p) >> 16) & 0xffff)
 
 /* tx_info bitmasks */
-#define EP_AVG_TRB_LENGTH(p)		((p) & 0xffff)
+#define EP_AVG_TRB_LENGTH_MASK		0xffff
+#define EP_AVG_TRB_LENGTH(p)		((p) & EP_AVG_TRB_LENGTH_MASK)
 #define EP_MAX_ESIT_PAYLOAD_LO(p)	(((p) & 0xffff) << 16)
 #define EP_MAX_ESIT_PAYLOAD_HI(p)	((((p) >> 16) & 0xff) << 24)
 #define CTX_TO_MAX_ESIT_PAYLOAD(p)	(((p) >> 16) & 0xffff)
