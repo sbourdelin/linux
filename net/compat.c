@@ -245,7 +245,9 @@ int put_cmsg_compat(struct msghdr *kmsg, int level, int type, int len, void *dat
 
 	if (copy_to_user(cm, &cmhdr, sizeof cmhdr))
 		return -EFAULT;
-	if (copy_to_user(CMSG_COMPAT_DATA(cm), data, cmlen - sizeof(struct compat_cmsghdr)))
+	if (cmlen > CMSG_COMPAT_ALIGN(sizeof(struct compat_cmsghdr)) &&
+	    copy_to_user(CMSG_COMPAT_DATA(cm), data,
+			    cmlen - CMSG_COMPAT_ALIGN(sizeof(struct compat_cmsghdr))))
 		return -EFAULT;
 	cmlen = CMSG_COMPAT_SPACE(len);
 	if (kmsg->msg_controllen < cmlen)
@@ -258,11 +260,15 @@ int put_cmsg_compat(struct msghdr *kmsg, int level, int type, int len, void *dat
 void scm_detach_fds_compat(struct msghdr *kmsg, struct scm_cookie *scm)
 {
 	struct compat_cmsghdr __user *cm = (struct compat_cmsghdr __user *) kmsg->msg_control;
-	int fdmax = (kmsg->msg_controllen - sizeof(struct compat_cmsghdr)) / sizeof(int);
+	int fdmax = 0;
 	int fdnum = scm->fp->count;
 	struct file **fp = scm->fp->fp;
 	int __user *cmfptr;
 	int err = 0, i;
+
+	if (kmsg->msg_controllen > CMSG_COMPAT_ALIGN(sizeof(struct compat_cmsghdr)))
+		fdmax = (kmsg->msg_controllen -
+		         CMSG_COMPAT_ALIGN(sizeof(struct compat_cmsghdr))) / sizeof(int);
 
 	if (fdnum < fdmax)
 		fdmax = fdnum;
