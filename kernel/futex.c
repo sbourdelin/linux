@@ -191,6 +191,10 @@ int __read_mostly futex_cmpxchg_enabled;
 #define FLAGS_CLOCKRT		0x02
 #define FLAGS_HAS_TIMEOUT	0x04
 
+enum futex_type {
+	TYPE_PI = 0,
+};
+
 /*
  * Futex state object:
  *  - Priority Inheritance state
@@ -210,6 +214,7 @@ struct futex_state {
 	struct task_struct *owner;
 	atomic_t refcount;
 
+	enum futex_type type;
 	union futex_key key;
 };
 
@@ -903,13 +908,14 @@ static void put_futex_state(struct futex_state *state)
 		return;
 
 	/*
-	 * If state->owner is NULL, the owner is most probably dying
-	 * and has cleaned up the futex state already
+	 * If state->owner is NULL and the type is TYPE_PI, the owner is
+	 * most probably dying and has cleaned up the futex state already.
 	 */
 	if (state->owner) {
 		task_pi_list_del(state, false);
 
-		rt_mutex_proxy_unlock(&state->pi_mutex, state->owner);
+		if (state->type == TYPE_PI)
+			rt_mutex_proxy_unlock(&state->pi_mutex, state->owner);
 	}
 
 	if (current->pi_state_cache)
@@ -1062,7 +1068,7 @@ static int attach_to_pi_state(u32 uval, struct futex_state *pi_state,
 	/*
 	 * Userspace might have messed up non-PI and PI futexes [3]
 	 */
-	if (unlikely(!pi_state))
+	if (unlikely(!pi_state || (pi_state->type != TYPE_PI)))
 		return -EINVAL;
 
 	WARN_ON(!atomic_read(&pi_state->refcount));
@@ -1180,6 +1186,7 @@ static int attach_to_pi_owner(u32 uval, union futex_key *key,
 
 	/* Store the key for possible exit cleanups: */
 	pi_state->key = *key;
+	pi_state->type = TYPE_PI;
 
 	WARN_ON(!list_empty(&pi_state->list));
 	list_add(&pi_state->list, &p->pi_state_list);
