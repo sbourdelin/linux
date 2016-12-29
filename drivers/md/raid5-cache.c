@@ -162,7 +162,58 @@ struct r5l_log {
 
 	/* to submit async io_units, to fulfill ordering of flush */
 	struct work_struct deferred_io_work;
+
+	/* to for chunk_aligned_read in writeback mode, details below */
+	spinlock_t tree_lock;
+	struct radix_tree_root big_stripe_tree;
+	struct kmem_cache *bsi_kc;	/* kmem_cache for big_stripe_info */
+	mempool_t *big_stripe_info_pool;
 };
+
+/*
+ * Enable chunk_aligned_read() with write back cache.
+ *
+ * Each chunk may contain more than one stripe (for example, a 256kB
+ * chunk contains 64 4kB-page, so this chunk contain 64 stripes). For
+ * chunk_aligned_read, these stripes are grouped into one "big_stripe".
+ * For each big_stripe, struct big_stripe_info tracks how many stripes of
+ * this big_stripe are in the write back cache. These data are tracked
+ * in a radix tree (big_stripe_tree). big_stripe_index() is used to
+ * calculate keys for the radix tree.
+ *
+ * chunk_aligned_read() calls r5c_big_stripe_cached() to look up
+ * big_stripe of each chunk in the tree. If this big_stripe is in the
+ * tree, chunk_aligned_read() aborts. This look up is protected by
+ * rcu_read_lock().
+ *
+ * It is necessary to remember whether a stripe is counted in
+ * big_stripe_tree. Instead of adding new flag, we reuses existing flags:
+ * STRIPE_R5C_PARTIAL_STRIPE and STRIPE_R5C_FULL_STRIPE. If either of these
+ * two flags are set, the stripe is counted in big_stripe_tree. This
+ * requires moving set_bit(STRIPE_R5C_PARTIAL_STRIPE) to
+ * r5c_try_caching_write().
+ */
+struct big_stripe_info {
+	atomic_t count;
+#ifdef CONFIG_DEBUG_VM
+	void *pad;  /* suppress size check error in kmem_cache_sanity_check */
+#endif
+};
+
+/*
+ * calculate key for big_stripe_tree
+ *
+ * sect: align_bi->bi_iter.bi_sector or sh->sector
+ */
+static inline sector_t big_stripe_index(struct r5conf *conf,
+					sector_t sect)
+{
+	sector_t offset;
+
+	offset = sector_div(sect, conf->chunk_sectors *
+			    (conf->raid_disks - conf->max_degraded));
+	return sect;
+}
 
 /*
  * an IO range starts from a meta data block and end at the next meta data
@@ -2267,6 +2318,8 @@ int r5c_try_caching_write(struct r5conf *conf,
 	int i;
 	struct r5dev *dev;
 	int to_cache = 0;
+	struct big_stripe_info *bsinfo;
+	sector_t bs_index;
 
 	BUG_ON(!r5c_is_writeback(log));
 
@@ -2299,6 +2352,37 @@ int r5c_try_caching_write(struct r5conf *conf,
 			r5c_make_stripe_write_out(sh);
 			return -EAGAIN;
 		}
+	}
+
+	/* if the stripe is not counted in big_stripe_tree, add it now */
+	if (!test_bit(STRIPE_R5C_PARTIAL_STRIPE, &sh->state) &&
+	    !test_bit(STRIPE_R5C_FULL_STRIPE, &sh->state)) {
+		bs_index = big_stripe_index(conf, sh->sector);
+		spin_lock(&log->tree_lock);
+		bsinfo = radix_tree_lookup(&log->big_stripe_tree, bs_index);
+		if (bsinfo)
+			atomic_inc(&bsinfo->count);
+		else {
+			bsinfo = mempool_alloc(log->big_stripe_info_pool, GFP_ATOMIC);
+			if (bsinfo) {
+				atomic_set(&bsinfo->count, 1);
+				radix_tree_insert(&log->big_stripe_tree, bs_index, bsinfo);
+			}
+		}
+		spin_unlock(&log->tree_lock);
+		if (!bsinfo) {
+			/* in case we cannot allocate memory for the tree, do
+			 * not cache this stripe
+			 */
+			r5c_make_stripe_write_out(sh);
+			return -EAGAIN;
+		}
+
+		/* set STRIPE_R5C_PARTIAL_STRIPE, this shows the stripe is
+		 * counted in the radix tree
+		 */
+		set_bit(STRIPE_R5C_PARTIAL_STRIPE, &sh->state);
+		atomic_dec(&conf->r5c_cached_partial_stripes);
 	}
 
 	for (i = disks; i--; ) {
@@ -2373,17 +2457,19 @@ void r5c_finish_stripe_write_out(struct r5conf *conf,
 				 struct stripe_head *sh,
 				 struct stripe_head_state *s)
 {
+	struct r5l_log *log = conf->log;
 	int i;
 	int do_wakeup = 0;
+	struct big_stripe_info *bsinfo;
+	sector_t bs_index;
 
-	if (!conf->log ||
-	    !test_bit(R5_InJournal, &sh->dev[sh->pd_idx].flags))
+	if (!log || !test_bit(R5_InJournal, &sh->dev[sh->pd_idx].flags))
 		return;
 
 	WARN_ON(test_bit(STRIPE_R5C_CACHING, &sh->state));
 	clear_bit(R5_InJournal, &sh->dev[sh->pd_idx].flags);
 
-	if (conf->log->r5c_journal_mode == R5C_JOURNAL_MODE_WRITE_THROUGH)
+	if (log->r5c_journal_mode == R5C_JOURNAL_MODE_WRITE_THROUGH)
 		return;
 
 	for (i = sh->disks; i--; ) {
@@ -2405,13 +2491,26 @@ void r5c_finish_stripe_write_out(struct r5conf *conf,
 	if (do_wakeup)
 		wake_up(&conf->wait_for_overlap);
 
-	spin_lock_irq(&conf->log->stripe_in_journal_lock);
+	spin_lock_irq(&log->stripe_in_journal_lock);
 	list_del_init(&sh->r5c);
-	spin_unlock_irq(&conf->log->stripe_in_journal_lock);
+	spin_unlock_irq(&log->stripe_in_journal_lock);
 	sh->log_start = MaxSector;
 
-	atomic_dec(&conf->log->stripe_in_journal_count);
-	r5c_update_log_state(conf->log);
+	atomic_dec(&log->stripe_in_journal_count);
+	r5c_update_log_state(log);
+
+	/* stop counting this stripe in big_stripe_tree */
+	if (test_bit(STRIPE_R5C_PARTIAL_STRIPE, &sh->state) ||
+	    test_bit(STRIPE_R5C_FULL_STRIPE, &sh->state)) {
+		bs_index = big_stripe_index(conf, sh->sector);
+		bsinfo = radix_tree_lookup(&log->big_stripe_tree, bs_index);
+
+		if (atomic_dec_and_lock(&bsinfo->count, &log->tree_lock)) {
+			radix_tree_delete(&log->big_stripe_tree, bs_index);
+			spin_unlock(&log->tree_lock);
+			mempool_free(bsinfo, log->big_stripe_info_pool);
+		}
+	}
 
 	if (test_and_clear_bit(STRIPE_R5C_PARTIAL_STRIPE, &sh->state)) {
 		BUG_ON(atomic_read(&conf->r5c_cached_partial_stripes) == 0);
@@ -2479,6 +2578,22 @@ r5c_cache_data(struct r5l_log *log, struct stripe_head *sh,
 
 	mutex_unlock(&log->io_mutex);
 	return 0;
+}
+
+/* check whether this big stripe is in write back cache. */
+bool r5c_big_stripe_cached(struct r5conf *conf, sector_t sect)
+{
+	struct r5l_log *log = conf->log;
+	sector_t bs_index;
+	struct big_stripe_info *bsinfo;
+
+	if (!log)
+		return false;
+
+	WARN_ON_ONCE(!rcu_read_lock_held());
+	bs_index = big_stripe_index(conf, sect);
+	bsinfo = radix_tree_lookup(&log->big_stripe_tree, bs_index);
+	return bsinfo != NULL;
 }
 
 static int r5l_load_log(struct r5l_log *log)
@@ -2614,6 +2729,17 @@ int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev)
 	if (!log->meta_pool)
 		goto out_mempool;
 
+	log->bsi_kc = KMEM_CACHE(big_stripe_info, 0);
+	if (!log->bsi_kc)
+		goto bsi_kc;
+
+	log->big_stripe_info_pool = mempool_create_slab_pool(4, log->bsi_kc);
+	if (!log->big_stripe_info_pool)
+		goto big_stripe_info_pool;
+
+	spin_lock_init(&log->tree_lock);
+	INIT_RADIX_TREE(&log->big_stripe_tree, GFP_ATOMIC);
+
 	log->reclaim_thread = md_register_thread(r5l_reclaim_thread,
 						 log->rdev->mddev, "reclaim");
 	if (!log->reclaim_thread)
@@ -2646,6 +2772,10 @@ error:
 	rcu_assign_pointer(conf->log, NULL);
 	md_unregister_thread(&log->reclaim_thread);
 reclaim_thread:
+	mempool_destroy(log->big_stripe_info_pool);
+big_stripe_info_pool:
+	kmem_cache_destroy(log->bsi_kc);
+bsi_kc:
 	mempool_destroy(log->meta_pool);
 out_mempool:
 	bioset_free(log->bs);
@@ -2661,6 +2791,8 @@ io_kc:
 void r5l_exit_log(struct r5l_log *log)
 {
 	md_unregister_thread(&log->reclaim_thread);
+	mempool_destroy(log->big_stripe_info_pool);
+	kmem_cache_destroy(log->bsi_kc);
 	mempool_destroy(log->meta_pool);
 	bioset_free(log->bs);
 	mempool_destroy(log->io_pool);
