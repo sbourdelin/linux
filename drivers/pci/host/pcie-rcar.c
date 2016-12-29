@@ -451,6 +451,7 @@ static int rcar_pcie_enable(struct rcar_pcie *pcie)
 {
 	struct device *dev = pcie->dev;
 	struct pci_bus *bus, *child;
+	struct pci_host_bridge *bridge;
 	LIST_HEAD(res);
 
 	/* Try setting 5 GT/s link speed */
@@ -479,6 +480,10 @@ static int rcar_pcie_enable(struct rcar_pcie *pcie)
 
 	list_for_each_entry(child, &bus->children, node)
 		pcie_bus_configure_settings(child);
+
+	bridge = pci_find_host_bridge(bus);
+	bridge->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+	bridge->dev.dma_mask = &bridge->dev.coherent_dma_mask;
 
 	pci_bus_add_devices(bus);
 
