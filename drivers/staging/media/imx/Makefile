@@ -4,3 +4,5 @@ imx-media-objs := imx-media-dev.o imx-media-fim.o imx-media-internal-sd.o \
 obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media.o
 obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-common.o
 
+obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-csi.o
+
