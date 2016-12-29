@@ -1815,6 +1815,7 @@ void xhci_free_command(struct xhci_hcd *xhci,
 void xhci_mem_cleanup(struct xhci_hcd *xhci)
 {
 	struct device	*dev = xhci_to_hcd(xhci)->self.controller;
+	int max_slots;
 	int size;
 	int i, j, num_ports;
 
@@ -1851,7 +1852,8 @@ void xhci_mem_cleanup(struct xhci_hcd *xhci)
 		}
 	}
 
-	for (i = 1; i <= HCS_MAX_SLOTS(xhci->hcs_params1); i++)
+	max_slots = HCS_MAX_SLOTS(xhci->hcs_params1) + 1;
+	for (i = 1; i < max_slots; i++)
 		xhci_free_virt_device(xhci, i);
 
 	dma_pool_destroy(xhci->segment_pool);
@@ -1872,11 +1874,13 @@ void xhci_mem_cleanup(struct xhci_hcd *xhci)
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"Freed medium stream array pool");
 
-	if (xhci->dcbaa)
-		dma_free_coherent(dev, sizeof(*xhci->dcbaa),
-				xhci->dcbaa, xhci->dcbaa->dma);
-	xhci->dcbaa = NULL;
+	if (xhci->dcbaa->dev_context_ptrs)
+		dma_free_coherent(dev, sizeof(__le64) * max_slots,
+				xhci->dcbaa->dev_context_ptrs,
+				xhci->dcbaa->dma);
 
+	kfree(xhci->dcbaa);
+	xhci->dcbaa = NULL;
 	scratchpad_free(xhci);
 
 	if (!xhci->rh_bw)
@@ -2205,6 +2209,7 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 	u64		val_64;
 	struct xhci_segment	*seg;
 	u32 page_size, temp;
+	int max_slots;
 	int i;
 
 	INIT_LIST_HEAD(&xhci->cmd_list);
@@ -2236,17 +2241,22 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 	 * Program the Number of Device Slots Enabled field in the CONFIG
 	 * register with the max value of slots the HC can handle.
 	 */
-	val = HCS_MAX_SLOTS(readl(&xhci->cap_regs->hcs_params1));
+	max_slots = HCS_MAX_SLOTS(readl(&xhci->cap_regs->hcs_params1));
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
-			"// xHC can handle at most %d device slots.", val);
+			"// xHC can handle at most %d device slots.", max_slots);
+
 	val2 = readl(&xhci->op_regs->config_reg);
-	val |= (val2 & ~HCS_SLOTS_MASK);
+	val = max_slots | (val2 & ~HCS_SLOTS_MASK);
+
+	/* XHCI needs offset 0 to be unused */
+	max_slots += 1;
+
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"// Setting Max device slots reg = 0x%x.", val);
 	writel(val, &xhci->op_regs->config_reg);
 
-	xhci->devs = kcalloc(HCS_MAX_SLOTS(xhci->hcs_params1) + 1,
-			sizeof(struct xhci_virt_device *), GFP_KERNEL);
+	xhci->devs = kcalloc(max_slots, sizeof(struct xhci_virt_device *),
+			GFP_KERNEL);
 	if (!xhci->devs)
 		goto fail;
 
@@ -2254,16 +2264,21 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 	 * Section 5.4.8 - doorbell array must be
 	 * "physically contiguous and 64-byte (cache line) aligned".
 	 */
-	xhci->dcbaa = dma_alloc_coherent(dev, sizeof(*xhci->dcbaa), &dma,
-			flags);
+	xhci->dcbaa = kzalloc(sizeof(*xhci->dcbaa), GFP_KERNEL);
 	if (!xhci->dcbaa)
 		goto fail;
-	memset(xhci->dcbaa, 0, sizeof *(xhci->dcbaa));
-	xhci->dcbaa->dma = dma;
+
+	xhci->dcbaa->dev_context_ptrs = dma_alloc_coherent(dev, sizeof(__le64) *
+			max_slots, &xhci->dcbaa->dma, flags);
+	if (!xhci->dcbaa->dev_context_ptrs)
+		goto fail;
+
+	memset(xhci->dcbaa->dev_context_ptrs, 0, sizeof (__le64) *
+			max_slots);
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"// Device context base array address = 0x%llx (DMA), %p (virt)",
 			(unsigned long long)xhci->dcbaa->dma, xhci->dcbaa);
-	xhci_write_64(xhci, dma, &xhci->op_regs->dcbaa_ptr);
+	xhci_write_64(xhci, xhci->dcbaa->dma, &xhci->op_regs->dcbaa_ptr);
 
 	/*
 	 * Initialize the ring segment pool.  The ring must be a contiguous
