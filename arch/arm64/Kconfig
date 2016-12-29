@@ -495,6 +495,16 @@ config QCOM_FALKOR_E1003_RESERVED_ASID
 	default 1
 	depends on QCOM_FALKOR_ERRATUM_1003
 
+config QCOM_FALKOR_ERRATUM_1009
+	bool "Falkor E1009: Prematurely complete a DSB after a TLBI"
+	default y
+	help
+	  Falkor CPU may prematurely complete a DSB following a TLBI xxIS
+	  invalidate maintenance operations. Repeat the TLBI operation one
+	  more time to fix the issue.
+
+	  If unsure, say Y.
+
 endmenu
 
 

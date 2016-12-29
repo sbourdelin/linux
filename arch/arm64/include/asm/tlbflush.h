@@ -85,7 +85,10 @@
 			asm (__TLBI_INSTR(op, ##__VA_ARGS__)		       \
 			__TLBI_IO(op, ##__VA_ARGS__));			       \
 		asm volatile (	     as			"\ndsb " #attr "\n"    \
-		: : : "memory"); } while (0)
+			ALTERNATIVE("nop"		"\nnop"	       "\n",   \
+			__TLBI_INSTR(op, ##__VA_ARGS__)	"\ndsb " #attr "\n",   \
+			ARM64_WORKAROUND_REPEAT_TLBI)			       \
+		__TLBI_IO(op, ##__VA_ARGS__) : "memory"); } while (0)
 
 #define __tlbi_dsb(...)	__tlbi_asm_dsb("", ##__VA_ARGS__)
 
