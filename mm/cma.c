@@ -369,7 +369,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
 	unsigned long start = 0;
 	unsigned long bitmap_maxno, bitmap_no, bitmap_count;
 	struct page *page = NULL;
-	int ret;
+	int ret = -ENOMEM;
 
 	if (!cma || !cma->count)
 		return NULL;
@@ -427,6 +427,33 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
 	trace_cma_alloc(pfn, page, count, align);
 
 	pr_debug("%s(): returned %p\n", __func__, page);
+
+	if (ret != 0) {
+		unsigned int nr, nr_total = 0;
+		unsigned long next_set_bit;
+
+		pr_info("%s: alloc failed, req-size: %zu pages, ret: %d\n",
+			__func__, count, ret);
+		mutex_lock(&cma->lock);
+		printk("number of available pages: ");
+		start = 0;
+		for (;;) {
+			bitmap_no = find_next_zero_bit(cma->bitmap, cma->count, start);
+			next_set_bit = find_next_bit(cma->bitmap, cma->count, bitmap_no);
+			nr = next_set_bit - bitmap_no;
+			if (bitmap_no >= cma->count)
+				break;
+			if (nr_total == 0)
+				printk("%u", nr);
+			else
+				printk("+%u", nr);
+			nr_total += nr;
+			start = bitmap_no + nr;
+		}
+		printk("=>%u pages, total: %lu pages\n", nr_total, cma->count);
+		mutex_unlock(&cma->lock);
+	}
+
 	return page;
 }
 
