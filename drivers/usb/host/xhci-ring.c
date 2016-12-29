@@ -1692,8 +1692,7 @@ struct xhci_segment *trb_in_td(struct xhci_hcd *xhci,
 		struct xhci_segment *start_seg,
 		union xhci_trb	*start_trb,
 		union xhci_trb	*end_trb,
-		dma_addr_t	suspect_dma,
-		bool		debug)
+		dma_addr_t	suspect_dma)
 {
 	dma_addr_t start_dma;
 	dma_addr_t end_seg_dma;
@@ -1712,8 +1711,7 @@ struct xhci_segment *trb_in_td(struct xhci_hcd *xhci,
 		/* If the end TRB isn't in this segment, this is set to 0 */
 		end_trb_dma = xhci_trb_virt_to_dma(cur_seg, end_trb);
 
-		if (debug)
-			xhci_warn(xhci,
+		xhci_dbg(xhci,
 				"Looking for event-dma %016llx trb-start %016llx trb-end %016llx seg-start %016llx seg-end %016llx\n",
 				(unsigned long long)suspect_dma,
 				(unsigned long long)start_dma,
@@ -2380,7 +2378,7 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 
 		/* Is this a TRB in the currently executing TD? */
 		ep_seg = trb_in_td(xhci, ep_ring->deq_seg, ep_ring->dequeue,
-				td->last_trb, ep_trb_dma, false);
+				td->last_trb, ep_trb_dma);
 
 		/*
 		 * Skip the Force Stopped Event. The event_trb(event_dma) of FSE
@@ -2415,7 +2413,7 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 					trb_comp_code);
 				trb_in_td(xhci, ep_ring->deq_seg,
 					  ep_ring->dequeue, td->last_trb,
-					  ep_trb_dma, true);
+					  ep_trb_dma);
 				return -ESHUTDOWN;
 			}
 
