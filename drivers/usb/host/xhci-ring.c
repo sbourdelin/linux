@@ -2132,45 +2132,16 @@ static int process_bulk_intr_td(struct xhci_hcd *xhci, struct xhci_td *td,
 	struct xhci_virt_ep *ep, int *status)
 {
 	struct xhci_ring *ep_ring;
-	struct device *dev;
 	u32 trb_comp_code;
-	u32 remaining, requested, ep_trb_len;
+	u32 ep_trb_len;
+	u32 remaining;
+	u32 requested;
 
 	ep_ring = xhci_dma_to_transfer_ring(ep, le64_to_cpu(event->buffer));
 	trb_comp_code = GET_COMP_CODE(le32_to_cpu(event->transfer_len));
 	remaining = EVENT_TRB_LEN(le32_to_cpu(event->transfer_len));
 	ep_trb_len = TRB_LEN(le32_to_cpu(ep_trb->generic.field[2]));
 	requested = td->urb->transfer_buffer_length;
-	dev = xhci_to_hcd(xhci)->self.controller;
-
-	switch (trb_comp_code) {
-	case COMP_SUCCESS:
-		dev_WARN_ONCE(dev, (ep_trb != td->last_trb) || remaining,
-				"ep%d%s: unexpected success! TRB %p/%p size %d/%d\n",
-				usb_endpoint_num(&td->urb->ep->desc),
-				usb_endpoint_dir_in(&td->urb->ep->desc) ?
-				"in" : "out", ep_trb, td->last_trb, remaining,
-				requested);
-		*status = 0;
-		break;
-	case COMP_SHORT_PACKET:
-		xhci_dbg(xhci, "ep %#x - asked for %d bytes, %d bytes untransferred\n",
-			 td->urb->ep->desc.bEndpointAddress,
-			 requested, remaining);
-		*status = 0;
-		break;
-	case COMP_STOPPED_SHORT_PACKET:
-		td->urb->actual_length = remaining;
-		goto finish_td;
-	case COMP_STOPPED_LENGTH_INVALID:
-		/* stopped on ep trb with invalid length, exclude it */
-		ep_trb_len	= 0;
-		remaining	= 0;
-		break;
-	default:
-		/* do nothing */
-		break;
-	}
 
 	if (ep_trb == td->last_trb)
 		td->urb->actual_length = requested - remaining;
@@ -2178,12 +2149,33 @@ static int process_bulk_intr_td(struct xhci_hcd *xhci, struct xhci_td *td,
 		td->urb->actual_length =
 			sum_trb_lengths(xhci, ep_ring, ep_trb) +
 			ep_trb_len - remaining;
-finish_td:
-	if (remaining > requested) {
-		xhci_warn(xhci, "bad transfer trb length %d in event trb\n",
-			  remaining);
+
+	switch (trb_comp_code) {
+	case COMP_SUCCESS:
+	case COMP_SHORT_PACKET:
+		*status = 0;
+		break;
+	case COMP_STOPPED_SHORT_PACKET:
+		/*
+		 * NOTICE: according to section 6.4.2 Table 91 of xHCI rev 1.1
+		 * Specification, if completion code is Stopped - Short Packet,
+		 * Transfer Length field (referred to as 'remaining' here)
+		 * contain the value of EDTLA (see section 4.11.5.2 for
+		 * details), which means that remaining contains actual_length,
+		 * not the amount of bytes remaining to be transferred as usual.
+		 */
+		td->urb->actual_length = remaining;
+		*status = -ESHUTDOWN;
+		break;
+	case COMP_STOPPED_LENGTH_INVALID:
 		td->urb->actual_length = 0;
+		*status = -ESHUTDOWN;
+		break;
+	default:
+		/* do nothing */
+		break;
 	}
+
 	return finish_td(xhci, td, ep_trb, event, ep, status, false);
 }
 
