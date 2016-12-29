@@ -2261,12 +2261,12 @@ static int nf_tables_newrule(struct net *net, struct sock *nlsk,
 			err = -ENOENT;
 			goto err2;
 		}
-	} else if (nlh->nlmsg_flags & NLM_F_APPEND)
+	} else if (nlh->nlmsg_flags & NLM_F_APPEND) {
 		if (old_rule)
 			list_add_rcu(&rule->list, &old_rule->list);
 		else
 			list_add_tail_rcu(&rule->list, &chain->rules);
-	else {
+	} else {
 		if (old_rule)
 			list_add_tail_rcu(&rule->list, &old_rule->list);
 		else
