@@ -27,12 +27,12 @@
 #define PIN_OUT			1
 #define PIN_FUNC1		2
 
-#define PIN(_func, _pin, _pull, _drv)			\
-	_pin {						\
-		samsung,pins = #_pin;			\
-		samsung,pin-function = <PIN_ ##_func>;	\
-		samsung,pin-pud = <PIN_PULL_ ##_pull>;	\
-		samsung,pin-drv = <PIN_DRV_ ##_drv>;	\
+#define PIN(_func, _pin, _pull, _drv)					\
+	_pin {								\
+		samsung,pins = #_pin;					\
+		samsung,pin-function = <EXYNOS_PIN_FUNC_ ##_func>;	\
+		samsung,pin-pud = <EXYNOS_PIN_PULL_ ##_pull>;		\
+		samsung,pin-drv = <EXYNOS5433_PIN_DRV_ ##_drv>;		\
 	}
 
 &pinctrl_alive {
