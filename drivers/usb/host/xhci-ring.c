@@ -1932,97 +1932,78 @@ static int process_ctrl_td(struct xhci_hcd *xhci, struct xhci_td *td,
 	union xhci_trb *ep_trb, struct xhci_transfer_event *event,
 	struct xhci_virt_ep *ep, int *status)
 {
-	struct xhci_virt_device *xdev;
-	struct xhci_ring *ep_ring;
-	struct device *dev;
-	unsigned int slot_id;
-	int ep_index;
-	struct xhci_ep_ctx *ep_ctx;
 	u32 trb_comp_code;
-	u32 remaining, requested;
+	u32 remaining;
+	u32 requested;
 	u32 trb_type;
 
 	trb_type = TRB_FIELD_TO_TYPE(le32_to_cpu(ep_trb->generic.field[3]));
-	slot_id = TRB_TO_SLOT_ID(le32_to_cpu(event->flags));
-	xdev = xhci->devs[slot_id];
-	ep_index = TRB_TO_EP_ID(le32_to_cpu(event->flags)) - 1;
-	ep_ring = xhci_dma_to_transfer_ring(ep, le64_to_cpu(event->buffer));
-	ep_ctx = xhci_get_ep_ctx(xhci, xdev->out_ctx, ep_index);
 	trb_comp_code = GET_COMP_CODE(le32_to_cpu(event->transfer_len));
 	requested = td->urb->transfer_buffer_length;
 	remaining = EVENT_TRB_LEN(le32_to_cpu(event->transfer_len));
-	dev = xhci_to_hcd(xhci)->self.controller;
+
+	if (!td->urb_length_set)
+		td->urb->actual_length = requested - remaining;
 
 	switch (trb_comp_code) {
 	case COMP_SUCCESS:
-		dev_WARN_ONCE(dev, trb_type != TRB_STATUS,
-				"ep%d%s: unexpected success! TRB Type %d\n",
-				usb_endpoint_num(&td->urb->ep->desc),
-				usb_endpoint_dir_in(&td->urb->ep->desc) ?
-				"in" : "out", trb_type);
 		*status = 0;
 		break;
 	case COMP_SHORT_PACKET:
 		*status = 0;
+
+		if (td->urb->transfer_flags & URB_SHORT_NOT_OK)
+			*status = -EREMOTEIO;
+
 		break;
 	case COMP_STOPPED_SHORT_PACKET:
-		if (trb_type == TRB_DATA ||
-			trb_type == TRB_NORMAL)
-			td->urb->actual_length = remaining;
-		else
+		if (trb_type == TRB_SETUP ||
+				trb_type == TRB_STATUS)
 			xhci_warn(xhci, "WARN: Stopped Short Packet on ctrl setup or status TRB\n");
+		*status = -ESHUTDOWN;
+
+		/*
+		 * NOTICE: according to section 6.4.2 Table 91 of xHCI rev 1.1
+		 * Specification, if completion code is Stopped - Short Packet,
+		 * Transfer Length field (referred to as 'remaining' here)
+		 * contain the value of EDTLA (see section 4.11.5.2 for
+		 * details), which means that remaining contains actual_length,
+		 * not the amount of bytes remaining to be transferred as usual.
+		 */
+		td->urb->actual_length = remaining;
 		goto finish_td;
 	case COMP_STOPPED:
-		switch (trb_type) {
-		case TRB_SETUP:
+		if (trb_type == TRB_SETUP)
 			td->urb->actual_length = 0;
-			goto finish_td;
-		case TRB_DATA:
-		case TRB_NORMAL:
-			td->urb->actual_length = requested - remaining;
-			goto finish_td;
-		default:
-			xhci_warn(xhci, "WARN: unexpected TRB Type %d\n", trb_type);
-			goto finish_td;
-		}
+		*status = -ESHUTDOWN;
+		goto finish_td;
 	case COMP_STOPPED_LENGTH_INVALID:
+		td->urb->actual_length = 0;
+		*status = -EINVAL;
+		goto finish_td;
+	case COMP_STALL_ERROR:
+		*status = -EINVAL;
+
+		if (trb_type != TRB_DATA &&
+				trb_type != TRB_NORMAL)
+			td->urb->actual_length = 0;
 		goto finish_td;
 	default:
-		if (!xhci_requires_manual_halt_cleanup(xhci,
-						       ep_ctx, trb_comp_code))
-			break;
-		xhci_dbg(xhci, "TRB error %u, halted endpoint index = %u\n",
-			 trb_comp_code, ep_index);
-		/* else fall through */
-	case COMP_STALL_ERROR:
-		/* Did we transfer part of the data (middle) phase? */
-		if (trb_type == TRB_DATA ||
-			trb_type == TRB_NORMAL)
-			td->urb->actual_length = requested - remaining;
-		else if (!td->urb_length_set)
-			td->urb->actual_length = 0;
-		goto finish_td;
+		/* nothing, further processed by finish_td() */
+		break;
 	}
-
-	/* stopped at setup stage, no data transferred */
-	if (trb_type == TRB_SETUP)
-		goto finish_td;
 
 	/*
 	 * if on data stage then update the actual_length of the URB and flag it
 	 * as set, so it won't be overwritten in the event for the last TRB.
 	 */
 	if (trb_type == TRB_DATA ||
-		trb_type == TRB_NORMAL) {
+			trb_type == TRB_NORMAL) {
 		td->urb_length_set = true;
 		td->urb->actual_length = requested - remaining;
 		xhci_dbg(xhci, "Waiting for status stage event\n");
 		return 0;
 	}
-
-	/* at status stage */
-	if (!td->urb_length_set)
-		td->urb->actual_length = requested;
 
 finish_td:
 	return finish_td(xhci, td, ep_trb, event, ep, status, false);
