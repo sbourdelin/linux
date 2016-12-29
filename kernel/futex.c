@@ -237,6 +237,7 @@ struct futex_state {
 	atomic_t refcount;
 
 	u32 handoff_pid;			/* For TP futexes only */
+	int locksteal_disabled;			/* For TP futexes only */
 
 	enum futex_type type;
 	union futex_key key;
@@ -3436,6 +3437,7 @@ lookup_futex_state(struct futex_hash_bucket *hb, union futex_key *key,
 	state = alloc_futex_state();
 	state->type = TYPE_TP;
 	state->key = *key;
+	state->locksteal_disabled = false;
 	list_add(&state->fs_list, &hb->fs_head);
 	WARN_ON(atomic_read(&state->refcount) != 1);
 
@@ -3781,9 +3783,10 @@ retry:
 				WRITE_ONCE(state->handoff_pid, vpid);
 
 				/*
-				 * Disable handoff check.
+				 * Disable handoff check and reader lock
+				 * stealing.
 				 */
-				handoff_set = true;
+				state->locksteal_disabled = handoff_set = true;
 			}
 		}
 
@@ -3886,6 +3889,7 @@ retry:
 	 */
 	WRITE_ONCE(state->mutex_owner, NULL);
 	WRITE_ONCE(state->handoff_pid, 0);
+	state->locksteal_disabled = false;
 
 	preempt_enable();
 	return (ret < 0) ? ret : TP_STATUS_SLEEP(ret, nsleep);
@@ -3964,6 +3968,21 @@ static noinline int futex_lock(u32 __user *uaddr, unsigned int flags,
 	if (!state || (state->type != TYPE_TP)) {
 		ret = state ? -EINVAL : -ENOMEM;
 		goto out_put_state_key;
+	}
+
+	/*
+	 * For reader, we will try to steal the lock here as if it is the
+	 * top waiter without taking the serialization mutex if reader
+	 * lock stealing isn't disabled even though the FUTEX_WAITERS bit
+	 * is set.
+	 */
+	if (shared && !state->locksteal_disabled) {
+		ret = futex_trylock(uaddr, vpid, &uval, true);
+		if (ret) {
+			if (ret > 0)
+				ret = TP_LOCK_STOLEN;
+			goto out_put_state_key;
+		}
 	}
 
 	if (to)
