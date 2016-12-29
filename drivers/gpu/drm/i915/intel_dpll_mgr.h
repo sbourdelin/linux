@@ -101,7 +101,7 @@ struct intel_shared_dpll_state {
 struct intel_shared_dpll_funcs {
 	/* The mode_set hook is optional and should be used together with the
 	 * intel_prepare_shared_dpll function. */
-	void (*mode_set)(struct drm_i915_private *dev_priv,
+	void (*prepare)(struct drm_i915_private *dev_priv,
 			 struct intel_shared_dpll *pll);
 	void (*enable)(struct drm_i915_private *dev_priv,
 		       struct intel_shared_dpll *pll);
