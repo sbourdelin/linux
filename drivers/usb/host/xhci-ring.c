@@ -2230,6 +2230,10 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 
 	ep_trb_dma = le64_to_cpu(event->buffer);
 	trb_comp_code = GET_COMP_CODE(le32_to_cpu(event->transfer_len));
+
+	xhci_dbg(xhci, "Event TRB Status '%s' (%d)\n",
+			xhci_trb_comp_code_string(trb_comp_code), trb_comp_code);
+
 	/* Look for common error cases */
 	switch (trb_comp_code) {
 	/* Skip codes that require special handling depending on
@@ -2244,43 +2248,28 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 			xhci_warn_ratelimited(xhci,
 					"WARN Successful completion on short TX: needs XHCI_TRUST_TX_LENGTH quirk?\n");
 	case COMP_SHORT_PACKET:
-		break;
 	case COMP_STOPPED:
-		xhci_dbg(xhci, "Stopped on Transfer TRB\n");
-		break;
 	case COMP_STOPPED_LENGTH_INVALID:
-		xhci_dbg(xhci, "Stopped on No-op or Link TRB\n");
-		break;
 	case COMP_STOPPED_SHORT_PACKET:
-		xhci_dbg(xhci, "Stopped with short packet transfer detected\n");
+	case COMP_BANDWIDTH_OVERRUN_ERROR:
+	case COMP_ISOCH_BUFFER_OVERRUN:
 		break;
 	case COMP_STALL_ERROR:
-		xhci_dbg(xhci, "Stalled endpoint\n");
 		ep->ep_state |= EP_HALTED;
 		status = -EPIPE;
 		break;
 	case COMP_TRB_ERROR:
-		xhci_warn(xhci, "WARN: TRB error on endpoint\n");
 		status = -EILSEQ;
 		break;
 	case COMP_SPLIT_TRANSACTION_ERROR:
 	case COMP_USB_TRANSACTION_ERROR:
-		xhci_dbg(xhci, "Transfer error on endpoint\n");
 		status = -EPROTO;
 		break;
 	case COMP_BABBLE_DETECTED_ERROR:
-		xhci_dbg(xhci, "Babble error on endpoint\n");
 		status = -EOVERFLOW;
 		break;
 	case COMP_DATA_BUFFER_ERROR:
-		xhci_warn(xhci, "WARN: HC couldn't access mem fast enough\n");
 		status = -ENOSR;
-		break;
-	case COMP_BANDWIDTH_OVERRUN_ERROR:
-		xhci_warn(xhci, "WARN: bandwidth overrun event on endpoint\n");
-		break;
-	case COMP_ISOCH_BUFFER_OVERRUN:
-		xhci_warn(xhci, "WARN: buffer overrun event on endpoint\n");
 		break;
 	case COMP_RING_UNDERRUN:
 		/*
@@ -2288,7 +2277,6 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 		 * a Ring Overrun Event for IN Isoch endpoint or Ring
 		 * Underrun Event for OUT Isoch endpoint.
 		 */
-		xhci_dbg(xhci, "underrun event on endpoint\n");
 		if (!list_empty(&ep_ring->td_list))
 			xhci_dbg(xhci, "Underrun Event for slot %d ep %d "
 					"still with TDs queued?\n",
@@ -2296,7 +2284,6 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 				 ep_index);
 		goto cleanup;
 	case COMP_RING_OVERRUN:
-		xhci_dbg(xhci, "overrun event on endpoint\n");
 		if (!list_empty(&ep_ring->td_list))
 			xhci_dbg(xhci, "Overrun Event for slot %d ep %d "
 					"still with TDs queued?\n",
@@ -2304,7 +2291,6 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 				 ep_index);
 		goto cleanup;
 	case COMP_INCOMPATIBLE_DEVICE_ERROR:
-		xhci_warn(xhci, "WARN: detect an incompatible device");
 		status = -EPROTO;
 		break;
 	case COMP_MISSED_SERVICE_ERROR:
@@ -2315,11 +2301,9 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 		 * short transfer when process the ep_ring next time.
 		 */
 		ep->skip = true;
-		xhci_dbg(xhci, "Miss service interval error, set skip flag\n");
 		goto cleanup;
 	case COMP_NO_PING_RESPONSE_ERROR:
 		ep->skip = true;
-		xhci_dbg(xhci, "No Ping response error, Skip one Isoc TD\n");
 		goto cleanup;
 	default:
 		if (xhci_is_vendor_info_code(xhci, trb_comp_code)) {
