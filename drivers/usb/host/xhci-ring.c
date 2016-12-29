@@ -1789,7 +1789,10 @@ static int xhci_td_cleanup(struct xhci_hcd *xhci, struct xhci_td *td,
 		struct xhci_ring *ep_ring, int *status)
 {
 	struct urb_priv	*urb_priv;
-	struct urb *urb = NULL;
+	struct device *dev;
+	struct urb *urb;
+
+	dev = xhci_to_hcd(xhci)->self.controller;
 
 	/* Clean up the endpoint's TD list */
 	urb = td->urb;
@@ -1798,17 +1801,10 @@ static int xhci_td_cleanup(struct xhci_hcd *xhci, struct xhci_td *td,
 	/* if a bounce buffer was used to align this td then unmap it */
 	xhci_unmap_td_bounce_buffer(xhci, ep_ring, td);
 
-	/* Do one last check of the actual transfer length.
-	 * If the host controller said we transferred more data than the buffer
-	 * length, urb->actual_length will be a very big number (since it's
-	 * unsigned).  Play it safe and say we didn't transfer anything.
-	 */
-	if (urb->actual_length > urb->transfer_buffer_length) {
-		xhci_warn(xhci, "URB req %u and actual %u transfer length mismatch\n",
-			  urb->transfer_buffer_length, urb->actual_length);
-		urb->actual_length = 0;
-		*status = 0;
-	}
+	dev_WARN_ONCE(dev, urb->actual_length > urb->transfer_buffer_length,
+			"URB transfer length mismatch. Requested %u got %u\n",
+			urb->transfer_buffer_length, urb->actual_length);
+
 	list_del_init(&td->td_list);
 	/* Was this TD slated to be cancelled but completed anyway? */
 	if (!list_empty(&td->cancelled_td_list))
