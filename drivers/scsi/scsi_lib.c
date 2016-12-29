@@ -2856,9 +2856,11 @@ EXPORT_SYMBOL(scsi_target_resume);
 /**
  * scsi_internal_device_block - internal function to put a device temporarily into the SDEV_BLOCK state
  * @sdev:	device to block
+ * @flush:	wait for oustanding queuecommand calls to finish
  *
  * Block request made by scsi lld's to temporarily stop all
- * scsi commands on the specified device. May sleep.
+ * scsi commands on the specified device. May sleep if
+ * flush is set
  *
  * Returns zero if successful or error if not
  *
@@ -2873,7 +2875,7 @@ EXPORT_SYMBOL(scsi_target_resume);
  * remove the rport mutex lock and unlock calls from srp_queuecommand().
  */
 int
-scsi_internal_device_block(struct scsi_device *sdev)
+scsi_internal_device_block(struct scsi_device *sdev, bool flush)
 {
 	struct request_queue *q = sdev->request_queue;
 	unsigned long flags;
@@ -2898,7 +2900,8 @@ scsi_internal_device_block(struct scsi_device *sdev)
 		spin_lock_irqsave(q->queue_lock, flags);
 		blk_stop_queue(q);
 		spin_unlock_irqrestore(q->queue_lock, flags);
-		scsi_wait_for_queuecommand(sdev);
+		if (flush)
+			scsi_wait_for_queuecommand(sdev);
 	}
 
 	return 0;
@@ -2960,7 +2963,7 @@ EXPORT_SYMBOL_GPL(scsi_internal_device_unblock);
 static void
 device_block(struct scsi_device *sdev, void *data)
 {
-	scsi_internal_device_block(sdev);
+	scsi_internal_device_block(sdev, true);
 }
 
 static int
