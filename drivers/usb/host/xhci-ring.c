@@ -2630,8 +2630,7 @@ irqreturn_t xhci_irq(struct usb_hcd *hcd)
 	 * so we can receive interrupts from other MSI-X interrupters.
 	 * Write 1 to clear the interrupt status.
 	 */
-	status |= STS_EINT;
-	writel(status, &xhci->op_regs->status);
+	writel(STS_EINT, &xhci->op_regs->status);
 	/* FIXME when MSI-X is supported and there are multiple vectors */
 	/* Clear the MSI-X event interrupt status */
 
