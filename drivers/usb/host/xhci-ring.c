@@ -1717,7 +1717,7 @@ cleanup:
  * TRB in this TD, this function returns that TRB's segment.  Otherwise it
  * returns 0.
  */
-struct xhci_segment *trb_in_td(struct xhci_hcd *xhci,
+static struct xhci_segment *trb_in_td(struct xhci_hcd *xhci,
 		struct xhci_td *td, dma_addr_t suspect_dma)
 {
 	struct xhci_segment *cur_seg = td->start_seg;
