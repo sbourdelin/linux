@@ -140,6 +140,18 @@ ENDPROC(cpu_do_resume)
 ENTRY(cpu_do_switch_mm)
 	mmid	x1, x1				// get mm->context.id
 	bfi	x0, x1, #48, #16		// set the ASID
+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
+alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
+	mrs     x2, ttbr0_el1                   // get cuurent TTBR0_EL1
+	mov     x3, #CONFIG_QCOM_FALKOR_ERRATUM_1003	// reserved ASID
+	bfi     x2, x3, #48, #16                // set the reserved ASID + old BADDR
+	msr     ttbr0_el1, x2                   // update TTBR0_EL1
+	isb
+	bfi     x2, x0, #0, #48                 // set the desired BADDR + reserved ASID
+	msr     ttbr0_el1, x2                   // update TTBR0_EL1
+	isb
+alternative_else_nop_endif
+#endif
 	msr	ttbr0_el1, x0			// set TTBR0
 	isb
 	post_ttbr0_update_workaround
