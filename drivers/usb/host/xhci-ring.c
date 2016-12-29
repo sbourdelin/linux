@@ -523,6 +523,16 @@ void xhci_find_new_dequeue_state(struct xhci_hcd *xhci,
 			(unsigned long long) addr);
 }
 
+static void __trb_to_noop(union xhci_trb *trb, u32 noop)
+{
+	trb->generic.field[0] = 0;
+	trb->generic.field[1] = 0;
+	trb->generic.field[2] = 0;
+	/* Preserve only the cycle bit of this TRB */
+	trb->generic.field[3] &= cpu_to_le32(TRB_CYCLE);
+	trb->generic.field[3] |= cpu_to_le32(TRB_TYPE(noop));
+}
+
 static void trb_to_noop(union xhci_trb *trb)
 {
 	switch (TRB_FIELD_TO_TYPE(cpu_to_le32(trb->generic.field[3]))) {
@@ -535,12 +545,7 @@ static void trb_to_noop(union xhci_trb *trb)
 	case TRB_DATA:
 	case TRB_STATUS:
 	case TRB_ISOC:
-		trb->generic.field[0] = 0;
-		trb->generic.field[1] = 0;
-		trb->generic.field[2] = 0;
-		/* Preserve only the cycle bit of this TRB */
-		trb->generic.field[3] &= cpu_to_le32(TRB_CYCLE);
-		trb->generic.field[3] |= cpu_to_le32(TRB_TYPE(TRB_TR_NOOP));
+		__trb_to_noop(trb, TRB_TR_NOOP);
 		break;
 	case TRB_ENABLE_SLOT:
 	case TRB_DISABLE_SLOT:
@@ -556,12 +561,7 @@ static void trb_to_noop(union xhci_trb *trb)
 	case TRB_SET_LT:
 	case TRB_GET_BW:
 	case TRB_FORCE_HEADER:
-		trb->generic.field[0] = 0;
-		trb->generic.field[1] = 0;
-		trb->generic.field[2] = 0;
-		/* Preserve only the cycle bit of this TRB */
-		trb->generic.field[3] &= cpu_to_le32(TRB_CYCLE);
-		trb->generic.field[3] = cpu_to_le32(TRB_TYPE(TRB_CMD_NOOP));
+		__trb_to_noop(trb, TRB_CMD_NOOP);
 		break;
 	default:
 		/* nothing */
