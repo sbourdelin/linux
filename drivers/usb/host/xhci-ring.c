@@ -1773,32 +1773,6 @@ static void xhci_cleanup_halted_endpoint(struct xhci_hcd *xhci,
 	xhci_ring_cmd_db(xhci);
 }
 
-/* Check if an error has halted the endpoint ring.  The class driver will
- * cleanup the halt for a non-default control endpoint if we indicate a stall.
- * However, a babble and other errors also halt the endpoint ring, and the class
- * driver won't clear the halt in that case, so we need to issue a Set Transfer
- * Ring Dequeue Pointer command manually.
- */
-static int xhci_requires_manual_halt_cleanup(struct xhci_hcd *xhci,
-		struct xhci_ep_ctx *ep_ctx,
-		unsigned int trb_comp_code)
-{
-	/* TRB completion codes that may require a manual halt cleanup */
-	if (trb_comp_code == COMP_USB_TRANSACTION_ERROR ||
-			trb_comp_code == COMP_BABBLE_DETECTED_ERROR ||
-			trb_comp_code == COMP_SPLIT_TRANSACTION_ERROR)
-		/* The 0.95 spec says a babbling control endpoint
-		 * is not halted. The 0.96 spec says it is.  Some HW
-		 * claims to be 0.95 compliant, but it halts the control
-		 * endpoint anyway.  Check if a babble halted the
-		 * endpoint.
-		 */
-		if (GET_EP_CTX_STATE(ep_ctx) == EP_STATE_HALTED)
-			return 1;
-
-	return 0;
-}
-
 int xhci_is_vendor_info_code(struct xhci_hcd *xhci, unsigned int trb_comp_code)
 {
 	if (trb_comp_code >= 224 && trb_comp_code <= 255) {
@@ -1840,19 +1814,35 @@ static int finish_td(struct xhci_hcd *xhci, struct xhci_td *td,
 	if (skip)
 		goto td_cleanup;
 
-	if (trb_comp_code == COMP_STOPPED_LENGTH_INVALID ||
-			trb_comp_code == COMP_STOPPED ||
-			trb_comp_code == COMP_STOPPED_SHORT_PACKET) {
+	switch (trb_comp_code) {
+	case COMP_STOPPED_LENGTH_INVALID:
+	case COMP_STOPPED:
+	case COMP_STOPPED_SHORT_PACKET:
 		/* The Endpoint Stop Command completion will take care of any
 		 * stopped TDs.  A stopped TD may be restarted, so don't update
 		 * the ring dequeue pointer or take this TD off any lists yet.
 		 */
 		ep->stopped_td = td;
 		return 0;
-	}
-	if (trb_comp_code == COMP_STALL_ERROR ||
-		xhci_requires_manual_halt_cleanup(xhci, ep_ctx,
-						trb_comp_code)) {
+	case COMP_USB_TRANSACTION_ERROR:
+	case COMP_BABBLE_DETECTED_ERROR:
+	case COMP_SPLIT_TRANSACTION_ERROR:
+		/* Check if an error has halted the endpoint ring.  The class
+		 * driver will cleanup the halt for a non-default control
+		 * endpoint if we indicate a stall.  However, a babble and other
+		 * errors also halt the endpoint ring, and the class driver
+		 * won't clear the halt in that case, so we need to issue a Set
+		 * Transfer Ring Dequeue Pointer command manually.
+		 *
+		 * Note that the 0.95 spec says a babbling control endpoint is
+		 * not halted. The 0.96 spec says it is.  Some HW claims to be
+		 * 0.95 compliant, but it halts the control endpoint anyway.
+		 * Check if a babble halted the endpoint.
+		 */
+		if (GET_EP_CTX_STATE(ep_ctx) != EP_STATE_HALTED)
+			break;
+		/* FALLTHROUGH */
+	case COMP_STALL_ERROR:
 		/* Issue a reset endpoint command to clear the host side
 		 * halt, followed by a set dequeue command to move the
 		 * dequeue pointer past the TD.
@@ -1860,7 +1850,8 @@ static int finish_td(struct xhci_hcd *xhci, struct xhci_td *td,
 		 */
 		xhci_cleanup_halted_endpoint(xhci, slot_id, ep_index,
 					ep_ring->stream_id, td, ep_trb);
-	} else {
+		break;
+	default:
 		/* Update ring dequeue pointer */
 		while (ep_ring->dequeue != td->last_trb)
 			inc_deq(xhci, ep_ring);
