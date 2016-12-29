@@ -420,13 +420,15 @@ static int rt5670_headset_detect(struct snd_soc_codec *codec, int jack_insert)
 	struct rt5670_priv *rt5670 = snd_soc_codec_get_drvdata(codec);
 
 	if (jack_insert) {
+		if (rt5670->pdata.hs_ground_control_gpio)
+			snd_soc_dapm_force_enable_pin(dapm, "HS GND Control");
+
 		snd_soc_dapm_force_enable_pin(dapm, "Mic Det Power");
 		snd_soc_dapm_sync(dapm);
 		snd_soc_update_bits(codec, RT5670_GEN_CTRL3, 0x4, 0x0);
 		snd_soc_update_bits(codec, RT5670_CJ_CTRL2,
 			RT5670_CBJ_DET_MODE | RT5670_CBJ_MN_JD,
 			RT5670_CBJ_MN_JD);
-		snd_soc_write(codec, RT5670_GPIO_CTRL2, 0x0004);
 		snd_soc_update_bits(codec, RT5670_GPIO_CTRL1,
 			RT5670_GP1_PIN_MASK, RT5670_GP1_PIN_IRQ);
 		snd_soc_update_bits(codec, RT5670_CJ_CTRL1,
@@ -448,6 +450,10 @@ static int rt5670_headset_detect(struct snd_soc_codec *codec, int jack_insert)
 			snd_soc_update_bits(codec, RT5670_GEN_CTRL3, 0x4, 0x4);
 			rt5670->jack_type = SND_JACK_HEADPHONE;
 			snd_soc_dapm_disable_pin(dapm, "Mic Det Power");
+			snd_soc_dapm_sync(dapm);
+		}
+		if (rt5670->pdata.hs_ground_control_gpio) {
+			snd_soc_dapm_disable_pin(dapm, "HS GND Control");
 			snd_soc_dapm_sync(dapm);
 		}
 	} else {
@@ -1542,6 +1548,29 @@ static int rt5670_bst2_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+static int rt5670_hs_ground_control_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		snd_soc_update_bits(codec, RT5670_GPIO_CTRL2,
+				RT5670_GP2_OUT_MASK, RT5670_GP2_OUT_HI);
+		break;
+
+	case SND_SOC_DAPM_POST_PMD:
+		snd_soc_update_bits(codec, RT5670_GPIO_CTRL2,
+				RT5670_GP2_OUT_MASK, RT5670_GP2_OUT_LO);
+		break;
+
+	default:
+		return 0;
+	}
+
+	return 0;
+}
+
 static const struct snd_soc_dapm_widget rt5670_dapm_widgets[] = {
 	SND_SOC_DAPM_SUPPLY("PLL1", RT5670_PWR_ANLG2,
 			    RT5670_PWR_PLL_BIT, 0, NULL, 0),
@@ -1915,6 +1944,12 @@ static const struct snd_soc_dapm_widget rt5672_specific_dapm_widgets[] = {
 	SND_SOC_DAPM_OUTPUT("SPOLN"),
 	SND_SOC_DAPM_OUTPUT("SPORP"),
 	SND_SOC_DAPM_OUTPUT("SPORN"),
+};
+
+static const struct snd_soc_dapm_widget hs_gnd_cnotrol_widgets[] = {
+	SND_SOC_DAPM_SUPPLY("HS GND Control", SND_SOC_NOPM, 0, 0,
+			rt5670_hs_ground_control_event,
+			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 };
 
 static const struct snd_soc_dapm_route rt5670_dapm_routes[] = {
@@ -2314,6 +2349,11 @@ static const struct snd_soc_dapm_route rt5672_specific_dapm_routes[] = {
 	{ "SPORN", NULL, "SPO Amp" },
 };
 
+static const struct snd_soc_dapm_route hs_gnd_cnotrol_routes[] = {
+	{ "BST1", NULL, "HS GND Control" },
+	{ "HP Amp", NULL, "HS GND Control" },
+};
+
 static int rt5670_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params, struct snd_soc_dai *dai)
 {
@@ -2679,6 +2719,13 @@ static int rt5670_probe(struct snd_soc_codec *codec)
 			"The driver is for RT5670 RT5671 or RT5672 only\n");
 		return -ENODEV;
 	}
+	if (rt5670->pdata.hs_ground_control_gpio) {
+		snd_soc_dapm_new_controls(dapm, hs_gnd_cnotrol_widgets,
+			ARRAY_SIZE(hs_gnd_cnotrol_widgets));
+		snd_soc_dapm_add_routes(dapm, hs_gnd_cnotrol_routes,
+			ARRAY_SIZE(hs_gnd_cnotrol_routes));
+	}
+
 	rt5670->codec = codec;
 
 	return 0;
@@ -2827,6 +2874,10 @@ static const struct dmi_system_id dmi_platform_intel_braswell[] = {
 			DMI_MATCH(DMI_BOARD_NAME, "Braswell CRB"),
 		},
 	},
+	{}
+};
+
+static const struct dmi_system_id dmi_platform_dell_wyse[] = {
 	{
 		.ident = "Dell Wyse 3040",
 		.matches = {
@@ -2861,6 +2912,12 @@ static int rt5670_i2c_probe(struct i2c_client *i2c,
 		rt5670->pdata.dmic1_data_pin = RT5670_DMIC_DATA_IN2P;
 		rt5670->pdata.dev_gpio = true;
 		rt5670->pdata.jd_mode = 1;
+		rt5670->pdata.hs_ground_control_gpio = RT5670_GPIO_NONE;
+	} else if (dmi_check_system(dmi_platform_dell_wyse)) {
+		rt5670->pdata.dmic_en = false;
+		rt5670->pdata.dev_gpio = true;
+		rt5670->pdata.jd_mode = 1;
+		rt5670->pdata.hs_ground_control_gpio = RT5670_GPIO2;
 	}
 
 	rt5670->regmap = devm_regmap_init_i2c(i2c, &rt5670_regmap);
@@ -2885,6 +2942,21 @@ static int rt5670_i2c_probe(struct i2c_client *i2c,
 	msleep(100);
 
 	regmap_write(rt5670->regmap, RT5670_RESET, 0);
+
+	switch (rt5670->pdata.hs_ground_control_gpio) {
+	case RT5670_GPIO_NONE:
+		break;
+	case RT5670_GPIO2:
+		regmap_update_bits(rt5670->regmap, RT5670_GPIO_CTRL2,
+			RT5670_GP2_PF_MASK | RT5670_GP2_OUT_MASK,
+			RT5670_GP2_PF_OUT | RT5670_GP2_OUT_LO);
+		break;
+	default:
+		rt5670->pdata.hs_ground_control_gpio =
+			RT5670_GPIO_NONE;
+		dev_warn(&i2c->dev, "Only Support GPIO2 currently\n");
+			break;
+	}
 
 	regmap_read(rt5670->regmap, RT5670_VENDOR_ID, &val);
 	if (val >= 4)
