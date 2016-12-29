@@ -1828,7 +1828,7 @@ void xhci_mem_cleanup(struct xhci_hcd *xhci)
 		}
 	}
 
-	for (i = 1; i < MAX_HC_SLOTS; ++i)
+	for (i = 1; i <= HCS_MAX_SLOTS(xhci->hcs_params1); ++i)
 		xhci_free_virt_device(xhci, i);
 
 	dma_pool_destroy(xhci->segment_pool);
@@ -1866,6 +1866,8 @@ void xhci_mem_cleanup(struct xhci_hcd *xhci)
 			kfree(tt);
 		}
 	}
+
+	kfree(xhci->devs);
 
 no_bw:
 	xhci->cmd_ring_reserved_trbs = 0;
@@ -2378,6 +2380,11 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 			"// Setting Max device slots reg = 0x%x.", val);
 	writel(val, &xhci->op_regs->config_reg);
 
+	xhci->devs = kcalloc(HCS_MAX_SLOTS(xhci->hcs_params1) + 1,
+			sizeof(struct xhci_virt_device *), GFP_KERNEL);
+	if (!xhci->devs)
+		goto fail;
+
 	/*
 	 * Section 5.4.8 - doorbell array must be
 	 * "physically contiguous and 64-byte (cache line) aligned".
@@ -2535,7 +2542,7 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 	 * something other than the default (~1ms minimum between interrupts).
 	 * See section 5.5.1.2.
 	 */
-	for (i = 0; i < MAX_HC_SLOTS; ++i)
+	for (i = 0; i <= HCS_MAX_SLOTS(xhci->hcs_params1); ++i)
 		xhci->devs[i] = NULL;
 	for (i = 0; i < USB_MAXCHILDREN; ++i) {
 		xhci->bus_state[0].resume_done[i] = 0;

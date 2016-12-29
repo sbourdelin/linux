@@ -1583,7 +1583,7 @@ struct xhci_hcd {
 	/* For USB 3.0 LPM enable/disable. */
 	struct xhci_command		*lpm_command;
 	/* Internal mirror of the HW's dcbaa */
-	struct xhci_virt_device	*devs[MAX_HC_SLOTS];
+	struct xhci_virt_device	**devs;
 	/* For keeping track of bandwidth domains per roothub. */
 	struct xhci_root_port_bw_info	*rh_bw;
 
