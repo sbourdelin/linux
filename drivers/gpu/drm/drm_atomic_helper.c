@@ -30,6 +30,7 @@
 #include <drm/drm_plane_helper.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_dp_mst_helper.h>
 #include <linux/dma-fence.h>
 
 #include "drm_crtc_internal.h"
@@ -2034,6 +2035,15 @@ void drm_atomic_helper_swap_state(struct drm_atomic_state *state,
 		connector->state->state = state;
 		swap(state->connectors[i].state, connector->state);
 		connector->state->state = NULL;
+	}
+
+	for (i = 0; i < state->num_mst_topologies; i++) {
+		struct drm_dp_mst_topology_mgr *mgr;
+
+		mgr = state->dp_mst_topologies[i].ptr;
+		mgr->state->state = state;
+		swap(state->dp_mst_topologies[i].state, mgr->state);
+		mgr->state->state = NULL;
 	}
 
 	for_each_crtc_in_state(state, crtc, crtc_state, i) {

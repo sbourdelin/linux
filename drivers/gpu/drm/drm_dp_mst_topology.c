@@ -2042,6 +2042,9 @@ int drm_dp_mst_topology_mgr_set_mst(struct drm_dp_mst_topology_mgr *mgr, bool ms
 			goto out_unlock;
 		}
 
+		/* max. time slots - one slot for MTP header */
+		mgr->state->avail_slots = 63;
+
 		/* add initial branch device at LCT 1 */
 		mstb = drm_dp_add_mst_branch_device(1, NULL);
 		if (mstb == NULL) {
@@ -2973,6 +2976,11 @@ int drm_dp_mst_topology_mgr_init(struct drm_dp_mst_topology_mgr *mgr,
 	mgr->proposed_vcpis = kcalloc(max_payloads, sizeof(struct drm_dp_vcpi *), GFP_KERNEL);
 	if (!mgr->proposed_vcpis)
 		return -ENOMEM;
+	mgr->state = kzalloc(sizeof(*mgr->state), GFP_KERNEL);
+	if (!mgr->state)
+		return -ENOMEM;
+	mgr->state->mgr = mgr;
+
 	set_bit(0, &mgr->payload_mask);
 	if (test_calc_pbn_mode() < 0)
 		DRM_ERROR("MST PBN self-test failed\n");
@@ -2995,6 +3003,8 @@ void drm_dp_mst_topology_mgr_destroy(struct drm_dp_mst_topology_mgr *mgr)
 	kfree(mgr->proposed_vcpis);
 	mgr->proposed_vcpis = NULL;
 	mutex_unlock(&mgr->payload_lock);
+	kfree(mgr->state);
+	mgr->state = NULL;
 	mgr->dev = NULL;
 	mgr->aux = NULL;
 }
