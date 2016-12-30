@@ -495,6 +495,15 @@ void intel_psr_enable(struct intel_dp *intel_dp)
 		return;
 	}
 
+	/*
+	 * FIXME:enable psr2 only for y-cordinate psr2 panels
+	 * After gtc implementation , remove this restriction.
+	 */
+	if (!dev_priv->psr.y_cord_support &&  dev_priv->psr.psr2_support) {
+		DRM_DEBUG_KMS("PSR2 disabled, panel does not support Y coordinate\n");
+		return;
+	}
+
 	mutex_lock(&dev_priv->psr.lock);
 	if (dev_priv->psr.enabled) {
 		DRM_DEBUG_KMS("PSR already in use\n");
