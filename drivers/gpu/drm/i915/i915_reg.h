@@ -6449,6 +6449,13 @@ enum {
 #define  BDW_DPRS_MASK_VBLANK_SRD	(1 << 0)
 #define CHICKEN_PIPESL_1(pipe) _MMIO_PIPE(pipe, _CHICKEN_PIPESL_1_A, _CHICKEN_PIPESL_1_B)
 
+#define CHICKEN_TRANS_A         0x420c0
+#define CHICKEN_TRANS_B         0x420c4
+#define CHICKEN_TRANS(trans) _MMIO_TRANS(trans, CHICKEN_TRANS_A, CHICKEN_TRANS_B)
+#define TRANS_EDP              3
+#define CHICKEN_TRANS_BIT12    (1<<12)
+#define CHICKEN_TRANS_BIT15    (1<<15)
+
 #define DISP_ARB_CTL	_MMIO(0x45000)
 #define  DISP_FBC_MEMORY_WAKE		(1<<31)
 #define  DISP_TILE_SURFACE_SWIZZLING	(1<<13)
