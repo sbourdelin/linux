@@ -10,7 +10,8 @@ Optional properties:
 
 - simple-audio-card,name		: User specified audio sound card name, one string
 					  property.
-- simple-audio-card,widgets		: Please refer to widgets.txt.
+- simple-audio-card,widgets		: Please refer to
+					  Documentation/devicetree/bindings/sound/widgets.txt.
 - simple-audio-card,routing		: A list of the connections between audio components.
 					  Each entry is a pair of strings, the first being the
 					  connection's sink, the second being the connection's
