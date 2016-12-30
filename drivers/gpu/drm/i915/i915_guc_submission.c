@@ -1336,9 +1336,14 @@ static void guc_addon_create(struct intel_guc *guc)
 
 	for_each_engine(engine, dev_priv, id) {
 		reg_state->mmio_white_list[engine->guc_id].mmio_start =
-			engine->mmio_base + GUC_MMIO_WHITE_LIST_START;
+			i915_mmio_reg_offset(RING_FORCE_TO_NONPRIV(engine->mmio_base, 0));
 
-		/* Nothing to be saved or restored for now. */
+		/*
+		 * Nothing to be saved or restored for now.
+		 * XXX: when adding registers to the whitelist, make sure to not
+		 * conflict with what the workaround framework is doing with
+		 * the FORCE_TO_NONPRIV registers.
+		 */
 		reg_state->mmio_white_list[engine->guc_id].count = 0;
 	}
 
