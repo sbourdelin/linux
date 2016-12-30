@@ -3655,7 +3655,6 @@ intel_edp_init_dpcd(struct intel_dp *intel_dp)
 			dev_priv->psr.alpm =
 				intel_dp_get_alpm_status(intel_dp);
 		}
-
 	}
 
 	/* Read the eDP Display control capabilities registers */
