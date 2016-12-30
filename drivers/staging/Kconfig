@@ -50,6 +50,8 @@ source "drivers/staging/vt6656/Kconfig"
 
 source "drivers/staging/iio/Kconfig"
 
+source "drivers/staging/mars/Kconfig"
+
 source "drivers/staging/sm750fb/Kconfig"
 
 source "drivers/staging/xgifb/Kconfig"

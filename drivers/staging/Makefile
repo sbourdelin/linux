@@ -16,6 +16,7 @@ obj-$(CONFIG_VT6655)		+= vt6655/
 obj-$(CONFIG_VT6656)		+= vt6656/
 obj-$(CONFIG_VME_BUS)		+= vme/
 obj-$(CONFIG_IIO)		+= iio/
+obj-$(CONFIG_MARS)		+= mars/
 obj-$(CONFIG_FB_SM750)		+= sm750fb/
 obj-$(CONFIG_FB_XGI)		+= xgifb/
 obj-$(CONFIG_USB_EMXX)		+= emxx_udc/
