@@ -521,10 +521,8 @@ static void efx_mcdi_phy_get_link_ksettings(struct efx_nic *efx,
 	cmd->base.mdio_support = (efx->mdio.mode_support &
 			      (MDIO_SUPPORTS_C45 | MDIO_SUPPORTS_C22));
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	BUILD_BUG_ON(MC_CMD_GET_LINK_IN_LEN != 0);
 	rc = efx_mcdi_rpc(efx, MC_CMD_GET_LINK, NULL, 0,
@@ -535,8 +533,7 @@ static void efx_mcdi_phy_get_link_ksettings(struct efx_nic *efx,
 		mcdi_to_ethtool_cap(phy_cfg->media,
 				    MCDI_DWORD(outbuf, GET_LINK_OUT_LP_CAP));
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.lp_advertising,
-						lp_advertising);
+	ethtool_u32_to_ks(cmd->link_modes.lp_advertising, lp_advertising);
 }
 
 static int
@@ -548,8 +545,7 @@ efx_mcdi_phy_set_link_ksettings(struct efx_nic *efx,
 	int rc;
 	u32 advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising,	cmd->link_modes.advertising);
 
 	if (cmd->base.autoneg) {
 		caps = (ethtool_to_mcdi_cap(advertising) |

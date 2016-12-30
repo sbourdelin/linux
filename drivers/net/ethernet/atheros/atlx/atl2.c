@@ -1771,10 +1771,8 @@ static int atl2_get_link_ksettings(struct net_device *netdev,
 
 	cmd->base.autoneg = AUTONEG_ENABLE;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }
@@ -1786,8 +1784,7 @@ static int atl2_set_link_ksettings(struct net_device *netdev,
 	struct atl2_hw *hw = &adapter->hw;
 	u32 advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising,	cmd->link_modes.advertising);
 
 	while (test_and_set_bit(__ATL2_RESETTING, &adapter->flags))
 		msleep(1);

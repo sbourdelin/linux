@@ -76,12 +76,8 @@ static int xgene_get_link_ksettings(struct net_device *ndev,
 
 		supported = SUPPORTED_1000baseT_Full | SUPPORTED_Autoneg |
 			SUPPORTED_MII;
-		ethtool_convert_legacy_u32_to_link_mode(
-			cmd->link_modes.supported,
-			supported);
-		ethtool_convert_legacy_u32_to_link_mode(
-			cmd->link_modes.advertising,
-			supported);
+		ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+		ethtool_u32_to_ks(cmd->link_modes.advertising, supported);
 
 		cmd->base.speed = SPEED_1000;
 		cmd->base.duplex = DUPLEX_FULL;
@@ -89,12 +85,8 @@ static int xgene_get_link_ksettings(struct net_device *ndev,
 		cmd->base.autoneg = AUTONEG_ENABLE;
 	} else {
 		supported = SUPPORTED_10000baseT_Full | SUPPORTED_FIBRE;
-		ethtool_convert_legacy_u32_to_link_mode(
-			cmd->link_modes.supported,
-			supported);
-		ethtool_convert_legacy_u32_to_link_mode(
-			cmd->link_modes.advertising,
-			supported);
+		ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+		ethtool_u32_to_ks(cmd->link_modes.advertising, supported);
 
 		cmd->base.speed = SPEED_10000;
 		cmd->base.duplex = DUPLEX_FULL;

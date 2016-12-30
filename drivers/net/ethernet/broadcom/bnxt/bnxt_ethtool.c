@@ -872,61 +872,44 @@ u32 _bnxt_fw_to_ethtool_adv_spds(u16 fw_speeds, u8 fw_pause)
 	return speed_mask;
 }
 
-#define BNXT_FW_TO_ETHTOOL_SPDS(fw_speeds, fw_pause, lk_ksettings, name)\
-{									\
-	if ((fw_speeds) & BNXT_LINK_SPEED_MSK_100MB)			\
-		ethtool_link_ksettings_add_link_mode(lk_ksettings, name,\
-						     100baseT_Full);	\
-	if ((fw_speeds) & BNXT_LINK_SPEED_MSK_1GB)			\
-		ethtool_link_ksettings_add_link_mode(lk_ksettings, name,\
-						     1000baseT_Full);	\
-	if ((fw_speeds) & BNXT_LINK_SPEED_MSK_10GB)			\
-		ethtool_link_ksettings_add_link_mode(lk_ksettings, name,\
-						     10000baseT_Full);	\
-	if ((fw_speeds) & BNXT_LINK_SPEED_MSK_25GB)			\
-		ethtool_link_ksettings_add_link_mode(lk_ksettings, name,\
-						     25000baseCR_Full);	\
-	if ((fw_speeds) & BNXT_LINK_SPEED_MSK_40GB)			\
-		ethtool_link_ksettings_add_link_mode(lk_ksettings, name,\
-						     40000baseCR4_Full);\
-	if ((fw_speeds) & BNXT_LINK_SPEED_MSK_50GB)			\
-		ethtool_link_ksettings_add_link_mode(lk_ksettings, name,\
-						     50000baseCR2_Full);\
-	if ((fw_pause) & BNXT_LINK_PAUSE_RX) {				\
-		ethtool_link_ksettings_add_link_mode(lk_ksettings, name,\
-						     Pause);		\
-		if (!((fw_pause) & BNXT_LINK_PAUSE_TX))			\
-			ethtool_link_ksettings_add_link_mode(		\
-					lk_ksettings, name, Asym_Pause);\
-	} else if ((fw_pause) & BNXT_LINK_PAUSE_TX) {			\
-		ethtool_link_ksettings_add_link_mode(lk_ksettings, name,\
-						     Asym_Pause);	\
-	}								\
+#define BNXT_FW_TO_ETHTOOL_SPDS(fw_speeds, fw_pause, lk_ksettings, name)     \
+{									     \
+	if ((fw_speeds) & BNXT_LINK_SPEED_MSK_100MB)			     \
+		ethtool_ks_add_mode(lk_ksettings, name, 100baseT_Full);	     \
+	if ((fw_speeds) & BNXT_LINK_SPEED_MSK_1GB)			     \
+		ethtool_ks_add_mode(lk_ksettings, name, 1000baseT_Full);     \
+	if ((fw_speeds) & BNXT_LINK_SPEED_MSK_10GB)			     \
+		ethtool_ks_add_mode(lk_ksettings, name, 10000baseT_Full);    \
+	if ((fw_speeds) & BNXT_LINK_SPEED_MSK_25GB)			     \
+		ethtool_ks_add_mode(lk_ksettings, name, 25000baseCR_Full);   \
+	if ((fw_speeds) & BNXT_LINK_SPEED_MSK_40GB)			     \
+		ethtool_ks_add_mode(lk_ksettings, name, 40000baseCR4_Full);  \
+	if ((fw_speeds) & BNXT_LINK_SPEED_MSK_50GB)			     \
+		ethtool_ks_add_mode(lk_ksettings, name, 50000baseCR2_Full);  \
+	if ((fw_pause) & BNXT_LINK_PAUSE_RX) {				     \
+		ethtool_ks_add_mode(lk_ksettings, name, Pause);		     \
+		if (!((fw_pause) & BNXT_LINK_PAUSE_TX))			     \
+			ethtool_ks_add_mode(lk_ksettings, name, Asym_Pause); \
+	} else if ((fw_pause) & BNXT_LINK_PAUSE_TX) {			     \
+		ethtool_ks_add_mode(lk_ksettings, name, Asym_Pause);	     \
+	}								     \
 }
 
 #define BNXT_ETHTOOL_TO_FW_SPDS(fw_speeds, lk_ksettings, name)		\
 {									\
-	if (ethtool_link_ksettings_test_link_mode(lk_ksettings, name,	\
-						  100baseT_Full) ||	\
-	    ethtool_link_ksettings_test_link_mode(lk_ksettings, name,	\
-						  100baseT_Half))	\
+	if (ethtool_ks_test(lk_ksettings, name, 100baseT_Full) ||	\
+	    ethtool_ks_test(lk_ksettings, name, 100baseT_Half))		\
 		(fw_speeds) |= BNXT_LINK_SPEED_MSK_100MB;		\
-	if (ethtool_link_ksettings_test_link_mode(lk_ksettings, name,	\
-						  1000baseT_Full) ||	\
-	    ethtool_link_ksettings_test_link_mode(lk_ksettings, name,	\
-						  1000baseT_Half))	\
+	if (ethtool_ks_test(lk_ksettings, name, 1000baseT_Full) ||	\
+	    ethtool_ks_test(lk_ksettings, name, 1000baseT_Half))	\
 		(fw_speeds) |= BNXT_LINK_SPEED_MSK_1GB;			\
-	if (ethtool_link_ksettings_test_link_mode(lk_ksettings, name,	\
-						  10000baseT_Full))	\
+	if (ethtool_ks_test(lk_ksettings, name, 10000baseT_Full))	\
 		(fw_speeds) |= BNXT_LINK_SPEED_MSK_10GB;		\
-	if (ethtool_link_ksettings_test_link_mode(lk_ksettings, name,	\
-						  25000baseCR_Full))	\
+	if (ethtool_ks_test(lk_ksettings, name, 25000baseCR_Full))	\
 		(fw_speeds) |= BNXT_LINK_SPEED_MSK_25GB;		\
-	if (ethtool_link_ksettings_test_link_mode(lk_ksettings, name,	\
-						  40000baseCR4_Full))	\
+	if (ethtool_ks_test(lk_ksettings, name, 40000baseCR4_Full))	\
 		(fw_speeds) |= BNXT_LINK_SPEED_MSK_40GB;		\
-	if (ethtool_link_ksettings_test_link_mode(lk_ksettings, name,	\
-						  50000baseCR2_Full))	\
+	if (ethtool_ks_test(lk_ksettings, name, 50000baseCR2_Full))	\
 		(fw_speeds) |= BNXT_LINK_SPEED_MSK_50GB;		\
 }
 
@@ -962,13 +945,11 @@ static void bnxt_fw_to_ethtool_support_spds(struct bnxt_link_info *link_info,
 
 	BNXT_FW_TO_ETHTOOL_SPDS(fw_speeds, 0, lk_ksettings, supported);
 
-	ethtool_link_ksettings_add_link_mode(lk_ksettings, supported, Pause);
-	ethtool_link_ksettings_add_link_mode(lk_ksettings, supported,
-					     Asym_Pause);
+	ethtool_ks_add_mode(lk_ksettings, supported, Pause);
+	ethtool_ks_add_mode(lk_ksettings, supported, Asym_Pause);
 
 	if (link_info->support_auto_speeds)
-		ethtool_link_ksettings_add_link_mode(lk_ksettings, supported,
-						     Autoneg);
+		ethtool_ks_add_mode(lk_ksettings, supported, Autoneg);
 }
 
 u32 bnxt_fw_to_ethtool_speed(u16 fw_link_speed)
@@ -1003,14 +984,13 @@ static int bnxt_get_link_ksettings(struct net_device *dev,
 	struct ethtool_link_settings *base = &lk_ksettings->base;
 	u32 ethtool_speed;
 
-	ethtool_link_ksettings_zero_link_mode(lk_ksettings, supported);
+	ethtool_ks_clear(lk_ksettings, supported);
 	bnxt_fw_to_ethtool_support_spds(link_info, lk_ksettings);
 
-	ethtool_link_ksettings_zero_link_mode(lk_ksettings, advertising);
+	ethtool_ks_clear(lk_ksettings, advertising);
 	if (link_info->autoneg) {
 		bnxt_fw_to_ethtool_advertised_spds(link_info, lk_ksettings);
-		ethtool_link_ksettings_add_link_mode(lk_ksettings,
-						     advertising, Autoneg);
+		ethtool_ks_add_mode(lk_ksettings, advertising, Autoneg);
 		base->autoneg = AUTONEG_ENABLE;
 		if (link_info->phy_link_status == BNXT_LINK_LINK)
 			bnxt_fw_to_ethtool_lp_adv(link_info, lk_ksettings);
@@ -1034,15 +1014,11 @@ static int bnxt_get_link_ksettings(struct net_device *dev,
 	base->port = PORT_NONE;
 	if (link_info->media_type == PORT_PHY_QCFG_RESP_MEDIA_TYPE_TP) {
 		base->port = PORT_TP;
-		ethtool_link_ksettings_add_link_mode(lk_ksettings, supported,
-						     TP);
-		ethtool_link_ksettings_add_link_mode(lk_ksettings, advertising,
-						     TP);
+		ethtool_ks_add_mode(lk_ksettings, supported, TP);
+		ethtool_ks_add_mode(lk_ksettings, advertising, TP);
 	} else {
-		ethtool_link_ksettings_add_link_mode(lk_ksettings, supported,
-						     FIBRE);
-		ethtool_link_ksettings_add_link_mode(lk_ksettings, advertising,
-						     FIBRE);
+		ethtool_ks_add_mode(lk_ksettings, supported, FIBRE);
+		ethtool_ks_add_mode(lk_ksettings, advertising, FIBRE);
 
 		if (link_info->media_type == PORT_PHY_QCFG_RESP_MEDIA_TYPE_DAC)
 			base->port = PORT_DA;
