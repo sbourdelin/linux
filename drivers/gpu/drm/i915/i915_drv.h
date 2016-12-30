@@ -1051,44 +1051,118 @@ enum i915_cache_level {
 #define DEFAULT_CONTEXT_HANDLE 0
 
 /**
- * struct i915_gem_context - as the name implies, represents a context.
- * @ref: reference count.
- * @user_handle: userspace tracking identity for this context.
- * @remap_slice: l3 row remapping information.
- * @flags: context specific flags:
- *         CONTEXT_NO_ZEROMAP: do not allow mapping things to page 0.
- * @file_priv: filp associated with this context (NULL for global default
- *	       context).
- * @hang_stats: information about the role of this context in possible GPU
- *		hangs.
- * @ppgtt: virtual memory space used by this context.
- * @legacy_hw_ctx: render context backing object and whether it is correctly
- *                initialized (legacy ring submission mechanism only).
- * @link: link in the global list of contexts.
+ * struct i915_gem_context - client state
  *
- * Contexts are memory images used by the hardware to store copies of their
- * internal state.
+ * The struct i915_gem_context represents the combined view of the driver and
+ * logical hardware state for a particular client.
  */
 struct i915_gem_context {
-	struct kref ref;
+	/**
+	 * @i915: i915 device backpointer
+	 */
 	struct drm_i915_private *i915;
+
+	/**
+	 * @file_priv: owning file descriptor
+	 */
 	struct drm_i915_file_private *file_priv;
+
+	/**
+	 * @ppgtt: unique address space (GTT)
+	 *
+	 * In full-ppgtt mode, each context has its own address space ensuring
+	 * complete seperation of one client from all others.
+	 */
 	struct i915_hw_ppgtt *ppgtt;
+
+	/**
+	 * @pid: process id of creator
+	 *
+	 * Note that who created the context may not be the principle user,
+	 * as the context may be shared across a local socket. However,
+	 * that should only affect the default context, all contexts created
+	 * explicitly by the client are expected to be isolated.
+	 */
 	struct pid *pid;
+
+	/**
+	 * @name: arbitrary name
+	 *
+	 * A name is constructed for the context from the creator's process
+	 * name, pid and user handle in order to uniquely identify the
+	 * context in messages.
+	 */
 	const char *name;
 
+	/**
+	 * @link: place with &drm_i915_private.context_list
+	 */
+	struct list_head link;
+
+	/**
+	 * @ref: reference count
+	 *
+	 * A reference to a context is held by both the client who created it
+	 * and on each request submitted to the hardware using the request
+	 * (to ensure the hardware has access to the state until it has
+	 * finished all pending writes).
+	 */
+	struct kref ref;
+
+	/**
+	 * @flags: small set of booleans
+	 */
 	unsigned long flags;
 #define CONTEXT_NO_ZEROMAP		BIT(0)
-#define CONTEXT_NO_ERROR_CAPTURE	BIT(1)
+#define CONTEXT_NO_ERROR_CAPTURE	1
+#define CONTEXT_CLOSED			2
+#define CONTEXT_BANNABLE		3
+#define CONTEXT_BANNED			4
+#define CONTEXT_FORCE_SINGLE_SUBMISSION	5
 
-	/* Unique identifier for this context, used by the hw for tracking */
+	/**
+	 * @hw_id: - unique identifier for the context
+	 *
+	 * The hardware needs to uniquely identify the context for a few
+	 * functions like fault reporting, PASID, scheduling. The
+	 * &drm_i915_private.context_hw_ida is used to assign a unqiue
+	 * id for the lifetime of the context.
+	 */
 	unsigned int hw_id;
-	u32 user_handle;
-	int priority; /* greater priorities are serviced first */
 
+	/**
+	 * @user_handle: userspace identifier
+	 *
+	 * A unique per-file identifier is generated from
+	 * &drm_i915_file_private.contexts.
+	 */
+	u32 user_handle;
+
+	/**
+	 * @priority: execution and service priority
+	 *
+	 * All clients are equal, but some are more equal than others!
+	 *
+	 * Requests from a context with a greater (more positive) value of
+	 * @priority will be executed before those with a lower @priority
+	 * value, forming a simple QoS.
+	 *
+	 * The kernel_context is assigned the minimum priority.
+	 */
+	int priority;
+
+	/**
+	 * @ggtt_alignment: alignment restriction for context objects
+	 */
 	u32 ggtt_alignment;
+	/**
+	 * @ggtt_offset_bias: placement restriction for context objects
+	 */
 	u32 ggtt_offset_bias;
 
+	/**
+	 * @engine: per-engine logical HW state
+	 */
 	struct intel_context {
 		struct i915_vma *state;
 		struct intel_ring *ring;
@@ -1097,26 +1171,104 @@ struct i915_gem_context {
 		int pin_count;
 		bool initialised;
 	} engine[I915_NUM_ENGINES];
+
+	/**
+	 * @ring_size: size for allocating the per-engine ring buffer
+	 */
 	u32 ring_size;
+	/**
+	 * @desc_template: common/invariant fields for the HW context descriptor
+	 */
 	u32 desc_template;
+
+	/**
+	 * @status_notifier: list of callbacks
+	 */
 	struct atomic_notifier_head status_notifier;
-	bool execlists_force_single_submission;
 
-	struct list_head link;
-
-	u8 remap_slice;
-	bool closed:1;
-	bool bannable:1;
-	bool banned:1;
-
-	unsigned int guilty_count; /* guilty of a hang */
-	unsigned int active_count; /* active during hang */
+	/**
+	 * @guilty_count: How many times this context has caused a GPU hang.
+	 */
+	unsigned int guilty_count;
+	/**
+	 * @active_count: How many times this context was active during a GPU
+	 * hang, but did not cause it.
+	 */
+	unsigned int active_count;
 
 #define CONTEXT_SCORE_GUILTY		10
 #define CONTEXT_SCORE_BAN_THRESHOLD	40
-	/* Accumulated score of hangs caused by this context */
+	/**
+	 * @ban_score: Accumulated score of all hangs caused by this context.
+	 */
 	int ban_score;
+
+	/**
+	 * @remap_slice: Bitmask of cache lines that need remapping
+	 */
+	u8 remap_slice;
 };
+
+static inline bool i915_gem_context_is_closed(const struct i915_gem_context *ctx)
+{
+	return test_bit(CONTEXT_CLOSED, &ctx->flags);
+}
+
+static inline void i915_gem_context_set_closed(struct i915_gem_context *ctx)
+{
+	GEM_BUG_ON(i915_gem_context_is_closed(ctx));
+	set_bit(CONTEXT_CLOSED, &ctx->flags);
+}
+
+static inline bool i915_gem_context_no_error_capture(const struct i915_gem_context *ctx)
+{
+	return test_bit(CONTEXT_NO_ERROR_CAPTURE, &ctx->flags);
+}
+
+static inline void i915_gem_context_set_no_error_capture(struct i915_gem_context *ctx)
+{
+	return set_bit(CONTEXT_NO_ERROR_CAPTURE, &ctx->flags);
+}
+
+static inline void i915_gem_context_unset_no_error_capture(struct i915_gem_context *ctx)
+{
+	return clear_bit(CONTEXT_NO_ERROR_CAPTURE, &ctx->flags);
+}
+
+static inline bool i915_gem_context_is_bannable(const struct i915_gem_context *ctx)
+{
+	return test_bit(CONTEXT_BANNABLE, &ctx->flags);
+}
+
+static inline void i915_gem_context_set_bannable(struct i915_gem_context *ctx)
+{
+	set_bit(CONTEXT_BANNABLE, &ctx->flags);
+}
+
+static inline void i915_gem_context_unset_bannable(struct i915_gem_context *ctx)
+{
+	clear_bit(CONTEXT_BANNABLE, &ctx->flags);
+}
+
+static inline bool i915_gem_context_is_banned(const struct i915_gem_context *ctx)
+{
+	return test_bit(CONTEXT_BANNED, &ctx->flags);
+}
+
+static inline void i915_gem_context_set_banned(struct i915_gem_context *ctx)
+{
+	set_bit(CONTEXT_BANNED, &ctx->flags);
+}
+
+static inline bool i915_gem_context_force_single_submission(const struct i915_gem_context *ctx)
+{
+	return test_bit(CONTEXT_FORCE_SINGLE_SUBMISSION, &ctx->flags);
+}
+
+static inline void i915_gem_context_set_force_single_submission(struct i915_gem_context *ctx)
+{
+	set_bit(CONTEXT_FORCE_SINGLE_SUBMISSION, &ctx->flags);
+}
 
 enum fb_op_origin {
 	ORIGIN_GTT,
