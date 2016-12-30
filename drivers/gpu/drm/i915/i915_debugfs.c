@@ -2539,6 +2539,7 @@ static int i915_edp_psr_status(struct seq_file *m, void *data)
 	u32 stat[3];
 	enum pipe pipe;
 	bool enabled = false;
+	bool dc6_enabled = false;
 
 	if (!HAS_PSR(dev_priv)) {
 		seq_puts(m, "PSR not supported\n");
@@ -2598,11 +2599,20 @@ static int i915_edp_psr_status(struct seq_file *m, void *data)
 
 	/*
 	 * VLV/CHV PSR has no kind of performance counter
+	 * EDP_PSR_PERF_CNT is not valid for psr2.
 	 * SKL+ Perf counter is reset to 0 everytime DC state is entered
+	 * if we want to read EDP_PSR_PERF_CNT for debug purpose on SKL+,
+	 * disable dc state in kernel parameter i915.enable_dc=0.
 	 */
-	if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) {
+
+	dc6_enabled = ((I915_READ(DC_STATE_EN) &
+			DC_STATE_EN_UPTO_DC5_DC6_MASK) ==
+			DC_STATE_EN_UPTO_DC6);
+
+	if ((!dev_priv->psr.psr2_support && !dc6_enabled) ||
+	     IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) {
 		psrperf = I915_READ(EDP_PSR_PERF_CNT) &
-			EDP_PSR_PERF_CNT_MASK;
+			  EDP_PSR_PERF_CNT_MASK;
 
 		seq_printf(m, "Performance_Counter: %u\n", psrperf);
 	}
