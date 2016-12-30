@@ -25,6 +25,54 @@ Currently, all versions of the OCC support four types of sensor data: power,
 temperature, frequency, and "caps," which indicate limits and thresholds used
 internally on the OCC.
 
+sysfs Entries
+-------------
+
+The OCC driver uses the hwmon sysfs framework to provide data to userspace.
+
+The driver exports two sysfs files for each frequency, temperature, and power
+sensor. These are "input" and "label". The input file contains the value of the
+sensor. The label file contains the sensor id. The sensor id is the unique
+internal OCC identifier. Sensor ids may be provided by the OCC specification.
+The names of these files will be in the following format:
+	<sensor type><sensor index>_input
+	<sensor type><sensor index>_label
+Sensor types will be one of "temp", "freq", or "power". The sensor index is
+an index to differentiate different sensor files. For example, a single
+temperature sensor will have two sysfs files: temp1_input and temp1_label.
+
+Caps sensors are exported differently. For each caps sensor, the driver will
+export 6 entries:
+	curr_powercap - current power cap in watts
+	curr_powerreading - current power output in watts
+	norm_powercap - power cap without redundant power
+	max_powercap - maximum power cap that can be set in watts
+	min_powercap - minimum power cap that can be set in watts
+	user_powerlimit - power limit specified by the user in watts
+In addition, the OCC driver for P9 will export a 7th entry:
+	user_powerlimit_source - can be one of two values depending on who set
+		the user_powerlimit. 0x1 - out of band from BMC or host. 0x2 -
+		in band from other source.
+The format for these files is caps<sensor index>_<entry type>. For example,
+caps1_curr_powercap.
+
+The driver also provides a number of sysfs entries through hwmon to better
+control the driver and monitor the OCC.
+	powercap - read or write the OCC user power limit in watts.
+	name - read the name of the driver
+	update_interval - read or write the minimum interval for polling the
+		OCC.
+
+The driver also exports a single sysfs file through the communication protocol
+device (see BMC - Host Communications). The filename is "online" and represents
+the status of the OCC with respect to the driver. The OCC can be in one of two
+states: OCC polling enabled or OCC polling disabled. The purpose of this file
+is to control the behavior of the driver and it's hwmon sysfs entries, not to
+infer any information about the state of the physical OCC. Reading the file
+returns either a 0 (polling disabled) or 1 (polling enabled). Writing 1 to the
+file enables OCC polling in the driver if communications can be established
+with the OCC. Writing a 0 to the driver disables OCC polling.
+
 BMC - Host Communications
 -------------------------
 
