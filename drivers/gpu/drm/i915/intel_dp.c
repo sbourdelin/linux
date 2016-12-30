@@ -4516,7 +4516,6 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 	intel_dp_set_edid(intel_dp);
 	if (is_edp(intel_dp) || intel_connector->detect_edid)
 		status = connector_status_connected;
-	intel_dp->detect_done = true;
 
 	/* Try to read the source of the interrupt */
 	if (intel_dp->dpcd[DP_DPCD_REV] >= 0x11 &&
@@ -4551,10 +4550,10 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 		      connector->base.id, connector->name);
 
 	/* If full detect is not performed yet, do a full detect */
-	if (!intel_dp->detect_done)
+	if (!intel_dp->detect_done) {
+		intel_dp->detect_done = true;
 		status = intel_dp_long_pulse(intel_dp->attached_connector);
-
-	intel_dp->detect_done = false;
+	}
 
 	return status;
 }
@@ -4858,6 +4857,8 @@ void intel_dp_encoder_reset(struct drm_encoder *encoder)
 
 	if (lspcon->active)
 		lspcon_resume(lspcon);
+
+	intel_dp->detect_done = false;
 
 	pps_lock(intel_dp);
 
