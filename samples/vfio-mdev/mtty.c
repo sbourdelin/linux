@@ -1446,6 +1446,7 @@ static int __init mtty_dev_init(void)
 	mtty_dev.vd_class = class_create(THIS_MODULE, MTTY_CLASS_NAME);
 
 	if (IS_ERR(mtty_dev.vd_class)) {
+		ret = PTR_ERR(mtty_dev.vd_class);
 		pr_err("Error: failed to register mtty_dev class\n");
 		goto failed1;
 	}
@@ -1458,7 +1459,8 @@ static int __init mtty_dev_init(void)
 	if (ret)
 		goto failed2;
 
-	if (mdev_register_device(&mtty_dev.dev, &mdev_fops) != 0)
+	ret = mdev_register_device(&mtty_dev.dev, &mdev_fops);
+	if (ret)
 		goto failed3;
 
 	mutex_init(&mdev_list_lock);
@@ -1467,11 +1469,9 @@ static int __init mtty_dev_init(void)
 	goto all_done;
 
 failed3:
-
 	device_unregister(&mtty_dev.dev);
 failed2:
 	class_destroy(mtty_dev.vd_class);
-
 failed1:
 	cdev_del(&mtty_dev.vd_cdev);
 	unregister_chrdev_region(mtty_dev.vd_devt, MINORMASK);
