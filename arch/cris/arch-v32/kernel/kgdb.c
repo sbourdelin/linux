@@ -875,7 +875,7 @@ stub_is_stopped(int sigval)
 					   that it isn't configured for. */
 					if ((rw_bits == 0x1 && trig_bits != 0x1) ||
 					    (rw_bits == 0x2 && trig_bits != 0x2))
-						panic("Invalid r/w trigging for this BP");
+						panic("Invalid r/w triggering for this BP");
 
 					/* Mark this BP as trigged for future reference. */
 					trig_mask |= (1 << bp);
