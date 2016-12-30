@@ -2501,6 +2501,49 @@ static int drm_dp_init_vcpi(struct drm_dp_mst_topology_mgr *mgr,
 }
 
 /**
+ * drm_dp_atomic_release_vcpi_slots() - Release allocated vcpi slots from the state
+ * @topology_state: MST topology state
+ * @port: port to release the vcpi slots for
+ */
+int drm_dp_atomic_release_vcpi_slots(struct drm_dp_mst_topology_state *topology_state,
+				     struct drm_dp_mst_port *port)
+{
+	int alloc = drm_dp_mst_get_vcpi_slots(topology_state->mgr, port);
+
+	topology_state->avail_slots += alloc;
+	DRM_DEBUG_KMS("vcpi slots released=%d, avail=%d\n",
+			alloc, topology_state->avail_slots);
+	return alloc;
+}
+EXPORT_SYMBOL(drm_dp_atomic_release_vcpi_slots);
+
+/**
+ * drm_dp_atomic_find_vcpi_slots() - Find and add vcpi slots to the state
+ * @topology_state: MST topology state
+ * @port: port to find vcpi slots for
+ * @pbn: bandwidth required for the mode in PBN
+ */
+int drm_dp_atomic_find_vcpi_slots(struct drm_dp_mst_topology_state *topology_state,
+				  struct drm_dp_mst_port *port, int pbn)
+{
+	int num_slots, curr_alloc;
+	struct drm_dp_mst_topology_mgr *mgr = topology_state->mgr;
+
+	num_slots = DIV_ROUND_UP(pbn, mgr->pbn_div);
+	curr_alloc = drm_dp_mst_get_vcpi_slots(mgr, port);
+	DRM_DEBUG_KMS("vcpi slots new=%d, curr=%d, avail=%d\n",
+			num_slots, curr_alloc, topology_state->avail_slots);
+
+	if (num_slots - curr_alloc > topology_state->avail_slots)
+		return -ENOSPC;
+
+	topology_state->avail_slots -= (num_slots - curr_alloc);
+	DRM_DEBUG_KMS("vcpi slots avail=%d", topology_state->avail_slots);
+	return num_slots;
+}
+EXPORT_SYMBOL(drm_dp_atomic_find_vcpi_slots);
+
+/**
  * drm_dp_mst_allocate_vcpi() - Allocate a virtual channel
  * @mgr: manager for this port
  * @port: port to allocate a virtual channel for.
