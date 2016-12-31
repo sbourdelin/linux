@@ -1559,12 +1559,8 @@ dump_phys_mem(void *virt_addr, uint32_t num_bytes)
 
 	num_pages = (offset + num_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
 	pages = kmalloc_array(num_pages, sizeof(*pages), GFP_KERNEL);
-	if (!pages) {
-		vchiq_log_error(vchiq_arm_log_level,
-			"Unable to allocation memory for %d pages\n",
-			num_pages);
+	if (!pages)
 		return;
-	}
 
 	down_read(&current->mm->mmap_sem);
 	rc = get_user_pages(
