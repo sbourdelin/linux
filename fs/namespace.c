@@ -63,7 +63,7 @@ static int mnt_id_start = 0;
 static int mnt_group_start = 1;
 
 static struct hlist_head *mount_hashtable __read_mostly;
-static struct hlist_head *mountpoint_hashtable __read_mostly;
+static struct hlist_bl_head *mountpoint_hashtable __read_mostly;
 static struct kmem_cache *mnt_cache __read_mostly;
 static DECLARE_RWSEM(namespace_sem);
 
@@ -89,7 +89,7 @@ static inline struct hlist_head *m_hash(struct vfsmount *mnt, struct dentry *den
 	return &mount_hashtable[tmp & m_hash_mask];
 }
 
-static inline struct hlist_head *mp_hash(struct dentry *dentry)
+static inline struct hlist_bl_head *mp_hash(struct dentry *dentry)
 {
 	unsigned long tmp = ((unsigned long)dentry / L1_CACHE_BYTES);
 	tmp = tmp + (tmp >> mp_hash_shift);
@@ -727,26 +727,35 @@ out:
 
 static struct mountpoint *lookup_mountpoint(struct dentry *dentry)
 {
-	struct hlist_head *chain = mp_hash(dentry);
+	struct hlist_bl_head *chain = mp_hash(dentry);
+	struct hlist_bl_node *node;
 	struct mountpoint *mp;
 
-	hlist_for_each_entry(mp, chain, m_hash) {
+	rcu_read_lock();
+	hlist_bl_for_each_entry_rcu(mp, node, chain, m_hash) {
 		if (mp->m_dentry == dentry) {
 			/* might be worth a WARN_ON() */
-			if (d_unlinked(dentry))
-				return ERR_PTR(-ENOENT);
-			mp->m_count++;
-			return mp;
+			if (d_unlinked(dentry)) {
+				mp = ERR_PTR(-ENOENT);
+				goto out;
+			}
+			if (atomic_inc_not_zero(&mp->m_count))
+				goto out;
 		}
 	}
-	return NULL;
+	mp = NULL;
+out:
+	rcu_read_unlock();
+	return mp;
 }
 
 static struct mountpoint *new_mountpoint(struct dentry *dentry)
 {
-	struct hlist_head *chain = mp_hash(dentry);
+	struct hlist_bl_head *chain = mp_hash(dentry);
 	struct mountpoint *mp;
 	int ret;
+
+	WARN_ON(!rwsem_is_locked(&namespace_sem));
 
 	mp = kmalloc(sizeof(struct mountpoint), GFP_KERNEL);
 	if (!mp)
@@ -759,22 +768,37 @@ static struct mountpoint *new_mountpoint(struct dentry *dentry)
 	}
 
 	mp->m_dentry = dentry;
-	mp->m_count = 1;
-	hlist_add_head(&mp->m_hash, chain);
+	init_rcu_head(&mp->m_rcu);
+	atomic_set(&mp->m_count, 1);
+	hlist_bl_lock(chain);
+	hlist_bl_add_head_rcu(&mp->m_hash, chain);
+	hlist_bl_unlock(chain);
 	INIT_HLIST_HEAD(&mp->m_list);
 	return mp;
 }
 
+static void free_mountpoint(struct rcu_head *head)
+{
+	struct mountpoint *mp;
+
+	mp = container_of(head, struct mountpoint, m_rcu);
+	kfree(mp);
+}
+
 static void put_mountpoint(struct mountpoint *mp)
 {
-	if (!--mp->m_count) {
+	if (atomic_dec_and_test(&mp->m_count)) {
 		struct dentry *dentry = mp->m_dentry;
+		struct hlist_bl_head *chain = mp_hash(dentry);
+
 		BUG_ON(!hlist_empty(&mp->m_list));
 		spin_lock(&dentry->d_lock);
 		dentry->d_flags &= ~DCACHE_MOUNTED;
 		spin_unlock(&dentry->d_lock);
-		hlist_del(&mp->m_hash);
-		kfree(mp);
+		hlist_bl_lock(chain);
+		hlist_bl_del_rcu(&mp->m_hash);
+		hlist_bl_unlock(chain);
+		call_rcu(&mp->m_rcu, free_mountpoint);
 	}
 }
 
@@ -846,7 +870,7 @@ void mnt_set_mountpoint(struct mount *mnt,
 			struct mountpoint *mp,
 			struct mount *child_mnt)
 {
-	mp->m_count++;
+	atomic_inc(&mp->m_count);
 	mnt_add_count(mnt, 1);	/* essentially, that's mntget */
 	child_mnt->mnt_mountpoint = dget(mp->m_dentry);
 	child_mnt->mnt_parent = mnt;
@@ -3120,7 +3144,7 @@ SYSCALL_DEFINE2(pivot_root, const char __user *, new_root,
 	/* make certain new is below the root */
 	if (!is_path_reachable(new_mnt, new.dentry, &root))
 		goto out4;
-	root_mp->m_count++; /* pin it so it won't go away */
+	atomic_inc(&root_mp->m_count); /* pin it so it won't go away */
 	lock_mount_hash();
 	detach_mnt(new_mnt, &parent_path);
 	detach_mnt(root_mnt, &root_parent);
@@ -3199,7 +3223,7 @@ void __init mnt_init(void)
 				0,
 				&m_hash_shift, &m_hash_mask, 0, 0);
 	mountpoint_hashtable = alloc_large_system_hash("Mountpoint-cache",
-				sizeof(struct hlist_head),
+				sizeof(struct hlist_bl_head),
 				mphash_entries, 19,
 				0,
 				&mp_hash_shift, &mp_hash_mask, 0, 0);
@@ -3210,7 +3234,7 @@ void __init mnt_init(void)
 	for (u = 0; u <= m_hash_mask; u++)
 		INIT_HLIST_HEAD(&mount_hashtable[u]);
 	for (u = 0; u <= mp_hash_mask; u++)
-		INIT_HLIST_HEAD(&mountpoint_hashtable[u]);
+		INIT_HLIST_BL_HEAD(&mountpoint_hashtable[u]);
 
 	kernfs_init();
 

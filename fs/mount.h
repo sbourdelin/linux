@@ -3,6 +3,7 @@
 #include <linux/poll.h>
 #include <linux/ns_common.h>
 #include <linux/fs_pin.h>
+#include <linux/rculist_bl.h>
 
 struct mnt_namespace {
 	atomic_t		count;
@@ -24,10 +25,11 @@ struct mnt_pcp {
 };
 
 struct mountpoint {
-	struct hlist_node m_hash;
+	struct hlist_bl_node m_hash;
 	struct dentry *m_dentry;
 	struct hlist_head m_list;
-	int m_count;
+	atomic_t m_count;
+	struct rcu_head m_rcu;
 };
 
 struct mount {
