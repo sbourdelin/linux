@@ -270,6 +270,18 @@ static inline int inet_is_local_reserved_port(struct net *net, int port)
 }
 #endif
 
+#ifdef CONFIG_LOWPORT_SYSCTL
+static inline int inet_prot_sock(struct net *net)
+{
+	return net->ipv4.sysctl_ip_prot_sock;
+}
+#else
+static inline int inet_prot_sock(struct net *net)
+{
+	return PROT_SOCK;
+}
+#endif
+
 __be32 inet_current_timestamp(void);
 
 /* From inetpeer.c */

@@ -109,6 +109,13 @@ config NETWORK_PHY_TIMESTAMPING
 
 	  If you are unsure how to answer this question, answer N.
 
+config LOWPORT_SYSCTL
+	bool "Adjust reserved port range via sysctl"
+	depends on SYSCTL
+	help
+	  This allows the administrator to adjust the reserved port range
+	  using a sysctl.
+
 menuconfig NETFILTER
 	bool "Network packet filtering framework (Netfilter)"
 	---help---
