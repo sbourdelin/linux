@@ -723,6 +723,7 @@ static int ipvlan_addr6_event(struct notifier_block *unused,
 	struct inet6_ifaddr *if6 = (struct inet6_ifaddr *)ptr;
 	struct net_device *dev = (struct net_device *)if6->idev->dev;
 	struct ipvl_dev *ipvlan = netdev_priv(dev);
+	int err;
 
 	/* FIXME IPv6 autoconf calls us from bh without RTNL */
 	if (in_softirq())
@@ -736,8 +737,9 @@ static int ipvlan_addr6_event(struct notifier_block *unused,
 
 	switch (event) {
 	case NETDEV_UP:
-		if (ipvlan_add_addr6(ipvlan, &if6->addr))
-			return NOTIFY_BAD;
+		err = ipvlan_add_addr6(ipvlan, &if6->addr);
+		if (err)
+			return notifier_from_errno(err);
 		break;
 
 	case NETDEV_DOWN:
@@ -798,6 +800,7 @@ static int ipvlan_addr4_event(struct notifier_block *unused,
 	struct net_device *dev = (struct net_device *)if4->ifa_dev->dev;
 	struct ipvl_dev *ipvlan = netdev_priv(dev);
 	struct in_addr ip4_addr;
+	int err;
 
 	if (!netif_is_ipvlan(dev))
 		return NOTIFY_DONE;
@@ -808,8 +811,9 @@ static int ipvlan_addr4_event(struct notifier_block *unused,
 	switch (event) {
 	case NETDEV_UP:
 		ip4_addr.s_addr = if4->ifa_address;
-		if (ipvlan_add_addr4(ipvlan, &ip4_addr))
-			return NOTIFY_BAD;
+		err = ipvlan_add_addr4(ipvlan, &ip4_addr);
+		if (err)
+			return notifier_from_errno(err);
 		break;
 
 	case NETDEV_DOWN:

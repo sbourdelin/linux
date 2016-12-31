@@ -442,6 +442,7 @@ static int __inet_insert_ifa(struct in_ifaddr *ifa, struct nlmsghdr *nlh,
 {
 	struct in_device *in_dev = ifa->ifa_dev;
 	struct in_ifaddr *ifa1, **ifap, **last_primary;
+	int ret;
 
 	ASSERT_RTNL();
 
@@ -489,7 +490,12 @@ static int __inet_insert_ifa(struct in_ifaddr *ifa, struct nlmsghdr *nlh,
 	   Notifier will trigger FIB update, so that
 	   listeners of netlink will know about new ifaddr */
 	rtmsg_ifa(RTM_NEWADDR, ifa, nlh, portid);
-	blocking_notifier_call_chain(&inetaddr_chain, NETDEV_UP, ifa);
+	ret = blocking_notifier_call_chain(&inetaddr_chain, NETDEV_UP, ifa);
+	ret = notifier_to_errno(ret);
+	if (ret) {
+		__inet_del_ifa(in_dev, ifap, 1, NULL, portid);
+		return ret;
+	}
 
 	return 0;
 }

@@ -149,6 +149,7 @@ static inline void addrconf_sysctl_unregister(struct inet6_dev *idev)
 
 static void ipv6_regen_rndid(struct inet6_dev *idev);
 static void ipv6_try_regen_rndid(struct inet6_dev *idev, struct in6_addr *tmpaddr);
+static void __ipv6_del_addr(struct inet6_ifaddr *ifp, bool notify);
 
 static int ipv6_generate_eui64(u8 *eui, struct net_device *dev);
 static int ipv6_count_addresses(struct inet6_dev *idev);
@@ -1031,9 +1032,15 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr,
 out2:
 	rcu_read_unlock_bh();
 
-	if (likely(err == 0))
-		inet6addr_notifier_call_chain(NETDEV_UP, ifa);
-	else {
+	if (likely(err == 0)) {
+		err = inet6addr_notifier_call_chain(NETDEV_UP, ifa);
+		err = notifier_to_errno(err);
+		if (err) {
+			__ipv6_del_addr(ifa, false);
+			ifa = ERR_PTR(err);
+			return ifa;
+		}
+	} else {
 		kfree(ifa);
 		ifa = ERR_PTR(err);
 	}
@@ -1128,7 +1135,7 @@ cleanup_prefix_route(struct inet6_ifaddr *ifp, unsigned long expires, bool del_r
 
 /* This function wants to get referenced ifp and releases it before return */
 
-static void ipv6_del_addr(struct inet6_ifaddr *ifp)
+static void __ipv6_del_addr(struct inet6_ifaddr *ifp, bool notify)
 {
 	int state;
 	enum cleanup_prefix_rt_t action = CLEANUP_PREFIX_RT_NOP;
@@ -1169,7 +1176,8 @@ static void ipv6_del_addr(struct inet6_ifaddr *ifp)
 
 	addrconf_del_dad_work(ifp);
 
-	ipv6_ifa_notify(RTM_DELADDR, ifp);
+	if (notify)
+		ipv6_ifa_notify(RTM_DELADDR, ifp);
 
 	inet6addr_notifier_call_chain(NETDEV_DOWN, ifp);
 
@@ -1182,6 +1190,11 @@ static void ipv6_del_addr(struct inet6_ifaddr *ifp)
 	rt6_remove_prefsrc(ifp);
 out:
 	in6_ifa_put(ifp);
+}
+
+static void ipv6_del_addr(struct inet6_ifaddr *ifp)
+{
+	__ipv6_del_addr(ifp, true);
 }
 
 static int ipv6_create_tempaddr(struct inet6_ifaddr *ifp, struct inet6_ifaddr *ift)
