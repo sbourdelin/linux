@@ -1558,8 +1558,7 @@ dump_phys_mem(void *virt_addr, uint32_t num_bytes)
 	end_offset = (int)(long)end_virt_addr & (PAGE_SIZE - 1);
 
 	num_pages = (offset + num_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
-
-	pages = kmalloc(sizeof(struct page *) * num_pages, GFP_KERNEL);
+	pages = kmalloc_array(num_pages, sizeof(*pages), GFP_KERNEL);
 	if (pages == NULL) {
 		vchiq_log_error(vchiq_arm_log_level,
 			"Unable to allocation memory for %d pages\n",
