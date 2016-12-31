@@ -358,6 +358,18 @@ static int check_export(struct inode *inode, int *flags, unsigned char *uuid)
 	if (*flags & NFSEXP_V4ROOT)
 		*flags |= NFSEXP_READONLY;
 
+	/*
+	 * Convert to a readonly export for that,
+	 * 1. not supported fsync filesystem,
+	 * 2. readonly filesystem.
+	 */
+	if ((!inode->i_fop->fsync || IS_RDONLY(inode))
+	    && !(*flags & NFSEXP_READONLY)) {
+		dprintk("exp_export: Only support readonly export "
+			"for fsync unsupported or readonly filesystem.\n");
+		*flags |= NFSEXP_READONLY;
+	}
+
 	/* There are two requirements on a filesystem to be exportable.
 	 * 1:  We must be able to identify the filesystem from a number.
 	 *       either a device number (so FS_REQUIRES_DEV needed)
