@@ -1581,7 +1581,7 @@ dump_phys_mem(void *virt_addr, uint32_t num_bytes)
 	if (rc < 0) {
 		vchiq_log_error(vchiq_arm_log_level,
 				"Failed to get user pages: %d\n", rc);
-		goto out;
+		goto put_pages;
 	}
 
 	while (offset < end_offset) {
@@ -1607,10 +1607,9 @@ dump_phys_mem(void *virt_addr, uint32_t num_bytes)
 		offset += 16;
 	}
 
-out:
 	if (page)
 		kunmap(page);
-
+put_pages:
 	for (page_idx = 0; page_idx < num_pages; page_idx++)
 		put_page(pages[page_idx]);
 
