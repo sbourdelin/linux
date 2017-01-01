@@ -361,6 +361,10 @@ void sctp_association_free(struct sctp_association *asoc)
 	/* Free ssnmap storage. */
 	sctp_ssnmap_free(asoc->ssnmap);
 
+	/* Free stream information. */
+	kfree(asoc->streamout);
+	kfree(asoc->streamin);
+
 	/* Clean up the bound address list. */
 	sctp_bind_addr_free(&asoc->base.bind_addr);
 
@@ -1130,6 +1134,8 @@ void sctp_assoc_update(struct sctp_association *asoc,
 	 * has been discarded and needs retransmission.
 	 */
 	if (asoc->state >= SCTP_STATE_ESTABLISHED) {
+		int i;
+
 		asoc->next_tsn = new->next_tsn;
 		asoc->ctsn_ack_point = new->ctsn_ack_point;
 		asoc->adv_peer_ack_point = new->adv_peer_ack_point;
@@ -1138,6 +1144,12 @@ void sctp_assoc_update(struct sctp_association *asoc,
 		 * and peer's streams.
 		 */
 		sctp_ssnmap_clear(asoc->ssnmap);
+
+		for (i = 0; i < asoc->streamoutcnt; i++)
+			asoc->streamout[i].ssn = 0;
+
+		for (i = 0; i < asoc->streamincnt; i++)
+			asoc->streamin[i].ssn = 0;
 
 		/* Flush the ULP reassembly and ordered queue.
 		 * Any data there will now be stale and will
@@ -1166,6 +1178,13 @@ void sctp_assoc_update(struct sctp_association *asoc,
 			/* Move the ssnmap. */
 			asoc->ssnmap = new->ssnmap;
 			new->ssnmap = NULL;
+		}
+
+		if (!asoc->streamin && !asoc->streamout) {
+			asoc->streamout = new->streamout;
+			asoc->streamin = new->streamin;
+			new->streamout = NULL;
+			new->streamin = NULL;
 		}
 
 		if (!asoc->assoc_id) {

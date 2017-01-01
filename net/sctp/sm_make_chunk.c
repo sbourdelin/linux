@@ -2442,11 +2442,26 @@ int sctp_process_init(struct sctp_association *asoc, struct sctp_chunk *chunk,
 	 * association.
 	 */
 	if (!asoc->temp) {
-		int error;
+		int error, i;
+
+		asoc->streamoutcnt = asoc->c.sinit_num_ostreams;
+		asoc->streamincnt = asoc->c.sinit_max_instreams;
 
 		asoc->ssnmap = sctp_ssnmap_new(asoc->c.sinit_max_instreams,
 					       asoc->c.sinit_num_ostreams, gfp);
 		if (!asoc->ssnmap)
+			goto clean_up;
+
+		asoc->streamout = kcalloc(asoc->streamoutcnt,
+					  sizeof(*asoc->streamout), gfp);
+		if (!asoc->streamout)
+			goto clean_up;
+		for (i = 0; i < asoc->streamoutcnt; i++)
+			asoc->streamout[i].state = SCTP_STREAM_OPEN;
+
+		asoc->streamin = kcalloc(asoc->streamincnt,
+					 sizeof(*asoc->streamin), gfp);
+		if (!asoc->streamin)
 			goto clean_up;
 
 		error = sctp_assoc_set_id(asoc, gfp);

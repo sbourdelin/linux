@@ -1331,6 +1331,18 @@ struct sctp_inithdr_host {
 	__u32 initial_tsn;
 };
 
+struct sctp_stream_out {
+	__u16	ssn;
+	__u8	state;
+};
+
+struct sctp_stream_in {
+	__u16	ssn;
+};
+
+#define SCTP_STREAM_CLOSED		0x00
+#define SCTP_STREAM_OPEN		0x01
+
 /* SCTP_GET_ASSOC_STATS counters */
 struct sctp_priv_assoc_stats {
 	/* Maximum observed rto in the association during subsequent
@@ -1878,6 +1890,12 @@ struct sctp_association {
 	__u8 need_ecne:1,	/* Need to send an ECNE Chunk? */
 	     temp:1,		/* Is it a temporary association? */
 	     prsctp_enable:1;
+
+	/* stream arrays */
+	struct sctp_stream_out *streamout;
+	struct sctp_stream_in *streamin;
+	__u16 streamoutcnt;
+	__u16 streamincnt;
 
 	struct sctp_priv_assoc_stats stats;
 
