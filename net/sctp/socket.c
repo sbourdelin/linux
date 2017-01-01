@@ -434,6 +434,19 @@ out:
 	return retval;
 }
 
+static int sctp_send_reconf(struct sctp_association *asoc,
+			    struct sctp_chunk *chunk)
+{
+	struct net *net = sock_net(asoc->base.sk);
+	int retval = 0;
+
+	retval = sctp_primitive_RECONF(net, asoc, chunk);
+	if (retval)
+		sctp_chunk_free(chunk);
+
+	return retval;
+}
+
 /* Add a list of addresses as bind addresses to local endpoint or
  * association.
  *
@@ -3820,6 +3833,87 @@ out:
 	return retval;
 }
 
+static int sctp_setsockopt_reset_streams(struct sock *sk,
+					 char __user *optval,
+					 unsigned int optlen)
+{
+	struct sctp_reset_streams *params;
+	struct sctp_association *asoc;
+	struct sctp_chunk *chunk = NULL;
+	__u16 i, str_nums, *str_list;
+	int retval = -EINVAL;
+	bool out, in;
+
+	if (optlen < sizeof(struct sctp_reset_streams))
+		return -EINVAL;
+
+	params = memdup_user(optval, optlen);
+	if (IS_ERR(params)) {
+		retval = PTR_ERR(params);
+		goto out;
+	}
+
+	asoc = sctp_id2assoc(sk, params->srs_assoc_id);
+	if (!asoc)
+		goto out;
+
+	if (!asoc->peer.reconf_capable ||
+	    !(asoc->strreset_enable & SCTP_ENABLE_RESET_STREAM_REQ)) {
+		retval = -ENOPROTOOPT;
+		goto out;
+	}
+
+	if (asoc->strreset_outstanding) {
+		retval = -EINPROGRESS;
+		goto out;
+	}
+
+	out = params->srs_flags & SCTP_STREAM_RESET_OUTGOING;
+	in  = params->srs_flags & SCTP_STREAM_RESET_INCOMING;
+	if (!out && !in)
+		goto out;
+
+	str_nums = params->srs_number_streams;
+	str_list = params->srs_stream_list;
+	if (out && str_nums)
+		for (i = 0; i < str_nums; i++)
+			if (str_list[i] >= asoc->streamoutcnt)
+				goto out;
+
+	if (in && str_nums)
+		for (i = 0; i < str_nums; i++)
+			if (str_list[i] >= asoc->streamincnt)
+				goto out;
+
+	chunk = sctp_make_strreset_req(asoc, str_nums, str_list, out, in);
+	if (!chunk)
+		goto out;
+
+	if (out) {
+		if (str_nums)
+			for (i = 0; i < str_nums; i++)
+				asoc->streamout[str_list[i]].state =
+							   SCTP_STREAM_CLOSED;
+		else
+			for (i = 0; i < asoc->streamoutcnt; i++)
+				asoc->streamout[i].state = SCTP_STREAM_CLOSED;
+	}
+
+	asoc->strreset_outstanding = out + in;
+	asoc->strreset_chunk = chunk;
+	sctp_chunk_hold(asoc->strreset_chunk);
+
+	retval = sctp_send_reconf(asoc, chunk);
+	if (retval) {
+		sctp_chunk_put(asoc->strreset_chunk);
+		asoc->strreset_chunk = NULL;
+	}
+
+out:
+	kfree(params);
+	return retval;
+}
+
 /* API 6.2 setsockopt(), getsockopt()
  *
  * Applications use setsockopt() and getsockopt() to set or retrieve
@@ -3991,6 +4085,9 @@ static int sctp_setsockopt(struct sock *sk, int level, int optname,
 		break;
 	case SCTP_ENABLE_STREAM_RESET:
 		retval = sctp_setsockopt_enable_strreset(sk, optval, optlen);
+		break;
+	case SCTP_RESET_STREAMS:
+		retval = sctp_setsockopt_reset_streams(sk, optval, optlen);
 		break;
 	default:
 		retval = -ENOPROTOOPT;

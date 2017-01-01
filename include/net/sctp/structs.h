@@ -1861,6 +1861,7 @@ struct sctp_association {
 	     reconf_enable:1;
 
 	__u8 strreset_enable;
+	__u8 strreset_outstanding; /* request param count on the fly */
 
 	/* stream arrays */
 	struct sctp_stream_out *streamout;
