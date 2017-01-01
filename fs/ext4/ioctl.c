@@ -453,6 +453,9 @@ long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case EXT4_IOC_GETFLAGS:
+		if (inode_permission(inode, MAY_READ) != 0)
+			return -EACCES;
+
 		ext4_get_inode_flags(ei);
 		flags = ei->i_flags & EXT4_FL_USER_VISIBLE;
 		return put_user(flags, (int __user *) arg);
@@ -489,6 +492,9 @@ long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	}
 	case EXT4_IOC_GETVERSION:
 	case EXT4_IOC_GETVERSION_OLD:
+		if (inode_permission(inode, MAY_READ) != 0)
+			return -EACCES;
+
 		return put_user(inode->i_generation, (int __user *) arg);
 	case EXT4_IOC_SETVERSION:
 	case EXT4_IOC_SETVERSION_OLD: {
@@ -834,11 +840,17 @@ resizefs_out:
 #endif
 	}
 	case EXT4_IOC_GET_ENCRYPTION_POLICY:
+		if (inode_permission(inode, MAY_READ) != 0)
+			return -EACCES;
+
 		return fscrypt_ioctl_get_policy(filp, (void __user *)arg);
 
 	case EXT4_IOC_FSGETXATTR:
 	{
 		struct fsxattr fa;
+
+		if (inode_permission(inode, MAY_READ) != 0)
+			return -EACCES;
 
 		memset(&fa, 0, sizeof(struct fsxattr));
 		ext4_get_inode_flags(ei);
