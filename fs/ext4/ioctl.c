@@ -449,6 +449,9 @@ long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	struct ext4_inode_info *ei = EXT4_I(inode);
 	unsigned int flags;
 
+	if (inode_permission(inode, MAY_READ) != 0)
+		return -EACCES;
+
 	ext4_debug("cmd = %u, arg = %lu\n", cmd, arg);
 
 	switch (cmd) {
