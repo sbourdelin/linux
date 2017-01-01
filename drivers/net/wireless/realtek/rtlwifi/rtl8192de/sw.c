@@ -142,6 +142,8 @@ static int rtl92d_init_sw_vars(struct ieee80211_hw *hw)
 
 	/* for debug level */
 	rtlpriv->dbg.global_debuglevel = rtlpriv->cfg->mod_params->debug;
+	/* for debug mask */
+	rtlpriv->dbg.global_debug_mask = rtlpriv->cfg->mod_params->debug_mask;
 	/* for LPS & IPS */
 	rtlpriv->psc.inactiveps = rtlpriv->cfg->mod_params->inactiveps;
 	rtlpriv->psc.swctrl_lps = rtlpriv->cfg->mod_params->swctrl_lps;
@@ -255,6 +257,7 @@ static struct rtl_mod_params rtl92de_mod_params = {
 	.swctrl_lps = true,
 	.fwctrl_lps = false,
 	.debug = 0,
+	.debug_mask = 0,
 };
 
 static const struct rtl_hal_cfg rtl92de_hal_cfg = {
@@ -368,11 +371,13 @@ module_param_named(debug, rtl92de_mod_params.debug, int, 0444);
 module_param_named(ips, rtl92de_mod_params.inactiveps, bool, 0444);
 module_param_named(swlps, rtl92de_mod_params.swctrl_lps, bool, 0444);
 module_param_named(fwlps, rtl92de_mod_params.fwctrl_lps, bool, 0444);
+module_param_named(debug_mask, rtl92de_mod_params.debug_mask, ullong, 0444);
 MODULE_PARM_DESC(swenc, "Set to 1 for software crypto (default 0)\n");
 MODULE_PARM_DESC(ips, "Set to 0 to not use link power save (default 1)\n");
 MODULE_PARM_DESC(swlps, "Set to 1 to use SW control power save (default 1)\n");
 MODULE_PARM_DESC(fwlps, "Set to 1 to use FW control power save (default 0)\n");
 MODULE_PARM_DESC(debug, "Set debug level (0-5) (default 0)");
+MODULE_PARM_DESC(debug_mask, "Set debug mask (default 0)");
 
 static SIMPLE_DEV_PM_OPS(rtlwifi_pm_ops, rtl_pci_suspend, rtl_pci_resume);
 
