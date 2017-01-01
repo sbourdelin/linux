@@ -339,3 +339,62 @@ struct sctp_chunk *sctp_process_strreset_addstrm_out(
 out:
 	return sctp_make_strreset_resp(asoc, result, request_seq);
 }
+
+struct sctp_chunk *sctp_process_strreset_addstrm_in(
+				struct sctp_association *asoc,
+				union sctp_params param,
+				struct sctp_ulpevent **evp)
+{
+	struct sctp_strreset_addstrm *addstrm = param.v;
+	__u32 result = SCTP_STRRESET_DENIED;
+	__u32 request_seq;
+	__u16 i, nums;
+
+	request_seq = ntohl(addstrm->request_seq);
+	if (request_seq > asoc->strreset_inseq) {
+		result = SCTP_STRRESET_ERR_BAD_SEQNO;
+		goto out;
+	} else if (request_seq == asoc->strreset_inseq) {
+		asoc->strreset_inseq++;
+	}
+
+	if (!(asoc->strreset_enable & SCTP_ENABLE_CHANGE_ASSOC_REQ))
+		goto out;
+
+	if (asoc->strreset_outstanding) {
+		result = SCTP_STRRESET_ERR_IN_PROGRESS;
+		goto out;
+	}
+
+	nums = ntohs(addstrm->number_of_streams);
+	if (!nums || nums + asoc->streamoutcnt > SCTP_MAX_STREAM)
+		goto out;
+
+	nums = nums + asoc->streamoutcnt;
+	if (ksize(asoc->streamout) / sizeof(*asoc->streamout) < nums) {
+		struct sctp_stream_out *streamout;
+
+		streamout = kcalloc(nums, sizeof(*streamout), GFP_ATOMIC);
+		if (!streamout)
+			goto out;
+
+		memcpy(streamout, asoc->streamout,
+		       sizeof(*streamout) * asoc->streamoutcnt);
+
+		kfree(asoc->streamout);
+		asoc->streamout = streamout;
+	}
+
+	for (i = asoc->streamoutcnt; i < nums; i++)
+		asoc->streamout[i].state = SCTP_STREAM_OPEN;
+
+	asoc->streamoutcnt = nums;
+
+	result = SCTP_STRRESET_PERFORMED;
+
+	*evp = sctp_ulpevent_make_stream_change_event(asoc,
+		0, 0, ntohs(addstrm->number_of_streams), GFP_ATOMIC);
+
+out:
+	return sctp_make_strreset_resp(asoc, result, request_seq);
+}
