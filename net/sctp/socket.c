@@ -3968,6 +3968,117 @@ out:
 	return retval;
 }
 
+static int sctp_setsockopt_add_streams(struct sock *sk,
+				       char __user *optval,
+				       unsigned int optlen)
+{
+	struct sctp_association *asoc;
+	struct sctp_chunk *chunk = NULL;
+	struct sctp_add_streams params;
+	int retval = -EINVAL;
+	__u16 out, in;
+
+	if (optlen != sizeof(params))
+		goto out;
+
+	if (copy_from_user(&params, optval, optlen)) {
+		retval = -EFAULT;
+		goto out;
+	}
+
+	asoc = sctp_id2assoc(sk, params.sas_assoc_id);
+	if (!asoc)
+		goto out;
+
+	if (!asoc->peer.reconf_capable ||
+	    !(asoc->strreset_enable & SCTP_ENABLE_CHANGE_ASSOC_REQ)) {
+		retval = -ENOPROTOOPT;
+		goto out;
+	}
+
+	if (asoc->strreset_outstanding) {
+		retval = -EINPROGRESS;
+		goto out;
+	}
+
+	out = params.sas_outstrms;
+	in  = params.sas_instrms;
+
+	if (!out && !in)
+		goto out;
+
+	if (out) {
+		__u16 nums = asoc->streamoutcnt + out;
+
+		/* Check for overflow, can't use nums here */
+		if (asoc->streamoutcnt + out > SCTP_MAX_STREAM)
+			goto out;
+
+		/* Use ksize to check if stream array really needs to realloc */
+		if (ksize(asoc->streamout) / sizeof(*asoc->streamout) < nums) {
+			struct sctp_stream_out *streamout;
+
+			streamout = kcalloc(nums, sizeof(*streamout),
+					    GFP_KERNEL);
+			if (!streamout) {
+				retval = -ENOMEM;
+				goto out;
+			}
+
+			memcpy(streamout, asoc->streamout,
+			       sizeof(*streamout) * asoc->streamoutcnt);
+
+			kfree(asoc->streamout);
+			asoc->streamout = streamout;
+		}
+
+		asoc->streamoutcnt = nums;
+	}
+
+	if (in) {
+		__u16 nums = asoc->streamincnt + in;
+
+		if (asoc->streamincnt + in > SCTP_MAX_STREAM)
+			goto out;
+
+		if (ksize(asoc->streamin) / sizeof(*asoc->streamin) < nums) {
+			struct sctp_stream_in *streamin;
+
+			streamin = kcalloc(nums, sizeof(*streamin),
+					   GFP_KERNEL);
+			if (!streamin) {
+				retval = -ENOMEM;
+				goto out;
+			}
+
+			memcpy(streamin, asoc->streamin,
+			       sizeof(*streamin) * asoc->streamincnt);
+
+			kfree(asoc->streamin);
+			asoc->streamin = streamin;
+		}
+
+		asoc->streamincnt = nums;
+	}
+
+	chunk = sctp_make_strreset_addstrm(asoc, out, in);
+	if (!chunk)
+		goto out;
+
+	asoc->strreset_outstanding = !!out + !!in;
+	asoc->strreset_chunk = chunk;
+	sctp_chunk_hold(asoc->strreset_chunk);
+
+	retval = sctp_send_reconf(asoc, chunk);
+	if (retval) {
+		sctp_chunk_put(asoc->strreset_chunk);
+		asoc->strreset_chunk = NULL;
+	}
+
+out:
+	return retval;
+}
+
 /* API 6.2 setsockopt(), getsockopt()
  *
  * Applications use setsockopt() and getsockopt() to set or retrieve
@@ -4145,6 +4256,9 @@ static int sctp_setsockopt(struct sock *sk, int level, int optname,
 		break;
 	case SCTP_RESET_ASSOC:
 		retval = sctp_setsockopt_reset_assoc(sk, optval, optlen);
+		break;
+	case SCTP_ADD_STREAMS:
+		retval = sctp_setsockopt_add_streams(sk, optval, optlen);
 		break;
 	default:
 		retval = -ENOPROTOOPT;
