@@ -514,6 +514,17 @@ struct sctp_assoc_reset_event {
 	uint32_t assocreset_remote_tsn;
 };
 
+#define SCTP_ASSOC_CHANGE_DENIED	0x0004
+#define SCTP_ASSOC_CHANGE_FAILED	0x0008
+struct sctp_stream_change_event {
+	uint16_t strchange_type;
+	uint16_t strchange_flags;
+	uint32_t strchange_length;
+	sctp_assoc_t strchange_assoc_id;
+	uint16_t strchange_instrms;
+	uint16_t strchange_outstrms;
+};
+
 /*
  * Described in Section 7.3
  *   Ancillary Data and Notification Interest Options
@@ -531,6 +542,7 @@ struct sctp_event_subscribe {
 	uint8_t sctp_sender_dry_event;
 	uint8_t sctp_stream_reset_event;
 	uint8_t sctp_assoc_reset_event;
+	uint8_t sctp_stream_change_event;
 };
 
 /*
@@ -557,6 +569,7 @@ union sctp_notification {
 	struct sctp_sender_dry_event sn_sender_dry_event;
 	struct sctp_stream_reset_event sn_strreset_event;
 	struct sctp_assoc_reset_event sn_assocreset_event;
+	struct sctp_stream_change_event sn_strchange_event;
 };
 
 /* Section 5.3.1
@@ -588,6 +601,8 @@ enum sctp_sn_type {
 #define SCTP_STREAM_RESET_EVENT		SCTP_STREAM_RESET_EVENT
 	SCTP_ASSOC_RESET_EVENT,
 #define SCTP_ASSOC_RESET_EVENT		SCTP_ASSOC_RESET_EVENT
+	SCTP_STREAM_CHANGE_EVENT,
+#define SCTP_STREAM_CHANGE_EVENT	SCTP_STREAM_CHANGE_EVENT
 };
 
 /* Notification error codes used to fill up the error fields in some
