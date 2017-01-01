@@ -491,21 +491,34 @@ struct sctp_sender_dry_event {
 	sctp_assoc_t sender_dry_assoc_id;
 };
 
+#define SCTP_STREAM_RESET_INCOMING_SSN	0x0001
+#define SCTP_STREAM_RESET_OUTGOING_SSN	0x0002
+#define SCTP_STREAM_RESET_DENIED	0x0004
+#define SCTP_STREAM_RESET_FAILED	0x0008
+struct sctp_stream_reset_event {
+	uint16_t strreset_type;
+	uint16_t strreset_flags;
+	uint32_t strreset_length;
+	sctp_assoc_t strreset_assoc_id;
+	uint16_t strreset_stream_list[];
+};
+
 /*
  * Described in Section 7.3
  *   Ancillary Data and Notification Interest Options
  */
 struct sctp_event_subscribe {
-	__u8 sctp_data_io_event;
-	__u8 sctp_association_event;
-	__u8 sctp_address_event;
-	__u8 sctp_send_failure_event;
-	__u8 sctp_peer_error_event;
-	__u8 sctp_shutdown_event;
-	__u8 sctp_partial_delivery_event;
-	__u8 sctp_adaptation_layer_event;
-	__u8 sctp_authentication_event;
-	__u8 sctp_sender_dry_event;
+	uint8_t sctp_data_io_event;
+	uint8_t sctp_association_event;
+	uint8_t sctp_address_event;
+	uint8_t sctp_send_failure_event;
+	uint8_t sctp_peer_error_event;
+	uint8_t sctp_shutdown_event;
+	uint8_t sctp_partial_delivery_event;
+	uint8_t sctp_adaptation_layer_event;
+	uint8_t sctp_authentication_event;
+	uint8_t sctp_sender_dry_event;
+	uint8_t sctp_stream_reset_event;
 };
 
 /*
@@ -530,6 +543,7 @@ union sctp_notification {
 	struct sctp_pdapi_event sn_pdapi_event;
 	struct sctp_authkey_event sn_authkey_event;
 	struct sctp_sender_dry_event sn_sender_dry_event;
+	struct sctp_stream_reset_event sn_strreset_event;
 };
 
 /* Section 5.3.1
@@ -557,6 +571,8 @@ enum sctp_sn_type {
 #define SCTP_AUTHENTICATION_INDICATION	SCTP_AUTHENTICATION_EVENT
 	SCTP_SENDER_DRY_EVENT,
 #define SCTP_SENDER_DRY_EVENT		SCTP_SENDER_DRY_EVENT
+	SCTP_STREAM_RESET_EVENT,
+#define SCTP_STREAM_RESET_EVENT		SCTP_STREAM_RESET_EVENT
 };
 
 /* Notification error codes used to fill up the error fields in some

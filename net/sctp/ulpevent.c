@@ -854,6 +854,36 @@ struct sctp_ulpevent *sctp_ulpevent_make_sender_dry_event(
 	return event;
 }
 
+struct sctp_ulpevent *sctp_ulpevent_make_stream_reset_event(
+	const struct sctp_association *asoc, __u16 flags, __u16 stream_num,
+	__u16 *stream_list, gfp_t gfp)
+{
+	struct sctp_stream_reset_event *sreset;
+	struct sctp_ulpevent *event;
+	struct sk_buff *skb;
+
+	event = sctp_ulpevent_new(sizeof(struct sctp_stream_reset_event) +
+				  2 * stream_num, MSG_NOTIFICATION, gfp);
+	if (!event)
+		return NULL;
+
+	skb = sctp_event2skb(event);
+	sreset = (struct sctp_stream_reset_event *)skb_put(skb,
+		sizeof(struct sctp_stream_reset_event) + 2 * stream_num);
+
+	sreset->strreset_type = SCTP_STREAM_RESET_EVENT;
+	sreset->strreset_flags = flags;
+	sreset->strreset_length = sizeof(struct sctp_stream_reset_event);
+	sctp_ulpevent_set_owner(event, asoc);
+	sreset->strreset_assoc_id = sctp_assoc2id(asoc);
+
+	if (stream_num)
+		memcpy(sreset->strreset_stream_list, stream_list,
+		       2 * stream_num);
+
+	return event;
+}
+
 /* Return the notification type, assuming this is a notification
  * event.
  */
