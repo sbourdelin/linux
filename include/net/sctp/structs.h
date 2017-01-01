@@ -1857,6 +1857,9 @@ struct sctp_association {
 	__u16 streamoutcnt;
 	__u16 streamincnt;
 
+	__u32 strreset_outseq; /* Update after receiving response */
+	__u32 strreset_inseq; /* Update after receiving request */
+
 	struct sctp_priv_assoc_stats stats;
 
 	int sent_cnt_removable;
