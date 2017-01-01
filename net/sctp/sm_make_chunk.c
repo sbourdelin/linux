@@ -1527,7 +1527,6 @@ void sctp_chunk_assign_ssn(struct sctp_chunk *chunk)
 {
 	struct sctp_datamsg *msg;
 	struct sctp_chunk *lchunk;
-	struct sctp_stream *stream;
 	__u16 ssn;
 	__u16 sid;
 
@@ -1536,7 +1535,6 @@ void sctp_chunk_assign_ssn(struct sctp_chunk *chunk)
 
 	/* All fragments will be on the same stream */
 	sid = ntohs(chunk->subh.data_hdr->stream);
-	stream = &chunk->asoc->ssnmap->out;
 
 	/* Now assign the sequence number to the entire message.
 	 * All fragments must have the same stream sequence number.
@@ -1547,9 +1545,9 @@ void sctp_chunk_assign_ssn(struct sctp_chunk *chunk)
 			ssn = 0;
 		} else {
 			if (lchunk->chunk_hdr->flags & SCTP_DATA_LAST_FRAG)
-				ssn = sctp_ssn_next(stream, sid);
+				ssn = sctp_ssn_next(chunk->asoc, out, sid);
 			else
-				ssn = sctp_ssn_peek(stream, sid);
+				ssn = sctp_ssn_peek(chunk->asoc, out, sid);
 		}
 
 		lchunk->subh.data_hdr->ssn = htons(ssn);
@@ -2446,11 +2444,6 @@ int sctp_process_init(struct sctp_association *asoc, struct sctp_chunk *chunk,
 
 		asoc->streamoutcnt = asoc->c.sinit_num_ostreams;
 		asoc->streamincnt = asoc->c.sinit_max_instreams;
-
-		asoc->ssnmap = sctp_ssnmap_new(asoc->c.sinit_max_instreams,
-					       asoc->c.sinit_num_ostreams, gfp);
-		if (!asoc->ssnmap)
-			goto clean_up;
 
 		asoc->streamout = kcalloc(asoc->streamoutcnt,
 					  sizeof(*asoc->streamout), gfp);

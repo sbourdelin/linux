@@ -358,9 +358,6 @@ void sctp_association_free(struct sctp_association *asoc)
 
 	sctp_tsnmap_free(&asoc->peer.tsn_map);
 
-	/* Free ssnmap storage. */
-	sctp_ssnmap_free(asoc->ssnmap);
-
 	/* Free stream information. */
 	kfree(asoc->streamout);
 	kfree(asoc->streamin);
@@ -1143,8 +1140,6 @@ void sctp_assoc_update(struct sctp_association *asoc,
 		/* Reinitialize SSN for both local streams
 		 * and peer's streams.
 		 */
-		sctp_ssnmap_clear(asoc->ssnmap);
-
 		for (i = 0; i < asoc->streamoutcnt; i++)
 			asoc->streamout[i].ssn = 0;
 
@@ -1174,11 +1169,6 @@ void sctp_assoc_update(struct sctp_association *asoc,
 
 		asoc->ctsn_ack_point = asoc->next_tsn - 1;
 		asoc->adv_peer_ack_point = asoc->ctsn_ack_point;
-		if (!asoc->ssnmap) {
-			/* Move the ssnmap. */
-			asoc->ssnmap = new->ssnmap;
-			new->ssnmap = NULL;
-		}
 
 		if (!asoc->streamin && !asoc->streamout) {
 			asoc->streamout = new->streamout;

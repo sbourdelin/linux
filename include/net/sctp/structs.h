@@ -407,23 +407,16 @@ void sctp_ssnmap_free(struct sctp_ssnmap *map);
 void sctp_ssnmap_clear(struct sctp_ssnmap *map);
 
 /* What is the current SSN number for this stream? */
-static inline __u16 sctp_ssn_peek(struct sctp_stream *stream, __u16 id)
-{
-	return stream->ssn[id];
-}
+#define sctp_ssn_peek(asoc, type, sid) \
+	((asoc)->stream##type[sid].ssn)
 
 /* Return the next SSN number for this stream.	*/
-static inline __u16 sctp_ssn_next(struct sctp_stream *stream, __u16 id)
-{
-	return stream->ssn[id]++;
-}
+#define sctp_ssn_next(asoc, type, sid) \
+	((asoc)->stream##type[sid].ssn++)
 
 /* Skip over this ssn and all below. */
-static inline void sctp_ssn_skip(struct sctp_stream *stream, __u16 id, 
-				 __u16 ssn)
-{
-	stream->ssn[id] = ssn+1;
-}
+#define sctp_ssn_skip(asoc, type, sid, ssn) \
+	((asoc)->stream##type[sid].ssn = ssn + 1)
               
 /*
  * Pointers to address related SCTP functions.
