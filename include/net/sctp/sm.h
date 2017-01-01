@@ -135,6 +135,7 @@ sctp_state_fn_t sctp_sf_do_8_5_1_E_sa;
 sctp_state_fn_t sctp_sf_cookie_echoed_err;
 sctp_state_fn_t sctp_sf_do_asconf;
 sctp_state_fn_t sctp_sf_do_asconf_ack;
+sctp_state_fn_t sctp_sf_do_reconf;
 sctp_state_fn_t sctp_sf_do_9_2_reshutack;
 sctp_state_fn_t sctp_sf_eat_fwd_tsn;
 sctp_state_fn_t sctp_sf_eat_fwd_tsn_fast;
@@ -277,6 +278,13 @@ struct sctp_chunk *sctp_make_strreset_tsnresp(
 struct sctp_chunk *sctp_make_strreset_addstrm(
 				const struct sctp_association *asoc,
 				__u16 out, __u16 in);
+struct sctp_chunk *sctp_merge_reconf_chunk(
+				struct sctp_association *asoc,
+				struct sctp_chunk *last,
+				struct sctp_chunk *reply);
+bool sctp_verify_reconf(const struct sctp_association *asoc,
+			struct sctp_chunk *chunk,
+			struct sctp_paramhdr **errp);
 void sctp_chunk_assign_tsn(struct sctp_chunk *);
 void sctp_chunk_assign_ssn(struct sctp_chunk *);
 

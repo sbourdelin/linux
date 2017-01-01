@@ -3819,3 +3819,97 @@ struct sctp_chunk *sctp_make_strreset_addstrm(
 
 	return retval;
 }
+
+struct sctp_chunk *sctp_merge_reconf_chunk(
+				struct sctp_association *asoc,
+				struct sctp_chunk *last,
+				struct sctp_chunk *reply)
+{
+	struct sctp_chunk *retval = NULL;
+	__u16 lsize, rsize;
+
+	if (!reply)
+		return last;
+
+	rsize = ntohs(reply->param_hdr.p->length);
+	lsize = ntohs(last->param_hdr.p->length);
+
+	retval = sctp_make_reconf(asoc, lsize + rsize);
+	if (!retval)
+		goto out;
+
+	sctp_addto_chunk(retval, lsize, last->param_hdr.v);
+	sctp_addto_chunk(retval, rsize, reply->param_hdr.v);
+
+out:
+	if (asoc->strreset_chunk) {
+		sctp_chunk_put(asoc->strreset_chunk);
+		asoc->strreset_chunk = retval;
+		if (asoc->strreset_chunk)
+			sctp_chunk_hold(asoc->strreset_chunk);
+	}
+
+	sctp_chunk_free(reply);
+	sctp_chunk_free(last);
+
+	return retval;
+}
+
+bool sctp_verify_reconf(const struct sctp_association *asoc,
+			struct sctp_chunk *chunk,
+			struct sctp_paramhdr **errp)
+{
+	struct sctp_reconf_chunk *hdr;
+	union sctp_params param;
+	__u16 last = 0, cnt = 0;
+
+	hdr = (struct sctp_reconf_chunk *)chunk->chunk_hdr;
+	sctp_walk_params(param, hdr, params) {
+		__u16 length = ntohs(param.p->length);
+
+		*errp = param.p;
+		if (cnt++ > 2)
+			return false;
+		switch (param.p->type) {
+		case SCTP_PARAM_RESET_OUT_REQUEST:
+			if (length < sizeof(struct sctp_strreset_outreq) ||
+			    (last && last != SCTP_PARAM_RESET_RESPONSE &&
+			     last != SCTP_PARAM_RESET_IN_REQUEST))
+				return false;
+			break;
+		case SCTP_PARAM_RESET_IN_REQUEST:
+			if (length < sizeof(struct sctp_strreset_inreq) ||
+			    (last && last != SCTP_PARAM_RESET_OUT_REQUEST))
+				return false;
+			break;
+		case SCTP_PARAM_RESET_RESPONSE:
+			if ((length != sizeof(struct sctp_strreset_resp) &&
+			     length != sizeof(struct sctp_strreset_resptsn)) ||
+			    (last && last != SCTP_PARAM_RESET_RESPONSE &&
+			     last != SCTP_PARAM_RESET_OUT_REQUEST))
+				return false;
+			break;
+		case SCTP_PARAM_RESET_TSN_REQUEST:
+			if (length !=
+			    sizeof(struct sctp_strreset_tsnreq) || last)
+				return false;
+			break;
+		case SCTP_PARAM_RESET_ADD_IN_STREAMS:
+			if (length != sizeof(struct sctp_strreset_addstrm) ||
+			    (last && last != SCTP_PARAM_RESET_ADD_OUT_STREAMS))
+				return false;
+			break;
+		case SCTP_PARAM_RESET_ADD_OUT_STREAMS:
+			if (length != sizeof(struct sctp_strreset_addstrm) ||
+			    (last && last != SCTP_PARAM_RESET_ADD_IN_STREAMS))
+				return false;
+			break;
+		default:
+			return false;
+		}
+
+		last = param.p->type;
+	}
+
+	return true;
+}
