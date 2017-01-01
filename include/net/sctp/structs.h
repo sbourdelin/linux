@@ -82,7 +82,6 @@ struct sctp_outq;
 struct sctp_bind_addr;
 struct sctp_ulpq;
 struct sctp_ep_common;
-struct sctp_ssnmap;
 struct crypto_shash;
 
 
@@ -376,35 +375,6 @@ typedef struct sctp_sender_hb_info {
 	unsigned long sent_at;
 	__u64 hb_nonce;
 } __packed sctp_sender_hb_info_t;
-
-/*
- *  RFC 2960 1.3.2 Sequenced Delivery within Streams
- *
- *  The term "stream" is used in SCTP to refer to a sequence of user
- *  messages that are to be delivered to the upper-layer protocol in
- *  order with respect to other messages within the same stream.  This is
- *  in contrast to its usage in TCP, where it refers to a sequence of
- *  bytes (in this document a byte is assumed to be eight bits).
- *  ...
- *
- *  This is the structure we use to track both our outbound and inbound
- *  SSN, or Stream Sequence Numbers.
- */
-
-struct sctp_stream {
-	__u16 *ssn;
-	unsigned int len;
-};
-
-struct sctp_ssnmap {
-	struct sctp_stream in;
-	struct sctp_stream out;
-};
-
-struct sctp_ssnmap *sctp_ssnmap_new(__u16 in, __u16 out,
-				    gfp_t gfp);
-void sctp_ssnmap_free(struct sctp_ssnmap *map);
-void sctp_ssnmap_clear(struct sctp_ssnmap *map);
 
 /* What is the current SSN number for this stream? */
 #define sctp_ssn_peek(asoc, type, sid) \
@@ -1750,9 +1720,6 @@ struct sctp_association {
 
 	/* Default receive parameters */
 	__u32 default_rcv_context;
-
-	/* This tracks outbound ssn for a given stream.	 */
-	struct sctp_ssnmap *ssnmap;
 
 	/* All outbound chunks go through this structure.  */
 	struct sctp_outq outqueue;
