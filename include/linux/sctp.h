@@ -742,4 +742,9 @@ struct sctp_strreset_inreq {
 	__u16 list_of_streams[0];
 } __packed;
 
+struct sctp_strreset_tsnreq {
+	sctp_paramhdr_t param_hdr;
+	__u32 request_seq;
+} __packed;
+
 #endif /* __LINUX_SCTP_H__ */
