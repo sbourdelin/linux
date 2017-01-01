@@ -504,7 +504,7 @@ long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		int err;
 
 		if (!inode_owner_or_capable(inode))
-			return -EPERM;
+			return -EACCES;
 
 		if (ext4_has_metadata_csum(inode->i_sb)) {
 			ext4_warning(sb, "Setting inode version is not "
