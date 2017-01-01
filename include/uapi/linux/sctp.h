@@ -115,6 +115,7 @@ typedef __s32 sctp_assoc_t;
 #define SCTP_PR_SUPPORTED	113
 #define SCTP_DEFAULT_PRINFO	114
 #define SCTP_PR_ASSOC_STATUS	115
+#define SCTP_RECONFIG_SUPPORTED	117
 
 /* PR-SCTP policies */
 #define SCTP_PR_SCTP_NONE	0x0000
