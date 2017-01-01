@@ -1,4 +1,5 @@
-/// Make sure (of/i2c/platform)_device_id tables are NULL terminated
+/// Make sure (of/i2c/platform)_device_id and dmi_system_id tables are
+/// NULL terminated
 //
 // Keywords: of_table i2c_table platform_table
 // Confidence: Medium
@@ -14,14 +15,16 @@ identifier var, arr;
 expression E;
 @@
 (
-struct \(of_device_id \| i2c_device_id \| platform_device_id\) arr[] = {
+struct
+  \(of_device_id\|i2c_device_id\|platform_device_id\|dmi_system_id\) arr[] = {
 	...,
 	{
 	.var = E,
 *	}
 };
 |
-struct \(of_device_id \| i2c_device_id \| platform_device_id\) arr[] = {
+struct
+  \(of_device_id\|i2c_device_id\|platform_device_id\|dmi_system_id\) arr[] = {
 	...,
 *	{ ..., E, ... },
 };
@@ -32,7 +35,8 @@ identifier var, arr;
 expression E;
 @@
 (
-struct \(of_device_id \| i2c_device_id \| platform_device_id\) arr[] = {
+struct
+  \(of_device_id\|i2c_device_id\|platform_device_id\|dmi_system_id\) arr[] = {
 	...,
 	{
 	.var = E,
@@ -41,7 +45,8 @@ struct \(of_device_id \| i2c_device_id \| platform_device_id\) arr[] = {
 +	{ }
 };
 |
-struct \(of_device_id \| i2c_device_id \| platform_device_id\) arr[] = {
+struct
+  \(of_device_id\|i2c_device_id\|platform_device_id\|dmi_system_id\) arr[] = {
 	...,
 	{ ..., E, ... },
 +	{ },
@@ -54,7 +59,8 @@ identifier var, arr;
 expression E;
 @@
 (
-struct \(of_device_id \| i2c_device_id \| platform_device_id\) arr[] = {
+struct
+  \(of_device_id\|i2c_device_id\|platform_device_id\|dmi_system_id\) arr[] = {
 	...,
 	{
 	.var = E,
@@ -62,7 +68,8 @@ struct \(of_device_id \| i2c_device_id \| platform_device_id\) arr[] = {
 	@p1
 };
 |
-struct \(of_device_id \| i2c_device_id \| platform_device_id\) arr[] = {
+struct
+  \(of_device_id\|i2c_device_id\|platform_device_id\|dmi_system_id\) arr[] = {
 	...,
 	{ ..., E, ... }
 	@p1
