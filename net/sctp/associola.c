@@ -363,6 +363,9 @@ void sctp_association_free(struct sctp_association *asoc)
 	kfree(asoc->streamout);
 	kfree(asoc->streamin);
 
+	if (asoc->strreset_chunk)
+		sctp_chunk_free(asoc->strreset_chunk);
+
 	/* Clean up the bound address list. */
 	sctp_bind_addr_free(&asoc->base.bind_addr);
 
