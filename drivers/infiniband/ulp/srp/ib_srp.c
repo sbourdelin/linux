@@ -268,33 +268,28 @@ static void srp_qp_event(struct ib_event *event, void *context)
 static int srp_init_qp(struct srp_target_port *target,
 		       struct ib_qp *qp)
 {
-	struct ib_qp_attr *attr;
+	struct ib_qp_attr attr = { 0 };
 	int ret;
-
-	attr = kmalloc(sizeof *attr, GFP_KERNEL);
-	if (!attr)
-		return -ENOMEM;
 
 	ret = ib_find_cached_pkey(target->srp_host->srp_dev->dev,
 				  target->srp_host->port,
 				  be16_to_cpu(target->pkey),
-				  &attr->pkey_index);
+				  &attr.pkey_index);
 	if (ret)
 		goto out;
 
-	attr->qp_state        = IB_QPS_INIT;
-	attr->qp_access_flags = (IB_ACCESS_REMOTE_READ |
+	attr.qp_state        = IB_QPS_INIT;
+	attr.qp_access_flags = (IB_ACCESS_REMOTE_READ |
 				    IB_ACCESS_REMOTE_WRITE);
-	attr->port_num        = target->srp_host->port;
+	attr.port_num        = target->srp_host->port;
 
-	ret = ib_modify_qp(qp, attr,
+	ret = ib_modify_qp(qp, &attr,
 			   IB_QP_STATE		|
 			   IB_QP_PKEY_INDEX	|
 			   IB_QP_ACCESS_FLAGS	|
 			   IB_QP_PORT);
 
 out:
-	kfree(attr);
 	return ret;
 }
 
@@ -2292,7 +2287,7 @@ static void srp_cm_rep_handler(struct ib_cm_id *cm_id,
 			       struct srp_rdma_ch *ch)
 {
 	struct srp_target_port *target = ch->target;
-	struct ib_qp_attr *qp_attr = NULL;
+	struct ib_qp_attr qp_attr = { 0 };
 	int attr_mask = 0;
 	int ret;
 	int i;
@@ -2324,43 +2319,35 @@ static void srp_cm_rep_handler(struct ib_cm_id *cm_id,
 			goto error;
 	}
 
-	ret = -ENOMEM;
-	qp_attr = kmalloc(sizeof *qp_attr, GFP_KERNEL);
-	if (!qp_attr)
+	qp_attr.qp_state = IB_QPS_RTR;
+	ret = ib_cm_init_qp_attr(cm_id, &qp_attr, &attr_mask);
+	if (ret)
 		goto error;
 
-	qp_attr->qp_state = IB_QPS_RTR;
-	ret = ib_cm_init_qp_attr(cm_id, qp_attr, &attr_mask);
+	ret = ib_modify_qp(ch->qp, &qp_attr, attr_mask);
 	if (ret)
-		goto error_free;
-
-	ret = ib_modify_qp(ch->qp, qp_attr, attr_mask);
-	if (ret)
-		goto error_free;
+		goto error;
 
 	for (i = 0; i < target->queue_size; i++) {
 		struct srp_iu *iu = ch->rx_ring[i];
 
 		ret = srp_post_recv(ch, iu);
 		if (ret)
-			goto error_free;
+			goto error;
 	}
 
-	qp_attr->qp_state = IB_QPS_RTS;
-	ret = ib_cm_init_qp_attr(cm_id, qp_attr, &attr_mask);
+	qp_attr.qp_state = IB_QPS_RTS;
+	ret = ib_cm_init_qp_attr(cm_id, &qp_attr, &attr_mask);
 	if (ret)
-		goto error_free;
+		goto error;
 
-	target->rq_tmo_jiffies = srp_compute_rq_tmo(qp_attr, attr_mask);
+	target->rq_tmo_jiffies = srp_compute_rq_tmo(&qp_attr, attr_mask);
 
-	ret = ib_modify_qp(ch->qp, qp_attr, attr_mask);
+	ret = ib_modify_qp(ch->qp, &qp_attr, attr_mask);
 	if (ret)
-		goto error_free;
+		goto error;
 
 	ret = ib_send_cm_rtu(cm_id, NULL, 0);
-
-error_free:
-	kfree(qp_attr);
 
 error:
 	ch->status = ret;
