@@ -40,7 +40,7 @@ EXPORT_SYMBOL_GPL(rtl_dbgp_flag_init);
 
 #ifdef CONFIG_RTLWIFI_DEBUG
 void _rtl_dbg_trace(struct rtl_priv *rtlpriv, int comp, int level,
-		    const char *fmt, ...)
+		    const char *func, const char *fmt, ...)
 {
 	if (unlikely((comp & rtlpriv->dbg.global_debug_mask) &&
 		     (level <= rtlpriv->dbg.global_debuglevel))) {
@@ -52,7 +52,7 @@ void _rtl_dbg_trace(struct rtl_priv *rtlpriv, int comp, int level,
 		vaf.fmt = fmt;
 		vaf.va = &args;
 
-		pr_debug(":<%lx> %pV", in_interrupt(), &vaf);
+		pr_debug("%s %pV", func, &vaf);
 
 		va_end(args);
 	}
@@ -85,7 +85,7 @@ void _rtl_dbg_print_data(struct rtl_priv *rtlpriv, u64 comp, int level,
 {
 	if (unlikely(((comp) & rtlpriv->dbg.global_debug_mask) &&
 		     ((level) <= rtlpriv->dbg.global_debuglevel))) {
-		pr_debug("In process \"%s\" (pid %i): %s\n",
+		pr_info("In process \"%s\" (pid %i): %s\n",
 			 current->comm, current->pid, titlestring);
 		print_hex_dump_bytes("", DUMP_PREFIX_NONE,
 				     hexdata, hexdatalen);
