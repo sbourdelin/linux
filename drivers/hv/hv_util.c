@@ -182,9 +182,10 @@ struct adj_time_work {
 static void hv_set_host_time(struct work_struct *work)
 {
 	struct adj_time_work	*wrk;
-	s64 host_tns;
+	s64 host_tns, our_tns, delta;
 	u64 newtime;
-	struct timespec64 host_ts;
+	struct timespec64 host_ts, our_ts;
+	struct timex txc = {0};
 
 	wrk = container_of(work, struct adj_time_work, work);
 
@@ -205,7 +206,25 @@ static void hv_set_host_time(struct work_struct *work)
 	host_tns = (newtime - WLTIMEDELTA) * 100;
 	host_ts = ns_to_timespec64(host_tns);
 
-	do_settimeofday64(&host_ts);
+	getnstimeofday64(&our_ts);
+	our_tns = timespec64_to_ns(&our_ts);
+
+	/* Difference between our time and host time */
+	delta = host_tns - our_tns;
+
+	/* Try adjusting time by using phase adjustment if possible */
+	if (abs(delta) > MAXPHASE) {
+		do_settimeofday64(&host_ts);
+		return;
+	}
+
+	txc.modes = ADJ_TICK | ADJ_FREQUENCY | ADJ_OFFSET | ADJ_NANO |
+		ADJ_STATUS;
+	txc.tick = TICK_USEC;
+	txc.freq = 0;
+	txc.status = STA_PLL;
+	txc.offset = delta;
+	do_adjtimex(&txc);
 }
 
 /*
