@@ -85,6 +85,8 @@ struct cls_fl_filter {
 	struct rcu_head	rcu;
 	struct tc_to_netdev tc;
 	struct net_device *hw_dev;
+	size_t cookie_len;
+	long cookie[0];
 };
 
 static unsigned short int fl_mask_range(const struct fl_flow_mask *mask)
@@ -794,6 +796,9 @@ static int fl_change(struct net *net, struct sk_buff *in_skb,
 	struct cls_fl_filter *fnew;
 	struct nlattr *tb[TCA_FLOWER_MAX + 1];
 	struct fl_flow_mask mask = {};
+	const struct nlattr *attr;
+	size_t cookie_len = 0;
+	void *cookie;
 	int err;
 
 	if (!tca[TCA_OPTIONS])
@@ -806,9 +811,21 @@ static int fl_change(struct net *net, struct sk_buff *in_skb,
 	if (fold && handle && fold->handle != handle)
 		return -EINVAL;
 
-	fnew = kzalloc(sizeof(*fnew), GFP_KERNEL);
+	if (tb[TCA_FLOWER_COOKIE]) {
+		attr = tb[TCA_FLOWER_COOKIE];
+		cookie_len = nla_len(attr);
+		cookie = nla_data(attr);
+		if (cookie_len > FLOWER_MAX_COOKIE_SIZE)
+			return -EINVAL;
+	}
+
+	fnew = kzalloc(sizeof(*fnew) + cookie_len, GFP_KERNEL);
 	if (!fnew)
 		return -ENOBUFS;
+
+	fnew->cookie_len = cookie_len;
+	if (cookie_len)
+		memcpy(fnew->cookie, cookie, cookie_len);
 
 	err = tcf_exts_init(&fnew->exts, TCA_FLOWER_ACT, 0);
 	if (err < 0)
@@ -1150,6 +1167,9 @@ static int fl_dump(struct net *net, struct tcf_proto *tp, unsigned long fh,
 		goto nla_put_failure;
 
 	nla_put_u32(skb, TCA_FLOWER_FLAGS, f->flags);
+
+	if (f->cookie_len)
+		nla_put(skb, TCA_FLOWER_COOKIE, f->cookie_len, f->cookie);
 
 	if (tcf_exts_dump(skb, &f->exts))
 		goto nla_put_failure;
