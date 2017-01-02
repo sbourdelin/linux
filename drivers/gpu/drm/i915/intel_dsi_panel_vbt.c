@@ -695,16 +695,26 @@ struct drm_panel *vbt_panel_init(struct intel_dsi *intel_dsi, u16 panel_id)
 	/* count values in UI = (ns value) * (bitrate / (2 * 10^6))
 	 *
 	 * Since txddrclkhs_i is 2xUI, all the count values programmed in
-	 * DPHY param register are divided by 2
+	 * DPHY param register are divided by 2 except GEMINILAKE where it is
+	 * programmed in terms of HS byte clock so divided by 8
 	 *
 	 * prepare count
 	 */
 	ths_prepare_ns = max(mipi_config->ths_prepare,
 			     mipi_config->tclk_prepare);
-	prepare_cnt = DIV_ROUND_UP(ths_prepare_ns * ui_den, ui_num * 2);
+	if (IS_GEMINILAKE(dev_priv))
+		prepare_cnt = DIV_ROUND_UP(ths_prepare_ns * ui_den, ui_num * 8);
+	else
+		prepare_cnt = DIV_ROUND_UP(ths_prepare_ns * ui_den, ui_num * 2);
 
 	/* exit zero count */
-	exit_zero_cnt = DIV_ROUND_UP(
+	if (IS_GEMINILAKE(dev_priv))
+		exit_zero_cnt = DIV_ROUND_UP(
+				(ths_prepare_hszero - ths_prepare_ns) * ui_den,
+				ui_num * 8
+				);
+	else
+		exit_zero_cnt = DIV_ROUND_UP(
 				(ths_prepare_hszero - ths_prepare_ns) * ui_den,
 				ui_num * 2
 				);
@@ -719,13 +729,22 @@ struct drm_panel *vbt_panel_init(struct intel_dsi *intel_dsi, u16 panel_id)
 		exit_zero_cnt += 1;
 
 	/* clk zero count */
-	clk_zero_cnt = DIV_ROUND_UP(
-			(tclk_prepare_clkzero -	ths_prepare_ns)
-			* ui_den, 2 * ui_num);
+	if (IS_GEMINILAKE(dev_priv))
+		clk_zero_cnt = DIV_ROUND_UP(
+				(tclk_prepare_clkzero -	ths_prepare_ns)
+				* ui_den, 8 * ui_num);
+	else
+		clk_zero_cnt = DIV_ROUND_UP(
+				(tclk_prepare_clkzero -	ths_prepare_ns)
+				* ui_den, 2 * ui_num);
 
 	/* trail count */
 	tclk_trail_ns = max(mipi_config->tclk_trail, mipi_config->ths_trail);
-	trail_cnt = DIV_ROUND_UP(tclk_trail_ns * ui_den, 2 * ui_num);
+
+	if (IS_GEMINILAKE(dev_priv))
+		trail_cnt = DIV_ROUND_UP(tclk_trail_ns * ui_den, 8 * ui_num);
+	else
+		trail_cnt = DIV_ROUND_UP(tclk_trail_ns * ui_den, 2 * ui_num);
 
 	if (prepare_cnt > PREPARE_CNT_MAX ||
 		exit_zero_cnt > EXIT_ZERO_CNT_MAX ||
