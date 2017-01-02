@@ -2309,6 +2309,7 @@ int do_adjtimex(struct timex *txc)
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(do_adjtimex);
 
 #ifdef CONFIG_NTP_PPS
 /**
