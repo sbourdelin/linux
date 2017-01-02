@@ -138,6 +138,10 @@ SECCOMP_RET_TRACE:
 	allow use of ptrace, even of other sandboxed processes, without
 	extreme care; ptracers can use this mechanism to escape.)
 
+SECCOMP_RET_AUDIT:
+	Results in the system call being executed after an audit log record is
+	emitted.
+
 SECCOMP_RET_ALLOW:
 	Results in the system call being executed.
 
