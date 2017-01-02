@@ -2904,9 +2904,16 @@ static int smiapp_probe(struct i2c_client *client,
 	if (IS_ERR(sensor->xshutdown))
 		return PTR_ERR(sensor->xshutdown);
 
+	pm_runtime_set_suspended(&client->dev);
+	pm_runtime_enable(&client->dev);
+	rval = pm_runtime_get_sync(&client->dev);
+	if (rval < 0)
+		goto out_power_off;
+#ifndef CONFIG_PM
 	rval = smiapp_power_on(&client->dev);
 	if (rval < 0)
 		return rval;
+#endif
 
 	rval = smiapp_identify_module(sensor);
 	if (rval) {
@@ -3087,12 +3094,12 @@ static int smiapp_probe(struct i2c_client *client,
 	if (rval < 0)
 		goto out_media_entity_cleanup;
 
-	pm_runtime_set_active(&client->dev);
-	pm_runtime_get_noresume(&client->dev);
-	pm_runtime_enable(&client->dev);
 	pm_runtime_set_autosuspend_delay(&client->dev, 1000);
 	pm_runtime_use_autosuspend(&client->dev);
 	pm_runtime_put_autosuspend(&client->dev);
+#ifndef CONFIG_PM
+	smiapp_power_off(&client->dev);
+#endif
 
 	return 0;
 
@@ -3103,7 +3110,10 @@ out_cleanup:
 	smiapp_cleanup(sensor);
 
 out_power_off:
+	pm_runtime_put_sync(&client->dev);
+#ifndef CONFIG_PM
 	smiapp_power_off(&client->dev);
+#endif
 
 	return rval;
 }
@@ -3118,8 +3128,11 @@ static int smiapp_remove(struct i2c_client *client)
 
 	pm_runtime_disable(&client->dev);
 	if (!pm_runtime_status_suspended(&client->dev))
-		smiapp_power_off(&client->dev);
+		pm_runtime_suspend(&client->dev);
 	pm_runtime_set_suspended(&client->dev);
+#ifndef CONFIG_PM
+	smiapp_power_off(&client->dev);
+#endif
 
 	for (i = 0; i < sensor->ssds_used; i++) {
 		v4l2_device_unregister_subdev(&sensor->ssds[i].sd);
