@@ -73,6 +73,15 @@ nfs4_callback_svc(void *vrqstp)
 	int err;
 	struct svc_rqst *rqstp = vrqstp;
 
+	/*
+	 * thread is spawned with all signals set to SIG_IGN, re-enable
+	 * the ones that will bring down the thread
+	 */
+	allow_signal(SIGKILL);
+	allow_signal(SIGHUP);
+	allow_signal(SIGINT);
+	allow_signal(SIGQUIT);
+
 	set_freezable();
 
 	while (!kthread_should_stop()) {
@@ -80,11 +89,19 @@ nfs4_callback_svc(void *vrqstp)
 		 * Listen for a request on the socket
 		 */
 		err = svc_recv(rqstp, MAX_SCHEDULE_TIMEOUT);
-		if (err == -EAGAIN || err == -EINTR)
+		if (err == -EAGAIN)
 			continue;
+		else if (err == -EINTR)
+			break;
 		svc_process(rqstp);
 	}
-	return 0;
+
+	flush_signals(current);
+	rqstp->rq_server = NULL;
+
+	/* Release the thread */
+	svc_exit_thread(rqstp);
+	module_put_and_exit(0);
 }
 
 #if defined(CONFIG_NFS_V4_1)
@@ -99,6 +116,15 @@ nfs41_callback_svc(void *vrqstp)
 	struct rpc_rqst *req;
 	int error;
 	DEFINE_WAIT(wq);
+
+	/*
+	 * thread is spawned with all signals set to SIG_IGN, re-enable
+	 * the ones that will bring down the thread
+	 */
+	allow_signal(SIGKILL);
+	allow_signal(SIGHUP);
+	allow_signal(SIGINT);
+	allow_signal(SIGQUIT);
 
 	set_freezable();
 
@@ -121,11 +147,18 @@ nfs41_callback_svc(void *vrqstp)
 		} else {
 			spin_unlock_bh(&serv->sv_cb_lock);
 			schedule();
+			if (signalled())
+				break;
 			finish_wait(&serv->sv_cb_waitq, &wq);
 		}
-		flush_signals(current);
 	}
-	return 0;
+
+	flush_signals(current);
+	rqstp->rq_server = NULL;
+
+	/* Release the thread */
+	svc_exit_thread(rqstp);
+	module_put_and_exit(0);
 }
 
 static inline void nfs_callback_bc_serv(u32 minorversion, struct rpc_xprt *xprt,
