@@ -117,7 +117,7 @@ int f2fs_convert_inline_page(struct dnode_of_data *dn, struct page *page)
 	};
 	int dirty, err;
 
-	if (!f2fs_exist_data(dn->inode))
+	if (!f2fs_exist_data(dn->inode) || !i_size_read(dn->inode))
 		goto clear_out;
 
 	err = f2fs_reserve_block(dn, 0);
