@@ -19,4 +19,12 @@ config XGENE_PMU
         help
           Say y if you want to use APM X-Gene SoC performance monitors.
 
+config HISI_PMU
+	bool "HiSilicon SoC PMU"
+	depends on HW_PERF_EVENTS && ARM64
+	help
+	  Enable hardware event counter support for hardware event counters
+	  in Hisilicon HiP05/06/07 SoC. The hardware modules like L3C and MN
+	  have hardware events and counters.
+
 endmenu
