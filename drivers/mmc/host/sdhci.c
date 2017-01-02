@@ -2665,6 +2665,7 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 {
 	irqreturn_t result = IRQ_NONE;
 	struct sdhci_host *host = dev_id;
+	struct mmc_host *mmc = host->mmc;
 	u32 intmask, mask, unexpected = 0;
 	int max_loops = 16;
 
@@ -2733,7 +2734,9 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 		if (intmask & SDHCI_INT_RETUNE)
 			mmc_retune_needed(host->mmc);
 
-		if (intmask & SDHCI_INT_CARD_INT) {
+		if (intmask & SDHCI_INT_CARD_INT && mmc->card &&
+		    (mmc->card->type == MMC_TYPE_SDIO ||
+		     mmc->card->type == MMC_TYPE_SD_COMBO)) {
 			sdhci_enable_sdio_irq_nolock(host, false);
 			host->thread_isr |= SDHCI_INT_CARD_INT;
 			result = IRQ_WAKE_THREAD;
