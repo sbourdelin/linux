@@ -132,7 +132,7 @@ EXPORT_SYMBOL(jiffies_64);
  *  5	 320    131072 ms (~2m)    1048576 ms -    8388607 ms (~17m - ~2h)
  *  6	 384   1048576 ms (~17m)   8388608 ms -   67108863 ms (~2h - ~18h)
  *  7	 448   8388608 ms (~2h)   67108864 ms -  536870911 ms (~18h - ~6d)
- *  8    512  67108864 ms (~18h) 536870912 ms - 4294967288 ms (~6d - ~49d)
+ *  8    512  67108864 ms (~18h) 536870912 ms - 4294967295 ms (~6d - ~49d)
  *
  * HZ  100
  * Level Offset  Granularity            Range
@@ -157,7 +157,7 @@ EXPORT_SYMBOL(jiffies_64);
  * The time start value for each level to select the bucket at enqueue
  * time.
  */
-#define LVL_START(n)	((LVL_SIZE - 1) << (((n) - 1) * LVL_CLK_SHIFT))
+#define LVL_START(n)	(LVL_SIZE << (((n) - 1) * LVL_CLK_SHIFT))
 
 /* Size of each clock level */
 #define LVL_BITS	6
