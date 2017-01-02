@@ -74,6 +74,7 @@
 #include <linux/string.h>
 #include <linux/uaccess.h>
 #include <uapi/linux/limits.h>
+#include <uapi/linux/seccomp.h>
 
 #include "audit.h"
 
@@ -2415,7 +2416,7 @@ void audit_core_dumps(long signr)
 	audit_log_end(ab);
 }
 
-void __audit_seccomp(unsigned long syscall, long signr, int code)
+void __audit_seccomp(unsigned long syscall, struct audit_seccomp_info *info)
 {
 	struct audit_buffer *ab;
 
@@ -2423,9 +2424,19 @@ void __audit_seccomp(unsigned long syscall, long signr, int code)
 	if (unlikely(!ab))
 		return;
 	audit_log_task(ab);
-	audit_log_format(ab, " sig=%ld arch=%x syscall=%ld compat=%d ip=0x%lx code=0x%x",
-			 signr, syscall_get_arch(), syscall,
-			 in_compat_syscall(), KSTK_EIP(current), code);
+
+	switch (info->code) {
+	case SECCOMP_RET_KILL:
+		audit_log_format(ab, " sig=%ld", info->signr);
+		break;
+	default:
+		break;
+	}
+
+	audit_log_format(ab,
+			 " arch=%x syscall=%ld compat=%d ip=0x%lx code=0x%x",
+			 syscall_get_arch(), syscall, in_compat_syscall(),
+			 KSTK_EIP(current), info->code);
 	audit_log_end(ab);
 }
 

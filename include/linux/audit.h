@@ -85,6 +85,11 @@ struct audit_field {
 	u32				op;
 };
 
+struct audit_seccomp_info {
+	int		code;
+	long		signr;
+};
+
 extern int is_audit_feature_set(int which);
 
 extern int __init audit_register_class(int class, unsigned *list);
@@ -243,7 +248,8 @@ extern void __audit_file(const struct file *);
 extern void __audit_inode_child(struct inode *parent,
 				const struct dentry *dentry,
 				const unsigned char type);
-extern void __audit_seccomp(unsigned long syscall, long signr, int code);
+extern void __audit_seccomp(unsigned long syscall,
+			    struct audit_seccomp_info *info);
 extern void __audit_ptrace(struct task_struct *t);
 
 static inline bool audit_dummy_context(void)
@@ -313,14 +319,31 @@ static inline void audit_inode_child(struct inode *parent,
 }
 void audit_core_dumps(long signr);
 
-static inline void audit_seccomp(unsigned long syscall, long signr, int code)
+static inline void audit_seccomp_signal(unsigned long syscall, long signr,
+					int code)
 {
 	if (!audit_enabled)
 		return;
 
 	/* Force a record to be reported if a signal was delivered. */
-	if (signr || unlikely(!audit_dummy_context()))
-		__audit_seccomp(syscall, signr, code);
+	if (signr || unlikely(!audit_dummy_context())) {
+		struct audit_seccomp_info info = { .code = code,
+						   .signr = signr };
+
+		__audit_seccomp(syscall, &info);
+	}
+}
+
+static inline void audit_seccomp_common(unsigned long syscall, int code)
+{
+	if (!audit_enabled)
+		return;
+
+	if (code || unlikely(!audit_dummy_context())) {
+		struct audit_seccomp_info info = { .code = code };
+
+		__audit_seccomp(syscall, &info);
+	}
 }
 
 static inline void audit_ptrace(struct task_struct *t)
@@ -485,9 +508,13 @@ static inline void audit_inode_child(struct inode *parent,
 { }
 static inline void audit_core_dumps(long signr)
 { }
-static inline void __audit_seccomp(unsigned long syscall, long signr, int code)
+static inline void __audit_seccomp(unsigned long syscall,
+				   struct audit_seccomp_info *info);
 { }
-static inline void audit_seccomp(unsigned long syscall, long signr, int code)
+static inline void audit_seccomp_signal(unsigned long syscall, long signr,
+					int code)
+{ }
+static inline void audit_seccomp_common(unsigned long syscall, int code)
 { }
 static inline int auditsc_get_stamp(struct audit_context *ctx,
 			      struct timespec *t, unsigned int *serial)
