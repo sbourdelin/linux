@@ -22,6 +22,7 @@
 #include <linux/of_platform.h>
 #include <linux/acpi.h>
 #include <linux/regulator/consumer.h>
+#include <linux/gpio/consumer.h>
 
 #define PCA953X_INPUT		0
 #define PCA953X_OUTPUT		1
@@ -754,8 +755,18 @@ static int pca953x_probe(struct i2c_client *client,
 		invert = pdata->invert;
 		chip->names = pdata->names;
 	} else {
+		struct gpio_desc *reset_gpio;
+
 		chip->gpio_start = -1;
 		irq_base = 0;
+
+		/* see if we need to de-assert a reset pin */
+		reset_gpio = devm_gpiod_get_optional(&client->dev, "reset",
+						     GPIOD_OUT_LOW);
+		if (IS_ERR(reset_gpio)) {
+			dev_err(&client->dev, "request for reset pin failed\n");
+			return PTR_ERR(reset_gpio);
+		}
 	}
 
 	chip->client = client;
