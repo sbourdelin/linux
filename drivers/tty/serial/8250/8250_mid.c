@@ -181,6 +181,8 @@ static int dnv_setup(struct mid8250 *mid, struct uart_port *p)
 	if (ret)
 		return 0;
 
+	pci_set_master(pdev);
+
 	mid->dma_dev = pdev;
 
 	p->handle_irq = dnv_handle_irq;
@@ -288,8 +290,6 @@ static int mid8250_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	ret = pcim_enable_device(pdev);
 	if (ret)
 		return ret;
-
-	pci_set_master(pdev);
 
 	mid = devm_kzalloc(&pdev->dev, sizeof(*mid), GFP_KERNEL);
 	if (!mid)
