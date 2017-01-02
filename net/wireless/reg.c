@@ -748,8 +748,8 @@ static bool is_valid_rd(const struct ieee80211_regdomain *rd)
 	return true;
 }
 
-static bool reg_does_bw_fit(const struct ieee80211_freq_range *freq_range,
-			    u32 center_freq_khz, u32 bw_khz)
+bool reg_does_bw_fit(const struct ieee80211_freq_range *freq_range,
+		     u32 center_freq_khz, u32 bw_khz)
 {
 	u32 start_freq_khz, end_freq_khz;
 
@@ -1693,6 +1693,8 @@ static void wiphy_update_regulatory(struct wiphy *wiphy,
 	for (band = 0; band < NUM_NL80211_BANDS; band++)
 		handle_band(wiphy, initiator, wiphy->bands[band]);
 
+	wiphy_freq_limits_apply(wiphy);
+
 	reg_process_beacons(wiphy);
 	reg_process_ht_flags(wiphy);
 	reg_call_notifier(wiphy, lr);
@@ -1799,6 +1801,8 @@ void wiphy_apply_custom_regulatory(struct wiphy *wiphy,
 		handle_band_custom(wiphy, wiphy->bands[band], regd);
 		bands_set++;
 	}
+
+	wiphy_freq_limits_apply(wiphy);
 
 	/*
 	 * no point in calling this if it won't have any effect

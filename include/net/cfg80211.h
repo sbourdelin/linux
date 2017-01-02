@@ -3515,6 +3515,9 @@ struct wiphy_iftype_ext_capab {
  *	attribute indices defined in &enum nl80211_bss_select_attr.
  *
  * @cookie_counter: unique generic cookie counter, used to identify objects.
+ *
+ * @n_freq_limits: number of frequency limits
+ * @freq_limits: array of extra frequency limits
  */
 struct wiphy {
 	/* assign these fields before you register the wiphy */
@@ -3645,6 +3648,9 @@ struct wiphy {
 	u32 bss_select_support;
 
 	u64 cookie_counter;
+
+	unsigned int n_freq_limits;
+	struct ieee80211_freq_range *freq_limits;
 
 	char priv[0] __aligned(NETDEV_ALIGN);
 };

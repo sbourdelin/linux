@@ -87,6 +87,113 @@ struct wiphy *wiphy_idx_to_wiphy(int wiphy_idx)
 	return &rdev->wiphy;
 }
 
+static int wiphy_freq_limits_init(struct wiphy *wiphy)
+{
+	struct device *dev = wiphy_dev(wiphy);
+	struct device_node *np;
+	struct property *prop;
+	const __be32 *p;
+	int i;
+	int err = 0;
+
+	if (wiphy->n_freq_limits)
+		return 0;
+
+	if (!dev)
+		return 0;
+	np = dev->of_node;
+	if (!np)
+		return 0;
+
+	prop = of_find_property(np, "ieee80211-freq-limit", &i);
+	if (!prop)
+		return 0;
+
+	i = i / sizeof(u32);
+	if (i % 2) {
+		dev_err(dev, "ieee80211-freq-limit wrong value");
+		return -EPROTO;
+	}
+	wiphy->n_freq_limits = i / 2;
+
+	wiphy->freq_limits = kzalloc(wiphy->n_freq_limits * sizeof(*wiphy->freq_limits),
+				     GFP_KERNEL);
+	if (!wiphy->freq_limits) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	p = NULL;
+	for (i = 0; i < wiphy->n_freq_limits; i++) {
+		struct ieee80211_freq_range *limit = &wiphy->freq_limits[i];
+
+		p = of_prop_next_u32(prop, p, &limit->start_freq_khz);
+		if (!p) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		p = of_prop_next_u32(prop, p, &limit->end_freq_khz);
+		if (!p) {
+			err = -EINVAL;
+			goto out;
+		}
+	}
+
+out:
+	if (err) {
+		dev_err(dev, "Failed to get limits: %d\n", err);
+		kfree(wiphy->freq_limits);
+		wiphy->n_freq_limits = 0;
+	}
+	return err;
+}
+
+static bool wiphy_freq_limits_valid_chan(struct wiphy *wiphy,
+					 struct ieee80211_channel *chan)
+{
+	u32 bw = MHZ_TO_KHZ(20);
+	int i;
+
+	for (i = 0; i < wiphy->n_freq_limits; i++) {
+		struct ieee80211_freq_range *limit = &wiphy->freq_limits[i];
+
+		if (reg_does_bw_fit(limit, MHZ_TO_KHZ(chan->center_freq), bw))
+			return true;
+	}
+
+	return false;
+}
+
+void wiphy_freq_limits_apply(struct wiphy *wiphy)
+{
+	enum nl80211_band band;
+	int i;
+
+	if (!wiphy->n_freq_limits)
+		return;
+
+	for (band = 0; band < NUM_NL80211_BANDS; band++) {
+		struct ieee80211_supported_band *sband = wiphy->bands[band];
+
+		if (!sband)
+			continue;
+
+		for (i = 0; i < sband->n_channels; i++) {
+			struct ieee80211_channel *chan = &sband->channels[i];
+
+			if (chan->flags & IEEE80211_CHAN_DISABLED)
+				continue;
+
+			if (!wiphy_freq_limits_valid_chan(wiphy, chan)) {
+				pr_debug("Disabling freq %d MHz as it's out of OF limits\n",
+					 chan->center_freq);
+				chan->flags |= IEEE80211_CHAN_DISABLED;
+			}
+		}
+	}
+}
+
 static int cfg80211_dev_check_name(struct cfg80211_registered_device *rdev,
 				   const char *newname)
 {
@@ -480,6 +587,8 @@ use_default_name:
 	INIT_WORK(&rdev->event_work, cfg80211_event_work);
 
 	init_waitqueue_head(&rdev->dev_wait);
+
+	wiphy_freq_limits_init(&rdev->wiphy);
 
 	/*
 	 * Initialize wiphy parameters to IEEE 802.11 MIB default values.
@@ -942,6 +1051,7 @@ void cfg80211_dev_free(struct cfg80211_registered_device *rdev)
 
 void wiphy_free(struct wiphy *wiphy)
 {
+	kfree(wiphy->freq_limits);
 	put_device(&wiphy->dev);
 }
 EXPORT_SYMBOL(wiphy_free);

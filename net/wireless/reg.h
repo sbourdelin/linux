@@ -25,6 +25,8 @@ extern const struct ieee80211_regdomain __rcu *cfg80211_regdomain;
 
 bool reg_is_valid_request(const char *alpha2);
 bool is_world_regdom(const char *alpha2);
+bool reg_does_bw_fit(const struct ieee80211_freq_range *freq_range,
+		     u32 center_freq_khz, u32 bw_khz);
 bool reg_supported_dfs_region(enum nl80211_dfs_regions dfs_region);
 enum nl80211_dfs_regions reg_get_dfs_region(struct wiphy *wiphy);
 

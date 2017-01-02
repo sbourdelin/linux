@@ -271,6 +271,8 @@ struct cfg80211_iface_destroy {
 	u32 nlportid;
 };
 
+void wiphy_freq_limits_apply(struct wiphy *wiphy);
+
 void cfg80211_destroy_ifaces(struct cfg80211_registered_device *rdev);
 
 /* free object */
