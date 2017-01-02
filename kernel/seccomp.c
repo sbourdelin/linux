@@ -577,9 +577,11 @@ static int __seccomp_filter(int this_syscall, const struct seccomp_data *sd,
 		/* Set low-order bits as an errno, capped at MAX_ERRNO. */
 		if (data > MAX_ERRNO)
 			data = MAX_ERRNO;
+
+		audit_seccomp_errno(this_syscall, data, action);
 		syscall_set_return_value(current, task_pt_regs(current),
 					 -data, 0);
-		goto skip;
+		return -1;
 
 	case SECCOMP_RET_TRAP:
 		/* Show the handler the original registers. */

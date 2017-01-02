@@ -87,7 +87,10 @@ struct audit_field {
 
 struct audit_seccomp_info {
 	int		code;
-	long		signr;
+	union {
+		int	errno;
+		long	signr;
+	};
 };
 
 extern int is_audit_feature_set(int which);
@@ -318,6 +321,20 @@ static inline void audit_inode_child(struct inode *parent,
 		__audit_inode_child(parent, dentry, type);
 }
 void audit_core_dumps(long signr);
+
+static inline void audit_seccomp_errno(unsigned long syscall, int errno,
+				       int code)
+{
+	if (!audit_enabled)
+		return;
+
+	if (errno || unlikely(!audit_dummy_context())) {
+		struct audit_seccomp_info info = { .code = code,
+						   .errno = errno };
+
+		__audit_seccomp(syscall, &info);
+	}
+}
 
 static inline void audit_seccomp_signal(unsigned long syscall, long signr,
 					int code)

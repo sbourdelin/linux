@@ -2426,6 +2426,9 @@ void __audit_seccomp(unsigned long syscall, struct audit_seccomp_info *info)
 	audit_log_task(ab);
 
 	switch (info->code) {
+	case SECCOMP_RET_ERRNO:
+		audit_log_format(ab, " errno=%d", info->errno);
+		break;
 	case SECCOMP_RET_KILL:
 		audit_log_format(ab, " sig=%ld", info->signr);
 		break;
