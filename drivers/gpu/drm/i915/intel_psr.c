@@ -332,6 +332,7 @@ static void hsw_enable_source_psr2(struct intel_dp *intel_dp)
 	 */
 	uint32_t idle_frames = max(6, dev_priv->vbt.psr.idle_frames);
 	uint32_t val = EDP_PSR_ENABLE;
+	uint32_t chicken_trans = 0;
 
 	val |= idle_frames << EDP_PSR_IDLE_FRAME_SHIFT;
 
@@ -349,6 +350,12 @@ static void hsw_enable_source_psr2(struct intel_dp *intel_dp)
 	else
 		val |= EDP_PSR2_TP2_TIME_50;
 
+	/* Set CHICKEN_TRANS_BIT15 if Y coordinate is supported */
+	if (dev_priv->psr.y_cord_support)
+		chicken_trans = CHICKEN_TRANS_BIT15;
+	/* Set CHICKEN_TRANS_BIT12 for programable header */
+	chicken_trans = chicken_trans | CHICKEN_TRANS_BIT12;
+	I915_WRITE(CHICKEN_TRANS(TRANS_EDP), chicken_trans);
 	I915_WRITE(EDP_PSR2_CTL, val);
 }
 
