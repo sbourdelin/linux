@@ -47,6 +47,21 @@
 #define GET_CNTR_IDX(hwc) (hwc->idx)
 #define to_hisi_pmu(c)	(container_of(c, struct hisi_pmu, pmu))
 
+#define HISI_PMU_FORMAT_ATTR(_name, _config)		\
+	(&((struct dev_ext_attribute[]) {		\
+		{ .attr = __ATTR(_name, 0444,	\
+			hisi_format_sysfs_show, NULL),	\
+		  .var = (void *) _config,		\
+		}					\
+	})[0].attr.attr)
+
+#define HISI_PMU_EVENT_ATTR_STR(_name, _str)		\
+	(&((struct perf_pmu_events_attr[]) {		\
+		{ .attr = __ATTR(_name, 0444,	\
+			 hisi_event_sysfs_show, NULL),	\
+		  .event_str = _str,			\
+		}					\
+	  })[0].attr.attr)
 
 struct hisi_pmu;
 
@@ -103,4 +118,10 @@ int hisi_djtag_writereg(int module_id, int bank,
 				u32 offset, u32 value,
 				struct hisi_djtag_client *client);
 struct hisi_pmu *hisi_pmu_alloc(struct device *dev);
+ssize_t hisi_event_sysfs_show(struct device *dev,
+				  struct device_attribute *attr, char *buf);
+ssize_t hisi_format_sysfs_show(struct device *dev,
+				  struct device_attribute *attr, char *buf);
+ssize_t hisi_cpumask_sysfs_show(struct device *dev,
+				struct device_attribute *attr, char *buf);
 #endif /* __HISI_UNCORE_PMU_H__ */

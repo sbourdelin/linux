@@ -432,6 +432,58 @@ static int init_hisi_l3c_data(struct hisi_pmu *l3c_pmu,
 	return 0;
 }
 
+static struct attribute *hisi_l3c_format_attr[] = {
+	HISI_PMU_FORMAT_ATTR(event, "config:0-11"),
+	NULL,
+};
+
+static struct attribute_group hisi_l3c_format_group = {
+	.name = "format",
+	.attrs = hisi_l3c_format_attr,
+};
+
+static struct attribute *hisi_l3c_events_attr[] = {
+	HISI_PMU_EVENT_ATTR_STR(read_allocate, "event=0x0"),
+	HISI_PMU_EVENT_ATTR_STR(write_allocate, "event=0x01"),
+	HISI_PMU_EVENT_ATTR_STR(read_noallocate, "event=0x02"),
+	HISI_PMU_EVENT_ATTR_STR(write_noallocate, "event=0x03"),
+	HISI_PMU_EVENT_ATTR_STR(read_hit, "event=0x04"),
+	HISI_PMU_EVENT_ATTR_STR(write_hit, "event=0x05"),
+	NULL,
+};
+
+static struct attribute_group hisi_l3c_events_group = {
+	.name = "events",
+	.attrs = hisi_l3c_events_attr,
+};
+
+static struct attribute *hisi_l3c_attrs[] = {
+	NULL,
+};
+
+static struct attribute_group hisi_l3c_attr_group = {
+	.attrs = hisi_l3c_attrs,
+};
+
+static DEVICE_ATTR(cpumask, 0444, hisi_cpumask_sysfs_show, NULL);
+
+static struct attribute *hisi_l3c_cpumask_attrs[] = {
+	&dev_attr_cpumask.attr,
+	NULL,
+};
+
+static const struct attribute_group hisi_l3c_cpumask_attr_group = {
+	.attrs = hisi_l3c_cpumask_attrs,
+};
+
+static const struct attribute_group *hisi_l3c_pmu_attr_groups[] = {
+	&hisi_l3c_attr_group,
+	&hisi_l3c_format_group,
+	&hisi_l3c_events_group,
+	&hisi_l3c_cpumask_attr_group,
+	NULL,
+};
+
 static struct hisi_uncore_ops hisi_uncore_l3c_ops = {
 	.set_evtype = hisi_l3c_set_evtype,
 	.clear_evtype = hisi_l3c_clear_evtype,
@@ -495,6 +547,7 @@ static int hisi_pmu_l3c_dev_probe(struct hisi_djtag_client *client)
 		.start = hisi_uncore_pmu_start,
 		.stop = hisi_uncore_pmu_stop,
 		.read = hisi_uncore_pmu_read,
+		.attr_groups = hisi_l3c_pmu_attr_groups,
 	};
 
 	ret = hisi_uncore_pmu_setup(l3c_pmu, l3c_pmu->name);
