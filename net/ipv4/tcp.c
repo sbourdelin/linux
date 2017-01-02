@@ -992,8 +992,10 @@ out:
 	return copied;
 
 do_error:
-	if (copied)
+	if (copied) {
+		tcp_tx_timestamp(sk, sk->sk_tsflags, tcp_write_queue_tail(sk));
 		goto out;
+	}
 out_err:
 	/* make sure we wake any epoll edge trigger waiter */
 	if (unlikely(skb_queue_len(&sk->sk_write_queue) == 0 &&
@@ -1329,8 +1331,10 @@ do_fault:
 	}
 
 do_error:
-	if (copied + copied_syn)
+	if (copied + copied_syn) {
+		tcp_tx_timestamp(sk, sk->sk_tsflags, tcp_write_queue_tail(sk));
 		goto out;
+	}
 out_err:
 	err = sk_stream_error(sk, flags, err);
 	/* make sure we wake any epoll edge trigger waiter */
