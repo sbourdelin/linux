@@ -5432,10 +5432,15 @@ ext4_ext_shift_extents(struct inode *inode, handle_t *handle,
 			else
 				/* Beginning is reached, end of the loop */
 				iterator = NULL;
-			/* Update path extent in case we need to stop */
-			while (le32_to_cpu(extent->ee_block) < start)
-				extent++;
-			path[depth].p_ext = extent;
+			if (le32_to_cpu(extent->ee_block) < start)
+				/*
+				 * Desired extent is somewhere in the middle,
+				 * do binsearch and update a path with it.
+				 */
+				ext4_ext_binsearch(inode, &path[depth], start);
+			else
+				/* Set the first extent */
+				path[depth].p_ext = extent;
 		}
 		ret = ext4_ext_shift_path_extents(path, shift, inode,
 				handle, SHIFT);
