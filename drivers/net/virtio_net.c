@@ -1699,6 +1699,9 @@ static const struct ethtool_ops virtnet_ethtool_ops = {
 	.set_settings = virtnet_set_settings,
 };
 
+#define MIN_MTU ETH_MIN_MTU
+#define MAX_MTU ETH_MAX_MTU
+
 static int virtnet_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 {
 	unsigned long int max_sz = PAGE_SIZE - sizeof(struct padded_vnet_hdr);
@@ -1748,6 +1751,9 @@ static int virtnet_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 			virtnet_set_queues(vi, curr_qp);
 			return PTR_ERR(prog);
 		}
+		dev->max_mtu = max_sz;
+	} else {
+		dev->max_mtu = ETH_MAX_MTU;
 	}
 
 	vi->xdp_queue_pairs = xdp_qp;
@@ -2132,9 +2138,6 @@ static bool virtnet_validate_features(struct virtio_device *vdev)
 
 	return true;
 }
-
-#define MIN_MTU ETH_MIN_MTU
-#define MAX_MTU ETH_MAX_MTU
 
 static int virtnet_probe(struct virtio_device *vdev)
 {
