@@ -186,6 +186,9 @@ static void hv_set_host_time(struct work_struct *work)
 	u64 newtime;
 	struct timespec64 host_ts, our_ts;
 	struct timex txc = {0};
+	unsigned long flags;
+
+	local_irq_save(flags);
 
 	wrk = container_of(work, struct adj_time_work, work);
 
@@ -214,6 +217,7 @@ static void hv_set_host_time(struct work_struct *work)
 
 	/* Try adjusting time by using phase adjustment if possible */
 	if (abs(delta) > MAXPHASE) {
+		local_irq_restore(flags);
 		do_settimeofday64(&host_ts);
 		return;
 	}
@@ -225,6 +229,8 @@ static void hv_set_host_time(struct work_struct *work)
 	txc.status = STA_PLL;
 	txc.offset = delta;
 	do_adjtimex(&txc);
+
+	local_irq_restore(flags);
 }
 
 /*
