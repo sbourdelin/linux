@@ -1808,6 +1808,7 @@ static const struct platform_device_id spacc_id_table[] = {
 	{ "picochip,spacc-l2", },
 	{ }
 };
+MODULE_DEVICE_TABLE(platform, spacc_id_table);
 
 static struct platform_driver spacc_driver = {
 	.probe		= spacc_probe,
