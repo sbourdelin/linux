@@ -2139,11 +2139,23 @@ static void early_enable_iommu(struct amd_iommu *iommu)
  */
 static void early_enable_iommus(void)
 {
+	struct dev_table_entry *dev_tbl;
 	struct amd_iommu *iommu;
 	bool is_pre_enabled = false;
 
 	for_each_iommu(iommu) {
 		if (translation_pre_enabled(iommu)) {
+			gfp_t gfp_flag = GFP_KERNEL | __GFP_ZERO | GFP_DMA32;;
+
+			dev_tbl = (void *)__get_free_pages(gfp_flag,
+						get_order(dev_table_size));
+			if (dev_tbl != NULL) {
+				memcpy(dev_tbl, amd_iommu_dev_table, dev_table_size);
+				free_pages((unsigned long)amd_iommu_dev_table,
+						get_order(dev_table_size));
+				amd_iommu_dev_table = dev_tbl;
+			}
+
 			is_pre_enabled = true;
 			break;
 		}
