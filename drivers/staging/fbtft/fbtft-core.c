@@ -843,7 +843,8 @@ struct fb_info *fbtft_framebuffer_alloc(struct fbtft_display *display,
 		if (dma) {
 			txbuf = dmam_alloc_coherent(dev, txbuflen,
 						    &par->txbuf.dma, GFP_DMA);
-		} else
+		}
+		if (!txbuf)
 #endif
 		{
 			txbuf = devm_kzalloc(par->info->device,
