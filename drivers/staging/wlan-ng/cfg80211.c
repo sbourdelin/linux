@@ -694,7 +694,7 @@ static struct wiphy *wlan_create_wiphy(struct device *dev, struct wlandevice *wl
 	struct wiphy *wiphy;
 	struct prism2_wiphy_private *priv;
 
-	wiphy = wiphy_new(&prism2_usb_cfg_ops, sizeof(*priv));
+	wiphy = wiphy_new(dev, &prism2_usb_cfg_ops, sizeof(*priv));
 	if (!wiphy)
 		return NULL;
 
@@ -710,7 +710,6 @@ static struct wiphy *wlan_create_wiphy(struct device *dev, struct wlandevice *wl
 	priv->band.ht_cap.ht_supported = false;
 	wiphy->bands[NL80211_BAND_2GHZ] = &priv->band;
 
-	set_wiphy_dev(wiphy, dev);
 	wiphy->privid = prism2_wiphy_privid;
 	wiphy->max_scan_ssids = 1;
 	wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)

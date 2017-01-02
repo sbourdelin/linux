@@ -2178,7 +2178,7 @@ struct orinoco_private
 	 * NOTE: We only support a single virtual interface
 	 *       but this may change when monitor mode is added
 	 */
-	wiphy = wiphy_new(&orinoco_cfg_ops,
+	wiphy = wiphy_new(device, &orinoco_cfg_ops,
 			  sizeof(struct orinoco_private) + sizeof_card);
 	if (!wiphy)
 		return NULL;

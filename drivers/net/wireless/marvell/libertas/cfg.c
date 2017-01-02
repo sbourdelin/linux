@@ -2120,7 +2120,8 @@ struct wireless_dev *lbs_cfg_alloc(struct device *dev)
 	if (!wdev)
 		return ERR_PTR(-ENOMEM);
 
-	wdev->wiphy = wiphy_new(&lbs_cfg80211_ops, sizeof(struct lbs_private));
+	wdev->wiphy = wiphy_new(dev, &lbs_cfg80211_ops,
+				sizeof(struct lbs_private));
 	if (!wdev->wiphy) {
 		dev_err(dev, "cannot allocate wiphy\n");
 		ret = -ENOMEM;

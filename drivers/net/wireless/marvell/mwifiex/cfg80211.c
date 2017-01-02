@@ -4232,7 +4232,7 @@ int mwifiex_register_cfg80211(struct mwifiex_adapter *adapter)
 	u32 thr, retry;
 
 	/* create a new wiphy for use with cfg80211 */
-	wiphy = wiphy_new(&mwifiex_cfg80211_ops,
+	wiphy = wiphy_new(priv->adapter->dev, &mwifiex_cfg80211_ops,
 			  sizeof(struct mwifiex_adapter *));
 	if (!wiphy) {
 		mwifiex_dbg(adapter, ERROR,
@@ -4327,8 +4327,6 @@ int mwifiex_register_cfg80211(struct mwifiex_adapter *adapter)
 	/* Set struct mwifiex_adapter pointer in wiphy_priv */
 	wdev_priv = wiphy_priv(wiphy);
 	*(unsigned long *)wdev_priv = (unsigned long)adapter;
-
-	set_wiphy_dev(wiphy, priv->adapter->dev);
 
 	ret = wiphy_register(wiphy);
 	if (ret < 0) {

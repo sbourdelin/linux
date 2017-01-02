@@ -267,7 +267,7 @@ struct ath6kl *ath6kl_core_create(struct device *dev)
 	struct ath6kl *ar;
 	u8 ctr;
 
-	ar = ath6kl_cfg80211_create();
+	ar = ath6kl_cfg80211_create(dev);
 	if (!ar)
 		return NULL;
 

@@ -3870,9 +3870,6 @@ int ath6kl_cfg80211_init(struct ath6kl *ar)
 
 	wiphy->max_remain_on_channel_duration = 5000;
 
-	/* set device pointer for wiphy */
-	set_wiphy_dev(wiphy, ar->dev);
-
 	wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION) |
 				 BIT(NL80211_IFTYPE_ADHOC) |
 				 BIT(NL80211_IFTYPE_AP);
@@ -4004,13 +4001,13 @@ void ath6kl_cfg80211_cleanup(struct ath6kl *ar)
 	ar->wiphy_registered = false;
 }
 
-struct ath6kl *ath6kl_cfg80211_create(void)
+struct ath6kl *ath6kl_cfg80211_create(struct device *dev)
 {
 	struct ath6kl *ar;
 	struct wiphy *wiphy;
 
 	/* create a new wiphy for use with cfg80211 */
-	wiphy = wiphy_new(&ath6kl_cfg80211_ops, sizeof(struct ath6kl));
+	wiphy = wiphy_new(dev, &ath6kl_cfg80211_ops, sizeof(struct ath6kl));
 
 	if (!wiphy) {
 		ath6kl_err("couldn't allocate wiphy device\n");

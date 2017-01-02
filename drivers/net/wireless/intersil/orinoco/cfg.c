@@ -26,8 +26,6 @@ void orinoco_wiphy_init(struct wiphy *wiphy)
 	struct orinoco_private *priv = wiphy_priv(wiphy);
 
 	wiphy->privid = orinoco_wiphy_privid;
-
-	set_wiphy_dev(wiphy, priv->dev);
 }
 
 /* Called after firmware is initialised */

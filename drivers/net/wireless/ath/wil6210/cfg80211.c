@@ -1575,14 +1575,13 @@ struct wireless_dev *wil_cfg80211_init(struct device *dev)
 	if (!wdev)
 		return ERR_PTR(-ENOMEM);
 
-	wdev->wiphy = wiphy_new(&wil_cfg80211_ops,
+	wdev->wiphy = wiphy_new(dev, &wil_cfg80211_ops,
 				sizeof(struct wil6210_priv));
 	if (!wdev->wiphy) {
 		rc = -ENOMEM;
 		goto out;
 	}
 
-	set_wiphy_dev(wdev->wiphy, dev);
 	wil_wiphy_init(wdev->wiphy);
 
 	return wdev;

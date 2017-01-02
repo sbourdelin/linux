@@ -3730,8 +3730,8 @@ static inline const char *wiphy_name(const struct wiphy *wiphy)
  * Return: A pointer to the new wiphy. This pointer must be
  * assigned to each netdev's ieee80211_ptr for proper operation.
  */
-struct wiphy *wiphy_new_nm(const struct cfg80211_ops *ops, int sizeof_priv,
-			   const char *requested_name);
+struct wiphy *wiphy_new_nm(struct device *dev, const struct cfg80211_ops *ops,
+			   int sizeof_priv, const char *requested_name);
 
 /**
  * wiphy_new - create a new wiphy for use with cfg80211
@@ -3745,10 +3745,11 @@ struct wiphy *wiphy_new_nm(const struct cfg80211_ops *ops, int sizeof_priv,
  * Return: A pointer to the new wiphy. This pointer must be
  * assigned to each netdev's ieee80211_ptr for proper operation.
  */
-static inline struct wiphy *wiphy_new(const struct cfg80211_ops *ops,
+static inline struct wiphy *wiphy_new(struct device *dev,
+				      const struct cfg80211_ops *ops,
 				      int sizeof_priv)
 {
-	return wiphy_new_nm(ops, sizeof_priv, NULL);
+	return wiphy_new_nm(dev, ops, sizeof_priv, NULL);
 }
 
 /**

@@ -135,7 +135,7 @@ struct net_device *alloc_libipw(int sizeof_priv, int monitor)
 	ieee->dev = dev;
 
 	if (!monitor) {
-		ieee->wdev.wiphy = wiphy_new(&libipw_config_ops, 0);
+		ieee->wdev.wiphy = wiphy_new(NULL, &libipw_config_ops, 0);
 		if (!ieee->wdev.wiphy) {
 			LIBIPW_ERROR("Unable to allocate wiphy.\n");
 			goto failed_free_netdev;

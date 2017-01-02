@@ -524,7 +524,8 @@ struct ieee80211_hw *ieee80211_alloc_hw_nm(size_t priv_data_len,
 	 */
 	priv_size = ALIGN(sizeof(*local), NETDEV_ALIGN) + priv_data_len;
 
-	wiphy = wiphy_new_nm(&mac80211_config_ops, priv_size, requested_name);
+	wiphy = wiphy_new_nm(NULL, &mac80211_config_ops, priv_size,
+			     requested_name);
 
 	if (!wiphy)
 		return NULL;

@@ -6779,13 +6779,12 @@ struct brcmf_cfg80211_info *brcmf_cfg80211_attach(struct brcmf_pub *drvr,
 	if (brcmf_feat_is_enabled(ifp, BRCMF_FEAT_WOWL_GTK))
 		ops->set_rekey_data = brcmf_cfg80211_set_rekey_data;
 #endif
-	wiphy = wiphy_new(ops, sizeof(struct brcmf_cfg80211_info));
+	wiphy = wiphy_new(busdev, ops, sizeof(struct brcmf_cfg80211_info));
 	if (!wiphy) {
 		brcmf_err("Could not allocate wiphy device\n");
 		return NULL;
 	}
 	memcpy(wiphy->perm_addr, drvr->mac, ETH_ALEN);
-	set_wiphy_dev(wiphy, busdev);
 
 	cfg = wiphy_priv(wiphy);
 	cfg->wiphy = wiphy;

@@ -2243,7 +2243,7 @@ static const struct cfg80211_ops wilc_cfg80211_ops = {
 
 };
 
-static struct wireless_dev *WILC_WFI_CfgAlloc(void)
+static struct wireless_dev *WILC_WFI_CfgAlloc(struct device *dev)
 {
 	struct wireless_dev *wdev;
 
@@ -2251,7 +2251,8 @@ static struct wireless_dev *WILC_WFI_CfgAlloc(void)
 	if (!wdev)
 		goto _fail_;
 
-	wdev->wiphy = wiphy_new(&wilc_cfg80211_ops, sizeof(struct wilc_priv));
+	wdev->wiphy = wiphy_new(dev, &wilc_cfg80211_ops,
+				sizeof(struct wilc_priv));
 	if (!wdev->wiphy)
 		goto _fail_mem_;
 
@@ -2277,7 +2278,7 @@ struct wireless_dev *wilc_create_wiphy(struct net_device *net, struct device *de
 	struct wireless_dev *wdev;
 	s32 s32Error = 0;
 
-	wdev = WILC_WFI_CfgAlloc();
+	wdev = WILC_WFI_CfgAlloc(dev);
 	if (!wdev) {
 		netdev_err(net, "wiphy new allocate failed\n");
 		return NULL;
@@ -2301,8 +2302,6 @@ struct wireless_dev *wilc_create_wiphy(struct net_device *net, struct device *de
 		BIT(NL80211_IFTYPE_P2P_CLIENT);
 	wdev->wiphy->flags |= WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL;
 	wdev->iftype = NL80211_IFTYPE_STATION;
-
-	set_wiphy_dev(wdev->wiphy, dev);
 
 	s32Error = wiphy_register(wdev->wiphy);
 	if (s32Error)

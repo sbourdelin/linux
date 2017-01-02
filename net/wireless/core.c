@@ -359,8 +359,8 @@ static void cfg80211_sched_scan_stop_wk(struct work_struct *work)
 
 /* exported functions */
 
-struct wiphy *wiphy_new_nm(const struct cfg80211_ops *ops, int sizeof_priv,
-			   const char *requested_name)
+struct wiphy *wiphy_new_nm(struct device *dev, const struct cfg80211_ops *ops,
+			   int sizeof_priv, const char *requested_name)
 {
 	static atomic_t wiphy_counter = ATOMIC_INIT(0);
 
@@ -403,6 +403,8 @@ struct wiphy *wiphy_new_nm(const struct cfg80211_ops *ops, int sizeof_priv,
 
 	/* atomic_inc_return makes it start at 1, make it start at 0 */
 	rdev->wiphy_idx--;
+
+	set_wiphy_dev(&rdev->wiphy, dev);
 
 	/* give it a proper name */
 	if (requested_name && requested_name[0]) {

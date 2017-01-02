@@ -3408,7 +3408,8 @@ static int rndis_wlan_bind(struct usbnet *usbdev, struct usb_interface *intf)
 	 * NOTE: We only support a single virtual interface, so wiphy
 	 * and wireless_dev are somewhat synonymous for this device.
 	 */
-	wiphy = wiphy_new(&rndis_config_ops, sizeof(struct rndis_wlan_private));
+	wiphy = wiphy_new(&usbdev->udev->dev, &rndis_config_ops,
+			  sizeof(struct rndis_wlan_private));
 	if (!wiphy)
 		return -ENOMEM;
 
@@ -3485,8 +3486,6 @@ static int rndis_wlan_bind(struct usbnet *usbdev, struct usb_interface *intf)
 						sizeof(rndis_cipher_suites));
 	wiphy->cipher_suites = priv->cipher_suites;
 	wiphy->n_cipher_suites = ARRAY_SIZE(rndis_cipher_suites);
-
-	set_wiphy_dev(wiphy, &usbdev->udev->dev);
 
 	if (wiphy_register(wiphy)) {
 		retval = -ENODEV;
