@@ -139,7 +139,13 @@ static inline void __nodes_clear(nodemask_t *dstp, unsigned int nbits)
 }
 
 /* No static inline type checking - see Subtlety (1) above. */
-#define node_isset(node, nodemask) test_bit((node), (nodemask).bits)
+#define node_isset(node, nodemask) node_test_bit(node, nodemask, MAX_NUMNODES)
+static inline int node_test_bit(int node, nodemask_t nodemask, int maxnodes)
+{
+	if (node >= maxnodes)
+		return 0;
+	return test_bit((node), (nodemask).bits);
+}
 
 #define node_test_and_set(node, nodemask) \
 			__node_test_and_set((node), &(nodemask))
