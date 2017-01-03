@@ -326,7 +326,7 @@ static struct gb_power_supply_prop *get_psy_prop(struct gb_power_supply *gbpsy,
 }
 
 static int is_psy_prop_writeable(struct gb_power_supply *gbpsy,
-				     enum power_supply_property psp)
+				 enum power_supply_property psp)
 {
 	struct gb_power_supply_prop *prop;
 
