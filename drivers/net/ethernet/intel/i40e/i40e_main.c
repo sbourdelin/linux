@@ -10938,14 +10938,33 @@ static int i40e_devlink_eswitch_mode_get(struct devlink *devlink, u16 *mode)
 static int i40e_devlink_eswitch_mode_set(struct devlink *devlink, u16 mode)
 {
 	struct i40e_pf *pf = devlink_priv(devlink);
-	int err = 0;
+	struct i40e_vf *vf;
+	int i, j, err = 0;
 
 	if (mode == pf->eswitch_mode)
 		goto done;
 
 	switch (mode) {
 	case DEVLINK_ESWITCH_MODE_LEGACY:
+		for (i = 0; i < pf->num_alloc_vfs; i++) {
+			vf = &(pf->vf[i]);
+			i40e_free_vfpr_netdev(vf);
+		}
 		pf->eswitch_mode = mode;
+		break;
+	case DEVLINK_ESWITCH_MODE_SWITCHDEV:
+		for (i = 0; i < pf->num_alloc_vfs; i++) {
+			vf = &(pf->vf[i]);
+			err = i40e_alloc_vfpr_netdev(vf, i);
+			if (err) {
+				for (j = 0; j < i; j++) {
+					vf = &(pf->vf[j]);
+					i40e_free_vfpr_netdev(vf);
+				}
+				goto done;
+			}
+		}
+                pf->eswitch_mode = mode;
 		break;
 	default:
 		err = -EOPNOTSUPP;

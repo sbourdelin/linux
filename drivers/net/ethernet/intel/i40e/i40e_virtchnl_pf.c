@@ -697,12 +697,16 @@ static int i40e_alloc_vsi_res(struct i40e_vf *vf, enum i40e_vsi_type type)
 					 "Could not add MAC filter %pM for VF %d\n",
 					vf->default_lan_addr.addr, vf->vf_id);
 		}
-		eth_broadcast_addr(broadcast);
-		f = i40e_add_filter(vsi, broadcast,
-				    vf->port_vlan_id ? vf->port_vlan_id : -1);
-		if (!f)
-			dev_info(&pf->pdev->dev,
-				 "Could not allocate VF broadcast filter\n");
+
+		/* Add VF broadcast filter only in 'legacy' mode */
+		if (vsi->back->eswitch_mode == DEVLINK_ESWITCH_MODE_LEGACY) {
+			eth_broadcast_addr(broadcast);
+			f = i40e_add_filter(vsi, broadcast,
+					    vf->port_vlan_id ? vf->port_vlan_id : -1);
+			if (!f)
+				dev_info(&pf->pdev->dev,
+					 "Could not allocate VF broadcast filter\n");
+		}
 		spin_unlock_bh(&vsi->mac_filter_hash_lock);
 		i40e_write_rx_ctl(&pf->hw, I40E_VFQF_HENA1(0, vf->vf_id),
 				  (u32)hena);
@@ -1020,6 +1024,136 @@ complete_reset:
 }
 
 /**
+ * i40e_vfpr_netdev_open
+ * @dev: network interface device structure
+ *
+ * Called when vfpr netdevice is brought up.
+ **/
+static int i40e_vfpr_netdev_open(struct net_device *dev)
+{
+	return 0;
+}
+
+/**
+ * i40e_vfpr_netdev_stop
+ * @dev: network interface device structure
+ *
+ * Called when vfpr netdevice is brought down.
+ **/
+static int i40e_vfpr_netdev_stop(struct net_device *dev)
+{
+	return 0;
+}
+
+static const struct net_device_ops i40e_vfpr_netdev_ops = {
+	.ndo_open       	= i40e_vfpr_netdev_open,
+	.ndo_stop       	= i40e_vfpr_netdev_stop,
+};
+
+/**
+ * i40e_update_vf_broadcast_filter
+ * @vf: pointer to the VF structure
+ * @enable: boolean flag indicating add/delete
+ *
+ * add/delete VFs broadcast filter
+ **/
+void i40e_update_vf_broadcast_filter(struct i40e_vf *vf, bool enable)
+{
+	struct i40e_pf *pf = vf->pf;
+	struct i40e_vsi *vsi = pf->vsi[vf->lan_vsi_idx];
+	u8 broadcast[ETH_ALEN];
+	int err;
+
+	spin_lock_bh(&vsi->mac_filter_hash_lock);
+	eth_broadcast_addr(broadcast);
+	if (enable)
+		i40e_add_filter(vsi, broadcast, vf->port_vlan_id ? vf->port_vlan_id : -1);
+	else
+		i40e_del_filter(vsi, broadcast, vf->port_vlan_id ? vf->port_vlan_id : -1);
+	spin_unlock_bh(&vsi->mac_filter_hash_lock);
+
+	/* update broadcast filter */
+	err = i40e_sync_vsi_filters(vsi);
+	if (err)
+		dev_err(&pf->pdev->dev, "Unable to program bcast filter\n");
+}
+
+/**
+ * i40e_alloc_vfpr_netdev
+ * @vf: pointer to the VF structure
+ * @vf_num: VF number
+ *
+ * Create VF Port representor netdev
+ **/
+int i40e_alloc_vfpr_netdev(struct i40e_vf *vf, u16 vf_num)
+{
+	struct net_device *vfpr_netdev;
+	char netdev_name[IFNAMSIZ];
+	struct i40e_vfpr_netdev_priv *priv;
+	struct i40e_pf *pf = vf->pf;
+	struct i40e_vsi *vsi = pf->vsi[pf->lan_vsi];
+	int err;
+
+	snprintf(netdev_name, IFNAMSIZ, "%s-vf%d", vsi->netdev->name, vf_num);
+	vfpr_netdev = alloc_netdev(sizeof(struct i40e_vfpr_netdev_priv),
+				   netdev_name, NET_NAME_UNKNOWN, ether_setup);
+	if (!vfpr_netdev) {
+		dev_err(&pf->pdev->dev, "alloc_netdev failed for vf:%d\n",
+			vf_num);
+		return -ENOMEM;
+	}
+
+	pf->vf[vf_num].vfpr_netdev = vfpr_netdev;
+
+	priv = netdev_priv(vfpr_netdev);
+	priv->vf = &(pf->vf[vf_num]);
+
+	vfpr_netdev->netdev_ops = &i40e_vfpr_netdev_ops;
+
+	netif_carrier_off(vfpr_netdev);
+	netif_tx_disable(vfpr_netdev);
+
+	err = register_netdev(vfpr_netdev);
+	if (err) {
+		dev_err(&pf->pdev->dev, "register_netdev failed for vf: %s\n",
+			vf->vfpr_netdev->name);
+		free_netdev(vfpr_netdev);
+		return err;
+	}
+
+	dev_info(&pf->pdev->dev, "VF Port representor(%s) created for VF %d\n",
+		 vf->vfpr_netdev->name, vf_num);
+
+	/* Delete broadcast filter for VF */
+	i40e_update_vf_broadcast_filter(vf, false);
+
+	return 0;
+}
+
+/**
+ * i40e_free_vfpr_netdev
+ * @vf: pointer to the VF structure
+ *
+ * Free VF Port representor netdev
+ **/
+void i40e_free_vfpr_netdev(struct i40e_vf *vf)
+{
+	struct i40e_pf *pf = vf->pf;
+
+	if (!vf->vfpr_netdev)
+		return;
+
+	dev_info(&pf->pdev->dev, "Freeing VF Port representor(%s)\n",
+		 vf->vfpr_netdev->name);
+
+	unregister_netdev(vf->vfpr_netdev);
+	free_netdev(vf->vfpr_netdev);
+
+	/* Add broadcast filter to VF */
+	i40e_update_vf_broadcast_filter(vf, true);
+}
+
+/**
  * i40e_free_vfs
  * @pf: pointer to the PF structure
  *
@@ -1060,6 +1194,9 @@ void i40e_free_vfs(struct i40e_pf *pf)
 			i40e_free_vf_res(&pf->vf[i]);
 		/* disable qp mappings */
 		i40e_disable_vf_mappings(&pf->vf[i]);
+
+		if (pf->eswitch_mode == DEVLINK_ESWITCH_MODE_SWITCHDEV)
+			i40e_free_vfpr_netdev(&pf->vf[i]);
 	}
 
 	kfree(pf->vf);
@@ -1127,6 +1264,11 @@ int i40e_alloc_vfs(struct i40e_pf *pf, u16 num_alloc_vfs)
 		/* VF resources get allocated during reset */
 		i40e_reset_vf(&vfs[i], false);
 
+		if (pf->eswitch_mode == DEVLINK_ESWITCH_MODE_SWITCHDEV) {
+			ret = i40e_alloc_vfpr_netdev(&vfs[i], i);
+			if (ret)
+				goto err_alloc;
+		}
 	}
 	pf->num_alloc_vfs = num_alloc_vfs;
 
