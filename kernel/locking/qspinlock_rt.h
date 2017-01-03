@@ -43,12 +43,31 @@
  * it will have to break out of the MCS wait queue just like what is done
  * in the OSQ lock. Then it has to retry RT spinning if it has been boosted
  * to RT priority.
+ *
+ * Another RT requirement is that the CPU need to be preemptible even when
+ * waiting for a spinlock. If the task has already acquired the lock, we
+ * will let it run to completion to release the lock and reenable preemption.
+ * For non-nested spinlock, a spinlock waiter will periodically check
+ * need_resched flag to see if it should break out of the waiting loop and
+ * yield the CPU as long as the preemption count indicates just one
+ * preempt_disabled(). For nested spinlock with outer lock acquired, it will
+ * boost its priority to the highest RT priority level to try to acquire the
+ * inner lock, finish up its work, release the locks and reenable preemption.
  */
 #include <linux/sched.h>
 
 #ifndef MAX
 #define MAX(a, b)	(((a) >= (b)) ? (a) : (b))
 #endif
+
+/*
+ * Rescheduling is only needed when it is in the task context, the
+ * PREEMPT_NEED_RESCHED flag is set and the preemption count is one.
+ * If only the TIF_NEED_RESCHED flag is set, it will be moved to RT
+ * spinning with a minimum priority of 1.
+ */
+#define rt_should_resched()	(preempt_count() == \
+				(PREEMPT_OFFSET | PREEMPT_NEED_RESCHED))
 
 /*
  * For proper unqueuing from the MCS wait queue, we need to store the encoded
@@ -133,8 +152,11 @@ static bool __rt_spin_trylock(struct qspinlock *lock,
 	if (!task)
 		min_prio = in_nmi() ? MAX_RT_PRIO + 1
 			 : in_irq() ? MAX_RT_PRIO : 1;
+	else if (need_resched() && !min_prio)
+		min_prio = 1;
 	if (!(prio = rt_task_priority(task, min_prio)))
 		return false;
+
 
 	/*
 	 * Spin on the lock and try to set its priority into the pending byte.
@@ -189,6 +211,33 @@ next:
 		prio = MAX(ol ? ol->pending : 0,
 			   rt_task_priority(task, min_prio));
 
+		/*
+		 * If another task needs this CPU, we will yield it if in
+		 * the process context and it is not a nested spinlock call.
+		 * Otherwise, we will raise our RT priority to try to get
+		 * the lock ASAP.
+		 */
+		if (!task || !rt_should_resched())
+			continue;
+
+		if (outerlock) {
+			if (min_prio < MAX_RT_PRIO)
+				min_prio = MAX_RT_PRIO;
+			continue;
+		}
+
+		/*
+		 * In the unlikely event that we need to relinquish the CPU,
+		 * we need to make sure that we are not the highest priority
+		 * task waiting for the lock.
+		 */
+		if (mypdprio) {
+			lockpend = READ_ONCE(l->locked_pending);
+			pdprio = (u8)(lockpend >> _Q_PENDING_OFFSET);
+			if (pdprio == mypdprio)
+				cmpxchg_relaxed(&l->pending, pdprio, 0);
+		}
+		schedule_preempt_disabled();
 	}
 	return true;
 }
@@ -293,7 +342,7 @@ static bool rt_wait_node_or_unqueue(struct qspinlock *lock,
 	rt_write_prev(node, prev);	/* Save previous node pointer */
 
 	while (!READ_ONCE(node->locked)) {
-		if (rt_task_priority(current, 0))
+		if (rt_task_priority(current, 0) || need_resched())
 			goto unqueue;
 		cpu_relax();
 	}
@@ -354,6 +403,12 @@ unqueue:
 	 */
 	__this_cpu_dec(mcs_nodes[0].count);
 
+	/*
+	 * Yield the CPU if needed by another task with the right condition.
+	 */
+	if (rt_should_resched())
+		schedule_preempt_disabled();
+
 	return true;	/* Need to retry RT spinning */
 }
 
@@ -385,9 +440,10 @@ static u32 rt_spin_lock_or_retry(struct qspinlock *lock,
 		}
 		/*
 		 * We need to break out of the non-RT wait queue and do
-		 * RT spinnning if we become an RT task.
+		 * RT spinnning if we become an RT task or another task needs
+		 * the CPU.
 		 */
-		if (rt_task_priority(current, 0)) {
+		if (rt_task_priority(current, 0) || need_resched()) {
 			retry = true;
 			goto unlock;
 		}
@@ -426,6 +482,12 @@ release:
 	 * Release the node.
 	 */
 	__this_cpu_dec(mcs_nodes[0].count);
+
+	/*
+	 * Yield the CPU if needed by another task with the right condition.
+	 */
+	if (retry && rt_should_resched())
+		schedule_preempt_disabled();
 
 	return retry ? RT_RETRY : 1;
 }
