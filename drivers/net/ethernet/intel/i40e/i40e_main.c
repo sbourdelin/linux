@@ -9545,6 +9545,9 @@ static int i40e_xdp_setup(struct i40e_vsi *vsi,
 	bool need_reset;
 	struct bpf_prog *old_prog;
 
+	if (prog && prog->xdp_adjust_head)
+		return -EOPNOTSUPP;
+
 	/* The Rx frame has to fit in 2k */
 	if (frame_size > I40E_RXBUFFER_2048)
 		return -EINVAL;
