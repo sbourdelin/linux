@@ -31,6 +31,7 @@
 #include <drm/drm_mode.h>
 #include <drm/drm_plane_helper.h>
 #include <drm/drm_print.h>
+#include <drm/drm_dp_mst_helper.h>
 #include <linux/sync_file.h>
 
 #include "drm_crtc_internal.h"
@@ -62,6 +63,7 @@ void drm_atomic_state_default_release(struct drm_atomic_state *state)
 	kfree(state->connectors);
 	kfree(state->crtcs);
 	kfree(state->planes);
+	kfree(state->dp_mst_topologies);
 }
 EXPORT_SYMBOL(drm_atomic_state_default_release);
 
@@ -189,6 +191,18 @@ void drm_atomic_state_default_clear(struct drm_atomic_state *state)
 		state->planes[i].ptr = NULL;
 		state->planes[i].state = NULL;
 	}
+
+	for (i = 0; i < state->num_mst_topologies; i++) {
+		struct drm_dp_mst_topology_mgr *mgr = state->dp_mst_topologies[i].ptr;
+
+		if (!mgr)
+			continue;
+
+		kfree(state->dp_mst_topologies[i].state);
+		state->dp_mst_topologies[i].ptr = NULL;
+		state->dp_mst_topologies[i].state = NULL;
+	}
+
 }
 EXPORT_SYMBOL(drm_atomic_state_default_clear);
 
@@ -980,6 +994,58 @@ static void drm_atomic_plane_print_state(struct drm_printer *p,
 	if (plane->funcs->atomic_print_state)
 		plane->funcs->atomic_print_state(p, state);
 }
+
+struct drm_dp_mst_topology_state *drm_atomic_get_mst_topology_state(struct drm_atomic_state *state,
+		struct drm_dp_mst_topology_mgr *mgr)
+{
+
+	int ret, i;
+	size_t new_size;
+	struct __drm_dp_mst_topology_state *new_arr;
+	struct drm_dp_mst_topology_state *new_mst_state;
+	int num_topologies;
+	struct drm_mode_config *config = &mgr->dev->mode_config;
+
+	WARN_ON(!state->acquire_ctx);
+
+	ret = drm_modeset_lock(&config->connection_mutex, state->acquire_ctx);
+	if (ret)
+		return ERR_PTR(ret);
+
+	for (i = 0; i < state->num_mst_topologies; i++) {
+		if (mgr == state->dp_mst_topologies[i].ptr &&
+		    state->dp_mst_topologies[i].state) {
+			return state->dp_mst_topologies[i].state;
+		}
+	}
+
+	num_topologies = state->num_mst_topologies + 1;
+	new_size = sizeof(*state->dp_mst_topologies) * num_topologies;
+	new_arr = krealloc(state->dp_mst_topologies, new_size, GFP_KERNEL);
+	if (!new_arr)
+		return ERR_PTR(-ENOMEM);
+
+	state->dp_mst_topologies = new_arr;
+	memset(&state->dp_mst_topologies[state->num_mst_topologies], 0,
+		sizeof(*state->dp_mst_topologies));
+
+	new_mst_state = kmalloc(sizeof(*mgr->state), GFP_KERNEL);
+	if (!new_mst_state)
+		return ERR_PTR(-ENOMEM);
+
+	new_mst_state->avail_slots = mgr->state->avail_slots;
+	state->dp_mst_topologies[state->num_mst_topologies].state = new_mst_state;
+	state->dp_mst_topologies[state->num_mst_topologies].ptr = mgr;
+	state->num_mst_topologies = num_topologies;
+	new_mst_state->mgr = mgr;
+	mgr->state->state = state;
+
+	DRM_DEBUG_ATOMIC("Added [MST Topology w/ base connector:%d] %p state to %p\n",
+			 mgr->conn_base_id, new_mst_state, state);
+
+	return new_mst_state;
+}
+EXPORT_SYMBOL(drm_atomic_get_mst_topology_state);
 
 /**
  * drm_atomic_get_connector_state - get connector state

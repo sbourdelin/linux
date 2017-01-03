@@ -152,6 +152,11 @@ struct __drm_connnectors_state {
 	struct drm_connector_state *state;
 };
 
+struct __drm_dp_mst_topology_state {
+	struct drm_dp_mst_topology_mgr *ptr;
+	struct drm_dp_mst_topology_state *state;
+};
+
 /**
  * struct drm_atomic_state - the global state object for atomic updates
  * @ref: count of all references to this state (will not be freed until zero)
@@ -163,6 +168,8 @@ struct __drm_connnectors_state {
  * @crtcs: pointer to array of CRTC pointers
  * @num_connector: size of the @connectors and @connector_states arrays
  * @connectors: pointer to array of structures with per-connector data
+ * @num_mst_topologies: size of the @dp_mst_topologies array
+ * @dp_mst_topologies: pointer to array of structures with per-MST topology manager data
  * @acquire_ctx: acquire context for this atomic modeset state update
  */
 struct drm_atomic_state {
@@ -176,6 +183,8 @@ struct drm_atomic_state {
 	struct __drm_crtcs_state *crtcs;
 	int num_connector;
 	struct __drm_connnectors_state *connectors;
+	int num_mst_topologies;
+	struct __drm_dp_mst_topology_state *dp_mst_topologies;
 
 	struct drm_modeset_acquire_ctx *acquire_ctx;
 
@@ -248,6 +257,10 @@ drm_atomic_get_connector_state(struct drm_atomic_state *state,
 int drm_atomic_connector_set_property(struct drm_connector *connector,
 		struct drm_connector_state *state, struct drm_property *property,
 		uint64_t val);
+
+struct drm_dp_mst_topology_state * __must_check
+drm_atomic_get_mst_topology_state(struct drm_atomic_state *state,
+				  struct drm_dp_mst_topology_mgr *mgr);
 
 /**
  * drm_atomic_get_existing_crtc_state - get crtc state, if it exists
