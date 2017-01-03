@@ -3357,6 +3357,8 @@ int dw_mci_runtime_resume(struct device *dev)
 		if (slot->mmc->pm_flags & MMC_PM_KEEP_POWER) {
 			dw_mci_set_ios(slot->mmc, &slot->mmc->ios);
 			dw_mci_setup_bus(slot, true);
+		} else {
+			mci_send_cmd(slot, SDMMC_CMD_UPD_CLK, 0);
 		}
 	}
 
