@@ -6817,6 +6817,11 @@ struct brcmf_cfg80211_info *brcmf_cfg80211_attach(struct brcmf_pub *drvr,
 		brcmf_err("Failed to get D11 version (%d)\n", err);
 		goto priv_out;
 	}
+	if (io_type > BRCMU_D11AC_IOTYPE) {
+		brcmf_err("Unsupported IO version %d\n", io_type);
+		goto priv_out;
+	}
+
 	cfg->d11inf.io_type = (u8)io_type;
 	brcmu_d11_attach(&cfg->d11inf);
 
