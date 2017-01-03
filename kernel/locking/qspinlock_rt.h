@@ -19,6 +19,13 @@
  *
  * As RT qspinlock needs the whole pending byte, it cannot be used on kernel
  * configured to support 16K or more CPUs (CONFIG_NR_CPUS).
+ *
+ * In interrupt context, the priority of the interrupted task is not
+ * meaningful. So a fixed static RT priority is used and they won't go into
+ * the MCS wait queue.
+ *  1) Soft IRQ = 1
+ *  2) Hard IRQ = MAX_RT_PRIO
+ *  3) NMI	= MAX_RT_PRIO+1
  */
 #include <linux/sched.h>
 
@@ -60,11 +67,15 @@ static inline int rt_pending(int val)
 static bool rt_spin_trylock(struct qspinlock *lock)
 {
 	struct __qspinlock *l = (void *)lock;
-	u8 prio = rt_task_priority(current);
+	struct task_struct *task = in_interrupt() ? NULL : current;
+	u8 prio;
 
 	BUILD_BUG_ON(_Q_PENDING_BITS != 8);
 
-	if (!prio)
+	if (!task)
+		prio = in_nmi() ? MAX_RT_PRIO + 1
+		     : in_irq() ? MAX_RT_PRIO : 1;
+	else if (!(prio = rt_task_priority(task)))
 		return false;
 
 	/*
