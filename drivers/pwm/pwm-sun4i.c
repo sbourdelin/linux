@@ -10,6 +10,7 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/io.h>
+#include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -103,7 +104,7 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	u32 prd, dty, val, clk_gate;
 	u64 clk_rate, div = 0;
 	unsigned int prescaler = 0;
-	int err;
+	int err = 0;
 
 	clk_rate = clk_get_rate(sun4i_pwm->clk);
 
@@ -154,17 +155,21 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	spin_lock(&sun4i_pwm->ctrl_lock);
 	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
 
+	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+
 	if (sun4i_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm))) {
-		spin_unlock(&sun4i_pwm->ctrl_lock);
-		clk_disable_unprepare(sun4i_pwm->clk);
-		return -EBUSY;
+		val |= BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+		sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
+
+		err = readl_poll_timeout(sun4i_pwm->base + PWM_CTRL_REG, val,
+					 !(val & PWM_RDY(pwm->hwpwm)), 400,
+					 500000);
+		if (err)
+			goto finish;
 	}
 
-	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-	if (clk_gate) {
-		val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-		sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
-	}
+	val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
 
 	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
 	val &= ~BIT_CH(PWM_PRESCAL_MASK, pwm->hwpwm);
@@ -174,6 +179,7 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	val = (dty & PWM_DTY_MASK) | PWM_PRD(prd);
 	sun4i_pwm_writel(sun4i_pwm, val, PWM_CH_PRD(pwm->hwpwm));
 
+finish:
 	if (clk_gate) {
 		val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
 		val |= clk_gate;
@@ -183,7 +189,7 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	spin_unlock(&sun4i_pwm->ctrl_lock);
 	clk_disable_unprepare(sun4i_pwm->clk);
 
-	return 0;
+	return err;
 }
 
 static int sun4i_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
