@@ -144,7 +144,7 @@ static int mall_set_parms(struct net *net, struct tcf_proto *tp,
 	tcf_exts_init(&e, TCA_MATCHALL_ACT, 0);
 	err = tcf_exts_validate(net, tp, tb, est, &e, ovr);
 	if (err < 0)
-		return err;
+		goto errout;
 
 	if (tb[TCA_MATCHALL_CLASSID]) {
 		f->res.classid = nla_get_u32(tb[TCA_MATCHALL_CLASSID]);
@@ -154,6 +154,9 @@ static int mall_set_parms(struct net *net, struct tcf_proto *tp,
 	tcf_exts_change(tp, &f->exts, &e);
 
 	return 0;
+errout:
+	tcf_exts_destroy(&e);
+	return err;
 }
 
 static int mall_change(struct net *net, struct sk_buff *in_skb,
@@ -220,6 +223,7 @@ static int mall_change(struct net *net, struct sk_buff *in_skb,
 	return 0;
 
 errout:
+	tcf_exts_destroy(&f->exts);
 	kfree(f);
 	return err;
 }
