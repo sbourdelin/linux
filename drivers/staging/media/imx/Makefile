@@ -10,3 +10,4 @@ obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-csi.o
 obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-smfc.o
 obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-camif.o
 obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-mipi-csi2.o
+obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-video-switch.o
