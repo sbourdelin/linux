@@ -72,10 +72,20 @@ enum i40e_vf_capabilities {
 	I40E_VIRTCHNL_VF_CAP_IWARP,
 };
 
+struct vfpr_pcpu_stats {
+	u64			tx_packets;
+	u64			tx_bytes;
+	u64			tx_drops;
+	u64			rx_packets;
+	u64 			rx_bytes;
+	struct u64_stats_sync	syncp;
+};
+
 /* VF Port representator netdev private structure */
 struct i40e_vfpr_netdev_priv {
 	struct metadata_dst *vfpr_dst;
 	struct i40e_vf *vf;
+	struct vfpr_pcpu_stats *vfpr_stats;
 };
 
 /* VF information structure */

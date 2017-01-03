@@ -1172,6 +1172,32 @@ static bool i40e_alloc_mapped_page(struct i40e_ring *rx_ring,
 }
 
 /**
+ * i40e_vfpr_receive_skb
+ * @vf: pointer to VF
+ * @skb: packet to send up
+ *
+ * Update skb dev to vfpr netdev and rx stats.
+ **/
+static void i40e_vfpr_receive_skb(struct i40e_vf *vf, struct sk_buff *skb)
+{
+	struct i40e_vfpr_netdev_priv *priv;
+	struct vfpr_pcpu_stats *vfpr_stats;
+
+	if (!vf->vfpr_netdev)
+		return;
+
+	skb->dev = vf->vfpr_netdev;
+
+	priv = netdev_priv(vf->vfpr_netdev);
+	vfpr_stats = this_cpu_ptr(priv->vfpr_stats);
+
+	u64_stats_update_begin(&vfpr_stats->syncp);
+	vfpr_stats->rx_packets++;
+	vfpr_stats->rx_bytes += skb->len;
+	u64_stats_update_end(&vfpr_stats->syncp);
+}
+
+/**
  * i40e_receive_skb - Send a completed packet up the stack
  * @rx_ring:  rx ring in play
  * @skb: packet to send up
@@ -1201,7 +1227,7 @@ static void i40e_receive_skb(struct i40e_ring *rx_ring,
 	for (vf_id = 0; vf_id < pf->num_alloc_vfs; vf_id++) {
 		vf = &pf->vf[vf_id];
 		if (ether_addr_equal(eth->h_source, vf->default_lan_addr.addr)) {
-			skb->dev = vf->vfpr_netdev;
+			i40e_vfpr_receive_skb(vf, skb);
 			break;
 		}
 	}
@@ -3072,11 +3098,25 @@ netdev_tx_t i40e_vfpr_netdev_start_xmit(struct sk_buff *skb,
 	struct i40e_vf *vf = priv->vf;
 	struct i40e_pf *pf = vf->pf;
 	struct i40e_vsi *vsi = pf->vsi[pf->lan_vsi];
+	int ret;
 
 	skb_dst_drop(skb);
 	dst_hold(&priv->vfpr_dst->dst);
 	skb_dst_set(skb, &priv->vfpr_dst->dst);
 	skb->dev = vsi->netdev;
 
-	return dev_queue_xmit(skb);
+	ret = dev_queue_xmit(skb);
+
+	if (likely(ret == NET_XMIT_SUCCESS || ret == NET_XMIT_CN)) {
+		struct vfpr_pcpu_stats *vfpr_stats = this_cpu_ptr(priv->vfpr_stats);
+
+		u64_stats_update_begin(&vfpr_stats->syncp);
+		vfpr_stats->tx_packets++;
+		vfpr_stats->tx_bytes += skb->len;
+		u64_stats_update_end(&vfpr_stats->syncp);
+	} else {
+		this_cpu_inc(priv->vfpr_stats->tx_drops);
+	}
+
+	return ret;
 }
