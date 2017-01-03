@@ -13,3 +13,4 @@ obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-mipi-csi2.o
 obj-$(CONFIG_VIDEO_IMX_CAMERA) += imx-video-switch.o
 
 obj-$(CONFIG_IMX_OV5640_MIPI) += ov5640-mipi.o
+obj-$(CONFIG_IMX_OV5642) += ov5642.o
