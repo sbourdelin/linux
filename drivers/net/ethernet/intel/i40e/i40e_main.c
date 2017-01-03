@@ -5663,6 +5663,25 @@ static void i40e_fdir_filter_exit(struct i40e_pf *pf)
 }
 
 /**
+ * i40e_cloud_filter_exit - Cleans up Cloud Filters
+ * @pf: Pointer to PF
+ *
+ * This function destroys the hlist which keeps all the Cloud Filters.
+ **/
+static void i40e_cloud_filter_exit(struct i40e_pf *pf)
+{
+	struct i40e_cloud_filter *cfilter;
+	struct hlist_node *node;
+
+	hlist_for_each_entry_safe(cfilter, node,
+				  &pf->cloud_filter_list, cloud_node) {
+		hlist_del(&cfilter->cloud_node);
+		kfree(cfilter);
+	}
+	pf->num_cloud_filters = 0;
+}
+
+/**
  * i40e_close - Disables a network interface
  * @netdev: network interface device structure
  *
@@ -6856,6 +6875,7 @@ static void i40e_fdir_teardown(struct i40e_pf *pf)
 	struct i40e_vsi *vsi;
 
 	i40e_fdir_filter_exit(pf);
+	i40e_cloud_filter_exit(pf);
 	vsi = i40e_find_vsi_by_type(pf, I40E_VSI_FDIR);
 	if (vsi)
 		i40e_vsi_release(vsi);
@@ -8800,6 +8820,7 @@ bool i40e_set_ntuple(struct i40e_pf *pf, netdev_features_t features)
 		if (pf->flags & I40E_FLAG_FD_SB_ENABLED) {
 			need_reset = true;
 			i40e_fdir_filter_exit(pf);
+			i40e_cloud_filter_exit(pf);
 		}
 		pf->flags &= ~I40E_FLAG_FD_SB_ENABLED;
 		pf->auto_disable_flags &= ~I40E_FLAG_FD_SB_ENABLED;
