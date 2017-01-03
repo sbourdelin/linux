@@ -54,6 +54,8 @@
 #include <linux/clocksource.h>
 #include <linux/net_tstamp.h>
 #include <linux/ptp_clock_kernel.h>
+#include <net/devlink.h>
+
 #include "i40e_type.h"
 #include "i40e_prototype.h"
 #ifdef I40E_FCOE
@@ -448,6 +450,7 @@ struct i40e_pf {
 	u32 ioremap_len;
 	u32 fd_inv;
 	u16 phy_led_val;
+	enum devlink_eswitch_mode eswitch_mode;
 };
 
 /**
