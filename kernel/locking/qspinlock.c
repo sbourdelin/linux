@@ -270,10 +270,18 @@ static __always_inline u32  __pv_wait_head_or_lock(struct qspinlock *lock,
 /*
  * Realtime queued spinlock is mutual exclusive with native and PV spinlocks.
  */
+#define RT_RETRY	((u32)-1)
+
 #ifdef CONFIG_REALTIME_QUEUED_SPINLOCKS
 #include "qspinlock_rt.h"
 #else
-static __always_inline u32 rt_wait_head_or_retry(struct qspinlock *lock)
+static __always_inline void rt_init_node(struct mcs_spinlock *node, u32 tail) {}
+static __always_inline bool rt_wait_node_or_unqueue(struct qspinlock *lock,
+						    struct mcs_spinlock *node,
+						    struct mcs_spinlock *prev)
+						{ return false; }
+static __always_inline u32  rt_spin_lock_or_retry(struct qspinlock *lock,
+						  struct mcs_spinlock *node)
 						{ return 0; }
 #define rt_pending(v)		0
 #define rt_enabled()		false
@@ -514,6 +522,7 @@ queue:
 	node->locked = 0;
 	node->next = NULL;
 	pv_init_node(node);
+	rt_init_node(node, tail);
 
 	/*
 	 * We touched a (possibly) cold cacheline in the per-cpu queue node;
@@ -552,6 +561,10 @@ queue:
 		WRITE_ONCE(prev->next, node);
 
 		pv_wait_node(node, prev);
+
+		if (rt_wait_node_or_unqueue(lock, node, prev))
+			goto queue;	/* Retry RT locking */
+
 		arch_mcs_spin_lock_contended(&node->locked);
 
 		/*
@@ -591,10 +604,14 @@ queue:
 
 	/*
 	 * The RT rt_wait_head_or_lock function, if active, will acquire the
-	 * lock and return a non-zero value.
+	 * lock, release the MCS lock and return a non-zero value. We need to
+	 * retry with RT spinning when RT_RETRY is returned.
 	 */
-	if ((val = rt_wait_head_or_retry(lock)))
-		goto locked;
+	val = rt_spin_lock_or_retry(lock, node);
+	if (val == RT_RETRY)
+		goto queue;
+	else if (val)
+		return;
 
 	val = smp_cond_load_acquire(&lock->val.counter, !(VAL & _Q_LOCKED_PENDING_MASK));
 
