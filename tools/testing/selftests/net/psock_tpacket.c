@@ -235,6 +235,7 @@ static void walk_v1_v2_rx(int sock, struct ring *ring)
 	int udp_sock[2];
 	union frame_map ppd;
 	unsigned int frame_num = 0;
+	int ifindex = ring->ll.sll_ifindex;
 
 	bug_on(ring->type != PACKET_RX_RING);
 
@@ -255,12 +256,18 @@ static void walk_v1_v2_rx(int sock, struct ring *ring)
 
 			switch (ring->version) {
 			case TPACKET_V1:
+				if (ppd.v1->s_ll.sll_ifindex != ifindex)
+					goto skip;
+
 				test_payload((uint8_t *) ppd.raw + ppd.v1->tp_h.tp_mac,
 					     ppd.v1->tp_h.tp_snaplen);
 				total_bytes += ppd.v1->tp_h.tp_snaplen;
 				break;
 
 			case TPACKET_V2:
+				if (ppd.v2->s_ll.sll_ifindex != ifindex)
+					goto skip;
+
 				test_payload((uint8_t *) ppd.raw + ppd.v2->tp_h.tp_mac,
 					     ppd.v2->tp_h.tp_snaplen);
 				total_bytes += ppd.v2->tp_h.tp_snaplen;
@@ -270,6 +277,7 @@ static void walk_v1_v2_rx(int sock, struct ring *ring)
 			status_bar_update();
 			total_packets++;
 
+skip:
 			__v1_v2_rx_user_ready(ppd.raw, ring->version);
 
 			frame_num = (frame_num + 1) % ring->rd_num;
@@ -553,11 +561,13 @@ static void __v3_test_block_header(struct block_desc *pbd, const int block_num)
 	__v3_test_block_seq_num(pbd);
 }
 
-static void __v3_walk_block(struct block_desc *pbd, const int block_num)
+static void __v3_walk_block(struct block_desc *pbd, const int block_num,
+			    int ifindex)
 {
 	int num_pkts = pbd->h1.num_pkts, i;
 	unsigned long bytes = 0, bytes_with_padding = ALIGN_8(sizeof(*pbd));
 	struct tpacket3_hdr *ppd;
+	struct sockaddr_ll *s_ll;
 
 	__v3_test_block_header(pbd, block_num);
 
@@ -572,10 +582,15 @@ static void __v3_walk_block(struct block_desc *pbd, const int block_num)
 		else
 			bytes_with_padding += ALIGN_8(ppd->tp_snaplen + ppd->tp_mac);
 
-		test_payload((uint8_t *) ppd + ppd->tp_mac, ppd->tp_snaplen);
+		s_ll = (struct sockaddr_ll *)&ppd[1];
 
-		status_bar_update();
-		total_packets++;
+		if (ifindex == s_ll->sll_ifindex) {
+			test_payload((uint8_t *) ppd + ppd->tp_mac,
+				     ppd->tp_snaplen);
+
+			status_bar_update();
+			total_packets++;
+		}
 
 		ppd = (struct tpacket3_hdr *) ((uint8_t *) ppd + ppd->tp_next_offset);
 		__sync_synchronize();
@@ -616,7 +631,7 @@ static void walk_v3_rx(int sock, struct ring *ring)
 		while ((pbd->h1.block_status & TP_STATUS_USER) == 0)
 			poll(&pfd, 1, 1);
 
-		__v3_walk_block(pbd, block_num);
+		__v3_walk_block(pbd, block_num, ring->ll.sll_ifindex);
 		__v3_flush_block(pbd);
 
 		block_num = (block_num + 1) % ring->rd_num;
