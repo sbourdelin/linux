@@ -44,6 +44,7 @@ static bool intel_dp_mst_compute_config(struct intel_encoder *encoder,
 	int lane_count, slots;
 	const struct drm_display_mode *adjusted_mode = &pipe_config->base.adjusted_mode;
 	int mst_pbn;
+	struct drm_dp_mst_topology_state *topology_state;
 
 	pipe_config->has_pch_encoder = false;
 	bpp = 24;
@@ -65,7 +66,18 @@ static bool intel_dp_mst_compute_config(struct intel_encoder *encoder,
 	mst_pbn = drm_dp_calc_pbn_mode(adjusted_mode->crtc_clock, bpp);
 
 	pipe_config->pbn = mst_pbn;
-	slots = drm_dp_find_vcpi_slots(&intel_dp->mst_mgr, mst_pbn);
+
+	topology_state = drm_atomic_get_mst_topology_state(state,
+							   &intel_dp->mst_mgr);
+	if (topology_state == NULL)
+		return false;
+
+	slots = drm_dp_atomic_find_vcpi_slots(topology_state, connector->port,
+					      mst_pbn);
+	if (slots < 0) {
+		DRM_DEBUG_KMS("not enough link bw for this mode\n");
+		return false;
+	}
 
 	intel_link_compute_m_n(bpp, lane_count,
 			       adjusted_mode->crtc_clock,
@@ -76,6 +88,28 @@ static bool intel_dp_mst_compute_config(struct intel_encoder *encoder,
 
 	return true;
 
+}
+
+int intel_dp_mst_reset_vcpi(struct intel_encoder *encoder,
+			     struct drm_connector_state *conn_state, int slots)
+{
+	struct intel_dp_mst_encoder *intel_mst = enc_to_mst(&encoder->base);
+	struct drm_dp_mst_topology_mgr *mgr  = &intel_mst->primary->dp.mst_mgr;
+	struct drm_dp_mst_topology_state *topology_state;
+	struct intel_connector *connector =
+		to_intel_connector(conn_state->connector);
+	int released;
+
+	topology_state = drm_atomic_get_mst_topology_state(conn_state->state, mgr);
+	if (IS_ERR(topology_state))
+		return PTR_ERR(topology_state);
+
+	released = drm_dp_atomic_release_vcpi_slots(topology_state, connector->port);
+
+	if (WARN_ON(released != slots))
+		return -EINVAL;
+
+	return 0;
 }
 
 static void intel_mst_disable_dp(struct intel_encoder *encoder,

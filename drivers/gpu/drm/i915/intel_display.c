@@ -14070,6 +14070,40 @@ static int calc_watermark_data(struct drm_atomic_state *state)
 	return 0;
 }
 
+static int intel_mst_clear_config(struct drm_atomic_state *state)
+{
+	struct drm_crtc_state *crtc_state;
+	struct drm_crtc *crtc;
+	struct drm_connector *connector;
+	struct drm_connector_state *connector_state;
+	int i, j;
+
+	for_each_crtc_in_state(state, crtc, crtc_state, i) {
+		if (!crtc_state->active_changed || crtc_state->active)
+			continue;
+
+		for_each_connector_in_state(state, connector, connector_state, j) {
+			struct intel_encoder *encoder;
+			struct drm_crtc *curr_crtc;
+			int slots;
+
+			encoder = to_intel_encoder(connector->state->best_encoder);
+			if (encoder->type != INTEL_OUTPUT_DP_MST)
+				continue;
+
+			curr_crtc = connector->state->crtc;
+			if (curr_crtc && crtc == curr_crtc) {
+				slots = to_intel_crtc_state(crtc->state)->dp_m_n.tu;
+				return intel_dp_mst_reset_vcpi(encoder,
+							       connector_state,
+							       slots);
+			}
+		}
+	}
+
+	return 0;
+}
+
 /**
  * intel_atomic_check - validate state object
  * @dev: drm device
@@ -14140,8 +14174,11 @@ static int intel_atomic_check(struct drm_device *dev,
 	}
 
 	if (any_ms) {
-		ret = intel_modeset_checks(state);
+		ret = intel_mst_clear_config(state);
+		if (ret)
+			return ret;
 
+		ret = intel_modeset_checks(state);
 		if (ret)
 			return ret;
 	} else {
