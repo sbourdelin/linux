@@ -838,7 +838,7 @@ static void add_discard_addrs(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 		return;
 
 	if (!force) {
-		if (!test_opt(sbi, DISCARD) || !se->valid_blocks ||
+		if (!test_opt(sbi, DISCARD) ||
 		    SM_I(sbi)->nr_discards >= SM_I(sbi)->max_discards)
 			return;
 	}
