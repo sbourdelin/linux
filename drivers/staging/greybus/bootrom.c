@@ -175,7 +175,7 @@ static int find_firmware(struct gb_bootrom *bootrom, u8 stage)
 		 firmware_name);
 
 	rc = request_firmware(&bootrom->fw, firmware_name,
-		&connection->bundle->dev);
+			      &connection->bundle->dev);
 	if (rc) {
 		dev_err(&connection->bundle->dev,
 			"failed to find %s firmware (%d)\n", firmware_name, rc);
@@ -272,7 +272,7 @@ static int gb_bootrom_get_firmware(struct gb_operation *op)
 
 	if (offset >= fw->size || size > fw->size - offset) {
 		dev_warn(dev, "bad firmware request (offs = %u, size = %u)\n",
-				offset, size);
+			 offset, size);
 		ret = -EINVAL;
 		goto unlock;
 	}
@@ -385,15 +385,15 @@ static int gb_bootrom_get_version(struct gb_bootrom *bootrom)
 				sizeof(response));
 	if (ret) {
 		dev_err(&bundle->dev,
-				"failed to get protocol version: %d\n",
-				ret);
+			"failed to get protocol version: %d\n",
+			ret);
 		return ret;
 	}
 
 	if (response.major > request.major) {
 		dev_err(&bundle->dev,
-				"unsupported major protocol version (%u > %u)\n",
-				response.major, request.major);
+			"unsupported major protocol version (%u > %u)\n",
+			response.major, request.major);
 		return -ENOTSUPP;
 	}
 
@@ -401,13 +401,13 @@ static int gb_bootrom_get_version(struct gb_bootrom *bootrom)
 	bootrom->protocol_minor = response.minor;
 
 	dev_dbg(&bundle->dev, "%s - %u.%u\n", __func__, response.major,
-			response.minor);
+		response.minor);
 
 	return 0;
 }
 
 static int gb_bootrom_probe(struct gb_bundle *bundle,
-					const struct greybus_bundle_id *id)
+			    const struct greybus_bundle_id *id)
 {
 	struct greybus_descriptor_cport *cport_desc;
 	struct gb_connection *connection;
@@ -426,8 +426,8 @@ static int gb_bootrom_probe(struct gb_bundle *bundle,
 		return -ENOMEM;
 
 	connection = gb_connection_create(bundle,
-						le16_to_cpu(cport_desc->id),
-						gb_bootrom_request_handler);
+					  le16_to_cpu(cport_desc->id),
+					  gb_bootrom_request_handler);
 	if (IS_ERR(connection)) {
 		ret = PTR_ERR(connection);
 		goto err_free_bootrom;
@@ -464,7 +464,7 @@ static int gb_bootrom_probe(struct gb_bundle *bundle,
 				NULL, 0);
 	if (ret) {
 		dev_err(&connection->bundle->dev,
-				"failed to send AP READY: %d\n", ret);
+			"failed to send AP READY: %d\n", ret);
 		goto err_cancel_timeout;
 	}
 
