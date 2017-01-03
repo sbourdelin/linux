@@ -234,7 +234,22 @@ static inline struct jump_entry *static_key_entries(struct static_key *key)
 
 static inline bool static_key_type(struct static_key *key)
 {
-	return (unsigned long)key->entries & JUMP_TYPE_MASK;
+	return (unsigned long)key->entries & JUMP_TYPE_TRUE;
+}
+
+static inline bool static_key_linked(struct static_key *key)
+{
+	return (unsigned long)key->entries & JUMP_TYPE_LINKED;
+}
+
+static inline void static_key_clear_linked(struct static_key *key)
+{
+	*(unsigned long *)&key->entries &= ~JUMP_TYPE_LINKED;
+}
+
+static inline void static_key_set_linked(struct static_key *key)
+{
+	*(unsigned long *)&key->entries |= JUMP_TYPE_LINKED;
 }
 
 static inline struct static_key *jump_entry_key(struct jump_entry *entry)
@@ -307,12 +322,9 @@ void __init jump_label_init(void)
 
 		key = iterk;
 		/*
-		 * Set key->entries to iter, but preserve JUMP_LABEL_TRUE_BRANCH.
+		 * Set key->entries to iter preserve JUMP_TYPE_MASK bits
 		 */
 		*((unsigned long *)&key->entries) += (unsigned long)iter;
-#ifdef CONFIG_MODULES
-		key->next = NULL;
-#endif
 	}
 	static_key_initialized = true;
 	jump_label_unlock();
@@ -356,13 +368,20 @@ static int __jump_label_mod_text_reserved(void *start, void *end)
 
 static void __jump_label_mod_update(struct static_key *key)
 {
-	struct static_key_mod *mod;
+	struct jump_entry *stop;
+	struct static_key_mod *mod =
+			(struct static_key_mod *)static_key_entries(key);
 
-	for (mod = key->next; mod; mod = mod->next) {
+	while (mod) {
 		struct module *m = mod->mod;
 
-		__jump_label_update(key, mod->entries,
-				    m->jump_entries + m->num_jump_entries);
+		if (!m)
+			stop = __stop___jump_table;
+		else
+			stop = m->jump_entries + m->num_jump_entries;
+		if (mod->entries)
+			__jump_label_update(key, mod->entries, stop);
+		mod = mod->next;
 	}
 }
 
@@ -397,7 +416,7 @@ static int jump_label_add_module(struct module *mod)
 	struct jump_entry *iter_stop = iter_start + mod->num_jump_entries;
 	struct jump_entry *iter;
 	struct static_key *key = NULL;
-	struct static_key_mod *jlm;
+	struct static_key_mod *jlm, *jlm2;
 
 	/* if the module doesn't have jump label entries, just return */
 	if (iter_start == iter_stop)
@@ -415,19 +434,36 @@ static int jump_label_add_module(struct module *mod)
 		key = iterk;
 		if (within_module(iter->key, mod)) {
 			/*
-			 * Set key->entries to iter, but preserve JUMP_LABEL_TRUE_BRANCH.
+			 * Set key->entries to iter preserve JUMP_TYPE_MASK bits
 			 */
 			*((unsigned long *)&key->entries) += (unsigned long)iter;
-			key->next = NULL;
 			continue;
 		}
 		jlm = kzalloc(sizeof(struct static_key_mod), GFP_KERNEL);
 		if (!jlm)
 			return -ENOMEM;
+		if (!static_key_linked(key)) {
+			jlm2 = kzalloc(sizeof(struct static_key_mod),
+				       GFP_KERNEL);
+			if (!jlm2) {
+				kfree(jlm);
+				return -ENOMEM;
+			}
+			preempt_disable();
+			jlm2->mod = __module_address((unsigned long)key);
+			preempt_enable();
+			jlm2->entries = static_key_entries(key);
+			jlm2->next = NULL;
+			*(unsigned long *)&key->entries = (unsigned long)jlm2 |
+							  static_key_type(key);
+			static_key_set_linked(key);
+		}
 		jlm->mod = mod;
 		jlm->entries = iter;
-		jlm->next = key->next;
-		key->next = jlm;
+		jlm->next = (struct static_key_mod *)static_key_entries(key);
+		*(unsigned long *)&key->entries = (unsigned long)jlm |
+						  static_key_type(key);
+		static_key_set_linked(key);
 
 		/* Only update if we've changed from our initial state */
 		if (jump_label_type(iter) != jump_label_init_type(iter))
@@ -454,16 +490,28 @@ static void jump_label_del_module(struct module *mod)
 		if (within_module(iter->key, mod))
 			continue;
 
-		prev = &key->next;
-		jlm = key->next;
+		prev = (struct static_key_mod **)&key->entries;
+		jlm = (struct static_key_mod *)static_key_entries(key);
 
 		while (jlm && jlm->mod != mod) {
 			prev = &jlm->next;
 			jlm = jlm->next;
 		}
 
-		if (jlm) {
-			*prev = jlm->next;
+		if (!jlm)
+			continue;
+
+		*prev = (struct static_key_mod *)((unsigned long)jlm->next |
+				((unsigned long)*prev & JUMP_TYPE_MASK));
+		kfree(jlm);
+
+		jlm = (struct static_key_mod *)static_key_entries(key);
+		/* if only one etry is left, fold it back into the static_key */
+		if (jlm->next == NULL) {
+			*(unsigned long *)&key->entries =
+				(unsigned long)jlm->entries |
+				static_key_type(key);
+			static_key_clear_linked(key);
 			kfree(jlm);
 		}
 	}
@@ -558,7 +606,8 @@ static void jump_label_update(struct static_key *key)
 #ifdef CONFIG_MODULES
 	struct module *mod;
 
-	__jump_label_mod_update(key);
+	if (static_key_linked(key))
+		__jump_label_mod_update(key);
 
 	preempt_disable();
 	mod = __module_address((unsigned long)key);
@@ -567,7 +616,7 @@ static void jump_label_update(struct static_key *key)
 	preempt_enable();
 #endif
 	/* if there are no users, entry can be NULL */
-	if (entry)
+	if (entry && !static_key_linked(key))
 		__jump_label_update(key, entry, stop);
 }
 
