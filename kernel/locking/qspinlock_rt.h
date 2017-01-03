@@ -55,6 +55,7 @@
  * inner lock, finish up its work, release the locks and reenable preemption.
  */
 #include <linux/sched.h>
+#include "qspinlock_stat.h"
 
 #ifndef MAX
 #define MAX(a, b)	(((a) >= (b)) ? (a) : (b))
@@ -157,6 +158,7 @@ static bool __rt_spin_trylock(struct qspinlock *lock,
 	if (!(prio = rt_task_priority(task, min_prio)))
 		return false;
 
+	qstat_inc_either(qstat_rt_spin_task, qstat_rt_spin_irq, task);
 
 	/*
 	 * Spin on the lock and try to set its priority into the pending byte.
@@ -237,6 +239,7 @@ next:
 			if (pdprio == mypdprio)
 				cmpxchg_relaxed(&l->pending, pdprio, 0);
 		}
+		qstat_inc(qstat_rt_resched, true);
 		schedule_preempt_disabled();
 	}
 	return true;
@@ -349,6 +352,9 @@ static bool rt_wait_node_or_unqueue(struct qspinlock *lock,
 	return false;
 
 unqueue:
+	qstat_inc_either(qstat_rt_unqueue_sched, qstat_rt_unqueue_prio,
+			 need_resched());
+
 	/*
 	 * Step - A  -- stabilize @prev
 	 *
@@ -406,8 +412,10 @@ unqueue:
 	/*
 	 * Yield the CPU if needed by another task with the right condition.
 	 */
-	if (rt_should_resched())
+	if (rt_should_resched()) {
+		qstat_inc(qstat_rt_resched, true);
 		schedule_preempt_disabled();
+	}
 
 	return true;	/* Need to retry RT spinning */
 }
@@ -486,8 +494,10 @@ release:
 	/*
 	 * Yield the CPU if needed by another task with the right condition.
 	 */
-	if (retry && rt_should_resched())
+	if (retry && rt_should_resched()) {
+		qstat_inc(qstat_rt_resched, true);
 		schedule_preempt_disabled();
+	}
 
 	return retry ? RT_RETRY : 1;
 }
@@ -514,6 +524,7 @@ void __lockfunc _rt_raw_spin_lock_nested(raw_spinlock_t *lock, int subclass,
 				  _RET_IP_);
 	}
 #endif
+	qstat_inc(qstat_rt_spin_nest, true);
 	__acquire(lock);
 	__rt_spin_trylock(&lock->raw_lock,
 			  outerlock ? &outerlock->raw_lock : NULL, 1);

@@ -688,6 +688,14 @@ config SCHED_OMIT_FRAME_POINTER
 
 	  If in doubt, say "Y".
 
+config QUEUED_LOCK_STAT
+	bool "Queued spinlock statistics"
+	depends on (PARAVIRT_SPINLOCKS || REALTIME_QUEUED_SPINLOCKS) && DEBUG_FS
+	---help---
+	  Enable the collection of statistical data on the slowpath
+	  behavior of paravirtualized or realtime queued spinlocks
+	  and report them on debugfs.
+
 menuconfig HYPERVISOR_GUEST
 	bool "Linux guest support"
 	---help---
@@ -727,14 +735,6 @@ config PARAVIRT_SPINLOCKS
 	  benefit on paravirtualized KVM / Xen kernels.
 
 	  If you are unsure how to answer this question, answer Y.
-
-config QUEUED_LOCK_STAT
-	bool "Paravirt queued spinlock statistics"
-	depends on PARAVIRT_SPINLOCKS && DEBUG_FS
-	---help---
-	  Enable the collection of statistical data on the slowpath
-	  behavior of paravirtualized queued spinlocks and report
-	  them on debugfs.
 
 source "arch/x86/xen/Kconfig"
 

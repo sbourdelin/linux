@@ -14,9 +14,10 @@
 
 /*
  * When queued spinlock statistical counters are enabled, the following
- * debugfs files will be created for reporting the counter values:
+ * debugfs files will be created under the <debugfs>/qlockstat directory
+ * for reporting the counter values:
  *
- * <debugfs>/qlockstat/
+ * PV qspinlock specific files:
  *   pv_hash_hops	- average # of hops per hashing operation
  *   pv_kick_unlock	- # of vCPU kicks issued at unlock time
  *   pv_kick_wake	- # of vCPU kicks used for computing pv_latency_wake
@@ -30,6 +31,14 @@
  *   pv_wait_head	- # of vCPU wait's at the queue head
  *   pv_wait_node	- # of vCPU wait's at a non-head queue node
  *
+ * RT qspinlock specific files:
+ *   rt_resched		- # of voluntary CPU yieldings
+ *   rt_spin_irq	- # of interrupt context RT spinnings
+ *   rt_spin_nest	- # of nested spinlock RT spinnings
+ *   rt_spin_task	- # of task context RT spinnings
+ *   rt_unqueue_prio	- # of unqueue operations due to RT priority
+ *   rt_unqueue_sched	- # of unqueue operations due to need_resched()
+ *
  * Writing to the "reset_counters" file will reset all the above counter
  * values.
  *
@@ -40,12 +49,11 @@
  *
  * There may be slight difference between pv_kick_wake and pv_kick_unlock.
  */
+#ifndef __KERNEL_LOCKING_QSPINLOCK_STAT_H
+#define __KERNEL_LOCKING_QSPINLOCK_STAT_H
+
 enum qlock_stats {
-	qstat_pv_hash_hops,
-	qstat_pv_kick_unlock,
-	qstat_pv_kick_wake,
-	qstat_pv_latency_kick,
-	qstat_pv_latency_wake,
+#ifdef CONFIG_PARAVIRT_SPINLOCKS
 	qstat_pv_lock_slowpath,
 	qstat_pv_lock_stealing,
 	qstat_pv_spurious_wakeup,
@@ -53,6 +61,26 @@ enum qlock_stats {
 	qstat_pv_wait_early,
 	qstat_pv_wait_head,
 	qstat_pv_wait_node,
+#endif
+	/*
+	 * These enums are needed to avoid compilation error even though
+	 * they are not used when CONFIG_PARAVIRT_SPINLOCKS isn't defined.
+	 */
+	qstat_pv_hash_hops,
+	qstat_pv_latency_kick,
+	qstat_pv_latency_wake,
+	qstat_pv_kick_unlock,
+	qstat_pv_kick_wake,
+
+#ifdef CONFIG_REALTIME_QUEUED_SPINLOCKS
+	qstat_rt_resched,
+	qstat_rt_spin_irq,
+	qstat_rt_spin_nest,
+	qstat_rt_spin_task,
+	qstat_rt_unqueue_prio,
+	qstat_rt_unqueue_sched,
+#endif
+
 	qstat_num,	/* Total number of statistical counters */
 	qstat_reset_cnts = qstat_num,
 };
@@ -66,6 +94,7 @@ enum qlock_stats {
 #include <linux/fs.h>
 
 static const char * const qstat_names[qstat_num + 1] = {
+#ifdef CONFIG_PARAVIRT_SPINLOCKS
 	[qstat_pv_hash_hops]	   = "pv_hash_hops",
 	[qstat_pv_kick_unlock]     = "pv_kick_unlock",
 	[qstat_pv_kick_wake]       = "pv_kick_wake",
@@ -78,6 +107,17 @@ static const char * const qstat_names[qstat_num + 1] = {
 	[qstat_pv_wait_early]      = "pv_wait_early",
 	[qstat_pv_wait_head]       = "pv_wait_head",
 	[qstat_pv_wait_node]       = "pv_wait_node",
+#endif
+
+#ifdef CONFIG_REALTIME_QUEUED_SPINLOCKS
+	[qstat_rt_resched]         = "rt_resched",
+	[qstat_rt_spin_irq]        = "rt_spin_irq",
+	[qstat_rt_spin_nest]       = "rt_spin_nest",
+	[qstat_rt_spin_task]       = "rt_spin_task",
+	[qstat_rt_unqueue_prio]    = "rt_unqueue_prio",
+	[qstat_rt_unqueue_sched]   = "rt_unqueue_sched",
+#endif
+
 	[qstat_reset_cnts]         = "reset_counters",
 };
 
@@ -85,7 +125,9 @@ static const char * const qstat_names[qstat_num + 1] = {
  * Per-cpu counters
  */
 static DEFINE_PER_CPU(unsigned long, qstats[qstat_num]);
+#ifdef CONFIG_PARAVIRT_SPINLOCKS
 static DEFINE_PER_CPU(u64, pv_kick_time);
+#endif
 
 /*
  * Function to read and return the qlock statistical counter values
@@ -222,8 +264,8 @@ static int __init init_qspinlock_stat(void)
 	 * performance.
 	 */
 	for (i = 0; i < qstat_num; i++)
-		if (!debugfs_create_file(qstat_names[i], 0400, d_qstat,
-					 (void *)(long)i, &fops_qstat))
+		if (qstat_names[i] && !debugfs_create_file(qstat_names[i],
+				0400, d_qstat, (void *)(long)i, &fops_qstat))
 			goto fail_undo;
 
 	if (!debugfs_create_file(qstat_names[qstat_reset_cnts], 0200, d_qstat,
@@ -240,7 +282,7 @@ out:
 fs_initcall(init_qspinlock_stat);
 
 /*
- * Increment the PV qspinlock statistical counters
+ * Increment the qspinlock statistical counter.
  */
 static inline void qstat_inc(enum qlock_stats stat, bool cond)
 {
@@ -248,6 +290,20 @@ static inline void qstat_inc(enum qlock_stats stat, bool cond)
 		this_cpu_inc(qstats[stat]);
 }
 
+/*
+ * Increment either one of the qspinlock statistical counters depending
+ * on the given condition.
+ */
+static inline void qstat_inc_either(enum qlock_stats true_stat,
+				    enum qlock_stats false_stat, bool cond)
+{
+	if (cond)
+		this_cpu_inc(qstats[true_stat]);
+	else
+		this_cpu_inc(qstats[false_stat]);
+}
+
+#ifdef CONFIG_PARAVIRT_SPINLOCKS
 /*
  * PV hash hop count
  */
@@ -287,9 +343,14 @@ static inline void __pv_wait(u8 *ptr, u8 val)
 #define pv_kick(c)	__pv_kick(c)
 #define pv_wait(p, v)	__pv_wait(p, v)
 
+#endif /* CONFIG_PARAVIRT_SPINLOCKS */
+
 #else /* CONFIG_QUEUED_LOCK_STAT */
 
 static inline void qstat_inc(enum qlock_stats stat, bool cond)	{ }
+static inline void qstat_inc_either(enum qlock_stats true_stat,
+		   enum qlock_stats false_stat, bool cond)	{ }
 static inline void qstat_hop(int hopcnt)			{ }
 
 #endif /* CONFIG_QUEUED_LOCK_STAT */
+#endif /* __KERNEL_LOCKING_QSPINLOCK_STAT_H */
