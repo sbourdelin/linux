@@ -68,7 +68,10 @@ union handle_parts {
 struct stack_record {
 	struct stack_record *next;	/* Link in the hashtable */
 	u32 hash;			/* Hash in the hastable */
-	u32 size;			/* Number of frames in the stack */
+	u32 size;			/* Number of frames in the stack - the top bit
+					   encodes whether the stack has been seen already
+					   by depot_test_set_reported_stack. Use entries_count
+					   to get the value */
 	union handle_parts handle;
 	unsigned long entries[1];	/* Variable-sized array of entries. */
 };
@@ -79,6 +82,15 @@ static int depot_index;
 static int next_slab_inited;
 static size_t depot_offset;
 static DEFINE_SPINLOCK(depot_lock);
+
+#define STACK_SEEN_BIT	31
+#define STACK_SEEN_MASK (1u<<STACK_SEEN_BIT)
+#define STACK_COUNT_MASK ~STACK_SEEN_MASK
+
+static inline u32 entries_count(struct stack_record *record)
+{
+	return record->size & STACK_COUNT_MASK;
+}
 
 static bool init_stack_slab(void **prealloc)
 {
@@ -172,7 +184,7 @@ static inline struct stack_record *find_stack(struct stack_record *bucket,
 
 	for (found = bucket; found; found = found->next) {
 		if (found->hash == hash &&
-		    found->size == size &&
+		    entries_count(found) == size &&
 		    !memcmp(entries, found->entries,
 			    size * sizeof(unsigned long))) {
 			return found;
@@ -188,24 +200,16 @@ void depot_fetch_stack(depot_stack_handle_t handle, struct stack_trace *trace)
 	size_t offset = parts.offset << STACK_ALLOC_ALIGN;
 	struct stack_record *stack = slab + offset;
 
-	trace->nr_entries = trace->max_entries = stack->size;
+	trace->nr_entries = trace->max_entries = entries_count(stack);
 	trace->entries = stack->entries;
 	trace->skip = 0;
 }
 EXPORT_SYMBOL_GPL(depot_fetch_stack);
 
-/**
- * depot_save_stack - save stack in a stack depot.
- * @trace - the stacktrace to save.
- * @alloc_flags - flags for allocating additional memory if required.
- *
- * Returns the handle of the stack struct stored in depot.
- */
-depot_stack_handle_t depot_save_stack(struct stack_trace *trace,
+struct stack_record *__depot_save_stack(struct stack_trace *trace,
 				    gfp_t alloc_flags)
 {
 	u32 hash;
-	depot_stack_handle_t retval = 0;
 	struct stack_record *found = NULL, **bucket;
 	unsigned long flags;
 	struct page *page = NULL;
@@ -279,9 +283,58 @@ exit:
 		/* Nobody used this memory, ok to free it. */
 		free_pages((unsigned long)prealloc, STACK_ALLOC_ORDER);
 	}
+fast_exit:
+	return found;
+}
+
+/**
+ * depot_save_stack - save stack in a stack depot.
+ * @trace - the stacktrace to save.
+ * @alloc_flags - flags for allocating additional memory if required.
+ *
+ * Returns the handle of the stack struct stored in depot.
+ */
+depot_stack_handle_t depot_save_stack(struct stack_trace *trace,
+				    gfp_t alloc_flags)
+{
+	depot_stack_handle_t retval = 0;
+	struct stack_record *found = NULL;
+
+	found = __depot_save_stack(trace, alloc_flags);
 	if (found)
 		retval = found->handle.handle;
-fast_exit:
+
 	return retval;
 }
 EXPORT_SYMBOL_GPL(depot_save_stack);
+
+/* FIXME be careful about recursion */
+bool depot_test_set_reported_stack(int stack_depth)
+{
+	unsigned long entries[stack_depth];
+	struct stack_trace trace = {
+		.nr_entries = 0,
+		.entries = entries,
+		.max_entries = stack_depth,
+		.skip = 0
+	};
+	struct stack_record *record;
+
+	/* FIXME deduplicate save_stack from kasan.c */
+	save_stack_trace(&trace);
+	if (trace.nr_entries != 0 &&
+	    trace.entries[trace.nr_entries-1] == ULONG_MAX)
+		trace.nr_entries--;
+
+	record = __depot_save_stack(&trace, GFP_ATOMIC);
+	if (!record)
+		return false;
+
+	/* This is racy but races should be too rare to matter */
+	if (record->size & STACK_SEEN_MASK)
+		return true;
+
+	record->size = STACK_SEEN_MASK | entries_count(record);
+	return false;
+}
+EXPORT_SYMBOL_GPL(depot_test_set_reported_stack);

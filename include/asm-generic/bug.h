@@ -11,6 +11,7 @@
 
 #ifndef __ASSEMBLY__
 #include <linux/kernel.h>
+#include <linux/stackdepot.h>
 
 #ifdef CONFIG_BUG
 
@@ -112,6 +113,7 @@ void __warn(const char *file, int line, void *caller, unsigned taint,
 	unlikely(__ret_warn_on);					\
 })
 
+#ifndef CONFIG_STACKDEPOT
 #define WARN_ON_ONCE(condition)	({				\
 	static bool __section(.data.unlikely) __warned;		\
 	int __ret_warn_once = !!(condition);			\
@@ -133,6 +135,26 @@ void __warn(const char *file, int line, void *caller, unsigned taint,
 	}							\
 	unlikely(__ret_warn_once);				\
 })
+#else
+#define WARN_STACK_DEPTH 16
+#define WARN_ON_ONCE(condition)	({				\
+	int __ret_warn_once = !!(condition);			\
+								\
+	if (unlikely(__ret_warn_once && !depot_test_set_reported_stack(WARN_STACK_DEPTH))) {		\
+		WARN_ON(1);					\
+	}							\
+	unlikely(__ret_warn_once);				\
+})
+
+#define WARN_ONCE(condition, format...)	({			\
+	int __ret_warn_once = !!(condition);			\
+								\
+	if (unlikely(__ret_warn_once && !depot_test_set_reported_stack(WARN_STACK_DEPTH))) {		\
+		WARN(1, format);				\
+	}							\
+	unlikely(__ret_warn_once);				\
+})
+#endif
 
 #define WARN_TAINT_ONCE(condition, taint, format...)	({	\
 	static bool __section(.data.unlikely) __warned;		\
