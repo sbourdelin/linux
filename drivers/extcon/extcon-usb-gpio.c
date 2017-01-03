@@ -244,6 +244,7 @@ static int usb_extcon_suspend(struct device *dev)
 		disable_irq(info->id_irq);
 	if (info->vbus_gpiod)
 		disable_irq(info->vbus_irq);
+	pinctrl_pm_select_sleep_state(dev);
 
 	return ret;
 }
@@ -253,6 +254,7 @@ static int usb_extcon_resume(struct device *dev)
 	struct usb_extcon_info *info = dev_get_drvdata(dev);
 	int ret = 0;
 
+	pinctrl_pm_select_default_state(dev);
 	if (device_may_wakeup(dev)) {
 		if (info->id_gpiod) {
 			ret = disable_irq_wake(info->id_irq);
