@@ -69,15 +69,14 @@ static int coldboot_seq(struct platform_device *pdev)
 	struct arche_apb_ctrl_drvdata *apb = platform_get_drvdata(pdev);
 	int ret;
 
-	if (apb->init_disabled ||
-			apb->state == ARCHE_PLATFORM_STATE_ACTIVE)
+	if (apb->init_disabled || apb->state == ARCHE_PLATFORM_STATE_ACTIVE)
 		return 0;
 
 	/* Hold APB in reset state */
 	assert_reset(apb->resetn_gpio);
 
 	if (apb->state == ARCHE_PLATFORM_STATE_FW_FLASHING &&
-			gpio_is_valid(apb->spi_en_gpio))
+	    gpio_is_valid(apb->spi_en_gpio))
 		devm_gpio_free(dev, apb->spi_en_gpio);
 
 	/* Enable power to APB */
@@ -120,7 +119,7 @@ static int fw_flashing_seq(struct platform_device *pdev)
 	int ret;
 
 	if (apb->init_disabled ||
-			apb->state == ARCHE_PLATFORM_STATE_FW_FLASHING)
+	    apb->state == ARCHE_PLATFORM_STATE_FW_FLASHING)
 		return 0;
 
 	ret = regulator_enable(apb->vcore);
@@ -144,7 +143,7 @@ static int fw_flashing_seq(struct platform_device *pdev)
 			flags = GPIOF_OUT_INIT_LOW;
 
 		ret = devm_gpio_request_one(dev, apb->spi_en_gpio,
-				flags, "apb_spi_en");
+					    flags, "apb_spi_en");
 		if (ret) {
 			dev_err(dev, "Failed requesting SPI bus en gpio %d\n",
 				apb->spi_en_gpio);
@@ -169,11 +168,11 @@ static int standby_boot_seq(struct platform_device *pdev)
 
 	/* Even if it is in OFF state, then we do not want to change the state */
 	if (apb->state == ARCHE_PLATFORM_STATE_STANDBY ||
-			apb->state == ARCHE_PLATFORM_STATE_OFF)
+	    apb->state == ARCHE_PLATFORM_STATE_OFF)
 		return 0;
 
 	if (apb->state == ARCHE_PLATFORM_STATE_FW_FLASHING &&
-			gpio_is_valid(apb->spi_en_gpio))
+	    gpio_is_valid(apb->spi_en_gpio))
 		devm_gpio_free(dev, apb->spi_en_gpio);
 
 	/*
@@ -198,7 +197,7 @@ static void poweroff_seq(struct platform_device *pdev)
 		return;
 
 	if (apb->state == ARCHE_PLATFORM_STATE_FW_FLASHING &&
-			gpio_is_valid(apb->spi_en_gpio))
+	    gpio_is_valid(apb->spi_en_gpio))
 		devm_gpio_free(dev, apb->spi_en_gpio);
 
 	/* disable the clock */
@@ -252,8 +251,8 @@ void apb_ctrl_poweroff(struct device *dev)
 	poweroff_seq(to_platform_device(dev));
 }
 
-static ssize_t state_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t state_store(struct device *dev, struct device_attribute *attr,
+			   const char *buf, size_t count)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct arche_apb_ctrl_drvdata *apb = platform_get_drvdata(pdev);
@@ -298,8 +297,8 @@ static ssize_t state_store(struct device *dev,
 	return ret ? ret : count;
 }
 
-static ssize_t state_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
+static ssize_t state_show(struct device *dev, struct device_attribute *attr,
+			  char *buf)
 {
 	struct arche_apb_ctrl_drvdata *apb = dev_get_drvdata(dev);
 
@@ -321,7 +320,7 @@ static ssize_t state_show(struct device *dev,
 static DEVICE_ATTR_RW(state);
 
 static int apb_ctrl_get_devtree_data(struct platform_device *pdev,
-		struct arche_apb_ctrl_drvdata *apb)
+				     struct arche_apb_ctrl_drvdata *apb)
 {
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
@@ -333,10 +332,10 @@ static int apb_ctrl_get_devtree_data(struct platform_device *pdev,
 		return apb->resetn_gpio;
 	}
 	ret = devm_gpio_request_one(dev, apb->resetn_gpio,
-			GPIOF_OUT_INIT_LOW, "apb-reset");
+				    GPIOF_OUT_INIT_LOW, "apb-reset");
 	if (ret) {
 		dev_err(dev, "Failed requesting reset gpio %d\n",
-				apb->resetn_gpio);
+			apb->resetn_gpio);
 		return ret;
 	}
 
@@ -346,10 +345,10 @@ static int apb_ctrl_get_devtree_data(struct platform_device *pdev,
 		return apb->boot_ret_gpio;
 	}
 	ret = devm_gpio_request_one(dev, apb->boot_ret_gpio,
-			GPIOF_OUT_INIT_LOW, "boot retention");
+				    GPIOF_OUT_INIT_LOW, "boot retention");
 	if (ret) {
 		dev_err(dev, "Failed requesting bootret gpio %d\n",
-				apb->boot_ret_gpio);
+			apb->boot_ret_gpio);
 		return ret;
 	}
 
@@ -360,10 +359,10 @@ static int apb_ctrl_get_devtree_data(struct platform_device *pdev,
 		return apb->pwroff_gpio;
 	}
 	ret = devm_gpio_request_one(dev, apb->pwroff_gpio,
-			GPIOF_IN, "pwroff_n");
+				    GPIOF_IN, "pwroff_n");
 	if (ret) {
 		dev_err(dev, "Failed requesting pwroff_n gpio %d\n",
-				apb->pwroff_gpio);
+			apb->pwroff_gpio);
 		return ret;
 	}
 
@@ -373,10 +372,10 @@ static int apb_ctrl_get_devtree_data(struct platform_device *pdev,
 		dev_warn(dev, "failed to get clock en gpio\n");
 	} else if (gpio_is_valid(apb->clk_en_gpio)) {
 		ret = devm_gpio_request_one(dev, apb->clk_en_gpio,
-				GPIOF_OUT_INIT_LOW, "apb_clk_en");
+					    GPIOF_OUT_INIT_LOW, "apb_clk_en");
 		if (ret) {
 			dev_warn(dev, "Failed requesting APB clock en gpio %d\n",
-					apb->clk_en_gpio);
+				 apb->clk_en_gpio);
 			return ret;
 		}
 	}
@@ -409,7 +408,7 @@ static int apb_ctrl_get_devtree_data(struct platform_device *pdev,
 	apb->spi_en_gpio = of_get_named_gpio(np, "spi-en-gpio", 0);
 	if (apb->spi_en_gpio >= 0) {
 		if (of_property_read_bool(pdev->dev.of_node,
-					"spi-en-active-high"))
+					  "spi-en-active-high"))
 			apb->spi_en_polarity_high = true;
 	}
 
