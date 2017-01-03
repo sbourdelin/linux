@@ -348,6 +348,8 @@ static int dsa_ds_apply(struct dsa_switch_tree *dst, struct dsa_switch *ds)
 			continue;
 	}
 
+	dsa_hwmon_register(ds);
+
 	return 0;
 }
 
@@ -355,6 +357,8 @@ static void dsa_ds_unapply(struct dsa_switch_tree *dst, struct dsa_switch *ds)
 {
 	struct device_node *port;
 	u32 index;
+
+	dsa_hwmon_unregister(ds);
 
 	for (index = 0; index < DSA_MAX_PORTS; index++) {
 		port = ds->ports[index].dn;
