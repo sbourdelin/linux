@@ -1031,6 +1031,13 @@ complete_reset:
  **/
 static int i40e_vfpr_netdev_open(struct net_device *dev)
 {
+	struct i40e_vfpr_netdev_priv *priv = netdev_priv(dev);
+	struct i40e_vf *vf = priv->vf;
+
+	vf->link_forced = true;
+	vf->link_up = true;
+	i40e_vc_notify_vf_link_state(vf);
+
 	return 0;
 }
 
@@ -1042,6 +1049,13 @@ static int i40e_vfpr_netdev_open(struct net_device *dev)
  **/
 static int i40e_vfpr_netdev_stop(struct net_device *dev)
 {
+	struct i40e_vfpr_netdev_priv *priv = netdev_priv(dev);
+	struct i40e_vf *vf = priv->vf;
+
+	vf->link_forced = true;
+	vf->link_up = false;
+	i40e_vc_notify_vf_link_state(vf);
+
 	return 0;
 }
 
@@ -1127,6 +1141,13 @@ int i40e_alloc_vfpr_netdev(struct i40e_vf *vf, u16 vf_num)
 	/* Delete broadcast filter for VF */
 	i40e_update_vf_broadcast_filter(vf, false);
 
+	/* Reset VF link as we are changing the mode to 'switchdev'. VFPR netdev
+	 * needs to be brought up to enable VF link.
+	 */
+	vf->link_forced = true;
+	vf->link_up = false;
+	i40e_vc_notify_vf_link_state(vf);
+
 	return 0;
 }
 
@@ -1151,6 +1172,10 @@ void i40e_free_vfpr_netdev(struct i40e_vf *vf)
 
 	/* Add broadcast filter to VF */
 	i40e_update_vf_broadcast_filter(vf, true);
+
+	/* In legacy mode, VF link is not controlled by VFPR */
+	vf->link_forced = false;
+	i40e_vc_notify_vf_link_state(vf);
 }
 
 /**
@@ -1910,6 +1935,10 @@ static int i40e_vc_enable_queues_msg(struct i40e_vf *vf, u8 *msg, u16 msglen)
 
 	if (i40e_vsi_start_rings(pf->vsi[vf->lan_vsi_idx]))
 		aq_ret = I40E_ERR_TIMEOUT;
+
+	if ((0 == aq_ret) && vf->vfpr_netdev)
+		netif_carrier_on(vf->vfpr_netdev);
+
 error_param:
 	/* send the response to the VF */
 	return i40e_vc_send_resp_to_vf(vf, I40E_VIRTCHNL_OP_ENABLE_QUEUES,
@@ -1948,6 +1977,9 @@ static int i40e_vc_disable_queues_msg(struct i40e_vf *vf, u8 *msg, u16 msglen)
 	}
 
 	i40e_vsi_stop_rings(pf->vsi[vf->lan_vsi_idx]);
+
+	if ((0 == aq_ret) && vf->vfpr_netdev)
+		netif_carrier_off(vf->vfpr_netdev);
 
 error_param:
 	/* send the response to the VF */
@@ -3189,6 +3221,7 @@ int i40e_ndo_set_vf_link_state(struct net_device *netdev, int vf_id, int link)
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_pf *pf = np->vsi->back;
 	struct i40e_virtchnl_pf_event pfe;
+	struct net_device *vfpr_netdev;
 	struct i40e_hw *hw = &pf->hw;
 	struct i40e_vf *vf;
 	int abs_vf_id;
@@ -3231,6 +3264,17 @@ int i40e_ndo_set_vf_link_state(struct net_device *netdev, int vf_id, int link)
 		ret = -EINVAL;
 		goto error_out;
 	}
+
+	vfpr_netdev = vf->vfpr_netdev;
+	if (vfpr_netdev) {
+		unsigned int flags = vfpr_netdev->flags;
+
+		if (vf->link_up)
+			dev_change_flags(vfpr_netdev, flags | IFF_UP);
+		else
+			dev_change_flags(vfpr_netdev, flags & ~IFF_UP);
+	}
+
 	/* Notify the VF of its new link state */
 	i40e_aq_send_msg_to_vf(hw, abs_vf_id, I40E_VIRTCHNL_OP_EVENT,
 			       0, (u8 *)&pfe, sizeof(pfe), NULL);
