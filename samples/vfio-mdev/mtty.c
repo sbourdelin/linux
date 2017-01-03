@@ -1143,7 +1143,7 @@ int mtty_get_device_info(struct mdev_device *mdev,
 	return 0;
 }
 
-static long mtty_ioctl(struct mdev_device *mdev, unsigned int cmd,
+static int mtty_ioctl(struct mdev_device *mdev, unsigned int cmd,
 			unsigned long arg)
 {
 	int ret = 0;

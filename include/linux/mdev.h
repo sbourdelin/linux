@@ -103,7 +103,7 @@ struct parent_ops {
 			size_t count, loff_t *ppos);
 	ssize_t (*write)(struct mdev_device *mdev, const char __user *buf,
 			 size_t count, loff_t *ppos);
-	ssize_t (*ioctl)(struct mdev_device *mdev, unsigned int cmd,
+	int	(*ioctl)(struct mdev_device *mdev, unsigned int cmd,
 			 unsigned long arg);
 	int	(*mmap)(struct mdev_device *mdev, struct vm_area_struct *vma);
 };
