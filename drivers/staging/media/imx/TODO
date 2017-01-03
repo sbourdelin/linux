@@ -1,0 +1,18 @@
+
+- v4l2-compliance
+
+- imx-csi subdev is not being autoloaded as a kernel module, probably
+  because ipu_add_client_devices() does not register the IPU client
+  platform devices, but only allocates those devices.
+
+- Verify driver remove paths.
+
+- Currently registering with notifications from subdevs are only
+  available through the subdev device nodes and not through the main
+  capture device node. Need to come up with a way to find the camif in
+  the current pipeline that owns the subdev that sent the notify.
+
+- Need to decide whether a mem2mem device should be incorporated into
+  the media graph, or whether it should be a separate device that does
+  not link with any other entities.
+
