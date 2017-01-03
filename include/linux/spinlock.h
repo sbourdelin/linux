@@ -177,7 +177,15 @@ static inline void do_raw_spin_unlock(raw_spinlock_t *lock) __releases(lock)
 
 #define raw_spin_lock(lock)	_raw_spin_lock(lock)
 
-#ifdef CONFIG_DEBUG_LOCK_ALLOC
+#ifdef CONFIG_REALTIME_QUEUED_SPINLOCKS
+# define raw_spin_lock_nested(lock, subclass)		\
+	_rt_raw_spin_lock_nested(lock, subclass, NULL)
+# define raw_spin_lock_nested2(lock, subclass, nest_lock)\
+	_rt_raw_spin_lock_nested(lock, subclass, nest_lock)
+# define raw_spin_lock_nest_lock(lock, nest_lock)	\
+	_rt_raw_spin_lock_nested(lock, 0, &(nest_lock)->rlock)
+
+#elif defined(CONFIG_DEBUG_LOCK_ALLOC)
 # define raw_spin_lock_nested(lock, subclass) \
 	_raw_spin_lock_nested(lock, subclass)
 
@@ -205,7 +213,16 @@ static inline void do_raw_spin_unlock(raw_spinlock_t *lock) __releases(lock)
 		flags = _raw_spin_lock_irqsave(lock);	\
 	} while (0)
 
-#ifdef CONFIG_DEBUG_LOCK_ALLOC
+#ifdef CONFIG_REALTIME_QUEUED_SPINLOCKS
+#define raw_spin_lock_irqsave_nested(lock, flags, subclass)		 \
+	raw_spin_lock_irqsave_nested2(lock, flags, subclass, NULL)
+#define raw_spin_lock_irqsave_nested2(lock, flags, subclass, nest_lock)	 \
+	do {								 \
+		typecheck(unsigned long, flags);			 \
+		flags = _rt_raw_spin_lock_irqsave_nested(lock, subclass, \
+							 nest_lock);	 \
+	} while (0)
+#elif defined(CONFIG_DEBUG_LOCK_ALLOC)
 #define raw_spin_lock_irqsave_nested(lock, flags, subclass)		\
 	do {								\
 		typecheck(unsigned long, flags);			\
@@ -230,6 +247,15 @@ static inline void do_raw_spin_unlock(raw_spinlock_t *lock) __releases(lock)
 #define raw_spin_lock_irqsave_nested(lock, flags, subclass)	\
 	raw_spin_lock_irqsave(lock, flags)
 
+#endif
+
+#ifndef raw_spin_lock_nested2
+#define raw_spin_lock_nested2(lock, subclass, nest_lock)		\
+	raw_spin_lock_nested(lock, subclass)
+#endif
+#ifndef raw_spin_lock_irqsave_nested2
+#define raw_spin_lock_irqsave_nested2(lock, flags, subclass, nest_lock)	\
+	raw_spin_lock_irqsave_nested(lock, flags, subclass)
 #endif
 
 #define raw_spin_lock_irq(lock)		_raw_spin_lock_irq(lock)
@@ -314,6 +340,10 @@ do {								\
 	raw_spin_lock_nested(spinlock_check(lock), subclass);	\
 } while (0)
 
+#define spin_lock_nested2(lock, subclass, nest_lock)		\
+	raw_spin_lock_nested2(spinlock_check(lock), subclass,	\
+			      spinlock_check(nest_lock))
+
 #define spin_lock_nest_lock(lock, nest_lock)				\
 do {									\
 	raw_spin_lock_nest_lock(spinlock_check(lock), nest_lock);	\
@@ -333,6 +363,9 @@ do {								\
 do {									\
 	raw_spin_lock_irqsave_nested(spinlock_check(lock), flags, subclass); \
 } while (0)
+
+#define spin_lock_irqsave_nested2(lock, flags, subclass, nest_lock)	\
+	raw_spin_lock_irqsave_nested2(spinlock_check(lock), flags, subclass)
 
 static __always_inline void spin_unlock(spinlock_t *lock)
 {

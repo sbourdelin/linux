@@ -43,6 +43,13 @@ void __lockfunc
 _raw_spin_unlock_irqrestore(raw_spinlock_t *lock, unsigned long flags)
 								__releases(lock);
 
+#ifdef CONFIG_REALTIME_QUEUED_SPINLOCKS
+void __lockfunc _rt_raw_spin_lock_nested(raw_spinlock_t *lock, int subclass,
+		raw_spinlock_t *outerlock)		 __acquires(lock);
+unsigned long __lockfunc _rt_raw_spin_lock_irqsave_nested(raw_spinlock_t *lock,
+		int subclass, raw_spinlock_t *outerlock) __acquires(lock);
+#endif
+
 #ifdef CONFIG_INLINE_SPIN_LOCK
 #define _raw_spin_lock(lock) __raw_spin_lock(lock)
 #endif
