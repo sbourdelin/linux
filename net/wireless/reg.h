@@ -54,6 +54,8 @@ void regulatory_exit(void);
 int set_regdom(const struct ieee80211_regdomain *rd,
 	       enum ieee80211_regd_source regd_src);
 
+bool reg_does_bw_fit(const struct ieee80211_freq_range *freq_range,
+		     u32 center_freq_khz, u32 bw_khz);
 unsigned int reg_get_max_bandwidth(const struct ieee80211_regdomain *rd,
 				   const struct ieee80211_reg_rule *rule);
 
