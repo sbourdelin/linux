@@ -589,6 +589,8 @@ struct i40e_vsi {
 	struct i40e_ring **rx_rings;
 	struct i40e_ring **tx_rings;
 
+	bool xdp_enabled;
+
 	u32  active_filters;
 	u32  promisc_threshold;
 
@@ -948,4 +950,15 @@ i40e_status i40e_get_npar_bw_setting(struct i40e_pf *pf);
 i40e_status i40e_set_npar_bw_setting(struct i40e_pf *pf);
 i40e_status i40e_commit_npar_bw_setting(struct i40e_pf *pf);
 void i40e_print_link_message(struct i40e_vsi *vsi, bool isup);
+
+/**
+ * i40e_enabled_xdp_vsi - Check if VSI has XDP enabled
+ * @vsi: pointer to a vsi
+ *
+ * Returns true if the VSI has XDP enabled.
+ **/
+static inline bool i40e_enabled_xdp_vsi(const struct i40e_vsi *vsi)
+{
+	return !!vsi->xdp_enabled;
+}
 #endif /* _I40E_H_ */
