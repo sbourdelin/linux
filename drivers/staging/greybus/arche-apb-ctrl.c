@@ -21,7 +21,6 @@
 #include <linux/spinlock.h>
 #include "arche_platform.h"
 
-
 struct arche_apb_ctrl_drvdata {
 	/* Control GPIO signals to and from AP <=> AP Bridges */
 	int resetn_gpio;
