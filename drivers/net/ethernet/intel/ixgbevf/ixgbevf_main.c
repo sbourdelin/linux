@@ -3686,6 +3686,13 @@ static int ixgbevf_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		return NETDEV_TX_OK;
 	}
 
+	/* On PCI/PCI-X HW, if packet size is less than ETH_ZLEN,
+	 * packets may get corrupted during padding by HW.
+	 * To WA this issue, pad all small packets manually.
+	 */
+	if (eth_skb_pad(skb))
+		return NETDEV_TX_OK;
+
 	tx_ring = adapter->tx_ring[skb->queue_mapping];
 
 	/* need: 1 descriptor per page * PAGE_SIZE/IXGBE_MAX_DATA_PER_TXD,
