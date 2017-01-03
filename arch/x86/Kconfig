@@ -717,7 +717,7 @@ config PARAVIRT_DEBUG
 
 config PARAVIRT_SPINLOCKS
 	bool "Paravirtualization layer for spinlocks"
-	depends on PARAVIRT && SMP
+	depends on PARAVIRT && SMP && !REALTIME_QUEUED_SPINLOCKS
 	---help---
 	  Paravirtualized spinlocks allow a pvops backend to replace the
 	  spinlock implementation with something virtualization-friendly

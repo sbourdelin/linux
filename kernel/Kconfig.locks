@@ -248,3 +248,12 @@ config ARCH_USE_QUEUED_RWLOCKS
 config QUEUED_RWLOCKS
 	def_bool y if ARCH_USE_QUEUED_RWLOCKS
 	depends on SMP
+
+config REALTIME_QUEUED_SPINLOCKS
+	bool "Realtime queued spinlocks"
+	default n
+	depends on QUEUED_SPINLOCKS && PREEMPT && NR_CPUS < 16384
+	help
+	  This enables support for realtime environment where tasks with
+	  realtime priority will get the spinlocks ASAP instead of waiting
+	  in a queue.

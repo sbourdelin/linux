@@ -268,6 +268,19 @@ static __always_inline u32  __pv_wait_head_or_lock(struct qspinlock *lock,
 #endif
 
 /*
+ * Realtime queued spinlock is mutual exclusive with native and PV spinlocks.
+ */
+#ifdef CONFIG_REALTIME_QUEUED_SPINLOCKS
+#include "qspinlock_rt.h"
+#else
+static __always_inline u32 rt_wait_head_or_retry(struct qspinlock *lock)
+						{ return 0; }
+#define rt_pending(v)		0
+#define rt_enabled()		false
+#define rt_spin_trylock(l)	false
+#endif
+
+/*
  * Various notes on spin_is_locked() and spin_unlock_wait(), which are
  * 'interesting' functions:
  *
@@ -415,7 +428,7 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
 
 	BUILD_BUG_ON(CONFIG_NR_CPUS >= (1U << _Q_TAIL_CPU_BITS));
 
-	if (pv_enabled())
+	if (pv_enabled() || rt_enabled())
 		goto queue;
 
 	if (virt_spin_lock(lock))
@@ -490,6 +503,9 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
 	 * queuing.
 	 */
 queue:
+	if (rt_spin_trylock(lock))
+		return;
+
 	node = this_cpu_ptr(&mcs_nodes[0]);
 	idx = node->count++;
 	tail = encode_tail(smp_processor_id(), idx);
@@ -573,6 +589,13 @@ queue:
 	if ((val = pv_wait_head_or_lock(lock, node)))
 		goto locked;
 
+	/*
+	 * The RT rt_wait_head_or_lock function, if active, will acquire the
+	 * lock and return a non-zero value.
+	 */
+	if ((val = rt_wait_head_or_retry(lock)))
+		goto locked;
+
 	val = smp_cond_load_acquire(&lock->val.counter, !(VAL & _Q_LOCKED_PENDING_MASK));
 
 locked:
@@ -587,7 +610,9 @@ locked:
 	 * to grab the lock.
 	 */
 	for (;;) {
-		/* In the PV case we might already have _Q_LOCKED_VAL set */
+		/*
+		 * In the PV & RT cases we might already have _Q_LOCKED_VAL set.
+		 */
 		if ((val & _Q_TAIL_MASK) != tail) {
 			set_locked(lock);
 			break;
@@ -596,8 +621,11 @@ locked:
 		 * The smp_cond_load_acquire() call above has provided the
 		 * necessary acquire semantics required for locking. At most
 		 * two iterations of this loop may be ran.
+		 *
+		 * In the RT case, the pending byte needs to be preserved.
 		 */
-		old = atomic_cmpxchg_relaxed(&lock->val, val, _Q_LOCKED_VAL);
+		old = atomic_cmpxchg_relaxed(&lock->val, val,
+					     rt_pending(val) | _Q_LOCKED_VAL);
 		if (old == val)
 			goto release;	/* No contention */
 
