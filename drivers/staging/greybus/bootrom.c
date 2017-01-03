@@ -220,7 +220,8 @@ static int gb_bootrom_firmware_size_request(struct gb_operation *op)
 	size_response = op->response->payload;
 	size_response->size = cpu_to_le32(bootrom->fw->size);
 
-	dev_dbg(dev, "%s: firmware size %d bytes\n", __func__, size_response->size);
+	dev_dbg(dev, "%s: firmware size %d bytes\n",
+		__func__, size_response->size);
 
 unlock:
 	mutex_unlock(&bootrom->mutex);
@@ -287,8 +288,8 @@ static int gb_bootrom_get_firmware(struct gb_operation *op)
 	firmware_response = op->response->payload;
 	memcpy(firmware_response->data, fw->data + offset, size);
 
-	dev_dbg(dev, "responding with firmware (offs = %u, size = %u)\n", offset,
-		size);
+	dev_dbg(dev, "responding with firmware (offs = %u, size = %u)\n",
+		offset, size);
 
 unlock:
 	mutex_unlock(&bootrom->mutex);
