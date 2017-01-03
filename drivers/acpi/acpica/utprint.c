@@ -627,7 +627,7 @@ int sprintf(char *string, const char *format, ...)
 	int length;
 
 	va_start(args, format);
-	length = vsnprintf(string, ACPI_UINT32_MAX, format, args);
+	length = vsnprintf(string, ACPI_SIZE_MAX, format, args);
 	va_end(args);
 
 	return (length);
