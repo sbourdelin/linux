@@ -549,7 +549,6 @@ static void __timer_interrupt(void)
 		cu->current_tb = mfspr(SPRN_PURR);
 	}
 #endif
-
 	trace_timer_interrupt_exit(regs);
 }
 
@@ -597,6 +596,7 @@ void timer_interrupt(struct pt_regs * regs)
 	set_irq_regs(old_regs);
 }
 EXPORT_SYMBOL(timer_interrupt);
+
 
 /*
  * Hypervisor decrementer interrupts shouldn't occur but are sometimes
