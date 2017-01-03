@@ -201,6 +201,11 @@ extern int __meminit hash__vmemmap_create_mapping(unsigned long start,
 					      unsigned long phys);
 extern void hash__vmemmap_remove_mapping(unsigned long start,
 				     unsigned long page_size);
+
+#ifdef CONFIG_MEMORY_HOTPLUG
+int hash__create_section_mapping(unsigned long start, unsigned long end);
+int hash__remove_section_mapping(unsigned long start, unsigned long end);
+#endif /* CONFIG_MEMORY_HOTPLUG */
 #endif /* !__ASSEMBLY__ */
 #endif /* __KERNEL__ */
 #endif /* _ASM_POWERPC_BOOK3S_64_HASH_H */
