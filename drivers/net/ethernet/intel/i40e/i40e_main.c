@@ -10938,6 +10938,7 @@ static int i40e_devlink_eswitch_mode_get(struct devlink *devlink, u16 *mode)
 static int i40e_devlink_eswitch_mode_set(struct devlink *devlink, u16 mode)
 {
 	struct i40e_pf *pf = devlink_priv(devlink);
+	struct i40e_vsi *vsi = pf->vsi[pf->lan_vsi];
 	struct i40e_vf *vf;
 	int i, j, err = 0;
 
@@ -10951,6 +10952,8 @@ static int i40e_devlink_eswitch_mode_set(struct devlink *devlink, u16 mode)
 			i40e_free_vfpr_netdev(vf);
 		}
 		pf->eswitch_mode = mode;
+		vsi->netdev->priv_flags |=
+			(IFF_XMIT_DST_RELEASE | IFF_XMIT_DST_RELEASE_PERM);
 		break;
 	case DEVLINK_ESWITCH_MODE_SWITCHDEV:
 		for (i = 0; i < pf->num_alloc_vfs; i++) {
@@ -10965,6 +10968,7 @@ static int i40e_devlink_eswitch_mode_set(struct devlink *devlink, u16 mode)
 			}
 		}
                 pf->eswitch_mode = mode;
+		netif_keep_dst(vsi->netdev);
 		break;
 	default:
 		err = -EOPNOTSUPP;

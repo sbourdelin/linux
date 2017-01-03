@@ -1062,6 +1062,7 @@ static int i40e_vfpr_netdev_stop(struct net_device *dev)
 static const struct net_device_ops i40e_vfpr_netdev_ops = {
 	.ndo_open       	= i40e_vfpr_netdev_open,
 	.ndo_stop       	= i40e_vfpr_netdev_stop,
+	.ndo_start_xmit		= i40e_vfpr_netdev_start_xmit,
 };
 
 /**
@@ -1121,16 +1122,22 @@ int i40e_alloc_vfpr_netdev(struct i40e_vf *vf, u16 vf_num)
 
 	priv = netdev_priv(vfpr_netdev);
 	priv->vf = &(pf->vf[vf_num]);
+	priv->vfpr_dst = metadata_dst_alloc(0, METADATA_HW_PORT_MUX, GFP_KERNEL);
+	priv->vfpr_dst->u.port_info.lower_dev = vsi->netdev;
+	priv->vfpr_dst->u.port_info.port_id = vf->vf_id;
 
 	vfpr_netdev->netdev_ops = &i40e_vfpr_netdev_ops;
 
 	netif_carrier_off(vfpr_netdev);
 	netif_tx_disable(vfpr_netdev);
 
+	eth_hw_addr_inherit(vfpr_netdev, vsi->netdev);
+
 	err = register_netdev(vfpr_netdev);
 	if (err) {
 		dev_err(&pf->pdev->dev, "register_netdev failed for vf: %s\n",
 			vf->vfpr_netdev->name);
+		dst_release((struct dst_entry *)priv->vfpr_dst);
 		free_netdev(vfpr_netdev);
 		return err;
 	}
@@ -1159,14 +1166,18 @@ int i40e_alloc_vfpr_netdev(struct i40e_vf *vf, u16 vf_num)
  **/
 void i40e_free_vfpr_netdev(struct i40e_vf *vf)
 {
+	struct i40e_vfpr_netdev_priv *priv;
 	struct i40e_pf *pf = vf->pf;
 
 	if (!vf->vfpr_netdev)
 		return;
 
+	priv = netdev_priv(vf->vfpr_netdev);
+
 	dev_info(&pf->pdev->dev, "Freeing VF Port representor(%s)\n",
 		 vf->vfpr_netdev->name);
 
+	dst_release((struct dst_entry *)priv->vfpr_dst);
 	unregister_netdev(vf->vfpr_netdev);
 	free_netdev(vf->vfpr_netdev);
 
@@ -1936,8 +1947,10 @@ static int i40e_vc_enable_queues_msg(struct i40e_vf *vf, u8 *msg, u16 msglen)
 	if (i40e_vsi_start_rings(pf->vsi[vf->lan_vsi_idx]))
 		aq_ret = I40E_ERR_TIMEOUT;
 
-	if ((0 == aq_ret) && vf->vfpr_netdev)
+	if ((0 == aq_ret) && vf->vfpr_netdev) {
+		netif_tx_start_all_queues(vf->vfpr_netdev);
 		netif_carrier_on(vf->vfpr_netdev);
+	}
 
 error_param:
 	/* send the response to the VF */
@@ -1978,8 +1991,10 @@ static int i40e_vc_disable_queues_msg(struct i40e_vf *vf, u8 *msg, u16 msglen)
 
 	i40e_vsi_stop_rings(pf->vsi[vf->lan_vsi_idx]);
 
-	if ((0 == aq_ret) && vf->vfpr_netdev)
+	if ((0 == aq_ret) && vf->vfpr_netdev) {
+		netif_tx_stop_all_queues(vf->vfpr_netdev);
 		netif_carrier_off(vf->vfpr_netdev);
+	}
 
 error_param:
 	/* send the response to the VF */
