@@ -3671,6 +3671,7 @@ static struct srp_function_template ib_srp_transport_functions = {
 static int __init srp_init_module(void)
 {
 	int ret;
+	unsigned int max_indirect_sg_entries = SG_MAX_SEGMENTS;
 
 	if (srp_sg_tablesize) {
 		pr_warn("srp_sg_tablesize is deprecated, please use cmd_sg_entries\n");
@@ -3692,6 +3693,12 @@ static int __init srp_init_module(void)
 		pr_warn("Bumping up indirect_sg_entries to match cmd_sg_entries (%u)\n",
 			cmd_sg_entries);
 		indirect_sg_entries = cmd_sg_entries;
+	}
+
+	if (indirect_sg_entries > max_indirect_sg_entries) {
+		pr_warn("Clamping indirect_sg_entries to %u\n",
+			max_indirect_sg_entries);
+		indirect_sg_entries = max_indirect_sg_entries;
 	}
 
 	srp_remove_wq = create_workqueue("srp_remove");
