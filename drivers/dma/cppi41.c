@@ -320,7 +320,7 @@ static irqreturn_t cppi41_irq(int irq, void *data)
 			int error;
 
 			error = pm_runtime_get(cdd->ddev.dev);
-			if (error < 0)
+			if ((error != -EINPROGRESS) && error < 0)
 				dev_err(cdd->ddev.dev, "%s pm runtime get: %i\n",
 					__func__, error);
 
