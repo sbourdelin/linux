@@ -146,8 +146,9 @@ void drm_kms_helper_poll_enable_locked(struct drm_device *dev)
 	drm_connector_list_iter_put(&conn_iter);
 
 	if (dev->mode_config.delayed_event) {
+		/* Use short (1s) delay to handle the initial delayed event */
 		poll = true;
-		delay = 0;
+		delay = HZ;
 	}
 
 	if (poll)
