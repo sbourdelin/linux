@@ -90,19 +90,34 @@ static int imx_pwm_config_v1(struct pwm_chip *chip,
 	return 0;
 }
 
-static void imx_pwm_set_enable_v1(struct pwm_chip *chip, bool enable)
+static int imx_pwm_enable_v1(struct pwm_chip *chip, struct pwm_device *pwm)
+{
+	struct imx_chip *imx = to_imx_chip(chip);
+	int ret;
+	u32 val;
+
+	ret = clk_prepare_enable(imx->clk_per);
+	if (ret)
+		return ret;
+
+	val = readl(imx->mmio_base + MX1_PWMC);
+	val |= MX1_PWMC_EN;
+	writel(val, imx->mmio_base + MX1_PWMC);
+
+	return 0;
+}
+
+static void imx_pwm_disable_v1(struct pwm_chip *chip, struct pwm_device *pwm)
 {
 	struct imx_chip *imx = to_imx_chip(chip);
 	u32 val;
 
 	val = readl(imx->mmio_base + MX1_PWMC);
-
-	if (enable)
-		val |= MX1_PWMC_EN;
-	else
-		val &= ~MX1_PWMC_EN;
+	val &= ~MX1_PWMC_EN;
 
 	writel(val, imx->mmio_base + MX1_PWMC);
+
+	clk_disable_unprepare(imx->clk_per);
 }
 
 static int imx_pwm_config_v2(struct pwm_chip *chip,
@@ -240,9 +255,9 @@ static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 }
 
 static struct pwm_ops imx_pwm_ops_v1 = {
-	.enable = imx_pwm_enable,
-	.disable = imx_pwm_disable,
-	.config = imx_pwm_config,
+	.enable = imx_pwm_enable_v1,
+	.disable = imx_pwm_disable_v1,
+	.config = imx_pwm_config_v1,
 	.owner = THIS_MODULE,
 };
 
@@ -261,8 +276,6 @@ struct imx_pwm_data {
 };
 
 static struct imx_pwm_data imx_pwm_data_v1 = {
-	.config = imx_pwm_config_v1,
-	.set_enable = imx_pwm_set_enable_v1,
 	.pwm_ops = &imx_pwm_ops_v1,
 };
 
