@@ -445,7 +445,7 @@ void choose_random_location(unsigned long input,
 	}
 
 #ifdef CONFIG_X86_64
-	_kernel_mapping_size = KERNEL_MAPPING_SIZE;
+	_kernel_mapping_size = KERNEL_MAPPING_SIZE_EXT;
 #endif
 
 	boot_params->hdr.loadflags |= KASLR_FLAG;

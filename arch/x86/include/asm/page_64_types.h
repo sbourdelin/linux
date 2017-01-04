@@ -64,10 +64,6 @@
  * kernel page table mapping, reducing the size of the modules area.
  */
 #define KERNEL_MAPPING_SIZE_EXT	(1024 * 1024 * 1024)
-#if defined(CONFIG_RANDOMIZE_BASE)
-#define KERNEL_MAPPING_SIZE	KERNEL_MAPPING_SIZE_EXT
-#else
-#define KERNEL_MAPPING_SIZE	KERNEL_IMAGE_SIZE
-#endif
+#define KERNEL_MAPPING_SIZE	kernel_mapping_size
 
 #endif /* _ASM_X86_PAGE_64_DEFS_H */

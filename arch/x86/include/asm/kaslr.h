@@ -2,6 +2,7 @@
 #define _ASM_KASLR_H_
 
 unsigned long kaslr_get_random_long(const char *purpose);
+extern unsigned long kernel_mapping_size;
 
 #ifdef CONFIG_RANDOMIZE_MEMORY
 extern unsigned long page_offset_base;

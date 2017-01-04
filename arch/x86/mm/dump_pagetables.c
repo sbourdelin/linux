@@ -82,7 +82,7 @@ static struct addr_marker address_markers[] = {
 	{ EFI_VA_END,		"EFI Runtime Services" },
 # endif
 	{ __START_KERNEL_map,   "High Kernel Mapping" },
-	{ MODULES_VADDR,        "Modules" },
+	{ 0/*MODULES_VADDR*/,        "Modules" },
 	{ MODULES_END,          "End Modules" },
 #else
 	{ PAGE_OFFSET,          "Kernel Mapping" },
@@ -442,6 +442,7 @@ static int __init pt_dump_init(void)
 	address_markers[LOW_KERNEL_NR].start_address = PAGE_OFFSET;
 	address_markers[VMALLOC_START_NR].start_address = VMALLOC_START;
 	address_markers[VMEMMAP_START_NR].start_address = VMEMMAP_START;
+	address_markers[MODULES_VADDR_NR].start_address = MODULES_VADDR;
 #endif
 #ifdef CONFIG_X86_32
 	address_markers[VMALLOC_START_NR].start_address = VMALLOC_START;
