@@ -381,13 +381,13 @@ static int rndis_filter_receive_data(struct rndis_device *dev,
 
 	vlan = rndis_get_ppi(rndis_pkt, IEEE_8021Q_INFO);
 	if (vlan) {
-		vlan_tci = VLAN_TAG_PRESENT | vlan->vlanid |
+		vlan_tci = vlan->vlanid |
 			(vlan->pri << VLAN_PRIO_SHIFT);
 	}
 
 	csum_info = rndis_get_ppi(rndis_pkt, TCPIP_CHKSUM_PKTINFO);
 	return netvsc_recv_callback(net_device_ctx->device_ctx, pkt, data,
-				    csum_info, channel, vlan_tci);
+				    csum_info, channel, vlan_tci, vlan);
 }
 
 int rndis_filter_receive(struct hv_device *dev,

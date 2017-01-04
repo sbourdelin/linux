@@ -595,7 +595,7 @@ void netvsc_linkstatus_callback(struct hv_device *device_obj,
 static struct sk_buff *netvsc_alloc_recv_skb(struct net_device *net,
 				struct hv_netvsc_packet *packet,
 				struct ndis_tcp_ip_checksum_info *csum_info,
-				void *data, u16 vlan_tci)
+				void *data)
 {
 	struct sk_buff *skb;
 
@@ -625,10 +625,6 @@ static struct sk_buff *netvsc_alloc_recv_skb(struct net_device *net,
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
 	}
 
-	if (vlan_tci & VLAN_TAG_PRESENT)
-		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q),
-				       vlan_tci);
-
 	return skb;
 }
 
@@ -641,7 +637,7 @@ int netvsc_recv_callback(struct hv_device *device_obj,
 				void **data,
 				struct ndis_tcp_ip_checksum_info *csum_info,
 				struct vmbus_channel *channel,
-				u16 vlan_tci)
+				u16 vlan_tci, bool vlan_present)
 {
 	struct net_device *net = hv_get_drvdata(device_obj);
 	struct net_device_context *net_device_ctx = netdev_priv(net);
@@ -664,11 +660,14 @@ int netvsc_recv_callback(struct hv_device *device_obj,
 		net = vf_netdev;
 
 	/* Allocate a skb - TODO direct I/O to pages? */
-	skb = netvsc_alloc_recv_skb(net, packet, csum_info, *data, vlan_tci);
+	skb = netvsc_alloc_recv_skb(net, packet, csum_info, *data);
 	if (unlikely(!skb)) {
 		++net->stats.rx_dropped;
 		return NVSP_STAT_FAIL;
 	}
+
+	if (vlan_present)
+		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), vlan_tci);
 
 	if (net != vf_netdev)
 		skb_record_rx_queue(skb,

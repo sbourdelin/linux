@@ -186,7 +186,7 @@ int netvsc_recv_callback(struct hv_device *device_obj,
 			void **data,
 			struct ndis_tcp_ip_checksum_info *csum_info,
 			struct vmbus_channel *channel,
-			u16 vlan_tci);
+			u16 vlan_tci, bool vlan_present);
 void netvsc_channel_cb(void *context);
 int rndis_filter_open(struct netvsc_device *nvdev);
 int rndis_filter_close(struct netvsc_device *nvdev);
