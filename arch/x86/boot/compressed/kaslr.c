@@ -11,6 +11,7 @@
  */
 #include "misc.h"
 #include "error.h"
+#include "../boot.h"
 
 #include <generated/compile.h>
 #include <linux/module.h>
@@ -56,11 +57,16 @@ struct mem_vector {
 	unsigned long size;
 };
 
+/* only supporting at most 4 unusable memmap regions with kaslr */
+#define MAX_MEMMAP_REGIONS	4
+
 enum mem_avoid_index {
 	MEM_AVOID_ZO_RANGE = 0,
 	MEM_AVOID_INITRD,
 	MEM_AVOID_CMDLINE,
 	MEM_AVOID_BOOTPARAMS,
+	MEM_AVOID_MEMMAP_BEGIN,
+	MEM_AVOID_MEMMAP_END = MEM_AVOID_MEMMAP_BEGIN + MAX_MEMMAP_REGIONS - 1,
 	MEM_AVOID_MAX,
 };
 
@@ -75,6 +81,121 @@ static bool mem_overlaps(struct mem_vector *one, struct mem_vector *two)
 	if (one->start >= two->start + two->size)
 		return false;
 	return true;
+}
+
+/**
+ *	_memparse - parse a string with mem suffixes into a number
+ *	@ptr: Where parse begins
+ *	@retptr: (output) Optional pointer to next char after parse completes
+ *
+ *	Parses a string into a number.  The number stored at @ptr is
+ *	potentially suffixed with K, M, G, T, P, E.
+ */
+static unsigned long long _memparse(const char *ptr, char **retptr)
+{
+	char *endptr;	/* local pointer to end of parsed string */
+
+	unsigned long long ret = simple_strtoull(ptr, &endptr, 0);
+
+	switch (*endptr) {
+	case 'E':
+	case 'e':
+		ret <<= 10;
+	case 'P':
+	case 'p':
+		ret <<= 10;
+	case 'T':
+	case 't':
+		ret <<= 10;
+	case 'G':
+	case 'g':
+		ret <<= 10;
+	case 'M':
+	case 'm':
+		ret <<= 10;
+	case 'K':
+	case 'k':
+		ret <<= 10;
+		endptr++;
+	default:
+		break;
+	}
+
+	if (retptr)
+		*retptr = endptr;
+
+	return ret;
+}
+
+static int
+parse_memmap(char *p, unsigned long long *start, unsigned long long *size)
+{
+	char *oldp;
+
+	if (!p)
+		return -EINVAL;
+
+	/* we don't care about this option here */
+	if (!strncmp(p, "exactmap", 8))
+		return -EINVAL;
+
+	oldp = p;
+	*size = _memparse(p, &p);
+	if (p == oldp)
+		return -EINVAL;
+
+	switch (*p) {
+	case '@':
+		/* skip this region, usable */
+		*start = 0;
+		*size = 0;
+		return 0;
+	case '#':
+	case '$':
+	case '!':
+		*start = _memparse(p + 1, &p);
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+static int mem_avoid_memmap(void)
+{
+	char arg[128];
+	int rc = 0;
+
+	/* see if we have any memmap areas */
+	if (cmdline_find_option("memmap", arg, sizeof(arg)) > 0) {
+		int i = 0;
+		char *str = arg;
+
+		while (str && (i < MAX_MEMMAP_REGIONS)) {
+			unsigned long long start, size;
+			char *k = strchr(str, ',');
+
+			if (k)
+				*k++ = 0;
+
+			rc = parse_memmap(str, &start, &size);
+			if (rc < 0)
+				break;
+			str = k;
+			/* a usable region that should not be skipped */
+			if (size == 0)
+				continue;
+
+			mem_avoid[MEM_AVOID_MEMMAP_BEGIN + i].start = start;
+			mem_avoid[MEM_AVOID_MEMMAP_BEGIN + i].size = size;
+			i++;
+		}
+
+		/* more than 4 memmaps, fail kaslr */
+		if ((i >= MAX_MEMMAP_REGIONS) && str)
+			rc = -EINVAL;
+	}
+
+	return rc;
 }
 
 /*
@@ -435,6 +556,12 @@ void choose_random_location(unsigned long input,
 
 	if (cmdline_find_option_bool("nokaslr")) {
 		warn("KASLR disabled: 'nokaslr' on cmdline.");
+		return;
+	}
+
+	/* Mark the memmap regions we need to avoid */
+	if (mem_avoid_memmap()) {
+		warn("KASLR disabled: memmap exceeds limit of 4, giving up.");
 		return;
 	}
 
