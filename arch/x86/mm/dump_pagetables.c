@@ -50,6 +50,9 @@ enum address_markers_idx {
 	LOW_KERNEL_NR,
 	VMALLOC_START_NR,
 	VMEMMAP_START_NR,
+# ifdef CONFIG_RANDOMIZE_MEMORY
+	GDT_REMAP_NR,
+# endif
 # ifdef CONFIG_X86_ESPFIX64
 	ESPFIX_START_NR,
 # endif
@@ -75,6 +78,9 @@ static struct addr_marker address_markers[] = {
 	{ 0/* PAGE_OFFSET */,   "Low Kernel Mapping" },
 	{ 0/* VMALLOC_START */, "vmalloc() Area" },
 	{ 0/* VMEMMAP_START */, "Vmemmap" },
+# ifdef CONFIG_RANDOMIZE_MEMORY
+	{ 0, "GDT remapping" },
+# endif
 # ifdef CONFIG_X86_ESPFIX64
 	{ ESPFIX_BASE_ADDR,	"ESPfix Area", 16 },
 # endif
@@ -442,6 +448,10 @@ static int __init pt_dump_init(void)
 	address_markers[LOW_KERNEL_NR].start_address = PAGE_OFFSET;
 	address_markers[VMALLOC_START_NR].start_address = VMALLOC_START;
 	address_markers[VMEMMAP_START_NR].start_address = VMEMMAP_START;
+#ifdef CONFIG_RANDOMIZE_MEMORY
+	address_markers[GDT_REMAP_NR].start_address =
+		(unsigned long) kaslr_get_gdt_remap(0);
+#endif
 #endif
 #ifdef CONFIG_X86_32
 	address_markers[VMALLOC_START_NR].start_address = VMALLOC_START;

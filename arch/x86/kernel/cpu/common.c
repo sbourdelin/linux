@@ -450,8 +450,13 @@ void load_percpu_segment(int cpu)
 void switch_to_new_gdt(int cpu)
 {
 	struct desc_ptr gdt_descr;
+	struct desc_struct *gdt;
 
-	gdt_descr.address = (long)get_cpu_gdt_table(cpu);
+	gdt = kaslr_get_gdt_remap(cpu);
+	if (!gdt)
+		gdt = get_cpu_gdt_table(cpu);
+
+	gdt_descr.address = (long)gdt;
 	gdt_descr.size = GDT_SIZE - 1;
 	load_gdt(&gdt_descr);
 	/* Reload the per-cpu base */

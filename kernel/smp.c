@@ -554,6 +554,7 @@ void __init smp_init(void)
 
 	idle_threads_init();
 	cpuhp_threads_init();
+	kernel_randomize_smp();
 
 	pr_info("Bringing up secondary CPUs ...\n");
 

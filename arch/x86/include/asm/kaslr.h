@@ -9,8 +9,12 @@ extern unsigned long vmalloc_base;
 extern unsigned long vmemmap_base;
 
 void kernel_randomize_memory(void);
+void kernel_randomize_smp(void);
+void* kaslr_get_gdt_remap(int cpu);
 #else
 static inline void kernel_randomize_memory(void) { }
+static inline void kernel_randomize_smp(void) { }
+static inline void *kaslr_get_gdt_remap(int cpu) { return NULL; }
 #endif /* CONFIG_RANDOMIZE_MEMORY */
 
 #endif

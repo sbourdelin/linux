@@ -1040,6 +1040,9 @@ void enable_nonboot_cpus(void)
 {
 	int cpu, error;
 
+	/* Redo KASLR steps for main processor */
+	kernel_randomize_smp();
+
 	/* Allow everyone to use the CPU hotplug again */
 	cpu_maps_update_begin();
 	__cpu_hotplug_enable();

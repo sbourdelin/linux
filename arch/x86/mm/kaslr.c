@@ -22,11 +22,13 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/random.h>
+#include <linux/slab.h>
 
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/setup.h>
 #include <asm/kaslr.h>
+#include <asm/desc.h>
 
 #include "mm_internal.h"
 
@@ -60,6 +62,7 @@ unsigned long vmalloc_base = __VMALLOC_BASE;
 EXPORT_SYMBOL(vmalloc_base);
 unsigned long vmemmap_base = __VMEMMAP_BASE;
 EXPORT_SYMBOL(vmemmap_base);
+unsigned long gdt_tables_base = 0;
 
 /*
  * Memory regions randomized by KASLR (except modules that use a separate logic
@@ -97,7 +100,7 @@ void __init kernel_randomize_memory(void)
 	unsigned long vaddr = vaddr_start;
 	unsigned long rand, memory_tb;
 	struct rnd_state rand_state;
-	unsigned long remain_entropy;
+	unsigned long remain_entropy, gdt_reserved;
 
 	/*
 	 * All these BUILD_BUG_ON checks ensures the memory layout is
@@ -130,6 +133,13 @@ void __init kernel_randomize_memory(void)
 	remain_entropy = vaddr_end - vaddr_start;
 	for (i = 0; i < ARRAY_SIZE(kaslr_regions); i++)
 		remain_entropy -= get_padding(&kaslr_regions[i]);
+
+	/* Reserve space for fixed GDTs, if we have enough available */
+	gdt_reserved = sizeof(struct gdt_page) * max(setup_max_cpus, 1U);
+	if (gdt_reserved < remain_entropy) {
+		gdt_tables_base = vaddr_end - gdt_reserved;
+		remain_entropy -= gdt_reserved;
+	}
 
 	prandom_seed_state(&rand_state, kaslr_get_random_long("Memory"));
 
@@ -191,4 +201,99 @@ void __meminit init_trampoline(void)
 
 	set_pgd(&trampoline_pgd_entry,
 		__pgd(_KERNPG_TABLE | __pa(pud_page_tramp)));
+}
+
+/* Hold the remapping of the gdt page for each cpu */
+DEFINE_PER_CPU_PAGE_ALIGNED(struct desc_struct *, gdt_remap);
+
+/* Return the address where the GDT is remapped for this CPU */
+static unsigned long gdt_remap_address(int cpu)
+{
+	return gdt_tables_base + cpu * sizeof(struct gdt_page);
+}
+
+/* Remap the specified gdt table */
+static struct desc_struct *remap_gdt(int cpu)
+{
+	pgd_t *pgd;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+	struct desc_struct *gdt;
+	unsigned long addr;
+
+	/* GDT table should be only one page */
+	BUILD_BUG_ON(sizeof(struct gdt_page) != PAGE_SIZE);
+
+	/* Keep the original GDT before the allocator is available */
+	if (!slab_is_available())
+		return NULL;
+
+	gdt = get_cpu_gdt_table(cpu);
+	addr = gdt_remap_address(cpu);
+
+	pgd = pgd_offset_k(addr);
+	pud = pud_alloc(&init_mm, pgd, addr);
+	if (WARN_ON(!pud))
+		return NULL;
+	pmd = pmd_alloc(&init_mm, pud, addr);
+	if (WARN_ON(!pmd))
+		return NULL;
+	pte = pte_alloc_kernel(pmd, addr);
+	if (WARN_ON(!pte))
+		return NULL;
+
+	/* If the PTE is already set, something is wrong with the VA ranges */
+	BUG_ON(!pte_none(*pte));
+
+	/* Remap the target GDT and return it */
+	set_pte_at(&init_mm, addr, pte,
+		   pfn_pte(PFN_DOWN(__pa(gdt)), PAGE_KERNEL));
+	gdt = (struct desc_struct *)addr;
+	per_cpu(gdt_remap, cpu) = gdt;
+	return gdt;
+}
+
+/* Check if GDT remapping is enabled */
+static bool kaslr_gdt_remap_enabled(void)
+{
+	return kaslr_memory_enabled() && gdt_tables_base != 0;
+}
+
+/*
+ * The GDT table address is available to user-mode through the sgdt
+ * instruction. This function will return a fixed remapping to load so you
+ * cannot leak the per-cpu structure address.
+ */
+void* kaslr_get_gdt_remap(int cpu)
+{
+	struct desc_struct *gdt_remapping;
+
+	if (!kaslr_gdt_remap_enabled())
+		return NULL;
+
+	gdt_remapping = per_cpu(gdt_remap, cpu);
+	if (!gdt_remapping)
+		gdt_remapping = remap_gdt(cpu);
+
+	return gdt_remapping;
+}
+
+/*
+ * Switch the first processor GDT to the remapping. The GDT is loaded too early
+ * to generate the remapping correctly. This step is done later at boot or
+ * before other processors come back from hibernation.
+ */
+void kernel_randomize_smp(void)
+{
+	struct desc_ptr gdt_descr;
+	struct desc_struct *gdt;
+
+	gdt = kaslr_get_gdt_remap(raw_smp_processor_id());
+	if (WARN_ON(!gdt))
+		return;
+
+	gdt_descr.address = (long)gdt;
+	gdt_descr.size = GDT_SIZE - 1;
+	load_gdt(&gdt_descr);
 }
