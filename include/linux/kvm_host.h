@@ -283,6 +283,7 @@ struct kvm_vcpu {
 	struct dentry *debugfs_dentry;
 #ifdef KVM_DIRTY_LOG_PAGE_OFFSET
 	struct gfn_list_t *dirty_logs;
+	bool need_exit;
 #endif
 };
 

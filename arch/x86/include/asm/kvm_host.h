@@ -75,6 +75,7 @@
 #define KVM_REQ_HV_RESET          28
 #define KVM_REQ_HV_EXIT           29
 #define KVM_REQ_HV_STIMER         30
+#define KVM_REQ_EXIT_DIRTY_LOG_FULL 31
 
 #define CR0_RESERVED_BITS                                               \
 	(~(unsigned long)(X86_CR0_PE | X86_CR0_MP | X86_CR0_EM | X86_CR0_TS \
@@ -997,6 +998,8 @@ struct kvm_x86_ops {
 	 *  - enable_log_dirty_pt_masked:
 	 *	called when reenabling log dirty for the GFNs in the mask after
 	 *	corresponding bits are cleared in slot->dirty_bitmap.
+	 *  - cpu_dirty_log_size:
+	 *      called to inquire about the size of the hardware dirty log
 	 */
 	void (*slot_enable_log_dirty)(struct kvm *kvm,
 				      struct kvm_memory_slot *slot);
@@ -1006,6 +1009,8 @@ struct kvm_x86_ops {
 	void (*enable_log_dirty_pt_masked)(struct kvm *kvm,
 					   struct kvm_memory_slot *slot,
 					   gfn_t offset, unsigned long mask);
+	int (*cpu_dirty_log_size)(void);
+
 	/* pmu operations of sub-arch */
 	const struct kvm_pmu_ops *pmu_ops;
 
@@ -1387,6 +1392,8 @@ bool kvm_intr_is_single_vcpu(struct kvm *kvm, struct kvm_lapic_irq *irq,
 
 void kvm_set_msi_irq(struct kvm *kvm, struct kvm_kernel_irq_routing_entry *e,
 		     struct kvm_lapic_irq *irq);
+
+int kvm_mt_cpu_dirty_log_size(void);
 
 static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
 {

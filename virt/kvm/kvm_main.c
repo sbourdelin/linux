@@ -270,6 +270,7 @@ int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
 		}
 		vcpu->dirty_logs = page_address(page);
 	}
+	vcpu->need_exit = false;
 #endif
 
 	kvm_vcpu_set_in_spin_loop(vcpu, false);
@@ -3030,6 +3031,29 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 }
 
 #ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+static void kvm_mt_dirty_log_full(struct kvm *kvm, struct kvm_vcpu *vcpu)
+{
+	/*
+	 * Request vcpu exits, but if interrupts are disabled, we have
+	 * to defer the requests because smp_call_xxx may deadlock when
+	 * called that way.
+	 */
+	if (vcpu && irqs_disabled()) {
+		kvm_make_request(KVM_REQ_EXIT_DIRTY_LOG_FULL, vcpu);
+		vcpu->need_exit = true;
+	} else {
+		WARN_ON(irqs_disabled());
+		kvm_make_all_cpus_request(kvm,
+					  KVM_REQ_EXIT_DIRTY_LOG_FULL);
+	}
+}
+
+/*
+ * estimated number of pages being dirtied during vcpu exit, not counting
+ * hardware dirty log (PML) flush
+ */
+#define KVM_MT_DIRTY_PAGE_NUM_EXTRA 128
+
 void kvm_mt_mark_page_dirty(struct kvm *kvm, struct kvm_memory_slot *slot,
 	struct kvm_vcpu *vcpu, gfn_t gfn)
 {
@@ -3037,6 +3061,7 @@ void kvm_mt_mark_page_dirty(struct kvm *kvm, struct kvm_memory_slot *slot,
 	int slot_id;
 	u32 as_id = 0;
 	u64 offset;
+	u32 extra = KVM_MT_DIRTY_PAGE_NUM_EXTRA;
 
 	if (!slot || !slot->dirty_bitmap || !kvm->dirty_log_size)
 		return;
@@ -3068,6 +3093,17 @@ void kvm_mt_mark_page_dirty(struct kvm *kvm, struct kvm_memory_slot *slot,
 	gfnlist->dirty_gfns[gfnlist->dirty_index].offset = offset;
 	smp_wmb();
 	gfnlist->dirty_index++;
+
+	/*
+	 * more pages will be dirtied during vcpu exit, e.g. pml log
+	 * being flushed. So allow some buffer space.
+	 */
+	if (vcpu)
+		extra += kvm_mt_cpu_dirty_log_size();
+
+	if (gfnlist->dirty_index == (kvm->max_dirty_logs - extra))
+		kvm_mt_dirty_log_full(kvm, vcpu);
+
 	if (!vcpu)
 		spin_unlock(&kvm->dirty_log_lock);
 }

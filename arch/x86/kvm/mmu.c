@@ -4980,6 +4980,13 @@ void kvm_mmu_invalidate_mmio_sptes(struct kvm *kvm, struct kvm_memslots *slots)
 	}
 }
 
+int kvm_mt_cpu_dirty_log_size(void)
+{
+	if (kvm_x86_ops->cpu_dirty_log_size)
+		return kvm_x86_ops->cpu_dirty_log_size();
+	return 0;
+}
+
 static unsigned long
 mmu_shrink_scan(struct shrinker *shrink, struct shrink_control *sc)
 {
