@@ -15,6 +15,7 @@
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/idr.h>
+#include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/mux.h>
 #include <linux/of.h>
@@ -288,6 +289,63 @@ static struct mux_chip *of_find_mux_chip_by_node(struct device_node *np)
 	return dev ? to_mux_chip(dev) : NULL;
 }
 
+#ifdef CONFIG_MUX_GPIO
+
+static int mux_gpio_set(struct mux_control *mux, int state)
+{
+	struct mux_gpio *mux_gpio = mux_chip_priv(mux->chip);
+	int i;
+
+	for (i = 0; i < mux_gpio->gpios->ndescs; i++)
+		mux_gpio->val[i] = (state >> i) & 1;
+
+	gpiod_set_array_value_cansleep(mux_gpio->gpios->ndescs,
+				       mux_gpio->gpios->desc,
+				       mux_gpio->val);
+
+	return 0;
+}
+
+static const struct mux_control_ops mux_gpio_ops = {
+	.set = mux_gpio_set,
+};
+
+struct mux_chip *mux_gpio_alloc(struct device *dev)
+{
+	struct mux_chip *mux_chip;
+	struct mux_gpio *mux_gpio;
+	int pins;
+	int ret;
+
+	pins = gpiod_count(dev, "mux");
+	if (pins < 0)
+		return ERR_PTR(pins);
+
+	mux_chip = devm_mux_chip_alloc(dev, 1, sizeof(*mux_gpio) +
+				       pins * sizeof(*mux_gpio->val));
+	if (!mux_chip)
+		return ERR_PTR(-ENOMEM);
+
+	mux_gpio = mux_chip_priv(mux_chip);
+	mux_gpio->val = (int *)(mux_gpio + 1);
+	mux_chip->ops = &mux_gpio_ops;
+
+	mux_gpio->gpios = devm_gpiod_get_array(dev, "mux", GPIOD_OUT_LOW);
+	if (IS_ERR(mux_gpio->gpios)) {
+		ret = PTR_ERR(mux_gpio->gpios);
+		if (ret != -EPROBE_DEFER)
+			dev_err(dev, "failed to get gpios\n");
+		return ERR_PTR(ret);
+	}
+	WARN_ON(pins != mux_gpio->gpios->ndescs);
+	mux_chip->mux->states = 1 << pins;
+
+	return mux_chip;
+}
+EXPORT_SYMBOL_GPL(mux_gpio_alloc);
+
+#endif /* CONFIG_MUX_GPIO */
+
 struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
 {
 	struct device_node *np = dev->of_node;
@@ -307,9 +365,28 @@ struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
 	ret = of_parse_phandle_with_args(np,
 					 "mux-controls", "#mux-control-cells",
 					 index, &args);
+
+#ifdef CONFIG_MUX_GPIO
+	if (ret == -ENOENT && !mux_name && gpiod_count(dev, "mux") > 0) {
+		mux_chip = mux_gpio_alloc(dev);
+		if (!IS_ERR(mux_chip)) {
+			ret = devm_mux_chip_register(dev, mux_chip);
+			if (ret < 0) {
+				dev_err(dev, "failed to register mux-chip\n");
+				return ERR_PTR(ret);
+			}
+			get_device(&mux_chip->dev);
+			return mux_chip->mux;
+		}
+
+		ret = PTR_ERR(mux_chip);
+	}
+#endif
+
 	if (ret) {
-		dev_err(dev, "%s: failed to get mux-control %s(%i)\n",
-			np->full_name, mux_name ?: "", index);
+		if (ret != -EPROBE_DEFER)
+			dev_err(dev, "%s: failed to get mux-control %s(%i)\n",
+				np->full_name, mux_name ?: "", index);
 		return ERR_PTR(ret);
 	}
 

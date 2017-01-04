@@ -241,4 +241,11 @@ struct mux_control *devm_mux_control_get(struct device *dev,
  */
 void devm_mux_control_put(struct device *dev, struct mux_control *mux);
 
+struct mux_gpio {
+	struct gpio_descs *gpios;
+	int *val;
+};
+
+struct mux_chip *mux_gpio_alloc(struct device *dev);
+
 #endif /* _LINUX_MUX_H */
