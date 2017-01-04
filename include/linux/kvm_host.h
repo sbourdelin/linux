@@ -204,6 +204,22 @@ struct kvm_mmio_fragment {
 	unsigned len;
 };
 
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+struct dirty_gfn_t {
+	__u32 slot; /* as_id | slot_id */
+	__u32 pad;
+	__u64 offset;
+};
+
+struct gfn_list_t {
+	__u32 dirty_index; /* where to put the next dirty GFN */
+	__u32 avail_index; /* GFNs before this can be harvested */
+	__u32 fetch_index; /* the next GFN to be harvested */
+	__u32 pad;
+	struct dirty_gfn_t dirty_gfns[0];
+};
+#endif
+
 struct kvm_vcpu {
 	struct kvm *kvm;
 #ifdef CONFIG_PREEMPT_NOTIFIERS
@@ -265,6 +281,9 @@ struct kvm_vcpu {
 	bool preempted;
 	struct kvm_vcpu_arch arch;
 	struct dentry *debugfs_dentry;
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+	struct gfn_list_t *dirty_logs;
+#endif
 };
 
 static inline int kvm_vcpu_exiting_guest_mode(struct kvm_vcpu *vcpu)
@@ -430,6 +449,12 @@ struct kvm {
 	struct list_head devices;
 	struct dentry *debugfs_dentry;
 	struct kvm_stat_data **debugfs_stat_data;
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+	u32 dirty_log_size;
+	u32 max_dirty_logs;
+	struct gfn_list_t *dirty_logs;
+	spinlock_t dirty_log_lock;
+#endif
 };
 
 #define kvm_err(fmt, ...) \

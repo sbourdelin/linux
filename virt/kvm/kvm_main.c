@@ -122,6 +122,12 @@ static void kvm_io_bus_destroy(struct kvm_io_bus *bus);
 
 static void kvm_release_pfn_dirty(kvm_pfn_t pfn);
 static void mark_page_dirty_in_slot(struct kvm_memory_slot *memslot, gfn_t gfn);
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+static void kvm_mt_mark_page_dirty(struct kvm *kvm,
+				   struct kvm_memory_slot *slot,
+				   struct kvm_vcpu *vcpu,
+				   gfn_t gfn);
+#endif
 
 __visible bool kvm_rebooting;
 EXPORT_SYMBOL_GPL(kvm_rebooting);
@@ -254,15 +260,37 @@ int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
 	}
 	vcpu->run = page_address(page);
 
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+	if (kvm->dirty_log_size) {
+		page = alloc_pages(GFP_KERNEL | __GFP_ZERO,
+				   get_order(kvm->dirty_log_size));
+		if (!page) {
+			r = -ENOMEM;
+			goto fail_free_run;
+		}
+		vcpu->dirty_logs = page_address(page);
+	}
+#endif
+
 	kvm_vcpu_set_in_spin_loop(vcpu, false);
 	kvm_vcpu_set_dy_eligible(vcpu, false);
 	vcpu->preempted = false;
 
 	r = kvm_arch_vcpu_init(vcpu);
 	if (r < 0)
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+		goto fail_free_logs;
+#else
 		goto fail_free_run;
+#endif
 	return 0;
 
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+fail_free_logs:
+	if (kvm->dirty_log_size)
+		free_pages((unsigned long)vcpu->dirty_logs,
+			   get_order(kvm->dirty_log_size));
+#endif
 fail_free_run:
 	free_page((unsigned long)vcpu->run);
 fail:
@@ -275,6 +303,11 @@ void kvm_vcpu_uninit(struct kvm_vcpu *vcpu)
 	put_pid(vcpu->pid);
 	kvm_arch_vcpu_uninit(vcpu);
 	free_page((unsigned long)vcpu->run);
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+	if (vcpu->kvm->dirty_log_size)
+		free_pages((unsigned long)vcpu->dirty_logs,
+			   get_order(vcpu->kvm->dirty_log_size));
+#endif
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_uninit);
 
@@ -726,6 +759,11 @@ static void kvm_destroy_vm(struct kvm *kvm)
 	for (i = 0; i < KVM_NR_BUSES; i++)
 		kvm_io_bus_destroy(kvm->buses[i]);
 	kvm_coalesced_mmio_free(kvm);
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+	if (kvm->dirty_log_size)
+		free_pages((unsigned long)kvm->dirty_logs,
+			  get_order(kvm->dirty_log_size));
+#endif
 #if defined(CONFIG_MMU_NOTIFIER) && defined(KVM_ARCH_WANT_MMU_NOTIFIER)
 	mmu_notifier_unregister(&kvm->mmu_notifier, kvm->mm);
 #else
@@ -1862,7 +1900,8 @@ int kvm_vcpu_read_guest_atomic(struct kvm_vcpu *vcpu, gpa_t gpa,
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_read_guest_atomic);
 
-static int __kvm_write_guest_page(struct kvm_memory_slot *memslot, gfn_t gfn,
+static int __kvm_write_guest_page(struct kvm *kvm,
+				  struct kvm_memory_slot *memslot, gfn_t gfn,
 			          const void *data, int offset, int len)
 {
 	int r;
@@ -1874,6 +1913,9 @@ static int __kvm_write_guest_page(struct kvm_memory_slot *memslot, gfn_t gfn,
 	r = __copy_to_user((void __user *)addr + offset, data, len);
 	if (r)
 		return -EFAULT;
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+	kvm_mt_mark_page_dirty(kvm, memslot, NULL, gfn);
+#endif
 	mark_page_dirty_in_slot(memslot, gfn);
 	return 0;
 }
@@ -1883,7 +1925,7 @@ int kvm_write_guest_page(struct kvm *kvm, gfn_t gfn,
 {
 	struct kvm_memory_slot *slot = gfn_to_memslot(kvm, gfn);
 
-	return __kvm_write_guest_page(slot, gfn, data, offset, len);
+	return __kvm_write_guest_page(kvm, slot, gfn, data, offset, len);
 }
 EXPORT_SYMBOL_GPL(kvm_write_guest_page);
 
@@ -1892,7 +1934,7 @@ int kvm_vcpu_write_guest_page(struct kvm_vcpu *vcpu, gfn_t gfn,
 {
 	struct kvm_memory_slot *slot = kvm_vcpu_gfn_to_memslot(vcpu, gfn);
 
-	return __kvm_write_guest_page(slot, gfn, data, offset, len);
+	return __kvm_write_guest_page(vcpu->kvm, slot, gfn, data, offset, len);
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_write_guest_page);
 
@@ -1996,6 +2038,9 @@ int kvm_write_guest_offset_cached(struct kvm *kvm, struct gfn_to_hva_cache *ghc,
 	r = __copy_to_user((void __user *)ghc->hva + offset, data, len);
 	if (r)
 		return -EFAULT;
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+	kvm_mt_mark_page_dirty(kvm, ghc->memslot, NULL, gpa >> PAGE_SHIFT);
+#endif
 	mark_page_dirty_in_slot(ghc->memslot, gpa >> PAGE_SHIFT);
 
 	return 0;
@@ -2076,6 +2121,12 @@ void mark_page_dirty(struct kvm *kvm, gfn_t gfn)
 	struct kvm_memory_slot *memslot;
 
 	memslot = gfn_to_memslot(kvm, gfn);
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+	if (memslot) {
+		if (memslot->id >= 0 && memslot->id < KVM_USER_MEM_SLOTS)
+			kvm_mt_mark_page_dirty(kvm, memslot, NULL, gfn);
+	}
+#endif
 	mark_page_dirty_in_slot(memslot, gfn);
 }
 EXPORT_SYMBOL_GPL(mark_page_dirty);
@@ -2085,6 +2136,13 @@ void kvm_vcpu_mark_page_dirty(struct kvm_vcpu *vcpu, gfn_t gfn)
 	struct kvm_memory_slot *memslot;
 
 	memslot = kvm_vcpu_gfn_to_memslot(vcpu, gfn);
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+	if (memslot) {
+		if (memslot->id >= 0 && memslot->id < KVM_USER_MEM_SLOTS)
+			kvm_mt_mark_page_dirty(vcpu->kvm, memslot,
+					       vcpu, gfn);
+	}
+#endif
 	mark_page_dirty_in_slot(memslot, gfn);
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_mark_page_dirty);
@@ -2377,6 +2435,32 @@ static const struct vm_operations_struct kvm_vcpu_vm_ops = {
 
 static int kvm_vcpu_mmap(struct file *file, struct vm_area_struct *vma)
 {
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+	struct kvm_vcpu *vcpu = file->private_data;
+	unsigned long start, pfn, size;
+	int ret;
+	struct gfn_list_t *log;
+
+	if (vcpu->kvm->dirty_log_size) {
+		size = vcpu->kvm->dirty_log_size;
+		start = vma->vm_start +
+			KVM_DIRTY_LOG_PAGE_OFFSET*PAGE_SIZE;
+		log = vcpu->kvm->dirty_logs;
+		pfn = page_to_pfn(virt_to_page((unsigned long)log));
+		ret = remap_pfn_range(vma, start, pfn, size,
+				      vma->vm_page_prot);
+		if (ret)
+			return ret;
+		start = vma->vm_start +
+			KVM_DIRTY_LOG_PAGE_OFFSET*PAGE_SIZE + size;
+		log = vcpu->dirty_logs;
+		pfn = page_to_pfn(virt_to_page((unsigned long)log));
+		ret = remap_pfn_range(vma, start, pfn, size,
+				      vma->vm_page_prot);
+		if (ret)
+			return ret;
+	}
+#endif
 	vma->vm_ops = &kvm_vcpu_vm_ops;
 	return 0;
 }
@@ -2946,19 +3030,143 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 }
 
 #ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+void kvm_mt_mark_page_dirty(struct kvm *kvm, struct kvm_memory_slot *slot,
+	struct kvm_vcpu *vcpu, gfn_t gfn)
+{
+	struct gfn_list_t *gfnlist;
+	int slot_id;
+	u32 as_id = 0;
+	u64 offset;
+
+	if (!slot || !slot->dirty_bitmap || !kvm->dirty_log_size)
+		return;
+
+	offset = gfn - slot->base_gfn;
+
+	if (test_bit_le(offset, slot->dirty_bitmap))
+		return;
+
+	slot_id = slot->id;
+
+	if (vcpu)
+		as_id = kvm_arch_vcpu_memslots_id(vcpu);
+
+	if (vcpu)
+		gfnlist = vcpu->dirty_logs;
+	else
+		gfnlist = kvm->dirty_logs;
+
+	if (gfnlist->dirty_index == kvm->max_dirty_logs) {
+		printk(KERN_ERR "dirty log overflow\n");
+		return;
+	}
+
+	if (!vcpu)
+		spin_lock(&kvm->dirty_log_lock);
+	gfnlist->dirty_gfns[gfnlist->dirty_index].slot =
+		(as_id << 16) | slot_id;
+	gfnlist->dirty_gfns[gfnlist->dirty_index].offset = offset;
+	smp_wmb();
+	gfnlist->dirty_index++;
+	if (!vcpu)
+		spin_unlock(&kvm->dirty_log_lock);
+}
+
 static int kvm_mt_set_dirty_log_size(struct kvm *kvm, u32 size)
 {
-	return -EINVAL;
+	struct page *page;
+
+	if (!size)
+		return -EINVAL;
+
+	kvm->dirty_log_size = get_order(size) * PAGE_SIZE;
+	kvm->max_dirty_logs = (kvm->dirty_log_size -
+			       sizeof(struct gfn_list_t)) /
+			      sizeof(struct dirty_gfn_t);
+	page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(size));
+	if (!page) {
+		kvm_put_kvm(kvm);
+		return -ENOMEM;
+	}
+	kvm->dirty_logs = page_address(page);
+	spin_lock_init(&kvm->dirty_log_lock);
+	return 0;
+}
+
+static void kvm_mt_reset_gfn(struct kvm *kvm,
+			     struct dirty_gfn_t *slot_offset)
+{
+	struct kvm_memory_slot *slot;
+	int as_id, id;
+
+	as_id = slot_offset->slot >> 16;
+	id = (u16)slot_offset->slot;
+	slot = id_to_memslot(__kvm_memslots(kvm, as_id), id);
+
+	clear_bit_le(slot_offset->offset, slot->dirty_bitmap);
+	kvm_arch_mmu_enable_log_dirty_pt_masked(kvm, slot,
+						slot_offset->offset, 1);
 }
 
 static int kvm_mt_reset_all_gfns(struct kvm *kvm)
 {
-	return -EINVAL;
+	int i, j;
+	struct kvm_vcpu *vcpu;
+	int cleared = 0;
+
+	if (!kvm->dirty_log_size)
+		return -EINVAL;
+
+	spin_lock(&kvm->mmu_lock);
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		for (j = 0;
+		     j < vcpu->dirty_logs->dirty_index;
+		     j++, cleared++)
+			kvm_mt_reset_gfn(kvm,
+					 &kvm->dirty_logs->dirty_gfns[j]);
+		vcpu->dirty_logs->dirty_index = 0;
+		vcpu->dirty_logs->avail_index = 0;
+		vcpu->dirty_logs->fetch_index = 0;
+	}
+
+	for (j = 0; j < kvm->dirty_logs->dirty_index; j++, cleared++)
+		kvm_mt_reset_gfn(kvm, &kvm->dirty_logs->dirty_gfns[j]);
+	kvm->dirty_logs->dirty_index = 0;
+	kvm->dirty_logs->avail_index = 0;
+	kvm->dirty_logs->fetch_index = 0;
+
+	spin_unlock(&kvm->mmu_lock);
+
+	if (cleared)
+		kvm_flush_remote_tlbs(kvm);
+
+	return 0;
 }
 
 static int kvm_mt_get_dirty_count(struct kvm *kvm, u32 *count)
 {
-	return -EINVAL;
+	int i, avail = 0;
+	struct kvm_vcpu *vcpu;
+
+	if (!kvm->dirty_log_size)
+		return -EINVAL;
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		vcpu->dirty_logs->avail_index =
+			READ_ONCE(vcpu->dirty_logs->dirty_index);
+		avail += vcpu->dirty_logs->avail_index -
+			 vcpu->dirty_logs->fetch_index;
+	}
+
+	kvm->dirty_logs->avail_index =
+		READ_ONCE(kvm->dirty_logs->dirty_index);
+	avail += kvm->dirty_logs->avail_index -
+		 kvm->dirty_logs->fetch_index;
+
+	*count = avail;
+
+	return 0;
 }
 #endif /* KVM_DIRTY_LOG_PAGE_OFFSET*/
 
