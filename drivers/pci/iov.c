@@ -113,7 +113,7 @@ resource_size_t pci_iov_resource_size(struct pci_dev *dev, int resno)
 	return dev->sriov->barsz[resno - PCI_IOV_RESOURCES];
 }
 
-int pci_iov_add_virtfn(struct pci_dev *dev, int id, int reset)
+static int pci_iov_add_virtfn(struct pci_dev *dev, int id, int reset)
 {
 	int i;
 	int rc = -ENOMEM;
@@ -124,7 +124,6 @@ int pci_iov_add_virtfn(struct pci_dev *dev, int id, int reset)
 	struct pci_sriov *iov = dev->sriov;
 	struct pci_bus *bus;
 
-	mutex_lock(&iov->dev->sriov->lock);
 	bus = virtfn_add_bus(dev->bus, pci_iov_virtfn_bus(dev, id));
 	if (!bus)
 		goto failed;
@@ -162,7 +161,6 @@ int pci_iov_add_virtfn(struct pci_dev *dev, int id, int reset)
 		__pci_reset_function(virtfn);
 
 	pci_device_add(virtfn, virtfn->bus);
-	mutex_unlock(&iov->dev->sriov->lock);
 
 	pci_bus_add_device(virtfn);
 	sprintf(buf, "virtfn%u", id);
@@ -191,11 +189,22 @@ failed:
 	return rc;
 }
 
-void pci_iov_remove_virtfn(struct pci_dev *dev, int id, int reset)
+int pci_iov_add_virtfn_locked(struct pci_dev *dev, int id, int reset)
+{
+	struct pci_sriov *iov = dev->sriov;
+	int rc;
+
+	mutex_lock(&iov->dev->sriov->lock);
+	rc = pci_iov_add_virtfn(dev, id, reset);
+	mutex_unlock(&iov->dev->sriov->lock);
+
+	return rc;
+}
+
+static void pci_iov_remove_virtfn(struct pci_dev *dev, int id, int reset)
 {
 	char buf[VIRTFN_ID_LEN];
 	struct pci_dev *virtfn;
-	struct pci_sriov *iov = dev->sriov;
 
 	virtfn = pci_get_domain_bus_and_slot(pci_domain_nr(dev->bus),
 					     pci_iov_virtfn_bus(dev, id),
@@ -218,15 +227,23 @@ void pci_iov_remove_virtfn(struct pci_dev *dev, int id, int reset)
 	if (virtfn->dev.kobj.sd)
 		sysfs_remove_link(&virtfn->dev.kobj, "physfn");
 
-	mutex_lock(&iov->dev->sriov->lock);
 	pci_stop_and_remove_bus_device(virtfn);
 	virtfn_remove_bus(dev->bus, virtfn->bus);
-	mutex_unlock(&iov->dev->sriov->lock);
 
 	/* balance pci_get_domain_bus_and_slot() */
 	pci_dev_put(virtfn);
 	pci_dev_put(dev);
 }
+
+void pci_iov_remove_virtfn_locked(struct pci_dev *dev, int id, int reset)
+{
+	struct pci_sriov *iov = dev->sriov;
+
+	mutex_lock(&iov->dev->sriov->lock);
+	pci_iov_remove_virtfn(dev, id, reset);
+	mutex_unlock(&iov->dev->sriov->lock);
+}
+
 
 int __weak pcibios_sriov_enable(struct pci_dev *pdev, u16 num_vfs)
 {
