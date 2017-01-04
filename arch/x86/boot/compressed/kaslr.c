@@ -22,6 +22,12 @@
 static const char build_str[] = UTS_RELEASE " (" LINUX_COMPILE_BY "@"
 		LINUX_COMPILE_HOST ") (" LINUX_COMPILER ") " UTS_VERSION;
 
+/*
+ * By default, the size of kernel text mapping equals KERNEL_IMAGE_SIZE.
+ * While x86_64 may extend it to 1G if KASLR is enabled.
+ */
+static unsigned long _kernel_mapping_size = KERNEL_IMAGE_SIZE;
+
 static unsigned long rotate_xor(unsigned long hash, const void *area,
 				size_t size)
 {
@@ -311,7 +317,7 @@ static void process_e820_entry(struct e820entry *entry,
 		return;
 
 	/* On 32-bit, ignore entries entirely above our maximum. */
-	if (IS_ENABLED(CONFIG_X86_32) && entry->addr >= KERNEL_IMAGE_SIZE)
+	if (IS_ENABLED(CONFIG_X86_32) && entry->addr >= _kernel_mapping_size)
 		return;
 
 	/* Ignore entries entirely below our minimum. */
@@ -341,8 +347,8 @@ static void process_e820_entry(struct e820entry *entry,
 
 		/* On 32-bit, reduce region size to fit within max size. */
 		if (IS_ENABLED(CONFIG_X86_32) &&
-		    region.start + region.size > KERNEL_IMAGE_SIZE)
-			region.size = KERNEL_IMAGE_SIZE - region.start;
+		    region.start + region.size > _kernel_mapping_size)
+			region.size = _kernel_mapping_size - region.start;
 
 		/* Return if region can't contain decompressed kernel */
 		if (region.size < image_size)
@@ -408,9 +414,9 @@ static unsigned long find_random_virt_addr(unsigned long minimum,
 	/*
 	 * There are how many CONFIG_PHYSICAL_ALIGN-sized slots
 	 * that can hold image_size within the range of minimum to
-	 * KERNEL_IMAGE_SIZE?
+	 * _kernel_mapping_size?
 	 */
-	slots = (KERNEL_IMAGE_SIZE - minimum - image_size) /
+	slots = (_kernel_mapping_size - minimum - image_size) /
 		 CONFIG_PHYSICAL_ALIGN + 1;
 
 	random_addr = kaslr_get_random_long("Virtual") % slots;
@@ -437,6 +443,10 @@ void choose_random_location(unsigned long input,
 		warn("KASLR disabled: 'nokaslr' on cmdline.");
 		return;
 	}
+
+#ifdef CONFIG_X86_64
+	_kernel_mapping_size = KERNEL_MAPPING_SIZE;
+#endif
 
 	boot_params->hdr.loadflags |= KASLR_FLAG;
 
