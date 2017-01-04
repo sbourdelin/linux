@@ -339,6 +339,7 @@ struct ib_ucontext *pvrdma_alloc_ucontext(struct ib_device *ibdev,
 	context->ctx_handle = resp->ctx_handle;
 
 	/* copy back to user */
+	memset(&uresp, 0, sizeof(uresp));
 	uresp.qp_tab_size = vdev->dsr->caps.max_qp;
 	ret = ib_copy_to_udata(udata, &uresp, sizeof(uresp));
 	if (ret) {
