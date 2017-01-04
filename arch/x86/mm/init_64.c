@@ -307,7 +307,7 @@ void __init init_extra_mapping_uc(unsigned long phys, unsigned long size)
 void __init cleanup_highmap(void)
 {
 	unsigned long vaddr = __START_KERNEL_map;
-	unsigned long vaddr_end = __START_KERNEL_map + KERNEL_IMAGE_SIZE;
+	unsigned long vaddr_end = __START_KERNEL_map + KERNEL_MAPPING_SIZE_EXT;
 	unsigned long end = roundup((unsigned long)_brk_end, PMD_SIZE) - 1;
 	pmd_t *pmd = level2_kernel_pgt;
 
