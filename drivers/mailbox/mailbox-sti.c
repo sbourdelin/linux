@@ -433,7 +433,7 @@ static int sti_mbox_probe(struct platform_device *pdev)
 	if (IS_ERR(mdev->base))
 		return PTR_ERR(mdev->base);
 
-	ret = of_property_read_string(np, "mbox-name", &mdev->name);
+	ret = of_property_read_string(np, "mbox-names", &mdev->name);
 	if (ret)
 		mdev->name = np->full_name;
 

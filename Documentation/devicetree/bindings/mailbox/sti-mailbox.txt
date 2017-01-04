@@ -9,7 +9,7 @@ Controller
 Required properties:
 - compatible		: Should be "st,stih407-mailbox"
 - reg			: Offset and length of the device's register set
-- mbox-name		: Name of the mailbox
+- mbox-names		: Name of the mailbox
 - #mbox-cells:		: Must be 2
 			  <&phandle instance channel direction>
 			    phandle   : Label name of controller
@@ -26,7 +26,7 @@ mailbox0: mailbox@0  {
 	reg		= <0x08f00000 0x1000>;
 	interrupts	= <GIC_SPI 1 IRQ_TYPE_NONE>;
 	#mbox-cells	= <2>;
-	mbox-name	= "a9";
+	mbox-names	= "a9";
 };
 
 Client
