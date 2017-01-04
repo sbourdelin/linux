@@ -125,3 +125,29 @@ An example mux controller might look like this:
 		reg = <0x50>;
 		#mux-control-cells = <1>;
 	};
+
+
+Combinded controller and consumer of a GPIO mux
+-----------------------------------------------
+
+For the common case of a single consumer of a GPIO controlled mux, there is
+a simplified binding which will instantiate an implicit mux controller. Just
+specify a mux-gpios property with the same interpretation as in mux-gpio.txt.
+Note that other properties described in mux-gpio.txt are not available in
+this simplified form and that the mux controller is unnamed. If you need
+more than one mux controller, a shared mux controller or if you need a
+specific idle-state, use the more flexible binding with the mux controller
+in its own node.
+
+Example:
+
+	adc-mux {
+		compatible = "io-channel-mux";
+		io-channels = <&adc 0>;
+		io-channel-names = "parent";
+
+		mux-gpios = <&pioA 0 GPIO_ACTIVE_HIGH>,
+			    <&pioA 1 GPIO_ACTIVE_HIGH>;
+
+		channels = "sync-1", "in", "out", "sync-2";
+	};
