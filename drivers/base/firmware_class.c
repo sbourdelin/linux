@@ -542,6 +542,8 @@ static struct firmware_priv *to_firmware_priv(struct device *dev)
 
 static void __fw_load_abort(struct firmware_buf *buf)
 {
+	if (!buf)
+		return;
 	/*
 	 * There is a small window in which user can write to 'loading'
 	 * between loading done and disappearance of 'loading'
