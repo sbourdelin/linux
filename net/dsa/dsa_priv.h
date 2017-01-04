@@ -24,6 +24,11 @@ struct dsa_device_ops {
 struct dsa_slave_priv {
 	struct sk_buff *	(*xmit)(struct sk_buff *skb,
 					struct net_device *dev);
+	/*
+	 * Which host device do we used to send packets to the switch
+	 * for this port.
+	 */
+	struct net_device	*master;
 
 	/*
 	 * Which switch this port is a part of, and the port index

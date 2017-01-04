@@ -258,7 +258,7 @@ static void dsa_cpu_port_unapply(struct device_node *port, u32 index,
 {
 	dsa_cpu_dsa_destroy(port);
 	ds->cpu_port_mask &= ~BIT(index);
-
+	dev_put(ds->cd->port_ethernet[index]);
 }
 
 static int dsa_user_port_apply(struct device_node *port, u32 index,
@@ -475,6 +475,28 @@ static int dsa_cpu_parse(struct device_node *port, u32 index,
 
 	dst->rcv = dst->tag_ops->rcv;
 
+	dev_hold(ethernet_dev);
+	ds->cd->port_ethernet[index] = ethernet_dev;
+
+	return 0;
+}
+
+static int dsa_user_parse(struct device_node *port, u32 index,
+			  struct dsa_switch *ds)
+{
+	struct device_node *cpu_port;
+	const unsigned int *cpu_port_reg;
+	int cpu_port_index;
+
+	cpu_port = of_parse_phandle(port, "cpu", 0);
+	if (cpu_port) {
+		cpu_port_reg = of_get_property(cpu_port, "reg", NULL);
+		if (!cpu_port_reg)
+			return -EINVAL;
+		cpu_port_index = be32_to_cpup(cpu_port_reg);
+		ds->cd->port_cpu[index] = cpu_port_index;
+	}
+
 	return 0;
 }
 
@@ -482,18 +504,20 @@ static int dsa_ds_parse(struct dsa_switch_tree *dst, struct dsa_switch *ds)
 {
 	struct device_node *port;
 	u32 index;
-	int err;
+	int err = 0;
 
 	for (index = 0; index < DSA_MAX_PORTS; index++) {
 		port = ds->ports[index].dn;
 		if (!port)
 			continue;
 
-		if (dsa_port_is_cpu(port)) {
+		if (dsa_port_is_cpu(port))
 			err = dsa_cpu_parse(port, index, dst, ds);
-			if (err)
-				return err;
-		}
+		else if (!dsa_port_is_dsa(port))
+			err = dsa_user_parse(port, index,  ds);
+
+		if (err)
+			return err;
 	}
 
 	pr_info("DSA: switch %d %d parsed\n", dst->tree, ds->index);
