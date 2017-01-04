@@ -190,13 +190,31 @@ int get_current_ap(struct ks_wlan_private *priv, struct link_ap_info_t *ap_info)
 		wireless_send_event(netdev, SIOCGIWAP, &wrqu, NULL);
 	}
 	DPRINTK(4, "\n    Link AP\n");
-	DPRINTK(4, "    bssid=%02X:%02X:%02X:%02X:%02X:%02X\n \
-   essid=%s\n    rate_set=%02X,%02X,%02X,%02X,%02X,%02X,%02X,%02X\n    channel=%d\n \
-   rssi=%d\n    sq=%d\n    capability=%04X\n", ap->bssid[0], ap->bssid[1], ap->bssid[2], ap->bssid[3], ap->bssid[4], ap->bssid[5], &(ap->ssid.body[0]), ap->rate_set.body[0], ap->rate_set.body[1], ap->rate_set.body[2], ap->rate_set.body[3], ap->rate_set.body[4], ap->rate_set.body[5], ap->rate_set.body[6], ap->rate_set.body[7], ap->channel, ap->rssi, ap->sq, ap->capability);
-	DPRINTK(4, "\n    Link AP\n    rsn.mode=%d\n    rsn.size=%d\n",
-		ap_info->rsn_mode, ap_info->rsn.size);
-	DPRINTK(4, "\n    ext_rate_set_size=%d\n    rate_set_size=%d\n",
-		ap_info->ext_rate_set.size, ap_info->rate_set.size);
+	DPRINTK(4, "    bssid=");
+	DPRINTK(4, "%02X:", ap->bssid[0]);
+	DPRINTK(4, "%02X:", ap->bssid[1]);
+	DPRINTK(4, "%02X:", ap->bssid[2]);
+	DPRINTK(4, "%02X:", ap->bssid[3]);
+	DPRINTK(4, "%02X:", ap->bssid[4]);
+	DPRINTK(4, "%02X\n", ap->bssid[5]);
+	DPRINTK(4, "    essid=%s\n", &ap->ssid.body[0]);
+	DPRINTK(4, "    rate_set=");
+	DPRINTK(4, "%02X:", ap->rate_set.body[0]);
+	DPRINTK(4, "%02X:", ap->rate_set.body[1]);
+	DPRINTK(4, "%02X:", ap->rate_set.body[2]);
+	DPRINTK(4, "%02X:", ap->rate_set.body[3]);
+	DPRINTK(4, "%02X:", ap->rate_set.body[4]);
+	DPRINTK(4, "%02X:", ap->rate_set.body[5]);
+	DPRINTK(4, "%02X:", ap->rate_set.body[6]);
+	DPRINTK(4, "%02X\n", ap->rate_set.body[7]);
+	DPRINTK(4, "    channel=%d\n", ap->channel);
+	DPRINTK(4, "    rssi=%d\n", ap->rssi);
+	DPRINTK(4, "    sq=%d\n", ap->sq);
+	DPRINTK(4, "    capability=%04X\n\n", ap->capability);
+	DPRINTK(4, "    Link AP\n    rsn.mode=%d\n", ap_info->rsn_mode);
+	DPRINTK(4, "    rsn.size=%d\n\n", ap_info->rsn.size);
+	DPRINTK(4, "    ext_rate_set_size=%d\n", ap_info->ext_rate_set.size);
+	DPRINTK(4, "    rate_set_size=%d\n", ap_info->rate_set.size);
 
 	return rc;
 }
