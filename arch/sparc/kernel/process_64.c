@@ -680,6 +680,27 @@ int copy_thread(unsigned long clone_flags, unsigned long sp,
 	return 0;
 }
 
+/* Update the state of MCDPER register in current task's mm context before
+ * dup so the dup'd task will inherit flags in this register correctly.
+ * Current task may have updated flags since it started running.
+ */
+int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
+{
+	if (adi_capable() && src->mm) {
+		register unsigned long tmp_mcdper;
+
+		__asm__ __volatile__(
+			".word 0x83438000\n\t"	/* rd %mcdper, %g1 */
+			"mov %%g1, %0\n\t"
+			: "=r" (tmp_mcdper)
+			:
+			: "g1");
+		src->mm->context.mcdper = tmp_mcdper;
+	}
+	*dst = *src;
+	return 0;
+}
+
 typedef struct {
 	union {
 		unsigned int	pr_regs[32];
