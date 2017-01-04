@@ -47,7 +47,7 @@ struct lpss8250_board {
 	unsigned long freq;
 	unsigned int base_baud;
 	int (*setup)(struct lpss8250 *, struct uart_port *p);
-	void (*exit)(struct lpss8250 *);
+	void (*exit)(struct lpss8250 *, struct pci_dev *pdev);
 };
 
 struct lpss8250 {
@@ -226,9 +226,10 @@ static int qrk_serial_setup(struct lpss8250 *lpss, struct uart_port *port)
 	return 0;
 }
 
-static void qrk_serial_exit(struct lpss8250 *lpss)
+static void qrk_serial_exit(struct lpss8250 *lpss, struct pci_dev *pdev)
 {
 	qrk_serial_exit_dma(lpss);
+	pci_free_irq_vectors(pdev);
 }
 
 static bool lpss8250_dma_filter(struct dma_chan *chan, void *param)
@@ -324,7 +325,7 @@ static int lpss8250_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 err_exit:
 	if (lpss->board->exit)
-		lpss->board->exit(lpss);
+		lpss->board->exit(lpss, pdev);
 	return ret;
 }
 
@@ -333,7 +334,7 @@ static void lpss8250_remove(struct pci_dev *pdev)
 	struct lpss8250 *lpss = pci_get_drvdata(pdev);
 
 	if (lpss->board->exit)
-		lpss->board->exit(lpss);
+		lpss->board->exit(lpss, pdev);
 
 	serial8250_unregister_port(lpss->line);
 }
