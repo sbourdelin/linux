@@ -1,0 +1,17 @@
+* ZTE 2967 SoC Power Domains
+
+2967 processors include support for multiple power domains which are used
+to gate power to one or more peripherals on the processor.
+
+Required Properties:
+- compatible: should be one of the following.
+    * zte,zx296718-pcu - for zx296718 board's power domain.
+- reg: physical base address of the controller and length of memory mapped
+    region.
+
+Example:
+
+	pcu_domain: pcu@0x00117000 {
+		compatible = "zte,zx296718-pcu";
+		reg = <0x00117000 0x1000>;
+	};
