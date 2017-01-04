@@ -34,6 +34,7 @@
 #include "core.h"
 #include "gadget.h"
 #include "io.h"
+#include "otg.h"
 
 /**
  * dwc3_gadget_set_test_mode - Enables USB2 Test Modes
@@ -1792,6 +1793,43 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 	int			ret = 0;
 	int			irq;
 
+	spin_lock_irqsave(&dwc->lock, flags);
+	if (dwc->gadget_driver) {
+		dev_err(dwc->dev, "%s is already bound to %s\n",
+				dwc->gadget.name,
+				dwc->gadget_driver->driver.name);
+		ret = -EBUSY;
+		goto err0;
+	}
+
+	if (g->is_otg) {
+		static struct usb_gadget_driver *prev_driver;
+		/* There are two instances where OTG functionality is enabled :
+		 * 1. This function will be called from OTG driver to start the
+		 * gadget
+		 * 2. This function will be called by the Linux Class Driver to
+		 * start the gadget
+		 * Below code will keep synchronization between these calls. The
+		 * "driver" argument will be NULL when it is called from the OTG
+		 * driver, so we are maintaning a global variable "prev_driver"
+		 * to assign value of argument "driver" (from class driver) to
+		 * dwc->gadget_driver when it is called from OTG.
+		 */
+		if (driver) {
+			prev_driver	= driver;
+			if (dwc->otg) {
+				struct dwc3_otg		*otg = dwc->otg;
+
+				if ((otg->host_started ||
+						(!otg->peripheral_started)))
+					goto err0;
+			}
+			dwc->gadget_driver	= driver;
+		} else
+			dwc->gadget_driver	= prev_driver;
+	} else
+		dwc->gadget_driver	= driver;
+
 	irq = dwc->irq_gadget;
 	ret = request_threaded_irq(irq, dwc3_interrupt, dwc3_thread_interrupt,
 			IRQF_SHARED, "dwc3", dwc->ev_buf);
@@ -1801,17 +1839,6 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 		goto err0;
 	}
 
-	spin_lock_irqsave(&dwc->lock, flags);
-	if (dwc->gadget_driver) {
-		dev_err(dwc->dev, "%s is already bound to %s\n",
-				dwc->gadget.name,
-				dwc->gadget_driver->driver.name);
-		ret = -EBUSY;
-		goto err1;
-	}
-
-	dwc->gadget_driver	= driver;
-
 	if (pm_runtime_active(dwc->dev))
 		__dwc3_gadget_start(dwc);
 
@@ -1819,11 +1846,9 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 
 	return 0;
 
-err1:
-	spin_unlock_irqrestore(&dwc->lock, flags);
-	free_irq(irq, dwc);
-
 err0:
+	dwc->gadget_driver = NULL;
+	spin_unlock_irqrestore(&dwc->lock, flags);
 	return ret;
 }
 
@@ -2977,6 +3002,18 @@ int dwc3_gadget_init(struct dwc3 *dwc)
 
 	dwc->irq_gadget = irq;
 
+	if (dwc->dr_mode == USB_DR_MODE_OTG) {
+		struct usb_phy *phy;
+		/* Switch otg to peripheral mode */
+		phy = usb_get_phy(USB_PHY_TYPE_USB3);
+		if (!IS_ERR(phy)) {
+			if (phy && phy->otg)
+				otg_set_peripheral(phy->otg,
+						(struct usb_gadget *)(long)1);
+			usb_put_phy(phy);
+		}
+	}
+
 	dwc->ctrl_req = dma_alloc_coherent(dwc->sysdev, sizeof(*dwc->ctrl_req),
 			&dwc->ctrl_req_addr, GFP_KERNEL);
 	if (!dwc->ctrl_req) {
@@ -3064,6 +3101,26 @@ int dwc3_gadget_init(struct dwc3 *dwc)
 	if (ret) {
 		dev_err(dwc->dev, "failed to register udc\n");
 		goto err5;
+	}
+
+	if (dwc->dr_mode == USB_DR_MODE_OTG) {
+		struct usb_phy *phy;
+
+		phy = usb_get_phy(USB_PHY_TYPE_USB3);
+		if (!IS_ERR(phy)) {
+			if (phy && phy->otg) {
+				ret = otg_set_peripheral(phy->otg,
+						&dwc->gadget);
+				if (ret) {
+					usb_put_phy(phy);
+					phy = NULL;
+					goto err5;
+				}
+			} else {
+				usb_put_phy(phy);
+				phy = NULL;
+			}
+		}
 	}
 
 	return 0;
