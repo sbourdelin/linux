@@ -20,6 +20,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/mfd/core.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
@@ -831,6 +832,32 @@ static const struct iio_info lm3533_als_info = {
 	.read_raw	= &lm3533_als_read_raw,
 };
 
+static struct lm3533_als_platform_data *lm3533_als_of_parse(struct device *dev)
+{
+	struct lm3533_als_platform_data *als_pdata;
+	struct device_node *node = dev->of_node;
+	int ret;
+	u32 val;
+
+	als_pdata = devm_kzalloc(dev, sizeof(*als_pdata), GFP_KERNEL);
+	if (!als_pdata)
+		return NULL;
+
+	als_pdata->pwm_mode = of_property_read_bool(node, "ti,pwm-mode");
+
+	ret = of_property_read_u32(node, "ti,als-resistance-ohm", &val);
+	if (ret < 0 && ret != -EINVAL) {
+		dev_err(dev, "unable to read ti,als-resistance-ohm");
+		return NULL;
+	}
+
+	/* Leave at high-Z, if the property was omitted or specified as 0 */
+	if (!ret && val != 0)
+		als_pdata->r_select = 200000 / val;
+
+	return als_pdata;
+}
+
 static int lm3533_als_probe(struct platform_device *pdev)
 {
 	struct lm3533 *lm3533;
@@ -843,7 +870,11 @@ static int lm3533_als_probe(struct platform_device *pdev)
 	if (!lm3533)
 		return -EINVAL;
 
-	pdata = pdev->dev.platform_data;
+	if (pdev->dev.of_node)
+		pdata = lm3533_als_of_parse(&pdev->dev);
+	else
+		pdata = pdev->dev.platform_data;
+
 	if (!pdata) {
 		dev_err(&pdev->dev, "no platform data\n");
 		return -EINVAL;
@@ -914,9 +945,16 @@ static int lm3533_als_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct of_device_id lm3533_als_of_match[] = {
+	{ .compatible = "ti,lm3533-als", },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, lm3533_als_of_match);
+
 static struct platform_driver lm3533_als_driver = {
 	.driver	= {
 		.name	= "lm3533-als",
+		.of_match_table = lm3533_als_of_match,
 	},
 	.probe		= lm3533_als_probe,
 	.remove		= lm3533_als_remove,
