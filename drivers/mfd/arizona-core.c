@@ -236,28 +236,22 @@ static irqreturn_t arizona_overclocked(int irq, void *data)
 }
 
 static int arizona_poll_reg(struct arizona *arizona,
-			    int timeout, unsigned int reg,
+			    int npolls, unsigned int reg,
 			    unsigned int mask, unsigned int target)
 {
+	const int poll_us = 7500;
 	unsigned int val = 0;
-	int ret, i;
+	int ret;
 
-	for (i = 0; i < timeout; i++) {
-		ret = regmap_read(arizona->regmap, reg, &val);
-		if (ret != 0) {
-			dev_err(arizona->dev, "Failed to read reg 0x%x: %d\n",
-				reg, ret);
-			continue;
-		}
+	ret = regmap_read_poll_timeout(arizona->regmap,
+				       ARIZONA_INTERRUPT_RAW_STATUS_5, val,
+				       ((val & mask) == target), poll_us,
+				       npolls * poll_us);
+	if (ret)
+		dev_err(arizona->dev, "Polling reg 0x%x timed out: %x\n",
+			reg, val);
 
-		if ((val & mask) == target)
-			return 0;
-
-		usleep_range(1000, 5000);
-	}
-
-	dev_err(arizona->dev, "Polling reg 0x%x timed out: %x\n", reg, val);
-	return -ETIMEDOUT;
+	return ret;
 }
 
 static int arizona_wait_for_boot(struct arizona *arizona)
