@@ -3201,6 +3201,51 @@ struct kvm_reinject_control {
 pit_reinject = 0 (!reinject mode) is recommended, unless running an old
 operating system that uses the PIT for timing (e.g. Linux 2.4.x).
 
+4.99 KVM_SET_DIRTY_LOG_SIZE
+
+Capability: KVM_CAP_DIRTY_LOG_LIST
+Architectures: x86
+Type: vm ioctl
+Parameters: __u32 (in)
+Returns: 0 on success,
+         -ENOMEM if kernel cannot allocate memory for dirty log
+
+This ioctl is used to set the dirty log size in bytes. The dirty log size
+should be page aligned, and the number of pages should be power of 2. 
+There is one dirty log for each vcpu and one global dirty log.
+
+This ioctl should be called right after KVM_CREATE_VM ioctl to initialize
+dirty list capability for the newly created guest.
+
+4.100 KVM_RESET_DIRTY_PAGES
+
+Capability: KVM_CAP_DIRTY_LOG_LIST
+Architectures: x86
+Type: vm ioctl
+Parameters: none
+Returns: 0 on success,
+         -EINVAL if dirty log size is 0, which means dirty tracking using
+                 list is not enabled
+
+This ioctl is used to reset the dirty traps for all the pages on the dirty
+page lists, in preparation for the next iteration of dirty tracking.
+
+4.101 KVM_GET_DIRTY_COUNT
+
+Capability: KVM_CAP_DIRTY_LOG_LIST
+Architectures: x86
+Type: vm ioctl
+Parameters: __u32 (out)
+Returns: 0 on success,
+         -EINVAL if dirty log size is 0, which means dirty tracking
+                 using list is not enabled
+
+This ioctl is used to get the current number of dirty pages. It also
+advances the available pointer so that the userspace can start 
+harvest the dirty pages.
+
+See 8.3 for more details.
+
 5. The kvm_run structure
 ------------------------
 
@@ -3942,3 +3987,74 @@ In order to use SynIC, it has to be activated by setting this
 capability via KVM_ENABLE_CAP ioctl on the vcpu fd. Note that this
 will disable the use of APIC hardware virtualization even if supported
 by the CPU, as it's incompatible with SynIC auto-EOI behavior.
+
+8.3 KVM_CAP_DIRTY_LOG_LIST
+
+Architectures: x86
+
+Kernel is capable of tracking dirty memory using lists, which 
+are stored in memory regions that can be mmaped into userspace.
+KVM_CHECK_EXTENSION returns the offset of the dirty list pages from
+kvm_run.
+
+There is one dirty list per vcpu and one global list. The mmaped 
+memory has the following layout,
+kvm_run page
+PIO page
+coalesced mmio page
+global dirty list pages 
+vcpu dirty list pages
+
+The dirty list has the following structure.
+
+struct dirty_gfn_t {
+        __u32 slot; /* as_id | slot_id */
+        __u32 pad;
+        __u64 offset;
+};
+
+struct gfn_list_t {
+        __u32 dirty_index; /* where to put the next dirty GFN */
+        __u32 avail_index; /* GFNs before this can be retrieved */
+        __u32 fetch_index; /* the next GFN to be retrieved */
+        __u32 pad;
+        struct dirty_gfn_t dirty_gfns[0]; /* dirty list */
+};
+
+Userspace calls KVM_SET_DIRTY_LOG_SIZE ioctl right after
+KVM_CREATE_VM ioctl to initialize this capability for the new
+guest.
+
+When userspace mmaps kvm_run for each vcpu, the mmap size should
+take into account the size of the global dirty list and the vcpu
+dirty list.
+
+To enable dirty logging with list, userspace calls 
+KVM_SET_USER_MEMORY_REGION ioctls on all the user memory regions
+with KVM_MEM_LOG_DIRTY_PAGES bit set.
+
+To disable dirty logging with list, userspace calls
+KVM_SET_USER_MEMORY_REGION ioctls on all the user memory regions
+with KVM_MEM_LOG_DIRTY_PAGES bit clear.
+
+Once the dirty logging is enabled, userspace can start harvesting
+dirty pages.
+
+To harvest the dirty pages, userspace calls KVM_GET_DIRTY_COUNT
+ioctl first. It then access the mmaped dirty list to read the 
+dirty GFNs up to avail_index and set the fetch_index accordingly.
+Harvest can be done when the guest is running or paused. Dirty
+pages don't need to be harvest all at once. Every time userspace
+accesses the dirty lists for harvest, it should all 
+KVM_GET_DIRTY_COUNT ioctl first. 
+
+To rearm the dirty traps, userspace calls KVM_RESET_DIRTY_PAGES
+ioctl. This should be done only when the guest is paused and
+all the dirty pages have been harvested.
+
+If one of the dirty lists is full, the guest will exit to userspace
+with the exit reason set to KVM_EXIT_DIRTY_LOG_FULL, and the
+KVM_RUN ioctl will return -EINTR. Once that happens, userspace
+should pause all the vcpus, then harvest all the dirty pages and
+rearm the dirty traps. It can unpause the guest after that.
+
