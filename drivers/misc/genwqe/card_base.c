@@ -228,6 +228,7 @@ static int genwqe_bus_reset(struct genwqe_dev *cd)
 	if (cd->mmio == NULL) {
 		dev_err(&pci_dev->dev,
 			"[%s] err: mapping BAR0 failed\n", __func__);
+		pci_release_mem_regions(pci_dev);
 		return -ENOMEM;
 	}
 	return 0;
