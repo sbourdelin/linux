@@ -2945,6 +2945,23 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 	return kvm_vm_ioctl_check_extension(kvm, arg);
 }
 
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+static int kvm_mt_set_dirty_log_size(struct kvm *kvm, u32 size)
+{
+	return -EINVAL;
+}
+
+static int kvm_mt_reset_all_gfns(struct kvm *kvm)
+{
+	return -EINVAL;
+}
+
+static int kvm_mt_get_dirty_count(struct kvm *kvm, u32 *count)
+{
+	return -EINVAL;
+}
+#endif /* KVM_DIRTY_LOG_PAGE_OFFSET*/
+
 static long kvm_vm_ioctl(struct file *filp,
 			   unsigned int ioctl, unsigned long arg)
 {
@@ -3101,9 +3118,37 @@ out_free_irq_routing:
 		r = 0;
 		break;
 	}
-	case KVM_CHECK_EXTENSION:
+	case KVM_CHECK_EXTENSION: {
 		r = kvm_vm_ioctl_check_extension_generic(kvm, arg);
 		break;
+	}
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+	case KVM_SET_DIRTY_LOG_SIZE: {
+		u32 size;
+
+		r = -EFAULT;
+		if (copy_from_user(&size, argp, sizeof(u32)))
+			goto out;
+		r = kvm_mt_set_dirty_log_size(kvm, size);
+		break;
+	}
+	case KVM_RESET_DIRTY_PAGES: {
+		r = kvm_mt_reset_all_gfns(kvm);
+		break;
+	}
+	case KVM_GET_DIRTY_COUNT: {
+		u32 count;
+
+		r = kvm_mt_get_dirty_count(kvm, &count);
+		if (r)
+			goto out;
+		r = -EFAULT;
+		if (copy_to_user(argp, &count, sizeof(count)))
+			goto out;
+		r = 0;
+		break;
+	}
+#endif /* KVM_DIRTY_LOG_PAGE_OFFSET */
 	default:
 		r = kvm_arch_vm_ioctl(filp, ioctl, arg);
 	}

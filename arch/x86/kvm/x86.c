@@ -2688,6 +2688,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_X2APIC_API:
 		r = KVM_X2APIC_API_VALID_FLAGS;
 		break;
+	case KVM_CAP_DIRTY_LOG_LIST:
+		r = KVM_DIRTY_LOG_PAGE_OFFSET;
+		break;
 	default:
 		r = 0;
 		break;

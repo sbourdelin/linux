@@ -871,6 +871,7 @@ struct kvm_ppc_smmu_info {
 #define KVM_CAP_S390_USER_INSTR0 130
 #define KVM_CAP_MSI_DEVID 131
 #define KVM_CAP_PPC_HTM 132
+#define KVM_CAP_DIRTY_LOG_LIST 133
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
@@ -1281,6 +1282,13 @@ struct kvm_s390_ucas_mapping {
 #define KVM_S390_GET_IRQ_STATE	  _IOW(KVMIO, 0xb6, struct kvm_s390_irq_state)
 /* Available with KVM_CAP_X86_SMM */
 #define KVM_SMI                   _IO(KVMIO,   0xb7)
+
+/* Set the per-vcpu dirty log size */
+#define KVM_SET_DIRTY_LOG_SIZE    _IOW(KVMIO, 0xc0, __u32)
+/* Rearm traps for all dirty pages */
+#define KVM_RESET_DIRTY_PAGES     _IO(KVMIO, 0xc1)
+/* Get the current dirty count */
+#define KVM_GET_DIRTY_COUNT       _IOR(KVMIO, 0xc2, __u32)
 
 #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
 #define KVM_DEV_ASSIGN_PCI_2_3		(1 << 1)
