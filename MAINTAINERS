@@ -8434,6 +8434,8 @@ MULTIPLEXER SUBSYSTEM
 M:	Peter Rosin <peda@axentia.se>
 S:	Maintained
 F:	Documentation/devicetree/bindings/mux/
+F:	include/linux/mux.h
+F:	drivers/mux/
 
 MULTISOUND SOUND DRIVER
 M:	Andrew Veliath <andrewtv@usa.net>
