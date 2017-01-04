@@ -53,6 +53,7 @@ static bool nf_dup_ipv4_route(struct net *net, struct sk_buff *skb,
 void nf_dup_ipv4(struct net *net, struct sk_buff *skb, unsigned int hooknum,
 		 const struct in_addr *gw, int oif)
 {
+	struct nf_conn *untracked;
 	struct iphdr *iph;
 
 	if (this_cpu_read(nf_skb_duplicated))
@@ -68,10 +69,10 @@ void nf_dup_ipv4(struct net *net, struct sk_buff *skb, unsigned int hooknum,
 
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)
 	/* Avoid counting cloned packets towards the original connection. */
+	untracked = nf_ct_untracked_get();
 	nf_reset(skb);
-	skb->nfct     = &nf_ct_untracked_get()->ct_general;
-	skb->nfctinfo = IP_CT_NEW;
-	nf_conntrack_get(skb->nfct);
+	nf_conntrack_get(&untracked->ct_general);
+	skb->_nfct = (unsigned long) untracked | IP_CT_NEW;
 #endif
 	/*
 	 * If we are in PREROUTING/INPUT, decrease the TTL to mitigate potential
