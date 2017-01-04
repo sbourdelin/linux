@@ -85,6 +85,9 @@
 /* Max number of processors/hosts in a system */
 #define SMEM_HOST_COUNT		9
 
+
+extern void qcom_socinfo_init(struct device *device);
+
 /**
   * struct smem_proc_comm - proc_comm communication struct (legacy)
   * @command:	current command to be executed
@@ -750,6 +753,8 @@ static int qcom_smem_probe(struct platform_device *pdev)
 		return -ENXIO;
 
 	__smem = smem;
+
+	qcom_socinfo_init(&pdev->dev);
 
 	return 0;
 }
