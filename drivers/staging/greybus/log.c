@@ -39,7 +39,7 @@ static int gb_log_request_handler(struct gb_operation *op)
 	len = le16_to_cpu(receive->len);
 	if (len != (int)(op->request->payload_size - sizeof(*receive))) {
 		dev_err(dev, "log request wrong size %d vs %d\n", len,
-				(int)(op->request->payload_size - sizeof(*receive)));
+			(int)(op->request->payload_size - sizeof(*receive)));
 		return -EINVAL;
 	}
 	if (len == 0) {
