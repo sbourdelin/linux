@@ -887,6 +887,8 @@ struct dwc3 {
 	struct usb_gadget	gadget;
 	struct usb_gadget_driver *gadget_driver;
 
+	struct dwc3_otg		*otg;
+
 	struct usb_phy		*usb2_phy;
 	struct usb_phy		*usb3_phy;
 
@@ -987,6 +989,7 @@ struct dwc3 {
 	unsigned		setup_packet_pending:1;
 	unsigned		three_stage_setup:1;
 	unsigned		usb3_lpm_capable:1;
+	unsigned		remote_wakeup:1;
 
 	unsigned		disable_scramble_quirk:1;
 	unsigned		u2exit_lfps_quirk:1;
@@ -1220,6 +1223,13 @@ static inline int dwc3_send_gadget_generic_command(struct dwc3 *dwc,
 { return 0; }
 #endif
 
+#if IS_ENABLED(CONFIG_USB_DWC3_DUAL_ROLE)
+int dwc3_otg_init(struct dwc3 *dwc);
+#else
+static inline int dwc3_otg_init(struct dwc3 *dwc)
+{ return 0; }
+#endif
+
 /* power management interface */
 #if !IS_ENABLED(CONFIG_USB_DWC3_HOST)
 int dwc3_gadget_suspend(struct dwc3 *dwc);
@@ -1250,5 +1260,9 @@ static inline int dwc3_ulpi_init(struct dwc3 *dwc)
 static inline void dwc3_ulpi_exit(struct dwc3 *dwc)
 { }
 #endif
+
+int dwc3_alloc_event_buffers(struct dwc3 *dwc, unsigned length);
+void dwc3_free_event_buffers(struct dwc3 *dwc);
+int dwc3_event_buffers_setup(struct dwc3 *dwc);
 
 #endif /* __DRIVERS_USB_DWC3_CORE_H */
