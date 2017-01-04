@@ -285,6 +285,31 @@ static void gb_operation_work(struct work_struct *work)
 	gb_operation_put(operation);
 }
 
+/*
+ * This function runs once the delayed_work associated with an operation
+ * that was originally launched with gb_operation_send_timeout has expired.
+ *
+ * If the timeout is the first thing to run then this callback cancels the
+ * operation and sets the result-code of the operation to -ETIMEDOUT.
+ * Setting the result-code to -ETIMEDOUT will subsequently cause the
+ * completion callback of the operation to run with -ETIMEDOUT as the result
+ * code.
+ *
+ * Alternatively if the operation has already had it's status code set to
+ * something other than -EINPROGRESS then this function will result in no
+ * further action being taken.
+ *
+ */
+static void gb_operation_delayed_work(struct work_struct *work)
+{
+	struct delayed_work *delayed_work = to_delayed_work(work);
+	struct gb_operation *operation =
+		container_of(delayed_work, struct gb_operation, delayed_work);
+
+	gb_operation_cancel(operation, -ETIMEDOUT);
+	gb_operation_put(operation);
+}
+
 static void gb_operation_message_init(struct gb_host_device *hd,
 				struct gb_message *message, u16 operation_id,
 				size_t payload_size, u8 type)
@@ -524,6 +549,7 @@ gb_operation_create_common(struct gb_connection *connection, u8 type,
 	operation->type = type;
 	operation->errno = -EBADR;  /* Initial value--means "never set" */
 
+	INIT_DELAYED_WORK(&operation->delayed_work, gb_operation_delayed_work);
 	INIT_WORK(&operation->work, gb_operation_work);
 	init_completion(&operation->completion);
 	kref_init(&operation->kref);
@@ -673,6 +699,7 @@ EXPORT_SYMBOL_GPL(gb_operation_put);
 static void gb_operation_sync_callback(struct gb_operation *operation)
 {
 	complete(&operation->completion);
+	cancel_delayed_work_sync(&operation->delayed_work);
 }
 
 /**
@@ -752,6 +779,45 @@ err_put:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(gb_operation_request_send);
+
+/*
+ * Send an asynchronous operation. This function will not block, it returns
+ * immediately. The delayed worker gb_operation_delayed_work() will run
+ * unconditionally dropping the extra reference we take below.
+ */
+int gb_operation_request_send_timeout(struct gb_operation *operation,
+				      unsigned int timeout,
+				      gb_operation_callback callback,
+				      gfp_t gfp)
+{
+	bool queued;
+	unsigned long timeout_jiffies;
+	int ret = 0;
+
+	/* Reference dropped later in gb_operation_delayed_work() or on error */
+	gb_operation_get(operation);
+
+	ret = gb_operation_request_send(operation, callback, gfp);
+	if (ret) {
+		gb_operation_put(operation);
+		return ret;
+	}
+
+	if (timeout)
+		timeout_jiffies = msecs_to_jiffies(timeout);
+	else
+		timeout_jiffies = MAX_SCHEDULE_TIMEOUT;
+
+	queued = queue_delayed_work(gb_operation_completion_wq,
+				    &operation->delayed_work,
+				    timeout_jiffies);
+	if (!queued) {
+		gb_operation_put(operation);
+		ret = -EBUSY;
+	}
+	return ret;
+}
+EXPORT_SYMBOL_GPL(gb_operation_request_send_timeout);
 
 /*
  * Send a synchronous operation.  This function is expected to
