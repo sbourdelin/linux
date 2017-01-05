@@ -339,8 +339,10 @@ static struct svc_export *svc_export_update(struct svc_export *new,
 					    struct svc_export *old);
 static struct svc_export *svc_export_lookup(struct svc_export *);
 
-static int check_export(struct inode *inode, int *flags, unsigned char *uuid)
+static int check_export(struct svc_export *exp, char *path_str)
 {
+	struct inode *inode = d_inode(exp->ex_path.dentry);
+	int *flags = &exp->ex_flags;
 
 	/*
 	 * We currently export only dirs, regular files, and (for v4
@@ -358,6 +360,18 @@ static int check_export(struct inode *inode, int *flags, unsigned char *uuid)
 	if (*flags & NFSEXP_V4ROOT)
 		*flags |= NFSEXP_READONLY;
 
+	/*
+	 * Convert to a readonly export for that,
+	 * 1. not supported fsync filesystem,
+	 * 2. readonly filesystem.
+	 */
+	if ((!inode->i_fop->fsync || IS_RDONLY(inode))
+	    && !(*flags & NFSEXP_READONLY)) {
+		dprintk("%s %s: exporting read-only.\n", path_str,
+			IS_RDONLY(inode) ? "is read-only" : "has no fsync method");
+		*flags |= NFSEXP_READONLY;
+	}
+
 	/* There are two requirements on a filesystem to be exportable.
 	 * 1:  We must be able to identify the filesystem from a number.
 	 *       either a device number (so FS_REQUIRES_DEV needed)
@@ -367,7 +381,7 @@ static int check_export(struct inode *inode, int *flags, unsigned char *uuid)
 	 */
 	if (!(inode->i_sb->s_type->fs_flags & FS_REQUIRES_DEV) &&
 	    !(*flags & NFSEXP_FSID) &&
-	    uuid == NULL) {
+	    exp->ex_uuid == NULL) {
 		dprintk("exp_export: export of non-dev fs without fsid\n");
 		return -EINVAL;
 	}
@@ -509,7 +523,7 @@ uuid_parse(char **mesg, char *buf, unsigned char **puuid)
 static int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 {
 	/* client path expiry [flags anonuid anongid fsid] */
-	char *buf;
+	char *buf, *path_str = NULL;
 	int len;
 	int err;
 	struct auth_domain *dom = NULL;
@@ -544,6 +558,7 @@ static int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 	if (err)
 		goto out1;
 
+	path_str = kstrdup(buf, GFP_KERNEL);
 	exp.ex_client = dom;
 	exp.cd = cd;
 	exp.ex_devid_map = NULL;
@@ -599,8 +614,7 @@ static int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 				goto out4;
 		}
 
-		err = check_export(d_inode(exp.ex_path.dentry), &exp.ex_flags,
-				   exp.ex_uuid);
+		err = check_export(&exp, path_str);
 		if (err)
 			goto out4;
 		/*
@@ -645,6 +659,7 @@ out3:
 out1:
 	auth_domain_put(dom);
 out:
+	kfree(path_str);
 	kfree(buf);
 	return err;
 }
