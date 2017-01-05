@@ -3324,7 +3324,7 @@ int dw_mci_runtime_resume(struct device *dev)
 	if (ret)
 		goto err;
 
-	if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS)) {
+	if (host->cur_slot && !dw_mci_reset(host)) {
 		clk_disable_unprepare(host->ciu_clk);
 		ret = -ENODEV;
 		goto err;
