@@ -182,5 +182,48 @@ const struct smp_operations armada_xp_smp_ops __initconst = {
 #endif
 };
 
+static int mv98dx3236_boot_secondary(unsigned int cpu, struct task_struct *idle)
+{
+	int ret, hw_cpu;
+
+	pr_info("Booting CPU %d\n", cpu);
+
+	hw_cpu = cpu_logical_map(cpu);
+	set_secondary_cpu_clock(hw_cpu);
+	mv98dx3236_resume_set_cpu_boot_addr(hw_cpu,
+					    armada_xp_secondary_startup);
+
+	/*
+	 * This is needed to wake up CPUs in the offline state after
+	 * using CPU hotplug.
+	 */
+	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+
+	/*
+	 * This is needed to take secondary CPUs out of reset on the
+	 * initial boot.
+	 */
+	ret = mvebu_cpu_reset_deassert(hw_cpu);
+	if (ret) {
+		pr_warn("unable to boot CPU: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+struct smp_operations mv98dx3236_smp_ops __initdata = {
+	.smp_init_cpus		= armada_xp_smp_init_cpus,
+	.smp_prepare_cpus	= armada_xp_smp_prepare_cpus,
+	.smp_boot_secondary	= mv98dx3236_boot_secondary,
+	.smp_secondary_init     = armada_xp_secondary_init,
+#ifdef CONFIG_HOTPLUG_CPU
+	.cpu_die		= armada_xp_cpu_die,
+	.cpu_kill               = armada_xp_cpu_kill,
+#endif
+};
+
 CPU_METHOD_OF_DECLARE(armada_xp_smp, "marvell,armada-xp-smp",
 		      &armada_xp_smp_ops);
+CPU_METHOD_OF_DECLARE(mv98dx3236_smp, "marvell,98dx3236-smp",
+		      &mv98dx3236_smp_ops);

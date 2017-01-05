@@ -27,4 +27,5 @@ void __iomem *mvebu_get_scu_base(void);
 
 int mvebu_pm_suspend_init(void (*board_pm_enter)(void __iomem *sdram_reg,
 							u32 srcmd));
+void mv98dx3236_resume_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
 #endif
