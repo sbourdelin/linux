@@ -226,6 +226,7 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	int wlen, channels, wpf;
 	int pkt_size = 0;
 	unsigned int format, div, framesize, master;
+	unsigned int buffer_size = mcbsp->pdata->buffer_size;
 
 	dma_data = snd_soc_dai_get_dma_data(cpu_dai, substream);
 	channels = params_channels(params);
@@ -240,7 +241,9 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	default:
 		return -EINVAL;
 	}
-	if (mcbsp->pdata->buffer_size) {
+	if (buffer_size) {
+		int latency;
+
 		if (mcbsp->dma_op_mode == MCBSP_DMA_MODE_THRESHOLD) {
 			int period_words, max_thrsh;
 			int divider = 0;
@@ -271,6 +274,12 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 			/* Use packet mode for non mono streams */
 			pkt_size = channels;
 		}
+
+		latency = ((((buffer_size - pkt_size) / channels) * 1000)
+				 / (params->rate_num / params->rate_den));
+
+		mcbsp->latency[substream->stream] = latency;
+
 		omap_mcbsp_set_threshold(substream, pkt_size);
 	}
 

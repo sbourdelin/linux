@@ -25,6 +25,7 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
+#include <linux/pm_qos.h>
 
 #include <linux/platform_data/asoc-ti-mcbsp.h>
 
@@ -640,8 +641,27 @@ void omap_mcbsp_free(struct omap_mcbsp *mcbsp)
  */
 void omap_mcbsp_start(struct omap_mcbsp *mcbsp, int tx, int rx)
 {
+	struct pm_qos_request *pm_qos_req = &mcbsp->pm_qos_req;
+	int stream1 = tx ? SNDRV_PCM_STREAM_PLAYBACK : SNDRV_PCM_STREAM_CAPTURE;
+	int stream2 = tx ? SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK;
 	int enable_srg = 0;
+	int latency;
 	u16 w;
+
+	/* Prevent omap hardware from hitting off between FIFO fills */
+	if (!mcbsp->latency[stream2] ||
+			mcbsp->latency[stream1] < mcbsp->latency[stream2])
+		latency = mcbsp->latency[stream1];
+	else
+		latency = mcbsp->latency[stream2];
+
+	if (latency) {
+		if (pm_qos_request_active(pm_qos_req))
+			pm_qos_update_request(pm_qos_req, latency);
+		else
+			pm_qos_add_request(pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
+					   latency);
+	}
 
 	if (mcbsp->st_data)
 		omap_st_start(mcbsp);
@@ -731,6 +751,20 @@ void omap_mcbsp_stop(struct omap_mcbsp *mcbsp, int tx, int rx)
 
 	if (mcbsp->st_data)
 		omap_st_stop(mcbsp);
+
+	if (pm_qos_request_active(&mcbsp->pm_qos_req)) {
+		int stream1 = tx ? SNDRV_PCM_STREAM_PLAYBACK :
+			SNDRV_PCM_STREAM_CAPTURE;
+		int stream2 = tx ? SNDRV_PCM_STREAM_CAPTURE :
+			SNDRV_PCM_STREAM_PLAYBACK;
+
+		mcbsp->latency[stream1] = 0;
+		if (mcbsp->latency[stream2])
+			pm_qos_update_request(&mcbsp->pm_qos_req,
+					      mcbsp->latency[stream2]);
+		else
+			pm_qos_remove_request(&mcbsp->pm_qos_req);
+	}
 }
 
 int omap2_mcbsp_set_clks_src(struct omap_mcbsp *mcbsp, u8 fck_src_id)
@@ -1098,6 +1132,9 @@ err_thres:
 
 void omap_mcbsp_cleanup(struct omap_mcbsp *mcbsp)
 {
+	if (pm_qos_request_active(&mcbsp->pm_qos_req))
+		pm_qos_remove_request(&mcbsp->pm_qos_req);
+
 	if (mcbsp->pdata->buffer_size)
 		sysfs_remove_group(&mcbsp->dev->kobj, &additional_attr_group);
 
