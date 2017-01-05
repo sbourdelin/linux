@@ -948,8 +948,6 @@ static int spi_imx_sdma_init(struct device *dev, struct spi_imx_data *spi_imx,
 	if (of_machine_is_compatible("fsl,imx6dl"))
 		return 0;
 
-	spi_imx->wml = spi_imx_get_fifosize(spi_imx) / 2;
-
 	/* Prepare for TX DMA: */
 	master->dma_tx = dma_request_slave_channel_reason(dev, "tx");
 	if (IS_ERR(master->dma_tx)) {
@@ -1174,6 +1172,7 @@ static int spi_imx_probe(struct platform_device *pdev)
 	struct spi_imx_data *spi_imx;
 	struct resource *res;
 	int i, ret, irq;
+	u32 wml;
 
 	if (!np && !mxc_platform_info) {
 		dev_err(&pdev->dev, "can't get the platform data\n");
@@ -1195,6 +1194,15 @@ static int spi_imx_probe(struct platform_device *pdev)
 
 	spi_imx->devtype_data = of_id ? of_id->data :
 		(struct spi_imx_devtype_data *)pdev->id_entry->driver_data;
+
+	if (of_property_read_u32(np, "dma-wml", &wml) == 0) {
+		if (wml > spi_imx_get_fifosize(spi_imx) || wml == 0) {
+			dev_warn(&pdev->dev, "mis-configured dma-wml\n");
+			spi_imx->wml = spi_imx_get_fifosize(spi_imx) / 2;
+		} else
+			spi_imx->wml = wml;
+	} else
+		spi_imx->wml = spi_imx_get_fifosize(spi_imx) / 2;
 
 	if (mxc_platform_info) {
 		master->num_chipselect = mxc_platform_info->num_chipselect;
