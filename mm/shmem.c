@@ -33,6 +33,7 @@
 #include <linux/swap.h>
 #include <linux/uio.h>
 #include <linux/khugepaged.h>
+#include <linux/xattr.h>
 
 static struct vfsmount *shm_mnt;
 
@@ -2179,7 +2180,7 @@ static const struct inode_operations shmem_symlink_inode_operations;
 static const struct inode_operations shmem_short_symlink_operations;
 
 #ifdef CONFIG_TMPFS_XATTR
-static int shmem_initxattrs(struct inode *, const struct xattr *, void *);
+#define shmem_initxattrs simple_xattr_initxattrs
 #else
 #define shmem_initxattrs NULL
 #endif
@@ -2819,6 +2820,7 @@ static int
 shmem_mknod(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev)
 {
 	struct inode *inode;
+	struct shmem_inode_info *info;
 	int error = -ENOSPC;
 
 	inode = shmem_get_inode(dir->i_sb, dir, mode, dev, VM_NORESERVE);
@@ -2826,9 +2828,11 @@ shmem_mknod(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev)
 		error = simple_acl_create(dir, inode);
 		if (error)
 			goto out_iput;
+		info = SHMEM_I(inode);
 		error = security_inode_init_security(inode, dir,
 						     &dentry->d_name,
-						     shmem_initxattrs, NULL);
+						     shmem_initxattrs,
+						     &info->xattrs);
 		if (error && error != -EOPNOTSUPP)
 			goto out_iput;
 
@@ -2848,13 +2852,16 @@ static int
 shmem_tmpfile(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	struct inode *inode;
+	struct shmem_inode_info *info;
 	int error = -ENOSPC;
 
 	inode = shmem_get_inode(dir->i_sb, dir, mode, 0, VM_NORESERVE);
 	if (inode) {
+		info = SHMEM_I(inode);
 		error = security_inode_init_security(inode, dir,
 						     NULL,
-						     shmem_initxattrs, NULL);
+						     shmem_initxattrs,
+						     &info->xattrs);
 		if (error && error != -EOPNOTSUPP)
 			goto out_iput;
 		error = simple_acl_create(dir, inode);
@@ -3046,8 +3053,9 @@ static int shmem_symlink(struct inode *dir, struct dentry *dentry, const char *s
 	if (!inode)
 		return -ENOSPC;
 
+	info = SHMEM_I(inode);
 	error = security_inode_init_security(inode, dir, &dentry->d_name,
-					     shmem_initxattrs, NULL);
+					     shmem_initxattrs, &info->xattrs);
 	if (error) {
 		if (error != -EOPNOTSUPP) {
 			iput(inode);
@@ -3056,7 +3064,6 @@ static int shmem_symlink(struct inode *dir, struct dentry *dentry, const char *s
 		error = 0;
 	}
 
-	info = SHMEM_I(inode);
 	inode->i_size = len-1;
 	if (len <= SHORT_SYMLINK_LEN) {
 		inode->i_link = kmemdup(symname, len, GFP_KERNEL);
@@ -3124,42 +3131,6 @@ static const char *shmem_get_link(struct dentry *dentry,
  * like ACLs, we also need to implement the security.* handlers at
  * filesystem level, though.
  */
-
-/*
- * Callback for security_inode_init_security() for acquiring xattrs.
- */
-static int shmem_initxattrs(struct inode *inode,
-			    const struct xattr *xattr_array,
-			    void *fs_info)
-{
-	struct shmem_inode_info *info = SHMEM_I(inode);
-	const struct xattr *xattr;
-	struct simple_xattr *new_xattr;
-	size_t len;
-
-	for (xattr = xattr_array; xattr->name != NULL; xattr++) {
-		new_xattr = simple_xattr_alloc(xattr->value, xattr->value_len);
-		if (!new_xattr)
-			return -ENOMEM;
-
-		len = strlen(xattr->name) + 1;
-		new_xattr->name = kmalloc(XATTR_SECURITY_PREFIX_LEN + len,
-					  GFP_KERNEL);
-		if (!new_xattr->name) {
-			kfree(new_xattr);
-			return -ENOMEM;
-		}
-
-		memcpy(new_xattr->name, XATTR_SECURITY_PREFIX,
-		       XATTR_SECURITY_PREFIX_LEN);
-		memcpy(new_xattr->name + XATTR_SECURITY_PREFIX_LEN,
-		       xattr->name, len);
-
-		simple_xattr_list_add(&info->xattrs, new_xattr);
-	}
-
-	return 0;
-}
 
 static int shmem_xattr_handler_get(const struct xattr_handler *handler,
 				   struct dentry *unused, struct inode *inode,
