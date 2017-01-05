@@ -12,7 +12,7 @@ Required parameters:
 
 - reg:			Physical base address and length of the controller's
 			registers.
-- clock-names: 		Set to "int".
+- clock-names:		Set to "int".
 - clocks: 		Phandle to the clock used by the timer module.
 			For Clk properties, please refer to ../clock/clock-bindings.txt
 
