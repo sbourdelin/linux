@@ -109,7 +109,7 @@ i915_gem_evict_something(struct i915_address_space *vm,
 	}, **phase;
 	struct i915_vma *vma, *next;
 	struct drm_mm_node *node;
-	int ret;
+	int ret = 0;
 
 	lockdep_assert_held(&vm->i915->drm.struct_mutex);
 	trace_i915_gem_evict(vm, min_size, alignment, flags);
