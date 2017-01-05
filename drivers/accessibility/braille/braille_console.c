@@ -45,7 +45,7 @@ MODULE_LICENSE("GPL");
 
 /* Emit various sounds */
 static bool sound;
-module_param(sound, bool, 0);
+module_param(sound, bool, 0000);
 MODULE_PARM_DESC(sound, "emit sounds");
 
 static void beep(unsigned int freq)
@@ -238,6 +238,7 @@ static int keyboard_notifier_call(struct notifier_block *blk,
 	case KBD_POST_KEYSYM:
 	{
 		unsigned char type = KTYP(param->value) - 0xf0;
+
 		if (type == KT_SPEC) {
 			unsigned char val = KVAL(param->value);
 			int on_off = -1;
@@ -277,6 +278,7 @@ static int vt_notifier_call(struct notifier_block *blk,
 {
 	struct vt_notifier_param *param = _param;
 	struct vc_data *vc = param->vc;
+
 	switch (code) {
 	case VT_ALLOCATE:
 		break;
@@ -285,6 +287,7 @@ static int vt_notifier_call(struct notifier_block *blk,
 	case VT_WRITE:
 	{
 		unsigned char c = param->c;
+
 		if (vc->vc_num != fg_console)
 			break;
 		switch (c) {
