@@ -1856,6 +1856,7 @@ static int will_overwrite_ref(struct send_ctx *sctx, u64 dir, u64 dir_gen,
 	u64 gen;
 	u64 other_inode = 0;
 	u8 other_type = 0;
+	struct waiting_dir_move *dm = NULL;
 
 	if (!sctx->parent_root)
 		goto out;
@@ -1897,11 +1898,15 @@ static int will_overwrite_ref(struct send_ctx *sctx, u64 dir, u64 dir_gen,
 	 * overwrite anything at this point in time.
 	 */
 	if (other_inode > sctx->send_progress ||
-	    is_waiting_for_move(sctx, other_inode)) {
+		((dm = get_waiting_dir_move(sctx, other_inode)) != NULL)) {
 		ret = get_inode_info(sctx->parent_root, other_inode, NULL,
 				who_gen, NULL, NULL, NULL, NULL);
 		if (ret < 0)
 			goto out;
+		if (dm && dm->gen != *who_gen) {
+			ret = 0;
+			goto out;
+		}
 
 		ret = 1;
 		*who_ino = other_inode;
