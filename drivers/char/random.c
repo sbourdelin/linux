@@ -730,7 +730,8 @@ retry:
 		    r->entropy_total >= 2*random_read_wakeup_bits) {
 			struct entropy_store *other = &blocking_pool;
 
-			if (other->entropy_count <=
+			if (likely(keventd_up()) &&
+			    other->entropy_count <=
 			    3 * other->poolinfo->poolfracbits / 4) {
 				schedule_work(&other->push_work);
 				r->entropy_total = 0;
