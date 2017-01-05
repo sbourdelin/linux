@@ -964,6 +964,10 @@ struct netdev_xdp {
  *      with PF and querying it may introduce a theoretical security risk.
  * int (*ndo_set_vf_rss_query_en)(struct net_device *dev, int vf, bool setting);
  * int (*ndo_get_vf_port)(struct net_device *dev, int vf, struct sk_buff *skb);
+ * int (*ndo_get_vf_count)(const struct net_device *dev);
+ *	Return the number of VFs present on this device instead of having
+ *	rtnetlink use pci_num_vf() on the PCI parent device.
+ *
  * int (*ndo_setup_tc)(struct net_device *dev, u8 tc)
  * 	Called to setup 'tc' number of traffic classes in the net device. This
  * 	is always called from the stack with the rtnl lock held and netif tx
@@ -1218,6 +1222,7 @@ struct net_device_ops {
 	int			(*ndo_set_vf_rss_query_en)(
 						   struct net_device *dev,
 						   int vf, bool setting);
+	int			(*ndo_get_vf_count)(const struct net_device *dev);
 	int			(*ndo_setup_tc)(struct net_device *dev,
 						u32 handle,
 						__be16 protocol,
