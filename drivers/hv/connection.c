@@ -438,46 +438,44 @@ void vmbus_on_event(unsigned long data)
 int vmbus_post_msg(void *buffer, size_t buflen)
 {
 	union hv_connection_id conn_id;
-	int ret = 0;
-	int retries = 0;
+	int ret;
 	u32 usec = 1;
 
 	conn_id.asu32 = 0;
 	conn_id.u.id = VMBUS_MESSAGE_CONNECTION_ID;
 
 	/*
-	 * hv_post_message() can have transient failures because of
-	 * insufficient resources. Retry the operation a couple of
-	 * times before giving up.
+	 * hv_post_message() can have transient failures. We retry infinitely
+	 * on these failures because host guarantees hypercall will finish.
 	 */
-	while (retries < 20) {
+	while (1) {
 		ret = hv_post_message(conn_id, 1, buffer, buflen);
 
 		switch (ret) {
+		/*
+		 * Retry on transient failures:
+		 * 1. HV_STATUS_INVALID_CONNECTION_ID:
+		 *    We send messages too frequently.
+		 *
+		 * 2. HV_STATUS_INSUFFICIENT_MEMORY and
+		 *    HV_STATUS_INSUFFICIENT_BUFFERS:
+		 *    The host is temporariliy running out of resources.
+		 */
 		case HV_STATUS_INVALID_CONNECTION_ID:
-			/*
-			 * We could get this if we send messages too
-			 * frequently.
-			 */
-			ret = -EAGAIN;
-			break;
 		case HV_STATUS_INSUFFICIENT_MEMORY:
 		case HV_STATUS_INSUFFICIENT_BUFFERS:
-			ret = -ENOMEM;
 			break;
 		case HV_STATUS_SUCCESS:
-			return ret;
+			return 0;
 		default:
 			pr_err("hv_post_msg() failed; error code:%d\n", ret);
 			return -EINVAL;
 		}
 
-		retries++;
 		udelay(usec);
 		if (usec < 2048)
 			usec *= 2;
 	}
-	return ret;
 }
 
 /*
