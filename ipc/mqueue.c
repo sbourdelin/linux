@@ -35,6 +35,7 @@
 #include <linux/ipc_namespace.h>
 #include <linux/user_namespace.h>
 #include <linux/slab.h>
+#include <linux/xattr.h>
 
 #include <net/sock.h>
 #include "util.h"
@@ -70,6 +71,7 @@ struct mqueue_inode_info {
 	struct rb_root msg_tree;
 	struct posix_msg_tree_node *node_cache;
 	struct mq_attr attr;
+	struct simple_xattrs xattrs;	/* list of xattrs */
 
 	struct sigevent notify;
 	struct pid *notify_owner;
@@ -254,6 +256,7 @@ static struct inode *mqueue_get_inode(struct super_block *sb,
 			info->attr.mq_maxmsg = attr->mq_maxmsg;
 			info->attr.mq_msgsize = attr->mq_msgsize;
 		}
+		simple_xattrs_init(&info->xattrs);
 		/*
 		 * We used to allocate a static array of pointers and account
 		 * the size of that array as well as one msg_msg struct per
@@ -418,7 +421,8 @@ static int mqueue_create(struct inode *dir, struct dentry *dentry,
 {
 	struct inode *inode;
 	struct mq_attr *attr = dentry->d_fsdata;
-	int error;
+	struct mqueue_inode_info *info;
+	int error = 0;
 	struct ipc_namespace *ipc_ns;
 
 	spin_lock(&mq_lock);
@@ -439,6 +443,18 @@ static int mqueue_create(struct inode *dir, struct dentry *dentry,
 	inode = mqueue_get_inode(dir->i_sb, ipc_ns, mode, attr);
 	if (IS_ERR(inode)) {
 		error = PTR_ERR(inode);
+		spin_lock(&mq_lock);
+		ipc_ns->mq_queues_count--;
+		goto out_unlock;
+	}
+	info = MQUEUE_I(inode);
+	if (info){
+		error = security_inode_init_security(inode, dir,
+						     &dentry->d_name,
+						     simple_xattr_initxattrs,
+						     &info->xattrs);
+	}
+	if (error && error != -EOPNOTSUPP) {
 		spin_lock(&mq_lock);
 		ipc_ns->mq_queues_count--;
 		goto out_unlock;
