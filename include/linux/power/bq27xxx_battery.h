@@ -31,6 +31,9 @@ struct bq27xxx_platform_data {
 struct bq27xxx_device_info;
 struct bq27xxx_access_methods {
 	int (*read)(struct bq27xxx_device_info *di, u8 reg, bool single);
+	int (*write)(struct bq27xxx_device_info *di, u8 reg, int value, bool single);
+	int (*read_bulk)(struct bq27xxx_device_info *di, u8 reg, u8 *data, int len);
+	int (*write_bulk)(struct bq27xxx_device_info *di, u8 reg, u8 *data, int len);
 };
 
 struct bq27xxx_reg_cache {
@@ -60,6 +63,7 @@ struct bq27xxx_device_info {
 	struct power_supply *bat;
 	struct list_head list;
 	struct mutex lock;
+	u8 buffer[32];
 	u8 *regs;
 };
 
