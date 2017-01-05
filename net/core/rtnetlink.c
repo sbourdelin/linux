@@ -833,13 +833,24 @@ static void copy_rtnl_link_stats(struct rtnl_link_stats *a,
 	a->rx_nohandler = b->rx_nohandler;
 }
 
+static int dev_num_vf(const struct net_device *dev)
+{
+	if (dev->netdev_ops->ndo_get_vf_count)
+		return dev->netdev_ops->ndo_get_vf_count(dev);
+#ifdef CONFIG_PCI
+	if (dev->dev.parent && dev_is_pci(dev->dev.parent))
+		return pci_num_vf(to_pci_dev(dev->dev.parent));
+#endif
+	return 0;
+}
+
 /* All VF info */
 static inline int rtnl_vfinfo_size(const struct net_device *dev,
 				   u32 ext_filter_mask)
 {
-	if (dev->dev.parent && dev_is_pci(dev->dev.parent) &&
-	    (ext_filter_mask & RTEXT_FILTER_VF)) {
-		int num_vfs = dev_num_vf(dev->dev.parent);
+	int num_vfs = dev_num_vf(dev);
+
+	if (num_vfs && (ext_filter_mask & RTEXT_FILTER_VF)) {
 		size_t size = nla_total_size(0);
 		size += num_vfs *
 			(nla_total_size(0) +
@@ -889,12 +900,12 @@ static size_t rtnl_port_size(const struct net_device *dev,
 	size_t port_self_size = nla_total_size(sizeof(struct nlattr))
 		+ port_size;
 
-	if (!dev->netdev_ops->ndo_get_vf_port || !dev->dev.parent ||
+	if (!dev->netdev_ops->ndo_get_vf_port ||
 	    !(ext_filter_mask & RTEXT_FILTER_VF))
 		return 0;
-	if (dev_num_vf(dev->dev.parent))
+	if (dev_num_vf(dev))
 		return port_self_size + vf_ports_size +
-			vf_port_size * dev_num_vf(dev->dev.parent);
+			vf_port_size * dev_num_vf(dev);
 	else
 		return port_self_size;
 }
@@ -962,7 +973,7 @@ static int rtnl_vf_ports_fill(struct sk_buff *skb, struct net_device *dev)
 	if (!vf_ports)
 		return -EMSGSIZE;
 
-	for (vf = 0; vf < dev_num_vf(dev->dev.parent); vf++) {
+	for (vf = 0; vf < dev_num_vf(dev); vf++) {
 		vf_port = nla_nest_start(skb, IFLA_VF_PORT);
 		if (!vf_port)
 			goto nla_put_failure;
@@ -1012,7 +1023,7 @@ static int rtnl_port_fill(struct sk_buff *skb, struct net_device *dev,
 {
 	int err;
 
-	if (!dev->netdev_ops->ndo_get_vf_port || !dev->dev.parent ||
+	if (!dev->netdev_ops->ndo_get_vf_port ||
 	    !(ext_filter_mask & RTEXT_FILTER_VF))
 		return 0;
 
@@ -1020,7 +1031,7 @@ static int rtnl_port_fill(struct sk_buff *skb, struct net_device *dev,
 	if (err)
 		return err;
 
-	if (dev_num_vf(dev->dev.parent)) {
+	if (dev_num_vf(dev)) {
 		err = rtnl_vf_ports_fill(skb, dev);
 		if (err)
 			return err;
@@ -1351,15 +1362,15 @@ static int rtnl_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 	if (rtnl_fill_stats(skb, dev))
 		goto nla_put_failure;
 
-	if (dev->dev.parent && (ext_filter_mask & RTEXT_FILTER_VF) &&
-	    nla_put_u32(skb, IFLA_NUM_VF, dev_num_vf(dev->dev.parent)))
+	if (ext_filter_mask & RTEXT_FILTER_VF &&
+	    nla_put_u32(skb, IFLA_NUM_VF, dev_num_vf(dev)))
 		goto nla_put_failure;
 
-	if (dev->netdev_ops->ndo_get_vf_config && dev->dev.parent &&
+	if (dev->netdev_ops->ndo_get_vf_config &&
 	    ext_filter_mask & RTEXT_FILTER_VF) {
 		int i;
 		struct nlattr *vfinfo;
-		int num_vfs = dev_num_vf(dev->dev.parent);
+		int num_vfs = dev_num_vf(dev);
 
 		vfinfo = nla_nest_start(skb, IFLA_VFINFO_LIST);
 		if (!vfinfo)
