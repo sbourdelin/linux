@@ -263,13 +263,17 @@ source "drivers/usb/gadget/udc/bdc/Kconfig"
 
 config USB_AMD5536UDC
 	tristate "AMD5536 UDC"
-	depends on PCI
+	depends on PCI || OF
 	help
 	   The AMD5536 UDC is part of the AMD Geode CS5536, an x86 southbridge.
 	   It is a USB Highspeed DMA capable USB device controller. Beside ep0
 	   it provides 4 IN and 4 OUT endpoints (bulk or interrupt type).
 	   The UDC port supports OTG operation, and may be used as a host port
 	   if it's not being used to implement peripheral or OTG roles.
+
+	   This UDC is based on Synopsis Designware core USB Device controller
+	   IP. The driver also supports UDCs integrated to ARM based SoC's like
+	   Broadcom's Northstar2 and Cygnus platforms.
 
 	   Say "y" to link the driver statically, or "m" to build a
 	   dynamically linked module called "amd5536udc" and force all
