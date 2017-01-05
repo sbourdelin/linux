@@ -165,7 +165,9 @@ static const struct clk_ops cpu_ops = {
 	.set_rate = clk_cpu_set_rate,
 };
 
-static void __init of_cpu_clk_setup(struct device_node *node)
+/* Add parameter to allow this to support different clock operations. */
+static void __init _of_cpu_clk_setup(struct device_node *node,
+			const struct clk_ops *cpu_clk_ops)
 {
 	struct cpu_clk *cpuclk;
 	void __iomem *clock_complex_base = of_iomap(node, 0);
@@ -218,7 +220,7 @@ static void __init of_cpu_clk_setup(struct device_node *node)
 		cpuclk[cpu].hw.init = &init;
 
 		init.name = cpuclk[cpu].clk_name;
-		init.ops = &cpu_ops;
+		init.ops = cpu_clk_ops;
 		init.flags = 0;
 		init.parent_names = &cpuclk[cpu].parent_name;
 		init.num_parents = 1;
@@ -243,5 +245,30 @@ cpuclk_out:
 	iounmap(clock_complex_base);
 }
 
+/* Use this function to call the generic setup with the correct
+ * clock operation
+ */
+static void __init of_cpu_clk_setup(struct device_node *node)
+{
+	_of_cpu_clk_setup(node, &cpu_ops);
+}
+
 CLK_OF_DECLARE(armada_xp_cpu_clock, "marvell,armada-xp-cpu-clock",
-					 of_cpu_clk_setup);
+					of_cpu_clk_setup);
+
+/* Define the clock and operations for the mv98dx3236 - it cannot perform
+ * any operations.
+ */
+static const struct clk_ops mv98dx3236_cpu_ops = {
+	.recalc_rate = NULL,
+	.round_rate = NULL,
+	.set_rate = NULL,
+};
+
+static void __init of_mv98dx3236_cpu_clk_setup(struct device_node *node)
+{
+	_of_cpu_clk_setup(node, &mv98dx3236_cpu_ops);
+}
+
+CLK_OF_DECLARE(mv98dx3236_cpu_clock, "marvell,mv98dx3236-cpu-clock",
+					 of_mv98dx3236_cpu_clk_setup);
