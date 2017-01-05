@@ -992,3 +992,42 @@ void simple_xattr_list_add(struct simple_xattrs *xattrs,
 	list_add(&new_xattr->list, &xattrs->head);
 	spin_unlock(&xattrs->lock);
 }
+
+/*
+ * Callback for security_inode_init_security() for acquiring xattrs.
+ */
+int simple_xattr_initxattrs(struct inode *inode,
+			    const struct xattr *xattr_array,
+			    void *fs_info)
+{
+	struct simple_xattrs *xattrs;
+	const struct xattr *xattr;
+	struct simple_xattr *new_xattr;
+	size_t len;
+
+	if (!fs_info)
+		return -ENOMEM;
+	xattrs = (struct simple_xattrs *) fs_info;
+
+	for (xattr = xattr_array; xattr->name != NULL; xattr++) {
+		new_xattr = simple_xattr_alloc(xattr->value, xattr->value_len);
+		if (!new_xattr)
+			return -ENOMEM;
+		len = strlen(xattr->name) + 1;
+		new_xattr->name = kmalloc(XATTR_SECURITY_PREFIX_LEN + len,
+					  GFP_KERNEL);
+		if (!new_xattr->name) {
+			kfree(new_xattr);
+			return -ENOMEM;
+		}
+
+		memcpy(new_xattr->name, XATTR_SECURITY_PREFIX,
+		       XATTR_SECURITY_PREFIX_LEN);
+		memcpy(new_xattr->name + XATTR_SECURITY_PREFIX_LEN,
+		       xattr->name, len);
+
+		simple_xattr_list_add(xattrs, new_xattr);
+	}
+
+	return 0;
+}

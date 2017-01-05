@@ -107,5 +107,8 @@ ssize_t simple_xattr_list(struct inode *inode, struct simple_xattrs *xattrs, cha
 			  size_t size);
 void simple_xattr_list_add(struct simple_xattrs *xattrs,
 			   struct simple_xattr *new_xattr);
+int simple_xattr_initxattrs(struct inode *inode,
+			    const struct xattr *xattr_array,
+			    void *fs_info);
 
 #endif	/* _LINUX_XATTR_H */
