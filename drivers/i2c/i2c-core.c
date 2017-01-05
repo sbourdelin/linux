@@ -3691,6 +3691,25 @@ int i2c_slave_unregister(struct i2c_client *client)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(i2c_slave_unregister);
+
+int i2c_slave_mode_detect(struct device *dev)
+{
+	struct device_node *child;
+	u32 reg;
+
+	if (IS_BUILTIN(CONFIG_OF) && dev->of_node) {
+		for_each_child_of_node(dev->of_node, child) {
+			of_property_read_u32(child, "reg", &reg);
+			if (reg & I2C_OWN_SLAVE_ADDRESS)
+				return 1;
+		}
+	} else if (IS_BUILTIN(CONFIG_ACPI) && ACPI_HANDLE(dev)) {
+		dev_dbg(dev, "ACPI slave is not supported yet\n");
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(i2c_slave_mode_detect);
+
 #endif
 
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
