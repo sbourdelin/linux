@@ -1,0 +1,46 @@
+* Marvell 98dx3236 pinctrl driver for mpp
+
+Please refer to marvell,mvebu-pinctrl.txt in this directory for common binding
+part and usage
+
+Required properties:
+- compatible: "marvell,98dx3236-pinctrl" or "marvell,98dx4251-pinctrl"
+- reg: register specifier of MPP registers
+
+This driver supports all 98dx3236, 98dx3336 and 98dx4251 variants
+
+name          pins     functions
+================================================================================
+mpp0          0        gpio, spi0(mosi), dev(ad8)
+mpp1          1        gpio, spi0(miso), dev(ad9)
+mpp2          2        gpio, spi0(sck), dev(ad10)
+mpp3          3        gpio, spi0(cs0), dev(ad11)
+mpp4          4        gpio, spi0(cs1), smi(mdc), dev(cs0)
+mpp5          5        gpio, pex(rsto), sd0(cmd), dev(bootcs)
+mpp6          6        gpio, sd0(clk), dev(a2)
+mpp7          7        gpio, sd0(d0), dev(ale0)
+mpp8          8        gpio, sd0(d1), dev(ale1)
+mpp9          9        gpio, sd0(d2), dev(ready0)
+mpp10         10       gpio, sd0(d3), dev(ad12)
+mpp11         11       gpio, uart1(rxd), uart0(cts), dev(ad13)
+mpp12         12       gpio, uart1(txd), uart0(rts), dev(ad14)
+mpp13         13       gpio, intr(out), dev(ad15)
+mpp14         14       gpio, i2c0(sck)
+mpp15         15       gpio, i2c0(sda)
+mpp16         16       gpio, dev(oe)
+mpp17         17       gpio, dev(clk)
+mpp18         18       gpio, uart1(txd)
+mpp19         19       gpio, uart1(rxd), dev(rb)
+mpp20         20       gpio, dev(we)
+mpp21         21       gpio, dev(ad0)
+mpp22         22       gpio, dev(ad1)
+mpp23         23       gpio, dev(ad2)
+mpp24         24       gpio, dev(ad3)
+mpp25         25       gpio, dev(ad4)
+mpp26         26       gpio, dev(ad5)
+mpp27         27       gpio, dev(ad6)
+mpp28         28       gpio, dev(ad7)
+mpp29         29       gpio, dev(a0)
+mpp30         30       gpio, dev(a1)
+mpp31         31       gpio, slv_smi(mdc), smi(mdc), dev(we1)
+mpp32         32       gpio, slv_smi(mdio), smi(mdio), dev(cs1)
