@@ -157,6 +157,7 @@ static int _qcom_cc_register_board_clk(struct device *dev, const char *path,
 
 		init_data.name = path;
 		init_data.ops = &clk_fixed_rate_ops;
+		init_data.num_parents = 0;
 
 		ret = devm_clk_hw_register(dev, &fixed->hw);
 		if (ret)
