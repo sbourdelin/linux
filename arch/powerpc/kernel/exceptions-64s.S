@@ -1305,10 +1305,9 @@ masked_##_H##interrupt:					\
 	stb	r11,PACAIRQHAPPENED(r13);		\
 	cmpwi	r10,PACA_IRQ_DEC;			\
 	bne	1f;					\
-	lis	r10,0x7fff;				\
-	ori	r10,r10,0xffff;				\
-	mtspr	SPRN_DEC,r10;				\
-	b	2f;					\
+	GET_SCRATCH0(r10);				\
+	std	r13,PACA_EXGEN+EX_R13(r13);		\
+	EXCEPTION_PROLOG_PSERIES_1(handle_nmi_dec, _H);	\
 1:	cmpwi	r10,PACA_IRQ_DBELL;			\
 	beq	2f;					\
 	cmpwi	r10,PACA_IRQ_HMI;			\
@@ -1332,6 +1331,7 @@ USE_FIXED_SECTION(virt_trampolines)
 	MASKED_INTERRUPT(H)
 
 EXC_COMMON(handle_irq_mask, 0x500, handle_masked_irq)
+EXC_COMMON(handle_nmi_dec, 0x900, handle_soft_nmi)
 
 #ifdef CONFIG_KVM_BOOK3S_64_HANDLER
 TRAMP_REAL_BEGIN(kvmppc_skip_interrupt)
