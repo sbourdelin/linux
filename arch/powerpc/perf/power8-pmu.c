@@ -25,11 +25,6 @@ enum {
 
 #undef EVENT
 
-/* MMCRA IFM bits - POWER8 */
-#define	POWER8_MMCRA_IFM1		0x0000000040000000UL
-#define	POWER8_MMCRA_IFM2		0x0000000080000000UL
-#define	POWER8_MMCRA_IFM3		0x00000000C0000000UL
-
 /* PowerISA v2.07 format attribute structure*/
 extern struct attribute_group isa207_pmu_format_group;
 
@@ -195,46 +190,6 @@ static int power8_generic_events[] = {
 	[PERF_COUNT_HW_CACHE_MISSES] =			PM_LD_MISS_L1,
 };
 
-static u64 power8_bhrb_filter_map(u64 branch_sample_type)
-{
-	u64 pmu_bhrb_filter = 0;
-
-	/* BHRB and regular PMU events share the same privilege state
-	 * filter configuration. BHRB is always recorded along with a
-	 * regular PMU event. As the privilege state filter is handled
-	 * in the basic PMC configuration of the accompanying regular
-	 * PMU event, we ignore any separate BHRB specific request.
-	 */
-
-	/* No branch filter requested */
-	if (branch_sample_type & PERF_SAMPLE_BRANCH_ANY)
-		return pmu_bhrb_filter;
-
-	/* Invalid branch filter options - HW does not support */
-	if (branch_sample_type & PERF_SAMPLE_BRANCH_ANY_RETURN)
-		return -1;
-
-	if (branch_sample_type & PERF_SAMPLE_BRANCH_IND_CALL)
-		return -1;
-
-	if (branch_sample_type & PERF_SAMPLE_BRANCH_CALL)
-		return -1;
-
-	if (branch_sample_type & PERF_SAMPLE_BRANCH_ANY_CALL) {
-		pmu_bhrb_filter |= POWER8_MMCRA_IFM1;
-		return pmu_bhrb_filter;
-	}
-
-	/* Every thing else is unsupported */
-	return -1;
-}
-
-static void power8_config_bhrb(u64 pmu_bhrb_filter)
-{
-	/* Enable BHRB filter in PMU */
-	mtspr(SPRN_MMCRA, (mfspr(SPRN_MMCRA) | pmu_bhrb_filter));
-}
-
 #define C(x)	PERF_COUNT_HW_CACHE_##x
 
 /*
@@ -352,8 +307,8 @@ static struct power_pmu power8_pmu = {
 	.add_fields		= ISA207_ADD_FIELDS,
 	.test_adder		= ISA207_TEST_ADDER,
 	.compute_mmcr		= isa207_compute_mmcr,
-	.config_bhrb		= power8_config_bhrb,
-	.bhrb_filter_map	= power8_bhrb_filter_map,
+	.config_bhrb		= isa207_config_bhrb,
+	.bhrb_filter_map	= isa207_bhrb_filter_map,
 	.get_constraint		= isa207_get_constraint,
 	.get_alternatives	= power8_get_alternatives,
 	.disable_pmc		= isa207_disable_pmc,

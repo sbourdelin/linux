@@ -244,6 +244,12 @@
 #define MMCRA_SDAR_MODE_TLB		(1ull << MMCRA_SDAR_MODE_SHIFT)
 #define MMCRA_IFM_SHIFT			30
 
+/* MMCRA IFM bits */
+#define MMCRA_IFM1		0x0000000040000000UL
+#define MMCRA_IFM2		0x0000000080000000UL
+#define MMCRA_IFM3		0x00000000C0000000UL
+
+
 /* MMCR1 Threshold Compare bit constant for power9 */
 #define p9_MMCRA_THR_CMP_SHIFT	45
 
@@ -260,5 +266,8 @@ int isa207_compute_mmcr(u64 event[], int n_ev,
 				unsigned int hwc[], unsigned long mmcr[],
 				struct perf_event *pevents[]);
 void isa207_disable_pmc(unsigned int pmc, unsigned long mmcr[]);
+
+u64 isa207_bhrb_filter_map(u64 branch_sample_type);
+void isa207_config_bhrb(u64 pmu_bhrb_filter);
 
 #endif
