@@ -179,6 +179,44 @@ static struct mdiobb_ops bb_ops = {
 	.get_mdio_data = ravb_get_mdio_data,
 };
 
+/* Free TX skb function for AVB-IP */
+static int ravb_tx_free(struct net_device *ndev, int q)
+{
+	struct ravb_private *priv = netdev_priv(ndev);
+	struct net_device_stats *stats = &priv->stats[q];
+	struct ravb_tx_desc *desc;
+	int free_num = 0;
+	int entry;
+	u32 size;
+
+	for (; priv->cur_tx[q] - priv->dirty_tx[q] > 0; priv->dirty_tx[q]++) {
+		entry = priv->dirty_tx[q] % (priv->num_tx_ring[q] *
+					     NUM_TX_DESC);
+		desc = &priv->tx_ring[q][entry];
+		if (desc->die_dt != DT_FEMPTY)
+			break;
+		/* Descriptor type must be checked before all other reads */
+		dma_rmb();
+		size = le16_to_cpu(desc->ds_tagl) & TX_DS;
+		/* Free the original skb. */
+		if (priv->tx_skb[q][entry / NUM_TX_DESC]) {
+			dma_unmap_single(ndev->dev.parent, le32_to_cpu(desc->dptr),
+					 size, DMA_TO_DEVICE);
+			/* Last packet descriptor? */
+			if (entry % NUM_TX_DESC == NUM_TX_DESC - 1) {
+				entry /= NUM_TX_DESC;
+				dev_kfree_skb_any(priv->tx_skb[q][entry]);
+				priv->tx_skb[q][entry] = NULL;
+				stats->tx_packets++;
+			}
+			free_num++;
+		}
+		stats->tx_bytes += size;
+		desc->die_dt = DT_EEMPTY;
+	}
+	return free_num;
+}
+
 /* Free skb's and DMA buffers for Ethernet AVB */
 static void ravb_ring_free(struct net_device *ndev, int q)
 {
@@ -207,6 +245,18 @@ static void ravb_ring_free(struct net_device *ndev, int q)
 	priv->tx_align[q] = NULL;
 
 	if (priv->rx_ring[q]) {
+		for (i = 0; i < priv->num_rx_ring[q]; i++) {
+			struct ravb_ex_rx_desc *rx_desc = &priv->rx_ring[q][i];
+
+			if (!dma_mapping_error(ndev->dev.parent,
+					       rx_desc->dptr)) {
+				dma_unmap_single(ndev->dev.parent,
+						 le32_to_cpu(rx_desc->dptr),
+						 PKT_BUF_SZ,
+						 DMA_FROM_DEVICE);
+				rx_desc->ds_cc = cpu_to_le16(0);
+			}
+		}
 		ring_size = sizeof(struct ravb_ex_rx_desc) *
 			    (priv->num_rx_ring[q] + 1);
 		dma_free_coherent(ndev->dev.parent, ring_size, priv->rx_ring[q],
@@ -215,6 +265,7 @@ static void ravb_ring_free(struct net_device *ndev, int q)
 	}
 
 	if (priv->tx_ring[q]) {
+		ravb_tx_free(ndev, q);
 		ring_size = sizeof(struct ravb_tx_desc) *
 			    (priv->num_tx_ring[q] * NUM_TX_DESC + 1);
 		dma_free_coherent(ndev->dev.parent, ring_size, priv->tx_ring[q],
@@ -429,44 +480,6 @@ static int ravb_dmac_init(struct net_device *ndev)
 	ravb_modify(ndev, CCC, CCC_OPC, CCC_OPC_OPERATION);
 
 	return 0;
-}
-
-/* Free TX skb function for AVB-IP */
-static int ravb_tx_free(struct net_device *ndev, int q)
-{
-	struct ravb_private *priv = netdev_priv(ndev);
-	struct net_device_stats *stats = &priv->stats[q];
-	struct ravb_tx_desc *desc;
-	int free_num = 0;
-	int entry;
-	u32 size;
-
-	for (; priv->cur_tx[q] - priv->dirty_tx[q] > 0; priv->dirty_tx[q]++) {
-		entry = priv->dirty_tx[q] % (priv->num_tx_ring[q] *
-					     NUM_TX_DESC);
-		desc = &priv->tx_ring[q][entry];
-		if (desc->die_dt != DT_FEMPTY)
-			break;
-		/* Descriptor type must be checked before all other reads */
-		dma_rmb();
-		size = le16_to_cpu(desc->ds_tagl) & TX_DS;
-		/* Free the original skb. */
-		if (priv->tx_skb[q][entry / NUM_TX_DESC]) {
-			dma_unmap_single(ndev->dev.parent, le32_to_cpu(desc->dptr),
-					 size, DMA_TO_DEVICE);
-			/* Last packet descriptor? */
-			if (entry % NUM_TX_DESC == NUM_TX_DESC - 1) {
-				entry /= NUM_TX_DESC;
-				dev_kfree_skb_any(priv->tx_skb[q][entry]);
-				priv->tx_skb[q][entry] = NULL;
-				stats->tx_packets++;
-			}
-			free_num++;
-		}
-		stats->tx_bytes += size;
-		desc->die_dt = DT_EEMPTY;
-	}
-	return free_num;
 }
 
 static void ravb_get_tx_tstamp(struct net_device *ndev)
