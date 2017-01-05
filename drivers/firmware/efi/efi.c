@@ -403,7 +403,10 @@ u64 __init efi_mem_desc_end(efi_memory_desc_t *md)
 	return end;
 }
 
-void __init __weak efi_arch_mem_reserve(phys_addr_t addr, u64 size) {}
+void __init __weak efi_arch_mem_reserve(phys_addr_t addr, u64 size)
+{
+	WARN(slab_is_available(), "efi_mem_reserve() has no effect");
+}
 
 /**
  * efi_mem_reserve - Reserve an EFI memory region
@@ -419,7 +422,7 @@ void __init __weak efi_arch_mem_reserve(phys_addr_t addr, u64 size) {}
  */
 void __init efi_mem_reserve(phys_addr_t addr, u64 size)
 {
-	if (!memblock_is_region_reserved(addr, size))
+	if (!slab_is_available() && !memblock_is_region_reserved(addr, size))
 		memblock_reserve(addr, size);
 
 	/*
