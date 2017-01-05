@@ -1268,6 +1268,23 @@ EXC_REAL_NONE(0x1800, 0x1900)
 EXC_VIRT_NONE(0x5800, 0x5900)
 #endif
 
+/*
+ * Currently we support keeping interrupts
+ * enabled only for XICS. We can enhance this
+ * as we add support for other controllers
+ */
+#ifdef CONFIG_PPC_XICS
+#define MASKED_INTERRUPT_DISABLE(_H)			\
+	GET_SCRATCH0(r10);				\
+	std	r13,PACA_EXGEN+EX_R13(r13);		\
+	EXCEPTION_PROLOG_PSERIES_1(handle_irq_mask, _H);
+#else
+#define MASKED_INTERRUPT_DISABLE(_H)			\
+	mfspr	r10,SPRN_##_H##SRR1;			\
+	rldicl	r10,r10,48,1; /* clear MSR_EE */	\
+	rotldi	r10,r10,16;				\
+	mtspr	SPRN_##_H##SRR1,r10;
+#endif
 
 /*
  * An interrupt came in while soft-disabled. We set paca->irq_happened, then:
@@ -1282,6 +1299,7 @@ EXC_VIRT_NONE(0x5800, 0x5900)
 #define MASKED_INTERRUPT(_H)				\
 masked_##_H##interrupt:					\
 	std	r11,PACA_EXGEN+EX_R11(r13);		\
+	std	r12,PACA_EXGEN+EX_R12(r13);		\
 	lbz	r11,PACAIRQHAPPENED(r13);		\
 	or	r11,r11,r10;				\
 	stb	r11,PACAIRQHAPPENED(r13);		\
@@ -1295,10 +1313,7 @@ masked_##_H##interrupt:					\
 	beq	2f;					\
 	cmpwi	r10,PACA_IRQ_HMI;			\
 	beq	2f;					\
-	mfspr	r10,SPRN_##_H##SRR1;			\
-	rldicl	r10,r10,48,1; /* clear MSR_EE */	\
-	rotldi	r10,r10,16;				\
-	mtspr	SPRN_##_H##SRR1,r10;			\
+	MASKED_INTERRUPT_DISABLE(_H)			\
 2:	mtcrf	0x80,r9;				\
 	ld	r9,PACA_EXGEN+EX_R9(r13);		\
 	ld	r10,PACA_EXGEN+EX_R10(r13);		\
@@ -1315,6 +1330,8 @@ masked_##_H##interrupt:					\
 USE_FIXED_SECTION(virt_trampolines)
 	MASKED_INTERRUPT()
 	MASKED_INTERRUPT(H)
+
+EXC_COMMON(handle_irq_mask, 0x500, handle_masked_irq)
 
 #ifdef CONFIG_KVM_BOOK3S_64_HANDLER
 TRAMP_REAL_BEGIN(kvmppc_skip_interrupt)

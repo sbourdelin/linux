@@ -96,7 +96,6 @@ extern int tau_interrupts(int);
 #ifdef CONFIG_PPC64
 
 int distribute_irqs = 1;
-
 static inline notrace unsigned long get_irq_happened(void)
 {
 	unsigned long happened;
@@ -498,6 +497,54 @@ static inline void check_stack_overflow(void)
 #endif
 }
 
+#ifdef CONFIG_PPC_XICS
+static inline notrace int get_paca_irq(void)
+{
+	int irq;
+
+	__asm__ __volatile__("lbz %0,%1(13)"
+	: "=r" (irq) : "i" (offsetof(struct paca_struct, irq)));
+
+	return irq;
+}
+
+static inline notrace void set_paca_irq(int irq)
+{
+	__asm__ __volatile__("stb %0,%1(13)"
+	: : "r" (irq), "i" (offsetof(struct paca_struct, irq)));
+}
+
+void handle_masked_irq(struct pt_regs *regs)
+{
+	/*
+	 * TODO: Add support for XIVE as applicable
+	 */
+	unsigned int irq;
+	/*
+	 * NOTE, we don't use irq_enter/exit, otherwise
+	 * our accounting and tracing might be incorrect.
+	 */
+	irq = ppc_md.get_irq();
+
+	/*
+	 * Store away irq in PACA for replay later
+	 */
+	set_paca_irq(irq);
+}
+
+#else
+
+static inline notrace int get_paca_irq(void)
+{
+	return -1;
+}
+
+static inline notrace void set_paca_irq(int irq)
+{
+}
+
+#endif /* CONFIG_PPC_XICS */
+
 void __do_irq(struct pt_regs *regs)
 {
 	unsigned int irq;
@@ -513,7 +560,11 @@ void __do_irq(struct pt_regs *regs)
 	 *
 	 * This will typically lower the interrupt line to the CPU
 	 */
-	irq = ppc_md.get_irq();
+	irq = get_paca_irq();
+	if (irq != -1)
+		set_paca_irq(-1);
+	else
+		irq = ppc_md.get_irq();
 
 	/* We can hard enable interrupts now to allow perf interrupts */
 	may_hard_irq_enable();

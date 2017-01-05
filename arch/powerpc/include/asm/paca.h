@@ -163,6 +163,7 @@ struct paca_struct {
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	u64 tm_scratch;                 /* TM scratch area for reclaim */
 #endif
+	u32 irq;			/* IRQ pending */
 
 #ifdef CONFIG_PPC_POWERNV
 	/* Per-core mask tracking idle threads and a lock bit-[L][TTTTTTTT] */
