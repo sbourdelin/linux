@@ -770,7 +770,7 @@ qlafx00_iospace_config(struct qla_hw_data *ha)
 		ql_log_pci(ql_log_fatal, ha->pdev, 0x014e,
 		    "Failed to reserve PIO/MMIO regions (%s), aborting.\n",
 		    pci_name(ha->pdev));
-		goto iospace_error_exit;
+		return -ENOMEM;
 	}
 
 	/* Use MMIO operations for all accesses. */
@@ -799,13 +799,13 @@ qlafx00_iospace_config(struct qla_hw_data *ha)
 		ql_log_pci(ql_log_warn, ha->pdev, 0x0129,
 		    "region #2 not an MMIO resource (%s), aborting\n",
 		    pci_name(ha->pdev));
-		goto iospace_error_exit;
+		goto iounmap_error_exit;
 	}
 	if (pci_resource_len(ha->pdev, 2) < BAR2_LEN_FX00) {
 		ql_log_pci(ql_log_warn, ha->pdev, 0x012a,
 		    "Invalid PCI mem BAR2 region size (%s), aborting\n",
 			pci_name(ha->pdev));
-		goto iospace_error_exit;
+		goto iounmap_error_exit;
 	}
 
 	ha->iobase =
@@ -813,7 +813,7 @@ qlafx00_iospace_config(struct qla_hw_data *ha)
 	if (!ha->iobase) {
 		ql_log_pci(ql_log_fatal, ha->pdev, 0x012b,
 		    "cannot remap MMIO (%s), aborting\n", pci_name(ha->pdev));
-		goto iospace_error_exit;
+		goto iounmap_error_exit;
 	}
 
 	/* Determine queue resources */
@@ -825,7 +825,10 @@ qlafx00_iospace_config(struct qla_hw_data *ha)
 
 	return 0;
 
+iounmap_error_exit:
+	iounmap(ha->cregbase);
 iospace_error_exit:
+	pci_release_selected_regions(ha->pdev, ha->bars);
 	return -ENOMEM;
 }
 
