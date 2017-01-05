@@ -97,7 +97,7 @@
 /*
  * Some controllers needs to set 1 on SDIO status reserved bits
  */
-#define TMIO_MMC_SDIO_STATUS_QUIRK	(1 << 8)
+#define TMIO_MMC_SDIO_STATUS_SETBITS	(1 << 8)
 
 /*
  * Some controllers have a 32-bit wide data port register
