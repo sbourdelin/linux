@@ -5249,6 +5249,24 @@ static int tcp_copy_to_iovec(struct sock *sk, struct sk_buff *skb, int hlen)
 	return err;
 }
 
+/* Accept RST for rcv_nxt - 1 after a FIN.
+ * When tcp connections are abruptly terminated from Mac OSX (via ^C), a
+ * FIN is sent followed by a RST packet. The RST is sent with the same
+ * sequence number as the FIN, and thus according to RFC 5961 a challenge
+ * ACK should be sent. However, Mac OSX does not reply to the challenge ACK
+ * with a RST on the closed socket, hence accept this class of RSTs.
+ */
+static bool tcp_reset_check(struct sock *sk, struct sk_buff *skb)
+{
+	struct tcp_sock *tp = tcp_sk(sk);
+
+	return unlikely((TCP_SKB_CB(skb)->seq == (tp->rcv_nxt - 1)) &&
+			(TCP_SKB_CB(skb)->end_seq == (tp->rcv_nxt - 1))	&&
+			(sk->sk_state == TCP_CLOSE_WAIT ||
+			 sk->sk_state == TCP_LAST_ACK ||
+			 sk->sk_state == TCP_CLOSING));
+}
+
 /* Does PAWS and seqno based validation of an incoming segment, flags will
  * play significant role here.
  */
@@ -5287,6 +5305,8 @@ static bool tcp_validate_incoming(struct sock *sk, struct sk_buff *skb,
 						  LINUX_MIB_TCPACKSKIPPEDSEQ,
 						  &tp->last_oow_ack_time))
 				tcp_send_dupack(sk, skb);
+		} else if (tcp_reset_check(sk, skb)) {
+			tcp_reset(sk);
 		}
 		goto discard;
 	}
@@ -5300,7 +5320,8 @@ static bool tcp_validate_incoming(struct sock *sk, struct sk_buff *skb,
 		 * else
 		 *     Send a challenge ACK
 		 */
-		if (TCP_SKB_CB(skb)->seq == tp->rcv_nxt) {
+		if (TCP_SKB_CB(skb)->seq == tp->rcv_nxt ||
+		    tcp_reset_check(sk, skb)) {
 			rst_seq_match = true;
 		} else if (tcp_is_sack(tp) && tp->rx_opt.num_sacks > 0) {
 			struct tcp_sack_block *sp = &tp->selective_acks[0];
