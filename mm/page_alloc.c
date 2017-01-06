@@ -3761,9 +3761,10 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 
 	if (cpusets_enabled()) {
 		alloc_mask |= __GFP_HARDWALL;
-		alloc_flags |= ALLOC_CPUSET;
 		if (!ac.nodemask)
 			ac.nodemask = &cpuset_current_mems_allowed;
+		else
+			alloc_flags |= ALLOC_CPUSET;
 	}
 
 	gfp_mask &= gfp_allowed_mask;
