@@ -10,7 +10,7 @@
  */
 
 #include <linux/filter.h>
-#include <linux/seccomp.h>
+#include <linux/uapi/seccomp.h>
 #include <linux/unistd.h>
 #include <stdio.h>
 #include <string.h>
