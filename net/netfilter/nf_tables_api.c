@@ -4154,9 +4154,7 @@ static int nf_tables_newobj(struct net *net, struct sock *nlsk,
 			return err;
 
 		obj = NULL;
-	}
-
-	if (obj != NULL) {
+	} else {
 		if (nlh->nlmsg_flags & NLM_F_EXCL)
 			return -EEXIST;
 
