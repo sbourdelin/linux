@@ -1,6 +1,7 @@
 #include "util.h"
 #include "build-id.h"
 #include "hist.h"
+#include "map.h"
 #include "session.h"
 #include "sort.h"
 #include "evlist.h"
@@ -1019,6 +1020,12 @@ int hist_entry_iter__add(struct hist_entry_iter *iter, struct addr_location *al,
 			 int max_stack_depth, void *arg)
 {
 	int err, err2;
+	struct map *alm;
+
+	alm = NULL;
+
+	if (al && al->map)
+		alm = map__get(al->map);
 
 	err = sample__resolve_callchain(iter->sample, &callchain_cursor, &iter->parent,
 					iter->evsel, al, max_stack_depth);
@@ -1057,6 +1064,9 @@ out:
 	err2 = iter->ops->finish_entry(iter, al);
 	if (!err)
 		err = err2;
+
+	if (alm)
+		map__put(alm);
 
 	return err;
 }
