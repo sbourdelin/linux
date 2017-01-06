@@ -289,6 +289,24 @@ static void at91_ddr_standby(void)
 		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
 }
 
+static void at91_ddr_cache_standby(void)
+{
+	u32 saved_lpr;
+
+	flush_cache_all();
+	outer_disable();
+
+	saved_lpr = at91_ramc_read(0, AT91_DDRSDRC_LPR);
+	at91_ramc_write(0, AT91_DDRSDRC_LPR, (saved_lpr &
+			(~AT91_DDRSDRC_LPCB)) | AT91_DDRSDRC_LPCB_SELF_REFRESH);
+
+	cpu_do_idle();
+
+	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr);
+
+	outer_resume();
+}
+
 /* We manage both DDRAM/SDRAM controllers, we need more than one value to
  * remember.
  */
@@ -324,6 +342,7 @@ static const struct of_device_id const ramc_ids[] __initconst = {
 	{ .compatible = "atmel,at91sam9260-sdramc", .data = at91sam9_sdram_standby },
 	{ .compatible = "atmel,at91sam9g45-ddramc", .data = at91_ddr_standby },
 	{ .compatible = "atmel,sama5d3-ddramc", .data = at91_ddr_standby },
+	{ .compatible = "atmel,sama5d4-ddramc", .data = at91_ddr_cache_standby },
 	{ /*sentinel*/ }
 };
 

@@ -48,6 +48,7 @@ static const struct of_device_id atmel_ramc_of_match[] = {
 	{ .compatible = "atmel,at91sam9260-sdramc", .data = &at91rm9200_caps, },
 	{ .compatible = "atmel,at91sam9g45-ddramc", .data = &at91sam9g45_caps, },
 	{ .compatible = "atmel,sama5d3-ddramc", .data = &sama5d3_caps, },
+	{ .compatible = "atmel,sama5d4-ddramc", .data = &sama5d3_caps, },
 	{},
 };
 
