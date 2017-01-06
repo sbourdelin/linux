@@ -2933,7 +2933,7 @@ again:
 				le16_to_cpu(path[k].p_hdr->eh_entries)+1;
 	} else {
 		path = kzalloc(sizeof(struct ext4_ext_path) * (depth + 1),
-			       GFP_NOFS);
+			       GFP_KERNEL);
 		if (path == NULL) {
 			ext4_journal_stop(handle);
 			return -ENOMEM;

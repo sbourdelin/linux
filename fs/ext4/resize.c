@@ -816,7 +816,7 @@ static int add_new_gdb(handle_t *handle, struct inode *inode,
 
 	n_group_desc = ext4_kvmalloc((gdb_num + 1) *
 				     sizeof(struct buffer_head *),
-				     GFP_NOFS);
+				     GFP_KERNEL);
 	if (!n_group_desc) {
 		err = -ENOMEM;
 		ext4_warning(sb, "not enough memory for %lu groups",
@@ -943,7 +943,7 @@ static int reserve_backup_gdb(handle_t *handle, struct inode *inode,
 	int res, i;
 	int err;
 
-	primary = kmalloc(reserved_gdb * sizeof(*primary), GFP_NOFS);
+	primary = kmalloc(reserved_gdb * sizeof(*primary), GFP_KERNEL);
 	if (!primary)
 		return -ENOMEM;
 
