@@ -478,11 +478,11 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
 	}
 
 	/*
-	 * PAXC is connected to an internally emulated EP within the SoC.  It
-	 * allows only one device.
+	 * PAXC is connected to an internally emulated EP within the SoC.
+	 * Allow multiple slots only on PAXCv1 hardware.
 	 */
 	if (pcie->ep_is_internal)
-		if (slot > 0)
+		if (slot > 0 && pcie->type != IPROC_PCIE_PAXC)
 			return NULL;
 
 	/* EP device access */
