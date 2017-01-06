@@ -1,4 +1,4 @@
-/*
+ patch /home/rahul/git/kernels/staging/drivers//*
  * Sonics Silicon Backplane
  * Subsystem core
  *
@@ -1272,9 +1272,7 @@ u32 ssb_admatch_size(u32 adm)
 	default:
 		SSB_WARN_ON(1);
 	}
-	size = (1 << (size + 1));
-
-	return size;
+	return (1 << (size + 1));
 }
 EXPORT_SYMBOL(ssb_admatch_size);
 
