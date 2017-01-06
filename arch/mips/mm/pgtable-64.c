@@ -6,6 +6,7 @@
  * Copyright (C) 1999, 2000 by Silicon Graphics
  * Copyright (C) 2003 by Ralf Baechle
  */
+#include <linux/export.h>
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <asm/fixmap.h>
@@ -39,6 +40,7 @@ void pgd_init(unsigned long page)
 		p[-1] = entry;
 	} while (p != end);
 }
+EXPORT_SYMBOL_GPL(pgd_init);
 
 #ifndef __PAGETABLE_PMD_FOLDED
 void pmd_init(unsigned long addr, unsigned long pagetable)
@@ -60,6 +62,7 @@ void pmd_init(unsigned long addr, unsigned long pagetable)
 		p[-1] = pagetable;
 	} while (p != end);
 }
+EXPORT_SYMBOL_GPL(pmd_init);
 #endif
 
 pmd_t mk_pmd(struct page *page, pgprot_t prot)

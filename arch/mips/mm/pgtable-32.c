@@ -29,6 +29,7 @@ void pgd_init(unsigned long page)
 		p[i + 7] = (unsigned long) invalid_pte_table;
 	}
 }
+EXPORT_SYMBOL_GPL(pgd_init);
 
 void __init pagetable_init(void)
 {
