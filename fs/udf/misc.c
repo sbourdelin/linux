@@ -94,8 +94,8 @@ struct genericFormat *udf_add_extendedattr(struct inode *inode, uint32_t size,
 					cpu_to_le16(sbi->s_serial_number);
 			eahd->descTag.tagLocation = cpu_to_le32(
 					iinfo->i_location.logicalBlockNum);
-			eahd->impAttrLocation = cpu_to_le32(0xFFFFFFFF);
-			eahd->appAttrLocation = cpu_to_le32(0xFFFFFFFF);
+			eahd->impAttrLocation = cpu_to_le32(~0);
+			eahd->appAttrLocation = cpu_to_le32(~0);
 		}
 
 		offset = iinfo->i_lenEAttr;
@@ -204,7 +204,7 @@ struct buffer_head *udf_read_tagged(struct super_block *sb, uint32_t block,
 	u8 checksum;
 
 	/* Read the block */
-	if (block == 0xFFFFFFFF)
+	if (block == ~0)
 		return NULL;
 
 	bh = udf_tread(sb, block);

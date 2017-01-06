@@ -34,7 +34,7 @@ uint32_t udf_get_pblock(struct super_block *sb, uint32_t block,
 	if (partition >= sbi->s_partitions) {
 		udf_debug("block=%d, partition=%d, offset=%d: invalid partition\n",
 			  block, partition, offset);
-		return 0xFFFFFFFF;
+		return ~0;
 	}
 	map = &sbi->s_partmaps[partition];
 	if (map->s_partition_func)
@@ -61,7 +61,7 @@ uint32_t udf_get_pblock_virt15(struct super_block *sb, uint32_t block,
 	if (block > vdata->s_num_entries) {
 		udf_debug("Trying to access block beyond end of VAT (%d max %d)\n",
 			  block, vdata->s_num_entries);
-		return 0xFFFFFFFF;
+		return ~0;
 	}
 
 	if (iinfo->i_alloc_type == ICBTAG_FLAG_AD_IN_ICB) {
@@ -85,7 +85,7 @@ uint32_t udf_get_pblock_virt15(struct super_block *sb, uint32_t block,
 	if (!bh) {
 		udf_debug("get_pblock(UDF_VIRTUAL_MAP:%p,%d,%d) VAT: %d[%d]\n",
 			  sb, block, partition, loc, index);
-		return 0xFFFFFFFF;
+		return ~0;
 	}
 
 	loc = le32_to_cpu(((__le32 *)bh->b_data)[index]);
@@ -95,7 +95,7 @@ uint32_t udf_get_pblock_virt15(struct super_block *sb, uint32_t block,
 translate:
 	if (iinfo->i_location.partitionReferenceNum == partition) {
 		udf_debug("recursive call to udf_get_pblock!\n");
-		return 0xFFFFFFFF;
+		return ~0;
 	}
 
 	return udf_get_pblock(sb, loc,
@@ -188,7 +188,7 @@ int udf_relocate_blocks(struct super_block *sb, long old_block, long *new_block)
 				struct sparingEntry *entry = &st->mapEntry[k];
 				u32 origLoc = le32_to_cpu(entry->origLocation);
 
-				if (origLoc == 0xFFFFFFFF) {
+				if (origLoc == ~0) {
 					for (; j < 4; j++) {
 						int len;
 						bh = sdata->s_spar_map[j];
@@ -229,7 +229,7 @@ int udf_relocate_blocks(struct super_block *sb, long old_block, long *new_block)
 				struct sparingEntry *entry = &st->mapEntry[l];
 				u32 origLoc = le32_to_cpu(entry->origLocation);
 
-				if (origLoc != 0xFFFFFFFF)
+				if (origLoc != ~0)
 					continue;
 
 				for (; j < 4; j++) {
@@ -290,7 +290,7 @@ static uint32_t udf_try_read_meta(struct inode *inode, uint32_t block,
 
 	if (inode_bmap(inode, block, &epos, &eloc, &elen, &ext_offset) !=
 						(EXT_RECORDED_ALLOCATED >> 30))
-		phyblock = 0xFFFFFFFF;
+		phyblock = ~0;
 	else {
 		map = &UDF_SB(sb)->s_partmaps[partition];
 		/* map to sparable/physical partition desc */
@@ -319,10 +319,10 @@ uint32_t udf_get_pblock_meta25(struct super_block *sb, uint32_t block,
 	inode = mdata->s_metadata_fe ? : mdata->s_mirror_fe;
 
 	if (!inode)
-		return 0xFFFFFFFF;
+		return ~0;
 
 	retblk = udf_try_read_meta(inode, block, partition, offset);
-	if (retblk == 0xFFFFFFFF && mdata->s_metadata_fe) {
+	if (retblk == ~0 && mdata->s_metadata_fe) {
 		udf_warn(sb, "error reading from METADATA, trying to read from MIRROR\n");
 		if (!(mdata->s_flags & MF_MIRROR_FE_LOADED)) {
 			mdata->s_mirror_fe = udf_find_metadata_inode_efe(sb,
@@ -335,7 +335,7 @@ uint32_t udf_get_pblock_meta25(struct super_block *sb, uint32_t block,
 
 		inode = mdata->s_mirror_fe;
 		if (!inode)
-			return 0xFFFFFFFF;
+			return ~0;
 		retblk = udf_try_read_meta(inode, block, partition, offset);
 	}
 

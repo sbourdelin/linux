@@ -492,12 +492,12 @@ static int udf_parse_options(char *options, struct udf_options *uopt,
 
 	uopt->novrs = 0;
 	uopt->partition = 0xFFFF;
-	uopt->session = 0xFFFFFFFF;
+	uopt->session = ~0;
 	uopt->lastblock = 0;
 	uopt->anchor = 0;
-	uopt->volume = 0xFFFFFFFF;
-	uopt->rootdir = 0xFFFFFFFF;
-	uopt->fileset = 0xFFFFFFFF;
+	uopt->volume = ~0;
+	uopt->rootdir = ~0;
+	uopt->fileset = ~0;
 	uopt->nls_map = NULL;
 
 	if (!options)
@@ -803,7 +803,7 @@ static int udf_find_fileset(struct super_block *sb,
 	uint16_t ident;
 	struct udf_sb_info *sbi;
 
-	if (fileset->logicalBlockNum != 0xFFFFFFFF ||
+	if (fileset->logicalBlockNum != ~0 ||
 	    fileset->partitionReferenceNum != 0xFFFF) {
 		bh = udf_read_ptagged(sb, fileset, 0, &ident);
 
@@ -826,7 +826,7 @@ static int udf_find_fileset(struct super_block *sb,
 
 		for (newfileset.partitionReferenceNum = sbi->s_partitions - 1;
 		     (newfileset.partitionReferenceNum != 0xFFFF &&
-		      fileset->logicalBlockNum == 0xFFFFFFFF &&
+		      fileset->logicalBlockNum == ~0 &&
 		      fileset->partitionReferenceNum == 0xFFFF);
 		     newfileset.partitionReferenceNum--) {
 			lastblock = sbi->s_partmaps
@@ -865,12 +865,12 @@ static int udf_find_fileset(struct super_block *sb,
 					break;
 				}
 			} while (newfileset.logicalBlockNum < lastblock &&
-				 fileset->logicalBlockNum == 0xFFFFFFFF &&
+				 fileset->logicalBlockNum == ~0 &&
 				 fileset->partitionReferenceNum == 0xFFFF);
 		}
 	}
 
-	if ((fileset->logicalBlockNum != 0xFFFFFFFF ||
+	if ((fileset->logicalBlockNum != ~0 ||
 	     fileset->partitionReferenceNum != 0xFFFF) && bh) {
 		udf_debug("Fileset at block=%d, partition=%d\n",
 			  fileset->logicalBlockNum,
@@ -1012,7 +1012,7 @@ static int udf_load_metadata_files(struct super_block *sb, int partition,
 	 * Note:
 	 * Load only if bitmap file location differs from 0xFFFFFFFF (DCN-5102)
 	*/
-	if (mdata->s_bitmap_file_loc != 0xFFFFFFFF) {
+	if (mdata->s_bitmap_file_loc != ~0) {
 		addr.logicalBlockNum = mdata->s_bitmap_file_loc;
 		addr.partitionReferenceNum = mdata->s_phys_partition_ref;
 
@@ -2076,7 +2076,7 @@ u64 lvid_get_unique_id(struct super_block *sb)
 
 	mutex_lock(&sbi->s_alloc_mutex);
 	ret = uniqueID = le64_to_cpu(lvhd->uniqueID);
-	if (!(++uniqueID & 0xFFFFFFFF))
+	if (!(++uniqueID & ~0))
 		uniqueID += 16;
 	lvhd->uniqueID = cpu_to_le64(uniqueID);
 	mutex_unlock(&sbi->s_alloc_mutex);
@@ -2129,7 +2129,7 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 	if (!(uopt.flags & (1 << UDF_FLAG_NLS_MAP)))
 		uopt.flags |= (1 << UDF_FLAG_UTF8);
 
-	fileset.logicalBlockNum = 0xFFFFFFFF;
+	fileset.logicalBlockNum = ~0;
 	fileset.partitionReferenceNum = 0xFFFF;
 
 	sbi->s_flags = uopt.flags;
@@ -2141,7 +2141,7 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 	sbi->s_nls_map = uopt.nls_map;
 	rwlock_init(&sbi->s_cred_lock);
 
-	if (uopt.session == 0xFFFFFFFF)
+	if (uopt.session == ~0)
 		sbi->s_session = udf_get_last_session(sb);
 	else
 		sbi->s_session = uopt.session;
@@ -2467,7 +2467,7 @@ static unsigned int udf_count_free(struct super_block *sb)
 		if (le32_to_cpu(lvid->numOfPartitions) > sbi->s_partition) {
 			accum = le32_to_cpu(
 					lvid->freeSpaceTable[sbi->s_partition]);
-			if (accum == 0xFFFFFFFF)
+			if (accum == ~0)
 				accum = 0;
 		}
 	}

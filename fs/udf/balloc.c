@@ -511,7 +511,7 @@ static int udf_table_prealloc_blocks(struct super_block *sb,
 	epos.offset = sizeof(struct unallocSpaceEntry);
 	epos.block = iinfo->i_location;
 	epos.bh = NULL;
-	eloc.logicalBlockNum = 0xFFFFFFFF;
+	eloc.logicalBlockNum = ~0;
 
 	while (first_block != eloc.logicalBlockNum &&
 	       (etype = udf_next_aext(table, &epos, &eloc, &elen, 1)) != -1) {
@@ -550,7 +550,7 @@ static int udf_table_new_block(struct super_block *sb,
 			       uint32_t goal, int *err)
 {
 	struct udf_sb_info *sbi = UDF_SB(sb);
-	uint32_t spread = 0xFFFFFFFF, nspread = 0xFFFFFFFF;
+	uint32_t spread = ~0, nspread = ~0;
 	uint32_t newblock = 0, adsize;
 	uint32_t elen, goal_elen = 0;
 	struct kernel_lb_addr eloc, uninitialized_var(goal_eloc);
@@ -609,7 +609,7 @@ static int udf_table_new_block(struct super_block *sb,
 
 	brelse(epos.bh);
 
-	if (spread == 0xFFFFFFFF) {
+	if (spread == ~0) {
 		brelse(goal_epos.bh);
 		mutex_unlock(&sbi->s_alloc_mutex);
 		return 0;
