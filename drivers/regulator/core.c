@@ -1242,6 +1242,21 @@ static int set_consumer_device_supply(struct regulator_dev *rdev,
 	return 0;
 }
 
+static int regulator_unset_supply(struct device *dev, void *data)
+{
+	struct regulator_dev *rdev = dev_to_rdev(dev);
+	struct regulator_dev *supply_rdev = data;
+
+	if (rdev->supply && rdev->supply->rdev == supply_rdev) {
+		rdev_dbg(rdev, "removing supply %s\n", rdev_get_name(rdev));
+		WARN_ON(rdev->open_count);
+		_regulator_put(rdev->supply);
+		rdev->supply = NULL;
+	}
+
+	return 0;
+}
+
 static void unset_regulator_supplies(struct regulator_dev *rdev)
 {
 	struct regulator_map *node, *n;
@@ -1253,6 +1268,9 @@ static void unset_regulator_supplies(struct regulator_dev *rdev)
 			kfree(node);
 		}
 	}
+
+	class_for_each_device(&regulator_class, NULL, rdev,
+			      regulator_unset_supply);
 }
 
 #ifdef CONFIG_DEBUG_FS
@@ -4131,10 +4149,10 @@ void regulator_unregister(struct regulator_dev *rdev)
 		regulator_put(rdev->supply);
 	}
 	mutex_lock(&regulator_list_mutex);
-	debugfs_remove_recursive(rdev->debugfs);
 	flush_work(&rdev->disable_work.work);
-	WARN_ON(rdev->open_count);
 	unset_regulator_supplies(rdev);
+	debugfs_remove_recursive(rdev->debugfs);
+	WARN_ON(rdev->open_count);
 	list_del(&rdev->list);
 	regulator_ena_gpio_free(rdev);
 	mutex_unlock(&regulator_list_mutex);
