@@ -998,10 +998,10 @@ static void udf_prealloc_extents(struct inode *inode, int c, int lastblock,
 				length : UDF_DEFAULT_PREALLOC_BLOCKS) -
 				currlength);
 		if (numalloc) 	{
+			loff_t pos = numalloc << inode->i_sb->s_blocksize_bits;
+
 			if (start == (c + 1))
-				laarr[start].extLength +=
-					(numalloc <<
-					 inode->i_sb->s_blocksize_bits);
+				laarr[start].extLength += pos;
 			else {
 				memmove(&laarr[c + 2], &laarr[c + 1],
 					sizeof(struct long_ad) * (*endnum - (c + 1)));
@@ -1011,9 +1011,7 @@ static void udf_prealloc_extents(struct inode *inode, int c, int lastblock,
 					laarr[c].extLocation.
 							partitionReferenceNum;
 				laarr[c + 1].extLength =
-					EXT_NOT_RECORDED_ALLOCATED |
-					(numalloc <<
-					 inode->i_sb->s_blocksize_bits);
+					EXT_NOT_RECORDED_ALLOCATED | pos;
 				start = c + 1;
 			}
 
@@ -1024,12 +1022,12 @@ static void udf_prealloc_extents(struct inode *inode, int c, int lastblock,
 					    inode->i_sb->s_blocksize_bits;
 
 				if (elen > numalloc) {
-					laarr[i].extLength -=
-						(numalloc <<
-						 inode->i_sb->s_blocksize_bits);
-					numalloc = 0;
+					laarr[i].extLength -= pos;
+					numalloc = pos = 0;
 				} else {
 					numalloc -= elen;
+					pos = numalloc <<
+					      inode->i_sb->s_blocksize_bits;
 					if (*endnum > (i + 1))
 						memmove(&laarr[i],
 							&laarr[i + 1],
@@ -1039,8 +1037,7 @@ static void udf_prealloc_extents(struct inode *inode, int c, int lastblock,
 					(*endnum)--;
 				}
 			}
-			UDF_I(inode)->i_lenExtents +=
-				numalloc << inode->i_sb->s_blocksize_bits;
+			UDF_I(inode)->i_lenExtents += pos;
 		}
 	}
 }
