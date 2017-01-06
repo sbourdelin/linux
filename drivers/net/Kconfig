@@ -284,6 +284,20 @@ config TUN
 
 	  If you don't know what to use this for, you don't need it.
 
+config TAP
+        tristate "TAP module support for virtual interfaces"
+        ---help---
+          TAP module serves two purposes. This can be used as library of functions
+          for virtual interfaces to implement tap functionality.
+
+          This module also includes character device file and socket operations
+          that can be used by virtual interface implementing tap.
+
+          To compile this driver as a module, choose M here: the module
+          will be called tap.
+
+          If you don't know what to use this for, you don't need it.
+
 config TUN_VNET_CROSS_LE
 	bool "Support for cross-endian vnet headers on little-endian kernels"
 	default n
