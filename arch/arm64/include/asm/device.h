@@ -22,6 +22,7 @@ struct dev_archdata {
 	void *iommu;			/* private IOMMU data */
 #endif
 	bool dma_coherent;
+	u64 parent_dma_mask;
 };
 
 struct pdev_archdata {

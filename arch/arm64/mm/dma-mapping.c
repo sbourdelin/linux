@@ -352,6 +352,31 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
 	return 1;
 }
 
+static int __swiotlb_set_dma_mask(struct device *dev, u64 mask)
+{
+	/* device is not DMA capable */
+	if (!dev->dma_mask)
+		return -EIO;
+
+	/* mask is below swiotlb bounce buffer, so fail */
+	if (!swiotlb_dma_supported(dev, mask))
+		return -EIO;
+
+	/*
+	 * because of the swiotlb, we can return success for
+	 * larger masks, but need to ensure that bounce buffers
+	 * are used above parent_dma_mask, so set that as
+	 * the effective mask.
+	 */
+	if (mask > dev->archdata.parent_dma_mask)
+		mask = dev->archdata.parent_dma_mask;
+
+
+	*dev->dma_mask = mask;
+
+	return 0;
+}
+
 static struct dma_map_ops swiotlb_dma_ops = {
 	.alloc = __dma_alloc,
 	.free = __dma_free,
@@ -367,7 +392,22 @@ static struct dma_map_ops swiotlb_dma_ops = {
 	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
 	.dma_supported = __swiotlb_dma_supported,
 	.mapping_error = swiotlb_dma_mapping_error,
+	.set_dma_mask = __swiotlb_set_dma_mask,
 };
+
+int dma_set_coherent_mask(struct device *dev, u64 mask)
+{
+	if (!dma_supported(dev, mask))
+		return -EIO;
+
+	if (get_dma_ops(dev) == &swiotlb_dma_ops &&
+	    mask > dev->archdata.parent_dma_mask)
+		mask = dev->archdata.parent_dma_mask;
+
+	dev->coherent_dma_mask = mask;
+	return 0;
+}
+EXPORT_SYMBOL(dma_set_coherent_mask);
 
 static int __init atomic_pool_init(void)
 {
@@ -954,6 +994,18 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
 {
 	if (!dev->archdata.dma_ops)
 		dev->archdata.dma_ops = &swiotlb_dma_ops;
+
+	/*
+	 * we don't yet support buses that have a non-zero mapping.
+	 *  Let's hope we won't need it
+	 */
+	WARN_ON(dma_base != 0);
+
+	/*
+	 * Whatever the parent bus can set. A device must not set
+	 * a DMA mask larger than this.
+	 */
+	dev->archdata.parent_dma_mask = size;
 
 	dev->archdata.dma_coherent = coherent;
 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
