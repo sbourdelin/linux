@@ -54,10 +54,9 @@ int dccp_parse_options(struct sock *sk, struct dccp_request_sock *dreq,
 	struct dccp_sock *dp = dccp_sk(sk);
 	const struct dccp_hdr *dh = dccp_hdr(skb);
 	const u8 pkt_type = DCCP_SKB_CB(skb)->dccpd_type;
-	unsigned char *options = (unsigned char *)dh + dccp_hdr_len(skb);
-	unsigned char *opt_ptr = options;
-	const unsigned char *opt_end = (unsigned char *)dh +
-					(dh->dccph_doff * 4);
+	unsigned char *opt_ptr = (unsigned char *)dh + __dccp_hdr_len(dh);
+	unsigned int optlen = dh->dccph_doff * 4 - __dccp_hdr_len(dh);
+	const unsigned char *opt_end = opt_ptr + optlen;
 	struct dccp_options_received *opt_recv = &dp->dccps_options_received;
 	unsigned char opt, len;
 	unsigned char *uninitialized_var(value);
