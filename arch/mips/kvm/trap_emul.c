@@ -670,6 +670,8 @@ static int kvm_trap_emul_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 			write_c0_entryhi(cpu_asid(cpu, kern_mm));
 		else
 			write_c0_entryhi(cpu_asid(cpu, user_mm));
+		cpumask_clear_cpu(cpu, mm_cpumask(current->active_mm));
+		current->active_mm = &init_mm;
 		ehb();
 	}
 
@@ -689,6 +691,8 @@ static int kvm_trap_emul_vcpu_put(struct kvm_vcpu *vcpu, int cpu)
 			get_new_mmu_context(current->mm, cpu);
 		}
 		write_c0_entryhi(cpu_asid(cpu, current->mm));
+		cpumask_set_cpu(cpu, mm_cpumask(current->mm));
+		current->active_mm = current->mm;
 		ehb();
 	}
 
@@ -723,7 +727,7 @@ static void kvm_trap_emul_vcpu_reenter(struct kvm_run *run,
 
 static int kvm_trap_emul_vcpu_run(struct kvm_run *run, struct kvm_vcpu *vcpu)
 {
-	int cpu;
+	int cpu = smp_processor_id();
 	int r;
 
 	/* Check if we have any exceptions/interrupts pending */
@@ -735,6 +739,14 @@ static int kvm_trap_emul_vcpu_run(struct kvm_run *run, struct kvm_vcpu *vcpu)
 	/* Disable hardware page table walking while in guest */
 	htw_stop();
 
+	/*
+	 * While in guest context we're in the guest's address space, not the
+	 * host process address space, so we need to be careful not to confuse
+	 * e.g. cache management IPIs.
+	 */
+	cpumask_clear_cpu(cpu, mm_cpumask(current->active_mm));
+	current->active_mm = &init_mm;
+
 	r = vcpu->arch.vcpu_run(run, vcpu);
 
 	/* We may have migrated while handling guest exits */
@@ -745,6 +757,8 @@ static int kvm_trap_emul_vcpu_run(struct kvm_run *run, struct kvm_vcpu *vcpu)
 	     asid_version_mask(cpu)))
 		get_new_mmu_context(current->mm, cpu);
 	write_c0_entryhi(cpu_asid(cpu, current->mm));
+	cpumask_set_cpu(cpu, mm_cpumask(current->mm));
+	current->active_mm = current->mm;
 
 	htw_start();
 
