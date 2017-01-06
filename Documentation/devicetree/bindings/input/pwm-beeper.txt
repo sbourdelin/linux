@@ -5,3 +5,14 @@ Registers a PWM device as beeper.
 Required properties:
 - compatible: should be "pwm-beeper"
 - pwms: phandle to the physical PWM device
+
+Optional properties:
+- enable-gpios: phandle to gpio to enable the beeper
+
+Example:
+
+beeper {
+	compatible = "pwm-beeper";
+	pwms = <&pwm0>;
+	enable-gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
+};
