@@ -32,6 +32,8 @@
 #define FMC_CFG_OP_MODE_MASK		BIT_MASK(0)
 #define FMC_CFG_OP_MODE_BOOT		0
 #define FMC_CFG_OP_MODE_NORMAL		1
+#define FMC_CFG_OP_MODE_SEL(mode)      ((mode) & 0x1)
+#define FMC_CFG_FLASH_SEL_SPI_NOR	(0x0 << 1)
 #define FMC_CFG_FLASH_SEL(type)		(((type) & 0x3) << 1)
 #define FMC_CFG_FLASH_SEL_MASK		0x6
 #define FMC_ECC_TYPE(type)		(((type) & 0x7) << 5)
@@ -141,10 +143,36 @@ static int get_if_type(enum read_mode flash_read)
 	return if_type;
 }
 
+static void spi_nor_switch_spi_type(struct hifmc_host *host)
+{
+	unsigned int reg;
+
+	reg = readl(host->regbase + FMC_CFG);
+	if ((reg & FMC_CFG_FLASH_SEL_MASK)
+		   	== FMC_CFG_FLASH_SEL_SPI_NOR)
+		return;
+
+	/* if the flash type isn't spi nor, change it */
+	reg &= ~FMC_CFG_FLASH_SEL_MASK;
+	reg |= FMC_CFG_FLASH_SEL(0);
+	writel(reg, host->regbase + FMC_CFG);
+}
+
 static void hisi_spi_nor_init(struct hifmc_host *host)
 {
 	u32 reg;
 
+	/* switch the flash type to spi nor */
+	spi_nor_switch_spi_type(host);
+
+	/* set the boot mode to normal */
+	reg = readl(host->regbase + FMC_CFG);
+	if ((reg & FMC_CFG_OP_MODE_MASK) == FMC_CFG_OP_MODE_BOOT) {
+		reg |= FMC_CFG_OP_MODE_SEL(FMC_CFG_OP_MODE_NORMAL);
+		writel(reg, host->regbase + FMC_CFG);
+	}
+
+	/* set timming */
 	reg = TIMING_CFG_TCSH(CS_HOLD_TIME)
 		| TIMING_CFG_TCSS(CS_SETUP_TIME)
 		| TIMING_CFG_TSHSL(CS_DESELECT_TIME);
@@ -166,6 +194,8 @@ static int hisi_spi_nor_prep(struct spi_nor *nor, enum spi_nor_ops ops)
 	ret = clk_prepare_enable(host->clk);
 	if (ret)
 		goto out;
+
+	spi_nor_switch_spi_type(host);
 
 	return 0;
 
