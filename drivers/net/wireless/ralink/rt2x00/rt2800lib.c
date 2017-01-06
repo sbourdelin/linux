@@ -4968,7 +4968,7 @@ static int rt2800_init_registers(struct rt2x00_dev *rt2x00dev)
 	rt2800_register_write(rt2x00dev, HT_FBK_CFG0, reg);
 
 	rt2800_register_read(rt2x00dev, HT_FBK_CFG1, &reg);
-	rt2x00_set_field32(&reg, HT_FBK_CFG1_HTMCS8FBK, 8);
+	rt2x00_set_field32(&reg, HT_FBK_CFG1_HTMCS8FBK, 7);
 	rt2x00_set_field32(&reg, HT_FBK_CFG1_HTMCS9FBK, 8);
 	rt2x00_set_field32(&reg, HT_FBK_CFG1_HTMCS10FBK, 9);
 	rt2x00_set_field32(&reg, HT_FBK_CFG1_HTMCS11FBK, 10);
