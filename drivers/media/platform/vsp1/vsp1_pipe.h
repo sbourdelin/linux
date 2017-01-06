@@ -108,8 +108,6 @@ struct vsp1_pipeline {
 
 	struct list_head entities;
 
-	struct vsp1_dl_list *dl;
-
 	unsigned int div_size;
 	unsigned int partitions;
 	struct v4l2_rect partition;
