@@ -342,6 +342,14 @@ static const char *acpi_ec_cmd_string(u8 cmd)
  *                           GPE Registers
  * -------------------------------------------------------------------------- */
 
+static inline bool acpi_ec_is_gpe_enabled(struct acpi_ec *ec)
+{
+	acpi_event_status gpe_status = 0;
+
+	(void)acpi_get_gpe_status(NULL, ec->gpe, &gpe_status);
+	return (gpe_status & ACPI_EVENT_FLAG_ENABLE_SET) ? true : false;
+}
+
 static inline bool acpi_ec_is_gpe_raised(struct acpi_ec *ec)
 {
 	acpi_event_status gpe_status = 0;
@@ -734,7 +742,7 @@ static int ec_guard(struct acpi_ec *ec)
 
 	/* Ensure guarding period before polling EC status */
 	do {
-		if (ec_busy_polling) {
+		if (!acpi_ec_is_gpe_enabled(ec) || ec_busy_polling) {
 			/* Perform busy polling */
 			if (ec_transaction_completed(ec))
 				return 0;
