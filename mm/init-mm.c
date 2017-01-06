@@ -1,3 +1,4 @@
+#include <linux/export.h>
 #include <linux/mm_types.h>
 #include <linux/rbtree.h>
 #include <linux/rwsem.h>
@@ -25,3 +26,4 @@ struct mm_struct init_mm = {
 	.user_ns	= &init_user_ns,
 	INIT_MM_CONTEXT(init_mm)
 };
+EXPORT_SYMBOL_GPL(init_mm);
