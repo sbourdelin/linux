@@ -99,12 +99,16 @@ static struct proto tap_proto = {
 };
 
 #define TAP_NUM_DEVS (1U << MINORBITS)
+
+LIST_HEAD(major_list);
+
 struct major_info {
 	dev_t major;
 	struct idr minor_idr;
 	struct mutex minor_lock;
 	const char *device_name;
-} macvtap_major;
+	struct list_head next;
+};
 
 #define GOODCOPY_LEN 128
 
@@ -385,44 +389,81 @@ drop:
 	return RX_HANDLER_CONSUMED;
 }
 
-int tap_get_minor(struct tap_dev *tap)
+int tap_get_minor(dev_t major, struct tap_dev *tap)
 {
 	int retval = -ENOMEM;
+	struct major_info *tap_major, *tmp;
+	bool found = false;
 
-	mutex_lock(&macvtap_major.minor_lock);
-	retval = idr_alloc(&macvtap_major.minor_idr, tap, 1, TAP_NUM_DEVS, GFP_KERNEL);
+	list_for_each_entry_safe(tap_major, tmp, &major_list, next) {
+		if (tap_major->major == MAJOR(major)) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found)
+		return -EINVAL;
+
+	mutex_lock(&tap_major->minor_lock);
+	retval = idr_alloc(&tap_major->minor_idr, tap, 1, TAP_NUM_DEVS, GFP_KERNEL);
 	if (retval >= 0) {
 		tap->minor = retval;
 	} else if (retval == -ENOSPC) {
 		netdev_err(tap->dev, "Too many tap devices\n");
 		retval = -EINVAL;
 	}
-	mutex_unlock(&macvtap_major.minor_lock);
+	mutex_unlock(&tap_major->minor_lock);
 	return retval < 0 ? retval : 0;
 }
 
-void tap_free_minor(struct tap_dev *tap)
+void tap_free_minor(dev_t major, struct tap_dev *tap)
 {
-	mutex_lock(&macvtap_major.minor_lock);
+	struct major_info *tap_major, *tmp;
+	bool found = false;
+
+	list_for_each_entry_safe(tap_major, tmp, &major_list, next) {
+		if (tap_major->major == MAJOR(major)) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found)
+		return;
+
+	mutex_lock(&tap_major->minor_lock);
 	if (tap->minor) {
-		idr_remove(&macvtap_major.minor_idr, tap->minor);
+		idr_remove(&tap_major->minor_idr, tap->minor);
 		tap->minor = 0;
 	}
-	mutex_unlock(&macvtap_major.minor_lock);
+	mutex_unlock(&tap_major->minor_lock);
 }
 
-static struct tap_dev *dev_get_by_tap_minor(int minor)
+static struct tap_dev *dev_get_by_tap_file(int major, int minor)
 {
 	struct net_device *dev = NULL;
 	struct tap_dev *tap;
+	struct major_info *tap_major, *tmp;
+	bool found = false;
 
-	mutex_lock(&macvtap_major.minor_lock);
-	tap = idr_find(&macvtap_major.minor_idr, minor);
+	list_for_each_entry_safe(tap_major, tmp, &major_list, next) {
+		if (tap_major->major == major) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found)
+		return NULL;
+
+	mutex_lock(&tap_major->minor_lock);
+	tap = idr_find(&tap_major->minor_idr, minor);
 	if (tap) {
 		dev = tap->dev;
 		dev_hold(dev);
 	}
-	mutex_unlock(&macvtap_major.minor_lock);
+	mutex_unlock(&tap_major->minor_lock);
 	return tap;
 }
 
@@ -454,7 +495,7 @@ static int tap_open(struct inode *inode, struct file *file)
 	int err = -ENODEV;
 
 	rtnl_lock();
-	tap = dev_get_by_tap_minor(iminor(inode));
+	tap = dev_get_by_tap_file(imajor(inode), iminor(inode));
 	if (!tap)
 		goto err;
 
@@ -1161,6 +1202,24 @@ int tap_queue_resize(struct tap_dev *tap)
 	return ret;
 }
 
+static int tap_list_add(dev_t major, const char *device_name)
+{
+	int err = 0;
+	struct major_info *tap_major;
+
+	tap_major = kzalloc(sizeof(*tap_major), GFP_ATOMIC);
+
+	tap_major->major = MAJOR(major);
+
+	idr_init(&tap_major->minor_idr);
+	mutex_init(&tap_major->minor_lock);
+
+	tap_major->device_name = device_name;
+
+	list_add_tail(&tap_major->next, &major_list);
+	return err;
+}
+
 int tap_create_cdev(struct cdev *tap_cdev,
 		    dev_t *tap_major, const char *device_name)
 {
@@ -1176,12 +1235,7 @@ int tap_create_cdev(struct cdev *tap_cdev,
 	if (err)
 		goto out2;
 
-	macvtap_major.major = MAJOR(*tap_major);
-
-	idr_init(&macvtap_major.minor_idr);
-	mutex_init(&macvtap_major.minor_lock);
-
-	macvtap_major.device_name = device_name;
+	err = tap_list_add(*tap_major, device_name);
 
 	return err;
 
@@ -1193,8 +1247,20 @@ out1:
 
 void tap_destroy_cdev(dev_t major, struct cdev *tap_cdev)
 {
+	struct major_info *tap_major, *tmp;
+	bool found = false;
+
+	list_for_each_entry_safe(tap_major, tmp, &major_list, next) {
+		if (tap_major->major == MAJOR(major)) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found)
+		return;
+
 	cdev_del(tap_cdev);
 	unregister_chrdev_region(major, TAP_NUM_DEVS);
-	idr_destroy(&macvtap_major.minor_idr);
+	idr_destroy(&tap_major->minor_idr);
 }
-
