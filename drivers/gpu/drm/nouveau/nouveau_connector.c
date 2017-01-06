@@ -696,7 +696,7 @@ nouveau_connector_detect_lvds(struct drm_connector *connector, bool force)
 	}
 
 	/* If no EDID found above, and the VBIOS indicates a hardcoded
-	 * modeline is avalilable for the panel, set it as the panel's
+	 * modeline is available for the panel, set it as the panel's
 	 * native mode and exit.
 	 */
 	if (nouveau_bios_fp_mode(dev, NULL) && (drm->vbios.fp_no_ddc ||
