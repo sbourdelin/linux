@@ -388,6 +388,7 @@ static int davinci_spi_setup_transfer(struct spi_device *spi,
 static int davinci_spi_of_setup(struct spi_device *spi)
 {
 	struct davinci_spi_config *spicfg = spi->controller_data;
+	struct davinci_spi *dspi = spi_master_get_devdata(spi->master);
 	struct device_node *np = spi->dev.of_node;
 	u32 prop;
 
@@ -400,6 +401,9 @@ static int davinci_spi_of_setup(struct spi_device *spi)
 		if (!of_property_read_u32(np, "ti,spi-wdelay", &prop))
 			spicfg->wdelay = (u8)prop;
 		spi->controller_data = spicfg;
+		/* Use DMA for device if master supports it */
+		if (dspi->dma_rx)
+			spicfg->io_type = SPI_IO_TYPE_DMA;
 	}
 
 	return 0;
