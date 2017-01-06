@@ -111,6 +111,7 @@ RAMC SDRAM/DDR Controller required properties:
 			"atmel,at91sam9260-sdramc",
 			"atmel,at91sam9g45-ddramc",
 			"atmel,sama5d3-ddramc",
+			"atmel,sama5d4-ddramc",
 - reg: Should contain registers location and length
 
 Examples:
