@@ -14,6 +14,7 @@
  */
 
 #include <linux/input.h>
+#include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/of.h>
@@ -25,6 +26,7 @@
 struct pwm_beeper {
 	struct input_dev *input;
 	struct pwm_device *pwm;
+	struct gpio_desc *enable_gpio;
 	struct work_struct work;
 	unsigned long period;
 };
@@ -38,8 +40,13 @@ static void __pwm_beeper_set(struct pwm_beeper *beeper)
 	if (period) {
 		pwm_config(beeper->pwm, period / 2, period);
 		pwm_enable(beeper->pwm);
-	} else
+		if (beeper->enable_gpio)
+			gpiod_direction_output(beeper->enable_gpio, 1);
+	} else {
+		if (beeper->enable_gpio)
+			gpiod_direction_output(beeper->enable_gpio, 0);
 		pwm_disable(beeper->pwm);
+	}
 }
 
 static void pwm_beeper_work(struct work_struct *work)
@@ -82,6 +89,8 @@ static void pwm_beeper_stop(struct pwm_beeper *beeper)
 {
 	cancel_work_sync(&beeper->work);
 
+	if (beeper->enable_gpio)
+		gpiod_direction_output(beeper->enable_gpio, 0);
 	if (beeper->period)
 		pwm_disable(beeper->pwm);
 }
@@ -114,6 +123,15 @@ static int pwm_beeper_probe(struct platform_device *pdev)
 		if (error != -EPROBE_DEFER)
 			dev_err(&pdev->dev, "Failed to request pwm device\n");
 		goto err_free;
+	}
+
+	beeper->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+						      GPIOD_OUT_LOW);
+	error = PTR_ERR_OR_ZERO(beeper->enable_gpio);
+	if (error) {
+		if (error != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "Failed to get enable gpio\n");
+		goto err_pwm_free;
 	}
 
 	/*
