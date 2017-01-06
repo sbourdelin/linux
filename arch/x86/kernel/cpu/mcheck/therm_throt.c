@@ -6,7 +6,7 @@
  *
  * Maintains a counter in /sys that keeps track of the number of thermal
  * events, such that the user knows how bad the thermal problem might be
- * (since the logging to syslog and mcelog is rate limited).
+ * (since the logging to syslog is rate limited).
  *
  * Author: Dmitriy Zavin (dmitriyz@google.com)
  *
@@ -392,10 +392,9 @@ static void intel_thermal_interrupt(void)
 	/* Check for violation of core thermal thresholds*/
 	notify_thresholds(msr_val);
 
-	if (therm_throt_process(msr_val & THERM_STATUS_PROCHOT,
-				THERMAL_THROTTLING_EVENT,
-				CORE_LEVEL) != 0)
-		mce_log_therm_throt_event(msr_val);
+	therm_throt_process(msr_val & THERM_STATUS_PROCHOT,
+			    THERMAL_THROTTLING_EVENT,
+			    CORE_LEVEL);
 
 	if (this_cpu_has(X86_FEATURE_PLN) && int_pln_enable)
 		therm_throt_process(msr_val & THERM_STATUS_POWER_LIMIT,
