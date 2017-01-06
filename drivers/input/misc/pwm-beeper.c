@@ -109,9 +109,10 @@ static int pwm_beeper_probe(struct platform_device *pdev)
 		beeper->pwm = pwm_request(pwm_id, "pwm beeper");
 	}
 
-	if (IS_ERR(beeper->pwm)) {
-		error = PTR_ERR(beeper->pwm);
-		dev_err(&pdev->dev, "Failed to request pwm device: %d\n", error);
+	error = PTR_ERR_OR_ZERO(beeper->pwm);
+	if (error) {
+		if (error != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "Failed to request pwm device\n");
 		goto err_free;
 	}
 
