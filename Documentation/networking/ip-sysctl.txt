@@ -1471,6 +1471,19 @@ accept_ra_rt_info_max_plen - INTEGER
 	Functional default: 0 if accept_ra_rtr_pref is enabled.
 			    -1 if accept_ra_rtr_pref is disabled.
 
+accept_ra_rt_table - INTEGER
+	Which table to put routes created by Router Advertisements into.
+
+	= 0: Use the main table if the device is not in a VRF, and the
+	     VRF table if it is.
+	> 0: Use the specified table.
+	< 0: Add the absolute value to the receiving interface index,
+	     and use that table. For example, if set to -1000, an RA
+	     received on interface index 4 will create routes in
+	     table 1004.
+
+	Default: 0
+
 accept_ra_rtr_pref - BOOLEAN
 	Accept Router Preference in RA.
 

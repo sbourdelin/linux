@@ -243,6 +243,7 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.seg6_require_hmac	= 0,
 #endif
 	.enhanced_dad           = 1,
+	.accept_ra_rt_table	= 0,
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
@@ -294,6 +295,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.seg6_require_hmac	= 0,
 #endif
 	.enhanced_dad           = 1,
+	.accept_ra_rt_table	= 0,
 };
 
 /* Check if a valid qdisc is available */
@@ -2210,6 +2212,30 @@ static void  ipv6_try_regen_rndid(struct inet6_dev *idev, struct in6_addr *tmpad
 		ipv6_regen_rndid(idev);
 }
 
+#ifdef CONFIG_IPV6_MULTIPLE_TABLES
+u32 addrconf_rt_table(const struct net_device *dev, u32 default_table)
+{
+	struct inet6_dev *idev = in6_dev_get(dev);
+	u32 table;
+	int sysctl = idev->cnf.accept_ra_rt_table;
+
+	if (sysctl == 0)
+		table = l3mdev_fib_table(dev) ? : default_table;
+	else if (sysctl > 0)
+		table = (u32)sysctl;
+	else
+		table = (unsigned int)dev->ifindex + (-sysctl);
+
+	in6_dev_put(idev);
+	return table;
+}
+#else
+u32 addrconf_rt_table(const struct net_device *dev, u32 default_table)
+{
+	return RT6_TABLE_DFLT;
+}
+#endif
+
 /*
  *	Add prefix route.
  */
@@ -2219,7 +2245,7 @@ addrconf_prefix_route(struct in6_addr *pfx, int plen, struct net_device *dev,
 		      unsigned long expires, u32 flags)
 {
 	struct fib6_config cfg = {
-		.fc_table = l3mdev_fib_table(dev) ? : RT6_TABLE_PREFIX,
+		.fc_table = addrconf_rt_table(dev, RT6_TABLE_PREFIX),
 		.fc_metric = IP6_RT_PRIO_ADDRCONF,
 		.fc_ifindex = dev->ifindex,
 		.fc_expires = expires,
@@ -2252,9 +2278,9 @@ static struct rt6_info *addrconf_get_prefix_route(const struct in6_addr *pfx,
 	struct fib6_node *fn;
 	struct rt6_info *rt = NULL;
 	struct fib6_table *table;
-	u32 tb_id = l3mdev_fib_table(dev) ? : RT6_TABLE_PREFIX;
 
-	table = fib6_get_table(dev_net(dev), tb_id);
+	table = fib6_get_table(dev_net(dev),
+			       addrconf_rt_table(dev, RT6_TABLE_PREFIX));
 	if (!table)
 		return NULL;
 
@@ -4975,6 +5001,7 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_SEG6_REQUIRE_HMAC] = cnf->seg6_require_hmac;
 #endif
 	array[DEVCONF_ENHANCED_DAD] = cnf->enhanced_dad;
+	array[DEVCONF_ACCEPT_RA_RT_TABLE] = cnf->accept_ra_rt_table;
 }
 
 static inline size_t inet6_ifla6_size(void)
@@ -6088,6 +6115,13 @@ static const struct ctl_table addrconf_sysctl[] = {
 		.maxlen         = sizeof(int),
 		.mode           = 0644,
 		.proc_handler   = proc_dointvec,
+	},
+	{
+		.procname	= "accept_ra_rt_table",
+		.data		= &ipv6_devconf.accept_ra_rt_table,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
 	},
 	{
 		/* sentinel */

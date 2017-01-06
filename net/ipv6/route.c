@@ -2345,13 +2345,12 @@ static struct rt6_info *rt6_get_route_info(struct net *net,
 					   const struct in6_addr *gwaddr,
 					   struct net_device *dev)
 {
-	u32 tb_id = l3mdev_fib_table(dev) ? : RT6_TABLE_INFO;
 	int ifindex = dev->ifindex;
 	struct fib6_node *fn;
 	struct rt6_info *rt = NULL;
 	struct fib6_table *table;
 
-	table = fib6_get_table(net, tb_id);
+	table = fib6_get_table(net, addrconf_rt_table(dev, RT6_TABLE_INFO));
 	if (!table)
 		return NULL;
 
@@ -2392,7 +2391,7 @@ static struct rt6_info *rt6_add_route_info(struct net *net,
 		.fc_nlinfo.nl_net = net,
 	};
 
-	cfg.fc_table = l3mdev_fib_table(dev) ? : RT6_TABLE_INFO,
+	cfg.fc_table = addrconf_rt_table(dev, RT6_TABLE_INFO);
 	cfg.fc_dst = *prefix;
 	cfg.fc_gateway = *gwaddr;
 
@@ -2408,11 +2407,11 @@ static struct rt6_info *rt6_add_route_info(struct net *net,
 
 struct rt6_info *rt6_get_dflt_router(const struct in6_addr *addr, struct net_device *dev)
 {
-	u32 tb_id = l3mdev_fib_table(dev) ? : RT6_TABLE_DFLT;
 	struct rt6_info *rt;
 	struct fib6_table *table;
 
-	table = fib6_get_table(dev_net(dev), tb_id);
+	table = fib6_get_table(dev_net(dev),
+			       addrconf_rt_table(dev, RT6_TABLE_DFLT));
 	if (!table)
 		return NULL;
 
@@ -2434,7 +2433,7 @@ struct rt6_info *rt6_add_dflt_router(const struct in6_addr *gwaddr,
 				     unsigned int pref)
 {
 	struct fib6_config cfg = {
-		.fc_table	= l3mdev_fib_table(dev) ? : RT6_TABLE_DFLT,
+		.fc_table	= addrconf_rt_table(dev, RT6_TABLE_DFLT),
 		.fc_metric	= IP6_RT_PRIO_USER,
 		.fc_ifindex	= dev->ifindex,
 		.fc_flags	= RTF_GATEWAY | RTF_ADDRCONF | RTF_DEFAULT |
