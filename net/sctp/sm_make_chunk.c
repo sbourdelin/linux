@@ -3526,3 +3526,36 @@ struct sctp_chunk *sctp_make_fwdtsn(const struct sctp_association *asoc,
 
 	return retval;
 }
+
+/* RE-CONFIG 3.1 (RE-CONFIG chunk)
+ *   0                   1                   2                   3
+ *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *  | Type = 130    |  Chunk Flags  |      Chunk Length             |
+ *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *  \                                                               \
+ *  /                  Re-configuration Parameter                   /
+ *  \                                                               \
+ *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *  \                                                               \
+ *  /             Re-configuration Parameter (optional)             /
+ *  \                                                               \
+ *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ */
+static struct sctp_chunk *sctp_make_reconf(
+				const struct sctp_association *asoc,
+				int length)
+{
+	struct sctp_reconf_chunk *reconf;
+	struct sctp_chunk *retval;
+
+	retval = sctp_make_control(asoc, SCTP_CID_RECONF, 0, length,
+				   GFP_ATOMIC);
+	if (!retval)
+		return NULL;
+
+	reconf = (struct sctp_reconf_chunk *)retval->chunk_hdr;
+	retval->param_hdr.v = reconf->params;
+
+	return retval;
+}
