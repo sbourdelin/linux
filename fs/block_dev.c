@@ -846,12 +846,22 @@ static struct inode *bdev_alloc_inode(struct super_block *sb)
 	return &ei->vfs_inode;
 }
 
+static void bdev_release(struct work_struct *w)
+{
+	struct block_device *bdev = container_of(w, typeof(*bdev), bd_release);
+	struct bdev_inode *bdi = container_of(bdev, typeof(*bdi), bdev);
+
+	blk_put_queue(bdev->bd_queue);
+	kmem_cache_free(bdev_cachep, bdi);
+}
+
 static void bdev_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	struct bdev_inode *bdi = BDEV_I(inode);
+	struct block_device *bdev = &BDEV_I(inode)->bdev;
 
-	kmem_cache_free(bdev_cachep, bdi);
+	/* blk_put_queue needs process context */
+	schedule_work(&bdev->bd_release);
 }
 
 static void bdev_destroy_inode(struct inode *inode)
@@ -870,6 +880,7 @@ static void init_once(void *foo)
 #ifdef CONFIG_SYSFS
 	INIT_LIST_HEAD(&bdev->bd_holder_disks);
 #endif
+	INIT_WORK(&bdev->bd_release, bdev_release);
 	inode_init_once(&ei->vfs_inode);
 	/* Initialize mutex for freeze. */
 	mutex_init(&bdev->bd_fsfreeze_mutex);
@@ -1525,6 +1536,8 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 	mutex_lock_nested(&bdev->bd_mutex, for_part);
 	if (!bdev->bd_openers) {
 		bdev->bd_disk = disk;
+		if (!blk_get_queue(disk->queue))
+			goto out_clear;
 		bdev->bd_queue = disk->queue;
 		bdev->bd_contains = bdev;
 
@@ -1545,7 +1558,6 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 					disk_put_part(bdev->bd_part);
 					bdev->bd_part = NULL;
 					bdev->bd_disk = NULL;
-					bdev->bd_queue = NULL;
 					mutex_unlock(&bdev->bd_mutex);
 					disk_unblock_events(disk);
 					put_disk(disk);
@@ -1621,7 +1633,6 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 	disk_put_part(bdev->bd_part);
 	bdev->bd_disk = NULL;
 	bdev->bd_part = NULL;
-	bdev->bd_queue = NULL;
 	if (bdev != bdev->bd_contains)
 		__blkdev_put(bdev->bd_contains, mode, 1);
 	bdev->bd_contains = NULL;
@@ -1843,12 +1854,6 @@ static void __blkdev_put(struct block_device *bdev, fmode_t mode, int for_part)
 		kill_bdev(bdev);
 
 		bdev_write_inode(bdev);
-		/*
-		 * Detaching bdev inode from its wb in __destroy_inode()
-		 * is too late: the queue which embeds its bdi (along with
-		 * root wb) can be gone as soon as we put_disk() below.
-		 */
-		inode_detach_wb(bdev->bd_inode);
 	}
 	if (bdev->bd_contains == bdev) {
 		if (disk->fops->release)

@@ -436,6 +436,7 @@ struct block_device {
 	int			bd_fsfreeze_count;
 	/* Mutex for freeze */
 	struct mutex		bd_fsfreeze_mutex;
+	struct work_struct	bd_release;
 };
 
 /*

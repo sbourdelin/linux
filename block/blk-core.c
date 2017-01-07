@@ -379,7 +379,8 @@ EXPORT_SYMBOL(blk_run_queue);
 
 void blk_put_queue(struct request_queue *q)
 {
-	kobject_put(&q->kobj);
+	if (q)
+		kobject_put(&q->kobj);
 }
 EXPORT_SYMBOL(blk_put_queue);
 
