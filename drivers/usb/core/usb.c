@@ -74,6 +74,9 @@ MODULE_PARM_DESC(autosuspend, "default autosuspend delay");
 #define usb_autosuspend_delay		0
 #endif
 
+static bool timing_minimum;
+module_param(timing_minimum, bool, 0644);
+MODULE_PARM_DESC(timing_minimum, "Use USB 2.0 spec minimum delays");
 
 /**
  * usb_find_alt_setting() - Given a configuration, find the alternate setting
@@ -1069,6 +1072,13 @@ static int __init usb_init(void)
 		return 0;
 	}
 	usb_init_pool_max();
+
+	if (timing_minimum) {
+		usb_timing.tdrsmdn = USB_TIMING_TDRSMDN_MIN;
+		usb_timing.trsmrcy = USB_TIMING_TRSMRCY_MIN;
+		usb_timing.trstrcy = USB_TIMING_TRSTRCY_MIN;
+		usb_timing.tdrstr  = USB_TIMING_TDRSTR_MIN;
+	}
 
 	retval = usb_debugfs_init();
 	if (retval)

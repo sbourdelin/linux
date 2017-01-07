@@ -1896,7 +1896,7 @@ static int isp1362_bus_resume(struct usb_hcd *hcd)
 	isp1362_write_reg32(isp1362_hcd, HCCONTROL, isp1362_hcd->hc_control);
 	spin_unlock_irqrestore(&isp1362_hcd->lock, flags);
 	/* TRSMRCY */
-	msleep(10);
+	msleep(usb_timing.trsmrcy);
 
 	/* keep it alive for ~5x suspend + resume costs */
 	isp1362_hcd->next_statechange = jiffies + msecs_to_jiffies(250);

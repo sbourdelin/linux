@@ -256,7 +256,7 @@ skip_resume:
 
 	/* TRSMRCY */
 	if (!autostopped) {
-		msleep (10);
+		msleep(usb_timing.trsmrcy);
 		spin_lock_irq (&ohci->lock);
 	}
 	/* now ohci->lock is always held and irqs are always disabled */

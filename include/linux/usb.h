@@ -233,8 +233,32 @@ void usb_put_intf(struct usb_interface *intf);
  * In order to avoid both conditions, we're using a 40 ms resume timeout, which
  * should cope with both LPJ calibration errors and devices not following every
  * detail of the USB Specification.
+ *
+ * struct _usb_timing_config - USB timing value settings
+ * @tdrsmdn: TDRSMDN resume signal time    7.1.7.7
+ * @trsmrcy; TRSMRCY resume recovery time  7.1.7.7
+ * @trstrcy; TRSTRCY reset recovery time   7.1.7.5
+ *
+ * These timing values are defined in the USB 2.0 spec sec 7.3.2 table 7-13
+ * Thir default values have been padded for various reasons and this config
+ * allows the system to use different values.
  */
-#define USB_RESUME_TIMEOUT	40 /* ms */
+#define USB_TIMING_TDRSMDN_MIN 20
+#define USB_TIMING_TRSMRCY_MIN 10
+#define USB_TIMING_TRSTRCY_MIN 0
+#define USB_TIMING_TDRSTR_MIN  50
+#define USB_TIMING_TDRSMDN_DEF 40
+#define USB_TIMING_TRSMRCY_DEF 10
+#define USB_TIMING_TRSTRCY_DEF 50
+#define USB_TIMING_TDRSTR_DEF  50
+
+struct usb_timing_config {
+	unsigned int tdrsmdn; /* resume signal time   20ms - infinity */
+	unsigned int trsmrcy; /* resume recovery time  0ms - 10ms     */
+	unsigned int trstrcy; /* reset recovery time   0ms - infinity */
+	unsigned int tdrstr;  /* root hub port reset  50ms - infinity */
+};
+extern struct usb_timing_config usb_timing;
 
 /**
  * struct usb_interface_cache - long-term representation of a device interface

@@ -166,7 +166,7 @@ static void uhci_check_ports(struct uhci_hcd *uhci)
 				/* Port received a wakeup request */
 				set_bit(port, &uhci->resuming_ports);
 				uhci->ports_timeout = jiffies +
-					msecs_to_jiffies(USB_RESUME_TIMEOUT);
+					msecs_to_jiffies(usb_timing.tdrsmdn);
 				usb_hcd_start_port_resume(
 						&uhci_to_hcd(uhci)->self, port);
 
@@ -339,7 +339,7 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 
 			/* USB v2.0 7.1.7.5 */
 			uhci->ports_timeout = jiffies +
-				msecs_to_jiffies(USB_RESUME_TIMEOUT);
+				msecs_to_jiffies(usb_timing.tdrstr);
 			break;
 		case USB_PORT_FEAT_POWER:
 			/* UHCI has no power switching */
@@ -382,7 +382,7 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 				else
 					/* USB v2.0 7.1.7.7 */
 					uhci->ports_timeout = jiffies +
-						msecs_to_jiffies(20);
+						msecs_to_jiffies(usb_timing.tdrsmdn);
 			}
 			break;
 		case USB_PORT_FEAT_C_SUSPEND:
