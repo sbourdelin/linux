@@ -39,6 +39,8 @@
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
 #include <linux/debugfs.h>
+#include <linux/seq_file.h>
+#include <linux/uaccess.h>
 #include <linux/usb/of.h>
 
 #include <asm/io.h>
@@ -1036,6 +1038,52 @@ struct dentry *usb_debug_root;
 EXPORT_SYMBOL_GPL(usb_debug_root);
 
 static struct dentry *usb_debug_devices;
+static struct dentry *usb_debug_timing;
+
+static int usb_timing_show(struct seq_file *s, void *unused)
+{
+	seq_printf(s, "tdrsmdn=%d\n", usb_timing.tdrsmdn);
+	seq_printf(s, "trsmrcy=%d\n", usb_timing.trsmrcy);
+	seq_printf(s, "trstrcy=%d\n", usb_timing.trstrcy);
+	seq_printf(s, "tdrstr=%d\n", usb_timing.tdrstr);
+	return 0;
+}
+
+static int usb_timing_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, usb_timing_show, inode->i_private);
+}
+
+static ssize_t usb_timing_write(struct file *file,
+		const char __user *ubuf, size_t count, loff_t *ppos)
+{
+	int val;
+	char buf[32];
+
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if (sscanf(buf, "tdrsmdn=%u", &val) == 1)
+		usb_timing.tdrsmdn = max(val, USB_TIMING_TDRSMDN_MIN);
+	else if (sscanf(buf, "trsmrcy=%u", &val) == 1)
+		usb_timing.trsmrcy = max(val, USB_TIMING_TRSMRCY_MIN);
+	else if (sscanf(buf, "trstrcy=%u", &val) == 1)
+		usb_timing.trstrcy = max(val, USB_TIMING_TRSTRCY_MIN);
+	else if (sscanf(buf, "tdrstr=%u", &val) == 1)
+		usb_timing.tdrstr = max(val, USB_TIMING_TDRSTR_MIN);
+	else
+		return -EINVAL;
+
+	return count;
+}
+
+static const struct file_operations usbfs_timing_fops = {
+	.open     = usb_timing_open,
+	.write    = usb_timing_write,
+	.read     = seq_read,
+	.llseek   = seq_lseek,
+	.release  = single_release,
+};
 
 static int usb_debugfs_init(void)
 {
@@ -1052,11 +1100,21 @@ static int usb_debugfs_init(void)
 		return -ENOENT;
 	}
 
+	usb_debug_timing = debugfs_create_file("timing", 0644,
+						usb_debug_root, NULL,
+						&usbfs_timing_fops);
+	if (!usb_debug_timing) {
+		debugfs_remove(usb_debug_root);
+		usb_debug_root = NULL;
+		return -ENOENT;
+	}
+
 	return 0;
 }
 
 static void usb_debugfs_cleanup(void)
 {
+	debugfs_remove(usb_debug_timing);
 	debugfs_remove(usb_debug_devices);
 	debugfs_remove(usb_debug_root);
 }
