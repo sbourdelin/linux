@@ -749,8 +749,8 @@ ixgb_configure_tx(struct ixgb_adapter *adapter)
 	 * tx_ring.dma can be either a 32 or 64 bit value
 	 */
 
-	IXGB_WRITE_REG(hw, TDBAL, (tdba & 0x00000000ffffffffULL));
-	IXGB_WRITE_REG(hw, TDBAH, (tdba >> 32));
+	IXGB_WRITE_REG(hw, TDBAL, lower_32_bits(tdba));
+	IXGB_WRITE_REG(hw, TDBAH, upper_32_bits(tdba));
 
 	IXGB_WRITE_REG(hw, TDLEN, tdlen);
 
@@ -875,8 +875,8 @@ ixgb_configure_rx(struct ixgb_adapter *adapter)
 
 	/* Setup the Base and Length of the Rx Descriptor Ring */
 
-	IXGB_WRITE_REG(hw, RDBAL, (rdba & 0x00000000ffffffffULL));
-	IXGB_WRITE_REG(hw, RDBAH, (rdba >> 32));
+	IXGB_WRITE_REG(hw, RDBAL, lower_32_bits(rdba));
+	IXGB_WRITE_REG(hw, RDBAH, upper_32_bits(rdba));
 
 	IXGB_WRITE_REG(hw, RDLEN, rdlen);
 
@@ -1664,8 +1664,8 @@ ixgb_update_stats(struct ixgb_adapter *adapter)
 		if (multi >= bcast)
 			multi -= bcast;
 
-		adapter->stats.mprcl += (multi & 0xFFFFFFFF);
-		adapter->stats.mprch += (multi >> 32);
+		adapter->stats.mprcl += lower_32_bits(multi);
+		adapter->stats.mprch += upper_32_bits(multi);
 		adapter->stats.bprcl += bcast_l;
 		adapter->stats.bprch += bcast_h;
 	} else {

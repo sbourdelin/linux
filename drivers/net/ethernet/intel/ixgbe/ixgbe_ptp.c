@@ -206,8 +206,8 @@ static void ixgbe_ptp_setup_sdp_x540(struct ixgbe_adapter *adapter)
 		 IXGBE_TSAUXC_SDP0_INT;
 
 	/* clock period (or pulse length) */
-	clktiml = (u32)(IXGBE_PTP_PPS_HALF_SECOND << shift);
-	clktimh = (u32)((IXGBE_PTP_PPS_HALF_SECOND << shift) >> 32);
+	clktiml = lower_32_bits(IXGBE_PTP_PPS_HALF_SECOND << shift);
+	clktimh = upper_32_bits(IXGBE_PTP_PPS_HALF_SECOND << shift);
 
 	/* Account for the cyclecounter wrap-around value by
 	 * using the converted ns value of the current time to
@@ -221,8 +221,8 @@ static void ixgbe_ptp_setup_sdp_x540(struct ixgbe_adapter *adapter)
 	clock_edge += ((IXGBE_PTP_PPS_HALF_SECOND - (u64)rem) << shift);
 
 	/* specify the initial clock start time */
-	trgttiml = (u32)clock_edge;
-	trgttimh = (u32)(clock_edge >> 32);
+	trgttiml = lower_32_bits(clock_edge);
+	trgttimh = upper_32_bits(clock_edge);
 
 	IXGBE_WRITE_REG(hw, IXGBE_CLKTIML, clktiml);
 	IXGBE_WRITE_REG(hw, IXGBE_CLKTIMH, clktimh);
@@ -339,8 +339,8 @@ static void ixgbe_ptp_convert_to_hwtstamp(struct ixgbe_adapter *adapter,
 		 * correct math even though the units haven't been corrected
 		 * yet.
 		 */
-		systime.tv_sec = timestamp >> 32;
-		systime.tv_nsec = timestamp & 0xFFFFFFFF;
+		systime.tv_sec = upper_32_bits(timestamp);
+		systime.tv_nsec = lower_32_bits(timestamp);
 
 		timestamp = timespec64_to_ns(&systime);
 		break;

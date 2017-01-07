@@ -705,9 +705,9 @@ static int i40e_alloc_vsi_res(struct i40e_vf *vf, enum i40e_vsi_type type)
 				 "Could not allocate VF broadcast filter\n");
 		spin_unlock_bh(&vsi->mac_filter_hash_lock);
 		i40e_write_rx_ctl(&pf->hw, I40E_VFQF_HENA1(0, vf->vf_id),
-				  (u32)hena);
+				  lower_32_bits(hena));
 		i40e_write_rx_ctl(&pf->hw, I40E_VFQF_HENA1(1, vf->vf_id),
-				  (u32)(hena >> 32));
+				  upper_32_bits(hena));
 	}
 
 	/* program mac filter */
@@ -2349,9 +2349,10 @@ static int i40e_vc_set_rss_hena(struct i40e_vf *vf, u8 *msg, u16 msglen)
 		aq_ret = I40E_ERR_PARAM;
 		goto err;
 	}
-	i40e_write_rx_ctl(hw, I40E_VFQF_HENA1(0, vf->vf_id), (u32)vrh->hena);
+	i40e_write_rx_ctl(hw, I40E_VFQF_HENA1(0, vf->vf_id),
+			  lower_32_bits(vrh->hena));
 	i40e_write_rx_ctl(hw, I40E_VFQF_HENA1(1, vf->vf_id),
-			  (u32)(vrh->hena >> 32));
+			  upper_32_bits(vrh->hena));
 
 	/* send the response to the VF */
 err:

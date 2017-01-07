@@ -1548,7 +1548,7 @@ static void fm10k_rebind_hw_stats_pf(struct fm10k_hw *hw,
 static void fm10k_set_dma_mask_pf(struct fm10k_hw *hw, u64 dma_mask)
 {
 	/* we need to write the upper 32 bits of DMA mask to PhyAddrSpace */
-	u32 phyaddr = (u32)(dma_mask >> 32);
+	u32 phyaddr = upper_32_bits(dma_mask);
 
 	fm10k_write_reg(hw, FM10K_PHYADDR, phyaddr);
 }

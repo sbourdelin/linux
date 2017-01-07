@@ -1203,8 +1203,8 @@ static int e1000_setup_desc_rings(struct e1000_adapter *adapter)
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
 
-	ew32(TDBAL(0), ((u64)tx_ring->dma & 0x00000000FFFFFFFF));
-	ew32(TDBAH(0), ((u64)tx_ring->dma >> 32));
+	ew32(TDBAL(0), lower_32_bits(tx_ring->dma));
+	ew32(TDBAH(0), upper_32_bits(tx_ring->dma));
 	ew32(TDLEN(0), tx_ring->count * sizeof(struct e1000_tx_desc));
 	ew32(TDH(0), 0);
 	ew32(TDT(0), 0);
@@ -1266,8 +1266,8 @@ static int e1000_setup_desc_rings(struct e1000_adapter *adapter)
 	rctl = er32(RCTL);
 	if (!(adapter->flags2 & FLAG2_NO_DISABLE_RX))
 		ew32(RCTL, rctl & ~E1000_RCTL_EN);
-	ew32(RDBAL(0), ((u64)rx_ring->dma & 0xFFFFFFFF));
-	ew32(RDBAH(0), ((u64)rx_ring->dma >> 32));
+	ew32(RDBAL(0), lower_32_bits(rx_ring->dma));
+	ew32(RDBAH(0), upper_32_bits(rx_ring->dma));
 	ew32(RDLEN(0), rx_ring->size);
 	ew32(RDH(0), 0);
 	ew32(RDT(0), 0);

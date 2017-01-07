@@ -936,10 +936,10 @@ static inline void ixgbe_irq_rearm_queues(struct ixgbe_adapter *adapter,
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_x550em_a:
-		mask = (qmask & 0xFFFFFFFF);
-		IXGBE_WRITE_REG(&adapter->hw, IXGBE_EICS_EX(0), mask);
-		mask = (qmask >> 32);
-		IXGBE_WRITE_REG(&adapter->hw, IXGBE_EICS_EX(1), mask);
+		IXGBE_WRITE_REG(&adapter->hw, IXGBE_EICS_EX(0),
+				lower_32_bits(qmask));
+		IXGBE_WRITE_REG(&adapter->hw, IXGBE_EICS_EX(1),
+				upper_32_bits(qmask));
 		break;
 	default:
 		break;
@@ -2650,10 +2650,10 @@ static inline void ixgbe_irq_enable_queues(struct ixgbe_adapter *adapter,
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_x550em_a:
-		mask = (qmask & 0xFFFFFFFF);
+		mask = lower_32_bits(qmask);
 		if (mask)
 			IXGBE_WRITE_REG(hw, IXGBE_EIMS_EX(0), mask);
-		mask = (qmask >> 32);
+		mask = upper_32_bits(qmask);
 		if (mask)
 			IXGBE_WRITE_REG(hw, IXGBE_EIMS_EX(1), mask);
 		break;
@@ -2679,10 +2679,10 @@ static inline void ixgbe_irq_disable_queues(struct ixgbe_adapter *adapter,
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_x550em_a:
-		mask = (qmask & 0xFFFFFFFF);
+		mask = lower_32_bits(qmask);
 		if (mask)
 			IXGBE_WRITE_REG(hw, IXGBE_EIMC_EX(0), mask);
-		mask = (qmask >> 32);
+		mask = upper_32_bits(qmask);
 		if (mask)
 			IXGBE_WRITE_REG(hw, IXGBE_EIMC_EX(1), mask);
 		break;

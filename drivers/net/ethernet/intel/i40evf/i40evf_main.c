@@ -1379,8 +1379,8 @@ static int i40evf_init_rss(struct i40evf_adapter *adapter)
 		else
 			adapter->hena = I40E_DEFAULT_RSS_HENA;
 
-		wr32(hw, I40E_VFQF_HENA(0), (u32)adapter->hena);
-		wr32(hw, I40E_VFQF_HENA(1), (u32)(adapter->hena >> 32));
+		wr32(hw, I40E_VFQF_HENA(0), lower_32_bits(adapter->hena));
+		wr32(hw, I40E_VFQF_HENA(1), upper_32_bits(adapter->hena));
 	}
 
 	i40evf_fill_rss_lut(adapter);

@@ -188,8 +188,8 @@ static void igb_ptp_systim_to_hwtstamp(struct igb_adapter *adapter,
 	case e1000_i211:
 		memset(hwtstamps, 0, sizeof(*hwtstamps));
 		/* Upper 32 bits contain s, lower 32 bits contain ns. */
-		hwtstamps->hwtstamp = ktime_set(systim >> 32,
-						systim & 0xFFFFFFFF);
+		hwtstamps->hwtstamp = ktime_set(upper_32_bits(systim),
+						lower_32_bits(systim));
 		break;
 	default:
 		break;

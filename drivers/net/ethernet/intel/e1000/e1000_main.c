@@ -1614,8 +1614,8 @@ static void e1000_configure_tx(struct e1000_adapter *adapter)
 		tdlen = adapter->tx_ring[0].count *
 			sizeof(struct e1000_tx_desc);
 		ew32(TDLEN, tdlen);
-		ew32(TDBAH, (tdba >> 32));
-		ew32(TDBAL, (tdba & 0x00000000ffffffffULL));
+		ew32(TDBAH, upper_32_bits(tdba));
+		ew32(TDBAL, lower_32_bits(tdba));
 		ew32(TDT, 0);
 		ew32(TDH, 0);
 		adapter->tx_ring[0].tdh = ((hw->mac_type >= e1000_82543) ?
@@ -1896,8 +1896,8 @@ static void e1000_configure_rx(struct e1000_adapter *adapter)
 	default:
 		rdba = adapter->rx_ring[0].dma;
 		ew32(RDLEN, rdlen);
-		ew32(RDBAH, (rdba >> 32));
-		ew32(RDBAL, (rdba & 0x00000000ffffffffULL));
+		ew32(RDBAH, upper_32_bits(rdba));
+		ew32(RDBAL, lower_32_bits(rdba));
 		ew32(RDT, 0);
 		ew32(RDH, 0);
 		adapter->rx_ring[0].rdh = ((hw->mac_type >= e1000_82543) ?

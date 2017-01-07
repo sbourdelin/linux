@@ -2550,14 +2550,14 @@ static int i40e_set_rss_hash_opt(struct i40e_pf *pf, struct ethtool_rxnfc *nfc)
 					       flow_pctype)) << 32);
 		i_set = i40e_get_rss_hash_bits(nfc, i_setc);
 		i40e_write_rx_ctl(hw, I40E_GLQF_HASH_INSET(0, flow_pctype),
-				  (u32)i_set);
+				  lower_32_bits(i_set));
 		i40e_write_rx_ctl(hw, I40E_GLQF_HASH_INSET(1, flow_pctype),
-				  (u32)(i_set >> 32));
+				  upper_32_bits(i_set));
 		hena |= BIT_ULL(flow_pctype);
 	}
 
-	i40e_write_rx_ctl(hw, I40E_PFQF_HENA(0), (u32)hena);
-	i40e_write_rx_ctl(hw, I40E_PFQF_HENA(1), (u32)(hena >> 32));
+	i40e_write_rx_ctl(hw, I40E_PFQF_HENA(0), lower_32_bits(hena));
+	i40e_write_rx_ctl(hw, I40E_PFQF_HENA(1), upper_32_bits(hena));
 	i40e_flush(hw);
 
 	return 0;

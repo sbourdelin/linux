@@ -173,8 +173,8 @@ static inline void ixgbe_write_reg(struct ixgbe_hw *hw, u32 reg, u32 value)
 #define writeq writeq
 static inline void writeq(u64 val, void __iomem *addr)
 {
-	writel((u32)val, addr);
-	writel((u32)(val >> 32), addr + 4);
+	writel(lower_32_bits(val), addr);
+	writel(upper_32_bits(val), addr + 4);
 }
 #endif
 

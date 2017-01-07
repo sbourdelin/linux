@@ -3390,9 +3390,8 @@ void igb_configure_tx_ring(struct igb_adapter *adapter,
 
 	wr32(E1000_TDLEN(reg_idx),
 	     ring->count * sizeof(union e1000_adv_tx_desc));
-	wr32(E1000_TDBAL(reg_idx),
-	     tdba & 0x00000000ffffffffULL);
-	wr32(E1000_TDBAH(reg_idx), tdba >> 32);
+	wr32(E1000_TDBAL(reg_idx), lower_32_bits(tdba));
+	wr32(E1000_TDBAH(reg_idx), upper_32_bits(tdba));
 
 	ring->tail = hw->hw_addr + E1000_TDT(reg_idx);
 	wr32(E1000_TDH(reg_idx), 0);
@@ -3726,9 +3725,8 @@ void igb_configure_rx_ring(struct igb_adapter *adapter,
 	wr32(E1000_RXDCTL(reg_idx), 0);
 
 	/* Set DMA base address registers */
-	wr32(E1000_RDBAL(reg_idx),
-	     rdba & 0x00000000ffffffffULL);
-	wr32(E1000_RDBAH(reg_idx), rdba >> 32);
+	wr32(E1000_RDBAL(reg_idx), lower_32_bits(rdba));
+	wr32(E1000_RDBAH(reg_idx), upper_32_bits(rdba));
 	wr32(E1000_RDLEN(reg_idx),
 	     ring->count * sizeof(union e1000_adv_rx_desc));
 

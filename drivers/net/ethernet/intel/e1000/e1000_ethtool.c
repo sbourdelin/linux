@@ -1021,8 +1021,8 @@ static int e1000_setup_desc_rings(struct e1000_adapter *adapter)
 	}
 	txdr->next_to_use = txdr->next_to_clean = 0;
 
-	ew32(TDBAL, ((u64)txdr->dma & 0x00000000FFFFFFFF));
-	ew32(TDBAH, ((u64)txdr->dma >> 32));
+	ew32(TDBAL, lower_32_bits(txdr->dma));
+	ew32(TDBAH, upper_32_bits(txdr->dma));
 	ew32(TDLEN, txdr->count * sizeof(struct e1000_tx_desc));
 	ew32(TDH, 0);
 	ew32(TDT, 0);
@@ -1081,8 +1081,8 @@ static int e1000_setup_desc_rings(struct e1000_adapter *adapter)
 
 	rctl = er32(RCTL);
 	ew32(RCTL, rctl & ~E1000_RCTL_EN);
-	ew32(RDBAL, ((u64)rxdr->dma & 0xFFFFFFFF));
-	ew32(RDBAH, ((u64)rxdr->dma >> 32));
+	ew32(RDBAL, lower_32_bits(rxdr->dma));
+	ew32(RDBAH, upper_32_bits(rxdr->dma));
 	ew32(RDLEN, rxdr->size);
 	ew32(RDH, 0);
 	ew32(RDT, 0);

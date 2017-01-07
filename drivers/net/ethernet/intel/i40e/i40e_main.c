@@ -8410,8 +8410,8 @@ static int i40e_pf_config_rss(struct i40e_pf *pf)
 		((u64)i40e_read_rx_ctl(hw, I40E_PFQF_HENA(1)) << 32);
 	hena |= i40e_pf_get_default_rss_hena(pf);
 
-	i40e_write_rx_ctl(hw, I40E_PFQF_HENA(0), (u32)hena);
-	i40e_write_rx_ctl(hw, I40E_PFQF_HENA(1), (u32)(hena >> 32));
+	i40e_write_rx_ctl(hw, I40E_PFQF_HENA(0), lower_32_bits(hena));
+	i40e_write_rx_ctl(hw, I40E_PFQF_HENA(1), upper_32_bits(hena));
 
 	/* Determine the RSS table size based on the hardware capabilities */
 	reg_val = i40e_read_rx_ctl(hw, I40E_PFQF_CTL_0);

@@ -88,8 +88,8 @@ static void i40e_ptp_write(struct i40e_pf *pf, const struct timespec64 *ts)
 	/* The timer will not update until the high register is written, so
 	 * write the low register first.
 	 */
-	wr32(hw, I40E_PRTTSYN_TIME_L, ns & 0xFFFFFFFF);
-	wr32(hw, I40E_PRTTSYN_TIME_H, ns >> 32);
+	wr32(hw, I40E_PRTTSYN_TIME_L, lower_32_bits(ns));
+	wr32(hw, I40E_PRTTSYN_TIME_H, upper_32_bits(ns));
 }
 
 /**
@@ -141,8 +141,8 @@ static int i40e_ptp_adjfreq(struct ptp_clock_info *ptp, s32 ppb)
 	else
 		adj += diff;
 
-	wr32(hw, I40E_PRTTSYN_INC_L, adj & 0xFFFFFFFF);
-	wr32(hw, I40E_PRTTSYN_INC_H, adj >> 32);
+	wr32(hw, I40E_PRTTSYN_INC_L, lower_32_bits(adj));
+	wr32(hw, I40E_PRTTSYN_INC_H, upper_32_bits(adj));
 
 	return 0;
 }
@@ -447,8 +447,8 @@ void i40e_ptp_set_increment(struct i40e_pf *pf)
 	 * hardware will not update the clock until both registers have been
 	 * written.
 	 */
-	wr32(hw, I40E_PRTTSYN_INC_L, incval & 0xFFFFFFFF);
-	wr32(hw, I40E_PRTTSYN_INC_H, incval >> 32);
+	wr32(hw, I40E_PRTTSYN_INC_L, lower_32_bits(incval));
+	wr32(hw, I40E_PRTTSYN_INC_H, upper_32_bits(incval));
 
 	/* Update the base adjustement value. */
 	ACCESS_ONCE(pf->ptp_base_adj) = incval;

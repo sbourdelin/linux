@@ -2984,8 +2984,8 @@ i40e_status i40e_aq_debug_write_register(struct i40e_hw *hw,
 	i40e_fill_default_direct_cmd_desc(&desc, i40e_aqc_opc_debug_write_reg);
 
 	cmd->address = cpu_to_le32(reg_addr);
-	cmd->value_high = cpu_to_le32((u32)(reg_val >> 32));
-	cmd->value_low = cpu_to_le32((u32)(reg_val & 0xFFFFFFFF));
+	cmd->value_high = cpu_to_le32(upper_32_bits(reg_val));
+	cmd->value_low = cpu_to_le32(lower_32_bits(reg_val));
 
 	status = i40e_asq_send_command(hw, &desc, NULL, 0, cmd_details);
 

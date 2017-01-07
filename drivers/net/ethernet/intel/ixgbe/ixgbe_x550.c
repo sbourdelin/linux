@@ -3437,8 +3437,8 @@ static void ixgbe_set_source_address_pruning_X550(struct ixgbe_hw *hw,
 	else
 		pfflp &= ~(1ULL << pool);
 
-	IXGBE_WRITE_REG(hw, IXGBE_PFFLPL, (u32)pfflp);
-	IXGBE_WRITE_REG(hw, IXGBE_PFFLPH, (u32)(pfflp >> 32));
+	IXGBE_WRITE_REG(hw, IXGBE_PFFLPL, lower_32_bits(pfflp));
+	IXGBE_WRITE_REG(hw, IXGBE_PFFLPH, upper_32_bits(pfflp));
 }
 
 /**

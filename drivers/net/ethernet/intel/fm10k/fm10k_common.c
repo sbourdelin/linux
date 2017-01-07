@@ -325,10 +325,10 @@ static void fm10k_update_hw_base_48b(struct fm10k_hw_stat *stat, u64 delta)
 
 	/* update lower 32 bits */
 	delta += stat->base_l;
-	stat->base_l = (u32)delta;
+	stat->base_l = lower_32_bits(delta);
 
 	/* update upper 32 bits */
-	stat->base_h += (u32)(delta >> 32);
+	stat->base_h += upper_32_bits(delta);
 }
 
 /**
