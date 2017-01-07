@@ -60,6 +60,14 @@
 				 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,
 				 <MBUS_ID(0x01, 0x0f) 0 0xf4000000 0x40000>,
 				 <MBUS_ID(0x01, 0x1e) 0 0xfc000000 0x1000000>;
+
+		internal-regs {
+			power_off {
+				compatible = "linkstation,power-off";
+				reg = <0x12100 0x100>;
+				clocks = <&core_clk 0>;
+			};
+		};
 	};
 
 	memory { /* 128 MB */

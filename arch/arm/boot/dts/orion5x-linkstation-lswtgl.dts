@@ -59,6 +59,10 @@
 		reg = <0x00000000 0x4000000>;
 	};
 
+	restart_poweroff {
+		compatible = "restart-poweroff";
+	};
+
 	gpio_keys {
 		power-on-switch {
 			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
