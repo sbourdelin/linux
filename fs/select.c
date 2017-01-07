@@ -259,34 +259,6 @@ int poll_schedule_timeout(struct poll_wqueues *pwq, int state,
 }
 EXPORT_SYMBOL(poll_schedule_timeout);
 
-/**
- * poll_select_set_timeout - helper function to setup the timeout value
- * @to:		pointer to timespec64 variable for the final timeout
- * @sec:	seconds (from user space)
- * @nsec:	nanoseconds (from user space)
- *
- * Note, we do not use a timespec for the user space value here, That
- * way we can use the function for timeval and compat interfaces as well.
- *
- * Returns -EINVAL if sec/nsec are not normalized. Otherwise 0.
- */
-int poll_select_set_timeout(struct timespec64 *to, time64_t sec, long nsec)
-{
-	struct timespec64 ts = {.tv_sec = sec, .tv_nsec = nsec};
-
-	if (!timespec64_valid(&ts))
-		return -EINVAL;
-
-	/* Optimize for the zero timeout value here */
-	if (!sec && !nsec) {
-		to->tv_sec = to->tv_nsec = 0;
-	} else {
-		ktime_get_ts64(to);
-		*to = timespec64_add_safe(*to, ts);
-	}
-	return 0;
-}
-
 static int poll_select_copy_remaining(struct timespec64 *end_time,
 				      void __user *p,
 				      int timeval, int ret)
@@ -643,7 +615,7 @@ SYSCALL_DEFINE5(select, int, n, fd_set __user *, inp, fd_set __user *, outp,
 			return -EFAULT;
 
 		to = &end_time;
-		if (poll_select_set_timeout(to,
+		if (set_normalized_timeout(to,
 				tv.tv_sec + (tv.tv_usec / USEC_PER_SEC),
 				(tv.tv_usec % USEC_PER_SEC) * NSEC_PER_USEC))
 			return -EINVAL;
@@ -670,7 +642,7 @@ static long do_pselect(int n, fd_set __user *inp, fd_set __user *outp,
 		ts64 = timespec_to_timespec64(ts);
 
 		to = &end_time;
-		if (poll_select_set_timeout(to, ts64.tv_sec, ts64.tv_nsec))
+		if (set_normalized_timeout(to, ts64.tv_sec, ts64.tv_nsec))
 			return -EINVAL;
 	}
 
@@ -976,8 +948,9 @@ SYSCALL_DEFINE3(poll, struct pollfd __user *, ufds, unsigned int, nfds,
 
 	if (timeout_msecs >= 0) {
 		to = &end_time;
-		poll_select_set_timeout(to, timeout_msecs / MSEC_PER_SEC,
-			NSEC_PER_MSEC * (timeout_msecs % MSEC_PER_SEC));
+		if (set_normalized_timeout(to, timeout_msecs / MSEC_PER_SEC,
+			NSEC_PER_MSEC * (timeout_msecs % MSEC_PER_SEC)))
+			return -EINVAL;
 	}
 
 	ret = do_sys_poll(ufds, nfds, to);
@@ -1016,7 +989,7 @@ SYSCALL_DEFINE5(ppoll, struct pollfd __user *, ufds, unsigned int, nfds,
 			return -EFAULT;
 
 		to = &end_time;
-		if (poll_select_set_timeout(to, ts.tv_sec, ts.tv_nsec))
+		if (set_normalized_timeout(to, ts.tv_sec, ts.tv_nsec))
 			return -EINVAL;
 	}
 

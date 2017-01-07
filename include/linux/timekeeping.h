@@ -352,5 +352,32 @@ extern void read_boot_clock64(struct timespec64 *ts);
 extern int update_persistent_clock(struct timespec now);
 extern int update_persistent_clock64(struct timespec64 now);
 
+/**
+ * set_normalized_timeout - helper function to setup the timeout value
+ * @to:		pointer to timespec64 variable for the final timeout
+ * @sec:	seconds (from user space)
+ * @nsec:	nanoseconds (from user space)
+ *
+ * Note, we do not use a timespec for the user space value here, That
+ * way we can use the function for timeval and compat interfaces as well.
+ *
+ * Returns -EINVAL if sec/nsec are not normalized. Otherwise 0.
+ */
+static inline int set_normalized_timeout(struct timespec64 *to, time64_t sec, long nsec)
+{
+	struct timespec64 ts = {.tv_sec = sec, .tv_nsec = nsec};
+
+	if (!timespec64_valid(&ts))
+		return -EINVAL;
+
+	/* Optimize for the zero timeout value here */
+	if (!sec && !nsec) {
+		to->tv_sec = to->tv_nsec = 0;
+	} else {
+		ktime_get_ts64(to);
+		*to = timespec64_add_safe(*to, ts);
+	}
+	return 0;
+}
 
 #endif

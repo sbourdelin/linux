@@ -2217,7 +2217,7 @@ int __sys_recvmmsg(int fd, struct mmsghdr __user *mmsg, unsigned int vlen,
 	struct timespec64 timeout64;
 
 	if (timeout &&
-	    poll_select_set_timeout(&end_time, timeout->tv_sec,
+	    set_normalized_timeout(&end_time, timeout->tv_sec,
 				    timeout->tv_nsec))
 		return -EINVAL;
 

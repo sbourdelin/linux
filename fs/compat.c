@@ -1229,7 +1229,7 @@ COMPAT_SYSCALL_DEFINE5(select, int, n, compat_ulong_t __user *, inp,
 			return -EFAULT;
 
 		to = &end_time;
-		if (poll_select_set_timeout(to,
+		if (set_normalized_timeout(to,
 				tv.tv_sec + (tv.tv_usec / USEC_PER_SEC),
 				(tv.tv_usec % USEC_PER_SEC) * NSEC_PER_USEC))
 			return -EINVAL;
@@ -1275,7 +1275,7 @@ static long do_compat_pselect(int n, compat_ulong_t __user *inp,
 			return -EFAULT;
 
 		to = &end_time;
-		if (poll_select_set_timeout(to, ts.tv_sec, ts.tv_nsec))
+		if (set_normalized_timeout(to, ts.tv_sec, ts.tv_nsec))
 			return -EINVAL;
 	}
 
@@ -1344,7 +1344,7 @@ COMPAT_SYSCALL_DEFINE5(ppoll, struct pollfd __user *, ufds,
 			return -EFAULT;
 
 		to = &end_time;
-		if (poll_select_set_timeout(to, ts.tv_sec, ts.tv_nsec))
+		if (set_normalized_timeout(to, ts.tv_sec, ts.tv_nsec))
 			return -EINVAL;
 	}
 

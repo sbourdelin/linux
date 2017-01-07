@@ -27,7 +27,6 @@
 #include <linux/stat.h>
 #include <linux/mman.h>
 #include <linux/shm.h>
-#include <linux/poll.h>
 #include <linux/file.h>
 #include <linux/types.h>
 #include <linux/ipc.h>
@@ -1114,7 +1113,7 @@ SYSCALL_DEFINE5(osf_select, int, n, fd_set __user *, inp, fd_set __user *, outp,
 		if (sec < 0 || usec < 0)
 			return -EINVAL;
 
-		if (poll_select_set_timeout(to, sec, usec * NSEC_PER_USEC))
+		if (set_normalized_timeout(to, sec, usec * NSEC_PER_USEC))
 			return -EINVAL;		
 
 	}

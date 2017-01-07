@@ -159,7 +159,4 @@ extern int do_sys_poll(struct pollfd __user * ufds, unsigned int nfds,
 extern int core_sys_select(int n, fd_set __user *inp, fd_set __user *outp,
 			   fd_set __user *exp, struct timespec64 *end_time);
 
-extern int poll_select_set_timeout(struct timespec64 *to, time64_t sec,
-				   long nsec);
-
 #endif /* _LINUX_POLL_H */
