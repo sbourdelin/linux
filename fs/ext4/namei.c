@@ -3662,6 +3662,13 @@ static int ext4_rename(struct inode *old_dir, struct dentry *old_dentry,
 	}
 
 	if (new.inode) {
+		if (new.inode->i_nlink == 0) {
+			ext4_warning_inode(new.inode,
+					   "Removing file '%.*s' with no links",
+					   new.dentry->d_name.len,
+					   new.dentry->d_name.name);
+			set_nlink(new.inode, 1);
+		}
 		ext4_dec_count(handle, new.inode);
 		new.inode->i_ctime = current_time(new.inode);
 	}
