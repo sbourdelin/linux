@@ -12,11 +12,7 @@
 
 #include "sha256.h"
 #include "../boot/string.h"
-
-struct sha_region {
-	unsigned long start;
-	unsigned long len;
-};
+#include "purgatory.h"
 
 unsigned long backup_dest = 0;
 unsigned long backup_src = 0;
