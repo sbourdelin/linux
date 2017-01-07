@@ -39,6 +39,10 @@
 
 #include "mm.h"
 
+#ifndef CONFIG_MMU
+extern unsigned long vectors_base;
+#endif
+
 #ifdef CONFIG_CPU_CP15_MMU
 unsigned long __init __clear_cr(unsigned long mask)
 {
@@ -521,8 +525,13 @@ void __init mem_init(void)
 			"      .data : 0x%p" " - 0x%p" "   (%4td kB)\n"
 			"       .bss : 0x%p" " - 0x%p" "   (%4td kB)\n",
 
+#ifdef CONFIG_MMU
 			MLK(UL(CONFIG_VECTORS_BASE), UL(CONFIG_VECTORS_BASE) +
 				(PAGE_SIZE)),
+#else
+			MLK_ROUNDUP(vectors_base, vectors_base + PAGE_SIZE),
+#endif
+
 #ifdef CONFIG_HAVE_TCM
 			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
 			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
