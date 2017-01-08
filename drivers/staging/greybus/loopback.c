@@ -991,9 +991,7 @@ static int gb_loopback_fn(void *data)
 			gb_pm_runtime_put_autosuspend(bundle);
 			wait_event_interruptible(gb->wq, gb->type ||
 						 kthread_should_stop());
-			ret = gb_pm_runtime_get_sync(bundle);
-			if (ret)
-				return ret;
+			gb_pm_runtime_get_sync(bundle);
 		}
 
 		if (kthread_should_stop())
