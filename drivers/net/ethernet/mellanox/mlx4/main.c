@@ -3701,14 +3701,11 @@ static int __mlx4_init_one(struct pci_dev *pdev, int pci_dev_data,
 			goto err_release_regions;
 		}
 	}
-	err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
+	/* CX3 firmware 2.11.1280 does not support 64-bit coherent DMA */
+	err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
 	if (err) {
-		dev_warn(&pdev->dev, "Warning: couldn't set 64-bit consistent PCI DMA mask\n");
-		err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
-		if (err) {
-			dev_err(&pdev->dev, "Can't set consistent PCI DMA mask, aborting\n");
-			goto err_release_regions;
-		}
+		dev_err(&pdev->dev, "Can't set consistent PCI DMA mask, aborting\n");
+		goto err_release_regions;
 	}
 
 	/* Allow large DMA segments, up to the firmware limit of 1 GB */
