@@ -905,6 +905,7 @@ static inline void dio_zero_block(struct dio *dio, struct dio_submit *sdio,
 static int do_direct_IO(struct dio *dio, struct dio_submit *sdio,
 			struct buffer_head *map_bh)
 {
+	const unsigned i_blkbits = dio->inode->i_blkbits;
 	const unsigned blkbits = sdio->blkbits;
 	int ret = 0;
 
@@ -949,7 +950,7 @@ static int do_direct_IO(struct dio *dio, struct dio_submit *sdio,
 					clean_bdev_aliases(
 						map_bh->b_bdev,
 						map_bh->b_blocknr,
-						map_bh->b_size >> blkbits);
+						map_bh->b_size >> i_blkbits);
 				}
 
 				if (!sdio->blkfactor)
