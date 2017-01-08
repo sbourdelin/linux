@@ -1567,15 +1567,13 @@ static int lan78xx_set_pause(struct net_device *net,
 		u32 mii_adv;
 		u32 advertising;
 
-		ethtool_convert_link_mode_to_legacy_u32(
-			&advertising, ecmd.link_modes.advertising);
+		ethtool_ks_to_u32(&advertising, ecmd.link_modes.advertising);
 
 		advertising &= ~(ADVERTISED_Pause | ADVERTISED_Asym_Pause);
 		mii_adv = (u32)mii_advertise_flowctrl(dev->fc_request_control);
 		advertising |= mii_adv_to_ethtool_adv_t(mii_adv);
 
-		ethtool_convert_legacy_u32_to_link_mode(
-			ecmd.link_modes.advertising, advertising);
+		ethtool_u32_to_ks(ecmd.link_modes.advertising, advertising);
 
 		phy_ethtool_ksettings_set(phydev, &ecmd);
 	}

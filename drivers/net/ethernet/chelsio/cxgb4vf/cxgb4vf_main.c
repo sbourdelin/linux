@@ -1335,9 +1335,9 @@ static int cxgb4vf_get_link_ksettings(struct net_device *dev,
 	const struct port_info *pi = netdev_priv(dev);
 	struct ethtool_link_settings *base = &link_ksettings->base;
 
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, supported);
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, advertising);
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, lp_advertising);
+	ethtool_ks_clear(link_ksettings, supported);
+	ethtool_ks_clear(link_ksettings, advertising);
+	ethtool_ks_clear(link_ksettings, lp_advertising);
 
 	base->port = from_fw_port_mod_type(pi->port_type, pi->mod_type);
 
@@ -1368,11 +1368,9 @@ static int cxgb4vf_get_link_ksettings(struct net_device *dev,
 
 	base->autoneg = pi->link_cfg.autoneg;
 	if (pi->link_cfg.supported & FW_PORT_CAP_ANEG)
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     supported, Autoneg);
+		ethtool_ks_add_mode(link_ksettings, supported, Autoneg);
 	if (pi->link_cfg.autoneg)
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     advertising, Autoneg);
+		ethtool_ks_add_mode(link_ksettings, advertising, Autoneg);
 
 	return 0;
 }

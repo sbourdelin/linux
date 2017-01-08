@@ -12113,8 +12113,7 @@ static int tg3_get_link_ksettings(struct net_device *dev,
 		supported |= SUPPORTED_FIBRE;
 		cmd->base.port = PORT_FIBRE;
 	}
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
 
 	advertising = tp->link_config.advertising;
 	if (tg3_flag(tp, PAUSE_AUTONEG)) {
@@ -12129,15 +12128,13 @@ static int tg3_get_link_ksettings(struct net_device *dev,
 			advertising |= ADVERTISED_Asym_Pause;
 		}
 	}
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	if (netif_running(dev) && tp->link_up) {
 		cmd->base.speed = tp->link_config.active_speed;
 		cmd->base.duplex = tp->link_config.active_duplex;
-		ethtool_convert_legacy_u32_to_link_mode(
-			cmd->link_modes.lp_advertising,
-			tp->link_config.rmt_adv);
+		ethtool_u32_to_ks(cmd->link_modes.lp_advertising,
+				  tp->link_config.rmt_adv);
 
 		if (!(tp->phy_flags & TG3_PHYFLG_ANY_SERDES)) {
 			if (tp->phy_flags & TG3_PHYFLG_MDIX_STATE)
@@ -12179,8 +12176,7 @@ static int tg3_set_link_ksettings(struct net_device *dev,
 	    cmd->base.duplex != DUPLEX_HALF)
 		return -EINVAL;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	if (cmd->base.autoneg == AUTONEG_ENABLE) {
 		u32 mask = ADVERTISED_Autoneg |

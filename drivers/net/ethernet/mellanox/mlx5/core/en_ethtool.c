@@ -705,7 +705,7 @@ static void ptys2ethtool_supported_port(struct ethtool_link_ksettings *link_kset
 			   | MLX5E_PROT_MASK(MLX5E_40GBASE_SR4)
 			   | MLX5E_PROT_MASK(MLX5E_100GBASE_SR4)
 			   | MLX5E_PROT_MASK(MLX5E_1000BASE_CX_SGMII))) {
-		ethtool_link_ksettings_add_link_mode(link_ksettings, supported, FIBRE);
+		ethtool_ks_add_mode(link_ksettings, supported, FIBRE);
 	}
 
 	if (eth_proto_cap & (MLX5E_PROT_MASK(MLX5E_100GBASE_KR4)
@@ -713,7 +713,7 @@ static void ptys2ethtool_supported_port(struct ethtool_link_ksettings *link_kset
 			   | MLX5E_PROT_MASK(MLX5E_10GBASE_KR)
 			   | MLX5E_PROT_MASK(MLX5E_10GBASE_KX4)
 			   | MLX5E_PROT_MASK(MLX5E_1000BASE_KX))) {
-		ethtool_link_ksettings_add_link_mode(link_ksettings, supported, Backplane);
+		ethtool_ks_add_mode(link_ksettings, supported, Backplane);
 	}
 }
 
@@ -766,8 +766,8 @@ static void get_supported(u32 eth_proto_cap,
 
 	ptys2ethtool_supported_port(link_ksettings, eth_proto_cap);
 	ptys2ethtool_supported_link(supported, eth_proto_cap);
-	ethtool_link_ksettings_add_link_mode(link_ksettings, supported, Pause);
-	ethtool_link_ksettings_add_link_mode(link_ksettings, supported, Asym_Pause);
+	ethtool_ks_add_mode(link_ksettings, supported, Pause);
+	ethtool_ks_add_mode(link_ksettings, supported, Asym_Pause);
 }
 
 static void get_advertising(u32 eth_proto_cap, u8 tx_pause,
@@ -778,9 +778,9 @@ static void get_advertising(u32 eth_proto_cap, u8 tx_pause,
 
 	ptys2ethtool_adver_link(advertising, eth_proto_cap);
 	if (tx_pause)
-		ethtool_link_ksettings_add_link_mode(link_ksettings, advertising, Pause);
+		ethtool_ks_add_mode(link_ksettings, advertising, Pause);
 	if (tx_pause ^ rx_pause)
-		ethtool_link_ksettings_add_link_mode(link_ksettings, advertising, Asym_Pause);
+		ethtool_ks_add_mode(link_ksettings, advertising, Asym_Pause);
 }
 
 static u8 get_connector_port(u32 eth_proto)
@@ -844,8 +844,8 @@ static int mlx5e_get_link_ksettings(struct net_device *netdev,
 	an_disable_admin = MLX5_GET(ptys_reg, out, an_disable_admin);
 	an_status        = MLX5_GET(ptys_reg, out, an_status);
 
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, supported);
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, advertising);
+	ethtool_ks_clear(link_ksettings, supported);
+	ethtool_ks_clear(link_ksettings, advertising);
 
 	get_supported(eth_proto_cap, link_ksettings);
 	get_advertising(eth_proto_admin, 0, 0, link_ksettings);
@@ -857,16 +857,13 @@ static int mlx5e_get_link_ksettings(struct net_device *netdev,
 	get_lp_advertising(eth_proto_lp, link_ksettings);
 
 	if (an_status == MLX5_AN_COMPLETE)
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     lp_advertising, Autoneg);
+		ethtool_ks_add_mode(link_ksettings, lp_advertising, Autoneg);
 
 	link_ksettings->base.autoneg = an_disable_admin ? AUTONEG_DISABLE :
 							  AUTONEG_ENABLE;
-	ethtool_link_ksettings_add_link_mode(link_ksettings, supported,
-					     Autoneg);
+	ethtool_ks_add_mode(link_ksettings, supported, Autoneg);
 	if (!an_disable_admin)
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     advertising, Autoneg);
+		ethtool_ks_add_mode(link_ksettings, advertising, Autoneg);
 
 err_query_ptys:
 	return err;

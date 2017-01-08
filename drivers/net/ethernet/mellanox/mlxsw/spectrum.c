@@ -1860,14 +1860,14 @@ mlxsw_sp_from_ptys_supported_port(u32 ptys_eth_proto,
 			      MLXSW_REG_PTYS_ETH_SPEED_40GBASE_SR4 |
 			      MLXSW_REG_PTYS_ETH_SPEED_100GBASE_SR4 |
 			      MLXSW_REG_PTYS_ETH_SPEED_SGMII))
-		ethtool_link_ksettings_add_link_mode(cmd, supported, FIBRE);
+		ethtool_ks_add_mode(cmd, supported, FIBRE);
 
 	if (ptys_eth_proto & (MLXSW_REG_PTYS_ETH_SPEED_10GBASE_KR |
 			      MLXSW_REG_PTYS_ETH_SPEED_10GBASE_KX4 |
 			      MLXSW_REG_PTYS_ETH_SPEED_40GBASE_KR4 |
 			      MLXSW_REG_PTYS_ETH_SPEED_100GBASE_KR4 |
 			      MLXSW_REG_PTYS_ETH_SPEED_1000BASE_KX))
-		ethtool_link_ksettings_add_link_mode(cmd, supported, Backplane);
+		ethtool_ks_add_mode(cmd, supported, Backplane);
 }
 
 static void mlxsw_sp_from_ptys_link(u32 ptys_eth_proto, unsigned long *mode)
@@ -1966,9 +1966,9 @@ static u32 mlxsw_sp_to_ptys_upper_speed(u32 upper_speed)
 static void mlxsw_sp_port_get_link_supported(u32 eth_proto_cap,
 					     struct ethtool_link_ksettings *cmd)
 {
-	ethtool_link_ksettings_add_link_mode(cmd, supported, Asym_Pause);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, Autoneg);
-	ethtool_link_ksettings_add_link_mode(cmd, supported, Pause);
+	ethtool_ks_add_mode(cmd, supported, Asym_Pause);
+	ethtool_ks_add_mode(cmd, supported, Autoneg);
+	ethtool_ks_add_mode(cmd, supported, Pause);
 
 	mlxsw_sp_from_ptys_supported_port(eth_proto_cap, cmd);
 	mlxsw_sp_from_ptys_link(eth_proto_cap, cmd->link_modes.supported);
@@ -1980,7 +1980,7 @@ static void mlxsw_sp_port_get_link_advertise(u32 eth_proto_admin, bool autoneg,
 	if (!autoneg)
 		return;
 
-	ethtool_link_ksettings_add_link_mode(cmd, advertising, Autoneg);
+	ethtool_ks_add_mode(cmd, advertising, Autoneg);
 	mlxsw_sp_from_ptys_link(eth_proto_admin, cmd->link_modes.advertising);
 }
 
@@ -1991,7 +1991,7 @@ mlxsw_sp_port_get_link_lp_advertise(u32 eth_proto_lp, u8 autoneg_status,
 	if (autoneg_status != MLXSW_REG_PTYS_AN_STATUS_OK || !eth_proto_lp)
 		return;
 
-	ethtool_link_ksettings_add_link_mode(cmd, lp_advertising, Autoneg);
+	ethtool_ks_add_mode(cmd, lp_advertising, Autoneg);
 	mlxsw_sp_from_ptys_link(eth_proto_lp, cmd->link_modes.lp_advertising);
 }
 

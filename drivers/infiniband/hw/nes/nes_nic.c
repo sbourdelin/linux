@@ -1503,10 +1503,8 @@ static int nes_netdev_get_link_ksettings(struct net_device *netdev,
 				cmd->base.autoneg = AUTONEG_DISABLE;
 			cmd->base.phy_address = phy_index;
 		}
-		ethtool_convert_legacy_u32_to_link_mode(
-			cmd->link_modes.supported, supported);
-		ethtool_convert_legacy_u32_to_link_mode(
-			cmd->link_modes.advertising, advertising);
+		ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+		ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 		return 0;
 	}
 	if ((phy_type == NES_PHY_TYPE_ARGUS) ||
@@ -1523,10 +1521,8 @@ static int nes_netdev_get_link_ksettings(struct net_device *netdev,
 	}
 	cmd->base.speed = SPEED_10000;
 	cmd->base.autoneg = AUTONEG_DISABLE;
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }

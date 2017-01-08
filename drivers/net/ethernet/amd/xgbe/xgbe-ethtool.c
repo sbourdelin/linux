@@ -279,12 +279,10 @@ static int xgbe_get_link_ksettings(struct net_device *netdev,
 
 	cmd->base.phy_address = pdata->phy.address;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						pdata->phy.supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						pdata->phy.advertising);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.lp_advertising,
-						pdata->phy.lp_advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, pdata->phy.supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, pdata->phy.advertising);
+	ethtool_u32_to_ks(cmd->link_modes.lp_advertising,
+			  pdata->phy.lp_advertising);
 
 	cmd->base.autoneg = pdata->phy.autoneg;
 	cmd->base.speed = pdata->phy.speed;
@@ -331,8 +329,7 @@ static int xgbe_set_link_ksettings(struct net_device *netdev,
 		}
 	}
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	netif_dbg(pdata, link, netdev,
 		  "requested advertisement %#x, phy supported %#x\n",

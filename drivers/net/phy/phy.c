@@ -409,8 +409,7 @@ int phy_ethtool_ksettings_set(struct phy_device *phydev,
 	if (cmd->base.phy_address != phydev->mdio.addr)
 		return -EINVAL;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	/* We make sure that we don't pass unsupported values in to the PHY */
 	advertising &= phydev->supported;
@@ -479,14 +478,12 @@ EXPORT_SYMBOL(phy_ethtool_gset);
 int phy_ethtool_ksettings_get(struct phy_device *phydev,
 			      struct ethtool_link_ksettings *cmd)
 {
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						phydev->supported);
+	ethtool_u32_to_ks(cmd->link_modes.supported, phydev->supported);
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						phydev->advertising);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, phydev->advertising);
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.lp_advertising,
-						phydev->lp_advertising);
+	ethtool_u32_to_ks(cmd->link_modes.lp_advertising,
+			  phydev->lp_advertising);
 
 	cmd->base.speed = phydev->speed;
 	cmd->base.duplex = phydev->duplex;

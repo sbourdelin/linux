@@ -133,13 +133,11 @@ efx_ethtool_get_link_ksettings(struct net_device *net_dev,
 	mutex_unlock(&efx->mac_lock);
 
 	/* Both MACs support pause frames (bidirectional and respond-only) */
-	ethtool_convert_link_mode_to_legacy_u32(&supported,
-						cmd->link_modes.supported);
+	ethtool_ks_to_u32(&supported, cmd->link_modes.supported);
 
 	supported |= SUPPORTED_Pause | SUPPORTED_Asym_Pause;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
 
 	if (LOOPBACK_INTERNAL(efx)) {
 		cmd->base.speed = link_state->speed;
