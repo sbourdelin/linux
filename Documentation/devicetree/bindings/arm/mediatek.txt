@@ -41,6 +41,9 @@ Supported boards:
 - Evaluation board for MT7623:
     Required root node properties:
       - compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
+- AsiaRF Geek Force board:
+    Required root node properties:
+      - compatible = "asiarf,geekforce", "mediatek,mt7623";
 - MTK mt8127 tablet moose EVB:
     Required root node properties:
       - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
