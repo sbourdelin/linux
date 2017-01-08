@@ -525,6 +525,8 @@ static void i40e_unmap_and_free_tx_resource(struct i40e_ring *ring,
 	if (tx_buffer->skb) {
 		if (tx_buffer->tx_flags & I40E_TX_FLAGS_FD_SB)
 			kfree(tx_buffer->raw_buf);
+		else if (tx_buffer->tx_flags & I40E_TX_FLAGS_XDP)
+			put_page(tx_buffer->page);
 		else
 			dev_kfree_skb_any(tx_buffer->skb);
 		if (dma_unmap_len(tx_buffer, len))
@@ -762,6 +764,98 @@ static bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
 					    tx_ring->queue_index);
 			++tx_ring->tx_stats.restart_queue;
 		}
+	}
+
+	return !!budget;
+}
+
+static bool i40e_clean_xdp_irq(struct i40e_vsi *vsi,
+			       struct i40e_ring *tx_ring)
+{
+	u16 i = tx_ring->next_to_clean;
+	struct i40e_tx_buffer *tx_buf;
+	struct i40e_tx_desc *tx_head;
+	struct i40e_tx_desc *tx_desc;
+	unsigned int total_bytes = 0, total_packets = 0;
+	unsigned int budget = vsi->work_limit;
+
+	tx_buf = &tx_ring->tx_bi[i];
+	tx_desc = I40E_TX_DESC(tx_ring, i);
+	i -= tx_ring->count;
+
+	tx_head = I40E_TX_DESC(tx_ring, i40e_get_head(tx_ring));
+
+	do {
+		struct i40e_tx_desc *eop_desc = tx_buf->next_to_watch;
+
+		/* if next_to_watch is not set then there is no work pending */
+		if (!eop_desc)
+			break;
+
+		/* prevent any other reads prior to eop_desc */
+		read_barrier_depends();
+
+		/* we have caught up to head, no work left to do */
+		if (tx_head == tx_desc)
+			break;
+
+		/* clear next_to_watch to prevent false hangs */
+		tx_buf->next_to_watch = NULL;
+
+		/* update the statistics for this packet */
+		total_bytes += tx_buf->bytecount;
+		total_packets += tx_buf->gso_segs;
+
+		put_page(tx_buf->page);
+
+		/* unmap skb header data */
+		dma_unmap_single(tx_ring->dev,
+				 dma_unmap_addr(tx_buf, dma),
+				 dma_unmap_len(tx_buf, len),
+				 DMA_TO_DEVICE);
+
+		/* clear tx_buffer data */
+		tx_buf->skb = NULL;
+		dma_unmap_len_set(tx_buf, len, 0);
+
+		/* move us one more past the eop_desc for start of next pkt */
+		tx_buf++;
+		tx_desc++;
+		i++;
+		if (unlikely(!i)) {
+			i -= tx_ring->count;
+			tx_buf = tx_ring->tx_bi;
+			tx_desc = I40E_TX_DESC(tx_ring, 0);
+		}
+
+		prefetch(tx_desc);
+
+		/* update budget accounting */
+		budget--;
+	} while (likely(budget));
+
+	i += tx_ring->count;
+	tx_ring->next_to_clean = i;
+	u64_stats_update_begin(&tx_ring->syncp);
+	tx_ring->stats.bytes += total_bytes;
+	tx_ring->stats.packets += total_packets;
+	u64_stats_update_end(&tx_ring->syncp);
+	tx_ring->q_vector->tx.total_bytes += total_bytes;
+	tx_ring->q_vector->tx.total_packets += total_packets;
+
+	if (tx_ring->flags & I40E_TXR_FLAGS_WB_ON_ITR) {
+		/* check to see if there are < 4 descriptors
+		 * waiting to be written back, then kick the hardware to force
+		 * them to be written back in case we stay in NAPI.
+		 * In this mode on X722 we do not enable Interrupt.
+		 */
+		unsigned int j = i40e_get_tx_pending(tx_ring, false);
+
+		if (budget &&
+		    ((j / WB_STRIDE) == 0) && (j > 0) &&
+		    !test_bit(__I40E_DOWN, &vsi->state) &&
+		    (I40E_DESC_UNUSED(tx_ring) != tx_ring->count))
+			tx_ring->arm_wb = true;
 	}
 
 	return !!budget;
@@ -1460,29 +1554,6 @@ static bool i40e_cleanup_headers(struct i40e_ring *rx_ring, struct sk_buff *skb)
 }
 
 /**
- * i40e_reuse_rx_page - page flip buffer and store it back on the ring
- * @rx_ring: rx descriptor ring to store buffers on
- * @old_buff: donor buffer to have page reused
- *
- * Synchronizes page for reuse by the adapter
- **/
-static void i40e_reuse_rx_page(struct i40e_ring *rx_ring,
-			       struct i40e_rx_buffer *old_buff)
-{
-	struct i40e_rx_buffer *new_buff;
-	u16 nta = rx_ring->next_to_alloc;
-
-	new_buff = &rx_ring->rx_bi[nta];
-
-	/* update, and store next to alloc */
-	nta++;
-	rx_ring->next_to_alloc = (nta < rx_ring->count) ? nta : 0;
-
-	/* transfer page from old buffer to new buffer */
-	*new_buff = *old_buff;
-}
-
-/**
  * i40e_page_is_reusable - check if any reuse is possible
  * @page: page struct to check
  *
@@ -1627,6 +1698,103 @@ add_tail_frag:
 }
 
 /**
+ * i40e_xdp_xmit_tail_bump - updates the tail and sets the RS bit
+ * @xdp_ring: XDP Tx ring
+ **/
+static
+void i40e_xdp_xmit_tail_bump(struct i40e_ring *xdp_ring)
+{
+	struct i40e_tx_desc *tx_desc;
+
+	/* Set RS and bump tail */
+	tx_desc = I40E_TX_DESC(xdp_ring, xdp_ring->curr_in_use);
+	tx_desc->cmd_type_offset_bsz |=
+		cpu_to_le64(I40E_TX_DESC_CMD_RS << I40E_TXD_QW1_CMD_SHIFT);
+	/* Force memory writes to complete before letting h/w know
+	 * there are new descriptors to fetch.  (Only applicable for
+	 * weak-ordered memory model archs, such as IA-64).
+	 */
+	wmb();
+	writel(xdp_ring->curr_in_use, xdp_ring->tail);
+
+	xdp_ring->xdp_needs_tail_bump = false;
+}
+
+/**
+ * i40e_xdp_xmit - transmit a frame on the XDP Tx queue
+ * @xdp_ring: XDP Tx ring
+ * @page: current page containing the frame
+ * @page_offset: offset where the frame resides
+ * @dma: Bus address of the frame
+ * @size: size of the frame
+ *
+ * Returns true successfully sent.
+ **/
+static bool i40e_xdp_xmit(void *data, size_t size, struct page *page,
+			  struct i40e_ring *xdp_ring)
+{
+	struct i40e_tx_buffer *tx_bi;
+	struct i40e_tx_desc *tx_desc;
+	u16 i = xdp_ring->next_to_use;
+	dma_addr_t dma;
+
+	if (unlikely(I40E_DESC_UNUSED(xdp_ring) < 1)) {
+		if (xdp_ring->xdp_needs_tail_bump)
+			i40e_xdp_xmit_tail_bump(xdp_ring);
+		xdp_ring->tx_stats.tx_busy++;
+		return false;
+	}
+
+	tx_bi = &xdp_ring->tx_bi[i];
+	tx_bi->bytecount = size;
+	tx_bi->gso_segs = 1;
+	tx_bi->tx_flags = I40E_TX_FLAGS_XDP;
+	tx_bi->page = page;
+
+	dma = dma_map_single(xdp_ring->dev, data, size, DMA_TO_DEVICE);
+	if (dma_mapping_error(xdp_ring->dev, dma))
+		return false;
+
+	/* record length, and DMA address */
+	dma_unmap_len_set(tx_bi, len, size);
+	dma_unmap_addr_set(tx_bi, dma, dma);
+
+	tx_desc = I40E_TX_DESC(xdp_ring, i);
+	tx_desc->buffer_addr = cpu_to_le64(dma);
+	tx_desc->cmd_type_offset_bsz = build_ctob(I40E_TX_DESC_CMD_ICRC
+						  | I40E_TX_DESC_CMD_EOP,
+						  0, size, 0);
+	tx_bi->next_to_watch = tx_desc;
+	xdp_ring->curr_in_use = i++;
+	xdp_ring->next_to_use = (i < xdp_ring->count) ? i : 0;
+	xdp_ring->xdp_needs_tail_bump = true;
+	return true;
+}
+
+/**
+ * i40e_reuse_rx_page - page flip buffer and store it back on the ring
+ * @rx_ring: rx descriptor ring to store buffers on
+ * @old_buff: donor buffer to have page reused
+ *
+ * Synchronizes page for reuse by the adapter
+ **/
+static void i40e_reuse_rx_page(struct i40e_ring *rx_ring,
+			       struct i40e_rx_buffer *old_buff)
+{
+	struct i40e_rx_buffer *new_buff;
+	u16 nta = rx_ring->next_to_alloc;
+
+	new_buff = &rx_ring->rx_bi[nta];
+
+	/* update, and store next to alloc */
+	nta++;
+	rx_ring->next_to_alloc = (nta < rx_ring->count) ? nta : 0;
+
+	/* transfer page from old buffer to new buffer */
+	*new_buff = *old_buff;
+}
+
+/**
  * i40e_run_xdp - Runs an XDP program for an Rx ring
  * @rx_ring: Rx ring used for XDP
  * @rx_buffer: current Rx buffer
@@ -1643,8 +1811,14 @@ static bool i40e_run_xdp(struct i40e_ring *rx_ring,
 			 unsigned int size,
 			 struct bpf_prog *xdp_prog)
 {
+#if (PAGE_SIZE < 8192)
+	unsigned int truesize = I40E_RXBUFFER_2048;
+#else
+	unsigned int truesize = ALIGN(size, L1_CACHE_BYTES);
+#endif
 	struct xdp_buff xdp;
 	u32 xdp_action;
+	bool tx_ok;
 
 	if (unlikely(!i40e_test_staterr(rx_desc,
 					BIT(I40E_RX_DESC_STATUS_EOF_SHIFT)))) {
@@ -1661,10 +1835,21 @@ static bool i40e_run_xdp(struct i40e_ring *rx_ring,
 	switch (xdp_action) {
 	case XDP_PASS:
 		return false;
-	default:
-		bpf_warn_invalid_xdp_action(xdp_action);
-	case XDP_ABORTED:
 	case XDP_TX:
+		tx_ok = i40e_xdp_xmit(xdp.data, size, rx_buffer->page,
+				      rx_ring->xdp_sibling);
+		if (likely(tx_ok)) {
+			if (i40e_can_reuse_rx_page(rx_buffer, rx_buffer->page,
+						   truesize)) {
+				i40e_reuse_rx_page(rx_ring, rx_buffer);
+				rx_ring->rx_stats.page_reuse_count++;
+			} else {
+				dma_unmap_page(rx_ring->dev, rx_buffer->dma,
+					       PAGE_SIZE, DMA_FROM_DEVICE);
+			}
+			break;
+		}
+	case XDP_ABORTED:
 	case XDP_DROP:
 do_drop:
 		if (likely(i40e_page_is_reusable(rx_buffer->page))) {
@@ -1672,11 +1857,13 @@ do_drop:
 			rx_ring->rx_stats.page_reuse_count++;
 			break;
 		}
-
-		/* we are not reusing the buffer so unmap it */
 		dma_unmap_page(rx_ring->dev, rx_buffer->dma, PAGE_SIZE,
 			       DMA_FROM_DEVICE);
 		__free_pages(rx_buffer->page, 0);
+		break;
+	default:
+		bpf_warn_invalid_xdp_action(xdp_action);
+		goto do_drop;
 	}
 
 	/* clear contents of buffer_info */
@@ -2104,6 +2291,15 @@ int i40e_napi_poll(struct napi_struct *napi, int budget)
 		ring->arm_wb = false;
 	}
 
+	i40e_for_each_ring(ring, q_vector->xdp) {
+		if (!i40e_clean_xdp_irq(vsi, ring)) {
+			clean_complete = false;
+			continue;
+		}
+		arm_wb |= ring->arm_wb;
+		ring->arm_wb = false;
+	}
+
 	/* Handle case where we are called by netpoll with a budget of 0 */
 	if (budget <= 0)
 		goto tx_only;
@@ -2115,6 +2311,9 @@ int i40e_napi_poll(struct napi_struct *napi, int budget)
 
 	i40e_for_each_ring(ring, q_vector->rx) {
 		int cleaned = i40e_clean_rx_irq(ring, budget_per_ring);
+
+		if (ring->xdp_sibling && ring->xdp_sibling->xdp_needs_tail_bump)
+			i40e_xdp_xmit_tail_bump(ring->xdp_sibling);
 
 		work_done += cleaned;
 		/* if we clean as many as budgeted, we must not be done */
