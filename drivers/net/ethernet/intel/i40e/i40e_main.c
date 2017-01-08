@@ -24,6 +24,7 @@
  *
  ******************************************************************************/
 
+#include <linux/bpf.h>
 #include <linux/etherdevice.h>
 #include <linux/of_net.h>
 #include <linux/pci.h>
@@ -2488,6 +2489,13 @@ static int i40e_change_mtu(struct net_device *netdev, int new_mtu)
 {
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_vsi *vsi = np->vsi;
+
+	if (i40e_enabled_xdp_vsi(vsi)) {
+		int max_frame = new_mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
+
+		if (max_frame > I40E_RXBUFFER_2048)
+			return -EINVAL;
+	}
 
 	netdev_info(netdev, "changing MTU from %d to %d\n",
 		    netdev->mtu, new_mtu);
@@ -9347,6 +9355,78 @@ out_err:
 	return features & ~(NETIF_F_CSUM_MASK | NETIF_F_GSO_MASK);
 }
 
+/**
+ * i40e_xdp_setup - Add/remove an XDP program to a VSI
+ * @vsi: the VSI to add the program
+ * @prog: the XDP program
+ **/
+static int i40e_xdp_setup(struct i40e_vsi *vsi,
+			  struct bpf_prog *prog)
+{
+	struct i40e_pf *pf = vsi->back;
+	struct net_device *netdev = vsi->netdev;
+	int i, frame_size = netdev->mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
+	bool need_reset;
+	struct bpf_prog *old_prog;
+
+	/* The Rx frame has to fit in 2k */
+	if (frame_size > I40E_RXBUFFER_2048)
+		return -EINVAL;
+
+	if (!i40e_enabled_xdp_vsi(vsi) && !prog)
+		return 0;
+
+	if (prog) {
+		prog = bpf_prog_add(prog, vsi->num_queue_pairs - 1);
+		if (IS_ERR(prog))
+			return PTR_ERR(prog);
+	}
+
+	/* When turning XDP on->off/off->on we reset and rebuild the rings. */
+	need_reset = (i40e_enabled_xdp_vsi(vsi) != !!prog);
+
+	if (need_reset)
+		i40e_prep_for_reset(pf);
+
+	vsi->xdp_enabled = !!prog;
+
+	if (need_reset)
+		i40e_reset_and_rebuild(pf, true);
+
+	for (i = 0; i < vsi->num_queue_pairs; i++) {
+		old_prog = rtnl_dereference(vsi->rx_rings[i]->xdp_prog);
+		rcu_assign_pointer(vsi->rx_rings[i]->xdp_prog, prog);
+		if (old_prog)
+			bpf_prog_put(old_prog);
+	}
+	return 0;
+}
+
+/**
+ * i40e_xdp - NDO for enabled/query
+ * @dev: the netdev
+ * @xdp: XDP program
+ **/
+static int i40e_xdp(struct net_device *dev,
+		    struct netdev_xdp *xdp)
+{
+	struct i40e_netdev_priv *np = netdev_priv(dev);
+	struct i40e_vsi *vsi = np->vsi;
+
+	if (vsi->type != I40E_VSI_MAIN)
+		return -EINVAL;
+
+	switch (xdp->command) {
+	case XDP_SETUP_PROG:
+		return i40e_xdp_setup(vsi, xdp->prog);
+	case XDP_QUERY_PROG:
+		xdp->prog_attached = i40e_enabled_xdp_vsi(vsi);
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
 static const struct net_device_ops i40e_netdev_ops = {
 	.ndo_open		= i40e_open,
 	.ndo_stop		= i40e_close,
@@ -9383,6 +9463,7 @@ static const struct net_device_ops i40e_netdev_ops = {
 	.ndo_features_check	= i40e_features_check,
 	.ndo_bridge_getlink	= i40e_ndo_bridge_getlink,
 	.ndo_bridge_setlink	= i40e_ndo_bridge_setlink,
+	.ndo_xdp                = i40e_xdp,
 };
 
 /**
@@ -11606,7 +11687,9 @@ static void i40e_remove(struct pci_dev *pdev)
 		pf->flags &= ~I40E_FLAG_SRIOV_ENABLED;
 	}
 
+	rtnl_lock();
 	i40e_fdir_teardown(pf);
+	rtnl_unlock();
 
 	/* If there is a switch structure or any orphans, remove them.
 	 * This will leave only the PF's VSI remaining.
