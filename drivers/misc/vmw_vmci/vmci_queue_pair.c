@@ -486,13 +486,15 @@ static int qp_alloc_ppn_set(void *prod_q,
 	if (ppn_set->initialized)
 		return VMCI_ERROR_ALREADY_EXISTS;
 
-	produce_ppns =
-	    kmalloc(num_produce_pages * sizeof(*produce_ppns), GFP_KERNEL);
+	produce_ppns = kmalloc_array(num_produce_pages,
+				     sizeof(*produce_ppns),
+				     GFP_KERNEL);
 	if (!produce_ppns)
 		return VMCI_ERROR_NO_MEM;
 
-	consume_ppns =
-	    kmalloc(num_consume_pages * sizeof(*consume_ppns), GFP_KERNEL);
+	consume_ppns = kmalloc_array(num_consume_pages,
+				     sizeof(*consume_ppns),
+				     GFP_KERNEL);
 	if (!consume_ppns) {
 		kfree(produce_ppns);
 		return VMCI_ERROR_NO_MEM;
