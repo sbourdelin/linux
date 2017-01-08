@@ -1363,9 +1363,9 @@ module_init(loopback_init);
 
 static void __exit loopback_exit(void)
 {
-	debugfs_remove_recursive(gb_dev.root);
 	greybus_deregister(&gb_loopback_driver);
 	class_unregister(&loopback_class);
+	debugfs_remove_recursive(gb_dev.root);
 	ida_destroy(&loopback_ida);
 }
 module_exit(loopback_exit);
