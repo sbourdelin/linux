@@ -635,12 +635,17 @@ static int bq27xxx_battery_read_pwr_avg(struct bq27xxx_device_info *di)
  */
 static bool bq27xxx_battery_overtemp(struct bq27xxx_device_info *di, u16 flags)
 {
-	if (di->chip == BQ27500 || di->chip == BQ27541 || di->chip == BQ27545)
+	switch (di->chip) {
+	case BQ27500:
+	case BQ27541:
+	case BQ27545:
 		return flags & (BQ27XXX_FLAG_OTC | BQ27XXX_FLAG_OTD);
-	if (di->chip == BQ27530 || di->chip == BQ27421)
+	case BQ27530:
+	case BQ27421:
 		return flags & BQ27XXX_FLAG_OT;
-
-	return false;
+	default:
+		return false;
+	}
 }
 
 /*
