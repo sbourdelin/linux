@@ -30,8 +30,8 @@
 /*
  * flags for paca->soft_enabled
  */
-#define IRQ_DISABLE_MASK_NONE	1
-#define IRQ_DISABLE_MASK_LINUX	0
+#define IRQ_DISABLE_MASK_NONE	0
+#define IRQ_DISABLE_MASK_LINUX	1
 
 #endif /* CONFIG_PPC64 */
 
@@ -134,7 +134,7 @@ static inline bool arch_irqs_disabled(void)
 	_was_enabled = local_paca->soft_enabled;	\
 	local_paca->soft_enabled = IRQ_DISABLE_MASK_LINUX;\
 	local_paca->irq_happened |= PACA_IRQ_HARD_DIS;	\
-	if (_was_enabled == IRQ_DISABLE_MASK_NONE)	\
+	if (!(_was_enabled & IRQ_DISABLE_MASK_LINUX))	\
 		trace_hardirqs_off();			\
 } while(0)
 
