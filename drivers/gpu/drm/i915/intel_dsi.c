@@ -620,8 +620,10 @@ static void intel_dsi_disable(struct intel_encoder *encoder)
 		for_each_dsi_port(port, intel_dsi->ports)
 			wait_for_dsi_fifo_empty(intel_dsi, port);
 
-		intel_dsi_port_disable(encoder);
-		msleep(2);
+		if (!IS_BROXTON(dev_priv)) {
+			intel_dsi_port_disable(encoder);
+			msleep(2);
+		}
 	}
 
 	for_each_dsi_port(port, intel_dsi->ports) {
@@ -629,7 +631,11 @@ static void intel_dsi_disable(struct intel_encoder *encoder)
 		I915_WRITE(MIPI_DEVICE_READY(port), 0x0);
 
 		intel_dsi_reset_clocks(encoder, port);
-		I915_WRITE(MIPI_EOT_DISABLE(port), CLOCKSTOP);
+		temp = 0;
+		if (intel_dsi->clock_stop) {
+			temp |= CLOCKSTOP;
+			I915_WRITE(MIPI_EOT_DISABLE(port), temp);
+		}
 
 		temp = I915_READ(MIPI_DSI_FUNC_PRG(port));
 		temp &= ~VID_MODE_FORMAT_MASK;
@@ -694,12 +700,26 @@ static void intel_dsi_post_disable(struct intel_encoder *encoder,
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
+	u32 val;
+	enum port port;
 
 	DRM_DEBUG_KMS("\n");
 
 	intel_dsi_disable(encoder);
 
-	intel_dsi_clear_device_ready(encoder);
+	if (IS_BROXTON(dev_priv)) {
+		/*
+		 * Reset the DSI Device ready first for both ports
+		 * and then port control registers for both ports
+		 */
+		for_each_dsi_port(port, intel_dsi->ports)
+			I915_WRITE(MIPI_DEVICE_READY(port), 0);
+
+		for_each_dsi_port(port, intel_dsi->ports)
+			I915_WRITE(BXT_MIPI_PORT_CTRL(port), 0);
+	} else {
+		intel_dsi_clear_device_ready(encoder);
+	}
 
 	intel_disable_dsi_pll(encoder);
 
@@ -713,7 +733,11 @@ static void intel_dsi_post_disable(struct intel_encoder *encoder,
 
 	drm_panel_unprepare(intel_dsi->panel);
 
+	/* Disable Panel */
+	drm_panel_power_off(intel_dsi->panel);
 	msleep(intel_dsi->panel_off_delay);
+
+	intel_disable_dsi_pll(encoder);
 
 	/* Panel Disable over CRC PMIC */
 	if (intel_dsi->gpio_panel)
