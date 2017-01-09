@@ -979,6 +979,8 @@ static void __init __gic_init(unsigned long gic_base_addr,
 	__gic_base_addr = gic_base_addr;
 
 	gic_base = ioremap_nocache(gic_base_addr, gic_addrspace_size);
+	if (!gic_base)
+		panic("Failed to map GIC memory");
 
 	gicconfig = gic_read(GIC_REG(SHARED, GIC_SH_CONFIG));
 	gic_shared_intrs = (gicconfig & GIC_SH_CONFIG_NUMINTRS_MSK) >>
