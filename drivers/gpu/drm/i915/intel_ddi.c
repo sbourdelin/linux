@@ -1102,13 +1102,13 @@ hsw_ddi_pll_select(struct intel_crtc *intel_crtc,
 {
 	struct intel_shared_dpll *pll;
 
-	pll = intel_get_shared_dpll(intel_crtc, crtc_state,
-				    intel_encoder);
-	if (!pll)
+	pll = intel_get_shared_dpll(intel_crtc, crtc_state, intel_encoder);
+	if (pll == NULL) {
 		DRM_DEBUG_DRIVER("failed to find PLL for pipe %c\n",
 				 pipe_name(intel_crtc->pipe));
-
-	return pll;
+		return false;
+	}
+	return true;
 }
 
 static bool
@@ -1124,7 +1124,6 @@ skl_ddi_pll_select(struct intel_crtc *intel_crtc,
 				 pipe_name(intel_crtc->pipe));
 		return false;
 	}
-
 	return true;
 }
 
@@ -1133,7 +1132,15 @@ bxt_ddi_pll_select(struct intel_crtc *intel_crtc,
 		   struct intel_crtc_state *crtc_state,
 		   struct intel_encoder *intel_encoder)
 {
-	return !!intel_get_shared_dpll(intel_crtc, crtc_state, intel_encoder);
+	struct intel_shared_dpll *pll;
+
+	pll = intel_get_shared_dpll(intel_crtc, crtc_state, intel_encoder);
+	if (pll == NULL) {
+		DRM_DEBUG_DRIVER("failed to find PLL for pipe %c\n",
+				 pipe_name(intel_crtc->pipe));
+		return false;
+	}
+	return true;
 }
 
 /*
@@ -1149,6 +1156,9 @@ bool intel_ddi_pll_select(struct intel_crtc *intel_crtc,
 	struct drm_i915_private *dev_priv = to_i915(intel_crtc->base.dev);
 	struct intel_encoder *intel_encoder =
 		intel_ddi_get_crtc_new_encoder(crtc_state);
+
+	if (intel_encoder->type == INTEL_OUTPUT_DSI)
+		return true;
 
 	if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))
 		return skl_ddi_pll_select(intel_crtc, crtc_state,
