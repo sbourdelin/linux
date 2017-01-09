@@ -167,6 +167,10 @@
 	status = "okay";
 };
 
+&cppi41dma  {
+	status = "okay";
+};
+
 &aemif {
 	pinctrl-names = "default";
 	pinctrl-0 = <&nand_pins>;
