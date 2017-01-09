@@ -41,6 +41,14 @@ config MTD_SM_COMMON
 	tristate
 	default n
 
+config MTD_NAND_ARASAN
+	tristate "Support for Arasan Nand Flash controller"
+	depends on HAS_IOMEM
+	depends on HAS_DMA
+	help
+	  Enables the driver for the Arasan NAND Flash controller on
+	  Zynq UltraScale+ MPSoC.
+
 config MTD_NAND_DENALI
 	tristate
 
