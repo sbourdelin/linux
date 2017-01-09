@@ -471,6 +471,8 @@ static void cppi41_dma_issue_pending(struct dma_chan *chan)
 {
 	struct cppi41_channel *c = to_cpp41_chan(chan);
 	struct cppi41_dd *cdd = c->cdd;
+	unsigned long flags;
+	bool active;
 	int error;
 
 	error = pm_runtime_get(cdd->ddev.dev);
@@ -482,7 +484,21 @@ static void cppi41_dma_issue_pending(struct dma_chan *chan)
 		return;
 	}
 
-	if (likely(pm_runtime_active(cdd->ddev.dev)))
+	active = pm_runtime_active(cdd->ddev.dev);
+	if (!active) {
+		/*
+		 * Runtime resume may be interrupted before runtime_status
+		 * has been updated. Test if device has resumed.
+		 */
+		if (error == -EINPROGRESS) {
+			spin_lock_irqsave(&cdd->lock, flags);
+			if (list_empty(&cdd->pending))
+				active = true;
+			spin_unlock_irqrestore(&cdd->lock, flags);
+		}
+	}
+
+	if (likely(active))
 		push_desc_queue(c);
 	else
 		pending_desc(c);
