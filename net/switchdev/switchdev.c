@@ -776,12 +776,14 @@ static int switchdev_port_vlan_dump_cb(struct switchdev_obj *obj)
 	return err;
 }
 
-static int switchdev_port_vlan_fill(struct sk_buff *skb, struct net_device *dev,
-				    u32 filter_mask)
+static int __switchdev_port_vlan_fill(struct sk_buff *skb,
+				      struct net_device *dev,
+				      u32 filter_mask, u32 obj_flags)
 {
 	struct switchdev_vlan_dump dump = {
 		.vlan.obj.orig_dev = dev,
 		.vlan.obj.id = SWITCHDEV_OBJ_ID_PORT_VLAN,
+		.vlan.obj.flags = obj_flags,
 		.skb = skb,
 		.filter_mask = filter_mask,
 	};
@@ -802,17 +804,27 @@ err_out:
 	return err == -EOPNOTSUPP ? 0 : err;
 }
 
-/**
- *	switchdev_port_bridge_getlink - Get bridge port attributes
- *
- *	@dev: port device
- *
- *	Called for SELF on rtnl_bridge_getlink to get bridge port
- *	attributes.
- */
-int switchdev_port_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
-				  struct net_device *dev, u32 filter_mask,
-				  int nlflags)
+static int switchdev_port_vlan_fill_deferred(struct sk_buff *skb,
+					     struct net_device *dev,
+					     u32 filter_mask)
+{
+	return __switchdev_port_vlan_fill(skb, dev, filter_mask,
+					  SWITCHDEV_F_DEFER);
+}
+
+static int switchdev_port_vlan_fill(struct sk_buff *skb,
+				    struct net_device *dev,
+				    u32 filter_mask)
+{
+	return __switchdev_port_vlan_fill(skb, dev, filter_mask, 0);
+}
+
+static int __switchdev_port_bridge_getlink(struct sk_buff *skb, u32 pid,
+					   u32 seq, struct net_device *dev,
+					   u32 filter_mask, int nlflags,
+					   int (*fill_cb)(struct sk_buff *skb,
+							  struct net_device *d,
+							  u32 filter_mask))
 {
 	struct switchdev_attr attr = {
 		.orig_dev = dev,
@@ -829,11 +841,48 @@ int switchdev_port_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 	if (err && err != -EOPNOTSUPP)
 		return err;
 
-	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode,
+	return ndo_dflt_bridge_getlink(skb, pid, seq, d, mode,
 				       attr.u.brport_flags, mask, nlflags,
-				       filter_mask, switchdev_port_vlan_fill);
+				       filter_mask, fill_cb);
+}
+
+/**
+ *	switchdev_port_bridge_getlink - Get bridge port attributes
+ *
+ *	@dev: port device
+ *
+ *	Called for SELF on rtnl_bridge_getlink to get bridge port
+ *	attributes.
+ */
+int switchdev_port_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
+				  struct net_device *dev, u32 filter_mask,
+				  int nlflags)
+{
+	return __switchdev_port_bridge_getlink(skb, pid, seq, dev, filter_mask,
+					       nlflags,
+					       switchdev_port_vlan_fill);
 }
 EXPORT_SYMBOL_GPL(switchdev_port_bridge_getlink);
+
+/**
+ *	switchdev_port_bridge_getlink_deferred - Get bridge port attributes
+ *	(deferred variant)
+ *
+ *	@dev: port device
+ *
+ *	Called for SELF on rtnl_bridge_getlink to get bridge port
+ *	attributes.
+ */
+int switchdev_port_bridge_getlink_deferred(struct sk_buff *skb, u32 pid,
+					   u32 seq, struct net_device *dev,
+					   u32 filter_mask,
+					   int nlflags)
+{
+	return __switchdev_port_bridge_getlink(skb, pid, seq, dev, filter_mask,
+					       nlflags,
+					       switchdev_port_vlan_fill_deferred);
+}
+EXPORT_SYMBOL_GPL(switchdev_port_bridge_getlink_deferred);
 
 static int switchdev_port_br_setflag(struct net_device *dev,
 				     struct nlattr *nlattr,
