@@ -113,13 +113,16 @@ struct in_device;
 int ip_rt_init(void);
 void rt_cache_flush(struct net *net);
 void rt_flush_dev(struct net_device *dev);
-struct rtable *__ip_route_output_key_hash(struct net *, struct flowi4 *flp,
-					  int mp_hash);
+struct rtable *ip_route_output_key_hash(struct net *, struct flowi4 *flp,
+					int mp_hash);
+struct rtable *ip_route_output_key_hash_rcu(struct net *, struct flowi4 *flp,
+					    struct fib_result *res,
+					    int mp_hash);
 
 static inline struct rtable *__ip_route_output_key(struct net *net,
 						   struct flowi4 *flp)
 {
-	return __ip_route_output_key_hash(net, flp, -1);
+	return ip_route_output_key_hash(net, flp, -1);
 }
 
 struct rtable *ip_route_output_flow(struct net *, struct flowi4 *flp,
