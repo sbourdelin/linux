@@ -993,6 +993,7 @@ GLOBAL_ENTRY(ia64_delay_loop)
 	mov ar.lc=r2
 	br.ret.sptk.many rp
 END(ia64_delay_loop)
+EXPORT_SYMBOL(ia64_delay_loop)
 
 /*
  * Return a CPU-local timestamp in nano-seconds.  This timestamp is
