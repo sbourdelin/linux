@@ -2300,6 +2300,7 @@ static void i915_sg_trim(struct sg_table *orig_st)
 	if (sg_alloc_table(&new_st, orig_st->nents, GFP_KERNEL | __GFP_NOWARN))
 		return;
 
+	new_st->orig_nents = orig_st->orig_nents; /* XXX lies for 
 	new_sg = new_st.sgl;
 	for_each_sg(orig_st->sgl, sg, orig_st->nents, i) {
 		sg_set_page(new_sg, sg_page(sg), sg->length, 0);
@@ -3519,7 +3520,7 @@ i915_gem_object_pin_to_display_plane(struct drm_i915_gem_object *obj,
 	vma->display_alignment = max_t(u64, vma->display_alignment, alignment);
 
 	/* Treat this as an end-of-frame, like intel_user_framebuffer_dirty() */
-	if (obj->cache_dirty) {
+	if (obj->cache_dirty || obj->base.write_domain == I915_GEM_DOMAIN_CPU) {
 		i915_gem_clflush_object(obj, true);
 		intel_fb_obj_flush(obj, false, ORIGIN_DIRTYFB);
 	}
