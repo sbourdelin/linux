@@ -1,3 +1,4 @@
+#include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/dmaengine.h>
 #include <linux/dma-mapping.h>
@@ -86,10 +87,19 @@
 
 #define USBSS_IRQ_PD_COMP	(1 <<  2)
 
+/* USB DA8XX */
+#define DA8XX_INTR_SRC_MASKED	0x38
+#define DA8XX_END_OF_INTR	0x3c
+
+#define DA8XX_QMGR_PENDING_MASK	(0xf << 24)
+
+
+
 /* Packet Descriptor */
 #define PD2_ZERO_LENGTH		(1 << 19)
 
 #define AM335X_CPPI41		0
+#define DA8XX_CPPI41		1
 
 struct cppi41_channel {
 	struct dma_chan chan;
@@ -158,6 +168,9 @@ struct cppi41_dd {
 
 	/* context for suspend/resume */
 	unsigned int dma_tdfdq;
+
+	/* da8xx clock */
+	struct clk *clk;
 };
 
 static struct chan_queues am335x_usb_queues_tx[] = {
@@ -230,6 +243,20 @@ static const struct chan_queues am335x_usb_queues_rx[] = {
 	[27] = { .submit = 28, .complete = 153},
 	[28] = { .submit = 29, .complete = 154},
 	[29] = { .submit = 30, .complete = 155},
+};
+
+static const struct chan_queues da8xx_usb_queues_tx[] = {
+	[0] = { .submit =  16, .complete = 24},
+	[1] = { .submit =  18, .complete = 24},
+	[2] = { .submit =  20, .complete = 24},
+	[3] = { .submit =  22, .complete = 24},
+};
+
+static const struct chan_queues da8xx_usb_queues_rx[] = {
+	[0] = { .submit =  1, .complete = 26},
+	[1] = { .submit =  3, .complete = 26},
+	[2] = { .submit =  5, .complete = 26},
+	[3] = { .submit =  7, .complete = 26},
 };
 
 struct cppi_glue_infos {
@@ -364,6 +391,26 @@ static irqreturn_t am335x_cppi41_irq(int irq, void *data)
 	cppi_writel(status, cdd->usbss_mem + USBSS_IRQ_STATUS);
 
 	return cppi41_irq(cdd);
+}
+
+static irqreturn_t da8xx_cppi41_irq(int irq, void *data)
+{
+	struct cppi41_dd *cdd = data;
+	u32 status;
+	u32 usbss_status;
+
+	status = cppi_readl(cdd->qmgr_mem + QMGR_PEND(0));
+	if (status & DA8XX_QMGR_PENDING_MASK)
+		cppi41_irq(cdd);
+	else
+		return IRQ_NONE;
+
+	/* Re-assert IRQ if there no usb core interrupts pending */
+	usbss_status = cppi_readl(cdd->usbss_mem + DA8XX_INTR_SRC_MASKED);
+	if (!usbss_status)
+		cppi_writel(0, cdd->usbss_mem + DA8XX_END_OF_INTR);
+
+	return IRQ_HANDLED;
 }
 
 static dma_cookie_t cppi41_tx_submit(struct dma_async_tx_descriptor *tx)
@@ -972,8 +1019,19 @@ static const struct cppi_glue_infos am335x_usb_infos = {
 	.platform = AM335X_CPPI41,
 };
 
+static const struct cppi_glue_infos da8xx_usb_infos = {
+	.isr = da8xx_cppi41_irq,
+	.queues_rx = da8xx_usb_queues_rx,
+	.queues_tx = da8xx_usb_queues_tx,
+	.td_queue = { .submit = 31, .complete = 0 },
+	.first_completion_queue = 24,
+	.qmgr_num_pend = 2,
+	.platform = DA8XX_CPPI41,
+};
+
 static const struct of_device_id cppi41_dma_ids[] = {
 	{ .compatible = "ti,am3359-cppi41", .data = &am335x_usb_infos},
+	{ .compatible = "ti,da8xx-cppi41", .data = &da8xx_usb_infos},
 	{},
 };
 MODULE_DEVICE_TABLE(of, cppi41_dma_ids);
@@ -993,6 +1051,13 @@ static int is_am335x_cppi41(struct device *dev)
 	struct cppi41_dd *cdd = dev_get_drvdata(dev);
 
 	return cdd->platform == AM335X_CPPI41;
+}
+
+static int is_da8xx_cppi41(struct device *dev)
+{
+	struct cppi41_dd *cdd = dev_get_drvdata(dev);
+
+	return cdd->platform == DA8XX_CPPI41;
 }
 
 #define CPPI41_DMA_BUSWIDTHS	(BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) | \
@@ -1058,6 +1123,21 @@ static int cppi41_dma_probe(struct platform_device *pdev)
 	cdd->first_completion_queue = glue_info->first_completion_queue;
 	cdd->platform = glue_info->platform;
 
+	if (is_da8xx_cppi41(dev)) {
+		cdd->clk = devm_clk_get(&pdev->dev, "usb20");
+		ret = PTR_ERR_OR_ZERO(cdd->clk);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to get clock\n");
+			goto err_clk_en;
+		}
+
+		ret = clk_prepare_enable(cdd->clk);
+		if (ret) {
+			dev_err(dev, "failed to enable clock\n");
+			goto err_clk_en;
+		}
+	}
+
 	ret = of_property_read_u32(dev->of_node,
 				   "#dma-channels", &cdd->n_chans);
 	if (ret)
@@ -1112,6 +1192,9 @@ err_chans:
 err_init_cppi:
 	pm_runtime_dont_use_autosuspend(dev);
 err_get_n_chans:
+	if (is_da8xx_cppi41(dev))
+		clk_disable_unprepare(cdd->clk);
+err_clk_en:
 err_get_sync:
 	pm_runtime_put_sync(dev);
 	pm_runtime_disable(dev);
@@ -1146,6 +1229,8 @@ static int cppi41_dma_remove(struct platform_device *pdev)
 	pm_runtime_dont_use_autosuspend(&pdev->dev);
 	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
+	if (is_da8xx_cppi41(&pdev->dev))
+		clk_disable_unprepare(cdd->clk);
 	return 0;
 }
 
@@ -1158,6 +1243,9 @@ static int __maybe_unused cppi41_suspend(struct device *dev)
 		cppi_writel(0, cdd->usbss_mem + USBSS_IRQ_CLEARR);
 	disable_sched(cdd);
 
+	if (is_da8xx_cppi41(dev))
+		clk_disable_unprepare(cdd->clk);
+
 	return 0;
 }
 
@@ -1165,7 +1253,14 @@ static int __maybe_unused cppi41_resume(struct device *dev)
 {
 	struct cppi41_dd *cdd = dev_get_drvdata(dev);
 	struct cppi41_channel *c;
+	int ret;
 	int i;
+
+	if (is_da8xx_cppi41(dev)) {
+		ret = clk_prepare_enable(cdd->clk);
+		if (ret)
+			return ret;
+	}
 
 	for (i = 0; i < DESCS_AREAS; i++)
 		cppi_writel(cdd->descs_phys, cdd->qmgr_mem + QMGR_MEMBASE(i));
