@@ -2337,8 +2337,14 @@ static int __init early_amd_iommu_init(void)
 
 out:
 	/* Don't leak any ACPI memory */
+
+	/*
+	 * Temporarily avoid doing that because we're called too early and
+	 * acpi_put_table() ends up in RCU (see acpi_os_map_cleanup()) which is
+	 * not initialized yet.
 	acpi_put_table(ivrs_base);
 	ivrs_base = NULL;
+	*/
 
 	return ret;
 }
