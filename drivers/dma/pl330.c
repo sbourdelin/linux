@@ -450,6 +450,7 @@ struct dma_pl330_chan {
 
 	/* for runtime pm tracking */
 	bool active;
+	struct device *slave;
 };
 
 struct pl330_dmac {
@@ -2112,6 +2113,14 @@ static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
 	chan_id = dma_spec->args[0];
 	if (chan_id >= pl330->num_peripherals)
 		return NULL;
+
+	if (!pl330->peripherals[chan_id].slave)
+		pl330->peripherals[chan_id].slave = slave;
+	else if (pl330->peripherals[chan_id].slave != slave) {
+		dev_err(pl330->ddma.dev,
+			"Can't use same channel with multiple slave devices!\n");
+		return NULL;
+	}
 
 	return dma_get_slave_channel(&pl330->peripherals[chan_id].chan);
 }
