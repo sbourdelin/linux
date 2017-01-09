@@ -148,9 +148,9 @@ static int bq27xxx_battery_i2c_remove(struct i2c_client *client)
 static const struct i2c_device_id bq27xxx_i2c_id_table[] = {
 	{ "bq27200", BQ27000 },
 	{ "bq27210", BQ27010 },
-	{ "bq27500", BQ27500 },
-	{ "bq27510", BQ27500 },
-	{ "bq27520", BQ27500 },
+	{ "bq27500", BQ275XX },
+	{ "bq27510", BQ275XX },
+	{ "bq27520", BQ275XX },
 	{ "bq27530", BQ27530 },
 	{ "bq27531", BQ27530 },
 	{ "bq27541", BQ27541 },
