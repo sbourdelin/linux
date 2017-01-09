@@ -1096,7 +1096,7 @@ static void nbpf_free_chan_resources(struct dma_chan *dchan)
 }
 
 static struct dma_chan *nbpf_of_xlate(struct of_phandle_args *dma_spec,
-				      struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	struct nbpf_device *nbpf = ofdma->of_dma_data;
 	struct dma_chan *dchan;

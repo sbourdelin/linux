@@ -708,7 +708,7 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
 
 	/* If device-tree is present get slave info from here */
 	if (dev->of_node)
-		chan = of_dma_request_slave_channel(dev->of_node, name);
+		chan = of_dma_request_slave_channel(dev, name);
 
 	/* If device was enumerated by ACPI get slave info from here */
 	if (has_acpi_companion(dev) && !chan)

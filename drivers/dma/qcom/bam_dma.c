@@ -1049,7 +1049,7 @@ static void bam_dma_free_desc(struct virt_dma_desc *vd)
 }
 
 static struct dma_chan *bam_dma_xlate(struct of_phandle_args *dma_spec,
-		struct of_dma *of)
+				      struct of_dma *of, struct device *slave)
 {
 	struct bam_device *bdev = container_of(of->of_dma_data,
 					struct bam_device, common);

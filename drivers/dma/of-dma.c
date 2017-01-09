@@ -54,7 +54,8 @@ static struct of_dma *of_dma_find_controller(struct of_phandle_args *dma_spec)
  * to request channel from the real DMA controller.
  */
 static struct dma_chan *of_dma_router_xlate(struct of_phandle_args *dma_spec,
-					    struct of_dma *ofdma)
+					    struct of_dma *ofdma,
+					    struct device *slave)
 {
 	struct dma_chan		*chan;
 	struct of_dma		*ofdma_target;
@@ -71,7 +72,8 @@ static struct dma_chan *of_dma_router_xlate(struct of_phandle_args *dma_spec,
 	if (!ofdma_target)
 		return NULL;
 
-	chan = ofdma_target->of_dma_xlate(&dma_spec_target, ofdma_target);
+	chan = ofdma_target->of_dma_xlate(&dma_spec_target, ofdma_target,
+					  slave);
 	if (chan) {
 		chan->router = ofdma->dma_router;
 		chan->route_data = route_data;
@@ -103,7 +105,8 @@ static struct dma_chan *of_dma_router_xlate(struct of_phandle_args *dma_spec,
  */
 int of_dma_controller_register(struct device_node *np,
 				struct dma_chan *(*of_dma_xlate)
-				(struct of_phandle_args *, struct of_dma *),
+				(struct of_phandle_args *, struct of_dma *,
+				 struct device *),
 				void *data)
 {
 	struct of_dma	*ofdma;
@@ -229,14 +232,15 @@ static int of_dma_match_channel(struct device_node *np, const char *name,
 
 /**
  * of_dma_request_slave_channel - Get the DMA slave channel
- * @np:		device node to get DMA request from
+ * @slave:		device to get DMA request from
  * @name:	name of desired channel
  *
  * Returns pointer to appropriate DMA channel on success or an error pointer.
  */
-struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+struct dma_chan *of_dma_request_slave_channel(struct device *slave,
 					      const char *name)
 {
+	struct device_node	*np = slave->of_node;
 	struct of_phandle_args	dma_spec;
 	struct of_dma		*ofdma;
 	struct dma_chan		*chan;
@@ -275,7 +279,7 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
 		ofdma = of_dma_find_controller(&dma_spec);
 
 		if (ofdma) {
-			chan = ofdma->of_dma_xlate(&dma_spec, ofdma);
+			chan = ofdma->of_dma_xlate(&dma_spec, ofdma, slave);
 		} else {
 			ret_no_channel = -EPROBE_DEFER;
 			chan = NULL;
@@ -305,7 +309,7 @@ EXPORT_SYMBOL_GPL(of_dma_request_slave_channel);
  * pointer to appropriate dma channel on success or NULL on error.
  */
 struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
-						struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	int count = dma_spec->args_count;
 	struct of_dma_filter_info *info = ofdma->of_dma_data;
@@ -335,7 +339,7 @@ EXPORT_SYMBOL_GPL(of_dma_simple_xlate);
  * Returns pointer to appropriate dma channel on success or NULL on error.
  */
 struct dma_chan *of_dma_xlate_by_chan_id(struct of_phandle_args *dma_spec,
-					 struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	struct dma_device *dev = ofdma->of_dma_data;
 	struct dma_chan *chan, *candidate = NULL;

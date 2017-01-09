@@ -22,7 +22,8 @@ struct of_dma {
 	struct list_head	of_dma_controllers;
 	struct device_node	*of_node;
 	struct dma_chan		*(*of_dma_xlate)
-				(struct of_phandle_args *, struct of_dma *);
+				(struct of_phandle_args *, struct of_dma *,
+				 struct device *);
 	void			*(*of_dma_route_allocate)
 				(struct of_phandle_args *, struct of_dma *);
 	struct dma_router	*dma_router;
@@ -37,7 +38,7 @@ struct of_dma_filter_info {
 #ifdef CONFIG_DMA_OF
 extern int of_dma_controller_register(struct device_node *np,
 		struct dma_chan *(*of_dma_xlate)
-		(struct of_phandle_args *, struct of_dma *),
+		(struct of_phandle_args *, struct of_dma *, struct device *),
 		void *data);
 extern void of_dma_controller_free(struct device_node *np);
 
@@ -47,17 +48,17 @@ extern int of_dma_router_register(struct device_node *np,
 		struct dma_router *dma_router);
 #define of_dma_router_free of_dma_controller_free
 
-extern struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+extern struct dma_chan *of_dma_request_slave_channel(struct device *slave,
 						     const char *name);
 extern struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
-		struct of_dma *ofdma);
+		struct of_dma *ofdma, struct device *slave);
 extern struct dma_chan *of_dma_xlate_by_chan_id(struct of_phandle_args *dma_spec,
-		struct of_dma *ofdma);
+		struct of_dma *ofdma, struct device *slave);
 
 #else
 static inline int of_dma_controller_register(struct device_node *np,
 		struct dma_chan *(*of_dma_xlate)
-		(struct of_phandle_args *, struct of_dma *),
+		(struct of_phandle_args *, struct of_dma *, struct device *),
 		void *data)
 {
 	return -ENODEV;
@@ -77,14 +78,14 @@ static inline int of_dma_router_register(struct device_node *np,
 
 #define of_dma_router_free of_dma_controller_free
 
-static inline struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+static inline struct dma_chan *of_dma_request_slave_channel(struct device *slave,
 						     const char *name)
 {
 	return ERR_PTR(-ENODEV);
 }
 
 static inline struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
-		struct of_dma *ofdma)
+		struct of_dma *ofdma, struct device *slave)
 {
 	return NULL;
 }

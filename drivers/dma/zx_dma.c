@@ -732,7 +732,7 @@ static const struct of_device_id zx6702_dma_dt_ids[] = {
 MODULE_DEVICE_TABLE(of, zx6702_dma_dt_ids);
 
 static struct dma_chan *zx_of_dma_simple_xlate(struct of_phandle_args *dma_spec,
-					       struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	struct zx_dma_dev *d = ofdma->of_dma_data;
 	unsigned int request = dma_spec->args[0];

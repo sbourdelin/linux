@@ -750,7 +750,7 @@ static void fsl_edma_issue_pending(struct dma_chan *chan)
 }
 
 static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
-		struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	struct fsl_edma_engine *fsl_edma = ofdma->of_dma_data;
 	struct dma_chan *chan, *_chan;

@@ -930,7 +930,7 @@ static void sun6i_dma_free_chan_resources(struct dma_chan *chan)
 }
 
 static struct dma_chan *sun6i_dma_of_xlate(struct of_phandle_args *dma_spec,
-					   struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	struct sun6i_dma_dev *sdev = ofdma->of_dma_data;
 	struct sun6i_vchan *vchan;

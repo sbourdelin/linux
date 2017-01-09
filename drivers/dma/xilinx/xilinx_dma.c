@@ -2461,7 +2461,7 @@ static int xilinx_dma_child_probe(struct xilinx_dma_device *xdev,
  * Return: DMA channel pointer on success and NULL on error
  */
 static struct dma_chan *of_dma_xilinx_xlate(struct of_phandle_args *dma_spec,
-						struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	struct xilinx_dma_device *xdev = ofdma->of_dma_data;
 	int chan_id = dma_spec->args[0];

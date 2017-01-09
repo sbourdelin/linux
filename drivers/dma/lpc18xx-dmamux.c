@@ -53,7 +53,7 @@ static void lpc18xx_dmamux_free(struct device *dev, void *route_data)
 }
 
 static void *lpc18xx_dmamux_reserve(struct of_phandle_args *dma_spec,
-				    struct of_dma *ofdma)
+				    struct of_dma *ofdma, struct device *slave)
 {
 	struct platform_device *pdev = of_find_device_by_node(ofdma->of_node);
 	struct lpc18xx_dmamux_data *dmamux = platform_get_drvdata(pdev);

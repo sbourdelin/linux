@@ -29,7 +29,7 @@
 #define DRV_NAME	"dw_dmac"
 
 static struct dma_chan *dw_dma_of_xlate(struct of_phandle_args *dma_spec,
-					struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	struct dw_dma *dw = ofdma->of_dma_data;
 	struct dw_dma_slave slave = {

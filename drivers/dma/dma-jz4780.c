@@ -707,7 +707,7 @@ static bool jz4780_dma_filter_fn(struct dma_chan *chan, void *param)
 }
 
 static struct dma_chan *jz4780_of_dma_xlate(struct of_phandle_args *dma_spec,
-	struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	struct jz4780_dma_dev *jzdma = ofdma->of_dma_data;
 	dma_cap_mask_t mask = jzdma->dma_device.cap_mask;
