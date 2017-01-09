@@ -134,6 +134,16 @@ static int get_context_size(struct drm_i915_private *dev_priv)
 	return ret;
 }
 
+static void i915_gem_context_svm_fini(struct i915_gem_context *ctx)
+{
+	struct device *dev = &ctx->i915->drm.pdev->dev;
+
+	GEM_BUG_ON(!ctx->task);
+
+	intel_svm_unbind_mm(dev, ctx->pasid);
+	put_task_struct(ctx->task);
+}
+
 void i915_gem_context_free(struct kref *ctx_ref)
 {
 	struct i915_gem_context *ctx = container_of(ctx_ref, typeof(*ctx), ref);
@@ -142,6 +152,9 @@ void i915_gem_context_free(struct kref *ctx_ref)
 	lockdep_assert_held(&ctx->i915->drm.struct_mutex);
 	trace_i915_context_free(ctx);
 	GEM_BUG_ON(!i915_gem_context_is_closed(ctx));
+
+	if (i915_gem_context_is_svm(ctx))
+		i915_gem_context_svm_fini(ctx);
 
 	i915_ppgtt_put(ctx->ppgtt);
 
@@ -270,6 +283,61 @@ static u32 create_default_ctx_desc(const struct drm_i915_private *dev_priv)
 		desc |= GEN8_CTX_L3LLC_COHERENT;
 
 	return desc;
+}
+
+static u32 create_svm_ctx_desc(void)
+{
+	/*
+	 * Switch to stream once we have a scheduler and can
+	 * re-submit contexts.
+	 */
+	return GEN8_CTX_VALID |
+		INTEL_ADVANCED_CONTEXT << GEN8_CTX_ADDRESSING_MODE_SHIFT |
+		FAULT_AND_HALT << GEN8_CTX_FAULT_SHIFT;
+}
+
+static int i915_gem_context_svm_init(struct i915_gem_context *ctx)
+{
+	struct device *dev = &ctx->i915->drm.pdev->dev;
+	int ret;
+
+	GEM_BUG_ON(ctx->task);
+
+	if (!HAS_SVM(ctx->i915))
+		return -ENODEV;
+
+	get_task_struct(current);
+
+	ret = intel_svm_bind_mm(dev, &ctx->pasid, 0, NULL);
+	if (ret) {
+		DRM_DEBUG_DRIVER("pasid alloc fail: %d\n", ret);
+		put_task_struct(current);
+		return ret;
+	}
+
+	ctx->task = current;
+	i915_gem_context_set_svm(ctx);
+
+	return 0;
+}
+
+static int i915_gem_context_enable_svm(struct i915_gem_context *ctx)
+{
+	int ret;
+
+	if (!HAS_SVM(ctx->i915))
+		return -ENODEV;
+
+	if (i915_gem_context_is_svm(ctx))
+		return -EINVAL;
+
+	ret = i915_gem_context_svm_init(ctx);
+	if (ret)
+		return ret;
+
+	ctx->desc_template = create_svm_ctx_desc();
+
+	return 0;
 }
 
 static struct i915_gem_context *
@@ -1071,6 +1139,9 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 	case I915_CONTEXT_PARAM_BANNABLE:
 		args->value = i915_gem_context_is_bannable(ctx);
 		break;
+	case I915_CONTEXT_PARAM_SVM:
+		args->value = i915_gem_context_is_svm(ctx);
+		break;
 	default:
 		ret = -EINVAL;
 		break;
@@ -1127,6 +1198,13 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 			i915_gem_context_set_bannable(ctx);
 		else
 			i915_gem_context_clear_bannable(ctx);
+		break;
+	case I915_CONTEXT_PARAM_SVM:
+		/* There is no coming back once svm is enabled */
+		if (args->value && !args->size)
+			ret = i915_gem_context_enable_svm(ctx);
+		else
+			ret = -EINVAL;
 		break;
 	default:
 		ret = -EINVAL;

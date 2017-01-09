@@ -414,6 +414,10 @@ void intel_device_info_runtime_init(struct drm_i915_private *dev_priv)
 	if (IS_BXT_REVID(dev_priv, 0, BXT_REVID_A1))
 		info->has_snoop = false;
 
+	info->has_svm = INTEL_GEN(dev_priv) >= 9 &&
+		info->has_full_48bit_ppgtt &&
+		intel_svm_available(&dev_priv->drm.pdev->dev);
+
 	DRM_DEBUG_DRIVER("slice mask: %04x\n", info->sseu.slice_mask);
 	DRM_DEBUG_DRIVER("slice total: %u\n", hweight8(info->sseu.slice_mask));
 	DRM_DEBUG_DRIVER("subslice total: %u\n",
@@ -429,4 +433,6 @@ void intel_device_info_runtime_init(struct drm_i915_private *dev_priv)
 			 info->sseu.has_subslice_pg ? "y" : "n");
 	DRM_DEBUG_DRIVER("has EU power gating: %s\n",
 			 info->sseu.has_eu_pg ? "y" : "n");
+	DRM_DEBUG_DRIVER("has svm: %s\n",
+			 info->has_svm ? "y" : "n");
 }

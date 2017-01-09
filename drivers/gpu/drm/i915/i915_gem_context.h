@@ -108,6 +108,7 @@ struct i915_gem_context {
 #define CONTEXT_BANNABLE		3
 #define CONTEXT_BANNED			4
 #define CONTEXT_FORCE_SINGLE_SUBMISSION	5
+#define CONTEXT_SVM			6
 
 	/**
 	 * @hw_id: - unique identifier for the context
@@ -139,6 +140,25 @@ struct i915_gem_context {
 	 * The &drm_i915_private.kernel_context is assigned the lowest priority.
 	 */
 	int priority;
+
+	/**
+	 * @pasid: process address space identifier
+	 *
+	 * Unique identifier for the shared address space with cpu.
+	 * Used by the gpu to associate context's (ppgtt) address
+	 * space with the corresponding process's address space for
+	 * Shared Virtual Memory (SVM). 20 bits.
+	 */
+	u32 pasid;
+
+	/**
+	 * @task: user space task struct for this context
+	 *
+	 * If this is svm context, @task is the corresponding
+	 * user space process with which we share the vm. See
+	 * @pasid.
+	 */
+	struct task_struct *task;
 
 	/** ggtt_alignment: alignment restriction for context objects */
 	u32 ggtt_alignment;
@@ -239,6 +259,16 @@ static inline bool i915_gem_context_force_single_submission(const struct i915_ge
 static inline void i915_gem_context_set_force_single_submission(struct i915_gem_context *ctx)
 {
 	__set_bit(CONTEXT_FORCE_SINGLE_SUBMISSION, &ctx->flags);
+}
+
+static inline bool i915_gem_context_is_svm(const struct i915_gem_context *ctx)
+{
+	return test_bit(CONTEXT_SVM, &ctx->flags);
+}
+
+static inline void i915_gem_context_set_svm(struct i915_gem_context *ctx)
+{
+	__set_bit(CONTEXT_SVM, &ctx->flags);
 }
 
 static inline bool i915_gem_context_is_default(const struct i915_gem_context *c)

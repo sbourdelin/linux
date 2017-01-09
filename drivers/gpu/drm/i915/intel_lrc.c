@@ -209,6 +209,13 @@
 #define GEN8_CTX_RCS_INDIRECT_CTX_OFFSET_DEFAULT	0x17
 #define GEN9_CTX_RCS_INDIRECT_CTX_OFFSET_DEFAULT	0x26
 
+#define ASSIGN_CTX_SVM(reg_state, ctx, engine) do { \
+		ASSIGN_CTX_REG(reg_state, CTX_PDP0_UDW, \
+			       GEN8_RING_PDP_UDW((engine), 0), 0); \
+		ASSIGN_CTX_REG(reg_state, CTX_PDP0_LDW, \
+			       GEN8_RING_PDP_LDW((engine), 0), (ctx)->pasid); \
+} while (0)
+
 /* Typical size of the average request (2 pipecontrols and a MI_BB) */
 #define EXECLISTS_REQUEST_SIZE 64 /* bytes */
 
@@ -2084,7 +2091,9 @@ static void execlists_init_reg_state(u32 *reg_state,
 	ASSIGN_CTX_REG(reg_state, CTX_PDP0_LDW, GEN8_RING_PDP_LDW(engine, 0),
 		       0);
 
-	if (USES_FULL_48BIT_PPGTT(ppgtt->base.dev)) {
+	if (i915_gem_context_is_svm(ctx)) {
+		ASSIGN_CTX_SVM(reg_state, ctx, engine);
+	} else if (USES_FULL_48BIT_PPGTT(ppgtt->base.dev)) {
 		/* 64b PPGTT (48bit canonical)
 		 * PDP0_DESCRIPTOR contains the base address to PML4 and
 		 * other PDP Descriptors are ignored.

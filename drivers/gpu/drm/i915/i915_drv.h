@@ -39,6 +39,7 @@
 #include <linux/backlight.h>
 #include <linux/hashtable.h>
 #include <linux/intel-iommu.h>
+#include <linux/intel-svm.h>
 #include <linux/kref.h>
 #include <linux/pm_qos.h>
 #include <linux/reservation.h>
@@ -787,6 +788,7 @@ struct intel_csr {
 	func(has_fpga_dbg); \
 	func(has_full_ppgtt); \
 	func(has_full_48bit_ppgtt); \
+	func(has_svm); \
 	func(has_gmbus_irq); \
 	func(has_gmch_display); \
 	func(has_guc); \
@@ -2784,6 +2786,7 @@ intel_info(const struct drm_i915_private *dev_priv)
 #define USES_PPGTT(dev_priv)		(i915.enable_ppgtt)
 #define USES_FULL_PPGTT(dev_priv)	(i915.enable_ppgtt >= 2)
 #define USES_FULL_48BIT_PPGTT(dev_priv)	(i915.enable_ppgtt == 3)
+#define HAS_SVM(dev_priv)		((dev_priv)->info.has_svm)
 
 #define HAS_OVERLAY(dev_priv)		 ((dev_priv)->info.has_overlay)
 #define OVERLAY_NEEDS_PHYSICAL(dev_priv) \
