@@ -8340,6 +8340,7 @@ enum {
 #define  LANE_CONFIGURATION_4LANE			(0 << 0)
 #define  LANE_CONFIGURATION_DUAL_LINK_A			(1 << 0)
 #define  LANE_CONFIGURATION_DUAL_LINK_B			(2 << 0)
+#define  LANE_CONFIGURATION_DUAL_LINK_ENABLE		(1 << 0)
 
 #define _MIPIA_TEARING_CTRL			(VLV_DISPLAY_BASE + 0x61194)
 #define _MIPIC_TEARING_CTRL			(VLV_DISPLAY_BASE + 0x61704)
@@ -8672,6 +8673,10 @@ enum {
 #define  READ_REQUEST_PRIORITY_LOW			(0 << 3)
 #define  READ_REQUEST_PRIORITY_HIGH			(3 << 3)
 #define  RGB_FLIP_TO_BGR				(1 << 2)
+
+/* BXT has dual link Z inversion overlap field */
+#define  BXT_PIXEL_OVERLAP_CNT_MASK			(0xf << 10)
+#define  BXT_PIXEL_OVERLAP_CNT_SHIFT			10
 
 #define  BXT_PIPE_SELECT_SHIFT				7
 #define  BXT_PIPE_SELECT_MASK				(7 << 7)

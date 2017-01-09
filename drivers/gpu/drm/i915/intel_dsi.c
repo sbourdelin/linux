@@ -440,15 +440,24 @@ static void intel_dsi_port_enable(struct intel_encoder *encoder)
 	struct intel_crtc *intel_crtc = to_intel_crtc(encoder->base.crtc);
 	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
 	enum port port;
+	u32 temp;
 
 	if (intel_dsi->dual_link == DSI_DUAL_LINK_FRONT_BACK) {
-		u32 temp;
-
-		temp = I915_READ(VLV_CHICKEN_3);
-		temp &= ~PIXEL_OVERLAP_CNT_MASK |
+		if (IS_BROXTON(dev_priv)) {
+			for_each_dsi_port(port, intel_dsi->ports) {
+				temp = I915_READ(MIPI_CTRL(port));
+				temp &= ~BXT_PIXEL_OVERLAP_CNT_MASK |
 					intel_dsi->pixel_overlap <<
-					PIXEL_OVERLAP_CNT_SHIFT;
-		I915_WRITE(VLV_CHICKEN_3, temp);
+					BXT_PIXEL_OVERLAP_CNT_SHIFT;
+				I915_WRITE(MIPI_CTRL(port), temp);
+			}
+		} else {
+			temp = I915_READ(VLV_CHICKEN_3);
+			temp &= ~PIXEL_OVERLAP_CNT_MASK |
+				intel_dsi->pixel_overlap <<
+				PIXEL_OVERLAP_CNT_SHIFT;
+			I915_WRITE(VLV_CHICKEN_3, temp);
+		}
 	}
 
 	for_each_dsi_port(port, intel_dsi->ports) {
@@ -464,12 +473,12 @@ static void intel_dsi_port_enable(struct intel_encoder *encoder)
 		if (intel_dsi->ports == (BIT(PORT_A) | BIT(PORT_C))) {
 			temp |= (intel_dsi->dual_link - 1)
 						<< DUAL_LINK_MODE_SHIFT;
-			if (IS_BROXTON(dev_priv))
-				temp |= LANE_CONFIGURATION_DUAL_LINK_A;
-			else
+			if (IS_VALLEYVIEW(dev_priv))
 				temp |= intel_crtc->pipe ?
 					LANE_CONFIGURATION_DUAL_LINK_B :
 					LANE_CONFIGURATION_DUAL_LINK_A;
+			else if (IS_BROXTON(dev_priv))
+				temp |= LANE_CONFIGURATION_DUAL_LINK_ENABLE;
 		}
 		/* assert ip_tg_enable signal */
 		I915_WRITE(port_ctrl, temp | DPI_ENABLE);
