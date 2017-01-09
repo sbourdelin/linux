@@ -545,25 +545,14 @@ int switchdev_port_obj_del(struct net_device *dev,
 }
 EXPORT_SYMBOL_GPL(switchdev_port_obj_del);
 
-/**
- *	switchdev_port_obj_dump - Dump port objects
- *
- *	@dev: port device
- *	@id: object ID
- *	@obj: object to dump
- *	@cb: function to call with a filled object
- *
- *	rtnl_lock must be held.
- */
-int switchdev_port_obj_dump(struct net_device *dev, struct switchdev_obj *obj,
-			    switchdev_obj_dump_cb_t *cb)
+static int switchdev_port_obj_dump_now(struct net_device *dev,
+				       struct switchdev_obj *obj,
+				       switchdev_obj_dump_cb_t *cb)
 {
 	const struct switchdev_ops *ops = dev->switchdev_ops;
 	struct net_device *lower_dev;
 	struct list_head *iter;
 	int err = -EOPNOTSUPP;
-
-	ASSERT_RTNL();
 
 	if (ops && ops->switchdev_port_obj_dump)
 		return ops->switchdev_port_obj_dump(dev, obj, cb);
@@ -579,6 +568,60 @@ int switchdev_port_obj_dump(struct net_device *dev, struct switchdev_obj *obj,
 	}
 
 	return err;
+}
+
+struct switchdev_obj_dump_deferred_item {
+	struct switchdev_obj obj;
+	switchdev_obj_dump_cb_t *cb;
+};
+
+static void switchdev_port_obj_dump_deferred(struct net_device *dev,
+					     void *data)
+{
+	struct switchdev_obj_dump_deferred_item *i = data;
+	struct switchdev_obj *obj = &i->obj;
+	int err;
+
+	err = switchdev_port_obj_dump_now(dev, obj, i->cb);
+	if (err && err != -EOPNOTSUPP)
+		netdev_err(dev, "failed (err=%d) to dump object (id=%d)\n",
+			   err, obj->id);
+	if (obj->complete)
+		obj->complete(dev, err, obj->complete_priv);
+}
+
+static int switchdev_port_obj_dump_defer(struct net_device *dev,
+					 struct switchdev_obj *obj,
+					 switchdev_obj_dump_cb_t *cb)
+{
+	struct switchdev_obj_dump_deferred_item item;
+
+	memcpy(&item.obj, obj, switchdev_obj_size(obj));
+	item.cb = cb;
+
+	return switchdev_deferred_enqueue(dev, &item, sizeof(item),
+					  NULL,
+					  switchdev_port_obj_dump_deferred);
+}
+
+/**
+ *	switchdev_port_obj_dump - Dump port objects
+ *
+ *	@dev: port device
+ *	@id: object ID
+ *	@obj: object to dump
+ *	@cb: function to call with a filled object
+ *
+ *	rtnl_lock must be held and must not be in atomic section,
+ *	in case SWITCHDEV_F_DEFER flag is not set.
+ */
+int switchdev_port_obj_dump(struct net_device *dev, struct switchdev_obj *obj,
+			    switchdev_obj_dump_cb_t *cb)
+{
+	if (obj->flags & SWITCHDEV_F_DEFER)
+		return switchdev_port_obj_dump_defer(dev, obj, cb);
+	ASSERT_RTNL();
+	return switchdev_port_obj_dump_now(dev, obj, cb);
 }
 EXPORT_SYMBOL_GPL(switchdev_port_obj_dump);
 
