@@ -66,6 +66,7 @@ struct watchdog_core_data {
 	struct mutex lock;
 	unsigned long last_keepalive;
 	unsigned long last_hw_keepalive;
+	unsigned long open_deadline;
 	struct delayed_work work;
 	unsigned long status;		/* Internal status bits */
 #define _WDOG_DEV_OPEN		0	/* Opened ? */
@@ -79,6 +80,21 @@ static dev_t watchdog_devt;
 static struct watchdog_core_data *old_wd_data;
 
 static struct workqueue_struct *watchdog_wq;
+
+static unsigned open_timeout;
+module_param(open_timeout, uint, 0644);
+
+static bool watchdog_past_open_deadline(struct watchdog_core_data *data)
+{
+	if (!open_timeout)
+		return false;
+	return time_is_before_jiffies(data->open_deadline);
+}
+
+static void watchdog_set_open_deadline(struct watchdog_core_data *data)
+{
+	data->open_deadline = jiffies + msecs_to_jiffies(open_timeout);
+}
 
 static inline bool watchdog_need_worker(struct watchdog_device *wdd)
 {
@@ -196,7 +212,13 @@ static bool watchdog_worker_should_ping(struct watchdog_core_data *wd_data)
 {
 	struct watchdog_device *wdd = wd_data->wdd;
 
-	return wdd && (watchdog_active(wdd) || watchdog_hw_running(wdd));
+	if (!wdd)
+		return false;
+
+	if (watchdog_active(wdd))
+		return true;
+
+	return watchdog_hw_running(wdd) && !watchdog_past_open_deadline(wd_data);
 }
 
 static void watchdog_ping_work(struct work_struct *work)
@@ -857,6 +879,7 @@ static int watchdog_release(struct inode *inode, struct file *file)
 		watchdog_ping(wdd);
 	}
 
+	watchdog_set_open_deadline(wd_data);
 	watchdog_update_worker(wdd);
 
 	/* make sure that /dev/watchdog can be re-opened */
@@ -955,6 +978,7 @@ static int watchdog_cdev_register(struct watchdog_device *wdd, dev_t devno)
 
 	/* Record time of most recent heartbeat as 'just before now'. */
 	wd_data->last_hw_keepalive = jiffies - 1;
+	watchdog_set_open_deadline(wd_data);
 
 	/*
 	 * If the watchdog is running, prevent its driver from being unloaded,
