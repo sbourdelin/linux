@@ -81,7 +81,7 @@ static struct watchdog_core_data *old_wd_data;
 
 static struct workqueue_struct *watchdog_wq;
 
-static unsigned open_timeout;
+static unsigned open_timeout = CONFIG_WATCHDOG_OPEN_TIMEOUT;
 module_param(open_timeout, uint, 0644);
 
 static bool watchdog_past_open_deadline(struct watchdog_core_data *data)
