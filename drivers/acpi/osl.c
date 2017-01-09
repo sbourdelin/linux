@@ -77,6 +77,7 @@ static struct workqueue_struct *kacpi_hotplug_wq;
 static bool acpi_os_initialized;
 unsigned int acpi_sci_irq = INVALID_ACPI_IRQ;
 bool acpi_permanent_mmap = false;
+bool acpi_synchronize_rcu = false;
 
 /*
  * This list of permanent mappings is for memory that may be accessed from
@@ -378,7 +379,8 @@ static void acpi_os_drop_map_ref(struct acpi_ioremap *map)
 static void acpi_os_map_cleanup(struct acpi_ioremap *map)
 {
 	if (!map->refcount) {
-		synchronize_rcu_expedited();
+		if (acpi_synchronize_rcu)
+			synchronize_rcu_expedited();
 		acpi_unmap(map->phys, map->virt);
 		kfree(map);
 	}
@@ -444,6 +446,7 @@ int acpi_os_map_generic_address(struct acpi_generic_address *gas)
 	if (!virt)
 		return -EIO;
 
+	acpi_synchronize_rcu = true;
 	return 0;
 }
 EXPORT_SYMBOL(acpi_os_map_generic_address);
