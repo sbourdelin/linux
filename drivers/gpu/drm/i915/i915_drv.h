@@ -3094,6 +3094,8 @@ int i915_gem_execbuffer(struct drm_device *dev, void *data,
 			struct drm_file *file_priv);
 int i915_gem_execbuffer2(struct drm_device *dev, void *data,
 			 struct drm_file *file_priv);
+int i915_gem_exec_mm(struct drm_device *dev, void *data,
+		     struct drm_file *file);
 int i915_gem_busy_ioctl(struct drm_device *dev, void *data,
 			struct drm_file *file_priv);
 int i915_gem_get_caching_ioctl(struct drm_device *dev, void *data,

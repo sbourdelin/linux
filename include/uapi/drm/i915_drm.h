@@ -259,6 +259,7 @@ typedef struct _drm_i915_sarea {
 #define DRM_I915_GEM_CONTEXT_GETPARAM	0x34
 #define DRM_I915_GEM_CONTEXT_SETPARAM	0x35
 #define DRM_I915_PERF_OPEN		0x36
+#define DRM_I915_GEM_EXEC_MM		0x37
 
 #define DRM_IOCTL_I915_INIT		DRM_IOW( DRM_COMMAND_BASE + DRM_I915_INIT, drm_i915_init_t)
 #define DRM_IOCTL_I915_FLUSH		DRM_IO ( DRM_COMMAND_BASE + DRM_I915_FLUSH)
@@ -313,6 +314,7 @@ typedef struct _drm_i915_sarea {
 #define DRM_IOCTL_I915_GEM_CONTEXT_GETPARAM	DRM_IOWR (DRM_COMMAND_BASE + DRM_I915_GEM_CONTEXT_GETPARAM, struct drm_i915_gem_context_param)
 #define DRM_IOCTL_I915_GEM_CONTEXT_SETPARAM	DRM_IOWR (DRM_COMMAND_BASE + DRM_I915_GEM_CONTEXT_SETPARAM, struct drm_i915_gem_context_param)
 #define DRM_IOCTL_I915_PERF_OPEN	DRM_IOW(DRM_COMMAND_BASE + DRM_I915_PERF_OPEN, struct drm_i915_perf_open_param)
+#define DRM_IOCTL_I915_GEM_EXEC_MM			DRM_IOWR (DRM_COMMAND_BASE + DRM_I915_GEM_EXEC_MM, struct drm_i915_exec_mm)
 
 /* Allow drivers to submit batchbuffers directly to hardware, relying
  * on the security mechanisms provided by hardware.
@@ -1361,6 +1363,48 @@ enum drm_i915_perf_record_type {
 	DRM_I915_PERF_RECORD_OA_BUFFER_LOST = 3,
 
 	DRM_I915_PERF_RECORD_MAX /* non-ABI */
+};
+
+/**
+ * drm_i915_exec_mm - shared address space execbuf
+ * @batch_ptr: address of batch buffer (in context's CPU address space)
+ * @ctx_id: context to use for execution, must be svm enabled
+ * @ring_id: ring to which this context will be submitted, see execbuffer2
+ * @flags: used to signal if in/out fences should be used
+ * @out_fence_fd: returned fence handle of out fence you can wait on
+ * @in_fence_fd: given fence handle of fence the gpu will wait for
+ * @pad: padding, must be zero
+ *
+ * This simplified execbuf just executes an MI_BATCH_BUFFER_START at
+ * @batch_ptr using @ctx_id as the context.  The context will indicate
+ * which address space the @batch_ptr will use.
+ *
+ * Note @batch_ptr must be dword aligned.
+ *
+ * By default, the kernel will simply execute the address given on the GPU.
+ *
+ * If the %I915_EXEC_MM_FENCE_OUT flag is passed in the @flags field however,
+ * the kernel will return a sync_file (dma_fence) object in @out_fence_fd for
+ * the caller to use to synchronize execution of the passed batch.
+ *
+ * If the %I915_EXEC_MM_FENCE_IN flag is passed in the @flags field,
+ * the kernel will wait until the fence (dma_fence) object passed in
+ * @in_fence_fd to complete before submitting batch to gpu.
+ *
+ */
+struct drm_i915_exec_mm {
+	__u64 batch_ptr;
+	__u32 ctx_id;
+	__u32 ring_id; /* see execbuffer2 ring flags */
+
+#define I915_EXEC_MM_FENCE_OUT (1<<0)
+#define I915_EXEC_MM_FENCE_IN  (1<<1)
+	__u32 flags;
+
+	__u32 out_fence_fd;
+	__u32 in_fence_fd;
+
+	__u32 pad;
 };
 
 #if defined(__cplusplus)

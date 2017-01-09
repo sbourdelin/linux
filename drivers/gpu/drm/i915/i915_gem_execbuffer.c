@@ -29,6 +29,7 @@
 #include <linux/dma_remapping.h>
 #include <linux/reservation.h>
 #include <linux/uaccess.h>
+#include <linux/sync_file.h>
 
 #include <drm/drmP.h>
 #include <drm/i915_drm.h>
@@ -1982,5 +1983,179 @@ i915_gem_execbuffer2(struct drm_device *dev, void *data,
 	}
 
 	drm_free_large(exec2_list);
+	return ret;
+}
+
+static struct intel_engine_cs *
+exec_mm_select_engine(const struct drm_i915_private *dev_priv,
+		      const struct drm_i915_exec_mm *exec_mm)
+{
+	const unsigned int user_ring_id = exec_mm->ring_id;
+	struct intel_engine_cs *engine;
+
+	if (user_ring_id > I915_USER_RINGS) {
+		DRM_DEBUG("exec_mm with unknown ring: %u\n", user_ring_id);
+		return NULL;
+	}
+
+	engine = dev_priv->engine[user_ring_map[user_ring_id]];
+
+	if (!engine) {
+		DRM_DEBUG("exec_mm with invalid engine: %u\n", user_ring_id);
+		return NULL;
+	}
+
+	return engine;
+}
+
+static int do_exec_mm(struct drm_i915_exec_mm *exec_mm,
+		      struct drm_i915_gem_request *req,
+		      const u32 flags)
+{
+	struct sync_file *out_fence = NULL;
+	struct dma_fence *in_fence = NULL;
+	int out_fence_fd = -1;
+	int ret;
+
+	if (flags & I915_EXEC_MM_FENCE_IN) {
+		in_fence = sync_file_get_fence(exec_mm->in_fence_fd);
+		if (!in_fence)
+			return -EINVAL;
+
+		ret = i915_gem_request_await_dma_fence(req, in_fence);
+		if (ret < 0)
+			goto err_out;
+	}
+
+	if (flags & I915_EXEC_MM_FENCE_OUT) {
+		out_fence = sync_file_create(&req->fence);
+		if (!out_fence) {
+			DRM_DEBUG_DRIVER("sync_file_create failed\n");
+			ret = -ENOMEM;
+			goto err_out;
+		}
+
+		out_fence_fd = get_unused_fd_flags(O_CLOEXEC);
+		if (out_fence_fd < 0) {
+			ret = out_fence_fd;
+			out_fence_fd = -1;
+			goto err_out;
+		}
+
+		fd_install(out_fence_fd, out_fence->file);
+		exec_mm->out_fence_fd = out_fence_fd;
+	}
+
+	ret = req->engine->emit_flush(req, EMIT_INVALIDATE);
+	if (ret) {
+		DRM_DEBUG_DRIVER("engine flush failed: %d\n", ret);
+		goto err_out;
+	}
+
+	ret = req->engine->emit_bb_start(req, exec_mm->batch_ptr, 0, 0);
+	if (ret) {
+		DRM_DEBUG_DRIVER("engine dispatch execbuf failed: %d\n", ret);
+		goto err_out;
+	}
+
+	return 0;
+
+err_out:
+	if (out_fence_fd != -1)
+		put_unused_fd(out_fence_fd);
+
+	if (out_fence)
+		fput(out_fence->file);
+
+	if (in_fence)
+		dma_fence_put(in_fence);
+
+	return ret;
+}
+
+int i915_gem_exec_mm(struct drm_device *dev, void *data, struct drm_file *file)
+{
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_i915_exec_mm *exec_mm = data;
+	struct intel_engine_cs *engine;
+	struct i915_gem_context *ctx;
+	struct drm_i915_gem_request *req;
+	const u32 ctx_id = exec_mm->ctx_id;
+	const u32 flags = exec_mm->flags;
+	int ret;
+
+	if (exec_mm->batch_ptr & 3) {
+		DRM_DEBUG_DRIVER("ptr not 4-byt aligned %llu\n",
+				 exec_mm->batch_ptr);
+		return -EINVAL;
+	}
+
+	if (flags & ~(I915_EXEC_MM_FENCE_OUT | I915_EXEC_MM_FENCE_IN)) {
+		DRM_DEBUG_DRIVER("bad flags: 0x%08x\n", flags);
+		return -EINVAL;
+	}
+
+	if (exec_mm->pad != 0) {
+		DRM_DEBUG_DRIVER("bad pad: 0x%08x\n", exec_mm->pad);
+		return -EINVAL;
+	}
+
+	if (file == NULL)
+		return -EINVAL;
+
+	engine = exec_mm_select_engine(dev_priv, exec_mm);
+	if (!engine)
+		return -EINVAL;
+
+	intel_runtime_pm_get(dev_priv);
+
+	ret = i915_mutex_lock_interruptible(dev);
+	if (ret) {
+		DRM_ERROR("mutex interrupted\n");
+		goto pm_put;
+	}
+
+	ctx = i915_gem_validate_context(dev, file, engine, ctx_id);
+	if (IS_ERR(ctx)) {
+		ret = PTR_ERR(ctx);
+		DRM_DEBUG_DRIVER("couldn't get context\n");
+		goto unlock;
+	}
+
+	if (!i915_gem_context_is_svm(ctx)) {
+		ret = -EINVAL;
+		DRM_DEBUG_DRIVER("context is not SVM enabled\n");
+		goto unlock;
+	}
+
+	i915_gem_context_get(ctx);
+
+	req = i915_gem_request_alloc(engine, ctx);
+	if (IS_ERR(req)) {
+		ret = PTR_ERR(req);
+		goto ctx_put;
+	}
+
+	ret = i915_gem_request_add_to_client(req, file);
+	if (ret) {
+		DRM_DEBUG_DRIVER("failed to add request to client, %d\n", ret);
+		goto add_request;
+	}
+
+	/* If we fail here, we still need to submit the req */
+	ret = do_exec_mm(exec_mm, req, flags);
+
+add_request:
+	i915_add_request(req);
+
+ctx_put:
+	i915_gem_context_put(ctx);
+
+unlock:
+	mutex_unlock(&dev->struct_mutex);
+
+pm_put:
+	intel_runtime_pm_put(dev_priv);
+
 	return ret;
 }
