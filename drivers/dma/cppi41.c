@@ -89,6 +89,8 @@
 /* Packet Descriptor */
 #define PD2_ZERO_LENGTH		(1 << 19)
 
+#define AM335X_CPPI41		0
+
 struct cppi41_channel {
 	struct dma_chan chan;
 	struct dma_async_tx_descriptor txd;
@@ -237,6 +239,7 @@ struct cppi_glue_infos {
 	struct chan_queues td_queue;
 	u16 first_completion_queue;
 	u16 qmgr_num_pend;
+	u8 platform;
 };
 
 static struct cppi41_channel *to_cpp41_chan(struct dma_chan *c)
@@ -966,6 +969,7 @@ static const struct cppi_glue_infos am335x_usb_infos = {
 	.td_queue = { .submit = 31, .complete = 0 },
 	.first_completion_queue = 93,
 	.qmgr_num_pend = 5,
+	.platform = AM335X_CPPI41,
 };
 
 static const struct of_device_id cppi41_dma_ids[] = {
@@ -982,6 +986,13 @@ static const struct cppi_glue_infos *get_glue_info(struct device *dev)
 	if (!of_id)
 		return NULL;
 	return of_id->data;
+}
+
+static int is_am335x_cppi41(struct device *dev)
+{
+	struct cppi41_dd *cdd = dev_get_drvdata(dev);
+
+	return cdd->platform == AM335X_CPPI41;
 }
 
 #define CPPI41_DMA_BUSWIDTHS	(BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) | \
@@ -1045,6 +1056,7 @@ static int cppi41_dma_probe(struct platform_device *pdev)
 	cdd->td_queue = glue_info->td_queue;
 	cdd->qmgr_num_pend = glue_info->qmgr_num_pend;
 	cdd->first_completion_queue = glue_info->first_completion_queue;
+	cdd->platform = glue_info->platform;
 
 	ret = of_property_read_u32(dev->of_node,
 				   "#dma-channels", &cdd->n_chans);
