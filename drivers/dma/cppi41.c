@@ -751,9 +751,16 @@ static int cppi41_stop_chan(struct dma_chan *chan)
 {
 	struct cppi41_channel *c = to_cpp41_chan(chan);
 	struct cppi41_dd *cdd = c->cdd;
+	unsigned long flags;
 	u32 desc_num;
 	u32 desc_phys;
 	int ret;
+
+	/* Remove pending descriptor that haven't been pushed to queue */
+	spin_lock_irqsave(&cdd->lock, flags);
+	if (!list_empty(&c->node))
+		list_del_init(&c->node);
+	spin_unlock_irqrestore(&cdd->lock, flags);
 
 	desc_phys = lower_32_bits(c->desc_phys);
 	desc_num = (desc_phys - cdd->descs_phys) / sizeof(struct cppi41_desc);
@@ -812,6 +819,7 @@ static int cppi41_add_chans(struct device *dev, struct cppi41_dd *cdd)
 		cchan->desc_phys = cdd->descs_phys;
 		cchan->desc_phys += i * sizeof(struct cppi41_desc);
 		cchan->chan.device = &cdd->ddev;
+		INIT_LIST_HEAD(&cchan->node);
 		list_add_tail(&cchan->chan.device_node, &cdd->ddev.channels);
 	}
 	cdd->first_td_desc = n_chans;
@@ -1301,7 +1309,7 @@ static int __maybe_unused cppi41_runtime_resume(struct device *dev)
 	spin_lock_irqsave(&cdd->lock, flags);
 	list_for_each_entry_safe(c, _c, &cdd->pending, node) {
 		push_desc_queue(c);
-		list_del(&c->node);
+		list_del_init(&c->node);
 	}
 	spin_unlock_irqrestore(&cdd->lock, flags);
 
