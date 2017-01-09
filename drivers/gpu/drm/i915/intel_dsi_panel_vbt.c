@@ -547,10 +547,26 @@ static int vbt_panel_get_modes(struct drm_panel *panel)
 	return 1;
 }
 
+static int vbt_panel_power_on(struct drm_panel *panel)
+{
+        generic_exec_sequence(panel, MIPI_SEQ_POWER_ON);
+
+        return 0;
+}
+
+static int vbt_panel_power_off(struct drm_panel *panel)
+{
+        generic_exec_sequence(panel, MIPI_SEQ_POWER_OFF);
+
+        return 0;
+}
+
 static const struct drm_panel_funcs vbt_panel_funcs = {
 	.disable = vbt_panel_disable,
 	.unprepare = vbt_panel_unprepare,
 	.prepare = vbt_panel_prepare,
+	.power_on = vbt_panel_power_on,
+	.power_off = vbt_panel_power_off,
 	.enable = vbt_panel_enable,
 	.get_modes = vbt_panel_get_modes,
 };
