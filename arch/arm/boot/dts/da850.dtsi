@@ -403,6 +403,22 @@
 			phy-names = "usb-phy";
 			status = "disabled";
 		};
+		cppi41dma: dma-controller@201000 {
+			compatible = "ti,da8xx-cppi41";
+			reg =  <0x200000 0x1000
+				0x201000 0x1000
+				0x202000 0x1000
+				0x204000 0x4000>;
+			reg-names = "glue", "controller",
+				    "scheduler", "queuemgr";
+			interrupts = <58>;
+			interrupt-names = "glue";
+			#dma-cells = <2>;
+			#dma-channels = <4>;
+			#dma-requests = <256>;
+			status = "disabled";
+
+		};
 		mdio: mdio@224000 {
 			compatible = "ti,davinci_mdio";
 			#address-cells = <1>;
