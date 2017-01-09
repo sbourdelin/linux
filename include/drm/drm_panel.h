@@ -74,6 +74,8 @@ struct drm_panel_funcs {
 	int (*power_off)(struct drm_panel *panel);
 	int (*enable)(struct drm_panel *panel);
 	int (*get_modes)(struct drm_panel *panel);
+	int (*backlight_on)(struct drm_panel *panel);
+	int (*backlight_off)(struct drm_panel *panel);
 	int (*get_timings)(struct drm_panel *panel, unsigned int num_timings,
 			   struct display_timing *timings);
 };
@@ -139,6 +141,22 @@ static inline int drm_panel_reset(struct drm_panel *panel)
                 return panel->funcs->reset(panel);
 
         return panel ? -ENOSYS : -EINVAL;
+}
+
+static inline int drm_panel_backlight_on(struct drm_panel *panel)
+{
+	if (panel && panel->funcs && panel->funcs->backlight_on)
+		return panel->funcs->backlight_on(panel);
+
+	return panel ? -ENOSYS : -EINVAL;
+}
+
+static inline int drm_panel_backlight_off(struct drm_panel *panel)
+{
+	if (panel && panel->funcs && panel->funcs->backlight_off)
+		return panel->funcs->backlight_off(panel);
+
+	return panel ? -ENOSYS : -EINVAL;
 }
 
 /**
