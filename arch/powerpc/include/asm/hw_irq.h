@@ -29,7 +29,7 @@
 #define PACA_IRQ_PMI		0x40
 
 /*
- * flags for paca->soft_enabled
+ * flags for paca->soft_disabled_mask
  */
 #define IRQ_DISABLE_MASK_NONE	0
 #define IRQ_DISABLE_MASK_LINUX	1
@@ -53,52 +53,52 @@ extern void unknown_exception(struct pt_regs *regs);
 /*
  *TODO:
  * Currently none of the soft_eanbled modification helpers have clobbers
- * for modifying the r13->soft_enabled memory itself. Secondly they only
+ * for modifying the r13->soft_disabled_mask memory itself. Secondly they only
  * include "memory" clobber as a hint. Ideally, if all the accesses to
- * soft_enabled go via these helpers, we could avoid the "memory" clobber.
+ * soft_disabled_mask go via these helpers, we could avoid the "memory" clobber.
  * Former could be taken care by having location in the constraints.
  */
-static inline notrace void soft_enabled_set(unsigned long enable)
+static inline notrace void soft_disabled_mask_set(unsigned long enable)
 {
 	__asm__ __volatile__("stb %0,%1(13)"
-	: : "r" (enable), "i" (offsetof(struct paca_struct, soft_enabled))
+	: : "r" (enable), "i" (offsetof(struct paca_struct, soft_disabled_mask))
 	: "memory");
 }
 
-static inline notrace unsigned long soft_enabled_return(void)
+static inline notrace unsigned long soft_disabled_mask_return(void)
 {
 	unsigned long flags;
 
 	asm volatile(
 		"lbz %0,%1(13)"
 		: "=r" (flags)
-		: "i" (offsetof(struct paca_struct, soft_enabled)));
+		: "i" (offsetof(struct paca_struct, soft_disabled_mask)));
 
 	return flags;
 }
 
-static inline notrace unsigned long soft_enabled_set_return(unsigned long enable)
+static inline notrace unsigned long soft_disabled_mask_set_return(unsigned long enable)
 {
 	unsigned long flags, zero;
 
 	asm volatile(
 		"mr %1,%3; lbz %0,%2(13); stb %1,%2(13)"
 		: "=r" (flags), "=&r" (zero)
-		: "i" (offsetof(struct paca_struct, soft_enabled)),\
+		: "i" (offsetof(struct paca_struct, soft_disabled_mask)),\
 		  "r" (enable)
 		: "memory");
 
 	return flags;
 }
 
-static inline notrace unsigned long soft_enabled_or_return(unsigned long enable)
+static inline notrace unsigned long soft_disabled_mask_or_return(unsigned long enable)
 {
 	unsigned long flags, zero;
 
 	asm volatile(
 		"mr %1,%3; lbz %0,%2(13); or %1,%0,%1; stb %1,%2(13)"
 		: "=r" (flags), "=&r"(zero)
-		: "i" (offsetof(struct paca_struct, soft_enabled)),\
+		: "i" (offsetof(struct paca_struct, soft_disabled_mask)),\
 		 "r" (enable)
 		: "memory");
 
@@ -107,12 +107,12 @@ static inline notrace unsigned long soft_enabled_or_return(unsigned long enable)
 
 static inline unsigned long arch_local_save_flags(void)
 {
-	return soft_enabled_return();
+	return soft_disabled_mask_return();
 }
 
 static inline unsigned long arch_local_irq_disable(void)
 {
-	return soft_enabled_set_return(IRQ_DISABLE_MASK_LINUX);
+	return soft_disabled_mask_set_return(IRQ_DISABLE_MASK_LINUX);
 }
 
 extern void arch_local_irq_restore(unsigned long);
@@ -146,7 +146,7 @@ static inline bool arch_irqs_disabled(void)
 #define raw_local_irq_pmu_save(flags)					\
 	do {								\
 		typecheck(unsigned long, flags);			\
-		flags = soft_enabled_or_return(IRQ_DISABLE_MASK_LINUX | \
+		flags = soft_disabled_mask_or_return(IRQ_DISABLE_MASK_LINUX | \
 				IRQ_DISABLE_MASK_PMU);			\
 	} while(0)
 
@@ -192,12 +192,12 @@ static inline bool arch_irqs_disabled(void)
 #endif
 
 #define hard_irq_disable()	do {			\
-	u8 _was_enabled;				\
+	u8 _was_masked;					\
 	__hard_irq_disable();				\
-	_was_enabled = local_paca->soft_enabled;	\
-	local_paca->soft_enabled = IRQ_DISABLE_MASK_ALL;\
+	_was_masked = local_paca->soft_disabled_mask;	\
+	local_paca->soft_disabled_mask = IRQ_DISABLE_MASK_ALL;\
 	local_paca->irq_happened |= PACA_IRQ_HARD_DIS;	\
-	if (!(_was_enabled & IRQ_DISABLE_MASK_LINUX))	\
+	if (!(_was_masked & IRQ_DISABLE_MASK_LINUX))	\
 		trace_hardirqs_off();			\
 } while(0)
 

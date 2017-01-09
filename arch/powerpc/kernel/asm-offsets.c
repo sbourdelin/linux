@@ -178,7 +178,7 @@ int main(void)
 	DEFINE(PACATOC, offsetof(struct paca_struct, kernel_toc));
 	DEFINE(PACAKBASE, offsetof(struct paca_struct, kernelbase));
 	DEFINE(PACAKMSR, offsetof(struct paca_struct, kernel_msr));
-	DEFINE(PACASOFTIRQEN, offsetof(struct paca_struct, soft_enabled));
+	DEFINE(PACASOFTIRQEN, offsetof(struct paca_struct, soft_disabled_mask));
 	DEFINE(PACAIRQHAPPENED, offsetof(struct paca_struct, irq_happened));
 #ifdef CONFIG_PPC_BOOK3S
 	DEFINE(PACACONTEXTID, offsetof(struct paca_struct, mm_ctx_id));
