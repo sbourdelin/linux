@@ -561,6 +561,10 @@ static void intel_dsi_pre_enable(struct intel_encoder *encoder,
 
 	intel_dsi_prepare(encoder, pipe_config);
 
+	/* Panel Enable */
+	drm_panel_power_on(intel_dsi->panel);
+	msleep(intel_dsi->panel_on_delay);
+
 	/* Panel Enable over CRC PMIC */
 	if (intel_dsi->gpio_panel)
 		gpiod_set_value_cansleep(intel_dsi->gpio_panel, 1);
@@ -575,6 +579,8 @@ static void intel_dsi_pre_enable(struct intel_encoder *encoder,
 		val |= DPOUNIT_CLOCK_GATE_DISABLE;
 		I915_WRITE(DSPCLK_GATE_D, val);
 	}
+
+	 drm_panel_reset(intel_dsi->panel);
 
 	/* put device in ready state */
 	intel_dsi_device_ready(encoder);
