@@ -123,6 +123,7 @@ MODULE_PARM_DESC(halt_poll_ns_shrink, "Factor halt poll time is shrunk by");
 
 static void kvmppc_end_cede(struct kvm_vcpu *vcpu);
 static int kvmppc_hv_setup_htab_rma(struct kvm_vcpu *vcpu);
+static void kvmppc_machine_check_hook(void);
 
 static inline struct kvm_vcpu *next_runnable_thread(struct kvmppc_vcore *vc,
 		int *ip)
@@ -954,15 +955,14 @@ static int kvmppc_handle_exit_hv(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		r = RESUME_GUEST;
 		break;
 	case BOOK3S_INTERRUPT_MACHINE_CHECK:
+		/* Exit to guest with KVM_EXIT_NMI as exit reason */
+		run->exit_reason = KVM_EXIT_NMI;
+		r = RESUME_HOST;
 		/*
-		 * Deliver a machine check interrupt to the guest.
-		 * We have to do this, even if the host has handled the
-		 * machine check, because machine checks use SRR0/1 and
-		 * the interrupt might have trashed guest state in them.
+		 * Invoke host-kernel handler to perform any host-side
+		 * handling before exiting the guest.
 		 */
-		kvmppc_book3s_queue_irqprio(vcpu,
-					    BOOK3S_INTERRUPT_MACHINE_CHECK);
-		r = RESUME_GUEST;
+		kvmppc_machine_check_hook();
 		break;
 	case BOOK3S_INTERRUPT_PROGRAM:
 	{
@@ -3490,6 +3490,19 @@ static void kvmppc_irq_bypass_del_producer_hv(struct irq_bypass_consumer *cons,
 			prod->irq, irqfd->gsi, ret);
 }
 #endif
+
+/*
+ * Hook to handle machine check exceptions occurred inside a guest.
+ * This hook is invoked from host virtual mode from KVM before exiting
+ * the guest with KVM_EXIT_NMI exit reason. This gives an opportunity
+ * for the host to take action (if any) before passing on the machine
+ * check exception to the guest kernel.
+ */
+static void kvmppc_machine_check_hook(void)
+{
+	if (ppc_md.machine_check_exception)
+		ppc_md.machine_check_exception(NULL);
+}
 
 static long kvm_arch_vm_ioctl_hv(struct file *filp,
 				 unsigned int ioctl, unsigned long arg)
