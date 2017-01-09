@@ -24,7 +24,6 @@
 #include <linux/completion.h>
 #include <linux/firmware.h>
 #include <linux/nfc.h>
-#include <linux/unaligned/access_ok.h>
 
 #include "nxp-nci.h"
 

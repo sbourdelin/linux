@@ -36,7 +36,6 @@
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
 #include <linux/platform_data/nxp-nci.h>
-#include <linux/unaligned/access_ok.h>
 
 #include <net/nfc/nfc.h>
 
