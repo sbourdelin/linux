@@ -284,17 +284,10 @@ static u32 cppi41_pop_desc(struct cppi41_dd *cdd, unsigned queue_num)
 	return desc;
 }
 
-static irqreturn_t cppi41_irq(int irq, void *data)
+static irqreturn_t cppi41_irq(struct cppi41_dd *cdd)
 {
-	struct cppi41_dd *cdd = data;
 	struct cppi41_channel *c;
-	u32 status;
 	int i;
-
-	status = cppi_readl(cdd->usbss_mem + USBSS_IRQ_STATUS);
-	if (!(status & USBSS_IRQ_PD_COMP))
-		return IRQ_NONE;
-	cppi_writel(status, cdd->usbss_mem + USBSS_IRQ_STATUS);
 
 	for (i = QMGR_PENDING_SLOT_Q(FIST_COMPLETION_QUEUE); i < QMGR_NUM_PEND;
 			i++) {
@@ -349,6 +342,19 @@ static irqreturn_t cppi41_irq(int irq, void *data)
 		}
 	}
 	return IRQ_HANDLED;
+}
+
+static irqreturn_t am335x_cppi41_irq(int irq, void *data)
+{
+	struct cppi41_dd *cdd = data;
+	u32 status;
+
+	status = cppi_readl(cdd->usbss_mem + USBSS_IRQ_STATUS);
+	if (!(status & USBSS_IRQ_PD_COMP))
+		return IRQ_NONE;
+	cppi_writel(status, cdd->usbss_mem + USBSS_IRQ_STATUS);
+
+	return cppi41_irq(cdd);
 }
 
 static dma_cookie_t cppi41_tx_submit(struct dma_async_tx_descriptor *tx)
@@ -949,7 +955,7 @@ static struct dma_chan *cppi41_dma_xlate(struct of_phandle_args *dma_spec,
 }
 
 static const struct cppi_glue_infos am335x_usb_infos = {
-	.isr = cppi41_irq,
+	.isr = am335x_cppi41_irq,
 	.queues_rx = am335x_usb_queues_rx,
 	.queues_tx = am335x_usb_queues_tx,
 	.td_queue = { .submit = 31, .complete = 0 },
