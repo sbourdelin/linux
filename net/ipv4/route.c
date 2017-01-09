@@ -113,6 +113,7 @@
 #include <net/secure_seq.h>
 #include <net/ip_tunnels.h>
 #include <net/l3mdev.h>
+#include "fib_lookup.h"
 
 #define RT_FL_TOS(oldflp4) \
 	((oldflp4)->flowi4_tos & (IPTOS_RT_MASK | RTO_ONLINK))
@@ -2470,7 +2471,8 @@ EXPORT_SYMBOL_GPL(ip_route_output_flow);
 /* called with rcu_read_lock held */
 static int rt_fill_info(struct net *net,  __be32 dst, __be32 src, u32 table_id,
 			struct flowi4 *fl4, struct sk_buff *skb, u32 portid,
-			u32 seq, int event, struct rtable *rt)
+			u32 seq, int event, struct rtable *rt,
+			struct fib_result *res)
 {
 	struct rtmsg *r;
 	struct nlmsghdr *nlh;
@@ -2571,6 +2573,36 @@ static int rt_fill_info(struct net *net,  __be32 dst, __be32 src, u32 table_id,
 
 	if (rtnl_put_cacheinfo(skb, &rt->dst, 0, expires, error) < 0)
 		goto nla_put_failure;
+
+	if (res->fi) {
+		struct nlattr *get_rt;
+		struct rtmsg r_match;
+
+		/* Add data for matching route */
+		get_rt = nla_nest_start(skb, RTA_ROUTE_GET);
+		if (!get_rt)
+			goto nla_put_failure;
+
+		r_match.rtm_family = AF_INET;
+		r_match.rtm_dst_len = res->prefixlen;
+		r_match.rtm_src_len = 0;
+		r_match.rtm_tos  = fl4->flowi4_tos;
+		r_match.rtm_type = rt->rt_type;
+		r_match.rtm_flags = res->fi->fib_flags;
+		r_match.rtm_scope = res->fi->fib_scope;
+		r_match.rtm_protocol = res->fi->fib_protocol;
+		r_match.rtm_table = table_id;
+		if (nla_put_u32(skb, RTA_TABLE, table_id))
+			goto nla_put_failure;
+
+		if (fib_dump_add_attrs_rcu(skb, res->prefix, &r_match, res->fi))
+			goto nla_put_failure;
+
+		if (nla_put(skb, RTA_ROUTE_GET_RTM, sizeof(r_match), &r_match))
+			goto nla_put_failure;
+
+		nla_nest_end(skb, get_rt);
+	}
 
 	nlmsg_end(skb, nlh);
 	return 0;
@@ -2680,7 +2712,7 @@ static int inet_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr *nlh)
 
 	err = rt_fill_info(net, dst, src, table_id, &fl4, skb,
 			   NETLINK_CB(in_skb).portid, nlh->nlmsg_seq,
-			   RTM_NEWROUTE, rt);
+			   RTM_NEWROUTE, rt, &res);
 	if (err < 0)
 		goto errout_free;
 

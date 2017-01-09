@@ -319,6 +319,8 @@ enum rtattr_type_t {
 	RTA_EXPIRES,
 	RTA_PAD,
 	RTA_UID,
+	RTA_ROUTE_GET,  /* nested attribute; route spec for RTM_GETROUTE */
+	RTA_ROUTE_GET_RTM, /* struct rtmsg for nested spec */
 	__RTA_MAX
 };
 
