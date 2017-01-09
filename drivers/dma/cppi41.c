@@ -320,7 +320,7 @@ static irqreturn_t cppi41_irq(int irq, void *data)
 			int error;
 
 			error = pm_runtime_get(cdd->ddev.dev);
-			if (error < 0)
+			if ((error != -EINPROGRESS) && error < 0)
 				dev_err(cdd->ddev.dev, "%s pm runtime get: %i\n",
 					__func__, error);
 
@@ -492,8 +492,7 @@ static void cppi41_dma_issue_pending(struct dma_chan *chan)
 		 */
 		if (error == -EINPROGRESS) {
 			spin_lock_irqsave(&cdd->lock, flags);
-			if (list_empty(&cdd->pending))
-				active = true;
+			active = !!list_empty(&cdd->pending);
 			spin_unlock_irqrestore(&cdd->lock, flags);
 		}
 	}
