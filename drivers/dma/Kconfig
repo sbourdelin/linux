@@ -500,7 +500,7 @@ config TIMB_DMA
 
 config TI_CPPI41
 	tristate "AM33xx CPPI41 DMA support"
-	depends on ARCH_OMAP
+	depends on (ARCH_OMAP || ARCH_DAVINCI_DA8XX)
 	select DMA_ENGINE
 	help
 	  The Communications Port Programming Interface (CPPI) 4.1 DMA engine
