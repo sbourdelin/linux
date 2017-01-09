@@ -366,6 +366,11 @@ static void bxt_dsi_device_ready(struct intel_encoder *encoder)
 
 	DRM_DEBUG_KMS("\n");
 
+	/* Add MIPI IO reset programming for modeset */
+	val = I915_READ(BXT_P_CR_GT_DISP_PWRON_0_2_0_GTTMMADR);
+	I915_WRITE(BXT_P_CR_GT_DISP_PWRON_0_2_0_GTTMMADR,
+					val | MIPIO_RST_CTRL);
+
 	/* Enable MIPI PHY transparent latch */
 	for_each_dsi_port(port, intel_dsi->ports) {
 		val = I915_READ(BXT_MIPI_PORT_CTRL(port));
@@ -756,6 +761,10 @@ static void intel_dsi_post_disable(struct intel_encoder *encoder,
 	/* Disable Panel */
 	drm_panel_power_off(intel_dsi->panel);
 	msleep(intel_dsi->panel_off_delay);
+
+	val = I915_READ(BXT_P_CR_GT_DISP_PWRON_0_2_0_GTTMMADR);
+	I915_WRITE(BXT_P_CR_GT_DISP_PWRON_0_2_0_GTTMMADR,
+					val & ~MIPIO_RST_CTRL);
 
 	intel_disable_dsi_pll(encoder);
 
