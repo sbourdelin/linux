@@ -2248,6 +2248,7 @@ prio_changed_rt(struct rq *rq, struct task_struct *p, int oldprio)
 
 static void watchdog(struct rq *rq, struct task_struct *p)
 {
+#ifdef CONFIG_POSIX_TIMERS
 	unsigned long soft, hard;
 
 	/* max may change after cur was read, this will be fixed next tick */
@@ -2266,6 +2267,7 @@ static void watchdog(struct rq *rq, struct task_struct *p)
 		if (p->rt.timeout > next)
 			p->cputime_expires.sched_exp = p->se.sum_exec_runtime;
 	}
+#endif
 }
 
 static void task_tick_rt(struct rq *rq, struct task_struct *p, int queued)
