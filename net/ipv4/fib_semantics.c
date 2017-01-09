@@ -1247,6 +1247,21 @@ int fib_dump_info(struct sk_buff *skb, u32 portid, u32 seq, int event,
 	rtm->rtm_scope = fi->fib_scope;
 	rtm->rtm_protocol = fi->fib_protocol;
 
+	if (fib_dump_add_attrs_rcu(skb, dst, rtm, fi))
+		goto nla_put_failure;
+
+	nlmsg_end(skb, nlh);
+	return 0;
+
+nla_put_failure:
+	nlmsg_cancel(skb, nlh);
+	return -EMSGSIZE;
+}
+
+/* called with rcu_read_lock held */
+int fib_dump_add_attrs_rcu(struct sk_buff *skb, __be32 dst, struct rtmsg *rtm,
+			   struct fib_info *fi)
+{
 	if (rtm->rtm_dst_len &&
 	    nla_put_in_addr(skb, RTA_DST, dst))
 		goto nla_put_failure;
@@ -1325,11 +1340,9 @@ int fib_dump_info(struct sk_buff *skb, u32 portid, u32 seq, int event,
 		nla_nest_end(skb, mp);
 	}
 #endif
-	nlmsg_end(skb, nlh);
 	return 0;
 
 nla_put_failure:
-	nlmsg_cancel(skb, nlh);
 	return -EMSGSIZE;
 }
 

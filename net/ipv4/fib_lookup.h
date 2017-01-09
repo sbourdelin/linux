@@ -33,6 +33,8 @@ int fib_nh_match(struct fib_config *cfg, struct fib_info *fi);
 int fib_dump_info(struct sk_buff *skb, u32 pid, u32 seq, int event, u32 tb_id,
 		  u8 type, __be32 dst, int dst_len, u8 tos, struct fib_info *fi,
 		  unsigned int);
+int fib_dump_add_attrs_rcu(struct sk_buff *skb, __be32 dst, struct rtmsg *rtm,
+			   struct fib_info *fi);
 void rtmsg_fib(int event, __be32 key, struct fib_alias *fa, int dst_len,
 	       u32 tb_id, const struct nl_info *info, unsigned int nlm_flags);
 
