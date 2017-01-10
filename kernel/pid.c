@@ -75,6 +75,9 @@ struct pid_namespace init_pid_ns = {
 		[ 0 ... PIDMAP_ENTRIES-1] = { ATOMIC_INIT(BITS_PER_PAGE), NULL }
 	},
 	.last_pid = 0,
+#ifdef CONFIG_PUI
+	.pui_generator = PUI_GEN_INIT,
+#endif
 	.nr_hashed = PIDNS_HASH_ADDING,
 	.level = 0,
 	.child_reaper = &init_task,
@@ -267,6 +270,9 @@ void free_pid(struct pid *pid)
 		struct upid *upid = pid->numbers + i;
 		struct pid_namespace *ns = upid->ns;
 		hlist_del_rcu(&upid->pid_chain);
+#ifdef CONFIG_PUI
+		pui_del(upid);
+#endif
 		switch(--ns->nr_hashed) {
 		case 2:
 		case 1:
@@ -318,6 +324,9 @@ struct pid *alloc_pid(struct pid_namespace *ns)
 
 		pid->numbers[i].nr = nr;
 		pid->numbers[i].ns = tmp;
+#ifdef CONFIG_PUI
+		pui_make(&pid->numbers[i]);
+#endif
 		tmp = tmp->parent;
 	}
 
@@ -338,6 +347,9 @@ struct pid *alloc_pid(struct pid_namespace *ns)
 	for ( ; upid >= pid->numbers; --upid) {
 		hlist_add_head_rcu(&upid->pid_chain,
 				&pid_hash[pid_hashfn(upid->nr, upid->ns)]);
+#ifdef CONFIG_PUI
+		pui_add(upid);
+#endif
 		upid->ns->nr_hashed++;
 	}
 	spin_unlock_irq(&pidmap_lock);

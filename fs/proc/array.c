@@ -153,6 +153,16 @@ static inline int get_task_umask(struct task_struct *tsk)
 	return umask;
 }
 
+#ifdef CONFIG_PUI
+static inline void put_pui(struct seq_file *m, pui_t pui)
+{
+	pui_str_t str;
+
+	pui_to_str(pui, str);
+	seq_puts(m, str);
+}
+#endif
+
 static inline void task_state(struct seq_file *m, struct pid_namespace *ns,
 				struct pid *pid, struct task_struct *p)
 {
@@ -225,6 +235,17 @@ static inline void task_state(struct seq_file *m, struct pid_namespace *ns,
 	seq_puts(m, "\nNSsid:");
 	for (g = ns->level; g <= pid->level; g++)
 		seq_put_decimal_ull(m, "\t", task_session_nr_ns(p, pid->numbers[g].ns));
+#endif
+#ifdef CONFIG_PUI
+	seq_puts(m, "\nPui:");
+	put_pui(m, pid->numbers[ns->level].pui);
+#ifdef CONFIG_PID_NS
+	seq_puts(m, "\nNSpui:");
+	for (g = ns->level; g <= pid->level; g++) {
+		seq_putc(m, '\t');
+		put_pui(m, pid->numbers[g].pui);
+	}
+#endif
 #endif
 	seq_putc(m, '\n');
 }

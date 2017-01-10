@@ -306,6 +306,12 @@ config USELIB
 	  earlier, you may need to enable this syscall.  Current systems
 	  running glibc can safely disable this.
 
+config PUI
+	bool "Enables Process Unic Identifier"
+	default n
+	help
+	  Provides a 64 bits unic identifier to processes and threads
+
 config AUDIT
 	bool "Auditing support"
 	depends on NET
@@ -2158,3 +2164,4 @@ config ASN1
 	  functions to call on what tags.
 
 source "kernel/Kconfig.locks"
+

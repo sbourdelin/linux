@@ -1271,6 +1271,26 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 		v.val = sk->sk_incoming_cpu;
 		break;
 
+#ifdef CONFIG_PUI
+	case SO_PEERPUI:
+	{
+		pui_str_t str;
+		pui_t pui;
+		int l;
+
+		pui = pui_vnr(sk->sk_peer_pid);
+		if (pui == PUI_INVALID)
+			return -ENOTCONN;
+		l = pui_to_str(pui, str);
+		if (len <= l)
+			return -EINVAL;
+		len = l + 1; /* includes leading zero */
+		if (copy_to_user(optval, str, len))
+			return -EFAULT;
+		goto lenout;
+	}
+#endif
+
 	default:
 		/* We implement the SO_SNDLOWAT etc to not be settable
 		 * (1003.1g 7).

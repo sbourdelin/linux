@@ -2,6 +2,7 @@
 #define _LINUX_PID_H
 
 #include <linux/rcupdate.h>
+#include <linux/pui.h>
 
 enum pid_type
 {
@@ -52,6 +53,10 @@ struct upid {
 	int nr;
 	struct pid_namespace *ns;
 	struct hlist_node pid_chain;
+#ifdef CONFIG_PUI
+	struct hlist_node pui_chain;
+	pui_t pui;
+#endif
 };
 
 struct pid

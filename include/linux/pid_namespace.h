@@ -9,6 +9,7 @@
 #include <linux/nsproxy.h>
 #include <linux/kref.h>
 #include <linux/ns_common.h>
+#include <linux/pui.h>
 
 struct pidmap {
        atomic_t nr_free;
@@ -26,6 +27,9 @@ struct pid_namespace {
 	struct pidmap pidmap[PIDMAP_ENTRIES];
 	struct rcu_head rcu;
 	int last_pid;
+#ifdef CONFIG_PUI
+	pui_gen_t pui_generator;
+#endif
 	unsigned int nr_hashed;
 	struct task_struct *child_reaper;
 	struct kmem_cache *pid_cachep;
