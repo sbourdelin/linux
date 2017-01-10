@@ -1462,6 +1462,21 @@ ctx_group_list(struct perf_event *event, struct perf_event_context *ctx)
 		return &ctx->flexible_groups;
 }
 
+static void
+ctx_sched_groups_to_inactive(struct perf_event *event,
+			     struct perf_event_context *ctx)
+{
+	WARN_ON(event->state != PERF_EVENT_STATE_INACTIVE);
+	list_move_tail(&event->ctx_active_entry, &ctx->inactive_groups);
+};
+
+static void
+ctx_sched_groups_add(struct perf_event *event, struct perf_event_context *ctx)
+{
+	WARN_ON(!list_empty(&event->ctx_active_entry));
+	list_add_tail(&event->ctx_active_entry, &ctx->inactive_groups);
+}
+
 /*
  * Add a event from the lists for its context.
  * Must be called with ctx->mutex and ctx->lock held.
@@ -1487,10 +1502,11 @@ list_add_event(struct perf_event *event, struct perf_event_context *ctx)
 
 		list = ctx_group_list(event, ctx);
 		list_add_tail(&event->group_entry, list);
+		if (event->state == PERF_EVENT_STATE_INACTIVE)
+			ctx_sched_groups_add(event, ctx);
 	}
 
 	list_update_cgroup_event(event, ctx, true);
-
 	list_add_rcu(&event->event_entry, &ctx->event_list);
 	ctx->nr_events++;
 	if (event->attr.inherit_stat)
@@ -1648,6 +1664,13 @@ static void perf_group_attach(struct perf_event *event)
 		perf_event__header_size(pos);
 }
 
+static void ctx_sched_groups_del(struct perf_event *group,
+				 struct perf_event_context *ctx)
+{
+	WARN_ON(group->state != PERF_EVENT_STATE_INACTIVE);
+	list_del_init(&group->ctx_active_entry);
+}
+
 /*
  * Remove a event from the lists for its context.
  * Must be called with ctx->mutex and ctx->lock held.
@@ -1674,8 +1697,11 @@ list_del_event(struct perf_event *event, struct perf_event_context *ctx)
 
 	list_del_rcu(&event->event_entry);
 
-	if (event->group_leader == event)
+	if (event->group_leader == event) {
+		if (event->state == PERF_EVENT_STATE_INACTIVE)
+			ctx_sched_groups_del(event, ctx);
 		list_del_init(&event->group_entry);
+	}
 
 	update_group_times(event);
 
@@ -1851,6 +1877,11 @@ group_sched_out(struct perf_event *group_event,
 
 	if (state == PERF_EVENT_STATE_ACTIVE && group_event->attr.exclusive)
 		cpuctx->exclusive = 0;
+
+	if (group_event->state <= PERF_EVENT_STATE_INACTIVE)
+		ctx_sched_groups_to_inactive(group_event, ctx);
+	if (group_event->state < PERF_EVENT_STATE_INACTIVE)
+		ctx_sched_groups_del(group_event, ctx);
 }
 
 #define DETACH_GROUP	0x01UL
@@ -1918,6 +1949,8 @@ static void __perf_event_disable(struct perf_event *event,
 		group_sched_out(event, cpuctx, ctx);
 	else
 		event_sched_out(event, cpuctx, ctx);
+	if (event->state == PERF_EVENT_STATE_INACTIVE)
+		ctx_sched_groups_del(event, ctx);
 	event->state = PERF_EVENT_STATE_OFF;
 }
 
@@ -2014,6 +2047,17 @@ static void perf_set_shadow_time(struct perf_event *event,
 static void perf_log_throttle(struct perf_event *event, int enable);
 static void perf_log_itrace_start(struct perf_event *event);
 
+static void
+ctx_sched_groups_to_active(struct perf_event *event, struct perf_event_context *ctx)
+{
+	struct list_head *h = event->attr.pinned ? &ctx->active_pinned_groups :
+						   &ctx->active_flexible_groups;
+	WARN_ON(!event);
+	WARN_ON(list_empty(&event->ctx_active_entry));
+	WARN_ON(event->state != PERF_EVENT_STATE_ACTIVE);
+	list_move_tail(&event->ctx_active_entry, h);
+}
+
 static int
 event_sched_in(struct perf_event *event,
 		 struct perf_cpu_context *cpuctx,
@@ -2091,9 +2135,7 @@ group_sched_in(struct perf_event *group_event,
 	u64 now = ctx->time;
 	bool simulate = false;
 
-	if (group_event->state == PERF_EVENT_STATE_OFF)
-		return 0;
-
+	WARN_ON(group_event->state != PERF_EVENT_STATE_INACTIVE);
 	pmu->start_txn(pmu, PERF_PMU_TXN_ADD);
 
 	if (event_sched_in(group_event, cpuctx, ctx)) {
@@ -2112,9 +2154,10 @@ group_sched_in(struct perf_event *group_event,
 		}
 	}
 
-	if (!pmu->commit_txn(pmu))
+	if (!pmu->commit_txn(pmu)) {
+		ctx_sched_groups_to_active(group_event, ctx);
 		return 0;
-
+	}
 group_error:
 	/*
 	 * Groups can be scheduled in as one unit only, so undo any
@@ -2396,6 +2439,7 @@ static void __perf_event_enable(struct perf_event *event,
 		ctx_sched_out(ctx, cpuctx, EVENT_TIME);
 
 	__perf_event_mark_enabled(event);
+	ctx_sched_groups_add(event, ctx);
 
 	if (!ctx->is_active)
 		return;
@@ -2611,7 +2655,7 @@ static void ctx_sched_out(struct perf_event_context *ctx,
 			  enum event_type_t event_type)
 {
 	int is_active = ctx->is_active;
-	struct perf_event *event;
+	struct perf_event *event, *tmp;
 
 	lockdep_assert_held(&ctx->lock);
 
@@ -2658,13 +2702,17 @@ static void ctx_sched_out(struct perf_event_context *ctx,
 
 	perf_pmu_disable(ctx->pmu);
 	if (is_active & EVENT_PINNED) {
-		list_for_each_entry(event, &ctx->pinned_groups, group_entry)
+		list_for_each_entry_safe(event, tmp, &ctx->active_pinned_groups, ctx_active_entry) {
+			WARN_ON(event->state != PERF_EVENT_STATE_ACTIVE);
 			group_sched_out(event, cpuctx, ctx);
+		}
 	}
 
 	if (is_active & EVENT_FLEXIBLE) {
-		list_for_each_entry(event, &ctx->flexible_groups, group_entry)
+		list_for_each_entry_safe(event, tmp, &ctx->active_flexible_groups, ctx_active_entry) {
+			WARN_ON(event->state != PERF_EVENT_STATE_ACTIVE);
 			group_sched_out(event, cpuctx, ctx);
+		}
 	}
 	perf_pmu_enable(ctx->pmu);
 }
@@ -2962,10 +3010,11 @@ static void
 ctx_pinned_sched_in(struct perf_event_context *ctx,
 		    struct perf_cpu_context *cpuctx)
 {
-	struct perf_event *event;
+	struct perf_event *event = NULL, *tmp;
 
-	list_for_each_entry(event, &ctx->pinned_groups, group_entry) {
-		if (event->state <= PERF_EVENT_STATE_OFF)
+	list_for_each_entry_safe(
+			event, tmp, &ctx->inactive_groups, ctx_active_entry) {
+		if (WARN_ON(event->state != PERF_EVENT_STATE_INACTIVE)) /* debug only */
 			continue;
 		if (!event_filter_match(event))
 			continue;
@@ -2983,6 +3032,7 @@ ctx_pinned_sched_in(struct perf_event_context *ctx,
 		 */
 		if (event->state == PERF_EVENT_STATE_INACTIVE) {
 			update_group_times(event);
+			ctx_sched_groups_del(event, ctx);
 			event->state = PERF_EVENT_STATE_ERROR;
 		}
 	}
@@ -2992,12 +3042,12 @@ static void
 ctx_flexible_sched_in(struct perf_event_context *ctx,
 		      struct perf_cpu_context *cpuctx)
 {
-	struct perf_event *event;
+	struct perf_event *event = NULL, *tmp;
 	int can_add_hw = 1;
 
-	list_for_each_entry(event, &ctx->flexible_groups, group_entry) {
-		/* Ignore events in OFF or ERROR state */
-		if (event->state <= PERF_EVENT_STATE_OFF)
+	list_for_each_entry_safe(
+			event, tmp, &ctx->inactive_groups, ctx_active_entry) {
+		if (WARN_ON(event->state != PERF_EVENT_STATE_INACTIVE)) /* debug only */
 			continue;
 		/*
 		 * Listen to the 'cpu' scheduling filter constraint
@@ -3389,6 +3439,7 @@ static int event_enable_on_exec(struct perf_event *event,
 		return 0;
 
 	__perf_event_mark_enabled(event);
+	ctx_sched_groups_add(event, ctx);
 
 	return 1;
 }
@@ -3639,6 +3690,9 @@ static void __perf_event_init_context(struct perf_event_context *ctx)
 	INIT_LIST_HEAD(&ctx->pinned_groups);
 	INIT_LIST_HEAD(&ctx->flexible_groups);
 	INIT_LIST_HEAD(&ctx->event_list);
+	INIT_LIST_HEAD(&ctx->active_pinned_groups);
+	INIT_LIST_HEAD(&ctx->active_flexible_groups);
+	INIT_LIST_HEAD(&ctx->inactive_groups);
 	atomic_set(&ctx->refcount, 1);
 }
 
@@ -9109,6 +9163,7 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 	INIT_LIST_HEAD(&event->sibling_list);
 	INIT_LIST_HEAD(&event->rb_entry);
 	INIT_LIST_HEAD(&event->active_entry);
+	INIT_LIST_HEAD(&event->ctx_active_entry);
 	INIT_LIST_HEAD(&event->addr_filters.list);
 	INIT_HLIST_NODE(&event->hlist_entry);
 
@@ -10085,6 +10140,10 @@ perf_event_exit_event(struct perf_event *child_event,
 	if (parent_event)
 		perf_group_detach(child_event);
 	list_del_event(child_event, child_ctx);
+
+	if (!parent_event && child_event->state == PERF_EVENT_STATE_INACTIVE)
+		ctx_sched_groups_del(parent_event, child_ctx);
+
 	child_event->state = PERF_EVENT_STATE_EXIT; /* is_event_hup() */
 	raw_spin_unlock_irq(&child_ctx->lock);
 

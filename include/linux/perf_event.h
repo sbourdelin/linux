@@ -573,6 +573,7 @@ struct perf_event {
 
 	struct hlist_node		hlist_entry;
 	struct list_head		active_entry;
+	struct list_head		ctx_active_entry;
 	int				nr_siblings;
 
 	/* Not serialized. Only written during event initialization. */
@@ -734,6 +735,11 @@ struct perf_event_context {
 	struct list_head		active_ctx_list;
 	struct list_head		pinned_groups;
 	struct list_head		flexible_groups;
+
+	struct list_head		active_pinned_groups;
+	struct list_head		active_flexible_groups;
+	struct list_head		inactive_groups;
+
 	struct list_head		event_list;
 	int				nr_events;
 	int				nr_active;
