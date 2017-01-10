@@ -129,9 +129,6 @@ struct flag_table {
 #define NUM_MAP_ENTRIES		256
 #define NUM_MAP_REGS             32
 
-/* Bit offset into the GUID which carries HFI id information */
-#define GUID_HFI_INDEX_SHIFT     39
-
 /* extract the emulation revision */
 #define emulator_rev(dd) ((dd)->irev >> 8)
 /* parallel and serial emulation versions are 3 and 4 respectively */

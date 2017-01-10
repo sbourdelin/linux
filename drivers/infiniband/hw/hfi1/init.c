@@ -116,11 +116,28 @@ unsigned int user_credit_return_threshold = 33;	/* default is 33% */
 module_param(user_credit_return_threshold, uint, S_IRUGO);
 MODULE_PARM_DESC(user_credit_return_threshold, "Credit return threshold for user send contexts, return when unreturned credits passes this many blocks (in percent of allocated blocks, 0 is off)");
 
+static bool port_reorder;
+module_param(port_reorder, bool, S_IRUGO);
+MODULE_PARM_DESC(port_reorder, "Device port reorder: 1 - order HFIs on the same ASIC in increasing port order, or 0 - order exactly as the kernel enumerates (default)");
+
 static inline u64 encode_rcv_header_entry_size(u16);
 
 static struct idr hfi1_unit_table;
 u32 hfi1_cpulist_count;
 unsigned long *hfi1_cpulist;
+
+struct hfi1_init_dev {
+	struct list_head list;
+	struct pci_dev *pdev;
+	const struct pci_device_id *ent;
+	u64 guid;
+};
+
+static struct timer_list init_timer;
+static LIST_HEAD(init_list);
+static DEFINE_MUTEX(init_mutex); /* protects init_list */
+static struct workqueue_struct *hfi1_init_wq;
+static void hfi1_deferred_init(struct work_struct *work);
 
 /*
  * Common code for creating the receive context array.
@@ -1165,6 +1182,7 @@ void hfi1_disable_after_error(struct hfi1_devdata *dd)
 
 static void remove_one(struct pci_dev *);
 static int init_one(struct pci_dev *, const struct pci_device_id *);
+static void hfi1_probe_done(unsigned long data);
 
 #define DRIVER_LOAD_MSG "Intel " DRIVER_NAME " loaded: "
 #define PFX DRIVER_NAME ": "
@@ -1208,6 +1226,16 @@ static int __init hfi1_mod_init(void)
 	ret = node_affinity_init();
 	if (ret)
 		goto bail;
+
+	if (port_reorder) {
+		hfi1_init_wq = alloc_workqueue("hfi1_init_wq", WQ_MEM_RECLAIM,
+					       0);
+		if (!hfi1_init_wq) {
+			pr_err("Failed to create deffered dev init wq\n");
+			ret = -ENOMEM;
+			goto bail;
+		}
+	}
 
 	/* validate max MTU before any devices start */
 	if (!valid_opa_max_mtu(hfi1_max_mtu)) {
@@ -1264,6 +1292,9 @@ static int __init hfi1_mod_init(void)
 	ret = hfi1_wss_init();
 	if (ret < 0)
 		goto bail_wss;
+
+	setup_timer(&init_timer, hfi1_probe_done, 0);
+
 	ret = pci_register_driver(&hfi1_pci_driver);
 	if (ret < 0) {
 		pr_err("Unable to register driver: error %d\n", -ret);
@@ -1288,6 +1319,8 @@ module_init(hfi1_mod_init);
  */
 static void __exit hfi1_mod_cleanup(void)
 {
+	struct hfi1_init_dev *pos, *tmp;
+
 	pci_unregister_driver(&hfi1_pci_driver);
 	node_affinity_destroy();
 	hfi1_wss_exit();
@@ -1298,6 +1331,18 @@ static void __exit hfi1_mod_cleanup(void)
 	idr_destroy(&hfi1_unit_table);
 	dispose_firmware();	/* asymmetric with obtain_firmware() */
 	dev_cleanup();
+
+	mutex_lock(&init_mutex);
+	list_for_each_entry_safe(pos, tmp, &init_list, list) {
+		list_del(&pos->list);
+		kfree(pos);
+	}
+	mutex_unlock(&init_mutex);
+	del_timer(&init_timer);
+	if (hfi1_init_wq) {
+		destroy_workqueue(hfi1_init_wq);
+		hfi1_init_wq = NULL;
+	}
 }
 
 module_exit(hfi1_mod_cleanup);
@@ -1415,7 +1460,7 @@ static int init_validate_rcvhdrcnt(struct device *dev, uint thecnt)
 	return 0;
 }
 
-static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+static int do_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	int ret = 0, j, pidx, initfail;
 	struct hfi1_devdata *dd;
@@ -1542,6 +1587,129 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 clean_bail:
 	hfi1_pcie_cleanup(pdev);
 bail:
+	return ret;
+}
+
+static void hfi1_deferred_init(struct work_struct *work)
+{
+	struct hfi1_init_dev *pos, *tmp;
+	int ret;
+
+	mutex_lock(&init_mutex);
+	list_for_each_entry_safe(pos, tmp, &init_list, list) {
+		ret = do_init_one(pos->pdev, pos->ent);
+		if (ret)
+			hfi1_early_err(&pos->pdev->dev, "%s: dev init failed, err %d\n",
+				       __func__, ret);
+
+		list_del(&pos->list);
+		kfree(pos);
+	}
+	mutex_unlock(&init_mutex);
+	kfree(work);
+}
+
+static void hfi1_probe_done(unsigned long data)
+{
+	struct work_struct *work;
+
+	if (!hfi1_init_wq)
+		return;
+
+	/* Got probe for all devices. Now invoke hfi1_deferred_init */
+	work = kzalloc(sizeof(*work), GFP_ATOMIC);
+	if (!work)
+		return;
+
+	INIT_WORK(work, hfi1_deferred_init);
+	queue_work(hfi1_init_wq, work);
+}
+
+static int get_guid(struct pci_dev *pdev, u64 *guid)
+{
+	void __iomem *bar;
+
+	bar = ioremap_nocache(pci_resource_start(pdev, 0),
+			      DC_DC8051_CFG_LOCAL_GUID + 8);
+	if (!bar) {
+		hfi1_early_err(&pdev->dev, "%s: unable to ioremap bar\n",
+			       __func__);
+		return -ENOMEM;
+	}
+	/* make sure the DC is not in reset so the GUID is readable */
+	writeq(0ull, bar + CCE_DC_CTRL);
+	(void)readq(bar + CCE_DC_CTRL); /* force the write */
+
+	/* read device guid */
+	*guid = readq(bar + DC_DC8051_CFG_LOCAL_GUID);
+	iounmap(bar);
+	return 0;
+}
+
+static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+{
+	struct hfi1_init_dev *probed_pdev;
+	struct hfi1_init_dev *pos;
+	u64 guid;
+	int ret;
+
+	if (!port_reorder)
+		return do_init_one(pdev, ent);
+
+	probed_pdev = kzalloc(sizeof(*probed_pdev), GFP_KERNEL);
+	if (!probed_pdev)
+		return -ENOMEM;
+
+	ret = pci_enable_device(pdev);
+	if (ret) {
+		hfi1_early_err(&pdev->dev, "%s: cannot enable device, err %d\n",
+			       __func__, ret);
+		goto fail;
+	}
+
+	ret = get_guid(pdev, &guid);
+	if (ret)
+		goto fail_get_guid;
+
+	probed_pdev->pdev = pdev;
+	probed_pdev->ent = ent;
+	probed_pdev->guid = guid;
+
+	mutex_lock(&init_mutex);
+	if (list_empty(&init_list)) {
+		list_add_tail(&probed_pdev->list, &init_list);
+	} else {
+		list_for_each_entry(pos, &init_list, list)
+			if (HFI_ASIC_GUID(pos->guid) == HFI_ASIC_GUID(guid))
+				break;
+
+		/* Match found, pos and entry are valid */
+		if (pos->guid == probed_pdev->guid) {
+			/* Something wrong - same hardware id */
+			hfi1_early_err(&pdev->dev, "%s: duplicate guid 0x%llx\n",
+				       __func__, guid);
+			mutex_unlock(&init_mutex);
+			goto fail_get_guid;
+		}
+
+		/*
+		 * Order around the first of the pair that was enumerated.
+		 * Insert before or after the one already in the list.
+		 */
+		if ((pos->guid >> GUID_HFI_INDEX_SHIFT) & 1)
+			list_add_tail(&probed_pdev->list, &pos->list);
+		else
+			list_add(&probed_pdev->list, &pos->list);
+	}
+	mutex_unlock(&init_mutex);
+	mod_timer(&init_timer, jiffies + msecs_to_jiffies(1000));
+	pci_disable_device(pdev);
+	return 0;
+
+fail_get_guid:
+	pci_disable_device(pdev);
+fail:
+	kfree(probed_pdev);
 	return ret;
 }
 
