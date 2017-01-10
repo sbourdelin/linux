@@ -3642,19 +3642,6 @@ static void perf_adjust_freq_unthr_context(struct perf_event_context *ctx,
 	raw_spin_unlock(&ctx->lock);
 }
 
-/*
- * Round-robin a context's events:
- */
-static void rotate_ctx(struct perf_event_context *ctx)
-{
-	/*
-	 * Rotate the first entry last of non-pinned groups. Rotation might be
-	 * disabled by the inheritance code.
-	 */
-	if (!ctx->rotate_disable)
-		list_rotate_left(&ctx->flexible_groups);
-}
-
 static int perf_rotate_context(struct perf_cpu_context *cpuctx)
 {
 	struct perf_event_context *ctx = NULL;
@@ -3681,10 +3668,11 @@ static int perf_rotate_context(struct perf_cpu_context *cpuctx)
 	if (ctx)
 		ctx_sched_out(ctx, cpuctx, EVENT_FLEXIBLE);
 
-	rotate_ctx(&cpuctx->ctx);
-	if (ctx)
-		rotate_ctx(ctx);
-
+	/*
+	 * A sched out will insert event groups at end of inactive_groups,
+	 * a sched in will schedule events at the beginning of inactive_groups.
+	 * This causes a rotation.
+	 */
 	perf_event_sched_in(cpuctx, ctx, current);
 
 	perf_pmu_enable(cpuctx->ctx.pmu);
