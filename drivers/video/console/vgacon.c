@@ -174,11 +174,9 @@ struct vgacon_scrollback_info {
 };
 
 static struct vgacon_scrollback_info *vgacon_scrollback_cur;
-#ifdef CONFIG_VGACON_SOFT_SCROLLBACK_PERSISTENT
 static struct vgacon_scrollback_info vgacon_scrollbacks[MAX_NR_CONSOLES];
-#else
-static struct vgacon_scrollback_info vgacon_scrollbacks[1];
-#endif
+static bool scrollback_persistent = \
+	IS_ENABLED(CONFIG_VGACON_SOFT_SCROLLBACK_PERSISTENT_ENABLE_BY_DEFAULT);
 
 static void vgacon_scrollback_reset(int vc_num, size_t reset_size)
 {
@@ -213,20 +211,19 @@ static void vgacon_scrollback_init(int vc_num)
 
 static void vgacon_scrollback_switch(int vc_num)
 {
-#ifndef CONFIG_VGACON_SOFT_SCROLLBACK_PERSISTENT
-	vc_num = 0;
-#endif
+	if (!scrollback_persistent)
+		vc_num = 0;
 
 	if (!vgacon_scrollbacks[vc_num].data) {
 		vgacon_scrollback_init(vc_num);
 	} else {
-#ifdef CONFIG_VGACON_SOFT_SCROLLBACK_PERSISTENT
-		vgacon_scrollback_cur = &vgacon_scrollbacks[vc_num];
-#else
-		size_t size = CONFIG_VGACON_SOFT_SCROLLBACK_SIZE * 1024;
+		if (scrollback_persistent) {
+			vgacon_scrollback_cur = &vgacon_scrollbacks[vc_num];
+		} else {
+			size_t size = CONFIG_VGACON_SOFT_SCROLLBACK_SIZE * 1024;
 
-		vgacon_scrollback_reset(vc_num, size);
-#endif
+			vgacon_scrollback_reset(vc_num, size);
+		}
 	}
 }
 
@@ -1423,4 +1420,6 @@ const struct consw vga_con = {
 };
 EXPORT_SYMBOL(vga_con);
 
+module_param_named(scrollback_persistent, scrollback_persistent, bool, 0000);
+MODULE_PARM_DESC(scrollback_persistent, "Enable persistent scrollback for all vga consoles");
 MODULE_LICENSE("GPL");
