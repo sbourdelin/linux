@@ -3,8 +3,11 @@ skl-topology.o
 
 obj-$(CONFIG_SND_SOC_INTEL_SKYLAKE) += snd-soc-skl.o
 
-# Skylake IPC Support
-snd-soc-skl-ipc-objs := skl-sst-ipc.o skl-sst-dsp.o skl-sst-cldma.o \
+# Skylake DSP Support
+snd-soc-skl-dsp-objs := skl-sst-dsp.o skl-sst-cldma.o \
 		skl-sst.o bxt-sst.o skl-sst-utils.o
+obj-$(CONFIG_SND_SOC_INTEL_SKYLAKE) += snd-soc-skl-dsp.o
 
+# Skylake IPC Support
+snd-soc-skl-ipc-objs := skl-sst-ipc.o
 obj-$(CONFIG_SND_SOC_INTEL_SKYLAKE) += snd-soc-skl-ipc.o

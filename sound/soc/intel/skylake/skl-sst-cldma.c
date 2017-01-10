@@ -319,6 +319,7 @@ void skl_cldma_process_intr(struct sst_dsp *ctx)
 	ctx->cl_dev.wait_condition = true;
 	wake_up(&ctx->cl_dev.wait_queue);
 }
+EXPORT_SYMBOL_GPL(skl_cldma_process_intr);
 
 int skl_cldma_prepare(struct sst_dsp *ctx)
 {

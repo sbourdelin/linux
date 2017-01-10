@@ -337,6 +337,107 @@ irqreturn_t skl_dsp_sst_interrupt(int irq, void *dev_id)
 
 	return result;
 }
+
+void skl_ipc_int_enable(struct sst_dsp *ctx)
+{
+	sst_dsp_shim_update_bits(ctx, SKL_ADSP_REG_ADSPIC,
+			SKL_ADSPIC_IPC, SKL_ADSPIC_IPC);
+}
+EXPORT_SYMBOL_GPL(skl_ipc_int_enable);
+
+void skl_ipc_int_disable(struct sst_dsp *ctx)
+{
+	sst_dsp_shim_update_bits_unlocked(ctx, SKL_ADSP_REG_ADSPIC,
+			SKL_ADSPIC_IPC, 0);
+}
+
+void skl_ipc_op_int_enable(struct sst_dsp *ctx)
+{
+	/* enable IPC DONE interrupt */
+	sst_dsp_shim_update_bits(ctx, SKL_ADSP_REG_HIPCCTL,
+		SKL_ADSP_REG_HIPCCTL_DONE, SKL_ADSP_REG_HIPCCTL_DONE);
+
+	/* Enable IPC BUSY interrupt */
+	sst_dsp_shim_update_bits(ctx, SKL_ADSP_REG_HIPCCTL,
+		SKL_ADSP_REG_HIPCCTL_BUSY, SKL_ADSP_REG_HIPCCTL_BUSY);
+}
+
+void skl_ipc_op_int_disable(struct sst_dsp *ctx)
+{
+	/* disable IPC DONE interrupt */
+	sst_dsp_shim_update_bits_unlocked(ctx, SKL_ADSP_REG_HIPCCTL,
+					SKL_ADSP_REG_HIPCCTL_DONE, 0);
+
+	/* Disable IPC BUSY interrupt */
+	sst_dsp_shim_update_bits_unlocked(ctx, SKL_ADSP_REG_HIPCCTL,
+					SKL_ADSP_REG_HIPCCTL_BUSY, 0);
+
+}
+
+static void skl_ipc_tx_data_copy(struct ipc_message *msg, char *tx_data,
+		size_t tx_size)
+{
+	if (tx_size)
+		memcpy(msg->tx_data, tx_data, tx_size);
+}
+
+static bool skl_ipc_is_dsp_busy(struct sst_dsp *dsp)
+{
+	u32 hipci;
+
+	hipci = sst_dsp_shim_read_unlocked(dsp, SKL_ADSP_REG_HIPCI);
+	return (hipci & SKL_ADSP_REG_HIPCI_BUSY);
+}
+
+/* Lock to be held by caller */
+static void skl_ipc_tx_msg(struct sst_generic_ipc *ipc, struct ipc_message *msg)
+{
+	struct skl_ipc_header *header = (struct skl_ipc_header *)(&msg->header);
+
+	if (msg->tx_size)
+		sst_dsp_outbox_write(ipc->dsp, msg->tx_data, msg->tx_size);
+	sst_dsp_shim_write_unlocked(ipc->dsp, SKL_ADSP_REG_HIPCIE,
+						header->extension);
+	sst_dsp_shim_write_unlocked(ipc->dsp, SKL_ADSP_REG_HIPCI,
+		header->primary | SKL_ADSP_REG_HIPCI_BUSY);
+}
+
+int skl_ipc_init(struct device *dev, struct skl_sst *skl)
+{
+	struct sst_generic_ipc *ipc;
+	int err;
+
+	ipc = &skl->ipc;
+	ipc->dsp = skl->dsp;
+	ipc->dev = dev;
+
+	ipc->tx_data_max_size = SKL_ADSP_W1_SZ;
+	ipc->rx_data_max_size = SKL_ADSP_W0_UP_SZ;
+
+	err = sst_ipc_init(ipc);
+	if (err)
+		return err;
+
+	ipc->ops.tx_msg = skl_ipc_tx_msg;
+	ipc->ops.tx_data_copy = skl_ipc_tx_data_copy;
+	ipc->ops.is_dsp_busy = skl_ipc_is_dsp_busy;
+
+	return 0;
+}
+
+void skl_ipc_free(struct sst_generic_ipc *ipc)
+{
+	/* Disable IPC DONE interrupt */
+	sst_dsp_shim_update_bits(ipc->dsp, SKL_ADSP_REG_HIPCCTL,
+		SKL_ADSP_REG_HIPCCTL_DONE, 0);
+
+	/* Disable IPC BUSY interrupt */
+	sst_dsp_shim_update_bits(ipc->dsp, SKL_ADSP_REG_HIPCCTL,
+		SKL_ADSP_REG_HIPCCTL_BUSY, 0);
+
+	sst_ipc_fini(ipc);
+}
+
 /*
  * skl_dsp_get_core/skl_dsp_put_core will be called inside DAPM context
  * within the dapm mutex. Hence no separate lock is used.
