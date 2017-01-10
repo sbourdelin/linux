@@ -1531,6 +1531,10 @@ rbtree_add_inactive(struct perf_event *event,
 	/* Add new node and rebalance tree. */
 	rb_link_node(&event->rbtree_node, parent, pos);
 	rb_insert_color(&event->rbtree_node, &ctx->rbtree_root);
+	if (event->attr.pinned)
+		ctx->nr_inactive_pinned++;
+	else
+		ctx->nr_inactive_flexible++;
 }
 
 static void
@@ -1754,6 +1758,11 @@ static void ctx_sched_groups_del(struct perf_event *group,
 	WARN_ON(group->state != PERF_EVENT_STATE_INACTIVE);
 	rb_erase(&group->rbtree_node, &ctx->rbtree_root);
 	list_del_init(&group->ctx_active_entry);
+	if (group->attr.pinned)
+		ctx->nr_inactive_pinned--;
+	else
+		ctx->nr_inactive_flexible--;
+
 }
 
 /*
@@ -2142,6 +2151,10 @@ ctx_sched_groups_to_active(struct perf_event *event, struct perf_event_context *
 	WARN_ON(event->state != PERF_EVENT_STATE_ACTIVE);
 	rb_erase(&event->rbtree_node, &ctx->rbtree_root);
 	list_move_tail(&event->ctx_active_entry, h);
+	if (event->attr.pinned)
+		ctx->nr_inactive_pinned--;
+	else
+		ctx->nr_inactive_flexible--;
 }
 
 static int
@@ -3371,11 +3384,11 @@ ctx_sched_in(struct perf_event_context *ctx,
 	 * First go through the list and put on any pinned groups
 	 * in order to give them the best chance of going on.
 	 */
-	if (is_active & EVENT_PINNED)
+	if (is_active & EVENT_PINNED && ctx->nr_inactive_pinned)
 		ctx_pinned_sched_in(ctx, cpuctx);
 
 	/* Then walk through the lower prio flexible groups */
-	if (is_active & EVENT_FLEXIBLE)
+	if (is_active & EVENT_FLEXIBLE && ctx->nr_inactive_flexible)
 		ctx_flexible_sched_in(ctx, cpuctx);
 }
 

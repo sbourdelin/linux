@@ -748,6 +748,8 @@ struct perf_event_context {
 	struct list_head		event_list;
 	int				nr_events;
 	int				nr_active;
+	int				nr_inactive_pinned;
+	int				nr_inactive_flexible;
 	int				is_active;
 	int				nr_stat;
 	int				nr_freq;
