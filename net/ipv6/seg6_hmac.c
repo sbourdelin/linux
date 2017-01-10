@@ -363,7 +363,7 @@ static int seg6_hmac_init_ring(void)
 		return -ENOMEM;
 
 	for_each_possible_cpu(i) {
-		char *ring = kzalloc(SEG6_HMAC_RING_SIZE, GFP_KERNEL);
+		char *ring = kzalloc(SEG6_HMAC_RING_SIZE, GFP_ATOMIC);
 
 		if (!ring)
 			return -ENOMEM;
@@ -393,7 +393,9 @@ static int seg6_hmac_init_algo(void)
 			return -ENOMEM;
 
 		for_each_possible_cpu(cpu) {
-			tfm = crypto_alloc_shash(algo->name, 0, GFP_KERNEL);
+			local_bh_enable();
+			tfm = crypto_alloc_shash(algo->name, 0, GFP_ATOMIC);
+			local_bh_disable();
 			if (IS_ERR(tfm))
 				return PTR_ERR(tfm);
 			p_tfm = per_cpu_ptr(algo->tfms, cpu);
@@ -410,7 +412,7 @@ static int seg6_hmac_init_algo(void)
 			return -ENOMEM;
 
 		for_each_possible_cpu(cpu) {
-			shash = kzalloc(shsize, GFP_KERNEL);
+			shash = kzalloc(shsize, GFP_ATOMIC);
 			if (!shash)
 				return -ENOMEM;
 			*per_cpu_ptr(algo->shashs, cpu) = shash;
@@ -424,6 +426,8 @@ int __init seg6_hmac_init(void)
 {
 	int ret;
 
+	local_bh_disable();
+
 	ret = seg6_hmac_init_ring();
 	if (ret < 0)
 		goto out;
@@ -431,6 +435,7 @@ int __init seg6_hmac_init(void)
 	ret = seg6_hmac_init_algo();
 
 out:
+	local_bh_enable();
 	return ret;
 }
 EXPORT_SYMBOL(seg6_hmac_init);
@@ -449,6 +454,8 @@ void seg6_hmac_exit(void)
 {
 	struct seg6_hmac_algo *algo = NULL;
 	int i, alg_count, cpu;
+
+	local_bh_disable();
 
 	for_each_possible_cpu(i) {
 		char *ring = *per_cpu_ptr(hmac_ring, i);
@@ -472,6 +479,8 @@ void seg6_hmac_exit(void)
 		free_percpu(algo->tfms);
 		free_percpu(algo->shashs);
 	}
+
+	local_bh_enable();
 }
 EXPORT_SYMBOL(seg6_hmac_exit);
 
