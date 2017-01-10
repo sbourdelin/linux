@@ -131,8 +131,8 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
 	if (IS_ERR(exynos->susp_clk)) {
 		dev_info(dev, "no suspend clk specified\n");
 		exynos->susp_clk = NULL;
-	}
-	clk_prepare_enable(exynos->susp_clk);
+	} else
+		clk_prepare_enable(exynos->susp_clk);
 
 	if (of_device_is_compatible(node, "samsung,exynos7-dwusb3")) {
 		exynos->axius_clk = devm_clk_get(dev, "usbdrd30_axius_clk");
@@ -196,7 +196,8 @@ err3:
 	regulator_disable(exynos->vdd33);
 err2:
 	clk_disable_unprepare(exynos->axius_clk);
-	clk_disable_unprepare(exynos->susp_clk);
+	if (exynos->susp_clk)
+		clk_disable_unprepare(exynos->susp_clk);
 	clk_disable_unprepare(exynos->clk);
 	return ret;
 }
@@ -210,7 +211,8 @@ static int dwc3_exynos_remove(struct platform_device *pdev)
 	platform_device_unregister(exynos->usb3_phy);
 
 	clk_disable_unprepare(exynos->axius_clk);
-	clk_disable_unprepare(exynos->susp_clk);
+	if (exynos->susp_clk)
+		clk_disable_unprepare(exynos->susp_clk);
 	clk_disable_unprepare(exynos->clk);
 
 	regulator_disable(exynos->vdd33);
