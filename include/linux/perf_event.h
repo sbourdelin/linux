@@ -564,6 +564,9 @@ struct perf_event {
 	struct list_head		group_entry;
 	struct list_head		sibling_list;
 
+	u64				rbtree_key;
+	struct rb_node			rbtree_node;
+
 	/*
 	 * We need storage to track the entries in perf_pmu_migrate_context; we
 	 * cannot use the event_entry because of RCU and we want to keep the
@@ -736,6 +739,8 @@ struct perf_event_context {
 	struct list_head		pinned_groups;
 	struct list_head		flexible_groups;
 
+	struct rb_root			rbtree_root;
+	u32				nr_inactive_added;
 	struct list_head		active_pinned_groups;
 	struct list_head		active_flexible_groups;
 	struct list_head		inactive_groups;

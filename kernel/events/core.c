@@ -1462,19 +1462,98 @@ ctx_group_list(struct perf_event *event, struct perf_event_context *ctx)
 		return &ctx->flexible_groups;
 }
 
+/*
+ * The bits perf_event::kbtree_key represent:
+ *   - 63:33 an unique identifier for CPU (if a task context) or a cgroup
+ *     (if a CPU context).
+ *   - 32    a boolean to indicate if eventt is flexible (vs  pinnned).
+ *   - 31:0  a unique "stamp" that follows the last time the event was
+ *   scheduled.
+ * The 64 bits value groups event of the same type (CPU/cgroup + flexible)
+ * together in the rb-tree.
+ */
+#define RBTREE_KEY_STAMP_WIDTH		32
+#define RBTREE_KEY_STAMP_MASK 		GENMASK_ULL(RBTREE_KEY_STAMP_WIDTH - 1, 0)
+#define RBTREE_KEY_FLEXIBLE_MASK	BIT_ULL(RBTREE_KEY_STAMP_WIDTH)
+
+static u64 taskctx_rbtree_key(int cpu, bool flexible)
+{
+	/*
+	 * Use CPU only. PMU is never used in schedule in/out and, since  some
+	 * contexts share PMU, iterate over them would make things complicated.
+	 * I could not find a case where an ordered iteration over all PMU
+	 * events in one context is useful.
+	 */
+	return ((u64)cpu << (RBTREE_KEY_STAMP_WIDTH + 1)) |
+		(flexible ? RBTREE_KEY_FLEXIBLE_MASK : 0);
+}
+
+static u64 cpuctx_rbtree_key(struct perf_cgroup *cgrp, bool flexible)
+{
+	u64 k;
+
+	if (cgrp)
+		/* A cheap way to obtain an identifier for a cgroup. Suggestions appreciated. */
+		k = (u64)cgrp->css.id << (RBTREE_KEY_STAMP_WIDTH + 1);
+	else
+		k = GENMASK_ULL(63, RBTREE_KEY_STAMP_WIDTH + 1);
+	return k | (flexible ? RBTREE_KEY_FLEXIBLE_MASK : 0);
+}
+
+static void
+rbtree_add_inactive(struct perf_event *event,
+		    struct perf_event_context *ctx)
+{
+	struct rb_node **pos = &(ctx->rbtree_root.rb_node), *parent = NULL;
+	struct perf_event *pos_event;
+
+	event->rbtree_key &= ~RBTREE_KEY_STAMP_MASK;
+	/*
+	 * A unique key simplifies finding intervals of events. We could use
+	 * ctx time as timestamp, but it may no be unique. So use
+	 * nr_inactive_added, a counter that is guaranteed to be unique and that
+	 * has the same order as ctx->inactive_groups.
+	 */
+	event->rbtree_key |= ctx->nr_inactive_added;
+	while (*pos) {
+		pos_event = rb_entry(*pos, struct perf_event, rbtree_node);
+		parent = *pos;
+		if (event->rbtree_key < pos_event->rbtree_key)
+			pos = &((*pos)->rb_left);
+		else /* There cannot be repeated keys. */
+			pos = &((*pos)->rb_right);
+	}
+	/* Add new node and rebalance tree. */
+	rb_link_node(&event->rbtree_node, parent, pos);
+	rb_insert_color(&event->rbtree_node, &ctx->rbtree_root);
+}
+
 static void
 ctx_sched_groups_to_inactive(struct perf_event *event,
 			     struct perf_event_context *ctx)
 {
 	WARN_ON(event->state != PERF_EVENT_STATE_INACTIVE);
 	list_move_tail(&event->ctx_active_entry, &ctx->inactive_groups);
+	rbtree_add_inactive(event, ctx);
+	ctx->nr_inactive_added++;
 };
 
 static void
 ctx_sched_groups_add(struct perf_event *event, struct perf_event_context *ctx)
 {
+	u64 k;
+
+	WARN_ON(event->state != PERF_EVENT_STATE_INACTIVE);
+	if (event->attach_state & PERF_ATTACH_TASK)
+		k = taskctx_rbtree_key(event->cpu, !event->attr.pinned);
+	else
+		k = cpuctx_rbtree_key(event->cgrp, !event->attr.pinned);
+	event->rbtree_key = k;
+
 	WARN_ON(!list_empty(&event->ctx_active_entry));
 	list_add_tail(&event->ctx_active_entry, &ctx->inactive_groups);
+	rbtree_add_inactive(event, ctx);
+	ctx->nr_inactive_added++;
 }
 
 /*
@@ -1668,6 +1747,7 @@ static void ctx_sched_groups_del(struct perf_event *group,
 				 struct perf_event_context *ctx)
 {
 	WARN_ON(group->state != PERF_EVENT_STATE_INACTIVE);
+	rb_erase(&group->rbtree_node, &ctx->rbtree_root);
 	list_del_init(&group->ctx_active_entry);
 }
 
@@ -2055,6 +2135,7 @@ ctx_sched_groups_to_active(struct perf_event *event, struct perf_event_context *
 	WARN_ON(!event);
 	WARN_ON(list_empty(&event->ctx_active_entry));
 	WARN_ON(event->state != PERF_EVENT_STATE_ACTIVE);
+	rb_erase(&event->rbtree_node, &ctx->rbtree_root);
 	list_move_tail(&event->ctx_active_entry, h);
 }
 
@@ -3690,6 +3771,7 @@ static void __perf_event_init_context(struct perf_event_context *ctx)
 	INIT_LIST_HEAD(&ctx->pinned_groups);
 	INIT_LIST_HEAD(&ctx->flexible_groups);
 	INIT_LIST_HEAD(&ctx->event_list);
+	ctx->rbtree_root = RB_ROOT;
 	INIT_LIST_HEAD(&ctx->active_pinned_groups);
 	INIT_LIST_HEAD(&ctx->active_flexible_groups);
 	INIT_LIST_HEAD(&ctx->inactive_groups);
