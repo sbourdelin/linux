@@ -86,3 +86,78 @@ void __hyp_text __kvm_flush_vm_context(void)
 	__tlbi(alle1is);
 	__flush_icache_all(); /* contains a dsb(ish) */
 }
+
+/* Intentionally empty functions */
+static void __hyp_text __switch_to_hyp_role_nvhe(void) { }
+static void __hyp_text __switch_to_host_role_nvhe(void) { }
+
+static void __hyp_text __switch_to_hyp_role_vhe(void)
+{
+	u64 hcr = read_sysreg(hcr_el2);
+
+	/*
+	 * When VHE is enabled and HCR_EL2.TGE=1, EL1&0 TLB operations
+	 * apply to EL2&0 translation regime. As we prepare to emulate
+	 * guest TLB operation clear HCR_TGE to target TLB operations
+	 * to EL1&0 (guest).
+	 */
+	hcr &= ~HCR_TGE;
+	write_sysreg(hcr, hcr_el2);
+}
+
+static void __hyp_text __switch_to_host_role_vhe(void)
+{
+	u64 hcr = read_sysreg(hcr_el2);
+
+	hcr |= HCR_TGE;
+	write_sysreg(hcr, hcr_el2);
+}
+
+static hyp_alternate_select(__switch_to_hyp_role,
+			    __switch_to_hyp_role_nvhe,
+			    __switch_to_hyp_role_vhe,
+			    ARM64_HAS_VIRT_HOST_EXTN);
+
+static hyp_alternate_select(__switch_to_host_role,
+			    __switch_to_host_role_nvhe,
+			    __switch_to_host_role_vhe,
+			    ARM64_HAS_VIRT_HOST_EXTN);
+
+static void __hyp_text __switch_to_guest_regime(struct kvm *kvm)
+{
+	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+	__switch_to_hyp_role();
+	isb();
+}
+
+static void __hyp_text __switch_to_host_regime(void)
+{
+	__switch_to_host_role();
+	write_sysreg(0, vttbr_el2);
+}
+
+void __hyp_text
+__kvm_emulate_tlb_invalidate(struct kvm *kvm, u32 opcode, u64 regval)
+{
+	kvm = kern_hyp_va(kvm);
+
+	/*
+	 * Switch to the guest before performing any TLB operations to
+	 * target the appropriate VMID
+	 */
+	__switch_to_guest_regime(kvm);
+
+	/*
+	 *  TLB maintenance operations are broadcast to
+	 *  inner-shareable domain when HCR_FB is set (default for
+	 *  KVM).
+	 *
+	 *  Nuke all Stage 1 TLB entries for the VM. This will kill
+	 *  performance but it's always safe to do as we don't leave
+	 *  behind any strays in the TLB
+	 */
+	__tlbi(vmalle1is);
+	isb();
+
+	__switch_to_host_regime();
+}
