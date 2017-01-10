@@ -1476,6 +1476,11 @@ ctx_group_list(struct perf_event *event, struct perf_event_context *ctx)
 #define RBTREE_KEY_STAMP_MASK 		GENMASK_ULL(RBTREE_KEY_STAMP_WIDTH - 1, 0)
 #define RBTREE_KEY_FLEXIBLE_MASK	BIT_ULL(RBTREE_KEY_STAMP_WIDTH)
 
+static u32 rbtree_key_stamp(u64 k)
+{
+       return k & RBTREE_KEY_STAMP_MASK;
+}
+
 static u64 taskctx_rbtree_key(int cpu, bool flexible)
 {
 	/*
@@ -3087,16 +3092,191 @@ static void cpu_ctx_sched_out(struct perf_cpu_context *cpuctx,
 	ctx_sched_out(&cpuctx->ctx, cpuctx, event_type);
 }
 
+/* Find key max/min rbtree node with respect to bound that matches
+ * bound non-tstamp attributes in bound. */
+static struct perf_event *
+rbtree_find_bound(struct perf_event_context *ctx, u64 type_key, bool find_min)
+{
+	struct rb_node *pos = ctx->rbtree_root.rb_node;
+	struct perf_event *pos_event, *m = NULL;
+	u64 k, k_h, bound_h, bound;
+
+	bound = type_key | RBTREE_KEY_STAMP_MASK;
+	if (find_min)
+		bound &= ~RBTREE_KEY_STAMP_MASK;
+	while (pos) {
+		pos_event = rb_entry(pos, struct perf_event, rbtree_node);
+		WARN_ON(!pos_event);
+		k = pos_event->rbtree_key;
+		/*
+		 * Bits higher than tstamp indicate the node type, look for
+		 * node of same type as bound that is min (or max).
+		 */
+		k_h     =     k & ~RBTREE_KEY_STAMP_MASK;
+		bound_h = bound & ~RBTREE_KEY_STAMP_MASK;
+
+		if (k_h == bound_h) {
+			if (!m)
+				m = pos_event;
+			else if ((!find_min && k > m->rbtree_key) ||
+				  (find_min && k < m->rbtree_key))
+				m = pos_event;
+		}
+		if (bound < k)
+			pos = pos->rb_left;
+		else
+			pos = pos->rb_right;
+	}
+	return m;
+}
+
+/*
+ * Update start and stamp_max so that all events in @ctx with matching @key
+ * are contained in the [start->rbtree_stamp, stamp_max] interval.
+ */
+static void
+accumulate_ctx_interval(struct perf_event_context *ctx, u64 key_type,
+			struct perf_event **start, u32 *stamp_max)
+{
+	u64 start_stamp, new_start_stamp, new_end_stamp;
+	struct perf_event *new_start, *new_end;
+
+	WARN_ON(!ctx);
+	WARN_ON(!start);
+	WARN_ON(!stamp_max);
+
+	/* Find node with smallest stamp and key type (CPU/cgroup,flexible). */
+	new_start = rbtree_find_bound(ctx, key_type, true);
+	if (!new_start)
+		return;
+
+	/* Find node with largest stamp and key type (CPU/cgroup,flexible). */
+	new_end = rbtree_find_bound(ctx, key_type, false);
+	WARN_ON(!new_end);
+	new_end_stamp = rbtree_key_stamp(new_end->rbtree_key);
+
+	if (!(*start)) {
+		*start = new_start;
+		*stamp_max = new_end_stamp;
+	} else {
+		start_stamp = rbtree_key_stamp((*start)->rbtree_key);;
+		new_start_stamp = rbtree_key_stamp(new_start->rbtree_key);
+
+		if (start_stamp > new_start_stamp)
+			*start = new_start;
+		if (*stamp_max < new_end_stamp)
+			*stamp_max = new_end_stamp;
+	}
+}
+
+static void
+task_ctx_interval(struct perf_event_context *ctx, enum event_type_t type,
+		  struct perf_event **start, u32 *stamp_max)
+{
+	u64 k;
+
+	WARN_ON(!ctx);
+	/* Task events not bound to a CPU. */
+	if (type & EVENT_PINNED) {
+		k = taskctx_rbtree_key(-1, false);
+		accumulate_ctx_interval(ctx, k, start, stamp_max);
+	}
+	if (type & EVENT_FLEXIBLE) {
+		k = taskctx_rbtree_key(-1, true);
+		accumulate_ctx_interval(ctx, k, start, stamp_max);
+	}
+
+	/* Task events bound to current CPU. */
+	if (type & EVENT_PINNED) {
+		k = taskctx_rbtree_key(smp_processor_id(), false);
+		accumulate_ctx_interval(ctx, k, start, stamp_max);
+	}
+	if (type & EVENT_FLEXIBLE) {
+		k = taskctx_rbtree_key(smp_processor_id(), true);
+		accumulate_ctx_interval(ctx, k, start, stamp_max);
+	}
+
+}
+
+static void
+cpu_ctx_interval(struct perf_event_context *ctx,
+		 struct perf_cpu_context *cpuctx,
+		 enum event_type_t type,
+		 struct perf_event **start, u32 *stamp_max)
+{
+	struct cgroup_subsys_state *css;
+	struct perf_cgroup *cgrp;
+	u64 k;
+
+	WARN_ON(!ctx);
+	WARN_ON(!cpuctx);
+	if (type & EVENT_PINNED) {
+		k = cpuctx_rbtree_key(NULL, false);
+		accumulate_ctx_interval(ctx, k, start, stamp_max);
+	}
+	if (type & EVENT_FLEXIBLE) {
+		k = cpuctx_rbtree_key(NULL, true);
+		accumulate_ctx_interval(ctx, k, start, stamp_max);
+	}
+
+#ifdef CONFIG_CGROUP_PERF
+	if (!cpuctx->cgrp)
+		return;
+	/*
+	 * Find for interval with event for all schedulable cgroups, these
+	 * include ancestors, since cgroups are hierarchical.
+	 */
+	WARN_ON(!cpuctx->cgrp);
+	css = &cpuctx->cgrp->css;
+	while (css) {
+		cgrp = container_of(css, struct perf_cgroup, css);
+		if (type & EVENT_PINNED) {
+			k = cpuctx_rbtree_key(cgrp, false);
+			accumulate_ctx_interval(ctx, k, start, stamp_max);
+		}
+		if (type & EVENT_FLEXIBLE) {
+			k = cpuctx_rbtree_key(cgrp, true);
+			accumulate_ctx_interval(ctx, k, start, stamp_max);
+		}
+		css = css->parent;
+	}
+#endif
+}
+
+static void
+ctx_inactive_groups_interval(struct perf_event_context *ctx,
+			     struct perf_cpu_context *cpuctx,
+			     enum event_type_t type,
+			     struct perf_event **start,
+			     u32 *stamp_max)
+{
+	if (WARN_ON(!ctx->task && !cpuctx))
+		return;
+	if (ctx->task)
+		task_ctx_interval(ctx, type, start, stamp_max);
+	else
+		cpu_ctx_interval(ctx, cpuctx, type, start, stamp_max);
+}
+
 static void
 ctx_pinned_sched_in(struct perf_event_context *ctx,
 		    struct perf_cpu_context *cpuctx)
 {
 	struct perf_event *event = NULL, *tmp;
+	u32 stamp_max;
 
-	list_for_each_entry_safe(
+	ctx_inactive_groups_interval(ctx, cpuctx, EVENT_PINNED, &event, &stamp_max);
+	if (!event)
+		return;
+
+	list_for_each_entry_safe_from(
 			event, tmp, &ctx->inactive_groups, ctx_active_entry) {
 		if (WARN_ON(event->state != PERF_EVENT_STATE_INACTIVE)) /* debug only */
 			continue;
+		/* Break with tstamp and not by event pointer. */
+		if (rbtree_key_stamp(event->rbtree_key) > stamp_max)
+			break;
+
 		if (!event_filter_match(event))
 			continue;
 
@@ -3125,11 +3305,19 @@ ctx_flexible_sched_in(struct perf_event_context *ctx,
 {
 	struct perf_event *event = NULL, *tmp;
 	int can_add_hw = 1;
+	u32 stamp_max;
 
-	list_for_each_entry_safe(
+	ctx_inactive_groups_interval(ctx, cpuctx, EVENT_FLEXIBLE, &event, &stamp_max);
+	if (!event)
+		return;
+
+	list_for_each_entry_safe_from(
 			event, tmp, &ctx->inactive_groups, ctx_active_entry) {
 		if (WARN_ON(event->state != PERF_EVENT_STATE_INACTIVE)) /* debug only */
 			continue;
+		/* Break with tstamp and not by event pointer. */
+		if (rbtree_key_stamp(event->rbtree_key) > stamp_max)
+			break;
 		/*
 		 * Listen to the 'cpu' scheduling filter constraint
 		 * of events:
