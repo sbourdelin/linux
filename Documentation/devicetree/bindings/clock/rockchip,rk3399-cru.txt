@@ -13,6 +13,11 @@ Required Properties:
 - #clock-cells: should be 1.
 - #reset-cells: should be 1.
 
+Optional Properties:
+
+- rockchip,grf: phandle to the syscon managing the "general register files"
+  If missing pll rates are not changable, due to the missing pll lock status.
+
 Each clock is assigned an identifier and client nodes can use this identifier
 to specify the clock which they consume. All available clocks are defined as
 preprocessor macros in the dt-bindings/clock/rk3399-cru.h headers and can be
