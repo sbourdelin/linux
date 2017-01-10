@@ -177,6 +177,8 @@ static int btbcm_reset(struct hci_dev *hdev)
 		return err;
 	}
 	kfree_skb(skb);
+	/* 100 msec delay for module to complete reset process */
+	msleep(100);
 
 	return 0;
 }
