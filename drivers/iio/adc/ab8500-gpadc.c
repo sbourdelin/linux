@@ -6,8 +6,11 @@
  * Author: Daniel Willerud <daniel.willerud@stericsson.com>
  * Author: Johan Palsson <johan.palsson@stericsson.com>
  * Author: M'boumba Cedric Madianga
+ * Author: Linus Walleij <linus.walleij@linaro.org>
  */
 #include <linux/init.h>
+#include <linux/iio/iio.h>
+#include <linux/iio/sysfs.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
@@ -18,10 +21,48 @@
 #include <linux/regulator/consumer.h>
 #include <linux/err.h>
 #include <linux/slab.h>
-#include <linux/list.h>
 #include <linux/mfd/abx500.h>
 #include <linux/mfd/abx500/ab8500.h>
-#include <linux/mfd/abx500/ab8500-gpadc.h>
+
+/* GPADC source: From datasheet(ADCSwSel[4:0] in GPADCCtrl2
+ * and ADCHwSel[4:0] in GPADCCtrl3 ) */
+#define BAT_CTRL		0x01
+#define BTEMP_BALL		0x02
+#define MAIN_CHARGER_V		0x03
+#define ACC_DETECT1		0x04
+#define ACC_DETECT2		0x05
+#define ADC_AUX1		0x06
+#define ADC_AUX2		0x07
+#define MAIN_BAT_V		0x08
+#define VBUS_V			0x09
+#define MAIN_CHARGER_C		0x0A
+#define USB_CHARGER_C		0x0B
+#define BK_BAT_V		0x0C
+#define DIE_TEMP		0x0D
+#define USB_ID			0x0E
+#define XTAL_TEMP		0x12
+#define VBAT_TRUE_MEAS		0x13
+#define BAT_CTRL_AND_IBAT	0x1C
+#define VBAT_MEAS_AND_IBAT	0x1D
+#define VBAT_TRUE_MEAS_AND_IBAT	0x1E
+#define BAT_TEMP_AND_IBAT	0x1F
+
+/* Virtual channel used only for ibat convertion to ampere
+ * Battery current conversion (ibat) cannot be requested as a single conversion
+ *  but it is always in combination with other input requests
+ */
+#define IBAT_VIRTUAL_CHANNEL		0xFF
+
+#define SAMPLE_1        1
+#define SAMPLE_4        4
+#define SAMPLE_8        8
+#define SAMPLE_16       16
+#define RISING_EDGE     0
+#define FALLING_EDGE    1
+
+/* Arbitrary ADC conversion type constants */
+#define ADC_SW				0
+#define ADC_HW				1
 
 /*
  * GPADC register offsets
@@ -140,11 +181,27 @@ struct adc_cal_data {
 };
 
 /**
+ * struct ab8500_gpadc_chan_info - per-channel GPADC info
+ * @name: name of the channel
+ * @id: the internal AB8500 ID number for the channel
+ */
+struct ab8500_gpadc_chan_info {
+	const char *name;
+	u8 id;
+	u8 avg_sample;
+	u8 trig_edge;
+	u8 trig_timer;
+	u8 conv_type;
+};
+
+
+/**
  * struct ab8500_gpadc - AB8500 GPADC device information
  * @dev:			pointer to the struct device
- * @node:			a list of AB8500 GPADCs, hence prepared for
-				reentrance
- * @parent:			pointer to the struct ab8500
+ * @ab8500:			pointer to the struct ab8500
+ * @nchans:			number of IIO channels
+ * @chans:			Internal channel information container
+ * @iio_chans:			IIO channels
  * @ab8500_gpadc_complete:	pointer to the struct completion, to indicate
  *				the completion of gpadc conversion
  * @ab8500_gpadc_lock:		structure of type mutex
@@ -157,8 +214,10 @@ struct adc_cal_data {
  */
 struct ab8500_gpadc {
 	struct device *dev;
-	struct list_head node;
-	struct ab8500 *parent;
+	struct ab8500 *ab8500;
+	unsigned int nchans;
+	struct ab8500_gpadc_chan_info *chans;
+	struct iio_chan_spec *iio_chans;
 	struct completion ab8500_gpadc_complete;
 	struct mutex ab8500_gpadc_lock;
 	struct regulator *regu;
@@ -167,29 +226,27 @@ struct ab8500_gpadc {
 	struct adc_cal_data cal_data[NBR_CAL_INPUTS];
 };
 
-static LIST_HEAD(ab8500_gpadc_list);
-
-/**
- * ab8500_gpadc_get() - returns a reference to the primary AB8500 GPADC
- * (i.e. the first GPADC in the instance list)
- */
-struct ab8500_gpadc *ab8500_gpadc_get(char *name)
+static struct ab8500_gpadc_chan_info *
+ab8500_gpadc_get_channel(struct ab8500_gpadc *gpadc, u8 chan)
 {
-	struct ab8500_gpadc *gpadc;
+	struct ab8500_gpadc_chan_info *ch;
+	int i;
 
-	list_for_each_entry(gpadc, &ab8500_gpadc_list, node) {
-		if (!strcmp(name, dev_name(gpadc->dev)))
-			return gpadc;
+	for (i = 0; i < gpadc->nchans; i++) {
+		ch = &gpadc->chans[i];
+		if (ch->id == chan)
+			break;
 	}
+	if (i == gpadc->nchans)
+		return NULL;
 
-	return ERR_PTR(-ENOENT);
+	return ch;
 }
-EXPORT_SYMBOL(ab8500_gpadc_get);
 
 /**
  * ab8500_gpadc_ad_to_voltage() - Convert a raw ADC value to a voltage
  */
-int ab8500_gpadc_ad_to_voltage(struct ab8500_gpadc *gpadc, u8 channel,
+static int ab8500_gpadc_ad_to_voltage(struct ab8500_gpadc *gpadc, u8 channel,
 	int ad_value)
 {
 	int res;
@@ -294,70 +351,11 @@ int ab8500_gpadc_ad_to_voltage(struct ab8500_gpadc *gpadc, u8 channel,
 	}
 	return res;
 }
-EXPORT_SYMBOL(ab8500_gpadc_ad_to_voltage);
 
-/**
- * ab8500_gpadc_sw_hw_convert() - gpadc conversion
- * @channel:	analog channel to be converted to digital data
- * @avg_sample:  number of ADC sample to average
- * @trig_egde:  selected ADC trig edge
- * @trig_timer: selected ADC trigger delay timer
- * @conv_type: selected conversion type (HW or SW conversion)
- *
- * This function converts the selected analog i/p to digital
- * data.
- */
-int ab8500_gpadc_sw_hw_convert(struct ab8500_gpadc *gpadc, u8 channel,
-		u8 avg_sample, u8 trig_edge, u8 trig_timer, u8 conv_type)
-{
-	int ad_value;
-	int voltage;
-
-	ad_value = ab8500_gpadc_read_raw(gpadc, channel, avg_sample,
-			trig_edge, trig_timer, conv_type);
-
-	/* On failure retry a second time */
-	if (ad_value < 0)
-		ad_value = ab8500_gpadc_read_raw(gpadc, channel, avg_sample,
-			trig_edge, trig_timer, conv_type);
-	if (ad_value < 0) {
-		dev_err(gpadc->dev, "GPADC raw value failed ch: %d\n",
-				channel);
-		return ad_value;
-	}
-
-	voltage = ab8500_gpadc_ad_to_voltage(gpadc, channel, ad_value);
-	if (voltage < 0)
-		dev_err(gpadc->dev,
-			"GPADC to voltage conversion failed ch: %d AD: 0x%x\n",
-			channel, ad_value);
-
-	return voltage;
-}
-EXPORT_SYMBOL(ab8500_gpadc_sw_hw_convert);
-
-/**
- * ab8500_gpadc_read_raw() - gpadc read
- * @channel:	analog channel to be read
- * @avg_sample:  number of ADC sample to average
- * @trig_edge:  selected trig edge
- * @trig_timer: selected ADC trigger delay timer
- * @conv_type: selected conversion type (HW or SW conversion)
- *
- * This function obtains the raw ADC value for an hardware conversion,
- * this then needs to be converted by calling ab8500_gpadc_ad_to_voltage()
- */
-int ab8500_gpadc_read_raw(struct ab8500_gpadc *gpadc, u8 channel,
-		u8 avg_sample, u8 trig_edge, u8 trig_timer, u8 conv_type)
-{
-	return ab8500_gpadc_double_read_raw(gpadc, channel, avg_sample,
-					    trig_edge, trig_timer, conv_type,
-					    NULL);
-}
-
-int ab8500_gpadc_double_read_raw(struct ab8500_gpadc *gpadc, u8 channel,
-		u8 avg_sample, u8 trig_edge, u8 trig_timer, u8 conv_type,
-		int *ibat)
+static int ab8500_gpadc_read(struct ab8500_gpadc *gpadc, u8 channel,
+			     u8 avg_sample, u8 trig_edge,
+			     u8 trig_timer, u8 conv_type,
+			     int *ibat)
 {
 	int ret;
 	int looplimit = 0;
@@ -442,7 +440,7 @@ int ab8500_gpadc_double_read_raw(struct ab8500_gpadc *gpadc, u8 channel,
 		val_reg1 |= EN_BUF | EN_ICHAR;
 		break;
 	case BTEMP_BALL:
-		if (!is_ab8500_2p0_or_earlier(gpadc->parent)) {
+		if (!is_ab8500_2p0_or_earlier(gpadc->ab8500)) {
 			val_reg1 |= EN_BUF | BTEMP_PULL_UP;
 			/*
 			* Delay might be needed for ABB8500 cut 3.0, if not,
@@ -593,7 +591,6 @@ out:
 		"gpadc_conversion: Failed to AD convert channel %d\n", channel);
 	return ret;
 }
-EXPORT_SYMBOL(ab8500_gpadc_read_raw);
 
 /**
  * ab8500_bm_gpadcconvend_handler() - isr for gpadc conversion completion
@@ -605,9 +602,9 @@ EXPORT_SYMBOL(ab8500_gpadc_read_raw);
  * can be read from the registers.
  * Returns IRQ status(IRQ_HANDLED)
  */
-static irqreturn_t ab8500_bm_gpadcconvend_handler(int irq, void *_gpadc)
+static irqreturn_t ab8500_bm_gpadcconvend_handler(int irq, void *data)
 {
-	struct ab8500_gpadc *gpadc = _gpadc;
+	struct ab8500_gpadc *gpadc = data;
 
 	complete(&gpadc->ab8500_gpadc_complete);
 
@@ -644,7 +641,7 @@ static void ab8500_gpadc_read_calibration_data(struct ab8500_gpadc *gpadc)
 	s64 V_gain, V_offset, V2A_gain, V2A_offset;
 	struct ab8500 *ab8500;
 
-	ab8500 = gpadc->parent;
+	ab8500 = gpadc->ab8500;
 
 	/* First we read all OTP registers and store the error code */
 	for (i = 0; i < ARRAY_SIZE(otp_cal_regs); i++) {
@@ -868,10 +865,68 @@ static void ab8500_gpadc_read_calibration_data(struct ab8500_gpadc *gpadc)
 		gpadc->cal_data[ADC_INPUT_VBAT].offset);
 }
 
+static int ab8500_gpadc_read_raw(struct iio_dev *indio_dev,
+				  struct iio_chan_spec const *chan,
+				  int *val, int *val2, long mask)
+{
+	struct ab8500_gpadc *gpadc = iio_priv(indio_dev);
+	const struct ab8500_gpadc_chan_info *ch;
+	int raw_val;
+	int processed;
+
+	ch = ab8500_gpadc_get_channel(gpadc, chan->address);
+	if (!ch) {
+		dev_err(gpadc->dev, "no such channel %lu\n",
+			chan->address);
+		return -EINVAL;
+	}
+
+	dev_info(gpadc->dev, "read channel %d\n", ch->id);
+
+	raw_val = ab8500_gpadc_read(gpadc, ch->id, ch->avg_sample,
+				    ch->trig_edge, ch->trig_timer,
+				    ch->conv_type, NULL);
+	if (raw_val < 0)
+		return raw_val;
+
+	if (mask == IIO_CHAN_INFO_RAW) {
+		*val = raw_val;
+		return IIO_VAL_INT;
+	}
+
+	processed = ab8500_gpadc_ad_to_voltage(gpadc, ch->id, raw_val);
+	if (processed < 0)
+		return processed;
+
+	/* Return millivolt or milliamps or millicentigrades */
+	*val = processed * 1000;
+	return IIO_VAL_INT;
+}
+
+static int ab8500_gpadc_of_xlate(struct iio_dev *indio_dev,
+				 const struct of_phandle_args *iiospec)
+{
+	struct ab8500_gpadc *gpadc = iio_priv(indio_dev);
+	unsigned int i;
+
+	for (i = 0; i < gpadc->nchans; i++)
+		if (gpadc->iio_chans[i].channel == iiospec->args[0])
+			return i;
+
+	return -EINVAL;
+}
+
+static const struct iio_info ab8500_gpadc_info = {
+	.driver_module = THIS_MODULE,
+	.of_xlate = ab8500_gpadc_of_xlate,
+	.read_raw = ab8500_gpadc_read_raw,
+};
+
 #ifdef CONFIG_PM
 static int ab8500_gpadc_runtime_suspend(struct device *dev)
 {
-	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct ab8500_gpadc *gpadc = iio_priv(indio_dev);
 
 	regulator_disable(gpadc->regu);
 	return 0;
@@ -879,7 +934,8 @@ static int ab8500_gpadc_runtime_suspend(struct device *dev)
 
 static int ab8500_gpadc_runtime_resume(struct device *dev)
 {
-	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct ab8500_gpadc *gpadc = iio_priv(indio_dev);
 	int ret;
 
 	ret = regulator_enable(gpadc->regu);
@@ -887,12 +943,11 @@ static int ab8500_gpadc_runtime_resume(struct device *dev)
 		dev_err(dev, "Failed to enable vtvout LDO: %d\n", ret);
 	return ret;
 }
-#endif
 
-#ifdef CONFIG_PM_SLEEP
 static int ab8500_gpadc_suspend(struct device *dev)
 {
-	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct ab8500_gpadc *gpadc = iio_priv(indio_dev);
 
 	mutex_lock(&gpadc->ab8500_gpadc_lock);
 
@@ -904,7 +959,8 @@ static int ab8500_gpadc_suspend(struct device *dev)
 
 static int ab8500_gpadc_resume(struct device *dev)
 {
-	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct ab8500_gpadc *gpadc = iio_priv(indio_dev);
 	int ret;
 
 	ret = regulator_enable(gpadc->regu);
@@ -919,114 +975,207 @@ static int ab8500_gpadc_resume(struct device *dev)
 }
 #endif
 
+static int ab8500_gpadc_parse_channel(struct device *dev,
+				      struct device_node *np,
+				      struct ab8500_gpadc_chan_info *ch,
+				      struct iio_chan_spec *iio_chan)
+{
+	const char *name = np->name;
+	u32 chan;
+	int ret;
+
+	ret = of_property_read_u32(np, "reg", &chan);
+	if (ret) {
+		dev_err(dev, "invalid channel number %s\n", name);
+		return ret;
+	}
+	if (chan > BAT_TEMP_AND_IBAT) {
+		dev_err(dev, "%s too big channel number %d\n", name, chan);
+		return -EINVAL;
+	}
+
+	iio_chan->channel = chan;
+	iio_chan->datasheet_name = name;
+	iio_chan->indexed = 1;
+	iio_chan->address = chan;
+	iio_chan->info_mask_separate = BIT(IIO_CHAN_INFO_RAW);
+	/* All are voltages */
+	iio_chan->type = IIO_VOLTAGE;
+
+	ch->id = chan;
+
+	/* Sensible defaults */
+	ch->avg_sample = SAMPLE_16;
+	ch->trig_edge = RISING_EDGE;
+	ch->conv_type = ADC_SW;
+	ch->trig_timer = 0;
+
+	return 0;
+}
+
+static int ab8500_gpadc_parse_channels(struct ab8500_gpadc *gpadc,
+				       struct device_node *np)
+{
+	struct device_node *child;
+	struct ab8500_gpadc_chan_info *ch;
+	int i;
+
+	gpadc->nchans = of_get_available_child_count(np);
+	if (!gpadc->nchans) {
+		dev_err(gpadc->dev, "no channel children\n");
+		return -ENODEV;
+	}
+	dev_info(gpadc->dev, "found %d ADC channels\n", gpadc->nchans);
+
+	gpadc->iio_chans = devm_kcalloc(gpadc->dev, gpadc->nchans,
+					sizeof(*gpadc->iio_chans), GFP_KERNEL);
+	if (!gpadc->iio_chans)
+		return -ENOMEM;
+
+	gpadc->chans = devm_kcalloc(gpadc->dev, gpadc->nchans,
+				    sizeof(*gpadc->chans), GFP_KERNEL);
+	if (!gpadc->chans)
+		return -ENOMEM;
+
+	i = 0;
+	for_each_available_child_of_node(np, child) {
+		struct iio_chan_spec *iio_chan;
+		int ret;
+
+		ch = &gpadc->chans[i];
+		iio_chan = &gpadc->iio_chans[i];
+
+		ret = ab8500_gpadc_parse_channel(gpadc->dev, child, ch, iio_chan);
+		if (ret) {
+			of_node_put(child);
+			return ret;
+		}
+		i++;
+	}
+
+	return 0;
+}
+
 static int ab8500_gpadc_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct ab8500_gpadc *gpadc;
+	struct iio_dev *indio_dev;
+	struct device *dev = &pdev->dev;
+	struct device_node *np = pdev->dev.of_node;
 
-	gpadc = devm_kzalloc(&pdev->dev,
-			     sizeof(struct ab8500_gpadc), GFP_KERNEL);
-	if (!gpadc)
+	indio_dev = devm_iio_device_alloc(dev, sizeof(*gpadc));
+	if (!indio_dev)
 		return -ENOMEM;
+	platform_set_drvdata(pdev, indio_dev);
+	gpadc = iio_priv(indio_dev);
+
+	gpadc->dev = dev;
+	gpadc->ab8500 = dev_get_drvdata(pdev->dev.parent);
+	mutex_init(&gpadc->ab8500_gpadc_lock);
+
+	ret = ab8500_gpadc_parse_channels(gpadc, np);
 
 	gpadc->irq_sw = platform_get_irq_byname(pdev, "SW_CONV_END");
-	if (gpadc->irq_sw < 0)
-		dev_err(gpadc->dev, "failed to get platform sw_conv_end irq\n");
+	if (gpadc->irq_sw < 0) {
+		dev_err(dev, "failed to get platform sw_conv_end irq\n");
+		return gpadc->irq_sw;
+	}
 
 	gpadc->irq_hw = platform_get_irq_byname(pdev, "HW_CONV_END");
-	if (gpadc->irq_hw < 0)
-		dev_err(gpadc->dev, "failed to get platform hw_conv_end irq\n");
-
-	gpadc->dev = &pdev->dev;
-	gpadc->parent = dev_get_drvdata(pdev->dev.parent);
-	mutex_init(&gpadc->ab8500_gpadc_lock);
+	if (gpadc->irq_hw < 0) {
+		dev_err(dev, "failed to get platform hw_conv_end irq\n");
+		return gpadc->irq_hw;
+	}
 
 	/* Initialize completion used to notify completion of conversion */
 	init_completion(&gpadc->ab8500_gpadc_complete);
 
 	/* Register interrupts */
-	if (gpadc->irq_sw >= 0) {
-		ret = request_threaded_irq(gpadc->irq_sw, NULL,
-			ab8500_bm_gpadcconvend_handler,
-			IRQF_NO_SUSPEND | IRQF_SHARED | IRQF_ONESHOT,
-			"ab8500-gpadc-sw",
-			gpadc);
-		if (ret < 0) {
-			dev_err(gpadc->dev,
-				"Failed to register interrupt irq: %d\n",
-				gpadc->irq_sw);
-			goto fail;
-		}
+	ret = devm_request_threaded_irq(dev,
+		gpadc->irq_sw, NULL,
+		ab8500_bm_gpadcconvend_handler,
+		IRQF_NO_SUSPEND | IRQF_SHARED | IRQF_ONESHOT,
+		"ab8500-gpadc-sw",
+		gpadc);
+	if (ret < 0) {
+		dev_err(dev,
+			"failed to request interrupt irq %d\n",
+			gpadc->irq_sw);
+		return ret;
 	}
 
-	if (gpadc->irq_hw >= 0) {
-		ret = request_threaded_irq(gpadc->irq_hw, NULL,
-			ab8500_bm_gpadcconvend_handler,
-			IRQF_NO_SUSPEND | IRQF_SHARED | IRQF_ONESHOT,
-			"ab8500-gpadc-hw",
-			gpadc);
-		if (ret < 0) {
-			dev_err(gpadc->dev,
-				"Failed to register interrupt irq: %d\n",
-				gpadc->irq_hw);
-			goto fail_irq;
-		}
+	ret = devm_request_threaded_irq(dev,
+		gpadc->irq_hw, NULL,
+		ab8500_bm_gpadcconvend_handler,
+		IRQF_NO_SUSPEND | IRQF_SHARED | IRQF_ONESHOT,
+		"ab8500-gpadc-hw",
+		gpadc);
+	if (ret < 0) {
+		dev_err(dev,
+			"Failed to register interrupt irq: %d\n",
+			gpadc->irq_hw);
+		return ret;
 	}
 
-	/* VTVout LDO used to power up ab8500-GPADC */
-	gpadc->regu = devm_regulator_get(&pdev->dev, "vddadc");
+	/* The VTVout LDO used to power the AB8500 GPADC */
+	gpadc->regu = devm_regulator_get(dev, "vddadc");
 	if (IS_ERR(gpadc->regu)) {
 		ret = PTR_ERR(gpadc->regu);
-		dev_err(gpadc->dev, "failed to get vtvout LDO\n");
-		goto fail_irq;
+		dev_err(dev, "failed to get vtvout LDO\n");
+		return ret;
 	}
-
-	platform_set_drvdata(pdev, gpadc);
 
 	ret = regulator_enable(gpadc->regu);
 	if (ret) {
-		dev_err(gpadc->dev, "Failed to enable vtvout LDO: %d\n", ret);
-		goto fail_enable;
+		dev_err(dev, "failed to enable vtvout LDO: %d\n", ret);
+		return ret;
 	}
 
-	pm_runtime_set_autosuspend_delay(gpadc->dev, GPADC_AUDOSUSPEND_DELAY);
-	pm_runtime_use_autosuspend(gpadc->dev);
-	pm_runtime_set_active(gpadc->dev);
-	pm_runtime_enable(gpadc->dev);
+	pm_runtime_set_autosuspend_delay(dev, GPADC_AUDOSUSPEND_DELAY);
+	pm_runtime_use_autosuspend(dev);
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
 
 	ab8500_gpadc_read_calibration_data(gpadc);
-	list_add_tail(&gpadc->node, &ab8500_gpadc_list);
-	dev_dbg(gpadc->dev, "probe success\n");
+
+	indio_dev->dev.parent = dev;
+	indio_dev->dev.of_node = np;
+	indio_dev->name = "ab8500-gpadc";
+	indio_dev->modes = INDIO_DIRECT_MODE;
+	indio_dev->info = &ab8500_gpadc_info;
+	indio_dev->channels = gpadc->iio_chans;
+	indio_dev->num_channels = gpadc->nchans;
+
+	ret = iio_device_register(indio_dev);
+	if (ret)
+		goto out_dis_pm;
+
+	dev_info(dev, "AB8500 GPADC initialized\n");
 
 	return 0;
 
-fail_enable:
-fail_irq:
-	free_irq(gpadc->irq_sw, gpadc);
-	free_irq(gpadc->irq_hw, gpadc);
-fail:
+out_dis_pm:
+	pm_runtime_get_sync(dev);
+	pm_runtime_disable(dev);
+	regulator_disable(gpadc->regu);
+	pm_runtime_set_suspended(dev);
+	pm_runtime_put_noidle(dev);
+
 	return ret;
 }
 
 static int ab8500_gpadc_remove(struct platform_device *pdev)
 {
-	struct ab8500_gpadc *gpadc = platform_get_drvdata(pdev);
+	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+	struct ab8500_gpadc *gpadc = iio_priv(indio_dev);
 
-	/* remove this gpadc entry from the list */
-	list_del(&gpadc->node);
-	/* remove interrupt  - completion of Sw ADC conversion */
-	if (gpadc->irq_sw >= 0)
-		free_irq(gpadc->irq_sw, gpadc);
-	if (gpadc->irq_hw >= 0)
-		free_irq(gpadc->irq_hw, gpadc);
+	iio_device_unregister(indio_dev);
 
 	pm_runtime_get_sync(gpadc->dev);
 	pm_runtime_disable(gpadc->dev);
-
 	regulator_disable(gpadc->regu);
-
 	pm_runtime_set_suspended(gpadc->dev);
-
 	pm_runtime_put_noidle(gpadc->dev);
 
 	return 0;
