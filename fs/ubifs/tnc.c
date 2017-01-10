@@ -34,11 +34,6 @@
 #include <linux/slab.h>
 #include "ubifs.h"
 
-static int try_read_node(const struct ubifs_info *c, void *buf, int type,
-			 int len, int lnum, int offs);
-static int fallible_read_node(struct ubifs_info *c, const union ubifs_key *key,
-			      struct ubifs_zbranch *zbr, void *node);
-
 /*
  * Returned codes of 'matches_name()' and 'fallible_matches_name()' functions.
  * @NAME_LESS: name corresponding to the first argument is less than second
@@ -383,52 +378,6 @@ static void lnc_free(struct ubifs_zbranch *zbr)
 }
 
 /**
- * tnc_read_hashed_node - read a "hashed" leaf node.
- * @c: UBIFS file-system description object
- * @zbr: key and position of the node
- * @node: node is returned here
- *
- * This function reads a "hashed" node defined by @zbr from the leaf node cache
- * (in it is there) or from the hash media, in which case the node is also
- * added to LNC. Returns zero in case of success or a negative negative error
- * code in case of failure.
- */
-static int tnc_read_hashed_node(struct ubifs_info *c, struct ubifs_zbranch *zbr,
-				void *node)
-{
-	int err;
-
-	ubifs_assert(is_hash_key(c, &zbr->key));
-
-	if (zbr->leaf) {
-		/* Read from the leaf node cache */
-		ubifs_assert(zbr->len != 0);
-		memcpy(node, zbr->leaf, zbr->len);
-		return 0;
-	}
-
-	if (c->replaying) {
-		err = fallible_read_node(c, &zbr->key, zbr, node);
-		/*
-		 * When the node was not found, return -ENOENT, 0 otherwise.
-		 * Negative return codes stay as-is.
-		 */
-		if (err == 0)
-			err = -ENOENT;
-		else if (err == 1)
-			err = 0;
-	} else {
-		err = ubifs_tnc_read_node(c, zbr, node);
-	}
-	if (err)
-		return err;
-
-	/* Add the node to the leaf node cache */
-	err = lnc_add(c, zbr, node);
-	return err;
-}
-
-/**
  * try_read_node - read a node if it is a node.
  * @c: UBIFS file-system description object
  * @buf: buffer to read to
@@ -522,6 +471,52 @@ static int fallible_read_node(struct ubifs_info *c, const union ubifs_key *key,
 		dbg_mntk(key, "dangling branch LEB %d:%d len %d, key ",
 			zbr->lnum, zbr->offs, zbr->len);
 	return ret;
+}
+
+/**
+ * tnc_read_hashed_node - read a "hashed" leaf node.
+ * @c: UBIFS file-system description object
+ * @zbr: key and position of the node
+ * @node: node is returned here
+ *
+ * This function reads a "hashed" node defined by @zbr from the leaf node cache
+ * (in it is there) or from the hash media, in which case the node is also
+ * added to LNC. Returns zero in case of success or a negative negative error
+ * code in case of failure.
+ */
+static int tnc_read_hashed_node(struct ubifs_info *c, struct ubifs_zbranch *zbr,
+				void *node)
+{
+	int err;
+
+	ubifs_assert(is_hash_key(c, &zbr->key));
+
+	if (zbr->leaf) {
+		/* Read from the leaf node cache */
+		ubifs_assert(zbr->len != 0);
+		memcpy(node, zbr->leaf, zbr->len);
+		return 0;
+	}
+
+	if (c->replaying) {
+		err = fallible_read_node(c, &zbr->key, zbr, node);
+		/*
+		 * When the node was not found, return -ENOENT, 0 otherwise.
+		 * Negative return codes stay as-is.
+		 */
+		if (err == 0)
+			err = -ENOENT;
+		else if (err == 1)
+			err = 0;
+	} else {
+		err = ubifs_tnc_read_node(c, zbr, node);
+	}
+	if (err)
+		return err;
+
+	/* Add the node to the leaf node cache */
+	err = lnc_add(c, zbr, node);
+	return err;
 }
 
 /**
