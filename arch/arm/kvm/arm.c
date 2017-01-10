@@ -1263,6 +1263,7 @@ static int init_subsystems(void)
 		goto out;
 
 	kvm_perf_init();
+	kvm_host_pmu_init();
 	kvm_coproc_table_init();
 
 out:
@@ -1453,6 +1454,7 @@ out_err:
 void kvm_arch_exit(void)
 {
 	kvm_perf_teardown();
+	kvm_host_pmu_teardown();
 }
 
 static int arm_init(void)

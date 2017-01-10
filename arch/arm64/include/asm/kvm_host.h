@@ -349,6 +349,14 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
 int kvm_perf_init(void);
 int kvm_perf_teardown(void);
 
+#if !defined(CONFIG_KVM_HOST_PMU)
+static inline int kvm_host_pmu_init(void) { return 0; }
+static inline void kvm_host_pmu_teardown(void) { }
+#else
+int kvm_host_pmu_init(void);
+void kvm_host_pmu_teardown(void);
+#endif
+
 struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
 
 static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
