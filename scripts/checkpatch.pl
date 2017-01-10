@@ -6024,7 +6024,8 @@ sub process {
 		}
 
 # check for various structs that are normally const (ops, kgdb, device_tree)
-		if ($line !~ /\bconst\b/ &&
+		if ($const_structs ne "" &&
+		    $line !~ /\bconst\b/ &&
 		    $line =~ /\bstruct\s+($const_structs)\b/) {
 			WARN("CONST_STRUCT",
 			     "struct $1 should normally be const\n" .
