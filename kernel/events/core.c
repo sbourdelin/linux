@@ -6397,21 +6397,52 @@ typedef void (perf_iterate_f)(struct perf_event *event, void *data);
 static void
 perf_iterate_ctx(struct perf_event_context *ctx,
 		   perf_iterate_f output,
-		   void *data, bool all)
+		   void *data)
 {
 	struct perf_event *event;
 
-	list_for_each_entry_rcu(event, &ctx->event_list, event_entry) {
-		if (!all) {
-			if (event->state < PERF_EVENT_STATE_INACTIVE)
-				continue;
-			if (!event_filter_match(event))
-				continue;
-		}
-
+	list_for_each_entry_rcu(event, &ctx->event_list, event_entry)
 		output(event, data);
-	}
 }
+
+static void
+perf_iterate_group(struct perf_event *group, perf_iterate_f output, void *data)
+{
+	struct perf_event *event;
+
+	output(group, data);
+	list_for_each_entry(event, &group->sibling_list, group_entry)
+		output(event, data);
+}
+
+static void
+perf_iterate_ctx_matching(struct perf_event_context *ctx,
+			  struct perf_cpu_context *cpuctx,
+			  perf_iterate_f output,
+			  void *data)
+{
+	struct perf_event *event, *tmp;
+	u32 stamp_max;
+
+	/* This lists are not RCU safe. Need to find is this is true or if we can work around it */
+	lockdep_assert_held(&ctx->lock);
+	/* Active events have already passed event_filter_match. */
+	list_for_each_entry(event, &ctx->active_pinned_groups, ctx_active_entry)
+		perf_iterate_group(event, output, data);
+
+	list_for_each_entry(event, &ctx->active_flexible_groups, ctx_active_entry)
+		perf_iterate_group(event, output, data);
+
+	event = NULL;
+	ctx_inactive_groups_interval(ctx, cpuctx, EVENT_PINNED | EVENT_FLEXIBLE,
+				     &event, &stamp_max);
+
+	list_for_each_entry_safe_from(
+			event, tmp, &ctx->inactive_groups, ctx_active_entry) {
+		if (event_filter_match(event))
+			perf_iterate_group(event, output, data);
+	}
+};
 
 static void perf_iterate_sb_cpu(perf_iterate_f output, void *data)
 {
@@ -6457,7 +6488,7 @@ perf_iterate_sb(perf_iterate_f output, void *data,
 	 * context.
 	 */
 	if (task_ctx) {
-		perf_iterate_ctx(task_ctx, output, data, false);
+		perf_iterate_ctx_matching(task_ctx, NULL, output, data);
 		goto done;
 	}
 
@@ -6466,7 +6497,7 @@ perf_iterate_sb(perf_iterate_f output, void *data,
 	for_each_task_context_nr(ctxn) {
 		ctx = rcu_dereference(current->perf_event_ctxp[ctxn]);
 		if (ctx)
-			perf_iterate_ctx(ctx, output, data, false);
+			perf_iterate_ctx_matching(ctx, NULL, output, data);
 	}
 done:
 	preempt_enable();
@@ -6518,8 +6549,7 @@ void perf_event_exec(void)
 
 		perf_event_enable_on_exec(ctxn);
 
-		perf_iterate_ctx(ctx, perf_event_addr_filters_exec, NULL,
-				   true);
+		perf_iterate_ctx(ctx, perf_event_addr_filters_exec, NULL);
 	}
 	rcu_read_unlock();
 }
@@ -6568,10 +6598,10 @@ static int __perf_pmu_output_stop(void *info)
 	};
 
 	rcu_read_lock();
-	perf_iterate_ctx(&cpuctx->ctx, __perf_event_output_stop, &ro, false);
+	perf_iterate_ctx_matching(&cpuctx->ctx, cpuctx, __perf_event_output_stop, &ro);
 	if (cpuctx->task_ctx)
-		perf_iterate_ctx(cpuctx->task_ctx, __perf_event_output_stop,
-				   &ro, false);
+		perf_iterate_ctx_matching(cpuctx->task_ctx, NULL, __perf_event_output_stop,
+				   &ro);
 	rcu_read_unlock();
 
 	return ro.err;
@@ -7090,7 +7120,7 @@ static void perf_addr_filters_adjust(struct vm_area_struct *vma)
 		if (!ctx)
 			continue;
 
-		perf_iterate_ctx(ctx, __perf_addr_filters_adjust, vma, true);
+		perf_iterate_ctx(ctx, __perf_addr_filters_adjust, vma);
 	}
 	rcu_read_unlock();
 }
