@@ -102,7 +102,7 @@ static int stop_loop(struct cpuidle_device *dev,
 		     int index)
 {
 	ppc64_runlatch_off();
-	power9_idle_stop(stop_psscr_table[index]);
+	arch300_idle_stop(stop_psscr_table[index]);
 	ppc64_runlatch_on();
 	return index;
 }

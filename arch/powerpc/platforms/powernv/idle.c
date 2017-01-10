@@ -241,10 +241,10 @@ static DEVICE_ATTR(fastsleep_workaround_applyonce, 0600,
 /*
  * Used for ppc_md.power_save which needs a function with no parameters
  */
-static void power9_idle(void)
+static void arch300_idle(void)
 {
 	/* Requesting stop state 0 */
-	power9_idle_stop(0);
+	arch300_idle_stop(0);
 }
 /*
  * First deep stop state. Used to figure out when to save/restore
@@ -415,7 +415,7 @@ static int __init pnv_init_idle_states(void)
 	if (supported_cpuidle_states & OPAL_PM_NAP_ENABLED)
 		ppc_md.power_save = power7_idle;
 	else if (supported_cpuidle_states & OPAL_PM_STOP_INST_FAST)
-		ppc_md.power_save = power9_idle;
+		ppc_md.power_save = arch300_idle;
 
 out:
 	return 0;

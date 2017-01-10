@@ -106,8 +106,9 @@ core_idle_lock_held:
 
 /*
  * Pass requested state in r3:
- *	r3 - PNV_THREAD_NAP/SLEEP/WINKLE in POWER8
- *	   - Requested STOP state in POWER9
+ *	r3 - PNV_THREAD_NAP/SLEEP/WINKLE on ISA 2.07 or less
+	     (POWER7,POWER8)
+ *	   - Requested STOP state on ISA 3.0 CPUs
  *
  * To check IRQ_HAPPENED in r4
  * 	0 - don't check
@@ -357,7 +358,7 @@ ALT_FTR_SECTION_END_NESTED_IFSET(CPU_FTR_ARCH_207S, 66);		\
 /*
  * r3 - requested stop state
  */
-_GLOBAL(power9_idle_stop)
+_GLOBAL(arch300_idle_stop)
 	LOAD_REG_IMMEDIATE(r4, PSSCR_HV_TEMPLATE)
 	or	r4,r4,r3
 	mtspr	SPRN_PSSCR, r4
@@ -377,7 +378,7 @@ _GLOBAL(pnv_restore_hyp_resource)
 BEGIN_FTR_SECTION
 	ld	r2,PACATOC(r13);
 	/*
-	 * POWER ISA 3. Use PSSCR to determine if we
+	 * POWER ISA 3.0. Use PSSCR to determine if we
 	 * are waking up from deep idle state
 	 */
 	LOAD_REG_ADDRBASE(r5,pnv_first_deep_stop_state)
@@ -429,8 +430,8 @@ END_FTR_SECTION_IFSET(CPU_FTR_ARCH_300)
 /*
  * Called if waking up from idle state which can cause either partial or
  * complete hyp state loss.
- * In POWER8, called if waking up from fastsleep or winkle
- * In POWER9, called if waking up from stop state >= pnv_first_deep_stop_state
+ * In ISA 2.07 (POWER8),called if waking up from fastsleep or winkle
+ * In ISA 3.0, called if waking up from stop state >= pnv_first_deep_stop_state
  *
  * r13 - PACA
  * cr3 - gt if waking up with partial/complete hypervisor state loss

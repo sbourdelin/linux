@@ -456,7 +456,7 @@ extern int powersave_nap;	/* set if nap mode can be used in idle loop */
 extern unsigned long power7_nap(int check_irq);
 extern unsigned long power7_sleep(void);
 extern unsigned long power7_winkle(void);
-extern unsigned long power9_idle_stop(unsigned long stop_level);
+extern unsigned long arch300_idle_stop(unsigned long stop_level);
 
 extern void flush_instruction_cache(void);
 extern void hard_reset_now(void);

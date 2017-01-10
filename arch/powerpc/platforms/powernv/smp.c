@@ -183,7 +183,7 @@ static void pnv_smp_cpu_kill_self(void)
 		ppc64_runlatch_off();
 
 		if (cpu_has_feature(CPU_FTR_ARCH_300))
-			srr1 = power9_idle_stop(pnv_deepest_stop_state);
+			srr1 = arch300_idle_stop(pnv_deepest_stop_state);
 		else if (idle_states & OPAL_PM_WINKLE_ENABLED)
 			srr1 = power7_winkle();
 		else if ((idle_states & OPAL_PM_SLEEP_ENABLED) ||
