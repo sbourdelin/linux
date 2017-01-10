@@ -753,7 +753,7 @@ static int cfi_intelext_partition_fixup(struct mtd_info *mtd,
 			kfree(newcfi);
 			return -ENOMEM;
 		}
-		memcpy(newcfi, cfi, sizeof(struct cfi_private));
+		memcpy(newcfi, cfi, sizeof(*cfi));
 		newcfi->numchips = numvirtchips;
 		newcfi->chipshift = partshift;
 
