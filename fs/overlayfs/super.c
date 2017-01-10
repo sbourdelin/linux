@@ -157,6 +157,7 @@ static void ovl_put_super(struct super_block *sb)
 	kfree(ufs->config.upperdir);
 	kfree(ufs->config.workdir);
 	put_cred(ufs->creator_cred);
+	put_cred(ufs->creator_cred_unpriv);
 	kfree(ufs);
 }
 
@@ -701,6 +702,7 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 	unsigned int stacklen = 0;
 	unsigned int i;
 	bool remote = false;
+	struct cred *cred;
 	int err;
 
 	err = -ENOMEM;
@@ -874,10 +876,17 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 	if (!ufs->creator_cred)
 		goto out_put_lower_mnt;
 
+	cred = prepare_creds();
+	if (!cred)
+		goto out_put_cred;
+
+	ufs->creator_cred_unpriv = cred;
+	cap_lower(cred->cap_effective, CAP_SYS_RESOURCE);
+
 	err = -ENOMEM;
 	oe = ovl_alloc_entry(numlower);
 	if (!oe)
-		goto out_put_cred;
+		goto out_put_cred_unpriv;
 
 	sb->s_magic = OVERLAYFS_SUPER_MAGIC;
 	sb->s_op = &ovl_super_operations;
@@ -914,6 +923,8 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 
 out_free_oe:
 	kfree(oe);
+out_put_cred_unpriv:
+	put_cred(ufs->creator_cred_unpriv);
 out_put_cred:
 	put_cred(ufs->creator_cred);
 out_put_lower_mnt:

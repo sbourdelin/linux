@@ -35,8 +35,16 @@ struct dentry *ovl_workdir(struct dentry *dentry)
 const struct cred *ovl_override_creds(struct super_block *sb)
 {
 	struct ovl_fs *ofs = sb->s_fs_info;
+	const struct cred *cred = ofs->creator_cred;
 
-	return override_creds(ofs->creator_cred);
+	/*
+	 * Do not override quota inode limit if current task is not
+	 * capable to do that in mounter's user namespace.
+	 */
+	if (!ns_capable_noaudit(cred->user_ns, CAP_SYS_RESOURCE))
+		cred = ofs->creator_cred_unpriv;
+
+	return override_creds(cred);
 }
 
 struct ovl_entry *ovl_alloc_entry(unsigned int numlower)

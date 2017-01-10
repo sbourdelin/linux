@@ -27,6 +27,8 @@ struct ovl_fs {
 	struct ovl_config config;
 	/* creds of process who forced instantiation of super block */
 	const struct cred *creator_cred;
+	/* the same credentials without CAP_SYS_RESOURCE */
+	const struct cred *creator_cred_unpriv;
 };
 
 /* private information held for every overlayfs dentry */
