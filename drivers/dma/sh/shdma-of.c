@@ -20,7 +20,7 @@
 #define to_shdma_chan(c) container_of(c, struct shdma_chan, dma_chan)
 
 static struct dma_chan *shdma_of_xlate(struct of_phandle_args *dma_spec,
-				       struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	u32 id = dma_spec->args[0];
 	dma_cap_mask_t mask;

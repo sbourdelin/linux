@@ -1659,7 +1659,7 @@ static bool sdma_filter_fn(struct dma_chan *chan, void *fn_param)
 }
 
 static struct dma_chan *sdma_xlate(struct of_phandle_args *dma_spec,
-				   struct of_dma *ofdma)
+				   struct of_dma *ofdma, struct device *slave)
 {
 	struct sdma_engine *sdma = ofdma->of_dma_data;
 	dma_cap_mask_t mask = sdma->dma_device.cap_mask;

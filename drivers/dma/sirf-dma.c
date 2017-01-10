@@ -826,7 +826,7 @@ EXPORT_SYMBOL(sirfsoc_dma_filter_id);
 	BIT(DMA_SLAVE_BUSWIDTH_8_BYTES))
 
 static struct dma_chan *of_dma_sirfsoc_xlate(struct of_phandle_args *dma_spec,
-	struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	struct sirfsoc_dma *sdma = ofdma->of_dma_data;
 	unsigned int request = dma_spec->args[0];

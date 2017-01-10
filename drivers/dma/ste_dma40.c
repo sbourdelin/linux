@@ -2334,7 +2334,7 @@ static void d40_set_prio_realtime(struct d40_chan *d40c)
 #define D40_DT_FLAGS_HIGH_PRIO(flags)  ((flags >> 4) & 0x1)
 
 static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
-				  struct of_dma *ofdma)
+				  struct of_dma *ofdma, struct device *slave)
 {
 	struct stedma40_chan_cfg cfg;
 	dma_cap_mask_t cap;

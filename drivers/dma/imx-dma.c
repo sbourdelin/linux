@@ -1032,7 +1032,7 @@ static bool imxdma_filter_fn(struct dma_chan *chan, void *param)
 }
 
 static struct dma_chan *imxdma_xlate(struct of_phandle_args *dma_spec,
-						struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	int count = dma_spec->args_count;
 	struct imxdma_engine *imxdma = ofdma->of_dma_data;

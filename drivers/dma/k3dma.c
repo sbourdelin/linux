@@ -786,7 +786,7 @@ static const struct of_device_id k3_pdma_dt_ids[] = {
 MODULE_DEVICE_TABLE(of, k3_pdma_dt_ids);
 
 static struct dma_chan *k3_of_dma_simple_xlate(struct of_phandle_args *dma_spec,
-						struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	struct k3_dma_dev *d = ofdma->of_dma_data;
 	unsigned int request = dma_spec->args[0];

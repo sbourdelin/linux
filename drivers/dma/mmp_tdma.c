@@ -591,7 +591,7 @@ static bool mmp_tdma_filter_fn(struct dma_chan *chan, void *fn_param)
 }
 
 static struct dma_chan *mmp_tdma_xlate(struct of_phandle_args *dma_spec,
-			       struct of_dma *ofdma)
+			       struct of_dma *ofdma, struct device *slave)
 {
 	struct mmp_tdma_device *tdev = ofdma->of_dma_data;
 	dma_cap_mask_t mask = tdev->device.cap_mask;

@@ -1779,7 +1779,7 @@ static bool coh901318_filter_base_and_id(struct dma_chan *chan, void *data)
 }
 
 static struct dma_chan *coh901318_xlate(struct of_phandle_args *dma_spec,
-					struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	struct coh901318_filter_args args = {
 		.base = ofdma->of_dma_data,

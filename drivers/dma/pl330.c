@@ -2084,7 +2084,8 @@ static void pl330_tasklet(unsigned long data)
 }
 
 static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
-						struct of_dma *ofdma)
+					   struct of_dma *ofdma,
+					   struct device *slave)
 {
 	int count = dma_spec->args_count;
 	struct pl330_dmac *pl330 = ofdma->of_dma_data;

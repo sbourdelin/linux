@@ -1552,7 +1552,7 @@ static bool rcar_dmac_chan_filter(struct dma_chan *chan, void *arg)
 }
 
 static struct dma_chan *rcar_dmac_of_xlate(struct of_phandle_args *dma_spec,
-					   struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	struct rcar_dmac_chan *rchan;
 	struct dma_chan *chan;

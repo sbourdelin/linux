@@ -1040,7 +1040,7 @@ static int zynqmp_dma_chan_probe(struct zynqmp_dma_device *zdev,
  * Return: DMA channel pointer on success and NULL on error
  */
 static struct dma_chan *of_zynqmp_dma_xlate(struct of_phandle_args *dma_spec,
-					    struct of_dma *ofdma)
+				     struct of_dma *ofdma, struct device *slave)
 {
 	struct zynqmp_dma_device *zdev = ofdma->of_dma_data;
 
