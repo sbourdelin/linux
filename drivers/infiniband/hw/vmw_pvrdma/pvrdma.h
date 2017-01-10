@@ -221,6 +221,7 @@ struct pvrdma_dev {
 	u32 port_cap_mask;
 	struct mutex port_mutex; /* Port modification mutex. */
 	bool ib_active;
+	bool enabled;
 	atomic_t num_qps;
 	atomic_t num_cqs;
 	atomic_t num_pds;

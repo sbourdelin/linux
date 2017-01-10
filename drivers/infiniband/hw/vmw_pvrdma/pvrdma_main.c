@@ -74,6 +74,8 @@ static int pvrdma_del_gid(struct ib_device *ibdev,
 			  void **context);
 
 
+static int pvrdma_enable_dev(struct pvrdma_dev *dev);
+
 static ssize_t show_hca(struct device *device, struct device_attribute *attr,
 			char *buf)
 {
@@ -755,6 +757,10 @@ static void pvrdma_netdevice_event_handle(struct pvrdma_dev *dev,
 		pvrdma_dispatch_event(dev, 1, IB_EVENT_PORT_ERR);
 		break;
 	case NETDEV_UP:
+		if (!dev->enabled && pvrdma_enable_dev(dev)) {
+			dev_err(&dev->pdev->dev, "failed to enable device\n");
+			break;
+		}
 		pvrdma_dispatch_event(dev, 1, IB_EVENT_PORT_ACTIVE);
 		break;
 	default:
@@ -799,6 +805,48 @@ static int pvrdma_netdevice_event(struct notifier_block *this,
 	queue_work(event_wq, &netdev_work->work);
 
 	return NOTIFY_DONE;
+}
+
+static void pvrdma_disable_dev(struct pvrdma_dev *dev)
+{
+	if (dev->enabled) {
+		ib_unregister_device(&dev->ib_dev);
+		dev->enabled = false;
+	}
+}
+
+static int pvrdma_enable_dev(struct pvrdma_dev *dev)
+{
+	int ret;
+	pvrdma_enable_intrs(dev);
+
+	/* Activate pvrdma device */
+	pvrdma_write_reg(dev, PVRDMA_REG_CTL, PVRDMA_DEVICE_CTL_ACTIVATE);
+
+	/* Make sure the write is complete before reading status. */
+	mb();
+
+	/* Check if device was successfully activated */
+	ret = pvrdma_read_reg(dev, PVRDMA_REG_ERR);
+	if (ret) {
+		dev_err(&dev->pdev->dev, "failed to activate device\n");
+		ret = -EFAULT;
+		goto err_disable_intrs;
+	}
+
+	/* Register IB device */
+	ret = pvrdma_register_device(dev);
+	if (ret) {
+		dev_err(&dev->pdev->dev, "failed to register IB device\n");
+		goto err_disable_intrs;
+	}
+
+	dev->enabled = true;
+	return 0;
+
+err_disable_intrs:
+	pvrdma_disable_intrs(dev);
+	return ret;
 }
 
 static int pvrdma_pci_probe(struct pci_dev *pdev,
@@ -867,14 +915,14 @@ static int pvrdma_pci_probe(struct pci_dev *pdev,
 	/* Enable 64-Bit DMA */
 	if (pci_set_dma_mask(pdev, DMA_BIT_MASK(64)) == 0) {
 		ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
-		if (ret != 0) {
+		if (ret) {
 			dev_err(&pdev->dev,
 				"pci_set_consistent_dma_mask failed\n");
 			goto err_free_resource;
 		}
 	} else {
 		ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
-		if (ret != 0) {
+		if (ret) {
 			dev_err(&pdev->dev,
 				"pci_set_dma_mask failed\n");
 			goto err_free_resource;
@@ -1029,7 +1077,7 @@ static int pvrdma_pci_probe(struct pci_dev *pdev,
 	if (ret) {
 		dev_err(&pdev->dev, "failed to allocate interrupts\n");
 		ret = -ENOMEM;
-		goto err_netdevice;
+		goto err_free_cq_ring;
 	}
 
 	/* Allocate UAR table. */
@@ -1049,51 +1097,35 @@ static int pvrdma_pci_probe(struct pci_dev *pdev,
 	}
 	dev_dbg(&pdev->dev, "gid table len %d\n", dev->dsr->caps.gid_tbl_len);
 
-	pvrdma_enable_intrs(dev);
-
-	/* Activate pvrdma device */
-	pvrdma_write_reg(dev, PVRDMA_REG_CTL, PVRDMA_DEVICE_CTL_ACTIVATE);
-
-	/* Make sure the write is complete before reading status. */
-	mb();
-
-	/* Check if device was successfully activated */
-	ret = pvrdma_read_reg(dev, PVRDMA_REG_ERR);
-	if (ret != 0) {
-		dev_err(&pdev->dev, "failed to activate device\n");
-		ret = -EFAULT;
-		goto err_disable_intr;
-	}
-
-	/* Register IB device */
-	ret = pvrdma_register_device(dev);
-	if (ret) {
-		dev_err(&pdev->dev, "failed to register IB device\n");
-		goto err_disable_intr;
+	if (netif_running(dev->netdev) && netif_carrier_ok(dev->netdev)) {
+		ret = pvrdma_enable_dev(dev);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to enable device\n");
+			goto err_free_sgid_tbl;
+		}
+	} else {
+		dev_info(&pdev->dev, "pvrdma netdev link is down\n");
 	}
 
 	dev->nb_netdev.notifier_call = pvrdma_netdevice_event;
 	ret = register_netdevice_notifier(&dev->nb_netdev);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to register netdevice events\n");
-		goto err_unreg_ibdev;
+		goto err_disable_dev;
 	}
 
 	dev_info(&pdev->dev, "attached to device\n");
 	return 0;
 
-err_unreg_ibdev:
-	ib_unregister_device(&dev->ib_dev);
-err_disable_intr:
-	pvrdma_disable_intrs(dev);
+err_disable_dev:
+	pvrdma_disable_dev(dev);
+err_free_sgid_tbl:
 	kfree(dev->sgid_tbl);
 err_free_uar_table:
 	pvrdma_uar_table_cleanup(dev);
 err_free_intrs:
 	pvrdma_free_irq(dev);
 	pvrdma_disable_msi_all(dev);
-err_netdevice:
-	unregister_netdevice_notifier(&dev->nb_netdev);
 err_free_cq_ring:
 	pvrdma_page_dir_cleanup(dev, &dev->cq_pdir);
 err_free_async_ring:
@@ -1132,10 +1164,7 @@ static void pvrdma_pci_remove(struct pci_dev *pdev)
 	unregister_netdevice_notifier(&dev->nb_netdev);
 	dev->nb_netdev.notifier_call = NULL;
 
-	flush_workqueue(event_wq);
-
-	/* Unregister ib device */
-	ib_unregister_device(&dev->ib_dev);
+	pvrdma_disable_dev(dev);
 
 	mutex_lock(&pvrdma_device_list_lock);
 	list_del(&dev->device_link);
