@@ -76,3 +76,36 @@ void __hyp_text __kvm_flush_vm_context(void)
 	write_sysreg(0, ICIALLUIS);
 	dsb(ish);
 }
+
+static void __hyp_text __switch_to_guest_regime(struct kvm *kvm)
+{
+	write_sysreg(kvm->arch.vttbr, VTTBR);
+	isb();
+}
+
+static void __hyp_text __switch_to_host_regime(void)
+{
+	write_sysreg(0, VTTBR);
+}
+
+void __hyp_text
+__kvm_emulate_tlb_invalidate(struct kvm *kvm, u32 opcode, u64 regval)
+{
+	kvm = kern_hyp_va(kvm);
+
+	__switch_to_guest_regime(kvm);
+
+	/*
+	 *  TLB maintenance operations are broadcast to
+	 *  inner-shareable domain when HCR_FB is set (default for
+	 *  KVM).
+	 *
+	 *  Nuke all Stage 1 TLB entries for the VM. This will kill
+	 *  performance but it's always safe to do as we don't leave
+	 *  behind any strays in the TLB
+	 */
+	write_sysreg(0, TLBIALLIS);
+	isb();
+
+	__switch_to_host_regime();
+}
