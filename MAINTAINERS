@@ -3629,13 +3629,13 @@ F:	drivers/scsi/cxlflash/
 F:	include/uapi/scsi/cxlflash_ioctls.h
 F:	Documentation/powerpc/cxlflash.txt
 
-STMMAC ETHERNET DRIVER
+SYNOPSYS ETHERNET DRIVER
 M:	Giuseppe Cavallaro <peppe.cavallaro@st.com>
 M:	Alexandre Torgue <alexandre.torgue@st.com>
 L:	netdev@vger.kernel.org
 W:	http://www.stlinux.com
 S:	Supported
-F:	drivers/net/ethernet/stmicro/stmmac/
+F:	drivers/net/ethernet/synopsys/
 
 CYBERPRO FB DRIVER
 M:	Russell King <linux@armlinux.org.uk>

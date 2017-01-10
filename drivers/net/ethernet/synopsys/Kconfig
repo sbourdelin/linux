@@ -1,5 +1,5 @@
 config STMMAC_ETH
-	tristate "STMicroelectronics 10/100/1000 Ethernet driver"
+	tristate "Synopsys Ethernet drivers"
 	depends on HAS_IOMEM && HAS_DMA
 	select MII
 	select PHYLIB
@@ -14,7 +14,7 @@ config STMMAC_ETH
 if STMMAC_ETH
 
 config STMMAC_PLATFORM
-	tristate "STMMAC Platform bus support"
+	tristate "Platform bus support"
 	depends on STMMAC_ETH
 	select MFD_SYSCON
 	default y
@@ -149,13 +149,13 @@ config DWMAC_SUNXI
 endif
 
 config STMMAC_PCI
-	tristate "STMMAC PCI bus support"
+	tristate "PCI bus support"
 	depends on STMMAC_ETH && PCI
 	---help---
 	  This is to select the Synopsys DWMAC available on PCI devices,
 	  if you have a controller with this interface, say Y or M here.
 
-	  This PCI support is tested on XLINX XC2V3000 FF1152AMT0221
+	  This PCI support was tested on XLINX XC2V3000 FF1152AMT0221
 	  D1215994A VIRTEX FPGA board.
 
 	  If unsure, say N.
