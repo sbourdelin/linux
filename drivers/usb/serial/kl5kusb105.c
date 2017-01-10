@@ -138,9 +138,11 @@ static int klsi_105_chg_port_settings(struct usb_serial_port *port,
 			settings,
 			sizeof(struct klsi_105_port_settings),
 			KLSI_TIMEOUT);
-	if (rc < 0)
-		dev_err(&port->dev,
-			"Change port settings failed (error = %d)\n", rc);
+	if (rc < sizeof(*settings)) {
+		dev_err(&port->dev, "failed to change port settings: %d\n", rc);
+		if (rc >= 0)
+			rc = -EIO;
+	}
 
 	dev_dbg(&port->dev,
 		"pktlen %u, baudrate 0x%02x, databits %u, u1 %u, u2 %u\n",
