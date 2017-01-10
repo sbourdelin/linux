@@ -1553,6 +1553,11 @@ static int regulator_resolve_supply(struct regulator_dev *rdev)
 		}
 	}
 
+	if (r->dev.parent && !device_is_bound(r->dev.parent)) {
+		put_device(&r->dev);
+		return -EPROBE_DEFER;
+	}
+
 	/* Recursively resolve the supply of the supply */
 	ret = regulator_resolve_supply(r);
 	if (ret < 0) {
