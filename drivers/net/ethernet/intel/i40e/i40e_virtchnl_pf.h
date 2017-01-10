@@ -72,9 +72,20 @@ enum i40e_vf_capabilities {
 	I40E_VIRTCHNL_VF_CAP_IWARP,
 };
 
+/* VF Port representator netdev private structure */
+struct i40e_vfpr_netdev_priv {
+	struct i40e_vf *vf;
+};
+
 /* VF information structure */
 struct i40e_vf {
 	struct i40e_pf *pf;
+
+	/* VF Port representator netdev that allows control and configuration
+	 * of VFs from the host. Enables returning VF stats, configuring link
+	 * state, mtu, fdb/vlans etc.
+	 */
+	struct net_device *vfpr_netdev;
 
 	/* VF id in the PF space */
 	s16 vf_id;
@@ -141,5 +152,8 @@ int i40e_ndo_set_vf_spoofchk(struct net_device *netdev, int vf_id, bool enable);
 
 void i40e_vc_notify_link_state(struct i40e_pf *pf);
 void i40e_vc_notify_reset(struct i40e_pf *pf);
+
+int i40e_alloc_vfpr_netdev(struct i40e_vf *vf, u16 vf_num);
+void i40e_free_vfpr_netdev(struct i40e_vf *vf);
 
 #endif /* _I40E_VIRTCHNL_PF_H_ */
