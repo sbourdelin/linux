@@ -1,7 +1,7 @@
 #ifndef _UAPI_LINUX_MMAN_H
 #define _UAPI_LINUX_MMAN_H
 
-#include <uapi/asm/mman.h>
+#include <uapi/asm-generic/mman.h>
 
 #define MREMAP_MAYMOVE	1
 #define MREMAP_FIXED	2
