@@ -283,15 +283,20 @@ int _gpiochip_irqchip_add(struct gpio_chip *gpiochip,
 			  struct lock_class_key *lock_key);
 
 /* FIXME: I assume threaded IRQchips do not have the lockdep problem */
-static inline int gpiochip_irqchip_add_nested(struct gpio_chip *gpiochip,
-			  struct irq_chip *irqchip,
-			  unsigned int first_irq,
-			  irq_flow_handler_t handler,
-			  unsigned int type)
-{
-	return _gpiochip_irqchip_add(gpiochip, irqchip, first_irq,
-				     handler, type, true, NULL);
-}
+#ifdef CONFIG_LOCKDEP
+#define gpiochip_irqchip_add_nested(gpiochip, irqchip,			\
+				    first_irq, handler, type)		\
+(									\
+	({								\
+		static struct lock_class_key _key;			\
+		_gpiochip_irqchip_add(gpiochip, irqchip, first_irq,	\
+				      handler, type, true, &_key);	\
+	})								\
+)
+#else
+#define gpiochip_irqchip_add_nested(...)			\
+	_gpiochip_irqchip_add(__VA_ARGS__, true, NULL)
+#endif
 
 #ifdef CONFIG_LOCKDEP
 #define gpiochip_irqchip_add(...)				\
