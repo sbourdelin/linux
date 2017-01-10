@@ -1210,7 +1210,7 @@ static void kvm_write_wall_clock(struct kvm *kvm, gpa_t wall_clock)
 
 	if (kvm->arch.kvmclock_offset) {
 		struct timespec64 ts = ns_to_timespec64(kvm->arch.kvmclock_offset);
-		boot = timespec64_sub(boot, ts);
+		boot = timespec64_add(boot, ts);
 	}
 	wc.sec = (u32)boot.tv_sec; /* overflow in 2106 guest time */
 	wc.nsec = boot.tv_nsec;
