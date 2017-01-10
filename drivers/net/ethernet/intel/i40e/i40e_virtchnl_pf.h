@@ -74,6 +74,7 @@ enum i40e_vf_capabilities {
 
 /* VF Port representator netdev private structure */
 struct i40e_vfpr_netdev_priv {
+	struct metadata_dst *vfpr_dst;
 	struct i40e_vf *vf;
 };
 
