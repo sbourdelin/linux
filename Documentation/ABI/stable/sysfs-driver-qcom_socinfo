@@ -1,0 +1,147 @@
+What:		/sys/devices/soc0/accessory_chip
+Date:		January 2017
+Description:
+		This file shows the id of the accessory chip.
+
+What:		/sys/devices/soc0/adsp_image_crm
+What:		/sys/devices/soc0/adsp_image_variant
+What:		/sys/devices/soc0/adsp_image_version
+Date:		January 2017
+Description:
+		These files respectively show the crm version, variant and
+		version of the ADSP image.
+
+What:		/sys/devices/soc0/apps_image_crm
+What:		/sys/devices/soc0/apps_image_variant
+What:		/sys/devices/soc0/apps_image_version
+Date:		January 2017
+Description:
+		These files respectively show the crm version, variant and
+		version of the APPS(Linux kernel, rootfs) image.
+
+What:		/sys/devices/soc0/boot_image_crm
+What:		/sys/devices/soc0/boot_image_variant
+What:		/sys/devices/soc0/boot_image_version
+Date:		January 2017
+Description:
+		These files respectively show the crm version, variant and
+		version of the Boot(bootloader) image.
+
+What:		/sys/devices/soc0/build_id
+Date:		January 2017
+Description:
+		This file shows the unique id of current build being used on
+		the system.
+
+What:		/sys/devices/soc0/cnss_image_crm
+What:		/sys/devices/soc0/cnss_image_variant
+What:		/sys/devices/soc0/cnss_image_version
+Date:		January 2017
+Description:
+		These files respectively show the crm version, variant and
+		version of the CNSS image.
+
+What:		/sys/devices/soc0/family
+Date:		January 2017
+Description:
+		This file shows the family(e.g Snapdragon) of the SoC.
+
+What:		/sys/devices/soc0/foundry_id
+Date:		January 2017
+Description:
+		This file shows the id of the foundry, where soc was
+		manufactured.
+
+What:		/sys/devices/soc0/hw_platform
+Date:		January 2017
+Description:
+		This file shows the type of hardware platform
+		(e.g MTP, QRD etc) where SoC is being used.
+
+What:		/sys/devices/soc0/machine
+Date:		January 2017
+Description:
+		This file shows the machine name as given in the DT.
+
+What:		/sys/devices/soc0/mpss_image_crm
+What:		/sys/devices/soc0/mpss_image_variant
+What:		/sys/devices/soc0/mpss_image_version
+Date:		January 2017
+Description:
+		These files respectively show the crm version, variant and
+		version of the MPSS image.
+
+What:		/sys/devices/soc0/platform_subtype
+Date:		January 2017
+Description:
+		This file shows the sub-type of hardware platform
+		(SKUAA, SKUF etc.) where SoC is being used.
+
+What:		/sys/devices/soc0/platform_version
+Date:		January 2017
+Description:
+		This file show the version of the hardware platform.
+
+What:		/sys/devices/soc0/pmic_die_revision
+Date:		January 2017
+Description:
+		This file shows revision of PMIC die.
+
+What:		/sys/devices/soc0/pmic_model
+Date:		January 2017
+Description:
+		This file shows name of PMIC model.
+
+What:		/sys/devices/soc0/qcom_odm
+Date:		January 2017
+Description:
+		This file shows the ODM using the SoC.
+
+What:		/sys/devices/soc0/raw_version
+Date:		January 2017
+Description:
+		This file shows raw version of the SoC.
+
+What:		/sys/devices/soc0/revision
+Date:		January 2017
+Description:
+		This file shows revision of the SoC.
+
+What:		/sys/devices/soc0/rpm_image_crm
+What:		/sys/devices/soc0/rpm_image_variant
+What:		/sys/devices/soc0/rpm_image_version
+Date:		January 2017
+Description:
+		These files respectively show the crm version, variant and
+		version of the RPM image.
+
+What:		/sys/devices/soc0/serial_number
+Date:		January 2017
+Description:
+		This file shows serial number of the SoC.
+
+What:		/sys/devices/soc0/soc_id
+Date:		January 2017
+Description:
+		This file shows the unique numeric id of a Qualcomm SoC.
+
+What:		/sys/devices/soc0/tz_image_crm
+What:		/sys/devices/soc0/tz_image_variant
+What:		/sys/devices/soc0/tz_image_version
+Date:		January 2017
+Description:
+		These files respectively show the crm version, variant and
+		version of the TZ image.
+
+What:		/sys/devices/soc0/vendor
+Date:		January 2017
+Description:
+		This file shows the vendor of the SoC.
+
+What:		/sys/devices/soc0/video_image_crm
+What:		/sys/devices/soc0/video_image_variant
+What:		/sys/devices/soc0/video_image_version
+Date:		January 2017
+Description:
+		These files respectively show the crm version, variant and
+		version of the video image.
