@@ -44,7 +44,7 @@ EXPORT_SYMBOL(tty_port_init);
  * tty_register_driver.
  */
 void tty_port_link_device(struct tty_port *port,
-		struct tty_driver *driver, unsigned index)
+		struct tty_driver *driver, unsigned int index)
 {
 	if (WARN_ON(index >= driver->num))
 		return;
@@ -64,7 +64,7 @@ EXPORT_SYMBOL_GPL(tty_port_link_device);
  * Call tty_port_link_device as a last resort.
  */
 struct device *tty_port_register_device(struct tty_port *port,
-		struct tty_driver *driver, unsigned index,
+		struct tty_driver *driver, unsigned int index,
 		struct device *device)
 {
 	tty_port_link_device(port, driver, index);
@@ -86,7 +86,7 @@ EXPORT_SYMBOL_GPL(tty_port_register_device);
  * (or both). Call tty_port_link_device as a last resort.
  */
 struct device *tty_port_register_device_attr(struct tty_port *port,
-		struct tty_driver *driver, unsigned index,
+		struct tty_driver *driver, unsigned int index,
 		struct device *device, void *drvdata,
 		const struct attribute_group **attr_grp)
 {
@@ -363,8 +363,10 @@ int tty_port_block_til_ready(struct tty_port *port,
 	unsigned long flags;
 	DEFINE_WAIT(wait);
 
-	/* if non-blocking mode is set we can pass directly to open unless
-	   the port has just hung up or is in another error state */
+	/*
+	 * if non-blocking mode is set we can pass directly to open unless
+	 * the port has just hung up or is in another error state
+	 */
 	if (tty_io_error(tty)) {
 		tty_port_set_active(port, 1);
 		return 0;
@@ -380,10 +382,11 @@ int tty_port_block_til_ready(struct tty_port *port,
 	if (C_CLOCAL(tty))
 		do_clocal = 1;
 
-	/* Block waiting until we can proceed. We may need to wait for the
-	   carrier, but we must also wait for any close that is in progress
-	   before the next open may complete */
-
+	/*
+	 * Block waiting until we can proceed. We may need to wait for the
+	 * carrier, but we must also wait for any close that is in progress
+	 * before the next open may complete
+	 */
 	retval = 0;
 
 	/* The port lock protects the port counts */
@@ -398,8 +401,10 @@ int tty_port_block_til_ready(struct tty_port *port,
 			tty_port_raise_dtr_rts(port);
 
 		prepare_to_wait(&port->open_wait, &wait, TASK_INTERRUPTIBLE);
-		/* Check for a hangup or uninitialised port.
-							Return accordingly */
+		/*
+		 * Check for a hangup or uninitialised port.
+		 * Return accordingly
+		 */
 		if (tty_hung_up_p(filp) || !tty_port_initialized(port)) {
 			if (port->flags & ASYNC_HUP_NOTIFY)
 				retval = -EAGAIN;
@@ -425,8 +430,10 @@ int tty_port_block_til_ready(struct tty_port *port,
 	}
 	finish_wait(&port->open_wait, &wait);
 
-	/* Update counts. A parallel hangup will have set count to zero and
-	   we must not mess that up further */
+	/*
+	 * Update counts. A parallel hangup will have set count to zero and
+	 * we must not mess that up further
+	 */
 	spin_lock_irqsave(&port->lock, flags);
 	if (!tty_hung_up_p(filp))
 		port->count++;
@@ -583,6 +590,7 @@ int tty_port_open(struct tty_port *port, struct tty_struct *tty,
 		clear_bit(TTY_IO_ERROR, &tty->flags);
 		if (port->ops->activate) {
 			int retval = port->ops->activate(port, tty);
+
 			if (retval) {
 				mutex_unlock(&port->mutex);
 				return retval;
@@ -593,5 +601,4 @@ int tty_port_open(struct tty_port *port, struct tty_struct *tty,
 	mutex_unlock(&port->mutex);
 	return tty_port_block_til_ready(port, tty, filp);
 }
-
 EXPORT_SYMBOL(tty_port_open);
