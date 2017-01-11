@@ -735,20 +735,3 @@ const struct attribute_group *qeth_generic_attr_groups[] = {
 	&qeth_device_blkt_group,
 	NULL,
 };
-
-static struct attribute *qeth_osn_device_attrs[] = {
-	&dev_attr_state.attr,
-	&dev_attr_chpid.attr,
-	&dev_attr_if_name.attr,
-	&dev_attr_card_type.attr,
-	&dev_attr_buffer_count.attr,
-	&dev_attr_recover.attr,
-	NULL,
-};
-static struct attribute_group qeth_osn_device_attr_group = {
-	.attrs = qeth_osn_device_attrs,
-};
-const struct attribute_group *qeth_osn_attr_groups[] = {
-	&qeth_osn_device_attr_group,
-	NULL,
-};
