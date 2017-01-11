@@ -65,4 +65,18 @@ struct uverbs_type_alloc_action {
 	} fd;
 };
 
+struct uverbs_type {
+	const struct uverbs_type_alloc_action   *alloc;
+};
+
+struct uverbs_type_group {
+	size_t					num_types;
+	const struct uverbs_type		**types;
+};
+
+struct uverbs_root {
+	const struct uverbs_type_group		**type_groups;
+	size_t					num_groups;
+};
+
 #endif

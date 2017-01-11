@@ -58,6 +58,20 @@ void uverbs_finalize_object(struct ib_uobject *uobj,
 			    enum uverbs_idr_access access,
 			    bool success);
 /*
+ * These functions initialize and destroy the context. The context has a
+ * list of objects which is protected by a kref-ed lock, whose purpose is
+ * to protect concurrent FDs (e.g completion channel FDs) release while
+ * traversing the context and releasing its objects. initialize_ucontext
+ * should be called when we create a context. cleanup_ucontext removes all
+ * objects created in the ucontext. release_ucontext drops the reference from
+ * the lock.
+ */
+void uverbs_cleanup_ucontext(struct ib_ucontext *ucontext,
+			     const struct uverbs_root *root);
+int uverbs_initialize_ucontext(struct ib_ucontext *ucontext);
+void uverbs_release_ucontext(struct ib_ucontext *ucontext);
+
+/*
  * Indicate this fd is no longer used by this consumer, but its memory isn't
  * released yet. The memory is released only when ib_uverbs_cleanup_fd is
  * called.

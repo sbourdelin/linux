@@ -69,6 +69,12 @@ struct ib_ucontext_lock {
 	struct mutex lock;
 };
 
+static void init_uobjects_list_lock(struct ib_ucontext_lock *lock)
+{
+	mutex_init(&lock->lock);
+	kref_init(&lock->ref);
+}
+
 static void release_uobjects_list_lock(struct kref *ref)
 {
 	struct ib_ucontext_lock *lock = container_of(ref,
@@ -283,7 +289,7 @@ static void uverbs_uobject_add(struct ib_uobject *uobject)
 	mutex_unlock(&uobject->context->uobjects_lock->lock);
 }
 
-static void uverbs_uobject_remove(struct ib_uobject *uobject)
+static void uverbs_uobject_remove(struct ib_uobject *uobject, bool lock)
 {
 	/*
 	 * Calling remove requires exclusive access, so it's not possible
@@ -291,9 +297,11 @@ static void uverbs_uobject_remove(struct ib_uobject *uobject)
 	 * with exclusive access.
 	 */
 	uverbs_idr_remove_uobj(uobject);
-	mutex_lock(&uobject->context->uobjects_lock->lock);
+	if (lock)
+		mutex_lock(&uobject->context->uobjects_lock->lock);
 	list_del(&uobject->list);
-	mutex_unlock(&uobject->context->uobjects_lock->lock);
+	if (lock)
+		mutex_unlock(&uobject->context->uobjects_lock->lock);
 	put_uobj(uobject);
 }
 
@@ -326,7 +334,7 @@ static void uverbs_finalize_idr(struct ib_uobject *uobj,
 		break;
 	case UVERBS_ACCESS_DESTROY:
 		if (commit)
-			uverbs_uobject_remove(uobj);
+			uverbs_uobject_remove(uobj, true);
 		else
 			up_write(&uobj->usecnt);
 		break;
@@ -392,5 +400,92 @@ void uverbs_cleanup_fd(void *private_data)
 	struct ib_uobject *uobject = uverbs_priv_fd_to_uobject(private_data);
 
 	kfree(uobject);
+}
+
+static unsigned int get_max_type_orders(const struct uverbs_root *root)
+{
+	unsigned int i;
+	unsigned int max = 0;
+
+	for (i = 0; i < root->num_groups; i++) {
+		unsigned int j;
+		const struct uverbs_type_group *types = root->type_groups[i];
+
+		for (j = 0; j < types->num_types; j++) {
+			/*
+			 * Either this type isn't supported by this ib_device
+			 * (as the group is an array of pointers to types
+			 * indexed by the type) or this type is supported, but
+			 * we can't instantiate objects from this type
+			 * (e.g. you can't instantiate objects of
+			 * UVERBS_DEVICE).
+			 */
+			if (!types->types[j] || !types->types[j]->alloc)
+				continue;
+			if (types->types[j]->alloc->order > max)
+				max = types->types[j]->alloc->order;
+		}
+	}
+
+	return max;
+}
+
+void uverbs_release_ucontext(struct ib_ucontext *ucontext)
+{
+	/*
+	 * Since FD objects could outlive their context, we use a kref'ed
+	 * lock. This lock is referenced when a context and FD objects are
+	 * created. This lock protects concurrent context release from FD
+	 * objects release. Therefore, we need to put this lock object in
+	 * the context and every FD object release.
+	 */
+	kref_put(&ucontext->uobjects_lock->ref, release_uobjects_list_lock);
+}
+
+void uverbs_cleanup_ucontext(struct ib_ucontext *ucontext,
+			     const struct uverbs_root *root)
+{
+	unsigned int num_orders = get_max_type_orders(root);
+	unsigned int i;
+
+	for (i = 0; i <= num_orders; i++) {
+		struct ib_uobject *obj, *next_obj;
+
+		/*
+		 * This souldn't run while executing other commands on this
+		 * context. Thus, the only thing we should take care of is
+		 * releasing a FD while traversing this list. The FD could be
+		 * closed and released from the _release fop of this FD.
+		 * In order to mitigate this, we add a lock.
+		 * We take and release the lock per order traversal in order
+		 * to let other threads (which might still use the FDs) chance
+		 * to run.
+		 */
+		mutex_lock(&ucontext->uobjects_lock->lock);
+		list_for_each_entry_safe(obj, next_obj, &ucontext->uobjects,
+					 list)
+			if (obj->type->order == i) {
+				obj->type->free_fn(obj->type, obj);
+				if (obj->type->type == UVERBS_ATTR_TYPE_IDR)
+					uverbs_uobject_remove(obj, false);
+				else
+					uverbs_remove_fd(obj);
+			}
+		mutex_unlock(&ucontext->uobjects_lock->lock);
+	}
+	uverbs_release_ucontext(ucontext);
+}
+
+int uverbs_initialize_ucontext(struct ib_ucontext *ucontext)
+{
+	ucontext->uobjects_lock = kmalloc(sizeof(*ucontext->uobjects_lock),
+					  GFP_KERNEL);
+	if (!ucontext->uobjects_lock)
+		return -ENOMEM;
+
+	init_uobjects_list_lock(ucontext->uobjects_lock);
+	INIT_LIST_HEAD(&ucontext->uobjects);
+
+	return 0;
 }
 
