@@ -187,25 +187,19 @@ static void sas_smp_request(struct request_queue *q, struct Scsi_Host *shost,
 	}
 }
 
-static void sas_host_smp_request(struct request_queue *q)
+static int sas_bsg_dispatch(struct bsg_job *job)
 {
-	sas_smp_request(q, (struct Scsi_Host *)q->queuedata, NULL);
-}
-
-static void sas_non_host_smp_request(struct request_queue *q)
-{
-	struct sas_rphy *rphy = q->queuedata;
-	sas_smp_request(q, rphy_to_shost(rphy), rphy);
-}
-
-static void sas_host_release(struct device *dev)
-{
+	struct device *dev = job->dev;
 	struct Scsi_Host *shost = dev_to_shost(dev);
-	struct sas_host_attrs *sas_host = to_sas_host_attrs(shost);
-	struct request_queue *q = sas_host->q;
+	struct sas_rphy *rphy = dev_to_rphy(dev);
+	struct request_queue *q = job->req->q;
 
-	if (q)
-		blk_cleanup_queue(q);
+	if (rphy)
+		sas_smp_request(q, rphy_to_shost(rphy), rphy);
+	else
+		sas_smp_request(q, shost, NULL);
+
+	return 0;
 }
 
 static int sas_bsg_initialize(struct Scsi_Host *shost, struct sas_rphy *rphy)
@@ -215,7 +209,6 @@ static int sas_bsg_initialize(struct Scsi_Host *shost, struct sas_rphy *rphy)
 	struct device *dev;
 	char namebuf[20];
 	const char *name;
-	void (*release)(struct device *);
 
 	if (!to_sas_internal(shost->transportt)->f->smp_handler) {
 		printk("%s can't handle SMP requests\n", shost->hostt->name);
@@ -223,22 +216,20 @@ static int sas_bsg_initialize(struct Scsi_Host *shost, struct sas_rphy *rphy)
 	}
 
 	if (rphy) {
-		q = blk_init_queue(sas_non_host_smp_request, NULL);
 		dev = &rphy->dev;
 		name = dev_name(dev);
-		release = NULL;
 	} else {
-		q = blk_init_queue(sas_host_smp_request, NULL);
 		dev = &shost->shost_gendev;
-		snprintf(namebuf, sizeof(namebuf),
-			 "sas_host%d", shost->host_no);
-		name = namebuf;
-		release = sas_host_release;
+		name = kasprintf(GFP_KERNEL, "sas_host%d", shost->host_no);
+		if (!name)
+			return -ENOMEM;
 	}
+
+	q = __scsi_alloc_queue(shost, bsg_request_fn);
 	if (!q)
 		return -ENOMEM;
 
-	error = bsg_register_queue(q, dev, name, release);
+	error = bsg_setup_queue(dev, queue, name, sas_bsg_dispatch, 0);
 	if (error) {
 		blk_cleanup_queue(q);
 		return -ENOMEM;
