@@ -3045,8 +3045,7 @@ void warn_alloc(gfp_t gfp_mask, const char *fmt, ...)
 	static DEFINE_RATELIMIT_STATE(nopage_rs, DEFAULT_RATELIMIT_INTERVAL,
 				      DEFAULT_RATELIMIT_BURST);
 
-	if ((gfp_mask & __GFP_NOWARN) || !__ratelimit(&nopage_rs) ||
-	    debug_guardpage_minorder() > 0)
+	if (!__ratelimit(&nopage_rs) || debug_guardpage_minorder() > 0)
 		return;
 
 	pr_warn("%s: ", current->comm);
@@ -3735,8 +3734,9 @@ retry:
 	}
 
 nopage:
-	warn_alloc(gfp_mask,
-			"page allocation failure: order:%u", order);
+	if (!(gfp_mask & __GFP_NOWARN))
+		warn_alloc(gfp_mask,
+			   "page allocation failure: order:%u", order);
 got_pg:
 	return page;
 }
