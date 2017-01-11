@@ -77,6 +77,7 @@ static struct workqueue_struct *kacpi_hotplug_wq;
 static bool acpi_os_initialized;
 unsigned int acpi_sci_irq = INVALID_ACPI_IRQ;
 bool acpi_permanent_mmap = false;
+bool acpi_lockless_mmap;
 
 /*
  * This list of permanent mappings is for memory that may be accessed from
@@ -378,7 +379,10 @@ static void acpi_os_drop_map_ref(struct acpi_ioremap *map)
 static void acpi_os_map_cleanup(struct acpi_ioremap *map)
 {
 	if (!map->refcount) {
-		synchronize_rcu_expedited();
+		/* sync lockless after unregistering interrupt handlers */
+		smp_rmb();
+		if (acpi_lockless_mmap)
+			synchronize_rcu_expedited();
 		acpi_unmap(map->phys, map->virt);
 		kfree(map);
 	}
@@ -443,6 +447,10 @@ int acpi_os_map_generic_address(struct acpi_generic_address *gas)
 	virt = acpi_os_map_iomem(addr, gas->bit_width / 8);
 	if (!virt)
 		return -EIO;
+
+	acpi_lockless_mmap = true;
+	/* sync lockless before registering interrupt handlers */
+	smp_wmb();
 
 	return 0;
 }
@@ -663,18 +671,42 @@ acpi_status acpi_os_write_port(acpi_io_address port, u32 value, u32 width)
 
 EXPORT_SYMBOL(acpi_os_write_port);
 
+static bool acpi_lock_ioremap(void)
+{
+	bool lockless;
+
+	/* sync lockless after invoking interrupt handlers */
+	smp_rmb();
+	lockless = acpi_lockless_mmap;
+	if (lockless)
+		rcu_read_lock();
+	else
+		/* WARN_ON_ONCE(in_interrupt()); */
+		mutex_lock(&acpi_ioremap_lock);
+	return lockless;
+}
+
+static void acpi_unlock_ioremap(bool lockless)
+{
+	if (lockless)
+		rcu_read_unlock();
+	else
+		mutex_unlock(&acpi_ioremap_lock);
+}
+
 acpi_status
 acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
 {
 	void __iomem *virt_addr;
 	unsigned int size = width / 8;
 	bool unmap = false;
+	bool lockless;
 	u64 dummy;
 
-	rcu_read_lock();
+	lockless = acpi_lock_ioremap();
 	virt_addr = acpi_map_vaddr_lookup(phys_addr, size);
 	if (!virt_addr) {
-		rcu_read_unlock();
+		acpi_unlock_ioremap(lockless);
 		virt_addr = acpi_os_ioremap(phys_addr, size);
 		if (!virt_addr)
 			return AE_BAD_ADDRESS;
@@ -704,7 +736,7 @@ acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
 	if (unmap)
 		iounmap(virt_addr);
 	else
-		rcu_read_unlock();
+		acpi_unlock_ioremap(lockless);
 
 	return AE_OK;
 }
@@ -715,11 +747,12 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
 	void __iomem *virt_addr;
 	unsigned int size = width / 8;
 	bool unmap = false;
+	bool lockless;
 
-	rcu_read_lock();
+	lockless = acpi_lock_ioremap();
 	virt_addr = acpi_map_vaddr_lookup(phys_addr, size);
 	if (!virt_addr) {
-		rcu_read_unlock();
+		acpi_unlock_ioremap(lockless);
 		virt_addr = acpi_os_ioremap(phys_addr, size);
 		if (!virt_addr)
 			return AE_BAD_ADDRESS;
@@ -746,7 +779,7 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
 	if (unmap)
 		iounmap(virt_addr);
 	else
-		rcu_read_unlock();
+		acpi_unlock_ioremap(lockless);
 
 	return AE_OK;
 }
