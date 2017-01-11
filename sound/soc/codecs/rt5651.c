@@ -802,7 +802,7 @@ static int rt5651_hp_event(struct snd_soc_dapm_widget *w,
 
 	case SND_SOC_DAPM_PRE_PMD:
 		rt5651->hp_mute = 1;
-		usleep_range(70000, 75000);
+		msleep(70);
 		break;
 
 	default:
@@ -822,7 +822,7 @@ static int rt5651_hp_post_event(struct snd_soc_dapm_widget *w,
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
 		if (!rt5651->hp_mute)
-			usleep_range(80000, 85000);
+			msleep(80);
 
 		break;
 
