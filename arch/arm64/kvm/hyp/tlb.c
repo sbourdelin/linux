@@ -16,6 +16,7 @@
  */
 
 #include <asm/kvm_hyp.h>
+#include <asm/tlbflush.h>
 
 void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
 {
@@ -30,19 +31,15 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
 	 * We could do so much better if we had the VA as well.
 	 * Instead, we invalidate Stage-2 for this IPA, and the
 	 * whole of Stage-1. Weep...
+	 *
+	 * We have to ensure completion of the invalidation at Stage-2 with a
+	 * DSB, since a table walk on another CPU could refill a TLB with a
+	 * complete (S1 + S2) walk based on the old Stage-2 mapping if the
+	 * Stage-1 invalidation happened first.
 	 */
 	ipa >>= 12;
-	asm volatile("tlbi ipas2e1is, %0" : : "r" (ipa));
-
-	/*
-	 * We have to ensure completion of the invalidation at Stage-2,
-	 * since a table walk on another CPU could refill a TLB with a
-	 * complete (S1 + S2) walk based on the old Stage-2 mapping if
-	 * the Stage-1 invalidation happened first.
-	 */
-	dsb(ish);
-	asm volatile("tlbi vmalle1is" : : );
-	dsb(ish);
+	__tlbi_dsb(ipas2e1is, ish, ipa);
+	__tlbi_dsb(vmalle1is, ish);
 	isb();
 
 	write_sysreg(0, vttbr_el2);
@@ -57,8 +54,7 @@ void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
 	write_sysreg(kvm->arch.vttbr, vttbr_el2);
 	isb();
 
-	asm volatile("tlbi vmalls12e1is" : : );
-	dsb(ish);
+	__tlbi_dsb(vmalls12e1is, ish);
 	isb();
 
 	write_sysreg(0, vttbr_el2);
@@ -72,8 +68,7 @@ void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu)
 	write_sysreg(kvm->arch.vttbr, vttbr_el2);
 	isb();
 
-	asm volatile("tlbi vmalle1" : : );
-	dsb(nsh);
+	__tlbi_dsb(vmalle1, nsh);
 	isb();
 
 	write_sysreg(0, vttbr_el2);
@@ -82,7 +77,5 @@ void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu)
 void __hyp_text __kvm_flush_vm_context(void)
 {
 	dsb(ishst);
-	asm volatile("tlbi alle1is	\n"
-		     "ic ialluis	  ": : );
-	dsb(ish);
+	__tlbi_asm_dsb("ic ialluis", alle1is, ish);
 }
