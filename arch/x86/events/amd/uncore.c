@@ -22,12 +22,15 @@
 
 #define NUM_COUNTERS_NB		4
 #define NUM_COUNTERS_L2		4
-#define MAX_COUNTERS		NUM_COUNTERS_NB
+#define NUM_COUNTERS_L3		6
 
 #define RDPMC_BASE_NB		6
 #define RDPMC_BASE_LLC		10
 
 #define COUNTER_SHIFT		16
+
+static int num_counters_llc;
+static int num_counters_nb;
 
 static HLIST_HEAD(uncore_unused_list);
 
@@ -40,7 +43,7 @@ struct amd_uncore {
 	u32 msr_base;
 	cpumask_t *active_mask;
 	struct pmu *pmu;
-	struct perf_event *events[MAX_COUNTERS];
+	struct perf_event **events;
 	struct hlist_node node;
 };
 
@@ -122,6 +125,9 @@ static int amd_uncore_add(struct perf_event *event, int flags)
 	int i;
 	struct amd_uncore *uncore = event_to_amd_uncore(event);
 	struct hw_perf_event *hwc = &event->hw;
+
+	if (hwc->idx >= uncore->num_counters)
+		return -EINVAL;
 
 	/* are we already assigned? */
 	if (hwc->idx != -1 && uncore->events[hwc->idx] == event)
@@ -288,51 +294,91 @@ static struct pmu amd_llc_pmu = {
 	.read		= amd_uncore_read,
 };
 
-static struct amd_uncore *amd_uncore_alloc(unsigned int cpu)
+static struct amd_uncore *amd_uncore_alloc(unsigned int cpu,
+					unsigned int counters)
 {
-	return kzalloc_node(sizeof(struct amd_uncore), GFP_KERNEL,
+	void *mem;
+	struct amd_uncore *uncore;
+
+	mem = kzalloc_node(sizeof(struct amd_uncore) +
+			sizeof(struct perf_event*) * counters, GFP_KERNEL,
 			cpu_to_node(cpu));
+	if (!mem)
+		return NULL;
+
+	uncore = mem;
+	uncore->events = mem + sizeof(struct amd_uncore);
+
+	return uncore;
+}
+
+static int amd_uncore_cpu_up_nb_prepare(unsigned int cpu)
+{
+	struct amd_uncore *uncore_nb;
+
+	if (!amd_uncore_nb)
+		return 0;
+
+	uncore_nb = amd_uncore_alloc(cpu, num_counters_nb);
+	if (!uncore_nb)
+		return -ENOMEM;
+	uncore_nb->cpu = cpu;
+	uncore_nb->num_counters = num_counters_nb;
+	uncore_nb->rdpmc_base = RDPMC_BASE_NB;
+	uncore_nb->msr_base = MSR_F15H_NB_PERF_CTL;
+	uncore_nb->active_mask = &amd_nb_active_mask;
+	uncore_nb->pmu = &amd_nb_pmu;
+	uncore_nb->id = -1;
+	*per_cpu_ptr(amd_uncore_nb, cpu) = uncore_nb;
+
+	return 0;
+}
+
+static int amd_uncore_cpu_up_llc_prepare(unsigned int cpu)
+{
+	struct amd_uncore *uncore_llc;
+
+	if (!amd_uncore_llc)
+		return 0;
+
+	uncore_llc = amd_uncore_alloc(cpu, num_counters_llc);
+	if (!uncore_llc)
+		return -ENOMEM;
+	uncore_llc->cpu = cpu;
+	uncore_llc->num_counters = num_counters_llc;
+	uncore_llc->rdpmc_base = RDPMC_BASE_LLC;
+	uncore_llc->msr_base = MSR_F16H_L2I_PERF_CTL;
+	uncore_llc->active_mask = &amd_llc_active_mask;
+	uncore_llc->pmu = &amd_llc_pmu;
+	uncore_llc->id = -1;
+	*per_cpu_ptr(amd_uncore_llc, cpu) = uncore_llc;
+
+	return 0;
+}
+
+static void amd_uncore_cpu_up_nb_free(unsigned int cpu)
+{
+	struct amd_uncore *uncore_nb;
+
+	uncore_nb = *per_cpu_ptr(amd_uncore_nb, cpu);
+	if (uncore_nb)
+		kfree(uncore_nb);
+	*per_cpu_ptr(amd_uncore_nb, cpu) = NULL;
 }
 
 static int amd_uncore_cpu_up_prepare(unsigned int cpu)
 {
-	struct amd_uncore *uncore_nb = NULL, *uncore_llc;
+	int ret;
 
-	if (amd_uncore_nb) {
-		uncore_nb = amd_uncore_alloc(cpu);
-		if (!uncore_nb)
-			goto fail;
-		uncore_nb->cpu = cpu;
-		uncore_nb->num_counters = NUM_COUNTERS_NB;
-		uncore_nb->rdpmc_base = RDPMC_BASE_NB;
-		uncore_nb->msr_base = MSR_F15H_NB_PERF_CTL;
-		uncore_nb->active_mask = &amd_nb_active_mask;
-		uncore_nb->pmu = &amd_nb_pmu;
-		uncore_nb->id = -1;
-		*per_cpu_ptr(amd_uncore_nb, cpu) = uncore_nb;
+	ret = amd_uncore_cpu_up_nb_prepare(cpu);
+	if (ret)
+		return ret;
+	ret = amd_uncore_cpu_up_llc_prepare(cpu);
+	if (ret) {
+		amd_uncore_cpu_up_nb_free(cpu);
+		return ret;
 	}
-
-	if (amd_uncore_llc) {
-		uncore_llc = amd_uncore_alloc(cpu);
-		if (!uncore_llc)
-			goto fail;
-		uncore_llc->cpu = cpu;
-		uncore_llc->num_counters = NUM_COUNTERS_L2;
-		uncore_llc->rdpmc_base = RDPMC_BASE_LLC;
-		uncore_llc->msr_base = MSR_F16H_L2I_PERF_CTL;
-		uncore_llc->active_mask = &amd_llc_active_mask;
-		uncore_llc->pmu = &amd_llc_pmu;
-		uncore_llc->id = -1;
-		*per_cpu_ptr(amd_uncore_llc, cpu) = uncore_llc;
-	}
-
 	return 0;
-
-fail:
-	if (amd_uncore_nb)
-		*per_cpu_ptr(amd_uncore_nb, cpu) = NULL;
-	kfree(uncore_nb);
-	return -ENOMEM;
 }
 
 static struct amd_uncore *
@@ -491,6 +537,27 @@ static int __init amd_uncore_init(void)
 
 	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
 		goto fail_nodev;
+
+	switch(boot_cpu_data.x86) {
+		case 23:
+			/* Family 17h */
+			num_counters_nb = NUM_COUNTERS_NB;
+			num_counters_llc = NUM_COUNTERS_L3;
+			break;
+		case 22:
+			/* Family 16h. May change */
+			num_counters_nb = NUM_COUNTERS_NB;
+			num_counters_llc = NUM_COUNTERS_L2;
+			break;
+		default:
+			/*
+			 * All prior families have the same number of
+			 * Northbridge and Last level cache counters
+			 */
+			num_counters_nb = NUM_COUNTERS_NB;
+			num_counters_llc = NUM_COUNTERS_L2;
+			break;
+	}
 
 	if (!boot_cpu_has(X86_FEATURE_TOPOEXT))
 		goto fail_nodev;
