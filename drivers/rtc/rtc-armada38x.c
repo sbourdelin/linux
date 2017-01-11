@@ -90,7 +90,7 @@ static void rtc_update_mbus_timing_params(struct armada38x_rtc *rtc)
 
 static u32 read_rtc_register_wa(struct armada38x_rtc *rtc, u8 rtc_reg)
 {
-	int i, index_max, max = 0;
+	int i, index_max = 0, max = 0;
 
 	for (i = 0; i < SAMPLE_NR; i++) {
 		rtc->val_to_freq[i].value = readl(rtc->regs + rtc_reg);
