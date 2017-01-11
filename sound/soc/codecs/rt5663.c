@@ -2982,7 +2982,8 @@ static void rt5663_v2_calibrate(struct rt5663_priv *rt5663)
 
 static void rt5663_calibrate(struct rt5663_priv *rt5663)
 {
-	int value, count;
+	int value;
+	unsigned long timeout;
 
 	regmap_write(rt5663->regmap, RT5663_RC_CLK, 0x0280);
 	regmap_write(rt5663->regmap, RT5663_GLB_CLK, 0x8000);
@@ -3025,17 +3026,15 @@ static void rt5663_calibrate(struct rt5663_priv *rt5663)
 	regmap_write(rt5663->regmap, RT5663_HP_CALIB_3, 0x06c2);
 	regmap_write(rt5663->regmap, RT5663_HP_CALIB_1_1, 0x7b00);
 	regmap_write(rt5663->regmap, RT5663_HP_CALIB_1_1, 0xfb00);
-	count = 0;
-	while (true) {
+
+	/* allow the write completion to take up to 2s */
+	timeout = jiffies + msecs_to_jiffies(2000);
+	while (time_is_after_jiffies(timeout)) {
 		regmap_read(rt5663->regmap, RT5663_HP_CALIB_1_1, &value);
 		if (value & 0x8000)
-			usleep_range(10000, 10005);
+			msleep(10);
 		else
 			break;
-
-		if (count > 200)
-			return;
-		count++;
 	}
 }
 
