@@ -13,6 +13,7 @@
 / {
 	aliases {
 		serial3 = &uart4;
+		can = &hecc;
 	};
 
 	ocp@68000000 {
@@ -71,6 +72,18 @@
 			interrupt-controller;
 			pinctrl-single,register-width = <16>;
 			pinctrl-single,function-mask = <0xff1f>;
+		};
+
+		hecc: can@5c050000 {
+			compatible = "ti,am3505";
+			status = "disabled";
+			reg = <0x5c050000 0x4000>;
+			interrupts = <24>;
+			clocks = <&hecc_ck>;
+			ti,scc-ram-offset = <0x3000>;
+			ti,hecc-ram-offset = <0x3000>;
+			ti,mbx-offset = <0x2000>;
+			ti,int-line = <0>;
 		};
 	};
 };
