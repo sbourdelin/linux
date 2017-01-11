@@ -549,7 +549,7 @@ static void *__eeh_clear_pe_frozen_state(void *data, void *flag)
 	int i, rc = 1;
 
 	for (i = 0; rc && i < 3; i++)
-		rc = eeh_unfreeze_pe(pe, clear_sw_state);
+		rc = eeh_unfreeze_pe(pe, *clear_sw_state);
 
 	/* Stop immediately on any errors */
 	if (rc) {
