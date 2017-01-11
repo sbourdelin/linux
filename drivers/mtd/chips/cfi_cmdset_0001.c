@@ -1552,10 +1552,8 @@ static int __xipram do_write_oneword(struct map_info *map, struct flchip *chip,
 
 	mutex_lock(&chip->mutex);
 	ret = get_chip(map, chip, adr, mode);
-	if (ret) {
-		mutex_unlock(&chip->mutex);
-		return ret;
-	}
+	if (ret)
+		goto unlock;
 
 	XIP_INVAL_CACHED_RANGE(map, adr, map_bankwidth(map));
 	ENABLE_VPP(map);
@@ -1600,6 +1598,7 @@ static int __xipram do_write_oneword(struct map_info *map, struct flchip *chip,
 	xip_enable(map, chip, adr);
  out:	DISABLE_VPP(map);
 	put_chip(map, chip, adr);
+unlock:
 	mutex_unlock(&chip->mutex);
 	return ret;
 }
