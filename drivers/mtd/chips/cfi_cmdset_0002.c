@@ -1577,10 +1577,8 @@ static int __xipram do_write_oneword(struct map_info *map, struct flchip *chip,
 
 	mutex_lock(&chip->mutex);
 	ret = get_chip(map, chip, adr, mode);
-	if (ret) {
-		mutex_unlock(&chip->mutex);
-		return ret;
-	}
+	if (ret)
+		goto unlock;
 
 	pr_debug("MTD %s(): WRITE 0x%.8lx(0x%.8lx)\n",
 	       __func__, adr, datum.x[0] );
@@ -1664,6 +1662,7 @@ static int __xipram do_write_oneword(struct map_info *map, struct flchip *chip,
 	chip->state = FL_READY;
 	DISABLE_VPP(map);
 	put_chip(map, chip, adr);
+unlock:
 	mutex_unlock(&chip->mutex);
 
 	return ret;
