@@ -200,8 +200,8 @@ void ib_uverbs_release_uevent(struct ib_uverbs_file *file,
 	spin_unlock_irq(&file->async_file->lock);
 }
 
-static void ib_uverbs_detach_umcast(struct ib_qp *qp,
-				    struct ib_uqp_object *uobj)
+void ib_uverbs_detach_umcast(struct ib_qp *qp,
+			     struct ib_uqp_object *uobj)
 {
 	struct ib_uverbs_mcast_entry *mcast, *tmp;
 
@@ -477,7 +477,7 @@ static int ib_uverbs_event_close(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static const struct file_operations uverbs_event_fops = {
+const struct file_operations uverbs_event_fops = {
 	.owner	 = THIS_MODULE,
 	.read	 = ib_uverbs_event_read,
 	.poll    = ib_uverbs_event_poll,
