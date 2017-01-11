@@ -601,7 +601,7 @@ static struct mtd_info *cfi_intelext_setup(struct mtd_info *mtd)
 				    sizeof(*mtd->eraseregions),
 				    GFP_KERNEL);
 	if (!mtd->eraseregions)
-		goto setup_err;
+		goto free_priv;
 
 	for (i = 0; i < cfi->cfiq->NumEraseRegions; i++) {
 		unsigned long ernum, ersize;
@@ -657,16 +657,14 @@ static struct mtd_info *cfi_intelext_setup(struct mtd_info *mtd)
 	return mtd;
 
  setup_err:
-	if (mtd->eraseregions)
-		for (i = 0; i < cfi->cfiq->NumEraseRegions; i++)
-			for (j = 0; j < cfi->numchips; j++)
-				kfree(mtd->eraseregions[j
-							* cfi->cfiq
-							  ->NumEraseRegions
-							+ i].lockmap);
+	for (i = 0; i < cfi->cfiq->NumEraseRegions; i++)
+		for (j = 0; j < cfi->numchips; j++)
+			kfree(mtd->eraseregions[j * cfi->cfiq->NumEraseRegions
+						+ i].lockmap);
 	kfree(mtd->eraseregions);
-	kfree(mtd);
+free_priv:
 	kfree(cfi->cmdset_priv);
+	kfree(mtd);
 	return NULL;
 }
 
