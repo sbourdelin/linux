@@ -2764,7 +2764,7 @@ static int rt5663_set_bias_level(struct snd_soc_codec *codec,
 			RT5663_PWR_FV1_MASK | RT5663_PWR_FV2_MASK |
 			RT5663_PWR_MB_MASK, RT5663_PWR_VREF1 |
 			RT5663_PWR_VREF2 | RT5663_PWR_MB);
-		usleep_range(10000, 10005);
+		msleep(10);
 		if (rt5663->codec_ver == CODEC_VER_1) {
 			snd_soc_update_bits(codec, RT5663_SIG_CLK_DET,
 				RT5663_EN_ANA_CLK_DET_MASK |
