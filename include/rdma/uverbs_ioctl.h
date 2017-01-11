@@ -34,8 +34,7 @@
 #define _UVERBS_IOCTL_
 
 #include <linux/kernel.h>
-
-struct ib_uobject;
+#include <rdma/ib_verbs.h>
 
 enum uverbs_attr_type {
 	UVERBS_ATTR_TYPE_IDR,
@@ -78,5 +77,52 @@ struct uverbs_root {
 	const struct uverbs_type_group		**type_groups;
 	size_t					num_groups;
 };
+
+#define UVERBS_BUILD_BUG_ON(cond) (sizeof(char[1 - 2 * !!(cond)]) -	\
+				   sizeof(char))
+#define UVERBS_TYPE_ALLOC_FD(_order, _obj_size, _free_fn, _fops, _name, _flags)\
+	((const struct uverbs_type_alloc_action)			\
+	 {.type = UVERBS_ATTR_TYPE_FD,					\
+	 .order = _order,						\
+	 .obj_size = (_obj_size) +					\
+		UVERBS_BUILD_BUG_ON((_obj_size) < sizeof(struct ib_uobject)), \
+	 .free_fn = _free_fn,						\
+	 .fd = {.fops = _fops,						\
+		.name = _name,						\
+		.flags = _flags} })
+#define UVERBS_TYPE_ALLOC_IDR_SZ(_size, _order, _free_fn)		\
+	((const struct uverbs_type_alloc_action)			\
+	 {.type = UVERBS_ATTR_TYPE_IDR,					\
+	 .order = _order,						\
+	 .free_fn = _free_fn,						\
+	 .obj_size = (_size) +						\
+		UVERBS_BUILD_BUG_ON((_size) < sizeof(struct ib_uobject)),})
+#define UVERBS_TYPE_ALLOC_IDR(_order, _free_fn)				\
+	 UVERBS_TYPE_ALLOC_IDR_SZ(sizeof(struct ib_uobject), _order, _free_fn)
+#define DECLARE_UVERBS_TYPE(name, _alloc)				\
+	const struct uverbs_type name = {				\
+		.alloc = _alloc,					\
+	}
+#define _UVERBS_TYPE_SZ(...)						\
+	(sizeof((const struct uverbs_type *[]){__VA_ARGS__}) /	\
+	 sizeof(const struct uverbs_type *))
+#define ADD_UVERBS_TYPE(type_idx, type_ptr)				\
+	[type_idx] = ((const struct uverbs_type * const)&(type_ptr))
+#define UVERBS_TYPES(...)  ((const struct uverbs_type_group)		\
+	{.num_types = _UVERBS_TYPE_SZ(__VA_ARGS__),			\
+	 .types = (const struct uverbs_type *[]){__VA_ARGS__} })
+#define DECLARE_UVERBS_TYPES(name, ...)				\
+	const struct uverbs_type_group name = UVERBS_TYPES(__VA_ARGS__)
+
+#define _UVERBS_TYPES_SZ(...)						\
+	(sizeof((const struct uverbs_type_group *[]){__VA_ARGS__}) /	\
+	 sizeof(const struct uverbs_type_group *))
+
+#define UVERBS_TYPES_GROUP(...)						\
+	((const struct uverbs_root){				\
+		.type_groups = (const struct uverbs_type_group *[]){__VA_ARGS__},\
+		.num_groups = _UVERBS_TYPES_SZ(__VA_ARGS__)})
+#define DECLARE_UVERBS_TYPES_GROUP(name, ...)		\
+	const struct uverbs_root name = UVERBS_TYPES_GROUP(__VA_ARGS__)
 
 #endif
