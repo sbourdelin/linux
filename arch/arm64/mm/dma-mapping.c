@@ -203,6 +203,37 @@ static void __dma_free(struct device *dev, size_t size,
 	__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
 }
 
+int dma_set_mask(struct device *dev, u64 dma_mask)
+{
+	const struct dma_map_ops *ops = get_dma_ops(dev);
+
+	if (mask > dev->archdata.parent_dma_mask)
+		mask = dev->archdata.parent_dma_mask;
+
+	if (ops->set_dma_mask)
+		return ops->set_dma_mask(dev, mask);
+
+	if (!dev->dma_mask || !dma_supported(dev, mask))
+		return -EIO;
+
+	*dev->dma_mask = mask;
+	return 0;
+}
+EXPORT_SYMBOL(dma_set_mask);
+
+int dma_set_coherent_mask(struct device *dev, u64 mask)
+{
+	if (mask > dev->archdata.parent_dma_mask)
+		mask = dev->archdata.parent_dma_mask;
+
+	if (!dma_supported(dev, mask))
+		return -EIO;
+
+	dev->coherent_dma_mask = mask;
+	return 0;
+}
+EXPORT_SYMBOL(dma_set_coherent_mask);
+
 static dma_addr_t __swiotlb_map_page(struct device *dev, struct page *page,
 				     unsigned long offset, size_t size,
 				     enum dma_data_direction dir,
@@ -958,6 +989,15 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
 {
 	if (!dev->archdata.dma_ops)
 		dev->archdata.dma_ops = &swiotlb_dma_ops;
+
+	/*
+	 * Whatever the parent bus can set. A device must not set
+	 * a DMA mask larger than this.
+	 */
+	if (enforce_range)
+		dev->archdata.parent_dma_mask = size - 1;
+	else
+		dev->archdata.parent_dma_mask = DMA_BIT_MASK(64);
 
 	dev->archdata.dma_coherent = coherent;
 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);

@@ -52,6 +52,9 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
 			bool coherent);
 #define arch_setup_dma_ops	arch_setup_dma_ops
 
+#define HAVE_ARCH_DMA_SET_MASK 1
+extern int dma_set_mask(struct device *dev, u64 dma_mask);
+
 #ifdef CONFIG_IOMMU_DMA
 void arch_teardown_dma_ops(struct device *dev);
 #define arch_teardown_dma_ops	arch_teardown_dma_ops
