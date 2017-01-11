@@ -479,6 +479,17 @@ config CAVIUM_ERRATUM_27456
 
 	  If unsure, say Y.
 
+config QCOM_FALKOR_ERRATUM_1003
+	bool "Falkor E1003: Incorrect translation due to ASID change"
+	default y
+	help
+	  An incorrect translation TLBI entry may be created while changing the
+	  ASID and translation table address together for TTBR0_EL1. The
+	  workaround for this issue is to use a reserved ASID in
+	  cpu_do_switch_mm() before switching to the target ASID.
+
+	  If unsure, say Y.
+
 endmenu
 
 

@@ -23,6 +23,7 @@
 #include <asm/assembler.h>
 #include <asm/asm-offsets.h>
 #include <asm/hwcap.h>
+#include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/pgtable-hwdef.h>
 #include <asm/cpufeature.h>
@@ -140,6 +141,18 @@ ENDPROC(cpu_do_resume)
 ENTRY(cpu_do_switch_mm)
 	mmid	x1, x1				// get mm->context.id
 	bfi	x0, x1, #48, #16		// set the ASID
+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
+alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
+	mrs     x2, ttbr0_el1
+	mov     x3, #FALKOR_RESERVED_ASID
+	bfi     x2, x3, #48, #16                // reserved ASID + old BADDR
+	msr     ttbr0_el1, x2
+	isb
+	bfi     x2, x0, #0, #48                 // reserved ASID + new BADDR
+	msr     ttbr0_el1, x2
+	isb
+alternative_else_nop_endif
+#endif
 	msr	ttbr0_el1, x0			// set TTBR0
 	isb
 	post_ttbr0_update_workaround
