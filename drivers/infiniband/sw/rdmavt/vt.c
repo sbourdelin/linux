@@ -47,6 +47,7 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <rdma/uverbs_ioctl_cmd.h>
 #include "vt.h"
 #include "trace.h"
 
@@ -714,6 +715,8 @@ static noinline int check_support(struct rvt_dev_info *rdi, int verb)
 	return 0;
 }
 
+DECLARE_UVERBS_TYPES_GROUP(root, &uverbs_common_types);
+
 /**
  * rvt_register_device - register a driver
  * @rdi: main dev structure for all of rdmavt operations
@@ -826,6 +829,7 @@ int rvt_register_device(struct rvt_dev_info *rdi)
 	rdi->ibdev.num_comp_vectors = 1;
 
 	/* We are now good to announce we exist */
+	rdi->ibdev.specs_root = (struct uverbs_root *)&root;
 	ret =  ib_register_device(&rdi->ibdev, rdi->driver_f.port_callback);
 	if (ret) {
 		rvt_pr_err(rdi, "Failed to register driver with ib core.\n");

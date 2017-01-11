@@ -158,6 +158,8 @@ struct ib_usrq_object {
 
 struct ib_uqp_object {
 	struct ib_uevent_object	uevent;
+	/* lock for mcast list */
+	struct mutex		mcast_lock;
 	struct list_head 	mcast_list;
 	struct ib_uxrcd_object *uxrcd;
 };
@@ -175,14 +177,13 @@ struct ib_ucq_object {
 	u32			async_events_reported;
 };
 
-void idr_remove_uobj(struct ib_uobject *uobj);
 extern const struct file_operations uverbs_event_fops;
 
-struct file *ib_uverbs_alloc_event_file(struct ib_uverbs_file *uverbs_file,
-					struct ib_device *ib_dev,
-					int is_async);
+void ib_uverbs_init_event_file(struct ib_uverbs_event_file *ev_file,
+			       struct ib_uverbs_file *uverbs_file);
+struct file *ib_uverbs_alloc_async_event_file(struct ib_uverbs_file *uverbs_file,
+					      struct ib_device *ib_dev);
 void ib_uverbs_free_async_event_file(struct ib_uverbs_file *uverbs_file);
-struct ib_uverbs_event_file *ib_uverbs_lookup_comp_file(int fd);
 
 void ib_uverbs_release_ucq(struct ib_uverbs_file *file,
 			   struct ib_uverbs_event_file *ev_file,

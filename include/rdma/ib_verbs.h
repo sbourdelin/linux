@@ -1336,17 +1336,6 @@ struct ib_ucontext_lock;
 struct ib_ucontext {
 	struct ib_device       *device;
 	struct ib_uverbs_file  *ufile;
-	struct list_head	pd_list;
-	struct list_head	mr_list;
-	struct list_head	mw_list;
-	struct list_head	cq_list;
-	struct list_head	qp_list;
-	struct list_head	srq_list;
-	struct list_head	ah_list;
-	struct list_head	xrcd_list;
-	struct list_head	rule_list;
-	struct list_head	wq_list;
-	struct list_head	rwq_ind_tbl_list;
 	int			closing;
 
 	/* lock for uobjects list */
@@ -1378,11 +1367,8 @@ struct ib_uobject {
 	void		       *object;		/* containing object */
 	struct list_head	list;		/* link to context's list */
 	int			id;		/* index into kernel idr/fd */
-	struct kref		ref;
-	struct rw_semaphore	mutex;		/* protects .live */
 	struct rw_semaphore	usecnt;		/* protects exclusive access */
 	struct rcu_head		rcu;		/* kfree_rcu() overhead */
-	int			live;
 
 	const struct uverbs_type_alloc_action *type;
 	struct ib_ucontext_lock	*uobjects_lock;
@@ -2141,6 +2127,8 @@ struct ib_device {
 	 */
 	int (*get_port_immutable)(struct ib_device *, u8, struct ib_port_immutable *);
 	void (*get_dev_fw_str)(struct ib_device *, char *str, size_t str_len);
+
+	struct uverbs_root                      *specs_root;
 };
 
 struct ib_client {

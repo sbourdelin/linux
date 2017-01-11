@@ -54,6 +54,8 @@ struct ib_uobject *uverbs_get_uobject_from_context(const struct uverbs_type_allo
 						   enum uverbs_idr_access access,
 						   unsigned int id);
 
+/* Check if the object is still alive. This must be called within RCU */
+bool uverbs_is_live(struct ib_uobject *uobj);
 void uverbs_finalize_object(struct ib_uobject *uobj,
 			    enum uverbs_idr_access access,
 			    bool success);

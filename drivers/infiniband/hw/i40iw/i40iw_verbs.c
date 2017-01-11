@@ -43,6 +43,7 @@
 #include <rdma/ib_verbs.h>
 #include <rdma/iw_cm.h>
 #include <rdma/ib_user_verbs.h>
+#include <rdma/uverbs_ioctl_cmd.h>
 #include <rdma/ib_umem.h>
 #include "i40iw.h"
 
@@ -2869,6 +2870,8 @@ void i40iw_destroy_rdma_device(struct i40iw_ib_device *iwibdev)
 	ib_dealloc_device(&iwibdev->ibdev);
 }
 
+DECLARE_UVERBS_TYPES_GROUP(root, &uverbs_common_types);
+
 /**
  * i40iw_register_rdma_device - register iwarp device to IB
  * @iwdev: iwarp device
@@ -2883,6 +2886,7 @@ int i40iw_register_rdma_device(struct i40iw_device *iwdev)
 		return -ENOMEM;
 	iwibdev = iwdev->iwibdev;
 
+	iwibdev->ibdev.specs_root = (struct uverbs_root *)&root;
 	ret = ib_register_device(&iwibdev->ibdev, NULL);
 	if (ret)
 		goto error;

@@ -34,6 +34,7 @@
 #include "rxe.h"
 #include "rxe_loc.h"
 #include "rxe_queue.h"
+#include <rdma/uverbs_ioctl_cmd.h>
 
 static int rxe_query_device(struct ib_device *dev,
 			    struct ib_device_attr *attr,
@@ -1221,6 +1222,8 @@ static struct device_attribute *rxe_dev_attributes[] = {
 	&dev_attr_parent,
 };
 
+DECLARE_UVERBS_TYPES_GROUP(root, &uverbs_common_types);
+
 int rxe_register_device(struct rxe_dev *rxe)
 {
 	int err;
@@ -1318,6 +1321,7 @@ int rxe_register_device(struct rxe_dev *rxe)
 	dev->attach_mcast = rxe_attach_mcast;
 	dev->detach_mcast = rxe_detach_mcast;
 
+	dev->specs_root = (struct uverbs_root *)&root;
 	err = ib_register_device(dev, NULL);
 	if (err) {
 		pr_warn("rxe_register_device failed, err = %d\n", err);

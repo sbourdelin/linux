@@ -54,6 +54,7 @@
 #include <linux/etherdevice.h>
 #include <linux/mlx5/fs.h>
 #include "mlx5_ib.h"
+#include <rdma/uverbs_ioctl_cmd.h>
 
 #define DRIVER_NAME "mlx5_ib"
 #define DRIVER_VERSION "2.2-1"
@@ -3027,6 +3028,8 @@ free:
 	return ARRAY_SIZE(names);
 }
 
+DECLARE_UVERBS_TYPES_GROUP(root, &uverbs_common_types);
+
 static void *mlx5_ib_add(struct mlx5_core_dev *mdev)
 {
 	struct mlx5_ib_dev *dev;
@@ -3237,6 +3240,7 @@ static void *mlx5_ib_add(struct mlx5_core_dev *mdev)
 	if (err)
 		goto err_odp;
 
+	dev->ib_dev.specs_root = (struct uverbs_root *)&root;
 	err = ib_register_device(&dev->ib_dev, NULL);
 	if (err)
 		goto err_q_cnt;

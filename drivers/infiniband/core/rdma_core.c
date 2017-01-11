@@ -63,6 +63,11 @@ static struct ib_uobject *get_uobj_rcu(int id, struct ib_ucontext *context)
 	return uobj;
 }
 
+bool uverbs_is_live(struct ib_uobject *uobj)
+{
+	return uobj == get_uobj_rcu(uobj->id, uobj->context);
+}
+
 struct ib_ucontext_lock {
 	struct kref  ref;
 	/* locking the uobjects_list */

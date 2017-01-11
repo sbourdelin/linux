@@ -53,6 +53,7 @@
 #include <rdma/ib_smi.h>
 #include <rdma/ib_umem.h>
 #include <rdma/ib_user_verbs.h>
+#include <rdma/uverbs_ioctl_cmd.h>
 
 #include "cxio_hal.h"
 #include "iwch.h"
@@ -1361,6 +1362,8 @@ static void get_dev_fw_ver_str(struct ib_device *ibdev, char *str,
 	snprintf(str, str_len, "%s", info.fw_version);
 }
 
+DECLARE_UVERBS_TYPES_GROUP(root, &uverbs_common_types);
+
 int iwch_register_device(struct iwch_dev *dev)
 {
 	int ret;
@@ -1454,6 +1457,7 @@ int iwch_register_device(struct iwch_dev *dev)
 	memcpy(dev->ibdev.iwcm->ifname, dev->rdev.t3cdev_p->lldev->name,
 	       sizeof(dev->ibdev.iwcm->ifname));
 
+	dev->ibdev.specs_root = (struct uverbs_root *)&root;
 	ret = ib_register_device(&dev->ibdev, NULL);
 	if (ret)
 		goto bail1;
