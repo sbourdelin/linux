@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 ARM Ltd.
+ * Copfrigt (C) 2013 ARM Ltd.
  * Copyright (C) 2013 Linaro.
  *
  * This code is based on glibc cortex strings work originally authored by Linaro
@@ -163,12 +163,19 @@ D_h	.req	x14
 	*/
 	.p2align	L1_CACHE_SHIFT
 .Lcpy_body_large:
+alternative_if ARM64_HAS_NO_HW_PREFETCH
+	prfm	pldl1strm, [src, #128]
+	prfm	pldl1strm, [src, #256]
+alternative_else_nop_endif
 	/* pre-get 64 bytes data. */
 	ldp1	A_l, A_h, src, #16
 	ldp1	B_l, B_h, src, #16
 	ldp1	C_l, C_h, src, #16
 	ldp1	D_l, D_h, src, #16
 1:
+alternative_if ARM64_HAS_NO_HW_PREFETCH
+	prfm	pldl1strm, [src, #384]
+alternative_else_nop_endif
 	/*
 	* interlace the load of next 64 bytes data block with store of the last
 	* loaded 64 bytes data.

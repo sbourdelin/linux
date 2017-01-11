@@ -25,6 +25,9 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 #include <asm/cache.h>
+#include <asm/alternative.h>
+#include <asm/cpufeature.h>
+
 
 /*
  * Copy a buffer from src to dest (alignment handled by the hardware)
