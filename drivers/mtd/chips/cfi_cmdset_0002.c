@@ -712,14 +712,13 @@ static struct mtd_info *cfi_amdstd_setup(struct mtd_info *mtd)
 	if (offset != devsize) {
 		/* Argh */
 		printk(KERN_WARNING "Sum of regions (%lx) != total size of set of interleaved chips (%lx)\n", offset, devsize);
-		goto setup_err;
+		goto free_regions;
 	}
 
 	__module_get(THIS_MODULE);
 	register_reboot_notifier(&mtd->reboot_notifier);
 	return mtd;
-
- setup_err:
+free_regions:
 	kfree(mtd->eraseregions);
 free_priv:
 	kfree(cfi->cmdset_priv);
