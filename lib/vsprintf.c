@@ -1373,6 +1373,10 @@ char *address_val(char *buf, char *end, const void *addr, const char *fmt)
 		num = *(const dma_addr_t *)addr;
 		size = sizeof(dma_addr_t);
 		break;
+	case 'r':
+		num = *(const resource_size_t *)addr;
+		size = sizeof(resource_size_t);
+		break;
 	case 'p':
 	default:
 		num = *(const phys_addr_t *)addr;
@@ -1548,8 +1552,11 @@ int kptr_restrict __read_mostly;
  *              N no separator
  *            The maximum supported length is 64 bytes of the input. Consider
  *            to use print_hex_dump() for the larger input.
- * - 'a[pd]' For address types [p] phys_addr_t, [d] dma_addr_t and derivatives
- *           (default assumed to be phys_addr_t, passed by reference)
+ * - 'a[dpr]' For address types (default assumed to be phys_addr_t, passed by
+ *            reference):
+ *            [d] dma_addr_t
+ *            [p] phys_addr_t
+ *            [r] resource_size_t
  * - 'd[234]' For a dentry name (optionally 2-4 last components)
  * - 'D[234]' Same as 'd' but for a struct file
  * - 'g' For block_device name (gendisk + partition number)
