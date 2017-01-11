@@ -1863,6 +1863,10 @@ struct ib_device {
 
 	struct iw_cm_verbs	     *iwcm;
 
+	struct idr		idr;
+	/* Global lock in use to safely release device IDR */
+	spinlock_t		idr_lock;
+
 	/**
 	 * alloc_hw_stats - Allocate a struct rdma_hw_stats and fill in the
 	 *   driver initialized data.  The struct is kfree()'ed by the sysfs
