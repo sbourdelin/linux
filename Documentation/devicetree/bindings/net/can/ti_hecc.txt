@@ -1,0 +1,31 @@
+* Texas Instruments High End CAN Controller (HECC)
+
+This file provides information, what the device node
+for the hecc interface contains.
+
+Required properties:
+- compatible: "ti,am3505"
+- reg: offset and length of the register set for the device
+- interrupts: interrupt mapping for the hecc interrupts sources
+- clocks: clock phandles (see clock bindings for details)
+- ti,scc-ram-offset: offset to scc module ram
+- ti,hecc-ram-offset: offset to hecc module ram
+- ti,mbx-offset: offset to mailbox ram
+
+Optional properties:
+- ti,int-line: interrupt line
+
+Example:
+
+For am3517evm board:
+	hecc: can@0x5c050000 {
+		compatible = "ti,am3505";
+		status = "disabled";
+		reg = <0x5c050000 0x4000>;
+		interrupts = <24>;
+		clocks = <&hecc_ck>;
+		ti,scc-ram-offset = <0x3000>;
+		ti,hecc-ram-offset = <0x3000>;
+		ti,mbx-offset = <0x2000>;
+		ti,int-line = <0>;
+	};
