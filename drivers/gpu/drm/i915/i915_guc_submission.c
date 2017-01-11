@@ -350,7 +350,7 @@ int i915_guc_wq_reserve(struct drm_i915_gem_request *request)
 	u32 freespace;
 	int ret;
 
-	spin_lock(&client->wq_lock);
+	spin_lock_irq(&client->wq_lock);
 	freespace = CIRC_SPACE(client->wq_tail, desc->head, client->wq_size);
 	freespace -= client->wq_rsvd;
 	if (likely(freespace >= wqi_size)) {
@@ -360,7 +360,7 @@ int i915_guc_wq_reserve(struct drm_i915_gem_request *request)
 		client->no_wq_space++;
 		ret = -EAGAIN;
 	}
-	spin_unlock(&client->wq_lock);
+	spin_unlock_irq(&client->wq_lock);
 
 	return ret;
 }
@@ -372,9 +372,9 @@ void i915_guc_wq_unreserve(struct drm_i915_gem_request *request)
 
 	GEM_BUG_ON(READ_ONCE(client->wq_rsvd) < wqi_size);
 
-	spin_lock(&client->wq_lock);
+	spin_lock_irq(&client->wq_lock);
 	client->wq_rsvd -= wqi_size;
-	spin_unlock(&client->wq_lock);
+	spin_unlock_irq(&client->wq_lock);
 }
 
 /* Construct a Work Item and append it to the GuC's Work Queue */
@@ -534,8 +534,72 @@ static void __i915_guc_submit(struct drm_i915_gem_request *rq)
 
 static void i915_guc_submit(struct drm_i915_gem_request *rq)
 {
-	i915_gem_request_submit(rq);
+	__i915_gem_request_submit(rq);
 	__i915_guc_submit(rq);
+}
+
+static bool i915_guc_dequeue(struct intel_engine_cs *engine)
+{
+	struct execlist_port *port = engine->execlist_port;
+	struct drm_i915_gem_request *last = port[0].request;
+	unsigned long flags;
+	struct rb_node *rb;
+	bool submit = false;
+
+	spin_lock_irqsave(&engine->timeline->lock, flags);
+	rb = engine->execlist_first;
+	while (rb) {
+		struct drm_i915_gem_request *cursor =
+			rb_entry(rb, typeof(*cursor), priotree.node);
+
+		if (last && cursor->ctx != last->ctx) {
+			if (port != engine->execlist_port)
+				break;
+
+			i915_gem_request_assign(&port->request, last);
+			dma_fence_enable_sw_signaling(&last->fence);
+			port++;
+		}
+
+		rb = rb_next(rb);
+		rb_erase(&cursor->priotree.node, &engine->execlist_queue);
+		RB_CLEAR_NODE(&cursor->priotree.node);
+		cursor->priotree.priority = INT_MAX;
+
+		i915_guc_submit(cursor);
+		last = cursor;
+		submit = true;
+	}
+	if (submit) {
+		i915_gem_request_assign(&port->request, last);
+		dma_fence_enable_sw_signaling(&last->fence);
+		engine->execlist_first = rb;
+	}
+	spin_unlock_irqrestore(&engine->timeline->lock, flags);
+
+	return submit;
+}
+
+static void i915_guc_irq_handler(unsigned long data)
+{
+	struct intel_engine_cs *engine = (struct intel_engine_cs *)data;
+	struct execlist_port *port = engine->execlist_port;
+	struct drm_i915_gem_request *rq;
+	bool submit;
+
+	do {
+		rq = port[0].request;
+		while (rq && i915_gem_request_completed(rq)) {
+			i915_gem_request_put(rq);
+			rq = port[1].request;
+			port[0].request = rq;
+			port[1].request = NULL;
+		}
+
+		submit = false;
+		if (!port[1].request)
+			submit = i915_guc_dequeue(engine);
+	} while (submit);
 }
 
 /*
@@ -1428,8 +1492,9 @@ int i915_guc_submission_enable(struct drm_i915_private *dev_priv)
 	for_each_engine(engine, dev_priv, id) {
 		struct drm_i915_gem_request *rq;
 
-		engine->submit_request = i915_guc_submit;
-		engine->schedule = NULL;
+		tasklet_init(&engine->irq_tasklet,
+			     i915_guc_irq_handler,
+			     (unsigned long)engine);
 
 		/* Replay the current set of previously submitted requests */
 		list_for_each_entry(rq, &engine->timeline->requests, link) {
