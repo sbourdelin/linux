@@ -1535,7 +1535,7 @@ static int __xipram do_write_oneword(struct map_info *map, struct flchip *chip,
 {
 	struct cfi_private *cfi = map->fldrv_priv;
 	map_word status, write_cmd;
-	int ret=0;
+	int ret;
 
 	adr += chip->start;
 
