@@ -77,5 +77,18 @@ static inline void arch_clear_hugepage_flags(struct page *page)
 void hugetlb_free_pgd_range(struct mmu_gather *tlb, unsigned long addr,
 			    unsigned long end, unsigned long floor,
 			    unsigned long ceiling);
+#ifdef CONFIG_SPARC64
+static inline pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
+			 struct page *page, int writeable)
+{
+	/* If this vma has ADI enabled on it, turn on TTE.mcd
+	 */
+	if (vma->vm_flags & VM_SPARC_ADI)
+		return pte_mkmcd(entry);
+	else
+		return pte_mknotmcd(entry);
+}
+#define arch_make_huge_pte arch_make_huge_pte
+#endif
 
 #endif /* _ASM_SPARC64_HUGETLB_H */

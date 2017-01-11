@@ -7,6 +7,7 @@
 
 #include <linux/spinlock.h>
 #include <asm/spitfire.h>
+#include <asm/adi_64.h>
 #include <asm-generic/mm_hooks.h>
 
 static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
@@ -79,6 +80,21 @@ static inline void switch_mm(struct mm_struct *old_mm, struct mm_struct *mm, str
 	if (unlikely(mm == &init_mm))
 		return;
 
+	/* Save the current state of MCDPER register for the process we are
+	 * switching from
+	 */
+	if (adi_capable()) {
+		register unsigned long tmp_mcdper;
+
+		__asm__ __volatile__(
+			".word 0xa1438000\n\t"	/* rd  %mcdper, %l0 */
+			"mov %%l0, %0\n\t"
+			: "=r" (tmp_mcdper)
+			:
+			: "l0");
+		old_mm->context.mcdper = tmp_mcdper;
+	}
+
 	spin_lock_irqsave(&mm->context.lock, flags);
 	ctx_valid = CTX_VALID(mm->context);
 	if (!ctx_valid)
@@ -127,6 +143,22 @@ static inline void switch_mm(struct mm_struct *old_mm, struct mm_struct *mm, str
 		__flush_tlb_mm(CTX_HWBITS(mm->context),
 			       SECONDARY_CONTEXT);
 	}
+
+	/* Restore the state of MCDPER register for the process we are
+	 * switching to
+	 */
+	if (adi_capable()) {
+		register unsigned long tmp_mcdper;
+
+		tmp_mcdper = mm->context.mcdper;
+		__asm__ __volatile__(
+			"mov %0, %%l1\n\t"
+			".word 0x9d800011\n\t"	/* wr  %g0, %l1, %mcdper */
+			:
+			: "ir" (tmp_mcdper)
+			: "l1");
+	}
+
 	spin_unlock_irqrestore(&mm->context.lock, flags);
 }
 

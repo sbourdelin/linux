@@ -15,6 +15,7 @@
 #include <asm/cacheflush.h>
 #include <asm/mmu_context.h>
 #include <asm/tlb.h>
+#include <asm/asi.h>
 
 /* Heavily inspired by the ppc64 code.  */
 
@@ -140,6 +141,33 @@ void tlb_batch_add(struct mm_struct *mm, unsigned long vaddr,
 no_cache_flush:
 	if (!fullmm)
 		tlb_batch_add_one(mm, vaddr, pte_exec(orig), huge);
+}
+
+pte_t ptep_clear_flush(struct vm_area_struct *vma, unsigned long address,
+		       pte_t *ptep)
+{
+	struct mm_struct *mm = (vma)->vm_mm;
+	pte_t pte;
+
+	pte = *ptep;
+	/* If we are getting ready to swap out a page with ADI enabled
+	 * and version tags set, save the version tags so we can restore
+	 * them when page is swapped back in.
+	 */
+	if (pte_val(pte) & _PAGE_MCD_4V) {
+		unsigned long version, paddr;
+
+		paddr = pte_val(pte) & _PAGE_PADDR_4V;
+		asm volatile(
+			"ldxa [%1] %2, %0\n\t"
+			: "=r" (version)
+			: "r" (paddr), "i" (ASI_MCD_REAL));
+	}
+
+	pte = ptep_get_and_clear(mm, address, ptep);
+	if (pte_accessible(mm, pte))
+		flush_tlb_page(vma, address);
+	return pte;
 }
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
