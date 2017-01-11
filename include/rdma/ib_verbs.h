@@ -1331,6 +1331,8 @@ struct ib_fmr_attr {
 
 struct ib_umem;
 
+struct ib_ucontext_lock;
+
 struct ib_ucontext {
 	struct ib_device       *device;
 	struct list_head	pd_list;
@@ -1345,6 +1347,10 @@ struct ib_ucontext {
 	struct list_head	wq_list;
 	struct list_head	rwq_ind_tbl_list;
 	int			closing;
+
+	/* lock for uobjects list */
+	struct ib_ucontext_lock	*uobjects_lock;
+	struct list_head	uobjects;
 
 	struct pid             *tgid;
 #ifdef CONFIG_INFINIBAND_ON_DEMAND_PAGING
@@ -1373,8 +1379,11 @@ struct ib_uobject {
 	int			id;		/* index into kernel idr */
 	struct kref		ref;
 	struct rw_semaphore	mutex;		/* protects .live */
+	struct rw_semaphore	usecnt;		/* protects exclusive access */
 	struct rcu_head		rcu;		/* kfree_rcu() overhead */
 	int			live;
+
+	const struct uverbs_type_alloc_action *type;
 };
 
 struct ib_udata {
