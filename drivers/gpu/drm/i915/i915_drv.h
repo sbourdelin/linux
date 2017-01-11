@@ -2597,6 +2597,16 @@ static inline struct scatterlist *__sg_next(struct scatterlist *sg)
 	     (((__iter).curr += PAGE_SIZE) < (__iter).max) ||		\
 	     ((__iter) = __sgt_iter(__sg_next((__iter).sgp), false), 0))
 
+static inline unsigned int i915_sg_segment_size(void)
+{
+	unsigned int size = swiotlb_max_segment();
+
+	if (size == 0)
+		size = UINT_MAX;
+
+	return rounddown(size, PAGE_SIZE);
+}
+
 static inline const struct intel_device_info *
 intel_info(const struct drm_i915_private *dev_priv)
 {
