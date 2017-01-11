@@ -1569,7 +1569,7 @@ static int __xipram do_write_oneword(struct map_info *map, struct flchip *chip,
 	 * timeout of 0 jiffies if HZ is smaller than 1000.
 	 */
 	unsigned long uWriteTimeout = ( HZ / 1000 ) + 1;
-	int ret = 0;
+	int ret;
 	map_word oldd;
 	int retry_cnt = 0;
 
