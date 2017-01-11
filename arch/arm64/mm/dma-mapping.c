@@ -953,7 +953,8 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
 #endif  /* CONFIG_IOMMU_DMA */
 
 void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-			const struct iommu_ops *iommu, bool coherent)
+			bool enforce_range, const struct iommu_ops *iommu,
+			bool coherent)
 {
 	if (!dev->archdata.dma_ops)
 		dev->archdata.dma_ops = &swiotlb_dma_ops;

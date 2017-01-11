@@ -2380,7 +2380,8 @@ static struct dma_map_ops *arm_get_dma_map_ops(bool coherent)
 }
 
 void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-			const struct iommu_ops *iommu, bool coherent)
+			bool enforce_range, const struct iommu_ops *iommu,
+			bool coherent)
 {
 	struct dma_map_ops *dma_ops;
 

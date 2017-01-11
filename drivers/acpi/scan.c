@@ -1385,7 +1385,7 @@ void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
 	 * Assume dma valid range starts at 0 and covers the whole
 	 * coherent_dma_mask.
 	 */
-	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
+	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, false, iommu,
 			   attr == DEV_DMA_COHERENT);
 }
 EXPORT_SYMBOL_GPL(acpi_dma_configure);

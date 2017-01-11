@@ -89,6 +89,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
 	bool coherent;
 	unsigned long offset;
 	const struct iommu_ops *iommu;
+	bool enforce_range = false;
 
 	/*
 	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
@@ -126,6 +127,8 @@ void of_dma_configure(struct device *dev, struct device_node *np)
 			return;
 		}
 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+
+		enforce_range = true;
 	}
 
 	dev->dma_pfn_offset = offset;
@@ -147,7 +150,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
 	dev_dbg(dev, "device is%sbehind an iommu\n",
 		iommu ? " " : " not ");
 
-	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
+	arch_setup_dma_ops(dev, dma_addr, size, enforce_range, iommu, coherent);
 }
 EXPORT_SYMBOL_GPL(of_dma_configure);
 

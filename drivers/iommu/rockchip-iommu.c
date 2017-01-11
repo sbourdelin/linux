@@ -1096,7 +1096,7 @@ static int rk_iommu_domain_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	/* Set dma_ops for dev, otherwise it would be dummy_dma_ops */
-	arch_setup_dma_ops(dev, 0, DMA_BIT_MASK(32), NULL, false);
+	arch_setup_dma_ops(dev, 0, DMA_BIT_MASK(32), false, NULL, false);
 
 	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
 	dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(32));
