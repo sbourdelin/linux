@@ -94,6 +94,10 @@ struct s3c2410_udc {
 	unsigned			req_pending : 1;
 	u8				vbus;
 	struct dentry			*regs_info;
+	struct platform_device		*pdev;
+	struct resource			*mem;
+	int				irq;
+	unsigned int			ep_fifo_size;
 };
 #define to_s3c2410(g)	(container_of((g), struct s3c2410_udc, gadget))
 
