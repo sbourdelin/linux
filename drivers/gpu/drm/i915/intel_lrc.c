@@ -1358,7 +1358,7 @@ static int gen8_init_common_ring(struct intel_engine_cs *engine)
 	DRM_DEBUG_DRIVER("Execlists enabled for %s\n", engine->name);
 
 	/* After a GPU reset, we may have requests to replay */
-	if (!execlists_elsp_idle(engine)) {
+	if (!i915.enable_guc_submission && !execlists_elsp_idle(engine)) {
 		engine->execlist_port[0].count = 0;
 		engine->execlist_port[1].count = 0;
 		execlists_submit_ports(engine);
@@ -1425,9 +1425,6 @@ static void reset_common_ring(struct intel_engine_cs *engine,
 	request->ring->head = request->postfix;
 	request->ring->last_retired_head = -1;
 	intel_ring_update_space(request->ring);
-
-	if (i915.enable_guc_submission)
-		return;
 
 	/* Catch up with any missed context-switch interrupts */
 	I915_WRITE(RING_CONTEXT_STATUS_PTR(engine), _MASKED_FIELD(0xffff, 0));
