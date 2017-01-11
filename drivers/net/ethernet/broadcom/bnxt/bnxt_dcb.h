@@ -36,6 +36,9 @@ struct bnxt_cos2bw_cfg {
 
 #define HWRM_STRUCT_DATA_SUBTYPE_HOST_OPERATIONAL	0x0300
 
+#define ETH_P_ROCE		0x8915
+#define ROCE_V2_UDP_DPORT	4791
+
 void bnxt_dcb_init(struct bnxt *bp);
 void bnxt_dcb_free(struct bnxt *bp);
 #endif
