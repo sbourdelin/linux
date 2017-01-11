@@ -64,9 +64,19 @@ static struct ib_uobject *get_uobj_rcu(int id, struct ib_ucontext *context)
 }
 
 struct ib_ucontext_lock {
+	struct kref  ref;
 	/* locking the uobjects_list */
 	struct mutex lock;
 };
+
+static void release_uobjects_list_lock(struct kref *ref)
+{
+	struct ib_ucontext_lock *lock = container_of(ref,
+						     struct ib_ucontext_lock,
+						     ref);
+
+	kfree(lock);
+}
 
 static void init_uobj(struct ib_uobject *uobj, struct ib_ucontext *context)
 {
@@ -184,6 +194,75 @@ static struct ib_uobject *uverbs_get_uobject_from_idr(const struct uverbs_type_a
 	return uobj;
 }
 
+static struct ib_uobject *uverbs_priv_fd_to_uobject(void *priv)
+{
+	return priv - sizeof(struct ib_uobject);
+}
+
+static struct ib_uobject *uverbs_get_uobject_from_fd(const struct uverbs_type_alloc_action *type_alloc,
+						     struct ib_ucontext *ucontext,
+						     enum uverbs_idr_access access,
+						     unsigned int fd)
+{
+	if (access == UVERBS_ACCESS_NEW) {
+		int _fd;
+		struct ib_uobject *uobj = NULL;
+		struct file *filp;
+
+		_fd = get_unused_fd_flags(O_CLOEXEC);
+		if (_fd < 0)
+			return ERR_PTR(_fd);
+
+		uobj = kmalloc(type_alloc->obj_size, GFP_KERNEL);
+		if (!uobj) {
+			put_unused_fd(_fd);
+			return ERR_PTR(-ENOMEM);
+		}
+
+		init_uobj(uobj, ucontext);
+		filp = anon_inode_getfile(type_alloc->fd.name,
+					  type_alloc->fd.fops,
+					  uverbs_fd_uobj_to_priv(uobj),
+					  type_alloc->fd.flags);
+		if (IS_ERR(filp)) {
+			put_unused_fd(_fd);
+			kfree(uobj);
+			return (void *)filp;
+		}
+
+		/*
+		 * user_handle should be filled by the user,
+		 * the list is filled in the commit operation.
+		 */
+		uobj->type = type_alloc;
+		uobj->id = _fd;
+		uobj->object = filp;
+
+		return uobj;
+	} else if (access == UVERBS_ACCESS_READ) {
+		struct file *f = fget(fd);
+		struct ib_uobject *uobject;
+
+		if (!f)
+			return ERR_PTR(-EBADF);
+
+		uobject = uverbs_priv_fd_to_uobject(f->private_data);
+		if (f->f_op != type_alloc->fd.fops ||
+		    !uobject->context) {
+			fput(f);
+			return ERR_PTR(-EBADF);
+		}
+
+		/*
+		 * No need to protect it with a ref count, as fget increases
+		 * f_count.
+		 */
+		return uobject;
+	} else {
+		return ERR_PTR(-EOPNOTSUPP);
+	}
+}
+
 struct ib_uobject *uverbs_get_uobject_from_context(const struct uverbs_type_alloc_action *type_alloc,
 						   struct ib_ucontext *ucontext,
 						   enum uverbs_idr_access access,
@@ -193,7 +272,8 @@ struct ib_uobject *uverbs_get_uobject_from_context(const struct uverbs_type_allo
 		return uverbs_get_uobject_from_idr(type_alloc, ucontext, access,
 						   id);
 	else
-		return ERR_PTR(-ENOENT);
+		return uverbs_get_uobject_from_fd(type_alloc, ucontext, access,
+						  id);
 }
 
 static void uverbs_uobject_add(struct ib_uobject *uobject)
@@ -253,12 +333,64 @@ static void uverbs_finalize_idr(struct ib_uobject *uobj,
 	}
 }
 
+static void uverbs_finalize_fd(struct ib_uobject *uobj,
+			       enum uverbs_idr_access access,
+			       bool commit)
+{
+	struct file *filp = uobj->object;
+
+	if (access == UVERBS_ACCESS_NEW) {
+		if (commit) {
+			uobj->uobjects_lock = uobj->context->uobjects_lock;
+			kref_get(&uobj->uobjects_lock->ref);
+			uverbs_uobject_add(uobj);
+			fd_install(uobj->id, uobj->object);
+		} else {
+			/* Unsuccessful NEW */
+			fput(filp);
+			put_unused_fd(uobj->id);
+			kfree(uobj);
+		}
+	} else {
+		fput(filp);
+	}
+}
+
 void uverbs_finalize_object(struct ib_uobject *uobj,
 			    enum uverbs_idr_access access,
 			    bool commit)
 {
 	if (uobj->type->type == UVERBS_ATTR_TYPE_IDR)
 		uverbs_finalize_idr(uobj, access, commit);
+	else if (uobj->type->type == UVERBS_ATTR_TYPE_FD)
+		uverbs_finalize_fd(uobj, access, commit);
 	else
 		WARN_ON(true);
 }
+
+static void uverbs_remove_fd(struct ib_uobject *uobject)
+{
+	if (uobject->context) {
+		list_del(&uobject->list);
+		uobject->context = NULL;
+	}
+}
+
+/* user should release the uobject in the release file_operation callback. */
+void uverbs_close_fd(struct file *f)
+{
+	struct ib_uobject *uobject = uverbs_priv_fd_to_uobject(f->private_data);
+
+	mutex_lock(&uobject->uobjects_lock->lock);
+	uverbs_remove_fd(uobject);
+	mutex_unlock(&uobject->uobjects_lock->lock);
+	kref_put(&uobject->uobjects_lock->ref, release_uobjects_list_lock);
+}
+
+void uverbs_cleanup_fd(void *private_data)
+{
+	struct ib_uobject *uobject = uverbs_priv_fd_to_uobject(private_data);
+
+	kfree(uobject);
+}
+

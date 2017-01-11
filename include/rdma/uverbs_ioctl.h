@@ -35,8 +35,11 @@
 
 #include <linux/kernel.h>
 
+struct ib_uobject;
+
 enum uverbs_attr_type {
 	UVERBS_ATTR_TYPE_IDR,
+	UVERBS_ATTR_TYPE_FD,
 };
 
 enum uverbs_idr_access {
@@ -55,6 +58,11 @@ struct uverbs_type_alloc_action {
 	int				order;
 	size_t				obj_size;
 	free_type			free_fn;
+	struct {
+		const struct file_operations	*fops;
+		const char			*name;
+		int				flags;
+	} fd;
 };
 
 #endif
