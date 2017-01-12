@@ -673,8 +673,8 @@ static void f2fs_submit_bio_wait_endio(struct bio *bio)
 static int __f2fs_issue_discard_async(struct f2fs_sb_info *sbi,
 		struct block_device *bdev, block_t blkstart, block_t blklen)
 {
+	struct bio_entry *be;
 	struct bio *bio = NULL;
-	int err;
 
 	trace_f2fs_issue_discard(sbi->sb, blkstart, blklen);
 
@@ -683,20 +683,24 @@ static int __f2fs_issue_discard_async(struct f2fs_sb_info *sbi,
 
 		blkstart -= FDEV(devi).start_blk;
 	}
-	err = __blkdev_issue_discard(bdev,
-				SECTOR_FROM_BLOCK(blkstart),
-				SECTOR_FROM_BLOCK(blklen),
-				GFP_NOFS, 0, &bio);
-	if (!err && bio) {
-		struct bio_entry *be = __add_bio_entry(sbi, bio);
 
-		bio->bi_private = be;
-		bio->bi_end_io = f2fs_submit_bio_wait_endio;
-		bio->bi_opf |= REQ_SYNC;
-		submit_bio(bio);
-	}
+	if (!blk_queue_discard(bdev_get_queue(bdev)))
+		return 0;
 
-	return err;
+	/* we always submit 4KB-aligned discard commands. */
+	bio = f2fs_bio_alloc(0);
+	bio->bi_iter.bi_sector = SECTOR_FROM_BLOCK(blkstart);
+	bio->bi_bdev = bdev;
+	bio_set_op_attrs(bio, REQ_OP_DISCARD, 0);
+	bio->bi_iter.bi_size = SECTOR_FROM_BLOCK(blklen) << 9;
+	bio->bi_end_io = f2fs_submit_bio_wait_endio;
+
+	be = __add_bio_entry(sbi, bio);
+
+	bio->bi_private = be;
+	bio->bi_opf |= REQ_SYNC;
+	submit_bio(bio);
+	return 0;
 }
 
 #ifdef CONFIG_BLK_DEV_ZONED
