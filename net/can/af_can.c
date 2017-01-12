@@ -517,10 +517,8 @@ EXPORT_SYMBOL(can_rx_register);
 /*
  * can_rx_delete_receiver - rcu callback for single receiver entry removal
  */
-static void can_rx_delete_receiver(struct rcu_head *rp)
+static void can_rx_delete_receiver(struct receiver *r)
 {
-	struct receiver *r = container_of(rp, struct receiver, rcu);
-
 	kmem_cache_free(rcv_cache, r);
 }
 
@@ -595,9 +593,13 @@ void can_rx_unregister(struct net_device *dev, canid_t can_id, canid_t mask,
  out:
 	spin_unlock(&can_rcvlists_lock);
 
-	/* schedule the receiver item for deletion */
-	if (r)
-		call_rcu(&r->rcu, can_rx_delete_receiver);
+	/* synchronize_rcu to wait until a grace period has elapsed, to make
+	 * sure all receiver's sk dereferenced by others.
+	 */
+	if (r) {
+		synchronize_rcu();
+		can_rx_delete_receiver(r);
+	}
 }
 EXPORT_SYMBOL(can_rx_unregister);
 

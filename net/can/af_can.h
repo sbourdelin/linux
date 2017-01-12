@@ -50,7 +50,6 @@
 
 struct receiver {
 	struct hlist_node list;
-	struct rcu_head rcu;
 	canid_t can_id;
 	canid_t mask;
 	unsigned long matches;
