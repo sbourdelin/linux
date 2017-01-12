@@ -58,8 +58,7 @@
 #define SILEAD_POINT_X_MSB_OFF	0x03
 #define SILEAD_TOUCH_ID_MASK	0xF0
 
-#define SILEAD_CMD_SLEEP_MIN	10000
-#define SILEAD_CMD_SLEEP_MAX	20000
+#define SILEAD_CMD_SLEEP_MIN	10	/* 10+ ms */
 #define SILEAD_POWER_SLEEP	20
 #define SILEAD_STARTUP_SLEEP	30
 
@@ -190,25 +189,25 @@ static int silead_ts_init(struct i2c_client *client)
 					  SILEAD_CMD_RESET);
 	if (error)
 		goto i2c_write_err;
-	usleep_range(SILEAD_CMD_SLEEP_MIN, SILEAD_CMD_SLEEP_MAX);
+	msleep(SILEAD_CMD_SLEEP_MIN);
 
 	error = i2c_smbus_write_byte_data(client, SILEAD_REG_TOUCH_NR,
 					data->max_fingers);
 	if (error)
 		goto i2c_write_err;
-	usleep_range(SILEAD_CMD_SLEEP_MIN, SILEAD_CMD_SLEEP_MAX);
+	msleep(SILEAD_CMD_SLEEP_MIN);
 
 	error = i2c_smbus_write_byte_data(client, SILEAD_REG_CLOCK,
 					  SILEAD_CLOCK);
 	if (error)
 		goto i2c_write_err;
-	usleep_range(SILEAD_CMD_SLEEP_MIN, SILEAD_CMD_SLEEP_MAX);
+	msleep(SILEAD_CMD_SLEEP_MIN);
 
 	error = i2c_smbus_write_byte_data(client, SILEAD_REG_RESET,
 					  SILEAD_CMD_START);
 	if (error)
 		goto i2c_write_err;
-	usleep_range(SILEAD_CMD_SLEEP_MIN, SILEAD_CMD_SLEEP_MAX);
+	msleep(SILEAD_CMD_SLEEP_MIN);
 
 	return 0;
 
@@ -225,19 +224,19 @@ static int silead_ts_reset(struct i2c_client *client)
 					  SILEAD_CMD_RESET);
 	if (error)
 		goto i2c_write_err;
-	usleep_range(SILEAD_CMD_SLEEP_MIN, SILEAD_CMD_SLEEP_MAX);
+	msleep(SILEAD_CMD_SLEEP_MIN);
 
 	error = i2c_smbus_write_byte_data(client, SILEAD_REG_CLOCK,
 					  SILEAD_CLOCK);
 	if (error)
 		goto i2c_write_err;
-	usleep_range(SILEAD_CMD_SLEEP_MIN, SILEAD_CMD_SLEEP_MAX);
+	msleep(SILEAD_CMD_SLEEP_MIN);
 
 	error = i2c_smbus_write_byte_data(client, SILEAD_REG_POWER,
 					  SILEAD_CMD_START);
 	if (error)
 		goto i2c_write_err;
-	usleep_range(SILEAD_CMD_SLEEP_MIN, SILEAD_CMD_SLEEP_MAX);
+	msleep(SILEAD_CMD_SLEEP_MIN);
 
 	return 0;
 
