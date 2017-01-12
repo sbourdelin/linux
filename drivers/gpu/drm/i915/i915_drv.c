@@ -1894,6 +1894,7 @@ int i915_reset_engine(struct intel_engine_cs *engine)
 	if (ret)
 		goto error;
 
+	error->reset_engine_count[engine->id]++;
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 	return 0;
 
