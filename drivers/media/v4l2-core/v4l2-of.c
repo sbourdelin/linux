@@ -20,52 +20,87 @@
 
 #include <media/v4l2-of.h>
 
-static int v4l2_of_parse_csi_bus(const struct device_node *node,
-				 struct v4l2_of_endpoint *endpoint)
+enum v4l2_of_bus_type {
+	V4L2_OF_BUS_TYPE_CSI2 = 0,
+	V4L2_OF_BUS_TYPE_PARALLEL,
+};
+
+static int v4l2_of_parse_lanes(const struct device_node *node,
+			       unsigned char *clock_lane,
+			       bool *have_clk_lane,
+			       unsigned char *data_lanes,
+			       bool *lane_polarities,
+			       unsigned short *__num_data_lanes,
+			       unsigned int max_data_lanes)
 {
-	struct v4l2_of_bus_mipi_csi2 *bus = &endpoint->bus.mipi_csi2;
 	struct property *prop;
-	bool have_clk_lane = false;
-	unsigned int flags = 0;
+	unsigned short num_data_lanes = 0;
 	u32 v;
 
 	prop = of_find_property(node, "data-lanes", NULL);
 	if (prop) {
 		const __be32 *lane = NULL;
-		unsigned int i;
 
-		for (i = 0; i < ARRAY_SIZE(bus->data_lanes); i++) {
+		for (num_data_lanes = 0; num_data_lanes < max_data_lanes;
+		     num_data_lanes++) {
 			lane = of_prop_next_u32(prop, lane, &v);
 			if (!lane)
 				break;
-			bus->data_lanes[i] = v;
+			data_lanes[num_data_lanes] = v;
 		}
-		bus->num_data_lanes = i;
 	}
+	if (__num_data_lanes)
+		*__num_data_lanes = num_data_lanes;
 
 	prop = of_find_property(node, "lane-polarities", NULL);
 	if (prop) {
 		const __be32 *polarity = NULL;
 		unsigned int i;
 
-		for (i = 0; i < ARRAY_SIZE(bus->lane_polarities); i++) {
+		for (i = 0; i < 1 + max_data_lanes; i++) {
 			polarity = of_prop_next_u32(prop, polarity, &v);
 			if (!polarity)
 				break;
-			bus->lane_polarities[i] = v;
+			lane_polarities[i] = v;
 		}
 
-		if (i < 1 + bus->num_data_lanes /* clock + data */) {
+		if (i < 1 + num_data_lanes /* clock + data */) {
 			pr_warn("%s: too few lane-polarities entries (need %u, got %u)\n",
-				node->full_name, 1 + bus->num_data_lanes, i);
+				node->full_name, 1 + num_data_lanes, i);
 			return -EINVAL;
 		}
 	}
 
+	if (have_clk_lane)
+		*have_clk_lane = false;
+
 	if (!of_property_read_u32(node, "clock-lanes", &v)) {
-		bus->clock_lane = v;
-		have_clk_lane = true;
+		*clock_lane = v;
+		if (have_clk_lane)
+			*have_clk_lane = true;
 	}
+
+	return 0;
+}
+
+static int v4l2_of_parse_csi2_bus(const struct device_node *node,
+				 struct v4l2_of_endpoint *endpoint)
+{
+	struct v4l2_of_bus_mipi_csi2 *bus = &endpoint->bus.mipi_csi2;
+	bool have_clk_lane = false;
+	unsigned int flags = 0;
+	int rval;
+	u32 v;
+
+	rval = v4l2_of_parse_lanes(node, &bus->clock_lane, &have_clk_lane,
+				   bus->data_lanes, bus->lane_polarities,
+				   &bus->num_data_lanes,
+				   ARRAY_SIZE(bus->data_lanes));
+	if (rval)
+		return rval;
+
+	BUILD_BUG_ON(1 + ARRAY_SIZE(bus->data_lanes)
+		       != ARRAY_SIZE(bus->lane_polarities));
 
 	if (of_get_property(node, "clock-noncontinuous", &v))
 		flags |= V4L2_MBUS_CSI2_NONCONTINUOUS_CLOCK;
@@ -151,6 +186,7 @@ static void v4l2_of_parse_parallel_bus(const struct device_node *node,
 int v4l2_of_parse_endpoint(const struct device_node *node,
 			   struct v4l2_of_endpoint *endpoint)
 {
+	u32 bus_type;
 	int rval;
 
 	of_graph_parse_endpoint(node, &endpoint->base);
@@ -158,17 +194,33 @@ int v4l2_of_parse_endpoint(const struct device_node *node,
 	memset(&endpoint->bus_type, 0, sizeof(*endpoint) -
 	       offsetof(typeof(*endpoint), bus_type));
 
-	rval = v4l2_of_parse_csi_bus(node, endpoint);
-	if (rval)
-		return rval;
-	/*
-	 * Parse the parallel video bus properties only if none
-	 * of the MIPI CSI-2 specific properties were found.
-	 */
-	if (endpoint->bus.mipi_csi2.flags == 0)
-		v4l2_of_parse_parallel_bus(node, endpoint);
+	rval = of_property_read_u32(node, "bus-type", &bus_type);
+	if (rval < 0) {
+		endpoint->bus_type = 0;
+		rval = v4l2_of_parse_csi2_bus(node, endpoint);
+		if (rval)
+			return rval;
+		/*
+		 * Parse the parallel video bus properties only if none
+		 * of the MIPI CSI-2 specific properties were found.
+		 */
+		if (endpoint->bus.mipi_csi2.flags == 0)
+			v4l2_of_parse_parallel_bus(node, endpoint);
 
-	return 0;
+		return 0;
+	}
+
+	switch (bus_type) {
+	case V4L2_OF_BUS_TYPE_CSI2:
+		return v4l2_of_parse_csi2_bus(node, endpoint);
+	case V4L2_OF_BUS_TYPE_PARALLEL:
+		v4l2_of_parse_parallel_bus(node, endpoint);
+		return 0;
+	default:
+		pr_warn("bad bus-type %u, device_node \"%s\"\n",
+			bus_type, node->full_name);
+		return -EINVAL;
+	}
 }
 EXPORT_SYMBOL(v4l2_of_parse_endpoint);
 
