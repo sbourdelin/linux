@@ -2630,7 +2630,15 @@ static void i915_reset_and_wakeup(struct drm_i915_private *dev_priv)
 
 	kobject_uevent_env(kobj, KOBJ_CHANGE, error_event);
 
-	DRM_DEBUG_DRIVER("resetting chip\n");
+	/*
+	 * This event needs to be sent before performing gpu reset. When
+	 * engine resets are supported we iterate through all engines and
+	 * reset hung engines individually. To keep the event dispatch
+	 * mechanism consistent with full gpu reset, this is only sent once
+	 * even when multiple engines are hung. It is also safe to move this
+	 * here because when we are in this function, we will definitely
+	 * perform gpu reset.
+	 */
 	kobject_uevent_env(kobj, KOBJ_CHANGE, reset_event);
 
 	/*
@@ -2645,17 +2653,20 @@ static void i915_reset_and_wakeup(struct drm_i915_private *dev_priv)
 
 	do {
 		/*
-		 * All state reset _must_ be completed before we update the
-		 * reset counter, for otherwise waiters might miss the reset
-		 * pending state and not properly drop locks, resulting in
-		 * deadlocks with the reset work.
+		 * All state reset _must_ be completed before we update
+		 * the reset counter, for otherwise waiters might miss
+		 * the reset pending state and not properly drop locks,
+		 * resulting in deadlocks with the reset work.
 		 */
 		if (mutex_trylock(&dev_priv->drm.struct_mutex)) {
 			i915_reset(dev_priv);
 			mutex_unlock(&dev_priv->drm.struct_mutex);
 		}
 
-		/* We need to wait for anyone holding the lock to wakeup */
+		/*
+		 * We need to wait for anyone holding the lock to
+		 * wakeup.
+		 */
 	} while (wait_on_bit_timeout(&dev_priv->gpu_error.flags,
 				     I915_RESET_IN_PROGRESS,
 				     TASK_UNINTERRUPTIBLE,
@@ -2664,7 +2675,7 @@ static void i915_reset_and_wakeup(struct drm_i915_private *dev_priv)
 	intel_finish_reset(dev_priv);
 	intel_runtime_pm_put(dev_priv);
 
-	if (!test_bit(I915_WEDGED, &dev_priv->gpu_error.flags))
+	if (!i915_terminally_wedged(&dev_priv->gpu_error))
 		kobject_uevent_env(kobj,
 				   KOBJ_CHANGE, reset_done_event);
 
@@ -2758,6 +2769,12 @@ void i915_handle_error(struct drm_i915_private *dev_priv,
 	if (test_and_set_bit(I915_RESET_IN_PROGRESS,
 			     &dev_priv->gpu_error.flags))
 		return;
+
+	/*
+	 * Save which engines need reset; if engine support is available,
+	 * we can just reset the hung engines.
+	 */
+	dev_priv->gpu_error.reset_engine_mask = engine_mask;
 
 	/*
 	 * Wakeup waiting processes so that the reset function

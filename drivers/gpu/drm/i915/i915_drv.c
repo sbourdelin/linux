@@ -1745,7 +1745,7 @@ static void enable_engines_irq(struct drm_i915_private *dev_priv)
 }
 
 /**
- * i915_reset - reset chip after a hang
+ * i915_reset_chip - reset chip after a hang
  * @dev_priv: device private to reset
  *
  * Reset the chip.  Useful if a hang is detected. Marks the device as wedged
@@ -1761,7 +1761,7 @@ static void enable_engines_irq(struct drm_i915_private *dev_priv)
  *   - re-init interrupt state
  *   - re-init display
  */
-void i915_reset(struct drm_i915_private *dev_priv)
+void i915_reset_chip(struct drm_i915_private *dev_priv)
 {
 	struct i915_gpu_error *error = &dev_priv->gpu_error;
 	int ret;
@@ -1770,6 +1770,8 @@ void i915_reset(struct drm_i915_private *dev_priv)
 
 	if (!test_and_clear_bit(I915_RESET_IN_PROGRESS, &error->flags))
 		return;
+
+	DRM_DEBUG_DRIVER("resetting chip\n");
 
 	/* Clear any previous failed attempts at recovery. Time to try again. */
 	__clear_bit(I915_WEDGED, &error->flags);
@@ -1822,6 +1824,50 @@ wakeup:
 error:
 	i915_gem_set_wedged(dev_priv);
 	goto wakeup;
+}
+
+/**
+ * i915_reset_engine - reset GPU engine to recover from a hang
+ * @engine: engine to reset
+ *
+ * Reset a specific GPU engine. Useful if a hang is detected.
+ * Returns zero on successful reset or otherwise an error code.
+ */
+int i915_reset_engine(struct intel_engine_cs *engine)
+{
+	/* FIXME: replace me with engine reset sequence */
+	return -ENODEV;
+}
+
+/**
+ * i915_reset - start either engine or full GPU reset to recover from a hang
+ * @dev_priv: device private
+ *
+ * Wrapper function to initiate a GPU reset. If platform supports it, attempt
+ * to reset the hung engine(s) only. In engine reset fails (or not supported),
+ * reset the full GPU.
+ *
+ * Caller must hold the struct_mutex.
+ */
+void i915_reset(struct drm_i915_private *dev_priv)
+{
+	/* If hardware supports it (GEN8+), try engine reset first */
+	if (intel_has_reset_engine(dev_priv)) {
+		struct intel_engine_cs *engine;
+		u32 engine_mask = dev_priv->gpu_error.reset_engine_mask;
+		unsigned int tmp;
+
+		for_each_engine_masked(engine, dev_priv, engine_mask, tmp) {
+			/* on failure fallback to full gpu reset for recovery */
+			if (i915_reset_engine(engine))
+				goto error;
+		}
+
+		return;
+	}
+
+error:
+	i915_reset_chip(dev_priv);
 }
 
 static int i915_pm_suspend(struct device *kdev)
