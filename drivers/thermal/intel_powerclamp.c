@@ -50,6 +50,7 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/sched/rt.h>
+#include <linux/once.h>
 
 #include <asm/nmi.h>
 #include <asm/msr.h>
@@ -384,6 +385,7 @@ static void clamp_balancing_func(struct kthread_work *work)
 	unsigned int compensated_ratio;
 	int interval; /* jiffies to sleep for each attempt */
 
+	DO_ONCE(sched_setscheduler, current, SCHED_FIFO, &sparam);
 	w_data = container_of(work, struct powerclamp_worker_data,
 			      balancing_work);
 
@@ -506,7 +508,6 @@ static void start_power_clamp_worker(unsigned long cpu)
 	w_data->cpu = cpu;
 	w_data->clamping = true;
 	set_bit(cpu, cpu_clamping_mask);
-	sched_setscheduler(worker->task, SCHED_FIFO, &sparam);
 	kthread_init_work(&w_data->balancing_work, clamp_balancing_func);
 	kthread_init_delayed_work(&w_data->idle_injection_work,
 				  clamp_idle_injection_func);
