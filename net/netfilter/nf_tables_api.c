@@ -498,14 +498,13 @@ static int nf_tables_dump_tables(struct sk_buff *skb,
 	struct net *net = sock_net(skb->sk);
 	int family = nfmsg->nfgen_family;
 
-	rcu_read_lock();
 	cb->seq = net->nft.base_seq;
 
-	list_for_each_entry_rcu(afi, &net->nft.af_info, list) {
+	list_for_each_entry(afi, &net->nft.af_info, list) {
 		if (family != NFPROTO_UNSPEC && family != afi->family)
 			continue;
 
-		list_for_each_entry_rcu(table, &afi->tables, list) {
+		list_for_each_entry(table, &afi->tables, list) {
 			if (idx < s_idx)
 				goto cont;
 			if (idx > s_idx)
@@ -527,7 +526,6 @@ cont:
 		}
 	}
 done:
-	rcu_read_unlock();
 	cb->args[0] = idx;
 	return skb->len;
 }
@@ -1089,15 +1087,14 @@ static int nf_tables_dump_chains(struct sk_buff *skb,
 	struct net *net = sock_net(skb->sk);
 	int family = nfmsg->nfgen_family;
 
-	rcu_read_lock();
 	cb->seq = net->nft.base_seq;
 
-	list_for_each_entry_rcu(afi, &net->nft.af_info, list) {
+	list_for_each_entry(afi, &net->nft.af_info, list) {
 		if (family != NFPROTO_UNSPEC && family != afi->family)
 			continue;
 
-		list_for_each_entry_rcu(table, &afi->tables, list) {
-			list_for_each_entry_rcu(chain, &table->chains, list) {
+		list_for_each_entry(table, &afi->tables, list) {
+			list_for_each_entry(chain, &table->chains, list) {
 				if (idx < s_idx)
 					goto cont;
 				if (idx > s_idx)
@@ -1120,7 +1117,6 @@ cont:
 		}
 	}
 done:
-	rcu_read_unlock();
 	cb->args[0] = idx;
 	return skb->len;
 }
@@ -1981,24 +1977,23 @@ static int nf_tables_dump_rules(struct sk_buff *skb,
 	struct net *net = sock_net(skb->sk);
 	int family = nfmsg->nfgen_family;
 
-	rcu_read_lock();
 	cb->seq = net->nft.base_seq;
 
-	list_for_each_entry_rcu(afi, &net->nft.af_info, list) {
+	list_for_each_entry(afi, &net->nft.af_info, list) {
 		if (family != NFPROTO_UNSPEC && family != afi->family)
 			continue;
 
-		list_for_each_entry_rcu(table, &afi->tables, list) {
+		list_for_each_entry(table, &afi->tables, list) {
 			if (ctx && ctx->table[0] &&
 			    strcmp(ctx->table, table->name) != 0)
 				continue;
 
-			list_for_each_entry_rcu(chain, &table->chains, list) {
+			list_for_each_entry(chain, &table->chains, list) {
 				if (ctx && ctx->chain[0] &&
 				    strcmp(ctx->chain, chain->name) != 0)
 					continue;
 
-				list_for_each_entry_rcu(rule, &chain->rules, list) {
+				list_for_each_entry(rule, &chain->rules, list) {
 					if (!nft_is_active(net, rule))
 						goto cont;
 					if (idx < s_idx)
@@ -2021,8 +2016,6 @@ cont:
 		}
 	}
 done:
-	rcu_read_unlock();
-
 	cb->args[0] = idx;
 	return skb->len;
 }
@@ -2699,10 +2692,9 @@ static int nf_tables_dump_sets(struct sk_buff *skb, struct netlink_callback *cb)
 	if (cb->args[1])
 		return skb->len;
 
-	rcu_read_lock();
 	cb->seq = net->nft.base_seq;
 
-	list_for_each_entry_rcu(afi, &net->nft.af_info, list) {
+	list_for_each_entry(afi, &net->nft.af_info, list) {
 		if (ctx->afi && ctx->afi != afi)
 			continue;
 
@@ -2712,7 +2704,7 @@ static int nf_tables_dump_sets(struct sk_buff *skb, struct netlink_callback *cb)
 
 			cur_family = 0;
 		}
-		list_for_each_entry_rcu(table, &afi->tables, list) {
+		list_for_each_entry(table, &afi->tables, list) {
 			if (ctx->table && ctx->table != table)
 				continue;
 
@@ -2723,7 +2715,7 @@ static int nf_tables_dump_sets(struct sk_buff *skb, struct netlink_callback *cb)
 				cur_table = NULL;
 			}
 			idx = 0;
-			list_for_each_entry_rcu(set, &table->sets, list) {
+			list_for_each_entry(set, &table->sets, list) {
 				if (idx < s_idx)
 					goto cont;
 				if (!nft_is_active(net, set))
@@ -2750,7 +2742,6 @@ cont:
 	}
 	cb->args[1] = 1;
 done:
-	rcu_read_unlock();
 	return skb->len;
 }
 
@@ -4246,15 +4237,14 @@ static int nf_tables_dump_obj(struct sk_buff *skb, struct netlink_callback *cb)
 	if (NFNL_MSG_TYPE(cb->nlh->nlmsg_type) == NFT_MSG_GETOBJ_RESET)
 		reset = true;
 
-	rcu_read_lock();
 	cb->seq = net->nft.base_seq;
 
-	list_for_each_entry_rcu(afi, &net->nft.af_info, list) {
+	list_for_each_entry(afi, &net->nft.af_info, list) {
 		if (family != NFPROTO_UNSPEC && family != afi->family)
 			continue;
 
-		list_for_each_entry_rcu(table, &afi->tables, list) {
-			list_for_each_entry_rcu(obj, &table->objects, list) {
+		list_for_each_entry(table, &afi->tables, list) {
+			list_for_each_entry(obj, &table->objects, list) {
 				if (!nft_is_active(net, obj))
 					goto cont;
 				if (idx < s_idx)
@@ -4283,8 +4273,6 @@ cont:
 		}
 	}
 done:
-	rcu_read_unlock();
-
 	cb->args[0] = idx;
 	return skb->len;
 }
