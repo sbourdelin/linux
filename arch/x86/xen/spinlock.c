@@ -155,7 +155,6 @@ static __init int xen_init_spinlocks_jump(void)
 	if (!xen_domain())
 		return 0;
 
-	static_key_slow_inc(&paravirt_ticketlocks_enabled);
 	return 0;
 }
 early_initcall(xen_init_spinlocks_jump);
