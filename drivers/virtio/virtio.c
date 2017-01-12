@@ -145,14 +145,15 @@ void virtio_config_changed(struct virtio_device *dev)
 }
 EXPORT_SYMBOL_GPL(virtio_config_changed);
 
-static void virtio_config_disable(struct virtio_device *dev)
+void virtio_config_disable(struct virtio_device *dev)
 {
 	spin_lock_irq(&dev->config_lock);
 	dev->config_enabled = false;
 	spin_unlock_irq(&dev->config_lock);
 }
+EXPORT_SYMBOL_GPL(virtio_config_disable);
 
-static void virtio_config_enable(struct virtio_device *dev)
+void virtio_config_enable(struct virtio_device *dev)
 {
 	spin_lock_irq(&dev->config_lock);
 	dev->config_enabled = true;
@@ -161,8 +162,9 @@ static void virtio_config_enable(struct virtio_device *dev)
 	dev->config_change_pending = false;
 	spin_unlock_irq(&dev->config_lock);
 }
+EXPORT_SYMBOL_GPL(virtio_config_enable);
 
-static int virtio_finalize_features(struct virtio_device *dev)
+int virtio_finalize_features(struct virtio_device *dev)
 {
 	int ret = dev->config->finalize_features(dev);
 	unsigned status;
@@ -182,6 +184,7 @@ static int virtio_finalize_features(struct virtio_device *dev)
 	}
 	return 0;
 }
+EXPORT_SYMBOL_GPL(virtio_finalize_features);
 
 static int virtio_dev_probe(struct device *_d)
 {
