@@ -571,8 +571,8 @@ int vcc_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 
 int vcc_sendmsg(struct socket *sock, struct msghdr *m, size_t size)
 {
+	DEFINE_WAIT_FUNC(wait, woken_wake_function);
 	struct sock *sk = sock->sk;
-	DEFINE_WAIT(wait);
 	struct atm_vcc *vcc;
 	struct sk_buff *skb;
 	int eff, error;
@@ -604,14 +604,14 @@ int vcc_sendmsg(struct socket *sock, struct msghdr *m, size_t size)
 	}
 
 	eff = (size+3) & ~3; /* align to word boundary */
-	prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
+	add_wait_queue(sk_sleep(sk), &wait);
 	error = 0;
 	while (!(skb = alloc_tx(vcc, eff))) {
 		if (m->msg_flags & MSG_DONTWAIT) {
 			error = -EAGAIN;
 			break;
 		}
-		schedule();
+		wait_woken(&wait, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
 		if (signal_pending(current)) {
 			error = -ERESTARTSYS;
 			break;
@@ -623,9 +623,8 @@ int vcc_sendmsg(struct socket *sock, struct msghdr *m, size_t size)
 			send_sig(SIGPIPE, current, 0);
 			break;
 		}
-		prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 	}
-	finish_wait(sk_sleep(sk), &wait);
+	remove_wait_queue(sk_sleep(sk), &wait);
 	if (error)
 		goto out;
 	skb->dev = NULL; /* for paths shared with net_device interfaces */
