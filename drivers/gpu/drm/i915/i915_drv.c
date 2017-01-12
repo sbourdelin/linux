@@ -1832,11 +1832,76 @@ error:
  *
  * Reset a specific GPU engine. Useful if a hang is detected.
  * Returns zero on successful reset or otherwise an error code.
+ *
+ * Caller must hold the struct_mutex.
+ *
+ * Procedure is:
+ *  - identifies the request that caused the hang and it is dropped
+ *  - force engine to idle: this is done by issuing a reset request
+ *  - reset engine
+ *  - restart submissions to the engine
  */
 int i915_reset_engine(struct intel_engine_cs *engine)
 {
-	/* FIXME: replace me with engine reset sequence */
-	return -ENODEV;
+	int ret;
+	struct drm_i915_private *dev_priv = engine->i915;
+	struct i915_gpu_error *error = &dev_priv->gpu_error;
+
+	lockdep_assert_held(&dev_priv->drm.struct_mutex);
+
+	if (!test_and_clear_bit(I915_RESET_IN_PROGRESS, &error->flags))
+		return 0;
+
+	DRM_DEBUG_DRIVER("resetting %s\n", engine->name);
+
+	/*
+	 * We need to first idle the engine by issuing a reset request,
+	 * then perform soft reset and re-initialize hw state, for all of
+	 * this GT power need to be awake so ensure it does throughout the
+	 * process
+	 */
+	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
+
+	/*
+	 * the request that caused the hang is stuck on elsp, identify the
+	 * active request and drop it, adjust head to skip the offending
+	 * request to resume executing remaining requests in the queue.
+	 */
+	disable_engines_irq(dev_priv);
+	i915_gem_reset_engine(engine);
+	enable_engines_irq(dev_priv);
+
+	/* forcing engine to idle */
+	ret = intel_reset_engine_begin(engine);
+	if (ret) {
+		DRM_ERROR("Failed to disable %s\n", engine->name);
+		goto error;
+	}
+
+	/* finally, reset engine */
+	ret = intel_gpu_reset(dev_priv, intel_engine_flag(engine));
+	if (ret) {
+		DRM_ERROR("Failed to reset %s, ret=%d\n", engine->name, ret);
+		intel_reset_engine_cancel(engine);
+		goto error;
+	}
+
+	ret = intel_reset_engine_cancel(engine);
+	if (ret)
+		goto error;
+
+	ret = engine->init_hw(engine);
+	if (ret)
+		goto error;
+
+	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+	return 0;
+
+error:
+	/* use full gpu reset to recover on error */
+	set_bit(I915_RESET_IN_PROGRESS, &dev_priv->gpu_error.flags);
+	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+	return ret;
 }
 
 /**
