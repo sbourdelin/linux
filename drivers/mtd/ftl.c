@@ -1041,7 +1041,7 @@ static void ftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 {
 	partition_t *partition;
 
-	partition = kzalloc(sizeof(partition_t), GFP_KERNEL);
+	partition = kzalloc(sizeof(*partition), GFP_KERNEL);
 	if (!partition)
 		return;
 
