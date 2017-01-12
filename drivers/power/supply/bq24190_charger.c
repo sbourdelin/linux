@@ -156,6 +156,8 @@ struct bq24190_dev_info {
 	unsigned int			gpio_int;
 	unsigned int			irq;
 	struct mutex			f_reg_lock;
+	bool				initialized;
+	bool				irq_event;
 	u8				f_reg;
 	u8				ss_reg;
 	u8				watchdog;
@@ -1157,9 +1159,8 @@ static const struct power_supply_desc bq24190_battery_desc = {
 	.property_is_writeable	= bq24190_battery_property_is_writeable,
 };
 
-static irqreturn_t bq24190_irq_handler_thread(int irq, void *data)
+static void bq24190_check_status(struct bq24190_dev_info *bdi)
 {
-	struct bq24190_dev_info *bdi = data;
 	const u8 battery_mask_ss = BQ24190_REG_SS_CHRG_STAT_MASK;
 	const u8 battery_mask_f = BQ24190_REG_F_BAT_FAULT_MASK |
 		BQ24190_REG_F_NTC_FAULT_MASK;
@@ -1167,15 +1168,13 @@ static irqreturn_t bq24190_irq_handler_thread(int irq, void *data)
 	u8 ss_reg = 0, f_reg = 0;
 	int i, ret;
 
-	pm_runtime_get_sync(bdi->dev);
-
 	/* We need to read f_reg twice if fault is set to get correct value */
 	i = 0;
 	do {
 		ret = bq24190_read(bdi, BQ24190_REG_F, &f_reg);
 		if (ret < 0) {
 			dev_err(bdi->dev, "Can't read F reg: %d\n", ret);
-			goto out;
+			return;
 		}
 	} while (f_reg && ++i < 2);
 
@@ -1231,11 +1230,18 @@ static irqreturn_t bq24190_irq_handler_thread(int irq, void *data)
 	if (alert_battery)
 		power_supply_changed(bdi->battery);
 
-out:
-	pm_runtime_put_sync(bdi->dev);
-
 	dev_dbg(bdi->dev, "ss_reg: 0x%02x, f_reg: 0x%02x\n", ss_reg, f_reg);
+}
 
+static irqreturn_t bq24190_irq_handler_thread(int irq, void *data)
+{
+	struct bq24190_dev_info *bdi = data;
+
+	bdi->irq_event = true;
+	pm_runtime_get_sync(bdi->dev);
+	bq24190_check_status(bdi);
+	pm_runtime_put_sync(bdi->dev);
+	bdi->irq_event = false;
 	return IRQ_HANDLED;
 }
 
@@ -1404,6 +1410,7 @@ static int bq24190_probe(struct i2c_client *client,
 	}
 
 	enable_irq(bdi->irq);
+	bdi->initialized = 1;
 
 	return 0;
 
@@ -1435,6 +1442,35 @@ static int bq24190_remove(struct i2c_client *client)
 
 	if (bdi->gpio_int)
 		gpio_free(bdi->gpio_int);
+
+	return 0;
+}
+
+static int bq24190_runtime_suspend(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct bq24190_dev_info *bdi = i2c_get_clientdata(client);
+
+	if (!bdi->initialized)
+		return 0;
+
+	dev_dbg(bdi->dev, "%s\n", __func__);
+
+	return 0;
+}
+
+static int bq24190_runtime_resume(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct bq24190_dev_info *bdi = i2c_get_clientdata(client);
+
+	if (!bdi->initialized)
+		return 0;
+
+	if (!bdi->irq_event) {
+		dev_dbg(bdi->dev, "checking events on possible wakeirq\n");
+		bq24190_check_status(bdi);
+	}
 
 	return 0;
 }
@@ -1474,7 +1510,11 @@ static int bq24190_pm_resume(struct device *dev)
 }
 #endif
 
-static SIMPLE_DEV_PM_OPS(bq24190_pm_ops, bq24190_pm_suspend, bq24190_pm_resume);
+static const struct dev_pm_ops bq24190_pm_ops = {
+	SET_RUNTIME_PM_OPS(bq24190_runtime_suspend, bq24190_runtime_resume,
+			   NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(bq24190_pm_suspend, bq24190_pm_resume)
+};
 
 /*
  * Only support the bq24190 right now.  The bq24192, bq24192i, and bq24193
