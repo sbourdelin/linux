@@ -8150,6 +8150,25 @@ const char *netdev_drivername(const struct net_device *dev)
 	return empty;
 }
 
+struct net_device *dev_to_net_device(struct device *dev)
+{
+	struct device *d;
+
+	d = device_find_class(dev, "net");
+	if (d) {
+		struct net_device *nd;
+
+		nd = to_net_dev(d);
+		dev_hold(nd);
+		put_device(d);
+
+		return nd;
+	}
+
+	return NULL;
+}
+EXPORT_SYMBOL_GPL(dev_to_net_device);
+
 static void __netdev_printk(const char *level, const struct net_device *dev,
 			    struct va_format *vaf)
 {

@@ -4378,4 +4378,6 @@ do {								\
 #define PTYPE_HASH_SIZE	(16)
 #define PTYPE_HASH_MASK	(PTYPE_HASH_SIZE - 1)
 
+struct net_device *dev_to_net_device(struct device *dev);
+
 #endif	/* _LINUX_NETDEVICE_H */
