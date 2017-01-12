@@ -4162,10 +4162,9 @@ static void throttle_cfs_rq(struct cfs_rq *cfs_rq)
 	empty = list_empty(&cfs_b->throttled_cfs_rq);
 
 	/*
-	 * Add to the _head_ of the list, so that an already-started
-	 * distribute_cfs_runtime will not see us
+	 * Add to the _tail_ of the list, untrottle happens in FIFO order
 	 */
-	list_add_rcu(&cfs_rq->throttled_list, &cfs_b->throttled_cfs_rq);
+	list_add_tail_rcu(&cfs_rq->throttled_list, &cfs_b->throttled_cfs_rq);
 
 	/*
 	 * If we're the first throttled task, make sure the bandwidth
@@ -4240,6 +4239,15 @@ static u64 distribute_cfs_runtime(struct cfs_bandwidth *cfs_b,
 		if (!cfs_rq_throttled(cfs_rq))
 			goto next;
 
+		/*
+		 * Give throttled cfs_rq 1 ns of runtime. It will take more
+		 * from global pool when needed. But skip cfs_rq if expiration
+		 * time equals to ours, this means we already untrottled it in
+		 * this loop and global pool is already depleted.
+		 */
+		if (cfs_rq->runtime_expires == expires)
+			goto next;
+
 		runtime = -cfs_rq->runtime_remaining + 1;
 		if (runtime > remaining)
 			runtime = remaining;
@@ -4302,24 +4310,20 @@ static int do_sched_cfs_period_timer(struct cfs_bandwidth *cfs_b, int overrun)
 	runtime_expires = cfs_b->runtime_expires;
 
 	/*
-	 * This check is repeated as we are holding onto the new bandwidth while
-	 * we unthrottle. This can potentially race with an unthrottled group
-	 * trying to acquire new bandwidth from the global pool. This can result
-	 * in us over-using our runtime if it is all used during this loop, but
-	 * only by limited amounts in that extreme case.
+	 * This can potentially race with an unthrottled group trying to
+	 * acquire new bandwidth from the global pool. This can result
+	 * in us over-using our runtime if it is all used during this loop,
+	 * but only by limited amounts in that extreme case.
 	 */
-	while (throttled && cfs_b->runtime > 0) {
-		runtime = cfs_b->runtime;
-		raw_spin_unlock(&cfs_b->lock);
-		/* we can't nest cfs_b->lock while distributing bandwidth */
-		runtime = distribute_cfs_runtime(cfs_b, runtime,
-						 runtime_expires);
-		raw_spin_lock(&cfs_b->lock);
+	runtime = cfs_b->runtime;
 
-		throttled = !list_empty(&cfs_b->throttled_cfs_rq);
+	/* we can't nest cfs_b->lock while distributing bandwidth */
+	raw_spin_unlock(&cfs_b->lock);
+	runtime = distribute_cfs_runtime(cfs_b, runtime, runtime_expires);
+	raw_spin_lock(&cfs_b->lock);
 
+	if (runtime_expires == cfs_b->runtime_expires)
 		cfs_b->runtime -= min(runtime, cfs_b->runtime);
-	}
 
 	/*
 	 * While we are ensured activity in the period following an
