@@ -138,5 +138,7 @@ static inline void setup_initial_memory_limit(phys_addr_t first_memblock_base,
 extern int (*register_process_table)(unsigned long base, unsigned long page_size,
 				     unsigned long tbl_size);
 
+extern void radix_init_pseries(void);
+
 #endif /* __ASSEMBLY__ */
 #endif /* _ASM_POWERPC_BOOK3S_64_MMU_H_ */
