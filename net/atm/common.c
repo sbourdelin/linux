@@ -72,10 +72,11 @@ static struct sk_buff *alloc_tx(struct atm_vcc *vcc, unsigned int size)
 			 sk_wmem_alloc_get(sk), size, sk->sk_sndbuf);
 		return NULL;
 	}
-	while (!(skb = alloc_skb(size, GFP_KERNEL)))
-		schedule();
-	pr_debug("%d += %d\n", sk_wmem_alloc_get(sk), skb->truesize);
-	atomic_add(skb->truesize, &sk->sk_wmem_alloc);
+	skb = alloc_skb(size, GFP_KERNEL);
+	if (skb) {
+		pr_debug("%d += %d\n", sk_wmem_alloc_get(sk), skb->truesize);
+		atomic_add(skb->truesize, &sk->sk_wmem_alloc);
+	}
 	return skb;
 }
 
