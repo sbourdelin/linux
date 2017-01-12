@@ -22,6 +22,7 @@
 #include <linux/filter.h>
 #include <linux/compat.h>
 #include <linux/security.h>
+#include <linux/audit.h>
 #include <linux/export.h>
 
 #include <net/scm.h>
@@ -782,14 +783,27 @@ COMPAT_SYSCALL_DEFINE5(recvmmsg, int, fd, struct compat_mmsghdr __user *, mmsg,
 
 COMPAT_SYSCALL_DEFINE2(socketcall, int, call, u32 __user *, args)
 {
+	unsigned int len, i;
 	int ret;
-	u32 a[6];
+	u32 a[AUDITSC_ARGS];
+	unsigned long aa[AUDITSC_ARGS];
 	u32 a0, a1;
 
 	if (call < SYS_SOCKET || call > SYS_SENDMMSG)
 		return -EINVAL;
-	if (copy_from_user(a, args, nas[call]))
+	len = nas[call];
+	if (len > sizeof(a))
+		return -EINVAL;
+
+	if (copy_from_user(a, args, len))
 		return -EFAULT;
+
+	for (i=0; i < len/sizeof(a[0]); i++)
+		aa[i] = (unsigned long)a[i];
+	ret = audit_socketcall(len/sizeof(a[0]), aa);
+	if (ret)
+		return ret;
+
 	a0 = a[0];
 	a1 = a[1];
 
