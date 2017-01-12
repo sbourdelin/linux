@@ -1704,11 +1704,13 @@ static int mwifiex_pcie_process_cmd_complete(struct mwifiex_adapter *adapter)
 					    "Write register failed\n");
 				return -1;
 			}
-			mwifiex_delay_for_sleep_cookie(adapter,
-						       MWIFIEX_MAX_DELAY_COUNT);
-			while (reg->sleep_cookie && (count++ < 10) &&
-			       mwifiex_pcie_ok_to_access_hw(adapter))
-				usleep_range(50, 60);
+			if (reg->sleep_cookie) {
+				mwifiex_delay_for_sleep_cookie(adapter,
+							       MWIFIEX_MAX_DELAY_COUNT);
+				while ((count++ < 10) &&
+				       mwifiex_pcie_ok_to_access_hw(adapter))
+					usleep_range(50, 60);
+			}
 			mwifiex_pcie_enable_host_int(adapter);
 			mwifiex_process_sleep_confirm_resp(adapter, skb->data,
 							   skb->len);
