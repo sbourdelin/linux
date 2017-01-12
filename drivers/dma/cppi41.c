@@ -1,3 +1,4 @@
+#include <linux/atomic.h>
 #include <linux/delay.h>
 #include <linux/dmaengine.h>
 #include <linux/dma-mapping.h>
@@ -153,6 +154,8 @@ struct cppi41_dd {
 
 	/* context for suspend/resume */
 	unsigned int dma_tdfdq;
+
+	atomic_t active;
 };
 
 #define FIST_COMPLETION_QUEUE	93
@@ -320,7 +323,8 @@ static irqreturn_t cppi41_irq(int irq, void *data)
 			int error;
 
 			error = pm_runtime_get(cdd->ddev.dev);
-			if (error < 0)
+			if (((error != -EINPROGRESS) && error < 0) ||
+			    !atomic_read(&cdd->active))
 				dev_err(cdd->ddev.dev, "%s pm runtime get: %i\n",
 					__func__, error);
 
@@ -482,7 +486,7 @@ static void cppi41_dma_issue_pending(struct dma_chan *chan)
 		return;
 	}
 
-	if (likely(pm_runtime_active(cdd->ddev.dev)))
+	if (likely(atomic_read(&cdd->active)))
 		push_desc_queue(c);
 	else
 		pending_desc(c);
@@ -1003,6 +1007,7 @@ static int cppi41_dma_probe(struct platform_device *pdev)
 	cdd->ddev.dst_addr_widths = CPPI41_DMA_BUSWIDTHS;
 	cdd->ddev.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
 	cdd->ddev.dev = dev;
+	atomic_set(&cdd->active, 0);
 	INIT_LIST_HEAD(&cdd->ddev.channels);
 	cpp41_dma_info.dma_cap = cdd->ddev.cap_mask;
 
@@ -1151,6 +1156,7 @@ static int __maybe_unused cppi41_runtime_suspend(struct device *dev)
 {
 	struct cppi41_dd *cdd = dev_get_drvdata(dev);
 
+	atomic_set(&cdd->active, 0);
 	WARN_ON(!list_empty(&cdd->pending));
 
 	return 0;
@@ -1159,13 +1165,20 @@ static int __maybe_unused cppi41_runtime_suspend(struct device *dev)
 static int __maybe_unused cppi41_runtime_resume(struct device *dev)
 {
 	struct cppi41_dd *cdd = dev_get_drvdata(dev);
-	struct cppi41_channel *c, *_c;
+	struct cppi41_channel *c;
 	unsigned long flags;
 
+	atomic_set(&cdd->active, 1);
+
 	spin_lock_irqsave(&cdd->lock, flags);
-	list_for_each_entry_safe(c, _c, &cdd->pending, node) {
-		push_desc_queue(c);
+	while (!list_empty(&cdd->pending)) {
+		c = list_first_entry(&cdd->pending,
+				     struct cppi41_channel,
+				     node);
 		list_del(&c->node);
+		spin_unlock_irqrestore(&cdd->lock, flags);
+		push_desc_queue(c);
+		spin_lock_irqsave(&cdd->lock, flags);
 	}
 	spin_unlock_irqrestore(&cdd->lock, flags);
 
