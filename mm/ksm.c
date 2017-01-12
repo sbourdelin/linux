@@ -223,6 +223,11 @@ static unsigned int ksm_thread_pages_to_scan = 100;
 /* Milliseconds ksmd should sleep between batches */
 static unsigned int ksm_thread_sleep_millisecs = 20;
 
+#ifdef __HAVE_COLOR_ZERO_PAGE
+/* Checksum of an empty (zeroed) page */
+static unsigned int zero_checksum;
+#endif
+
 #ifdef CONFIG_NUMA
 /* Zeroed when merging across nodes is not allowed */
 static unsigned int ksm_merge_across_nodes = 1;
@@ -1467,6 +1472,25 @@ static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 		return;
 	}
 
+#ifdef __HAVE_COLOR_ZERO_PAGE
+	/*
+	 * Same checksum as an empty page. We attempt to merge it with the
+	 * appropriate zero page.
+	 */
+	if (checksum == zero_checksum) {
+		struct vm_area_struct *vma;
+
+		vma = find_mergeable_vma(rmap_item->mm, rmap_item->address);
+		err = try_to_merge_one_page(vma, page,
+					    ZERO_PAGE(rmap_item->address));
+		/*
+		 * In case of failure, the page was not really empty, so we
+		 * need to continue. Otherwise we're done.
+		 */
+		if (!err)
+			return;
+	}
+#endif
 	tree_rmap_item =
 		unstable_tree_search_insert(rmap_item, page, &tree_page);
 	if (tree_rmap_item) {
@@ -2303,6 +2327,11 @@ static int __init ksm_init(void)
 {
 	struct task_struct *ksm_thread;
 	int err;
+
+#ifdef __HAVE_COLOR_ZERO_PAGE
+	/* The correct value depends on page size and endianness */
+	zero_checksum = calc_checksum(ZERO_PAGE(0));
+#endif
 
 	err = ksm_slab_init();
 	if (err)
