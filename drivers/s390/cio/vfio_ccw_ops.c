@@ -41,7 +41,11 @@ static int vfio_ccw_mdev_reset(struct mdev_device *mdev)
 	if (ret)
 		return ret;
 
-	return cio_enable_subchannel(sch, (u32)(unsigned long)sch);
+	ret = cio_enable_subchannel(sch, (u32)(unsigned long)sch);
+	if (!ret)
+		private->state = VFIO_CCW_STATE_IDLE;
+
+	return ret;
 }
 
 static int vfio_ccw_mdev_notifier(struct notifier_block *nb,
@@ -115,11 +119,15 @@ static int vfio_ccw_mdev_create(struct kobject *kobj, struct mdev_device *mdev)
 {
 	struct vfio_ccw_private *private = dev_get_drvdata(mdev->parent->dev);
 
+	if (private->state == VFIO_CCW_STATE_NOT_OPER)
+		return -ENODEV;
+
 	/* Only support one mediated device for each physical subchannel. */
 	if (private->mdev)
 		return -EPERM;
 
 	private->mdev = mdev;
+	private->state = VFIO_CCW_STATE_IDLE;
 	available_instances--;
 
 	return 0;
@@ -130,10 +138,20 @@ static int vfio_ccw_mdev_remove(struct mdev_device *mdev)
 	struct vfio_ccw_private *private = dev_get_drvdata(mdev->parent->dev);
 	int ret;
 
+	if (!private)
+		goto out;
+
+	if ((private->state == VFIO_CCW_STATE_NOT_OPER) ||
+	    (private->state == VFIO_CCW_STATE_STANDBY))
+		goto out;
+
 	ret = vfio_ccw_mdev_reset(mdev);
 	if (ret)
 		return ret;
 
+	private->state = VFIO_CCW_STATE_STANDBY;
+
+out:
 	private->mdev = NULL;
 	available_instances++;
 
@@ -194,14 +212,18 @@ static ssize_t vfio_ccw_mdev_write(struct mdev_device *mdev,
 	private = dev_get_drvdata(mdev->dev.parent);
 	if (!private)
 		return -ENODEV;
+	if (private->state != VFIO_CCW_STATE_IDLE)
+		return -EACCES;
 
 	region = &private->io_region;
 	if (copy_from_user((void *)region + *ppos, buf, count))
 		return -EFAULT;
 
-	region->ret_code = vfio_ccw_sch_cmd_request(private);
-	if (region->ret_code != 0)
+	vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_IO_REQ);
+	if (region->ret_code != 0) {
+		private->state = VFIO_CCW_STATE_IDLE;
 		return region->ret_code;
+	}
 
 	return count;
 }
