@@ -802,23 +802,86 @@ static inline void perf_cgroup_sched_in(struct task_struct *prev,
 	rcu_read_unlock();
 }
 
+#ifdef CONFIG_PERF_NS_TRACE
+static inline bool is_container(void)
+{
+	bool flag = 0;
+#ifdef CONFIG_PID_NS_TRACE
+	if (task_active_pid_ns(current) == &init_pid_ns)
+		return 0;
+	else
+		flag = 1;
+#endif
+#ifdef CONFIG_UTS_NS_TRACE
+	if (current->nsproxy->uts_ns == &init_uts_ns)
+		return 0;
+	else
+		flag = 1;
+#endif
+#ifdef CONFIG_IPC_NS_TRACE
+	if (current->nsproxy->ipc_ns == &init_ipc_ns)
+		return 0;
+	else
+		flag = 1;
+#endif
+#ifdef CONFIG_MNT_NS_TRACE
+	if (current->nsproxy->mnt_ns == init_task.nsproxy->mnt_ns)
+		return 0;
+	else
+		flag = 1;
+#endif
+#ifdef CONFIG_NET_NS_TRACE
+	if (current->nsproxy->net_ns == &init_net)
+		return 0;
+	else
+		flag = 1;
+#endif
+#ifdef CONFIG_CGROUPS_NS_TRACE
+	if (current->nsproxy->cgroup_ns == &init_cgroup_ns)
+		return 0;
+	else
+		flag = 1;
+#endif
+	return flag;
+}
+#endif /* #ifdef CONFIG_PERF_NS_TRACE */
+
 static inline int perf_cgroup_connect(int fd, struct perf_event *event,
 				      struct perf_event_attr *attr,
 				      struct perf_event *group_leader)
 {
 	struct perf_cgroup *cgrp;
 	struct cgroup_subsys_state *css;
-	struct fd f = fdget(fd);
+	struct fd f;
 	int ret = 0;
 
-	if (!f.file)
-		return -EBADF;
+	if (fd != -1) {
+		f = fdget(fd);
+		if (!f.file)
+			return -EBADF;
 
-	css = css_tryget_online_from_dir(f.file->f_path.dentry,
-					 &perf_event_cgrp_subsys);
-	if (IS_ERR(css)) {
-		ret = PTR_ERR(css);
-		goto out;
+		css = css_tryget_online_from_dir(f.file->f_path.dentry,
+						 &perf_event_cgrp_subsys);
+		if (IS_ERR(css)) {
+			ret = PTR_ERR(css);
+			fdput(f);
+			return ret;
+		}
+#ifdef CONFIG_PERF_NS_TRACE
+	} else if (event->attach_state == PERF_ATTACH_TASK) {
+		/* Tracing on a PID. No need to set event->cgrp */
+		return ret;
+	} else if (is_container()) {
+		css = task_css(current, perf_event_cgrp_id);
+		if (!css || !css_tryget_online(css))
+			return -ENOENT;
+	} else {
+		/*
+		 * perf invoked from global context and hence don't set
+		 * event->cgrp as all the events should be included
+		 */
+		return ret;
+#endif /* #ifdef CONFIG_PERF_NS_TRACE */
 	}
 
 	cgrp = container_of(css, struct perf_cgroup, css);
@@ -833,8 +896,9 @@ static inline int perf_cgroup_connect(int fd, struct perf_event *event,
 		perf_detach_cgroup(event);
 		ret = -EINVAL;
 	}
-out:
-	fdput(f);
+	if (fd != -1)
+		fdput(f);
+
 	return ret;
 }
 
@@ -9197,11 +9261,9 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 	if (!has_branch_stack(event))
 		event->attr.branch_sample_type = 0;
 
-	if (cgroup_fd != -1) {
-		err = perf_cgroup_connect(cgroup_fd, event, attr, group_leader);
-		if (err)
-			goto err_ns;
-	}
+	err = perf_cgroup_connect(cgroup_fd, event, attr, group_leader);
+	if (err)
+		goto err_ns;
 
 	pmu = perf_init_event(event);
 	if (!pmu)
@@ -9541,6 +9603,13 @@ SYSCALL_DEFINE5(perf_event_open,
 		if (perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN))
 			return -EACCES;
 	}
+
+#ifdef CONFIG_PERF_NS_TRACE
+	if (is_container() && !(attr.type == PERF_TYPE_HARDWARE &&
+			attr.sample_type == PERF_SAMPLE_IDENTIFIER)) {
+		return -EACCES;
+	}
+#endif
 
 	if (attr.freq) {
 		if (attr.sample_freq > sysctl_perf_event_sample_rate)

@@ -1765,6 +1765,70 @@ config DEBUG_PERF_USE_VMALLOC
 
 	 Say N if unsure.
 
+config PERF_NS_TRACE
+	default n
+	bool "Container-aware tracing support"
+	depends on CGROUPS && NAMESPACES
+	help
+	 Enable tracing support inside a container.
+
+	 This allows to filter container specific events, without
+	 any change in the user interface, when perf is invoked
+	 within a container.
+
+	 As the kernel has no concept of a container the user should
+	 select from the below choice to let the kernel identify a container.
+
+	 Say N if unsure.
+
+if PERF_NS_TRACE
+
+menu "Select the namespaces with which containers are created"
+
+config UTS_NS_TRACE
+	bool "UTS namespace"
+	depends on UTS_NS
+	default n
+	help
+	 Select if containers are created with UTS namespace"
+
+config IPC_NS_TRACE
+	bool "IPC namespace"
+	depends on IPC_NS
+	default n
+	help
+	 Select if containers are created with IPC namespace"
+
+config MNT_NS_TRACE
+	bool "Mount namespace"
+	default n
+	help
+	 Select if containers are created with mount namespace"
+
+config PID_NS_TRACE
+	bool "PID Namespaces"
+	default y
+	depends on PID_NS
+	help
+	 Select if containers are created with IPC namespace"
+
+config NET_NS_TRACE
+	bool "Network namespace"
+	depends on NET_NS
+	default n
+	help
+	 Select if containers are created with NET namespace"
+
+config CGROUPS_NS_TRACE
+	bool "Cgroup namespace"
+	default y
+	help
+	 Select if containers are created with cgroup namespace"
+
+endmenu
+
+endif #PERF_NS_TRACE
+
 endmenu
 
 config VM_EVENT_COUNTERS
