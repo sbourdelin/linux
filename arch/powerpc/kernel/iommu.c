@@ -127,7 +127,7 @@ static ssize_t fail_iommu_store(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(fail_iommu, S_IRUGO|S_IWUSR, fail_iommu_show,
+static DEVICE_ATTR(fail_iommu, 0644, fail_iommu_show,
 		   fail_iommu_store);
 
 static int fail_iommu_bus_notify(struct notifier_block *nb,

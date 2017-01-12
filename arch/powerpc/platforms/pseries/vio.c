@@ -997,11 +997,11 @@ static struct device_attribute vio_cmo_dev_attrs[] = {
 	__ATTR_RO(name),
 	__ATTR_RO(devspec),
 	__ATTR_RO(modalias),
-	__ATTR(cmo_desired,       S_IWUSR|S_IRUSR|S_IWGRP|S_IRGRP|S_IROTH,
+	__ATTR(cmo_desired,       0664,
 	       viodev_cmo_desired_show, viodev_cmo_desired_set),
-	__ATTR(cmo_entitled,      S_IRUGO, viodev_cmo_entitled_show,      NULL),
-	__ATTR(cmo_allocated,     S_IRUGO, viodev_cmo_allocated_show,     NULL),
-	__ATTR(cmo_allocs_failed, S_IWUSR|S_IRUSR|S_IWGRP|S_IRGRP|S_IROTH,
+	__ATTR(cmo_entitled,      0444, viodev_cmo_entitled_show,      NULL),
+	__ATTR(cmo_allocated,     0444, viodev_cmo_allocated_show,     NULL),
+	__ATTR(cmo_allocs_failed, 0664,
 	       viodev_cmo_allocs_failed_show, viodev_cmo_allocs_failed_reset),
 	__ATTR_NULL
 };

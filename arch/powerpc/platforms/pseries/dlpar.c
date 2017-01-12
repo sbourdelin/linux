@@ -551,7 +551,7 @@ dlpar_store_out:
 	return rc ? rc : count;
 }
 
-static CLASS_ATTR(dlpar, S_IWUSR, NULL, dlpar_store);
+static CLASS_ATTR(dlpar, 0200, NULL, dlpar_store);
 
 static int __init pseries_dlpar_init(void)
 {
