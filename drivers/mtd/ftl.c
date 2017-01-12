@@ -1042,12 +1042,8 @@ static void ftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 	partition_t *partition;
 
 	partition = kzalloc(sizeof(partition_t), GFP_KERNEL);
-
-	if (!partition) {
-		printk(KERN_WARNING "No memory to scan for FTL on %s\n",
-		       mtd->name);
+	if (!partition)
 		return;
-	}
 
 	partition->mbd.mtd = mtd;
 
