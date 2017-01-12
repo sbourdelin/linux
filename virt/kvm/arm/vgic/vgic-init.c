@@ -350,6 +350,10 @@ int kvm_vgic_map_resources(struct kvm *kvm)
 		ret = vgic_v3_map_resources(kvm);
 out:
 	mutex_unlock(&kvm->lock);
+
+	if (ret)
+		kvm_vgic_destroy(kvm);
+
 	return ret;
 }
 
