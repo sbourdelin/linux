@@ -1123,18 +1123,19 @@ unlock:
 
 static bool mem_cgroup_wait_acct_move(struct mem_cgroup *memcg)
 {
-	if (mc.moving_task && current != mc.moving_task) {
-		if (mem_cgroup_under_move(memcg)) {
-			DEFINE_WAIT(wait);
-			prepare_to_wait(&mc.waitq, &wait, TASK_INTERRUPTIBLE);
-			/* moving charge context might have finished. */
-			if (mc.moving_task)
-				schedule();
-			finish_wait(&mc.waitq, &wait);
-			return true;
-		}
+	DEFINE_WAIT(wait);
+
+	if (likely(!mem_cgroup_under_move(memcg)))
+		return false;
+
+	prepare_to_wait(&mc.waitq, &wait, TASK_INTERRUPTIBLE);
+	/* moving charge context might have finished. */
+	if (mc.moving_task) {
+		WARN_ON_ONCE(mc.moving_task == current);
+		schedule();
 	}
-	return false;
+	finish_wait(&mc.waitq, &wait);
+	return true;
 }
 
 #define K(x) ((x) << (PAGE_SHIFT-10))
@@ -4353,9 +4354,14 @@ static int mem_cgroup_do_precharge(unsigned long count)
 		return ret;
 	}
 
-	/* Try charges one by one with reclaim */
+	/*
+	 * Try charges one by one with reclaim, but do not retry.  This avoids
+	 * looping forever when try_charge() cannot reclaim memory and the oom
+	 * killer defers while waiting for a process to exit which is trying to
+	 * acquire cgroup_threadgroup_rwsem in the exit path.
+	 */
 	while (count--) {
-		ret = try_charge(mc.to, GFP_KERNEL & ~__GFP_NORETRY, 1);
+		ret = try_charge(mc.to, GFP_KERNEL | __GFP_NORETRY, 1);
 		if (ret)
 			return ret;
 		mc.precharge++;
