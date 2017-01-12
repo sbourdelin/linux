@@ -264,11 +264,12 @@ out:
 	return ret;
 }
 
-static void kvm_vgic_dist_destroy(struct kvm *kvm)
+static void kvm_vgic_dist_destroy(struct kvm *kvm, bool locked)
 {
 	struct vgic_dist *dist = &kvm->arch.vgic;
 
-	mutex_lock(&kvm->lock);
+	if (!locked)
+		mutex_lock(&kvm->lock);
 
 	dist->ready = false;
 	dist->initialized = false;
@@ -276,7 +277,8 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
 	kfree(dist->spis);
 	dist->nr_spis = 0;
 
-	mutex_unlock(&kvm->lock);
+	if (!locked)
+		mutex_unlock(&kvm->lock);
 }
 
 void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
@@ -286,15 +288,20 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
 	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
 }
 
-void kvm_vgic_destroy(struct kvm *kvm)
+static void kvm_vgic_destroy_locked(struct kvm *kvm, bool locked)
 {
 	struct kvm_vcpu *vcpu;
 	int i;
 
-	kvm_vgic_dist_destroy(kvm);
+	kvm_vgic_dist_destroy(kvm, locked);
 
 	kvm_for_each_vcpu(i, vcpu, kvm)
 		kvm_vgic_vcpu_destroy(vcpu);
+}
+
+void kvm_vgic_destroy(struct kvm *kvm)
+{
+	kvm_vgic_destroy_locked(kvm, false);
 }
 
 /**
@@ -348,6 +355,10 @@ int kvm_vgic_map_resources(struct kvm *kvm)
 		ret = vgic_v2_map_resources(kvm);
 	else
 		ret = vgic_v3_map_resources(kvm);
+
+	if (ret)
+		kvm_vgic_destroy_locked(kvm, true);
+
 out:
 	mutex_unlock(&kvm->lock);
 	return ret;
