@@ -1392,6 +1392,7 @@ static int bq24190_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
+	irq_set_status_flags(bdi->irq, IRQ_NOAUTOEN);
 	ret = devm_request_threaded_irq(dev, bdi->irq, NULL,
 			bq24190_irq_handler_thread,
 			IRQF_TRIGGER_RISING | IRQF_ONESHOT,
@@ -1435,6 +1436,8 @@ static int bq24190_probe(struct i2c_client *client,
 		dev_err(dev, "Can't create sysfs entries\n");
 		goto out4;
 	}
+
+	enable_irq(bdi->irq);
 
 	return 0;
 
