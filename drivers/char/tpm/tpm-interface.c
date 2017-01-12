@@ -7,6 +7,7 @@
  * Dave Safford <safford@watson.ibm.com>
  * Reiner Sailer <sailer@watson.ibm.com>
  * Kylene Hall <kjhall@us.ibm.com>
+ * Nayna Jain <nayna@linux.vnet.ibm.com>
  *
  * Maintained by: <tpmdd-devel@lists.sourceforge.net>
  *
@@ -759,6 +760,7 @@ static const struct tpm_input_header pcrextend_header = {
 int tpm_pcr_extend(u32 chip_num, int pcr_idx, const u8 *hash)
 {
 	struct tpm_cmd_t cmd;
+	int i;
 	int rc;
 	struct tpm_chip *chip;
 
@@ -767,7 +769,19 @@ int tpm_pcr_extend(u32 chip_num, int pcr_idx, const u8 *hash)
 		return -ENODEV;
 
 	if (chip->flags & TPM_CHIP_FLAG_TPM2) {
-		rc = tpm2_pcr_extend(chip, pcr_idx, hash);
+		struct tpml_digest_values d_values;
+
+		memset(&d_values, 0, sizeof(d_values));
+
+		for (i = 0; (chip->active_banks[i] != 0) &&
+		     (i < ARRAY_SIZE(chip->active_banks)); i++) {
+			d_values.digests[i].alg_id = chip->active_banks[i];
+			memcpy(d_values.digests[i].digest, hash,
+			       TPM_DIGEST_SIZE);
+			d_values.count++;
+		}
+
+		rc = tpm2_pcr_extend(chip, pcr_idx, &d_values);
 		tpm_put_ops(chip);
 		return rc;
 	}

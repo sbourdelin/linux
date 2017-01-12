@@ -2,9 +2,12 @@
 #ifndef __TPM_EVENTLOG_H__
 #define __TPM_EVENTLOG_H__
 
+#include <crypto/hash_info.h>
+
 #define TCG_EVENT_NAME_LEN_MAX	255
 #define MAX_TEXT_EVENT		1000	/* Max event string length */
 #define ACPI_TCPA_SIG		"TCPA"	/* 0x41504354 /'TCPA' */
+#define TPM2_ACTIVE_PCR_BANKS	3
 
 #ifdef CONFIG_PPC64
 #define do_endian_conversion(x) be32_to_cpu(x)
@@ -72,6 +75,21 @@ enum tcpa_pc_event_ids {
 	POST_CONTENTS,
 	HOST_TABLE_OF_DEVICES,
 };
+
+/**
+ * Digest structures for TPM 2.0 as defined in document
+ * Trusted Platform Module Library Part 2: Structures, Family "2.0".
+ */
+
+struct tpmt_ha {
+	u16 alg_id;
+	u8 digest[SHA384_DIGEST_SIZE];
+} __packed;
+
+struct tpml_digest_values {
+	u32 count;
+	struct tpmt_ha digests[TPM2_ACTIVE_PCR_BANKS];
+} __packed;
 
 #if defined(CONFIG_ACPI)
 int tpm_read_log_acpi(struct tpm_chip *chip);
