@@ -341,8 +341,7 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int armada38x_rtc_suspend(struct device *dev)
+static int __maybe_unused armada38x_rtc_suspend(struct device *dev)
 {
 	if (device_may_wakeup(dev)) {
 		struct armada38x_rtc *rtc = dev_get_drvdata(dev);
@@ -353,7 +352,7 @@ static int armada38x_rtc_suspend(struct device *dev)
 	return 0;
 }
 
-static int armada38x_rtc_resume(struct device *dev)
+static int __maybe_unused armada38x_rtc_resume(struct device *dev)
 {
 	if (device_may_wakeup(dev)) {
 		struct armada38x_rtc *rtc = dev_get_drvdata(dev);
@@ -366,7 +365,6 @@ static int armada38x_rtc_resume(struct device *dev)
 
 	return 0;
 }
-#endif
 
 static SIMPLE_DEV_PM_OPS(armada38x_rtc_pm_ops,
 			 armada38x_rtc_suspend, armada38x_rtc_resume);
