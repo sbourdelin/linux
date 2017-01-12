@@ -1154,6 +1154,22 @@ i40e_vfpr_netdev_get_offload_stats(int attr_id, const struct net_device *dev,
 	return -EINVAL;
 }
 
+static int
+i40e_vfpr_netdev_get_phys_port_name(struct net_device *dev, char *buf,
+				    size_t len)
+{
+	struct i40e_vfpr_netdev_priv *priv = netdev_priv(dev);
+	struct i40e_vf *vf = priv->vf;
+
+	int ret;
+
+	ret = snprintf(buf, len, "%d", vf->vf_id);
+	if (ret >= len)
+		return -EOPNOTSUPP;
+
+	return 0;
+}
+
 static const struct net_device_ops i40e_vfpr_netdev_ops = {
 	.ndo_open		= i40e_vfpr_netdev_open,
 	.ndo_stop		= i40e_vfpr_netdev_stop,
@@ -1161,6 +1177,26 @@ static const struct net_device_ops i40e_vfpr_netdev_ops = {
 	.ndo_get_stats64        = i40e_vfpr_netdev_get_stats64,
 	.ndo_has_offload_stats  = i40e_vfpr_netdev_has_offload_stats,
 	.ndo_get_offload_stats  = i40e_vfpr_netdev_get_offload_stats,
+	.ndo_get_phys_port_name	= i40e_vfpr_netdev_get_phys_port_name,
+};
+
+static int i40e_vfpr_attr_get(struct net_device *dev,
+			      struct switchdev_attr *attr)
+{
+	switch (attr->id) {
+	case SWITCHDEV_ATTR_ID_PORT_PARENT_ID:
+		attr->u.ppid.id_len = ETH_ALEN;
+		ether_addr_copy(attr->u.ppid.id, dev->dev_addr);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static const struct switchdev_ops i40e_vfpr_switchdev_ops = {
+	.switchdev_port_attr_get        = i40e_vfpr_attr_get,
 };
 
 /**
@@ -1234,6 +1270,10 @@ int i40e_alloc_vfpr_netdev(struct i40e_vf *vf, u16 vf_num)
 
 	vfpr_netdev->netdev_ops = &i40e_vfpr_netdev_ops;
 	eth_hw_addr_inherit(vfpr_netdev, vsi->netdev);
+
+#ifdef CONFIG_NET_SWITCHDEV
+	vfpr_netdev->switchdev_ops = &i40e_vfpr_switchdev_ops;
+#endif
 
 	netif_carrier_off(vfpr_netdev);
 	netif_tx_disable(vfpr_netdev);
