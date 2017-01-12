@@ -1463,16 +1463,9 @@ static void if_cfg_callback(struct octeon_device *oct,
  */
 static u16 select_q(struct net_device *dev, struct sk_buff *skb,
 		    void *accel_priv __attribute__((unused)),
-		    select_queue_fallback_t fallback __attribute__((unused)))
+		    select_queue_fallback_t fallback)
 {
-	struct lio *lio;
-	u32 qindex;
-
-	lio = GET_LIO(dev);
-
-	qindex = skb_tx_hash(dev, skb);
-
-	return (u16)(qindex % (lio->linfo.num_txpciq));
+	return fallback(dev, skb);
 }
 
 /** Routine to push packets arriving on Octeon interface upto network layer.
