@@ -32,9 +32,15 @@
 #include <sound/soc.h>
 #include <sound/jack.h>
 #include "../../codecs/rt5640.h"
+#include "../../codecs/rt5660.h"
 #include "../atom/sst-atom-controls.h"
 #include "../common/sst-acpi.h"
 #include "../common/sst-dsp.h"
+
+enum {
+	CODEC_TYPE_RT5640,
+	CODEC_TYPE_RT5660,
+};
 
 enum {
 	BYT_RT5640_DMIC1_MAP,
@@ -60,8 +66,16 @@ enum {
 	PLL1_MCLK,
 };
 
+struct byt_acpi_card {
+	char *codec_id;
+	int codec_type;
+	struct snd_soc_card *soc_card;
+};
+
 struct byt_rt5640_private {
+	struct byt_acpi_card *acpi_card;
 	struct clk *mclk;
+	char codec_name[16];
 	int *clks;
 };
 
@@ -70,6 +84,13 @@ static int byt_rt5640_clks[] = {
 	RT5640_SCLK_S_RCCLK,
 	RT5640_PLL1_S_BCLK1,
 	RT5640_PLL1_S_MCLK
+};
+
+static int byt_rt5660_clks[] = {
+	RT5660_SCLK_S_PLL1,
+	RT5660_SCLK_S_RCCLK,
+	RT5660_PLL1_S_BCLK,
+	RT5660_PLL1_S_MCLK
 };
 
 static unsigned long byt_rt5640_quirk = BYT_RT5640_MCLK_EN;
@@ -105,6 +126,7 @@ static void log_quirks(struct device *dev)
 
 #define BYT_CODEC_DAI1	"rt5640-aif1"
 #define BYT_CODEC_DAI2	"rt5640-aif2"
+#define BYT_CODEC_DAI3	"rt5660-aif1"
 
 static inline struct snd_soc_dai *byt_get_codec_dai(struct snd_soc_card *card)
 {
@@ -116,6 +138,9 @@ static inline struct snd_soc_dai *byt_get_codec_dai(struct snd_soc_card *card)
 			return rtd->codec_dai;
 		if (!strncmp(rtd->codec_dai->name, BYT_CODEC_DAI2,
 				strlen(BYT_CODEC_DAI2)))
+			return rtd->codec_dai;
+		if (!strncmp(rtd->codec_dai->name, BYT_CODEC_DAI3,
+				strlen(BYT_CODEC_DAI3)))
 			return rtd->codec_dai;
 
 	}
@@ -267,6 +292,29 @@ static const struct snd_kcontrol_new byt_rt5640_controls[] = {
 	SOC_DAPM_PIN_SWITCH("Headset Mic"),
 	SOC_DAPM_PIN_SWITCH("Internal Mic"),
 	SOC_DAPM_PIN_SWITCH("Speaker"),
+};
+
+static const struct snd_soc_dapm_widget byt_rt5660_widgets[] = {
+	SND_SOC_DAPM_MIC("Line In", NULL),
+	SND_SOC_DAPM_LINE("Line Out", NULL),
+	SND_SOC_DAPM_SUPPLY("Platform Clock", SND_SOC_NOPM, 0, 0,
+			platform_clock_control, SND_SOC_DAPM_PRE_PMU |
+			SND_SOC_DAPM_POST_PMD),
+};
+
+static const struct snd_soc_dapm_route byt_rt5660_audio_map[] = {
+	{"IN1P", NULL, "Line In"},
+	{"IN2P", NULL, "Line In"},
+	{"Line Out", NULL, "LOUTR"},
+	{"Line Out", NULL, "LOUTL"},
+
+	{"Line In", NULL, "Platform Clock"},
+	{"Line Out", NULL, "Platform Clock"},
+};
+
+static const struct snd_kcontrol_new byt_rt5660_controls[] = {
+	SOC_DAPM_PIN_SWITCH("Line In"),
+	SOC_DAPM_PIN_SWITCH("Line Out"),
 };
 
 static int byt_rt5640_aif1_hw_params(struct snd_pcm_substream *substream,
@@ -422,10 +470,7 @@ static int byt_rt5640_init(struct snd_soc_pcm_runtime *runtime)
 	struct snd_soc_codec *codec = runtime->codec;
 	struct snd_soc_card *card = runtime->card;
 	const struct snd_soc_dapm_route *custom_map;
-	struct byt_rt5640_private *priv = snd_soc_card_get_drvdata(card);
 	int num_routes;
-
-	card->dapm.idle_bias_off = true;
 
 	rt5640_sel_asrc_clk_src(codec,
 				RT5640_DA_STEREO_FILTER |
@@ -510,6 +555,39 @@ static int byt_rt5640_init(struct snd_soc_pcm_runtime *runtime)
 
 	snd_soc_dapm_ignore_suspend(&card->dapm, "Headphone");
 	snd_soc_dapm_ignore_suspend(&card->dapm, "Speaker");
+
+	return ret;
+}
+
+static int byt_rt5660_init(struct snd_soc_pcm_runtime *runtime)
+{
+	int ret;
+	struct snd_soc_card *card = runtime->card;
+
+	ret = snd_soc_dapm_add_routes(&card->dapm,
+			byt_rt5640_ssp2_aif1_map,
+			ARRAY_SIZE(byt_rt5640_ssp2_aif1_map));
+	if (ret)
+		return ret;
+
+	snd_soc_dapm_enable_pin(&card->dapm, "Line In");
+	snd_soc_dapm_enable_pin(&card->dapm, "Line Out");
+
+	return ret;
+}
+
+static int byt_rt56x0_init(struct snd_soc_pcm_runtime *runtime)
+{
+	int ret;
+	struct snd_soc_card *card = runtime->card;
+	struct byt_rt5640_private *priv = snd_soc_card_get_drvdata(card);
+
+	card->dapm.idle_bias_off = true;
+
+	if (priv->acpi_card->codec_type == CODEC_TYPE_RT5640)
+		ret = byt_rt5640_init(runtime);
+	else
+		ret = byt_rt5660_init(runtime);
 
 	if ((byt_rt5640_quirk & BYT_RT5640_MCLK_EN) && priv->mclk) {
 		/*
@@ -679,7 +757,7 @@ static struct snd_soc_dai_link byt_rt5640_dais[] = {
 		.ignore_suspend = 1,
 		.dpcm_playback = 1,
 		.dpcm_capture = 1,
-		.init = byt_rt5640_init,
+		.init = byt_rt56x0_init,
 		.ops = &byt_rt5640_be_ssp2_ops,
 	},
 };
@@ -695,6 +773,25 @@ static struct snd_soc_card byt_rt5640_card = {
 	.dapm_routes = byt_rt5640_audio_map,
 	.num_dapm_routes = ARRAY_SIZE(byt_rt5640_audio_map),
 	.fully_routed = true,
+};
+
+static struct snd_soc_card byt_rt5660_card = {
+	.name = "bytcr-rt5660",
+	.owner = THIS_MODULE,
+	.dai_link = byt_rt5640_dais,
+	.num_links = ARRAY_SIZE(byt_rt5640_dais),
+	.controls = byt_rt5660_controls,
+	.num_controls = ARRAY_SIZE(byt_rt5660_controls),
+	.dapm_widgets = byt_rt5660_widgets,
+	.num_dapm_widgets = ARRAY_SIZE(byt_rt5660_widgets),
+	.dapm_routes = byt_rt5660_audio_map,
+	.num_dapm_routes = ARRAY_SIZE(byt_rt5660_audio_map),
+	.fully_routed = true,
+};
+
+static struct byt_acpi_card snd_soc_cards[] = {
+	{"10EC5640", CODEC_TYPE_RT5640, &byt_rt5640_card},
+	{"10EC3277", CODEC_TYPE_RT5660, &byt_rt5660_card},
 };
 
 static char byt_rt5640_codec_name[16]; /* i2c-<HID>:00 with HID being 8 chars */
@@ -721,40 +818,50 @@ struct acpi_chan_package {   /* ACPICA seems to require 64 bit integers */
 static int snd_byt_rt5640_mc_probe(struct platform_device *pdev)
 {
 	int ret_val = 0;
+	int i;
+	struct byt_rt5640_private *priv;
+	struct snd_soc_card *card = snd_soc_cards[0].soc_card;
 	struct sst_acpi_mach *mach;
 	const char *i2c_name = NULL;
-	int i;
-	int dai_index;
-	struct byt_rt5640_private *priv;
+	int dai_index = 0;
 	bool is_bytcr = false;
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_ATOMIC);
 	if (!priv)
 		return -ENOMEM;
 
-	/* register the soc card */
-	priv->clks = byt_rt5640_clks;
-	byt_rt5640_card.dev = &pdev->dev;
-	mach = byt_rt5640_card.dev->platform_data;
-	snd_soc_card_set_drvdata(&byt_rt5640_card, priv);
-
-	/* fix index of codec dai */
-	dai_index = MERR_DPCM_COMPR + 1;
-	for (i = 0; i < ARRAY_SIZE(byt_rt5640_dais); i++) {
-		if (!strcmp(byt_rt5640_dais[i].codec_name, "i2c-10EC5640:00")) {
-			dai_index = i;
+	for (i = 0; i < ARRAY_SIZE(snd_soc_cards); i++) {
+		if (acpi_dev_found(snd_soc_cards[i].codec_id)) {
+			dev_dbg(&pdev->dev,
+				"found codec %s\n", snd_soc_cards[i].codec_id);
+			card = snd_soc_cards[i].soc_card;
+			priv->acpi_card = &snd_soc_cards[i];
 			break;
 		}
 	}
+
+	/* register the soc card */
+	priv->clks = byt_rt5640_clks;
+	card->dev = &pdev->dev;
+	mach = card->dev->platform_data;
+	sprintf(priv->codec_name, "i2c-%s:00", priv->acpi_card->codec_id);
+
+	/* fix index of codec dai */
+	for (i = 0; i < ARRAY_SIZE(byt_rt5640_dais); i++)
+		if (!strcmp(byt_rt5640_dais[i].codec_name, "i2c-10EC5640:00")) {
+			card->dai_link[i].codec_name = priv->codec_name;
+			dai_index = i;
+		}
 
 	/* fixup codec name based on HID */
 	i2c_name = sst_acpi_find_name_from_hid(mach->id);
 	if (i2c_name != NULL) {
 		snprintf(byt_rt5640_codec_name, sizeof(byt_rt5640_codec_name),
 			"%s%s", "i2c-", i2c_name);
-
 		byt_rt5640_dais[dai_index].codec_name = byt_rt5640_codec_name;
 	}
+
+	snd_soc_card_set_drvdata(card, priv);
 
 	/*
 	 * swap SSP0 if bytcr is detected
@@ -821,6 +928,21 @@ static int snd_byt_rt5640_mc_probe(struct platform_device *pdev)
 				BYT_RT5640_DMIC_EN);
 	}
 
+	if (priv->acpi_card->codec_type == CODEC_TYPE_RT5660) {
+		priv->clks = byt_rt5660_clks;
+
+		/* fixup codec aif name for rt5660 */
+		snprintf(byt_rt5640_codec_aif_name,
+			sizeof(byt_rt5640_codec_aif_name),
+			"%s", "rt5660-aif1");
+
+		byt_rt5640_dais[dai_index].codec_dai_name =
+			byt_rt5640_codec_aif_name;
+
+		/* setup codec quirks for rt5660 */
+		byt_rt5640_quirk = BYT_RT5640_MCLK_EN;
+	}
+
 	/* check quirks before creating card */
 	dmi_check_system(byt_rt5640_quirk_table);
 	log_quirks(&pdev->dev);
@@ -869,14 +991,14 @@ static int snd_byt_rt5640_mc_probe(struct platform_device *pdev)
 		}
 	}
 
-	ret_val = devm_snd_soc_register_card(&pdev->dev, &byt_rt5640_card);
+	ret_val = devm_snd_soc_register_card(&pdev->dev, card);
 
 	if (ret_val) {
 		dev_err(&pdev->dev, "devm_snd_soc_register_card failed %d\n",
 			ret_val);
 		return ret_val;
 	}
-	platform_set_drvdata(pdev, &byt_rt5640_card);
+	platform_set_drvdata(pdev, card);
 	return ret_val;
 }
 
