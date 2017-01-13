@@ -3176,10 +3176,13 @@ struct ieee80211_iface_limit {
  * @radar_detect_regions: bitmap of regions supported for radar detection
  * @beacon_int_min_gcd: This interface combination supports different
  *	beacon intervals.
- *	= 0 - all beacon intervals for different interface must be same.
- *	> 0 - any beacon interval for the interface part of this combination AND
- *	      *GCD* of all beacon intervals from beaconing interfaces of this
- *	      combination must be greater or equal to this value.
+ *	
+ *	= 0
+ *	  all beacon intervals for different interface must be same.
+ *	> 0
+ *	  any beacon interval for the interface part of this combination AND
+ *	  GCD of all beacon intervals from beaconing interfaces of this
+ *	  combination must be greater or equal to this value.
  *
  * With this structure the driver can describe which interface
  * combinations it supports concurrently.
