@@ -5,8 +5,38 @@
 #define _TRACE_SCHED_H
 
 #include <linux/sched.h>
+#include <linux/sched/deadline.h>
+#include <linux/sched/rt.h>
 #include <linux/tracepoint.h>
 #include <linux/binfmts.h>
+
+#define SCHEDULING_POLICY				\
+	EM( SCHED_NORMAL,	"SCHED_NORMAL")		\
+	EM( SCHED_FIFO,		"SCHED_FIFO")		\
+	EM( SCHED_RR,		"SCHED_RR")		\
+	EM( SCHED_BATCH,	"SCHED_BATCH")		\
+	EM( SCHED_IDLE,		"SCHED_IDLE")		\
+	EMe(SCHED_DEADLINE,	"SCHED_DEADLINE")
+
+/*
+ * First define the enums in the above macros to be exported to userspace
+ * via TRACE_DEFINE_ENUM().
+ */
+#undef EM
+#undef EMe
+#define EM(a, b)       TRACE_DEFINE_ENUM(a);
+#define EMe(a, b)      TRACE_DEFINE_ENUM(a);
+
+SCHEDULING_POLICY
+
+/*
+ * Now redefine the EM() and EMe() macros to map the enums to the strings
+ * that will be printed in the output.
+ */
+#undef EM
+#undef EMe
+#define EM(a, b)       {a, b},
+#define EMe(a, b)      {a, b}
 
 /*
  * Tracepoint for calling kthread_stop, performed to end a kthread:
@@ -159,6 +189,168 @@ TRACE_EVENT(sched_switch,
 				{ 1024, "N" }) : "R",
 		__entry->prev_state & TASK_STATE_MAX ? "+" : "",
 		__entry->next_comm, __entry->next_pid, __entry->next_prio)
+);
+
+/*
+ * Tracepoint for task switches, performed by the scheduler where the next
+ * task has a fair scheduling policy.
+ */
+TRACE_EVENT_MAP_COND(sched_switch, sched_switch_fair,
+
+	TP_PROTO(bool preempt,
+		 struct task_struct *prev,
+		 struct task_struct *next),
+
+	TP_ARGS(preempt, prev, next),
+
+	TP_CONDITION(!dl_prio(next->prio) && !rt_prio(next->prio)),
+
+	TP_STRUCT__entry(
+		__array(	char,	prev_comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	prev_pid			)
+		__field(	long,	prev_state			)
+		__array(	char,	next_comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	next_pid			)
+		__field(	unsigned int, next_policy		)
+		__field(	int,	next_nice			)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->next_comm, next->comm, TASK_COMM_LEN);
+		__entry->prev_pid	= prev->pid;
+		__entry->prev_state	= __trace_sched_switch_state(preempt, prev);
+		memcpy(__entry->prev_comm, prev->comm, TASK_COMM_LEN);
+		__entry->next_pid	= next->pid;
+		__entry->next_policy	= next->policy;
+		__entry->next_nice	= task_nice(next);
+	),
+
+	TP_printk("prev_comm=%s prev_pid=%d prev_state=%s%s ==> next_comm=%s "
+			"next_pid=%d next_policy=%s next_nice=%d",
+		__entry->prev_comm, __entry->prev_pid,
+		__entry->prev_state & (TASK_STATE_MAX-1) ?
+		  __print_flags(__entry->prev_state & (TASK_STATE_MAX-1), "|",
+				{ 1, "S"} , { 2, "D" }, { 4, "T" }, { 8, "t" },
+				{ 16, "Z" }, { 32, "X" }, { 64, "x" },
+				{ 128, "K" }, { 256, "W" }, { 512, "P" },
+				{ 1024, "N" }) : "R",
+		__entry->prev_state & TASK_STATE_MAX ? "+" : "",
+		__entry->next_comm, __entry->next_pid,
+		__print_symbolic(__entry->next_policy, SCHEDULING_POLICY),
+		__entry->next_nice)
+);
+
+/*
+ * Tracepoint for task switches, performed by the scheduler where the next
+ * task has a rt scheduling policy.
+ */
+TRACE_EVENT_MAP_COND(sched_switch, sched_switch_rt,
+
+	TP_PROTO(bool preempt,
+		 struct task_struct *prev,
+		 struct task_struct *next),
+
+	TP_ARGS(preempt, prev, next),
+
+	TP_CONDITION(rt_prio(next->prio)),
+
+	TP_STRUCT__entry(
+		__array(	char,	prev_comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	prev_pid			)
+		__field(	long,	prev_state			)
+		__array(	char,	next_comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	next_pid			)
+		__field(	unsigned int, next_policy		)
+		__field(	int,	next_nice			)
+		__field(	unsigned int,	next_rt_priority	)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->next_comm, next->comm, TASK_COMM_LEN);
+		__entry->prev_pid	= prev->pid;
+		__entry->prev_state	= __trace_sched_switch_state(preempt, prev);
+		memcpy(__entry->prev_comm, prev->comm, TASK_COMM_LEN);
+		__entry->next_pid	= next->pid;
+		/*
+		 * With PI, a real RT policy might not be set and the default
+		 * RT policy is SCHED_FIFO.
+		 */
+		__entry->next_policy	= (next->policy == SCHED_RR) ?
+						SCHED_RR : SCHED_FIFO;
+		__entry->next_nice	= task_nice(next);
+		__entry->next_rt_priority = MAX_RT_PRIO - 1 - next->prio;
+	),
+
+	TP_printk("prev_comm=%s prev_pid=%d prev_state=%s%s ==> next_comm=%s "
+			"next_pid=%d next_policy=%s next_nice=%d "
+			"next_rt_priority=%u",
+		__entry->prev_comm, __entry->prev_pid,
+		__entry->prev_state & (TASK_STATE_MAX-1) ?
+		  __print_flags(__entry->prev_state & (TASK_STATE_MAX-1), "|",
+				{ 1, "S"} , { 2, "D" }, { 4, "T" }, { 8, "t" },
+				{ 16, "Z" }, { 32, "X" }, { 64, "x" },
+				{ 128, "K" }, { 256, "W" }, { 512, "P" },
+				{ 1024, "N" }) : "R",
+		__entry->prev_state & TASK_STATE_MAX ? "+" : "",
+		__entry->next_comm, __entry->next_pid,
+		__print_symbolic(__entry->next_policy, SCHEDULING_POLICY),
+		__entry->next_nice, __entry->next_rt_priority)
+);
+
+/*
+ * Tracepoint for task switches, performed by the scheduler where the next
+ * task has a deadline scheduling policy.
+ */
+TRACE_EVENT_MAP_COND(sched_switch, sched_switch_dl,
+
+	TP_PROTO(bool preempt,
+		 struct task_struct *prev,
+		 struct task_struct *next),
+
+	TP_ARGS(preempt, prev, next),
+
+	TP_CONDITION(dl_prio(next->prio)),
+
+	TP_STRUCT__entry(
+		__array(	char,	prev_comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	prev_pid			)
+		__field(	long,	prev_state			)
+		__array(	char,	next_comm,	TASK_COMM_LEN	)
+		__field(	pid_t,	next_pid			)
+		__field(	unsigned int, next_policy		)
+		__field( 	u64,	next_dl_runtime			)
+		__field( 	u64,	next_dl_deadline		)
+		__field( 	u64,	next_dl_period			)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->next_comm, next->comm, TASK_COMM_LEN);
+		__entry->prev_pid	= prev->pid;
+		__entry->prev_state	= __trace_sched_switch_state(preempt, prev);
+		memcpy(__entry->prev_comm, prev->comm, TASK_COMM_LEN);
+		__entry->next_pid	= next->pid;
+		__entry->next_policy	= SCHED_DEADLINE;
+		__entry->next_dl_runtime	= next->dl.dl_runtime;
+		__entry->next_dl_deadline	= next->dl.dl_deadline;
+		__entry->next_dl_period		= next->dl.dl_period;
+	),
+
+	TP_printk("prev_comm=%s prev_pid=%d prev_state=%s%s ==> next_comm=%s "
+			"next_pid=%d next_policy=%s next_dl_runtime=%Lu "
+			"next_dl_deadline=%Lu next_dl_period=%Lu",
+		__entry->prev_comm, __entry->prev_pid,
+		__entry->prev_state & (TASK_STATE_MAX-1) ?
+		  __print_flags(__entry->prev_state & (TASK_STATE_MAX-1), "|",
+				{ 1, "S"} , { 2, "D" }, { 4, "T" }, { 8, "t" },
+				{ 16, "Z" }, { 32, "X" }, { 64, "x" },
+				{ 128, "K" }, { 256, "W" }, { 512, "P" },
+				{ 1024, "N" }) : "R",
+		__entry->prev_state & TASK_STATE_MAX ? "+" : "",
+		__entry->next_comm, __entry->next_pid,
+		__print_symbolic(__entry->next_policy, SCHEDULING_POLICY),
+		__entry->next_dl_runtime, __entry->next_dl_deadline,
+		__entry->next_dl_period)
+
 );
 
 /*
