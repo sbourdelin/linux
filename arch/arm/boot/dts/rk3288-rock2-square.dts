@@ -86,6 +86,17 @@
 		#sound-dai-cells = <0>;
 	};
 
+	sound_es8388 {
+		compatible = "rockchip,rockchip-audio-es8388";
+		rockchip,model = "Analog audio output";
+		rockchip,i2s-controller = <&i2s>;
+		rockchip,audio-codec = <&es8388>;
+		rockchip,hp-en-gpios = <&gpio8 0 GPIO_ACTIVE_HIGH>;
+		rockchip,hp-det-gpios = <&gpio7 7 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&headphone>;
+	};
+
 	sdio_pwrseq: sdio-pwrseq {
 		compatible = "mmc-pwrseq-simple";
 		clocks = <&hym8563>;
@@ -173,7 +184,26 @@
 	};
 };
 
+&i2c2 {
+	status = "okay";
+
+	es8388: es8388@10 {
+		compatible = "everest,es8388", "everest,es8328";
+		reg = <0x10>;
+		AVDD-supply = <&vcca_codec>;
+		DVDD-supply = <&vcca_codec>;
+		HPVDD-supply = <&vcca_codec>;
+		PVDD-supply = <&vcca_codec>;
+		clocks = <&cru SCLK_I2S0_OUT>;
+		clock-names = "i2s_clk_out";
+	};
+};
+
 &i2c5 {
+	status = "okay";
+};
+
+&i2s {
 	status = "okay";
 };
 
@@ -187,6 +217,13 @@
 	pmic {
 		pmic_int: pmic-int {
 			rockchip,pins = <0 4 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
+	};
+
+	sound {
+		headphone: headphone {
+			rockchip,pins = <8 0 RK_FUNC_GPIO &pcfg_pull_up>,
+					<7 7 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 
