@@ -785,7 +785,8 @@ config HID_SUNPLUS
 config HID_RMI
 	tristate "Synaptics RMI4 device support"
 	depends on HID
-	select RMI4_CORE
+	depends on SERIO && RMI4_CORE
+	depends on SERIO=y || RMI4_CORE=SERIO
 	select RMI4_F03
 	select RMI4_F11
 	select RMI4_F12
