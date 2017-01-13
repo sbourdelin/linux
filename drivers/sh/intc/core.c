@@ -353,8 +353,7 @@ int __init register_intc_controller(struct intc_desc *desc)
 					res = irq_domain_associate(d->domain,
 								   irq2, irq2);
 					if (unlikely(res)) {
-						pr_err("domain association "
-						       "failure\n");
+						pr_err("domain association failure\n");
 						continue;
 					}
 				} else {
