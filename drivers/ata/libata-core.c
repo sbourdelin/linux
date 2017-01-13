@@ -3987,8 +3987,8 @@ int sata_link_hardreset(struct ata_link *link, const unsigned long *timing,
 			unsigned long deadline,
 			bool *online, int (*check_ready)(struct ata_link *))
 {
+	int rc, retry = ATA_LINK_RESET_TRIES;
 	u32 scontrol;
-	int rc;
 
 	DPRINTK("ENTER\n");
 
@@ -4011,7 +4011,7 @@ int sata_link_hardreset(struct ata_link *link, const unsigned long *timing,
 
 		sata_set_spd(link);
 	}
-
+retry:
 	/* issue phy wake/reset */
 	if ((rc = sata_scr_read(link, SCR_CONTROL, &scontrol)))
 		goto out;
@@ -4030,9 +4030,17 @@ int sata_link_hardreset(struct ata_link *link, const unsigned long *timing,
 	rc = sata_link_resume(link, timing, deadline);
 	if (rc)
 		goto out;
-	/* if link is offline nothing more to do */
-	if (ata_phys_link_offline(link))
+
+	if (ata_phys_link_offline(link)) {
+		if (retry--) {
+			ata_link_warn(link,
+				      "link still offline after hardreset - retrying\n");
+			goto retry;
+		}
+
+		/* if link is still offline nothing more to do */
 		goto out;
+	}
 
 	/* Link is online.  From this point, -ENODEV too is an error. */
 	if (online)
