@@ -7,7 +7,7 @@
 
 [Requirements]
     - USB/IP device drivers
-	Found in the staging directory of the Linux kernel.
+	Found in the drivers/usb/usbip directory of the Linux kernel.
 
     - libudev >= 2.0
 	libudev library
