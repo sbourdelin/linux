@@ -122,7 +122,7 @@ static void mdc_set(struct mdiobb_ctrl *ctrl, int what)
 	gpio_set_value_cansleep(bitbang->mdc, what ^ bitbang->mdc_active_low);
 }
 
-static struct mdiobb_ops mdio_gpio_ops = {
+static const struct mdiobb_ops mdio_gpio_ops = {
 	.owner = THIS_MODULE,
 	.set_mdc = mdc_set,
 	.set_mdio_dir = mdio_dir,
