@@ -918,7 +918,7 @@ intel_check_sprite_plane(struct drm_plane *plane,
 	dst->y1 = crtc_y;
 	dst->y2 = crtc_y + crtc_h;
 
-	if (INTEL_GEN(dev_priv) >= 9) {
+	if (INTEL_GEN(dev_priv) >= 9 && state->base.visible) {
 		ret = skl_check_plane_surface(state);
 		if (ret)
 			return ret;
