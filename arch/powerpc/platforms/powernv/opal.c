@@ -446,6 +446,16 @@ int opal_machine_check(struct pt_regs *regs)
 	}
 	machine_check_print_event_info(&evt);
 
+	/*
+	 * If regs is NULL, then the machine check exception occurred
+	 * in the guest. Currently no action is performed in the host
+	 * other than printing the event information. The machine check
+	 * exception is passed on to the guest kernel and the guest
+	 * kernel will attempt for recovery.
+	 */
+	if (!regs)
+		return 0;
+
 	if (opal_recover_mce(regs, &evt))
 		return 1;
 
