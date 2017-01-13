@@ -45,6 +45,10 @@
 		assign, print, reg, unreg)			\
 	DEFINE_TRACE_FN(name, reg, unreg)
 
+#undef TRACE_EVENT_MAP_COND
+#define TRACE_EVENT_MAP_COND(name, map, proto, args, cond, tstruct,	\
+		assign, print)
+
 #undef DEFINE_EVENT
 #define DEFINE_EVENT(template, name, proto, args) \
 	DEFINE_TRACE(name)
@@ -100,7 +104,9 @@
 #undef TRACE_EVENT_FN
 #undef TRACE_EVENT_FN_COND
 #undef TRACE_EVENT_CONDITION
+#undef TRACE_EVENT_MAP_COND
 #undef DECLARE_EVENT_CLASS
+#undef DECLARE_EVENT_COND_CLASS
 #undef DEFINE_EVENT
 #undef DEFINE_EVENT_FN
 #undef DEFINE_EVENT_PRINT

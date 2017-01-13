@@ -26,8 +26,9 @@
 #undef __perf_task
 #define __perf_task(t)	(__task = (t))
 
-#undef DECLARE_EVENT_CLASS
-#define DECLARE_EVENT_CLASS(call, proto, args, tstruct, assign, print)	\
+#undef DECLARE_EVENT_COND_CLASS
+#define DECLARE_EVENT_COND_CLASS(call, proto, args, cond, tstruct,	\
+		assign, print)						\
 static notrace void							\
 perf_trace_##call(void *__data, proto)					\
 {									\
@@ -42,6 +43,9 @@ perf_trace_##call(void *__data, proto)					\
 	int __entry_size;						\
 	int __data_size;						\
 	int rctx;							\
+									\
+	if (!(cond))							\
+		return;							\
 									\
 	__data_size = trace_event_get_offsets_##call(&__data_offsets, args); \
 									\
@@ -69,18 +73,28 @@ perf_trace_##call(void *__data, proto)					\
 				  head, __task);			\
 }
 
+#undef DECLARE_EVENT_CLASS
+#define DECLARE_EVENT_CLASS(call, proto, args, tstruct, assign, print)	\
+	DECLARE_EVENT_COND_CLASS(call, PARAMS(proto), PARAMS(args),	\
+			1, PARAMS(tstruct), PARAMS(assign),		\
+			PARAMS(print))
+
 /*
  * This part is compiled out, it is only here as a build time check
  * to make sure that if the tracepoint handling changes, the
  * perf probe will fail to compile unless it too is updated.
  */
-#undef DEFINE_EVENT
-#define DEFINE_EVENT(template, call, proto, args)			\
-static inline void perf_test_probe_##call(void)				\
+#undef DEFINE_EVENT_MAP_COND
+#define DEFINE_EVENT_MAP_COND(template, call, map, proto, args, cond)	\
+static inline void perf_test_probe_##map(void)				\
 {									\
 	check_trace_callback_type_##call(perf_trace_##template);	\
 }
 
+#undef DEFINE_EVENT
+#define DEFINE_EVENT(template, call, proto, args)			\
+	DEFINE_EVENT_MAP_COND(template, call, call, PARAMS(proto),	\
+			PARAMS(args), 1)
 
 #undef DEFINE_EVENT_PRINT
 #define DEFINE_EVENT_PRINT(template, name, proto, args, print)	\

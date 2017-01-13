@@ -276,6 +276,7 @@ extern void syscall_unregfunc(void);
 
 #define DEFINE_TRACE_FN(name, reg, unreg)
 #define DEFINE_TRACE(name)
+#define DEFINE_TRACE_MAP_COND(name, map, cond)
 #define EXPORT_TRACEPOINT_SYMBOL_GPL(name)
 #define EXPORT_TRACEPOINT_SYMBOL(name)
 
@@ -469,6 +470,8 @@ extern void syscall_unregfunc(void);
  */
 
 #define DECLARE_EVENT_CLASS(name, proto, args, tstruct, assign, print)
+#define DECLARE_EVENT_COND_CLASS(name, proto, args, cond, 	\
+		tstruct, assign, print)
 #define DEFINE_EVENT(template, name, proto, args)		\
 	DECLARE_TRACE(name, PARAMS(proto), PARAMS(args))
 #define DEFINE_EVENT_FN(template, name, proto, args, reg, unreg)\
@@ -497,5 +500,8 @@ extern void syscall_unregfunc(void);
 #define TRACE_EVENT_FLAGS(event, flag)
 
 #define TRACE_EVENT_PERF_PERM(event, expr...)
+
+#define TRACE_EVENT_MAP_COND(name, map, proto, args, cond, 	\
+		struct, assign, print)
 
 #endif /* ifdef TRACE_EVENT (see note above) */

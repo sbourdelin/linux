@@ -287,26 +287,33 @@ int trace_event_reg(struct trace_event_call *call,
 		    enum trace_reg type, void *data)
 {
 	struct trace_event_file *file = data;
+	struct tracepoint *tp;
 
 	WARN_ON(!(call->flags & TRACE_EVENT_FL_TRACEPOINT));
+
+	if (call->flags & TRACE_EVENT_FL_MAP)
+		tp = call->map->tp;
+	else
+		tp = call->tp;
+
 	switch (type) {
 	case TRACE_REG_REGISTER:
-		return tracepoint_probe_register(call->tp,
+		return tracepoint_probe_register(tp,
 						 call->class->probe,
 						 file);
 	case TRACE_REG_UNREGISTER:
-		tracepoint_probe_unregister(call->tp,
+		tracepoint_probe_unregister(tp,
 					    call->class->probe,
 					    file);
 		return 0;
 
 #ifdef CONFIG_PERF_EVENTS
 	case TRACE_REG_PERF_REGISTER:
-		return tracepoint_probe_register(call->tp,
+		return tracepoint_probe_register(tp,
 						 call->class->perf_probe,
 						 call);
 	case TRACE_REG_PERF_UNREGISTER:
-		tracepoint_probe_unregister(call->tp,
+		tracepoint_probe_unregister(tp,
 					    call->class->perf_probe,
 					    call);
 		return 0;

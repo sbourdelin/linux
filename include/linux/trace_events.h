@@ -217,6 +217,7 @@ enum {
 	TRACE_EVENT_FL_TRACEPOINT_BIT,
 	TRACE_EVENT_FL_KPROBE_BIT,
 	TRACE_EVENT_FL_UPROBE_BIT,
+	TRACE_EVENT_FL_MAP_BIT,
 };
 
 /*
@@ -231,6 +232,7 @@ enum {
  *  TRACEPOINT    - Event is a tracepoint
  *  KPROBE        - Event is a kprobe
  *  UPROBE        - Event is a uprobe
+ *  MAP           - Event maps to a tracepoint as an alias
  */
 enum {
 	TRACE_EVENT_FL_FILTERED		= (1 << TRACE_EVENT_FL_FILTERED_BIT),
@@ -241,9 +243,15 @@ enum {
 	TRACE_EVENT_FL_TRACEPOINT	= (1 << TRACE_EVENT_FL_TRACEPOINT_BIT),
 	TRACE_EVENT_FL_KPROBE		= (1 << TRACE_EVENT_FL_KPROBE_BIT),
 	TRACE_EVENT_FL_UPROBE		= (1 << TRACE_EVENT_FL_UPROBE_BIT),
+	TRACE_EVENT_FL_MAP		= (1 << TRACE_EVENT_FL_MAP_BIT),
 };
 
 #define TRACE_EVENT_FL_UKPROBE (TRACE_EVENT_FL_KPROBE | TRACE_EVENT_FL_UPROBE)
+
+struct trace_event_map {
+	struct tracepoint	*tp;
+	char			*name;
+};
 
 struct trace_event_call {
 	struct list_head	list;
@@ -252,6 +260,8 @@ struct trace_event_call {
 		char			*name;
 		/* Set TRACE_EVENT_FL_TRACEPOINT flag when using "tp" */
 		struct tracepoint	*tp;
+		/* Set TRACE_EVENT_FL_MAP flag when using "map" instead */
+		struct trace_event_map	*map;
 	};
 	struct trace_event	event;
 	char			*print_fmt;
@@ -282,7 +292,9 @@ struct trace_event_call {
 static inline const char *
 trace_event_name(struct trace_event_call *call)
 {
-	if (call->flags & TRACE_EVENT_FL_TRACEPOINT)
+	if (call->flags & TRACE_EVENT_FL_MAP)
+		return call->map->name;
+	else if (call->flags & TRACE_EVENT_FL_TRACEPOINT)
 		return call->tp ? call->tp->name : NULL;
 	else
 		return call->name;
