@@ -656,7 +656,8 @@ xfrm_init_tempstate(struct xfrm_state *x, const struct flowi *fl,
 		if (!afinfo)
 			return;
 	}
-	afinfo->init_temprop(x, tmpl, daddr, saddr);
+	if (afinfo)
+		afinfo->init_temprop(x, tmpl, daddr, saddr);
 }
 
 static struct xfrm_state *__xfrm_state_lookup(struct net *net, u32 mark,
