@@ -14843,7 +14843,7 @@ intel_check_primary_plane(struct drm_plane *plane,
 	if (!state->base.fb)
 		return 0;
 
-	if (INTEL_GEN(dev_priv) >= 9) {
+	if (INTEL_GEN(dev_priv) >= 9 && state->base.visible) {
 		ret = skl_check_plane_surface(state);
 		if (ret)
 			return ret;
