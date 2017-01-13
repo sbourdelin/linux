@@ -266,6 +266,10 @@ static void do_release_stripe(struct r5conf *conf, struct stripe_head *sh,
 			    < IO_THRESHOLD)
 				md_wakeup_thread(conf->mddev->thread);
 		atomic_dec(&conf->active_stripes);
+		if (test_bit(R5C_PRE_INIT_FLUSH, &conf->cache_state) &&
+		    atomic_read(&conf->active_stripes) == 0)
+			wake_up(&sh->raid_conf->wait_for_quiescent);
+
 		if (!test_bit(STRIPE_EXPANDING, &sh->state)) {
 			if (!r5c_is_writeback(conf->log))
 				list_add_tail(&sh->lru, temp_inactive_list);

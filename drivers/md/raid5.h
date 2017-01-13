@@ -564,6 +564,9 @@ enum r5_cache_state {
 	R5C_EXTRA_PAGE_IN_USE,	/* a stripe is using disk_info.extra_page
 				 * for prexor
 				 */
+	R5C_PRE_INIT_FLUSH,	/* flushing data only stripes recovered from
+				 * the journal
+				 */
 };
 
 struct r5conf {
