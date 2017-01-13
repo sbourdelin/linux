@@ -387,6 +387,18 @@ static inline int audit_socketcall(int nargs, unsigned long *args)
 		return __audit_socketcall(nargs, args);
 	return 0;
 }
+static inline int audit_socketcall_compat(int nargs, u32 *args)
+{
+	if (unlikely(!audit_dummy_context())) {
+		int i;
+		unsigned long a[AUDITSC_ARGS];
+
+		for (i=0; i<nargs; i++)
+			a[i] = (unsigned long)args[i];
+		return __audit_socketcall(nargs, a);
+	}
+	return 0;
+}
 static inline int audit_sockaddr(int len, void *addr)
 {
 	if (unlikely(!audit_dummy_context()))
@@ -510,6 +522,10 @@ static inline void audit_ipc_set_perm(unsigned long qbytes, uid_t uid,
 static inline void audit_bprm(struct linux_binprm *bprm)
 { }
 static inline int audit_socketcall(int nargs, unsigned long *args)
+{
+	return 0;
+}
+static inline int audit_socketcall_compat(int nargs, u32 *args)
 {
 	return 0;
 }
