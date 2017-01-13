@@ -33,7 +33,8 @@ struct s3cmci_host {
 	unsigned long		real_rate;
 	u8			prescaler;
 
-	int			is2440;
+	const struct s3cmci_variant_data *variant;
+
 	unsigned		sdiimsk;
 	unsigned		sdidata;
 
