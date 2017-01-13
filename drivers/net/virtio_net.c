@@ -1864,12 +1864,13 @@ static void virtnet_free_queues(struct virtnet_info *vi)
 	kfree(vi->sq);
 }
 
-static void free_receive_bufs(struct virtnet_info *vi)
+static void free_receive_bufs(struct virtnet_info *vi, bool need_lock)
 {
 	struct bpf_prog *old_prog;
 	int i;
 
-	rtnl_lock();
+	if (need_lock)
+		rtnl_lock();
 	for (i = 0; i < vi->max_queue_pairs; i++) {
 		while (vi->rq[i].pages)
 			__free_pages(get_a_page(&vi->rq[i], GFP_KERNEL), 0);
@@ -1879,7 +1880,8 @@ static void free_receive_bufs(struct virtnet_info *vi)
 		if (old_prog)
 			bpf_prog_put(old_prog);
 	}
-	rtnl_unlock();
+	if (need_lock)
+		rtnl_unlock();
 }
 
 static void free_receive_page_frags(struct virtnet_info *vi)
@@ -2351,14 +2353,14 @@ free:
 	return err;
 }
 
-static void remove_vq_common(struct virtnet_info *vi)
+static void remove_vq_common(struct virtnet_info *vi, bool lock)
 {
 	vi->vdev->config->reset(vi->vdev);
 
 	/* Free unused buffers in both send and recv, if any. */
 	free_unused_bufs(vi);
 
-	free_receive_bufs(vi);
+	free_receive_bufs(vi, lock);
 
 	free_receive_page_frags(vi);
 
@@ -2376,7 +2378,7 @@ static void virtnet_remove(struct virtio_device *vdev)
 
 	unregister_netdev(vi->dev);
 
-	remove_vq_common(vi);
+	remove_vq_common(vi, true);
 
 	free_percpu(vi->stats);
 	free_netdev(vi->dev);
@@ -2401,7 +2403,7 @@ static int virtnet_freeze(struct virtio_device *vdev)
 			napi_disable(&vi->rq[i].napi);
 	}
 
-	remove_vq_common(vi);
+	remove_vq_common(vi, true);
 
 	return 0;
 }
