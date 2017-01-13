@@ -599,16 +599,22 @@ bpf_alu32_trunc:
 				break;
 			case 64:
 				/*
-				 * Way easier and faster(?) to store the value
-				 * into stack and then use ldbrx
+				 * We'll split it up into two words, swap those
+				 * independently and then merge them back.
 				 *
-				 * ctx->seen will be reliable in pass2, but
-				 * the instructions generated will remain the
-				 * same across all passes
+				 * First up, let's swap the most-significant word.
 				 */
-				PPC_STD(dst_reg, 1, bpf_jit_stack_local(ctx));
-				PPC_ADDI(b2p[TMP_REG_1], 1, bpf_jit_stack_local(ctx));
-				PPC_LDBRX(dst_reg, 0, b2p[TMP_REG_1]);
+				PPC_RLDICL(b2p[TMP_REG_1], dst_reg, 32, 32);
+				PPC_RLWINM(b2p[TMP_REG_2], b2p[TMP_REG_1], 8, 0, 31);
+				PPC_RLWIMI(b2p[TMP_REG_2], b2p[TMP_REG_1], 24, 0, 7);
+				PPC_RLWIMI(b2p[TMP_REG_2], b2p[TMP_REG_1], 24, 16, 23);
+				/* Then, the second half */
+				PPC_RLWINM(b2p[TMP_REG_1], dst_reg, 8, 0, 31);
+				PPC_RLWIMI(b2p[TMP_REG_1], dst_reg, 24, 0, 7);
+				PPC_RLWIMI(b2p[TMP_REG_1], dst_reg, 24, 16, 23);
+				/* Merge back */
+				PPC_RLDICR(dst_reg, b2p[TMP_REG_1], 32, 31);
+				PPC_OR(dst_reg, dst_reg, b2p[TMP_REG_2]);
 				break;
 			}
 			break;
