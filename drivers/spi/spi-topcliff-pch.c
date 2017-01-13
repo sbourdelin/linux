@@ -531,12 +531,11 @@ err_return_spinlock:
 static inline void pch_spi_select_chip(struct pch_spi_data *data,
 				       struct spi_device *pspi)
 {
-	if (data->current_chip != NULL) {
+	if (data->current_chip)
 		if (pspi->chip_select != data->n_curnt_chip) {
 			dev_dbg(&pspi->dev, "%s : different slave\n", __func__);
 			data->current_chip = NULL;
 		}
-	}
 
 	data->current_chip = pspi;
 
@@ -583,7 +582,7 @@ static void pch_spi_set_tx(struct pch_spi_data *data, int *bpw)
 
 	/* allocate memory for pkt_tx_buff & pkt_rx_buffer */
 	data->pkt_tx_buff = kzalloc(size, GFP_KERNEL);
-	if (data->pkt_tx_buff != NULL) {
+	if (data->pkt_tx_buff) {
 		data->pkt_rx_buff = kzalloc(size, GFP_KERNEL);
 		if (!data->pkt_rx_buff)
 			kfree(data->pkt_tx_buff);
@@ -605,7 +604,7 @@ static void pch_spi_set_tx(struct pch_spi_data *data, int *bpw)
 	}
 
 	/* copy Tx Data */
-	if (data->cur_trans->tx_buf != NULL) {
+	if (data->cur_trans->tx_buf) {
 		if (*bpw == 8) {
 			tx_buf = data->cur_trans->tx_buf;
 			for (j = 0; j < data->bpw_len; j++)
@@ -965,7 +964,7 @@ static void pch_spi_handle_dma(struct pch_spi_data *data, int *bpw)
 	}
 
 	/* copy Tx Data */
-	if (data->cur_trans->tx_buf != NULL) {
+	if (data->cur_trans->tx_buf) {
 		if (*bpw == 8) {
 			tx_buf = data->cur_trans->tx_buf;
 			tx_dma_buf = dma->tx_buf_virt;
@@ -1176,7 +1175,7 @@ static void pch_spi_process_messages(struct work_struct *pwork)
 		transfer structure from the message otherwise retrieve
 		the 1st transfer request from the message. */
 		spin_lock(&data->lock);
-		if (data->cur_trans == NULL) {
+		if (!data->cur_trans) {
 			data->cur_trans =
 				list_entry(data->current_msg->transfers.next,
 					   struct spi_transfer, transfer_list);
@@ -1247,9 +1246,7 @@ static void pch_spi_process_messages(struct work_struct *pwork)
 		}
 
 		spin_unlock(&data->lock);
-
-	} while (data->cur_trans != NULL);
-
+	} while (data->cur_trans);
 out:
 	pch_spi_writereg(data->master, PCH_SSNXCR, SSN_HIGH);
 	if (data->use_dma)
