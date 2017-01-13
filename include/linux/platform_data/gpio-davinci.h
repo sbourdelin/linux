@@ -45,14 +45,6 @@ struct davinci_gpio_controller {
 	unsigned int		base;
 };
 
-/*
- * basic gpio routines
- */
-#define	GPIO(X)		(X)	/* 0 <= X <= (DAVINCI_N_GPIO - 1) */
-
-/* Convert GPIO signal to GPIO pin number */
-#define GPIO_TO_PIN(bank, gpio)	(16 * (bank) + (gpio))
-
 static inline u32 __gpio_mask(unsigned gpio)
 {
 	return 1 << (gpio % 32);
