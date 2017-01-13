@@ -816,7 +816,7 @@ static int __spi_map_msg(struct spi_master *master, struct spi_message *msg)
 		if (!master->can_dma(master, msg->spi, xfer))
 			continue;
 
-		if (xfer->tx_buf != NULL) {
+		if (xfer->tx_buf) {
 			ret = spi_map_buf(master, tx_dev, &xfer->tx_sg,
 					  (void *)xfer->tx_buf, xfer->len,
 					  DMA_TO_DEVICE);
@@ -824,7 +824,7 @@ static int __spi_map_msg(struct spi_master *master, struct spi_message *msg)
 				return ret;
 		}
 
-		if (xfer->rx_buf != NULL) {
+		if (xfer->rx_buf) {
 			ret = spi_map_buf(master, rx_dev, &xfer->rx_sg,
 					  xfer->rx_buf, xfer->len,
 					  DMA_FROM_DEVICE);
@@ -3145,7 +3145,7 @@ static int of_spi_notify(struct notifier_block *nb, unsigned long action,
 	switch (of_reconfig_get_state_change(action, arg)) {
 	case OF_RECONFIG_CHANGE_ADD:
 		master = of_find_spi_master_by_node(rd->dn->parent);
-		if (master == NULL)
+		if (!master)
 			return NOTIFY_OK;	/* not for us */
 
 		if (of_node_test_and_set_flag(rd->dn, OF_POPULATED)) {
@@ -3171,7 +3171,7 @@ static int of_spi_notify(struct notifier_block *nb, unsigned long action,
 
 		/* find our device by node */
 		spi = of_find_spi_device_by_node(rd->dn);
-		if (spi == NULL)
+		if (!spi)
 			return NOTIFY_OK;	/* no? not meant for us */
 
 		/* unregister takes one ref away */
