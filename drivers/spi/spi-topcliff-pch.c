@@ -584,22 +584,25 @@ static void pch_spi_set_tx(struct pch_spi_data *data, int *bpw)
 	data->pkt_tx_buff = kzalloc(size, GFP_KERNEL);
 	if (data->pkt_tx_buff) {
 		data->pkt_rx_buff = kzalloc(size, GFP_KERNEL);
-		if (!data->pkt_rx_buff)
+		if (!data->pkt_rx_buff) {
 			kfree(data->pkt_tx_buff);
-	}
 
-	if (!data->pkt_rx_buff) {
-		/* flush queue and set status of all transfers to -ENOMEM */
-		list_for_each_entry_safe(pmsg, tmp, data->queue.next, queue) {
-			pmsg->status = -ENOMEM;
+			/*
+			 * Flush queue and set status of all transfers
+			 * to -ENOMEM.
+			 */
+			list_for_each_entry_safe(pmsg, tmp, data->queue.next,
+						 queue) {
+				pmsg->status = -ENOMEM;
 
-			if (pmsg->complete)
-				pmsg->complete(pmsg->context);
+				if (pmsg->complete)
+					pmsg->complete(pmsg->context);
 
-			/* delete from queue */
-			list_del_init(&pmsg->queue);
+				/* delete from queue */
+				list_del_init(&pmsg->queue);
+			}
+			return;
 		}
-		return;
 	}
 
 	/* copy Tx Data */
