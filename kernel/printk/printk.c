@@ -2150,7 +2150,7 @@ void console_unlock(void)
 	static u64 seen_seq;
 	unsigned long flags;
 	bool wake_klogd = false;
-	bool do_cond_resched, retry;
+	bool may_schedule_orig, retry;
 
 	if (console_suspended) {
 		up_console_sem();
@@ -2158,17 +2158,15 @@ void console_unlock(void)
 	}
 
 	/*
-	 * Console drivers are called under logbuf_lock, so
-	 * @console_may_schedule should be cleared before; however, we may
-	 * end up dumping a lot of lines, for example, if called from
-	 * console registration path, and should invoke cond_resched()
-	 * between lines if allowable.  Not doing so can cause a very long
-	 * scheduling stall on a slow console leading to RCU stall and
-	 * softlockup warnings which exacerbate the issue with more
-	 * messages practically incapacitating the system.
+	 * Console drivers are called with interrupts disabled, so
+	 * @console_may_schedule must be cleared before. The original
+	 * value must be restored so that we could schedule between lines.
+	 *
+	 * console_trylock() is not able to detect the preemptive context when
+	 * CONFIG_PREEMPT_COUNT is disabled. Therefore the value must be
+	 * stored before the "again" goto label.
 	 */
-	do_cond_resched = console_may_schedule;
-	console_may_schedule = 0;
+	may_schedule_orig = console_may_schedule;
 
 again:
 	/*
@@ -2235,12 +2233,13 @@ skip:
 		raw_spin_unlock(&logbuf_lock);
 
 		stop_critical_timings();	/* don't trace print latency */
+		console_may_schedule = 0;
 		call_console_drivers(ext_text, ext_len, text, len);
+		console_may_schedule = may_schedule_orig;
 		start_critical_timings();
 		printk_safe_exit_irqrestore(flags);
 
-		if (do_cond_resched)
-			cond_resched();
+		console_conditional_schedule();
 	}
 	console_locked = 0;
 
