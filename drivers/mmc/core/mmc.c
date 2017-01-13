@@ -1062,8 +1062,7 @@ static int mmc_select_hs_ddr(struct mmc_card *card)
 			   EXT_CSD_BUS_WIDTH,
 			   ext_csd_bits,
 			   card->ext_csd.generic_cmd6_time,
-			   MMC_TIMING_MMC_DDR52,
-			   true, true, true);
+			   0, true, true, true);
 	if (err) {
 		pr_err("%s: switch to bus width %d ddr failed\n",
 			mmc_hostname(host), 1 << bus_width);
@@ -1105,6 +1104,9 @@ static int mmc_select_hs_ddr(struct mmc_card *card)
 	/* make sure vccq is 3.3v after switching disaster */
 	if (err)
 		err = __mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_330);
+
+	if (!err)
+		mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
 
 	return err;
 }
