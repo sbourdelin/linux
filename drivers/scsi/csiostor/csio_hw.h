@@ -95,7 +95,6 @@ enum {
 };
 
 struct csio_msix_entries {
-	unsigned short	vector;		/* Assigned MSI-X vector */
 	void		*dev_id;	/* Priv object associated w/ this msix*/
 	char		desc[24];	/* Description of this vector */
 };
@@ -591,8 +590,9 @@ int csio_enqueue_evt(struct csio_hw *, enum csio_evt, void *, uint16_t);
 void csio_evtq_flush(struct csio_hw *hw);
 
 int csio_request_irqs(struct csio_hw *);
+void csio_free_irqs(struct csio_hw *);
 void csio_intr_enable(struct csio_hw *);
-void csio_intr_disable(struct csio_hw *, bool);
+void csio_intr_disable(struct csio_hw *);
 void csio_hw_fatal_err(struct csio_hw *);
 
 struct csio_lnode *csio_lnode_alloc(struct csio_hw *);
