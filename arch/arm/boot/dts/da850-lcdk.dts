@@ -105,6 +105,11 @@
 	status = "okay";
 };
 
+&sata {
+	status = "okay";
+	da850,clk_multiplier = <15>;
+};
+
 &mdio {
 	pinctrl-names = "default";
 	pinctrl-0 = <&mdio_pins>;
