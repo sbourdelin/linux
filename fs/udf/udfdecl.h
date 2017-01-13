@@ -225,11 +225,11 @@ extern void udf_truncate_extents(struct inode *);
 
 /* balloc.c */
 extern void udf_free_blocks(struct super_block *, struct inode *,
-			    struct kernel_lb_addr *, uint32_t, uint32_t);
-extern int udf_prealloc_blocks(struct super_block *, struct inode *, uint16_t,
-			       uint32_t, uint32_t);
-extern int udf_new_block(struct super_block *, struct inode *, uint16_t,
-			 uint32_t, int *);
+			    struct kernel_lb_addr *, sector_t, int);
+extern int udf_prealloc_blocks(struct super_block *, struct inode *, int,
+			       sector_t, int);
+extern sector_t udf_new_block(struct super_block *, struct inode *, int,
+			 sector_t, int *);
 
 /* directory.c */
 extern struct fileIdentDesc *udf_fileident_read(struct inode *, loff_t *,
