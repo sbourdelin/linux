@@ -1220,70 +1220,70 @@ static int __init fujitsu_init(void)
 
 	ret = acpi_bus_register_driver(&acpi_fujitsu_driver);
 	if (ret)
-		goto fail_acpi;
+		goto err_free_fujitsu;
 
 	/* Register platform stuff */
 
 	fujitsu->pf_device = platform_device_alloc("fujitsu-laptop", -1);
 	if (!fujitsu->pf_device) {
 		ret = -ENOMEM;
-		goto fail_platform_driver;
+		goto err_unregister_acpi;
 	}
 
 	ret = platform_device_add(fujitsu->pf_device);
 	if (ret)
-		goto fail_platform_device1;
+		goto err_put_platform_device;
 
 	ret =
 	    sysfs_create_group(&fujitsu->pf_device->dev.kobj,
 			       &fujitsupf_attribute_group);
 	if (ret)
-		goto fail_platform_device2;
+		goto err_del_platform_device;
 
 	/* Register backlight stuff */
 
 	if (acpi_video_get_backlight_type() == acpi_backlight_vendor) {
 		ret = fujitsu_backlight_init();
 		if (ret)
-			goto fail_sysfs_group;
+			goto err_remove_sysfs_group;
 	}
 
 	ret = platform_driver_register(&fujitsupf_driver);
 	if (ret)
-		goto fail_backlight;
+		goto err_unregister_backlight;
 
 	/* Register hotkey driver */
 
 	fujitsu_hotkey = kzalloc(sizeof(struct fujitsu_hotkey_t), GFP_KERNEL);
 	if (!fujitsu_hotkey) {
 		ret = -ENOMEM;
-		goto fail_hotkey;
+		goto err_unregister_platform_driver;
 	}
 
 	ret = acpi_bus_register_driver(&acpi_fujitsu_hotkey_driver);
 	if (ret)
-		goto fail_hotkey1;
+		goto err_free_fujitsu_hotkey;
 
 	pr_info("driver " FUJITSU_DRIVER_VERSION " successfully loaded\n");
 
 	return 0;
 
-fail_hotkey1:
+err_free_fujitsu_hotkey:
 	kfree(fujitsu_hotkey);
-fail_hotkey:
+err_unregister_platform_driver:
 	platform_driver_unregister(&fujitsupf_driver);
-fail_backlight:
+err_unregister_backlight:
 	backlight_device_unregister(fujitsu->bl_device);
-fail_sysfs_group:
+err_remove_sysfs_group:
 	sysfs_remove_group(&fujitsu->pf_device->dev.kobj,
 			   &fujitsupf_attribute_group);
-fail_platform_device2:
+err_del_platform_device:
 	platform_device_del(fujitsu->pf_device);
-fail_platform_device1:
+err_put_platform_device:
 	platform_device_put(fujitsu->pf_device);
-fail_platform_driver:
+err_unregister_acpi:
 	acpi_bus_unregister_driver(&acpi_fujitsu_driver);
-fail_acpi:
+err_free_fujitsu:
 	kfree(fujitsu);
 
 	return ret;
