@@ -108,6 +108,7 @@ typedef enum {
 	/* Use hex, as defined in ADDIP sec. 3.1 */
 	SCTP_CID_ASCONF			= 0xC1,
 	SCTP_CID_ASCONF_ACK		= 0x80,
+	SCTP_CID_RECONF			= 0x82,
 } sctp_cid_t; /* enum */
 
 
@@ -709,5 +710,10 @@ struct sctp_infox {
 	struct sctp_info *sctpinfo;
 	struct sctp_association *asoc;
 };
+
+struct sctp_reconf_chunk {
+	sctp_chunkhdr_t chunk_hdr;
+	__u8 params[0];
+} __packed;
 
 #endif /* __LINUX_SCTP_H__ */
