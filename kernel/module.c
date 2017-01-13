@@ -2940,6 +2940,7 @@ static struct module *setup_load_info(struct load_info *info, int flags)
 	}
 	/* This is temporary: point mod into copy of data. */
 	mod = (void *)info->sechdrs[info->index.mod].sh_addr;
+	mod->name[MODULE_NAME_LEN - 1] = '\0';
 
 	if (info->index.sym == 0) {
 		pr_warn("%s: module has no symbols (stripped?)\n", mod->name);
