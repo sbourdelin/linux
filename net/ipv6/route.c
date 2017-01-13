@@ -2154,6 +2154,7 @@ static int ip6_route_del(struct fib6_config *cfg)
 	if (!table)
 		return err;
 
+again:
 	read_lock_bh(&table->tb6_lock);
 
 	fn = fib6_locate(&table->tb6_root,
@@ -2179,7 +2180,11 @@ static int ip6_route_del(struct fib6_config *cfg)
 			dst_hold(&rt->dst);
 			read_unlock_bh(&table->tb6_lock);
 
-			return __ip6_del_rt(rt, &cfg->fc_nlinfo);
+			err = __ip6_del_rt(rt, &cfg->fc_nlinfo);
+			if (err || !cfg->fc_delete_all_nexthop)
+				return err;
+
+			goto again;
 		}
 	}
 	read_unlock_bh(&table->tb6_lock);
@@ -2848,6 +2853,9 @@ static int rtm_to_fib6_config(struct sk_buff *skb, struct nlmsghdr *nlh,
 
 	if (rtm->rtm_flags & RTM_F_CLONED)
 		cfg->fc_flags |= RTF_CACHE;
+
+	if (rtm->rtm_flags & RTM_F_ALL_NEXTHOPS)
+		cfg->fc_delete_all_nexthop = 1;
 
 	cfg->fc_nlinfo.portid = NETLINK_CB(skb).portid;
 	cfg->fc_nlinfo.nlh = nlh;
