@@ -286,7 +286,7 @@ int __init register_intc_controller(struct intc_desc *desc)
 	if (hw->subgroups)
 		for (i = 0; i < hw->nr_subgroups; i++)
 			if (hw->subgroups[i].reg)
-				k+= save_reg(d, k, hw->subgroups[i].reg, 0);
+				k += save_reg(d, k, hw->subgroups[i].reg, 0);
 
 	memcpy(&d->chip, &intc_irq_chip, sizeof(struct irq_chip));
 	d->chip.name = desc->name;
