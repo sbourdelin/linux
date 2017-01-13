@@ -579,6 +579,7 @@ void tracing_reset_all_online_cpus(void);
 int tracing_open_generic(struct inode *inode, struct file *filp);
 bool tracing_is_disabled(void);
 int tracer_tracing_is_on(struct trace_array *tr);
+bool tracing_is_nop(void);
 struct dentry *trace_create_file(const char *name,
 				 umode_t mode,
 				 struct dentry *parent,
@@ -789,12 +790,14 @@ extern void __trace_graph_return(struct trace_array *tr,
 
 
 #ifdef CONFIG_DYNAMIC_FTRACE
-/* TODO: make this variable */
 #define FTRACE_GRAPH_MAX_FUNCS		32
+extern int ftrace_graph_funcs_size;
 extern int ftrace_graph_count;
-extern unsigned long ftrace_graph_funcs[FTRACE_GRAPH_MAX_FUNCS];
+extern unsigned long __ftrace_graph_funcs[FTRACE_GRAPH_MAX_FUNCS];
+extern unsigned long *ftrace_graph_funcs;
 extern int ftrace_graph_notrace_count;
-extern unsigned long ftrace_graph_notrace_funcs[FTRACE_GRAPH_MAX_FUNCS];
+extern unsigned long __ftrace_graph_notrace_funcs[FTRACE_GRAPH_MAX_FUNCS];
+extern unsigned long *ftrace_graph_notrace_funcs;
 
 static inline int ftrace_graph_addr(unsigned long addr)
 {

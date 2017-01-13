@@ -4542,8 +4542,11 @@ static DEFINE_MUTEX(graph_lock);
 
 int ftrace_graph_count;
 int ftrace_graph_notrace_count;
-unsigned long ftrace_graph_funcs[FTRACE_GRAPH_MAX_FUNCS] __read_mostly;
-unsigned long ftrace_graph_notrace_funcs[FTRACE_GRAPH_MAX_FUNCS] __read_mostly;
+int ftrace_graph_funcs_size = FTRACE_GRAPH_MAX_FUNCS;
+unsigned long __ftrace_graph_funcs[FTRACE_GRAPH_MAX_FUNCS] __read_mostly;
+unsigned long __ftrace_graph_notrace_funcs[FTRACE_GRAPH_MAX_FUNCS] __read_mostly;
+unsigned long *ftrace_graph_funcs = __ftrace_graph_funcs;
+unsigned long *ftrace_graph_notrace_funcs = __ftrace_graph_notrace_funcs;
 
 struct ftrace_graph_data {
 	unsigned long *table;
@@ -4574,6 +4577,12 @@ static void *g_start(struct seq_file *m, loff_t *pos)
 	struct ftrace_graph_data *fgd = m->private;
 
 	mutex_lock(&graph_lock);
+
+	/* it might be changed, reload the pointers */
+	if (fgd->count == &ftrace_graph_count)
+		fgd->table = ftrace_graph_funcs;
+	else
+		fgd->table = ftrace_graph_notrace_funcs;
 
 	/* Nothing, tell g_show to print all functions are enabled */
 	if (!*fgd->count && !*pos)
@@ -4622,13 +4631,11 @@ __ftrace_graph_open(struct inode *inode, struct file *file,
 {
 	int ret = 0;
 
-	mutex_lock(&graph_lock);
 	if ((file->f_mode & FMODE_WRITE) &&
 	    (file->f_flags & O_TRUNC)) {
 		*fgd->count = 0;
 		memset(fgd->table, 0, fgd->size * sizeof(*fgd->table));
 	}
-	mutex_unlock(&graph_lock);
 
 	if (file->f_mode & FMODE_READ) {
 		ret = seq_open(file, fgd->seq_ops);
@@ -4646,6 +4653,7 @@ static int
 ftrace_graph_open(struct inode *inode, struct file *file)
 {
 	struct ftrace_graph_data *fgd;
+	int ret;
 
 	if (unlikely(ftrace_disabled))
 		return -ENODEV;
@@ -4654,18 +4662,26 @@ ftrace_graph_open(struct inode *inode, struct file *file)
 	if (fgd == NULL)
 		return -ENOMEM;
 
+	mutex_lock(&graph_lock);
+
 	fgd->table = ftrace_graph_funcs;
-	fgd->size = FTRACE_GRAPH_MAX_FUNCS;
+	fgd->size = ftrace_graph_funcs_size;
 	fgd->count = &ftrace_graph_count;
 	fgd->seq_ops = &ftrace_graph_seq_ops;
 
-	return __ftrace_graph_open(inode, file, fgd);
+	ret = __ftrace_graph_open(inode, file, fgd);
+	if (ret < 0)
+		kfree(fgd);
+
+	mutex_unlock(&graph_lock);
+	return ret;
 }
 
 static int
 ftrace_graph_notrace_open(struct inode *inode, struct file *file)
 {
 	struct ftrace_graph_data *fgd;
+	int ret;
 
 	if (unlikely(ftrace_disabled))
 		return -ENODEV;
@@ -4674,12 +4690,19 @@ ftrace_graph_notrace_open(struct inode *inode, struct file *file)
 	if (fgd == NULL)
 		return -ENOMEM;
 
+	mutex_lock(&graph_lock);
+
 	fgd->table = ftrace_graph_notrace_funcs;
-	fgd->size = FTRACE_GRAPH_MAX_FUNCS;
+	fgd->size = ftrace_graph_funcs_size;
 	fgd->count = &ftrace_graph_notrace_count;
 	fgd->seq_ops = &ftrace_graph_seq_ops;
 
-	return __ftrace_graph_open(inode, file, fgd);
+	ret = __ftrace_graph_open(inode, file, fgd);
+	if (ret < 0)
+		kfree(fgd);
+
+	mutex_unlock(&graph_lock);
+	return ret;
 }
 
 static int
@@ -4784,6 +4807,13 @@ ftrace_graph_write(struct file *file, const char __user *ubuf,
 
 		mutex_lock(&graph_lock);
 
+		/* it might be changed, reload the pointers */
+		if (fgd->count == &ftrace_graph_count)
+			fgd->table = ftrace_graph_funcs;
+		else
+			fgd->table = ftrace_graph_notrace_funcs;
+		fgd->size = ftrace_graph_funcs_size;
+
 		/* we allow only one expression at a time */
 		ret = ftrace_set_func(fgd->table, fgd->count, fgd->size,
 				      parser.buffer);
@@ -4796,6 +4826,102 @@ ftrace_graph_write(struct file *file, const char __user *ubuf,
 
 	trace_parser_put(&parser);
 
+	return ret;
+}
+
+static ssize_t
+ftrace_graph_funcs_size_read(struct file *filp, char __user *ubuf,
+			     size_t cnt, loff_t *ppos)
+{
+	char buf[64];		/* big enough to hold a number */
+	int r;
+
+	r = sprintf(buf, "%d\n", ftrace_graph_funcs_size);
+	return simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
+}
+
+static ssize_t
+ftrace_graph_funcs_size_write(struct file *file, const char __user *ubuf,
+			      size_t cnt, loff_t *ppos)
+{
+	unsigned long *pfuncs, *old_funcs;
+	unsigned long *pnotrace, *old_notrace;
+	unsigned long val;
+	int ret;
+
+	ret = kstrtoul_from_user(ubuf, cnt, 10, &val);
+	if (ret)
+		return ret;
+
+	if (val == 0 || val > INT_MAX)
+		return -EINVAL;
+
+	mutex_lock(&graph_lock);
+
+	if (val == ftrace_graph_funcs_size)
+		goto out;
+
+	if (val < max(ftrace_graph_count, ftrace_graph_notrace_count)) {
+		ret = -EBUSY;
+		goto out;
+	}
+
+	mutex_lock(&trace_types_lock);
+
+	/* ensure function graph tracer is not running */
+	if (!tracing_is_nop()) {
+		ret = -EBUSY;
+		goto out_unlock;
+	}
+
+	old_funcs = ftrace_graph_funcs;
+	old_notrace = ftrace_graph_notrace_funcs;
+
+	if (val <= FTRACE_GRAPH_MAX_FUNCS) {
+		if (old_funcs == __ftrace_graph_funcs) {
+			ftrace_graph_funcs_size = val;
+			goto out_unlock;
+		}
+
+		pfuncs   = __ftrace_graph_funcs;
+		pnotrace = __ftrace_graph_notrace_funcs;
+	} else {
+		pfuncs = kmalloc_array(val, sizeof(long), GFP_KERNEL);
+		if (!pfuncs) {
+			ret = -ENOMEM;
+			goto out_unlock;
+		}
+
+		pnotrace = kmalloc_array(val, sizeof(long), GFP_KERNEL);
+		if (!pnotrace) {
+			kfree(pfuncs);
+			ret = -ENOMEM;
+			goto out_unlock;
+		}
+	}
+
+	memcpy(pfuncs, old_funcs, ftrace_graph_count * sizeof(long));
+	memcpy(pnotrace, old_notrace, ftrace_graph_notrace_count * sizeof(long));
+
+	ftrace_graph_funcs = pfuncs;
+	ftrace_graph_notrace_funcs = pnotrace;
+	ftrace_graph_funcs_size = val;
+
+	if (old_funcs != __ftrace_graph_funcs)
+		kfree(old_funcs);
+	if (old_notrace != __ftrace_graph_notrace_funcs)
+		kfree(old_notrace);
+
+out_unlock:
+	mutex_unlock(&trace_types_lock);
+
+out:
+	if (ret == 0) {
+		*ppos += cnt;
+		ret = cnt;
+	}
+
+	mutex_unlock(&graph_lock);
 	return ret;
 }
 
@@ -4813,6 +4939,13 @@ static const struct file_operations ftrace_graph_notrace_fops = {
 	.write		= ftrace_graph_write,
 	.llseek		= tracing_lseek,
 	.release	= ftrace_graph_release,
+};
+
+static const struct file_operations ftrace_graph_filter_size_fops = {
+	.open		= tracing_open_generic,
+	.read		= ftrace_graph_funcs_size_read,
+	.write		= ftrace_graph_funcs_size_write,
+	.llseek		= tracing_lseek,
 };
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 
@@ -4864,6 +4997,8 @@ static __init int ftrace_init_dyn_tracefs(struct dentry *d_tracer)
 	trace_create_file("set_graph_notrace", 0444, d_tracer,
 				    NULL,
 				    &ftrace_graph_notrace_fops);
+	trace_create_file("graph_filter_size", 0644, d_tracer,
+			  NULL, &ftrace_graph_filter_size_fops);
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 
 	return 0;

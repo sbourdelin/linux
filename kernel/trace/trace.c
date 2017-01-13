@@ -1106,6 +1106,14 @@ int tracing_is_on(void)
 }
 EXPORT_SYMBOL_GPL(tracing_is_on);
 
+/**
+ * tracing_is_nop - show current tracer is not selected
+ */
+bool tracing_is_nop(void)
+{
+	return global_trace.current_trace == &nop_trace;
+}
+
 static int __init set_buf_size(char *str)
 {
 	unsigned long buf_size;
