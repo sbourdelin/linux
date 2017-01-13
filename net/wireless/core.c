@@ -346,13 +346,17 @@ static void cfg80211_destroy_iface_wk(struct work_struct *work)
 static void cfg80211_sched_scan_stop_wk(struct work_struct *work)
 {
 	struct cfg80211_registered_device *rdev;
+	struct cfg80211_sched_scan_request *pos, *tmp;
 
 	rdev = container_of(work, struct cfg80211_registered_device,
 			   sched_scan_stop_wk);
 
 	rtnl_lock();
 
-	__cfg80211_stop_sched_scan(rdev, false);
+	/* request gets removed from list so need safe iterator */
+	list_for_each_entry_safe(pos, tmp, &rdev->sched_scan_req_list, list) {
+		cfg80211_stop_sched_scan_req(rdev, pos, false);
+	}
 
 	rtnl_unlock();
 }
@@ -436,6 +440,7 @@ use_default_name:
 	spin_lock_init(&rdev->beacon_registrations_lock);
 	spin_lock_init(&rdev->bss_lock);
 	INIT_LIST_HEAD(&rdev->bss_list);
+	INIT_LIST_HEAD(&rdev->sched_scan_req_list);
 	INIT_WORK(&rdev->scan_done_wk, __cfg80211_scan_done);
 	INIT_WORK(&rdev->sched_scan_results_wk, __cfg80211_sched_scan_results);
 	INIT_LIST_HEAD(&rdev->mlme_unreg);
@@ -689,6 +694,10 @@ int wiphy_register(struct wiphy *wiphy)
 	if (WARN_ON(wiphy->bss_select_support &&
 		    (wiphy->bss_select_support & ~(BIT(__NL80211_BSS_SELECT_ATTR_AFTER_LAST) - 2))))
 		return -EINVAL;
+
+	if ((wiphy->flags & WIPHY_FLAG_SUPPORTS_SCHED_SCAN) &&
+	    !wiphy->max_sched_scan_reqs)
+		wiphy->max_sched_scan_reqs = 1;
 
 	if (wiphy->addresses)
 		memcpy(wiphy->perm_addr, wiphy->addresses[0].addr, ETH_ALEN);
@@ -1000,7 +1009,7 @@ void __cfg80211_leave(struct cfg80211_registered_device *rdev,
 		      struct wireless_dev *wdev)
 {
 	struct net_device *dev = wdev->netdev;
-	struct cfg80211_sched_scan_request *sched_scan_req;
+	struct cfg80211_sched_scan_request *pos, *tmp;
 
 	ASSERT_RTNL();
 	ASSERT_WDEV_LOCK(wdev);
@@ -1011,9 +1020,10 @@ void __cfg80211_leave(struct cfg80211_registered_device *rdev,
 		break;
 	case NL80211_IFTYPE_P2P_CLIENT:
 	case NL80211_IFTYPE_STATION:
-		sched_scan_req = rtnl_dereference(rdev->sched_scan_req);
-		if (sched_scan_req && dev == sched_scan_req->dev)
-			__cfg80211_stop_sched_scan(rdev, false);
+		list_for_each_entry_safe(pos, tmp, &rdev->sched_scan_req_list, list) {
+			if (dev == pos->dev)
+				cfg80211_stop_sched_scan_req(rdev, pos, false);
+		}
 
 #ifdef CONFIG_CFG80211_WEXT
 		kfree(wdev->wext.ie);
@@ -1088,7 +1098,7 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
 	struct cfg80211_registered_device *rdev;
-	struct cfg80211_sched_scan_request *sched_scan_req;
+	struct cfg80211_sched_scan_request *pos, *tmp;
 
 	if (!wdev)
 		return NOTIFY_DONE;
@@ -1157,10 +1167,10 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 			___cfg80211_scan_done(rdev, false);
 		}
 
-		sched_scan_req = rtnl_dereference(rdev->sched_scan_req);
-		if (WARN_ON(sched_scan_req &&
-			    sched_scan_req->dev == wdev->netdev)) {
-			__cfg80211_stop_sched_scan(rdev, false);
+		list_for_each_entry_safe(pos, tmp,
+					 &rdev->sched_scan_req_list, list) {
+			if (WARN_ON(pos && pos->dev == wdev->netdev))
+				cfg80211_stop_sched_scan_req(rdev, pos, false);
 		}
 
 		rdev->opencount--;

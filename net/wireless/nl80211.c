@@ -405,6 +405,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_FILS_NONCES] = { .len = 2 * FILS_NONCE_LEN },
 	[NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED] = { .type = NLA_FLAG, },
 	[NL80211_ATTR_BSSID] = { .len = ETH_ALEN },
+	[NL80211_ATTR_SCHED_SCAN_MULTI] = { .type = NLA_FLAG },
 };
 
 /* policy for the key attributes */
@@ -1463,6 +1464,8 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 			       rdev->wiphy.coverage_class) ||
 		    nla_put_u8(msg, NL80211_ATTR_MAX_NUM_SCAN_SSIDS,
 			       rdev->wiphy.max_scan_ssids) ||
+		    nla_put_u8(msg, NL80211_ATTR_SCHED_SCAN_MAX_REQS,
+			       rdev->wiphy.max_sched_scan_reqs) ||
 		    nla_put_u8(msg, NL80211_ATTR_MAX_NUM_SCHED_SCAN_SSIDS,
 			       rdev->wiphy.max_sched_scan_ssids) ||
 		    nla_put_u16(msg, NL80211_ATTR_MAX_SCAN_IE_LEN,
@@ -7176,14 +7179,17 @@ static int nl80211_start_sched_scan(struct sk_buff *skb,
 	struct net_device *dev = info->user_ptr[1];
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
 	struct cfg80211_sched_scan_request *sched_scan_req;
+	bool want_multi;
 	int err;
 
 	if (!(rdev->wiphy.flags & WIPHY_FLAG_SUPPORTS_SCHED_SCAN) ||
 	    !rdev->ops->sched_scan_start)
 		return -EOPNOTSUPP;
 
-	if (rdev->sched_scan_req)
-		return -EINPROGRESS;
+	want_multi = !!info->attrs[NL80211_ATTR_SCHED_SCAN_MULTI];
+	err = cfg80211_sched_scan_req_possible(rdev, want_multi);
+	if (err)
+		return err;
 
 	sched_scan_req = nl80211_parse_sched_scan(&rdev->wiphy, wdev,
 						  info->attrs);
@@ -7191,6 +7197,14 @@ static int nl80211_start_sched_scan(struct sk_buff *skb,
 	err = PTR_ERR_OR_ZERO(sched_scan_req);
 	if (err)
 		goto out_err;
+
+	/* leave request id zero for legacy request
+	 * or if driver does not support multi-scheduled scan
+	 */
+	if (want_multi && rdev->wiphy.max_sched_scan_reqs > 1) {
+		while (!sched_scan_req->reqid)
+			sched_scan_req->reqid = rdev->wiphy.cookie_counter++;
+	}
 
 	err = rdev_sched_scan_start(rdev, dev, sched_scan_req);
 	if (err)
@@ -7202,7 +7216,7 @@ static int nl80211_start_sched_scan(struct sk_buff *skb,
 	if (info->attrs[NL80211_ATTR_SOCKET_OWNER])
 		sched_scan_req->owner_nlportid = info->snd_portid;
 
-	rcu_assign_pointer(rdev->sched_scan_req, sched_scan_req);
+	cfg80211_add_sched_scan_req(rdev, sched_scan_req);
 
 	nl80211_send_sched_scan(rdev, dev,
 				NL80211_CMD_START_SCHED_SCAN);
@@ -7217,13 +7231,28 @@ out_err:
 static int nl80211_stop_sched_scan(struct sk_buff *skb,
 				   struct genl_info *info)
 {
+	struct cfg80211_sched_scan_request *req;
 	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	u64 cookie;
 
 	if (!(rdev->wiphy.flags & WIPHY_FLAG_SUPPORTS_SCHED_SCAN) ||
 	    !rdev->ops->sched_scan_stop)
 		return -EOPNOTSUPP;
 
-	return __cfg80211_stop_sched_scan(rdev, false);
+	if (info->attrs[NL80211_ATTR_COOKIE]) {
+		cookie = nla_get_u64(info->attrs[NL80211_ATTR_COOKIE]);
+		return __cfg80211_stop_sched_scan(rdev, cookie, false);
+	} else {
+		req = list_first_or_null_rcu(&rdev->sched_scan_req_list,
+					     struct cfg80211_sched_scan_request,
+					     list);
+		if (!req || req->reqid ||
+		    (req->owner_nlportid &&
+		     req->owner_nlportid != info->snd_portid))
+			return -ENOENT;
+
+		return cfg80211_stop_sched_scan_req(rdev, req, false);
+	}
 }
 
 static int nl80211_start_radar_detection(struct sk_buff *skb,
