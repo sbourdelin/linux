@@ -409,7 +409,7 @@ mpls:
 					       sizeof(_arp_eth), data,
 					       hlen - sizeof(_arp),
 					       &_arp_eth);
-		if (!arp)
+		if (!arp_eth)
 			goto out_bad;
 
 		if (dissector_uses_key(flow_dissector,
