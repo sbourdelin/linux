@@ -392,13 +392,13 @@ static void print_lockdep_off(const char *bug_msg)
 #endif
 }
 
-static int save_trace(struct stack_trace *trace)
+static unsigned int __save_trace(struct stack_trace *trace, unsigned long *buf,
+				 unsigned long max_nr, int skip)
 {
 	trace->nr_entries = 0;
-	trace->max_entries = MAX_STACK_TRACE_ENTRIES - nr_stack_trace_entries;
-	trace->entries = stack_trace + nr_stack_trace_entries;
-
-	trace->skip = 3;
+	trace->max_entries = max_nr;
+	trace->entries = buf;
+	trace->skip = skip;
 
 	save_stack_trace(trace);
 
@@ -415,7 +415,15 @@ static int save_trace(struct stack_trace *trace)
 
 	trace->max_entries = trace->nr_entries;
 
-	nr_stack_trace_entries += trace->nr_entries;
+	return trace->nr_entries;
+}
+
+static int save_trace(struct stack_trace *trace)
+{
+	unsigned long *buf = stack_trace + nr_stack_trace_entries;
+	unsigned long max_nr = MAX_STACK_TRACE_ENTRIES - nr_stack_trace_entries;
+
+	nr_stack_trace_entries += __save_trace(trace, buf, max_nr, 3);
 
 	if (nr_stack_trace_entries >= MAX_STACK_TRACE_ENTRIES-1) {
 		if (!debug_locks_off_graph_unlock())
