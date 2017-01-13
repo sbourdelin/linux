@@ -229,7 +229,7 @@ static int spi_ppc4xx_setup(struct spi_device *spi)
 		return -EINVAL;
 	}
 
-	if (cs == NULL) {
+	if (!cs) {
 		cs = kzalloc(sizeof *cs, GFP_KERNEL);
 		if (!cs)
 			return -ENOMEM;
@@ -392,7 +392,7 @@ static int spi_ppc4xx_of_probe(struct platform_device *op)
 	const unsigned int *clk;
 
 	master = spi_alloc_master(dev, sizeof *hw);
-	if (master == NULL)
+	if (!master)
 		return -ENOMEM;
 	master->dev.of_node = np;
 	platform_set_drvdata(op, master);
@@ -466,14 +466,14 @@ static int spi_ppc4xx_of_probe(struct platform_device *op)
 
 	/* Get the clock for the OPB */
 	opbnp = of_find_compatible_node(NULL, NULL, "ibm,opb");
-	if (opbnp == NULL) {
+	if (!opbnp) {
 		dev_err(dev, "OPB: cannot find node\n");
 		ret = -ENODEV;
 		goto free_gpios;
 	}
 	/* Get the clock (Hz) for the OPB */
 	clk = of_get_property(opbnp, "clock-frequency", NULL);
-	if (clk == NULL) {
+	if (!clk) {
 		dev_err(dev, "OPB: no clock-frequency property set\n");
 		of_node_put(opbnp);
 		ret = -ENODEV;
