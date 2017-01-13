@@ -3148,8 +3148,8 @@ EXPORT_SYMBOL(blk_start_plug);
 
 static int plug_rq_cmp(void *priv, struct list_head *a, struct list_head *b)
 {
-	struct request *rqa = container_of(a, struct request, queuelist);
-	struct request *rqb = container_of(b, struct request, queuelist);
+	struct request *rqa = list_entry_rq(a);
+	struct request *rqb = list_entry_rq(b);
 
 	return !(rqa->q < rqb->q ||
 		(rqa->q == rqb->q && blk_rq_pos(rqa) < blk_rq_pos(rqb)));

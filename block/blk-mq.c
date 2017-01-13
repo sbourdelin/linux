@@ -553,7 +553,7 @@ static void blk_mq_requeue_work(struct work_struct *work)
 	}
 
 	while (!list_empty(&rq_list)) {
-		rq = list_entry(rq_list.next, struct request, queuelist);
+		rq = list_entry_rq(rq_list.next);
 		list_del_init(&rq->queuelist);
 		blk_mq_insert_request(rq, false, false, false);
 	}
@@ -1192,8 +1192,8 @@ static void blk_mq_insert_requests(struct request_queue *q,
 
 static int plug_ctx_cmp(void *priv, struct list_head *a, struct list_head *b)
 {
-	struct request *rqa = container_of(a, struct request, queuelist);
-	struct request *rqb = container_of(b, struct request, queuelist);
+	struct request *rqa = list_entry_rq(a);
+	struct request *rqb = list_entry_rq(b);
 
 	return !(rqa->mq_ctx < rqb->mq_ctx ||
 		 (rqa->mq_ctx == rqb->mq_ctx &&
