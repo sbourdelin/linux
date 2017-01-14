@@ -4,6 +4,12 @@
 #include <linux/types.h>
 #include <linux/pkt_sched.h>
 
+union u_act_cookie {
+	__u16 ck16[8];
+	__u32 ck32[4];
+	__u64 ck64[2];
+};
+
 /* Action attributes */
 enum {
 	TCA_ACT_UNSPEC,
@@ -12,6 +18,7 @@ enum {
 	TCA_ACT_INDEX,
 	TCA_ACT_STATS,
 	TCA_ACT_PAD,
+	TCA_ACT_COOKIE,
 	__TCA_ACT_MAX
 };
 

@@ -20,6 +20,12 @@ struct tcf_hashinfo {
 
 struct tc_action_ops;
 
+union act_cookie {
+	u16 ck16[8];
+	u32 ck32[4];
+	u64 ck64[2];
+};
+
 struct tc_action {
 	const struct tc_action_ops	*ops;
 	__u32				type; /* for backward compat(TCA_OLD_COMPAT) */
@@ -41,6 +47,7 @@ struct tc_action {
 	struct rcu_head			tcfa_rcu;
 	struct gnet_stats_basic_cpu __percpu *cpu_bstats;
 	struct gnet_stats_queue __percpu *cpu_qstats;
+	union act_cookie	*ck;
 };
 #define tcf_head	common.tcfa_head
 #define tcf_index	common.tcfa_index
