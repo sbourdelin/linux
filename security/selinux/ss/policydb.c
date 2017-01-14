@@ -2015,7 +2015,7 @@ static int genfs_read(struct policydb *p, void *fp)
 		newgenfs = kzalloc(sizeof(*newgenfs), GFP_KERNEL);
 		if (!newgenfs) {
 			rc = -ENOMEM;
-			goto out;
+			goto exit;
 		}
 
 		rc = str_read(&newgenfs->fstype, GFP_KERNEL, fp, len);
@@ -2101,7 +2101,7 @@ out:
 		kfree(newgenfs);
 	}
 	ocontext_destroy(newc, OCON_FSUSE);
-
+exit:
 	return rc;
 }
 
