@@ -2269,11 +2269,8 @@ int policydb_read(struct policydb *p, void *fp)
 
 	rc = -ENOMEM;
 	policydb_str = kmalloc(len + 1, GFP_KERNEL);
-	if (!policydb_str) {
-		printk(KERN_ERR "SELinux:  unable to allocate memory for policydb "
-		       "string of length %d\n", len);
+	if (!policydb_str)
 		goto bad;
-	}
 
 	rc = next_entry(policydb_str, fp, len);
 	if (rc) {
