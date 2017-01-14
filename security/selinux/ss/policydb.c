@@ -2250,27 +2250,28 @@ int policydb_read(struct policydb *p, void *fp)
 	if (rc)
 		goto bad;
 
-	rc = -EINVAL;
 	if (le32_to_cpu(buf[0]) != POLICYDB_MAGIC) {
 		printk(KERN_ERR "SELinux:  policydb magic number 0x%x does "
 		       "not match expected magic number 0x%x\n",
 		       le32_to_cpu(buf[0]), POLICYDB_MAGIC);
+		rc = -EINVAL;
 		goto bad;
 	}
 
-	rc = -EINVAL;
 	len = le32_to_cpu(buf[1]);
 	if (len != strlen(POLICYDB_STRING)) {
 		printk(KERN_ERR "SELinux:  policydb string length %d does not "
 		       "match expected length %Zu\n",
 		       len, strlen(POLICYDB_STRING));
+		rc = -EINVAL;
 		goto bad;
 	}
 
-	rc = -ENOMEM;
 	policydb_str = kmalloc(len + 1, GFP_KERNEL);
-	if (!policydb_str)
+	if (!policydb_str) {
+		rc = -ENOMEM;
 		goto bad;
+	}
 
 	rc = next_entry(policydb_str, fp, len);
 	if (rc) {
@@ -2279,12 +2280,12 @@ int policydb_read(struct policydb *p, void *fp)
 		goto bad;
 	}
 
-	rc = -EINVAL;
 	policydb_str[len] = '\0';
 	if (strcmp(policydb_str, POLICYDB_STRING)) {
 		printk(KERN_ERR "SELinux:  policydb string %s does not match "
 		       "my string %s\n", policydb_str, POLICYDB_STRING);
 		kfree(policydb_str);
+		rc = -EINVAL;
 		goto bad;
 	}
 	/* Done with policydb_str. */
@@ -2296,24 +2297,24 @@ int policydb_read(struct policydb *p, void *fp)
 	if (rc)
 		goto bad;
 
-	rc = -EINVAL;
 	p->policyvers = le32_to_cpu(buf[0]);
 	if (p->policyvers < POLICYDB_VERSION_MIN ||
 	    p->policyvers > POLICYDB_VERSION_MAX) {
 		printk(KERN_ERR "SELinux:  policydb version %d does not match "
 		       "my version range %d-%d\n",
 		       le32_to_cpu(buf[0]), POLICYDB_VERSION_MIN, POLICYDB_VERSION_MAX);
+		rc = -EINVAL;
 		goto bad;
 	}
 
 	if ((le32_to_cpu(buf[1]) & POLICYDB_CONFIG_MLS)) {
 		p->mls_enabled = 1;
 
-		rc = -EINVAL;
 		if (p->policyvers < POLICYDB_VERSION_MLS) {
 			printk(KERN_ERR "SELinux: security policydb version %d "
 				"(MLS) not backwards compatible\n",
 				p->policyvers);
+			rc = -EINVAL;
 			goto bad;
 		}
 	}
@@ -2332,21 +2333,21 @@ int policydb_read(struct policydb *p, void *fp)
 			goto bad;
 	}
 
-	rc = -EINVAL;
 	info = policydb_lookup_compat(p->policyvers);
 	if (!info) {
 		printk(KERN_ERR "SELinux:  unable to find policy compat info "
 		       "for version %d\n", p->policyvers);
+		rc = -EINVAL;
 		goto bad;
 	}
 
-	rc = -EINVAL;
 	if (le32_to_cpu(buf[2]) != info->sym_num ||
 		le32_to_cpu(buf[3]) != info->ocon_num) {
 		printk(KERN_ERR "SELinux:  policydb table sizes (%d,%d) do "
 		       "not match mine (%d,%d)\n", le32_to_cpu(buf[2]),
 			le32_to_cpu(buf[3]),
 		       info->sym_num, info->ocon_num);
+		rc = -EINVAL;
 		goto bad;
 	}
 
@@ -2365,10 +2366,11 @@ int policydb_read(struct policydb *p, void *fp)
 		p->symtab[i].nprim = nprim;
 	}
 
-	rc = -EINVAL;
 	p->process_class = string_to_security_class(p, "process");
-	if (!p->process_class)
+	if (!p->process_class) {
+		rc = -EINVAL;
 		goto bad;
+	}
 
 	rc = avtab_read(&p->te_avtab, fp, p);
 	if (rc)
@@ -2386,10 +2388,12 @@ int policydb_read(struct policydb *p, void *fp)
 	nel = le32_to_cpu(buf[0]);
 	ltr = NULL;
 	for (i = 0; i < nel; i++) {
-		rc = -ENOMEM;
 		tr = kzalloc(sizeof(*tr), GFP_KERNEL);
-		if (!tr)
+		if (!tr) {
+			rc = -ENOMEM;
 			goto bad;
+		}
+
 		if (ltr)
 			ltr->next = tr;
 		else
@@ -2398,7 +2402,6 @@ int policydb_read(struct policydb *p, void *fp)
 		if (rc)
 			goto bad;
 
-		rc = -EINVAL;
 		tr->role = le32_to_cpu(buf[0]);
 		tr->type = le32_to_cpu(buf[1]);
 		tr->new_role = le32_to_cpu(buf[2]);
@@ -2410,12 +2413,14 @@ int policydb_read(struct policydb *p, void *fp)
 		} else
 			tr->tclass = p->process_class;
 
-		rc = -EINVAL;
 		if (!policydb_role_isvalid(p, tr->role) ||
 		    !policydb_type_isvalid(p, tr->type) ||
 		    !policydb_class_isvalid(p, tr->tclass) ||
-		    !policydb_role_isvalid(p, tr->new_role))
+		    !policydb_role_isvalid(p, tr->new_role)) {
+			rc = -EINVAL;
 			goto bad;
+		}
+
 		ltr = tr;
 	}
 
@@ -2425,10 +2430,12 @@ int policydb_read(struct policydb *p, void *fp)
 	nel = le32_to_cpu(buf[0]);
 	lra = NULL;
 	for (i = 0; i < nel; i++) {
-		rc = -ENOMEM;
 		ra = kzalloc(sizeof(*ra), GFP_KERNEL);
-		if (!ra)
+		if (!ra) {
+			rc = -ENOMEM;
 			goto bad;
+		}
+
 		if (lra)
 			lra->next = ra;
 		else
@@ -2437,12 +2444,14 @@ int policydb_read(struct policydb *p, void *fp)
 		if (rc)
 			goto bad;
 
-		rc = -EINVAL;
 		ra->role = le32_to_cpu(buf[0]);
 		ra->new_role = le32_to_cpu(buf[1]);
 		if (!policydb_role_isvalid(p, ra->role) ||
-		    !policydb_role_isvalid(p, ra->new_role))
+		    !policydb_role_isvalid(p, ra->new_role)) {
+			rc = -EINVAL;
 			goto bad;
+		}
+
 		lra = ra;
 	}
 
@@ -2454,11 +2463,12 @@ int policydb_read(struct policydb *p, void *fp)
 	if (rc)
 		goto bad;
 
-	rc = -EINVAL;
 	p->process_trans_perms = string_to_av_perm(p, p->process_class, "transition");
 	p->process_trans_perms |= string_to_av_perm(p, p->process_class, "dyntransition");
-	if (!p->process_trans_perms)
+	if (!p->process_trans_perms) {
+		rc = -EINVAL;
 		goto bad;
+	}
 
 	rc = ocontext_read(p, info, fp);
 	if (rc)
@@ -2472,12 +2482,13 @@ int policydb_read(struct policydb *p, void *fp)
 	if (rc)
 		goto bad;
 
-	rc = -ENOMEM;
 	p->type_attr_map_array = flex_array_alloc(sizeof(struct ebitmap),
 						  p->p_types.nprim,
 						  GFP_KERNEL | __GFP_ZERO);
-	if (!p->type_attr_map_array)
+	if (!p->type_attr_map_array) {
+		rc = -ENOMEM;
 		goto bad;
+	}
 
 	/* preallocate so we don't have to worry about the put ever failing */
 	rc = flex_array_prealloc(p->type_attr_map_array, 0, p->p_types.nprim,
