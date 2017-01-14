@@ -1997,14 +1997,14 @@ static int genfs_read(struct policydb *p, void *fp)
 	int i, j, rc;
 	u32 nel, nel2, len, len2;
 	__le32 buf[1];
-	struct ocontext *l, *c;
-	struct ocontext *newc = NULL;
-	struct genfs *genfs_p, *genfs;
-	struct genfs *newgenfs = NULL;
+	struct ocontext *l, *c, *newc;
+	struct genfs *genfs_p, *genfs, *newgenfs;
 
 	rc = next_entry(buf, fp, sizeof(u32));
 	if (rc)
 		return rc;
+	newc = NULL;
+	newgenfs = NULL;
 	nel = le32_to_cpu(buf[0]);
 
 	for (i = 0; i < nel; i++) {
