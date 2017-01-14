@@ -1932,7 +1932,7 @@ static int filename_trans_read(struct policydb *p, void *fp)
 		ft = kzalloc(sizeof(*ft), GFP_KERNEL);
 		if (!ft) {
 			rc = -ENOMEM;
-			goto out;
+			goto free_name;
 		}
 
 		otype = kmalloc(sizeof(*otype), GFP_KERNEL);
@@ -1986,6 +1986,7 @@ static int filename_trans_read(struct policydb *p, void *fp)
 	return 0;
 out:
 	kfree(ft);
+free_name:
 	kfree(name);
 	kfree(otype);
 
