@@ -2012,11 +2012,11 @@ static int genfs_read(struct policydb *p, void *fp)
 		if (rc)
 			goto out;
 		len = le32_to_cpu(buf[0]);
-
-		rc = -ENOMEM;
 		newgenfs = kzalloc(sizeof(*newgenfs), GFP_KERNEL);
-		if (!newgenfs)
+		if (!newgenfs) {
+			rc = -ENOMEM;
 			goto out;
+		}
 
 		rc = str_read(&newgenfs->fstype, GFP_KERNEL, fp, len);
 		if (rc)
@@ -2024,10 +2024,10 @@ static int genfs_read(struct policydb *p, void *fp)
 
 		for (genfs_p = NULL, genfs = p->genfs; genfs;
 		     genfs_p = genfs, genfs = genfs->next) {
-			rc = -EINVAL;
 			if (strcmp(newgenfs->fstype, genfs->fstype) == 0) {
 				printk(KERN_ERR "SELinux:  dup genfs fstype %s\n",
 				       newgenfs->fstype);
+				rc = -EINVAL;
 				goto out;
 			}
 			if (strcmp(newgenfs->fstype, genfs->fstype) < 0)
@@ -2051,11 +2051,11 @@ static int genfs_read(struct policydb *p, void *fp)
 			if (rc)
 				goto out;
 			len = le32_to_cpu(buf[0]);
-
-			rc = -ENOMEM;
 			newc = kzalloc(sizeof(*newc), GFP_KERNEL);
-			if (!newc)
+			if (!newc) {
+				rc = -ENOMEM;
 				goto out;
+			}
 
 			rc = str_read(&newc->u.name, GFP_KERNEL, fp, len);
 			if (rc)
@@ -2072,12 +2072,12 @@ static int genfs_read(struct policydb *p, void *fp)
 
 			for (l = NULL, c = genfs->head; c;
 			     l = c, c = c->next) {
-				rc = -EINVAL;
 				if (!strcmp(newc->u.name, c->u.name) &&
 				    (!c->v.sclass || !newc->v.sclass ||
 				     newc->v.sclass == c->v.sclass)) {
 					printk(KERN_ERR "SELinux:  dup genfs entry (%s,%s)\n",
 					       genfs->fstype, c->u.name);
+					rc = -EINVAL;
 					goto out;
 				}
 				len = strlen(newc->u.name);
