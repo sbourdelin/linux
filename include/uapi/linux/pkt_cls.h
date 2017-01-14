@@ -4,6 +4,16 @@
 #include <linux/types.h>
 #include <linux/pkt_sched.h>
 
+#define MAX_TC_COOKIE_SZ 16
+
+/* This structure holds cookie structure that is passed from user
+ * to the kernel for actions and classifiers
+ */
+struct tc_cookie {
+	unsigned char ck[MAX_TC_COOKIE_SZ];
+	unsigned char ck_len;
+};
+
 /* Action attributes */
 enum {
 	TCA_ACT_UNSPEC,
@@ -12,6 +22,7 @@ enum {
 	TCA_ACT_INDEX,
 	TCA_ACT_STATS,
 	TCA_ACT_PAD,
+	TCA_ACT_COOKIE,
 	__TCA_ACT_MAX
 };
 
