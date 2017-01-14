@@ -1857,7 +1857,7 @@ static int range_read(struct policydb *p, void *fp)
 		rt = kzalloc(sizeof(*rt), GFP_KERNEL);
 		if (!rt) {
 			rc = -ENOMEM;
-			goto out;
+			goto exit;
 		}
 
 		rc = next_entry(buf, fp, (sizeof(u32) * 2));
@@ -1909,6 +1909,7 @@ static int range_read(struct policydb *p, void *fp)
 out:
 	kfree(rt);
 	kfree(r);
+exit:
 	return rc;
 }
 
