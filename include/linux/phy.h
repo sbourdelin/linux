@@ -622,6 +622,10 @@ struct phy_driver {
 	int (*set_tunable)(struct phy_device *dev,
 			    struct ethtool_tunable *tuna,
 			    const void *data);
+
+	/* Diagnose PHY register configuration issue from user space */
+	ssize_t (*read_regs)(struct phy_device *dev, char *buf, size_t size);
+	int (*write_regs)(struct phy_device *dev, const char *buf, size_t size);
 };
 #define to_phy_driver(d) container_of(to_mdio_common_driver(d),		\
 				      struct phy_driver, mdiodrv)

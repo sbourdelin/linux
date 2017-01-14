@@ -617,10 +617,36 @@ phy_has_fixups_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RO(phy_has_fixups);
 
+static ssize_t
+phy_regs_show(struct device *dev, struct device_attribute *attr,
+		    char *buf)
+{
+	struct phy_device *phydev = to_phy_device(dev);
+
+	if (!phydev->drv || !phydev->drv->read_regs)
+		return 0;
+
+	return phydev->drv->read_regs(phydev, buf, PAGE_SIZE);
+}
+
+static ssize_t
+phy_regs_store(struct device *dev, struct device_attribute *attr,
+		    const char *buf, size_t count)
+{
+	struct phy_device *phydev = to_phy_device(dev);
+
+	if (!phydev->drv || !phydev->drv->write_regs)
+		return 0;
+
+	return phydev->drv->write_regs(phydev, buf, count);
+}
+static DEVICE_ATTR_RW(phy_regs);
+
 static struct attribute *phy_dev_attrs[] = {
 	&dev_attr_phy_id.attr,
 	&dev_attr_phy_interface.attr,
 	&dev_attr_phy_has_fixups.attr,
+	&dev_attr_phy_regs.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(phy_dev);
