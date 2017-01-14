@@ -1840,7 +1840,7 @@ u32 string_to_av_perm(struct policydb *p, u16 tclass, const char *name)
 static int range_read(struct policydb *p, void *fp)
 {
 	struct range_trans *rt;
-	struct mls_range *r = NULL;
+	struct mls_range *r;
 	int i, rc;
 	__le32 buf[2];
 	u32 nel;
@@ -1852,6 +1852,7 @@ static int range_read(struct policydb *p, void *fp)
 	if (rc)
 		return rc;
 
+	r = NULL;
 	nel = le32_to_cpu(buf[0]);
 	for (i = 0; i < nel; i++) {
 		rt = kzalloc(sizeof(*rt), GFP_KERNEL);
