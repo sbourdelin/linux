@@ -1930,16 +1930,17 @@ static int filename_trans_read(struct policydb *p, void *fp)
 		ft = NULL;
 		otype = NULL;
 		name = NULL;
-
-		rc = -ENOMEM;
 		ft = kzalloc(sizeof(*ft), GFP_KERNEL);
-		if (!ft)
+		if (!ft) {
+			rc = -ENOMEM;
 			goto out;
+		}
 
-		rc = -ENOMEM;
 		otype = kmalloc(sizeof(*otype), GFP_KERNEL);
-		if (!otype)
+		if (!otype) {
+			rc = -ENOMEM;
 			goto out;
+		}
 
 		/* length of the path component string */
 		rc = next_entry(buf, fp, sizeof(u32));
