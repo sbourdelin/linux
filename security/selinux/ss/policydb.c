@@ -1854,10 +1854,11 @@ static int range_read(struct policydb *p, void *fp)
 
 	nel = le32_to_cpu(buf[0]);
 	for (i = 0; i < nel; i++) {
-		rc = -ENOMEM;
 		rt = kzalloc(sizeof(*rt), GFP_KERNEL);
-		if (!rt)
+		if (!rt) {
+			rc = -ENOMEM;
 			goto out;
+		}
 
 		rc = next_entry(buf, fp, (sizeof(u32) * 2));
 		if (rc)
@@ -1873,24 +1874,26 @@ static int range_read(struct policydb *p, void *fp)
 		} else
 			rt->target_class = p->process_class;
 
-		rc = -EINVAL;
 		if (!policydb_type_isvalid(p, rt->source_type) ||
 		    !policydb_type_isvalid(p, rt->target_type) ||
-		    !policydb_class_isvalid(p, rt->target_class))
+		    !policydb_class_isvalid(p, rt->target_class)) {
+			rc = -EINVAL;
 			goto out;
+		}
 
-		rc = -ENOMEM;
 		r = kzalloc(sizeof(*r), GFP_KERNEL);
-		if (!r)
+		if (!r) {
+			rc = -ENOMEM;
 			goto out;
+		}
 
 		rc = mls_read_range_helper(r, fp);
 		if (rc)
 			goto out;
 
-		rc = -EINVAL;
 		if (!mls_range_isvalid(p, r)) {
 			printk(KERN_WARNING "SELinux:  rangetrans:  invalid range\n");
+			rc = -EINVAL;
 			goto out;
 		}
 
