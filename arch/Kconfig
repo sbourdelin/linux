@@ -410,6 +410,23 @@ config GCC_PLUGIN_LATENT_ENTROPY
 	   * https://grsecurity.net/
 	   * https://pax.grsecurity.net/
 
+config GCC_PLUGIN_KERNEXEC
+	bool "Provide weak SMEP emulation by instrumenting function calls"
+	depends on GCC_PLUGINS && X86_64
+	help
+	  For x86_64 CPUs that lack Supervisor Mode Execute Prevention (SMEP),
+	  the kernel can be instrumented so that C call sites set the high
+	  bit on the target address. This means that attempts to execute
+	  userspace memory will force the execution to land in the
+	  non-canonical memory region and trigger a fault (instead of letting
+	  an attacker execute userspace memory).
+
+	  For systems with SMEP, select "n"; this option is redundant.
+
+	  This plugin was ported from grsecurity/PaX. More information at:
+	   * https://grsecurity.net/
+	   * https://pax.grsecurity.net/
+
 config HAVE_CC_STACKPROTECTOR
 	bool
 	help

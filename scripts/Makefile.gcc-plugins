@@ -25,9 +25,16 @@ ifdef CONFIG_GCC_PLUGINS
     endif
   endif
 
-  GCC_PLUGINS_CFLAGS := $(strip $(addprefix -fplugin=$(objtree)/scripts/gcc-plugins/, $(gcc-plugin-y)) $(gcc-plugin-cflags-y))
+  gcc-plugin-$(CONFIG_GCC_PLUGIN_KERNEXEC)              += kernexec_plugin.so
+  gcc-plugin-cflags-$(CONFIG_GCC_PLUGIN_KERNEXEC)       += -DKERNEXEC_PLUGIN
+  gcc-plugin-aflags-$(CONFIG_GCC_PLUGIN_KERNEXEC)       += -fplugin=$(objtree)/scripts/gcc-plugins/kernexec_plugin.so
+  gcc-plugin-aflags-$(CONFIG_GCC_PLUGIN_KERNEXEC)       += -DKERNEXEC_PLUGIN
 
-  export PLUGINCC GCC_PLUGINS_CFLAGS GCC_PLUGIN GCC_PLUGIN_SUBDIR
+  GCC_PLUGINS_CFLAGS := $(strip $(addprefix -fplugin=$(objtree)/scripts/gcc-plugins/, $(gcc-plugin-y)) $(gcc-plugin-cflags-y))
+  GCC_PLUGINS_AFLAGS := $(gcc-plugin-aflags-y)
+
+  export PLUGINCC GCC_PLUGIN GCC_PLUGIN_SUBDIR
+  export GCC_PLUGINS_CFLAGS GCC_PLUGINS_AFLAGS
   export SANCOV_PLUGIN DISABLE_LATENT_ENTROPY_PLUGIN
 
   ifneq ($(PLUGINCC),)
@@ -36,6 +43,7 @@ ifdef CONFIG_GCC_PLUGINS
   endif
 
   KBUILD_CFLAGS += $(GCC_PLUGINS_CFLAGS)
+  KBUILD_AFLAGS += $(GCC_PLUGINS_AFLAGS)
   GCC_PLUGIN := $(gcc-plugin-y)
   GCC_PLUGIN_SUBDIR := $(gcc-plugin-subdir-y)
 endif

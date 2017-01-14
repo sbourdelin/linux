@@ -5,6 +5,7 @@
 
 #ifdef CONFIG_X86_64
 /* X86_64 does not define MODULE_PROC_FAMILY */
+#define MODULE_PROC_FAMILY ""
 #elif defined CONFIG_M486
 #define MODULE_PROC_FAMILY "486 "
 #elif defined CONFIG_M586
@@ -57,8 +58,12 @@
 #error unknown processor family
 #endif
 
-#ifdef CONFIG_X86_32
-# define MODULE_ARCH_VERMAGIC MODULE_PROC_FAMILY
+#ifdef CONFIG_GCC_PLUGIN_KERNEXEC
+#define MODULE_GCC_PLUGIN_KERNEXEC "KERNEXEC_BTS "
+#else
+#define MODULE_GCC_PLUGIN_KERNEXEC ""
 #endif
+
+#define MODULE_ARCH_VERMAGIC MODULE_PROC_FAMILY MODULE_GCC_PLUGIN_KERNEXEC
 
 #endif /* _ASM_X86_MODULE_H */
