@@ -1608,10 +1608,11 @@ static int sens_read(struct policydb *p, struct hashtab *h, void *fp)
 	if (rc)
 		goto bad;
 
-	rc = -ENOMEM;
 	levdatum->level = kmalloc(sizeof(*levdatum->level), GFP_ATOMIC);
-	if (!levdatum->level)
+	if (!levdatum->level) {
+		rc = -ENOMEM;
 		goto bad;
+	}
 
 	rc = mls_read_level(levdatum->level, fp);
 	if (rc)
