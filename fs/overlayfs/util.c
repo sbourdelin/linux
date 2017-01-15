@@ -281,3 +281,23 @@ struct dentry *ovl_alloc_tmpfile(struct dentry *parent, umode_t mode)
 
 	return temp;
 }
+
+int ovl_link_tmpfile(struct dentry *temp, struct inode *dir,
+		     struct dentry *dentry)
+{
+	struct inode *inode = temp->d_inode;
+	int err;
+
+	if (WARN_ON_ONCE(!inode || inode->i_nlink))
+		return -ENOENT;
+
+	/* Make tempfile linkable */
+	spin_lock(&inode->i_lock);
+	if (!inode->i_nlink)
+		inode->i_state |= I_LINKABLE;
+	spin_unlock(&inode->i_lock);
+
+	err = ovl_do_link(temp, dir, dentry, true);
+
+	return err;
+}

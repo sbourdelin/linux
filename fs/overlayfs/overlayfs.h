@@ -178,6 +178,8 @@ u64 ovl_dentry_version_get(struct dentry *dentry);
 bool ovl_is_whiteout(struct dentry *dentry);
 struct file *ovl_path_open(struct path *path, int flags);
 struct dentry *ovl_alloc_tmpfile(struct dentry *parent, umode_t mode);
+int ovl_link_tmpfile(struct dentry *temp, struct inode *dir,
+		     struct dentry *dentry);
 
 /* namei.c */
 int ovl_path_next(int idx, struct dentry *dentry, struct path *path);
