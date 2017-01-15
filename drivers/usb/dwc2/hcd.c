@@ -4964,7 +4964,7 @@ static void dwc2_hcd_release(struct dwc2_hsotg *hsotg)
  * USB bus with the core and calls the hc_driver->start() function. It returns
  * a negative error on failure.
  */
-int dwc2_hcd_init(struct dwc2_hsotg *hsotg, int irq)
+int dwc2_hcd_init(struct dwc2_hsotg *hsotg, int irq, struct resource *res)
 {
 	struct usb_hcd *hcd;
 	struct dwc2_host_chan *channel;
@@ -5020,6 +5020,9 @@ int dwc2_hcd_init(struct dwc2_hsotg *hsotg, int irq)
 		hcd->self.uses_dma = 0;
 
 	hcd->has_tt = 1;
+
+	hcd->rsrc_start = res->start;
+	hcd->rsrc_len = resource_size(res);
 
 	((struct wrapper_priv_data *) &hcd->hcd_priv)->hsotg = hsotg;
 	hsotg->priv = hcd;
