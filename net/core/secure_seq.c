@@ -16,15 +16,18 @@
 #include <net/secure_seq.h>
 
 #if IS_ENABLED(CONFIG_IPV6) || IS_ENABLED(CONFIG_INET)
+#include <linux/init.h>
 #include <linux/in6.h>
 #include <net/tcp.h>
 
 static siphash_key_t net_secret __read_mostly;
 
-static __always_inline void net_secret_init(void)
+static int net_secret_init(void)
 {
-	net_get_random_once(&net_secret, sizeof(net_secret));
+	get_random_bytes(&net_secret, sizeof(net_secret));
+	return 0;
 }
+__initcall(net_secret_init);
 #endif
 
 #ifdef CONFIG_INET
@@ -60,7 +63,6 @@ u32 secure_tcpv6_sequence_number(const __be32 *saddr, const __be32 *daddr,
 		.dport = dport
 	};
 	u64 hash;
-	net_secret_init();
 	hash = siphash(&combined, offsetofend(typeof(combined), dport),
 		       &net_secret);
 	*tsoff = sysctl_tcp_timestamps == 1 ? (hash >> 32) : 0;
@@ -80,7 +82,6 @@ u32 secure_ipv6_port_ephemeral(const __be32 *saddr, const __be32 *daddr,
 		.daddr = *(struct in6_addr *)daddr,
 		.dport = dport
 	};
-	net_secret_init();
 	return siphash(&combined, offsetofend(typeof(combined), dport),
 		       &net_secret);
 }
@@ -99,7 +100,6 @@ u32 secure_tcp_sequence_number(__be32 saddr, __be32 daddr,
 			       __be16 sport, __be16 dport, u32 *tsoff)
 {
 	u64 hash;
-	net_secret_init();
 	hash = siphash_3u32((__force u32)saddr, (__force u32)daddr,
 			    (__force u32)sport << 16 | (__force u32)dport,
 			    &net_secret);
@@ -109,7 +109,6 @@ u32 secure_tcp_sequence_number(__be32 saddr, __be32 daddr,
 
 u32 secure_ipv4_port_ephemeral(__be32 saddr, __be32 daddr, __be16 dport)
 {
-	net_secret_init();
 	return siphash_3u32((__force u32)saddr, (__force u32)daddr,
 			    (__force u16)dport, &net_secret);
 }
@@ -121,7 +120,6 @@ u64 secure_dccp_sequence_number(__be32 saddr, __be32 daddr,
 				__be16 sport, __be16 dport)
 {
 	u64 seq;
-	net_secret_init();
 	seq = siphash_3u32((__force u32)saddr, (__force u32)daddr,
 			   (__force u32)sport << 16 | (__force u32)dport,
 			   &net_secret);
@@ -147,7 +145,6 @@ u64 secure_dccpv6_sequence_number(__be32 *saddr, __be32 *daddr,
 		.dport = dport
 	};
 	u64 seq;
-	net_secret_init();
 	seq = siphash(&combined, offsetofend(typeof(combined), dport),
 		      &net_secret);
 	seq += ktime_get_real_ns();
