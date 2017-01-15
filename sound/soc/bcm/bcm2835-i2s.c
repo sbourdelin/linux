@@ -310,15 +310,9 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
 	ch1pos = data_delay;
 	ch2pos = bclk_ratio / 2 + data_delay;
 
-	switch (params_channels(params)) {
-	case 2:
-		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
-		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
-		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
-		break;
-	default:
-		return -EINVAL;
-	}
+	format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
+	format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
+	format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
 
 	/*
 	 * Set format for both streams.
