@@ -25,6 +25,7 @@ PCIe Designware Controller
 
 Optional Property:
  - gpios : Should be added if a gpio line is required to drive PERST# line
+ - to,pcie-is-gen1: Indicates that forced gen1 port operation is needed.
 
 Example:
 axi {

@@ -63,6 +63,13 @@
 #define	LINK_UP						BIT(16)
 #define	DRA7XX_CPU_TO_BUS_ADDR				0x0FFFFFFF
 
+#define         PCIECTRL_EP_DBICS_LNK_CAP                       0x007C
+#define         MAX_LINK_SPEEDS_MASK				GENMASK(3, 0)
+#define         MAX_LINK_SPEEDS_GEN1                            BIT(0)
+
+#define         PCIECTRL_PL_WIDTH_SPEED_CTL                     0x080C
+#define         CFG_DIRECTED_SPEED_CHANGE                       BIT(17)
+
 struct dra7xx_pcie {
 	struct pcie_port	pp;
 	void __iomem		*base;		/* DT ti_conf */
@@ -270,6 +277,7 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx,
 	struct pcie_port *pp = &dra7xx->pp;
 	struct device *dev = pp->dev;
 	struct resource *res;
+	u32 val;
 
 	pp->irq = platform_get_irq(pdev, 1);
 	if (pp->irq < 0) {
@@ -295,6 +303,18 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx,
 	pp->dbi_base = devm_ioremap(dev, res->start, resource_size(res));
 	if (!pp->dbi_base)
 		return -ENOMEM;
+
+	if (pp->is_gen1) {
+		dev_info(dev, "GEN1 forced\n");
+
+		val = readl(pp->dbi_base + PCIECTRL_EP_DBICS_LNK_CAP);
+		set_mask_bits(&val, MAX_LINK_SPEEDS_MASK, MAX_LINK_SPEEDS_GEN1);
+		writel(val, pp->dbi_base + PCIECTRL_EP_DBICS_LNK_CAP);
+
+		val = readl(pp->dbi_base + PCIECTRL_PL_WIDTH_SPEED_CTL);
+		val &= ~CFG_DIRECTED_SPEED_CHANGE;
+		writel(val, pp->dbi_base + PCIECTRL_PL_WIDTH_SPEED_CTL);
+	}
 
 	ret = dw_pcie_host_init(pp);
 	if (ret) {
@@ -403,6 +423,9 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
 		ret = -EPROBE_DEFER;
 		goto err_gpio;
 	}
+
+	if (of_property_read_bool(np, "ti,pcie-is-gen1"))
+		pp->is_gen1 = true;
 
 	reg = dra7xx_pcie_readl(dra7xx, PCIECTRL_DRA7XX_CONF_DEVICE_CMD);
 	reg &= ~LTSSM_EN;
