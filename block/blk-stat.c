@@ -236,10 +236,11 @@ void blk_stat_clear(struct request_queue *q)
 	}
 }
 
-void blk_stat_set_issue_time(struct blk_issue_stat *stat)
+void blk_stat_set_issue(struct blk_issue_stat *stat, sector_t size)
 {
-	stat->time = (stat->time & BLK_STAT_MASK) |
-			(ktime_to_ns(ktime_get()) & BLK_STAT_TIME_MASK);
+	stat->stat = (stat->stat & BLK_STAT_RES_MASK) |
+		(ktime_to_ns(ktime_get()) & BLK_STAT_TIME_MASK) |
+		(((u64)blk_capped_size(size)) << BLK_STAT_SIZE_SHIFT);
 }
 
 /*
