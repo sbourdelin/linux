@@ -2121,10 +2121,11 @@ static int ocontext_read(struct policydb *p, struct policydb_compat_info *info,
 
 		l = NULL;
 		for (j = 0; j < nel; j++) {
-			rc = -ENOMEM;
 			c = kzalloc(sizeof(*c), GFP_KERNEL);
-			if (!c)
+			if (!c) {
+				rc = -ENOMEM;
 				goto out;
+			}
 			if (l)
 				l->next = c;
 			else
@@ -2186,13 +2187,13 @@ static int ocontext_read(struct policydb *p, struct policydb_compat_info *info,
 				if (rc)
 					goto out;
 
-				rc = -EINVAL;
 				c->v.behavior = le32_to_cpu(buf[0]);
 				/* Determined at runtime, not in policy DB. */
-				if (c->v.behavior == SECURITY_FS_USE_MNTPOINT)
+				if (c->v.behavior == SECURITY_FS_USE_MNTPOINT ||
+				    c->v.behavior > SECURITY_FS_USE_MAX) {
+					rc = -EINVAL;
 					goto out;
-				if (c->v.behavior > SECURITY_FS_USE_MAX)
-					goto out;
+				}
 
 				len = le32_to_cpu(buf[1]);
 				rc = str_read(&c->u.name, GFP_KERNEL, fp, len);
