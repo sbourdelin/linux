@@ -996,10 +996,10 @@ static int mls_read_range_helper(struct mls_range *r, void *fp)
 	if (rc)
 		goto out;
 
-	rc = -EINVAL;
 	items = le32_to_cpu(buf[0]);
 	if (items > ARRAY_SIZE(buf)) {
 		printk(KERN_ERR "SELinux: mls:  range overflow\n");
+		rc = -EINVAL;
 		goto out;
 	}
 
