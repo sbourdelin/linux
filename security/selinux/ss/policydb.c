@@ -174,7 +174,7 @@ static struct policydb_compat_info *policydb_lookup_compat(int version)
  */
 static int roles_init(struct policydb *p)
 {
-	char *key = NULL;
+	char *key;
 	int rc;
 	struct role_datum *role;
 
@@ -185,13 +185,13 @@ static int roles_init(struct policydb *p)
 	role->value = ++p->p_roles.nprim;
 	if (role->value != OBJECT_R_VAL) {
 		rc = -EINVAL;
-		goto out;
+		goto free_role;
 	}
 
 	key = kstrdup(OBJECT_R, GFP_KERNEL);
 	if (!key) {
 		rc = -ENOMEM;
-		goto out;
+		goto free_role;
 	}
 
 	rc = hashtab_insert(p->p_roles.table, key, role);
@@ -201,6 +201,7 @@ static int roles_init(struct policydb *p)
 	return 0;
 out:
 	kfree(key);
+free_role:
 	kfree(role);
 	return rc;
 }
