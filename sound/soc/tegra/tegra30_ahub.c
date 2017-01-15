@@ -493,17 +493,17 @@ static const struct regmap_config tegra30_ahub_ahub_regmap_config = {
 	.cache_type = REGCACHE_FLAT,
 };
 
-static struct tegra30_ahub_soc_data soc_data_tegra30 = {
+static const struct tegra30_ahub_soc_data soc_data_tegra30 = {
 	.mod_list_mask = MOD_LIST_MASK_TEGRA30,
 	.set_audio_cif = tegra30_ahub_set_cif,
 };
 
-static struct tegra30_ahub_soc_data soc_data_tegra114 = {
+static const struct tegra30_ahub_soc_data soc_data_tegra114 = {
 	.mod_list_mask = MOD_LIST_MASK_TEGRA114,
 	.set_audio_cif = tegra30_ahub_set_cif,
 };
 
-static struct tegra30_ahub_soc_data soc_data_tegra124 = {
+static const struct tegra30_ahub_soc_data soc_data_tegra124 = {
 	.mod_list_mask = MOD_LIST_MASK_TEGRA124,
 	.set_audio_cif = tegra124_ahub_set_cif,
 };
