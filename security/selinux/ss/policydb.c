@@ -182,15 +182,17 @@ static int roles_init(struct policydb *p)
 	if (!role)
 		return -ENOMEM;
 
-	rc = -EINVAL;
 	role->value = ++p->p_roles.nprim;
-	if (role->value != OBJECT_R_VAL)
+	if (role->value != OBJECT_R_VAL) {
+		rc = -EINVAL;
 		goto out;
+	}
 
-	rc = -ENOMEM;
 	key = kstrdup(OBJECT_R, GFP_KERNEL);
-	if (!key)
+	if (!key) {
+		rc = -ENOMEM;
 		goto out;
+	}
 
 	rc = hashtab_insert(p->p_roles.table, key, role);
 	if (rc)
