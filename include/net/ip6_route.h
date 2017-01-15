@@ -154,6 +154,7 @@ struct rt6_rtnl_dump_arg {
 	struct sk_buff *skb;
 	struct netlink_callback *cb;
 	struct net *net;
+	unsigned int rtm_flags;
 };
 
 int rt6_dump_route(struct rt6_info *rt, void *p_arg);

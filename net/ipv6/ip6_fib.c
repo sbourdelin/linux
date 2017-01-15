@@ -308,16 +308,27 @@ static void __net_init fib6_tables_init(struct net *net)
 
 static int fib6_dump_node(struct fib6_walker *w)
 {
+	struct rt6_rtnl_dump_arg *arg = (struct rt6_rtnl_dump_arg *)w->args;
 	int res;
 	struct rt6_info *rt;
 
 	for (rt = w->leaf; rt; rt = rt->dst.rt6_next) {
-		res = rt6_dump_route(rt, w->args);
+		res = rt6_dump_route(rt, arg);
 		if (res < 0) {
 			/* Frame is full, suspend walking */
 			w->leaf = rt;
 			return 1;
 		}
+
+		/* if multipath routes are dumped in one route with
+		 * the RTA_MULTIPATH attribute, then jump rt to point
+		 * to the last sibling of this route (no need to dump
+		 * the sibling routes again)
+		 */
+		if ((arg->rtm_flags & RTM_F_ALL_NEXTHOPS) && rt->rt6i_nsiblings)
+			rt = list_last_entry(&rt->rt6i_siblings,
+					     struct rt6_info,
+					     rt6i_siblings);
 	}
 	w->leaf = NULL;
 	return 0;
@@ -392,13 +403,16 @@ static int fib6_dump_table(struct fib6_table *table, struct sk_buff *skb,
 static int inet6_dump_fib(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	struct net *net = sock_net(skb->sk);
+	struct nlattr *nlattr[RTA_MAX + 1];
 	unsigned int h, s_h;
 	unsigned int e = 0, s_e;
 	struct rt6_rtnl_dump_arg arg;
 	struct fib6_walker *w;
 	struct fib6_table *tb;
 	struct hlist_head *head;
+	unsigned int flags = 0;
 	int res = 0;
+	int hdrlen;
 
 	s_h = cb->args[0];
 	s_e = cb->args[1];
@@ -422,9 +436,22 @@ static int inet6_dump_fib(struct sk_buff *skb, struct netlink_callback *cb)
 		cb->args[2] = (long)w;
 	}
 
+	hdrlen = nlmsg_len(cb->nlh) < sizeof(struct ifinfomsg) ?
+		 sizeof(struct rtgenmsg) : sizeof(struct ifinfomsg);
+
+	if (nlmsg_parse(cb->nlh, hdrlen, nlattr, RTA_MAX, NULL) >= 0) {
+		/* existence of RTA_MULTIPATH attribute in dump
+		 * request means user wants multipath routes
+		 * returned using RTA_MULTIPATH attribute
+		 */
+		if (nlattr[RTA_MULTIPATH])
+			flags |= RTM_F_ALL_NEXTHOPS;
+	}
+
 	arg.skb = skb;
 	arg.cb = cb;
 	arg.net = net;
+	arg.rtm_flags = flags;
 	w->args = &arg;
 
 	rcu_read_lock();
