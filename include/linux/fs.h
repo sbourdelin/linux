@@ -1611,6 +1611,7 @@ extern int vfs_rmdir(struct inode *, struct dentry *);
 extern int vfs_unlink(struct inode *, struct dentry *, struct inode **);
 extern int vfs_rename(struct inode *, struct dentry *, struct inode *, struct dentry *, struct inode **, unsigned int);
 extern int vfs_whiteout(struct inode *, struct dentry *);
+extern int vfs_tmpfile(struct inode *, struct dentry *, umode_t);
 
 /*
  * VFS file helper functions.

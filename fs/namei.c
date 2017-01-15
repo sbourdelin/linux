@@ -3393,6 +3393,20 @@ out:
 	return error;
 }
 
+int vfs_tmpfile(struct inode *dir, struct dentry *dentry, umode_t mode)
+{
+	int error;
+
+	/* we want directory to be writable */
+	error = inode_permission(dir, MAY_WRITE | MAY_EXEC);
+	if (error)
+		return error;
+	if (!dir->i_op->tmpfile)
+		return -EOPNOTSUPP;
+	return dir->i_op->tmpfile(dir, dentry, mode);
+}
+EXPORT_SYMBOL(vfs_tmpfile);
+
 static int do_tmpfile(struct nameidata *nd, unsigned flags,
 		const struct open_flags *op,
 		struct file *file, int *opened)
@@ -3408,14 +3422,6 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
 	if (unlikely(error))
 		goto out;
 	dir = path.dentry->d_inode;
-	/* we want directory to be writable */
-	error = inode_permission(dir, MAY_WRITE | MAY_EXEC);
-	if (error)
-		goto out2;
-	if (!dir->i_op->tmpfile) {
-		error = -EOPNOTSUPP;
-		goto out2;
-	}
 	child = d_alloc(path.dentry, &name);
 	if (unlikely(!child)) {
 		error = -ENOMEM;
@@ -3423,8 +3429,8 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
 	}
 	dput(path.dentry);
 	path.dentry = child;
-	error = dir->i_op->tmpfile(dir, child, op->mode);
-	if (error)
+	error = vfs_tmpfile(dir, child, op->mode);
+	if (unlikely(error))
 		goto out2;
 	audit_inode(nd->name, child, 0);
 	/* Don't check for other permissions, the inode was just created */
