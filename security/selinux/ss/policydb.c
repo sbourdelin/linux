@@ -1345,10 +1345,10 @@ static int class_read(struct policydb *p, struct hashtab *h, void *fp)
 		if (rc)
 			goto bad;
 
-		rc = -EINVAL;
 		cladatum->comdatum = hashtab_search(p->p_commons.table, cladatum->comkey);
 		if (!cladatum->comdatum) {
 			printk(KERN_ERR "SELinux:  unknown common %s\n", cladatum->comkey);
+			rc = -EINVAL;
 			goto bad;
 		}
 	}
