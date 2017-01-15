@@ -620,8 +620,8 @@ static int common_destroy(void *key, void *datum, void *p)
 		comdatum = datum;
 		hashtab_map(comdatum->permissions.table, perm_destroy, NULL);
 		hashtab_destroy(comdatum->permissions.table);
+		kfree(datum);
 	}
-	kfree(datum);
 	return 0;
 }
 
@@ -675,8 +675,8 @@ static int cls_destroy(void *key, void *datum, void *p)
 			kfree(ctemp);
 		}
 		kfree(cladatum->comkey);
+		kfree(datum);
 	}
-	kfree(datum);
 	return 0;
 }
 
@@ -689,8 +689,8 @@ static int role_destroy(void *key, void *datum, void *p)
 		role = datum;
 		ebitmap_destroy(&role->dominates);
 		ebitmap_destroy(&role->types);
+		kfree(datum);
 	}
-	kfree(datum);
 	return 0;
 }
 
@@ -712,8 +712,8 @@ static int user_destroy(void *key, void *datum, void *p)
 		ebitmap_destroy(&usrdatum->range.level[0].cat);
 		ebitmap_destroy(&usrdatum->range.level[1].cat);
 		ebitmap_destroy(&usrdatum->dfltlevel.cat);
+		kfree(datum);
 	}
-	kfree(datum);
 	return 0;
 }
 
@@ -726,8 +726,8 @@ static int sens_destroy(void *key, void *datum, void *p)
 		levdatum = datum;
 		ebitmap_destroy(&levdatum->level->cat);
 		kfree(levdatum->level);
+		kfree(datum);
 	}
-	kfree(datum);
 	return 0;
 }
 
