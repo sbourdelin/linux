@@ -35,10 +35,8 @@ int sidtab_insert(struct sidtab *s, u32 sid, struct context *context)
 	int hvalue, rc = 0;
 	struct sidtab_node *prev, *cur, *newnode;
 
-	if (!s) {
-		rc = -ENOMEM;
-		goto out;
-	}
+	if (!s)
+		goto failure_indication;
 
 	hvalue = SIDTAB_HASH(sid);
 	prev = NULL;
@@ -54,15 +52,12 @@ int sidtab_insert(struct sidtab *s, u32 sid, struct context *context)
 	}
 
 	newnode = kmalloc(sizeof(*newnode), GFP_ATOMIC);
-	if (!newnode) {
-		rc = -ENOMEM;
-		goto out;
-	}
+	if (!newnode)
+		goto failure_indication;
 	newnode->sid = sid;
 	if (context_cpy(&newnode->context, context)) {
 		kfree(newnode);
-		rc = -ENOMEM;
-		goto out;
+		goto failure_indication;
 	}
 
 	if (prev) {
@@ -80,6 +75,9 @@ int sidtab_insert(struct sidtab *s, u32 sid, struct context *context)
 		s->next_sid = sid + 1;
 out:
 	return rc;
+failure_indication:
+	rc = -ENOMEM;
+	goto out;
 }
 
 static struct context *sidtab_search_core(struct sidtab *s, u32 sid, int force)
