@@ -2143,6 +2143,26 @@ int ip6_del_rt(struct rt6_info *rt)
 	return __ip6_del_rt(rt, &info);
 }
 
+/* called with table lock held */
+static int __ip6_route_del(struct rt6_info *rt, struct fib6_config *cfg)
+{
+	int err;
+
+	if (rt->rt6i_nsiblings && cfg->fc_delete_all_nexthop) {
+		struct rt6_info *sibling, *next_sibling;
+
+		list_for_each_entry_safe(sibling, next_sibling,
+					 &rt->rt6i_siblings,
+					 rt6i_siblings) {
+			err = fib6_del(sibling, &cfg->fc_nlinfo);
+			if (err)
+				return err;
+		}
+	}
+
+	return fib6_del(rt, &cfg->fc_nlinfo);
+}
+
 static int ip6_route_del(struct fib6_config *cfg)
 {
 	struct fib6_table *table;
@@ -2176,10 +2196,9 @@ static int ip6_route_del(struct fib6_config *cfg)
 				continue;
 			if (cfg->fc_protocol && cfg->fc_protocol != rt->rt6i_protocol)
 				continue;
-			dst_hold(&rt->dst);
-			read_unlock_bh(&table->tb6_lock);
 
-			return __ip6_del_rt(rt, &cfg->fc_nlinfo);
+			err = __ip6_route_del(rt, cfg);
+			break;
 		}
 	}
 	read_unlock_bh(&table->tb6_lock);
@@ -2848,6 +2867,9 @@ static int rtm_to_fib6_config(struct sk_buff *skb, struct nlmsghdr *nlh,
 
 	if (rtm->rtm_flags & RTM_F_CLONED)
 		cfg->fc_flags |= RTF_CACHE;
+
+	if (rtm->rtm_flags & RTM_F_ALL_NEXTHOPS)
+		cfg->fc_delete_all_nexthop = 1;
 
 	cfg->fc_nlinfo.portid = NETLINK_CB(skb).portid;
 	cfg->fc_nlinfo.nlh = nlh;
