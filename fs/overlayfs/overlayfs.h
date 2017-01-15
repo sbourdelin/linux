@@ -127,6 +127,14 @@ static inline int ovl_do_whiteout(struct inode *dir, struct dentry *dentry)
 	return err;
 }
 
+static inline int ovl_do_tmpfile(struct inode *dir, struct dentry *dentry,
+				 umode_t mode)
+{
+	int err = vfs_tmpfile(dir, dentry, mode);
+	pr_debug("tmpfile(%pd2, 0%o) = %i\n", dentry, mode, err);
+	return err;
+}
+
 static inline struct inode *ovl_inode_real(struct inode *inode, bool *is_upper)
 {
 	unsigned long x = (unsigned long) READ_ONCE(inode->i_private);
@@ -169,6 +177,7 @@ void ovl_dentry_version_inc(struct dentry *dentry);
 u64 ovl_dentry_version_get(struct dentry *dentry);
 bool ovl_is_whiteout(struct dentry *dentry);
 struct file *ovl_path_open(struct path *path, int flags);
+struct dentry *ovl_alloc_tmpfile(struct dentry *parent, umode_t mode);
 
 /* namei.c */
 int ovl_path_next(int idx, struct dentry *dentry, struct path *path);

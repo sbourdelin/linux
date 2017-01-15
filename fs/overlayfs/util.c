@@ -263,3 +263,21 @@ struct file *ovl_path_open(struct path *path, int flags)
 {
 	return dentry_open(path, flags | O_NOATIME, current_cred());
 }
+
+struct dentry *ovl_alloc_tmpfile(struct dentry *parent, umode_t mode)
+{
+	static const struct qstr name = QSTR_INIT("/", 1);
+	struct dentry *temp;
+	struct inode *dir = parent->d_inode;
+	int err;
+
+	temp = d_alloc(parent, &name);
+	if (unlikely(!temp))
+		return ERR_PTR(-ENOMEM);
+
+	err = ovl_do_tmpfile(dir, temp, mode);
+	if (unlikely(err))
+		return ERR_PTR(err);
+
+	return temp;
+}
