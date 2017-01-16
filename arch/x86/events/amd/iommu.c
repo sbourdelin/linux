@@ -284,6 +284,7 @@ static void perf_iommu_disable_event(struct perf_event *event)
 
 static void perf_iommu_start(struct perf_event *event, int flags)
 {
+	u64 val;
 	struct hw_perf_event *hwc = &event->hw;
 
 	if (WARN_ON_ONCE(!(hwc->state & PERF_HES_STOPPED)))
@@ -292,15 +293,16 @@ static void perf_iommu_start(struct perf_event *event, int flags)
 	WARN_ON_ONCE(!(hwc->state & PERF_HES_UPTODATE));
 	hwc->state = 0;
 
-	if (flags & PERF_EF_RELOAD) {
-		u64 prev_raw_count =  local64_read(&hwc->prev_count);
-		amd_iommu_pc_set_reg(0, _GET_BANK(event), _GET_CNTR(event),
-				     IOMMU_PC_COUNTER_REG, &prev_raw_count);
-	}
+	if (!(flags & PERF_EF_RELOAD))
+		return;
+
+	val = local64_read(&hwc->prev_count) & GENMASK_ULL(48, 0);
+	if (amd_iommu_pc_set_reg(0, _GET_BANK(event), _GET_CNTR(event),
+				   IOMMU_PC_COUNTER_REG, &val))
+		return;
 
 	perf_iommu_enable_event(event);
 	perf_event_update_userpage(event);
-
 }
 
 static void perf_iommu_read(struct perf_event *event)
@@ -309,8 +311,9 @@ static void perf_iommu_read(struct perf_event *event)
 	s64 delta;
 	struct hw_perf_event *hwc = &event->hw;
 
-	amd_iommu_pc_get_reg(0, _GET_BANK(event), _GET_CNTR(event),
-			     IOMMU_PC_COUNTER_REG, &count);
+	if (amd_iommu_pc_get_reg(0, _GET_BANK(event), _GET_CNTR(event),
+				 IOMMU_PC_COUNTER_REG, &count))
+		return;
 
 	/* IOMMU pc counter register is only 48 bits */
 	count &= GENMASK_ULL(48, 0);
