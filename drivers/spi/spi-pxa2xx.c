@@ -751,6 +751,7 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
 	struct driver_data *drv_data = dev_id;
 	u32 sccr1_reg;
 	u32 mask = drv_data->mask_sr;
+	irqreturn_t ret = IRQ_NONE;
 	u32 status;
 
 	/*
@@ -774,24 +775,29 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
 
 	sccr1_reg = pxa2xx_spi_read(drv_data, SSCR1);
 
-	/* Ignore possible writes if we don't need to write */
-	if (!(sccr1_reg & SSCR1_TIE))
-		mask &= ~SSSR_TFS;
-
 	/* Ignore RX timeout interrupt if it is disabled */
 	if (!(sccr1_reg & SSCR1_TINTE))
 		mask &= ~SSSR_TINT;
 
-	if (!(status & mask))
-		return IRQ_NONE;
+	while (1) {
+		/* Ignore possible writes if we don't need to write */
+		if (!(sccr1_reg & SSCR1_TIE))
+			mask &= ~SSSR_TFS;
 
-	if (!drv_data->master->cur_msg) {
-		handle_bad_msg(drv_data);
-		/* Never fail */
-		return IRQ_HANDLED;
+		if (!(status & mask))
+			return ret;
+
+		if (!drv_data->master->cur_msg) {
+			handle_bad_msg(drv_data);
+			/* Never fail */
+			return IRQ_HANDLED;
+		}
+
+		ret |= drv_data->transfer_handler(drv_data);
+
+		status = pxa2xx_spi_read(drv_data, SSSR);
+		sccr1_reg = pxa2xx_spi_read(drv_data, SSCR1);
 	}
-
-	return drv_data->transfer_handler(drv_data);
 }
 
 /*
