@@ -1155,6 +1155,11 @@ svc_process_common(struct svc_rqst *rqstp, struct kvec *argv, struct kvec *resv)
 	case SVC_DENIED:
 		goto err_bad_auth;
 	case SVC_CLOSE:
+		/*
+		 * Makesure authorise svc if progp->pg_authenticate fail,
+		 * it's harmless if svc_authenticate fail.
+		 */
+		svc_authorise(rqstp);
 		goto close;
 	case SVC_DROP:
 		goto dropit;
