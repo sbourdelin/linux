@@ -214,6 +214,7 @@ static inline void do_raw_spin_unlock(raw_spinlock_t *lock) __releases(lock)
 #else
 #define raw_spin_lock_irqsave_nested(lock, flags, subclass)		\
 	do {								\
+		(void)subclass;						\
 		typecheck(unsigned long, flags);			\
 		flags = _raw_spin_lock_irqsave(lock);			\
 	} while (0)
