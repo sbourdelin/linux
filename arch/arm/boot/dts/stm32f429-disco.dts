@@ -88,6 +88,16 @@
 			gpios = <&gpioa 0 0>;
 		};
 	};
+
+	/* This turns on vbus for otg for host mode (dwc2) */
+	vcc5v_otg: vcc5v-otg-regulator {
+		compatible = "regulator-fixed";
+		gpio = <&gpioc 4 0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&usbotg_pwren_h>;
+		regulator-name = "vcc5_host1";
+		regulator-always-on;
+	};
 };
 
 &clk_hse {
@@ -98,4 +108,24 @@
 	pinctrl-0 = <&usart1_pins_a>;
 	pinctrl-names = "default";
 	status = "okay";
+};
+
+&usbotg_hs {
+	compatible = "st,stm32-fsotg", "snps,dwc2";
+	dr_mode = "host";
+	pinctrl-0 = <&usbotg_fs_pins_b>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&pinctrl {
+	usb-host {
+		usbotg_pwren_h: usbotg-pwren-h {
+			pins {
+				pinmux = <STM32F429_PC4_FUNC_GPIO>;
+				bias-disable;
+				drive-push-pull;
+			};
+		};
+	};
 };
