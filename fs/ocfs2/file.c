@@ -1138,6 +1138,9 @@ int ocfs2_setattr(struct dentry *dentry, struct iattr *attr)
 	handle_t *handle = NULL;
 	struct dquot *transfer_to[MAXQUOTAS] = { };
 	int qtype;
+	int arg_flags = 0, had_lock;
+	struct ocfs2_lock_holder oh;
+	struct ocfs2_lock_res *lockres;
 
 	trace_ocfs2_setattr(inode, dentry,
 			    (unsigned long long)OCFS2_I(inode)->ip_blkno,
@@ -1173,13 +1176,41 @@ int ocfs2_setattr(struct dentry *dentry, struct iattr *attr)
 		}
 	}
 
-	status = ocfs2_inode_lock(inode, &bh, 1);
+	lockres = &OCFS2_I(inode)->ip_inode_lockres;
+	had_lock = ocfs2_is_locked_by_me(lockres);
+	if (had_lock) {
+		arg_flags = OCFS2_META_LOCK_GETBH;
+
+		/*
+		 * As far as we know, ocfs2_setattr() could only be the first
+		 * VFS entry point in the call chain of recursive cluster
+		 * locking issue.
+		 *
+		 * For instance:
+		 * chmod_common()
+		 *  notify_change()
+		 *   ocfs2_setattr()
+		 *    posix_acl_chmod()
+		 *     ocfs2_iop_get_acl()
+		 *
+		 * But, we're not 100% sure if it's always true, because the
+		 * ordering of the VFS entry points in the call chain is out
+		 * of our control. So, we'd better dump the stack here to
+		 * catch the other cases of recursive locking.
+		 */
+		mlog(ML_ERROR, "Another case of recursive locking:\n");
+		dump_stack();
+	}
+	status = ocfs2_inode_lock_full(inode, &bh, 1, arg_flags);
 	if (status < 0) {
 		if (status != -ENOENT)
 			mlog_errno(status);
 		goto bail_unlock_rw;
 	}
-	inode_locked = 1;
+	if (!had_lock) {
+		ocfs2_add_holder(lockres, &oh);
+		inode_locked = 1;
+	}
 
 	if (size_change) {
 		status = inode_newsize_ok(inode, attr->ia_size);
@@ -1260,7 +1291,8 @@ int ocfs2_setattr(struct dentry *dentry, struct iattr *attr)
 bail_commit:
 	ocfs2_commit_trans(osb, handle);
 bail_unlock:
-	if (status) {
+	if (status && inode_locked) {
+		ocfs2_remove_holder(lockres, &oh);
 		ocfs2_inode_unlock(inode, 1);
 		inode_locked = 0;
 	}
@@ -1278,8 +1310,10 @@ bail:
 		if (status < 0)
 			mlog_errno(status);
 	}
-	if (inode_locked)
+	if (inode_locked) {
+		ocfs2_remove_holder(lockres, &oh);
 		ocfs2_inode_unlock(inode, 1);
+	}
 
 	brelse(bh);
 	return status;
@@ -1321,20 +1355,42 @@ bail:
 int ocfs2_permission(struct inode *inode, int mask)
 {
 	int ret;
+	int has_locked;
+	struct ocfs2_lock_holder oh;
+	struct ocfs2_lock_res *lockres;
 
 	if (mask & MAY_NOT_BLOCK)
 		return -ECHILD;
 
-	ret = ocfs2_inode_lock(inode, NULL, 0);
-	if (ret) {
-		if (ret != -ENOENT)
-			mlog_errno(ret);
-		goto out;
+	lockres = &OCFS2_I(inode)->ip_inode_lockres;
+	has_locked = ocfs2_is_locked_by_me(lockres);
+	if (!has_locked) {
+		ret = ocfs2_inode_lock(inode, NULL, 0);
+		if (ret) {
+			if (ret != -ENOENT)
+				mlog_errno(ret);
+			goto out;
+		}
+		ocfs2_add_holder(lockres, &oh);
+	} else {
+		/* See comments in ocfs2_setattr() for details.
+		 * The call chain of this case could be:
+		 * do_sys_open()
+		 *  may_open()
+		 *   inode_permission()
+		 *    ocfs2_permission()
+		 *     ocfs2_iop_get_acl()
+		 */
+		mlog(ML_ERROR, "Another case of recursive locking:\n");
+		dump_stack();
 	}
 
 	ret = generic_permission(inode, mask);
 
-	ocfs2_inode_unlock(inode, 0);
+	if (!has_locked) {
+		ocfs2_remove_holder(lockres, &oh);
+		ocfs2_inode_unlock(inode, 0);
+	}
 out:
 	return ret;
 }
