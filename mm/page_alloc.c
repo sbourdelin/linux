@@ -5070,7 +5070,7 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 	 * memory
 	 */
 	if (altmap && start_pfn == altmap->base_pfn)
-		start_pfn += altmap->reserve;
+		start_pfn += vmem_altmap_offset(altmap);
 
 	for (pfn = start_pfn; pfn < end_pfn; pfn++) {
 		/*
