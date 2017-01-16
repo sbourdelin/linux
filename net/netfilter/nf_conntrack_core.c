@@ -88,8 +88,8 @@ static __read_mostly bool nf_conntrack_locks_all;
 #define GC_MAX_BUCKETS_DIV	64u
 /* upper bound of scan intervals */
 #define GC_INTERVAL_MAX		(2 * HZ)
-/* maximum conntracks to evict per gc run */
-#define GC_MAX_EVICTS		256u
+/* desired ratio of entries found to be expired */
+#define GC_EVICT_RATIO	50u
 
 static struct conntrack_gc_work conntrack_gc_work;
 
@@ -979,8 +979,7 @@ static void gc_worker(struct work_struct *work)
 		 */
 		rcu_read_unlock();
 		cond_resched_rcu_qs();
-	} while (++buckets < goal &&
-		 expired_count < GC_MAX_EVICTS);
+	} while (++buckets < goal);
 
 	if (gc_work->exiting)
 		return;
@@ -997,26 +996,19 @@ static void gc_worker(struct work_struct *work)
 	 * 1. Minimize time until we notice a stale entry
 	 * 2. Maximize scan intervals to not waste cycles
 	 *
-	 * Normally, expired_count will be 0, this increases the next_run time
-	 * to priorize 2) above.
+	 * Normally, expire ratio will be close to 0.
 	 *
-	 * As soon as a timed-out entry is found, move towards 1) and increase
-	 * the scan frequency.
-	 * In case we have lots of evictions next scan is done immediately.
+	 * As soon as a sizeable fraction of the entries have expired
+	 * increase scan frequency.
 	 */
-	ratio = scanned ? expired_count * 100 / scanned : 0;
-	if (ratio >= 90 || expired_count == GC_MAX_EVICTS) {
-		gc_work->next_gc_run = 0;
-		next_run = 0;
-	} else if (expired_count) {
-		gc_work->next_gc_run /= 2U;
-		next_run = msecs_to_jiffies(1);
-	} else {
-		if (gc_work->next_gc_run < GC_INTERVAL_MAX)
-			gc_work->next_gc_run += msecs_to_jiffies(1);
+	if (gc_work->next_gc_run < GC_INTERVAL_MAX)
+		gc_work->next_gc_run += msecs_to_jiffies(10);
 
-		next_run = gc_work->next_gc_run;
-	}
+	ratio = scanned ? expired_count * 100 / scanned : 0;
+	if (ratio > GC_EVICT_RATIO)
+		gc_work->next_gc_run /= 2U;
+
+	next_run = gc_work->next_gc_run;
 
 	gc_work->last_bucket = i;
 	queue_delayed_work(system_long_wq, &gc_work->dwork, next_run);
