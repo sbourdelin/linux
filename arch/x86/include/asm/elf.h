@@ -349,6 +349,11 @@ static inline int mmap_is_ia32(void)
 		test_thread_flag(TIF_ADDR32));
 }
 
+#ifdef CONFIG_COMPAT
+extern unsigned long arch_compat_rnd(void);
+#endif
+extern unsigned long arch_native_rnd(void);
+
 /* Do not change the values. See get_align_mask() */
 enum align_flags {
 	ALIGN_VA_32	= BIT(0),

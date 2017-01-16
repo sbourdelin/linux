@@ -65,20 +65,27 @@ static int mmap_is_legacy(void)
 	return sysctl_legacy_va_layout;
 }
 
+#ifdef CONFIG_COMPAT
+unsigned long arch_compat_rnd(void)
+{
+	return (get_random_long() & ((1UL << mmap_rnd_compat_bits) - 1))
+		<< PAGE_SHIFT;
+}
+#endif
+
+unsigned long arch_native_rnd(void)
+{
+	return (get_random_long() & ((1UL << mmap_rnd_bits) - 1)) << PAGE_SHIFT;
+}
+
 unsigned long arch_mmap_rnd(void)
 {
-	unsigned long rnd;
-
-	if (mmap_is_ia32())
 #ifdef CONFIG_COMPAT
-		rnd = get_random_long() & ((1UL << mmap_rnd_compat_bits) - 1);
-#else
-		rnd = get_random_long() & ((1UL << mmap_rnd_bits) - 1);
+	if (mmap_is_ia32())
+		return arch_compat_rnd();
 #endif
-	else
-		rnd = get_random_long() & ((1UL << mmap_rnd_bits) - 1);
 
-	return rnd << PAGE_SHIFT;
+	return arch_native_rnd();
 }
 
 static unsigned long mmap_base(unsigned long rnd)
