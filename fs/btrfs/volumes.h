@@ -149,6 +149,10 @@ struct btrfs_device {
 	/* Counter to record the change of device stats */
 	atomic_t dev_stats_ccnt;
 	atomic_t dev_stat_values[BTRFS_DEV_STAT_VALUES_MAX];
+
+	/* To ensure we wait this target device before destroying it */
+	atomic_t tgtdev_refs;
+	wait_queue_head_t tgtdev_wait;
 };
 
 /*
@@ -538,4 +542,10 @@ struct list_head *btrfs_get_fs_uuids(void);
 void btrfs_set_fs_info_ptr(struct btrfs_fs_info *fs_info);
 void btrfs_reset_fs_info_ptr(struct btrfs_fs_info *fs_info);
 
+static inline void wait_target_device(struct btrfs_device *tgtdev)
+{
+	if (!tgtdev || !tgtdev->is_tgtdev_for_dev_replace)
+		return;
+	wait_event(tgtdev->tgtdev_wait, atomic_read(&tgtdev->tgtdev_refs) == 0);
+}
 #endif
