@@ -34,6 +34,7 @@
 #include <asm/ftrace.h>
 #include <asm/ptrace.h>
 #include <asm/export.h>
+#include <asm/stackprotector.h>
 
 /*
  * MSR_KERNEL is > 0x10000 on 4xx/Book-E since it include MSR_CE.
@@ -149,6 +150,9 @@ transfer_to_handler:
 	mfspr	r12,SPRN_SPRG_THREAD
 	addi	r2,r12,-THREAD
 	tovirt(r2,r2)			/* set r2 to current */
+#if defined(CONFIG_CC_STACKPROTECTOR)
+	addi	r2,r2,TSK_STACK_CANARY+SSP_OFFSET
+#endif
 	beq	2f			/* if from user, fix up THREAD.regs */
 	addi	r11,r1,STACK_FRAME_OVERHEAD
 	stw	r11,PT_REGS(r12)
@@ -385,6 +389,9 @@ syscall_exit_cont:
 	lwz	r3,GPR3(r1)
 1:
 #endif /* CONFIG_TRACE_IRQFLAGS */
+#if defined(CONFIG_CC_STACKPROTECTOR)
+	subi	r2,r2,TSK_STACK_CANARY+SSP_OFFSET
+#endif
 #if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
 	/* If the process has its own DBCR0 value, load it up.  The internal
 	   debug mode bit tells us that dbcr0 should be loaded. */
@@ -617,6 +624,9 @@ _GLOBAL(_switch)
 	stwu	r1,-INT_FRAME_SIZE(r1)
 	mflr	r0
 	stw	r0,INT_FRAME_SIZE+4(r1)
+#if defined(CONFIG_CC_STACKPROTECTOR)
+	subi	r2,r2,TSK_STACK_CANARY+SSP_OFFSET
+#endif
 	/* r3-r12 are caller saved -- Cort */
 	SAVE_NVGPRS(r1)
 	stw	r0,_NIP(r1)	/* Return to switch caller */
@@ -674,10 +684,8 @@ BEGIN_FTR_SECTION
 	mtspr	SPRN_SPEFSCR,r0		/* restore SPEFSCR reg */
 END_FTR_SECTION_IFSET(CPU_FTR_SPE)
 #endif /* CONFIG_SPE */
-#if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
-	lwz	r0,TSK_STACK_CANARY(r2)
-	lis	r4,__stack_chk_guard@ha
-	stw	r0,__stack_chk_guard@l(r4)
+#if defined(CONFIG_CC_STACKPROTECTOR)
+	addi	r2,r2,TSK_STACK_CANARY+SSP_OFFSET
 #endif
 	lwz	r0,_CCR(r1)
 	mtcrf	0xFF,r0
@@ -779,6 +787,9 @@ user_exc_return:		/* r10 contains MSR_KERNEL here */
 	bne	do_work
 
 restore_user:
+#if defined(CONFIG_CC_STACKPROTECTOR)
+	subi	r2,r2,TSK_STACK_CANARY+SSP_OFFSET
+#endif
 #if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
 	/* Check whether this process has its own DBCR0 value.  The internal
 	   debug mode bit tells us that dbcr0 should be loaded. */

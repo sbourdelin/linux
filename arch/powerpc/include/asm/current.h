@@ -27,14 +27,24 @@ static inline struct task_struct *get_current(void)
 }
 #define current	get_current()
 
-#else
+#else /* __powerpc64__ */
+#if defined(CONFIG_CC_STACKPROTECTOR)
+#include <linux/thread_info.h>
 
+static inline struct task_struct *get_current(void)
+{
+	return current_thread_info()->task;
+}
+#define current	get_current()
+#else
 /*
  * We keep `current' in r2 for speed.
  */
 register struct task_struct *current asm ("r2");
 
 #endif
+
+#endif /* __powerpc64__ */
 
 #endif /* __KERNEL__ */
 #endif /* _ASM_POWERPC_CURRENT_H */

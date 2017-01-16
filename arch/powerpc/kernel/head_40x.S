@@ -42,6 +42,7 @@
 #include <asm/asm-offsets.h>
 #include <asm/ptrace.h>
 #include <asm/export.h>
+#include <asm/stackprotector.h>
 
 /* As with the other PowerPC ports, it is expected that when code
  * execution begins here, the following registers contain valid, yet
@@ -835,6 +836,9 @@ start_here:
 	tophys(r4,r2)
 	addi	r4,r4,THREAD	/* init task's THREAD */
 	mtspr	SPRN_SPRG_THREAD,r4
+#if defined(CONFIG_CC_STACKPROTECTOR)
+	addi	r2,r2,TSK_STACK_CANARY+SSP_OFFSET
+#endif
 
 	/* stack */
 	lis	r1,init_thread_union@ha

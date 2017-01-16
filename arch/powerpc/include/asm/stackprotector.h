@@ -12,11 +12,17 @@
 #ifndef _ASM_STACKPROTECTOR_H
 #define _ASM_STACKPROTECTOR_H
 
+#ifdef CONFIG_PPC64
+#define SSP_OFFSET	0x7010
+#else
+#define SSP_OFFSET	0x7008
+#endif
+
+#ifndef __ASSEMBLY__
+
 #include <linux/random.h>
 #include <linux/version.h>
 #include <asm/reg.h>
-
-extern unsigned long __stack_chk_guard;
 
 /*
  * Initialize the stackprotector canary value.
@@ -34,7 +40,6 @@ static __always_inline void boot_init_stack_canary(void)
 	canary ^= LINUX_VERSION_CODE;
 
 	current->stack_canary = canary;
-	__stack_chk_guard = current->stack_canary;
 }
-
+#endif /* __ASSEMBLY__ */
 #endif	/* _ASM_STACKPROTECTOR_H */

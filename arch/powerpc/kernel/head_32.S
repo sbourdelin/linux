@@ -35,6 +35,7 @@
 #include <asm/bug.h>
 #include <asm/kvm_book3s_asm.h>
 #include <asm/export.h>
+#include <asm/stackprotector.h>
 
 /* 601 only have IBAT; cr0.eq is set on 601 when using this macro */
 #define LOAD_BAT(n, reg, RA, RB)	\
@@ -864,6 +865,9 @@ __secondary_start:
 	tophys(r4,r2)
 	addi	r4,r4,THREAD	/* phys address of our thread_struct */
 	mtspr	SPRN_SPRG_THREAD,r4
+#if defined(CONFIG_CC_STACKPROTECTOR)
+	addi	r2,r2,TSK_STACK_CANARY+SSP_OFFSET
+#endif
 	li	r3,0
 	mtspr	SPRN_SPRG_RTAS,r3	/* 0 => not in RTAS */
 
@@ -950,6 +954,9 @@ start_here:
 	tophys(r4,r2)
 	addi	r4,r4,THREAD	/* init task's THREAD */
 	mtspr	SPRN_SPRG_THREAD,r4
+#if defined(CONFIG_CC_STACKPROTECTOR)
+	addi	r2,r2,TSK_STACK_CANARY+SSP_OFFSET
+#endif
 	li	r3,0
 	mtspr	SPRN_SPRG_RTAS,r3	/* 0 => not in RTAS */
 

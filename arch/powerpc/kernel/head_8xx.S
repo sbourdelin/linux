@@ -32,6 +32,7 @@
 #include <asm/ptrace.h>
 #include <asm/fixmap.h>
 #include <asm/export.h>
+#include <asm/stackprotector.h>
 
 /* Macro to make the code more readable. */
 #ifdef CONFIG_8xx_CPU6
@@ -820,6 +821,9 @@ start_here:
 	tophys(r4,r2)
 	addi	r4,r4,THREAD	/* init task's THREAD */
 	mtspr	SPRN_SPRG_THREAD,r4
+#if defined(CONFIG_CC_STACKPROTECTOR)
+	addi	r2,r2,TSK_STACK_CANARY+SSP_OFFSET
+#endif
 
 	/* stack */
 	lis	r1,init_thread_union@ha
