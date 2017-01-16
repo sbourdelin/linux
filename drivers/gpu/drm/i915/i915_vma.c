@@ -69,15 +69,13 @@ i915_vma_retire(struct i915_gem_active *active,
 }
 
 static struct i915_vma *
-__i915_vma_create(struct drm_i915_gem_object *obj,
-		  struct i915_address_space *vm,
-		  const struct i915_ggtt_view *view)
+i915_vma_create(struct drm_i915_gem_object *obj,
+		struct i915_address_space *vm,
+		const struct i915_ggtt_view *view)
 {
 	struct i915_vma *vma;
 	struct rb_node *rb, **p;
 	int i;
-
-	GEM_BUG_ON(vm->closed);
 
 	vma = kmem_cache_zalloc(to_i915(obj->base.dev)->vmas, GFP_KERNEL);
 	if (vma == NULL)
@@ -184,31 +182,6 @@ i915_vma_lookup(struct drm_i915_gem_object *obj,
 	}
 
 	return NULL;
-}
-
-/**
- * i915_vma_create - creates a VMA
- * @obj - parent  &drm_i915_gem_object to be mapped
- * @vm - address space in which the mapping is located
- * @view - additional mapping requirements
- *
- * i915_vma_create() allocates a new VMA of the @obj in the @vm with
- * @view characteristics.
- *
- * Must be called with struct_mutex held.
- *
- * Returns the vma if found, or an error pointer.
- */
-struct i915_vma *
-i915_vma_create(struct drm_i915_gem_object *obj,
-		struct i915_address_space *vm,
-		const struct i915_ggtt_view *view)
-{
-	lockdep_assert_held(&obj->base.dev->struct_mutex);
-	GEM_BUG_ON(view && !i915_is_ggtt(vm));
-	GEM_BUG_ON(i915_vma_lookup(obj, vm, view));
-
-	return __i915_vma_create(obj, vm, view);
 }
 
 /**
