@@ -138,10 +138,9 @@ void unregister_virtio_device(struct virtio_device *dev);
 void virtio_break_device(struct virtio_device *dev);
 
 void virtio_config_changed(struct virtio_device *dev);
-#ifdef CONFIG_PM_SLEEP
 int virtio_device_freeze(struct virtio_device *dev);
 int virtio_device_restore(struct virtio_device *dev);
-#endif
+int virtio_device_reset(struct virtio_device *dev);
 
 /**
  * virtio_driver - operations for a virtio I/O driver
@@ -167,10 +166,8 @@ struct virtio_driver {
 	void (*scan)(struct virtio_device *dev);
 	void (*remove)(struct virtio_device *dev);
 	void (*config_changed)(struct virtio_device *dev);
-#ifdef CONFIG_PM
 	int (*freeze)(struct virtio_device *dev);
 	int (*restore)(struct virtio_device *dev);
-#endif
 };
 
 static inline struct virtio_driver *drv_to_virtio(struct device_driver *drv)

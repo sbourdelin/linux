@@ -339,7 +339,6 @@ void unregister_virtio_device(struct virtio_device *dev)
 }
 EXPORT_SYMBOL_GPL(unregister_virtio_device);
 
-#ifdef CONFIG_PM_SLEEP
 int virtio_device_freeze(struct virtio_device *dev)
 {
 	struct virtio_driver *drv = drv_to_virtio(dev->dev.driver);
@@ -400,7 +399,18 @@ err:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(virtio_device_restore);
-#endif
+
+int virtio_device_reset(struct virtio_device *dev)
+{
+	int err;
+
+	err = virtio_device_freeze(dev);
+	if (err)
+		return err;
+
+	return virtio_device_restore(dev);
+}
+EXPORT_SYMBOL_GPL(virtio_device_reset);
 
 static int virtio_init(void)
 {

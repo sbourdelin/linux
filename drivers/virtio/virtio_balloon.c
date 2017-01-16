@@ -620,7 +620,6 @@ static void virtballoon_remove(struct virtio_device *vdev)
 	kfree(vb);
 }
 
-#ifdef CONFIG_PM_SLEEP
 static int virtballoon_freeze(struct virtio_device *vdev)
 {
 	struct virtio_balloon *vb = vdev->priv;
@@ -649,7 +648,6 @@ static int virtballoon_restore(struct virtio_device *vdev)
 	update_balloon_size(vb);
 	return 0;
 }
-#endif
 
 static unsigned int features[] = {
 	VIRTIO_BALLOON_F_MUST_TELL_HOST,
@@ -666,10 +664,8 @@ static struct virtio_driver virtio_balloon_driver = {
 	.probe =	virtballoon_probe,
 	.remove =	virtballoon_remove,
 	.config_changed = virtballoon_changed,
-#ifdef CONFIG_PM_SLEEP
 	.freeze	=	virtballoon_freeze,
 	.restore =	virtballoon_restore,
-#endif
 };
 
 module_virtio_driver(virtio_balloon_driver);
