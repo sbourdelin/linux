@@ -1020,7 +1020,7 @@ static int _request_firmware_load(struct firmware_priv *fw_priv,
 	}
 
 	retval = fw_state_wait_timeout(&buf->fw_st, timeout);
-	if (retval < 0) {
+	if (retval == -ETIMEDOUT || retval == -ERESTARTSYS) {
 		mutex_lock(&fw_lock);
 		fw_load_abort(fw_priv);
 		mutex_unlock(&fw_lock);
