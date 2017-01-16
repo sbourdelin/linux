@@ -2622,7 +2622,8 @@ err_out_mem:
 	free_cpumask_var(mce_device_initialized);
 
 err_out:
-	pr_err("Unable to init device /dev/mcelog (rc: %d)\n", err);
+	if (mce_available(&boot_cpu_data))
+		pr_err("Unable to init device /dev/mcelog (rc: %d)\n", err);
 
 	return err;
 }
