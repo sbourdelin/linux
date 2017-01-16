@@ -35,12 +35,14 @@ struct va_alignment __read_mostly va_align = {
 	.flags = -1,
 };
 
-static unsigned long stack_maxrandom_size(void)
+static unsigned long stack_maxrandom_size(unsigned long task_size)
 {
 	unsigned long max = 0;
 	if ((current->flags & PF_RANDOMIZE) &&
 		!(current->personality & ADDR_NO_RANDOMIZE)) {
-		max = ((-1UL) & STACK_RND_MASK) << PAGE_SHIFT;
+		max = (-1UL);
+		max &= STACK_RND_MASK_MODE(task_size == TASK_SIZE_MAX);
+		max <<= PAGE_SHIFT;
 	}
 
 	return max;
@@ -51,8 +53,8 @@ static unsigned long stack_maxrandom_size(void)
  *
  * Leave an at least ~128 MB hole with possible stack randomization.
  */
-#define MIN_GAP (128*1024*1024UL + stack_maxrandom_size())
-#define MAX_GAP (TASK_SIZE/6*5)
+#define MIN_GAP(task_size) (128*1024*1024UL + stack_maxrandom_size(task_size))
+#define MAX_GAP(task_size) (task_size/6*5)
 
 static int mmap_is_legacy(void)
 {
@@ -88,16 +90,21 @@ unsigned long arch_mmap_rnd(void)
 	return arch_native_rnd();
 }
 
-static unsigned long mmap_base(unsigned long rnd)
+unsigned long mmap_base(unsigned long rnd, unsigned long task_size)
 {
 	unsigned long gap = rlimit(RLIMIT_STACK);
 
-	if (gap < MIN_GAP)
-		gap = MIN_GAP;
-	else if (gap > MAX_GAP)
-		gap = MAX_GAP;
+	if (gap < MIN_GAP(task_size))
+		gap = MIN_GAP(task_size);
+	else if (gap > MAX_GAP(task_size))
+		gap = MAX_GAP(task_size);
 
-	return PAGE_ALIGN(TASK_SIZE - gap - rnd);
+	return PAGE_ALIGN(task_size - gap - rnd);
+}
+
+unsigned long mmap_legacy_base(unsigned long rnd, unsigned long task_size)
+{
+	return TASK_UNMAPPED_BASE(task_size) + rnd;
 }
 
 /*
@@ -111,13 +118,13 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
 	if (current->flags & PF_RANDOMIZE)
 		random_factor = arch_mmap_rnd();
 
-	mm->mmap_legacy_base = TASK_UNMAPPED_BASE + random_factor;
+	mm->mmap_legacy_base = mmap_legacy_base(random_factor, TASK_SIZE);
 
 	if (mmap_is_legacy()) {
 		mm->mmap_base = mm->mmap_legacy_base;
 		mm->get_unmapped_area = arch_get_unmapped_area;
 	} else {
-		mm->mmap_base = mmap_base(random_factor);
+		mm->mmap_base = mmap_base(random_factor, TASK_SIZE);
 		mm->get_unmapped_area = arch_get_unmapped_area_topdown;
 	}
 }

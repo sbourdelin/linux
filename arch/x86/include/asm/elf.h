@@ -286,6 +286,7 @@ do {									\
 
 #ifdef CONFIG_X86_32
 
+#define STACK_RND_MASK_MODE(native) (0x7ff)
 #define STACK_RND_MASK (0x7ff)
 
 #define ARCH_DLINFO		ARCH_DLINFO_IA32
@@ -295,7 +296,8 @@ do {									\
 #else /* CONFIG_X86_32 */
 
 /* 1GB for 64bit, 8MB for 32bit */
-#define STACK_RND_MASK (test_thread_flag(TIF_ADDR32) ? 0x7ff : 0x3fffff)
+#define STACK_RND_MASK_MODE(native) ((native) ? 0x3fffff : 0x7ff)
+#define STACK_RND_MASK STACK_RND_MASK_MODE(!test_thread_flag(TIF_ADDR32))
 
 #define ARCH_DLINFO							\
 do {									\
@@ -320,7 +322,7 @@ if (test_thread_flag(TIF_X32))						\
 else									\
 	ARCH_DLINFO_IA32
 
-#define COMPAT_ELF_ET_DYN_BASE	(TASK_UNMAPPED_BASE + 0x1000000)
+#define COMPAT_ELF_ET_DYN_BASE	(TASK_UNMAPPED_BASE(TASK_SIZE) + 0x1000000)
 
 #endif /* !CONFIG_X86_32 */
 
@@ -353,6 +355,9 @@ static inline int mmap_is_ia32(void)
 extern unsigned long arch_compat_rnd(void);
 #endif
 extern unsigned long arch_native_rnd(void);
+extern unsigned long mmap_base(unsigned long rnd, unsigned long task_size);
+extern unsigned long mmap_legacy_base(unsigned long rnd,
+					unsigned long task_size);
 
 /* Do not change the values. See get_align_mask() */
 enum align_flags {

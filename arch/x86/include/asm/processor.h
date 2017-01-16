@@ -797,7 +797,7 @@ extern void start_thread(struct pt_regs *regs, unsigned long new_ip,
  * This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 3))
+#define TASK_UNMAPPED_BASE(task_size)	(PAGE_ALIGN(task_size / 3))
 
 #define KSTK_EIP(task)		(task_pt_regs(task)->ip)
 
