@@ -176,7 +176,7 @@ const void *of_device_get_match_data(const struct device *dev)
 }
 EXPORT_SYMBOL(of_device_get_match_data);
 
-ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
+static ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
 {
 	const char *compat;
 	int cplen, i;
@@ -224,6 +224,20 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
 	}
 
 	return repend;
+}
+
+/**
+ * of_device_modalias - Fill buffer with newline terminated modalias string
+ */
+ssize_t of_device_modalias(struct device *dev, char *str, ssize_t len)
+{
+	ssize_t sl = of_device_get_modalias(dev, str, len - 2);
+	if (sl < 0)
+		return sl;
+
+	str[sl++] = '\n';
+	str[sl] = 0;
+	return sl;
 }
 
 /**
