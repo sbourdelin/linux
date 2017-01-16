@@ -99,6 +99,7 @@ struct qed_dcbx_info {
 	struct dcbx_mib remote;
 #ifdef CONFIG_DCB
 	struct qed_dcbx_set set;
+	struct qed_dcbx_get get;
 #endif
 	u8 dcbx_cap;
 };
