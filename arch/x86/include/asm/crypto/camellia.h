@@ -10,6 +10,15 @@
 #define CAMELLIA_TABLE_BYTE_LEN	272
 #define CAMELLIA_PARALLEL_BLOCKS 2
 
+extern const u64 camellia_sp10011110[256];
+extern const u64 camellia_sp22000222[256];
+extern const u64 camellia_sp03303033[256];
+extern const u64 camellia_sp00444404[256];
+extern const u64 camellia_sp02220222[256];
+extern const u64 camellia_sp30333033[256];
+extern const u64 camellia_sp44044404[256];
+extern const u64 camellia_sp11101110[256];
+
 struct camellia_ctx {
 	u64 key_table[CAMELLIA_TABLE_BYTE_LEN / sizeof(u64)];
 	u32 key_length;
