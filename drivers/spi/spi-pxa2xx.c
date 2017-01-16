@@ -737,6 +737,7 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
 	struct driver_data *drv_data = dev_id;
 	u32 sccr1_reg;
 	u32 mask = drv_data->mask_sr;
+	irqreturn_t ret = IRQ_NONE;
 	u32 status;
 
 	/*
@@ -760,37 +761,42 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
 
 	sccr1_reg = pxa2xx_spi_read(drv_data, SSCR1);
 
-	/* Ignore possible writes if we don't need to write */
-	if (!(sccr1_reg & SSCR1_TIE))
-		mask &= ~SSSR_TFS;
-
 	/* Ignore RX timeout interrupt if it is disabled */
 	if (!(sccr1_reg & SSCR1_TINTE))
 		mask &= ~SSSR_TINT;
 
-	if (!(status & mask))
-		return IRQ_NONE;
+	while (1) {
+		/* Ignore possible writes if we don't need to write */
+		if (!(sccr1_reg & SSCR1_TIE))
+			mask &= ~SSSR_TFS;
 
-	if (!drv_data->master->cur_msg) {
+		if (!(status & mask))
+			return ret;
 
-		pxa2xx_spi_write(drv_data, SSCR0,
-				 pxa2xx_spi_read(drv_data, SSCR0)
-				 & ~SSCR0_SSE);
-		pxa2xx_spi_write(drv_data, SSCR1,
-				 pxa2xx_spi_read(drv_data, SSCR1)
-				 & ~drv_data->int_cr1);
-		if (!pxa25x_ssp_comp(drv_data))
-			pxa2xx_spi_write(drv_data, SSTO, 0);
-		write_SSSR_CS(drv_data, drv_data->clear_sr);
+		if (!drv_data->master->cur_msg) {
 
-		dev_err(&drv_data->pdev->dev,
-			"bad message state in interrupt handler\n");
+			pxa2xx_spi_write(drv_data, SSCR0,
+					 pxa2xx_spi_read(drv_data, SSCR0)
+					 & ~SSCR0_SSE);
+			pxa2xx_spi_write(drv_data, SSCR1,
+					 pxa2xx_spi_read(drv_data, SSCR1)
+					 & ~drv_data->int_cr1);
+			if (!pxa25x_ssp_comp(drv_data))
+				pxa2xx_spi_write(drv_data, SSTO, 0);
+			write_SSSR_CS(drv_data, drv_data->clear_sr);
 
-		/* Never fail */
-		return IRQ_HANDLED;
+			dev_err(&drv_data->pdev->dev,
+				"bad message state in interrupt handler\n");
+
+			/* Never fail */
+			return IRQ_HANDLED;
+		}
+
+		ret |= drv_data->transfer_handler(drv_data);
+
+		status = pxa2xx_spi_read(drv_data, SSSR);
+		sccr1_reg = pxa2xx_spi_read(drv_data, SSCR1);
 	}
-
-	return drv_data->transfer_handler(drv_data);
 }
 
 /*
