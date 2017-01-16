@@ -384,21 +384,23 @@ EXPORT_SYMBOL(hashbin_new);
  *    just supply kfree, which should take care of the job.
  */
 #ifdef CONFIG_LOCKDEP
-static int hashbin_lock_depth = 0;
+static atomic_t hashbin_lock_depth = ATOMIC_INIT(0);
 #endif
 int hashbin_delete( hashbin_t* hashbin, FREE_FUNC free_func)
 {
 	irda_queue_t* queue;
 	unsigned long flags = 0;
-	int i;
+	int i, depth = 0;
 
 	IRDA_ASSERT(hashbin != NULL, return -1;);
 	IRDA_ASSERT(hashbin->magic == HB_MAGIC, return -1;);
 
 	/* Synchronize */
 	if ( hashbin->hb_type & HB_LOCK ) {
-		spin_lock_irqsave_nested(&hashbin->hb_spinlock, flags,
-					 hashbin_lock_depth++);
+#ifdef CONFIG_LOCKDEP
+		depth = atomic_inc_return(&hashbin_lock_depth) - 1;
+#endif
+		spin_lock_irqsave_nested(&hashbin->hb_spinlock, flags, depth);
 	}
 
 	/*
@@ -423,7 +425,7 @@ int hashbin_delete( hashbin_t* hashbin, FREE_FUNC free_func)
 	if ( hashbin->hb_type & HB_LOCK) {
 		spin_unlock_irqrestore(&hashbin->hb_spinlock, flags);
 #ifdef CONFIG_LOCKDEP
-		hashbin_lock_depth--;
+		atomic_dec(&hashbin_lock_depth);
 #endif
 	}
 
