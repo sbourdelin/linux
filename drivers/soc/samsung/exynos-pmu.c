@@ -120,6 +120,7 @@ static int exynos_pmu_probe(struct platform_device *pdev)
 		pmu_context->pmu_data->pmu_init();
 
 	platform_set_drvdata(pdev, pmu_context);
+	dev_set_name(dev, EXYNOS_PMU_DEV_NAME);
 
 	dev_dbg(dev, "Exynos PMU Driver probe done\n");
 	return 0;
