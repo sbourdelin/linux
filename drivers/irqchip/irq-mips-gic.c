@@ -968,7 +968,7 @@ static struct irq_domain_ops gic_ipi_domain_ops = {
 	.match = gic_ipi_domain_match,
 };
 
-static void __init __gic_init(unsigned long gic_base_addr,
+static int  __init __gic_init(unsigned long gic_base_addr,
 			      unsigned long gic_addrspace_size,
 			      unsigned int cpu_vec, unsigned int irqbase,
 			      struct device_node *node)
@@ -979,6 +979,10 @@ static void __init __gic_init(unsigned long gic_base_addr,
 	__gic_base_addr = gic_base_addr;
 
 	gic_base = ioremap_nocache(gic_base_addr, gic_addrspace_size);
+	if (!gic_base) {
+		pr_err("Failed to map GIC memory");
+		return -ENOMEM;
+	}
 
 	gicconfig = gic_read(GIC_REG(SHARED, GIC_SH_CONFIG));
 	gic_shared_intrs = (gicconfig & GIC_SH_CONFIG_NUMINTRS_MSK) >>
@@ -1035,23 +1039,29 @@ static void __init __gic_init(unsigned long gic_base_addr,
 	gic_irq_domain = irq_domain_add_simple(node, GIC_NUM_LOCAL_INTRS +
 					       gic_shared_intrs, irqbase,
 					       &gic_irq_domain_ops, NULL);
-	if (!gic_irq_domain)
-		panic("Failed to add GIC IRQ domain");
+	if (!gic_irq_domain) {
+		pr_err("Failed to add GIC IRQ domain");
+		goto iounmap;
+	}
 	gic_irq_domain->name = "mips-gic-irq";
 
 	gic_dev_domain = irq_domain_add_hierarchy(gic_irq_domain, 0,
 						  GIC_NUM_LOCAL_INTRS + gic_shared_intrs,
 						  node, &gic_dev_domain_ops, NULL);
-	if (!gic_dev_domain)
-		panic("Failed to add GIC DEV domain");
+	if (!gic_dev_domain) {
+		pr_err("Failed to add GIC DEV domain");
+		goto iounmap;
+	}
 	gic_dev_domain->name = "mips-gic-dev";
 
 	gic_ipi_domain = irq_domain_add_hierarchy(gic_irq_domain,
 						  IRQ_DOMAIN_FLAG_IPI_PER_CPU,
 						  GIC_NUM_LOCAL_INTRS + gic_shared_intrs,
 						  node, &gic_ipi_domain_ops, NULL);
-	if (!gic_ipi_domain)
-		panic("Failed to add GIC IPI domain");
+	if (!gic_ipi_domain) {
+		pr_err("Failed to add GIC IPI domain");
+		goto iounmap;
+	}
 
 	gic_ipi_domain->name = "mips-gic-ipi";
 	gic_ipi_domain->bus_token = DOMAIN_BUS_IPI;
@@ -1067,13 +1077,22 @@ static void __init __gic_init(unsigned long gic_base_addr,
 	}
 
 	gic_basic_init();
+	return 0;
+iounmap:
+	iounmap(gic_base);
+	return -ENOMEM;
 }
 
 void __init gic_init(unsigned long gic_base_addr,
 		     unsigned long gic_addrspace_size,
 		     unsigned int cpu_vec, unsigned int irqbase)
 {
-	__gic_init(gic_base_addr, gic_addrspace_size, cpu_vec, irqbase, NULL);
+	int ret;
+
+	ret = __gic_init(gic_base_addr, gic_addrspace_size, cpu_vec, irqbase,
+			 NULL);
+	if (ret)
+		pr_err("Failed to initialize GIC");
 }
 
 static int __init gic_of_init(struct device_node *node,
@@ -1083,6 +1102,7 @@ static int __init gic_of_init(struct device_node *node,
 	unsigned int cpu_vec, i = 0, reserved = 0;
 	phys_addr_t gic_base;
 	size_t gic_len;
+	int ret;
 
 	/* Find the first available CPU vector. */
 	while (!of_property_read_u32_index(node, "mti,reserved-cpu-vectors",
@@ -1119,7 +1139,9 @@ static int __init gic_of_init(struct device_node *node,
 		write_gcr_gic_base(gic_base | CM_GCR_GIC_BASE_GICEN_MSK);
 	gic_present = true;
 
-	__gic_init(gic_base, gic_len, cpu_vec, 0, node);
+	ret = __gic_init(gic_base, gic_len, cpu_vec, 0, node);
+	if (ret)
+		return ret;
 
 	return 0;
 }
