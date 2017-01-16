@@ -34,6 +34,9 @@ number of data structures, such as command format, response headers, and the
 like, are also defined in this specification, and are common to both POWER8 and
 POWER9 OCCs.
 
+There is currently no public P9 OCC specification, and the data structures
+defined in the POWER9 OCC driver are subject to change.
+
 sysfs Entries
 -------------
 
