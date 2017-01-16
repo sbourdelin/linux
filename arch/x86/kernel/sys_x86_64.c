@@ -113,10 +113,31 @@ static void find_start_end(unsigned long flags, unsigned long *begin,
 		if (current->flags & PF_RANDOMIZE) {
 			*begin = randomize_page(*begin, 0x02000000);
 		}
-	} else {
-		*begin = current->mm->mmap_legacy_base;
-		*end = TASK_SIZE;
+		return;
 	}
+
+	if (!test_thread_flag(TIF_ADDR32)) {
+#ifdef CONFIG_COMPAT
+		/* 64-bit native binary doing compat 32-bit syscall */
+		if (in_compat_syscall()) {
+			*begin = mmap_legacy_base(arch_compat_rnd(),
+						IA32_PAGE_OFFSET);
+			*end = IA32_PAGE_OFFSET;
+			return;
+		}
+#endif
+	} else {
+		/* 32-bit binary doing 64-bit syscall */
+		if (!in_compat_syscall()) {
+			*begin = mmap_legacy_base(arch_native_rnd(),
+						IA32_PAGE_OFFSET);
+			*end = TASK_SIZE_MAX;
+			return;
+		}
+	}
+
+	*begin = current->mm->mmap_legacy_base;
+	*end = TASK_SIZE;
 }
 
 unsigned long
@@ -157,6 +178,23 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 	return vm_unmapped_area(&info);
 }
 
+static unsigned long find_top(void)
+{
+	if (!test_thread_flag(TIF_ADDR32)) {
+#ifdef CONFIG_COMPAT
+		/* 64-bit native binary doing compat 32-bit syscall */
+		if (in_compat_syscall())
+			return mmap_base(arch_compat_rnd(), IA32_PAGE_OFFSET);
+#endif
+	} else {
+		/* 32-bit binary doing 64-bit syscall */
+		if (!in_compat_syscall())
+			return mmap_base(arch_native_rnd(), TASK_SIZE_MAX);
+	}
+
+	return current->mm->mmap_base;
+}
+
 unsigned long
 arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 			  const unsigned long len, const unsigned long pgoff,
@@ -190,7 +228,7 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
 	info.length = len;
 	info.low_limit = PAGE_SIZE;
-	info.high_limit = mm->mmap_base;
+	info.high_limit = find_top();
 	info.align_mask = 0;
 	info.align_offset = pgoff << PAGE_SHIFT;
 	if (filp) {
