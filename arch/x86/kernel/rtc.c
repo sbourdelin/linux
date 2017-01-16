@@ -178,6 +178,8 @@ static struct platform_device rtc_device = {
 
 static __init int add_rtc_cmos(void)
 {
+	struct irq_alloc_info info;
+	int ret;
 #ifdef CONFIG_PNP
 	static const char * const ids[] __initconst =
 	    { "PNP0b00", "PNP0b01", "PNP0b02", };
@@ -196,6 +198,11 @@ static __init int add_rtc_cmos(void)
 #endif
 	if (!x86_platform.legacy.rtc)
 		return -ENODEV;
+
+	ioapic_set_alloc_attr(&info, NUMA_NO_NODE, 1, 0);
+	ret = mp_map_gsi_to_irq(RTC_IRQ, IOAPIC_MAP_ALLOC, &info);
+	if (ret < 0)
+		return ret;
 
 	platform_device_register(&rtc_device);
 	dev_info(&rtc_device.dev,
