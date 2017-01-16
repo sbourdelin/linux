@@ -320,9 +320,8 @@ static void perf_iommu_start(struct perf_event *event, int flags)
 
 static void perf_iommu_read(struct perf_event *event)
 {
-	u64 count = 0ULL;
-	u64 prev_raw_count = 0ULL;
-	u64 delta = 0ULL;
+	u64 count, prev;
+	s64 delta;
 	struct hw_perf_event *hwc = &event->hw;
 
 	amd_iommu_pc_get_set_reg_val(_GET_DEVID(event),
@@ -330,18 +329,20 @@ static void perf_iommu_read(struct perf_event *event)
 				IOMMU_PC_COUNTER_REG, &count, false);
 
 	/* IOMMU pc counter register is only 48 bits */
-	count &= 0xFFFFFFFFFFFFULL;
+	count &= GENMASK_ULL(48, 0);
 
-	prev_raw_count =  local64_read(&hwc->prev_count);
-	if (local64_cmpxchg(&hwc->prev_count, prev_raw_count,
-					count) != prev_raw_count)
-		return;
+	prev = local64_read(&hwc->prev_count);
 
-	/* Handling 48-bit counter overflowing */
-	delta = (count << COUNTER_SHIFT) - (prev_raw_count << COUNTER_SHIFT);
+	/*
+	 * Since we do not enable counter overflow interrupts,
+	 * we do not have to worry about prev_count changing on us.
+	 */
+	local64_set(&hwc->prev_count, count);
+
+	/* Handle 48-bit counter overflow */
+	delta = (count << COUNTER_SHIFT) - (prev << COUNTER_SHIFT);
 	delta >>= COUNTER_SHIFT;
 	local64_add(delta, &event->count);
-
 }
 
 static void perf_iommu_stop(struct perf_event *event, int flags)
