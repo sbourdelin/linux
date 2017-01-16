@@ -661,6 +661,9 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
 	unsigned long expire = jiffies + msecs_to_jiffies(750);
 	u32 rval;
 
+	dev_dbg(mmc_dev(host->mmc), "%sabling the clock\n",
+		oclk_en ? "en" : "dis");
+
 	rval = mmc_readl(host, REG_CLKCR);
 	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON | SDXC_MASK_DATA0);
 
@@ -737,6 +740,7 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
 			index = SDXC_CLK_50M_DDR;
 		}
 	} else {
+		dev_dbg(mmc_dev(host->mmc), "Invalid clock... returning\n");
 		return -EINVAL;
 	}
 
@@ -752,6 +756,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
 	long rate;
 	u32 rval, clock = ios->clock;
 	int ret;
+
+	dev_dbg(mmc_dev(host->mmc), "setting clk to %u (requested %u)\n",
+		clock, ios->clock);
 
 	ret = sunxi_mmc_oclk_onoff(host, 0);
 	if (ret)
@@ -771,8 +778,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
 			clock, rate);
 		return rate;
 	}
-	dev_dbg(mmc_dev(host->mmc), "setting clk to %d, rounded %ld\n",
-		clock, rate);
+	dev_dbg(mmc_dev(host->mmc), "Rounded clk to %ld\n", rate);
 
 	/* setting clock rate */
 	ret = clk_set_rate(host->clk_mmc, rate);
