@@ -1075,6 +1075,9 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
 		ctrl->eint_gpio_init(drvdata);
 	if (ctrl->eint_wkup_init)
 		ctrl->eint_wkup_init(drvdata);
+	if (ctrl->retention_data && ctrl->retention_data->init)
+		drvdata->retention_ctrl = ctrl->retention_data->init(drvdata,
+							  ctrl->retention_data);
 
 	platform_set_drvdata(pdev, drvdata);
 
@@ -1127,15 +1130,15 @@ static void samsung_pinctrl_suspend_dev(
 
 	if (drvdata->suspend)
 		drvdata->suspend(drvdata);
+	if (drvdata->retention_ctrl && drvdata->retention_ctrl->on)
+		drvdata->retention_ctrl->on(drvdata);
+
 }
 
 /**
  * samsung_pinctrl_resume_dev - restore pinctrl state from suspend for a device
  *
  * Restore one of the banks that was saved during suspend.
- *
- * We don't bother doing anything complicated to avoid glitching lines since
- * we're called before pad retention is turned off.
  */
 static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
 {
@@ -1174,6 +1177,9 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
 			if (widths[type])
 				writel(bank->pm_save[type], reg + offs[type]);
 	}
+
+	if (drvdata->retention_ctrl && drvdata->retention_ctrl->off)
+		drvdata->retention_ctrl->off(drvdata);
 }
 
 /**
