@@ -532,6 +532,7 @@ void ocfs2_lock_res_init_once(struct ocfs2_lock_res *res)
 	init_waitqueue_head(&res->l_event);
 	INIT_LIST_HEAD(&res->l_blocked_list);
 	INIT_LIST_HEAD(&res->l_mask_waiters);
+	INIT_LIST_HEAD(&res->l_holders);
 }
 
 void ocfs2_inode_lock_res_init(struct ocfs2_lock_res *res,
@@ -747,6 +748,46 @@ void ocfs2_lock_res_free(struct ocfs2_lock_res *res)
 	memset(&res->l_lksb, 0, sizeof(res->l_lksb));
 
 	res->l_flags = 0UL;
+}
+
+void ocfs2_add_holder(struct ocfs2_lock_res *lockres,
+				   struct ocfs2_lock_holder *oh)
+{
+	INIT_LIST_HEAD(&oh->oh_list);
+	oh->oh_owner_pid =  get_pid(task_pid(current));
+
+	spin_lock(&lockres->l_lock);
+	list_add_tail(&oh->oh_list, &lockres->l_holders);
+	spin_unlock(&lockres->l_lock);
+}
+
+void ocfs2_remove_holder(struct ocfs2_lock_res *lockres,
+				       struct ocfs2_lock_holder *oh)
+{
+	spin_lock(&lockres->l_lock);
+	list_del(&oh->oh_list);
+	spin_unlock(&lockres->l_lock);
+
+	put_pid(oh->oh_owner_pid);
+}
+
+int ocfs2_is_locked_by_me(struct ocfs2_lock_res *lockres)
+{
+	struct ocfs2_lock_holder *oh;
+	struct pid *pid;
+
+	/* look in the list of holders for one with the current task as owner */
+	spin_lock(&lockres->l_lock);
+	pid = task_pid(current);
+	list_for_each_entry(oh, &lockres->l_holders, oh_list) {
+		if (oh->oh_owner_pid == pid) {
+			spin_unlock(&lockres->l_lock);
+			return 1;
+		}
+	}
+	spin_unlock(&lockres->l_lock);
+
+	return 0;
 }
 
 static inline void ocfs2_inc_holders(struct ocfs2_lock_res *lockres,
@@ -2333,8 +2374,9 @@ int ocfs2_inode_lock_full_nested(struct inode *inode,
 		goto getbh;
 	}
 
-	if (ocfs2_mount_local(osb))
-		goto local;
+	if ((arg_flags & OCFS2_META_LOCK_GETBH) ||
+	    ocfs2_mount_local(osb))
+		goto update;
 
 	if (!(arg_flags & OCFS2_META_LOCK_RECOVERY))
 		ocfs2_wait_for_recovery(osb);
@@ -2363,7 +2405,7 @@ int ocfs2_inode_lock_full_nested(struct inode *inode,
 	if (!(arg_flags & OCFS2_META_LOCK_RECOVERY))
 		ocfs2_wait_for_recovery(osb);
 
-local:
+update:
 	/*
 	 * We only see this flag if we're being called from
 	 * ocfs2_read_locked_inode(). It means we're locking an inode
