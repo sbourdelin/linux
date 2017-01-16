@@ -227,15 +227,23 @@ static int pxa2xx_spi_pci_probe(struct pci_dev *dev,
 	ssp = &spi_pdata.ssp;
 	ssp->phys_base = pci_resource_start(dev, 0);
 	ssp->mmio_base = pcim_iomap_table(dev)[0];
-	ssp->irq = dev->irq;
 	ssp->port_id = (c->port_id >= 0) ? c->port_id : dev->devfn;
 	ssp->type = c->type;
 
 	snprintf(buf, sizeof(buf), "pxa2xx-spi.%d", ssp->port_id);
 	ssp->clk = clk_register_fixed_rate(&dev->dev, buf , NULL, 0,
 					   c->max_clk_rate);
-	 if (IS_ERR(ssp->clk))
+	if (IS_ERR(ssp->clk))
 		return PTR_ERR(ssp->clk);
+
+	pci_set_master(dev);
+
+	ret = pci_alloc_irq_vectors(dev, 1, 1, PCI_IRQ_ALL_TYPES);
+	if (ret < 0) {
+		clk_unregister(ssp->clk);
+		return ret;
+	}
+	ssp->irq = pci_irq_vector(dev, 0);
 
 	memset(&pi, 0, sizeof(pi));
 	pi.fwnode = dev->dev.fwnode;
@@ -248,6 +256,7 @@ static int pxa2xx_spi_pci_probe(struct pci_dev *dev,
 	pdev = platform_device_register_full(&pi);
 	if (IS_ERR(pdev)) {
 		clk_unregister(ssp->clk);
+		pci_free_irq_vectors(dev);
 		return PTR_ERR(pdev);
 	}
 
@@ -265,6 +274,7 @@ static void pxa2xx_spi_pci_remove(struct pci_dev *dev)
 
 	platform_device_unregister(pdev);
 	clk_unregister(spi_pdata->ssp.clk);
+	pci_free_irq_vectors(dev);
 }
 
 static const struct pci_device_id pxa2xx_spi_pci_devices[] = {
