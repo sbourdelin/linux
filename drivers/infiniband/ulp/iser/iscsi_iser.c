@@ -656,7 +656,8 @@ iscsi_iser_session_create(struct iscsi_endpoint *ep,
 		 * max fastreg page list length.
 		 */
 		shost->sg_tablesize = min_t(unsigned short, shost->sg_tablesize,
-			ib_conn->device->ib_device->attrs.max_fast_reg_page_list_len);
+				      min_t(unsigned int, USHRT_MAX,
+			ib_conn->device->ib_device->attrs.max_fast_reg_page_list_len));
 
 		if (iscsi_host_add(shost,
 				   ib_conn->device->ib_device->dma_device)) {
