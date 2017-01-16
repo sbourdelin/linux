@@ -164,6 +164,7 @@ read the file /proc/PID/status:
   Uid:    501     501     501     501
   Gid:    100     100     100     100
   FDSize: 256
+  HidePid:      0
   Groups: 100 14 16
   VmPeak:     5004 kB
   VmSize:     5004 kB
@@ -228,6 +229,7 @@ Table 1-2: Contents of the status files (as of 4.1)
  Gid                         Real, effective, saved set, and  file system GIDs
  Umask                       file mode creation mask
  FDSize                      number of file descriptor slots currently allocated
+ HidePid                     process access mode of /proc/<pid>/
  Groups                      supplementary group list
  NStgid                      descendant namespace thread group ID hierarchy
  NSpid                       descendant namespace process ID hierarchy

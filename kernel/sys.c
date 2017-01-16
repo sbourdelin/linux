@@ -2261,6 +2261,19 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 	case PR_GET_FP_MODE:
 		error = GET_FP_MODE(me);
 		break;
+	case PR_SET_HIDEPID:
+		if (arg2 < HIDEPID_OFF || arg2 > HIDEPID_INVISIBLE ||
+		    arg3 || arg4 || arg5)
+			return -EINVAL;
+		if (arg2 < me->hide_pid)
+			return -EPERM;
+		me->hide_pid = arg2;
+		break;
+	case PR_GET_HIDEPID:
+		if (arg2 || arg3 || arg4 || arg5)
+			return -EINVAL;
+		error = me->hide_pid;
+		break;
 	default:
 		error = -EINVAL;
 		break;
