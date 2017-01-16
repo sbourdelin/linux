@@ -25,6 +25,68 @@ Currently, all versions of the OCC support four types of sensor data: power,
 temperature, frequency, and "caps," which indicate limits and thresholds used
 internally on the OCC.
 
+sysfs Entries
+-------------
+
+The OCC driver uses the hwmon sysfs framework to provide data to userspace.
+
+The driver exports a number of sysfs files for each type of sensor. The
+sensor-specific files vary depending on the processor type, though many of the
+attributes are common for both the POWER8 and POWER9.
+
+The hwmon interface cannot define every type of sensor that may be used.
+Therefore, the frequency sensor on the OCC uses the "input" type sensor defined
+by the hwmon interface, rather than defining a new type of custom sensor.
+
+Below are detailed the names and meaning of each sensor file for both types of
+processors. All sensors are read-only unless otherwise specified. <x> indicates
+the hwmon index. sensor id indicates the unique internal OCC identifer. Please
+see the POWER OCC specification for details on all these sensor values.
+
+frequency:
+	all processors:
+		in<x>_input - frequency value
+		in<x>_label - sensor id
+temperature:
+	POWER8:
+		temp<x>_input - temperature value
+		temp<x>_label - sensor id
+	POWER9 (in addition to above):
+		temp<x>_type - FRU type
+
+power:
+	POWER8:
+		power<x>_input - power value
+		power<x>_label - sensor id
+		power<x>_average - accumulator
+		power<x>_average_interval - update tag (number of samples in
+			accumulator)
+	POWER9:
+		power<x>_input - power value
+		power<x>_label - sensor id
+		power<x>_average_min - accumulator[0]
+		power<x>_average_max - accumulator[1] (64 bits total)
+		power<x>_average_interval - update tag
+		power<x>_reset_history - (function_id | (apss_channel << 8)
+
+caps:
+	POWER8:
+		power<x>_cap - current powercap
+		power<x>_cap_max - max powercap
+		power<x>_cap_min - min powercap
+		power<x>_max - normal powercap
+		power<x>_alarm - user powercap, r/w
+	POWER9:
+		power<x>_cap_alarm - user powercap source
+
+The driver also provides two sysfs entries through hwmon to better
+control the driver and monitor the master OCC. Though there may be multiple
+OCCs present on the system, these two files are only present for the "master"
+OCC.
+	name - read the name of the driver
+	update_interval - read or write the minimum interval for polling the
+		OCC.
+
 BMC - Host Communications
 -------------------------
 
