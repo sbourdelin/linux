@@ -709,7 +709,7 @@ void kmem_cache_destroy(struct kmem_cache *s)
 	bool need_rcu_barrier = false;
 	int err;
 
-	if (unlikely(!s))
+	if (unlikely(!s) || s->refcount == -1)
 		return;
 
 	get_online_cpus();
