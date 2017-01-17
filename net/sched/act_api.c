@@ -24,6 +24,7 @@
 #include <net/net_namespace.h>
 #include <net/sock.h>
 #include <net/sch_generic.h>
+#include <net/pkt_cls.h>
 #include <net/act_api.h>
 #include <net/netlink.h>
 
@@ -33,6 +34,7 @@ static void free_tcf(struct rcu_head *head)
 
 	free_percpu(p->cpu_bstats);
 	free_percpu(p->cpu_qstats);
+	kfree(p->act_ck);
 	kfree(p);
 }
 
@@ -475,6 +477,12 @@ tcf_action_dump_1(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 		goto nla_put_failure;
 	if (tcf_action_copy_stats(skb, a, 0))
 		goto nla_put_failure;
+	if (a->act_ck) {
+		if (nla_put(skb, TCA_ACT_COOKIE, a->act_ck->ck_len,
+			    a->act_ck))
+			goto nla_put_failure;
+	}
+
 	nest = nla_nest_start(skb, TCA_OPTIONS);
 	if (nest == NULL)
 		goto nla_put_failure;
@@ -574,6 +582,23 @@ struct tc_action *tcf_action_init_1(struct net *net, struct nlattr *nla,
 		err = a_o->init(net, nla, est, &a, ovr, bind);
 	if (err < 0)
 		goto err_mod;
+
+	if (tb[TCA_ACT_COOKIE]) {
+		if (nla_len(tb[TCA_ACT_COOKIE]) > TC_COOKIE_MAX_SIZE) {
+			err = -EINVAL;
+			goto err_mod;
+		}
+
+		a->act_ck = kzalloc(sizeof(*a->act_ck), GFP_KERNEL);
+		if (unlikely(!a->act_ck)) {
+			err = -ENOMEM;
+			goto err_mod;
+		}
+
+		memcpy(a->act_ck->ck, nla_data(tb[TCA_ACT_COOKIE]),
+		       nla_len(tb[TCA_ACT_COOKIE]));
+		a->act_ck->ck_len = nla_len(tb[TCA_ACT_COOKIE]);
+	}
 
 	/* module count goes up only when brand new policy is created
 	 * if it exists and is only bound to in a_o->init() then
