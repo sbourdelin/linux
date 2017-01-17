@@ -192,6 +192,37 @@ static const struct dwc2_core_params params_amlogic = {
 	.hibernation			= -1,
 };
 
+static const struct dwc2_core_params params_stm32f4_otgfs = {
+	.otg_cap			= DWC2_CAP_PARAM_NO_HNP_SRP_CAPABLE,
+	.otg_ver			= -1,
+	.dma_desc_enable		= 0,
+	.dma_desc_fs_enable		= 0,
+	.speed				= DWC2_SPEED_PARAM_FULL,
+	.enable_dynamic_fifo		= -1,
+	.en_multiple_tx_fifo		= -1,
+	.host_rx_fifo_size		= 128,	/* 128 DWORDs */
+	.host_nperio_tx_fifo_size	= 96,	/* 96 DWORDs */
+	.host_perio_tx_fifo_size	= 96,	/* 96 DWORDs */
+	.max_transfer_size		= -1,
+	.max_packet_count		= 256,
+	.host_channels			= -1,
+	.phy_type			= DWC2_PHY_TYPE_PARAM_FS,
+	.phy_utmi_width			= -1,
+	.phy_ulpi_ddr			= -1,
+	.phy_ulpi_ext_vbus		= -1,
+	.i2c_enable			= 0,
+	.ulpi_fs_ls			= -1,
+	.host_support_fs_ls_low_power	= -1,
+	.host_ls_low_power_phy_clk	= -1,
+	.ts_dline			= -1,
+	.reload_ctl			= -1,
+	.ahbcfg				= -1,
+	.uframe_sched			= 0,
+	.external_id_pin_ctl		= -1,
+	.hibernation			= -1,
+	.activate_transceiver		= 1,
+};
+
 static const struct dwc2_core_params params_default = {
 	.otg_cap			= -1,
 	.otg_ver			= -1,
@@ -240,6 +271,8 @@ const struct of_device_id dwc2_of_match_table[] = {
 	{ .compatible = "amlogic,meson8b-usb", .data = &params_amlogic },
 	{ .compatible = "amlogic,meson-gxbb-usb", .data = &params_amlogic },
 	{ .compatible = "amcc,dwc-otg", .data = NULL },
+	{ .compatible = "st,stm32f4xx-fsotg", .data = &params_stm32f4_otgfs },
+	{ .compatible = "st,stm32f4xx-hsotg", .data = NULL },
 	{},
 };
 MODULE_DEVICE_TABLE(of, dwc2_of_match_table);
@@ -1056,6 +1089,23 @@ static void dwc2_set_param_hibernation(struct dwc2_hsotg *hsotg,
 	hsotg->params.hibernation = val;
 }
 
+static void dwc2_set_param_activate_transceiver(struct dwc2_hsotg *hsotg,
+		int val)
+{
+	if (DWC2_OUT_OF_BOUNDS(val, 0, 1)) {
+		if (val >= 0) {
+			dev_err(hsotg->dev,
+				"'%d' invalid for parameter activate transceiver\n",
+				val);
+			dev_err(hsotg->dev, "activate transceiver must be 0 or 1\n");
+		}
+		val = 0;
+		dev_dbg(hsotg->dev, "Setting activate transceiver to %d\n", val);
+	}
+
+	hsotg->params.activate_transceiver = val;
+}
+
 static void dwc2_set_param_tx_fifo_sizes(struct dwc2_hsotg *hsotg)
 {
 	int i;
@@ -1170,6 +1220,7 @@ static void dwc2_set_parameters(struct dwc2_hsotg *hsotg,
 	dwc2_set_param_uframe_sched(hsotg, params->uframe_sched);
 	dwc2_set_param_external_id_pin_ctl(hsotg, params->external_id_pin_ctl);
 	dwc2_set_param_hibernation(hsotg, params->hibernation);
+	dwc2_set_param_activate_transceiver(hsotg, params->activate_transceiver);
 
 	/*
 	 * Set devicetree-only parameters. These parameters do not

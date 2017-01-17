@@ -430,6 +430,9 @@ enum dwc2_ep0_state {
  *			needed.
  *			0 - No (default)
  *			1 - Yes
+ * @activate_transceiver: Activate internal transceiver using GGPIO register.
+ *			0 - Deactivate the transceiver (default)
+ *			1 - Activate the transceiver
  * @g_dma:              Enables gadget dma usage (default: autodetect).
  * @g_dma_desc:         Enables gadget descriptor DMA (default: autodetect).
  * @g_rx_fifo_size:	The periodic rx fifo size for the device, in
@@ -501,6 +504,7 @@ struct dwc2_core_params {
 	int uframe_sched;
 	int external_id_pin_ctl;
 	int hibernation;
+	int activate_transceiver;
 
 	/*
 	 * The following parameters are *only* set via device
