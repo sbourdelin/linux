@@ -5886,6 +5886,9 @@ static int brcmf_construct_chaninfo(struct brcmf_cfg80211_info *cfg,
 			continue;
 		}
 
+		if (channel->orig_flags & IEEE80211_CHAN_DISABLED)
+			continue;
+
 		/* assuming the chanspecs order is HT20,
 		 * HT40 upper, HT40 lower, and VHT80.
 		 */
@@ -6477,6 +6480,9 @@ static int brcmf_setup_wiphy(struct wiphy *wiphy, struct brcmf_if *ifp)
 			wiphy->bands[NL80211_BAND_5GHZ] = band;
 		}
 	}
+
+	wiphy_read_of_freq_limits(wiphy);
+
 	return 0;
 }
 
