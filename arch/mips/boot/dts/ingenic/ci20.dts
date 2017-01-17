@@ -29,18 +29,30 @@
 
 &uart0 {
 	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pins_uart0_data>;
 };
 
 &uart1 {
 	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pins_uart1_data>;
 };
 
 &uart3 {
 	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pins_uart2_dataplusflow>;
 };
 
 &uart4 {
 	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pins_uart4_data>;
 };
 
 &nemc {
@@ -61,6 +73,16 @@
 		ingenic,nemc-tAW = <15>;
 		ingenic,nemc-tSTRV = <100>;
 
+		/*
+		 * Only CLE/ALE are needed for the devices that are connected, rather
+		 * than the full address line set.
+		 */
+		pinctrl-names = "default";
+		pinctrl-0 = <&pins_nemc_data
+				 &pins_nemc_cle_ale
+				 &pins_nemc_rd_we
+				 &pins_nemc_frd_fwe>;
+
 		nand@1 {
 			reg = <1>;
 
@@ -68,6 +90,9 @@
 			nand-ecc-strength = <24>;
 			nand-ecc-mode = "hw";
 			nand-on-flash-bbt;
+
+			pinctrl-names = "default";
+			pinctrl-0 = <&pins_nemc_cs1>;
 
 			partitions {
 				compatible = "fixed-partitions";
