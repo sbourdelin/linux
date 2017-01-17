@@ -47,6 +47,7 @@ static struct equiv_cpu_entry *equiv_cpu_table;
  */
 struct cont_desc {
 	struct microcode_amd *mc;
+	u32 cpuid_1_eax;
 	u32 psize;
 	u16 eq_id;
 	u8 *data;
@@ -92,7 +93,6 @@ static ssize_t parse_container(u8 *ucode, ssize_t size, struct cont_desc *desc)
 	struct equiv_cpu_entry *eq;
 	ssize_t orig_size = size;
 	u32 *hdr = (u32 *)ucode;
-	u32 eax, ebx, ecx, edx;
 	u16 eq_id;
 	u8 *buf;
 
@@ -108,12 +108,8 @@ static ssize_t parse_container(u8 *ucode, ssize_t size, struct cont_desc *desc)
 
 	eq = (struct equiv_cpu_entry *)(buf + CONTAINER_HDR_SZ);
 
-	eax = 1;
-	ecx = 0;
-	native_cpuid(&eax, &ebx, &ecx, &edx);
-
 	/* Find the equivalence ID of our CPU in this table: */
-	eq_id = find_equiv_id(eq, eax);
+	eq_id = find_equiv_id(eq, desc->cpuid_1_eax);
 
 	buf  += hdr[2] + CONTAINER_HDR_SZ;
 	size -= hdr[2] + CONTAINER_HDR_SZ;
@@ -214,8 +210,9 @@ static int __apply_microcode_amd(struct microcode_amd *mc)
  *
  * Returns true if container found (sets @desc), false otherwise.
  */
-static bool apply_microcode_early_amd(void *ucode, size_t size, bool save_patch,
-				      struct cont_desc *ret_desc)
+static bool
+apply_microcode_early_amd(u32 cpuid_1_eax, void *ucode, size_t size,
+			  bool save_patch, struct cont_desc *ret_desc)
 {
 	struct cont_desc desc = { 0 };
 	u8 (*patch)[PATCH_MAX_SIZE];
@@ -233,6 +230,8 @@ static bool apply_microcode_early_amd(void *ucode, size_t size, bool save_patch,
 
 	if (check_current_patch_level(&rev, true))
 		return ret;
+
+	desc.cpuid_1_eax = cpuid_1_eax;
 
 	scan_containers(ucode, size, &desc);
 	if (!desc.eq_id)
@@ -276,10 +275,9 @@ static bool get_builtin_microcode(struct cpio_data *cp, unsigned int family)
 #endif
 }
 
-void __init load_ucode_amd_bsp(unsigned int family)
+void __init load_ucode_amd_bsp(unsigned int cpuid_1_eax)
 {
 	struct ucode_cpu_info *uci;
-	u32 eax, ebx, ecx, edx;
 	struct cpio_data cp;
 	const char *path;
 	bool use_pa;
@@ -294,19 +292,16 @@ void __init load_ucode_amd_bsp(unsigned int family)
 		use_pa	= false;
 	}
 
-	if (!get_builtin_microcode(&cp, family))
+	if (!get_builtin_microcode(&cp, x86_family(cpuid_1_eax)))
 		cp = find_microcode_in_initrd(path, use_pa);
 
 	if (!(cp.data && cp.size))
 		return;
 
-	/* Get BSP's CPUID.EAX(1), needed in load_microcode_amd() */
-	eax = 1;
-	ecx = 0;
-	native_cpuid(&eax, &ebx, &ecx, &edx);
-	uci->cpu_sig.sig = eax;
+	/* Needed in load_microcode_amd() */
+	uci->cpu_sig.sig = cpuid_1_eax;
 
-	apply_microcode_early_amd(cp.data, cp.size, true, NULL);
+	apply_microcode_early_amd(cpuid_1_eax, cp.data, cp.size, true, NULL);
 }
 
 #ifdef CONFIG_X86_32
@@ -317,7 +312,7 @@ void __init load_ucode_amd_bsp(unsigned int family)
  * In save_microcode_in_initrd_amd() BSP's patch is copied to amd_ucode_patch,
  * which is used upon resume from suspend.
  */
-void load_ucode_amd_ap(unsigned int family)
+void load_ucode_amd_ap(unsigned int cpuid_1_eax)
 {
 	struct microcode_amd *mc;
 	struct cpio_data cp;
@@ -328,7 +323,7 @@ void load_ucode_amd_ap(unsigned int family)
 		return;
 	}
 
-	if (!get_builtin_microcode(&cp, family))
+	if (!get_builtin_microcode(&cp, x86_family(cpuid_1_eax)))
 		cp = find_microcode_in_initrd((const char *)__pa_nodebug(ucode_path), true);
 
 	if (!(cp.data && cp.size))
@@ -338,14 +333,14 @@ void load_ucode_amd_ap(unsigned int family)
 	 * This would set amd_ucode_patch above so that the following APs can
 	 * use it directly instead of going down this path again.
 	 */
-	apply_microcode_early_amd(cp.data, cp.size, true, NULL);
+	apply_microcode_early_amd(cpuid_1_eax, cp.data, cp.size, true, NULL);
 }
 #else
-void load_ucode_amd_ap(unsigned int family)
+void load_ucode_amd_ap(unsigned int cpuid_1_eax)
 {
 	struct equiv_cpu_entry *eq;
 	struct microcode_amd *mc;
-	u32 rev, eax;
+	u32 rev;
 	u16 eq_id;
 
 	/* 64-bit runs with paging enabled, thus early==false. */
@@ -360,7 +355,7 @@ void load_ucode_amd_ap(unsigned int family)
 			return;
 
 reget:
-		if (!get_builtin_microcode(&cp, family)) {
+		if (!get_builtin_microcode(&cp, x86_family(cpuid_1_eax))) {
 #ifdef CONFIG_BLK_DEV_INITRD
 			cp = find_cpio_data(ucode_path, (void *)initrd_start,
 					    initrd_end - initrd_start, NULL);
@@ -376,17 +371,16 @@ reget:
 			}
 		}
 
-		if (!apply_microcode_early_amd(cp.data, cp.size, false, &cont)) {
+		if (!apply_microcode_early_amd(cpuid_1_eax, cp.data, cp.size, false, &cont)) {
 			cont.data = NULL;
 			cont.size = -1;
 			return;
 		}
 	}
 
-	eax = cpuid_eax(0x00000001);
 	eq  = (struct equiv_cpu_entry *)(cont.data + CONTAINER_HDR_SZ);
 
-	eq_id = find_equiv_id(eq, eax);
+	eq_id = find_equiv_id(eq, cpuid_1_eax);
 	if (!eq_id)
 		return;
 
@@ -412,7 +406,7 @@ reget:
 static enum ucode_state
 load_microcode_amd(int cpu, u8 family, const u8 *data, size_t size);
 
-int __init save_microcode_in_initrd_amd(unsigned int fam)
+int __init save_microcode_in_initrd_amd(unsigned int cpuid_1_eax)
 {
 	enum ucode_state ret;
 	int retval = 0;
@@ -431,6 +425,8 @@ int __init save_microcode_in_initrd_amd(unsigned int fam)
 				return -EINVAL;
 			}
 
+			cont.cpuid_1_eax = cpuid_1_eax;
+
 			scan_containers(cp.data, cp.size, &cont);
 			if (!cont.eq_id) {
 				cont.size = -1;
@@ -441,7 +437,7 @@ int __init save_microcode_in_initrd_amd(unsigned int fam)
 			return -EINVAL;
 	}
 
-	ret = load_microcode_amd(smp_processor_id(), fam, cont.data, cont.size);
+	ret = load_microcode_amd(smp_processor_id(), x86_family(cpuid_1_eax), cont.data, cont.size);
 	if (ret != UCODE_OK)
 		retval = -EINVAL;
 
