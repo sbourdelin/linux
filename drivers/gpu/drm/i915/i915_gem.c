@@ -2631,6 +2631,13 @@ static void reset_request(struct drm_i915_gem_request *request)
 
 void i915_gem_reset_prepare(struct drm_i915_private *dev_priv)
 {
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+
+	/* Ensure irq handler finishes, and not run again. */
+	for_each_engine(engine, dev_priv, id)
+		tasklet_kill(&engine->irq_tasklet);
+
 	i915_gem_revoke_fences(dev_priv);
 }
 
