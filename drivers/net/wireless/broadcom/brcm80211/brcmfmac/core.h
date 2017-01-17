@@ -22,6 +22,7 @@
 #define BRCMFMAC_CORE_H
 
 #include <net/cfg80211.h>
+#include "bus.h"
 #include "fweh.h"
 
 #define TOE_TX_CSUM_OL		0x00000001
@@ -213,10 +214,28 @@ struct brcmf_if *brcmf_add_if(struct brcmf_pub *drvr, s32 bsscfgidx, s32 ifidx,
 void brcmf_remove_interface(struct brcmf_if *ifp, bool rtnl_locked);
 void brcmf_txflowblock_if(struct brcmf_if *ifp,
 			  enum brcmf_netif_stop_reason reason, bool state);
+/* Indication from bus module to change flow-control state */
+void brcmf_txflowblock(struct device *dev, bool state);
 void brcmf_txfinalize(struct brcmf_if *ifp, struct sk_buff *txp, bool success);
 void brcmf_netif_rx(struct brcmf_if *ifp, struct sk_buff *skb);
+/* Receive frame for delivery to OS.  Callee disposes of rxp. */
+void brcmf_rx_frame(struct device *dev, struct sk_buff *rxp, bool handle_event);
+/* Receive async event packet from firmware. Callee disposes of rxp. */
+void brcmf_rx_event(struct device *dev, struct sk_buff *rxp);
+/* Notify the bus has transferred the tx packet to firmware */
+void brcmf_txcomplete(struct device *dev, struct sk_buff *txp, bool success);
 void brcmf_net_setcarrier(struct brcmf_if *ifp, bool on);
-void brcmf_c_set_joinpref_default(struct brcmf_if *ifp);
+/* Indication from bus module regarding presence/insertion of dongle. */
+int brcmf_attach(struct device *dev, struct brcmf_mp_device *settings);
+int brcmf_bus_start(struct device *dev);
+void brcmf_bus_add_txhdrlen(struct device *dev, uint len);
+/* Indication from bus module that dongle should be reset */
+void brcmf_dev_reset(struct device *dev);
+/* Indication from bus module regarding removal/absence of dongle */
+void brcmf_detach(struct device *dev);
+s32 brcmf_iovar_data_set(struct device *dev, char *name, void *data, u32 len);
+/* Configure the "global" bus state used by upper layers */
+void brcmf_bus_change_state(struct brcmf_bus *bus, enum brcmf_bus_state state);
 int __init brcmf_core_init(void);
 void __exit brcmf_core_exit(void);
 

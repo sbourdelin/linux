@@ -214,34 +214,6 @@ int brcmf_bus_get_memdump(struct brcmf_bus *bus, void *data, size_t len)
 	return bus->ops->get_memdump(bus->dev, data, len);
 }
 
-/*
- * interface functions from common layer
- */
-
-/* Receive frame for delivery to OS.  Callee disposes of rxp. */
-void brcmf_rx_frame(struct device *dev, struct sk_buff *rxp, bool handle_event);
-/* Receive async event packet from firmware. Callee disposes of rxp. */
-void brcmf_rx_event(struct device *dev, struct sk_buff *rxp);
-
-/* Indication from bus module regarding presence/insertion of dongle. */
-int brcmf_attach(struct device *dev, struct brcmf_mp_device *settings);
-/* Indication from bus module regarding removal/absence of dongle */
-void brcmf_detach(struct device *dev);
-/* Indication from bus module that dongle should be reset */
-void brcmf_dev_reset(struct device *dev);
-/* Indication from bus module to change flow-control state */
-void brcmf_txflowblock(struct device *dev, bool state);
-
-/* Notify the bus has transferred the tx packet to firmware */
-void brcmf_txcomplete(struct device *dev, struct sk_buff *txp, bool success);
-
-/* Configure the "global" bus state used by upper layers */
-void brcmf_bus_change_state(struct brcmf_bus *bus, enum brcmf_bus_state state);
-
-int brcmf_bus_start(struct device *dev);
-s32 brcmf_iovar_data_set(struct device *dev, char *name, void *data, u32 len);
-void brcmf_bus_add_txhdrlen(struct device *dev, uint len);
-
 #ifdef CONFIG_BRCMFMAC_SDIO
 void brcmf_sdio_exit(void);
 void brcmf_sdio_register(void);
