@@ -78,6 +78,30 @@
 					0x10 0x00220000 0x00ff0000
 				>;
 			};
+			sata_cp_det_pin: pinmux_sata_cp_det_pin {
+				pinctrl-single,bits = <
+					/* SATA_CP_DET */
+					0x0c 0x00000000 0xf0000000
+				>;
+			};
+			sata_mp_switch_pin: pinmux_sata_mp_switch_pin {
+				pinctrl-single,bits = <
+					/* SATA_MP_SWITCH */
+					0x0c 0x00000000 0x0f000000
+				>;
+			};
+			sata_cp_pod_pin: pinmux_sata_cp_pod_pin {
+				pinctrl-single,bits = <
+					/* SATA_CP_POD */
+					0x10 0x40000000 0xf0000000
+				>;
+			};
+			sata_led_pin: pinmux_sata_led_pin {
+				pinctrl-single,bits = <
+					/* SATA_LED */
+					0x10 0x04000000 0x0f000000
+				>;
+			};
 			i2c0_pins: pinmux_i2c0_pins {
 				pinctrl-single,bits = <
 					/* I2C0_SDA,I2C0_SCL */
