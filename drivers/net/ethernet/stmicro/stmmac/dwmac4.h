@@ -35,6 +35,7 @@
 #define GMAC_HW_FEATURE2		0x00000124
 #define GMAC_MDIO_ADDR			0x00000200
 #define GMAC_MDIO_DATA			0x00000204
+#define GMAC_ARP_ADDR			0x00000210
 #define GMAC_ADDR_HIGH(reg)		(0x300 + reg * 8)
 #define GMAC_ADDR_LOW(reg)		(0x304 + reg * 8)
 
@@ -116,6 +117,7 @@ enum power_event {
 #define GMAC_DEBUG_RPESTS		BIT(0)
 
 /* MAC config */
+#define GMAC_CONFIG_ARPEN		BIT(31)
 #define GMAC_CONFIG_IPC			BIT(27)
 #define GMAC_CONFIG_2K			BIT(22)
 #define GMAC_CONFIG_ACS			BIT(20)
@@ -135,6 +137,7 @@ enum power_event {
 #define GMAC_HW_FEAT_TXCOSEL		BIT(14)
 #define GMAC_HW_FEAT_EEESEL		BIT(13)
 #define GMAC_HW_FEAT_TSSEL		BIT(12)
+#define GMAC_HW_FEAT_ARPOFFSEL		BIT(9)
 #define GMAC_HW_FEAT_MMCSEL		BIT(8)
 #define GMAC_HW_FEAT_MGKSEL		BIT(7)
 #define GMAC_HW_FEAT_RWKSEL		BIT(6)

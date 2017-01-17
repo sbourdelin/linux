@@ -67,6 +67,7 @@ struct stmmac_priv {
 	bool tx_path_in_lpi_mode;
 	struct timer_list txtimer;
 	bool tso;
+	int arp;
 
 	struct dma_desc *dma_rx	____cacheline_aligned_in_smp;
 	struct dma_extended_desc *dma_erx;

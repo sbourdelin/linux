@@ -306,6 +306,7 @@ struct dma_features {
 	unsigned int pmt_remote_wake_up;
 	unsigned int pmt_magic_frame;
 	unsigned int rmon;
+	unsigned int arpoffsel;
 	/* IEEE 1588-2002 */
 	unsigned int time_stamp;
 	/* IEEE 1588-2008 */
@@ -447,6 +448,7 @@ struct stmmac_dma_ops {
 	void (*set_rx_tail_ptr)(void __iomem *ioaddr, u32 tail_ptr, u32 chan);
 	void (*set_tx_tail_ptr)(void __iomem *ioaddr, u32 tail_ptr, u32 chan);
 	void (*enable_tso)(void __iomem *ioaddr, bool en, u32 chan);
+	void (*set_arp_addr)(void __iomem *ioaddr, bool en, u32 addr);
 };
 
 struct mac_device_info;
@@ -459,6 +461,8 @@ struct stmmac_ops {
 	int (*rx_ipc)(struct mac_device_info *hw);
 	/* Enable RX Queues */
 	void (*rx_queue_enable)(struct mac_device_info *hw, u32 queue);
+	/* Enable and verify that the ARP feature is supported */
+	int (*arp_en)(struct mac_device_info *hw);
 	/* Dump MAC registers */
 	void (*dump_regs)(struct mac_device_info *hw);
 	/* Handle extra events on specific interrupts hw dependent */

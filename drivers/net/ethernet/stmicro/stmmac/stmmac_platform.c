@@ -306,6 +306,7 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
 		plat->has_gmac = 0;
 		plat->pmt = 1;
 		plat->tso_en = of_property_read_bool(np, "snps,tso");
+		plat->arp_en = of_property_read_bool(np, "snps,arp");
 	}
 
 	if (of_device_is_compatible(np, "snps,dwmac-3.610") ||

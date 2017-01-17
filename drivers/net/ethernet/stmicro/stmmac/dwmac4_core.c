@@ -102,6 +102,20 @@ static int dwmac4_rx_ipc_enable(struct mac_device_info *hw)
 	return !!(value & GMAC_CONFIG_IPC);
 }
 
+static int dwmac4_arp_enable(struct mac_device_info *hw)
+{
+	void __iomem *ioaddr = hw->pcsr;
+	u32 value = readl(ioaddr + GMAC_CONFIG);
+
+	value |= GMAC_CONFIG_ARPEN;
+
+	writel(value, ioaddr + GMAC_CONFIG);
+
+	value = readl(ioaddr + GMAC_CONFIG);
+
+	return !!(value & GMAC_CONFIG_ARPEN);
+}
+
 static void dwmac4_pmt(struct mac_device_info *hw, unsigned long mode)
 {
 	void __iomem *ioaddr = hw->pcsr;
@@ -463,6 +477,7 @@ static const struct stmmac_ops dwmac4_ops = {
 	.core_init = dwmac4_core_init,
 	.rx_ipc = dwmac4_rx_ipc_enable,
 	.rx_queue_enable = dwmac4_rx_queue_enable,
+	.arp_en = dwmac4_arp_enable,
 	.dump_regs = dwmac4_dump_regs,
 	.host_irq_status = dwmac4_irq_status,
 	.flow_ctrl = dwmac4_flow_ctrl,

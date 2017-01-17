@@ -284,6 +284,8 @@ static void dwmac4_get_hw_feature(void __iomem *ioaddr,
 	dma_cap->pmt_magic_frame = (hw_cap & GMAC_HW_FEAT_MGKSEL) >> 7;
 	/* MMC */
 	dma_cap->rmon = (hw_cap & GMAC_HW_FEAT_MMCSEL) >> 8;
+	/* ARP */
+	dma_cap->arpoffsel = (hw_cap & GMAC_HW_FEAT_ARPOFFSEL) >> 9;
 	/* IEEE 1588-2008 */
 	dma_cap->atime_stamp = (hw_cap & GMAC_HW_FEAT_TSSEL) >> 12;
 	/* 802.3az - Energy-Efficient Ethernet (EEE) */
@@ -331,6 +333,25 @@ static void dwmac4_enable_tso(void __iomem *ioaddr, bool en, u32 chan)
 	}
 }
 
+/* Set ARP Address */
+static void dwmac4_set_arp_addr(void __iomem *ioaddr, bool set, u32 addr)
+{
+	u32 value;
+
+	value = readl(ioaddr + GMAC_ARP_ADDR);
+
+	if (set) {
+		/* set arp address */
+		value = addr;
+	} else {
+		/* unset arp address */
+		value = 0;
+	}
+
+	writel(value, ioaddr + GMAC_ARP_ADDR);
+	value = readl(ioaddr + GMAC_ARP_ADDR);
+}
+
 const struct stmmac_dma_ops dwmac4_dma_ops = {
 	.reset = dwmac4_dma_reset,
 	.init = dwmac4_dma_init,
@@ -351,6 +372,7 @@ const struct stmmac_dma_ops dwmac4_dma_ops = {
 	.set_rx_tail_ptr = dwmac4_set_rx_tail_ptr,
 	.set_tx_tail_ptr = dwmac4_set_tx_tail_ptr,
 	.enable_tso = dwmac4_enable_tso,
+	.set_arp_addr = dwmac4_set_arp_addr,
 };
 
 const struct stmmac_dma_ops dwmac410_dma_ops = {
@@ -373,4 +395,5 @@ const struct stmmac_dma_ops dwmac410_dma_ops = {
 	.set_rx_tail_ptr = dwmac4_set_rx_tail_ptr,
 	.set_tx_tail_ptr = dwmac4_set_tx_tail_ptr,
 	.enable_tso = dwmac4_enable_tso,
+	.set_arp_addr = dwmac4_set_arp_addr,
 };

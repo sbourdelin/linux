@@ -3284,6 +3284,19 @@ int stmmac_dvr_probe(struct device *device,
 		priv->tso = true;
 		dev_info(priv->device, "TSO feature enabled\n");
 	}
+
+	if ((priv->plat->arp_en) && (priv->dma_cap.arpoffsel)) {
+		ret = priv->hw->mac->arp_en(priv->hw);
+		if (!ret) {
+			pr_warn(" ARP feature disabled\n");
+		} else {
+			pr_info(" ARP feature enabled\n");
+			/* Copy MAC addr into MAC_ARP_ADDRESS register*/
+			priv->hw->dma->set_arp_addr(priv->ioaddr, 1,
+						    priv->dev->dev_addr);
+		}
+	}
+
 	ndev->features |= ndev->hw_features | NETIF_F_HIGHDMA;
 	ndev->watchdog_timeo = msecs_to_jiffies(watchdog);
 #ifdef STMMAC_VLAN_TAG_USED
