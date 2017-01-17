@@ -97,17 +97,16 @@ static size_t compute_container_size(u8 *data, u32 total_size)
 	return size;
 }
 
-static inline u16 find_equiv_id(struct equiv_cpu_entry *equiv_cpu_table,
-				unsigned int sig)
+static u16 find_equiv_id(struct equiv_cpu_entry *equiv_table, u32 sig)
 {
 	int i = 0;
 
-	if (!equiv_cpu_table)
+	if (!equiv_table)
 		return 0;
 
-	while (equiv_cpu_table[i].installed_cpu != 0) {
-		if (sig == equiv_cpu_table[i].installed_cpu)
-			return equiv_cpu_table[i].equiv_cpu;
+	while (equiv_table[i].installed_cpu) {
+		if (sig == equiv_table[i].installed_cpu)
+			return equiv_table[i].equiv_cpu;
 
 		i++;
 	}
