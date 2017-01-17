@@ -33,6 +33,7 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/io.h>
+#include <linux/of_platform.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
@@ -88,6 +89,8 @@ struct da8xx_glue {
 	struct clk		*clk;
 	struct phy		*phy;
 };
+
+static void da8xx_dma_controller_callback(struct musb *musb);
 
 /*
  * Because we don't set CTRL.UINT, it's "important" to:
@@ -457,12 +460,35 @@ static inline u8 get_vbus_power(struct device *dev)
 	return current_uA / 1000 / 2;
 }
 
+static struct dma_controller *
+da8xx_dma_controller_create(struct musb *musb, void __iomem *base)
+{
+	struct dma_controller *controller;
+
+	controller = cppi41_dma_controller_create(musb, base);
+	if (!IS_ERR_OR_NULL(controller))
+		cppi41_register_dma_callback(controller,
+					     da8xx_dma_controller_callback);
+	return controller;
+}
+
+static void da8xx_dma_controller_callback(struct musb *musb)
+{
+	void __iomem *reg_base = musb->ctrl_base;
+
+	musb_writel(reg_base, DA8XX_USB_END_OF_INTR_REG, 0);
+}
+
 static const struct musb_platform_ops da8xx_ops = {
-	.quirks		= MUSB_INDEXED_EP,
+	.quirks		= MUSB_INDEXED_EP | MUSB_DMA_CPPI41,
 	.init		= da8xx_musb_init,
 	.exit		= da8xx_musb_exit,
 
 	.fifo_mode	= 2,
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	.dma_init	= da8xx_dma_controller_create,
+	.dma_exit	= cppi41_dma_controller_destroy,
+#endif
 	.enable		= da8xx_musb_enable,
 	.disable	= da8xx_musb_disable,
 
@@ -533,6 +559,10 @@ static int da8xx_probe(struct platform_device *pdev)
 		return ret;
 	}
 	platform_set_drvdata(pdev, glue);
+
+	ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+	if (ret)
+		return ret;
 
 	memset(musb_resources, 0x00, sizeof(*musb_resources) *
 			ARRAY_SIZE(musb_resources));
