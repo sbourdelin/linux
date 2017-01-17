@@ -251,6 +251,14 @@ void cleanup_srcu_struct(struct srcu_struct *sp)
 {
 	if (WARN_ON(srcu_readers_active(sp)))
 		return; /* Leakage unless caller handles error. */
+
+	/*
+	 * No readers active, so any pending callbacks will rush through the two
+	 * batches before sp->running becomes false.  No risk of busy-waiting.
+	 */
+	while (sp->running)
+		flush_delayed_work(&sp->work);
+
 	free_percpu(sp->per_cpu_ref);
 	sp->per_cpu_ref = NULL;
 }
