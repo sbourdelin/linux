@@ -120,8 +120,6 @@ static inline const char *qeth_get_cardname(struct qeth_card *card)
 			return " OSD Express";
 		case QETH_CARD_TYPE_IQD:
 			return " HiperSockets";
-		case QETH_CARD_TYPE_OSN:
-			return " OSN QDIO";
 		case QETH_CARD_TYPE_OSM:
 			return " OSM QDIO";
 		case QETH_CARD_TYPE_OSX:
@@ -174,8 +172,6 @@ const char *qeth_get_cardname_short(struct qeth_card *card)
 			}
 		case QETH_CARD_TYPE_IQD:
 			return "HiperSockets";
-		case QETH_CARD_TYPE_OSN:
-			return "OSN";
 		case QETH_CARD_TYPE_OSM:
 			return "OSM_1000";
 		case QETH_CARD_TYPE_OSX:
@@ -602,10 +598,7 @@ static struct qeth_ipa_cmd *qeth_check_ipa_data(struct qeth_card *card,
 	if (IS_IPA(iob->data)) {
 		cmd = (struct qeth_ipa_cmd *) PDU_ENCAPSULATION(iob->data);
 		if (IS_IPA_REPLY(cmd)) {
-			if (cmd->hdr.command != IPA_CMD_SETCCID &&
-			    cmd->hdr.command != IPA_CMD_DELCCID &&
-			    cmd->hdr.command != IPA_CMD_MODCCID &&
-			    cmd->hdr.command != IPA_CMD_SET_DIAG_ASS)
+			if (cmd->hdr.command != IPA_CMD_SET_DIAG_ASS)
 				qeth_issue_ipa_msg(cmd,
 						cmd->hdr.return_code, card);
 			return cmd;
@@ -653,8 +646,6 @@ static struct qeth_ipa_cmd *qeth_check_ipa_data(struct qeth_card *card,
 					return cmd;
 				else
 					return NULL;
-			case IPA_CMD_MODCCID:
-				return cmd;
 			case IPA_CMD_REGISTER_LOCAL_ADDR:
 				QETH_CARD_TEXT(card, 3, "irla");
 				break;
@@ -835,14 +826,6 @@ static void qeth_send_control_data_cb(struct qeth_channel *channel,
 	cmd = qeth_check_ipa_data(card, iob);
 	if ((cmd == NULL) && (card->state != CARD_STATE_DOWN))
 		goto out;
-	/*in case of OSN : check if cmd is set */
-	if (card->info.type == QETH_CARD_TYPE_OSN &&
-	    cmd &&
-	    cmd->hdr.command != IPA_CMD_STARTLAN &&
-	    card->osn_info.assist_cb != NULL) {
-		card->osn_info.assist_cb(card->dev, cmd);
-		goto out;
-	}
 
 	spin_lock_irqsave(&card->lock, flags);
 	list_for_each_entry_safe(reply, r, &card->cmd_waiter_list, list) {
@@ -1529,6 +1512,11 @@ static int qeth_determine_card_type(struct qeth_card *card)
 		    (CARD_RDEV(card)->id.dev_model ==
 				known_devices[i][QETH_DEV_MODEL_IND])) {
 			card->info.type = known_devices[i][QETH_DEV_MODEL_IND];
+			if (card->info.type == QETH_CARD_TYPE_OSN) {
+				dev_err(&card->gdev->dev,
+				       "OSN devices are not supported\n");
+				goto out;
+			}
 			card->qdio.no_out_queues =
 				known_devices[i][QETH_QUEUE_NO_IND];
 			card->qdio.no_in_queues = 1;
@@ -1539,6 +1527,7 @@ static int qeth_determine_card_type(struct qeth_card *card)
 		}
 		i++;
 	}
+out:
 	card->info.type = QETH_CARD_TYPE_UNKNOWN;
 	dev_err(&card->gdev->dev, "The adapter hardware is of an "
 		"unknown type\n");
@@ -1756,7 +1745,6 @@ static void qeth_init_func_level(struct qeth_card *card)
 		card->info.func_level =	QETH_IDX_FUNC_LEVEL_IQD;
 		break;
 	case QETH_CARD_TYPE_OSD:
-	case QETH_CARD_TYPE_OSN:
 		card->info.func_level = QETH_IDX_FUNC_LEVEL_OSD;
 		break;
 	default:
@@ -2255,7 +2243,6 @@ static inline int qeth_mtu_is_valid(struct qeth_card *card, int mtu)
 	case QETH_CARD_TYPE_IQD:
 		return ((mtu >= 576) &&
 			(mtu <= card->info.max_mtu));
-	case QETH_CARD_TYPE_OSN:
 	case QETH_CARD_TYPE_UNKNOWN:
 	default:
 		return 1;
@@ -2331,10 +2318,7 @@ static int qeth_ulp_enable(struct qeth_card *card)
 	*(QETH_ULP_ENABLE_LINKNUM(iob->data)) =
 		(__u8) card->info.portno;
 	if (card->options.layer2)
-		if (card->info.type == QETH_CARD_TYPE_OSN)
-			prot_type = QETH_PROT_OSN2;
-		else
-			prot_type = QETH_PROT_LAYER2;
+		prot_type = QETH_PROT_LAYER2;
 	else
 		prot_type = QETH_PROT_TCPIP;
 
@@ -2927,10 +2911,7 @@ int qeth_send_ipa_cmd(struct qeth_card *card, struct qeth_cmd_buffer *iob,
 	QETH_CARD_TEXT(card, 4, "sendipa");
 
 	if (card->options.layer2)
-		if (card->info.type == QETH_CARD_TYPE_OSN)
-			prot_type = QETH_PROT_OSN2;
-		else
-			prot_type = QETH_PROT_LAYER2;
+		prot_type = QETH_PROT_LAYER2;
 	else
 		prot_type = QETH_PROT_TCPIP;
 	qeth_prepare_ipa_cmd(card, iob, prot_type);
@@ -4427,7 +4408,6 @@ int qeth_mdio_read(struct net_device *dev, int phy_id, int regnum)
 	case MII_BMCR: /* Basic mode control register */
 		rc = BMCR_FULLDPLX;
 		if ((card->info.link_type != QETH_LINK_TYPE_GBIT_ETH) &&
-		    (card->info.link_type != QETH_LINK_TYPE_OSN) &&
 		    (card->info.link_type != QETH_LINK_TYPE_10GBIT_ETH))
 			rc |= BMCR_SPEED100;
 		break;
@@ -5218,10 +5198,6 @@ struct sk_buff *qeth_core_get_next_skb(struct qeth_card *card,
 		skb_len = (*hdr)->hdr.l3.length;
 		headroom = ETH_HLEN;
 		break;
-	case QETH_HEADER_TYPE_OSN:
-		skb_len = (*hdr)->hdr.osn.pdu_length;
-		headroom = sizeof(struct qeth_hdr);
-		break;
 	default:
 		break;
 	}
@@ -5230,7 +5206,6 @@ struct sk_buff *qeth_core_get_next_skb(struct qeth_card *card,
 		return NULL;
 
 	if (((skb_len >= card->options.rx_sg_cb) &&
-	     (!(card->info.type == QETH_CARD_TYPE_OSN)) &&
 	     (!atomic_read(&card->force_alloc_skb))) ||
 	    (card->options.cq == QETH_CQ_ENABLED)) {
 		use_rx_sg = 1;
@@ -5463,10 +5438,6 @@ static const struct device_type qeth_generic_devtype = {
 	.name = "qeth_generic",
 	.groups = qeth_generic_attr_groups,
 };
-static const struct device_type qeth_osn_devtype = {
-	.name = "qeth_osn",
-	.groups = qeth_osn_attr_groups,
-};
 
 #define DBF_NAME_LEN	20
 
@@ -5588,13 +5559,9 @@ static int qeth_core_probe_device(struct ccwgroup_device *gdev)
 		goto err_card;
 	}
 
-	if (card->info.type == QETH_CARD_TYPE_OSN)
-		gdev->dev.type = &qeth_osn_devtype;
-	else
-		gdev->dev.type = &qeth_generic_devtype;
+	gdev->dev.type = &qeth_generic_devtype;
 
 	switch (card->info.type) {
-	case QETH_CARD_TYPE_OSN:
 	case QETH_CARD_TYPE_OSM:
 		rc = qeth_core_load_discipline(card, QETH_DISCIPLINE_LAYER2);
 		if (rc)

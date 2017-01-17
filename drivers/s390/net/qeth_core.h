@@ -310,22 +310,10 @@ struct qeth_hdr_layer2 {
 	__u8 reserved2[16];
 } __attribute__ ((packed));
 
-struct qeth_hdr_osn {
-	__u8 id;
-	__u8 reserved;
-	__u16 seq_no;
-	__u16 reserved2;
-	__u16 control_flags;
-	__u16 pdu_length;
-	__u8 reserved3[18];
-	__u32 ccid;
-} __attribute__ ((packed));
-
 struct qeth_hdr {
 	union {
 		struct qeth_hdr_layer2 l2;
 		struct qeth_hdr_layer3 l3;
-		struct qeth_hdr_osn    osn;
 	} hdr;
 } __attribute__ ((packed));
 
@@ -372,7 +360,6 @@ enum qeth_header_ids {
 	QETH_HEADER_TYPE_LAYER3 = 0x01,
 	QETH_HEADER_TYPE_LAYER2 = 0x02,
 	QETH_HEADER_TYPE_TSO	= 0x03,
-	QETH_HEADER_TYPE_OSN    = 0x04,
 };
 /* flags for qeth_hdr.ext_flags */
 #define QETH_HDR_EXT_VLAN_FRAME       0x01
@@ -627,7 +614,6 @@ struct qeth_seqno {
 	__u32 pdu_hdr;
 	__u32 pdu_hdr_ack;
 	__u16 ipa;
-	__u32 pkt_seqno;
 };
 
 struct qeth_reply {
@@ -701,11 +687,6 @@ struct qeth_card_options {
  */
 enum qeth_threads {
 	QETH_RECOVER_THREAD = 1,
-};
-
-struct qeth_osn_info {
-	int (*assist_cb)(struct net_device *dev, void *data);
-	int (*data_cb)(struct sk_buff *skb);
 };
 
 enum qeth_discipline_id {
@@ -803,7 +784,6 @@ struct qeth_card {
 	struct qeth_qdio_info qdio;
 	struct qeth_perf_stats perf_stats;
 	int read_or_write_problem;
-	struct qeth_osn_info osn_info;
 	struct qeth_discipline *discipline;
 	atomic_t force_alloc_skb;
 	struct service_level qeth_service_level;
@@ -888,7 +868,6 @@ static inline int qeth_is_diagass_supported(struct qeth_card *card,
 extern struct qeth_discipline qeth_l2_discipline;
 extern struct qeth_discipline qeth_l3_discipline;
 extern const struct attribute_group *qeth_generic_attr_groups[];
-extern const struct attribute_group *qeth_osn_attr_groups[];
 extern struct workqueue_struct *qeth_wq;
 
 int qeth_card_hw_is_reachable(struct qeth_card *);
@@ -996,12 +975,5 @@ struct qeth_cmd_buffer *qeth_get_setassparms_cmd(struct qeth_card *,
 int qeth_set_features(struct net_device *, netdev_features_t);
 int qeth_recover_features(struct net_device *);
 netdev_features_t qeth_fix_features(struct net_device *, netdev_features_t);
-
-/* exports for OSN */
-int qeth_osn_assist(struct net_device *, void *, int);
-int qeth_osn_register(unsigned char *read_dev_no, struct net_device **,
-		int (*assist_cb)(struct net_device *, void *),
-		int (*data_cb)(struct sk_buff *));
-void qeth_osn_deregister(struct net_device *);
 
 #endif /* __QETH_CORE_H__ */
