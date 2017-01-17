@@ -77,6 +77,8 @@
 
 #define MII_CLOCK 1250000 	/* no more than 2.5MHz */
 
+#define NAPI_WEIGHT	64
+
 /* the following must be powers of two */
 #define KORINA_NUM_RDS	64  /* number of receive descriptors */
 #define KORINA_NUM_TDS	64  /* number of transmit descriptors */
@@ -1080,7 +1082,7 @@ static int korina_probe(struct platform_device *pdev)
 	dev->netdev_ops = &korina_netdev_ops;
 	dev->ethtool_ops = &netdev_ethtool_ops;
 	dev->watchdog_timeo = TX_TIMEOUT;
-	netif_napi_add(dev, &lp->napi, korina_poll, 64);
+	netif_napi_add(dev, &lp->napi, korina_poll, NAPI_WEIGHT);
 
 	lp->phy_addr = (((lp->rx_irq == 0x2c? 1:0) << 8) | 0x05);
 	lp->mii_if.dev = dev;
