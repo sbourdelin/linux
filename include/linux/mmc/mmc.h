@@ -442,6 +442,8 @@ struct _mmc_csd {
  */
 #define EXT_CSD_BKOPS_LEVEL_2		0x2
 
+#define EXT_CSD_BKOPS_LEVEL_PM_SUSPEND	EXT_CSD_BKOPS_LEVEL_2
+
 /*
  * BKOPS modes
  */
