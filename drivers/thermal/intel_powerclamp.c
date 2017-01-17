@@ -376,6 +376,7 @@ static bool powerclamp_adjust_controls(unsigned int target_ratio,
 	return set_target_ratio + guard <= current_ratio;
 }
 
+static DEFINE_PER_CPU(int, setscheduler_done);
 static void clamp_balancing_func(struct kthread_work *work)
 {
 	struct powerclamp_worker_data *w_data;
@@ -387,6 +388,10 @@ static void clamp_balancing_func(struct kthread_work *work)
 	w_data = container_of(work, struct powerclamp_worker_data,
 			      balancing_work);
 
+	if (unlikely(this_cpu_read(setscheduler_done) == 0)) {
+		sched_setscheduler(current, SCHED_FIFO, &sparam);
+		this_cpu_inc(setscheduler_done);
+	}
 	/*
 	 * make sure user selected ratio does not take effect until
 	 * the next round. adjust target_ratio if user has changed
@@ -506,7 +511,6 @@ static void start_power_clamp_worker(unsigned long cpu)
 	w_data->cpu = cpu;
 	w_data->clamping = true;
 	set_bit(cpu, cpu_clamping_mask);
-	sched_setscheduler(worker->task, SCHED_FIFO, &sparam);
 	kthread_init_work(&w_data->balancing_work, clamp_balancing_func);
 	kthread_init_delayed_work(&w_data->idle_injection_work,
 				  clamp_idle_injection_func);
