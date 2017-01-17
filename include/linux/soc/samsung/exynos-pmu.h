@@ -12,6 +12,8 @@
 #ifndef __LINUX_SOC_EXYNOS_PMU_H
 #define __LINUX_SOC_EXYNOS_PMU_H
 
+#include <linux/regmap.h>
+
 enum sys_powerdown {
 	SYS_AFTR,
 	SYS_LPA,
@@ -20,5 +22,10 @@ enum sys_powerdown {
 };
 
 extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
+#ifdef CONFIG_EXYNOS_PMU
+extern struct regmap *exynos_get_pmu_regmap(void);
+#else
+static inline struct regmap *exynos_get_pmu_regmap(void) { return NULL; }
+#endif
 
 #endif /* __LINUX_SOC_EXYNOS_PMU_H */
