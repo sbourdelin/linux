@@ -373,6 +373,7 @@ struct i915_hw_ppgtt {
 	struct kref ref;
 	struct drm_mm_node node;
 	unsigned long pd_dirty_rings;
+	bool preallocate_top_level_pdps;
 	union {
 		struct i915_pml4 pml4;		/* GEN8+ & 48b PPGTT */
 		struct i915_page_directory_pointer pdp;	/* GEN8+ */

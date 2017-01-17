@@ -1472,7 +1472,7 @@ static int gen8_emit_bb_start(struct drm_i915_gem_request *req,
 	if (req->ctx->ppgtt &&
 	    (intel_engine_flag(req->engine) & req->ctx->ppgtt->pd_dirty_rings)) {
 		if (!USES_FULL_48BIT_PPGTT(req->i915) &&
-		    !intel_vgpu_active(req->i915)) {
+		    !req->ctx->ppgtt->preallocate_top_level_pdps) {
 			ret = intel_logical_ring_emit_pdps(req);
 			if (ret)
 				return ret;

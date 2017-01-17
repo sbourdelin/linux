@@ -814,12 +814,18 @@ static bool gen8_ppgtt_clear_pdp(struct i915_address_space *vm,
 	struct i915_hw_ppgtt *ppgtt = i915_vm_to_ppgtt(vm);
 	struct i915_page_directory *pd;
 	uint64_t pdpe;
+	bool pd_is_empty;
 
 	gen8_for_each_pdpe(pd, pdp, start, length, pdpe) {
 		if (WARN_ON(!pdp->page_directory[pdpe]))
 			break;
 
-		if (gen8_ppgtt_clear_pd(vm, pd, start, length)) {
+		pd_is_empty = gen8_ppgtt_clear_pd(vm, pd, start, length);
+		/* Do not free pd pages if pdps are preallocated. */
+		if (ppgtt->preallocate_top_level_pdps)
+			continue;
+
+		if (pd_is_empty) {
 			__clear_bit(pdpe, pdp->used_pdpes);
 			gen8_setup_pdpe(ppgtt, pdp, vm->scratch_pd, pdpe);
 			free_pd(vm->i915, pd);
@@ -1565,6 +1571,8 @@ static int gen8_preallocate_top_level_pdps(struct i915_hw_ppgtt *ppgtt)
 		*ppgtt->pdp.used_pdpes = *new_page_dirs;
 
 	free_gen8_temp_bitmaps(new_page_dirs, new_page_tables);
+
+	ppgtt->preallocate_top_level_pdps = true;
 
 	return ret;
 }
