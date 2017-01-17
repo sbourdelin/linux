@@ -3546,12 +3546,13 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	struct page *page = NULL;
 	unsigned int alloc_flags;
 	unsigned long did_some_progress;
-	enum compact_priority compact_priority = DEF_COMPACT_PRIORITY;
+	enum compact_priority compact_priority;
 	enum compact_result compact_result;
-	int compaction_retries = 0;
-	int no_progress_loops = 0;
+	int compaction_retries;
+	int no_progress_loops;
 	unsigned long alloc_start = jiffies;
 	unsigned int stall_timeout = 10 * HZ;
+	unsigned int cpuset_mems_cookie;
 
 	/*
 	 * In the slowpath, we sanity check order to avoid ever trying to
@@ -3571,6 +3572,12 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	if (WARN_ON_ONCE((gfp_mask & (__GFP_ATOMIC|__GFP_DIRECT_RECLAIM)) ==
 				(__GFP_ATOMIC|__GFP_DIRECT_RECLAIM)))
 		gfp_mask &= ~__GFP_ATOMIC;
+
+retry_cpuset:
+	compaction_retries = 0;
+	no_progress_loops = 0;
+	compact_priority = DEF_COMPACT_PRIORITY;
+	cpuset_mems_cookie = read_mems_allowed_begin();
 
 	/*
 	 * The fast path uses conservative alloc_flags to succeed only until
@@ -3743,6 +3750,15 @@ retry:
 	}
 
 nopage:
+	/*
+	 * When updating a task's mems_allowed, it is possible to race with
+	 * parallel threads in such a way that an allocation can fail while
+	 * the mask is being updated. If a page allocation is about to fail,
+	 * check if the cpuset changed during allocation and if so, retry.
+	 */
+	if (read_mems_allowed_retry(cpuset_mems_cookie))
+		goto retry_cpuset;
+
 	warn_alloc(gfp_mask,
 			"page allocation failure: order:%u", order);
 got_pg:
@@ -3757,7 +3773,6 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 			struct zonelist *zonelist, nodemask_t *nodemask)
 {
 	struct page *page;
-	unsigned int cpuset_mems_cookie;
 	unsigned int alloc_flags = ALLOC_WMARK_LOW;
 	gfp_t alloc_mask = gfp_mask; /* The gfp_t that was actually used for allocation */
 	struct alloc_context ac = {
@@ -3794,9 +3809,6 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 	if (IS_ENABLED(CONFIG_CMA) && ac.migratetype == MIGRATE_MOVABLE)
 		alloc_flags |= ALLOC_CMA;
 
-retry_cpuset:
-	cpuset_mems_cookie = read_mems_allowed_begin();
-
 	/* Dirty zone balancing only done in the fast path */
 	ac.spread_dirty_pages = (gfp_mask & __GFP_WRITE);
 
@@ -3809,6 +3821,10 @@ retry_cpuset:
 					ac.high_zoneidx, ac.nodemask);
 	if (!ac.preferred_zoneref->zone) {
 		page = NULL;
+		/*
+		 * This might be due to race with cpuset_current_mems_allowed
+		 * update, so make sure we retry with original nodemask.
+		 */
 		goto no_zone;
 	}
 
@@ -3831,26 +3847,14 @@ retry_cpuset:
 	 * we could end up iterating over non-eligible zones endlessly.
 	 */
 	if (unlikely(ac.nodemask != nodemask)) {
+no_zone:
 		ac.nodemask = nodemask;
 		ac.preferred_zoneref = first_zones_zonelist(ac.zonelist,
 						ac.high_zoneidx, ac.nodemask);
-		if (!ac.preferred_zoneref->zone)
-			goto no_zone;
+		/* If we have NULL preferred zone, slowpath wll handle that */
 	}
 
 	page = __alloc_pages_slowpath(alloc_mask, order, &ac);
-
-no_zone:
-	/*
-	 * When updating a task's mems_allowed, it is possible to race with
-	 * parallel threads in such a way that an allocation can fail while
-	 * the mask is being updated. If a page allocation is about to fail,
-	 * check if the cpuset changed during allocation and if so, retry.
-	 */
-	if (unlikely(!page && read_mems_allowed_retry(cpuset_mems_cookie))) {
-		alloc_mask = gfp_mask;
-		goto retry_cpuset;
-	}
 
 out:
 	if (memcg_kmem_enabled() && (gfp_mask & __GFP_ACCOUNT) && page &&
