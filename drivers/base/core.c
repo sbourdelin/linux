@@ -2058,6 +2058,37 @@ struct device *device_find_child(struct device *parent, void *data,
 }
 EXPORT_SYMBOL_GPL(device_find_child);
 
+static int device_class_name_match(struct device *dev, void *class)
+{
+	if (dev->class != NULL && !strcmp(dev->class->name, class))
+		return 1;
+
+	return 0;
+}
+
+/**
+ * device_find_in_class_name - device iterator for locating a particular device
+ * within the specified class name
+ * @parent: parent struct device
+ * @class_name: Class name to match against
+ *
+ * This function returns 1 if the device (specified by @parent), or one of its child
+ * is in the class whose name is specified by @class_name. Returns 0 otherwise.
+ *
+ * NOTE: you will need to drop the reference with put_device() after use.
+ */
+struct device *device_find_in_class_name(struct device *parent,
+					 char *class_name)
+{
+	if (device_class_name_match(parent, class_name)) {
+		get_device(parent);
+		return parent;
+	}
+
+	return device_find_child(parent, class_name, device_class_name_match);
+}
+EXPORT_SYMBOL_GPL(device_find_in_class_name);
+
 int __init devices_init(void)
 {
 	devices_kset = kset_create_and_add("devices", &device_uevent_ops, NULL);
