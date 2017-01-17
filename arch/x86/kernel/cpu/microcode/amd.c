@@ -193,15 +193,15 @@ find_proper_container(u8 *ucode, size_t size, struct container *ret_cont)
 	return eq_id;
 }
 
-static int __apply_microcode_amd(struct microcode_amd *mc_amd)
+static int __apply_microcode_amd(struct microcode_amd *mc)
 {
 	u32 rev, dummy;
 
-	microcode_wrmsr(MSR_AMD64_PATCH_LOADER, (u64)(long)&mc_amd->hdr.data_code);
+	microcode_wrmsr(MSR_AMD64_PATCH_LOADER, (u64)(long)&mc->hdr.data_code);
 
 	/* verify patch application was successful */
 	microcode_rdmsr(MSR_AMD64_PATCH_LEVEL, rev, dummy);
-	if (rev != mc_amd->hdr.patch_id)
+	if (rev != mc->hdr.patch_id)
 		return -1;
 
 	return 0;
