@@ -22,6 +22,8 @@
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/pm.h>
 
+#define MMC_RUNTIME_SUSPEND_DELAY_MS	3000
+
 struct mmc_ios {
 	unsigned int	clock;			/* clock rate */
 	unsigned short	vdd;

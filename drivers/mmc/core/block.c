@@ -2203,7 +2203,8 @@ static int mmc_blk_probe(struct mmc_card *card)
 			goto out;
 	}
 
-	pm_runtime_set_autosuspend_delay(&card->dev, 3000);
+	pm_runtime_set_autosuspend_delay(&card->dev,
+			MMC_RUNTIME_SUSPEND_DELAY_MS);
 	pm_runtime_use_autosuspend(&card->dev);
 
 	/*
