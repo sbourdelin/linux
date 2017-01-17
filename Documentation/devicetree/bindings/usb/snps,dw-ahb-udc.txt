@@ -1,0 +1,27 @@
+Synopsys USB Device controller.
+
+The device node is used for Synopsys Designware Cores AHB
+Subsystem Device Controller (UDC).
+
+This device node is used by UDCs integrated it Broadcom's
+Northstar2 and Cygnus SoC's.
+
+Required properties:
+ - compatible: should be "snps,dw-ahb-udc"
+ - reg: Offset and length of UDC register set
+ - interrupts: description of interrupt line
+ - phys: phandle to phy node.
+ - extcon: phandle to the extcon device. This is optional and
+   not required for those that don't require extcon support.
+   Extcon support will be required if the UDC is connected to
+   a Dual Role Device Phy that supports both Host and Device
+   mode based on the external cable.
+
+Example:
+	udc_dwc: usb@664e0000 {
+		compatible = "snps,dw-ahb-udc";
+		reg = <0x664e0000 0x2000>;
+		interrupts = <GIC_SPI 424 IRQ_TYPE_LEVEL_HIGH>;
+		phys = <&usbdrd_phy>;
+		extcon = <&usbdrd_phy>";
+	};
