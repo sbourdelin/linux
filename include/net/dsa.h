@@ -42,6 +42,11 @@ struct dsa_chip_data {
 	struct device	*host_dev;
 	int		sw_addr;
 
+	/*
+	 * Reference to network devices
+	 */
+	struct device	*netdev[DSA_MAX_PORTS];
+
 	/* set to size of eeprom if supported by the switch */
 	int		eeprom_len;
 
@@ -140,6 +145,7 @@ struct dsa_switch_tree {
 };
 
 struct dsa_port {
+	const char		*name;
 	struct net_device	*netdev;
 	struct device_node	*dn;
 	unsigned int		ageing_time;
