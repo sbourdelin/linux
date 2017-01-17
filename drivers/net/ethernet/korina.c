@@ -80,8 +80,8 @@
 #define NAPI_WEIGHT	64
 
 /* the following must be powers of two */
-#define KORINA_NUM_RDS	64  /* number of receive descriptors */
-#define KORINA_NUM_TDS	64  /* number of transmit descriptors */
+#define KORINA_NUM_RDS	256 /* number of receive descriptors */
+#define KORINA_NUM_TDS	256 /* number of transmit descriptors */
 
 /* KORINA_RBSIZE is the hardware's default maximum receive
  * frame size in bytes. Having this hardcoded means that there
