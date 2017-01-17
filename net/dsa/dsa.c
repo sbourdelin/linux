@@ -455,29 +455,11 @@ EXPORT_SYMBOL_GPL(dsa_switch_resume);
 #endif
 
 /* platform driver init and cleanup *****************************************/
-static int dev_is_class(struct device *dev, void *class)
-{
-	if (dev->class != NULL && !strcmp(dev->class->name, class))
-		return 1;
-
-	return 0;
-}
-
-static struct device *dev_find_class(struct device *parent, char *class)
-{
-	if (dev_is_class(parent, class)) {
-		get_device(parent);
-		return parent;
-	}
-
-	return device_find_child(parent, class, dev_is_class);
-}
-
 struct mii_bus *dsa_host_dev_to_mii_bus(struct device *dev)
 {
 	struct device *d;
 
-	d = dev_find_class(dev, "mdio_bus");
+	d = device_find_in_class_name(dev, "mdio_bus");
 	if (d != NULL) {
 		struct mii_bus *bus;
 
@@ -495,7 +477,7 @@ static struct net_device *dev_to_net_device(struct device *dev)
 {
 	struct device *d;
 
-	d = dev_find_class(dev, "net");
+	d = device_find_in_class_name(dev, "net");
 	if (d != NULL) {
 		struct net_device *nd;
 
