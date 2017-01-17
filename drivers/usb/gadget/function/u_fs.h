@@ -247,7 +247,7 @@ struct ffs_data {
 
 	unsigned			user_flags;
 
-	u8				eps_addrmap[15];
+	u8				eps_addrmap[31];
 
 	unsigned short			strings_count;
 	unsigned short			interfaces_count;
