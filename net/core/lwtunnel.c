@@ -120,7 +120,9 @@ int lwtunnel_build_state(struct net_device *dev, u16 encap_type,
 
 		if (encap_type_str) {
 			rcu_read_unlock();
+			__rtnl_unlock();
 			request_module("rtnl-lwt-%s", encap_type_str);
+			rtnl_lock();
 			rcu_read_lock();
 			ops = rcu_dereference(lwtun_encaps[encap_type]);
 		}
