@@ -800,7 +800,6 @@ static void acpi_fujitsu_notify(struct acpi_device *device, u32 event)
 		return;
 	}
 
-	keycode = 0;
 	oldb = fujitsu->brightness_level;
 	get_lcd_level();
 	newb = fujitsu->brightness_level;
@@ -809,30 +808,22 @@ static void acpi_fujitsu_notify(struct acpi_device *device, u32 event)
 		    "brightness button event [%i -> %i (%i)]\n",
 		    oldb, newb, fujitsu->brightness_changed);
 
-	if (oldb < newb) {
-		if (disable_brightness_adjust != 1) {
-			if (use_alt_lcd_levels)
-				set_lcd_level_alt(newb);
-			else
-				set_lcd_level(newb);
-		}
-		keycode = KEY_BRIGHTNESSUP;
-	} else if (oldb > newb) {
-		if (disable_brightness_adjust != 1) {
-			if (use_alt_lcd_levels)
-				set_lcd_level_alt(newb);
-			else
-				set_lcd_level(newb);
-		}
-		keycode = KEY_BRIGHTNESSDOWN;
+	if (oldb == newb)
+		return;
+
+	if (disable_brightness_adjust != 1) {
+		if (use_alt_lcd_levels)
+			set_lcd_level_alt(newb);
+		else
+			set_lcd_level(newb);
 	}
 
-	if (keycode != 0) {
-		input_report_key(input, keycode, 1);
-		input_sync(input);
-		input_report_key(input, keycode, 0);
-		input_sync(input);
-	}
+	keycode = oldb < newb ? KEY_BRIGHTNESSUP : KEY_BRIGHTNESSDOWN;
+
+	input_report_key(input, keycode, 1);
+	input_sync(input);
+	input_report_key(input, keycode, 0);
+	input_sync(input);
 }
 
 /* ACPI device for hotkey handling */
