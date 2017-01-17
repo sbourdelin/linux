@@ -29,9 +29,14 @@ static void nft_cmp_eval(const struct nft_expr *expr,
 			 const struct nft_pktinfo *pkt)
 {
 	const struct nft_cmp_expr *priv = nft_expr_priv(expr);
+	static const u32 nulldata[4] = { 0 };
+	const void *data = &priv->data;
 	int d;
 
-	d = memcmp(&regs->data[priv->sreg], &priv->data, priv->len);
+	if (priv->op == NFT_CMP_BOOL)
+		data = nulldata;
+
+	d = memcmp(&regs->data[priv->sreg], data, priv->len);
 	switch (priv->op) {
 	case NFT_CMP_EQ:
 		if (d != 0)
@@ -53,6 +58,10 @@ static void nft_cmp_eval(const struct nft_expr *expr,
 			goto mismatch;
 	case NFT_CMP_GTE:
 		if (d < 0)
+			goto mismatch;
+		break;
+	case NFT_CMP_BOOL:
+		if (!!priv->data.data[0] ^ !!d)
 			goto mismatch;
 		break;
 	}
@@ -191,6 +200,7 @@ nft_cmp_select_ops(const struct nft_ctx *ctx, const struct nlattr * const tb[])
 	case NFT_CMP_LTE:
 	case NFT_CMP_GT:
 	case NFT_CMP_GTE:
+	case NFT_CMP_BOOL:
 		break;
 	default:
 		return ERR_PTR(-EINVAL);

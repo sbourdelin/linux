@@ -535,6 +535,7 @@ enum nft_byteorder_attributes {
  * @NFT_CMP_LTE: less than or equal to
  * @NFT_CMP_GT: greater than
  * @NFT_CMP_GTE: greater than or equal to
+ * @NFT_CMP_BOOL: boolean comparison
  */
 enum nft_cmp_ops {
 	NFT_CMP_EQ,
@@ -543,6 +544,7 @@ enum nft_cmp_ops {
 	NFT_CMP_LTE,
 	NFT_CMP_GT,
 	NFT_CMP_GTE,
+	NFT_CMP_BOOL,
 };
 
 /**
