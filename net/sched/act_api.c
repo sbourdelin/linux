@@ -739,9 +739,8 @@ out_nlmsg_trim:
 	return -1;
 }
 
-static int
-act_get_notify(struct net *net, u32 portid, struct nlmsghdr *n,
-	       struct list_head *actions, int event)
+static int act_get_notify(struct net *net, u32 portid, struct nlmsghdr *n,
+			  struct list_head *actions, int event)
 {
 	struct sk_buff *skb;
 
@@ -864,9 +863,8 @@ noflush_out:
 	return err;
 }
 
-static int
-tcf_del_notify(struct net *net, struct nlmsghdr *n, struct list_head *actions,
-	       u32 portid)
+static int tcf_del_notify(struct net *net, struct nlmsghdr *n,
+			  struct list_head *actions, u32 portid)
 {
 	int ret;
 	struct sk_buff *skb;
@@ -895,9 +893,8 @@ tcf_del_notify(struct net *net, struct nlmsghdr *n, struct list_head *actions,
 	return ret;
 }
 
-static int
-tca_action_gd(struct net *net, struct nlattr *nla, struct nlmsghdr *n,
-	      u32 portid, int event)
+static int tca_action_gd(struct net *net, struct nlattr *nla,
+			 struct nlmsghdr *n, u32 portid, int event)
 {
 	int i, ret;
 	struct nlattr *tb[TCA_ACT_MAX_PRIO + 1];
@@ -940,9 +937,8 @@ err:
 	return ret;
 }
 
-static int
-tcf_add_notify(struct net *net, struct nlmsghdr *n, struct list_head *actions,
-	       u32 portid)
+static int tcf_add_notify(struct net *net, struct nlmsghdr *n,
+			  struct list_head *actions, u32 portid)
 {
 	struct sk_buff *skb;
 	int err = 0;

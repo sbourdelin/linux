@@ -11,33 +11,32 @@ struct tcf_walker {
 	int	stop;
 	int	skip;
 	int	count;
-	int	(*fn)(struct tcf_proto *, unsigned long node, struct tcf_walker *);
+	int	(*fn)(struct tcf_proto *, unsigned long node,
+		      struct tcf_walker *);
 };
 
 int register_tcf_proto_ops(struct tcf_proto_ops *ops);
 int unregister_tcf_proto_ops(struct tcf_proto_ops *ops);
 
-static inline unsigned long
-__cls_set_class(unsigned long *clp, unsigned long cl)
+static inline unsigned long __cls_set_class(unsigned long *clp,
+					    unsigned long cl)
 {
 	return xchg(clp, cl);
 }
 
-static inline unsigned long
-cls_set_class(struct tcf_proto *tp, unsigned long *clp, 
+static inline unsigned long cls_set_class(struct tcf_proto *tp,
+					  unsigned long *clp,
 	unsigned long cl)
 {
 	unsigned long old_cl;
-	
 	tcf_tree_lock(tp);
 	old_cl = __cls_set_class(clp, cl);
 	tcf_tree_unlock(tp);
- 
 	return old_cl;
 }
 
-static inline void
-tcf_bind_filter(struct tcf_proto *tp, struct tcf_result *r, unsigned long base)
+static inline void tcf_bind_filter(struct tcf_proto *tp, struct tcf_result *r,
+				   unsigned long base)
 {
 	unsigned long cl;
 
@@ -47,8 +46,7 @@ tcf_bind_filter(struct tcf_proto *tp, struct tcf_result *r, unsigned long base)
 		tp->q->ops->cl_ops->unbind_tcf(tp->q, cl);
 }
 
-static inline void
-tcf_unbind_filter(struct tcf_proto *tp, struct tcf_result *r)
+static inline void tcf_unbind_filter(struct tcf_proto *tp, struct tcf_result *r)
 {
 	unsigned long cl;
 
@@ -91,8 +89,7 @@ static inline int tcf_exts_init(struct tcf_exts *exts, int action, int police)
  * Returns 1 if a predicative extension is present, i.e. an extension which
  * might cause further actions and thus overrule the regular tcf_result.
  */
-static inline int
-tcf_exts_is_predicative(struct tcf_exts *exts)
+static inline int tcf_exts_is_predicative(struct tcf_exts *exts)
 {
 #ifdef CONFIG_NET_CLS_ACT
 	return exts->nr_actions;
@@ -107,8 +104,7 @@ tcf_exts_is_predicative(struct tcf_exts *exts)
  *
  * Returns 1 if at least one extension is present.
  */
-static inline int
-tcf_exts_is_available(struct tcf_exts *exts)
+static inline int tcf_exts_is_available(struct tcf_exts *exts)
 {
 	/* All non-predicative extensions must be added here. */
 	return tcf_exts_is_predicative(exts);
@@ -139,9 +135,8 @@ static inline void tcf_exts_to_list(const struct tcf_exts *exts,
  * a positive action code (TC_ACT_*) which must be returned to the
  * underlying layer.
  */
-static inline int
-tcf_exts_exec(struct sk_buff *skb, struct tcf_exts *exts,
-	       struct tcf_result *res)
+static inline int tcf_exts_exec(struct sk_buff *skb, struct tcf_exts *exts,
+				struct tcf_result *res)
 {
 #ifdef CONFIG_NET_CLS_ACT
 	if (exts->nr_actions)
@@ -196,7 +191,7 @@ struct tcf_ematch_ops;
  * @data: ematch specific data
  */
 struct tcf_ematch {
-	struct tcf_ematch_ops * ops;
+	struct tcf_ematch_ops *ops;
 	unsigned long		data;
 	unsigned int		datalen;
 	u16			matchid;
@@ -237,7 +232,6 @@ static inline int tcf_em_early_end(struct tcf_ematch *em, int result)
 
 	return 0;
 }
-	
 /**
  * struct tcf_ematch_tree - ematch tree handle
  *
@@ -246,8 +240,7 @@ static inline int tcf_em_early_end(struct tcf_ematch *em, int result)
  */
 struct tcf_ematch_tree {
 	struct tcf_ematch_tree_hdr hdr;
-	struct tcf_ematch *	matches;
-	
+	struct tcf_ematch	*matches;
 };
 
 /**
@@ -343,7 +336,7 @@ struct tcf_ematch_tree {
 
 #endif /* CONFIG_NET_EMATCH */
 
-static inline unsigned char * tcf_get_base_ptr(struct sk_buff *skb, int layer)
+static inline unsigned char *tcf_get_base_ptr(struct sk_buff *skb, int layer)
 {
 	switch (layer) {
 		case TCF_LAYER_LINK:
@@ -368,8 +361,7 @@ static inline int tcf_valid_offset(const struct sk_buff *skb,
 #ifdef CONFIG_NET_CLS_IND
 #include <net/net_namespace.h>
 
-static inline int
-tcf_change_indev(struct net *net, struct nlattr *indev_tlv)
+static inline int tcf_change_indev(struct net *net, struct nlattr *indev_tlv)
 {
 	char indev[IFNAMSIZ];
 	struct net_device *dev;
@@ -382,8 +374,7 @@ tcf_change_indev(struct net *net, struct nlattr *indev_tlv)
 	return dev->ifindex;
 }
 
-static inline bool
-tcf_match_indev(struct sk_buff *skb, int ifindex)
+static inline bool tcf_match_indev(struct sk_buff *skb, int ifindex)
 {
 	if (!ifindex)
 		return true;

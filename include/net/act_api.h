@@ -118,7 +118,8 @@ struct tc_action_ops {
 			struct nlattr *est, struct tc_action **act, int ovr,
 			int bind);
 	int     (*walk)(struct net *, struct sk_buff *,
-			struct netlink_callback *, int, const struct tc_action_ops *);
+			struct netlink_callback *, int,
+			const struct tc_action_ops *);
 	void	(*stats_update)(struct tc_action *, u64, u32, u64);
 	int	(*get_dev)(const struct tc_action *a, struct net *net,
 			   struct net_device **mirred_dev);
@@ -162,8 +163,8 @@ u32 tcf_hash_new_index(struct tc_action_net *tn);
 bool tcf_hash_check(struct tc_action_net *tn, u32 index, struct tc_action **a,
 		    int bind);
 int tcf_hash_create(struct tc_action_net *tn, u32 index, struct nlattr *est,
-		    struct tc_action **a, const struct tc_action_ops *ops, int bind,
-		    bool cpustats);
+		    struct tc_action **a, const struct tc_action_ops *ops,
+		    int bind, bool cpustats);
 void tcf_hash_cleanup(struct tc_action *a, struct nlattr *est);
 void tcf_hash_insert(struct tc_action_net *tn, struct tc_action *a);
 
