@@ -10,6 +10,7 @@
  */
 
 #include <linux/export.h>
+#include <linux/mm.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/sdio.h>
@@ -307,7 +308,7 @@ static int sdio_io_rw_ext_helper(struct sdio_func *func, int write,
 	unsigned max_blocks;
 	int ret;
 
-	if (!func || (func->num > 7))
+	if (!func || (func->num > 7) || is_vmalloc_addr(buf))
 		return -EINVAL;
 
 	/* Do the bulk of the transfer using block mode (if supported). */
