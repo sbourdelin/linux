@@ -69,6 +69,42 @@ struct cpu_info_ctx {
 	int			err;
 };
 
+/*
+ * Those patch levels cannot be updated to newer ones and thus should be final.
+ */
+static u32 final_levels[] = {
+	0x01000098,
+	0x0100009f,
+	0x010000af,
+	0, /* T-101 terminator */
+};
+
+/*
+ * Check the current patch level on this CPU.
+ *
+ * Returns:
+ *  - true: if update should stop
+ *  - false: otherwise
+ */
+static bool amd_check_current_patch_level(void)
+{
+	u32 lvl, dummy, i;
+	u32 *levels;
+
+	microcode_rdmsr(MSR_AMD64_PATCH_LEVEL, lvl, dummy);
+
+	if (IS_ENABLED(CONFIG_X86_32))
+		levels = (u32 *)__pa_nodebug(&final_levels);
+	else
+		levels = final_levels;
+
+	for (i = 0; levels[i]; i++) {
+		if (lvl == levels[i])
+			return true;
+	}
+	return false;
+}
+
 static bool __init check_loader_disabled_bsp(void)
 {
 	static const char *__dis_opt_str = "dis_ucode_ldr";
@@ -94,6 +130,11 @@ static bool __init check_loader_disabled_bsp(void)
 	 */
 	if (native_cpuid_ecx(1) & BIT(31))
 		return *res;
+
+	if (x86_cpuid_vendor() == X86_VENDOR_AMD) {
+		if (amd_check_current_patch_level())
+			return *res;
+	}
 
 	if (cmdline_find_option_bool(cmdline, option) <= 0)
 		*res = false;
@@ -122,15 +163,14 @@ bool get_builtin_firmware(struct cpio_data *cd, const char *name)
 
 void __init load_ucode_bsp(void)
 {
-	unsigned int vendor, cpuid_1_eax;
+	unsigned int cpuid_1_eax;
 
 	if (check_loader_disabled_bsp())
 		return;
 
-	vendor	    = x86_cpuid_vendor();
 	cpuid_1_eax = native_cpuid_eax(1);
 
-	switch (vendor) {
+	switch (x86_cpuid_vendor()) {
 	case X86_VENDOR_INTEL:
 		if (x86_family(cpuid_1_eax) >= 6)
 			load_ucode_intel_bsp();
@@ -155,15 +195,14 @@ static bool check_loader_disabled_ap(void)
 
 void load_ucode_ap(void)
 {
-	unsigned int vendor, cpuid_1_eax;
+	unsigned int cpuid_1_eax;
 
 	if (check_loader_disabled_ap())
 		return;
 
-	vendor	    = x86_cpuid_vendor();
 	cpuid_1_eax = native_cpuid_eax(1);
 
-	switch (vendor) {
+	switch (x86_cpuid_vendor()) {
 	case X86_VENDOR_INTEL:
 		if (x86_family(cpuid_1_eax) >= 6)
 			load_ucode_intel_ap();
