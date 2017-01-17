@@ -8128,6 +8128,36 @@ const char *netdev_drivername(const struct net_device *dev)
 	return empty;
 }
 
+/**
+ *	device_to_net_device - return the net_device from device
+ *	@dev: device reference
+ *
+ *	Returns the net_device associated with this device reference
+ *	NULL if the device is not a network device, or could not be
+ *	found.
+ *
+ *	Note: caller must call dev_put() to release the net_device
+ *	once done with it.
+ */
+struct net_device *device_to_net_device(struct device *dev)
+{
+	struct device *d;
+
+	d = device_find_in_class_name(dev, "net");
+	if (d) {
+		struct net_device *nd;
+
+		nd = to_net_dev(d);
+		dev_hold(nd);
+		put_device(d);
+
+		return nd;
+	}
+
+	return NULL;
+}
+EXPORT_SYMBOL_GPL(device_to_net_device);
+
 static void __netdev_printk(const char *level, const struct net_device *dev,
 			    struct va_format *vaf)
 {

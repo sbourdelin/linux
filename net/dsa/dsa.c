@@ -473,24 +473,6 @@ struct mii_bus *dsa_host_dev_to_mii_bus(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(dsa_host_dev_to_mii_bus);
 
-static struct net_device *dev_to_net_device(struct device *dev)
-{
-	struct device *d;
-
-	d = device_find_in_class_name(dev, "net");
-	if (d != NULL) {
-		struct net_device *nd;
-
-		nd = to_net_dev(d);
-		dev_hold(nd);
-		put_device(d);
-
-		return nd;
-	}
-
-	return NULL;
-}
-
 #ifdef CONFIG_OF
 static int dsa_of_setup_routing_table(struct dsa_platform_data *pd,
 					struct dsa_chip_data *cd,
@@ -799,7 +781,7 @@ static int dsa_probe(struct platform_device *pdev)
 		dev = pd->of_netdev;
 		dev_hold(dev);
 	} else {
-		dev = dev_to_net_device(pd->netdev);
+		dev = device_to_net_device(pd->netdev);
 	}
 	if (dev == NULL) {
 		ret = -EPROBE_DEFER;
