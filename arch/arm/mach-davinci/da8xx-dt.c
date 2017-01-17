@@ -61,6 +61,14 @@ static void __init da850_init_machine(void)
 		pr_warn("%s: registering USB 1.1 PHY clock failed: %d",
 			__func__, ret);
 
+	if (of_machine_is_compatible("ti,da850-evm") ||
+	    of_machine_is_compatible("ti,da850-lcdk")) {
+		ret = da850_register_sata_refclk(100000000);
+		if (ret)
+			pr_warn("%s: registering SATA_REFCLK clock failed: %d",
+				__func__, ret);
+	}
+
 	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
 	davinci_pm_init();
 }
