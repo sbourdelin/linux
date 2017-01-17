@@ -155,7 +155,7 @@ static void req_bio_endio(struct request *rq, struct bio *bio,
 
 	/* don't actually finish bio if it's part of flush sequence */
 	if (bio->bi_iter.bi_size == 0 && !(rq->rq_flags & RQF_FLUSH_SEQ))
-		bio_endio(bio);
+		__bio_endio(bio);
 }
 
 void blk_dump_rq_flags(struct request *rq, char *msg)
@@ -1933,7 +1933,7 @@ not_supported:
 	err = -EOPNOTSUPP;
 end_io:
 	bio->bi_error = err;
-	bio_endio(bio);
+	__bio_endio(bio);
 	return false;
 }
 

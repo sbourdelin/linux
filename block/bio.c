@@ -1785,16 +1785,7 @@ static inline bool bio_remaining_done(struct bio *bio)
 	return false;
 }
 
-/**
- * bio_endio - end I/O on a bio
- * @bio:	bio
- *
- * Description:
- *   bio_endio() will end I/O on the whole bio. bio_endio() is the preferred
- *   way to end I/O on a bio. No one should call bi_end_io() directly on a
- *   bio unless they own it and thus know that it has an end_io function.
- **/
-void bio_endio(struct bio *bio)
+void __bio_endio(struct bio *bio)
 {
 again:
 	if (!bio_remaining_done(bio))
@@ -1815,6 +1806,22 @@ again:
 
 	if (bio->bi_end_io)
 		bio->bi_end_io(bio);
+}
+
+/**
+ * bio_endio - end I/O on a bio
+ * @bio:	bio
+ *
+ * Description:
+ *   bio_endio() will end I/O on the whole bio. bio_endio() is the preferred
+ *   way to end I/O on a bio. No one should call bi_end_io() directly on a
+ *   bio unless they own it and thus know that it has an end_io function.
+ **/
+void bio_endio(struct bio *bio)
+{
+	trace_block_bio_complete(bdev_get_queue(bio->bi_bdev),
+				 bio, bio->bi_error);
+	__bio_endio(bio);
 }
 EXPORT_SYMBOL(bio_endio);
 
