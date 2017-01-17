@@ -5,20 +5,33 @@
 #include <linux/earlycpio.h>
 #include <linux/initrd.h>
 
-#define native_rdmsr(msr, val1, val2)			\
+static inline unsigned long long __rdmsr(unsigned int msr)
+{
+	DECLARE_ARGS(val, low, high);
+
+	asm volatile("1: rdmsr\n"
+		     "2:\n"
+		     : EAX_EDX_RET(val, low, high) : "c" (msr));
+	return EAX_EDX_VAL(val, low, high);
+}
+
+#define microcode_rdmsr(msr, val1, val2)		\
 do {							\
-	u64 __val = native_read_msr((msr));		\
+	u64 __val = __rdmsr((msr));			\
 	(void)((val1) = (u32)__val);			\
 	(void)((val2) = (u32)(__val >> 32));		\
 } while (0)
 
-#define native_wrmsr(msr, low, high)			\
-	native_write_msr(msr, low, high)
+static inline void microcode_wrmsr(unsigned int msr, u64 val)
+{
+	u32 low, high;
 
-#define native_wrmsrl(msr, val)				\
-	native_write_msr((msr),				\
-			 (u32)((u64)(val)),		\
-			 (u32)((u64)(val) >> 32))
+	low  = (u32)val;
+	high = (u32)(val >> 32);
+
+	asm volatile("wrmsr\n"
+		     :: "c" (msr), "a"(low), "d" (high) : "memory");
+}
 
 struct ucode_patch {
 	struct list_head plist;

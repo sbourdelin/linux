@@ -198,10 +198,10 @@ static int __apply_microcode_amd(struct microcode_amd *mc_amd)
 {
 	u32 rev, dummy;
 
-	native_wrmsrl(MSR_AMD64_PATCH_LOADER, (u64)(long)&mc_amd->hdr.data_code);
+	microcode_wrmsr(MSR_AMD64_PATCH_LOADER, (u64)(long)&mc_amd->hdr.data_code);
 
 	/* verify patch application was successful */
-	native_rdmsr(MSR_AMD64_PATCH_LEVEL, rev, dummy);
+	microcode_rdmsr(MSR_AMD64_PATCH_LEVEL, rev, dummy);
 	if (rev != mc_amd->hdr.patch_id)
 		return -1;
 
@@ -656,7 +656,7 @@ bool check_current_patch_level(u32 *rev, bool early)
 	bool ret = false;
 	u32 *levels;
 
-	native_rdmsr(MSR_AMD64_PATCH_LEVEL, lvl, dummy);
+	microcode_rdmsr(MSR_AMD64_PATCH_LEVEL, lvl, dummy);
 
 	if (IS_ENABLED(CONFIG_X86_32) && early)
 		levels = (u32 *)__pa_nodebug(&final_levels);
