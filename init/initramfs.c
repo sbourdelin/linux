@@ -18,6 +18,7 @@
 #include <linux/dirent.h>
 #include <linux/syscalls.h>
 #include <linux/utime.h>
+#include <linux/file.h>
 
 static ssize_t __init xwrite(int fd, const char *p, size_t count)
 {
@@ -652,6 +653,7 @@ static int __init populate_rootfs(void)
 		 * us a chance to load before device_initcalls.
 		 */
 		load_default_modules();
+		flush_delayed_fput();
 	}
 	return 0;
 }
