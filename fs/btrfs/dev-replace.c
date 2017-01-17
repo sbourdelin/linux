@@ -558,7 +558,6 @@ static int btrfs_dev_replace_finishing(struct btrfs_fs_info *fs_info,
 			  rcu_str_deref(src_device->name),
 			  src_device->devid,
 			  rcu_str_deref(tgt_device->name));
-	tgt_device->is_tgtdev_for_dev_replace = 0;
 	tgt_device->devid = src_device->devid;
 	src_device->devid = BTRFS_DEV_REPLACE_DEVID;
 	memcpy(uuid_tmp, tgt_device->uuid, sizeof(uuid_tmp));
@@ -579,6 +578,12 @@ static int btrfs_dev_replace_finishing(struct btrfs_fs_info *fs_info,
 
 	btrfs_dev_replace_unlock(dev_replace, 1);
 
+	/*
+	 * Only change is_tgtdev_for_dev_replace flag after all its
+	 * users get released.
+	 */
+	wait_target_device(tgt_device);
+	tgt_device->is_tgtdev_for_dev_replace = 0;
 	btrfs_rm_dev_replace_blocked(fs_info);
 
 	btrfs_rm_dev_replace_remove_srcdev(fs_info, src_device);
