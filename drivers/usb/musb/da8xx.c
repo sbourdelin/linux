@@ -379,11 +379,7 @@ static int da8xx_musb_init(struct musb *musb)
 
 	musb->mregs += DA8XX_MENTOR_CORE_OFFSET;
 
-	ret = clk_prepare_enable(glue->clk);
-	if (ret) {
-		dev_err(glue->dev, "failed to enable clock\n");
-		return ret;
-	}
+	pm_runtime_get(musb->controller->parent);
 
 	/* Returns zero if e.g. not clocked */
 	rev = musb_readl(reg_base, DA8XX_USB_REVISION_REG);
@@ -426,7 +422,7 @@ static int da8xx_musb_init(struct musb *musb)
 err_phy_power_on:
 	phy_exit(glue->phy);
 fail:
-	clk_disable_unprepare(glue->clk);
+	pm_runtime_put(musb->controller->parent);
 	return ret;
 }
 
@@ -438,7 +434,7 @@ static int da8xx_musb_exit(struct musb *musb)
 
 	phy_power_off(glue->phy);
 	phy_exit(glue->phy);
-	clk_disable_unprepare(glue->clk);
+	pm_runtime_put(musb->controller->parent);
 
 	usb_put_phy(musb->xceiv);
 
@@ -584,6 +580,8 @@ static int da8xx_probe(struct platform_device *pdev)
 	pinfo.data = pdata;
 	pinfo.size_data = sizeof(*pdata);
 
+	pm_runtime_enable(&pdev->dev);
+
 	glue->musb = platform_device_register_full(&pinfo);
 	ret = PTR_ERR_OR_ZERO(glue->musb);
 	if (ret) {
@@ -614,12 +612,41 @@ static const struct of_device_id da8xx_id_table[] = {
 MODULE_DEVICE_TABLE(of, da8xx_id_table);
 #endif
 
+static int da8xx_runtime_suspend(struct device *dev)
+{
+	struct da8xx_glue *glue = dev_get_drvdata(dev);
+
+	clk_disable_unprepare(glue->clk);
+
+	return 0;
+}
+
+static int da8xx_runtime_resume(struct device *dev)
+{
+	int ret;
+	struct da8xx_glue *glue = dev_get_drvdata(dev);
+
+	ret = clk_prepare_enable(glue->clk);
+	if (ret) {
+		dev_err(glue->dev, "failed to enable clock\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+static const struct dev_pm_ops da8xx_pm_ops = {
+	.runtime_suspend = da8xx_runtime_suspend,
+	.runtime_resume = da8xx_runtime_resume,
+};
+
 static struct platform_driver da8xx_driver = {
 	.probe		= da8xx_probe,
 	.remove		= da8xx_remove,
 	.driver		= {
 		.name	= "musb-da8xx",
 		.of_match_table = of_match_ptr(da8xx_id_table),
+		.pm = &da8xx_pm_ops,
 	},
 };
 
