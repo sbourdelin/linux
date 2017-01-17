@@ -231,9 +231,13 @@ extern struct dma_controller *
 cppi_dma_controller_create(struct musb *musb, void __iomem *base);
 extern void cppi_dma_controller_destroy(struct dma_controller *c);
 
+typedef void (*cppi41_platform_dma_callback)(struct musb *musb);
 extern struct dma_controller *
 cppi41_dma_controller_create(struct musb *musb, void __iomem *base);
 extern void cppi41_dma_controller_destroy(struct dma_controller *c);
+extern struct musb *cppi41_dma_controller_to_musb(struct dma_controller *c);
+extern void cppi41_register_dma_callback(struct dma_controller *c,
+					 cppi41_platform_dma_callback callback);
 
 extern struct dma_controller *
 ux500_dma_controller_create(struct musb *musb, void __iomem *base);

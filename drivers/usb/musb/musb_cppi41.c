@@ -36,6 +36,8 @@ struct cppi41_dma_controller {
 	u32 rx_mode;
 	u32 tx_mode;
 	u32 auto_req;
+
+	cppi41_platform_dma_callback dma_callback;
 };
 
 static void save_rx_toggle(struct cppi41_dma_channel *cppi41_channel)
@@ -218,6 +220,10 @@ static void cppi41_dma_callback(void *private_data)
 	int is_hs = 0;
 	bool empty;
 
+	controller = cppi41_channel->controller;
+	if (controller->dma_callback)
+		controller->dma_callback(musb);
+
 	spin_lock_irqsave(&musb->lock, flags);
 
 	dmaengine_tx_status(cppi41_channel->dc, cppi41_channel->cookie,
@@ -250,8 +256,6 @@ static void cppi41_dma_callback(void *private_data)
 	 * We spin on HS (no longer than than 25us and setup a timer on
 	 * FS to check for the bit and complete the transfer.
 	 */
-	controller = cppi41_channel->controller;
-
 	if (is_host_active(musb)) {
 		if (musb->port1_status & USB_PORT_STAT_HIGH_SPEED)
 			is_hs = 1;
@@ -288,6 +292,16 @@ static void cppi41_dma_callback(void *private_data)
 out:
 	spin_unlock_irqrestore(&musb->lock, flags);
 }
+
+void cppi41_register_dma_callback(struct dma_controller *c,
+				  cppi41_platform_dma_callback callback)
+{
+	struct cppi41_dma_controller *controller = container_of(c,
+			struct cppi41_dma_controller, controller);
+
+	controller->dma_callback = callback;
+}
+EXPORT_SYMBOL_GPL(cppi41_register_dma_callback);
 
 static u32 update_ep_mode(unsigned ep, unsigned mode, u32 old)
 {
@@ -710,3 +724,12 @@ kzalloc_fail:
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(cppi41_dma_controller_create);
+
+struct musb *cppi41_dma_controller_to_musb(struct dma_controller *c)
+{
+	struct cppi41_dma_controller *controller = container_of(c,
+			struct cppi41_dma_controller, controller);
+
+	return controller->musb;
+}
+EXPORT_SYMBOL_GPL(cppi41_dma_controller_to_musb);
