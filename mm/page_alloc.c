@@ -3578,6 +3578,11 @@ retry_cpuset:
 	no_progress_loops = 0;
 	compact_priority = DEF_COMPACT_PRIORITY;
 	cpuset_mems_cookie = read_mems_allowed_begin();
+	ac->preferred_zoneref = first_zones_zonelist(ac->zonelist,
+					ac->high_zoneidx, ac->nodemask);
+	if (!ac->preferred_zoneref->zone)
+		goto nopage;
+
 
 	/*
 	 * The fast path uses conservative alloc_flags to succeed only until
@@ -3738,6 +3743,9 @@ retry:
 				&compaction_retries))
 		goto retry;
 
+	if (read_mems_allowed_retry(cpuset_mems_cookie))
+		goto retry_cpuset;
+
 	/* Reclaim has failed us, start killing things */
 	page = __alloc_pages_may_oom(gfp_mask, order, ac, &did_some_progress);
 	if (page)
@@ -3833,6 +3841,7 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 	if (likely(page))
 		goto out;
 
+no_zone:
 	/*
 	 * Runtime PM, block IO and its error handling path can deadlock
 	 * because I/O on the device might not complete.
@@ -3846,13 +3855,8 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 	 * Also recalculate the starting point for the zonelist iterator or
 	 * we could end up iterating over non-eligible zones endlessly.
 	 */
-	if (unlikely(ac.nodemask != nodemask)) {
-no_zone:
+	if (unlikely(ac.nodemask != nodemask))
 		ac.nodemask = nodemask;
-		ac.preferred_zoneref = first_zones_zonelist(ac.zonelist,
-						ac.high_zoneidx, ac.nodemask);
-		/* If we have NULL preferred zone, slowpath wll handle that */
-	}
 
 	page = __alloc_pages_slowpath(alloc_mask, order, &ac);
 
