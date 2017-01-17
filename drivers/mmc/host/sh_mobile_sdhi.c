@@ -143,6 +143,7 @@ MODULE_DEVICE_TABLE(of, sh_mobile_sdhi_of_match);
 
 struct sh_mobile_sdhi {
 	struct clk *clk;
+	struct clk *clk2;
 	struct tmio_mmc_data mmc_data;
 	struct tmio_mmc_dma dma_priv;
 	struct pinctrl *pinctrl;
@@ -187,6 +188,10 @@ static int sh_mobile_sdhi_clk_enable(struct tmio_mmc_host *host)
 	struct mmc_host *mmc = host->mmc;
 	struct sh_mobile_sdhi *priv = host_to_priv(host);
 	int ret = clk_prepare_enable(priv->clk);
+	if (ret < 0)
+		return ret;
+
+	ret = clk_prepare_enable(priv->clk2);
 	if (ret < 0)
 		return ret;
 
@@ -255,6 +260,8 @@ static void sh_mobile_sdhi_clk_disable(struct tmio_mmc_host *host)
 	struct sh_mobile_sdhi *priv = host_to_priv(host);
 
 	clk_disable_unprepare(priv->clk);
+	if (priv->clk2)
+		clk_disable_unprepare(priv->clk2);
 }
 
 static int sh_mobile_sdhi_card_busy(struct mmc_host *mmc)
@@ -583,6 +590,10 @@ static int sh_mobile_sdhi_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "cannot get clock: %d\n", ret);
 		goto eprobe;
 	}
+
+	priv->clk2 = devm_clk_get(&pdev->dev, "carddetect");
+	if (IS_ERR(priv->clk2))
+		priv->clk2 = NULL;
 
 	priv->pinctrl = devm_pinctrl_get(&pdev->dev);
 	if (!IS_ERR(priv->pinctrl)) {
