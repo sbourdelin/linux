@@ -805,6 +805,7 @@ struct dwc3_scratchpad_array {
  * @regs: base address for our registers
  * @regs_size: address space size
  * @fladj: frame length adjustment
+ * @incrx_type: INCR burst type adjustment
  * @irq_gadget: peripheral controller's IRQ number
  * @nr_scratch: number of scratch buffers
  * @u1u2: only used on revisions <1.83a for workaround
@@ -928,6 +929,12 @@ struct dwc3 {
 	enum usb_phy_interface	hsphy_mode;
 
 	u32			fladj;
+	/*
+	 * For INCR burst type.
+	 * First field: for undefined length INCR burst type enable.
+	 * Second field: for INCRx burst type enable
+	 */
+	u32			incrx_type[2];
 	u32			irq_gadget;
 	u32			nr_scratch;
 	u32			u1u2;
