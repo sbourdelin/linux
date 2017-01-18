@@ -84,7 +84,7 @@ error_release_irq:
 error_free_trig_info:
 	kfree(trig_info);
 error_put_trigger:
-	iio_trigger_put(trig);
+	iio_trigger_free(trig);
 error_ret:
 	return ret;
 }
@@ -99,7 +99,7 @@ static int iio_interrupt_trigger_remove(struct platform_device *pdev)
 	iio_trigger_unregister(trig);
 	free_irq(trig_info->irq, trig);
 	kfree(trig_info);
-	iio_trigger_put(trig);
+	iio_trigger_free(trig);
 
 	return 0;
 }
