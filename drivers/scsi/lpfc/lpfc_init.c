@@ -3367,8 +3367,15 @@ lpfc_sli4_nvmet_sgl_update(struct lpfc_hba *phba)
 	 * update on pci function's nvmet xri-sgl list
 	 */
 	els_xri_cnt = lpfc_sli4_get_els_iocb_cnt(phba);
-	nvmet_xri_cnt = 0;
+	nvmet_xri_cnt = phba->cfg_nvmet_mrq * phba->cfg_nvmet_mrq_post;
 	tot_cnt = phba->sli4_hba.max_cfg_param.max_xri - els_xri_cnt;
+	if (nvmet_xri_cnt > tot_cnt) {
+		phba->cfg_nvmet_mrq_post = tot_cnt / phba->cfg_nvmet_mrq;
+		nvmet_xri_cnt = phba->cfg_nvmet_mrq * phba->cfg_nvmet_mrq_post;
+		lpfc_printf_log(phba, KERN_INFO, LOG_SLI,
+				"6301 NVMET post-sgl count changed to %d\n",
+				phba->cfg_nvmet_mrq_post);
+	}
 
 	if (nvmet_xri_cnt > phba->sli4_hba.nvmet_xri_cnt) {
 		/* els xri-sgl expanded */
@@ -7721,13 +7728,15 @@ lpfc_sli4_queue_verify(struct lpfc_hba *phba)
 		phba->cfg_fcp_io_channel = io_channel;
 	if (phba->cfg_nvme_io_channel > io_channel)
 		phba->cfg_nvme_io_channel = io_channel;
+	if (phba->cfg_nvme_io_channel < phba->cfg_nvmet_mrq)
+		phba->cfg_nvmet_mrq = phba->cfg_nvme_io_channel;
 
 	lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
-			"2574 IO chann: %d fcp %d nvme %d hwQ: nvme %d "
-			"nvmet %d\n",
+			"2574 IO chann: %d fcp %d nvme %d hwQ: "
+			"nvme %d nvmet %d MRQ: %d\n",
 			phba->io_channel, phba->cfg_fcp_io_channel,
 			phba->cfg_nvme_io_channel, phba->cfg_nvme_max_hw_queue,
-			phba->cfg_nvmet_max_hw_queue);
+			phba->cfg_nvmet_max_hw_queue, phba->cfg_nvmet_mrq);
 
 	/* Get EQ depth from module parameter, fake the default for now */
 	phba->sli4_hba.eq_esize = LPFC_EQE_SIZE_4B;
@@ -7757,7 +7766,7 @@ int
 lpfc_sli4_queue_create(struct lpfc_hba *phba)
 {
 	struct lpfc_queue *qdesc;
-	int idx, io_channel, numwq, cnt = 0;
+	int idx, io_channel, numwq, cnt;
 
 	/*
 	 * Create HBA Record arrays.
@@ -7833,8 +7842,38 @@ lpfc_sli4_queue_create(struct lpfc_hba *phba)
 			goto out_error;
 		}
 
-		if (phba->nvmet_support == 0)
+		if (phba->nvmet_support) {
+			phba->sli4_hba.nvmet_cqset = kzalloc(
+					(sizeof(struct lpfc_queue *)
+					* phba->cfg_nvmet_mrq), GFP_KERNEL);
+			if (!phba->sli4_hba.nvmet_cqset) {
+				lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+						"3121 Fail allocate memory for "
+						"fast-path CQ set array\n");
+				goto out_error;
+			}
+			phba->sli4_hba.nvmet_mrq_hdr = kzalloc(
+					(sizeof(struct lpfc_queue *)
+					* phba->cfg_nvmet_mrq), GFP_KERNEL);
+			if (!phba->sli4_hba.nvmet_mrq_hdr) {
+				lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+						"3122 Fail allocate memory for "
+						"fast-path RQ set hdr array\n");
+				goto out_error;
+			}
+			phba->sli4_hba.nvmet_mrq_data = kzalloc(
+					(sizeof(struct lpfc_queue *)
+					* phba->cfg_nvmet_mrq), GFP_KERNEL);
+			if (!phba->sli4_hba.nvmet_mrq_data) {
+				lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+						"3124 Fail allocate memory for "
+						"fast-path RQ set data array\n");
+				goto out_error;
+			}
+			numwq = phba->cfg_nvmet_max_hw_queue;
+		} else {
 			numwq = phba->cfg_nvme_max_hw_queue;
+		}
 
 		phba->sli4_hba.nvme_wq =
 			kzalloc((numwq * sizeof(struct lpfc_queue *)),
@@ -7908,6 +7947,23 @@ lpfc_sli4_queue_create(struct lpfc_hba *phba)
 				goto out_error;
 			}
 			phba->sli4_hba.nvme_cq[idx] = qdesc;
+
+			if (idx < phba->cfg_nvmet_mrq) {
+
+				qdesc = lpfc_sli4_queue_alloc(
+					phba,
+					phba->sli4_hba.cq_esize,
+					phba->sli4_hba.cq_ecount);
+				if (!qdesc) {
+					lpfc_printf_log(phba,
+							KERN_ERR, LOG_INIT,
+							"3142 Failed allocate "
+							"NVME CQ Set (%d)\n",
+							idx);
+					goto out_error;
+				}
+				phba->sli4_hba.nvmet_cqset[idx] = qdesc;
+			}
 		}
 	}
 
@@ -7915,14 +7971,21 @@ lpfc_sli4_queue_create(struct lpfc_hba *phba)
 		if (phba->cfg_nvme_io_channel && (idx < numwq)) {
 			/* Create Fast Path NVME WQs. */
 
-			/* For NVME, every posted buffer potentially
+			/* For NVMET, every RQ posted buffer potentially
+			 * represents 1 IO.
+			 *
+			 * For NVME, every posted buffer potentially
 			 * represents 1 IO and IOs are spread across
 			 * cfg_nvme_max_hw_queue NVME hardware queues.
 			 *
 			 * Thus we need to ensure we have
 			 * enough WQE slots in the WQs to address all IOs.
 			 */
-			if (phba->nvmet_support == 0) {
+			if (phba->nvmet_support) {
+				cnt = LPFC_WQE128_DEF_COUNT;
+				if (cnt < phba->cfg_nvmet_mrq_post)
+					cnt = LPFC_WQE128_MAX_COUNT;
+			} else {
 				cnt = phba->cfg_nvme_posted_buf /
 					phba->cfg_nvme_max_hw_queue;
 				if (cnt < LPFC_WQE128_DEF_COUNT)
@@ -8068,6 +8131,44 @@ lpfc_sli4_queue_create(struct lpfc_hba *phba)
 	}
 	phba->sli4_hba.dat_rq = qdesc;
 
+	if (phba->nvmet_support) {
+		for (idx = 0; idx < phba->cfg_nvmet_mrq; idx++) {
+			/* Create NVMET Receive Queue for header */
+			qdesc = lpfc_sli4_queue_alloc(phba,
+						      phba->sli4_hba.rq_esize,
+						      phba->sli4_hba.rq_ecount);
+			if (!qdesc) {
+				lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+						"3146 Failed allocate "
+						"receive HRQ\n");
+				goto out_error;
+			}
+			phba->sli4_hba.nvmet_mrq_hdr[idx] = qdesc;
+
+			/* Only needed for header of RQ pair */
+			qdesc->rqbp = kzalloc(sizeof(struct lpfc_rqb),
+					      GFP_KERNEL);
+			if (qdesc->rqbp == NULL) {
+				lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+						"6131 Failed allocate "
+						"Header RQBP\n");
+				goto out_error;
+			}
+
+			/* Create NVMET Receive Queue for data */
+			qdesc = lpfc_sli4_queue_alloc(phba,
+						      phba->sli4_hba.rq_esize,
+						      phba->sli4_hba.rq_ecount);
+			if (!qdesc) {
+				lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+						"3156 Failed allocate "
+						"receive DRQ\n");
+				goto out_error;
+			}
+			phba->sli4_hba.nvmet_mrq_data[idx] = qdesc;
+		}
+	}
+
 	/* Create the Queues needed for Flash Optimized Fabric operations */
 	if (phba->cfg_fof)
 		lpfc_fof_queue_create(phba);
@@ -8135,6 +8236,39 @@ lpfc_sli4_queue_destroy(struct lpfc_hba *phba)
 		}
 		kfree(phba->sli4_hba.nvme_cq);
 		phba->sli4_hba.nvme_cq = NULL;
+	}
+
+	if (phba->sli4_hba.nvmet_cqset != NULL) {
+		/* Release NVME completion queue */
+		for (idx = 0; idx < phba->cfg_nvmet_mrq; idx++) {
+			if (phba->sli4_hba.nvmet_cqset[idx] != NULL) {
+				lpfc_sli4_queue_free(
+					phba->sli4_hba.nvmet_cqset[idx]);
+				phba->sli4_hba.nvmet_cqset[idx] = NULL;
+			}
+		}
+		kfree(phba->sli4_hba.nvmet_cqset);
+		phba->sli4_hba.nvmet_cqset = NULL;
+	}
+
+	if (phba->sli4_hba.nvmet_mrq_hdr != NULL) {
+		/* Release NVME completion queue */
+		for (idx = 0; idx < phba->cfg_nvmet_mrq; idx++) {
+			if (phba->sli4_hba.nvmet_mrq_hdr[idx] != NULL) {
+				lpfc_sli4_queue_free(
+					phba->sli4_hba.nvmet_mrq_hdr[idx]);
+				phba->sli4_hba.nvmet_mrq_hdr[idx] = NULL;
+			}
+			if (phba->sli4_hba.nvmet_mrq_data[idx] != NULL) {
+				lpfc_sli4_queue_free(
+					phba->sli4_hba.nvmet_mrq_data[idx]);
+				phba->sli4_hba.nvmet_mrq_data[idx] = NULL;
+			}
+		}
+		kfree(phba->sli4_hba.nvmet_mrq_hdr);
+		phba->sli4_hba.nvmet_mrq_hdr = NULL;
+		kfree(phba->sli4_hba.nvmet_mrq_data);
+		phba->sli4_hba.nvmet_mrq_data = NULL;
 	}
 
 	if (phba->sli4_hba.fcp_wq != NULL) {
@@ -8630,6 +8764,45 @@ lpfc_sli4_queue_setup(struct lpfc_hba *phba)
 			phba->sli4_hba.mbx_cq->queue_id,
 			phba->sli4_hba.hba_eq[0]->queue_id);
 
+	if (phba->nvmet_support) {
+		if (!phba->sli4_hba.nvmet_cqset) {
+			lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+					"3165 Fast-path NVME CQ Set "
+					"array not allocated\n");
+			rc = -ENOMEM;
+			goto out_destroy;
+		}
+		if (phba->cfg_nvmet_mrq > 1) {
+			rc = lpfc_cq_create_set(
+				phba, phba->sli4_hba.nvmet_cqset,
+				phba->sli4_hba.hba_eq,
+				LPFC_WCQ, LPFC_NVMET);
+			if (rc) {
+				lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+						"3164 Failed setup of NVME CQ "
+						"Set, rc = 0x%x\n",
+						(uint32_t)rc);
+				goto out_destroy;
+			}
+		} else {
+			/* Set up NVMET Receive Complete Queue */
+			rc = lpfc_cq_create(phba, phba->sli4_hba.nvmet_cqset[0],
+					    phba->sli4_hba.hba_eq[0],
+					    LPFC_WCQ, LPFC_NVMET);
+			if (rc) {
+				lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+						"6089 Failed setup NVMET CQ: "
+						"rc = 0x%x\n", (uint32_t)rc);
+				goto out_destroy;
+			}
+			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
+					"6090 NVMET CQ setup: cq-id=%d, "
+					"parent eq-id=%d\n",
+					phba->sli4_hba.nvmet_cqset[0]->queue_id,
+					phba->sli4_hba.hba_eq[0]->queue_id);
+		}
+	}
+
 	/* Set up slow-path ELS Complete Queue */
 	if (!phba->sli4_hba.els_cq) {
 		lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
@@ -8749,6 +8922,58 @@ lpfc_sli4_queue_setup(struct lpfc_hba *phba)
 				"parent cq-id=%d\n",
 				phba->sli4_hba.nvmels_wq->queue_id,
 				phba->sli4_hba.nvmels_cq->queue_id);
+	}
+
+	/*
+	 * Create NVMET Receive Queue (RQ)
+	 */
+	if (phba->nvmet_support) {
+		if ((!phba->sli4_hba.nvmet_cqset) ||
+		    (!phba->sli4_hba.nvmet_mrq_hdr) ||
+		    (!phba->sli4_hba.nvmet_mrq_data)) {
+			lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+					"6130 MRQ CQ Queues not "
+					"allocated\n");
+			rc = -ENOMEM;
+			goto out_destroy;
+		}
+		if (phba->cfg_nvmet_mrq > 1) {
+			rc = lpfc_mrq_create(phba,
+					     phba->sli4_hba.nvmet_mrq_hdr,
+					     phba->sli4_hba.nvmet_mrq_data,
+					     phba->sli4_hba.nvmet_cqset,
+					     LPFC_NVMET);
+			if (rc) {
+				lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+						"6098 Failed setup of NVMET "
+						"MRQ: rc = 0x%x\n",
+						(uint32_t)rc);
+				goto out_destroy;
+			}
+
+		} else {
+			rc = lpfc_rq_create(phba,
+					    phba->sli4_hba.nvmet_mrq_hdr[0],
+					    phba->sli4_hba.nvmet_mrq_data[0],
+					    phba->sli4_hba.nvmet_cqset[0],
+					    LPFC_NVMET);
+			if (rc) {
+				lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+						"6057 Failed setup of NVMET "
+						"Receive Queue: rc = 0x%x\n",
+						(uint32_t)rc);
+				goto out_destroy;
+			}
+
+			lpfc_printf_log(
+				phba, KERN_INFO, LOG_INIT,
+				"6099 NVMET RQ setup: hdr-rq-id=%d, "
+				"dat-rq-id=%d parent cq-id=%d\n",
+				phba->sli4_hba.nvmet_mrq_hdr[0]->queue_id,
+				phba->sli4_hba.nvmet_mrq_data[0]->queue_id,
+				phba->sli4_hba.nvmet_cqset[0]->queue_id);
+
+		}
 	}
 
 	if (!phba->sli4_hba.hdr_rq || !phba->sli4_hba.dat_rq) {
@@ -8880,6 +9105,23 @@ lpfc_sli4_queue_unset(struct lpfc_hba *phba)
 			if (phba->sli4_hba.nvme_cq[qidx])
 				lpfc_cq_destroy(phba,
 						phba->sli4_hba.nvme_cq[qidx]);
+	}
+	/* Unset NVMET MRQ queue */
+	if (phba->sli4_hba.nvmet_mrq_hdr) {
+		for (qidx = 0; qidx < phba->cfg_nvmet_mrq; qidx++)
+			if (phba->sli4_hba.nvmet_mrq_hdr[qidx])
+				lpfc_rq_destroy(
+					phba,
+					phba->sli4_hba.nvmet_mrq_hdr[qidx],
+					phba->sli4_hba.nvmet_mrq_data[qidx]);
+	}
+	/* Unset NVMET CQ Set complete queue */
+	if (phba->sli4_hba.nvmet_cqset) {
+		for (qidx = 0; qidx < phba->cfg_nvmet_mrq; qidx++)
+			if (phba->sli4_hba.nvmet_cqset[qidx])
+				lpfc_cq_destroy(
+					phba,
+					phba->sli4_hba.nvmet_cqset[qidx]);
 	}
 	/* Unset FCP response complete queue */
 	if (phba->sli4_hba.fcp_cq) {
@@ -10427,6 +10669,7 @@ lpfc_get_sli4_parameters(struct lpfc_hba *phba, LPFC_MBOXQ_t *mboxq)
 	    !phba->nvme_support) {
 		phba->nvme_support = 0;
 		phba->nvmet_support = 0;
+		phba->cfg_nvmet_mrq = 0;
 		phba->cfg_nvmet_max_hw_queue = 0;
 		phba->cfg_nvme_io_channel = 0;
 		phba->cfg_nvme_max_hw_queue = 0;
@@ -11373,8 +11616,11 @@ lpfc_pci_probe_one_s4(struct pci_dev *pdev, const struct pci_device_id *pid)
 	if (phba->intr_type != MSIX) {
 		if (phba->cfg_enable_fc4_type & LPFC_ENABLE_FCP)
 			phba->cfg_fcp_io_channel = 1;
-		if (phba->cfg_enable_fc4_type & LPFC_ENABLE_NVME)
+		if (phba->cfg_enable_fc4_type & LPFC_ENABLE_NVME) {
 			phba->cfg_nvme_io_channel = 1;
+			if (phba->nvmet_support)
+				phba->cfg_nvmet_mrq = 1;
+		}
 		phba->io_channel = 1;
 	}
 
