@@ -384,9 +384,8 @@ sys_cacheflush (unsigned long addr, int scope, int cache, unsigned long len)
 
 	if (scope == FLUSH_SCOPE_ALL) {
 		/* Only the superuser may explicitly flush the whole cache. */
-		ret = -EPERM;
 		if (!capable(CAP_SYS_ADMIN))
-			goto out;
+			return -EPERM;
 	} else {
 		struct vm_area_struct *vma;
 
