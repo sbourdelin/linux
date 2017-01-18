@@ -358,23 +358,26 @@ lpfc_debug_dump_q(struct lpfc_queue *q)
 }
 
 /**
- * lpfc_debug_dump_fcp_wq - dump all entries from a fcp work queue
+ * lpfc_debug_dump_wq - dump all entries from the fcp work queue
  * @phba: Pointer to HBA context object.
- * @fcp_wqidx: Index to a FCP work queue.
+ * @wqidx: Index to a FCP work queue.
  *
  * This function dumps all entries from a FCP work queue specified by the
- * @fcp_wqidx.
+ * @wqidx.
  **/
 static inline void
-lpfc_debug_dump_fcp_wq(struct lpfc_hba *phba, int fcp_wqidx)
+lpfc_debug_dump_wq(struct lpfc_hba *phba, int wqidx)
 {
 	/* sanity check */
-	if (fcp_wqidx >= phba->cfg_fcp_io_channel)
+	if (wqidx >= phba->cfg_fcp_io_channel) {
+		pr_err("WQIDX %d too large for FCP WQ max %d\n",
+		       wqidx, phba->cfg_fcp_io_channel);
 		return;
+	}
 
-	printk(KERN_ERR "FCP WQ: WQ[Idx:%d|Qid:%d]\n",
-		fcp_wqidx, phba->sli4_hba.fcp_wq[fcp_wqidx]->queue_id);
-	lpfc_debug_dump_q(phba->sli4_hba.fcp_wq[fcp_wqidx]);
+	pr_err("FCP WQ: WQ[Idx:%d|Qid:%d]\n",
+	       wqidx, phba->sli4_hba.fcp_wq[wqidx]->queue_id);
+	lpfc_debug_dump_q(phba->sli4_hba.fcp_wq[wqidx]);
 }
 
 /**
@@ -421,35 +424,37 @@ lpfc_debug_dump_fcp_cq(struct lpfc_hba *phba, int fcp_wqidx)
  * associated to the FCP work queue specified by the @fcp_wqidx.
  **/
 static inline void
-lpfc_debug_dump_hba_eq(struct lpfc_hba *phba, int fcp_wqidx)
+lpfc_debug_dump_hba_eq(struct lpfc_hba *phba, int wqidx)
 {
 	struct lpfc_queue *qdesc;
-	int fcp_eqidx, fcp_eqid;
-	int fcp_cqidx, fcp_cqid;
+	int eqidx, eqid;
+	int cqidx, cqid;
 
-	/* sanity check */
-	if (fcp_wqidx >= phba->cfg_fcp_io_channel)
+	/* Start with FCP Queues.  Sanity check the index */
+	if (wqidx >= phba->cfg_fcp_io_channel)
 		return;
-	fcp_cqid = phba->sli4_hba.fcp_wq[fcp_wqidx]->assoc_qid;
-	for (fcp_cqidx = 0; fcp_cqidx < phba->cfg_fcp_io_channel; fcp_cqidx++)
-		if (phba->sli4_hba.fcp_cq[fcp_cqidx]->queue_id == fcp_cqid)
+
+	cqid = phba->sli4_hba.fcp_wq[wqidx]->assoc_qid;
+	for (cqidx = 0; cqidx < phba->cfg_fcp_io_channel; cqidx++)
+		if (phba->sli4_hba.fcp_cq[cqidx]->queue_id == cqid)
 			break;
 	if (phba->intr_type == MSIX) {
-		if (fcp_cqidx >= phba->cfg_fcp_io_channel)
+		if (cqidx >= phba->io_channel)
 			return;
 	} else {
-		if (fcp_cqidx > 0)
+		if (cqidx > 0)
 			return;
 	}
 
-	fcp_eqidx = fcp_cqidx;
-	fcp_eqid = phba->sli4_hba.hba_eq[fcp_eqidx]->queue_id;
-	qdesc = phba->sli4_hba.hba_eq[fcp_eqidx];
+	eqidx = cqidx;
+	eqid = phba->sli4_hba.hba_eq[eqidx]->queue_id;
+	qdesc = phba->sli4_hba.hba_eq[eqidx];
 
-	printk(KERN_ERR "FCP EQ: WQ[Idx:%d|Qid:%d]->CQ[Idx:%d|Qid:%d]->"
-		"EQ[Idx:%d|Qid:%d]\n",
-		fcp_wqidx, phba->sli4_hba.fcp_wq[fcp_wqidx]->queue_id,
-		fcp_cqidx, fcp_cqid, fcp_eqidx, fcp_eqid);
+	pr_err(
+	       "FCP EQ: WQ[Idx:%d|Qid:%d]->CQ[Idx:%d|Qid:%d]->"
+	       "EQ[Idx:%d|Qid:%d]\n",
+	       wqidx, phba->sli4_hba.fcp_wq[wqidx]->queue_id,
+	       cqidx, cqid, eqidx, eqid);
 	lpfc_debug_dump_q(qdesc);
 }
 
@@ -556,13 +561,13 @@ lpfc_debug_dump_wq_by_id(struct lpfc_hba *phba, int qid)
 		if (phba->sli4_hba.fcp_wq[wq_idx]->queue_id == qid)
 			break;
 	if (wq_idx < phba->cfg_fcp_io_channel) {
-		printk(KERN_ERR "FCP WQ[Idx:%d|Qid:%d]\n", wq_idx, qid);
+		pr_err("FCP WQ[Idx:%d|Qid:%d]\n", wq_idx, qid);
 		lpfc_debug_dump_q(phba->sli4_hba.fcp_wq[wq_idx]);
 		return;
 	}
 
 	if (phba->sli4_hba.els_wq->queue_id == qid) {
-		printk(KERN_ERR "ELS WQ[Qid:%d]\n", qid);
+		pr_err("ELS WQ[Qid:%d]\n", qid);
 		lpfc_debug_dump_q(phba->sli4_hba.els_wq);
 	}
 }
@@ -625,19 +630,19 @@ lpfc_debug_dump_cq_by_id(struct lpfc_hba *phba, int qid)
 	} while (++cq_idx < phba->cfg_fcp_io_channel);
 
 	if (cq_idx < phba->cfg_fcp_io_channel) {
-		printk(KERN_ERR "FCP CQ[Idx:%d|Qid:%d]\n", cq_idx, qid);
+		pr_err("FCP CQ[Idx:%d|Qid:%d]\n", cq_idx, qid);
 		lpfc_debug_dump_q(phba->sli4_hba.fcp_cq[cq_idx]);
 		return;
 	}
 
 	if (phba->sli4_hba.els_cq->queue_id == qid) {
-		printk(KERN_ERR "ELS CQ[Qid:%d]\n", qid);
+		pr_err("ELS CQ[Qid:%d]\n", qid);
 		lpfc_debug_dump_q(phba->sli4_hba.els_cq);
 		return;
 	}
 
 	if (phba->sli4_hba.mbx_cq->queue_id == qid) {
-		printk(KERN_ERR "MBX CQ[Qid:%d]\n", qid);
+		pr_err("MBX CQ[Qid:%d]\n", qid);
 		lpfc_debug_dump_q(phba->sli4_hba.mbx_cq);
 	}
 }
@@ -655,12 +660,12 @@ lpfc_debug_dump_eq_by_id(struct lpfc_hba *phba, int qid)
 {
 	int eq_idx;
 
-	for (eq_idx = 0; eq_idx < phba->cfg_fcp_io_channel; eq_idx++) {
+	for (eq_idx = 0; eq_idx < phba->io_channel; eq_idx++) {
 		if (phba->sli4_hba.hba_eq[eq_idx]->queue_id == qid)
 			break;
 	}
 
-	if (eq_idx < phba->cfg_fcp_io_channel) {
+	if (eq_idx < phba->io_channel) {
 		printk(KERN_ERR "FCP EQ[Idx:%d|Qid:%d]\n", eq_idx, qid);
 		lpfc_debug_dump_q(phba->sli4_hba.hba_eq[eq_idx]);
 		return;
