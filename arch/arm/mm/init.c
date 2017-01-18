@@ -716,6 +716,7 @@ void fix_kernmem_perms(void)
 int __mark_rodata_ro(void *unused)
 {
 	update_sections_early(ro_perms, ARRAY_SIZE(ro_perms));
+	rodata_test();
 	return 0;
 }
 
@@ -739,6 +740,11 @@ void set_kernel_text_ro(void)
 #else
 static inline void fix_kernmem_perms(void) { }
 #endif /* CONFIG_DEBUG_RODATA */
+
+#ifdef CONFIG_DEBUG_RODATA_TEST
+const int rodata_test_data = 0xC3;
+EXPORT_SYMBOL_GPL(rodata_test_data);
+#endif
 
 void free_tcmmem(void)
 {

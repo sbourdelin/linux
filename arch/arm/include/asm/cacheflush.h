@@ -498,6 +498,16 @@ static inline void set_kernel_text_rw(void) { }
 static inline void set_kernel_text_ro(void) { }
 #endif
 
+#ifdef CONFIG_DEBUG_RODATA_TEST
+extern const int rodata_test_data;
+int rodata_test(void);
+#else
+static inline int rodata_test(void)
+{
+	return 0;
+}
+#endif
+
 void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
 			     void *kaddr, unsigned long len);
 

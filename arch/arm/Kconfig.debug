@@ -1749,6 +1749,11 @@ config DEBUG_SET_MODULE_RONX
 	  against certain classes of kernel exploits.
 	  If in doubt, say "N".
 
+config DEBUG_RODATA_TEST
+	bool "Testcase for the marking rodata read-only"
+	---help---
+	  This option enables a testcase for the setting rodata read-only.
+
 source "drivers/hwtracing/coresight/Kconfig"
 
 endmenu
