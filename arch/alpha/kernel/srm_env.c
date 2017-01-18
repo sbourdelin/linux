@@ -113,13 +113,15 @@ static ssize_t srm_env_proc_write(struct file *file, const char __user *buffer,
 	if (!buf)
 		return -ENOMEM;
 
-	res = -EINVAL;
-	if (count >= PAGE_SIZE)
+	if (count >= PAGE_SIZE) {
+		res = -EINVAL;
 		goto out;
+	}
 
-	res = -EFAULT;
-	if (copy_from_user(buf, buffer, count))
+	if (copy_from_user(buf, buffer, count)) {
+		res = -EFAULT;
 		goto out;
+	}
 	buf[count] = '\0';
 
 	ret1 = callback_setenv(id, buf, count);
