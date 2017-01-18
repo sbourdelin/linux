@@ -1577,6 +1577,19 @@ vchiq_ioctl_compat_internal(
 		}
 	} break;
 
+	case VCHIQ_IOC_DUMP_PHYS_MEM32: {
+		struct vchiq_dump_mem32 args32;
+
+		if (copy_from_user
+			 (&args32, (const void __user *)arg,
+			  sizeof(args32))) {
+			ret = -EFAULT;
+			break;
+		}
+
+		dump_phys_mem(compat_ptr(args32.virt_addr), args32.num_bytes);
+	} break;
+
 	default:
 		ret = -ENOTTY;
 		break;
@@ -1624,6 +1637,7 @@ vchiq_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
 	case VCHIQ_IOC_AWAIT_COMPLETION32:
 	case VCHIQ_IOC_DEQUEUE_MESSAGE32:
 	case VCHIQ_IOC_GET_CONFIG32:
+	case VCHIQ_IOC_DUMP_PHYS_MEM32:
 		return vchiq_ioctl_compat_internal(file, cmd, arg);
 	default:
 		return vchiq_ioctl(file, cmd, arg);
