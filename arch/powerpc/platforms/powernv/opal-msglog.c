@@ -15,6 +15,7 @@
 #include <linux/of.h>
 #include <linux/types.h>
 #include <asm/barrier.h>
+#include <asm/setup.h>
 
 /* OPAL in-memory console. Defined in OPAL source at core/console.c */
 struct memcons {
@@ -104,11 +105,17 @@ static struct bin_attribute opal_msglog_attr = {
 
 void __init opal_msglog_init(void)
 {
-	u64 mcaddr;
+	u64 mcaddr, obuf_top;
 	struct memcons *mc;
 
 	if (of_property_read_u64(opal_node, "ibm,opal-memcons", &mcaddr)) {
 		pr_warn("OPAL: Property ibm,opal-memcons not found, no message log\n");
+		return;
+	}
+
+	if (memory_limit && (mcaddr + sizeof(*mc)) > memory_limit) {
+		pr_warn("OPAL: memcons descriptor (0x%llx, 0x%lx) is out of memory (0x%llx)\n",
+			mcaddr, sizeof(*mc), memory_limit);
 		return;
 	}
 
@@ -120,6 +127,13 @@ void __init opal_msglog_init(void)
 
 	if (be64_to_cpu(mc->magic) != MEMCONS_MAGIC) {
 		pr_warn("OPAL: memory console version is invalid\n");
+		return;
+	}
+
+	obuf_top = be64_to_cpu(mc->obuf_phys) + be32_to_cpu(mc->obuf_size);
+	if (memory_limit && obuf_top > memory_limit) {
+		pr_warn("OPAL: memcons output buffer ceiling (0x%llx) is out of memory (0x%llx)\n",
+			obuf_top, memory_limit);
 		return;
 	}
 
