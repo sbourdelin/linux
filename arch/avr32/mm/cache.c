@@ -126,30 +126,19 @@ void flush_icache_page(struct vm_area_struct *vma, struct page *page)
 
 asmlinkage int sys_cacheflush(int operation, void __user *addr, size_t len)
 {
-	int ret;
-
-	if (len > CACHEFLUSH_MAX_LEN) {
-		ret = -EPERM;
-		if (!capable(CAP_SYS_ADMIN))
-			goto out;
-	}
-
-	ret = -EFAULT;
+	if (len > CACHEFLUSH_MAX_LEN && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
 	if (!access_ok(VERIFY_WRITE, addr, len))
-		goto out;
+		return -EFAULT;
 
 	switch (operation) {
 	case CACHE_IFLUSH:
 		flush_icache_range((unsigned long)addr,
 				   (unsigned long)addr + len);
-		ret = 0;
-		break;
+		return 0;
 	default:
-		ret = -EINVAL;
+		return -EINVAL;
 	}
-
-out:
-	return ret;
 }
 
 void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
