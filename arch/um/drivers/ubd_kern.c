@@ -1049,19 +1049,21 @@ static int ubd_remove(int n, char **error_out)
 {
 	struct gendisk *disk = ubd_gendisk[n];
 	struct ubd *ubd_dev;
-	int err = -ENODEV;
+	int err;
 
 	mutex_lock(&ubd_lock);
 
 	ubd_dev = &ubd_devs[n];
-
-	if(ubd_dev->file == NULL)
+	if (!ubd_dev->file) {
+		err = -ENODEV;
 		goto out;
+	}
 
 	/* you cannot remove a open disk */
-	err = -EBUSY;
-	if(ubd_dev->count > 0)
+	if (ubd_dev->count > 0) {
+		err = -EBUSY;
 		goto out;
+	}
 
 	ubd_gendisk[n] = NULL;
 	if(disk != NULL){
