@@ -395,6 +395,15 @@ i915_gem_object_wait_fence(struct dma_fence *fence,
 			rps = NULL;
 	}
 
+	/* Very rarely do we wait whilst holding the mutex. We try to always
+	 * do an unlocked wait before using a locked wait. However, when we
+	 * have to resort to a locked wait, we want that wait to be as short
+	 * as possible as the struct_mutex is our BKL that will stall the
+	 * driver and all clients.
+	 */
+	if (flags & I915_WAIT_LOCKED && rq->engine->schedule)
+		rq->engine->schedule(rq, I915_PRIORITY_MAX);
+
 	timeout = i915_wait_request(rq, flags, timeout);
 
 out:
