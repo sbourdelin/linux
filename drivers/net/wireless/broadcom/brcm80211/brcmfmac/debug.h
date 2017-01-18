@@ -50,16 +50,23 @@
  * debugging is not selected. When debugging the driver error
  * messages are as important as other tracing or even more so.
  */
-#define brcmf_err(fmt, ...)						\
+#define __brcmf_err(dev, fmt, ...)					\
 	do {								\
 		if (IS_ENABLED(CONFIG_BRCMDBG) || net_ratelimit())	\
-			pr_err("%s: " fmt, __func__, ##__VA_ARGS__);	\
+			dev_err(dev, "%s: " fmt, __func__,		\
+				##__VA_ARGS__);				\
 	} while (0)
+#define brcmf_err(fmt, ...)						\
+	__brcmf_err(NULL, fmt, ##__VA_ARGS__)
+#define brcmf_err_pub(pub, fmt, ...)					\
+	__brcmf_err(pub->bus_if->dev, fmt, ##__VA_ARGS__)
 #else
-__printf(2, 3)
-void __brcmf_err(const char *func, const char *fmt, ...);
+__printf(3, 4)
+void __brcmf_err(struct brcmf_pub *pub, const char *func, const char *fmt, ...);
 #define brcmf_err(fmt, ...) \
-	__brcmf_err(__func__, fmt, ##__VA_ARGS__)
+	__brcmf_err(NULL, __func__, fmt, ##__VA_ARGS__)
+#define brcmf_err_pub(fmt, ...) \
+	__brcmf_err(pub, __func__, fmt, ##__VA_ARGS__)
 #endif
 
 #if defined(DEBUG) || defined(CONFIG_BRCM_TRACING)
