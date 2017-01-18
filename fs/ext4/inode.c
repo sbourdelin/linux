@@ -5382,6 +5382,16 @@ int ext4_getattr(struct vfsmount *mnt, struct dentry *dentry,
 	return 0;
 }
 
+int ext4_validate(struct inode *inode)
+{
+	if (inode->i_nlink == 0) {
+		EXT4_ERROR_INODE(inode, "bad nlink value: %lu", inode->i_nlink);
+		return -EFSCORRUPTED;
+	}
+
+	return 0;
+}
+
 static int ext4_index_trans_blocks(struct inode *inode, int lblocks,
 				   int pextents)
 {
