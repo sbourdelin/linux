@@ -572,6 +572,87 @@ vchiq_ioctl_create_service(VCHIQ_INSTANCE_T instance,
 	return 0;
 }
 
+static long
+vchiq_ioctl_queue_bulk(VCHIQ_INSTANCE_T instance,
+		       VCHIQ_QUEUE_BULK_TRANSFER_T *args,
+		       VCHIQ_BULK_DIR_T dir,
+		       VCHIQ_STATUS_T *status,
+		       bool *needs_ret_mode_waiting)
+{
+	struct bulk_waiter_node *waiter = NULL;
+	*needs_ret_mode_waiting = false;
+
+	if (args->mode == VCHIQ_BULK_MODE_BLOCKING) {
+		waiter = kzalloc(sizeof(*waiter), GFP_KERNEL);
+
+		if (!waiter)
+			return -ENOMEM;
+
+		args->userdata = &waiter->bulk_waiter;
+	} else if (args->mode == VCHIQ_BULK_MODE_WAITING) {
+		struct list_head *pos;
+
+		mutex_lock(&instance->bulk_waiter_list_mutex);
+		list_for_each(pos, &instance->bulk_waiter_list) {
+			if (list_entry(pos, struct bulk_waiter_node,
+				       list)->pid == current->pid) {
+					waiter = list_entry(pos,
+							    struct bulk_waiter_node,
+							    list);
+					list_del(pos);
+					break;
+				}
+		}
+
+		mutex_unlock(&instance->bulk_waiter_list_mutex);
+		if (!waiter) {
+			vchiq_log_error(vchiq_arm_log_level,
+					"no bulk_waiter found for pid %d",
+					current->pid);
+			return -ESRCH;
+		}
+
+		vchiq_log_info(vchiq_arm_log_level,
+			       "found bulk_waiter %pK for pid %d", waiter,
+			       current->pid);
+		args->userdata = &waiter->bulk_waiter;
+	}
+
+	*status = vchiq_bulk_transfer(args->handle,
+			 VCHI_MEM_HANDLE_INVALID,
+			 args->data, args->size,
+			 args->userdata, args->mode,
+			 dir);
+
+	if (!waiter)
+		return 0;
+
+	if ((*status != VCHIQ_RETRY) || fatal_signal_pending(current) ||
+	    !waiter->bulk_waiter.bulk) {
+		if (waiter->bulk_waiter.bulk) {
+			/*
+			 * Cancel the signal when the transfer
+			 * completes.
+			 */
+			spin_lock(&bulk_waiter_spinlock);
+			waiter->bulk_waiter.bulk->userdata = NULL;
+			spin_unlock(&bulk_waiter_spinlock);
+		}
+		kfree(waiter);
+	} else {
+		*needs_ret_mode_waiting  = true;
+		waiter->pid = current->pid;
+		mutex_lock(&instance->bulk_waiter_list_mutex);
+		list_add(&waiter->list, &instance->bulk_waiter_list);
+		mutex_unlock(&instance->bulk_waiter_list_mutex);
+		vchiq_log_info(vchiq_arm_log_level,
+			       "saved bulk_waiter %pK for pid %d",
+			       waiter, current->pid);
+	}
+
+	return 0;
+}
+
 /****************************************************************************
 *
 *   vchiq_ioctl
@@ -774,7 +855,7 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case VCHIQ_IOC_QUEUE_BULK_TRANSMIT:
 	case VCHIQ_IOC_QUEUE_BULK_RECEIVE: {
 		VCHIQ_QUEUE_BULK_TRANSFER_T args;
-		struct bulk_waiter_node *waiter = NULL;
+		bool needs_ret_mode_waiting = false;
 		VCHIQ_BULK_DIR_T dir =
 			(cmd == VCHIQ_IOC_QUEUE_BULK_TRANSMIT) ?
 			VCHIQ_BULK_TRANSMIT : VCHIQ_BULK_RECEIVE;
@@ -792,75 +873,21 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
-		if (args.mode == VCHIQ_BULK_MODE_BLOCKING) {
-			waiter = kzalloc(sizeof(struct bulk_waiter_node),
-				GFP_KERNEL);
-			if (!waiter) {
-				ret = -ENOMEM;
-				break;
-			}
-			args.userdata = &waiter->bulk_waiter;
-		} else if (args.mode == VCHIQ_BULK_MODE_WAITING) {
-			struct list_head *pos;
-			mutex_lock(&instance->bulk_waiter_list_mutex);
-			list_for_each(pos, &instance->bulk_waiter_list) {
-				if (list_entry(pos, struct bulk_waiter_node,
-					list)->pid == current->pid) {
-					waiter = list_entry(pos,
-						struct bulk_waiter_node,
-						list);
-					list_del(pos);
-					break;
-				}
+		ret = vchiq_ioctl_queue_bulk(instance,
+					     &args,
+					     dir,
+					     &status,
+					     &needs_ret_mode_waiting);
 
-			}
-			mutex_unlock(&instance->bulk_waiter_list_mutex);
-			if (!waiter) {
-				vchiq_log_error(vchiq_arm_log_level,
-					"no bulk_waiter found for pid %d",
-					current->pid);
-				ret = -ESRCH;
-				break;
-			}
-			vchiq_log_info(vchiq_arm_log_level,
-				"found bulk_waiter %pK for pid %d", waiter,
-				current->pid);
-			args.userdata = &waiter->bulk_waiter;
-		}
-		status = vchiq_bulk_transfer
-			(args.handle,
-			 VCHI_MEM_HANDLE_INVALID,
-			 args.data, args.size,
-			 args.userdata, args.mode,
-			 dir);
-		if (!waiter)
-			break;
-		if ((status != VCHIQ_RETRY) || fatal_signal_pending(current) ||
-			!waiter->bulk_waiter.bulk) {
-			if (waiter->bulk_waiter.bulk) {
-				/* Cancel the signal when the transfer
-				** completes. */
-				spin_lock(&bulk_waiter_spinlock);
-				waiter->bulk_waiter.bulk->userdata = NULL;
-				spin_unlock(&bulk_waiter_spinlock);
-			}
-			kfree(waiter);
-		} else {
+		if (needs_ret_mode_waiting) {
 			const VCHIQ_BULK_MODE_T mode_waiting =
 				VCHIQ_BULK_MODE_WAITING;
-			waiter->pid = current->pid;
-			mutex_lock(&instance->bulk_waiter_list_mutex);
-			list_add(&waiter->list, &instance->bulk_waiter_list);
-			mutex_unlock(&instance->bulk_waiter_list_mutex);
-			vchiq_log_info(vchiq_arm_log_level,
-				"saved bulk_waiter %pK for pid %d",
-				waiter, current->pid);
 
 			if (copy_to_user((void __user *)
-				&(((VCHIQ_QUEUE_BULK_TRANSFER_T __user *)
-					arg)->mode),
-				(const void *)&mode_waiting,
-				sizeof(mode_waiting)) != 0)
+					 &(((VCHIQ_QUEUE_BULK_TRANSFER_T __user *)
+					 arg)->mode),
+					(const void *)&mode_waiting,
+					sizeof(mode_waiting)))
 				ret = -EFAULT;
 		}
 	} break;
@@ -1306,6 +1333,53 @@ vchiq_ioctl_compat_internal(
 						 elements, args32.count);
 	} break;
 
+	case VCHIQ_IOC_QUEUE_BULK_TRANSMIT32:
+	case VCHIQ_IOC_QUEUE_BULK_RECEIVE32: {
+		VCHIQ_QUEUE_BULK_TRANSFER_T args;
+		struct vchiq_queue_bulk_transfer32 args32;
+		bool needs_ret_mode_waiting = false;
+		VCHIQ_BULK_DIR_T dir =
+			(cmd == VCHIQ_IOC_QUEUE_BULK_TRANSMIT32) ?
+			VCHIQ_BULK_TRANSMIT : VCHIQ_BULK_RECEIVE;
+
+		if (copy_from_user
+			(&args32, (const void __user *)arg,
+			sizeof(args32))) {
+			ret = -EFAULT;
+			break;
+		}
+
+		args.handle   = args32.handle;
+		args.data     = compat_ptr(args32.data);
+		args.size     = args32.size;
+		args.userdata = compat_ptr(args32.userdata);
+		args.mode     = args32.mode;
+
+		service = find_service_for_instance(instance, args.handle);
+		if (!service) {
+			ret = -EINVAL;
+			break;
+		}
+
+		ret = vchiq_ioctl_queue_bulk(instance,
+					     &args,
+					     dir,
+					     &status,
+					     &needs_ret_mode_waiting);
+
+		if (needs_ret_mode_waiting) {
+			const VCHIQ_BULK_MODE_T mode_waiting =
+				VCHIQ_BULK_MODE_WAITING;
+
+			if (copy_to_user((void __user *)
+					 &(((struct vchiq_queue_bulk_transfer32 __user *)
+					 arg)->mode),
+					(const void *)&mode_waiting,
+					sizeof(mode_waiting)))
+				ret = -EFAULT;
+		}
+	} break;
+
 	default:
 		ret = -ENOTTY;
 		break;
@@ -1348,6 +1422,8 @@ vchiq_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case VCHIQ_IOC_CREATE_SERVICE32:
 	case VCHIQ_IOC_QUEUE_MESSAGE32:
+	case VCHIQ_IOC_QUEUE_BULK_TRANSMIT32:
+	case VCHIQ_IOC_QUEUE_BULK_RECEIVE32:
 		return vchiq_ioctl_compat_internal(file, cmd, arg);
 	default:
 		return vchiq_ioctl(file, cmd, arg);
