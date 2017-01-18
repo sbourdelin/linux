@@ -166,7 +166,7 @@ void *port_data(int port_num)
 		if (port->port == port_num)
 			goto found;
 	}
-	port = kmalloc(sizeof(struct port_list), GFP_KERNEL);
+	port = kmalloc(sizeof(*port), GFP_KERNEL);
 	if (!port)
 		goto out;
 
@@ -196,7 +196,7 @@ void *port_data(int port_num)
 	list_add(&port->list, &ports);
 
  found:
-	dev = kmalloc(sizeof(struct port_dev), GFP_KERNEL);
+	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev)
 		goto out;
 
