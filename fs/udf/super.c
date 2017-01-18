@@ -1957,7 +1957,7 @@ static int udf_load_vrs(struct super_block *sb, struct udf_options *uopt,
 		if (!nsr_off) {
 			if (!silent)
 				udf_warn(sb, "No VRS found\n");
-			return 0;
+			return -EINVAL;
 		}
 		if (nsr_off == -1)
 			udf_debug("Failed to read sector at offset %d. "
@@ -2161,15 +2161,19 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 		ret = udf_load_vrs(sb, &uopt, silent, &fileset);
 	} else {
 		uopt.blocksize = bdev_logical_block_size(sb->s_bdev);
-		ret = udf_load_vrs(sb, &uopt, silent, &fileset);
-		if (ret == -EAGAIN && uopt.blocksize != UDF_DEFAULT_BLOCKSIZE) {
-			if (!silent)
-				pr_notice("Rescanning with blocksize %d\n",
-					  UDF_DEFAULT_BLOCKSIZE);
-			brelse(sbi->s_lvid_bh);
-			sbi->s_lvid_bh = NULL;
-			uopt.blocksize = UDF_DEFAULT_BLOCKSIZE;
+		while (uopt.blocksize <= 4096) {
 			ret = udf_load_vrs(sb, &uopt, silent, &fileset);
+			if (ret < 0) {
+				if (!silent) {
+					pr_notice("Scanning with blocksize %d failed\n",
+						  uopt.blocksize);
+				}
+				brelse(sbi->s_lvid_bh);
+				sbi->s_lvid_bh = NULL;
+			} else
+				break;
+
+			uopt.blocksize <<= 1;
 		}
 	}
 	if (ret < 0) {
