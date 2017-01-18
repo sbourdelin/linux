@@ -703,6 +703,8 @@ static struct rt6_info *find_rr_leaf(struct fib6_node *fn,
 		}
 
 		match = find_match(rt, oif, strict, &mpri, match, do_rr);
+		if (match && ipv6_addr_is_multicast(&rt->rt6i_dst.addr))
+			return match;
 	}
 
 	for (rt = fn->leaf; rt && rt != rr_head; rt = rt->dst.rt6_next) {
@@ -712,13 +714,18 @@ static struct rt6_info *find_rr_leaf(struct fib6_node *fn,
 		}
 
 		match = find_match(rt, oif, strict, &mpri, match, do_rr);
+		if (match && ipv6_addr_is_multicast(&rt->rt6i_dst.addr))
+			return match;
 	}
 
 	if (match || !cont)
 		return match;
 
-	for (rt = cont; rt; rt = rt->dst.rt6_next)
+	for (rt = cont; rt; rt = rt->dst.rt6_next) {
 		match = find_match(rt, oif, strict, &mpri, match, do_rr);
+		if (match && ipv6_addr_is_multicast(&rt->rt6i_dst.addr))
+			return match;
+	}
 
 	return match;
 }
