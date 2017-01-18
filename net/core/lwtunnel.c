@@ -126,8 +126,14 @@ int lwtunnel_build_state(struct net_device *dev, u16 encap_type,
 		}
 	}
 #endif
-	if (likely(ops && ops->build_state))
+	/* take module reference if destroy_state is in use */
+	if (unlikely(ops && ops->destroy_state && !try_module_get(ops->owner)))
+		ops = NULL;
+	if (likely(ops && ops->build_state)) {
 		ret = ops->build_state(dev, encap, family, cfg, lws);
+		if (ret && ops->destroy_state)
+			module_put(ops->owner);
+	}
 	rcu_read_unlock();
 
 	return ret;
@@ -138,9 +144,10 @@ void lwtstate_free(struct lwtunnel_state *lws)
 {
 	const struct lwtunnel_encap_ops *ops = lwtun_encaps[lws->type];
 
-	if (ops->destroy_state) {
+	if (ops && ops->destroy_state) {
 		ops->destroy_state(lws);
 		kfree_rcu(lws, rcu);
+		module_put(ops->owner);
 	} else {
 		kfree(lws);
 	}
