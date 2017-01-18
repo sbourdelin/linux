@@ -141,9 +141,8 @@ setup_rt_frame(struct ksignal *ksig, sigset_t *set, struct pt_regs *regs)
 	int err = 0;
 
 	frame = get_sigframe(ksig, regs, sizeof(*frame));
-	err = -EFAULT;
 	if (!access_ok(VERIFY_WRITE, frame, sizeof (*frame)))
-		goto out;
+		return -EFAULT;
 
 	/*
 	 * Set up the return code:
