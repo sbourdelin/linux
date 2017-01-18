@@ -834,7 +834,7 @@ bpf_program__collect_reloc(struct bpf_program *prog,
 
 		map_idx = sym.st_value / prog->obj->map_len;
 		if (map_idx >= nr_maps) {
-			pr_warning("bpf relocation: map_idx %d large than %d\n",
+			pr_warning("bpf relocation: map_idx %d larger than %d\n",
 				   (int)map_idx, (int)nr_maps - 1);
 			return -LIBBPF_ERRNO__RELOC;
 		}
