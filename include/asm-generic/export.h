@@ -9,17 +9,14 @@
 #ifndef KSYM_ALIGN
 #define KSYM_ALIGN 8
 #endif
-#ifndef KCRC_ALIGN
-#define KCRC_ALIGN 8
-#endif
 #else
 #define __put .long
 #ifndef KSYM_ALIGN
 #define KSYM_ALIGN 4
 #endif
+#endif
 #ifndef KCRC_ALIGN
 #define KCRC_ALIGN 4
-#endif
 #endif
 
 #ifdef CONFIG_HAVE_UNDERSCORE_SYMBOL_PREFIX
@@ -52,8 +49,8 @@ KSYM(__kstrtab_\name):
 	.section ___kcrctab\sec+\name,"a"
 	.balign KCRC_ALIGN
 KSYM(__kcrctab_\name):
-	__put KSYM(__crc_\name)
-	.weak KSYM(__crc_\name)
+	.long KSYM(__crcp_\name) - .
+	.weak KSYM(__crcp_\name)
 	.previous
 #endif
 #endif
