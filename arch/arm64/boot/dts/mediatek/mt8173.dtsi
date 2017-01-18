@@ -754,8 +754,8 @@
 		u3phy: usb-phy@11290000 {
 			compatible = "mediatek,mt8173-u3phy";
 			reg = <0 0x11290000 0 0x800>;
-			clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
-			clock-names = "u3phya_ref";
+			clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>, <&clk26m>;
+			clock-names = "u2ref_clk", "u3ref_clk";
 			#address-cells = <2>;
 			#size-cells = <2>;
 			ranges;
