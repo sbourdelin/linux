@@ -11157,7 +11157,23 @@ lpfc_pci_probe_one_s4(struct pci_dev *pdev, const struct pci_device_id *pid)
 	/* Perform post initialization setup */
 	lpfc_post_init_setup(phba);
 
-	/* todo: init: register port with nvme */
+	/* NVME support in FW earlier in the driver load corrects the
+	 * FC4 type making a check for nvme_support unnecessary.
+	 */
+	if ((phba->nvmet_support == 0) &&
+	    (phba->cfg_enable_fc4_type & LPFC_ENABLE_NVME)) {
+		/* Create NVME binding with nvme_fc_transport. This
+		 * ensures the vport is initialized.
+		 */
+		error = lpfc_nvme_create_localport(vport);
+		if (error) {
+			lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+					"6004 NVME registration failed, "
+					"error x%x\n",
+					error);
+			goto out_disable_intr;
+		}
+	}
 
 	/* check for firmware upgrade or downgrade */
 	if (phba->cfg_request_firmware_upgrade)
@@ -11234,7 +11250,7 @@ lpfc_pci_remove_one_s4(struct pci_dev *pdev)
 	 * is destroyed after to ensure all rports are io-disabled.
 	 */
 	lpfc_cleanup(vport);
-	/* todo: init: unregister port with nvme */
+	lpfc_nvme_destroy_localport(vport);
 
 	/*
 	 * Bring down the SLI Layer. This step disables all interrupts,
