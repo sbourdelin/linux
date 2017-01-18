@@ -29,7 +29,7 @@ config MUX_ADG792A
 	  be called mux-adg792a.
 
 config MUX_GPIO
-	tristate "GPIO-controlled Multiplexer"
+	bool "GPIO-controlled Multiplexer"
 	depends on OF && GPIOLIB
 	help
 	  GPIO-controlled Multiplexer controller.
@@ -38,8 +38,5 @@ config MUX_GPIO
 	  of gpio pins. For N pins, there will be 2^N possible multiplexer
 	  states. The GPIO pins can be connected (by the hardware) to several
 	  multiplexers, which in that case will be operated in parallel.
-
-	  To compile the driver as a module, choose M here: the module will
-	  be called mux-gpio.
 
 endif

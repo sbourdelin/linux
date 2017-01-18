@@ -18,6 +18,8 @@
 #include <linux/platform_device.h>
 #include <linux/property.h>
 
+#include "mux-gpio.h"
+
 struct mux_gpio {
 	struct gpio_descs *gpios;
 	int *val;
@@ -48,24 +50,21 @@ static const struct of_device_id mux_gpio_dt_ids[] = {
 };
 MODULE_DEVICE_TABLE(of, mux_gpio_dt_ids);
 
-static int mux_gpio_probe(struct platform_device *pdev)
+struct mux_chip *mux_gpio_alloc(struct device *dev)
 {
-	struct device *dev = &pdev->dev;
-	struct device_node *np = dev->of_node;
 	struct mux_chip *mux_chip;
 	struct mux_gpio *mux_gpio;
 	int pins;
-	u32 idle_state;
 	int ret;
 
 	pins = gpiod_count(dev, "mux");
 	if (pins < 0)
-		return pins;
+		return ERR_PTR(pins);
 
 	mux_chip = devm_mux_chip_alloc(dev, 1, sizeof(*mux_gpio) +
 				       pins * sizeof(*mux_gpio->val));
 	if (!mux_chip)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	mux_gpio = mux_chip_priv(mux_chip);
 	mux_gpio->val = (int *)(mux_gpio + 1);
@@ -76,10 +75,25 @@ static int mux_gpio_probe(struct platform_device *pdev)
 		ret = PTR_ERR(mux_gpio->gpios);
 		if (ret != -EPROBE_DEFER)
 			dev_err(dev, "failed to get gpios\n");
-		return ret;
+		return ERR_PTR(ret);
 	}
 	WARN_ON(pins != mux_gpio->gpios->ndescs);
 	mux_chip->mux->states = 1 << pins;
+
+	return mux_chip;
+}
+EXPORT_SYMBOL_GPL(mux_gpio_alloc);
+
+static int mux_gpio_probe(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct mux_chip *mux_chip;
+	u32 idle_state;
+	int ret;
+
+	mux_chip = mux_gpio_alloc(dev);
+	if (IS_ERR(mux_chip))
+		return PTR_ERR(mux_chip);
 
 	ret = device_property_read_u32(dev, "idle-state", &idle_state);
 	if (ret >= 0) {

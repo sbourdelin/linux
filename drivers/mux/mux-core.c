@@ -21,6 +21,8 @@
 #include <linux/of_platform.h>
 #include <linux/slab.h>
 
+#include "mux-gpio.h"
+
 static struct class mux_class = {
 	.name = "mux",
 	.owner = THIS_MODULE,
@@ -314,9 +316,26 @@ struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
 	ret = of_parse_phandle_with_args(np,
 					 "mux-controls", "#mux-control-cells",
 					 index, &args);
+
+#ifdef CONFIG_MUX_GPIO
+	if (ret == -ENOENT && !mux_name) {
+		mux_chip = mux_gpio_alloc(dev);
+		if (!IS_ERR(mux_chip)) {
+			ret = devm_mux_chip_register(dev, mux_chip);
+			if (ret < 0)
+				return ERR_PTR(ret);
+			get_device(&mux_chip->dev);
+			return mux_chip->mux;
+		}
+
+		ret = PTR_ERR(mux_chip);
+	}
+#endif
+
 	if (ret) {
-		dev_err(dev, "%s: failed to get mux-control %s(%i)\n",
-			np->full_name, mux_name ?: "", index);
+		if (ret != -EPROBE_DEFER)
+			dev_err(dev, "%s: failed to get mux-control %s(%i)\n",
+				np->full_name, mux_name ?: "", index);
 		return ERR_PTR(ret);
 	}
 
