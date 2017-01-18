@@ -1426,8 +1426,7 @@ struct disk_events {
 	struct gendisk		*disk;		/* the associated disk */
 	spinlock_t		lock;
 
-	struct mutex		block_mutex;	/* protects blocking */
-	int			block;		/* event blocking depth */
+	atomic_t		block;		/* event blocking depth */
 	unsigned int		pending;	/* events already sent out */
 	unsigned int		clearing;	/* events being cleared */
 
@@ -1488,26 +1487,13 @@ static unsigned long disk_events_poll_jiffies(struct gendisk *disk)
 void disk_block_events(struct gendisk *disk)
 {
 	struct disk_events *ev = disk->ev;
-	unsigned long flags;
-	bool cancel;
 
 	if (!ev)
 		return;
 
-	/*
-	 * Outer mutex ensures that the first blocker completes canceling
-	 * the event work before further blockers are allowed to finish.
-	 */
-	mutex_lock(&ev->block_mutex);
-
-	spin_lock_irqsave(&ev->lock, flags);
-	cancel = !ev->block++;
-	spin_unlock_irqrestore(&ev->lock, flags);
-
-	if (cancel)
+	if (atomic_inc_return(&ev->block) == 1)
 		cancel_delayed_work_sync(&disk->ev->dwork);
 
-	mutex_unlock(&ev->block_mutex);
 }
 
 static void __disk_unblock_events(struct gendisk *disk, bool check_now)
@@ -1516,23 +1502,18 @@ static void __disk_unblock_events(struct gendisk *disk, bool check_now)
 	unsigned long intv;
 	unsigned long flags;
 
+	if (atomic_dec_return(&ev->block) > 0)
+		return;
+
 	spin_lock_irqsave(&ev->lock, flags);
-
-	if (WARN_ON_ONCE(ev->block <= 0))
-		goto out_unlock;
-
-	if (--ev->block)
-		goto out_unlock;
-
 	intv = disk_events_poll_jiffies(disk);
+	spin_unlock_irqrestore(&ev->lock, flags);
 	if (check_now)
 		queue_delayed_work(system_freezable_power_efficient_wq,
 				&ev->dwork, 0);
 	else if (intv)
 		queue_delayed_work(system_freezable_power_efficient_wq,
 				&ev->dwork, intv);
-out_unlock:
-	spin_unlock_irqrestore(&ev->lock, flags);
 }
 
 /**
@@ -1572,10 +1553,10 @@ void disk_flush_events(struct gendisk *disk, unsigned int mask)
 
 	spin_lock_irq(&ev->lock);
 	ev->clearing |= mask;
-	if (!ev->block)
+	spin_unlock_irq(&ev->lock);
+	if (!atomic_read(&ev->block))
 		mod_delayed_work(system_freezable_power_efficient_wq,
 				&ev->dwork, 0);
-	spin_unlock_irq(&ev->lock);
 }
 
 /**
@@ -1666,11 +1647,10 @@ static void disk_check_events(struct disk_events *ev,
 	*clearing_ptr &= ~clearing;
 
 	intv = disk_events_poll_jiffies(disk);
-	if (!ev->block && intv)
+	spin_unlock_irq(&ev->lock);
+	if (!atomic_read(&ev->block) && intv)
 		queue_delayed_work(system_freezable_power_efficient_wq,
 				&ev->dwork, intv);
-
-	spin_unlock_irq(&ev->lock);
 
 	/*
 	 * Tell userland about new events.  Only the events listed in
@@ -1824,8 +1804,7 @@ static void disk_alloc_events(struct gendisk *disk)
 	INIT_LIST_HEAD(&ev->node);
 	ev->disk = disk;
 	spin_lock_init(&ev->lock);
-	mutex_init(&ev->block_mutex);
-	ev->block = 1;
+	atomic_set(&ev->block, 1);
 	ev->poll_msecs = -1;
 	INIT_DELAYED_WORK(&ev->dwork, disk_events_workfn);
 
@@ -1870,6 +1849,6 @@ static void disk_del_events(struct gendisk *disk)
 static void disk_release_events(struct gendisk *disk)
 {
 	/* the block count should be 1 from disk_del_events() */
-	WARN_ON_ONCE(disk->ev && disk->ev->block != 1);
+	WARN_ON_ONCE(disk->ev && atomic_read(&disk->ev->block) != 1);
 	kfree(disk->ev);
 }
