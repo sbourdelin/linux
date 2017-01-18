@@ -39,6 +39,9 @@
 #define ACPI_ALS_DEVICE_NAME		"acpi-als"
 #define ACPI_ALS_NOTIFY_ILLUMINANCE	0x80
 
+#define ACPI_ALS_ASUS_TALS		"\\_SB.PCI0.LPCB.EC0.TALS"
+#define ACPI_ALS_ASUS_ALSC		"\\_SB.ATKD.ALSC"
+
 ACPI_MODULE_NAME("acpi-als");
 
 /*
@@ -180,6 +183,8 @@ static int acpi_als_add(struct acpi_device *device)
 	struct acpi_als *als;
 	struct iio_dev *indio_dev;
 	struct iio_buffer *buffer;
+	acpi_handle handle_tals, handle_alsc;
+	acpi_status status_tals, status_alsc;
 
 	indio_dev = devm_iio_device_alloc(&device->dev, sizeof(*als));
 	if (!indio_dev)
@@ -190,6 +195,18 @@ static int acpi_als_add(struct acpi_device *device)
 	device->driver_data = indio_dev;
 	als->device = device;
 	mutex_init(&als->lock);
+
+	/* ASUS Zenbooks need this to enable ALS */
+	status_tals = acpi_get_handle(NULL, ACPI_ALS_ASUS_TALS, &handle_tals);
+	status_alsc = acpi_get_handle(NULL, ACPI_ALS_ASUS_ALSC, &handle_alsc);
+	/* So far only devices with both have been observed */
+	if (ACPI_SUCCESS(status_tals) ^ ACPI_SUCCESS(status_alsc))
+		dev_warn(&device->dev, "Attempting to enable ACPI ALS, but found only one of \""
+			 ACPI_ALS_ASUS_TALS "\" and \"" ACPI_ALS_ASUS_ALSC "\"");
+	if (ACPI_SUCCESS(status_tals))
+		acpi_execute_simple_method(handle_tals, NULL, 1);
+	if (ACPI_SUCCESS(status_alsc))
+		acpi_execute_simple_method(handle_alsc, NULL, 1);
 
 	indio_dev->name = ACPI_ALS_DEVICE_NAME;
 	indio_dev->dev.parent = &device->dev;
