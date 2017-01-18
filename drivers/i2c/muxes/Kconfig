@@ -73,6 +73,19 @@ config I2C_MUX_REG
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-mux-reg.
 
+config I2C_MUX_SIMPLE
+	tristate "Simple I2C multiplexer"
+	select MULTIPLEXER
+	depends on OF
+	help
+	  If you say yes to this option, support will be included for a
+	  simple generic I2C multiplexer. This driver provides access to
+	  I2C busses connected through a MUX, which is controlled
+	  by a generic MUX controller.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-mux-simple.
+
 config I2C_DEMUX_PINCTRL
 	tristate "pinctrl-based I2C demultiplexer"
 	depends on PINCTRL && OF
