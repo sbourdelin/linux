@@ -561,7 +561,7 @@ static enum i40iw_status_code i40iw_create_cqp(struct i40iw_device *iwdev)
 	struct i40iw_sc_dev *dev = &iwdev->sc_dev;
 	struct i40iw_cqp_init_info cqp_init_info;
 	struct i40iw_cqp *cqp = &iwdev->cqp;
-	u16 maj_err, min_err;
+	u16 maj_err = 0, min_err = 0;
 	int i;
 
 	cqp->cqp_requests = kcalloc(sqsize, sizeof(*cqp->cqp_requests), GFP_KERNEL);
