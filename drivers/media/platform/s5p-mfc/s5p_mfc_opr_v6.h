@@ -40,6 +40,9 @@
 #define FRAME_DELTA_H264_H263		1
 #define TIGHT_CBR_MAX			10
 
+#define CPB_ALIGN			512
+#define set_strm_size_max(cpb_max)	((cpb_max) - CPB_ALIGN)
+
 struct s5p_mfc_hw_ops *s5p_mfc_init_hw_ops_v6(void);
 const struct s5p_mfc_regs *s5p_mfc_init_regs_v6_plus(struct s5p_mfc_dev *dev);
 #endif /* S5P_MFC_OPR_V6_H_ */

@@ -408,8 +408,15 @@ static int s5p_mfc_set_dec_stream_buffer_v6(struct s5p_mfc_ctx *ctx,
 	struct s5p_mfc_dev *dev = ctx->dev;
 	const struct s5p_mfc_regs *mfc_regs = dev->mfc_regs;
 	struct s5p_mfc_buf_size *buf_size = dev->variant->buf_size;
+	size_t cpb_buf_size;
 
 	mfc_debug_enter();
+	cpb_buf_size = ALIGN(buf_size->cpb, CPB_ALIGN);
+	if (strm_size >= set_strm_size_max(cpb_buf_size)) {
+		mfc_debug(2, "Decrease strm_size : %u -> %zu, gap : %d\n",
+			strm_size, set_strm_size_max(cpb_buf_size), CPB_ALIGN);
+		strm_size = set_strm_size_max(cpb_buf_size);
+	}
 	mfc_debug(2, "inst_no: %d, buf_addr: 0x%08x,\n"
 		"buf_size: 0x%08x (%d)\n",
 		ctx->inst_no, buf_addr, strm_size, strm_size);
@@ -518,6 +525,8 @@ static int s5p_mfc_set_enc_stream_buffer_v6(struct s5p_mfc_ctx *ctx,
 {
 	struct s5p_mfc_dev *dev = ctx->dev;
 	const struct s5p_mfc_regs *mfc_regs = dev->mfc_regs;
+
+	size = ALIGN(size, 512);
 
 	writel(addr, mfc_regs->e_stream_buffer_addr); /* 16B align */
 	writel(size, mfc_regs->e_stream_buffer_size);
