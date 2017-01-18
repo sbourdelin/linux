@@ -11728,7 +11728,7 @@ lpfc_pci_remove_one_s4(struct pci_dev *pdev)
 	/* Remove FC host and then SCSI host with the physical port */
 	fc_remove_host(shost);
 	scsi_remove_host(shost);
-	/* todo: tgt: remove targetport */
+	lpfc_nvmet_destroy_targetport(phba);
 
 	/* Perform ndlp cleanup on the physical port.  The nvme localport
 	 * is destroyed after to ensure all rports are io-disabled.
