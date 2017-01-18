@@ -1,5 +1,6 @@
 /*
  * A fast, small, non-recursive O(nlog n) sort for the Linux kernel
+ * License: GPL
  *
  * Jan 23 2005  Matt Mackall <mpm@selenic.com>
  */
@@ -106,7 +107,7 @@ EXPORT_SYMBOL(sort);
 
 #ifdef CONFIG_TEST_SORT
 #include <linux/slab.h>
-#include <linux/module.h>
+#include <linux/init.h>
 /* a simple boot-time regression test */
 
 #define TEST_LEN 1000
@@ -143,7 +144,5 @@ exit:
 	kfree(a);
 	return err;
 }
-
-module_init(test_sort_init);
-MODULE_LICENSE("GPL");
+subsys_initcall(test_sort_init);
 #endif
