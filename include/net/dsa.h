@@ -11,14 +11,16 @@
 #ifndef __LINUX_NET_DSA_H
 #define __LINUX_NET_DSA_H
 
+#include <linux/if.h>
 #include <linux/if_ether.h>
 #include <linux/list.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
 #include <linux/of.h>
-#include <linux/phy.h>
-#include <linux/phy_fixed.h>
 #include <linux/ethtool.h>
+
+struct phy_device;
+struct fixed_phy_status;
 
 enum dsa_tag_protocol {
 	DSA_TAG_PROTO_NONE = 0,
