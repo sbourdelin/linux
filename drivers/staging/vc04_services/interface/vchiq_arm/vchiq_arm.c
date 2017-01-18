@@ -1546,6 +1546,37 @@ vchiq_ioctl_compat_internal(
 		DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
 	} break;
 
+	case VCHIQ_IOC_GET_CONFIG32: {
+		VCHIQ_GET_CONFIG_T args;
+		struct vchiq_get_config32 args32;
+		VCHIQ_CONFIG_T config;
+
+		if (copy_from_user(&args32, (const void __user *)arg,
+				   sizeof(args32))) {
+			ret = -EFAULT;
+			break;
+		}
+
+		args.pconfig	 = compat_ptr(args32.pconfig);
+		args.config_size = args32.config_size;
+
+		if (args.config_size > sizeof(config)) {
+			ret = -EINVAL;
+			break;
+		}
+
+		status = vchiq_get_config(instance, args.config_size, &config);
+
+		if (status == VCHIQ_SUCCESS) {
+			if (copy_to_user((void __user *)args.pconfig,
+					 &config,
+					 args.config_size)) {
+				ret = -EFAULT;
+				break;
+			}
+		}
+	} break;
+
 	default:
 		ret = -ENOTTY;
 		break;
@@ -1592,6 +1623,7 @@ vchiq_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
 	case VCHIQ_IOC_QUEUE_BULK_RECEIVE32:
 	case VCHIQ_IOC_AWAIT_COMPLETION32:
 	case VCHIQ_IOC_DEQUEUE_MESSAGE32:
+	case VCHIQ_IOC_GET_CONFIG32:
 		return vchiq_ioctl_compat_internal(file, cmd, arg);
 	default:
 		return vchiq_ioctl(file, cmd, arg);
