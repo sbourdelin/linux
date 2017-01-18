@@ -436,11 +436,10 @@ sys_cacheflush (unsigned long addr, int scope, int cache, unsigned long len)
 	     * 040 or 060: don't blindly trust 'scope', someone could
 	     * try to flush a few megs of memory.
 	     */
-
-	    if (len>=3*PAGE_SIZE && scope<FLUSH_SCOPE_PAGE)
-	        scope=FLUSH_SCOPE_PAGE;
-	    if (len>=10*PAGE_SIZE && scope<FLUSH_SCOPE_ALL)
-	        scope=FLUSH_SCOPE_ALL;
+		if (len >= 3 * PAGE_SIZE && scope < FLUSH_SCOPE_PAGE)
+			scope = FLUSH_SCOPE_PAGE;
+		if (len >= 10 * PAGE_SIZE && scope < FLUSH_SCOPE_ALL)
+			scope = FLUSH_SCOPE_ALL;
 	    if (CPU_IS_040) {
 		ret = cache_flush_040 (addr, scope, cache, len);
 	    } else if (CPU_IS_060) {
