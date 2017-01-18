@@ -87,11 +87,8 @@ static int port_accept(struct port_list *port)
 	}
 
 	conn = kmalloc(sizeof(*conn), GFP_ATOMIC);
-	if (conn == NULL) {
-		printk(KERN_ERR "port_accept : failed to allocate "
-		       "connection\n");
+	if (!conn)
 		goto out_close;
-	}
 	*conn = ((struct connection)
 		{ .list 	= LIST_HEAD_INIT(conn->list),
 		  .fd 		= fd,
@@ -170,10 +167,8 @@ void *port_data(int port_num)
 			goto found;
 	}
 	port = kmalloc(sizeof(struct port_list), GFP_KERNEL);
-	if (port == NULL) {
-		printk(KERN_ERR "Allocation of port list failed\n");
+	if (!port)
 		goto out;
-	}
 
 	fd = port_listen_fd(port_num);
 	if (fd < 0) {
@@ -202,10 +197,8 @@ void *port_data(int port_num)
 
  found:
 	dev = kmalloc(sizeof(struct port_dev), GFP_KERNEL);
-	if (dev == NULL) {
-		printk(KERN_ERR "Allocation of port device entry failed\n");
+	if (!dev)
 		goto out;
-	}
 
 	*dev = ((struct port_dev) { .port  		= port,
 				    .helper_pid  	= -1,
