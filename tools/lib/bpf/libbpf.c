@@ -201,6 +201,7 @@ struct bpf_object {
 	size_t nr_programs;
 	struct bpf_map *maps;
 	size_t nr_maps;
+	size_t map_len;
 
 	bool loaded;
 
@@ -379,6 +380,7 @@ static struct bpf_object *bpf_object__new(const char *path,
 	obj->efile.maps_shndx = -1;
 
 	obj->loaded = false;
+	obj->map_len = sizeof(struct bpf_map_def);
 
 	INIT_LIST_HEAD(&obj->list);
 	list_add(&obj->list, &bpf_objects_list);
@@ -602,6 +604,7 @@ bpf_object__init_maps(struct bpf_object *obj)
 		return -ENOMEM;
 	}
 	obj->nr_maps = nr_maps;
+	obj->map_len = data->d_size / nr_maps;
 
 	/*
 	 * fill all fd with -1 so won't close incorrect
@@ -829,7 +832,7 @@ bpf_program__collect_reloc(struct bpf_program *prog,
 			return -LIBBPF_ERRNO__RELOC;
 		}
 
-		map_idx = sym.st_value / sizeof(struct bpf_map_def);
+		map_idx = sym.st_value / prog->obj->map_len;
 		if (map_idx >= nr_maps) {
 			pr_warning("bpf relocation: map_idx %d large than %d\n",
 				   (int)map_idx, (int)nr_maps - 1);
