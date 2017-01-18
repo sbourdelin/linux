@@ -1140,7 +1140,9 @@ static void i915_driver_register(struct drm_i915_private *dev_priv)
 	 * irqs are fully enabled. We do it last so that the async config
 	 * cannot run before the connectors are registered.
 	 */
-	intel_fbdev_initial_config_async(dev);
+	if (dev_priv->fbdev) {
+		intel_fbdev_initial_config_async(dev);
+	}
 }
 
 /**
