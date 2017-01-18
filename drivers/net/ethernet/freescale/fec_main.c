@@ -60,6 +60,7 @@
 #include <linux/if_vlan.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/prefetch.h>
+#include <linux/highmem.h>
 #include <soc/imx/cpuidle.h>
 
 #include <asm/cacheflush.h>
@@ -377,20 +378,28 @@ fec_enet_txq_submit_frag_skb(struct fec_enet_priv_tx_q *txq,
 			ebdp->cbd_esc = cpu_to_fec32(estatus);
 		}
 
-		bufaddr = page_address(this_frag->page.p) + this_frag->page_offset;
-
 		index = fec_enet_get_bd_index(bdp, &txq->bd);
-		if (((unsigned long) bufaddr) & fep->tx_align ||
+		txq->tx_page_mapping[index] = 0;
+		if (this_frag->page_offset & fep->tx_align ||
 			fep->quirks & FEC_QUIRK_SWAP_FRAME) {
+			bufaddr = kmap_atomic(this_frag->page.p) +
+						this_frag->page_offset;
 			memcpy(txq->tx_bounce[index], bufaddr, frag_len);
+			kunmap_atomic(bufaddr);
 			bufaddr = txq->tx_bounce[index];
 
 			if (fep->quirks & FEC_QUIRK_SWAP_FRAME)
 				swap_buffer(bufaddr, frag_len);
+			addr = dma_map_single(&fep->pdev->dev,
+					      bufaddr,
+					      frag_len,
+					      DMA_TO_DEVICE);
+		} else {
+			txq->tx_page_mapping[index] = 1;
+			addr = skb_frag_dma_map(&fep->pdev->dev, this_frag, 0,
+						frag_len, DMA_TO_DEVICE);
 		}
 
-		addr = dma_map_single(&fep->pdev->dev, bufaddr, frag_len,
-				      DMA_TO_DEVICE);
 		if (dma_mapping_error(&fep->pdev->dev, addr)) {
 			if (net_ratelimit())
 				netdev_err(ndev, "Tx DMA memory map failed\n");
@@ -411,8 +420,16 @@ dma_mapping_error:
 	bdp = txq->bd.cur;
 	for (i = 0; i < frag; i++) {
 		bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
-		dma_unmap_single(&fep->pdev->dev, fec32_to_cpu(bdp->cbd_bufaddr),
-				 fec16_to_cpu(bdp->cbd_datlen), DMA_TO_DEVICE);
+		if (txq->tx_page_mapping[index])
+			dma_unmap_page(&fep->pdev->dev,
+				       fec32_to_cpu(bdp->cbd_bufaddr),
+				       fec16_to_cpu(bdp->cbd_datlen),
+				       DMA_TO_DEVICE);
+		else
+			dma_unmap_single(&fep->pdev->dev,
+					 fec32_to_cpu(bdp->cbd_bufaddr),
+					 fec16_to_cpu(bdp->cbd_datlen),
+					 DMA_TO_DEVICE);
 	}
 	return ERR_PTR(-ENOMEM);
 }
@@ -1201,11 +1218,18 @@ fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
 
 		skb = txq->tx_skbuff[index];
 		txq->tx_skbuff[index] = NULL;
-		if (!IS_TSO_HEADER(txq, fec32_to_cpu(bdp->cbd_bufaddr)))
-			dma_unmap_single(&fep->pdev->dev,
-					 fec32_to_cpu(bdp->cbd_bufaddr),
-					 fec16_to_cpu(bdp->cbd_datlen),
-					 DMA_TO_DEVICE);
+		if (!IS_TSO_HEADER(txq, fec32_to_cpu(bdp->cbd_bufaddr))) {
+			if (txq->tx_page_mapping[index])
+				dma_unmap_page(&fep->pdev->dev,
+					       fec32_to_cpu(bdp->cbd_bufaddr),
+					       fec16_to_cpu(bdp->cbd_datlen),
+					       DMA_TO_DEVICE);
+			else
+				dma_unmap_single(&fep->pdev->dev,
+						 fec32_to_cpu(bdp->cbd_bufaddr),
+						 fec16_to_cpu(bdp->cbd_datlen),
+						 DMA_TO_DEVICE);
+		}
 		bdp->cbd_bufaddr = cpu_to_fec32(0);
 		if (!skb)
 			goto skb_done;

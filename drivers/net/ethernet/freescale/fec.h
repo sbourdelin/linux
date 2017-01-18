@@ -463,6 +463,7 @@ struct bufdesc_prop {
 struct fec_enet_priv_tx_q {
 	struct bufdesc_prop bd;
 	unsigned char *tx_bounce[TX_RING_SIZE];
+	int tx_page_mapping[TX_RING_SIZE];
 	struct  sk_buff *tx_skbuff[TX_RING_SIZE];
 
 	unsigned short tx_stop_threshold;
