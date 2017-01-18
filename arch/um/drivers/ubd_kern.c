@@ -1386,8 +1386,7 @@ static void do_ubd_request(struct request_queue *q)
 		req = dev->request;
 
 		if (req_op(req) == REQ_OP_FLUSH) {
-			io_req = kmalloc(sizeof(struct io_thread_req),
-					 GFP_ATOMIC);
+			io_req = kmalloc(sizeof(*io_req), GFP_ATOMIC);
 			if (io_req == NULL) {
 				if (list_empty(&dev->restart))
 					list_add(&dev->restart, &restart);
@@ -1401,8 +1400,7 @@ static void do_ubd_request(struct request_queue *q)
 		while(dev->start_sg < dev->end_sg){
 			struct scatterlist *sg = &dev->sg[dev->start_sg];
 
-			io_req = kmalloc(sizeof(struct io_thread_req),
-					 GFP_ATOMIC);
+			io_req = kmalloc(sizeof(*io_req), GFP_ATOMIC);
 			if(io_req == NULL){
 				if(list_empty(&dev->restart))
 					list_add(&dev->restart, &restart);
