@@ -232,7 +232,6 @@ out1:
 }
 module_init(macvtap_init);
 
-extern struct idr minor_idr;
 static void macvtap_exit(void)
 {
 	rtnl_link_unregister(&macvtap_link_ops);
