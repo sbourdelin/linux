@@ -1271,6 +1271,41 @@ vchiq_ioctl_compat_internal(
 		}
 	} break;
 
+	case VCHIQ_IOC_QUEUE_MESSAGE32: {
+		struct vchiq_queue_message32 args32;
+		VCHIQ_ELEMENT_T elements[MAX_ELEMENTS];
+		struct vchiq_element32 elements32[MAX_ELEMENTS];
+		unsigned int i;
+
+		if (copy_from_user
+			 (&args32, (const void __user *)arg,
+			  sizeof(args32))) {
+			ret = -EFAULT;
+			break;
+		}
+
+		service = find_service_for_instance(instance, args32.handle);
+
+		if (!service || args32.count > MAX_ELEMENTS) {
+			ret = -EINVAL;
+			break;
+		}
+
+		if (copy_from_user(elements32, compat_ptr(args32.elements),
+				   args32.count * sizeof(struct vchiq_element32))) {
+			ret = -EFAULT;
+			break;
+		}
+
+		for (i = 0; i < args32.count; i++) {
+			elements[i].data = compat_ptr(elements32[i].data);
+			elements[i].size = elements32[i].size;
+		}
+
+		status = vchiq_ioc_queue_message(args32.handle,
+						 elements, args32.count);
+	} break;
+
 	default:
 		ret = -ENOTTY;
 		break;
@@ -1312,6 +1347,7 @@ vchiq_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	switch (cmd) {
 	case VCHIQ_IOC_CREATE_SERVICE32:
+	case VCHIQ_IOC_QUEUE_MESSAGE32:
 		return vchiq_ioctl_compat_internal(file, cmd, arg);
 	default:
 		return vchiq_ioctl(file, cmd, arg);
