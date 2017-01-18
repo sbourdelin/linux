@@ -146,9 +146,9 @@ static ssize_t bl_power_store(struct device *dev, struct device_attribute *attr,
 		pr_debug("set power to %lu\n", power);
 		if (bd->props.power != power) {
 			bd->props.power = power;
-			backlight_update_status(bd);
+			rc = backlight_update_status(bd);
 		}
-		rc = count;
+		rc = rc ? rc : count;
 	}
 	mutex_unlock(&bd->ops_lock);
 
@@ -176,8 +176,7 @@ int backlight_device_set_brightness(struct backlight_device *bd,
 		else {
 			pr_debug("set brightness to %lu\n", brightness);
 			bd->props.brightness = brightness;
-			backlight_update_status(bd);
-			rc = 0;
+			rc = backlight_update_status(bd);
 		}
 	}
 	mutex_unlock(&bd->ops_lock);
