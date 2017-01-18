@@ -3211,9 +3211,11 @@ static DEFINE_PER_CPU(u64, perf_throttled_seq);
 
 static void perf_adjust_period(struct perf_event *event, u64 nsec, u64 count, bool disable)
 {
+	struct perf_event *head_event = (event->parent != NULL) ? event->parent : event;
 	struct hw_perf_event *hwc = &event->hw;
 	s64 period, sample_period;
 	s64 delta;
+	u64 now;
 
 	period = perf_calculate_period(event, nsec, count);
 
@@ -3226,6 +3228,15 @@ static void perf_adjust_period(struct perf_event *event, u64 nsec, u64 count, bo
 		sample_period = 1;
 
 	hwc->sample_period = sample_period;
+
+	now = perf_clock();
+	if ((now - head_event->avg_time_stamp) > TICK_NSEC) {
+		s64 avg_period;
+
+		head_event->avg_time_stamp = now;
+		avg_period = (atomic64_read(&head_event->avg_sample_period) + sample_period) / 2;
+		atomic64_set(&head_event->avg_sample_period, avg_period);
+	}
 
 	if (local64_read(&hwc->period_left) > 8*sample_period) {
 		if (disable)
@@ -9190,8 +9201,13 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 
 	hwc = &event->hw;
 	hwc->sample_period = attr->sample_period;
-	if (attr->freq && attr->sample_freq)
+	if (attr->freq && attr->sample_freq) {
 		hwc->sample_period = 1;
+		if (parent_event)
+			hwc->sample_period = atomic64_read(&parent_event->avg_sample_period);
+		else
+			atomic64_set(&event->avg_sample_period, hwc->sample_period);
+	}
 	hwc->last_period = hwc->sample_period;
 
 	local64_set(&hwc->period_left, hwc->sample_period);
@@ -10373,8 +10389,8 @@ inherit_event(struct perf_event *parent_event,
 		child_event->state = PERF_EVENT_STATE_OFF;
 
 	if (parent_event->attr.freq) {
-		u64 sample_period = parent_event->hw.sample_period;
 		struct hw_perf_event *hwc = &child_event->hw;
+		u64 sample_period = atomic64_read(&parent_event->avg_sample_period);
 
 		hwc->sample_period = sample_period;
 		hwc->last_period   = sample_period;

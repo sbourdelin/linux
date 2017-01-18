@@ -648,6 +648,9 @@ struct perf_event {
 	struct list_head		child_list;
 	struct perf_event		*parent;
 
+	atomic64_t			avg_sample_period;
+	u64				avg_time_stamp;
+
 	int				oncpu;
 	int				cpu;
 
