@@ -42,6 +42,11 @@
 /* hbqinfo output buffer size */
 #define LPFC_HBQINFO_SIZE 8192
 
+/* nvmestat output buffer size */
+#define LPFC_NVMESTAT_SIZE 8192
+#define LPFC_NVMEKTIME_SIZE 8192
+#define LPFC_CPUCHECK_SIZE 8192
+
 /*
  * For SLI4 iDiag debugfs diagnostics tool
  */
@@ -358,7 +363,7 @@ lpfc_debug_dump_q(struct lpfc_queue *q)
 }
 
 /**
- * lpfc_debug_dump_wq - dump all entries from the fcp work queue
+ * lpfc_debug_dump_wq - dump all entries from the fcp and nvme work queue
  * @phba: Pointer to HBA context object.
  * @wqidx: Index to a FCP work queue.
  *
@@ -372,12 +377,61 @@ lpfc_debug_dump_wq(struct lpfc_hba *phba, int wqidx)
 	if (wqidx >= phba->cfg_fcp_io_channel) {
 		pr_err("WQIDX %d too large for FCP WQ max %d\n",
 		       wqidx, phba->cfg_fcp_io_channel);
-		return;
+		goto nvme_wqs;
 	}
 
 	pr_err("FCP WQ: WQ[Idx:%d|Qid:%d]\n",
 	       wqidx, phba->sli4_hba.fcp_wq[wqidx]->queue_id);
 	lpfc_debug_dump_q(phba->sli4_hba.fcp_wq[wqidx]);
+
+ nvme_wqs:
+	/* sanity check */
+	if (wqidx >= phba->cfg_nvme_io_channel) {
+		pr_err("WQIDX %d too large for NVME WQ max %d\n",
+		       wqidx, phba->cfg_nvme_io_channel);
+		return;
+	}
+
+	pr_err("NVME WQ: WQ[Idx:%d|Qid:%d]\n",
+	       wqidx, phba->sli4_hba.nvme_wq[wqidx]->queue_id);
+	lpfc_debug_dump_q(phba->sli4_hba.nvme_wq[wqidx]);
+
+}
+
+/**
+ * lpfc_debug_dump_nvme_cq - dump all entries from nvme work queue's cmpl queue
+ * @phba: Pointer to HBA context object.
+ * @nvme_wqidx: Index to a FCP work queue.
+ *
+ * This function dumps all entries from a FCP complete queue which is
+ * associated to the FCP work queue specified by the @nvme_wqidx.
+ **/
+static inline void
+lpfc_debug_dump_nvme_cq(struct lpfc_hba *phba, int nvme_wqidx)
+{
+	int nvme_cqidx, nvme_cqid;
+
+	/* sanity check */
+	if (nvme_wqidx >= phba->cfg_nvme_io_channel)
+		return;
+
+	nvme_cqid = phba->sli4_hba.nvme_wq[nvme_wqidx]->assoc_qid;
+	for (nvme_cqidx = 0; nvme_cqidx < phba->cfg_nvme_io_channel;
+	     nvme_cqidx++)
+		if (phba->sli4_hba.nvme_cq[nvme_cqidx]->queue_id == nvme_cqid)
+			break;
+	if (phba->intr_type == MSIX) {
+		if (nvme_cqidx >= phba->cfg_nvme_io_channel)
+			return;
+	} else {
+		if (nvme_cqidx > 0)
+			return;
+	}
+
+	pr_err("NVME CQ: WQ[Idx:%d|Qid%d]->CQ[Idx%d|Qid%d]:\n",
+		nvme_wqidx, phba->sli4_hba.nvme_wq[nvme_wqidx]->queue_id,
+		nvme_cqidx, nvme_cqid);
+	lpfc_debug_dump_q(phba->sli4_hba.nvme_cq[nvme_cqidx]);
 }
 
 /**
@@ -432,7 +486,7 @@ lpfc_debug_dump_hba_eq(struct lpfc_hba *phba, int wqidx)
 
 	/* Start with FCP Queues.  Sanity check the index */
 	if (wqidx >= phba->cfg_fcp_io_channel)
-		return;
+		goto nvme_queues;
 
 	cqid = phba->sli4_hba.fcp_wq[wqidx]->assoc_qid;
 	for (cqidx = 0; cqidx < phba->cfg_fcp_io_channel; cqidx++)
@@ -456,6 +510,34 @@ lpfc_debug_dump_hba_eq(struct lpfc_hba *phba, int wqidx)
 	       wqidx, phba->sli4_hba.fcp_wq[wqidx]->queue_id,
 	       cqidx, cqid, eqidx, eqid);
 	lpfc_debug_dump_q(qdesc);
+
+ nvme_queues:
+	/* Do the NVME queues now. */
+	if (wqidx >= phba->cfg_nvme_io_channel)
+		return;
+
+	cqid = phba->sli4_hba.nvme_wq[wqidx]->assoc_qid;
+	for (cqidx = 0; cqidx < phba->cfg_nvme_io_channel; cqidx++)
+		if (phba->sli4_hba.nvme_cq[cqidx]->queue_id == cqid)
+			break;
+	if (phba->intr_type == MSIX) {
+		if (cqidx >= phba->io_channel)
+			return;
+	} else {
+		if (cqidx > 0)
+			return;
+	}
+
+	eqidx = cqidx;
+	eqid = phba->sli4_hba.hba_eq[eqidx]->queue_id;
+	qdesc = phba->sli4_hba.hba_eq[eqidx];
+
+	pr_err(
+	       "NVME EQ: WQ[Idx:%d|Qid:%d]->CQ[Idx:%d|Qid:%d]->"
+	       "EQ[Idx:%d|Qid:%d]\n",
+	       wqidx, phba->sli4_hba.nvme_wq[wqidx]->queue_id,
+	       cqidx, cqid, eqidx, eqid);
+	lpfc_debug_dump_q(qdesc);
 }
 
 /**
@@ -470,6 +552,20 @@ lpfc_debug_dump_els_wq(struct lpfc_hba *phba)
 	printk(KERN_ERR "ELS WQ: WQ[Qid:%d]:\n",
 		phba->sli4_hba.els_wq->queue_id);
 	lpfc_debug_dump_q(phba->sli4_hba.els_wq);
+}
+
+/**
+ * lpfc_debug_dump_nvmels_wq - dump all entries from the nvme ls work queue
+ * @phba: Pointer to HBA context object.
+ *
+ * This function dumps all entries from the NVME LS work queue.
+ **/
+static inline void
+lpfc_debug_dump_nvmels_wq(struct lpfc_hba *phba)
+{
+	pr_err("NVME LS WQ: WQ[Qid:%d]:\n",
+		phba->sli4_hba.nvmels_wq->queue_id);
+	lpfc_debug_dump_q(phba->sli4_hba.nvmels_wq);
 }
 
 /**
@@ -530,6 +626,21 @@ lpfc_debug_dump_els_cq(struct lpfc_hba *phba)
 }
 
 /**
+ * lpfc_debug_dump_nvmels_cq - dump all entries from the nvme ls complete queue
+ * @phba: Pointer to HBA context object.
+ *
+ * This function dumps all entries from the nvme ls complete queue.
+ **/
+static inline void
+lpfc_debug_dump_nvmels_cq(struct lpfc_hba *phba)
+{
+	pr_err("NVME LS CQ: WQ[Qid:%d]->CQ[Qid:%d]\n",
+		phba->sli4_hba.nvmels_wq->queue_id,
+		phba->sli4_hba.nvmels_cq->queue_id);
+	lpfc_debug_dump_q(phba->sli4_hba.nvmels_cq);
+}
+
+/**
  * lpfc_debug_dump_mbx_cq - dump all entries from the mbox complete queue
  * @phba: Pointer to HBA context object.
  *
@@ -566,9 +677,23 @@ lpfc_debug_dump_wq_by_id(struct lpfc_hba *phba, int qid)
 		return;
 	}
 
+	for (wq_idx = 0; wq_idx < phba->cfg_nvme_io_channel; wq_idx++)
+		if (phba->sli4_hba.nvme_wq[wq_idx]->queue_id == qid)
+			break;
+	if (wq_idx < phba->cfg_nvme_io_channel) {
+		pr_err("NVME WQ[Idx:%d|Qid:%d]\n", wq_idx, qid);
+		lpfc_debug_dump_q(phba->sli4_hba.nvme_wq[wq_idx]);
+		return;
+	}
+
 	if (phba->sli4_hba.els_wq->queue_id == qid) {
 		pr_err("ELS WQ[Qid:%d]\n", qid);
 		lpfc_debug_dump_q(phba->sli4_hba.els_wq);
+	}
+
+	if (phba->sli4_hba.nvmels_wq->queue_id == qid) {
+		pr_err("NVME LS WQ[Qid:%d]\n", qid);
+		lpfc_debug_dump_q(phba->sli4_hba.nvmels_wq);
 	}
 }
 
@@ -635,9 +760,28 @@ lpfc_debug_dump_cq_by_id(struct lpfc_hba *phba, int qid)
 		return;
 	}
 
+	/* Reset loop variant and search the NVME CQs. */
+	cq_idx = 0;
+	do {
+		if (phba->sli4_hba.nvme_cq[cq_idx]->queue_id == qid)
+			break;
+	} while (++cq_idx < phba->cfg_nvme_io_channel);
+
+	if (cq_idx < phba->cfg_fcp_io_channel) {
+		pr_err("NVME CQ[Idx:%d|Qid:%d]\n", cq_idx, qid);
+		lpfc_debug_dump_q(phba->sli4_hba.nvme_cq[cq_idx]);
+		return;
+	}
+
 	if (phba->sli4_hba.els_cq->queue_id == qid) {
 		pr_err("ELS CQ[Qid:%d]\n", qid);
 		lpfc_debug_dump_q(phba->sli4_hba.els_cq);
+		return;
+	}
+
+	if (phba->sli4_hba.nvmels_cq->queue_id == qid) {
+		pr_err("NVME LS CQ[Qid:%d]\n", qid);
+		lpfc_debug_dump_q(phba->sli4_hba.nvmels_cq);
 		return;
 	}
 
