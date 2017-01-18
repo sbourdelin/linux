@@ -3935,6 +3935,7 @@ static int nf_tables_delsetelem(struct net *net, struct sock *nlsk,
 		struct nft_set_iter iter = {
 			.genmask	= genmask,
 			.fn		= nft_flush_set,
+			.flush		= true,
 		};
 		set->ops->walk(&ctx, set, &iter);
 
