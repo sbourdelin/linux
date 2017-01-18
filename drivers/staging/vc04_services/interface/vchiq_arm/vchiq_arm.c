@@ -503,6 +503,75 @@ vchiq_ioc_queue_message(VCHIQ_SERVICE_HANDLE_T handle,
 				   &context, total_size);
 }
 
+static long
+vchiq_ioctl_create_service(VCHIQ_INSTANCE_T instance,
+			   VCHIQ_CREATE_SERVICE_T *args,
+			   VCHIQ_STATUS_T *status)
+{
+	VCHIQ_SERVICE_T *service = NULL;
+	USER_SERVICE_T *user_service = NULL;
+	void *userdata;
+	int srvstate;
+
+	user_service = kmalloc(sizeof(USER_SERVICE_T), GFP_KERNEL);
+	if (!user_service)
+		return -ENOMEM;
+
+	if (args->is_open) {
+		if (!instance->connected) {
+			kfree(user_service);
+			return -ENOTCONN;
+		}
+		srvstate = VCHIQ_SRVSTATE_OPENING;
+	} else {
+		srvstate =
+			 instance->connected ?
+			 VCHIQ_SRVSTATE_LISTENING :
+			 VCHIQ_SRVSTATE_HIDDEN;
+	}
+
+	userdata = args->params.userdata;
+	args->params.callback = service_callback;
+	args->params.userdata = user_service;
+
+	service = vchiq_add_service_internal(
+			instance->state,
+			&args->params, srvstate,
+			instance, user_service_free);
+
+	if (!service) {
+		kfree(user_service);
+		return -EEXIST;
+	}
+
+	user_service->service = service;
+	user_service->userdata = userdata;
+	user_service->instance = instance;
+	user_service->is_vchi = (args->is_vchi != 0);
+	user_service->dequeue_pending = 0;
+	user_service->close_pending = 0;
+	user_service->message_available_pos =
+		instance->completion_remove - 1;
+	user_service->msg_insert = 0;
+	user_service->msg_remove = 0;
+	sema_init(&user_service->insert_event, 0);
+	sema_init(&user_service->remove_event, 0);
+	sema_init(&user_service->close_event, 0);
+
+	if (args->is_open) {
+		*status = vchiq_open_service_internal(service, instance->pid);
+
+		if (*status != VCHIQ_SUCCESS) {
+			vchiq_remove_service(service->handle);
+			return (*status == VCHIQ_RETRY) ? -EINTR : -EIO;
+		}
+	}
+
+	args->handle = service->handle;
+
+	return 0;
+}
+
 /****************************************************************************
 *
 *   vchiq_ioctl
@@ -575,85 +644,25 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case VCHIQ_IOC_CREATE_SERVICE: {
 		VCHIQ_CREATE_SERVICE_T args;
-		USER_SERVICE_T *user_service = NULL;
-		void *userdata;
-		int srvstate;
 
 		if (copy_from_user
 			 (&args, (const void __user *)arg,
-			  sizeof(args)) != 0) {
+			  sizeof(args))) {
 			ret = -EFAULT;
 			break;
 		}
 
-		user_service = kmalloc(sizeof(USER_SERVICE_T), GFP_KERNEL);
-		if (!user_service) {
-			ret = -ENOMEM;
-			break;
-		}
+		ret = vchiq_ioctl_create_service(instance, &args, &status);
 
-		if (args.is_open) {
-			if (!instance->connected) {
-				ret = -ENOTCONN;
-				kfree(user_service);
-				break;
-			}
-			srvstate = VCHIQ_SRVSTATE_OPENING;
-		} else {
-			srvstate =
-				 instance->connected ?
-				 VCHIQ_SRVSTATE_LISTENING :
-				 VCHIQ_SRVSTATE_HIDDEN;
-		}
-
-		userdata = args.params.userdata;
-		args.params.callback = service_callback;
-		args.params.userdata = user_service;
-		service = vchiq_add_service_internal(
-				instance->state,
-				&args.params, srvstate,
-				instance, user_service_free);
-
-		if (service != NULL) {
-			user_service->service = service;
-			user_service->userdata = userdata;
-			user_service->instance = instance;
-			user_service->is_vchi = (args.is_vchi != 0);
-			user_service->dequeue_pending = 0;
-			user_service->close_pending = 0;
-			user_service->message_available_pos =
-				instance->completion_remove - 1;
-			user_service->msg_insert = 0;
-			user_service->msg_remove = 0;
-			sema_init(&user_service->insert_event, 0);
-			sema_init(&user_service->remove_event, 0);
-			sema_init(&user_service->close_event, 0);
-
-			if (args.is_open) {
-				status = vchiq_open_service_internal
-					(service, instance->pid);
-				if (status != VCHIQ_SUCCESS) {
-					vchiq_remove_service(service->handle);
-					service = NULL;
-					ret = (status == VCHIQ_RETRY) ?
-						-EINTR : -EIO;
-					break;
-				}
-			}
-
+		if (ret >= 0) {
 			if (copy_to_user((void __user *)
-				&(((VCHIQ_CREATE_SERVICE_T __user *)
-					arg)->handle),
-				(const void *)&service->handle,
-				sizeof(service->handle)) != 0) {
+					&(((VCHIQ_CREATE_SERVICE_T __user *)
+						arg)->handle),
+					(const void *)&args.handle,
+					sizeof(args.handle))) {
 				ret = -EFAULT;
-				vchiq_remove_service(service->handle);
+				vchiq_remove_service(args.handle);
 			}
-
-			service = NULL;
-		} else {
-			ret = -EEXIST;
-			kfree(user_service);
 		}
 	} break;
 
@@ -1229,6 +1238,39 @@ vchiq_ioctl_compat_internal(
 			ioctl_names[_IOC_NR(cmd)] : "<invalid>", arg);
 
 	switch (cmd) {
+	case VCHIQ_IOC_CREATE_SERVICE32: {
+		struct vchiq_create_service32 args32;
+		VCHIQ_CREATE_SERVICE_T args;
+
+		if (copy_from_user
+			 (&args32, (const void __user *)arg,
+			  sizeof(args32))) {
+			ret = -EFAULT;
+			break;
+		}
+
+		args.params.fourcc	= args32.params.fourcc;
+		args.params.callback	= compat_ptr(args32.params.callback);
+		args.params.userdata	= compat_ptr(args32.params.userdata);
+		args.params.version	= args32.params.version;
+		args.params.version_min = args32.params.version_min;
+		args.is_open		= args32.is_open;
+		args.is_vchi		= args32.is_vchi;
+
+		ret = vchiq_ioctl_create_service(instance, &args, &status);
+
+		if (ret >= 0) {
+			if (copy_to_user((void __user *)
+					&(((struct vchiq_create_service32 __user *)
+						arg)->handle),
+					(const void *)&args.handle,
+					sizeof(args.handle))) {
+				ret = -EFAULT;
+				vchiq_remove_service(args.handle);
+			}
+		}
+	} break;
+
 	default:
 		ret = -ENOTTY;
 		break;
@@ -1269,6 +1311,8 @@ static long
 vchiq_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	switch (cmd) {
+	case VCHIQ_IOC_CREATE_SERVICE32:
+		return vchiq_ioctl_compat_internal(file, cmd, arg);
 	default:
 		return vchiq_ioctl(file, cmd, arg);
 	}
