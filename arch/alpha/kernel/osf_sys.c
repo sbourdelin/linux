@@ -454,16 +454,13 @@ osf_ufs_mount(const char __user *dirname,
 	struct cdfs_args tmp;
 	struct filename *devname;
 
-	retval = -EFAULT;
 	if (copy_from_user(&tmp, args, sizeof(tmp)))
-		goto out;
+		return -EFAULT;
 	devname = getname(tmp.devname);
-	retval = PTR_ERR(devname);
 	if (IS_ERR(devname))
-		goto out;
+		return PTR_ERR(devname);
 	retval = do_mount(devname->name, dirname, "ext2", flags, NULL);
 	putname(devname);
- out:
 	return retval;
 }
 
@@ -475,16 +472,13 @@ osf_cdfs_mount(const char __user *dirname,
 	struct cdfs_args tmp;
 	struct filename *devname;
 
-	retval = -EFAULT;
 	if (copy_from_user(&tmp, args, sizeof(tmp)))
-		goto out;
+		return -EFAULT;
 	devname = getname(tmp.devname);
-	retval = PTR_ERR(devname);
 	if (IS_ERR(devname))
-		goto out;
+		return PTR_ERR(devname);
 	retval = do_mount(devname->name, dirname, "iso9660", flags, NULL);
 	putname(devname);
- out:
 	return retval;
 }
 
