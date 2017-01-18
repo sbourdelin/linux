@@ -1527,7 +1527,8 @@ static int get_any_page(struct page *page, unsigned long pfn, int flags)
 {
 	int ret = __get_any_page(page, pfn, flags);
 
-	if (ret == 1 && !PageHuge(page) && !PageLRU(page)) {
+	if (ret == 1 && !PageHuge(page) &&
+	    !PageLRU(page) && !__PageMovable(page)) {
 		/*
 		 * Try to free it.
 		 */
@@ -1546,6 +1547,54 @@ static int get_any_page(struct page *page, unsigned long pfn, int flags)
 			return -EIO;
 		}
 	}
+	return ret;
+}
+
+static int soft_offline_movable_page(struct page *page, int flags)
+{
+	int ret;
+	unsigned long pfn = page_to_pfn(page);
+	LIST_HEAD(pagelist);
+
+	/*
+	 * This double-check of PageHWPoison is to avoid the race with
+	 * memory_failure(). See also comment in __soft_offline_page().
+	 */
+	lock_page(page);
+	if (PageHWPoison(page)) {
+		unlock_page(page);
+		put_hwpoison_page(page);
+		pr_info("soft offline: %#lx movable page already poisoned\n",
+			pfn);
+		return -EBUSY;
+	}
+	unlock_page(page);
+
+	ret = isolate_movable_page(page, ISOLATE_UNEVICTABLE);
+	/*
+	 * get_any_page() and isolate_movable_page() takes a refcount each,
+	 * so need to drop one here.
+	 */
+	put_hwpoison_page(page);
+	if (!ret) {
+		pr_info("soft offline: %#lx movable page failed to isolate\n",
+			pfn);
+		return -EBUSY;
+	}
+
+	list_add(&page->lru, &pagelist);
+	ret = migrate_pages(&pagelist, new_page, NULL, MPOL_MF_MOVE_ALL,
+			    MIGRATE_SYNC, MR_MEMORY_FAILURE);
+	if (ret) {
+		if (!list_empty(&pagelist))
+			putback_movable_pages(&pagelist);
+
+		pr_info("soft offline: %#lx: migration failed %d, type %lx\n",
+			pfn, ret, page->flags);
+		if (ret > 0)
+			ret = -EIO;
+	}
+
 	return ret;
 }
 
@@ -1705,8 +1754,10 @@ static int soft_offline_in_use_page(struct page *page, int flags)
 
 	if (PageHuge(page))
 		ret = soft_offline_huge_page(page, flags);
-	else
+	else if (PageLRU(page))
 		ret = __soft_offline_page(page, flags);
+	else
+		ret = soft_offline_movable_page(page, flags);
 
 	return ret;
 }
