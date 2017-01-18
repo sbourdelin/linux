@@ -954,7 +954,7 @@ lpfc_config_pcb_setup(struct lpfc_hba * phba)
 	pcbp->maxRing = (psli->num_rings - 1);
 
 	for (i = 0; i < psli->num_rings; i++) {
-		pring = &psli->ring[i];
+		pring = &psli->sli3_ring[i];
 
 		pring->sli.sli3.sizeCiocb =
 			phba->sli_rev == 3 ? SLI3_IOCB_CMD_SIZE :
@@ -1217,7 +1217,7 @@ lpfc_config_ring(struct lpfc_hba * phba, int ring, LPFC_MBOXQ_t * pmb)
 	mb->un.varCfgRing.recvNotify = 1;
 
 	psli = &phba->sli;
-	pring = &psli->ring[ring];
+	pring = &psli->sli3_ring[ring];
 	mb->un.varCfgRing.numMask = pring->num_mask;
 	mb->mbxCommand = MBX_CONFIG_RING;
 	mb->mbxOwner = OWN_HOST;
@@ -1291,7 +1291,7 @@ lpfc_config_port(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 			mb->un.varCfgPort.cdss = 1; /* Configure Security */
 		mb->un.varCfgPort.cerbm = 1; /* Request HBQs */
 		mb->un.varCfgPort.ccrp = 1; /* Command Ring Polling */
-		mb->un.varCfgPort.max_hbq = lpfc_sli_hbq_count();
+		mb->un.varCfgPort.max_hbq = lpfc_sli_hbq_count(phba);
 		if (phba->max_vpi && phba->cfg_enable_npiv &&
 		    phba->vpd.sli3Feat.cmv) {
 			mb->un.varCfgPort.max_vpi = LPFC_MAX_VPI;
@@ -2260,7 +2260,7 @@ lpfc_sli4_dump_cfg_rg23(struct lpfc_hba *phba, struct lpfcMboxq *mbox)
 	return 0;
 }
 
-static void
+void
 lpfc_mbx_cmpl_rdp_link_stat(struct lpfc_hba *phba, LPFC_MBOXQ_t *mboxq)
 {
 	MAILBOX_t *mb;
@@ -2281,7 +2281,7 @@ mbx_failed:
 	rdp_context->cmpl(phba, rdp_context, rc);
 }
 
-static void
+void
 lpfc_mbx_cmpl_rdp_page_a2(struct lpfc_hba *phba, LPFC_MBOXQ_t *mbox)
 {
 	struct lpfc_dmabuf *mp = (struct lpfc_dmabuf *) mbox->context1;
@@ -2328,7 +2328,7 @@ lpfc_mbx_cmpl_rdp_page_a0(struct lpfc_hba *phba, LPFC_MBOXQ_t *mbox)
 		goto error;
 
 	lpfc_sli_bemem_bcopy(mp->virt, &rdp_context->page_a0,
-				DMP_SFF_PAGE_A0_SIZE);
+			     DMP_SFF_PAGE_A0_SIZE);
 
 	memset(mbox, 0, sizeof(*mbox));
 
@@ -2341,13 +2341,13 @@ lpfc_mbx_cmpl_rdp_page_a0(struct lpfc_hba *phba, LPFC_MBOXQ_t *mbox)
 
 	bf_set(lpfc_mqe_command, &mbox->u.mqe, MBX_DUMP_MEMORY);
 	bf_set(lpfc_mbx_memory_dump_type3_type,
-		&mbox->u.mqe.un.mem_dump_type3, DMP_LMSD);
+	       &mbox->u.mqe.un.mem_dump_type3, DMP_LMSD);
 	bf_set(lpfc_mbx_memory_dump_type3_link,
-		&mbox->u.mqe.un.mem_dump_type3, phba->sli4_hba.physical_port);
+	       &mbox->u.mqe.un.mem_dump_type3, phba->sli4_hba.physical_port);
 	bf_set(lpfc_mbx_memory_dump_type3_page_no,
-		&mbox->u.mqe.un.mem_dump_type3, DMP_PAGE_A2);
+	       &mbox->u.mqe.un.mem_dump_type3, DMP_PAGE_A2);
 	bf_set(lpfc_mbx_memory_dump_type3_length,
-		&mbox->u.mqe.un.mem_dump_type3, DMP_SFF_PAGE_A2_SIZE);
+	       &mbox->u.mqe.un.mem_dump_type3, DMP_SFF_PAGE_A2_SIZE);
 	mbox->u.mqe.un.mem_dump_type3.addr_lo = putPaddrLow(mp->phys);
 	mbox->u.mqe.un.mem_dump_type3.addr_hi = putPaddrHigh(mp->phys);
 
@@ -2400,13 +2400,13 @@ lpfc_sli4_dump_page_a0(struct lpfc_hba *phba, struct lpfcMboxq *mbox)
 	mbox->context1 = mp;
 
 	bf_set(lpfc_mbx_memory_dump_type3_type,
-		&mbox->u.mqe.un.mem_dump_type3, DMP_LMSD);
+	       &mbox->u.mqe.un.mem_dump_type3, DMP_LMSD);
 	bf_set(lpfc_mbx_memory_dump_type3_link,
-		&mbox->u.mqe.un.mem_dump_type3, phba->sli4_hba.physical_port);
+	       &mbox->u.mqe.un.mem_dump_type3, phba->sli4_hba.physical_port);
 	bf_set(lpfc_mbx_memory_dump_type3_page_no,
-		&mbox->u.mqe.un.mem_dump_type3, DMP_PAGE_A0);
+	       &mbox->u.mqe.un.mem_dump_type3, DMP_PAGE_A0);
 	bf_set(lpfc_mbx_memory_dump_type3_length,
-		&mbox->u.mqe.un.mem_dump_type3, DMP_SFF_PAGE_A0_SIZE);
+	       &mbox->u.mqe.un.mem_dump_type3, DMP_SFF_PAGE_A0_SIZE);
 	mbox->u.mqe.un.mem_dump_type3.addr_lo = putPaddrLow(mp->phys);
 	mbox->u.mqe.un.mem_dump_type3.addr_hi = putPaddrHigh(mp->phys);
 
@@ -2434,14 +2434,25 @@ lpfc_reg_fcfi(struct lpfc_hba *phba, struct lpfcMboxq *mbox)
 	memset(mbox, 0, sizeof(*mbox));
 	reg_fcfi = &mbox->u.mqe.un.reg_fcfi;
 	bf_set(lpfc_mqe_command, &mbox->u.mqe, MBX_REG_FCFI);
-	bf_set(lpfc_reg_fcfi_rq_id0, reg_fcfi, phba->sli4_hba.hdr_rq->queue_id);
-	bf_set(lpfc_reg_fcfi_rq_id1, reg_fcfi, REG_FCF_INVALID_QID);
+	if (phba->nvmet_support == 0) {
+		bf_set(lpfc_reg_fcfi_rq_id0, reg_fcfi,
+		       phba->sli4_hba.hdr_rq->queue_id);
+		/* Match everything - rq_id0 */
+		bf_set(lpfc_reg_fcfi_type_match0, reg_fcfi, 0);
+		bf_set(lpfc_reg_fcfi_type_mask0, reg_fcfi, 0);
+		bf_set(lpfc_reg_fcfi_rctl_match0, reg_fcfi, 0);
+		bf_set(lpfc_reg_fcfi_rctl_mask0, reg_fcfi, 0);
+
+		bf_set(lpfc_reg_fcfi_rq_id1, reg_fcfi, REG_FCF_INVALID_QID);
+
+		/* addr mode is bit wise inverted value of fcf addr_mode */
+		bf_set(lpfc_reg_fcfi_mam, reg_fcfi,
+		       (~phba->fcf.addr_mode) & 0x3);
+	}
 	bf_set(lpfc_reg_fcfi_rq_id2, reg_fcfi, REG_FCF_INVALID_QID);
 	bf_set(lpfc_reg_fcfi_rq_id3, reg_fcfi, REG_FCF_INVALID_QID);
 	bf_set(lpfc_reg_fcfi_info_index, reg_fcfi,
 	       phba->fcf.current_rec.fcf_indx);
-	/* reg_fcf addr mode is bit wise inverted value of fcf addr_mode */
-	bf_set(lpfc_reg_fcfi_mam, reg_fcfi, (~phba->fcf.addr_mode) & 0x3);
 	if (phba->fcf.current_rec.vlan_id != LPFC_FCOE_NULL_VID) {
 		bf_set(lpfc_reg_fcfi_vv, reg_fcfi, 1);
 		bf_set(lpfc_reg_fcfi_vlan_tag, reg_fcfi,

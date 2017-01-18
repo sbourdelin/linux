@@ -44,8 +44,6 @@
 #define LPFC_FCP_RING            0	/* ring 0 for FCP initiator commands */
 #define LPFC_EXTRA_RING          1	/* ring 1 for other protocols */
 #define LPFC_ELS_RING            2	/* ring 2 for ELS commands */
-#define LPFC_FCP_NEXT_RING       3
-#define LPFC_FCP_OAS_RING        3
 
 #define SLI2_IOCB_CMD_R0_ENTRIES    172	/* SLI-2 FCP command ring entries */
 #define SLI2_IOCB_RSP_R0_ENTRIES    134	/* SLI-2 FCP response ring entries */
@@ -1791,6 +1789,7 @@ typedef struct {		/* FireFly BIU registers */
 #define MBX_INIT_VFI        0xA3
 #define MBX_INIT_VPI        0xA4
 #define MBX_ACCESS_VDATA    0xA5
+#define MBX_REG_FCFI_MRQ    0xAF
 
 #define MBX_AUTH_PORT       0xF8
 #define MBX_SECURITY_MGMT   0xF9
@@ -4163,7 +4162,7 @@ typedef struct _IOCB {	/* IOCB structure */
 
 /* HBQ entries are 4 words each = 4k */
 #define LPFC_TOTAL_HBQ_SIZE (sizeof(struct lpfc_hbq_entry) *  \
-			     lpfc_sli_hbq_count())
+			     lpfc_sli_hbq_count(phba))
 
 struct lpfc_sli2_slim {
 	MAILBOX_t mbx;

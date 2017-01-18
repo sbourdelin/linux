@@ -114,3 +114,4 @@ lpfc_vport_param_set(name, defval, minval, maxval)\
 lpfc_vport_param_store(name)\
 static DEVICE_ATTR(lpfc_##name, S_IRUGO | S_IWUSR,\
 		   lpfc_##name##_show, lpfc_##name##_store)
+

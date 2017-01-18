@@ -20,6 +20,7 @@
 
 #define LPFC_DRIVER_VERSION "11.2.0.4"
 #define LPFC_DRIVER_NAME		"lpfc"
+#define LPFCMGMT_NAME			"lpfcmgmt"
 
 /* Used for SLI 2/3 */
 #define LPFC_SP_DRIVER_HANDLER_NAME	"lpfc:sp"
