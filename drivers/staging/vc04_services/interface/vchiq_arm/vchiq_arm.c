@@ -1206,6 +1206,76 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	return ret;
 }
 
+#if defined(CONFIG_COMPAT)
+
+static long
+vchiq_ioctl_compat_internal(
+	struct file *file,
+	unsigned int cmd,
+	unsigned long arg)
+{
+	VCHIQ_INSTANCE_T instance = file->private_data;
+	VCHIQ_STATUS_T status = VCHIQ_SUCCESS;
+	VCHIQ_SERVICE_T *service = NULL;
+	long ret = 0;
+
+	DEBUG_INITIALISE(g_state.local)
+
+	vchiq_log_trace(vchiq_arm_log_level,
+			"vchiq_ioctl_compat - instance %pK, cmd %s, arg %lx",
+			instance,
+			((_IOC_TYPE(cmd) == VCHIQ_IOC_MAGIC) &&
+			(_IOC_NR(cmd) <= VCHIQ_IOC_MAX)) ?
+			ioctl_names[_IOC_NR(cmd)] : "<invalid>", arg);
+
+	switch (cmd) {
+	default:
+		ret = -ENOTTY;
+		break;
+	}
+
+	if (service)
+		unlock_service(service);
+
+	if (ret == 0) {
+		if (status == VCHIQ_ERROR)
+			ret = -EIO;
+		else if (status == VCHIQ_RETRY)
+			ret = -EINTR;
+	}
+
+	if ((status == VCHIQ_SUCCESS) && (ret < 0) && (ret != -EINTR) &&
+	    (ret != -EWOULDBLOCK))
+		vchiq_log_info(vchiq_arm_log_level,
+			       "  ioctl_compat instance %lx, cmd %s -> status %d, %ld",
+			       (unsigned long)instance,
+			       (_IOC_NR(cmd) <= VCHIQ_IOC_MAX) ?
+			       ioctl_names[_IOC_NR(cmd)] :
+			       "<invalid>",
+			       status, ret);
+	else
+		vchiq_log_trace(vchiq_arm_log_level,
+				"  ioctl_compat instance %lx, cmd %s -> status %d, %ld",
+				(unsigned long)instance,
+				(_IOC_NR(cmd) <= VCHIQ_IOC_MAX) ?
+				ioctl_names[_IOC_NR(cmd)] :
+				"<invalid>",
+				status, ret);
+
+	return ret;
+}
+
+static long
+vchiq_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	switch (cmd) {
+	default:
+		return vchiq_ioctl(file, cmd, arg);
+	}
+}
+
+#endif
+
 /****************************************************************************
 *
 *   vchiq_open
@@ -1660,6 +1730,9 @@ static const struct file_operations
 vchiq_fops = {
 	.owner = THIS_MODULE,
 	.unlocked_ioctl = vchiq_ioctl,
+#if defined(CONFIG_COMPAT)
+	.compat_ioctl = vchiq_ioctl_compat,
+#endif
 	.open = vchiq_open,
 	.release = vchiq_release,
 	.read = vchiq_read
