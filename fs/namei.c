@@ -257,6 +257,23 @@ void putname(struct filename *name)
 		__putname(name);
 }
 
+int generic_validate(struct inode *inode)
+{
+	if (unlikely(inode->i_nlink == 0))
+		return -EUCLEAN;
+}
+EXPORT_SYMBOL(generic_validate);
+
+static inline int inode_validate(struct inode *inode)
+{
+	int retval = 0;
+
+	if (inode->i_op->validate)
+		retval = inode->i_op->validate(inode);
+
+	return retval;
+}
+
 static int check_acl(struct inode *inode, int mask)
 {
 #ifdef CONFIG_FS_POSIX_ACL
@@ -2716,20 +2733,21 @@ EXPORT_SYMBOL(__check_sticky);
  *	Check whether we can remove a link victim from directory dir, check
  *  whether the type of victim is right.
  *  1. We can't do it if dir is read-only (done in permission())
- *  2. We should have write and exec permissions on dir
- *  3. We can't remove anything from append-only dir
- *  4. We can't do anything with immutable dir (done in permission())
- *  5. If the sticky bit on dir is set we should either
+ *  2. We should validate the victim's inode
+ *  3. We should have write and exec permissions on dir
+ *  4. We can't remove anything from append-only dir
+ *  5. We can't do anything with immutable dir (done in permission())
+ *  6. If the sticky bit on dir is set we should either
  *	a. be owner of dir, or
  *	b. be owner of victim, or
  *	c. have CAP_FOWNER capability
- *  6. If the victim is append-only or immutable we can't do antyhing with
+ *  7. If the victim is append-only or immutable we can't do antyhing with
  *     links pointing to it.
- *  7. If the victim has an unknown uid or gid we can't change the inode.
- *  8. If we were asked to remove a directory and victim isn't one - ENOTDIR.
- *  9. If we were asked to remove a non-directory and victim isn't one - EISDIR.
- * 10. We can't remove a root or mountpoint.
- * 11. We don't allow removal of NFS sillyrenamed files; it's handled by
+ *  8. If the victim has an unknown uid or gid we can't change the inode.
+ *  9. If we were asked to remove a directory and victim isn't one - ENOTDIR.
+ * 10. If we were asked to remove a non-directory and victim isn't one - EISDIR.
+ * 11. We can't remove a root or mountpoint.
+ * 12. We don't allow removal of NFS sillyrenamed files; it's handled by
  *     nfs_async_unlink().
  */
 static int may_delete(struct inode *dir, struct dentry *victim, bool isdir)
@@ -2744,6 +2762,9 @@ static int may_delete(struct inode *dir, struct dentry *victim, bool isdir)
 	BUG_ON(victim->d_parent->d_inode != dir);
 	audit_inode_child(dir, victim, AUDIT_TYPE_CHILD_DELETE);
 
+	error = inode_validate(inode);
+	if (error)
+		return error;
 	error = inode_permission(dir, MAY_WRITE | MAY_EXEC);
 	if (error)
 		return error;
@@ -2889,6 +2910,9 @@ static int may_open(const struct path *path, int acc_mode, int flag)
 		break;
 	}
 
+	error = inode_validate(inode);
+	if (error)
+		return error;
 	error = inode_permission(inode, MAY_OPEN | acc_mode);
 	if (error)
 		return error;
