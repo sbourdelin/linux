@@ -230,10 +230,10 @@ int port_wait(void *data)
 
 	atomic_inc(&port->wait_count);
 	while (1) {
-		fd = -ERESTARTSYS;
-		if (wait_for_completion_interruptible(&port->done))
+		if (wait_for_completion_interruptible(&port->done)) {
+			fd = -ERESTARTSYS;
 			goto out;
-
+		}
 		spin_lock(&port->lock);
 
 		conn = list_entry(port->connections.next, struct connection,
