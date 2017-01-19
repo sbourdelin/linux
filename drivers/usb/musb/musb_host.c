@@ -743,7 +743,14 @@ static void musb_ep_program(struct musb *musb, u8 epnum,
 
 	musb_ep_select(mbase, epnum);
 
-	if (is_out && !len) {
+	/*
+	 * Skip dma for zero sized out and small in transfers.
+	 * At least cppi41 in dma will just hang with size of 1 until the
+	 * device is connected. For sizes 8 and less it seems to take a
+	 * long time to complete. Let's use minimum size of 16 to avoid
+	 * tiny in DMA transfers.
+	 */
+	if ((is_out && !len) || (!is_out && (len < 16))) {
 		use_dma = 0;
 		csr = musb_readw(epio, MUSB_TXCSR);
 		csr &= ~MUSB_TXCSR_DMAENAB;
