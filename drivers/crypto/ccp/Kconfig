@@ -1,6 +1,7 @@
 config CRYPTO_DEV_CCP_CRYPTO
 	tristate "Support for AMD Cryptographic Coprocessor"
 	default n
+	select AMD_SP
 	select AMD_CCP
 	select CRYPTO_HASH
 	select CRYPTO_BLKCIPHER

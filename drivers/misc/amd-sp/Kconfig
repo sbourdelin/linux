@@ -1,7 +1,16 @@
-config AMD_CCP
-	tristate "Support for AMD Cryptographic Coprocessor"
+config AMD_SP
+	tristate "Support for AMD Secure Processor"
 	default n
 	depends on ((X86 && PCI) || (ARM64 && (OF_ADDRESS || ACPI))) && HAS_IOMEM
+	help
+	  Provides the interface to access the AMD Secure Processor. The
+	  AMD Secure Processor supports the AMD Cryptographic Coprocessor.
+	  If you choose 'M' here, this module will be call ccp.
+
+config AMD_CCP
+	bool "Support for AMD Cryptographic Coprocessor"
+	depends on AMD_SP
+	default y
 	select HW_RANDOM
 	select DMA_ENGINE
 	select DMADEVICES
@@ -10,5 +19,4 @@ config AMD_CCP
 	help
 	  Provides the interface to use the AMD Cryptographic Coprocessor
 	  which can be used to offload encryption operations such as SHA,
-	  AES and more. If you choose 'M' here, this module will be called
-	  ccp.
+	  AES and more.
