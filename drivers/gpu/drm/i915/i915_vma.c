@@ -113,6 +113,7 @@ vma_create(struct drm_i915_gem_object *obj,
 						      i915_gem_object_get_tiling(obj),
 						      i915_gem_object_get_stride(obj));
 		GEM_BUG_ON(!IS_ALIGNED(vma->fence_size, I915_GTT_MIN_ALIGNMENT));
+		GEM_BUG_ON(vma->fence_size < vma->size); /* overflow */
 
 		vma->fence_alignment = i915_gem_fence_alignment(vm->i915, vma->size,
 								i915_gem_object_get_tiling(obj),
