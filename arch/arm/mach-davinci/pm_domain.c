@@ -23,7 +23,7 @@ static struct dev_pm_domain davinci_pm_domain = {
 
 static struct pm_clk_notifier_block platform_bus_notifier = {
 	.pm_domain = &davinci_pm_domain,
-	.con_ids = { "fck", "master", "slave", NULL },
+	.con_ids = { "fck", "master", "slave", "usb20", NULL },
 };
 
 static int __init davinci_pm_runtime_init(void)
