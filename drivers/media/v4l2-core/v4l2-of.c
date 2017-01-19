@@ -14,6 +14,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_graph.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/types.h>
@@ -284,7 +285,7 @@ int v4l2_of_parse_link(const struct device_node *node,
 		np = of_get_next_parent(np);
 	link->local_node = np;
 
-	np = of_parse_phandle(node, "remote-endpoint", 0);
+	np = of_graph_get_remote_endpoint(node);
 	if (!np) {
 		of_node_put(link->local_node);
 		return -ENOLINK;
