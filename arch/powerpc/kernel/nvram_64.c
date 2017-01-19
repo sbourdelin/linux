@@ -790,17 +790,15 @@ static ssize_t dev_nvram_write(struct file *file, const char __user *buf,
 			  size_t count, loff_t *ppos)
 {
 	ssize_t ret;
-	char *tmp = NULL;
+	char *tmp;
 	ssize_t size;
 
-	ret = -ENODEV;
 	if (!ppc_md.nvram_size)
-		goto out;
+		return -ENODEV;
 
-	ret = 0;
 	size = ppc_md.nvram_size();
 	if (*ppos >= size || size < 0)
-		goto out;
+		return 0;
 
 	count = min_t(size_t, count, size - *ppos);
 	count = min(count, PAGE_SIZE);
