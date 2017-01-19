@@ -548,6 +548,7 @@ static void intel_dsi_pre_enable(struct intel_encoder *encoder,
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
 	enum port port;
+	u32 val;
 
 	DRM_DEBUG_KMS("\n");
 
@@ -557,6 +558,11 @@ static void intel_dsi_pre_enable(struct intel_encoder *encoder,
 	 */
 	intel_disable_dsi_pll(encoder);
 	intel_enable_dsi_pll(encoder, pipe_config);
+
+	/* Add MIPI IO reset programming for modeset */
+	val = I915_READ(BXT_P_CR_GT_DISP_PWRON);
+	I915_WRITE(BXT_P_CR_GT_DISP_PWRON,
+				val | MIPIO_RST_CTRL);
 
 	intel_dsi_prepare(encoder, pipe_config);
 
@@ -573,6 +579,14 @@ static void intel_dsi_pre_enable(struct intel_encoder *encoder,
 		val = I915_READ(DSPCLK_GATE_D);
 		val |= DPOUNIT_CLOCK_GATE_DISABLE;
 		I915_WRITE(DSPCLK_GATE_D, val);
+	}
+
+	/* Power up DSI regulator */
+	if (IS_BROXTON(dev_priv)) {
+		I915_WRITE(BXT_P_DSI_REGULATOR_CFG, STAP_SELECT);
+		val = I915_READ(BXT_P_DSI_REGULATOR_TX_CTRL);
+		val &= ~HS_IO_CTRL_SELECT;
+		I915_WRITE(BXT_P_DSI_REGULATOR_TX_CTRL, val);
 	}
 
 	/* put device in ready state */
@@ -707,6 +721,7 @@ static void intel_dsi_post_disable(struct intel_encoder *encoder,
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
+	u32 val;
 
 	DRM_DEBUG_KMS("\n");
 
@@ -714,7 +729,17 @@ static void intel_dsi_post_disable(struct intel_encoder *encoder,
 
 	intel_dsi_clear_device_ready(encoder);
 
+	val = I915_READ(BXT_P_CR_GT_DISP_PWRON);
+	I915_WRITE(BXT_P_CR_GT_DISP_PWRON,
+				val & ~MIPIO_RST_CTRL);
+
 	intel_disable_dsi_pll(encoder);
+
+	if (IS_BROXTON(dev_priv)) {
+		/* Power down DSI regulator to save power */
+		I915_WRITE(BXT_P_DSI_REGULATOR_CFG, STAP_SELECT);
+		I915_WRITE(BXT_P_DSI_REGULATOR_TX_CTRL, HS_IO_CTRL_SELECT);
+	}
 
 	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
 		u32 val;
