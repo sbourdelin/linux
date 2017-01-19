@@ -762,10 +762,8 @@ static ssize_t dev_nvram_read(struct file *file, char __user *buf,
 	count = min(count, PAGE_SIZE);
 
 	tmp = kmalloc(count, GFP_KERNEL);
-	if (!tmp) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	if (!tmp)
+		return -ENOMEM;
 
 	ret = ppc_md.nvram_read(tmp, count, ppos);
 	if (ret <= 0)
