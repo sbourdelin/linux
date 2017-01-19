@@ -1173,9 +1173,10 @@ int __init nvram_scan_partitions(void)
 			goto out;
 		}
 		tmp_part = kmalloc(sizeof(*tmp_part), GFP_KERNEL);
-		err = -ENOMEM;
-		if (!tmp_part)
+		if (!tmp_part) {
+			err = -ENOMEM;
 			goto out;
+		}
 		
 		memcpy(&tmp_part->header, &phead, NVRAM_HEADER_LEN);
 		tmp_part->index = cur_index;
