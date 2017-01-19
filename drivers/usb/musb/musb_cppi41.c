@@ -696,6 +696,7 @@ cppi41_dma_controller_create(struct musb *musb, void __iomem *base)
 	controller->controller.channel_program = cppi41_dma_channel_program;
 	controller->controller.channel_abort = cppi41_dma_channel_abort;
 	controller->controller.is_compatible = cppi41_is_compatible;
+	controller->controller.quirks = MUSB_DMA_QUIRK_CPPI41_IN;
 
 	ret = cppi41_dma_controller_start(controller);
 	if (ret)

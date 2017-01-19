@@ -743,6 +743,8 @@ static void musb_ep_program(struct musb *musb, u8 epnum,
 
 	musb_ep_select(mbase, epnum);
 
+	dma_controller = musb->dma_controller;
+
 	if (is_out && !len) {
 		use_dma = 0;
 		csr = musb_readw(epio, MUSB_TXCSR);
@@ -751,8 +753,20 @@ static void musb_ep_program(struct musb *musb, u8 epnum,
 		hw_ep->tx_channel = NULL;
 	}
 
+	/*
+	 * At least cppi41 in dma will just hang with size of 1 until the
+	 * device is disconnected.
+	 */
+	if (!is_out && dma_controller &&
+	    (dma_controller->quirks & MUSB_DMA_QUIRK_CPPI41_IN)) {
+		use_dma = 0;
+		csr = musb_readw(epio, MUSB_RXCSR);
+		csr &= ~MUSB_RXCSR_DMAENAB;
+		musb_writew(epio, MUSB_RXCSR, csr);
+		hw_ep->rx_channel = NULL;
+	}
+
 	/* candidate for DMA? */
-	dma_controller = musb->dma_controller;
 	if (use_dma && is_dma_capable() && epnum && dma_controller) {
 		dma_channel = is_out ? hw_ep->tx_channel : hw_ep->rx_channel;
 		if (!dma_channel) {

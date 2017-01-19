@@ -171,6 +171,8 @@ dma_channel_status(struct dma_channel *c)
 	return (is_dma_capable() && c) ? c->status : MUSB_DMA_STATUS_UNKNOWN;
 }
 
+#define MUSB_DMA_QUIRK_CPPI41_IN	BIT(0)
+
 /**
  * struct dma_controller - A DMA Controller.
  * @start: call this to start a DMA controller;
@@ -196,6 +198,7 @@ struct dma_controller {
 	int			(*is_compatible)(struct dma_channel *channel,
 							u16 maxpacket,
 							void *buf, u32 length);
+	unsigned int quirks;
 };
 
 /* called after channel_program(), may indicate a fault */
