@@ -26,7 +26,7 @@ static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
 
 	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
 		page = vmalloc_to_page(addr);
-	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
+	else if (!module && IS_ENABLED(CONFIG_HARDENED_PAGE_MAPPINGS))
 		page = virt_to_page(addr);
 	else
 		return addr;

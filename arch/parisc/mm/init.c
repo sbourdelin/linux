@@ -545,7 +545,7 @@ void free_initmem(void)
 }
 
 
-#ifdef CONFIG_DEBUG_RODATA
+#ifdef CONFIG_HARDENED_PAGE_MAPPINGS
 void mark_rodata_ro(void)
 {
 	/* rodata memory was already mapped with KERNEL_RO access rights by

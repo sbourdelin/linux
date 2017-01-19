@@ -158,6 +158,22 @@ config HARDENED_USERCOPY_PAGESPAN
 	  been removed. This config is intended to be used only while
 	  trying to find such users.
 
+config ARCH_HAS_HARDENED_MAPPINGS
+	def_bool n
+
+config HARDENED_PAGE_MAPPINGS
+	bool "Mark kernel mappings with stricter permissions (RO/W^X)"
+	default y
+	depends on ARCH_HAS_HARDENED_MAPPINGS
+	help
+          If this is set, kernel text and rodata memory will be made read-only,
+	  and non-text memory will be made non-executable. This provides
+	  protection against certain security attacks (e.g. executing the heap
+	  or modifying text).
+
+	  Unless your system has known restrictions or performance issues, it
+	  is recommended to say Y here.
+
 source security/selinux/Kconfig
 source security/smack/Kconfig
 source security/tomoyo/Kconfig

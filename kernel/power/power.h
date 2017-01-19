@@ -61,12 +61,12 @@ extern int hibernation_snapshot(int platform_mode);
 extern int hibernation_restore(int platform_mode);
 extern int hibernation_platform_enter(void);
 
-#ifdef CONFIG_DEBUG_RODATA
+#ifdef CONFIG_HARDENED_PAGE_MAPPINGS
 /* kernel/power/snapshot.c */
 extern void enable_restore_image_protection(void);
 #else
 static inline void enable_restore_image_protection(void) {}
-#endif /* CONFIG_DEBUG_RODATA */
+#endif /* CONFIG_HARDENED_PAGE_MAPPINGS */
 
 #else /* !CONFIG_HIBERNATION */
 
