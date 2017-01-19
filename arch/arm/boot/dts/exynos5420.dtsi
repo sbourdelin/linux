@@ -294,7 +294,7 @@
 			reg = <0x10044060 0x20>;
 			clocks = <&clock CLK_FIN_PLL>,
 				 <&clock CLK_MOUT_USER_ACLK333>,
-				 <&clock CLK_ACLK333>;
+				 <&clock CLK_MFC>;
 			clock-names = "oscclk", "clk0","asb0";
 			#power-domain-cells = <0>;
 		};
