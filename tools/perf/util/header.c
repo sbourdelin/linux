@@ -2278,7 +2278,7 @@ int perf_header__fprintf_info(struct perf_session *session, FILE *fp, bool full)
 }
 
 static int do_write_feat(int fd, struct perf_header *h, int type,
-			 struct perf_file_section **p,
+			 struct perf_file_section *p,
 			 struct perf_evlist *evlist)
 {
 	int err;
@@ -2288,19 +2288,19 @@ static int do_write_feat(int fd, struct perf_header *h, int type,
 		if (!feat_ops[type].write)
 			return -1;
 
-		(*p)->offset = lseek(fd, 0, SEEK_CUR);
+		p->offset = lseek(fd, 0, SEEK_CUR);
 
 		err = feat_ops[type].write(fd, h, evlist);
 		if (err < 0) {
 			pr_debug("failed to write feature %s\n", feat_ops[type].name);
 
 			/* undo anything written */
-			lseek(fd, (*p)->offset, SEEK_SET);
+			lseek(fd, p->offset, SEEK_SET);
 
 			return -1;
 		}
-		(*p)->size = lseek(fd, 0, SEEK_CUR) - (*p)->offset;
-		(*p)++;
+		p->size = lseek(fd, 0, SEEK_CUR) - p->offset;
+		p++;
 	}
 	return ret;
 }
@@ -2309,7 +2309,7 @@ static int perf_header__adds_write(struct perf_header *header,
 				   struct perf_evlist *evlist, int fd)
 {
 	int nr_sections;
-	struct perf_file_section *feat_sec, *p;
+	struct perf_file_section *feat_sec;
 	int sec_size;
 	u64 sec_start;
 	int feat;
@@ -2319,7 +2319,7 @@ static int perf_header__adds_write(struct perf_header *header,
 	if (!nr_sections)
 		return 0;
 
-	feat_sec = p = calloc(nr_sections, sizeof(*feat_sec));
+	feat_sec = calloc(nr_sections, sizeof(*feat_sec));
 	if (feat_sec == NULL)
 		return -ENOMEM;
 
@@ -2329,7 +2329,7 @@ static int perf_header__adds_write(struct perf_header *header,
 	lseek(fd, sec_start + sec_size, SEEK_SET);
 
 	for_each_set_bit(feat, header->adds_features, HEADER_FEAT_BITS) {
-		if (do_write_feat(fd, header, feat, &p, evlist))
+		if (do_write_feat(fd, header, feat, feat_sec, evlist))
 			perf_header__clear_feat(header, feat);
 	}
 
