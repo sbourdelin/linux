@@ -745,24 +745,18 @@ static ssize_t dev_nvram_read(struct file *file, char __user *buf,
 			  size_t count, loff_t *ppos)
 {
 	ssize_t ret;
-	char *tmp = NULL;
+	char *tmp;
 	ssize_t size;
 
-	if (!ppc_md.nvram_size) {
-		ret = -ENODEV;
-		goto out;
-	}
+	if (!ppc_md.nvram_size)
+		return -ENODEV;
 
 	size = ppc_md.nvram_size();
-	if (size < 0) {
-		ret = size;
-		goto out;
-	}
+	if (size < 0)
+		return size;
 
-	if (*ppos >= size) {
-		ret = 0;
-		goto out;
-	}
+	if (*ppos >= size)
+		return 0;
 
 	count = min_t(size_t, count, size - *ppos);
 	count = min(count, PAGE_SIZE);
