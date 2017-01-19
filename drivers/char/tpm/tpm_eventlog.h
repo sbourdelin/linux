@@ -2,6 +2,8 @@
 #ifndef __TPM_EVENTLOG_H__
 #define __TPM_EVENTLOG_H__
 
+#include <crypto/hash_info.h>
+
 #define TCG_EVENT_NAME_LEN_MAX	255
 #define MAX_TEXT_EVENT		1000	/* Max event string length */
 #define ACPI_TCPA_SIG		"TCPA"	/* 0x41504354 /'TCPA' */
@@ -72,6 +74,11 @@ enum tcpa_pc_event_ids {
 	POST_CONTENTS,
 	HOST_TABLE_OF_DEVICES,
 };
+
+struct tpm2_digest {
+	u16 alg_id;
+	u8 digest[SHA512_DIGEST_SIZE];
+} __packed;
 
 #if defined(CONFIG_ACPI)
 int tpm_read_log_acpi(struct tpm_chip *chip);
