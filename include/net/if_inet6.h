@@ -1,9 +1,9 @@
 /*
  *	inet6 interface/address list definitions
- *	Linux INET6 implementation 
+ *	Linux INET6 implementation
  *
  *	Authors:
- *	Pedro Roque		<roque@di.fc.ul.pt>	
+ *	Pedro Roque		<roque@di.fc.ul.pt>
  *
  *
  *	This program is free software; you can redistribute it and/or
@@ -205,7 +205,6 @@ struct inet6_dev {
 	__s32			rs_interval;	/* in jiffies */
 	__u8			rs_probes;
 
-	__u8			addr_gen_mode;
 	unsigned long		tstamp; /* ipv6InterfaceTable update timestamp */
 	struct rcu_head		rcu;
 };

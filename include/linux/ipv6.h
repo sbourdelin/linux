@@ -69,6 +69,7 @@ struct ipv6_devconf {
 	__s32		seg6_require_hmac;
 #endif
 	__u32		enhanced_dad;
+	__u32		addr_gen_mode;
 
 	struct ctl_table_header *sysctl_header;
 };
@@ -99,7 +100,7 @@ static inline struct ipv6hdr *ipipv6_hdr(const struct sk_buff *skb)
 	return (struct ipv6hdr *)skb_transport_header(skb);
 }
 
-/* 
+/*
    This structure contains results of exthdrs parsing
    as offsets from skb->nh.
  */
