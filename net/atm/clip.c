@@ -930,7 +930,9 @@ static void atm_clip_exit_noproc(void)
 
 static void __exit atm_clip_exit(void)
 {
+#ifdef CONFIG_PROC_FS
 	remove_proc_entry("arp", atm_proc_root);
+#endif
 
 	atm_clip_exit_noproc();
 }
