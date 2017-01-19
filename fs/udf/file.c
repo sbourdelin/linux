@@ -184,12 +184,6 @@ long udf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		goto out;
 	}
 
-	if (!arg) {
-		udf_debug("invalid argument to udf_ioctl\n");
-		result = -EINVAL;
-		goto out;
-	}
-
 	switch (cmd) {
 	case UDF_GETVOLIDENT:
 		if (copy_to_user((char __user *)arg,
@@ -220,6 +214,8 @@ long udf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				      UDF_I(inode)->i_ext.i_data,
 				      UDF_I(inode)->i_lenEAttr) ? -EFAULT : 0;
 		goto out;
+	default:
+		return -ENOIOCTLCMD;
 	}
 
 out:
