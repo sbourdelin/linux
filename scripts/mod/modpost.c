@@ -619,8 +619,15 @@ static void handle_modversions(struct module *mod, struct elf_info *info,
 
 	/* CRC'd symbol */
 	if (strncmp(symname, CRC_PFX, strlen(CRC_PFX)) == 0) {
+		unsigned int *crcp = NULL;
+
+		if (sym->st_shndx != SHN_UNDEF)
+			crcp = (void *)info->hdr + sym->st_value +
+			       info->sechdrs[sym->st_shndx].sh_offset -
+			       info->sechdrs[sym->st_shndx].sh_addr;
+
 		is_crc = true;
-		crc = (unsigned int) sym->st_value;
+		crc = crcp ? *crcp : 0;
 		sym_update_crc(symname + strlen(CRC_PFX), mod, crc,
 				export);
 	}
