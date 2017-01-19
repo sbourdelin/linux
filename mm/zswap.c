@@ -787,7 +787,10 @@ static int zswap_writeback_entry(struct zpool *pool, unsigned long handle)
 		return 0;
 	}
 	spin_unlock(&tree->lock);
-	BUG_ON(offset != entry->offset);
+	if (WARN_ON(offset != entry->offset)) {
+		ret = -EINVAL;
+		goto fail;
+	}
 
 	/* try to allocate swap cache page */
 	switch (zswap_get_swap_cache_page(swpentry, &page)) {
@@ -813,8 +816,13 @@ static int zswap_writeback_entry(struct zpool *pool, unsigned long handle)
 		put_cpu_ptr(entry->pool->tfm);
 		kunmap_atomic(dst);
 		zpool_unmap_handle(entry->pool->zpool, entry->handle);
-		BUG_ON(ret);
-		BUG_ON(dlen != PAGE_SIZE);
+		if (WARN(ret, "error decompressing page: %d\n", ret))
+			goto fail;
+		if (WARN(dlen != PAGE_SIZE,
+			 "decompressed page only %x bytes\n", dlen)) {
+			ret = -EINVAL;
+			goto fail;
+		}
 
 		/* page is up to date */
 		SetPageUptodate(page);
