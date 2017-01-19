@@ -1951,8 +1951,10 @@ out:
 	switch (ret) {
 	case BLK_MQ_RQ_QUEUE_BUSY:
 		if (atomic_read(&sdev->device_busy) == 0 &&
-		    !scsi_device_blocked(sdev))
+		    !scsi_device_blocked(sdev)) {
+			blk_mq_stop_hw_queue(hctx);
 			blk_mq_delay_queue(hctx, SCSI_QUEUE_DELAY);
+		}
 		break;
 	case BLK_MQ_RQ_QUEUE_ERROR:
 		/*
