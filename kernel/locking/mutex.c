@@ -513,7 +513,11 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 
 	if (use_ww_ctx) {
 		struct ww_mutex *ww = container_of(lock, struct ww_mutex, base);
-		if (unlikely(ww_ctx == READ_ONCE(ww->ctx)))
+		/*
+		 * This really should be an unlikely() but currently
+		 * the intel drm makes this a very likely case.
+		 */
+		if (ww_ctx == READ_ONCE(ww->ctx))
 			return -EALREADY;
 	}
 
