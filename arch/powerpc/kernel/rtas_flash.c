@@ -419,9 +419,10 @@ static ssize_t manage_flash_write(struct file *file, const char __user *buf,
 	op = -1;
 	if (buf) {
 		if (count > 9) count = 9;
-		rc = -EFAULT;
-		if (copy_from_user (stkbuf, buf, count))
+		if (copy_from_user(stkbuf, buf, count)) {
+			rc = -EFAULT;
 			goto error;
+		}
 		if (strncmp(stkbuf, reject_str, strlen(reject_str)) == 0) 
 			op = RTAS_REJECT_TMP_IMG;
 		else if (strncmp(stkbuf, commit_str, strlen(commit_str)) == 0) 
