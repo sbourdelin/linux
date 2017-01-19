@@ -806,9 +806,10 @@ static ssize_t dev_nvram_write(struct file *file, const char __user *buf,
 	if (!tmp)
 		return -ENOMEM;
 
-	ret = -EFAULT;
-	if (copy_from_user(tmp, buf, count))
+	if (copy_from_user(tmp, buf, count)) {
+		ret = -EFAULT;
 		goto out;
+	}
 
 	ret = ppc_md.nvram_write(tmp, count, ppos);
 
