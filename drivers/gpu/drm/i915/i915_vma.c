@@ -107,6 +107,8 @@ vma_create(struct drm_i915_gem_object *obj,
 		}
 	}
 
+	GEM_BUG_ON(vma->size > vm->total);
+
 	if (i915_is_ggtt(vm)) {
 		GEM_BUG_ON(overflows_type(vma->size, u32));
 		vma->fence_size = i915_gem_fence_size(vm->i915, vma->size,
