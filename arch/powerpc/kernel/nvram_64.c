@@ -802,11 +802,9 @@ static ssize_t dev_nvram_write(struct file *file, const char __user *buf,
 
 	count = min_t(size_t, count, size - *ppos);
 	count = min(count, PAGE_SIZE);
-
-	ret = -ENOMEM;
 	tmp = kmalloc(count, GFP_KERNEL);
 	if (!tmp)
-		goto out;
+		return -ENOMEM;
 
 	ret = -EFAULT;
 	if (copy_from_user(tmp, buf, count))
