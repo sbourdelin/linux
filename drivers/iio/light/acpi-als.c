@@ -39,6 +39,9 @@
 #define ACPI_ALS_DEVICE_NAME		"acpi-als"
 #define ACPI_ALS_NOTIFY_ILLUMINANCE	0x80
 
+#define ACPI_ALS_ASUS_TALS		"\\_SB.PCI0.LPCB.EC0.TALS"
+#define ACPI_ALS_ASUS_ALSC		"\\_SB.ATKD.ALSC"
+
 ACPI_MODULE_NAME("acpi-als");
 
 /*
@@ -170,6 +173,16 @@ static int acpi_als_read_raw(struct iio_dev *indio_dev,
 	return IIO_VAL_INT;
 }
 
+static void acpi_als_quirk_asus(struct acpi_als *als)
+{
+	acpi_execute_simple_method(NULL, ACPI_ALS_ASUS_TALS, 1);
+	acpi_execute_simple_method(NULL, ACPI_ALS_ASUS_ALSC, 1);
+}
+
+static void (*acpi_als_quirks[])(struct acpi_als *als) = {
+	acpi_als_quirk_asus,
+};
+
 static const struct iio_info acpi_als_info = {
 	.driver_module		= THIS_MODULE,
 	.read_raw		= acpi_als_read_raw,
@@ -180,6 +193,7 @@ static int acpi_als_add(struct acpi_device *device)
 	struct acpi_als *als;
 	struct iio_dev *indio_dev;
 	struct iio_buffer *buffer;
+	int i;
 
 	indio_dev = devm_iio_device_alloc(&device->dev, sizeof(*als));
 	if (!indio_dev)
@@ -190,6 +204,9 @@ static int acpi_als_add(struct acpi_device *device)
 	device->driver_data = indio_dev;
 	als->device = device;
 	mutex_init(&als->lock);
+
+	for (i = 0; i < ARRAY_SIZE(acpi_als_quirks); i++)
+		acpi_als_quirks[i](als);
 
 	indio_dev->name = ACPI_ALS_DEVICE_NAME;
 	indio_dev->dev.parent = &device->dev;
