@@ -1040,10 +1040,8 @@ loff_t __init nvram_create_partition(const char *name, int sig,
 	
 	/* Create our OS partition */
 	new_part = kmalloc(sizeof(*new_part), GFP_KERNEL);
-	if (!new_part) {
-		pr_err("%s: kmalloc failed\n", __func__);
+	if (!new_part)
 		return -ENOMEM;
-	}
 
 	new_part->index = free_part->index;
 	new_part->header.signature = sig;
@@ -1145,10 +1143,8 @@ int __init nvram_scan_partitions(void)
 	total_size = ppc_md.nvram_size();
 	
 	header = kmalloc(NVRAM_HEADER_LEN, GFP_KERNEL);
-	if (!header) {
-		printk(KERN_ERR "nvram_scan_partitions: Failed kmalloc\n");
+	if (!header)
 		return -ENOMEM;
-	}
 
 	while (cur_index < total_size) {
 
@@ -1181,10 +1177,8 @@ int __init nvram_scan_partitions(void)
 		}
 		tmp_part = kmalloc(sizeof(struct nvram_partition), GFP_KERNEL);
 		err = -ENOMEM;
-		if (!tmp_part) {
-			printk(KERN_ERR "nvram_scan_partitions: kmalloc failed\n");
+		if (!tmp_part)
 			goto out;
-		}
 		
 		memcpy(&tmp_part->header, &phead, NVRAM_HEADER_LEN);
 		tmp_part->index = cur_index;
