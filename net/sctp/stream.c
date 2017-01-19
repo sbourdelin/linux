@@ -195,3 +195,102 @@ int sctp_send_reset_assoc(struct sctp_association *asoc)
 
 	return retval;
 }
+
+int sctp_send_add_streams(struct sctp_association *asoc,
+			  struct sctp_add_streams *params)
+{
+	struct sctp_stream *stream = asoc->stream;
+	struct sctp_chunk *chunk = NULL;
+	int retval = -EINVAL;
+	__u16 out, in;
+
+	if (!asoc->peer.reconf_capable ||
+	    !(asoc->strreset_enable & SCTP_ENABLE_CHANGE_ASSOC_REQ)) {
+		retval = -ENOPROTOOPT;
+		goto out;
+	}
+
+	if (asoc->strreset_outstanding) {
+		retval = -EINPROGRESS;
+		goto out;
+	}
+
+	out = params->sas_outstrms;
+	in  = params->sas_instrms;
+
+	if (!out && !in)
+		goto out;
+
+	if (out) {
+		__u16 nums = stream->outcnt + out;
+
+		/* Check for overflow, can't use nums here */
+		if (stream->outcnt + out > SCTP_MAX_STREAM)
+			goto out;
+
+		/* Use ksize to check if stream array really needs to realloc */
+		if (ksize(stream->out) / sizeof(*stream->out) < nums) {
+			struct sctp_stream_out *streamout;
+
+			streamout = kcalloc(nums, sizeof(*streamout),
+					    GFP_KERNEL);
+			if (!streamout) {
+				retval = -ENOMEM;
+				goto out;
+			}
+
+			memcpy(streamout, stream->out,
+			       sizeof(*streamout) * stream->outcnt);
+
+			kfree(stream->out);
+			stream->out = streamout;
+		}
+
+		stream->outcnt = nums;
+	}
+
+	if (in) {
+		__u16 nums = stream->incnt + in;
+
+		if (stream->incnt + in > SCTP_MAX_STREAM)
+			goto out;
+
+		if (ksize(stream->in) / sizeof(*stream->in) < nums) {
+			struct sctp_stream_in *streamin;
+
+			streamin = kcalloc(nums, sizeof(*streamin),
+					   GFP_KERNEL);
+			if (!streamin) {
+				retval = -ENOMEM;
+				goto out;
+			}
+
+			memcpy(streamin, stream->in,
+			       sizeof(*streamin) * stream->incnt);
+
+			kfree(stream->in);
+			stream->in = streamin;
+		}
+
+		stream->incnt = nums;
+	}
+
+	chunk = sctp_make_strreset_addstrm(asoc, out, in);
+	if (!chunk) {
+		retval = -ENOMEM;
+		goto out;
+	}
+
+	asoc->strreset_outstanding = !!out + !!in;
+	asoc->strreset_chunk = chunk;
+	sctp_chunk_hold(asoc->strreset_chunk);
+
+	retval = sctp_send_reconf(asoc, chunk);
+	if (retval) {
+		sctp_chunk_put(asoc->strreset_chunk);
+		asoc->strreset_chunk = NULL;
+	}
+
+out:
+	return retval;
+}
