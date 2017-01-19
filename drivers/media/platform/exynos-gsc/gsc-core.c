@@ -1083,8 +1083,10 @@ static int gsc_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, gsc);
 
-	gsc_hw_set_sw_reset(gsc);
-	gsc_wait_reset(gsc);
+	if (!IS_ENABLED(CONFIG_PM)) {
+		gsc_hw_set_sw_reset(gsc);
+		gsc_wait_reset(gsc);
+	}
 
 	vb2_dma_contig_set_max_seg_size(dev, DMA_BIT_MASK(32));
 
