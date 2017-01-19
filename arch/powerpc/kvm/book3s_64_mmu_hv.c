@@ -1399,22 +1399,23 @@ static ssize_t kvm_htab_write(struct file *file, const char __user *buf,
 
 	err = 0;
 	for (nb = 0; nb + sizeof(hdr) <= count; ) {
-		err = -EFAULT;
-		if (__copy_from_user(&hdr, buf, sizeof(hdr)))
+		if (__copy_from_user(&hdr, buf, sizeof(hdr))) {
+			err = -EFAULT;
 			break;
+		}
 
-		err = 0;
 		if (nb + hdr.n_valid * HPTE_SIZE > count)
 			break;
 
 		nb += sizeof(hdr);
 		buf += sizeof(hdr);
 
-		err = -EINVAL;
 		i = hdr.index;
 		if (i >= kvm->arch.hpt_npte ||
-		    i + hdr.n_valid + hdr.n_invalid > kvm->arch.hpt_npte)
+		    i + hdr.n_valid + hdr.n_invalid > kvm->arch.hpt_npte) {
+			err = -EINVAL;
 			break;
+		}
 
 		hptp = (__be64 *)(kvm->arch.hpt_virt + (i * HPTE_SIZE));
 		lbuf = (unsigned long __user *)buf;
@@ -1422,26 +1423,28 @@ static ssize_t kvm_htab_write(struct file *file, const char __user *buf,
 			__be64 hpte_v;
 			__be64 hpte_r;
 
-			err = -EFAULT;
 			if (__get_user(hpte_v, lbuf) ||
-			    __get_user(hpte_r, lbuf + 1))
+			    __get_user(hpte_r, lbuf + 1)) {
+				err = -EFAULT;
 				goto out;
+			}
 			v = be64_to_cpu(hpte_v);
 			r = be64_to_cpu(hpte_r);
-			err = -EINVAL;
-			if (!(v & HPTE_V_VALID))
+			if (!(v & HPTE_V_VALID)) {
+				err = -EINVAL;
 				goto out;
+			}
 			lbuf += 2;
 			nb += HPTE_SIZE;
 
 			if (be64_to_cpu(hptp[0]) & (HPTE_V_VALID | HPTE_V_ABSENT))
 				kvmppc_do_h_remove(kvm, 0, i, 0, tmp);
-			err = -EIO;
 			ret = kvmppc_virtmode_do_h_enter(kvm, H_EXACT, i, v, r,
 							 tmp);
 			if (ret != H_SUCCESS) {
 				pr_err("kvm_htab_write ret %ld i=%ld v=%lx "
 				       "r=%lx\n", ret, i, v, r);
+				err = -EIO;
 				goto out;
 			}
 			if (!hpte_setup && is_vrma_hpte(v)) {
@@ -1465,7 +1468,6 @@ static ssize_t kvm_htab_write(struct file *file, const char __user *buf,
 			++i;
 			hptp += 2;
 		}
-		err = 0;
 	}
 
  out:
