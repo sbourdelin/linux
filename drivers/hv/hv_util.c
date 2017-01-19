@@ -27,6 +27,7 @@
 #include <linux/sysctl.h>
 #include <linux/reboot.h>
 #include <linux/hyperv.h>
+#include <linux/ptp_clock_kernel.h>
 
 #include "hyperv_vmbus.h"
 
@@ -179,31 +180,34 @@ struct adj_time_work {
 	u8	flags;
 };
 
+static u64 get_timeadj_latency(u64 ref_time)
+{
+	u64 current_tick;
+
+	if (ts_srv_version <= TS_VERSION_3)
+		return 0;
+
+	/*
+	 * Some latency has been introduced since Hyper-V generated
+	 * its time sample. Take that latency into account before
+	 * using TSC reference time sample from Hyper-V.
+	 *
+	 * This sample is given by TimeSync v4 and above hosts.
+	 */
+	rdmsrl(HV_X64_MSR_TIME_REF_COUNT, current_tick);
+	return current_tick - ref_time;
+}
+
 static void hv_set_host_time(struct work_struct *work)
 {
 	struct adj_time_work	*wrk;
-	s64 host_tns;
-	u64 newtime;
 	struct timespec64 host_ts;
+	u64 newtime;
 
 	wrk = container_of(work, struct adj_time_work, work);
 
-	newtime = wrk->host_time;
-	if (ts_srv_version > TS_VERSION_3) {
-		/*
-		 * Some latency has been introduced since Hyper-V generated
-		 * its time sample. Take that latency into account before
-		 * using TSC reference time sample from Hyper-V.
-		 *
-		 * This sample is given by TimeSync v4 and above hosts.
-		 */
-		u64 current_tick;
-
-		rdmsrl(HV_X64_MSR_TIME_REF_COUNT, current_tick);
-		newtime += (current_tick - wrk->ref_time);
-	}
-	host_tns = (newtime - WLTIMEDELTA) * 100;
-	host_ts = ns_to_timespec64(host_tns);
+	newtime = wrk->host_time + get_timeadj_latency(wrk->ref_time);
+	host_ts = ns_to_timespec64((newtime - WLTIMEDELTA) * 100);
 
 	do_settimeofday64(&host_ts);
 }
@@ -222,22 +226,52 @@ static void hv_set_host_time(struct work_struct *work)
  * to discipline the clock.
  */
 static struct adj_time_work  wrk;
-static inline void adj_guesttime(u64 hosttime, u64 reftime, u8 flags)
+
+/*
+ * The last time sample, received from the host. PTP device responds to
+ * requests by using this data and the current partition-wide time reference
+ * count.
+ */
+static struct {
+	u64		host_time;
+	u64		ref_time;
+	spinlock_t	lock;
+} host_ts;
+
+static inline void adj_guesttime(u64 hosttime, u64 reftime, u8 adj_flags)
 {
+	unsigned long flags;
 
 	/*
 	 * This check is safe since we are executing in the
 	 * interrupt context and time synch messages arre always
 	 * delivered on the same CPU.
 	 */
-	if (work_pending(&wrk.work))
-		return;
+	if (adj_flags & ICTIMESYNCFLAG_SYNC) {
+		if (work_pending(&wrk.work))
+			return;
 
-	wrk.host_time = hosttime;
-	wrk.ref_time = reftime;
-	wrk.flags = flags;
-	if ((flags & (ICTIMESYNCFLAG_SYNC | ICTIMESYNCFLAG_SAMPLE)) != 0) {
+		wrk.host_time = hosttime;
+		wrk.ref_time = reftime;
+		wrk.flags = adj_flags;
 		schedule_work(&wrk.work);
+	} else {
+		spin_lock_irqsave(&host_ts.lock, flags);
+		host_ts.host_time = hosttime;
+
+		/*
+		 * Prior to version 4 TimeSync messages from the host don't
+		 * contain any reference time (the time when the time sample
+		 * was generated), save the current time reference count
+		 * instead. This adds a small delta between the time sample
+		 * generation and the reception of the sample here to the result
+		 * but it's the best thing we can do.
+		 */
+		if (ts_srv_version <= TS_VERSION_3)
+			rdmsrl(HV_X64_MSR_TIME_REF_COUNT, host_ts.ref_time);
+		else
+			host_ts.ref_time = reftime;
+		spin_unlock_irqrestore(&host_ts.lock, flags);
 	}
 }
 
@@ -470,14 +504,74 @@ static  struct hv_driver util_drv = {
 	.remove =  util_remove,
 };
 
+static int hv_ptp_enable(struct ptp_clock_info *info,
+			 struct ptp_clock_request *request, int on)
+{
+	return -EOPNOTSUPP;
+}
+
+static int hv_ptp_settime(struct ptp_clock_info *p, const struct timespec64 *ts)
+{
+	return -EOPNOTSUPP;
+}
+
+static int hv_ptp_adjfreq(struct ptp_clock_info *ptp, s32 delta)
+{
+	return -EOPNOTSUPP;
+}
+static int hv_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
+{
+	return -EOPNOTSUPP;
+}
+
+static int hv_ptp_gettime(struct ptp_clock_info *info, struct timespec64 *ts)
+{
+	u64 newtime;
+	unsigned long flags;
+
+	spin_lock_irqsave(&host_ts.lock, flags);
+	newtime = host_ts.host_time + get_timeadj_latency(host_ts.ref_time);
+	*ts = ns_to_timespec64((newtime - WLTIMEDELTA) * 100);
+	spin_unlock_irqrestore(&host_ts.lock, flags);
+
+	return 0;
+}
+
+static const struct ptp_clock_info ptp_hyperv_info = {
+	.name		= "hyperv",
+	.enable         = hv_ptp_enable,
+	.adjtime        = hv_ptp_adjtime,
+	.adjfreq        = hv_ptp_adjfreq,
+	.gettime64      = hv_ptp_gettime,
+	.settime64      = hv_ptp_settime,
+	.owner		= THIS_MODULE,
+};
+
+static struct ptp_clock *hv_ptp_clock;
+
 static int hv_timesync_init(struct hv_util_service *srv)
 {
 	INIT_WORK(&wrk.work, hv_set_host_time);
+
+	/*
+	 * ptp_clock_register() returns NULL when CONFIG_PTP_1588_CLOCK is
+	 * disabled but the driver is still useful without the PTP device
+	 * as it still handles the ICTIMESYNCFLAG_SYNC case.
+	 */
+	hv_ptp_clock = ptp_clock_register(&ptp_hyperv_info, NULL);
+	if (IS_ERR_OR_NULL(hv_ptp_clock)) {
+		pr_err("cannot register PTP clock: %ld\n",
+		       PTR_ERR(hv_ptp_clock));
+		hv_ptp_clock = NULL;
+	}
+
 	return 0;
 }
 
 static void hv_timesync_deinit(void)
 {
+	if (hv_ptp_clock)
+		ptp_clock_unregister(hv_ptp_clock);
 	cancel_work_sync(&wrk.work);
 }
 
