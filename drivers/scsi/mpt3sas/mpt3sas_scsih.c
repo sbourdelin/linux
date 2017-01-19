@@ -1096,6 +1096,27 @@ _scsih_scsi_lookup_get_clear(struct MPT3SAS_ADAPTER *ioc, u16 smid)
 }
 
 /**
+ * _scsih_scsi_lookup_get_clear_without_lock - returns scmd entry without
+ *						holding any lock.
+ * @ioc: per adapter object
+ * @smid: system request message index
+ *
+ * Returns the smid stored scmd pointer.
+ * Then will derefrence the stored scmd pointer.
+ */
+static inline struct scsi_cmnd *
+_scsih_scsi_lookup_get_clear_without_lock(struct MPT3SAS_ADAPTER *ioc,
+		u16 smid)
+{
+	struct scsi_cmnd *scmd;
+
+	scmd = ioc->scsi_lookup[smid - 1].scmd;
+	ioc->scsi_lookup[smid - 1].scmd = NULL;
+
+	return scmd;
+}
+
+/**
  * _scsih_scsi_lookup_find_by_scmd - scmd lookup
  * @ioc: per adapter object
  * @smid: system request message index
@@ -4659,7 +4680,13 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 	unsigned long flags;
 
 	mpi_reply = mpt3sas_base_get_reply_virt_addr(ioc, reply);
-	scmd = _scsih_scsi_lookup_get_clear(ioc, smid);
+
+	if (ioc->broadcast_aen_busy || ioc->pci_error_recovery ||
+			ioc->got_task_abort_from_ioctl)
+		scmd = _scsih_scsi_lookup_get_clear(ioc, smid);
+	else
+		scmd = _scsih_scsi_lookup_get_clear_without_lock(ioc, smid);
+
 	if (scmd == NULL)
 		return 1;
 
