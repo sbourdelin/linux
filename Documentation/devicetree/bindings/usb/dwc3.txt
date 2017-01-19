@@ -55,6 +55,9 @@ Optional properties:
 	fladj_30mhz_sdbnd signal is invalid or incorrect.
 
  - <DEPRECATED> tx-fifo-resize: determines if the FIFO *has* to be reallocated.
+ - snps,num_in_eps_quirk: when set core will over-ride the num_in_eps value.
+ - snps,num_in_eps_override: the value that will be used for num_in_eps when
+			num_in_eps_quirk is true
 
 This is usually a subnode to DWC3 glue to which it is connected.
 

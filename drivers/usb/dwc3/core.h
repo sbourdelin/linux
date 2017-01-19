@@ -857,6 +857,9 @@ struct dwc3_scratchpad_array {
  * 	3	- Reserved
  * @imod_interval: set the interrupt moderation interval in 250ns
  *                 increments or 0 to disable.
+ * @num_in_eps_quirk: set if silicon reports number of device-mode IN endpoints
+ *		      as equal to equal to the total number of endpoints.
+ * @num_in_eps_override: The value to set the number of IN endpoints to.
  */
 struct dwc3 {
 	struct usb_ctrlrequest	*ctrl_req;
@@ -1007,6 +1010,9 @@ struct dwc3 {
 	unsigned		tx_de_emphasis:2;
 
 	u16			imod_interval;
+
+	unsigned		num_in_eps_quirk:1;
+	unsigned		num_in_eps_override:6;
 };
 
 /* -------------------------------------------------------------------------- */

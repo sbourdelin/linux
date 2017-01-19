@@ -398,6 +398,8 @@ static void dwc3_core_num_eps(struct dwc3 *dwc)
 	struct dwc3_hwparams	*parms = &dwc->hwparams;
 
 	dwc->num_in_eps = DWC3_NUM_IN_EPS(parms);
+	if (dwc->num_in_eps_quirk)
+		dwc->num_in_eps = dwc->num_in_eps_override;
 	dwc->num_out_eps = DWC3_NUM_EPS(parms) - dwc->num_in_eps;
 }
 
@@ -909,6 +911,7 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 	struct device		*dev = dwc->dev;
 	u8			lpm_nyet_threshold;
 	u8			tx_de_emphasis;
+	u8			num_in_eps_override;
 	u8			hird_threshold;
 
 	/* default to highest possible threshold */
@@ -922,6 +925,9 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 	 * threshold value of 0b1100
 	 */
 	hird_threshold = 12;
+
+	/* default value of 2 is the minimum RTL parameter value */
+	num_in_eps_override = 2;
 
 	dwc->maximum_speed = usb_get_maximum_speed(dev);
 	dwc->dr_mode = usb_get_dr_mode(dev);
@@ -982,9 +988,14 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 				    &dwc->hsphy_interface);
 	device_property_read_u32(dev, "snps,quirk-frame-length-adjustment",
 				 &dwc->fladj);
+	dwc->num_in_eps_quirk = device_property_read_bool(dev,
+				"snps,num_in_eps_quirk");
+	device_property_read_u8(dev, "snps,num_in_eps_override",
+				&num_in_eps_override);
 
 	dwc->lpm_nyet_threshold = lpm_nyet_threshold;
 	dwc->tx_de_emphasis = tx_de_emphasis;
+	dwc->num_in_eps_override = num_in_eps_override;
 
 	dwc->hird_threshold = hird_threshold
 		| (dwc->is_utmi_l1_suspend << 4);
