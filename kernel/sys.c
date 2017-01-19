@@ -2063,6 +2063,55 @@ static int prctl_get_tid_address(struct task_struct *me, int __user **tid_addr)
 }
 #endif
 
+static DEFINE_SPINLOCK(descendants_lock);
+
+static void prctl_set_child_subreaper(struct task_struct *reaper, bool arg2)
+{
+	LIST_HEAD(descendants);
+
+	reaper->signal->is_child_subreaper = arg2;
+	if (!arg2)
+		return;
+
+	spin_lock(&descendants_lock);
+	read_lock(&tasklist_lock);
+
+	list_add(&reaper->csr_descendant, &descendants);
+
+	while (!list_empty(&descendants)) {
+		struct task_struct *tsk;
+		struct task_struct *p;
+
+		tsk = list_first_entry(&descendants, struct task_struct,
+				csr_descendant);
+
+		list_for_each_entry(p, &tsk->children, sibling) {
+			/*
+			 * If tsk has has_child_subreaper - all its decendants
+			 * already have these flag too and new decendants will
+			 * inherit it on fork, so nothing to be done here.
+			 */
+			if (p->signal->has_child_subreaper)
+				continue;
+
+			/*
+			 * If we've found child_reaper - skip descendants in
+			 * it's subtree as they will never get out pidns
+			 */
+			if (is_child_reaper(task_pid(p)))
+				continue;
+
+			p->signal->has_child_subreaper = 1;
+			list_add(&p->csr_descendant, &descendants);
+		}
+
+		list_del_init(&tsk->csr_descendant);
+	}
+
+	read_unlock(&tasklist_lock);
+	spin_unlock(&descendants_lock);
+}
+
 SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		unsigned long, arg4, unsigned long, arg5)
 {
@@ -2213,7 +2262,7 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		error = prctl_get_tid_address(me, (int __user **)arg2);
 		break;
 	case PR_SET_CHILD_SUBREAPER:
-		me->signal->is_child_subreaper = !!arg2;
+		prctl_set_child_subreaper(me, !!arg2);
 		break;
 	case PR_GET_CHILD_SUBREAPER:
 		error = put_user(me->signal->is_child_subreaper,

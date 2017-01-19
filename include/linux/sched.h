@@ -1723,6 +1723,8 @@ struct task_struct {
 	struct signal_struct *signal;
 	struct sighand_struct *sighand;
 
+	struct list_head csr_descendant;
+
 	sigset_t blocked, real_blocked;
 	sigset_t saved_sigmask;	/* restored if set_restore_sigmask() was used */
 	struct sigpending pending;
