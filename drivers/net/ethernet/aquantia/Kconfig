@@ -1,0 +1,20 @@
+#
+# aQuantia device configuration
+#
+
+config NET_VENDOR_AQUANTIA
+	bool "aQuantia devices"
+	default y
+	---help---
+	  Set this to y if you have an Ethernet network cards that uses the aQuantia
+	  AQC107/AQC108 chipset.
+
+	  This option does not build any drivers; it casues the aQuantia
+	  drivers that can be built to appear in the list of Ethernet drivers.
+
+
+if NET_VENDOR_AQUANTIA
+
+source "drivers/net/ethernet/aquantia/atlantic/Kconfig"
+
+endif # NET_VENDOR_AQUANTIA
