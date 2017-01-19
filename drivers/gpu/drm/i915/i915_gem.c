@@ -3679,6 +3679,12 @@ i915_gem_object_ggtt_pin(struct drm_i915_gem_object *obj,
 
 	lockdep_assert_held(&obj->base.dev->struct_mutex);
 
+	/* Disallow a single VMA to occupy the entire GGTT, and catch any
+	 * attempt to create a normal VMA larger than the GGTT.
+	 */
+	if (!view && obj->base.size >= vm->total)
+		return ERR_PTR(-ENOSPC);
+
 	vma = i915_vma_instance(obj, vm, view);
 	if (IS_ERR(vma))
 		return vma;
