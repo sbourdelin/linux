@@ -30,7 +30,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/of_platform.h>
@@ -86,7 +85,6 @@ struct da8xx_glue {
 	struct device		*dev;
 	struct platform_device	*musb;
 	struct platform_device	*usb_phy;
-	struct clk		*clk;
 	struct phy		*phy;
 };
 
@@ -377,11 +375,7 @@ static int da8xx_musb_init(struct musb *musb)
 
 	musb->mregs += DA8XX_MENTOR_CORE_OFFSET;
 
-	ret = clk_prepare_enable(glue->clk);
-	if (ret) {
-		dev_err(glue->dev, "failed to enable clock\n");
-		return ret;
-	}
+	pm_runtime_get_sync(musb->controller->parent);
 
 	/* Returns zero if e.g. not clocked */
 	rev = musb_readl(reg_base, DA8XX_USB_REVISION_REG);
@@ -424,7 +418,7 @@ static int da8xx_musb_init(struct musb *musb)
 err_phy_power_on:
 	phy_exit(glue->phy);
 fail:
-	clk_disable_unprepare(glue->clk);
+	pm_runtime_put_sync(musb->controller->parent);
 	return ret;
 }
 
@@ -436,7 +430,7 @@ static int da8xx_musb_exit(struct musb *musb)
 
 	phy_power_off(glue->phy);
 	phy_exit(glue->phy);
-	clk_disable_unprepare(glue->clk);
+	pm_runtime_put_sync(musb->controller->parent);
 
 	usb_put_phy(musb->xceiv);
 
@@ -519,19 +513,12 @@ static int da8xx_probe(struct platform_device *pdev)
 	struct musb_hdrc_platform_data	*pdata = dev_get_platdata(&pdev->dev);
 	struct da8xx_glue		*glue;
 	struct platform_device_info	pinfo;
-	struct clk			*clk;
 	struct device_node		*np = pdev->dev.of_node;
 	int				ret;
 
 	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
 	if (!glue)
 		return -ENOMEM;
-
-	clk = devm_clk_get(&pdev->dev, "usb20");
-	if (IS_ERR(clk)) {
-		dev_err(&pdev->dev, "failed to get clock\n");
-		return PTR_ERR(clk);
-	}
 
 	glue->phy = devm_phy_get(&pdev->dev, "usb-phy");
 	if (IS_ERR(glue->phy)) {
@@ -541,7 +528,6 @@ static int da8xx_probe(struct platform_device *pdev)
 	}
 
 	glue->dev			= &pdev->dev;
-	glue->clk			= clk;
 
 	if (IS_ENABLED(CONFIG_OF) && np) {
 		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
@@ -587,6 +573,8 @@ static int da8xx_probe(struct platform_device *pdev)
 	pinfo.data = pdata;
 	pinfo.size_data = sizeof(*pdata);
 
+	pm_runtime_enable(&pdev->dev);
+
 	glue->musb = platform_device_register_full(&pinfo);
 	ret = PTR_ERR_OR_ZERO(glue->musb);
 	if (ret) {
@@ -603,6 +591,7 @@ static int da8xx_remove(struct platform_device *pdev)
 
 	platform_device_unregister(glue->musb);
 	usb_phy_generic_unregister(glue->usb_phy);
+	pm_runtime_disable(&pdev->dev);
 
 	return 0;
 }
