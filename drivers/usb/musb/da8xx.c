@@ -483,7 +483,7 @@ da8xx_dma_controller_create(struct musb *musb, void __iomem *base)
 #endif
 
 static const struct musb_platform_ops da8xx_ops = {
-	.quirks		= MUSB_INDEXED_EP | MUSB_DMA_CPPI41,
+	.quirks		= MUSB_INDEXED_EP | MUSB_DMA_CPPI41 | MUSB_DA8XX,
 	.init		= da8xx_musb_init,
 	.exit		= da8xx_musb_exit,
 
