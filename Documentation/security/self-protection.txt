@@ -52,7 +52,7 @@ made writable during the update, and then returned to the original
 permissions.)
 
 In support of this are CONFIG_HARDENED_PAGE_MAPPINGS and
-CONFIG_DEBUG_SET_MODULE_RONX, which seek to make sure that code is not
+CONFIG_HARDENED_MODULE_MAPPINGS, which seek to make sure that code is not
 writable, data is not executable, and read-only data is neither writable
 nor executable.
 

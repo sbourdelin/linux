@@ -174,6 +174,22 @@ config HARDENED_PAGE_MAPPINGS
 	  Unless your system has known restrictions or performance issues, it
 	  is recommended to say Y here.
 
+config ARCH_HAS_HARDENED_MODULE_MAPPINGS
+	def_bool n
+
+config HARDENED_MODULE_MAPPINGS
+	bool "Mark module mappings with stricter permissions (RO/W^X)"
+	default y
+	depends on ARCH_HAS_HARDENED_MODULE_MAPPINGS
+	help
+	  If this is set, module text and rodata memory will be made read-only,
+	  and non-text memory will be made non-executable. This provides
+	  protection against certain security vulnerabilities (e.g. modifying
+	  code)
+
+	  Unless your system has known restrictions or performance issues, it
+	  is recommended to say Y here.
+
 source security/selinux/Kconfig
 source security/smack/Kconfig
 source security/tomoyo/Kconfig

@@ -126,7 +126,7 @@ void prepare_namespace(void);
 void __init load_default_modules(void);
 int __init init_rootfs(void);
 
-#if defined(CONFIG_HARDENED_PAGE_MAPPINGS) || defined(CONFIG_DEBUG_SET_MODULE_RONX)
+#if defined(CONFIG_HARDENED_PAGE_MAPPINGS) || defined(CONFIG_HARDENED_MODULE_MAPPINGS)
 extern bool rodata_enabled;
 #endif
 #ifdef CONFIG_HARDENED_PAGE_MAPPINGS
