@@ -349,7 +349,7 @@ static int __init rcar_sysc_pd_init(void)
 	domains = kzalloc(sizeof(*domains), GFP_KERNEL);
 	if (!domains) {
 		error = -ENOMEM;
-		goto out_put;
+		goto out_iounmap;
 	}
 
 	domains->onecell_data.domains = domains->domains;
@@ -380,7 +380,7 @@ static int __init rcar_sysc_pd_init(void)
 		pd = kzalloc(sizeof(*pd) + strlen(area->name) + 1, GFP_KERNEL);
 		if (!pd) {
 			error = -ENOMEM;
-			goto out_put;
+			goto out_kfree;
 		}
 
 		strcpy(pd->name, area->name);
@@ -400,6 +400,10 @@ static int __init rcar_sysc_pd_init(void)
 
 	error = of_genpd_add_provider_onecell(np, &domains->onecell_data);
 
+out_kfree:
+	kfree(domains);
+out_iounmap:
+	iounmap(base);
 out_put:
 	of_node_put(np);
 	return error;
@@ -414,6 +418,8 @@ void __init rcar_sysc_init(phys_addr_t base, u32 syscier)
 		return;
 
 	rcar_sysc_base = ioremap_nocache(base, PAGE_SIZE);
+	if (!rcar_sysc_base)
+		return;
 
 	/*
 	 * Mask all interrupt sources to prevent the CPU from receiving them.
