@@ -114,7 +114,8 @@ ar9003_set_txdesc(struct ath_hw *ah, void *ds, struct ath_tx_info *i)
 		| SM(i->type, AR_FrameType)
 		| (i->flags & ATH9K_TXDESC_NOACK ? AR_NoAck : 0)
 		| (i->flags & ATH9K_TXDESC_EXT_ONLY ? AR_ExtOnly : 0)
-		| (i->flags & ATH9K_TXDESC_EXT_AND_CTL ? AR_ExtAndCtl : 0);
+		| (i->flags & ATH9K_TXDESC_EXT_AND_CTL ? AR_ExtAndCtl : 0)
+		| (i->flags & ATH9K_TXDESC_CORRUPT_FCS ? AR_CorruptFCS : 0);
 
 	ctl17 |= (i->flags & ATH9K_TXDESC_LDPC ? AR_LDPC : 0);
 	switch (i->aggr) {

@@ -265,6 +265,8 @@ struct ath_desc {
 #define ATH9K_TXDESC_PAPRD		0x70000
 #define ATH9K_TXDESC_PAPRD_S		16
 
+#define ATH9K_TXDESC_CORRUPT_FCS	0x80000
+
 #define ATH9K_RXDESC_INTREQ		0x0020
 
 struct ar5416_desc {
