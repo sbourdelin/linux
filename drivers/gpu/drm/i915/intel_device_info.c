@@ -189,7 +189,7 @@ static void gen9_sseu_info_init(struct drm_i915_private *dev_priv)
 	 * pair per subslice.
 	*/
 	sseu->has_slice_pg =
-		(IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv)) &&
+		(IS_GEN9(dev_priv) && !IS_LP(dev_priv)) &&
 		hweight8(sseu->slice_mask) > 1;
 	sseu->has_subslice_pg =
 		IS_GEN9_LP(dev_priv) && sseu_subslice_total(sseu) > 1;

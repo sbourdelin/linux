@@ -538,7 +538,7 @@ static int find_compression_threshold(struct drm_i915_private *dev_priv,
 	 * If we enable FBC using a CFB on that memory range we'll get FIFO
 	 * underruns, even if that range is not reserved by the BIOS. */
 	if (IS_BROADWELL(dev_priv) ||
-	    IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))
+	    (IS_GEN9(dev_priv) && !IS_LP(dev_priv)))
 		end = ggtt->stolen_size - 8 * 1024 * 1024;
 	else
 		end = U64_MAX;
