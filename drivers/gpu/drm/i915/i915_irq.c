@@ -1741,16 +1741,17 @@ static bool intel_pipe_handle_vblank(struct drm_i915_private *dev_priv,
 	return ret;
 }
 
-static void valleyview_pipestat_irq_ack(struct drm_i915_private *dev_priv,
+static bool valleyview_pipestat_irq_ack(struct drm_i915_private *dev_priv,
 					u32 iir, u32 pipe_stats[I915_MAX_PIPES])
 {
+	bool active = false;
 	int pipe;
 
 	spin_lock(&dev_priv->irq_lock);
 
 	if (!dev_priv->display_irqs_enabled) {
 		spin_unlock(&dev_priv->irq_lock);
-		return;
+		return false;
 	}
 
 	for_each_pipe(dev_priv, pipe) {
@@ -1795,8 +1796,12 @@ static void valleyview_pipestat_irq_ack(struct drm_i915_private *dev_priv,
 		if (pipe_stats[pipe] & (PIPE_FIFO_UNDERRUN_STATUS |
 					PIPESTAT_INT_STATUS_MASK))
 			I915_WRITE(reg, pipe_stats[pipe]);
+
+		active = true;
 	}
 	spin_unlock(&dev_priv->irq_lock);
+
+	return active;
 }
 
 static void valleyview_pipestat_irq_handler(struct drm_i915_private *dev_priv,
@@ -1964,12 +1969,19 @@ static irqreturn_t cherryview_irq_handler(int irq, void *arg)
 		u32 gt_iir[4] = {};
 		u32 pipe_stats[I915_MAX_PIPES] = {};
 		u32 hotplug_status = 0;
+		bool any_pipe_stats = false;
 		u32 ier = 0;
 
 		master_ctl = I915_READ(GEN8_MASTER_IRQ) & ~GEN8_MASTER_IRQ_CONTROL;
-		iir = I915_READ(VLV_IIR);
+		I915_WRITE(GEN8_MASTER_IRQ, 0);
 
-		if (master_ctl == 0 && iir == 0)
+		if (gen8_gt_irq_ack(dev_priv, master_ctl, gt_iir)) {
+			ret = IRQ_HANDLED;
+			goto skip_display;
+		}
+
+		iir = I915_READ(VLV_IIR);
+		if (iir == 0)
 			break;
 
 		ret = IRQ_HANDLED;
@@ -1987,18 +1999,17 @@ static irqreturn_t cherryview_irq_handler(int irq, void *arg)
 		 * don't end up clearing all the VLV_IIR and GEN8_MASTER_IRQ_CONTROL
 		 * bits this time around.
 		 */
-		I915_WRITE(GEN8_MASTER_IRQ, 0);
 		ier = I915_READ(VLV_IER);
 		I915_WRITE(VLV_IER, 0);
 
-		gen8_gt_irq_ack(dev_priv, master_ctl, gt_iir);
 
 		if (iir & I915_DISPLAY_PORT_INTERRUPT)
 			hotplug_status = i9xx_hpd_irq_ack(dev_priv);
 
 		/* Call regardless, as some status bits might not be
 		 * signalled in iir */
-		valleyview_pipestat_irq_ack(dev_priv, iir, pipe_stats);
+		any_pipe_stats =
+			valleyview_pipestat_irq_ack(dev_priv, iir, pipe_stats);
 
 		/*
 		 * VLV_IIR is single buffered, and reflects the level
@@ -2008,6 +2019,8 @@ static irqreturn_t cherryview_irq_handler(int irq, void *arg)
 			I915_WRITE(VLV_IIR, iir);
 
 		I915_WRITE(VLV_IER, ier);
+
+skip_display:
 		I915_WRITE(GEN8_MASTER_IRQ, GEN8_MASTER_IRQ_CONTROL);
 		POSTING_READ(GEN8_MASTER_IRQ);
 
@@ -2016,7 +2029,8 @@ static irqreturn_t cherryview_irq_handler(int irq, void *arg)
 		if (hotplug_status)
 			i9xx_hpd_irq_handler(dev_priv, hotplug_status);
 
-		valleyview_pipestat_irq_handler(dev_priv, pipe_stats);
+		if (any_pipe_stats)
+			valleyview_pipestat_irq_handler(dev_priv, pipe_stats);
 	} while (0);
 
 	enable_rpm_wakeref_asserts(dev_priv);
