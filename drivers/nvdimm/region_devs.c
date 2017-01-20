@@ -953,14 +953,18 @@ EXPORT_SYMBOL_GPL(nvdimm_flush);
  * nvdimm_has_flush - determine write flushing requirements
  * @nd_region: blk or interleaved pmem region
  *
- * Returns 1 if writes require flushing
- * Returns 0 if writes do not require flushing
+ * Returns 1 if writes require wpq flushing
+ * Returns 0 if writes do not require wpq flushing
  * Returns -ENXIO if flushing capability can not be determined
+ * Returns -EINVAL if neither wpq nor cache flushing is required
  */
 int nvdimm_has_flush(struct nd_region *nd_region)
 {
 	struct nd_region_data *ndrd = dev_get_drvdata(&nd_region->dev);
 	int i;
+
+	if (is_nd_volatile(&nd_region->dev))
+		return -EINVAL;
 
 	/* no nvdimm or pmem api == flushing capability unknown */
 	if (nd_region->ndr_mappings == 0

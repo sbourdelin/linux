@@ -229,6 +229,17 @@ static const struct block_device_operations pmem_fops = {
 	.dax_ops =		&pmem_dax_ops,
 };
 
+static const struct dax_operations vmem_dax_ops = {
+	.direct_access = pmem_direct_access,
+};
+
+static const struct block_device_operations vmem_fops = {
+	.owner =		THIS_MODULE,
+	.rw_page =		pmem_rw_page,
+	.revalidate_disk =	nvdimm_revalidate_disk,
+	.dax_ops =		&vmem_dax_ops,
+};
+
 static void pmem_release_queue(void *q)
 {
 	blk_cleanup_queue(q);
@@ -254,6 +265,7 @@ static int pmem_attach_disk(struct device *dev,
 	struct resource pfn_res;
 	struct request_queue *q;
 	struct gendisk *disk;
+	int has_flush;
 	void *addr;
 
 	/* while nsio_rw_bytes is active, parse a pfn info block if present */
@@ -274,7 +286,8 @@ static int pmem_attach_disk(struct device *dev,
 	dev_set_drvdata(dev, pmem);
 	pmem->phys_addr = res->start;
 	pmem->size = resource_size(res);
-	if (nvdimm_has_flush(nd_region) < 0)
+	has_flush = nvdimm_has_flush(nd_region);
+	if (has_flush == -ENXIO)
 		dev_warn(dev, "unable to guarantee persistence of writes\n");
 
 	if (!devm_request_mem_region(dev, res->start, resource_size(res),
@@ -316,7 +329,12 @@ static int pmem_attach_disk(struct device *dev,
 		return PTR_ERR(addr);
 	pmem->virt_addr = addr;
 
-	blk_queue_write_cache(q, true, true);
+	/*
+	 * If the region is !volatile request that the upper layers send
+	 * flush requests to trigger fencing and wpq flushing
+	 */
+	if (has_flush != -EINVAL)
+		blk_queue_write_cache(q, true, true);
 	blk_queue_make_request(q, pmem_make_request);
 	blk_queue_physical_block_size(q, PAGE_SIZE);
 	blk_queue_max_hw_sectors(q, UINT_MAX);
@@ -329,9 +347,12 @@ static int pmem_attach_disk(struct device *dev,
 	if (!disk)
 		return -ENOMEM;
 
-	disk->fops		= &pmem_fops;
-	disk->queue		= q;
-	disk->flags		= GENHD_FL_EXT_DEVT;
+	if (has_flush == -EINVAL)
+		disk->fops = &vmem_fops;
+	else
+		disk->fops = &pmem_fops;
+	disk->queue = q;
+	disk->flags = GENHD_FL_EXT_DEVT;
 	nvdimm_namespace_disk_name(ndns, disk->disk_name);
 	set_capacity(disk, (pmem->size - pmem->pfn_pad - pmem->data_offset)
 			/ 512);
