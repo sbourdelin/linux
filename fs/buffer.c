@@ -243,7 +243,7 @@ __find_get_block_slow(struct block_device *bdev, sector_t block)
 		printk("b_state=0x%08lx, b_size=%zu\n",
 			bh->b_state, bh->b_size);
 		printk("device %pg blocksize: %d\n", bdev,
-			1 << bd_inode->i_blkbits);
+			i_blocksize(bd_inode));
 	}
 out_unlock:
 	spin_unlock(&bd_mapping->private_lock);
