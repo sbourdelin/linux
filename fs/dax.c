@@ -112,8 +112,14 @@ struct page *read_dax_sector(struct block_device *bdev, sector_t n)
 	rc = dax_map_atomic(bdev, &dax);
 	if (rc < 0)
 		return ERR_PTR(rc);
-	memcpy_from_pmem(page_address(page), dax.addr, PAGE_SIZE);
+	rc = memcpy_mcsafe(page_address(page), dax.addr, PAGE_SIZE);
 	dax_unmap_atomic(bdev, &dax);
+
+	if (rc) {
+		put_page(page);
+		return ERR_PTR(rc);
+	}
+
 	return page;
 }
 
