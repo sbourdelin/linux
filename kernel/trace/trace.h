@@ -787,6 +787,20 @@ extern void __trace_graph_return(struct trace_array *tr,
 				 struct ftrace_graph_ret *trace,
 				 unsigned long flags, int pc);
 
+struct ftrace_hash {
+	unsigned long		size_bits;
+	struct hlist_head	*buckets;
+	unsigned long		count;
+	struct rcu_head		rcu;
+};
+
+struct ftrace_func_entry *
+ftrace_lookup_ip(struct ftrace_hash *hash, unsigned long ip);
+
+static bool __always_inline ftrace_hash_empty(struct ftrace_hash *hash)
+{
+	return !hash || !hash->count;
+}
 
 #ifdef CONFIG_DYNAMIC_FTRACE
 /* TODO: make this variable */
