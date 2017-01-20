@@ -222,14 +222,14 @@ static size_t pmem_copy_from_iter(void *addr, size_t bytes,
 {
 	size_t rc = copy_from_iter_nocache(addr, bytes, i);
 
-	wb_cache_pmem(addr, bytes);
+	arch_wb_cache_pmem(addr, bytes);
 	return rc;
 }
 
 static const struct dax_operations pmem_dax_ops = {
 	.direct_access = pmem_direct_access,
 	.copy_from_iter = pmem_copy_from_iter,
-	.flush = wb_cache_pmem,
+	.flush = arch_wb_cache_pmem,
 };
 
 static const struct block_device_operations pmem_fops = {
