@@ -10,6 +10,7 @@
  */
 
 #include <linux/export.h>
+#include <linux/mm.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/sdio.h>
@@ -298,6 +299,12 @@ unsigned int sdio_align_size(struct sdio_func *func, unsigned int sz)
 }
 EXPORT_SYMBOL_GPL(sdio_align_size);
 
+static int sdio_io_addr_sanity_check(void *addr)
+{
+	return (is_vmalloc_or_module_addr(addr) ||
+		object_is_on_stack(addr));
+}
+
 /* Split an arbitrarily sized data transfer into several
  * IO_RW_EXTENDED commands. */
 static int sdio_io_rw_ext_helper(struct sdio_func *func, int write,
@@ -307,7 +314,7 @@ static int sdio_io_rw_ext_helper(struct sdio_func *func, int write,
 	unsigned max_blocks;
 	int ret;
 
-	if (!func || (func->num > 7))
+	if (!func || (func->num > 7) || sdio_io_addr_sanity_check(buf))
 		return -EINVAL;
 
 	/* Do the bulk of the transfer using block mode (if supported). */
