@@ -217,8 +217,18 @@ __weak long pmem_direct_access(struct block_device *bdev, sector_t sector,
 	return pmem->size - pmem->pfn_pad - offset;
 }
 
+static size_t pmem_copy_from_iter(void *addr, size_t bytes,
+		struct iov_iter *i)
+{
+	size_t rc = copy_from_iter_nocache(addr, bytes, i);
+
+	wb_cache_pmem(addr, bytes);
+	return rc;
+}
+
 static const struct dax_operations pmem_dax_ops = {
 	.direct_access = pmem_direct_access,
+	.copy_from_iter = pmem_copy_from_iter,
 };
 
 static const struct block_device_operations pmem_fops = {

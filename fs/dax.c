@@ -1006,6 +1006,10 @@ static loff_t
 dax_iomap_actor(struct inode *inode, loff_t pos, loff_t length, void *data,
 		struct iomap *iomap)
 {
+	struct block_device *bdev = iomap->bdev;
+	size_t (*dax_copy_from_iter)(void *, size_t, struct iov_iter *);
+	const struct block_device_operations *ops = bdev->bd_disk->fops;
+	const struct dax_operations *dax_ops = ops->dax_ops;
 	struct iov_iter *iter = data;
 	loff_t end = pos + length, done = 0;
 	ssize_t ret = 0;
@@ -1033,6 +1037,11 @@ dax_iomap_actor(struct inode *inode, loff_t pos, loff_t length, void *data,
 					      (end - 1) >> PAGE_SHIFT);
 	}
 
+	if (dax_ops->copy_from_iter)
+		dax_copy_from_iter = dax_ops->copy_from_iter;
+	else
+		dax_copy_from_iter = copy_from_iter_nocache;
+
 	while (pos < end) {
 		unsigned offset = pos & (PAGE_SIZE - 1);
 		struct blk_dax_ctl dax = { 0 };
@@ -1052,7 +1061,7 @@ dax_iomap_actor(struct inode *inode, loff_t pos, loff_t length, void *data,
 			map_len = end - pos;
 
 		if (iov_iter_rw(iter) == WRITE)
-			map_len = copy_from_iter_pmem(dax.addr, map_len, iter);
+			map_len = dax_copy_from_iter(dax.addr, map_len, iter);
 		else
 			map_len = copy_to_iter(dax.addr, map_len, iter);
 		dax_unmap_atomic(iomap->bdev, &dax);

@@ -1879,6 +1879,7 @@ struct blk_dax_ctl {
 struct dax_operations {
 	long (*direct_access)(struct block_device *, sector_t, void **, pfn_t *,
 			long);
+	size_t (*copy_from_iter)(void *, size_t, struct iov_iter *);
 };
 
 struct block_device_operations {
