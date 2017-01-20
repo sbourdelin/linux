@@ -7,6 +7,7 @@
 #include <linux/clk.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/pm_runtime.h>
 #include <linux/usb/of.h>
 
 #include "phy-am335x-control.h"
@@ -22,16 +23,40 @@ struct am335x_phy {
 static int am335x_init(struct usb_phy *phy)
 {
 	struct am335x_phy *am_phy = dev_get_drvdata(phy->dev);
+	int error;
+
+	error = pm_runtime_get_sync(phy->dev);
+	if (error < 0) {
+		dev_err(phy->dev, "%s pm_runtime_get: %i\n", __func__, error);
+
+		return error;
+	}
 
 	phy_ctrl_power(am_phy->phy_ctrl, am_phy->id, am_phy->dr_mode, true);
+
+	pm_runtime_mark_last_busy(phy->dev);
+	pm_runtime_put_autosuspend(phy->dev);
+
 	return 0;
 }
 
 static void am335x_shutdown(struct usb_phy *phy)
 {
 	struct am335x_phy *am_phy = dev_get_drvdata(phy->dev);
+	int error;
+
+	error = pm_runtime_get_sync(phy->dev);
+	if (error < 0) {
+		dev_err(phy->dev, "%s pm_runtime_get: %i\n", __func__, error);
+
+		return;
+	}
 
 	phy_ctrl_power(am_phy->phy_ctrl, am_phy->id, am_phy->dr_mode, false);
+
+	pm_runtime_mark_last_busy(phy->dev);
+	pm_runtime_put_autosuspend(phy->dev);
+
 }
 
 static int am335x_phy_probe(struct platform_device *pdev)
@@ -56,13 +81,23 @@ static int am335x_phy_probe(struct platform_device *pdev)
 
 	am_phy->dr_mode = of_usb_get_dr_mode_by_phy(pdev->dev.of_node, -1);
 
+	pm_runtime_enable(dev);
+	pm_runtime_set_autosuspend_delay(dev, 100);
+	pm_runtime_use_autosuspend(dev);
+	ret = pm_runtime_get_sync(dev);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "%s pm_runtime_get: %i\n", __func__, ret);
+
+		return ret;
+	}
+
 	ret = usb_phy_gen_create_phy(dev, &am_phy->usb_phy_gen, NULL);
 	if (ret)
-		return ret;
+		goto disable;
 
 	ret = usb_add_phy_dev(&am_phy->usb_phy_gen.phy);
 	if (ret)
-		return ret;
+		goto disable;
 	am_phy->usb_phy_gen.phy.init = am335x_init;
 	am_phy->usb_phy_gen.phy.shutdown = am335x_shutdown;
 
@@ -81,14 +116,34 @@ static int am335x_phy_probe(struct platform_device *pdev)
 	device_set_wakeup_enable(dev, false);
 	phy_ctrl_power(am_phy->phy_ctrl, am_phy->id, am_phy->dr_mode, false);
 
-	return 0;
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_put_autosuspend(dev);
+
+	return ret;
+
+disable:
+	pm_runtime_dont_use_autosuspend(dev);
+	pm_runtime_put_sync(dev);
+	pm_runtime_disable(dev);
+
+	return ret;
 }
 
 static int am335x_phy_remove(struct platform_device *pdev)
 {
 	struct am335x_phy *am_phy = platform_get_drvdata(pdev);
+	int error;
+
+	error = pm_runtime_get_sync(&pdev->dev);
+	if (error < 0)
+		dev_err(&pdev->dev, "%s pm_runtime_get: %i\n", __func__, error);
 
 	usb_remove_phy(&am_phy->usb_phy_gen.phy);
+
+	pm_runtime_dont_use_autosuspend(&pdev->dev);
+	pm_runtime_put_sync(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
+
 	return 0;
 }
 
