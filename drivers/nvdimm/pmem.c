@@ -27,7 +27,7 @@
 #include <linux/vmalloc.h>
 #include <linux/pfn_t.h>
 #include <linux/slab.h>
-#include <linux/pmem.h>
+#include <linux/uio.h>
 #include <linux/nd.h>
 #include "pmem.h"
 #include "pfn.h"
@@ -78,7 +78,7 @@ static void write_pmem(void *pmem_addr, struct page *page,
 {
 	void *mem = kmap_atomic(page);
 
-	memcpy_to_pmem(pmem_addr, mem + off, len);
+	arch_memcpy_to_pmem(pmem_addr, mem + off, len);
 	kunmap_atomic(mem);
 }
 

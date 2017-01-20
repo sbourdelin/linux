@@ -40,3 +40,17 @@ void arch_invalidate_pmem(void *addr, size_t size)
 	clflush_cache_range(addr, size);
 }
 EXPORT_SYMBOL_GPL(arch_invalidate_pmem);
+
+void __arch_memcpy_to_pmem(void *dst, void *src, unsigned size);
+
+void arch_memcpy_to_pmem(void *dst, void *src, unsigned size)
+{
+	if (((unsigned long) dst | (unsigned long) src | size) & 7) {
+		/* __arch_memcpy_to_pmem assumes 8-byte alignment */
+		memcpy(dst, src, size);
+		arch_wb_cache_pmem(dst, size);
+		return;
+	}
+	__arch_memcpy_to_pmem(dst, src, size);
+}
+EXPORT_SYMBOL_GPL(arch_memcpy_to_pmem);

@@ -25,3 +25,4 @@ libnvdimm-$(CONFIG_BTT) += btt_devs.o
 libnvdimm-$(CONFIG_NVDIMM_PFN) += pfn_devs.o
 libnvdimm-$(CONFIG_NVDIMM_DAX) += dax_devs.o
 libnvdimm-$(CONFIG_X86_64) += x86.o
+libnvdimm-$(CONFIG_X86_64) += x86-asm.o
