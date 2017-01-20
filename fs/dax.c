@@ -756,10 +756,19 @@ unlock_pte:
 	i_mmap_unlock_read(mapping);
 }
 
+static const struct dax_operations *to_dax_ops(struct block_device *bdev)
+{
+	const struct block_device_operations *ops = bdev->bd_disk->fops;
+	const struct dax_operations *dax_ops = ops->dax_ops;
+
+	return dax_ops;
+}
+
 static int dax_writeback_one(struct block_device *bdev,
 		struct address_space *mapping, pgoff_t index, void *entry)
 {
 	struct radix_tree_root *page_tree = &mapping->page_tree;
+	const struct dax_operations *dax_ops = to_dax_ops(bdev);
 	struct blk_dax_ctl dax;
 	void *entry2, **slot;
 	int ret = 0;
@@ -830,7 +839,8 @@ static int dax_writeback_one(struct block_device *bdev,
 	}
 
 	dax_mapping_entry_mkclean(mapping, index, pfn_t_to_pfn(dax.pfn));
-	wb_cache_pmem(dax.addr, dax.size);
+	if (dax_ops->flush)
+		dax_ops->flush(dax.addr, dax.size);
 	/*
 	 * After we have flushed the cache, we can clear the dirty tag. There
 	 * cannot be new dirty data in the pfn after the flush has completed as
@@ -1006,10 +1016,8 @@ static loff_t
 dax_iomap_actor(struct inode *inode, loff_t pos, loff_t length, void *data,
 		struct iomap *iomap)
 {
-	struct block_device *bdev = iomap->bdev;
 	size_t (*dax_copy_from_iter)(void *, size_t, struct iov_iter *);
-	const struct block_device_operations *ops = bdev->bd_disk->fops;
-	const struct dax_operations *dax_ops = ops->dax_ops;
+	const struct dax_operations *dax_ops = to_dax_ops(iomap->bdev);
 	struct iov_iter *iter = data;
 	loff_t end = pos + length, done = 0;
 	ssize_t ret = 0;
