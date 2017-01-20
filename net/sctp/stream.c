@@ -136,8 +136,20 @@ int sctp_send_reset_streams(struct sctp_association *asoc,
 				goto out;
 
 	chunk = sctp_make_strreset_req(asoc, str_nums, str_list, out, in);
-	if (!chunk)
+	if (!chunk) {
+		retval = -ENOMEM;
 		goto out;
+	}
+
+	asoc->strreset_chunk = chunk;
+	sctp_chunk_hold(asoc->strreset_chunk);
+
+	retval = sctp_send_reconf(asoc, chunk);
+	if (retval) {
+		sctp_chunk_put(asoc->strreset_chunk);
+		asoc->strreset_chunk = NULL;
+		goto out;
+	}
 
 	if (out) {
 		if (str_nums)
@@ -150,14 +162,6 @@ int sctp_send_reset_streams(struct sctp_association *asoc,
 	}
 
 	asoc->strreset_outstanding = out + in;
-	asoc->strreset_chunk = chunk;
-	sctp_chunk_hold(asoc->strreset_chunk);
-
-	retval = sctp_send_reconf(asoc, chunk);
-	if (retval) {
-		sctp_chunk_put(asoc->strreset_chunk);
-		asoc->strreset_chunk = NULL;
-	}
 
 out:
 	return retval;
