@@ -334,6 +334,7 @@ struct pci_dev {
 	 */
 	unsigned int	irq;
 	struct resource resource[DEVICE_COUNT_RESOURCE]; /* I/O and memory regions + expansion ROMs */
+	resource_size_t res_addsize[PCI_ROM_RESOURCE + 1];
 
 	bool match_driver;		/* Skip attaching driver */
 	/* These fields are used by common fixups */
@@ -1644,7 +1645,10 @@ static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
 /* these helpers provide future and backwards compatibility
  * for accessing popular PCI BAR info */
 #define pci_resource_start(dev, bar)	((dev)->resource[(bar)].start)
-#define pci_resource_end(dev, bar)	((dev)->resource[(bar)].end)
+#define pci_resource_end(dev, bar)	(((bar) > PCI_ROM_RESOURCE) ?	\
+					(dev)->resource[(bar)].end :	\
+					((dev)->resource[(bar)].end -	\
+					(dev)->res_addsize[(bar)]))
 #define pci_resource_flags(dev, bar)	((dev)->resource[(bar)].flags)
 #define pci_resource_len(dev,bar) \
 	((pci_resource_start((dev), (bar)) == 0 &&	\

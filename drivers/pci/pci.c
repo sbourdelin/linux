@@ -5096,6 +5096,7 @@ void pci_reassigndev_resource_alignment(struct pci_dev *dev)
 
 		size = resource_size(r);
 		if (size < align) {
+			dev->res_addsize[i] = align - size;
 			size = align;
 			dev_info(&dev->dev,
 				"Rounding up size of resource #%d to %#llx.\n",
