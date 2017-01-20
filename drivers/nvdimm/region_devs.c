@@ -11,6 +11,7 @@
  * General Public License for more details.
  */
 #include <linux/scatterlist.h>
+#include <linux/moduleparam.h>
 #include <linux/highmem.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -20,6 +21,11 @@
 #include <linux/nd.h>
 #include "nd-core.h"
 #include "nd.h"
+
+static bool platform_has_flush_on_fail;
+module_param(platform_has_flush_on_fail, bool, 00444);
+MODULE_PARM_DESC(platform_has_flush_on_fail,
+	"Platform arranges for cpu caches to be flushed on power failure");
 
 /*
  * For readq() and writeq() on 32-bit builds, the hi-lo, lo-hi order is
@@ -962,6 +968,11 @@ int nvdimm_has_flush(struct nd_region *nd_region)
 {
 	struct nd_region_data *ndrd = dev_get_drvdata(&nd_region->dev);
 	int i;
+
+	if (platform_has_flush_on_fail) {
+		pr_info_once("libnvdimm.platform_has_flush_on_fail enabled\n");
+		return -EINVAL;
+	}
 
 	if (is_nd_volatile(&nd_region->dev))
 		return -EINVAL;
