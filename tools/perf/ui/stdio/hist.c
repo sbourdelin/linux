@@ -17,6 +17,56 @@ static size_t callchain__fprintf_left_margin(FILE *fp, int left_margin)
 	return ret;
 }
 
+static size_t inline__fprintf(struct map *map, u64 ip,
+			      int left_margin, FILE *fp)
+{
+	struct dso *dso;
+	struct inline_node *node;
+	struct inline_list *ilist;
+	int ret = 0, i = 0;
+
+	if (map == NULL)
+		return 0;
+
+	dso = map->dso;
+	if (dso == NULL)
+		return 0;
+
+	if (dso->kernel != DSO_TYPE_USER)
+		return 0;
+
+	node = dso__parse_addr_inlines(dso,
+				       map__rip_2objdump(map, ip));
+	if (node == NULL)
+		return 0;
+
+	ret += callchain__fprintf_left_margin(fp, left_margin);
+	ret += fprintf(fp, "|\n");
+	ret += callchain__fprintf_left_margin(fp, left_margin);
+	ret += fprintf(fp, "---");
+	left_margin += 3;
+
+	list_for_each_entry(ilist, &node->val, list) {
+		if (ilist->filename != NULL) {
+			if (i++ > 0)
+				ret = callchain__fprintf_left_margin(fp,
+								left_margin);
+
+			if (symbol_conf.inline_name)
+				ret += fprintf(fp, "%s (inline)",
+					       ilist->funcname);
+			else
+				ret += fprintf(fp, "%s:%d (inline)",
+					       ilist->filename, ilist->line_nr);
+
+			ret += fprintf(fp, "\n");
+		}
+	}
+
+	inline_node__delete(node);
+	return ret;
+}
+
 static size_t ipchain__fprintf_graph_line(FILE *fp, int depth, int depth_mask,
 					  int left_margin)
 {
@@ -78,6 +128,10 @@ static size_t ipchain__fprintf_graph(FILE *fp, struct callchain_node *node,
 	fputs(str, fp);
 	fputc('\n', fp);
 	free(alloc_str);
+
+	if (symbol_conf.inline_line || symbol_conf.inline_name)
+		ret += inline__fprintf(chain->ms.map, chain->ip,
+				       left_margin + 11, fp);
 	return ret;
 }
 
@@ -229,6 +283,7 @@ static size_t callchain__fprintf_graph(FILE *fp, struct rb_root *root,
 			if (!i++ && field_order == NULL &&
 			    sort_order && !prefixcmp(sort_order, "sym"))
 				continue;
+
 			if (!printed) {
 				ret += callchain__fprintf_left_margin(fp, left_margin);
 				ret += fprintf(fp, "|\n");
@@ -251,6 +306,12 @@ static size_t callchain__fprintf_graph(FILE *fp, struct rb_root *root,
 
 			if (++entries_printed == callchain_param.print_limit)
 				break;
+
+			if (symbol_conf.inline_line || symbol_conf.inline_name)
+				ret += inline__fprintf(chain->ms.map,
+						       chain->ip,
+						       left_margin,
+						       fp);
 		}
 		root = &cnode->rb_root;
 	}
@@ -529,6 +590,8 @@ static int hist_entry__fprintf(struct hist_entry *he, size_t size,
 			       bool use_callchain)
 {
 	int ret;
+	int callchain_ret = 0;
+	int inline_ret = 0;
 	struct perf_hpp hpp = {
 		.buf		= bf,
 		.size		= size,
@@ -547,7 +610,17 @@ static int hist_entry__fprintf(struct hist_entry *he, size_t size,
 	ret = fprintf(fp, "%s\n", bf);
 
 	if (use_callchain)
-		ret += hist_entry_callchain__fprintf(he, total_period, 0, fp);
+		callchain_ret = hist_entry_callchain__fprintf(he, total_period,
+							      0, fp);
+
+	if ((callchain_ret == 0) &&
+	    (symbol_conf.inline_line || symbol_conf.inline_name)) {
+		inline_ret = inline__fprintf(he->ms.map, he->ip, 0, fp);
+		ret += inline_ret;
+		if (inline_ret > 0)
+			ret += fprintf(fp, "\n");
+	} else
+		ret += callchain_ret;
 
 	return ret;
 }
