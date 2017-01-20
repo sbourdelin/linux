@@ -382,7 +382,7 @@ data_copy:
 	/* Perform all necessary steps similar write_begin()/write_end()
 	 * but keeping in mind that i_size will not change */
 	if (!page_has_buffers(pagep[0]))
-		create_empty_buffers(pagep[0], 1 << orig_inode->i_blkbits, 0);
+		create_empty_buffers(pagep[0], i_blocksize(orig_inode), 0);
 	bh = page_buffers(pagep[0]);
 	for (i = 0; i < data_offset_in_page; i++)
 		bh = bh->b_this_page;
