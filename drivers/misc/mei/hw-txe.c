@@ -1196,19 +1196,19 @@ static const struct mei_hw_ops mei_txe_hw_ops = {
 };
 
 /**
- * mei_txe_dev_init - allocates and initializes txe hardware specific structure
+ * devm_mei_txe_init - allocates and initializes txe hardware specific structure
  *
  * @pdev: pci device
  *
  * Return: struct mei_device * on success or NULL
  */
-struct mei_device *mei_txe_dev_init(struct pci_dev *pdev)
+struct mei_device *devm_mei_txe_init(struct pci_dev *pdev)
 {
 	struct mei_device *dev;
 	struct mei_txe_hw *hw;
 
-	dev = kzalloc(sizeof(struct mei_device) +
-			 sizeof(struct mei_txe_hw), GFP_KERNEL);
+	dev = devm_kzalloc(&pdev->dev, sizeof(struct mei_device) +
+			   sizeof(struct mei_txe_hw), GFP_KERNEL);
 	if (!dev)
 		return NULL;
 
