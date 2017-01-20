@@ -366,7 +366,7 @@ static int read_page(struct file *file, unsigned long index,
 	pr_debug("read bitmap file (%dB @ %llu)\n", (int)PAGE_SIZE,
 		 (unsigned long long)index << PAGE_SHIFT);
 
-	bh = alloc_page_buffers(page, 1<<inode->i_blkbits, 0);
+	bh = alloc_page_buffers(page, i_blocksize(inode), 0);
 	if (!bh) {
 		ret = -ENOMEM;
 		goto out;
@@ -384,10 +384,10 @@ static int read_page(struct file *file, unsigned long index,
 				goto out;
 			}
 			bh->b_bdev = inode->i_sb->s_bdev;
-			if (count < (1<<inode->i_blkbits))
+			if (count < i_blocksize(inode))
 				count = 0;
 			else
-				count -= (1<<inode->i_blkbits);
+				count -= i_blocksize(inode);
 
 			bh->b_end_io = end_bitmap_write;
 			bh->b_private = bitmap;
