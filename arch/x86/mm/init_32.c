@@ -798,9 +798,11 @@ void __init mem_init(void)
 #ifdef CONFIG_HIGHMEM
 	BUILD_BUG_ON(PKMAP_BASE + LAST_PKMAP*PAGE_SIZE	> FIXADDR_START);
 	BUILD_BUG_ON(VMALLOC_END			> PKMAP_BASE);
+	BUILD_BUG_ON(__fix_to_virt(__end_of_fixed_addresses) <= PKMAP_BASE + LAST_PKMAP*PAGE_SIZE);
 #endif
 #define high_memory (-128UL << 20)
 	BUILD_BUG_ON(VMALLOC_START			>= VMALLOC_END);
+	BUILD_BUG_ON(__fix_to_virt(__end_of_fixed_addresses) <= VMALLOC_END);
 #undef high_memory
 #undef __FIXADDR_TOP
 

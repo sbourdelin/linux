@@ -183,6 +183,9 @@ static void fix_processor_context(void)
 	load_mm_ldt(current->active_mm);	/* This does lldt */
 
 	fpu__resume_cpu();
+
+	/* Load remapped GDT */
+	load_remapped_gdt(cpu);
 }
 
 /**

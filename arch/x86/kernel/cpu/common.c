@@ -443,6 +443,19 @@ void load_percpu_segment(int cpu)
 	load_stack_canary_segment();
 }
 
+/* Load a fixmap remapping of the per-cpu GDT */
+void load_remapped_gdt(int cpu)
+{
+	struct desc_ptr gdt_descr;
+	unsigned long idx = FIX_GDT_REMAP_BEGIN + cpu;
+
+	__set_fixmap(idx, __pa(get_cpu_gdt_table(cpu)), PAGE_KERNEL);
+
+	gdt_descr.address = (long)__fix_to_virt(idx);
+	gdt_descr.size = GDT_SIZE - 1;
+	load_gdt(&gdt_descr);
+}
+
 /*
  * Current gdt points %fs at the "master" per-cpu area: after this,
  * it's on the real one.
@@ -455,7 +468,6 @@ void switch_to_new_gdt(int cpu)
 	gdt_descr.size = GDT_SIZE - 1;
 	load_gdt(&gdt_descr);
 	/* Reload the per-cpu base */
-
 	load_percpu_segment(cpu);
 }
 
@@ -1508,6 +1520,8 @@ void cpu_init(void)
 
 	if (is_uv_system())
 		uv_cpu_init();
+
+	load_remapped_gdt(cpu);
 }
 
 #else
@@ -1563,6 +1577,8 @@ void cpu_init(void)
 	dbg_restore_debug_regs();
 
 	fpu__init_cpu();
+
+	load_remapped_gdt(cpu);
 }
 #endif
 
