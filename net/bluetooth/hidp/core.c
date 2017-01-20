@@ -1180,7 +1180,9 @@ static void hidp_session_run(struct hidp_session *session)
 	struct sock *ctrl_sk = session->ctrl_sock->sk;
 	struct sock *intr_sk = session->intr_sock->sk;
 	struct sk_buff *skb;
+	DEFINE_WAIT_FUNC(wait, woken_wake_function);
 
+	add_wait_queue(sk_sleep(intr_sk), &wait);
 	for (;;) {
 		/*
 		 * This thread can be woken up two ways:
@@ -1188,12 +1190,10 @@ static void hidp_session_run(struct hidp_session *session)
 		 *    session->terminate flag and wakes this thread up.
 		 *  - Via modifying the socket state of ctrl/intr_sock. This
 		 *    thread is woken up by ->sk_state_changed().
-		 *
-		 * Note: set_current_state() performs any necessary
-		 * memory-barriers for us.
 		 */
-		set_current_state(TASK_INTERRUPTIBLE);
 
+		/* Ensure session->terminate is updated */
+		smp_mb__before_atomic();
 		if (atomic_read(&session->terminate))
 			break;
 
@@ -1227,11 +1227,14 @@ static void hidp_session_run(struct hidp_session *session)
 		hidp_process_transmit(session, &session->ctrl_transmit,
 				      session->ctrl_sock);
 
-		schedule();
+		wait_woken(&wait, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
 	}
+	remove_wait_queue(sk_sleep(intr_sk), &wait);
 
 	atomic_inc(&session->terminate);
-	set_current_state(TASK_RUNNING);
+
+	/* Ensure session->terminate is updated */
+	smp_mb__after_atomic();
 }
 
 /*
