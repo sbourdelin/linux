@@ -1256,19 +1256,19 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 	switch (ioctl) {
 	case KVM_INTERRUPT: {
 		struct kvm_interrupt irq;
-		r = -EFAULT;
+
 		if (copy_from_user(&irq, argp, sizeof(irq)))
-			goto out;
+			return -EFAULT;
 		r = kvm_vcpu_ioctl_interrupt(vcpu, &irq);
-		goto out;
+		break;
 	}
 
 	case KVM_ENABLE_CAP:
 	{
 		struct kvm_enable_cap cap;
-		r = -EFAULT;
+
 		if (copy_from_user(&cap, argp, sizeof(cap)))
-			goto out;
+			return -EFAULT;
 		r = kvm_vcpu_ioctl_enable_cap(vcpu, &cap);
 		break;
 	}
@@ -1277,9 +1277,9 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 	case KVM_GET_ONE_REG:
 	{
 		struct kvm_one_reg reg;
-		r = -EFAULT;
+
 		if (copy_from_user(&reg, argp, sizeof(reg)))
-			goto out;
+			return -EFAULT;
 		if (ioctl == KVM_SET_ONE_REG)
 			r = kvm_vcpu_ioctl_set_one_reg(vcpu, &reg);
 		else
@@ -1290,9 +1290,9 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 #if defined(CONFIG_KVM_E500V2) || defined(CONFIG_KVM_E500MC)
 	case KVM_DIRTY_TLB: {
 		struct kvm_dirty_tlb dirty;
-		r = -EFAULT;
+
 		if (copy_from_user(&dirty, argp, sizeof(dirty)))
-			goto out;
+			return -EFAULT;
 		r = kvm_vcpu_ioctl_dirty_tlb(vcpu, &dirty);
 		break;
 	}
@@ -1300,8 +1300,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 	default:
 		r = -EINVAL;
 	}
-
-out:
 	return r;
 }
 
@@ -1405,19 +1403,16 @@ long kvm_arch_vm_ioctl(struct file *filp,
 		struct kvm_ppc_pvinfo pvinfo;
 		memset(&pvinfo, 0, sizeof(pvinfo));
 		r = kvm_vm_ioctl_get_pvinfo(&pvinfo);
-		if (copy_to_user(argp, &pvinfo, sizeof(pvinfo))) {
-			r = -EFAULT;
-			goto out;
-		}
-
+		if (copy_to_user(argp, &pvinfo, sizeof(pvinfo)))
+			return -EFAULT;
 		break;
 	}
 	case KVM_ENABLE_CAP:
 	{
 		struct kvm_enable_cap cap;
-		r = -EFAULT;
+
 		if (copy_from_user(&cap, argp, sizeof(cap)))
-			goto out;
+			return -EFAULT;
 		r = kvm_vm_ioctl_enable_cap(kvm, &cap);
 		break;
 	}
@@ -1425,23 +1420,19 @@ long kvm_arch_vm_ioctl(struct file *filp,
 	case KVM_CREATE_SPAPR_TCE_64: {
 		struct kvm_create_spapr_tce_64 create_tce_64;
 
-		r = -EFAULT;
 		if (copy_from_user(&create_tce_64, argp, sizeof(create_tce_64)))
-			goto out;
-		if (create_tce_64.flags) {
-			r = -EINVAL;
-			goto out;
-		}
+			return -EFAULT;
+		if (create_tce_64.flags)
+			return -EINVAL;
 		r = kvm_vm_ioctl_create_spapr_tce(kvm, &create_tce_64);
-		goto out;
+		break;
 	}
 	case KVM_CREATE_SPAPR_TCE: {
 		struct kvm_create_spapr_tce create_tce;
 		struct kvm_create_spapr_tce_64 create_tce_64;
 
-		r = -EFAULT;
 		if (copy_from_user(&create_tce, argp, sizeof(create_tce)))
-			goto out;
+			return -EFAULT;
 
 		create_tce_64.liobn = create_tce.liobn;
 		create_tce_64.page_shift = IOMMU_PAGE_SHIFT_4K;
@@ -1450,7 +1441,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
 				IOMMU_PAGE_SHIFT_4K;
 		create_tce_64.flags = 0;
 		r = kvm_vm_ioctl_create_spapr_tce(kvm, &create_tce_64);
-		goto out;
+		break;
 	}
 	case KVM_PPC_GET_SMMU_INFO: {
 		struct kvm_ppc_smmu_info info;
@@ -1477,7 +1468,6 @@ long kvm_arch_vm_ioctl(struct file *filp,
 		r = -ENOTTY;
 #endif
 	}
-out:
 	return r;
 }
 
