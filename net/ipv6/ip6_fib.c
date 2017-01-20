@@ -308,16 +308,27 @@ static void __net_init fib6_tables_init(struct net *net)
 
 static int fib6_dump_node(struct fib6_walker *w)
 {
+	struct rt6_rtnl_dump_arg *arg = (struct rt6_rtnl_dump_arg *)w->args;
 	int res;
 	struct rt6_info *rt;
 
 	for (rt = w->leaf; rt; rt = rt->dst.rt6_next) {
-		res = rt6_dump_route(rt, w->args);
+		res = rt6_dump_route(rt, arg);
 		if (res < 0) {
 			/* Frame is full, suspend walking */
 			w->leaf = rt;
 			return 1;
 		}
+
+		/* if multipath routes are dumped in one route with
+		 * the RTA_MULTIPATH attribute, then jump rt to point
+		 * to the last sibling of this route (no need to dump
+		 * the sibling routes again)
+		 */
+		if ((arg->rtm_flags & RTM_F_ALL_NEXTHOPS) && rt->rt6i_nsiblings)
+			rt = list_last_entry(&rt->rt6i_siblings,
+					     struct rt6_info,
+					     rt6i_siblings);
 	}
 	w->leaf = NULL;
 	return 0;
@@ -398,6 +409,7 @@ static int inet6_dump_fib(struct sk_buff *skb, struct netlink_callback *cb)
 	struct fib6_walker *w;
 	struct fib6_table *tb;
 	struct hlist_head *head;
+	unsigned int flags = 0;
 	int res = 0;
 
 	s_h = cb->args[0];
@@ -422,9 +434,23 @@ static int inet6_dump_fib(struct sk_buff *skb, struct netlink_callback *cb)
 		cb->args[2] = (long)w;
 	}
 
+	/* sadly, the size of the ancillary header can vary: the correct
+	 * header is struct rtmsg as passed by libnl. iproute2 sends
+	 * ifinfomsg [+ filter]. Technically, passing only rtgenmsg is
+	 * sufficient since the header has not been parsed before. Luckily,
+	 * the struct sizes sufficiently vary to detect the permutations.
+	 * For the dump request to contain flags, require rtmsg header.
+	 */
+	if (nlmsg_len(cb->nlh) == sizeof(struct rtmsg)) {
+		struct rtmsg *rtm = nlmsg_data(cb->nlh);
+
+		flags = rtm->rtm_flags;
+	}
+
 	arg.skb = skb;
 	arg.cb = cb;
 	arg.net = net;
+	arg.rtm_flags = flags;
 	w->args = &arg;
 
 	rcu_read_lock();

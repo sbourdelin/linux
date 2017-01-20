@@ -276,7 +276,10 @@ enum rt_scope_t {
 #define RTM_F_EQUALIZE		0x400	/* Multipath equalizer: NI	*/
 #define RTM_F_PREFIX		0x800	/* Prefix addresses		*/
 #define RTM_F_LOOKUP_TABLE	0x1000	/* set rtm_table to FIB lookup result */
-#define RTM_F_ALL_NEXTHOPS	0x2000	/* delete all nexthops (IPv6) */
+#define RTM_F_ALL_NEXTHOPS	0x2000	/* IPv6 flag:
+					 * delete: remove all nexthops
+					 * dump: nexthops can use RTA_MULTIPATH
+					 */
 
 /* Reserved table identifiers */
 
