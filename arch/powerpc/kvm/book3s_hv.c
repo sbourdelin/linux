@@ -458,7 +458,7 @@ static unsigned long do_h_register_vpa(struct kvm_vcpu *vcpu,
 
 		/* convert logical addr to kernel addr and read length */
 		va = kvmppc_pin_guest_page(kvm, vpa, &nb);
-		if (va == NULL)
+		if (!va)
 			return H_PARAMETER;
 		if (subfunc == H_VPA_REG_VPA)
 			len = be16_to_cpu(((struct reg_vpa *)va)->length.hword);
@@ -1591,8 +1591,7 @@ static struct kvmppc_vcore *kvmppc_vcore_create(struct kvm *kvm, int core)
 	struct kvmppc_vcore *vcore;
 
 	vcore = kzalloc(sizeof(struct kvmppc_vcore), GFP_KERNEL);
-
-	if (vcore == NULL)
+	if (!vcore)
 		return NULL;
 
 	spin_lock_init(&vcore->lock);
@@ -2220,7 +2219,7 @@ static void collect_piggybacks(struct core_info *cip, int target_threads)
 		prepare_threads(pvc);
 		if (!pvc->n_runnable) {
 			list_del_init(&pvc->preempt_list);
-			if (pvc->runner == NULL) {
+			if (!pvc->runner) {
 				pvc->vcore_state = VCORE_INACTIVE;
 				kvmppc_core_end_stolen(pvc);
 			}
@@ -2286,7 +2285,7 @@ static void post_guest_process(struct kvmppc_vcore *vc, bool is_master)
 		} else {
 			vc->vcore_state = VCORE_INACTIVE;
 		}
-		if (vc->n_runnable > 0 && vc->runner == NULL) {
+		if (vc->n_runnable > 0 && !vc->runner) {
 			/* make sure there's a candidate runner awake */
 			i = -1;
 			vcpu = next_runnable_thread(vc, &i);
@@ -2785,7 +2784,7 @@ static int kvmppc_run_vcpu(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 
 	while (vcpu->arch.state == KVMPPC_VCPU_RUNNABLE &&
 	       !signal_pending(current)) {
-		if (vc->vcore_state == VCORE_PREEMPT && vc->runner == NULL)
+		if (vc->vcore_state == VCORE_PREEMPT && !vc->runner)
 			kvmppc_vcore_end_preempt(vc);
 
 		if (vc->vcore_state != VCORE_INACTIVE) {
@@ -2832,7 +2831,7 @@ static int kvmppc_run_vcpu(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 		vc->vcore_state == VCORE_PIGGYBACK))
 		kvmppc_wait_for_exec(vc, vcpu, TASK_UNINTERRUPTIBLE);
 
-	if (vc->vcore_state == VCORE_PREEMPT && vc->runner == NULL)
+	if (vc->vcore_state == VCORE_PREEMPT && !vc->runner)
 		kvmppc_vcore_end_preempt(vc);
 
 	if (vcpu->arch.state == KVMPPC_VCPU_RUNNABLE) {
@@ -3202,7 +3201,7 @@ void kvmppc_alloc_host_rm_ops(void)
 	int size;
 
 	/* Not the first time here ? */
-	if (kvmppc_host_rm_ops_hv != NULL)
+	if (kvmppc_host_rm_ops_hv)
 		return;
 
 	ops = kzalloc(sizeof(struct kvmppc_host_rm_ops), GFP_KERNEL);
@@ -3429,10 +3428,10 @@ static int kvmppc_set_passthru_irq(struct kvm *kvm, int host_irq, int guest_gsi)
 	mutex_lock(&kvm->lock);
 
 	pimap = kvm->arch.pimap;
-	if (pimap == NULL) {
+	if (!pimap) {
 		/* First call, allocate structure to hold IRQ map */
 		pimap = kvmppc_alloc_pimap();
-		if (pimap == NULL) {
+		if (!pimap) {
 			mutex_unlock(&kvm->lock);
 			return -ENOMEM;
 		}
