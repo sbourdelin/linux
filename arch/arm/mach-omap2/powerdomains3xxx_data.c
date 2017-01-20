@@ -14,6 +14,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/bug.h>
+#include <linux/delay.h>
 
 #include "soc.h"
 #include "powerdomain.h"

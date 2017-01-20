@@ -22,6 +22,7 @@
 #include <linux/err.h>
 #include <linux/io.h>
 
+#include "common.h"
 #include "clockdomain.h"
 #include "cm.h"
 #include "cm33xx.h"
