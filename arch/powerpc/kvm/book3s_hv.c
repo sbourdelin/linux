@@ -655,7 +655,7 @@ static void kvmppc_create_dtl_entry(struct kvm_vcpu *vcpu,
 	spin_unlock_irq(&vcpu->arch.tbacct_lock);
 	if (!dt || !vpa)
 		return;
-	memset(dt, 0, sizeof(struct dtl_entry));
+	memset(dt, 0, sizeof(*dt));
 	dt->dispatch_reason = 7;
 	dt->processor_id = cpu_to_be16(vc->pcpu + vcpu->arch.ptid);
 	dt->timebase = cpu_to_be64(now + vc->tb_offset);
@@ -1073,7 +1073,7 @@ static int kvm_arch_vcpu_ioctl_get_sregs_hv(struct kvm_vcpu *vcpu,
 {
 	int i;
 
-	memset(sregs, 0, sizeof(struct kvm_sregs));
+	memset(sregs, 0, sizeof(*sregs));
 	sregs->pvr = vcpu->arch.pvr;
 	for (i = 0; i < vcpu->arch.slb_max; i++) {
 		sregs->u.s.ppc64.slb[i].slbe = vcpu->arch.slb[i].orige;
@@ -1590,7 +1590,7 @@ static struct kvmppc_vcore *kvmppc_vcore_create(struct kvm *kvm, int core)
 {
 	struct kvmppc_vcore *vcore;
 
-	vcore = kzalloc(sizeof(struct kvmppc_vcore), GFP_KERNEL);
+	vcore = kzalloc(sizeof(*vcore), GFP_KERNEL);
 	if (!vcore)
 		return NULL;
 
@@ -3203,7 +3203,7 @@ void kvmppc_alloc_host_rm_ops(void)
 	if (kvmppc_host_rm_ops_hv)
 		return;
 
-	ops = kzalloc(sizeof(struct kvmppc_host_rm_ops), GFP_KERNEL);
+	ops = kzalloc(sizeof(*ops), GFP_KERNEL);
 	if (!ops)
 		return;
 
@@ -3712,13 +3712,13 @@ static int kvm_init_subcore_bitmap(void)
 			continue;
 
 		sibling_subcore_state =
-			kmalloc_node(sizeof(struct sibling_subcore_state),
-							GFP_KERNEL, node);
+			kmalloc_node(sizeof(*sibling_subcore_state), GFP_KERNEL,
+				     node);
 		if (!sibling_subcore_state)
 			return -ENOMEM;
 
 		memset(sibling_subcore_state, 0,
-				sizeof(struct sibling_subcore_state));
+		       sizeof(*sibling_subcore_state));
 
 		for (j = 0; j < threads_per_core; j++) {
 			int cpu = first_cpu + j;
