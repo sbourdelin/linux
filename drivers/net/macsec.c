@@ -880,6 +880,7 @@ static void macsec_decrypt_done(struct crypto_async_request *base, int err)
 	aead_request_free(macsec_skb_cb(skb)->req);
 
 	rcu_read_lock_bh();
+	macsec_skb_cb(skb)->valid = true;
 	pn = ntohl(macsec_ethhdr(skb)->packet_number);
 	if (!macsec_post_decrypt(skb, &macsec->secy, pn)) {
 		rcu_read_unlock_bh();
