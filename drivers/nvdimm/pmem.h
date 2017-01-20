@@ -3,6 +3,7 @@
 #include <linux/badblocks.h>
 #include <linux/types.h>
 #include <linux/pfn_t.h>
+#include <linux/uio.h>
 #include <linux/fs.h>
 
 long pmem_direct_access(struct block_device *bdev, sector_t sector,
@@ -11,12 +12,18 @@ long pmem_direct_access(struct block_device *bdev, sector_t sector,
 #ifdef CONFIG_ARCH_HAS_PMEM_API
 void arch_wb_cache_pmem(void *addr, size_t size);
 void arch_invalidate_pmem(void *addr, size_t size);
+size_t arch_copy_from_iter_pmem(void *addr, size_t bytes, struct iov_iter *i);
 #else
 static inline void arch_wb_cache_pmem(void *addr, size_t size)
 {
 }
 static inline void arch_invalidate_pmem(void *addr, size_t size)
 {
+}
+static inline size_t arch_copy_from_iter_pmem(void *addr, size_t bytes,
+		struct iov_iter *i)
+{
+	return copy_from_iter_nocache(addr, bytes, i);
 }
 #endif
 

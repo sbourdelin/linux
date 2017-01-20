@@ -395,6 +395,9 @@ config HAS_DMA
 	depends on !NO_DMA
 	default y
 
+config COPY_FROM_ITER_OPS
+	bool
+
 config CHECK_SIGNATURE
 	bool
 

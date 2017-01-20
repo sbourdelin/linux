@@ -10,6 +10,9 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
  */
+#include <linux/uio.h>
+#include <linux/uaccess.h>
+#include <linux/highmem.h>
 #include <asm/cacheflush.h>
 #include <asm/cpufeature.h>
 #include <asm/special_insns.h>
@@ -54,3 +57,28 @@ void arch_memcpy_to_pmem(void *dst, void *src, unsigned size)
 	__arch_memcpy_to_pmem(dst, src, size);
 }
 EXPORT_SYMBOL_GPL(arch_memcpy_to_pmem);
+
+static int pmem_from_user(void *dst, const void __user *src, unsigned size)
+{
+	int rc = __copy_from_user_nocache(dst, src, size);
+
+	/* 'nocache' does not guarantee 'writethrough'*/
+	arch_wb_cache_pmem(dst, size);
+
+	return rc;
+}
+
+static void pmem_from_page(char *to, struct page *page, size_t offset, size_t len)
+{
+	char *from = kmap_atomic(page);
+
+	arch_memcpy_to_pmem(to, from + offset, len);
+	kunmap_atomic(from);
+}
+
+size_t arch_copy_from_iter_pmem(void *addr, size_t bytes, struct iov_iter *i)
+{
+	return copy_from_iter_ops(addr, bytes, i, pmem_from_user, pmem_from_page,
+			arch_memcpy_to_pmem);
+}
+EXPORT_SYMBOL_GPL(arch_copy_from_iter_pmem);
