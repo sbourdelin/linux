@@ -443,18 +443,45 @@ void load_percpu_segment(int cpu)
 	load_stack_canary_segment();
 }
 
+/* Load the GDT from the per-cpu structure */
+void load_percpu_gdt(int cpu)
+{
+	struct desc_ptr gdt_descr;
+
+	gdt_descr.address = (long)get_cpu_gdt_table(cpu);
+	gdt_descr.size = GDT_SIZE - 1;
+	load_gdt(&gdt_descr);
+}
+EXPORT_SYMBOL(load_percpu_gdt);
+
+/* Provide the fixmap address of the remapped GDT */
+struct desc_struct *get_remapped_gdt(int cpu)
+{
+	return (struct desc_struct *)__fix_to_virt(FIX_GDT_REMAP_BEGIN + cpu);
+
+}
+EXPORT_SYMBOL(get_remapped_gdt);
+
+/* On 64bit the GDT remapping is read-only */
+#ifdef CONFIG_X86_64
+#define GDT_REMAP_PROT PAGE_KERNEL_RO
+#else
+#define GDT_REMAP_PROT PAGE_KERNEL
+#endif
+
 /* Load a fixmap remapping of the per-cpu GDT */
 void load_remapped_gdt(int cpu)
 {
 	struct desc_ptr gdt_descr;
 	unsigned long idx = FIX_GDT_REMAP_BEGIN + cpu;
 
-	__set_fixmap(idx, __pa(get_cpu_gdt_table(cpu)), PAGE_KERNEL);
+	__set_fixmap(idx, __pa(get_cpu_gdt_table(cpu)), GDT_REMAP_PROT);
 
 	gdt_descr.address = (long)__fix_to_virt(idx);
 	gdt_descr.size = GDT_SIZE - 1;
 	load_gdt(&gdt_descr);
 }
+EXPORT_SYMBOL(load_remapped_gdt);
 
 /*
  * Current gdt points %fs at the "master" per-cpu area: after this,
@@ -462,11 +489,8 @@ void load_remapped_gdt(int cpu)
  */
 void switch_to_new_gdt(int cpu)
 {
-	struct desc_ptr gdt_descr;
-
-	gdt_descr.address = (long)get_cpu_gdt_table(cpu);
-	gdt_descr.size = GDT_SIZE - 1;
-	load_gdt(&gdt_descr);
+	/* Load the original GDT */
+	load_percpu_gdt(cpu);
 	/* Reload the per-cpu base */
 	load_percpu_segment(cpu);
 }

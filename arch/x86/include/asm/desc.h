@@ -50,6 +50,13 @@ static inline struct desc_struct *get_cpu_gdt_table(unsigned int cpu)
 	return per_cpu(gdt_page, cpu).gdt;
 }
 
+static inline struct desc_struct *get_current_gdt_table(void)
+{
+	return get_cpu_var(gdt_page).gdt;
+}
+
+struct desc_struct *get_remapped_gdt(int cpu);
+
 #ifdef CONFIG_X86_64
 
 static inline void pack_gate(gate_desc *gate, unsigned type, unsigned long func,
@@ -208,11 +215,6 @@ static inline void native_set_ldt(const void *addr, unsigned int entries)
 	}
 }
 
-static inline void native_load_tr_desc(void)
-{
-	asm volatile("ltr %w0"::"q" (GDT_ENTRY_TSS*8));
-}
-
 static inline void native_load_gdt(const struct desc_ptr *dtr)
 {
 	asm volatile("lgdt %0"::"m" (*dtr));
@@ -232,6 +234,38 @@ static inline void native_store_idt(struct desc_ptr *dtr)
 {
 	asm volatile("sidt %0":"=m" (*dtr));
 }
+
+/*
+ * The LTR instruction marks the TSS GDT entry as busy. In 64bit, the GDT is
+ * a read-only remapping. To prevent a page fault, the GDT is switched to the
+ * original writeable version when needed.
+ */
+#ifdef CONFIG_X86_64
+static inline void native_load_tr_desc(void)
+{
+	struct desc_ptr gdt;
+	int cpu = raw_smp_processor_id();
+	bool restore = false;
+	struct desc_struct *remapped_gdt;
+
+	native_store_gdt(&gdt);
+	remapped_gdt = get_remapped_gdt(cpu);
+
+	/* Swap and restore only if the current GDT is the remap. */
+	if (gdt.address == (unsigned long)remapped_gdt) {
+		load_percpu_gdt(cpu);
+		restore = true;
+	}
+	asm volatile("ltr %w0"::"q" (GDT_ENTRY_TSS*8));
+	if (restore)
+		load_remapped_gdt(cpu);
+}
+#else
+static inline void native_load_tr_desc(void)
+{
+	asm volatile("ltr %w0"::"q" (GDT_ENTRY_TSS*8));
+}
+#endif
 
 static inline unsigned long native_store_tr(void)
 {
