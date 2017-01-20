@@ -1443,6 +1443,10 @@ static void ath_tx_fill_desc(struct ath_softc *sc, struct ath_buf *bf,
 			if (bf->bf_state.bfs_paprd)
 				info.flags |= (u32) bf->bf_state.bfs_paprd <<
 					      ATH9K_TXDESC_PAPRD_S;
+#ifdef CONFIG_ATH9K_FRAME_LOSS_SIMULATOR
+			if (fi->corrupt_fcs)
+				info.flags |= ATH9K_TXDESC_CORRUPT_FCS;
+#endif
 
 			/*
 			 * mac80211 doesn't handle RTS threshold for HT because
@@ -2345,6 +2349,112 @@ static int ath_tx_prepare(struct ieee80211_hw *hw, struct sk_buff *skb,
 	return 0;
 }
 
+#ifdef CONFIG_ATH9K_FRAME_LOSS_SIMULATOR
+static bool corrupt_frame_fcs(struct ath_softc *sc, struct sk_buff *skb)
+{
+	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
+	struct ath_common *common = ath9k_hw_common(sc->sc_ah);
+
+	/* Frame loss enable mask */
+	/* Bit 16 - Null function*/
+	/* Bit 15 - QoS Null function*/
+	/* Bit 14 - EAPOL */
+	/* Bit 13 - Action */
+	/* Bit 12 - Deauthentication */
+	/* Bit 11 - Authentication */
+	/* Bit 10 - Disassociation */
+	/* Bit 9  - ATIM */
+	/* Bit 8  - Beacon */
+	/* Bit 5  - Probe response */
+	/* Bit 4  - Probe request */
+	/* Bit 3  - Reassociation response */
+	/* Bit 2  - Reassociation request */
+	/* Bit 1  - Association response */
+	/* Bit 0  - Association request */
+
+	/* Frame loss probability is 0(0%) to 255(100%) */
+	if (sc->corrupt_fcs_prob &&
+	    get_random_int() % 256 <= sc->corrupt_fcs_prob) {
+		u16 fctl_stype =
+			le16_to_cpu(hdr->frame_control) & IEEE80211_FCTL_STYPE;
+
+		if (((1 << 16) & sc->corrupt_fcs_frame_mask) &&
+		    ieee80211_is_nullfunc(hdr->frame_control)) {
+			ath_info(common, "Null function frame corrupted\n");
+			return true;
+		}
+		if (((1 << 15) & sc->corrupt_fcs_frame_mask) &&
+		    ieee80211_is_qos_nullfunc(hdr->frame_control)) {
+			ath_info(common, "QOS Null function frame corrupted\n");
+			return true;
+		}
+		if (((1 << 14) & sc->corrupt_fcs_frame_mask) &&
+		    (info->control.flags & IEEE80211_TX_CTRL_PORT_CTRL_PROTO)) {
+			ath_info(common, "EAPOL frame corrupted\n");
+			return true;
+		}
+		if (ieee80211_is_mgmt(hdr->frame_control) &&
+		    ((1 << (fctl_stype >> 4)) & sc->corrupt_fcs_frame_mask)) {
+			switch (fctl_stype) {
+			case IEEE80211_STYPE_ASSOC_REQ:
+				ath_info(common,
+					 "Association request corrupted\n");
+				break;
+			case IEEE80211_STYPE_ASSOC_RESP:
+				ath_info(common,
+					 "Association response corrupted\n");
+				break;
+			case IEEE80211_STYPE_REASSOC_REQ:
+				ath_info(common,
+					 "Re-association request corrupted\n");
+				break;
+			case IEEE80211_STYPE_REASSOC_RESP:
+				ath_info(common,
+					 "Re-association response corrupted\n");
+				break;
+			case IEEE80211_STYPE_PROBE_REQ:
+				ath_info(common,
+					 "Probe request corrupted\n");
+				break;
+			case IEEE80211_STYPE_PROBE_RESP:
+				ath_info(common,
+					 "Probe response corrupted\n");
+				break;
+			case IEEE80211_STYPE_BEACON:
+				ath_info(common,
+					 "Beacon corrupted\n");
+				break;
+			case IEEE80211_STYPE_ATIM:
+				ath_info(common,
+					 "ATIM frame corrupted\n");
+				break;
+			case IEEE80211_STYPE_DISASSOC:
+				ath_info(common,
+					 "Disassociation frame corrupted\n");
+				break;
+			case IEEE80211_STYPE_AUTH:
+				ath_info(common,
+					 "Authentication frame corrupted\n");
+				break;
+			case IEEE80211_STYPE_DEAUTH:
+				ath_info(common,
+					 "Deauthentication frame corrupted\n");
+				break;
+			case IEEE80211_STYPE_ACTION:
+				ath_info(common,
+					 "Action frame corrupted\n");
+				break;
+
+			default:
+				return false;
+			}
+			return true;
+		}
+	}
+	return false;
+}
+#endif
 
 /* Upon failure caller should free skb */
 int ath_tx_start(struct ieee80211_hw *hw, struct sk_buff *skb,
@@ -2363,6 +2473,9 @@ int ath_tx_start(struct ieee80211_hw *hw, struct sk_buff *skb,
 	struct ath_buf *bf;
 	bool ps_resp;
 	int q, ret;
+#ifdef CONFIG_ATH9K_FRAME_LOSS_SIMULATOR
+	bool corrupt_fcs = corrupt_frame_fcs(sc, skb);
+#endif
 
 	if (vif)
 		avp = (void *)vif->drv_priv;
@@ -2372,6 +2485,10 @@ int ath_tx_start(struct ieee80211_hw *hw, struct sk_buff *skb,
 	ret = ath_tx_prepare(hw, skb, txctl);
 	if (ret)
 	    return ret;
+
+#ifdef CONFIG_ATH9K_FRAME_LOSS_SIMULATOR
+	fi->corrupt_fcs = corrupt_fcs;
+#endif
 
 	hdr = (struct ieee80211_hdr *) skb->data;
 	/*

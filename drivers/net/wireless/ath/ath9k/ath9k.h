@@ -183,6 +183,9 @@ struct ath_frame_info {
 	u8 baw_tracked : 1;
 	u8 tx_power;
 	enum ath9k_key_type keytype:2;
+#ifdef CONFIG_ATH9K_FRAME_LOSS_SIMULATOR
+	u8 corrupt_fcs : 1;
+#endif
 };
 
 struct ath_rxbuf {
@@ -1086,6 +1089,10 @@ struct ath_softc {
 #ifdef CONFIG_ATH9K_HWRNG
 	u32 rng_last;
 	struct task_struct *rng_task;
+#endif
+#ifdef CONFIG_ATH9K_FRAME_LOSS_SIMULATOR
+	u16 corrupt_fcs_prob;
+	u32 corrupt_fcs_frame_mask;
 #endif
 };
 

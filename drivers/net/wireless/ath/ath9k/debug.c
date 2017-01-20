@@ -1315,6 +1315,50 @@ void ath9k_deinit_debug(struct ath_softc *sc)
 	ath9k_cmn_spectral_deinit_debug(&sc->spec_priv);
 }
 
+#ifdef CONFIG_ATH9K_FRAME_LOSS_SIMULATOR
+static ssize_t read_file_corrupt_fcs_frame_mask(struct file *file,
+						char __user *user_buf,
+						size_t count, loff_t *ppos)
+{
+	struct ath_softc *sc = file->private_data;
+	char buf[4];
+	unsigned int len;
+
+	len = sprintf(buf, "0x%08x\n", sc->corrupt_fcs_frame_mask);
+	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+}
+
+static ssize_t write_file_corrupt_fcs_frame_mask(struct file *file,
+						 const char __user *user_buf,
+						 size_t count, loff_t *ppos)
+{
+	struct ath_softc *sc = file->private_data;
+	unsigned long corrupt_fcs_frame_mask;
+	char buf[32];
+	ssize_t len;
+
+	len = min(count, sizeof(buf) - 1);
+	if (copy_from_user(buf, user_buf, len))
+		return -EFAULT;
+
+	buf[len] = '\0';
+	if (kstrtoul(buf, 0, &corrupt_fcs_frame_mask))
+		return -EINVAL;
+
+	sc->corrupt_fcs_frame_mask = corrupt_fcs_frame_mask;
+
+	return count;
+}
+
+static const struct file_operations fops_corrupt_fcs_frame_mask = {
+	.read = read_file_corrupt_fcs_frame_mask,
+	.write = write_file_corrupt_fcs_frame_mask,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+#endif
+
 int ath9k_init_debug(struct ath_hw *ah)
 {
 	struct ath_common *common = ath9k_hw_common(ah);
@@ -1402,5 +1446,12 @@ int ath9k_init_debug(struct ath_hw *ah)
 	debugfs_create_u16("airtime_flags", S_IRUSR | S_IWUSR,
 			   sc->debug.debugfs_phy, &sc->airtime_flags);
 
+#ifdef CONFIG_ATH9K_FRAME_LOSS_SIMULATOR
+	debugfs_create_u16("corrupt_fcs_prob", S_IRUSR | S_IWUSR,
+			   sc->debug.debugfs_phy, &sc->corrupt_fcs_prob);
+	debugfs_create_file("corrupt_fcs_frame_mask", S_IRUSR | S_IWUSR,
+			    sc->debug.debugfs_phy, sc,
+			    &fops_corrupt_fcs_frame_mask);
+#endif
 	return 0;
 }

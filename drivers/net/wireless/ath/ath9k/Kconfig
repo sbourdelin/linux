@@ -95,6 +95,21 @@ config ATH9K_TX99
 	  be evaluated to meet the RF exposure limits set forth in the
 	  governmental SAR regulations.
 
+config ATH9K_FRAME_LOSS_SIMULATOR
+	bool "Atheros ath9k frame loss simulator"
+	depends on ATH9K && ATH9K_DEBUGFS && DEBUG_FS
+	default n
+	---help---
+	  Say N. This option should be used only to test fail paths
+          and timeouts by inverting fcs field of selected frames to
+	  be transmitted.
+	  Which frames are corrupted is marked by bitfield in
+	  corrupt_fcs_frame_mask debug entry and probability of
+	  of corruption in corrupt_fcs_prob (0-255). Zero means
+	  disabled and writing 255 makes all selected frames fail.
+	  Management, EAPOL, and Null function frames are
+	  supported.
+
 config ATH9K_DFS_CERTIFIED
 	bool "Atheros DFS support for certified platforms"
 	depends on ATH9K && CFG80211_CERTIFICATION_ONUS
