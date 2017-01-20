@@ -736,6 +736,7 @@ long bdev_direct_access(struct block_device *bdev, struct blk_dax_ctl *dax)
 	sector_t sector = dax->sector;
 	long avail, size = dax->size;
 	const struct block_device_operations *ops = bdev->bd_disk->fops;
+	const struct dax_operations *dax_ops = ops->dax_ops;
 
 	/*
 	 * The device driver is allowed to sleep, in order to make the
@@ -745,7 +746,8 @@ long bdev_direct_access(struct block_device *bdev, struct blk_dax_ctl *dax)
 
 	if (size < 0)
 		return size;
-	if (!blk_queue_dax(bdev_get_queue(bdev)) || !ops->direct_access)
+	if (!blk_queue_dax(bdev_get_queue(bdev)) || !dax_ops
+			|| !dax_ops->direct_access)
 		return -EOPNOTSUPP;
 	if ((sector + DIV_ROUND_UP(size, 512)) >
 					part_nr_sects_read(bdev->bd_part))
@@ -753,7 +755,7 @@ long bdev_direct_access(struct block_device *bdev, struct blk_dax_ctl *dax)
 	sector += get_start_sect(bdev);
 	if (sector % (PAGE_SIZE / 512))
 		return -EINVAL;
-	avail = ops->direct_access(bdev, sector, &dax->addr, &dax->pfn, size);
+	avail = dax_ops->direct_access(bdev, sector, &dax->addr, &dax->pfn, size);
 	if (!avail)
 		return -ERANGE;
 	if (avail > 0 && avail & ~PAGE_MASK)

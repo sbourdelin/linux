@@ -395,10 +395,14 @@ static long brd_direct_access(struct block_device *bdev, sector_t sector,
 #define brd_direct_access NULL
 #endif
 
+static const struct dax_operations brd_dax_ops = {
+	.direct_access = 	brd_direct_access,
+};
+
 static const struct block_device_operations brd_fops = {
 	.owner =		THIS_MODULE,
 	.rw_page =		brd_rw_page,
-	.direct_access =	brd_direct_access,
+	.dax_ops =		&brd_dax_ops,
 };
 
 /*

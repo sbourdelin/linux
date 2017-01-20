@@ -2725,13 +2725,17 @@ static const struct pr_ops dm_pr_ops = {
 	.pr_clear	= dm_pr_clear,
 };
 
+static const struct dax_operations dm_dax_ops = {
+	.direct_access = dm_blk_direct_access,
+};
+
 static const struct block_device_operations dm_blk_dops = {
 	.open = dm_blk_open,
 	.release = dm_blk_close,
 	.ioctl = dm_blk_ioctl,
-	.direct_access = dm_blk_direct_access,
 	.getgeo = dm_blk_getgeo,
 	.pr_ops = &dm_pr_ops,
+	.dax_ops = &dm_dax_ops,
 	.owner = THIS_MODULE
 };
 

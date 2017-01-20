@@ -153,9 +153,13 @@ axon_ram_direct_access(struct block_device *device, sector_t sector,
 	return bank->size - offset;
 }
 
+static const struct dax_operations axon_ram_dax_ops = {
+	.direct_access	= axon_ram_direct_access,
+};
+
 static const struct block_device_operations axon_ram_devops = {
 	.owner		= THIS_MODULE,
-	.direct_access	= axon_ram_direct_access
+	.dax_ops	= &axon_ram_dax_ops,
 };
 
 /**

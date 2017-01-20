@@ -217,11 +217,15 @@ __weak long pmem_direct_access(struct block_device *bdev, sector_t sector,
 	return pmem->size - pmem->pfn_pad - offset;
 }
 
+static const struct dax_operations pmem_dax_ops = {
+	.direct_access = pmem_direct_access,
+};
+
 static const struct block_device_operations pmem_fops = {
 	.owner =		THIS_MODULE,
 	.rw_page =		pmem_rw_page,
-	.direct_access =	pmem_direct_access,
 	.revalidate_disk =	nvdimm_revalidate_disk,
+	.dax_ops =		&pmem_dax_ops,
 };
 
 static void pmem_release_queue(void *q)

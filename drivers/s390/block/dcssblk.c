@@ -36,11 +36,15 @@ static long dcssblk_direct_access(struct block_device *bdev, sector_t secnum,
 static char dcssblk_segments[DCSSBLK_PARM_LEN] = "\0";
 
 static int dcssblk_major;
+
+static const struct dax_operations dcssblk_dax_ops = {
+	.direct_access 	= dcssblk_direct_access,
+};
+
 static const struct block_device_operations dcssblk_devops = {
 	.owner   	= THIS_MODULE,
 	.open    	= dcssblk_open,
 	.release 	= dcssblk_release,
-	.direct_access 	= dcssblk_direct_access,
 };
 
 struct dcssblk_dev_info {
