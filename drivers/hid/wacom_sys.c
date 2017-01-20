@@ -803,8 +803,12 @@ static int wacom_led_control(struct wacom *wacom)
 		buf[4] = wacom->led.img_lum;
 	}
 
-	retval = wacom_set_report(wacom->hdev, HID_FEATURE_REPORT, buf, buf_size,
-				  WAC_CMD_RETRIES);
+	/*
+	 * we do not use wacom_set_report because -EPIPE happens but is
+	 * not fatal, so do not shout something at the user.
+	 */
+	retval = hid_hw_raw_request(wacom->hdev, buf[0], buf, buf_size,
+				    HID_FEATURE_REPORT, HID_REQ_SET_REPORT);
 	kfree(buf);
 
 	return retval;
