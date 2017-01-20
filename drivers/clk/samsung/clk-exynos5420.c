@@ -586,7 +586,7 @@ static const struct samsung_gate_clock exynos5800_gate_clks[] __initconst = {
 	GATE(CLK_ACLK550_CAM, "aclk550_cam", "mout_user_aclk550_cam",
 				GATE_BUS_TOP, 24, 0, 0),
 	GATE(CLK_ACLK432_SCALER, "aclk432_scaler", "mout_user_aclk432_scaler",
-				GATE_BUS_TOP, 27, 0, 0),
+				GATE_BUS_TOP, 27, CLK_IS_CRITICAL, 0),
 };
 
 static const struct samsung_mux_clock exynos5420_mux_clks[] __initconst = {
