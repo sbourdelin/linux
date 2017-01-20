@@ -79,7 +79,9 @@ static void probe_xeon_phi_r3mwait(struct cpuinfo_x86 *c)
 	 * Ring 3 MONITOR/MWAIT feature cannot be detected without
 	 * cpu model and family comparison.
 	 */
-	if (c->x86 != 6 || c->x86_model != INTEL_FAM6_XEON_PHI_KNL)
+	if (c->x86 != 6 ||
+	   (c->x86_model != INTEL_FAM6_XEON_PHI_KNL &&
+	    c->x86_model != INTEL_FAM6_XEON_PHI_KNM))
 		return;
 
 	if (ring3mwait_disabled) {
