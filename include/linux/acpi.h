@@ -1056,6 +1056,11 @@ int __acpi_probe_device_table(struct acpi_probe_entry *start, int nr);
 					  (&ACPI_PROBE_TABLE_END(t) -	\
 					   &ACPI_PROBE_TABLE(t)));	\
 	})
+
+#define __dsdt_irqchip __section(__dsdt_irqchip_acpi_probe_table)
+extern struct acpi_device_id __dsdt_irqchip_acpi_probe_table;
+extern struct acpi_device_id __dsdt_irqchip_acpi_probe_table_end;
+
 #else
 static inline int acpi_dev_get_property(struct acpi_device *adev,
 					const char *name, acpi_object_type type,
@@ -1151,6 +1156,16 @@ static inline bool acpi_has_watchdog(void) { return false; }
 int parse_spcr(bool earlycon);
 #else
 static inline int parse_spcr(bool earlycon) { return 0; }
+#endif
+
+#ifdef CONFIG_ACPI_GENERIC_GSI
+int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res);
+#else
+static inline int acpi_irq_get(acpi_handle handle, unsigned int index,
+			       struct resource *res)
+{
+	return -EINVAL;
+}
 #endif
 
 #endif	/*_LINUX_ACPI_H*/

@@ -567,6 +567,7 @@
 	ACPI_PROBE_TABLE(irqchip)					\
 	ACPI_PROBE_TABLE(clksrc)					\
 	ACPI_PROBE_TABLE(iort)						\
+	ACPI_PROBE_TABLE(dsdt_irqchip)					\
 	EARLYCON_TABLE()
 
 #define INIT_TEXT							\
