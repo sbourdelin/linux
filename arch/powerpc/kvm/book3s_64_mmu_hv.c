@@ -91,7 +91,7 @@ long kvmppc_alloc_hpt(struct kvm *kvm, u32 *htab_orderp)
 	atomic64_set(&kvm->arch.mmio_update, 0);
 
 	/* Allocate reverse map array */
-	rev = vmalloc(sizeof(struct revmap_entry) * kvm->arch.hpt_npte);
+	rev = vmalloc(sizeof(*rev) * kvm->arch.hpt_npte);
 	if (!rev) {
 		pr_err("kvmppc_alloc_hpt: Couldn't alloc reverse map array\n");
 		goto out_freehpt;
