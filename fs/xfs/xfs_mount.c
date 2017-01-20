@@ -207,7 +207,7 @@ xfs_initialize_perag(
 
 		pag = kmem_zalloc(sizeof(*pag), KM_MAYFAIL);
 		if (!pag)
-			goto out_unwind;
+			goto out_unwind_pags;
 		pag->pag_agno = index;
 		pag->pag_mount = mp;
 		spin_lock_init(&pag->pag_ici_lock);
@@ -242,6 +242,7 @@ xfs_initialize_perag(
 out_unwind:
 	xfs_buf_hash_destroy(pag);
 	kmem_free(pag);
+out_unwind_pags:
 	for (; index > first_initialised; index--) {
 		pag = radix_tree_delete(&mp->m_perag_tree, index);
 		xfs_buf_hash_destroy(pag);
