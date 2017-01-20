@@ -934,8 +934,7 @@ static int xics_debug_show(struct seq_file *m, void *private)
 	t_reject = 0;
 
 	xics_debugfs_irqmap(m, kvm->arch.pimap);
-
-	seq_printf(m, "=========\nICP state\n=========\n");
+	seq_puts(m, "=========\nICP state\n=========\n");
 
 	kvm_for_each_vcpu(i, vcpu, kvm) {
 		struct kvmppc_icp *icp = vcpu->arch.icp;
