@@ -84,7 +84,7 @@ void obdo_from_inode(struct obdo *dst, struct inode *src, u32 valid)
 		newvalid |= OBD_MD_FLBLOCKS;
 	}
 	if (valid & OBD_MD_FLBLKSZ) {   /* optimal block size */
-		dst->o_blksize = 1 << src->i_blkbits;
+		dst->o_blksize = i_blocksize(src);
 		newvalid |= OBD_MD_FLBLKSZ;
 	}
 	if (valid & OBD_MD_FLTYPE) {
