@@ -3198,7 +3198,6 @@ void kvmppc_alloc_host_rm_ops(void)
 	struct kvmppc_host_rm_ops *ops;
 	unsigned long l_ops;
 	int cpu, core;
-	int size;
 
 	/* Not the first time here ? */
 	if (kvmppc_host_rm_ops_hv)
@@ -3208,9 +3207,9 @@ void kvmppc_alloc_host_rm_ops(void)
 	if (!ops)
 		return;
 
-	size = cpu_nr_cores() * sizeof(struct kvmppc_host_rm_core);
-	ops->rm_core = kzalloc(size, GFP_KERNEL);
-
+	ops->rm_core = kcalloc(cpu_nr_cores(),
+			       sizeof(*ops->rm_core),
+			       GFP_KERNEL);
 	if (!ops->rm_core) {
 		kfree(ops);
 		return;
