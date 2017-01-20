@@ -118,7 +118,9 @@ struct symbol_conf {
 			show_ref_callgraph,
 			hide_unresolved,
 			raw_trace,
-			report_hierarchy;
+			report_hierarchy,
+			inline_name,
+			inline_line;
 	const char	*vmlinux_name,
 			*kallsyms_name,
 			*source_prefix,
