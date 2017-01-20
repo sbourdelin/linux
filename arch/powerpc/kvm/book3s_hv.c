@@ -2966,15 +2966,17 @@ static int kvm_vm_ioctl_get_dirty_log_hv(struct kvm *kvm,
 
 	mutex_lock(&kvm->slots_lock);
 
-	r = -EINVAL;
-	if (log->slot >= KVM_USER_MEM_SLOTS)
+	if (log->slot >= KVM_USER_MEM_SLOTS) {
+		r = -EINVAL;
 		goto out;
+	}
 
 	slots = kvm_memslots(kvm);
 	memslot = id_to_memslot(slots, log->slot);
-	r = -ENOENT;
-	if (!memslot->dirty_bitmap)
+	if (!memslot->dirty_bitmap) {
+		r = -ENOENT;
 		goto out;
+	}
 
 	n = kvm_dirty_bitmap_bytes(memslot);
 	memset(memslot->dirty_bitmap, 0, n);
@@ -2983,9 +2985,10 @@ static int kvm_vm_ioctl_get_dirty_log_hv(struct kvm *kvm,
 	if (r)
 		goto out;
 
-	r = -EFAULT;
-	if (copy_to_user(log->dirty_bitmap, memslot->dirty_bitmap, n))
+	if (copy_to_user(log->dirty_bitmap, memslot->dirty_bitmap, n)) {
+		r = -EFAULT;
 		goto out;
+	}
 
 	r = 0;
 out:
@@ -3126,9 +3129,10 @@ static int kvmppc_hv_setup_htab_rma(struct kvm_vcpu *vcpu)
 	memslot = gfn_to_memslot(kvm, 0);
 
 	/* We must have some memory at 0 by now */
-	err = -EINVAL;
-	if (!memslot || (memslot->flags & KVM_MEMSLOT_INVALID))
+	if (!memslot || (memslot->flags & KVM_MEMSLOT_INVALID)) {
+		err = -EINVAL;
 		goto out_srcu;
+	}
 
 	/* Look up the VMA for the start of this memory slot */
 	hva = memslot->userspace_addr;
@@ -3143,10 +3147,11 @@ static int kvmppc_hv_setup_htab_rma(struct kvm_vcpu *vcpu)
 	up_read(&current->mm->mmap_sem);
 
 	/* We can handle 4k, 64k or 16M pages in the VRMA */
-	err = -EINVAL;
 	if (!(psize == 0x1000 || psize == 0x10000 ||
-	      psize == 0x1000000))
+	      psize == 0x1000000)) {
+		err = -EINVAL;
 		goto out_srcu;
+	}
 
 	senc = slb_pgsize_encoding(psize);
 	kvm->arch.vrma_slb_v = senc | SLB_VSID_B_1T |
