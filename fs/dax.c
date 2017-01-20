@@ -986,6 +986,7 @@ static bool dax_range_is_aligned(struct block_device *bdev,
 int __dax_zero_page_range(struct block_device *bdev, sector_t sector,
 		unsigned int offset, unsigned int length)
 {
+	const struct dax_operations *dax_ops = to_dax_ops(bdev);
 	struct blk_dax_ctl dax = {
 		.sector		= sector,
 		.size		= PAGE_SIZE,
@@ -999,7 +1000,9 @@ int __dax_zero_page_range(struct block_device *bdev, sector_t sector,
 	} else {
 		if (dax_map_atomic(bdev, &dax) < 0)
 			return PTR_ERR(dax.addr);
-		clear_pmem(dax.addr + offset, length);
+		memset(dax.addr + offset, 0, length);
+		if (dax_ops->flush)
+			dax_ops->flush(dax.addr + offset, length);
 		dax_unmap_atomic(bdev, &dax);
 	}
 	return 0;
