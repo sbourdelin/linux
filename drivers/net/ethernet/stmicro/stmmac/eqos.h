@@ -1,5 +1,5 @@
 /*
- * DWMAC4 Header file.
+ * eQOS Header file.
  *
  * Copyright (C) 2015  STMicroelectronics Ltd
  *
@@ -10,8 +10,8 @@
  * Author: Alexandre Torgue <alexandre.torgue@st.com>
  */
 
-#ifndef __DWMAC4_H__
-#define __DWMAC4_H__
+#ifndef __EQOS_H__
+#define __EQOS_H__
 
 #include "common.h"
 
@@ -70,7 +70,7 @@
 
 #define	GMAC_INT_DEFAULT_MASK	GMAC_INT_PMT_EN
 
-enum dwmac4_irq_status {
+enum eqos_irq_status {
 	time_stamp_irq = 0x00001000,
 	mmc_rx_csum_offload_irq = 0x00000800,
 	mmc_tx_irq = 0x00000400,
@@ -90,18 +90,18 @@ enum power_event {
 	power_down = 0x00000001,
 };
 
-/* Energy Efficient Ethernet (EEE) for GMAC4
+/* Energy Efficient Ethernet (EEE) for eQOS
  *
  * LPI status, timer and control register offset
  */
-#define GMAC4_LPI_CTRL_STATUS	0xd0
-#define GMAC4_LPI_TIMER_CTRL	0xd4
+#define QOS_LPI_CTRL_STATUS	0xd0
+#define QOS_LPI_TIMER_CTRL	0xd4
 
 /* LPI control and status defines */
-#define GMAC4_LPI_CTRL_STATUS_LPITCSE	BIT(21)	/* LPI Tx Clock Stop Enable */
-#define GMAC4_LPI_CTRL_STATUS_LPITXA	BIT(19)	/* Enable LPI TX Automate */
-#define GMAC4_LPI_CTRL_STATUS_PLS	BIT(17) /* PHY Link Status */
-#define GMAC4_LPI_CTRL_STATUS_LPIEN	BIT(16)	/* LPI Enable */
+#define QOS_LPI_CTRL_STATUS_LPITCSE	BIT(21)	/* LPI Tx Clock Stop Enable */
+#define QOS_LPI_CTRL_STATUS_LPITXA	BIT(19)	/* Enable LPI TX Automate */
+#define QOS_LPI_CTRL_STATUS_PLS	BIT(17) /* PHY Link Status */
+#define QOS_LPI_CTRL_STATUS_LPIEN	BIT(16)	/* LPI Enable */
 
 /* MAC Debug bitmap */
 #define GMAC_DEBUG_TFCSTS_MASK		GENMASK(18, 17)
@@ -287,6 +287,6 @@ enum power_event {
 #define GMAC_PHYIF_CTRLSTATUS_SPEED_25		0x1
 #define GMAC_PHYIF_CTRLSTATUS_SPEED_2_5		0x0
 
-extern const struct stmmac_dma_ops dwmac4_dma_ops;
-extern const struct stmmac_dma_ops dwmac410_dma_ops;
-#endif /* __DWMAC4_H__ */
+extern const struct stmmac_dma_ops eqos_dma_ops;
+extern const struct stmmac_dma_ops eqos10_dma_ops;
+#endif /* __EQOS_H__ */

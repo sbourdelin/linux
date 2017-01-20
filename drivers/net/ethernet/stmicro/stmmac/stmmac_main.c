@@ -398,8 +398,8 @@ static void stmmac_get_rx_hwtstamp(struct stmmac_priv *priv, struct dma_desc *p,
 
 	/* Check if timestamp is available */
 	if (!priv->hw->desc->get_rx_timestamp_status(p, priv->adv_ts)) {
-		/* For GMAC4, the valid timestamp is from CTX next desc. */
-		if (priv->plat->has_gmac4)
+		/* For eQOS, the valid timestamp is from CTX next desc. */
+		if (priv->plat->has_qos)
 			ns = priv->hw->desc->get_timestamp(np, priv->adv_ts);
 		else
 			ns = priv->hw->desc->get_timestamp(p, priv->adv_ts);
@@ -608,7 +608,7 @@ static int stmmac_hwtstamp_ioctl(struct net_device *dev, struct ifreq *ifr)
 		/* program Sub Second Increment reg */
 		sec_inc = priv->hw->ptp->config_sub_second_increment(
 			priv->ptpaddr, priv->plat->clk_ptp_rate,
-			priv->plat->has_gmac4);
+			priv->plat->has_qos);
 		temp = div_u64(1000000000ULL, sec_inc);
 
 		/* calculate default added value:
@@ -647,7 +647,7 @@ static int stmmac_init_ptp(struct stmmac_priv *priv)
 
 	priv->adv_ts = 0;
 	/* Check if adv_ts can be enabled for dwmac 4.x core */
-	if (priv->plat->has_gmac4 && priv->dma_cap.atime_stamp)
+	if (priv->plat->has_qos && priv->dma_cap.atime_stamp)
 		priv->adv_ts = 1;
 	/* Dwmac 3.x core with extend_desc can support adv_ts */
 	else if (priv->extend_desc && priv->dma_cap.atime_stamp)
@@ -721,14 +721,14 @@ static void stmmac_adjust_link(struct net_device *dev)
 			switch (phydev->speed) {
 			case 1000:
 				if (likely((priv->plat->has_gmac) ||
-					   (priv->plat->has_gmac4)))
+					   (priv->plat->has_qos)))
 					ctrl &= ~priv->hw->link.port;
 				stmmac_hw_fix_mac_speed(priv);
 				break;
 			case 100:
 			case 10:
 				if (likely((priv->plat->has_gmac) ||
-					   (priv->plat->has_gmac4))) {
+					   (priv->plat->has_qos))) {
 					ctrl |= priv->hw->link.port;
 					if (phydev->speed == SPEED_100) {
 						ctrl |= priv->hw->link.speed;
@@ -1491,8 +1491,8 @@ static void stmmac_mmc_setup(struct stmmac_priv *priv)
 			    MMC_CNTRL_PRESET | MMC_CNTRL_FULL_HALF_PRESET;
 
 	if (priv->synopsys_id >= DWMAC_CORE_4_00) {
-		priv->ptpaddr = priv->ioaddr + PTP_GMAC4_OFFSET;
-		priv->mmcaddr = priv->ioaddr + MMC_GMAC4_OFFSET;
+		priv->ptpaddr = priv->ioaddr + PTP_QOS_OFFSET;
+		priv->mmcaddr = priv->ioaddr + MMC_QOS_OFFSET;
 	} else {
 		priv->ptpaddr = priv->ioaddr + PTP_GMAC3_X_OFFSET;
 		priv->mmcaddr = priv->ioaddr + MMC_GMAC3_X_OFFSET;
@@ -1715,7 +1715,7 @@ static int stmmac_hw_setup(struct net_device *dev, bool init_ptp)
 
 	/* Enable the MAC Rx/Tx */
 	if (priv->synopsys_id >= DWMAC_CORE_4_00)
-		stmmac_dwmac4_set_mac(priv->ioaddr, true);
+		stmmac_eqos_set_mac(priv->ioaddr, true);
 	else
 		stmmac_set_mac(priv->ioaddr, true);
 
@@ -1979,7 +1979,7 @@ static void stmmac_tso_allocator(struct stmmac_priv *priv, unsigned int des,
  *  @skb : the socket buffer
  *  @dev : device pointer
  *  Description: this is the transmit function that is called on TSO frames
- *  (support available on GMAC4 and newer chips).
+ *  (support available on eQOS and newer chips).
  *  Diagram below show the ring programming in case of TSO frames:
  *
  *  First Descriptor
@@ -2187,7 +2187,7 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 	unsigned int enh_desc;
 	unsigned int des;
 
-	/* Manage oversized TCP frames for GMAC4 device */
+	/* Manage oversized TCP frames for eQOS device */
 	if (skb_is_gso(skb) && priv->tso) {
 		if (ip_hdr(skb)->protocol == IPPROTO_TCP)
 			return stmmac_tso_xmit(skb, dev);
@@ -2584,10 +2584,10 @@ static int stmmac_rx(struct stmmac_priv *priv, int limit)
 			}
 
 			/* The zero-copy is always used for all the sizes
-			 * in case of GMAC4 because it needs
+			 * in case of eQOS because it needs
 			 * to refill the used descriptors, always.
 			 */
-			if (unlikely(!priv->plat->has_gmac4 &&
+			if (unlikely(!priv->plat->has_qos &&
 				     ((frame_len < priv->rx_copybreak) ||
 				     stmmac_rx_threshold_count(priv)))) {
 				skb = netdev_alloc_skb_ip_align(priv->dev,
@@ -2822,7 +2822,7 @@ static irqreturn_t stmmac_interrupt(int irq, void *dev_id)
 	}
 
 	/* To handle GMAC own interrupts */
-	if ((priv->plat->has_gmac) || (priv->plat->has_gmac4)) {
+	if ((priv->plat->has_gmac) || (priv->plat->has_qos)) {
 		int status = priv->hw->mac->host_irq_status(priv->hw,
 							    &priv->xstats);
 		if (unlikely(status)) {
@@ -3127,9 +3127,9 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
 				      priv->plat->multicast_filter_bins,
 				      priv->plat->unicast_filter_entries,
 				      &priv->synopsys_id);
-	} else if (priv->plat->has_gmac4) {
+	} else if (priv->plat->has_qos) {
 		priv->dev->priv_flags |= IFF_UNICAST_FLT;
-		mac = dwmac4_setup(priv->ioaddr,
+		mac = eqos_setup(priv->ioaddr,
 				   priv->plat->multicast_filter_bins,
 				   priv->plat->unicast_filter_entries,
 				   &priv->synopsys_id);
@@ -3143,7 +3143,7 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
 
 	/* To use the chained or ring mode */
 	if (priv->synopsys_id >= DWMAC_CORE_4_00) {
-		priv->hw->mode = &dwmac4_ring_mode_ops;
+		priv->hw->mode = &eqos_ring_mode_ops;
 	} else {
 		if (chain_mode) {
 			priv->hw->mode = &chain_mode_ops;
@@ -3176,7 +3176,7 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
 		else
 			priv->plat->tx_coe = priv->dma_cap.tx_coe;
 
-		/* In case of GMAC4 rx_coe is from HW cap register. */
+		/* In case of eQOS rx_coe is from HW cap register. */
 		priv->plat->rx_coe = priv->dma_cap.rx_coe;
 
 		if (priv->dma_cap.rx_coe_type2)
@@ -3188,9 +3188,9 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
 		dev_info(priv->device, "No HW DMA feature register supported\n");
 	}
 
-	/* To use alternate (extended), normal or GMAC4 descriptor structures */
+	/* To use alternate (extended), normal or eQOS descriptor structures */
 	if (priv->synopsys_id >= DWMAC_CORE_4_00)
-		priv->hw->desc = &dwmac4_desc_ops;
+		priv->hw->desc = &eqos_desc_ops;
 	else
 		stmmac_selec_desc_mode(priv);
 
@@ -3504,7 +3504,7 @@ int stmmac_resume(struct device *dev)
 	priv->dirty_tx = 0;
 	priv->cur_tx = 0;
 	/* reset private mss value to force mss context settings at
-	 * next tso xmit (only used for gmac4).
+	 * next tso xmit (only used for eQOS).
 	 */
 	priv->mss = 0;
 

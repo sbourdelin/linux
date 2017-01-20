@@ -34,7 +34,7 @@ static void stmmac_config_hw_tstamping(void __iomem *ioaddr, u32 data)
 }
 
 static u32 stmmac_config_sub_second_increment(void __iomem *ioaddr,
-					      u32 ptp_clock, int gmac4)
+					      u32 ptp_clock, int qos)
 {
 	u32 value = readl(ioaddr + PTP_TCR);
 	unsigned long data;
@@ -54,8 +54,8 @@ static u32 stmmac_config_sub_second_increment(void __iomem *ioaddr,
 
 	data &= PTP_SSIR_SSINC_MASK;
 
-	if (gmac4)
-		data = data << GMAC4_PTP_SSIR_SSINC_SHIFT;
+	if (qos)
+		data = data << QOS_PTP_SSIR_SSINC_SHIFT;
 
 	writel(data, ioaddr + PTP_SSIR);
 
@@ -112,7 +112,7 @@ static int stmmac_config_addend(void __iomem *ioaddr, u32 addend)
 }
 
 static int stmmac_adjust_systime(void __iomem *ioaddr, u32 sec, u32 nsec,
-				 int add_sub, int gmac4)
+				 int add_sub, int qos)
 {
 	u32 value;
 	int limit;
@@ -122,7 +122,7 @@ static int stmmac_adjust_systime(void __iomem *ioaddr, u32 sec, u32 nsec,
 		 * the system time, then MAC_STSUR reg should be
 		 * programmed with (2^32 – <new_sec_value>)
 		 */
-		if (gmac4)
+		if (qos)
 			sec = (100000000ULL - sec);
 
 		value = readl(ioaddr + PTP_TCR);

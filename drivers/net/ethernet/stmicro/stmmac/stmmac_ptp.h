@@ -25,7 +25,7 @@
 #ifndef	__STMMAC_PTP_H__
 #define	__STMMAC_PTP_H__
 
-#define	PTP_GMAC4_OFFSET	0xb00
+#define	PTP_QOS_OFFSET	0xb00
 #define	PTP_GMAC3_X_OFFSET	0x700
 
 /* IEEE 1588 PTP register offsets */
@@ -69,6 +69,6 @@
 
 /* SSIR defines */
 #define	PTP_SSIR_SSINC_MASK		0xff
-#define	GMAC4_PTP_SSIR_SSINC_SHIFT	16
+#define	QOS_PTP_SSIR_SSINC_SHIFT	16
 
 #endif	/* __STMMAC_PTP_H__ */

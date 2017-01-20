@@ -90,7 +90,7 @@ static int stmmac_adjust_time(struct ptp_clock_info *ptp, s64 delta)
 	spin_lock_irqsave(&priv->ptp_lock, flags);
 
 	priv->hw->ptp->adjust_systime(priv->ptpaddr, sec, nsec, neg_adj,
-				      priv->plat->has_gmac4);
+				      priv->plat->has_qos);
 
 	spin_unlock_irqrestore(&priv->ptp_lock, flags);
 

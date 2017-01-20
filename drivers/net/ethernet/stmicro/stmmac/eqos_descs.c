@@ -1,6 +1,6 @@
 /*
  * This contains the functions to handle the descriptors for DesignWare databook
- * 4.xx.
+ * eQOS IP.
  *
  * Copyright (C) 2015  STMicroelectronics Ltd
  *
@@ -13,9 +13,9 @@
 
 #include <linux/stmmac.h>
 #include "common.h"
-#include "dwmac4_descs.h"
+#include "eqos_descs.h"
 
-static int dwmac4_wrback_get_tx_status(void *data, struct stmmac_extra_stats *x,
+static int eqos_wrback_get_tx_status(void *data, struct stmmac_extra_stats *x,
 				       struct dma_desc *p,
 				       void __iomem *ioaddr)
 {
@@ -73,7 +73,7 @@ static int dwmac4_wrback_get_tx_status(void *data, struct stmmac_extra_stats *x,
 	return ret;
 }
 
-static int dwmac4_wrback_get_rx_status(void *data, struct stmmac_extra_stats *x,
+static int eqos_wrback_get_rx_status(void *data, struct stmmac_extra_stats *x,
 				       struct dma_desc *p)
 {
 	struct net_device_stats *stats = (struct net_device_stats *)data;
@@ -174,43 +174,43 @@ static int dwmac4_wrback_get_rx_status(void *data, struct stmmac_extra_stats *x,
 	return ret;
 }
 
-static int dwmac4_rd_get_tx_len(struct dma_desc *p)
+static int eqos_rd_get_tx_len(struct dma_desc *p)
 {
 	return (le32_to_cpu(p->des2) & TDES2_BUFFER1_SIZE_MASK);
 }
 
-static int dwmac4_get_tx_owner(struct dma_desc *p)
+static int eqos_get_tx_owner(struct dma_desc *p)
 {
 	return (le32_to_cpu(p->des3) & TDES3_OWN) >> TDES3_OWN_SHIFT;
 }
 
-static void dwmac4_set_tx_owner(struct dma_desc *p)
+static void eqos_set_tx_owner(struct dma_desc *p)
 {
 	p->des3 |= cpu_to_le32(TDES3_OWN);
 }
 
-static void dwmac4_set_rx_owner(struct dma_desc *p)
+static void eqos_set_rx_owner(struct dma_desc *p)
 {
 	p->des3 |= cpu_to_le32(RDES3_OWN);
 }
 
-static int dwmac4_get_tx_ls(struct dma_desc *p)
+static int eqos_get_tx_ls(struct dma_desc *p)
 {
 	return (le32_to_cpu(p->des3) & TDES3_LAST_DESCRIPTOR)
 		>> TDES3_LAST_DESCRIPTOR_SHIFT;
 }
 
-static int dwmac4_wrback_get_rx_frame_len(struct dma_desc *p, int rx_coe)
+static int eqos_wrback_get_rx_frame_len(struct dma_desc *p, int rx_coe)
 {
 	return (le32_to_cpu(p->des3) & RDES3_PACKET_SIZE_MASK);
 }
 
-static void dwmac4_rd_enable_tx_timestamp(struct dma_desc *p)
+static void eqos_rd_enable_tx_timestamp(struct dma_desc *p)
 {
 	p->des2 |= cpu_to_le32(TDES2_TIMESTAMP_ENABLE);
 }
 
-static int dwmac4_wrback_get_tx_timestamp_status(struct dma_desc *p)
+static int eqos_wrback_get_tx_timestamp_status(struct dma_desc *p)
 {
 	/* Context type from W/B descriptor must be zero */
 	if (le32_to_cpu(p->des3) & TDES3_CONTEXT_TYPE)
@@ -223,7 +223,7 @@ static int dwmac4_wrback_get_tx_timestamp_status(struct dma_desc *p)
 	return 1;
 }
 
-static inline u64 dwmac4_get_timestamp(void *desc, u32 ats)
+static inline u64 eqos_get_timestamp(void *desc, u32 ats)
 {
 	struct dma_desc *p = (struct dma_desc *)desc;
 	u64 ns;
@@ -235,7 +235,7 @@ static inline u64 dwmac4_get_timestamp(void *desc, u32 ats)
 	return ns;
 }
 
-static int dwmac4_rx_check_timestamp(void *desc)
+static int eqos_rx_check_timestamp(void *desc)
 {
 	struct dma_desc *p = (struct dma_desc *)desc;
 	u32 own, ctxt;
@@ -258,7 +258,7 @@ static int dwmac4_rx_check_timestamp(void *desc)
 	return ret;
 }
 
-static int dwmac4_wrback_get_rx_timestamp_status(void *desc, u32 ats)
+static int eqos_wrback_get_rx_timestamp_status(void *desc, u32 ats)
 {
 	struct dma_desc *p = (struct dma_desc *)desc;
 	int ret = -EINVAL;
@@ -270,7 +270,7 @@ static int dwmac4_wrback_get_rx_timestamp_status(void *desc, u32 ats)
 
 			/* Check if timestamp is OK from context descriptor */
 			do {
-				ret = dwmac4_rx_check_timestamp(desc);
+				ret = eqos_rx_check_timestamp(desc);
 				if (ret < 0)
 					goto exit;
 				i++;
@@ -285,7 +285,7 @@ exit:
 	return ret;
 }
 
-static void dwmac4_rd_init_rx_desc(struct dma_desc *p, int disable_rx_ic,
+static void eqos_rd_init_rx_desc(struct dma_desc *p, int disable_rx_ic,
 				   int mode, int end)
 {
 	p->des3 = cpu_to_le32(RDES3_OWN | RDES3_BUFFER1_VALID_ADDR);
@@ -294,7 +294,7 @@ static void dwmac4_rd_init_rx_desc(struct dma_desc *p, int disable_rx_ic,
 		p->des3 |= cpu_to_le32(RDES3_INT_ON_COMPLETION_EN);
 }
 
-static void dwmac4_rd_init_tx_desc(struct dma_desc *p, int mode, int end)
+static void eqos_rd_init_tx_desc(struct dma_desc *p, int mode, int end)
 {
 	p->des0 = 0;
 	p->des1 = 0;
@@ -302,7 +302,7 @@ static void dwmac4_rd_init_tx_desc(struct dma_desc *p, int mode, int end)
 	p->des3 = 0;
 }
 
-static void dwmac4_rd_prepare_tx_desc(struct dma_desc *p, int is_fs, int len,
+static void eqos_rd_prepare_tx_desc(struct dma_desc *p, int is_fs, int len,
 				      bool csum_flag, int mode, bool tx_own,
 				      bool ls)
 {
@@ -339,7 +339,7 @@ static void dwmac4_rd_prepare_tx_desc(struct dma_desc *p, int is_fs, int len,
 	p->des3 = cpu_to_le32(tdes3);
 }
 
-static void dwmac4_rd_prepare_tso_tx_desc(struct dma_desc *p, int is_fs,
+static void eqos_rd_prepare_tso_tx_desc(struct dma_desc *p, int is_fs,
 					  int len1, int len2, bool tx_own,
 					  bool ls, unsigned int tcphdrlen,
 					  unsigned int tcppayloadlen)
@@ -382,18 +382,18 @@ static void dwmac4_rd_prepare_tso_tx_desc(struct dma_desc *p, int is_fs,
 	p->des3 = cpu_to_le32(tdes3);
 }
 
-static void dwmac4_release_tx_desc(struct dma_desc *p, int mode)
+static void eqos_release_tx_desc(struct dma_desc *p, int mode)
 {
 	p->des2 = 0;
 	p->des3 = 0;
 }
 
-static void dwmac4_rd_set_tx_ic(struct dma_desc *p)
+static void eqos_rd_set_tx_ic(struct dma_desc *p)
 {
 	p->des2 |= cpu_to_le32(TDES2_INTERRUPT_ON_COMPLETION);
 }
 
-static void dwmac4_display_ring(void *head, unsigned int size, bool rx)
+static void eqos_display_ring(void *head, unsigned int size, bool rx)
 {
 	struct dma_desc *p = (struct dma_desc *)head;
 	int i;
@@ -409,7 +409,7 @@ static void dwmac4_display_ring(void *head, unsigned int size, bool rx)
 	}
 }
 
-static void dwmac4_set_mss_ctxt(struct dma_desc *p, unsigned int mss)
+static void eqos_set_mss_ctxt(struct dma_desc *p, unsigned int mss)
 {
 	p->des0 = 0;
 	p->des1 = 0;
@@ -417,27 +417,27 @@ static void dwmac4_set_mss_ctxt(struct dma_desc *p, unsigned int mss)
 	p->des3 = cpu_to_le32(TDES3_CONTEXT_TYPE | TDES3_CTXT_TCMSSV);
 }
 
-const struct stmmac_desc_ops dwmac4_desc_ops = {
-	.tx_status = dwmac4_wrback_get_tx_status,
-	.rx_status = dwmac4_wrback_get_rx_status,
-	.get_tx_len = dwmac4_rd_get_tx_len,
-	.get_tx_owner = dwmac4_get_tx_owner,
-	.set_tx_owner = dwmac4_set_tx_owner,
-	.set_rx_owner = dwmac4_set_rx_owner,
-	.get_tx_ls = dwmac4_get_tx_ls,
-	.get_rx_frame_len = dwmac4_wrback_get_rx_frame_len,
-	.enable_tx_timestamp = dwmac4_rd_enable_tx_timestamp,
-	.get_tx_timestamp_status = dwmac4_wrback_get_tx_timestamp_status,
-	.get_rx_timestamp_status = dwmac4_wrback_get_rx_timestamp_status,
-	.get_timestamp = dwmac4_get_timestamp,
-	.set_tx_ic = dwmac4_rd_set_tx_ic,
-	.prepare_tx_desc = dwmac4_rd_prepare_tx_desc,
-	.prepare_tso_tx_desc = dwmac4_rd_prepare_tso_tx_desc,
-	.release_tx_desc = dwmac4_release_tx_desc,
-	.init_rx_desc = dwmac4_rd_init_rx_desc,
-	.init_tx_desc = dwmac4_rd_init_tx_desc,
-	.display_ring = dwmac4_display_ring,
-	.set_mss = dwmac4_set_mss_ctxt,
+const struct stmmac_desc_ops eqos_desc_ops = {
+	.tx_status = eqos_wrback_get_tx_status,
+	.rx_status = eqos_wrback_get_rx_status,
+	.get_tx_len = eqos_rd_get_tx_len,
+	.get_tx_owner = eqos_get_tx_owner,
+	.set_tx_owner = eqos_set_tx_owner,
+	.set_rx_owner = eqos_set_rx_owner,
+	.get_tx_ls = eqos_get_tx_ls,
+	.get_rx_frame_len = eqos_wrback_get_rx_frame_len,
+	.enable_tx_timestamp = eqos_rd_enable_tx_timestamp,
+	.get_tx_timestamp_status = eqos_wrback_get_tx_timestamp_status,
+	.get_rx_timestamp_status = eqos_wrback_get_rx_timestamp_status,
+	.get_timestamp = eqos_get_timestamp,
+	.set_tx_ic = eqos_rd_set_tx_ic,
+	.prepare_tx_desc = eqos_rd_prepare_tx_desc,
+	.prepare_tso_tx_desc = eqos_rd_prepare_tso_tx_desc,
+	.release_tx_desc = eqos_release_tx_desc,
+	.init_rx_desc = eqos_rd_init_rx_desc,
+	.init_tx_desc = eqos_rd_init_tx_desc,
+	.display_ring = eqos_display_ring,
+	.set_mss = eqos_set_mss_ctxt,
 };
 
-const struct stmmac_mode_ops dwmac4_ring_mode_ops = { };
+const struct stmmac_mode_ops eqos_ring_mode_ops = { };

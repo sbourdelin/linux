@@ -144,7 +144,7 @@ struct plat_stmmacenet_data {
 	unsigned int clk_ptp_rate;
 	struct reset_control *stmmac_rst;
 	struct stmmac_axi *axi;
-	int has_gmac4;
+	int has_qos;
 	bool tso_en;
 	int mac_port_sel_speed;
 	bool en_tx_lpi_clockgating;

@@ -11,10 +11,10 @@
 #include <linux/io.h>
 #include <linux/delay.h>
 #include "common.h"
-#include "dwmac4_dma.h"
-#include "dwmac4.h"
+#include "eqos_dma.h"
+#include "eqos.h"
 
-int dwmac4_dma_reset(void __iomem *ioaddr)
+int eqos_dma_reset(void __iomem *ioaddr)
 {
 	u32 value = readl(ioaddr + DMA_BUS_MODE);
 	int limit;
@@ -35,17 +35,17 @@ int dwmac4_dma_reset(void __iomem *ioaddr)
 	return 0;
 }
 
-void dwmac4_set_rx_tail_ptr(void __iomem *ioaddr, u32 tail_ptr, u32 chan)
+void eqos_set_rx_tail_ptr(void __iomem *ioaddr, u32 tail_ptr, u32 chan)
 {
 	writel(tail_ptr, ioaddr + DMA_CHAN_RX_END_ADDR(0));
 }
 
-void dwmac4_set_tx_tail_ptr(void __iomem *ioaddr, u32 tail_ptr, u32 chan)
+void eqos_set_tx_tail_ptr(void __iomem *ioaddr, u32 tail_ptr, u32 chan)
 {
 	writel(tail_ptr, ioaddr + DMA_CHAN_TX_END_ADDR(0));
 }
 
-void dwmac4_dma_start_tx(void __iomem *ioaddr)
+void eqos_dma_start_tx(void __iomem *ioaddr)
 {
 	u32 value = readl(ioaddr + DMA_CHAN_TX_CONTROL(STMMAC_CHAN0));
 
@@ -57,7 +57,7 @@ void dwmac4_dma_start_tx(void __iomem *ioaddr)
 	writel(value, ioaddr + GMAC_CONFIG);
 }
 
-void dwmac4_dma_stop_tx(void __iomem *ioaddr)
+void eqos_dma_stop_tx(void __iomem *ioaddr)
 {
 	u32 value = readl(ioaddr + DMA_CHAN_TX_CONTROL(STMMAC_CHAN0));
 
@@ -69,7 +69,7 @@ void dwmac4_dma_stop_tx(void __iomem *ioaddr)
 	writel(value, ioaddr + GMAC_CONFIG);
 }
 
-void dwmac4_dma_start_rx(void __iomem *ioaddr)
+void eqos_dma_start_rx(void __iomem *ioaddr)
 {
 	u32 value = readl(ioaddr + DMA_CHAN_RX_CONTROL(STMMAC_CHAN0));
 
@@ -82,7 +82,7 @@ void dwmac4_dma_start_rx(void __iomem *ioaddr)
 	writel(value, ioaddr + GMAC_CONFIG);
 }
 
-void dwmac4_dma_stop_rx(void __iomem *ioaddr)
+void eqos_dma_stop_rx(void __iomem *ioaddr)
 {
 	u32 value = readl(ioaddr + DMA_CHAN_RX_CONTROL(STMMAC_CHAN0));
 
@@ -94,34 +94,34 @@ void dwmac4_dma_stop_rx(void __iomem *ioaddr)
 	writel(value, ioaddr + GMAC_CONFIG);
 }
 
-void dwmac4_set_tx_ring_len(void __iomem *ioaddr, u32 len)
+void eqos_set_tx_ring_len(void __iomem *ioaddr, u32 len)
 {
 	writel(len, ioaddr + DMA_CHAN_TX_RING_LEN(STMMAC_CHAN0));
 }
 
-void dwmac4_set_rx_ring_len(void __iomem *ioaddr, u32 len)
+void eqos_set_rx_ring_len(void __iomem *ioaddr, u32 len)
 {
 	writel(len, ioaddr + DMA_CHAN_RX_RING_LEN(STMMAC_CHAN0));
 }
 
-void dwmac4_enable_dma_irq(void __iomem *ioaddr)
+void eqos_enable_dma_irq(void __iomem *ioaddr)
 {
 	writel(DMA_CHAN_INTR_DEFAULT_MASK, ioaddr +
 	       DMA_CHAN_INTR_ENA(STMMAC_CHAN0));
 }
 
-void dwmac410_enable_dma_irq(void __iomem *ioaddr)
+void eqos10_enable_dma_irq(void __iomem *ioaddr)
 {
 	writel(DMA_CHAN_INTR_DEFAULT_MASK_4_10,
 	       ioaddr + DMA_CHAN_INTR_ENA(STMMAC_CHAN0));
 }
 
-void dwmac4_disable_dma_irq(void __iomem *ioaddr)
+void eqos_disable_dma_irq(void __iomem *ioaddr)
 {
 	writel(0, ioaddr + DMA_CHAN_INTR_ENA(STMMAC_CHAN0));
 }
 
-int dwmac4_dma_interrupt(void __iomem *ioaddr,
+int eqos_dma_interrupt(void __iomem *ioaddr,
 			 struct stmmac_extra_stats *x)
 {
 	int ret = 0;
@@ -177,7 +177,7 @@ int dwmac4_dma_interrupt(void __iomem *ioaddr,
 	return ret;
 }
 
-void stmmac_dwmac4_set_mac_addr(void __iomem *ioaddr, u8 addr[6],
+void stmmac_eqos_set_mac_addr(void __iomem *ioaddr, u8 addr[6],
 				unsigned int high, unsigned int low)
 {
 	unsigned long data;
@@ -194,7 +194,7 @@ void stmmac_dwmac4_set_mac_addr(void __iomem *ioaddr, u8 addr[6],
 }
 
 /* Enable disable MAC RX/TX */
-void stmmac_dwmac4_set_mac(void __iomem *ioaddr, bool enable)
+void stmmac_eqos_set_mac(void __iomem *ioaddr, bool enable)
 {
 	u32 value = readl(ioaddr + GMAC_CONFIG);
 
@@ -206,7 +206,7 @@ void stmmac_dwmac4_set_mac(void __iomem *ioaddr, bool enable)
 	writel(value, ioaddr + GMAC_CONFIG);
 }
 
-void stmmac_dwmac4_get_mac_addr(void __iomem *ioaddr, unsigned char *addr,
+void stmmac_eqos_get_mac_addr(void __iomem *ioaddr, unsigned char *addr,
 				unsigned int high, unsigned int low)
 {
 	unsigned int hi_addr, lo_addr;

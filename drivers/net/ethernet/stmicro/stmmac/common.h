@@ -493,16 +493,16 @@ struct stmmac_ops {
 struct stmmac_hwtimestamp {
 	void (*config_hw_tstamping) (void __iomem *ioaddr, u32 data);
 	u32 (*config_sub_second_increment)(void __iomem *ioaddr, u32 ptp_clock,
-					   int gmac4);
+					   int qos);
 	int (*init_systime) (void __iomem *ioaddr, u32 sec, u32 nsec);
 	int (*config_addend) (void __iomem *ioaddr, u32 addend);
 	int (*adjust_systime) (void __iomem *ioaddr, u32 sec, u32 nsec,
-			       int add_sub, int gmac4);
+			       int add_sub, int qos);
 	 u64(*get_systime) (void __iomem *ioaddr);
 };
 
 extern const struct stmmac_hwtimestamp stmmac_ptp;
-extern const struct stmmac_mode_ops dwmac4_ring_mode_ops;
+extern const struct stmmac_mode_ops eqos_ring_mode_ops;
 
 struct mac_link {
 	int port;
@@ -555,7 +555,7 @@ struct mac_device_info *dwmac1000_setup(void __iomem *ioaddr, int mcbins,
 					int perfect_uc_entries,
 					int *synopsys_id);
 struct mac_device_info *dwmac100_setup(void __iomem *ioaddr, int *synopsys_id);
-struct mac_device_info *dwmac4_setup(void __iomem *ioaddr, int mcbins,
+struct mac_device_info *eqos_setup(void __iomem *ioaddr, int mcbins,
 				     int perfect_uc_entries, int *synopsys_id);
 
 void stmmac_set_mac_addr(void __iomem *ioaddr, u8 addr[6],
@@ -564,17 +564,17 @@ void stmmac_get_mac_addr(void __iomem *ioaddr, unsigned char *addr,
 			 unsigned int high, unsigned int low);
 void stmmac_set_mac(void __iomem *ioaddr, bool enable);
 
-void stmmac_dwmac4_set_mac_addr(void __iomem *ioaddr, u8 addr[6],
+void stmmac_eqos_set_mac_addr(void __iomem *ioaddr, u8 addr[6],
 				unsigned int high, unsigned int low);
-void stmmac_dwmac4_get_mac_addr(void __iomem *ioaddr, unsigned char *addr,
+void stmmac_eqos_get_mac_addr(void __iomem *ioaddr, unsigned char *addr,
 				unsigned int high, unsigned int low);
-void stmmac_dwmac4_set_mac(void __iomem *ioaddr, bool enable);
+void stmmac_eqos_set_mac(void __iomem *ioaddr, bool enable);
 
 void dwmac_dma_flush_tx_fifo(void __iomem *ioaddr);
 
 extern const struct stmmac_mode_ops ring_mode_ops;
 extern const struct stmmac_mode_ops chain_mode_ops;
-extern const struct stmmac_desc_ops dwmac4_desc_ops;
+extern const struct stmmac_desc_ops eqos_desc_ops;
 
 /**
  * stmmac_get_synopsys_id - return the SYINID.

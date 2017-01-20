@@ -37,10 +37,10 @@
 #define MII_BUSY 0x00000001
 #define MII_WRITE 0x00000002
 
-/* GMAC4 defines */
-#define MII_GMAC4_GOC_SHIFT		2
-#define MII_GMAC4_WRITE			(1 << MII_GMAC4_GOC_SHIFT)
-#define MII_GMAC4_READ			(3 << MII_GMAC4_GOC_SHIFT)
+/* QOS defines */
+#define MII_QOS_GOC_SHIFT		2
+#define MII_QOS_WRITE			(1 << MII_QOS_GOC_SHIFT)
+#define MII_QOS_READ			(3 << MII_QOS_GOC_SHIFT)
 
 static int stmmac_mdio_busy_wait(void __iomem *ioaddr, unsigned int mii_addr)
 {
@@ -83,8 +83,8 @@ static int stmmac_mdio_read(struct mii_bus *bus, int phyaddr, int phyreg)
 	value |= (phyreg << priv->hw->mii.reg_shift) & priv->hw->mii.reg_mask;
 	value |= (priv->clk_csr << priv->hw->mii.clk_csr_shift)
 		& priv->hw->mii.clk_csr_mask;
-	if (priv->plat->has_gmac4)
-		value |= MII_GMAC4_READ;
+	if (priv->plat->has_qos)
+		value |= MII_QOS_READ;
 
 	if (stmmac_mdio_busy_wait(priv->ioaddr, mii_address))
 		return -EBUSY;
@@ -124,8 +124,8 @@ static int stmmac_mdio_write(struct mii_bus *bus, int phyaddr, int phyreg,
 
 	value |= (priv->clk_csr << priv->hw->mii.clk_csr_shift)
 		& priv->hw->mii.clk_csr_mask;
-	if (priv->plat->has_gmac4)
-		value |= MII_GMAC4_WRITE;
+	if (priv->plat->has_qos)
+		value |= MII_QOS_WRITE;
 	else
 		value |= MII_WRITE;
 
@@ -198,10 +198,10 @@ int stmmac_mdio_reset(struct mii_bus *bus)
 
 	/* This is a workaround for problems with the STE101P PHY.
 	 * It doesn't complete its reset until at least one clock cycle
-	 * on MDC, so perform a dummy mdio read. To be upadted for GMAC4
+	 * on MDC, so perform a dummy mdio read. To be upadted for eQOS
 	 * if needed.
 	 */
-	if (!priv->plat->has_gmac4)
+	if (!priv->plat->has_qos)
 		writel(0, priv->ioaddr + mii_address);
 #endif
 	return 0;

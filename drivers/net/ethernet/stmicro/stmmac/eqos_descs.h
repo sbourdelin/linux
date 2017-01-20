@@ -1,6 +1,6 @@
 /*
  * Header File to describe the DMA descriptors and related definitions specific
- * for DesignWare databook 4.xx.
+ * for DesignWare eQOS.
  *
  * Copyright (C) 2015  STMicroelectronics Ltd
  *
@@ -11,8 +11,8 @@
  * Author: Alexandre Torgue <alexandre.torgue@st.com>
  */
 
-#ifndef __DWMAC4_DESCS_H__
-#define __DWMAC4_DESCS_H__
+#ifndef __EQOS_DESCS_H__
+#define __EQOS_DESCS_H__
 
 #include <linux/bitops.h>
 
@@ -130,4 +130,4 @@
 /* TDS3 use for both format (read and write back) */
 #define RDES3_OWN			BIT(31)
 
-#endif /* __DWMAC4_DESCS_H__ */
+#endif /* __EQOS_DESCS_H__ */

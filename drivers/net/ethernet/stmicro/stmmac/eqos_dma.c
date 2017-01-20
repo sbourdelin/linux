@@ -1,6 +1,5 @@
 /*
- * This is the driver for the GMAC on-chip Ethernet controller for ST SoCs.
- * DWC Ether MAC version 4.xx  has been used for  developing this code.
+ * This is the driver for the eQOS on-chip Ethernet controller for ST SoCs.
  *
  * This contains the functions to handle the dma.
  *
@@ -14,15 +13,15 @@
  */
 
 #include <linux/io.h>
-#include "dwmac4.h"
-#include "dwmac4_dma.h"
+#include "eqos.h"
+#include "eqos_dma.h"
 
-static void dwmac4_dma_axi(void __iomem *ioaddr, struct stmmac_axi *axi)
+static void eqos_dma_axi(void __iomem *ioaddr, struct stmmac_axi *axi)
 {
 	u32 value = readl(ioaddr + DMA_SYS_BUS_MODE);
 	int i;
 
-	pr_info("dwmac4: Master AXI performs %s burst length\n",
+	pr_info("eQOS: Master AXI performs %s burst length\n",
 		(value & DMA_SYS_BUS_FB) ? "fixed" : "any");
 
 	if (axi->axi_lpi_en)
@@ -71,7 +70,7 @@ static void dwmac4_dma_axi(void __iomem *ioaddr, struct stmmac_axi *axi)
 	writel(value, ioaddr + DMA_SYS_BUS_MODE);
 }
 
-static void dwmac4_dma_init_channel(void __iomem *ioaddr,
+static void eqos_dma_init_channel(void __iomem *ioaddr,
 				    struct stmmac_dma_cfg *dma_cfg,
 				    u32 dma_tx_phy, u32 dma_rx_phy,
 				    u32 channel)
@@ -103,7 +102,7 @@ static void dwmac4_dma_init_channel(void __iomem *ioaddr,
 	writel(dma_rx_phy, ioaddr + DMA_CHAN_RX_BASE_ADDR(channel));
 }
 
-static void dwmac4_dma_init(void __iomem *ioaddr,
+static void eqos_dma_init(void __iomem *ioaddr,
 			    struct stmmac_dma_cfg *dma_cfg,
 			    u32 dma_tx, u32 dma_rx, int atds)
 {
@@ -124,10 +123,10 @@ static void dwmac4_dma_init(void __iomem *ioaddr,
 	writel(value, ioaddr + DMA_SYS_BUS_MODE);
 
 	for (i = 0; i < DMA_CHANNEL_NB_MAX; i++)
-		dwmac4_dma_init_channel(ioaddr, dma_cfg, dma_tx, dma_rx, i);
+		eqos_dma_init_channel(ioaddr, dma_cfg, dma_tx, dma_rx, i);
 }
 
-static void _dwmac4_dump_dma_regs(void __iomem *ioaddr, u32 channel)
+static void _eqos_dump_dma_regs(void __iomem *ioaddr, u32 channel)
 {
 	pr_debug(" Channel %d\n", channel);
 	pr_debug("\tDMA_CHAN_CONTROL, offset: 0x%x, val: 0x%x\n", 0,
@@ -166,17 +165,17 @@ static void _dwmac4_dump_dma_regs(void __iomem *ioaddr, u32 channel)
 		 readl(ioaddr + DMA_CHAN_STATUS(channel)));
 }
 
-static void dwmac4_dump_dma_regs(void __iomem *ioaddr)
+static void eqos_dump_dma_regs(void __iomem *ioaddr)
 {
 	int i;
 
-	pr_debug(" GMAC4 DMA registers\n");
+	pr_debug("eQOS DMA registers\n");
 
 	for (i = 0; i < DMA_CHANNEL_NB_MAX; i++)
-		_dwmac4_dump_dma_regs(ioaddr, i);
+		_eqos_dump_dma_regs(ioaddr, i);
 }
 
-static void dwmac4_rx_watchdog(void __iomem *ioaddr, u32 riwt)
+static void eqos_rx_watchdog(void __iomem *ioaddr, u32 riwt)
 {
 	int i;
 
@@ -184,7 +183,7 @@ static void dwmac4_rx_watchdog(void __iomem *ioaddr, u32 riwt)
 		writel(riwt, ioaddr + DMA_CHAN_RX_WATCHDOG(i));
 }
 
-static void dwmac4_dma_chan_op_mode(void __iomem *ioaddr, int txmode,
+static void eqos_dma_chan_op_mode(void __iomem *ioaddr, int txmode,
 				    int rxmode, u32 channel)
 {
 	u32 mtl_tx_op, mtl_rx_op, mtl_rx_int;
@@ -195,11 +194,11 @@ static void dwmac4_dma_chan_op_mode(void __iomem *ioaddr, int txmode,
 	mtl_tx_op = readl(ioaddr + MTL_CHAN_TX_OP_MODE(channel));
 
 	if (txmode == SF_DMA_MODE) {
-		pr_debug("GMAC: enable TX store and forward mode\n");
+		pr_debug("eQOS: enable TX store and forward mode\n");
 		/* Transmit COE type 2 cannot be done in cut-through mode. */
 		mtl_tx_op |= MTL_OP_MODE_TSF;
 	} else {
-		pr_debug("GMAC: disabling TX SF (threshold %d)\n", txmode);
+		pr_debug("eQOS: disabling TX SF (threshold %d)\n", txmode);
 		mtl_tx_op &= ~MTL_OP_MODE_TSF;
 		mtl_tx_op &= MTL_OP_MODE_TTC_MASK;
 		/* Set the transmit threshold */
@@ -236,10 +235,10 @@ static void dwmac4_dma_chan_op_mode(void __iomem *ioaddr, int txmode,
 	mtl_rx_op = readl(ioaddr + MTL_CHAN_RX_OP_MODE(channel));
 
 	if (rxmode == SF_DMA_MODE) {
-		pr_debug("GMAC: enable RX store and forward mode\n");
+		pr_debug("eQOS: enable RX store and forward mode\n");
 		mtl_rx_op |= MTL_OP_MODE_RSF;
 	} else {
-		pr_debug("GMAC: disable RX SF mode (threshold %d)\n", rxmode);
+		pr_debug("eQOS: disable RX SF mode (threshold %d)\n", rxmode);
 		mtl_rx_op &= ~MTL_OP_MODE_RSF;
 		mtl_rx_op &= MTL_OP_MODE_RTC_MASK;
 		if (rxmode <= 32)
@@ -260,14 +259,14 @@ static void dwmac4_dma_chan_op_mode(void __iomem *ioaddr, int txmode,
 	       ioaddr + MTL_CHAN_INT_CTRL(channel));
 }
 
-static void dwmac4_dma_operation_mode(void __iomem *ioaddr, int txmode,
+static void eqos_dma_operation_mode(void __iomem *ioaddr, int txmode,
 				      int rxmode, int rxfifosz)
 {
 	/* Only Channel 0 is actually configured and used */
-	dwmac4_dma_chan_op_mode(ioaddr, txmode, rxmode, 0);
+	eqos_dma_chan_op_mode(ioaddr, txmode, rxmode, 0);
 }
 
-static void dwmac4_get_hw_feature(void __iomem *ioaddr,
+static void eqos_get_hw_feature(void __iomem *ioaddr,
 				  struct dma_features *dma_cap)
 {
 	u32 hw_cap = readl(ioaddr + GMAC_HW_FEATURE0);
@@ -314,7 +313,7 @@ static void dwmac4_get_hw_feature(void __iomem *ioaddr,
 }
 
 /* Enable/disable TSO feature and set MSS */
-static void dwmac4_enable_tso(void __iomem *ioaddr, bool en, u32 chan)
+static void eqos_enable_tso(void __iomem *ioaddr, bool en, u32 chan)
 {
 	u32 value;
 
@@ -331,46 +330,46 @@ static void dwmac4_enable_tso(void __iomem *ioaddr, bool en, u32 chan)
 	}
 }
 
-const struct stmmac_dma_ops dwmac4_dma_ops = {
-	.reset = dwmac4_dma_reset,
-	.init = dwmac4_dma_init,
-	.axi = dwmac4_dma_axi,
-	.dump_regs = dwmac4_dump_dma_regs,
-	.dma_mode = dwmac4_dma_operation_mode,
-	.enable_dma_irq = dwmac4_enable_dma_irq,
-	.disable_dma_irq = dwmac4_disable_dma_irq,
-	.start_tx = dwmac4_dma_start_tx,
-	.stop_tx = dwmac4_dma_stop_tx,
-	.start_rx = dwmac4_dma_start_rx,
-	.stop_rx = dwmac4_dma_stop_rx,
-	.dma_interrupt = dwmac4_dma_interrupt,
-	.get_hw_feature = dwmac4_get_hw_feature,
-	.rx_watchdog = dwmac4_rx_watchdog,
-	.set_rx_ring_len = dwmac4_set_rx_ring_len,
-	.set_tx_ring_len = dwmac4_set_tx_ring_len,
-	.set_rx_tail_ptr = dwmac4_set_rx_tail_ptr,
-	.set_tx_tail_ptr = dwmac4_set_tx_tail_ptr,
-	.enable_tso = dwmac4_enable_tso,
+const struct stmmac_dma_ops eqos_dma_ops = {
+	.reset = eqos_dma_reset,
+	.init = eqos_dma_init,
+	.axi = eqos_dma_axi,
+	.dump_regs = eqos_dump_dma_regs,
+	.dma_mode = eqos_dma_operation_mode,
+	.enable_dma_irq = eqos_enable_dma_irq,
+	.disable_dma_irq = eqos_disable_dma_irq,
+	.start_tx = eqos_dma_start_tx,
+	.stop_tx = eqos_dma_stop_tx,
+	.start_rx = eqos_dma_start_rx,
+	.stop_rx = eqos_dma_stop_rx,
+	.dma_interrupt = eqos_dma_interrupt,
+	.get_hw_feature = eqos_get_hw_feature,
+	.rx_watchdog = eqos_rx_watchdog,
+	.set_rx_ring_len = eqos_set_rx_ring_len,
+	.set_tx_ring_len = eqos_set_tx_ring_len,
+	.set_rx_tail_ptr = eqos_set_rx_tail_ptr,
+	.set_tx_tail_ptr = eqos_set_tx_tail_ptr,
+	.enable_tso = eqos_enable_tso,
 };
 
-const struct stmmac_dma_ops dwmac410_dma_ops = {
-	.reset = dwmac4_dma_reset,
-	.init = dwmac4_dma_init,
-	.axi = dwmac4_dma_axi,
-	.dump_regs = dwmac4_dump_dma_regs,
-	.dma_mode = dwmac4_dma_operation_mode,
-	.enable_dma_irq = dwmac410_enable_dma_irq,
-	.disable_dma_irq = dwmac4_disable_dma_irq,
-	.start_tx = dwmac4_dma_start_tx,
-	.stop_tx = dwmac4_dma_stop_tx,
-	.start_rx = dwmac4_dma_start_rx,
-	.stop_rx = dwmac4_dma_stop_rx,
-	.dma_interrupt = dwmac4_dma_interrupt,
-	.get_hw_feature = dwmac4_get_hw_feature,
-	.rx_watchdog = dwmac4_rx_watchdog,
-	.set_rx_ring_len = dwmac4_set_rx_ring_len,
-	.set_tx_ring_len = dwmac4_set_tx_ring_len,
-	.set_rx_tail_ptr = dwmac4_set_rx_tail_ptr,
-	.set_tx_tail_ptr = dwmac4_set_tx_tail_ptr,
-	.enable_tso = dwmac4_enable_tso,
+const struct stmmac_dma_ops eqos10_dma_ops = {
+	.reset = eqos_dma_reset,
+	.init = eqos_dma_init,
+	.axi = eqos_dma_axi,
+	.dump_regs = eqos_dump_dma_regs,
+	.dma_mode = eqos_dma_operation_mode,
+	.enable_dma_irq = eqos10_enable_dma_irq,
+	.disable_dma_irq = eqos_disable_dma_irq,
+	.start_tx = eqos_dma_start_tx,
+	.stop_tx = eqos_dma_stop_tx,
+	.start_rx = eqos_dma_start_rx,
+	.stop_rx = eqos_dma_stop_rx,
+	.dma_interrupt = eqos_dma_interrupt,
+	.get_hw_feature = eqos_get_hw_feature,
+	.rx_watchdog = eqos_rx_watchdog,
+	.set_rx_ring_len = eqos_set_rx_ring_len,
+	.set_tx_ring_len = eqos_set_tx_ring_len,
+	.set_rx_tail_ptr = eqos_set_rx_tail_ptr,
+	.set_tx_tail_ptr = eqos_set_tx_tail_ptr,
+	.enable_tso = eqos_enable_tso,
 };

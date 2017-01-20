@@ -1,8 +1,7 @@
 /*
- * This is the driver for the GMAC on-chip Ethernet controller for ST SoCs.
- * DWC Ether MAC version 4.00  has been used for developing this code.
+ * This is the driver for the eQOS on-chip Ethernet controller for ST SoCs.
  *
- * This only implements the mac core functions for this chip.
+ * This only implements the eQOS core functions.
  *
  * Copyright (C) 2015  STMicroelectronics Ltd
  *
@@ -18,9 +17,9 @@
 #include <linux/ethtool.h>
 #include <linux/io.h>
 #include "stmmac_pcs.h"
-#include "dwmac4.h"
+#include "eqos.h"
 
-static void dwmac4_core_init(struct mac_device_info *hw, int mtu)
+static void eqos_core_init(struct mac_device_info *hw, int mtu)
 {
 	void __iomem *ioaddr = hw->pcsr;
 	u32 value = readl(ioaddr + GMAC_CONFIG);
@@ -59,7 +58,7 @@ static void dwmac4_core_init(struct mac_device_info *hw, int mtu)
 	writel(value, ioaddr + GMAC_INT_EN);
 }
 
-static void dwmac4_rx_queue_enable(struct mac_device_info *hw, u32 queue)
+static void eqos_rx_queue_enable(struct mac_device_info *hw, u32 queue)
 {
 	void __iomem *ioaddr = hw->pcsr;
 	u32 value = readl(ioaddr + GMAC_RXQ_CTRL0);
@@ -70,12 +69,12 @@ static void dwmac4_rx_queue_enable(struct mac_device_info *hw, u32 queue)
 	writel(value, ioaddr + GMAC_RXQ_CTRL0);
 }
 
-static void dwmac4_dump_regs(struct mac_device_info *hw)
+static void eqos_dump_regs(struct mac_device_info *hw)
 {
 	void __iomem *ioaddr = hw->pcsr;
 	int i;
 
-	pr_debug("\tDWMAC4 regs (base addr = 0x%p)\n", ioaddr);
+	pr_debug("\teqos regs (base addr = 0x%p)\n", ioaddr);
 
 	for (i = 0; i < GMAC_REG_NUM; i++) {
 		int offset = i * 4;
@@ -85,7 +84,7 @@ static void dwmac4_dump_regs(struct mac_device_info *hw)
 	}
 }
 
-static int dwmac4_rx_ipc_enable(struct mac_device_info *hw)
+static int eqos_rx_ipc_enable(struct mac_device_info *hw)
 {
 	void __iomem *ioaddr = hw->pcsr;
 	u32 value = readl(ioaddr + GMAC_CONFIG);
@@ -102,7 +101,7 @@ static int dwmac4_rx_ipc_enable(struct mac_device_info *hw)
 	return !!(value & GMAC_CONFIG_IPC);
 }
 
-static void dwmac4_pmt(struct mac_device_info *hw, unsigned long mode)
+static void eqos_pmt(struct mac_device_info *hw, unsigned long mode)
 {
 	void __iomem *ioaddr = hw->pcsr;
 	unsigned int pmt = 0;
@@ -119,25 +118,25 @@ static void dwmac4_pmt(struct mac_device_info *hw, unsigned long mode)
 	writel(pmt, ioaddr + GMAC_PMT);
 }
 
-static void dwmac4_set_umac_addr(struct mac_device_info *hw,
+static void eqos_set_umac_addr(struct mac_device_info *hw,
 				 unsigned char *addr, unsigned int reg_n)
 {
 	void __iomem *ioaddr = hw->pcsr;
 
-	stmmac_dwmac4_set_mac_addr(ioaddr, addr, GMAC_ADDR_HIGH(reg_n),
+	stmmac_eqos_set_mac_addr(ioaddr, addr, GMAC_ADDR_HIGH(reg_n),
 				   GMAC_ADDR_LOW(reg_n));
 }
 
-static void dwmac4_get_umac_addr(struct mac_device_info *hw,
+static void eqos_get_umac_addr(struct mac_device_info *hw,
 				 unsigned char *addr, unsigned int reg_n)
 {
 	void __iomem *ioaddr = hw->pcsr;
 
-	stmmac_dwmac4_get_mac_addr(ioaddr, addr, GMAC_ADDR_HIGH(reg_n),
+	stmmac_eqos_get_mac_addr(ioaddr, addr, GMAC_ADDR_HIGH(reg_n),
 				   GMAC_ADDR_LOW(reg_n));
 }
 
-static void dwmac4_set_eee_mode(struct mac_device_info *hw,
+static void eqos_set_eee_mode(struct mac_device_info *hw,
 				bool en_tx_lpi_clockgating)
 {
 	void __iomem *ioaddr = hw->pcsr;
@@ -147,41 +146,41 @@ static void dwmac4_set_eee_mode(struct mac_device_info *hw,
 	 * receive path and instruct the transmit to enter in LPI
 	 * state.
 	 */
-	value = readl(ioaddr + GMAC4_LPI_CTRL_STATUS);
-	value |= GMAC4_LPI_CTRL_STATUS_LPIEN | GMAC4_LPI_CTRL_STATUS_LPITXA;
+	value = readl(ioaddr + QOS_LPI_CTRL_STATUS);
+	value |= QOS_LPI_CTRL_STATUS_LPIEN | QOS_LPI_CTRL_STATUS_LPITXA;
 
 	if (en_tx_lpi_clockgating)
-		value |= GMAC4_LPI_CTRL_STATUS_LPITCSE;
+		value |= QOS_LPI_CTRL_STATUS_LPITCSE;
 
-	writel(value, ioaddr + GMAC4_LPI_CTRL_STATUS);
+	writel(value, ioaddr + QOS_LPI_CTRL_STATUS);
 }
 
-static void dwmac4_reset_eee_mode(struct mac_device_info *hw)
+static void eqos_reset_eee_mode(struct mac_device_info *hw)
 {
 	void __iomem *ioaddr = hw->pcsr;
 	u32 value;
 
-	value = readl(ioaddr + GMAC4_LPI_CTRL_STATUS);
-	value &= ~(GMAC4_LPI_CTRL_STATUS_LPIEN | GMAC4_LPI_CTRL_STATUS_LPITXA);
-	writel(value, ioaddr + GMAC4_LPI_CTRL_STATUS);
+	value = readl(ioaddr + QOS_LPI_CTRL_STATUS);
+	value &= ~(QOS_LPI_CTRL_STATUS_LPIEN | QOS_LPI_CTRL_STATUS_LPITXA);
+	writel(value, ioaddr + QOS_LPI_CTRL_STATUS);
 }
 
-static void dwmac4_set_eee_pls(struct mac_device_info *hw, int link)
+static void eqos_set_eee_pls(struct mac_device_info *hw, int link)
 {
 	void __iomem *ioaddr = hw->pcsr;
 	u32 value;
 
-	value = readl(ioaddr + GMAC4_LPI_CTRL_STATUS);
+	value = readl(ioaddr + QOS_LPI_CTRL_STATUS);
 
 	if (link)
-		value |= GMAC4_LPI_CTRL_STATUS_PLS;
+		value |= QOS_LPI_CTRL_STATUS_PLS;
 	else
-		value &= ~GMAC4_LPI_CTRL_STATUS_PLS;
+		value &= ~QOS_LPI_CTRL_STATUS_PLS;
 
-	writel(value, ioaddr + GMAC4_LPI_CTRL_STATUS);
+	writel(value, ioaddr + QOS_LPI_CTRL_STATUS);
 }
 
-static void dwmac4_set_eee_timer(struct mac_device_info *hw, int ls, int tw)
+static void eqos_set_eee_timer(struct mac_device_info *hw, int ls, int tw)
 {
 	void __iomem *ioaddr = hw->pcsr;
 	int value = ((tw & 0xffff)) | ((ls & 0x7ff) << 16);
@@ -193,10 +192,10 @@ static void dwmac4_set_eee_timer(struct mac_device_info *hw, int ls, int tw)
 	 * TW: minimum time (us) for which the core waits
 	 *  after it has stopped transmitting the LPI pattern.
 	 */
-	writel(value, ioaddr + GMAC4_LPI_TIMER_CTRL);
+	writel(value, ioaddr + QOS_LPI_TIMER_CTRL);
 }
 
-static void dwmac4_set_filter(struct mac_device_info *hw,
+static void eqos_set_filter(struct mac_device_info *hw,
 			      struct net_device *dev)
 {
 	void __iomem *ioaddr = (void __iomem *)dev->base_addr;
@@ -248,7 +247,7 @@ static void dwmac4_set_filter(struct mac_device_info *hw,
 		struct netdev_hw_addr *ha;
 
 		netdev_for_each_uc_addr(ha, dev) {
-			dwmac4_set_umac_addr(hw, ha->addr, reg);
+			eqos_set_umac_addr(hw, ha->addr, reg);
 			reg++;
 		}
 	}
@@ -256,7 +255,7 @@ static void dwmac4_set_filter(struct mac_device_info *hw,
 	writel(value, ioaddr + GMAC_PACKET_FILTER);
 }
 
-static void dwmac4_flow_ctrl(struct mac_device_info *hw, unsigned int duplex,
+static void eqos_flow_ctrl(struct mac_device_info *hw, unsigned int duplex,
 			     unsigned int fc, unsigned int pause_time)
 {
 	void __iomem *ioaddr = hw->pcsr;
@@ -282,24 +281,24 @@ static void dwmac4_flow_ctrl(struct mac_device_info *hw, unsigned int duplex,
 	}
 }
 
-static void dwmac4_ctrl_ane(void __iomem *ioaddr, bool ane, bool srgmi_ral,
+static void eqos_ctrl_ane(void __iomem *ioaddr, bool ane, bool srgmi_ral,
 			    bool loopback)
 {
 	dwmac_ctrl_ane(ioaddr, GMAC_PCS_BASE, ane, srgmi_ral, loopback);
 }
 
-static void dwmac4_rane(void __iomem *ioaddr, bool restart)
+static void eqos_rane(void __iomem *ioaddr, bool restart)
 {
 	dwmac_rane(ioaddr, GMAC_PCS_BASE, restart);
 }
 
-static void dwmac4_get_adv_lp(void __iomem *ioaddr, struct rgmii_adv *adv)
+static void eqos_get_adv_lp(void __iomem *ioaddr, struct rgmii_adv *adv)
 {
 	dwmac_get_adv_lp(ioaddr, GMAC_PCS_BASE, adv);
 }
 
 /* RGMII or SMII interface */
-static void dwmac4_phystatus(void __iomem *ioaddr, struct stmmac_extra_stats *x)
+static void eqos_phystatus(void __iomem *ioaddr, struct stmmac_extra_stats *x)
 {
 	u32 status;
 
@@ -331,7 +330,7 @@ static void dwmac4_phystatus(void __iomem *ioaddr, struct stmmac_extra_stats *x)
 	}
 }
 
-static int dwmac4_irq_status(struct mac_device_info *hw,
+static int eqos_irq_status(struct mac_device_info *hw,
 			     struct stmmac_extra_stats *x)
 {
 	void __iomem *ioaddr = hw->pcsr;
@@ -370,12 +369,12 @@ static int dwmac4_irq_status(struct mac_device_info *hw,
 
 	dwmac_pcs_isr(ioaddr, GMAC_PCS_BASE, intr_status, x);
 	if (intr_status & PCS_RGSMIIIS_IRQ)
-		dwmac4_phystatus(ioaddr, x);
+		eqos_phystatus(ioaddr, x);
 
 	return ret;
 }
 
-static void dwmac4_debug(void __iomem *ioaddr, struct stmmac_extra_stats *x)
+static void eqos_debug(void __iomem *ioaddr, struct stmmac_extra_stats *x)
 {
 	u32 value;
 
@@ -459,28 +458,28 @@ static void dwmac4_debug(void __iomem *ioaddr, struct stmmac_extra_stats *x)
 		x->mac_gmii_rx_proto_engine++;
 }
 
-static const struct stmmac_ops dwmac4_ops = {
-	.core_init = dwmac4_core_init,
-	.rx_ipc = dwmac4_rx_ipc_enable,
-	.rx_queue_enable = dwmac4_rx_queue_enable,
-	.dump_regs = dwmac4_dump_regs,
-	.host_irq_status = dwmac4_irq_status,
-	.flow_ctrl = dwmac4_flow_ctrl,
-	.pmt = dwmac4_pmt,
-	.set_umac_addr = dwmac4_set_umac_addr,
-	.get_umac_addr = dwmac4_get_umac_addr,
-	.set_eee_mode = dwmac4_set_eee_mode,
-	.reset_eee_mode = dwmac4_reset_eee_mode,
-	.set_eee_timer = dwmac4_set_eee_timer,
-	.set_eee_pls = dwmac4_set_eee_pls,
-	.pcs_ctrl_ane = dwmac4_ctrl_ane,
-	.pcs_rane = dwmac4_rane,
-	.pcs_get_adv_lp = dwmac4_get_adv_lp,
-	.debug = dwmac4_debug,
-	.set_filter = dwmac4_set_filter,
+static const struct stmmac_ops eqos_ops = {
+	.core_init = eqos_core_init,
+	.rx_ipc = eqos_rx_ipc_enable,
+	.rx_queue_enable = eqos_rx_queue_enable,
+	.dump_regs = eqos_dump_regs,
+	.host_irq_status = eqos_irq_status,
+	.flow_ctrl = eqos_flow_ctrl,
+	.pmt = eqos_pmt,
+	.set_umac_addr = eqos_set_umac_addr,
+	.get_umac_addr = eqos_get_umac_addr,
+	.set_eee_mode = eqos_set_eee_mode,
+	.reset_eee_mode = eqos_reset_eee_mode,
+	.set_eee_timer = eqos_set_eee_timer,
+	.set_eee_pls = eqos_set_eee_pls,
+	.pcs_ctrl_ane = eqos_ctrl_ane,
+	.pcs_rane = eqos_rane,
+	.pcs_get_adv_lp = eqos_get_adv_lp,
+	.debug = eqos_debug,
+	.set_filter = eqos_set_filter,
 };
 
-struct mac_device_info *dwmac4_setup(void __iomem *ioaddr, int mcbins,
+struct mac_device_info *eqos_setup(void __iomem *ioaddr, int mcbins,
 				     int perfect_uc_entries, int *synopsys_id)
 {
 	struct mac_device_info *mac;
@@ -498,7 +497,7 @@ struct mac_device_info *dwmac4_setup(void __iomem *ioaddr, int mcbins,
 	if (mac->multicast_filter_bins)
 		mac->mcast_bits_log2 = ilog2(mac->multicast_filter_bins);
 
-	mac->mac = &dwmac4_ops;
+	mac->mac = &eqos_ops;
 
 	mac->link.port = GMAC_CONFIG_PS;
 	mac->link.duplex = GMAC_CONFIG_DM;
@@ -516,9 +515,9 @@ struct mac_device_info *dwmac4_setup(void __iomem *ioaddr, int mcbins,
 	*synopsys_id = stmmac_get_synopsys_id(hwid);
 
 	if (*synopsys_id > DWMAC_CORE_4_00)
-		mac->dma = &dwmac410_dma_ops;
+		mac->dma = &eqos10_dma_ops;
 	else
-		mac->dma = &dwmac4_dma_ops;
+		mac->dma = &eqos_dma_ops;
 
 	return mac;
 }

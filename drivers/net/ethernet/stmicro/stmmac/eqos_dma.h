@@ -1,5 +1,5 @@
 /*
- * DWMAC4 DMA Header file.
+ * eQOS DMA Header file.
  *
  *
  * Copyright (C) 2007-2015  STMicroelectronics Ltd
@@ -11,11 +11,11 @@
  * Author: Alexandre Torgue <alexandre.torgue@st.com>
  */
 
-#ifndef __DWMAC4_DMA_H__
-#define __DWMAC4_DMA_H__
+#ifndef __EQOS_DMA_H__
+#define __EQOS_DMA_H__
 
 /* Define the max channel number used for tx (also rx).
- * dwmac4 accepts up to 8 channels for TX (and also 8 channels for RX
+ * eQOS accepts up to 8 channels for TX (and also 8 channels for RX
  */
 #define DMA_CHANNEL_NB_MAX		1
 
@@ -183,20 +183,20 @@
 #define DMA_CHAN0_DBG_STAT_RPS		GENMASK(11, 8)
 #define DMA_CHAN0_DBG_STAT_RPS_SHIFT	8
 
-int dwmac4_dma_reset(void __iomem *ioaddr);
-void dwmac4_enable_dma_transmission(void __iomem *ioaddr, u32 tail_ptr);
-void dwmac4_enable_dma_irq(void __iomem *ioaddr);
-void dwmac410_enable_dma_irq(void __iomem *ioaddr);
-void dwmac4_disable_dma_irq(void __iomem *ioaddr);
-void dwmac4_dma_start_tx(void __iomem *ioaddr);
-void dwmac4_dma_stop_tx(void __iomem *ioaddr);
-void dwmac4_dma_start_rx(void __iomem *ioaddr);
-void dwmac4_dma_stop_rx(void __iomem *ioaddr);
-int dwmac4_dma_interrupt(void __iomem *ioaddr,
+int eqos_dma_reset(void __iomem *ioaddr);
+void eqos_enable_dma_transmission(void __iomem *ioaddr, u32 tail_ptr);
+void eqos_enable_dma_irq(void __iomem *ioaddr);
+void eqos10_enable_dma_irq(void __iomem *ioaddr);
+void eqos_disable_dma_irq(void __iomem *ioaddr);
+void eqos_dma_start_tx(void __iomem *ioaddr);
+void eqos_dma_stop_tx(void __iomem *ioaddr);
+void eqos_dma_start_rx(void __iomem *ioaddr);
+void eqos_dma_stop_rx(void __iomem *ioaddr);
+int eqos_dma_interrupt(void __iomem *ioaddr,
 			 struct stmmac_extra_stats *x);
-void dwmac4_set_rx_ring_len(void __iomem *ioaddr, u32 len);
-void dwmac4_set_tx_ring_len(void __iomem *ioaddr, u32 len);
-void dwmac4_set_rx_tail_ptr(void __iomem *ioaddr, u32 tail_ptr, u32 chan);
-void dwmac4_set_tx_tail_ptr(void __iomem *ioaddr, u32 tail_ptr, u32 chan);
+void eqos_set_rx_ring_len(void __iomem *ioaddr, u32 len);
+void eqos_set_tx_ring_len(void __iomem *ioaddr, u32 len);
+void eqos_set_rx_tail_ptr(void __iomem *ioaddr, u32 tail_ptr, u32 chan);
+void eqos_set_tx_tail_ptr(void __iomem *ioaddr, u32 tail_ptr, u32 chan);
 
-#endif /* __DWMAC4_DMA_H__ */
+#endif /* __EQOS_DMA_H__ */

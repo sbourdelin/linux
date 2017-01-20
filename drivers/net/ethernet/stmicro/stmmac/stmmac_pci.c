@@ -47,6 +47,8 @@ struct stmmac_pci_info {
 	struct stmmac_pci_dmi_data *dmi;
 };
 
+static const u8 snps_dev_addr[6] = {0, 0x55, 0x7b, 0xb5, 0x7d, 0xf7};
+
 static int stmmac_pci_find_phy_addr(struct stmmac_pci_info *info)
 {
 	const char *name = dmi_get_system_info(DMI_BOARD_NAME);
@@ -72,10 +74,13 @@ static void stmmac_default_data(struct plat_stmmacenet_data *plat)
 {
 	plat->bus_id = 1;
 	plat->phy_addr = 0;
-	plat->interface = PHY_INTERFACE_MODE_GMII;
-	plat->clk_csr = 2;	/* clk_csr_i = 20-35MHz & MDC = clk_csr_i/16 */
-	plat->has_gmac = 1;
-	plat->force_sf_dma_mode = 1;
+	plat->interface = PHY_INTERFACE_MODE_SGMII;
+	plat->clk_csr = 0x5;
+	plat->has_gmac = 0;
+	plat->has_qos = 1;
+	plat->force_sf_dma_mode = 0;
+	plat->rx_fifo_size = 8192;
+	plat->maxmtu = JUMBO_LEN;
 
 	plat->mdio_bus_data->phy_reset = NULL;
 	plat->mdio_bus_data->phy_mask = 0;
@@ -87,11 +92,11 @@ static void stmmac_default_data(struct plat_stmmacenet_data *plat)
 	/* Set default value for multicast hash bins */
 	plat->multicast_filter_bins = HASH_TABLE_SIZE;
 
+	plat->dma_cfg->fixed_burst = 0;
+	plat->dma_cfg->aal = 0;
+
 	/* Set default value for unicast filter entries */
 	plat->unicast_filter_entries = 1;
-
-	/* Set the maxmtu to a default of JUMBO_LEN */
-	plat->maxmtu = JUMBO_LEN;
 }
 
 static int quark_default_data(struct plat_stmmacenet_data *plat,
@@ -128,9 +133,6 @@ static int quark_default_data(struct plat_stmmacenet_data *plat,
 
 	/* Set default value for unicast filter entries */
 	plat->unicast_filter_entries = 1;
-
-	/* Set the maxmtu to a default of JUMBO_LEN */
-	plat->maxmtu = JUMBO_LEN;
 
 	return 0;
 }
@@ -220,12 +222,14 @@ static int stmmac_pci_probe(struct pci_dev *pdev,
 	} else
 		stmmac_default_data(plat);
 
-	pci_enable_msi(pdev);
+	/*pci_enable_msi(pdev);*/
 
 	memset(&res, 0, sizeof(res));
 	res.addr = pcim_iomap_table(pdev)[i];
 	res.wol_irq = pdev->irq;
 	res.irq = pdev->irq;
+
+	res.mac = snps_dev_addr;
 
 	return stmmac_dvr_probe(&pdev->dev, plat, &res);
 }
@@ -247,11 +251,15 @@ static SIMPLE_DEV_PM_OPS(stmmac_pm_ops, stmmac_suspend, stmmac_resume);
 #define STMMAC_VENDOR_ID 0x700
 #define STMMAC_QUARK_ID  0x0937
 #define STMMAC_DEVICE_ID 0x1108
+#define DEVICE_ID_HAPS_DX 0x7102
+#define DEVICE_ID_HAPS_6X 0x7101
 
 static const struct pci_device_id stmmac_id_table[] = {
 	{PCI_DEVICE(STMMAC_VENDOR_ID, STMMAC_DEVICE_ID)},
 	{PCI_DEVICE(PCI_VENDOR_ID_STMICRO, PCI_DEVICE_ID_STMICRO_MAC)},
 	{PCI_VDEVICE(INTEL, STMMAC_QUARK_ID), (kernel_ulong_t)&quark_pci_info},
+	{PCI_DEVICE(PCI_VENDOR_ID_SYNOPSYS, DEVICE_ID_HAPS_DX)},
+	{PCI_DEVICE(PCI_VENDOR_ID_SYNOPSYS, DEVICE_ID_HAPS_6X)},
 	{}
 };
 
