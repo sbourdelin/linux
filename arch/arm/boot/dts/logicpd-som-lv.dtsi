@@ -261,7 +261,7 @@
 
 &twl {
 	twl_power: power {
-		compatible = "ti,twl4030-power-idle-osc-off", "ti,twl4030-power-idle";
+		compatible = "ti,twl4030-power","ti,twl4030-power-reset", "ti,twl4030-power-idle-osc-off", "ti,twl4030-power-idle";
 		ti,use_poweroff;
 	};
 };
