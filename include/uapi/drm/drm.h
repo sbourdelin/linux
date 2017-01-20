@@ -813,6 +813,7 @@ extern "C" {
 #define DRM_IOCTL_MODE_ATOMIC		DRM_IOWR(0xBC, struct drm_mode_atomic)
 #define DRM_IOCTL_MODE_CREATEPROPBLOB	DRM_IOWR(0xBD, struct drm_mode_create_blob)
 #define DRM_IOCTL_MODE_DESTROYPROPBLOB	DRM_IOWR(0xBE, struct drm_mode_destroy_blob)
+#define DRM_IOCTL_MODE_OBJ_SETPROPERTIES DRM_IOWR(0xBF, struct drm_mode_obj_set_properties)
 
 /**
  * Device specific ioctls should only be in their respective headers

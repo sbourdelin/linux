@@ -362,6 +362,14 @@ struct drm_mode_obj_get_properties {
 	__u32 obj_type;
 };
 
+struct drm_mode_obj_set_properties {
+	__u64 props_ptr;
+	__u64 prop_values_ptr;
+	__u32 count_props;
+	__u32 obj_id;
+	__u32 obj_type;
+};
+
 struct drm_mode_obj_set_property {
 	__u64 value;
 	__u32 prop_id;

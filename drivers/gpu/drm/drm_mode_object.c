@@ -437,3 +437,186 @@ out:
 	drm_modeset_unlock_all(dev);
 	return ret;
 }
+
+/**
+ * drm_mode_object_set_properties
+ * helper for drm_mode_obj_set_properties_ioctl which can be used to set
+ * values of an object's numerous properties
+ * @dev: DRM device
+ * @obj: Object pointer
+ * @atomic: Flag that indicates atomocity
+ * @prop_ptr: pointer to array of prop IDs
+ * @prop_values: pointer to array of prop values
+ * @arg_count_props: pointer to total num of properties
+ *
+ * This function helps to set the values for an object's several properties
+ * in one go.
+ * Called by drm_mode_obj_set_properties_ioctl
+ *
+ * Returns:
+ * Zero on success, negative errno on failure.
+ * Fills prop_values with -1 for failed prop IDs.
+ * Fills arg_count_props with total successful props
+ */
+int drm_mode_object_set_properties(struct drm_device *dev,
+		struct drm_mode_object *obj, bool atomic,
+		uint32_t __user *prop_ptr,
+		uint64_t __user *prop_values, uint32_t *arg_count_props)
+{
+	struct drm_mode_object *ref = NULL;
+	int props_count;
+	int i, j, ret = 0, set = 0;
+	/* user requested property id, value, count*/
+	uint32_t prop_id_req;
+	uint64_t prop_val_req;
+	uint32_t props_count_req = *arg_count_props;
+
+	props_count = obj->properties->count;
+	if (!props_count) {
+		DRM_DEBUG_KMS("0 props_count\n");
+		return -EINVAL;
+	}
+	/*
+	 * if user sends arg_count_props = 0
+	 * user will get *arg_count_props = props_count
+	 */
+	if (!props_count_req) {
+		*arg_count_props = props_count;
+		return 0;
+	}
+	/* if user wish to set number of props <= props_count, its allowed*/
+	if (props_count_req > props_count) {
+		DRM_DEBUG_KMS("Invalid props_count\
+		 %u\n", props_count_req);
+		return -EINVAL;
+	}
+	for (j = 0; j < props_count_req; j++) {
+		if (get_user(prop_id_req, prop_ptr + j)) {
+			DRM_DEBUG_KMS("get_user failed\
+			 for prop_id %u\n", prop_id_req);
+			return -EFAULT;
+		}
+		if (get_user(prop_val_req, prop_values + j)) {
+			DRM_DEBUG_KMS("get_user failed\
+			 for prop_val %llu\n", prop_val_req);
+			return -EFAULT;
+		}
+		for (i = 0; i < props_count; i++) {
+			struct drm_property *prop =
+			obj->properties->properties[i];
+			/*in case prop inside the array
+			 *obj->properties->properties[]
+			 *are less than props_count
+			 */
+			if (!prop)
+				continue;
+			if (prop->base.id != prop_id_req)
+					continue;
+			if ((prop->flags & DRM_MODE_PROP_ATOMIC) && !atomic)
+				continue;
+			if (!drm_property_change_valid_get(prop,
+						prop_val_req, &ref)) {
+				DRM_DEBUG_KMS("change_valid_get failed\
+				 for prop id %u, prop val %llu\n",\
+				prop_id_req, prop_val_req);
+				/*copy -1 to prop_values array
+				 * to let the user know that this prop id
+				 * failed
+				 */
+				if (put_user((uint64_t) -1, prop_values + j)) {
+					DRM_DEBUG_KMS("put_user failed\
+					 for prop_val %d\n", -1);
+					return -EFAULT;
+				}
+				continue;
+			}
+			drm_modeset_lock_all(dev);
+			switch (obj->type) {
+			case DRM_MODE_OBJECT_CONNECTOR:
+				ret = drm_mode_connector_set_obj_prop(obj,
+						prop, prop_val_req);
+				break;
+			case DRM_MODE_OBJECT_CRTC:
+				ret = drm_mode_crtc_set_obj_prop(obj,
+				prop, prop_val_req);
+				break;
+			case DRM_MODE_OBJECT_PLANE:
+				ret = drm_mode_plane_set_obj_prop(
+				obj_to_plane(obj), prop, prop_val_req);
+				break;
+			default:
+				DRM_DEBUG_KMS("Invalid object type %u\n",\
+				obj->type);
+				drm_modeset_unlock_all(dev);
+				drm_property_change_valid_put(prop, ref);
+				return -EINVAL;
+			}
+			drm_modeset_unlock_all(dev);
+			drm_property_change_valid_put(prop, ref);
+			if (ret) {
+				/*Even if one prop failed to set
+				 *continue setting others , so that
+				 *max props can be set and this ioctl/feature
+				 *is utilized to max extent
+				 */
+				DRM_DEBUG_KMS("drm_mode_<connector|crtc|plane>\
+				_set_obj_prop failed for obj id %u and obj type\
+				 %u, prop id %u, prop val %llu\n", obj->id,\
+				 obj->type, prop_id_req, prop_val_req);
+				/*The properties which failed
+				 *user gets -1 in prop_values
+				 *for those prop IDs,
+				 *if ret is passed, it may coincide with
+				 *some prop val, therefore -1 is passed
+				 */
+				if (put_user((uint64_t) -1, prop_values + j)) {
+					DRM_DEBUG_KMS("put_user failed\
+					 for prop_val %d\n", -1);
+					return -EFAULT;
+				}
+			} else {
+				set++;
+			}
+		}
+	}
+	DRM_DEBUG_KMS("Total %u props set successfully\n", set);
+	*arg_count_props = set;
+	return ret;
+}
+
+/**
+ * drm_mode_obj_set_properties_ioctl - sets values of an object's multiple
+ * properties
+ * @dev: DRM device
+ * @data: ioctl data
+ * @file_priv: DRM file info
+ * This function sets the values for an object's several properties in one go.
+ * It internally utilizes the helper function set_properties
+ * Called by the user via ioctl.
+ *
+ * Returns:
+ * Zero on success, negative errno on failure.
+ */
+int drm_mode_obj_set_properties_ioctl(struct drm_device *dev, void *data,
+				      struct drm_file *file_priv)
+{
+	struct drm_mode_obj_set_properties *arg = data;
+	struct drm_mode_object *obj;
+	int ret = 0;
+
+	if (!drm_core_check_feature(dev, DRIVER_MODESET))
+		return -EINVAL;
+
+
+	obj = drm_mode_object_find(dev, arg->obj_id, arg->obj_type);
+	if (!obj)
+		return -ENOENT;
+	if (!obj->properties)
+		return -EINVAL;
+	ret = drm_mode_object_set_properties(dev, obj, file_priv->atomic,
+		(uint32_t __user *)(unsigned long)(arg->props_ptr),
+		(uint64_t __user *)(unsigned long)(arg->prop_values_ptr),
+			&arg->count_props);
+
+	return ret;
+}

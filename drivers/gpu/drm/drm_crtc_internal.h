@@ -115,6 +115,12 @@ int drm_mode_object_get_properties(struct drm_mode_object *obj, bool atomic,
 				   uint32_t __user *prop_ptr,
 				   uint64_t __user *prop_values,
 				   uint32_t *arg_count_props);
+
+int drm_mode_object_set_properties(struct drm_device *dev,
+	struct drm_mode_object *obj,
+	bool atomic, uint32_t __user *prop_ptr,
+	uint64_t __user *prop_values, uint32_t *arg_count_props);
+
 struct drm_property *drm_mode_obj_find_prop_id(struct drm_mode_object *obj,
 					       uint32_t prop_id);
 
@@ -124,7 +130,8 @@ int drm_mode_obj_get_properties_ioctl(struct drm_device *dev, void *data,
 				      struct drm_file *file_priv);
 int drm_mode_obj_set_property_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *file_priv);
-
+int drm_mode_obj_set_properties_ioctl(struct drm_device *dev, void *data,
+					struct drm_file *file_priv);
 /* drm_encoder.c */
 int drm_encoder_register_all(struct drm_device *dev);
 void drm_encoder_unregister_all(struct drm_device *dev);
