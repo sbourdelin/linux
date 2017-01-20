@@ -1500,7 +1500,7 @@ enum ethtool_link_mode_bit_indices {
 
 #define SPEED_UNKNOWN		-1
 
-static inline int ethtool_validate_speed(__u32 speed)
+static inline int ethtool_validate_speed(__s32 speed)
 {
 	return speed <= INT_MAX || speed == SPEED_UNKNOWN;
 }
