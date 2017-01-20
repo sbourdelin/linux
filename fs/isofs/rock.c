@@ -84,7 +84,7 @@ static void init_rock_state(struct rock_state *rs, struct inode *inode)
 static int rock_continue(struct rock_state *rs)
 {
 	int ret = 1;
-	int blocksize = 1 << rs->inode->i_blkbits;
+	int blocksize = i_blocksize(rs->inode);
 	const int min_de_size = offsetof(struct rock_ridge, u);
 
 	kfree(rs->buffer);
