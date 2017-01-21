@@ -1143,7 +1143,7 @@ int tmio_mmc_host_probe(struct tmio_mmc_host *_host,
 	if (!res_ctl)
 		return -EINVAL;
 
-	ret = mmc_of_parse(mmc);
+	ret = mmc_of_parse(mmc, pdev->dev.of_node);
 	if (ret < 0)
 		goto host_free;
 

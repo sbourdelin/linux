@@ -1435,7 +1435,7 @@ static int sh_mmcif_probe(struct platform_device *pdev)
 	if (!mmc)
 		return -ENOMEM;
 
-	ret = mmc_of_parse(mmc);
+	ret = mmc_of_parse(mmc, dev->of_node);
 	if (ret < 0)
 		goto err_host;
 

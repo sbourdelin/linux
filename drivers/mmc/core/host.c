@@ -171,24 +171,22 @@ static void mmc_retune_timer(unsigned long data)
 /**
  *	mmc_of_parse() - parse host's device-tree node
  *	@host: host whose node should be parsed.
+ *	@np: node that should be parsed.
  *
  * To keep the rest of the MMC subsystem unaware of whether DT has been
  * used to to instantiate and configure this host instance or not, we
  * parse the properties and set respective generic mmc-host flags and
  * parameters.
  */
-int mmc_of_parse(struct mmc_host *host)
+int mmc_of_parse(struct mmc_host *host, struct device_node *np)
 {
-	struct device_node *np;
 	u32 bus_width;
 	int ret;
 	bool cd_cap_invert, cd_gpio_invert = false;
 	bool ro_cap_invert, ro_gpio_invert = false;
 
-	if (!host->parent || !host->parent->of_node)
+	if (!np)
 		return 0;
-
-	np = host->parent->of_node;
 
 	/* "bus-width" is translated to MMC_CAP_*_BIT_DATA flags */
 	if (of_property_read_u32(np, "bus-width", &bus_width) < 0) {

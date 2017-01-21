@@ -740,7 +740,7 @@ static int meson_mmc_probe(struct platform_device *pdev)
 	if (ret == -EPROBE_DEFER)
 		goto free_host;
 
-	ret = mmc_of_parse(mmc);
+	ret = mmc_of_parse(mmc, pdev->dev.of_node);
 	if (ret) {
 		dev_warn(&pdev->dev, "error parsing DT: %d\n", ret);
 		goto free_host;

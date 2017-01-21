@@ -658,7 +658,7 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
 	if (ret)
 		goto clk_disable_all;
 
-	ret = mmc_of_parse(host->mmc);
+	ret = mmc_of_parse(host->mmc, pdev->dev.of_node);
 	if (ret) {
 		dev_err(&pdev->dev, "parsing dt failed (%u)\n", ret);
 		goto unreg_clk;

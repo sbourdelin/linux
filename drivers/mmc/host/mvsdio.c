@@ -750,7 +750,7 @@ static int mvsd_probe(struct platform_device *pdev)
 	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
 
 	host->base_clock = clk_get_rate(host->clk) / 2;
-	ret = mmc_of_parse(mmc);
+	ret = mmc_of_parse(mmc, np);
 	if (ret < 0)
 		goto out;
 	if (maxfreq)

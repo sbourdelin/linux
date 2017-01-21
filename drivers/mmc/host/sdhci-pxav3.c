@@ -430,7 +430,7 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 
 	match = of_match_device(of_match_ptr(sdhci_pxav3_of_match), &pdev->dev);
 	if (match) {
-		ret = mmc_of_parse(host->mmc);
+		ret = mmc_of_parse(host->mmc, np);
 		if (ret)
 			goto err_of_parse;
 		sdhci_get_of_property(pdev);

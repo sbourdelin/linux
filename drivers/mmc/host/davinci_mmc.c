@@ -1257,7 +1257,7 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
 	match = of_match_device(davinci_mmc_dt_ids, &pdev->dev);
 	if (match) {
 		pdev->id_entry = match->data;
-		ret = mmc_of_parse(mmc);
+		ret = mmc_of_parse(mmc, pdev->dev.of_node);
 		if (ret) {
 			dev_err(&pdev->dev,
 				"could not parse of data: %d\n", ret);

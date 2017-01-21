@@ -126,7 +126,7 @@ static int sdhci_f_sdh30_probe(struct platform_device *pdev)
 	host->quirks2 = SDHCI_QUIRK2_SUPPORT_SINGLE |
 			SDHCI_QUIRK2_TUNING_WORK_AROUND;
 
-	ret = mmc_of_parse(host->mmc);
+	ret = mmc_of_parse(host->mmc, dev->of_node);
 	if (ret)
 		goto err;
 

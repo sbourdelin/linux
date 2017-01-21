@@ -617,7 +617,7 @@ static int sdhci_s3c_probe(struct platform_device *pdev)
 	pm_runtime_use_autosuspend(&pdev->dev);
 	pm_suspend_ignore_children(&pdev->dev, 1);
 
-	ret = mmc_of_parse(host->mmc);
+	ret = mmc_of_parse(host->mmc, pdev->dev.of_node);
 	if (ret)
 		goto err_req_regs;
 

@@ -92,7 +92,7 @@ static int sdhci_dove_probe(struct platform_device *pdev)
 	if (!IS_ERR(pltfm_host->clk))
 		clk_prepare_enable(pltfm_host->clk);
 
-	ret = mmc_of_parse(host->mmc);
+	ret = mmc_of_parse(host->mmc, pdev->dev.of_node);
 	if (ret)
 		goto err_sdhci_add;
 

@@ -1760,7 +1760,7 @@ static int usdhi6_probe(struct platform_device *pdev)
 	if (ret == -EPROBE_DEFER)
 		goto e_free_mmc;
 
-	ret = mmc_of_parse(mmc);
+	ret = mmc_of_parse(mmc, dev->of_node);
 	if (ret < 0)
 		goto e_free_mmc;
 

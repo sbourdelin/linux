@@ -2028,7 +2028,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 		goto err;
 	}
 
-	ret = mmc_of_parse(mmc);
+	ret = mmc_of_parse(mmc, pdev->dev.of_node);
 	if (ret)
 		goto err1;
 

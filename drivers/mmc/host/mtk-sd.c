@@ -1497,7 +1497,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	host = mmc_priv(mmc);
-	ret = mmc_of_parse(mmc);
+	ret = mmc_of_parse(mmc, pdev->dev.of_node);
 	if (ret)
 		goto host_free;
 

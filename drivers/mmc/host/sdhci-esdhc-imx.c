@@ -1098,7 +1098,7 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
 	}
 
 	/* call to generic mmc_of_parse to support additional capabilities */
-	ret = mmc_of_parse(host->mmc);
+	ret = mmc_of_parse(host->mmc, np);
 	if (ret)
 		return ret;
 

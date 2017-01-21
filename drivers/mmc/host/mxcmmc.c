@@ -1031,7 +1031,7 @@ static int mxcmci_probe(struct platform_device *pdev)
 
 	host->phys_base = res->start;
 
-	ret = mmc_of_parse(mmc);
+	ret = mmc_of_parse(mmc, pdev->dev.of_node);
 	if (ret)
 		goto out_free;
 	mmc->ops = &mxcmci_ops;

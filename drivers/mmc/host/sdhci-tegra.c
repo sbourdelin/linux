@@ -466,7 +466,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	tegra_host->pad_calib_required = false;
 	tegra_host->soc_data = soc_data;
 
-	rc = mmc_of_parse(host->mmc);
+	rc = mmc_of_parse(host->mmc, pdev->dev.of_node);
 	if (rc)
 		goto err_parse_dt;
 

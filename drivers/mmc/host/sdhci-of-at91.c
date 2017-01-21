@@ -260,7 +260,7 @@ static int sdhci_at91_probe(struct platform_device *pdev)
 	clk_prepare_enable(priv->mainck);
 	clk_prepare_enable(priv->gck);
 
-	ret = mmc_of_parse(host->mmc);
+	ret = mmc_of_parse(host->mmc, pdev->dev.of_node);
 	if (ret)
 		goto clocks_disable_unprepare;
 

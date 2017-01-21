@@ -242,7 +242,7 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 	host->ioaddr += SDHCI_CDNS_SRS_BASE;
 	host->mmc_host_ops.execute_tuning = sdhci_cdns_execute_tuning;
 
-	ret = mmc_of_parse(host->mmc);
+	ret = mmc_of_parse(host->mmc, pdev->dev.of_node);
 	if (ret)
 		goto free;
 

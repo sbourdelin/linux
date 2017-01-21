@@ -388,7 +388,7 @@ static int sdhci_st_probe(struct platform_device *pdev)
 	pdata = sdhci_pltfm_priv(pltfm_host);
 	pdata->rstc = rstc;
 
-	ret = mmc_of_parse(host->mmc);
+	ret = mmc_of_parse(host->mmc, np);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed mmc_of_parse\n");
 		goto err_of;

@@ -649,7 +649,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
 	mmc->f_min = 400000;
 	mmc->f_max = 288000000;
 
-	ret = mmc_of_parse(mmc);
+	ret = mmc_of_parse(mmc, np);
 	if (ret)
 		goto out_clk_disable;
 

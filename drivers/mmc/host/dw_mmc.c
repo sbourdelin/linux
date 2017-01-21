@@ -2673,7 +2673,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
 	if (host->pdata->caps2)
 		mmc->caps2 = host->pdata->caps2;
 
-	ret = mmc_of_parse(mmc);
+	ret = mmc_of_parse(mmc, host->dev->of_node);
 	if (ret)
 		goto err_host_allocated;
 

@@ -1505,7 +1505,7 @@ static struct mmc_host_ops mmci_ops = {
 static int mmci_of_parse(struct device_node *np, struct mmc_host *mmc)
 {
 	struct mmci_host *host = mmc_priv(mmc);
-	int ret = mmc_of_parse(mmc);
+	int ret = mmc_of_parse(mmc, np);
 
 	if (ret)
 		return ret;

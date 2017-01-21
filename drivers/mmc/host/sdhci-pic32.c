@@ -189,7 +189,7 @@ static int pic32_sdhci_probe(struct platform_device *pdev)
 		goto err_base_clk;
 	}
 
-	ret = mmc_of_parse(host->mmc);
+	ret = mmc_of_parse(host->mmc, pdev->dev.of_node);
 	if (ret)
 		goto err_base_clk;
 

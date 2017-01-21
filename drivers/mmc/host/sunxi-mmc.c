@@ -1253,7 +1253,7 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
 	if (host->cfg->clk_delays)
 		mmc->caps      |= MMC_CAP_1_8V_DDR;
 
-	ret = mmc_of_parse(mmc);
+	ret = mmc_of_parse(mmc, pdev->dev.of_node);
 	if (ret)
 		goto error_free_dma;
 

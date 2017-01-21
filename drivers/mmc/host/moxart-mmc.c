@@ -599,7 +599,7 @@ static int moxart_probe(struct platform_device *pdev)
 		goto out;
 	}
 
-	ret = mmc_of_parse(mmc);
+	ret = mmc_of_parse(mmc, node);
 	if (ret)
 		goto out;
 
