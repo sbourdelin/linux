@@ -709,7 +709,8 @@ static u32 xfrm_gen_index(struct net *net, int dir, u32 index)
 	}
 }
 
-static inline int selector_cmp(struct xfrm_selector *s1, struct xfrm_selector *s2)
+static inline int selector_cmp(const struct xfrm_selector *s1,
+			       const struct xfrm_selector *s2)
 {
 	u32 *p1 = (u32 *) s1;
 	u32 *p2 = (u32 *) s2;
@@ -833,7 +834,8 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 EXPORT_SYMBOL(xfrm_policy_insert);
 
 struct xfrm_policy *xfrm_policy_bysel_ctx(struct net *net, u32 mark, u8 type,
-					  int dir, struct xfrm_selector *sel,
+					  int dir,
+					  const struct xfrm_selector *sel,
 					  struct xfrm_sec_ctx *ctx, int delete,
 					  int *err)
 {
@@ -1016,7 +1018,7 @@ out:
 EXPORT_SYMBOL(xfrm_policy_flush);
 
 int xfrm_policy_walk(struct net *net, struct xfrm_policy_walk *walk,
-		     int (*func)(struct xfrm_policy *, int, int, void*),
+		     int (*func)(const struct xfrm_policy *, int, int, void*),
 		     void *data)
 {
 	struct xfrm_policy *pol;

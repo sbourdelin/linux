@@ -230,7 +230,7 @@ struct xfrm_state {
 	void			*data;
 };
 
-static inline struct net *xs_net(struct xfrm_state *x)
+static inline struct net *xs_net(const struct xfrm_state *x)
 {
 	return read_pnet(&x->xs_net);
 }
@@ -589,12 +589,23 @@ struct xfrm_migrate {
 struct xfrm_mgr {
 	struct list_head	list;
 	char			*id;
-	int			(*notify)(struct xfrm_state *x, const struct km_event *c);
-	int			(*acquire)(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *xp);
-	struct xfrm_policy	*(*compile_policy)(struct sock *sk, int opt, u8 *data, int len, int *dir);
-	int			(*new_mapping)(struct xfrm_state *x, xfrm_address_t *ipaddr, __be16 sport);
-	int			(*notify_policy)(struct xfrm_policy *x, int dir, const struct km_event *c);
-	int			(*report)(struct net *net, u8 proto, struct xfrm_selector *sel, xfrm_address_t *addr);
+	int			(*notify)(const struct xfrm_state *x,
+					  const struct km_event *c);
+	int			(*acquire)(struct xfrm_state *x,
+					   const struct xfrm_tmpl *,
+					   const struct xfrm_policy *xp);
+	struct xfrm_policy	*(*compile_policy)(struct sock *sk,
+						   int opt, u8 *data,
+						   int len, int *dir);
+	int			(*new_mapping)(struct xfrm_state *x,
+					       const xfrm_address_t *ipaddr,
+					       __be16 sport);
+	int			(*notify_policy)(const struct xfrm_policy *x,
+						 int dir,
+						 const struct km_event *c);
+	int			(*report)(struct net *net, u8 proto,
+					  const struct xfrm_selector *sel,
+					  const xfrm_address_t *addr);
 	int			(*migrate)(const struct xfrm_selector *sel,
 					   u8 dir, u8 type,
 					   const struct xfrm_migrate *m,
@@ -1434,7 +1445,7 @@ static inline void xfrm_sysctl_fini(struct net *net)
 void xfrm_state_walk_init(struct xfrm_state_walk *walk, u8 proto,
 			  struct xfrm_address_filter *filter);
 int xfrm_state_walk(struct net *net, struct xfrm_state_walk *walk,
-		    int (*func)(struct xfrm_state *, int, void*), void *);
+		    int (*func)(const struct xfrm_state *, int, void*), void *);
 void xfrm_state_walk_done(struct xfrm_state_walk *walk, struct net *net);
 struct xfrm_state *xfrm_state_alloc(struct net *net);
 struct xfrm_state *xfrm_state_find(const xfrm_address_t *daddr,
@@ -1586,13 +1597,13 @@ struct xfrm_policy *xfrm_policy_alloc(struct net *net, gfp_t gfp);
 
 void xfrm_policy_walk_init(struct xfrm_policy_walk *walk, u8 type);
 int xfrm_policy_walk(struct net *net, struct xfrm_policy_walk *walk,
-		     int (*func)(struct xfrm_policy *, int, int, void*),
+		     int (*func)(const struct xfrm_policy *, int, int, void*),
 		     void *);
 void xfrm_policy_walk_done(struct xfrm_policy_walk *walk, struct net *net);
 int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl);
 struct xfrm_policy *xfrm_policy_bysel_ctx(struct net *net, u32 mark,
 					  u8 type, int dir,
-					  struct xfrm_selector *sel,
+					  const struct xfrm_selector *sel,
 					  struct xfrm_sec_ctx *ctx, int delete,
 					  int *err);
 struct xfrm_policy *xfrm_policy_byid(struct net *net, u32 mark, u8, int dir,
@@ -1697,7 +1708,7 @@ static inline int xfrm_acquire_is_on(struct net *net)
 }
 #endif
 
-static inline int aead_len(struct xfrm_algo_aead *alg)
+static inline int aead_len(const struct xfrm_algo_aead *alg)
 {
 	return sizeof(*alg) + ((alg->alg_key_len + 7) / 8);
 }
@@ -1712,7 +1723,8 @@ static inline int xfrm_alg_auth_len(const struct xfrm_algo_auth *alg)
 	return sizeof(*alg) + ((alg->alg_key_len + 7) / 8);
 }
 
-static inline int xfrm_replay_state_esn_len(struct xfrm_replay_state_esn *replay_esn)
+static inline int xfrm_replay_state_esn_len(
+		const struct xfrm_replay_state_esn *replay_esn)
 {
 	return sizeof(*replay_esn) + replay_esn->bmp_len * sizeof(__u32);
 }

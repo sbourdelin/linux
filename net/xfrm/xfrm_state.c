@@ -1642,7 +1642,7 @@ static bool __xfrm_state_filter_match(struct xfrm_state *x,
 }
 
 int xfrm_state_walk(struct net *net, struct xfrm_state_walk *walk,
-		    int (*func)(struct xfrm_state *, int, void*),
+		    int (*func)(const struct xfrm_state *, int, void*),
 		    void *data)
 {
 	struct xfrm_state *state;

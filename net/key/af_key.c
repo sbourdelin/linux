@@ -1433,7 +1433,7 @@ static inline int event2keytype(int event)
 }
 
 /* ADD/UPD/DEL */
-static int key_notify_sa(struct xfrm_state *x, const struct km_event *c)
+static int key_notify_sa(const struct xfrm_state *x, const struct km_event *c)
 {
 	struct sk_buff *skb;
 	struct sadb_msg *hdr;
@@ -1744,7 +1744,7 @@ static int pfkey_flush(struct sock *sk, struct sk_buff *skb, const struct sadb_m
 	return 0;
 }
 
-static int dump_sa(struct xfrm_state *x, int count, void *ptr)
+static int dump_sa(const struct xfrm_state *x, int count, void *ptr)
 {
 	struct pfkey_sock *pfk = ptr;
 	struct sk_buff *out_skb;
@@ -1851,7 +1851,8 @@ static int pfkey_promisc(struct sock *sk, struct sk_buff *skb, const struct sadb
 	return 0;
 }
 
-static int check_reqid(struct xfrm_policy *xp, int dir, int count, void *ptr)
+static int check_reqid(const struct xfrm_policy *xp, int dir, int count,
+		       void *ptr)
 {
 	int i;
 	u32 reqid = *(u32*)ptr;
@@ -2157,7 +2158,9 @@ static int pfkey_xfrm_policy2msg(struct sk_buff *skb, const struct xfrm_policy *
 	return 0;
 }
 
-static int key_notify_policy(struct xfrm_policy *xp, int dir, const struct km_event *c)
+static int key_notify_policy(const struct xfrm_policy *xp,
+			     int dir,
+			     const struct km_event *c)
 {
 	struct sk_buff *out_skb;
 	struct sadb_msg *out_hdr;
@@ -2628,7 +2631,7 @@ out:
 	return err;
 }
 
-static int dump_sp(struct xfrm_policy *xp, int dir, int count, void *ptr)
+static int dump_sp(const struct xfrm_policy *xp, int dir, int count, void *ptr)
 {
 	struct pfkey_sock *pfk = ptr;
 	struct sk_buff *out_skb;
@@ -2961,12 +2964,14 @@ static void dump_esp_combs(struct sk_buff *skb, const struct xfrm_tmpl *t)
 	}
 }
 
-static int key_notify_policy_expire(struct xfrm_policy *xp, const struct km_event *c)
+static int key_notify_policy_expire(const struct xfrm_policy *xp,
+				    const struct km_event *c)
 {
 	return 0;
 }
 
-static int key_notify_sa_expire(struct xfrm_state *x, const struct km_event *c)
+static int key_notify_sa_expire(const struct xfrm_state *x,
+				const struct km_event *c)
 {
 	struct sk_buff *out_skb;
 	struct sadb_msg *out_hdr;
@@ -2996,7 +3001,8 @@ static int key_notify_sa_expire(struct xfrm_state *x, const struct km_event *c)
 	return 0;
 }
 
-static int pfkey_send_notify(struct xfrm_state *x, const struct km_event *c)
+static int pfkey_send_notify(const struct xfrm_state *x,
+			     const struct km_event *c)
 {
 	struct net *net = x ? xs_net(x) : c->net;
 	struct netns_pfkey *net_pfkey = net_generic(net, pfkey_net_id);
@@ -3023,7 +3029,9 @@ static int pfkey_send_notify(struct xfrm_state *x, const struct km_event *c)
 	return 0;
 }
 
-static int pfkey_send_policy_notify(struct xfrm_policy *xp, int dir, const struct km_event *c)
+static int pfkey_send_policy_notify(const struct xfrm_policy *xp,
+				    int dir,
+				    const struct km_event *c)
 {
 	if (xp && xp->type != XFRM_POLICY_TYPE_MAIN)
 		return 0;
@@ -3076,7 +3084,9 @@ static bool pfkey_is_alive(const struct km_event *c)
 	return is_alive;
 }
 
-static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct xfrm_policy *xp)
+static int pfkey_send_acquire(struct xfrm_state *x,
+			      const struct xfrm_tmpl *t,
+			      const struct xfrm_policy *xp)
 {
 	struct sk_buff *skb;
 	struct sadb_msg *hdr;
@@ -3273,7 +3283,9 @@ out:
 	return NULL;
 }
 
-static int pfkey_send_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, __be16 sport)
+static int pfkey_send_new_mapping(struct xfrm_state *x,
+				  const xfrm_address_t *ipaddr,
+				  __be16 sport)
 {
 	struct sk_buff *skb;
 	struct sadb_msg *hdr;
