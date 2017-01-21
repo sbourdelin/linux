@@ -477,36 +477,6 @@ vchiq_ioc_copy_element_data(
 	return bytes_this_round;
 }
 
-/**************************************************************************
- *
- *   vchiq_ioc_queue_message
- *
- **************************************************************************/
-static VCHIQ_STATUS_T
-vchiq_ioc_queue_message(VCHIQ_SERVICE_HANDLE_T handle,
-			VCHIQ_ELEMENT_T *elements,
-			unsigned long count)
-{
-	struct vchiq_io_copy_callback_context context;
-	unsigned long i;
-	size_t total_size = 0;
-
-	context.current_element = elements;
-	context.current_element_offset = 0;
-	context.elements_to_go = count;
-	context.current_offset = 0;
-
-	for (i = 0; i < count; i++) {
-		if (!elements[i].data && elements[i].size != 0)
-			return -EFAULT;
-
-		total_size += elements[i].size;
-	}
-
-	return vchiq_queue_message(handle, vchiq_ioc_copy_element_data,
-				   &context, total_size);
-}
-
 struct vchiq_ioctl_ctxt;
 typedef long (*vchiq_ioctl_cpyret_handler_t)(struct vchiq_ioctl_ctxt *ctxt);
 
@@ -755,6 +725,129 @@ vchiq_ioctl_compat_create_service(struct vchiq_ioctl_ctxt *ctxt)
 
 #endif
 
+static long
+vchiq_ioctl_queue_message(struct vchiq_ioctl_ctxt *ctxt)
+{
+	VCHIQ_CREATE_SERVICE_T __user *puargs =
+		(VCHIQ_CREATE_SERVICE_T __user *)ctxt->arg;
+	VCHIQ_QUEUE_MESSAGE_T args;
+	VCHIQ_ELEMENT_T elements[MAX_ELEMENTS];
+	struct vchiq_io_copy_callback_context context;
+	int i;
+	size_t total_size = 0;
+
+	if (copy_from_user(&args, puargs, sizeof(args)))
+		return -EFAULT;
+
+	ctxt->service = find_service_for_instance(ctxt->instance, args.handle);
+
+	if (!ctxt->service)
+		return -EINVAL;
+
+	if (args.count > MAX_ELEMENTS)
+		return -EINVAL;
+
+	if (copy_from_user(elements, args.elements,
+			   args.count * sizeof(VCHIQ_ELEMENT_T)))
+		return -EFAULT;
+
+	context.current_element = elements;
+	context.current_element_offset = 0;
+	context.elements_to_go = args.count;
+	context.current_offset = 0;
+
+	for (i = 0; i < args.count; i++) {
+		size_t prev_total_size = total_size;
+
+		if (!elements[i].data && elements[i].size != 0)
+			return -EFAULT;
+
+		total_size += elements[i].size;
+
+		if (total_size < prev_total_size)
+			return -EINVAL;
+	}
+
+	ctxt->status =
+		vchiq_queue_message(args.handle, vchiq_ioc_copy_element_data,
+				    &context, total_size);
+
+	return vchiq_map_status(ctxt->status);
+}
+
+#if defined(CONFIG_COMPAT)
+
+struct vchiq_element32 {
+	compat_uptr_t data;
+	unsigned int size;
+};
+
+struct vchiq_queue_message32 {
+	unsigned int handle;
+	unsigned int count;
+	compat_uptr_t elements;
+};
+
+#define VCHIQ_IOC_QUEUE_MESSAGE32 \
+	_IOW(VCHIQ_IOC_MAGIC,  4, struct vchiq_queue_message32)
+
+static long
+vchiq_ioctl_compat_queue_message(struct vchiq_ioctl_ctxt *ctxt)
+{
+	struct vchiq_queue_message32 __user *puargs32 =
+		(struct vchiq_queue_message32 __user *)ctxt->arg;
+	struct vchiq_queue_message32 args32;
+	VCHIQ_ELEMENT_T elements[MAX_ELEMENTS];
+	struct vchiq_element32 elements32[MAX_ELEMENTS];
+	struct vchiq_io_copy_callback_context context;
+	int i;
+	size_t total_size = 0;
+
+	if (copy_from_user(&args32, puargs32, sizeof(args32)))
+		return -EFAULT;
+
+	if (args32.count > MAX_ELEMENTS)
+		return -EINVAL;
+
+	ctxt->service = find_service_for_instance(ctxt->instance,
+						  args32.handle);
+
+	if (!ctxt->service)
+		return -EINVAL;
+
+	if (copy_from_user(elements32, compat_ptr(args32.elements),
+			   args32.count * sizeof(struct vchiq_element32)))
+		return -EFAULT;
+
+	context.current_element = elements;
+	context.current_element_offset = 0;
+	context.elements_to_go = args32.count;
+	context.current_offset = 0;
+
+	for (i = 0; i < args32.count; i++) {
+		size_t prev_total_size = total_size;
+
+		elements[i].data = compat_ptr(elements32[i].data);
+		elements[i].size = elements32[i].size;
+
+		if (!elements[i].data && elements[i].size != 0)
+			return -EFAULT;
+
+		total_size += elements[i].size;
+
+		if (total_size < prev_total_size)
+			return -EINVAL;
+	}
+
+	ctxt->status =
+		vchiq_queue_message(args32.handle, vchiq_ioc_copy_element_data,
+				    &context, total_size);
+
+	return vchiq_map_status(ctxt->status);
+}
+
+#endif
+
 /****************************************************************************
 *
 *   vchiq_ioctl
@@ -773,6 +866,9 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case VCHIQ_IOC_CREATE_SERVICE:
 		return vchiq_dispatch_ioctl(vchiq_ioctl_create_service,
+					    file, cmd, arg);
+	case VCHIQ_IOC_QUEUE_MESSAGE:
+		return vchiq_dispatch_ioctl(vchiq_ioctl_queue_message,
 					    file, cmd, arg);
 	default:
 		break;
@@ -910,32 +1006,6 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			}
 		} else
 			ret = -EINVAL;
-	} break;
-
-	case VCHIQ_IOC_QUEUE_MESSAGE: {
-		VCHIQ_QUEUE_MESSAGE_T args;
-		if (copy_from_user
-			 (&args, (const void __user *)arg,
-			  sizeof(args)) != 0) {
-			ret = -EFAULT;
-			break;
-		}
-
-		service = find_service_for_instance(instance, args.handle);
-
-		if ((service != NULL) && (args.count <= MAX_ELEMENTS)) {
-			/* Copy elements into kernel space */
-			VCHIQ_ELEMENT_T elements[MAX_ELEMENTS];
-			if (copy_from_user(elements, args.elements,
-				args.count * sizeof(VCHIQ_ELEMENT_T)) == 0)
-				status = vchiq_ioc_queue_message
-					(args.handle,
-					elements, args.count);
-			else
-				ret = -EFAULT;
-		} else {
-			ret = -EINVAL;
-		}
 	} break;
 
 	case VCHIQ_IOC_QUEUE_BULK_TRANSMIT:
@@ -1399,6 +1469,9 @@ vchiq_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case VCHIQ_IOC_CREATE_SERVICE32:
 		return vchiq_dispatch_ioctl(vchiq_ioctl_compat_create_service,
+					    file, cmd, arg);
+	case VCHIQ_IOC_QUEUE_MESSAGE32:
+		return vchiq_dispatch_ioctl(vchiq_ioctl_compat_queue_message,
 					    file, cmd, arg);
 	default:
 		return vchiq_ioctl(file, cmd, arg);
