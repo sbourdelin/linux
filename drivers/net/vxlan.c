@@ -628,6 +628,10 @@ static int vxlan_fdb_create(struct vxlan_dev *vxlan,
 			return -EEXIST;
 		}
 		if (f->state != state) {
+			if ((f->state & NUD_PERMANENT) &&
+			    !(state & NUD_PERMANENT))
+				return -EINVAL;
+
 			f->state = state;
 			f->updated = jiffies;
 			notify = 1;
