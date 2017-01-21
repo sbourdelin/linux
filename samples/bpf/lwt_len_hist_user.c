@@ -68,7 +68,7 @@ int main(int argc, char **argv)
 	for (i = 1; i <= max_key + 1; i++) {
 		stars(starstr, data[i - 1], max_value, MAX_STARS);
 		printf("%8ld -> %-8ld : %-8ld |%-*s|\n",
-		       (1l << i) >> 1, (1l << i) - 1, data[i - 1],
+		       (1ULL << i) >> 1, (1ULL << i) - 1, data[i - 1],
 		       MAX_STARS, starstr);
 	}
 
