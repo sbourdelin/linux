@@ -1020,6 +1020,341 @@ vchiq_ioctl_compat_queue_bulk(struct vchiq_ioctl_ctxt *ctxt)
 
 #endif
 
+typedef int (*vchiq_get_msgbuf_ptr_callback_t)(VCHIQ_AWAIT_COMPLETION_T *args,
+					       void __user **msgbuf);
+
+typedef int (*vchiq_put_completion_callback_t)(VCHIQ_AWAIT_COMPLETION_T *args,
+					       long num,
+					       VCHIQ_COMPLETION_DATA_T *completion);
+
+static long
+vchiq_ioctl_do_process_completions(
+	struct vchiq_ioctl_ctxt *ctxt,
+	vchiq_get_msgbuf_ptr_callback_t get_msgbuf,
+	vchiq_put_completion_callback_t put_completion)
+{
+	VCHIQ_AWAIT_COMPLETION_T *args = ctxt->args;
+	VCHIQ_INSTANCE_T instance = ctxt->instance;
+	int remove = instance->completion_remove;
+	long ret;
+
+	for (ret = 0; ret < args->count; ret++) {
+		VCHIQ_COMPLETION_DATA_T *completion;
+		VCHIQ_SERVICE_T *service;
+		USER_SERVICE_T *user_service;
+		VCHIQ_HEADER_T *header;
+
+		if (instance->completion_remove == instance->completion_insert)
+			return ret;
+
+		completion = &instance->completions[
+			instance->completion_remove &
+			(MAX_COMPLETIONS - 1)];
+
+		/*
+		 * A read memory barrier is needed to stop
+		 * prefetch of a stale completion record
+		 */
+		rmb();
+
+		service = completion->service_userdata;
+		user_service = service->base.userdata;
+		completion->service_userdata = user_service->userdata;
+
+		header = completion->header;
+		if (header) {
+			void __user *msgbuf;
+			int msglen;
+
+			msglen = header->size + sizeof(VCHIQ_HEADER_T);
+			/* This must be a VCHIQ-style service */
+			if (args->msgbufsize < msglen) {
+				vchiq_log_error(
+					vchiq_arm_log_level,
+					"header %pK: msgbufsize %x < msglen %x",
+					header, args->msgbufsize,
+					msglen);
+				WARN(1, "invalid message size\n");
+				if (!ret)
+					ret = -EMSGSIZE;
+				return ret;
+			}
+			if (args->msgbufcount <= 0)
+				/* Stall here for lack of a
+				 * buffer for the message.
+				 */
+				return ret;
+
+			/* Get the pointer from user space */
+			args->msgbufcount--;
+			if (get_msgbuf(args, &msgbuf)) {
+				if (!ret)
+					ret = -EFAULT;
+				return ret;
+			}
+
+			/* Copy the message to user space */
+			if (copy_to_user(msgbuf, header,
+					 msglen)) {
+				if (!ret)
+					ret = -EFAULT;
+				return ret;
+			}
+
+			/* Now it has been copied, the message
+			 * can be released.
+			 */
+			vchiq_release_message(service->handle, header);
+
+			/* The completion must point to the
+			 * msgbuf.
+			 */
+			completion->header = msgbuf;
+		}
+
+		if ((completion->reason == VCHIQ_SERVICE_CLOSED) &&
+		    !instance->use_close_delivered)
+			unlock_service(service);
+
+		if (put_completion(args, ret, completion)) {
+			if (!ret)
+				ret = -EFAULT;
+			return ret;
+		}
+
+		/*
+		 * Ensure that the above copy has completed
+		 * before advancing the remove pointer.
+		 */
+		mb();
+		remove++;
+		instance->completion_remove = remove;
+	}
+
+	return ret;
+}
+
+static long
+vchiq_ioctl_do_await_completion(struct vchiq_ioctl_ctxt *ctxt,
+				vchiq_get_msgbuf_ptr_callback_t get_msgbuf,
+				vchiq_put_completion_callback_t put_completion)
+{
+	VCHIQ_AWAIT_COMPLETION_T *args = ctxt->args;
+	VCHIQ_INSTANCE_T instance = ctxt->instance;
+	unsigned int initialmsgbufcount = args->msgbufcount;
+	long ret;
+
+	DEBUG_INITIALISE(g_state.local)
+
+	mutex_lock(&instance->completion_mutex);
+
+	DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+	while ((instance->completion_remove == instance->completion_insert) &&
+	       !instance->closing) {
+		int rc;
+
+		DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+		mutex_unlock(&instance->completion_mutex);
+		rc = down_interruptible(&instance->insert_event);
+		mutex_lock(&instance->completion_mutex);
+
+		if (rc) {
+			DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+			vchiq_log_info(vchiq_arm_log_level,
+				       "AWAIT_COMPLETION interrupted");
+
+			up(&instance->remove_event);
+			mutex_unlock(&instance->completion_mutex);
+			DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+
+			return -EINTR;
+		}
+	}
+
+	DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+
+	ret = vchiq_ioctl_do_process_completions(ctxt,
+						 get_msgbuf,
+						 put_completion);
+
+	if (initialmsgbufcount != args->msgbufcount) {
+		if (ctxt->cpyret_handler(ctxt))
+			ret = -EFAULT;
+	}
+
+	if (ret)
+		up(&instance->remove_event);
+	mutex_unlock(&instance->completion_mutex);
+	DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+
+	return ret;
+}
+
+static int
+vchiq_ioctl_get_msgbuf(VCHIQ_AWAIT_COMPLETION_T *args,
+		       void __user **msgbuf)
+{
+	unsigned int msgbufcount = args->msgbufcount;
+
+	return copy_from_user(msgbuf,
+			      &args->msgbufs[msgbufcount],
+			      sizeof(*msgbuf));
+}
+
+static int
+vchiq_ioctl_put_completion(VCHIQ_AWAIT_COMPLETION_T *args,
+			   long num,
+			   VCHIQ_COMPLETION_DATA_T *completion)
+{
+	if (num < 0)
+		return -EFAULT;
+
+	return copy_to_user((void *)args->buf +
+			    num * sizeof(VCHIQ_COMPLETION_DATA_T),
+			    completion,
+			    sizeof(VCHIQ_COMPLETION_DATA_T));
+}
+
+static long
+vchiq_ioctl_await_completion_cpyret(struct vchiq_ioctl_ctxt *ctxt)
+{
+	VCHIQ_AWAIT_COMPLETION_T __user *puargs =
+		(VCHIQ_AWAIT_COMPLETION_T __user *)ctxt->arg;
+	VCHIQ_AWAIT_COMPLETION_T *args = ctxt->args;
+
+	return copy_to_user(&puargs->msgbufcount,
+			    &args->msgbufcount,
+			    sizeof(args->msgbufcount));
+}
+
+static long
+vchiq_ioctl_await_completion(struct vchiq_ioctl_ctxt *ctxt)
+{
+	VCHIQ_AWAIT_COMPLETION_T __user *puargs =
+		(VCHIQ_AWAIT_COMPLETION_T __user *)ctxt->arg;
+	VCHIQ_AWAIT_COMPLETION_T args;
+
+	DEBUG_INITIALISE(g_state.local)
+
+	DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+
+	if (!ctxt->instance->connected)
+		return -ENOTCONN;
+
+	if (copy_from_user(&args, puargs, sizeof(args)))
+		return -EFAULT;
+
+	ctxt->args = &args;
+	ctxt->cpyret_handler = vchiq_ioctl_await_completion_cpyret;
+
+	return vchiq_ioctl_do_await_completion(ctxt,
+					       vchiq_ioctl_get_msgbuf,
+					       vchiq_ioctl_put_completion);
+}
+
+#if defined(CONFIG_COMPAT)
+
+struct vchiq_completion_data32 {
+	VCHIQ_REASON_T reason;
+	compat_uptr_t header;
+	compat_uptr_t service_userdata;
+	compat_uptr_t bulk_userdata;
+};
+
+struct vchiq_await_completion32 {
+	unsigned int count;
+	compat_uptr_t buf;
+	unsigned int msgbufsize;
+	unsigned int msgbufcount; /* IN/OUT */
+	compat_uptr_t msgbufs;
+};
+
+#define VCHIQ_IOC_AWAIT_COMPLETION32 \
+	_IOWR(VCHIQ_IOC_MAGIC, 7, struct vchiq_await_completion32)
+
+static int
+vchiq_ioctl_compat_get_msgbuf(VCHIQ_AWAIT_COMPLETION_T *args,
+			      void __user **msgbuf)
+{
+	u32 msgbuf32;
+	unsigned int msgbufcount = args->msgbufcount;
+
+	if (copy_from_user(&msgbuf32,
+			   ((void *)args->msgbufs) +
+			   (sizeof(u32) * msgbufcount),
+			   sizeof(msgbuf32)))
+		return -EFAULT;
+
+	*msgbuf = compat_ptr(msgbuf32);
+	return 0;
+}
+
+static int
+vchiq_ioctl_compat_put_completion(VCHIQ_AWAIT_COMPLETION_T *args,
+				  long num,
+				  VCHIQ_COMPLETION_DATA_T *completion)
+{
+	struct vchiq_completion_data32 completion32;
+
+	completion32.reason = completion->reason;
+	completion32.header = ptr_to_compat(completion->header);
+	completion32.service_userdata =
+		ptr_to_compat(completion->service_userdata);
+	completion32.bulk_userdata =
+		ptr_to_compat(completion->bulk_userdata);
+
+	return copy_to_user(((void *)args->buf) +
+			     num * sizeof(struct vchiq_completion_data32),
+			     &completion32,
+			     sizeof(struct vchiq_completion_data32));
+}
+
+static long
+vchiq_ioctl_compat_await_completion_cpyret(struct vchiq_ioctl_ctxt *ctxt)
+{
+	struct vchiq_await_completion32 __user *puargs32 =
+		(struct vchiq_await_completion32 __user *)ctxt->arg;
+	VCHIQ_AWAIT_COMPLETION_T *args = ctxt->args;
+
+	return copy_to_user(&puargs32->msgbufcount,
+			    &args->msgbufcount,
+			    sizeof(args->msgbufcount));
+}
+
+static long
+vchiq_ioctl_compat_await_completion(struct vchiq_ioctl_ctxt *ctxt)
+{
+	struct vchiq_await_completion32 __user *puargs32 =
+		(struct vchiq_await_completion32 __user *)ctxt->arg;
+	VCHIQ_AWAIT_COMPLETION_T args;
+	struct vchiq_await_completion32 args32;
+
+	DEBUG_INITIALISE(g_state.local)
+
+	DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+
+	if (!ctxt->instance->connected)
+		return -ENOTCONN;
+
+	if (copy_from_user(&args32, puargs32, sizeof(args32)))
+		return -EFAULT;
+
+	args.count       = args32.count;
+	args.buf         = compat_ptr(args32.buf);
+	args.msgbufsize  = args32.msgbufsize;
+	args.msgbufcount = args32.msgbufcount;
+	args.msgbufs	 = compat_ptr(args32.msgbufs);
+
+	ctxt->args = &args;
+	ctxt->cpyret_handler = vchiq_ioctl_compat_await_completion_cpyret;
+
+	return vchiq_ioctl_do_await_completion(ctxt,
+					       vchiq_ioctl_compat_get_msgbuf,
+					       vchiq_ioctl_compat_put_completion);
+}
+
+#endif
+
 /****************************************************************************
 *
 *   vchiq_ioctl
@@ -1045,6 +1380,9 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case VCHIQ_IOC_QUEUE_BULK_TRANSMIT:
 	case VCHIQ_IOC_QUEUE_BULK_RECEIVE:
 		return vchiq_dispatch_ioctl(vchiq_ioctl_queue_bulk,
+					    file, cmd, arg);
+	case VCHIQ_IOC_AWAIT_COMPLETION:
+		return vchiq_dispatch_ioctl(vchiq_ioctl_await_completion,
 					    file, cmd, arg);
 	default:
 		break;
@@ -1182,163 +1520,6 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			}
 		} else
 			ret = -EINVAL;
-	} break;
-
-	case VCHIQ_IOC_AWAIT_COMPLETION: {
-		VCHIQ_AWAIT_COMPLETION_T args;
-
-		DEBUG_TRACE(AWAIT_COMPLETION_LINE);
-		if (!instance->connected) {
-			ret = -ENOTCONN;
-			break;
-		}
-
-		if (copy_from_user(&args, (const void __user *)arg,
-			sizeof(args)) != 0) {
-			ret = -EFAULT;
-			break;
-		}
-
-		mutex_lock(&instance->completion_mutex);
-
-		DEBUG_TRACE(AWAIT_COMPLETION_LINE);
-		while ((instance->completion_remove ==
-			instance->completion_insert)
-			&& !instance->closing) {
-			int rc;
-			DEBUG_TRACE(AWAIT_COMPLETION_LINE);
-			mutex_unlock(&instance->completion_mutex);
-			rc = down_interruptible(&instance->insert_event);
-			mutex_lock(&instance->completion_mutex);
-			if (rc != 0) {
-				DEBUG_TRACE(AWAIT_COMPLETION_LINE);
-				vchiq_log_info(vchiq_arm_log_level,
-					"AWAIT_COMPLETION interrupted");
-				ret = -EINTR;
-				break;
-			}
-		}
-		DEBUG_TRACE(AWAIT_COMPLETION_LINE);
-
-		if (ret == 0) {
-			int msgbufcount = args.msgbufcount;
-			int remove = instance->completion_remove;
-
-			for (ret = 0; ret < args.count; ret++) {
-				VCHIQ_COMPLETION_DATA_T *completion;
-				VCHIQ_SERVICE_T *service;
-				USER_SERVICE_T *user_service;
-				VCHIQ_HEADER_T *header;
-
-				if (remove == instance->completion_insert)
-					break;
-
-				completion = &instance->completions[
-					remove & (MAX_COMPLETIONS - 1)];
-
-				/*
-				 * A read memory barrier is needed to stop
-				 * prefetch of a stale completion record
-				 */
-				rmb();
-
-				service = completion->service_userdata;
-				user_service = service->base.userdata;
-				completion->service_userdata =
-					user_service->userdata;
-
-				header = completion->header;
-				if (header) {
-					void __user *msgbuf;
-					int msglen;
-
-					msglen = header->size +
-						sizeof(VCHIQ_HEADER_T);
-					/* This must be a VCHIQ-style service */
-					if (args.msgbufsize < msglen) {
-						vchiq_log_error(
-							vchiq_arm_log_level,
-							"header %pK: msgbufsize %x < msglen %x",
-							header, args.msgbufsize,
-							msglen);
-						WARN(1, "invalid message "
-							"size\n");
-						if (ret == 0)
-							ret = -EMSGSIZE;
-						break;
-					}
-					if (msgbufcount <= 0)
-						/* Stall here for lack of a
-						** buffer for the message. */
-						break;
-					/* Get the pointer from user space */
-					msgbufcount--;
-					if (copy_from_user(&msgbuf,
-						(const void __user *)
-						&args.msgbufs[msgbufcount],
-						sizeof(msgbuf)) != 0) {
-						if (ret == 0)
-							ret = -EFAULT;
-						break;
-					}
-
-					/* Copy the message to user space */
-					if (copy_to_user(msgbuf, header,
-						msglen) != 0) {
-						if (ret == 0)
-							ret = -EFAULT;
-						break;
-					}
-
-					/* Now it has been copied, the message
-					** can be released. */
-					vchiq_release_message(service->handle,
-						header);
-
-					/* The completion must point to the
-					** msgbuf. */
-					completion->header = msgbuf;
-				}
-
-				if ((completion->reason ==
-					VCHIQ_SERVICE_CLOSED) &&
-					!instance->use_close_delivered)
-					unlock_service(service);
-
-				if (copy_to_user((void __user *)(
-					(size_t)args.buf +
-					ret * sizeof(VCHIQ_COMPLETION_DATA_T)),
-					completion,
-					sizeof(VCHIQ_COMPLETION_DATA_T)) != 0) {
-						if (ret == 0)
-							ret = -EFAULT;
-					break;
-				}
-
-				/*
-				 * Ensure that the above copy has completed
-				 * before advancing the remove pointer.
-				 */
-				mb();
-				remove++;
-				instance->completion_remove = remove;
-			}
-
-			if (msgbufcount != args.msgbufcount) {
-				if (copy_to_user((void __user *)
-					&((VCHIQ_AWAIT_COMPLETION_T *)arg)->
-						msgbufcount,
-					&msgbufcount,
-					sizeof(msgbufcount)) != 0) {
-					ret = -EFAULT;
-				}
-			}
-		}
-
-		if (ret != 0)
-			up(&instance->remove_event);
-		mutex_unlock(&instance->completion_mutex);
-		DEBUG_TRACE(AWAIT_COMPLETION_LINE);
 	} break;
 
 	case VCHIQ_IOC_DEQUEUE_MESSAGE: {
@@ -1558,6 +1739,9 @@ vchiq_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
 	case VCHIQ_IOC_QUEUE_BULK_TRANSMIT32:
 	case VCHIQ_IOC_QUEUE_BULK_RECEIVE32:
 		return vchiq_dispatch_ioctl(vchiq_ioctl_compat_queue_bulk,
+					    file, cmd, arg);
+	case VCHIQ_IOC_AWAIT_COMPLETION32:
+		return vchiq_dispatch_ioctl(vchiq_ioctl_compat_await_completion,
 					    file, cmd, arg);
 	default:
 		return vchiq_ioctl(file, cmd, arg);
