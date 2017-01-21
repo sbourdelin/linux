@@ -7,5 +7,11 @@ obj-$(CONFIG_XFRM) := xfrm_policy.o xfrm_state.o xfrm_hash.o \
 		      xfrm_sysctl.o xfrm_replay.o
 obj-$(CONFIG_XFRM_STATISTICS) += xfrm_proc.o
 obj-$(CONFIG_XFRM_ALGO) += xfrm_algo.o
-obj-$(CONFIG_XFRM_USER) += xfrm_user.o
+
+xfrm-user-objs := xfrm_user.o
+ifneq ($(CONFIG_XFRM_USER_LEGACY),)
+xfrm-user-objs += xfrm_user_legacy.o
+endif
+obj-$(CONFIG_XFRM_USER) += xfrm-user.o
+
 obj-$(CONFIG_XFRM_IPCOMP) += xfrm_ipcomp.o

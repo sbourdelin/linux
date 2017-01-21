@@ -20,6 +20,20 @@ config XFRM_USER
 
 	  If unsure, say Y.
 
+config XFRM_USER_LEGACY
+	tristate "Legacy transformation user configuration interface"
+	depends on XFRM_USER
+	default y
+	---help---
+	  The original Transformation(XFRM) netlink messages were not
+	  compatible between 32-bit programs and 64-bit kernels, so they
+	  have been deprecated.  Enable this option if you have existing
+	  binaries that rely on the old format messages.  Disable this
+	  option if you know that all users of the interface have been
+	  built against recent kernel headers.
+
+	  If unsure, say Y.
+
 config XFRM_SUB_POLICY
 	bool "Transformation sub policy support"
 	depends on XFRM
