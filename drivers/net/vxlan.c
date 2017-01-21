@@ -467,12 +467,19 @@ static int vxlan_fdb_replace(struct vxlan_fdb *f,
 	if (!rd)
 		return 0;
 
-	dst_cache_reset(&rd->dst_cache);
-	rd->remote_ip = *ip;
-	rd->remote_port = port;
-	rd->remote_vni = vni;
-	rd->remote_ifindex = ifindex;
-	return 1;
+	if (!vxlan_addr_equal(&rd->remote_ip, ip) ||
+	    rd->remote_port != port ||
+	    rd->remote_vni != vni ||
+	    rd->remote_ifindex != ifindex) {
+		dst_cache_reset(&rd->dst_cache);
+		rd->remote_ip = *ip;
+		rd->remote_port = port;
+		rd->remote_vni = vni;
+		rd->remote_ifindex = ifindex;
+		return 1;
+	}
+
+	return 0;
 }
 
 /* Add/update destinations for multicast */
