@@ -577,7 +577,7 @@ static void intel_lrc_irq_handler(unsigned long data)
 
 	intel_uncore_forcewake_get(dev_priv, engine->fw_domains);
 
-	if (!execlists_elsp_idle(engine)) {
+	if (!execlists_elsp_idle(engine)) do {
 		u32 __iomem *csb_mmio =
 			dev_priv->regs + i915_mmio_reg_offset(RING_CONTEXT_STATUS_PTR(engine));
 		u32 __iomem *buf =
@@ -587,9 +587,12 @@ static void intel_lrc_irq_handler(unsigned long data)
 		csb = readl(csb_mmio);
 		head = GEN8_CSB_READ_PTR(csb);
 		tail = GEN8_CSB_WRITE_PTR(csb);
+		if (head == tail)
+			break;
+
 		if (tail < head)
 			tail += GEN8_CSB_ENTRIES;
-		while (head < tail) {
+		do {
 			unsigned int idx = ++head % GEN8_CSB_ENTRIES;
 			unsigned int status = readl(buf + 2 * idx);
 
@@ -609,12 +612,12 @@ static void intel_lrc_irq_handler(unsigned long data)
 
 			GEM_BUG_ON(port[0].count == 0 &&
 				   !(status & GEN8_CTX_STATUS_ACTIVE_IDLE));
-		}
+		} while (head < tail);
 
 		writel(_MASKED_FIELD(GEN8_CSB_READ_PTR_MASK,
 				     GEN8_CSB_WRITE_PTR(csb) << 8),
 		       csb_mmio);
-	}
+	} while (0);
 
 	if (execlists_elsp_ready(engine))
 		execlists_dequeue(engine);
