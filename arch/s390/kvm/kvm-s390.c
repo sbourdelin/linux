@@ -443,16 +443,17 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm,
 	int is_dirty = 0;
 
 	mutex_lock(&kvm->slots_lock);
-
-	r = -EINVAL;
-	if (log->slot >= KVM_USER_MEM_SLOTS)
+	if (log->slot >= KVM_USER_MEM_SLOTS) {
+		r = -EINVAL;
 		goto out;
+	}
 
 	slots = kvm_memslots(kvm);
 	memslot = id_to_memslot(slots, log->slot);
-	r = -ENOENT;
-	if (!memslot->dirty_bitmap)
+	if (!memslot->dirty_bitmap) {
+		r = -ENOENT;
 		goto out;
+	}
 
 	kvm_s390_sync_dirty_log(kvm, memslot);
 	r = kvm_get_dirty_log(kvm, log, &is_dirty);
