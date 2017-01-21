@@ -262,6 +262,10 @@ rx_handler_result_t br_handle_frame(struct sk_buff **pskb)
 		return RX_HANDLER_CONSUMED;
 
 	p = br_port_get_rcu(skb->dev);
+	if (p->flags & BR_LWT_VLAN) {
+		if (br_handle_ingress_vlan_tunnel(skb, p, nbp_vlan_group_rcu(p)))
+			goto drop;
+	}
 
 	if (unlikely(is_link_local_ether_addr(dest))) {
 		u16 fwd_mask = p->br->group_fwd_mask_required;

@@ -405,6 +405,11 @@ struct sk_buff *br_handle_vlan(struct net_bridge *br,
 
 	if (v->flags & BRIDGE_VLAN_INFO_UNTAGGED)
 		skb->vlan_tci = 0;
+
+	if (br_handle_egress_vlan_tunnel(skb, v)) {
+		kfree_skb(skb);
+		return NULL;
+	}
 out:
 	return skb;
 }
@@ -1210,6 +1215,56 @@ int nbp_vlan_tunnel_info_delete(struct net_bridge_port *port, u16 vid)
 		return -ENOENT;
 
 	__vlan_tunnel_info_del(vg, v);
+
+	return 0;
+}
+
+int br_handle_ingress_vlan_tunnel(struct sk_buff *skb,
+				  struct net_bridge_port *p,
+				  struct net_bridge_vlan_group *vg)
+{
+	struct ip_tunnel_info *tinfo = skb_tunnel_info(skb);
+	struct net_bridge_vlan *vlan;
+
+	if (!vg || !tinfo)
+		return 0;
+
+	/* if already tagged, ignore */
+	if (skb_vlan_tagged(skb))
+		return 0;
+
+	/* lookup vid, given tunnel id */
+	vlan = br_vlan_tunnel_lookup(&vg->tunnel_hash, tinfo->key.tun_id);
+	if (!vlan)
+		return 0;
+
+	skb_dst_drop(skb);
+
+	__vlan_hwaccel_put_tag(skb, p->br->vlan_proto, vlan->vid);
+
+	return 0;
+}
+
+int br_handle_egress_vlan_tunnel(struct sk_buff *skb,
+				 struct net_bridge_vlan *vlan)
+{
+	__be32 tun_id;
+	int err;
+
+	if (!vlan || !vlan->tinfo.tunnel_id)
+		return 0;
+
+	if (unlikely(!skb_vlan_tag_present(skb)))
+		return 0;
+
+	skb_dst_drop(skb);
+	tun_id = tunnel_id_to_key32(vlan->tinfo.tunnel_id);
+
+	err = skb_vlan_pop(skb);
+	if (err)
+		return err;
+
+	skb_dst_set(skb, dst_clone(&vlan->tinfo.tunnel_dst->dst));
 
 	return 0;
 }

@@ -804,6 +804,10 @@ int nbp_vlan_tunnel_info_delete(struct net_bridge_port *port, u16 vid);
 int nbp_vlan_tunnel_info_add(struct net_bridge_port *port, u16 vid, u32 tun_id);
 bool vlan_tunnel_id_isrange(struct net_bridge_vlan *v_end,
 			    struct net_bridge_vlan *v);
+int br_handle_ingress_vlan_tunnel(struct sk_buff *skb, struct net_bridge_port *p,
+				  struct net_bridge_vlan_group *vg);
+int br_handle_egress_vlan_tunnel(struct sk_buff *skb,
+				 struct net_bridge_vlan *vlan);
 
 static inline struct net_bridge_vlan_group *br_vlan_group(
 					const struct net_bridge *br)
