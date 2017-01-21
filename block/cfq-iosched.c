@@ -1788,9 +1788,10 @@ static ssize_t __cfqg_set_weight_device(struct kernfs_open_file *of,
 
 	if (sscanf(ctx.body, "%llu", &v) == 1) {
 		/* require "default" on dfl */
-		ret = -ERANGE;
-		if (!v && on_dfl)
+		if (!v && on_dfl) {
+			ret = -ERANGE;
 			goto out_finish;
+		}
 	} else if (!strcmp(strim(ctx.body), "default")) {
 		v = 0;
 	} else {
