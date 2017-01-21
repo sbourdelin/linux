@@ -514,9 +514,8 @@ static int clp_normal_command(struct clp_req *req)
 	void __user *uptr;
 	int rc;
 
-	rc = -EINVAL;
 	if (req->lps != 0 && req->lps != 2)
-		goto out;
+		return -EINVAL;
 
 	rc = -ENOMEM;
 	lpcb = clp_alloc_block(GFP_KERNEL);
