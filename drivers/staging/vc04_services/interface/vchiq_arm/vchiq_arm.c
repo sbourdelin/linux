@@ -1554,6 +1554,48 @@ vchiq_ioctl_compat_get_config(struct vchiq_ioctl_ctxt *ctxt)
 
 #endif
 
+static long
+vchiq_ioctl_dump_mem(struct vchiq_ioctl_ctxt *ctxt)
+{
+	VCHIQ_DUMP_MEM_T __user *puargs =
+		(VCHIQ_DUMP_MEM_T __user *)ctxt->arg;
+	VCHIQ_DUMP_MEM_T  args;
+
+	if (copy_from_user(&args, puargs, sizeof(args)))
+		return -EFAULT;
+
+	dump_phys_mem(args.virt_addr, args.num_bytes);
+
+	return 0;
+}
+
+#if defined(CONFIG_COMPAT)
+
+struct vchiq_dump_mem32 {
+	compat_uptr_t virt_addr;
+	u32 num_bytes;
+};
+
+#define VCHIQ_IOC_DUMP_PHYS_MEM32 \
+	_IOW(VCHIQ_IOC_MAGIC,  15, struct vchiq_dump_mem32)
+
+static long
+vchiq_ioctl_compat_dump_mem(struct vchiq_ioctl_ctxt *ctxt)
+{
+	struct vchiq_dump_mem32 __user *puargs32 =
+		(struct vchiq_dump_mem32 __user *)ctxt->arg;
+	struct vchiq_dump_mem32 args32;
+
+	if (copy_from_user(&args32, puargs32, sizeof(args32)))
+		return -EFAULT;
+
+	dump_phys_mem(compat_ptr(args32.virt_addr), args32.num_bytes);
+
+	return 0;
+}
+
+#endif
+
 /****************************************************************************
 *
 *   vchiq_ioctl
@@ -1587,6 +1629,9 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 					    file, cmd, arg);
 	case VCHIQ_IOC_GET_CONFIG:
 		return vchiq_dispatch_ioctl(vchiq_ioctl_get_config,
+					    file, cmd, arg);
+	case VCHIQ_IOC_DUMP_PHYS_MEM:
+		return vchiq_dispatch_ioctl(vchiq_ioctl_dump_mem,
 					    file, cmd, arg);
 	default:
 		break;
@@ -1752,18 +1797,6 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				args.handle, args.option, args.value);
 	} break;
 
-	case VCHIQ_IOC_DUMP_PHYS_MEM: {
-		VCHIQ_DUMP_MEM_T  args;
-
-		if (copy_from_user
-			 (&args, (const void __user *)arg,
-			  sizeof(args)) != 0) {
-			ret = -EFAULT;
-			break;
-		}
-		dump_phys_mem(args.virt_addr, args.num_bytes);
-	} break;
-
 	case VCHIQ_IOC_LIB_VERSION: {
 		unsigned int lib_version = (unsigned int)arg;
 
@@ -1846,6 +1879,9 @@ vchiq_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
 					    file, cmd, arg);
 	case VCHIQ_IOC_GET_CONFIG32:
 		return vchiq_dispatch_ioctl(vchiq_ioctl_compat_get_config,
+					    file, cmd, arg);
+	case VCHIQ_IOC_DUMP_PHYS_MEM32:
+		return vchiq_dispatch_ioctl(vchiq_ioctl_compat_dump_mem,
 					    file, cmd, arg);
 	default:
 		return vchiq_ioctl(file, cmd, arg);
