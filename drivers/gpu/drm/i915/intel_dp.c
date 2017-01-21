@@ -281,17 +281,29 @@ static int intel_dp_find_rate(const int *rates, int len, int rate)
 	return -1;
 }
 
-static int intel_dp_common_rates(struct intel_dp *intel_dp,
-				 int *common_rates)
+static void intel_dp_set_common_rates(struct intel_dp *intel_dp)
 {
-	int max_rate = intel_dp->max_sink_link_rate;
-	int i, common_len;
+	WARN_ON(!intel_dp->num_source_rates || !intel_dp->num_sink_rates);
 
-	common_len = intersect_rates(intel_dp->source_rates,
-				     intel_dp->num_source_rates,
-				     intel_dp->sink_rates,
-				     intel_dp->num_sink_rates,
-				     common_rates);
+	intel_dp->num_common_rates = intersect_rates(intel_dp->source_rates,
+						     intel_dp->num_source_rates,
+						     intel_dp->sink_rates,
+						     intel_dp->num_sink_rates,
+						     intel_dp->common_rates);
+
+	/* Paranoia, there should always be something in common. */
+	if (WARN_ON(intel_dp->num_common_rates == 0)) {
+		intel_dp->common_rates[0] = default_rates[0];
+		intel_dp->num_common_rates = 1;
+	}
+}
+
+/* get length of common rates potentially limited by max_rate */
+static int intel_dp_common_len_rate_limit(struct intel_dp *intel_dp,
+					  int max_rate)
+{
+	const int *common_rates = intel_dp->common_rates;
+	int i, common_len = intel_dp->num_common_rates;
 
 	/* Limit results by potentially reduced max rate */
 	for (i = 0; i < common_len; i++) {
@@ -302,25 +314,23 @@ static int intel_dp_common_rates(struct intel_dp *intel_dp,
 	return 0;
 }
 
-static int intel_dp_link_rate_index(struct intel_dp *intel_dp,
-				    int *common_rates, int link_rate)
+static int intel_dp_link_rate_index(struct intel_dp *intel_dp, int link_rate)
 {
 	int common_len;
 
-	common_len = intel_dp_common_rates(intel_dp, common_rates);
+	common_len = intel_dp_common_len_rate_limit(intel_dp,
+						    intel_dp->max_sink_link_rate);
 
-	return intel_dp_find_rate(common_rates, common_len, link_rate);
+	return intel_dp_find_rate(intel_dp->common_rates, common_len, link_rate);
 }
 
 int intel_dp_get_link_train_fallback_values(struct intel_dp *intel_dp,
 					    int link_rate, uint8_t lane_count)
 {
-	int common_rates[DP_MAX_SUPPORTED_RATES];
+	const int *common_rates = intel_dp->common_rates;
 	int link_rate_index;
 
-	link_rate_index = intel_dp_link_rate_index(intel_dp,
-						   common_rates,
-						   link_rate);
+	link_rate_index = intel_dp_link_rate_index(intel_dp, link_rate);
 	if (link_rate_index > 0) {
 		intel_dp->max_sink_link_rate = common_rates[link_rate_index - 1];
 		intel_dp->max_sink_lane_count = lane_count;
@@ -1507,8 +1517,6 @@ static void snprintf_int_array(char *str, size_t len,
 
 static void intel_dp_print_rates(struct intel_dp *intel_dp)
 {
-	int common_len;
-	int common_rates[DP_MAX_SUPPORTED_RATES];
 	char str[128]; /* FIXME: too big for stack? */
 
 	if ((drm_debug & DRM_UT_KMS) == 0)
@@ -1522,8 +1530,8 @@ static void intel_dp_print_rates(struct intel_dp *intel_dp)
 			   intel_dp->sink_rates, intel_dp->num_sink_rates);
 	DRM_DEBUG_KMS("sink rates: %s\n", str);
 
-	common_len = intel_dp_common_rates(intel_dp, common_rates);
-	snprintf_int_array(str, sizeof(str), common_rates, common_len);
+	snprintf_int_array(str, sizeof(str),
+			   intel_dp->common_rates, intel_dp->num_common_rates);
 	DRM_DEBUG_KMS("common rates: %s\n", str);
 }
 
@@ -1561,14 +1569,14 @@ bool intel_dp_read_desc(struct intel_dp *intel_dp)
 int
 intel_dp_max_link_rate(struct intel_dp *intel_dp)
 {
-	int rates[DP_MAX_SUPPORTED_RATES] = {};
 	int len;
 
-	len = intel_dp_common_rates(intel_dp, rates);
+	len = intel_dp_common_len_rate_limit(intel_dp,
+					     intel_dp->max_sink_link_rate);
 	if (WARN_ON(len <= 0))
 		return 162000;
 
-	return rates[len - 1];
+	return intel_dp->common_rates[len - 1];
 }
 
 int intel_dp_rate_select(struct intel_dp *intel_dp, int rate)
@@ -1629,11 +1637,12 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 	int max_clock;
 	int bpp, mode_rate;
 	int link_avail, link_clock;
-	int common_rates[DP_MAX_SUPPORTED_RATES] = {};
+	const int *common_rates = intel_dp->common_rates;
 	int common_len;
 	uint8_t link_bw, rate_select;
 
-	common_len = intel_dp_common_rates(intel_dp, common_rates);
+	common_len = intel_dp_common_len_rate_limit(intel_dp,
+						    intel_dp->max_sink_link_rate);
 
 	/* No common link rates between source and sink */
 	WARN_ON(common_len <= 0);
@@ -3706,6 +3715,7 @@ intel_edp_init_dpcd(struct intel_dp *intel_dp)
 	} else {
 		intel_dp_set_sink_rates(intel_dp);
 	}
+	intel_dp_set_common_rates(intel_dp);
 
 	return true;
 }
@@ -3718,6 +3728,7 @@ intel_dp_get_dpcd(struct intel_dp *intel_dp)
 		return false;
 
 	intel_dp_set_sink_rates(intel_dp);
+	intel_dp_set_common_rates(intel_dp);
 
 	if (drm_dp_dpcd_read(&intel_dp->aux, DP_SINK_COUNT,
 			     &intel_dp->sink_count, 1) < 0)

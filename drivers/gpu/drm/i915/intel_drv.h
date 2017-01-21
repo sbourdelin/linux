@@ -921,6 +921,9 @@ struct intel_dp {
 	/* sink rates as reported by DP_MAX_LINK_RATE/DP_SUPPORTED_LINK_RATES */
 	int num_sink_rates;
 	int sink_rates[DP_MAX_SUPPORTED_RATES];
+	/* intersection of source and sink rates */
+	int num_common_rates;
+	int common_rates[DP_MAX_SUPPORTED_RATES];
 	/* Max lane count for the sink as per DPCD registers */
 	uint8_t max_sink_lane_count;
 	/* Max link BW for the sink as per DPCD registers */
