@@ -20,6 +20,7 @@
 #include <net/arp.h>
 #include <linux/export.h>
 #include <linux/rculist.h>
+#include <net/dst_metadata.h>
 #include "br_private.h"
 
 /* Hook for brouter */

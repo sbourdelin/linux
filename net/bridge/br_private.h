@@ -91,6 +91,11 @@ struct br_vlan_stats {
 	struct u64_stats_sync syncp;
 };
 
+struct br_tunnel_info {
+	__be64			tunnel_id;
+	struct metadata_dst	*tunnel_dst;
+};
+
 /**
  * struct net_bridge_vlan - per-vlan entry
  *
@@ -113,6 +118,7 @@ struct br_vlan_stats {
  */
 struct net_bridge_vlan {
 	struct rhash_head		vnode;
+	struct rhash_head		tnode;
 	u16				vid;
 	u16				flags;
 	struct br_vlan_stats __percpu	*stats;
@@ -124,6 +130,9 @@ struct net_bridge_vlan {
 		atomic_t		refcnt;
 		struct net_bridge_vlan	*brvlan;
 	};
+
+	struct br_tunnel_info		tinfo;
+
 	struct list_head		vlist;
 
 	struct rcu_head			rcu;
@@ -145,6 +154,7 @@ struct net_bridge_vlan {
  */
 struct net_bridge_vlan_group {
 	struct rhashtable		vlan_hash;
+	struct rhashtable		tunnel_hash;
 	struct list_head		vlan_list;
 	u16				num_vlans;
 	u16				pvid;
@@ -786,6 +796,14 @@ int nbp_vlan_init(struct net_bridge_port *port);
 int nbp_get_num_vlan_infos(struct net_bridge_port *p, u32 filter_mask);
 void br_vlan_get_stats(const struct net_bridge_vlan *v,
 		       struct br_vlan_stats *stats);
+int __vlan_tunnel_info_add(struct net_bridge_vlan_group *vg,
+			   struct net_bridge_vlan *vlan, u32 tun_id);
+int __vlan_tunnel_info_del(struct net_bridge_vlan_group *vg,
+                           struct net_bridge_vlan *vlan);
+int nbp_vlan_tunnel_info_delete(struct net_bridge_port *port, u16 vid);
+int nbp_vlan_tunnel_info_add(struct net_bridge_port *port, u16 vid, u32 tun_id);
+bool vlan_tunnel_id_isrange(struct net_bridge_vlan *v_end,
+			    struct net_bridge_vlan *v);
 
 static inline struct net_bridge_vlan_group *br_vlan_group(
 					const struct net_bridge *br)

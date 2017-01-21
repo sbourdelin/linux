@@ -3,6 +3,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/slab.h>
 #include <net/switchdev.h>
+#include <net/dst_metadata.h>
 
 #include "br_private.h"
 
@@ -29,6 +30,31 @@ static const struct rhashtable_params br_vlan_rht_params = {
 static struct net_bridge_vlan *br_vlan_lookup(struct rhashtable *tbl, u16 vid)
 {
 	return rhashtable_lookup_fast(tbl, &vid, br_vlan_rht_params);
+}
+
+static inline int br_vlan_tunid_cmp(struct rhashtable_compare_arg *arg,
+				    const void *ptr)
+{
+	const struct net_bridge_vlan *vle = ptr;
+	__be64 tunid = *(__be64 *)arg->key;
+
+	return vle->tinfo.tunnel_id != tunid;
+}
+
+static const struct rhashtable_params br_vlan_tunnel_rht_params = {
+	.head_offset = offsetof(struct net_bridge_vlan, tnode),
+	.key_offset = offsetof(struct net_bridge_vlan, tinfo.tunnel_id),
+	.key_len = sizeof(__be64),
+	.nelem_hint = 3,
+	.locks_mul = 1,
+	.obj_cmpfn = br_vlan_tunid_cmp,
+	.automatic_shrinking = true,
+};
+
+static struct net_bridge_vlan *br_vlan_tunnel_lookup(struct rhashtable *tbl,
+						     u64 tunnel_id)
+{
+	return rhashtable_lookup_fast(tbl, &tunnel_id, br_vlan_tunnel_rht_params);
 }
 
 static void __vlan_add_pvid(struct net_bridge_vlan_group *vg, u16 vid)
@@ -325,6 +351,7 @@ static void __vlan_group_free(struct net_bridge_vlan_group *vg)
 {
 	WARN_ON(!list_empty(&vg->vlan_list));
 	rhashtable_destroy(&vg->vlan_hash);
+	rhashtable_destroy(&vg->tunnel_hash);
 	kfree(vg);
 }
 
@@ -612,6 +639,8 @@ int br_vlan_delete(struct net_bridge *br, u16 vid)
 
 	br_fdb_find_delete_local(br, NULL, br->dev->dev_addr, vid);
 	br_fdb_delete_by_port(br, NULL, vid, 0);
+
+	__vlan_tunnel_info_del(vg, v);
 
 	return __vlan_del(v);
 }
@@ -918,6 +947,9 @@ int br_vlan_init(struct net_bridge *br)
 	ret = rhashtable_init(&vg->vlan_hash, &br_vlan_rht_params);
 	if (ret)
 		goto err_rhtbl;
+	ret = rhashtable_init(&vg->tunnel_hash, &br_vlan_tunnel_rht_params);
+	if (ret)
+		goto err_rhtbl2;
 	INIT_LIST_HEAD(&vg->vlan_list);
 	br->vlan_proto = htons(ETH_P_8021Q);
 	br->default_pvid = 1;
@@ -932,6 +964,8 @@ out:
 	return ret;
 
 err_vlan_add:
+	rhashtable_destroy(&vg->tunnel_hash);
+err_rhtbl2:
 	rhashtable_destroy(&vg->vlan_hash);
 err_rhtbl:
 	kfree(vg);
@@ -960,7 +994,10 @@ int nbp_vlan_init(struct net_bridge_port *p)
 
 	ret = rhashtable_init(&vg->vlan_hash, &br_vlan_rht_params);
 	if (ret)
-		goto err_rhtbl;
+		goto err_rhtbl1;
+	ret = rhashtable_init(&vg->tunnel_hash, &br_vlan_tunnel_rht_params);
+	if (ret)
+		goto err_rhtbl2;
 	INIT_LIST_HEAD(&vg->vlan_list);
 	rcu_assign_pointer(p->vlgrp, vg);
 	if (p->br->default_pvid) {
@@ -976,9 +1013,11 @@ out:
 err_vlan_add:
 	RCU_INIT_POINTER(p->vlgrp, NULL);
 	synchronize_rcu();
-	rhashtable_destroy(&vg->vlan_hash);
+	rhashtable_destroy(&vg->tunnel_hash);
 err_vlan_enabled:
-err_rhtbl:
+err_rhtbl2:
+	rhashtable_destroy(&vg->vlan_hash);
+err_rhtbl1:
 	kfree(vg);
 
 	goto out;
@@ -1080,4 +1119,97 @@ void br_vlan_get_stats(const struct net_bridge_vlan *v,
 		stats->tx_bytes += txbytes;
 		stats->tx_packets += txpackets;
 	}
+}
+
+bool vlan_tunnel_id_isrange(struct net_bridge_vlan *v_end,
+			    struct net_bridge_vlan *v)
+{
+	/* XXX: check other tunnel attributes */
+	return (be32_to_cpu(tunnel_id_to_key32(v_end->tinfo.tunnel_id)) -
+		be32_to_cpu(tunnel_id_to_key32(v->tinfo.tunnel_id)) == 1);
+}
+
+int __vlan_tunnel_info_add(struct net_bridge_vlan_group *vg,
+			   struct net_bridge_vlan *vlan, u32 tun_id)
+{
+	struct metadata_dst *metadata = NULL;
+	__be64 key = key32_to_tunnel_id(cpu_to_be32(tun_id));
+	int err;
+
+	if (vlan->tinfo.tunnel_dst)
+		return -EEXIST;
+
+	metadata = __ip_tun_set_dst(0, 0, 0, 0, 0, TUNNEL_KEY,
+				    key, 0);
+	if (!metadata)
+		return -EINVAL;
+
+	metadata->u.tun_info.mode |= IP_TUNNEL_INFO_TX | IP_TUNNEL_INFO_BRIDGE;
+	vlan->tinfo.tunnel_dst = metadata;
+	vlan->tinfo.tunnel_id = key;
+
+	err = rhashtable_lookup_insert_fast(&vg->tunnel_hash, &vlan->tnode,
+					    br_vlan_tunnel_rht_params);
+	if (err)
+		goto out;
+
+	return 0;
+out:
+	dst_release(&vlan->tinfo.tunnel_dst->dst);
+
+	return err;
+}
+
+int __vlan_tunnel_info_del(struct net_bridge_vlan_group *vg,
+			   struct net_bridge_vlan *vlan)
+{
+	if (vlan->tinfo.tunnel_dst) {
+		vlan->tinfo.tunnel_id = 0;
+		dst_release(&vlan->tinfo.tunnel_dst->dst);
+
+		rhashtable_remove_fast(&vg->tunnel_hash, &vlan->vnode,
+				       br_vlan_tunnel_rht_params);
+	}
+
+	return 0;
+}
+
+/* Must be protected by RTNL.
+ * Must be called with vid in range from 1 to 4094 inclusive.
+ */
+int nbp_vlan_tunnel_info_add(struct net_bridge_port *port, u16 vid, u32 tun_id)
+{
+	struct net_bridge_vlan_group *vg;
+	struct net_bridge_vlan *vlan;
+
+	ASSERT_RTNL();
+
+	vg = nbp_vlan_group(port);
+	vlan = br_vlan_find(vg, vid);
+	if (!vlan)
+		return -EINVAL;
+
+	__vlan_tunnel_info_add(vg, vlan, tun_id);
+
+	return 0;
+}
+
+/* Must be protected by RTNL.
+ * Must be called with vid in range from 1 to 4094 inclusive.
+ */
+int nbp_vlan_tunnel_info_delete(struct net_bridge_port *port, u16 vid)
+{
+	struct net_bridge_vlan_group *vg;
+	struct net_bridge_vlan *v;
+
+	ASSERT_RTNL();
+
+	vg = nbp_vlan_group(port);
+	v = br_vlan_find(vg, vid);
+	if (!v)
+		return -ENOENT;
+
+	__vlan_tunnel_info_del(vg, v);
+
+	return 0;
 }
