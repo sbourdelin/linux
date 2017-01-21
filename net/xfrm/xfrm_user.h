@@ -1,6 +1,7 @@
 #ifndef _XFRM_USER_H
 #define _XFRM_USER_H
 
+#include <linux/errno.h>
 #include <linux/netlink.h>
 #include <linux/skbuff.h>
 #include <linux/types.h>
@@ -86,5 +87,79 @@ static inline int copy_to_user_state_sec_ctx(const struct xfrm_state *x,
 	}
 	return 0;
 }
+
+/* Legacy functions */
+
+#ifdef CONFIG_XFRM_USER_LEGACY
+int xfrm_alloc_userspi_legacy(struct sk_buff *skb, const struct nlmsghdr *nlh,
+			      struct nlattr **attrs);
+int xfrm_add_pol_expire_legacy(struct sk_buff *skb, const struct nlmsghdr *nlh,
+			       struct nlattr **attrs);
+int xfrm_add_sa_expire_legacy(struct sk_buff *skb, const struct nlmsghdr *nlh,
+			      struct nlattr **attrs);
+int xfrm_add_acquire_legacy(struct sk_buff *skb, const struct nlmsghdr *nlh,
+			    struct nlattr **attrs);
+
+int xfrm_add_sa_legacy(struct sk_buff *skb, const struct nlmsghdr *nlh,
+		       struct nlattr **attrs);
+int xfrm_del_sa_legacy(struct sk_buff *skb, const struct nlmsghdr *nlh,
+		       struct nlattr **attrs);
+int xfrm_dump_sa_done_legacy(struct netlink_callback *cb);
+int xfrm_dump_sa_legacy(struct sk_buff *skb, struct netlink_callback *cb);
+int xfrm_get_sa_legacy(struct sk_buff *skb, const struct nlmsghdr *nlh,
+		       struct nlattr **attrs);
+int xfrm_add_policy_legacy(struct sk_buff *skb, const struct nlmsghdr *nlh,
+			   struct nlattr **attrs);
+int xfrm_dump_policy_done_legacy(struct netlink_callback *cb);
+int xfrm_dump_policy_legacy(struct sk_buff *skb, struct netlink_callback *cb);
+int xfrm_get_policy_legacy(struct sk_buff *skb, const struct nlmsghdr *nlh,
+			   struct nlattr **attrs);
+
+int xfrm_exp_state_notify_legacy(const struct xfrm_state *x,
+				 const struct km_event *c);
+int xfrm_notify_sa_legacy(const struct xfrm_state *x, const struct km_event *c);
+int xfrm_send_acquire_legacy(struct xfrm_state *x,
+			     const struct xfrm_tmpl *xt,
+			     const struct xfrm_policy *xp);
+int xfrm_exp_policy_notify_legacy(const struct xfrm_policy *xp,
+				  int dir,
+				  const struct km_event *c);
+int xfrm_notify_policy_legacy(const struct xfrm_policy *xp,
+			      int dir,
+			      const struct km_event *c);
+#else /* CONFIG_XFRM_USER_LEGACY */
+static inline int xfrm_exp_state_notify_legacy(const struct xfrm_state *x,
+					       const struct km_event *c)
+{
+	return 0;
+}
+
+static inline int xfrm_notify_sa_legacy(const struct xfrm_state *x,
+					const struct km_event *c)
+{
+	return 0;
+}
+
+static inline int xfrm_send_acquire_legacy(struct xfrm_state *x,
+					   const struct xfrm_tmpl *xt,
+					   const struct xfrm_policy *xp)
+{
+	return 0;
+}
+
+static inline int xfrm_exp_policy_notify_legacy(const struct xfrm_policy *xp,
+						int dir,
+						const struct km_event *c)
+{
+	return 0;
+}
+
+static inline int xfrm_notify_policy_legacy(const struct xfrm_policy *xp,
+					    int dir,
+					    const struct km_event *c)
+{
+	return 0;
+}
+#endif /* CONFIG_XFRM_USER_LEGACY */
 
 #endif /* _XFRM_USER_H */

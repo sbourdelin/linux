@@ -2350,6 +2350,32 @@ static const int xfrm_msg_min[XFRM_NR_MSGTYPES] = {
 	[XFRM_MSG_GETSADINFO  - XFRM_MSG_BASE] = sizeof(u32),
 	[XFRM_MSG_NEWSPDINFO  - XFRM_MSG_BASE] = sizeof(u32),
 	[XFRM_MSG_GETSPDINFO  - XFRM_MSG_BASE] = sizeof(u32),
+
+	[XFRM_MSG_ALLOCSPI_LEGACY  - XFRM_MSG_BASE] =
+		XMSGSIZE(xfrm_userspi_info_legacy),
+	[XFRM_MSG_ACQUIRE_LEGACY   - XFRM_MSG_BASE] =
+		XMSGSIZE(xfrm_user_acquire_legacy),
+	[XFRM_MSG_EXPIRE_LEGACY    - XFRM_MSG_BASE] =
+		XMSGSIZE(xfrm_user_expire_legacy),
+	[XFRM_MSG_POLEXPIRE_LEGACY - XFRM_MSG_BASE] =
+		XMSGSIZE(xfrm_user_polexpire_legacy),
+
+	[XFRM_MSG_NEWSA_LEGACY     - XFRM_MSG_BASE] =
+		XMSGSIZE(xfrm_usersa_info_legacy),
+	[XFRM_MSG_UPDSA_LEGACY     - XFRM_MSG_BASE] =
+		XMSGSIZE(xfrm_usersa_info_legacy),
+	[XFRM_MSG_DELSA_LEGACY     - XFRM_MSG_BASE] =
+		XMSGSIZE(xfrm_usersa_id),
+	[XFRM_MSG_GETSA_LEGACY     - XFRM_MSG_BASE] =
+		XMSGSIZE(xfrm_usersa_id),
+	[XFRM_MSG_NEWPOLICY_LEGACY - XFRM_MSG_BASE] =
+		XMSGSIZE(xfrm_userpolicy_info_legacy),
+	[XFRM_MSG_UPDPOLICY_LEGACY - XFRM_MSG_BASE] =
+		XMSGSIZE(xfrm_userpolicy_info_legacy),
+	[XFRM_MSG_DELPOLICY_LEGACY - XFRM_MSG_BASE] =
+		XMSGSIZE(xfrm_userpolicy_id),
+	[XFRM_MSG_GETPOLICY_LEGACY - XFRM_MSG_BASE] =
+		XMSGSIZE(xfrm_userpolicy_id),
 };
 
 #undef XMSGSIZE
@@ -2396,6 +2422,7 @@ static const struct xfrm_link {
 	int (*done)(struct netlink_callback *);
 	const struct nla_policy *nla_pol;
 	int nla_max;
+	bool legacy;
 } xfrm_dispatch[XFRM_NR_MSGTYPES] = {
 	[XFRM_MSG_NEWSA       - XFRM_MSG_BASE] = { .doit = xfrm_add_sa        },
 	[XFRM_MSG_DELSA       - XFRM_MSG_BASE] = { .doit = xfrm_del_sa        },
@@ -2423,6 +2450,62 @@ static const struct xfrm_link {
 						   .nla_pol = xfrma_spd_policy,
 						   .nla_max = XFRMA_SPD_MAX },
 	[XFRM_MSG_GETSPDINFO  - XFRM_MSG_BASE] = { .doit = xfrm_get_spdinfo   },
+
+#ifdef CONFIG_XFRM_USER_LEGACY
+	[XFRM_MSG_ALLOCSPI_LEGACY  - XFRM_MSG_BASE] = {
+		.doit = xfrm_alloc_userspi_legacy,
+		.legacy = true,
+	},
+	[XFRM_MSG_ACQUIRE_LEGACY   - XFRM_MSG_BASE] = {
+		.doit = xfrm_add_acquire_legacy,
+		.legacy = true,
+	},
+	[XFRM_MSG_EXPIRE_LEGACY    - XFRM_MSG_BASE] = {
+		.doit = xfrm_add_sa_expire_legacy,
+		.legacy = true,
+	},
+	[XFRM_MSG_POLEXPIRE_LEGACY - XFRM_MSG_BASE] = {
+		.doit = xfrm_add_pol_expire_legacy,
+		.legacy = true,
+	},
+
+	[XFRM_MSG_NEWSA_LEGACY     - XFRM_MSG_BASE] = {
+		.doit = xfrm_add_sa_legacy,
+		.legacy = true,
+	},
+	[XFRM_MSG_UPDSA_LEGACY     - XFRM_MSG_BASE] = {
+		.doit = xfrm_add_sa_legacy,
+		.legacy = true,
+	},
+	[XFRM_MSG_DELSA_LEGACY     - XFRM_MSG_BASE] = {
+		.doit = xfrm_del_sa_legacy,
+		.legacy = true,
+	},
+	[XFRM_MSG_GETSA_LEGACY     - XFRM_MSG_BASE] = {
+		.doit = xfrm_get_sa_legacy,
+		.dump = xfrm_dump_sa_legacy,
+		.done = xfrm_dump_sa_done_legacy,
+		.legacy = true,
+	},
+	[XFRM_MSG_NEWPOLICY_LEGACY - XFRM_MSG_BASE] = {
+		.doit = xfrm_add_policy_legacy,
+		.legacy = true,
+	},
+	[XFRM_MSG_UPDPOLICY_LEGACY - XFRM_MSG_BASE] = {
+		.doit = xfrm_add_policy_legacy,
+		.legacy = true,
+	},
+	[XFRM_MSG_DELPOLICY_LEGACY - XFRM_MSG_BASE] = {
+		.doit = xfrm_get_policy_legacy,
+		.legacy = true,
+	},
+	[XFRM_MSG_GETPOLICY_LEGACY - XFRM_MSG_BASE] = {
+		.doit = xfrm_get_policy_legacy,
+		.dump = xfrm_dump_policy_legacy,
+		.done = xfrm_dump_policy_done_legacy,
+		.legacy = true,
+	},
+#endif /* CONFIG_XFRM_USER_LEGACY */
 };
 
 static int xfrm_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
@@ -2432,11 +2515,6 @@ static int xfrm_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	const struct xfrm_link *link;
 	int type, err;
 
-#ifdef CONFIG_COMPAT
-	if (in_compat_syscall())
-		return -EOPNOTSUPP;
-#endif
-
 	type = nlh->nlmsg_type;
 	if (type > XFRM_MSG_MAX)
 		return -EINVAL;
@@ -2444,12 +2522,19 @@ static int xfrm_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	type -= XFRM_MSG_BASE;
 	link = &xfrm_dispatch[type];
 
+#ifdef CONFIG_COMPAT
+	if (link->legacy && in_compat_syscall())
+		return -EOPNOTSUPP;
+#endif
+
 	/* All operations require privileges, even GET */
 	if (!netlink_net_capable(skb, CAP_NET_ADMIN))
 		return -EPERM;
 
 	if ((type == (XFRM_MSG_GETSA - XFRM_MSG_BASE) ||
-	     type == (XFRM_MSG_GETPOLICY - XFRM_MSG_BASE)) &&
+	     type == (XFRM_MSG_GETPOLICY - XFRM_MSG_BASE) ||
+	     type == (XFRM_MSG_GETSA_LEGACY - XFRM_MSG_BASE) ||
+	     type == (XFRM_MSG_GETPOLICY_LEGACY - XFRM_MSG_BASE)) &&
 	    (nlh->nlmsg_flags & NLM_F_DUMP)) {
 		if (link->dump == NULL)
 			return -EINVAL;
@@ -2670,16 +2755,23 @@ out_free_skb:
 static int xfrm_send_state_notify(const struct xfrm_state *x,
 				  const struct km_event *c)
 {
+	int err;
 
 	switch (c->event) {
 	case XFRM_MSG_EXPIRE:
-		return xfrm_exp_state_notify(x, c);
+		err = xfrm_exp_state_notify(x, c);
+		if (err)
+			return err;
+		return xfrm_exp_state_notify_legacy(x, c);
 	case XFRM_MSG_NEWAE:
 		return xfrm_aevent_state_notify(x, c);
 	case XFRM_MSG_DELSA:
 	case XFRM_MSG_UPDSA:
 	case XFRM_MSG_NEWSA:
-		return xfrm_notify_sa(x, c);
+		err = xfrm_notify_sa(x, c);
+		if (err)
+			return err;
+		return xfrm_notify_sa_legacy(x, c);
 	case XFRM_MSG_FLUSHSA:
 		return xfrm_notify_sa_flush(c);
 	default:
@@ -2748,6 +2840,7 @@ static int xfrm_send_acquire(struct xfrm_state *x,
 {
 	struct net *net = xs_net(x);
 	struct sk_buff *skb;
+	int err;
 
 	skb = nlmsg_new(xfrm_acquire_msgsize(x, xp), GFP_ATOMIC);
 	if (skb == NULL)
@@ -2756,7 +2849,11 @@ static int xfrm_send_acquire(struct xfrm_state *x,
 	if (build_acquire(skb, x, xt, xp) < 0)
 		BUG();
 
-	return xfrm_nlmsg_multicast(net, skb, 0, XFRMNLGRP_ACQUIRE);
+	err = xfrm_nlmsg_multicast(net, skb, 0, XFRMNLGRP_ACQUIRE);
+	if (err)
+		return err;
+
+	return xfrm_send_acquire_legacy(x, xt, xp);
 }
 
 /* User gives us xfrm_user_policy_info followed by an array of 0
@@ -2799,6 +2896,16 @@ static struct xfrm_policy *xfrm_compile_policy(struct sock *sk, int opt,
 		return NULL;
 
 	nr = ((len - sizeof(*p)) / sizeof(*ut));
+	if (len == (nr + 1) * sizeof(*ut) + sizeof(*p) - sizeof(u32)) {
+		/* The user passed a legacy xfrm_userpolicy_info struct whose
+		 * length is padded to 32 bits instead of 64, so the above
+		 * division had a remainder.  Adjust the start address and
+		 * count accordingly.
+		 */
+		ut = (void *)data + sizeof(*p) - sizeof(u32);
+		nr++;
+	}
+
 	if (validate_tmpl(nr, ut, p->sel.family))
 		return NULL;
 
@@ -2979,16 +3086,23 @@ static int xfrm_send_policy_notify(const struct xfrm_policy *xp,
 				   int dir,
 				   const struct km_event *c)
 {
+	int err;
 
 	switch (c->event) {
 	case XFRM_MSG_NEWPOLICY:
 	case XFRM_MSG_UPDPOLICY:
 	case XFRM_MSG_DELPOLICY:
-		return xfrm_notify_policy(xp, dir, c);
+		err = xfrm_notify_policy(xp, dir, c);
+		if (err)
+			return err;
+		return xfrm_notify_policy_legacy(xp, dir, c);
 	case XFRM_MSG_FLUSHPOLICY:
 		return xfrm_notify_policy_flush(c);
 	case XFRM_MSG_POLEXPIRE:
-		return xfrm_exp_policy_notify(xp, dir, c);
+		err = xfrm_exp_policy_notify(xp, dir, c);
+		if (err)
+			return err;
+		return xfrm_exp_policy_notify_legacy(xp, dir, c);
 	default:
 		printk(KERN_NOTICE "xfrm_user: Unknown Policy event %d\n",
 		       c->event);

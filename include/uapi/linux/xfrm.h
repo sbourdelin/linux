@@ -1,6 +1,7 @@
 #ifndef _LINUX_XFRM_H
 #define _LINUX_XFRM_H
 
+#include <linux/compiler.h>
 #include <linux/in6.h>
 #include <linux/types.h>
 
@@ -157,34 +158,34 @@ enum {
 enum {
 	XFRM_MSG_BASE = 0x10,
 
-	XFRM_MSG_NEWSA = 0x10,
-#define XFRM_MSG_NEWSA XFRM_MSG_NEWSA
-	XFRM_MSG_DELSA,
-#define XFRM_MSG_DELSA XFRM_MSG_DELSA
-	XFRM_MSG_GETSA,
-#define XFRM_MSG_GETSA XFRM_MSG_GETSA
+	XFRM_MSG_NEWSA_LEGACY = 0x10,
+#define XFRM_MSG_NEWSA_LEGACY XFRM_MSG_NEWSA_LEGACY
+	XFRM_MSG_DELSA_LEGACY,
+#define XFRM_MSG_DELSA_LEGACY XFRM_MSG_DELSA_LEGACY
+	XFRM_MSG_GETSA_LEGACY,
+#define XFRM_MSG_GETSA_LEGACY XFRM_MSG_GETSA_LEGACY
 
-	XFRM_MSG_NEWPOLICY,
-#define XFRM_MSG_NEWPOLICY XFRM_MSG_NEWPOLICY
-	XFRM_MSG_DELPOLICY,
-#define XFRM_MSG_DELPOLICY XFRM_MSG_DELPOLICY
-	XFRM_MSG_GETPOLICY,
-#define XFRM_MSG_GETPOLICY XFRM_MSG_GETPOLICY
+	XFRM_MSG_NEWPOLICY_LEGACY,
+#define XFRM_MSG_NEWPOLICY_LEGACY XFRM_MSG_NEWPOLICY_LEGACY
+	XFRM_MSG_DELPOLICY_LEGACY,
+#define XFRM_MSG_DELPOLICY_LEGACY XFRM_MSG_DELPOLICY_LEGACY
+	XFRM_MSG_GETPOLICY_LEGACY,
+#define XFRM_MSG_GETPOLICY_LEGACY XFRM_MSG_GETPOLICY_LEGACY
 
-	XFRM_MSG_ALLOCSPI,
-#define XFRM_MSG_ALLOCSPI XFRM_MSG_ALLOCSPI
-	XFRM_MSG_ACQUIRE,
-#define XFRM_MSG_ACQUIRE XFRM_MSG_ACQUIRE
-	XFRM_MSG_EXPIRE,
-#define XFRM_MSG_EXPIRE XFRM_MSG_EXPIRE
+	XFRM_MSG_ALLOCSPI_LEGACY,
+#define XFRM_MSG_ALLOCSPI_LEGACY XFRM_MSG_ALLOCSPI_LEGACY
+	XFRM_MSG_ACQUIRE_LEGACY,
+#define XFRM_MSG_ACQUIRE_LEGACY XFRM_MSG_ACQUIRE_LEGACY
+	XFRM_MSG_EXPIRE_LEGACY,
+#define XFRM_MSG_EXPIRE_LEGACY XFRM_MSG_EXPIRE_LEGACY
 
-	XFRM_MSG_UPDPOLICY,
-#define XFRM_MSG_UPDPOLICY XFRM_MSG_UPDPOLICY
-	XFRM_MSG_UPDSA,
-#define XFRM_MSG_UPDSA XFRM_MSG_UPDSA
+	XFRM_MSG_UPDPOLICY_LEGACY,
+#define XFRM_MSG_UPDPOLICY_LEGACY XFRM_MSG_UPDPOLICY_LEGACY
+	XFRM_MSG_UPDSA_LEGACY,
+#define XFRM_MSG_UPDSA_LEGACY XFRM_MSG_UPDSA_LEGACY
 
-	XFRM_MSG_POLEXPIRE,
-#define XFRM_MSG_POLEXPIRE XFRM_MSG_POLEXPIRE
+	XFRM_MSG_POLEXPIRE_LEGACY,
+#define XFRM_MSG_POLEXPIRE_LEGACY XFRM_MSG_POLEXPIRE_LEGACY
 
 	XFRM_MSG_FLUSHSA,
 #define XFRM_MSG_FLUSHSA XFRM_MSG_FLUSHSA
@@ -214,6 +215,34 @@ enum {
 
 	XFRM_MSG_MAPPING,
 #define XFRM_MSG_MAPPING XFRM_MSG_MAPPING
+
+	XFRM_MSG_ALLOCSPI,
+#define XFRM_MSG_ALLOCSPI XFRM_MSG_ALLOCSPI
+	XFRM_MSG_ACQUIRE,
+#define XFRM_MSG_ACQUIRE XFRM_MSG_ACQUIRE
+	XFRM_MSG_EXPIRE,
+#define XFRM_MSG_EXPIRE XFRM_MSG_EXPIRE
+	XFRM_MSG_POLEXPIRE,
+#define XFRM_MSG_POLEXPIRE XFRM_MSG_POLEXPIRE
+
+	XFRM_MSG_NEWSA,
+#define XFRM_MSG_NEWSA XFRM_MSG_NEWSA
+	XFRM_MSG_UPDSA,
+#define XFRM_MSG_UPDSA XFRM_MSG_UPDSA
+	XFRM_MSG_DELSA,
+#define XFRM_MSG_DELSA XFRM_MSG_DELSA
+	XFRM_MSG_GETSA,
+#define XFRM_MSG_GETSA XFRM_MSG_GETSA
+
+	XFRM_MSG_NEWPOLICY,
+#define XFRM_MSG_NEWPOLICY XFRM_MSG_NEWPOLICY
+	XFRM_MSG_UPDPOLICY,
+#define XFRM_MSG_UPDPOLICY XFRM_MSG_UPDPOLICY
+	XFRM_MSG_DELPOLICY,
+#define XFRM_MSG_DELPOLICY XFRM_MSG_DELPOLICY
+	XFRM_MSG_GETPOLICY,
+#define XFRM_MSG_GETPOLICY XFRM_MSG_GETPOLICY
+
 	__XFRM_MSG_MAX
 };
 #define XFRM_MSG_MAX (__XFRM_MSG_MAX - 1)
@@ -221,7 +250,7 @@ enum {
 #define XFRM_NR_MSGTYPES (XFRM_MSG_MAX + 1 - XFRM_MSG_BASE)
 
 /*
- * Generic LSM security context for comunicating to user space
+ * Generic LSM security context for communicating to user space
  * NOTE: Same format as sadb_x_sec_ctx
  */
 struct xfrm_user_sec_ctx {
@@ -357,6 +386,22 @@ struct xfrmu_spdhthresh {
 	__u8 rbits;
 };
 
+/* Legacy structs are incompatible between 32-bit and 64-bit. */
+struct xfrm_usersa_info_legacy {
+	struct xfrm_selector		sel;
+	struct xfrm_id			id;
+	xfrm_address_t			saddr;
+	struct xfrm_lifetime_cfg	lft;
+	struct xfrm_lifetime_cur	curlft;
+	struct xfrm_stats		stats;
+	__u32				seq;
+	__u32				reqid;
+	__u16				family;
+	__u8				mode;		/* XFRM_MODE_xxx */
+	__u8				replay_window;
+	__u8				flags;
+};
+
 struct xfrm_usersa_info {
 	struct xfrm_selector		sel;
 	struct xfrm_id			id;
@@ -378,7 +423,8 @@ struct xfrm_usersa_info {
 #define XFRM_STATE_AF_UNSPEC	32
 #define XFRM_STATE_ALIGN4	64
 #define XFRM_STATE_ESN		128
-};
+	__u8				reserved[7];
+} __packed;
 
 #define XFRM_SA_XFLAG_DONT_ENCAP_DSCP	1
 
@@ -396,10 +442,28 @@ struct xfrm_aevent_id {
 	__u32				reqid;
 };
 
+struct xfrm_userspi_info_legacy {
+	struct xfrm_usersa_info_legacy	info;
+	__u32				min;
+	__u32				max;
+};
+
 struct xfrm_userspi_info {
 	struct xfrm_usersa_info		info;
 	__u32				min;
 	__u32				max;
+} __packed;
+
+struct xfrm_userpolicy_info_legacy {
+	struct xfrm_selector		sel;
+	struct xfrm_lifetime_cfg	lft;
+	struct xfrm_lifetime_cur	curlft;
+	__u32				priority;
+	__u32				index;
+	__u8				dir;
+	__u8				action;
+	__u8				flags;
+	__u8				share;
 };
 
 struct xfrm_userpolicy_info {
@@ -417,12 +481,24 @@ struct xfrm_userpolicy_info {
 	/* Automatically expand selector to include matching ICMP payloads. */
 #define XFRM_POLICY_ICMP	2
 	__u8				share;
-};
+	__u8				reserved[4];
+} __packed;
 
 struct xfrm_userpolicy_id {
 	struct xfrm_selector		sel;
 	__u32				index;
 	__u8				dir;
+};
+
+struct xfrm_user_acquire_legacy {
+	struct xfrm_id				id;
+	xfrm_address_t				saddr;
+	struct xfrm_selector			sel;
+	struct xfrm_userpolicy_info_legacy	policy;
+	__u32					aalgos;
+	__u32					ealgos;
+	__u32					calgos;
+	__u32					seq;
 };
 
 struct xfrm_user_acquire {
@@ -434,17 +510,29 @@ struct xfrm_user_acquire {
 	__u32				ealgos;
 	__u32				calgos;
 	__u32				seq;
+} __packed;
+
+struct xfrm_user_expire_legacy {
+	struct xfrm_usersa_info_legacy	state;
+	__u8				hard;
 };
 
 struct xfrm_user_expire {
 	struct xfrm_usersa_info		state;
 	__u8				hard;
+	__u8				reserved[7];
+} __packed;
+
+struct xfrm_user_polexpire_legacy {
+	struct xfrm_userpolicy_info_legacy	pol;
+	__u8					hard;
 };
 
 struct xfrm_user_polexpire {
 	struct xfrm_userpolicy_info	pol;
 	__u8				hard;
-};
+	__u8				reserved[7];
+} __packed;
 
 struct xfrm_usersa_flush {
 	__u8				proto;
