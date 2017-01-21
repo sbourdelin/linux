@@ -440,6 +440,8 @@ static void dsa_dst_unapply(struct dsa_switch_tree *dst)
 
 	pr_info("DSA: tree %d unapplied\n", dst->tree);
 	dst->applied = false;
+
+	dev_put(dst->master_netdev);
 }
 
 static int dsa_cpu_parse(struct device_node *port, u32 index,
@@ -458,6 +460,8 @@ static int dsa_cpu_parse(struct device_node *port, u32 index,
 	if (!ethernet_dev)
 		return -EPROBE_DEFER;
 
+	dev_hold(ethernet_dev);
+
 	if (!ds->master_netdev)
 		ds->master_netdev = ethernet_dev;
 
@@ -473,6 +477,7 @@ static int dsa_cpu_parse(struct device_node *port, u32 index,
 	dst->tag_ops = dsa_resolve_tag_protocol(tag_protocol);
 	if (IS_ERR(dst->tag_ops)) {
 		dev_warn(ds->dev, "No tagger for this switch\n");
+		dev_put(ethernet_dev);
 		return PTR_ERR(dst->tag_ops);
 	}
 
