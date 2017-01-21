@@ -460,6 +460,13 @@ config BACKLIGHT_BD6107
 	help
 	  If you have a Rohm BD6107 say Y to enable the backlight driver.
 
+config BACKLIGHT_DDCCI
+	tristate "VESA DDC/CI MCCS brightness driver"
+	depends on BACKLIGHT_CLASS_DEVICE && I2C
+	default m
+	help
+	  This supports brightness control via VESA DDC/CI MCCS.
+
 endif # BACKLIGHT_CLASS_DEVICE
 
 endif # BACKLIGHT_LCD_SUPPORT
