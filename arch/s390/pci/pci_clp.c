@@ -517,10 +517,9 @@ static int clp_normal_command(struct clp_req *req)
 	if (req->lps != 0 && req->lps != 2)
 		return -EINVAL;
 
-	rc = -ENOMEM;
 	lpcb = clp_alloc_block(GFP_KERNEL);
 	if (!lpcb)
-		goto out;
+		return -ENOMEM;
 
 	rc = -EFAULT;
 	uptr = (void __force __user *)(unsigned long) req->data_p;
@@ -550,7 +549,6 @@ static int clp_normal_command(struct clp_req *req)
 
 out_free:
 	clp_free_block(lpcb);
-out:
 	return rc;
 }
 
